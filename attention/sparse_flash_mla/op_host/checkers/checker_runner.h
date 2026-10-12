@@ -24,15 +24,15 @@ public:
     ~CheckerRunner() = default;
 
     void Add(std::unique_ptr<BaseChecker> checker);
-    ge::graphStatus Process(const CheckContext &context) const;
+    ge::graphStatus Process(const CheckContext& context) const;
 
 private:
-    using CheckMethod = ge::graphStatus (BaseChecker::*)(const CheckContext &) const;
-    ge::graphStatus Run(CheckMethod method, const CheckContext &context) const;
+    using CheckMethod = ge::graphStatus (BaseChecker::*)(const CheckContext&) const;
+    ge::graphStatus Run(CheckMethod method, const CheckContext& context) const;
     std::vector<std::unique_ptr<BaseChecker>> checkers_;
 };
 
-void RegisterCommonCheckers(CheckerRunner &runner);
+void RegisterCommonCheckers(CheckerRunner& runner);
 
 } // namespace sparse_mla_checker
 } // namespace optiling

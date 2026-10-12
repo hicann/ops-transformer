@@ -24,17 +24,17 @@ class SparseFlashAttentionGradPostRegbase {
 public:
     __aicore__ inline SparseFlashAttentionGradPostRegbase(){};
     __aicore__ inline void Init(
-        __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dqRope, __gm__ uint8_t *dkRope,
-        __gm__ uint8_t *workspace,
-        const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase *__restrict ordTilingData, TPipe *pipe_in);
+        __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* dqRope, __gm__ uint8_t* dkRope,
+        __gm__ uint8_t* workspace,
+        const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase* __restrict ordTilingData, TPipe* pipe_in);
     __aicore__ inline void Process();
 
     constexpr static uint32_t ADDR_ALIGN_SIZE = 512;
     uint32_t REGBASE_POST_BASE = 128 * 128;
     uint32_t ROPE_DIM = 64;
     uint32_t VALUE_DIM = 512;
-    TPipe *pipe;
-    const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase *__restrict tilingData;
+    TPipe* pipe;
+    const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase* __restrict tilingData;
     TQue<QuePosition::VECIN, 1> inQueuePing;
     TQue<QuePosition::VECOUT, 1> outQueuePing;
     TQue<QuePosition::VECIN, 1> inQueuePong;
@@ -51,33 +51,33 @@ public:
 
 template <typename T1, typename T2, typename OUTDTYPE, bool IS_ROPE, const bool IS_TND, const bool KV_MERGE>
 __aicore__ inline void SparseFlashAttentionGradPostRegbase<T1, T2, OUTDTYPE, IS_ROPE, IS_TND, KV_MERGE>::Init(
-    __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dqRope, __gm__ uint8_t *dkRope,
-    __gm__ uint8_t *workspace,
-    const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase *__restrict ordTilingData, TPipe *pipe_in)
+    __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* dqRope, __gm__ uint8_t* dkRope,
+    __gm__ uint8_t* workspace,
+    const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase* __restrict ordTilingData, TPipe* pipe_in)
 {
     vBlockIdx = GetBlockIdx();
     tilingData = ordTilingData;
     pipe = pipe_in;
 
-    dqkv[0].SetGlobalBuffer((__gm__ OUTDTYPE *)dq);
-    dqkv[1].SetGlobalBuffer((__gm__ OUTDTYPE *)dk);
+    dqkv[0].SetGlobalBuffer((__gm__ OUTDTYPE*)dq);
+    dqkv[1].SetGlobalBuffer((__gm__ OUTDTYPE*)dk);
     if constexpr (!KV_MERGE) {
-        dqkv[2].SetGlobalBuffer((__gm__ OUTDTYPE *)dv);
+        dqkv[2].SetGlobalBuffer((__gm__ OUTDTYPE*)dv);
     }
 
-    dqkRope[0].SetGlobalBuffer((__gm__ OUTDTYPE *)dqRope);
-    dqkRope[1].SetGlobalBuffer((__gm__ OUTDTYPE *)dkRope);
+    dqkRope[0].SetGlobalBuffer((__gm__ OUTDTYPE*)dqRope);
+    dqkRope[1].SetGlobalBuffer((__gm__ OUTDTYPE*)dkRope);
 
     loop = tilingData->postTilingData.qPostBlockFactor;
     inputTotalSize = tilingData->postTilingData.qPostBlockTotal;
     qPostTailNum = tilingData->postTilingData.qPostTailNum;
 
-    dqkvWorkspace[0].SetGlobalBuffer((__gm__ float *)workspace +
+    dqkvWorkspace[0].SetGlobalBuffer((__gm__ float*)workspace +
                                      tilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
-    dqkvWorkspace[1].SetGlobalBuffer((__gm__ float *)workspace +
+    dqkvWorkspace[1].SetGlobalBuffer((__gm__ float*)workspace +
                                      tilingData->postTilingData.dkWorkSpaceOffset / sizeof(T2));
     if constexpr (!KV_MERGE) {
-        dqkvWorkspace[2].SetGlobalBuffer((__gm__ float *)workspace +
+        dqkvWorkspace[2].SetGlobalBuffer((__gm__ float*)workspace +
                                          tilingData->postTilingData.dvWorkSpaceOffset / sizeof(T2));
     }
 

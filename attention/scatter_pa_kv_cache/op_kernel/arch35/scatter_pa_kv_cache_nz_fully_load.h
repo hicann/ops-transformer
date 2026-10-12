@@ -24,7 +24,7 @@ using namespace AscendC;
 template <typename T1, typename T2, typename IndexDtype, int64_t InOutMode>
 class ScatterPaKvCacheNzFullyLoad {
 public:
-    __aicore__ inline ScatterPaKvCacheNzFullyLoad(TPipe *pipe, const ScatterPaKvCacheTilingData *__restrict tiling)
+    __aicore__ inline ScatterPaKvCacheNzFullyLoad(TPipe* pipe, const ScatterPaKvCacheTilingData* __restrict tiling)
         : pipe_(pipe),
           tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR key, GM_ADDR slot_mapping, GM_ADDR value, GM_ADDR key_cache_out,
@@ -39,7 +39,7 @@ private:
     int32_t lastDimK_{0};
     int32_t lastDimV_{0};
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, 1> inputKeyQueue_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, 1> inputValueQueue_;
 
@@ -49,7 +49,7 @@ private:
     GlobalTensor<T2> outputValueCacheGm_;
     GlobalTensor<IndexDtype> slotMappingGm_;
 
-    const ScatterPaKvCacheTilingData *tilingData_;
+    const ScatterPaKvCacheTilingData* tilingData_;
 };
 
 template <typename T1, typename T2, typename IndexDtype, int64_t InOutMode>
@@ -63,13 +63,13 @@ __aicore__ inline void ScatterPaKvCacheNzFullyLoad<T1, T2, IndexDtype, InOutMode
     tokenSizeV_ = tilingData_->numHead * tilingData_->vHeadSize;
     lastDimK_ = BLOCK_SIZE / sizeof(T1);
     lastDimV_ = BLOCK_SIZE / sizeof(T2);
-    inputKeyGm_.SetGlobalBuffer((__gm__ T1 *)(key));
-    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype *)(slot_mapping));
-    outputKeyCacheGm_.SetGlobalBuffer((__gm__ T1 *)(key_cache_out));
+    inputKeyGm_.SetGlobalBuffer((__gm__ T1*)(key));
+    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype*)(slot_mapping));
+    outputKeyCacheGm_.SetGlobalBuffer((__gm__ T1*)(key_cache_out));
     pipe_->InitBuffer(inputKeyQueue_, 1, tokenSizeK_ * sizeof(T1));
     if constexpr (InOutMode == DUAL_IN_OUT) {
-        inputValueGm_.SetGlobalBuffer((__gm__ T2 *)(value));
-        outputValueCacheGm_.SetGlobalBuffer((__gm__ T2 *)(value_cache_out));
+        inputValueGm_.SetGlobalBuffer((__gm__ T2*)(value));
+        outputValueCacheGm_.SetGlobalBuffer((__gm__ T2*)(value_cache_out));
         pipe_->InitBuffer(inputValueQueue_, 1, tokenSizeV_ * sizeof(T2));
     }
 }

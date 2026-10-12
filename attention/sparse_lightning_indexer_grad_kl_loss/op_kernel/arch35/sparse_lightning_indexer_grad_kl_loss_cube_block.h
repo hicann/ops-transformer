@@ -23,7 +23,7 @@ using T = float;
 TEMPLATES_DEF
 class SligKlLossBlockCube {
 public:
-    TPipe *pipe;
+    TPipe* pipe;
     constexpr static uint32_t QUERY_BUFFER_SIZE = 128 * 576 * 2;
     constexpr static uint32_t QUERY_INDEX_BUFFER_SIZE = 64 * 128 * 2;
     constexpr static uint32_t MM4_GATHER_BUFFER_SIZE = 128 * 128 * 2;
@@ -54,7 +54,7 @@ public:
 
     /* =====================LocalBuffer变量==================== */
 
-    BufferManager<BufferType::L1> *l1BufferManagerPtr;
+    BufferManager<BufferType::L1>* l1BufferManagerPtr;
     BuffersPolicySingleBuffer<BufferType::L1> queryBuf;
     BuffersPolicySingleBuffer<BufferType::L1> sYQueryL1Buf;
     BuffersPolicySingleBuffer<BufferType::L1> sYGatherResBuf; // mm4右矩阵用
@@ -71,43 +71,43 @@ public:
     SLIGradKLLossConstInfo constInfo{};
 
     __aicore__ inline SligKlLossBlockCube(){};
-    __aicore__ inline void SetCubeBlockParams(TPipe *tPipe, BufferManager<BufferType::L1> *l1BuffMgr);
+    __aicore__ inline void SetCubeBlockParams(TPipe* tPipe, BufferManager<BufferType::L1>* l1BuffMgr);
     __aicore__ inline void InitCubeBuffers();
     __aicore__ inline void InitGlobalBuffer(GM_ADDR query, GM_ADDR queryIndex, GM_ADDR queryRope, GM_ADDR dQueryIndex,
-                                            GlobalTensor<T> &bmm2Res, GlobalTensor<INPUT_T> &gatherSYResGm,
-                                            GlobalTensor<T> &bmm3ResGm);
-    __aicore__ inline void ComputeMmP(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm1ResBuf,
-                                      BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &sYL1Buf,
-                                      SLIGradKLLossRunInfo &runInfo, SLIGradKLLossConstInfo &constInfo,
-                                      SLIGradKLLossKRunInfo &pRunInfo);
-    __aicore__ inline void ComputeMmSy(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm2ResBuf,
-                                       BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &sYL1Buf,
-                                       SLIGradKLLossRunInfo &runInfo, SLIGradKLLossConstInfo &constInfo,
-                                       SLIGradKLLossKRunInfo &syRunInfo);
-    __aicore__ inline void ComputeMm3(BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm3Buf,
-                                      Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &reluGradResL1Buf,
-                                      SLIGradKLLossRunInfo &runInfo, SLIGradKLLossConstInfo &constInfo,
-                                      SLIGradKLLossKRunInfo &pRunInfo);
-    __aicore__ inline void ComputeMm4(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &reluGradResL1Buf,
-                                      SLIGradKLLossRunInfo &runInfo, SLIGradKLLossConstInfo &constInfo,
-                                      SLIGradKLLossKRunInfo &pRunInfo, bool isFixOut);
+                                            GlobalTensor<T>& bmm2Res, GlobalTensor<INPUT_T>& gatherSYResGm,
+                                            GlobalTensor<T>& bmm3ResGm);
+    __aicore__ inline void ComputeMmP(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm1ResBuf,
+                                      BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& sYL1Buf,
+                                      SLIGradKLLossRunInfo& runInfo, SLIGradKLLossConstInfo& constInfo,
+                                      SLIGradKLLossKRunInfo& pRunInfo);
+    __aicore__ inline void ComputeMmSy(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm2ResBuf,
+                                       BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& sYL1Buf,
+                                       SLIGradKLLossRunInfo& runInfo, SLIGradKLLossConstInfo& constInfo,
+                                       SLIGradKLLossKRunInfo& syRunInfo);
+    __aicore__ inline void ComputeMm3(BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm3Buf,
+                                      Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& reluGradResL1Buf,
+                                      SLIGradKLLossRunInfo& runInfo, SLIGradKLLossConstInfo& constInfo,
+                                      SLIGradKLLossKRunInfo& pRunInfo);
+    __aicore__ inline void ComputeMm4(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& reluGradResL1Buf,
+                                      SLIGradKLLossRunInfo& runInfo, SLIGradKLLossConstInfo& constInfo,
+                                      SLIGradKLLossKRunInfo& pRunInfo, bool isFixOut);
 
 private:
-    __aicore__ inline void CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor, GlobalTensor<INPUT_T> &gmSrcTensor, uint32_t srcN,
+    __aicore__ inline void CopyGmToL1(LocalTensor<INPUT_T>& l1Tensor, GlobalTensor<INPUT_T>& gmSrcTensor, uint32_t srcN,
                                       uint32_t srcD, uint32_t srcDstride);
-    __aicore__ inline void CopyInMm1AToL1(LocalTensor<INPUT_T> &l1Tensor, const SLIGradKLLossRunInfo &info,
-                                          SLIGradKLLossConstInfo &constInfo);
-    __aicore__ inline void CopyInMm1ARopeToL1(LocalTensor<INPUT_T> &l1Tensor, const SLIGradKLLossRunInfo &info,
-                                              SLIGradKLLossConstInfo &constInfo);
-    __aicore__ inline void CopyInMm2AToL1(LocalTensor<INPUT_T> &l1Tensor, const SLIGradKLLossRunInfo &info,
-                                          SLIGradKLLossConstInfo &constInfo);
-    __aicore__ inline void CopyInMm4BToL1(LocalTensor<INPUT_T> &l1Tensor, uint64_t gatherOffset, uint32_t mSizeAct,
+    __aicore__ inline void CopyInMm1AToL1(LocalTensor<INPUT_T>& l1Tensor, const SLIGradKLLossRunInfo& info,
+                                          SLIGradKLLossConstInfo& constInfo);
+    __aicore__ inline void CopyInMm1ARopeToL1(LocalTensor<INPUT_T>& l1Tensor, const SLIGradKLLossRunInfo& info,
+                                              SLIGradKLLossConstInfo& constInfo);
+    __aicore__ inline void CopyInMm2AToL1(LocalTensor<INPUT_T>& l1Tensor, const SLIGradKLLossRunInfo& info,
+                                          SLIGradKLLossConstInfo& constInfo);
+    __aicore__ inline void CopyInMm4BToL1(LocalTensor<INPUT_T>& l1Tensor, uint64_t gatherOffset, uint32_t mSizeAct,
                                           uint32_t realDSize, uint32_t headOffset);
 };
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::SetCubeBlockParams(TPipe *tPipe,
-                                                                              BufferManager<BufferType::L1> *l1BuffMgr)
+__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::SetCubeBlockParams(TPipe* tPipe,
+                                                                              BufferManager<BufferType::L1>* l1BuffMgr)
 {
     this->pipe = tPipe;
     this->l1BufferManagerPtr = l1BuffMgr;
@@ -136,22 +136,22 @@ __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::InitCubeBuffers()
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::InitGlobalBuffer(GM_ADDR query, GM_ADDR queryIndex,
                                                                             GM_ADDR queryRope, GM_ADDR dQueryIndex,
-                                                                            GlobalTensor<T> &bmm2Res,
-                                                                            GlobalTensor<INPUT_T> &gatherSYResGm,
-                                                                            GlobalTensor<T> &bmm3ResGm)
+                                                                            GlobalTensor<T>& bmm2Res,
+                                                                            GlobalTensor<INPUT_T>& gatherSYResGm,
+                                                                            GlobalTensor<T>& bmm3ResGm)
 {
-    queryGm.SetGlobalBuffer((__gm__ INPUT_T *)query);
-    queryIndexGm.SetGlobalBuffer((__gm__ INPUT_T *)queryIndex);
-    qRopeGm.SetGlobalBuffer((__gm__ INPUT_T *)queryRope);
-    mm4ResGm.SetGlobalBuffer((__gm__ OUT_T *)dQueryIndex);
+    queryGm.SetGlobalBuffer((__gm__ INPUT_T*)query);
+    queryIndexGm.SetGlobalBuffer((__gm__ INPUT_T*)queryIndex);
+    qRopeGm.SetGlobalBuffer((__gm__ INPUT_T*)queryRope);
+    mm4ResGm.SetGlobalBuffer((__gm__ OUT_T*)dQueryIndex);
     this->mm3DeterResGm = bmm3ResGm;
     this->mm2ResGm = bmm2Res;
     this->gatherSYResGm = gatherSYResGm;
 };
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::CopyGmToL1(LocalTensor<INPUT_T> &l1Tensor,
-                                                                      GlobalTensor<INPUT_T> &gmSrcTensor, uint32_t srcN,
+__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::CopyGmToL1(LocalTensor<INPUT_T>& l1Tensor,
+                                                                      GlobalTensor<INPUT_T>& gmSrcTensor, uint32_t srcN,
                                                                       uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;
@@ -167,34 +167,34 @@ __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::CopyGmToL1(LocalTenso
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::CopyInMm1AToL1(LocalTensor<INPUT_T> &l1Tensor,
-                                                                          const SLIGradKLLossRunInfo &info,
-                                                                          SLIGradKLLossConstInfo &constInfo)
+__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::CopyInMm1AToL1(LocalTensor<INPUT_T>& l1Tensor,
+                                                                          const SLIGradKLLossRunInfo& info,
+                                                                          SLIGradKLLossConstInfo& constInfo)
 {
     auto srcGm = queryGm[info.queryTensorOffset];
     CopyGmToL1(l1Tensor, srcGm, constInfo.gSizeQuery, constInfo.dSizeQuery, constInfo.dSizeQuery);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::CopyInMm1ARopeToL1(LocalTensor<INPUT_T> &l1Tensor,
-                                                                              const SLIGradKLLossRunInfo &info,
-                                                                              SLIGradKLLossConstInfo &constInfo)
+__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::CopyInMm1ARopeToL1(LocalTensor<INPUT_T>& l1Tensor,
+                                                                              const SLIGradKLLossRunInfo& info,
+                                                                              SLIGradKLLossConstInfo& constInfo)
 {
     auto srcGm = qRopeGm[info.queryRopeTensorOffset];
     CopyGmToL1(l1Tensor, srcGm, constInfo.gSizeQuery, constInfo.dSizeQueryRope, constInfo.dSizeQueryRope);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::CopyInMm2AToL1(LocalTensor<INPUT_T> &l1Tensor,
-                                                                          const SLIGradKLLossRunInfo &info,
-                                                                          SLIGradKLLossConstInfo &constInfo)
+__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::CopyInMm2AToL1(LocalTensor<INPUT_T>& l1Tensor,
+                                                                          const SLIGradKLLossRunInfo& info,
+                                                                          SLIGradKLLossConstInfo& constInfo)
 {
     auto srcGm = queryIndexGm[info.queryIndexTensorOffset];
     CopyGmToL1(l1Tensor, srcGm, constInfo.gSizeQueryIndex, constInfo.dSizeQueryIndex, constInfo.dSizeQueryIndex);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::CopyInMm4BToL1(LocalTensor<INPUT_T> &l1Tensor,
+__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::CopyInMm4BToL1(LocalTensor<INPUT_T>& l1Tensor,
                                                                           uint64_t gatherOffset, uint32_t mSizeAct,
                                                                           uint32_t realDSize, uint32_t headOffset)
 {
@@ -203,9 +203,9 @@ __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::CopyInMm4BToL1(LocalT
 }
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::ComputeMmP(
-    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm1ResBuf,
-    BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &sYL1Buf, SLIGradKLLossRunInfo &runInfo,
-    SLIGradKLLossConstInfo &constInfo, SLIGradKLLossKRunInfo &pRunInfo)
+    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm1ResBuf,
+    BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& sYL1Buf, SLIGradKLLossRunInfo& runInfo,
+    SLIGradKLLossConstInfo& constInfo, SLIGradKLLossKRunInfo& pRunInfo)
 {
     uint32_t dSizeTotal = HAS_ROPE ? constInfo.dSizeQuery + constInfo.dSizeQueryRope : constInfo.dSizeQuery; // 576
     uint32_t dLoopTimes = (dSizeTotal + 127) / K_SPLIT_SIZE;                                                 // 5
@@ -270,9 +270,9 @@ __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::ComputeMmP(
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::ComputeMmSy(
-    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm2ResBuf,
-    BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &sYL1Buf, SLIGradKLLossRunInfo &runInfo,
-    SLIGradKLLossConstInfo &constInfo, SLIGradKLLossKRunInfo &syRunInfo)
+    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm2ResBuf,
+    BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& sYL1Buf, SLIGradKLLossRunInfo& runInfo,
+    SLIGradKLLossConstInfo& constInfo, SLIGradKLLossKRunInfo& syRunInfo)
 {
     uint32_t dSize = constInfo.dSizeQueryIndex;                          // 128
     uint32_t kSize = syRunInfo.kProcessSize;                             // 2048 / 256
@@ -338,9 +338,9 @@ __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::ComputeMmSy(
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::ComputeMm3(
-    BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm3Buf,
-    Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &reluGradResL1Buf, SLIGradKLLossRunInfo &runInfo,
-    SLIGradKLLossConstInfo &constInfo, SLIGradKLLossKRunInfo &pRunInfo)
+    BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm3Buf,
+    Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& reluGradResL1Buf, SLIGradKLLossRunInfo& runInfo,
+    SLIGradKLLossConstInfo& constInfo, SLIGradKLLossKRunInfo& pRunInfo)
 {
     uint32_t kSize = pRunInfo.kProcessSize;                             // 2048
     uint32_t kLoopTimes = CeilDiv(kSize, VEC_P_BASESIZE);               // 循环次数，循环累计kSize行搬出UB
@@ -407,8 +407,8 @@ __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::ComputeMm3(
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::ComputeMm4(
-    Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &reluGradResL1Buf, SLIGradKLLossRunInfo &runInfo,
-    SLIGradKLLossConstInfo &constInfo, SLIGradKLLossKRunInfo &pRunInfo, bool isFixOut)
+    Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& reluGradResL1Buf, SLIGradKLLossRunInfo& runInfo,
+    SLIGradKLLossConstInfo& constInfo, SLIGradKLLossKRunInfo& pRunInfo, bool isFixOut)
 {
     uint32_t kSize = pRunInfo.kProcessSize;                             // 2048
     uint32_t kLoopTimes = CeilDiv(kSize, VEC_P_BASESIZE);               // 循环次数，循环累计kSize行搬出UB
@@ -473,26 +473,26 @@ TEMPLATES_DEF
 class SligKlLossBlockCubeDummy {
 public:
     __aicore__ inline SligKlLossBlockCubeDummy(){};
-    __aicore__ inline void SetCubeBlockParams(TPipe *tPipe, BufferManager<BufferType::L1> *l1BuffMgr) {};
+    __aicore__ inline void SetCubeBlockParams(TPipe* tPipe, BufferManager<BufferType::L1>* l1BuffMgr) {};
     __aicore__ inline void InitCubeBuffers() {};
     __aicore__ inline void InitGlobalBuffer(GM_ADDR query, GM_ADDR queryIndex, GM_ADDR queryRope, GM_ADDR dQueryIndex,
-                                            GlobalTensor<T> &bmm2Res, GlobalTensor<INPUT_T> &gatherSYResGm,
-                                            GlobalTensor<T> &bmm3ResGm) {};
-    __aicore__ inline void ComputeMmP(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm1ResBuf,
-                                      BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &sYL1Buf,
-                                      SLIGradKLLossRunInfo &runInfo, SLIGradKLLossConstInfo &constInfo,
-                                      SLIGradKLLossKRunInfo &pRunInfo) {};
-    __aicore__ inline void ComputeMmSy(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm2ResBuf,
-                                       BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &sYL1Buf,
-                                       SLIGradKLLossRunInfo &runInfo, SLIGradKLLossConstInfo &constInfo,
-                                       SLIGradKLLossKRunInfo &syRunInfo) {};
-    __aicore__ inline void ComputeMm3(BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm3Buf,
-                                      Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &reluGradResL1Buf,
-                                      SLIGradKLLossRunInfo &runInfo, SLIGradKLLossConstInfo &constInfo,
-                                      SLIGradKLLossKRunInfo &pRunInfo) {};
-    __aicore__ inline void ComputeMm4(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH> &reluGradResL1Buf,
-                                      SLIGradKLLossRunInfo &runInfo, SLIGradKLLossConstInfo &constInfo,
-                                      SLIGradKLLossKRunInfo &pRunInfo, bool isFixOut) {};
+                                            GlobalTensor<T>& bmm2Res, GlobalTensor<INPUT_T>& gatherSYResGm,
+                                            GlobalTensor<T>& bmm3ResGm) {};
+    __aicore__ inline void ComputeMmP(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm1ResBuf,
+                                      BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& sYL1Buf,
+                                      SLIGradKLLossRunInfo& runInfo, SLIGradKLLossConstInfo& constInfo,
+                                      SLIGradKLLossKRunInfo& pRunInfo) {};
+    __aicore__ inline void ComputeMmSy(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm2ResBuf,
+                                       BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& sYL1Buf,
+                                       SLIGradKLLossRunInfo& runInfo, SLIGradKLLossConstInfo& constInfo,
+                                       SLIGradKLLossKRunInfo& syRunInfo) {};
+    __aicore__ inline void ComputeMm3(BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm3Buf,
+                                      Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& reluGradResL1Buf,
+                                      SLIGradKLLossRunInfo& runInfo, SLIGradKLLossConstInfo& constInfo,
+                                      SLIGradKLLossKRunInfo& pRunInfo) {};
+    __aicore__ inline void ComputeMm4(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& reluGradResL1Buf,
+                                      SLIGradKLLossRunInfo& runInfo, SLIGradKLLossConstInfo& constInfo,
+                                      SLIGradKLLossKRunInfo& pRunInfo, bool isFixOut) {};
 };
 
 template <typename T>

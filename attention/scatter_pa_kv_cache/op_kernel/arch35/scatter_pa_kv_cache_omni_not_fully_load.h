@@ -24,7 +24,7 @@ using namespace AscendC;
 template <typename T, typename IndexDtype, int64_t InOutMode>
 class ScatterPaKvCacheOmniNotFullyLoad {
 public:
-    __aicore__ inline ScatterPaKvCacheOmniNotFullyLoad(TPipe *pipe, const ScatterPaKvCacheTilingData *__restrict tiling)
+    __aicore__ inline ScatterPaKvCacheOmniNotFullyLoad(TPipe* pipe, const ScatterPaKvCacheTilingData* __restrict tiling)
         : pipe_(pipe),
           tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR key, GM_ADDR key_cache_in, GM_ADDR slot_mapping, GM_ADDR value,
@@ -44,7 +44,7 @@ private:
     __aicore__ inline void UpdateValueCache(int64_t k, int64_t startIdx, int64_t valueOffset);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, 1> inputKeyQueue_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, 1> inputValueQueue_;
     int64_t keyBlockOffset_{0};
@@ -61,7 +61,7 @@ private:
     GlobalTensor<IndexDtype> compressSeqOffsetGm_;
     GlobalTensor<IndexDtype> compressLensGm_;
     GlobalTensor<IndexDtype> seqLensGm_;
-    const ScatterPaKvCacheTilingData *tilingData_;
+    const ScatterPaKvCacheTilingData* tilingData_;
 };
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
@@ -72,14 +72,14 @@ __aicore__ inline void ScatterPaKvCacheOmniNotFullyLoad<T, IndexDtype, InOutMode
 {
     blockIdx_ = GetBlockIdx();
     kvBlockOffset_ = GetBlockIdx() * tilingData_->blockFactor;
-    inputKeyGm_.SetGlobalBuffer((__gm__ T *)(key));
+    inputKeyGm_.SetGlobalBuffer((__gm__ T*)(key));
 
-    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype *)(slot_mapping) + GetBlockIdx() * tilingData_->blockFactor);
-    compressSeqOffsetGm_.SetGlobalBuffer((__gm__ IndexDtype *)(compress_seq_offset) +
+    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype*)(slot_mapping) + GetBlockIdx() * tilingData_->blockFactor);
+    compressSeqOffsetGm_.SetGlobalBuffer((__gm__ IndexDtype*)(compress_seq_offset) +
                                          GetBlockIdx() * tilingData_->blockFactor);
-    compressLensGm_.SetGlobalBuffer((__gm__ IndexDtype *)(compress_lens) + GetBlockIdx() * tilingData_->blockFactor);
-    seqLensGm_.SetGlobalBuffer((__gm__ IndexDtype *)(seq_lens));
-    outputKeyCacheGm_.SetGlobalBuffer((__gm__ T *)(key_cache_out));
+    compressLensGm_.SetGlobalBuffer((__gm__ IndexDtype*)(compress_lens) + GetBlockIdx() * tilingData_->blockFactor);
+    seqLensGm_.SetGlobalBuffer((__gm__ IndexDtype*)(seq_lens));
+    outputKeyCacheGm_.SetGlobalBuffer((__gm__ T*)(key_cache_out));
 
     int64_t maxKHandleNum = tilingData_->kHandleNumPerLoop > tilingData_->kTailHandleNum ?
                                 tilingData_->kHandleNumPerLoop :
@@ -90,8 +90,8 @@ __aicore__ inline void ScatterPaKvCacheOmniNotFullyLoad<T, IndexDtype, InOutMode
     pipe_->InitBuffer(inputKeyQueue_, 1, RoundUp(maxKHandleNum) * sizeof(T));
 
     if constexpr (InOutMode == DUAL_IN_OUT) {
-        inputValueGm_.SetGlobalBuffer((__gm__ T *)(value));
-        outputValueCacheGm_.SetGlobalBuffer((__gm__ T *)(value_cache_out));
+        inputValueGm_.SetGlobalBuffer((__gm__ T*)(value));
+        outputValueCacheGm_.SetGlobalBuffer((__gm__ T*)(value_cache_out));
         pipe_->InitBuffer(inputValueQueue_, 1, RoundUp(maxVHandleNum) * sizeof(T));
     }
 }

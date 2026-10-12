@@ -23,8 +23,8 @@ struct TileBroadcastOneBlk {
 
     __aicore__ inline TileBroadcastOneBlk() {}
 
-    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const &ubOut,
-                                      AscendC::LocalTensor<ElementCompute> const &ubIn)
+    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const& ubOut,
+                                      AscendC::LocalTensor<ElementCompute> const& ubIn)
     {
         constexpr uint32_t maxRepeatNum = 255;
         constexpr uint32_t eleNumPerBlk =

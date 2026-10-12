@@ -21,46 +21,36 @@ namespace l0op {
 OP_TYPE_REGISTER(ScatterPaKvCache);
 
 std::tuple<const aclTensor*, const aclTensor*> ScatterPaKvCache(
-    const aclTensor *key,
-    aclTensor *keyCacheRef,
-    const aclTensor *slotMapping,
-    const aclTensor *value,
-    aclTensor *valueCacheRef,
-    const aclTensor *compressLensOptional,
-    const aclTensor *compressSeqOffsetOptional,
-    const aclTensor *seqLensOptional,
-    char *cacheModeOptional,
-    char *scatterModeOptional,
-    const aclIntArray *stridesOptional,
-    const aclIntArray *offsetsOptional,
-    aclOpExecutor *executor)
+    const aclTensor* key, aclTensor* keyCacheRef, const aclTensor* slotMapping, const aclTensor* value,
+    aclTensor* valueCacheRef, const aclTensor* compressLensOptional, const aclTensor* compressSeqOffsetOptional,
+    const aclTensor* seqLensOptional, char* cacheModeOptional, char* scatterModeOptional,
+    const aclIntArray* stridesOptional, const aclIntArray* offsetsOptional, aclOpExecutor* executor)
 {
-    L0_DFX(ScatterPaKvCache, key, keyCacheRef, slotMapping, value, valueCacheRef,
-           compressLensOptional, compressSeqOffsetOptional, seqLensOptional,
-           cacheModeOptional, scatterModeOptional, stridesOptional, offsetsOptional);
+    L0_DFX(ScatterPaKvCache, key, keyCacheRef, slotMapping, value, valueCacheRef, compressLensOptional,
+           compressSeqOffsetOptional, seqLensOptional, cacheModeOptional, scatterModeOptional, stridesOptional,
+           offsetsOptional);
 
     auto& platformInfo = op::GetCurrentPlatformInfo();
     auto socVersion = platformInfo.GetCurNpuArch();
     bool isArch35 = (socVersion == NpuArch::DAV_3510);
 
-    const aclTensor *compressLens = compressLensOptional;
+    const aclTensor* compressLens = compressLensOptional;
     if (!isArch35 && compressLensOptional == nullptr) {
         compressLens = executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
     }
 
-    const aclTensor *compressSeqOffset = compressSeqOffsetOptional;
+    const aclTensor* compressSeqOffset = compressSeqOffsetOptional;
     if (!isArch35 && compressSeqOffsetOptional == nullptr) {
         compressSeqOffset = executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
     }
 
-    const aclTensor *seqLens = seqLensOptional;
+    const aclTensor* seqLens = seqLensOptional;
     if (!isArch35 && seqLensOptional == nullptr) {
         seqLens = executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
     }
     auto ret = ADD_TO_LAUNCHER_LIST_AICORE(
         ScatterPaKvCache,
-        OP_INPUT(key, keyCacheRef, slotMapping, value, valueCacheRef,
-                 compressLens, compressSeqOffset, seqLens),
+        OP_INPUT(key, keyCacheRef, slotMapping, value, valueCacheRef, compressLens, compressSeqOffset, seqLens),
         OP_OUTPUT(keyCacheRef, valueCacheRef),
         OP_ATTR(cacheModeOptional, scatterModeOptional, stridesOptional, offsetsOptional));
     if (ret != ACLNN_SUCCESS) {

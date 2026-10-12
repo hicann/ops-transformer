@@ -91,7 +91,7 @@ TEST_F(RecurrentGatedDeltaRuleTilingTest, Test0)
     EXPECT_EQ(tilingInfo.tilingKey, expectTilingKey);
     constexpr uint32_t expectedPlatformAivNum = 64;
     EXPECT_EQ(tilingInfo.blockNum, expectedPlatformAivNum);
-    auto tilingData = reinterpret_cast<RecurrentGatedDeltaRuleTilingData *>(tilingInfo.tilingData.get());
+    auto tilingData = reinterpret_cast<RecurrentGatedDeltaRuleTilingData*>(tilingInfo.tilingData.get());
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->vectorCoreNum, expectedPlatformAivNum);
 }
@@ -143,7 +143,7 @@ TEST_F(RecurrentGatedDeltaRuleTilingTest, SmallBatchHeadUsesEffectiveCoreNum)
     ExecuteTiling(tilingContextPara, tilingInfo);
     uint32_t expectedCoreNum = static_cast<uint32_t>(b * nv);
     EXPECT_EQ(tilingInfo.blockNum, expectedCoreNum);
-    auto tilingData = reinterpret_cast<RecurrentGatedDeltaRuleTilingData *>(tilingInfo.tilingData.get());
+    auto tilingData = reinterpret_cast<RecurrentGatedDeltaRuleTilingData*>(tilingInfo.tilingData.get());
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->vectorCoreNum, expectedCoreNum);
 }
@@ -248,7 +248,7 @@ TEST_F(RecurrentGatedDeltaRuleTilingTest, WithGkInput)
     TilingInfo tilingInfo;
     EXPECT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, 0UL);
-    auto tilingData = reinterpret_cast<RecurrentGatedDeltaRuleTilingData *>(tilingInfo.tilingData.get());
+    auto tilingData = reinterpret_cast<RecurrentGatedDeltaRuleTilingData*>(tilingInfo.tilingData.get());
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->hasGama, 1U);
     EXPECT_EQ(tilingData->hasGamaK, 1U);
@@ -305,7 +305,7 @@ TEST_F(RecurrentGatedDeltaRuleTilingTest, WithNumAcceptedTokens)
     TilingInfo tilingInfo;
     EXPECT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, 0UL);
-    auto tilingData = reinterpret_cast<RecurrentGatedDeltaRuleTilingData *>(tilingInfo.tilingData.get());
+    auto tilingData = reinterpret_cast<RecurrentGatedDeltaRuleTilingData*>(tilingInfo.tilingData.get());
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->hasGama, 1U);
     EXPECT_EQ(tilingData->hasGamaK, 0U);
@@ -362,7 +362,7 @@ TEST_F(RecurrentGatedDeltaRuleTilingTest, WithGkAndNumAcceptedTokens)
     TilingInfo tilingInfo;
     EXPECT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, 0UL);
-    auto tilingData = reinterpret_cast<RecurrentGatedDeltaRuleTilingData *>(tilingInfo.tilingData.get());
+    auto tilingData = reinterpret_cast<RecurrentGatedDeltaRuleTilingData*>(tilingInfo.tilingData.get());
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->hasGama, 1U);
     EXPECT_EQ(tilingData->hasGamaK, 1U);

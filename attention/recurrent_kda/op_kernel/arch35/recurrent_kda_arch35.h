@@ -63,7 +63,7 @@ struct RKDAInitParams {
 template <typename inType, typename outType, typename stateType>
 class RKDA {
 public:
-    __aicore__ inline explicit RKDA(const RecurrentKdaTilingData *tilingData)
+    __aicore__ inline explicit RKDA(const RecurrentKdaTilingData* tilingData)
     {
         B_ = tilingData->b;
         T_ = tilingData->t;
@@ -115,7 +115,7 @@ public:
         eventMte3ToVInitialized_ = false;
     }
 
-    __aicore__ inline void Init(const RKDAInitParams &initParams, TPipe *pipe)
+    __aicore__ inline void Init(const RKDAInitParams& initParams, TPipe* pipe)
     {
         uint64_t blockDim = GetBlockNum();
         blockIdx = GetBlockIdx();
@@ -127,28 +127,28 @@ public:
         InitLocalBuffers();
     }
 
-    __aicore__ inline void SetGlobalTensors(const RKDAInitParams &initParams)
+    __aicore__ inline void SetGlobalTensors(const RKDAInitParams& initParams)
     {
-        queryGm_.SetGlobalBuffer((__gm__ inType *)initParams.query);
-        keyGm_.SetGlobalBuffer((__gm__ inType *)initParams.key);
-        valueGm_.SetGlobalBuffer((__gm__ inType *)initParams.value);
-        gateFloatGm_.SetGlobalBuffer((__gm__ float *)initParams.gate);
-        gateBf16Gm_.SetGlobalBuffer((__gm__ bfloat16_t *)initParams.gate);
-        gateFp16Gm_.SetGlobalBuffer((__gm__ half *)initParams.gate);
-        betaFloatGm_.SetGlobalBuffer((__gm__ float *)initParams.beta);
-        betaBf16Gm_.SetGlobalBuffer((__gm__ bfloat16_t *)initParams.beta);
-        betaFp16Gm_.SetGlobalBuffer((__gm__ half *)initParams.beta);
-        initStateGm_.SetGlobalBuffer((__gm__ stateType *)initParams.initState);
-        cuSeqlensInt32Gm_.SetGlobalBuffer((__gm__ int32_t *)initParams.cuSeqlens);
-        cuSeqlensInt64Gm_.SetGlobalBuffer((__gm__ int64_t *)initParams.cuSeqlens);
-        ssmStateIndicesInt32Gm_.SetGlobalBuffer((__gm__ int32_t *)initParams.ssmStateIndices);
-        ssmStateIndicesInt64Gm_.SetGlobalBuffer((__gm__ int64_t *)initParams.ssmStateIndices);
-        aLogGm_.SetGlobalBuffer((__gm__ float *)initParams.aLog);
-        dtBiasGm_.SetGlobalBuffer((__gm__ float *)initParams.dtBias);
-        numAcceptedTokensInt32Gm_.SetGlobalBuffer((__gm__ int32_t *)initParams.numAcceptedTokens);
-        numAcceptedTokensInt64Gm_.SetGlobalBuffer((__gm__ int64_t *)initParams.numAcceptedTokens);
-        finalStateGm_.SetGlobalBuffer((__gm__ stateType *)initParams.finalState);
-        attnOutGm_.SetGlobalBuffer((__gm__ outType *)initParams.attnOut);
+        queryGm_.SetGlobalBuffer((__gm__ inType*)initParams.query);
+        keyGm_.SetGlobalBuffer((__gm__ inType*)initParams.key);
+        valueGm_.SetGlobalBuffer((__gm__ inType*)initParams.value);
+        gateFloatGm_.SetGlobalBuffer((__gm__ float*)initParams.gate);
+        gateBf16Gm_.SetGlobalBuffer((__gm__ bfloat16_t*)initParams.gate);
+        gateFp16Gm_.SetGlobalBuffer((__gm__ half*)initParams.gate);
+        betaFloatGm_.SetGlobalBuffer((__gm__ float*)initParams.beta);
+        betaBf16Gm_.SetGlobalBuffer((__gm__ bfloat16_t*)initParams.beta);
+        betaFp16Gm_.SetGlobalBuffer((__gm__ half*)initParams.beta);
+        initStateGm_.SetGlobalBuffer((__gm__ stateType*)initParams.initState);
+        cuSeqlensInt32Gm_.SetGlobalBuffer((__gm__ int32_t*)initParams.cuSeqlens);
+        cuSeqlensInt64Gm_.SetGlobalBuffer((__gm__ int64_t*)initParams.cuSeqlens);
+        ssmStateIndicesInt32Gm_.SetGlobalBuffer((__gm__ int32_t*)initParams.ssmStateIndices);
+        ssmStateIndicesInt64Gm_.SetGlobalBuffer((__gm__ int64_t*)initParams.ssmStateIndices);
+        aLogGm_.SetGlobalBuffer((__gm__ float*)initParams.aLog);
+        dtBiasGm_.SetGlobalBuffer((__gm__ float*)initParams.dtBias);
+        numAcceptedTokensInt32Gm_.SetGlobalBuffer((__gm__ int32_t*)initParams.numAcceptedTokens);
+        numAcceptedTokensInt64Gm_.SetGlobalBuffer((__gm__ int64_t*)initParams.numAcceptedTokens);
+        finalStateGm_.SetGlobalBuffer((__gm__ stateType*)initParams.finalState);
+        attnOutGm_.SetGlobalBuffer((__gm__ outType*)initParams.attnOut);
     }
 
     __aicore__ inline void InitLocalBuffers()
@@ -316,8 +316,8 @@ private:
         int64_t seq1;
     };
 
-    __aicore__ inline bool PrepareNextTask(uint64_t &taskIdx, uint64_t taskNum, uint64_t taskStride, RKDATaskInfo &task,
-                                           bool &taskValid)
+    __aicore__ inline bool PrepareNextTask(uint64_t& taskIdx, uint64_t taskNum, uint64_t taskStride, RKDATaskInfo& task,
+                                           bool& taskValid)
     {
         taskValid = true;
         while (taskIdx < taskNum) {
@@ -448,7 +448,7 @@ private:
     }
 
     template <typename dataType>
-    __aicore__ inline void CopyVectorIn(LocalTensor<dataType> &dst, GlobalTensor<dataType> &src, uint64_t offset,
+    __aicore__ inline void CopyVectorIn(LocalTensor<dataType>& dst, GlobalTensor<dataType>& src, uint64_t offset,
                                         uint64_t count)
     {
         uint64_t rowBytes = count * sizeof(dataType);
@@ -461,7 +461,7 @@ private:
         }
     }
 
-    __aicore__ inline float ReadFloat(GlobalTensor<float> &tensor, uint64_t offset)
+    __aicore__ inline float ReadFloat(GlobalTensor<float>& tensor, uint64_t offset)
     {
         LocalTensor<float> scalar = scalarBuf_.Get<float>();
         DataCopyParams params{1, static_cast<uint16_t>(sizeof(float)), 0, 0};
@@ -471,7 +471,7 @@ private:
         Adds(scalar, scalar, 0.0f, 1);
         PipeBarrier<PIPE_V>();
         SyncVToS();
-        __ubuf__ float *ptr = (__ubuf__ float *)scalar.GetPhyAddr();
+        __ubuf__ float* ptr = (__ubuf__ float*)scalar.GetPhyAddr();
         return ptr[0];
     }
 
@@ -483,7 +483,7 @@ private:
         Exp(scalar, scalar, 1);
         PipeBarrier<PIPE_V>();
         SyncVToS();
-        __ubuf__ float *ptr = (__ubuf__ float *)scalar.GetPhyAddr();
+        __ubuf__ float* ptr = (__ubuf__ float*)scalar.GetPhyAddr();
         return ptr[0];
     }
 
@@ -493,7 +493,7 @@ private:
         return 1.0f / denom;
     }
 
-    __aicore__ inline void NormalizeRows(LocalTensor<float> &tensor, int32_t seqLen)
+    __aicore__ inline void NormalizeRows(LocalTensor<float>& tensor, int32_t seqLen)
     {
         for (int32_t row = 0; row < seqLen; ++row) {
             uint32_t rowOffset = static_cast<uint32_t>(row) * alignK_;
@@ -634,8 +634,8 @@ private:
     }
 
     template <typename transType>
-    __aicore__ inline void TransposeStateMatrixTyped(const LocalTensor<transType> &dst,
-                                                     const LocalTensor<transType> &src, uint32_t rowCount,
+    __aicore__ inline void TransposeStateMatrixTyped(const LocalTensor<transType>& dst,
+                                                     const LocalTensor<transType>& src, uint32_t rowCount,
                                                      uint32_t columnCount, uint32_t srcRowStride, uint32_t dstRowStride)
     {
         constexpr uint32_t elementsPerBlock = DATA_BLOCK_BYTES / sizeof(transType);
@@ -661,7 +661,7 @@ private:
         }
     }
 
-    __aicore__ inline void TransposeKFirstToVFirst(const LocalTensor<stateType> &dst, const LocalTensor<stateType> &src,
+    __aicore__ inline void TransposeKFirstToVFirst(const LocalTensor<stateType>& dst, const LocalTensor<stateType>& src,
                                                    uint32_t curSingleV)
     {
         if constexpr (std::is_same<stateType, float32_t>()) {
@@ -673,7 +673,7 @@ private:
         }
     }
 
-    __aicore__ inline void TransposeVFirstToKFirst(const LocalTensor<stateType> &dst, const LocalTensor<stateType> &src,
+    __aicore__ inline void TransposeVFirstToKFirst(const LocalTensor<stateType>& dst, const LocalTensor<stateType>& src,
                                                    uint32_t curSingleV)
     {
         if constexpr (std::is_same<stateType, float32_t>()) {
@@ -729,12 +729,12 @@ private:
         stateInQueue_.FreeTensor(stateLocal);
     }
 
-    __aicore__ inline void MatVecMul(const LocalTensor<float> &cubeTensor, const LocalTensor<float> &vecTensor,
-                                     LocalTensor<float> &dstTensor, uint32_t rows)
+    __aicore__ inline void MatVecMul(const LocalTensor<float>& cubeTensor, const LocalTensor<float>& vecTensor,
+                                     LocalTensor<float>& dstTensor, uint32_t rows)
     {
-        __ubuf__ float *cubeAddr = (__ubuf__ float *)cubeTensor.GetPhyAddr();
-        __ubuf__ float *vecAddr = (__ubuf__ float *)vecTensor.GetPhyAddr();
-        __ubuf__ float *dstAddr = (__ubuf__ float *)dstTensor.GetPhyAddr();
+        __ubuf__ float* cubeAddr = (__ubuf__ float*)cubeTensor.GetPhyAddr();
+        __ubuf__ float* vecAddr = (__ubuf__ float*)vecTensor.GetPhyAddr();
+        __ubuf__ float* dstAddr = (__ubuf__ float*)dstTensor.GetPhyAddr();
 
         uint16_t rowNum = static_cast<uint16_t>(rows);
         uint16_t colLoopTimes = static_cast<uint16_t>(Ceil(alignK_, V_LENGTH));
@@ -757,14 +757,14 @@ private:
         }
     }
 
-    __aicore__ inline void DecayMatVecReduce128(LocalTensor<float> &stateTensor, const LocalTensor<float> &gateTensor,
-                                                const LocalTensor<float> &vecTensor, LocalTensor<float> &dstTensor,
+    __aicore__ inline void DecayMatVecReduce128(LocalTensor<float>& stateTensor, const LocalTensor<float>& gateTensor,
+                                                const LocalTensor<float>& vecTensor, LocalTensor<float>& dstTensor,
                                                 uint32_t rows)
     {
-        __ubuf__ float *stateAddr = (__ubuf__ float *)stateTensor.GetPhyAddr();
-        __ubuf__ float *gateAddr = (__ubuf__ float *)gateTensor.GetPhyAddr();
-        __ubuf__ float *vecAddr = (__ubuf__ float *)vecTensor.GetPhyAddr();
-        __ubuf__ float *dstAddr = (__ubuf__ float *)dstTensor.GetPhyAddr();
+        __ubuf__ float* stateAddr = (__ubuf__ float*)stateTensor.GetPhyAddr();
+        __ubuf__ float* gateAddr = (__ubuf__ float*)gateTensor.GetPhyAddr();
+        __ubuf__ float* vecAddr = (__ubuf__ float*)vecTensor.GetPhyAddr();
+        __ubuf__ float* dstAddr = (__ubuf__ float*)dstTensor.GetPhyAddr();
         uint16_t rowNum = static_cast<uint16_t>(rows);
         __VEC_SCOPE__
         {
@@ -794,15 +794,15 @@ private:
         }
     }
 
-    __aicore__ inline void ProcessKQ(const LocalTensor<float> &cubeTensor, const LocalTensor<float> &vec1Tensor,
-                                     LocalTensor<float> &dst1Tensor, const LocalTensor<float> &vec2Tensor,
-                                     LocalTensor<float> &dst2Tensor, uint32_t rows)
+    __aicore__ inline void ProcessKQ(const LocalTensor<float>& cubeTensor, const LocalTensor<float>& vec1Tensor,
+                                     LocalTensor<float>& dst1Tensor, const LocalTensor<float>& vec2Tensor,
+                                     LocalTensor<float>& dst2Tensor, uint32_t rows)
     {
-        __ubuf__ float *cubeAddr = (__ubuf__ float *)cubeTensor.GetPhyAddr();
-        __ubuf__ float *vec1Addr = (__ubuf__ float *)vec1Tensor.GetPhyAddr();
-        __ubuf__ float *vec2Addr = (__ubuf__ float *)vec2Tensor.GetPhyAddr();
-        __ubuf__ float *dst1Addr = (__ubuf__ float *)dst1Tensor.GetPhyAddr();
-        __ubuf__ float *dst2Addr = (__ubuf__ float *)dst2Tensor.GetPhyAddr();
+        __ubuf__ float* cubeAddr = (__ubuf__ float*)cubeTensor.GetPhyAddr();
+        __ubuf__ float* vec1Addr = (__ubuf__ float*)vec1Tensor.GetPhyAddr();
+        __ubuf__ float* vec2Addr = (__ubuf__ float*)vec2Tensor.GetPhyAddr();
+        __ubuf__ float* dst1Addr = (__ubuf__ float*)dst1Tensor.GetPhyAddr();
+        __ubuf__ float* dst2Addr = (__ubuf__ float*)dst2Tensor.GetPhyAddr();
 
         uint16_t rowNum = static_cast<uint16_t>(rows);
         uint16_t colLoopTimes = static_cast<uint16_t>(Ceil(alignK_, V_LENGTH));
@@ -833,21 +833,21 @@ private:
     }
 
     template <bool useSigmoid, bool allowNeg>
-    __aicore__ inline void ProcessDeltaKQReduce128(const LocalTensor<float> &dotTensor,
-                                                   const LocalTensor<float> &vTensor,
-                                                   const LocalTensor<float> &betaTensor, uint64_t betaOffset,
-                                                   const LocalTensor<float> &kTensor, LocalTensor<float> &stateTensor,
-                                                   const LocalTensor<float> &qTensor, LocalTensor<float> &attnTensor,
+    __aicore__ inline void ProcessDeltaKQReduce128(const LocalTensor<float>& dotTensor,
+                                                   const LocalTensor<float>& vTensor,
+                                                   const LocalTensor<float>& betaTensor, uint64_t betaOffset,
+                                                   const LocalTensor<float>& kTensor, LocalTensor<float>& stateTensor,
+                                                   const LocalTensor<float>& qTensor, LocalTensor<float>& attnTensor,
                                                    uint32_t rows)
     {
-        __ubuf__ float *dotAddr = (__ubuf__ float *)dotTensor.GetPhyAddr();
-        __ubuf__ float *vAddr = (__ubuf__ float *)vTensor.GetPhyAddr();
+        __ubuf__ float* dotAddr = (__ubuf__ float*)dotTensor.GetPhyAddr();
+        __ubuf__ float* vAddr = (__ubuf__ float*)vTensor.GetPhyAddr();
         uint64_t betaRowStride = betaDtype_ == 0 ? FP32_NUM_PER_BLOCK : BF16_NUM_PER_BLOCK;
-        __ubuf__ float *betaAddr = (__ubuf__ float *)betaTensor.GetPhyAddr() + betaOffset * betaRowStride;
-        __ubuf__ float *kAddr = (__ubuf__ float *)kTensor.GetPhyAddr();
-        __ubuf__ float *stateAddr = (__ubuf__ float *)stateTensor.GetPhyAddr();
-        __ubuf__ float *qAddr = (__ubuf__ float *)qTensor.GetPhyAddr();
-        __ubuf__ float *attnAddr = (__ubuf__ float *)attnTensor.GetPhyAddr();
+        __ubuf__ float* betaAddr = (__ubuf__ float*)betaTensor.GetPhyAddr() + betaOffset * betaRowStride;
+        __ubuf__ float* kAddr = (__ubuf__ float*)kTensor.GetPhyAddr();
+        __ubuf__ float* stateAddr = (__ubuf__ float*)stateTensor.GetPhyAddr();
+        __ubuf__ float* qAddr = (__ubuf__ float*)qTensor.GetPhyAddr();
+        __ubuf__ float* attnAddr = (__ubuf__ float*)attnTensor.GetPhyAddr();
         uint16_t rowNum = static_cast<uint16_t>(rows);
         __VEC_SCOPE__
         {
@@ -902,9 +902,9 @@ private:
     }
 
     __aicore__ inline void ProcessDeltaKQReduce128Dispatch(
-        const LocalTensor<float> &dotTensor, const LocalTensor<float> &vTensor, const LocalTensor<float> &betaTensor,
-        uint64_t betaOffset, const LocalTensor<float> &kTensor, LocalTensor<float> &stateTensor,
-        const LocalTensor<float> &qTensor, LocalTensor<float> &attnTensor, uint32_t rows)
+        const LocalTensor<float>& dotTensor, const LocalTensor<float>& vTensor, const LocalTensor<float>& betaTensor,
+        uint64_t betaOffset, const LocalTensor<float>& kTensor, LocalTensor<float>& stateTensor,
+        const LocalTensor<float>& qTensor, LocalTensor<float>& attnTensor, uint32_t rows)
     {
         if (useBetaSigmoid_) {
             if (allowNegEigval_) {
@@ -920,7 +920,7 @@ private:
         }
     }
 
-    __aicore__ inline void ReduceSum64(__ubuf__ float *dstAddr, __ubuf__ float *srcAddr, uint16_t rowNum)
+    __aicore__ inline void ReduceSum64(__ubuf__ float* dstAddr, __ubuf__ float* srcAddr, uint16_t rowNum)
     {
         uint32_t colLength = alignK_;
         __VEC_SCOPE__
@@ -936,7 +936,7 @@ private:
         }
     }
 
-    __aicore__ inline void ReduceSum128(__ubuf__ float *dstAddr, __ubuf__ float *srcAddr, uint16_t rowNum)
+    __aicore__ inline void ReduceSum128(__ubuf__ float* dstAddr, __ubuf__ float* srcAddr, uint16_t rowNum)
     {
         uint32_t colLength = alignK_ - V_LENGTH;
         __VEC_SCOPE__
@@ -956,7 +956,7 @@ private:
         }
     }
 
-    __aicore__ inline void ReduceSumVF(__ubuf__ float *dstAddr, __ubuf__ float *srcAddr, uint16_t rowNum)
+    __aicore__ inline void ReduceSumVF(__ubuf__ float* dstAddr, __ubuf__ float* srcAddr, uint16_t rowNum)
     {
         uint16_t colLoopTimes = static_cast<uint16_t>(Ceil(alignK_, V_LENGTH));
         __VEC_SCOPE__
@@ -980,11 +980,11 @@ private:
         }
     }
 
-    __aicore__ inline void ReduceSumDispatch(LocalTensor<float> &dstTensor, LocalTensor<float> &srcTensor,
+    __aicore__ inline void ReduceSumDispatch(LocalTensor<float>& dstTensor, LocalTensor<float>& srcTensor,
                                              uint32_t rows)
     {
-        __ubuf__ float *srcAddr = (__ubuf__ float *)srcTensor.GetPhyAddr();
-        __ubuf__ float *dstAddr = (__ubuf__ float *)dstTensor.GetPhyAddr();
+        __ubuf__ float* srcAddr = (__ubuf__ float*)srcTensor.GetPhyAddr();
+        __ubuf__ float* dstAddr = (__ubuf__ float*)dstTensor.GetPhyAddr();
         uint16_t rowNum = static_cast<uint16_t>(rows);
         if (alignK_ <= V_LENGTH) {
             ReduceSum64(dstAddr, srcAddr, rowNum);
@@ -1228,7 +1228,7 @@ private:
     GlobalTensor<int64_t> numAcceptedTokensInt64Gm_;
     GlobalTensor<stateType> finalStateGm_;
     GlobalTensor<outType> attnOutGm_;
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> qInQueue_;
     TQue<QuePosition::VECIN, 1> kInQueue_;
     TQue<QuePosition::VECIN, 1> vInQueue_;

@@ -145,8 +145,8 @@ struct FagConstInfo {
     int64_t gS1oS2o;
     int64_t s1oS2o;
 
-    __gm__ uint8_t *seqS1_addr;
-    __gm__ uint8_t *seqS2_addr;
+    __gm__ uint8_t* seqS1_addr;
+    __gm__ uint8_t* seqS2_addr;
 
     int64_t s1Token;
     int64_t s2Token;

@@ -25,5 +25,5 @@ if (BUILD_OPEN_PROJECT)
         add_modules_sources(OPTYPE swin_attention_score_quant ACLNNTYPE aclnn)
     endif()
 else() # 回黄host
-    add_modules_sources(OPTYPE swin_attention_score_quant ACLNNTYPE aclnn)  
+    add_modules_sources(OPTYPE swin_attention_score_quant ACLNNTYPE aclnn)
 endif()

@@ -33,8 +33,7 @@ constexpr uint32_t AIC_CORE_NUM = 36;
 constexpr uint32_t AIV_CORE_NUM = 72;
 
 struct TndC4aParams {
-    std::unique_ptr<aclTensor, void (*)(aclTensor*)> cuSeqlensQ =
-        TensorDesc({3}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+    std::unique_ptr<aclTensor, void (*)(aclTensor*)> cuSeqlensQ = TensorDesc({3}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
     std::unique_ptr<aclTensor, void (*)(aclTensor*)> cuSeqlensOriKv =
         TensorDesc({3}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
     std::unique_ptr<aclTensor, void (*)(aclTensor*)> cuSeqlensCmpKv =
@@ -45,13 +44,13 @@ struct TndC4aParams {
         TensorDesc({optiling::SMLA_METADATA_TOTAL_SIZE}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
 };
 
-aclnnStatus RunParamsCheck(const TndC4aParams &params, const aclTensor *cmpResidualKv)
+aclnnStatus RunParamsCheck(const TndC4aParams& params, const aclTensor* cmpResidualKv)
 {
-    return ParamsCheck(params.cuSeqlensQ.get(), params.cuSeqlensOriKv.get(), params.cuSeqlensCmpKv.get(),
-                       nullptr, nullptr, nullptr, cmpResidualKv, nullptr, nullptr, NUM_HEADS_Q, NUM_HEADS_KV,
-                       HEAD_DIM, BATCH_SIZE, MAX_SEQLEN_Q, MAX_SEQLEN_ORI_KV, MAX_SEQLEN_CMP_KV, ORI_TOPK,
-                       CMP_TOPK, CMP_RATIO, ORI_MASK_MODE, CMP_MASK_MODE, ORI_WIN_LEFT, ORI_WIN_RIGHT, "TND",
-                       "TND", true, true, AIC_CORE_NUM, AIV_CORE_NUM, "Ascend910B", params.metadata.get());
+    return ParamsCheck(params.cuSeqlensQ.get(), params.cuSeqlensOriKv.get(), params.cuSeqlensCmpKv.get(), nullptr,
+                       nullptr, nullptr, cmpResidualKv, nullptr, nullptr, NUM_HEADS_Q, NUM_HEADS_KV, HEAD_DIM,
+                       BATCH_SIZE, MAX_SEQLEN_Q, MAX_SEQLEN_ORI_KV, MAX_SEQLEN_CMP_KV, ORI_TOPK, CMP_TOPK, CMP_RATIO,
+                       ORI_MASK_MODE, CMP_MASK_MODE, ORI_WIN_LEFT, ORI_WIN_RIGHT, "TND", "TND", true, true,
+                       AIC_CORE_NUM, AIV_CORE_NUM, "Ascend910B", params.metadata.get());
 }
 } // namespace
 

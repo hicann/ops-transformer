@@ -14,47 +14,56 @@
 
 namespace ScatterPaKvCacheWithKScaleUT {
 
-class ScatterPaKvCacheWithKScaleInferShapeTest : public testing::TestWithParam<ScatterPaKvCacheWithKScaleInferShapeUtParam> {
+class ScatterPaKvCacheWithKScaleInferShapeTest
+    : public testing::TestWithParam<ScatterPaKvCacheWithKScaleInferShapeUtParam> {
 protected:
-    static void SetUpTestCase() {
+    static void SetUpTestCase()
+    {
         std::cout << "ScatterPaKvCacheWithKScale InferShapeTest SetUp" << std::endl;
     }
-    static void TearDownTestCase() {
+    static void TearDownTestCase()
+    {
         std::cout << "ScatterPaKvCacheWithKScale InferShapeTest TearDown" << std::endl;
     }
 };
 
-TEST_P(ScatterPaKvCacheWithKScaleInferShapeTest, param) {
+TEST_P(ScatterPaKvCacheWithKScaleInferShapeTest, param)
+{
     auto param = GetParam();
 
     std::vector<gert::InfershapeContextPara::TensorDescription> inputTensorDesc;
-    if (param.inputInstance[0] == 1) inputTensorDesc.emplace_back(param.key);
-    if (param.inputInstance[1] == 1) inputTensorDesc.emplace_back(param.value);
-    if (param.inputInstance[2] == 1) inputTensorDesc.emplace_back(param.key_cache);
-    if (param.inputInstance[3] == 1) inputTensorDesc.emplace_back(param.value_cache);
-    if (param.inputInstance[4] == 1) inputTensorDesc.emplace_back(param.slot_mapping);
-    if (param.inputInstance[5] == 1) inputTensorDesc.emplace_back(param.key_scale);
-    if (param.inputInstance[6] == 1) inputTensorDesc.emplace_back(param.key_scale_cache);
+    if (param.inputInstance[0] == 1)
+        inputTensorDesc.emplace_back(param.key);
+    if (param.inputInstance[1] == 1)
+        inputTensorDesc.emplace_back(param.value);
+    if (param.inputInstance[2] == 1)
+        inputTensorDesc.emplace_back(param.key_cache);
+    if (param.inputInstance[3] == 1)
+        inputTensorDesc.emplace_back(param.value_cache);
+    if (param.inputInstance[4] == 1)
+        inputTensorDesc.emplace_back(param.slot_mapping);
+    if (param.inputInstance[5] == 1)
+        inputTensorDesc.emplace_back(param.key_scale);
+    if (param.inputInstance[6] == 1)
+        inputTensorDesc.emplace_back(param.key_scale_cache);
 
     std::vector<gert::InfershapeContextPara::TensorDescription> outputTensorDesc;
-    if (param.outputInstance[0] == 1) outputTensorDesc.emplace_back(param.key_cache_out);
-    if (param.outputInstance[1] == 1) outputTensorDesc.emplace_back(param.value_cache_out);
-    if (param.outputInstance[2] == 1) outputTensorDesc.emplace_back(param.key_scale_cache_out);
+    if (param.outputInstance[0] == 1)
+        outputTensorDesc.emplace_back(param.key_cache_out);
+    if (param.outputInstance[1] == 1)
+        outputTensorDesc.emplace_back(param.value_cache_out);
+    if (param.outputInstance[2] == 1)
+        outputTensorDesc.emplace_back(param.key_scale_cache_out);
 
     gert::InfershapeContextPara infershapeContextPara(
-        "ScatterPaKvCacheWithKScale",
-        inputTensorDesc,
-        outputTensorDesc,
-        {
-            {"cache_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.cache_layout)}
-        });
+        "ScatterPaKvCacheWithKScale", inputTensorDesc, outputTensorDesc,
+        {{"cache_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.cache_layout)}});
 
     ExecuteTestCase(infershapeContextPara, param.expectResult, param.expectOutputShape);
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    ScatterPaKvCacheWithKScale,
-    ScatterPaKvCacheWithKScaleInferShapeTest,
+    ScatterPaKvCacheWithKScale, ScatterPaKvCacheWithKScaleInferShapeTest,
     testing::ValuesIn(GetCasesFromCsv<ScatterPaKvCacheWithKScaleInferShapeUtParam>(ReplaceFileExtension2Csv(__FILE__))),
     PrintCaseInfoString<ScatterPaKvCacheWithKScaleInferShapeUtParam>);
 

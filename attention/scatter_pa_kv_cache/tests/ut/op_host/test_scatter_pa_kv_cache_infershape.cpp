@@ -17,28 +17,31 @@
 
 class ScatterPaKvCache : public testing::Test {
 protected:
-static void SetUpTestCase() {
-    std::cout << "ScatterPaKvCache SetUp" << std::endl;
-}
+    static void SetUpTestCase()
+    {
+        std::cout << "ScatterPaKvCache SetUp" << std::endl;
+    }
 
-static void TearDownTestCase() {
-    std::cout << "ScatterPaKvCache TearDown" << std::endl;
-}
+    static void TearDownTestCase()
+    {
+        std::cout << "ScatterPaKvCache TearDown" << std::endl;
+    }
 };
 
 TEST_F(ScatterPaKvCache, scatter_pa_kv_cache_infershape_0)
 {
-    gert::InfershapeContextPara infershapeContextPara("ScatterPaKvCache",
+    gert::InfershapeContextPara infershapeContextPara(
+        "ScatterPaKvCache",
         {
-            {{{102, 1, 128}, {102, 1, 128}}, ge::DT_FLOAT, ge::FORMAT_ND}, // key
+            {{{102, 1, 128}, {102, 1, 128}}, ge::DT_FLOAT, ge::FORMAT_ND},           // key
             {{{306, 128, 1, 128}, {306, 128, 1, 128}}, ge::DT_FLOAT, ge::FORMAT_ND}, // keyCache
-            {{{102}, {102}}, ge::DT_INT32, ge::FORMAT_ND}, // slotMapping
-            {{{102, 1, 128}, {102, 1, 128}}, ge::DT_FLOAT, ge::FORMAT_ND}, // value
+            {{{102}, {102}}, ge::DT_INT32, ge::FORMAT_ND},                           // slotMapping
+            {{{102, 1, 128}, {102, 1, 128}}, ge::DT_FLOAT, ge::FORMAT_ND},           // value
             {{{306, 128, 1, 128}, {306, 128, 1, 128}}, ge::DT_FLOAT, ge::FORMAT_ND}, // valueCache
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, 
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, 
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, 
-            
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+
         },
         {
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // keyCache
@@ -49,8 +52,7 @@ TEST_F(ScatterPaKvCache, scatter_pa_kv_cache_infershape_0)
             {"scatter_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("None")},
             {"strides", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({1, 1})},
             {"offsets", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({0, 0})},
-        }
-    );
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{306, 128, 1, 128}, {306, 128, 1, 128}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }

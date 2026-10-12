@@ -27,13 +27,13 @@ namespace l0op {
 
 OP_TYPE_REGISTER(RecurrentKda);
 
-const std::array<const aclTensor *, 3> RecurrentKda(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *gate, const aclTensor *beta,
-    aclTensor *initialStateRef, const aclTensor *cuSeqlensOptional, const aclTensor *ssmStateIndicesOptional,
-    const aclTensor *aLogOptional, const aclTensor *dtBiasOptional, const aclTensor *numAcceptedTokensOptional,
-    const char *layout, double scale, bool outputFinalState, bool inplaceFinalState, bool useQkL2normInKernel,
+const std::array<const aclTensor*, 3> RecurrentKda(
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* gate, const aclTensor* beta,
+    aclTensor* initialStateRef, const aclTensor* cuSeqlensOptional, const aclTensor* ssmStateIndicesOptional,
+    const aclTensor* aLogOptional, const aclTensor* dtBiasOptional, const aclTensor* numAcceptedTokensOptional,
+    const char* layout, double scale, bool outputFinalState, bool inplaceFinalState, bool useQkL2normInKernel,
     bool useGateInKernel, bool useBetaSigmoidInKernel, bool allowNegEigval, bool safeGate, double lowerBound,
-    bool stateVFirst, const aclTensor *attnOut, const aclTensor *finalState, aclOpExecutor *executor)
+    bool stateVFirst, const aclTensor* attnOut, const aclTensor* finalState, aclOpExecutor* executor)
 {
     L0_DFX(RecurrentKda, query, key, value, gate, beta, initialStateRef, cuSeqlensOptional, ssmStateIndicesOptional,
            aLogOptional, dtBiasOptional, numAcceptedTokensOptional, layout, scale, outputFinalState, inplaceFinalState,

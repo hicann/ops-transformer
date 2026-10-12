@@ -23,14 +23,14 @@ template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uin
 class SparseFlashMlaGradPost {
 public:
     __aicore__ inline SparseFlashMlaGradPost(){};
-    __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *d_ori_kv, __gm__ uint8_t *d_cmp_kv,
-                                __gm__ uint8_t *dsinks, __gm__ uint8_t *workspace,
-                                const TILING_TYPE *__restrict ordTilingData, TPipe *pipe_in);
+    __aicore__ inline void Init(__gm__ uint8_t* dq, __gm__ uint8_t* d_ori_kv, __gm__ uint8_t* d_cmp_kv,
+                                __gm__ uint8_t* dsinks, __gm__ uint8_t* workspace,
+                                const TILING_TYPE* __restrict ordTilingData, TPipe* pipe_in);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessSink();
 
     constexpr static uint32_t BUFFER_NUM = 1;
-    TPipe *pipe;
+    TPipe* pipe;
     TBuf<> tmpBuf;
     TQue<QuePosition::VECIN, BUFFER_NUM> inQueue;
     TQue<QuePosition::VECOUT, BUFFER_NUM> outQueue;
@@ -44,7 +44,7 @@ public:
     AscendC::GlobalTensor<float> dqWorkSpaceGm;
     AscendC::GlobalTensor<float> dkWorkSpaceGm;
 
-    const TILING_TYPE *__restrict tilingData;
+    const TILING_TYPE* __restrict tilingData;
     constexpr static uint32_t SYNC_GLOBAL_WORKSPACE_SIZE = 16 * 1024;
     constexpr static uint32_t ADDR_ALIGN_SIZE = 512;
     constexpr static uint64_t C0_SIZE = 16;
@@ -95,18 +95,18 @@ public:
 template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uint32_t LAYOUT,
           const uint32_t INPUT_FORMAT, const uint32_t MODE>
 __aicore__ inline void SparseFlashMlaGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT, MODE>::Init(
-    __gm__ uint8_t *dq, __gm__ uint8_t *d_ori_kv, __gm__ uint8_t *d_cmp_kv, __gm__ uint8_t *dsinks,
-    __gm__ uint8_t *workspace, const TILING_TYPE *__restrict ordTilingData, TPipe *pipe_in)
+    __gm__ uint8_t* dq, __gm__ uint8_t* d_ori_kv, __gm__ uint8_t* d_cmp_kv, __gm__ uint8_t* dsinks,
+    __gm__ uint8_t* workspace, const TILING_TYPE* __restrict ordTilingData, TPipe* pipe_in)
 {
     cBlockIdx = GetBlockIdx();
 
     tilingData = ordTilingData;
     pipe = pipe_in;
 
-    dqGm.SetGlobalBuffer((__gm__ OUT_TYPE *)dq);
-    dOriKvGm.SetGlobalBuffer((__gm__ OUT_TYPE *)d_ori_kv);
-    dCmpKvGm.SetGlobalBuffer((__gm__ OUT_TYPE *)d_cmp_kv);
-    dsinkGm.SetGlobalBuffer((__gm__ float *)dsinks);
+    dqGm.SetGlobalBuffer((__gm__ OUT_TYPE*)dq);
+    dOriKvGm.SetGlobalBuffer((__gm__ OUT_TYPE*)d_ori_kv);
+    dCmpKvGm.SetGlobalBuffer((__gm__ OUT_TYPE*)d_cmp_kv);
+    dsinkGm.SetGlobalBuffer((__gm__ float*)dsinks);
 
     // tiling_data
     usedCoreNum = tilingData->postTilingData.coreNum;
@@ -135,12 +135,12 @@ __aicore__ inline void SparseFlashMlaGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LA
     dCmpKvSize = LAYOUT == 3 ? tilingData->opInfo.S3 * tilingData->opInfo.N2 * dimDqk :
                                tilingData->opInfo.B * tilingData->opInfo.S3 * tilingData->opInfo.N2 * dimDqk;
 
-    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                   tilingData->postTilingData.dqWorkSpaceOffset / sizeof(float));
-    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                   tilingData->postTilingData.dkWorkSpaceOffset / sizeof(float));
     if (isDeterministic) {
-        dsinkWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dsinkWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                          tilingData->postTilingData.dSinkWorkSpaceOffset / sizeof(float));
     }
 

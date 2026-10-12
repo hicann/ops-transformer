@@ -33,32 +33,32 @@ extern "C" {
 namespace {
 
 extern aclnnStatus aclnnInnerSparseFlashAttentionGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *sparse_indices,
-    const aclTensor *blockTableOptional, const aclTensor *actualSeqLengthsQueryOptional,
-    const aclTensor *actualSeqLengthsKvOptional, const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional,
-    const aclTensor *sinksOptional, double scaleValue, int64_t sparseBlockSizeOptional, char *layoutQueryOptional,
-    char *layoutKvOptional, int64_t sparseMode, int64_t preTokens, int64_t nextTokens, int64_t attentionMode,
-    bool returnSoftmaxLse, const aclTensor *attentionOut, const aclTensor *softmaxMax, const aclTensor *softmaxSum,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* sparse_indices,
+    const aclTensor* blockTableOptional, const aclTensor* actualSeqLengthsQueryOptional,
+    const aclTensor* actualSeqLengthsKvOptional, const aclTensor* queryRopeOptional, const aclTensor* keyRopeOptional,
+    const aclTensor* sinksOptional, double scaleValue, int64_t sparseBlockSizeOptional, char* layoutQueryOptional,
+    char* layoutKvOptional, int64_t sparseMode, int64_t preTokens, int64_t nextTokens, int64_t attentionMode,
+    bool returnSoftmaxLse, const aclTensor* attentionOut, const aclTensor* softmaxMax, const aclTensor* softmaxSum,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
-extern aclnnStatus aclnnInnerSparseFlashAttention(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern aclnnStatus aclnnInnerSparseFlashAttention(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                   const aclrtStream stream);
 
 aclnnStatus aclnnSparseFlashAttentionV2GetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *sparseIndices,
-    const aclTensor *blockTableOptional, const aclTensor *actualSeqLengthsQueryOptional,
-    const aclTensor *actualSeqLengthsKvOptional, const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional,
-    const aclTensor *sinksOptional, double scaleValue, int64_t sparseBlockSizeOptional, char *layoutQueryOptional,
-    char *layoutKvOptional, int64_t sparseMode, int64_t preTokens, int64_t nextTokens, int64_t attentionMode,
-    bool returnSoftmaxLse, const aclTensor *attentionOut, const aclTensor *softmaxMax, const aclTensor *softmaxSum,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* sparseIndices,
+    const aclTensor* blockTableOptional, const aclTensor* actualSeqLengthsQueryOptional,
+    const aclTensor* actualSeqLengthsKvOptional, const aclTensor* queryRopeOptional, const aclTensor* keyRopeOptional,
+    const aclTensor* sinksOptional, double scaleValue, int64_t sparseBlockSizeOptional, char* layoutQueryOptional,
+    char* layoutKvOptional, int64_t sparseMode, int64_t preTokens, int64_t nextTokens, int64_t attentionMode,
+    bool returnSoftmaxLse, const aclTensor* attentionOut, const aclTensor* softmaxMax, const aclTensor* softmaxSum,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (sinksOptional != nullptr && op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
                 "The sinks input of aclnnSparseFlashAttentionV2 is only supported on Ascend950.");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
-    const aclTensor *valueTensor = (value == nullptr) ? key : value;
+    const aclTensor* valueTensor = (value == nullptr) ? key : value;
     if (returnSoftmaxLse) {
         if (softmaxMax == nullptr || softmaxSum == nullptr) {
             OP_LOGE(ACLNN_ERR_PARAM_NULLPTR,
@@ -84,7 +84,7 @@ aclnnStatus aclnnSparseFlashAttentionV2GetWorkspaceSize(
         attentionMode, returnSoftmaxLse, attentionOut, softmaxMax, softmaxSum, workspaceSize, executor);
 }
 
-aclnnStatus aclnnSparseFlashAttentionV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnSparseFlashAttentionV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                         const aclrtStream stream)
 {
     return aclnnInnerSparseFlashAttention(workspace, workspaceSize, executor, stream);

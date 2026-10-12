@@ -70,7 +70,7 @@ public:
     static constexpr uint32_t MAX_ROW_NUM_SUB_CORE = 256;
     static constexpr int64_t UB_FLOAT_LINE_SIZE = 64;
 
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource, float scaleValue_)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource, float scaleValue_)
     {
         // Allocate UB space
         constexpr uint32_t LS_UB_TENSOR_OFFSET = 0;
@@ -142,9 +142,9 @@ public:
         AscendC::SetVectorMask<int8_t>(maskValue, maskValue);
     }
 
-    __aicore__ inline void RowsumSPECTILE512(const AscendC::LocalTensor<float> &srcUb,
-                                             const AscendC::LocalTensor<float> &rowsumUb,
-                                             const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound,
+    __aicore__ inline void RowsumSPECTILE512(const AscendC::LocalTensor<float>& srcUb,
+                                             const AscendC::LocalTensor<float>& rowsumUb,
+                                             const AscendC::LocalTensor<float>& tvUbTensor, uint32_t numRowsRound,
                                              uint32_t numElems, uint32_t numElemsAligned)
     {
         RFA_BLOCK_REDUCE_SUM(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0, 1, 1, 8);
@@ -158,9 +158,9 @@ public:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void RowsumSPECTILE256(const AscendC::LocalTensor<float> &srcUb,
-                                             const AscendC::LocalTensor<float> &rowsumUb,
-                                             const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound,
+    __aicore__ inline void RowsumSPECTILE256(const AscendC::LocalTensor<float>& srcUb,
+                                             const AscendC::LocalTensor<float>& rowsumUb,
+                                             const AscendC::LocalTensor<float>& tvUbTensor, uint32_t numRowsRound,
                                              uint32_t numElems, uint32_t numElemsAligned)
     {
         RFA_BLOCK_REDUCE_SUM(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0, 1, 1, 8);
@@ -175,9 +175,9 @@ public:
         AscendC::SetVectorMask<int8_t>((uint64_t)-1, (uint64_t)-1);
     }
 
-    __aicore__ inline void RowsumTAILTILE(const AscendC::LocalTensor<float> &srcUb,
-                                          const AscendC::LocalTensor<float> &rowsumUb,
-                                          const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound,
+    __aicore__ inline void RowsumTAILTILE(const AscendC::LocalTensor<float>& srcUb,
+                                          const AscendC::LocalTensor<float>& rowsumUb,
+                                          const AscendC::LocalTensor<float>& tvUbTensor, uint32_t numRowsRound,
                                           uint32_t numElems, uint32_t numElemsAligned)
     {
         if (numElems >= FLOAT_VECTOR_SIZE) {
@@ -223,9 +223,9 @@ public:
         }
     }
 
-    __aicore__ inline void RowmaxSPECTILE512(const AscendC::LocalTensor<float> &srcUb,
-                                             const AscendC::LocalTensor<float> &rowmaxUb,
-                                             const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound,
+    __aicore__ inline void RowmaxSPECTILE512(const AscendC::LocalTensor<float>& srcUb,
+                                             const AscendC::LocalTensor<float>& rowmaxUb,
+                                             const AscendC::LocalTensor<float>& tvUbTensor, uint32_t numRowsRound,
                                              uint32_t numElems, uint32_t numElemsAligned)
     {
         RFA_BLOCK_REDUCE_MAX(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0, 1, 1, 8);
@@ -238,9 +238,9 @@ public:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void RowmaxSPECTILE256(const AscendC::LocalTensor<float> &srcUb,
-                                             const AscendC::LocalTensor<float> &rowmaxUb,
-                                             const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound,
+    __aicore__ inline void RowmaxSPECTILE256(const AscendC::LocalTensor<float>& srcUb,
+                                             const AscendC::LocalTensor<float>& rowmaxUb,
+                                             const AscendC::LocalTensor<float>& tvUbTensor, uint32_t numRowsRound,
                                              uint32_t numElems, uint32_t numElemsAligned)
     {
         RFA_BLOCK_REDUCE_MAX(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0, 1, 1, 8);
@@ -255,9 +255,9 @@ public:
         AscendC::SetVectorMask<int8_t>((uint64_t)-1, (uint64_t)-1);
     }
 
-    __aicore__ inline void RowmaxTAILTILE(const AscendC::LocalTensor<float> &srcUb,
-                                          const AscendC::LocalTensor<float> &rowmaxUb,
-                                          const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound,
+    __aicore__ inline void RowmaxTAILTILE(const AscendC::LocalTensor<float>& srcUb,
+                                          const AscendC::LocalTensor<float>& rowmaxUb,
+                                          const AscendC::LocalTensor<float>& tvUbTensor, uint32_t numRowsRound,
                                           uint32_t numElems, uint32_t numElemsAligned)
     {
         if (numElems >= FLOAT_VECTOR_SIZE) {
@@ -349,8 +349,8 @@ public:
     }
 
     template <typename ElementMaskDst, typename ElementMaskSrc>
-    __aicore__ inline void UpCastMask(const AscendC::LocalTensor<ElementMaskDst> &maskUbTensorDst,
-                                      const AscendC::LocalTensor<ElementMaskSrc> &maskUbTensorSrc,
+    __aicore__ inline void UpCastMask(const AscendC::LocalTensor<ElementMaskDst>& maskUbTensorDst,
+                                      const AscendC::LocalTensor<ElementMaskSrc>& maskUbTensorSrc,
                                       uint32_t rowNumCurLoop, uint32_t columnNumRound)
     {
         AscendC::Cast<ElementMaskDst, ElementMaskSrc, false>(
@@ -536,7 +536,7 @@ public:
 
     template <bool doTriUMask>
     __aicore__ inline void SubCoreCompute(AscendC::GlobalTensor<ElementOutput> gOutput,
-                                          const LayoutOutput &layoutOutput, uint32_t rowOffset,
+                                          const LayoutOutput& layoutOutput, uint32_t rowOffset,
                                           uint32_t isFirstStackTile, uint32_t isLastNoMaskStackTile,
                                           uint32_t isFirstRowLoop, uint32_t isLastRowLoop, uint32_t columnNumRound,
                                           uint32_t pingpongFlag, uint32_t curStackTileMod)
@@ -585,8 +585,8 @@ public:
     }
 
     __aicore__ inline void operator()(AscendC::GlobalTensor<ElementOutput> gOutput,
-                                      AscendC::GlobalTensor<ElementInput> gInput, const LayoutOutput &layoutOutput,
-                                      const LayoutInput &layoutInput, GemmCoord actualBlockShape,
+                                      AscendC::GlobalTensor<ElementInput> gInput, const LayoutOutput& layoutOutput,
+                                      const LayoutInput& layoutInput, GemmCoord actualBlockShape,
                                       uint32_t isFirstStackTile, uint32_t isLastNoMaskStackTile, uint32_t qSBlockSize,
                                       uint32_t qNBlockSize, uint32_t curStackTileMod)
     {
@@ -650,8 +650,8 @@ public:
 
     __aicore__ inline void operator()(AscendC::GlobalTensor<ElementOutput> gOutput,
                                       AscendC::GlobalTensor<ElementInput> gInput,
-                                      AscendC::GlobalTensor<ElementMask> gMask, const LayoutOutput &layoutOutput,
-                                      const LayoutInput &layoutInput, const LayoutInput &layoutMask,
+                                      AscendC::GlobalTensor<ElementMask> gMask, const LayoutOutput& layoutOutput,
+                                      const LayoutInput& layoutInput, const LayoutInput& layoutMask,
                                       GemmCoord actualBlockShape, uint32_t isFirstStackTile, uint32_t qSBlockSize,
                                       uint32_t qNBlockSize, uint32_t curStackTileMod, Arch::CrossCoreFlag qkReady,
                                       uint32_t triUp, uint32_t triDown, uint32_t kvSStartIdx, uint32_t kvSEndIdx)

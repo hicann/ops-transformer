@@ -31,8 +31,8 @@ namespace {
 static constexpr int64_t DIM_QK = 128;
 static constexpr int64_t MAX_BATCH_SIZE = 1024;
 
-static aclnnStatus CheckNullptr(const aclTensor *q, const aclIntArray *qSeqLens, const aclIntArray *cuSeqLensQ,
-                                const aclTensor *qFlat, uint64_t *workspaceSize, aclOpExecutor **executor)
+static aclnnStatus CheckNullptr(const aclTensor* q, const aclIntArray* qSeqLens, const aclIntArray* cuSeqLensQ,
+                                const aclTensor* qFlat, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     CHECK_RET(q != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(qSeqLens != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -43,8 +43,8 @@ static aclnnStatus CheckNullptr(const aclTensor *q, const aclIntArray *qSeqLens,
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckShape(const aclTensor *q, const aclIntArray *qSeqLens, const aclIntArray *cuSeqLensQ,
-                              const aclTensor *qScale, const aclTensor *qFlat)
+static aclnnStatus CheckShape(const aclTensor* q, const aclIntArray* qSeqLens, const aclIntArray* cuSeqLensQ,
+                              const aclTensor* qScale, const aclTensor* qFlat)
 {
     auto qShape = q->GetViewShape();
     if (qShape.GetDimNum() != 3) {
@@ -69,7 +69,7 @@ static aclnnStatus CheckShape(const aclTensor *q, const aclIntArray *qSeqLens, c
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    const int64_t *cuData = cuSeqLensQ->GetData();
+    const int64_t* cuData = cuSeqLensQ->GetData();
     if (cuData[0] != 0) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "cuSeqLensQ[0] must be 0, but got %ld.", cuData[0]);
         return ACLNN_ERR_PARAM_INVALID;
@@ -103,7 +103,7 @@ static aclnnStatus CheckShape(const aclTensor *q, const aclIntArray *qSeqLens, c
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckDtype(const aclTensor *q, const aclTensor *qScale, const aclTensor *qFlat)
+static aclnnStatus CheckDtype(const aclTensor* q, const aclTensor* qScale, const aclTensor* qFlat)
 {
     auto qDtype = q->GetDataType();
     if (qDtype != DataType::DT_FLOAT8_E4M3FN) {
@@ -153,17 +153,17 @@ static aclnnStatus CheckAttr(int64_t stemBlockSize, int64_t stemStride)
 
 } // namespace
 
-aclnnStatus aclnnStemOamPrepVarlenQGetWorkspaceSize(const aclTensor *q, const aclIntArray *qSeqLens,
-                                                    const aclIntArray *cuSeqLensQ, const aclTensor *qScale,
-                                                    int64_t stemBlockSize, int64_t stemStride, aclTensor *qFlat,
-                                                    uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnStemOamPrepVarlenQGetWorkspaceSize(const aclTensor* q, const aclIntArray* qSeqLens,
+                                                    const aclIntArray* cuSeqLensQ, const aclTensor* qScale,
+                                                    int64_t stemBlockSize, int64_t stemStride, aclTensor* qFlat,
+                                                    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnStemOamPrepVarlenQ, DFX_IN(q, qSeqLens, cuSeqLensQ, qScale, stemBlockSize, stemStride),
                    DFX_OUT(qFlat));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-    auto *executorImpl = uniqueExecutor.get();
+    auto* executorImpl = uniqueExecutor.get();
 
     aclnnStatus ret = CheckNullptr(q, qSeqLens, cuSeqLensQ, qFlat, workspaceSize, executor);
     if (ret != ACLNN_SUCCESS) {
@@ -210,7 +210,7 @@ aclnnStatus aclnnStemOamPrepVarlenQGetWorkspaceSize(const aclTensor *q, const ac
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnStemOamPrepVarlenQ(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnStemOamPrepVarlenQ(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                     aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnStemOamPrepVarlenQ);

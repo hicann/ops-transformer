@@ -24,7 +24,7 @@ namespace AttentionCommon {
 
 // 将物理地址块从 UB 拷出到 GM
 __aicore__ inline void CopyPhyAddrToGm(LocalTensor<uint32_t> kvPhyAddrUb, int64_t bS1Idx, int64_t s1Idx,
-                                       int64_t validS2, int64_t alignNum, GlobalTensor<uint32_t> &phyAddrGm,
+                                       int64_t validS2, int64_t alignNum, GlobalTensor<uint32_t>& phyAddrGm,
                                        uint32_t alignedSparseBlockCount)
 {
     constexpr int64_t numPerBlock = 32;
@@ -39,7 +39,7 @@ __aicore__ inline void CopyPhyAddrToGm(LocalTensor<uint32_t> kvPhyAddrUb, int64_
 
 // 将 paged attention block table 从 GM 搬入 UB
 __aicore__ inline void CopyPaTableToUb(LocalTensor<int32_t> blkTableUb, int64_t bIdx,
-                                       GlobalTensor<int32_t> &blockTableGm, uint32_t maxBlockNumPerBatch)
+                                       GlobalTensor<int32_t>& blockTableGm, uint32_t maxBlockNumPerBatch)
 {
     DataCopyExtParams params;
     params.blockCount = 1U;
@@ -52,7 +52,7 @@ __aicore__ inline void CopyPaTableToUb(LocalTensor<int32_t> blkTableUb, int64_t 
 
 // 将 sparse block 索引从 GM 搬入 UB
 __aicore__ inline void CopySparseIdxToUb(LocalTensor<int32_t> sparseIdxUb, int64_t bS1Idx, int64_t s1Idx,
-                                         int64_t validS2, GlobalTensor<int32_t> &sparseIndicesGm,
+                                         int64_t validS2, GlobalTensor<int32_t>& sparseIndicesGm,
                                          uint32_t sparseBlockCount)
 {
     DataCopyExtParams params;

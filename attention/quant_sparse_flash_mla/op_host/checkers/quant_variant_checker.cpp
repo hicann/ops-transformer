@@ -14,14 +14,14 @@
 namespace optiling {
 namespace sparse_mla_checker {
 namespace {
-const char *Op(const CheckContext &context)
+const char* Op(const CheckContext& context)
 {
     return context.opName == nullptr ? "QuantSparseFlashMla" : context.opName;
 }
 } // namespace
 
-ge::graphStatus QuantVariantChecker::CheckDescale(const CheckContext &context, const TensorParam &param,
-                                                  const char *name) const
+ge::graphStatus QuantVariantChecker::CheckDescale(const CheckContext& context, const TensorParam& param,
+                                                  const char* name) const
 {
     if (!param.present) {
         return ge::GRAPH_SUCCESS;
@@ -33,7 +33,7 @@ ge::graphStatus QuantVariantChecker::CheckDescale(const CheckContext &context, c
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantVariantChecker::CheckSinglePara(const CheckContext &context) const
+ge::graphStatus QuantVariantChecker::CheckSinglePara(const CheckContext& context) const
 {
     OP_CHECK_IF(context.quantMode != 1,
                 OP_LOGE_FOR_INVALID_VALUE(Op(context), "quant_mode", std::to_string(context.quantMode).c_str(), "1"),
@@ -46,20 +46,19 @@ ge::graphStatus QuantVariantChecker::CheckSinglePara(const CheckContext &context
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantVariantChecker::CheckParaExistence(const CheckContext &context) const
+ge::graphStatus QuantVariantChecker::CheckParaExistence(const CheckContext& context) const
 {
-    OP_CHECK_IF(!context.qDescale.present,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                    Op(context), "q_descale", "Q_descale is required when quant_mode=1"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        !context.qDescale.present,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Op(context), "q_descale", "Q_descale is required when quant_mode=1"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(!context.oriKvDescale.present,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                    Op(context), "ori_kv_descale", "Ori_kv_descale is required when quant_mode=1"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Op(context), "ori_kv_descale",
+                                                         "Ori_kv_descale is required when quant_mode=1"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(context.cmpKv.present != context.cmpKvDescale.present,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                    Op(context), "cmp_kv_descale",
-                    "Cmp_kv_descale must be present exactly when cmp_kv is present"),
+                    Op(context), "cmp_kv_descale", "Cmp_kv_descale must be present exactly when cmp_kv is present"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

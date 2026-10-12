@@ -23,39 +23,30 @@ using namespace AscendC;
 #define TILINGKEY_REGBASE_SOFTMAX_TND 110
 #define TILINGKEY_REGBASE_TND 120
 
-extern "C" __global__ __aicore__ void ring_attention_update(
-    GM_ADDR prevAttnOut, GM_ADDR prevSoftmaxMax, GM_ADDR prevSoftmaxSum,
-    GM_ADDR curAttnOut, GM_ADDR curSoftmaxMax, GM_ADDR curSoftmaxSum,
-    GM_ADDR actualSeqQlen,
-    GM_ADDR attnOut, GM_ADDR softmaxMax, GM_ADDR softmaxSum,
-    GM_ADDR workspace, GM_ADDR tiling) {
-        TPipe pipe;
-        if (TILING_KEY_IS(TILINGKEY_REGBASE_SBH)) {
-            GET_TILING_DATA_WITH_STRUCT(RingAttentionUpdateRegbaseSBHTilingData, tilingData, tiling);
-            KernelRingAttentionUpdateRegbaseSBH<DTYPE_PREV_ATTN_OUT> op;
-            op.Init(prevAttnOut, prevSoftmaxMax, prevSoftmaxSum,
-                    curAttnOut, curSoftmaxMax, curSoftmaxSum,
-                    actualSeqQlen,
-                    attnOut, softmaxMax, softmaxSum,
-                    workspace, &tilingData, &pipe);
-            op.Process();   
-        } else if (TILING_KEY_IS(TILINGKEY_REGBASE_SOFTMAX_TND)) {
-            GET_TILING_DATA_WITH_STRUCT(RingAttentionUpdateRegbaseSoftmaxTNDTilingData, tilingData, tiling);
-            KernelRingAttentionUpdateRegbaseSoftmaxTND<DTYPE_PREV_ATTN_OUT> op;
-            op.Init(prevAttnOut, prevSoftmaxMax, prevSoftmaxSum,
-                    curAttnOut, curSoftmaxMax, curSoftmaxSum,
-                    actualSeqQlen,
-                    attnOut, softmaxMax, softmaxSum,
-                    workspace, &tilingData, &pipe);
-            op.Process();
-        } else if (TILING_KEY_IS(TILINGKEY_REGBASE_TND)) {
-            GET_TILING_DATA_WITH_STRUCT(RingAttentionUpdateRegbaseTNDTilingData, tilingData, tiling);
-            KernelRingAttentionUpdateRegbaseTND<DTYPE_PREV_ATTN_OUT> op;
-            op.Init(prevAttnOut, prevSoftmaxMax, prevSoftmaxSum,
-                    curAttnOut, curSoftmaxMax, curSoftmaxSum,
-                    actualSeqQlen,
-                    attnOut, softmaxMax, softmaxSum,
-                    workspace, &tilingData, &pipe);
-            op.Process();
-        }
+extern "C" __global__ __aicore__ void ring_attention_update(GM_ADDR prevAttnOut, GM_ADDR prevSoftmaxMax,
+                                                            GM_ADDR prevSoftmaxSum, GM_ADDR curAttnOut,
+                                                            GM_ADDR curSoftmaxMax, GM_ADDR curSoftmaxSum,
+                                                            GM_ADDR actualSeqQlen, GM_ADDR attnOut, GM_ADDR softmaxMax,
+                                                            GM_ADDR softmaxSum, GM_ADDR workspace, GM_ADDR tiling)
+{
+    TPipe pipe;
+    if (TILING_KEY_IS(TILINGKEY_REGBASE_SBH)) {
+        GET_TILING_DATA_WITH_STRUCT(RingAttentionUpdateRegbaseSBHTilingData, tilingData, tiling);
+        KernelRingAttentionUpdateRegbaseSBH<DTYPE_PREV_ATTN_OUT> op;
+        op.Init(prevAttnOut, prevSoftmaxMax, prevSoftmaxSum, curAttnOut, curSoftmaxMax, curSoftmaxSum, actualSeqQlen,
+                attnOut, softmaxMax, softmaxSum, workspace, &tilingData, &pipe);
+        op.Process();
+    } else if (TILING_KEY_IS(TILINGKEY_REGBASE_SOFTMAX_TND)) {
+        GET_TILING_DATA_WITH_STRUCT(RingAttentionUpdateRegbaseSoftmaxTNDTilingData, tilingData, tiling);
+        KernelRingAttentionUpdateRegbaseSoftmaxTND<DTYPE_PREV_ATTN_OUT> op;
+        op.Init(prevAttnOut, prevSoftmaxMax, prevSoftmaxSum, curAttnOut, curSoftmaxMax, curSoftmaxSum, actualSeqQlen,
+                attnOut, softmaxMax, softmaxSum, workspace, &tilingData, &pipe);
+        op.Process();
+    } else if (TILING_KEY_IS(TILINGKEY_REGBASE_TND)) {
+        GET_TILING_DATA_WITH_STRUCT(RingAttentionUpdateRegbaseTNDTilingData, tilingData, tiling);
+        KernelRingAttentionUpdateRegbaseTND<DTYPE_PREV_ATTN_OUT> op;
+        op.Init(prevAttnOut, prevSoftmaxMax, prevSoftmaxSum, curAttnOut, curSoftmaxMax, curSoftmaxSum, actualSeqQlen,
+                attnOut, softmaxMax, softmaxSum, workspace, &tilingData, &pipe);
+        op.Process();
+    }
 }

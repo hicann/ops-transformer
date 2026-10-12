@@ -37,7 +37,7 @@ constexpr uint32_t OUTPUT_INDEX_0 = 0;
 constexpr uint32_t OUTPUT_INDEX_1 = 1;
 constexpr uint32_t OUTPUT_INDEX_2 = 2;
 
-static std::vector<int64_t> ToVectorFunc(const gert::Shape *shape)
+static std::vector<int64_t> ToVectorFunc(const gert::Shape* shape)
 {
     size_t shapeSize = shape->GetDimNum();
     std::vector<int64_t> shapeVec(shapeSize, 0);
@@ -48,7 +48,7 @@ static std::vector<int64_t> ToVectorFunc(const gert::Shape *shape)
     return shapeVec;
 }
 
-static std::string ToStringFunc(const gert::Shape *shape)
+static std::string ToStringFunc(const gert::Shape* shape)
 {
     std::ostringstream oss;
     auto v = ToVectorFunc(shape);
@@ -61,7 +61,7 @@ static std::string ToStringFunc(const gert::Shape *shape)
     return oss.str();
 }
 
-static int64_t GetKvHeadNum(const gert::Shape *kvShape, const std::string &layoutKv)
+static int64_t GetKvHeadNum(const gert::Shape* kvShape, const std::string& layoutKv)
 {
     if (layoutKv == "TND") {
         return kvShape->GetDim(DIM_INDEX_1);
@@ -69,41 +69,40 @@ static int64_t GetKvHeadNum(const gert::Shape *kvShape, const std::string &layou
     return kvShape->GetDim(DIM_INDEX_2);
 }
 
-ge::graphStatus InferShapeSparseFlashAttention(gert::InferShapeContext *context)
+ge::graphStatus InferShapeSparseFlashAttention(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("SparseFlashAttention", "InferShapeContext is nullptr"),
                 return ge::GRAPH_FAILED);
-    const gert::Shape *queryShape = context->GetInputShape(QUERY_INPUT_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(QUERY_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
 
-    const gert::Shape *keyShape = context->GetInputShape(KEY_INPUT_INDEX);
+    const gert::Shape* keyShape = context->GetInputShape(KEY_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
 
-    gert::Shape *attentionOutShape = context->GetOutputShape(0);
+    gert::Shape* attentionOutShape = context->GetOutputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
     *attentionOutShape = *queryShape;
 
-    gert::Shape *softmaxMaxShape = context->GetOutputShape(1);
+    gert::Shape* softmaxMaxShape = context->GetOutputShape(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxMaxShape);
 
-    gert::Shape *softmaxSumShape = context->GetOutputShape(2);
+    gert::Shape* softmaxSumShape = context->GetOutputShape(2);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxSumShape);
 
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const char *inputLayoutKeyPtr = attrs->GetAttrPointer<char>(LAYOUT_KEY_ATTR_INDEX);
+    const char* inputLayoutKeyPtr = attrs->GetAttrPointer<char>(LAYOUT_KEY_ATTR_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutKeyPtr);
     std::string inputLayoutKeyPtrStr = std::string(inputLayoutKeyPtr);
-    const bool *lse_flag = attrs->GetAttrPointer<bool>(RETURN_SOFTMAX_LSE_INDEX);
+    const bool* lse_flag = attrs->GetAttrPointer<bool>(RETURN_SOFTMAX_LSE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, lse_flag);
     bool return_softmax_lse = (lse_flag != nullptr) ? *lse_flag : false;
 
     int64_t kvHeadNum = GetKvHeadNum(keyShape, inputLayoutKeyPtrStr);
     OP_CHECK_IF(kvHeadNum == 0,
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("SparseFlashAttention", "key",
-            ToStringFunc(keyShape).c_str(),
-            "The head num of key should not be 0"),
-        return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("SparseFlashAttention", "key", ToStringFunc(keyShape).c_str(),
+                                                      "The head num of key should not be 0"),
+                return ge::GRAPH_FAILED);
 
     if (return_softmax_lse) {
         if (queryShape->GetDimNum() == DIM_NUM_3) {
@@ -139,7 +138,7 @@ ge::graphStatus InferShapeSparseFlashAttention(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeSparseFlashAttention(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeSparseFlashAttention(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("SparseFlashAttention", "InferShapeContext is nullptr"),
                 return ge::GRAPH_FAILED);

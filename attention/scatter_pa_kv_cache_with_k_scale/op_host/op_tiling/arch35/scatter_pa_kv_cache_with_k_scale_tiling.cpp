@@ -84,13 +84,13 @@ struct ScatterPaKvCacheWithKScaleCompileInfo {};
 
 // ==================== tensor info (shape + stride, align gather_elements) ====================
 
-static void GetTensorInfo(gert::TilingContext *ctx, size_t idx, int64_t *shape, int64_t *stride, int64_t &dimNum)
+static void GetTensorInfo(gert::TilingContext* ctx, size_t idx, int64_t* shape, int64_t* stride, int64_t& dimNum)
 {
-    auto *shapeRef = ctx->GetInputShape(idx);
+    auto* shapeRef = ctx->GetInputShape(idx);
 
     bool isView = ctx->InputIsView(idx);
     if (isView) {
-        auto *s = ctx->GetInputStride(idx);
+        auto* s = ctx->GetInputStride(idx);
         if (s != nullptr && s->GetDimNum() > 0) {
             auto viewShape = shapeRef->GetShape();
             dimNum = viewShape.GetDimNum();
@@ -114,9 +114,9 @@ static void GetTensorInfo(gert::TilingContext *ctx, size_t idx, int64_t *shape, 
 
 // ==================== platform / workspace ====================
 
-static ge::graphStatus GetPlatformInfo(gert::TilingContext *context, uint64_t &ubSize, int64_t &coreNum)
+static ge::graphStatus GetPlatformInfo(gert::TilingContext* context, uint64_t& ubSize, int64_t& coreNum)
 {
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfoPtr);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     coreNum = ascendcPlatform.GetCoreNumAiv();
@@ -132,12 +132,12 @@ static ge::graphStatus GetPlatformInfo(gert::TilingContext *context, uint64_t &u
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus GetWorkspaceSize(gert::TilingContext *context)
+static ge::graphStatus GetWorkspaceSize(gert::TilingContext* context)
 {
     int64_t userWorkspaceSize = 0;
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint64_t sysWorkspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
-    size_t *currentWorkspace = context->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, currentWorkspace);
     currentWorkspace[0] = static_cast<size_t>(userWorkspaceSize + static_cast<int64_t>(sysWorkspaceSize));
     return ge::GRAPH_SUCCESS;
@@ -145,7 +145,7 @@ static ge::graphStatus GetWorkspaceSize(gert::TilingContext *context)
 
 // ==================== dtype validation ====================
 
-static ge::graphStatus ValidateDtype(gert::TilingContext *context)
+static ge::graphStatus ValidateDtype(gert::TilingContext* context)
 {
     auto keyDesc = context->GetInputDesc(INPUT_KEY_IDX);
     auto valueDesc = context->GetInputDesc(INPUT_VALUE_IDX);
@@ -203,9 +203,9 @@ static ge::graphStatus ValidateDtype(gert::TilingContext *context)
 
 // ==================== shape validation ====================
 
-static gert::Shape GetTensorShape(gert::TilingContext *context, size_t idx)
+static gert::Shape GetTensorShape(gert::TilingContext* context, size_t idx)
 {
-    auto *shapeRef = context->GetInputShape(idx);
+    auto* shapeRef = context->GetInputShape(idx);
     if (shapeRef == nullptr) {
         return gert::Shape();
     }
@@ -218,7 +218,7 @@ static gert::Shape GetTensorShape(gert::TilingContext *context, size_t idx)
     }
 }
 
-static ge::graphStatus ValidateShape(gert::TilingContext *context, int64_t numTokens, int64_t numHead,
+static ge::graphStatus ValidateShape(gert::TilingContext* context, int64_t numTokens, int64_t numHead,
                                      int64_t kHeadSize, int64_t vHeadSize, int64_t numBlocks, int64_t blockSize)
 {
     auto valueShape = GetTensorShape(context, INPUT_VALUE_IDX);
@@ -336,7 +336,7 @@ static ge::graphStatus ValidateShape(gert::TilingContext *context, int64_t numTo
 // ==================== stride copy helpers ====================
 
 template <size_t N>
-static void CopyStrides(int64_t *dst, const int64_t *src)
+static void CopyStrides(int64_t* dst, const int64_t* src)
 {
     for (size_t i = 0; i < N; ++i) {
         dst[i] = src[i];
@@ -362,7 +362,7 @@ struct TensorParams {
     int64_t keyScaleCacheStride[KEY_SCALE_CACHE_DIM_NUM];
 };
 
-static ge::graphStatus ExtractTensorParams(gert::TilingContext *context, TensorParams &params)
+static ge::graphStatus ExtractTensorParams(gert::TilingContext* context, TensorParams& params)
 {
     int64_t keyShapeArr[KEY_DIM_NUM];
     int64_t keyStrideArr[KEY_DIM_NUM];
@@ -448,7 +448,7 @@ static ge::graphStatus ExtractTensorParams(gert::TilingContext *context, TensorP
 
 // ==================== fill tiling data ====================
 
-static void FillTilingData(ScatterPaKvCacheWithKScaleTilingData *tiling, const TensorParams &params, int64_t coreNum,
+static void FillTilingData(ScatterPaKvCacheWithKScaleTilingData* tiling, const TensorParams& params, int64_t coreNum,
                            uint64_t ubSize, int64_t tplMode)
 {
     tiling->numTokens = params.numTokens;
@@ -490,7 +490,7 @@ static void FillTilingData(ScatterPaKvCacheWithKScaleTilingData *tiling, const T
 
 // ==================== dump tiling info ====================
 
-static void DumpTilingInfo(gert::TilingContext *context, const ScatterPaKvCacheWithKScaleTilingData *tiling,
+static void DumpTilingInfo(gert::TilingContext* context, const ScatterPaKvCacheWithKScaleTilingData* tiling,
                            int64_t tplMode)
 {
     OP_LOGI(context, "==================== ScatterPaKvCacheWithKScale Tiling Info ====================");
@@ -536,7 +536,7 @@ static void DumpTilingInfo(gert::TilingContext *context, const ScatterPaKvCacheW
 constexpr int64_t SIMD_MIN_HEAD_SIZE_BYTES = 128;
 
 // 算子仅支持 FP8（1 字节）key/value，返回 0 表示未知 dtype（走 SIMT 兜底）
-static int64_t GetKeyDtypeSize(gert::TilingContext *context)
+static int64_t GetKeyDtypeSize(gert::TilingContext* context)
 {
     auto keyDesc = context->GetInputDesc(INPUT_KEY_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyDesc);
@@ -550,7 +550,7 @@ static int64_t GetKeyDtypeSize(gert::TilingContext *context)
 // SIMD 模板使用 DataCopyPad 多行搬运，要求 headSize 不小于 128B、key/value/cache 尾轴连续且头间无重叠，
 // key_scale 走 DataCopyPad 多块拷贝，要求尾轴 stride 为正；
 // PCIe through 场景下 tensor 布局由框架保证，直接选择 simd 模板
-static bool IsSimdCapable(gert::TilingContext *context, const TensorParams &params, int64_t dtypeSize)
+static bool IsSimdCapable(gert::TilingContext* context, const TensorParams& params, int64_t dtypeSize)
 {
     if (dtypeSize <= 0) {
         return false;
@@ -576,7 +576,7 @@ static bool IsSimdCapable(gert::TilingContext *context, const TensorParams &para
 
 // ==================== set tiling key ====================
 
-static void SetTilingKeyByScene(gert::TilingContext *context, int64_t kHeadSize, int64_t vHeadSize, int64_t tplMode)
+static void SetTilingKeyByScene(gert::TilingContext* context, int64_t kHeadSize, int64_t vHeadSize, int64_t tplMode)
 {
     uint64_t schMode =
         (kHeadSize == vHeadSize) ? SCATTER_KV_CACHE_SCENE_SPECIALIZED : SCATTER_KV_CACHE_SCENE_GENERALIZED;
@@ -586,7 +586,7 @@ static void SetTilingKeyByScene(gert::TilingContext *context, int64_t kHeadSize,
 
 // ==================== main tiling ====================
 
-static ge::graphStatus ScatterPaKvCacheWithKScaleTilingFunc(gert::TilingContext *context)
+static ge::graphStatus ScatterPaKvCacheWithKScaleTilingFunc(gert::TilingContext* context)
 {
     uint64_t ubSize;
     int64_t coreNum;
@@ -619,7 +619,7 @@ static ge::graphStatus ScatterPaKvCacheWithKScaleTilingFunc(gert::TilingContext 
     int64_t tplMode =
         IsSimdCapable(context, params, keyDtypeSize) ? SCATTER_KV_CACHE_TPL_SIMD : SCATTER_KV_CACHE_TPL_SIMT;
 
-    ScatterPaKvCacheWithKScaleTilingData *tiling = context->GetTilingData<ScatterPaKvCacheWithKScaleTilingData>();
+    ScatterPaKvCacheWithKScaleTilingData* tiling = context->GetTilingData<ScatterPaKvCacheWithKScaleTilingData>();
     OP_CHECK_NULL_WITH_CONTEXT(context, tiling);
     if (memset_s(tiling, sizeof(ScatterPaKvCacheWithKScaleTilingData), 0,
                  sizeof(ScatterPaKvCacheWithKScaleTilingData)) != EOK) {
@@ -647,7 +647,7 @@ static ge::graphStatus ScatterPaKvCacheWithKScaleTilingFunc(gert::TilingContext 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingParseForScatterPaKvCacheWithKScale([[maybe_unused]] gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForScatterPaKvCacheWithKScale([[maybe_unused]] gert::TilingParseContext* context)
 {
     return ge::GRAPH_SUCCESS;
 }

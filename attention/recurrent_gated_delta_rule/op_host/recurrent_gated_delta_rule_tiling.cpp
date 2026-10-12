@@ -62,7 +62,7 @@ void RecurrentGatedDeltaRuleTiling::InitCompileInfo()
         OP_LOGE(context_->GetNodeName(), "platformInfoPtr is null");
         return;
     }
-    const auto &ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
+    const auto& ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfo_.ubSize);
     compileInfo_.aivNum = ascendcPlatform.GetCoreNumAiv();
 
@@ -138,14 +138,14 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::PostTiling()
     context_->SetBlockDim(tilingData_.vectorCoreNum);
     auto tilingDataSize = sizeof(RecurrentGatedDeltaRuleTilingData);
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d.", ret);
         return ge::GRAPH_FAILED;
     }
     context_->GetRawTilingData()->SetDataSize(tilingDataSize);
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     OP_CHECK_IF(workspaces == nullptr, OPS_REPORT_CUBE_INNER_ERR(context_->GetNodeName(), "workspaces is null."),
                 return ge::GRAPH_FAILED);
     workspaces[0] = workspaceSize_;
@@ -154,7 +154,7 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::PostTiling()
 }
 
 ge::graphStatus RecurrentGatedDeltaRuleTiling::CheckOptionalInputContext(const size_t optionalIndex,
-                                                                         const std::string &optionalName)
+                                                                         const std::string& optionalName)
 {
     OP_CHECK_IF(context_->GetOptionalInputDesc(optionalIndex) == nullptr &&
                     context_->GetOptionalInputTensor(optionalIndex) != nullptr,
@@ -258,7 +258,7 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeDtype()
 }
 
 // 检查维度数量是否符合预期
-bool RecurrentGatedDeltaRuleTiling::CheckDim(const gert::Shape shape, const size_t dim, const std::string &dimDesc)
+bool RecurrentGatedDeltaRuleTiling::CheckDim(const gert::Shape shape, const size_t dim, const std::string& dimDesc)
 {
     if (shape.GetDimNum() != dim) {
         OP_LOGE(context_->GetNodeName(), "The number of dimensions of %s should be %zu, but it is %zu.",
@@ -270,10 +270,10 @@ bool RecurrentGatedDeltaRuleTiling::CheckDim(const gert::Shape shape, const size
 
 ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeShapesParser()
 {
-    const auto &queryShape = context_->GetInputShape(QUERY_INDEX)->GetStorageShape();
-    const auto &valueShape = context_->GetInputShape(VALUE_INDEX)->GetStorageShape();
-    const auto &stateShape = context_->GetInputShape(STATE_INDEX)->GetStorageShape();
-    const auto &actSeqlensShape = context_->GetInputShape(ACTUAL_SEQ_LENGTHS_INDEX)->GetStorageShape();
+    const auto& queryShape = context_->GetInputShape(QUERY_INDEX)->GetStorageShape();
+    const auto& valueShape = context_->GetInputShape(VALUE_INDEX)->GetStorageShape();
+    const auto& stateShape = context_->GetInputShape(STATE_INDEX)->GetStorageShape();
+    const auto& actSeqlensShape = context_->GetInputShape(ACTUAL_SEQ_LENGTHS_INDEX)->GetStorageShape();
 
     int64_t t = queryShape.GetDim(DIM_0);
     int64_t nk = queryShape.GetDim(DIM_1);
@@ -376,7 +376,7 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeOptionalShapes()
     // num_accepted_tokens (B)
     gert::Shape expectNumAcceptedShape = gert::Shape({tilingData_.b});
     if (tilingData_.hasGama == 1) {
-        const auto &gShape = context_->GetOptionalInputShape(G_INDEX)->GetStorageShape();
+        const auto& gShape = context_->GetOptionalInputShape(G_INDEX)->GetStorageShape();
         if (!CheckDim(gShape, G_DIM_NUM, "g")) {
             return ge::GRAPH_FAILED;
         }
@@ -387,7 +387,7 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeOptionalShapes()
             return ge::GRAPH_FAILED);
     }
     if (tilingData_.hasGamaK == 1) {
-        const auto &gkShape = context_->GetOptionalInputShape(GK_INDEX)->GetStorageShape();
+        const auto& gkShape = context_->GetOptionalInputShape(GK_INDEX)->GetStorageShape();
         if (!CheckDim(gkShape, GK_DIM_NUM, "gk")) {
             return ge::GRAPH_FAILED;
         }
@@ -399,7 +399,7 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeOptionalShapes()
                     return ge::GRAPH_FAILED);
     }
     if (tilingData_.hasAcceptedTokens == 1) {
-        const auto &numAcceptedShape = context_->GetOptionalInputShape(NUM_ACCEPTED_TOKENS_INDEX)->GetStorageShape();
+        const auto& numAcceptedShape = context_->GetOptionalInputShape(NUM_ACCEPTED_TOKENS_INDEX)->GetStorageShape();
         if (!CheckDim(numAcceptedShape, NUM_ACCEPTED_TOKENS_DIM_NUM, "num_accepted_tokens")) {
             return ge::GRAPH_FAILED;
         }
@@ -414,14 +414,14 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeOptionalShapes()
 
 ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeShapes()
 {
-    const auto &queryShape = context_->GetInputShape(QUERY_INDEX)->GetStorageShape();
-    const auto &keyShape = context_->GetInputShape(KEY_INDEX)->GetStorageShape();
-    const auto &valueShape = context_->GetInputShape(VALUE_INDEX)->GetStorageShape();
-    const auto &betaShape = context_->GetInputShape(BETA_INDEX)->GetStorageShape();
-    const auto &stateShape = context_->GetInputShape(STATE_INDEX)->GetStorageShape();
-    const auto &actSeqlensShape = context_->GetInputShape(ACTUAL_SEQ_LENGTHS_INDEX)->GetStorageShape();
-    const auto &ssmStateShape = context_->GetInputShape(SSM_STATE_INDICES_INDEX)->GetStorageShape();
-    const auto &outShape = context_->GetOutputShape(OUT_INDEX)->GetStorageShape();
+    const auto& queryShape = context_->GetInputShape(QUERY_INDEX)->GetStorageShape();
+    const auto& keyShape = context_->GetInputShape(KEY_INDEX)->GetStorageShape();
+    const auto& valueShape = context_->GetInputShape(VALUE_INDEX)->GetStorageShape();
+    const auto& betaShape = context_->GetInputShape(BETA_INDEX)->GetStorageShape();
+    const auto& stateShape = context_->GetInputShape(STATE_INDEX)->GetStorageShape();
+    const auto& actSeqlensShape = context_->GetInputShape(ACTUAL_SEQ_LENGTHS_INDEX)->GetStorageShape();
+    const auto& ssmStateShape = context_->GetInputShape(SSM_STATE_INDICES_INDEX)->GetStorageShape();
+    const auto& outShape = context_->GetOutputShape(OUT_INDEX)->GetStorageShape();
 
     if (!CheckDim(queryShape, QKV_DIM_NUM, "query") || !CheckDim(keyShape, QKV_DIM_NUM, "key") ||
         !CheckDim(valueShape, QKV_DIM_NUM, "value") || !CheckDim(betaShape, BETA_DIM_NUM, "beta") ||
@@ -511,7 +511,7 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeShapes()
 }
 
 // 检查是否为FormatND格式
-bool RecurrentGatedDeltaRuleTiling::CheckFormat(ge::Format format, const std::string &Desc)
+bool RecurrentGatedDeltaRuleTiling::CheckFormat(ge::Format format, const std::string& Desc)
 {
     if (format == ge::FORMAT_FRACTAL_NZ) {
         OP_LOGE(context_->GetNodeName(), "%s format not support NZ", Desc.c_str());
@@ -663,19 +663,19 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::CalUbSize()
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus RecurrentGatedDeltaRuleTilingFunc(gert::TilingContext *context)
+static ge::graphStatus RecurrentGatedDeltaRuleTilingFunc(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("RecurrentGatedDeltaRule", "context is null."),
                 return ge::GRAPH_FAILED);
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-static ge::graphStatus TilingPrepareForRecurrentGatedDeltaRule(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForRecurrentGatedDeltaRule(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("RecurrentGatedDeltaRule", "context is null."),
                 return ge::GRAPH_FAILED);
 
-    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfo == nullptr, OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "platformInfoPtr is null."),
                 return ge::GRAPH_FAILED);
 

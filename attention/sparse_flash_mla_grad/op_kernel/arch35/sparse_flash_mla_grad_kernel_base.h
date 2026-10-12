@@ -31,35 +31,35 @@ public:
                                 GM_ADDR ori_topk_length, GM_ADDR cmp_topk_length, GM_ADDR softmax_lse, GM_ADDR sinks,
                                 GM_ADDR metadata, GM_ADDR dq, GM_ADDR dori_kv, GM_ADDR dcmp_kv, GM_ADDR dsinks,
                                 GM_ADDR ori_softmax_l1, GM_ADDR cmp_softmax_l1, GM_ADDR workspace,
-                                SFagTilingType ordTilingData, TPipe *pipeIn);
+                                SFagTilingType ordTilingData, TPipe* pipeIn);
     __aicore__ inline void InitCVCommonBuffer();
     __aicore__ inline void InitCVCommonGlobalBuffer(GM_ADDR workspace);
     __aicore__ inline void SetConstInfo();
     __aicore__ inline void SetOptionalInfo();
     template <const bool IS_ORI_KV = true>
-    __aicore__ inline void SetRunInfo(FagRunInfo &runInfo, FagRunInfo &preRunInfo, int64_t taskId, int64_t sTaskId,
+    __aicore__ inline void SetRunInfo(FagRunInfo& runInfo, FagRunInfo& preRunInfo, int64_t taskId, int64_t sTaskId,
                                       int64_t deterTaskId, int64_t kvOffset);
     template <const bool IS_ORI_KV = true>
-    __aicore__ inline void SetDeterRunInfo(FagRunInfo &runInfo, int64_t sTaskId, int64_t deterTaskId,
+    __aicore__ inline void SetDeterRunInfo(FagRunInfo& runInfo, int64_t sTaskId, int64_t deterTaskId,
                                            int64_t kvSeqOffset);
     __aicore__ inline void Process();
     template <bool IS_MM1_MM2 = true>
-    __aicore__ inline int64_t GetQueryOffset(FagRunInfo &runInfo);
-    __aicore__ inline int64_t GetQueryRopeOffset(FagRunInfo &runInfo);
-    __aicore__ inline int64_t GetDxOffset(FagRunInfo &runInfo);
+    __aicore__ inline int64_t GetQueryOffset(FagRunInfo& runInfo);
+    __aicore__ inline int64_t GetQueryRopeOffset(FagRunInfo& runInfo);
+    __aicore__ inline int64_t GetDxOffset(FagRunInfo& runInfo);
     template <const bool IS_ORI_KV = true>
-    __aicore__ inline int64_t GetKeyOffset(FagRunInfo &runInfo);
-    __aicore__ inline int64_t GetKeyRopeOffset(FagRunInfo &runInfo);
-    __aicore__ inline int64_t GetValueOffset(FagRunInfo &runInfo);
+    __aicore__ inline int64_t GetKeyOffset(FagRunInfo& runInfo);
+    __aicore__ inline int64_t GetKeyRopeOffset(FagRunInfo& runInfo);
+    __aicore__ inline int64_t GetValueOffset(FagRunInfo& runInfo);
     __aicore__ inline void SyncALLCores();
-    __aicore__ inline void GetSeqQlenKvlenByBidx(int64_t bIdx, int64_t &actualSeqQlen, int64_t &actualSeqKvlen);
-    __aicore__ inline void GetActualSelCount(const int64_t t1Idx, const int64_t n2Idx, int64_t &actSelBlkCount);
-    __aicore__ inline void GetTndSeqLen(const int64_t t1Idx, int64_t &bIdx);
+    __aicore__ inline void GetSeqQlenKvlenByBidx(int64_t bIdx, int64_t& actualSeqQlen, int64_t& actualSeqKvlen);
+    __aicore__ inline void GetActualSelCount(const int64_t t1Idx, const int64_t n2Idx, int64_t& actSelBlkCount);
+    __aicore__ inline void GetTndSeqLen(const int64_t t1Idx, int64_t& bIdx);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline ChildClass *GetDerived()
+    __aicore__ inline ChildClass* GetDerived()
     {
-        return static_cast<ChildClass *>(this);
+        return static_cast<ChildClass*>(this);
     }
 
     constexpr static bool IS_D_NO_EQUAL = false;
@@ -93,13 +93,13 @@ public:
 
     constexpr static bool IS_DQ_RES_EXCEED_UB = HEAD_DIM_ALIGN > VECTOR_BASEN;
     constexpr static bool IS_DKV_RES_EXCEED_UB =
-        VECTOR_BASEN / CV_CORE_RATIO * HEAD_DIM_ALIGN > VECTOR_BASEM *VECTOR_BASEN;
+        VECTOR_BASEN / CV_CORE_RATIO * HEAD_DIM_ALIGN > VECTOR_BASEM* VECTOR_BASEN;
     constexpr static bool IS_DQ_WRITE_UB = !IS_DQ_RES_EXCEED_UB;
     constexpr static bool IS_DK_WRITE_UB = !IS_DKV_RES_EXCEED_UB;
     constexpr static bool IS_DV_WRITE_UB = !IS_DKV_RES_EXCEED_UB;
 
 protected:
-    TPipe *pipe;
+    TPipe* pipe;
 
     // output global mmemory
     GlobalTensor<float> dqWorkSpaceGm, dOriKVWorkSpaceGm, dCmpKVWorkSpaceGm, dOriVWorkSpaceGm, dCmpVWorkSpaceGm;
@@ -231,7 +231,7 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
     GM_ADDR seqused_q, GM_ADDR seqused_ori_kv, GM_ADDR seqused_cmp_kv, GM_ADDR cmp_residual_kv, GM_ADDR ori_topk_length,
     GM_ADDR cmp_topk_length, GM_ADDR softmax_lse, GM_ADDR sinks, GM_ADDR metadata, GM_ADDR dq, GM_ADDR dori_kv,
     GM_ADDR dcmp_kv, GM_ADDR dsinks, GM_ADDR ori_softmax_l1, GM_ADDR cmp_softmax_l1, GM_ADDR workspace,
-    SFagTilingType ordTilingData, TPipe *pipeIn)
+    SFagTilingType ordTilingData, TPipe* pipeIn)
 {
     // init current core tilingInfo
     if ASCEND_IS_AIV {
@@ -292,32 +292,32 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
     GM_ADDR workspace)
 {
     // init workspace address
-    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                   tilingData->postTilingData.dqWorkSpaceOffset / sizeof(float));
-    dOriKVWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dOriKVWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                       tilingData->postTilingData.dOriKVWorkSpaceOffset / sizeof(float));
-    dCmpKVWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dCmpKVWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                       tilingData->postTilingData.dCmpKVWorkSpaceOffset / sizeof(float));
-    dOriVWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dOriVWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                      tilingData->postTilingData.dOriVWorkSpaceOffset / sizeof(float));
-    dCmpVWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dCmpVWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                      tilingData->postTilingData.dCmpVWorkSpaceOffset / sizeof(float));
 
     int64_t selectedKWorkSpaceOffset = tilingData->baseParams.selectedKWorkSpaceOffset / sizeof(INPUT_TYPE) +
                                        cBlockIdx * CUBE_BASEN * constInfo.commonConstInfo.dSize * 3;
-    selectedKWorkSpaceGm.SetGlobalBuffer((__gm__ INPUT_TYPE *)workspace + selectedKWorkSpaceOffset);
+    selectedKWorkSpaceGm.SetGlobalBuffer((__gm__ INPUT_TYPE*)workspace + selectedKWorkSpaceOffset);
     if constexpr (IsDETER) {
-        mm4ResWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        mm4ResWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           tilingData->baseParams.mm4ResWorkSpaceOffset / sizeof(float));
-        mm5ResWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        mm5ResWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           tilingData->baseParams.mm5ResWorkSpaceOffset / sizeof(float));
     } else {
         int64_t mm4ResWorkSpaceOffset = tilingData->baseParams.mm4ResWorkSpaceOffset / sizeof(float) +
                                         cBlockIdx * PROCESS_KV_SIZE_NO_DETER * constInfo.commonConstInfo.dSize * 2;
-        mm4ResWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm4ResWorkSpaceOffset);
+        mm4ResWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + mm4ResWorkSpaceOffset);
         int64_t mm5ResWorkSpaceOffset = tilingData->baseParams.mm5ResWorkSpaceOffset / sizeof(float) +
                                         cBlockIdx * PROCESS_KV_SIZE_NO_DETER * constInfo.commonConstInfo.dSizeV * 2;
-        mm5ResWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm5ResWorkSpaceOffset);
+        mm5ResWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + mm5ResWorkSpaceOffset);
     }
 }
 
@@ -423,15 +423,15 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
     }
     GetDerived()->SetUniqueConstInfo(constInfo);
 
-    constInfo.totalNum = ((__gm__ uint32_t *)metadataGm)[0];
-    int64_t totalNum = static_cast<int64_t>(((__gm__ int32_t *)metadataGm)[0]);
-    int64_t formerCoreProcessNNum = static_cast<int64_t>(((__gm__ int32_t *)metadataGm)[1]);
+    constInfo.totalNum = ((__gm__ uint32_t*)metadataGm)[0];
+    int64_t totalNum = static_cast<int64_t>(((__gm__ int32_t*)metadataGm)[0]);
+    int64_t formerCoreProcessNNum = static_cast<int64_t>(((__gm__ int32_t*)metadataGm)[1]);
     formerCoreProcessS1Num = formerCoreProcessNNum;
-    int64_t remainCoreProcessNNum = static_cast<int64_t>(((__gm__ int32_t *)metadataGm)[2]);
-    int64_t remainCoreNum = static_cast<int64_t>(((__gm__ int32_t *)metadataGm)[3]);
-    usedCoreNum = static_cast<int64_t>(((__gm__ int32_t *)metadataGm)[4]);
-    maxOriSeqKV = static_cast<int64_t>(((__gm__ int32_t *)metadataGm)[5]);
-    maxCmpSeqKV = static_cast<int64_t>(((__gm__ int32_t *)metadataGm)[6]);
+    int64_t remainCoreProcessNNum = static_cast<int64_t>(((__gm__ int32_t*)metadataGm)[2]);
+    int64_t remainCoreNum = static_cast<int64_t>(((__gm__ int32_t*)metadataGm)[3]);
+    usedCoreNum = static_cast<int64_t>(((__gm__ int32_t*)metadataGm)[4]);
+    maxOriSeqKV = static_cast<int64_t>(((__gm__ int32_t*)metadataGm)[5]);
+    maxCmpSeqKV = static_cast<int64_t>(((__gm__ int32_t*)metadataGm)[6]);
     int64_t totalCoreNum = static_cast<int64_t>(GetBlockNum());
     constInfo.usedCoreNum = usedCoreNum;
     if (cBlockIdx >= usedCoreNum) {
@@ -452,15 +452,15 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetSeqQlenKvlenByBidx(
-    int64_t bIdx, int64_t &actualSeqQlen, int64_t &actualSeqKvlen)
+    int64_t bIdx, int64_t& actualSeqQlen, int64_t& actualSeqKvlen)
 {
     if (unlikely(bIdx == 0)) {
-        actualSeqQlen = ((__gm__ int64_t *)actualSeqQlenAddr)[0];
-        actualSeqKvlen = ((__gm__ int64_t *)actualSeqOriKvlenAddr)[0];
+        actualSeqQlen = ((__gm__ int64_t*)actualSeqQlenAddr)[0];
+        actualSeqKvlen = ((__gm__ int64_t*)actualSeqOriKvlenAddr)[0];
     } else {
-        actualSeqQlen = ((__gm__ int64_t *)actualSeqQlenAddr)[bIdx] - ((__gm__ int64_t *)actualSeqQlenAddr)[bIdx - 1];
+        actualSeqQlen = ((__gm__ int64_t*)actualSeqQlenAddr)[bIdx] - ((__gm__ int64_t*)actualSeqQlenAddr)[bIdx - 1];
         actualSeqKvlen =
-            ((__gm__ int64_t *)actualSeqOriKvlenAddr)[bIdx] - ((__gm__ int64_t *)actualSeqOriKvlenAddr)[bIdx - 1];
+            ((__gm__ int64_t*)actualSeqOriKvlenAddr)[bIdx] - ((__gm__ int64_t*)actualSeqOriKvlenAddr)[bIdx - 1];
     }
     return;
 }
@@ -468,7 +468,7 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 template <const bool IS_ORI_KV>
 __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::SetRunInfo(
-    FagRunInfo &runInfo, FagRunInfo &preRunInfo, int64_t taskId, int64_t sTaskId, int64_t deterTaskId, int64_t kvOffset)
+    FagRunInfo& runInfo, FagRunInfo& preRunInfo, int64_t taskId, int64_t sTaskId, int64_t deterTaskId, int64_t kvOffset)
 {
     runInfo.t1Index = t1Index;
     runInfo.t2Index = t2Index;
@@ -554,7 +554,7 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 template <const bool IS_ORI_KV>
 __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::SetDeterRunInfo(
-    FagRunInfo &runInfo, int64_t sTaskId, int64_t deterTaskId, int64_t kvSeqOffset)
+    FagRunInfo& runInfo, int64_t sTaskId, int64_t deterTaskId, int64_t kvSeqOffset)
 {
     runInfo.sTaskId = sTaskId;
     runInfo.sTaskIdMod2 = sTaskId & 1;
@@ -568,21 +568,21 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 template <bool IS_MM1_MM2>
 __aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetQueryOffset(
-    FagRunInfo &runInfo)
+    FagRunInfo& runInfo)
 {
     return runInfo.t1Index * constInfo.n2Size * constInfo.commonConstInfo.gSize * constInfo.commonConstInfo.dSize;
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetQueryRopeOffset(
-    FagRunInfo &runInfo)
+    FagRunInfo& runInfo)
 {
     return runInfo.t1Index * constInfo.n2Size * constInfo.commonConstInfo.gSize * constInfo.dRopeSize;
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetDxOffset(
-    FagRunInfo &runInfo)
+    FagRunInfo& runInfo)
 {
     return runInfo.t1Index * constInfo.n2Size * constInfo.commonConstInfo.gSize * constInfo.commonConstInfo.dSizeV;
 }
@@ -590,7 +590,7 @@ __aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 template <const bool IS_ORI_KV>
 __aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetKeyOffset(
-    FagRunInfo &runInfo)
+    FagRunInfo& runInfo)
 {
     if constexpr (IS_ORI_KV) {
         return runInfo.t2Index * constInfo.n2Size * constInfo.commonConstInfo.dSize;
@@ -601,31 +601,31 @@ __aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetKeyRopeOffset(
-    FagRunInfo &runInfo)
+    FagRunInfo& runInfo)
 {
     return runInfo.t2Index * constInfo.n2Size * constInfo.dRopeSize;
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetValueOffset(
-    FagRunInfo &runInfo)
+    FagRunInfo& runInfo)
 {
     return runInfo.t2Index * constInfo.n2Size * constInfo.commonConstInfo.dSizeV;
 }
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetActualSelCount(
-    const int64_t t1Idx, const int64_t n2Idx, int64_t &actSelBlkCount)
+    const int64_t t1Idx, const int64_t n2Idx, int64_t& actSelBlkCount)
 {
     if (constInfo.hasOriTopK) {
-        oriTopkLength = ((__gm__ int32_t *)oriTopkLengthAddr)[t1Index];
+        oriTopkLength = ((__gm__ int32_t*)oriTopkLengthAddr)[t1Index];
     } else if (IsOriKVSparse) {
         oriTopkLength = constInfo.oriSelectedBlockCount;
     } else {
         oriTopkLength = curS2;
     }
     if (constInfo.hasCmpTopK) {
-        cmpTopkLength = ((__gm__ int32_t *)cmpTopkLengthAddr)[t1Index];
+        cmpTopkLength = ((__gm__ int32_t*)cmpTopkLengthAddr)[t1Index];
     } else if (IsCmpKVSparse) {
         cmpTopkLength = constInfo.cmpSelectedBlockCount;
     } else {
@@ -638,7 +638,7 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
 
 template <typename ChildClass, typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::GetTndSeqLen(
-    const int64_t t1Idx, int64_t &bIdx)
+    const int64_t t1Idx, int64_t& bIdx)
 {
     int64_t t1Offset = 0;
     int64_t t2Offset = 0;
@@ -646,12 +646,12 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
 
     if (!constInfo.hasUsedSeqQ) {
         if constexpr (IS_TND) {
-            int64_t curT1 = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
+            int64_t curT1 = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
             while (usedT1Index >= curT1) {
-                curT1 = ((__gm__ int32_t *)actualSeqQlenAddr)[++bIndex];
+                curT1 = ((__gm__ int32_t*)actualSeqQlenAddr)[++bIndex];
             }
             bIndex = bIndex - 1;
-            t1Offset = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
+            t1Offset = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
             s1Index = usedT1Index - t1Offset;
         } else {
             bIndex = usedT1Index / curS1;
@@ -661,12 +661,12 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
     } else {
         while (usedT1Index >= nextUsedT1Offset) {
             usedT1Offset = nextUsedT1Offset;
-            nextUsedT1Offset = ((__gm__ int32_t *)usedSeqQlenAddr)[++bIndex] + usedT1Offset;
+            nextUsedT1Offset = ((__gm__ int32_t*)usedSeqQlenAddr)[++bIndex] + usedT1Offset;
         }
 
         s1Index = usedT1Index - usedT1Offset;
         if constexpr (IS_TND) {
-            t1Offset = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
+            t1Offset = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
         } else {
             t1Offset = bIndex * constInfo.commonConstInfo.s1Size;
         }
@@ -678,24 +678,24 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
         if (unlikely(bIndex == 0)) {
             t2Offset = 0;
             t3Offset = 0;
-            curS1 = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex + 1];
+            curS1 = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex + 1];
             if constexpr (IsOriKVExist) {
-                curS2 = ((__gm__ int32_t *)actualSeqOriKvlenAddr)[bIndex + 1];
+                curS2 = ((__gm__ int32_t*)actualSeqOriKvlenAddr)[bIndex + 1];
             }
             if constexpr (IsCmpKVExist) {
-                curS3 = ((__gm__ int32_t *)actualSeqCmpKvlenAddr)[bIndex + 1];
+                curS3 = ((__gm__ int32_t*)actualSeqCmpKvlenAddr)[bIndex + 1];
             }
         } else {
-            curS1 = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex + 1] - ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
+            curS1 = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex + 1] - ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
             if constexpr (IsOriKVExist) {
-                t2Offset = ((__gm__ int32_t *)actualSeqOriKvlenAddr)[bIndex];
-                curS2 = ((__gm__ int32_t *)actualSeqOriKvlenAddr)[bIndex + 1] -
-                        ((__gm__ int32_t *)actualSeqOriKvlenAddr)[bIndex];
+                t2Offset = ((__gm__ int32_t*)actualSeqOriKvlenAddr)[bIndex];
+                curS2 = ((__gm__ int32_t*)actualSeqOriKvlenAddr)[bIndex + 1] -
+                        ((__gm__ int32_t*)actualSeqOriKvlenAddr)[bIndex];
             }
             if constexpr (IsCmpKVExist) {
-                t3Offset = ((__gm__ int32_t *)actualSeqCmpKvlenAddr)[bIndex];
-                curS3 = ((__gm__ int32_t *)actualSeqCmpKvlenAddr)[bIndex + 1] -
-                        ((__gm__ int32_t *)actualSeqCmpKvlenAddr)[bIndex];
+                t3Offset = ((__gm__ int32_t*)actualSeqCmpKvlenAddr)[bIndex];
+                curS3 = ((__gm__ int32_t*)actualSeqCmpKvlenAddr)[bIndex + 1] -
+                        ((__gm__ int32_t*)actualSeqCmpKvlenAddr)[bIndex];
             }
         }
     } else {
@@ -704,17 +704,17 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
     }
 
     if (constInfo.hasUsedSeqQ) {
-        usedS1 = ((__gm__ int32_t *)usedSeqQlenAddr)[bIndex];
+        usedS1 = ((__gm__ int32_t*)usedSeqQlenAddr)[bIndex];
     } else {
         usedS1 = curS1;
     }
     if (constInfo.hasUsedSeqOriKV) {
-        usedS2 = ((__gm__ int32_t *)usedSeqOriKvlenAddr)[bIndex];
+        usedS2 = ((__gm__ int32_t*)usedSeqOriKvlenAddr)[bIndex];
     } else {
         usedS2 = curS2;
     }
     if (constInfo.hasUsedSeqCmpKV) {
-        usedS3 = ((__gm__ int32_t *)usedSeqCmpKvlenAddr)[bIndex];
+        usedS3 = ((__gm__ int32_t*)usedSeqCmpKvlenAddr)[bIndex];
     } else {
         usedS3 = curS3;
     }
@@ -730,7 +730,7 @@ __aicore__ inline void SparseFlashMlaGradKernelBase<ChildClass, CubeBlockType, V
     if (tilingData->baseParams.cmpSparseMode == 3 && constInfo.cmpRatio == 1) {
         usedS3 = Max(usedS3 - usedS1 + s1Index + 1, 0);
     } else if (tilingData->baseParams.cmpSparseMode == 3 && constInfo.cmpRatio != 1) {
-        int64_t oriUsedS3 = usedS3 * constInfo.cmpRatio + ((__gm__ int32_t *)cmpResidualKVAddr)[bIndex];
+        int64_t oriUsedS3 = usedS3 * constInfo.cmpRatio + ((__gm__ int32_t*)cmpResidualKVAddr)[bIndex];
         usedS3 = Max((oriUsedS3 - usedS1 + s1Index + 1) / constInfo.cmpRatio, 0);
     }
 

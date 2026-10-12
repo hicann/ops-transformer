@@ -21,8 +21,8 @@ namespace op_api {
 
 static constexpr int64_t DIM_QK = 128;
 
-at::Tensor stem_oam_prep_varlen_q(const at::Tensor &q, at::IntArrayRef qSeqLens, at::IntArrayRef cuSeqLensQ,
-                                  const c10::optional<at::Tensor> &qScale, int64_t stemBlockSize, int64_t stemStride)
+at::Tensor stem_oam_prep_varlen_q(const at::Tensor& q, at::IntArrayRef qSeqLens, at::IntArrayRef cuSeqLensQ,
+                                  const c10::optional<at::Tensor>& qScale, int64_t stemBlockSize, int64_t stemStride)
 {
     TORCH_CHECK(q.size(2) == DIM_QK, "q last dim must be 128, but got ", q.size(2));
     TORCH_CHECK(stemBlockSize % 32 == 0, "stemBlockSize must be multiple of 32");

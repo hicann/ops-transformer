@@ -53,14 +53,14 @@ extern "C" __global__ __aicore__ void recurrent_gated_delta_rule(GM_ADDR query, 
                                                                  GM_ADDR tilingGM);
 
 template <typename T>
-T *GmAllocWrapper(size_t size)
+T* GmAllocWrapper(size_t size)
 {
-    T *ptr = reinterpret_cast<T *>(AscendC::GmAlloc(size));
+    T* ptr = reinterpret_cast<T*>(AscendC::GmAlloc(size));
     assert(ptr != nullptr && "GM allocation failed");
     return ptr;
 }
 
-void InitTilingData(RecurrentGatedDeltaRuleTilingData *tilingData, uint32_t b, uint32_t t, uint32_t nk, uint32_t nv,
+void InitTilingData(RecurrentGatedDeltaRuleTilingData* tilingData, uint32_t b, uint32_t t, uint32_t nk, uint32_t nv,
                     uint32_t dk, uint32_t dv, uint32_t hasGama, uint32_t hasAcceptedTokens)
 {
     tilingData->vectorCoreNum = 8;
@@ -79,10 +79,10 @@ void InitTilingData(RecurrentGatedDeltaRuleTilingData *tilingData, uint32_t b, u
     tilingData->hasAcceptedTokens = hasAcceptedTokens;
 }
 
-void InitInputData(uint8_t *stateGm, size_t shapeState, uint8_t *queryGm, size_t shapeQ, uint8_t *keyGm, size_t shapeK,
-                   uint8_t *valueGm, size_t shapeV, uint8_t *betaGm, size_t shapeBeta, uint8_t *gamaGm,
-                   size_t shapeGama, uint8_t *actSeqLenGM, size_t b, uint8_t *ssmStaIdGm, size_t t,
-                   uint8_t *numAccTokGm, size_t b_size, uint8_t *attnOutGM, size_t shapeAttnOut)
+void InitInputData(uint8_t* stateGm, size_t shapeState, uint8_t* queryGm, size_t shapeQ, uint8_t* keyGm, size_t shapeK,
+                   uint8_t* valueGm, size_t shapeV, uint8_t* betaGm, size_t shapeBeta, uint8_t* gamaGm,
+                   size_t shapeGama, uint8_t* actSeqLenGM, size_t b, uint8_t* ssmStaIdGm, size_t t,
+                   uint8_t* numAccTokGm, size_t b_size, uint8_t* attnOutGM, size_t shapeAttnOut)
 {
     memset(stateGm, 0, shapeState);
     memset(queryGm, 0, shapeQ);
@@ -92,15 +92,15 @@ void InitInputData(uint8_t *stateGm, size_t shapeState, uint8_t *queryGm, size_t
     memset(gamaGm, 0, shapeGama);
     memset(attnOutGM, 0, shapeAttnOut);
 
-    int32_t *actSeqLen = reinterpret_cast<int32_t *>(actSeqLenGM);
+    int32_t* actSeqLen = reinterpret_cast<int32_t*>(actSeqLenGM);
     for (size_t i = 0; i < b; ++i) {
         actSeqLen[i] = 2;
     }
-    int32_t *ssmStaId = reinterpret_cast<int32_t *>(ssmStaIdGm);
+    int32_t* ssmStaId = reinterpret_cast<int32_t*>(ssmStaIdGm);
     for (size_t i = 0; i < t; ++i) {
         ssmStaId[i] = static_cast<int32_t>(i);
     }
-    int32_t *numAccTok = reinterpret_cast<int32_t *>(numAccTokGm);
+    int32_t* numAccTok = reinterpret_cast<int32_t*>(numAccTokGm);
     for (size_t i = 0; i < b_size; ++i) {
         numAccTok[i] = 1;
     }
@@ -134,18 +134,18 @@ protected:
     size_t allWorkspaceSize = 196608;
     size_t tilingSize = sizeof(RecurrentGatedDeltaRuleTilingData);
 
-    uint8_t *stateGm = nullptr;
-    uint8_t *queryGm = nullptr;
-    uint8_t *keyGm = nullptr;
-    uint8_t *valueGm = nullptr;
-    uint8_t *betaGm = nullptr;
-    uint8_t *gamaGm = nullptr;
-    uint8_t *actSeqLenGM = nullptr;
-    uint8_t *ssmStaIdGm = nullptr;
-    uint8_t *numAccTokGm = nullptr;
-    uint8_t *attnOutGM = nullptr;
-    uint8_t *workspace = nullptr;
-    uint8_t *tiling = nullptr;
+    uint8_t* stateGm = nullptr;
+    uint8_t* queryGm = nullptr;
+    uint8_t* keyGm = nullptr;
+    uint8_t* valueGm = nullptr;
+    uint8_t* betaGm = nullptr;
+    uint8_t* gamaGm = nullptr;
+    uint8_t* actSeqLenGM = nullptr;
+    uint8_t* ssmStaIdGm = nullptr;
+    uint8_t* numAccTokGm = nullptr;
+    uint8_t* attnOutGM = nullptr;
+    uint8_t* workspace = nullptr;
+    uint8_t* tiling = nullptr;
 
     void SetUp() override
     {
@@ -167,7 +167,7 @@ protected:
                       shapeGama, actSeqLenGM, b, ssmStaIdGm, t, numAccTokGm, b, attnOutGM, shapeAttnOut);
 
         auto params = GetParam();
-        RecurrentGatedDeltaRuleTilingData *tilingData = reinterpret_cast<RecurrentGatedDeltaRuleTilingData *>(tiling);
+        RecurrentGatedDeltaRuleTilingData* tilingData = reinterpret_cast<RecurrentGatedDeltaRuleTilingData*>(tiling);
         InitTilingData(tilingData, b, t, nk, nv, dk, dv, params.hasGama, params.hasAcceptedTokens);
     }
 

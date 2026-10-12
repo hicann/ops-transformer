@@ -35,7 +35,7 @@ constexpr static AscendC::Reg::CastTrait castTraitB162B32Even = {
 };
 
 template <typename T, typename WEIGHT_T>
-__simd_vf__ inline void ProcessVec1BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb, __ubuf__ WEIGHT_T *weightUb,
+__simd_vf__ inline void ProcessVec1BasicVF(__ubuf__ T* dstUb, __ubuf__ T* srcUb, __ubuf__ WEIGHT_T* weightUb,
                                            const uint32_t m, const uint32_t nBaseSize)
 {
     RegTensor<float> vreg_input_x1;
@@ -96,20 +96,20 @@ __simd_vf__ inline void ProcessVec1BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
         Add(vreg_output_x3, vreg_output_x3, vreg_input_x3, preg_all_b32);
         Add(vreg_output_x4, vreg_output_x4, vreg_input_x4, preg_all_b32);
     }
-    StoreAlign(((__ubuf__ T *&)dstUb), vreg_output_x1, preg_all_b32);
-    StoreAlign(((__ubuf__ T *&)dstUb + floatRepSize), vreg_output_x2, preg_all_b32);
-    StoreAlign(((__ubuf__ T *&)dstUb + floatRepSize * 2), vreg_output_x3, preg_all_b32);
-    StoreAlign(((__ubuf__ T *&)dstUb + floatRepSize * 3), vreg_output_x4, preg_all_b32);
+    StoreAlign(((__ubuf__ T*&)dstUb), vreg_output_x1, preg_all_b32);
+    StoreAlign(((__ubuf__ T*&)dstUb + floatRepSize), vreg_output_x2, preg_all_b32);
+    StoreAlign(((__ubuf__ T*&)dstUb + floatRepSize * 2), vreg_output_x3, preg_all_b32);
+    StoreAlign(((__ubuf__ T*&)dstUb + floatRepSize * 3), vreg_output_x4, preg_all_b32);
 }
 
 template <typename T, typename WEIGHT_T>
-__aicore__ inline void ProcessVec1Vf(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor,
-                                     const LocalTensor<WEIGHT_T> &weightTensor, const uint32_t m,
+__aicore__ inline void ProcessVec1Vf(const LocalTensor<T>& dstTensor, const LocalTensor<T>& srcTensor,
+                                     const LocalTensor<WEIGHT_T>& weightTensor, const uint32_t m,
                                      const uint32_t nBaseSize)
 {
-    __ubuf__ T *dstUb = (__ubuf__ T *)dstTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
-    __ubuf__ WEIGHT_T *weightUb = (__ubuf__ WEIGHT_T *)weightTensor.GetPhyAddr();
+    __ubuf__ T* dstUb = (__ubuf__ T*)dstTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
+    __ubuf__ WEIGHT_T* weightUb = (__ubuf__ WEIGHT_T*)weightTensor.GetPhyAddr();
 
     ProcessVec1BasicVF<T, WEIGHT_T>(dstUb, srcUb, weightUb, m, nBaseSize);
 }

@@ -27,7 +27,7 @@ struct StemPrepQHostUtParamBase : public HostUtParamBase {
     int64_t stemBlockSize = 128;
     int64_t stem_stride = 16;
 
-    StemPrepQHostUtParamBase(const csv_map &csvMap)
+    StemPrepQHostUtParamBase(const csv_map& csvMap)
         : HostUtParamBase(csvMap)
     {
         stemBlockSize = std::stoll(ReadMap(csvMap, "stemBlockSize", "128"));
@@ -45,7 +45,7 @@ struct StemPrepQInferShapeUtParam : public StemPrepQHostUtParamBase {
 
     std::vector<std::vector<int64_t>> expectOutputShape;
 
-    StemPrepQInferShapeUtParam(const csv_map &csvMap)
+    StemPrepQInferShapeUtParam(const csv_map& csvMap)
         : StemPrepQHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "q_shape", "q_dtype", "q_format", this->q));
@@ -79,7 +79,7 @@ struct StemPrepQInferDTypeUtParam : public StemPrepQHostUtParamBase {
 
     ge::DataType expect_qFlat_dtype = ge::DT_UNDEFINED;
 
-    StemPrepQInferDTypeUtParam(const csv_map &csvMap)
+    StemPrepQInferDTypeUtParam(const csv_map& csvMap)
         : StemPrepQHostUtParamBase(csvMap)
     {
         GetDataTypeGE(csvMap, "q_dtype", this->q_dtype);
@@ -108,7 +108,7 @@ struct StemPrepQTilingUtParam : public StemPrepQHostUtParamBase {
 
     StemPrepQCompileInfo compileInfo = {64};
 
-    StemPrepQTilingUtParam(const csv_map &csvMap)
+    StemPrepQTilingUtParam(const csv_map& csvMap)
         : StemPrepQHostUtParamBase(csvMap)
     {
         inputInstance.emplace_back(GetTensorGE(csvMap, "q_shape", "q_dtype", "q_format", this->q));

@@ -39,29 +39,24 @@ ge::graphStatus InferShape4ScatterPaCache(gert::InferShapeContext* context)
     auto outputKeyCacheShape = context->GetOutputShape(OUTPUT_KEY_CACHE);
     OP_CHECK_NULL_WITH_CONTEXT(context, outputKeyCacheShape);
     *outputKeyCacheShape = *inputKeyCacheShape;
-    
+
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataType4ScatterPaCache(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataType4ScatterPaCache(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context, "Begin to do InferDataType4ScatterPaCache");
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
     auto cache_mode = attrs->GetAttrPointer<char>(ATTR_CACHE_MODE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, cache_mode);
-    OP_CHECK_IF(strcmp(cache_mode, "") != 0 &&
-                strcmp(cache_mode, "Norm") != 0 &&
-                strcmp(cache_mode, "PA_NZ") != 0,
-                OP_LOGE(context, "invalid cache mode : %s", cache_mode),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(strcmp(cache_mode, "") != 0 && strcmp(cache_mode, "Norm") != 0 && strcmp(cache_mode, "PA_NZ") != 0,
+                OP_LOGE(context, "invalid cache mode : %s", cache_mode), return ge::GRAPH_FAILED);
 
     context->SetOutputDataType(OUTPUT_KEY_CACHE, context->GetRequiredInputDataType(INPUT_KEY));
     OP_LOGD(context, "End to do InferDataType4ScatterPaCache");
     return ge::GRAPH_SUCCESS;
 }
 
-IMPL_OP_INFERSHAPE(ScatterPaCache)
-    .InferShape(InferShape4ScatterPaCache)
-    .InferDataType(InferDataType4ScatterPaCache);
-}  // namespace ops
+IMPL_OP_INFERSHAPE(ScatterPaCache).InferShape(InferShape4ScatterPaCache).InferDataType(InferDataType4ScatterPaCache);
+} // namespace ops

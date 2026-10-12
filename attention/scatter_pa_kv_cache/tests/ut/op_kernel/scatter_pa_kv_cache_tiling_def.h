@@ -54,7 +54,7 @@ struct ScatterPaKvCacheTilingData {
     uint64_t vOffset;
 };
 
-inline void InitScatterPaKvCacheTilingData(uint8_t *tiling, ScatterPaKvCacheTilingData *const_data)
+inline void InitScatterPaKvCacheTilingData(uint8_t* tiling, ScatterPaKvCacheTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(ScatterPaKvCacheTilingData));
 }

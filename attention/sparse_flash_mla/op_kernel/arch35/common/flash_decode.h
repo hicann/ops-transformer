@@ -68,7 +68,7 @@ struct FdBuffers {
 };
 
 template <typename T, int64_t D_ALIGN, typename PipeType, typename BufferType>
-__aicore__ inline void InitFDBuffers(const FdRunInfo &fdRunInfo, PipeType *tPipe, FdBuffers<BufferType> &buffers)
+__aicore__ inline void InitFDBuffers(const FdRunInfo& fdRunInfo, PipeType* tPipe, FdBuffers<BufferType>& buffers)
 {
     tPipe->Reset();
     int64_t maxSumTotal = static_cast<uint32_t>(fdRunInfo.workspaceNum) * FD_REDUCE_CHUNK_ROWS *
@@ -86,8 +86,8 @@ __aicore__ inline void InitFDBuffers(const FdRunInfo &fdRunInfo, PipeType *tPipe
 // 静态 tensor 版本的 FD buffer 初始化：不调用 tPipe->Reset()，从 ubBaseAddr 顺序排布。
 // FD 在主流程 SyncAll() 之后独立执行，可复用主流程 UB 地址空间。
 template <typename T, int64_t D_ALIGN>
-__aicore__ inline void InitFDBuffersStatic(const FdRunInfo &fdRunInfo, uint32_t ubBaseAddr,
-                                           FdBuffers<fa_base_matmul::StaticBuffer<uint8_t>> &buffers)
+__aicore__ inline void InitFDBuffersStatic(const FdRunInfo& fdRunInfo, uint32_t ubBaseAddr,
+                                           FdBuffers<fa_base_matmul::StaticBuffer<uint8_t>>& buffers)
 {
     uint32_t ubAddr = ubBaseAddr;
     int64_t maxSumTotal = static_cast<uint32_t>(fdRunInfo.workspaceNum) * FD_REDUCE_CHUNK_ROWS *
@@ -128,34 +128,34 @@ struct S2SplitFdStagingLayout {
         return stagingM * broadcastElems * sizeof(float);
     }
 
-    __aicore__ inline __gm__ uint8_t *AttenOutRegion(__gm__ uint8_t *base) const
+    __aicore__ inline __gm__ uint8_t* AttenOutRegion(__gm__ uint8_t* base) const
     {
         return base;
     }
 
-    __aicore__ inline __gm__ uint8_t *MaxRegion(__gm__ uint8_t *base) const
+    __aicore__ inline __gm__ uint8_t* MaxRegion(__gm__ uint8_t* base) const
     {
         return AttenOutRegion(base) + slotCount * StagingAttenOutElems() * sizeof(float);
     }
 
-    __aicore__ inline __gm__ uint8_t *SumRegion(__gm__ uint8_t *base) const
+    __aicore__ inline __gm__ uint8_t* SumRegion(__gm__ uint8_t* base) const
     {
         return MaxRegion(base) + slotCount * StagingMaxSumBytes();
     }
 };
 
 // Stage max/sum that are already stored as one broadcast block per row.
-__aicore__ inline void StageBroadcastMaxSum(const S2SplitFdStagingLayout &layout, __gm__ uint8_t *stagingBase,
+__aicore__ inline void StageBroadcastMaxSum(const S2SplitFdStagingLayout& layout, __gm__ uint8_t* stagingBase,
                                             int64_t workspaceIdx, int64_t stagingMOffset, int64_t validRows,
-                                            LocalTensor<float> &maxBroadcastUb, LocalTensor<float> &sumBroadcastUb,
+                                            LocalTensor<float>& maxBroadcastUb, LocalTensor<float>& sumBroadcastUb,
                                             uint8_t vToMte3Id, uint8_t mte3ToVId)
 {
-    __gm__ uint8_t *maxRegion = layout.MaxRegion(stagingBase);
-    __gm__ uint8_t *sumRegion = layout.SumRegion(stagingBase);
+    __gm__ uint8_t* maxRegion = layout.MaxRegion(stagingBase);
+    __gm__ uint8_t* sumRegion = layout.SumRegion(stagingBase);
     GlobalTensor<float> maxGm;
-    maxGm.SetGlobalBuffer((__gm__ float *)maxRegion);
+    maxGm.SetGlobalBuffer((__gm__ float*)maxRegion);
     GlobalTensor<float> sumGm;
-    sumGm.SetGlobalBuffer((__gm__ float *)sumRegion);
+    sumGm.SetGlobalBuffer((__gm__ float*)sumRegion);
     int64_t maxSumBytes = layout.StagingMaxSumBytes();
     int64_t floatOffset = workspaceIdx * (maxSumBytes / sizeof(float)) + stagingMOffset * layout.broadcastElems;
     DataCopyExtParams copyParams{static_cast<uint16_t>(validRows),
@@ -170,9 +170,9 @@ __aicore__ inline void StageBroadcastMaxSum(const S2SplitFdStagingLayout &layout
 
 // Stage Vec1 max/sum to GM staging.
 // tmpUb must hold at least 2 * stagingM * broadcastElems floats (max + sum broadcast blocks).
-__aicore__ inline void StageVec1Lse(const S2SplitFdStagingLayout &layout, __gm__ uint8_t *stagingBase,
+__aicore__ inline void StageVec1Lse(const S2SplitFdStagingLayout& layout, __gm__ uint8_t* stagingBase,
                                     int64_t workspaceIdx, int64_t stagingMOffset, int64_t validRows,
-                                    LocalTensor<float> &maxUb, LocalTensor<float> &sumUb, LocalTensor<float> &tmpUb,
+                                    LocalTensor<float>& maxUb, LocalTensor<float>& sumUb, LocalTensor<float>& tmpUb,
                                     uint8_t vToMte3Id, uint8_t mte3ToVId)
 {
     LocalTensor<float> tmpMaxBlockUb = tmpUb;
@@ -189,9 +189,9 @@ __aicore__ inline void StageVec1Lse(const S2SplitFdStagingLayout &layout, __gm__
 // vec2ResUb must contain FP32 partial O after final division.
 // stagingOut points to the base of the atten-out staging region; workspaceIdx offset is folded into the element offset.
 template <typename T>
-__aicore__ inline void StageVec2PartialO(const S2SplitFdStagingLayout &layout, GlobalTensor<float> &stagingOut,
+__aicore__ inline void StageVec2PartialO(const S2SplitFdStagingLayout& layout, GlobalTensor<float>& stagingOut,
                                          int64_t workspaceIdx, int64_t stagingMOffset, int64_t validRows,
-                                         int64_t dValid, LocalTensor<T> &vec2ResUb, uint8_t vToMte3Id,
+                                         int64_t dValid, LocalTensor<T>& vec2ResUb, uint8_t vToMte3Id,
                                          uint8_t mte3ToVId)
 {
     int64_t offset = workspaceIdx * layout.StagingAttenOutElems() + stagingMOffset * dValid;
@@ -207,9 +207,9 @@ __aicore__ inline void StageVec2PartialO(const S2SplitFdStagingLayout &layout, G
 
 // Stage normalized partial O and wait for MTE3 completion before the source UB can be reused.
 template <typename T>
-__aicore__ inline void StageVec2PartialOAndWait(const S2SplitFdStagingLayout &layout, GlobalTensor<float> &stagingOut,
+__aicore__ inline void StageVec2PartialOAndWait(const S2SplitFdStagingLayout& layout, GlobalTensor<float>& stagingOut,
                                                 int64_t workspaceIdx, int64_t stagingMOffset, int64_t validRows,
-                                                int64_t dValid, LocalTensor<T> &vec2ResUb, uint8_t vToMte3Id,
+                                                int64_t dValid, LocalTensor<T>& vec2ResUb, uint8_t vToMte3Id,
                                                 uint8_t mte3ToVId)
 {
     StageVec2PartialO<T>(layout, stagingOut, workspaceIdx, stagingMOffset, validRows, dValid, vec2ResUb, vToMte3Id,
@@ -222,28 +222,28 @@ __aicore__ inline void StageVec2PartialOAndWait(const S2SplitFdStagingLayout &la
 // D_ALIGN is a compile-time constant (e.g. 512) used by ReduceFinalRes_const_VF.
 // workspaceNum must match the number of contiguous slots allocated by the host and emitted by metadata.
 template <typename T, int64_t D_ALIGN>
-__aicore__ inline void ReduceWithLse(const S2SplitFdStagingLayout &layout, __gm__ uint8_t *stagingBase,
+__aicore__ inline void ReduceWithLse(const S2SplitFdStagingLayout& layout, __gm__ uint8_t* stagingBase,
                                      int64_t workspaceIdx, int64_t workspaceNum, int64_t fdMOffset, int64_t mNum,
-                                     int64_t dValid, LocalTensor<T> &accumulatedO, LocalTensor<float> &lseExpUb,
-                                     LocalTensor<float> &blockMaxUb, LocalTensor<float> &blockSumUb,
-                                     LocalTensor<T> &partialOFp32, bool softmaxLseFlag, GlobalTensor<T> &softmaxLseGm,
+                                     int64_t dValid, LocalTensor<T>& accumulatedO, LocalTensor<float>& lseExpUb,
+                                     LocalTensor<float>& blockMaxUb, LocalTensor<float>& blockSumUb,
+                                     LocalTensor<T>& partialOFp32, bool softmaxLseFlag, GlobalTensor<T>& softmaxLseGm,
                                      int64_t softmaxLseOffset, uint8_t vToMte2Id0, uint8_t vToMte2Id1,
                                      uint8_t mte2ToVId, uint8_t vToMte3LseOutId, uint8_t mte3ToVLseOutId)
 {
     constexpr int64_t outputElemsPerBlock = FD_BUFFER_SIZE_BYTE_32B / sizeof(float);
     int64_t attenOutElems = layout.StagingAttenOutElems();
     int64_t maxSumBytes = layout.StagingMaxSumBytes();
-    __gm__ uint8_t *maxRegion = layout.MaxRegion(stagingBase);
-    __gm__ uint8_t *sumRegion = layout.SumRegion(stagingBase);
+    __gm__ uint8_t* maxRegion = layout.MaxRegion(stagingBase);
+    __gm__ uint8_t* sumRegion = layout.SumRegion(stagingBase);
 
     GlobalTensor<float> maxGm;
-    maxGm.SetGlobalBuffer((__gm__ float *)(maxRegion + workspaceIdx * maxSumBytes));
+    maxGm.SetGlobalBuffer((__gm__ float*)(maxRegion + workspaceIdx * maxSumBytes));
     GlobalTensor<float> sumGm;
-    sumGm.SetGlobalBuffer((__gm__ float *)(sumRegion + workspaceIdx * maxSumBytes));
+    sumGm.SetGlobalBuffer((__gm__ float*)(sumRegion + workspaceIdx * maxSumBytes));
     int64_t splitStride = maxSumBytes / sizeof(float);
     GlobalTensor<float> stagingOutGm;
     stagingOutGm.SetGlobalBuffer(
-        (__gm__ float *)(layout.AttenOutRegion(stagingBase) + workspaceIdx * attenOutElems * sizeof(float)));
+        (__gm__ float*)(layout.AttenOutRegion(stagingBase) + workspaceIdx * attenOutElems * sizeof(float)));
     int64_t outSplitStride = attenOutElems;
     LocalTensor<T> sinkUb;
     int64_t mChunks = (mNum + layout.chunkRows - 1) / layout.chunkRows;
@@ -308,11 +308,11 @@ __aicore__ inline void ReduceWithLse(const S2SplitFdStagingLayout &layout, __gm_
 }
 
 template <typename T, int64_t D_ALIGN>
-__aicore__ inline void Reduce(const S2SplitFdStagingLayout &layout, __gm__ uint8_t *stagingBase, int64_t workspaceIdx,
+__aicore__ inline void Reduce(const S2SplitFdStagingLayout& layout, __gm__ uint8_t* stagingBase, int64_t workspaceIdx,
                               int64_t workspaceNum, int64_t fdMOffset, int64_t mNum, int64_t dValid,
-                              LocalTensor<T> &accumulatedO, LocalTensor<float> &lseExpUb,
-                              LocalTensor<float> &blockMaxUb, LocalTensor<float> &blockSumUb,
-                              LocalTensor<T> &partialOFp32, uint8_t vToMte2Id0, uint8_t vToMte2Id1, uint8_t mte2ToVId)
+                              LocalTensor<T>& accumulatedO, LocalTensor<float>& lseExpUb,
+                              LocalTensor<float>& blockMaxUb, LocalTensor<float>& blockSumUb,
+                              LocalTensor<T>& partialOFp32, uint8_t vToMte2Id0, uint8_t vToMte2Id1, uint8_t mte2ToVId)
 {
     GlobalTensor<T> unusedSoftmaxLseGm;
     ReduceWithLse<T, D_ALIGN>(layout, stagingBase, workspaceIdx, workspaceNum, fdMOffset, mNum, dValid, accumulatedO,
@@ -323,11 +323,11 @@ __aicore__ inline void Reduce(const S2SplitFdStagingLayout &layout, __gm__ uint8
 // Merge two normalized partial results. mergedO may alias leftO; rightO must remain
 // readable until the second reduction finishes. The result is (LSE, 1, normalized O).
 template <typename T, int64_t D_ALIGN>
-__aicore__ inline void MergeTwoInputsWithLse(const S2SplitFdStagingLayout &layout, int64_t mNum,
-                                             LocalTensor<T> &mergedO, LocalTensor<T> &leftO, LocalTensor<T> &rightO,
-                                             LocalTensor<float> &mergedLseUb, LocalTensor<float> &mergedSumUb,
-                                             LocalTensor<float> &maxUb, LocalTensor<float> &sumUb,
-                                             LocalTensor<T> &sinkUb)
+__aicore__ inline void MergeTwoInputsWithLse(const S2SplitFdStagingLayout& layout, int64_t mNum,
+                                             LocalTensor<T>& mergedO, LocalTensor<T>& leftO, LocalTensor<T>& rightO,
+                                             LocalTensor<float>& mergedLseUb, LocalTensor<float>& mergedSumUb,
+                                             LocalTensor<float>& maxUb, LocalTensor<float>& sumUb,
+                                             LocalTensor<T>& sinkUb)
 {
     FaVectorApi::ComputeScaleValue_VF<T, T>(sinkUb, maxUb, sumUb, mergedLseUb, mNum, FD_INCREMENTAL_MERGE_INPUT_NUM,
                                             true, false);
@@ -344,12 +344,12 @@ __aicore__ inline void MergeTwoInputsWithLse(const S2SplitFdStagingLayout &layou
 //   state = ((slot0 merge slot1) merge slot2) ...
 // accumulatedO holds the left-fold state; partialOUb streams one new input at a time.
 template <typename T, int64_t D_ALIGN>
-__aicore__ inline void ReducePairwiseWithLse(const S2SplitFdStagingLayout &layout, __gm__ uint8_t *stagingBase,
+__aicore__ inline void ReducePairwiseWithLse(const S2SplitFdStagingLayout& layout, __gm__ uint8_t* stagingBase,
                                              int64_t workspaceIdx, int64_t workspaceNum, int64_t fdMOffset,
-                                             int64_t mNum, int64_t dValid, LocalTensor<T> &accumulatedO,
-                                             LocalTensor<float> &lseExpUb, LocalTensor<float> &blockMaxUb,
-                                             LocalTensor<float> &blockSumUb, LocalTensor<T> &partialOUb,
-                                             bool softmaxLseFlag, GlobalTensor<T> &softmaxLseGm,
+                                             int64_t mNum, int64_t dValid, LocalTensor<T>& accumulatedO,
+                                             LocalTensor<float>& lseExpUb, LocalTensor<float>& blockMaxUb,
+                                             LocalTensor<float>& blockSumUb, LocalTensor<T>& partialOUb,
+                                             bool softmaxLseFlag, GlobalTensor<T>& softmaxLseGm,
                                              int64_t softmaxLseOffset, uint8_t vToMte2Id0, uint8_t vToMte2Id1,
                                              uint8_t mte2ToVId, uint8_t vToMte3LseOutId, uint8_t mte3ToVLseOutId)
 {
@@ -365,12 +365,12 @@ __aicore__ inline void ReducePairwiseWithLse(const S2SplitFdStagingLayout &layou
     int64_t attenOutElems = layout.StagingAttenOutElems();
     int64_t maxSumBytes = layout.StagingMaxSumBytes();
     GlobalTensor<float> maxGm;
-    maxGm.SetGlobalBuffer((__gm__ float *)(layout.MaxRegion(stagingBase) + workspaceIdx * maxSumBytes));
+    maxGm.SetGlobalBuffer((__gm__ float*)(layout.MaxRegion(stagingBase) + workspaceIdx * maxSumBytes));
     GlobalTensor<float> sumGm;
-    sumGm.SetGlobalBuffer((__gm__ float *)(layout.SumRegion(stagingBase) + workspaceIdx * maxSumBytes));
+    sumGm.SetGlobalBuffer((__gm__ float*)(layout.SumRegion(stagingBase) + workspaceIdx * maxSumBytes));
     GlobalTensor<float> stagingOutGm;
     stagingOutGm.SetGlobalBuffer(
-        (__gm__ float *)(layout.AttenOutRegion(stagingBase) + workspaceIdx * attenOutElems * sizeof(float)));
+        (__gm__ float*)(layout.AttenOutRegion(stagingBase) + workspaceIdx * attenOutElems * sizeof(float)));
     int64_t splitStride = maxSumBytes / sizeof(float);
     int64_t outSplitStride = attenOutElems;
 
@@ -456,11 +456,11 @@ __aicore__ inline void ReducePairwiseWithLse(const S2SplitFdStagingLayout &layou
 // Both V_MTE2 events must be set before the first call. This function restores them before returning.
 template <typename T, int64_t D_ALIGN>
 __aicore__ inline void MergeStagedAndCurrentChunk(
-    const S2SplitFdStagingLayout &layout, __gm__ uint8_t *stagingBase, int64_t workspaceIdx, int64_t stagingMOffset,
-    int64_t dealRowCount, int64_t dValid, LocalTensor<float> &currentMaxUb, LocalTensor<float> &currentSumUb,
-    LocalTensor<T> &currentPartialO, LocalTensor<float> &blockMaxUb, LocalTensor<float> &blockSumUb,
-    LocalTensor<T> &partialOTmpUb, LocalTensor<float> &mergedLseBroadcastUb, LocalTensor<float> &mergedSumBroadcastUb,
-    LocalTensor<T> &sinkUb, uint8_t maxSumVToMte2Id, uint8_t partialOVToMte2Id, uint8_t mte2ToVId)
+    const S2SplitFdStagingLayout& layout, __gm__ uint8_t* stagingBase, int64_t workspaceIdx, int64_t stagingMOffset,
+    int64_t dealRowCount, int64_t dValid, LocalTensor<float>& currentMaxUb, LocalTensor<float>& currentSumUb,
+    LocalTensor<T>& currentPartialO, LocalTensor<float>& blockMaxUb, LocalTensor<float>& blockSumUb,
+    LocalTensor<T>& partialOTmpUb, LocalTensor<float>& mergedLseBroadcastUb, LocalTensor<float>& mergedSumBroadcastUb,
+    LocalTensor<T>& sinkUb, uint8_t maxSumVToMte2Id, uint8_t partialOVToMte2Id, uint8_t mte2ToVId)
 {
     constexpr int64_t outputElemsPerBlock = FD_BUFFER_SIZE_BYTE_32B / sizeof(float);
     int64_t dealRowsElems = dealRowCount * layout.broadcastElems;
@@ -470,9 +470,9 @@ __aicore__ inline void MergeStagedAndCurrentChunk(
 
     int64_t maxSumBytes = layout.StagingMaxSumBytes();
     GlobalTensor<float> previousMaxGm;
-    previousMaxGm.SetGlobalBuffer((__gm__ float *)(layout.MaxRegion(stagingBase) + workspaceIdx * maxSumBytes));
+    previousMaxGm.SetGlobalBuffer((__gm__ float*)(layout.MaxRegion(stagingBase) + workspaceIdx * maxSumBytes));
     GlobalTensor<float> previousSumGm;
-    previousSumGm.SetGlobalBuffer((__gm__ float *)(layout.SumRegion(stagingBase) + workspaceIdx * maxSumBytes));
+    previousSumGm.SetGlobalBuffer((__gm__ float*)(layout.SumRegion(stagingBase) + workspaceIdx * maxSumBytes));
     int64_t maxSumOffset = stagingMOffset * layout.broadcastElems;
     WaitFlag<HardEvent::V_MTE2>(maxSumVToMte2Id);
     DataCopy(blockMaxUb, previousMaxGm[maxSumOffset], dealRowsElems);
@@ -481,8 +481,8 @@ __aicore__ inline void MergeStagedAndCurrentChunk(
     WaitFlag<HardEvent::MTE2_V>(mte2ToVId);
 
     GlobalTensor<float> previousPartialOGm;
-    previousPartialOGm.SetGlobalBuffer((__gm__ float *)(layout.AttenOutRegion(stagingBase) +
-                                                        workspaceIdx * layout.StagingAttenOutElems() * sizeof(float)));
+    previousPartialOGm.SetGlobalBuffer((__gm__ float*)(layout.AttenOutRegion(stagingBase) +
+                                                       workspaceIdx * layout.StagingAttenOutElems() * sizeof(float)));
     int64_t partialOOffset = stagingMOffset * dValid;
     DataCopyExtParams inParams;
     inParams.blockLen = static_cast<uint32_t>(dValid * sizeof(float));

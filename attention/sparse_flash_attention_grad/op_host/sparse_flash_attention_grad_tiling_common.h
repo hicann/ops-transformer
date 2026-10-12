@@ -25,11 +25,11 @@
 
 namespace optiling {
 namespace sfag {
-constexpr const char *BSH_STR = "BSH";
-constexpr const char *SBH_STR = "SBH";
-constexpr const char *BNSD_STR = "BNSD";
-constexpr const char *BSND_STR = "BSND";
-constexpr const char *TND_STR = "TND";
+constexpr const char* BSH_STR = "BSH";
+constexpr const char* SBH_STR = "SBH";
+constexpr const char* BNSD_STR = "BNSD";
+constexpr const char* BSND_STR = "BSND";
+constexpr const char* TND_STR = "TND";
 constexpr size_t DIM_0 = 0;
 constexpr size_t DIM_1 = 1;
 constexpr size_t DIM_2 = 2;
@@ -124,15 +124,15 @@ inline uint32_t CalcTschBlockDim(uint32_t sliceNum, uint32_t aicCoreNum, uint32_
     return (sliceNum + (ration - 1)) / ration;
 }
 
-ge::graphStatus CheckTndSoftmaxMaxShape(gert::TilingContext *context, int64_t t1, int64_t n2, int64_t g);
-ge::graphStatus CheckTndSoftmaxSumShape(gert::TilingContext *context, int64_t t1, int64_t n2, int64_t g);
-ge::graphStatus CheckAttentionInShape(gert::TilingContext *context);
-ge::graphStatus CheckSoftmaxDtype(gert::TilingContext *context);
-ge::graphStatus CheckAttentionInDtype(gert::TilingContext *context);
-ge::graphStatus CheckTndShapeValid(gert::TilingContext *context, int64_t t1, int64_t n1, int64_t d, int64_t d2,
+ge::graphStatus CheckTndSoftmaxMaxShape(gert::TilingContext* context, int64_t t1, int64_t n2, int64_t g);
+ge::graphStatus CheckTndSoftmaxSumShape(gert::TilingContext* context, int64_t t1, int64_t n2, int64_t g);
+ge::graphStatus CheckAttentionInShape(gert::TilingContext* context);
+ge::graphStatus CheckSoftmaxDtype(gert::TilingContext* context);
+ge::graphStatus CheckAttentionInDtype(gert::TilingContext* context);
+ge::graphStatus CheckTndShapeValid(gert::TilingContext* context, int64_t t1, int64_t n1, int64_t d, int64_t d2,
                                    int64_t n2);
-ge::graphStatus CheckDtypeValid(gert::TilingContext *context);
-bool IsSameShape(const gert::StorageShape *aShape, const gert::StorageShape *bShape);
+ge::graphStatus CheckDtypeValid(gert::TilingContext* context);
+bool IsSameShape(const gert::StorageShape* aShape, const gert::StorageShape* bShape);
 
 } // namespace sfag
 } // namespace optiling

@@ -39,13 +39,13 @@ class SparseLightningIndexerKLLossGradMetadataCpuKernelArch22 : public CpuKernel
 public:
     SparseLightningIndexerKLLossGradMetadataCpuKernelArch22() = default;
     ~SparseLightningIndexerKLLossGradMetadataCpuKernelArch22() override = default;
-    uint32_t Compute(CpuKernelContext &ctx) override;
+    uint32_t Compute(CpuKernelContext& ctx) override;
 
 private:
-    bool Prepare(CpuKernelContext &ctx);
+    bool Prepare(CpuKernelContext& ctx);
     bool ParamsCheck();
-    int64_t GetActualSeqLen(Tensor *tensor, int64_t bIdx) const;
-    int64_t GetSeqUsedLen(Tensor *tensor, int64_t bIdx, int64_t defaultLen) const;
+    int64_t GetActualSeqLen(Tensor* tensor, int64_t bIdx) const;
+    int64_t GetSeqUsedLen(Tensor* tensor, int64_t bIdx, int64_t defaultLen) const;
     int64_t GetS1SeqSize(int64_t bIdx) const;
     int64_t GetS2SeqSize(int64_t bIdx) const;
     int64_t CalcTotalSize() const;
@@ -53,21 +53,21 @@ private:
     int64_t GetPreCompressS2Len(int64_t bIdx, int64_t s2Size) const;
     int64_t GetS2RealSize(int64_t bIdx, int64_t s1Size, int64_t s2Size, int64_t s1Idx) const;
     int64_t GetS1Load(int64_t s2RealSize) const;
-    bool BuildSparseValidArray(std::vector<int64_t> &sparseValidArray);
-    bool CanSplitWithMaxLoad(const std::vector<int64_t> &sparseValidArray, int64_t start, int64_t partNum,
+    bool BuildSparseValidArray(std::vector<int64_t>& sparseValidArray);
+    bool CanSplitWithMaxLoad(const std::vector<int64_t>& sparseValidArray, int64_t start, int64_t partNum,
                              int64_t maxLoad) const;
-    int64_t FindMinMaxLoad(const std::vector<int64_t> &sparseValidArray, int64_t start, int64_t partNum) const;
-    bool BuildBalancedSparseStartIdx(const std::vector<int64_t> &sparseValidArray,
-                                     std::vector<int64_t> &sparseStartIdx) const;
-    bool SetSparseStartIdx(const std::vector<int64_t> &sparseValidArray);
+    int64_t FindMinMaxLoad(const std::vector<int64_t>& sparseValidArray, int64_t start, int64_t partNum) const;
+    bool BuildBalancedSparseStartIdx(const std::vector<int64_t>& sparseValidArray,
+                                     std::vector<int64_t>& sparseStartIdx) const;
+    bool SetSparseStartIdx(const std::vector<int64_t>& sparseValidArray);
     bool BuildMetadata();
 
-    Tensor *cuSeqLensQuery_ = nullptr;
-    Tensor *cuSeqLensKey_ = nullptr;
-    Tensor *seqUsedQuery_ = nullptr;
-    Tensor *seqUsedKey_ = nullptr;
-    Tensor *cmpResidualKey_ = nullptr;
-    Tensor *metadata_ = nullptr;
+    Tensor* cuSeqLensQuery_ = nullptr;
+    Tensor* cuSeqLensKey_ = nullptr;
+    Tensor* seqUsedQuery_ = nullptr;
+    Tensor* seqUsedKey_ = nullptr;
+    Tensor* cmpResidualKey_ = nullptr;
+    Tensor* metadata_ = nullptr;
 
     int64_t bSize_ = 0;
     int64_t s1Size_ = 0;
@@ -89,7 +89,7 @@ private:
     std::vector<int64_t> bS1Index_;
 };
 
-inline uint32_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::Compute(CpuKernelContext &ctx)
+inline uint32_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::Compute(CpuKernelContext& ctx)
 {
     if (!Prepare(ctx)) {
         return KERNEL_STATUS_PARAM_INVALID;
@@ -97,7 +97,7 @@ inline uint32_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::Compute
     return BuildMetadata() ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;
 }
 
-inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::Prepare(CpuKernelContext &ctx)
+inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::Prepare(CpuKernelContext& ctx)
 {
     cuSeqLensQuery_ = ctx.Input(0);
     cuSeqLensKey_ = ctx.Input(1);
@@ -148,10 +148,10 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::ParamsCheck
     KERNEL_CHECK_NULLPTR(metadata_->GetData(), false, "metadata data is null");
     KERNEL_CHECK_NULLPTR(metadata_->GetTensorShape(), false, "metadata shape is null");
 
-    Tensor *int32VectorInputs[] = {cuSeqLensQuery_, cuSeqLensKey_, seqUsedQuery_, seqUsedKey_, cmpResidualKey_};
-    const char *inputNames[] = {"cu_seqlens_q", "cu_seqlens_k", "seqused_q", "seqused_k", "cmp_residual_k"};
+    Tensor* int32VectorInputs[] = {cuSeqLensQuery_, cuSeqLensKey_, seqUsedQuery_, seqUsedKey_, cmpResidualKey_};
+    const char* inputNames[] = {"cu_seqlens_q", "cu_seqlens_k", "seqused_q", "seqused_k", "cmp_residual_k"};
     for (size_t idx = 0; idx < sizeof(int32VectorInputs) / sizeof(int32VectorInputs[0]); ++idx) {
-        Tensor *tensor = int32VectorInputs[idx];
+        Tensor* tensor = int32VectorInputs[idx];
         if (!IsTensorValid(tensor)) {
             continue;
         }
@@ -266,23 +266,23 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::ParamsCheck
     return true;
 }
 
-inline int64_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::GetActualSeqLen(Tensor *tensor,
+inline int64_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::GetActualSeqLen(Tensor* tensor,
                                                                                         int64_t bIdx) const
 {
     if (!IsTensorValid(tensor)) {
         return 0;
     }
-    auto *data = reinterpret_cast<const int32_t *>(tensor->GetData());
+    auto* data = reinterpret_cast<const int32_t*>(tensor->GetData());
     return static_cast<int64_t>(data[bIdx + 1]) - static_cast<int64_t>(data[bIdx]);
 }
 
-inline int64_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::GetSeqUsedLen(Tensor *tensor, int64_t bIdx,
+inline int64_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::GetSeqUsedLen(Tensor* tensor, int64_t bIdx,
                                                                                       int64_t defaultLen) const
 {
     if (!IsTensorValid(tensor)) {
         return defaultLen;
     }
-    auto *data = reinterpret_cast<const int32_t *>(tensor->GetData());
+    auto* data = reinterpret_cast<const int32_t*>(tensor->GetData());
     return static_cast<int64_t>(data[bIdx]);
 }
 
@@ -308,7 +308,7 @@ inline int64_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::CalcTota
         return total;
     }
     if (layoutType_ == SliLayout::TND) {
-        auto *data = reinterpret_cast<const int32_t *>(cuSeqLensQuery_->GetData());
+        auto* data = reinterpret_cast<const int32_t*>(cuSeqLensQuery_->GetData());
         return data[bSize_];
     }
     return bSize_ * s1Size_;
@@ -319,7 +319,7 @@ inline int64_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::GetCmpRe
     if (!IsTensorValid(cmpResidualKey_)) {
         return 0;
     }
-    auto *data = reinterpret_cast<const int32_t *>(cmpResidualKey_->GetData());
+    auto* data = reinterpret_cast<const int32_t*>(cmpResidualKey_->GetData());
     return static_cast<int64_t>(data[bIdx]);
 }
 
@@ -352,7 +352,7 @@ inline int64_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::GetS1Loa
 }
 
 inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::BuildSparseValidArray(
-    std::vector<int64_t> &sparseValidArray)
+    std::vector<int64_t>& sparseValidArray)
 {
     if (sparseValidArray.empty()) {
         KERNEL_LOG_ERROR("Sparse valid array size should be larger than 0.");
@@ -383,7 +383,7 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::BuildSparse
 }
 
 inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::CanSplitWithMaxLoad(
-    const std::vector<int64_t> &sparseValidArray, int64_t start, int64_t partNum, int64_t maxLoad) const
+    const std::vector<int64_t>& sparseValidArray, int64_t start, int64_t partNum, int64_t maxLoad) const
 {
     if (partNum == 0) {
         return start == totalSize_;
@@ -413,7 +413,7 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::CanSplitWit
 }
 
 inline int64_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::FindMinMaxLoad(
-    const std::vector<int64_t> &sparseValidArray, int64_t start, int64_t partNum) const
+    const std::vector<int64_t>& sparseValidArray, int64_t start, int64_t partNum) const
 {
     int64_t totalLoad = std::accumulate(sparseValidArray.begin() + start, sparseValidArray.end(), 0LL);
     int64_t minMaxLoad = std::max(*std::max_element(sparseValidArray.begin() + start, sparseValidArray.end()),
@@ -431,7 +431,7 @@ inline int64_t SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::FindMinM
 }
 
 inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::BuildBalancedSparseStartIdx(
-    const std::vector<int64_t> &sparseValidArray, std::vector<int64_t> &sparseStartIdx) const
+    const std::vector<int64_t>& sparseValidArray, std::vector<int64_t>& sparseStartIdx) const
 {
     sparseStartIdx.assign(SLI_METADATA_MAX_CORE_NUM, totalSize_);
     int64_t activeStart = 0;
@@ -502,7 +502,7 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::BuildBalanc
 }
 
 inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::SetSparseStartIdx(
-    const std::vector<int64_t> &sparseValidArray)
+    const std::vector<int64_t>& sparseValidArray)
 {
     if (!BuildBalancedSparseStartIdx(sparseValidArray, bS1Index_)) {
         return false;
@@ -532,9 +532,9 @@ inline bool SparseLightningIndexerKLLossGradMetadataCpuKernelArch22::BuildMetada
         return false;
     }
 
-    auto *metadataData = reinterpret_cast<SLI_METADATA_T *>(metadata_->GetData());
+    auto* metadataData = reinterpret_cast<SLI_METADATA_T*>(metadata_->GetData());
     std::fill_n(metadataData, SLI_METADATA_SIZE, static_cast<SLI_METADATA_T>(0));
-    auto *metadata = reinterpret_cast<detail::SliGradKLLossMetaData *>(metadataData);
+    auto* metadata = reinterpret_cast<detail::SliGradKLLossMetaData*>(metadataData);
     metadata->coreNum = static_cast<int32_t>(coreNum_);
     metadata->totalSize = static_cast<int32_t>(totalSize_);
     metadata->splitFactorSize = static_cast<int32_t>(splitFactorSize_);

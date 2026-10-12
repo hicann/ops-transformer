@@ -53,7 +53,7 @@ constexpr uint64_t kKeyBsndBf16KvMerge = 17179869185UL;
 // Deterministic 在 ASCENDC_TPL_ARGS_DECL 中紧邻 KvMerge 之前声明，故占 bit33。
 constexpr uint64_t kKeyBsndBf16KvMergeDeter = kKeyBsndBf16KvMerge | (1UL << 33);
 
-gert::TilingContextPara MakeKvMergePara(CompileInfo &compileInfo, int64_t sparseBlockSize, int64_t s2,
+gert::TilingContextPara MakeKvMergePara(CompileInfo& compileInfo, int64_t sparseBlockSize, int64_t s2,
                                         int32_t deterministicInfo = 0)
 {
     return gert::TilingContextPara(

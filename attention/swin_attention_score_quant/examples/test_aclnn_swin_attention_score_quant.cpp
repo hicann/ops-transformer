@@ -30,7 +30,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -39,7 +39,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -52,8 +52,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -93,29 +93,29 @@ int main()
     std::vector<int64_t> hShape = {1, H};
     std::vector<int64_t> mask1Shape = {1, N, S, S};
     std::vector<int64_t> attentionScoreShape = {B, N, S, H};
-    void *queryDeviceAddr = nullptr;
-    void *keyDeviceAddr = nullptr;
-    void *valueDeviceAddr = nullptr;
-    void *scaleQuantDeviceAddr = nullptr;
-    void *scaleDequant1DeviceAddr = nullptr;
-    void *scaleDequant2DeviceAddr = nullptr;
-    void *biasQuantDeviceAddr = nullptr;
-    void *biasDequant1DeviceAddr = nullptr;
-    void *biasDequant2DeviceAddr = nullptr;
-    void *paddingMask1DeviceAddr = nullptr;
-    void *attentionScoreDeviceAddr = nullptr;
-    aclTensor *query = nullptr;
-    aclTensor *key = nullptr;
-    aclTensor *value = nullptr;
-    aclTensor *scaleQuant = nullptr;
-    aclTensor *scaleDequant1 = nullptr;
-    aclTensor *scaleDequant2 = nullptr;
-    aclTensor *biasQuantOptional = nullptr;
-    aclTensor *biasDequant1Optional = nullptr;
-    aclTensor *biasDequant2Optional = nullptr;
-    aclTensor *paddingMask1Optional = nullptr;
-    aclTensor *paddingMask2Optional = nullptr;
-    aclTensor *attentionScore = nullptr;
+    void* queryDeviceAddr = nullptr;
+    void* keyDeviceAddr = nullptr;
+    void* valueDeviceAddr = nullptr;
+    void* scaleQuantDeviceAddr = nullptr;
+    void* scaleDequant1DeviceAddr = nullptr;
+    void* scaleDequant2DeviceAddr = nullptr;
+    void* biasQuantDeviceAddr = nullptr;
+    void* biasDequant1DeviceAddr = nullptr;
+    void* biasDequant2DeviceAddr = nullptr;
+    void* paddingMask1DeviceAddr = nullptr;
+    void* attentionScoreDeviceAddr = nullptr;
+    aclTensor* query = nullptr;
+    aclTensor* key = nullptr;
+    aclTensor* value = nullptr;
+    aclTensor* scaleQuant = nullptr;
+    aclTensor* scaleDequant1 = nullptr;
+    aclTensor* scaleDequant2 = nullptr;
+    aclTensor* biasQuantOptional = nullptr;
+    aclTensor* biasDequant1Optional = nullptr;
+    aclTensor* biasDequant2Optional = nullptr;
+    aclTensor* paddingMask1Optional = nullptr;
+    aclTensor* paddingMask2Optional = nullptr;
+    aclTensor* attentionScore = nullptr;
     std::vector<int8_t> queryHostData(B * N * S * H, 1);
     std::vector<int8_t> keyHostData(B * N * S * H, 1);
     std::vector<int8_t> valueHostData(B * N * S * H, 1);
@@ -162,7 +162,7 @@ int main()
     // aclnn接口调用示例
     // 3. 调用CANN算子库API
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     // 调用aclnn第一段接口
     ret = aclnnSwinAttentionScoreQuantGetWorkspaceSize(query, key, value, scaleQuant, scaleDequant1, scaleDequant2,
                                                        biasQuantOptional, biasDequant1Optional, biasDequant2Optional,
@@ -171,7 +171,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSwinAttentionScoreQuantGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

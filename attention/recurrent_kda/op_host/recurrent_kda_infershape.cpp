@@ -29,7 +29,7 @@ const size_t DIM_0 = 0;
 const size_t DIM_1 = 1;
 const size_t DIM_2 = 2;
 
-static ge::graphStatus InferShapeRecurrentKda(InferShapeContext *context)
+static ge::graphStatus InferShapeRecurrentKda(InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("RecurrentKda", "inference context is null");
@@ -55,7 +55,7 @@ static ge::graphStatus InferShapeRecurrentKda(InferShapeContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeRecurrentKda(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeRecurrentKda(gert::InferDataTypeContext* context)
 {
     context->SetOutputDataType(0, ge::DT_BF16);
     context->SetOutputDataType(1, context->GetInputDataType(STATE_INDEX));

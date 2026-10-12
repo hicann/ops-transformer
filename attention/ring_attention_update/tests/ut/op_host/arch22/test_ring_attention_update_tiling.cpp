@@ -32,7 +32,7 @@ constexpr uint64_t kTilingKeyTndFp16 = 10UL;
 
 using TensorDesc = gert::TilingContextPara::TensorDescription;
 using OpAttr = gert::TilingContextPara::OpAttr;
-}  // namespace
+} // namespace
 
 class RingAttentionUpdateTiling : public testing::Test {
 protected:
@@ -50,7 +50,7 @@ protected:
 // A1: SBH fp32
 TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_A1_sbh_fp32)
 {
-    struct RingAttentionUpdateCompileInfo compileInfo{};
+    struct RingAttentionUpdateCompileInfo compileInfo {};
     gert::TilingContextPara para(
         "RingAttentionUpdate",
         {
@@ -70,20 +70,14 @@ TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_A1_sbh_fp32)
             {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
             {"input_softmax_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
         },
-        kInputIrInstanceSbh,
-        kOutputIrInstance,
-        &compileInfo,
-        "Ascend910B",
-        kUtCoreNum,
-        kUbSize,
-        kTilingDataSize);
+        kInputIrInstanceSbh, kOutputIrInstance, &compileInfo, "Ascend910B", kUtCoreNum, kUbSize, kTilingDataSize);
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kTilingKeySbhFp32);
 }
 
 // A2: SBH fp16
 TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_A2_sbh_fp16)
 {
-    struct RingAttentionUpdateCompileInfo compileInfo{};
+    struct RingAttentionUpdateCompileInfo compileInfo {};
     gert::TilingContextPara para(
         "RingAttentionUpdate",
         {
@@ -103,20 +97,14 @@ TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_A2_sbh_fp16)
             {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
             {"input_softmax_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
         },
-        kInputIrInstanceSbh,
-        kOutputIrInstance,
-        &compileInfo,
-        "Ascend910B",
-        kUtCoreNum,
-        kUbSize,
-        kTilingDataSize);
+        kInputIrInstanceSbh, kOutputIrInstance, &compileInfo, "Ascend910B", kUtCoreNum, kUbSize, kTilingDataSize);
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kTilingKeySbhFp16);
 }
 
 // A3: SBH bf16
 TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_A3_sbh_bf16)
 {
-    struct RingAttentionUpdateCompileInfo compileInfo{};
+    struct RingAttentionUpdateCompileInfo compileInfo {};
     gert::TilingContextPara para(
         "RingAttentionUpdate",
         {
@@ -136,22 +124,16 @@ TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_A3_sbh_bf16)
             {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
             {"input_softmax_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
         },
-        kInputIrInstanceSbh,
-        kOutputIrInstance,
-        &compileInfo,
-        "Ascend910B",
-        kUtCoreNum,
-        kUbSize,
-        kTilingDataSize);
+        kInputIrInstanceSbh, kOutputIrInstance, &compileInfo, "Ascend910B", kUtCoreNum, kUbSize, kTilingDataSize);
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kTilingKeySbhBf16);
 }
 
 // A4: TND fp16 with actual_seq_qlen
 TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_A4_tnd_fp16)
 {
-    struct RingAttentionUpdateCompileInfo compileInfo{};
-    int64_t actSeqQlen[] = {500, 1000, 1500, 2100, 2700, 3300, 3900, 4500,
-                            5100, 5700, 6300, 6900, 7500, 8100, 8700, 9300, 9900, 12000};
+    struct RingAttentionUpdateCompileInfo compileInfo {};
+    int64_t actSeqQlen[] = {500,  1000, 1500, 2100, 2700, 3300, 3900, 4500, 5100,
+                            5700, 6300, 6900, 7500, 8100, 8700, 9300, 9900, 12000};
     gert::TilingContextPara para(
         "RingAttentionUpdate",
         {
@@ -172,22 +154,16 @@ TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_A4_tnd_fp16)
             {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
             {"input_softmax_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
         },
-        kInputIrInstanceTnd,
-        kOutputIrInstance,
-        &compileInfo,
-        "Ascend910B",
-        kUtCoreNum,
-        kUbSize,
-        kTilingDataSize);
+        kInputIrInstanceTnd, kOutputIrInstance, &compileInfo, "Ascend910B", kUtCoreNum, kUbSize, kTilingDataSize);
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kTilingKeyTndFp16);
 }
 
 // E1: TND headDim not aligned to 64
 TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_E1_tnd_head_dim_misaligned)
 {
-    struct RingAttentionUpdateCompileInfo compileInfo{};
-    int64_t actSeqQlen[] = {500, 1000, 1500, 2100, 2700, 3300, 3900, 4500,
-                            5100, 5700, 6300, 6900, 7500, 8100, 8700, 9300, 9900, 12000};
+    struct RingAttentionUpdateCompileInfo compileInfo {};
+    int64_t actSeqQlen[] = {500,  1000, 1500, 2100, 2700, 3300, 3900, 4500, 5100,
+                            5700, 6300, 6900, 7500, 8100, 8700, 9300, 9900, 12000};
     gert::TilingContextPara para(
         "RingAttentionUpdate",
         {
@@ -208,20 +184,14 @@ TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_E1_tnd_head_di
             {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
             {"input_softmax_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
         },
-        kInputIrInstanceTnd,
-        kOutputIrInstance,
-        &compileInfo,
-        "Ascend910B",
-        kUtCoreNum,
-        kUbSize,
-        kTilingDataSize);
+        kInputIrInstanceTnd, kOutputIrInstance, &compileInfo, "Ascend910B", kUtCoreNum, kUbSize, kTilingDataSize);
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
 
 // E2: softmax last dim != 8
 TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_E2_invalid_softmax_tail)
 {
-    struct RingAttentionUpdateCompileInfo compileInfo{};
+    struct RingAttentionUpdateCompileInfo compileInfo {};
     gert::TilingContextPara para(
         "RingAttentionUpdate",
         {
@@ -241,20 +211,14 @@ TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_E2_invalid_sof
             {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
             {"input_softmax_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
         },
-        kInputIrInstanceSbh,
-        kOutputIrInstance,
-        &compileInfo,
-        "Ascend910B",
-        kUtCoreNum,
-        kUbSize,
-        kTilingDataSize);
+        kInputIrInstanceSbh, kOutputIrInstance, &compileInfo, "Ascend910B", kUtCoreNum, kUbSize, kTilingDataSize);
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
 
 // E3: attn/softmax shape mismatch
 TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_E3_attn_softmax_mismatch)
 {
-    struct RingAttentionUpdateCompileInfo compileInfo{};
+    struct RingAttentionUpdateCompileInfo compileInfo {};
     gert::TilingContextPara para(
         "RingAttentionUpdate",
         {
@@ -274,20 +238,14 @@ TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_E3_attn_softma
             {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
             {"input_softmax_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
         },
-        kInputIrInstanceSbh,
-        kOutputIrInstance,
-        &compileInfo,
-        "Ascend910B",
-        kUtCoreNum,
-        kUbSize,
-        kTilingDataSize);
+        kInputIrInstanceSbh, kOutputIrInstance, &compileInfo, "Ascend910B", kUtCoreNum, kUbSize, kTilingDataSize);
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
 
 // E4: unsupported attn dtype
 TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_E4_invalid_attn_dtype)
 {
-    struct RingAttentionUpdateCompileInfo compileInfo{};
+    struct RingAttentionUpdateCompileInfo compileInfo {};
     gert::TilingContextPara para(
         "RingAttentionUpdate",
         {
@@ -307,12 +265,6 @@ TEST_F(RingAttentionUpdateTiling, RingAttentionUpdate_910b_tiling_E4_invalid_att
             {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
             {"input_softmax_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("SBH")},
         },
-        kInputIrInstanceSbh,
-        kOutputIrInstance,
-        &compileInfo,
-        "Ascend910B",
-        kUtCoreNum,
-        kUbSize,
-        kTilingDataSize);
+        kInputIrInstanceSbh, kOutputIrInstance, &compileInfo, "Ascend910B", kUtCoreNum, kUbSize, kTilingDataSize);
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }

@@ -32,9 +32,9 @@ namespace op_api {
  * @param keyScaleCache [num_blocks, num_head, block_size, 1] float32格式的key scale cache（原地更新）
  * @param cacheLayout cache布局格式字符串（默认"BNBD"）
  */
-void ScatterPaKvCacheWithKScale(const at::Tensor &key, const at::Tensor &value, at::Tensor &keyCache,
-                                at::Tensor &valueCache, const at::Tensor &slotMapping, const at::Tensor &keyScale,
-                                at::Tensor &keyScaleCache, std::string cacheLayout)
+void ScatterPaKvCacheWithKScale(const at::Tensor& key, const at::Tensor& value, at::Tensor& keyCache,
+                                at::Tensor& valueCache, const at::Tensor& slotMapping, const at::Tensor& keyScale,
+                                at::Tensor& keyScaleCache, std::string cacheLayout)
 {
     // 检查输入tensor维度
     TORCH_CHECK(key.dim() == 3, "key must be 3D tensor [num_tokens, num_head, k_head_size]");
@@ -57,7 +57,7 @@ void ScatterPaKvCacheWithKScale(const at::Tensor &key, const at::Tensor &value, 
                 "slot_mapping dtype must be int32 or int64");
 
     // 转换cache_layout为char指针
-    char *cacheLayoutPtr = const_cast<char *>(cacheLayout.c_str());
+    char* cacheLayoutPtr = const_cast<char*>(cacheLayout.c_str());
 
     // 调用ACLNN算子（inplace更新输入cache）
     ACLNN_CMD(aclnnScatterPaKvCacheWithKScale, key, value, keyCache, valueCache, slotMapping, keyScale, keyScaleCache,

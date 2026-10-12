@@ -34,13 +34,13 @@ enum class Layout : uint32_t {
 };
 
 struct TensorParam {
-    const gert::CompileTimeTensorDesc *desc = nullptr;
-    const gert::Shape *shape = nullptr;
+    const gert::CompileTimeTensorDesc* desc = nullptr;
+    const gert::Shape* shape = nullptr;
     bool present = false;
 };
 
 struct CheckContext {
-    const char *opName = nullptr;
+    const char* opName = nullptr;
     OperatorVariant variant = OperatorVariant::SPARSE;
     NpuArch npuArch = NpuArch::DAV_2201;
 

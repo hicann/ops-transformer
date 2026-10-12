@@ -39,12 +39,12 @@ public:
     using MM2_OUT_T = float;
 
     __aicore__ inline SWAVectorBlock(){};
-    __aicore__ inline void ProcessVec0L(const RunInfo &runInfo);
-    __aicore__ inline void ProcessVec1L(const RunInfo &info);
-    __aicore__ inline void ProcessVec2L(const RunInfo &info);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitParams(const struct ConstInfo &constInfo,
-                                      const SparseFlashMlaTilingData *__restrict tilingData);
+    __aicore__ inline void ProcessVec0L(const RunInfo& runInfo);
+    __aicore__ inline void ProcessVec1L(const RunInfo& info);
+    __aicore__ inline void ProcessVec2L(const RunInfo& info);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void InitParams(const struct ConstInfo& constInfo,
+                                      const SparseFlashMlaTilingData* __restrict tilingData);
     __aicore__ inline void InitVec0GlobalTensor(GlobalTensor<KV_T> kvMergeGm, GlobalTensor<KV_T> oriKvGm,
                                                 GlobalTensor<int32_t> oriBlockTableGm,
                                                 GlobalTensor<int32_t> oriSparseIndicesGm,
@@ -66,35 +66,35 @@ public:
     __aicore__ inline void RowMuls(LocalTensor<T> dstUb, LocalTensor<T> src0Ub, LocalTensor<T> src1Ub,
                                    uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount);
     // ================================Vector1==========================================
-    __aicore__ inline void ProcessVec1SingleBuf(const RunInfo &info, const MSplitInfo &mSplitInfo);
-    __aicore__ inline void DealBmm1ResBaseBlock(const RunInfo &info, const MSplitInfo &mSplitInfo, uint32_t startRow,
+    __aicore__ inline void ProcessVec1SingleBuf(const RunInfo& info, const MSplitInfo& mSplitInfo);
+    __aicore__ inline void DealBmm1ResBaseBlock(const RunInfo& info, const MSplitInfo& mSplitInfo, uint32_t startRow,
                                                 uint32_t dealRowCount, uint32_t columnCount, uint32_t loopId);
-    __aicore__ inline void SoftmaxFlashV2Compute(const RunInfo &info, const MSplitInfo &mSplitInfo,
-                                                 LocalTensor<T> &mmResUb, LocalTensor<uint8_t> &softmaxTmpUb,
+    __aicore__ inline void SoftmaxFlashV2Compute(const RunInfo& info, const MSplitInfo& mSplitInfo,
+                                                 LocalTensor<T>& mmResUb, LocalTensor<uint8_t>& softmaxTmpUb,
                                                  uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount,
                                                  uint32_t actualColumnCount);
-    __aicore__ inline void ElewiseCompute(const RunInfo &info, const MSplitInfo &mSplitInfo,
-                                          const LocalTensor<T> &mmResUb, uint32_t dealRowCount, uint32_t startRow,
+    __aicore__ inline void ElewiseCompute(const RunInfo& info, const MSplitInfo& mSplitInfo,
+                                          const LocalTensor<T>& mmResUb, uint32_t dealRowCount, uint32_t startRow,
                                           uint32_t columnCount);
-    __aicore__ inline void ProcessLse(const RunInfo &info, const MSplitInfo &mSplitInfo);
+    __aicore__ inline void ProcessLse(const RunInfo& info, const MSplitInfo& mSplitInfo);
     // ================================Vecotr2==========================================
-    __aicore__ inline void ProcessVec2SingleBuf(const RunInfo &info, const MSplitInfo &mSplitInfo);
-    __aicore__ inline void DealBmm2ResBaseBlock(const RunInfo &info, const MSplitInfo &mSplitInfo, uint32_t startRow,
+    __aicore__ inline void ProcessVec2SingleBuf(const RunInfo& info, const MSplitInfo& mSplitInfo);
+    __aicore__ inline void DealBmm2ResBaseBlock(const RunInfo& info, const MSplitInfo& mSplitInfo, uint32_t startRow,
                                                 uint32_t dealRowCount, uint32_t columnCount,
                                                 uint32_t actualColumnCount);
-    __aicore__ inline void ProcessVec2Inner(const RunInfo &info, const MSplitInfo &mSplitInfo, uint32_t mStartRow,
+    __aicore__ inline void ProcessVec2Inner(const RunInfo& info, const MSplitInfo& mSplitInfo, uint32_t mStartRow,
                                             uint32_t mDealSize);
-    __aicore__ inline void Bmm2DataCopyOutTrans(const RunInfo &info, LocalTensor<OUT_T> &attenOutUb, uint32_t wsMStart,
+    __aicore__ inline void Bmm2DataCopyOutTrans(const RunInfo& info, LocalTensor<OUT_T>& attenOutUb, uint32_t wsMStart,
                                                 uint32_t dealRowCount, uint32_t columnCount,
                                                 uint32_t actualColumnCount);
-    __aicore__ inline void Bmm2ResCopyOut(const RunInfo &info, LocalTensor<T> &bmm2ResUb, uint32_t wsMStart,
+    __aicore__ inline void Bmm2ResCopyOut(const RunInfo& info, LocalTensor<T>& bmm2ResUb, uint32_t wsMStart,
                                           uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount);
-    __aicore__ inline void Bmm2CastAndCopyOut(const RunInfo &info, LocalTensor<T> &bmm2ResUb, uint32_t wsMStart,
+    __aicore__ inline void Bmm2CastAndCopyOut(const RunInfo& info, LocalTensor<T>& bmm2ResUb, uint32_t wsMStart,
                                               uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount);
-    __aicore__ inline void Bmm2FDDataCopyOut(const RunInfo &info, LocalTensor<T> &bmm2ResUb, uint32_t wsMStart,
+    __aicore__ inline void Bmm2FDDataCopyOut(const RunInfo& info, LocalTensor<T>& bmm2ResUb, uint32_t wsMStart,
                                              uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount);
     __aicore__ inline uint64_t CalcAccumOffset(uint32_t bN2Idx, uint32_t gS1Idx);
-    __aicore__ inline void SetInfInBlk(const LocalTensor<T> &mmResUb, uint32_t dealRowCount, uint32_t columnCount,
+    __aicore__ inline void SetInfInBlk(const LocalTensor<T>& mmResUb, uint32_t dealRowCount, uint32_t columnCount,
                                        int64_t startId, int64_t endId);
 
     // BLOCK和REPEAT的字节数
@@ -109,16 +109,16 @@ public:
     static constexpr uint64_t MERGE_WORKSPACE_ROW_NUM = 512;
 
 private:
-    __aicore__ inline int64_t GetOriSparseKeyGmOffset(int32_t logicalIdx, const RunInfo &runInfo);
-    __aicore__ inline void CopyInSingleOriSparseRow(int64_t &mte2Size, int64_t mte3Size, int64_t mergeMte3Idx,
-                                                    int32_t logicalIdx, const RunInfo &runInfo);
-    __aicore__ inline void CopyInOriSparseKv(int64_t &mte2Size, int64_t mte3Size, int64_t mergeMte3Idx,
-                                             int32_t logicalIdx0, int32_t logicalIdx1, const RunInfo &runInfo);
+    __aicore__ inline int64_t GetOriSparseKeyGmOffset(int32_t logicalIdx, const RunInfo& runInfo);
+    __aicore__ inline void CopyInSingleOriSparseRow(int64_t& mte2Size, int64_t mte3Size, int64_t mergeMte3Idx,
+                                                    int32_t logicalIdx, const RunInfo& runInfo);
+    __aicore__ inline void CopyInOriSparseKv(int64_t& mte2Size, int64_t mte3Size, int64_t mergeMte3Idx,
+                                             int32_t logicalIdx0, int32_t logicalIdx1, const RunInfo& runInfo);
     __aicore__ inline void CopyOutOriSparseMerge(int64_t mte2Size, int64_t mte3Size, int64_t s2GmStartOffset,
-                                                 int64_t mergeMte3Idx, const RunInfo &runInfo);
+                                                 int64_t mergeMte3Idx, const RunInfo& runInfo);
     __aicore__ inline int32_t AlignOriSparseIndexLoadCount(int32_t loadCount);
     __aicore__ inline void LoadOriSparseIndicesGmToUb(uint64_t qTokenOffset, uint32_t n2Idx, uint32_t gmColStart,
-                                                      int32_t loadCount, const LocalTensor<int32_t> &dstUb);
+                                                      int32_t loadCount, const LocalTensor<int32_t>& dstUb);
     static constexpr bool PAGE_ATTENTION = SMLAT::pageAttention;
     static constexpr bool FLASH_DECODE = SMLAT::flashDecode;
     static constexpr SMLA_LAYOUT LAYOUT_T = SMLAT::layout;
@@ -140,7 +140,7 @@ private:
     static constexpr T SOFTMAX_MIN_NUM = -2e38;
     static constexpr SINKS_T R0 = 1.0f;
 
-    const SparseFlashMlaTilingData *__restrict tilingData;
+    const SparseFlashMlaTilingData* __restrict tilingData;
 
     uint32_t pingpongFlag = 0U;
     ConstInfo constInfo = {};
@@ -200,7 +200,7 @@ private:
 
 // ============================== init ==============================================
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void SWAVectorBlock<SMLAT>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(inputBuff1, ConstInfo::BUFFER_SIZE_BYTE_32K * 2); // 2:pingpong
     pipe->InitBuffer(inputBuff2, ConstInfo::BUFFER_SIZE_BYTE_8K * 2);  // 2:pingpong
@@ -236,8 +236,8 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::InitBuffers(TPipe *pipe)
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::InitParams(const struct ConstInfo &constInfo,
-                                                         const SparseFlashMlaTilingData *__restrict tilingData)
+__aicore__ inline void SWAVectorBlock<SMLAT>::InitParams(const struct ConstInfo& constInfo,
+                                                         const SparseFlashMlaTilingData* __restrict tilingData)
 {
     this->constInfo = constInfo;
     this->tilingData = tilingData;
@@ -258,7 +258,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::InitVec0GlobalTensor(GlobalTensor<
 }
 
 template <typename SMLAT>
-__aicore__ inline int64_t SWAVectorBlock<SMLAT>::GetOriSparseKeyGmOffset(int32_t logicalIdx, const RunInfo &runInfo)
+__aicore__ inline int64_t SWAVectorBlock<SMLAT>::GetOriSparseKeyGmOffset(int32_t logicalIdx, const RunInfo& runInfo)
 {
     if (logicalIdx < 0) {
         return -1;
@@ -278,9 +278,9 @@ __aicore__ inline int64_t SWAVectorBlock<SMLAT>::GetOriSparseKeyGmOffset(int32_t
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::CopyInSingleOriSparseRow(int64_t &mte2Size, int64_t mte3Size,
+__aicore__ inline void SWAVectorBlock<SMLAT>::CopyInSingleOriSparseRow(int64_t& mte2Size, int64_t mte3Size,
                                                                        int64_t mergeMte3Idx, int32_t logicalIdx,
-                                                                       const RunInfo &runInfo)
+                                                                       const RunInfo& runInfo)
 {
     int64_t keyOffset = GetOriSparseKeyGmOffset(logicalIdx, runInfo);
     if (keyOffset >= 0) {
@@ -298,9 +298,9 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::CopyInSingleOriSparseRow(int64_t &
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::CopyInOriSparseKv(int64_t &mte2Size, int64_t mte3Size,
+__aicore__ inline void SWAVectorBlock<SMLAT>::CopyInOriSparseKv(int64_t& mte2Size, int64_t mte3Size,
                                                                 int64_t mergeMte3Idx, int32_t logicalIdx0,
-                                                                int32_t logicalIdx1, const RunInfo &runInfo)
+                                                                int32_t logicalIdx1, const RunInfo& runInfo)
 {
     int64_t keyOffset1 = GetOriSparseKeyGmOffset(logicalIdx0, runInfo);
     int64_t keyOffset2 = GetOriSparseKeyGmOffset(logicalIdx1, runInfo);
@@ -341,7 +341,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::CopyInOriSparseKv(int64_t &mte2Siz
 template <typename SMLAT>
 __aicore__ inline void SWAVectorBlock<SMLAT>::CopyOutOriSparseMerge(int64_t mte2Size, int64_t mte3Size,
                                                                     int64_t s2GmStartOffset, int64_t mergeMte3Idx,
-                                                                    const RunInfo &runInfo)
+                                                                    const RunInfo& runInfo)
 {
     if (mte2Size <= mte3Size) {
         return;
@@ -374,7 +374,7 @@ __aicore__ inline int32_t SWAVectorBlock<SMLAT>::AlignOriSparseIndexLoadCount(in
 template <typename SMLAT>
 __aicore__ inline void SWAVectorBlock<SMLAT>::LoadOriSparseIndicesGmToUb(uint64_t qTokenOffset, uint32_t n2Idx,
                                                                          uint32_t gmColStart, int32_t loadCount,
-                                                                         const LocalTensor<int32_t> &dstUb)
+                                                                         const LocalTensor<int32_t>& dstUb)
 {
     if (loadCount <= 0 || constInfo.oriSparseIndexWidth == 0) {
         return;
@@ -409,7 +409,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::LoadOriSparseIndicesGmToUb(uint64_
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec0L(const RunInfo &runInfo)
+__aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec0L(const RunInfo& runInfo)
 {
     int64_t s2ProcessSize = runInfo.v0S2DealSize;
     if (s2ProcessSize <= 0) {
@@ -574,8 +574,8 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::InitSoftmaxDefaultBuffer()
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::ElewiseCompute(const RunInfo &info, const MSplitInfo &mSplitInfo,
-                                                             const LocalTensor<T> &mmResUb, uint32_t startRow,
+__aicore__ inline void SWAVectorBlock<SMLAT>::ElewiseCompute(const RunInfo& info, const MSplitInfo& mSplitInfo,
+                                                             const LocalTensor<T>& mmResUb, uint32_t startRow,
                                                              uint32_t dealRowCount, uint32_t columnCount)
 {
     Muls(mmResUb, mmResUb, static_cast<T>(tilingData->baseParams.softmaxScale), dealRowCount * columnCount);
@@ -735,7 +735,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ElewiseCompute(const RunInfo &info
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::SetInfInBlk(const LocalTensor<T> &mmResUb, uint32_t dealRowCount,
+__aicore__ inline void SWAVectorBlock<SMLAT>::SetInfInBlk(const LocalTensor<T>& mmResUb, uint32_t dealRowCount,
                                                           uint32_t columnCount, int64_t startId, int64_t endId)
 {
     //       startId     endId
@@ -770,9 +770,9 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::SetInfInBlk(const LocalTensor<T> &
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::SoftmaxFlashV2Compute(const RunInfo &info, const MSplitInfo &mSplitInfo,
-                                                                    LocalTensor<T> &mmResUb,
-                                                                    LocalTensor<uint8_t> &softmaxTmpUb,
+__aicore__ inline void SWAVectorBlock<SMLAT>::SoftmaxFlashV2Compute(const RunInfo& info, const MSplitInfo& mSplitInfo,
+                                                                    LocalTensor<T>& mmResUb,
+                                                                    LocalTensor<uint8_t>& softmaxTmpUb,
                                                                     uint32_t startRow, uint32_t dealRowCount,
                                                                     uint32_t columnCount, uint32_t actualColumnCount)
 {
@@ -805,7 +805,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::SoftmaxFlashV2Compute(const RunInf
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::ProcessLse(const RunInfo &info, const MSplitInfo &mSplitInfo)
+__aicore__ inline void SWAVectorBlock<SMLAT>::ProcessLse(const RunInfo& info, const MSplitInfo& mSplitInfo)
 {
     if (mSplitInfo.vecDealM == 0) {
         return;
@@ -844,7 +844,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ProcessLse(const RunInfo &info, co
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::DealBmm1ResBaseBlock(const RunInfo &info, const MSplitInfo &mSplitInfo,
+__aicore__ inline void SWAVectorBlock<SMLAT>::DealBmm1ResBaseBlock(const RunInfo& info, const MSplitInfo& mSplitInfo,
                                                                    uint32_t startRow, uint32_t dealRowCount,
                                                                    uint32_t columnCount, uint32_t loopId)
 {
@@ -881,7 +881,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::DealBmm1ResBaseBlock(const RunInfo
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec1SingleBuf(const RunInfo &info, const MSplitInfo &mSplitInfo)
+__aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec1SingleBuf(const RunInfo& info, const MSplitInfo& mSplitInfo)
 {
     if (mSplitInfo.vecDealM == 0) {
         return;
@@ -915,7 +915,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec1SingleBuf(const RunInfo
 // =======================vec1=============================
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec1L(const RunInfo &info)
+__aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec1L(const RunInfo& info)
 {
     uint32_t nBufferLoopTimes = (info.actMBaseSize + constInfo.nBufferMBaseSize - 1) / constInfo.nBufferMBaseSize;
     uint32_t nBufferTail = info.actMBaseSize - (nBufferLoopTimes - 1) * constInfo.nBufferMBaseSize;
@@ -954,7 +954,7 @@ __aicore__ inline uint64_t SWAVectorBlock<SMLAT>::CalcAccumOffset(uint32_t bN2Id
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec2SingleBuf(const RunInfo &info, const MSplitInfo &mSplitInfo)
+__aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec2SingleBuf(const RunInfo& info, const MSplitInfo& mSplitInfo)
 {
     if (mSplitInfo.vecDealM == 0) {
         return;
@@ -964,7 +964,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec2SingleBuf(const RunInfo
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec2L(const RunInfo &info)
+__aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec2L(const RunInfo& info)
 {
     uint32_t nBufferLoopTimes = (info.actMBaseSize + constInfo.nBufferMBaseSize - 1) / constInfo.nBufferMBaseSize;
     uint32_t nBufferTail = info.actMBaseSize - (nBufferLoopTimes - 1) * constInfo.nBufferMBaseSize;
@@ -987,7 +987,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec2L(const RunInfo &info)
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec2Inner(const RunInfo &info, const MSplitInfo &mSplitInfo,
+__aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec2Inner(const RunInfo& info, const MSplitInfo& mSplitInfo,
                                                                uint32_t mStartRow, uint32_t mDealSize)
 {
     uint32_t mSplitSize = BASE_BLOCK_MAX_ELEMENT_NUM / constInfo.headDim;
@@ -1008,7 +1008,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ProcessVec2Inner(const RunInfo &in
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::Bmm2FDDataCopyOut(const RunInfo &info, LocalTensor<T> &bmm2ResUb,
+__aicore__ inline void SWAVectorBlock<SMLAT>::Bmm2FDDataCopyOut(const RunInfo& info, LocalTensor<T>& bmm2ResUb,
                                                                 uint32_t wsMStart, uint32_t dealRowCount,
                                                                 uint32_t columnCount, uint32_t actualColumnCount)
 {
@@ -1037,7 +1037,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::Bmm2FDDataCopyOut(const RunInfo &i
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::Bmm2DataCopyOutTrans(const RunInfo &info, LocalTensor<OUT_T> &attenOutUb,
+__aicore__ inline void SWAVectorBlock<SMLAT>::Bmm2DataCopyOutTrans(const RunInfo& info, LocalTensor<OUT_T>& attenOutUb,
                                                                    uint32_t wsMStart, uint32_t dealRowCount,
                                                                    uint32_t columnCount, uint32_t actualColumnCount)
 {
@@ -1051,7 +1051,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::Bmm2DataCopyOutTrans(const RunInfo
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::Bmm2CastAndCopyOut(const RunInfo &info, LocalTensor<T> &bmm2ResUb,
+__aicore__ inline void SWAVectorBlock<SMLAT>::Bmm2CastAndCopyOut(const RunInfo& info, LocalTensor<T>& bmm2ResUb,
                                                                  uint32_t wsMStart, uint32_t dealRowCount,
                                                                  uint32_t columnCount, uint32_t actualColumnCount)
 {
@@ -1070,7 +1070,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::Bmm2CastAndCopyOut(const RunInfo &
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::Bmm2ResCopyOut(const RunInfo &info, LocalTensor<T> &bmm2ResUb,
+__aicore__ inline void SWAVectorBlock<SMLAT>::Bmm2ResCopyOut(const RunInfo& info, LocalTensor<T>& bmm2ResUb,
                                                              uint32_t wsMStart, uint32_t dealRowCount,
                                                              uint32_t columnCount, uint32_t actualColumnCount)
 {
@@ -1086,7 +1086,7 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::Bmm2ResCopyOut(const RunInfo &info
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWAVectorBlock<SMLAT>::DealBmm2ResBaseBlock(const RunInfo &info, const MSplitInfo &mSplitInfo,
+__aicore__ inline void SWAVectorBlock<SMLAT>::DealBmm2ResBaseBlock(const RunInfo& info, const MSplitInfo& mSplitInfo,
                                                                    uint32_t startRow, uint32_t dealRowCount,
                                                                    uint32_t columnCount, uint32_t actualColumnCount)
 {

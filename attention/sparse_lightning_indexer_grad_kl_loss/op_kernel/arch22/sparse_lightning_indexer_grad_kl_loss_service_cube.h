@@ -44,25 +44,25 @@ public:
     using MM_OUT_T = T;
 
     __aicore__ inline SLITMatmulService(){};
-    __aicore__ inline void InitParams(const SLIGradKLLossConstInfo &constInfo);
-    __aicore__ inline void InitMm1GlobalTensor(GlobalTensor<Q_T> &queryGm, GlobalTensor<KV_T> &keyGatherWithRopeGm,
-                                               GlobalTensor<Q_T> &qRopeGm,
-                                               GlobalTensor<int64_t> &actualSeqLengthsQueryGm,
-                                               GlobalTensor<int64_t> &actualSeqLengthsKeyGm,
-                                               GlobalTensor<MM_OUT_T> &bmm1Res, GM_ADDR mm1Res);
-    __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<Q_T> &queryIndex, GlobalTensor<KV_T> &keyIndexGather,
-                                               GlobalTensor<T> &mm2Res);
-    __aicore__ inline void InitMm5GlobalTensor(GlobalTensor<Q_T> &queryGm, GlobalTensor<KV_T> &queryIndexGm,
-                                               GlobalTensor<MM_OUT_T> &bmm5Res, GlobalTensor<int32_t> &topKIndex);
-    __aicore__ inline void InitMm6GlobalTensor(GlobalTensor<Q_T> &queryGm, GlobalTensor<KV_T> &keyIndexGm,
-                                               GlobalTensor<OUT_T> &bmm6Res);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
+    __aicore__ inline void InitParams(const SLIGradKLLossConstInfo& constInfo);
+    __aicore__ inline void InitMm1GlobalTensor(GlobalTensor<Q_T>& queryGm, GlobalTensor<KV_T>& keyGatherWithRopeGm,
+                                               GlobalTensor<Q_T>& qRopeGm,
+                                               GlobalTensor<int64_t>& actualSeqLengthsQueryGm,
+                                               GlobalTensor<int64_t>& actualSeqLengthsKeyGm,
+                                               GlobalTensor<MM_OUT_T>& bmm1Res, GM_ADDR mm1Res);
+    __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<Q_T>& queryIndex, GlobalTensor<KV_T>& keyIndexGather,
+                                               GlobalTensor<T>& mm2Res);
+    __aicore__ inline void InitMm5GlobalTensor(GlobalTensor<Q_T>& queryGm, GlobalTensor<KV_T>& queryIndexGm,
+                                               GlobalTensor<MM_OUT_T>& bmm5Res, GlobalTensor<int32_t>& topKIndex);
+    __aicore__ inline void InitMm6GlobalTensor(GlobalTensor<Q_T>& queryGm, GlobalTensor<KV_T>& keyIndexGm,
+                                               GlobalTensor<OUT_T>& bmm6Res);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void ComputeMm1(const SLIGradKLLossRunInfo &info);
-    __aicore__ inline void ComputeMm2(const SLIGradKLLossRunInfo &info);
-    __aicore__ inline void ComputeMm5(const SLIGradKLLossRunInfo &info);
-    __aicore__ inline void ComputeMm6(const SLIGradKLLossRunInfo &info);
+    __aicore__ inline void ComputeMm1(const SLIGradKLLossRunInfo& info);
+    __aicore__ inline void ComputeMm2(const SLIGradKLLossRunInfo& info);
+    __aicore__ inline void ComputeMm5(const SLIGradKLLossRunInfo& info);
+    __aicore__ inline void ComputeMm6(const SLIGradKLLossRunInfo& info);
 
 private:
     static constexpr bool HAS_ROPE = SLIT::hasRope;
@@ -152,45 +152,45 @@ private:
 
     MMParam mmParam;
 
-    __aicore__ inline void CopyGmToL1(LocalTensor<KV_T> &l1Tensor, GlobalTensor<KV_T> &gmSrcTensor, uint32_t srcN,
+    __aicore__ inline void CopyGmToL1(LocalTensor<KV_T>& l1Tensor, GlobalTensor<KV_T>& gmSrcTensor, uint32_t srcN,
                                       uint32_t srcD, uint32_t srcDstride);
-    __aicore__ inline void CopyInMm1AToL1(LocalTensor<KV_T> &aL1Tensor, const SLIGradKLLossRunInfo &info,
+    __aicore__ inline void CopyInMm1AToL1(LocalTensor<KV_T>& aL1Tensor, const SLIGradKLLossRunInfo& info,
                                           uint32_t mSizeAct, uint32_t headSize, uint32_t headOffset);
-    __aicore__ inline void CopyInMm1ARopeToL1(LocalTensor<KV_T> &aL1Tensor, const SLIGradKLLossRunInfo &info,
+    __aicore__ inline void CopyInMm1ARopeToL1(LocalTensor<KV_T>& aL1Tensor, const SLIGradKLLossRunInfo& info,
                                               uint32_t mSizeAct);
-    __aicore__ inline void CopyInMm1BToL1(LocalTensor<KV_T> &l1Tensor, uint64_t gatherOffset, struct MMParam &mmParam,
+    __aicore__ inline void CopyInMm1BToL1(LocalTensor<KV_T>& l1Tensor, uint64_t gatherOffset, struct MMParam& mmParam,
                                           uint32_t headOffset);
-    __aicore__ inline void CopyInMm2AToL1(LocalTensor<KV_T> &l1Tensor, const SLIGradKLLossRunInfo &info,
+    __aicore__ inline void CopyInMm2AToL1(LocalTensor<KV_T>& l1Tensor, const SLIGradKLLossRunInfo& info,
                                           uint32_t mSizeAct, uint32_t headSize, uint32_t headOffset);
-    __aicore__ inline void CopyInMm2BToL1(LocalTensor<KV_T> &l1Tensor, uint64_t gatherOffset, uint32_t mSizeAct,
+    __aicore__ inline void CopyInMm2BToL1(LocalTensor<KV_T>& l1Tensor, uint64_t gatherOffset, uint32_t mSizeAct,
                                           uint32_t realDSize, uint32_t headOffset);
-    __aicore__ inline void MmadInner(LocalTensor<MM_OUT_T> &l0cTensor, LocalTensor<Q_T> &l1QPTensor,
-                                     LocalTensor<KV_T> &kTensor, struct MMParam &mmParam);
-    __aicore__ inline void LoadDataMmA(LocalTensor<KV_T> &aL0Tensor, LocalTensor<KV_T> &aL1Tensor,
-                                       struct MMParam &mmParam);
-    __aicore__ inline void LoadDataMmAWithTranspose(LocalTensor<KV_T> &aL0Tensor, LocalTensor<KV_T> &aL1Tensor,
-                                                    struct MMParam &mmParam);
-    __aicore__ inline void LoadDataMmB(LocalTensor<KV_T> &aL0Tensor, LocalTensor<KV_T> &aL1Tensor,
-                                       struct MMParam &mmParam);
-    __aicore__ inline void CopyInMm5AToL1(LocalTensor<KV_T> &l1Tensor, const SLIGradKLLossRunInfo &info,
+    __aicore__ inline void MmadInner(LocalTensor<MM_OUT_T>& l0cTensor, LocalTensor<Q_T>& l1QPTensor,
+                                     LocalTensor<KV_T>& kTensor, struct MMParam& mmParam);
+    __aicore__ inline void LoadDataMmA(LocalTensor<KV_T>& aL0Tensor, LocalTensor<KV_T>& aL1Tensor,
+                                       struct MMParam& mmParam);
+    __aicore__ inline void LoadDataMmAWithTranspose(LocalTensor<KV_T>& aL0Tensor, LocalTensor<KV_T>& aL1Tensor,
+                                                    struct MMParam& mmParam);
+    __aicore__ inline void LoadDataMmB(LocalTensor<KV_T>& aL0Tensor, LocalTensor<KV_T>& aL1Tensor,
+                                       struct MMParam& mmParam);
+    __aicore__ inline void CopyInMm5AToL1(LocalTensor<KV_T>& l1Tensor, const SLIGradKLLossRunInfo& info,
                                           uint32_t mSizeAct, uint32_t headSize, uint32_t headOffset);
-    __aicore__ inline void ScatterAdd(GlobalTensor<MM_OUT_T> &resGm, LocalTensor<MM_OUT_T> &l0cTensor,
-                                      struct MMParam &mmParam, const SLIGradKLLossRunInfo &info, int64_t scatterOffset);
+    __aicore__ inline void ScatterAdd(GlobalTensor<MM_OUT_T>& resGm, LocalTensor<MM_OUT_T>& l0cTensor,
+                                      struct MMParam& mmParam, const SLIGradKLLossRunInfo& info, int64_t scatterOffset);
 };
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::InitParams(const SLIGradKLLossConstInfo &constInfo)
+__aicore__ inline void SLITMatmulService<SLIT>::InitParams(const SLIGradKLLossConstInfo& constInfo)
 {
     this->constInfo = constInfo;
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::InitMm1GlobalTensor(GlobalTensor<Q_T> &queryGm,
-                                                                    GlobalTensor<KV_T> &keyGatherWithRopeGm,
-                                                                    GlobalTensor<Q_T> &qRopeGm,
-                                                                    GlobalTensor<int64_t> &actualSeqLengthsQueryGm,
-                                                                    GlobalTensor<int64_t> &actualSeqLengthsKeyGm,
-                                                                    GlobalTensor<MM_OUT_T> &bmm1Res, GM_ADDR mm1Res)
+__aicore__ inline void SLITMatmulService<SLIT>::InitMm1GlobalTensor(GlobalTensor<Q_T>& queryGm,
+                                                                    GlobalTensor<KV_T>& keyGatherWithRopeGm,
+                                                                    GlobalTensor<Q_T>& qRopeGm,
+                                                                    GlobalTensor<int64_t>& actualSeqLengthsQueryGm,
+                                                                    GlobalTensor<int64_t>& actualSeqLengthsKeyGm,
+                                                                    GlobalTensor<MM_OUT_T>& bmm1Res, GM_ADDR mm1Res)
 {
     this->queryGm = queryGm;
     this->qRopeGm = qRopeGm;
@@ -204,9 +204,9 @@ __aicore__ inline void SLITMatmulService<SLIT>::InitMm1GlobalTensor(GlobalTensor
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::InitMm2GlobalTensor(GlobalTensor<Q_T> &queryIndex,
-                                                                    GlobalTensor<KV_T> &keyIndexGather,
-                                                                    GlobalTensor<T> &mm2Res)
+__aicore__ inline void SLITMatmulService<SLIT>::InitMm2GlobalTensor(GlobalTensor<Q_T>& queryIndex,
+                                                                    GlobalTensor<KV_T>& keyIndexGather,
+                                                                    GlobalTensor<T>& mm2Res)
 {
     queryIndexGm = queryIndex;
     keyIndexGatherGm = keyIndexGather;
@@ -215,10 +215,10 @@ __aicore__ inline void SLITMatmulService<SLIT>::InitMm2GlobalTensor(GlobalTensor
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::InitMm5GlobalTensor(GlobalTensor<Q_T> &reluGradRes,
-                                                                    GlobalTensor<KV_T> &queryIndexGm,
-                                                                    GlobalTensor<MM_OUT_T> &bmm5Res,
-                                                                    GlobalTensor<int32_t> &topKIndex)
+__aicore__ inline void SLITMatmulService<SLIT>::InitMm5GlobalTensor(GlobalTensor<Q_T>& reluGradRes,
+                                                                    GlobalTensor<KV_T>& queryIndexGm,
+                                                                    GlobalTensor<MM_OUT_T>& bmm5Res,
+                                                                    GlobalTensor<int32_t>& topKIndex)
 {
     this->reluGradRes[0] = reluGradRes;
     this->reluGradRes[1] = reluGradRes[topKSize * constInfo.gSizeQueryIndex];
@@ -228,9 +228,9 @@ __aicore__ inline void SLITMatmulService<SLIT>::InitMm5GlobalTensor(GlobalTensor
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::InitMm6GlobalTensor(GlobalTensor<Q_T> &reluGradRes,
-                                                                    GlobalTensor<KV_T> &keyIndexGm,
-                                                                    GlobalTensor<OUT_T> &bmm6Res)
+__aicore__ inline void SLITMatmulService<SLIT>::InitMm6GlobalTensor(GlobalTensor<Q_T>& reluGradRes,
+                                                                    GlobalTensor<KV_T>& keyIndexGm,
+                                                                    GlobalTensor<OUT_T>& bmm6Res)
 {
     this->reluGradRes[0] = reluGradRes;
     this->reluGradRes[1] = reluGradRes[topKSize * constInfo.gSizeQueryIndex];
@@ -269,7 +269,7 @@ __aicore__ inline void SLITMatmulService<SLIT>::FreeEventID()
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void SLITMatmulService<SLIT>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(queryBuf, 576 * 128 * sizeof(Q_T));
     l1QPTensor = queryBuf.Get<Q_T>();
@@ -304,7 +304,7 @@ __aicore__ inline void SLITMatmulService<SLIT>::InitBuffers(TPipe *pipe)
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::CopyGmToL1(LocalTensor<KV_T> &l1Tensor, GlobalTensor<KV_T> &gmSrcTensor,
+__aicore__ inline void SLITMatmulService<SLIT>::CopyGmToL1(LocalTensor<KV_T>& l1Tensor, GlobalTensor<KV_T>& gmSrcTensor,
                                                            uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;
@@ -320,8 +320,8 @@ __aicore__ inline void SLITMatmulService<SLIT>::CopyGmToL1(LocalTensor<KV_T> &l1
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::CopyInMm1AToL1(LocalTensor<KV_T> &l1Tensor,
-                                                               const SLIGradKLLossRunInfo &info, uint32_t mSizeAct,
+__aicore__ inline void SLITMatmulService<SLIT>::CopyInMm1AToL1(LocalTensor<KV_T>& l1Tensor,
+                                                               const SLIGradKLLossRunInfo& info, uint32_t mSizeAct,
                                                                uint32_t headSize, uint32_t headOffset)
 {
     auto srcGm = queryGm[info.queryTensorOffset + headOffset];
@@ -329,24 +329,24 @@ __aicore__ inline void SLITMatmulService<SLIT>::CopyInMm1AToL1(LocalTensor<KV_T>
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::CopyInMm1ARopeToL1(LocalTensor<KV_T> &l1Tensor,
-                                                                   const SLIGradKLLossRunInfo &info, uint32_t mSizeAct)
+__aicore__ inline void SLITMatmulService<SLIT>::CopyInMm1ARopeToL1(LocalTensor<KV_T>& l1Tensor,
+                                                                   const SLIGradKLLossRunInfo& info, uint32_t mSizeAct)
 {
     auto srcGm = qRopeGm[info.queryRopeTensorOffset];
     CopyGmToL1(l1Tensor, srcGm, mSizeAct, constInfo.dSizeQueryRope, constInfo.dSizeQueryRope);
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::CopyInMm1BToL1(LocalTensor<KV_T> &l1Tensor, uint64_t gatherOffset,
-                                                               struct MMParam &mmParam, uint32_t headOffset)
+__aicore__ inline void SLITMatmulService<SLIT>::CopyInMm1BToL1(LocalTensor<KV_T>& l1Tensor, uint64_t gatherOffset,
+                                                               struct MMParam& mmParam, uint32_t headOffset)
 {
     auto srcGm = keyGatherWithRopeGm[keyGatherResPingPoingFlag & 1][gatherOffset];
     CopyGmToL1(l1Tensor, srcGm, mmParam.singleN, mmParam.singleK, headOffset);
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::CopyInMm5AToL1(LocalTensor<KV_T> &l1Tensor,
-                                                               const SLIGradKLLossRunInfo &info, uint32_t mSizeAct,
+__aicore__ inline void SLITMatmulService<SLIT>::CopyInMm5AToL1(LocalTensor<KV_T>& l1Tensor,
+                                                               const SLIGradKLLossRunInfo& info, uint32_t mSizeAct,
                                                                uint32_t headSize, uint32_t headOffset)
 {
     auto srcGm = reluGradRes[info.taskIdMod2][headOffset];
@@ -354,8 +354,8 @@ __aicore__ inline void SLITMatmulService<SLIT>::CopyInMm5AToL1(LocalTensor<KV_T>
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::LoadDataMmA(LocalTensor<KV_T> &aL0Tensor, LocalTensor<KV_T> &aL1Tensor,
-                                                            struct MMParam &mmParam)
+__aicore__ inline void SLITMatmulService<SLIT>::LoadDataMmA(LocalTensor<KV_T>& aL0Tensor, LocalTensor<KV_T>& aL1Tensor,
+                                                            struct MMParam& mmParam)
 {
     uint32_t alignM =
         AlignTo(mmParam.isLeftTranspose ? mmParam.singleK : mmParam.singleM, static_cast<uint32_t>(C0_SIZE));
@@ -374,9 +374,9 @@ __aicore__ inline void SLITMatmulService<SLIT>::LoadDataMmA(LocalTensor<KV_T> &a
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::LoadDataMmAWithTranspose(LocalTensor<KV_T> &aL0Tensor,
-                                                                         LocalTensor<KV_T> &aL1Tensor,
-                                                                         struct MMParam &mmParam)
+__aicore__ inline void SLITMatmulService<SLIT>::LoadDataMmAWithTranspose(LocalTensor<KV_T>& aL0Tensor,
+                                                                         LocalTensor<KV_T>& aL1Tensor,
+                                                                         struct MMParam& mmParam)
 {
     uint32_t mloop = (mmParam.singleM + 15) / 16;
     uint32_t kloop = (mmParam.singleK + 15) / 16;
@@ -390,8 +390,8 @@ __aicore__ inline void SLITMatmulService<SLIT>::LoadDataMmAWithTranspose(LocalTe
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::LoadDataMmB(LocalTensor<KV_T> &l0Tensor, LocalTensor<KV_T> &l1Tensor,
-                                                            struct MMParam &mmParam)
+__aicore__ inline void SLITMatmulService<SLIT>::LoadDataMmB(LocalTensor<KV_T>& l0Tensor, LocalTensor<KV_T>& l1Tensor,
+                                                            struct MMParam& mmParam)
 {
     uint32_t alignN = AlignTo(mmParam.singleN, static_cast<uint32_t>(C0_SIZE));
     uint32_t alignK = AlignTo(mmParam.singleK, static_cast<uint32_t>(C0_SIZE));
@@ -408,8 +408,8 @@ __aicore__ inline void SLITMatmulService<SLIT>::LoadDataMmB(LocalTensor<KV_T> &l
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::CopyInMm2AToL1(LocalTensor<KV_T> &l1Tensor,
-                                                               const SLIGradKLLossRunInfo &info, uint32_t mSizeAct,
+__aicore__ inline void SLITMatmulService<SLIT>::CopyInMm2AToL1(LocalTensor<KV_T>& l1Tensor,
+                                                               const SLIGradKLLossRunInfo& info, uint32_t mSizeAct,
                                                                uint32_t headSize, uint32_t headOffset)
 {
     auto srcGm = queryIndexGm[info.queryIndexTensorOffset + headOffset];
@@ -417,7 +417,7 @@ __aicore__ inline void SLITMatmulService<SLIT>::CopyInMm2AToL1(LocalTensor<KV_T>
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::CopyInMm2BToL1(LocalTensor<KV_T> &l1Tensor, uint64_t gatherOffset,
+__aicore__ inline void SLITMatmulService<SLIT>::CopyInMm2BToL1(LocalTensor<KV_T>& l1Tensor, uint64_t gatherOffset,
                                                                uint32_t mSizeAct, uint32_t realDSize,
                                                                uint32_t headOffset)
 {
@@ -426,9 +426,9 @@ __aicore__ inline void SLITMatmulService<SLIT>::CopyInMm2BToL1(LocalTensor<KV_T>
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::MmadInner(LocalTensor<MM_OUT_T> &l0cTensor,
-                                                          LocalTensor<Q_T> &l1QPTensor, LocalTensor<KV_T> &kTensor,
-                                                          struct MMParam &mmParam)
+__aicore__ inline void SLITMatmulService<SLIT>::MmadInner(LocalTensor<MM_OUT_T>& l0cTensor,
+                                                          LocalTensor<Q_T>& l1QPTensor, LocalTensor<KV_T>& kTensor,
+                                                          struct MMParam& mmParam)
 {
     MmadParams mmadParams;
     mmadParams.m = mmParam.singleM == 1 ? 16 : mmParam.singleM;
@@ -459,9 +459,9 @@ __aicore__ inline void SLITMatmulService<SLIT>::MmadInner(LocalTensor<MM_OUT_T> 
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::ScatterAdd(GlobalTensor<MM_OUT_T> &resGm,
-                                                           LocalTensor<MM_OUT_T> &l0cTensor, struct MMParam &mmParam,
-                                                           const SLIGradKLLossRunInfo &info, int64_t scatterOffset)
+__aicore__ inline void SLITMatmulService<SLIT>::ScatterAdd(GlobalTensor<MM_OUT_T>& resGm,
+                                                           LocalTensor<MM_OUT_T>& l0cTensor, struct MMParam& mmParam,
+                                                           const SLIGradKLLossRunInfo& info, int64_t scatterOffset)
 {
     if (mmParam.isFixOut) {
         SetFlag<AscendC::HardEvent::M_FIX>(SYNC_MMFIX_FLAG[l0cPingPongFlag & 1]);
@@ -481,7 +481,7 @@ __aicore__ inline void SLITMatmulService<SLIT>::ScatterAdd(GlobalTensor<MM_OUT_T
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::ComputeMm1(const SLIGradKLLossRunInfo &info)
+__aicore__ inline void SLITMatmulService<SLIT>::ComputeMm1(const SLIGradKLLossRunInfo& info)
 {
     uint32_t dSizeTotal = HAS_ROPE ? constInfo.dSizeQuery + constInfo.dSizeQueryRope : constInfo.dSizeQuery;
     uint32_t dLoopTimes = (dSizeTotal + 127) / K_SPLIT_SIZE;
@@ -573,7 +573,7 @@ __aicore__ inline void SLITMatmulService<SLIT>::ComputeMm1(const SLIGradKLLossRu
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::ComputeMm2(const SLIGradKLLossRunInfo &info)
+__aicore__ inline void SLITMatmulService<SLIT>::ComputeMm2(const SLIGradKLLossRunInfo& info)
 {
     uint32_t dSize = constInfo.dSizeQueryIndex;
     uint32_t kTailLoopSize = N_WORKSPACE_SIZE;
@@ -647,7 +647,7 @@ __aicore__ inline void SLITMatmulService<SLIT>::ComputeMm2(const SLIGradKLLossRu
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::ComputeMm5(const SLIGradKLLossRunInfo &info)
+__aicore__ inline void SLITMatmulService<SLIT>::ComputeMm5(const SLIGradKLLossRunInfo& info)
 {
     uint32_t kLoopSize = RELU_GRAD_SPLIT_SIZE;
     uint32_t kInnerLoopTimes = RELU_GRAD_SPLIT_SIZE / K_SPLIT_SIZE;
@@ -706,7 +706,7 @@ __aicore__ inline void SLITMatmulService<SLIT>::ComputeMm5(const SLIGradKLLossRu
 }
 
 template <typename SLIT>
-__aicore__ inline void SLITMatmulService<SLIT>::ComputeMm6(const SLIGradKLLossRunInfo &info)
+__aicore__ inline void SLITMatmulService<SLIT>::ComputeMm6(const SLIGradKLLossRunInfo& info)
 {
     uint32_t kLoopSize = RELU_GRAD_SPLIT_SIZE;
     uint32_t kInnerLoopTimes = RELU_GRAD_SPLIT_SIZE / K_SPLIT_SIZE;

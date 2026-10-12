@@ -81,18 +81,18 @@ __aicore__ inline void CrossCoreBarrier()
 }
 
 template <uint8_t MODE, pipe_t PIPE>
-__aicore__ inline void CrossCoreSetFlag(CrossCoreFlag &flag)
+__aicore__ inline void CrossCoreSetFlag(CrossCoreFlag& flag)
 {
     AscendC::CrossCoreSetFlag<MODE, PIPE>(flag.id);
 }
 
-__aicore__ inline void CrossCoreWaitFlag(CrossCoreFlag &flag)
+__aicore__ inline void CrossCoreWaitFlag(CrossCoreFlag& flag)
 {
     AscendC::CrossCoreWaitFlag(flag.id);
 }
 
 template <uint8_t MODE, pipe_t PIPE, uint32_t REVERSE_DEPTH>
-__aicore__ inline void CrossCoreSetFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
+__aicore__ inline void CrossCoreSetFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH>& flag)
 {
     AscendC::CrossCoreSetFlag<MODE, PIPE>(flag.id);
     if (++flag.count >= REVERSE_DEPTH) {
@@ -102,7 +102,7 @@ __aicore__ inline void CrossCoreSetFlagWithReverse(CrossCoreFlagWithReverse<REVE
 }
 
 template <uint8_t MODE, pipe_t PIPE, uint32_t REVERSE_DEPTH>
-__aicore__ inline void CrossCoreWaitFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH> &flag)
+__aicore__ inline void CrossCoreWaitFlagWithReverse(CrossCoreFlagWithReverse<REVERSE_DEPTH>& flag)
 {
     AscendC::CrossCoreWaitFlag(flag.id);
     if (++flag.count >= REVERSE_DEPTH) {

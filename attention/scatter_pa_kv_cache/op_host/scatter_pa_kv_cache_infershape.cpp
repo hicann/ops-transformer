@@ -34,7 +34,7 @@ constexpr int64_t OPTIONAL_INPUT_SEQ_LENS = 7;
 constexpr int64_t OUTPUT_KEY_CACHE = 0;
 constexpr int64_t OUTPUT_VALUE_CACHE = 1;
 
-ge::graphStatus InferShape4ScatterPaKvCache(gert::InferShapeContext *context)
+ge::graphStatus InferShape4ScatterPaKvCache(gert::InferShapeContext* context)
 {
     // inferShape key_cache
     OP_LOGD(context, "Begin to do InferShape4ScatterPaKvCache");
@@ -54,7 +54,7 @@ ge::graphStatus InferShape4ScatterPaKvCache(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataType4ScatterPaKvCache(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataType4ScatterPaKvCache(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context, "Begin to do InferDataType4ScatterPaKvCache");
     auto attrs = context->GetAttrs();
@@ -63,15 +63,15 @@ ge::graphStatus InferDataType4ScatterPaKvCache(gert::InferDataTypeContext *conte
     OP_CHECK_NULL_WITH_CONTEXT(context, cache_mode);
     if (strcmp(cache_mode, "") != 0 && strcmp(cache_mode, "Norm") != 0 && strcmp(cache_mode, "PA_NZ") != 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "cache_mode", cache_mode,
-            "The cache_mode must be one of '', 'Norm', or 'PA_NZ'.");
+                                              "The cache_mode must be one of '', 'Norm', or 'PA_NZ'.");
         return ge::GRAPH_FAILED;
     }
     auto scatter_mode = attrs->GetAttrPointer<char>(INPUT_SCATTER_MODE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, scatter_mode);
-    if (strcmp(scatter_mode, "") != 0 && strcmp(scatter_mode, "None") != 0 &&
-        strcmp(scatter_mode, "Alibi") != 0 && strcmp(scatter_mode, "Rope") != 0 &&
-        strcmp(scatter_mode, "Omni") != 0 && strcmp(scatter_mode, "Nct") != 0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "scatter_mode", scatter_mode,
+    if (strcmp(scatter_mode, "") != 0 && strcmp(scatter_mode, "None") != 0 && strcmp(scatter_mode, "Alibi") != 0 &&
+        strcmp(scatter_mode, "Rope") != 0 && strcmp(scatter_mode, "Omni") != 0 && strcmp(scatter_mode, "Nct") != 0) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context->GetNodeName(), "scatter_mode", scatter_mode,
             "The scatter_mode must be one of '', 'None', 'Alibi', 'Rope', 'Omni', or 'Nct'.");
         return ge::GRAPH_FAILED;
     }

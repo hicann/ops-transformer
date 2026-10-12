@@ -57,43 +57,48 @@ inline uint32_t RoundUp(uint32_t num, uint32_t align)
 
 struct SwinAttentionScoreQuantCompileInfo {};
 
-inline bool CheckQTensor(gert::TilingContext *context, gert::Shape &qOriShape)
+inline bool CheckQTensor(gert::TilingContext* context, gert::Shape& qOriShape)
 {
-    OP_CHECK_IF(qOriShape.GetDimNum() != QKV_DIM_SIZE, OP_LOGE(context->GetNodeName(),
-        "input tensor %ld's dim is not equal to %d\n", qOriShape.GetDimNum(), QKV_DIM_SIZE), return false);
+    OP_CHECK_IF(qOriShape.GetDimNum() != QKV_DIM_SIZE,
+                OP_LOGE(context->GetNodeName(), "input tensor %ld's dim is not equal to %d\n", qOriShape.GetDimNum(),
+                        QKV_DIM_SIZE),
+                return false);
     int64_t dimB = qOriShape.GetDim(0);
     int64_t dimN = qOriShape.GetDim(1);
     int64_t dimS = qOriShape.GetDim(2); // query的第2维是S
     int64_t dimH = qOriShape.GetDim(3); // query的第3维是H
     int64_t dimBN = dimB * dimN;
-    OP_CHECK_IF(dimS < MIN_S_DIM || dimS > MAX_S_DIM, OP_LOGE(context->GetNodeName(),
-        "input tensor query's s dim is %ld should great than 0 and less than 1024\n", dimS), return false);
-    OP_CHECK_IF(dimH != MIN_H_DIM && dimH != MAX_H_DIM, OP_LOGE(context->GetNodeName(),
-        "input tensor query's h dim is %ld should be 32 or 64\n", dimH), return false);
+    OP_CHECK_IF(dimS < MIN_S_DIM || dimS > MAX_S_DIM,
+                OP_LOGE(context->GetNodeName(),
+                        "input tensor query's s dim is %ld should great than 0 and less than 1024\n", dimS),
+                return false);
+    OP_CHECK_IF(dimH != MIN_H_DIM && dimH != MAX_H_DIM,
+                OP_LOGE(context->GetNodeName(), "input tensor query's h dim is %ld should be 32 or 64\n", dimH),
+                return false);
     OP_CHECK_IF(dimBN < 0 || dimBN > (int64_t)UINT32_MAX / dimS,
-        OP_LOGE(context->GetNodeName(), "input tensor size exceeds the limit\n"), return false);
+                OP_LOGE(context->GetNodeName(), "input tensor size exceeds the limit\n"), return false);
     return true;
 }
 
-inline bool CheckQKVDimSize(gert::TilingContext *context, gert::Shape &qOriShape, gert::Shape & kvOriShape)
+inline bool CheckQKVDimSize(gert::TilingContext* context, gert::Shape& qOriShape, gert::Shape& kvOriShape)
 {
     OP_CHECK_IF(kvOriShape.GetDimNum() != QKV_DIM_SIZE,
-        OP_LOGE(context->GetNodeName(), "input tensor kv's dim num is not equal to q\n"), return false);
+                OP_LOGE(context->GetNodeName(), "input tensor kv's dim num is not equal to q\n"), return false);
     for (uint32_t i = 0; i < qOriShape.GetDimNum(); i++) {
         OP_CHECK_IF(qOriShape.GetDim(i) != kvOriShape.GetDim(i),
-            OP_LOGE(context->GetNodeName(), "input tensor kv's dim is not equal to q\n"), return false);
+                    OP_LOGE(context->GetNodeName(), "input tensor kv's dim is not equal to q\n"), return false);
     }
     return true;
 }
 
-inline bool CheckKVTensor(gert::TilingContext *context, gert::Shape &qOriShape)
+inline bool CheckKVTensor(gert::TilingContext* context, gert::Shape& qOriShape)
 {
     for (uint32_t i = K_IDX; i <= V_IDX; i++) {
         auto kvShape = context->GetInputShape(i);
         if (kvShape != nullptr) {
             auto kvOriShape = kvShape->GetOriginShape();
             OP_CHECK_IF(!CheckQKVDimSize(context, qOriShape, kvOriShape),
-                OP_LOGE(context->GetNodeName(), "input tensor kv's dim check failed\n"), return false);
+                        OP_LOGE(context->GetNodeName(), "input tensor kv's dim check failed\n"), return false);
         } else {
             OP_LOGE(context->GetNodeName(), "input tensor %d is nullptr\n", i);
             return false;
@@ -102,61 +107,62 @@ inline bool CheckKVTensor(gert::TilingContext *context, gert::Shape &qOriShape)
     return true;
 }
 
-inline bool CheckQuantTensor(gert::TilingContext *context)
+inline bool CheckQuantTensor(gert::TilingContext* context)
 {
     for (uint32_t i = SCALE_QUANT_IDX; i < BIAS_DEQUANT2_IDX; i++) {
         auto quantShape = context->GetOptionalInputShape(i);
-        OP_CHECK_IF(quantShape == nullptr,
-            OP_LOGE(context->GetNodeName(), "input tensor %d is nullptr\n", i), return false);
+        OP_CHECK_IF(quantShape == nullptr, OP_LOGE(context->GetNodeName(), "input tensor %d is nullptr\n", i),
+                    return false);
     }
     return true;
 }
 
-inline bool CheckMaskDimSize(gert::TilingContext *context, gert::Shape &qOriShape, gert::Shape & maskOriShape)
+inline bool CheckMaskDimSize(gert::TilingContext* context, gert::Shape& qOriShape, gert::Shape& maskOriShape)
 {
     OP_CHECK_IF(maskOriShape.GetDimNum() != QKV_DIM_SIZE,
-        OP_LOGE(context->GetNodeName(), "input tensor mask's dim num not equal to q\n"), return false);
+                OP_LOGE(context->GetNodeName(), "input tensor mask's dim num not equal to q\n"), return false);
     OP_CHECK_IF(maskOriShape.GetDim(0) != 1,
-        OP_LOGE(context->GetNodeName(), "input tensor mask[0] is not equal to 1\n"), return false);
+                OP_LOGE(context->GetNodeName(), "input tensor mask[0] is not equal to 1\n"), return false);
     for (uint32_t i = 1; i < QKV_DIM_SIZE - 1; i++) {
         OP_CHECK_IF(qOriShape.GetDim(i) != maskOriShape.GetDim(i),
-            OP_LOGE(context->GetNodeName(), "input dim[%d] of mask is wrong\n", i), return false);
+                    OP_LOGE(context->GetNodeName(), "input dim[%d] of mask is wrong\n", i), return false);
     }
     OP_CHECK_IF(qOriShape.GetDim(QKV_DIM_SIZE - 2) != maskOriShape.GetDim(QKV_DIM_SIZE - 1),
-        OP_LOGE(context->GetNodeName(), "input dim[3] of mask is wrong\n"), return false);  // Mask的最后2维大小相等
+                OP_LOGE(context->GetNodeName(), "input dim[3] of mask is wrong\n"),
+                return false); // Mask的最后2维大小相等
     return true;
 }
 
-inline bool CheckMaskTensor(gert::TilingContext *context, gert::Shape &qOriShape)
+inline bool CheckMaskTensor(gert::TilingContext* context, gert::Shape& qOriShape)
 {
     auto maskShape1 = context->GetOptionalInputShape(MASK1_IDX);
     if (maskShape1 != nullptr) {
         auto maskOriShape = maskShape1->GetOriginShape();
         OP_CHECK_IF(!CheckMaskDimSize(context, qOriShape, maskOriShape),
-            OP_LOGE(context->GetNodeName(), "input mask check failed\n"), return false);
+                    OP_LOGE(context->GetNodeName(), "input mask check failed\n"), return false);
     }
     return true;
 }
 
-inline bool CheckInTensor(gert::TilingContext *context)
+inline bool CheckInTensor(gert::TilingContext* context)
 {
     auto qShape = context->GetInputShape(Q_IDX);
-    OP_CHECK_IF(qShape == nullptr,
-        OP_LOGE(context->GetNodeName(), "input tensor %d is nullptr\n", Q_IDX), return false);
+    OP_CHECK_IF(qShape == nullptr, OP_LOGE(context->GetNodeName(), "input tensor %d is nullptr\n", Q_IDX),
+                return false);
     auto qOriShape = qShape->GetOriginShape();
-    OP_CHECK_IF(!CheckQTensor(context, qOriShape),
-        OP_LOGE(context->GetNodeName(), "input q check failed\n"), return false);
-    OP_CHECK_IF(!CheckKVTensor(context, qOriShape),
-        OP_LOGE(context->GetNodeName(), "input kv check failed\n"), return false);
-    OP_CHECK_IF(!CheckQuantTensor(context),
-        OP_LOGE(context->GetNodeName(), "input quant check failed\n"), return false);
-    OP_CHECK_IF(!CheckMaskTensor(context, qOriShape),
-        OP_LOGE(context->GetNodeName(), "input mask check failed\n"), return false);
-    
+    OP_CHECK_IF(!CheckQTensor(context, qOriShape), OP_LOGE(context->GetNodeName(), "input q check failed\n"),
+                return false);
+    OP_CHECK_IF(!CheckKVTensor(context, qOriShape), OP_LOGE(context->GetNodeName(), "input kv check failed\n"),
+                return false);
+    OP_CHECK_IF(!CheckQuantTensor(context), OP_LOGE(context->GetNodeName(), "input quant check failed\n"),
+                return false);
+    OP_CHECK_IF(!CheckMaskTensor(context, qOriShape), OP_LOGE(context->GetNodeName(), "input mask check failed\n"),
+                return false);
+
     return true;
 }
 
-inline void GetSingleCoreM(uint32_t s, uint32_t &singleCoreM)
+inline void GetSingleCoreM(uint32_t s, uint32_t& singleCoreM)
 {
     if (s > SMALL_S_DIM) {
         singleCoreM = BLOCK_NUM_PER_FRACTAL;
@@ -165,8 +171,8 @@ inline void GetSingleCoreM(uint32_t s, uint32_t &singleCoreM)
     }
 }
 
-inline ge::graphStatus SwinAttentionCfgTiling(SwinAttentionScoreQuantTilingData &tiling,
-    uint32_t &coreNum, uint32_t &tmpSize, gert::TilingContext *context, bool hasMask)
+inline ge::graphStatus SwinAttentionCfgTiling(SwinAttentionScoreQuantTilingData& tiling, uint32_t& coreNum,
+                                              uint32_t& tmpSize, gert::TilingContext* context, bool hasMask)
 {
     uint32_t cubeSharedUbSize;
     uint32_t vecSharedUbSize;
@@ -179,13 +185,13 @@ inline ge::graphStatus SwinAttentionCfgTiling(SwinAttentionScoreQuantTilingData 
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, l1Size);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, l0CSize);
     auto inputShape = context->GetInputShape(0);
-    OP_CHECK_IF(inputShape == nullptr, OP_LOGE(context->GetNodeName(),
-        "[SwinAttentionCfgTiling] inputShape is null."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(inputShape == nullptr, OP_LOGE(context->GetNodeName(), "[SwinAttentionCfgTiling] inputShape is null."),
+                return ge::GRAPH_FAILED);
     auto qOriShape = inputShape->GetOriginShape();
     uint32_t dimB = qOriShape.GetDim(0);
     uint32_t dimN = qOriShape.GetDim(1);
-    uint32_t dimS = qOriShape.GetDim(2);    // query的第2维是S
-    uint32_t dimH = qOriShape.GetDim(3);    // query的第3维是H
+    uint32_t dimS = qOriShape.GetDim(2); // query的第2维是S
+    uint32_t dimH = qOriShape.GetDim(3); // query的第3维是H
     uint32_t round16S = RoundUp(dimS, BLOCK_SIZE_16);
     uint32_t round32S = RoundUp(dimS, BLOCK_SIZE_32);
     tmpSize = 0;
@@ -207,37 +213,36 @@ inline ge::graphStatus SwinAttentionCfgTiling(SwinAttentionScoreQuantTilingData 
     matmul_tiling::MatmulApiTiling qkBmm(ascendcPlatform);
     matmul_tiling::MatmulApiTiling pvBmm(ascendcPlatform);
     qkBmm.SetAType(matmul_tiling::TPosition::TSCM, matmul_tiling::CubeFormat::NZ, matmul_tiling::DataType::DT_INT8,
-        false);
+                   false);
     qkBmm.SetBType(matmul_tiling::TPosition::TSCM, matmul_tiling::CubeFormat::NZ, matmul_tiling::DataType::DT_INT8,
-        true);
+                   true);
     qkBmm.SetCType(matmul_tiling::TPosition::VECCALC, matmul_tiling::CubeFormat::NZ,
-        matmul_tiling::DataType::DT_FLOAT16);
+                   matmul_tiling::DataType::DT_FLOAT16);
     qkBmm.SetBiasType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_INT32);
     qkBmm.SetShape(singleCoreM, dimS, dimH);
     qkBmm.SetOrgShape(singleCoreM, round32S, dimH);
     qkBmm.SetBias(true);
-    qkBmm.SetBufferSpace(l1Size / 2, l0CSize);  // 使用1/2的l1空间
+    qkBmm.SetBufferSpace(l1Size / 2, l0CSize); // 使用1/2的l1空间
     OP_CHECK_IF(qkBmm.GetTiling(tiling.qkBmmTilingData) == -1,
-        OP_LOGE(context->GetNodeName(), "get qk tiling failed\n"), return ge::GRAPH_FAILED);
+                OP_LOGE(context->GetNodeName(), "get qk tiling failed\n"), return ge::GRAPH_FAILED);
     matmul_tiling::SysTilingTempBufSize qkBufSize;
     OP_CHECK_IF(MatmulGetTmpBufSize(tiling.qkBmmTilingData, qkBufSize) == -1,
-        OP_LOGE(context->GetNodeName(), "get qk buf size failed\n"), return ge::GRAPH_FAILED);
+                OP_LOGE(context->GetNodeName(), "get qk buf size failed\n"), return ge::GRAPH_FAILED);
     cubeSharedUbSize = qkBufSize.ubSize;
 
     // pv tiling
     pvBmm.SetAType(matmul_tiling::TPosition::TSCM, matmul_tiling::CubeFormat::NZ, matmul_tiling::DataType::DT_INT8,
-        false);
+                   false);
     pvBmm.SetBType(matmul_tiling::TPosition::TSCM, matmul_tiling::CubeFormat::NZ, matmul_tiling::DataType::DT_INT8,
-        true);
-    pvBmm.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND,
-        matmul_tiling::DataType::DT_FLOAT16);
+                   true);
+    pvBmm.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT16);
     pvBmm.SetBiasType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_INT32);
     pvBmm.SetShape(singleCoreM, dimH, dimS);
     pvBmm.SetOrgShape(singleCoreM, dimH, round32S, round32S);
     pvBmm.SetBias(true);
-    pvBmm.SetBufferSpace(l1Size / 2, l0CSize);  // 使用1/2的l1空间
+    pvBmm.SetBufferSpace(l1Size / 2, l0CSize); // 使用1/2的l1空间
     OP_CHECK_IF(pvBmm.GetTiling(tiling.pvBmmTilingData) == -1,
-        OP_LOGE(context->GetNodeName(), "get pv tiling failed\n"), return ge::GRAPH_FAILED);
+                OP_LOGE(context->GetNodeName(), "get pv tiling failed\n"), return ge::GRAPH_FAILED);
     uint32_t pvUbSize = tiling.pvBmmTilingData.get_transLength() + tiling.pvBmmTilingData.get_transLength();
     uint32_t pvUbSizeTmp = round32S * dimH + round32S * dimH;
     pvUbSize = std::max(pvUbSize, pvUbSizeTmp);
@@ -250,7 +255,7 @@ inline ge::graphStatus SwinAttentionCfgTiling(SwinAttentionScoreQuantTilingData 
 
     auto bmmMaxL0 = std::max(qkL0, pvL0);
     auto bmmMaxL1 = std::max(qkL1, pvL1);
-    
+
     tiling.qkBmmTilingData.set_shareL0CSize(bmmMaxL0);
     tiling.qkBmmTilingData.set_shareL1Size(bmmMaxL1);
     tiling.pvBmmTilingData.set_shareL0CSize(bmmMaxL0);
@@ -258,7 +263,7 @@ inline ge::graphStatus SwinAttentionCfgTiling(SwinAttentionScoreQuantTilingData 
 
     // softmax
     uint32_t softmaxTmpSize;
-    const ge::Shape softmaxShape = ge::Shape({ singleCoreM, round16S });
+    const ge::Shape softmaxShape = ge::Shape({singleCoreM, round16S});
     if (hasMask && dimS > CRITICAL_S_DIM) {
         softmaxTmpSize = 0;
     } else {
@@ -282,11 +287,12 @@ inline ge::graphStatus SwinAttentionCfgTiling(SwinAttentionScoreQuantTilingData 
     tiling.set_vSize(vSize);
     tiling.set_cubeSharedUbSize(cubeSharedUbSize);
     tiling.set_vecSharedUbSize(vecSharedUbSize);
-    
+
     return ge::GRAPH_SUCCESS;
 }
 
-void TilingLog(SwinAttentionScoreQuantTilingData &tiling) {
+void TilingLog(SwinAttentionScoreQuantTilingData& tiling)
+{
     OP_LOGI("[SwinAttentionScoreQuant]", "[coreLoops]: %u", tiling.get_coreLoops());
     OP_LOGI("[SwinAttentionScoreQuant]", "[dimB]: %u", tiling.get_dimB());
     OP_LOGI("[SwinAttentionScoreQuant]", "[dimN]: %u", tiling.get_dimN());
@@ -325,17 +331,21 @@ void TilingLog(SwinAttentionScoreQuantTilingData &tiling) {
     OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.srcSize]: %u", tiling.softmaxTilingData.get_srcSize());
     OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.outMaxM]: %u", tiling.softmaxTilingData.get_outMaxM());
     OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.outMaxK]: %u", tiling.softmaxTilingData.get_outMaxK());
-    OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.outMaxSize]: %u", tiling.softmaxTilingData.get_outMaxSize());
+    OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.outMaxSize]: %u",
+            tiling.softmaxTilingData.get_outMaxSize());
     OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.splitM]: %u", tiling.softmaxTilingData.get_splitM());
     OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.splitK]: %u", tiling.softmaxTilingData.get_splitK());
     OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.splitSize]: %u", tiling.softmaxTilingData.get_splitSize());
     OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.reduceM]: %u", tiling.softmaxTilingData.get_reduceM());
     OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.reduceK]: %u", tiling.softmaxTilingData.get_reduceK());
-    OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.reduceSize]: %u", tiling.softmaxTilingData.get_reduceSize());
+    OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.reduceSize]: %u",
+            tiling.softmaxTilingData.get_reduceSize());
     OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.rangeM]: %u", tiling.softmaxTilingData.get_rangeM());
     OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.tailM]: %u", tiling.softmaxTilingData.get_tailM());
-    OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.tailSplitSize]: %u", tiling.softmaxTilingData.get_tailSplitSize());
-    OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.tailReduceSize]: %u", tiling.softmaxTilingData.get_tailReduceSize());
+    OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.tailSplitSize]: %u",
+            tiling.softmaxTilingData.get_tailSplitSize());
+    OP_LOGI("[SwinAttentionScoreQuant]", "[softmaxTilingData.tailReduceSize]: %u",
+            tiling.softmaxTilingData.get_tailReduceSize());
 }
 
 static ge::graphStatus TilingFunc(gert::TilingContext* context)
@@ -344,9 +354,9 @@ static ge::graphStatus TilingFunc(gert::TilingContext* context)
     SwinAttentionScoreQuantTilingData tiling;
     uint32_t coreNum;
     uint32_t tmpSize;
-    
+
     OP_CHECK_IF(!CheckInTensor(context), OP_LOGE(context->GetNodeName(), "input tensor check failed\n"),
-        return ge::GRAPH_FAILED);
+                return ge::GRAPH_FAILED);
 
     auto maskShape = context->GetOptionalInputShape(MASK1_IDX);
     if (maskShape == nullptr) {
@@ -359,15 +369,14 @@ static ge::graphStatus TilingFunc(gert::TilingContext* context)
         res = SwinAttentionCfgTiling(tiling, coreNum, tmpSize, context, true);
     }
 
-    OP_CHECK_IF(res == ge::GRAPH_FAILED,
-        OP_LOGE(context->GetNodeName(), "get tiling failed\n"), return ge::GRAPH_FAILED);
-    
+    OP_CHECK_IF(res == ge::GRAPH_FAILED, OP_LOGE(context->GetNodeName(), "get tiling failed\n"),
+                return ge::GRAPH_FAILED);
+
     TilingLog(tiling);
 
-    size_t *workspaces = context->GetWorkspaceSizes(1);
-    OP_CHECK_IF(workspaces == nullptr, OP_LOGE(context->GetNodeName(),
-                        "failed to get workspace size"),
-                        return ge::GRAPH_FAILED);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
+    OP_CHECK_IF(workspaces == nullptr, OP_LOGE(context->GetNodeName(), "failed to get workspace size"),
+                return ge::GRAPH_FAILED);
     workspaces[0] = tmpSize + WORKSPACE_SIZE;
     context->SetBlockDim(coreNum);
     tiling.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
@@ -376,13 +385,14 @@ static ge::graphStatus TilingFunc(gert::TilingContext* context)
     return res;
 }
 
-ge::graphStatus TilingPrepareForSwinAttentionScoreQuant(gert::TilingParseContext* context) {
+ge::graphStatus TilingPrepareForSwinAttentionScoreQuant(gert::TilingParseContext* context)
+{
     auto compileInfo = context->GetCompiledInfo<SwinAttentionScoreQuantCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfo);
     return ge::GRAPH_SUCCESS;
 }
 
 IMPL_OP_OPTILING(SwinAttentionScoreQuant)
-.Tiling(TilingFunc)
-.TilingParse<SwinAttentionScoreQuantCompileInfo>(TilingPrepareForSwinAttentionScoreQuant);  // 向框架注册入口函数
-}   // optiling
+    .Tiling(TilingFunc)
+    .TilingParse<SwinAttentionScoreQuantCompileInfo>(TilingPrepareForSwinAttentionScoreQuant); // 向框架注册入口函数
+} // namespace optiling

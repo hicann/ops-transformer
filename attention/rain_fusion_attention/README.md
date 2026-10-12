@@ -112,9 +112,9 @@ aclnnStatus ret = aclnnRainFusionAttentionGetWorkspaceSize(
 if (ret == ACLNN_SUCCESS) {
     void *workspace = nullptr;
     aclrtMalloc(&workspace, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
-    
+
     ret = aclnnRainFusionAttention(workspace, workspaceSize, executor, stream);
-    
+
     aclrtFree(workspace);
 }
 ```

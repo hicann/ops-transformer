@@ -26,7 +26,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -35,7 +35,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -51,8 +51,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -86,23 +86,23 @@ int main()
     std::vector<int64_t> softmaxL1NormShape = {16, 1, 2048};
     std::vector<int64_t> metadataShape = {64};
 
-    void *qDeviceAddr = nullptr;
-    void *kDeviceAddr = nullptr;
-    void *softmaxLseDeviceAddr = nullptr;
-    void *cuSeqQLenDeviceAddr = nullptr;
-    void *cuSeqKLenDeviceAddr = nullptr;
-    void *cmpResidualKDeviceAddr = nullptr;
-    void *softmaxL1NormDeviceAddr = nullptr;
-    void *metadataDeviceAddr = nullptr;
+    void* qDeviceAddr = nullptr;
+    void* kDeviceAddr = nullptr;
+    void* softmaxLseDeviceAddr = nullptr;
+    void* cuSeqQLenDeviceAddr = nullptr;
+    void* cuSeqKLenDeviceAddr = nullptr;
+    void* cmpResidualKDeviceAddr = nullptr;
+    void* softmaxL1NormDeviceAddr = nullptr;
+    void* metadataDeviceAddr = nullptr;
 
-    aclTensor *q = nullptr;
-    aclTensor *k = nullptr;
-    aclTensor *softmaxLse = nullptr;
-    aclTensor *cuSeqQLen = nullptr;
-    aclTensor *cuSeqKLen = nullptr;
-    aclTensor *cmpResidualK = nullptr;
-    aclTensor *softmaxL1Norm = nullptr;
-    aclTensor *metadata = nullptr;
+    aclTensor* q = nullptr;
+    aclTensor* k = nullptr;
+    aclTensor* softmaxLse = nullptr;
+    aclTensor* cuSeqQLen = nullptr;
+    aclTensor* cuSeqKLen = nullptr;
+    aclTensor* cmpResidualK = nullptr;
+    aclTensor* softmaxL1Norm = nullptr;
+    aclTensor* metadata = nullptr;
 
     std::vector<short> qHostData(16 * 128 * 512, 1.0);
     std::vector<short> kHostData(2048 * 1 * 512, 1.0);
@@ -142,14 +142,14 @@ int main()
 
     // 1. 调用 metadata 前置算子
     uint64_t metadataWorkspaceSize = 0;
-    aclOpExecutor *metadataExecutor = nullptr;
+    aclOpExecutor* metadataExecutor = nullptr;
     ret = aclnnSparseFlashMlaSoftmaxL1NormMetadataGetWorkspaceSize(
         cuSeqQLen, cuSeqKLen, nullptr, nullptr, cmpResidualK, nullptr, 0, 16, 2048, 128, 1, 512, 0, cmpRatio, maskMode,
         layoutQ, layoutK, metadata, &metadataWorkspaceSize, &metadataExecutor);
     CHECK_RET(ret == ACL_SUCCESS,
               LOG_PRINT("aclnnSparseFlashMlaSoftmaxL1NormMetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
-    void *metadataWorkspaceAddr = nullptr;
+    void* metadataWorkspaceAddr = nullptr;
     if (metadataWorkspaceSize > 0) {
         ret = aclrtMalloc(&metadataWorkspaceAddr, metadataWorkspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate metadata workspace failed. ERROR: %d\n", ret); return ret);
@@ -163,7 +163,7 @@ int main()
 
     // 2. 调用主算子
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     ret = aclnnSparseFlashMlaSoftmaxL1NormGetWorkspaceSize(
         q, k, softmaxLse, nullptr, cuSeqQLen, cuSeqKLen, nullptr, nullptr, cmpResidualK, nullptr, metadata,
         softmaxScale, maxSeqlenK, cmpRatio, maskMode, layoutQ, layoutK, softmaxL1Norm, &workspaceSize, &executor);
@@ -171,7 +171,7 @@ int main()
               LOG_PRINT("aclnnSparseFlashMlaSoftmaxL1NormGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
@@ -185,7 +185,7 @@ int main()
             ret = aclrtSynchronizeStream(stream);
             CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
         }
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         LOG_PRINT("Expected kernel failure (skeleton stage): %s\n", e.what());
     }
 

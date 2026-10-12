@@ -28,7 +28,7 @@ public:
         return y == 0 ? 0 : (x + y - 1) / y * y;
     }
 
-    __aicore__ inline void Init(AscendC::TPipe *pipe, const ScatterPaKvCacheTilingData *__restrict tilingData)
+    __aicore__ inline void Init(AscendC::TPipe* pipe, const ScatterPaKvCacheTilingData* __restrict tilingData)
     {
         pipe_ = pipe;
         // init tiling
@@ -44,19 +44,19 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void InitGlobalTensor(AscendC::GlobalTensor<T> &gm, GM_ADDR addr)
+    __aicore__ inline void InitGlobalTensor(AscendC::GlobalTensor<T>& gm, GM_ADDR addr)
     {
-        gm.SetGlobalBuffer((__gm__ T *)addr);
+        gm.SetGlobalBuffer((__gm__ T*)addr);
     }
 
     template <typename T, typename B>
-    __aicore__ inline void InitTBuf(B &buf, uint32_t len)
+    __aicore__ inline void InitTBuf(B& buf, uint32_t len)
     {
         pipe_->InitBuffer(buf, RoundUp(len * sizeof(T), BLOCK_SIZE));
     }
 
     template <typename T, typename B>
-    __aicore__ inline void InitScalarTBuf(B &buf, uint32_t len)
+    __aicore__ inline void InitScalarTBuf(B& buf, uint32_t len)
     {
         pipe_->InitBuffer(buf, SCALAR_INPUT_PARAMETERS * RoundUp(len * sizeof(T), BLOCK_SIZE));
     }
@@ -94,9 +94,9 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void CopyKvCache(AscendC::GlobalTensor<T> &src, AscendC::LocalTensor<T> &ubAddr,
-                                       AscendC::GlobalTensor<T> &dst, uint64_t start, uint64_t cacheStart,
-                                       AscendC::DataCopyParams &copyParamsIn, AscendC::DataCopyParams &copyParamsOut)
+    __aicore__ inline void CopyKvCache(AscendC::GlobalTensor<T>& src, AscendC::LocalTensor<T>& ubAddr,
+                                       AscendC::GlobalTensor<T>& dst, uint64_t start, uint64_t cacheStart,
+                                       AscendC::DataCopyParams& copyParamsIn, AscendC::DataCopyParams& copyParamsOut)
     {
         DataCopy(ubAddr, src[start], copyParamsIn);
         AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(EVENT_ID1);
@@ -107,10 +107,10 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void CopyKvCacheDoubleBuf(AscendC::GlobalTensor<T> &src, AscendC::LocalTensor<T> &ubAddr,
-                                                AscendC::GlobalTensor<T> &dst, event_t eventID, uint64_t start,
-                                                uint64_t cacheStart, AscendC::DataCopyParams &copyParamsIn,
-                                                AscendC::DataCopyParams &copyParamsOut)
+    __aicore__ inline void CopyKvCacheDoubleBuf(AscendC::GlobalTensor<T>& src, AscendC::LocalTensor<T>& ubAddr,
+                                                AscendC::GlobalTensor<T>& dst, event_t eventID, uint64_t start,
+                                                uint64_t cacheStart, AscendC::DataCopyParams& copyParamsIn,
+                                                AscendC::DataCopyParams& copyParamsOut)
     {
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(eventID);
         DataCopy(ubAddr, src[start], copyParamsIn);
@@ -144,11 +144,11 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void RopeInitBuf(AscendC::LocalTensor<T> &copyLocalPing_, AscendC::LocalTensor<T> &copyLocalPong_,
-                                       AscendC::LocalTensor<T> &tokenLocal_,
-                                       AscendC::LocalTensor<float> &tokenCompressLocal_,
-                                       AscendC::LocalTensor<float> &tokenSumLocal_, uint16_t &repeatDivisor,
-                                       uint16_t &addNumPerLoop)
+    __aicore__ inline void RopeInitBuf(AscendC::LocalTensor<T>& copyLocalPing_, AscendC::LocalTensor<T>& copyLocalPong_,
+                                       AscendC::LocalTensor<T>& tokenLocal_,
+                                       AscendC::LocalTensor<float>& tokenCompressLocal_,
+                                       AscendC::LocalTensor<float>& tokenSumLocal_, uint16_t& repeatDivisor,
+                                       uint16_t& addNumPerLoop)
     {
         uint32_t computeBufStart = 0;
         uint32_t copyBufStart = 0;
@@ -172,7 +172,7 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void OmniInitBuf(AscendC::LocalTensor<T> &copyLocalPing_, AscendC::LocalTensor<T> &copyLocalPong_)
+    __aicore__ inline void OmniInitBuf(AscendC::LocalTensor<T>& copyLocalPing_, AscendC::LocalTensor<T>& copyLocalPong_)
     {
         uint32_t copyBufStart = 0;
         InitTBuf<T>(totalBuf_, TOTAL_BUFFER_SIZE / sizeof(T));
@@ -182,9 +182,9 @@ public:
         copyLocalPong_ = totalBuf_.GetWithOffset<T>(static_cast<uint32_t>(copyFp16Num), copyBufStart);
     }
 
-    __aicore__ inline void PreProcess(AscendC::GlobalTensor<int32_t> &winsInputGt_,
-                                      AscendC::GlobalTensor<int32_t> &seqLenInputGt_,
-                                      AscendC::GlobalTensor<int32_t> &offsetInputGt_)
+    __aicore__ inline void PreProcess(AscendC::GlobalTensor<int32_t>& winsInputGt_,
+                                      AscendC::GlobalTensor<int32_t>& seqLenInputGt_,
+                                      AscendC::GlobalTensor<int32_t>& offsetInputGt_)
     {
         DataCopy(winsLocal_, winsInputGt_, RoundUp(numHeads_ * numBatchs_, BLOCK_SIZE / sizeof(int32_t)));
         AscendC::PipeBarrier<PIPE_MTE2>();
@@ -199,7 +199,7 @@ public:
         }
     }
 
-    __aicore__ inline void ParamSet(AscendC::GlobalTensor<int32_t> &slotInputGt_, uint32_t startTaskOffset)
+    __aicore__ inline void ParamSet(AscendC::GlobalTensor<int32_t>& slotInputGt_, uint32_t startTaskOffset)
     {
         slotValue = slotInputGt_.GetValue(startTaskOffset);
         batchId = (startTaskOffset) / numHeads_;
@@ -248,7 +248,7 @@ protected:
     uint32_t consumSeqLen = 0;
     uint32_t offsetPerLine = 0;
     int32_t offsetIdx = 0;
-    AscendC::TPipe *pipe_;
+    AscendC::TPipe* pipe_;
 };
 } // namespace ScatterPaKvCache
 #endif

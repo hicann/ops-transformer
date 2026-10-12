@@ -58,7 +58,7 @@ struct MatrixCoord : public Coord<2, uint32_t> {
 
     /// Constructs from Coord<2>
     HOST_DEVICE
-    MatrixCoord(Coord<2, Index> const &coord)
+    MatrixCoord(Coord<2, Index> const& coord)
         : Base(coord)
     {}
 
@@ -76,42 +76,42 @@ struct MatrixCoord : public Coord<2, uint32_t> {
 
     /// Returns the row of the coordinate
     HOST_DEVICE
-    Index const &row() const
+    Index const& row() const
     {
         return this->At(ROW_INDEX);
     }
 
     /// Returns the row of the coordinate
     HOST_DEVICE
-    Index &row()
+    Index& row()
     {
         return this->At(ROW_INDEX);
     }
 
     /// Returns the column of the coordinate
     HOST_DEVICE
-    Index const &column() const
+    Index const& column() const
     {
         return this->At(COLUMN_INDEX);
     }
 
     /// Returns the column of the coordinate
     HOST_DEVICE
-    Index &column()
+    Index& column()
     {
         return this->At(COLUMN_INDEX);
     }
 
     /// Element-wise addition
     HOST_DEVICE
-    MatrixCoord operator+(Base const &b) const
+    MatrixCoord operator+(Base const& b) const
     {
         return MatrixCoord(Base::operator+(b));
     }
 
     /// In-place addition
     HOST_DEVICE
-    MatrixCoord &operator+=(Base const &b)
+    MatrixCoord& operator+=(Base const& b)
     {
         Base::operator+=(b);
         return *this;

@@ -30,11 +30,11 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadataGetWorkspaceSize(
-    const aclTensor *cuSeqLensQOptional, const aclTensor *cuSeqLensKOptional, const aclTensor *seqUsedQOptional,
-    const aclTensor *seqUsedKOptional, const aclTensor *cmpResidualKOptional, const aclTensor *topkLengthOptional,
+    const aclTensor* cuSeqLensQOptional, const aclTensor* cuSeqLensKOptional, const aclTensor* seqUsedQOptional,
+    const aclTensor* seqUsedKOptional, const aclTensor* cmpResidualKOptional, const aclTensor* topkLengthOptional,
     int64_t batchSize, int64_t maxSeqLenQ, int64_t maxSeqLenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim,
-    int64_t topk, int64_t cmpRatio, int64_t maskMode, char *layoutQ, char *layoutK, const aclTensor *metadata,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    int64_t topk, int64_t cmpRatio, int64_t maskMode, char* layoutQ, char* layoutK, const aclTensor* metadata,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (workspaceSize == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "workspaceSize is nullptr");
@@ -53,43 +53,43 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadataGetWorkspaceSize(
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
+    const op::PlatformInfo& npuInfo = op::GetCurrentPlatformInfo();
     int64_t aicCoreNum = static_cast<int64_t>(npuInfo.GetCubeCoreNum());
     std::string socVersionStr = npuInfo.GetSocLongVersion();
-    const char *socVersion = socVersionStr.c_str();
+    const char* socVersion = socVersionStr.c_str();
 
-    auto ret = ParamsCheckSmlaL1Norm(cuSeqLensQOptional, cuSeqLensKOptional, seqUsedQOptional, seqUsedKOptional,
-                                     cmpResidualKOptional, topkLengthOptional, batchSize, maxSeqLenQ, maxSeqLenK,
-                                     numHeadsQ, numHeadsK, headDim, topk, maskMode, cmpRatio, layoutQ, layoutK,
-                                     metadata, aicCoreNum);
+    auto ret =
+        ParamsCheckSmlaL1Norm(cuSeqLensQOptional, cuSeqLensKOptional, seqUsedQOptional, seqUsedKOptional,
+                              cmpResidualKOptional, topkLengthOptional, batchSize, maxSeqLenQ, maxSeqLenK, numHeadsQ,
+                              numHeadsK, headDim, topk, maskMode, cmpRatio, layoutQ, layoutK, metadata, aicCoreNum);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
-    const aclTensor *cuSeqLensQContiguous = nullptr;
+    const aclTensor* cuSeqLensQContiguous = nullptr;
     if (cuSeqLensQOptional != nullptr) {
         cuSeqLensQContiguous = l0op::Contiguous(cuSeqLensQOptional, uniqueExecutor.get());
         CHECK_RET(cuSeqLensQContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
-    const aclTensor *cuSeqLensKContiguous = nullptr;
+    const aclTensor* cuSeqLensKContiguous = nullptr;
     if (cuSeqLensKOptional != nullptr) {
         cuSeqLensKContiguous = l0op::Contiguous(cuSeqLensKOptional, uniqueExecutor.get());
         CHECK_RET(cuSeqLensKContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
-    const aclTensor *seqUsedQContiguous = nullptr;
+    const aclTensor* seqUsedQContiguous = nullptr;
     if (seqUsedQOptional != nullptr) {
         seqUsedQContiguous = l0op::Contiguous(seqUsedQOptional, uniqueExecutor.get());
         CHECK_RET(seqUsedQContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
-    const aclTensor *seqUsedKContiguous = nullptr;
+    const aclTensor* seqUsedKContiguous = nullptr;
     if (seqUsedKOptional != nullptr) {
         seqUsedKContiguous = l0op::Contiguous(seqUsedKOptional, uniqueExecutor.get());
         CHECK_RET(seqUsedKContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
-    const aclTensor *cmpResidualKContiguous = nullptr;
+    const aclTensor* cmpResidualKContiguous = nullptr;
     if (cmpResidualKOptional != nullptr) {
         cmpResidualKContiguous = l0op::Contiguous(cmpResidualKOptional, uniqueExecutor.get());
         CHECK_RET(cmpResidualKContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
-    const aclTensor *topkLengthContiguous = nullptr;
+    const aclTensor* topkLengthContiguous = nullptr;
     if (topkLengthOptional != nullptr) {
         topkLengthContiguous = l0op::Contiguous(topkLengthOptional, uniqueExecutor.get());
         CHECK_RET(topkLengthContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -106,9 +106,9 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadataGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-__attribute__((visibility("default"))) aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(void *workspace,
+__attribute__((visibility("default"))) aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(void* workspace,
                                                                                             uint64_t workspaceSize,
-                                                                                            aclOpExecutor *executor,
+                                                                                            aclOpExecutor* executor,
                                                                                             aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnSparseFlashMlaSoftmaxL1NormMetadata);

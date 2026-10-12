@@ -20,10 +20,10 @@ using namespace commondef;
 
 template <typename T1, typename T2, typename OUTDTYPE, const uint32_t VECTOR_BASEM = 64,
           const uint32_t HEAD_DIM_ALIGN = 128, const bool IS_D_NO_EQUAL = false>
-__aicore__ inline void CopyInSoftmaxGrad(FagConstInfo &constInfo, FagRunInfo &runInfo, int32_t loopIdx,
-                                         int32_t curLoopSize, int32_t loopSize, TQue<QuePosition::VECIN, 1> &yInQue,
-                                         TQue<QuePosition::VECIN, 1> &dxInQue, GlobalTensor<T1> &dxGm,
-                                         GlobalTensor<OUTDTYPE> &yGm)
+__aicore__ inline void CopyInSoftmaxGrad(FagConstInfo& constInfo, FagRunInfo& runInfo, int32_t loopIdx,
+                                         int32_t curLoopSize, int32_t loopSize, TQue<QuePosition::VECIN, 1>& yInQue,
+                                         TQue<QuePosition::VECIN, 1>& dxInQue, GlobalTensor<T1>& dxGm,
+                                         GlobalTensor<OUTDTYPE>& yGm)
 {
     constexpr static bool IS_FP8_INPUT = IsSameType<T1, fp8_e5m2_t>::value || IsSameType<T1, fp8_e4m3fn_t>::value;
     int64_t srcGmOffset = 0;
@@ -61,9 +61,9 @@ __aicore__ inline void CopyInSoftmaxGrad(FagConstInfo &constInfo, FagRunInfo &ru
 
 template <typename T1, typename T2, typename OUTDTYPE, const uint32_t VECTOR_BASEM = 64,
           const uint32_t HEAD_DIM_ALIGN = 128>
-__aicore__ inline void CalculateCastSoftmaxGrad(FagConstInfo &constInfo, int32_t curLoopSize,
-                                                TQue<QuePosition::VECIN, 1> &yInQue,
-                                                TQue<QuePosition::VECIN, 1> &dxInQue, const LocalTensor<T2> &dstTensor,
+__aicore__ inline void CalculateCastSoftmaxGrad(FagConstInfo& constInfo, int32_t curLoopSize,
+                                                TQue<QuePosition::VECIN, 1>& yInQue,
+                                                TQue<QuePosition::VECIN, 1>& dxInQue, const LocalTensor<T2>& dstTensor,
                                                 float deqScaleDyValue = 1.0)
 {
     LocalTensor<OUTDTYPE> yTensor = yInQue.DeQue<OUTDTYPE>();

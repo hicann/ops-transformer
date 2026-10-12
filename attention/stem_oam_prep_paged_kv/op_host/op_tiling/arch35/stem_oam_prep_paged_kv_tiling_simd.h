@@ -72,7 +72,7 @@ struct StemOamPrepPagedKvCompileInfo {
 
 class StemOamPrepPagedKvTilingSimd : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit StemOamPrepPagedKvTilingSimd(gert::TilingContext *context)
+    explicit StemOamPrepPagedKvTilingSimd(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 
@@ -88,8 +88,8 @@ protected:
     void DumpTilingInfo() override;
 
     ge::graphStatus CheckParams();
-    ge::graphStatus ContinuousStridesCompute(gert::Shape &shape, gert::Stride &stride, size_t idx);
-    ge::graphStatus GetTensorInfo(gert::Shape &shape, gert::Stride &inputStride, size_t idx);
+    ge::graphStatus ContinuousStridesCompute(gert::Shape& shape, gert::Stride& stride, size_t idx);
+    ge::graphStatus GetTensorInfo(gert::Shape& shape, gert::Stride& inputStride, size_t idx);
 
 private:
     uint64_t totalCoreNum_ = 0;
@@ -116,7 +116,7 @@ private:
     gert::Shape vcacheShape_;
     gert::Shape kScaleCacheShape_;
 
-    StemOamPrepPagedKvTilingData *tilingData_ = nullptr;
+    StemOamPrepPagedKvTilingData* tilingData_ = nullptr;
 };
 
 } // namespace optiling

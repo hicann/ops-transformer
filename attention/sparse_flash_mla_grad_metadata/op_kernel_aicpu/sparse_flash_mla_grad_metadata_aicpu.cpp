@@ -17,7 +17,7 @@
 using namespace optiling;
 
 namespace aicpu {
-uint32_t SparseFlashMlaGradMetadataCpuKernel::Compute(CpuKernelContext &ctx)
+uint32_t SparseFlashMlaGradMetadataCpuKernel::Compute(CpuKernelContext& ctx)
 {
     bool success = Prepare(ctx);
     if (!success) {
@@ -28,7 +28,7 @@ uint32_t SparseFlashMlaGradMetadataCpuKernel::Compute(CpuKernelContext &ctx)
     return success ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;
 }
 
-bool SparseFlashMlaGradMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
+bool SparseFlashMlaGradMetadataCpuKernel::Prepare(CpuKernelContext& ctx)
 {
     // input
     cuSeqlensQ_ = ctx.Input(static_cast<uint32_t>(ParamId::cuSeqlensQ));
@@ -86,7 +86,7 @@ bool SparseFlashMlaGradMetadataCpuKernel::ParamsCheck()
     // 校验 cu_seqlens_q 元素
     if (layoutQ_ == "TND") {
         if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
-            const int32_t *cuSeqlensQPtr = static_cast<const int32_t *>(cuSeqlensQ_->GetData());
+            const int32_t* cuSeqlensQPtr = static_cast<const int32_t*>(cuSeqlensQ_->GetData());
             // 校验 cu_seqlens_q 首元素为 0
             if (cuSeqlensQPtr[0] != 0) {
                 KERNEL_LOG_ERROR("The first element of cu_seqlens_q should be 0, but got %d", cuSeqlensQPtr[0]);
@@ -105,10 +105,11 @@ bool SparseFlashMlaGradMetadataCpuKernel::ParamsCheck()
     }
     // 校验 seqused_q 元素
     if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
-        const int32_t *sequsedQPtr = static_cast<const int32_t *>(sequsedQ_->GetData());
-        const int32_t *cuSeqlensQPtr = (layoutQ_ == "TND" && cuSeqlensQ_ != nullptr &&
-                                        cuSeqlensQ_->GetData() != nullptr) ?
-                                           static_cast<const int32_t *>(cuSeqlensQ_->GetData()) : nullptr;
+        const int32_t* sequsedQPtr = static_cast<const int32_t*>(sequsedQ_->GetData());
+        const int32_t* cuSeqlensQPtr =
+            (layoutQ_ == "TND" && cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) ?
+                static_cast<const int32_t*>(cuSeqlensQ_->GetData()) :
+                nullptr;
         for (int i = 0; i < batchSize; i++) {
             // 校验 seqused_q 元素非负
             if (sequsedQPtr[i] < 0) {
@@ -119,14 +120,16 @@ bool SparseFlashMlaGradMetadataCpuKernel::ParamsCheck()
             // 校验 seqused_q 元素不大于 max_seqlen_q (BSND) 或 cu_seqlens_q 序列长度 (TND)
             if (layoutQ_ == "BSND" && sequsedQPtr[i] > maxSeqlenQ_) {
                 KERNEL_LOG_ERROR("The elements in seqused_q should not be greater than max_seqlen_q %d, "
-                                 "but got seqused_q[%d] = %d", maxSeqlenQ_, i, sequsedQPtr[i]);
+                                 "but got seqused_q[%d] = %d",
+                                 maxSeqlenQ_, i, sequsedQPtr[i]);
                 return false;
             }
             if (cuSeqlensQPtr != nullptr) {
                 int32_t seqLen = cuSeqlensQPtr[i + 1] - cuSeqlensQPtr[i];
                 if (sequsedQPtr[i] > seqLen) {
                     KERNEL_LOG_ERROR("The elements in seqused_q should not be greater than the sequence length "
-                                     "from cu_seqlens_q %d, but got seqused_q[%d] = %d", seqLen, i, sequsedQPtr[i]);
+                                     "from cu_seqlens_q %d, but got seqused_q[%d] = %d",
+                                     seqLen, i, sequsedQPtr[i]);
                     return false;
                 }
             }
@@ -136,7 +139,7 @@ bool SparseFlashMlaGradMetadataCpuKernel::ParamsCheck()
         // 校验 cu_seqlens_ori_kv 元素
         if (layoutKv_ == "TND") {
             if (cuSeqlensOriKv_ != nullptr && cuSeqlensOriKv_->GetData() != nullptr) {
-                const int32_t *cuSeqlensOriKvPtr = static_cast<const int32_t *>(cuSeqlensOriKv_->GetData());
+                const int32_t* cuSeqlensOriKvPtr = static_cast<const int32_t*>(cuSeqlensOriKv_->GetData());
                 // 校验 cu_seqlens_ori_kv 首元素为 0
                 if (cuSeqlensOriKvPtr[0] != 0) {
                     KERNEL_LOG_ERROR("The first element of cu_seqlens_ori_kv should be 0, but got %d",
@@ -156,11 +159,11 @@ bool SparseFlashMlaGradMetadataCpuKernel::ParamsCheck()
         }
         // 校验 seqused_ori_kv 元素
         if (sequsedOriKv_ != nullptr && sequsedOriKv_->GetData() != nullptr) {
-            const int32_t *sequsedOriKvPtr = static_cast<const int32_t *>(sequsedOriKv_->GetData());
-            const int32_t *cuSeqlensOriKvPtr = (layoutKv_ == "TND" && cuSeqlensOriKv_ != nullptr &&
-                                                cuSeqlensOriKv_->GetData() != nullptr) ?
-                                                   static_cast<const int32_t *>(cuSeqlensOriKv_->GetData()) :
-                                                   nullptr;
+            const int32_t* sequsedOriKvPtr = static_cast<const int32_t*>(sequsedOriKv_->GetData());
+            const int32_t* cuSeqlensOriKvPtr =
+                (layoutKv_ == "TND" && cuSeqlensOriKv_ != nullptr && cuSeqlensOriKv_->GetData() != nullptr) ?
+                    static_cast<const int32_t*>(cuSeqlensOriKv_->GetData()) :
+                    nullptr;
             for (int i = 0; i < batchSize; i++) {
                 // 校验 seqused_ori_kv 元素非负
                 if (sequsedOriKvPtr[i] < 0) {
@@ -191,7 +194,7 @@ bool SparseFlashMlaGradMetadataCpuKernel::ParamsCheck()
             oriTopkLength_ != nullptr && oriTopkLength_->GetData() != nullptr) {
             // 校验 ori_topk_length 元素数量
             int32_t sumOfQuerySeq = GetSumOfQuerySeq();
-            const int32_t *oriTopkLengthPtr = static_cast<const int32_t *>(oriTopkLength_->GetData());
+            const int32_t* oriTopkLengthPtr = static_cast<const int32_t*>(oriTopkLength_->GetData());
             auto oriTopkLengthShape = oriTopkLength_->GetTensorShape();
             int32_t oriTopkLengthSize = layoutQ_ == "TND" ?
                                             oriTopkLengthShape->GetDimSize(0) * oriTopkLengthShape->GetDimSize(1) :
@@ -217,7 +220,7 @@ bool SparseFlashMlaGradMetadataCpuKernel::ParamsCheck()
         if (layoutKv_ == "TND") {
             // 校验 cu_seqlens_cmp_kv 元素
             if (cuSeqlensCmpKv_ != nullptr && cuSeqlensCmpKv_->GetData() != nullptr) {
-                const int32_t *cuSeqlensCmpKvPtr = static_cast<const int32_t *>(cuSeqlensCmpKv_->GetData());
+                const int32_t* cuSeqlensCmpKvPtr = static_cast<const int32_t*>(cuSeqlensCmpKv_->GetData());
                 // 校验 cu_seqlens_cmp_kv 首元素为 0
                 if (cuSeqlensCmpKvPtr[0] != 0) {
                     KERNEL_LOG_ERROR("The first element of cu_seqlens_cmp_kv should be 0, but got %d",
@@ -237,11 +240,11 @@ bool SparseFlashMlaGradMetadataCpuKernel::ParamsCheck()
         }
         // 校验 seqused_cmp_kv 元素
         if (sequsedCmpKv_ != nullptr && sequsedCmpKv_->GetData() != nullptr) {
-            const int32_t *sequsedCmpKvPtr = static_cast<const int32_t *>(sequsedCmpKv_->GetData());
-            const int32_t *cuSeqlensCmpKvPtr = (layoutKv_ == "TND" && cuSeqlensCmpKv_ != nullptr &&
-                                                cuSeqlensCmpKv_->GetData() != nullptr) ?
-                                                   static_cast<const int32_t *>(cuSeqlensCmpKv_->GetData()) :
-                                                   nullptr;
+            const int32_t* sequsedCmpKvPtr = static_cast<const int32_t*>(sequsedCmpKv_->GetData());
+            const int32_t* cuSeqlensCmpKvPtr =
+                (layoutKv_ == "TND" && cuSeqlensCmpKv_ != nullptr && cuSeqlensCmpKv_->GetData() != nullptr) ?
+                    static_cast<const int32_t*>(cuSeqlensCmpKv_->GetData()) :
+                    nullptr;
             for (int i = 0; i < batchSize; i++) {
                 // 校验 seqused_cmp_kv 元素非负
                 if (sequsedCmpKvPtr[i] < 0) {
@@ -269,12 +272,12 @@ bool SparseFlashMlaGradMetadataCpuKernel::ParamsCheck()
         }
         // 校验 cmp_residual_kv 元素
         if (cmpResidualKv_ != nullptr && cmpResidualKv_->GetData() != nullptr) {
-            const int32_t *cmpResidualKvPtr = static_cast<const int32_t *>(cmpResidualKv_->GetData());
+            const int32_t* cmpResidualKvPtr = static_cast<const int32_t*>(cmpResidualKv_->GetData());
             for (int i = 0; i < batchSize; i++) {
                 if (cmpResidualKvPtr[i] < 0 || cmpResidualKvPtr[i] >= cmpRatio_) {
                     KERNEL_LOG_ERROR("The elements in cmp_residual_kv should be in [0, cmpRatio_(%d)), but got "
-                                     "cmp_residual_kv[%d] = %d", cmpRatio_,
-                                     i, cmpResidualKvPtr[i]);
+                                     "cmp_residual_kv[%d] = %d",
+                                     cmpRatio_, i, cmpResidualKvPtr[i]);
                     return false;
                 }
             }
@@ -284,7 +287,7 @@ bool SparseFlashMlaGradMetadataCpuKernel::ParamsCheck()
             cmpTopkLength_ != nullptr && cmpTopkLength_->GetData() != nullptr) {
             // 校验 cmp_topk_length 元素数量
             int32_t sumOfQuerySeq = GetSumOfQuerySeq();
-            const int32_t *cmpTopkLengthPtr = static_cast<const int32_t *>(cmpTopkLength_->GetData());
+            const int32_t* cmpTopkLengthPtr = static_cast<const int32_t*>(cmpTopkLength_->GetData());
             auto cmpTopkLengthShape = cmpTopkLength_->GetTensorShape();
             int32_t cmpTopkLengthSize = layoutQ_ == "TND" ?
                                             cmpTopkLengthShape->GetDimSize(0) * cmpTopkLengthShape->GetDimSize(1) :
@@ -315,7 +318,7 @@ int32_t SparseFlashMlaGradMetadataCpuKernel::GetSumOfQuerySeq()
     // 如果sequsedQ_ 传了，使用sequsedQ_获取 BsSize
     if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
         if (sequsedQ_->GetTensorShape() != nullptr) {
-            const int32_t *seqUsedPtr = static_cast<const int32_t *>(sequsedQ_->GetData());
+            const int32_t* seqUsedPtr = static_cast<const int32_t*>(sequsedQ_->GetData());
             int32_t queryBsSize = 0;
             for (int i = 0; i < batchSize; i++) {
                 queryBsSize += seqUsedPtr[i];
@@ -328,7 +331,7 @@ int32_t SparseFlashMlaGradMetadataCpuKernel::GetSumOfQuerySeq()
         // 如果是 TND，尝试使用 cuSeqlensQ_获取 BsSize
         if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
             if (cuSeqlensQ_->GetTensorShape() != nullptr) {
-                const int32_t *s1Ptr = static_cast<const int32_t *>(cuSeqlensQ_->GetData());
+                const int32_t* s1Ptr = static_cast<const int32_t*>(cuSeqlensQ_->GetData());
                 return s1Ptr[batchSize];
             }
         }
@@ -446,7 +449,7 @@ uint32_t SparseFlashMlaGradMetadataCpuKernel::GetBsStride(uint32_t bIdx, uint32_
     uint32_t bsStride = 0;
     if (layoutQ_ == "TND") {
         if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
-            const int32_t *s1Ptr = static_cast<const int32_t *>(cuSeqlensQ_->GetData());
+            const int32_t* s1Ptr = static_cast<const int32_t*>(cuSeqlensQ_->GetData());
             bsStride = s1Ptr[bIdx] + s1Idx;
             return bsStride;
         }
@@ -458,9 +461,9 @@ uint32_t SparseFlashMlaGradMetadataCpuKernel::GetBsStride(uint32_t bIdx, uint32_
 uint32_t SparseFlashMlaGradMetadataCpuKernel::GetOriTopkLength(uint32_t bsStride)
 {
     // 尝试使用 oriTopkLength_
-    if (oriTopK_ != 0 && oriMaskMode_ == static_cast<int32_t>(SparseMode::DEFAULT_MASK) &&
-        oriTopkLength_ != nullptr && oriTopkLength_->GetData() != nullptr) {
-        const int32_t *oriTopkPtr = static_cast<const int32_t *>(oriTopkLength_->GetData());
+    if (oriTopK_ != 0 && oriMaskMode_ == static_cast<int32_t>(SparseMode::DEFAULT_MASK) && oriTopkLength_ != nullptr &&
+        oriTopkLength_->GetData() != nullptr) {
+        const int32_t* oriTopkPtr = static_cast<const int32_t*>(oriTopkLength_->GetData());
         return static_cast<uint32_t>(oriTopkPtr[bsStride]);
     }
     // 如果不是 DEFAULT_MASK，使用 oriTopK_
@@ -470,9 +473,9 @@ uint32_t SparseFlashMlaGradMetadataCpuKernel::GetOriTopkLength(uint32_t bsStride
 uint32_t SparseFlashMlaGradMetadataCpuKernel::GetCmpTopkLength(uint32_t bsStride)
 {
     // 尝试使用 cmpTopkLength_
-    if (cmpTopK_ != 0 && cmpMaskMode_ == static_cast<int32_t>(SparseMode::DEFAULT_MASK) &&
-        cmpTopkLength_ != nullptr && cmpTopkLength_->GetData() != nullptr) {
-        const int32_t *cmpTopkPtr = static_cast<const int32_t *>(cmpTopkLength_->GetData());
+    if (cmpTopK_ != 0 && cmpMaskMode_ == static_cast<int32_t>(SparseMode::DEFAULT_MASK) && cmpTopkLength_ != nullptr &&
+        cmpTopkLength_->GetData() != nullptr) {
+        const int32_t* cmpTopkPtr = static_cast<const int32_t*>(cmpTopkLength_->GetData());
         return static_cast<uint32_t>(cmpTopkPtr[bsStride]);
     }
     // 如果不是 DEFAULT_MASK，使用 cmpTopK_
@@ -483,14 +486,14 @@ uint32_t SparseFlashMlaGradMetadataCpuKernel::GetS1SeqSize(uint32_t bIdx)
 {
     // 1. 如果 sequsedQ_ 传了，直接使用
     if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
-        const int32_t *seqUsedPtr = static_cast<const int32_t *>(sequsedQ_->GetData());
+        const int32_t* seqUsedPtr = static_cast<const int32_t*>(sequsedQ_->GetData());
         return static_cast<uint32_t>(seqUsedPtr[bIdx]);
     }
     // 2. sequsedQ_ 没传，判断 Layout
     if (layoutQ_ == "TND") {
         // 如果是 TND，尝试使用 cuSeqlensQ_
         if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
-            const int32_t *s1Ptr = static_cast<const int32_t *>(cuSeqlensQ_->GetData());
+            const int32_t* s1Ptr = static_cast<const int32_t*>(cuSeqlensQ_->GetData());
             return static_cast<uint32_t>(s1Ptr[bIdx + 1U] - s1Ptr[bIdx]);
         }
     }
@@ -502,14 +505,14 @@ uint32_t SparseFlashMlaGradMetadataCpuKernel::GetOriS2SeqSize(uint32_t bIdx)
 {
     // 如果 sequsedOriKv_ 传了，直接使用
     if (sequsedOriKv_ != nullptr && sequsedOriKv_->GetData() != nullptr) {
-        const int32_t *seqUsedPtr = static_cast<const int32_t *>(sequsedOriKv_->GetData());
+        const int32_t* seqUsedPtr = static_cast<const int32_t*>(sequsedOriKv_->GetData());
         return static_cast<uint32_t>(seqUsedPtr[bIdx]);
     }
     // sequsedOriKv_ 没传，判断 Layout
     if (layoutKv_ == "TND") {
         // 如果是 TND，尝试使用 cuSeqlensOriKv_
         if (cuSeqlensOriKv_ != nullptr && cuSeqlensOriKv_->GetData() != nullptr) {
-            const int32_t *s2Ptr = static_cast<const int32_t *>(cuSeqlensOriKv_->GetData());
+            const int32_t* s2Ptr = static_cast<const int32_t*>(cuSeqlensOriKv_->GetData());
             return static_cast<uint32_t>(s2Ptr[bIdx + 1U] - s2Ptr[bIdx]);
         }
     }
@@ -521,14 +524,14 @@ uint32_t SparseFlashMlaGradMetadataCpuKernel::GetCmpS2SeqSize(uint32_t bIdx)
 {
     // 如果 sequsedCmpKv_ 传了，直接使用
     if (sequsedCmpKv_ != nullptr && sequsedCmpKv_->GetData() != nullptr) {
-        const int32_t *seqUsedPtr = static_cast<const int32_t *>(sequsedCmpKv_->GetData());
+        const int32_t* seqUsedPtr = static_cast<const int32_t*>(sequsedCmpKv_->GetData());
         return static_cast<uint32_t>(seqUsedPtr[bIdx]);
     }
     // sequsedCmpKv_ 没传，判断 Layout
     if (layoutKv_ == "TND") {
         // 如果是 TND，尝试使用 cuSeqlensCmpKv_
         if (cuSeqlensCmpKv_ != nullptr && cuSeqlensCmpKv_->GetData() != nullptr) {
-            const int32_t *s2Ptr = static_cast<const int32_t *>(cuSeqlensCmpKv_->GetData());
+            const int32_t* s2Ptr = static_cast<const int32_t*>(cuSeqlensCmpKv_->GetData());
             return static_cast<uint32_t>(s2Ptr[bIdx + 1U] - s2Ptr[bIdx]);
         }
     }
@@ -540,17 +543,17 @@ uint64_t SparseFlashMlaGradMetadataCpuKernel::GetRevertS2Size(uint32_t bIdx)
 {
     uint32_t cmpS2Size = GetCmpS2SeqSize(bIdx);
     if (cmpResidualKv_ != nullptr && cmpResidualKv_->GetData() != nullptr) {
-        const int32_t *residualPtr = static_cast<const int32_t *>(cmpResidualKv_->GetData());
+        const int32_t* residualPtr = static_cast<const int32_t*>(cmpResidualKv_->GetData());
         return static_cast<uint64_t>(cmpS2Size) * static_cast<uint64_t>(cmpRatio_) + residualPtr[bIdx];
     } else {
         return static_cast<uint64_t>(cmpS2Size) * static_cast<uint64_t>(cmpRatio_);
     }
 }
 
-void SparseFlashMlaGradMetadataCpuKernel::CalcSplitInfo(SplitContext &splitContext)
+void SparseFlashMlaGradMetadataCpuKernel::CalcSplitInfo(SplitContext& splitContext)
 {
     // 计算每个batch的切分，统计是否为空batch，记录最后有效batch（每个batch的每个N2切分是一样的）
-    SplitInfo &splitInfo = splitContext.splitInfo;
+    SplitInfo& splitInfo = splitContext.splitInfo;
     for (uint32_t bIdx = 0; bIdx < batchSize_; bIdx++) {
         uint32_t s1Size = GetS1SeqSize(bIdx);
         totalNum_ += s1Size;
@@ -629,7 +632,7 @@ int64_t SparseFlashMlaGradMetadataCpuKernel::CalcCmpNextTokenLeftUp(uint32_t s1S
     }
 }
 
-Range<int64_t> SparseFlashMlaGradMetadataCpuKernel::CalcS2TokenRange(uint32_t s1GIdx, const BatchCache &batchCache,
+Range<int64_t> SparseFlashMlaGradMetadataCpuKernel::CalcS2TokenRange(uint32_t s1GIdx, const BatchCache& batchCache,
                                                                      bool isCmpKv)
 {
     // actual seq == 0
@@ -689,10 +692,10 @@ Range<int64_t> SparseFlashMlaGradMetadataCpuKernel::CalcS2TokenRange(uint32_t s1
     return std::make_pair(s2FirstToken, s2LastToken);
 }
 
-void SparseFlashMlaGradMetadataCpuKernel::CalcBatchCache(uint32_t bIdx, const SplitContext &splitContext,
-                                                         BatchCache &batchCache)
+void SparseFlashMlaGradMetadataCpuKernel::CalcBatchCache(uint32_t bIdx, const SplitContext& splitContext,
+                                                         BatchCache& batchCache)
 {
-    const SplitInfo &splitInfo = splitContext.splitInfo;
+    const SplitInfo& splitInfo = splitContext.splitInfo;
 
     batchCache.bIdx = bIdx;
     batchCache.s1Size = GetS1SeqSize(bIdx);
@@ -708,8 +711,8 @@ void SparseFlashMlaGradMetadataCpuKernel::CalcBatchCache(uint32_t bIdx, const Sp
     }
 }
 
-void SparseFlashMlaGradMetadataCpuKernel::CalcOriBlockRange(const Range<int64_t> &oriS2TokenRange,
-                                                            const BatchCache &batchCache, S1GCache &s1GCache)
+void SparseFlashMlaGradMetadataCpuKernel::CalcOriBlockRange(const Range<int64_t>& oriS2TokenRange,
+                                                            const BatchCache& batchCache, S1GCache& s1GCache)
 {
     int64_t oriS2FirstToken = oriS2TokenRange.first;
     int64_t oriS2LastToken = oriS2TokenRange.second;
@@ -736,8 +739,8 @@ void SparseFlashMlaGradMetadataCpuKernel::CalcOriBlockRange(const Range<int64_t>
     }
 }
 
-void SparseFlashMlaGradMetadataCpuKernel::CalcCmpBlockRange(const Range<int64_t> &cmpRevertS2TokenRange,
-                                                            const BatchCache &batchCache, S1GCache &s1GCache)
+void SparseFlashMlaGradMetadataCpuKernel::CalcCmpBlockRange(const Range<int64_t>& cmpRevertS2TokenRange,
+                                                            const BatchCache& batchCache, S1GCache& s1GCache)
 {
     int64_t cmpRevertS2FirstToken = cmpRevertS2TokenRange.first;
     int64_t cmpRevertS2LastToken = cmpRevertS2TokenRange.second;
@@ -776,10 +779,10 @@ void SparseFlashMlaGradMetadataCpuKernel::CalcCmpBlockRange(const Range<int64_t>
     }
 }
 
-void SparseFlashMlaGradMetadataCpuKernel::CalcS1GCache(uint32_t s1GIdx, const SplitContext &splitContext,
-                                                       const BatchCache &batchCache, S1GCache &s1GCache)
+void SparseFlashMlaGradMetadataCpuKernel::CalcS1GCache(uint32_t s1GIdx, const SplitContext& splitContext,
+                                                       const BatchCache& batchCache, S1GCache& s1GCache)
 {
-    const SplitInfo &splitInfo = splitContext.splitInfo;
+    const SplitInfo& splitInfo = splitContext.splitInfo;
     // 如果s1G是空行，则直接返回
     if (splitInfo.s1GBaseNum[batchCache.bIdx] == 0) {
         return;
@@ -812,9 +815,9 @@ void SparseFlashMlaGradMetadataCpuKernel::CalcS1GCache(uint32_t s1GIdx, const Sp
     }
 }
 
-void SparseFlashMlaGradMetadataCpuKernel::CalcBatchCost(uint32_t bIdx, const SplitContext &splitContext)
+void SparseFlashMlaGradMetadataCpuKernel::CalcBatchCost(uint32_t bIdx, const SplitContext& splitContext)
 {
-    const SplitInfo &splitInfo = splitContext.splitInfo;
+    const SplitInfo& splitInfo = splitContext.splitInfo;
     if (GetS1SeqSize(bIdx) == 0U) {
         return;
     }
@@ -842,9 +845,9 @@ void SparseFlashMlaGradMetadataCpuKernel::CalcBatchCost(uint32_t bIdx, const Spl
     }
 }
 
-void SparseFlashMlaGradMetadataCpuKernel::CalcCostInfo(SplitContext &splitContext)
+void SparseFlashMlaGradMetadataCpuKernel::CalcCostInfo(SplitContext& splitContext)
 {
-    const SplitInfo &splitInfo = splitContext.splitInfo;
+    const SplitInfo& splitInfo = splitContext.splitInfo;
     if (splitInfo.isKvSeqAllZero) {
         return;
     }
@@ -853,7 +856,7 @@ void SparseFlashMlaGradMetadataCpuKernel::CalcCostInfo(SplitContext &splitContex
     }
 }
 
-bool SparseFlashMlaGradMetadataCpuKernel::BalanceSchedule(SplitResult &splitRes)
+bool SparseFlashMlaGradMetadataCpuKernel::BalanceSchedule(SplitResult& splitRes)
 {
     SplitContext splitContext(batchSize_);
 
@@ -867,10 +870,10 @@ bool SparseFlashMlaGradMetadataCpuKernel::BalanceSchedule(SplitResult &splitRes)
     return true;
 }
 
-bool SparseFlashMlaGradMetadataCpuKernel::GenMetadata(SplitResult &splitRes)
+bool SparseFlashMlaGradMetadataCpuKernel::GenMetadata(SplitResult& splitRes)
 {
-    optiling::detail::SmlagMetadata *gradMetadataPtr =
-        static_cast<optiling::detail::SmlagMetadata *>(metadata_->GetData());
+    optiling::detail::SmlagMetadata* gradMetadataPtr =
+        static_cast<optiling::detail::SmlagMetadata*>(metadata_->GetData());
     // Grad Metadata Generate
     uint32_t formerCoreProcessNum = CeilDiv(totalNum_, aicCoreNum_);
     uint32_t remainCoreProcessNum = formerCoreProcessNum - 1;
@@ -887,7 +890,7 @@ bool SparseFlashMlaGradMetadataCpuKernel::GenMetadata(SplitResult &splitRes)
     return true;
 }
 namespace {
-static const char *kernelType = "SparseFlashMlaGradMetadata";
+static const char* kernelType = "SparseFlashMlaGradMetadata";
 REGISTER_CPU_KERNEL(kernelType, SparseFlashMlaGradMetadataCpuKernel);
 } // namespace
 

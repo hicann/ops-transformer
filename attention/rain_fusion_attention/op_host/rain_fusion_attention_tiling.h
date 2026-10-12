@@ -85,13 +85,13 @@ struct RainFusionAttentionCompileInfo {
 
 // 输入参数信息
 struct RequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct OptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 // KVCache Layout枚举
@@ -112,46 +112,46 @@ public:
     RFATiling() = default;
     ~RFATiling() = default;
 
-    ge::graphStatus GetRFATiling(gert::TilingContext *rfaContext, RainFusionAttentionTilingData &tilingData);
-    ge::graphStatus RFASetTilingData(gert::TilingContext *context, RainFusionAttentionTilingData &tilingData);
+    ge::graphStatus GetRFATiling(gert::TilingContext* rfaContext, RainFusionAttentionTilingData& tilingData);
+    ge::graphStatus RFASetTilingData(gert::TilingContext* context, RainFusionAttentionTilingData& tilingData);
 
 private:
-    ge::graphStatus GetNpuInfo(gert::TilingContext *rfaContext);
-    ge::graphStatus ProcessInput(gert::TilingContext *rfaContext);
-    ge::graphStatus CheckAttr(gert::TilingContext *rfaContext);
-    ge::graphStatus CheckKvCacheLayout(gert::TilingContext *rfaContext);
-    ge::graphStatus CalculateTaskSplit(gert::TilingContext *rfaContext);
-    ge::graphStatus CalculateWorkSpace(gert::TilingContext *rfaContext);
-    ge::graphStatus FillTilingData(gert::TilingContext *rfaContext);
-    uint64_t GenerateTilingKey(gert::TilingContext *rfaContext);
+    ge::graphStatus GetNpuInfo(gert::TilingContext* rfaContext);
+    ge::graphStatus ProcessInput(gert::TilingContext* rfaContext);
+    ge::graphStatus CheckAttr(gert::TilingContext* rfaContext);
+    ge::graphStatus CheckKvCacheLayout(gert::TilingContext* rfaContext);
+    ge::graphStatus CalculateTaskSplit(gert::TilingContext* rfaContext);
+    ge::graphStatus CalculateWorkSpace(gert::TilingContext* rfaContext);
+    ge::graphStatus FillTilingData(gert::TilingContext* rfaContext);
+    uint64_t GenerateTilingKey(gert::TilingContext* rfaContext);
 
-    ge::graphStatus ParseQInputLayout(gert::TilingContext *rfaContext);
-    ge::graphStatus ParseKvInputLayout(gert::TilingContext *rfaContext);
-    ge::graphStatus ValidateTNDFormat(gert::TilingContext *rfaContext);
-    ge::graphStatus ValidateBNSDFormat(gert::TilingContext *rfaContext);
+    ge::graphStatus ParseQInputLayout(gert::TilingContext* rfaContext);
+    ge::graphStatus ParseKvInputLayout(gert::TilingContext* rfaContext);
+    ge::graphStatus ValidateTNDFormat(gert::TilingContext* rfaContext);
+    ge::graphStatus ValidateBNSDFormat(gert::TilingContext* rfaContext);
 
-    ge::graphStatus ProcessQueryShape(gert::TilingContext *rfaContext);
-    ge::graphStatus ProcessSelectIdx(gert::TilingContext *rfaContext);
-    ge::graphStatus ProcessActualSeqLengths(gert::TilingContext *rfaContext);
-    ge::graphStatus ProcessBlockShape(gert::TilingContext *rfaContext);
-    ge::graphStatus ValidateConfiguration(gert::TilingContext *rfaContext);
-    ge::graphStatus ValidateTNDSeqlenSum(gert::TilingContext *rfaContext);
+    ge::graphStatus ProcessQueryShape(gert::TilingContext* rfaContext);
+    ge::graphStatus ProcessSelectIdx(gert::TilingContext* rfaContext);
+    ge::graphStatus ProcessActualSeqLengths(gert::TilingContext* rfaContext);
+    ge::graphStatus ProcessBlockShape(gert::TilingContext* rfaContext);
+    ge::graphStatus ValidateConfiguration(gert::TilingContext* rfaContext);
+    ge::graphStatus ValidateTNDSeqlenSum(gert::TilingContext* rfaContext);
 
-    ge::graphStatus ProcessQSeqLengths(gert::TilingContext *rfaContext, const gert::Tensor *actualSeqLengths);
-    ge::graphStatus ProcessKvSeqLengths(gert::TilingContext *rfaContext, const gert::Tensor *actualSeqLengthsKv);
-    ge::graphStatus ValidateBNSDQSeqlen(gert::TilingContext *rfaContext);
-    ge::graphStatus ValidateBNSDKvSeqlen(gert::TilingContext *rfaContext);
-    ge::graphStatus GetKvSeqlenFromShape(gert::TilingContext *rfaContext, uint32_t &kvSeqlen);
+    ge::graphStatus ProcessQSeqLengths(gert::TilingContext* rfaContext, const gert::Tensor* actualSeqLengths);
+    ge::graphStatus ProcessKvSeqLengths(gert::TilingContext* rfaContext, const gert::Tensor* actualSeqLengthsKv);
+    ge::graphStatus ValidateBNSDQSeqlen(gert::TilingContext* rfaContext);
+    ge::graphStatus ValidateBNSDKvSeqlen(gert::TilingContext* rfaContext);
+    ge::graphStatus GetKvSeqlenFromShape(gert::TilingContext* rfaContext, uint32_t& kvSeqlen);
 
-    bool CheckShouldUseUniformKvSeqlen(const gert::Tensor *actualSeqLengthsKv);
-    ge::graphStatus SetupUniformKvSeqlen(gert::TilingContext *rfaContext);
-    ge::graphStatus ProcessKvSeqLengthsBNSD(gert::TilingContext *rfaContext, const gert::Tensor *actualSeqLengthsKv);
-    ge::graphStatus ProcessKvSeqLengthsTND(gert::TilingContext *rfaContext, const gert::Tensor *actualSeqLengthsKv);
-    ge::graphStatus ProcessKvSeqLengthsWithArray(gert::TilingContext *rfaContext,
-                                                 const gert::Tensor *actualSeqLengthsKv);
+    bool CheckShouldUseUniformKvSeqlen(const gert::Tensor* actualSeqLengthsKv);
+    ge::graphStatus SetupUniformKvSeqlen(gert::TilingContext* rfaContext);
+    ge::graphStatus ProcessKvSeqLengthsBNSD(gert::TilingContext* rfaContext, const gert::Tensor* actualSeqLengthsKv);
+    ge::graphStatus ProcessKvSeqLengthsTND(gert::TilingContext* rfaContext, const gert::Tensor* actualSeqLengthsKv);
+    ge::graphStatus ProcessKvSeqLengthsWithArray(gert::TilingContext* rfaContext,
+                                                 const gert::Tensor* actualSeqLengthsKv);
 
-    void CalculateBatchTaskSplit(uint32_t batchIdx, int64_t qSeqlen, uint32_t groupSize, uint32_t &curTaskNum,
-                                 uint32_t &curQBlockNum);
+    void CalculateBatchTaskSplit(uint32_t batchIdx, int64_t qSeqlen, uint32_t groupSize, uint32_t& curTaskNum,
+                                 uint32_t& curQBlockNum);
 
 private:
     uint32_t batch_ = 0;
@@ -173,9 +173,9 @@ private:
     uint32_t firstBatchTaskNum_ = 0;
     uint32_t totalTaskNum_ = 0;
     uint32_t maxNumBlocksPerBatch_ = 0;
-    const int64_t *qSeqLenList = nullptr;
-    const int64_t *kvSeqLenList = nullptr;
-    const int64_t *blockShapeList = nullptr;
+    const int64_t* qSeqLenList = nullptr;
+    const int64_t* kvSeqLenList = nullptr;
+    const int64_t* blockShapeList = nullptr;
     bool useUniformQSeqlen_ = false;  // 是否使用统一的qseqlen值（使用maxQSeqlen_）
     bool useUniformKvSeqlen_ = false; // 是否使用统一的kvseqlen值（使用maxKvSeqlen_）
 
@@ -201,7 +201,7 @@ private:
 
     ge::DataType dataType_ = ge::DT_FLOAT16;
 
-    RainFusionAttentionTilingData *tilingData_ = nullptr;
+    RainFusionAttentionTilingData* tilingData_ = nullptr;
 };
 
 } // namespace optiling

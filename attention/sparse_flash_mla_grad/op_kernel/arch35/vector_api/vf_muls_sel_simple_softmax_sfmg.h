@@ -89,10 +89,10 @@ __simd_vf__ inline void MulsSelVFPseType1(uint64_t srcLocalInt, uint64_t dstLoca
     // 64 * 128 max/sum: 64 * 8
     for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
         LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_BRC_B32>(
-            vregLse, ((__ubuf__ float *&)lseLocalInt), 1);
+            vregLse, ((__ubuf__ float*&)lseLocalInt), 1);
         // 1 -> 64 【64，128】 【64，2，64】 64
         for (uint16_t n = 0; n < repeatTimes; n++) {
-            LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrc, ((__ubuf__ float *&)srcLocalInt), srcN);
+            LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrc, ((__ubuf__ float*&)srcLocalInt), srcN);
             Muls(vregMuls, vregSrc, scale, pregFullExe);
             Sub(vregSub, vregMuls, vregLse, pregFullExe);
             Exp(vregExp, vregSub, pregFullExe);
@@ -100,10 +100,10 @@ __simd_vf__ inline void MulsSelVFPseType1(uint64_t srcLocalInt, uint64_t dstLoca
                 Add(vregReduceSumMuls, vregReduceSumMuls, vregExp, pregFullExe);
             }
             StoreAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B32>(
-                ((__ubuf__ float *&)dstLocalInt), vregExp, srcN, pregFullExe);
+                ((__ubuf__ float*&)dstLocalInt), vregExp, srcN, pregFullExe);
         }
         // tailLoop
-        LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcTail, ((__ubuf__ float *&)srcLocalIntTail), 128);
+        LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSrcTail, ((__ubuf__ float*&)srcLocalIntTail), 128);
         Muls(vregMulsTail, vregSrcTail, scale, pregTailExe);
         Sub(vregSubTail, vregMulsTail, vregLse, pregTailExe);
         Exp(vregExpTail, vregSubTail, pregTailExe);
@@ -111,29 +111,29 @@ __simd_vf__ inline void MulsSelVFPseType1(uint64_t srcLocalInt, uint64_t dstLoca
             Add(vregReduceSumMulsTail, vregReduceSumMulsTail, vregExpTail, pregTailExe);
         }
         StoreAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B32>(
-            ((__ubuf__ float *&)dstLocalIntTail), vregExpTail, 128, pregFullExe);
+            ((__ubuf__ float*&)dstLocalIntTail), vregExpTail, 128, pregFullExe);
         if constexpr (isDeter == 1 && srcN == 64) { // 确定性计算需要将64~128的数据补零， 否则会有脏数据inf
             Duplicate(vregExp, 0);
             StoreAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B32>(
-                (__ubuf__ float *&)dstLocalIntTailZero, vregExp, 128, pregFullExe);
+                (__ubuf__ float*&)dstLocalIntTailZero, vregExp, 128, pregFullExe);
         }
     }
     if constexpr (IsSparseIndicesExist) {
         for (uint16_t n = 0; n < repeatTimes; n++) {
             Muls(vregReduceSumMuls, vregReduceSumMuls, pScalar, pregFullExe);
-            StoreAlign<float>(((__ubuf__ float *&)softmaxL1LocalInt), vregReduceSumMuls, pregFullExe);
+            StoreAlign<float>(((__ubuf__ float*&)softmaxL1LocalInt), vregReduceSumMuls, pregFullExe);
         }
         Muls(vregReduceSumMulsTail, vregReduceSumMulsTail, pScalar, pregTailExe);
-        StoreAlign<float>(((__ubuf__ float *&)softmaxL1LocalIntTail), vregReduceSumMulsTail, pregFullExe);
+        StoreAlign<float>(((__ubuf__ float*&)softmaxL1LocalIntTail), vregReduceSumMulsTail, pregFullExe);
     }
 }
 
 template <typename T1, typename T, uint32_t srcN, bool hasAtten = 0, bool hasPse = 0, bool isDeter = 0,
           bool IsSparseIndicesExist = 0>
-__aicore__ inline void MulsSelSimpleSoftMax(const LocalTensor<float> &dstTensor, const LocalTensor<float> &inLseTensor,
-                                            const LocalTensor<float> &inMaxTensor, const LocalTensor<float> &srcTensor,
-                                            const LocalTensor<float> &softmaxL1Tensor, const LocalTensor<T1> &pseTensor,
-                                            const LocalTensor<uint8_t> &maskTensor, const T scale, const T minValue,
+__aicore__ inline void MulsSelSimpleSoftMax(const LocalTensor<float>& dstTensor, const LocalTensor<float>& inLseTensor,
+                                            const LocalTensor<float>& inMaxTensor, const LocalTensor<float>& srcTensor,
+                                            const LocalTensor<float>& softmaxL1Tensor, const LocalTensor<T1>& pseTensor,
+                                            const LocalTensor<uint8_t>& maskTensor, const T scale, const T minValue,
                                             uint32_t srcM, uint32_t realN = srcN, float pScalar = 1.0,
                                             uint32_t pseType = 1, uint32_t pse_layout_type = 1, float posShift = -1.0,
                                             float slopes = -1.0)
@@ -165,10 +165,10 @@ __aicore__ inline void MulsSelSimpleSoftMax(const LocalTensor<float> &dstTensor,
 #else
 template <typename T1, typename T, uint32_t srcN, bool hasAtten = 0, bool hasPse = 0, bool isDeter = 0,
           bool IsSparseIndicesExist = 0>
-__aicore__ inline void MulsSelSimpleSoftMax(const LocalTensor<float> &dstTensor, const LocalTensor<float> &inLseTensor,
-                                            const LocalTensor<float> &inMaxTensor, const LocalTensor<float> &srcTensor,
-                                            const LocalTensor<float> &softmaxL1Tensor, const LocalTensor<T1> &pseTensor,
-                                            const LocalTensor<uint8_t> &maskTensor, const T scale, const T minValue,
+__aicore__ inline void MulsSelSimpleSoftMax(const LocalTensor<float>& dstTensor, const LocalTensor<float>& inLseTensor,
+                                            const LocalTensor<float>& inMaxTensor, const LocalTensor<float>& srcTensor,
+                                            const LocalTensor<float>& softmaxL1Tensor, const LocalTensor<T1>& pseTensor,
+                                            const LocalTensor<uint8_t>& maskTensor, const T scale, const T minValue,
                                             uint32_t srcM, uint32_t realN = srcN, float pScalar = 1.0,
                                             uint32_t pseType = 1, uint32_t pse_layout_type = 1, float posShift = -1.0,
                                             float slopes = -1.0)

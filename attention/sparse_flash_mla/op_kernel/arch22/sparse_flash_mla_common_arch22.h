@@ -111,7 +111,7 @@ struct Position {
 // L1按NZ格式存储
 // GM的行、列、列的stride
 template <typename T>
-__aicore__ inline void DataCopyGmNDToL1(LocalTensor<T> &l1Tensor, GlobalTensor<T> &gmTensor, uint32_t rowAct,
+__aicore__ inline void DataCopyGmNDToL1(LocalTensor<T>& l1Tensor, GlobalTensor<T>& gmTensor, uint32_t rowAct,
                                         uint32_t rowAlign,
                                         uint32_t col,       // D
                                         uint32_t colStride) // D or N*D
@@ -136,11 +136,11 @@ __aicore__ inline void DataCopyGmNDToL1(LocalTensor<T> &l1Tensor, GlobalTensor<T
     shape.copyRowNumAlign 需要16字节对齐，如拷贝k矩阵，一次拷贝128*512，遇到尾块 10*512 需对齐到16*512
 */
 template <typename T, SMLA_LAYOUT SRC_LAYOUT = SMLA_LAYOUT::PA_BBND>
-__aicore__ inline void DataCopyPA(LocalTensor<T> &dstTensor,  // l1
-                                  GlobalTensor<T> &srcTensor, // gm
-                                  GlobalTensor<int32_t> &blockTableGm,
-                                  const PAShape &shape,     // blockSize, headNum, headDim
-                                  const Position &startPos) // bacthIdx nIdx curSeqIdx
+__aicore__ inline void DataCopyPA(LocalTensor<T>& dstTensor,  // l1
+                                  GlobalTensor<T>& srcTensor, // gm
+                                  GlobalTensor<int32_t>& blockTableGm,
+                                  const PAShape& shape,     // blockSize, headNum, headDim
+                                  const Position& startPos) // bacthIdx nIdx curSeqIdx
 {
     uint32_t copyFinishRowCnt = 0;
     uint64_t blockTableBaseOffset = startPos.bIdx * shape.maxblockNumPerBatch;
@@ -178,9 +178,9 @@ __aicore__ inline void DataCopyPA(LocalTensor<T> &dstTensor,  // l1
 }
 
 template <typename T>
-__aicore__ inline void DataCopyPABySlots(LocalTensor<T> &dstTensor, GlobalTensor<T> &srcTensor,
-                                         GlobalTensor<int32_t> &blockTableGm, GlobalTensor<int32_t> &sparseIndicesGm,
-                                         const PAShape &shape, const Position &startPos, uint64_t sparseIndexBaseOffset,
+__aicore__ inline void DataCopyPABySlots(LocalTensor<T>& dstTensor, GlobalTensor<T>& srcTensor,
+                                         GlobalTensor<int32_t>& blockTableGm, GlobalTensor<int32_t>& sparseIndicesGm,
+                                         const PAShape& shape, const Position& startPos, uint64_t sparseIndexBaseOffset,
                                          uint32_t sparseIndexStart)
 {
     uint32_t blockElementCnt = 32 / sizeof(T);

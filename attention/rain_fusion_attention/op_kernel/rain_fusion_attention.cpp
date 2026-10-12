@@ -19,60 +19,59 @@
 
 /**
  * @brief RainFusionAttention算子的kernel入口函数
- * 
+ *
  * 这是NPU上执行的入口点，使用extern "C"以避免C++名称修饰，
  * 使用__global__和__aicore__修饰符标识为全局kernel函数
  */
-extern "C" __global__ __aicore__ void rain_fusion_attention(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
-                                                            __gm__ uint8_t* selectIdx, __gm__ uint8_t* selectNumIdx,
-                                                            __gm__ uint8_t* blockShape, __gm__ uint8_t* mask,
-                                                            __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKv, __gm__ uint8_t* blockTable,
-                                                            __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
+extern "C" __global__ __aicore__ void rain_fusion_attention(
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* selectIdx,
+    __gm__ uint8_t* selectNumIdx, __gm__ uint8_t* blockShape, __gm__ uint8_t* mask, __gm__ uint8_t* actualSeqLengths,
+    __gm__ uint8_t* actualSeqLengthsKv, __gm__ uint8_t* blockTable, __gm__ uint8_t* attentionOut,
+    __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     if (TILING_KEY_VAR >= RFA_BASE_TILING) {
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
-    // 读取tilingKey进行kernel分发
-    __gm__ RainFusionAttentionTilingData *tilingDataPtr = 
-        reinterpret_cast<__gm__ RainFusionAttentionTilingData *>(tiling);
-    uint64_t tilingKey = tilingDataPtr->tilingKey;
-    
-    TILING_KEY_IS(QF16_KVF16_TND_TND_NOCACHE_FLOATSM_NOMASK_RFA_TILING);
-    TILING_KEY_IS(QF16_KVF16_TND_TND_NOCACHE_HALFSM_NOMASK_RFA_TILING);
-    TILING_KEY_IS(QBF16_KVBF16_TND_TND_NOCACHE_FLOATSM_NOMASK_RFA_TILING);
-    TILING_KEY_IS(QF16_KVF16_BNSD_BNSD_NOCACHE_FLOATSM_NOMASK_RFA_TILING);
-    TILING_KEY_IS(QF16_KVF16_BNSD_BNSD_NOCACHE_HALFSM_NOMASK_RFA_TILING);
-    TILING_KEY_IS(QBF16_KVBF16_BNSD_BNSD_NOCACHE_FLOATSM_NOMASK_RFA_TILING);
+        __gm__ uint8_t* user = GetUserWorkspace(workspace);
+        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+        // 读取tilingKey进行kernel分发
+        __gm__ RainFusionAttentionTilingData* tilingDataPtr =
+            reinterpret_cast<__gm__ RainFusionAttentionTilingData*>(tiling);
+        uint64_t tilingKey = tilingDataPtr->tilingKey;
 
-    #if TILING_KEY_VAR == QF16_KVF16_TND_TND_NOCACHE_FLOATSM_NOMASK_RFA_TILING
+        TILING_KEY_IS(QF16_KVF16_TND_TND_NOCACHE_FLOATSM_NOMASK_RFA_TILING);
+        TILING_KEY_IS(QF16_KVF16_TND_TND_NOCACHE_HALFSM_NOMASK_RFA_TILING);
+        TILING_KEY_IS(QBF16_KVBF16_TND_TND_NOCACHE_FLOATSM_NOMASK_RFA_TILING);
+        TILING_KEY_IS(QF16_KVF16_BNSD_BNSD_NOCACHE_FLOATSM_NOMASK_RFA_TILING);
+        TILING_KEY_IS(QF16_KVF16_BNSD_BNSD_NOCACHE_HALFSM_NOMASK_RFA_TILING);
+        TILING_KEY_IS(QBF16_KVBF16_BNSD_BNSD_NOCACHE_FLOATSM_NOMASK_RFA_TILING);
+
+#if TILING_KEY_VAR == QF16_KVF16_TND_TND_NOCACHE_FLOATSM_NOMASK_RFA_TILING
         RainFusion::RainFusionAttentionInfer<half, float, Epilogue::LseMode::NONE, 0, 0>(
-            query, key, value, mask, blockTable, attentionOut,
-            actualSeqLengths, actualSeqLengthsKv, blockShape, selectIdx, selectNumIdx, user, softmaxLse, tiling);
-    #elif TILING_KEY_VAR == QF16_KVF16_TND_TND_NOCACHE_HALFSM_NOMASK_RFA_TILING
+            query, key, value, mask, blockTable, attentionOut, actualSeqLengths, actualSeqLengthsKv, blockShape,
+            selectIdx, selectNumIdx, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QF16_KVF16_TND_TND_NOCACHE_HALFSM_NOMASK_RFA_TILING
         RainFusion::RainFusionAttentionInfer<half, half, Epilogue::LseMode::NONE, 0, 0>(
-            query, key, value, mask, blockTable, attentionOut,
-            actualSeqLengths, actualSeqLengthsKv, blockShape, selectIdx, selectNumIdx, user, softmaxLse, tiling);
-    #elif TILING_KEY_VAR == QBF16_KVBF16_TND_TND_NOCACHE_FLOATSM_NOMASK_RFA_TILING
+            query, key, value, mask, blockTable, attentionOut, actualSeqLengths, actualSeqLengthsKv, blockShape,
+            selectIdx, selectNumIdx, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QBF16_KVBF16_TND_TND_NOCACHE_FLOATSM_NOMASK_RFA_TILING
         RainFusion::RainFusionAttentionInfer<bfloat16_t, float, Epilogue::LseMode::NONE, 0, 0>(
-            query, key, value, mask, blockTable, attentionOut,
-            actualSeqLengths, actualSeqLengthsKv, blockShape, selectIdx, selectNumIdx, user, softmaxLse, tiling);
-    #elif TILING_KEY_VAR == QF16_KVF16_BNSD_BNSD_NOCACHE_FLOATSM_NOMASK_RFA_TILING
+            query, key, value, mask, blockTable, attentionOut, actualSeqLengths, actualSeqLengthsKv, blockShape,
+            selectIdx, selectNumIdx, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QF16_KVF16_BNSD_BNSD_NOCACHE_FLOATSM_NOMASK_RFA_TILING
         RainFusion::RainFusionAttentionInfer<half, float, Epilogue::LseMode::NONE, 1, 1>(
-            query, key, value, mask, blockTable, attentionOut,
-            actualSeqLengths, actualSeqLengthsKv, blockShape, selectIdx, selectNumIdx, user, softmaxLse, tiling);
-    #elif TILING_KEY_VAR == QF16_KVF16_BNSD_BNSD_NOCACHE_HALFSM_NOMASK_RFA_TILING
+            query, key, value, mask, blockTable, attentionOut, actualSeqLengths, actualSeqLengthsKv, blockShape,
+            selectIdx, selectNumIdx, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QF16_KVF16_BNSD_BNSD_NOCACHE_HALFSM_NOMASK_RFA_TILING
         RainFusion::RainFusionAttentionInfer<half, half, Epilogue::LseMode::NONE, 1, 1>(
-            query, key, value, mask, blockTable, attentionOut,
-            actualSeqLengths, actualSeqLengthsKv, blockShape, selectIdx, selectNumIdx, user, softmaxLse, tiling);
-    #elif TILING_KEY_VAR == QBF16_KVBF16_BNSD_BNSD_NOCACHE_FLOATSM_NOMASK_RFA_TILING
+            query, key, value, mask, blockTable, attentionOut, actualSeqLengths, actualSeqLengthsKv, blockShape,
+            selectIdx, selectNumIdx, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QBF16_KVBF16_BNSD_BNSD_NOCACHE_FLOATSM_NOMASK_RFA_TILING
         RainFusion::RainFusionAttentionInfer<bfloat16_t, float, Epilogue::LseMode::NONE, 1, 1>(
-            query, key, value, mask, blockTable, attentionOut,
-            actualSeqLengths, actualSeqLengthsKv, blockShape, selectIdx, selectNumIdx, user, softmaxLse, tiling);
-    #else
+            query, key, value, mask, blockTable, attentionOut, actualSeqLengths, actualSeqLengthsKv, blockShape,
+            selectIdx, selectNumIdx, user, softmaxLse, tiling);
+#else
         RainFusion::RainFusionAttentionInfer<half, half, Epilogue::LseMode::NONE, 0, 0>(
-            query, key, value, mask, blockTable, attentionOut,
-            actualSeqLengths, actualSeqLengthsKv, blockShape, selectIdx, selectNumIdx, user, softmaxLse, tiling);
-    #endif
+            query, key, value, mask, blockTable, attentionOut, actualSeqLengths, actualSeqLengthsKv, blockShape,
+            selectIdx, selectNumIdx, user, softmaxLse, tiling);
+#endif
     }
 }
-

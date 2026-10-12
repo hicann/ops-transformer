@@ -25,7 +25,7 @@ using AscendC::RoundMode;
 
 namespace SfagBaseApi {
 template <typename IndexTensor>
-__aicore__ inline int64_t FindSfagPartialBlock(IndexTensor &indices, int64_t baseOffset, int64_t count,
+__aicore__ inline int64_t FindSfagPartialBlock(IndexTensor& indices, int64_t baseOffset, int64_t count,
                                                int64_t blockSize, int64_t validTokens)
 {
     if (count <= 0 || validTokens <= 0 || validTokens % blockSize == 0) {
@@ -180,8 +180,8 @@ struct FagConstInfo {
     int64_t gS1oS2o;
     int64_t s1oS2o;
 
-    __gm__ uint8_t *seqS1_addr;
-    __gm__ uint8_t *seqS2_addr;
+    __gm__ uint8_t* seqS1_addr;
+    __gm__ uint8_t* seqS2_addr;
 
     int64_t s1Token;
     int64_t s2Token;

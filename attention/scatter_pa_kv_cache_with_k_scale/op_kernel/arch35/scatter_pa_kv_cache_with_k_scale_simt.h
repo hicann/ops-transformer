@@ -57,8 +57,8 @@ static constexpr uint32_t THREADS = (sizeof(IDX_T) == SIZEOF_32BIT_IDX) ? THREAD
 
 template <typename T_FP8, typename T_SLOT, typename IDX_T>
 __simt_vf__ __aicore__ __launch_bounds__(THREADS<IDX_T>) inline void ScatterKvKVVf(
-    IDX_T count, __gm__ T_FP8 *key, __gm__ T_FP8 *value, __gm__ T_FP8 *keyCache, __gm__ T_FP8 *valueCache,
-    __gm__ T_SLOT *slotMapping, IDX_T numHead, IDX_T kHeadSize, IDX_T blockSize, IDX_T maxSlot, IDX_T kStride0,
+    IDX_T count, __gm__ T_FP8* key, __gm__ T_FP8* value, __gm__ T_FP8* keyCache, __gm__ T_FP8* valueCache,
+    __gm__ T_SLOT* slotMapping, IDX_T numHead, IDX_T kHeadSize, IDX_T blockSize, IDX_T maxSlot, IDX_T kStride0,
     IDX_T kStride1, IDX_T kStride2, IDX_T kcStride0, IDX_T kcStride1, IDX_T kcStride2, IDX_T kcStride3, IDX_T vStride0,
     IDX_T vStride1, IDX_T vStride2, IDX_T vcStride0, IDX_T vcStride1, IDX_T vcStride2, IDX_T vcStride3, IDX_T smStride0,
     IDX_T mNHKS, IDX_T sNHKS, IDX_T mHKS, IDX_T sHKS, IDX_T mBlk, IDX_T sBlk)
@@ -90,7 +90,7 @@ __simt_vf__ __aicore__ __launch_bounds__(THREADS<IDX_T>) inline void ScatterKvKV
 
 template <typename T_FP8, typename T_SLOT, typename IDX_T>
 __simt_vf__ __aicore__ __launch_bounds__(THREADS<IDX_T>) inline void ScatterKvKeyVf(
-    IDX_T count, __gm__ T_FP8 *key, __gm__ T_FP8 *keyCache, __gm__ T_SLOT *slotMapping, IDX_T numHead, IDX_T kHeadSize,
+    IDX_T count, __gm__ T_FP8* key, __gm__ T_FP8* keyCache, __gm__ T_SLOT* slotMapping, IDX_T numHead, IDX_T kHeadSize,
     IDX_T blockSize, IDX_T maxSlot, IDX_T kStride0, IDX_T kStride1, IDX_T kStride2, IDX_T kcStride0, IDX_T kcStride1,
     IDX_T kcStride2, IDX_T kcStride3, IDX_T smStride0, IDX_T mNHKS, IDX_T sNHKS, IDX_T mHKS, IDX_T sHKS, IDX_T mBlk,
     IDX_T sBlk)
@@ -120,7 +120,7 @@ __simt_vf__ __aicore__ __launch_bounds__(THREADS<IDX_T>) inline void ScatterKvKe
 
 template <typename T_FP8, typename T_SLOT, typename IDX_T>
 __simt_vf__ __aicore__ __launch_bounds__(THREADS<IDX_T>) inline void ScatterKvValueVf(
-    IDX_T count, __gm__ T_FP8 *value, __gm__ T_FP8 *valueCache, __gm__ T_SLOT *slotMapping, IDX_T numHead,
+    IDX_T count, __gm__ T_FP8* value, __gm__ T_FP8* valueCache, __gm__ T_SLOT* slotMapping, IDX_T numHead,
     IDX_T vHeadSize, IDX_T blockSize, IDX_T maxSlot, IDX_T vStride0, IDX_T vStride1, IDX_T vStride2, IDX_T vcStride0,
     IDX_T vcStride1, IDX_T vcStride2, IDX_T vcStride3, IDX_T smStride0, IDX_T mNHVS, IDX_T sNHVS, IDX_T mHVS,
     IDX_T sHVS, IDX_T mBlk, IDX_T sBlk)
@@ -150,7 +150,7 @@ __simt_vf__ __aicore__ __launch_bounds__(THREADS<IDX_T>) inline void ScatterKvVa
 
 template <typename T_SLOT, typename IDX_T>
 __simt_vf__ __aicore__ __launch_bounds__(THREADS<IDX_T>) inline void ScatterKvKeyScaleVf(
-    IDX_T count, __gm__ float *keyScale, __gm__ float *keyScaleCache, __gm__ T_SLOT *slotMapping, IDX_T numHead,
+    IDX_T count, __gm__ float* keyScale, __gm__ float* keyScaleCache, __gm__ T_SLOT* slotMapping, IDX_T numHead,
     IDX_T blockSize, IDX_T maxSlot, IDX_T ksStride0, IDX_T ksStride1, IDX_T kscStride0, IDX_T kscStride1,
     IDX_T kscStride2, IDX_T smStride0, IDX_T mNH, IDX_T sNH, IDX_T mBlk, IDX_T sBlk)
 {
@@ -174,9 +174,9 @@ __simt_vf__ __aicore__ __launch_bounds__(THREADS<IDX_T>) inline void ScatterKvKe
 // ==================== Launch helpers (magic/shift + stride cast + VF call) ====================
 
 template <typename T_FP8, typename T_SLOT, typename IDX_T>
-__aicore__ inline void LaunchKVVf(const ScatterPaKvCacheWithKScaleTilingData *t, IDX_T count, IDX_T nH, IDX_T kH,
-                                  IDX_T bS, IDX_T mS, __gm__ T_FP8 *kg, __gm__ T_FP8 *vg, __gm__ T_FP8 *kcg,
-                                  __gm__ T_FP8 *vcg, __gm__ T_SLOT *sg)
+__aicore__ inline void LaunchKVVf(const ScatterPaKvCacheWithKScaleTilingData* t, IDX_T count, IDX_T nH, IDX_T kH,
+                                  IDX_T bS, IDX_T mS, __gm__ T_FP8* kg, __gm__ T_FP8* vg, __gm__ T_FP8* kcg,
+                                  __gm__ T_FP8* vcg, __gm__ T_SLOT* sg)
 {
     IDX_T m1, s1, m2, s2, m3, s3;
     GetUintDivMagicAndShift(m1, s1, nH * kH);
@@ -199,8 +199,8 @@ __aicore__ inline void LaunchKVVf(const ScatterPaKvCacheWithKScaleTilingData *t,
 }
 
 template <typename T_FP8, typename T_SLOT, typename IDX_T>
-__aicore__ inline void LaunchKeyVf(const ScatterPaKvCacheWithKScaleTilingData *t, IDX_T count, IDX_T nH, IDX_T kH,
-                                   IDX_T bS, IDX_T mS, __gm__ T_FP8 *kg, __gm__ T_FP8 *kcg, __gm__ T_SLOT *sg)
+__aicore__ inline void LaunchKeyVf(const ScatterPaKvCacheWithKScaleTilingData* t, IDX_T count, IDX_T nH, IDX_T kH,
+                                   IDX_T bS, IDX_T mS, __gm__ T_FP8* kg, __gm__ T_FP8* kcg, __gm__ T_SLOT* sg)
 {
     IDX_T m1, s1, m2, s2, m3, s3;
     GetUintDivMagicAndShift(m1, s1, nH * kH);
@@ -217,8 +217,8 @@ __aicore__ inline void LaunchKeyVf(const ScatterPaKvCacheWithKScaleTilingData *t
 }
 
 template <typename T_FP8, typename T_SLOT, typename IDX_T>
-__aicore__ inline void LaunchValueVf(const ScatterPaKvCacheWithKScaleTilingData *t, IDX_T count, IDX_T nH, IDX_T vH,
-                                     IDX_T bS, IDX_T mS, __gm__ T_FP8 *vg, __gm__ T_FP8 *vcg, __gm__ T_SLOT *sg)
+__aicore__ inline void LaunchValueVf(const ScatterPaKvCacheWithKScaleTilingData* t, IDX_T count, IDX_T nH, IDX_T vH,
+                                     IDX_T bS, IDX_T mS, __gm__ T_FP8* vg, __gm__ T_FP8* vcg, __gm__ T_SLOT* sg)
 {
     IDX_T m1, s1, m2, s2, m3, s3;
     GetUintDivMagicAndShift(m1, s1, nH * vH);
@@ -235,8 +235,8 @@ __aicore__ inline void LaunchValueVf(const ScatterPaKvCacheWithKScaleTilingData 
 }
 
 template <typename T_SLOT, typename IDX_T>
-__aicore__ inline void LaunchKeyScaleVf(const ScatterPaKvCacheWithKScaleTilingData *t, IDX_T count, IDX_T nH, IDX_T bS,
-                                        IDX_T mS, __gm__ float *ksg, __gm__ float *kscg, __gm__ T_SLOT *sg)
+__aicore__ inline void LaunchKeyScaleVf(const ScatterPaKvCacheWithKScaleTilingData* t, IDX_T count, IDX_T nH, IDX_T bS,
+                                        IDX_T mS, __gm__ float* ksg, __gm__ float* kscg, __gm__ T_SLOT* sg)
 {
     IDX_T m1, s1, m2, s2;
     GetUintDivMagicAndShift(m1, s1, nH);
@@ -253,7 +253,7 @@ __aicore__ inline void LaunchKeyScaleVf(const ScatterPaKvCacheWithKScaleTilingDa
 
 template <typename T_FP8, typename T_SLOT, uint32_t SCH_MODE>
 __aicore__ inline void Process(GM_ADDR key, GM_ADDR value, GM_ADDR keyCache, GM_ADDR valueCache, GM_ADDR slotMapping,
-                               GM_ADDR keyScale, GM_ADDR keyScaleCache, const ScatterPaKvCacheWithKScaleTilingData *t)
+                               GM_ADDR keyScale, GM_ADDR keyScaleCache, const ScatterPaKvCacheWithKScaleTilingData* t)
 {
     uint64_t nT = static_cast<uint64_t>(t->numTokens);
     uint64_t nH = static_cast<uint64_t>(t->numHead);
@@ -263,13 +263,13 @@ __aicore__ inline void Process(GM_ADDR key, GM_ADDR value, GM_ADDR keyCache, GM_
     uint64_t total = nT * nH * ((kH > vH) ? kH : vH);
     bool use32 = (total <= static_cast<uint64_t>(INT32_MAX));
 
-    __gm__ T_FP8 *kg = (__gm__ T_FP8 *)key;
-    __gm__ T_FP8 *vg = (__gm__ T_FP8 *)value;
-    __gm__ T_FP8 *kcg = (__gm__ T_FP8 *)keyCache;
-    __gm__ T_FP8 *vcg = (__gm__ T_FP8 *)valueCache;
-    __gm__ T_SLOT *sg = (__gm__ T_SLOT *)slotMapping;
-    __gm__ float *ksg = (__gm__ float *)keyScale;
-    __gm__ float *kscg = (__gm__ float *)keyScaleCache;
+    __gm__ T_FP8* kg = (__gm__ T_FP8*)key;
+    __gm__ T_FP8* vg = (__gm__ T_FP8*)value;
+    __gm__ T_FP8* kcg = (__gm__ T_FP8*)keyCache;
+    __gm__ T_FP8* vcg = (__gm__ T_FP8*)valueCache;
+    __gm__ T_SLOT* sg = (__gm__ T_SLOT*)slotMapping;
+    __gm__ float* ksg = (__gm__ float*)keyScale;
+    __gm__ float* kscg = (__gm__ float*)keyScaleCache;
 
     if constexpr (SCH_MODE == SCATTER_KV_CACHE_SCENE_SPECIALIZED) {
         if (use32) {

@@ -14,13 +14,13 @@
 namespace optiling {
 namespace sparse_mla_checker {
 namespace {
-const char *Op(const CheckContext &context)
+const char* Op(const CheckContext& context)
 {
     return context.opName == nullptr ? "SparseMla" : context.opName;
 }
 } // namespace
 
-ge::graphStatus MaskChecker::CheckSinglePara(const CheckContext &context) const
+ge::graphStatus MaskChecker::CheckSinglePara(const CheckContext& context) const
 {
     OP_CHECK_IF(context.oriMaskMode != 0 && context.oriMaskMode != 3 &&
                     context.oriMaskMode != 4, // 3: RightDownCausal模式 4: Band模式
@@ -40,7 +40,7 @@ ge::graphStatus MaskChecker::CheckSinglePara(const CheckContext &context) const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckFeature(const CheckContext &context) const
+ge::graphStatus MaskChecker::CheckFeature(const CheckContext& context) const
 {
     if (context.oriMaskMode != 4) { // 4: Band模式
         OP_CHECK_IF(context.oriWinLeft != -1 || context.oriWinRight != -1,

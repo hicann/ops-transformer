@@ -35,29 +35,29 @@ enum OutputIdx {
     softmaxOutEnum
 };
 
-ge::graphStatus InferShapeSparseLightningIndexerKLLossGrad(gert::InferShapeContext *context)
+ge::graphStatus InferShapeSparseLightningIndexerKLLossGrad(gert::InferShapeContext* context)
 {
     OP_LOGI(context, "Start enter SparseLightningIndexerKLLossGrad infershape impl.");
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
     }
 
-    const gert::Shape *qShape = context->GetInputShape(qEnum);
+    const gert::Shape* qShape = context->GetInputShape(qEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, qShape);
-    const gert::Shape *kShape = context->GetInputShape(kEnum);
+    const gert::Shape* kShape = context->GetInputShape(kEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, kShape);
-    const gert::Shape *wShape = context->GetInputShape(wEnum);
+    const gert::Shape* wShape = context->GetInputShape(wEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, wShape);
-    const gert::Shape *softmaxShape = context->GetInputShape(attnSoftmaxL1NormEnum);
+    const gert::Shape* softmaxShape = context->GetInputShape(attnSoftmaxL1NormEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxShape);
 
-    gert::Shape *dqShape = context->GetOutputShape(dqEnum);
+    gert::Shape* dqShape = context->GetOutputShape(dqEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, dqShape);
-    gert::Shape *dkShape = context->GetOutputShape(dkEnum);
+    gert::Shape* dkShape = context->GetOutputShape(dkEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, dkShape);
-    gert::Shape *dwShape = context->GetOutputShape(dwEnum);
+    gert::Shape* dwShape = context->GetOutputShape(dwEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, dwShape);
-    gert::Shape *softmaxOutShape = context->GetOutputShape(softmaxOutEnum);
+    gert::Shape* softmaxOutShape = context->GetOutputShape(softmaxOutEnum);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxOutShape);
 
     *dqShape = *qShape;
@@ -67,7 +67,7 @@ ge::graphStatus InferShapeSparseLightningIndexerKLLossGrad(gert::InferShapeConte
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeSparseLightningIndexerKLLossGrad(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeSparseLightningIndexerKLLossGrad(gert::InferDataTypeContext* context)
 {
     OP_LOGI(context, "Start enter SparseLightningIndexerKLLossGrad infer dtype impl.");
     if (context == nullptr) {

@@ -23,14 +23,14 @@ template <typename T1, typename T2, const uint32_t IS_TND = 0, const bool isOriK
 class SparseFlashMlaGradPreRegbase {
 public:
     __aicore__ inline SparseFlashMlaGradPreRegbase(){};
-    __aicore__ inline void Init(__gm__ uint8_t *workspace, __gm__ uint8_t *dsinks, __gm__ uint8_t *ori_softmax_l1,
-                                __gm__ uint8_t *cmp_softmax_l1,
-                                const optiling::smlag::SparseFlashMlaGradTilingDataRegbase *ordTilingData,
-                                TPipe *pipe_in);
+    __aicore__ inline void Init(__gm__ uint8_t* workspace, __gm__ uint8_t* dsinks, __gm__ uint8_t* ori_softmax_l1,
+                                __gm__ uint8_t* cmp_softmax_l1,
+                                const optiling::smlag::SparseFlashMlaGradTilingDataRegbase* ordTilingData,
+                                TPipe* pipe_in);
     __aicore__ inline void Process();
     __aicore__ inline void SyncALLCores();
 
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> helpQue;
     TQue<QuePosition::VECIN, 1> inputQue;
     TQue<QuePosition::VECIN, 1> castQue;
@@ -40,7 +40,7 @@ public:
     GlobalTensor<float> dOriVWorkSpaceGm, dCmpVWorkSpaceGm;
     GlobalTensor<float> dsinkGm, orisoftmaxl1Gm, cmpsoftmaxl1Gm;
 
-    const optiling::smlag::SparseFlashMlaGradTilingDataRegbase *TilingData;
+    const optiling::smlag::SparseFlashMlaGradTilingDataRegbase* TilingData;
 
     uint32_t cBlockIdx;
     // query
@@ -82,8 +82,8 @@ template <typename T1, typename T2, const uint32_t IS_TND, const bool isOriKVExi
           const bool IsOriKVSparse, const bool IsCmpKVSparse, const bool IsDETER>
 __aicore__ inline void
 SparseFlashMlaGradPreRegbase<T1, T2, IS_TND, isOriKVExist, isCmpKVExist, IsOriKVSparse, IsCmpKVSparse, IsDETER>::Init(
-    __gm__ uint8_t *workspace, __gm__ uint8_t *dsinks, __gm__ uint8_t *ori_softmax_l1, __gm__ uint8_t *cmp_softmax_l1,
-    const optiling::smlag::SparseFlashMlaGradTilingDataRegbase *orgTilingData, TPipe *pipe_in)
+    __gm__ uint8_t* workspace, __gm__ uint8_t* dsinks, __gm__ uint8_t* ori_softmax_l1, __gm__ uint8_t* cmp_softmax_l1,
+    const optiling::smlag::SparseFlashMlaGradTilingDataRegbase* orgTilingData, TPipe* pipe_in)
 {
     cBlockIdx = GetBlockIdx();
 
@@ -110,34 +110,33 @@ SparseFlashMlaGradPreRegbase<T1, T2, IS_TND, isOriKVExist, isCmpKVExist, IsOriKV
     cmpsoftmaxl1PreBlockTotal = TilingData->preTilingData.cmpSoftmaxL1PreBlockTotal;
     cmpsoftmaxl1PreBlockTail = TilingData->preTilingData.cmpSoftmaxL1PreBlockTail;
 
-    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                  TilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
+    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + TilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
     if constexpr (isOriKVExist) {
-        dorikvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dorikvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           TilingData->postTilingData.dOriKVWorkSpaceOffset / sizeof(T2));
         if constexpr (!IsOriKVSparse && !IsDETER) {
-            dOriVWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dOriVWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                              TilingData->postTilingData.dOriVWorkSpaceOffset / sizeof(T2));
         }
     }
     if constexpr (isCmpKVExist) {
-        dcmpkvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dcmpkvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           TilingData->postTilingData.dCmpKVWorkSpaceOffset / sizeof(T2));
         if constexpr (!IsCmpKVSparse && !IsDETER) {
-            dCmpVWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dCmpVWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                              TilingData->postTilingData.dCmpVWorkSpaceOffset / sizeof(T2));
         }
     }
     if (TilingData->baseParams.isSink) {
-        dsinkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dsinkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                          TilingData->baseParams.dSinkWorkSpaceOffset / sizeof(T2));
-        dsinkGm.SetGlobalBuffer((__gm__ float *)dsinks);
+        dsinkGm.SetGlobalBuffer((__gm__ float*)dsinks);
     }
     if constexpr (IsOriKVSparse) {
-        orisoftmaxl1Gm.SetGlobalBuffer((__gm__ float *)ori_softmax_l1);
+        orisoftmaxl1Gm.SetGlobalBuffer((__gm__ float*)ori_softmax_l1);
     }
     if constexpr (IsCmpKVSparse) {
-        cmpsoftmaxl1Gm.SetGlobalBuffer((__gm__ float *)cmp_softmax_l1);
+        cmpsoftmaxl1Gm.SetGlobalBuffer((__gm__ float*)cmp_softmax_l1);
     }
 
     initdqSize = cBlockIdx == qPreBlockTotal - 1 ? qPreBlockTail : qPreBlockFactor;

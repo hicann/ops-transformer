@@ -17,7 +17,7 @@ namespace optiling {
 namespace sparse_mla_checker {
 
 template <typename OptionalParam>
-void PopulateOptionalTensorParam(gert::TilingContext *context, uint32_t index, OptionalParam &param)
+void PopulateOptionalTensorParam(gert::TilingContext* context, uint32_t index, OptionalParam& param)
 {
     param.desc = context->GetOptionalInputDesc(index);
     param.shape = context->GetOptionalInputShape(index);
@@ -25,32 +25,32 @@ void PopulateOptionalTensorParam(gert::TilingContext *context, uint32_t index, O
 }
 
 template <typename RequiredParam>
-TensorParam MakeRequiredTensor(const RequiredParam &param)
+TensorParam MakeRequiredTensor(const RequiredParam& param)
 {
     return {param.desc, param.shape == nullptr ? nullptr : &param.shape->GetStorageShape(),
             param.desc != nullptr || param.shape != nullptr};
 }
 
 template <typename OptionalParam>
-TensorParam MakeOptionalTensor(const OptionalParam &param)
+TensorParam MakeOptionalTensor(const OptionalParam& param)
 {
-    const gert::Shape *shape = param.shape == nullptr ? nullptr : &param.shape->GetStorageShape();
+    const gert::Shape* shape = param.shape == nullptr ? nullptr : &param.shape->GetStorageShape();
     if (shape == nullptr && param.tensor != nullptr) {
         shape = &param.tensor->GetStorageShape();
     }
     return {param.desc, shape, shape != nullptr};
 }
 
-inline int64_t GetLastDim(const TensorParam &param)
+inline int64_t GetLastDim(const TensorParam& param)
 {
     return param.shape == nullptr || param.shape->GetDimNum() == 0 ? 0 :
                                                                      param.shape->GetDim(param.shape->GetDimNum() - 1);
 }
 
 template <typename TilingInfo>
-void PopulateCommonContext(CheckContext &context, const TilingInfo &info)
+void PopulateCommonContext(CheckContext& context, const TilingInfo& info)
 {
-    const auto &param = info.opParamInfo;
+    const auto& param = info.opParamInfo;
     context.opName = info.opName;
     context.q = MakeRequiredTensor(param.q);
     context.oriKv = MakeOptionalTensor(param.oriKv);

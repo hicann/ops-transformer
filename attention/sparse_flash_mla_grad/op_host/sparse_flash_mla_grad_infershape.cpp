@@ -65,16 +65,16 @@ enum class AttrIndex : uint32_t {
     LAYOUT_KV
 };
 
-ge::graphStatus InferShape4SparseFlashMlaGrad(gert::InferShapeContext *context)
+ge::graphStatus InferShape4SparseFlashMlaGrad(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("SparseFlashMlaGrad", "InferShapeContext is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_LOGD(context, "Enter InferShape4SparseFlashMlaGrad.");
 
-    const gert::Shape *queryShape = context->GetInputShape(static_cast<size_t>(InputIndex::QUERY));
-    const gert::Shape *oriKvShape = context->GetInputShape(static_cast<size_t>(InputIndex::ORI_KV));
-    const gert::Shape *cmpKvShape = context->GetInputShape(static_cast<size_t>(InputIndex::CMP_KV));
-    const gert::Shape *sinksShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::SINKS));
+    const gert::Shape* queryShape = context->GetInputShape(static_cast<size_t>(InputIndex::QUERY));
+    const gert::Shape* oriKvShape = context->GetInputShape(static_cast<size_t>(InputIndex::ORI_KV));
+    const gert::Shape* cmpKvShape = context->GetInputShape(static_cast<size_t>(InputIndex::CMP_KV));
+    const gert::Shape* sinksShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::SINKS));
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, oriKvShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, cmpKvShape);
@@ -86,9 +86,9 @@ ge::graphStatus InferShape4SparseFlashMlaGrad(gert::InferShapeContext *context)
     OP_CHECK_NULL_WITH_CONTEXT(context, scaleValue);
     OP_CHECK_NULL_WITH_CONTEXT(context, cmpRatio);
 
-    gert::Shape *dqShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DQ));
-    gert::Shape *dOriKvShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DORI_KV));
-    gert::Shape *dCmpKvShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DCMP_KV));
+    gert::Shape* dqShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DQ));
+    gert::Shape* dOriKvShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DORI_KV));
+    gert::Shape* dCmpKvShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DCMP_KV));
     OP_CHECK_NULL_WITH_CONTEXT(context, dqShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, dOriKvShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, dCmpKvShape);
@@ -97,7 +97,7 @@ ge::graphStatus InferShape4SparseFlashMlaGrad(gert::InferShapeContext *context)
     *dCmpKvShape = *cmpKvShape;
 
     if (sinksShape != nullptr) {
-        gert::Shape *dSinksShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DSINKS));
+        gert::Shape* dSinksShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DSINKS));
         OP_CHECK_NULL_WITH_CONTEXT(context, dSinksShape);
         *dSinksShape = *sinksShape;
     }
@@ -105,7 +105,7 @@ ge::graphStatus InferShape4SparseFlashMlaGrad(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataType4SparseFlashMlaGrad(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataType4SparseFlashMlaGrad(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("SparseFlashMlaGrad", "InferDataTypeContext is nullptr"),
                 return ge::GRAPH_FAILED);

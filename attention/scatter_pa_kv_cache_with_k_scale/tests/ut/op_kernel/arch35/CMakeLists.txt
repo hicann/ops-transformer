@@ -9,7 +9,7 @@
 # -----------------------------------------------------------------------------------------------------------
 
 if (UT_TEST_ALL OR OP_KERNEL_UT)
-    AddOpTestCase(scatter_pa_kv_cache_with_k_scale "Ascend950PR_9599" 
-        "-DDTYPE_KEY=uint8_t -DDTYPE_SLOT_MAPPING=int32_t" 
+    AddOpTestCase(scatter_pa_kv_cache_with_k_scale "Ascend950PR_9599"
+        "-DDTYPE_KEY=uint8_t -DDTYPE_SLOT_MAPPING=int32_t"
         "")
 endif()

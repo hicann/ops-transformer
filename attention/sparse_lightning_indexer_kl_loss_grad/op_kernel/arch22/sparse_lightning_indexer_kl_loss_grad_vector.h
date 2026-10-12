@@ -58,67 +58,67 @@ public:
     using scatterAddGmType = typename std::conditional<deterministic, GlobalTensor<T>, int8_t>::type;
 
     __aicore__ inline SLIKLLossVectorService(){};
-    __aicore__ inline void InitParams(const SLIKLLossGradConstInfo &vecConstInfo,
-                                      const optiling::SparseLightningIndexerKLLossGradTilingData *__restrict tilingData,
+    __aicore__ inline void InitParams(const SLIKLLossGradConstInfo& vecConstInfo,
+                                      const optiling::SparseLightningIndexerKLLossGradTilingData* __restrict tilingData,
                                       GlobalTensor<int32_t> metadataGm, GlobalTensor<int32_t> cmpResidualKeyGm,
                                       bool hasMetadata);
-    __aicore__ inline void InitSeqUsedGM(GlobalTensor<int32_t> &seqUsedQ, GlobalTensor<int32_t> &seqUsedK);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
+    __aicore__ inline void InitSeqUsedGM(GlobalTensor<int32_t>& seqUsedQ, GlobalTensor<int32_t>& seqUsedK);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
 
     // =============== vector 0 functions ==============
-    __aicore__ inline void InitVector0GM(GlobalTensor<KV_T> &key, GlobalTensor<KV_T> &keyRope,
-                                         GlobalTensor<KV_T> &keyIndex, GlobalTensor<int32_t> &topK,
-                                         GlobalTensor<int32_t> &actualSeqLengthsQ,
-                                         GlobalTensor<int32_t> &actualSeqLengthsKV, GlobalTensor<KV_T> &gatherPRes,
-                                         GlobalTensor<KV_T> &gatherSYRes);
-    __aicore__ inline void ProcessVector0(SLIKLLossGradRunInfo &runInfo);
+    __aicore__ inline void InitVector0GM(GlobalTensor<KV_T>& key, GlobalTensor<KV_T>& keyRope,
+                                         GlobalTensor<KV_T>& keyIndex, GlobalTensor<int32_t>& topK,
+                                         GlobalTensor<int32_t>& actualSeqLengthsQ,
+                                         GlobalTensor<int32_t>& actualSeqLengthsKV, GlobalTensor<KV_T>& gatherPRes,
+                                         GlobalTensor<KV_T>& gatherSYRes);
+    __aicore__ inline void ProcessVector0(SLIKLLossGradRunInfo& runInfo);
 
     // =============== vector 1 functions ==============
-    __aicore__ inline void InitVector1GM(const GlobalTensor<T> &attnSoftmaxL1Norm,
-                                         const GlobalTensor<MM12_OUT_T> &bmm2Res, const GlobalTensor<T> &weight,
-                                         const GlobalTensor<T> psySync, GlobalTensor<T> &softmaxOut,
-                                         GlobalTensor<T> &dWeight, GlobalTensor<T> &reluGm,
-                                         GlobalTensor<KV_T> &reluGradRes,
-                                         GlobalTensor<int32_t> &actualSeqLengthsQueryGm,
-                                         GlobalTensor<int32_t> &actualSeqLengthsKeyGm);
-    __aicore__ inline void ProcessVector1(SLIKLLossGradRunInfo &runInfo);
+    __aicore__ inline void InitVector1GM(const GlobalTensor<T>& attnSoftmaxL1Norm,
+                                         const GlobalTensor<MM12_OUT_T>& bmm2Res, const GlobalTensor<T>& weight,
+                                         const GlobalTensor<T> psySync, GlobalTensor<T>& softmaxOut,
+                                         GlobalTensor<T>& dWeight, GlobalTensor<T>& reluGm,
+                                         GlobalTensor<KV_T>& reluGradRes,
+                                         GlobalTensor<int32_t>& actualSeqLengthsQueryGm,
+                                         GlobalTensor<int32_t>& actualSeqLengthsKeyGm);
+    __aicore__ inline void ProcessVector1(SLIKLLossGradRunInfo& runInfo);
 
     // =============== vector 2 functions ==============
-    __aicore__ inline void ProcessVector2(SLIKLLossGradRunInfo &runInfo);
-    __aicore__ inline void InitVector2GM(const GlobalTensor<MM5_OUT_T> &bmm5Res, const GlobalTensor<int32_t> &topK,
-                                         GlobalTensor<T> &scatterAddRes,
+    __aicore__ inline void ProcessVector2(SLIKLLossGradRunInfo& runInfo);
+    __aicore__ inline void InitVector2GM(const GlobalTensor<MM5_OUT_T>& bmm5Res, const GlobalTensor<int32_t>& topK,
+                                         GlobalTensor<T>& scatterAddRes,
                                          scatterAddGmType scatterAddBanks[SLI_DETER_SCATTER_BANK_NUM]);
-    __aicore__ inline void ProcessDeterVector2(SLIKLLossGradRunInfo &runInfo);
-    __aicore__ inline void ProcessPrivateScatterVector2(SLIKLLossGradRunInfo &runInfo);
+    __aicore__ inline void ProcessDeterVector2(SLIKLLossGradRunInfo& runInfo);
+    __aicore__ inline void ProcessPrivateScatterVector2(SLIKLLossGradRunInfo& runInfo);
     __aicore__ inline void SetCachedValidTotalSize(int64_t validTotalSize);
     template <typename CLEAR_T>
-    __aicore__ inline void ZeroOutputGm(GlobalTensor<CLEAR_T> &dst, int64_t offset, int64_t count);
+    __aicore__ inline void ZeroOutputGm(GlobalTensor<CLEAR_T>& dst, int64_t offset, int64_t count);
 
 private:
     // =============== vector 0 functions ==============
     template <event_t IdStart, bool gatherRope>
-    __aicore__ inline void MergeKv(const SLIKLLossGradRunInfo &runInfo, GlobalTensor<KV_T> kvMergeGm_,
+    __aicore__ inline void MergeKv(const SLIKLLossGradRunInfo& runInfo, GlobalTensor<KV_T> kvMergeGm_,
                                    GlobalTensor<KV_T> srcTensor, GlobalTensor<KV_T> srcRopeTensor);
     template <bool gatherRope>
-    __aicore__ inline void CopyInSingleKv(int64_t &mte2Size, int64_t mte3Size, int64_t mergeMte3Idx, int64_t realS2Idx,
-                                          int64_t keyBNBOffset, int64_t s2IdLimit, const SLIKLLossGradRunInfo &runInfo,
+    __aicore__ inline void CopyInSingleKv(int64_t& mte2Size, int64_t mte3Size, int64_t mergeMte3Idx, int64_t realS2Idx,
+                                          int64_t keyBNBOffset, int64_t s2IdLimit, const SLIKLLossGradRunInfo& runInfo,
                                           GlobalTensor<KV_T> srcTensor, GlobalTensor<KV_T> srcRopeTensor);
-    __aicore__ inline int64_t GetKeyRopeGmOffset(int64_t realS2Idx, const SLIKLLossGradRunInfo &runInfo);
-    __aicore__ inline int64_t GetKeyGmOffset(int64_t realS2Idx, const SLIKLLossGradRunInfo &runInfo, int64_t s2IdLimit,
+    __aicore__ inline int64_t GetKeyRopeGmOffset(int64_t realS2Idx, const SLIKLLossGradRunInfo& runInfo);
+    __aicore__ inline int64_t GetKeyGmOffset(int64_t realS2Idx, const SLIKLLossGradRunInfo& runInfo, int64_t s2IdLimit,
                                              int32_t dValue);
     template <bool gatherRope>
-    __aicore__ inline void CopyInKv(int64_t &mte2Size, int64_t mte3Size, int64_t mergeMte3Idx, int64_t realS2Idx1,
-                                    int64_t realS2Idx2, const SLIKLLossGradRunInfo &runInfo,
+    __aicore__ inline void CopyInKv(int64_t& mte2Size, int64_t mte3Size, int64_t mergeMte3Idx, int64_t realS2Idx1,
+                                    int64_t realS2Idx2, const SLIKLLossGradRunInfo& runInfo,
                                     GlobalTensor<KV_T> srcTensor, GlobalTensor<KV_T> srcRopeTensor);
     template <event_t IdStart, bool gatherRope>
     __aicore__ inline void CopyOutMrgeResult(int64_t mte2Size, int64_t mte3Size, int64_t s2GmStartOffset,
                                              int64_t s2IdxOffset, int64_t mergeMte3Idx,
-                                             const SLIKLLossGradRunInfo &runInfo, GlobalTensor<KV_T> kvMergeGm_,
+                                             const SLIKLLossGradRunInfo& runInfo, GlobalTensor<KV_T> kvMergeGm_,
                                              GlobalTensor<KV_T> srcTensor, GlobalTensor<KV_T> srcRopeTensor);
-    __aicore__ inline void GetRealS2Idx(int64_t s2GmOffset, int64_t s2IdxOffset, int64_t &realS2Idx,
-                                        const SLIKLLossGradRunInfo &runInfo);
+    __aicore__ inline void GetRealS2Idx(int64_t s2GmOffset, int64_t s2IdxOffset, int64_t& realS2Idx,
+                                        const SLIKLLossGradRunInfo& runInfo);
 
     // =============== vector 1 functions ==============
     // Legacy Q@K/P path is intentionally isolated in this op. P is supplied by attn_softmax_l1_norm.
@@ -126,59 +126,59 @@ private:
     __aicore__ inline void VectorP(SLIKLLossGradRunInfo &runInfo);
     __aicore__ inline void VectorPWithOutSoftMaxSum(SLIKLLossGradRunInfo &runInfo);
 #endif
-    __aicore__ inline void CopyPFromInput(SLIKLLossGradRunInfo &runInfo);
-    __aicore__ inline void PreloadWeight(SLIKLLossGradRunInfo &runInfo);
-    __aicore__ inline bool ShouldEnableSyLoadBalance(const SLIKLLossGradRunInfo &runInfo) const;
-    __aicore__ inline void VectorSy(SLIKLLossGradRunInfo &runInfo);
-    __aicore__ inline void VectorSyLoadBalance(SLIKLLossGradRunInfo &runInfo);
-    __aicore__ inline void FinalizeVectorSy(SLIKLLossGradRunInfo &runInfo);
-    __aicore__ inline void ReLUGrad(LocalTensor<KV_T> &reluGradOutTensor, LocalTensor<T> &subResTensor,
-                                    LocalTensor<T> &maskUb, int32_t kRealSizeAlign);
-    __aicore__ inline void VectorDwDqDk(SLIKLLossGradRunInfo &runInfo, int32_t kLoopIdx);
+    __aicore__ inline void CopyPFromInput(SLIKLLossGradRunInfo& runInfo);
+    __aicore__ inline void PreloadWeight(SLIKLLossGradRunInfo& runInfo);
+    __aicore__ inline bool ShouldEnableSyLoadBalance(const SLIKLLossGradRunInfo& runInfo) const;
+    __aicore__ inline void VectorSy(SLIKLLossGradRunInfo& runInfo);
+    __aicore__ inline void VectorSyLoadBalance(SLIKLLossGradRunInfo& runInfo);
+    __aicore__ inline void FinalizeVectorSy(SLIKLLossGradRunInfo& runInfo);
+    __aicore__ inline void ReLUGrad(LocalTensor<KV_T>& reluGradOutTensor, LocalTensor<T>& subResTensor,
+                                    LocalTensor<T>& maskUb, int32_t kRealSizeAlign);
+    __aicore__ inline void VectorDwDqDk(SLIKLLossGradRunInfo& runInfo, int32_t kLoopIdx);
     __aicore__ inline uint32_t GetPsySyncSumPOffset() const;
     __aicore__ inline uint32_t GetPsySyncStride() const;
     __aicore__ inline int64_t GetNSplitSize() const;
-    __aicore__ inline void CopyPsyKPad(const LocalTensor<T> &dstUb, const GlobalTensor<T> &srcGm, int32_t kRealSize,
+    __aicore__ inline void CopyPsyKPad(const LocalTensor<T>& dstUb, const GlobalTensor<T>& srcGm, int32_t kRealSize,
                                        int32_t kRealSizeAlign16);
     __aicore__ inline void CopySoftmaxOutTailZeros(int64_t softmaxOutOffset, int32_t realKSize);
     __aicore__ inline void SoftmaxInplaceRealK(int32_t realKSize, int32_t realKSizeAlign);
     template <typename DT>
-    __aicore__ inline void CopyRowsGmToUb(const LocalTensor<DT> &dstUb, const GlobalTensor<DT> &srcGm, uint16_t nRows,
+    __aicore__ inline void CopyRowsGmToUb(const LocalTensor<DT>& dstUb, const GlobalTensor<DT>& srcGm, uint16_t nRows,
                                           int32_t validLen, int32_t gmStride, int32_t ubStride);
     template <typename DT>
-    __aicore__ inline void CopyRowsUbToGm(const GlobalTensor<DT> &dstGm, const LocalTensor<DT> &srcUb, uint16_t nRows,
+    __aicore__ inline void CopyRowsUbToGm(const GlobalTensor<DT>& dstGm, const LocalTensor<DT>& srcUb, uint16_t nRows,
                                           int32_t validLen, int32_t gmStride, int32_t ubStride);
-    __aicore__ inline void VectorDwDqDkMoreThan2k(SLIKLLossGradRunInfo &runInfo, int32_t kLoopIdx);
-    __aicore__ inline void VectorDwDqDkLess2k(SLIKLLossGradRunInfo &runInfo);
+    __aicore__ inline void VectorDwDqDkMoreThan2k(SLIKLLossGradRunInfo& runInfo, int32_t kLoopIdx);
+    __aicore__ inline void VectorDwDqDkLess2k(SLIKLLossGradRunInfo& runInfo);
     // =============== vector 2 functions ==============
-    __aicore__ inline void ScatterAddCopyOutSingle(const LocalTensor<MM5_OUT_T> &srcUb, int64_t keyBNBOffset,
-                                                   GlobalTensor<T> &scatterAddGm);
+    __aicore__ inline void ScatterAddCopyOutSingle(const LocalTensor<MM5_OUT_T>& srcUb, int64_t keyBNBOffset,
+                                                   GlobalTensor<T>& scatterAddGm);
     __aicore__ inline int32_t GetActualSeqLens(int32_t bIdx, int32_t defaultLens,
-                                               GlobalTensor<int32_t> &actualSeqLensGm, SLILayout layout,
-                                               int64_t &accumLen);
-    __aicore__ inline int32_t GetUsedSeqLens(int32_t bIdx, int32_t defaultLens, GlobalTensor<int32_t> &seqUsedGm);
+                                               GlobalTensor<int32_t>& actualSeqLensGm, SLILayout layout,
+                                               int64_t& accumLen);
+    __aicore__ inline int32_t GetUsedSeqLens(int32_t bIdx, int32_t defaultLens, GlobalTensor<int32_t>& seqUsedGm);
     __aicore__ inline int32_t GetCmpResidualK(int32_t bIdx);
     __aicore__ inline int64_t GetPreCompressS2Len(int32_t bIdx, int32_t actualSeqLensK);
     __aicore__ inline int32_t GetS2SparseLen(int32_t bIdx, int32_t s1Idx, int32_t actualSeqLensQ,
                                              int32_t actualSeqLensK, int64_t cmpRatio, SLISparseMode sparseMode);
     __aicore__ inline int64_t GetInvalidS1Size(int64_t bIdx, int64_t actualSeqLensQ, int64_t actualSeqLensK);
     __aicore__ inline void ResetValidIdxMap();
-    __aicore__ inline void LoadAllocatedAndUsedSeqLens(int64_t bIdx, int64_t &accumS1, int64_t &accumS2, int32_t &usedQ,
-                                                       int32_t &usedK);
+    __aicore__ inline void LoadAllocatedAndUsedSeqLens(int64_t bIdx, int64_t& accumS1, int64_t& accumS2, int32_t& usedQ,
+                                                       int32_t& usedK);
     __aicore__ inline bool LoadValidBatchAt(int64_t curB);
-    __aicore__ inline bool MapValidIdxToBS1(int64_t validIdx, int64_t &bIdx, int64_t &s1Idx, int64_t &accumS1Len,
-                                            int64_t &accumS2Len, int32_t &actualSeqLensQ, int32_t &actualSeqLensK);
-    __aicore__ inline void GetRunInfo(int64_t taskId, int64_t bIdx, int64_t s1Idx, SLIKLLossGradRunInfo &runInfo,
+    __aicore__ inline bool MapValidIdxToBS1(int64_t validIdx, int64_t& bIdx, int64_t& s1Idx, int64_t& accumS1Len,
+                                            int64_t& accumS2Len, int32_t& actualSeqLensQ, int32_t& actualSeqLensK);
+    __aicore__ inline void GetRunInfo(int64_t taskId, int64_t bIdx, int64_t s1Idx, SLIKLLossGradRunInfo& runInfo,
                                       int64_t accumS1Len, int64_t accumS2Len, int32_t actualSeqLensQ,
                                       int32_t actualSeqLensK);
-    __aicore__ inline void Vector2ScatterAdd(int32_t vRealKSize, GlobalTensor<MM5_OUT_T> &srcGm, int64_t coreKOffset,
-                                             SLIKLLossGradRunInfo &runInfo, GlobalTensor<T> &scatterAddGm);
+    __aicore__ inline void Vector2ScatterAdd(int32_t vRealKSize, GlobalTensor<MM5_OUT_T>& srcGm, int64_t coreKOffset,
+                                             SLIKLLossGradRunInfo& runInfo, GlobalTensor<T>& scatterAddGm);
     __aicore__ inline int64_t GetMetadataTotalSize();
     __aicore__ inline int64_t GetMetadataBS1Index(uint32_t coreIdx);
 
     // =============== vector common variable ==============
     SLIKLLossGradConstInfo constInfo;
-    const optiling::SparseLightningIndexerKLLossGradTilingData *__restrict tilingData;
+    const optiling::SparseLightningIndexerKLLossGradTilingData* __restrict tilingData;
     bool hasMetadata = false;
     GlobalTensor<int32_t> metadataGm;
     GlobalTensor<int32_t> cmpResidualKeyGm;
@@ -328,8 +328,8 @@ private:
 
 template <typename SLIT>
 __aicore__ inline void SLIKLLossVectorService<SLIT>::InitParams(
-    const SLIKLLossGradConstInfo &vecConstInfo,
-    const optiling::SparseLightningIndexerKLLossGradTilingData *__restrict tilingData, GlobalTensor<int32_t> metadataGm,
+    const SLIKLLossGradConstInfo& vecConstInfo,
+    const optiling::SparseLightningIndexerKLLossGradTilingData* __restrict tilingData, GlobalTensor<int32_t> metadataGm,
     GlobalTensor<int32_t> cmpResidualKeyGm, bool hasMetadata)
 {
     this->constInfo = vecConstInfo;
@@ -340,8 +340,8 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::InitParams(
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::InitSeqUsedGM(GlobalTensor<int32_t> &seqUsedQ,
-                                                                   GlobalTensor<int32_t> &seqUsedK)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::InitSeqUsedGM(GlobalTensor<int32_t>& seqUsedQ,
+                                                                   GlobalTensor<int32_t>& seqUsedK)
 {
     this->seqUsedQueryGm = seqUsedQ;
     this->seqUsedKeyGm = seqUsedK;
@@ -349,9 +349,9 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::InitSeqUsedGM(GlobalTensor<
 
 template <typename SLIT>
 __aicore__ inline void SLIKLLossVectorService<SLIT>::InitVector0GM(
-    GlobalTensor<KV_T> &key, GlobalTensor<KV_T> &keyRope, GlobalTensor<KV_T> &keyIndex, GlobalTensor<int32_t> &topK,
-    GlobalTensor<int32_t> &actualSeqLengthsQ, GlobalTensor<int32_t> &actualSeqLengthsKV, GlobalTensor<KV_T> &gatherPRes,
-    GlobalTensor<KV_T> &gatherSYRes)
+    GlobalTensor<KV_T>& key, GlobalTensor<KV_T>& keyRope, GlobalTensor<KV_T>& keyIndex, GlobalTensor<int32_t>& topK,
+    GlobalTensor<int32_t>& actualSeqLengthsQ, GlobalTensor<int32_t>& actualSeqLengthsKV, GlobalTensor<KV_T>& gatherPRes,
+    GlobalTensor<KV_T>& gatherSYRes)
 {
     this->keyGm = key;
     this->keyRopeGm = keyRope;
@@ -364,10 +364,10 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::InitVector0GM(
 
 template <typename SLIT>
 __aicore__ inline void SLIKLLossVectorService<SLIT>::InitVector1GM(
-    const GlobalTensor<T> &attnSoftmaxL1Norm, const GlobalTensor<MM12_OUT_T> &bmm2Res, const GlobalTensor<T> &weight,
-    const GlobalTensor<T> psySync, GlobalTensor<T> &softmaxOut, GlobalTensor<T> &dWeight, GlobalTensor<T> &reluGm,
-    GlobalTensor<KV_T> &reluGradRes, GlobalTensor<int32_t> &actualSeqLengthsQueryGm,
-    GlobalTensor<int32_t> &actualSeqLengthsKeyGm)
+    const GlobalTensor<T>& attnSoftmaxL1Norm, const GlobalTensor<MM12_OUT_T>& bmm2Res, const GlobalTensor<T>& weight,
+    const GlobalTensor<T> psySync, GlobalTensor<T>& softmaxOut, GlobalTensor<T>& dWeight, GlobalTensor<T>& reluGm,
+    GlobalTensor<KV_T>& reluGradRes, GlobalTensor<int32_t>& actualSeqLengthsQueryGm,
+    GlobalTensor<int32_t>& actualSeqLengthsKeyGm)
 {
     this->attnSoftmaxL1NormGm = attnSoftmaxL1Norm;
     this->bmm2ResGm = bmm2Res;
@@ -385,7 +385,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::InitVector1GM(
 
 template <typename SLIT>
 __aicore__ inline void SLIKLLossVectorService<SLIT>::InitVector2GM(
-    const GlobalTensor<MM5_OUT_T> &bmm5Res, const GlobalTensor<int32_t> &topK, GlobalTensor<T> &scatterAddRes,
+    const GlobalTensor<MM5_OUT_T>& bmm5Res, const GlobalTensor<int32_t>& topK, GlobalTensor<T>& scatterAddRes,
     scatterAddGmType scatterAddBanks[SLI_DETER_SCATTER_BANK_NUM])
 {
     this->bmm5ResGm = bmm5Res;
@@ -399,7 +399,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::InitVector2GM(
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::InitBuffers(TPipe* pipe)
 {
     // 可选输入的buffer空间，保持和stage1处理的size一致
     pipe->InitBuffer(this->gatherTbuf, ubAllocPolicy.gatherUbSize);
@@ -505,7 +505,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::FreeEventID()
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessVector0(SLIKLLossGradRunInfo &runInfo)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessVector0(SLIKLLossGradRunInfo& runInfo)
 {
     SetFlag<AscendC::HardEvent::MTE3_MTE2>(eventIdVec0Inner2);
     SetFlag<AscendC::HardEvent::MTE3_MTE2>(eventIdVec0Inner3);
@@ -528,10 +528,10 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessVector0(SLIKLLossGra
 
 template <typename SLIT>
 template <bool gatherRope>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::CopyInSingleKv(int64_t &mte2Size, int64_t mte3Size,
+__aicore__ inline void SLIKLLossVectorService<SLIT>::CopyInSingleKv(int64_t& mte2Size, int64_t mte3Size,
                                                                     int64_t mergeMte3Idx, int64_t realS2Idx,
                                                                     int64_t keyBNBOffset, int64_t s2IdLimit,
-                                                                    const SLIKLLossGradRunInfo &runInfo,
+                                                                    const SLIKLLossGradRunInfo& runInfo,
                                                                     GlobalTensor<KV_T> srcTensor,
                                                                     GlobalTensor<KV_T> srcRopeTensor)
 {
@@ -557,7 +557,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::CopyInSingleKv(int64_t &mte
 
 template <typename SLIT>
 __aicore__ inline int64_t SLIKLLossVectorService<SLIT>::GetKeyRopeGmOffset(int64_t realS2Idx,
-                                                                           const SLIKLLossGradRunInfo &runInfo)
+                                                                           const SLIKLLossGradRunInfo& runInfo)
 {
     int64_t tensorBRopeOffset = runInfo.accumS2Idx * gatherParams.dRopeValue;
     int64_t realKeyRopeGmOffset = (tensorBRopeOffset + realS2Idx * gatherParams.dRopeValue) / gatherParams.dRopeValue;
@@ -566,7 +566,7 @@ __aicore__ inline int64_t SLIKLLossVectorService<SLIT>::GetKeyRopeGmOffset(int64
 
 template <typename SLIT>
 __aicore__ inline int64_t SLIKLLossVectorService<SLIT>::GetKeyGmOffset(int64_t realS2Idx,
-                                                                       const SLIKLLossGradRunInfo &runInfo,
+                                                                       const SLIKLLossGradRunInfo& runInfo,
                                                                        int64_t s2IdLimit, int32_t dValue)
 {
     if (realS2Idx < 0 || realS2Idx >= s2IdLimit) {
@@ -579,9 +579,9 @@ __aicore__ inline int64_t SLIKLLossVectorService<SLIT>::GetKeyGmOffset(int64_t r
 
 template <typename SLIT>
 template <bool gatherRope>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::CopyInKv(int64_t &mte2Size, int64_t mte3Size, int64_t mergeMte3Idx,
+__aicore__ inline void SLIKLLossVectorService<SLIT>::CopyInKv(int64_t& mte2Size, int64_t mte3Size, int64_t mergeMte3Idx,
                                                               int64_t realS2Idx1, int64_t realS2Idx2,
-                                                              const SLIKLLossGradRunInfo &runInfo,
+                                                              const SLIKLLossGradRunInfo& runInfo,
                                                               GlobalTensor<KV_T> srcTensor,
                                                               GlobalTensor<KV_T> srcRopeTensor)
 {
@@ -651,7 +651,7 @@ template <typename SLIT>
 template <event_t IdStart, bool gatherRope>
 __aicore__ inline void SLIKLLossVectorService<SLIT>::CopyOutMrgeResult(
     int64_t mte2Size, int64_t mte3Size, int64_t s2GmStartOffset, int64_t s2IdxOffset, int64_t mergeMte3Idx,
-    const SLIKLLossGradRunInfo &runInfo, GlobalTensor<KV_T> kvMergeGm_, GlobalTensor<KV_T> srcTensor,
+    const SLIKLLossGradRunInfo& runInfo, GlobalTensor<KV_T> kvMergeGm_, GlobalTensor<KV_T> srcTensor,
     GlobalTensor<KV_T> srcRopeTensor)
 {
     if (mte2Size <= mte3Size) {
@@ -678,8 +678,8 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::CopyOutMrgeResult(
 
 template <typename SLIT>
 __aicore__ inline void SLIKLLossVectorService<SLIT>::GetRealS2Idx(int64_t s2GmOffset, int64_t s2IdxOffset,
-                                                                  int64_t &realS2Idx,
-                                                                  const SLIKLLossGradRunInfo &runInfo)
+                                                                  int64_t& realS2Idx,
+                                                                  const SLIKLLossGradRunInfo& runInfo)
 {
     int64_t topkGmIdx = (s2GmOffset + s2IdxOffset) / constInfo.sparseBlockSize;
     if (topkGmIdx < 0 || topkGmIdx >= static_cast<int64_t>(runInfo.kRealSize)) {
@@ -693,7 +693,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::GetRealS2Idx(int64_t s2GmOf
 
 template <typename SLIT>
 template <event_t IdStart, bool gatherRope>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::MergeKv(const SLIKLLossGradRunInfo &runInfo,
+__aicore__ inline void SLIKLLossVectorService<SLIT>::MergeKv(const SLIKLLossGradRunInfo& runInfo,
                                                              GlobalTensor<KV_T> kvMergeGm_,
                                                              GlobalTensor<KV_T> srcTensor,
                                                              GlobalTensor<KV_T> srcRopeTensor)
@@ -747,7 +747,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::MergeKv(const SLIKLLossGrad
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessVector1(SLIKLLossGradRunInfo &runInfo)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessVector1(SLIKLLossGradRunInfo& runInfo)
 {
     CrossCoreWaitFlag(SYNC_C1_TO_V1_P_FLAG[runInfo.taskIdMod2]);
     CrossCoreWaitFlag(SYNC_C1_TO_V1_SY_FLAG[runInfo.taskIdMod2]);
@@ -788,9 +788,9 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessVector1(SLIKLLossGra
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::ScatterAddCopyOutSingle(const LocalTensor<MM5_OUT_T> &srcUb,
+__aicore__ inline void SLIKLLossVectorService<SLIT>::ScatterAddCopyOutSingle(const LocalTensor<MM5_OUT_T>& srcUb,
                                                                              int64_t keyBNBOffset,
-                                                                             GlobalTensor<T> &scatterAddGm)
+                                                                             GlobalTensor<T>& scatterAddGm)
 {
     if (keyBNBOffset < 0) {
         return;
@@ -800,7 +800,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::ScatterAddCopyOutSingle(con
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::CopyPFromInput(SLIKLLossGradRunInfo &runInfo)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::CopyPFromInput(SLIKLLossGradRunInfo& runInfo)
 {
     int64_t softmaxOffset = 0;
     if constexpr (LAYOUT_T == SLILayout::BSND) {
@@ -843,8 +843,8 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::CopyPFromInput(SLIKLLossGra
 
 template <typename SLIT>
 __aicore__ inline int32_t SLIKLLossVectorService<SLIT>::GetActualSeqLens(int32_t bIdx, int32_t defaultLens,
-                                                                         GlobalTensor<int32_t> &actualSeqLensGm,
-                                                                         SLILayout layout, int64_t &accumLen)
+                                                                         GlobalTensor<int32_t>& actualSeqLensGm,
+                                                                         SLILayout layout, int64_t& accumLen)
 {
     if (actualSeqLensGm.GetSize() <= 0) {
         return defaultLens;
@@ -860,7 +860,7 @@ __aicore__ inline int32_t SLIKLLossVectorService<SLIT>::GetActualSeqLens(int32_t
 
 template <typename SLIT>
 __aicore__ inline int32_t SLIKLLossVectorService<SLIT>::GetUsedSeqLens(int32_t bIdx, int32_t defaultLens,
-                                                                       GlobalTensor<int32_t> &seqUsedGm)
+                                                                       GlobalTensor<int32_t>& seqUsedGm)
 {
     if (seqUsedGm.GetSize() <= 0) {
         return defaultLens;
@@ -943,9 +943,9 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::ResetValidIdxMap()
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::LoadAllocatedAndUsedSeqLens(int64_t bIdx, int64_t &accumS1,
-                                                                                 int64_t &accumS2, int32_t &usedQ,
-                                                                                 int32_t &usedK)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::LoadAllocatedAndUsedSeqLens(int64_t bIdx, int64_t& accumS1,
+                                                                                 int64_t& accumS2, int32_t& usedQ,
+                                                                                 int32_t& usedK)
 {
     int32_t allocatedQ = constInfo.s1Size;
     int32_t allocatedK = constInfo.s2Size;
@@ -987,9 +987,9 @@ __aicore__ inline bool SLIKLLossVectorService<SLIT>::LoadValidBatchAt(int64_t cu
 }
 
 template <typename SLIT>
-__aicore__ inline bool SLIKLLossVectorService<SLIT>::MapValidIdxToBS1(int64_t validIdx, int64_t &bIdx, int64_t &s1Idx,
-                                                                      int64_t &accumS1Len, int64_t &accumS2Len,
-                                                                      int32_t &actualSeqLensQ, int32_t &actualSeqLensK)
+__aicore__ inline bool SLIKLLossVectorService<SLIT>::MapValidIdxToBS1(int64_t validIdx, int64_t& bIdx, int64_t& s1Idx,
+                                                                      int64_t& accumS1Len, int64_t& accumS2Len,
+                                                                      int32_t& actualSeqLensQ, int32_t& actualSeqLensK)
 {
     if (validIdx < 0) {
         return false;
@@ -1040,7 +1040,7 @@ __aicore__ inline bool SLIKLLossVectorService<SLIT>::MapValidIdxToBS1(int64_t va
 
 template <typename SLIT>
 __aicore__ inline void SLIKLLossVectorService<SLIT>::GetRunInfo(int64_t taskId, int64_t bIdx, int64_t s1Idx,
-                                                                SLIKLLossGradRunInfo &runInfo, int64_t accumS1Len,
+                                                                SLIKLLossGradRunInfo& runInfo, int64_t accumS1Len,
                                                                 int64_t accumS2Len, int32_t actualSeqLensQ,
                                                                 int32_t actualSeqLensK)
 {
@@ -1107,10 +1107,10 @@ __aicore__ inline int64_t SLIKLLossVectorService<SLIT>::GetMetadataBS1Index(uint
 
 template <typename SLIT>
 __aicore__ inline void SLIKLLossVectorService<SLIT>::Vector2ScatterAdd(int32_t vRealKSize,
-                                                                       GlobalTensor<MM5_OUT_T> &srcGm,
+                                                                       GlobalTensor<MM5_OUT_T>& srcGm,
                                                                        int64_t coreKOffset,
-                                                                       SLIKLLossGradRunInfo &runInfo,
-                                                                       GlobalTensor<T> &scatterAddGm)
+                                                                       SLIKLLossGradRunInfo& runInfo,
+                                                                       GlobalTensor<T>& scatterAddGm)
 {
     LocalTensor<MM5_OUT_T> scatterAddTmpUb;
     int32_t kSplitSize = ubAllocPolicy.scatterAddUbSize / (2 * sizeof(T) * constInfo.dSizeQueryIndex);
@@ -1197,7 +1197,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::Vector2ScatterAdd(int32_t v
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessDeterVector2(SLIKLLossGradRunInfo &runInfo)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessDeterVector2(SLIKLLossGradRunInfo& runInfo)
 {
     CrossCoreWaitFlag<2, PIPE_MTE2>(SYNC_C2_TO_V2_SA_FLAG[runInfo.taskIdMod2]);
     CrossCoreSetFlag<0, PIPE_MTE2>(SYNC_V2_TO_V2_DETER_SA_FLAG_MOD0);
@@ -1272,7 +1272,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessDeterVector2(SLIKLLo
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessVector2(SLIKLLossGradRunInfo &runInfo)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessVector2(SLIKLLossGradRunInfo& runInfo)
 {
     CrossCoreWaitFlag(SYNC_C2_TO_V2_SA_FLAG[runInfo.taskIdMod2]);
 
@@ -1378,7 +1378,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessVector2(SLIKLLossGra
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessPrivateScatterVector2(SLIKLLossGradRunInfo &runInfo)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::ProcessPrivateScatterVector2(SLIKLLossGradRunInfo& runInfo)
 {
     CrossCoreWaitFlag<2, PIPE_MTE2>(SYNC_C2_TO_V2_SA_FLAG[runInfo.taskIdMod2]);
     if (!runInfo.isValid) {
@@ -1553,7 +1553,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::VectorPWithOutSoftMaxSum(SL
 #endif
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::PreloadWeight(SLIKLLossGradRunInfo &runInfo)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::PreloadWeight(SLIKLLossGradRunInfo& runInfo)
 {
     int64_t weightOffset = 0;
     if constexpr (LAYOUT_T == SLILayout::BSND) {
@@ -1575,7 +1575,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::PreloadWeight(SLIKLLossGrad
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::VectorSy(SLIKLLossGradRunInfo &runInfo)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::VectorSy(SLIKLLossGradRunInfo& runInfo)
 {
     {
         // weight UB cast To weight.GetValue and release eventID
@@ -1673,7 +1673,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::VectorSy(SLIKLLossGradRunIn
 
 template <typename SLIT>
 __aicore__ inline bool SLIKLLossVectorService<SLIT>::ShouldEnableSyLoadBalance(
-    const SLIKLLossGradRunInfo &runInfo) const
+    const SLIKLLossGradRunInfo& runInfo) const
 {
     int64_t gSize = static_cast<int64_t>(constInfo.gSizeQueryIndex);
     if (gSize < SY_LB_MIN_G_SIZE) {
@@ -1686,7 +1686,7 @@ __aicore__ inline bool SLIKLLossVectorService<SLIT>::ShouldEnableSyLoadBalance(
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::VectorSyLoadBalance(SLIKLLossGradRunInfo &runInfo)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::VectorSyLoadBalance(SLIKLLossGradRunInfo& runInfo)
 {
     event_t eventIdVToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_S));
     AscendC::SetFlag<AscendC::HardEvent::V_S>(eventIdVToS);
@@ -1781,7 +1781,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::VectorSyLoadBalance(SLIKLLo
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::FinalizeVectorSy(SLIKLLossGradRunInfo &runInfo)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::FinalizeVectorSy(SLIKLLossGradRunInfo& runInfo)
 {
     int64_t realKSize = runInfo.s2RealSize;
     int64_t realKSizeAlign = CeilDiv(realKSize, 8) * 8;
@@ -1812,8 +1812,8 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::FinalizeVectorSy(SLIKLLossG
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::ReLUGrad(LocalTensor<KV_T> &reluGradOutTensor,
-                                                              LocalTensor<T> &subResTensor, LocalTensor<T> &maskUb,
+__aicore__ inline void SLIKLLossVectorService<SLIT>::ReLUGrad(LocalTensor<KV_T>& reluGradOutTensor,
+                                                              LocalTensor<T>& subResTensor, LocalTensor<T>& maskUb,
                                                               int32_t kRealSizeAlign)
 {
     // 根据mask选择subResTensor中可用数据
@@ -1825,7 +1825,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::ReLUGrad(LocalTensor<KV_T> 
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::VectorDwDqDkLess2k(SLIKLLossGradRunInfo &runInfo)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::VectorDwDqDkLess2k(SLIKLLossGradRunInfo& runInfo)
 {
     LocalTensor<T> reluResUb[2] = {pingBuf, pongBuf};
     LocalTensor<T> mulLeftUb[2] = {pingBuf, pongBuf};
@@ -1861,7 +1861,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::VectorDwDqDkLess2k(SLIKLLos
         reduceSumPUbSingleK = mm2TBuf.template Get<T>()[6144];
         reduceSumYUbSingleK = resPSYTBuf.Get<T>();
         WaitFlag<HardEvent::V_MTE2>(eventIdVToMte24SY);
-        GlobalTensor<T> &pOwnerSyncGm = runInfo.calcP ? psySyncGm : psySyncOtherGm;
+        GlobalTensor<T>& pOwnerSyncGm = runInfo.calcP ? psySyncGm : psySyncOtherGm;
         CopyPsyKPad(reduceSumPUbSingleK, pOwnerSyncGm, kRealSize, kRealSizeAlign16);
         if (runInfo.calcP) {
             CopyPsyKPad(reduceSumYUbSingleK, psySyncOtherGm[constInfo.kAlign16], kRealSize, kRealSizeAlign16);
@@ -1998,7 +1998,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::VectorDwDqDkLess2k(SLIKLLos
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::VectorDwDqDkMoreThan2k(SLIKLLossGradRunInfo &runInfo,
+__aicore__ inline void SLIKLLossVectorService<SLIT>::VectorDwDqDkMoreThan2k(SLIKLLossGradRunInfo& runInfo,
                                                                             int32_t kLoopIdx)
 {
     LocalTensor<T> reluResUb[2] = {pingBuf, pongBuf};
@@ -2036,7 +2036,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::VectorDwDqDkMoreThan2k(SLIK
         reduceSumPUbSingleK = mm2TBuf.template Get<T>()[6144];
         reduceSumYUbSingleK = resPSYTBuf.Get<T>()[kLoopOffset];
         WaitFlag<HardEvent::V_MTE2>(eventIdVToMte24SY);
-        GlobalTensor<T> &pOwnerSyncGm = runInfo.calcP ? psySyncGm : psySyncOtherGm;
+        GlobalTensor<T>& pOwnerSyncGm = runInfo.calcP ? psySyncGm : psySyncOtherGm;
         CopyPsyKPad(reduceSumPUbSingleK, pOwnerSyncGm[kLoopOffset], kRealSize, kRealSizeAlign16);
         if (runInfo.calcP) {
             CopyPsyKPad(reduceSumYUbSingleK, psySyncOtherGm[constInfo.kAlign16 + kLoopOffset], kRealSize,
@@ -2205,8 +2205,8 @@ __aicore__ inline int64_t SLIKLLossVectorService<SLIT>::GetNSplitSize() const
 
 template <typename SLIT>
 template <typename DT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::CopyRowsGmToUb(const LocalTensor<DT> &dstUb,
-                                                                    const GlobalTensor<DT> &srcGm, uint16_t nRows,
+__aicore__ inline void SLIKLLossVectorService<SLIT>::CopyRowsGmToUb(const LocalTensor<DT>& dstUb,
+                                                                    const GlobalTensor<DT>& srcGm, uint16_t nRows,
                                                                     int32_t validLen, int32_t gmStride,
                                                                     int32_t ubStride)
 {
@@ -2234,8 +2234,8 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::CopyRowsGmToUb(const LocalT
 
 template <typename SLIT>
 template <typename DT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::CopyRowsUbToGm(const GlobalTensor<DT> &dstGm,
-                                                                    const LocalTensor<DT> &srcUb, uint16_t nRows,
+__aicore__ inline void SLIKLLossVectorService<SLIT>::CopyRowsUbToGm(const GlobalTensor<DT>& dstGm,
+                                                                    const LocalTensor<DT>& srcUb, uint16_t nRows,
                                                                     int32_t validLen, int32_t gmStride,
                                                                     int32_t ubStride)
 {
@@ -2318,8 +2318,8 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::SoftmaxInplaceRealK(int32_t
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::CopyPsyKPad(const LocalTensor<T> &dstUb,
-                                                                 const GlobalTensor<T> &srcGm, int32_t kRealSize,
+__aicore__ inline void SLIKLLossVectorService<SLIT>::CopyPsyKPad(const LocalTensor<T>& dstUb,
+                                                                 const GlobalTensor<T>& srcGm, int32_t kRealSize,
                                                                  int32_t kRealSizeAlign16)
 {
     if (kRealSize <= 0) {
@@ -2358,7 +2358,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::CopySoftmaxOutTailZeros(int
 
 template <typename SLIT>
 template <typename CLEAR_T>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::ZeroOutputGm(GlobalTensor<CLEAR_T> &dst, int64_t offset,
+__aicore__ inline void SLIKLLossVectorService<SLIT>::ZeroOutputGm(GlobalTensor<CLEAR_T>& dst, int64_t offset,
                                                                   int64_t count)
 {
     if (count <= 0) {
@@ -2387,7 +2387,7 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::ZeroOutputGm(GlobalTensor<C
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::VectorDwDqDk(SLIKLLossGradRunInfo &runInfo, int32_t kLoopIdx)
+__aicore__ inline void SLIKLLossVectorService<SLIT>::VectorDwDqDk(SLIKLLossGradRunInfo& runInfo, int32_t kLoopIdx)
 {
     if constexpr (isTopkLess2k) {
         VectorDwDqDkLess2k(runInfo);

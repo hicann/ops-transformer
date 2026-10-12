@@ -17,13 +17,13 @@
 namespace optiling {
 namespace {
 using sparse_mla_checker::CheckContext;
-CheckContext BuildContext(const QSMLATilingInfo &info)
+CheckContext BuildContext(const QSMLATilingInfo& info)
 {
     CheckContext context;
     sparse_mla_checker::PopulateCommonContext(context, info);
     context.variant = sparse_mla_checker::OperatorVariant::QUANT;
 
-    const auto &param = info.opParamInfo;
+    const auto& param = info.opParamInfo;
     context.qDescale = sparse_mla_checker::MakeOptionalTensor(param.qDescale);
     context.oriKvDescale = sparse_mla_checker::MakeOptionalTensor(param.oriKvDescale);
     context.cmpKvDescale = sparse_mla_checker::MakeOptionalTensor(param.cmpKvDescale);

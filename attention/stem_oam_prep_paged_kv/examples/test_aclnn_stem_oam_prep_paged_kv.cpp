@@ -30,7 +30,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -39,7 +39,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -51,8 +51,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor, aclFormat format)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor, aclFormat format)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -85,7 +85,7 @@ int main()
     int64_t stemStride = 16;
     int64_t maxKb = 2;
     int64_t kflatDim = stemStride * dimQk;
-    char *kvLayout = "BNBD";
+    char* kvLayout = "BNBD";
 
     std::vector<int64_t> kCacheShape = {totalBlocks, numKvHeads, 64, dimQk};
     std::vector<int64_t> kvIndicesShape = {batch, maxKvBlocks};
@@ -94,22 +94,22 @@ int main()
     std::vector<int64_t> kFlatShape = {batch, numKvHeads, maxKb, kflatDim};
     std::vector<int64_t> vBiasShape = {batch, numKvHeads, maxKb};
 
-    void *kCacheDeviceAddr = nullptr;
-    void *vCacheDeviceAddr = nullptr;
-    void *kvIndicesDeviceAddr = nullptr;
-    void *kScaleCacheDeviceAddr = nullptr;
-    void *vScaleDeviceAddr = nullptr;
-    void *kFlatDeviceAddr = nullptr;
-    void *vBiasDeviceAddr = nullptr;
+    void* kCacheDeviceAddr = nullptr;
+    void* vCacheDeviceAddr = nullptr;
+    void* kvIndicesDeviceAddr = nullptr;
+    void* kScaleCacheDeviceAddr = nullptr;
+    void* vScaleDeviceAddr = nullptr;
+    void* kFlatDeviceAddr = nullptr;
+    void* vBiasDeviceAddr = nullptr;
 
-    aclTensor *kCache = nullptr;
-    aclTensor *vCache = nullptr;
-    aclTensor *kvIndices = nullptr;
-    aclIntArray *kvSeqLens = nullptr;
-    aclTensor *kScaleCache = nullptr;
-    aclTensor *vScale = nullptr;
-    aclTensor *kFlat = nullptr;
-    aclTensor *vBias = nullptr;
+    aclTensor* kCache = nullptr;
+    aclTensor* vCache = nullptr;
+    aclTensor* kvIndices = nullptr;
+    aclIntArray* kvSeqLens = nullptr;
+    aclTensor* kScaleCache = nullptr;
+    aclTensor* vScale = nullptr;
+    aclTensor* kFlat = nullptr;
+    aclTensor* vBias = nullptr;
 
     std::vector<uint8_t> hostKCache(GetShapeSize(kCacheShape), 1);
     std::vector<uint8_t> hostVCache(GetShapeSize(kCacheShape), 1);
@@ -144,13 +144,13 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     ret = aclnnStemOamPrepPagedKvGetWorkspaceSize(kCache, vCache, kvIndices, kvSeqLens, kScaleCache, vScale, 0.3,
                                                   kvLayout, stemBlockSize, stemStride, kFlat, vBias, &workspaceSize,
                                                   &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
 
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

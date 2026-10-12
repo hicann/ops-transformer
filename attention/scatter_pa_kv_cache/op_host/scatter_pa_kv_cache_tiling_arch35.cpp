@@ -1113,7 +1113,7 @@ ge::graphStatus ScatterPaKvCacheTiling::GetTemplateType(int64_t inputKeyDimNum)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ScatterPaKvCacheTiling::GetContiguousTensorInfo(gert::Shape &shape, gert::Stride &stride, size_t idx)
+ge::graphStatus ScatterPaKvCacheTiling::GetContiguousTensorInfo(gert::Shape& shape, gert::Stride& stride, size_t idx)
 {
     auto xStorageShape = context_->GetInputShape(idx);
     OP_CHECK_NULL_WITH_CONTEXT(context_, xStorageShape);
@@ -1128,11 +1128,11 @@ ge::graphStatus ScatterPaKvCacheTiling::GetContiguousTensorInfo(gert::Shape &sha
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ScatterPaKvCacheTiling::GetTensorInfo(gert::Shape &shape, gert::Stride &stride, size_t idx)
+ge::graphStatus ScatterPaKvCacheTiling::GetTensorInfo(gert::Shape& shape, gert::Stride& stride, size_t idx)
 {
     bool isView = context_->InputIsView(idx);
     if (isView) {
-        auto *inputStride = context_->GetInputStride(idx);
+        auto* inputStride = context_->GetInputStride(idx);
         if (inputStride == nullptr || inputStride->GetDimNum() == 0) {
             return GetContiguousTensorInfo(shape, stride, idx);
         } else {
@@ -1145,7 +1145,7 @@ ge::graphStatus ScatterPaKvCacheTiling::GetTensorInfo(gert::Shape &shape, gert::
     return ge::GRAPH_SUCCESS;
 }
 
-bool ScatterPaKvCacheTiling::IsAxesContiguous(const gert::Stride &stride, const gert::Shape &shape, int64_t startAxis,
+bool ScatterPaKvCacheTiling::IsAxesContiguous(const gert::Stride& stride, const gert::Shape& shape, int64_t startAxis,
                                               int64_t endAxis)
 {
     if (startAxis < 0 || endAxis < 0 || startAxis >= endAxis) {
@@ -1170,7 +1170,7 @@ bool ScatterPaKvCacheTiling::IsAxesContiguous(const gert::Stride &stride, const 
     return true;
 }
 
-bool ScatterPaKvCacheTiling::IsLastAxisContiguous(const gert::Stride &stride, const gert::Shape &shape)
+bool ScatterPaKvCacheTiling::IsLastAxisContiguous(const gert::Stride& stride, const gert::Shape& shape)
 {
     int64_t dimNum = static_cast<int64_t>(shape.GetDimNum());
     if (dimNum < 1) {
@@ -1496,7 +1496,7 @@ void ScatterPaKvCacheTiling::DumpTilingInfo()
     OP_LOGI(context_->GetNodeName(), "%s", info.c_str());
 }
 
-ge::graphStatus Tiling4ScatterPaKvCache(gert::TilingContext *context_)
+ge::graphStatus Tiling4ScatterPaKvCache(gert::TilingContext* context_)
 {
     if (!Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_)) {
         ScatterPaKvCacheMembaseTiling tiling(context_);
@@ -1507,13 +1507,13 @@ ge::graphStatus Tiling4ScatterPaKvCache(gert::TilingContext *context_)
     return tiling.DoTiling();
 }
 
-ge::graphStatus Tiling4ScatterPaCache(gert::TilingContext *context_)
+ge::graphStatus Tiling4ScatterPaCache(gert::TilingContext* context_)
 {
     ScatterPaKvCacheTiling tiling(context_, SINGLE_IN_OUT);
     return tiling.DoTiling();
 }
 
-ge::graphStatus TilingPrepare4ScatterPaKvCache(gert::TilingParseContext *context_)
+ge::graphStatus TilingPrepare4ScatterPaKvCache(gert::TilingParseContext* context_)
 {
     return ge::GRAPH_SUCCESS;
 }

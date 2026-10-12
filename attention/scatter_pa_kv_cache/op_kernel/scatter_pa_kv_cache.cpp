@@ -67,11 +67,13 @@ extern "C" __global__ __aicore__ void scatter_pa_kv_cache(GM_ADDR key, GM_ADDR k
     }
     // nz
     else if (TILING_KEY_IS(NZ_FULLY_LOAD)) {
-        ScatterPaKvCache::ScatterPaKvCacheNormalNzFullyLoad<DTYPE_KEY, DTYPE_VALUE, DTYPE_SLOT_MAPPING> op(&pipe, &tilingData);
+        ScatterPaKvCache::ScatterPaKvCacheNormalNzFullyLoad<DTYPE_KEY, DTYPE_VALUE, DTYPE_SLOT_MAPPING> op(&pipe,
+                                                                                                           &tilingData);
         op.Init(key, slot_mapping, value, key_cache_out, value_cache_out);
         op.Process();
     } else if (TILING_KEY_IS(NZ_NOT_FULLY_LOAD)) {
-        ScatterPaKvCache::ScatterPaKvCacheNormalNzNotFullyLoad<DTYPE_KEY, DTYPE_VALUE, DTYPE_SLOT_MAPPING> op(&pipe, &tilingData);
+        ScatterPaKvCache::ScatterPaKvCacheNormalNzNotFullyLoad<DTYPE_KEY, DTYPE_VALUE, DTYPE_SLOT_MAPPING> op(
+            &pipe, &tilingData);
         op.Init(key, slot_mapping, value, key_cache_out, value_cache_out);
         op.Process();
     }
@@ -114,11 +116,13 @@ extern "C" __global__ __aicore__ void scatter_pa_kv_cache(GM_ADDR key, GM_ADDR k
     }
     // norm_nct
     else if TILING_KEY_IS (NORM_NCT_FULLY_LOAD) {
-        ScatterPaKvCache::ScatterPaKvCacheNormal<DTYPE_KEY, DTYPE_VALUE, DTYPE_SLOT_MAPPING, true> op(&pipe, &tilingData);
+        ScatterPaKvCache::ScatterPaKvCacheNormal<DTYPE_KEY, DTYPE_VALUE, DTYPE_SLOT_MAPPING, true> op(&pipe,
+                                                                                                      &tilingData);
         op.Init(key, value, slot_mapping, key_cache_out, value_cache_out);
         op.ProcessFullyLoad();
     } else if TILING_KEY_IS (NORM_NCT_NOT_FULLY_LOAD) {
-        ScatterPaKvCache::ScatterPaKvCacheNormal<DTYPE_KEY, DTYPE_VALUE, DTYPE_SLOT_MAPPING, true> op(&pipe, &tilingData);
+        ScatterPaKvCache::ScatterPaKvCacheNormal<DTYPE_KEY, DTYPE_VALUE, DTYPE_SLOT_MAPPING, true> op(&pipe,
+                                                                                                      &tilingData);
         op.Init(key, value, slot_mapping, key_cache_out, value_cache_out);
         op.Process();
     }

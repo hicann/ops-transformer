@@ -20,16 +20,16 @@ extern "C" {
 namespace {
 
 extern aclnnStatus aclnnInnerSparseFlashAttentionGradGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *sparseIndices, const aclTensor *dOut,
-    const aclTensor *out, const aclTensor *softmaxMax, const aclTensor *softmaxSum, const aclTensor *sinksOptional,
-    const aclTensor *valueOptional, const aclTensor *actualSeqLengthsQueryOptional,
-    const aclTensor *actualSeqLengthsKvOptional, const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional,
-    double scaleValue, int64_t sparseBlockSize, char *layoutOptional, int64_t sparseMode, int64_t preTokens,
-    int64_t nextTokens, bool deterministic, const aclTensor *dQueryOut, const aclTensor *dKeyOut,
-    const aclTensor *dValueOutOptional, const aclTensor *dQueryRopeOutOptional, const aclTensor *dKeyRopeOutOptional,
-    const aclTensor *dSinksOptional, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* query, const aclTensor* key, const aclTensor* sparseIndices, const aclTensor* dOut,
+    const aclTensor* out, const aclTensor* softmaxMax, const aclTensor* softmaxSum, const aclTensor* sinksOptional,
+    const aclTensor* valueOptional, const aclTensor* actualSeqLengthsQueryOptional,
+    const aclTensor* actualSeqLengthsKvOptional, const aclTensor* queryRopeOptional, const aclTensor* keyRopeOptional,
+    double scaleValue, int64_t sparseBlockSize, char* layoutOptional, int64_t sparseMode, int64_t preTokens,
+    int64_t nextTokens, bool deterministic, const aclTensor* dQueryOut, const aclTensor* dKeyOut,
+    const aclTensor* dValueOutOptional, const aclTensor* dQueryRopeOutOptional, const aclTensor* dKeyRopeOutOptional,
+    const aclTensor* dSinksOptional, uint64_t* workspaceSize, aclOpExecutor** executor);
 
-extern aclnnStatus aclnnInnerSparseFlashAttentionGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern aclnnStatus aclnnInnerSparseFlashAttentionGrad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                       aclrtStream stream);
 
 // V2 接口：sinks 传了则必须给 dSinks 输出（传了 sinks 却无 dSinks 会拒绝）；
@@ -37,16 +37,16 @@ extern aclnnStatus aclnnInnerSparseFlashAttentionGrad(void *workspace, uint64_t 
 // 位置参数顺序与 V1 签名完全一致，仅在 softmaxSum 后插 sinks、dKeyRopeOutOptional 后插
 // dSinksOptional，复用同一 OpDef 与同一 inner aclnn。
 aclnnStatus aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *sparseIndices,
-    const aclTensor *dOut, const aclTensor *out, const aclTensor *softmaxMax, const aclTensor *softmaxSum,
-    const aclTensor *sinks, // oss-sink 输入 [N1] FP32，OPTIONAL；传了则必须给 dSinks
-    const aclTensor *actualSeqLengthsQueryOptional, const aclTensor *actualSeqLengthsKvOptional,
-    const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional, double scaleValue, int64_t sparseBlockSize,
-    char *layoutOptional, int64_t sparseMode, int64_t preTokens, int64_t nextTokens, bool deterministic,
-    const aclTensor *dQueryOut, const aclTensor *dKeyOut, const aclTensor *dValueOut,
-    const aclTensor *dQueryRopeOutOptional, const aclTensor *dKeyRopeOutOptional,
-    const aclTensor *dSinksOptional, // sink 梯度 [N1] FP32，OPTIONAL；sinks 为空时可空占位
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* sparseIndices,
+    const aclTensor* dOut, const aclTensor* out, const aclTensor* softmaxMax, const aclTensor* softmaxSum,
+    const aclTensor* sinks, // oss-sink 输入 [N1] FP32，OPTIONAL；传了则必须给 dSinks
+    const aclTensor* actualSeqLengthsQueryOptional, const aclTensor* actualSeqLengthsKvOptional,
+    const aclTensor* queryRopeOptional, const aclTensor* keyRopeOptional, double scaleValue, int64_t sparseBlockSize,
+    char* layoutOptional, int64_t sparseMode, int64_t preTokens, int64_t nextTokens, bool deterministic,
+    const aclTensor* dQueryOut, const aclTensor* dKeyOut, const aclTensor* dValueOut,
+    const aclTensor* dQueryRopeOutOptional, const aclTensor* dKeyRopeOutOptional,
+    const aclTensor* dSinksOptional, // sink 梯度 [N1] FP32，OPTIONAL；sinks 为空时可空占位
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     // 不强制 sinks/dSinks 严格成对：host tiling 已把 nullptr/空 shape 的 sinks
     // 统一识别为 hasSinks=false（sparse_flash_attention_grad_tiling_bs1_regbase.cpp），此时内核
@@ -69,7 +69,7 @@ aclnnStatus aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
         dKeyRopeOutOptional, dSinksOptional, workspaceSize, executor);
 }
 
-aclnnStatus aclnnSparseFlashAttentionGradV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnSparseFlashAttentionGradV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                             aclrtStream stream)
 {
     return aclnnInnerSparseFlashAttentionGrad(workspace, workspaceSize, executor, stream);

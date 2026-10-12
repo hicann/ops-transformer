@@ -15,14 +15,14 @@ namespace optiling {
 namespace sparse_mla_checker {
 constexpr int64_t TURBO_QUANT_MODE = 3;
 namespace {
-const char *Op(const CheckContext &context)
+const char* Op(const CheckContext& context)
 {
     return context.opName == nullptr ? "SparseMla" : context.opName;
 }
 } // namespace
 
-ge::graphStatus SeqLenChecker::CheckLengthTensor(const CheckContext &context, const TensorParam &param,
-                                                 const char *name) const
+ge::graphStatus SeqLenChecker::CheckLengthTensor(const CheckContext& context, const TensorParam& param,
+                                                 const char* name) const
 {
     if (!param.present) {
         return ge::GRAPH_SUCCESS;
@@ -35,7 +35,7 @@ ge::graphStatus SeqLenChecker::CheckLengthTensor(const CheckContext &context, co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSinglePara(const CheckContext &context) const
+ge::graphStatus SeqLenChecker::CheckSinglePara(const CheckContext& context) const
 {
     if (CheckLengthTensor(context, context.cuSeqlensQ, "cu_seqlens_q") != ge::GRAPH_SUCCESS ||
         CheckLengthTensor(context, context.cuSeqlensOriKv, "cu_seqlens_ori_kv") != ge::GRAPH_SUCCESS ||
@@ -49,7 +49,7 @@ ge::graphStatus SeqLenChecker::CheckSinglePara(const CheckContext &context) cons
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckParaExistence(const CheckContext &context) const
+ge::graphStatus SeqLenChecker::CheckParaExistence(const CheckContext& context) const
 {
     if (context.variant == OperatorVariant::MIXED_QUANT && context.quantMode == TURBO_QUANT_MODE) {
         OP_CHECK_IF(!context.cuSeqlensQ.present || !context.sequsedOriKv.present,
@@ -109,7 +109,7 @@ ge::graphStatus SeqLenChecker::CheckParaExistence(const CheckContext &context) c
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckLength(const CheckContext &context, const TensorParam &param, const char *name,
+ge::graphStatus SeqLenChecker::CheckLength(const CheckContext& context, const TensorParam& param, const char* name,
                                            int64_t expected) const
 {
     if (!param.present) {
@@ -122,7 +122,7 @@ ge::graphStatus SeqLenChecker::CheckLength(const CheckContext &context, const Te
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckMultiPara(const CheckContext &context) const
+ge::graphStatus SeqLenChecker::CheckMultiPara(const CheckContext& context) const
 {
     const int64_t batch = context.bSize;
     OP_CHECK_IF(batch <= 0,

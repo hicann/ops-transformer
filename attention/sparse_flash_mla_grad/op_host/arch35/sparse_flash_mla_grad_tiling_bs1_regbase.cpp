@@ -31,7 +31,7 @@ constexpr uint32_t DROPE_SIZE = 64;
 constexpr uint32_t SELECTED_BLOCK_SIZE = 1;
 static const std::string METADATA_NAME = "metadata";
 
-ge::graphStatus CheckAttentionInShape(gert::TilingContext *context)
+ge::graphStatus CheckAttentionInShape(gert::TilingContext* context)
 {
     auto attentionInShape = context->GetInputShape(static_cast<size_t>(InputIndex::ATTENTION_OUT));
     if (attentionInShape == nullptr) {
@@ -91,7 +91,7 @@ ge::graphStatus CheckAttentionInShape(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckAttentionInDtype(gert::TilingContext *context)
+ge::graphStatus CheckAttentionInDtype(gert::TilingContext* context)
 {
     auto query = context->GetInputDesc(static_cast<size_t>(InputIndex::QUERY));
     auto attentionIn = context->GetInputDesc(static_cast<size_t>(InputIndex::ATTENTION_OUT));
@@ -110,7 +110,7 @@ ge::graphStatus CheckAttentionInDtype(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckTndShapeValid(gert::TilingContext *context, int64_t t1, int64_t n1, int64_t d, int64_t d2,
+ge::graphStatus CheckTndShapeValid(gert::TilingContext* context, int64_t t1, int64_t n1, int64_t d, int64_t d2,
                                    int64_t n2)
 {
     if (context == nullptr) {
@@ -133,7 +133,7 @@ ge::graphStatus CheckTndShapeValid(gert::TilingContext *context, int64_t t1, int
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckDtypeValid(gert::TilingContext *context)
+ge::graphStatus CheckDtypeValid(gert::TilingContext* context)
 {
     if (context == nullptr) {
         OP_LOGE(context, "context is nullptr");
@@ -148,7 +148,7 @@ ge::graphStatus CheckDtypeValid(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-bool IsSameShape(const gert::StorageShape *aShape, const gert::StorageShape *bShape)
+bool IsSameShape(const gert::StorageShape* aShape, const gert::StorageShape* bShape)
 {
     OP_CHECK_IF((aShape == nullptr) || (bShape == nullptr), OP_LOGW("aShape or bShape is nullptr."), return false);
     uint32_t dimSizeA = aShape->GetStorageShape().GetDimNum();
@@ -194,7 +194,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetPlatformInfo()
     auto platformInfoPtr = context_->GetPlatformInfo();
     uint64_t l2CacheSize;
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const SparseFlashMlaGradCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const SparseFlashMlaGradCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OPS_REPORT_VECTOR_INNER_ERR(opName, "compile_info is null."),
                     return ge::GRAPH_FAILED);
         aicoreParams_.numBlocks = compileInfoPtr->aivNum;
@@ -300,7 +300,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetWorkspaceSize()
     int64_t doriVWorkspaceLen = tmpData.doriVWorkspaceLen;
     int64_t dcmpVWorkspaceLen = tmpData.dcmpVWorkspaceLen;
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = sysLen;
     workspaces[0] += selectedKWorkspaceLen * coreNum;
     workspaces[0] += (mm4WorkspaceLen + mm5WorkspaceLen + dSinkWorkspaceLen) * coreNum;
@@ -652,10 +652,10 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::DoCastTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::CheckOutShapeInfo(const gert::Shape &inputshape,
-                                                                      const char *inputName,
-                                                                      const gert::Shape &outputshape,
-                                                                      const char *inputLayout)
+ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::CheckOutShapeInfo(const gert::Shape& inputshape,
+                                                                      const char* inputName,
+                                                                      const gert::Shape& outputshape,
+                                                                      const char* inputLayout)
 {
     if (strcmp(inputLayout, TND_STR) == 0) {
         if (inputshape.GetDim(DIM_0) != outputshape.GetDim(DIM_0) ||
@@ -711,21 +711,21 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
                 OPS_REPORT_VECTOR_INNER_ERR(opName, "InputShape of q is nullptr."), return ge::GRAPH_FAILED);
 
     // attrs
-    const char *layoutQ = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_Q));
-    const char *layoutKV = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_KV));
+    const char* layoutQ = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_Q));
+    const char* layoutKV = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_KV));
 
     // input
-    const gert::Shape &qShape = context_->GetInputShape(static_cast<size_t>(InputIndex::QUERY))->GetStorageShape();
-    const gert::Shape &dqueryShape = context_->GetOutputShape(static_cast<size_t>(OutputIndex::DQ))->GetStorageShape();
-    const gert::Shape &doriKVShape =
+    const gert::Shape& qShape = context_->GetInputShape(static_cast<size_t>(InputIndex::QUERY))->GetStorageShape();
+    const gert::Shape& dqueryShape = context_->GetOutputShape(static_cast<size_t>(OutputIndex::DQ))->GetStorageShape();
+    const gert::Shape& doriKVShape =
         context_->GetOutputShape(static_cast<size_t>(OutputIndex::DORI_KV))->GetStorageShape();
-    const gert::Shape &dcmpKVShape =
+    const gert::Shape& dcmpKVShape =
         context_->GetOutputShape(static_cast<size_t>(OutputIndex::DCMP_KV))->GetStorageShape();
-    const gert::Shape &dsinksShape =
+    const gert::Shape& dsinksShape =
         context_->GetOutputShape(static_cast<size_t>(OutputIndex::DSINKS))->GetStorageShape();
-    const gert::Shape &oriSoftmaxL1Shape =
+    const gert::Shape& oriSoftmaxL1Shape =
         context_->GetOutputShape(static_cast<size_t>(OutputIndex::ORI_SOFTMAX_L1_NORM))->GetStorageShape();
-    const gert::Shape &cmpSoftmaxL1Shape =
+    const gert::Shape& cmpSoftmaxL1Shape =
         context_->GetOutputShape(static_cast<size_t>(OutputIndex::CMP_SOFTMAX_L1_NORM))->GetStorageShape();
     uint32_t dimSize = qShape.GetDimNum();
     int64_t dimDq = qShape.GetDim(dimSize - 1);
@@ -743,7 +743,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     auto oriKV = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::ORI_KV));
     if (oriKV != nullptr) {
         tmpData.oriKV = true;
-        const gert::Shape &oriKVShape = oriKV->GetStorageShape();
+        const gert::Shape& oriKVShape = oriKV->GetStorageShape();
         status = CheckOutShapeInfo(oriKVShape, "ori_kv", doriKVShape, layoutKV);
         if (status == ge::GRAPH_FAILED) {
             return ge::GRAPH_FAILED;
@@ -772,7 +772,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     auto cmpKV = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::CMP_KV));
     if (cmpKV != nullptr) {
         tmpData.cmpKV = true;
-        const gert::Shape &cmpKVShape = cmpKV->GetStorageShape();
+        const gert::Shape& cmpKVShape = cmpKV->GetStorageShape();
         status = CheckOutShapeInfo(cmpKVShape, "cmp_kv", dcmpKVShape, layoutKV);
         if (status == ge::GRAPH_FAILED) {
             return ge::GRAPH_FAILED;
@@ -804,7 +804,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     auto oriSparseIndices = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::ORI_SPARSE_INDICES));
     if (oriSparseIndices != nullptr) {
         tmpData.oriKVSparse = true;
-        const gert::Shape &oriSparseIndicesShape = oriSparseIndices->GetStorageShape();
+        const gert::Shape& oriSparseIndicesShape = oriSparseIndices->GetStorageShape();
         auto ori_selected_block_count = oriSparseIndicesShape.GetDim(dimSize - 1);
         baseParams_->set_oriselectedBlockCount(ori_selected_block_count);
         tmpData.ori_selected_block_count = ori_selected_block_count;
@@ -817,7 +817,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     auto cmpSparseIndices = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::CMP_SPARSE_INDICES));
     if (cmpSparseIndices != nullptr) {
         tmpData.cmpKVSparse = true;
-        const gert::Shape &cmpSparseIndicesShape = cmpSparseIndices->GetStorageShape();
+        const gert::Shape& cmpSparseIndicesShape = cmpSparseIndices->GetStorageShape();
         auto cmp_selected_block_count = cmpSparseIndicesShape.GetDim(dimSize - 1);
         baseParams_->set_cmpselectedBlockCount(cmp_selected_block_count);
         tmpData.cmp_selected_block_count = cmp_selected_block_count;
@@ -830,13 +830,13 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     auto usedSeqQ = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::SEQUSED_Q));
     if (usedSeqQ != nullptr) {
         tmpData.usedSeqQ = true;
-        const gert::Shape &usedSeqQShape = usedSeqQ->GetStorageShape();
+        const gert::Shape& usedSeqQShape = usedSeqQ->GetStorageShape();
     }
 
     auto usedSeqOriKV = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::SEQUSED_ORI_KV));
     if (usedSeqOriKV != nullptr) {
         tmpData.usedSeqOriKV = true;
-        const gert::Shape &usedSeqOriKVShape = usedSeqOriKV->GetStorageShape();
+        const gert::Shape& usedSeqOriKVShape = usedSeqOriKV->GetStorageShape();
     }
 
     auto oriMaskMode = *context_->GetAttrs()->GetAttrPointer<int>(static_cast<size_t>(AttrIndex::ORI_MASK_MODE));
@@ -855,7 +855,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     auto usedSeqCmpKV = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::SEQUSED_CMP_KV));
     if (usedSeqCmpKV != nullptr) {
         tmpData.usedSeqCmpKV = true;
-        const gert::Shape &usedSeqCmpKVShape = usedSeqCmpKV->GetStorageShape();
+        const gert::Shape& usedSeqCmpKVShape = usedSeqCmpKV->GetStorageShape();
     }
     auto cmpResidualKV = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::CMP_RESIDUAL_KV));
     if (cmpMaskMode == 3 && cmpRatio != 1 && cmpResidualKV == nullptr) {
@@ -869,7 +869,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     }
     if (oriTopkLength != nullptr) {
         tmpData.oriTopK = true;
-        const gert::Shape &oriTopkLengthShape = oriTopkLength->GetStorageShape();
+        const gert::Shape& oriTopkLengthShape = oriTopkLength->GetStorageShape();
     }
 
     auto cmpTopkLength = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::CMP_TOPK_LENGTH));
@@ -879,7 +879,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     }
     if (cmpTopkLength != nullptr) {
         tmpData.cmpTopK = true;
-        const gert::Shape &cmpTopkLengthShape = cmpTopkLength->GetStorageShape();
+        const gert::Shape& cmpTopkLengthShape = cmpTopkLength->GetStorageShape();
     }
 
     auto softmaxLseShape = context_->GetInputShape(static_cast<size_t>(InputIndex::LSE))->GetStorageShape();
@@ -891,7 +891,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     auto sinks = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::SINKS));
     if (sinks != nullptr) {
         tmpData.sinks = true;
-        const gert::Shape &sinksShape = sinks->GetStorageShape();
+        const gert::Shape& sinksShape = sinks->GetStorageShape();
     }
 
     auto metadataTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::METADATA));
@@ -925,7 +925,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     }
 
     if (strcmp(layoutQ, TND_STR) == 0) {
-        const gert::Shape &actSeqQLenShape =
+        const gert::Shape& actSeqQLenShape =
             context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::CU_SEQLENS_Q))->GetStorageShape();
         tmpData.b = actSeqQLenShape.GetDim(DIM_0) - 1;
         tmpData.t1 = qShape.GetDim(DIM_0);

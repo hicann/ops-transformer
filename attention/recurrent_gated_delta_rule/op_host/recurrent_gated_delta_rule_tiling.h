@@ -31,12 +31,12 @@ struct RecurrentGatedDeltaRuleCompileInfo {
 struct RecurrentGatedDeltaRuleInfo {
 public:
     int64_t usedCoreNum = 0;
-    const char *opName = "RecurrentGatedDeltaRule";
+    const char* opName = "RecurrentGatedDeltaRule";
 };
 
 class RecurrentGatedDeltaRuleTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit RecurrentGatedDeltaRuleTiling(gert::TilingContext *context)
+    explicit RecurrentGatedDeltaRuleTiling(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context)
     {
         InitCompileInfo();
@@ -77,11 +77,11 @@ protected:
     ge::graphStatus GetScale();
     ge::graphStatus GetOptionalInput();
     ge::graphStatus AnalyzeFormat();
-    ge::graphStatus CheckOptionalInputContext(const size_t optionalIndex, const std::string &optionalName);
+    ge::graphStatus CheckOptionalInputContext(const size_t optionalIndex, const std::string& optionalName);
     ge::graphStatus GetStrides();
 
-    bool CheckDim(const gert::Shape shape, const size_t dim, const std::string &dimDesc);
-    bool CheckFormat(ge::Format format, const std::string &Desc);
+    bool CheckDim(const gert::Shape shape, const size_t dim, const std::string& dimDesc);
+    bool CheckFormat(ge::Format format, const std::string& Desc);
 
     RecurrentGatedDeltaRuleCompileInfo compileInfo_;
     RecurrentGatedDeltaRuleTilingData tilingData_;

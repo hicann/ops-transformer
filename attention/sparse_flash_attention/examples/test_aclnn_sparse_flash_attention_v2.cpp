@@ -34,7 +34,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -43,7 +43,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<short> resultData(size, 0);
@@ -55,7 +55,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     // 固定写法，AscendCL初始化
     auto ret = aclInit(nullptr);
@@ -72,8 +72,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * aclDataTypeSize(dataType);
     // 调用aclrtMalloc申请device侧内存
@@ -122,31 +122,31 @@ int main()
     std::vector<int64_t> kRopeShape = {2048, 1, 64};        // T2, N2, Drope
     std::vector<int64_t> sinksShape = {16};                 // N1
 
-    void *qDeviceAddr = nullptr;
-    void *kDeviceAddr = nullptr;
-    void *vDeviceAddr = nullptr;
-    void *sparseIndicesDeviceAddr = nullptr;
-    void *outDeviceAddr = nullptr;
-    void *softmaxMaxDeviceAddr = nullptr;
-    void *softmaxSumDeviceAddr = nullptr;
-    void *actSeqQLenDeviceAddr = nullptr;
-    void *actSeqKvLenDeviceAddr = nullptr;
-    void *qRopeDeviceAddr = nullptr;
-    void *kRopeDeviceAddr = nullptr;
-    void *sinksDeviceAddr = nullptr;
+    void* qDeviceAddr = nullptr;
+    void* kDeviceAddr = nullptr;
+    void* vDeviceAddr = nullptr;
+    void* sparseIndicesDeviceAddr = nullptr;
+    void* outDeviceAddr = nullptr;
+    void* softmaxMaxDeviceAddr = nullptr;
+    void* softmaxSumDeviceAddr = nullptr;
+    void* actSeqQLenDeviceAddr = nullptr;
+    void* actSeqKvLenDeviceAddr = nullptr;
+    void* qRopeDeviceAddr = nullptr;
+    void* kRopeDeviceAddr = nullptr;
+    void* sinksDeviceAddr = nullptr;
 
-    aclTensor *q = nullptr;
-    aclTensor *k = nullptr;
-    aclTensor *v = nullptr;
-    aclTensor *sparseIndices = nullptr;
-    aclTensor *out = nullptr;
-    aclTensor *softmaxMax = nullptr;
-    aclTensor *softmaxSum = nullptr;
-    aclTensor *actSeqQLen = nullptr;
-    aclTensor *actSeqKvLen = nullptr;
-    aclTensor *qRope = nullptr;
-    aclTensor *kRope = nullptr;
-    aclTensor *sinks = nullptr;
+    aclTensor* q = nullptr;
+    aclTensor* k = nullptr;
+    aclTensor* v = nullptr;
+    aclTensor* sparseIndices = nullptr;
+    aclTensor* out = nullptr;
+    aclTensor* softmaxMax = nullptr;
+    aclTensor* softmaxSum = nullptr;
+    aclTensor* actSeqQLen = nullptr;
+    aclTensor* actSeqKvLen = nullptr;
+    aclTensor* qRope = nullptr;
+    aclTensor* kRope = nullptr;
+    aclTensor* sinks = nullptr;
 
     std::vector<op::fp16_t> qHostData(1 * 16 * 512, 1.0);
     std::vector<op::fp16_t> kHostData(2048 * 1 * 512, 1.0);
@@ -204,7 +204,7 @@ int main()
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     bool returnSoftmaxLse = false;
 
     // 调用aclnnSparseFlashAttentionV2第一段接口
@@ -216,7 +216,7 @@ int main()
               return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

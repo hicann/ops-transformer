@@ -35,7 +35,7 @@ constexpr uint32_t SMLA_QUERY_INPUT_INDEX = 0;
 constexpr uint32_t SMLA_ORI_KV_INPUT_INDEX = 1;
 constexpr uint32_t SMLA_CMP_KV_INPUT_INDEX = 2;
 
-inline std::vector<int64_t> SMLAToVector(const gert::Shape *shape)
+inline std::vector<int64_t> SMLAToVector(const gert::Shape* shape)
 {
     size_t shapeSize = shape->GetDimNum();
     std::vector<int64_t> shapeVec(shapeSize, 0);
@@ -45,7 +45,7 @@ inline std::vector<int64_t> SMLAToVector(const gert::Shape *shape)
     return shapeVec;
 }
 
-inline std::string SMLAToString(const gert::Shape *shape)
+inline std::string SMLAToString(const gert::Shape* shape)
 {
     std::ostringstream oss;
     auto v = SMLAToVector(shape);
@@ -58,7 +58,7 @@ inline std::string SMLAToString(const gert::Shape *shape)
     return oss.str();
 }
 
-inline int64_t SMLAGetKvHeadNum(const gert::Shape *kvShape, const std::string &layoutKv)
+inline int64_t SMLAGetKvHeadNum(const gert::Shape* kvShape, const std::string& layoutKv)
 {
     if (layoutKv == "TND") {
         return kvShape->GetDim(DIM_IDX_ONE);
@@ -66,7 +66,7 @@ inline int64_t SMLAGetKvHeadNum(const gert::Shape *kvShape, const std::string &l
     return kvShape->GetDim(DIM_IDX_TWO);
 }
 
-inline ge::graphStatus SMLACheckKvHeadNum(const char *opName, const gert::Shape *kvShape, int64_t kvHeadNum)
+inline ge::graphStatus SMLACheckKvHeadNum(const char* opName, const gert::Shape* kvShape, int64_t kvHeadNum)
 {
     OP_CHECK_IF(kvHeadNum <= 0,
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
@@ -76,7 +76,7 @@ inline ge::graphStatus SMLACheckKvHeadNum(const char *opName, const gert::Shape 
     return ge::GRAPH_SUCCESS;
 }
 
-inline void SMLASetSoftmaxLseShape(gert::Shape *softmaxLseShape, const gert::Shape *queryShape, int64_t kvHeadNum,
+inline void SMLASetSoftmaxLseShape(gert::Shape* softmaxLseShape, const gert::Shape* queryShape, int64_t kvHeadNum,
                                    bool isTnd, bool returnSoftmaxLse)
 {
     if (!returnSoftmaxLse) {
@@ -99,17 +99,17 @@ inline void SMLASetSoftmaxLseShape(gert::Shape *softmaxLseShape, const gert::Sha
 }
 
 struct SMLAInferShapeBase {
-    const gert::Shape *queryShape = nullptr;
-    gert::Shape *attentionOutShape = nullptr;
-    gert::Shape *softmaxLseShape = nullptr;
-    const gert::RuntimeAttrs *attrs = nullptr;
-    const bool *returnSoftmaxLsePtr = nullptr;
-    const gert::Shape *kvShape = nullptr;
+    const gert::Shape* queryShape = nullptr;
+    gert::Shape* attentionOutShape = nullptr;
+    gert::Shape* softmaxLseShape = nullptr;
+    const gert::RuntimeAttrs* attrs = nullptr;
+    const bool* returnSoftmaxLsePtr = nullptr;
+    const gert::Shape* kvShape = nullptr;
 };
 
 // 解析 query 输入、两个输出、attr 及 return_softmax_lse 指针
-inline ge::graphStatus SMLAGetInferShapeBase(gert::InferShapeContext *context, uint32_t returnSoftmaxLseAttrIdx,
-                                             SMLAInferShapeBase &base)
+inline ge::graphStatus SMLAGetInferShapeBase(gert::InferShapeContext* context, uint32_t returnSoftmaxLseAttrIdx,
+                                             SMLAInferShapeBase& base)
 {
     base.queryShape = context->GetInputShape(SMLA_QUERY_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, base.queryShape);
@@ -126,7 +126,7 @@ inline ge::graphStatus SMLAGetInferShapeBase(gert::InferShapeContext *context, u
 }
 
 // 三个算子统一的 InferShape 主体：ori_kv / cmp_kv 均为可选输入，layout_q / layout_kv 为 String attr
-inline ge::graphStatus SMLAInferShape(gert::InferShapeContext *context, const char *opName,
+inline ge::graphStatus SMLAInferShape(gert::InferShapeContext* context, const char* opName,
                                       uint32_t returnSoftmaxLseAttrIdx, uint32_t layoutQAttrIdx,
                                       uint32_t layoutKvAttrIdx)
 {
@@ -134,13 +134,13 @@ inline ge::graphStatus SMLAInferShape(gert::InferShapeContext *context, const ch
     if (SMLAGetInferShapeBase(context, returnSoftmaxLseAttrIdx, base) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape *oriKvShape = context->GetOptionalInputShape(SMLA_ORI_KV_INPUT_INDEX);
-    const gert::Shape *cmpKvShape = context->GetOptionalInputShape(SMLA_CMP_KV_INPUT_INDEX);
+    const gert::Shape* oriKvShape = context->GetOptionalInputShape(SMLA_ORI_KV_INPUT_INDEX);
+    const gert::Shape* cmpKvShape = context->GetOptionalInputShape(SMLA_CMP_KV_INPUT_INDEX);
     base.kvShape = (oriKvShape != nullptr) ? oriKvShape : cmpKvShape;
     OP_CHECK_NULL_WITH_CONTEXT(context, base.kvShape);
 
-    const char *layoutQ = base.attrs->GetStr(layoutQAttrIdx);
-    const char *layoutKv = base.attrs->GetStr(layoutKvAttrIdx);
+    const char* layoutQ = base.attrs->GetStr(layoutQAttrIdx);
+    const char* layoutKv = base.attrs->GetStr(layoutKvAttrIdx);
     std::string layoutQStr = (layoutQ != nullptr) ? std::string(layoutQ) : "BSND";
     std::string layoutKvStr = (layoutKv != nullptr) ? std::string(layoutKv) : "BSND";
     bool returnSoftmaxLse = (base.returnSoftmaxLsePtr != nullptr) ? *base.returnSoftmaxLsePtr : false;
@@ -153,7 +153,7 @@ inline ge::graphStatus SMLAInferShape(gert::InferShapeContext *context, const ch
 }
 
 // sparse_flash_mla / mixed_quant_sparse_flash_mla 的 InferDataType（输出 dtype 跟随 query 输入）
-inline ge::graphStatus SMLAInferDataTypeByInput(gert::InferDataTypeContext *context, const char *opName)
+inline ge::graphStatus SMLAInferDataTypeByInput(gert::InferDataTypeContext* context, const char* opName)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE(opName, "InferShapeContext is nullptr"), return ge::GRAPH_FAILED);
     const auto inputDataType = context->GetInputDataType(SMLA_QUERY_INPUT_INDEX);

@@ -79,7 +79,7 @@ public:
 
     static_assert(std::is_same_v<LayoutC, layout::RowMajor>, "LayoutC only support RowMajor yet!");
 
-    __aicore__ inline BlockMmad(Arch::Resource<ArchTag> &resource, uint32_t l1BufAddrStart = 0)
+    __aicore__ inline BlockMmad(Arch::Resource<ArchTag>& resource, uint32_t l1BufAddrStart = 0)
     {
         l1ATensor = resource.l1Buf.template GetBufferByByte<ElementA>(l1BufAddrStart);
 
@@ -95,7 +95,7 @@ public:
     __aicore__ inline ~BlockMmad() {}
 
     __aicore__ inline void loadQGM(AscendC::GlobalTensor<ElementA> gA, LayoutA layoutA, uint32_t rowNum,
-                                   uint32_t &singleGroupHeads, uint64_t qStride)
+                                   uint32_t& singleGroupHeads, uint64_t qStride)
     {
         uint32_t embed = layoutA.shape(1);
         uint32_t rowNumRound = RoundUp<L1AAlignHelper::M_ALIGNED>(rowNum);
@@ -112,7 +112,7 @@ public:
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID3);
     }
 
-    __aicore__ inline void getBlockShape(GemmCoord &actualShape, uint32_t nL1Idx, uint32_t nL1Loop,
+    __aicore__ inline void getBlockShape(GemmCoord& actualShape, uint32_t nL1Idx, uint32_t nL1Loop,
                                          uint32_t stackSeqTile)
     {
         uint32_t nSplitSize = L1TileShape::N;
@@ -125,9 +125,9 @@ public:
     __aicore__ inline void operator()(AscendC::GlobalTensor<ElementA> gA, AscendC::GlobalTensor<ElementB> gB,
                                       AscendC::GlobalTensor<ElementC> gC, AscendC::GlobalTensor<int32_t> gBlockTable,
                                       AscendC::GlobalTensor<int64_t> gSelectIdx, LayoutA layoutA, LayoutB layoutB,
-                                      LayoutC layoutC, GemmCoord actualOriShape, uint32_t &nIdx, uint32_t &nLoop,
-                                      uint32_t &blockSize, uint32_t strideKV, uint32_t &y, uint32_t &selectNum,
-                                      uint32_t &kvYBlockNum, uint32_t &kvSeqlen)
+                                      LayoutC layoutC, GemmCoord actualOriShape, uint32_t& nIdx, uint32_t& nLoop,
+                                      uint32_t& blockSize, uint32_t strideKV, uint32_t& y, uint32_t& selectNum,
+                                      uint32_t& kvYBlockNum, uint32_t& kvSeqlen)
     {
         uint32_t rowNum = actualOriShape[0];
         uint32_t stackSeqTile = actualOriShape[1];

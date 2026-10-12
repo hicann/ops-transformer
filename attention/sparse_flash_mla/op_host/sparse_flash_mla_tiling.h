@@ -143,16 +143,16 @@ struct SMLAParaInfo {
     SMLATilingRequiredParaInfo attnOut = {nullptr, nullptr};
     SMLATilingRequiredParaInfo softmaxLse = {nullptr, nullptr};
 
-    const float *softmaxScale = nullptr;
-    const uint32_t *cmpRatio = nullptr;
-    const uint32_t *oriMaskMode = nullptr;
-    const uint32_t *cmpMaskMode = nullptr;
-    const int32_t *oriWinLeft = nullptr;
-    const int32_t *oriWinRight = nullptr;
-    const char *layoutQ = nullptr;
-    const char *layoutKv = nullptr;
-    const uint32_t *topkValueMode = nullptr;
-    const bool *returnSoftmaxLse = nullptr;
+    const float* softmaxScale = nullptr;
+    const uint32_t* cmpRatio = nullptr;
+    const uint32_t* oriMaskMode = nullptr;
+    const uint32_t* cmpMaskMode = nullptr;
+    const int32_t* oriWinLeft = nullptr;
+    const int32_t* oriWinRight = nullptr;
+    const char* layoutQ = nullptr;
+    const char* layoutKv = nullptr;
+    const uint32_t* topkValueMode = nullptr;
+    const bool* returnSoftmaxLse = nullptr;
 };
 
 static std::string SMLADataTypeToSerialString(ge::DataType type);
@@ -161,8 +161,8 @@ std::string SMLALayoutToSerialString(SMLALayout layout);
 // -----------算子Tiling入参信息类---------------
 class SMLATilingInfo {
 public:
-    const char *opName = nullptr;
-    fe::PlatFormInfos *platformInfo = nullptr;
+    const char* opName = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     SMLAParaInfo opParamInfo;
 
     // Base Param
@@ -236,7 +236,7 @@ public:
 // -----------算子Tiling入参信息解析及Check类---------------
 class SMLATilingCheck {
 public:
-    explicit SMLATilingCheck(const SMLATilingInfo &smlaInfo)
+    explicit SMLATilingCheck(const SMLATilingInfo& smlaInfo)
         : smlaInfo_(smlaInfo) {};
     ~SMLATilingCheck() = default;
     virtual ge::graphStatus Process();
@@ -244,22 +244,22 @@ public:
 private:
     void Init();
 
-    void LogErrorDtypeSupport(const std::vector<ge::DataType> &expectDtypeList, const ge::DataType &actualDtype,
-                              const std::string &name) const;
-    ge::graphStatus CheckLayoutSupport(const SMLALayout &actualLayout, const std::string &name) const;
+    void LogErrorDtypeSupport(const std::vector<ge::DataType>& expectDtypeList, const ge::DataType& actualDtype,
+                              const std::string& name) const;
+    ge::graphStatus CheckLayoutSupport(const SMLALayout& actualLayout, const std::string& name) const;
     template <typename T>
-    void LogErrorDimNumSupport(const std::vector<T> &expectNumberList, const T &actualValue,
-                               const std::string &name) const;
+    void LogErrorDimNumSupport(const std::vector<T>& expectNumberList, const T& actualValue,
+                               const std::string& name) const;
     template <typename T>
-    void LogErrorNumberSupport(const std::vector<T> &expectNumberList, const T &actualValue, const std::string &name,
+    void LogErrorNumberSupport(const std::vector<T>& expectNumberList, const T& actualValue, const std::string& name,
                                const std::string subName) const;
-    ge::graphStatus CheckDimNumSupport(const gert::StorageShape *shape, const std::vector<size_t> &expectDimNumList,
-                                       const std::string &name) const;
-    void LogErrorLayoutSupport(const std::vector<SMLALayout> &expectLayoutList, const SMLALayout &actualLayout,
-                               const std::string &name) const;
-    ge::graphStatus CheckDimNumInLayoutSupport(const SMLALayout &layout, const gert::StorageShape *shape,
-                                               const std::string &name) const;
-    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
+    ge::graphStatus CheckDimNumSupport(const gert::StorageShape* shape, const std::vector<size_t>& expectDimNumList,
+                                       const std::string& name) const;
+    void LogErrorLayoutSupport(const std::vector<SMLALayout>& expectLayoutList, const SMLALayout& actualLayout,
+                               const std::string& name) const;
+    ge::graphStatus CheckDimNumInLayoutSupport(const SMLALayout& layout, const gert::StorageShape* shape,
+                                               const std::string& name) const;
+    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc* desc, const std::string& name) const;
     ge::graphStatus CheckSinglePara() const;
     ge::graphStatus CheckSingleParaQuery() const;
     ge::graphStatus CheckSingleParaOriKv() const;
@@ -286,12 +286,12 @@ private:
     ge::graphStatus CheckSingleParaCmpBlockTable() const;
 
     ge::graphStatus CheckParaExistence() const;
-    ge::graphStatus CheckExists(const void *pointer, const std::string &name) const;
-    ge::graphStatus CheckNotExists(const void *pointer, const std::string &name) const;
-    ge::graphStatus CheckExistsByMap(const std::map<std::string, const void *> &paramMap) const;
-    ge::graphStatus CheckNotExistsByMap(const std::map<std::string, const void *> &paramMap) const;
-    ge::graphStatus CheckExistenceByMap(std::map<std::string, const void *> &existMap,
-                                        std::map<std::string, const void *> &notExistMap) const;
+    ge::graphStatus CheckExists(const void* pointer, const std::string& name) const;
+    ge::graphStatus CheckNotExists(const void* pointer, const std::string& name) const;
+    ge::graphStatus CheckExistsByMap(const std::map<std::string, const void*>& paramMap) const;
+    ge::graphStatus CheckNotExistsByMap(const std::map<std::string, const void*>& paramMap) const;
+    ge::graphStatus CheckExistenceByMap(std::map<std::string, const void*>& existMap,
+                                        std::map<std::string, const void*>& notExistMap) const;
 
     ge::graphStatus CheckFeature() const;
     ge::graphStatus CheckFeatureShape() const;
@@ -300,17 +300,17 @@ private:
     ge::graphStatus CheckFeaturePa() const;
 
     ge::graphStatus CheckMultiParaConsistency() const;
-    ge::graphStatus CheckDTypeConsistency(const ge::DataType &actualDtype, const ge::DataType &expectDtype,
-                                          const std::string &name) const;
+    ge::graphStatus CheckDTypeConsistency(const ge::DataType& actualDtype, const ge::DataType& expectDtype,
+                                          const std::string& name) const;
     ge::graphStatus CheckOriAndCmpKv() const;
     ge::graphStatus CheckAttenOut() const;
     ge::graphStatus CheckActualSeqLensQ() const;
     ge::graphStatus CheckActualSeqLens() const;
 
-    const char *opName_;
-    fe::PlatFormInfos *platformInfo_;
+    const char* opName_;
+    fe::PlatFormInfos* platformInfo_;
     SMLAParaInfo opParamInfo_;
-    const SMLATilingInfo &smlaInfo_;
+    const SMLATilingInfo& smlaInfo_;
 
     int64_t bSize_ = 0;
     int64_t n1Size_ = 0;
@@ -357,7 +357,7 @@ inline T Align(T num, T rnd)
 
 class SMLAInfoParser {
 public:
-    explicit SMLAInfoParser(gert::TilingContext *context)
+    explicit SMLAInfoParser(gert::TilingContext* context)
         : context_(context)
     {}
     ~SMLAInfoParser() = default;
@@ -367,9 +367,9 @@ public:
     ge::graphStatus CheckRequiredParaExistence() const;
     ge::graphStatus CheckUnrequiredParaExistence() const;
 
-    ge::graphStatus GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor, SMLALayout &layout,
-                                        const std::string &name) const;
-    ge::graphStatus GetActualSeqLenQSize(int64_t &size);
+    ge::graphStatus GetActualSeqLenSize(int64_t& size, const gert::Tensor* tensor, SMLALayout& layout,
+                                        const std::string& name) const;
+    ge::graphStatus GetActualSeqLenQSize(int64_t& size);
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
     void GetOptionalInputParaInfo();
@@ -400,19 +400,19 @@ public:
     ge::graphStatus GetActualseqInfo();
     ge::graphStatus GetSinks();
     uint64_t GetOptionalInputStride0(uint32_t inputIndex) const;
-    void GenerateInfo(SMLATilingInfo &smlaInfo);
-    ge::graphStatus Parse(SMLATilingInfo &smlaInfo);
-    std::vector<uint64_t> GetKvstride(const gert::Shape &shape, const SMLALayout &layout) const;
+    void GenerateInfo(SMLATilingInfo& smlaInfo);
+    ge::graphStatus Parse(SMLATilingInfo& smlaInfo);
+    std::vector<uint64_t> GetKvstride(const gert::Shape& shape, const SMLALayout& layout) const;
     ge::graphStatus CheckContiguous() const; // A5
 
-    gert::TilingContext *context_ = nullptr;
-    const char *opName_;
-    fe::PlatFormInfos *platformInfo_;
+    gert::TilingContext* context_ = nullptr;
+    const char* opName_;
+    fe::PlatFormInfos* platformInfo_;
     SMLAParaInfo opParamInfo_;
 
-    bool HasAxis(const SMLAAxis &axis, const SMLALayout &layout, const gert::Shape &shape) const;
-    size_t GetAxisIdx(const SMLAAxis &axis, const SMLALayout &layout) const;
-    int64_t GetAxisNum(const gert::Shape &shape, const SMLAAxis &axis, const SMLALayout &layout) const;
+    bool HasAxis(const SMLAAxis& axis, const SMLALayout& layout, const gert::Shape& shape) const;
+    size_t GetAxisIdx(const SMLAAxis& axis, const SMLALayout& layout) const;
+    int64_t GetAxisNum(const gert::Shape& shape, const SMLAAxis& axis, const SMLALayout& layout) const;
     static constexpr int64_t invalidDimValue_ = std::numeric_limits<int64_t>::min();
 
     // BaseParams
@@ -486,24 +486,24 @@ public:
 // ---------------算子Tiling类---------------
 class SparseFlashMlaTiling {
 public:
-    explicit SparseFlashMlaTiling(gert::TilingContext *context)
+    explicit SparseFlashMlaTiling(gert::TilingContext* context)
         : context_(context) {};
-    ge::graphStatus DoOpTiling(SMLATilingInfo *tilingInfo);
+    ge::graphStatus DoOpTiling(SMLATilingInfo* tilingInfo);
 
 private:
-    void SplitBalanced(SMLATilingInfo *tilingInfo);
-    void CalcUbBmm(const SMLATilingInfo *tilingInfo);
-    uint32_t CalcFdLogicalSlotCount(const SMLATilingInfo *tilingInfo, uint32_t aicNum) const;
-    uint64_t CalcFdStagingWorkspaceSize(const SMLATilingInfo *tilingInfo, uint32_t aicNum) const;
-    uint64_t CalcVectorizeKvPhyAddrWorkspaceSize(const SMLATilingInfo *tilingInfo, uint32_t &vectorizeFlag) const;
-    gert::TilingContext *context_ = nullptr;
+    void SplitBalanced(SMLATilingInfo* tilingInfo);
+    void CalcUbBmm(const SMLATilingInfo* tilingInfo);
+    uint32_t CalcFdLogicalSlotCount(const SMLATilingInfo* tilingInfo, uint32_t aicNum) const;
+    uint64_t CalcFdStagingWorkspaceSize(const SMLATilingInfo* tilingInfo, uint32_t aicNum) const;
+    uint64_t CalcVectorizeKvPhyAddrWorkspaceSize(const SMLATilingInfo* tilingInfo, uint32_t& vectorizeFlag) const;
+    gert::TilingContext* context_ = nullptr;
     SMLATemplateMode perfMode_ = SMLATemplateMode::SWA_TEMPLATE_MODE;
     SparseFlashMlaTilingData tilingData_;
     uint32_t blockDim_{0};
     uint64_t workspaceSize_{0};
     uint64_t tilingKey_{0};
 
-    SMLATilingInfo *smlaInfo_ = nullptr;
+    SMLATilingInfo* smlaInfo_ = nullptr;
 
     size_t mmResUbSize_ = 0;
     size_t bmm2ResUbSize_ = 0;

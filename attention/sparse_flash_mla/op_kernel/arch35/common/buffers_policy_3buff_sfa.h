@@ -23,7 +23,7 @@ template <BufferType bufferType, SyncType syncType = SyncType::INNER_CORE_SYNC,
           SyncMode syncMode = SyncMode::SET_WAIT_FLAG, IdSource idSource = IdSource::INTERNAL>
 class BuffersPolicy3buffSFA {
 public:
-    __aicore__ inline void Init(BufferManager<bufferType> &bufferManager, uint32_t size, uint32_t aId = 0U,
+    __aicore__ inline void Init(BufferManager<bufferType>& bufferManager, uint32_t size, uint32_t aId = 0U,
                                 uint32_t bId = 0U, uint32_t cId = 0U)
     {
         a_ = bufferManager.template AllocBuffer<syncType, syncMode>(size);
@@ -41,7 +41,7 @@ public:
         }
     }
 
-    __aicore__ inline void Uninit(BufferManager<bufferType> &bufferManager)
+    __aicore__ inline void Uninit(BufferManager<bufferType>& bufferManager)
     {
         a_.template UnInit<idSource>();
         b_.template UnInit<idSource>();
@@ -52,7 +52,7 @@ public:
         bufferManager.template FreeBuffer<syncType, syncMode>(c_);
     }
 
-    __aicore__ inline Buffer<bufferType, syncType, syncMode> &Get()
+    __aicore__ inline Buffer<bufferType, syncType, syncMode>& Get()
     {
         if (flag1_ == 0) {
             flag1_ = 1;
@@ -66,7 +66,7 @@ public:
         }
     }
 
-    __aicore__ inline Buffer<bufferType, syncType, syncMode> &Get(uint32_t id)
+    __aicore__ inline Buffer<bufferType, syncType, syncMode>& Get(uint32_t id)
     {
         uint32_t flag = id % 3;
         if (flag == 0) {
@@ -78,7 +78,7 @@ public:
         }
     }
 
-    __aicore__ inline Buffer<bufferType, syncType, syncMode> &GetVec()
+    __aicore__ inline Buffer<bufferType, syncType, syncMode>& GetVec()
     { // mixcore architecture
         if (flag1_vec1_ == 0) {
             flag1_vec1_ = 1;
@@ -92,7 +92,7 @@ public:
         }
     }
 
-    __aicore__ inline Buffer<bufferType, syncType, syncMode> &GetCube()
+    __aicore__ inline Buffer<bufferType, syncType, syncMode>& GetCube()
     { // mixcore architecture
         if (flag1_bmm2_ == 0) {
             flag1_bmm2_ = 1;
@@ -107,7 +107,7 @@ public:
     }
 
     // Q复用
-    __aicore__ inline Buffer<bufferType, syncType, syncMode> &GetPre()
+    __aicore__ inline Buffer<bufferType, syncType, syncMode>& GetPre()
     {
         if (flag1_ == 0) {
             return c_;
@@ -119,7 +119,7 @@ public:
     }
 
     // KV复用
-    __aicore__ inline Buffer<bufferType, syncType, syncMode> &GetReused()
+    __aicore__ inline Buffer<bufferType, syncType, syncMode>& GetReused()
     {
         if (flag2_ == 0) {
             flag2_ = 1;

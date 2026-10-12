@@ -38,7 +38,7 @@ extern "C" {
 
 namespace {
 
-static constexpr const char *kOpName = "aclnnScatterPaKvCache";
+static constexpr const char* kOpName = "aclnnScatterPaKvCache";
 
 static const std::initializer_list<op::DataType> KEY_VALUE_DTYPE_SUPPORT_LIST = {
     DataType::DT_FLOAT16,     DataType::DT_FLOAT,      DataType::DT_BF16,        DataType::DT_INT8,
@@ -51,9 +51,9 @@ static const std::initializer_list<op::DataType> KEY_VALUE_DTYPE_SUPPORT_LIST_91
 
 static const std::initializer_list<op::DataType> INDEX_DTYPE_SUPPORT_LIST = {DataType::DT_INT32, DataType::DT_INT64};
 
-static aclnnStatus CheckNullptr(const aclTensor *key, const aclTensor *keyCacheRef, const aclTensor *slotMapping,
-                                const aclTensor *value, const aclTensor *valueCacheRef, const uint64_t *workspaceSize,
-                                aclOpExecutor **executor)
+static aclnnStatus CheckNullptr(const aclTensor* key, const aclTensor* keyCacheRef, const aclTensor* slotMapping,
+                                const aclTensor* value, const aclTensor* valueCacheRef, const uint64_t* workspaceSize,
+                                aclOpExecutor** executor)
 {
     CHECK_RET(key != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(keyCacheRef != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -68,12 +68,12 @@ static aclnnStatus CheckNullptr(const aclTensor *key, const aclTensor *keyCacheR
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckDtypeValid(const aclTensor *key, const aclTensor *keyCacheRef, const aclTensor *slotMapping,
-                                   const aclTensor *value, const aclTensor *valueCacheRef,
-                                   const aclTensor *compressLensOptional, const aclTensor *compressSeqOffsetOptional,
-                                   const aclTensor *seqLensOptional, char *cacheModeOptional)
+static aclnnStatus CheckDtypeValid(const aclTensor* key, const aclTensor* keyCacheRef, const aclTensor* slotMapping,
+                                   const aclTensor* value, const aclTensor* valueCacheRef,
+                                   const aclTensor* compressLensOptional, const aclTensor* compressSeqOffsetOptional,
+                                   const aclTensor* seqLensOptional, char* cacheModeOptional)
 {
-    auto &platformInfo = op::GetCurrentPlatformInfo();
+    auto& platformInfo = op::GetCurrentPlatformInfo();
     auto socVersion = platformInfo.GetCurNpuArch();
     bool isArch35 = (socVersion == NpuArch::DAV_3510);
     auto dtypeSupportList = isArch35 ? KEY_VALUE_DTYPE_SUPPORT_LIST : KEY_VALUE_DTYPE_SUPPORT_LIST_910;
@@ -189,7 +189,7 @@ static aclnnStatus CheckDtypeValid(const aclTensor *key, const aclTensor *keyCac
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckShape(const aclTensor *key, const aclTensor *value)
+static aclnnStatus CheckShape(const aclTensor* key, const aclTensor* value)
 {
     auto keyDimNum = key->GetViewShape().GetDimNum();
     auto valueDimNum = value != nullptr ? value->GetViewShape().GetDimNum() : 0;
@@ -209,7 +209,7 @@ static aclnnStatus CheckShape(const aclTensor *key, const aclTensor *value)
     return ACLNN_SUCCESS;
 }
 
-static bool IsAxesContiguous(const aclTensor *tensor, int64_t startAxis, int64_t endAxis)
+static bool IsAxesContiguous(const aclTensor* tensor, int64_t startAxis, int64_t endAxis)
 {
     if (tensor == nullptr || startAxis < 0 || endAxis < 0 || startAxis >= endAxis) {
         return false;
@@ -235,7 +235,7 @@ static bool IsAxesContiguous(const aclTensor *tensor, int64_t startAxis, int64_t
     return true;
 }
 
-static bool IsFirstAxisNonContiguous(const aclTensor *tensor)
+static bool IsFirstAxisNonContiguous(const aclTensor* tensor)
 {
     if (tensor == nullptr) {
         return false;
@@ -254,7 +254,7 @@ static bool IsFirstAxisNonContiguous(const aclTensor *tensor)
     return (!firstAxisContiguous) && otherAxesContiguous;
 }
 
-static bool IsLastAxisContiguous(const aclTensor *tensor)
+static bool IsLastAxisContiguous(const aclTensor* tensor)
 {
     if (tensor == nullptr) {
         return false;
@@ -269,8 +269,8 @@ static bool IsLastAxisContiguous(const aclTensor *tensor)
     return viewStrides[dimNum - 1] == 1;
 }
 
-static bool IsSupportNonContiguousCache(const aclTensor *key, const aclTensor *keyCacheRef, const aclTensor *value,
-                                        const aclTensor *valueCacheRef)
+static bool IsSupportNonContiguousCache(const aclTensor* key, const aclTensor* keyCacheRef, const aclTensor* value,
+                                        const aclTensor* valueCacheRef)
 {
     bool keyContiguous = IsContiguous(key);
     bool valueContiguous = true;
@@ -290,8 +290,8 @@ static bool IsSupportNonContiguousCache(const aclTensor *key, const aclTensor *k
     return keyAndValueContiguous && cacheNonContiguous;
 }
 
-static bool IsSupportNonContiguousKeyAndCache(const aclTensor *key, const aclTensor *keyCacheRef,
-                                              const aclTensor *value, const aclTensor *valueCacheRef)
+static bool IsSupportNonContiguousKeyAndCache(const aclTensor* key, const aclTensor* keyCacheRef,
+                                              const aclTensor* value, const aclTensor* valueCacheRef)
 {
     bool keyLastAxisContiguous = IsLastAxisContiguous(key);
     bool keyCacheLastAxisContiguous = IsLastAxisContiguous(keyCacheRef);
@@ -314,16 +314,16 @@ static bool IsSupportNonContiguousKeyAndCache(const aclTensor *key, const aclTen
     return allLastAxisContiguous && anyNonContiguous;
 }
 
-static aclnnStatus ProcessNonContiguous(const aclTensor *key, aclTensor *keyCacheRef, const aclTensor *slotMapping,
-                                        const aclTensor *value, aclTensor *valueCacheRef,
-                                        const aclTensor *compressLensOptional,
-                                        const aclTensor *compressSeqOffsetOptional, const aclTensor *seqLensOptional,
-                                        char *cacheModeOptional, char *scatterModeOptional,
-                                        const aclIntArray *stridesOptional, const aclIntArray *offsetsOptional,
-                                        uint64_t *workspaceSize, aclOpExecutor **executor,
-                                        UniqueExecutor &uniqueExecutor, bool isKeyAndCacheNonContiguous)
+static aclnnStatus ProcessNonContiguous(const aclTensor* key, aclTensor* keyCacheRef, const aclTensor* slotMapping,
+                                        const aclTensor* value, aclTensor* valueCacheRef,
+                                        const aclTensor* compressLensOptional,
+                                        const aclTensor* compressSeqOffsetOptional, const aclTensor* seqLensOptional,
+                                        char* cacheModeOptional, char* scatterModeOptional,
+                                        const aclIntArray* stridesOptional, const aclIntArray* offsetsOptional,
+                                        uint64_t* workspaceSize, aclOpExecutor** executor,
+                                        UniqueExecutor& uniqueExecutor, bool isKeyAndCacheNonContiguous)
 {
-    const aclTensor *keyView = nullptr;
+    const aclTensor* keyView = nullptr;
     if (isKeyAndCacheNonContiguous && IsLastAxisContiguous(key)) {
         keyView = uniqueExecutor->CreateView(key, key->GetViewShape(), key->GetStorageShape(), key->GetViewStrides(),
                                              key->GetViewOffset());
@@ -341,8 +341,8 @@ static aclnnStatus ProcessNonContiguous(const aclTensor *key, aclTensor *keyCach
     auto slotMappingContiguous = l0op::Contiguous(slotMapping, uniqueExecutor.get());
     CHECK_RET(slotMappingContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    const aclTensor *valueView = value;
-    const aclTensor *valueCacheView = nullptr;
+    const aclTensor* valueView = value;
+    const aclTensor* valueCacheView = nullptr;
     if (value != nullptr) {
         if (isKeyAndCacheNonContiguous && IsLastAxisContiguous(value)) {
             valueView = uniqueExecutor->CreateView(value, value->GetViewShape(), value->GetStorageShape(),
@@ -378,8 +378,8 @@ static aclnnStatus ProcessNonContiguous(const aclTensor *key, aclTensor *keyCach
     }
 
     auto scatterResult = l0op::ScatterPaKvCache(
-        keyView, const_cast<aclTensor *>(keyCacheView), slotMappingContiguous, valueView,
-        const_cast<aclTensor *>(valueCacheView), compressLensContiguous, compressSeqOffsetContiguous, seqLensContiguous,
+        keyView, const_cast<aclTensor*>(keyCacheView), slotMappingContiguous, valueView,
+        const_cast<aclTensor*>(valueCacheView), compressLensContiguous, compressSeqOffsetContiguous, seqLensContiguous,
         cacheModeOptional, scatterModeOptional, stridesOptional, offsetsOptional, uniqueExecutor.get());
     CHECK_RET(std::get<0>(scatterResult) != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
@@ -388,18 +388,18 @@ static aclnnStatus ProcessNonContiguous(const aclTensor *key, aclTensor *keyCach
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ProcessContiguous(const aclTensor *key, aclTensor *keyCacheRef, const aclTensor *slotMapping,
-                                     const aclTensor *value, aclTensor *valueCacheRef,
-                                     const aclTensor *compressLensOptional, const aclTensor *compressSeqOffsetOptional,
-                                     const aclTensor *seqLensOptional, char *cacheModeOptional,
-                                     char *scatterModeOptional, const aclIntArray *stridesOptional,
-                                     const aclIntArray *offsetsOptional, uint64_t *workspaceSize,
-                                     aclOpExecutor **executor, UniqueExecutor &uniqueExecutor)
+static aclnnStatus ProcessContiguous(const aclTensor* key, aclTensor* keyCacheRef, const aclTensor* slotMapping,
+                                     const aclTensor* value, aclTensor* valueCacheRef,
+                                     const aclTensor* compressLensOptional, const aclTensor* compressSeqOffsetOptional,
+                                     const aclTensor* seqLensOptional, char* cacheModeOptional,
+                                     char* scatterModeOptional, const aclIntArray* stridesOptional,
+                                     const aclIntArray* offsetsOptional, uint64_t* workspaceSize,
+                                     aclOpExecutor** executor, UniqueExecutor& uniqueExecutor)
 {
     auto keyContiguous = l0op::Contiguous(key, uniqueExecutor.get());
     CHECK_RET(keyContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    auto keyCacheContiguous = const_cast<aclTensor *>(l0op::Contiguous(keyCacheRef, uniqueExecutor.get()));
+    auto keyCacheContiguous = const_cast<aclTensor*>(l0op::Contiguous(keyCacheRef, uniqueExecutor.get()));
     CHECK_RET(keyCacheContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     auto slotMappingContiguous = l0op::Contiguous(slotMapping, uniqueExecutor.get());
@@ -411,7 +411,7 @@ static aclnnStatus ProcessContiguous(const aclTensor *key, aclTensor *keyCacheRe
         valueContiguous = l0op::Contiguous(value, uniqueExecutor.get());
         CHECK_RET(valueContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-        valueCacheContiguous = const_cast<aclTensor *>(l0op::Contiguous(valueCacheRef, uniqueExecutor.get()));
+        valueCacheContiguous = const_cast<aclTensor*>(l0op::Contiguous(valueCacheRef, uniqueExecutor.get()));
         CHECK_RET(valueCacheContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
@@ -454,14 +454,14 @@ static aclnnStatus ProcessContiguous(const aclTensor *key, aclTensor *keyCacheRe
 
 } // namespace
 
-aclnnStatus aclnnScatterPaKvCacheGetWorkspaceSize(const aclTensor *key, aclTensor *keyCacheRef,
-                                                  const aclTensor *slotMapping, const aclTensor *value,
-                                                  aclTensor *valueCacheRef, const aclTensor *compressLensOptional,
-                                                  const aclTensor *compressSeqOffsetOptional,
-                                                  const aclTensor *seqLensOptional, char *cacheModeOptional,
-                                                  char *scatterModeOptional, const aclIntArray *stridesOptional,
-                                                  const aclIntArray *offsetsOptional, uint64_t *workspaceSize,
-                                                  aclOpExecutor **executor)
+aclnnStatus aclnnScatterPaKvCacheGetWorkspaceSize(const aclTensor* key, aclTensor* keyCacheRef,
+                                                  const aclTensor* slotMapping, const aclTensor* value,
+                                                  aclTensor* valueCacheRef, const aclTensor* compressLensOptional,
+                                                  const aclTensor* compressSeqOffsetOptional,
+                                                  const aclTensor* seqLensOptional, char* cacheModeOptional,
+                                                  char* scatterModeOptional, const aclIntArray* stridesOptional,
+                                                  const aclIntArray* offsetsOptional, uint64_t* workspaceSize,
+                                                  aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(
         aclnnScatterPaKvCache,
@@ -515,7 +515,7 @@ aclnnStatus aclnnScatterPaKvCacheGetWorkspaceSize(const aclTensor *key, aclTenso
                              stridesOptional, offsetsOptional, workspaceSize, executor, uniqueExecutor);
 }
 
-aclnnStatus aclnnScatterPaKvCache(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnScatterPaKvCache(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnScatterPaKvCache);
     CHECK_COND(CommonOpExecutorRun(workspace, workspaceSize, executor, stream) == ACLNN_SUCCESS, ACLNN_ERR_INNER,

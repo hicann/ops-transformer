@@ -23,7 +23,7 @@ using namespace AscendC;
 template <typename T1, typename IndexDtype, bool NCT = false>
 class ScatterPaKvCacheNormalSiso : public ScatterPaKvCacheNormalCommon {
 public:
-    __aicore__ inline ScatterPaKvCacheNormalSiso(TPipe *pipe, const ScatterPaKvCacheTilingData *__restrict__ tilingData)
+    __aicore__ inline ScatterPaKvCacheNormalSiso(TPipe* pipe, const ScatterPaKvCacheTilingData* __restrict__ tilingData)
         : ScatterPaKvCacheNormalCommon(pipe, tilingData)
     {}
 
@@ -34,9 +34,9 @@ public:
         curBlockFactor_ = (blockId == coreNums - 1) ? tilingData_->tailBlockFactor : tilingData_->blockFactor;
         startTaskId_ = blockId * tilingData_->blockFactor; // 当前核起始token
 
-        keyInGm_.SetGlobalBuffer((__gm__ T1 *)keyIn);
-        keyCacheOutGm_.SetGlobalBuffer((__gm__ T1 *)keyCacheOut);
-        slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype *)slotMapping);
+        keyInGm_.SetGlobalBuffer((__gm__ T1*)keyIn);
+        keyCacheOutGm_.SetGlobalBuffer((__gm__ T1*)keyCacheOut);
+        slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype*)slotMapping);
     }
 
     // 通用分支

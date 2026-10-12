@@ -19,7 +19,7 @@ template <typename T1>
 __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube5Process(const int64_t pGmOffset,
                                                                                const int32_t blkCntOffset,
                                                                                const int32_t mmPingPongIdx,
-                                                                               const RunInfo &runInfo)
+                                                                               const RunInfo& runInfo)
 {
     uint32_t dLoopTimes = (dimDv + 127) / N_SPLIT_SIZE;
     uint32_t perLoopDSize = N_SPLIT_SIZE;
@@ -41,30 +41,30 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube5Process(c
             if (!runInfo.isOri) {
                 mm5ResOutBaseOffset = runInfo.roundDbIdx * MAX_CORE_NUM * selectedBlockCount * dimDv +
                                       cBlockIdx * selectedBlockCount * dimDv;
-                mm5ResWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm5ResAddr);
+                mm5ResWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + mm5ResAddr);
             } else {
                 int64_t dbIdx = runInfo.roundDbIdx;
                 int64_t perCore = singleN * dimDTotal * 2;
                 // Dv 紧跟 Dk：offset += singleN * Dk
                 mm5ResOutBaseOffset = dbIdx * usedCoreNum * perCore + cBlockIdx * perCore + singleN * dimDTotal -
                                       blkCntOffset * selectedBlockSize * dimDv;
-                mm5ResWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + deterKvAddr);
+                mm5ResWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + deterKvAddr);
             }
         } else {
             int64_t dbIdx = runInfo.task & 1;
             int64_t perCore = singleN * dimDTotal * 2;
             mm5ResOutBaseOffset = dbIdx * usedCoreNum * perCore + cBlockIdx * perCore + singleN * dimDTotal -
                                   blkCntOffset * selectedBlockSize * dimDv;
-            mm5ResWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + deterKvAddr);
+            mm5ResWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + deterKvAddr);
         }
     } else if constexpr (MODE == SMLAG_SCFA_MODE) {
         if (!runInfo.isOri) {
             mm5ResOutBaseOffset = runInfo.scatterTaskId * MAX_CORE_NUM * selectedBlockCount * dimDv +
                                   cBlockIdx * selectedBlockCount * dimDv;
-            mm5ResWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + mm5ResAddr);
+            mm5ResWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + mm5ResAddr);
         } else {
             mm5ResOutBaseOffset = runInfo.selectedKGmOffset - blkCntOffset * selectedBlockSize * dimDTotal;
-            mm5ResWorkspaceGm.SetGlobalBuffer((__gm__ float *)workspace + dkAddr);
+            mm5ResWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + dkAddr);
         }
     } else {
         mm5ResOutBaseOffset = runInfo.isOri ?

@@ -26,9 +26,9 @@ namespace l0op {
 
 OP_TYPE_REGISTER(StemOamPrepVarlenQ);
 
-const aclTensor *StemOamPrepVarlenQ(const aclTensor *q, const aclIntArray *qSeqLens, const aclIntArray *cuSeqLensQ,
-                                    const aclTensor *qScale, int64_t stemBlockSize, int64_t stemStride,
-                                    aclOpExecutor *executor)
+const aclTensor* StemOamPrepVarlenQ(const aclTensor* q, const aclIntArray* qSeqLens, const aclIntArray* cuSeqLensQ,
+                                    const aclTensor* qScale, int64_t stemBlockSize, int64_t stemStride,
+                                    aclOpExecutor* executor)
 {
     L0_DFX(StemOamPrepVarlenQ, q, qSeqLens, cuSeqLensQ, qScale, stemBlockSize, stemStride);
 

@@ -25,8 +25,8 @@
 namespace AttentionCommon {
 
 template <typename T>
-__simd_vf__ void GetKVPhyAddrVFPaImpl(__ubuf__ uint32_t *kvPhyAddrUb, __ubuf__ int32_t *sparseIdxUb,
-                                      __ubuf__ int32_t *blkTableUb, const uint16_t s2Loop, uint32_t s2Tail,
+__simd_vf__ void GetKVPhyAddrVFPaImpl(__ubuf__ uint32_t* kvPhyAddrUb, __ubuf__ int32_t* sparseIdxUb,
+                                      __ubuf__ int32_t* blkTableUb, const uint16_t s2Loop, uint32_t s2Tail,
                                       const uint32_t blockSize, const int16_t shiftRightNum,
                                       const uint32_t sparseBlockSize, const uint32_t kvDim, const uint32_t kvStride)
 {
@@ -79,9 +79,9 @@ __simd_vf__ void GetKVPhyAddrVFPaImpl(__ubuf__ uint32_t *kvPhyAddrUb, __ubuf__ i
 
     for (; s2Loop > 1;) {
         for (uint16_t i = 0; i < s2Loop - 1; i++) {
-            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)paSparseIndex0,
+            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t>&)paSparseIndex0,
                                                               sparseIdxUb + i * paElemsPerLoop);
-            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)paSparseIndex1,
+            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t>&)paSparseIndex1,
                                                               sparseIdxUb + paElemsPerReg + i * paElemsPerLoop);
             // * sparseBlockSize
             Reg::Muls(paSparseIndex0, paSparseIndex0, sparseBlockSize, paAllMask);
@@ -131,9 +131,9 @@ __simd_vf__ void GetKVPhyAddrVFPaImpl(__ubuf__ uint32_t *kvPhyAddrUb, __ubuf__ i
         Reg::Not(paInvalidMask0, paTailMask0, paAllMask);
         Reg::Not(paInvalidMask1, paTailMask1, paAllMask);
 
-        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)paSparseIndex0,
+        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t>&)paSparseIndex0,
                                                           sparseIdxUb + i * paElemsPerLoop);
-        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)paSparseIndex1,
+        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t>&)paSparseIndex1,
                                                           sparseIdxUb + paElemsPerReg + i * paElemsPerLoop);
         // * sparseBlockSize
         Reg::Muls(paSparseIndex0, paSparseIndex0, sparseBlockSize, paTailMask0);
@@ -186,15 +186,15 @@ __aicore__ inline void GetKVPhyAddrVFPa(LocalTensor<uint32_t> kvPhyAddrTensor, L
                                         const uint32_t s2Tail, const uint32_t blockSize, const int16_t shiftRightNum,
                                         const uint32_t sparseBlockSize, const uint32_t kvDim, const uint32_t kvStride)
 {
-    __ubuf__ uint32_t *kv_phy_addr_ub = (__ubuf__ uint32_t *)(kvPhyAddrTensor.GetPhyAddr());
-    __ubuf__ int32_t *sparse_idx_ub = (__ubuf__ int32_t *)(sparseIdxTensor.GetPhyAddr());
-    __ubuf__ int32_t *blk_table_ub = (__ubuf__ int32_t *)(blkTableTensor.GetPhyAddr());
+    __ubuf__ uint32_t* kv_phy_addr_ub = (__ubuf__ uint32_t*)(kvPhyAddrTensor.GetPhyAddr());
+    __ubuf__ int32_t* sparse_idx_ub = (__ubuf__ int32_t*)(sparseIdxTensor.GetPhyAddr());
+    __ubuf__ int32_t* blk_table_ub = (__ubuf__ int32_t*)(blkTableTensor.GetPhyAddr());
     GetKVPhyAddrVFPaImpl<uint32_t>(kv_phy_addr_ub, sparse_idx_ub, blk_table_ub, s2Loop, s2Tail, blockSize,
                                    shiftRightNum, sparseBlockSize, kvDim, kvStride);
 }
 
 template <typename T>
-__simd_vf__ void GetKVPhyAddrVFTndImpl(__ubuf__ uint32_t *tndAddrUb, __ubuf__ int32_t *tndSparseUb,
+__simd_vf__ void GetKVPhyAddrVFTndImpl(__ubuf__ uint32_t* tndAddrUb, __ubuf__ int32_t* tndSparseUb,
                                        const uint16_t tndLoopCount, uint32_t tndTailSize,
                                        const uint32_t tndSparseBlockSize, const uint32_t tndKvDim,
                                        const uint32_t tndKvPrefix)
@@ -228,9 +228,9 @@ __simd_vf__ void GetKVPhyAddrVFTndImpl(__ubuf__ uint32_t *tndAddrUb, __ubuf__ in
     // (kvPrefix + sparseIdx) * kvDim -> int64 物理地址
     for (; tndLoopCount > 1;) {
         for (uint16_t i = 0; i < tndLoopCount - 1; i++) {
-            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)tndSparseIndex0,
+            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t>&)tndSparseIndex0,
                                                               tndSparseUb + i * tndElemsPerLoop);
-            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)tndSparseIndex1,
+            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t>&)tndSparseIndex1,
                                                               tndSparseUb + tndElemsPerReg + i * tndElemsPerLoop);
             Reg::Muls(tndSparseIndex0, tndSparseIndex0, tndSparseBlockSize, tndAllMask);
             Reg::Muls(tndSparseIndex1, tndSparseIndex1, tndSparseBlockSize, tndAllMask);
@@ -256,9 +256,9 @@ __simd_vf__ void GetKVPhyAddrVFTndImpl(__ubuf__ uint32_t *tndAddrUb, __ubuf__ in
 
         // * sparseBlockSize
         // (kvPrefix + sparseIdx) * kvDim -> int64 物理地址
-        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)tndSparseIndex0,
+        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t>&)tndSparseIndex0,
                                                           tndSparseUb + i * tndElemsPerLoop);
-        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)tndSparseIndex1,
+        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t>&)tndSparseIndex1,
                                                           tndSparseUb + tndElemsPerReg + i * tndElemsPerLoop);
         Reg::Muls(tndSparseIndex0, tndSparseIndex0, tndSparseBlockSize, tndTailMask0);
         Reg::Muls(tndSparseIndex1, tndSparseIndex1, tndSparseBlockSize, tndTailMask1);
@@ -284,13 +284,13 @@ __aicore__ inline void GetKVPhyAddrVFTnd(LocalTensor<uint32_t> kvPhyAddrTensor, 
                                          const uint16_t s2Loop, const uint32_t s2Tail, const uint32_t sparseBlockSize,
                                          const uint32_t kvDim, const uint32_t kvPrefix)
 {
-    __ubuf__ uint32_t *kv_phy_addr_ub = (__ubuf__ uint32_t *)(kvPhyAddrTensor.GetPhyAddr());
-    __ubuf__ int32_t *sparse_idx_ub = (__ubuf__ int32_t *)(sparseIdxTensor.GetPhyAddr());
+    __ubuf__ uint32_t* kv_phy_addr_ub = (__ubuf__ uint32_t*)(kvPhyAddrTensor.GetPhyAddr());
+    __ubuf__ int32_t* sparse_idx_ub = (__ubuf__ int32_t*)(sparseIdxTensor.GetPhyAddr());
     GetKVPhyAddrVFTndImpl<uint32_t>(kv_phy_addr_ub, sparse_idx_ub, s2Loop, s2Tail, sparseBlockSize, kvDim, kvPrefix);
 }
 
 template <typename T>
-__simd_vf__ void GetKVPhyAddrVFBsndImpl(__ubuf__ uint32_t *bsndAddrUb, __ubuf__ int32_t *bsndSparseUb,
+__simd_vf__ void GetKVPhyAddrVFBsndImpl(__ubuf__ uint32_t* bsndAddrUb, __ubuf__ int32_t* bsndSparseUb,
                                         const uint16_t bsndLoopCount, uint32_t bsndTailSize,
                                         const uint32_t bsndSparseBlockSize, const uint32_t bsndKvDim,
                                         const uint32_t bsndBaseLow, const uint32_t bsndBaseHigh)
@@ -332,9 +332,9 @@ __simd_vf__ void GetKVPhyAddrVFBsndImpl(__ubuf__ uint32_t *bsndAddrUb, __ubuf__ 
     // sparseIdx * kvDim (带进位乘法)
     for (; bsndLoopCount > 1;) {
         for (uint16_t i = 0; i < bsndLoopCount - 1; i++) {
-            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)bsndSparseIndex0,
+            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t>&)bsndSparseIndex0,
                                                               bsndSparseUb + i * bsndElemsPerLoop);
-            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)bsndSparseIndex1,
+            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t>&)bsndSparseIndex1,
                                                               bsndSparseUb + bsndElemsPerReg + i * bsndElemsPerLoop);
             Reg::Muls(bsndSparseIndex0, bsndSparseIndex0, bsndSparseBlockSize, bsndAllMask);
             Reg::Muls(bsndSparseIndex1, bsndSparseIndex1, bsndSparseBlockSize, bsndAllMask);
@@ -362,9 +362,9 @@ __simd_vf__ void GetKVPhyAddrVFBsndImpl(__ubuf__ uint32_t *bsndAddrUb, __ubuf__ 
 
         // * sparseBlockSize
         // sparseIdx * kvDim (带进位乘法)
-        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)bsndSparseIndex0,
+        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t>&)bsndSparseIndex0,
                                                           bsndSparseUb + i * bsndElemsPerLoop);
-        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)bsndSparseIndex1,
+        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t>&)bsndSparseIndex1,
                                                           bsndSparseUb + bsndElemsPerReg + i * bsndElemsPerLoop);
         Reg::Muls(bsndSparseIndex0, bsndSparseIndex0, bsndSparseBlockSize, bsndTailMask0);
         Reg::Muls(bsndSparseIndex1, bsndSparseIndex1, bsndSparseBlockSize, bsndTailMask1);
@@ -392,8 +392,8 @@ __aicore__ inline void GetKVPhyAddrVFBsnd(LocalTensor<uint32_t> kvPhyAddrTensor,
                                           const uint16_t s2Loop, const uint32_t s2Tail, const uint32_t sparseBlockSize,
                                           const uint32_t kvDim, const uint32_t bS2BaseLow, const uint32_t bS2BaseHigh)
 {
-    __ubuf__ uint32_t *kv_phy_addr_ub = (__ubuf__ uint32_t *)(kvPhyAddrTensor.GetPhyAddr());
-    __ubuf__ int32_t *sparse_idx_ub = (__ubuf__ int32_t *)(sparseIdxTensor.GetPhyAddr());
+    __ubuf__ uint32_t* kv_phy_addr_ub = (__ubuf__ uint32_t*)(kvPhyAddrTensor.GetPhyAddr());
+    __ubuf__ int32_t* sparse_idx_ub = (__ubuf__ int32_t*)(sparseIdxTensor.GetPhyAddr());
     GetKVPhyAddrVFBsndImpl<uint32_t>(kv_phy_addr_ub, sparse_idx_ub, s2Loop, s2Tail, sparseBlockSize, kvDim, bS2BaseLow,
                                      bS2BaseHigh);
 }

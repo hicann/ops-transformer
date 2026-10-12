@@ -32,12 +32,12 @@ struct RecurrentKdaCompileInfo {
 struct RecurrentKdaInfo {
 public:
     int64_t usedCoreNum = 0;
-    const char *opName = "RecurrentKda";
+    const char* opName = "RecurrentKda";
 };
 
 class RecurrentKdaTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit RecurrentKdaTiling(gert::TilingContext *context)
+    explicit RecurrentKdaTiling(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context)
     {
         InitCompileInfo();
@@ -69,7 +69,7 @@ protected:
     ge::graphStatus GetAttrsInfo();
     ge::graphStatus GetOptionalInput();
     ge::graphStatus AnalyzeFormat();
-    bool CheckFormat(ge::Format format, const std::string &Desc);
+    bool CheckFormat(ge::Format format, const std::string& Desc);
 
     RecurrentKdaCompileInfo compileInfo_;
     RecurrentKdaTilingData tilingData_;

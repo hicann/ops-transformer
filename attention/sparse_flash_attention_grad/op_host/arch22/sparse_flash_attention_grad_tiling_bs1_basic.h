@@ -49,11 +49,11 @@ struct TempParams {
     bool enableOptimizedScatter = false;
 };
 
-bool EnableOptimizedScatterPath(const TempParams &tmpData);
+bool EnableOptimizedScatterPath(const TempParams& tmpData);
 
 class SparseFlashAttentionGradBasicTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit SparseFlashAttentionGradBasicTiling(gert::TilingContext *context)
+    explicit SparseFlashAttentionGradBasicTiling(gert::TilingContext* context)
         : TilingBaseClass(context) {};
     SparseFlashAttentionGradBasicTilingData tilingData;
 
@@ -74,7 +74,7 @@ private:
     ge::graphStatus DoCastTiling();
     TempParams tmpData;
 
-    const char *opName;
+    const char* opName;
 };
 } // namespace sfag
 } // namespace optiling

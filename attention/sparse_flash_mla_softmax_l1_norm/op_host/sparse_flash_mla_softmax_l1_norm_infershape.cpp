@@ -26,31 +26,31 @@ constexpr uint32_t SOFTMAX_L1_NORM_INDEX = 0;
 constexpr uint32_t ATTR_MAX_SEQLEN_K_INDEX = 1;
 constexpr uint32_t ATTR_LAYOUT_Q_INDEX = 4;
 
-static ge::graphStatus InferShapeSparseFlashMlaSoftmaxL1Norm(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeSparseFlashMlaSoftmaxL1Norm(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("SparseFlashMlaSoftmaxL1Norm", "InferShapeContext is nullptr!"),
                 return ge::GRAPH_FAILED);
     OP_LOGD(context->GetNodeName(), "Enter SparseFlashMlaSoftmaxL1Norm InferShape impl.");
-    const gert::Shape *queryShape = context->GetInputShape(QUERY_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(KEY_INDEX);
+    const gert::Shape* keyShape = context->GetInputShape(KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
 
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const char *layoutQPtr = attrs->GetAttrPointer<char>(ATTR_LAYOUT_Q_INDEX);
+    const char* layoutQPtr = attrs->GetAttrPointer<char>(ATTR_LAYOUT_Q_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, layoutQPtr);
     std::string layoutQStr(layoutQPtr);
     OP_CHECK_IF(layoutQStr != "BSND" && layoutQStr != "TND",
                 OP_LOGE(context, "layout_q only supports BSND or TND, but got %s.", layoutQStr.c_str()),
                 return ge::GRAPH_FAILED);
-    const int64_t *maxSeqlenKPtr = attrs->GetAttrPointer<int64_t>(ATTR_MAX_SEQLEN_K_INDEX);
+    const int64_t* maxSeqlenKPtr = attrs->GetAttrPointer<int64_t>(ATTR_MAX_SEQLEN_K_INDEX);
     int64_t maxSeqlenK = (maxSeqlenKPtr != nullptr) ? *maxSeqlenKPtr : 0;
 
-    gert::Shape *outShape = context->GetOutputShape(SOFTMAX_L1_NORM_INDEX);
+    gert::Shape* outShape = context->GetOutputShape(SOFTMAX_L1_NORM_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, outShape);
 
-    const gert::Shape *sparseIndiceShape = context->GetOptionalInputShape(static_cast<size_t>(SPARSE_INDICES_INDEX));
+    const gert::Shape* sparseIndiceShape = context->GetOptionalInputShape(static_cast<size_t>(SPARSE_INDICES_INDEX));
     if (layoutQStr == "BSND") {
         OP_CHECK_IF(queryShape->GetDimNum() != 4,
                     OP_LOGE(context, "BSND layout, query dim num (%zu) must be 4!", queryShape->GetDimNum()),
@@ -89,7 +89,7 @@ static ge::graphStatus InferShapeSparseFlashMlaSoftmaxL1Norm(gert::InferShapeCon
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeSparseFlashMlaSoftmaxL1Norm(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeSparseFlashMlaSoftmaxL1Norm(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("SparseFlashMlaSoftmaxL1Norm", "InferDataTypeContext is nullptr!"),
                 return ge::GRAPH_FAILED);

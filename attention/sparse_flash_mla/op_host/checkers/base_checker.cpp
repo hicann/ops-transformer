@@ -16,9 +16,12 @@
 namespace optiling {
 namespace sparse_mla_checker {
 namespace {
-const char *GetOpName(const CheckContext &context) { return context.opName == nullptr ? "SparseMla" : context.opName; }
+const char* GetOpName(const CheckContext& context)
+{
+    return context.opName == nullptr ? "SparseMla" : context.opName;
+}
 
-std::string ShapeToString(const gert::Shape *shape)
+std::string ShapeToString(const gert::Shape* shape)
 {
     if (shape == nullptr) {
         return "nullptr";
@@ -51,31 +54,31 @@ std::string ValuesToString(std::initializer_list<T> values)
 }
 } // namespace
 
-ge::graphStatus BaseChecker::CheckSinglePara(const CheckContext &context) const
+ge::graphStatus BaseChecker::CheckSinglePara(const CheckContext& context) const
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BaseChecker::CheckParaExistence(const CheckContext &context) const
+ge::graphStatus BaseChecker::CheckParaExistence(const CheckContext& context) const
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BaseChecker::CheckFeature(const CheckContext &context) const
+ge::graphStatus BaseChecker::CheckFeature(const CheckContext& context) const
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BaseChecker::CheckMultiPara(const CheckContext &context) const
+ge::graphStatus BaseChecker::CheckMultiPara(const CheckContext& context) const
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BaseChecker::CheckTensorDesc(const CheckContext &context, const TensorParam &param, const char *name,
+ge::graphStatus BaseChecker::CheckTensorDesc(const CheckContext& context, const TensorParam& param, const char* name,
                                              std::initializer_list<ge::DataType> dtypes) const
 {
     if (!param.present) {
@@ -98,7 +101,7 @@ ge::graphStatus BaseChecker::CheckTensorDesc(const CheckContext &context, const 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BaseChecker::CheckDimNum(const CheckContext &context, const TensorParam &param, const char *name,
+ge::graphStatus BaseChecker::CheckDimNum(const CheckContext& context, const TensorParam& param, const char* name,
                                          std::initializer_list<size_t> dimNums) const
 {
     if (!param.present) {
@@ -116,8 +119,8 @@ ge::graphStatus BaseChecker::CheckDimNum(const CheckContext &context, const Tens
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BaseChecker::CheckNoEmptyDim(const CheckContext &context, const TensorParam &param,
-                                             const char *name) const
+ge::graphStatus BaseChecker::CheckNoEmptyDim(const CheckContext& context, const TensorParam& param,
+                                             const char* name) const
 {
     if (!param.present) {
         return ge::GRAPH_SUCCESS;
@@ -134,7 +137,7 @@ ge::graphStatus BaseChecker::CheckNoEmptyDim(const CheckContext &context, const 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BaseChecker::CheckShape(const CheckContext &context, const TensorParam &param, const char *name,
+ge::graphStatus BaseChecker::CheckShape(const CheckContext& context, const TensorParam& param, const char* name,
                                         std::initializer_list<int64_t> expected) const
 {
     if (!param.present) {
@@ -156,8 +159,8 @@ ge::graphStatus BaseChecker::CheckShape(const CheckContext &context, const Tenso
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BaseChecker::CheckSameShape(const CheckContext &context, const TensorParam &left, const char *leftName,
-                                            const TensorParam &right, const char *rightName) const
+ge::graphStatus BaseChecker::CheckSameShape(const CheckContext& context, const TensorParam& left, const char* leftName,
+                                            const TensorParam& right, const char* rightName) const
 {
     OP_CHECK_IF(
         left.shape == nullptr || right.shape == nullptr,
@@ -181,7 +184,7 @@ ge::graphStatus BaseChecker::CheckSameShape(const CheckContext &context, const T
     return ge::GRAPH_SUCCESS;
 }
 
-int64_t BaseChecker::GetDim(const TensorParam &param, size_t index) const
+int64_t BaseChecker::GetDim(const TensorParam& param, size_t index) const
 {
     if (param.shape == nullptr || index >= param.shape->GetDimNum()) {
         return -1;
@@ -189,9 +192,15 @@ int64_t BaseChecker::GetDim(const TensorParam &param, size_t index) const
     return param.shape->GetDim(index);
 }
 
-bool BaseChecker::CanOmitSequsedOriKv(const CheckContext &context) const { return context.oriTopkLength.present; }
+bool BaseChecker::CanOmitSequsedOriKv(const CheckContext& context) const
+{
+    return context.oriTopkLength.present;
+}
 
-bool BaseChecker::CanOmitSequsedCmpKv(const CheckContext &context) const { return context.cmpTopkLength.present; }
+bool BaseChecker::CanOmitSequsedCmpKv(const CheckContext& context) const
+{
+    return context.cmpTopkLength.present;
+}
 
 } // namespace sparse_mla_checker
 } // namespace optiling

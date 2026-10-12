@@ -17,20 +17,26 @@ namespace StemOamPrepVarlenQUT {
 
 class StemPrepQInferDTypeTest : public testing::TestWithParam<StemPrepQInferDTypeUtParam> {
 protected:
-    static void SetUpTestCase() { std::cout << "StemOamPrepVarlenQ InferDTypeTest SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "StemOamPrepVarlenQ InferDTypeTest SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "StemOamPrepVarlenQ InferDTypeTest TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "StemOamPrepVarlenQ InferDTypeTest TearDown" << std::endl;
+    }
 };
 
 TEST_P(StemPrepQInferDTypeTest, param)
 {
     auto param = GetParam();
 
-    std::vector<void *> inputDataTypes;
+    std::vector<void*> inputDataTypes;
     inputDataTypes.emplace_back(&param.q_dtype);
 
     ge::DataType qFlat_dtype_init = ge::DT_UNDEFINED;
-    std::vector<void *> outputDataTypes;
+    std::vector<void*> outputDataTypes;
     outputDataTypes.emplace_back(&qFlat_dtype_init);
 
     auto contextHolder =

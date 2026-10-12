@@ -22,7 +22,7 @@
 namespace {
 using OpAttr = gert::TilingContextPara::OpAttr;
 
-constexpr const char *kOpName = "SparseLightningIndexerGradKLLoss";
+constexpr const char* kOpName = "SparseLightningIndexerGradKLLoss";
 constexpr uint32_t kCoreNum = 1U;
 constexpr uint64_t kUbSize = 196608ULL;
 constexpr uint64_t kL1Size = 524288ULL;
@@ -30,12 +30,10 @@ constexpr uint64_t kL0CSize = 131072ULL;
 constexpr uint64_t kL2Size = 33554432ULL;
 constexpr size_t kTilingDataSize = 8192;
 
-static const uint64_t kTilingKeyBsndFp16 =
-    GET_TPL_TILING_KEY(1, 2048, static_cast<uint8_t>(LayoutType::LAYOUT_BSND),
-                       static_cast<uint8_t>(LayoutType::LAYOUT_BSND), 3, 0);
-static const uint64_t kTilingKeyTndBf16 =
-    GET_TPL_TILING_KEY(1, 2048, static_cast<uint8_t>(LayoutType::LAYOUT_TND),
-                       static_cast<uint8_t>(LayoutType::LAYOUT_TND), 3, 0);
+static const uint64_t kTilingKeyBsndFp16 = GET_TPL_TILING_KEY(1, 2048, static_cast<uint8_t>(LayoutType::LAYOUT_BSND),
+                                                              static_cast<uint8_t>(LayoutType::LAYOUT_BSND), 3, 0);
+static const uint64_t kTilingKeyTndBf16 = GET_TPL_TILING_KEY(1, 2048, static_cast<uint8_t>(LayoutType::LAYOUT_TND),
+                                                             static_cast<uint8_t>(LayoutType::LAYOUT_TND), 3, 0);
 
 optiling::SparseLightningIndexerGradKLLossCompileInfo MakeCompileInfo()
 {
@@ -50,24 +48,19 @@ optiling::SparseLightningIndexerGradKLLossCompileInfo MakeCompileInfo()
     return info;
 }
 
-std::vector<OpAttr> MakeAttrs(const std::string &layout, int64_t sparseMode = 3, bool deterministic = false)
+std::vector<OpAttr> MakeAttrs(const std::string& layout, int64_t sparseMode = 3, bool deterministic = false)
 {
-    return {
-        {"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
-        {"layout", Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)},
-        {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(sparseMode)},
-        {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-        {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
-        {"deterministic", Ops::Transformer::AnyValue::CreateFrom<bool>(deterministic)}
-    };
+    return {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
+            {"layout", Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)},
+            {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(sparseMode)},
+            {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+            {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2147483647)},
+            {"deterministic", Ops::Transformer::AnyValue::CreateFrom<bool>(deterministic)}};
 }
 
-gert::TilingContextPara MakeBsndPara(optiling::SparseLightningIndexerGradKLLossCompileInfo &compileInfo,
-                                     ge::DataType dataType = ge::DT_FLOAT16,
-                                     ge::DataType weightType = ge::DT_FLOAT16,
-                                     const std::string &layout = "BSND",
-                                     int64_t sparseMode = 3,
-                                     int64_t topK = 2048,
+gert::TilingContextPara MakeBsndPara(optiling::SparseLightningIndexerGradKLLossCompileInfo& compileInfo,
+                                     ge::DataType dataType = ge::DT_FLOAT16, ge::DataType weightType = ge::DT_FLOAT16,
+                                     const std::string& layout = "BSND", int64_t sparseMode = 3, int64_t topK = 2048,
                                      int64_t queryHeadNum = 32)
 {
     constexpr int64_t b = 1;
@@ -81,39 +74,28 @@ gert::TilingContextPara MakeBsndPara(optiling::SparseLightningIndexerGradKLLossC
 
     return gert::TilingContextPara(
         kOpName,
-        {
-            {{{b, s1, queryHeadNum, d}, {b, s1, queryHeadNum, d}}, dataType, ge::FORMAT_ND},
-            {{{b, s2, n2, d}, {b, s2, n2, d}}, dataType, ge::FORMAT_ND},
-            {{{b, s1, nIdx, dIdx}, {b, s1, nIdx, dIdx}}, dataType, ge::FORMAT_ND},
-            {{{b, s2, n2, dIdx}, {b, s2, n2, dIdx}}, dataType, ge::FORMAT_ND},
-            {{{b, s1, nIdx}, {b, s1, nIdx}}, weightType, ge::FORMAT_ND},
-            {{{b, n2, s1, topK}, {b, n2, s1, topK}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{b, n2, s1, nIdx}, {b, n2, s1, nIdx}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{b, n2, s1, nIdx}, {b, n2, s1, nIdx}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{b, s1, queryHeadNum, dRope}, {b, s1, queryHeadNum, dRope}}, dataType, ge::FORMAT_ND},
-            {{{b, s2, n2, dRope}, {b, s2, n2, dRope}}, dataType, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND}
-        },
-        {
-            {{{b, s1, nIdx, dIdx}, {b, s1, nIdx, dIdx}}, dataType, ge::FORMAT_ND},
-            {{{b, s2, n2, dIdx}, {b, s2, n2, dIdx}}, dataType, ge::FORMAT_ND},
-            {{{b, s1, nIdx}, {b, s1, nIdx}}, weightType, ge::FORMAT_ND},
-            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        MakeAttrs(layout, sparseMode),
-        std::vector<uint32_t>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
-        std::vector<uint32_t>{1, 1, 1, 1},
-        &compileInfo,
-        "Ascend910B",
-        kCoreNum,
-        kUbSize,
-        kTilingDataSize);
+        {{{{b, s1, queryHeadNum, d}, {b, s1, queryHeadNum, d}}, dataType, ge::FORMAT_ND},
+         {{{b, s2, n2, d}, {b, s2, n2, d}}, dataType, ge::FORMAT_ND},
+         {{{b, s1, nIdx, dIdx}, {b, s1, nIdx, dIdx}}, dataType, ge::FORMAT_ND},
+         {{{b, s2, n2, dIdx}, {b, s2, n2, dIdx}}, dataType, ge::FORMAT_ND},
+         {{{b, s1, nIdx}, {b, s1, nIdx}}, weightType, ge::FORMAT_ND},
+         {{{b, n2, s1, topK}, {b, n2, s1, topK}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{b, n2, s1, nIdx}, {b, n2, s1, nIdx}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{b, n2, s1, nIdx}, {b, n2, s1, nIdx}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{b, s1, queryHeadNum, dRope}, {b, s1, queryHeadNum, dRope}}, dataType, ge::FORMAT_ND},
+         {{{b, s2, n2, dRope}, {b, s2, n2, dRope}}, dataType, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND}},
+        {{{{b, s1, nIdx, dIdx}, {b, s1, nIdx, dIdx}}, dataType, ge::FORMAT_ND},
+         {{{b, s2, n2, dIdx}, {b, s2, n2, dIdx}}, dataType, ge::FORMAT_ND},
+         {{{b, s1, nIdx}, {b, s1, nIdx}}, weightType, ge::FORMAT_ND},
+         {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        MakeAttrs(layout, sparseMode), std::vector<uint32_t>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+        std::vector<uint32_t>{1, 1, 1, 1}, &compileInfo, "Ascend910B", kCoreNum, kUbSize, kTilingDataSize);
 }
 
-gert::TilingContextPara MakeTndPara(optiling::SparseLightningIndexerGradKLLossCompileInfo &compileInfo,
-                                    int64_t *actualSeqQuery,
-                                    int64_t *actualSeqKey)
+gert::TilingContextPara MakeTndPara(optiling::SparseLightningIndexerGradKLLossCompileInfo& compileInfo,
+                                    int64_t* actualSeqQuery, int64_t* actualSeqKey)
 {
     constexpr int64_t t1 = 128;
     constexpr int64_t t2 = 256;
@@ -126,36 +108,26 @@ gert::TilingContextPara MakeTndPara(optiling::SparseLightningIndexerGradKLLossCo
     constexpr int64_t topK = 2048;
     constexpr int64_t batch = 1;
 
-    return gert::TilingContextPara(
-        kOpName,
-        {
-            {{{t1, n1, d}, {t1, n1, d}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{t2, n2, d}, {t2, n2, d}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{t1, nIdx, dIdx}, {t1, nIdx, dIdx}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{t2, n2, dIdx}, {t2, n2, dIdx}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{t1, nIdx}, {t1, nIdx}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{n2, t1, topK}, {n2, t1, topK}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{n2, t1, nIdx}, {n2, t1, nIdx}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{n2, t1, nIdx}, {n2, t1, nIdx}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{t1, n1, dRope}, {t1, n1, dRope}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{t2, n2, dRope}, {t2, n2, dRope}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND, true, actualSeqQuery},
-            {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND, true, actualSeqKey}
-        },
-        {
-            {{{t1, nIdx, dIdx}, {t1, nIdx, dIdx}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{t2, n2, dIdx}, {t2, n2, dIdx}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{t1, nIdx}, {t1, nIdx}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND}
-        },
-        MakeAttrs("TND"),
-        std::vector<uint32_t>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-        std::vector<uint32_t>{1, 1, 1, 1},
-        &compileInfo,
-        "Ascend910B",
-        kCoreNum,
-        kUbSize,
-        kTilingDataSize);
+    return gert::TilingContextPara(kOpName,
+                                   {{{{t1, n1, d}, {t1, n1, d}}, ge::DT_BF16, ge::FORMAT_ND},
+                                    {{{t2, n2, d}, {t2, n2, d}}, ge::DT_BF16, ge::FORMAT_ND},
+                                    {{{t1, nIdx, dIdx}, {t1, nIdx, dIdx}}, ge::DT_BF16, ge::FORMAT_ND},
+                                    {{{t2, n2, dIdx}, {t2, n2, dIdx}}, ge::DT_BF16, ge::FORMAT_ND},
+                                    {{{t1, nIdx}, {t1, nIdx}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                    {{{n2, t1, topK}, {n2, t1, topK}}, ge::DT_INT32, ge::FORMAT_ND},
+                                    {{{n2, t1, nIdx}, {n2, t1, nIdx}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                    {{{n2, t1, nIdx}, {n2, t1, nIdx}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                    {{{t1, n1, dRope}, {t1, n1, dRope}}, ge::DT_BF16, ge::FORMAT_ND},
+                                    {{{t2, n2, dRope}, {t2, n2, dRope}}, ge::DT_BF16, ge::FORMAT_ND},
+                                    {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND, true, actualSeqQuery},
+                                    {{{batch}, {batch}}, ge::DT_INT64, ge::FORMAT_ND, true, actualSeqKey}},
+                                   {{{{t1, nIdx, dIdx}, {t1, nIdx, dIdx}}, ge::DT_BF16, ge::FORMAT_ND},
+                                    {{{t2, n2, dIdx}, {t2, n2, dIdx}}, ge::DT_BF16, ge::FORMAT_ND},
+                                    {{{t1, nIdx}, {t1, nIdx}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                    {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+                                   MakeAttrs("TND"), std::vector<uint32_t>{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+                                   std::vector<uint32_t>{1, 1, 1, 1}, &compileInfo, "Ascend910B", kCoreNum, kUbSize,
+                                   kTilingDataSize);
 }
 } // namespace
 

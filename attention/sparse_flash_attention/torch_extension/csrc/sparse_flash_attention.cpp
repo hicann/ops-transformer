@@ -28,7 +28,7 @@ const int64_t DIM_3 = 3;
 const int64_t DIM_4 = 4;
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> ConstructSparseFlashAttentionOutputTensor(
-    const at::Tensor &query, const at::Tensor &key, const std::string &queryLayoutStr, const std::string &keyLayoutStr,
+    const at::Tensor& query, const at::Tensor& key, const std::string& queryLayoutStr, const std::string& keyLayoutStr,
     bool returnSoftmaxLse)
 {
     TORCH_CHECK(query.numel() > 0, "Tensor query is empty.")
@@ -74,11 +74,11 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> ConstructSparseFlashAttentionOutp
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> SparseFlashAttention(
-    const at::Tensor &query, const at::Tensor &key, const c10::optional<at::Tensor> &value,
-    const at::Tensor &sparseIndices, double scaleValue, const c10::optional<at::Tensor> &blockTable,
-    const c10::optional<at::Tensor> &actualSeqLengthsQuery, const c10::optional<at::Tensor> &actualSeqLengthsKv,
-    const c10::optional<at::Tensor> &queryRope, const c10::optional<at::Tensor> &keyRope,
-    const c10::optional<at::Tensor> &sinks, int64_t sparseBlockSize, c10::string_view layoutQuery,
+    const at::Tensor& query, const at::Tensor& key, const c10::optional<at::Tensor>& value,
+    const at::Tensor& sparseIndices, double scaleValue, const c10::optional<at::Tensor>& blockTable,
+    const c10::optional<at::Tensor>& actualSeqLengthsQuery, const c10::optional<at::Tensor>& actualSeqLengthsKv,
+    const c10::optional<at::Tensor>& queryRope, const c10::optional<at::Tensor>& keyRope,
+    const c10::optional<at::Tensor>& sinks, int64_t sparseBlockSize, c10::string_view layoutQuery,
     c10::string_view layoutKv, int64_t sparseMode, int64_t preTokens, int64_t nextTokens, int64_t attentionMode,
     bool returnSoftmaxLse)
 {

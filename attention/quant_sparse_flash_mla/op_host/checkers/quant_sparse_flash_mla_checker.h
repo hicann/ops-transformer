@@ -18,13 +18,13 @@ namespace optiling {
 
 class QuantSparseFlashMlaChecker {
 public:
-    explicit QuantSparseFlashMlaChecker(const QSMLATilingInfo &info)
+    explicit QuantSparseFlashMlaChecker(const QSMLATilingInfo& info)
         : info_(info)
     {}
     ge::graphStatus Process() const;
 
 private:
-    const QSMLATilingInfo &info_;
+    const QSMLATilingInfo& info_;
 };
 
 } // namespace optiling

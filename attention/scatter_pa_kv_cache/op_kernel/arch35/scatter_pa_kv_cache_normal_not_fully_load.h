@@ -24,8 +24,8 @@ using namespace AscendC;
 template <typename T, typename IndexDtype, int64_t InOutMode, bool NCT = false>
 class ScatterPaKvCacheNormalNotFullyLoad {
 public:
-    __aicore__ inline ScatterPaKvCacheNormalNotFullyLoad(TPipe *pipe,
-                                                         const ScatterPaKvCacheTilingData *__restrict tiling)
+    __aicore__ inline ScatterPaKvCacheNormalNotFullyLoad(TPipe* pipe,
+                                                         const ScatterPaKvCacheTilingData* __restrict tiling)
         : pipe_(pipe),
           tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR key, GM_ADDR key_cache_in, GM_ADDR slot_mapping, GM_ADDR value,
@@ -41,10 +41,10 @@ private:
     __aicore__ inline int64_t RoundUp(int64_t x);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, 1> keyQueue_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, 1> valueQueue_;
-    const ScatterPaKvCacheTilingData *tilingData_;
+    const ScatterPaKvCacheTilingData* tilingData_;
 
     GlobalTensor<T> keyGm_;
     GlobalTensor<T> valueGm_;
@@ -65,17 +65,17 @@ __aicore__ inline void ScatterPaKvCacheNormalNotFullyLoad<T, IndexDtype, InOutMo
 {
     blockIdx_ = GetBlockIdx();
     blockFactorOffset_ = blockIdx_ * tilingData_->blockFactor;
-    keyGm_.SetGlobalBuffer((__gm__ T *)(key));
-    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype *)(slot_mapping) + GetBlockIdx() * tilingData_->blockFactor);
-    keyCacheOutGm_.SetGlobalBuffer((__gm__ T *)(key_cache_out));
+    keyGm_.SetGlobalBuffer((__gm__ T*)(key));
+    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype*)(slot_mapping) + GetBlockIdx() * tilingData_->blockFactor);
+    keyCacheOutGm_.SetGlobalBuffer((__gm__ T*)(key_cache_out));
     int64_t kMaxHandleNumPerLoop = tilingData_->kHandleNumPerLoop > tilingData_->kTailHandleNum ?
                                        tilingData_->kHandleNumPerLoop :
                                        tilingData_->kTailHandleNum;
     pipe_->InitBuffer(keyQueue_, 1, RoundUp(kMaxHandleNumPerLoop) * sizeof(T));
 
     if constexpr (InOutMode == DUAL_IN_OUT) {
-        valueGm_.SetGlobalBuffer((__gm__ T *)(value));
-        valueCacheOutGm_.SetGlobalBuffer((__gm__ T *)(value_cache_out));
+        valueGm_.SetGlobalBuffer((__gm__ T*)(value));
+        valueCacheOutGm_.SetGlobalBuffer((__gm__ T*)(value_cache_out));
         int64_t vMaxHandleNumPerLoop = tilingData_->vHandleNumPerLoop > tilingData_->vTailHandleNum ?
                                            tilingData_->vHandleNumPerLoop :
                                            tilingData_->vTailHandleNum;

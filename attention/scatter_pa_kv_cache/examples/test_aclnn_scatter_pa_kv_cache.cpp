@@ -17,19 +17,19 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_scatter_pa_kv_cache.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -38,8 +38,9 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-  int Init(int32_t deviceId, aclrtStream* stream) {
-  // 固定写法，资源初始化
+int Init(int32_t deviceId, aclrtStream* stream)
+{
+    // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
     ret = aclrtSetDevice(deviceId);
@@ -47,10 +48,12 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     ret = aclrtCreateStream(stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtCreateStream failed. ERROR: %d\n", ret); return ret);
     return 0;
-  }
+}
 
-  template <typename T>
-  int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr, aclDataType dataType, aclTensor** tensor, aclFormat format) {
+template <typename T>
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor, aclFormat format)
+{
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -62,16 +65,17 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     // 计算连续tensor的strides
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = shape.size() - 2; i >= 0; i--) {
-      strides[i] = shape[i + 1] * strides[i + 1];
+        strides[i] = shape[i + 1] * strides[i + 1];
     }
 
     // 调用aclCreateTensor接口创建aclTensor
-    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format,
-                              shape.data(), shape.size(), *deviceAddr);
+    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
+                              shape.size(), *deviceAddr);
     return 0;
-  }
+}
 
-  int main() {
+int main()
+{
     // 1. （固定写法）device/stream初始化，参考acl API手册
     // 根据自己的实际device填写deviceId
     int32_t deviceId = 0;
@@ -103,8 +107,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     aclTensor* compressLens = nullptr;
     aclTensor* compressSeqOffset = nullptr;
     aclTensor* seqLens = nullptr;
-    char * cacheMode = "PA_NZ";
-    char * scatterMode = "None";
+    char* cacheMode = "PA_NZ";
+    char* scatterMode = "None";
 
     std::vector<int16_t> hostKey(128, 0);
     std::vector<int16_t> hostValue(128, 0);
@@ -118,33 +122,40 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     ret = CreateAclTensor(hostKey, keyShape, &keyDeviceAddr, aclDataType::ACL_FLOAT16, &key, aclFormat::ACL_FORMAT_ND);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建value aclTensor
-    ret = CreateAclTensor(hostValue, valueShape, &valueDeviceAddr, aclDataType::ACL_FLOAT16, &value, aclFormat::ACL_FORMAT_ND);
+    ret = CreateAclTensor(hostValue, valueShape, &valueDeviceAddr, aclDataType::ACL_FLOAT16, &value,
+                          aclFormat::ACL_FORMAT_ND);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建slotMappitng aclTensor
-    ret = CreateAclTensor(hostSlotMapping, slotMappingShape, &slotMappingDeviceAddr, aclDataType::ACL_INT32, &slotMapping, aclFormat::ACL_FORMAT_ND);
+    ret = CreateAclTensor(hostSlotMapping, slotMappingShape, &slotMappingDeviceAddr, aclDataType::ACL_INT32,
+                          &slotMapping, aclFormat::ACL_FORMAT_ND);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建keyCache aclTensor
-    ret = CreateAclTensor(hostKeyCacheRef, keyCacheShape, &keyCacheDeviceAddr, aclDataType::ACL_FLOAT16, &keyCache, aclFormat::ACL_FORMAT_ND);
+    ret = CreateAclTensor(hostKeyCacheRef, keyCacheShape, &keyCacheDeviceAddr, aclDataType::ACL_FLOAT16, &keyCache,
+                          aclFormat::ACL_FORMAT_ND);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建valueCache aclTensor
-    ret = CreateAclTensor(hostValueCacheRef, valueCacheShape, &valueCacheDeviceAddr, aclDataType::ACL_FLOAT16, &valueCache, aclFormat::ACL_FORMAT_ND);
+    ret = CreateAclTensor(hostValueCacheRef, valueCacheShape, &valueCacheDeviceAddr, aclDataType::ACL_FLOAT16,
+                          &valueCache, aclFormat::ACL_FORMAT_ND);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    aclIntArray *strides = aclCreateIntArray(hostStrides.data(), 2);
+    aclIntArray* strides = aclCreateIntArray(hostStrides.data(), 2);
     CHECK_RET(strides != nullptr, return ACL_ERROR_INTERNAL_ERROR);
-    aclIntArray *offsets = aclCreateIntArray(hostOffsets.data(), 2);
+    aclIntArray* offsets = aclCreateIntArray(hostOffsets.data(), 2);
     CHECK_RET(offsets != nullptr, return ACL_ERROR_INTERNAL_ERROR);
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor;
     // 调用aclnnScatterPaKvCache第一段接口
-    ret = aclnnScatterPaKvCacheGetWorkspaceSize(key, keyCache, slotMapping, value, valueCache, compressLens, compressSeqOffset, seqLens, cacheMode, scatterMode, strides, offsets, &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnScatterPaKvCacheGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+    ret = aclnnScatterPaKvCacheGetWorkspaceSize(key, keyCache, slotMapping, value, valueCache, compressLens,
+                                                compressSeqOffset, seqLens, cacheMode, scatterMode, strides, offsets,
+                                                &workspaceSize, &executor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnScatterPaKvCacheGetWorkspaceSize failed. ERROR: %d\n", ret);
+              return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
     void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
-      ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
-      CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+        ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
     }
     // 调用aclnnScatterPaKvCache第二段接口
     ret = aclnnScatterPaKvCache(workspaceAddr, workspaceSize, executor, stream);
@@ -161,16 +172,17 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
                       keyCacheSize * sizeof(int16_t), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy keyCache from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t i = 0; i < keyCacheSize; i++) {
-      LOG_PRINT("keyCache[%ld] is: %d\n", i, keyCacheResult[i]);
+        LOG_PRINT("keyCache[%ld] is: %d\n", i, keyCacheResult[i]);
     }
 
     auto valueCacheSize = GetShapeSize(valueCacheShape);
     std::vector<int16_t> valueCacheResult(valueCacheSize, 0);
     ret = aclrtMemcpy(valueCacheResult.data(), valueCacheResult.size() * sizeof(int16_t), valueCacheDeviceAddr,
                       valueCacheSize * sizeof(int16_t), ACL_MEMCPY_DEVICE_TO_HOST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy valueCache from device to host failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy valueCache from device to host failed. ERROR: %d\n", ret);
+              return ret);
     for (int64_t i = 0; i < valueCacheSize; i++) {
-      LOG_PRINT("valueCache[%ld] is: %d\n", i, valueCacheResult[i]);
+        LOG_PRINT("valueCache[%ld] is: %d\n", i, valueCacheResult[i]);
     }
 
     // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
@@ -189,10 +201,10 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     aclrtFree(keyCacheDeviceAddr);
     aclrtFree(valueCacheDeviceAddr);
     if (workspaceSize > 0) {
-      aclrtFree(workspaceAddr);
+        aclrtFree(workspaceAddr);
     }
     aclrtDestroyStream(stream);
     aclrtResetDevice(deviceId);
     aclFinalize();
     return 0;
-  }
+}

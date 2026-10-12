@@ -39,25 +39,25 @@ public:
                                    GM_ADDR seqused_ori_kv, GM_ADDR seqused_cmp_kv, GM_ADDR cmp_residual_kv,
                                    GM_ADDR sinks, GM_ADDR dq, GM_ADDR d_ori_kv, GM_ADDR d_cmp_kv, GM_ADDR dsinks,
                                    GM_ADDR cmp_softmax_l1_norm, GM_ADDR workspace,
-                                   const TILING_CLASS *__restrict tilingData);
+                                   const TILING_CLASS* __restrict tilingData);
 
 private:
-    __aicore__ inline void Init(const TILING_CLASS *__restrict tilingData, const GM_ADDR seqused_q,
+    __aicore__ inline void Init(const TILING_CLASS* __restrict tilingData, const GM_ADDR seqused_q,
                                 const GM_ADDR seqused_ori_kv, const GM_ADDR seqused_cmp_kv);
-    __aicore__ inline void CubeCompute(CubeOp<SMLAGT> &cubeOp);
-    __aicore__ inline void VecCompute(VecOp<SMLAGT> &vecOp);
-    __aicore__ inline void CubeComputeDeter(CubeOp<SMLAGT> &cubeOp, bool &hasPendingTask);
-    __aicore__ inline void VecComputeDeter(VecOp<SMLAGT> &vecOp, bool &hasPendingTask);
-    __aicore__ inline void DrainCubeDeter(CubeOp<SMLAGT> &cubeOp, bool &hasPendingTask);
-    __aicore__ inline void DrainVecDeter(VecOp<SMLAGT> &vecOp, bool &hasPendingTask);
+    __aicore__ inline void CubeCompute(CubeOp<SMLAGT>& cubeOp);
+    __aicore__ inline void VecCompute(VecOp<SMLAGT>& vecOp);
+    __aicore__ inline void CubeComputeDeter(CubeOp<SMLAGT>& cubeOp, bool& hasPendingTask);
+    __aicore__ inline void VecComputeDeter(VecOp<SMLAGT>& vecOp, bool& hasPendingTask);
+    __aicore__ inline void DrainCubeDeter(CubeOp<SMLAGT>& cubeOp, bool& hasPendingTask);
+    __aicore__ inline void DrainVecDeter(VecOp<SMLAGT>& vecOp, bool& hasPendingTask);
     __aicore__ inline void UpdateGmOffset(int64_t task, int32_t loop);
     __aicore__ inline void SaveLastInfo();
     __aicore__ inline void GetTndSeqLen(const GM_ADDR actual_seq_qlen_addr, const GM_ADDR actual_seq_ori_kvlen_addr,
                                         const GM_ADDR actual_seq_cmp_kvlen_addr, const GM_ADDR cmp_residual_kv,
-                                        const int64_t t1Idx, int64_t &bIdx);
-    __aicore__ inline void GetActualSelCount(const int64_t t1Idx, const int64_t n2Idx, int32_t &actSelBlkCount,
-                                             int32_t &curS2Loop);
-    __aicore__ inline void DeterAccumulateAfterLocalSync(VecOp<SMLAGT> &vecOp);
+                                        const int64_t t1Idx, int64_t& bIdx);
+    __aicore__ inline void GetActualSelCount(const int64_t t1Idx, const int64_t n2Idx, int32_t& actSelBlkCount,
+                                             int32_t& curS2Loop);
+    __aicore__ inline void DeterAccumulateAfterLocalSync(VecOp<SMLAGT>& vecOp);
     __aicore__ inline void UpdateUsedSeqLen(int64_t batchIdx);
 
     uint32_t cubeBlockIdx;
@@ -175,7 +175,7 @@ private:
 };
 
 template <typename SMLAGT>
-__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::Init(const TILING_CLASS *__restrict tilingData,
+__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::Init(const TILING_CLASS* __restrict tilingData,
                                                                 const GM_ADDR seqused_q, const GM_ADDR seqused_ori_kv,
                                                                 const GM_ADDR seqused_cmp_kv)
 {
@@ -261,13 +261,13 @@ __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::Process(
     GM_ADDR topk_indices, GM_ADDR cu_seqlens_q, GM_ADDR cu_seqlens_ori_kv, GM_ADDR cu_seqlens_cmp_kv, GM_ADDR seqused_q,
     GM_ADDR seqused_ori_kv, GM_ADDR seqused_cmp_kv, GM_ADDR cmp_residual_kv, GM_ADDR sinks, GM_ADDR dq,
     GM_ADDR d_ori_kv, GM_ADDR d_cmp_kv, GM_ADDR dsinks, GM_ADDR cmp_softmax_l1_norm, GM_ADDR workspace,
-    const TILING_CLASS *__restrict tilingData)
+    const TILING_CLASS* __restrict tilingData)
 {
     Init(tilingData, seqused_q, seqused_ori_kv, seqused_cmp_kv);
-    topkIndicesGm.SetGlobalBuffer((__gm__ int32_t *)topk_indices);
+    topkIndicesGm.SetGlobalBuffer((__gm__ int32_t*)topk_indices);
 
     if constexpr (IS_BSND == true) {
-        residual = ((__gm__ int32_t *)cmp_residual_kv)[0];
+        residual = ((__gm__ int32_t*)cmp_residual_kv)[0];
     }
 
     // AIC Process
@@ -471,7 +471,7 @@ __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::Process(
 }
 
 template <typename SMLAGT>
-__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::CubeCompute(CubeOp<SMLAGT> &cubeOp)
+__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::CubeCompute(CubeOp<SMLAGT>& cubeOp)
 {
     int64_t taskMod = runInfo[mmPingPongIdx].task & 1;
     // WaitVec for select & gather
@@ -490,7 +490,7 @@ __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::CubeCompute(CubeOp<SM
 }
 
 template <typename SMLAGT>
-__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::VecCompute(VecOp<SMLAGT> &vecOp)
+__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::VecCompute(VecOp<SMLAGT>& vecOp)
 {
     int64_t taskMod = runInfo[mmPingPongIdx].task & 1;
     if (cubeBlockIdx < usedCoreNum && !runInfo[mmPingPongIdx].isOri) {
@@ -522,8 +522,8 @@ __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::VecCompute(VecOp<SMLA
 }
 
 template <typename SMLAGT>
-__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::CubeComputeDeter(CubeOp<SMLAGT> &cubeOp,
-                                                                            bool &hasPendingTask)
+__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::CubeComputeDeter(CubeOp<SMLAGT>& cubeOp,
+                                                                            bool& hasPendingTask)
 {
     int64_t taskMod = runInfo[mmPingPongIdx].task & 1;
     CrossCoreWaitFlag<2, PIPE_MTE2>(taskMod == 0 ? CUBE_WAIT_VEC_GATHER_PING : CUBE_WAIT_VEC_GATHER_PONG);
@@ -543,7 +543,7 @@ __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::CubeComputeDeter(Cube
 }
 
 template <typename SMLAGT>
-__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::DrainCubeDeter(CubeOp<SMLAGT> &cubeOp, bool &hasPendingTask)
+__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::DrainCubeDeter(CubeOp<SMLAGT>& cubeOp, bool& hasPendingTask)
 {
     if (!hasPendingTask) {
         return;
@@ -558,7 +558,7 @@ __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::DrainCubeDeter(CubeOp
 }
 
 template <typename SMLAGT>
-__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::VecComputeDeter(VecOp<SMLAGT> &vecOp, bool &hasPendingTask)
+__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::VecComputeDeter(VecOp<SMLAGT>& vecOp, bool& hasPendingTask)
 {
     int64_t taskMod = runInfo[mmPingPongIdx].task & 1;
     if (cubeBlockIdx < usedCoreNum && !runInfo[mmPingPongIdx].isOri) {
@@ -583,7 +583,7 @@ __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::VecComputeDeter(VecOp
 }
 
 template <typename SMLAGT>
-__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::DrainVecDeter(VecOp<SMLAGT> &vecOp, bool &hasPendingTask)
+__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::DrainVecDeter(VecOp<SMLAGT>& vecOp, bool& hasPendingTask)
 {
     if (!hasPendingTask) {
         return;
@@ -689,33 +689,33 @@ __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::GetTndSeqLen(const GM
                                                                         const GM_ADDR actual_seq_ori_kvlen_addr,
                                                                         const GM_ADDR actual_seq_cmp_kvlen_addr,
                                                                         const GM_ADDR cmp_residual_kv,
-                                                                        const int64_t t1Idx, int64_t &bIdx)
+                                                                        const int64_t t1Idx, int64_t& bIdx)
 {
     if constexpr (IS_BSND == false) {
-        int64_t curT1 = ((__gm__ int32_t *)actual_seq_qlen_addr)[bIndex];
+        int64_t curT1 = ((__gm__ int32_t*)actual_seq_qlen_addr)[bIndex];
         while (t1Idx >= curT1) {
-            curT1 = ((__gm__ int32_t *)actual_seq_qlen_addr)[++bIndex];
+            curT1 = ((__gm__ int32_t*)actual_seq_qlen_addr)[++bIndex];
         }
 
         if (unlikely(bIndex == 0)) {
             t1Offset = 0;
             t2Offset = 0;
             t3Offset = 0;
-            curS1 = ((__gm__ int32_t *)actual_seq_qlen_addr)[bIndex + 1];
-            curS2 = ((__gm__ int32_t *)actual_seq_ori_kvlen_addr)[bIndex + 1];
-            curS3 = ((__gm__ int32_t *)actual_seq_cmp_kvlen_addr)[bIndex + 1];
-            residual = ((__gm__ int32_t *)cmp_residual_kv)[bIndex];
+            curS1 = ((__gm__ int32_t*)actual_seq_qlen_addr)[bIndex + 1];
+            curS2 = ((__gm__ int32_t*)actual_seq_ori_kvlen_addr)[bIndex + 1];
+            curS3 = ((__gm__ int32_t*)actual_seq_cmp_kvlen_addr)[bIndex + 1];
+            residual = ((__gm__ int32_t*)cmp_residual_kv)[bIndex];
         } else {
-            t1Offset = ((__gm__ int32_t *)actual_seq_qlen_addr)[bIndex - 1];
-            t2Offset = ((__gm__ int32_t *)actual_seq_ori_kvlen_addr)[bIndex - 1];
-            t3Offset = ((__gm__ int32_t *)actual_seq_cmp_kvlen_addr)[bIndex - 1];
+            t1Offset = ((__gm__ int32_t*)actual_seq_qlen_addr)[bIndex - 1];
+            t2Offset = ((__gm__ int32_t*)actual_seq_ori_kvlen_addr)[bIndex - 1];
+            t3Offset = ((__gm__ int32_t*)actual_seq_cmp_kvlen_addr)[bIndex - 1];
             curS1 =
-                ((__gm__ int32_t *)actual_seq_qlen_addr)[bIndex] - ((__gm__ int32_t *)actual_seq_qlen_addr)[bIndex - 1];
-            curS2 = (((__gm__ int32_t *)actual_seq_ori_kvlen_addr)[bIndex] -
-                     ((__gm__ int32_t *)actual_seq_ori_kvlen_addr)[bIndex - 1]);
-            curS3 = (((__gm__ int32_t *)actual_seq_cmp_kvlen_addr)[bIndex] -
-                     ((__gm__ int32_t *)actual_seq_cmp_kvlen_addr)[bIndex - 1]);
-            residual = ((__gm__ int32_t *)cmp_residual_kv)[bIndex - 1];
+                ((__gm__ int32_t*)actual_seq_qlen_addr)[bIndex] - ((__gm__ int32_t*)actual_seq_qlen_addr)[bIndex - 1];
+            curS2 = (((__gm__ int32_t*)actual_seq_ori_kvlen_addr)[bIndex] -
+                     ((__gm__ int32_t*)actual_seq_ori_kvlen_addr)[bIndex - 1]);
+            curS3 = (((__gm__ int32_t*)actual_seq_cmp_kvlen_addr)[bIndex] -
+                     ((__gm__ int32_t*)actual_seq_cmp_kvlen_addr)[bIndex - 1]);
+            residual = ((__gm__ int32_t*)cmp_residual_kv)[bIndex - 1];
         }
 
         s1Index = t1Idx - t1Offset;
@@ -731,7 +731,7 @@ __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::GetTndSeqLen(const GM
 }
 
 template <typename SMLAGT>
-__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::DeterAccumulateAfterLocalSync(VecOp<SMLAGT> &vecOp)
+__aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::DeterAccumulateAfterLocalSync(VecOp<SMLAGT>& vecOp)
 {
     if (needDeterAcc) {
         CrossCoreWaitFlag<2, PIPE_MTE2>(DETER_KV_SYNC_FLAG);
@@ -753,21 +753,21 @@ __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::UpdateUsedSeqLen(int6
     usedS3 = curS3;
     if constexpr (HAS_SEQUSED) {
         if (hasUsedSeqQ) {
-            usedS1 = ((__gm__ int32_t *)seqused_q)[batchIdx];
+            usedS1 = ((__gm__ int32_t*)seqused_q)[batchIdx];
         }
         if (hasUsedSeqOriKV) {
-            usedS2 = ((__gm__ int32_t *)seqused_ori_kv)[batchIdx];
+            usedS2 = ((__gm__ int32_t*)seqused_ori_kv)[batchIdx];
         }
         if (hasUsedSeqCmpKV) {
-            usedS3 = ((__gm__ int32_t *)seqused_cmp_kv)[batchIdx];
+            usedS3 = ((__gm__ int32_t*)seqused_cmp_kv)[batchIdx];
         }
     }
 }
 
 template <typename SMLAGT>
 __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::GetActualSelCount(const int64_t t1Idx, const int64_t n2Idx,
-                                                                             int32_t &actSelBlkCount,
-                                                                             int32_t &curS2Loop)
+                                                                             int32_t& actSelBlkCount,
+                                                                             int32_t& curS2Loop)
 {
     // EOD 下 usedS* 为槽位内有效长度（非 EOD 时等于 curS*）
     int64_t maxS3 = Max((usedS3 * cmpRatio + residual - usedS1 + s1Index + 1) / cmpRatio, 0);

@@ -53,16 +53,16 @@ __aicore__ inline void SoftmaxCompute(LocalTensor<float> prevCurSoftmaxMaxLocal,
                                       LocalTensor<float> softmaxSumLocal, LocalTensor<float> tempFp32Buf1Local,
                                       LocalTensor<float> tempFp32Buf2Local, int64_t softmaxEleNumLoop, int64_t calNum)
 {
-    auto prevSoftmaxMaxUbAddr = (__ubuf__ float *)prevCurSoftmaxMaxLocal.GetPhyAddr();
-    auto curSoftmaxMaxUbAddr = (__ubuf__ float *)prevCurSoftmaxMaxLocal.GetPhyAddr() + softmaxEleNumLoop;
-    auto prevSoftmaxSumUbAddr = (__ubuf__ float *)prevCurSoftmaxSumLocal.GetPhyAddr();
-    auto curSoftmaxSumUbAddr = (__ubuf__ float *)prevCurSoftmaxSumLocal.GetPhyAddr() + softmaxEleNumLoop;
-    auto softmaxMaxUbAddr = (__ubuf__ float *)softmaxMaxLocal.GetPhyAddr();
-    auto softmaxSumUbAddr = (__ubuf__ float *)softmaxSumLocal.GetPhyAddr();
-    auto tempFp32Buf1UbAddr = (__ubuf__ float *)tempFp32Buf1Local.GetPhyAddr(); // prev_out_scale
-    auto tempFp32Buf2UbAddr = (__ubuf__ float *)tempFp32Buf2Local.GetPhyAddr(); // cur_out_scale
-    uint16_t repeatTimes = (uint16_t)CeilDiv(calNum, (int64_t)VL_FP32);         // 实际计算量
-    uint32_t count = uint32_t(calNum);                                          // 实际计算量
+    auto prevSoftmaxMaxUbAddr = (__ubuf__ float*)prevCurSoftmaxMaxLocal.GetPhyAddr();
+    auto curSoftmaxMaxUbAddr = (__ubuf__ float*)prevCurSoftmaxMaxLocal.GetPhyAddr() + softmaxEleNumLoop;
+    auto prevSoftmaxSumUbAddr = (__ubuf__ float*)prevCurSoftmaxSumLocal.GetPhyAddr();
+    auto curSoftmaxSumUbAddr = (__ubuf__ float*)prevCurSoftmaxSumLocal.GetPhyAddr() + softmaxEleNumLoop;
+    auto softmaxMaxUbAddr = (__ubuf__ float*)softmaxMaxLocal.GetPhyAddr();
+    auto softmaxSumUbAddr = (__ubuf__ float*)softmaxSumLocal.GetPhyAddr();
+    auto tempFp32Buf1UbAddr = (__ubuf__ float*)tempFp32Buf1Local.GetPhyAddr(); // prev_out_scale
+    auto tempFp32Buf2UbAddr = (__ubuf__ float*)tempFp32Buf2Local.GetPhyAddr(); // cur_out_scale
+    uint16_t repeatTimes = (uint16_t)CeilDiv(calNum, (int64_t)VL_FP32);        // 实际计算量
+    uint32_t count = uint32_t(calNum);                                         // 实际计算量
     __VEC_SCOPE__
     {
         AscendC::Reg::MaskReg maskReg;
@@ -136,11 +136,11 @@ __aicore__ inline void AttnComputeFp32(LocalTensor<T> prevCurAttnOutLocal, Local
                                        int64_t attnEleNumLoop, int64_t loopNum, int64_t calNum, int64_t headDimLoopEach,
                                        int64_t softmaxTailSize)
 {
-    auto prevAttnOutUbAddr = (__ubuf__ T *)prevCurAttnOutLocal.GetPhyAddr();
-    auto curAttnOutUbAddr = (__ubuf__ T *)prevCurAttnOutLocal.GetPhyAddr() + attnEleNumLoop;
-    auto tempFp32Buf1UbAddr = (__ubuf__ float *)tempFp32Buf1Local.GetPhyAddr(); // prev_out_scale
-    auto tempFp32Buf2UbAddr = (__ubuf__ float *)tempFp32Buf2Local.GetPhyAddr(); // cur_out_scale
-    auto attnOutUbAddr = (__ubuf__ float *)attnOutLocal.GetPhyAddr();
+    auto prevAttnOutUbAddr = (__ubuf__ T*)prevCurAttnOutLocal.GetPhyAddr();
+    auto curAttnOutUbAddr = (__ubuf__ T*)prevCurAttnOutLocal.GetPhyAddr() + attnEleNumLoop;
+    auto tempFp32Buf1UbAddr = (__ubuf__ float*)tempFp32Buf1Local.GetPhyAddr(); // prev_out_scale
+    auto tempFp32Buf2UbAddr = (__ubuf__ float*)tempFp32Buf2Local.GetPhyAddr(); // cur_out_scale
+    auto attnOutUbAddr = (__ubuf__ float*)attnOutLocal.GetPhyAddr();
     uint16_t loop = (uint16_t)loopNum;                                           // 实际计算量
     uint16_t repeatTimes = (uint16_t)((uint32_t)calNum + VL_FP32 - 1) / VL_FP32; // 实际计算量对齐，冗余的最后不会搬出
 
@@ -190,11 +190,11 @@ __aicore__ inline void AttnComputeBf16Fp16(LocalTensor<T> prevCurAttnOutLocal, L
                                            int64_t attnEleNumLoop, int64_t loopNum, int64_t calNum,
                                            int64_t headDimLoopEach, int64_t softmaxTailSize)
 {
-    auto prevAttnOutUbAddr = (__ubuf__ T *)prevCurAttnOutLocal.GetPhyAddr();
-    auto curAttnOutUbAddr = (__ubuf__ T *)prevCurAttnOutLocal.GetPhyAddr() + attnEleNumLoop;
-    auto tempFp32Buf1UbAddr = (__ubuf__ float *)tempFp32Buf1Local.GetPhyAddr(); // prev_out_scale
-    auto tempFp32Buf2UbAddr = (__ubuf__ float *)tempFp32Buf2Local.GetPhyAddr(); // cur_out_scale
-    auto attnOutUbAddr = (__ubuf__ T *)attnOutLocal.GetPhyAddr();
+    auto prevAttnOutUbAddr = (__ubuf__ T*)prevCurAttnOutLocal.GetPhyAddr();
+    auto curAttnOutUbAddr = (__ubuf__ T*)prevCurAttnOutLocal.GetPhyAddr() + attnEleNumLoop;
+    auto tempFp32Buf1UbAddr = (__ubuf__ float*)tempFp32Buf1Local.GetPhyAddr(); // prev_out_scale
+    auto tempFp32Buf2UbAddr = (__ubuf__ float*)tempFp32Buf2Local.GetPhyAddr(); // cur_out_scale
+    auto attnOutUbAddr = (__ubuf__ T*)attnOutLocal.GetPhyAddr();
     uint16_t loop = (uint16_t)loopNum;                                           // 实际计算量
     uint16_t repeatTimes = (uint16_t)((uint32_t)calNum + VL_FP32 - 1) / VL_FP32; // 实际计算量对齐，冗余的最后不会搬出
 

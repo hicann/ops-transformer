@@ -26,8 +26,8 @@
 namespace optiling {
 namespace smlag {
 
-constexpr const char *BSND_STR = "BSND";
-constexpr const char *TND_STR = "TND";
+constexpr const char* BSND_STR = "BSND";
+constexpr const char* TND_STR = "TND";
 constexpr size_t DIM_0 = 0;
 constexpr size_t DIM_1 = 1;
 constexpr size_t DIM_2 = 2;

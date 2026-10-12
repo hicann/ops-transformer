@@ -45,34 +45,34 @@ public:
     SMLA_ARGS_TRAITS;
     __aicore__ inline SparseFlashMlaSwaKernel(){};
 
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV,
-                                __gm__ uint8_t *oriSparseIndices, __gm__ uint8_t *cmpSparseIndices,
-                                __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
-                                __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv,
-                                __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedQ, __gm__ uint8_t *seqUsedOriKV,
-                                __gm__ uint8_t *seqUsedCmpKV, __gm__ uint8_t *cmpResidualKV,
-                                __gm__ uint8_t *oriTopkLength, __gm__ uint8_t *cmpTopkLength, __gm__ uint8_t *sinks,
-                                __gm__ uint8_t *metadata, __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
-                                __gm__ uint8_t *workspace, const SparseFlashMlaTilingData *__restrict tiling);
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* oriKV, __gm__ uint8_t* cmpKV,
+                                __gm__ uint8_t* oriSparseIndices, __gm__ uint8_t* cmpSparseIndices,
+                                __gm__ uint8_t* oriBlockTable, __gm__ uint8_t* cmpBlockTable,
+                                __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensOriKv,
+                                __gm__ uint8_t* cuSeqlensCmpKv, __gm__ uint8_t* sequsedQ, __gm__ uint8_t* seqUsedOriKV,
+                                __gm__ uint8_t* seqUsedCmpKV, __gm__ uint8_t* cmpResidualKV,
+                                __gm__ uint8_t* oriTopkLength, __gm__ uint8_t* cmpTopkLength, __gm__ uint8_t* sinks,
+                                __gm__ uint8_t* metadata, __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse,
+                                __gm__ uint8_t* workspace, const SparseFlashMlaTilingData* __restrict tiling);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void ProcessMainLoop();
-    __aicore__ inline void ParseTilingData(__gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ,
-                                           __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv,
-                                           __gm__ uint8_t *seqUsedOriKV, __gm__ uint8_t *seqUsedCmpKV,
-                                           __gm__ uint8_t *cmpResidualKV);
-    __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV,
-                                            __gm__ uint8_t *oriSparseIndices, __gm__ uint8_t *cmpSparseIndices,
-                                            __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
-                                            __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv,
-                                            __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedQ,
-                                            __gm__ uint8_t *seqUsedOriKV, __gm__ uint8_t *seqUsedCmpKV,
-                                            __gm__ uint8_t *cmpResidualKV, __gm__ uint8_t *sinks,
-                                            __gm__ uint8_t *workspace,
-                                            const SparseFlashMlaTilingData *__restrict tiling);
-    __aicore__ inline void InitMMResBuf(__gm__ uint8_t *workspace);
-    const SparseFlashMlaTilingData *__restrict tilingData;
+    __aicore__ inline void ParseTilingData(__gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* sequsedQ,
+                                           __gm__ uint8_t* cuSeqlensOriKv, __gm__ uint8_t* cuSeqlensCmpKv,
+                                           __gm__ uint8_t* seqUsedOriKV, __gm__ uint8_t* seqUsedCmpKV,
+                                           __gm__ uint8_t* cmpResidualKV);
+    __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t* query, __gm__ uint8_t* oriKV, __gm__ uint8_t* cmpKV,
+                                            __gm__ uint8_t* oriSparseIndices, __gm__ uint8_t* cmpSparseIndices,
+                                            __gm__ uint8_t* oriBlockTable, __gm__ uint8_t* cmpBlockTable,
+                                            __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensOriKv,
+                                            __gm__ uint8_t* cuSeqlensCmpKv, __gm__ uint8_t* sequsedQ,
+                                            __gm__ uint8_t* seqUsedOriKV, __gm__ uint8_t* seqUsedCmpKV,
+                                            __gm__ uint8_t* cmpResidualKV, __gm__ uint8_t* sinks,
+                                            __gm__ uint8_t* workspace,
+                                            const SparseFlashMlaTilingData* __restrict tiling);
+    __aicore__ inline void InitMMResBuf(__gm__ uint8_t* workspace);
+    const SparseFlashMlaTilingData* __restrict tilingData;
     /* 编译期常量的基本块信息 */
     static constexpr uint32_t PRELOAD_NUM = 2;
 
@@ -118,13 +118,13 @@ private:
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::Init(
-    __gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV, __gm__ uint8_t *oriSparseIndices,
-    __gm__ uint8_t *cmpSparseIndices, __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
-    __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv,
-    __gm__ uint8_t *sequsedQ, __gm__ uint8_t *seqUsedOriKv, __gm__ uint8_t *seqUsedCmpKv, __gm__ uint8_t *cmpResidualKV,
-    __gm__ uint8_t *oriTopkLength, __gm__ uint8_t *cmpTopkLength, __gm__ uint8_t *sinks, __gm__ uint8_t *metadata,
-    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-    const SparseFlashMlaTilingData *__restrict tiling)
+    __gm__ uint8_t* query, __gm__ uint8_t* oriKV, __gm__ uint8_t* cmpKV, __gm__ uint8_t* oriSparseIndices,
+    __gm__ uint8_t* cmpSparseIndices, __gm__ uint8_t* oriBlockTable, __gm__ uint8_t* cmpBlockTable,
+    __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensOriKv, __gm__ uint8_t* cuSeqlensCmpKv,
+    __gm__ uint8_t* sequsedQ, __gm__ uint8_t* seqUsedOriKv, __gm__ uint8_t* seqUsedCmpKv, __gm__ uint8_t* cmpResidualKV,
+    __gm__ uint8_t* oriTopkLength, __gm__ uint8_t* cmpTopkLength, __gm__ uint8_t* sinks, __gm__ uint8_t* metadata,
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+    const SparseFlashMlaTilingData* __restrict tiling)
 {
     fa_base_matmul::ResetIdCounter();
     constInfo.subBlockIdx = GetSubBlockIdx();
@@ -141,7 +141,7 @@ __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::Ini
     if (metadata == nullptr) {
         return;
     }
-    this->metadataGm.SetGlobalBuffer((__gm__ uint32_t *)metadata);
+    this->metadataGm.SetGlobalBuffer((__gm__ uint32_t*)metadata);
 
     constInfo.s1BaseSize = 64;
     constInfo.s2BaseSize = 128;
@@ -167,12 +167,12 @@ __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::Ini
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::ParseTilingData(
-    __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ, __gm__ uint8_t *cuSeqlensOriKv,
-    __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *seqUsedOriKV, __gm__ uint8_t *seqUsedCmpKV,
-    __gm__ uint8_t *cmpResidualKV)
+    __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* sequsedQ, __gm__ uint8_t* cuSeqlensOriKv,
+    __gm__ uint8_t* cuSeqlensCmpKv, __gm__ uint8_t* seqUsedOriKV, __gm__ uint8_t* seqUsedCmpKV,
+    __gm__ uint8_t* cmpResidualKV)
 {
-    auto &sparseFlashMLABaseParams = this->tilingData->baseParams;
-    auto &sparseFlashMLACmpParams = this->tilingData->cmpParams;
+    auto& sparseFlashMLABaseParams = this->tilingData->baseParams;
+    auto& sparseFlashMLACmpParams = this->tilingData->cmpParams;
     constInfo.bSize = sparseFlashMLABaseParams.batchSize;
     constInfo.n2Size = 1;
     constInfo.gSize = sparseFlashMLABaseParams.nNumOfQInOneGroup;
@@ -211,30 +211,30 @@ __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::Par
     }
 
     if (cuSeqlensQ != nullptr) {
-        cuSeqlensQGm.SetGlobalBuffer((__gm__ int32_t *)cuSeqlensQ);
+        cuSeqlensQGm.SetGlobalBuffer((__gm__ int32_t*)cuSeqlensQ);
         hasCuSeqlensQ = true;
     }
     if (cuSeqlensOriKv != nullptr) {
-        cuSeqlensOriKvGm.SetGlobalBuffer((__gm__ int32_t *)cuSeqlensOriKv);
+        cuSeqlensOriKvGm.SetGlobalBuffer((__gm__ int32_t*)cuSeqlensOriKv);
         hasCuSeqlensOriKv = true;
     }
     if (cuSeqlensCmpKv != nullptr) {
-        cuSeqlensCmpKvGm.SetGlobalBuffer((__gm__ int32_t *)cuSeqlensCmpKv);
+        cuSeqlensCmpKvGm.SetGlobalBuffer((__gm__ int32_t*)cuSeqlensCmpKv);
         hasCuSeqlensCmpKv = true;
     }
     if (seqUsedOriKV != nullptr) {
-        actualSeqOriKvlenGm.SetGlobalBuffer((__gm__ int32_t *)seqUsedOriKV);
+        actualSeqOriKvlenGm.SetGlobalBuffer((__gm__ int32_t*)seqUsedOriKV);
         hasActualSeqOriKvlen = true;
     }
     if (seqUsedCmpKV != nullptr) {
-        actualSeqCmpKvlenGm.SetGlobalBuffer((__gm__ int32_t *)seqUsedCmpKV);
+        actualSeqCmpKvlenGm.SetGlobalBuffer((__gm__ int32_t*)seqUsedCmpKV);
         hasActualSeqCmpKvlen = true;
     }
     if (cmpResidualKV != nullptr) {
-        cmpResidualKvGm.SetGlobalBuffer((__gm__ int32_t *)cmpResidualKV);
+        cmpResidualKvGm.SetGlobalBuffer((__gm__ int32_t*)cmpResidualKV);
     }
     if (sequsedQ != nullptr) {
-        actualSeqQlenGm.SetGlobalBuffer((__gm__ int32_t *)sequsedQ);
+        actualSeqQlenGm.SetGlobalBuffer((__gm__ int32_t*)sequsedQ);
         hasActualSeqQlen = true;
     }
 
@@ -268,11 +268,11 @@ __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::Par
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::InitGlobalBuffer(
-    __gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV, __gm__ uint8_t *oriSparseIndices,
-    __gm__ uint8_t *cmpSparseIndices, __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
-    __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv,
-    __gm__ uint8_t *sequsedQ, __gm__ uint8_t *seqUsedOriKV, __gm__ uint8_t *seqUsedCmpKV, __gm__ uint8_t *cmpResidualKV,
-    __gm__ uint8_t *sinks, __gm__ uint8_t *workspace, const SparseFlashMlaTilingData *__restrict tiling)
+    __gm__ uint8_t* query, __gm__ uint8_t* oriKV, __gm__ uint8_t* cmpKV, __gm__ uint8_t* oriSparseIndices,
+    __gm__ uint8_t* cmpSparseIndices, __gm__ uint8_t* oriBlockTable, __gm__ uint8_t* cmpBlockTable,
+    __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensOriKv, __gm__ uint8_t* cuSeqlensCmpKv,
+    __gm__ uint8_t* sequsedQ, __gm__ uint8_t* seqUsedOriKV, __gm__ uint8_t* seqUsedCmpKV, __gm__ uint8_t* cmpResidualKV,
+    __gm__ uint8_t* sinks, __gm__ uint8_t* workspace, const SparseFlashMlaTilingData* __restrict tiling)
 {
     vecBlock.InitGlobalBuffer(oriKV, cmpKV, oriSparseIndices, cmpSparseIndices, oriBlockTable, cmpBlockTable, sequsedQ,
                               sinks, seqUsedOriKV, seqUsedCmpKV, cmpResidualKV);
@@ -281,7 +281,7 @@ __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::Ini
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::InitMMResBuf(__gm__ uint8_t *workspace)
+__aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::InitMMResBuf(__gm__ uint8_t* workspace)
 {
     // L1: [l1P x2][cube L1], l1P 必须放在最前面保证与 vec 申请地址相同
     uint32_t mm2LeftSize = constInfo.s1BaseSize * constInfo.s2BaseSize;
@@ -476,7 +476,7 @@ __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::Pro
                     }
                 }
                 if (notLastTwoLoop) {
-                    RunInfo &runInfo1 = smlaSwaRunInfo[taskId % 3];
+                    RunInfo& runInfo1 = smlaSwaRunInfo[taskId % 3];
                     SetRunInfo<TEMPLATE_INTF_ARGS>(runInfo1, smlaSwaRunParam, taskId, s2LoopCount, s2LoopLimit,
                                                    multiCoreInnerIdx, this->constInfo);
                     if ASCEND_IS_AIC {
@@ -485,7 +485,7 @@ __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::Pro
                     }
                 }
                 if (taskId > 0 && notLast) {
-                    auto &runInfo2 = smlaSwaRunInfo[(taskId + 2) % 3];
+                    auto& runInfo2 = smlaSwaRunInfo[(taskId + 2) % 3];
                     if ASCEND_IS_AIV {
                         uint32_t bmm1Slot = bmm1GetFlag;
                         bmm1GetFlag ^= 1;
@@ -496,13 +496,13 @@ __aicore__ inline void SparseFlashMlaSwaKernel<CubeBlockType, VecBlockType>::Pro
                     } else {
                         uint32_t bmm1Slot = bmm1GetFlag;
                         bmm1GetFlag ^= 1;
-                        RunInfo &runInfoNext = smlaSwaRunInfo[taskId % 3];
+                        RunInfo& runInfoNext = smlaSwaRunInfo[taskId % 3];
                         this->cubeBlock.IterateBmm1(this->bmm1Buffers[bmm1Slot], notLastTwoLoop, runInfoNext, runInfo2,
                                                     this->constInfo);
                     }
                 }
                 if (taskId > 1) {
-                    RunInfo &runInfo3 = smlaSwaRunInfo[(taskId + 1) % 3];
+                    RunInfo& runInfo3 = smlaSwaRunInfo[(taskId + 1) % 3];
                     if ASCEND_IS_AIV {
                         this->vecBlock.ProcessVec2(this->bmm2Buffers, runInfo3, this->constInfo);
                     } else {

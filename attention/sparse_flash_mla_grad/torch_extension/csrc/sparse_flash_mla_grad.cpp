@@ -23,16 +23,16 @@ constexpr int64_t SMLAG_METADATA_SIZE = 1024;
 
 bool IsAscend950()
 {
-    const char *socName = aclrtGetSocName();
+    const char* socName = aclrtGetSocName();
     return socName != nullptr && std::strstr(socName, "Ascend950") != nullptr;
 }
 
 at::Tensor SparseFlashMlaGradMetadata(
-    int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, const c10::optional<at::Tensor> &cuSeqlensQ,
-    const c10::optional<at::Tensor> &cuSeqlensOriKv, const c10::optional<at::Tensor> &cuSeqlensCmpKv,
-    const c10::optional<at::Tensor> &sequsedQ, const c10::optional<at::Tensor> &sequsedOriKv,
-    const c10::optional<at::Tensor> &sequsedCmpKv, const c10::optional<at::Tensor> &cmpResidualKv,
-    const c10::optional<at::Tensor> &oriTopkLength, const c10::optional<at::Tensor> &cmpTopkLength, int64_t batchSize,
+    int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, const c10::optional<at::Tensor>& cuSeqlensQ,
+    const c10::optional<at::Tensor>& cuSeqlensOriKv, const c10::optional<at::Tensor>& cuSeqlensCmpKv,
+    const c10::optional<at::Tensor>& sequsedQ, const c10::optional<at::Tensor>& sequsedOriKv,
+    const c10::optional<at::Tensor>& sequsedCmpKv, const c10::optional<at::Tensor>& cmpResidualKv,
+    const c10::optional<at::Tensor>& oriTopkLength, const c10::optional<at::Tensor>& cmpTopkLength, int64_t batchSize,
     int64_t maxSeqlenQ, int64_t maxSeqlenOriKv, int64_t maxSeqlenCmpKv, int64_t oriTopk, int64_t cmpTopk,
     int64_t cmpRatio, int64_t oriMaskMode, int64_t cmpMaskMode, int64_t oriWinLeft, int64_t oriWinRight,
     c10::string_view layoutQ, c10::string_view layoutKv, bool hasOriKv, bool hasCmpKv)
@@ -76,8 +76,8 @@ at::Tensor SparseFlashMlaGradMetadata(
     // convert str
     std::string layoutQStr = std::string(layoutQ);
     std::string layoutKvStr = std::string(layoutKv);
-    char *layoutQPtr = const_cast<char *>(layoutQStr.c_str());
-    char *layoutKvPtr = const_cast<char *>(layoutKvStr.c_str());
+    char* layoutQPtr = const_cast<char*>(layoutQStr.c_str());
+    char* layoutKvPtr = const_cast<char*>(layoutKvStr.c_str());
 
     ACLNN_CMD(aclnnSparseFlashMlaGradMetadata, cuSeqlensQVal, cuSeqlensOriKvVal, cuSeqlensCmpKvVal, sequsedQVal,
               sequsedOriKvVal, sequsedCmpKvVal, cmpResidualKvVal, oriTopkLengthVal, cmpTopkLengthVal, numHeadsQ,
@@ -87,43 +87,43 @@ at::Tensor SparseFlashMlaGradMetadata(
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> SparseFlashMlaGrad(
-    const at::Tensor &q, const at::Tensor &dout, const at::Tensor &attnOut, const at::Tensor &softmaxLse,
-    const c10::optional<at::Tensor> &oriKv, const c10::optional<at::Tensor> &cmpKv,
-    const c10::optional<at::Tensor> &oriSparseIndices, const c10::optional<at::Tensor> &cmpSparseIndices,
-    const c10::optional<at::Tensor> &cuSeqlensQ, const c10::optional<at::Tensor> &cuSeqlensOriKv,
-    const c10::optional<at::Tensor> &cuSeqlensCmpKv, const c10::optional<at::Tensor> &sequsedQ,
-    const c10::optional<at::Tensor> &sequsedOriKv, const c10::optional<at::Tensor> &sequsedCmpKv,
-    const c10::optional<at::Tensor> &cmpResidualKv, const c10::optional<at::Tensor> &oriTopkLength,
-    const c10::optional<at::Tensor> &cmpTopkLength, const c10::optional<at::Tensor> &sinks,
-    const c10::optional<at::Tensor> &metadata, c10::optional<double> softmaxScale, c10::optional<int64_t> cmpRatio,
+    const at::Tensor& q, const at::Tensor& dout, const at::Tensor& attnOut, const at::Tensor& softmaxLse,
+    const c10::optional<at::Tensor>& oriKv, const c10::optional<at::Tensor>& cmpKv,
+    const c10::optional<at::Tensor>& oriSparseIndices, const c10::optional<at::Tensor>& cmpSparseIndices,
+    const c10::optional<at::Tensor>& cuSeqlensQ, const c10::optional<at::Tensor>& cuSeqlensOriKv,
+    const c10::optional<at::Tensor>& cuSeqlensCmpKv, const c10::optional<at::Tensor>& sequsedQ,
+    const c10::optional<at::Tensor>& sequsedOriKv, const c10::optional<at::Tensor>& sequsedCmpKv,
+    const c10::optional<at::Tensor>& cmpResidualKv, const c10::optional<at::Tensor>& oriTopkLength,
+    const c10::optional<at::Tensor>& cmpTopkLength, const c10::optional<at::Tensor>& sinks,
+    const c10::optional<at::Tensor>& metadata, c10::optional<double> softmaxScale, c10::optional<int64_t> cmpRatio,
     c10::optional<int64_t> oriMaskMode, c10::optional<int64_t> cmpMaskMode, c10::optional<int64_t> oriWinLeft,
     c10::optional<int64_t> oriWinRight, c10::optional<c10::string_view> layoutQ,
     c10::optional<c10::string_view> layoutKv)
 {
-    const at::Tensor &oriKvConst = oriKv.value_or(at::Tensor());
-    const at::Tensor &cmpKvConst = cmpKv.value_or(at::Tensor());
-    const at::Tensor &oriSparseIndicesConst = oriSparseIndices.value_or(at::Tensor());
-    const at::Tensor &cmpSparseIndicesConst = cmpSparseIndices.value_or(at::Tensor());
-    const at::Tensor &cuSeqlensQConst = cuSeqlensQ.value_or(at::Tensor());
-    const at::Tensor &cuSeqlensOriKvConst = cuSeqlensOriKv.value_or(at::Tensor());
-    const at::Tensor &cuSeqlensCmpKvConst = cuSeqlensCmpKv.value_or(at::Tensor());
-    const at::Tensor &sequsedQConst = sequsedQ.value_or(at::Tensor());
-    const at::Tensor &sequsedOriKvConst = sequsedOriKv.value_or(at::Tensor());
-    const at::Tensor &sequsedCmpKvConst = sequsedCmpKv.value_or(at::Tensor());
-    const at::Tensor &cmpResidualKvConst = cmpResidualKv.value_or(at::Tensor());
-    const at::Tensor &oriTopkLengthConst = oriTopkLength.value_or(at::Tensor());
-    const at::Tensor &cmpTopkLengthConst = cmpTopkLength.value_or(at::Tensor());
-    const at::Tensor &sinksConst = sinks.value_or(at::Tensor());
+    const at::Tensor& oriKvConst = oriKv.value_or(at::Tensor());
+    const at::Tensor& cmpKvConst = cmpKv.value_or(at::Tensor());
+    const at::Tensor& oriSparseIndicesConst = oriSparseIndices.value_or(at::Tensor());
+    const at::Tensor& cmpSparseIndicesConst = cmpSparseIndices.value_or(at::Tensor());
+    const at::Tensor& cuSeqlensQConst = cuSeqlensQ.value_or(at::Tensor());
+    const at::Tensor& cuSeqlensOriKvConst = cuSeqlensOriKv.value_or(at::Tensor());
+    const at::Tensor& cuSeqlensCmpKvConst = cuSeqlensCmpKv.value_or(at::Tensor());
+    const at::Tensor& sequsedQConst = sequsedQ.value_or(at::Tensor());
+    const at::Tensor& sequsedOriKvConst = sequsedOriKv.value_or(at::Tensor());
+    const at::Tensor& sequsedCmpKvConst = sequsedCmpKv.value_or(at::Tensor());
+    const at::Tensor& cmpResidualKvConst = cmpResidualKv.value_or(at::Tensor());
+    const at::Tensor& oriTopkLengthConst = oriTopkLength.value_or(at::Tensor());
+    const at::Tensor& cmpTopkLengthConst = cmpTopkLength.value_or(at::Tensor());
+    const at::Tensor& sinksConst = sinks.value_or(at::Tensor());
     at::Tensor metadataConst = metadata.value_or(at::Tensor());
     if (!IsAscend950() && metadataConst.defined()) {
         metadataConst = at::Tensor();
     }
 
     c10::string_view layoutQStrView = layoutQ.value_or("BSND");
-    char *layoutQPtr = const_cast<char *>(layoutQStrView.data());
+    char* layoutQPtr = const_cast<char*>(layoutQStrView.data());
 
     c10::string_view layoutKvStrView = layoutKv.value_or("BSND");
-    char *layoutKvPtr = const_cast<char *>(layoutKvStrView.data());
+    char* layoutKvPtr = const_cast<char*>(layoutKvStrView.data());
 
     at::Tensor dq = at::empty_like(q);
     at::Tensor dOriKv;

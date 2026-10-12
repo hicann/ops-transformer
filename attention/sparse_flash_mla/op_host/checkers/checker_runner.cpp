@@ -26,9 +26,9 @@ void CheckerRunner::Add(std::unique_ptr<BaseChecker> checker)
     checkers_.push_back(std::move(checker));
 }
 
-ge::graphStatus CheckerRunner::Run(CheckMethod method, const CheckContext &context) const
+ge::graphStatus CheckerRunner::Run(CheckMethod method, const CheckContext& context) const
 {
-    for (const auto &checker : checkers_) {
+    for (const auto& checker : checkers_) {
         if ((checker.get()->*method)(context) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
@@ -36,7 +36,7 @@ ge::graphStatus CheckerRunner::Run(CheckMethod method, const CheckContext &conte
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckerRunner::Process(const CheckContext &context) const
+ge::graphStatus CheckerRunner::Process(const CheckContext& context) const
 {
     if (Run(&BaseChecker::CheckSinglePara, context) != ge::GRAPH_SUCCESS ||
         Run(&BaseChecker::CheckParaExistence, context) != ge::GRAPH_SUCCESS ||
@@ -47,7 +47,7 @@ ge::graphStatus CheckerRunner::Process(const CheckContext &context) const
     return ge::GRAPH_SUCCESS;
 }
 
-void RegisterCommonCheckers(CheckerRunner &runner)
+void RegisterCommonCheckers(CheckerRunner& runner)
 {
     runner.Add(std::make_unique<CommonChecker>());
     runner.Add(std::make_unique<SeqLenChecker>());

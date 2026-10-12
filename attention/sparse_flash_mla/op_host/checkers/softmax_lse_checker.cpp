@@ -14,13 +14,13 @@
 namespace optiling {
 namespace sparse_mla_checker {
 namespace {
-const char *Op(const CheckContext &context)
+const char* Op(const CheckContext& context)
 {
     return context.opName == nullptr ? "SparseMla" : context.opName;
 }
 } // namespace
 
-ge::graphStatus SoftmaxLseChecker::CheckSinglePara(const CheckContext &context) const
+ge::graphStatus SoftmaxLseChecker::CheckSinglePara(const CheckContext& context) const
 {
     if (!context.returnSoftmaxLse || !context.softmaxLse.present) {
         return ge::GRAPH_SUCCESS;
@@ -28,7 +28,7 @@ ge::graphStatus SoftmaxLseChecker::CheckSinglePara(const CheckContext &context) 
     return CheckTensorDesc(context, context.softmaxLse, "softmax_lse", {ge::DT_FLOAT});
 }
 
-ge::graphStatus SoftmaxLseChecker::CheckMultiPara(const CheckContext &context) const
+ge::graphStatus SoftmaxLseChecker::CheckMultiPara(const CheckContext& context) const
 {
     if (!context.returnSoftmaxLse || !context.softmaxLse.present) {
         return ge::GRAPH_SUCCESS;
@@ -45,8 +45,7 @@ ge::graphStatus SoftmaxLseChecker::CheckMultiPara(const CheckContext &context) c
         return CheckShape(context, context.softmaxLse, "softmax_lse",
                           {context.bSize, context.kvNumHeads, context.qSeqSize, group});
     }
-    return CheckShape(context, context.softmaxLse, "softmax_lse",
-                      {context.kvNumHeads, context.qTotalSize, group});
+    return CheckShape(context, context.softmaxLse, "softmax_lse", {context.kvNumHeads, context.qTotalSize, group});
 }
 
 } // namespace sparse_mla_checker

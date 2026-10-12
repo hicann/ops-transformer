@@ -132,7 +132,7 @@ struct RGDRInitParams {
 template <typename inType, typename outType, typename stateType = inType>
 class RGDR {
 public:
-    __aicore__ inline RGDR(const RecurrentGatedDeltaRuleTilingData *tilingData)
+    __aicore__ inline RGDR(const RecurrentGatedDeltaRuleTilingData* tilingData)
     {
         B_ = tilingData->b;
         T_ = tilingData->t;
@@ -157,7 +157,7 @@ public:
         stateStride1_ = tilingData->stateStride1;
     }
 
-    __aicore__ inline void Init(const RGDRInitParams &initParams, TPipe *pipe)
+    __aicore__ inline void Init(const RGDRInitParams& initParams, TPipe* pipe)
     {
         uint64_t blockDim = GetBlockNum();
         blockIdx = GetBlockIdx();
@@ -169,20 +169,20 @@ public:
         InitLocalBuffers();
     }
 
-    __aicore__ inline void SetGlobalTensors(const RGDRInitParams &initParams)
+    __aicore__ inline void SetGlobalTensors(const RGDRInitParams& initParams)
     {
-        queryGm_.SetGlobalBuffer((__gm__ inType *)initParams.query);
-        keyGm_.SetGlobalBuffer((__gm__ inType *)initParams.key);
-        valueGm_.SetGlobalBuffer((__gm__ inType *)initParams.value);
-        gamaGm_.SetGlobalBuffer((__gm__ float *)initParams.gama);
-        gamaKGm_.SetGlobalBuffer((__gm__ float *)initParams.gamaK);
-        betaGm_.SetGlobalBuffer((__gm__ inType *)initParams.beta);
-        initStateGm_.SetGlobalBuffer((__gm__ stateType *)initParams.initState);
-        cuSeqlensGm_.SetGlobalBuffer((__gm__ int32_t *)initParams.cuSeqlens);
-        ssmStateIndicesGm_.SetGlobalBuffer((__gm__ int32_t *)initParams.ssmStateIndices);
-        numAcceptedTokensGm_.SetGlobalBuffer((__gm__ int32_t *)initParams.numAcceptedTokens);
-        finalStateGm_.SetGlobalBuffer((__gm__ stateType *)initParams.finalState);
-        attnOutGm_.SetGlobalBuffer((__gm__ outType *)initParams.attnOut);
+        queryGm_.SetGlobalBuffer((__gm__ inType*)initParams.query);
+        keyGm_.SetGlobalBuffer((__gm__ inType*)initParams.key);
+        valueGm_.SetGlobalBuffer((__gm__ inType*)initParams.value);
+        gamaGm_.SetGlobalBuffer((__gm__ float*)initParams.gama);
+        gamaKGm_.SetGlobalBuffer((__gm__ float*)initParams.gamaK);
+        betaGm_.SetGlobalBuffer((__gm__ inType*)initParams.beta);
+        initStateGm_.SetGlobalBuffer((__gm__ stateType*)initParams.initState);
+        cuSeqlensGm_.SetGlobalBuffer((__gm__ int32_t*)initParams.cuSeqlens);
+        ssmStateIndicesGm_.SetGlobalBuffer((__gm__ int32_t*)initParams.ssmStateIndices);
+        numAcceptedTokensGm_.SetGlobalBuffer((__gm__ int32_t*)initParams.numAcceptedTokens);
+        finalStateGm_.SetGlobalBuffer((__gm__ stateType*)initParams.finalState);
+        attnOutGm_.SetGlobalBuffer((__gm__ outType*)initParams.attnOut);
     }
 
     __aicore__ inline void InitLocalBuffers()
@@ -360,7 +360,7 @@ private:
         beta_ = Cast(betaGm_.GetValue(gamaBetaGmOffset));
     }
 
-    __aicore__ inline void CopyOutState(LocalTensor<float> &outStateFp32Ub, uint32_t tIdx, uint32_t head_i,
+    __aicore__ inline void CopyOutState(LocalTensor<float>& outStateFp32Ub, uint32_t tIdx, uint32_t head_i,
                                         uint32_t dvIdx, uint32_t curSingleV)
     {
         LocalTensor<stateType> stateOutLocal = stateOutQueue_.AllocTensor<stateType>();
@@ -382,7 +382,7 @@ private:
         stateOutQueue_.FreeTensor(stateOutLocal);
     }
 
-    __aicore__ inline void CopyAttentionOut(LocalTensor<float> &attnOutFp32Ub, uint32_t tIdx, uint32_t head_i,
+    __aicore__ inline void CopyAttentionOut(LocalTensor<float>& attnOutFp32Ub, uint32_t tIdx, uint32_t head_i,
                                             uint32_t dvIdx, uint32_t curSingleV)
     {
         LocalTensor<outType> attnOutLocal = attnOutQueue_.AllocTensor<outType>();
@@ -472,7 +472,7 @@ private:
     }
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     GlobalTensor<inType> queryGm_;
     GlobalTensor<inType> keyGm_;
     GlobalTensor<inType> valueGm_;

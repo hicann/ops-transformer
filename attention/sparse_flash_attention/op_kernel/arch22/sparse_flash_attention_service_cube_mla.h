@@ -44,7 +44,7 @@ struct Position {
 // L1按NZ格式存储
 // GM的行、列、列的stride
 template <typename T>
-__aicore__ inline void DataCopyGmNDToL1(LocalTensor<T> &l1Tensor, GlobalTensor<T> &gmTensor, uint32_t rowAct,
+__aicore__ inline void DataCopyGmNDToL1(LocalTensor<T>& l1Tensor, GlobalTensor<T>& gmTensor, uint32_t rowAct,
                                         uint32_t rowAlign,
                                         uint32_t col,       // D
                                         uint32_t colStride) // D or N*D
@@ -69,11 +69,11 @@ __aicore__ inline void DataCopyGmNDToL1(LocalTensor<T> &l1Tensor, GlobalTensor<T
     shape.copyRowNumAlign 需要16字节对齐，如拷贝k矩阵，一次拷贝128*512，遇到尾块 10*512 需对齐到16*512
 */
 template <typename T, SFA_LAYOUT SRC_LAYOUT>
-__aicore__ inline void DataCopyPA(LocalTensor<T> &dstTensor,  // l1
-                                  GlobalTensor<T> &srcTensor, // gm
-                                  GlobalTensor<int32_t> &blockTableGm,
-                                  const PAShape &shape,     // blockSize, headNum, headDim
-                                  const Position &startPos) // bacthIdx nIdx curSeqIdx
+__aicore__ inline void DataCopyPA(LocalTensor<T>& dstTensor,  // l1
+                                  GlobalTensor<T>& srcTensor, // gm
+                                  GlobalTensor<int32_t>& blockTableGm,
+                                  const PAShape& shape,     // blockSize, headNum, headDim
+                                  const Position& startPos) // bacthIdx nIdx curSeqIdx
 {
     uint64_t blockTableBaseOffset = startPos.bIdx * shape.maxblockNumPerBatch;
     uint32_t curS2Idx = startPos.s2Idx;
@@ -123,27 +123,27 @@ public:
     using MM_OUT_T = T;
 
     __aicore__ inline SFAMatmulService(){};
-    __aicore__ inline void InitParams(const ConstInfo &sfaCubeConstInfo);
+    __aicore__ inline void InitParams(const ConstInfo& sfaCubeConstInfo);
     __aicore__ inline void InitMm1GlobalTensor(GlobalTensor<Q_T> queryGm, GlobalTensor<Q_T> qRopeGm,
                                                GlobalTensor<KV_T> keyGm, GlobalTensor<KV_T> kRopeGm,
                                                GlobalTensor<MM_OUT_T> mm1ResGm);
     __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<KV_T> vec1ResGm, GlobalTensor<KV_T> valueGm,
                                                GlobalTensor<MM_OUT_T> mm2ResGm, GlobalTensor<OUT_T> attentionOutGm);
-    __aicore__ inline void InitPageAttentionInfo(const GlobalTensor<KV_T> &kvMergeGm,
+    __aicore__ inline void InitPageAttentionInfo(const GlobalTensor<KV_T>& kvMergeGm,
                                                  GlobalTensor<int32_t> blockTableGm, GlobalTensor<int32_t> topKGm,
                                                  uint32_t blockSize, uint32_t maxBlockNumPerBatch);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
     __aicore__ inline void UpdateKey(GlobalTensor<KV_T> keyGm);
     __aicore__ inline void UpdateValue(GlobalTensor<KV_T> valueGm);
 
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void CalcTopKBlockInfo(const RunInfo &sfaCubeRunInfo, uint32_t &curTopKIdx,
-                                             uint64_t &curOffsetInSparseBlock, uint32_t curSeqIdx, uint32_t &copyRowCnt,
-                                             int64_t &idInTopK);
-    __aicore__ inline void ComputeMm1(const RunInfo &sfaCubeRunInfo, const MSplitInfo sfaCubeSplitInfo);
-    __aicore__ inline void ComputeMm1NoRope(const RunInfo &sfaCubeRunInfo, const MSplitInfo sfaCubeSplitInfo);
-    __aicore__ inline void ComputeMm2(const RunInfo &sfaCubeRunInfo, const MSplitInfo sfaCubeSplitInfo);
+    __aicore__ inline void CalcTopKBlockInfo(const RunInfo& sfaCubeRunInfo, uint32_t& curTopKIdx,
+                                             uint64_t& curOffsetInSparseBlock, uint32_t curSeqIdx, uint32_t& copyRowCnt,
+                                             int64_t& idInTopK);
+    __aicore__ inline void ComputeMm1(const RunInfo& sfaCubeRunInfo, const MSplitInfo sfaCubeSplitInfo);
+    __aicore__ inline void ComputeMm1NoRope(const RunInfo& sfaCubeRunInfo, const MSplitInfo sfaCubeSplitInfo);
+    __aicore__ inline void ComputeMm2(const RunInfo& sfaCubeRunInfo, const MSplitInfo sfaCubeSplitInfo);
 
 private:
     static constexpr bool PAGE_ATTENTION = SFAT::pageAttention;
@@ -233,32 +233,32 @@ private:
         return idxMap[mIdx % 2] + k1Idx;
     }
 
-    __aicore__ inline void CopyGmToL1(LocalTensor<KV_T> &l1Tensor, GlobalTensor<KV_T> &gmSrcTensor, uint32_t srcN,
+    __aicore__ inline void CopyGmToL1(LocalTensor<KV_T>& l1Tensor, GlobalTensor<KV_T>& gmSrcTensor, uint32_t srcN,
                                       uint32_t srcD, uint32_t srcDstride);
-    __aicore__ inline void CopyInMm1AToL1(LocalTensor<KV_T> &aL1Tensor, const RunInfo &sfaCubeRunInfo, uint32_t mSeqIdx,
+    __aicore__ inline void CopyInMm1AToL1(LocalTensor<KV_T>& aL1Tensor, const RunInfo& sfaCubeRunInfo, uint32_t mSeqIdx,
                                           uint32_t mSizeAct, uint32_t headSize, uint32_t headOffset);
-    __aicore__ inline void CopyInMm1ARopeToL1(LocalTensor<KV_T> &aL1Tensor, const RunInfo &sfaCubeRunInfo,
+    __aicore__ inline void CopyInMm1ARopeToL1(LocalTensor<KV_T>& aL1Tensor, const RunInfo& sfaCubeRunInfo,
                                               uint32_t mSeqIdx, uint32_t mSizeAct);
-    __aicore__ inline void CopyInMm1BToL1(LocalTensor<KV_T> &bL1Tensor, const uint64_t keyGmBaseOffset,
+    __aicore__ inline void CopyInMm1BToL1(LocalTensor<KV_T>& bL1Tensor, const uint64_t keyGmBaseOffset,
                                           uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                           uint32_t nActCopyRowCount, uint32_t headSize);
-    __aicore__ inline void CopyInMm1BRopeToL1(LocalTensor<KV_T> &bL1Tensor, const uint64_t keyGmBaseOffset,
+    __aicore__ inline void CopyInMm1BRopeToL1(LocalTensor<KV_T>& bL1Tensor, const uint64_t keyGmBaseOffset,
                                               uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                               uint32_t nActCopyRowCount, uint32_t headSize);
-    __aicore__ inline void CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor, const RunInfo &sfaCubeRunInfo, uint32_t mSeqIdx,
+    __aicore__ inline void CopyInMm2AToL1(LocalTensor<KV_T>& aL1Tensor, const RunInfo& sfaCubeRunInfo, uint32_t mSeqIdx,
                                           uint32_t subMSizeAct, uint32_t nSize, uint32_t nOffset);
-    __aicore__ inline void CopyInMm2BToL1(LocalTensor<KV_T> &bL1Tensor, const uint64_t valueGmBaseOffset,
+    __aicore__ inline void CopyInMm2BToL1(LocalTensor<KV_T>& bL1Tensor, const uint64_t valueGmBaseOffset,
                                           uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                           uint32_t nActCopyRowCount, uint32_t copyStartColumnCount,
                                           uint32_t copyColumnCount);
-    __aicore__ inline void LoadDataMm1A(LocalTensor<KV_T> &aL0Tensor, LocalTensor<KV_T> &aL1Tensor, uint32_t idx,
+    __aicore__ inline void LoadDataMm1A(LocalTensor<KV_T>& aL0Tensor, LocalTensor<KV_T>& aL1Tensor, uint32_t idx,
                                         uint32_t kSplitSize, uint32_t mSize, uint32_t kSize);
-    __aicore__ inline void LoadDataMm1B(LocalTensor<KV_T> &bL0Tensor, LocalTensor<KV_T> &bL1Tensor, uint32_t idx,
+    __aicore__ inline void LoadDataMm1B(LocalTensor<KV_T>& bL0Tensor, LocalTensor<KV_T>& bL1Tensor, uint32_t idx,
                                         uint32_t kSplitSize, uint32_t kSize, uint32_t nSize);
 };
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::InitParams(const ConstInfo &sfaCubeConstInfo)
+__aicore__ inline void SFAMatmulService<SFAT>::InitParams(const ConstInfo& sfaCubeConstInfo)
 {
     this->sfaCubeConstInfo = sfaCubeConstInfo;
 }
@@ -290,7 +290,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::InitMm2GlobalTensor(GlobalTensor<
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::InitPageAttentionInfo(const GlobalTensor<KV_T> &kvMergeGm,
+__aicore__ inline void SFAMatmulService<SFAT>::InitPageAttentionInfo(const GlobalTensor<KV_T>& kvMergeGm,
                                                                      GlobalTensor<int32_t> blockTableGm,
                                                                      GlobalTensor<int32_t> topKGm, uint32_t blockSize,
                                                                      uint32_t maxBlockNumPerBatch)
@@ -303,7 +303,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::InitPageAttentionInfo(const Globa
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void SFAMatmulService<SFAT>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(bufQPL1, L1_BLOCK_SIZE * 4); // (64K + 8K) * 4
     l1QPTensor = bufQPL1.Get<Q_T>();
@@ -362,7 +362,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::FreeEventID()
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::CopyGmToL1(LocalTensor<KV_T> &l1Tensor, GlobalTensor<KV_T> &gmSrcTensor,
+__aicore__ inline void SFAMatmulService<SFAT>::CopyGmToL1(LocalTensor<KV_T>& l1Tensor, GlobalTensor<KV_T>& gmSrcTensor,
                                                           uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams sfaCubeCopyParams;
@@ -378,8 +378,8 @@ __aicore__ inline void SFAMatmulService<SFAT>::CopyGmToL1(LocalTensor<KV_T> &l1T
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::CopyInMm1AToL1(LocalTensor<KV_T> &l1Tensor,
-                                                              const RunInfo &sfaCubeRunInfo, uint32_t mSeqIdx,
+__aicore__ inline void SFAMatmulService<SFAT>::CopyInMm1AToL1(LocalTensor<KV_T>& l1Tensor,
+                                                              const RunInfo& sfaCubeRunInfo, uint32_t mSeqIdx,
                                                               uint32_t mSizeAct, uint32_t headSize, uint32_t headOffset)
 {
     auto srcGm = queryGm[sfaCubeRunInfo.tensorAOffset + mSeqIdx * sfaCubeConstInfo.headDim + headOffset];
@@ -387,8 +387,8 @@ __aicore__ inline void SFAMatmulService<SFAT>::CopyInMm1AToL1(LocalTensor<KV_T> 
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::CopyInMm1ARopeToL1(LocalTensor<KV_T> &l1Tensor,
-                                                                  const RunInfo &sfaCubeRunInfo, uint32_t mSeqIdx,
+__aicore__ inline void SFAMatmulService<SFAT>::CopyInMm1ARopeToL1(LocalTensor<KV_T>& l1Tensor,
+                                                                  const RunInfo& sfaCubeRunInfo, uint32_t mSeqIdx,
                                                                   uint32_t mSizeAct)
 {
     auto srcGm = qRopeGm[sfaCubeRunInfo.tensorARopeOffset + mSeqIdx * sfaCubeConstInfo.headDimRope];
@@ -396,7 +396,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::CopyInMm1ARopeToL1(LocalTensor<KV
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::CopyInMm1BToL1(LocalTensor<KV_T> &bL1Tensor,
+__aicore__ inline void SFAMatmulService<SFAT>::CopyInMm1BToL1(LocalTensor<KV_T>& bL1Tensor,
                                                               const uint64_t keyGmBaseOffset,
                                                               uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                                               uint32_t nActCopyRowCount, uint32_t headSize)
@@ -421,7 +421,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::CopyInMm1BToL1(LocalTensor<KV_T> 
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::CopyInMm1BRopeToL1(LocalTensor<KV_T> &bL1Tensor,
+__aicore__ inline void SFAMatmulService<SFAT>::CopyInMm1BRopeToL1(LocalTensor<KV_T>& bL1Tensor,
                                                                   const uint64_t kRopeGmBaseOffset,
                                                                   uint32_t copyTotalRowCntAlign,
                                                                   uint32_t copyStartRowCnt, uint32_t nActCopyRowCount,
@@ -447,7 +447,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::CopyInMm1BRopeToL1(LocalTensor<KV
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::LoadDataMm1A(LocalTensor<KV_T> &aL0Tensor, LocalTensor<KV_T> &aL1Tensor,
+__aicore__ inline void SFAMatmulService<SFAT>::LoadDataMm1A(LocalTensor<KV_T>& aL0Tensor, LocalTensor<KV_T>& aL1Tensor,
                                                             uint32_t idx, uint32_t kSplitSize, uint32_t mSize,
                                                             uint32_t kSize)
 {
@@ -481,7 +481,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::LoadDataMm1A(LocalTensor<KV_T> &a
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::LoadDataMm1B(LocalTensor<KV_T> &l0Tensor, LocalTensor<KV_T> &l1Tensor,
+__aicore__ inline void SFAMatmulService<SFAT>::LoadDataMm1B(LocalTensor<KV_T>& l0Tensor, LocalTensor<KV_T>& l1Tensor,
                                                             uint32_t idx, uint32_t kSplitSize, uint32_t kSize,
                                                             uint32_t nSize)
 {
@@ -498,8 +498,8 @@ __aicore__ inline void SFAMatmulService<SFAT>::LoadDataMm1B(LocalTensor<KV_T> &l
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor,
-                                                              const RunInfo &sfaCubeRunInfo, uint32_t mSeqIdx,
+__aicore__ inline void SFAMatmulService<SFAT>::CopyInMm2AToL1(LocalTensor<KV_T>& aL1Tensor,
+                                                              const RunInfo& sfaCubeRunInfo, uint32_t mSeqIdx,
                                                               uint32_t subMSizeAct, uint32_t nSize, uint32_t nOffset)
 {
     auto srcGm = vec1ResGm[(sfaCubeRunInfo.loop % sfaCubeConstInfo.preLoadNum) * sfaCubeConstInfo.mmResUbSize +
@@ -508,7 +508,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::CopyInMm2AToL1(LocalTensor<KV_T> 
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::CopyInMm2BToL1(LocalTensor<KV_T> &bL1Tensor,
+__aicore__ inline void SFAMatmulService<SFAT>::CopyInMm2BToL1(LocalTensor<KV_T>& bL1Tensor,
                                                               const uint64_t valueGmBaseOffset,
                                                               uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                                               uint32_t nActCopyRowCount, uint32_t copyStartColumnCount,
@@ -535,9 +535,9 @@ __aicore__ inline void SFAMatmulService<SFAT>::CopyInMm2BToL1(LocalTensor<KV_T> 
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::CalcTopKBlockInfo(const RunInfo &sfaCubeRunInfo, uint32_t &curTopKIdx,
-                                                                 uint64_t &curOffsetInSparseBlock, uint32_t curSeqIdx,
-                                                                 uint32_t &copyRowCnt, int64_t &idInTopK)
+__aicore__ inline void SFAMatmulService<SFAT>::CalcTopKBlockInfo(const RunInfo& sfaCubeRunInfo, uint32_t& curTopKIdx,
+                                                                 uint64_t& curOffsetInSparseBlock, uint32_t curSeqIdx,
+                                                                 uint32_t& copyRowCnt, int64_t& idInTopK)
 {
     uint64_t blockBegin = idInTopK * sfaCubeConstInfo.sparseBlockSize;
     uint64_t blockEnd = (blockBegin + sfaCubeConstInfo.sparseBlockSize > sfaCubeRunInfo.threshold) ?
@@ -572,7 +572,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::CalcTopKBlockInfo(const RunInfo &
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::ComputeMm1NoRope(const RunInfo &sfaCubeRunInfo,
+__aicore__ inline void SFAMatmulService<SFAT>::ComputeMm1NoRope(const RunInfo& sfaCubeRunInfo,
                                                                 const MSplitInfo sfaCubeSplitInfo)
 {
     uint32_t mSize = sfaCubeSplitInfo.nBufferDealM;
@@ -770,7 +770,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::ComputeMm1NoRope(const RunInfo &s
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::ComputeMm1(const RunInfo &sfaCubeRunInfo,
+__aicore__ inline void SFAMatmulService<SFAT>::ComputeMm1(const RunInfo& sfaCubeRunInfo,
                                                           const MSplitInfo sfaCubeSplitInfo)
 {
     // 最外层还需要一层m的循环
@@ -1065,7 +1065,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::ComputeMm1(const RunInfo &sfaCube
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAMatmulService<SFAT>::ComputeMm2(const RunInfo &sfaCubeRunInfo,
+__aicore__ inline void SFAMatmulService<SFAT>::ComputeMm2(const RunInfo& sfaCubeRunInfo,
                                                           const MSplitInfo sfaCubeSplitInfo)
 {
     uint32_t mSize = sfaCubeSplitInfo.nBufferDealM;

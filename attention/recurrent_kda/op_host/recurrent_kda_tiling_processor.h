@@ -53,7 +53,7 @@ static constexpr int64_t RKDA_FUSED_REDUCE_K = 128;
 static constexpr size_t RKDA_SYS_WORKSPACE_SIZE = 16U * 1024U * 1024U;
 
 struct RecurrentKdaTilingContext {
-    const char *nodeName = "RecurrentKda";
+    const char* nodeName = "RecurrentKda";
     gert::Shape queryShape;
     gert::Shape keyShape;
     gert::Shape valueShape;
@@ -97,17 +97,17 @@ struct RecurrentKdaTilingContext {
 
 class RecurrentKdaTilingProcessor {
 public:
-    explicit RecurrentKdaTilingProcessor(const RecurrentKdaTilingContext &ctx)
+    explicit RecurrentKdaTilingProcessor(const RecurrentKdaTilingContext& ctx)
         : ctx_(ctx)
     {}
 
-    ge::graphStatus ProcessShapes(RecurrentKdaTilingData &tiling) const
+    ge::graphStatus ProcessShapes(RecurrentKdaTilingData& tiling) const
     {
         tiling.vectorCoreNum = static_cast<uint32_t>(ctx_.aivNum);
 
         struct RuleItem {
-            const char *name;
-            ge::graphStatus (RecurrentKdaTilingProcessor::*fn)(RecurrentKdaTilingData &) const;
+            const char* name;
+            ge::graphStatus (RecurrentKdaTilingProcessor::*fn)(RecurrentKdaTilingData&) const;
         };
         const std::array<RuleItem, 4> shapeRules = {{
             {"RuleCheckShapeDimAndRelation", &RecurrentKdaTilingProcessor::RuleCheckShapeDimAndRelation},
@@ -116,18 +116,18 @@ public:
             {"RuleUpdateDynamicBlockDimByTaskUnits",
              &RecurrentKdaTilingProcessor::RuleUpdateDynamicBlockDimByTaskUnits},
         }};
-        for (const auto &rule : shapeRules) {
+        for (const auto& rule : shapeRules) {
             OP_CHECK_IF((this->*(rule.fn))(tiling) != ge::GRAPH_SUCCESS,
                         OP_LOGE(ctx_.nodeName, "ProcessShapes rule failed: %s", rule.name), return ge::GRAPH_FAILED);
         }
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus ProcessUb(RecurrentKdaTilingData &tiling) const
+    ge::graphStatus ProcessUb(RecurrentKdaTilingData& tiling) const
     {
         struct RuleItem {
-            const char *name;
-            ge::graphStatus (RecurrentKdaTilingProcessor::*fn)(RecurrentKdaTilingData &, UbCalcContext &) const;
+            const char* name;
+            ge::graphStatus (RecurrentKdaTilingProcessor::*fn)(RecurrentKdaTilingData&, UbCalcContext&) const;
         };
         UbCalcContext ubCalcCtx;
         const std::array<RuleItem, 5> ubRules = {{
@@ -137,7 +137,7 @@ public:
             {"RuleCalcVStepCoeff", &RecurrentKdaTilingProcessor::RuleCalcVStepCoeff},
             {"RuleFinalizeVStepFromUb", &RecurrentKdaTilingProcessor::RuleFinalizeVStepFromUb},
         }};
-        for (const auto &rule : ubRules) {
+        for (const auto& rule : ubRules) {
             OP_CHECK_IF((this->*(rule.fn))(tiling, ubCalcCtx) != ge::GRAPH_SUCCESS,
                         OP_LOGE(ctx_.nodeName, "ProcessUb rule failed: %s", rule.name), return ge::GRAPH_FAILED);
         }
@@ -171,7 +171,7 @@ private:
         if (hasStrides) {
             return output ? ctx_.stateOutStrides : ctx_.stateInStrides;
         }
-        const auto &shape = ctx_.stateShape;
+        const auto& shape = ctx_.stateShape;
         std::array<int64_t, RKDA_STATE_DIM_NUM> strides = {};
         strides[RKDA_DIM_3] = 1;
         strides[RKDA_DIM_2] = shape.GetDim(RKDA_DIM_3);
@@ -180,14 +180,14 @@ private:
         return strides;
     }
 
-    ge::graphStatus ValidateStateStrides(const std::array<int64_t, RKDA_STATE_DIM_NUM> &strides, const char *name) const
+    ge::graphStatus ValidateStateStrides(const std::array<int64_t, RKDA_STATE_DIM_NUM>& strides, const char* name) const
     {
         for (size_t i = 0; i < RKDA_STATE_DIM_NUM; ++i) {
             OP_CHECK_IF(strides[i] <= 0,
                         OP_LOGE(ctx_.nodeName, "%s stride[%zu] must be positive, but it is %ld.", name, i, strides[i]),
                         return ge::GRAPH_FAILED);
         }
-        const auto &shape = ctx_.stateShape;
+        const auto& shape = ctx_.stateShape;
         const int64_t denseRow = shape.GetDim(RKDA_DIM_3);
         const int64_t densePlane = shape.GetDim(RKDA_DIM_2) * denseRow;
         OP_CHECK_IF(
@@ -216,7 +216,7 @@ private:
         return ge::GRAPH_SUCCESS;
     }
 
-    bool CheckDim(const gert::Shape &shape, const size_t dim, const std::string &dimDesc) const
+    bool CheckDim(const gert::Shape& shape, const size_t dim, const std::string& dimDesc) const
     {
         if (shape.GetDimNum() != dim) {
             OP_LOGE(ctx_.nodeName, "The number of dimensions of %s should be %zu, but it is %zu", dimDesc.c_str(), dim,
@@ -226,8 +226,8 @@ private:
         return true;
     }
 
-    bool CheckDimEqual(const gert::Shape &a, const int64_t dimA, const gert::Shape &b, const int64_t dimB,
-                       const std::string &nameA, const std::string &nameB, const std::string &dimDesc) const
+    bool CheckDimEqual(const gert::Shape& a, const int64_t dimA, const gert::Shape& b, const int64_t dimB,
+                       const std::string& nameA, const std::string& nameB, const std::string& dimDesc) const
     {
         if (a.GetDim(dimA) != b.GetDim(dimB)) {
             OP_LOGE(ctx_.nodeName, "The %s of %s and %s should be the same, but %s is %ld while %s is %ld",
@@ -238,7 +238,7 @@ private:
         return true;
     }
 
-    int64_t SeqNum(const gert::Shape &queryShape, const gert::Shape &cuSeqlensShape) const
+    int64_t SeqNum(const gert::Shape& queryShape, const gert::Shape& cuSeqlensShape) const
     {
         if (ctx_.hasCuSeqlens) {
             return cuSeqlensShape.GetDim(RKDA_DIM_0) - 1;
@@ -246,7 +246,7 @@ private:
         return ctx_.layout == RKDA_LAYOUT_BSND ? queryShape.GetDim(RKDA_DIM_0) : 1;
     }
 
-    ge::graphStatus CheckMetadataShapes(const gert::Shape &queryShape, const gert::Shape &cuSeqlensShape) const
+    ge::graphStatus CheckMetadataShapes(const gert::Shape& queryShape, const gert::Shape& cuSeqlensShape) const
     {
         if (ctx_.hasCuSeqlens) {
             if (!CheckDim(cuSeqlensShape, RKDA_METADATA_RANK1, "cu_seqlens")) {
@@ -305,10 +305,10 @@ private:
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus CheckShapeDimAndRelation(const gert::Shape &queryShape, const gert::Shape &keyShape,
-                                             const gert::Shape &valueShape, const gert::Shape &gateShape,
-                                             const gert::Shape &betaShape, const gert::Shape &stateShape,
-                                             const gert::Shape &cuSeqlensShape) const
+    ge::graphStatus CheckShapeDimAndRelation(const gert::Shape& queryShape, const gert::Shape& keyShape,
+                                             const gert::Shape& valueShape, const gert::Shape& gateShape,
+                                             const gert::Shape& betaShape, const gert::Shape& stateShape,
+                                             const gert::Shape& cuSeqlensShape) const
     {
         int64_t totalTokens = 0;
         int64_t denseSeqLen = 0;
@@ -400,9 +400,9 @@ private:
         return ge::GRAPH_SUCCESS;
     }
 
-    void FillTilingShapeData(const gert::Shape &queryShape, const gert::Shape &valueShape,
-                             const gert::Shape &stateShape, const gert::Shape &cuSeqlensShape,
-                             RecurrentKdaTilingData &tiling) const
+    void FillTilingShapeData(const gert::Shape& queryShape, const gert::Shape& valueShape,
+                             const gert::Shape& stateShape, const gert::Shape& cuSeqlensShape,
+                             RecurrentKdaTilingData& tiling) const
     {
         if (ctx_.layout == RKDA_LAYOUT_TND) {
             tiling.t = static_cast<uint32_t>(queryShape.GetDim(RKDA_DIM_0));
@@ -458,7 +458,7 @@ private:
         tiling.acceptedTokensDtype = ctx_.acceptedTokensDtype == ge::DT_INT32 ? 0 : 1;
     }
 
-    ge::graphStatus CheckShapeValueRangeAndRule(const RecurrentKdaTilingData &tiling) const
+    ge::graphStatus CheckShapeValueRangeAndRule(const RecurrentKdaTilingData& tiling) const
     {
         OP_CHECK_IF(tiling.nk > 256 || tiling.nv > 256,
                     OP_LOGE(ctx_.nodeName, "H/HV must be <= 256, but H=%u, HV=%u.", tiling.nk, tiling.nv),
@@ -476,7 +476,7 @@ private:
         return ge::GRAPH_SUCCESS;
     }
 
-    void UpdateDynamicBlockDimByTaskUnits(RecurrentKdaTilingData &tiling) const
+    void UpdateDynamicBlockDimByTaskUnits(RecurrentKdaTilingData& tiling) const
     {
         uint64_t taskUnits = static_cast<uint64_t>(tiling.b) * static_cast<uint64_t>(tiling.nv);
         if (taskUnits == 0) {
@@ -489,25 +489,25 @@ private:
                 static_cast<unsigned long long>(taskUnits), tiling.vectorCoreNum);
     }
 
-    ge::graphStatus RuleCheckShapeDimAndRelation(RecurrentKdaTilingData &tiling) const
+    ge::graphStatus RuleCheckShapeDimAndRelation(RecurrentKdaTilingData& tiling) const
     {
         (void)tiling;
         return CheckShapeDimAndRelation(ctx_.queryShape, ctx_.keyShape, ctx_.valueShape, ctx_.gateShape, ctx_.betaShape,
                                         ctx_.stateShape, ctx_.cuSeqlensShape);
     }
 
-    ge::graphStatus RuleFillTilingShapeData(RecurrentKdaTilingData &tiling) const
+    ge::graphStatus RuleFillTilingShapeData(RecurrentKdaTilingData& tiling) const
     {
         FillTilingShapeData(ctx_.queryShape, ctx_.valueShape, ctx_.stateShape, ctx_.cuSeqlensShape, tiling);
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus RuleCheckShapeValueRangeAndRule(RecurrentKdaTilingData &tiling) const
+    ge::graphStatus RuleCheckShapeValueRangeAndRule(RecurrentKdaTilingData& tiling) const
     {
         return CheckShapeValueRangeAndRule(tiling);
     }
 
-    ge::graphStatus RuleUpdateDynamicBlockDimByTaskUnits(RecurrentKdaTilingData &tiling) const
+    ge::graphStatus RuleUpdateDynamicBlockDimByTaskUnits(RecurrentKdaTilingData& tiling) const
     {
         UpdateDynamicBlockDimByTaskUnits(tiling);
         return ge::GRAPH_SUCCESS;
@@ -553,8 +553,8 @@ private:
     }
 
     bool EvaluateBufferProfile(int64_t ubSize, int64_t usedUbBytes, int64_t aDk, uint32_t stateOutBufferNum,
-                               uint32_t attnOutBufferNum, const RecurrentKdaTilingData &tiling,
-                               BufferProfile &profile) const
+                               uint32_t attnOutBufferNum, const RecurrentKdaTilingData& tiling,
+                               BufferProfile& profile) const
     {
         const int64_t vStepAlignment = ctx_.stateVFirst == 0 ? 16 : 8;
         int64_t coeff = CalcVStepCoeff(aDk, stateOutBufferNum, attnOutBufferNum);
@@ -576,7 +576,7 @@ private:
         return true;
     }
 
-    bool IsBetterProfile(const BufferProfile &candidate, const BufferProfile &current) const
+    bool IsBetterProfile(const BufferProfile& candidate, const BufferProfile& current) const
     {
         if (!current.valid) {
             return true;
@@ -593,7 +593,7 @@ private:
     }
 
     ge::graphStatus FinalizeVStepFromUb(int64_t ubSize, int64_t usedUbBytes, int64_t coeff,
-                                        RecurrentKdaTilingData &tiling, UbCalcContext &ubCalcCtx) const
+                                        RecurrentKdaTilingData& tiling, UbCalcContext& ubCalcCtx) const
     {
         (void)coeff;
         int64_t aDk = Ops::Base::CeilAlign(tiling.dk, static_cast<uint32_t>(16));
@@ -603,7 +603,7 @@ private:
             {1, 2, 0, 0, false},
             {2, 2, 0, 0, false},
         }};
-        for (const auto &candidate : candidates) {
+        for (const auto& candidate : candidates) {
             BufferProfile profile;
             if (!EvaluateBufferProfile(ubSize, usedUbBytes, aDk, candidate.stateOutBufferNum,
                                        candidate.attnOutBufferNum, tiling, profile)) {
@@ -634,7 +634,7 @@ private:
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus RuleInitUbCalcContext(RecurrentKdaTilingData &tiling, UbCalcContext &ubCalcCtx) const
+    ge::graphStatus RuleInitUbCalcContext(RecurrentKdaTilingData& tiling, UbCalcContext& ubCalcCtx) const
     {
         ubCalcCtx.ubSize = static_cast<int64_t>(ctx_.ubSize);
         ubCalcCtx.aNv = Ops::Base::CeilAlign(tiling.nv, static_cast<uint32_t>(16));
@@ -643,28 +643,28 @@ private:
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus RuleCalcFixedUbBytes(RecurrentKdaTilingData &tiling, UbCalcContext &ubCalcCtx) const
+    ge::graphStatus RuleCalcFixedUbBytes(RecurrentKdaTilingData& tiling, UbCalcContext& ubCalcCtx) const
     {
         ubCalcCtx.fixedUbBytes = CalcFixedUbBytes(ubCalcCtx.aNv, ubCalcCtx.aDv, ubCalcCtx.aDk);
         tiling.ubRestBytes = static_cast<uint32_t>(ubCalcCtx.ubSize - ubCalcCtx.fixedUbBytes);
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus RuleCalcWorkingUbBytes(RecurrentKdaTilingData &tiling, UbCalcContext &ubCalcCtx) const
+    ge::graphStatus RuleCalcWorkingUbBytes(RecurrentKdaTilingData& tiling, UbCalcContext& ubCalcCtx) const
     {
         (void)tiling;
         ubCalcCtx.workingUbBytes = CalcWorkingUbBytes(ubCalcCtx.aNv, ubCalcCtx.aDv, ubCalcCtx.aDk);
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus RuleCalcVStepCoeff(RecurrentKdaTilingData &tiling, UbCalcContext &ubCalcCtx) const
+    ge::graphStatus RuleCalcVStepCoeff(RecurrentKdaTilingData& tiling, UbCalcContext& ubCalcCtx) const
     {
         (void)tiling;
         ubCalcCtx.coeff = CalcVStepCoeff(ubCalcCtx.aDk, 1, 1);
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus RuleFinalizeVStepFromUb(RecurrentKdaTilingData &tiling, UbCalcContext &ubCalcCtx) const
+    ge::graphStatus RuleFinalizeVStepFromUb(RecurrentKdaTilingData& tiling, UbCalcContext& ubCalcCtx) const
     {
         return FinalizeVStepFromUb(ubCalcCtx.ubSize, ubCalcCtx.workingUbBytes, ubCalcCtx.coeff, tiling, ubCalcCtx);
     }

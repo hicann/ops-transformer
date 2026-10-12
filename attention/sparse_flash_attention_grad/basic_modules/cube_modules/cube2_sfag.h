@@ -70,7 +70,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube2ProcessSp
 template <typename T1>
 __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube2ProcessDense(const int32_t blkCntOffset,
                                                                                     const int32_t mmPingPongIdx,
-                                                                                    const RunInfo &runInfo)
+                                                                                    const RunInfo& runInfo)
 {
     const int64_t dyGmOffset = runInfo.dyGmOffset;
     const int64_t valueGmOffset = runInfo.valueGmOffset;
@@ -131,7 +131,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube2ProcessDe
 template <typename T1>
 __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube2Process(
     const int64_t dyGmOffset, const int64_t valueGmOffset, const int64_t indicesGmOffset, const int64_t outGmOffset,
-    const int32_t blkCntOffset, const int32_t mmPingPongIdx, const RunInfo &runInfo)
+    const int32_t blkCntOffset, const int32_t mmPingPongIdx, const RunInfo& runInfo)
 {
     if (!runInfo.isSmallS2) {
         cube2ProcessSparse(dyGmOffset, valueGmOffset, indicesGmOffset, outGmOffset, blkCntOffset, mmPingPongIdx,

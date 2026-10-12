@@ -53,18 +53,18 @@ enum class AttrIndex : uint32_t {
     INPUT_LAYOUT
 };
 
-ge::graphStatus InferShape4SparseFlashAttentionGrad(gert::InferShapeContext *context)
+ge::graphStatus InferShape4SparseFlashAttentionGrad(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("SparseFlashAttentionGrad", "InferShapeContext is nullptr"),
                 return ge::GRAPH_FAILED);
     OP_LOGD(context, "Enter InferShape4SparseFlashAttentionGrad.");
 
-    const gert::Shape *queryShape = context->GetInputShape(static_cast<size_t>(InputIndex::QUERY));
-    const gert::Shape *keyShape = context->GetInputShape(static_cast<size_t>(InputIndex::KEY));
-    const gert::Shape *valueShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::VALUE));
-    const gert::Shape *sinksShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::SINKS));
-    const gert::Shape *queryRopeShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::Q_ROPE));
-    const gert::Shape *keyRopeShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::K_ROPE));
+    const gert::Shape* queryShape = context->GetInputShape(static_cast<size_t>(InputIndex::QUERY));
+    const gert::Shape* keyShape = context->GetInputShape(static_cast<size_t>(InputIndex::KEY));
+    const gert::Shape* valueShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::VALUE));
+    const gert::Shape* sinksShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::SINKS));
+    const gert::Shape* queryRopeShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::Q_ROPE));
+    const gert::Shape* keyRopeShape = context->GetOptionalInputShape(static_cast<size_t>(InputIndex::K_ROPE));
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
 
@@ -74,11 +74,11 @@ ge::graphStatus InferShape4SparseFlashAttentionGrad(gert::InferShapeContext *con
     OP_CHECK_NULL_WITH_CONTEXT(context, scaleValue);
     auto selectedBlockSize = attrs->GetInt(static_cast<size_t>(AttrIndex::SELECTED_BLOCK_SIZE));
     OP_CHECK_NULL_WITH_CONTEXT(context, selectedBlockSize);
-    const char *inputLayout = attrs->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::INPUT_LAYOUT));
+    const char* inputLayout = attrs->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::INPUT_LAYOUT));
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayout);
 
     std::string inputLayoutSfag = std::string(inputLayout);
-    for (auto &c : inputLayoutSfag) {
+    for (auto& c : inputLayoutSfag) {
         c = toupper(c);
     }
     if (inputLayoutSfag != "BSND" && inputLayoutSfag != "TND") {
@@ -87,9 +87,9 @@ ge::graphStatus InferShape4SparseFlashAttentionGrad(gert::InferShapeContext *con
         return GRAPH_FAILED;
     }
 
-    gert::Shape *dqShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DQ));
-    gert::Shape *dkShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DK));
-    gert::Shape *dvShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DV));
+    gert::Shape* dqShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DQ));
+    gert::Shape* dkShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DK));
+    gert::Shape* dvShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DV));
     OP_CHECK_NULL_WITH_CONTEXT(context, dqShape);
     OP_CHECK_NULL_WITH_CONTEXT(context, dkShape);
     *dqShape = *queryShape;
@@ -99,18 +99,18 @@ ge::graphStatus InferShape4SparseFlashAttentionGrad(gert::InferShapeContext *con
     }
 
     if (queryRopeShape != nullptr) {
-        gert::Shape *dqRopeShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DQ_ROPE));
+        gert::Shape* dqRopeShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DQ_ROPE));
         OP_CHECK_NULL_WITH_CONTEXT(context, dqRopeShape);
         *dqRopeShape = *queryRopeShape;
     }
     if (keyRopeShape != nullptr) {
-        gert::Shape *dkRopeShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DK_ROPE));
+        gert::Shape* dkRopeShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::DK_ROPE));
         OP_CHECK_NULL_WITH_CONTEXT(context, dkRopeShape);
         *dkRopeShape = *keyRopeShape;
     }
 
     // d_sinks shape 随 sinks：sinks 存在时 = sinks shape ([N1])，否则强制返回空 (shape [0])
-    gert::Shape *dSinksShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::D_SINKS));
+    gert::Shape* dSinksShape = context->GetOutputShape(static_cast<size_t>(OutputIndex::D_SINKS));
     OP_CHECK_NULL_WITH_CONTEXT(context, dSinksShape);
     if (sinksShape != nullptr && sinksShape->GetDimNum() > 0) {
         *dSinksShape = *sinksShape;
@@ -122,7 +122,7 @@ ge::graphStatus InferShape4SparseFlashAttentionGrad(gert::InferShapeContext *con
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataType4SparseFlashAttentionGrad(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataType4SparseFlashAttentionGrad(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("SparseFlashAttentionGrad", "InferDataTypeContext is nullptr"),
                 return ge::GRAPH_FAILED);

@@ -32,7 +32,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -41,7 +41,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<aclFloat16> resultData(size, 0);
@@ -53,7 +53,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     // 固定写法，AscendCL初始化
     auto ret = aclInit(nullptr);
@@ -70,8 +70,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -134,39 +134,39 @@ int main()
     std::vector<int64_t> lossShape = {1};
     std::vector<int64_t> sinksShape = {G};
 
-    void *qDeviceAddr = nullptr;
-    void *kDeviceAddr = nullptr;
-    void *qRopeDeviceAddr = nullptr;
-    void *kRopeDeviceAddr = nullptr;
-    void *qIndexDeviceAddr = nullptr;
-    void *kIndexDeviceAddr = nullptr;
-    void *weightDeviceAddr = nullptr;
-    void *sparseIndicesDeviceAddr = nullptr;
-    void *softmaxMaxDeviceAddr = nullptr;
-    void *softmaxSumDeviceAddr = nullptr;
-    void *sinksDeviceAddr = nullptr;
+    void* qDeviceAddr = nullptr;
+    void* kDeviceAddr = nullptr;
+    void* qRopeDeviceAddr = nullptr;
+    void* kRopeDeviceAddr = nullptr;
+    void* qIndexDeviceAddr = nullptr;
+    void* kIndexDeviceAddr = nullptr;
+    void* weightDeviceAddr = nullptr;
+    void* sparseIndicesDeviceAddr = nullptr;
+    void* softmaxMaxDeviceAddr = nullptr;
+    void* softmaxSumDeviceAddr = nullptr;
+    void* sinksDeviceAddr = nullptr;
 
-    void *dQIndexDeviceAddr = nullptr;
-    void *dKIndexDeviceAddr = nullptr;
-    void *dWeightDeviceAddr = nullptr;
-    void *lossDeviceAddr = nullptr;
+    void* dQIndexDeviceAddr = nullptr;
+    void* dKIndexDeviceAddr = nullptr;
+    void* dWeightDeviceAddr = nullptr;
+    void* lossDeviceAddr = nullptr;
 
-    aclTensor *q = nullptr;
-    aclTensor *k = nullptr;
-    aclTensor *qRope = nullptr;
-    aclTensor *kRope = nullptr;
-    aclTensor *qIndex = nullptr;
-    aclTensor *kIndex = nullptr;
-    aclTensor *weight = nullptr;
-    aclTensor *sparseIndices = nullptr;
-    aclTensor *softmaxMax = nullptr;
-    aclTensor *softmaxSum = nullptr;
-    aclTensor *sinks = nullptr;
+    aclTensor* q = nullptr;
+    aclTensor* k = nullptr;
+    aclTensor* qRope = nullptr;
+    aclTensor* kRope = nullptr;
+    aclTensor* qIndex = nullptr;
+    aclTensor* kIndex = nullptr;
+    aclTensor* weight = nullptr;
+    aclTensor* sparseIndices = nullptr;
+    aclTensor* softmaxMax = nullptr;
+    aclTensor* softmaxSum = nullptr;
+    aclTensor* sinks = nullptr;
 
-    aclTensor *dQIndex = nullptr;
-    aclTensor *dKIndex = nullptr;
-    aclTensor *dWeight = nullptr;
-    aclTensor *loss = nullptr;
+    aclTensor* dQIndex = nullptr;
+    aclTensor* dKIndex = nullptr;
+    aclTensor* dWeight = nullptr;
+    aclTensor* loss = nullptr;
 
     std::vector<aclFloat16> qHostData(t1 * n1 * dQuery, aclFloatToFloat16(0.1));
     std::vector<aclFloat16> kHostData(t2 * dQuery, aclFloatToFloat16(0.2));
@@ -226,8 +226,8 @@ int main()
 
     std::vector<int64_t> acSeqQLenOp = {t1};
     std::vector<int64_t> acSeqKvLenOp = {t2};
-    aclIntArray *acSeqQLen = aclCreateIntArray(acSeqQLenOp.data(), acSeqQLenOp.size());
-    aclIntArray *acSeqKvLen = aclCreateIntArray(acSeqKvLenOp.data(), acSeqKvLenOp.size());
+    aclIntArray* acSeqQLen = aclCreateIntArray(acSeqQLenOp.data(), acSeqQLenOp.size());
+    aclIntArray* acSeqKvLen = aclCreateIntArray(acSeqKvLenOp.data(), acSeqKvLenOp.size());
     float scaleValue = 1.0 / sqrt(dQuery);
     int64_t preTokens = 2147483647;
     int64_t nextTokens = 2147483647;
@@ -238,7 +238,7 @@ int main()
 
     // 3. 调用CANN算子库API
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     // 调用aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize第一段接口
     ret = aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize(
@@ -250,7 +250,7 @@ int main()
               return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

@@ -42,7 +42,7 @@ namespace optiling {
 
 class TilingBaseClass {
 public:
-    explicit TilingBaseClass(gert::TilingContext *context)
+    explicit TilingBaseClass(gert::TilingContext* context)
         : context_(context)
     {}
 
@@ -79,7 +79,7 @@ public:
     }
 
     // 更新 context
-    virtual void Reset(gert::TilingContext *context)
+    virtual void Reset(gert::TilingContext* context)
     {
         context_ = context;
     }
@@ -103,7 +103,7 @@ protected:
         if (enable != 1) {
             return;
         }
-        auto buf = (uint32_t *)context_->GetRawTilingData()->GetData();
+        auto buf = (uint32_t*)context_->GetRawTilingData()->GetData();
         auto bufLen = context_->GetRawTilingData()->GetDataSize();
         std::ostringstream oss;
         oss << "Start to dump tiling info. tilingkey:" << context_->GetTilingKey() << ", tiling data size:" << bufLen
@@ -129,7 +129,7 @@ protected:
     }
 
     template <typename T>
-    [[nodiscard]] std::string GetShapeDebugStr(const T &shape) const
+    [[nodiscard]] std::string GetShapeDebugStr(const T& shape) const
     {
         std::ostringstream oss;
         oss << "[";
@@ -143,8 +143,8 @@ protected:
         return oss.str();
     }
 
-    [[nodiscard]] std::string GetTensorDebugStr(const gert::StorageShape *shape,
-                                                const gert::CompileTimeTensorDesc *tensor)
+    [[nodiscard]] std::string GetTensorDebugStr(const gert::StorageShape* shape,
+                                                const gert::CompileTimeTensorDesc* tensor)
     {
         if (shape == nullptr || tensor == nullptr) {
             return "nil ";
@@ -180,7 +180,7 @@ protected:
     {
         auto rawTilingData = context_->GetRawTilingData();
         auto rawTilingDataSize = rawTilingData->GetDataSize();
-        auto data = reinterpret_cast<const int32_t *>(rawTilingData->GetData());
+        auto data = reinterpret_cast<const int32_t*>(rawTilingData->GetData());
         size_t len = rawTilingDataSize / sizeof(int32_t);
         std::ostringstream oss;
         for (size_t i = 0; i < len; i++) {
@@ -190,7 +190,7 @@ protected:
     }
 
 protected:
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     std::unique_ptr<platform_ascendc::PlatformAscendC> ascendcPlatform_{nullptr};
     uint32_t blockDim_{0};
     uint64_t workspaceSize_{0};
@@ -212,14 +212,14 @@ struct SparseLightningIndexerKLLossGradCompileInfo {
 
 class SparseLightningIndexerKLLossGradTilingBase : public TilingBaseClass {
 public:
-    explicit SparseLightningIndexerKLLossGradTilingBase(gert::TilingContext *context)
+    explicit SparseLightningIndexerKLLossGradTilingBase(gert::TilingContext* context)
         : TilingBaseClass(context)
     {
         Reset();
     }
     ~SparseLightningIndexerKLLossGradTilingBase() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();
@@ -253,7 +253,7 @@ protected:
         keyLayout = nullptr;
     }
 
-    [[nodiscard]] gert::TilingContext *GetContext()
+    [[nodiscard]] gert::TilingContext* GetContext()
     {
         return context_;
     }
@@ -275,10 +275,10 @@ protected:
     // 7、保存Tiling数据
     ge::graphStatus CheckContext();
     bool AnalyzeAttrs();
-    bool CrossShapeVerify(const gert::Shape &queryRopeShape, const gert::Shape &keyRopeShap);
-    bool AnalyzeDimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape,
-                          const gert::Shape &queryIndexShape, const gert::Shape &topKShape, size_t layoutLen,
-                          const gert::Shape &queryRopeShape, const gert::Shape &keyRopeShape);
+    bool CrossShapeVerify(const gert::Shape& queryRopeShape, const gert::Shape& keyRopeShap);
+    bool AnalyzeDimLayout(const gert::Shape& queryShape, const gert::Shape& keyShape,
+                          const gert::Shape& queryIndexShape, const gert::Shape& topKShape, size_t layoutLen,
+                          const gert::Shape& queryRopeShape, const gert::Shape& keyRopeShape);
     bool AnalyzeDtype();
     bool AnalyzeLayout();
     int64_t CalcTotalSize();
@@ -301,7 +301,7 @@ protected:
     int64_t hasSoftmaxInput;
     float scaleValue;
 
-    const char *templateName = "slikbase";
+    const char* templateName = "slikbase";
 
     LayoutType tilingKeyLayout;
     TopKRange topkSize;
@@ -320,14 +320,14 @@ protected:
     bool privateScatter = false;
     bool hasRope = false;
 
-    const char *opName;
-    const char *inputLayout;
-    const char *keyLayout;
+    const char* opName;
+    const char* inputLayout;
+    const char* keyLayout;
 
-    SparseLightningIndexerKLLossGradTilingData *tilingData =
+    SparseLightningIndexerKLLossGradTilingData* tilingData =
         context_->GetTilingData<SparseLightningIndexerKLLossGradTilingData>();
-    SLIKLLossGradBaseParams *sliGradkllossBaseParams_ = &tilingData->baseParams;
-    SLIKLLossGradMultiCoreParams *sliGradkllossMultiCoreParams_ = &tilingData->multiCoreParams;
+    SLIKLLossGradBaseParams* sliGradkllossBaseParams_ = &tilingData->baseParams;
+    SLIKLLossGradMultiCoreParams* sliGradkllossMultiCoreParams_ = &tilingData->multiCoreParams;
 };
 
 } // namespace optiling

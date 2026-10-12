@@ -17,9 +17,9 @@ namespace op_api {
 constexpr int64_t SLI_KL_LOSS_GRAD_METADATA_SIZE = 64;
 
 at::Tensor SparseLightningIndexerKlLossGradMetadata(
-    int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, const c10::optional<at::Tensor> &cuSeqlensQ,
-    const c10::optional<at::Tensor> &cuSeqlensK, const c10::optional<at::Tensor> &sequsedQ,
-    const c10::optional<at::Tensor> &sequsedK, const c10::optional<at::Tensor> &cmpResidualK, int64_t batchSize,
+    int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, const c10::optional<at::Tensor>& cuSeqlensQ,
+    const c10::optional<at::Tensor>& cuSeqlensK, const c10::optional<at::Tensor>& sequsedQ,
+    const c10::optional<at::Tensor>& sequsedK, const c10::optional<at::Tensor>& cmpResidualK, int64_t batchSize,
     int64_t maxSeqlenQ, int64_t maxSeqlenK, int64_t topk, std::string layoutQ, std::string layoutK, int64_t maskMode,
     int64_t cmpRatio)
 {
@@ -44,8 +44,8 @@ at::Tensor SparseLightningIndexerKlLossGradMetadata(
     auto sequsedKVal = get_valid_tensor(sequsedK, outputDevice);
     auto cmpResidualKVal = get_valid_tensor(cmpResidualK, outputDevice);
 
-    char *layoutQPtr = const_cast<char *>(layoutQ.c_str());
-    char *layoutKPtr = const_cast<char *>(layoutK.c_str());
+    char* layoutQPtr = const_cast<char*>(layoutQ.c_str());
+    char* layoutKPtr = const_cast<char*>(layoutK.c_str());
 
     ACLNN_CMD(aclnnSparseLightningIndexerKLLossGradMetadata, cuSeqlensQVal, cuSeqlensKVal, sequsedQVal, sequsedKVal,
               cmpResidualKVal, batchSize, maxSeqlenQ, maxSeqlenK, numHeadsQ, numHeadsK, headDim, topk, layoutQPtr,
@@ -55,11 +55,11 @@ at::Tensor SparseLightningIndexerKlLossGradMetadata(
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> SparseLightningIndexerKlLossGrad(
-    const at::Tensor &q, const at::Tensor &k, const at::Tensor &w, const at::Tensor &sparseIndices,
-    const at::Tensor &attnSoftmaxL1Norm, const c10::optional<at::Tensor> &cuSeqlensQ,
-    const c10::optional<at::Tensor> &cuSeqlensK, const c10::optional<at::Tensor> &sequsedQ,
-    const c10::optional<at::Tensor> &sequsedK, const c10::optional<at::Tensor> &cmpResidualK,
-    const c10::optional<at::Tensor> &metadata, std::string layoutQ, std::string layoutK, int64_t maskMode,
+    const at::Tensor& q, const at::Tensor& k, const at::Tensor& w, const at::Tensor& sparseIndices,
+    const at::Tensor& attnSoftmaxL1Norm, const c10::optional<at::Tensor>& cuSeqlensQ,
+    const c10::optional<at::Tensor>& cuSeqlensK, const c10::optional<at::Tensor>& sequsedQ,
+    const c10::optional<at::Tensor>& sequsedK, const c10::optional<at::Tensor>& cmpResidualK,
+    const c10::optional<at::Tensor>& metadata, std::string layoutQ, std::string layoutK, int64_t maskMode,
     int64_t cmpRatio)
 {
     at::Tensor dq = at::empty_like(q);
@@ -67,8 +67,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> SparseLightningIndexe
     at::Tensor dw = at::empty_like(w);
     at::Tensor softmaxOut = at::empty_like(attnSoftmaxL1Norm);
 
-    char *layoutQPtr = const_cast<char *>(layoutQ.c_str());
-    char *layoutKPtr = const_cast<char *>(layoutK.c_str());
+    char* layoutQPtr = const_cast<char*>(layoutQ.c_str());
+    char* layoutKPtr = const_cast<char*>(layoutK.c_str());
 
     ACLNN_CMD(aclnnSparseLightningIndexerKLLossGrad, q, k, w, sparseIndices, attnSoftmaxL1Norm, cuSeqlensQ, cuSeqlensK,
               sequsedQ, sequsedK, cmpResidualK, metadata, layoutQPtr, layoutKPtr, maskMode, cmpRatio, dq, dk, dw,

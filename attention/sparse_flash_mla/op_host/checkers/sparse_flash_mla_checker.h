@@ -18,13 +18,13 @@ namespace optiling {
 
 class SparseFlashMlaChecker {
 public:
-    explicit SparseFlashMlaChecker(const SMLATilingInfo &info)
+    explicit SparseFlashMlaChecker(const SMLATilingInfo& info)
         : info_(info)
     {}
     ge::graphStatus Process() const;
 
 private:
-    const SMLATilingInfo &info_;
+    const SMLATilingInfo& info_;
 };
 
 } // namespace optiling

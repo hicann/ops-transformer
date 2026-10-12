@@ -23,14 +23,14 @@ template <typename T1, typename T2, const uint32_t IS_TND = 0, bool IS_SINKS = f
 class FlashAttentionGradPreRegbase {
 public:
     __aicore__ inline FlashAttentionGradPreRegbase(){};
-    __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dSinks,
-                                __gm__ uint8_t *actual_seq_kvlen, __gm__ uint8_t *workspace,
-                                const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase *ordTilingData,
-                                TPipe *pipe_in);
+    __aicore__ inline void Init(__gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* dSinks,
+                                __gm__ uint8_t* actual_seq_kvlen, __gm__ uint8_t* workspace,
+                                const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase* ordTilingData,
+                                TPipe* pipe_in);
     __aicore__ inline void Process();
     __aicore__ inline void SyncALLCores();
 
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> helpQue;
     TQue<QuePosition::VECIN, 1> inputQue;
     TQue<QuePosition::VECIN, 1> castQue;
@@ -40,7 +40,7 @@ public:
     GlobalTensor<T1> dqGm, dkGm, dvGm;
     GlobalTensor<float> dSinksGm, dSinkWorkSpaceGm;
 
-    const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase *TilingData;
+    const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase* TilingData;
     constexpr static uint32_t ADDR_ALIGN_SIZE = 512;
     constexpr static uint32_t HELP_LEN = 256;
     constexpr static uint32_t BIT8 = 8;
@@ -85,9 +85,9 @@ public:
 
 template <typename T1, typename T2, const uint32_t IS_TND, bool IS_SINKS, bool IS_DETER, bool KV_MERGE>
 __aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, IS_SINKS, IS_DETER, KV_MERGE>::Init(
-    __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dSinks,
-    __gm__ uint8_t *actual_seq_kvlen, __gm__ uint8_t *workspace,
-    const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase *orgTilingData, TPipe *pipe_in)
+    __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* dSinks,
+    __gm__ uint8_t* actual_seq_kvlen, __gm__ uint8_t* workspace,
+    const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase* orgTilingData, TPipe* pipe_in)
 {
     cBlockIdx = GetBlockIdx();
 
@@ -107,22 +107,19 @@ __aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, IS_SINKS, IS
     vPreBlockTail = TilingData->preTilingData.vPreBlockTail;
     vPostBlockTotal = TilingData->postTilingData.vPostBlockTotal;
 
-    dqGm.SetGlobalBuffer((__gm__ T1 *)dq);
-    dkGm.SetGlobalBuffer((__gm__ T1 *)dk);
+    dqGm.SetGlobalBuffer((__gm__ T1*)dq);
+    dkGm.SetGlobalBuffer((__gm__ T1*)dk);
     if constexpr (!KV_MERGE) {
-        dvGm.SetGlobalBuffer((__gm__ T1 *)dv);
+        dvGm.SetGlobalBuffer((__gm__ T1*)dv);
     }
 
-    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                  TilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
-    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                  TilingData->postTilingData.dkWorkSpaceOffset / sizeof(T2));
-    dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
-                                  TilingData->postTilingData.dvWorkSpaceOffset / sizeof(T2));
+    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + TilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
+    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + TilingData->postTilingData.dkWorkSpaceOffset / sizeof(T2));
+    dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + TilingData->postTilingData.dvWorkSpaceOffset / sizeof(T2));
 
     if constexpr (IS_SINKS) {
-        dSinksGm.SetGlobalBuffer((__gm__ float *)dSinks);
-        dSinkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dSinksGm.SetGlobalBuffer((__gm__ float*)dSinks);
+        dSinkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                          TilingData->postTilingData.dSinkWorkSpaceOffset / sizeof(T2));
     }
 

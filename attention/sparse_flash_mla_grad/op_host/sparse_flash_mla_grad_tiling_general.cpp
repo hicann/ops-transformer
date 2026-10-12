@@ -54,7 +54,7 @@ ge::graphStatus SparseFlashMlaGradBasicTiling::GetPlatformInfo()
     auto platformInfoPtr = context_->GetPlatformInfo();
     uint64_t l2CacheSize;
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const SparseFlashMlaGradCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const SparseFlashMlaGradCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OPS_REPORT_VECTOR_INNER_ERR(opName, "compile_info is null."),
                     return ge::GRAPH_FAILED);
         aicoreParams_.numBlocks = compileInfoPtr->aivNum;
@@ -182,7 +182,7 @@ ge::graphStatus SparseFlashMlaGradBasicTiling::GetWorkspaceSize()
         selectedKWorkspaceLen *= 4;
     }
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = sysLen;
     workspaces[0] += selectedKWorkspaceLen * currentUseCoreNum;
     workspaces[0] += mm12WorkspaceLen * 4 * currentUseCoreNum;
@@ -422,8 +422,8 @@ ge::graphStatus SparseFlashMlaGradBasicTiling::GetBaseShapeInfo()
     // -------------- input ----------------
     // TND: query [t1, n1, d]  ori_kv [t2, n2, d]  cmp_kv [t3, n2, d]   dy/attentionIn [t1, n1, d]
     // BSND: query [b, s1, n1, d]   k [b, s2, n2, d]  v [b, s3, n2, d]   dy/attentionIn [b, s1, n1, d]
-    const gert::Shape &queryShape = context_->GetInputShape(static_cast<size_t>(InputIndex::QUERY))->GetStorageShape();
-    const gert::Shape &oriKvShape = context_->GetInputShape(static_cast<size_t>(InputIndex::ORI_KV))->GetStorageShape();
+    const gert::Shape& queryShape = context_->GetInputShape(static_cast<size_t>(InputIndex::QUERY))->GetStorageShape();
+    const gert::Shape& oriKvShape = context_->GetInputShape(static_cast<size_t>(InputIndex::ORI_KV))->GetStorageShape();
     auto cmpKvTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::CMP_KV));
     auto cmpIndicesTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::CMP_SPARSE_INDICES));
 
@@ -461,17 +461,17 @@ ge::graphStatus SparseFlashMlaGradBasicTiling::GetBaseShapeInfo()
     }
 
     // -------------- attrs ----------------
-    const char *inputLayoutQ = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_Q));
-    const char *inputLayoutKv = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_KV));
-    const int64_t *cmpRatioPtr =
+    const char* inputLayoutQ = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_Q));
+    const char* inputLayoutKv = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_KV));
+    const int64_t* cmpRatioPtr =
         context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::CMP_RATIO));
-    const int64_t *oriWinLeftPtr =
+    const int64_t* oriWinLeftPtr =
         context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::ORI_WIN_LEFT));
-    const int64_t *oriWinRightPtr =
+    const int64_t* oriWinRightPtr =
         context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::ORI_WIN_RIGHT));
-    const int64_t *oriMaskModePtr =
+    const int64_t* oriMaskModePtr =
         context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::ORI_MASK_MODE));
-    const int64_t *cmpMaskModePtr =
+    const int64_t* cmpMaskModePtr =
         context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::CMP_MASK_MODE));
 
     // -------------------------------------
@@ -500,7 +500,7 @@ ge::graphStatus SparseFlashMlaGradBasicTiling::GetBaseShapeInfo()
     }
 
     if (strcmp(inputLayoutQ, TND_STR) == 0) {
-        const gert::Shape &actSeqQLenShape =
+        const gert::Shape& actSeqQLenShape =
             context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::CU_SEQLENS_Q))->GetStorageShape();
         tmpData.b = actSeqQLenShape.GetDim(DIM_0) - 1;
         tmpData.t1 = queryShape.GetDim(DIM_0);
@@ -528,7 +528,7 @@ ge::graphStatus SparseFlashMlaGradBasicTiling::GetBaseShapeInfo()
     }
 
     if (cmpKvTensor != nullptr) {
-        const gert::Shape &cmpKvShape =
+        const gert::Shape& cmpKvShape =
             context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::CMP_KV))->GetStorageShape();
         int64_t dimCmpKv = cmpKvShape.GetDim(dimSize - 1);
         if (dimDq != dimCmpKv) {
@@ -601,7 +601,7 @@ ge::graphStatus SparseFlashMlaGradBasicTiling::GetBaseShapeInfo()
         static_cast<uint32_t>(context_->GetInputDesc(static_cast<size_t>(InputIndex::QUERY))->GetDataType());
 
     if (cmpIndicesTensor != nullptr) {
-        const gert::Shape &cmpIndicesShape =
+        const gert::Shape& cmpIndicesShape =
             context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::CMP_SPARSE_INDICES))->GetStorageShape();
         tmpData.selected_block_count = cmpIndicesShape.GetDim(dimSize - 1);
         tilingData.opInfo.set_selectedBlockCount(tmpData.selected_block_count);
@@ -611,7 +611,7 @@ ge::graphStatus SparseFlashMlaGradBasicTiling::GetBaseShapeInfo()
         OP_CHECK_IF(cmpSoftmaxL1ShapePtr == nullptr,
                     OP_LOGE("SparseFlashMlaGrad", "In SCFA mode, cmpSoftmaxL1Norm cannot be nullptr."),
                     return ge::GRAPH_FAILED);
-        const gert::Shape &cmpSoftmaxL1Shape = cmpSoftmaxL1ShapePtr->GetStorageShape();
+        const gert::Shape& cmpSoftmaxL1Shape = cmpSoftmaxL1ShapePtr->GetStorageShape();
         OP_CHECK_IF(cmpSoftmaxL1Shape.GetDimNum() != strlen(inputLayoutQ),
                     OP_LOGE("SparseFlashMlaGrad",
                             "In SCFA mode, cmpSoftmaxL1Norm layout should be same with layout_q and layout_kv."),
@@ -656,7 +656,7 @@ ge::graphStatus SparseFlashMlaGradBasicTiling::GetBaseShapeInfo()
                         OP_LOGE("SparseFlashMlaGrad", "cmpResidual cannot be null when CFA/SCFA and cmpMaskMode=3"),
                         return ge::GRAPH_FAILED);
 
-            const gert::Shape &cmpResidualKvShape =
+            const gert::Shape& cmpResidualKvShape =
                 context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::CMP_RESIDUAL_KV))->GetStorageShape();
             OP_CHECK_IF(cmpResidualKvShape.GetDim(DIM_0) != tmpData.b,
                         OP_LOGE("SparseFlashMlaGrad", "cmpResidual length should be equal to batchNum."),

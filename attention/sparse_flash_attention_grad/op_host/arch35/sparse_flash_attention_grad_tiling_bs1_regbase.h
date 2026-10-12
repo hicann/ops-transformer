@@ -67,13 +67,13 @@ struct AiCoreParams {
 
 class SparseFlashAttentionGradBs1Regbase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit SparseFlashAttentionGradBs1Regbase(gert::TilingContext *context)
+    explicit SparseFlashAttentionGradBs1Regbase(gert::TilingContext* context)
         : TilingBaseClass(context) {};
-    SparseFlashAttentionGradTilingDataRegbase *tilingData =
+    SparseFlashAttentionGradTilingDataRegbase* tilingData =
         context_->GetTilingData<SparseFlashAttentionGradTilingDataRegbase>();
-    SparseFlashAttentionGradBaseParamsRegbase *baseParams_ = &tilingData->baseParams;
-    PreParamsRegbase *preTilingData_ = &tilingData->preTilingData;
-    PostParamsRegbase *postTilingData_ = &tilingData->postTilingData;
+    SparseFlashAttentionGradBaseParamsRegbase* baseParams_ = &tilingData->baseParams;
+    PreParamsRegbase* preTilingData_ = &tilingData->preTilingData;
+    PostParamsRegbase* postTilingData_ = &tilingData->postTilingData;
 
 protected:
     ge::graphStatus GetShapeAttrsInfo() override;
@@ -86,15 +86,15 @@ protected:
     uint64_t GetTilingKey() const override;
 
 private:
-    ge::graphStatus CheckOutShapeInfo(const gert::Shape &inputshape, const char *inputName,
-                                      const gert::Shape &outputshape, const char *inputLayout);
+    ge::graphStatus CheckOutShapeInfo(const gert::Shape& inputshape, const char* inputName,
+                                      const gert::Shape& outputshape, const char* inputLayout);
     ge::graphStatus GetBaseShapeInfo();
     ge::graphStatus DoSftTiling();
     ge::graphStatus DoBlockTiling();
     ge::graphStatus DoCastTiling();
     TempParams tmpData;
 
-    const char *opName;
+    const char* opName;
 };
 } // namespace sfag
 } // namespace optiling

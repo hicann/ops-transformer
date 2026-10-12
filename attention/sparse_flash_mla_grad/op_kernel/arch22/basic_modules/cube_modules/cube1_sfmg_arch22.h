@@ -19,7 +19,7 @@
 template <typename T1>
 __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube1Process(
     const int64_t queryGmOffset, const int64_t keyGmOffset, const int64_t outGmOffset, const int32_t blkCntOffset,
-    const int32_t mmPingPongIdx, const RunInfo &runInfo)
+    const int32_t mmPingPongIdx, const RunInfo& runInfo)
 {
     uint32_t dLoopTimes = (dimDTotal + 127) / K_SPLIT_SIZE;
     uint32_t perLoopDSize = K_SPLIT_SIZE;

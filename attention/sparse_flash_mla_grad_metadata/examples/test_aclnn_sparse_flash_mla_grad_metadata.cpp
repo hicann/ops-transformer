@@ -21,12 +21,12 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_sparse_flash_mla_grad_metadata.h"
 
-#define CHECK_LOG_RET(cond, ret_val, fmt, ...)      \
-    do {                                            \
-        if (!(cond)) {                              \
-            printf(fmt "\n", ##__VA_ARGS__);        \
-            return (ret_val);                       \
-        }                                           \
+#define CHECK_LOG_RET(cond, ret_val, fmt, ...) \
+    do { \
+        if (!(cond)) { \
+            printf(fmt "\n", ##__VA_ARGS__); \
+            return (ret_val); \
+        } \
     } while (0)
 
 // Constants
@@ -49,10 +49,11 @@ struct SmlagMetadata {
     uint32_t gradMetadata[GRAD_METADATA_SIZE];
 };
 
-struct ScopeGuard
-{
-    explicit ScopeGuard(std::function<void()> onExitScope) : m_exitFunc(std::move(onExitScope)),
-        m_isDismissed(false) {}
+struct ScopeGuard {
+    explicit ScopeGuard(std::function<void()> onExitScope)
+        : m_exitFunc(std::move(onExitScope)),
+          m_isDismissed(false)
+    {}
     // 禁止拷贝
     ScopeGuard(const ScopeGuard&) = delete;
     ScopeGuard& operator=(const ScopeGuard&) = delete;
@@ -74,51 +75,51 @@ struct ScopeGuard
 };
 
 struct Tensor {
-    void *hostAddr { nullptr };
-    void *deviceAddr { nullptr };
-    aclTensor *data { nullptr };
+    void* hostAddr{nullptr};
+    void* deviceAddr{nullptr};
+    aclTensor* data{nullptr};
 };
 
 struct ArgScenario {
-    bool hasCuSeq { false };
-    bool hasSeqused { false };
+    bool hasCuSeq{false};
+    bool hasSeqused{false};
 };
 
 struct ArgContext {
     // required input
-    int64_t numHeadsQ { 0 };
-    int64_t numHeadsKv { 0 };
-    int64_t headDim { 0 };
+    int64_t numHeadsQ{0};
+    int64_t numHeadsKv{0};
+    int64_t headDim{0};
     // optional input
-    Tensor cuSeqlensQOptional {};
-    Tensor cuSeqlensOriKvOptional {};
-    Tensor cuSeqlensCmpKvOptional {};
-    Tensor sequsedQOptional {};
-    Tensor sequsedOriKvOptional {};
-    Tensor sequsedCmpKvOptional {};
-    Tensor cmpResidualKvOptional {};
-    Tensor oriTopkLengthOptional {};
-    Tensor cmpTopkLengthOptional {};
-    int64_t batchSize { 0 };
-    int64_t maxSeqlenQ { 0 };
-    int64_t maxSeqlenOriKv { 0 };
-    int64_t maxSeqlenCmpKv { 0 };
-    int64_t oriTopk { 0 };
-    int64_t cmpTopk { 0 };
-    int64_t cmpRatio { 0 };
-    int64_t oriMaskMode { 0 };
-    int64_t cmpMaskMode { 0 };
-    int64_t oriWinLeft { -1 };
-    int64_t oriWinRight { -1 };
-    char *layoutQOptional { nullptr };
-    char *layoutKvOptional { nullptr };
-    bool hasOriKv { true };
-    bool hasCmpKv { true };
+    Tensor cuSeqlensQOptional{};
+    Tensor cuSeqlensOriKvOptional{};
+    Tensor cuSeqlensCmpKvOptional{};
+    Tensor sequsedQOptional{};
+    Tensor sequsedOriKvOptional{};
+    Tensor sequsedCmpKvOptional{};
+    Tensor cmpResidualKvOptional{};
+    Tensor oriTopkLengthOptional{};
+    Tensor cmpTopkLengthOptional{};
+    int64_t batchSize{0};
+    int64_t maxSeqlenQ{0};
+    int64_t maxSeqlenOriKv{0};
+    int64_t maxSeqlenCmpKv{0};
+    int64_t oriTopk{0};
+    int64_t cmpTopk{0};
+    int64_t cmpRatio{0};
+    int64_t oriMaskMode{0};
+    int64_t cmpMaskMode{0};
+    int64_t oriWinLeft{-1};
+    int64_t oriWinRight{-1};
+    char* layoutQOptional{nullptr};
+    char* layoutKvOptional{nullptr};
+    bool hasOriKv{true};
+    bool hasCmpKv{true};
     // output
-    Tensor metadata {};
+    Tensor metadata{};
 };
 
-int64_t GetShapeSize(const std::vector<int64_t>& shape) 
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -127,7 +128,7 @@ int64_t GetShapeSize(const std::vector<int64_t>& shape)
     return shapeSize;
 }
 
-aclnnStatus Init(int32_t deviceId, aclrtStream* stream) 
+aclnnStatus Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，初始化
     auto ret = aclInit(nullptr);
@@ -139,14 +140,14 @@ aclnnStatus Init(int32_t deviceId, aclrtStream* stream)
     return ACL_SUCCESS;
 }
 
-void Finalize(int32_t deviceId, aclrtStream stream) 
+void Finalize(int32_t deviceId, aclrtStream stream)
 {
     aclrtDestroyStream(stream);
     aclrtResetDevice(deviceId);
     aclFinalize();
 }
 
-aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t> &shape, Tensor &tensor)
+aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t>& shape, Tensor& tensor)
 {
     auto size = GetShapeSize(shape) * aclDataTypeSize(dataType);
     // 调用aclrtMallocHost申请host侧内存
@@ -158,7 +159,7 @@ aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t> &shape
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtMalloc failed. ERROR: %d", ret);
     // 调用aclCreateTensor接口创建aclTensor
     tensor.data = aclCreateTensor(shape.data(), shape.size(), dataType, nullptr, 0, aclFormat::ACL_FORMAT_ND,
-        shape.data(), shape.size(), tensor.deviceAddr);
+                                  shape.data(), shape.size(), tensor.deviceAddr);
     CHECK_LOG_RET(tensor.data != nullptr, ACL_ERROR_FAILURE, "aclCreateTensor failed");
     // 调用aclrtMemcpy将host侧数据拷贝到device侧内存上
     ret = aclrtMemcpy(tensor.deviceAddr, size, tensor.hostAddr, size, ACL_MEMCPY_HOST_TO_DEVICE);
@@ -166,7 +167,7 @@ aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t> &shape
     return ACL_SUCCESS;
 }
 
-void DestroyTensor(Tensor &tensor)
+void DestroyTensor(Tensor& tensor)
 {
     if (tensor.data != nullptr) {
         aclDestroyTensor(tensor.data);
@@ -182,7 +183,7 @@ void DestroyTensor(Tensor &tensor)
     }
 }
 
-void DestroyArgs(ArgContext &context)
+void DestroyArgs(ArgContext& context)
 {
     DestroyTensor(context.metadata);
     DestroyTensor(context.cuSeqlensQOptional);
@@ -205,7 +206,7 @@ void DestroyArgs(ArgContext &context)
     }
 }
 
-aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
+aclnnStatus CreateArgs(const ArgScenario& scenario, ArgContext& context)
 {
     ScopeGuard argsGuard([&] { DestroyArgs(context); });
     aclnnStatus ret;
@@ -213,7 +214,7 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     context.numHeadsQ = 64;
     context.numHeadsKv = 1;
     context.headDim = 512;
-    ret = CreateTensor(aclDataType::ACL_INT32, { SMLAG_METADATA_TOTAL_SIZE }, context.metadata);     // 1024: Fix size
+    ret = CreateTensor(aclDataType::ACL_INT32, {SMLAG_METADATA_TOTAL_SIZE}, context.metadata); // 1024: Fix size
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create metadata failed. Error: %d", ret);
     context.oriTopk = 0;
     context.cmpTopk = 0;
@@ -222,12 +223,12 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     context.cmpMaskMode = 3;
     context.oriWinLeft = 127;
     context.oriWinRight = 0;
-    context.layoutQOptional = (char *)malloc(sizeof(char) * 16);
-    context.layoutKvOptional = (char *)malloc(sizeof(char) * 16);
+    context.layoutQOptional = (char*)malloc(sizeof(char) * 16);
+    context.layoutKvOptional = (char*)malloc(sizeof(char) * 16);
     CHECK_LOG_RET(context.layoutQOptional != nullptr, ACL_ERROR_FAILURE, "Create layoutQOptional failed");
     CHECK_LOG_RET(context.layoutKvOptional != nullptr, ACL_ERROR_FAILURE, "Create layoutKvOptional failed");
-    strcpy(context.layoutQOptional, "BSND");                // BSND,TND
-    strcpy(context.layoutKvOptional, "BSND");               // BSND,TND
+    strcpy(context.layoutQOptional, "BSND");  // BSND,TND
+    strcpy(context.layoutKvOptional, "BSND"); // BSND,TND
     context.hasOriKv = true;
     context.hasCmpKv = true;
 
@@ -238,27 +239,27 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
 
     if (scenario.hasCuSeq) {
         // (B+1,), first element is always 0
-        ret = CreateTensor(aclDataType::ACL_INT32, { context.batchSize + 1 }, context.cuSeqlensQOptional);
+        ret = CreateTensor(aclDataType::ACL_INT32, {context.batchSize + 1}, context.cuSeqlensQOptional);
         CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create cuSeqlensQOptional failed. Error: %d", ret);
-        ret = CreateTensor(aclDataType::ACL_INT32, { context.batchSize + 1 }, context.cuSeqlensOriKvOptional);
+        ret = CreateTensor(aclDataType::ACL_INT32, {context.batchSize + 1}, context.cuSeqlensOriKvOptional);
         CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create cuSeqlensOriKvOptional failed. Error: %d", ret);
-        ret = CreateTensor(aclDataType::ACL_INT32, { context.batchSize + 1 }, context.cuSeqlensCmpKvOptional);
+        ret = CreateTensor(aclDataType::ACL_INT32, {context.batchSize + 1}, context.cuSeqlensCmpKvOptional);
         CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create cuSeqlensCmpKvOptional failed. Error: %d", ret);
     }
 
     if (scenario.hasSeqused) {
         // (B,)
-        ret = CreateTensor(aclDataType::ACL_INT32, { context.batchSize }, context.sequsedQOptional);
+        ret = CreateTensor(aclDataType::ACL_INT32, {context.batchSize}, context.sequsedQOptional);
         CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create sequsedQOptional failed. Error: %d", ret);
-        ret = CreateTensor(aclDataType::ACL_INT32, { context.batchSize }, context.sequsedOriKvOptional);
+        ret = CreateTensor(aclDataType::ACL_INT32, {context.batchSize}, context.sequsedOriKvOptional);
         CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create sequsedOriKvOptional failed. Error: %d", ret);
-        ret = CreateTensor(aclDataType::ACL_INT32, { context.batchSize }, context.sequsedCmpKvOptional);
+        ret = CreateTensor(aclDataType::ACL_INT32, {context.batchSize}, context.sequsedCmpKvOptional);
         CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create sequsedCmpKvOptional failed. Error: %d", ret);
     }
 
     if (context.hasCmpKv && context.cmpRatio != 1 && context.cmpMaskMode == 3) {
         // (B,)
-        ret = CreateTensor(aclDataType::ACL_INT32, { context.batchSize }, context.cmpResidualKvOptional);
+        ret = CreateTensor(aclDataType::ACL_INT32, {context.batchSize}, context.cmpResidualKvOptional);
         CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create cmpResidualKvOptional failed. Error: %d", ret);
     }
 
@@ -266,7 +267,8 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     return ACL_SUCCESS;
 }
 
-int main() {
+int main()
+{
     // 1. （固定写法）device/stream初始化，参考对外接口列表
     // 根据自己的实际device填写deviceId
     int32_t deviceId = 0;
@@ -276,10 +278,10 @@ int main() {
     ScopeGuard sysGuard([&] { Finalize(deviceId, stream); });
 
     // 2. 构造输入与输出，需要根据API的接口定义构造
-    ArgScenario scenario {};
+    ArgScenario scenario{};
     scenario.hasCuSeq = false;
     scenario.hasSeqused = false;
-    ArgContext context {};
+    ArgContext context{};
     ret = CreateArgs(scenario, context);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create input arguments failed. ERROR: %d", ret);
     ScopeGuard argsGuard([&] { DestroyArgs(context); });
@@ -287,18 +289,17 @@ int main() {
     // 3. 调用CANN算子库API，需要修改为具体的API
     // 调用aclnnSparseFlashMlaGradMetadata第一段接口
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
     ret = aclnnSparseFlashMlaGradMetadataGetWorkspaceSize(
         context.cuSeqlensQOptional.data, context.cuSeqlensOriKvOptional.data, context.cuSeqlensCmpKvOptional.data,
         context.sequsedQOptional.data, context.sequsedOriKvOptional.data, context.sequsedCmpKvOptional.data,
-        context.cmpResidualKvOptional.data, context.oriTopkLengthOptional.data, context.cmpTopkLengthOptional.data, 
+        context.cmpResidualKvOptional.data, context.oriTopkLengthOptional.data, context.cmpTopkLengthOptional.data,
         context.numHeadsQ, context.numHeadsKv, context.headDim, context.batchSize, context.maxSeqlenQ,
         context.maxSeqlenOriKv, context.maxSeqlenCmpKv, context.oriTopk, context.cmpTopk, context.cmpRatio,
         context.oriMaskMode, context.cmpMaskMode, context.oriWinLeft, context.oriWinRight, context.layoutQOptional,
         context.layoutKvOptional, context.hasOriKv, context.hasCmpKv, context.metadata.data, &workspaceSize, &executor);
-    CHECK_LOG_RET(ret == ACL_SUCCESS, ret,
-        "aclnnSparseFlashMlaGradMetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
+    CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclnnSparseFlashMlaGradMetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
 
     if (workspaceSize > static_cast<uint64_t>(0)) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -310,7 +311,7 @@ int main() {
             workspaceAddr = nullptr;
         }
     });
-    
+
     // 调用aclnnSparseFlashMlaGradMetadata第二段接口
     ret = aclnnSparseFlashMlaGradMetadata(workspaceAddr, workspaceSize, executor, stream);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclnnSparseFlashMlaGradMetadata failed. ERROR: %d\n", ret);
@@ -320,7 +321,7 @@ int main() {
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtSynchronizeStream failed. ERROR: %d\n", ret);
 
     // 5. 打印输出
-    SmlagMetadata result {};
+    SmlagMetadata result{};
     ret = aclrtMemcpy(&result, sizeof(result), context.metadata.deviceAddr, sizeof(result), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtMemcpy failed. ERROR: %d\n", ret);
 

@@ -25,14 +25,14 @@ namespace optiling {
 
 // ------------------公共定义--------------------------
 struct SMLATilingRequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct SMLATilingOptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
+    const gert::StorageShape* shape;
 };
 
 enum class SMLALayout : uint32_t {

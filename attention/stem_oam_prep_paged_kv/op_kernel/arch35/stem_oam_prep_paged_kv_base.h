@@ -33,7 +33,7 @@ constexpr static AscendC::Reg::CastTrait castTraitFloatTo16 = {
     AscendC::RoundMode::CAST_RINT};
 
 template <typename PARAM_T>
-__aicore__ inline void CopyIn(const LocalTensor<PARAM_T> &dstTensor, const GlobalTensor<PARAM_T> &srcTensor,
+__aicore__ inline void CopyIn(const LocalTensor<PARAM_T>& dstTensor, const GlobalTensor<PARAM_T>& srcTensor,
                               int64_t repTime, int64_t dataLen, uint32_t ubStride, uint32_t gmStride)
 {
     DataCopyExtParams copyParams = {static_cast<uint16_t>(repTime), static_cast<uint32_t>(dataLen * sizeof(PARAM_T)),
@@ -45,7 +45,7 @@ __aicore__ inline void CopyIn(const LocalTensor<PARAM_T> &dstTensor, const Globa
 }
 
 template <typename PARAM_T>
-__aicore__ inline void CopyOut(const GlobalTensor<PARAM_T> &dstTensor, const LocalTensor<PARAM_T> &srcTensor,
+__aicore__ inline void CopyOut(const GlobalTensor<PARAM_T>& dstTensor, const LocalTensor<PARAM_T>& srcTensor,
                                int64_t repTime, int64_t dataLen, uint32_t ubStride, uint32_t gmStride)
 {
     DataCopyExtParams copyParams = {static_cast<uint16_t>(repTime), static_cast<uint32_t>(dataLen * sizeof(PARAM_T)),

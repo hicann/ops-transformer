@@ -24,7 +24,7 @@ using namespace AscendC;
 namespace optiling {
 namespace smlag {
 
-ASCENDC_EXTERN_C ge::graphStatus TilingSparseFlashMlaGrad(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingSparseFlashMlaGrad(gert::TilingContext* context)
 {
     auto platform = context->GetPlatformInfo();
     auto sasgPlatform = platform_ascendc::PlatformAscendC(platform);
@@ -36,14 +36,16 @@ ASCENDC_EXTERN_C ge::graphStatus TilingSparseFlashMlaGrad(gert::TilingContext *c
     return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForSparseFlashMlaGrad(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForSparseFlashMlaGrad(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE(context->GetNodeName(), "context is null."), return ge::GRAPH_FAILED);
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
-    OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "platformInfoPtr is null."), return ge::GRAPH_FAILED);
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
+    OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "platformInfoPtr is null."),
+                return ge::GRAPH_FAILED);
 
     auto compileInfoPtr = context->GetCompiledInfo<SparseFlashMlaGradCompileInfo>();
-    OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "compileInfoPtr is null."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "compileInfoPtr is null."),
+                return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -56,10 +58,10 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForSparseFlashMlaGrad(gert::Tiling
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, compileInfoPtr->l2CacheSize);
 
     OP_LOGI(context,
-              "parse TilingParseContext succ. aivNum:%u, aicNum:%u, "
-              "ubSize:%lu, l1Size:%lu, l0aSize:%lu, l0bSize:%lu, l0cSize:%lu, l2CacheSize:%lu",
-              compileInfoPtr->aivNum, compileInfoPtr->aicNum, compileInfoPtr->ubSize, compileInfoPtr->l1Size,
-              compileInfoPtr->l0aSize, compileInfoPtr->l0bSize, compileInfoPtr->l0cSize, compileInfoPtr->l2CacheSize);
+            "parse TilingParseContext succ. aivNum:%u, aicNum:%u, "
+            "ubSize:%lu, l1Size:%lu, l0aSize:%lu, l0bSize:%lu, l0cSize:%lu, l2CacheSize:%lu",
+            compileInfoPtr->aivNum, compileInfoPtr->aicNum, compileInfoPtr->ubSize, compileInfoPtr->l1Size,
+            compileInfoPtr->l0aSize, compileInfoPtr->l0bSize, compileInfoPtr->l0cSize, compileInfoPtr->l2CacheSize);
 
     return ge::GRAPH_SUCCESS;
 }

@@ -56,7 +56,7 @@ struct MMParam {
     int64_t dstStride = 0;
 };
 
-__aicore__ inline void UpdatePingPongFlag(uint32_t &flag)
+__aicore__ inline void UpdatePingPongFlag(uint32_t& flag)
 {
     flag = 1 - flag;
 }
@@ -100,7 +100,7 @@ __aicore__ inline void FreeEventID()
 }
 
 template <typename T>
-__aicore__ inline void CopyGmToL1(const LocalTensor<T> &l1Tensor, const GlobalTensor<T> &gmTensor, uint32_t srcN,
+__aicore__ inline void CopyGmToL1(const LocalTensor<T>& l1Tensor, const GlobalTensor<T>& gmTensor, uint32_t srcN,
                                   uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;
@@ -116,7 +116,7 @@ __aicore__ inline void CopyGmToL1(const LocalTensor<T> &l1Tensor, const GlobalTe
 }
 
 template <typename T>
-__aicore__ inline void LoadDataMm1A(LocalTensor<T> &aL0Tensor, LocalTensor<T> &aL1Tensor, struct MMParam &mmParam)
+__aicore__ inline void LoadDataMm1A(LocalTensor<T>& aL0Tensor, LocalTensor<T>& aL1Tensor, struct MMParam& mmParam)
 {
     uint32_t alignM =
         AlignTo(mmParam.isLeftTranspose ? mmParam.singleK : mmParam.singleM, static_cast<uint32_t>(C0_SIZE));
@@ -135,8 +135,8 @@ __aicore__ inline void LoadDataMm1A(LocalTensor<T> &aL0Tensor, LocalTensor<T> &a
 }
 
 template <typename T>
-__aicore__ inline void LoadDataMm1AWithTranspose(LocalTensor<T> &aL0Tensor, LocalTensor<T> &aL1Tensor,
-                                                 struct MMParam &mmParam)
+__aicore__ inline void LoadDataMm1AWithTranspose(LocalTensor<T>& aL0Tensor, LocalTensor<T>& aL1Tensor,
+                                                 struct MMParam& mmParam)
 {
     uint32_t mloop = (mmParam.singleM + 15) / 16;
     uint32_t kloop = (mmParam.singleK + 15) / 16;
@@ -150,7 +150,7 @@ __aicore__ inline void LoadDataMm1AWithTranspose(LocalTensor<T> &aL0Tensor, Loca
 }
 
 template <typename T>
-__aicore__ inline void LoadDataMm1B(LocalTensor<T> &l0Tensor, LocalTensor<T> &l1Tensor, struct MMParam &mmParam)
+__aicore__ inline void LoadDataMm1B(LocalTensor<T>& l0Tensor, LocalTensor<T>& l1Tensor, struct MMParam& mmParam)
 {
     uint32_t alignN = AlignTo(mmParam.singleN, static_cast<uint32_t>(C0_SIZE));
     uint32_t alignK = AlignTo(mmParam.singleK, static_cast<uint32_t>(C0_SIZE));
@@ -168,11 +168,11 @@ __aicore__ inline void LoadDataMm1B(LocalTensor<T> &l0Tensor, LocalTensor<T> &l1
 }
 
 template <typename T1, bool needAtomic = false, bool isScatterFixOut = false>
-__aicore__ inline void MmadInnerWithSync(LocalTensor<float> &l0cTensor, LocalTensor<T1> &l1aTensor,
-                                         LocalTensor<T1> &l1bTensor, LocalTensor<T1> (&aL0TensorPingPong)[2],
-                                         LocalTensor<T1> (&bL0TensorPingPong)[2], struct MMParam &mmParam,
-                                         uint32_t &l0aPingPongFlag, uint32_t &l0bPingPongFlag, uint32_t l0cPingPongFlag,
-                                         bool needCopyL0a, const GlobalTensor<float> &resGm)
+__aicore__ inline void MmadInnerWithSync(LocalTensor<float>& l0cTensor, LocalTensor<T1>& l1aTensor,
+                                         LocalTensor<T1>& l1bTensor, LocalTensor<T1> (&aL0TensorPingPong)[2],
+                                         LocalTensor<T1> (&bL0TensorPingPong)[2], struct MMParam& mmParam,
+                                         uint32_t& l0aPingPongFlag, uint32_t& l0bPingPongFlag, uint32_t l0cPingPongFlag,
+                                         bool needCopyL0a, const GlobalTensor<float>& resGm)
 {
     MmadParams mmadParams;
     mmadParams.m = (mmParam.singleM == 1) ? 2 : mmParam.singleM;
@@ -244,12 +244,12 @@ __aicore__ inline void MmadInnerWithSync(LocalTensor<float> &l0cTensor, LocalTen
 }
 
 template <typename T1, bool needAtomic = false, bool isScatterFixOut = false>
-__aicore__ inline void MmadInnerWithSyncFixpNzOut(LocalTensor<float> &l0cTensor, LocalTensor<T1> &l1aTensor,
-                                                  LocalTensor<T1> &l1bTensor, LocalTensor<T1> (&aL0TensorPingPong)[2],
-                                                  LocalTensor<T1> (&bL0TensorPingPong)[2], struct MMParam &mmParam,
-                                                  uint32_t &l0aPingPongFlag, uint32_t &l0bPingPongFlag,
+__aicore__ inline void MmadInnerWithSyncFixpNzOut(LocalTensor<float>& l0cTensor, LocalTensor<T1>& l1aTensor,
+                                                  LocalTensor<T1>& l1bTensor, LocalTensor<T1> (&aL0TensorPingPong)[2],
+                                                  LocalTensor<T1> (&bL0TensorPingPong)[2], struct MMParam& mmParam,
+                                                  uint32_t& l0aPingPongFlag, uint32_t& l0bPingPongFlag,
                                                   uint32_t l0cPingPongFlag, bool needCopyL0a,
-                                                  const GlobalTensor<float> &resGm)
+                                                  const GlobalTensor<float>& resGm)
 {
     MmadParams mmadParams;
     mmadParams.m = (mmParam.singleM == 1) ? 2 : mmParam.singleM;
@@ -323,9 +323,9 @@ __aicore__ inline void MmadInnerWithSyncFixpNzOut(LocalTensor<float> &l0cTensor,
 }
 
 template <bool needAtomic = false>
-__aicore__ inline void ScatterFixOutWithSync(const GlobalTensor<float> &resGm,
-                                             const GlobalTensor<int32_t> &topkIndicesGm,
-                                             const LocalTensor<float> &l0cTensor, struct MMParam &mmParam,
+__aicore__ inline void ScatterFixOutWithSync(const GlobalTensor<float>& resGm,
+                                             const GlobalTensor<int32_t>& topkIndicesGm,
+                                             const LocalTensor<float>& l0cTensor, struct MMParam& mmParam,
                                              const int32_t selectedBlockSize, const int32_t blockOffset,
                                              const int32_t dimN2, const uint32_t eventId)
 {

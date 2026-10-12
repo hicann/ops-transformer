@@ -91,18 +91,18 @@ static int64_t AlignData(const int64_t a, const int64_t b)
     return (a + b - 1U) / b * b;
 }
 
-static ge::graphStatus ParseAttrs(gert::TilingContext *context, float &scaleValue, int64_t &maxSeqlenK,
-                                  int64_t &cmpRatio, int64_t &maskMode, string &layoutQ, string &layoutK)
+static ge::graphStatus ParseAttrs(gert::TilingContext* context, float& scaleValue, int64_t& maxSeqlenK,
+                                  int64_t& cmpRatio, int64_t& maskMode, string& layoutQ, string& layoutK)
 {
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const float *scaleValuePtr = attrs->GetAttrPointer<float>(SCALE_VALUE_ATTR_IDX);
-    const int64_t *maxSeqlenKPtr = attrs->GetAttrPointer<int64_t>(MAX_SEQLEN_K_ATTR_IDX);
-    const int64_t *cmpRatioPtr = attrs->GetAttrPointer<int64_t>(CMP_RATIO_ATTR_IDX);
-    const int64_t *maskModePtr = attrs->GetAttrPointer<int64_t>(MASK_MODE_ATTR_IDX);
-    const char *layoutQPtr = attrs->GetAttrPointer<char>(LAYOUT_Q_ATTR_IDX);
-    const char *layoutKPtr = attrs->GetAttrPointer<char>(LAYOUT_K_ATTR_IDX);
+    const float* scaleValuePtr = attrs->GetAttrPointer<float>(SCALE_VALUE_ATTR_IDX);
+    const int64_t* maxSeqlenKPtr = attrs->GetAttrPointer<int64_t>(MAX_SEQLEN_K_ATTR_IDX);
+    const int64_t* cmpRatioPtr = attrs->GetAttrPointer<int64_t>(CMP_RATIO_ATTR_IDX);
+    const int64_t* maskModePtr = attrs->GetAttrPointer<int64_t>(MASK_MODE_ATTR_IDX);
+    const char* layoutQPtr = attrs->GetAttrPointer<char>(LAYOUT_Q_ATTR_IDX);
+    const char* layoutKPtr = attrs->GetAttrPointer<char>(LAYOUT_K_ATTR_IDX);
 
     scaleValue = (scaleValuePtr != nullptr) ? *scaleValuePtr : 1.0;
     maxSeqlenK = (maxSeqlenKPtr != nullptr) ? *maxSeqlenKPtr : 0;
@@ -113,7 +113,7 @@ static ge::graphStatus ParseAttrs(gert::TilingContext *context, float &scaleValu
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateRequiredInputs(gert::TilingContext *context, const string &opName)
+static ge::graphStatus ValidateRequiredInputs(gert::TilingContext* context, const string& opName)
 {
     auto queryDesc = context->GetInputDesc(QUERY_IDX);
     auto keyDesc = context->GetInputDesc(KEY_IDX);
@@ -132,7 +132,7 @@ static ge::graphStatus ValidateRequiredInputs(gert::TilingContext *context, cons
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateLayout(const string &layoutQ, const string &layoutK, bool &isTnd, const string &opName)
+static ge::graphStatus ValidateLayout(const string& layoutQ, const string& layoutK, bool& isTnd, const string& opName)
 {
     const set<string> validLayouts = {"BSND", "TND"};
     OP_CHECK_IF(validLayouts.find(layoutQ) == validLayouts.end(),
@@ -148,7 +148,7 @@ static ge::graphStatus ValidateLayout(const string &layoutQ, const string &layou
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateDtypes(gert::TilingContext *context, const string &opName)
+static ge::graphStatus ValidateDtypes(gert::TilingContext* context, const string& opName)
 {
     auto queryDesc = context->GetInputDesc(QUERY_IDX);
     auto keyDesc = context->GetInputDesc(KEY_IDX);
@@ -177,7 +177,7 @@ static ge::graphStatus ValidateDtypes(gert::TilingContext *context, const string
                 OP_LOGE(opName, "softmaxL1Norm dtype must be FLOAT32, but got %s.", DataTypeToStr(outputDtype).c_str()),
                 return ge::GRAPH_FAILED);
 
-    auto checkInt32OptionalInput = [&](uint32_t idx, const string &name) -> ge::graphStatus {
+    auto checkInt32OptionalInput = [&](uint32_t idx, const string& name) -> ge::graphStatus {
         auto desc = context->GetOptionalInputDesc(idx);
         if (desc != nullptr) {
             OP_CHECK_IF(desc->GetDataType() != ge::DT_INT32,
@@ -204,8 +204,8 @@ static ge::graphStatus ValidateDtypes(gert::TilingContext *context, const string
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateInputDims(gert::TilingContext *context, const string &layoutQ, const string &layoutK,
-                                         bool isTnd, const string &opName)
+static ge::graphStatus ValidateInputDims(gert::TilingContext* context, const string& layoutQ, const string& layoutK,
+                                         bool isTnd, const string& opName)
 {
     auto queryShape = context->GetInputShape(QUERY_IDX);
     auto keyShape = context->GetInputShape(KEY_IDX);
@@ -236,7 +236,7 @@ static ge::graphStatus ValidateInputDims(gert::TilingContext *context, const str
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateAttrRanges(int64_t cmpRatio, int64_t maskMode, const string &opName)
+static ge::graphStatus ValidateAttrRanges(int64_t cmpRatio, int64_t maskMode, const string& opName)
 {
     OP_CHECK_IF(cmpRatio < CMP_RATIO_MIN || cmpRatio > CMP_RATIO_MAX,
                 OP_LOGE(opName, "cmpRatio must be in [1, 128], but got %lld.", cmpRatio), return ge::GRAPH_FAILED);
@@ -245,8 +245,8 @@ static ge::graphStatus ValidateAttrRanges(int64_t cmpRatio, int64_t maskMode, co
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateAndExtractShapesTnd(gert::TilingContext *context, TilingShapeInfo &info,
-                                                   const string &opName)
+static ge::graphStatus ValidateAndExtractShapesTnd(gert::TilingContext* context, TilingShapeInfo& info,
+                                                   const string& opName)
 {
     auto queryShape = context->GetInputShape(QUERY_IDX);
     auto keyShape = context->GetInputShape(KEY_IDX);
@@ -296,8 +296,8 @@ static ge::graphStatus ValidateAndExtractShapesTnd(gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateAndExtractShapesBsnd(gert::TilingContext *context, TilingShapeInfo &info,
-                                                    const string &opName)
+static ge::graphStatus ValidateAndExtractShapesBsnd(gert::TilingContext* context, TilingShapeInfo& info,
+                                                    const string& opName)
 {
     auto queryShape = context->GetInputShape(QUERY_IDX);
     auto keyShape = context->GetInputShape(KEY_IDX);
@@ -329,8 +329,8 @@ static ge::graphStatus ValidateAndExtractShapesBsnd(gert::TilingContext *context
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateShapeRanges(gert::TilingContext *context, const TilingShapeInfo &info, bool isTnd,
-                                           const string &opName)
+static ge::graphStatus ValidateShapeRanges(gert::TilingContext* context, const TilingShapeInfo& info, bool isTnd,
+                                           const string& opName)
 {
     auto keyShape = context->GetInputShape(KEY_IDX);
     int64_t n1Size = info.gSize;
@@ -345,8 +345,8 @@ static ge::graphStatus ValidateShapeRanges(gert::TilingContext *context, const T
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateLseShape(gert::TilingContext *context, const TilingShapeInfo &info, bool isTnd,
-                                        const string &opName)
+static ge::graphStatus ValidateLseShape(gert::TilingContext* context, const TilingShapeInfo& info, bool isTnd,
+                                        const string& opName)
 {
     auto lseShape = context->GetInputShape(LSE_IDX);
     if (isTnd) {
@@ -380,8 +380,8 @@ static ge::graphStatus ValidateLseShape(gert::TilingContext *context, const Tili
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateOptionalShapeInputs(gert::TilingContext *context, int64_t bSize, int64_t maskMode,
-                                                   int64_t cmpRatio, const string &opName)
+static ge::graphStatus ValidateOptionalShapeInputs(gert::TilingContext* context, int64_t bSize, int64_t maskMode,
+                                                   int64_t cmpRatio, const string& opName)
 {
     auto cmpResidualKInput = context->GetOptionalInputTensor(CMP_RESIDUAL_K_IDX);
     if (maskMode == 3 && cmpRatio > 1) {
@@ -425,8 +425,8 @@ static ge::graphStatus ValidateOptionalShapeInputs(gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateSparseInfo(gert::TilingContext *context, int64_t maskMode, bool isTnd,
-                                          const string &layoutQ, const string &opName, bool &isSparse, int64_t &kLength)
+static ge::graphStatus ValidateSparseInfo(gert::TilingContext* context, int64_t maskMode, bool isTnd,
+                                          const string& layoutQ, const string& opName, bool& isSparse, int64_t& kLength)
 {
     auto sparseIndicesInput = context->GetOptionalInputTensor(SPARSE_INDICES_IDX);
     isSparse = (sparseIndicesInput != nullptr);
@@ -457,13 +457,13 @@ static ge::graphStatus ValidateSparseInfo(gert::TilingContext *context, int64_t 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus GetPlatformInfo(gert::TilingContext *context, const string &opName, AiCoreParams &aicoreParams_)
+static ge::graphStatus GetPlatformInfo(gert::TilingContext* context, const string& opName, AiCoreParams& aicoreParams_)
 {
     auto platformInfoPtr = context->GetPlatformInfo();
     uint64_t l2CacheSize;
     if (platformInfoPtr == nullptr) {
         auto compileInfoPtr =
-            reinterpret_cast<const SparseFlashMlaSoftmaxL1NormCompileInfo *>(context->GetCompileInfo());
+            reinterpret_cast<const SparseFlashMlaSoftmaxL1NormCompileInfo*>(context->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OPS_REPORT_VECTOR_INNER_ERR(opName, "compile_info is null."),
                     return ge::GRAPH_FAILED);
         aicoreParams_.numBlocks = compileInfoPtr->aivNum;
@@ -497,7 +497,7 @@ static ge::graphStatus GetPlatformInfo(gert::TilingContext *context, const strin
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SparseFlashMlaSoftmaxL1NormTilingFunc(gert::TilingContext *context)
+static ge::graphStatus SparseFlashMlaSoftmaxL1NormTilingFunc(gert::TilingContext* context)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -564,7 +564,7 @@ static ge::graphStatus SparseFlashMlaSoftmaxL1NormTilingFunc(gert::TilingContext
     bool has_seqused_k = (context->GetOptionalInputTensor(SEQUSED_K_IDX) != nullptr);
     bool has_topk_length = (context->GetOptionalInputTensor(TOPK_LENGTH_IDX) != nullptr);
 
-    OpTiling *tilingData = context->GetTilingData<OpTiling>();
+    OpTiling* tilingData = context->GetTilingData<OpTiling>();
     tilingData->b = info.bSize;
     tilingData->sq = info.sqSize;
     tilingData->sk = info.skSize;
@@ -603,7 +603,7 @@ static ge::graphStatus SparseFlashMlaSoftmaxL1NormTilingFunc(gert::TilingContext
     } else {
         workspaceSize += static_cast<size_t>(info.gSize) * static_cast<size_t>(info.t2) * sizeof(float);
     }
-    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    size_t* workSpaces = context->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;
 
     OP_LOGI(context->GetNodeName(),
@@ -615,7 +615,7 @@ static ge::graphStatus SparseFlashMlaSoftmaxL1NormTilingFunc(gert::TilingContext
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingParseForSparseFlashMlaSoftmaxL1Norm([[maybe_unused]] gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForSparseFlashMlaSoftmaxL1Norm([[maybe_unused]] gert::TilingParseContext* context)
 {
     return ge::GRAPH_SUCCESS;
 }

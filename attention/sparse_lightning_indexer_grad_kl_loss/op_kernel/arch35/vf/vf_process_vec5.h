@@ -21,8 +21,8 @@ namespace AscendC {
 using namespace Reg;
 
 template <typename T, bool isAlign>
-__simd_vf__ inline void ProcessVec5BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb, __ubuf__ T *srcOtherUb,
-                                           __ubuf__ T *reduceSumUb, uint32_t alignCnt, uint32_t tailSize,
+__simd_vf__ inline void ProcessVec5BasicVF(__ubuf__ T* dstUb, __ubuf__ T* srcUb, __ubuf__ T* srcOtherUb,
+                                           __ubuf__ T* reduceSumUb, uint32_t alignCnt, uint32_t tailSize,
                                            float maxValue, uint32_t lossSize)
 {
     RegTensor<float> vreg_input_x1;
@@ -52,7 +52,7 @@ __simd_vf__ inline void ProcessVec5BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
         LoadAlign(vreg_input_x1, srcUb + i * floatRepSize);
         LoadAlign(vreg_input_other1, srcOtherUb + i * floatRepSize);
         Add(vreg_input_x1, vreg_input_x1, vreg_input_other1, preg_all_b32);
-        StoreAlign(((__ubuf__ T *&)srcUb + i * floatRepSize), vreg_input_x1, preg_all_b32);
+        StoreAlign(((__ubuf__ T*&)srcUb + i * floatRepSize), vreg_input_x1, preg_all_b32);
     }
     if constexpr (!isAlign) {
         LoadAlign(vreg_input_x1, srcUb + alignCnt * floatRepSize);
@@ -60,7 +60,7 @@ __simd_vf__ inline void ProcessVec5BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
         Select(vreg_input_x1_new, vreg_input_x1, vreg_zero, preg_tail_n);
         Select(vreg_input_other1_new, vreg_input_other1, vreg_zero, preg_tail_n);
         Add(vreg_input_x1_new, vreg_input_x1_new, vreg_input_other1_new, preg_tail_n);
-        StoreAlign(((__ubuf__ T *&)srcUb + alignCnt * floatRepSize), vreg_input_x1_new, preg_tail_n);
+        StoreAlign(((__ubuf__ T*&)srcUb + alignCnt * floatRepSize), vreg_input_x1_new, preg_tail_n);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
     for (uint16_t i = 0; i < alignCnt; ++i) {
@@ -89,18 +89,18 @@ __simd_vf__ inline void ProcessVec5BasicVF(__ubuf__ T *dstUb, __ubuf__ T *srcUb,
     }
     Reduce<Reg::ReduceType::SUM, float, float, Reg::MaskMergeMode::ZEROING>(vreg_output, vreg_output_x, preg_all_b32);
     Add(vreg_dst, vreg_output, vreg_dst, preg_all_b32);
-    StoreAlign(((__ubuf__ T *&)dstUb), vreg_dst, preg_loss);
+    StoreAlign(((__ubuf__ T*&)dstUb), vreg_dst, preg_loss);
 }
 
 template <typename T, bool isAlign>
-__aicore__ inline void ProcessVec5Vf(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor,
-                                     const LocalTensor<T> &srcOtherTensor, const LocalTensor<T> &reduceSumTensor,
+__aicore__ inline void ProcessVec5Vf(const LocalTensor<T>& dstTensor, const LocalTensor<T>& srcTensor,
+                                     const LocalTensor<T>& srcOtherTensor, const LocalTensor<T>& reduceSumTensor,
                                      const uint32_t m)
 {
-    __ubuf__ T *dstUb = (__ubuf__ T *)dstTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
-    __ubuf__ T *srcOtherUb = (__ubuf__ T *)srcOtherTensor.GetPhyAddr();
-    __ubuf__ T *reduceSumUb = (__ubuf__ T *)reduceSumTensor.GetPhyAddr();
+    __ubuf__ T* dstUb = (__ubuf__ T*)dstTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
+    __ubuf__ T* srcOtherUb = (__ubuf__ T*)srcOtherTensor.GetPhyAddr();
+    __ubuf__ T* reduceSumUb = (__ubuf__ T*)reduceSumTensor.GetPhyAddr();
     uint32_t alignCnt = m >> 6;
     uint32_t tailSize = m - (m >> 6 << 6);
     float maxValue = 1e-8;

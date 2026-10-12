@@ -23,24 +23,24 @@ public:
     BaseChecker() = default;
     virtual ~BaseChecker() = default;
 
-    virtual ge::graphStatus CheckSinglePara(const CheckContext &context) const;
-    virtual ge::graphStatus CheckParaExistence(const CheckContext &context) const;
-    virtual ge::graphStatus CheckFeature(const CheckContext &context) const;
-    virtual ge::graphStatus CheckMultiPara(const CheckContext &context) const;
+    virtual ge::graphStatus CheckSinglePara(const CheckContext& context) const;
+    virtual ge::graphStatus CheckParaExistence(const CheckContext& context) const;
+    virtual ge::graphStatus CheckFeature(const CheckContext& context) const;
+    virtual ge::graphStatus CheckMultiPara(const CheckContext& context) const;
 
 protected:
-    ge::graphStatus CheckTensorDesc(const CheckContext &context, const TensorParam &param, const char *name,
+    ge::graphStatus CheckTensorDesc(const CheckContext& context, const TensorParam& param, const char* name,
                                     std::initializer_list<ge::DataType> dtypes) const;
-    ge::graphStatus CheckDimNum(const CheckContext &context, const TensorParam &param, const char *name,
+    ge::graphStatus CheckDimNum(const CheckContext& context, const TensorParam& param, const char* name,
                                 std::initializer_list<size_t> dimNums) const;
-    ge::graphStatus CheckNoEmptyDim(const CheckContext &context, const TensorParam &param, const char *name) const;
-    ge::graphStatus CheckShape(const CheckContext &context, const TensorParam &param, const char *name,
+    ge::graphStatus CheckNoEmptyDim(const CheckContext& context, const TensorParam& param, const char* name) const;
+    ge::graphStatus CheckShape(const CheckContext& context, const TensorParam& param, const char* name,
                                std::initializer_list<int64_t> expected) const;
-    ge::graphStatus CheckSameShape(const CheckContext &context, const TensorParam &left, const char *leftName,
-                                   const TensorParam &right, const char *rightName) const;
-    int64_t GetDim(const TensorParam &param, size_t index) const;
-    bool CanOmitSequsedOriKv(const CheckContext &context) const;
-    bool CanOmitSequsedCmpKv(const CheckContext &context) const;
+    ge::graphStatus CheckSameShape(const CheckContext& context, const TensorParam& left, const char* leftName,
+                                   const TensorParam& right, const char* rightName) const;
+    int64_t GetDim(const TensorParam& param, size_t index) const;
+    bool CanOmitSequsedOriKv(const CheckContext& context) const;
+    bool CanOmitSequsedCmpKv(const CheckContext& context) const;
 };
 
 } // namespace sparse_mla_checker

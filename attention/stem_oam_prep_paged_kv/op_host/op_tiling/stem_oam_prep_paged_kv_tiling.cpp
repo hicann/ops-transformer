@@ -24,7 +24,7 @@
 
 namespace optiling {
 
-static ge::graphStatus Tiling4StemOamPrepPagedKv(gert::TilingContext *context)
+static ge::graphStatus Tiling4StemOamPrepPagedKv(gert::TilingContext* context)
 {
     OP_LOGD(context->GetNodeName(), "StemOamPrepPagedKv is running.");
 
@@ -37,7 +37,10 @@ static ge::graphStatus Tiling4StemOamPrepPagedKv(gert::TilingContext *context)
     return ge::GRAPH_FAILED;
 }
 
-static ge::graphStatus TilingPrepare4StemOamPrepPagedKv(gert::TilingParseContext *context) { return ge::GRAPH_SUCCESS; }
+static ge::graphStatus TilingPrepare4StemOamPrepPagedKv(gert::TilingParseContext* context)
+{
+    return ge::GRAPH_SUCCESS;
+}
 
 IMPL_OP_OPTILING(StemOamPrepPagedKv)
     .Tiling(Tiling4StemOamPrepPagedKv)

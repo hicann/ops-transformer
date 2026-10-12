@@ -19,7 +19,7 @@
 
 namespace AscendC {
 template <typename T, typename WEIGHT_T>
-__simd_vf__ inline void CastDupBasicVF(__ubuf__ WEIGHT_T *dstUb, __ubuf__ T *srcUb, uint32_t m, uint32_t maskScaler)
+__simd_vf__ inline void CastDupBasicVF(__ubuf__ WEIGHT_T* dstUb, __ubuf__ T* srcUb, uint32_t m, uint32_t maskScaler)
 {
     RegTensor<float> vreg_input;
     RegTensor<float> vreg_input_new;
@@ -41,23 +41,23 @@ __simd_vf__ inline void CastDupBasicVF(__ubuf__ WEIGHT_T *dstUb, __ubuf__ T *src
     if constexpr (IsSameType<WEIGHT_T, half>::value) {
         Cast<WEIGHT_T, float, castTraitZero>(vreg_dw_half, vreg_input_new, pregFullExeB16);
         DeInterleave(vreg_dw_half_even, vreg_dw_half_odd, vreg_dw_half, vreg_dw_half);
-        StoreAlign(((__ubuf__ WEIGHT_T *&)dstUb), vreg_dw_half_even, preg_tail);
+        StoreAlign(((__ubuf__ WEIGHT_T*&)dstUb), vreg_dw_half_even, preg_tail);
     } else if constexpr (IsSameType<WEIGHT_T, bfloat16_t>::value) {
         Cast<WEIGHT_T, float, castTraitZero>(vreg_dw_bf, vreg_input_new, pregFullExeB16);
         DeInterleave(vreg_dw_bf_even, vreg_dw_bf_odd, vreg_dw_bf, vreg_dw_bf);
-        StoreAlign(((__ubuf__ WEIGHT_T *&)dstUb), vreg_dw_bf_even, preg_tail);
+        StoreAlign(((__ubuf__ WEIGHT_T*&)dstUb), vreg_dw_bf_even, preg_tail);
     } else if constexpr (IsSameType<WEIGHT_T, float>::value) {
-        StoreAlign(((__ubuf__ WEIGHT_T *&)dstUb), vreg_input_new, preg_tail);
+        StoreAlign(((__ubuf__ WEIGHT_T*&)dstUb), vreg_input_new, preg_tail);
     }
-    StoreAlign(((__ubuf__ T *&)srcUb), vreg_zero, preg_tail_n);
+    StoreAlign(((__ubuf__ T*&)srcUb), vreg_zero, preg_tail_n);
 }
 
 template <typename T, typename WEIGHT_T>
-__aicore__ inline void CastDupVf(const LocalTensor<WEIGHT_T> &dstTensor, const LocalTensor<T> &srcTensor,
+__aicore__ inline void CastDupVf(const LocalTensor<WEIGHT_T>& dstTensor, const LocalTensor<T>& srcTensor,
                                  const uint32_t m)
 {
-    __ubuf__ WEIGHT_T *dstUb = (__ubuf__ WEIGHT_T *)dstTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)srcTensor.GetPhyAddr();
+    __ubuf__ WEIGHT_T* dstUb = (__ubuf__ WEIGHT_T*)dstTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)srcTensor.GetPhyAddr();
     uint32_t maskScaler = m;
 
     CastDupBasicVF<T, WEIGHT_T>(dstUb, srcUb, m, maskScaler);

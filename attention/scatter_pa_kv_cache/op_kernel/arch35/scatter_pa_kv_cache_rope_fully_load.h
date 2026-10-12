@@ -34,7 +34,7 @@ constexpr uint32_t VECTOR_LENGTH = GetVRegSize();
 constexpr uint32_t VL_B32 = VECTOR_LENGTH / sizeof(uint32_t);
 
 template <typename T, typename U>
-__simd_vf__ inline void CastToOriginFullyVf(__ubuf__ U *srcAddr, __ubuf__ T *dstAddr, uint32_t dataLen,
+__simd_vf__ inline void CastToOriginFullyVf(__ubuf__ U* srcAddr, __ubuf__ T* dstAddr, uint32_t dataLen,
                                             uint16_t loopNum)
 {
     Reg::RegTensor<U> valueSrc;
@@ -44,10 +44,10 @@ __simd_vf__ inline void CastToOriginFullyVf(__ubuf__ U *srcAddr, __ubuf__ T *dst
         curpreg = Reg::UpdateMask<uint32_t>(sregMask);
         Reg::LoadAlign<U, Reg::LoadDist::DIST_NORM>(valueSrc, srcAddr + VL_B32 * j);
         if constexpr (IsSameType<T, int16_t>::value || IsSameType<T, uint16_t>::value) {
-            Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(dstAddr + VL_B32 * j, (Reg::RegTensor<T> &)valueSrc,
+            Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(dstAddr + VL_B32 * j, (Reg::RegTensor<T>&)valueSrc,
                                                               curpreg);
         } else {
-            Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK4_B32>(dstAddr + VL_B32 * j, (Reg::RegTensor<T> &)valueSrc,
+            Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK4_B32>(dstAddr + VL_B32 * j, (Reg::RegTensor<T>&)valueSrc,
                                                                curpreg);
         }
     }
@@ -56,7 +56,7 @@ __simd_vf__ inline void CastToOriginFullyVf(__ubuf__ U *srcAddr, __ubuf__ T *dst
 template <typename T, typename IndexDtype, int64_t InOutMode>
 class ScatterPaKvCacheRopeFullyLoad {
 public:
-    __aicore__ inline ScatterPaKvCacheRopeFullyLoad(TPipe *pipe, const ScatterPaKvCacheTilingData *__restrict tiling)
+    __aicore__ inline ScatterPaKvCacheRopeFullyLoad(TPipe* pipe, const ScatterPaKvCacheTilingData* __restrict tiling)
         : pipe_(pipe),
           tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR key, GM_ADDR key_cache_in, GM_ADDR slot_mapping, GM_ADDR value,
@@ -80,10 +80,10 @@ private:
     __aicore__ inline void ReduceMeanValue(int64_t iter, int64_t startIdx, int64_t endIdx, int64_t curBlockFactor);
     __aicore__ inline void CalcStartIdx(LocalTensor<IndexDtype> slotMappingLocal, int64_t curBlockFactor);
     template <typename U>
-    __aicore__ inline void CastToOrigin(LocalTensor<T> &dstLocal, LocalTensor<U> &srcLocal, uint32_t dataLen);
+    __aicore__ inline void CastToOrigin(LocalTensor<T>& dstLocal, LocalTensor<U>& srcLocal, uint32_t dataLen);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, 1> inputKeyQueue_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, 1> inputValueQueue_;
     TBuf<TPosition::VECCALC> slotMappingBuf_;
@@ -94,7 +94,7 @@ private:
     TBuf<TPosition::VECCALC> divideBuf_;
     TBuf<TPosition::VECCALC> castBuf_;
 
-    const ScatterPaKvCacheTilingData *tilingData_;
+    const ScatterPaKvCacheTilingData* tilingData_;
 
     GlobalTensor<T> inputKeyGm_;
     GlobalTensor<T> inputValueGm_;
@@ -130,13 +130,13 @@ __aicore__ inline void ScatterPaKvCacheRopeFullyLoad<T, IndexDtype, InOutMode>::
     seqLen_ = tilingData_->seqLen;
     numHead_ = tilingData_->numHead;
     kvBlockOffset_ = GetBlockIdx() * tilingData_->blockFactor;
-    inputKeyGm_.SetGlobalBuffer((__gm__ T *)(key));
-    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype *)(slot_mapping) + GetBlockIdx() * tilingData_->blockFactor);
-    compressSeqOffsetGm_.SetGlobalBuffer((__gm__ IndexDtype *)(compress_seq_offset) +
+    inputKeyGm_.SetGlobalBuffer((__gm__ T*)(key));
+    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype*)(slot_mapping) + GetBlockIdx() * tilingData_->blockFactor);
+    compressSeqOffsetGm_.SetGlobalBuffer((__gm__ IndexDtype*)(compress_seq_offset) +
                                          GetBlockIdx() * tilingData_->blockFactor);
-    compressLensGm_.SetGlobalBuffer((__gm__ IndexDtype *)(compress_lens) + GetBlockIdx() * tilingData_->blockFactor);
-    seqLensGm_.SetGlobalBuffer((__gm__ IndexDtype *)(seq_lens));
-    outputKeyCacheGm_.SetGlobalBuffer((__gm__ T *)(key_cache_out));
+    compressLensGm_.SetGlobalBuffer((__gm__ IndexDtype*)(compress_lens) + GetBlockIdx() * tilingData_->blockFactor);
+    seqLensGm_.SetGlobalBuffer((__gm__ IndexDtype*)(seq_lens));
+    outputKeyCacheGm_.SetGlobalBuffer((__gm__ T*)(key_cache_out));
 
     pipe_->InitBuffer(slotMappingBuf_, RoundUp(tilingData_->blockFactor) * sizeof(IndexDtype));
     pipe_->InitBuffer(compressSeqOffsetBuf_, RoundUp(tilingData_->blockFactor) * sizeof(IndexDtype));
@@ -149,8 +149,8 @@ __aicore__ inline void ScatterPaKvCacheRopeFullyLoad<T, IndexDtype, InOutMode>::
     pipe_->InitBuffer(inputKeyQueue_, 1, (seqLen_ * RoundUp(tilingData_->kHeadSize)) * sizeof(T));
 
     if constexpr (InOutMode == DUAL_IN_OUT) {
-        inputValueGm_.SetGlobalBuffer((__gm__ T *)(value));
-        outputValueCacheGm_.SetGlobalBuffer((__gm__ T *)(value_cache_out));
+        inputValueGm_.SetGlobalBuffer((__gm__ T*)(value));
+        outputValueCacheGm_.SetGlobalBuffer((__gm__ T*)(value_cache_out));
         pipe_->InitBuffer(inputValueQueue_, 1, (seqLen_ * RoundUp(tilingData_->vHeadSize)) * sizeof(T));
     }
 }
@@ -254,16 +254,16 @@ __aicore__ inline uint32_t ScatterPaKvCacheRopeFullyLoad<T, IndexDtype, InOutMod
 
 template <typename T, typename IndexDtype, int64_t InOutMode>
 template <typename U>
-__aicore__ inline void ScatterPaKvCacheRopeFullyLoad<T, IndexDtype, InOutMode>::CastToOrigin(LocalTensor<T> &dstLocal,
-                                                                                             LocalTensor<U> &srcLocal,
+__aicore__ inline void ScatterPaKvCacheRopeFullyLoad<T, IndexDtype, InOutMode>::CastToOrigin(LocalTensor<T>& dstLocal,
+                                                                                             LocalTensor<U>& srcLocal,
                                                                                              uint32_t dataLen)
 {
-    __ubuf__ U *srcPhyAddr = (__ubuf__ U *)srcLocal.GetPhyAddr();
-    __ubuf__ T *dstPhyAddr = (__ubuf__ T *)dstLocal.GetPhyAddr();
+    __ubuf__ U* srcPhyAddr = (__ubuf__ U*)srcLocal.GetPhyAddr();
+    __ubuf__ T* dstPhyAddr = (__ubuf__ T*)dstLocal.GetPhyAddr();
 
     uint16_t loopNum = CeilDivFully(dataLen, VL_B32);
 
-    CastToOriginFullyVf<T, U>((__ubuf__ U *)srcPhyAddr, (__ubuf__ T *)dstPhyAddr, dataLen, loopNum);
+    CastToOriginFullyVf<T, U>((__ubuf__ U*)srcPhyAddr, (__ubuf__ T*)dstPhyAddr, dataLen, loopNum);
 }
 
 template <typename T, typename IndexDtype, int64_t InOutMode>

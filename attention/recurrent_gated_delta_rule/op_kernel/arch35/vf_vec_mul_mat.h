@@ -21,7 +21,7 @@
 namespace AscendC {
 
 template <typename T>
-__simd_vf__ void VecMulMatVFImpl(__ubuf__ T *outputUb, __ubuf__ T *rowVecUb, __ubuf__ T *matrixUb,
+__simd_vf__ void VecMulMatVFImpl(__ubuf__ T* outputUb, __ubuf__ T* rowVecUb, __ubuf__ T* matrixUb,
                                  const uint32_t floatRepSize, uint16_t dLoops, uint32_t dTail, uint16_t dTailLoop,
                                  const uint16_t row, const uint32_t col)
 {
@@ -64,12 +64,12 @@ __simd_vf__ void VecMulMatVFImpl(__ubuf__ T *outputUb, __ubuf__ T *rowVecUb, __u
 }
 
 template <typename T>
-__aicore__ inline void VecMulMatVF(const LocalTensor<T> &matrixOutUb, const LocalTensor<T> &rowVecInUb,
-                                   const LocalTensor<T> &matrixInUb, const uint16_t row, const uint32_t col)
+__aicore__ inline void VecMulMatVF(const LocalTensor<T>& matrixOutUb, const LocalTensor<T>& rowVecInUb,
+                                   const LocalTensor<T>& matrixInUb, const uint16_t row, const uint32_t col)
 {
-    __ubuf__ float *matrixUb = (__ubuf__ float *)matrixInUb.GetPhyAddr();
-    __ubuf__ float *rowVecUb = (__ubuf__ float *)rowVecInUb.GetPhyAddr();
-    __ubuf__ float *outputUb = (__ubuf__ float *)matrixOutUb.GetPhyAddr();
+    __ubuf__ float* matrixUb = (__ubuf__ float*)matrixInUb.GetPhyAddr();
+    __ubuf__ float* rowVecUb = (__ubuf__ float*)rowVecInUb.GetPhyAddr();
+    __ubuf__ float* outputUb = (__ubuf__ float*)matrixOutUb.GetPhyAddr();
 
     constexpr uint16_t floatRepSize = 64; // 一个寄存器能够存放64个FP32
     uint16_t dLoops = col / floatRepSize;

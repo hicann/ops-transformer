@@ -21,8 +21,8 @@
 namespace AscendC {
 
 template <typename T>
-__simd_vf__ void OuterAddVFImpl(__ubuf__ T *outputBuf, __ubuf__ T *deltaBuf, __ubuf__ T *kInputBuf,
-                                __ubuf__ T *stateInBuf, const uint32_t floatRepSize, uint16_t dLoops, uint32_t dTail,
+__simd_vf__ void OuterAddVFImpl(__ubuf__ T* outputBuf, __ubuf__ T* deltaBuf, __ubuf__ T* kInputBuf,
+                                __ubuf__ T* stateInBuf, const uint32_t floatRepSize, uint16_t dLoops, uint32_t dTail,
                                 const uint16_t row, const uint32_t col)
 {
     AscendC::Reg::RegTensor<T> vregKInput;
@@ -60,14 +60,14 @@ __simd_vf__ void OuterAddVFImpl(__ubuf__ T *outputBuf, __ubuf__ T *deltaBuf, __u
     }
 }
 template <typename T>
-__aicore__ inline void OuterAddVF(const LocalTensor<T> &outputUb, const LocalTensor<T> &deltaInUb,
-                                  const LocalTensor<T> &kInUb, const LocalTensor<T> &stateInUb, const uint16_t row,
+__aicore__ inline void OuterAddVF(const LocalTensor<T>& outputUb, const LocalTensor<T>& deltaInUb,
+                                  const LocalTensor<T>& kInUb, const LocalTensor<T>& stateInUb, const uint16_t row,
                                   const uint32_t col)
 {
-    __ubuf__ T *deltaBuf = (__ubuf__ T *)deltaInUb.GetPhyAddr();
-    __ubuf__ T *kInputBuf = (__ubuf__ T *)kInUb.GetPhyAddr();
-    __ubuf__ T *stateInBuf = (__ubuf__ T *)stateInUb.GetPhyAddr();
-    __ubuf__ T *outputBuf = (__ubuf__ T *)outputUb.GetPhyAddr();
+    __ubuf__ T* deltaBuf = (__ubuf__ T*)deltaInUb.GetPhyAddr();
+    __ubuf__ T* kInputBuf = (__ubuf__ T*)kInUb.GetPhyAddr();
+    __ubuf__ T* stateInBuf = (__ubuf__ T*)stateInUb.GetPhyAddr();
+    __ubuf__ T* outputBuf = (__ubuf__ T*)outputUb.GetPhyAddr();
 
     constexpr uint16_t floatRepSize = 64; // 一个寄存器能够存放64个FP32
     uint16_t dLoops = col / floatRepSize;

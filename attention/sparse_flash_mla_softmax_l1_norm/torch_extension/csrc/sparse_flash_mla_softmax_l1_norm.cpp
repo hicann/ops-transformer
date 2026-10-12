@@ -19,12 +19,12 @@ constexpr int64_t DIM_1 = 1;
 constexpr int64_t DIM_2 = 2;
 constexpr int64_t DIM_3 = 3;
 
-at::Device get_sparse_flash_mla_softmax_l1_norm_metadata_device(const c10::optional<at::Tensor> &cu_seqlens_q,
-                                                                const c10::optional<at::Tensor> &cu_seqlens_k,
-                                                                const c10::optional<at::Tensor> &seqused_q,
-                                                                const c10::optional<at::Tensor> &seqused_k,
-                                                                const c10::optional<at::Tensor> &cmp_residual_k,
-                                                                const c10::optional<at::Tensor> &topk_length)
+at::Device get_sparse_flash_mla_softmax_l1_norm_metadata_device(const c10::optional<at::Tensor>& cu_seqlens_q,
+                                                                const c10::optional<at::Tensor>& cu_seqlens_k,
+                                                                const c10::optional<at::Tensor>& seqused_q,
+                                                                const c10::optional<at::Tensor>& seqused_k,
+                                                                const c10::optional<at::Tensor>& cmp_residual_k,
+                                                                const c10::optional<at::Tensor>& topk_length)
 {
     if (cu_seqlens_q.has_value() && cu_seqlens_q.value().defined()) {
         return cu_seqlens_q.value().device();
@@ -48,10 +48,10 @@ at::Device get_sparse_flash_mla_softmax_l1_norm_metadata_device(const c10::optio
 }
 
 at::Tensor sparse_flash_mla_softmax_l1_norm_metadata(
-    int64_t num_heads_q, int64_t num_heads_k, int64_t head_dim, const c10::optional<at::Tensor> &cu_seqlens_q,
-    const c10::optional<at::Tensor> &cu_seqlens_k, const c10::optional<at::Tensor> &seqused_q,
-    const c10::optional<at::Tensor> &seqused_k, const c10::optional<at::Tensor> &cmp_residual_k,
-    const c10::optional<at::Tensor> &topk_length, int64_t batch_size, int64_t max_seqlen_q, int64_t max_seqlen_k,
+    int64_t num_heads_q, int64_t num_heads_k, int64_t head_dim, const c10::optional<at::Tensor>& cu_seqlens_q,
+    const c10::optional<at::Tensor>& cu_seqlens_k, const c10::optional<at::Tensor>& seqused_q,
+    const c10::optional<at::Tensor>& seqused_k, const c10::optional<at::Tensor>& cmp_residual_k,
+    const c10::optional<at::Tensor>& topk_length, int64_t batch_size, int64_t max_seqlen_q, int64_t max_seqlen_k,
     int64_t topk, std::string layout_q, std::string layout_k, int64_t mask_mode, int64_t cmp_ratio)
 {
     TORCH_CHECK((num_heads_q > 0), "The num_heads_q should be greater than 0, current is: ", num_heads_q);
@@ -69,8 +69,8 @@ at::Tensor sparse_flash_mla_softmax_l1_norm_metadata(
         output = at::empty({SMLA_METADATA_SIZE}, at::TensorOptions().dtype(at::kInt).device(local_device));
     }
 
-    char *layout_q_ptr = const_cast<char *>(layout_q.c_str());
-    char *layout_k_ptr = const_cast<char *>(layout_k.c_str());
+    char* layout_q_ptr = const_cast<char*>(layout_q.c_str());
+    char* layout_k_ptr = const_cast<char*>(layout_k.c_str());
 
     ACLNN_CMD(aclnnSparseFlashMlaSoftmaxL1NormMetadata, cu_seqlens_q, cu_seqlens_k, seqused_q, seqused_k,
               cmp_residual_k, topk_length, batch_size, max_seqlen_q, max_seqlen_k, num_heads_q, num_heads_k, head_dim,
@@ -80,11 +80,11 @@ at::Tensor sparse_flash_mla_softmax_l1_norm_metadata(
 }
 
 at::Tensor sparse_flash_mla_softmax_l1_norm(
-    const at::Tensor &query, const at::Tensor &key, const at::Tensor &lse,
-    const c10::optional<at::Tensor> &sparse_indices, const c10::optional<at::Tensor> &cu_seqlens_q,
-    const c10::optional<at::Tensor> &cu_seqlens_k, const c10::optional<at::Tensor> &seqused_q,
-    const c10::optional<at::Tensor> &seqused_k, const c10::optional<at::Tensor> &cmp_residual_k,
-    const c10::optional<at::Tensor> &topk_length, const c10::optional<at::Tensor> &metadata, double scale_value,
+    const at::Tensor& query, const at::Tensor& key, const at::Tensor& lse,
+    const c10::optional<at::Tensor>& sparse_indices, const c10::optional<at::Tensor>& cu_seqlens_q,
+    const c10::optional<at::Tensor>& cu_seqlens_k, const c10::optional<at::Tensor>& seqused_q,
+    const c10::optional<at::Tensor>& seqused_k, const c10::optional<at::Tensor>& cmp_residual_k,
+    const c10::optional<at::Tensor>& topk_length, const c10::optional<at::Tensor>& metadata, double scale_value,
     int64_t max_seqlen_k, int64_t cmp_ratio, int64_t mask_mode, std::string layout_q, std::string layout_k)
 {
     TORCH_CHECK(query.scalar_type() == key.scalar_type(), "query and key should have the same dtype.");
@@ -122,7 +122,7 @@ at::Tensor sparse_flash_mla_softmax_l1_norm(
     {
         auto local_device = c10::Device(query.device());
         const c10::OptionalDeviceGuard device_guard(local_device);
-        const at::Tensor &sparse_indices_value = sparse_indices.value_or(at::Tensor());
+        const at::Tensor& sparse_indices_value = sparse_indices.value_or(at::Tensor());
         if (sparse_indices_value.defined()) {
             softmax_l1_norm = at::empty(sparse_indices_value.sizes(), query.options().dtype(at::kFloat));
         } else {
@@ -134,8 +134,8 @@ at::Tensor sparse_flash_mla_softmax_l1_norm(
         }
     }
 
-    char *layout_q_ptr = const_cast<char *>(layout_q_str.c_str());
-    char *layout_k_ptr = const_cast<char *>(layout_k_str.c_str());
+    char* layout_q_ptr = const_cast<char*>(layout_q_str.c_str());
+    char* layout_k_ptr = const_cast<char*>(layout_k_str.c_str());
 
     ACLNN_CMD(aclnnSparseFlashMlaSoftmaxL1Norm, query, key, lse, sparse_indices, cu_seqlens_q, cu_seqlens_k, seqused_q,
               seqused_k, cmp_residual_k, topk_length, metadata, scale_value, max_seqlen_k, cmp_ratio, mask_mode,

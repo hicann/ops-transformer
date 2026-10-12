@@ -15,9 +15,9 @@
 
 namespace l0op {
 
-const aclTensor *StemOamPrepVarlenQ(const aclTensor *q, const aclIntArray *qSeqLens, const aclIntArray *cuSeqLensQ,
-                                    const aclTensor *qScale, int64_t stemBlockSize, int64_t stemStride,
-                                    aclOpExecutor *executor);
+const aclTensor* StemOamPrepVarlenQ(const aclTensor* q, const aclIntArray* qSeqLens, const aclIntArray* cuSeqLensQ,
+                                    const aclTensor* qScale, int64_t stemBlockSize, int64_t stemStride,
+                                    aclOpExecutor* executor);
 
 } // namespace l0op
 

@@ -17,19 +17,19 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_scatter_pa_kv_cache_with_k_scale.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -38,7 +38,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -50,8 +50,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor, aclFormat format)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor, aclFormat format)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -84,22 +84,22 @@ int main()
     std::vector<int64_t> keyScaleShape = {2, 2};
     std::vector<int64_t> keyScaleCacheShape = {4, 2, 16, 1};
 
-    void *keyDeviceAddr = nullptr;
-    void *valueDeviceAddr = nullptr;
-    void *slotMappingDeviceAddr = nullptr;
-    void *keyCacheDeviceAddr = nullptr;
-    void *valueCacheDeviceAddr = nullptr;
-    void *keyScaleDeviceAddr = nullptr;
-    void *keyScaleCacheDeviceAddr = nullptr;
+    void* keyDeviceAddr = nullptr;
+    void* valueDeviceAddr = nullptr;
+    void* slotMappingDeviceAddr = nullptr;
+    void* keyCacheDeviceAddr = nullptr;
+    void* valueCacheDeviceAddr = nullptr;
+    void* keyScaleDeviceAddr = nullptr;
+    void* keyScaleCacheDeviceAddr = nullptr;
 
-    aclTensor *key = nullptr;
-    aclTensor *value = nullptr;
-    aclTensor *slotMapping = nullptr;
-    aclTensor *keyCache = nullptr;
-    aclTensor *valueCache = nullptr;
-    aclTensor *keyScale = nullptr;
-    aclTensor *keyScaleCache = nullptr;
-    char *cacheLayout = "BNBD";
+    aclTensor* key = nullptr;
+    aclTensor* value = nullptr;
+    aclTensor* slotMapping = nullptr;
+    aclTensor* keyCache = nullptr;
+    aclTensor* valueCache = nullptr;
+    aclTensor* keyScale = nullptr;
+    aclTensor* keyScaleCache = nullptr;
+    char* cacheLayout = "BNBD";
 
     std::vector<uint8_t> hostKey(256, 1);
     std::vector<uint8_t> hostValue(256, 1);
@@ -132,12 +132,12 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     ret = aclnnScatterPaKvCacheWithKScaleGetWorkspaceSize(key, value, keyCache, valueCache, slotMapping, keyScale,
-                                                        keyScaleCache, cacheLayout, &workspaceSize, &executor);
+                                                          keyScaleCache, cacheLayout, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnScatterPaKvCacheWithKScaleGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

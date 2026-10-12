@@ -32,8 +32,8 @@ constexpr int64_t SIMD_QUEUE_NUM = 3; // key / value / keyScale
 template <typename T, typename IndexDtype>
 class ScatterPaKvCacheWithKScaleSimd {
 public:
-    __aicore__ inline ScatterPaKvCacheWithKScaleSimd(TPipe *pipe,
-                                                     const ScatterPaKvCacheWithKScaleTilingData *__restrict tiling)
+    __aicore__ inline ScatterPaKvCacheWithKScaleSimd(TPipe* pipe,
+                                                     const ScatterPaKvCacheWithKScaleTilingData* __restrict tiling)
         : pipe_(pipe),
           tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR key, GM_ADDR value, GM_ADDR slotMapping, GM_ADDR keyScale, GM_ADDR keyCacheOut,
@@ -59,12 +59,12 @@ private:
     __aicore__ inline void ProcessKeyScale(int64_t tokenIdx, int64_t blockIdx, int64_t blockOffset);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, SIMD_DOUBLE_BUFFER> keyQue_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, SIMD_DOUBLE_BUFFER> valueQue_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, SIMD_DOUBLE_BUFFER> scaleQue_;
     TBuf<TPosition::VECCALC> slotMappingBuf_;
-    const ScatterPaKvCacheWithKScaleTilingData *__restrict tilingData_;
+    const ScatterPaKvCacheWithKScaleTilingData* __restrict tilingData_;
 
     GlobalTensor<T> keyGm_;
     GlobalTensor<T> valueGm_;
@@ -112,13 +112,13 @@ __aicore__ inline void ScatterPaKvCacheWithKScaleSimd<T, IndexDtype>::Init(GM_AD
     blockFactorOffset_ = blockIdx_ * tilingData_->blockFactor;
     maxSlot_ = tilingData_->maxSlot;
 
-    keyGm_.SetGlobalBuffer((__gm__ T *)(key));
-    valueGm_.SetGlobalBuffer((__gm__ T *)(value));
-    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype *)(slotMapping));
-    keyScaleGm_.SetGlobalBuffer((__gm__ float *)(keyScale));
-    keyCacheOutGm_.SetGlobalBuffer((__gm__ T *)(keyCacheOut));
-    valueCacheOutGm_.SetGlobalBuffer((__gm__ T *)(valueCacheOut));
-    keyScaleCacheGm_.SetGlobalBuffer((__gm__ float *)(keyScaleCacheOut));
+    keyGm_.SetGlobalBuffer((__gm__ T*)(key));
+    valueGm_.SetGlobalBuffer((__gm__ T*)(value));
+    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype*)(slotMapping));
+    keyScaleGm_.SetGlobalBuffer((__gm__ float*)(keyScale));
+    keyCacheOutGm_.SetGlobalBuffer((__gm__ T*)(keyCacheOut));
+    valueCacheOutGm_.SetGlobalBuffer((__gm__ T*)(valueCacheOut));
+    keyScaleCacheGm_.SetGlobalBuffer((__gm__ float*)(keyScaleCacheOut));
 
     int64_t ubSize = tilingData_->ubSize;
     // slot_mapping 暂存区：单缓冲，按 blockFactor 个索引分配，上限 ubSize/16

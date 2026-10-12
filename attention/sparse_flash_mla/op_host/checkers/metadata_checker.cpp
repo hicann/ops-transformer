@@ -14,13 +14,13 @@
 namespace optiling {
 namespace sparse_mla_checker {
 namespace {
-const char *Op(const CheckContext &context)
+const char* Op(const CheckContext& context)
 {
     return context.opName == nullptr ? "SparseMla" : context.opName;
 }
 } // namespace
 
-ge::graphStatus MetadataChecker::CheckSinglePara(const CheckContext &context) const
+ge::graphStatus MetadataChecker::CheckSinglePara(const CheckContext& context) const
 {
     if (!context.metadata.present) {
         return ge::GRAPH_SUCCESS;
@@ -32,11 +32,11 @@ ge::graphStatus MetadataChecker::CheckSinglePara(const CheckContext &context) co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MetadataChecker::CheckParaExistence(const CheckContext &context) const
+ge::graphStatus MetadataChecker::CheckParaExistence(const CheckContext& context) const
 {
     OP_CHECK_IF(!context.metadata.present,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                    Op(context), "metadata", "Metadata is required in the current version"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Op(context), "metadata",
+                                                         "Metadata is required in the current version"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

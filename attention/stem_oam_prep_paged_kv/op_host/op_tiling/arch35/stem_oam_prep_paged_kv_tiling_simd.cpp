@@ -30,7 +30,7 @@ ge::graphStatus StemOamPrepPagedKvTilingSimd::CheckParams()
 {
     auto attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
-    const char *kvLayoutStr = attrs->GetAttrPointer<char>(ATTR_KV_LAYOUT_INDEX);
+    const char* kvLayoutStr = attrs->GetAttrPointer<char>(ATTR_KV_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, kvLayoutStr);
     std::string kvLayout(kvLayoutStr);
     int64_t kvLayoutVal = KV_LAYOUT_BBND;
@@ -79,7 +79,7 @@ ge::graphStatus StemOamPrepPagedKvTilingSimd::CheckParams()
         return ge::GRAPH_FAILED;
     }
 
-    static const char *inputNames[] = {"kCache", "vCache", "kvIndices", "kvSeqLens", "kScaleCache", "vScale"};
+    static const char* inputNames[] = {"kCache", "vCache", "kvIndices", "kvSeqLens", "kScaleCache", "vScale"};
     for (size_t i = 0; i < INPUT_COUNT; i++) {
         auto inputShape = context_->GetInputShape(i);
         OP_CHECK_NULL_WITH_CONTEXT(context_, inputShape);
@@ -204,9 +204,12 @@ ge::graphStatus StemOamPrepPagedKvTilingSimd::CheckParams()
     return ge::GRAPH_SUCCESS;
 }
 
-bool StemOamPrepPagedKvTilingSimd::IsCapable() { return true; }
+bool StemOamPrepPagedKvTilingSimd::IsCapable()
+{
+    return true;
+}
 
-ge::graphStatus StemOamPrepPagedKvTilingSimd::ContinuousStridesCompute(gert::Shape &shape, gert::Stride &stride,
+ge::graphStatus StemOamPrepPagedKvTilingSimd::ContinuousStridesCompute(gert::Shape& shape, gert::Stride& stride,
                                                                        size_t idx)
 {
     auto xStorageShape = context_->GetInputShape(idx);
@@ -224,10 +227,10 @@ ge::graphStatus StemOamPrepPagedKvTilingSimd::ContinuousStridesCompute(gert::Sha
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus StemOamPrepPagedKvTilingSimd::GetTensorInfo(gert::Shape &shape, gert::Stride &inputStride, size_t idx)
+ge::graphStatus StemOamPrepPagedKvTilingSimd::GetTensorInfo(gert::Shape& shape, gert::Stride& inputStride, size_t idx)
 {
     if (context_->InputIsView(idx)) {
-        auto *strides = context_->GetInputStride(idx);
+        auto* strides = context_->GetInputStride(idx);
         if (strides == nullptr || strides->GetDimNum() == 0) {
             ContinuousStridesCompute(shape, inputStride, idx);
         } else {
@@ -269,15 +272,15 @@ ge::graphStatus StemOamPrepPagedKvTilingSimd::GetShapeAttrsInfo()
     tilingData_ = context_->GetTilingData<StemOamPrepPagedKvTilingData>();
     OP_CHECK_NULL_WITH_CONTEXT(context_, tilingData_);
 
-    const float *lambdaMagAttr = attrs->GetAttrPointer<float>(ATTR_LAMBDA_MAG_INDEX);
+    const float* lambdaMagAttr = attrs->GetAttrPointer<float>(ATTR_LAMBDA_MAG_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, lambdaMagAttr);
-    const int64_t *stemBlocksAttr = attrs->GetAttrPointer<int64_t>(ATTR_STEM_BLOCK_SIZE_INDEX);
+    const int64_t* stemBlocksAttr = attrs->GetAttrPointer<int64_t>(ATTR_STEM_BLOCK_SIZE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, stemBlocksAttr);
-    const int64_t *stemStrideAttr = attrs->GetAttrPointer<int64_t>(ATTR_STEM_STRIDE_INDEX);
+    const int64_t* stemStrideAttr = attrs->GetAttrPointer<int64_t>(ATTR_STEM_STRIDE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, stemStrideAttr);
 
     lambdaMag_ = *lambdaMagAttr;
-    const char *kvLayoutStr = attrs->GetAttrPointer<char>(ATTR_KV_LAYOUT_INDEX);
+    const char* kvLayoutStr = attrs->GetAttrPointer<char>(ATTR_KV_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, kvLayoutStr);
     std::string kvLayout(kvLayoutStr);
     if (kvLayout == "BNBD") {
@@ -314,7 +317,7 @@ ge::graphStatus StemOamPrepPagedKvTilingSimd::GetShapeAttrsInfo()
 
     rVal_ = stemBlocks_ / stemStride_;
 
-    const gert::StorageShape *kvSeqLensShape = context_->GetInputShape(INPUT_KV_SEQ_LENS_INDEX);
+    const gert::StorageShape* kvSeqLensShape = context_->GetInputShape(INPUT_KV_SEQ_LENS_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, kvSeqLensShape);
     batchSize_ = kvSeqLensShape->GetShape().GetDim(DIM_0);
 
@@ -346,10 +349,10 @@ ge::graphStatus StemOamPrepPagedKvTilingSimd::GetShapeAttrsInfo()
     OP_CHECK_IF(CheckParams() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CheckParams failed."),
                 return ge::GRAPH_FAILED);
     dimQk_ = kcacheShape_.GetDim(DIM_3);
-    const gert::StorageShape *kvIndicesShape = context_->GetInputShape(INPUT_KV_INDICES_INDEX);
+    const gert::StorageShape* kvIndicesShape = context_->GetInputShape(INPUT_KV_INDICES_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, kvIndicesShape);
     maxKvBlocks_ = kvIndicesShape->GetShape().GetDim(DIM_1);
-    const gert::StorageShape *kFlatOutShape = context_->GetOutputShape(OUTPUT_KFLAT_INDEX);
+    const gert::StorageShape* kFlatOutShape = context_->GetOutputShape(OUTPUT_KFLAT_INDEX);
     kflatDim_ = kFlatOutShape->GetShape().GetDim(DIM_3);
 
     return ge::GRAPH_SUCCESS;
@@ -367,9 +370,15 @@ ge::graphStatus StemOamPrepPagedKvTilingSimd::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus StemOamPrepPagedKvTilingSimd::DoLibApiTiling() { return ge::GRAPH_SUCCESS; }
+ge::graphStatus StemOamPrepPagedKvTilingSimd::DoLibApiTiling()
+{
+    return ge::GRAPH_SUCCESS;
+}
 
-uint64_t StemOamPrepPagedKvTilingSimd::GetTilingKey() const { return GET_TPL_TILING_KEY(true); }
+uint64_t StemOamPrepPagedKvTilingSimd::GetTilingKey() const
+{
+    return GET_TPL_TILING_KEY(true);
+}
 
 ge::graphStatus StemOamPrepPagedKvTilingSimd::GetWorkspaceSize()
 {

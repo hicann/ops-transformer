@@ -30,8 +30,8 @@ struct TileCast {
 
     __aicore__ inline TileCast() {}
 
-    __aicore__ inline void operator()(AscendC::LocalTensor<ElementDst> const &ubOut,
-                                      AscendC::LocalTensor<ElementSrc> const &ubIn)
+    __aicore__ inline void operator()(AscendC::LocalTensor<ElementDst> const& ubOut,
+                                      AscendC::LocalTensor<ElementSrc> const& ubIn)
     {
         AscendC::Cast(ubOut, ubIn, AscendC::RoundMode::CAST_RINT, TileShape::COUNT);
     }

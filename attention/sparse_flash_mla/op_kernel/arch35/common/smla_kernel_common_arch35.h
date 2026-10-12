@@ -37,8 +37,8 @@ using namespace AttentionCommon;
 
 // ===================== 无模板参数的公共函数 =====================
 __aicore__ inline int64_t GetSmlaSeqLen(int32_t batchIndex, bool useExplicitLength, bool useCumulativeLength,
-                                        GlobalTensor<int32_t> &explicitLengthGm,
-                                        GlobalTensor<int32_t> &cumulativeLengthGm, int64_t fallbackLength)
+                                        GlobalTensor<int32_t>& explicitLengthGm,
+                                        GlobalTensor<int32_t>& cumulativeLengthGm, int64_t fallbackLength)
 {
     if (useExplicitLength) {
         return explicitLengthGm.GetValue(batchIndex);
@@ -49,7 +49,7 @@ __aicore__ inline int64_t GetSmlaSeqLen(int32_t batchIndex, bool useExplicitLeng
     }
 }
 
-__aicore__ inline int64_t ConvertS2MetadataBlockToToken(const RunParamStr &smlaRunParam, const ConstInfo &constInfo,
+__aicore__ inline int64_t ConvertS2MetadataBlockToToken(const RunParamStr& smlaRunParam, const ConstInfo& constInfo,
                                                         uint32_t s2BlockIdx)
 {
     int64_t s2BaseSize = static_cast<int64_t>(constInfo.s2BaseSize);
@@ -67,7 +67,7 @@ __aicore__ inline int64_t ConvertS2MetadataBlockToToken(const RunParamStr &smlaR
     return smlaOriLength + (cmpToken < cmpLen ? cmpToken : cmpLen);
 }
 
-__aicore__ inline bool ApplyS2MetadataRange(RunParamStr &smlaRunParam, ConstInfo &constInfo, int64_t s2StartPoint,
+__aicore__ inline bool ApplyS2MetadataRange(RunParamStr& smlaRunParam, ConstInfo& constInfo, int64_t s2StartPoint,
                                             int64_t s2EndPoint, bool isFirstS2RangeTask, bool isLastS2RangeTask)
 {
     int64_t oriStart = smlaRunParam.s2OriLineStartIdx;
@@ -119,7 +119,7 @@ __aicore__ inline bool ApplyS2MetadataRange(RunParamStr &smlaRunParam, ConstInfo
     return smlaRunParam.s2LoopEndIdx == 0;
 }
 
-__aicore__ inline void ComputeBmm1Tail(RunInfo &smlaRunInfo, RunParamStr &smlaRunParam, const ConstInfo &constInfo)
+__aicore__ inline void ComputeBmm1Tail(RunInfo& smlaRunInfo, RunParamStr& smlaRunParam, const ConstInfo& constInfo)
 {
     // ------------------------S1 Base Related---------------------------
     smlaRunInfo.s1RealSize = smlaRunParam.s1RealSize;
@@ -143,8 +143,8 @@ __aicore__ inline void ComputeBmm1Tail(RunInfo &smlaRunInfo, RunParamStr &smlaRu
     }
 }
 
-__aicore__ inline void ParseFdRunInfo(FdRunInfo &fdRunInfo, const ConstInfo &constInfo,
-                                      GlobalTensor<uint32_t> &metadataGm)
+__aicore__ inline void ParseFdRunInfo(FdRunInfo& fdRunInfo, const ConstInfo& constInfo,
+                                      GlobalTensor<uint32_t>& metadataGm)
 {
     uint32_t aivIdx = static_cast<uint32_t>(constInfo.aivIdx);
     fdRunInfo.coreEnable = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_CORE_ENABLE_INDEX, true)) != 0;
@@ -161,7 +161,7 @@ __aicore__ inline void ParseFdRunInfo(FdRunInfo &fdRunInfo, const ConstInfo &con
 
 // ===================== 需要 TEMPLATE_INTF 的公共函数 =====================
 TEMPLATE_INTF
-__aicore__ inline void ComputeConstexpr(ConstInfo &constInfo)
+__aicore__ inline void ComputeConstexpr(ConstInfo& constInfo)
 {
     // 计算轴的乘积
     constInfo.s1S2 = constInfo.s1Size * constInfo.s2Size;
@@ -199,16 +199,16 @@ __aicore__ inline void ComputeConstexpr(ConstInfo &constInfo)
 }
 
 TEMPLATE_INTF
-__aicore__ inline void InitUniqueRunInfo(const RunParamStr &smlaRunParam, RunInfo &smlaRunInfo,
-                                         const ConstInfo &constInfo)
+__aicore__ inline void InitUniqueRunInfo(const RunParamStr& smlaRunParam, RunInfo& smlaRunInfo,
+                                         const ConstInfo& constInfo)
 {
     InitTaskParamByRun<TEMPLATE_INTF_ARGS>(smlaRunParam, smlaRunInfo, constInfo);
 }
 
 TEMPLATE_INTF
-__aicore__ inline void SetRunInfo(RunInfo &smlaRunInfo, RunParamStr &smlaRunParam, int64_t smlaTaskId,
+__aicore__ inline void SetRunInfo(RunInfo& smlaRunInfo, RunParamStr& smlaRunParam, int64_t smlaTaskId,
                                   int64_t smlaS2LoopCount, int64_t smlaS2LoopLimit, int64_t smlaCoreInnerIndex,
-                                  const ConstInfo &constInfo)
+                                  const ConstInfo& constInfo)
 {
     if (smlaS2LoopCount < smlaRunParam.oriKvLoopEndIdx) {
         smlaRunInfo.s2StartIdx = smlaRunParam.s2OriLineStartIdx;
@@ -263,8 +263,8 @@ __aicore__ inline void SetRunInfo(RunInfo &smlaRunInfo, RunParamStr &smlaRunPara
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index, RunParamStr &smlaRunParam,
-                                                const ConstInfo &constInfo, int32_t aicIdx)
+__aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index, RunParamStr& smlaRunParam,
+                                                const ConstInfo& constInfo, int32_t aicIdx)
 {
     // GS1合轴, 不切G, 只切S1
     smlaRunParam.s1oIdx = gS1Index * smlaRunParam.qSNumInOneBlock;
@@ -280,8 +280,8 @@ __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Inde
 
 // ===================== 依赖 Cube/Vec Block 的公共函数 =====================
 template <typename T, typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void FreeEvent(fa_base_matmul::StaticBuffer<T> (&bmm1Buffers)[2], CubeBlockType &cubeBlock,
-                                 VecBlockType &vecBlock, ConstInfo &constInfo)
+__aicore__ inline void FreeEvent(fa_base_matmul::StaticBuffer<T> (&bmm1Buffers)[2], CubeBlockType& cubeBlock,
+                                 VecBlockType& vecBlock, ConstInfo& constInfo)
 {
     if ASCEND_IS_AIC {
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM1(bmm1Buffers[0].idx));
@@ -297,7 +297,7 @@ __aicore__ inline void FreeEvent(fa_base_matmul::StaticBuffer<T> (&bmm1Buffers)[
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void InitLocalBuffer(VecBlockType &vecBlock, CubeBlockType &cubeBlock, ConstInfo &constInfo,
+__aicore__ inline void InitLocalBuffer(VecBlockType& vecBlock, CubeBlockType& cubeBlock, ConstInfo& constInfo,
                                        uint32_t vUbBase, uint32_t l1CubeBase)
 {
     vecBlock.InitLocalBuffer(constInfo, vUbBase);

@@ -19,35 +19,33 @@ namespace l0op {
 
 OP_TYPE_REGISTER(RingAttentionUpdate);
 
-const std::array<const aclTensor *, 3> RingAttentionUpdate(
-    const aclTensor *prevAttnOut, const aclTensor *prevSoftmaxMax,
-    const aclTensor *prevSoftmaxSum, const aclTensor *curAttnOut,
-    const aclTensor *curSoftmaxMax, const aclTensor *curSoftmaxSum,
-    const aclTensor *actualSeqQLen, const char *inputLayout,
-    const char *inputSoftmaxLayout, aclOpExecutor *executor)
+const std::array<const aclTensor*, 3> RingAttentionUpdate(const aclTensor* prevAttnOut, const aclTensor* prevSoftmaxMax,
+                                                          const aclTensor* prevSoftmaxSum, const aclTensor* curAttnOut,
+                                                          const aclTensor* curSoftmaxMax,
+                                                          const aclTensor* curSoftmaxSum,
+                                                          const aclTensor* actualSeqQLen, const char* inputLayout,
+                                                          const char* inputSoftmaxLayout, aclOpExecutor* executor)
 {
-    L0_DFX(RingAttentionUpdate, prevAttnOut, prevSoftmaxMax, prevSoftmaxSum,
-           curAttnOut, curSoftmaxMax, curSoftmaxSum, actualSeqQLen);
+    L0_DFX(RingAttentionUpdate, prevAttnOut, prevSoftmaxMax, prevSoftmaxSum, curAttnOut, curSoftmaxMax, curSoftmaxSum,
+           actualSeqQLen);
 
     auto attentionOutOut = executor->AllocTensor(prevAttnOut->GetDataType(), Format::FORMAT_ND, Format::FORMAT_ND);
     auto softmaxMaxOut = executor->AllocTensor(DataType::DT_FLOAT, Format::FORMAT_ND, Format::FORMAT_ND);
     auto softmaxSumOut = executor->AllocTensor(DataType::DT_FLOAT, Format::FORMAT_ND, Format::FORMAT_ND);
 
-    auto ret = INFER_SHAPE(RingAttentionUpdate,
-                           OP_INPUT(prevAttnOut, prevSoftmaxMax, prevSoftmaxSum,
-                                    curAttnOut, curSoftmaxMax, curSoftmaxSum, actualSeqQLen),
-                           OP_OUTPUT(attentionOutOut, softmaxMaxOut, softmaxSumOut),
-                           OP_ATTR(inputLayout, inputSoftmaxLayout));
+    auto ret = INFER_SHAPE(
+        RingAttentionUpdate,
+        OP_INPUT(prevAttnOut, prevSoftmaxMax, prevSoftmaxSum, curAttnOut, curSoftmaxMax, curSoftmaxSum, actualSeqQLen),
+        OP_OUTPUT(attentionOutOut, softmaxMaxOut, softmaxSumOut), OP_ATTR(inputLayout, inputSoftmaxLayout));
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "RingAttentionUpdate InferShape failed.");
         return {nullptr, nullptr, nullptr};
     }
 
-    ADD_TO_LAUNCHER_LIST_AICORE(RingAttentionUpdate,
-                                OP_INPUT(prevAttnOut, prevSoftmaxMax, prevSoftmaxSum,
-                                         curAttnOut, curSoftmaxMax, curSoftmaxSum, actualSeqQLen),
-                                OP_OUTPUT(attentionOutOut, softmaxMaxOut, softmaxSumOut),
-                                OP_ATTR(inputLayout, inputSoftmaxLayout));
-  return {attentionOutOut, softmaxMaxOut, softmaxSumOut};
+    ADD_TO_LAUNCHER_LIST_AICORE(
+        RingAttentionUpdate,
+        OP_INPUT(prevAttnOut, prevSoftmaxMax, prevSoftmaxSum, curAttnOut, curSoftmaxMax, curSoftmaxSum, actualSeqQLen),
+        OP_OUTPUT(attentionOutOut, softmaxMaxOut, softmaxSumOut), OP_ATTR(inputLayout, inputSoftmaxLayout));
+    return {attentionOutOut, softmaxMaxOut, softmaxSumOut};
 }
 } // namespace l0op

@@ -30,12 +30,12 @@ static constexpr int64_t UNKNOWN_RANK_DIM_VALUE = -2LL;
 static constexpr int64_t SUPPORTED_STEM_BLOCK_SIZE = 128;
 static constexpr int64_t SUPPORTED_STEM_STRIDE = 16;
 
-static bool IsUnknownRank(const gert::Shape &shape)
+static bool IsUnknownRank(const gert::Shape& shape)
 {
     return shape.GetDimNum() == 1 && shape.GetDim(0) == UNKNOWN_RANK_DIM_VALUE;
 }
 
-static bool IsUnknownShape(const gert::Shape &shape)
+static bool IsUnknownShape(const gert::Shape& shape)
 {
     size_t dimNum = shape.GetDimNum();
     for (size_t i = 0; i < dimNum; i++) {
@@ -46,19 +46,19 @@ static bool IsUnknownShape(const gert::Shape &shape)
     return false;
 }
 
-static ge::graphStatus InferShapeForStemOamPrepVarlenQ(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeForStemOamPrepVarlenQ(gert::InferShapeContext* context)
 {
     OP_LOGI(context, "Enter StemOamPrepVarlenQ runtime infershape impl.");
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
     }
 
-    const gert::Shape *qShape = context->GetInputShape(INPUT_Q);
+    const gert::Shape* qShape = context->GetInputShape(INPUT_Q);
     OP_CHECK_NULL_WITH_CONTEXT(context, qShape);
-    const gert::Shape *qSeqLensShape = context->GetInputShape(INPUT_Q_SEQ_LENS);
+    const gert::Shape* qSeqLensShape = context->GetInputShape(INPUT_Q_SEQ_LENS);
     OP_CHECK_NULL_WITH_CONTEXT(context, qSeqLensShape);
 
-    gert::Shape *qFlatShape = context->GetOutputShape(OUTPUT_Q_FLAT);
+    gert::Shape* qFlatShape = context->GetOutputShape(OUTPUT_Q_FLAT);
     OP_CHECK_NULL_WITH_CONTEXT(context, qFlatShape);
 
     if (IsUnknownRank(*qShape) || IsUnknownRank(*qSeqLensShape)) {
@@ -86,7 +86,7 @@ static ge::graphStatus InferShapeForStemOamPrepVarlenQ(gert::InferShapeContext *
     int64_t hQ = qShape->GetDim(Q_HEAD_DIM_INDEX);
     int64_t batch = qSeqLensShape->GetDim(0);
 
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     auto stemBlockSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_STEM_BLOCK_SIZE);
     OP_CHECK_NULL_WITH_CONTEXT(context, stemBlockSizePtr);
     int64_t stemBlockSize = *stemBlockSizePtr;
@@ -115,9 +115,9 @@ static ge::graphStatus InferShapeForStemOamPrepVarlenQ(gert::InferShapeContext *
         return ge::GRAPH_SUCCESS;
     }
 
-    const gert::Tensor *qSeqLensTensor = context->GetInputTensor(INPUT_Q_SEQ_LENS);
+    const gert::Tensor* qSeqLensTensor = context->GetInputTensor(INPUT_Q_SEQ_LENS);
     OP_CHECK_NULL_WITH_CONTEXT(context, qSeqLensTensor);
-    const int64_t *qSeqLensData = qSeqLensTensor->GetData<int64_t>();
+    const int64_t* qSeqLensData = qSeqLensTensor->GetData<int64_t>();
     OP_CHECK_NULL_WITH_CONTEXT(context, qSeqLensData);
 
     int64_t maxQLen = 0;
@@ -134,7 +134,7 @@ static ge::graphStatus InferShapeForStemOamPrepVarlenQ(gert::InferShapeContext *
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeForStemOamPrepVarlenQ(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeForStemOamPrepVarlenQ(gert::InferDataTypeContext* context)
 {
     context->SetOutputDataType(OUTPUT_Q_FLAT, ge::DT_BF16);
     return ge::GRAPH_SUCCESS;

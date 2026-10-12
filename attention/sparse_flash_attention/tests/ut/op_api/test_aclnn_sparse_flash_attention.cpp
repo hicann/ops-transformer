@@ -23,7 +23,7 @@ using namespace std;
 using namespace op;
 
 namespace {
-void DestroyAclTensor(aclTensor *tensor)
+void DestroyAclTensor(aclTensor* tensor)
 {
     Release(tensor);
 }
@@ -59,7 +59,7 @@ TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_aclnn_0)
     auto attentionOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionGetWorkspaceSize(
         query.get(), key.get(), value.get(), sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr,
@@ -84,7 +84,7 @@ TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_aclnn_1)
     auto attentionOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionGetWorkspaceSize(
         query.get(), nullptr, value.get(), sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr,
@@ -113,7 +113,7 @@ TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v2_aclnn_a3_sinks
     auto attentionOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionV2GetWorkspaceSize(
         query.get(), key.get(), value.get(), sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr,
@@ -140,7 +140,7 @@ TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v2_aclnn_a3_witho
     auto attentionOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionV2GetWorkspaceSize(
         query.get(), key.get(), value.get(), sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
@@ -167,7 +167,7 @@ TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v2_aclnn_lse_fals
     auto attentionOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionV2GetWorkspaceSize(
         query.get(), key.get(), value.get(), sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
@@ -194,7 +194,7 @@ TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v2_aclnn_value_nu
     auto attentionOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionV2GetWorkspaceSize(
         query.get(), key.get(), nullptr, sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
@@ -224,7 +224,7 @@ TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v2_aclnn_950_sink
     auto attentionOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionV2GetWorkspaceSize(
         query.get(), key.get(), value.get(), sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr,

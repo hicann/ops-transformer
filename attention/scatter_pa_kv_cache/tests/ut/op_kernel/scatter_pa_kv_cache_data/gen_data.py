@@ -16,17 +16,17 @@ import numpy as np
 
 
 def do_golden(
-        key,
-        value,
-        key_cache,
-        value_cache,
-        slot_mapping,
-        block_size,
-        num_heads,
-        head_size_k,
-        head_size_v,
-        last_dim_k,
-        last_dim_v,
+    key,
+    value,
+    key_cache,
+    value_cache,
+    slot_mapping,
+    block_size,
+    num_heads,
+    head_size_k,
+    head_size_v,
+    last_dim_k,
+    last_dim_v,
 ):
     for i, slot in enumerate(slot_mapping):
         if slot < 0:
@@ -36,19 +36,25 @@ def do_golden(
 
         token_key = key[i].reshape(num_heads * head_size_k)
         for k in range(num_heads * head_size_k // last_dim_k):
-            key_cache[block_index][k][block_offset][:] = token_key[k * last_dim_k: k * last_dim_k + last_dim_k]
+            key_cache[block_index][k][block_offset][:] = token_key[
+                k * last_dim_k : k * last_dim_k + last_dim_k
+            ]
 
         token_value = value[i].reshape(num_heads * head_size_v)
         for v in range(num_heads * head_size_v // last_dim_v):
-            value_cache[block_index][v][block_offset][:] = token_value[v * last_dim_v: v * last_dim_v + last_dim_v]
+            value_cache[block_index][v][block_offset][:] = token_value[
+                v * last_dim_v : v * last_dim_v + last_dim_v
+            ]
 
     return key_cache, value_cache
+
 
 def get_dtype_size(dtype):
     if dtype == "int8":
         return 1
     else:
         return 2
+
 
 def gen_golden_data_simple(params):
     num_tokens = params["num_tokens"]
@@ -62,12 +68,22 @@ def gen_golden_data_simple(params):
     dtype_slot_mapping = params["slot_mapping_type"]
     last_dim_k = 32 // get_dtype_size(dtype_k)
     last_dim_v = 32 // get_dtype_size(dtype_v)
-    key = np.random.uniform(-5.0, 5.0, size=(num_tokens, num_heads, head_size_k)).astype(dtype_k)
-    value = np.random.uniform(-5.0, 5.0, size=(num_tokens, num_heads, head_size_v)).astype(dtype_v)
+    key = np.random.uniform(
+        -5.0, 5.0, size=(num_tokens, num_heads, head_size_k)
+    ).astype(dtype_k)
+    value = np.random.uniform(
+        -5.0, 5.0, size=(num_tokens, num_heads, head_size_v)
+    ).astype(dtype_v)
     num_slots = block_size * num_blocks
-    slot_mapping = np.array(random.sample(range(0, num_slots), num_tokens)).astype(dtype_slot_mapping)
-    key_cache = np.zeros((num_blocks, num_heads * head_size_k // last_dim_k, block_size, last_dim_k)).astype(dtype_k)
-    value_cache = np.zeros((num_blocks, num_heads * head_size_v // last_dim_v, block_size, last_dim_v)).astype(dtype_v)
+    slot_mapping = np.array(random.sample(range(0, num_slots), num_tokens)).astype(
+        dtype_slot_mapping
+    )
+    key_cache = np.zeros(
+        (num_blocks, num_heads * head_size_k // last_dim_k, block_size, last_dim_k)
+    ).astype(dtype_k)
+    value_cache = np.zeros(
+        (num_blocks, num_heads * head_size_v // last_dim_v, block_size, last_dim_v)
+    ).astype(dtype_v)
     key_cache.tofile("./input_key_cache.bin")
     value_cache.tofile("./input_value_cache.bin")
 

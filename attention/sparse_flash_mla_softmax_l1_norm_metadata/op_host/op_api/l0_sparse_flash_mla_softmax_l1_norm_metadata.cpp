@@ -26,12 +26,12 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(SparseFlashMlaSoftmaxL1NormMetadata);
 
-const aclTensor *SparseFlashMlaSoftmaxL1NormMetadata(
-    const aclTensor *cuSeqLensQOptional, const aclTensor *cuSeqLensKOptional, const aclTensor *seqUsedQOptional,
-    const aclTensor *seqUsedKOptional, const aclTensor *cmpResidualKOptional, const aclTensor *topkLengthOptional,
+const aclTensor* SparseFlashMlaSoftmaxL1NormMetadata(
+    const aclTensor* cuSeqLensQOptional, const aclTensor* cuSeqLensKOptional, const aclTensor* seqUsedQOptional,
+    const aclTensor* seqUsedKOptional, const aclTensor* cmpResidualKOptional, const aclTensor* topkLengthOptional,
     int64_t batchSize, int64_t maxSeqLenQ, int64_t maxSeqLenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim,
-    int64_t topk, int64_t cmpRatio, int64_t maskMode, char *layoutQ, char *layoutK, const char *socVersion,
-    int64_t aicCoreNum, const aclTensor *metadata, aclOpExecutor *executor)
+    int64_t topk, int64_t cmpRatio, int64_t maskMode, char* layoutQ, char* layoutK, const char* socVersion,
+    int64_t aicCoreNum, const aclTensor* metadata, aclOpExecutor* executor)
 {
     L0_DFX(SparseFlashMlaSoftmaxL1NormMetadata, cuSeqLensQOptional, cuSeqLensKOptional, seqUsedQOptional,
            seqUsedKOptional, cmpResidualKOptional, topkLengthOptional, batchSize, maxSeqLenQ, maxSeqLenK, numHeadsQ,

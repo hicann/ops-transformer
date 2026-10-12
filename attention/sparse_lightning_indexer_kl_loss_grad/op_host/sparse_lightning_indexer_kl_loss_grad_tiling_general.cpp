@@ -165,9 +165,9 @@ bool SparseLightningIndexerKLLossGradTilingBase::AnalyzeDtype()
                         ge::TypeUtils::DataTypeToSerialString(softmaxDesc->GetDataType()).c_str()),
                 return false);
 
-    const gert::CompileTimeTensorDesc *int32OptionalInputs[] = {cuSeqQDesc,   cuSeqKDesc,       seqUsedQDesc,
+    const gert::CompileTimeTensorDesc* int32OptionalInputs[] = {cuSeqQDesc,   cuSeqKDesc,       seqUsedQDesc,
                                                                 seqUsedKDesc, cmpResidualKDesc, metadataDesc};
-    const char *inputNames[] = {"cu_seqlens_q", "cu_seqlens_k", "seqused_q", "seqused_k", "cmp_residual_k", "metadata"};
+    const char* inputNames[] = {"cu_seqlens_q", "cu_seqlens_k", "seqused_q", "seqused_k", "cmp_residual_k", "metadata"};
     for (size_t i = 0; i < sizeof(int32OptionalInputs) / sizeof(int32OptionalInputs[0]); ++i) {
         if (int32OptionalInputs[i] != nullptr && int32OptionalInputs[i]->GetDataType() != ge::DT_INT32) {
             OP_LOGE(opName, "%s dtype must be int32, but got [%s].", inputNames[i],
@@ -180,11 +180,11 @@ bool SparseLightningIndexerKLLossGradTilingBase::AnalyzeDtype()
 
 bool SparseLightningIndexerKLLossGradTilingBase::AnalyzeLayout()
 {
-    auto &qShape = context_->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
-    auto &kShape = context_->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
-    auto &wShape = context_->GetInputShape(WEIGHT_INPUT_INDEX)->GetStorageShape();
-    auto &sparseShape = context_->GetInputShape(SPARSE_INDICES_INPUT_INDEX)->GetStorageShape();
-    auto &softmaxShape = context_->GetInputShape(ATTN_SOFTMAX_L1_NORM_INPUT_INDEX)->GetStorageShape();
+    auto& qShape = context_->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
+    auto& kShape = context_->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
+    auto& wShape = context_->GetInputShape(WEIGHT_INPUT_INDEX)->GetStorageShape();
+    auto& sparseShape = context_->GetInputShape(SPARSE_INDICES_INPUT_INDEX)->GetStorageShape();
+    auto& softmaxShape = context_->GetInputShape(ATTN_SOFTMAX_L1_NORM_INPUT_INDEX)->GetStorageShape();
 
     size_t qLayoutLen = strlen(inputLayout);
     size_t kLayoutLen = strlen(keyLayout);
@@ -212,8 +212,8 @@ bool SparseLightningIndexerKLLossGradTilingBase::AnalyzeLayout()
         auto cuSeqKShape = context_->GetOptionalInputShape(CU_SEQLENS_KEY_INPUT_INDEX);
         OP_CHECK_IF(cuSeqQShape == nullptr || cuSeqKShape == nullptr,
                     OP_LOGE(opName, "TND layout requires cu_seqlens_q/cu_seqlens_k tensor inputs."), return false);
-        auto &cuSeqQStorageShape = cuSeqQShape->GetStorageShape();
-        auto &cuSeqKStorageShape = cuSeqKShape->GetStorageShape();
+        auto& cuSeqQStorageShape = cuSeqQShape->GetStorageShape();
+        auto& cuSeqKStorageShape = cuSeqKShape->GetStorageShape();
         OP_CHECK_IF(cuSeqQStorageShape.GetDimNum() != 1 || cuSeqKStorageShape.GetDimNum() != 1,
                     OP_LOGE(opName, "cu_seqlens_q/cu_seqlens_k must be 1D tensors in TND layout."), return false);
         OP_CHECK_IF(cuSeqQStorageShape.GetDim(0) <= 1 || cuSeqQStorageShape.GetDim(0) != cuSeqKStorageShape.GetDim(0),
@@ -246,12 +246,12 @@ bool SparseLightningIndexerKLLossGradTilingBase::AnalyzeLayout()
         tilingKeyLayout = LayoutType::LAYOUT_BSND;
     }
 
-    auto checkOptionalVector = [this](uint32_t inputIndex, const char *inputName, int64_t expectedElementNum) -> bool {
+    auto checkOptionalVector = [this](uint32_t inputIndex, const char* inputName, int64_t expectedElementNum) -> bool {
         auto optionalShape = context_->GetOptionalInputShape(inputIndex);
         if (optionalShape == nullptr) {
             return true;
         }
-        auto &storageShape = optionalShape->GetStorageShape();
+        auto& storageShape = optionalShape->GetStorageShape();
         if (storageShape.GetDimNum() != 1 || storageShape.GetDim(0) != expectedElementNum) {
             OP_LOGE(context_, "%s must be a 1D tensor with %ld elements.", inputName, expectedElementNum);
             return false;
@@ -292,7 +292,7 @@ ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::GetPlatformInfo()
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
         auto compileInfoPtr =
-            reinterpret_cast<const SparseLightningIndexerKLLossGradCompileInfo *>(context_->GetCompileInfo());
+            reinterpret_cast<const SparseLightningIndexerKLLossGradCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(opName, "compileInfoPtr is null."), return ge::GRAPH_FAILED);
         aivNum = compileInfoPtr->aivNum;
         aicNum = compileInfoPtr->aicNum;
@@ -361,7 +361,7 @@ void SparseLightningIndexerKLLossGradTilingBase::SetMultiCoreParamsRegbase(int64
     sliGradkllossMultiCoreParams_->set_totalSize(totalSize);
     sliGradkllossMultiCoreParams_->set_splitFactorSize(CeilDivision(totalSize, actualUsedCoreNum));
     int64_t splitFactorSize = sliGradkllossMultiCoreParams_->get_splitFactorSize();
-    int64_t *bS1Index = sliGradkllossMultiCoreParams_->get_bS1Ptr();
+    int64_t* bS1Index = sliGradkllossMultiCoreParams_->get_bS1Ptr();
     for (int64_t idx = 0; idx < static_cast<int64_t>(MAX_CORE_NUM); ++idx) {
         bS1Index[idx] = totalSize;
     }
@@ -372,8 +372,8 @@ void SparseLightningIndexerKLLossGradTilingBase::SetMultiCoreParamsRegbase(int64
 
 ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::InitOutputSplit()
 {
-    SLIKLLossGradInitOutputParams *initoutput = &tilingData->initOutputParams;
-    auto &dKeyShape = context_->GetOutputShape(D_KEY_OUTPUT_INDEX)->GetStorageShape();
+    SLIKLLossGradInitOutputParams* initoutput = &tilingData->initOutputParams;
+    auto& dKeyShape = context_->GetOutputShape(D_KEY_OUTPUT_INDEX)->GetStorageShape();
     int64_t totalSize = 0;
     if (tilingKeyLayout == LayoutType::LAYOUT_TND) {
         totalSize = dKeyShape.GetDim(0) * dKeyShape.GetDim(2);
@@ -429,7 +429,7 @@ uint64_t SparseLightningIndexerKLLossGradTilingBase::GetTilingKey() const
 
 ge::graphStatus SparseLightningIndexerKLLossGradTilingBase::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     int64_t kAlign16 = ((static_cast<int64_t>(kSize) + 15) / 16) * 16;
     int64_t pSize = static_cast<int64_t>(kSize) * dSizeQuery * sizeof(uint16_t);
     int64_t sySize = static_cast<int64_t>(kSize) * dSizeQueryIndex * sizeof(uint16_t);

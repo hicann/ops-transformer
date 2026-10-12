@@ -32,14 +32,14 @@ constexpr uint64_t KERNEL_UB_SIZE = 191 * 1024;
 namespace {
 struct OptimizedScatterGateDecision {
     bool enabled = false;
-    const char *reason = "unknown";
+    const char* reason = "unknown";
     int64_t n1 = 0;
     int64_t gateS1 = 0;
     int64_t gateS2 = 0;
     int64_t effectiveSelectedTokens = 0;
 };
 
-OptimizedScatterGateDecision GetOptimizedScatterGateDecision(const TempParams &tmpData)
+OptimizedScatterGateDecision GetOptimizedScatterGateDecision(const TempParams& tmpData)
 {
     OptimizedScatterGateDecision decision;
     int64_t s1 = tmpData.s1;
@@ -115,7 +115,7 @@ OptimizedScatterGateDecision GetOptimizedScatterGateDecision(const TempParams &t
 }
 } // namespace
 
-bool EnableOptimizedScatterPath(const TempParams &tmpData)
+bool EnableOptimizedScatterPath(const TempParams& tmpData)
 {
     return GetOptimizedScatterGateDecision(tmpData).enabled;
 }
@@ -148,7 +148,7 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::GetPlatformInfo()
     auto platformInfoPtr = context_->GetPlatformInfo();
     uint64_t l2CacheSize;
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const SparseFlashAttentionGradCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const SparseFlashAttentionGradCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OPS_REPORT_VECTOR_INNER_ERR(opName, "compile_info is null."),
                     return ge::GRAPH_FAILED);
         aicoreParams_.numBlocks = compileInfoPtr->aivNum;
@@ -264,7 +264,7 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::GetWorkspaceSize()
 
     selectedKWorkspaceLen *= 4;
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = sysLen;
     workspaces[0] += selectedKWorkspaceLen * currentUseCoreNum;
     workspaces[0] += mm12WorkspaceLen * 4 * currentUseCoreNum;
@@ -556,13 +556,13 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::GetBaseShapeInfo()
     // input
     // TND: query [t1, n1, d]   k [t2, n2, d]  v [t2, n2, d2]   dy/attentionIn [t1, n1, d2]
     // BSND: query [b, s1, n1, d]   k [b, s2, n2, d]  v [b, s2, n2, d2]   dy/attentionIn [b, s1, n1, d2]
-    const gert::Shape &queryShape = context_->GetInputShape(static_cast<size_t>(InputIndex::QUERY))->GetStorageShape();
-    const gert::Shape &keyShape = context_->GetInputShape(static_cast<size_t>(InputIndex::KEY))->GetStorageShape();
-    const gert::StorageShape *valueStorageShape =
+    const gert::Shape& queryShape = context_->GetInputShape(static_cast<size_t>(InputIndex::QUERY))->GetStorageShape();
+    const gert::Shape& keyShape = context_->GetInputShape(static_cast<size_t>(InputIndex::KEY))->GetStorageShape();
+    const gert::StorageShape* valueStorageShape =
         context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::VALUE));
     tmpData.kvMerge = (valueStorageShape == nullptr);
-    const gert::Shape &valueShape = (valueStorageShape == nullptr) ? keyShape : valueStorageShape->GetStorageShape();
-    const gert::Shape &indicesShape =
+    const gert::Shape& valueShape = (valueStorageShape == nullptr) ? keyShape : valueStorageShape->GetStorageShape();
+    const gert::Shape& indicesShape =
         context_->GetInputShape(static_cast<size_t>(InputIndex::TOPK_INDICES))->GetStorageShape();
     auto qRopeTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::Q_ROPE));
     auto kRopeTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::K_ROPE));
@@ -572,7 +572,7 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::GetBaseShapeInfo()
     int64_t dimDv = valueShape.GetDim(dimSize - 1);
 
     // attrs
-    const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::INPUT_LAYOUT));
+    const char* inputLayout = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::INPUT_LAYOUT));
     auto selected_block_count = indicesShape.GetDim(dimSize - 1);
 
     auto selected_block_size =
@@ -610,9 +610,9 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::GetBaseShapeInfo()
     if (qRopeTensor != nullptr && kRopeTensor != nullptr) {
         OP_LOGD(context_, "SparseFlashAttentionGrad qRope and kRope is not nullptr, rope is enabled.");
         tmpData.ropeEnable = true;
-        const gert::Shape &qRopeShape =
+        const gert::Shape& qRopeShape =
             context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::Q_ROPE))->GetStorageShape();
-        const gert::Shape &kRopeShape =
+        const gert::Shape& kRopeShape =
             context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::K_ROPE))->GetStorageShape();
         auto qRopeDim = qRopeShape.GetDim(dimSize - 1);
         auto kRopeDim = kRopeShape.GetDim(dimSize - 1);
@@ -633,7 +633,7 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::GetBaseShapeInfo()
             actSeqQLen == nullptr || actSeqKVLen == nullptr,
             OPS_REPORT_VECTOR_INNER_ERR(opName, "When layout is TND, actSeqQLen / actSeqKVLen can not be nullptr"),
             return ge::GRAPH_FAILED);
-        const gert::Shape &actSeqQLenShape =
+        const gert::Shape& actSeqQLenShape =
             context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::ACTUAL_SEQ_Q_LEN))->GetStorageShape();
         tmpData.b = actSeqQLenShape.GetDim(DIM_0);
         OP_CHECK_IF(tmpData.b == 0, OP_LOGE(context_, "batchNum is 0"), return ge::GRAPH_FAILED);

@@ -24,8 +24,8 @@ using namespace AscendC;
 template <typename T, typename IndexDtype, int64_t InOutMode>
 class ScatterPaKvCacheNormNonContiguous {
 public:
-    __aicore__ inline ScatterPaKvCacheNormNonContiguous(TPipe *pipe,
-                                                        const ScatterPaKvCacheTilingData *__restrict tiling)
+    __aicore__ inline ScatterPaKvCacheNormNonContiguous(TPipe* pipe,
+                                                        const ScatterPaKvCacheTilingData* __restrict tiling)
         : pipe_(pipe),
           tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR key, GM_ADDR slot_mapping, GM_ADDR value, GM_ADDR key_cache_out,
@@ -47,10 +47,10 @@ private:
     __aicore__ inline void ProcessValue(int64_t tokenIdx, int64_t blockIdx, int64_t blockOffset);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, DOUBLE_BUFFER> keyQue_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, DOUBLE_BUFFER> valueQue_;
-    const ScatterPaKvCacheTilingData *tilingData_;
+    const ScatterPaKvCacheTilingData* tilingData_;
 
     GlobalTensor<T> keyGm_;
     GlobalTensor<T> valueGm_;
@@ -88,15 +88,15 @@ __aicore__ inline void ScatterPaKvCacheNormNonContiguous<T, IndexDtype, InOutMod
 {
     blockIdx_ = GetBlockIdx();
     blockFactorOffset_ = blockIdx_ * tilingData_->blockFactor;
-    keyGm_.SetGlobalBuffer((__gm__ T *)(key));
-    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype *)(slot_mapping) + blockIdx_ * tilingData_->blockFactor);
-    keyCacheOutGm_.SetGlobalBuffer((__gm__ T *)(key_cache_out));
+    keyGm_.SetGlobalBuffer((__gm__ T*)(key));
+    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype*)(slot_mapping) + blockIdx_ * tilingData_->blockFactor);
+    keyCacheOutGm_.SetGlobalBuffer((__gm__ T*)(key_cache_out));
 
     maxHandleSize_ = tilingData_->ubSize / DOUBLE_BUFFER;
     if constexpr (InOutMode == DUAL_IN_OUT) {
         maxHandleSize_ /= DUAL_IN_OUT;
-        valueGm_.SetGlobalBuffer((__gm__ T *)(value));
-        valueCacheOutGm_.SetGlobalBuffer((__gm__ T *)(value_cache_out));
+        valueGm_.SetGlobalBuffer((__gm__ T*)(value));
+        valueCacheOutGm_.SetGlobalBuffer((__gm__ T*)(value_cache_out));
         pipe_->InitBuffer(valueQue_, DOUBLE_BUFFER, maxHandleSize_);
     }
     pipe_->InitBuffer(keyQue_, DOUBLE_BUFFER, maxHandleSize_);

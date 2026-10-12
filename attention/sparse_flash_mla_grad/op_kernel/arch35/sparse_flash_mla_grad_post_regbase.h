@@ -25,10 +25,10 @@ template <typename T1, typename T2, typename OUTDTYPE = T1, const bool IS_TND = 
 class SparseFlashMlaGradPostRegbase {
 public:
     __aicore__ inline SparseFlashMlaGradPostRegbase(){};
-    __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dori_kv, __gm__ uint8_t *dcmp_kv,
-                                __gm__ uint8_t *dsinks, __gm__ uint8_t *workspace,
-                                const optiling::smlag::SparseFlashMlaGradTilingDataRegbase *__restrict ordTilingData,
-                                TPipe *pipe_in);
+    __aicore__ inline void Init(__gm__ uint8_t* dq, __gm__ uint8_t* dori_kv, __gm__ uint8_t* dcmp_kv,
+                                __gm__ uint8_t* dsinks, __gm__ uint8_t* workspace,
+                                const optiling::smlag::SparseFlashMlaGradTilingDataRegbase* __restrict ordTilingData,
+                                TPipe* pipe_in);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessSink();
     __aicore__ inline void ProcessDqkv();
@@ -37,8 +37,8 @@ public:
     uint32_t REGBASE_POST_BASE = 128 * 128;
     uint32_t VALUE_DIM = 512;
     uint32_t POST_S_BASE = 18;
-    TPipe *pipe;
-    const optiling::smlag::SparseFlashMlaGradTilingDataRegbase *__restrict tilingData;
+    TPipe* pipe;
+    const optiling::smlag::SparseFlashMlaGradTilingDataRegbase* __restrict tilingData;
     TQue<QuePosition::VECIN, 1> inQueuePing;
     TQue<QuePosition::VECOUT, 1> outQueuePing;
     TQue<QuePosition::VECIN, 1> inQueuePong;
@@ -59,32 +59,32 @@ template <typename T1, typename T2, typename OUTDTYPE, const bool IS_TND, const 
           const bool isCmpKVExist, const bool IsOriKVSparse, const bool IsCmpKVSparse, const bool IsDETER>
 __aicore__ inline void SparseFlashMlaGradPostRegbase<
     T1, T2, OUTDTYPE, IS_TND, isOriKVExist, isCmpKVExist, IsOriKVSparse, IsCmpKVSparse,
-    IsDETER>::Init(__gm__ uint8_t *dq, __gm__ uint8_t *dori_kv, __gm__ uint8_t *dcmp_kv, __gm__ uint8_t *dsinks,
-                   __gm__ uint8_t *workspace,
-                   const optiling::smlag::SparseFlashMlaGradTilingDataRegbase *__restrict ordTilingData, TPipe *pipe_in)
+    IsDETER>::Init(__gm__ uint8_t* dq, __gm__ uint8_t* dori_kv, __gm__ uint8_t* dcmp_kv, __gm__ uint8_t* dsinks,
+                   __gm__ uint8_t* workspace,
+                   const optiling::smlag::SparseFlashMlaGradTilingDataRegbase* __restrict ordTilingData, TPipe* pipe_in)
 {
     vBlockIdx = GetBlockIdx();
     tilingData = ordTilingData;
     pipe = pipe_in;
 
-    dqkv[0].SetGlobalBuffer((__gm__ OUTDTYPE *)dq);
-    dqkvWorkspace[0].SetGlobalBuffer((__gm__ float *)workspace +
+    dqkv[0].SetGlobalBuffer((__gm__ OUTDTYPE*)dq);
+    dqkvWorkspace[0].SetGlobalBuffer((__gm__ float*)workspace +
                                      tilingData->postTilingData.dqWorkSpaceOffset / sizeof(T2));
     if constexpr (isOriKVExist) {
-        dqkv[1].SetGlobalBuffer((__gm__ OUTDTYPE *)dori_kv);
-        dqkvWorkspace[1].SetGlobalBuffer((__gm__ float *)workspace +
+        dqkv[1].SetGlobalBuffer((__gm__ OUTDTYPE*)dori_kv);
+        dqkvWorkspace[1].SetGlobalBuffer((__gm__ float*)workspace +
                                          tilingData->postTilingData.dOriKVWorkSpaceOffset / sizeof(T2));
         if constexpr (!IsOriKVSparse && !IsDETER) {
-            dqkvVWorkspace[1].SetGlobalBuffer((__gm__ float *)workspace +
+            dqkvVWorkspace[1].SetGlobalBuffer((__gm__ float*)workspace +
                                               tilingData->postTilingData.dOriVWorkSpaceOffset / sizeof(T2));
         }
     }
     if constexpr (isCmpKVExist) {
-        dqkv[2].SetGlobalBuffer((__gm__ OUTDTYPE *)dcmp_kv);
-        dqkvWorkspace[2].SetGlobalBuffer((__gm__ float *)workspace +
+        dqkv[2].SetGlobalBuffer((__gm__ OUTDTYPE*)dcmp_kv);
+        dqkvWorkspace[2].SetGlobalBuffer((__gm__ float*)workspace +
                                          tilingData->postTilingData.dCmpKVWorkSpaceOffset / sizeof(T2));
         if constexpr (!IsCmpKVSparse && !IsDETER) {
-            dqkvVWorkspace[2].SetGlobalBuffer((__gm__ float *)workspace +
+            dqkvVWorkspace[2].SetGlobalBuffer((__gm__ float*)workspace +
                                               tilingData->postTilingData.dCmpVWorkSpaceOffset / sizeof(T2));
         }
     }
@@ -94,9 +94,9 @@ __aicore__ inline void SparseFlashMlaGradPostRegbase<
     qPostTailNum = tilingData->postTilingData.qPostTailNum;
 
     if (unlikely(tilingData->baseParams.isSink)) {
-        dsinkWorkspace.SetGlobalBuffer((__gm__ float *)workspace +
+        dsinkWorkspace.SetGlobalBuffer((__gm__ float*)workspace +
                                        tilingData->baseParams.dSinkWorkSpaceOffset / sizeof(float));
-        dsinkGm.SetGlobalBuffer((__gm__ float *)dsinks);
+        dsinkGm.SetGlobalBuffer((__gm__ float*)dsinks);
         pipe->InitBuffer(dsinkResBuf, tilingData->baseParams.g * sizeof(float));
     }
 

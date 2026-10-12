@@ -25,7 +25,7 @@ extern "C" {
 
 namespace {
 
-static constexpr const char *SMLAG_ACLNN_OP_NAME = "aclnnSparseFlashMlaGradMetadata";
+static constexpr const char* SMLAG_ACLNN_OP_NAME = "aclnnSparseFlashMlaGradMetadata";
 
 enum class SparseModeSmlag : uint8_t {
     DEFAULT_MASK = 0,
@@ -41,12 +41,12 @@ inline constexpr int64_t SMLAG_CMP_RATIO_UPPER_BOUND = 128;
 inline constexpr int64_t SMLAG_NUM_HEADS_Q_LOWER_BOUND = 1;
 inline constexpr int64_t SMLAG_NUM_HEADS_Q_UPPER_BOUND = 128;
 
-inline bool IsTensorExistSmlag(const aclTensor *tensor)
+inline bool IsTensorExistSmlag(const aclTensor* tensor)
 {
     return (tensor != nullptr) && (tensor->GetViewShape().GetDimNum() > 0) && (tensor->GetViewShape().GetDim(0) > 0);
 }
 
-int64_t GetDimNumSmlag(const aclTensor *tensor)
+int64_t GetDimNumSmlag(const aclTensor* tensor)
 {
     if (tensor == nullptr) {
         return -1;
@@ -54,7 +54,7 @@ int64_t GetDimNumSmlag(const aclTensor *tensor)
     return tensor->GetViewShape().GetDimNum();
 }
 
-aclDataType GetDataTypeSmlag(const aclTensor *tensor)
+aclDataType GetDataTypeSmlag(const aclTensor* tensor)
 {
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
     if (tensor == nullptr) {
@@ -64,12 +64,12 @@ aclDataType GetDataTypeSmlag(const aclTensor *tensor)
     return dataType;
 }
 
-inline bool IsTensorSourceSmlag(const std::string &source)
+inline bool IsTensorSourceSmlag(const std::string& source)
 {
     return source != "batch_size";
 }
 
-inline int64_t GetRawShapeSizeSmlag(const std::string &source, int64_t batchValue)
+inline int64_t GetRawShapeSizeSmlag(const std::string& source, int64_t batchValue)
 {
     if (source.find("cu_seqlens") != std::string::npos) {
         return batchValue + 1;
@@ -77,7 +77,7 @@ inline int64_t GetRawShapeSizeSmlag(const std::string &source, int64_t batchValu
     return batchValue;
 }
 
-inline std::string GetSourceDescSmlag(const std::string &source)
+inline std::string GetSourceDescSmlag(const std::string& source)
 {
     if (source == "batch_size") {
         return "batch_size";
@@ -91,9 +91,9 @@ inline std::string GetSourceDescSmlag(const std::string &source)
 aclnnStatus CheckSingleParamSmlag(int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenOriKv, int64_t maxSeqlenCmpKv,
                                   int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, int64_t oriTopk,
                                   int64_t cmpTopk, int64_t cmpRatio, int64_t oriMaskMode, int64_t cmpMaskMode,
-                                  int64_t oriWinLeft, int64_t oriWinRight, const char *layoutQOptional,
-                                  const char *layoutKvOptional, bool hasOriKv, bool hasCmpKv, uint32_t aicCoreNum,
-                                  uint32_t aivCoreNum, const char *socVersion)
+                                  int64_t oriWinLeft, int64_t oriWinRight, const char* layoutQOptional,
+                                  const char* layoutKvOptional, bool hasOriKv, bool hasCmpKv, uint32_t aicCoreNum,
+                                  uint32_t aivCoreNum, const char* socVersion)
 {
     // batch_size >= 0
     if (batchSize < 0) {
@@ -256,13 +256,13 @@ aclnnStatus CheckSingleParamSmlag(int64_t batchSize, int64_t maxSeqlenQ, int64_t
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckExistenceSmlag(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensOriKvOptional,
-                                const aclTensor *cuSeqlensCmpKvOptional, const aclTensor *sequsedOriKvOptional,
-                                const aclTensor *sequsedCmpKvOptional, const aclTensor *cmpResidualKvOptional,
-                                const aclTensor *oriTopkLengthOptional, const aclTensor *cmpTopkLengthOptional,
+aclnnStatus CheckExistenceSmlag(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensOriKvOptional,
+                                const aclTensor* cuSeqlensCmpKvOptional, const aclTensor* sequsedOriKvOptional,
+                                const aclTensor* sequsedCmpKvOptional, const aclTensor* cmpResidualKvOptional,
+                                const aclTensor* oriTopkLengthOptional, const aclTensor* cmpTopkLengthOptional,
                                 int64_t oriTopk, int64_t cmpTopk, int64_t cmpRatio, int64_t oriMaskMode,
-                                int64_t cmpMaskMode, bool hasOriKv, bool hasCmpKv, const char *layoutQOptional,
-                                const char *layoutKvOptional, const aclTensor *metadata)
+                                int64_t cmpMaskMode, bool hasOriKv, bool hasCmpKv, const char* layoutQOptional,
+                                const char* layoutKvOptional, const aclTensor* metadata)
 {
     // cu_seqlens_q 存在性校验
     if (strcmp(layoutQOptional, "TND") == 0) {
@@ -329,8 +329,8 @@ aclnnStatus CheckExistenceSmlag(const aclTensor *cuSeqlensQOptional, const aclTe
     return ACLNN_SUCCESS;
 }
 
-int64_t GetQueryBatchSizeSmlag(const aclTensor *sequsedQOptional, const aclTensor *cuSeqlensQOptional,
-                               const char *layoutQOptional, int64_t batchSize, std::string *source)
+int64_t GetQueryBatchSizeSmlag(const aclTensor* sequsedQOptional, const aclTensor* cuSeqlensQOptional,
+                               const char* layoutQOptional, int64_t batchSize, std::string* source)
 {
     if (IsTensorExistSmlag(sequsedQOptional)) {
         *source = "seqused_q";
@@ -346,8 +346,8 @@ int64_t GetQueryBatchSizeSmlag(const aclTensor *sequsedQOptional, const aclTenso
     return batchSize;
 }
 
-int64_t GetOriKvBatchSizeSmlag(const aclTensor *sequsedOriKvOptional, const aclTensor *cuSeqlensOriKvOptional,
-                               const char *layoutKvOptional, int64_t batchSize, std::string *source)
+int64_t GetOriKvBatchSizeSmlag(const aclTensor* sequsedOriKvOptional, const aclTensor* cuSeqlensOriKvOptional,
+                               const char* layoutKvOptional, int64_t batchSize, std::string* source)
 {
     if (IsTensorExistSmlag(sequsedOriKvOptional)) {
         *source = "seqused_ori_kv";
@@ -363,8 +363,8 @@ int64_t GetOriKvBatchSizeSmlag(const aclTensor *sequsedOriKvOptional, const aclT
     return batchSize;
 }
 
-int64_t GetCmpKvBatchSizeSmlag(const aclTensor *sequsedCmpKvOptional, const aclTensor *cuSeqlensCmpKvOptional,
-                               const char *layoutKvOptional, int64_t batchSize, std::string *source)
+int64_t GetCmpKvBatchSizeSmlag(const aclTensor* sequsedCmpKvOptional, const aclTensor* cuSeqlensCmpKvOptional,
+                               const char* layoutKvOptional, int64_t batchSize, std::string* source)
 {
     if (IsTensorExistSmlag(sequsedCmpKvOptional)) {
         *source = "seqused_cmp_kv";
@@ -380,9 +380,9 @@ int64_t GetCmpKvBatchSizeSmlag(const aclTensor *sequsedCmpKvOptional, const aclT
     return batchSize;
 }
 
-std::string TopkLengthShapeToStringSmlag(const aclTensor *topkLengthOptional)
+std::string TopkLengthShapeToStringSmlag(const aclTensor* topkLengthOptional)
 {
-    const auto &shape = topkLengthOptional->GetViewShape();
+    const auto& shape = topkLengthOptional->GetViewShape();
     std::string result;
     for (size_t i = 0; i < shape.GetDimNum(); ++i) {
         if (i != 0) {
@@ -393,8 +393,8 @@ std::string TopkLengthShapeToStringSmlag(const aclTensor *topkLengthOptional)
     return result;
 }
 
-aclnnStatus CheckTopkLengthFirstDimSmlag(const aclTensor *topkLengthOptional, const std::string &topkLengthName,
-                                         int64_t queryBatchSize, const std::string &querySource)
+aclnnStatus CheckTopkLengthFirstDimSmlag(const aclTensor* topkLengthOptional, const std::string& topkLengthName,
+                                         int64_t queryBatchSize, const std::string& querySource)
 {
     if (topkLengthOptional->GetViewShape().GetDim(0) == queryBatchSize) {
         return ACLNN_SUCCESS;
@@ -414,15 +414,15 @@ aclnnStatus CheckTopkLengthFirstDimSmlag(const aclTensor *topkLengthOptional, co
 
 struct TopkLengthAxisSmlag {
     int64_t index;
-    const char *desc;
+    const char* desc;
 };
 
 inline constexpr TopkLengthAxisSmlag SMLAG_TOPK_LENGTH_SECOND_AXIS{1, "second"};
 inline constexpr TopkLengthAxisSmlag SMLAG_TOPK_LENGTH_THIRD_AXIS{2, "third"};
 
-aclnnStatus CheckTopkLengthSingleDimSmlag(const aclTensor *topkLengthOptional, const std::string &topkLengthName,
+aclnnStatus CheckTopkLengthSingleDimSmlag(const aclTensor* topkLengthOptional, const std::string& topkLengthName,
                                           TopkLengthAxisSmlag axis, int64_t expectedValue,
-                                          const std::string &expectedDesc, const char *layoutQOptional)
+                                          const std::string& expectedDesc, const char* layoutQOptional)
 {
     if (topkLengthOptional->GetViewShape().GetDim(axis.index) == expectedValue) {
         return ACLNN_SUCCESS;
@@ -435,15 +435,15 @@ aclnnStatus CheckTopkLengthSingleDimSmlag(const aclTensor *topkLengthOptional, c
     return ACLNN_ERR_PARAM_INVALID;
 }
 
-aclnnStatus CheckConsistencySmlag(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensOriKvOptional,
-                                  const aclTensor *cuSeqlensCmpKvOptional, const aclTensor *sequsedQOptional,
-                                  const aclTensor *sequsedOriKvOptional, const aclTensor *sequsedCmpKvOptional,
-                                  const aclTensor *cmpResidualKvOptional, const aclTensor *oriTopkLengthOptional,
-                                  const aclTensor *cmpTopkLengthOptional, int64_t batchSize,
-                                  const char *layoutQOptional, const char *layoutKvOptional, bool hasOriKv,
+aclnnStatus CheckConsistencySmlag(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensOriKvOptional,
+                                  const aclTensor* cuSeqlensCmpKvOptional, const aclTensor* sequsedQOptional,
+                                  const aclTensor* sequsedOriKvOptional, const aclTensor* sequsedCmpKvOptional,
+                                  const aclTensor* cmpResidualKvOptional, const aclTensor* oriTopkLengthOptional,
+                                  const aclTensor* cmpTopkLengthOptional, int64_t batchSize,
+                                  const char* layoutQOptional, const char* layoutKvOptional, bool hasOriKv,
                                   bool hasCmpKv, int64_t oriTopk, int64_t cmpTopk, int64_t oriMaskMode,
                                   int64_t cmpMaskMode, int64_t maxSeqlenQ, int64_t numHeadsKv,
-                                  const aclTensor *metadata)
+                                  const aclTensor* metadata)
 {
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
     int64_t dimNum = -1;
@@ -841,17 +841,17 @@ aclnnStatus CheckConsistencySmlag(const aclTensor *cuSeqlensQOptional, const acl
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ParamsCheck(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensOriKvOptional,
-                               const aclTensor *cuSeqlensCmpKvOptional, const aclTensor *sequsedQOptional,
-                               const aclTensor *sequsedOriKvOptional, const aclTensor *sequsedCmpKvOptional,
-                               const aclTensor *cmpResidualKvOptional, const aclTensor *oriTopkLengthOptional,
-                               const aclTensor *cmpTopkLengthOptional, int64_t numHeadsQ, int64_t numHeadsKv,
+static aclnnStatus ParamsCheck(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensOriKvOptional,
+                               const aclTensor* cuSeqlensCmpKvOptional, const aclTensor* sequsedQOptional,
+                               const aclTensor* sequsedOriKvOptional, const aclTensor* sequsedCmpKvOptional,
+                               const aclTensor* cmpResidualKvOptional, const aclTensor* oriTopkLengthOptional,
+                               const aclTensor* cmpTopkLengthOptional, int64_t numHeadsQ, int64_t numHeadsKv,
                                int64_t headDim, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenOriKv,
                                int64_t maxSeqlenCmpKv, int64_t oriTopk, int64_t cmpTopk, int64_t cmpRatio,
                                int64_t oriMaskMode, int64_t cmpMaskMode, int64_t oriWinLeft, int64_t oriWinRight,
-                               const char *layoutQOptional, const char *layoutKvOptional, bool hasOriKv, bool hasCmpKv,
-                               uint32_t aicCoreNum, uint32_t aivCoreNum, const char *socVersion,
-                               const aclTensor *metaData)
+                               const char* layoutQOptional, const char* layoutKvOptional, bool hasOriKv, bool hasCmpKv,
+                               uint32_t aicCoreNum, uint32_t aivCoreNum, const char* socVersion,
+                               const aclTensor* metaData)
 {
     if (CheckSingleParamSmlag(batchSize, maxSeqlenQ, maxSeqlenOriKv, maxSeqlenCmpKv, numHeadsQ, numHeadsKv, headDim,
                               oriTopk, cmpTopk, cmpRatio, oriMaskMode, cmpMaskMode, oriWinLeft, oriWinRight,

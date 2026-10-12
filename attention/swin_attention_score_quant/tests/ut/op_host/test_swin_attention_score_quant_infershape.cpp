@@ -41,10 +41,9 @@ gert::InfershapeContextPara BuildInfershapePara(int64_t b, int64_t n, int64_t s,
             {{{1, s}, {1, s}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, s}, {1, s}}, ge::DT_INT32, ge::FORMAT_ND},
             {{{1, h}, {1, h}}, ge::DT_INT32, ge::FORMAT_ND},
-            mask1_present
-                ? gert::InfershapeContextPara::TensorDescription({{1, n, s, s}, {1, n, s, s}}, ge::DT_FLOAT16,
-                                                                 ge::FORMAT_ND)
-                : gert::InfershapeContextPara::TensorDescription({{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND),
+            mask1_present ? gert::InfershapeContextPara::TensorDescription({{1, n, s, s}, {1, n, s, s}}, ge::DT_FLOAT16,
+                                                                           ge::FORMAT_ND) :
+                            gert::InfershapeContextPara::TensorDescription({{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND),
             {{{1, n, s, s}, {1, n, s, s}}, ge::DT_FLOAT16, ge::FORMAT_ND},
         },
         {{{{1, 1, 1, 1}, {1, 1, 1, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND}},

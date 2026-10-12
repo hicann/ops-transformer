@@ -24,7 +24,7 @@ using namespace AscendC;
 template <typename T, typename IndexDtype, int64_t InOutMode, bool NCT = false>
 class ScatterPaKvCacheNormalFullyLoad {
 public:
-    __aicore__ inline ScatterPaKvCacheNormalFullyLoad(TPipe *pipe, const ScatterPaKvCacheTilingData *__restrict tiling)
+    __aicore__ inline ScatterPaKvCacheNormalFullyLoad(TPipe* pipe, const ScatterPaKvCacheTilingData* __restrict tiling)
         : pipe_(pipe),
           tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR key, GM_ADDR key_cache_in, GM_ADDR slot_mapping, GM_ADDR value,
@@ -40,7 +40,7 @@ private:
                                         int64_t handleNumPerCore);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, 1> inputKeyQueue_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, 1> inputValueQueue_;
 
@@ -50,7 +50,7 @@ private:
     GlobalTensor<T> outputValueCacheGm_;
     GlobalTensor<IndexDtype> slotMappingGm_;
 
-    const ScatterPaKvCacheTilingData *tilingData_;
+    const ScatterPaKvCacheTilingData* tilingData_;
 
     int64_t blockIdx_{0};
 
@@ -68,16 +68,16 @@ __aicore__ inline void ScatterPaKvCacheNormalFullyLoad<T, IndexDtype, InOutMode,
 {
     blockIdx_ = GetBlockIdx();
     blockFactorOffset_ = blockIdx_ * tilingData_->blockFactor;
-    inputKeyGm_.SetGlobalBuffer((__gm__ T *)(key));
-    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype *)(slot_mapping) + GetBlockIdx() * tilingData_->blockFactor);
-    outputKeyCacheGm_.SetGlobalBuffer((__gm__ T *)(key_cache_out));
+    inputKeyGm_.SetGlobalBuffer((__gm__ T*)(key));
+    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype*)(slot_mapping) + GetBlockIdx() * tilingData_->blockFactor);
+    outputKeyCacheGm_.SetGlobalBuffer((__gm__ T*)(key_cache_out));
     int64_t maxBlockFactor = tilingData_->blockFactor > tilingData_->tailBlockFactor ? tilingData_->blockFactor :
                                                                                        tilingData_->tailBlockFactor;
     pipe_->InitBuffer(kSlotMappingBuf_, RoundUp(maxBlockFactor) * sizeof(IndexDtype));
     pipe_->InitBuffer(inputKeyQueue_, 1, maxBlockFactor * RoundUp(tilingData_->kHandleNumPerCore) * sizeof(T));
     if constexpr (InOutMode == DUAL_IN_OUT) {
-        inputValueGm_.SetGlobalBuffer((__gm__ T *)(value));
-        outputValueCacheGm_.SetGlobalBuffer((__gm__ T *)(value_cache_out));
+        inputValueGm_.SetGlobalBuffer((__gm__ T*)(value));
+        outputValueCacheGm_.SetGlobalBuffer((__gm__ T*)(value_cache_out));
         pipe_->InitBuffer(vSlotMappingBuf_, RoundUp(maxBlockFactor) * sizeof(IndexDtype));
         pipe_->InitBuffer(inputValueQueue_, 1, maxBlockFactor * RoundUp(tilingData_->vHandleNumPerCore) * sizeof(T));
     }

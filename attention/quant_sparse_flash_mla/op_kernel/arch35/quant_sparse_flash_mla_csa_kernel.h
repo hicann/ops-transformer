@@ -48,57 +48,57 @@ public:
     QSMLA_ARGS_TRAITS;
     __aicore__ inline QuantSparseFlashMlaCsa(){};
 
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV,
-                                __gm__ uint8_t *qDescale, __gm__ uint8_t *oriKVDescale, __gm__ uint8_t *cmpKVDescale,
-                                __gm__ uint8_t *oriSparseIndices, __gm__ uint8_t *cmpSparseIndices,
-                                __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
-                                __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv,
-                                __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedQ, __gm__ uint8_t *seqUsedOriKV,
-                                __gm__ uint8_t *seqUsedCmpKV, __gm__ uint8_t *cmpResidualKv,
-                                __gm__ uint8_t *oriTopkLength, __gm__ uint8_t *cmpTopkLength, __gm__ uint8_t *sinks,
-                                __gm__ uint8_t *metadata, __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
-                                __gm__ uint8_t *workspace, const QuantSparseFlashMlaTilingData *__restrict tiling,
-                                TPipe *tPipe);
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* oriKV, __gm__ uint8_t* cmpKV,
+                                __gm__ uint8_t* qDescale, __gm__ uint8_t* oriKVDescale, __gm__ uint8_t* cmpKVDescale,
+                                __gm__ uint8_t* oriSparseIndices, __gm__ uint8_t* cmpSparseIndices,
+                                __gm__ uint8_t* oriBlockTable, __gm__ uint8_t* cmpBlockTable,
+                                __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensOriKv,
+                                __gm__ uint8_t* cuSeqlensCmpKv, __gm__ uint8_t* sequsedQ, __gm__ uint8_t* seqUsedOriKV,
+                                __gm__ uint8_t* seqUsedCmpKV, __gm__ uint8_t* cmpResidualKv,
+                                __gm__ uint8_t* oriTopkLength, __gm__ uint8_t* cmpTopkLength, __gm__ uint8_t* sinks,
+                                __gm__ uint8_t* metadata, __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse,
+                                __gm__ uint8_t* workspace, const QuantSparseFlashMlaTilingData* __restrict tiling,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void ProcessMainLoop();
     __aicore__ inline int64_t GetQsmlaSeqLen(int32_t batchIndex, bool useActualLength, bool useCuSeqlens,
-                                             GlobalTensor<int32_t> &actualLengthGm, GlobalTensor<int32_t> &cuLengthGm,
+                                             GlobalTensor<int32_t>& actualLengthGm, GlobalTensor<int32_t>& cuLengthGm,
                                              int64_t defaultLength);
-    __aicore__ inline void ParseTilingData(__gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ,
-                                           __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *sequsedOriKv,
-                                           __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedCmpKv,
-                                           __gm__ uint8_t *cmpResidualKv);
-    __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV,
-                                            __gm__ uint8_t *qDescale, __gm__ uint8_t *oriKVDescale,
-                                            __gm__ uint8_t *cmpKVDescale, __gm__ uint8_t *oriSparseIndices,
-                                            __gm__ uint8_t *cmpSparseIndices, __gm__ uint8_t *oriBlockTable,
-                                            __gm__ uint8_t *cmpBlockTable, __gm__ uint8_t *cuSeqlensQ,
-                                            __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv,
-                                            __gm__ uint8_t *sequsedQ, __gm__ uint8_t *sequsedOriKv,
-                                            __gm__ uint8_t *sequsedCmpKv, __gm__ uint8_t *cmpResidualKv,
-                                            __gm__ uint8_t *oriTopkLength, __gm__ uint8_t *cmpTopkLength,
-                                            __gm__ uint8_t *sinks, __gm__ uint8_t *workspace,
-                                            const QuantSparseFlashMlaTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void ParseTilingData(__gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* sequsedQ,
+                                           __gm__ uint8_t* cuSeqlensOriKv, __gm__ uint8_t* sequsedOriKv,
+                                           __gm__ uint8_t* cuSeqlensCmpKv, __gm__ uint8_t* sequsedCmpKv,
+                                           __gm__ uint8_t* cmpResidualKv);
+    __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t* query, __gm__ uint8_t* oriKV, __gm__ uint8_t* cmpKV,
+                                            __gm__ uint8_t* qDescale, __gm__ uint8_t* oriKVDescale,
+                                            __gm__ uint8_t* cmpKVDescale, __gm__ uint8_t* oriSparseIndices,
+                                            __gm__ uint8_t* cmpSparseIndices, __gm__ uint8_t* oriBlockTable,
+                                            __gm__ uint8_t* cmpBlockTable, __gm__ uint8_t* cuSeqlensQ,
+                                            __gm__ uint8_t* cuSeqlensOriKv, __gm__ uint8_t* cuSeqlensCmpKv,
+                                            __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sequsedOriKv,
+                                            __gm__ uint8_t* sequsedCmpKv, __gm__ uint8_t* cmpResidualKv,
+                                            __gm__ uint8_t* oriTopkLength, __gm__ uint8_t* cmpTopkLength,
+                                            __gm__ uint8_t* sinks, __gm__ uint8_t* workspace,
+                                            const QuantSparseFlashMlaTilingData* __restrict tiling, TPipe* tPipe);
     __aicore__ inline void InitLocalBuffer();
     __aicore__ inline void FreeEvent();
-    __aicore__ inline void InitMMResBuf(__gm__ uint8_t *workspace);
+    __aicore__ inline void InitMMResBuf(__gm__ uint8_t* workspace);
     __aicore__ inline void ComputeConstexpr();
-    __aicore__ inline void ParseFdRunInfo(FdRunInfo &fdRunInfo);
-    __aicore__ inline int64_t ConvertS2MetadataBlockToToken(const RunParamStr &qs35RunParam, const ConstInfo &constInfo,
+    __aicore__ inline void ParseFdRunInfo(FdRunInfo& fdRunInfo);
+    __aicore__ inline int64_t ConvertS2MetadataBlockToToken(const RunParamStr& qs35RunParam, const ConstInfo& constInfo,
                                                             uint32_t s2BlockIdx);
-    __aicore__ inline bool ApplyS2MetadataRange(RunParamStr &qs35RunParam, ConstInfo &constInfo, int64_t s2StartPoint,
+    __aicore__ inline bool ApplyS2MetadataRange(RunParamStr& qs35RunParam, ConstInfo& constInfo, int64_t s2StartPoint,
                                                 int64_t s2EndPoint, bool isFirstS2RangeTask, bool isLastS2RangeTask);
-    __aicore__ inline void SetRunInfo(RunInfo &qs35RunInfo, RunParamStr &qs35RunParam, int64_t taskId,
+    __aicore__ inline void SetRunInfo(RunInfo& qs35RunInfo, RunParamStr& qs35RunParam, int64_t taskId,
                                       int64_t s2LoopCount, int64_t s2LoopLimit, int64_t multiCoreInnerIdx);
-    __aicore__ inline void ComputeBmm1Tail(RunInfo &qs35RunInfo, RunParamStr &qs35RunParam);
+    __aicore__ inline void ComputeBmm1Tail(RunInfo& qs35RunInfo, RunParamStr& qs35RunParam);
     __aicore__ inline void InitUniqueConstInfo();
-    __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index, RunParamStr &qs35RunParam);
-    __aicore__ inline void InitUniqueRunInfo(const RunParamStr &qs35RunParam, RunInfo &qs35RunInfo);
-    TPipe *pipe;
+    __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index, RunParamStr& qs35RunParam);
+    __aicore__ inline void InitUniqueRunInfo(const RunParamStr& qs35RunParam, RunInfo& qs35RunInfo);
+    TPipe* pipe;
 
-    const QuantSparseFlashMlaTilingData *__restrict tilingData;
+    const QuantSparseFlashMlaTilingData* __restrict tilingData;
     static constexpr uint64_t SYNC_MODE = 4;
     static constexpr uint32_t PRELOAD_NUM = 3;
 
@@ -158,17 +158,17 @@ private:
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Init(
-    __gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV, __gm__ uint8_t *qDescale,
-    __gm__ uint8_t *oriKVDescale, __gm__ uint8_t *cmpKVDescale, __gm__ uint8_t *oriSparseIndices,
-    __gm__ uint8_t *cmpSparseIndices, __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
-    __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv,
-    __gm__ uint8_t *sequsedQ, __gm__ uint8_t *seqUsedOriKV, __gm__ uint8_t *seqUsedCmpKV, __gm__ uint8_t *cmpResidualKv,
-    __gm__ uint8_t *oriTopkLength, __gm__ uint8_t *cmpTopkLength, __gm__ uint8_t *sinks, __gm__ uint8_t *metadata,
-    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-    const QuantSparseFlashMlaTilingData *__restrict tiling, TPipe *tPipe)
+    __gm__ uint8_t* query, __gm__ uint8_t* oriKV, __gm__ uint8_t* cmpKV, __gm__ uint8_t* qDescale,
+    __gm__ uint8_t* oriKVDescale, __gm__ uint8_t* cmpKVDescale, __gm__ uint8_t* oriSparseIndices,
+    __gm__ uint8_t* cmpSparseIndices, __gm__ uint8_t* oriBlockTable, __gm__ uint8_t* cmpBlockTable,
+    __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensOriKv, __gm__ uint8_t* cuSeqlensCmpKv,
+    __gm__ uint8_t* sequsedQ, __gm__ uint8_t* seqUsedOriKV, __gm__ uint8_t* seqUsedCmpKV, __gm__ uint8_t* cmpResidualKv,
+    __gm__ uint8_t* oriTopkLength, __gm__ uint8_t* cmpTopkLength, __gm__ uint8_t* sinks, __gm__ uint8_t* metadata,
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+    const QuantSparseFlashMlaTilingData* __restrict tiling, TPipe* tPipe)
 {
-    __gm__ uint8_t *sequsedOriKv = seqUsedOriKV;
-    __gm__ uint8_t *sequsedCmpKv = seqUsedCmpKV;
+    __gm__ uint8_t* sequsedOriKv = seqUsedOriKV;
+    __gm__ uint8_t* sequsedCmpKv = seqUsedCmpKV;
     fa_base_matmul::ResetIdCounter();
     constInfo.subBlockIdx = GetSubBlockIdx();
     if ASCEND_IS_AIC {
@@ -184,7 +184,7 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Init
     if (metadata == nullptr) {
         return;
     }
-    this->metadataGm.SetGlobalBuffer((__gm__ uint32_t *)metadata);
+    this->metadataGm.SetGlobalBuffer((__gm__ uint32_t*)metadata);
 
     // 从meta data解析分核信息
     bN2StartIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_BN2_START_INDEX, false));
@@ -237,8 +237,8 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Init
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::GetQsmlaSeqLen(
-    int32_t batchIndex, bool useActualLength, bool useCuSeqlens, GlobalTensor<int32_t> &actualLengthGm,
-    GlobalTensor<int32_t> &cuLengthGm, int64_t defaultLength)
+    int32_t batchIndex, bool useActualLength, bool useCuSeqlens, GlobalTensor<int32_t>& actualLengthGm,
+    GlobalTensor<int32_t>& cuLengthGm, int64_t defaultLength)
 {
     if (useActualLength) {
         return actualLengthGm.GetValue(batchIndex);
@@ -251,10 +251,10 @@ __aicore__ inline int64_t QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::G
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ParseTilingData(
-    __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ, __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *sequsedOriKv,
-    __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedCmpKv, __gm__ uint8_t *cmpResidualKv)
+    __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* sequsedQ, __gm__ uint8_t* cuSeqlensOriKv, __gm__ uint8_t* sequsedOriKv,
+    __gm__ uint8_t* cuSeqlensCmpKv, __gm__ uint8_t* sequsedCmpKv, __gm__ uint8_t* cmpResidualKv)
 {
-    auto &quantSparseFlashMlaBaseParams = this->tilingData->baseParams;
+    auto& quantSparseFlashMlaBaseParams = this->tilingData->baseParams;
     constInfo.bSize = quantSparseFlashMlaBaseParams.batchSize;
     constInfo.n2Size = 1;
     constInfo.gSize = quantSparseFlashMlaBaseParams.nNumOfQInOneGroup;
@@ -300,36 +300,36 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Pars
     }
 
     if (cuSeqlensQ != nullptr) {
-        cuSeqlensQGm.SetGlobalBuffer((__gm__ int32_t *)cuSeqlensQ);
+        cuSeqlensQGm.SetGlobalBuffer((__gm__ int32_t*)cuSeqlensQ);
         qsmlaHasCuSeqlensQ = true;
     }
     if (cuSeqlensOriKv != nullptr) {
-        cuSeqlensOriKvGm.SetGlobalBuffer((__gm__ int32_t *)cuSeqlensOriKv);
+        cuSeqlensOriKvGm.SetGlobalBuffer((__gm__ int32_t*)cuSeqlensOriKv);
         qsmlaHasCuSeqlensOriKv = true;
     }
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
         if (cuSeqlensCmpKv != nullptr) {
-            cuSeqlensCmpKvGm.SetGlobalBuffer((__gm__ int32_t *)cuSeqlensCmpKv);
+            cuSeqlensCmpKvGm.SetGlobalBuffer((__gm__ int32_t*)cuSeqlensCmpKv);
             qsmlaHasCuSeqlensCmpKv = true;
         }
     }
     if (sequsedQ != nullptr) {
-        actualSeqQlenGm.SetGlobalBuffer((__gm__ int32_t *)sequsedQ);
+        actualSeqQlenGm.SetGlobalBuffer((__gm__ int32_t*)sequsedQ);
         qsmlaHasActualSeqQlen = true;
     }
     if (sequsedOriKv != nullptr) {
-        actualSeqOriKvlenGm.SetGlobalBuffer((__gm__ int32_t *)sequsedOriKv);
+        actualSeqOriKvlenGm.SetGlobalBuffer((__gm__ int32_t*)sequsedOriKv);
         qsmlaHasActualSeqOriKvlen = true;
     }
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
         if (sequsedCmpKv != nullptr) {
-            actualSeqCmpKvlenGm.SetGlobalBuffer((__gm__ int32_t *)sequsedCmpKv);
+            actualSeqCmpKvlenGm.SetGlobalBuffer((__gm__ int32_t*)sequsedCmpKv);
             qsmlaHasActualSeqCmpKvlen = true;
         }
         if (cmpResidualKv != nullptr) {
-            cmpResidualKvGm.SetGlobalBuffer((__gm__ int32_t *)cmpResidualKv);
+            cmpResidualKvGm.SetGlobalBuffer((__gm__ int32_t*)cmpResidualKv);
         }
     }
 
@@ -360,33 +360,33 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Pars
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::InitGlobalBuffer(
-    __gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV, __gm__ uint8_t *qDescale,
-    __gm__ uint8_t *oriKVDescale, __gm__ uint8_t *cmpKVDescale, __gm__ uint8_t *oriSparseIndices,
-    __gm__ uint8_t *cmpSparseIndices, __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
-    __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv,
-    __gm__ uint8_t *sequsedQ, __gm__ uint8_t *sequsedOriKv, __gm__ uint8_t *sequsedCmpKv, __gm__ uint8_t *cmpResidualKv,
-    __gm__ uint8_t *oriTopkLength, __gm__ uint8_t *cmpTopkLength, __gm__ uint8_t *sinks, __gm__ uint8_t *workspace,
-    const QuantSparseFlashMlaTilingData *__restrict tiling, TPipe *tPipe)
+    __gm__ uint8_t* query, __gm__ uint8_t* oriKV, __gm__ uint8_t* cmpKV, __gm__ uint8_t* qDescale,
+    __gm__ uint8_t* oriKVDescale, __gm__ uint8_t* cmpKVDescale, __gm__ uint8_t* oriSparseIndices,
+    __gm__ uint8_t* cmpSparseIndices, __gm__ uint8_t* oriBlockTable, __gm__ uint8_t* cmpBlockTable,
+    __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensOriKv, __gm__ uint8_t* cuSeqlensCmpKv,
+    __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sequsedOriKv, __gm__ uint8_t* sequsedCmpKv, __gm__ uint8_t* cmpResidualKv,
+    __gm__ uint8_t* oriTopkLength, __gm__ uint8_t* cmpTopkLength, __gm__ uint8_t* sinks, __gm__ uint8_t* workspace,
+    const QuantSparseFlashMlaTilingData* __restrict tiling, TPipe* tPipe)
 {
     vecBlock.InitGlobalBuffer(oriKV, cmpKV, qDescale, oriKVDescale, cmpKVDescale, oriSparseIndices, cmpSparseIndices,
                               oriBlockTable, cmpBlockTable, sequsedQ, sinks, sequsedOriKv, sequsedCmpKv, cmpResidualKv);
     cubeBlock.InitCubeInput(cuSeqlensQ, sequsedQ, constInfo);
     if (oriTopkLength != nullptr) {
         constInfo.hasOriTopkLength = true;
-        oriTopkLengthGm.SetGlobalBuffer((__gm__ int32_t *)oriTopkLength);
+        oriTopkLengthGm.SetGlobalBuffer((__gm__ int32_t*)oriTopkLength);
     } else {
         constInfo.hasOriTopkLength = false;
     }
     if (cmpTopkLength != nullptr) {
         constInfo.hasCmpTopkLength = true;
-        cmpTopkLengthGm.SetGlobalBuffer((__gm__ int32_t *)cmpTopkLength);
+        cmpTopkLengthGm.SetGlobalBuffer((__gm__ int32_t*)cmpTopkLength);
     } else {
         constInfo.hasCmpTopkLength = false;
     }
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::InitMMResBuf(__gm__ uint8_t *workspace)
+__aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::InitMMResBuf(__gm__ uint8_t* workspace)
 {
     uint32_t mm1ResultSize = constInfo.s1BaseSize / CV_RATIO * constInfo.s2BaseSize * sizeof(T);
     uint32_t mm2ResultSize = constInfo.s1BaseSize / CV_RATIO * 512 * sizeof(T);
@@ -662,27 +662,27 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Proc
                     }
                 }
                 if (qsmlaNotLastThreeLoop) {
-                    RunInfo &runInfo1 = qs35RunInfo[taskId % 4];
+                    RunInfo& runInfo1 = qs35RunInfo[taskId % 4];
                     this->SetRunInfo(runInfo1, qs35RunParam, taskId, s2LoopCount, s2LoopLimit, qsmlaMultiCoreInnerIdx);
                 }
                 if ASCEND_IS_AIV {
                     if (qsmlaNotLastThreeLoop) {
-                        RunInfo &runInfo1 = qs35RunInfo[taskId % 4];
+                        RunInfo& runInfo1 = qs35RunInfo[taskId % 4];
                         this->vecBlock.ProcessVec0(this->l1RightBuffers.Get(runInfo1.taskIdMod3),
                                                    v0ResGmBuffers.Get(runInfo1.taskIdMod3), runInfo1, this->constInfo);
                     }
                     if (taskId > 1 && qsmlaNotLast) {
-                        auto &runInfo2 = qs35RunInfo[(taskId + 2) % 4];
+                        auto& runInfo2 = qs35RunInfo[(taskId + 2) % 4];
                         this->vecBlock.ProcessVec1(this->l1PBuffers.Get(), this->bmm1Buffers.Get(), runInfo2,
                                                    this->constInfo);
                     }
                     if (taskId > 2) {
-                        RunInfo &runInfo3 = qs35RunInfo[(taskId + 1) % 4];
+                        RunInfo& runInfo3 = qs35RunInfo[(taskId + 1) % 4];
                         this->vecBlock.ProcessVec2(this->bmm2Buffers.Get(), runInfo3, this->constInfo);
                     }
                 } else {
                     if (taskId > 0 && qsmlaNotLastTwoLoop) {
-                        RunInfo &runInfo1 = qs35RunInfo[(taskId + 3) % 4];
+                        RunInfo& runInfo1 = qs35RunInfo[(taskId + 3) % 4];
                         this->cubeBlock.IterateLoadQK(this->l1RightBuffers.Get(runInfo1.taskIdMod3),
                                                       v0ResGmBuffers.Get(runInfo1.taskIdMod3), runInfo1,
                                                       this->constInfo, isFirstLoop);
@@ -697,15 +697,15 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Proc
                         }
                     }
                     if (taskId > 1 && qsmlaNotLast) {
-                        auto &runInfo2 = qs35RunInfo[(taskId + 2) % 4];
-                        RunInfo &runInfoNext = qs35RunInfo[(taskId + 3) % 4];
+                        auto& runInfo2 = qs35RunInfo[(taskId + 2) % 4];
+                        RunInfo& runInfoNext = qs35RunInfo[(taskId + 3) % 4];
                         this->cubeBlock.IterateBmm1(this->bmm1Buffers.Get(),
                                                     this->l1RightBuffers.Get(runInfo2.taskIdMod3),
                                                     v0ResGmBuffers.Get(runInfo2.taskIdMod3), qsmlaNotLastTwoLoop,
                                                     runInfoNext, runInfo2, this->constInfo);
                     }
                     if (taskId > 2) {
-                        RunInfo &runInfo3 = qs35RunInfo[(taskId + 1) % 4];
+                        RunInfo& runInfo3 = qs35RunInfo[(taskId + 1) % 4];
                         this->cubeBlock.IterateBmm2(this->bmm2Buffers.Get(), this->l1PBuffers,
                                                     this->l1RightBuffers.Get(runInfo3.taskIdMod3), runInfo3,
                                                     this->constInfo);
@@ -729,7 +729,7 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Proc
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline int64_t QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ConvertS2MetadataBlockToToken(
-    const RunParamStr &qs35RunParam, const ConstInfo &constInfo, uint32_t s2BlockIdx)
+    const RunParamStr& qs35RunParam, const ConstInfo& constInfo, uint32_t s2BlockIdx)
 {
     int64_t s2BaseSize = static_cast<int64_t>(constInfo.s2BaseSize);
     int64_t oriLen = qs35RunParam.s2LineOriEndIdx - qs35RunParam.s2LineStartIdx;
@@ -748,7 +748,7 @@ __aicore__ inline int64_t QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::C
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline bool QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ApplyS2MetadataRange(
-    RunParamStr &qs35RunParam, ConstInfo &constInfo, int64_t s2StartPoint, int64_t s2EndPoint, bool isFirstS2RangeTask,
+    RunParamStr& qs35RunParam, ConstInfo& constInfo, int64_t s2StartPoint, int64_t s2EndPoint, bool isFirstS2RangeTask,
     bool isLastS2RangeTask)
 {
     int64_t oriStart = qs35RunParam.s2LineStartIdx;
@@ -801,7 +801,7 @@ __aicore__ inline bool QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Appl
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ParseFdRunInfo(FdRunInfo &fdRunInfo)
+__aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ParseFdRunInfo(FdRunInfo& fdRunInfo)
 {
     uint32_t aivIdx = static_cast<uint32_t>(this->constInfo.aivIdx);
     fdRunInfo.coreEnable = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_CORE_ENABLE_INDEX, true)) != 0;
@@ -818,7 +818,7 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Pars
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ComputeAxisIdxByBnAndGs1(
-    int64_t bnIndex, int64_t gS1Index, RunParamStr &qs35RunParam)
+    int64_t bnIndex, int64_t gS1Index, RunParamStr& qs35RunParam)
 {
     // GS1合轴, 不切G, 只切S1
     qs35RunParam.s1oIdx = gS1Index * qs35RunParam.qSNumInOneBlock;
@@ -834,7 +834,7 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Comp
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::SetRunInfo(
-    RunInfo &qs35RunInfo, RunParamStr &qs35RunParam, int64_t taskId, int64_t s2LoopCount, int64_t s2LoopLimit,
+    RunInfo& qs35RunInfo, RunParamStr& qs35RunParam, int64_t taskId, int64_t s2LoopCount, int64_t s2LoopLimit,
     int64_t multiCoreInnerIdx)
 {
     if (s2LoopCount < qs35RunParam.oriKvLoopEndIdx) {
@@ -894,7 +894,7 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::SetR
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::InitUniqueRunInfo(
-    const RunParamStr &qs35RunParam, RunInfo &qs35RunInfo)
+    const RunParamStr& qs35RunParam, RunInfo& qs35RunInfo)
 {
     InitTaskParamByRun<TEMPLATE_INTF_ARGS>(qs35RunParam, qs35RunInfo);
 }
@@ -913,8 +913,8 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Free
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ComputeBmm1Tail(RunInfo &qs35RunInfo,
-                                                                                            RunParamStr &qs35RunParam)
+__aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ComputeBmm1Tail(RunInfo& qs35RunInfo,
+                                                                                            RunParamStr& qs35RunParam)
 {
     // ------------------------S1 Base Related---------------------------
     qs35RunInfo.s1RealSize = qs35RunParam.s1RealSize;

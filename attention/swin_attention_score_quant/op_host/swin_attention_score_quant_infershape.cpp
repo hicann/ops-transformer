@@ -25,7 +25,7 @@ static ge::graphStatus InferShapeSwinAttentionScoreQuant(gert::InferShapeContext
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeSwinAttentionScoreQuant(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeSwinAttentionScoreQuant(gert::InferDataTypeContext* context)
 {
     const ge::DataType x1_data_type = context->GetInputDataType(3);
     ge::graphStatus ret = context->SetOutputDataType(0, x1_data_type);
@@ -35,4 +35,4 @@ static ge::graphStatus InferDataTypeSwinAttentionScoreQuant(gert::InferDataTypeC
 IMPL_OP_INFERSHAPE(SwinAttentionScoreQuant)
     .InferShape(InferShapeSwinAttentionScoreQuant)
     .InferDataType(InferDataTypeSwinAttentionScoreQuant);
-}  // namespace ops
+} // namespace ops

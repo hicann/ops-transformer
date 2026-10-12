@@ -113,13 +113,13 @@ enum class SFAAxis : uint32_t {
 };
 
 struct SFARequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct SFAOptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 // -----------算子Tiling入参结构体定义---------------
@@ -138,15 +138,15 @@ struct SFAParaInfo {
     SFARequiredParaInfo softmaxMax = {nullptr, nullptr};
     SFARequiredParaInfo softmaxSum = {nullptr, nullptr};
 
-    const char *layoutQuery = nullptr;
-    const char *layoutKV = nullptr;
-    const int64_t *sparseBlockSize = nullptr;
-    const float *scaleValue = nullptr;
-    const int64_t *sparseMode = nullptr;
-    const int64_t *preTokens = nullptr;
-    const int64_t *nextTokens = nullptr;
-    const int64_t *attentionMode = nullptr;
-    const bool *returnSoftmaxLse = nullptr;
+    const char* layoutQuery = nullptr;
+    const char* layoutKV = nullptr;
+    const int64_t* sparseBlockSize = nullptr;
+    const float* scaleValue = nullptr;
+    const int64_t* sparseMode = nullptr;
+    const int64_t* preTokens = nullptr;
+    const int64_t* nextTokens = nullptr;
+    const int64_t* attentionMode = nullptr;
+    const bool* returnSoftmaxLse = nullptr;
 };
 
 struct InnerSplitParams {
@@ -220,14 +220,14 @@ inline T Align(T num, T rnd)
 }
 
 static std::string SFADataTypeToSerialString(ge::DataType type);
-std::string SFATensorDesc2String(const gert::StorageShape *shape, const gert::CompileTimeTensorDesc *tensor);
-std::string SFADebugTilingContext(const gert::TilingContext *context);
+std::string SFATensorDesc2String(const gert::StorageShape* shape, const gert::CompileTimeTensorDesc* tensor);
+std::string SFADebugTilingContext(const gert::TilingContext* context);
 std::string SFALayoutToSerialString(SFALayout layout);
 
 // -----------算子Tiling入参信息类---------------
 struct SFATilingInfo {
-    const char *opName = nullptr;
-    fe::PlatFormInfos *platformInfo = nullptr;
+    const char* opName = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     SFAParaInfo opParamInfo;
 
     // Base Param
@@ -296,16 +296,16 @@ struct SFATilingInfo {
 // ---------------算子Tiling类---------------
 class SFAMlaTiling {
 public:
-    explicit SFAMlaTiling(gert::TilingContext *context)
+    explicit SFAMlaTiling(gert::TilingContext* context)
         : context_(context)
     {}
-    ge::graphStatus DoOpTiling(SFATilingInfo *sfaInfo);
+    ge::graphStatus DoOpTiling(SFATilingInfo* sfaInfo);
 
 private:
     ge::graphStatus SetBlockDim(uint32_t blockDim) const;
     ge::graphStatus SetTilingKey(uint64_t tilingKey) const;
     ge::graphStatus SetWorkspaceSize(uint64_t workspaceSize) const;
-    ge::graphStatus SetTilingData(TilingDef &tilingData) const;
+    ge::graphStatus SetTilingData(TilingDef& tilingData) const;
     ge::graphStatus GetPlatformInfo();
     void GenTilingKey();
     bool DealSameSeqEachBatch();
@@ -337,7 +337,7 @@ private:
 
     void CalcBlockDim();
 
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     bool balanceModeFlag_ = false;
     bool splitKVFlag_ = false;
 
@@ -370,39 +370,39 @@ private:
     uint32_t mBaseSize_ = 128;
     uint32_t mFdBaseSize_ = 8;
 
-    SFATilingInfo *sfaInfo_ = nullptr;
+    SFATilingInfo* sfaInfo_ = nullptr;
 };
 
 // -----------算子Tiling入参信息解析及Check类---------------
 class SFATilingCheck {
 public:
-    explicit SFATilingCheck(const SFATilingInfo &sfaInfo)
+    explicit SFATilingCheck(const SFATilingInfo& sfaInfo)
         : sfaInfo_(sfaInfo) {};
     ~SFATilingCheck() = default;
     virtual ge::graphStatus Process();
 
 private:
     void Init();
-    void LogErrorDtypeSupport(const std::vector<ge::DataType> &expectDtypeList, const ge::DataType &actualDtype,
-                              const std::string &name) const;
-    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc *sfaDesc, const std::string &name) const;
+    void LogErrorDtypeSupport(const std::vector<ge::DataType>& expectDtypeList, const ge::DataType& actualDtype,
+                              const std::string& name) const;
+    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc* sfaDesc, const std::string& name) const;
     template <typename T>
-    void LogErrorNumberSupport(const std::vector<T> &expectNumberList, const T &actualValue, const std::string &name,
+    void LogErrorNumberSupport(const std::vector<T>& expectNumberList, const T& actualValue, const std::string& name,
                                const std::string subName) const;
     template <typename T>
-    void LogErrorDimNumSupport(const std::vector<T> &expectNumberList, const T &actualValue,
-                               const std::string &name) const;
-    ge::graphStatus CheckDimNumSupport(const gert::StorageShape *shape, const std::vector<size_t> &sfaExpectDimNumList,
-                                       const std::string &name) const;
-    ge::graphStatus CheckDimNumInLayoutSupport(const SFALayout &layout, const gert::StorageShape *shape,
-                                               const std::string &name) const;
-    void LogErrorLayoutSupport(const std::vector<SFALayout> &expectLayoutList, const SFALayout &actualLayout,
-                               const std::string &name) const;
-    ge::graphStatus GetExpectedShape(gert::Shape &shapeExpected, const SFATilingShapeCompareParam &param,
-                                     const SFALayout &layout) const;
-    ge::graphStatus CompareShape(SFATilingShapeCompareParam &param, const gert::Shape &shape, const SFALayout &layout,
-                                 const std::string &name) const;
-    ge::graphStatus CheckLayoutSupport(const SFALayout &actualLayout, const std::string &name) const;
+    void LogErrorDimNumSupport(const std::vector<T>& expectNumberList, const T& actualValue,
+                               const std::string& name) const;
+    ge::graphStatus CheckDimNumSupport(const gert::StorageShape* shape, const std::vector<size_t>& sfaExpectDimNumList,
+                                       const std::string& name) const;
+    ge::graphStatus CheckDimNumInLayoutSupport(const SFALayout& layout, const gert::StorageShape* shape,
+                                               const std::string& name) const;
+    void LogErrorLayoutSupport(const std::vector<SFALayout>& expectLayoutList, const SFALayout& actualLayout,
+                               const std::string& name) const;
+    ge::graphStatus GetExpectedShape(gert::Shape& shapeExpected, const SFATilingShapeCompareParam& param,
+                                     const SFALayout& layout) const;
+    ge::graphStatus CompareShape(SFATilingShapeCompareParam& param, const gert::Shape& shape, const SFALayout& layout,
+                                 const std::string& name) const;
+    ge::graphStatus CheckLayoutSupport(const SFALayout& actualLayout, const std::string& name) const;
     ge::graphStatus CheckSingleParaQuery() const;
     ge::graphStatus CheckSingleParaKey() const;
     ge::graphStatus CheckSingleParaValue() const;
@@ -418,14 +418,14 @@ private:
     ge::graphStatus CheckSinglePara() const;
     ge::graphStatus CheckMultiParaConsistency() const;
     ge::graphStatus CheckRopeExistence();
-    ge::graphStatus CheckExists(const void *pointer, const std::string &name) const;
-    ge::graphStatus CheckNotExists(const void *pointer, const std::string &name) const;
-    ge::graphStatus CheckExistsByMap(const std::map<std::string, const void *> &paramMap) const;
-    ge::graphStatus CheckNotExistsByMap(const std::map<std::string, const void *> &paramMap) const;
-    ge::graphStatus CheckExistenceByMap(std::map<std::string, const void *> &existMap,
-                                        std::map<std::string, const void *> &notExistMap) const;
+    ge::graphStatus CheckExists(const void* pointer, const std::string& name) const;
+    ge::graphStatus CheckNotExists(const void* pointer, const std::string& name) const;
+    ge::graphStatus CheckExistsByMap(const std::map<std::string, const void*>& paramMap) const;
+    ge::graphStatus CheckNotExistsByMap(const std::map<std::string, const void*>& paramMap) const;
+    ge::graphStatus CheckExistenceByMap(std::map<std::string, const void*>& existMap,
+                                        std::map<std::string, const void*>& notExistMap) const;
     template <typename T>
-    ge::graphStatus CheckAttrValueByMap(std::map<std::string, std::pair<const T *, T>> &attrMap) const;
+    ge::graphStatus CheckAttrValueByMap(std::map<std::string, std::pair<const T*, T>>& attrMap) const;
     ge::graphStatus CheckParaExistenceMlaNoquant() const;
     ge::graphStatus CheckParaExistenceGqaNoquant() const;
     ge::graphStatus CheckParaExistenceMla() const;
@@ -440,8 +440,8 @@ private:
     ge::graphStatus CheckTopK();
     ge::graphStatus CheckTopkShape();
     ge::graphStatus CheckBlockTable() const;
-    ge::graphStatus CheckDTypeConsistency(const ge::DataType &actualDtype, const ge::DataType &expectDtype,
-                                          const std::string &name) const;
+    ge::graphStatus CheckDTypeConsistency(const ge::DataType& actualDtype, const ge::DataType& expectDtype,
+                                          const std::string& name) const;
 
     ge::graphStatus CheckAttenOut();
     ge::graphStatus CheckAttenOutShape();
@@ -470,10 +470,10 @@ private:
     ge::graphStatus CheckSingleParaNextTokens() const;
 
 private:
-    const char *opName_;
-    fe::PlatFormInfos *platformInfo_;
+    const char* opName_;
+    fe::PlatFormInfos* platformInfo_;
     SFAParaInfo opParamInfo_;
-    const SFATilingInfo &sfaInfo_;
+    const SFATilingInfo& sfaInfo_;
 
     int64_t bSize_ = 0;
     int64_t n1Size_ = 0;
@@ -525,7 +525,7 @@ private:
 
 class SFAInfoParser {
 public:
-    explicit SFAInfoParser(const gert::TilingContext *context)
+    explicit SFAInfoParser(const gert::TilingContext* context)
         : context_(context)
     {}
     ~SFAInfoParser() = default;
@@ -536,7 +536,7 @@ public:
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckRequiredParaExistence() const;
 
-    ge::graphStatus GetActualSeqLenQSize(int64_t &size);
+    ge::graphStatus GetActualSeqLenQSize(int64_t& size);
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
     void GetOptionalInputParaInfo();
@@ -570,15 +570,15 @@ public:
     ge::graphStatus GetGSize();
     ge::graphStatus GetSparseBlockCount();
     ge::graphStatus GetActualseqInfo();
-    void GenerateInfo(SFATilingInfo &sfaInfo);
-    void FillTilingInfoAttrsAndLayouts(SFATilingInfo &sfaInfo);
-    ge::graphStatus Parse(SFATilingInfo &sfaInfo);
+    void GenerateInfo(SFATilingInfo& sfaInfo);
+    void FillTilingInfoAttrsAndLayouts(SFATilingInfo& sfaInfo);
+    ge::graphStatus Parse(SFATilingInfo& sfaInfo);
     ge::graphStatus CheckContiguous() const;
 
-    const gert::TilingContext *context_ = nullptr;
+    const gert::TilingContext* context_ = nullptr;
 
-    const char *opName_;
-    fe::PlatFormInfos *platformInfo_;
+    const char* opName_;
+    fe::PlatFormInfos* platformInfo_;
     SFAParaInfo opParamInfo_;
 
     int64_t bSize_ = 0;

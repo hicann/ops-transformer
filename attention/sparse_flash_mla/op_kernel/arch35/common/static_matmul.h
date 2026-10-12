@@ -36,11 +36,11 @@ namespace fa_base_matmul {
 template <typename A, typename B, typename C, uint32_t baseM, uint32_t baseN, uint32_t baseK, ABLayout AL, ABLayout BL,
           typename L0AType, typename L0BType, typename AScaleType = fp8_e8m0_t, typename BScaleType = fp8_e8m0_t,
           typename L0ADType = A, typename L0BDType = B>
-__aicore__ inline void MatmulKStatic(const LocalTensor<A> &aL1Tensor, const LocalTensor<B> &bL1Tensor,
-                                     RingBuffer<L0AType> &l0A, RingBuffer<L0BType> &l0B,
-                                     const LocalTensor<C> &cL0Tensor, const MMParam &param,
-                                     const LocalTensor<AScaleType> &aScaleL1Tensor = LocalTensor<AScaleType>(),
-                                     const LocalTensor<BScaleType> &bScaleL1Tensor = LocalTensor<AScaleType>())
+__aicore__ inline void MatmulKStatic(const LocalTensor<A>& aL1Tensor, const LocalTensor<B>& bL1Tensor,
+                                     RingBuffer<L0AType>& l0A, RingBuffer<L0BType>& l0B,
+                                     const LocalTensor<C>& cL0Tensor, const MMParam& param,
+                                     const LocalTensor<AScaleType>& aScaleL1Tensor = LocalTensor<AScaleType>(),
+                                     const LocalTensor<BScaleType>& bScaleL1Tensor = LocalTensor<AScaleType>())
 {
     uint32_t kLoops = (param.singleK + baseK - 1) / baseK;
     uint32_t tailSize = param.singleK % baseK;
@@ -51,8 +51,8 @@ __aicore__ inline void MatmulKStatic(const LocalTensor<A> &aL1Tensor, const Loca
     for (uint32_t k = 0; k < kLoops; k++) {
         uint32_t tileK = (k == (kLoops - 1)) ? tailK : baseK;
 
-        StaticBuffer<L0AType> &aBuf = l0A.GetNext();
-        StaticBuffer<L0BType> &bBuf = l0B.GetNext();
+        StaticBuffer<L0AType>& aBuf = l0A.GetNext();
+        StaticBuffer<L0BType>& bBuf = l0B.GetNext();
 
         WaitFlag<HardEvent::M_MTE1>(MATMUL_STATIC_L0AB_ID(aBuf.idx)); // 等 M 用完该 AB 槽
         LocalTensor<L0ADType> L0ATensor = aBuf.tensor.template ReinterpretCast<L0ADType>();
@@ -92,11 +92,11 @@ __aicore__ inline void MatmulKStatic(const LocalTensor<A> &aL1Tensor, const Loca
 template <typename A, typename B, typename C, uint32_t baseM, uint32_t baseN, uint32_t baseK, ABLayout AL, ABLayout BL,
           typename L0AType, typename L0BType, typename AScaleType = fp8_e8m0_t, typename BScaleType = fp8_e8m0_t,
           typename L0ADType = A, typename L0BDType = B>
-__aicore__ inline void MatmulNStatic(const LocalTensor<A> &aL1Tensor, const LocalTensor<B> &bL1Tensor,
-                                     RingBuffer<L0AType> &l0A, RingBuffer<L0BType> &l0B,
-                                     const LocalTensor<C> &cL0Tensor, const MMParam &param,
-                                     const LocalTensor<AScaleType> &aScaleL1Tensor = LocalTensor<AScaleType>(),
-                                     const LocalTensor<BScaleType> &bScaleL1Tensor = LocalTensor<AScaleType>())
+__aicore__ inline void MatmulNStatic(const LocalTensor<A>& aL1Tensor, const LocalTensor<B>& bL1Tensor,
+                                     RingBuffer<L0AType>& l0A, RingBuffer<L0BType>& l0B,
+                                     const LocalTensor<C>& cL0Tensor, const MMParam& param,
+                                     const LocalTensor<AScaleType>& aScaleL1Tensor = LocalTensor<AScaleType>(),
+                                     const LocalTensor<BScaleType>& bScaleL1Tensor = LocalTensor<AScaleType>())
 {
     uint32_t nLoops = (param.singleN + baseN - 1) / baseN;
     uint32_t tailSize = param.singleN % baseN;
@@ -124,8 +124,8 @@ __aicore__ inline void MatmulNStatic(const LocalTensor<A> &aL1Tensor, const Loca
         uint32_t tileN = (n == (nLoops - 1)) ? tailN : baseN;
         mmadParams.n = tileN;
 
-        StaticBuffer<L0AType> &aBuf = l0A.GetNext();
-        StaticBuffer<L0BType> &bBuf = l0B.GetNext();
+        StaticBuffer<L0AType>& aBuf = l0A.GetNext();
+        StaticBuffer<L0BType>& bBuf = l0B.GetNext();
 
         WaitFlag<HardEvent::M_MTE1>(MATMUL_STATIC_L0AB_ID(aBuf.idx)); // 等 M 用完该 AB 槽
         if (n == 0 || n == 1) { // 每个 ping-pong slot 首次访问各装一份 A, 之后复用不再覆盖

@@ -13,7 +13,6 @@
  * \brief
  */
 
-
 #include "rain_fusion_attention.h"
 
 #include "opdev/make_op_executor.h"
@@ -25,13 +24,11 @@ namespace l0op {
 
 OP_TYPE_REGISTER(RainFusionAttention);
 
-static const aclTensor *ConvertIntArrayToTensor(const aclIntArray *intArray,
-                                                aclOpExecutor *executor,
-                                                DataType dtype)
+static const aclTensor* ConvertIntArrayToTensor(const aclIntArray* intArray, aclOpExecutor* executor, DataType dtype)
 {
     if (intArray != nullptr) {
-        const aclTensor *tensor = executor->ConvertToTensor(intArray, dtype);
-        auto mutableTensor = const_cast<aclTensor *>(tensor);
+        const aclTensor* tensor = executor->ConvertToTensor(intArray, dtype);
+        auto mutableTensor = const_cast<aclTensor*>(tensor);
         mutableTensor->SetStorageFormat(Format::FORMAT_ND);
         mutableTensor->SetViewFormat(Format::FORMAT_ND);
         mutableTensor->SetOriginalFormat(Format::FORMAT_ND);
@@ -40,59 +37,46 @@ static const aclTensor *ConvertIntArrayToTensor(const aclIntArray *intArray,
     return executor->AllocTensor(dtype, Format::FORMAT_ND, Format::FORMAT_ND);
 }
 
-const std::array<const aclTensor *, 2> RainFusionAttention(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *selectIdx,
-    const aclTensor *selectNumIdx,
-    const aclIntArray *blockShape,
-    const aclTensor *attenMaskOptional,
-    const aclIntArray *actualSeqLengthsOptional,
-    const aclIntArray *actualSeqLengthsKvOptional,
-    const aclTensor *blockTableOptional,
-    const char *qInputLayout,
-    const char *kvInputLayout,
-    int64_t numKeyValueHeads,
-    int64_t maskType,
-    double scaleValue,
-    int64_t innerPrecise,
-    int64_t blockSize,
-    aclOpExecutor *executor)
+const std::array<const aclTensor*, 2> RainFusionAttention(
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* selectIdx,
+    const aclTensor* selectNumIdx, const aclIntArray* blockShape, const aclTensor* attenMaskOptional,
+    const aclIntArray* actualSeqLengthsOptional, const aclIntArray* actualSeqLengthsKvOptional,
+    const aclTensor* blockTableOptional, const char* qInputLayout, const char* kvInputLayout, int64_t numKeyValueHeads,
+    int64_t maskType, double scaleValue, int64_t innerPrecise, int64_t blockSize, aclOpExecutor* executor)
 {
-    const char *safeKvInputLayout = (kvInputLayout != nullptr) ? kvInputLayout : qInputLayout;
-    
-    L0_DFX(RainFusionAttention, query, key, value, selectIdx, selectNumIdx, blockShape,
-           attenMaskOptional, actualSeqLengthsOptional, actualSeqLengthsKvOptional,
-           blockTableOptional, qInputLayout, safeKvInputLayout, numKeyValueHeads,
-           maskType, scaleValue, innerPrecise, blockSize);
+    const char* safeKvInputLayout = (kvInputLayout != nullptr) ? kvInputLayout : qInputLayout;
 
-    const aclTensor *blockShapeTensor = ConvertIntArrayToTensor(blockShape, executor, DataType::DT_INT64);
-    const aclTensor *attenMaskTensor = (attenMaskOptional != nullptr) ? attenMaskOptional :
-                                       executor->AllocTensor(DataType::DT_BOOL, Format::FORMAT_ND, Format::FORMAT_ND);
-    const aclTensor *actualSeqTensor = ConvertIntArrayToTensor(actualSeqLengthsOptional, executor, DataType::DT_INT64);
-    const aclTensor *actualSeqKvTensor = ConvertIntArrayToTensor(actualSeqLengthsKvOptional, executor, DataType::DT_INT64);
+    L0_DFX(RainFusionAttention, query, key, value, selectIdx, selectNumIdx, blockShape, attenMaskOptional,
+           actualSeqLengthsOptional, actualSeqLengthsKvOptional, blockTableOptional, qInputLayout, safeKvInputLayout,
+           numKeyValueHeads, maskType, scaleValue, innerPrecise, blockSize);
+
+    const aclTensor* blockShapeTensor = ConvertIntArrayToTensor(blockShape, executor, DataType::DT_INT64);
+    const aclTensor* attenMaskTensor =
+        (attenMaskOptional != nullptr) ? attenMaskOptional :
+                                         executor->AllocTensor(DataType::DT_BOOL, Format::FORMAT_ND, Format::FORMAT_ND);
+    const aclTensor* actualSeqTensor = ConvertIntArrayToTensor(actualSeqLengthsOptional, executor, DataType::DT_INT64);
+    const aclTensor* actualSeqKvTensor =
+        ConvertIntArrayToTensor(actualSeqLengthsKvOptional, executor, DataType::DT_INT64);
 
     auto attentionOutTensor = executor->AllocTensor(query->GetDataType(), Format::FORMAT_ND, Format::FORMAT_ND);
     auto softmaxLseTensor = executor->AllocTensor(DataType::DT_FLOAT, Format::FORMAT_ND, Format::FORMAT_ND);
 
     // scaleValue is already float type, no need for cast
     auto ret = INFER_SHAPE(RainFusionAttention,
-                           OP_INPUT(query, key, value, selectIdx, selectNumIdx, blockShapeTensor, attenMaskTensor, 
+                           OP_INPUT(query, key, value, selectIdx, selectNumIdx, blockShapeTensor, attenMaskTensor,
                                     actualSeqTensor, actualSeqKvTensor, blockTableOptional),
                            OP_OUTPUT(attentionOutTensor, softmaxLseTensor),
-                           OP_ATTR(qInputLayout, safeKvInputLayout,
-                                   static_cast<uint32_t>(numKeyValueHeads), static_cast<uint32_t>(maskType),
-                                   static_cast<float>(scaleValue), static_cast<uint32_t>(innerPrecise),
-                                   static_cast<uint32_t>(blockSize)));
+                           OP_ATTR(qInputLayout, safeKvInputLayout, static_cast<uint32_t>(numKeyValueHeads),
+                                   static_cast<uint32_t>(maskType), static_cast<float>(scaleValue),
+                                   static_cast<uint32_t>(innerPrecise), static_cast<uint32_t>(blockSize)));
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "RainFusionAttention infer shape failed, scaleValue: %f.", scaleValue);
         return {nullptr, nullptr};
     }
-    
+
     ADD_TO_LAUNCHER_LIST_AICORE(RainFusionAttention,
-                                OP_INPUT(query, key, value, selectIdx, selectNumIdx, blockShapeTensor,
-                                    attenMaskTensor, actualSeqTensor, actualSeqKvTensor, blockTableOptional),
+                                OP_INPUT(query, key, value, selectIdx, selectNumIdx, blockShapeTensor, attenMaskTensor,
+                                         actualSeqTensor, actualSeqKvTensor, blockTableOptional),
                                 OP_OUTPUT(attentionOutTensor, softmaxLseTensor),
                                 OP_ATTR(qInputLayout, safeKvInputLayout, static_cast<uint32_t>(numKeyValueHeads),
                                         static_cast<uint32_t>(maskType), static_cast<float>(scaleValue),
@@ -101,5 +85,3 @@ const std::array<const aclTensor *, 2> RainFusionAttention(
     return {attentionOutTensor, softmaxLseTensor};
 }
 } // namespace l0op
-
-

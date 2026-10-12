@@ -23,7 +23,7 @@ constexpr size_t OUTPUT_KEY_CACHE_IDX = 0;
 constexpr size_t OUTPUT_VALUE_CACHE_IDX = 1;
 constexpr size_t OUTPUT_KEY_SCALE_CACHE_IDX = 2;
 
-static ge::graphStatus InferShapeScatterPaKvCacheWithKScale(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeScatterPaKvCacheWithKScale(gert::InferShapeContext* context)
 {
     // inferShape key_cache
     OP_LOGD(context, "Begin to do InferShapeScatterPaKvCacheWithKScale");
@@ -41,9 +41,9 @@ static ge::graphStatus InferShapeScatterPaKvCacheWithKScale(gert::InferShapeCont
     *outputValueCacheShape = *inputValueCacheShape;
 
     // inferShape key_scale_cache
-    const gert::Shape *kscShape = context->GetInputShape(INPUT_KEY_SCALE_CACHE_IDX);
+    const gert::Shape* kscShape = context->GetInputShape(INPUT_KEY_SCALE_CACHE_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, kscShape);
-    gert::Shape *outKscShape = context->GetOutputShape(OUTPUT_KEY_SCALE_CACHE_IDX);
+    gert::Shape* outKscShape = context->GetOutputShape(OUTPUT_KEY_SCALE_CACHE_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, outKscShape);
     *outKscShape = *kscShape;
     OP_LOGD(context, "End to do InferShapeScatterPaKvCacheWithKScale");
@@ -51,7 +51,7 @@ static ge::graphStatus InferShapeScatterPaKvCacheWithKScale(gert::InferShapeCont
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataType4ScatterPaKvCacheWithKScale(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataType4ScatterPaKvCacheWithKScale(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context, "Begin to do InferDataType4ScatterPaKvCacheWithKScale");
     context->SetOutputDataType(OUTPUT_KEY_CACHE_IDX, context->GetInputDataType(INPUT_KEY_CACHE_IDX));

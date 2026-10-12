@@ -63,7 +63,7 @@ struct AiCoreParams {
 
 class SparseFlashMlaGradBasicTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit SparseFlashMlaGradBasicTiling(gert::TilingContext *context)
+    explicit SparseFlashMlaGradBasicTiling(gert::TilingContext* context)
         : TilingBaseClass(context) {};
     SparseFlashMlaGradTilingData tilingData;
 
@@ -84,7 +84,7 @@ private:
     ge::graphStatus DoCastTiling();
     TempParams tmpData;
 
-    const char *opName;
+    const char* opName;
 };
 } // namespace smlag
 } // namespace optiling

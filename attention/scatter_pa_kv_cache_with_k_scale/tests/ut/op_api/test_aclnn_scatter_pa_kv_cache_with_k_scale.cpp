@@ -18,8 +18,7 @@
 using namespace std;
 using namespace op;
 
-class scatter_pa_kv_cache_with_k_scale_opapi_ut : public testing::Test
-{
+class scatter_pa_kv_cache_with_k_scale_opapi_ut : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -44,8 +43,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     char cacheLayout[] = "BNBD";
 
     auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT((aclTensor*)nullptr, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+                        INPUT((aclTensor*)nullptr, value, keyCacheRef, valueCacheRef, slotMapping, keyScale,
+                              keyScaleCacheRef, cacheLayout),
+                        OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -63,8 +63,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     char cacheLayout[] = "BNBD";
 
     auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, (aclTensor*)nullptr, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+                        INPUT(key, (aclTensor*)nullptr, keyCacheRef, valueCacheRef, slotMapping, keyScale,
+                              keyScaleCacheRef, cacheLayout),
+                        OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -81,7 +82,8 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
         INPUT(key, value, (aclTensor*)nullptr, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
         OUTPUT());
 
@@ -100,7 +102,8 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
         INPUT(key, value, keyCacheRef, valueCacheRef, (aclTensor*)nullptr, keyScale, keyScaleCacheRef, cacheLayout),
         OUTPUT());
 
@@ -119,7 +122,8 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
         INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, (aclTensor*)nullptr, keyScaleCacheRef, cacheLayout),
         OUTPUT());
 
@@ -140,9 +144,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -160,9 +164,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -180,9 +184,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -200,9 +204,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -220,9 +224,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT16, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -241,9 +245,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -261,9 +265,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -281,9 +285,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -301,9 +305,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -321,9 +325,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -331,7 +335,8 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
 }
 
 // 正常功能测试 - 4 种 dtype 组合
-TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_scale_aclnn_dtype_combo_1_float8_e5m2_int64)
+TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut,
+       scatter_pa_kv_cache_with_k_scale_aclnn_dtype_combo_1_float8_e5m2_int64)
 {
     auto key = TensorDesc({2, 2, 64}, ACL_FLOAT8_E5M2, ACL_FORMAT_ND);
     auto value = TensorDesc({2, 2, 64}, ACL_FLOAT8_E5M2, ACL_FORMAT_ND);
@@ -342,16 +347,17 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
     EXPECT_EQ(aclRet, ACL_SUCCESS);
 }
 
-TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_scale_aclnn_dtype_combo_2_float8_e4m3fn_int64)
+TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut,
+       scatter_pa_kv_cache_with_k_scale_aclnn_dtype_combo_2_float8_e4m3fn_int64)
 {
     auto key = TensorDesc({2, 2, 64}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto value = TensorDesc({2, 2, 64}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
@@ -362,16 +368,17 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
     EXPECT_EQ(aclRet, ACL_SUCCESS);
 }
 
-TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_scale_aclnn_dtype_combo_3_float8_e5m2_int32)
+TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut,
+       scatter_pa_kv_cache_with_k_scale_aclnn_dtype_combo_3_float8_e5m2_int32)
 {
     auto key = TensorDesc({2, 2, 64}, ACL_FLOAT8_E5M2, ACL_FORMAT_ND);
     auto value = TensorDesc({2, 2, 64}, ACL_FLOAT8_E5M2, ACL_FORMAT_ND);
@@ -382,16 +389,17 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
     EXPECT_EQ(aclRet, ACL_SUCCESS);
 }
 
-TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_scale_aclnn_dtype_combo_4_float8_e4m3fn_int32)
+TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut,
+       scatter_pa_kv_cache_with_k_scale_aclnn_dtype_combo_4_float8_e4m3fn_int32)
 {
     auto key = TensorDesc({2, 2, 64}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto value = TensorDesc({2, 2, 64}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
@@ -402,9 +410,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -423,9 +431,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({16, 2, 32, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -443,9 +451,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({2, 1, 8, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
@@ -464,9 +472,9 @@ TEST_F(scatter_pa_kv_cache_with_k_scale_opapi_ut, scatter_pa_kv_cache_with_k_sca
     auto keyScaleCacheRef = TensorDesc({4, 2, 16, 1}, ACL_FLOAT, ACL_FORMAT_ND);
     char cacheLayout[] = "BNBD";
 
-    auto ut = OP_API_UT(aclnnScatterPaKvCacheWithKScale,
-        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout),
-        OUTPUT());
+    auto ut = OP_API_UT(
+        aclnnScatterPaKvCacheWithKScale,
+        INPUT(key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef, cacheLayout), OUTPUT());
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);

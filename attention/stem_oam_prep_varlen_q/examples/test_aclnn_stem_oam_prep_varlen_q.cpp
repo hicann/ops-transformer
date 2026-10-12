@@ -31,7 +31,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -40,7 +40,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -52,8 +52,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -98,16 +98,16 @@ int main()
     std::vector<int64_t> qFlatShape = {batch, H_q, max_Qb, kflat_dim};
 
     // 设备地址
-    void *qDeviceAddr = nullptr;
-    void *qScaleDeviceAddr = nullptr;
-    void *qFlatDeviceAddr = nullptr;
+    void* qDeviceAddr = nullptr;
+    void* qScaleDeviceAddr = nullptr;
+    void* qFlatDeviceAddr = nullptr;
 
     // aclTensor
-    aclTensor *q = nullptr;
-    aclTensor *qScale = nullptr;
-    aclTensor *qFlat = nullptr;
-    aclIntArray *qSeqLens = nullptr;
-    aclIntArray *cuSeqLensQ = nullptr;
+    aclTensor* q = nullptr;
+    aclTensor* qScale = nullptr;
+    aclTensor* qFlat = nullptr;
+    aclIntArray* qSeqLens = nullptr;
+    aclIntArray* cuSeqLensQ = nullptr;
 
     // 创建 q tensor (FP8_E4M3FN)
     std::vector<uint8_t> hostQ(GetShapeSize(qShape), 1);
@@ -133,7 +133,7 @@ int main()
 
     // 1. 获取 workspace 大小
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     ret = aclnnStemOamPrepVarlenQGetWorkspaceSize(q, qSeqLens, cuSeqLensQ, qScale, stemBlockSize, stemStride, qFlat,
                                                   &workspaceSize, &executor);
@@ -141,7 +141,7 @@ int main()
               return ret);
 
     // 2. 申请 workspace
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

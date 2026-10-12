@@ -25,14 +25,14 @@ constexpr uint32_t RETURN_SOFTMAX_INDEX = 9;
 constexpr uint32_t LAYOUT_Q_ATTR_INDEX = 6;
 constexpr uint32_t LAYOUT_KV_ATTR_INDEX = 7;
 
-ge::graphStatus InferShapeSparseFlashMla(gert::InferShapeContext *context)
+ge::graphStatus InferShapeSparseFlashMla(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("SparseFlashMla", "InferShapeContext is nullptr"), return ge::GRAPH_FAILED);
     return optiling::SMLAInferShape(context, "SparseFlashMla", RETURN_SOFTMAX_INDEX, LAYOUT_Q_ATTR_INDEX,
                                     LAYOUT_KV_ATTR_INDEX);
 }
 
-ge::graphStatus InferDataTypeSparseFlashMla(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeSparseFlashMla(gert::InferDataTypeContext* context)
 {
     return optiling::SMLAInferDataTypeByInput(context, "SparseFlashMla");
 }

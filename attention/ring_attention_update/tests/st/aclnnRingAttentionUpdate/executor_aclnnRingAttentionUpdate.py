@@ -19,20 +19,31 @@ from atk.tasks.api_execute.base_api import BaseApi
 
 from einops import rearrange
 
+
 def create_random_integer_array(len, max):
     np.random.seed(33)
     # Generate a sorted array of random integers between 0 and b
-    try: 
-        random_points = np.sort(np.random.choice(range(1, max), len-2, replace=False))
+    try:
+        random_points = np.sort(np.random.choice(range(1, max), len - 2, replace=False))
         # Concatenate 0 at the beginning and b at the end
         array = np.concatenate(([0], random_points, [max]))
-    except: 
+    except:
         array = np.array([0, max])
     return array
 
+
 class RingAttentionUpdate:
-    def __init__(self, prev_attn_out, prev_softmax_max, prev_softmax_sum,
-                 cur_attn_out, cur_softmax_max, cur_softmax_sum, actual_seq_qlen, input_layout):
+    def __init__(
+        self,
+        prev_attn_out,
+        prev_softmax_max,
+        prev_softmax_sum,
+        cur_attn_out,
+        cur_softmax_max,
+        cur_softmax_sum,
+        actual_seq_qlen,
+        input_layout,
+    ):
         self.prev_attn_out = prev_attn_out
         self.prev_softmax_max = prev_softmax_max
         self.prev_softmax_sum = prev_softmax_sum
@@ -42,21 +53,35 @@ class RingAttentionUpdate:
         self.actual_seq_qlen = actual_seq_qlen
         self.input_layout = input_layout
 
+
 def flatten_softmax(x, sub_seq_len):
     orig_shape = x.shape  # TN8
     section_len = [s * orig_shape[1] for s in sub_seq_len]
-    splits = x.view(-1, orig_shape[-1]).split(section_len, dim=0)  # (NS1 + NS2 + NS3..) 8 FA 算子目前排布是NS8NS8NS8
-    merged = [item.view(orig_shape[1], -1, orig_shape[-1]).transpose(0, 1) for item in splits]
+    splits = x.view(-1, orig_shape[-1]).split(
+        section_len, dim=0
+    )  # (NS1 + NS2 + NS3..) 8 FA 算子目前排布是NS8NS8NS8
+    merged = [
+        item.view(orig_shape[1], -1, orig_shape[-1]).transpose(0, 1) for item in splits
+    ]
     merged = torch.cat(merged, dim=0)
     return merged
+
 
 def unflatten_softmax(x, sub_seq_len):
     orig_shape = x.shape  # TN8: (S1N + S2N + S3N) 8
     section_len = [s * orig_shape[1] for s in sub_seq_len]
-    splits = x.view(-1, orig_shape[-1]).split(section_len, dim=0)  # (S1N + S2N + S3N..)8
-    merged = [item.reshape(-1, orig_shape[1], orig_shape[-1]).transpose(0, 1).reshape(-1, orig_shape[-1]) for item in splits]
+    splits = x.view(-1, orig_shape[-1]).split(
+        section_len, dim=0
+    )  # (S1N + S2N + S3N..)8
+    merged = [
+        item.reshape(-1, orig_shape[1], orig_shape[-1])
+        .transpose(0, 1)
+        .reshape(-1, orig_shape[-1])
+        for item in splits
+    ]
     merged = torch.cat(merged, dim=0)  # (NS1+NS2+NS3)8
     return merged.view(*orig_shape)
+
 
 def ring_attention_update(params):
     # 使用params对象来访问参数
@@ -68,11 +93,14 @@ def ring_attention_update(params):
     cur_softmax_sum = params.cur_softmax_sum
     actual_seq_qlen = params.actual_seq_qlen
     input_layout = params.input_layout
-    
-    cur_sub_out_seq_len = (torch.cat([torch.tensor([0]), actual_seq_qlen])[1:] - torch.cat([torch.tensor([0]), actual_seq_qlen])[:-1]).tolist()
+
+    cur_sub_out_seq_len = (
+        torch.cat([torch.tensor([0]), actual_seq_qlen])[1:]
+        - torch.cat([torch.tensor([0]), actual_seq_qlen])[:-1]
+    ).tolist()
 
     # cur_sub_out_seq_len = (torch.tensor([0] + actual_seq_qlen)[1:] - torch.tensor([0] + actual_seq_qlen)[:-1]).tolist()
-    if input_layout == 'TND':
+    if input_layout == "TND":
         cur_softmax_max = flatten_softmax(cur_softmax_max, cur_sub_out_seq_len)
         cur_softmax_sum = flatten_softmax(cur_softmax_sum, cur_sub_out_seq_len)
         prev_softmax_max = flatten_softmax(prev_softmax_max, cur_sub_out_seq_len)
@@ -96,24 +124,30 @@ def ring_attention_update(params):
     cur_out_scale = cur_softmax_sum_scaled / softmax_sum
 
     # [b, n, s, 8] -> [s, b, h]
-    if input_layout == 'SBH':
+    if input_layout == "SBH":
         num_channels = prev_out_scale.shape[1]
         hidden_size = prev_attn_out.shape[-1]
         division_result = hidden_size // num_channels
-        prev_out_scale = prev_out_scale[..., 0].unsqueeze(3).repeat(1, 1, 1, division_result)
-        prev_out_scale = rearrange(prev_out_scale, 'b n s d -> s b (n d)').contiguous()
-        cur_out_scale = cur_out_scale[..., 0].unsqueeze(3).repeat(1, 1, 1, division_result)
-        cur_out_scale = rearrange(cur_out_scale, 'b n s d -> s b (n d)').contiguous()
-    elif input_layout == 'TND':
+        prev_out_scale = (
+            prev_out_scale[..., 0].unsqueeze(3).repeat(1, 1, 1, division_result)
+        )
+        prev_out_scale = rearrange(prev_out_scale, "b n s d -> s b (n d)").contiguous()
+        cur_out_scale = (
+            cur_out_scale[..., 0].unsqueeze(3).repeat(1, 1, 1, division_result)
+        )
+        cur_out_scale = rearrange(cur_out_scale, "b n s d -> s b (n d)").contiguous()
+    elif input_layout == "TND":
         division_result = prev_attn_out.shape[-1]
-        prev_out_scale = prev_out_scale[..., 0].unsqueeze(2).repeat(1, 1, division_result)  # [sb, n, d]
+        prev_out_scale = (
+            prev_out_scale[..., 0].unsqueeze(2).repeat(1, 1, division_result)
+        )  # [sb, n, d]
         cur_out_scale = cur_out_scale[..., 0].unsqueeze(2).repeat(1, 1, division_result)
 
     # update output
     attn_out = prev_attn_out * prev_out_scale + cur_attn_out * cur_out_scale
     attn_out = attn_out.to(origin_dtype)
 
-    if input_layout == 'TND':
+    if input_layout == "TND":
         softmax_max = unflatten_softmax(softmax_max, cur_sub_out_seq_len)
         softmax_sum = unflatten_softmax(softmax_sum, cur_sub_out_seq_len)
 
@@ -121,49 +155,54 @@ def ring_attention_update(params):
 
 
 @register("aclnn_ring_attention_update")
-class AclnnRingAttentionUpdateApi(BaseApi):  
+class AclnnRingAttentionUpdateApi(BaseApi):
     def __call__(self, input_data: InputDataset, with_output: bool = False):
         output = None
-        if not with_output:                                
+        if not with_output:
             if self.device == "npu":
-                if self.device_id == 0:  
+                if self.device_id == 0:
                     eval(self.api_name)(*input_data.args, **input_data.kwargs)
-                elif self.device_id == 1: 
+                elif self.device_id == 1:
                     params = RingAttentionUpdate(**input_data.kwargs)
                     output = ring_attention_update(params)
             return output
 
-        if self.device == 'cpu':
+        if self.device == "cpu":
             params = RingAttentionUpdate(**input_data.kwargs)
             output = ring_attention_update(params)
             return output
         elif self.device == "npu":
-            if self.device_id == 0:  
+            if self.device_id == 0:
                 torch.npu.set_compile_mode(jit_compile=False)
-            elif self.device_id == 1: 
+            elif self.device_id == 1:
                 torch.npu.set_compile_mode(jit_compile=True)
-            output = eval(self.api_name)(
-                *input_data.args, **input_data.kwargs
-            )
+            output = eval(self.api_name)(*input_data.args, **input_data.kwargs)
         if self.output is None:
-            output = eval(self.api_name)(
-                *input_data.args, **input_data.kwargs
-            )            
+            output = eval(self.api_name)(*input_data.args, **input_data.kwargs)
         else:
             if isinstance(self.output, int):
                 output = input_data.args[self.output]
             elif isinstance(self.output, str):
                 output = input_data.kwargs[self.output]
             else:
-                raise ValueError(
-                    f"self.output {self.output} value is " f"error"
-                )
+                raise ValueError(f"self.output {self.output} value is error")
         return output
 
     def init_by_input_data(self, input_data: InputDataset):
-        input_data.kwargs['prev_softmax_max'][..., :] = input_data.kwargs['prev_softmax_max'][..., 0:1]
-        input_data.kwargs['prev_softmax_sum'][..., :] = input_data.kwargs['prev_softmax_sum'][..., 0:1]
-        input_data.kwargs['cur_softmax_max'][..., :] = input_data.kwargs['cur_softmax_max'][..., 0:1]
-        input_data.kwargs['cur_softmax_sum'][..., :] = input_data.kwargs['cur_softmax_sum'][..., 0:1]
-        actualseq = create_random_integer_array(input_data.kwargs['actual_seq_qlen'].shape[0], input_data.kwargs['prev_attn_out'].shape[0])
-        input_data.kwargs['actual_seq_qlen'][..., :] = torch.tensor(actualseq)
+        input_data.kwargs["prev_softmax_max"][..., :] = input_data.kwargs[
+            "prev_softmax_max"
+        ][..., 0:1]
+        input_data.kwargs["prev_softmax_sum"][..., :] = input_data.kwargs[
+            "prev_softmax_sum"
+        ][..., 0:1]
+        input_data.kwargs["cur_softmax_max"][..., :] = input_data.kwargs[
+            "cur_softmax_max"
+        ][..., 0:1]
+        input_data.kwargs["cur_softmax_sum"][..., :] = input_data.kwargs[
+            "cur_softmax_sum"
+        ][..., 0:1]
+        actualseq = create_random_integer_array(
+            input_data.kwargs["actual_seq_qlen"].shape[0],
+            input_data.kwargs["prev_attn_out"].shape[0],
+        )
+        input_data.kwargs["actual_seq_qlen"][..., :] = torch.tensor(actualseq)

@@ -21,7 +21,7 @@
 namespace {
 using OpAttr = gert::TilingContextPara::OpAttr;
 
-constexpr const char *kOpName = "SparseLightningIndexerGradKLLoss";
+constexpr const char* kOpName = "SparseLightningIndexerGradKLLoss";
 constexpr uint32_t kCoreNum = 1U;
 constexpr uint64_t kUbSize = 196608ULL;
 constexpr uint64_t kL1Size = 524288ULL;
@@ -70,7 +70,7 @@ optiling::SparseLightningIndexerGradKLLossCompileInfo MakeCompileInfo()
     return info;
 }
 
-std::vector<OpAttr> MakeAttrs(const std::string &layout, int64_t sparseMode = 3, bool deterministic = false)
+std::vector<OpAttr> MakeAttrs(const std::string& layout, int64_t sparseMode = 3, bool deterministic = false)
 {
     return {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
             {"layout", Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)},
@@ -80,9 +80,9 @@ std::vector<OpAttr> MakeAttrs(const std::string &layout, int64_t sparseMode = 3,
             {"deterministic", Ops::Transformer::AnyValue::CreateFrom<bool>(deterministic)}};
 }
 
-gert::TilingContextPara MakeBsndPara(optiling::SparseLightningIndexerGradKLLossCompileInfo &compileInfo,
+gert::TilingContextPara MakeBsndPara(optiling::SparseLightningIndexerGradKLLossCompileInfo& compileInfo,
                                      ge::DataType dataType = ge::DT_FLOAT16, ge::DataType weightType = ge::DT_FLOAT16,
-                                     const std::string &layout = "BSND", int64_t sparseMode = 3, int64_t topK = 2048,
+                                     const std::string& layout = "BSND", int64_t sparseMode = 3, int64_t topK = 2048,
                                      int64_t queryHeadNum = 32)
 {
     constexpr int64_t b = 1;
@@ -115,8 +115,8 @@ gert::TilingContextPara MakeBsndPara(optiling::SparseLightningIndexerGradKLLossC
         MakeAttrs(layout, sparseMode), &compileInfo, "Ascend950", kA5SocInfo, kTilingDataSize);
 }
 
-gert::TilingContextPara MakeTndPara(optiling::SparseLightningIndexerGradKLLossCompileInfo &compileInfo,
-                                    int64_t *actualSeqQuery, int64_t *actualSeqKey)
+gert::TilingContextPara MakeTndPara(optiling::SparseLightningIndexerGradKLLossCompileInfo& compileInfo,
+                                    int64_t* actualSeqQuery, int64_t* actualSeqKey)
 {
     constexpr int64_t t1 = 128;
     constexpr int64_t t2 = 256;

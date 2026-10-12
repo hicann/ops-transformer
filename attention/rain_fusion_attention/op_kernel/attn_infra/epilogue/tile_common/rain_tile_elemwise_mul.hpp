@@ -29,9 +29,9 @@ struct TileElemwiseMul {
 
     __aicore__ inline TileElemwiseMul() {}
 
-    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const &ubOut,
-                                      AscendC::LocalTensor<ElementCompute> const &ubIn0,
-                                      AscendC::LocalTensor<ElementCompute> const &ubIn1)
+    __aicore__ inline void operator()(AscendC::LocalTensor<ElementCompute> const& ubOut,
+                                      AscendC::LocalTensor<ElementCompute> const& ubIn0,
+                                      AscendC::LocalTensor<ElementCompute> const& ubIn1)
     {
         // Do the calculation
         AscendC::Mul(ubOut, ubIn0, ubIn1, TileShape::COUNT);

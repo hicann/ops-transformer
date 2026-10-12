@@ -16,9 +16,15 @@ namespace StemOamPrepVarlenQUT {
 
 class StemPrepQInferShapeTest : public testing::TestWithParam<StemPrepQInferShapeUtParam> {
 protected:
-    static void SetUpTestCase() { std::cout << "StemOamPrepVarlenQ InferShapeTest SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "StemOamPrepVarlenQ InferShapeTest SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "StemOamPrepVarlenQ InferShapeTest TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "StemOamPrepVarlenQ InferShapeTest TearDown" << std::endl;
+    }
 };
 
 TEST_P(StemPrepQInferShapeTest, param)

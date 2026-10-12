@@ -22,9 +22,9 @@
 using namespace commondef;
 
 template <typename T2, const uint32_t VECTOR_BASEM = 64>
-__aicore__ inline void CopyInMaxSum(FagConstInfo &constInfo, FagRunInfo &runInfo,
-                                    TQue<QuePosition::VECIN, 1> &maxSumInQue, GlobalTensor<T2> &maxGm,
-                                    GlobalTensor<T2> &sumGm)
+__aicore__ inline void CopyInMaxSum(FagConstInfo& constInfo, FagRunInfo& runInfo,
+                                    TQue<QuePosition::VECIN, 1>& maxSumInQue, GlobalTensor<T2>& maxGm,
+                                    GlobalTensor<T2>& sumGm)
 {
     if (runInfo.halfGRealSize == 0) {
         return;
@@ -48,11 +48,11 @@ __aicore__ inline void CopyInMaxSum(FagConstInfo &constInfo, FagRunInfo &runInfo
 // 不能复用 maxSumQue——它是 {halfG,4,0,0} 摊开布局（BRC 读），sink 微指令用 default LoadAlign 连续读，布局不兼容。
 // GM 源起始地址无对齐约束（DataCopyPad 文档），sub1 从 sinksGm[firstHalfG] 非对齐偏移搬合法。
 template <typename T2, const uint32_t VECTOR_BASEM = 64>
-__aicore__ inline void CopyInSinksAndMaxSum(FagConstInfo &constInfo, FagRunInfo &runInfo, GlobalTensor<T2> &sinksGm,
-                                            GlobalTensor<T2> &maxGm, GlobalTensor<T2> &sumGm,
-                                            TQue<QuePosition::VECIN, 1> &sinksInQue,
-                                            TQue<QuePosition::VECIN, 1> &maxForSinkQue,
-                                            TQue<QuePosition::VECIN, 1> &sumForSinkQue)
+__aicore__ inline void CopyInSinksAndMaxSum(FagConstInfo& constInfo, FagRunInfo& runInfo, GlobalTensor<T2>& sinksGm,
+                                            GlobalTensor<T2>& maxGm, GlobalTensor<T2>& sumGm,
+                                            TQue<QuePosition::VECIN, 1>& sinksInQue,
+                                            TQue<QuePosition::VECIN, 1>& maxForSinkQue,
+                                            TQue<QuePosition::VECIN, 1>& sumForSinkQue)
 {
     if (runInfo.halfGRealSize == 0) {
         return;
@@ -90,13 +90,13 @@ srcTensor：VF输入，入参
 *************************/
 template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK = 0, const uint32_t IS_PSE = 0,
           const uint32_t IS_DETER_OLD = 0, const uint32_t VECTOR_BASEM = 64, const uint32_t VECTOR_BASEN = 128>
-__aicore__ inline void CalculatePseMulsSelSimpleSoftMax(FagConstInfo &constInfo, FagRunInfo &runInfo, PseInfo &pseInfo,
-                                                        AttenMaskInfo &attenMaskInfo,
-                                                        TQue<QuePosition::VECIN, 1> &maxSumInQue,
-                                                        TQue<QuePosition::VECIN, 1> &attenMaskInQue,
-                                                        TQue<QuePosition::VECIN, 1> &pseInQue,
-                                                        LocalTensor<T2> &dstTensor, LocalTensor<T2> &srcTensor,
-                                                        __gm__ uint8_t *pseSlope)
+__aicore__ inline void CalculatePseMulsSelSimpleSoftMax(FagConstInfo& constInfo, FagRunInfo& runInfo, PseInfo& pseInfo,
+                                                        AttenMaskInfo& attenMaskInfo,
+                                                        TQue<QuePosition::VECIN, 1>& maxSumInQue,
+                                                        TQue<QuePosition::VECIN, 1>& attenMaskInQue,
+                                                        TQue<QuePosition::VECIN, 1>& pseInQue,
+                                                        LocalTensor<T2>& dstTensor, LocalTensor<T2>& srcTensor,
+                                                        __gm__ uint8_t* pseSlope)
 {
     if (runInfo.halfGRealSize == 0) {
         return;
@@ -123,9 +123,9 @@ __aicore__ inline void CalculatePseMulsSelSimpleSoftMax(FagConstInfo &constInfo,
 template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK = 0, const uint32_t IS_PSE = 0,
           const uint32_t IS_DETER_OLD = 0, const uint32_t VECTOR_BASEM = 64, const uint32_t VECTOR_BASEN = 128>
 __aicore__ inline void CalculatePseMulsSelSimpleSoftMaxReuse(
-    FagConstInfo &constInfo, FagRunInfo &runInfo, PseInfo &pseInfo, AttenMaskInfo &attenMaskInfo,
-    LocalTensor<T2> &maxSumTensor, TQue<QuePosition::VECIN, 1> &attenMaskInQue, TQue<QuePosition::VECIN, 1> &pseInQue,
-    LocalTensor<T2> &dstTensor, LocalTensor<T2> &srcTensor, __gm__ uint8_t *pseSlope)
+    FagConstInfo& constInfo, FagRunInfo& runInfo, PseInfo& pseInfo, AttenMaskInfo& attenMaskInfo,
+    LocalTensor<T2>& maxSumTensor, TQue<QuePosition::VECIN, 1>& attenMaskInQue, TQue<QuePosition::VECIN, 1>& pseInQue,
+    LocalTensor<T2>& dstTensor, LocalTensor<T2>& srcTensor, __gm__ uint8_t* pseSlope)
 {
     LocalTensor<uint8_t> attenMaskTensor;
     LocalTensor<T1> pseTensor;
@@ -153,13 +153,13 @@ __simd_vf__ inline void SinkSoftMaxVF(uint64_t sinkAddr, uint64_t maxAddr, uint6
     RegTensor<float> vregSink, vregMax, vregSum, vregSub, vregExp, vregDiv;
     MaskReg pregTail = UpdateMask<float>(tailSize); // mask 控制处理的元素数（仅 [0:halfG) lane 有效）
     // 单次加载 64 元素（halfG ≤ 64）；[halfG:64] lane 读到的是 TQue UB 后续内容，pregTail 会屏蔽掉
-    LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSink, (__ubuf__ float *&)sinkAddr, 64);
-    LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregMax, (__ubuf__ float *&)maxAddr, 64);
-    LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSum, (__ubuf__ float *&)sumAddr, 64);
+    LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSink, (__ubuf__ float*&)sinkAddr, 64);
+    LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregMax, (__ubuf__ float*&)maxAddr, 64);
+    LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(vregSum, (__ubuf__ float*&)sumAddr, 64);
     Sub(vregSub, vregSink, vregMax, pregTail); // sink - max
     Exp(vregExp, vregSub, pregTail);           // exp(sink-max)
     Div(vregDiv, vregExp, vregSum, pregTail);  // exp / sum
-    StoreAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)dstAddr,
+    StoreAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float*&)dstAddr,
                                                                                          vregDiv, 64, pregTail);
 }
 
@@ -168,11 +168,11 @@ __simd_vf__ inline void SinkSoftMaxVF(uint64_t sinkAddr, uint64_t maxAddr, uint6
 // TQue DeQue 自动 MTE2→V 同步；微指令 LoadAlign 读 TQue（GetPhyAddr 原始地址）。
 // 结果 StoreAlign 写 sinkTensor(TBuf)，V3 用标准 Mul 读（TBuf 上标准 Vector API 可靠）。
 template <typename T2, const uint32_t VECTOR_BASEM = 64>
-__aicore__ inline void CalculateSinkSimpleSoftMax(FagConstInfo &constInfo, FagRunInfo &runInfo,
-                                                  TQue<QuePosition::VECIN, 1> &sinksInQue,
-                                                  TQue<QuePosition::VECIN, 1> &maxForSinkQue,
-                                                  TQue<QuePosition::VECIN, 1> &sumForSinkQue,
-                                                  LocalTensor<T2> &sinkTensor)
+__aicore__ inline void CalculateSinkSimpleSoftMax(FagConstInfo& constInfo, FagRunInfo& runInfo,
+                                                  TQue<QuePosition::VECIN, 1>& sinksInQue,
+                                                  TQue<QuePosition::VECIN, 1>& maxForSinkQue,
+                                                  TQue<QuePosition::VECIN, 1>& sumForSinkQue,
+                                                  LocalTensor<T2>& sinkTensor)
 {
     LocalTensor<T2> sinkInTensor = sinksInQue.DeQue<T2>();
     LocalTensor<T2> maxTensor = maxForSinkQue.DeQue<T2>();
@@ -212,30 +212,30 @@ __simd_vf__ inline void SinkNegRowSumVF(uint64_t dstAddr, uint64_t pAddr, uint64
     for (uint16_t m = 0; m < halfG; m++) {
         Duplicate(vregRes, 0);
         for (uint16_t n = 0; n < loopTimes; n++) {
-            LoadAlign(vregP, ((__ubuf__ T *&)pAddr + m * srcN + n * 64));
-            LoadAlign(vregDp, ((__ubuf__ T *&)dpAddr + m * srcN + n * 64));
+            LoadAlign(vregP, ((__ubuf__ T*&)pAddr + m * srcN + n * 64));
+            LoadAlign(vregDp, ((__ubuf__ T*&)dpAddr + m * srcN + n * 64));
             Mul(vregMul, vregP, vregDp, pregFullExe);
             ReduceSum(vregReduceSum, vregMul, pregFullExe);
             Sub(vregRes, vregRes, vregReduceSum, pregAccu);
         }
         // 尾块（直线，恒执行一次）：整 64 尾(realTailSize==64) 或部分尾(UpdateMask)
-        LoadAlign(vregP, ((__ubuf__ T *&)pTailAddr + m * srcN));
-        LoadAlign(vregDp, ((__ubuf__ T *&)dpTailAddr + m * srcN));
+        LoadAlign(vregP, ((__ubuf__ T*&)pTailAddr + m * srcN));
+        LoadAlign(vregDp, ((__ubuf__ T*&)dpTailAddr + m * srcN));
         Mul(vregMul, vregP, vregDp, pregTailExe);
         ReduceSum(vregReduceSum, vregMul, pregTailExe);
         Sub(vregRes, vregRes, vregReduceSum, pregAccu);
         // 每 head 标量写 dst[m]，POST_MODE_UPDATE 自动推进 dstAddr 一个元素
-        StoreUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)dstAddr), vregRes, uregRes, 1);
+        StoreUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T*&)dstAddr), vregRes, uregRes, 1);
     }
-    vstas(uregRes, ((__ubuf__ T *&)dstAddr), 0, POST_UPDATE);
+    vstas(uregRes, ((__ubuf__ T*&)dstAddr), 0, POST_UPDATE);
 }
 
 // CalculateSinkNegRowSum：逐元素 dSink 行内负和 wrapper（__aicore__ 侧算循环参数，VF 侧只跑 uint16_t 循环）
 // guard halfG==0 / realN==0（realN==0 时 CeilDivision-1 会下溢成 65535，尾指针越界，必须拦）。
 // 尾指针 = 基址 + loopTimes*64 元素（= 主 chunk 覆盖后的下一 chunk 起始），与 vf_cal_sink.h 一致。
 template <typename T2, const uint32_t VECTOR_BASEN = 128>
-__aicore__ inline void CalculateSinkNegRowSum(LocalTensor<T2> &dstTensor, LocalTensor<T2> &pTensor,
-                                              LocalTensor<T2> &dpTensor, uint16_t halfG, uint16_t realN)
+__aicore__ inline void CalculateSinkNegRowSum(LocalTensor<T2>& dstTensor, LocalTensor<T2>& pTensor,
+                                              LocalTensor<T2>& dpTensor, uint16_t halfG, uint16_t realN)
 {
     if (halfG == 0 || realN == 0) {
         return;

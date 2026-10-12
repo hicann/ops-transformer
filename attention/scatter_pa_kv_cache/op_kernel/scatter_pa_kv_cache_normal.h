@@ -23,7 +23,7 @@ using namespace AscendC;
 template <typename T1, typename T2, typename IndexDtype, bool NCT = false>
 class ScatterPaKvCacheNormal : public ScatterPaKvCacheNormalCommon {
 public:
-    __aicore__ inline ScatterPaKvCacheNormal(TPipe *pipe, const ScatterPaKvCacheTilingData *__restrict__ tilingData)
+    __aicore__ inline ScatterPaKvCacheNormal(TPipe* pipe, const ScatterPaKvCacheTilingData* __restrict__ tilingData)
         : ScatterPaKvCacheNormalCommon(pipe, tilingData)
     {}
 
@@ -35,11 +35,11 @@ public:
         curBlockFactor_ = (blockId == coreNums - 1) ? tilingData_->tailBlockFactor : tilingData_->blockFactor;
         startTaskId_ = blockId * tilingData_->blockFactor; // 当前核起始token
 
-        keyInGm_.SetGlobalBuffer((__gm__ T1 *)keyIn);
-        keyCacheOutGm_.SetGlobalBuffer((__gm__ T1 *)keyCacheOut);
-        slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype *)slotMapping);
-        valueInGm_.SetGlobalBuffer((__gm__ T2 *)valueIn);
-        valueCacheOutGm_.SetGlobalBuffer((__gm__ T2 *)valueCacheOut);
+        keyInGm_.SetGlobalBuffer((__gm__ T1*)keyIn);
+        keyCacheOutGm_.SetGlobalBuffer((__gm__ T1*)keyCacheOut);
+        slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype*)slotMapping);
+        valueInGm_.SetGlobalBuffer((__gm__ T2*)valueIn);
+        valueCacheOutGm_.SetGlobalBuffer((__gm__ T2*)valueCacheOut);
     }
 
     // 通用分支

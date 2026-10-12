@@ -20,9 +20,10 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(ScatterPaKvCacheWithKScale);
 
-std::tuple<const aclTensor *, const aclTensor *, const aclTensor *> ScatterPaKvCacheWithKScale(const aclTensor *key,
-    const aclTensor *value, aclTensor *keyCacheRef, aclTensor *valueCacheRef, const aclTensor *slotMapping,
-    aclTensor *keyScale, aclTensor *keyScaleCacheRef, char *cacheLayoutOptional, aclOpExecutor *executor)
+std::tuple<const aclTensor*, const aclTensor*, const aclTensor*> ScatterPaKvCacheWithKScale(
+    const aclTensor* key, const aclTensor* value, aclTensor* keyCacheRef, aclTensor* valueCacheRef,
+    const aclTensor* slotMapping, aclTensor* keyScale, aclTensor* keyScaleCacheRef, char* cacheLayoutOptional,
+    aclOpExecutor* executor)
 {
     L0_DFX(ScatterPaKvCacheWithKScale, key, value, keyCacheRef, valueCacheRef, slotMapping, keyScale, keyScaleCacheRef,
            cacheLayoutOptional);
@@ -35,8 +36,8 @@ std::tuple<const aclTensor *, const aclTensor *, const aclTensor *> ScatterPaKvC
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "ADD_TO_LAUNCHER_LIST_AICORE failed.");
         return {nullptr, nullptr, nullptr};
     }
-    return std::tuple<const aclTensor *, const aclTensor *, const aclTensor *>(keyCacheRef, valueCacheRef,
-                                                                               keyScaleCacheRef);
+    return std::tuple<const aclTensor*, const aclTensor*, const aclTensor*>(keyCacheRef, valueCacheRef,
+                                                                            keyScaleCacheRef);
 }
 
 } // namespace l0op

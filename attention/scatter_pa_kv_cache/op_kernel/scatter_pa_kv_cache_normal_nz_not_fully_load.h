@@ -25,8 +25,8 @@ using namespace AscendC;
 template <typename T1, typename T2, typename IndexDtype>
 class ScatterPaKvCacheNormalNzNotFullyLoad {
 public:
-    __aicore__ inline ScatterPaKvCacheNormalNzNotFullyLoad(TPipe *pipe,
-                                                           const ScatterPaKvCacheTilingData *__restrict tiling)
+    __aicore__ inline ScatterPaKvCacheNormalNzNotFullyLoad(TPipe* pipe,
+                                                           const ScatterPaKvCacheTilingData* __restrict tiling)
         : pipe_(pipe),
           tilingData_(tiling){};
     __aicore__ inline void Init(GM_ADDR key, GM_ADDR slot_mapping, GM_ADDR value, GM_ADDR key_cache_out,
@@ -38,9 +38,9 @@ private:
     __aicore__ inline void CopyToCacheNzV(uint32_t start, uint32_t cacheStart);
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, BUFFER_NUM> inputQueue_;
-    const ScatterPaKvCacheTilingData *tilingData_;
+    const ScatterPaKvCacheTilingData* tilingData_;
 
     GlobalTensor<T1> keyGm_;
     GlobalTensor<T2> valueGm_;
@@ -77,11 +77,11 @@ __aicore__ inline void ScatterPaKvCacheNormalNzNotFullyLoad<T1, T2, IndexDtype>:
     lastDimK_ = BLOCK_SIZE / sizeof(T1);
     lastDimV_ = BLOCK_SIZE / sizeof(T2);
 
-    keyGm_.SetGlobalBuffer((__gm__ T1 *)(key));
-    valueGm_.SetGlobalBuffer((__gm__ T2 *)(value));
-    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype *)(slot_mapping));
-    keyCacheOutGm_.SetGlobalBuffer((__gm__ T1 *)(key_cache_out));
-    valueCacheOutGm_.SetGlobalBuffer((__gm__ T2 *)(value_cache_out));
+    keyGm_.SetGlobalBuffer((__gm__ T1*)(key));
+    valueGm_.SetGlobalBuffer((__gm__ T2*)(value));
+    slotMappingGm_.SetGlobalBuffer((__gm__ IndexDtype*)(slot_mapping));
+    keyCacheOutGm_.SetGlobalBuffer((__gm__ T1*)(key_cache_out));
+    valueCacheOutGm_.SetGlobalBuffer((__gm__ T2*)(value_cache_out));
 
     maxUbUsed_ = tilingData_->ubSize / BUFFER_NUM;
     loopHK_ = (tokenSizeK_ * sizeof(T1)) / maxUbUsed_;

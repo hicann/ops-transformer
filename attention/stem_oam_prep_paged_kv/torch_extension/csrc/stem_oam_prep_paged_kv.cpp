@@ -17,11 +17,11 @@ using namespace at_npu::native;
 
 const int64_t DIM_QK = 128;
 
-std::tuple<at::Tensor, at::Tensor> StemOamPrepPagedKv(const at::Tensor &kCache, const at::Tensor &vCache,
-                                                      const at::Tensor &kvIndices, at::IntArrayRef kvSeqLens,
-                                                      const c10::optional<at::Tensor> &kScaleCacheOpt,
-                                                      const c10::optional<at::Tensor> &vScaleOpt, double lambdaMag,
-                                                      const std::string &kvLayout, int64_t stemBlockSize,
+std::tuple<at::Tensor, at::Tensor> StemOamPrepPagedKv(const at::Tensor& kCache, const at::Tensor& vCache,
+                                                      const at::Tensor& kvIndices, at::IntArrayRef kvSeqLens,
+                                                      const c10::optional<at::Tensor>& kScaleCacheOpt,
+                                                      const c10::optional<at::Tensor>& vScaleOpt, double lambdaMag,
+                                                      const std::string& kvLayout, int64_t stemBlockSize,
                                                       int64_t stemStride)
 {
     TORCH_CHECK(kCache.numel() > 0, "kCache is empty");
@@ -62,7 +62,7 @@ std::tuple<at::Tensor, at::Tensor> StemOamPrepPagedKv(const at::Tensor &kCache, 
     StorageShapeTensor kScaleCacheWrapped{kScaleCache};
     StorageShapeTensor kFlatWrapped{kFlat};
     StorageShapeTensor vBiasWrapped{vBias};
-    const char *kvLayoutPtr = kvLayout.c_str();
+    const char* kvLayoutPtr = kvLayout.c_str();
     ACLNN_CMD(aclnnStemOamPrepPagedKv, kCacheWrapped, vCacheWrapped, kvIndicesWrapped, kvSeqLens, kScaleCacheWrapped,
               vScale, lambdaMag, kvLayoutPtr, stemBlockSize, stemStride, kFlatWrapped, vBiasWrapped);
 

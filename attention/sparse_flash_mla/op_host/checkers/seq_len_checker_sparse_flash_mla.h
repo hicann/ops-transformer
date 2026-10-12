@@ -18,13 +18,13 @@ namespace sparse_mla_checker {
 
 class SeqLenChecker : public BaseChecker {
 public:
-    ge::graphStatus CheckSinglePara(const CheckContext &context) const override;
-    ge::graphStatus CheckParaExistence(const CheckContext &context) const override;
-    ge::graphStatus CheckMultiPara(const CheckContext &context) const override;
+    ge::graphStatus CheckSinglePara(const CheckContext& context) const override;
+    ge::graphStatus CheckParaExistence(const CheckContext& context) const override;
+    ge::graphStatus CheckMultiPara(const CheckContext& context) const override;
 
 private:
-    ge::graphStatus CheckLengthTensor(const CheckContext &context, const TensorParam &param, const char *name) const;
-    ge::graphStatus CheckLength(const CheckContext &context, const TensorParam &param, const char *name,
+    ge::graphStatus CheckLengthTensor(const CheckContext& context, const TensorParam& param, const char* name) const;
+    ge::graphStatus CheckLength(const CheckContext& context, const TensorParam& param, const char* name,
                                 int64_t expected) const;
 };
 

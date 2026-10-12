@@ -32,10 +32,10 @@ using namespace AscendC::Impl::Detail;
 
 TEMPLATE_INTF
 __aicore__ inline void GetSingleCoreParam(
-    RunParamStr &qsCacheRunParam, const ConstInfo &qsCacheConstInfo, GlobalTensor<int32_t> &cuSeqlensQGm,
-    GlobalTensor<int32_t> &cuSeqlensOriKvGm, GlobalTensor<int32_t> &cuSeqlensCmpKvGm,
-    GlobalTensor<int32_t> &actualSeqQlenGm, GlobalTensor<int32_t> &actualSeqOriKvlenGm,
-    GlobalTensor<int32_t> &actualSeqCmpKvlenGm, GlobalTensor<int32_t> &cmpResidualKvGm, bool hasCuSeqlensOriKv,
+    RunParamStr& qsCacheRunParam, const ConstInfo& qsCacheConstInfo, GlobalTensor<int32_t>& cuSeqlensQGm,
+    GlobalTensor<int32_t>& cuSeqlensOriKvGm, GlobalTensor<int32_t>& cuSeqlensCmpKvGm,
+    GlobalTensor<int32_t>& actualSeqQlenGm, GlobalTensor<int32_t>& actualSeqOriKvlenGm,
+    GlobalTensor<int32_t>& actualSeqCmpKvlenGm, GlobalTensor<int32_t>& cmpResidualKvGm, bool hasCuSeqlensOriKv,
     bool hasCuSeqlensCmpKv, bool hasActualSeqQlen, bool hasActualSeqOriKvlen, bool hasActualSeqCmpKvlen)
 {
     int32_t localActualS1Size = 0;
@@ -109,10 +109,10 @@ __aicore__ inline void GetSingleCoreParam(
 
 TEMPLATE_INTF
 __aicore__ inline void ComputeParamBatch(
-    RunParamStr &qsCacheRunParam, const ConstInfo &qsCacheConstInfo, GlobalTensor<int32_t> &cuSeqlensQGm,
-    GlobalTensor<int32_t> &cuSeqlensOriKvGm, GlobalTensor<int32_t> &cuSeqlensCmpKvGm,
-    GlobalTensor<int32_t> &actualSeqQlenGm, GlobalTensor<int32_t> &actualSeqOriKvlenGm,
-    GlobalTensor<int32_t> &actualSeqCmpKvlenGm, GlobalTensor<int32_t> &cmpResidualKvGm, bool hasCuSeqlensOriKv,
+    RunParamStr& qsCacheRunParam, const ConstInfo& qsCacheConstInfo, GlobalTensor<int32_t>& cuSeqlensQGm,
+    GlobalTensor<int32_t>& cuSeqlensOriKvGm, GlobalTensor<int32_t>& cuSeqlensCmpKvGm,
+    GlobalTensor<int32_t>& actualSeqQlenGm, GlobalTensor<int32_t>& actualSeqOriKvlenGm,
+    GlobalTensor<int32_t>& actualSeqCmpKvlenGm, GlobalTensor<int32_t>& cmpResidualKvGm, bool hasCuSeqlensOriKv,
     bool hasCuSeqlensCmpKv, bool hasActualSeqQlen, bool hasActualSeqOriKvlen, bool hasActualSeqCmpKvlen)
 {
     GetSingleCoreParam<TEMPLATE_INTF_ARGS>(qsCacheRunParam, qsCacheConstInfo, cuSeqlensQGm, cuSeqlensOriKvGm,
@@ -122,7 +122,7 @@ __aicore__ inline void ComputeParamBatch(
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeS1LoopInfo(RunParamStr &qsCacheRunParam, const ConstInfo &qsCacheConstInfo, bool lastBN,
+__aicore__ inline void ComputeS1LoopInfo(RunParamStr& qsCacheRunParam, const ConstInfo& qsCacheConstInfo, bool lastBN,
                                          int64_t nextGs1Idx, int64_t gS1StartIdx, int64_t s2EndIdx)
 {
     // 计算每个基本块可以拷贝多少行s
@@ -178,7 +178,7 @@ __aicore__ inline void ComputeS1LoopInfo(RunParamStr &qsCacheRunParam, const Con
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeSouterParam(RunParamStr &qsCacheRunParam, const ConstInfo &qsCacheConstInfo,
+__aicore__ inline void ComputeSouterParam(RunParamStr& qsCacheRunParam, const ConstInfo& qsCacheConstInfo,
                                           uint32_t sOuterLoopIdx)
 {
     int64_t qsmlaCubeSOuterOffset = sOuterLoopIdx * qsCacheRunParam.qSNumInOneBlock;
@@ -217,8 +217,8 @@ __aicore__ inline void ComputeSouterParam(RunParamStr &qsCacheRunParam, const Co
 }
 
 TEMPLATE_INTF
-__aicore__ inline void LoopSOuterOffsetInit(RunParamStr &qsCacheRunParam, const ConstInfo &qsCacheConstInfo,
-                                            int32_t sIdx, GlobalTensor<int32_t> &cuSeqlensQGm)
+__aicore__ inline void LoopSOuterOffsetInit(RunParamStr& qsCacheRunParam, const ConstInfo& qsCacheConstInfo,
+                                            int32_t sIdx, GlobalTensor<int32_t>& cuSeqlensQGm)
 {
     if ASCEND_IS_AIV {
         int64_t qsmlaSeqOffset = 0;
@@ -264,8 +264,8 @@ __aicore__ inline void LoopSOuterOffsetInit(RunParamStr &qsCacheRunParam, const 
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeParamS1(RunParamStr &qsCacheRunParam, const ConstInfo &qsCacheConstInfo,
-                                      uint32_t sOuterLoopIdx, GlobalTensor<int32_t> &cuSeqlensQGm)
+__aicore__ inline bool ComputeParamS1(RunParamStr& qsCacheRunParam, const ConstInfo& qsCacheConstInfo,
+                                      uint32_t sOuterLoopIdx, GlobalTensor<int32_t>& cuSeqlensQGm)
 {
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
@@ -299,7 +299,7 @@ __aicore__ inline bool ComputeParamS1(RunParamStr &qsCacheRunParam, const ConstI
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeLastBN(RunParamStr &qsCacheRunParam, GlobalTensor<int32_t> &cuSeqlensQGm)
+__aicore__ inline bool ComputeLastBN(RunParamStr& qsCacheRunParam, GlobalTensor<int32_t>& cuSeqlensQGm)
 {
     if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
         if (qsCacheRunParam.boIdx > 0 &&
@@ -319,9 +319,9 @@ __aicore__ inline int64_t ClipSInnerTokenCube(int64_t sInnerToken, int64_t minVa
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeS2LoopInfo(int64_t bnIndex, int64_t gS1Index, GlobalTensor<int32_t> &cuSeqlensQGm,
-                                         GlobalTensor<int32_t> &oriTopkLengthGm, GlobalTensor<int32_t> &cmpTopkLengthGm,
-                                         RunParamStr &qsCacheRunParam, const ConstInfo &qsCacheConstInfo)
+__aicore__ inline bool ComputeS2LoopInfo(int64_t bnIndex, int64_t gS1Index, GlobalTensor<int32_t>& cuSeqlensQGm,
+                                         GlobalTensor<int32_t>& oriTopkLengthGm, GlobalTensor<int32_t>& cmpTopkLengthGm,
+                                         RunParamStr& qsCacheRunParam, const ConstInfo& qsCacheConstInfo)
 {
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
@@ -404,7 +404,7 @@ __aicore__ inline bool ComputeS2LoopInfo(int64_t bnIndex, int64_t gS1Index, Glob
 }
 
 TEMPLATE_INTF
-__aicore__ inline void InitTaskParamByRun(const RunParamStr &qsCacheRunParam, RunInfo &qsCacheRunInfo)
+__aicore__ inline void InitTaskParamByRun(const RunParamStr& qsCacheRunParam, RunInfo& qsCacheRunInfo)
 {
     qsCacheRunInfo.boIdx = qsCacheRunParam.boIdx;
     qsCacheRunInfo.preTokensPerBatch = qsCacheRunParam.preTokensPerBatch;

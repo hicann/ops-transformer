@@ -98,7 +98,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube3ProcessDe
                                                                                     const int32_t mmPingPongIdx,
                                                                                     const int64_t lastBlockSize,
                                                                                     const bool isLastBasicBlock,
-                                                                                    const RunInfo &runInfo)
+                                                                                    const RunInfo& runInfo)
 {
     const int64_t dsGmOffset = runInfo.mm345GmOffset;
     const int64_t keyGmOffset = runInfo.keyGmOffset;
@@ -182,7 +182,7 @@ template <typename T1>
 __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube3Process(
     const int64_t dsGmOffset, const int64_t keyGmOffset, const int64_t indicesGmOffset, const int64_t outGmOffset,
     const int32_t blkCntOffset, const int32_t mmPingPongIdx, const int64_t lastBlockSize, const bool isLastBasicBlock,
-    const RunInfo &runInfo)
+    const RunInfo& runInfo)
 {
     if (!runInfo.isSmallS2) {
         cube3ProcessSparse(dsGmOffset, keyGmOffset, indicesGmOffset, outGmOffset, blkCntOffset, mmPingPongIdx,

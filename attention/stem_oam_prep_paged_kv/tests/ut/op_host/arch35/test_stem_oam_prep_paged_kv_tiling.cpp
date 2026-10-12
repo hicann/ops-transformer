@@ -18,9 +18,15 @@
 
 class StemOamPrepPagedKvTilingArch35 : public testing::Test {
 protected:
-    static void SetUpTestCase() { std::cout << "StemOamPrepPagedKvTilingArch35 SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "StemOamPrepPagedKvTilingArch35 SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "StemOamPrepPagedKvTilingArch35 TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "StemOamPrepPagedKvTilingArch35 TearDown" << std::endl;
+    }
 };
 
 namespace {
@@ -35,7 +41,7 @@ struct InputBundle {
 };
 
 InputBundle MakeInputs(int64_t totalBlocks = 8, int64_t kvBlockSize = 64, int64_t numKvHeads = 4, int64_t batch = 1,
-                       int64_t maxKvBlocks = 2, const std::string &kvLayout = "BBND",
+                       int64_t maxKvBlocks = 2, const std::string& kvLayout = "BBND",
                        std::vector<int32_t> seqLens = {128})
 {
     InputBundle bundle;
@@ -88,8 +94,8 @@ std::vector<TensorDesc> MakeOutputs(int64_t batch, int64_t numKvHeads, int64_t m
     };
 }
 
-std::vector<OpAttr> MakeAttrs(float lambdaMag = 0.3f, const std::string &kvLayout = "BBND",
-                              int64_t stemBlockSize = 128, int64_t stemStride = 16)
+std::vector<OpAttr> MakeAttrs(float lambdaMag = 0.3f, const std::string& kvLayout = "BBND", int64_t stemBlockSize = 128,
+                              int64_t stemStride = 16)
 {
     return {
         {"lambdaMag", Ops::Transformer::AnyValue::CreateFrom<float>(lambdaMag)},
@@ -99,15 +105,15 @@ std::vector<OpAttr> MakeAttrs(float lambdaMag = 0.3f, const std::string &kvLayou
     };
 }
 
-gert::TilingContextPara BuildTilingPara(const std::vector<TensorDesc> &inputs, const std::vector<TensorDesc> &outputs,
-                                        const std::vector<OpAttr> &attrs)
+gert::TilingContextPara BuildTilingPara(const std::vector<TensorDesc>& inputs, const std::vector<TensorDesc>& outputs,
+                                        const std::vector<OpAttr>& attrs)
 {
     static StemOamPrepPagedKvCompileInfo compileInfo;
     return gert::TilingContextPara("StemOamPrepPagedKv", inputs, outputs, attrs, &compileInfo, "Ascend950", 64, 262144,
                                    4096);
 }
 
-void ExpectTilingResult(const gert::TilingContextPara &para, bool expectSuccess)
+void ExpectTilingResult(const gert::TilingContextPara& para, bool expectSuccess)
 {
     TilingInfo tilingInfo;
     bool ok = ExecuteTiling(para, tilingInfo);

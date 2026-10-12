@@ -23,7 +23,7 @@ class SparseLightningIndexerKLLossGradMetadataCpuKernel : public CpuKernel {
 public:
     SparseLightningIndexerKLLossGradMetadataCpuKernel() = default;
     ~SparseLightningIndexerKLLossGradMetadataCpuKernel() override = default;
-    uint32_t Compute(CpuKernelContext &ctx) override
+    uint32_t Compute(CpuKernelContext& ctx) override
     {
         std::string socVersion;
         if (!GetAttrValue(ctx, "soc_version", socVersion)) {
@@ -42,7 +42,7 @@ private:
     SparseLightningIndexerKLLossGradMetadataCpuKernelArch35 arch35Kernel_;
 };
 
-static const char *kernelType = "SparseLightningIndexerKLLossGradMetadata";
+static const char* kernelType = "SparseLightningIndexerKLLossGradMetadata";
 REGISTER_CPU_KERNEL(kernelType, SparseLightningIndexerKLLossGradMetadataCpuKernel);
 
 } // namespace aicpu

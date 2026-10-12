@@ -57,15 +57,15 @@ gert::TilingContextPara BuildTilingPara(int64_t b, int64_t n, int64_t s, int64_t
             {{{1, s}, {1, s}}, ge::DT_FLOAT16, ge::FORMAT_ND},
             {{{1, s}, {1, s}}, ge::DT_UINT64, ge::FORMAT_ND},
             {{{1, h}, {1, h}}, ge::DT_UINT64, ge::FORMAT_ND},
-            bias_present ? gert::TilingContextPara::TensorDescription({{1, s}, {1, s}}, ge::DT_FLOAT16, ge::FORMAT_ND)
-                         : gert::TilingContextPara::TensorDescription({{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND),
-            bias_present ? gert::TilingContextPara::TensorDescription({{1, s}, {1, s}}, ge::DT_INT32, ge::FORMAT_ND)
-                         : gert::TilingContextPara::TensorDescription({{}, {}}, ge::DT_INT32, ge::FORMAT_ND),
-            bias_present ? gert::TilingContextPara::TensorDescription({{1, h}, {1, h}}, ge::DT_INT32, ge::FORMAT_ND)
-                         : gert::TilingContextPara::TensorDescription({{}, {}}, ge::DT_INT32, ge::FORMAT_ND),
+            bias_present ? gert::TilingContextPara::TensorDescription({{1, s}, {1, s}}, ge::DT_FLOAT16, ge::FORMAT_ND) :
+                           gert::TilingContextPara::TensorDescription({{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND),
+            bias_present ? gert::TilingContextPara::TensorDescription({{1, s}, {1, s}}, ge::DT_INT32, ge::FORMAT_ND) :
+                           gert::TilingContextPara::TensorDescription({{}, {}}, ge::DT_INT32, ge::FORMAT_ND),
+            bias_present ? gert::TilingContextPara::TensorDescription({{1, h}, {1, h}}, ge::DT_INT32, ge::FORMAT_ND) :
+                           gert::TilingContextPara::TensorDescription({{}, {}}, ge::DT_INT32, ge::FORMAT_ND),
             mask1_present ? gert::TilingContextPara::TensorDescription(
-                                {{1, n, s, mask1_last_dim}, {1, n, s, mask1_last_dim}}, ge::DT_FLOAT16, ge::FORMAT_ND)
-                          : gert::TilingContextPara::TensorDescription({{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND),
+                                {{1, n, s, mask1_last_dim}, {1, n, s, mask1_last_dim}}, ge::DT_FLOAT16, ge::FORMAT_ND) :
+                            gert::TilingContextPara::TensorDescription({{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND),
             {{{1, n, s, s}, {1, n, s, s}}, ge::DT_FLOAT16, ge::FORMAT_ND},
         },
         {{{{b, n, s, h}, {b, n, s, h}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
@@ -78,7 +78,7 @@ gert::TilingContextPara BuildTilingPara(int64_t b, int64_t n, int64_t s, int64_t
         &compileInfo);
 }
 
-void ExpectTilingResult(const gert::TilingContextPara &para, bool expect_success)
+void ExpectTilingResult(const gert::TilingContextPara& para, bool expect_success)
 {
     TilingInfo tilingInfo;
     bool ok = ExecuteTiling(para, tilingInfo);

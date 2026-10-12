@@ -60,7 +60,7 @@ void RecurrentKdaTiling::InitCompileInfo()
         OP_LOGE(context_->GetNodeName(), "platformInfoPtr is null");
         return;
     }
-    const auto &ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
+    const auto& ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfo_.ubSize);
     compileInfo_.aivNum = ascendcPlatform.GetCoreNumAiv();
 
@@ -72,7 +72,7 @@ void RecurrentKdaTiling::InitCompileInfo()
 }
 
 namespace {
-void CopyOptionalOriginShape(gert::TilingContext *context, size_t index, gert::Shape &dst)
+void CopyOptionalOriginShape(gert::TilingContext* context, size_t index, gert::Shape& dst)
 {
     auto shape = context->GetOptionalInputShape(index);
     if (shape != nullptr) {
@@ -81,7 +81,7 @@ void CopyOptionalOriginShape(gert::TilingContext *context, size_t index, gert::S
 }
 
 template <typename StrideType>
-void CopyStateStrides(const StrideType *src, std::array<int64_t, RKDA_STATE_DIM_NUM> &dst, bool &hasStrides)
+void CopyStateStrides(const StrideType* src, std::array<int64_t, RKDA_STATE_DIM_NUM>& dst, bool& hasStrides)
 {
     if (src == nullptr || src->GetDimNum() != RKDA_STATE_DIM_NUM) {
         return;
@@ -208,14 +208,14 @@ ge::graphStatus RecurrentKdaTiling::PostTiling()
     context_->SetBlockDim(tilingData_.vectorCoreNum);
     auto tilingDataSize = sizeof(RecurrentKdaTilingData);
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
     }
     context_->GetRawTilingData()->SetDataSize(tilingDataSize);
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_IF(workspaces == nullptr, OPS_REPORT_CUBE_INNER_ERR(context_->GetNodeName(), "workspaces is null"),
                 return ge::GRAPH_FAILED);
     workspaces[0] = workspaceSize_;
@@ -294,7 +294,7 @@ ge::graphStatus RecurrentKdaTiling::AnalyzeShapes()
     return processor.ProcessShapes(tilingData_);
 }
 
-bool RecurrentKdaTiling::CheckFormat(ge::Format format, const std::string &desc)
+bool RecurrentKdaTiling::CheckFormat(ge::Format format, const std::string& desc)
 {
     if (format == ge::FORMAT_FRACTAL_NZ) {
         OP_LOGE(context_->GetNodeName(), "%s format does not support NZ", desc.c_str());
@@ -314,14 +314,14 @@ ge::graphStatus RecurrentKdaTiling::AnalyzeFormat()
         return ge::GRAPH_FAILED;
     }
 
-    const std::array<std::pair<size_t, const char *>, 5> optionalInputs = {{
+    const std::array<std::pair<size_t, const char*>, 5> optionalInputs = {{
         {CU_SEQLENS_INDEX, "cu_seqlens"},
         {SSM_STATE_INDICES_INDEX, "ssm_state_indices"},
         {A_LOG_INDEX, "A_log"},
         {DT_BIAS_INDEX, "dt_bias"},
         {ACC_TOKEN_INDEX, "num_accepted_tokens"},
     }};
-    for (const auto &item : optionalInputs) {
+    for (const auto& item : optionalInputs) {
         auto desc = context_->GetOptionalInputDesc(item.first);
         if (desc != nullptr && !CheckFormat(desc->GetStorageFormat(), item.second)) {
             return ge::GRAPH_FAILED;
@@ -334,7 +334,7 @@ ge::graphStatus RecurrentKdaTiling::GetAttrsInfo()
 {
     auto attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is null"), return ge::GRAPH_FAILED);
-    const char *layout = attrs->GetAttrPointer<char>(ATTR_LAYOUT_INDEX);
+    const char* layout = attrs->GetAttrPointer<char>(ATTR_LAYOUT_INDEX);
     if (layout == nullptr || std::strcmp(layout, "BSND") == 0) {
         tilingData_.layout = RKDA_LAYOUT_BSND;
     } else if (std::strcmp(layout, "TND") == 0) {
@@ -412,19 +412,19 @@ ge::graphStatus RecurrentKdaTiling::CalUbSize()
     return processor.ProcessUb(tilingData_);
 }
 
-static ge::graphStatus RecurrentKdaTilingFunc(gert::TilingContext *context)
+static ge::graphStatus RecurrentKdaTilingFunc(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("RecurrentKda", "context is null"),
                 return ge::GRAPH_FAILED);
     return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-static ge::graphStatus TilingPrepareForRecurrentKda(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForRecurrentKda(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_CUBE_INNER_ERR("RecurrentKda", "context is null"),
                 return ge::GRAPH_FAILED);
 
-    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfo == nullptr, OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "platformInfoPtr is null"),
                 return ge::GRAPH_FAILED);
 

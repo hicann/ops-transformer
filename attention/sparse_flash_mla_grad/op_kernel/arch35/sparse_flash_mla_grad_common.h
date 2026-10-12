@@ -44,7 +44,7 @@ constexpr uint8_t DV_IDX = 2;
 
 template <typename T, bool IS_WRITE_UB>
 struct DqkvResPos {
-    using PosType = typename std::conditional<IS_WRITE_UB, LocalTensor<T> &, GlobalTensor<T> &>::type;
+    using PosType = typename std::conditional<IS_WRITE_UB, LocalTensor<T>&, GlobalTensor<T>&>::type;
 };
 
 // max(mm1, mm2, mm3) + mm4 + mm5
@@ -53,7 +53,7 @@ struct DqkvResPos {
      ((CUBE_BASEN) > (HEAD_DIM_ALIGN) ? (CUBE_BASEM) * (CUBE_BASEN) * sizeof(float) : \
                                         (CUBE_BASEM) * (HEAD_DIM_ALIGN) * sizeof(float))) <= L0C_MAX_SIZE
 
-#define SFagTilingType const optiling::smlag::SparseFlashMlaGradTilingDataRegbase *__restrict
+#define SFagTilingType const optiling::smlag::SparseFlashMlaGradTilingDataRegbase* __restrict
 
 #define CUBE_BLOCK_TRAITS_TYPE_FIELDS(X) \
     X(INPUT_TYPE) \

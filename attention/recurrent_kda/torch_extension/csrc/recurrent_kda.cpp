@@ -25,11 +25,11 @@
 namespace op_api {
 
 std::tuple<at::Tensor, at::Tensor> RecurrentKda(
-    const at::Tensor &q, const at::Tensor &k, const at::Tensor &v, const at::Tensor &g, const at::Tensor &beta,
-    at::Tensor &initialState, const c10::optional<at::Tensor> &cuSeqlens,
-    const c10::optional<at::Tensor> &ssmStateIndices, const c10::optional<at::Tensor> &aLog,
-    const c10::optional<at::Tensor> &dtBias, const c10::optional<at::Tensor> &numAcceptedTokens,
-    const std::string &layout, c10::optional<double> scale, c10::optional<bool> outputFinalState,
+    const at::Tensor& q, const at::Tensor& k, const at::Tensor& v, const at::Tensor& g, const at::Tensor& beta,
+    at::Tensor& initialState, const c10::optional<at::Tensor>& cuSeqlens,
+    const c10::optional<at::Tensor>& ssmStateIndices, const c10::optional<at::Tensor>& aLog,
+    const c10::optional<at::Tensor>& dtBias, const c10::optional<at::Tensor>& numAcceptedTokens,
+    const std::string& layout, c10::optional<double> scale, c10::optional<bool> outputFinalState,
     c10::optional<bool> inplaceFinalState, c10::optional<bool> useQkL2normInKernel, c10::optional<bool> useGateInKernel,
     c10::optional<bool> useBetaSigmoidInKernel, c10::optional<bool> allowNegEigval, c10::optional<bool> safeGate,
     c10::optional<double> lowerBound, c10::optional<bool> stateVFirst)
@@ -91,7 +91,7 @@ std::tuple<at::Tensor, at::Tensor> RecurrentKda(
     TORCH_CHECK(!safeGateValue || (useGateValue && lowerBoundValue >= -5.0 && lowerBoundValue < 0.0),
                 "recurrent_kda: safe_gate/lower_bound attributes are invalid.");
     const double scaleValue = scale.value_or(std::pow(static_cast<double>(kDim), -0.5));
-    const char *layoutValue = layout.c_str();
+    const char* layoutValue = layout.c_str();
 
     at::Tensor out;
     at::Tensor finalState;

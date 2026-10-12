@@ -54,7 +54,7 @@ template <typename DTYPE_IN, typename DTYPE_OUT, typename DTYPE_SCALE, typename 
 class SwinAttentionScoreQuant;
 
 template <typename DTYPE>
-__aicore__ inline int CopyNDBlock(AscendC::LocalTensor<DTYPE> &transTensor, const AscendC::GlobalTensor<DTYPE> &src,
+__aicore__ inline int CopyNDBlock(AscendC::LocalTensor<DTYPE>& transTensor, const AscendC::GlobalTensor<DTYPE>& src,
                                   int64_t srcOffset, const int height, const int width, const int gCol,
                                   const bool isBankConflict)
 {
@@ -88,7 +88,7 @@ __aicore__ inline int CopyNDBlock(AscendC::LocalTensor<DTYPE> &transTensor, cons
 }
 
 template <typename DTYPE>
-__aicore__ inline void NDPadZeros(AscendC::LocalTensor<DTYPE> &dst, const int height, const int calcWidth,
+__aicore__ inline void NDPadZeros(AscendC::LocalTensor<DTYPE>& dst, const int height, const int calcWidth,
                                   const int width)
 {
     const int c0Size = BLOCK_SIZE_32 / sizeof(DTYPE);
@@ -125,7 +125,7 @@ __aicore__ inline void NDPadZeros(AscendC::LocalTensor<DTYPE> &dst, const int he
 }
 
 template <typename DTYPE>
-__aicore__ inline void NDTrans2NZ(AscendC::LocalTensor<DTYPE> &dst, AscendC::LocalTensor<DTYPE> &src,
+__aicore__ inline void NDTrans2NZ(AscendC::LocalTensor<DTYPE>& dst, AscendC::LocalTensor<DTYPE>& src,
                                   const int calcHigh, const int calcWidth, const bool isBankConflict)
 {
     const int c0Size = BLOCK_SIZE_32 / sizeof(DTYPE);
@@ -174,8 +174,8 @@ __aicore__ inline void NDTrans2NZ(AscendC::LocalTensor<DTYPE> &dst, AscendC::Loc
 }
 
 template <typename DTYPE>
-__aicore__ inline void CopyND2NZ(AscendC::LocalTensor<DTYPE> &dst, const AscendC::GlobalTensor<DTYPE> &src,
-                                 AscendC::LocalTensor<DTYPE> &transTensor, const int row, const int col,
+__aicore__ inline void CopyND2NZ(AscendC::LocalTensor<DTYPE>& dst, const AscendC::GlobalTensor<DTYPE>& src,
+                                 AscendC::LocalTensor<DTYPE>& transTensor, const int row, const int col,
                                  const int height, const int width, const int gCol)
 {
     const int c0Size = BLOCK_SIZE_32 / sizeof(DTYPE);
@@ -194,8 +194,8 @@ __aicore__ inline void CopyND2NZ(AscendC::LocalTensor<DTYPE> &dst, const AscendC
 }
 
 template <typename DTYPE>
-__aicore__ inline void CopyND2NZOnTheFly(const AscendC::LocalTensor<DTYPE> &dst,
-                                         const AscendC::GlobalTensor<DTYPE> &src, const int row, const int col,
+__aicore__ inline void CopyND2NZOnTheFly(const AscendC::LocalTensor<DTYPE>& dst,
+                                         const AscendC::GlobalTensor<DTYPE>& src, const int row, const int col,
                                          const int height, const int width, const int gCol)
 {
     const int c0Size = BLOCK_SIZE_32 / sizeof(DTYPE);
@@ -243,7 +243,7 @@ __aicore__ inline void CopyND2NZOnTheFly(const AscendC::LocalTensor<DTYPE> &dst,
 }
 
 template <typename DTYPE>
-__aicore__ inline void TransDataBMatrix(const AscendC::LocalTensor<DTYPE> &dst, const AscendC::LocalTensor<DTYPE> &src,
+__aicore__ inline void TransDataBMatrix(const AscendC::LocalTensor<DTYPE>& dst, const AscendC::LocalTensor<DTYPE>& src,
                                         int height, int width)
 {
     const int c0Size = BLOCK_SIZE_32 / sizeof(DTYPE);
@@ -337,7 +337,7 @@ __aicore__ inline void TransDataBMatrix(const AscendC::LocalTensor<DTYPE> &dst, 
 }
 
 template <typename DTYPE>
-__aicore__ inline void CopyNZ2NZ(const AscendC::LocalTensor<DTYPE> &dst, const AscendC::LocalTensor<DTYPE> &src,
+__aicore__ inline void CopyNZ2NZ(const AscendC::LocalTensor<DTYPE>& dst, const AscendC::LocalTensor<DTYPE>& src,
                                  const int row, const int col, const int height, const int width, const int gRow)
 {
     const int c0Size = BLOCK_SIZE_32 / sizeof(DTYPE);

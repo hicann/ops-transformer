@@ -60,10 +60,10 @@ __simd_vf__ inline void CalculateDsinkVF(uint64_t dstLocalInt, uint64_t pLocalIn
     for (uint16_t m = 0; m < static_cast<uint16_t>(realM); m++) {
         Duplicate(vregRes, 0);
         LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_BRC_B32>(
-            vregSoftmaxSink, ((__ubuf__ T *&)softmaxSinkLocalInt), 1);
+            vregSoftmaxSink, ((__ubuf__ T*&)softmaxSinkLocalInt), 1);
         for (uint16_t n = 0; n < loopTimes; n++) {
-            LoadAlign(vregP, ((__ubuf__ T *&)pLocalInt + m * srcN + n * fullExeSize)); ////todo srcN
-            LoadAlign(vregDp, ((__ubuf__ T *&)dpLocalInt + m * srcN + n * fullExeSize));
+            LoadAlign(vregP, ((__ubuf__ T*&)pLocalInt + m * srcN + n * fullExeSize)); ////todo srcN
+            LoadAlign(vregDp, ((__ubuf__ T*&)dpLocalInt + m * srcN + n * fullExeSize));
             Mul(vregMul, vregP, vregDp, pregFullExe);
             Mul(vregMul1, vregMul, vregSoftmaxSink, pregFullExe);
             Muls(vregMul1, vregMul1, -1, pregFullExe);
@@ -72,22 +72,22 @@ __simd_vf__ inline void CalculateDsinkVF(uint64_t dstLocalInt, uint64_t pLocalIn
         }
 
         // 尾块
-        LoadAlign(vregPTail, ((__ubuf__ T *&)pLocalIntTail + m * srcN));
-        LoadAlign(vregDpTail, ((__ubuf__ T *&)dpLocalIntTail + m * srcN));
+        LoadAlign(vregPTail, ((__ubuf__ T*&)pLocalIntTail + m * srcN));
+        LoadAlign(vregDpTail, ((__ubuf__ T*&)dpLocalIntTail + m * srcN));
         Mul(vregMulTail, vregPTail, vregDpTail, pregTailExe);
         Mul(vregMulTail1, vregMulTail, vregSoftmaxSink, pregTailExe);
         Muls(vregMulTail1, vregMulTail1, -1, pregFullExe);
         Reduce<Reg::ReduceType::SUM>(vregReduceSumTail, vregMulTail1, pregTailExe);
         Add(vregRes, vregRes, vregReduceSumTail, pregAccu);
         uint64_t dstOffset = dstLocalInt + 4 * m;
-        StoreUnAlign<T>(((__ubuf__ T *&)dstOffset), vregRes, uregRes, 1);
-        StoreUnAlignPost<T>(((__ubuf__ T *&)dstOffset), uregRes, 0);
+        StoreUnAlign<T>(((__ubuf__ T*&)dstOffset), vregRes, uregRes, 1);
+        StoreUnAlignPost<T>(((__ubuf__ T*&)dstOffset), uregRes, 0);
     }
 }
 
 template <typename T>
-__aicore__ inline void CalculateDsink(const LocalTensor<T> &dstTensor, const LocalTensor<T> &pTensor,
-                                      const LocalTensor<T> &dpTensor, const LocalTensor<T> &softmaxSinkTensor,
+__aicore__ inline void CalculateDsink(const LocalTensor<T>& dstTensor, const LocalTensor<T>& pTensor,
+                                      const LocalTensor<T>& dpTensor, const LocalTensor<T>& softmaxSinkTensor,
                                       int64_t realN, uint64_t realM)
 {
     const uint16_t fullExeSize = 64;
@@ -106,8 +106,8 @@ __aicore__ inline void CalculateDsink(const LocalTensor<T> &dstTensor, const Loc
 }
 #else
 template <typename T>
-__aicore__ inline void CalculateDsink(const LocalTensor<T> &dstTensor, const LocalTensor<T> &pTensor,
-                                      const LocalTensor<T> &dpTensor, const LocalTensor<T> &softmaxSinkTensor,
+__aicore__ inline void CalculateDsink(const LocalTensor<T>& dstTensor, const LocalTensor<T>& pTensor,
+                                      const LocalTensor<T>& dpTensor, const LocalTensor<T>& softmaxSinkTensor,
                                       int64_t realN, uint64_t realM)
 {}
 #endif

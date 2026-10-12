@@ -18,17 +18,17 @@ namespace sparse_mla_checker {
 
 class CommonChecker : public BaseChecker {
 public:
-    ge::graphStatus CheckSinglePara(const CheckContext &context) const override;
-    ge::graphStatus CheckParaExistence(const CheckContext &context) const override;
-    ge::graphStatus CheckFeature(const CheckContext &context) const override;
-    ge::graphStatus CheckMultiPara(const CheckContext &context) const override;
+    ge::graphStatus CheckSinglePara(const CheckContext& context) const override;
+    ge::graphStatus CheckParaExistence(const CheckContext& context) const override;
+    ge::graphStatus CheckFeature(const CheckContext& context) const override;
+    ge::graphStatus CheckMultiPara(const CheckContext& context) const override;
 
 private:
-    ge::graphStatus CheckQuery(const CheckContext &context) const;
-    ge::graphStatus CheckKv(const CheckContext &context, const TensorParam &kv, const char *name) const;
-    ge::graphStatus CheckOutput(const CheckContext &context) const;
-    ge::graphStatus CheckQueryAxes(const CheckContext &context) const;
-    ge::graphStatus CheckKvAxes(const CheckContext &context, const TensorParam &kv, const char *name) const;
+    ge::graphStatus CheckQuery(const CheckContext& context) const;
+    ge::graphStatus CheckKv(const CheckContext& context, const TensorParam& kv, const char* name) const;
+    ge::graphStatus CheckOutput(const CheckContext& context) const;
+    ge::graphStatus CheckQueryAxes(const CheckContext& context) const;
+    ge::graphStatus CheckKvAxes(const CheckContext& context, const TensorParam& kv, const char* name) const;
 };
 
 } // namespace sparse_mla_checker

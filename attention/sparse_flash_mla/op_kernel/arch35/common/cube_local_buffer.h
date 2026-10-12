@@ -25,9 +25,9 @@ namespace AttentionCommon {
 template <typename Q_T, typename T>
 __aicore__ inline void InitCubeLocalBuffer(
     fa_base_matmul::StaticBuffer<Q_T> (&l1QBufs)[3], fa_base_matmul::StaticBuffer<Q_T> (&l1RightBufs)[3],
-    fa_base_matmul::StaticBuffer<Q_T> (&l0ABufs)[2], fa_base_matmul::RingBuffer<Q_T> &l0A,
-    fa_base_matmul::StaticBuffer<Q_T> (&l0BBufs)[2], fa_base_matmul::RingBuffer<Q_T> &l0B,
-    fa_base_matmul::StaticBuffer<T> (&l0CBufs)[2], fa_base_matmul::RingBuffer<T> &l0C, uint32_t l1BaseAddr)
+    fa_base_matmul::StaticBuffer<Q_T> (&l0ABufs)[2], fa_base_matmul::RingBuffer<Q_T>& l0A,
+    fa_base_matmul::StaticBuffer<Q_T> (&l0BBufs)[2], fa_base_matmul::RingBuffer<Q_T>& l0B,
+    fa_base_matmul::StaticBuffer<T> (&l0CBufs)[2], fa_base_matmul::RingBuffer<T>& l0C, uint32_t l1BaseAddr)
 {
     if ASCEND_IS_AIC {
         uint32_t l1Addr = l1BaseAddr;

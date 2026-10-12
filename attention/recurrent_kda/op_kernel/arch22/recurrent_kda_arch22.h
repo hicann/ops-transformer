@@ -60,7 +60,7 @@ struct RKDAInitParams {
 template <typename inType, typename outType, typename stateType>
 class RKDA {
 public:
-    __aicore__ inline explicit RKDA(const RecurrentKdaTilingData *tilingData)
+    __aicore__ inline explicit RKDA(const RecurrentKdaTilingData* tilingData)
     {
         B_ = tilingData->b;
         T_ = tilingData->t;
@@ -112,7 +112,7 @@ public:
         eventMte3ToVInitialized_ = false;
     }
 
-    __aicore__ inline void Init(const RKDAInitParams &initParams, TPipe *pipe)
+    __aicore__ inline void Init(const RKDAInitParams& initParams, TPipe* pipe)
     {
         uint64_t blockDim = GetBlockNum();
         blockIdx = GetBlockIdx();
@@ -124,28 +124,28 @@ public:
         InitLocalBuffers();
     }
 
-    __aicore__ inline void SetGlobalTensors(const RKDAInitParams &initParams)
+    __aicore__ inline void SetGlobalTensors(const RKDAInitParams& initParams)
     {
-        queryGm_.SetGlobalBuffer((__gm__ inType *)initParams.query);
-        keyGm_.SetGlobalBuffer((__gm__ inType *)initParams.key);
-        valueGm_.SetGlobalBuffer((__gm__ inType *)initParams.value);
-        gateFloatGm_.SetGlobalBuffer((__gm__ float *)initParams.gate);
-        gateBf16Gm_.SetGlobalBuffer((__gm__ bfloat16_t *)initParams.gate);
-        gateFp16Gm_.SetGlobalBuffer((__gm__ half *)initParams.gate);
-        betaFloatGm_.SetGlobalBuffer((__gm__ float *)initParams.beta);
-        betaBf16Gm_.SetGlobalBuffer((__gm__ bfloat16_t *)initParams.beta);
-        betaFp16Gm_.SetGlobalBuffer((__gm__ half *)initParams.beta);
-        initStateGm_.SetGlobalBuffer((__gm__ stateType *)initParams.initState);
-        cuSeqlensInt32Gm_.SetGlobalBuffer((__gm__ int32_t *)initParams.cuSeqlens);
-        cuSeqlensInt64Gm_.SetGlobalBuffer((__gm__ int64_t *)initParams.cuSeqlens);
-        ssmStateIndicesInt32Gm_.SetGlobalBuffer((__gm__ int32_t *)initParams.ssmStateIndices);
-        ssmStateIndicesInt64Gm_.SetGlobalBuffer((__gm__ int64_t *)initParams.ssmStateIndices);
-        aLogGm_.SetGlobalBuffer((__gm__ float *)initParams.aLog);
-        dtBiasGm_.SetGlobalBuffer((__gm__ float *)initParams.dtBias);
-        numAcceptedTokensInt32Gm_.SetGlobalBuffer((__gm__ int32_t *)initParams.numAcceptedTokens);
-        numAcceptedTokensInt64Gm_.SetGlobalBuffer((__gm__ int64_t *)initParams.numAcceptedTokens);
-        finalStateGm_.SetGlobalBuffer((__gm__ stateType *)initParams.finalState);
-        attnOutGm_.SetGlobalBuffer((__gm__ outType *)initParams.attnOut);
+        queryGm_.SetGlobalBuffer((__gm__ inType*)initParams.query);
+        keyGm_.SetGlobalBuffer((__gm__ inType*)initParams.key);
+        valueGm_.SetGlobalBuffer((__gm__ inType*)initParams.value);
+        gateFloatGm_.SetGlobalBuffer((__gm__ float*)initParams.gate);
+        gateBf16Gm_.SetGlobalBuffer((__gm__ bfloat16_t*)initParams.gate);
+        gateFp16Gm_.SetGlobalBuffer((__gm__ half*)initParams.gate);
+        betaFloatGm_.SetGlobalBuffer((__gm__ float*)initParams.beta);
+        betaBf16Gm_.SetGlobalBuffer((__gm__ bfloat16_t*)initParams.beta);
+        betaFp16Gm_.SetGlobalBuffer((__gm__ half*)initParams.beta);
+        initStateGm_.SetGlobalBuffer((__gm__ stateType*)initParams.initState);
+        cuSeqlensInt32Gm_.SetGlobalBuffer((__gm__ int32_t*)initParams.cuSeqlens);
+        cuSeqlensInt64Gm_.SetGlobalBuffer((__gm__ int64_t*)initParams.cuSeqlens);
+        ssmStateIndicesInt32Gm_.SetGlobalBuffer((__gm__ int32_t*)initParams.ssmStateIndices);
+        ssmStateIndicesInt64Gm_.SetGlobalBuffer((__gm__ int64_t*)initParams.ssmStateIndices);
+        aLogGm_.SetGlobalBuffer((__gm__ float*)initParams.aLog);
+        dtBiasGm_.SetGlobalBuffer((__gm__ float*)initParams.dtBias);
+        numAcceptedTokensInt32Gm_.SetGlobalBuffer((__gm__ int32_t*)initParams.numAcceptedTokens);
+        numAcceptedTokensInt64Gm_.SetGlobalBuffer((__gm__ int64_t*)initParams.numAcceptedTokens);
+        finalStateGm_.SetGlobalBuffer((__gm__ stateType*)initParams.finalState);
+        attnOutGm_.SetGlobalBuffer((__gm__ outType*)initParams.attnOut);
     }
 
     __aicore__ inline void InitLocalBuffers()
@@ -402,7 +402,7 @@ private:
     }
 
     template <typename dataType>
-    __aicore__ inline void CopyVectorIn(LocalTensor<dataType> &dst, GlobalTensor<dataType> &src, uint64_t offset,
+    __aicore__ inline void CopyVectorIn(LocalTensor<dataType>& dst, GlobalTensor<dataType>& src, uint64_t offset,
                                         uint64_t count)
     {
         uint64_t rowBytes = count * sizeof(dataType);
@@ -415,7 +415,7 @@ private:
         }
     }
 
-    __aicore__ inline float ReadFloat(GlobalTensor<float> &tensor, uint64_t offset)
+    __aicore__ inline float ReadFloat(GlobalTensor<float>& tensor, uint64_t offset)
     {
         LocalTensor<float> scalar = scalarBuf_.Get<float>();
         DataCopyParams params{1, static_cast<uint16_t>(sizeof(float)), 0, 0};
@@ -425,7 +425,7 @@ private:
         Adds(scalar, scalar, 0.0f, 1);
         PipeBarrier<PIPE_V>();
         SyncVToS();
-        __ubuf__ float *ptr = (__ubuf__ float *)scalar.GetPhyAddr();
+        __ubuf__ float* ptr = (__ubuf__ float*)scalar.GetPhyAddr();
         return ptr[0];
     }
 
@@ -437,7 +437,7 @@ private:
         Exp(scalar, scalar, 1);
         PipeBarrier<PIPE_V>();
         SyncVToS();
-        __ubuf__ float *ptr = (__ubuf__ float *)scalar.GetPhyAddr();
+        __ubuf__ float* ptr = (__ubuf__ float*)scalar.GetPhyAddr();
         return ptr[0];
     }
 
@@ -447,7 +447,7 @@ private:
         return 1.0f / denom;
     }
 
-    __aicore__ inline void NormalizeRows(LocalTensor<float> &tensor, int32_t seqLen)
+    __aicore__ inline void NormalizeRows(LocalTensor<float>& tensor, int32_t seqLen)
     {
         for (int32_t row = 0; row < seqLen; ++row) {
             uint32_t rowOffset = static_cast<uint32_t>(row) * alignK_;
@@ -588,8 +588,8 @@ private:
     }
 
     template <typename transType>
-    __aicore__ inline void TransposeStateMatrixTyped(const LocalTensor<transType> &dst,
-                                                     const LocalTensor<transType> &src, uint32_t rowCount,
+    __aicore__ inline void TransposeStateMatrixTyped(const LocalTensor<transType>& dst,
+                                                     const LocalTensor<transType>& src, uint32_t rowCount,
                                                      uint32_t columnCount, uint32_t srcRowStride, uint32_t dstRowStride)
     {
         constexpr uint32_t elementsPerBlock = DATA_BLOCK_BYTES / sizeof(transType);
@@ -615,7 +615,7 @@ private:
         }
     }
 
-    __aicore__ inline void TransposeKFirstToVFirst(const LocalTensor<stateType> &dst, const LocalTensor<stateType> &src,
+    __aicore__ inline void TransposeKFirstToVFirst(const LocalTensor<stateType>& dst, const LocalTensor<stateType>& src,
                                                    uint32_t curSingleV)
     {
         if constexpr (std::is_same<stateType, float32_t>()) {
@@ -627,7 +627,7 @@ private:
         }
     }
 
-    __aicore__ inline void TransposeVFirstToKFirst(const LocalTensor<stateType> &dst, const LocalTensor<stateType> &src,
+    __aicore__ inline void TransposeVFirstToKFirst(const LocalTensor<stateType>& dst, const LocalTensor<stateType>& src,
                                                    uint32_t curSingleV)
     {
         if constexpr (std::is_same<stateType, float32_t>()) {
@@ -683,8 +683,8 @@ private:
         stateInQueue_.FreeTensor(stateLocal);
     }
 
-    __aicore__ inline void MatVecMul(const LocalTensor<float> &cubeTensor, const LocalTensor<float> &vecTensor,
-                                     LocalTensor<float> &dstTensor, uint32_t cols, bool isAdd)
+    __aicore__ inline void MatVecMul(const LocalTensor<float>& cubeTensor, const LocalTensor<float>& vecTensor,
+                                     LocalTensor<float>& dstTensor, uint32_t cols, bool isAdd)
     {
         uint8_t repeatStride = alignK_ / FP32_NUM_PER_BLOCK;
         for (uint32_t i = 0; i < alignK_; i += REPEAT_LENTH) {
@@ -702,7 +702,7 @@ private:
         }
     }
 
-    __aicore__ inline void ReduceSumBaseline(LocalTensor<float> &dstTensor, const LocalTensor<float> &srcTensor,
+    __aicore__ inline void ReduceSumBaseline(LocalTensor<float>& dstTensor, const LocalTensor<float>& srcTensor,
                                              uint32_t rows)
     {
         uint32_t stateShape[2] = {rows, alignK_};
@@ -720,7 +720,7 @@ private:
         return true;
     }
 
-    __aicore__ inline void ReduceSumAddFoldK128(LocalTensor<float> &dstTensor, LocalTensor<float> &srcTensor,
+    __aicore__ inline void ReduceSumAddFoldK128(LocalTensor<float>& dstTensor, LocalTensor<float>& srcTensor,
                                                 uint32_t rows)
     {
         const uint8_t repeatTime = static_cast<uint8_t>(rows);
@@ -732,7 +732,7 @@ private:
         WholeReduceSum(dstTensor, srcTensor[REPEAT_LENTH], REPEAT_LENTH, repeatTime, 1, 1, rowRepStride);
     }
 
-    __aicore__ inline void ReduceSumAddFold(LocalTensor<float> &dstTensor, LocalTensor<float> &srcTensor, uint32_t rows)
+    __aicore__ inline void ReduceSumAddFold(LocalTensor<float>& dstTensor, LocalTensor<float>& srcTensor, uint32_t rows)
     {
         if (alignK_ < REPEAT_LENTH) {
             ReduceSumBaseline(dstTensor, srcTensor, rows);
@@ -763,7 +763,7 @@ private:
         }
     }
 
-    __aicore__ inline void ReduceSumDispatch(LocalTensor<float> &dstTensor, LocalTensor<float> &srcTensor,
+    __aicore__ inline void ReduceSumDispatch(LocalTensor<float>& dstTensor, LocalTensor<float>& srcTensor,
                                              uint32_t rows)
     {
         if (useAddFoldReduce_ && alignK_ >= ADD_FOLD_REDUCE_MIN_K) {
@@ -1008,7 +1008,7 @@ private:
     GlobalTensor<int64_t> numAcceptedTokensInt64Gm_;
     GlobalTensor<stateType> finalStateGm_;
     GlobalTensor<outType> attnOutGm_;
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> qInQueue_;
     TQue<QuePosition::VECIN, 1> kInQueue_;
     TQue<QuePosition::VECIN, 1> vInQueue_;

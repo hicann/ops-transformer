@@ -34,7 +34,7 @@ public:
     using MM_OUT_T = T;
 
     __aicore__ inline SWACubeBlock(){};
-    __aicore__ inline void InitParams(const ConstInfo &constInfo);
+    __aicore__ inline void InitParams(const ConstInfo& constInfo);
     __aicore__ inline void InitMm1GlobalTensor(GlobalTensor<Q_T> queryGm, GlobalTensor<KV_T> oriKvGm,
                                                GlobalTensor<KV_T> cmpKV, GlobalTensor<MM_OUT_T> mm1ResGm);
     __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<KV_T> vec1ResGm, GlobalTensor<MM_OUT_T> mm2ResGm,
@@ -42,12 +42,12 @@ public:
     __aicore__ inline void InitPageAttentionInfo(GlobalTensor<KV_T> oriKvGm, GlobalTensor<int32_t> oriBlockTableGm,
                                                  GlobalTensor<int32_t> cmpBlockTableGm);
     __aicore__ inline void InitDsparkKvMerge(GlobalTensor<KV_T> kvMergeGm);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
 
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void ComputeMm1(const RunInfo &info, const MSplitInfo mSplitInfo);
-    __aicore__ inline void ComputeMm2(const RunInfo &info, const MSplitInfo mSplitInfo);
+    __aicore__ inline void ComputeMm1(const RunInfo& info, const MSplitInfo mSplitInfo);
+    __aicore__ inline void ComputeMm2(const RunInfo& info, const MSplitInfo mSplitInfo);
 
 private:
     static constexpr bool PAGE_ATTENTION = SMLAT::pageAttention;
@@ -140,20 +140,20 @@ private:
         return idxMap[mIdx % 2] + k1Idx;
     }
 
-    __aicore__ inline void CopyGmToL1(LocalTensor<KV_T> &l1Tensor, GlobalTensor<KV_T> &gmSrcTensor, uint32_t srcN,
+    __aicore__ inline void CopyGmToL1(LocalTensor<KV_T>& l1Tensor, GlobalTensor<KV_T>& gmSrcTensor, uint32_t srcN,
                                       uint32_t srcD, uint32_t srcDstride);
-    __aicore__ inline void CopyInMm1AToL1(LocalTensor<KV_T> &aL1Tensor, const RunInfo &info, uint32_t mSeqIdx,
+    __aicore__ inline void CopyInMm1AToL1(LocalTensor<KV_T>& aL1Tensor, const RunInfo& info, uint32_t mSeqIdx,
                                           uint32_t mSizeAct, uint32_t headSize, uint32_t headOffset);
-    __aicore__ inline void CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor, const RunInfo &info, uint32_t mSeqIdx,
+    __aicore__ inline void CopyInMm2AToL1(LocalTensor<KV_T>& aL1Tensor, const RunInfo& info, uint32_t mSeqIdx,
                                           uint32_t subMSizeAct, uint32_t nSize, uint32_t nOffset);
-    __aicore__ inline void LoadDataMm1A(LocalTensor<KV_T> &aL0Tensor, LocalTensor<KV_T> &aL1Tensor, uint32_t idx,
+    __aicore__ inline void LoadDataMm1A(LocalTensor<KV_T>& aL0Tensor, LocalTensor<KV_T>& aL1Tensor, uint32_t idx,
                                         uint32_t kSplitSize, uint32_t mSize, uint32_t kSize);
-    __aicore__ inline void LoadDataMm1B(LocalTensor<KV_T> &bL0Tensor, LocalTensor<KV_T> &bL1Tensor, uint32_t idx,
+    __aicore__ inline void LoadDataMm1B(LocalTensor<KV_T>& bL0Tensor, LocalTensor<KV_T>& bL1Tensor, uint32_t idx,
                                         uint32_t kSplitSize, uint32_t kSize, uint32_t nSize);
 };
 
 template <typename SMLAT>
-__aicore__ inline void SWACubeBlock<SMLAT>::InitParams(const ConstInfo &constInfo)
+__aicore__ inline void SWACubeBlock<SMLAT>::InitParams(const ConstInfo& constInfo)
 {
     this->constInfo = constInfo;
 }
@@ -202,7 +202,7 @@ __aicore__ inline void SWACubeBlock<SMLAT>::InitDsparkKvMerge(GlobalTensor<KV_T>
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWACubeBlock<SMLAT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void SWACubeBlock<SMLAT>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(bufQPL1, L1_BLOCK_SIZE * 4);
     l1QPTensor = bufQPL1.Get<Q_T>();
@@ -248,7 +248,7 @@ __aicore__ inline void SWACubeBlock<SMLAT>::FreeEventID()
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWACubeBlock<SMLAT>::CopyGmToL1(LocalTensor<KV_T> &l1Tensor, GlobalTensor<KV_T> &gmSrcTensor,
+__aicore__ inline void SWACubeBlock<SMLAT>::CopyGmToL1(LocalTensor<KV_T>& l1Tensor, GlobalTensor<KV_T>& gmSrcTensor,
                                                        uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;
@@ -264,7 +264,7 @@ __aicore__ inline void SWACubeBlock<SMLAT>::CopyGmToL1(LocalTensor<KV_T> &l1Tens
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWACubeBlock<SMLAT>::CopyInMm1AToL1(LocalTensor<KV_T> &l1Tensor, const RunInfo &info,
+__aicore__ inline void SWACubeBlock<SMLAT>::CopyInMm1AToL1(LocalTensor<KV_T>& l1Tensor, const RunInfo& info,
                                                            uint32_t mSeqIdx, uint32_t mSizeAct, uint32_t headSize,
                                                            uint32_t headOffset)
 {
@@ -273,7 +273,7 @@ __aicore__ inline void SWACubeBlock<SMLAT>::CopyInMm1AToL1(LocalTensor<KV_T> &l1
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWACubeBlock<SMLAT>::LoadDataMm1A(LocalTensor<KV_T> &aL0Tensor, LocalTensor<KV_T> &aL1Tensor,
+__aicore__ inline void SWACubeBlock<SMLAT>::LoadDataMm1A(LocalTensor<KV_T>& aL0Tensor, LocalTensor<KV_T>& aL1Tensor,
                                                          uint32_t idx, uint32_t kSplitSize, uint32_t mSize,
                                                          uint32_t kSize)
 {
@@ -307,7 +307,7 @@ __aicore__ inline void SWACubeBlock<SMLAT>::LoadDataMm1A(LocalTensor<KV_T> &aL0T
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWACubeBlock<SMLAT>::LoadDataMm1B(LocalTensor<KV_T> &l0Tensor, LocalTensor<KV_T> &l1Tensor,
+__aicore__ inline void SWACubeBlock<SMLAT>::LoadDataMm1B(LocalTensor<KV_T>& l0Tensor, LocalTensor<KV_T>& l1Tensor,
                                                          uint32_t idx, uint32_t kSplitSize, uint32_t kSize,
                                                          uint32_t nSize)
 {
@@ -323,7 +323,7 @@ __aicore__ inline void SWACubeBlock<SMLAT>::LoadDataMm1B(LocalTensor<KV_T> &l0Te
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWACubeBlock<SMLAT>::CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor, const RunInfo &info,
+__aicore__ inline void SWACubeBlock<SMLAT>::CopyInMm2AToL1(LocalTensor<KV_T>& aL1Tensor, const RunInfo& info,
                                                            uint32_t mSeqIdx, uint32_t subMSizeAct, uint32_t nSize,
                                                            uint32_t nOffset)
 {
@@ -333,7 +333,7 @@ __aicore__ inline void SWACubeBlock<SMLAT>::CopyInMm2AToL1(LocalTensor<KV_T> &aL
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm1(const RunInfo &info, const MSplitInfo mSplitInfo)
+__aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm1(const RunInfo& info, const MSplitInfo mSplitInfo)
 {
     uint32_t mSize = mSplitInfo.nBufferDealM;
     uint32_t mL1Size = M_SPLIT_SIZE;
@@ -774,7 +774,7 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm1(const RunInfo &info, cons
 }
 
 template <typename SMLAT>
-__aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo &info, const MSplitInfo mSplitInfo)
+__aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo& info, const MSplitInfo mSplitInfo)
 {
     uint32_t mSize = mSplitInfo.nBufferDealM;
     uint32_t mSizeAlign = (mSize + 16 - 1) / 16;

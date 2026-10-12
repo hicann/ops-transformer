@@ -68,19 +68,19 @@ REGISTER_TILING_DATA_CLASS(QuantSparseFlashMla, QuantSparseFlashMlaTilingData)
 // ---------------算子Tiling类---------------
 class QuantSparseFlashMlaTiling {
 public:
-    explicit QuantSparseFlashMlaTiling(gert::TilingContext *context)
+    explicit QuantSparseFlashMlaTiling(gert::TilingContext* context)
         : context_(context) {};
-    ge::graphStatus DoOpTiling(QSMLATilingInfo *tilingInfo);
+    ge::graphStatus DoOpTiling(QSMLATilingInfo* tilingInfo);
 
 private:
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     QSMLATemplateMode perfMode_ = QSMLATemplateMode::SWA_TEMPLATE_MODE;
     QuantSparseFlashMlaTilingData tilingData_;
     uint32_t blockDim_{0};
     uint64_t workspaceSize_{0};
     uint64_t tilingKey_{0};
 
-    QSMLATilingInfo *qsmlaInfo_ = nullptr;
+    QSMLATilingInfo* qsmlaInfo_ = nullptr;
 };
 
 } // namespace optiling

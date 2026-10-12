@@ -17,29 +17,29 @@ extern "C" {
 namespace {
 
 extern aclnnStatus aclnnInnerSparseFlashAttentionGradGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *sparseIndices, const aclTensor *dOut,
-    const aclTensor *out, const aclTensor *softmaxMax, const aclTensor *softmaxSum, const aclTensor *sinksOptional,
-    const aclTensor *valueOptional, const aclTensor *actualSeqLengthsQueryOptional,
-    const aclTensor *actualSeqLengthsKvOptional, const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional,
-    double scaleValue, int64_t sparseBlockSize, char *layoutOptional, int64_t sparseMode, int64_t preTokens,
-    int64_t nextTokens, bool deterministic, const aclTensor *dQueryOut, const aclTensor *dKeyOut,
-    const aclTensor *dValueOutOptional, const aclTensor *dQueryRopeOutOptional, const aclTensor *dKeyRopeOutOptional,
-    const aclTensor *dSinksOptional, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* query, const aclTensor* key, const aclTensor* sparseIndices, const aclTensor* dOut,
+    const aclTensor* out, const aclTensor* softmaxMax, const aclTensor* softmaxSum, const aclTensor* sinksOptional,
+    const aclTensor* valueOptional, const aclTensor* actualSeqLengthsQueryOptional,
+    const aclTensor* actualSeqLengthsKvOptional, const aclTensor* queryRopeOptional, const aclTensor* keyRopeOptional,
+    double scaleValue, int64_t sparseBlockSize, char* layoutOptional, int64_t sparseMode, int64_t preTokens,
+    int64_t nextTokens, bool deterministic, const aclTensor* dQueryOut, const aclTensor* dKeyOut,
+    const aclTensor* dValueOutOptional, const aclTensor* dQueryRopeOutOptional, const aclTensor* dKeyRopeOutOptional,
+    const aclTensor* dSinksOptional, uint64_t* workspaceSize, aclOpExecutor** executor);
 
-extern aclnnStatus aclnnInnerSparseFlashAttentionGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern aclnnStatus aclnnInnerSparseFlashAttentionGrad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                       aclrtStream stream);
 
 // V1 接口：无 sinks/dSinks（5 输出），位置参数与商发 npu_sparse_flash_attention_grad 严格对齐。
 // 转发 inner 时 sinks/dSinks 传 nullptr。
 aclnnStatus aclnnSparseFlashAttentionGradGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *sparseIndices,
-    const aclTensor *dOut, const aclTensor *out, const aclTensor *softmaxMax, const aclTensor *softmaxSum,
-    const aclTensor *actualSeqLengthsQueryOptional, const aclTensor *actualSeqLengthsKvOptional,
-    const aclTensor *queryRopeOptional, const aclTensor *keyRopeOptional, double scaleValue, int64_t sparseBlockSize,
-    char *layoutOptional, int64_t sparseMode, int64_t preTokens, int64_t nextTokens, bool deterministic,
-    const aclTensor *dQueryOut, const aclTensor *dKeyOut, const aclTensor *dValueOut,
-    const aclTensor *dQueryRopeOutOptional, const aclTensor *dKeyRopeOutOptional, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* sparseIndices,
+    const aclTensor* dOut, const aclTensor* out, const aclTensor* softmaxMax, const aclTensor* softmaxSum,
+    const aclTensor* actualSeqLengthsQueryOptional, const aclTensor* actualSeqLengthsKvOptional,
+    const aclTensor* queryRopeOptional, const aclTensor* keyRopeOptional, double scaleValue, int64_t sparseBlockSize,
+    char* layoutOptional, int64_t sparseMode, int64_t preTokens, int64_t nextTokens, bool deterministic,
+    const aclTensor* dQueryOut, const aclTensor* dKeyOut, const aclTensor* dValueOut,
+    const aclTensor* dQueryRopeOutOptional, const aclTensor* dKeyRopeOutOptional, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     return aclnnInnerSparseFlashAttentionGradGetWorkspaceSize(
         query, key, sparseIndices, dOut, out, softmaxMax, softmaxSum, nullptr /*sinks*/, value,
@@ -48,7 +48,7 @@ aclnnStatus aclnnSparseFlashAttentionGradGetWorkspaceSize(
         dValueOut, dQueryRopeOutOptional, dKeyRopeOutOptional, nullptr /*dSinks*/, workspaceSize, executor);
 }
 
-aclnnStatus aclnnSparseFlashAttentionGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnSparseFlashAttentionGrad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                           aclrtStream stream)
 {
     return aclnnInnerSparseFlashAttentionGrad(workspace, workspaceSize, executor, stream);

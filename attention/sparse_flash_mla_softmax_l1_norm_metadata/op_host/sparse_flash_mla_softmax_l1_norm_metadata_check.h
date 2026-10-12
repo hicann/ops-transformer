@@ -24,7 +24,7 @@ extern "C" {
 
 namespace {
 
-static constexpr const char *SMLA_ACLNN_OP_NAME = "aclnnSparseFlashMlaSoftmaxL1NormMetadata";
+static constexpr const char* SMLA_ACLNN_OP_NAME = "aclnnSparseFlashMlaSoftmaxL1NormMetadata";
 
 inline constexpr int64_t SMLA_NO_MASK_MODE = 0;
 inline constexpr int64_t SMLA_CAUSAL_MASK_MODE = 3;
@@ -36,12 +36,12 @@ inline constexpr int64_t SMLA_NUM_HEADS_Q_UPPER_BOUND = 128;
 inline constexpr int64_t SMLA_NUM_HEADS_K = 1;
 inline constexpr int64_t SMLA_HEAD_DIM = 512;
 
-inline bool IsTensorExistSmlaL1Norm(const aclTensor *tensor)
+inline bool IsTensorExistSmlaL1Norm(const aclTensor* tensor)
 {
     return (tensor != nullptr) && (tensor->GetViewShape().GetDimNum() > 0) && (tensor->GetViewShape().GetDim(0) > 0);
 }
 
-int64_t GetDimNumSmlaL1Norm(const aclTensor *tensor)
+int64_t GetDimNumSmlaL1Norm(const aclTensor* tensor)
 {
     if (tensor == nullptr) {
         return -1;
@@ -49,7 +49,7 @@ int64_t GetDimNumSmlaL1Norm(const aclTensor *tensor)
     return tensor->GetViewShape().GetDimNum();
 }
 
-aclDataType GetDataTypeSmlaL1Norm(const aclTensor *tensor)
+aclDataType GetDataTypeSmlaL1Norm(const aclTensor* tensor)
 {
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
     if (tensor == nullptr) {
@@ -59,8 +59,8 @@ aclDataType GetDataTypeSmlaL1Norm(const aclTensor *tensor)
     return dataType;
 }
 
-int64_t GetQueryBatchSizeSmlaL1Norm(int64_t batchSize, const aclTensor *cuSeqLensQOptional,
-                                    const aclTensor *seqUsedQOptional, const char *layoutQ)
+int64_t GetQueryBatchSizeSmlaL1Norm(int64_t batchSize, const aclTensor* cuSeqLensQOptional,
+                                    const aclTensor* seqUsedQOptional, const char* layoutQ)
 {
     if (IsTensorExistSmlaL1Norm(seqUsedQOptional)) {
         return seqUsedQOptional->GetViewShape().GetDim(0);
@@ -73,8 +73,8 @@ int64_t GetQueryBatchSizeSmlaL1Norm(int64_t batchSize, const aclTensor *cuSeqLen
     return batchSize;
 }
 
-int64_t GetKeyBatchSizeSmlaL1Norm(int64_t batchSize, const aclTensor *cuSeqLensKOptional,
-                                  const aclTensor *seqUsedKOptional, const char *layoutK)
+int64_t GetKeyBatchSizeSmlaL1Norm(int64_t batchSize, const aclTensor* cuSeqLensKOptional,
+                                  const aclTensor* seqUsedKOptional, const char* layoutK)
 {
     if (IsTensorExistSmlaL1Norm(seqUsedKOptional)) {
         return seqUsedKOptional->GetViewShape().GetDim(0);
@@ -89,7 +89,7 @@ int64_t GetKeyBatchSizeSmlaL1Norm(int64_t batchSize, const aclTensor *cuSeqLensK
 
 aclnnStatus CheckSingleParamSmlaL1Norm(int64_t batchSize, int64_t maxSeqLenQ, int64_t maxSeqLenK, int64_t numHeadsQ,
                                        int64_t numHeadsK, int64_t headDim, int64_t topk, int64_t maskMode,
-                                       int64_t cmpRatio, const char *layoutQ, const char *layoutK, int64_t aicCoreNum)
+                                       int64_t cmpRatio, const char* layoutQ, const char* layoutK, int64_t aicCoreNum)
 {
     // batch_size 非负校验
     if (batchSize < 0) {
@@ -191,10 +191,10 @@ aclnnStatus CheckSingleParamSmlaL1Norm(int64_t batchSize, int64_t maxSeqLenQ, in
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckExistenceSmlaL1Norm(const aclTensor *cuSeqLensQOptional, const aclTensor *cuSeqLensKOptional,
-                                     const aclTensor *topkLengthOptional, const aclTensor *cmpResidualKOptional,
-                                     int64_t topk, int64_t maskMode, int64_t cmpRatio, const char *layoutQ,
-                                     const char *layoutK, const aclTensor *metadata)
+aclnnStatus CheckExistenceSmlaL1Norm(const aclTensor* cuSeqLensQOptional, const aclTensor* cuSeqLensKOptional,
+                                     const aclTensor* topkLengthOptional, const aclTensor* cmpResidualKOptional,
+                                     int64_t topk, int64_t maskMode, int64_t cmpRatio, const char* layoutQ,
+                                     const char* layoutK, const aclTensor* metadata)
 {
     // layout_q 为 TND 时，cu_seq_lens_q 必传
     if (strcmp(layoutQ, "TND") == 0) {
@@ -238,11 +238,11 @@ aclnnStatus CheckExistenceSmlaL1Norm(const aclTensor *cuSeqLensQOptional, const 
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckConsistencySmlaL1Norm(int64_t batchSize, const aclTensor *cuSeqLensQOptional,
-                                       const aclTensor *cuSeqLensKOptional, const aclTensor *seqUsedQOptional,
-                                       const aclTensor *seqUsedKOptional, const aclTensor *cmpResidualKOptional,
-                                       const aclTensor *topkLengthOptional, const char *layoutQ, const char *layoutK,
-                                       const aclTensor *metadata)
+aclnnStatus CheckConsistencySmlaL1Norm(int64_t batchSize, const aclTensor* cuSeqLensQOptional,
+                                       const aclTensor* cuSeqLensKOptional, const aclTensor* seqUsedQOptional,
+                                       const aclTensor* seqUsedKOptional, const aclTensor* cmpResidualKOptional,
+                                       const aclTensor* topkLengthOptional, const char* layoutQ, const char* layoutK,
+                                       const aclTensor* metadata)
 {
     int64_t dimNum = -1;
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
@@ -423,12 +423,12 @@ aclnnStatus CheckConsistencySmlaL1Norm(int64_t batchSize, const aclTensor *cuSeq
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus ParamsCheckSmlaL1Norm(const aclTensor *cuSeqLensQOptional, const aclTensor *cuSeqLensKOptional,
-                                  const aclTensor *seqUsedQOptional, const aclTensor *seqUsedKOptional,
-                                  const aclTensor *cmpResidualKOptional, const aclTensor *topkLengthOptional,
+aclnnStatus ParamsCheckSmlaL1Norm(const aclTensor* cuSeqLensQOptional, const aclTensor* cuSeqLensKOptional,
+                                  const aclTensor* seqUsedQOptional, const aclTensor* seqUsedKOptional,
+                                  const aclTensor* cmpResidualKOptional, const aclTensor* topkLengthOptional,
                                   int64_t batchSize, int64_t maxSeqLenQ, int64_t maxSeqLenK, int64_t numHeadsQ,
                                   int64_t numHeadsK, int64_t headDim, int64_t topk, int64_t maskMode, int64_t cmpRatio,
-                                  char *layoutQ, char *layoutK, const aclTensor *metadata, int64_t aicCoreNum)
+                                  char* layoutQ, char* layoutK, const aclTensor* metadata, int64_t aicCoreNum)
 {
     auto ret = CheckSingleParamSmlaL1Norm(batchSize, maxSeqLenQ, maxSeqLenK, numHeadsQ, numHeadsK, headDim, topk,
                                           maskMode, cmpRatio, layoutQ, layoutK, aicCoreNum);

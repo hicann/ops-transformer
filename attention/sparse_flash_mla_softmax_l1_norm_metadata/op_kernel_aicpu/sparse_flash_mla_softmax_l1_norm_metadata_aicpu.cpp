@@ -23,7 +23,7 @@ using namespace optiling;
 
 namespace aicpu {
 
-uint32_t SparseFlashMlaSoftmaxL1NormMetadataCpuKernel::Compute(CpuKernelContext &ctx)
+uint32_t SparseFlashMlaSoftmaxL1NormMetadataCpuKernel::Compute(CpuKernelContext& ctx)
 {
     if (!Prepare(ctx)) {
         return KERNEL_STATUS_PARAM_INVALID;
@@ -36,7 +36,7 @@ uint32_t SparseFlashMlaSoftmaxL1NormMetadataCpuKernel::Compute(CpuKernelContext 
     return KERNEL_STATUS_PARAM_INVALID;
 }
 
-bool SparseFlashMlaSoftmaxL1NormMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
+bool SparseFlashMlaSoftmaxL1NormMetadataCpuKernel::Prepare(CpuKernelContext& ctx)
 {
     cuSeqLensQuery_ = ctx.Input(0);
     cuSeqLensKey_ = ctx.Input(1);
@@ -106,7 +106,7 @@ bool SparseFlashMlaSoftmaxL1NormMetadataCpuKernel::ParamsCheck()
 }
 
 namespace {
-static const char *kernelType = "SparseFlashMlaSoftmaxL1NormMetadata";
+static const char* kernelType = "SparseFlashMlaSoftmaxL1NormMetadata";
 REGISTER_CPU_KERNEL(kernelType, SparseFlashMlaSoftmaxL1NormMetadataCpuKernel);
 } // namespace
 } // namespace aicpu

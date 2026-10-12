@@ -19,7 +19,7 @@ namespace ScatterPaKvCacheWithKScaleUT {
 struct ScatterPaKvCacheWithKScaleHostUtParamBase : public HostUtParamBase {
     std::string cache_layout;
 
-    ScatterPaKvCacheWithKScaleHostUtParamBase(const csv_map &csvMap)
+    ScatterPaKvCacheWithKScaleHostUtParamBase(const csv_map& csvMap)
         : HostUtParamBase(csvMap)
     {
         this->cache_layout = ReadMap(csvMap, "cache_layout", "BNBD");
@@ -42,7 +42,7 @@ struct ScatterPaKvCacheWithKScaleTilingUtParam : public ScatterPaKvCacheWithKSca
     uint64_t expectTilingKey;
     std::string expectTilingDataHash;
 
-    ScatterPaKvCacheWithKScaleTilingUtParam(const csv_map &csvMap)
+    ScatterPaKvCacheWithKScaleTilingUtParam(const csv_map& csvMap)
         : ScatterPaKvCacheWithKScaleHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "key_shape", "key_dtype", "key_format", this->key));
@@ -88,7 +88,7 @@ struct ScatterPaKvCacheWithKScaleInferShapeUtParam : public ScatterPaKvCacheWith
 
     std::vector<std::vector<int64_t>> expectOutputShape;
 
-    ScatterPaKvCacheWithKScaleInferShapeUtParam(const csv_map &csvMap)
+    ScatterPaKvCacheWithKScaleInferShapeUtParam(const csv_map& csvMap)
         : ScatterPaKvCacheWithKScaleHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "key_shape", "key_dtype", "key_format", this->key));

@@ -14,13 +14,13 @@
 namespace optiling {
 namespace sparse_mla_checker {
 namespace {
-const char *Op(const CheckContext &context)
+const char* Op(const CheckContext& context)
 {
     return context.opName == nullptr ? "SparseMla" : context.opName;
 }
 } // namespace
 
-ge::graphStatus SinksChecker::CheckSinglePara(const CheckContext &context) const
+ge::graphStatus SinksChecker::CheckSinglePara(const CheckContext& context) const
 {
     if (!context.sinks.present) {
         return ge::GRAPH_SUCCESS;
@@ -33,16 +33,16 @@ ge::graphStatus SinksChecker::CheckSinglePara(const CheckContext &context) const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SinksChecker::CheckParaExistence(const CheckContext &context) const
+ge::graphStatus SinksChecker::CheckParaExistence(const CheckContext& context) const
 {
-    OP_CHECK_IF(!context.sinks.present,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                    Op(context), "sinks", "Sinks is required in the current version"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        !context.sinks.present,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Op(context), "sinks", "Sinks is required in the current version"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SinksChecker::CheckMultiPara(const CheckContext &context) const
+ge::graphStatus SinksChecker::CheckMultiPara(const CheckContext& context) const
 {
     OP_CHECK_IF(GetDim(context.sinks, 0) != context.qNumHeads,
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(

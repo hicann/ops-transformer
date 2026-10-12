@@ -42,9 +42,9 @@ TEST_F(RingAttentionUpdateApiTest, aclnn_ring_attention_update_v2_sbh_fp32)
     auto softmax_sum = TensorDesc({2, 12, 1024, 8}, ACL_FLOAT, ACL_FORMAT_ND);
 
     auto ut = OP_API_UT(aclnnRingAttentionUpdateV2,
-        INPUT(prev_attn_out, prev_softmax_max, prev_softmax_sum, cur_attn_out, cur_softmax_max, cur_softmax_sum,
-              nullptr, input_layout, input_softmax_layout),
-        OUTPUT(attn_out, softmax_max, softmax_sum));
+                        INPUT(prev_attn_out, prev_softmax_max, prev_softmax_sum, cur_attn_out, cur_softmax_max,
+                              cur_softmax_sum, nullptr, input_layout, input_softmax_layout),
+                        OUTPUT(attn_out, softmax_max, softmax_sum));
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
@@ -67,9 +67,9 @@ TEST_F(RingAttentionUpdateApiTest, aclnn_ring_attention_update_v2_sbh_fp16)
     auto softmax_sum = TensorDesc({2, 12, 1024, 8}, ACL_FLOAT, ACL_FORMAT_ND);
 
     auto ut = OP_API_UT(aclnnRingAttentionUpdateV2,
-        INPUT(prev_attn_out, prev_softmax_max, prev_softmax_sum, cur_attn_out, cur_softmax_max, cur_softmax_sum,
-              nullptr, input_layout, input_softmax_layout),
-        OUTPUT(attn_out, softmax_max, softmax_sum));
+                        INPUT(prev_attn_out, prev_softmax_max, prev_softmax_sum, cur_attn_out, cur_softmax_max,
+                              cur_softmax_sum, nullptr, input_layout, input_softmax_layout),
+                        OUTPUT(attn_out, softmax_max, softmax_sum));
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);

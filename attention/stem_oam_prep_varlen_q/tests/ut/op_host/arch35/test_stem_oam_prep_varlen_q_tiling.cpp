@@ -16,8 +16,14 @@ namespace StemOamPrepVarlenQUT {
 
 class StemPrepQArch35TilingTest : public testing::TestWithParam<StemPrepQTilingUtParam> {
 protected:
-    static void SetUpTestCase() { std::cout << "StemOamPrepVarlenQ Arch35 TilingTest SetUp" << std::endl; }
-    static void TearDownTestCase() { std::cout << "StemOamPrepVarlenQ Arch35 TilingTest TearDown" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "StemOamPrepVarlenQ Arch35 TilingTest SetUp" << std::endl;
+    }
+    static void TearDownTestCase()
+    {
+        std::cout << "StemOamPrepVarlenQ Arch35 TilingTest TearDown" << std::endl;
+    }
 };
 
 TEST_P(StemPrepQArch35TilingTest, tiling)

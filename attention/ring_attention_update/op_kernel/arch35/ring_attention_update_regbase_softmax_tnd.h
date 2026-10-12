@@ -28,21 +28,21 @@ public:
     __aicore__ inline void Init(GM_ADDR prevAttnOut, GM_ADDR prevSoftmaxMax, GM_ADDR prevSoftmaxSum, GM_ADDR curAttnOut,
                                 GM_ADDR curSoftmaxMax, GM_ADDR curSoftmaxSum, GM_ADDR actualSeqQlen, GM_ADDR attnOut,
                                 GM_ADDR softmaxMax, GM_ADDR softmaxSum, GM_ADDR workspace,
-                                const RingAttentionUpdateRegbaseSoftmaxTNDTilingData *__restrict tiling, TPipe *tPipe)
+                                const RingAttentionUpdateRegbaseSoftmaxTNDTilingData* __restrict tiling, TPipe* tPipe)
     {
         // init input global gm buffer
         InitComputeInfo(tiling);
-        prevAttnOutGm.SetGlobalBuffer((__gm__ T *)prevAttnOut);
-        prevSoftmaxSumGm.SetGlobalBuffer((__gm__ float *)prevSoftmaxSum);
-        prevSoftmaxMaxGm.SetGlobalBuffer((__gm__ float *)prevSoftmaxMax);
-        curAttnOutGm.SetGlobalBuffer((__gm__ T *)curAttnOut);
-        curSoftmaxSumGm.SetGlobalBuffer((__gm__ float *)curSoftmaxSum);
-        curSoftmaxMaxGm.SetGlobalBuffer((__gm__ float *)curSoftmaxMax);
-        actualSeqQlenGm.SetGlobalBuffer((__gm__ int64_t *)actualSeqQlen);
+        prevAttnOutGm.SetGlobalBuffer((__gm__ T*)prevAttnOut);
+        prevSoftmaxSumGm.SetGlobalBuffer((__gm__ float*)prevSoftmaxSum);
+        prevSoftmaxMaxGm.SetGlobalBuffer((__gm__ float*)prevSoftmaxMax);
+        curAttnOutGm.SetGlobalBuffer((__gm__ T*)curAttnOut);
+        curSoftmaxSumGm.SetGlobalBuffer((__gm__ float*)curSoftmaxSum);
+        curSoftmaxMaxGm.SetGlobalBuffer((__gm__ float*)curSoftmaxMax);
+        actualSeqQlenGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqQlen);
         // init output global gm buffer
-        attnOutGM.SetGlobalBuffer((__gm__ T *)attnOut);
-        softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmaxMax);
-        softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmaxSum);
+        attnOutGM.SetGlobalBuffer((__gm__ T*)attnOut);
+        softmaxMaxGm.SetGlobalBuffer((__gm__ float*)softmaxMax);
+        softmaxSumGm.SetGlobalBuffer((__gm__ float*)softmaxSum);
 
         // init input queue
         uint32_t bufferNumInQueue = 2; // cur和prev共用一个flagid
@@ -105,7 +105,7 @@ public:
     }
 
 private:
-    __aicore__ inline void InitComputeInfo(const RingAttentionUpdateRegbaseSoftmaxTNDTilingData *__restrict tiling)
+    __aicore__ inline void InitComputeInfo(const RingAttentionUpdateRegbaseSoftmaxTNDTilingData* __restrict tiling)
     {
         curBlockIdx = GetBlockIdx();
         dimT = tiling->dimT;

@@ -17,34 +17,36 @@
 
 class ScatterPaCache : public testing::Test {
 protected:
-static void SetUpTestCase() {
-    std::cout << "ScatterPaCache SetUp" << std::endl;
-}
+    static void SetUpTestCase()
+    {
+        std::cout << "ScatterPaCache SetUp" << std::endl;
+    }
 
-static void TearDownTestCase() {
-    std::cout << "ScatterPaCache TearDown" << std::endl;
-}
+    static void TearDownTestCase()
+    {
+        std::cout << "ScatterPaCache TearDown" << std::endl;
+    }
 };
 
 TEST_F(ScatterPaCache, scatter_pa_cache_infershape_0)
 {
-    gert::InfershapeContextPara infershapeContextPara("ScatterPaCache",
+    gert::InfershapeContextPara infershapeContextPara(
+        "ScatterPaCache",
         {
-            {{{102, 1, 128}, {102, 1, 128}}, ge::DT_FLOAT, ge::FORMAT_ND}, // key
+            {{{102, 1, 128}, {102, 1, 128}}, ge::DT_FLOAT, ge::FORMAT_ND},           // key
             {{{306, 128, 1, 128}, {306, 128, 1, 128}}, ge::DT_FLOAT, ge::FORMAT_ND}, // keyCache
-            {{{102}, {102}}, ge::DT_INT32, ge::FORMAT_ND}, // slotMapping
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, 
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, 
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, 
-            
+            {{{102}, {102}}, ge::DT_INT32, ge::FORMAT_ND},                           // slotMapping
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+
         },
         {
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // keyCache
         },
         {
             {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("Norm")},
-        }
-    );
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{306, 128, 1, 128}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }

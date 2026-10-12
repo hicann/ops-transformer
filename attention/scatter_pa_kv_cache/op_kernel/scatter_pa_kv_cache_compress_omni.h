@@ -25,7 +25,7 @@ public:
     __aicore__ inline ScatterPaKvCacheCompressOmni() {}
 
     template <bool PHASE>
-    __aicore__ inline void Copy2Cache(AscendC::GlobalTensor<T> &inputCache, AscendC::GlobalTensor<T> &outputCache,
+    __aicore__ inline void Copy2Cache(AscendC::GlobalTensor<T>& inputCache, AscendC::GlobalTensor<T>& outputCache,
                                       uint32_t srcStart, uint32_t dstStart)
     {
         event_t eventID = EVENT_ID0;
@@ -93,7 +93,7 @@ public:
         }
     }
 
-    __aicore__ inline void Compress4Rope(AscendC::GlobalTensor<T> &inputCache, AscendC::GlobalTensor<T> &outputCache,
+    __aicore__ inline void Compress4Rope(AscendC::GlobalTensor<T>& inputCache, AscendC::GlobalTensor<T>& outputCache,
                                          uint32_t startTaskOffset)
     {
         ParamSet(slotInputGt_, startTaskOffset);

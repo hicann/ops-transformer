@@ -23,28 +23,28 @@ class SwinAttentionScoreQuant<int8_t, DTYPE_OUT, DTYPE_SCALE, DTYPE_BIAS, DTYPE_
 
 public:
     __aicore__ inline SwinAttentionScoreQuant(){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                __gm__ uint8_t *scaleQuant, __gm__ uint8_t *scaleDequant1,
-                                __gm__ uint8_t *scaleDequant2, __gm__ uint8_t *biasQuant, __gm__ uint8_t *biasDequant1,
-                                __gm__ uint8_t *biasDequant2, __gm__ uint8_t *paddingMask1,
-                                __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-                                const SwinAttentionScoreQuantTilingData *tiling, AscendC::TPipe *tPipe)
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                __gm__ uint8_t* scaleQuant, __gm__ uint8_t* scaleDequant1,
+                                __gm__ uint8_t* scaleDequant2, __gm__ uint8_t* biasQuant, __gm__ uint8_t* biasDequant1,
+                                __gm__ uint8_t* biasDequant2, __gm__ uint8_t* paddingMask1,
+                                __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace,
+                                const SwinAttentionScoreQuantTilingData* tiling, AscendC::TPipe* tPipe)
     {
         coreIdx = AscendC::GetBlockIdx();
         blockDim = AscendC::GetBlockNum();
-        queryGm.SetGlobalBuffer((__gm__ DTYPE_IN *)query);
-        keyGm.SetGlobalBuffer((__gm__ DTYPE_IN *)key);
-        valueGm.SetGlobalBuffer((__gm__ DTYPE_IN *)value);
-        biasQuantGm.SetGlobalBuffer((__gm__ DTYPE_MASK *)biasQuant);
-        biasDequant1Gm.SetGlobalBuffer((__gm__ DTYPE_BIAS *)biasDequant1);
-        biasDequant2Gm.SetGlobalBuffer((__gm__ DTYPE_BIAS *)biasDequant2);
-        scaleQuantGm.SetGlobalBuffer((__gm__ DTYPE_MASK *)scaleQuant);
-        scaleDequant1Gm.SetGlobalBuffer((__gm__ DTYPE_SCALE *)scaleDequant1);
-        scaleDequant2Gm.SetGlobalBuffer((__gm__ DTYPE_SCALE *)scaleDequant2);
-        mask1Gm.SetGlobalBuffer((__gm__ DTYPE_MASK *)paddingMask1);
-        attentionOutGm.SetGlobalBuffer((__gm__ DTYPE_OUT *)attentionOut);
+        queryGm.SetGlobalBuffer((__gm__ DTYPE_IN*)query);
+        keyGm.SetGlobalBuffer((__gm__ DTYPE_IN*)key);
+        valueGm.SetGlobalBuffer((__gm__ DTYPE_IN*)value);
+        biasQuantGm.SetGlobalBuffer((__gm__ DTYPE_MASK*)biasQuant);
+        biasDequant1Gm.SetGlobalBuffer((__gm__ DTYPE_BIAS*)biasDequant1);
+        biasDequant2Gm.SetGlobalBuffer((__gm__ DTYPE_BIAS*)biasDequant2);
+        scaleQuantGm.SetGlobalBuffer((__gm__ DTYPE_MASK*)scaleQuant);
+        scaleDequant1Gm.SetGlobalBuffer((__gm__ DTYPE_SCALE*)scaleDequant1);
+        scaleDequant2Gm.SetGlobalBuffer((__gm__ DTYPE_SCALE*)scaleDequant2);
+        mask1Gm.SetGlobalBuffer((__gm__ DTYPE_MASK*)paddingMask1);
+        attentionOutGm.SetGlobalBuffer((__gm__ DTYPE_OUT*)attentionOut);
 
-        tilingData = const_cast<SwinAttentionScoreQuantTilingData *>(tiling);
+        tilingData = const_cast<SwinAttentionScoreQuantTilingData*>(tiling);
         pipe = tPipe;
 
         coreLoops = tilingData->coreLoops;
@@ -147,8 +147,8 @@ protected:
     }
 
     __aicore__ inline void Stage1BmmQK(uint32_t bIdx, uint32_t nIdx, uint32_t sIdx, uint32_t bOffset,
-                                       AscendC::LocalTensor<DTYPE_IN> &qL1Tensor,
-                                       AscendC::LocalTensor<DTYPE_IN> &kL1Tensor)
+                                       AscendC::LocalTensor<DTYPE_IN>& qL1Tensor,
+                                       AscendC::LocalTensor<DTYPE_IN>& kL1Tensor)
     {
         AscendC::LocalTensor<DTYPE_MASK> pUbTensor = pUbTBuf.template Get<DTYPE_MASK>();
 
@@ -163,10 +163,10 @@ protected:
         qkBmm.End();
     }
 
-    __aicore__ inline void Stage2AscendQuantNz(AscendC::LocalTensor<DTYPE_IN> &dst,
-                                               AscendC::LocalTensor<DTYPE_MASK> &src,
-                                               AscendC::LocalTensor<DTYPE_MASK> &scaleQuantUb,
-                                               AscendC::LocalTensor<DTYPE_MASK> &biasQuantUb)
+    __aicore__ inline void Stage2AscendQuantNz(AscendC::LocalTensor<DTYPE_IN>& dst,
+                                               AscendC::LocalTensor<DTYPE_MASK>& src,
+                                               AscendC::LocalTensor<DTYPE_MASK>& scaleQuantUb,
+                                               AscendC::LocalTensor<DTYPE_MASK>& biasQuantUb)
     {
         uint64_t mask0 = 128;
         uint64_t mask1[2] = {0xffffffff, 0};
@@ -185,8 +185,8 @@ protected:
     }
 
     __aicore__ inline void Stage2Vec(uint32_t bIdx, uint32_t nIdx, uint32_t sIdx, uint32_t bOffset,
-                                     AscendC::LocalTensor<DTYPE_IN> &pL1Tensor,
-                                     AscendC::LocalTensor<DTYPE_IN> &vL1Tensor)
+                                     AscendC::LocalTensor<DTYPE_IN>& pL1Tensor,
+                                     AscendC::LocalTensor<DTYPE_IN>& vL1Tensor)
     {
         AscendC::LocalTensor<DTYPE_MASK> pUbTensor = pUbTBuf.template Get<DTYPE_MASK>();
         AscendC::LocalTensor<DTYPE_IN> pInt8 = pUbTBuf.template Get<DTYPE_IN>();
@@ -240,8 +240,8 @@ protected:
     }
 
     __aicore__ inline void Stage3BmmPV(uint32_t bIdx, uint32_t nIdx, uint32_t sIdx, uint32_t bOffset,
-                                       AscendC::LocalTensor<DTYPE_IN> &pL1Tensor,
-                                       AscendC::LocalTensor<DTYPE_IN> &vL1Tensor)
+                                       AscendC::LocalTensor<DTYPE_IN>& pL1Tensor,
+                                       AscendC::LocalTensor<DTYPE_IN>& vL1Tensor)
     {
         pvBmm.SetOrgShape(roundM, h, round32S, round32S);
         pvBmm.SetTail(actualM, h, s);
@@ -251,8 +251,8 @@ protected:
         pvBmm.End();
     }
 
-    SwinAttentionScoreQuantTilingData *tilingData;
-    AscendC::TPipe *pipe;
+    SwinAttentionScoreQuantTilingData* tilingData;
+    AscendC::TPipe* pipe;
     AscendC::TQue<AscendC::TPosition::B1, SWIN_BUFFER_NUM> pL1TQue;
     AscendC::TQue<AscendC::TPosition::B1, SWIN_BUFFER_NUM> vL1TQue;
     AscendC::TQue<AscendC::TPosition::A1, SWIN_BUFFER_NUM> qL1TQue;

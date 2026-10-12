@@ -37,15 +37,15 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensOriKvOptional,
-    const aclTensor *cuSeqlensCmpKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedOriKvOptional,
-    const aclTensor *sequsedCmpKvOptional, const aclTensor *cmpResidualKvOptional,
-    const aclTensor *oriTopkLengthOptional, const aclTensor *cmpTopkLengthOptional, int64_t numHeadsQ,
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensOriKvOptional,
+    const aclTensor* cuSeqlensCmpKvOptional, const aclTensor* sequsedQOptional, const aclTensor* sequsedOriKvOptional,
+    const aclTensor* sequsedCmpKvOptional, const aclTensor* cmpResidualKvOptional,
+    const aclTensor* oriTopkLengthOptional, const aclTensor* cmpTopkLengthOptional, int64_t numHeadsQ,
     int64_t numHeadsKv, int64_t headDim, int64_t quantMode, int64_t batchSize, int64_t maxSeqlenQ,
     int64_t maxSeqlenOriKv, int64_t maxSeqlenCmpKv, int64_t oriTopk, int64_t cmpTopk, int64_t cmpRatio,
-    int64_t oriMaskMode, int64_t cmpMaskMode, int64_t oriWinLeft, int64_t oriWinRight, const char *layoutQOptional,
-    const char *layoutKvOptional, bool hasOriKv, bool hasCmpKv, const aclTensor *metaData, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    int64_t oriMaskMode, int64_t cmpMaskMode, int64_t oriWinLeft, int64_t oriWinRight, const char* layoutQOptional,
+    const char* layoutKvOptional, bool hasOriKv, bool hasCmpKv, const aclTensor* metaData, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     if (workspaceSize == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "workspaceSize is nullptr");
@@ -66,7 +66,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
+    const op::PlatformInfo& npuInfo = op::GetCurrentPlatformInfo();
     uint32_t aicCoreNum = 0;
     uint32_t aivCoreNum = 0;
     if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &aicCoreNum) != ACL_SUCCESS) {
@@ -76,7 +76,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
         aivCoreNum = npuInfo.GetVectorCoreNum();
     }
     std::string socVersionStr = npuInfo.GetSocLongVersion();
-    const char *socVersion = socVersionStr.c_str();
+    const char* socVersion = socVersionStr.c_str();
 
     int64_t batchConsistencyLevel = 0;
     aclError aclRet = aclrtGetSysParamOpt(ACL_OPT_DETERMINISTIC, &batchConsistencyLevel);
@@ -93,7 +93,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
                            aivCoreNum, socVersion, metaData);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
-    const aclTensor *cuSeqlensQOptionalContiguous = nullptr;
+    const aclTensor* cuSeqlensQOptionalContiguous = nullptr;
     if (cuSeqlensQOptional != nullptr) {
         cuSeqlensQOptionalContiguous = l0op::Contiguous(cuSeqlensQOptional, uniqueExecutor.get());
         if (cuSeqlensQOptionalContiguous == nullptr) {
@@ -101,7 +101,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *cuSeqlensOriKvOptionalContiguous = nullptr;
+    const aclTensor* cuSeqlensOriKvOptionalContiguous = nullptr;
     if (cuSeqlensOriKvOptional != nullptr) {
         cuSeqlensOriKvOptionalContiguous = l0op::Contiguous(cuSeqlensOriKvOptional, uniqueExecutor.get());
         if (cuSeqlensOriKvOptionalContiguous == nullptr) {
@@ -109,7 +109,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *cuSeqlensCmpKvOptionalContiguous = nullptr;
+    const aclTensor* cuSeqlensCmpKvOptionalContiguous = nullptr;
     if (cuSeqlensCmpKvOptional != nullptr) {
         cuSeqlensCmpKvOptionalContiguous = l0op::Contiguous(cuSeqlensCmpKvOptional, uniqueExecutor.get());
         if (cuSeqlensCmpKvOptionalContiguous == nullptr) {
@@ -117,7 +117,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *sequsedQOptionalContiguous = nullptr;
+    const aclTensor* sequsedQOptionalContiguous = nullptr;
     if (sequsedQOptional != nullptr) {
         sequsedQOptionalContiguous = l0op::Contiguous(sequsedQOptional, uniqueExecutor.get());
         if (sequsedQOptionalContiguous == nullptr) {
@@ -125,7 +125,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *sequsedOriKvOptionalContiguous = nullptr;
+    const aclTensor* sequsedOriKvOptionalContiguous = nullptr;
     if (sequsedOriKvOptional != nullptr) {
         sequsedOriKvOptionalContiguous = l0op::Contiguous(sequsedOriKvOptional, uniqueExecutor.get());
         if (sequsedOriKvOptionalContiguous == nullptr) {
@@ -133,7 +133,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *sequsedCmpKvOptionalContiguous = nullptr;
+    const aclTensor* sequsedCmpKvOptionalContiguous = nullptr;
     if (sequsedCmpKvOptional != nullptr) {
         sequsedCmpKvOptionalContiguous = l0op::Contiguous(sequsedCmpKvOptional, uniqueExecutor.get());
         if (sequsedCmpKvOptionalContiguous == nullptr) {
@@ -141,7 +141,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *cmpResidualKvOptionalContiguous = nullptr;
+    const aclTensor* cmpResidualKvOptionalContiguous = nullptr;
     if (cmpResidualKvOptional != nullptr) {
         cmpResidualKvOptionalContiguous = l0op::Contiguous(cmpResidualKvOptional, uniqueExecutor.get());
         if (cmpResidualKvOptionalContiguous == nullptr) {
@@ -149,7 +149,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *oriTopkLengthOptionalContiguous = nullptr;
+    const aclTensor* oriTopkLengthOptionalContiguous = nullptr;
     if (oriTopkLengthOptional != nullptr) {
         oriTopkLengthOptionalContiguous = l0op::Contiguous(oriTopkLengthOptional, uniqueExecutor.get());
         if (oriTopkLengthOptionalContiguous == nullptr) {
@@ -157,7 +157,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *cmpTopkLengthOptionalContiguous = nullptr;
+    const aclTensor* cmpTopkLengthOptionalContiguous = nullptr;
     if (cmpTopkLengthOptional != nullptr) {
         cmpTopkLengthOptionalContiguous = l0op::Contiguous(cmpTopkLengthOptional, uniqueExecutor.get());
         if (cmpTopkLengthOptionalContiguous == nullptr) {
@@ -180,9 +180,9 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadataGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-__attribute__((visibility("default"))) aclnnStatus aclnnQuantSparseFlashMlaMetadata(void *workspace,
+__attribute__((visibility("default"))) aclnnStatus aclnnQuantSparseFlashMlaMetadata(void* workspace,
                                                                                     uint64_t workspaceSize,
-                                                                                    aclOpExecutor *executor,
+                                                                                    aclOpExecutor* executor,
                                                                                     aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnQuantSparseFlashMlaMetadata);

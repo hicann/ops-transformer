@@ -27,43 +27,45 @@ static constexpr size_t OUTPUT_ATTN = 0;
 static constexpr size_t OUTPUT_SOFTMAX_MAX = 1;
 static constexpr size_t OUTPUT_SOFTMAX_SUM = 2;
 
-static graphStatus InferShape4RingAttentionUpdate(gert::InferShapeContext* context) {
-  OP_LOGD(context->GetNodeName(), "Begin to do InferShape4RingAttentionUpdate");
-  // get input shape
-  const gert::Shape* inputAttnShape = context->GetInputShape(INPUT_ATTN);
-  OP_CHECK_NULL_WITH_CONTEXT(context, inputAttnShape);
-  const gert::Shape* inputSoftmaxMax = context->GetInputShape(INPUT_SOFTMAX_MAX);
-  OP_CHECK_NULL_WITH_CONTEXT(context, inputSoftmaxMax);
-  const gert::Shape* inputSoftmaxSum = context->GetInputShape(INPUT_SOFTMAX_SUM);
-  OP_CHECK_NULL_WITH_CONTEXT(context, inputSoftmaxSum);
-  //get output shape
-  gert::Shape* outputAttnShape = context->GetOutputShape(OUTPUT_ATTN);
-  OP_CHECK_NULL_WITH_CONTEXT(context, outputAttnShape);
-  gert::Shape* outputSoftmaxMax = context->GetOutputShape(OUTPUT_SOFTMAX_MAX);
-  OP_CHECK_NULL_WITH_CONTEXT(context, outputSoftmaxMax);
-  gert::Shape* outputSoftmaxSum = context->GetOutputShape(OUTPUT_SOFTMAX_SUM);
-  OP_CHECK_NULL_WITH_CONTEXT(context, outputSoftmaxSum);
-  // infer shape
-  *outputAttnShape = *inputAttnShape;
-  *outputSoftmaxMax = *inputSoftmaxMax;
-  *outputSoftmaxSum = *inputSoftmaxSum;
+static graphStatus InferShape4RingAttentionUpdate(gert::InferShapeContext* context)
+{
+    OP_LOGD(context->GetNodeName(), "Begin to do InferShape4RingAttentionUpdate");
+    // get input shape
+    const gert::Shape* inputAttnShape = context->GetInputShape(INPUT_ATTN);
+    OP_CHECK_NULL_WITH_CONTEXT(context, inputAttnShape);
+    const gert::Shape* inputSoftmaxMax = context->GetInputShape(INPUT_SOFTMAX_MAX);
+    OP_CHECK_NULL_WITH_CONTEXT(context, inputSoftmaxMax);
+    const gert::Shape* inputSoftmaxSum = context->GetInputShape(INPUT_SOFTMAX_SUM);
+    OP_CHECK_NULL_WITH_CONTEXT(context, inputSoftmaxSum);
+    // get output shape
+    gert::Shape* outputAttnShape = context->GetOutputShape(OUTPUT_ATTN);
+    OP_CHECK_NULL_WITH_CONTEXT(context, outputAttnShape);
+    gert::Shape* outputSoftmaxMax = context->GetOutputShape(OUTPUT_SOFTMAX_MAX);
+    OP_CHECK_NULL_WITH_CONTEXT(context, outputSoftmaxMax);
+    gert::Shape* outputSoftmaxSum = context->GetOutputShape(OUTPUT_SOFTMAX_SUM);
+    OP_CHECK_NULL_WITH_CONTEXT(context, outputSoftmaxSum);
+    // infer shape
+    *outputAttnShape = *inputAttnShape;
+    *outputSoftmaxMax = *inputSoftmaxMax;
+    *outputSoftmaxSum = *inputSoftmaxSum;
 
-  OP_LOGD(context->GetNodeName(), "End to do InferShape4RingAttentionUpdate");
-  return ge::GRAPH_SUCCESS;
+    OP_LOGD(context->GetNodeName(), "End to do InferShape4RingAttentionUpdate");
+    return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataType4RingAttentionUpdate(gert::InferDataTypeContext* context) {
-  OP_LOGD(context->GetNodeName(), "Begin to do InferDataType4RingAttentionUpdate");
-  // infer shape
-  context->SetOutputDataType(OUTPUT_ATTN, context->GetInputDataType(INPUT_ATTN));
-  context->SetOutputDataType(OUTPUT_SOFTMAX_MAX, context->GetInputDataType(INPUT_SOFTMAX_MAX));
-  context->SetOutputDataType(OUTPUT_SOFTMAX_SUM, context->GetInputDataType(INPUT_SOFTMAX_SUM));
+static ge::graphStatus InferDataType4RingAttentionUpdate(gert::InferDataTypeContext* context)
+{
+    OP_LOGD(context->GetNodeName(), "Begin to do InferDataType4RingAttentionUpdate");
+    // infer shape
+    context->SetOutputDataType(OUTPUT_ATTN, context->GetInputDataType(INPUT_ATTN));
+    context->SetOutputDataType(OUTPUT_SOFTMAX_MAX, context->GetInputDataType(INPUT_SOFTMAX_MAX));
+    context->SetOutputDataType(OUTPUT_SOFTMAX_SUM, context->GetInputDataType(INPUT_SOFTMAX_SUM));
 
-  OP_LOGD(context->GetNodeName(), "End to do InferDataType4RingAttentionUpdate");
-  return ge::GRAPH_SUCCESS;
+    OP_LOGD(context->GetNodeName(), "End to do InferDataType4RingAttentionUpdate");
+    return ge::GRAPH_SUCCESS;
 }
 
 IMPL_OP_INFERSHAPE(RingAttentionUpdate)
     .InferShape(InferShape4RingAttentionUpdate)
     .InferDataType(InferDataType4RingAttentionUpdate);
-}  // namespace ops
+} // namespace ops

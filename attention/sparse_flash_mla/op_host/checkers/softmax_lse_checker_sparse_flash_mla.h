@@ -18,8 +18,8 @@ namespace sparse_mla_checker {
 
 class SoftmaxLseChecker : public BaseChecker {
 public:
-    ge::graphStatus CheckSinglePara(const CheckContext &context) const override;
-    ge::graphStatus CheckMultiPara(const CheckContext &context) const override;
+    ge::graphStatus CheckSinglePara(const CheckContext& context) const override;
+    ge::graphStatus CheckMultiPara(const CheckContext& context) const override;
 };
 
 } // namespace sparse_mla_checker

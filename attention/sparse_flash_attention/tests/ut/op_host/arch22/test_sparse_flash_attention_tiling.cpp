@@ -1037,7 +1037,7 @@ TEST_F(SparseFlashAttentionTiling, SparseFlashAttention_910b_tiling_28)
 // Tiling data classes are registered for the op
 TEST_F(SparseFlashAttentionTiling, SparseFlashAttention_tiling_data_class_registered)
 {
-    auto &factory = optiling::CTilingDataClassFactory::GetInstance();
+    auto& factory = optiling::CTilingDataClassFactory::GetInstance();
     EXPECT_NE(factory.CreateTilingDataInstance("SparseFlashAttention"), nullptr);
     EXPECT_NE(factory.CreateTilingDataInstance("SparseFlashAttentionBaseParamsMlaOp"), nullptr);
     EXPECT_NE(factory.CreateTilingDataInstance("SparseFlashAttentionSingleCoreParamsMlaOp"), nullptr);

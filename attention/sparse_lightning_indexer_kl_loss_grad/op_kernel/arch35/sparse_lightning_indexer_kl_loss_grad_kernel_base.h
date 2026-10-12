@@ -31,32 +31,32 @@ public:
                                 GM_ADDR attnSoftmaxL1, GM_ADDR cuSeqlensQ, GM_ADDR cuSeqlensK, GM_ADDR sequsedQ,
                                 GM_ADDR sequsedK, GM_ADDR cmpResidualK, GM_ADDR metadata, GM_ADDR dQuery, GM_ADDR dKey,
                                 GM_ADDR dWeight, GM_ADDR softmaxOut, GM_ADDR workspace,
-                                const optiling::SparseLightningIndexerGradRegBaseTilingData *__restrict tiling,
-                                TPipe *tPipe);
+                                const optiling::SparseLightningIndexerGradRegBaseTilingData* __restrict tiling,
+                                TPipe* tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessDeter();
     __aicore__ inline void ProcessNormal();
-    __aicore__ inline void ProcessSY(SLIGradRunInfo &runInfo, int64_t taskId, int64_t bIdx, int64_t s1Idx);
-    __aicore__ inline void ProcessP(SLIGradRunInfo &runInfo, int64_t taskId, int64_t bIdx, int64_t s1Idx);
+    __aicore__ inline void ProcessSY(SLIGradRunInfo& runInfo, int64_t taskId, int64_t bIdx, int64_t s1Idx);
+    __aicore__ inline void ProcessP(SLIGradRunInfo& runInfo, int64_t taskId, int64_t bIdx, int64_t s1Idx);
     __aicore__ inline void InitMMResBuf();
     __aicore__ inline void FreeBuf();
-    __aicore__ inline void InitWorkspace(__gm__ uint8_t *workspace);
+    __aicore__ inline void InitWorkspace(__gm__ uint8_t* workspace);
     __aicore__ inline int32_t GetS2SparseLen(int32_t s1Idx, int32_t actualSeqLensQ, int32_t actualSeqLensK,
                                              int32_t cmpResidualK, int64_t cmpRatio, SLISparseMode sparseMode);
-    __aicore__ inline void SetRunInfo(SLIGradRunInfo &runInfo, int64_t taskId);
-    __aicore__ inline void SetRunInfoP(SLIGradRunInfo &runInfo);
-    __aicore__ inline void SetSYRunInfo(SLIGradKRunInfo &kRunInfo, SLIGradRunInfo &runInfo, int64_t s2TaskId);
-    __aicore__ inline void SetPRunInfo(SLIGradKRunInfo &kRunInfo, SLIGradRunInfo &runInfo, int64_t s2TaskId);
-    __aicore__ inline void SetSYSingleRunInfo(SLIGradKRunInfo &kRunInfo, SLIGradRunInfo &runInfo, int64_t s2TaskId,
+    __aicore__ inline void SetRunInfo(SLIGradRunInfo& runInfo, int64_t taskId);
+    __aicore__ inline void SetRunInfoP(SLIGradRunInfo& runInfo);
+    __aicore__ inline void SetSYRunInfo(SLIGradKRunInfo& kRunInfo, SLIGradRunInfo& runInfo, int64_t s2TaskId);
+    __aicore__ inline void SetPRunInfo(SLIGradKRunInfo& kRunInfo, SLIGradRunInfo& runInfo, int64_t s2TaskId);
+    __aicore__ inline void SetSYSingleRunInfo(SLIGradKRunInfo& kRunInfo, SLIGradRunInfo& runInfo, int64_t s2TaskId,
                                               int64_t taskId);
-    __aicore__ inline void SetPSingleRunInfo(SLIGradKRunInfo &kRunInfo, SLIGradRunInfo &runInfo, int64_t s2TaskId,
+    __aicore__ inline void SetPSingleRunInfo(SLIGradKRunInfo& kRunInfo, SLIGradRunInfo& runInfo, int64_t s2TaskId,
                                              int64_t taskId);
     __aicore__ inline void SetConstInfo();
     __aicore__ inline int32_t GetCmpResidualK(int32_t bIdx, int32_t defaultLens);
-    __aicore__ inline void GetTndSeqLen(const int64_t t1Idx, int64_t &bIdx);
+    __aicore__ inline void GetTndSeqLen(const int64_t t1Idx, int64_t& bIdx);
 
-    TPipe *pipe = nullptr;
-    const optiling::SparseLightningIndexerGradRegBaseTilingData *__restrict tilingData = nullptr;
+    TPipe* pipe = nullptr;
+    const optiling::SparseLightningIndexerGradRegBaseTilingData* __restrict tilingData = nullptr;
 
     GM_ADDR actualSeqQlenAddr;
     GM_ADDR actualSeqKvlenAddr;
@@ -131,7 +131,7 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
     GM_ADDR query, GM_ADDR key, GM_ADDR weight, GM_ADDR sparseIndices, GM_ADDR attnSoftmaxL1, GM_ADDR cuSeqlensQ,
     GM_ADDR cuSeqlensK, GM_ADDR sequsedQ, GM_ADDR sequsedK, GM_ADDR cmpResidualK, GM_ADDR metadata, GM_ADDR dQuery,
     GM_ADDR dKey, GM_ADDR dWeight, GM_ADDR softmaxOut, GM_ADDR workspace,
-    const optiling::SparseLightningIndexerGradRegBaseTilingData *__restrict tiling, TPipe *tPipe)
+    const optiling::SparseLightningIndexerGradRegBaseTilingData* __restrict tiling, TPipe* tPipe)
 {
     pipe = tPipe;
     tilingData = tiling;
@@ -142,9 +142,9 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
     usedSeqQlenAddr = sequsedQ;
     usedSeqKvlenAddr = sequsedK;
     cmpResidualKAddr = cmpResidualK;
-    softmaxOutGm.SetGlobalBuffer((__gm__ T *)softmaxOut);
-    dWeightGm.SetGlobalBuffer((__gm__ T *)dWeight);
-    dqGm.SetGlobalBuffer((__gm__ OUT_T *)dQuery);
+    softmaxOutGm.SetGlobalBuffer((__gm__ T*)softmaxOut);
+    dWeightGm.SetGlobalBuffer((__gm__ T*)dWeight);
+    dqGm.SetGlobalBuffer((__gm__ OUT_T*)dQuery);
 
     InitMMResBuf();
     InitWorkspace(workspace);
@@ -167,7 +167,7 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType, VecBlockType>::ProcessSY(
-    SLIGradRunInfo &runInfo, int64_t taskId, int64_t bIdx, int64_t s1Idx)
+    SLIGradRunInfo& runInfo, int64_t taskId, int64_t bIdx, int64_t s1Idx)
 {
     bool notLastLoop = true;
     SLIGradKRunInfo kRunInfos[MODE_NUM_2];
@@ -175,8 +175,8 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
         vecBlock.CopyInWeight(runInfo);
     }
     for (int32_t s2TaskId = 0; s2TaskId < runInfo.s2LoopTimes + 1; ++s2TaskId) {
-        SLIGradKRunInfo &kRunInfoNeg0 = kRunInfos[s2TaskId % MODE_NUM_2];
-        SLIGradKRunInfo &kRunInfoNeg1 = kRunInfos[(s2TaskId + 1) % MODE_NUM_2];
+        SLIGradKRunInfo& kRunInfoNeg0 = kRunInfos[s2TaskId % MODE_NUM_2];
+        SLIGradKRunInfo& kRunInfoNeg1 = kRunInfos[(s2TaskId + 1) % MODE_NUM_2];
         if (s2TaskId == runInfo.s2LoopTimes) {
             notLastLoop = false;
         }
@@ -210,7 +210,7 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType, VecBlockType>::ProcessP(
-    SLIGradRunInfo &runInfo, int64_t taskId, int64_t bIdx, int64_t s1Idx)
+    SLIGradRunInfo& runInfo, int64_t taskId, int64_t bIdx, int64_t s1Idx)
 {
     bool notLastLoop = true;
     bool notLastSecondLoop = true;
@@ -218,9 +218,9 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
     SLIGradKRunInfo kRunInfos[MODE_NUM_3];
     bool isFixOut = false;
     for (int32_t s2TaskId = 0; s2TaskId < runInfo.s2LoopTimes + 2; ++s2TaskId) {
-        SLIGradKRunInfo &kRunInfoNeg0 = kRunInfos[s2TaskId % MODE_NUM_3];
-        SLIGradKRunInfo &kRunInfoNeg2 = kRunInfos[(s2TaskId + 1) % MODE_NUM_3];
-        SLIGradKRunInfo &kRunInfoNeg1 = kRunInfos[(s2TaskId + 2) % MODE_NUM_3];
+        SLIGradKRunInfo& kRunInfoNeg0 = kRunInfos[s2TaskId % MODE_NUM_3];
+        SLIGradKRunInfo& kRunInfoNeg2 = kRunInfos[(s2TaskId + 1) % MODE_NUM_3];
+        SLIGradKRunInfo& kRunInfoNeg1 = kRunInfos[(s2TaskId + 2) % MODE_NUM_3];
         if (s2TaskId == runInfo.s2LoopTimes + 1) {
             notLastLoop = false;
         } else if (s2TaskId == runInfo.s2LoopTimes) {
@@ -263,19 +263,19 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType, VecBlockType>::GetTndSeqLen(
-    const int64_t t1Idx, int64_t &bIdx)
+    const int64_t t1Idx, int64_t& bIdx)
 {
     int64_t t1Offset = 0;
     int64_t t2Offset = 0;
 
     if constexpr (!HasSequsedQ) {
         if constexpr (Layout_Q == SLILayout::TND) {
-            int64_t curT1 = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
+            int64_t curT1 = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
             while (usedT1Index >= curT1) {
-                curT1 = ((__gm__ int32_t *)actualSeqQlenAddr)[++bIndex];
+                curT1 = ((__gm__ int32_t*)actualSeqQlenAddr)[++bIndex];
             }
             bIndex = bIndex - 1;
-            t1Offset = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
+            t1Offset = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
             s1Index = usedT1Index - t1Offset;
         } else {
             t1Offset = usedT1Index;
@@ -286,11 +286,11 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
     } else {
         while (usedT1Index >= nextUsedT1Offset) {
             usedT1Offset = nextUsedT1Offset;
-            nextUsedT1Offset = ((__gm__ int32_t *)usedSeqQlenAddr)[++bIndex] + usedT1Offset;
+            nextUsedT1Offset = ((__gm__ int32_t*)usedSeqQlenAddr)[++bIndex] + usedT1Offset;
         }
         s1Index = usedT1Index - usedT1Offset;
         if constexpr (Layout_Q == SLILayout::TND) {
-            t1Offset = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
+            t1Offset = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
         } else {
             t1Offset = bIndex * constInfo.s1Size;
         }
@@ -301,24 +301,24 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
     if constexpr (Layout_Q == SLILayout::TND) {
         if (unlikely(bIndex == 0)) {
             t2Offset = 0;
-            curS1 = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex + 1];
-            curS2 = ((__gm__ int32_t *)actualSeqKvlenAddr)[bIndex + 1];
+            curS1 = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex + 1];
+            curS2 = ((__gm__ int32_t*)actualSeqKvlenAddr)[bIndex + 1];
         } else {
-            curS1 = ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex + 1] - ((__gm__ int32_t *)actualSeqQlenAddr)[bIndex];
-            curS2 = ((__gm__ int32_t *)actualSeqKvlenAddr)[bIndex + 1] - ((__gm__ int32_t *)actualSeqKvlenAddr)[bIndex];
-            t2Offset = ((__gm__ int32_t *)actualSeqKvlenAddr)[bIndex];
+            curS1 = ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex + 1] - ((__gm__ int32_t*)actualSeqQlenAddr)[bIndex];
+            curS2 = ((__gm__ int32_t*)actualSeqKvlenAddr)[bIndex + 1] - ((__gm__ int32_t*)actualSeqKvlenAddr)[bIndex];
+            t2Offset = ((__gm__ int32_t*)actualSeqKvlenAddr)[bIndex];
         }
     } else {
         t2Offset = bIndex * curS2;
     }
 
     if constexpr (HasSequsedQ) {
-        usedS1 = ((__gm__ int32_t *)usedSeqQlenAddr)[bIndex];
+        usedS1 = ((__gm__ int32_t*)usedSeqQlenAddr)[bIndex];
     } else {
         usedS1 = curS1;
     }
     if constexpr (HasSequsedK) {
-        usedS2 = ((__gm__ int32_t *)usedSeqKvlenAddr)[bIndex];
+        usedS2 = ((__gm__ int32_t*)usedSeqKvlenAddr)[bIndex];
     } else {
         usedS2 = curS2;
     }
@@ -453,7 +453,7 @@ __aicore__ inline int32_t SparseLightningIndexerKLLossGradKernelBase<CubeBlockTy
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType, VecBlockType>::SetRunInfo(
-    SLIGradRunInfo &runInfo, int64_t taskId)
+    SLIGradRunInfo& runInfo, int64_t taskId)
 {
     runInfo.taskId = taskId;
     runInfo.taskIdMod2 = taskId & 1;
@@ -504,7 +504,7 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType, VecBlockType>::SetRunInfoP(
-    SLIGradRunInfo &runInfo)
+    SLIGradRunInfo& runInfo)
 {
     runInfo.s2LoopTimes = CeilDiv(runInfo.s2RealSize, constInfo.pKBaseSize);
     runInfo.s2TailSize = (runInfo.s2RealSize % constInfo.pKBaseSize == 0) ? constInfo.pKBaseSize :
@@ -514,7 +514,7 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType, VecBlockType>::SetSYRunInfo(
-    SLIGradKRunInfo &kRunInfo, SLIGradRunInfo &runInfo, int64_t s2TaskId)
+    SLIGradKRunInfo& kRunInfo, SLIGradRunInfo& runInfo, int64_t s2TaskId)
 {
     runInfo.s2TailSize =
         (runInfo.s2RealSize % VEC_SY_BASESIZE == 0) ? VEC_SY_BASESIZE : (runInfo.s2RealSize % VEC_SY_BASESIZE);
@@ -529,7 +529,7 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType, VecBlockType>::SetPRunInfo(
-    SLIGradKRunInfo &kRunInfo, SLIGradRunInfo &runInfo, int64_t s2TaskId)
+    SLIGradKRunInfo& kRunInfo, SLIGradRunInfo& runInfo, int64_t s2TaskId)
 {
     runInfo.s2TailSize =
         (runInfo.s2RealSize % VEC_P_BASESIZE == 0) ? VEC_P_BASESIZE : (runInfo.s2RealSize % VEC_P_BASESIZE);
@@ -545,7 +545,7 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType, VecBlockType>::SetSYSingleRunInfo(
-    SLIGradKRunInfo &kRunInfo, SLIGradRunInfo &runInfo, int64_t s2TaskId, int64_t taskId)
+    SLIGradKRunInfo& kRunInfo, SLIGradRunInfo& runInfo, int64_t s2TaskId, int64_t taskId)
 {
     kRunInfo.s2SingleIdx = taskId;
     kRunInfo.s2Idx = s2TaskId * constInfo.syKBaseSize / VEC_SY_BASESIZE + kRunInfo.s2SingleIdx;
@@ -558,7 +558,7 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType, VecBlockType>::SetPSingleRunInfo(
-    SLIGradKRunInfo &kRunInfo, SLIGradRunInfo &runInfo, int64_t s2TaskId, int64_t taskId)
+    SLIGradKRunInfo& kRunInfo, SLIGradRunInfo& runInfo, int64_t s2TaskId, int64_t taskId)
 {
     kRunInfo.s2SingleIdx = taskId;
     kRunInfo.s2Idx = s2TaskId * constInfo.pKBaseSize / VEC_P_BASESIZE + kRunInfo.s2SingleIdx;
@@ -585,7 +585,7 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
     coreNum = static_cast<int64_t>(GetBlockNum());
     ;
     constInfo.totalSize = tilingData->multiCoreParams.totalSize;
-    auto &baseInfo = tilingData->baseParams;
+    auto& baseInfo = tilingData->baseParams;
     constInfo.bSize = baseInfo.bSize;
     constInfo.n2Size = baseInfo.n2Size;
     constInfo.gSizeQuery = 128;
@@ -608,11 +608,11 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
     constInfo.pKBaseSize = 128;
     constInfo.syKBaseSize = 128;
     constInfo.pScaler = 1.0f / static_cast<float>(static_cast<int64_t>(constInfo.gSizeQuery));
-    constInfo.totalNum = ((__gm__ uint32_t *)metadataGm)[0];
-    constInfo.formerCoreProcessNNum = ((__gm__ uint32_t *)metadataGm)[1];
-    constInfo.remainCoreProcessNNum = ((__gm__ uint32_t *)metadataGm)[2];
-    constInfo.remainCoreNum = ((__gm__ uint32_t *)metadataGm)[3];
-    constInfo.usedCoreNum = ((__gm__ uint32_t *)metadataGm)[4];
+    constInfo.totalNum = ((__gm__ uint32_t*)metadataGm)[0];
+    constInfo.formerCoreProcessNNum = ((__gm__ uint32_t*)metadataGm)[1];
+    constInfo.remainCoreProcessNNum = ((__gm__ uint32_t*)metadataGm)[2];
+    constInfo.remainCoreNum = ((__gm__ uint32_t*)metadataGm)[3];
+    constInfo.usedCoreNum = ((__gm__ uint32_t*)metadataGm)[4];
     usedCoreNum = constInfo.usedCoreNum;
     int64_t totalCoreNum = static_cast<int64_t>(GetBlockNum());
     if (cBlockIdx >= constInfo.usedCoreNum) {
@@ -681,7 +681,7 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
 }
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType, VecBlockType>::InitWorkspace(
-    __gm__ uint8_t *workspace)
+    __gm__ uint8_t* workspace)
 {
     int64_t reduceSumOffset = 2 * constInfo.kSizeAlign128 * sizeof(float);
     int64_t reluOffset = constInfo.gSizeQueryIndex * constInfo.kSizeAlign128 * sizeof(float);
@@ -693,24 +693,24 @@ __aicore__ inline void SparseLightningIndexerKLLossGradKernelBase<CubeBlockType,
     uint64_t offset = 0;
 
     if constexpr (Layout_Q == SLILayout::TND) {
-        constInfo.totalCost = ((__gm__ int32_t *)actualSeqKvlenAddr)[constInfo.bSize];
+        constInfo.totalCost = ((__gm__ int32_t*)actualSeqKvlenAddr)[constInfo.bSize];
     } else if constexpr (Layout_Q == SLILayout::BSND) {
         constInfo.totalCost = constInfo.bSize * constInfo.s2Size;
     }
     int64_t scatterAddResOffset = constInfo.totalCost * constInfo.dSizeQueryIndex * sizeof(float);
 
-    reduceSumRes.SetGlobalBuffer((__gm__ T *)(workspace + offset + coreTotalOffset));
+    reduceSumRes.SetGlobalBuffer((__gm__ T*)(workspace + offset + coreTotalOffset));
     offset += reduceSumOffset;
-    reluRes.SetGlobalBuffer((__gm__ T *)(workspace + offset + coreTotalOffset));
+    reluRes.SetGlobalBuffer((__gm__ T*)(workspace + offset + coreTotalOffset));
     offset += reluOffset;
-    gatherSYRes.SetGlobalBuffer((__gm__ INPUT_T *)(workspace + offset + coreTotalOffset));
+    gatherSYRes.SetGlobalBuffer((__gm__ INPUT_T*)(workspace + offset + coreTotalOffset));
     offset += gatherSYOffset;
-    scatterAddResGm.SetGlobalBuffer((__gm__ T *)(workspace + totalOffset));
+    scatterAddResGm.SetGlobalBuffer((__gm__ T*)(workspace + totalOffset));
     if constexpr (Deterministic) {
         totalOffset += scatterAddResOffset;
-        scatterAddResPong.SetGlobalBuffer((__gm__ T *)(workspace + totalOffset));
+        scatterAddResPong.SetGlobalBuffer((__gm__ T*)(workspace + totalOffset));
         totalOffset += scatterAddResOffset;
-        bmm3Res.SetGlobalBuffer((__gm__ T *)(workspace + totalOffset));
+        bmm3Res.SetGlobalBuffer((__gm__ T*)(workspace + totalOffset));
     }
 
     if ASCEND_IS_AIV {
@@ -762,7 +762,7 @@ __aicore__ inline int32_t SparseLightningIndexerKLLossGradKernelBase<CubeBlockTy
     int32_t bIdx, int32_t defaultLens)
 {
     if constexpr (HasCmpResidualK) {
-        return ((__gm__ uint32_t *)cmpResidualKAddr)[bIdx];
+        return ((__gm__ uint32_t*)cmpResidualKAddr)[bIdx];
     } else {
         return defaultLens;
     }

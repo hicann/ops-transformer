@@ -23,7 +23,7 @@ using namespace optiling;
 using namespace ge;
 
 namespace ops {
-ge::graphStatus InferShapeQuantSparseFlashMla(gert::InferShapeContext *context)
+ge::graphStatus InferShapeQuantSparseFlashMla(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("QuantSparseFlashMla", "InferShapeContext",
@@ -33,7 +33,7 @@ ge::graphStatus InferShapeQuantSparseFlashMla(gert::InferShapeContext *context)
                           ATTR_LAYOUT_KV_INDEX);
 }
 
-ge::graphStatus InferDataTypeQuantSparseFlashMla(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeQuantSparseFlashMla(gert::InferDataTypeContext* context)
 {
     context->SetOutputDataType(ATTN_OUT_INDEX, ge::DT_BF16); // 目前仅支持BF16
     context->SetOutputDataType(SOFTMAX_LSE_INDEX, ge::DT_FLOAT);

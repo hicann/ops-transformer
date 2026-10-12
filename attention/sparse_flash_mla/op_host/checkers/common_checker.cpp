@@ -20,12 +20,12 @@ constexpr uint32_t DIM_IDX_TWO = 2;
 constexpr uint32_t DIM_IDX_THREE = 3;
 
 namespace {
-const char *Op(const CheckContext &context)
+const char* Op(const CheckContext& context)
 {
     return context.opName == nullptr ? "SparseMla" : context.opName;
 }
 
-bool IsTurboQuantEmptyTndTensor(const CheckContext &context, const TensorParam &param)
+bool IsTurboQuantEmptyTndTensor(const CheckContext& context, const TensorParam& param)
 {
     return context.variant == OperatorVariant::MIXED_QUANT && context.quantMode == TURBO_QUANT_MODE &&
            context.qLayout == Layout::TND && param.shape != nullptr && param.shape->GetDimNum() > 0 &&
@@ -33,7 +33,7 @@ bool IsTurboQuantEmptyTndTensor(const CheckContext &context, const TensorParam &
 }
 } // namespace
 
-ge::graphStatus CommonChecker::CheckQuery(const CheckContext &context) const
+ge::graphStatus CommonChecker::CheckQuery(const CheckContext& context) const
 {
     if (!context.q.present) {
         return ge::GRAPH_SUCCESS;
@@ -56,7 +56,7 @@ ge::graphStatus CommonChecker::CheckQuery(const CheckContext &context) const
     return CheckDimNum(context, context.q, "q", {expectedDimNum});
 }
 
-ge::graphStatus CommonChecker::CheckKv(const CheckContext &context, const TensorParam &kv, const char *name) const
+ge::graphStatus CommonChecker::CheckKv(const CheckContext& context, const TensorParam& kv, const char* name) const
 {
     if (!kv.present) {
         return ge::GRAPH_SUCCESS;
@@ -81,7 +81,7 @@ ge::graphStatus CommonChecker::CheckKv(const CheckContext &context, const Tensor
     return CheckDimNum(context, kv, name, {expectedDimNum});
 }
 
-ge::graphStatus CommonChecker::CheckOutput(const CheckContext &context) const
+ge::graphStatus CommonChecker::CheckOutput(const CheckContext& context) const
 {
     if (!context.attentionOut.present) {
         return ge::GRAPH_SUCCESS;
@@ -102,7 +102,7 @@ ge::graphStatus CommonChecker::CheckOutput(const CheckContext &context) const
     return CheckDimNum(context, context.attentionOut, "attention_out", {expectedDimNum});
 }
 
-ge::graphStatus CommonChecker::CheckSinglePara(const CheckContext &context) const
+ge::graphStatus CommonChecker::CheckSinglePara(const CheckContext& context) const
 {
     OP_CHECK_IF(
         context.qLayout != Layout::BSND && context.qLayout != Layout::TND,
@@ -127,7 +127,7 @@ ge::graphStatus CommonChecker::CheckSinglePara(const CheckContext &context) cons
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckParaExistence(const CheckContext &context) const
+ge::graphStatus CommonChecker::CheckParaExistence(const CheckContext& context) const
 {
     OP_CHECK_IF(!context.q.present, OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Op(context), "q", "Q is required"),
                 return ge::GRAPH_FAILED);
@@ -141,7 +141,7 @@ ge::graphStatus CommonChecker::CheckParaExistence(const CheckContext &context) c
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckFeature(const CheckContext &context) const
+ge::graphStatus CommonChecker::CheckFeature(const CheckContext& context) const
 {
     OP_CHECK_IF(
         context.kvLayout != Layout::PA_BBND && context.qLayout != context.kvLayout,
@@ -154,7 +154,7 @@ ge::graphStatus CommonChecker::CheckFeature(const CheckContext &context) const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckQueryAxes(const CheckContext &context) const
+ge::graphStatus CommonChecker::CheckQueryAxes(const CheckContext& context) const
 {
     const int64_t qSeq = GetDim(context.q, 0);
     int64_t qHeads = -1;
@@ -188,7 +188,7 @@ ge::graphStatus CommonChecker::CheckQueryAxes(const CheckContext &context) const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckKvAxes(const CheckContext &context, const TensorParam &kv, const char *name) const
+ge::graphStatus CommonChecker::CheckKvAxes(const CheckContext& context, const TensorParam& kv, const char* name) const
 {
     if (!kv.present) {
         return ge::GRAPH_SUCCESS;
@@ -229,7 +229,7 @@ ge::graphStatus CommonChecker::CheckKvAxes(const CheckContext &context, const Te
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckMultiPara(const CheckContext &context) const
+ge::graphStatus CommonChecker::CheckMultiPara(const CheckContext& context) const
 {
     if (CheckSameShape(context, context.q, "q", context.attentionOut, "attention_out") != ge::GRAPH_SUCCESS ||
         CheckQueryAxes(context) != ge::GRAPH_SUCCESS ||

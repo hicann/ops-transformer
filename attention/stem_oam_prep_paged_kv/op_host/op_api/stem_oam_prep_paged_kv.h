@@ -20,10 +20,10 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-std::tuple<const aclTensor *, const aclTensor *> StemOamPrepPagedKv(
-    const aclTensor *kCache, const aclTensor *vCache, const aclTensor *kvIndices, const aclTensor *kvSeqLens,
-    const aclTensor *kScaleCache, const aclTensor *vScale, float lambdaMag, const std::string &kvLayout,
-    int64_t stemBlockSize, int64_t stemStride, const aclTensor *kFlat, const aclTensor *vBias, aclOpExecutor *executor);
+std::tuple<const aclTensor*, const aclTensor*> StemOamPrepPagedKv(
+    const aclTensor* kCache, const aclTensor* vCache, const aclTensor* kvIndices, const aclTensor* kvSeqLens,
+    const aclTensor* kScaleCache, const aclTensor* vScale, float lambdaMag, const std::string& kvLayout,
+    int64_t stemBlockSize, int64_t stemStride, const aclTensor* kFlat, const aclTensor* vBias, aclOpExecutor* executor);
 }
 
 #endif // L0_STEM_OAM_PREP_PAGED_KV_H
