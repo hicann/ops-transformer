@@ -266,6 +266,15 @@ aclnnStatus aclnnRopeWithSinCosCacheGetWorkspaceSizeCommon(const aclTensor* posi
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     CHECK_RET(headSize > 0, ACLNN_ERR_PARAM_INVALID);
 
+    const int64_t queryLastDim = queryIn->GetViewShape()[1];
+    const int64_t keyLastDim = keyIn->GetViewShape()[1];
+    if (queryLastDim % headSize != 0) {
+        OP_LOGW("queryIn.shape[1] is not divisible by headSize, but got %ld and %ld.", queryLastDim, headSize);
+    }
+    if (keyLastDim % headSize != 0) {
+        OP_LOGW("keyIn.shape[1] is not divisible by headSize, but got %ld and %ld.", keyLastDim, headSize);
+    }
+
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
