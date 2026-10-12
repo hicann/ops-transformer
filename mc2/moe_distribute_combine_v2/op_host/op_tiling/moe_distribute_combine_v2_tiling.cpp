@@ -2094,7 +2094,7 @@ static uint64_t GetCommBufferSize(const gert::TilingContext* context,
     uint32_t clearFlagBufSize = (clearFlagCount * sizeof(float) + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
     uint64_t commBufferSize = static_cast<uint64_t>(scaleNumAlignSize) + clearFlagBufSize;
     dispatchBufferSize =
-        isA5 ? GetDispatchBufferSize(tilingData, moeQueueBytes, commDataBytes, packedDataBytes, quantBufferSize) : 0U;
+        GetDispatchBufferSize(tilingData, moeQueueBytes, commDataBytes, packedDataBytes, quantBufferSize);
     return commBufferSize;
 }
 
@@ -2130,6 +2130,8 @@ static void SetA3BufferNum(const uint64_t ubSize, const gert::TilingContext* con
 static bool UbUsedCal(const uint64_t ubSize, const gert::TilingContext* context,
                       MoeDistributeCombineV2TilingData* tilingData, const CombineV2Config& config)
 {
+    // A3 retains its raw-data/separate-flag protocol after EP16 regression checks.
+    // Its prefetch queues use the original A3 UB budget; A5 keeps the packed budget.
     if (mc2tiling::GetNpuArch(context) != Ops::Base::DAV_3510) {
         SetA3BufferNum(ubSize, context, tilingData, config);
         return true;
@@ -2176,6 +2178,7 @@ static ge::graphStatus CheckAndCalWinSize(const gert::TilingContext* context,
     winSizeData.isSetFullMeshV2 = false;
     winSizeData.isLayered = isLayered;
     winSizeData.isMc2Context = config.isMc2Context;
+    winSizeData.reserveA3FullMeshWindowPadding = mc2tiling::GetSocVersion(context) == "Ascend910_93" && !isLayered;
     const bool useRuntimeWinSize =
         !isLayered && !config.isMc2Context && mc2tiling::GetSocVersion(context) == "Ascend910_93";
     const auto ret = useRuntimeWinSize ? CalcMinWinSizeA3(context, nodeName, winSizeData) :

@@ -85,7 +85,7 @@ public:
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIds, GM_ADDR scales, GM_ADDR xActiveMask, GM_ADDR expertScales,
                                 GM_ADDR expandXOut, GM_ADDR dynamicScalesOut, GM_ADDR expandIdxOut,
                                 GM_ADDR expertTokenNumsOut, GM_ADDR epRecvCountsOut, GM_ADDR expandScales,
-                                GM_ADDR workspaceGM, TPipe* pipe, const MoeDistributeDispatchV2TilingData* tilingData);
+                                GM_ADDR workspaceGM, TPipe* pipe, const MoeDistributeDispatchV2Info* tilingData);
     __aicore__ inline void Process();
 
 private:
@@ -99,7 +99,7 @@ private:
     __aicore__ inline void SetIpcFlag();
     __aicore__ inline void CleanUp();
 
-    __aicore__ inline void SetTilingDataAndCal(const MoeDistributeDispatchV2TilingData* tilingData);
+    __aicore__ inline void SetTilingDataAndCal(const MoeDistributeDispatchV2Info* tilingData);
     __aicore__ inline void InitRDMABuffer();
     __aicore__ inline void InitIPCBuffer();
     __aicore__ inline void InitTokenStructInfo();
@@ -272,27 +272,27 @@ private:
 
 template <TemplateMC2TypeV2LayeredClass>
 __aicore__ inline void MoeDistributeDispatchV2Layered<TemplateMC2TypeV2LayeredFunc>::SetTilingDataAndCal(
-    const MoeDistributeDispatchV2TilingData* tilingData)
+    const MoeDistributeDispatchV2Info* tilingData)
 {
     /*极度负载不均衡时 最小需要所需空间为 moeExpertNum_ * axisBS_ * (axisH_ * sizeof(XType) +  EXTRA_TOKEN_INFO_NUM *
                                         alignK_ * sizeof(uint32_t)) + IPC_DATA_OFFSET + RDMA_DATA_SIZE;*/
-    axisBS_ = tilingData->moeDistributeDispatchV2Info.bs;
-    globalBs_ = tilingData->moeDistributeDispatchV2Info.globalBs;
-    expandXRows_ = tilingData->moeDistributeDispatchV2Info.a;
-    axisH_ = tilingData->moeDistributeDispatchV2Info.h;
-    axisK_ = tilingData->moeDistributeDispatchV2Info.k;
+    axisBS_ = tilingData->bs;
+    globalBs_ = tilingData->globalBs;
+    expandXRows_ = tilingData->a;
+    axisH_ = tilingData->h;
+    axisK_ = tilingData->k;
     alignK_ = RoundUp(axisK_, B32_PER_BLOCK);
-    aivNum_ = tilingData->moeDistributeDispatchV2Info.aivNum;
-    worldSize_ = tilingData->moeDistributeDispatchV2Info.epWorldSize;
-    moeExpertNum_ = tilingData->moeDistributeDispatchV2Info.moeExpertNum;
-    isTokenMaskFlag_ = tilingData->moeDistributeDispatchV2Info.isTokenMask;
+    aivNum_ = tilingData->aivNum;
+    worldSize_ = tilingData->epWorldSize;
+    moeExpertNum_ = tilingData->moeExpertNum;
+    isTokenMaskFlag_ = tilingData->isTokenMask;
     localMoeExpertNum_ = moeExpertNum_ / worldSize_;
     totalSize_ = winContext_->winSize;
     rdmaWinSize_ = RDMA_DATA_SIZE; // 100 MB for RDMA
     shareMemOffset_ = rdmaWinSize_;
     halfWinSize_ = rdmaWinSize_ / DOUBLE_WIN_SPACE;
     dataSpaceSize_ = halfWinSize_ - STATUS_SPACE_SIZE;
-    expertTokenNumsType_ = tilingData->moeDistributeDispatchV2Info.expertTokenNumsType;
+    expertTokenNumsType_ = tilingData->expertTokenNumsType;
 
     expertIdsCnt_ = axisBS_ * axisK_;
     serverNum_ = worldSize_ / SERVER_RANK_SIZE;
@@ -405,12 +405,12 @@ template <TemplateMC2TypeV2LayeredClass>
 __aicore__ inline void MoeDistributeDispatchV2Layered<TemplateMC2TypeV2LayeredFunc>::Init(
     GM_ADDR x, GM_ADDR expertIds, GM_ADDR scales, GM_ADDR xActiveMask, GM_ADDR expertScales, GM_ADDR expandXOut,
     GM_ADDR dynamicScalesOut, GM_ADDR expandIdxOut, GM_ADDR expertTokenNumsOut, GM_ADDR epRecvCountsOut,
-    GM_ADDR expandScales, GM_ADDR workspaceGM, TPipe* pipe, const MoeDistributeDispatchV2TilingData* tilingData)
+    GM_ADDR expandScales, GM_ADDR workspaceGM, TPipe* pipe, const MoeDistributeDispatchV2Info* tilingData)
 {
     tpipe_ = pipe;
 
     winContext_ = (__gm__ HcclOpResParam*)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
-    rankId_ = tilingData->moeDistributeDispatchV2Info.epRankId;
+    rankId_ = tilingData->epRankId;
     serverId_ = rankId_ / SERVER_RANK_SIZE;
     windowInGM_ = GetWindowInAddrByRankId(rankId_);
     windowOutGM_ = GetWindowOutAddrByRankId(rankId_);

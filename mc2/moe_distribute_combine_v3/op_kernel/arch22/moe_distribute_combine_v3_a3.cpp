@@ -37,7 +37,7 @@ __global__ __aicore__ void moe_distribute_combine_v3(GM_ADDR mc2Context, GM_ADDR
                                                      GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
     REGISTER_TILING_DEFAULT(MoeDistributeCombineV2TilingData);
-    GET_TILING_DATA_WITH_STRUCT(MoeDistributeCombineV2TilingData, tilingData, tilingGM);
+    GET_TILING_DATA_MEMBER(MoeDistributeCombineV2TilingData, moeDistributeCombineV2Info, tilingData, tilingGM);
     TPipe pipe;
 #if (ORIG_DTYPE_EXPAND_X == DT_BF16 || ORIG_DTYPE_EXPAND_X == DT_FLOAT16)
     if constexpr (ArchTag == TILINGKEY_TPL_A3) {

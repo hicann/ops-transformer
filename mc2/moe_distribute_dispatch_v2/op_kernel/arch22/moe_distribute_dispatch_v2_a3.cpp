@@ -36,14 +36,14 @@ __global__ __aicore__ void moe_distribute_dispatch_v2(GM_ADDR x, GM_ADDR expertI
                                                       GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
     REGISTER_TILING_DEFAULT(MoeDistributeDispatchV2TilingData);
-    GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchV2TilingData, tilingData, tilingGM);
+    GET_TILING_DATA_MEMBER(MoeDistributeDispatchV2TilingData, moeDistributeDispatchV2Info, tilingData, tilingGM);
     TPipe pipe;
     GM_ADDR contextGM0 = (GM_ADDR)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
     uint64_t realWinSize = 0;
     if constexpr ((ArchTag == TILINGKEY_TPL_A3) && (FullMesh != TILINGKEY_ENABLE_HIERARCHY)) {
         const auto epContext = reinterpret_cast<__gm__ Mc2Kernel::HcclOpParam*>(contextGM0);
         realWinSize = Mc2Kernel::GetWinSize(epContext);
-        const uint64_t minWinSize = tilingData.moeDistributeDispatchV2Info.totalWinSizeEp;
+        const uint64_t minWinSize = tilingData.totalWinSizeEp;
         assert(realWinSize >= minWinSize,
                "HCCL_BUFFSIZE_EP is too SMALL, NEEDED_HCCL_BUFFSIZE=%lu Bytes, "
                "actual CCL_BUFFSIZE=%lu Bytes.\n",

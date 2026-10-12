@@ -1565,6 +1565,7 @@ static ge::graphStatus CheckAndCalWinSize(const gert::TilingContext* context,
     winSizeData.isSetFullMeshV2 = isSetFullMeshV2;
     winSizeData.isLayered = isLayered;
     winSizeData.isMc2Context = config.isMc2Context;
+    winSizeData.reserveA3FullMeshWindowPadding = mc2tiling::GetSocVersion(context) == "Ascend910_93" && !isLayered;
     const bool useRuntimeWinSize =
         !isLayered && !config.isMc2Context && mc2tiling::GetSocVersion(context) == "Ascend910_93";
     const auto ret = useRuntimeWinSize ? CalcMinWinSizeA3(context, nodeName, winSizeData) :
@@ -1661,6 +1662,56 @@ static uint32_t AllToAllBasicUsedBuffer(const gert::TilingContext* context,
     return UbForBasic;
 }
 
+static uint32_t A3FullMeshUsedBuffer(const gert::TilingContext* context,
+                                     const MoeDistributeDispatchV2TilingData& tilingData, uint32_t expertIdsBufSize,
+                                     uint32_t hOutSizeAlign, const DispatchV2Config& config, const char* nodeName)
+{
+    const auto& info = tilingData.moeDistributeDispatchV2Info;
+    // calBeginBuf_, dataStateBuf and calEndBuf_ remain live until token sending ends.
+    uint32_t usedSize = UB_ALIGN * 3U;
+    if (info.hasElasticInfo) {
+        usedSize +=
+            Ceil((ELASTIC_INFO_OFFSET + RANK_LIST_NUM * info.epWorldSize) * sizeof(int32_t), UB_ALIGN, nodeName);
+    }
+    // SendCumSum retains both counting scratch buffers, the mask workspace and routing IDs.
+    usedSize += BUFFER_NUM * info.maxSizeForUbBuffer + BUFFER_NUM * expertIdsBufSize;
+    if (info.hasExpertScales) {
+        usedSize += expertIdsBufSize;
+    }
+    uint32_t countBufferSize =
+        Ceil(info.moeExpertNum + info.sharedExpertRankNum, UB_ALIGN / sizeof(int32_t), nodeName) * UB_ALIGN;
+    usedSize += countBufferSize;
+    if (info.isExpertMask || info.zeroComputeExpertNum != 0) {
+        usedSize += Ceil(info.bs * sizeof(int32_t), UB_ALIGN, nodeName);
+        uint32_t maskSize = info.bs * Ceil(info.k * sizeof(bool), UB_ALIGN, nodeName) * SIZE_OF_HALF;
+        usedSize += std::max(Ceil(info.bs * info.k * sizeof(int32_t), UB_ALIGN, nodeName), maskSize);
+    }
+    uint32_t packedDataSize = Ceil(hOutSizeAlign, SPLIT_BLOCK_DATA_SIZE, nodeName);
+    bool isSameType = context->GetInputDesc(config.xIndex)->GetDataType() ==
+                      context->GetOutputDesc(OUTPUT_EXPAND_X_INDEX)->GetDataType();
+    uint32_t inputSize = Ceil(info.h * SIZE_OF_HALF, UB_ALIGN, nodeName);
+    if (info.quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) {
+        inputSize += info.scalesCol * info.scalesTypeSize;
+        if (isSameType) {
+            inputSize = packedDataSize;
+        }
+    }
+    usedSize += BUFFER_NUM * Ceil(inputSize, UB_ALIGN, nodeName);
+    if (info.quantMode != static_cast<uint32_t>(QuantModeA5::NON_QUANT) || !isSameType) {
+        usedSize += packedDataSize; // quantization result, including the complete final 480B block
+    }
+    uint32_t sendSlotSize = packedDataSize / SPLIT_BLOCK_DATA_SIZE * SPLIT_BLOCK_SIZE;
+    // A completed count buffer can provide the first send slot.
+    if (countBufferSize < sendSlotSize) {
+        usedSize += sendSlotSize;
+    } else if (info.hasElasticInfo) {
+        // After shrink, a count buffer smaller than one slot needs a separate slot.
+        // Their combined capacity is below two slots; larger counts can be reused.
+        usedSize += std::max(countBufferSize, BUFFER_NUM * sendSlotSize) - countBufferSize;
+    }
+    return usedSize;
+}
+
 static uint32_t SetMaxSizeForUbBuffer(MoeDistributeDispatchV2TilingData& tilingData, uint32_t hSize, uint32_t bsSize,
                                       uint32_t kSize, uint32_t expertIdsCnt, bool isScales, const char* nodeName)
 {
@@ -1697,7 +1748,7 @@ static ge::graphStatus CheckUsedUbSize(const gert::TilingContext* context,
 }
 
 static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistributeDispatchV2TilingData& tilingData,
-                                   const char* nodeName)
+                                   const char* nodeName, const DispatchV2Config& config)
 {
     uint32_t ubSize = UB_ALIGN; // dataStateBuf
 
@@ -1739,6 +1790,9 @@ static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistri
     }
 
     ubSize = ubSize + SendToMoeExpertUsedBuffer(context, tilingData, expertIdsBufSize, kSize, nodeName);
+    if (mc2tiling::GetSocVersion(context) == "Ascend910_93") {
+        ubSize = A3FullMeshUsedBuffer(context, tilingData, expertIdsBufSize, hOutSizeAlign, config, nodeName);
+    }
     return CheckUsedUbSize(context, tilingData, nodeName, ubSize, bsSize, hSize, kSize);
 }
 
@@ -1900,7 +1954,7 @@ ge::graphStatus CheckSizeAndSetRelevantCfg(gert::TilingContext* context, MoeDist
 {
     // 校验UB大小
     if (isSetFullMeshV2) {
-        OP_TILING_CHECK(CheckUBSize(context, *tilingData, nodeName) != ge::GRAPH_SUCCESS,
+        OP_TILING_CHECK(CheckUBSize(context, *tilingData, nodeName, config) != ge::GRAPH_SUCCESS,
                         OP_LOGE(nodeName, "Tiling check UB size failed."), return ge::GRAPH_FAILED);
     }
 

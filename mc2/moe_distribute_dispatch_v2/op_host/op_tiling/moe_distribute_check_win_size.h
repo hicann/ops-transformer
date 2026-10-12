@@ -48,11 +48,17 @@ struct CheckWinSizeData {
     bool isSetFullMeshV2;
     bool isLayered;
     bool isMc2Context;
+    bool reserveA3FullMeshWindowPadding = false;
 };
 
 inline uint64_t CalcMinWinSize(const CheckWinSizeData& winSizeData, uint64_t& tokenNeedSizeDispatch,
                                uint64_t& tokenNeedSizeCombine, uint64_t combineDataAlign = WIN_ADDR_ALIGN)
 {
+    // Both runtime-window and tiling-window checks must reserve the Dispatch offset.
+    // A3 Combine still sends raw data; this padding is only a window reservation.
+    if (winSizeData.reserveA3FullMeshWindowPadding) {
+        combineDataAlign = FULL_MESH_DATA_ALIGN;
+    }
     const uint64_t h = winSizeData.h;
     const uint64_t k = winSizeData.k;
     const uint64_t maxBs = winSizeData.globalBs / winSizeData.epWorldSize;
