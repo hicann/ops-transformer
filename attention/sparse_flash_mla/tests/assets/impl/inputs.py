@@ -158,6 +158,8 @@ class SparseFlashMlaInputAdapter:
         if hasattr(attributes, "attributes"):
             attributes = attributes.attributes
         attributes = attributes or {}
+        if name + "_values" in attributes:
+            return attributes[name + "_values"]
         if name in attributes:
             return attributes[name]
         if mask_mode != 0:
@@ -344,6 +346,15 @@ class SparseFlashMlaInputAdapter:
         case_params["batch_consistency"] = params.get(
             "batch_consistency", batch_random is not None
         )
+        for name in ("ori_topk_length", "cmp_topk_length"):
+            value = case_params.get(name)
+            shape = (
+                (case_params["B"], case_params["S1"], case_params["N2"])
+                if case_params["layout_q"] == "BSND"
+                else (case_params["T1"], case_params["N2"])
+            )
+            if isinstance(value, (list, tuple)) and len(value) == 1:
+                case_params[name] = torch.full(shape, int(value[0]), dtype=torch.int32)
         for name in legacy_empty_actual_length_slots:
             case_params[name] = None
         if batch_random is None:
@@ -500,7 +511,23 @@ def generate_sparse_flash_mla_inputs(
         tuple(legacy_empty_actual_length_slots),
     )
     op_input = data["input"]
+    if sinks is None:
+        # A -inf sink contributes zero mass while preserving the pytest reference shape.
+        data["golden_state"]["sinks"] = torch.full_like(
+            op_input["sinks"], -float("inf")
+        )
+        op_input["sinks"] = None
     metadata_input = data.get("metadata_input", {})
+    for branch in ("ori", "cmp"):
+        length = metadata_input.get(branch + "_topk_length")
+        if length is None:
+            continue
+        # Keep unused sparse entries invalid in both physical inputs and the logical Golden state.
+        for values in (op_input, data["golden_state"]):
+            indices = values.get(branch + "_sparse_indices")
+            if indices is not None:
+                tail = torch.arange(indices.shape[-1]) >= length.unsqueeze(-1)
+                indices.masked_fill_(tail, -1)
     for name, tensor in (
         ("q", q),
         ("ori_kv", ori_kv),

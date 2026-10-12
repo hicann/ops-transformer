@@ -27,6 +27,13 @@ _VECTOR_NAMES = (
 )
 
 
+def expect_error(kwargs):
+    value = kwargs.get("expect_error", False)
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
 def load_metadata_protocol():
     name = "qli_v2_ttk_metadata_protocol"
     if name in sys.modules:
@@ -86,6 +93,8 @@ def generate_quant_lightning_indexer_metadata_inputs(
     **kwargs,
 ):
     """Copy explicit descriptor vectors into metadata API input tensors."""
+    if expect_error(kwargs):
+        return None
     del num_heads_q, num_heads_k, head_dim, topk, quant_mode
     sidecar = load_sidecar_values(kwargs)
     tensors = (

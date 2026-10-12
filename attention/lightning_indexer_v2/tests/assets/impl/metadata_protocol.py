@@ -220,6 +220,10 @@ def rewrite_metadata_input(operator, testcase_name, metadata_index, metadata):
         path = find_metadata_file(root, testcase_name, metadata_index)
         if path is None:
             continue
+        if path.name.startswith(f"input_{int(metadata_index)}_none."):
+            # Dynamic slots must remain empty None markers.  Replay materializes
+            # their real shape again through npu_preprocess.
+            return None
         write_array(path, metadata_to_array(metadata))
         return path
     return None

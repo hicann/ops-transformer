@@ -210,6 +210,10 @@ class KvQuantSparseFlashAttentionV2PytestAdapter:
 
         combination = pytest_params
         combination["q_type"] = cls.query_dtype(combination["q_type"])
+        # The pytest random generator accepts list ranges, not tuple ranges.
+        for name, value in tuple(combination.items()):
+            if name.startswith("range_") and isinstance(value, tuple):
+                combination[name] = list(value)
         pytest_utils, pytest_golden = cls.load_modules()
         params = pytest_utils.convert_param_combination_to_cs_format(combination)
         params["case_name"] = testcase_name or params["case_name"]

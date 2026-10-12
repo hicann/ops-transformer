@@ -345,6 +345,15 @@ class QuantSparseFlashMlaInputAdapter:
                 filled[name] = params[name]
         if filled.get("Testcase_Name") is None:
             filled["Testcase_Name"] = params.get("testcase_name")
+        for name in ("ori_topk_length", "cmp_topk_length"):
+            value = filled.get(name)
+            shape = (
+                (filled["B"], filled["S1"], filled["N2"])
+                if filled["layout_q"] == "BSND"
+                else (filled["T1"], filled["N2"])
+            )
+            if isinstance(value, (list, tuple)) and len(value) == 1:
+                filled[name] = torch.full(shape, int(value[0]), dtype=torch.int32)
         pytest_check.check_valid_param(filled)
         if batch_random is None:
             data = pytest_golden.gen_data(filled, generate_golden=False)
@@ -418,6 +427,9 @@ def generate_quant_sparse_flash_mla_inputs(
     if quant_mode is None:
         raise ValueError("QSMLA direct API requires quant_mode from CSV")
     params = dict(kwargs)
+    for name in ("ori_topk_length", "cmp_topk_length"):
+        if name + "_values" in params:
+            params[name] = params[name + "_values"]
     params.update(
         {
             "quant_mode": quant_mode,
@@ -450,6 +462,16 @@ def generate_quant_sparse_flash_mla_inputs(
     )
     data = INPUT_ADAPTER.generate_case(params, batch_random)
     op_input = data["op_input"]
+    for branch in ("ori", "cmp"):
+        length = op_input.get(branch + "_topk_length")
+        if length is None:
+            continue
+        # The device consumes only the declared prefix; persist the unused tail as -1.
+        for values in (op_input, data["golden_state"]):
+            indices = values.get(branch + "_sparse_indices")
+            if indices is not None:
+                tail = torch.arange(indices.shape[-1]) >= length.unsqueeze(-1)
+                indices.masked_fill_(tail, -1)
     for name, tensor in (
         ("q", q),
         ("ori_kv", ori_kv),

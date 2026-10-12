@@ -421,6 +421,13 @@ class LightningIndexerInputAdapter:
 INPUT_ADAPTER = LightningIndexerInputAdapter()
 
 
+def expect_error(kwargs):
+    value = kwargs.get("expect_error", False)
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
 def rebuild_li_compare_data(compare_context):
     return INPUT_ADAPTER.rebuild_compare_data(compare_context)
 
@@ -441,6 +448,8 @@ def generate_li_inputs(
     **kwargs,
 ):
     """Generate the exact canonical pytest inputs and CPU golden for a TTK case."""
+    if expect_error(kwargs):
+        return None
     INPUT_ADAPTER.customize(
         query,
         key,
@@ -477,6 +486,8 @@ def generate_li_inputs_aclnn(
 ):
     """Full aclnn param order. Generate the exact canonical pytest inputs and CPU golden for a TTK case."""
     del sparseIndicesOut, sparseValuesOut, preTokens, nextTokens
+    if expect_error(kwargs):
+        return None
     INPUT_ADAPTER.customize(
         query,
         key,

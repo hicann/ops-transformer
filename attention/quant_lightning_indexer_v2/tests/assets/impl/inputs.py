@@ -923,8 +923,6 @@ def generate_qli_v2_inputs(
     if expect_error(kwargs):
         return None
 
-    if metadata is None:
-        raise ValueError("QLI_V2 direct API CSV must reserve the metadata tensor slot")
     params = dict(kwargs)
     params.update(
         {
@@ -955,7 +953,8 @@ def generate_qli_v2_inputs(
         layout_k,
         params,
     )
-    zero_metadata(metadata)
+    if metadata is not None:
+        zero_metadata(metadata)
     case_data = INPUT_ADAPTER.load_golden_store().CASE_DATA
     testcase_name = params.get("testcase_name")
     case_data.put(testcase_name, data)

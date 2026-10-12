@@ -78,6 +78,11 @@ def get_case_data(testcase_name):
 
 
 def materialize_golden(data):
+    if int(data.get("params", {}).get("quant_mode", 0)) == 3:
+        raise NotImplementedError(
+            "MQ mode3 supports CPU input generation only; "
+            "the pytest CPU Golden currently supports modes 1/2."
+        )
     if data.get("cpu_output") is None:
         load_pytest_golden().generate_cpu_golden(data)
     CASE_DATA.discard(data)

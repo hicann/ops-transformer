@@ -84,6 +84,27 @@ def get_attribute(kwargs, name, default=None):
     return default if value is None else value
 
 
+def expect_error(kwargs):
+    value = kwargs.get("expect_error", False)
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
+def zero_metadata_for_expected_error(metadata, target, testcase_name):
+    if metadata is None:
+        generated = torch.zeros(1024, dtype=torch.int32, device=target.device)
+        logging.info(
+            "[%s] created zero QSMLA metadata for dynamic error case", testcase_name
+        )
+        return {"metadata": generated}
+    metadata.zero_()
+    logging.info(
+        "[%s] zeroed QSMLA metadata for main-operator error case", testcase_name
+    )
+    return None
+
+
 def get_values(kwargs, name):
     value = kwargs.get(f"{name}_values")
     if value is None:
@@ -232,7 +253,7 @@ def move_to_device(value, target, empty_if_none=False):
 
 
 def run_metadata(arguments, metadata):
-    import cann_ops_transformer
+    import cann_ops_transformer  # noqa: F401
 
     return torch.ops.cann_ops_transformer.quant_sparse_flash_mla_metadata(
         int(arguments["num_heads_q"]),
@@ -270,14 +291,29 @@ def run_metadata(arguments, metadata):
     )
 
 
-def run(q, *, ori_kv=None, cmp_kv=None, metadata=None, quant_mode=None, **kwargs):
-    """Generate metadata once, or reuse a nonzero manual-data slot."""
-    if metadata is None:
-        raise ValueError("QuantSparseFlashMla npu_preprocess requires metadata")
+def run(
+    q,
+    *,
+    ori_kv=None,
+    cmp_kv=None,
+    metadata=None,
+    quant_mode=None,
+    _metadata_target=None,
+    **kwargs,
+):
+    """Generate metadata dynamically, or fill an existing static placeholder."""
+    testcase_name = kwargs.get("testcase_name")
+    if expect_error(kwargs):
+        target = (
+            metadata
+            if metadata is not None
+            else (_metadata_target if _metadata_target is not None else q)
+        )
+        return zero_metadata_for_expected_error(metadata, target, testcase_name)
+
     if quant_mode is None:
         raise ValueError("QuantSparseFlashMla npu_preprocess requires quant_mode")
     protocol = load_metadata_protocol()
-    testcase_name = kwargs.get("testcase_name")
     force_metadata_refresh = bool(get_attribute(kwargs, "metadata_refresh", False))
     if protocol.metadata_is_materialized(metadata) and not force_metadata_refresh:
         logging.info("[%s] reuse nonzero QSMLA metadata input", testcase_name)
@@ -294,7 +330,10 @@ def run(q, *, ori_kv=None, cmp_kv=None, metadata=None, quant_mode=None, **kwargs
         source,
         force_metadata_refresh,
     )
-    generated = run_metadata(arguments, metadata)
+    target = metadata if metadata is not None else _metadata_target
+    generated = run_metadata(arguments, target if target is not None else q)
+    if metadata is None:
+        return {"metadata": generated}
     if tuple(metadata.shape) != tuple(generated.shape):
         raise ValueError(
             "QSMLA metadata shape mismatch: "
@@ -317,10 +356,13 @@ def run_aclnn(*args, **kwargs):
         )
     values = dict(zip(ACLNN_PARAMETER_NAMES, args))
     host_metadata = values["metadata"]
-    metadata = move_to_device(host_metadata, torch.empty(0, device="npu"))
+    metadata_target = torch.empty(0, device="npu")
+    metadata = move_to_device(host_metadata, metadata_target)
     values["metadata"] = metadata
     q = values.pop("q")
-    result = run(q, **values, **kwargs)
+    result = run(q, _metadata_target=metadata_target, **values, **kwargs)
+    if host_metadata is None:
+        return {"metadataOptional": result["metadata"]}
     if torch.is_tensor(host_metadata):
         if host_metadata.device != metadata.device:
             host_metadata.copy_(

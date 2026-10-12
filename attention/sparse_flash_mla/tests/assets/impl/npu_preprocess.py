@@ -12,9 +12,9 @@
 """Populate the SparseFlashMla metadata slot before the main API call.
 
 This module is intentionally independent from TTK.  The framework passes the
-main API arguments after H2D; this hook invokes the companion torch operator
-and updates ``metadata`` in place.  Profiling and result handling remain in
-TTK, and the hook always returns ``None``.
+main API arguments to this hook, which invokes the companion torch operator.
+Static metadata is updated in place; a dynamic slot returns the generated
+tensor for framework-side argument materialization.
 """
 
 import importlib.util
@@ -84,6 +84,27 @@ def get_attribute(kwargs, name, default=None):
     if value is None:
         value = kwargs.get(f"pytest_{name}")
     return default if value is None else value
+
+
+def expect_error(kwargs):
+    value = kwargs.get("expect_error", False)
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
+def zero_metadata_for_expected_error(metadata, target, testcase_name):
+    if metadata is None:
+        generated = torch.zeros(1024, dtype=torch.int32, device=target.device)
+        logging.info(
+            "[%s] created zero SMLA metadata for dynamic error case", testcase_name
+        )
+        return {"metadata": generated}
+    metadata.zero_()
+    logging.info(
+        "[%s] zeroed SMLA metadata for main-operator error case", testcase_name
+    )
+    return None
 
 
 def get_values(kwargs, name):
@@ -237,7 +258,7 @@ def move_to_device(value, target):
 
 
 def run_metadata(arguments, metadata):
-    import cann_ops_transformer
+    import cann_ops_transformer  # noqa: F401
 
     return torch.ops.cann_ops_transformer.sparse_flash_mla_metadata(
         int(arguments["num_heads_q"]),
@@ -270,12 +291,18 @@ def run_metadata(arguments, metadata):
     )
 
 
-def run(q, *, ori_kv=None, cmp_kv=None, metadata=None, **kwargs):
-    """Generate and copy metadata for a main SparseFlashMla invocation."""
-    if metadata is None:
-        raise ValueError("SparseFlashMla npu_preprocess requires metadata")
-    protocol = load_metadata_protocol()
+def run(q, *, ori_kv=None, cmp_kv=None, metadata=None, _metadata_target=None, **kwargs):
+    """Generate metadata dynamically, or fill an existing static placeholder."""
     testcase_name = kwargs.get("testcase_name")
+    if expect_error(kwargs):
+        target = (
+            metadata
+            if metadata is not None
+            else (_metadata_target if _metadata_target is not None else q)
+        )
+        return zero_metadata_for_expected_error(metadata, target, testcase_name)
+
+    protocol = load_metadata_protocol()
     force_metadata_refresh = bool(get_attribute(kwargs, "metadata_refresh", False))
     if protocol.metadata_is_materialized(metadata) and not force_metadata_refresh:
         logging.info("[%s] reuse nonzero SMLA metadata input", testcase_name)
@@ -293,7 +320,10 @@ def run(q, *, ori_kv=None, cmp_kv=None, metadata=None, **kwargs):
         source,
         force_metadata_refresh,
     )
-    generated = run_metadata(arguments, metadata)
+    target = metadata if metadata is not None else _metadata_target
+    generated = run_metadata(arguments, target if target is not None else q)
+    if metadata is None:
+        return {"metadata": generated}
     if tuple(metadata.shape) != tuple(generated.shape):
         raise ValueError(
             "SMLA metadata shape mismatch: "
@@ -319,10 +349,13 @@ def run_aclnn(*args, **kwargs):
         )
     values = dict(zip(ACLNN_PARAMETER_NAMES, args))
     host_metadata = values["metadata"]
-    metadata = move_to_device(host_metadata, torch.empty(0, device="npu"))
+    metadata_target = torch.empty(0, device="npu")
+    metadata = move_to_device(host_metadata, metadata_target)
     values["metadata"] = metadata
     q = values.pop("q")
-    result = run(q, **values, **kwargs)
+    result = run(q, _metadata_target=metadata_target, **values, **kwargs)
+    if host_metadata is None:
+        return {"metadataOptional": result["metadata"]}
     if torch.is_tensor(host_metadata):
         if host_metadata.device != metadata.device:
             host_metadata.copy_(

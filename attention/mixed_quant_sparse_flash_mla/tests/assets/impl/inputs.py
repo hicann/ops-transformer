@@ -20,7 +20,7 @@ import torch
 
 
 class MixedQuantSparseFlashMlaInputAdapter:
-    """Translate a TTK case to pytest parameters and reuse pytest generation."""
+    """Prepare MQ inputs through pytest or the TurboQuant CPU branch."""
 
     PYTEST_BLOCK_SIZE = 64
     PYTEST_TILE_SIZE = 64
@@ -331,6 +331,15 @@ class MixedQuantSparseFlashMlaInputAdapter:
                 filled[name] = params[name]
         if filled.get("Testcase_Name") is None:
             filled["Testcase_Name"] = params.get("testcase_name")
+        for name in ("ori_topk_length", "cmp_topk_length"):
+            value = filled.get(name)
+            shape = (
+                (filled["B"], filled["S1"], filled["N2"])
+                if filled["layout_q"] == "BSND"
+                else (filled["T1"], filled["N2"])
+            )
+            if isinstance(value, (list, tuple)) and len(value) == 1:
+                filled[name] = torch.full(shape, int(value[0]), dtype=torch.int32)
         pytest_check.check_valid_param(filled)
         if batch_random is None:
             data = pytest_golden.gen_data(filled, generate_golden=False)
@@ -402,6 +411,9 @@ def generate_mixed_quant_sparse_flash_mla_inputs(
         return None
 
     params = dict(kwargs)
+    for name in ("ori_topk_length", "cmp_topk_length"):
+        if name + "_values" in params:
+            params[name] = params[name + "_values"]
     params.update(
         {
             "quant_mode": quant_mode,
@@ -420,10 +432,12 @@ def generate_mixed_quant_sparse_flash_mla_inputs(
             "value_dtype": value_dtype,
         }
     )
-    batch_module = INPUT_ADAPTER.load_batch_consistency()
-    batch_random = batch_module.NumpyBatchRandomContext.from_case(
-        q, ori_kv, cmp_kv, params
-    )
+    batch_random = None
+    if int(quant_mode) != 3:
+        batch_module = INPUT_ADAPTER.load_batch_consistency()
+        batch_random = batch_module.NumpyBatchRandomContext.from_case(
+            q, ori_kv, cmp_kv, params
+        )
     params = INPUT_ADAPTER.build_case_params(
         q,
         ori_kv,
@@ -434,8 +448,57 @@ def generate_mixed_quant_sparse_flash_mla_inputs(
         layout_kv,
         params,
     )
-    data = INPUT_ADAPTER.generate_case(params, batch_random)
+    if int(quant_mode) == 3:
+        for name, tensor in (
+            ("ori_sparse_indices", ori_sparse_indices),
+            ("cu_seqlens_ori_kv", cu_seqlens_ori_kv),
+            ("cu_seqlens_cmp_kv", cu_seqlens_cmp_kv),
+            ("seqused_q", seqused_q),
+            ("seqused_cmp_kv", seqused_cmp_kv),
+            ("cmp_residual_kv", cmp_residual_kv),
+            ("ori_topk_length", ori_topk_length),
+            ("cmp_topk_length", cmp_topk_length),
+        ):
+            if tensor is not None:
+                raise ValueError(f"MQ mode3 does not accept {name}")
+        if cu_seqlens_q is None or seqused_ori_kv is None:
+            raise ValueError("MQ mode3 requires cu_seqlens_q and seqused_ori_kv")
+        path = Path(__file__).with_name("turbo_quant_inputs.py")
+        name = "mqsmla_ttk_turbo_quant_inputs"
+        if name not in sys.modules:
+            spec = importlib.util.spec_from_file_location(name, path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            sys.modules[name] = module
+        data = sys.modules[name].generate_case(
+            params,
+            q,
+            ori_kv,
+            cmp_kv,
+            cmp_sparse_indices,
+            ori_block_table,
+            cmp_block_table,
+            sinks,
+        )
+    else:
+        data = INPUT_ADAPTER.generate_case(params, batch_random)
     op_input = data["op_input"]
+    for branch in ("ori", "cmp"):
+        length = op_input.get(branch + "_topk_length")
+        if length is None:
+            continue
+        # The device consumes only the declared prefix; persist the unused tail as -1.
+        for values in (op_input, data.get("golden_state", {})):
+            indices = values.get(branch + "_sparse_indices")
+            if indices is not None:
+                tail = torch.arange(indices.shape[-1]) >= length.unsqueeze(-1)
+                indices.masked_fill_(tail, -1)
+    if sinks is None and data.get("golden_state") is not None:
+        # A -inf sink contributes zero mass while preserving the pytest reference shape.
+        data["golden_state"]["sinks"] = torch.full_like(
+            op_input["sinks"], -float("inf")
+        )
+        op_input["sinks"] = None
     for name, tensor in (
         ("q", q),
         ("ori_kv", ori_kv),

@@ -204,14 +204,18 @@ class KvQuantSparseFlashAttentionV2InputAdapter:
             self.copy_tensor(block_table, generated.get("block_table"), "block_table")
         elif layout_kv == "PA_BSND":
             raise ValueError("PA_BSND requires block_table to be declared by the CSV")
-        self.copy_sequence(
-            actual_seq_lengths_query,
-            params["actualseqlengths"],
-            "actual_seq_lengths_query",
-        )
-        self.copy_sequence(
-            actual_seq_lengths_kv, params["actualseqlengthskv"], "actual_seq_lengths_kv"
-        )
+        if actual_seq_lengths_query is not None or layout_query == "TND":
+            self.copy_sequence(
+                actual_seq_lengths_query,
+                params["actualseqlengths"],
+                "actual_seq_lengths_query",
+            )
+        if actual_seq_lengths_kv is not None or layout_kv != "BSND":
+            self.copy_sequence(
+                actual_seq_lengths_kv,
+                params["actualseqlengthskv"],
+                "actual_seq_lengths_kv",
+            )
         if sinks is not None:
             self.copy_tensor(sinks, generated.get("sinks"), "sinks")
 
@@ -223,6 +227,13 @@ class KvQuantSparseFlashAttentionV2InputAdapter:
                 )
             },
         )
+
+
+def expect_error(kwargs):
+    value = kwargs.get("expect_error", False)
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
 
 
 def generate_qsfa_v2_inputs(
@@ -252,6 +263,8 @@ def generate_qsfa_v2_inputs(
     testcase_name=None,
     **kwargs,
 ):
+    if expect_error(kwargs):
+        return None
     return INPUT_ADAPTER.generate(
         query,
         key,

@@ -78,6 +78,27 @@ def get_attribute(kwargs, name, default=None, aliases=()):
     return default
 
 
+def expect_error(kwargs):
+    value = kwargs.get("expect_error", False)
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
+def zero_metadata_for_expected_error(metadata, target, testcase_name):
+    if metadata is None:
+        generated = torch.zeros(1024, dtype=torch.int32, device=target.device)
+        logging.info(
+            "[%s] created zero QLI_V2 metadata for dynamic error case", testcase_name
+        )
+        return {"metadata": generated}
+    metadata.zero_()
+    logging.info(
+        "[%s] zeroed QLI_V2 metadata for main-operator error case", testcase_name
+    )
+    return None
+
+
 def get_values(kwargs, name, tensor):
     value = kwargs.get(f"{name}_values")
     if value is None:
@@ -214,7 +235,7 @@ def move_to_device(value, target):
 
 
 def run_metadata(arguments, metadata):
-    import cann_ops_transformer
+    import cann_ops_transformer  # noqa: F401
 
     return torch.ops.cann_ops_transformer.quant_lightning_indexer_metadata(
         int(arguments["num_heads_q"]),
@@ -252,16 +273,24 @@ def run(
     seqused_k=None,
     cmp_residual_k=None,
     metadata=None,
+    _metadata_target=None,
     layout_q="BSND",
     layout_k="BSND",
     mask_mode=0,
     cmp_ratio=1,
     **kwargs,
 ):
-    """Generate metadata once, or reuse a nonzero manual-data input."""
+    """Generate metadata dynamically, or fill an existing static placeholder."""
+    testcase_name = kwargs.get("testcase_name")
+    if expect_error(kwargs):
+        target = (
+            metadata
+            if metadata is not None
+            else (_metadata_target if _metadata_target is not None else query)
+        )
+        return zero_metadata_for_expected_error(metadata, target, testcase_name)
+
     del weights
-    if metadata is None:
-        raise ValueError("QuantLightningIndexer V2 npu_preprocess requires metadata")
     restore_mx_dtypes(query, key, query_dequant_scale, key_dequant_scale, quant_mode)
     arguments_kwargs = dict(kwargs)
     arguments_kwargs.update(
@@ -274,7 +303,6 @@ def run(
         }
     )
     protocol = load_metadata_protocol()
-    testcase_name = kwargs.get("testcase_name")
     force_metadata_refresh = bool(get_attribute(kwargs, "metadata_refresh", False))
     if protocol.metadata_is_materialized(metadata) and not force_metadata_refresh:
         logging.info("[%s] reuse nonzero QLI_V2 metadata input", testcase_name)
@@ -327,7 +355,10 @@ def run(
         source,
         force_metadata_refresh,
     )
-    generated = run_metadata(arguments, metadata)
+    target = metadata if metadata is not None else _metadata_target
+    generated = run_metadata(arguments, target if target is not None else query)
+    if metadata is None:
+        return {"metadata": generated}
     if tuple(metadata.shape) != tuple(generated.shape):
         raise ValueError(
             "QLI_V2 metadata shape mismatch: "
@@ -350,7 +381,8 @@ def run_aclnn(*args, **kwargs):
         )
     values = dict(zip(ACLNN_PARAMETER_NAMES, args))
     host_metadata = values["metadata"]
-    metadata = move_to_device(host_metadata, torch.empty(0, device="npu"))
+    metadata_target = torch.empty(0, device="npu")
+    metadata = move_to_device(host_metadata, metadata_target)
     values["metadata"] = metadata
     result = run(
         values.pop("query"),
@@ -360,9 +392,12 @@ def run_aclnn(*args, **kwargs):
         values.pop("key_dequant_scale"),
         values.pop("topk"),
         values.pop("quant_mode"),
+        _metadata_target=metadata_target,
         **values,
         **kwargs,
     )
+    if host_metadata is None:
+        return {"metadataOptional": result["metadata"]}
     if torch.is_tensor(host_metadata):
         if host_metadata.device != metadata.device:
             host_metadata.copy_(
