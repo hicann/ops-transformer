@@ -1017,7 +1017,6 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
             std::vector<float> scalesHostData(scalesShapeSize, 0.1);
             std::vector<float> expertScalesHostData(expertScalesShapeSize, 0.1);
 
-            std::vector<int16_t> expandXHostData(expandXShapeSize, 0);
             std::vector<float> dynamicScalesHostData(dynamicScalesShapeSize, 0);
             std::vector<int32_t> assistInfoForCombineHostData(assistInfoForCombineShapeSize, 0);
             std::vector<int64_t> expertTokenNumsHostData(expertTokenNumsShapeSize, 0);
@@ -1026,7 +1025,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
             std::vector<float> expandScalesHostData(expandScalesShapeSize, 0);
 
             std::vector<int16_t> oriXHostData(oriXSize, 1);
-            std::vector<int16_t> performanceInfoHostData(performanceInfoShapeSize, 0);
+            std::vector<int64_t> performanceInfoHostData(performanceInfoShapeSize, 0);
             std::vector<int16_t> xOutHostData(xOutShapeSize, 0);
 
 
@@ -1039,7 +1038,13 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
             ret = CreateAclTensor(expertScalesHostData, expertScalesShape, &expertScalesDeviceAddr, aclDataType::ACL_FLOAT, &expertScales);
             CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-            ret = CreateAclTensor(expandXHostData, expandXShape, &expandXDeviceAddr, (quantMode > 0) ? aclDataType::ACL_INT8 : aclDataType::ACL_BF16, &expandX);
+            if (quantMode > 0) {
+                std::vector<int8_t> expandXHostData(expandXShapeSize, 0);
+                ret = CreateAclTensor(expandXHostData, expandXShape, &expandXDeviceAddr, aclDataType::ACL_INT8, &expandX);
+            } else {
+                std::vector<int16_t> expandXHostData(expandXShapeSize, 0);
+                ret = CreateAclTensor(expandXHostData, expandXShape, &expandXDeviceAddr, aclDataType::ACL_BF16, &expandX);
+            }
             CHECK_RET(ret == ACL_SUCCESS, return ret);
             ret = CreateAclTensor(dynamicScalesHostData, dynamicScalesShape, &dynamicScalesDeviceAddr, aclDataType::ACL_FLOAT, &dynamicScales);
             CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -1056,7 +1061,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
 
             ret = CreateAclTensor(oriXHostData, oriXShape, &oriXDeviceAddr, aclDataType::ACL_BF16, &oriX);
             CHECK_RET(ret == ACL_SUCCESS, return ret);
-            ret = CreateAclTensor(performanceInfoHostData, performanceInfoShape, &performanceInfoDeviceAddr, aclDataType::ACL_BF16, &performanceInfo);
+            ret = CreateAclTensor(performanceInfoHostData, performanceInfoShape, &performanceInfoDeviceAddr, aclDataType::ACL_INT64, &performanceInfo);
             CHECK_RET(ret == ACL_SUCCESS, return ret);
 
             ret = CreateAclTensor(xOutHostData, xOutShape, &xOutDeviceAddr, aclDataType::ACL_BF16, &xOut);
@@ -1176,7 +1181,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
             aclrtDestroyStream(args.dispatchV4Stream);
             aclrtDestroyStream(args.combineV4Stream);
             aclrtDestroyContext(args.context);
-            LOG_PRINT("[INFO] device_%d DeStroy.\n", args.rankId);
+            LOG_PRINT("[INFO] device_%d Destroy.\n", args.rankId);
             aclrtResetDevice(args.rankId);
             LOG_PRINT("[INFO] device_%d Reset.\n", args.rankId);
             return 0;
@@ -1450,7 +1455,6 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
         std::vector<float> scalesHostData(scalesShapeSize, 0.1);
         std::vector<float> expertScalesHostData(expertScalesShapeSize, 0.1);
 
-        std::vector<int16_t> expandXHostData(expandXShapeSize, 0);
         std::vector<float> dynamicScalesHostData(dynamicScalesShapeSize, 0);
         std::vector<int32_t> expandIdxHostData(expandIdxShapeSize, 0);
         std::vector<int64_t> expertTokenNumsHostData(expertTokenNumsShapeSize, 0);
@@ -1476,7 +1480,13 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
         ret = CreateAclTensor(expertScalesHostData, expertScalesShape, &expertScalesDeviceAddr, aclDataType::ACL_FLOAT, &expertScales);
         CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-        ret = CreateAclTensor(expandXHostData, expandXShape, &expandXDeviceAddr, (quantMode > 0) ? aclDataType::ACL_INT8 : aclDataType::ACL_BF16, &expandX);
+        if (quantMode > 0) {
+            std::vector<int8_t> expandXHostData(expandXShapeSize, 0);
+            ret = CreateAclTensor(expandXHostData, expandXShape, &expandXDeviceAddr, aclDataType::ACL_INT8, &expandX);
+        } else {
+            std::vector<int16_t> expandXHostData(expandXShapeSize, 0);
+            ret = CreateAclTensor(expandXHostData, expandXShape, &expandXDeviceAddr, aclDataType::ACL_BF16, &expandX);
+        }
         CHECK_RET(ret == ACL_SUCCESS, return ret);
         ret = CreateAclTensor(dynamicScalesHostData, dynamicScalesShape, &dynamicScalesDeviceAddr, aclDataType::ACL_FLOAT, &dynamicScales);
         CHECK_RET(ret == ACL_SUCCESS, return ret);
