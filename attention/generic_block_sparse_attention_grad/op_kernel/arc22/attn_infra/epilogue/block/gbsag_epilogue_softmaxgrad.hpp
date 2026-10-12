@@ -41,7 +41,7 @@ public:
     static constexpr uint64_t CAST_BUFFER_LEN = PacketSoftmaxUbLayout::CAST_BUFFER_BYTES;
     static constexpr uint64_t OUTPUT_BUFFER_LEN = PacketSoftmaxUbLayout::D_BYTES;
 
-    __aicore__ inline explicit SoftmaxGrad(NpuArch::Arch::Resource<ArchTag> &resource_)
+    __aicore__ inline explicit SoftmaxGrad(NpuArch::Arch::Resource<ArchTag>& resource_)
         : resource(resource_)
     {
         // prepD 整体迁入 [PREPD_BASE, 192K) 私有区，与
@@ -135,7 +135,7 @@ public:
     }
 
 private:
-    NpuArch::Arch::Resource<ArchTag> &resource;
+    NpuArch::Arch::Resource<ArchTag>& resource;
     LocalTensor<InputDType> doutTensor[STAGES];
     LocalTensor<InputDType> outTensor[STAGES];
     LocalTensor<float> doutFp32Tensor[STAGES];

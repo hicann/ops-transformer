@@ -81,7 +81,7 @@ public:
 
     __aicore__ inline BlockMmad() {}
 
-    __aicore__ inline void init(Arch::Resource<ArchTag> &resource, uint32_t nDynamic, uint32_t kDynamic,
+    __aicore__ inline void init(Arch::Resource<ArchTag>& resource, uint32_t nDynamic, uint32_t kDynamic,
                                 uint32_t l1BufAddrStartQK = 0)
     {
         // Allocate L1 memory space
@@ -101,7 +101,7 @@ public:
     __aicore__ inline ~BlockMmad() {}
 
     __aicore__ inline void loadQGM(AscendC::GlobalTensor<ElementA> gA, LayoutA layoutA, uint32_t rowNum,
-                                   uint32_t &singleGroupHeads, uint32_t &qHeads, uint32_t kvNBlockSizeParam)
+                                   uint32_t& singleGroupHeads, uint32_t& qHeads, uint32_t kvNBlockSizeParam)
     {
         uint32_t embed = layoutA.shape(1);
         uint32_t rowNumRound = RoundUp(rowNum, L1AAlignHelper::M_ALIGNED);
@@ -119,7 +119,7 @@ public:
         l1AKvNBlockSize = kvNBlockSizeParam;
     }
 
-    __aicore__ inline void getBlockShape(GemmCoord &actShape, uint32_t nL1Index, uint32_t nL1Loop,
+    __aicore__ inline void getBlockShape(GemmCoord& actShape, uint32_t nL1Index, uint32_t nL1Loop,
                                          uint32_t stackSeqTile)
     {
         uint32_t nSplitSize = l1NDynamic;
@@ -129,7 +129,7 @@ public:
         actShape[COORD_DIM1] = nSplitSize;
     }
 
-    __aicore__ inline void getKVOffset(AscendC::GlobalTensor<int32_t> &gBlockTable, uint64_t &kOffset, uint32_t nowNIdx,
+    __aicore__ inline void getKVOffset(AscendC::GlobalTensor<int32_t>& gBlockTable, uint64_t& kOffset, uint32_t nowNIdx,
                                        uint32_t nL1Idx, uint32_t strideKV, uint32_t blockSize, uint32_t embed,
                                        uint64_t keyBnStride)
     {

@@ -32,7 +32,7 @@ using namespace ge;
 using namespace AscendC;
 namespace optiling {
 
-std::string RopeModeToSerialString(const RopeMode &ropeMode)
+std::string RopeModeToSerialString(const RopeMode& ropeMode)
 {
     switch (ropeMode) {
         case RopeMode::NO_ROPE:
@@ -41,7 +41,8 @@ std::string RopeModeToSerialString(const RopeMode &ropeMode)
             return "MLA";
         case RopeMode::ROPE_COMBINE:
             return "MLA";
-        default: return "UNKNOWN";
+        default:
+            return "UNKNOWN";
     }
 }
 
@@ -101,16 +102,14 @@ ge::graphStatus FiaTilingCheck::Process()
         return ge::GRAPH_SUCCESS;
     }
     Init();
-    if (CheckSinglePara() != ge::GRAPH_SUCCESS ||
-        CheckParaExistence() != ge::GRAPH_SUCCESS ||
-        CheckFeature() != ge::GRAPH_SUCCESS ||
-        CheckMultiParaConsistency() != ge::GRAPH_SUCCESS) {
+    if (CheckSinglePara() != ge::GRAPH_SUCCESS || CheckParaExistence() != ge::GRAPH_SUCCESS ||
+        CheckFeature() != ge::GRAPH_SUCCESS || CheckMultiParaConsistency() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingCheck::Check(const FiaTilingInfo &fiaInfo)
+ge::graphStatus TilingCheck::Check(const FiaTilingInfo& fiaInfo)
 {
     // Check函数只做校验，不能修改fiaInfo中的信息
     FiaTilingCheck tilingChecker(fiaInfo);

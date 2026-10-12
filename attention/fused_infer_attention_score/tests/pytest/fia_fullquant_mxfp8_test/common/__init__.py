@@ -16,4 +16,10 @@ from . import result_compare_method
 from . import perf_parser
 from . import test_runner
 
-__all__ = ['fia_fullquant_mxfp8_golden', 'golden_cache', 'result_compare_method', 'perf_parser', 'test_runner']
+__all__ = [
+    "fia_fullquant_mxfp8_golden",
+    "golden_cache",
+    "result_compare_method",
+    "perf_parser",
+    "test_runner",
+]

@@ -15,8 +15,7 @@
 #include "infer_shape_case_executor.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 
-class IndexerQuantCacheProto : public testing::Test
-{
+class IndexerQuantCacheProto : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -31,32 +30,35 @@ protected:
 
 TEST_F(IndexerQuantCacheProto, indexer_quant_cache_infershape_float16)
 {
-    gert::InfershapeContextPara infershapeContextPara("IndexerQuantCache",
+    gert::InfershapeContextPara infershapeContextPara(
+        "IndexerQuantCache",
         {
-            {{{2048, 1, 1, 128}, {2048, 1, 1, 128}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},  // cache 4D [blockNum,blockSize,1,headDim]
-            {{{2048, 1, 1, 1}, {2048, 1, 1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},              // cacheScale 4D
-            {{{1024, 128}, {1024, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},              // x
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND},                           // slotMapping
+            {{{2048, 1, 1, 128}, {2048, 1, 1, 128}},
+             ge::DT_FLOAT8_E4M3FN,
+             ge::FORMAT_ND}, // cache 4D [blockNum,blockSize,1,headDim]
+            {{{2048, 1, 1, 1}, {2048, 1, 1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND}, // cacheScale 4D
+            {{{1024, 128}, {1024, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},       // x
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND},                   // slotMapping
         },
         {
-            {{{}, {}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},                          // cacheOut
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                   // cacheScaleOut
+            {{{}, {}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND}, // cacheOut
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},         // cacheScaleOut
         },
         {
             {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
             {"round_scale", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
             {"scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
-        }
-    );
+        });
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS);
 }
 
 TEST_F(IndexerQuantCacheProto, indexer_quant_cache_infershape_dynamic)
 {
-    gert::InfershapeContextPara infershapeContextPara("IndexerQuantCache",
+    gert::InfershapeContextPara infershapeContextPara(
+        "IndexerQuantCache",
         {
-            {{{-2}, {2048, 1, 1, 128}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},      // cache 4D
-            {{{-2}, {2048, 1, 1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},                 // cacheScale 4D
+            {{{-2}, {2048, 1, 1, 128}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND}, // cache 4D
+            {{{-2}, {2048, 1, 1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},           // cacheScale 4D
             {{{-2}, {1024, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},             // x
             {{{-2}, {1024}}, ge::DT_INT32, ge::FORMAT_ND},                    // slotMapping
         },
@@ -68,8 +70,7 @@ TEST_F(IndexerQuantCacheProto, indexer_quant_cache_infershape_dynamic)
             {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
             {"round_scale", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
             {"scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
-        }
-    );
+        });
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS);
 }
 

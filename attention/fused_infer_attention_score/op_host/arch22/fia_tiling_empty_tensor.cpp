@@ -26,9 +26,9 @@ constexpr uint64_t FIA_PERF_MODE_TILINGKEYOFFSET = uint64_t(1000000000000000UL);
 
 constexpr uint64_t EMPTY_KV_TILING_KEY = 20;
 
-void FiaTilingEmptyTensor::InitTilingInfo(TilingInfo *tilingInfo)
+void FiaTilingEmptyTensor::InitTilingInfo(TilingInfo* tilingInfo)
 {
-    fiaInfo_ = static_cast<FiaTilingInfo *>(tilingInfo);
+    fiaInfo_ = static_cast<FiaTilingInfo*>(tilingInfo);
 }
 
 ge::graphStatus FiaTilingEmptyTensor::GetPlatformInfo()

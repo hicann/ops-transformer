@@ -20,12 +20,12 @@
 
 using namespace MaskedCausalConv1dNs;
 
-extern "C" __global__ __aicore__ void
-masked_causal_conv1d(GM_ADDR x,      // input: [S, B, H], BF16/FP16 (may be non-contiguous)
-                     GM_ADDR weight, // input: [3, H], BF16/FP16
-                     GM_ADDR mask,   // input: [B, S], BOOL (uint8_t)
-                     GM_ADDR y,      // output: [S, B, H], BF16/FP16
-                     GM_ADDR workspace, GM_ADDR tiling)
+extern "C" __global__ __aicore__ void masked_causal_conv1d(
+    GM_ADDR x,      // input: [S, B, H], BF16/FP16 (may be non-contiguous)
+    GM_ADDR weight, // input: [3, H], BF16/FP16
+    GM_ADDR mask,   // input: [B, S], BOOL (uint8_t)
+    GM_ADDR y,      // output: [S, B, H], BF16/FP16
+    GM_ADDR workspace, GM_ADDR tiling)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
     REGISTER_TILING_DEFAULT(MaskedCausalConv1dTilingData);

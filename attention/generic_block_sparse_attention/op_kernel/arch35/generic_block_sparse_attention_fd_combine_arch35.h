@@ -27,7 +27,7 @@ public:
     static constexpr uint32_t MAX_LSE_ELEMS = MAX_SPLIT_NUM * MAX_ROW_TILE;
     static constexpr uint32_t MAX_O_TILE_ELEMS = MAX_ROW_TILE * HEAD_DIM;
 
-    __aicore__ inline explicit GenericBlockSparseAttentionFdCombineArch35(Resource &resource)
+    __aicore__ inline explicit GenericBlockSparseAttentionFdCombineArch35(Resource& resource)
     {
         constexpr uint32_t LSE_OFFSET = 0U;
         constexpr uint32_t LSE_BROADCAST_OFFSET = LSE_OFFSET + MAX_LSE_ELEMS * sizeof(float);
@@ -51,12 +51,12 @@ public:
     }
 
     template <class CuSeqTensor, class SeqUsedTensor>
-    __aicore__ inline void operator()(__gm__ const GbsaMetadata::Metadata *meta,
-                                      __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData *tilingData,
-                                      AscendC::GlobalTensor<float> &gPartialLse,
-                                      AscendC::GlobalTensor<float> &gPartialO, AscendC::GlobalTensor<ElementO> &gO,
-                                      AscendC::GlobalTensor<float> &gLse, CuSeqTensor &gCuSeqLengths,
-                                      SeqUsedTensor &gSeqUsedQ, bool hasSeqUsedQ)
+    __aicore__ inline void operator()(__gm__ const GbsaMetadata::Metadata* meta,
+                                      __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData,
+                                      AscendC::GlobalTensor<float>& gPartialLse,
+                                      AscendC::GlobalTensor<float>& gPartialO, AscendC::GlobalTensor<ElementO>& gO,
+                                      AscendC::GlobalTensor<float>& gLse, CuSeqTensor& gCuSeqLengths,
+                                      SeqUsedTensor& gSeqUsedQ, bool hasSeqUsedQ)
     {
         AscendC::SetAtomicNone();
         AscendC::SetMaskNorm();
@@ -91,7 +91,7 @@ public:
             const uint32_t rowCount = Min(rowTile, sourceRows - sourceLocalRow);
             const uint32_t groupRowStart = (sourceSubBlock == 0U ? 0U : rowSplit) + sourceLocalRow;
             const uint32_t rowCountAlign = RoundUp(rowCount, FLOATS_PER_BLOCK);
-            const __gm__ GbsaMetadata::CombineSchedule &schedule = meta->combineSchedules[combineTask];
+            const __gm__ GbsaMetadata::CombineSchedule& schedule = meta->combineSchedules[combineTask];
             const uint32_t baseTask = static_cast<uint32_t>(schedule.baseTask);
             const uint32_t splitCount = static_cast<uint32_t>(schedule.partialCount);
             const uint32_t splitCountAlign = RoundUp(splitCount, FLOATS_PER_BLOCK);
@@ -161,7 +161,7 @@ public:
     }
 
 private:
-    __aicore__ inline void PrepareWeights(AscendC::GlobalTensor<float> &gPartialLse, uint32_t firstPartialTask,
+    __aicore__ inline void PrepareWeights(AscendC::GlobalTensor<float>& gPartialLse, uint32_t firstPartialTask,
                                           uint32_t splitCount, uint32_t splitCountAlign, uint32_t sourceSubBlock,
                                           uint32_t sourceLocalRow, uint32_t rowCount, uint32_t rowCountAlign,
                                           uint32_t lseSubStride, uint32_t lsePartialStride)
@@ -203,7 +203,7 @@ private:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void BroadcastRows(const AscendC::LocalTensor<float> &src, uint32_t rowCountAlign,
+    __aicore__ inline void BroadcastRows(const AscendC::LocalTensor<float>& src, uint32_t rowCountAlign,
                                          uint32_t splitCountAlign)
     {
         for (uint32_t split = 0U; split < splitCountAlign; ++split) {

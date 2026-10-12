@@ -37,26 +37,25 @@ extern "C" {
 #endif
 
 struct LightningIndexerGradParams {
-    const aclTensor *query = nullptr;
-    const aclTensor *key = nullptr;
-    const aclTensor *dy = nullptr;
-    const aclTensor *sparseIndices = nullptr;
-    const aclTensor *weights = nullptr;
-    const aclTensor *actualSeqLengthsQueryOptional = nullptr;
-    const aclTensor *actualSeqLengthsKeyOptional = nullptr;
+    const aclTensor* query = nullptr;
+    const aclTensor* key = nullptr;
+    const aclTensor* dy = nullptr;
+    const aclTensor* sparseIndices = nullptr;
+    const aclTensor* weights = nullptr;
+    const aclTensor* actualSeqLengthsQueryOptional = nullptr;
+    const aclTensor* actualSeqLengthsKeyOptional = nullptr;
     int64_t headNum;
-    char *layout;
+    char* layout;
     int64_t sparseMode;
     int64_t preTokens;
     int64_t nextTokens;
     bool deterministic;
-    const aclTensor *dqOut = nullptr;
-    const aclTensor *dkOut = nullptr;
-    const aclTensor *dweightsOut = nullptr;
+    const aclTensor* dqOut = nullptr;
+    const aclTensor* dkOut = nullptr;
+    const aclTensor* dweightsOut = nullptr;
 };
 
-
-static aclnnStatus CheckParams(const LightningIndexerGradParams &params)
+static aclnnStatus CheckParams(const LightningIndexerGradParams& params)
 {
     CHECK_COND(params.query != nullptr, ACLNN_ERR_PARAM_NULLPTR, "query must not be nullptr.");
     CHECK_COND(params.key != nullptr, ACLNN_ERR_PARAM_NULLPTR, "key must not be nullptr.");
@@ -70,32 +69,32 @@ static aclnnStatus CheckParams(const LightningIndexerGradParams &params)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus ContiguousAndLightningIndexerGrad(const LightningIndexerGradParams &params, aclOpExecutor *executor,
-                                                  const aclTensor *dqOut, const aclTensor *dkOut,
-                                                  const aclTensor *dweightsOut)
+aclnnStatus ContiguousAndLightningIndexerGrad(const LightningIndexerGradParams& params, aclOpExecutor* executor,
+                                              const aclTensor* dqOut, const aclTensor* dkOut,
+                                              const aclTensor* dweightsOut)
 {
     auto queryContiguous = l0op::Contiguous(params.query, executor);
     CHECK_RET(queryContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    
+
     auto keyContiguous = l0op::Contiguous(params.key, executor);
     CHECK_RET(keyContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    
+
     auto dyContiguous = l0op::Contiguous(params.dy, executor);
     CHECK_RET(dyContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    
+
     auto sparseIndicesContiguous = l0op::Contiguous(params.sparseIndices, executor);
     CHECK_RET(sparseIndicesContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    
+
     auto weightsContiguous = l0op::Contiguous(params.weights, executor);
     CHECK_RET(weightsContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    
-    const aclTensor *actualSeqLengthsQueryOptionalContiguous = nullptr;
+
+    const aclTensor* actualSeqLengthsQueryOptionalContiguous = nullptr;
     if (params.actualSeqLengthsQueryOptional != nullptr) {
         actualSeqLengthsQueryOptionalContiguous = l0op::Contiguous(params.actualSeqLengthsQueryOptional, executor);
         CHECK_RET(actualSeqLengthsQueryOptionalContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    const aclTensor *actualSeqLengthsKeyOptionalContiguous = nullptr;
+    const aclTensor* actualSeqLengthsKeyOptionalContiguous = nullptr;
     if (params.actualSeqLengthsKeyOptional != nullptr) {
         actualSeqLengthsKeyOptionalContiguous = l0op::Contiguous(params.actualSeqLengthsKeyOptional, executor);
         CHECK_RET(actualSeqLengthsKeyOptionalContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -104,9 +103,8 @@ aclnnStatus ContiguousAndLightningIndexerGrad(const LightningIndexerGradParams &
     // call l0 interface
     auto result = l0op::LightningIndexerGrad(
         queryContiguous, keyContiguous, dyContiguous, sparseIndicesContiguous, weightsContiguous,
-        actualSeqLengthsQueryOptionalContiguous, actualSeqLengthsKeyOptionalContiguous,
-        params.headNum, inputLayoutStr.c_str(), params.sparseMode, params.preTokens, 
-        params.nextTokens, params.deterministic, executor);
+        actualSeqLengthsQueryOptionalContiguous, actualSeqLengthsKeyOptionalContiguous, params.headNum,
+        inputLayoutStr.c_str(), params.sparseMode, params.preTokens, params.nextTokens, params.deterministic, executor);
 
     // convert output tensor to contiguous tensor
     CHECK_RET(result[0] != nullptr && result[1] != nullptr && result[2] != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -120,10 +118,7 @@ aclnnStatus ContiguousAndLightningIndexerGrad(const LightningIndexerGradParams &
     return ACLNN_SUCCESS;
 }
 
-static bool CheckDataType(const aclTensor *query,
-                          const aclTensor *key,
-                          const aclTensor *dy,
-                          const aclTensor *weights)
+static bool CheckDataType(const aclTensor* query, const aclTensor* key, const aclTensor* dy, const aclTensor* weights)
 {
     const DataType qDtype = query->GetDataType();
     const DataType kDtype = key->GetDataType();
@@ -151,19 +146,11 @@ static bool CheckDataType(const aclTensor *query,
     return true;
 }
 
-static aclnnStatus ValidateParams(const aclTensor *query,
-                                  const aclTensor *key,
-                                  const aclTensor *dy,
-                                  const aclTensor *sparseIndices,
-                                  const aclTensor *weights,
-                                  const aclTensor *actualSeqQLenOptional,
-                                  const aclTensor *actualSeqKvLenOptional,
-                                  int64_t headNum,
-                                  char *inputLayout,
-                                  int64_t sparseMode,
-                                  int64_t preTokens,
-                                  int64_t nextTokens,
-                                  bool deterministic)
+static aclnnStatus ValidateParams(const aclTensor* query, const aclTensor* key, const aclTensor* dy,
+                                  const aclTensor* sparseIndices, const aclTensor* weights,
+                                  const aclTensor* actualSeqQLenOptional, const aclTensor* actualSeqKvLenOptional,
+                                  int64_t headNum, char* inputLayout, int64_t sparseMode, int64_t preTokens,
+                                  int64_t nextTokens, bool deterministic)
 {
     CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(key != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -178,39 +165,30 @@ static aclnnStatus ValidateParams(const aclTensor *query,
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnLightningIndexerGradGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *dy, const aclTensor *sparseIndices,
-    const aclTensor *weights, const aclTensor *actualSeqQLenOptional, const aclTensor *actualSeqKvLenOptional,
-    int64_t headNum, char *inputLayout, int64_t sparseMode, int64_t preTokens, int64_t nextTokens, bool deterministic, 
-    const aclTensor *dqOut, const aclTensor *dkOut, const aclTensor *dweightsOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnLightningIndexerGradGetWorkspaceSize(const aclTensor* query, const aclTensor* key, const aclTensor* dy,
+                                                      const aclTensor* sparseIndices, const aclTensor* weights,
+                                                      const aclTensor* actualSeqQLenOptional,
+                                                      const aclTensor* actualSeqKvLenOptional, int64_t headNum,
+                                                      char* inputLayout, int64_t sparseMode, int64_t preTokens,
+                                                      int64_t nextTokens, bool deterministic, const aclTensor* dqOut,
+                                                      const aclTensor* dkOut, const aclTensor* dweightsOut,
+                                                      uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    aclnnStatus validateRet = ValidateParams(query, key, dy, sparseIndices, weights,
-                                             actualSeqQLenOptional, actualSeqKvLenOptional,
-                                             headNum, inputLayout, sparseMode, preTokens, nextTokens, deterministic);
+    aclnnStatus validateRet =
+        ValidateParams(query, key, dy, sparseIndices, weights, actualSeqQLenOptional, actualSeqKvLenOptional, headNum,
+                       inputLayout, sparseMode, preTokens, nextTokens, deterministic);
     if (validateRet != ACLNN_SUCCESS) {
         return validateRet;
     }
 
     L2_DFX_PHASE_1(aclnnLightningIndexerGrad,
                    DFX_IN(query, key, dy, sparseIndices, weights, actualSeqQLenOptional, actualSeqKvLenOptional,
-                            headNum, inputLayout, sparseMode, preTokens, nextTokens, deterministic),
+                          headNum, inputLayout, sparseMode, preTokens, nextTokens, deterministic),
                    DFX_OUT(dqOut, dkOut, dweightsOut));
-    LightningIndexerGradParams params{query,
-                                    key,
-                                    dy,
-                                    sparseIndices,
-                                    weights,
-                                    actualSeqQLenOptional,
-                                    actualSeqKvLenOptional,
-                                    headNum,
-                                    inputLayout,
-                                    sparseMode,
-                                    preTokens,
-                                    nextTokens,
-                                    deterministic,
-                                    dqOut,
-                                    dkOut,
-                                    dweightsOut};
+    LightningIndexerGradParams params{
+        query,   key,         dy,         sparseIndices, weights,    actualSeqQLenOptional, actualSeqKvLenOptional,
+        headNum, inputLayout, sparseMode, preTokens,     nextTokens, deterministic,         dqOut,
+        dkOut,   dweightsOut};
     // check params
     aclnnStatus ret = CheckParams(params);
     CHECK_COND(ret == ACLNN_SUCCESS, ret, "aclnnLightningIndexerGradGetWorkspaceSize checkParams failed.");
@@ -231,7 +209,7 @@ aclnnStatus aclnnLightningIndexerGradGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnLightningIndexerGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnLightningIndexerGrad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                       aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnLightningIndexerGrad);

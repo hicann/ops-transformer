@@ -38,10 +38,10 @@ namespace aicpu {
  */
 class GenericBlockSparseAttentionGradMetadataCpuKernelArch22 : public CpuKernel {
 public:
-    uint32_t Compute(CpuKernelContext &ctx) override;
+    uint32_t Compute(CpuKernelContext& ctx) override;
 
 private:
-    bool Prepare(CpuKernelContext &ctx);
+    bool Prepare(CpuKernelContext& ctx);
     bool BalanceSchedule();
     bool GenMetadata();
 
@@ -54,16 +54,16 @@ private:
     static uint32_t DecodeBasicBlockStart(uint32_t basicBlockIdx, uint32_t sparseBlockSize);
 
     uint32_t GetOutputCapacityWords() const;
-    bool FillKTask(uint32_t coreIdx, uint32_t startId, int32_t *out) const;
+    bool FillKTask(uint32_t coreIdx, uint32_t startId, int32_t* out) const;
 
     // ---- input（device tensor，AICPU 侧 GetData 可直接读） ----
-    Tensor *sparseBlockIdx_ = nullptr;
-    Tensor *cuSeqQ_ = nullptr;
-    Tensor *cuSeqKv_ = nullptr;
-    Tensor *sequsedQ_ = nullptr;
-    Tensor *sequsedKv_ = nullptr;
+    Tensor* sparseBlockIdx_ = nullptr;
+    Tensor* cuSeqQ_ = nullptr;
+    Tensor* cuSeqKv_ = nullptr;
+    Tensor* sequsedQ_ = nullptr;
+    Tensor* sequsedKv_ = nullptr;
     // ---- output ----
-    Tensor *metadata_ = nullptr;
+    Tensor* metadata_ = nullptr;
 
     // ---- attr ----
     int64_t maxQSeqlenAttr_ = 0;
@@ -96,7 +96,7 @@ private:
     };
 };
 
-uint32_t GenericBlockSparseAttentionGradMetadataCpuKernelArch22::Compute(CpuKernelContext &ctx)
+uint32_t GenericBlockSparseAttentionGradMetadataCpuKernelArch22::Compute(CpuKernelContext& ctx)
 {
     if (!Prepare(ctx)) {
         return KERNEL_STATUS_PARAM_INVALID;
@@ -118,7 +118,7 @@ uint32_t GenericBlockSparseAttentionGradMetadataCpuKernelArch22::GetOutputCapaci
     return static_cast<uint32_t>(metadata_->GetDataSize() / sizeof(int32_t));
 }
 
-bool GenericBlockSparseAttentionGradMetadataCpuKernelArch22::Prepare(CpuKernelContext &ctx)
+bool GenericBlockSparseAttentionGradMetadataCpuKernelArch22::Prepare(CpuKernelContext& ctx)
 {
     using PI = ParamId;
     sparseBlockIdx_ = ctx.Input(static_cast<uint32_t>(PI::sparseBlockIdx));
@@ -207,11 +207,11 @@ uint32_t GenericBlockSparseAttentionGradMetadataCpuKernelArch22::QSeqLen(uint32_
     // TND 契约：cuSeq 必传（Prepare 已校验），长度取前缀和差分；
     // packed 布局（BNSD/BSND）seqused 可选，缺省回退物理 max。
     if (inputLayout_ == gbsag_meta::LAYOUT_TND) {
-        const int64_t *cu = static_cast<const int64_t *>(cuSeqQ_->GetData());
+        const int64_t* cu = static_cast<const int64_t*>(cuSeqQ_->GetData());
         return static_cast<uint32_t>(cu[b + 1] - cu[b]);
     }
     if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
-        const int32_t *used = static_cast<const int32_t *>(sequsedQ_->GetData());
+        const int32_t* used = static_cast<const int32_t*>(sequsedQ_->GetData());
         return static_cast<uint32_t>(used[b]);
     }
     return static_cast<uint32_t>(maxQSeqlenAttr_);
@@ -220,11 +220,11 @@ uint32_t GenericBlockSparseAttentionGradMetadataCpuKernelArch22::QSeqLen(uint32_
 uint32_t GenericBlockSparseAttentionGradMetadataCpuKernelArch22::KvSeqLen(uint32_t b) const
 {
     if (inputLayout_ == gbsag_meta::LAYOUT_TND) {
-        const int64_t *cu = static_cast<const int64_t *>(cuSeqKv_->GetData());
+        const int64_t* cu = static_cast<const int64_t*>(cuSeqKv_->GetData());
         return static_cast<uint32_t>(cu[b + 1] - cu[b]);
     }
     if (sequsedKv_ != nullptr && sequsedKv_->GetData() != nullptr) {
-        const int32_t *used = static_cast<const int32_t *>(sequsedKv_->GetData());
+        const int32_t* used = static_cast<const int32_t*>(sequsedKv_->GetData());
         return static_cast<uint32_t>(used[b]);
     }
     return static_cast<uint32_t>(maxKvSeqlenAttr_);
@@ -291,7 +291,7 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch22::BalanceSchedule()
 }
 
 bool GenericBlockSparseAttentionGradMetadataCpuKernelArch22::FillKTask(uint32_t coreIdx, uint32_t startId,
-                                                                       int32_t *out) const
+                                                                       int32_t* out) const
 {
     const uint32_t count = taskNumPerCore_ + (coreIdx < tailTaskNum_ ? 1U : 0U);
     const uint32_t taskId = startId;
@@ -317,7 +317,7 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch22::FillKTask(uint32_t 
             }
         }
     }
-    auto *task = reinterpret_cast<gbsag_meta::KTask *>(out + gbsag_meta::HEADER_WORDS) + coreIdx;
+    auto* task = reinterpret_cast<gbsag_meta::KTask*>(out + gbsag_meta::HEADER_WORDS) + coreIdx;
     task->beginBatch = b;
     task->beginKvHead = h;
     task->beginKvSeqOffset = DecodeBasicBlockStart(kBlk, blockShapeY_);
@@ -326,7 +326,7 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch22::FillKTask(uint32_t 
 
 bool GenericBlockSparseAttentionGradMetadataCpuKernelArch22::GenMetadata()
 {
-    int32_t *out = reinterpret_cast<int32_t *>(metadata_->GetData());
+    int32_t* out = reinterpret_cast<int32_t*>(metadata_->GetData());
     if (GetOutputCapacityWords() < gbsag_meta::MetadataWords(std::max<uint32_t>(aicCoreNum_, 1))) {
         return false;
     }

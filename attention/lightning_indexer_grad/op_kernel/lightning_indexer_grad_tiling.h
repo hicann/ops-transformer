@@ -227,7 +227,7 @@ public:
         this->totalS1 = totalS1;
     }
 
-    uint64_t *get_coreS1StartIdxPtr()
+    uint64_t* get_coreS1StartIdxPtr()
     {
         return coreS1StartIdx;
     }

@@ -24,13 +24,13 @@ enum QuantMode : int64_t {
 };
 
 at::Tensor GenericBlockSparseAttentionMetadata(
-    const at::Tensor &sparse_block_idx, const at::Tensor &sparse_block_count,
-    const c10::optional<at::Tensor> &cu_seqlens_q, const c10::optional<at::Tensor> &cu_seqlens_kv,
-    const c10::optional<at::Tensor> &seqused_q, const c10::optional<at::Tensor> &seqused_kv, int64_t max_seqlen_q,
+    const at::Tensor& sparse_block_idx, const at::Tensor& sparse_block_count,
+    const c10::optional<at::Tensor>& cu_seqlens_q, const c10::optional<at::Tensor>& cu_seqlens_kv,
+    const c10::optional<at::Tensor>& seqused_q, const c10::optional<at::Tensor>& seqused_kv, int64_t max_seqlen_q,
     int64_t max_seqlen_kv, int64_t num_heads_q, int64_t num_heads_kv, int64_t head_dim, at::IntArrayRef block_shape,
     std::string layout_q, std::string layout_kv, int64_t layout_sparse_pattern, int64_t mask_mode, int64_t quant_mode,
     int64_t softmax_precision, int64_t win_left, int64_t win_right, int64_t residual_block_mode,
-    bool is_consistent_topk, const at::Tensor &output)
+    bool is_consistent_topk, const at::Tensor& output)
 {
     ACLNN_CMD(aclnnGenericBlockSparseAttentionMetadata, sparse_block_idx, sparse_block_count, cu_seqlens_q,
               cu_seqlens_kv, seqused_q, seqused_kv, max_seqlen_q, max_seqlen_kv, num_heads_q, num_heads_kv, head_dim,
@@ -40,13 +40,13 @@ at::Tensor GenericBlockSparseAttentionMetadata(
 }
 
 std::tuple<at::Tensor, at::Tensor> GenericBlockSparseAttention(
-    const at::Tensor &q, const at::Tensor &k, const at::Tensor &v, const at::Tensor &sparse_block_idx,
-    const at::Tensor &sparse_block_count, std::vector<int64_t> block_shape, const c10::optional<at::Tensor> &metadata,
-    const c10::optional<at::Tensor> &attn_mask, const c10::optional<at::Tensor> &q_dequant_scale,
-    const c10::optional<at::Tensor> &k_dequant_scale, const c10::optional<at::Tensor> &v_dequant_scale,
-    const c10::optional<at::Tensor> &p_quant_scale, const c10::optional<at::Tensor> &cu_seqlens_q,
-    const c10::optional<at::Tensor> &cu_seqlens_kv, const c10::optional<at::Tensor> &seqused_q,
-    const c10::optional<at::Tensor> &seqused_kv, const c10::optional<at::Tensor> &block_table, std::string layout_q,
+    const at::Tensor& q, const at::Tensor& k, const at::Tensor& v, const at::Tensor& sparse_block_idx,
+    const at::Tensor& sparse_block_count, std::vector<int64_t> block_shape, const c10::optional<at::Tensor>& metadata,
+    const c10::optional<at::Tensor>& attn_mask, const c10::optional<at::Tensor>& q_dequant_scale,
+    const c10::optional<at::Tensor>& k_dequant_scale, const c10::optional<at::Tensor>& v_dequant_scale,
+    const c10::optional<at::Tensor>& p_quant_scale, const c10::optional<at::Tensor>& cu_seqlens_q,
+    const c10::optional<at::Tensor>& cu_seqlens_kv, const c10::optional<at::Tensor>& seqused_q,
+    const c10::optional<at::Tensor>& seqused_kv, const c10::optional<at::Tensor>& block_table, std::string layout_q,
     std::string layout_kv, int64_t layout_sparse_pattern, double softmax_scale, int64_t mask_mode, int64_t quant_mode,
     double dst_type_max, int64_t softmax_precision, int64_t win_left, int64_t win_right, bool return_softmax_lse,
     int64_t residual_block_mode, bool is_consistent_topk, c10::optional<at::ScalarType> attention_out_dtype)

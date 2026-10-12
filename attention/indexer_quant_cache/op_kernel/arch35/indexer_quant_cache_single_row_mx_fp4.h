@@ -28,16 +28,16 @@ public:
     __aicore__ inline IndexerQuantCacheSingleRowMxFp4() {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR slotMapping, GM_ADDR cache, GM_ADDR cacheScale, GM_ADDR workspace,
-                                const IndexerQuantCacheTilingData *tilingDataPtr, TPipe *pipePtr)
+                                const IndexerQuantCacheTilingData* tilingDataPtr, TPipe* pipePtr)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
         cacheCol = (tilingData->d + 1) / 2; // fp4 打包后每行字节数
 
-        xGm.SetGlobalBuffer((__gm__ T0 *)x);
-        slotMappingGm.SetGlobalBuffer((__gm__ int32_t *)slotMapping);
-        cacheGm.SetGlobalBuffer((__gm__ int8_t *)cache); // fp4 cache 按字节寻址
-        cacheScaleGm.SetGlobalBuffer((__gm__ T2 *)cacheScale);
+        xGm.SetGlobalBuffer((__gm__ T0*)x);
+        slotMappingGm.SetGlobalBuffer((__gm__ int32_t*)slotMapping);
+        cacheGm.SetGlobalBuffer((__gm__ int8_t*)cache); // fp4 cache 按字节寻址
+        cacheScaleGm.SetGlobalBuffer((__gm__ T2*)cacheScale);
 
         // scale Que 最先 InitBuffer 以获得 UB 64B 对齐基址(满足 DIST_PACK_B16 的 64B 对齐要求)。
         pipe->InitBuffer(cacheScaleQue, 2,
@@ -99,8 +99,8 @@ public:
     }
 
 private:
-    TPipe *pipe;
-    const IndexerQuantCacheTilingData *tilingData;
+    TPipe* pipe;
+    const IndexerQuantCacheTilingData* tilingData;
     GlobalTensor<T0> xGm;
     GlobalTensor<int32_t> slotMappingGm;
     GlobalTensor<int8_t> cacheGm;

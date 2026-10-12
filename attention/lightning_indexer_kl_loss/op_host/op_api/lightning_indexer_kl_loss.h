@@ -14,8 +14,8 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor *LightningIndexerKLLoss(const aclTensor *targetScore, const aclTensor *indexProbs, double eps,
-                                        const char *weightType, aclOpExecutor *executor);
+const aclTensor* LightningIndexerKLLoss(const aclTensor* targetScore, const aclTensor* indexProbs, double eps,
+                                        const char* weightType, aclOpExecutor* executor);
 } // namespace l0op
 
 #endif // OP_API_INC_LEVEL0_OP_LIGHTNING_INDEXER_KL_LOSS_OP_H

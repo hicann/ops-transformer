@@ -115,72 +115,72 @@ public:
 
     __aicore__ inline AntiquantProcessorBaseAPI(){};
 
-    __aicore__ inline void ProcessBaseAPI(Buffer<BufferType::L1> &outBufAntiRes, GlobalTensor<KV_T> &kvGm,
-                                          GlobalTensor<ANTIQ_PARAMS_T> &antiqScaleGm,
-                                          GlobalTensor<ANTIQ_PARAMS_T> &antiqOffsetGm,
-                                          GlobalTensor<int32_t> &blockTableGm, TQue<QuePosition::VECIN, 1> &kvInputQue,
-                                          TQue<QuePosition::VECOUT, 1> &kvOutputQue,
-                                          TQue<QuePosition::VECIN, 1> &antiqScaleInputQue,
-                                          TQue<QuePosition::VECIN, 1> &antiqOffsetInputQue, TBuf<> kvAntiqMxScaleRes,
-                                          const AntiquantTaskParamBaseAPI &taskParam, int32_t taskId, bool isBeforeHalf,
+    __aicore__ inline void ProcessBaseAPI(Buffer<BufferType::L1>& outBufAntiRes, GlobalTensor<KV_T>& kvGm,
+                                          GlobalTensor<ANTIQ_PARAMS_T>& antiqScaleGm,
+                                          GlobalTensor<ANTIQ_PARAMS_T>& antiqOffsetGm,
+                                          GlobalTensor<int32_t>& blockTableGm, TQue<QuePosition::VECIN, 1>& kvInputQue,
+                                          TQue<QuePosition::VECOUT, 1>& kvOutputQue,
+                                          TQue<QuePosition::VECIN, 1>& antiqScaleInputQue,
+                                          TQue<QuePosition::VECIN, 1>& antiqOffsetInputQue, TBuf<> kvAntiqMxScaleRes,
+                                          const AntiquantTaskParamBaseAPI& taskParam, int32_t taskId, bool isBeforeHalf,
                                           int32_t s2RealSize);
 
-    __aicore__ inline void CopyAntiqScaleE8M0(LocalTensor<Q_T> dstLocal, GlobalTensor<Q_T> &srcGm, uint64_t offset,
+    __aicore__ inline void CopyAntiqScaleE8M0(LocalTensor<Q_T> dstLocal, GlobalTensor<Q_T>& srcGm, uint64_t offset,
                                               uint32_t rowCnt, uint32_t grpNum);
-    __aicore__ inline void CopyAntiqScaleE8M0Nz(LocalTensor<Q_T> dstLocal, GlobalTensor<Q_T> &srcGm, uint64_t offset,
+    __aicore__ inline void CopyAntiqScaleE8M0Nz(LocalTensor<Q_T> dstLocal, GlobalTensor<Q_T>& srcGm, uint64_t offset,
                                                 uint32_t rowCnt, uint32_t grpNum, uint32_t s2RealSize);
-    __aicore__ inline void LoadAntiquantParamsPerTokenGroup(GlobalTensor<ANTIQ_PARAMS_T> &antiqScaleGm,
-                                                            TQue<QuePosition::VECIN, 1> &antiqScaleInputQue,
+    __aicore__ inline void LoadAntiquantParamsPerTokenGroup(GlobalTensor<ANTIQ_PARAMS_T>& antiqScaleGm,
+                                                            TQue<QuePosition::VECIN, 1>& antiqScaleInputQue,
                                                             TBuf<> kvAntiqMxScaleRes,
-                                                            const AntiquantTaskParamBaseAPI &taskParam,
+                                                            const AntiquantTaskParamBaseAPI& taskParam,
                                                             bool isBeforeHalf, int32_t s2RealSize);
-    __aicore__ inline void LoadAntiquantParamsPerToken(GlobalTensor<ANTIQ_PARAMS_T> &antiqScaleGm,
-                                                       GlobalTensor<ANTIQ_PARAMS_T> &antiqOffsetGm,
-                                                       GlobalTensor<int32_t> &blockTableGm,
-                                                       TQue<QuePosition::VECIN, 1> &antiqScaleInputQue,
-                                                       TQue<QuePosition::VECIN, 1> &antiqOffsetInputQue,
-                                                       const AntiquantTaskParamBaseAPI &taskParam, bool isBeforeHalf,
+    __aicore__ inline void LoadAntiquantParamsPerToken(GlobalTensor<ANTIQ_PARAMS_T>& antiqScaleGm,
+                                                       GlobalTensor<ANTIQ_PARAMS_T>& antiqOffsetGm,
+                                                       GlobalTensor<int32_t>& blockTableGm,
+                                                       TQue<QuePosition::VECIN, 1>& antiqScaleInputQue,
+                                                       TQue<QuePosition::VECIN, 1>& antiqOffsetInputQue,
+                                                       const AntiquantTaskParamBaseAPI& taskParam, bool isBeforeHalf,
                                                        int32_t s2RealSize);
 
-    __aicore__ inline void CopyAntiqParam(LocalTensor<ANTIQ_PARAMS_T> dstLocal, GlobalTensor<ANTIQ_PARAMS_T> &srcGm,
-                                          uint32_t rowCnt, const AntiquantTaskParamBaseAPI &taskParam);
-    __aicore__ inline void LoadAntiquantParamsPerChannel(GlobalTensor<ANTIQ_PARAMS_T> &antiqScaleGm,
-                                                         GlobalTensor<ANTIQ_PARAMS_T> &antiqOffsetGm,
-                                                         TQue<QuePosition::VECIN, 1> &antiqScaleInputQue,
-                                                         TQue<QuePosition::VECIN, 1> &antiqOffsetInputQue,
-                                                         const AntiquantTaskParamBaseAPI &taskParam);
-    __aicore__ inline void FreeAntiquantParams(TQue<QuePosition::VECIN, 1> &antiqScaleInputQue,
-                                               TQue<QuePosition::VECIN, 1> &antiqOffsetInputQue,
-                                               const AntiquantTaskParamBaseAPI &taskParam);
-    __aicore__ inline void AntiquantBaseAPI(uint32_t copyLoopIdx, TQue<QuePosition::VECIN, 1> &kvInputQue,
-                                            TQue<QuePosition::VECOUT, 1> &kvOutputQue, LocalTensor<Q_T> outScm,
-                                            GlobalTensor<KV_T> &kvGm, GlobalTensor<int32_t> &blockTableGm,
-                                            uint32_t dealRowCount, const AntiquantTaskParamBaseAPI &taskParam,
+    __aicore__ inline void CopyAntiqParam(LocalTensor<ANTIQ_PARAMS_T> dstLocal, GlobalTensor<ANTIQ_PARAMS_T>& srcGm,
+                                          uint32_t rowCnt, const AntiquantTaskParamBaseAPI& taskParam);
+    __aicore__ inline void LoadAntiquantParamsPerChannel(GlobalTensor<ANTIQ_PARAMS_T>& antiqScaleGm,
+                                                         GlobalTensor<ANTIQ_PARAMS_T>& antiqOffsetGm,
+                                                         TQue<QuePosition::VECIN, 1>& antiqScaleInputQue,
+                                                         TQue<QuePosition::VECIN, 1>& antiqOffsetInputQue,
+                                                         const AntiquantTaskParamBaseAPI& taskParam);
+    __aicore__ inline void FreeAntiquantParams(TQue<QuePosition::VECIN, 1>& antiqScaleInputQue,
+                                               TQue<QuePosition::VECIN, 1>& antiqOffsetInputQue,
+                                               const AntiquantTaskParamBaseAPI& taskParam);
+    __aicore__ inline void AntiquantBaseAPI(uint32_t copyLoopIdx, TQue<QuePosition::VECIN, 1>& kvInputQue,
+                                            TQue<QuePosition::VECOUT, 1>& kvOutputQue, LocalTensor<Q_T> outScm,
+                                            GlobalTensor<KV_T>& kvGm, GlobalTensor<int32_t>& blockTableGm,
+                                            uint32_t dealRowCount, const AntiquantTaskParamBaseAPI& taskParam,
                                             int32_t taskId, bool isBeforeHalf, int32_t s2RealSize);
-    __aicore__ inline void CopyKV(LocalTensor<KV_T> dstLocal, GlobalTensor<KV_T> &srcGm, uint64_t offset,
+    __aicore__ inline void CopyKV(LocalTensor<KV_T> dstLocal, GlobalTensor<KV_T>& srcGm, uint64_t offset,
                                   uint32_t rowCnt, uint32_t headDim, uint32_t kvHeadNum, uint32_t paKvShapeType);
-    __aicore__ inline void CopyKVPaNz(LocalTensor<KV_T> dstLocal, GlobalTensor<KV_T> &srcGm, uint64_t offset,
+    __aicore__ inline void CopyKVPaNz(LocalTensor<KV_T> dstLocal, GlobalTensor<KV_T>& srcGm, uint64_t offset,
                                       uint32_t rowCnt, uint32_t dealRowCount,
-                                      const AntiquantTaskParamBaseAPI &taskParam);
-    __aicore__ inline void CopyKVPageAttention(LocalTensor<KV_T> dstLocal, GlobalTensor<KV_T> &srcGm,
-                                               GlobalTensor<int32_t> &blockTableGm,
-                                               const AntiquantTaskParamBaseAPI &taskParam, uint32_t curSequence,
+                                      const AntiquantTaskParamBaseAPI& taskParam);
+    __aicore__ inline void CopyKVPageAttention(LocalTensor<KV_T> dstLocal, GlobalTensor<KV_T>& srcGm,
+                                               GlobalTensor<int32_t>& blockTableGm,
+                                               const AntiquantTaskParamBaseAPI& taskParam, uint32_t curSequence,
                                                uint32_t dealRowCount);
     __aicore__ inline void CopyAntiquantParamsPageAttention(
-        LocalTensor<ANTIQ_PARAMS_T> dstLocal, GlobalTensor<ANTIQ_PARAMS_T> &srcGm, GlobalTensor<int32_t> &blockTableGm,
-        const AntiquantTaskParamBaseAPI &taskParam, DataCopyExtParams copyInParams,
+        LocalTensor<ANTIQ_PARAMS_T> dstLocal, GlobalTensor<ANTIQ_PARAMS_T>& srcGm, GlobalTensor<int32_t>& blockTableGm,
+        const AntiquantTaskParamBaseAPI& taskParam, DataCopyExtParams copyInParams,
         DataCopyPadExtParams<ANTIQ_PARAMS_T> copyInPadParams, bool isOffset = false);
     template <bool HAS_OFFSET, bool IS_PER_TOKEN>
-    __aicore__ inline void CallAntiquantVF(LocalTensor<Q_T> &antiqResUb, LocalTensor<KV_T> &antiqInUb,
-                                           LocalTensor<ANTIQ_PARAMS_T> &offsetTensor,
-                                           LocalTensor<ANTIQ_PARAMS_T> &scaleTensor, uint32_t dealRowCount,
-                                           const AntiquantTaskParamBaseAPI &taskParam);
-    __aicore__ inline void AntiquantVec(LocalTensor<Q_T> &antiqResUb, LocalTensor<KV_T> &antiqInUb,
+    __aicore__ inline void CallAntiquantVF(LocalTensor<Q_T>& antiqResUb, LocalTensor<KV_T>& antiqInUb,
+                                           LocalTensor<ANTIQ_PARAMS_T>& offsetTensor,
+                                           LocalTensor<ANTIQ_PARAMS_T>& scaleTensor, uint32_t dealRowCount,
+                                           const AntiquantTaskParamBaseAPI& taskParam);
+    __aicore__ inline void AntiquantVec(LocalTensor<Q_T>& antiqResUb, LocalTensor<KV_T>& antiqInUb,
                                         uint32_t copyLoopIdx, uint32_t dealRowCount,
-                                        const AntiquantTaskParamBaseAPI &taskParam, bool isBeforeHalf);
-    __aicore__ inline void CopyAntiquantResToL1BaseAPI(LocalTensor<Q_T> &antiqResScm, LocalTensor<Q_T> &antiqResUb,
+                                        const AntiquantTaskParamBaseAPI& taskParam, bool isBeforeHalf);
+    __aicore__ inline void CopyAntiquantResToL1BaseAPI(LocalTensor<Q_T>& antiqResScm, LocalTensor<Q_T>& antiqResUb,
                                                        uint32_t copyLoopIdx, uint32_t dealRowCount,
-                                                       const AntiquantTaskParamBaseAPI &taskParam, int32_t taskId,
+                                                       const AntiquantTaskParamBaseAPI& taskParam, int32_t taskId,
                                                        bool isBeforeHalf, int32_t s2RealSize);
 
 private:
@@ -190,11 +190,11 @@ private:
 
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::ProcessBaseAPI(
-    Buffer<BufferType::L1> &outBufAntiRes, GlobalTensor<KV_T> &kvGm, GlobalTensor<ANTIQ_PARAMS_T> &antiqScaleGm,
-    GlobalTensor<ANTIQ_PARAMS_T> &antiqOffsetGm, GlobalTensor<int32_t> &blockTableGm,
-    TQue<QuePosition::VECIN, 1> &kvInputQue, TQue<QuePosition::VECOUT, 1> &kvOutputQue,
-    TQue<QuePosition::VECIN, 1> &antiqScaleInputQue, TQue<QuePosition::VECIN, 1> &antiqOffsetInputQue,
-    TBuf<> kvAntiqMxScaleRes, const AntiquantTaskParamBaseAPI &taskParam, int32_t taskId, bool isBeforeHalf,
+    Buffer<BufferType::L1>& outBufAntiRes, GlobalTensor<KV_T>& kvGm, GlobalTensor<ANTIQ_PARAMS_T>& antiqScaleGm,
+    GlobalTensor<ANTIQ_PARAMS_T>& antiqOffsetGm, GlobalTensor<int32_t>& blockTableGm,
+    TQue<QuePosition::VECIN, 1>& kvInputQue, TQue<QuePosition::VECOUT, 1>& kvOutputQue,
+    TQue<QuePosition::VECIN, 1>& antiqScaleInputQue, TQue<QuePosition::VECIN, 1>& antiqOffsetInputQue,
+    TBuf<> kvAntiqMxScaleRes, const AntiquantTaskParamBaseAPI& taskParam, int32_t taskId, bool isBeforeHalf,
     int32_t s2RealSize)
 {
     if (taskParam.isLoadAntiqParam) {
@@ -245,7 +245,7 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU
 
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::CopyAntiqScaleE8M0(
-    LocalTensor<Q_T> dstLocal, GlobalTensor<Q_T> &srcGm, uint64_t offset, uint32_t rowCnt, uint32_t grpNum)
+    LocalTensor<Q_T> dstLocal, GlobalTensor<Q_T>& srcGm, uint64_t offset, uint32_t rowCnt, uint32_t grpNum)
 {
     DataCopyExtParams copyInParams;
     DataCopyPadExtParams<Q_T> copyInPadParams{};
@@ -258,7 +258,7 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU
 
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::CopyAntiqScaleE8M0Nz(
-    LocalTensor<Q_T> dstLocal, GlobalTensor<Q_T> &srcGm, uint64_t offset, uint32_t rowCnt, uint32_t grpNum,
+    LocalTensor<Q_T> dstLocal, GlobalTensor<Q_T>& srcGm, uint64_t offset, uint32_t rowCnt, uint32_t grpNum,
     uint32_t s2RealSize)
 {
     DataCopyExtParams copyInParams;
@@ -273,8 +273,8 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void
 AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::LoadAntiquantParamsPerTokenGroup(
-    GlobalTensor<ANTIQ_PARAMS_T> &antiqScaleGm, TQue<QuePosition::VECIN, 1> &antiqScaleInputQue,
-    TBuf<> kvAntiqMxScaleRes, const AntiquantTaskParamBaseAPI &taskParam, bool isBeforeHalf, int32_t s2RealSize)
+    GlobalTensor<ANTIQ_PARAMS_T>& antiqScaleGm, TQue<QuePosition::VECIN, 1>& antiqScaleInputQue,
+    TBuf<> kvAntiqMxScaleRes, const AntiquantTaskParamBaseAPI& taskParam, bool isBeforeHalf, int32_t s2RealSize)
 {
     int32_t subBlockIdx;
     if (ArchInfo::CV_RATIO == 1) {
@@ -347,9 +347,9 @@ AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::LoadAnt
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void
 AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::LoadAntiquantParamsPerToken(
-    GlobalTensor<ANTIQ_PARAMS_T> &antiqScaleGm, GlobalTensor<ANTIQ_PARAMS_T> &antiqOffsetGm,
-    GlobalTensor<int32_t> &blockTableGm, TQue<QuePosition::VECIN, 1> &antiqScaleInputQue,
-    TQue<QuePosition::VECIN, 1> &antiqOffsetInputQue, const AntiquantTaskParamBaseAPI &taskParam, bool isBeforeHalf,
+    GlobalTensor<ANTIQ_PARAMS_T>& antiqScaleGm, GlobalTensor<ANTIQ_PARAMS_T>& antiqOffsetGm,
+    GlobalTensor<int32_t>& blockTableGm, TQue<QuePosition::VECIN, 1>& antiqScaleInputQue,
+    TQue<QuePosition::VECIN, 1>& antiqOffsetInputQue, const AntiquantTaskParamBaseAPI& taskParam, bool isBeforeHalf,
     int32_t s2RealSize)
 {
     int32_t subBlockIdx;
@@ -442,8 +442,8 @@ AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::LoadAnt
 
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::CopyAntiqParam(
-    LocalTensor<ANTIQ_PARAMS_T> dstLocal, GlobalTensor<ANTIQ_PARAMS_T> &srcGm, uint32_t rowCnt,
-    const AntiquantTaskParamBaseAPI &taskParam)
+    LocalTensor<ANTIQ_PARAMS_T> dstLocal, GlobalTensor<ANTIQ_PARAMS_T>& srcGm, uint32_t rowCnt,
+    const AntiquantTaskParamBaseAPI& taskParam)
 {
     if (taskParam.isPertensor) {
         Duplicate(dstLocal, srcGm.GetValue(0), rowCnt * dBaseSize);
@@ -483,9 +483,9 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void
 AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::LoadAntiquantParamsPerChannel(
-    GlobalTensor<ANTIQ_PARAMS_T> &antiqScaleGm, GlobalTensor<ANTIQ_PARAMS_T> &antiqOffsetGm,
-    TQue<QuePosition::VECIN, 1> &antiqScaleInputQue, TQue<QuePosition::VECIN, 1> &antiqOffsetInputQue,
-    const AntiquantTaskParamBaseAPI &taskParam)
+    GlobalTensor<ANTIQ_PARAMS_T>& antiqScaleGm, GlobalTensor<ANTIQ_PARAMS_T>& antiqOffsetGm,
+    TQue<QuePosition::VECIN, 1>& antiqScaleInputQue, TQue<QuePosition::VECIN, 1>& antiqOffsetInputQue,
+    const AntiquantTaskParamBaseAPI& taskParam)
 {
     uint32_t qElementCntPerReg = 256 / sizeof(ANTIQ_PARAMS_T);
     uint32_t loopCount = qElementCntPerReg / taskParam.headDimAlignBlock;
@@ -507,8 +507,8 @@ AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::LoadAnt
 
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::FreeAntiquantParams(
-    TQue<QuePosition::VECIN, 1> &antiqScaleInputQue, TQue<QuePosition::VECIN, 1> &antiqOffsetInputQue,
-    const AntiquantTaskParamBaseAPI &taskParam)
+    TQue<QuePosition::VECIN, 1>& antiqScaleInputQue, TQue<QuePosition::VECIN, 1>& antiqOffsetInputQue,
+    const AntiquantTaskParamBaseAPI& taskParam)
 {
     antiqScaleInputQue.FreeTensor(antiqScale);
     if (taskParam.isExistOffset) {
@@ -518,9 +518,9 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU
 
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::AntiquantBaseAPI(
-    uint32_t copyLoopIdx, TQue<QuePosition::VECIN, 1> &kvInputQue, TQue<QuePosition::VECOUT, 1> &kvOutputQue,
-    LocalTensor<Q_T> outScm, GlobalTensor<KV_T> &kvGm, GlobalTensor<int32_t> &blockTableGm, uint32_t dealRowCount,
-    const AntiquantTaskParamBaseAPI &taskParam, int32_t taskId, bool isBeforeHalf, int32_t s2RealSize)
+    uint32_t copyLoopIdx, TQue<QuePosition::VECIN, 1>& kvInputQue, TQue<QuePosition::VECOUT, 1>& kvOutputQue,
+    LocalTensor<Q_T> outScm, GlobalTensor<KV_T>& kvGm, GlobalTensor<int32_t>& blockTableGm, uint32_t dealRowCount,
+    const AntiquantTaskParamBaseAPI& taskParam, int32_t taskId, bool isBeforeHalf, int32_t s2RealSize)
 {
     LocalTensor<KV_T> tmpUb = kvInputQue.template AllocTensor<KV_T>();
 
@@ -548,8 +548,8 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void
 AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::CopyAntiquantParamsPageAttention(
-    LocalTensor<ANTIQ_PARAMS_T> dstLocal, GlobalTensor<ANTIQ_PARAMS_T> &srcGm, GlobalTensor<int32_t> &blockTableGm,
-    const AntiquantTaskParamBaseAPI &taskParam, DataCopyExtParams copyInParams,
+    LocalTensor<ANTIQ_PARAMS_T> dstLocal, GlobalTensor<ANTIQ_PARAMS_T>& srcGm, GlobalTensor<int32_t>& blockTableGm,
+    const AntiquantTaskParamBaseAPI& taskParam, DataCopyExtParams copyInParams,
     DataCopyPadExtParams<ANTIQ_PARAMS_T> copyInPadParams, bool isOffset)
 {
     uint32_t useKvHeadNum = 1;
@@ -592,7 +592,7 @@ AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::CopyAnt
 
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::CopyKV(
-    LocalTensor<KV_T> dstLocal, GlobalTensor<KV_T> &srcGm, uint64_t offset, uint32_t rowCnt, uint32_t headDim,
+    LocalTensor<KV_T> dstLocal, GlobalTensor<KV_T>& srcGm, uint64_t offset, uint32_t rowCnt, uint32_t headDim,
     uint32_t kvHeadNum, uint32_t paKvShapeType)
 {
     uint32_t typeElementSize = ONE_BLK_SIZE / sizeof(KV_T);
@@ -635,8 +635,8 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU
 
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::CopyKVPaNz(
-    LocalTensor<KV_T> dstLocal, GlobalTensor<KV_T> &srcGm, uint64_t offset, uint32_t rowCnt, uint32_t dealRowCount,
-    const AntiquantTaskParamBaseAPI &taskParam)
+    LocalTensor<KV_T> dstLocal, GlobalTensor<KV_T>& srcGm, uint64_t offset, uint32_t rowCnt, uint32_t dealRowCount,
+    const AntiquantTaskParamBaseAPI& taskParam)
 {
     uint32_t typeElementSize = taskParam.kvCacheNzD0;
     uint32_t blockElemNum;
@@ -658,8 +658,8 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU
 
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::CopyKVPageAttention(
-    LocalTensor<KV_T> dstLocal, GlobalTensor<KV_T> &srcGm, GlobalTensor<int32_t> &blockTableGm,
-    const AntiquantTaskParamBaseAPI &taskParam, uint32_t curSequence, uint32_t dealRowCount)
+    LocalTensor<KV_T> dstLocal, GlobalTensor<KV_T>& srcGm, GlobalTensor<int32_t>& blockTableGm,
+    const AntiquantTaskParamBaseAPI& taskParam, uint32_t curSequence, uint32_t dealRowCount)
 {
     uint32_t typeElementSize = taskParam.isKvCacheNz ? taskParam.kvCacheNzD0 : (ONE_BLK_SIZE / sizeof(Q_T));
     uint64_t blockTableBaseOffset = taskParam.bIdx * taskParam.maxBlockNumPerSeq;
@@ -694,8 +694,8 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 template <bool HAS_OFFSET, bool IS_PER_TOKEN>
 __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::CallAntiquantVF(
-    LocalTensor<Q_T> &antiqResUb, LocalTensor<KV_T> &antiqInUb, LocalTensor<ANTIQ_PARAMS_T> &offsetTensor,
-    LocalTensor<ANTIQ_PARAMS_T> &scaleTensor, uint32_t dealRowCount, const AntiquantTaskParamBaseAPI &taskParam)
+    LocalTensor<Q_T>& antiqResUb, LocalTensor<KV_T>& antiqInUb, LocalTensor<ANTIQ_PARAMS_T>& offsetTensor,
+    LocalTensor<ANTIQ_PARAMS_T>& scaleTensor, uint32_t dealRowCount, const AntiquantTaskParamBaseAPI& taskParam)
 {
     if (taskParam.isKvCacheNz) {
         if constexpr (IsSameType<KV_T, int8_t>::value) {
@@ -725,8 +725,8 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU
 
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::AntiquantVec(
-    LocalTensor<Q_T> &antiqResUb, LocalTensor<KV_T> &antiqInUb, uint32_t copyLoopIdx, uint32_t dealRowCount,
-    const AntiquantTaskParamBaseAPI &taskParam, bool isBeforeHalf)
+    LocalTensor<Q_T>& antiqResUb, LocalTensor<KV_T>& antiqInUb, uint32_t copyLoopIdx, uint32_t dealRowCount,
+    const AntiquantTaskParamBaseAPI& taskParam, bool isBeforeHalf)
 {
     if constexpr (KVFP4) {
         uint32_t grpNum = taskParam.headDim / 32;
@@ -763,8 +763,8 @@ __aicore__ inline void AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQU
 template <ANTIQUANT_PROCESSOR_TEMPLATE_DEF, const bool ANTIQUANT_PER_TOKEN>
 __aicore__ inline void
 AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::CopyAntiquantResToL1BaseAPI(
-    LocalTensor<Q_T> &antiqResScm, LocalTensor<Q_T> &antiqResUb, uint32_t copyLoopIdx, uint32_t dealRowCount,
-    const AntiquantTaskParamBaseAPI &taskParam, int32_t taskId, bool isBeforeHalf, int32_t s2RealSize)
+    LocalTensor<Q_T>& antiqResScm, LocalTensor<Q_T>& antiqResUb, uint32_t copyLoopIdx, uint32_t dealRowCount,
+    const AntiquantTaskParamBaseAPI& taskParam, int32_t taskId, bool isBeforeHalf, int32_t s2RealSize)
 {
     uint16_t elementTypeSize = ONE_BLK_SIZE / sizeof(Q_T);
     uint16_t dstStep = (s2RealSize + 16 - 1) / 16 * 16;

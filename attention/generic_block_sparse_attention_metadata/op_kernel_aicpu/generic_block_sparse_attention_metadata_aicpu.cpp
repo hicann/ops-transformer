@@ -24,19 +24,19 @@ constexpr int32_t TND_BLOCK_CAPACITY_DIM_INDEX = 2;
 constexpr int32_t BATCHED_Q_BLOCK_DIM_INDEX = 2;
 constexpr int32_t BATCHED_BLOCK_CAPACITY_DIM_INDEX = 3;
 
-bool HasTensorShape(const Tensor *tensor)
+bool HasTensorShape(const Tensor* tensor)
 {
     return tensor != nullptr && tensor->GetTensorShape() != nullptr;
 }
 
-bool HasTensorData(const Tensor *tensor)
+bool HasTensorData(const Tensor* tensor)
 {
     return tensor != nullptr && tensor->GetData() != nullptr;
 }
 
 } // namespace
 
-uint32_t GenericBlockSparseAttentionMetadataAicpu::Compute(CpuKernelContext &ctx)
+uint32_t GenericBlockSparseAttentionMetadataAicpu::Compute(CpuKernelContext& ctx)
 {
     if (!Prepare(ctx)) {
         return KERNEL_STATUS_PARAM_INVALID;
@@ -52,7 +52,7 @@ uint32_t GenericBlockSparseAttentionMetadataAicpu::Compute(CpuKernelContext &ctx
     return KERNEL_STATUS_OK;
 }
 
-bool GenericBlockSparseAttentionMetadataAicpu::Prepare(CpuKernelContext &ctx)
+bool GenericBlockSparseAttentionMetadataAicpu::Prepare(CpuKernelContext& ctx)
 {
     sparseBlockIdx_ = ctx.Input(static_cast<uint32_t>(ParamId::SPARSE_BLOCK_IDX));
     sparseBlockCount_ = ctx.Input(static_cast<uint32_t>(ParamId::SPARSE_BLOCK_COUNT));
@@ -78,8 +78,8 @@ bool GenericBlockSparseAttentionMetadataAicpu::Prepare(CpuKernelContext &ctx)
     return attrsValid && CheckInputs();
 }
 
-bool GenericBlockSparseAttentionMetadataAicpu::CheckOptionalTensor(const Tensor *tensor, DataType dataType,
-                                                                   int64_t elementNum, const char *tensorName) const
+bool GenericBlockSparseAttentionMetadataAicpu::CheckOptionalTensor(const Tensor* tensor, DataType dataType,
+                                                                   int64_t elementNum, const char* tensorName) const
 {
     if (tensor == nullptr) {
         return true;
@@ -180,18 +180,18 @@ bool GenericBlockSparseAttentionMetadataAicpu::CheckInputs()
     return true;
 }
 
-bool GenericBlockSparseAttentionMetadataAicpu::ParseQSeqLens(std::vector<int64_t> &qSeqLens,
-                                                             std::vector<int64_t> &qStorageBlockStarts) const
+bool GenericBlockSparseAttentionMetadataAicpu::ParseQSeqLens(std::vector<int64_t>& qSeqLens,
+                                                             std::vector<int64_t>& qStorageBlockStarts) const
 {
     // Get valid Qseq len vector. Qseq priroty: seqUsedQ, cuSeqLengths, maxQSeqLen.
     // qSeqLens ：actual Qseqlens in batch. qStorageBlockStarts :
     // Qblocks start(1 qtoken) in batch base on cuSeq(maybe pad).
     if (qInputLayout_ == "TND") {
-        const auto *prefix = static_cast<const int64_t *>(cuSeqLengths_->GetData());
+        const auto* prefix = static_cast<const int64_t*>(cuSeqLengths_->GetData());
         std::vector<int64_t> cuSeqLengths(prefix, prefix + batchSize_ + 1);
         std::vector<int64_t> seqUsedQ;
         if (seqUsedQ_ != nullptr) {
-            const auto *seqUsed = static_cast<const int32_t *>(seqUsedQ_->GetData());
+            const auto* seqUsed = static_cast<const int32_t*>(seqUsedQ_->GetData());
             seqUsedQ.assign(seqUsed, seqUsed + batchSize_);
         }
         if (!generic_block_sparse_attention_metadata::BuildTndQSeqLayout(cuSeqLengths, seqUsedQ, seqUsedQ_ != nullptr,
@@ -206,7 +206,7 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseQSeqLens(std::vector<int64_t
     qSeqLens.assign(static_cast<size_t>(batchSize_), maxQSeqLen_);
     qStorageBlockStarts.clear();
     if (seqUsedQ_ != nullptr) {
-        const auto *seqUsed = static_cast<const int32_t *>(seqUsedQ_->GetData());
+        const auto* seqUsed = static_cast<const int32_t*>(seqUsedQ_->GetData());
         for (int64_t batchIdx = 0; batchIdx < batchSize_; ++batchIdx) {
             const int64_t qSeqLen = seqUsed[batchIdx];
             if (qSeqLen < 0 || qSeqLen > maxQSeqLen_) {
@@ -221,7 +221,7 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseQSeqLens(std::vector<int64_t
     if (cuSeqLengths_ == nullptr) {
         return true;
     }
-    const auto *prefix = static_cast<const int64_t *>(cuSeqLengths_->GetData());
+    const auto* prefix = static_cast<const int64_t*>(cuSeqLengths_->GetData());
     if (prefix[0] != 0) {
         KERNEL_LOG_ERROR("cu_seq_lengths[0] must be 0, but got %lld.", prefix[0]);
         return false;
@@ -242,11 +242,11 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseQSeqLens(std::vector<int64_t
     return true;
 }
 
-bool GenericBlockSparseAttentionMetadataAicpu::ParseValidBlockNums(const std::vector<int64_t> &qSeqLens,
-                                                                   const std::vector<int64_t> &qStorageBlockStarts,
-                                                                   std::vector<int64_t> &validBlockNums) const
+bool GenericBlockSparseAttentionMetadataAicpu::ParseValidBlockNums(const std::vector<int64_t>& qSeqLens,
+                                                                   const std::vector<int64_t>& qStorageBlockStarts,
+                                                                   std::vector<int64_t>& validBlockNums) const
 {
-    const auto *counts = static_cast<const int32_t *>(sparseBlockCount_->GetData());
+    const auto* counts = static_cast<const int32_t*>(sparseBlockCount_->GetData());
     if (qInputLayout_ == "TND") {
         if (!generic_block_sparse_attention_metadata::GatherTndValidBlockNums(counts, sparseHeadNum_, qBlockStorageNum_,
                                                                               blockShapeX_, blockIndexStride_, qSeqLens,
@@ -277,8 +277,8 @@ bool GenericBlockSparseAttentionMetadataAicpu::ParseValidBlockNums(const std::ve
     return true;
 }
 
-bool GenericBlockSparseAttentionMetadataAicpu::GenerateMetadata(const std::vector<int64_t> &qSeqLens,
-                                                                const std::vector<int64_t> &validBlockNums) const
+bool GenericBlockSparseAttentionMetadataAicpu::GenerateMetadata(const std::vector<int64_t>& qSeqLens,
+                                                                const std::vector<int64_t>& validBlockNums) const
 {
     generic_block_sparse_attention_metadata::ScheduleInput input;
     input.batchSize = batchSize_;
@@ -303,8 +303,8 @@ bool GenericBlockSparseAttentionMetadataAicpu::GenerateMetadata(const std::vecto
         KERNEL_LOG_ERROR("Failed to build metadata schedule, status=%u.", static_cast<uint32_t>(scheduleStatus));
         return false;
     }
-    auto *metadata =
-        static_cast<optiling::generic_block_sparse_attention_metadata::MetadataType *>(metadata_->GetData());
+    auto* metadata =
+        static_cast<optiling::generic_block_sparse_attention_metadata::MetadataType*>(metadata_->GetData());
     const auto encodeStatus = generic_block_sparse_attention_metadata::EncodeMetadata(
         result, metadata, optiling::generic_block_sparse_attention_metadata::METADATA_TOTAL_SIZE);
     if (encodeStatus != generic_block_sparse_attention_metadata::BSAScheduleStatus::BSA_SUCCESS) {
@@ -315,7 +315,7 @@ bool GenericBlockSparseAttentionMetadataAicpu::GenerateMetadata(const std::vecto
 }
 
 namespace {
-const char *KERNEL_TYPE = "GenericBlockSparseAttentionMetadata";
+const char* KERNEL_TYPE = "GenericBlockSparseAttentionMetadata";
 REGISTER_CPU_KERNEL(KERNEL_TYPE, GenericBlockSparseAttentionMetadataAicpu);
 } // namespace
 

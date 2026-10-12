@@ -111,27 +111,27 @@ inline __aicore__ T RoundUp(const T val, const T align)
     return (val + align - 1) / align * align;
 }
 
-__aicore__ inline int64_t GetSeqLen(int32_t i, __gm__ uint8_t *seqLen)
+__aicore__ inline int64_t GetSeqLen(int32_t i, __gm__ uint8_t* seqLen)
 {
     if (seqLen == nullptr) {
         return 0;
     }
-    const __gm__ int64_t *cu = (__gm__ int64_t *)seqLen;
+    const __gm__ int64_t* cu = (__gm__ int64_t*)seqLen;
     return cu[i + 1] - cu[i];
 }
 
-__aicore__ inline int64_t GetSeqPrefix(int32_t i, __gm__ uint8_t *seqLen)
+__aicore__ inline int64_t GetSeqPrefix(int32_t i, __gm__ uint8_t* seqLen)
 {
     if (i <= 0 || seqLen == nullptr) {
         return 0;
     }
-    return ((__gm__ int64_t *)seqLen)[i];
+    return ((__gm__ int64_t*)seqLen)[i];
 }
 
-__aicore__ inline int64_t GetSeqUsedLen(int32_t i, __gm__ uint8_t *seqused, __gm__ uint8_t *cuSeqLen)
+__aicore__ inline int64_t GetSeqUsedLen(int32_t i, __gm__ uint8_t* seqused, __gm__ uint8_t* cuSeqLen)
 {
     if (seqused != nullptr) {
-        return static_cast<int64_t>(((__gm__ int32_t *)seqused)[i]);
+        return static_cast<int64_t>(((__gm__ int32_t*)seqused)[i]);
     }
     return GetSeqLen(i, cuSeqLen);
 }

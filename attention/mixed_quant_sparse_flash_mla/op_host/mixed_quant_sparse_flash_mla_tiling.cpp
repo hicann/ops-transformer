@@ -30,7 +30,7 @@ constexpr int64_t BATCH_CONSISTENCY_LEVEL = 3;
 constexpr uint32_t DEFAULT_D_SIZE_V = 512;
 constexpr uint32_t DEFAULT_TILE_SIZE = 512;
 
-std::vector<int64_t> MQSMLAToVector(const gert::Shape &shape)
+std::vector<int64_t> MQSMLAToVector(const gert::Shape& shape)
 {
     size_t mqsmlaShapeSize = shape.GetDimNum();
     std::vector<int64_t> mqsmlaShapeVec(mqsmlaShapeSize, 0);
@@ -41,7 +41,7 @@ std::vector<int64_t> MQSMLAToVector(const gert::Shape &shape)
     return mqsmlaShapeVec;
 }
 
-std::string MQSMLAToStringRaw(const gert::Shape &shape)
+std::string MQSMLAToStringRaw(const gert::Shape& shape)
 {
     std::ostringstream mqsmlaOss;
     auto mqsmlaShapeValues = MQSMLAToVector(shape);
@@ -261,33 +261,33 @@ ge::graphStatus MQSMLAInfoParser::GetKvLayout()
 
 // =============Parser function====================
 
-bool MQSMLAInfoParser::HasAxis(const MQSMLAAxis &axis, const MQSMLALayout &layout, const gert::Shape &shape) const
+bool MQSMLAInfoParser::HasAxis(const MQSMLAAxis& axis, const MQSMLALayout& layout, const gert::Shape& shape) const
 {
-    const auto &mqsmlaLayoutIt = QSMLA_LAYOUT_AXIS_MAP.find(layout);
+    const auto& mqsmlaLayoutIt = QSMLA_LAYOUT_AXIS_MAP.find(layout);
     if (mqsmlaLayoutIt == QSMLA_LAYOUT_AXIS_MAP.end()) {
         return false;
     }
 
-    const std::vector<MQSMLAAxis> &mqsmlaAxes = mqsmlaLayoutIt->second;
-    const auto &mqsmlaAxisIt = std::find(mqsmlaAxes.begin(), mqsmlaAxes.end(), axis);
+    const std::vector<MQSMLAAxis>& mqsmlaAxes = mqsmlaLayoutIt->second;
+    const auto& mqsmlaAxisIt = std::find(mqsmlaAxes.begin(), mqsmlaAxes.end(), axis);
     if (mqsmlaAxisIt == mqsmlaAxes.end()) {
         return false;
     }
-    const auto &mqsmlaDimIt = QSMLA_LAYOUT_DIM_MAP.find(layout);
+    const auto& mqsmlaDimIt = QSMLA_LAYOUT_DIM_MAP.find(layout);
     if (mqsmlaDimIt == QSMLA_LAYOUT_DIM_MAP.end() || mqsmlaDimIt->second != shape.GetDimNum()) {
         return false;
     }
     return true;
 }
 
-size_t MQSMLAInfoParser::GetAxisIdx(const MQSMLAAxis &axis, const MQSMLALayout &layout) const
+size_t MQSMLAInfoParser::GetAxisIdx(const MQSMLAAxis& axis, const MQSMLALayout& layout) const
 {
-    const std::vector<MQSMLAAxis> &mqsmlaAxes = QSMLA_LAYOUT_AXIS_MAP.find(layout)->second;
-    const auto &mqsmlaAxisIt = std::find(mqsmlaAxes.begin(), mqsmlaAxes.end(), axis);
+    const std::vector<MQSMLAAxis>& mqsmlaAxes = QSMLA_LAYOUT_AXIS_MAP.find(layout)->second;
+    const auto& mqsmlaAxisIt = std::find(mqsmlaAxes.begin(), mqsmlaAxes.end(), axis);
     return std::distance(mqsmlaAxes.begin(), mqsmlaAxisIt);
 }
 
-int64_t MQSMLAInfoParser::GetAxisNum(const gert::Shape &shape, const MQSMLAAxis &axis, const MQSMLALayout &layout) const
+int64_t MQSMLAInfoParser::GetAxisNum(const gert::Shape& shape, const MQSMLAAxis& axis, const MQSMLALayout& layout) const
 {
     return HasAxis(axis, layout, shape) ? shape.GetDim(GetAxisIdx(axis, layout)) : invalidDimValue_;
 }
@@ -333,8 +333,8 @@ ge::graphStatus MQSMLAInfoParser::GetGSize()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MQSMLAInfoParser::GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor, MQSMLALayout &layout,
-                                                      const std::string &name) const
+ge::graphStatus MQSMLAInfoParser::GetActualSeqLenSize(int64_t& size, const gert::Tensor* tensor, MQSMLALayout& layout,
+                                                      const std::string& name) const
 {
     if ((tensor == nullptr)) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
@@ -351,7 +351,7 @@ ge::graphStatus MQSMLAInfoParser::GetActualSeqLenSize(int64_t &size, const gert:
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MQSMLAInfoParser::GetActualSeqLenQSize(int64_t &size)
+ge::graphStatus MQSMLAInfoParser::GetActualSeqLenQSize(int64_t& size)
 {
     if (mqsmlaParams_.cuSeqLensQ.tensor != nullptr) {
         int64_t mqsmlaShapeSize = mqsmlaParams_.cuSeqLensQ.tensor->GetShapeSize();
@@ -572,7 +572,7 @@ ge::graphStatus MQSMLAInfoParser::GetKvstride()
     return ge::GRAPH_SUCCESS;
 }
 
-void MQSMLAInfoParser::GenerateInfo(MQSMLATilingInfo &mqsmlaInfo)
+void MQSMLAInfoParser::GenerateInfo(MQSMLATilingInfo& mqsmlaInfo)
 {
     mqsmlaInfo.opName = mqsmlaOpName_;
     mqsmlaInfo.platformInfo = mqsmlaPlatformInfo_;
@@ -636,7 +636,7 @@ void MQSMLAInfoParser::GenerateInfo(MQSMLATilingInfo &mqsmlaInfo)
     mqsmlaInfo.returnSoftmaxLse = (mqsmlaParams_.returnSoftmaxLse != nullptr) ? *mqsmlaParams_.returnSoftmaxLse : false;
 }
 
-ge::graphStatus MQSMLAInfoParser::Parse(MQSMLATilingInfo &mqsmlaInfo)
+ge::graphStatus MQSMLAInfoParser::Parse(MQSMLATilingInfo& mqsmlaInfo)
 {
     if (context_ == nullptr) {
         OP_LOGE("SparseFlashAttention", "tiling context is nullptr!");
@@ -671,13 +671,13 @@ ge::graphStatus MQSMLAInfoParser::Parse(MQSMLATilingInfo &mqsmlaInfo)
 }
 
 // --------------------------TilingPrepare函数定义-------------------------------------
-static ge::graphStatus TilingPrepareForMixedQuantSparseFlashMla(gert::TilingParseContext * /* context */)
+static ge::graphStatus TilingPrepareForMixedQuantSparseFlashMla(gert::TilingParseContext* /* context */)
 {
     return ge::GRAPH_SUCCESS;
 }
 
 // --------------------------MixedQuantSparseFlashMlaTiling类成员函数定义-----------------------
-ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo *tilingInfo)
+ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo* tilingInfo)
 {
     if (tilingInfo->npuArch == NpuArch::DAV_2201) {
         return DoTurboQuantTiling(tilingInfo);
@@ -686,7 +686,7 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo *til
 }
 
 // --------------------------Tiling函数定义---------------------------
-ge::graphStatus TilingMixedQuantSparseFlashMla(gert::TilingContext *context)
+ge::graphStatus TilingMixedQuantSparseFlashMla(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("MixedQuantSparseFlashMla", "Tiling context is null."),
                 return ge::GRAPH_FAILED);

@@ -50,13 +50,13 @@ struct FusedFloydAttentionCompileInfo {
 };
 
 uint32_t FloydCalcTschBlockDim(uint32_t sliceNum, uint32_t aicCoreNum, uint32_t aivCoreNum);
-ge::graphStatus CheckAttentionMaskShape(gert::TilingContext *context, int64_t b, int64_t s1, int64_t s3);
-ge::graphStatus CheckSupportShape(gert::TilingContext *context);
-ge::graphStatus CheckInputShapeValid(gert::TilingContext *context, int64_t b, int64_t n, int64_t s1, int64_t s2,
+ge::graphStatus CheckAttentionMaskShape(gert::TilingContext* context, int64_t b, int64_t s1, int64_t s3);
+ge::graphStatus CheckSupportShape(gert::TilingContext* context);
+ge::graphStatus CheckInputShapeValid(gert::TilingContext* context, int64_t b, int64_t n, int64_t s1, int64_t s2,
                                      int64_t s3, int64_t d);
-bool CheckSameShape(const gert::StorageShape *aShape, const gert::StorageShape *bShape);
-ge::graphStatus CheckAttrs(gert::TilingContext *context);
-ge::graphStatus CheckBaseInput(gert::TilingContext *context);
+bool CheckSameShape(const gert::StorageShape* aShape, const gert::StorageShape* bShape);
+ge::graphStatus CheckAttrs(gert::TilingContext* context);
+ge::graphStatus CheckBaseInput(gert::TilingContext* context);
 
 } // namespace FFA
 } // namespace optiling

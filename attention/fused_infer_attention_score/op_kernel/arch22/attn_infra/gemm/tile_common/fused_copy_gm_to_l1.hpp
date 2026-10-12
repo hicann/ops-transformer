@@ -19,22 +19,16 @@
 
 namespace NpuArch::Gemm::Tile {
 
-template <
-    class ArchTag,
-    /// GemmType for matrix operand
-    class GmType,
-    class L1Type = void
->
+template <class ArchTag,
+          /// GemmType for matrix operand
+          class GmType, class L1Type = void>
 struct CopyGmToL1 {
     static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy gm to l1, can not find the specialization.");
 };
 
-template <
-    class ArchTag,
-    /// GemmType for matrix operand
-    class GmType,
-    class L1Type = void
->
+template <class ArchTag,
+          /// GemmType for matrix operand
+          class GmType, class L1Type = void>
 struct CopyGmToL1IntervalDataCopy {
     static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy gm to l1, can not find the specialization.");
 };
@@ -43,7 +37,7 @@ struct CopyGmToL1IntervalDataCopy {
 /// Using the standard strided DataCopy interface to implement nd2nz
 /// transfer may achieve higher data transfer efficiency when the data block shape is short and wide
 /// Partial specialization for AtlasA2, half, RowMajor in and zN out.
-template<>
+template <>
 struct CopyGmToL1IntervalDataCopy<Arch::AtlasA2, Gemm::GemmType<half, layout::RowMajor>> {
     using LayoutDst = layout::zN;
     using LayoutSrc = layout::RowMajor;
@@ -53,22 +47,17 @@ struct CopyGmToL1IntervalDataCopy<Arch::AtlasA2, Gemm::GemmType<half, layout::Ro
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1IntervalDataCopy() {};
+    __aicore__ inline CopyGmToL1IntervalDataCopy(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         for (int i = 0; i < layoutSrc.shape(0); ++i) {
             AscendC::DataCopyParams dataCopyParams(
                 NpuArch::Detail::Alignment::CeilDiv(layoutSrc.shape(1), layoutDst.shape(2)),
-                layoutDst.shape(2) / ELE_NUM_PER_C0_zN,
-                0,
-                (layoutDst.stride(3) - layoutDst.shape(2)) / ELE_NUM_PER_C0_zN
-            );
+                layoutDst.shape(2) / ELE_NUM_PER_C0_zN, 0,
+                (layoutDst.stride(3) - layoutDst.shape(2)) / ELE_NUM_PER_C0_zN);
             AscendC::DataCopy(dstTensor[i * layoutDst.shape(2)], srcTensor[i * layoutSrc.stride(0)], dataCopyParams);
         }
     }
@@ -77,7 +66,7 @@ struct CopyGmToL1IntervalDataCopy<Arch::AtlasA2, Gemm::GemmType<half, layout::Ro
 /// Partial specialization for AtlasA2, half, PaddingRowMajor in and zN out.
 /// Using the standard strided DataCopy interface to implement nd2nz
 /// transfer may achieve higher data transfer efficiency when the data block shape is short and wide
-template<>
+template <>
 struct CopyGmToL1IntervalDataCopy<Arch::AtlasA2, Gemm::GemmType<half, layout::PaddingRowMajor>> {
     using LayoutDst = layout::zN;
     using LayoutSrc = layout::PaddingRowMajor;
@@ -87,22 +76,17 @@ struct CopyGmToL1IntervalDataCopy<Arch::AtlasA2, Gemm::GemmType<half, layout::Pa
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1IntervalDataCopy() {};
+    __aicore__ inline CopyGmToL1IntervalDataCopy(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         for (int i = 0; i < layoutSrc.orgShape(0); ++i) {
             AscendC::DataCopyParams dataCopyParams(
                 NpuArch::Detail::Alignment::CeilDiv(layoutSrc.orgShape(1), layoutDst.shape(2)),
-                layoutDst.shape(2) / ELE_NUM_PER_C0_zN,
-                0,
-                (layoutDst.stride(3) - layoutDst.shape(2)) / ELE_NUM_PER_C0_zN
-            );
+                layoutDst.shape(2) / ELE_NUM_PER_C0_zN, 0,
+                (layoutDst.stride(3) - layoutDst.shape(2)) / ELE_NUM_PER_C0_zN);
             AscendC::DataCopy(dstTensor[i * layoutDst.shape(2)], srcTensor[i * layoutSrc.stride(0)], dataCopyParams);
         }
     }
@@ -111,7 +95,7 @@ struct CopyGmToL1IntervalDataCopy<Arch::AtlasA2, Gemm::GemmType<half, layout::Pa
 /// Partial specialization for AtlasA2, half, ColumnMajor in and zN out.
 /// Using the standard strided DataCopy interface to implement nd2nz
 /// transfer may achieve higher data transfer efficiency when the data block shape is tall and narrow
-template<>
+template <>
 struct CopyGmToL1IntervalDataCopy<Arch::AtlasA2, Gemm::GemmType<half, layout::ColumnMajor>> {
     using LayoutDst = layout::nZ;
     using LayoutSrc = layout::ColumnMajor;
@@ -121,22 +105,17 @@ struct CopyGmToL1IntervalDataCopy<Arch::AtlasA2, Gemm::GemmType<half, layout::Co
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1IntervalDataCopy() {};
+    __aicore__ inline CopyGmToL1IntervalDataCopy(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         for (int i = 0; i < layoutSrc.shape(1); ++i) {
             AscendC::DataCopyParams dataCopyParams(
                 NpuArch::Detail::Alignment::CeilDiv(layoutSrc.shape(0), layoutDst.shape(0)),
-                layoutDst.shape(0) / ELE_NUM_PER_C0_nZ,
-                0,
-                (layoutDst.stride(1) - layoutDst.shape(0)) / ELE_NUM_PER_C0_nZ
-            );
+                layoutDst.shape(0) / ELE_NUM_PER_C0_nZ, 0,
+                (layoutDst.stride(1) - layoutDst.shape(0)) / ELE_NUM_PER_C0_nZ);
             AscendC::DataCopy(dstTensor[i * layoutDst.shape(0)], srcTensor[i * layoutSrc.stride(1)], dataCopyParams);
         }
     }
@@ -145,7 +124,7 @@ struct CopyGmToL1IntervalDataCopy<Arch::AtlasA2, Gemm::GemmType<half, layout::Co
 /// Partial specialization for AtlasA2, half, PaddingColumnMajor in and zN out.
 /// Using the standard strided DataCopy interface to implement nd2nz
 /// transfer may achieve higher data transfer efficiency when the data block shape is tall and narrow
-template<>
+template <>
 struct CopyGmToL1IntervalDataCopy<Arch::AtlasA2, Gemm::GemmType<half, layout::PaddingColumnMajor>> {
     using LayoutDst = layout::nZ;
     using LayoutSrc = layout::PaddingColumnMajor;
@@ -155,22 +134,17 @@ struct CopyGmToL1IntervalDataCopy<Arch::AtlasA2, Gemm::GemmType<half, layout::Pa
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1IntervalDataCopy() {};
+    __aicore__ inline CopyGmToL1IntervalDataCopy(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         for (int i = 0; i < layoutSrc.orgShape(1); ++i) {
             AscendC::DataCopyParams dataCopyParams(
                 NpuArch::Detail::Alignment::CeilDiv(layoutSrc.orgShape(0), layoutDst.shape(0)),
-                layoutDst.shape(0) / ELE_NUM_PER_C0_nZ_PAD,
-                0,
-                (layoutDst.stride(1) - layoutDst.shape(0)) / ELE_NUM_PER_C0_nZ_PAD
-            );
+                layoutDst.shape(0) / ELE_NUM_PER_C0_nZ_PAD, 0,
+                (layoutDst.stride(1) - layoutDst.shape(0)) / ELE_NUM_PER_C0_nZ_PAD);
             AscendC::DataCopy(dstTensor[i * layoutDst.shape(0)], srcTensor[i * layoutSrc.stride(2)], dataCopyParams);
         }
     }
@@ -178,7 +152,8 @@ struct CopyGmToL1IntervalDataCopy<Arch::AtlasA2, Gemm::GemmType<half, layout::Pa
 
 /// new add gemm
 template <class ArchTag, class Element>
-struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::RowMajor>, Gemm::GemmType<Element, layout::zN, AscendC::TPosition::A1>> {
+struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::RowMajor>,
+                  Gemm::GemmType<Element, layout::zN, AscendC::TPosition::A1>> {
     using LayoutDst = layout::zN;
     using LayoutSrc = layout::RowMajor;
 
@@ -186,14 +161,11 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::RowMajor>, Gemm::Gemm
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         AscendC::Nd2NzParams intriParams;
 
@@ -220,7 +192,8 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::RowMajor>, Gemm::Gemm
 };
 
 template <class ArchTag, class Element>
-struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::RowMajor>, Gemm::GemmType<Element, layout::zZ, AscendC::TPosition::B1>> {
+struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::RowMajor>,
+                  Gemm::GemmType<Element, layout::zZ, AscendC::TPosition::B1>> {
     using LayoutDst = layout::zZ;
     using LayoutSrc = layout::RowMajor;
 
@@ -228,14 +201,11 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::RowMajor>, Gemm::Gemm
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         AscendC::Nd2NzParams intriParams;
         uint32_t srcNdStride = C0_NUM_PER_FRACTAL * layoutSrc.stride(0);
@@ -267,7 +237,7 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::RowMajor>, Gemm::Gemm
 
                 tailParams.dstNzC0Stride = layoutDst.stride(3) / ELE_NUM_PER_C0_zZ;
                 tailParams.dstNzNStride = layoutDst.stride(0) / ELE_NUM_PER_C0_zZ;
-                tailParams.dstNzMatrixStride = 0;  //`
+                tailParams.dstNzMatrixStride = 0; //`
 
                 AscendC::DataCopy(dstTensor[ndNum * layoutDst.stride(1)], srcTensor[ndNum * srcNdStride], tailParams);
             }
@@ -325,7 +295,8 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::RowMajor>, Gemm::Gemm
 };
 
 template <class ArchTag, class Element>
-struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>, Gemm::GemmType<Element, layout::nN, AscendC::TPosition::A1>> {
+struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>,
+                  Gemm::GemmType<Element, layout::nN, AscendC::TPosition::A1>> {
     using LayoutDst = layout::nN;
     using LayoutSrc = layout::ColumnMajor;
 
@@ -333,14 +304,11 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>, Gemm::G
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         AscendC::Nd2NzParams intriParams;
         uint32_t srcNdStride = C0_NUM_PER_FRACTAL * layoutSrc.stride(1);
@@ -430,7 +398,8 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>, Gemm::G
 };
 
 template <class ArchTag, class Element>
-struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>, Gemm::GemmType<Element, layout::nZ, AscendC::TPosition::B1>> {
+struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>,
+                  Gemm::GemmType<Element, layout::nZ, AscendC::TPosition::B1>> {
     using LayoutDst = layout::nZ;
     using LayoutSrc = layout::ColumnMajor;
 
@@ -438,14 +407,11 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>, Gemm::G
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         AscendC::Nd2NzParams intriParams;
 
@@ -472,7 +438,8 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>, Gemm::G
 };
 
 template <class ArchTag, class Element>
-struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>, Gemm::GemmType<Element, layout::nZ, AscendC::TPosition::A1>> {
+struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>,
+                  Gemm::GemmType<Element, layout::nZ, AscendC::TPosition::A1>> {
     using LayoutDst = layout::nZ;
     using LayoutSrc = layout::ColumnMajor;
 
@@ -480,14 +447,11 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>, Gemm::G
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         AscendC::Nd2NzParams intriParams;
 
@@ -517,7 +481,8 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>, Gemm::G
 ///////////////////////////////////////
 /// new add gemv, VectorLayout -> zN
 template <class ArchTag, class Element>
-struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::VectorLayout>, Gemm::GemmType<Element, layout::zN, AscendC::TPosition::A1>> {
+struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::VectorLayout>,
+                  Gemm::GemmType<Element, layout::zN, AscendC::TPosition::A1>> {
     using LayoutDst = layout::zN;
     using LayoutSrc = layout::VectorLayout;
 
@@ -525,14 +490,11 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::VectorLayout>, Gemm::
 
     // Methods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         AscendC::Nd2NzParams intriParams;
 
@@ -548,11 +510,11 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::VectorLayout>, Gemm::
     }
 };
 
-
 ///////////////////////////////////////
 /// new add gemv, ColumnMajor -> nN
 template <class ArchTag, class Element>
-struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>, Gemm::GemmType<Element, layout::nN, AscendC::TPosition::B1>> {
+struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>,
+                  Gemm::GemmType<Element, layout::nN, AscendC::TPosition::B1>> {
     using LayoutDst = layout::nN;
     using LayoutSrc = layout::ColumnMajor;
 
@@ -560,14 +522,11 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>, Gemm::G
 
     // Methods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         AscendC::Nd2NzParams intriParams;
         uint32_t srcNdStride = C0_NUM_PER_FRACTAL * layoutSrc.stride(1);
@@ -657,7 +616,8 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::ColumnMajor>, Gemm::G
 };
 
 template <class ArchTag, class Element>
-struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::RowMajor>, Gemm::GemmType<Element, layout::zN, AscendC::TPosition::B1>> {
+struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::RowMajor>,
+                  Gemm::GemmType<Element, layout::zN, AscendC::TPosition::B1>> {
     using LayoutDst = layout::zN;
     using LayoutSrc = layout::RowMajor;
 
@@ -665,14 +625,11 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::RowMajor>, Gemm::Gemm
 
     // Methods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         AscendC::Nd2NzParams intriParams;
 
@@ -709,14 +666,11 @@ struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::RowMajor>> {
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         AscendC::Nd2NzParams intriParams;
 
@@ -742,14 +696,10 @@ struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::RowMajor>> {
     }
 
     // layoutSrc must be the layout of one of the src matrices
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc,
-        uint32_t ndNum, uint32_t srcNdMatrixStride,
-        uint32_t dstNzNStride, uint32_t dstNzMatrixStride,
-        uint32_t dstNzC0Stride)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc, uint32_t ndNum, uint32_t srcNdMatrixStride,
+                                      uint32_t dstNzNStride, uint32_t dstNzMatrixStride, uint32_t dstNzC0Stride)
     {
         AscendC::Nd2NzParams intriParams;
 
@@ -775,9 +725,7 @@ struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::RowMajor>> {
 };
 
 /// Partial specialization for AtlasA2, ColumnMajor in and nZ out.
-template <
-    class Element
->
+template <class Element>
 struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::ColumnMajor>> {
     using LayoutDst = layout::nZ;
     using LayoutSrc = layout::ColumnMajor;
@@ -786,14 +734,11 @@ struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::ColumnMajor>> {
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         AscendC::Nd2NzParams intriParams;
 
@@ -820,10 +765,7 @@ struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::ColumnMajor>> {
 };
 
 /// Partial specialization for zN in and zN out.
-template <
-    class ArchTag,
-    class Element
->
+template <class ArchTag, class Element>
 struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::zN>> {
     using LayoutDst = layout::zN;
     using LayoutSrc = layout::zN;
@@ -832,14 +774,11 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::zN>> {
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         uint32_t blockCount = NpuArch::Detail::Alignment::CeilDiv<ELE_NUM_PER_C0_zN>(layoutSrc.orgShape(1));
         uint32_t blockLen = NpuArch::Detail::Alignment::RoundUp<C0_NUM_PER_FRACTAL>(layoutSrc.orgShape(0));
@@ -867,10 +806,7 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::zN>> {
 };
 
 /// Partial specialization for nZ in and nZ out.
-template <
-    class ArchTag,
-    class Element
->
+template <class ArchTag, class Element>
 struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::nZ>> {
     using LayoutDst = layout::nZ;
     using LayoutSrc = layout::nZ;
@@ -879,14 +815,11 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::nZ>> {
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         uint32_t blockCount = NpuArch::Detail::Alignment::CeilDiv<ELE_NUM_PER_C0_nZ>(layoutSrc.orgShape(0));
         uint32_t blockLen = NpuArch::Detail::Alignment::RoundUp<C0_NUM_PER_FRACTAL>(layoutSrc.orgShape(1));
@@ -923,14 +856,11 @@ struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::PaddingRowMajor
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         AscendC::Nd2NzParams intriParams;
 
@@ -948,9 +878,7 @@ struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::PaddingRowMajor
 };
 
 /// Partial specialization for AtlasA2, ColumnMajor in and nZ out.
-template <
-    class Element
->
+template <class Element>
 struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::PaddingColumnMajor>> {
     using LayoutDst = layout::nZ;
     using LayoutSrc = layout::PaddingColumnMajor;
@@ -959,14 +887,11 @@ struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::PaddingColumnMa
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         AscendC::Nd2NzParams intriParams;
 
@@ -986,7 +911,7 @@ struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::PaddingColumnMa
 /// Partial specialization for AtlasA2, RowMajor in and RowMajor out.
 template <class Element>
 struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::RowMajor>,
-    Gemm::GemmType<Element, layout::RowMajor, AscendC::TPosition::A1>> {
+                  Gemm::GemmType<Element, layout::RowMajor, AscendC::TPosition::A1>> {
     using LayoutDst = layout::RowMajor;
     using LayoutSrc = layout::RowMajor;
 
@@ -996,14 +921,11 @@ struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::RowMajor>,
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         uint32_t rows = layoutSrc.shape(0);
         uint32_t cols = layoutSrc.shape(1);
@@ -1016,9 +938,7 @@ struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::RowMajor>,
             uint32_t rLoops = NpuArch::Detail::Alignment::CeilDiv(rows, MAX_REPEAT);
             for (uint32_t i = 0; i < rLoops; ++i) {
                 uint32_t rActual = (i < rLoops - 1) ? MAX_REPEAT : rows - i * MAX_REPEAT;
-                AscendC::DataCopyParams dataCopyParams(
-                    rActual, cols / ELE_NUM_PER_BLK, srcStride, dstStride
-                );
+                AscendC::DataCopyParams dataCopyParams(rActual, cols / ELE_NUM_PER_BLK, srcStride, dstStride);
                 DataCopy(dstTensor[i * MAX_REPEAT * layoutDst.stride(0)],
                          srcTensor[i * MAX_REPEAT * layoutSrc.stride(0)], dataCopyParams);
             }
@@ -1032,7 +952,7 @@ struct CopyGmToL1<Arch::AtlasA2, Gemm::GemmType<Element, layout::RowMajor>,
 
 template <class ArchTag, class Element>
 struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::VectorLayout, AscendC::TPosition::GM>,
-    Gemm::GemmType<Element, layout::VectorLayout, AscendC::TPosition::A1>> {
+                  Gemm::GemmType<Element, layout::VectorLayout, AscendC::TPosition::A1>> {
     using LayoutDst = layout::VectorLayout;
     using LayoutSrc = layout::VectorLayout;
 
@@ -1040,14 +960,11 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::VectorLayout, AscendC
 
     // Mehtods
 
-    __aicore__ inline
-    CopyGmToL1() {};
+    __aicore__ inline CopyGmToL1(){};
 
-    __aicore__ inline
-    void operator()(
-        AscendC::LocalTensor<Element> const &dstTensor,
-        AscendC::GlobalTensor<Element> const &srcTensor,
-        LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    __aicore__ inline void operator()(AscendC::LocalTensor<Element> const& dstTensor,
+                                      AscendC::GlobalTensor<Element> const& srcTensor, LayoutDst const& layoutDst,
+                                      LayoutSrc const& layoutSrc)
     {
         AscendC::DataCopyParams intriParams;
         intriParams.blockCount = 1;
@@ -1057,7 +974,6 @@ struct CopyGmToL1<ArchTag, Gemm::GemmType<Element, layout::VectorLayout, AscendC
         AscendC::DataCopy(dstTensor, srcTensor, intriParams);
     }
 };
-
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 

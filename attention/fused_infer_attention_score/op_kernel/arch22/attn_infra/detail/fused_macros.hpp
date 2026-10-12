@@ -13,4 +13,4 @@
 
 #define HOST_DEVICE __host_aicore__ inline
 
-#endif  // DETAIL_MACROS_HPP
+#endif // DETAIL_MACROS_HPP

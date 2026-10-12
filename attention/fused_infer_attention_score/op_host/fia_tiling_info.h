@@ -140,13 +140,13 @@ std::string QuantModeToSerialString(FiaQuantMode fiaQuantMode);
 std::string SituationToSerialString(RopeMode ropeMode);
 
 struct FIARequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct FIAOptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 struct FIAParaInfo {
@@ -186,27 +186,27 @@ struct FIAParaInfo {
     FIARequiredParaInfo attenOut = {nullptr, nullptr};
     FIARequiredParaInfo lseOut = {nullptr, nullptr};
 
-    const int32_t *numHeads = nullptr;
-    const int64_t *preToken = nullptr;
-    const int64_t *nextToken = nullptr;
-    const float *scaleValue = nullptr;
-    const int32_t *kvHeadNums = nullptr;
-    const char *layOut = nullptr;
-    const int32_t *blockSize = nullptr;
-    const int32_t *innerPrecise = nullptr;
-    const int64_t *antiquantMode = nullptr;
-    const bool *softmaxLseFlag = nullptr;
-    const int64_t *keyAntiquantMode = nullptr;
-    const int64_t *valueAntiquantMode = nullptr;
-    const int32_t *sparseMode = nullptr;
-    const int64_t *queryQuantMode = nullptr;
-    const int64_t *pseType = nullptr;
+    const int32_t* numHeads = nullptr;
+    const int64_t* preToken = nullptr;
+    const int64_t* nextToken = nullptr;
+    const float* scaleValue = nullptr;
+    const int32_t* kvHeadNums = nullptr;
+    const char* layOut = nullptr;
+    const int32_t* blockSize = nullptr;
+    const int32_t* innerPrecise = nullptr;
+    const int64_t* antiquantMode = nullptr;
+    const bool* softmaxLseFlag = nullptr;
+    const int64_t* keyAntiquantMode = nullptr;
+    const int64_t* valueAntiquantMode = nullptr;
+    const int32_t* sparseMode = nullptr;
+    const int64_t* queryQuantMode = nullptr;
+    const int64_t* pseType = nullptr;
 };
 
 class FiaTilingInfo : public TilingInfo {
 public:
-    const char *opName = nullptr;
-    fe::PlatFormInfos *platformInfo = nullptr;
+    const char* opName = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     FIAParaInfo opParamInfo;
 
     // Base Param
@@ -227,18 +227,18 @@ public:
     int32_t innerPrecise = 0;
     uint32_t l2CacheOffFlag = 0;
     uint64_t l2CacheSize = 0;
-    std::vector<gert::StorageShape *> kCache = {};
-    std::vector<gert::StorageShape *> vCache = {};
+    std::vector<gert::StorageShape*> kCache = {};
+    std::vector<gert::StorageShape*> vCache = {};
     std::vector<int32_t> qSize = {};
     std::vector<int32_t> kvSize = {};
     // 增加strides参数和tensorv1的标志位
-    const gert::Stride *keyStrides = nullptr;
-    const gert::Stride *valueStrides = nullptr;
-    const gert::Stride *kRopeStrides = nullptr;
-    const gert::Stride *kScaleStrides = nullptr;
-    const gert::Stride *vScaleStrides = nullptr;
-    const gert::Stride *kOffsetStrides = nullptr;
-    const gert::Stride *vOffsetStrides = nullptr;
+    const gert::Stride* keyStrides = nullptr;
+    const gert::Stride* valueStrides = nullptr;
+    const gert::Stride* kRopeStrides = nullptr;
+    const gert::Stride* kScaleStrides = nullptr;
+    const gert::Stride* vScaleStrides = nullptr;
+    const gert::Stride* kOffsetStrides = nullptr;
+    const gert::Stride* vOffsetStrides = nullptr;
     bool hasViewStride = true;
     uint64_t keyBnStride = 0;
     uint64_t keyN2Stride = 0;

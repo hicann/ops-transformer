@@ -33,7 +33,7 @@ namespace {
 
 static constexpr int64_t LSE_OUT = 1;
 
-static bool CheckDataType(const aclTensor *query, const aclTensor *key, const aclTensor *value)
+static bool CheckDataType(const aclTensor* query, const aclTensor* key, const aclTensor* value)
 {
     const DataType qDtype = query->GetDataType();
     const DataType kDtype = key->GetDataType();
@@ -60,9 +60,9 @@ static bool CheckDataType(const aclTensor *query, const aclTensor *key, const ac
     return true;
 }
 
-static aclnnStatus CheckMandatoryTensors(const aclTensor *query, const aclTensor *key, const aclTensor *value,
-                                         const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
-                                         const aclTensor *metadataOptional)
+static aclnnStatus CheckMandatoryTensors(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                         const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount,
+                                         const aclTensor* metadataOptional)
 {
     CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(key != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -73,7 +73,7 @@ static aclnnStatus CheckMandatoryTensors(const aclTensor *query, const aclTensor
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ParseBlockShape(const aclIntArray *blockShape)
+static aclnnStatus ParseBlockShape(const aclIntArray* blockShape)
 {
     if (blockShape == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "blockShape must not be null.");
@@ -85,7 +85,7 @@ static aclnnStatus ParseBlockShape(const aclIntArray *blockShape)
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    const int64_t *data = blockShape->GetData();
+    const int64_t* data = blockShape->GetData();
     if (data == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "blockShape data is null.");
         return ACLNN_ERR_PARAM_INVALID;
@@ -99,10 +99,10 @@ static aclnnStatus ParseBlockShape(const aclIntArray *blockShape)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ValidateParams(const aclTensor *query, const aclTensor *key, const aclTensor *value,
-                                  const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
-                                  const aclTensor *metadataOptional, const aclIntArray *blockShape, char *layoutQ,
-                                  char *layoutKv)
+static aclnnStatus ValidateParams(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                  const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount,
+                                  const aclTensor* metadataOptional, const aclIntArray* blockShape, char* layoutQ,
+                                  char* layoutKv)
 {
     CHECK_RET(
         CheckMandatoryTensors(query, key, value, sparseBlockIdx, sparseBlockCount, metadataOptional) == ACLNN_SUCCESS,
@@ -136,8 +136,8 @@ static aclnnStatus ValidateParams(const aclTensor *query, const aclTensor *key, 
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ValidateAdditionalParams(int64_t softmaxPrecision, const aclTensor *attentionOut,
-                                            uint64_t *workspaceSize, aclOpExecutor **executor)
+static aclnnStatus ValidateAdditionalParams(int64_t softmaxPrecision, const aclTensor* attentionOut,
+                                            uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (softmaxPrecision != 0 && softmaxPrecision != 1) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "softmaxPrecision must be 0 or 1, got %ld.", softmaxPrecision);
@@ -151,7 +151,7 @@ static aclnnStatus ValidateAdditionalParams(int64_t softmaxPrecision, const aclT
 }
 
 // layoutQ / layoutKv are string attrs; keep as string end-to-end.
-static std::string ConvertLayoutString(char *layoutStr)
+static std::string ConvertLayoutString(char* layoutStr)
 {
     return op::ToString(layoutStr).GetString();
 }
@@ -161,14 +161,14 @@ static std::string ConvertLayoutString(char *layoutStr)
 // Keep Contiguous even when OpDef has AutoContiguous.
 // Do NOT Contiguous key/value here — dim0-strided KV is handled by NormalizeDim0KvTensor
 // (CreateView + SetStorageShape(viewShape)).
-static aclnnStatus MakeContiguous(const aclTensor *&query, const aclTensor *&sparseBlockIdx,
-                                  const aclTensor *&sparseBlockCount, const aclTensor *&metadataOptional,
-                                  const aclTensor *&attenMaskOptional, const aclTensor *&qDequantScaleOptional,
-                                  const aclTensor *&kDequantScaleOptional, const aclTensor *&vDequantScaleOptional,
-                                  const aclTensor *&pQuantScaleOptional, const aclTensor *&cuSeqLengthsQOptional,
-                                  const aclTensor *&cuSeqLengthsKvOptional, const aclTensor *&sequsedQOptional,
-                                  const aclTensor *&sequsedKvOptional, const aclTensor *&blockTableOptional,
-                                  aclOpExecutor *executor)
+static aclnnStatus MakeContiguous(const aclTensor*& query, const aclTensor*& sparseBlockIdx,
+                                  const aclTensor*& sparseBlockCount, const aclTensor*& metadataOptional,
+                                  const aclTensor*& attenMaskOptional, const aclTensor*& qDequantScaleOptional,
+                                  const aclTensor*& kDequantScaleOptional, const aclTensor*& vDequantScaleOptional,
+                                  const aclTensor*& pQuantScaleOptional, const aclTensor*& cuSeqLengthsQOptional,
+                                  const aclTensor*& cuSeqLengthsKvOptional, const aclTensor*& sequsedQOptional,
+                                  const aclTensor*& sequsedKvOptional, const aclTensor*& blockTableOptional,
+                                  aclOpExecutor* executor)
 {
     query = l0op::Contiguous(query, executor);
     CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -223,20 +223,20 @@ static aclnnStatus MakeContiguous(const aclTensor *&query, const aclTensor *&spa
 }
 
 // Only dim0 may be non-contiguous for PA_BBND KV.
-static bool IsFirstAxisOnlyNonContiguous(const aclTensor *tensor, const char *name)
+static bool IsFirstAxisOnlyNonContiguous(const aclTensor* tensor, const char* name)
 {
     if (tensor == nullptr || IsContiguous(tensor)) {
         return true;
     }
 
-    const auto &viewShape = tensor->GetViewShape();
+    const auto& viewShape = tensor->GetViewShape();
     const int64_t dimNum = static_cast<int64_t>(viewShape.GetDimNum());
     if (dimNum <= 1) {
         OP_LOGW("%s is non-contiguous with dim num[%ld] <= 1, it will be forced contiguous.", name, dimNum);
         return false;
     }
 
-    const auto &viewStrides = tensor->GetViewStrides();
+    const auto& viewStrides = tensor->GetViewStrides();
     if (viewStrides.size() < static_cast<size_t>(dimNum)) {
         OP_LOGW("%s view strides num[%zu] < dim num[%ld], it will be forced contiguous.", name, viewStrides.size(),
                 dimNum);
@@ -259,7 +259,7 @@ static bool IsFirstAxisOnlyNonContiguous(const aclTensor *tensor, const char *na
 
 // CreateView + SetStorageShape(viewShape): InferShape/GetInputShape often reads storage;
 // forcing storage==view keeps ND dims for tiling while preserving view strides (zero-copy).
-static const aclTensor *CreateStrideAwareView(const aclTensor *tensor, const char *name, aclOpExecutor *executor)
+static const aclTensor* CreateStrideAwareView(const aclTensor* tensor, const char* name, aclOpExecutor* executor)
 {
     auto strideView = executor->CreateView(tensor, tensor->GetViewShape(), tensor->GetStorageShape(),
                                            tensor->GetViewStrides(), tensor->GetViewOffset());
@@ -267,13 +267,13 @@ static const aclTensor *CreateStrideAwareView(const aclTensor *tensor, const cha
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "CreateStrideAwareView for %s failed.", name);
         return nullptr;
     }
-    const_cast<aclTensor *>(strideView)->SetStorageShape(tensor->GetViewShape());
+    const_cast<aclTensor*>(strideView)->SetStorageShape(tensor->GetViewShape());
     return strideView;
 }
 
 // Contiguous KV: Contiguous (normalize descriptor). Dim0-only holes: stride-aware view.
 // Other non-contig: Contiguous fallback (tiling rejects non-dim0 holes for PA_BBND).
-static const aclTensor *NormalizeDim0KvTensor(const aclTensor *tensor, const char *name, aclOpExecutor *executor)
+static const aclTensor* NormalizeDim0KvTensor(const aclTensor* tensor, const char* name, aclOpExecutor* executor)
 {
     if (tensor == nullptr) {
         return nullptr;
@@ -290,16 +290,16 @@ static const aclTensor *NormalizeDim0KvTensor(const aclTensor *tensor, const cha
 } // namespace
 
 __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttentionGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *sparseBlockIdx,
-    const aclTensor *sparseBlockCount, const aclTensor *metadataOptional, const aclTensor *attenMaskOptional,
-    const aclTensor *qDequantScaleOptional, const aclTensor *kDequantScaleOptional,
-    const aclTensor *vDequantScaleOptional, const aclTensor *pQuantScaleOptional,
-    const aclTensor *cuSeqLengthsQOptional, const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKvOptional, const aclTensor *blockTableOptional, const aclIntArray *blockShape,
-    char *layoutQ, char *layoutKv, int64_t layoutSparsePattern, double scaleValue, int64_t maskType, int64_t quantType,
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* sparseBlockIdx,
+    const aclTensor* sparseBlockCount, const aclTensor* metadataOptional, const aclTensor* attenMaskOptional,
+    const aclTensor* qDequantScaleOptional, const aclTensor* kDequantScaleOptional,
+    const aclTensor* vDequantScaleOptional, const aclTensor* pQuantScaleOptional,
+    const aclTensor* cuSeqLengthsQOptional, const aclTensor* cuSeqLengthsKvOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKvOptional, const aclTensor* blockTableOptional, const aclIntArray* blockShape,
+    char* layoutQ, char* layoutKv, int64_t layoutSparsePattern, double scaleValue, int64_t maskType, int64_t quantType,
     double dstTypeMax, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t returnSoftmaxlse,
-    int64_t residualBlockMode, bool isConsistentTopk, aclTensor *attentionOut, aclTensor *softmaxLseOptional,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    int64_t residualBlockMode, bool isConsistentTopk, aclTensor* attentionOut, aclTensor* softmaxLseOptional,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     aclnnStatus ret = ValidateParams(query, key, value, sparseBlockIdx, sparseBlockCount, metadataOptional, blockShape,
                                      layoutQ, layoutKv);
@@ -323,7 +323,7 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    auto *executorImpl = uniqueExecutor.get();
+    auto* executorImpl = uniqueExecutor.get();
 
     ret = MakeContiguous(query, sparseBlockIdx, sparseBlockCount, metadataOptional, attenMaskOptional,
                          qDequantScaleOptional, kDequantScaleOptional, vDequantScaleOptional, pQuantScaleOptional,
@@ -336,9 +336,9 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
     std::string layoutQStr = ConvertLayoutString(layoutQ);
     std::string layoutKvStr = ConvertLayoutString(layoutKv);
 
-    const aclTensor *keyFinal = NormalizeDim0KvTensor(key, "key", executorImpl);
+    const aclTensor* keyFinal = NormalizeDim0KvTensor(key, "key", executorImpl);
     CHECK_RET(keyFinal != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor *valueFinal = NormalizeDim0KvTensor(value, "value", executorImpl);
+    const aclTensor* valueFinal = NormalizeDim0KvTensor(value, "value", executorImpl);
     CHECK_RET(valueFinal != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     auto outputs = l0op::GenericBlockSparseAttention(
@@ -366,9 +366,9 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
     return ACLNN_SUCCESS;
 }
 
-__attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttention(void *workspace,
+__attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttention(void* workspace,
                                                                                     uint64_t workspaceSize,
-                                                                                    aclOpExecutor *executor,
+                                                                                    aclOpExecutor* executor,
                                                                                     aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnGenericBlockSparseAttention);

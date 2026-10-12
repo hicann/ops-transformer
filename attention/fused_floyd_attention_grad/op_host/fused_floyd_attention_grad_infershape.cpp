@@ -22,45 +22,45 @@ namespace ops {
 
 static const uint64_t DIM_NUM_2 = 2;
 
-ge::graphStatus InferShape4FusedFloydAttentionGrad(gert::InferShapeContext *context)
+ge::graphStatus InferShape4FusedFloydAttentionGrad(gert::InferShapeContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     OP_LOGI(context, "Enter FusedFloydAttentionGrad runtime infershape impl.");
-    const gert::Shape *queryShape = context->GetInputShape(0);
+    const gert::Shape* queryShape = context->GetInputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *key1Shape = context->GetInputShape(1);
+    const gert::Shape* key1Shape = context->GetInputShape(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, key1Shape);
-    const gert::Shape *value1Shape = context->GetInputShape(2);
+    const gert::Shape* value1Shape = context->GetInputShape(2);
     OP_CHECK_NULL_WITH_CONTEXT(context, value1Shape);
-    const gert::Shape *key2Shape = context->GetInputShape(3);
+    const gert::Shape* key2Shape = context->GetInputShape(3);
     OP_CHECK_NULL_WITH_CONTEXT(context, key2Shape);
-    const gert::Shape *value2Shape = context->GetInputShape(4);
+    const gert::Shape* value2Shape = context->GetInputShape(4);
     OP_CHECK_NULL_WITH_CONTEXT(context, value2Shape);
 
-    gert::Shape *dqShape = context->GetOutputShape(0);
+    gert::Shape* dqShape = context->GetOutputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, dqShape);
     *dqShape = *queryShape;
 
-    gert::Shape *dk1Shape = context->GetOutputShape(1);
+    gert::Shape* dk1Shape = context->GetOutputShape(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, dk1Shape);
     *dk1Shape = *key1Shape;
 
-    gert::Shape *dv1Shape = context->GetOutputShape(2);
+    gert::Shape* dv1Shape = context->GetOutputShape(2);
     OP_CHECK_NULL_WITH_CONTEXT(context, dv1Shape);
     *dv1Shape = *value1Shape;
 
-    gert::Shape *dk2Shape = context->GetOutputShape(3);
+    gert::Shape* dk2Shape = context->GetOutputShape(3);
     OP_CHECK_NULL_WITH_CONTEXT(context, dk2Shape);
     *dk2Shape = *key2Shape;
 
-    gert::Shape *dv2Shape = context->GetOutputShape(4);
+    gert::Shape* dv2Shape = context->GetOutputShape(4);
     OP_CHECK_NULL_WITH_CONTEXT(context, dv2Shape);
     *dv2Shape = *value2Shape;
 
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataType4FusedFloydAttentionGrad(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataType4FusedFloydAttentionGrad(gert::InferDataTypeContext* context)
 {
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     OP_LOGI(context, "Enter FusedFloydAttentionGrad infer data type impl.");

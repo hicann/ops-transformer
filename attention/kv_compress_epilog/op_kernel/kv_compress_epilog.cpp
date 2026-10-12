@@ -17,13 +17,8 @@
 
 using namespace AscendC;
 
-extern "C" __global__ __aicore__ void kv_compress_epilog(
-    GM_ADDR cache,
-    GM_ADDR x,
-    GM_ADDR slot_mapping,
-    GM_ADDR cache_out,
-    GM_ADDR workspace,
-    GM_ADDR tiling)
+extern "C" __global__ __aicore__ void kv_compress_epilog(GM_ADDR cache, GM_ADDR x, GM_ADDR slot_mapping,
+                                                         GM_ADDR cache_out, GM_ADDR workspace, GM_ADDR tiling)
 {
     if (workspace == nullptr) {
         return;

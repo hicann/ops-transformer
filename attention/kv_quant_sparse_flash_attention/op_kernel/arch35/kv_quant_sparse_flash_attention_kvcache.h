@@ -31,8 +31,8 @@ static constexpr uint32_t sparseModeThree = 3;
 static constexpr uint32_t sparseModeZero = 0;
 
 TEMPLATE_INTF
-__aicore__ inline void GetSingleCoreParam(RunParamStr &runParam, const ConstInfo &constInfo,
-                                          __gm__ int32_t *actualSeqQlenAddr, __gm__ int32_t *actualSeqKvlenAddr)
+__aicore__ inline void GetSingleCoreParam(RunParamStr& runParam, const ConstInfo& constInfo,
+                                          __gm__ int32_t* actualSeqQlenAddr, __gm__ int32_t* actualSeqKvlenAddr)
 {
     int32_t qsfaActualS1Size = 0;
     int32_t qsfaActualS2Size = 0;
@@ -83,14 +83,14 @@ __aicore__ inline void GetSingleCoreParam(RunParamStr &runParam, const ConstInfo
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeParamBatch(RunParamStr &runParam, const ConstInfo &constInfo,
-                                         __gm__ int32_t *actualSeqQlenAddr, __gm__ int32_t *actualSeqKvlenAddr)
+__aicore__ inline void ComputeParamBatch(RunParamStr& runParam, const ConstInfo& constInfo,
+                                         __gm__ int32_t* actualSeqQlenAddr, __gm__ int32_t* actualSeqKvlenAddr)
 {
     GetSingleCoreParam<TEMPLATE_INTF_ARGS>(runParam, constInfo, actualSeqQlenAddr, actualSeqKvlenAddr);
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeS1LoopInfo(RunParamStr &runParam, const ConstInfo &constInfo, bool lastBN,
+__aicore__ inline void ComputeS1LoopInfo(RunParamStr& runParam, const ConstInfo& constInfo, bool lastBN,
                                          int64_t nextGs1Idx, int64_t gS1StartIdx)
 {
     runParam.gs1LoopStartIdx = gS1StartIdx;
@@ -119,7 +119,7 @@ __aicore__ inline void ComputeS1LoopInfo(RunParamStr &runParam, const ConstInfo 
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeSouterParam(RunParamStr &runParam, const ConstInfo &constInfo, uint32_t sOuterLoopIdx)
+__aicore__ inline void ComputeSouterParam(RunParamStr& runParam, const ConstInfo& constInfo, uint32_t sOuterLoopIdx)
 {
     int64_t qsfaCubeSOuterOffset = sOuterLoopIdx * runParam.qSNumInOneBlock;
     if (runParam.actualS1Size == 0) {
@@ -155,8 +155,8 @@ __aicore__ inline void ComputeSouterParam(RunParamStr &runParam, const ConstInfo
 }
 
 TEMPLATE_INTF
-__aicore__ inline void LoopSOuterOffsetInit(RunParamStr &runParam, const ConstInfo &constInfo, int32_t sIdx,
-                                            __gm__ int32_t *cuSeqlensQAddr)
+__aicore__ inline void LoopSOuterOffsetInit(RunParamStr& runParam, const ConstInfo& constInfo, int32_t sIdx,
+                                            __gm__ int32_t* cuSeqlensQAddr)
 {
     if ASCEND_IS_AIV {
         int64_t qsfaSeqOffset = 0;
@@ -196,8 +196,8 @@ __aicore__ inline void LoopSOuterOffsetInit(RunParamStr &runParam, const ConstIn
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeParamS1(RunParamStr &runParam, const ConstInfo &constInfo, uint32_t sOuterLoopIdx,
-                                      __gm__ int32_t *cuSeqlensQAddr)
+__aicore__ inline bool ComputeParamS1(RunParamStr& runParam, const ConstInfo& constInfo, uint32_t sOuterLoopIdx,
+                                      __gm__ int32_t* cuSeqlensQAddr)
 {
     if (runParam.nextTokensPerBatch < 0) {
         uint64_t invalidTokenCount = static_cast<uint64_t>(-(runParam.nextTokensPerBatch + 1)) + 1ULL;
@@ -211,7 +211,7 @@ __aicore__ inline bool ComputeParamS1(RunParamStr &runParam, const ConstInfo &co
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeLastBN(RunParamStr &runParam, __gm__ int32_t *cuSeqlensQAddr)
+__aicore__ inline bool ComputeLastBN(RunParamStr& runParam, __gm__ int32_t* cuSeqlensQAddr)
 {
     if constexpr (LAYOUT_T == QSFA_LAYOUT::TND) {
         // TND格式下 相邻Batch中当actualSeqQlen相等时则返回true
@@ -232,7 +232,7 @@ __aicore__ inline int64_t ClipSInnerTokenCube(int64_t qsfaSInnerToken, int64_t m
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeS2LoopInfo(RunParamStr &runParam, const ConstInfo &constInfo)
+__aicore__ inline bool ComputeS2LoopInfo(RunParamStr& runParam, const ConstInfo& constInfo)
 {
     if (runParam.actualS2Size == 0) {
         runParam.kvLoopEndIdx = 0;
@@ -259,7 +259,7 @@ __aicore__ inline bool ComputeS2LoopInfo(RunParamStr &runParam, const ConstInfo 
 }
 
 TEMPLATE_INTF
-__aicore__ inline void InitTaskParamByRun(const RunParamStr &runParam, RunInfo &runInfo)
+__aicore__ inline void InitTaskParamByRun(const RunParamStr& runParam, RunInfo& runInfo)
 {
     runInfo.boIdx = runParam.boIdx;
     runInfo.actualS1Size = runParam.actualS1Size;

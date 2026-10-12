@@ -31,7 +31,7 @@ ge::graphStatus MaskedCausalConv1dBackwardTilingArch35::GetPlatformInfo()
     auto platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
         auto compileInfoPtr =
-            reinterpret_cast<const MaskedCausalConv1dBackwardArch35CompileInfo *>(context_->GetCompileInfo());
+            reinterpret_cast<const MaskedCausalConv1dBackwardArch35CompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
         totalCoreNum_ = compileInfoPtr->coreNum;
         ubSize_ = compileInfoPtr->ubSize;
@@ -494,7 +494,7 @@ ge::graphStatus MaskedCausalConv1dBackwardTilingArch35::GetWorkspaceSize()
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
         sysWorkspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
     }
-    size_t *currentWorkspace = context_->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context_->GetWorkspaceSizes(1);
     currentWorkspace[0] = static_cast<size_t>(0UL + sysWorkspaceSize);
     return ge::GRAPH_SUCCESS;
 }
@@ -503,9 +503,9 @@ ge::graphStatus MaskedCausalConv1dBackwardTilingArch35::PostTiling()
 {
     context_->SetBlockDim(static_cast<uint32_t>(usedCoreNum_));
 
-    auto *raw = context_->GetRawTilingData();
+    auto* raw = context_->GetRawTilingData();
     auto tilingDataSize = sizeof(MaskedCausalConv1dBackwardTilingDataV35);
-    errno_t ret = memcpy_s(raw->GetData(), raw->GetCapacity(), reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+    errno_t ret = memcpy_s(raw->GetData(), raw->GetCapacity(), reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;

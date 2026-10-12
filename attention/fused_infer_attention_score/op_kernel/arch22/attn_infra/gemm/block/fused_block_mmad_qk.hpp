@@ -79,7 +79,7 @@ public:
 
     __aicore__ inline BlockMmad() {}
 
-    __aicore__ inline void init(Arch::Resource<ArchTag> &resource, uint32_t nDyn, uint32_t kDyn,
+    __aicore__ inline void init(Arch::Resource<ArchTag>& resource, uint32_t nDyn, uint32_t kDyn,
                                 uint32_t KVStackLen = 512, uint32_t l1BufAddrStart = 0)
     {
         maxKVStackLen = KVStackLen;
@@ -97,7 +97,7 @@ public:
     }
 
     __aicore__ inline void loadQGM(AscendC::GlobalTensor<ElementA> gA, LayoutA layoutA, uint32_t rowNum,
-                                   uint32_t &singleGroupHeads, uint32_t &qHeads)
+                                   uint32_t& singleGroupHeads, uint32_t& qHeads)
     {
         uint32_t embed = layoutA.shape(1);
         uint32_t rowNumRound = NpuArch::Detail::Alignment::RoundUp(rowNum, L1AAlignHelper::M_ALIGNED);
@@ -112,8 +112,8 @@ public:
 
     __aicore__ inline ~BlockMmad() {}
 
-    __aicore__ inline void setBlockParam(uint32_t stackSeqTile, uint32_t &blockStart, uint32_t &blockEnd,
-                                         uint32_t &curBlockTotalNum, uint32_t blockSize)
+    __aicore__ inline void setBlockParam(uint32_t stackSeqTile, uint32_t& blockStart, uint32_t& blockEnd,
+                                         uint32_t& curBlockTotalNum, uint32_t blockSize)
     {
         if (stackSeqTile >= blockStart && blockSize != 0) {
             blockEnd =
@@ -126,7 +126,7 @@ public:
         }
     }
 
-    __aicore__ inline void getBlockShape(GemmCoord &actualShape, uint32_t nL1Index, uint32_t nL1Loop,
+    __aicore__ inline void getBlockShape(GemmCoord& actualShape, uint32_t nL1Index, uint32_t nL1Loop,
                                          uint32_t stackSeqTile)
     {
         uint32_t splitSize = l1NDynamic;
@@ -136,21 +136,21 @@ public:
         actualShape[COORD_DIM1] = splitSize;
     }
 
-    __aicore__ inline void getBlockShape(GemmCoord &actualShape, uint32_t &blockStartOffset, uint32_t &l1NResDynamic,
-                                         uint32_t &kvL1Len, uint32_t &nowLen, uint32_t &blockSize)
+    __aicore__ inline void getBlockShape(GemmCoord& actualShape, uint32_t& blockStartOffset, uint32_t& l1NResDynamic,
+                                         uint32_t& kvL1Len, uint32_t& nowLen, uint32_t& blockSize)
     {
         nowLen = (blockSize - blockStartOffset < l1NResDynamic - kvL1Len) ? blockSize - blockStartOffset :
                                                                             l1NResDynamic - kvL1Len;
         actualShape[COORD_DIM1] = nowLen;
     }
 
-    __aicore__ inline void getKVOffset(uint64_t &kOffset, uint32_t nIdx, uint32_t nowNIdx, uint32_t strideKV)
+    __aicore__ inline void getKVOffset(uint64_t& kOffset, uint32_t nIdx, uint32_t nowNIdx, uint32_t strideKV)
     {
         kOffset = static_cast<uint64_t>(nIdx) * maxKVStackLen * strideKV +
                   static_cast<uint64_t>(nowNIdx) * l1NDynamic * strideKV;
     }
 
-    __aicore__ inline void getKVOffset(AscendC::GlobalTensor<int32_t> &gBlockTable, uint64_t &kOffset, uint32_t nowNIdx,
+    __aicore__ inline void getKVOffset(AscendC::GlobalTensor<int32_t>& gBlockTable, uint64_t& kOffset, uint32_t nowNIdx,
                                        uint32_t startOffset, uint32_t strideKV, uint32_t blockSize, uint32_t embed,
                                        uint64_t keyBnStride)
     {
@@ -181,7 +181,7 @@ public:
         blockStartOffset = kvStart * maxKVStackLen % pagedBlockSize;
     }
 
-    __aicore__ inline void updateBlockOffset(uint32_t nowLen, uint32_t &curBlockIdx, uint32_t blockSize)
+    __aicore__ inline void updateBlockOffset(uint32_t nowLen, uint32_t& curBlockIdx, uint32_t blockSize)
     {
         if (blockStartOffset + nowLen == blockSize) {
             blockStartOffset = 0;

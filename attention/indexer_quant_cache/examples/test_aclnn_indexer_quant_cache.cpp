@@ -15,7 +15,7 @@
 #include "aclnn_indexer_quant_cache.h"
 
 namespace {
-bool Check(aclError status, const char *operation)
+bool Check(aclError status, const char* operation)
 {
     if (status == ACL_SUCCESS) {
         return true;
@@ -28,9 +28,9 @@ struct Resources {
     bool initialized = false;
     bool deviceSet = false;
     aclrtStream stream = nullptr;
-    void *workspace = nullptr;
-    std::vector<void *> buffers;
-    std::vector<aclTensor *> tensors;
+    void* workspace = nullptr;
+    std::vector<void*> buffers;
+    std::vector<aclTensor*> tensors;
 
     ~Resources()
     {
@@ -57,9 +57,9 @@ struct Resources {
         }
     }
 
-    aclTensor *CreateTensor(const std::vector<int64_t> &shape, aclDataType dtype, const void *data, size_t bytes)
+    aclTensor* CreateTensor(const std::vector<int64_t>& shape, aclDataType dtype, const void* data, size_t bytes)
     {
-        void *deviceData = nullptr;
+        void* deviceData = nullptr;
         if (!Check(aclrtMalloc(&deviceData, bytes, ACL_MEM_MALLOC_NORMAL_ONLY), "aclrtMalloc tensor")) {
             return nullptr;
         }
@@ -115,7 +115,7 @@ int main()
     }
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     if (!Check(
             aclnnIndexerQuantCacheGetWorkspaceSize(cache, scale, x, mapping, 1, true, 1.0f, &workspaceSize, &executor),
             "GetWorkspaceSize")) {

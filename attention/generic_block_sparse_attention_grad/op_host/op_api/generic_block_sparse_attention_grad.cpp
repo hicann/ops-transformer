@@ -23,44 +23,44 @@ namespace l0op {
 
 OP_TYPE_REGISTER(GenericBlockSparseAttentionGrad);
 
-const std::array<const aclTensor *, 3> GenericBlockSparseAttentionGrad(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *dout, const aclTensor *out,
-    const aclTensor *lse, const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
-    const aclTensor *metadataOptional, const aclTensor *attenMaskOptional, const aclTensor *cuSeqLengthsQOptional,
-    const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
-    const aclIntArray *blockShape, char *layoutQ, char *layoutKv, int64_t layoutSparsePattern, double scaleValue,
+const std::array<const aclTensor*, 3> GenericBlockSparseAttentionGrad(
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* dout, const aclTensor* out,
+    const aclTensor* lse, const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount,
+    const aclTensor* metadataOptional, const aclTensor* attenMaskOptional, const aclTensor* cuSeqLengthsQOptional,
+    const aclTensor* cuSeqLengthsKvOptional, const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional,
+    const aclIntArray* blockShape, char* layoutQ, char* layoutKv, int64_t layoutSparsePattern, double scaleValue,
     int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode,
-    bool isConsistentTopk, aclOpExecutor *executor)
+    bool isConsistentTopk, aclOpExecutor* executor)
 {
-    const char *safeKvLayout = (layoutKv != nullptr) ? layoutKv : layoutQ;
+    const char* safeKvLayout = (layoutKv != nullptr) ? layoutKv : layoutQ;
     L0_DFX(GenericBlockSparseAttentionGrad, query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount,
            metadataOptional, attenMaskOptional, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, blockShape, layoutQ,
            safeKvLayout, layoutSparsePattern, scaleValue, maskType, softmaxPrecision, winLeft, winRight,
            residualBlockMode, isConsistentTopk);
 
-    const aclTensor *metadataTensor =
+    const aclTensor* metadataTensor =
         (metadataOptional != nullptr) ? metadataOptional :
                                         executor->AllocTensor(DataType::DT_INT32, Format::FORMAT_ND, Format::FORMAT_ND);
-    const aclTensor *attenMaskTensor =
+    const aclTensor* attenMaskTensor =
         (attenMaskOptional != nullptr) ? attenMaskOptional :
                                          executor->AllocTensor(DataType::DT_BOOL, Format::FORMAT_ND, Format::FORMAT_ND);
-    const aclTensor *cuSeqTensor = (cuSeqLengthsQOptional != nullptr) ?
+    const aclTensor* cuSeqTensor = (cuSeqLengthsQOptional != nullptr) ?
                                        cuSeqLengthsQOptional :
                                        executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
-    const aclTensor *cuSeqKvTensor =
+    const aclTensor* cuSeqKvTensor =
         (cuSeqLengthsKvOptional != nullptr) ?
             cuSeqLengthsKvOptional :
             executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
-    const aclTensor *sequsedQTensor =
+    const aclTensor* sequsedQTensor =
         (sequsedQOptional != nullptr) ? sequsedQOptional :
                                         executor->AllocTensor(DataType::DT_INT32, Format::FORMAT_ND, Format::FORMAT_ND);
-    const aclTensor *sequsedKvTensor =
+    const aclTensor* sequsedKvTensor =
         (sequsedKvOptional != nullptr) ?
             sequsedKvOptional :
             executor->AllocTensor(DataType::DT_INT32, Format::FORMAT_ND, Format::FORMAT_ND);
 
     const int64_t defaultBlockShape[] = {1, 128};
-    const aclIntArray *blockShapeAttr =
+    const aclIntArray* blockShapeAttr =
         (blockShape != nullptr) ? blockShape : executor->AllocIntArray(defaultBlockShape, 2);
 
     auto dQuery = executor->AllocTensor(query->GetDataType(), Format::FORMAT_ND, Format::FORMAT_ND);

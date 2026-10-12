@@ -27,23 +27,23 @@
 #define TILING_KEY_BH_FP16 20001
 
 using namespace FusedCausalConv1dCutBSHNs;
-extern "C" __global__ __aicore__ void
-inplace_fused_causal_conv1d(GM_ADDR x,                           // 输入0: x
-                            GM_ADDR weight,                      // 输入1: weight
-                            GM_ADDR convStates,                  // 输入2: convStates
-                            GM_ADDR queryStartLoc,               // 输入3: queryStartLoc (optional)
-                            GM_ADDR cacheIndices,                // 输入4: cacheIndices (optional)
-                            GM_ADDR initialStateMode,            // 输入5: initialStateMode (optional)
-                            GM_ADDR bias,                        // 输入6: bias (optional)
-                            GM_ADDR numAcceptedToken,            // 输入7: numAcceptedToken (optional)
-                            GM_ADDR numComputedTokens,           // 输入8: numComputedTokens (optional, APC)
-                            GM_ADDR blockIdxFirstScheduledToken, // 输入9: blockIdxFirstScheduledToken (optional, APC)
-                            GM_ADDR blockIdxLastScheduledToken,  // 输入10: blockIdxLastScheduledToken (optional, APC)
-                            GM_ADDR initialStateIdx,             // 输入11: initialStateIdx (optional, APC)
-                            GM_ADDR outputConvStates,            // 输出0: convStates output
-                            GM_ADDR outputX,                     // 输出1: x (inplace write-back)
-                            GM_ADDR workspace,                   // workspace
-                            GM_ADDR tiling)                      // tiling
+extern "C" __global__ __aicore__ void inplace_fused_causal_conv1d(
+    GM_ADDR x,                           // 输入0: x
+    GM_ADDR weight,                      // 输入1: weight
+    GM_ADDR convStates,                  // 输入2: convStates
+    GM_ADDR queryStartLoc,               // 输入3: queryStartLoc (optional)
+    GM_ADDR cacheIndices,                // 输入4: cacheIndices (optional)
+    GM_ADDR initialStateMode,            // 输入5: initialStateMode (optional)
+    GM_ADDR bias,                        // 输入6: bias (optional)
+    GM_ADDR numAcceptedToken,            // 输入7: numAcceptedToken (optional)
+    GM_ADDR numComputedTokens,           // 输入8: numComputedTokens (optional, APC)
+    GM_ADDR blockIdxFirstScheduledToken, // 输入9: blockIdxFirstScheduledToken (optional, APC)
+    GM_ADDR blockIdxLastScheduledToken,  // 输入10: blockIdxLastScheduledToken (optional, APC)
+    GM_ADDR initialStateIdx,             // 输入11: initialStateIdx (optional, APC)
+    GM_ADDR outputConvStates,            // 输出0: convStates output
+    GM_ADDR outputX,                     // 输出1: x (inplace write-back)
+    GM_ADDR workspace,                   // workspace
+    GM_ADDR tiling)                      // tiling
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
     REGISTER_TILING_DEFAULT(FusedCausalConv1dCutBSHTilingData);

@@ -33,13 +33,13 @@ enum class DataLayout : uint32_t {
 };
 
 struct TilingRequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct TilingOptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 // ------------------算子原型索引常量定义----------------
@@ -116,21 +116,21 @@ struct LiParaInfo {
     TilingRequiredParaInfo attenOut = {nullptr, nullptr};
     TilingRequiredParaInfo valuesOut = {nullptr, nullptr};
 
-    const char *layOut = nullptr;
-    const char *layOutKey = nullptr;
-    const int32_t *blockSize = nullptr;
-    const int32_t *sparseMode = nullptr;
-    const int32_t *sparseCount = nullptr;
-    const int64_t *preTokens = nullptr;
-    const int64_t *nextTokens = nullptr;
-    const bool *returnValue = nullptr;
+    const char* layOut = nullptr;
+    const char* layOutKey = nullptr;
+    const int32_t* blockSize = nullptr;
+    const int32_t* sparseMode = nullptr;
+    const int32_t* sparseCount = nullptr;
+    const int64_t* preTokens = nullptr;
+    const int64_t* nextTokens = nullptr;
+    const bool* returnValue = nullptr;
 };
 
 // -----------算子Tiling入参信息类---------------
 class LITilingInfo {
 public:
-    const char *opName = nullptr;
-    fe::PlatFormInfos *platformInfo = nullptr;
+    const char* opName = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     LiParaInfo opParamInfo;
     // Base Param
     NpuArch npuArch = NpuArch::DAV_2201;
@@ -168,7 +168,7 @@ public:
 // -----------算子Tiling入参信息解析及Check类---------------
 class LIInfoParser {
 public:
-    explicit LIInfoParser(gert::TilingContext *context)
+    explicit LIInfoParser(gert::TilingContext* context)
         : context_(context)
     {}
     ~LIInfoParser() = default;
@@ -178,8 +178,8 @@ public:
     ge::graphStatus CheckTensorShapes() const;
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckLiRequiredParameters() const;
-    ge::graphStatus GetActualSeqLenSize(int64_t &liSize, const gert::Tensor *liTensor,
-                                        const std::string &liSeqLenName) const;
+    ge::graphStatus GetActualSeqLenSize(int64_t& liSize, const gert::Tensor* liTensor,
+                                        const std::string& liSeqLenName) const;
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
     void GetInputParaInfo();
@@ -208,14 +208,14 @@ public:
     ge::graphStatus CheckFeatureMlaNoQuantShape() const;
     ge::graphStatus GetAttenMaskInfo();
     ge::graphStatus GetActualSeqInfo();
-    void GenerateInfo(LITilingInfo &liInfo);
-    ge::graphStatus ParseAndCheck(LITilingInfo &liInfo);
+    void GenerateInfo(LITilingInfo& liInfo);
+    ge::graphStatus ParseAndCheck(LITilingInfo& liInfo);
     ge::graphStatus CheckKeyContiguous() const;
 
 public:
-    gert::TilingContext *context_ = nullptr;
-    const char *opName_;
-    fe::PlatFormInfos *platformInfo_;
+    gert::TilingContext* context_ = nullptr;
+    const char* opName_;
+    fe::PlatFormInfos* platformInfo_;
     LiParaInfo liParams_;
 
     // BaseParams
@@ -248,12 +248,12 @@ public:
 // ---------------算子Tiling类---------------
 class LightningIndexerTiling {
 public:
-    explicit LightningIndexerTiling(gert::TilingContext *context)
+    explicit LightningIndexerTiling(gert::TilingContext* context)
         : context_(context) {};
-    ge::graphStatus DoTiling(LITilingInfo *tilingInfo);
+    ge::graphStatus DoTiling(LITilingInfo* tilingInfo);
 
 private:
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     LITilingData tilingData_;
 };
 

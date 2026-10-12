@@ -14,8 +14,7 @@
 #include "../../attn_infra/fused_base_defs.hpp"
 #include "../../attn_infra/fused_coord.hpp"
 
-namespace NpuArch::layout 
-{
+namespace NpuArch::layout {
 
 struct VectorLayout {
 public:
@@ -41,34 +40,39 @@ public:
     // Methods
 
     HOST_DEVICE
-    VectorLayout(Index size = 0) : shape_(MakeCoord(size)), stride_(MakeCoord(LongIndex(1))) {}
+    VectorLayout(Index size = 0)
+        : shape_(MakeCoord(size)),
+          stride_(MakeCoord(LongIndex(1)))
+    {}
 
     HOST_DEVICE
-    VectorLayout(Shape shape, Stride stride) : shape_(shape), stride_(stride) {}
+    VectorLayout(Shape shape, Stride stride)
+        : shape_(shape),
+          stride_(stride)
+    {}
 
     template <class Element>
-    HOST_DEVICE
-    static VectorLayout MakeLayoutInUb(TensorCoord const &tileShape)
+    HOST_DEVICE static VectorLayout MakeLayoutInUb(TensorCoord const& tileShape)
     {
         return VectorLayout{NpuArch::Detail::Alignment::RoundUp<BYTE_PER_BLK / sizeof(Element)>(tileShape[0])};
     }
 
     HOST_DEVICE
-    LongIndex GetOffset(TensorCoord const &coord) const
+    LongIndex GetOffset(TensorCoord const& coord) const
     {
         return stride_[0] * coord[0];
     }
 
     /// Returns the layout of a tile_common.
     HOST_DEVICE
-    VectorLayout GetTileLayout(TensorCoord const &tileShape) const
+    VectorLayout GetTileLayout(TensorCoord const& tileShape) const
     {
         return VectorLayout(tileShape, stride());
     }
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape &shape()
+    Shape& shape()
     {
         return shape_;
     }
@@ -89,7 +93,7 @@ public:
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index &shape(int index)
+    typename Shape::Index& shape(int index)
     {
         return shape_[index];
     }
@@ -103,14 +107,14 @@ public:
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride &stride()
+    Stride& stride()
     {
         return stride_;
     }
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index &stride(int index)
+    typename Stride::Index& stride(int index)
     {
         return stride_[index];
     }
@@ -130,4 +134,4 @@ private:
 
 } // namespace NpuArch::layout
 
-#endif  // LAYOUT_VECTOR_HPP
+#endif // LAYOUT_VECTOR_HPP

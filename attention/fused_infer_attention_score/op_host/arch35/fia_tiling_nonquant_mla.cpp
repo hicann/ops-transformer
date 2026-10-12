@@ -33,9 +33,9 @@ namespace optiling {
 using namespace arch35FIA;
 constexpr uint64_t PRE_LOAD_NUM_MLA_ARCH35 = 2;
 
-void FiaTilingNonQuantMlaArch35::InitTilingInfo(TilingInfo *tilingInfo)
+void FiaTilingNonQuantMlaArch35::InitTilingInfo(TilingInfo* tilingInfo)
 {
-    fiaInfo_ = static_cast<FiaTilingInfo *>(tilingInfo);
+    fiaInfo_ = static_cast<FiaTilingInfo*>(tilingInfo);
 }
 
 bool FiaTilingNonQuantMlaArch35::IsCapableBasicCheckMla()
@@ -199,7 +199,7 @@ ge::graphStatus FiaTilingNonQuantMlaArch35::SetPlatMemoryInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-int64_t FiaTilingNonQuantMlaArch35::GetActSeqLenMla(const gert::Tensor *tensor, uint32_t dims, FiaLayout layout,
+int64_t FiaTilingNonQuantMlaArch35::GetActSeqLenMla(const gert::Tensor* tensor, uint32_t dims, FiaLayout layout,
                                                     uint32_t bIdx)
 {
     if (dims == 1) {
@@ -216,8 +216,8 @@ int64_t FiaTilingNonQuantMlaArch35::GetActSeqLenMla(const gert::Tensor *tensor, 
 
 void FiaTilingNonQuantMlaArch35::InitImplParam()
 {
-    const gert::Tensor *actSeqLenQ = fiaInfo_->opParamInfo.actualSeqLengthsQ.tensor;
-    const gert::Tensor *actSeqLenKV = fiaInfo_->opParamInfo.actualSeqLengths.tensor;
+    const gert::Tensor* actSeqLenQ = fiaInfo_->opParamInfo.actualSeqLengthsQ.tensor;
+    const gert::Tensor* actSeqLenKV = fiaInfo_->opParamInfo.actualSeqLengths.tensor;
     uint32_t actSeqLenQDims = 0;
     uint32_t actSeqLenKVDims = 0;
     if (fiaInfo_->isMaxWorkspace) {
@@ -260,8 +260,8 @@ void FiaTilingNonQuantMlaArch35::AdjustSinnerAndSouter()
     OP_LOGI(fiaInfo_->opName, "Souter:%u SInner:%u", sOuterFactor_, sInnerFactor_);
 }
 
-void FiaTilingNonQuantMlaArch35::CreateSplitInput(split_core_v2::BaseInfo &baseInfo,
-                                                  split_core_v2::SplitParam &splitParam)
+void FiaTilingNonQuantMlaArch35::CreateSplitInput(split_core_v2::BaseInfo& baseInfo,
+                                                  split_core_v2::SplitParam& splitParam)
 {
     baseInfo.bSize = fiaInfo_->bSize;
     baseInfo.n2Size = fiaInfo_->n2Size;
@@ -284,18 +284,18 @@ void FiaTilingNonQuantMlaArch35::CreateSplitInput(split_core_v2::BaseInfo &baseI
         baseInfo.isAccumSeqS1 = false;
         baseInfo.isAccumSeqS2 = false;
     }
-    const gert::Tensor *actSeqLenData = fiaInfo_->opParamInfo.actualSeqLengthsQ.tensor;
-    const gert::Tensor *actSeqLenDataKV = fiaInfo_->opParamInfo.actualSeqLengths.tensor;
+    const gert::Tensor* actSeqLenData = fiaInfo_->opParamInfo.actualSeqLengthsQ.tensor;
+    const gert::Tensor* actSeqLenDataKV = fiaInfo_->opParamInfo.actualSeqLengths.tensor;
     if (actSeqLenData != nullptr) {
         baseInfo.actualSeqS1Size.reserve(baseInfo.bSize);
-        const int64_t *s1Ptr = actSeqLenData->GetData<int64_t>();
+        const int64_t* s1Ptr = actSeqLenData->GetData<int64_t>();
         for (uint32_t i = 0; i < baseInfo.bSize; i++) {
             baseInfo.actualSeqS1Size.emplace_back(s1Ptr[i]);
         }
     }
     if (actSeqLenDataKV != nullptr) {
         baseInfo.actualSeqS2Size.reserve(baseInfo.bSize);
-        const int64_t *s2Ptr = actSeqLenDataKV->GetData<int64_t>();
+        const int64_t* s2Ptr = actSeqLenDataKV->GetData<int64_t>();
         for (uint32_t i = 0; i < baseInfo.bSize; i++) {
             baseInfo.actualSeqS2Size.emplace_back(s2Ptr[i]);
         }
@@ -308,7 +308,7 @@ void FiaTilingNonQuantMlaArch35::CreateSplitInput(split_core_v2::BaseInfo &baseI
     splitParam.fdLeastBlock = 0; // 实验经验值
 }
 
-void FiaTilingNonQuantMlaArch35::SetSplitOutput(const split_core_v2::FAMetaData &splitRes)
+void FiaTilingNonQuantMlaArch35::SetSplitOutput(const split_core_v2::FAMetaData& splitRes)
 {
     // FA Metadata Generate
     for (size_t i = 0; i < NPU_AIC_CORE_NUM; ++i) {
@@ -331,7 +331,7 @@ void FiaTilingNonQuantMlaArch35::SetSplitOutput(const split_core_v2::FAMetaData 
     }
 
     // FD Metadata Generate
-    const split_core_v2::FlashDecodeResult &fdRes = splitRes.fdRes;
+    const split_core_v2::FlashDecodeResult& fdRes = splitRes.fdRes;
     for (size_t i = 0; i < NPU_AIV_CORE_NUM; ++i) {
         if (i >= fdRes.fdUsedVecNum) {
             tilingData_.fiaMetaData.FDMetadata[i][FD_CORE_ENABLE_INDEX] = 0; // AIV disenable
@@ -372,7 +372,7 @@ void FiaTilingNonQuantMlaArch35::SplitPolicy()
                                         (fiaInfo_->qPaddingSizeFlag || fiaInfo_->kvPaddingSizeFlag));
 }
 
-bool FiaTilingNonQuantMlaArch35::IsActualSeqLengthsKVHasZero(const split_core_v2::BaseInfo &baseInfo)
+bool FiaTilingNonQuantMlaArch35::IsActualSeqLengthsKVHasZero(const split_core_v2::BaseInfo& baseInfo)
 {
     for (uint32_t bIdx = 0; bIdx < baseInfo.bSize; bIdx++) {
         uint32_t s2Size = split_core_v2::GetS2SeqSize(bIdx, baseInfo);
@@ -383,7 +383,7 @@ bool FiaTilingNonQuantMlaArch35::IsActualSeqLengthsKVHasZero(const split_core_v2
     return false;
 }
 
-bool FiaTilingNonQuantMlaArch35::IsExistRowInvalid(const split_core_v2::BaseInfo &baseInfo)
+bool FiaTilingNonQuantMlaArch35::IsExistRowInvalid(const split_core_v2::BaseInfo& baseInfo)
 {
     if (!baseInfo.attenMaskFlag) {
         return false;
@@ -431,7 +431,7 @@ bool FiaTilingNonQuantMlaArch35::IsExistRowInvalid(const split_core_v2::BaseInfo
 }
 
 void FiaTilingNonQuantMlaArch35::GetSafeActToken(split_core_v2::SparseMode mode, int64_t actSeqLensQ,
-                                                 int64_t actSeqLensKv, int64_t &safePreToken, int64_t &safeNextToken)
+                                                 int64_t actSeqLensKv, int64_t& safePreToken, int64_t& safeNextToken)
 {
     if (mode == split_core_v2::SparseMode::DEFAULT_MASK) {
         safePreToken = std::max(-actSeqLensKv, safePreToken);
@@ -684,9 +684,9 @@ void FiaTilingNonQuantMlaArch35::SetFATilingData()
     }
 }
 
-ge::graphStatus FiaTilingNonQuantMlaArch35::SetTilingData(FusedInferAttentionScoreTilingData &tilingData)
+ge::graphStatus FiaTilingNonQuantMlaArch35::SetTilingData(FusedInferAttentionScoreTilingData& tilingData)
 {
-    FusedInferAttentionScoreTilingData *tiling = context_->GetTilingData<FusedInferAttentionScoreTilingData>();
+    FusedInferAttentionScoreTilingData* tiling = context_->GetTilingData<FusedInferAttentionScoreTilingData>();
     OP_CHECK_IF(tiling == nullptr, OP_LOGE(fiaInfo_->opName, "The tiling data is nullptr"), return ge::GRAPH_FAILED);
     *tiling = tilingData;
     return ge::GRAPH_SUCCESS;
@@ -694,17 +694,17 @@ ge::graphStatus FiaTilingNonQuantMlaArch35::SetTilingData(FusedInferAttentionSco
 
 void FiaTilingNonQuantMlaArch35::PrintAllTilingData()
 {
-    NoQuantTilingArch35 &baseTiling = tilingData_.baseTiling;
-    FiaBaseParams &fiaBaseParams = baseTiling.fiaBaseParams;
-    FiaAttenMaskParams &fiaAttenMaskParams = baseTiling.fiaAttenMaskParams;
-    FiaPseParams &fiaPseParams = baseTiling.fiaPseParams;
-    FiaSystemPrefixParams &fiaSystemPrefixParams = baseTiling.fiaSystemPrefixParams;
-    FiaPageAttentionParams &fiaPageAttentionParams = baseTiling.fiaPageAttentionParams;
-    FiaLeftPaddingParams &fiaLeftPaddingParams = baseTiling.fiaLeftPaddingParams;
-    FiaPostQuantParams &fiaPostQuantParams = baseTiling.fiaPostQuantParams;
-    FiaWorkspaceParams &fiaWorkspaceParams = baseTiling.fiaWorkspaceParams;
-    FiaEmptyTensorParams &fiaEmptyTensorParams = baseTiling.fiaEmptyTensorParams;
-    FiaMetaData &fiaMetaData = tilingData_.fiaMetaData;
+    NoQuantTilingArch35& baseTiling = tilingData_.baseTiling;
+    FiaBaseParams& fiaBaseParams = baseTiling.fiaBaseParams;
+    FiaAttenMaskParams& fiaAttenMaskParams = baseTiling.fiaAttenMaskParams;
+    FiaPseParams& fiaPseParams = baseTiling.fiaPseParams;
+    FiaSystemPrefixParams& fiaSystemPrefixParams = baseTiling.fiaSystemPrefixParams;
+    FiaPageAttentionParams& fiaPageAttentionParams = baseTiling.fiaPageAttentionParams;
+    FiaLeftPaddingParams& fiaLeftPaddingParams = baseTiling.fiaLeftPaddingParams;
+    FiaPostQuantParams& fiaPostQuantParams = baseTiling.fiaPostQuantParams;
+    FiaWorkspaceParams& fiaWorkspaceParams = baseTiling.fiaWorkspaceParams;
+    FiaEmptyTensorParams& fiaEmptyTensorParams = baseTiling.fiaEmptyTensorParams;
+    FiaMetaData& fiaMetaData = tilingData_.fiaMetaData;
 
     OP_LOGD(fiaInfo_->opName, "bSize:%d", fiaBaseParams.bSize);
     OP_LOGD(fiaInfo_->opName, "t1Size:%d", fiaBaseParams.t1Size);

@@ -58,13 +58,13 @@ struct FiaPlatFormInfoMla {
 
 class FiaTilingFullQuantMlaArch35 : public FiaTilingBase {
 public:
-    explicit FiaTilingFullQuantMlaArch35(gert::TilingContext *context)
+    explicit FiaTilingFullQuantMlaArch35(gert::TilingContext* context)
         : FiaTilingBase(context)
     {}
     ~FiaTilingFullQuantMlaArch35() override = default;
 
 protected:
-    void InitTilingInfo(TilingInfo *tilingInfo) override;
+    void InitTilingInfo(TilingInfo* tilingInfo) override;
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
 
@@ -81,19 +81,19 @@ private:
     void SetFATilingData();
     void AdjustSinnerAndSouter();
     void InitImplParam();
-    bool IsActualSeqLengthsKVHasZero(const split_core_v2::BaseInfo &baseInfo);
-    bool IsExistRowInvalid(const split_core_v2::BaseInfo &baseInfo);
+    bool IsActualSeqLengthsKVHasZero(const split_core_v2::BaseInfo& baseInfo);
+    bool IsExistRowInvalid(const split_core_v2::BaseInfo& baseInfo);
     void GetSafeActToken(split_core_v2::SparseMode mode, int64_t actSeqLensQ, int64_t actSeqLensKv,
-                         int64_t &safePreToken, int64_t &safeNextToken);
+                         int64_t& safePreToken, int64_t& safeNextToken);
     bool CheckQKVActualSeqLengthsRight();
     void PrintAllTilingData();
     void CalcMaxWorkspaceSize();
     void CalcScheduleMode();
-    void CreateSplitInput(split_core_v2::BaseInfo &baseInfo, split_core_v2::SplitParam &splitParam);
-    void SetSplitOutput(const split_core_v2::FAMetaData &splitRes);
+    void CreateSplitInput(split_core_v2::BaseInfo& baseInfo, split_core_v2::SplitParam& splitParam);
+    void SetSplitOutput(const split_core_v2::FAMetaData& splitRes);
     void CalcNumBlocks(uint32_t coreNum);
     void FillTiling();
-    ge::graphStatus SetTilingData(FusedInferAttentionScoreFullQuantTilingData &tilingData);
+    ge::graphStatus SetTilingData(FusedInferAttentionScoreFullQuantTilingData& tilingData);
 
     FusedInferAttentionScoreFullQuantTilingData tilingData_;
     FiaTilingKeyInfoMla tilingKeyInfo_;
@@ -114,7 +114,7 @@ private:
     int32_t numBlocks_ = 0;
 
     // Tiling Info
-    FiaTilingInfo *fiaInfo_ = nullptr;
+    FiaTilingInfo* fiaInfo_ = nullptr;
 };
 
 } // namespace optiling

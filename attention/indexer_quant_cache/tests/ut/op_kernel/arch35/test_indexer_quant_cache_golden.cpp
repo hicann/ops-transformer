@@ -43,22 +43,22 @@ struct NormalGolden {
 };
 
 template <typename T>
-T *GmAlloc(size_t size)
+T* GmAlloc(size_t size)
 {
-    T *ptr = reinterpret_cast<T *>(AscendC::GmAlloc(size));
+    T* ptr = reinterpret_cast<T*>(AscendC::GmAlloc(size));
     assert(ptr != nullptr && "GM allocation failed");
     return ptr;
 }
 
-void FillInput(uint8_t *input)
+void FillInput(uint8_t* input)
 {
-    uint16_t *halfInput = reinterpret_cast<uint16_t *>(input);
+    uint16_t* halfInput = reinterpret_cast<uint16_t*>(input);
     for (int64_t i = 0; i < BS * D; ++i) {
         halfInput[i] = (i & 1) ? 0xB800 : 0x3C00; // -0.5, 1.0
     }
 }
 
-IndexerQuantCacheTilingData MakeTiling(const NormalGolden &golden)
+IndexerQuantCacheTilingData MakeTiling(const NormalGolden& golden)
 {
     IndexerQuantCacheTilingData tiling;
     std::memset(&tiling, 0, sizeof(tiling));
@@ -83,7 +83,7 @@ IndexerQuantCacheTilingData MakeTiling(const NormalGolden &golden)
     return tiling;
 }
 
-void RunAndCheckNormalGolden(const NormalGolden &golden)
+void RunAndCheckNormalGolden(const NormalGolden& golden)
 {
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
 
@@ -92,14 +92,14 @@ void RunAndCheckNormalGolden(const NormalGolden &golden)
     constexpr size_t CACHE_SIZE = CACHE_ROWS * D * sizeof(uint8_t);
     constexpr size_t SCALE_SIZE = CACHE_ROWS * sizeof(uint32_t);
 
-    uint8_t *cache = GmAlloc<uint8_t>(CACHE_SIZE);
-    uint8_t *cacheScale = GmAlloc<uint8_t>(SCALE_SIZE);
-    uint8_t *x = GmAlloc<uint8_t>(X_SIZE);
-    uint8_t *slotMapping = GmAlloc<uint8_t>(SLOT_SIZE);
-    uint8_t *cacheOut = GmAlloc<uint8_t>(CACHE_SIZE);
-    uint8_t *cacheScaleOut = GmAlloc<uint8_t>(SCALE_SIZE);
-    uint8_t *workspace = GmAlloc<uint8_t>(SYS_WORKSPACE);
-    uint8_t *tiling = GmAlloc<uint8_t>(sizeof(IndexerQuantCacheTilingData));
+    uint8_t* cache = GmAlloc<uint8_t>(CACHE_SIZE);
+    uint8_t* cacheScale = GmAlloc<uint8_t>(SCALE_SIZE);
+    uint8_t* x = GmAlloc<uint8_t>(X_SIZE);
+    uint8_t* slotMapping = GmAlloc<uint8_t>(SLOT_SIZE);
+    uint8_t* cacheOut = GmAlloc<uint8_t>(CACHE_SIZE);
+    uint8_t* cacheScaleOut = GmAlloc<uint8_t>(SCALE_SIZE);
+    uint8_t* workspace = GmAlloc<uint8_t>(SYS_WORKSPACE);
+    uint8_t* tiling = GmAlloc<uint8_t>(sizeof(IndexerQuantCacheTilingData));
 
     std::memset(cache, 0, CACHE_SIZE);
     std::memset(cacheScale, 0, SCALE_SIZE);

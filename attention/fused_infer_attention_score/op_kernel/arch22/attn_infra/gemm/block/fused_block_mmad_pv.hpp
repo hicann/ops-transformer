@@ -84,7 +84,7 @@ public:
     /// Construct
     __aicore__ inline BlockMmad() {}
 
-    __aicore__ inline void init(Arch::Resource<ArchTag> &resource, uint32_t nDyn, uint32_t kDyn,
+    __aicore__ inline void init(Arch::Resource<ArchTag>& resource, uint32_t nDyn, uint32_t kDyn,
                                 uint32_t setMaxKVStackLen = 512, uint32_t l1BufAddrStart = 0)
     {
         maxKVStackLen = setMaxKVStackLen;
@@ -110,19 +110,19 @@ public:
         blockStartOffset = kvStart * maxKVStackLen % pagedBlockSize;
     }
 
-    __aicore__ inline void getBlockShape(GemmCoord &actualShape, uint32_t &nowLen)
+    __aicore__ inline void getBlockShape(GemmCoord& actualShape, uint32_t& nowLen)
     {
         actualShape[COORD_DIM2] = nowLen;
     }
 
-    __aicore__ inline void getKVOffset(uint64_t &kOffset, uint32_t nIdx, uint32_t &strideKV)
+    __aicore__ inline void getKVOffset(uint64_t& kOffset, uint32_t nIdx, uint32_t& strideKV)
     {
         kOffset = static_cast<uint64_t>(nIdx) * maxKVStackLen * strideKV;
     }
 
-    __aicore__ inline void getKVOffset(AscendC::GlobalTensor<int32_t> &gBlockTable, uint64_t &kOffset,
-                                       uint32_t blockStartOffset, uint32_t nowNIdx, uint32_t &strideKV,
-                                       uint32_t &blockSize, uint32_t embed, uint64_t valueBnStride)
+    __aicore__ inline void getKVOffset(AscendC::GlobalTensor<int32_t>& gBlockTable, uint64_t& kOffset,
+                                       uint32_t blockStartOffset, uint32_t nowNIdx, uint32_t& strideKV,
+                                       uint32_t& blockSize, uint32_t embed, uint64_t valueBnStride)
     {
         uint32_t blockTableId = gBlockTable.GetValue(nowNIdx);
         if (valueBnStride != 0) {
@@ -149,8 +149,8 @@ public:
         }
     }
 
-    __aicore__ inline void setBlockParam(uint32_t stackSeqTile, uint32_t &blockStart, uint32_t &blockEnd,
-                                         uint32_t &curBlockTotalNum, uint32_t blockSize)
+    __aicore__ inline void setBlockParam(uint32_t stackSeqTile, uint32_t& blockStart, uint32_t& blockEnd,
+                                         uint32_t& curBlockTotalNum, uint32_t blockSize)
     {
         if (stackSeqTile >= blockStart && blockSize != 0) {
             blockEnd =
@@ -163,7 +163,7 @@ public:
         }
     }
 
-    __aicore__ inline void updateBlockOffset(uint32_t nowLen, uint32_t &curBlockIdx, uint32_t blockSize)
+    __aicore__ inline void updateBlockOffset(uint32_t nowLen, uint32_t& curBlockIdx, uint32_t blockSize)
     {
         if (blockStartOffset + nowLen == blockSize) {
             blockStartOffset = 0;
@@ -176,7 +176,7 @@ public:
     __aicore__ inline void operator()(AscendC::GlobalTensor<ElementA> gA, AscendC::GlobalTensor<ElementB> gB,
                                       AscendC::GlobalTensor<ElementC> gC, AscendC::GlobalTensor<int32_t> gBlockTable,
                                       LayoutA layoutA, LayoutB layoutB, LayoutC layoutC, GemmCoord actualOriShape,
-                                      uint32_t &nIdx, uint32_t &nLoop, uint32_t &blockSize, uint32_t kvSeqlen,
+                                      uint32_t& nIdx, uint32_t& nLoop, uint32_t& blockSize, uint32_t kvSeqlen,
                                       uint32_t strideKV, uint32_t blockStackNum, Arch::CrossCoreFlag softmaxFlag,
                                       uint64_t valueBnStride)
     {

@@ -32,7 +32,7 @@ class KeyPoolTools {
 public:
     __aicore__ inline KeyPoolTools() {}
 
-    __aicore__ inline void Init(__gm__ uint8_t *startPos, __gm__ uint8_t *seqUsed, __gm__ uint8_t *seqLens);
+    __aicore__ inline void Init(__gm__ uint8_t* startPos, __gm__ uint8_t* seqUsed, __gm__ uint8_t* seqLens);
 
     __aicore__ inline uint32_t GetSeqUsed(uint32_t bIdx);
     __aicore__ inline uint64_t GetStartPos(uint32_t bIdx);
@@ -51,21 +51,21 @@ private:
 };
 
 template <typename COMP>
-__aicore__ inline void KeyPoolTools<COMP>::Init(__gm__ uint8_t *startPos, __gm__ uint8_t *seqUsed,
-                                                __gm__ uint8_t *seqLens)
+__aicore__ inline void KeyPoolTools<COMP>::Init(__gm__ uint8_t* startPos, __gm__ uint8_t* seqUsed,
+                                                __gm__ uint8_t* seqLens)
 {
     isExistStartPos_ = (startPos != nullptr);
     if (isExistStartPos_) {
-        startPosGm_.SetGlobalBuffer((__gm__ int32_t *)startPos);
+        startPosGm_.SetGlobalBuffer((__gm__ int32_t*)startPos);
     }
 
     isExistSeqUsed_ = (seqUsed != nullptr);
     if (isExistSeqUsed_) {
-        sequsedGm_.SetGlobalBuffer((__gm__ int32_t *)seqUsed);
+        sequsedGm_.SetGlobalBuffer((__gm__ int32_t*)seqUsed);
     }
 
     if constexpr (COMP::hiddenStatesLayout == HIDDEN_STATES_LAYOUT::TH) {
-        cuSeqlensGm_.SetGlobalBuffer((__gm__ int32_t *)seqLens);
+        cuSeqlensGm_.SetGlobalBuffer((__gm__ int32_t*)seqLens);
     }
 }
 
@@ -137,7 +137,7 @@ struct SliceInfo {
 template <typename COMP>
 class KeyPoolSliceIterator {
 public:
-    __aicore__ inline KeyPoolSliceIterator(KeyPoolTools<COMP> &tools)
+    __aicore__ inline KeyPoolSliceIterator(KeyPoolTools<COMP>& tools)
         : tools_(tools)
     {}
 
@@ -146,14 +146,14 @@ public:
     __aicore__ inline void SetMaxDealSeqCnt(uint32_t maxDealSeqCnt);
     __aicore__ inline bool IsEnd();
     __aicore__ inline void IteratorSlice();
-    __aicore__ inline SliceInfo &GetSlice();
-    __aicore__ inline SliceInfo &GetSliceByCmp();
+    __aicore__ inline SliceInfo& GetSlice();
+    __aicore__ inline SliceInfo& GetSliceByCmp();
 
     bool isFirst_ = true;
     SliceInfo sliceInfo_{};
 
 private:
-    KeyPoolTools<COMP> &tools_;
+    KeyPoolTools<COMP>& tools_;
 
     // iterator
     uint32_t maxDealSeqCnt_ = 0;
@@ -222,7 +222,7 @@ __aicore__ inline void KeyPoolSliceIterator<COMP>::IteratorSlice()
 }
 
 template <typename COMP>
-__aicore__ inline SliceInfo &KeyPoolSliceIterator<COMP>::GetSliceByCmp()
+__aicore__ inline SliceInfo& KeyPoolSliceIterator<COMP>::GetSliceByCmp()
 {
     uint32_t cmpRatio = tools_.toolParams_.cmpRatio;
     if (isFirst_) {
@@ -267,7 +267,7 @@ __aicore__ inline SliceInfo &KeyPoolSliceIterator<COMP>::GetSliceByCmp()
 }
 
 template <typename COMP>
-__aicore__ inline SliceInfo &KeyPoolSliceIterator<COMP>::GetSlice()
+__aicore__ inline SliceInfo& KeyPoolSliceIterator<COMP>::GetSlice()
 {
     uint32_t cmpRatio = tools_.toolParams_.cmpRatio;
     if (isFirst_) {
@@ -311,7 +311,7 @@ struct SplitCoreSliceInfo : public SliceInfo {
 template <typename COMP>
 class KeyPoolSplitCoreSliceIterator {
 public:
-    __aicore__ inline KeyPoolSplitCoreSliceIterator(KeyPoolTools<COMP> &tools)
+    __aicore__ inline KeyPoolSplitCoreSliceIterator(KeyPoolTools<COMP>& tools)
         : tools_(tools)
     {}
 
@@ -320,11 +320,11 @@ public:
     __aicore__ inline void SetMaxDealSeqCnt(uint32_t maxDealSeqCnt);
     __aicore__ inline bool IsEnd();
     __aicore__ inline void IteratorSlice();
-    __aicore__ inline SplitCoreSliceInfo &GetSlice();
-    __aicore__ inline SplitCoreSliceInfo &GetSliceByCmp();
+    __aicore__ inline SplitCoreSliceInfo& GetSlice();
+    __aicore__ inline SplitCoreSliceInfo& GetSliceByCmp();
     __aicore__ inline uint32_t GetBIdx();
-    __aicore__ inline SplitCoreSliceInfo &GetLeftNextCmpSeqCnt();
-    __aicore__ inline SplitCoreSliceInfo &GetRightNextCmpSeqCnt();
+    __aicore__ inline SplitCoreSliceInfo& GetLeftNextCmpSeqCnt();
+    __aicore__ inline SplitCoreSliceInfo& GetRightNextCmpSeqCnt();
 
     bool isFirst_ = true;
     bool isLeftFirstBath = false;
@@ -333,7 +333,7 @@ public:
     SplitCoreSliceInfo sliceInfo_{};
 
 private:
-    KeyPoolTools<COMP> &tools_;
+    KeyPoolTools<COMP>& tools_;
 
     // iterator
     uint32_t maxDealSeqCnt_ = 0;
@@ -417,7 +417,7 @@ __aicore__ inline void KeyPoolSplitCoreSliceIterator<COMP>::IteratorSlice()
 }
 
 template <typename COMP>
-__aicore__ inline SplitCoreSliceInfo &KeyPoolSplitCoreSliceIterator<COMP>::GetLeftNextCmpSeqCnt()
+__aicore__ inline SplitCoreSliceInfo& KeyPoolSplitCoreSliceIterator<COMP>::GetLeftNextCmpSeqCnt()
 {
     uint32_t cmpRatio = tools_.toolParams_.cmpRatio;
     if (isFirst_) {
@@ -479,7 +479,7 @@ __aicore__ inline SplitCoreSliceInfo &KeyPoolSplitCoreSliceIterator<COMP>::GetLe
 }
 
 template <typename COMP>
-__aicore__ inline SplitCoreSliceInfo &KeyPoolSplitCoreSliceIterator<COMP>::GetRightNextCmpSeqCnt()
+__aicore__ inline SplitCoreSliceInfo& KeyPoolSplitCoreSliceIterator<COMP>::GetRightNextCmpSeqCnt()
 {
     uint32_t cmpRatio = tools_.toolParams_.cmpRatio;
     if (isFirst_) {
@@ -554,7 +554,7 @@ struct StatisticInfo {
 template <typename COMP>
 class KeyPoolVec1SliceIterator {
 public:
-    __aicore__ inline KeyPoolVec1SliceIterator(KeyPoolTools<COMP> &tools)
+    __aicore__ inline KeyPoolVec1SliceIterator(KeyPoolTools<COMP>& tools)
         : tools_(tools)
     {}
 
@@ -570,12 +570,12 @@ public:
     __aicore__ inline bool IsEnd();
     template <bool IS_STATISTIC = false>
     __aicore__ inline void IteratorSlice();
-    __aicore__ inline Vec1SliceInfo &GetSlice();
+    __aicore__ inline Vec1SliceInfo& GetSlice();
     template <bool IS_STATISTIC = false>
-    __aicore__ inline StatisticInfo &FullIteratorSlice();
+    __aicore__ inline StatisticInfo& FullIteratorSlice();
 
 private:
-    KeyPoolTools<COMP> &tools_;
+    KeyPoolTools<COMP>& tools_;
 
     bool isFirst_ = true;
     Vec1SliceInfo sliceInfo_{};
@@ -731,7 +731,7 @@ __aicore__ inline bool KeyPoolVec1SliceIterator<COMP>::IsEnd()
 }
 
 template <typename COMP>
-__aicore__ inline Vec1SliceInfo &KeyPoolVec1SliceIterator<COMP>::GetSlice()
+__aicore__ inline Vec1SliceInfo& KeyPoolVec1SliceIterator<COMP>::GetSlice()
 {
     uint32_t cmpRatio = tools_.toolParams_.cmpRatio;
     if (sliceInfo_.bSeqUsed < sliceInfo_.sIdx) {
@@ -769,7 +769,7 @@ __aicore__ inline Vec1SliceInfo &KeyPoolVec1SliceIterator<COMP>::GetSlice()
 
 template <typename COMP>
 template <bool IS_STATISTIC>
-__aicore__ inline StatisticInfo &KeyPoolVec1SliceIterator<COMP>::FullIteratorSlice()
+__aicore__ inline StatisticInfo& KeyPoolVec1SliceIterator<COMP>::FullIteratorSlice()
 {
     if constexpr (IS_STATISTIC) {
         statisticInfo_ = {0U, 0U, 0U};

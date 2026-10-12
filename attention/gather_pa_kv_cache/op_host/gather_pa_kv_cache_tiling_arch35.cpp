@@ -62,13 +62,14 @@ static const std::set<ge::DataType> KV_SUPPORT_DTYPE = {
 static const std::set<ge::DataType> INDEX_SUPPORT_DTYPE = {ge::DT_INT32, ge::DT_INT64};
 
 #define FORMAT_KEY_VALUE_NOT_SUPPORTED \
-    "%s dtype only support [float32, float16, bf16, hf8, fp8_e5m2, fp8_e4m3fn, int32, uint32, int16, uint16, int8, uint8], please check."
+    "%s dtype only support [float32, float16, bf16, hf8, fp8_e5m2, fp8_e4m3fn, int32, uint32, int16, uint16, int8, " \
+    "uint8], please check."
 
 ge::graphStatus GatherPaKvCacheTiling::GetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const GatherPaKvCacheCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const GatherPaKvCacheCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
         coreNum_ = compileInfoPtr->coreNum;
         ubSize_ = compileInfoPtr->ubSize;
@@ -84,7 +85,7 @@ ge::graphStatus GatherPaKvCacheTiling::GetPlatformInfo()
 
 ge::graphStatus GatherPaKvCacheTiling::GetAttrs()
 {
-    auto *attrs = context_->GetAttrs();
+    auto* attrs = context_->GetAttrs();
     cacheMode_ = std::string(attrs->GetAttrPointer<char>(INDEX_ATTR_CACHE_MODE));
     if (cacheMode_.empty()) {
         cacheMode_ = "Norm";
@@ -96,7 +97,7 @@ ge::graphStatus GatherPaKvCacheTiling::GetAttrs()
     }
     isCacheModeNorm_ = (cacheMode_ == "Norm");
 
-    const bool *isSeqLensCumsumPtr = attrs->GetAttrPointer<bool>(INDEX_ATTR_IS_SEQ_LENS_CUMSUM);
+    const bool* isSeqLensCumsumPtr = attrs->GetAttrPointer<bool>(INDEX_ATTR_IS_SEQ_LENS_CUMSUM);
     if (isSeqLensCumsumPtr == nullptr) {
         isSeqLenCumSum_ = true;
     } else {
@@ -114,8 +115,7 @@ ge::graphStatus GatherPaKvCacheTiling::GetInputKeyCache()
 
     // 校验数据类型是否合法
     OP_CHECK_IF((KV_SUPPORT_DTYPE.find(kCacheDType) == KV_SUPPORT_DTYPE.end()),
-                OP_LOGE(context_, FORMAT_KEY_VALUE_NOT_SUPPORTED, "key_cache"),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(context_, FORMAT_KEY_VALUE_NOT_SUPPORTED, "key_cache"), return ge::GRAPH_FAILED);
 
     uint32_t kCacheDTypeByteSize = tilingDataTypeByteTable.find(kCacheDType)->second;
     keyByteSize_ = kCacheDTypeByteSize;
@@ -189,8 +189,7 @@ ge::graphStatus GatherPaKvCacheTiling::GetInputValueCache()
 
     // 校验数据类型是否合法
     OP_CHECK_IF((KV_SUPPORT_DTYPE.find(vCacheDType) == KV_SUPPORT_DTYPE.end()),
-                OP_LOGE(context_, FORMAT_KEY_VALUE_NOT_SUPPORTED, "value_cache"),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(context_, FORMAT_KEY_VALUE_NOT_SUPPORTED, "value_cache"), return ge::GRAPH_FAILED);
     uint32_t vCacheDTypeByteSize = tilingDataTypeByteTable.find(vCacheDType)->second;
     valueByteSize_ = vCacheDTypeByteSize;
 
@@ -334,8 +333,7 @@ ge::graphStatus GatherPaKvCacheTiling::GetInputOutputKey()
 
     // 校验数据类型是否合法
     OP_CHECK_IF((KV_SUPPORT_DTYPE.find(keyDType) == KV_SUPPORT_DTYPE.end()),
-                OP_LOGE(context_, FORMAT_KEY_VALUE_NOT_SUPPORTED, "key"),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(context_, FORMAT_KEY_VALUE_NOT_SUPPORTED, "key"), return ge::GRAPH_FAILED);
 
     // 非连续场景下key可能为view，必须通过GetTensorInfo获取逻辑shape与stride。
     OP_CHECK_IF(GetTensorInfo(keyShape_, keyOutStride_, INDEX_INPUT_KEY) != ge::GRAPH_SUCCESS,
@@ -413,8 +411,7 @@ ge::graphStatus GatherPaKvCacheTiling::GetInputOutputValue()
 
     // 校验数据类型是否合法
     OP_CHECK_IF((KV_SUPPORT_DTYPE.find(valueDType) == KV_SUPPORT_DTYPE.end()),
-                OP_LOGE(context_, FORMAT_KEY_VALUE_NOT_SUPPORTED, "value"),
-                return ge::GRAPH_FAILED);
+                OP_LOGE(context_, FORMAT_KEY_VALUE_NOT_SUPPORTED, "value"), return ge::GRAPH_FAILED);
 
     // 非连续场景下value可能为view，必须通过GetTensorInfo获取逻辑shape与stride。
     OP_CHECK_IF(GetTensorInfo(valueShape_, valueOutStride_, INDEX_INPUT_VALUE) != ge::GRAPH_SUCCESS,
@@ -550,8 +547,8 @@ ge::graphStatus GatherPaKvCacheTiling::DoOpTiling()
     //   ND非连续(cache任一轴 或 ref任一轴非连续): 按"全局block轮询"分核, kernel用 globalBlk % needCoreNum 分配,
     //             故直接用满所有核。解决batch少(如batchCount=3/6)时按batch分核只用极少核的瓶颈。
     //   其余(ND连续 / NZ): 维持按batch分核, 行为完全不变。
-    bool isNdNonContig = isCacheModeNorm_ &&
-        (!isKCacheContiguous_ || !isVCacheContiguous_ || !isKeyOutContiguous_ || !isValueOutContiguous_);
+    bool isNdNonContig = isCacheModeNorm_ && (!isKCacheContiguous_ || !isVCacheContiguous_ || !isKeyOutContiguous_ ||
+                                              !isValueOutContiguous_);
     int64_t batchPerCore = Ops::Base::CeilDiv(batchCount_, coreNum_);
     if (isNdNonContig) {
         needCoreNum_ = static_cast<uint32_t>(coreNum_);
@@ -572,12 +569,12 @@ ge::graphStatus GatherPaKvCacheTiling::DoOpTiling()
     uint64_t maxUbHiddenSizeV =
         std::min(static_cast<uint64_t>(factor) * tileBase, cacheBlockV); // 最大不超过1个cacheBlock
     uint64_t maxUbHiddenSize = std::max(maxUbHiddenSizeK, maxUbHiddenSizeV);
-    maxUbHiddenSize = Ops::Base::CeilAlign(maxUbHiddenSize, static_cast<uint64_t>(tileBase)); // 保证maxUbHiddenSize和32B对齐
+    maxUbHiddenSize =
+        Ops::Base::CeilAlign(maxUbHiddenSize, static_cast<uint64_t>(tileBase)); // 保证maxUbHiddenSize和32B对齐
 
     // 动态调整: 如果有多余空间，就用于累加和的计算
     if (maxUbHiddenSizeK == cacheBlockK || maxUbHiddenSizeV == cacheBlockV) {
-        uint32_t spareBuffer =
-            ubSize_ - UB_REVERSE - maxUbHiddenSize * DOUBLE_BUFFER - BLOCK_SIZE;
+        uint32_t spareBuffer = ubSize_ - UB_REVERSE - maxUbHiddenSize * DOUBLE_BUFFER - BLOCK_SIZE;
         seqLenAccumSize = Ops::Base::CeilDiv(spareBuffer / DOUBLE_BUFFER, BLOCK_SIZE) * BLOCK_SIZE / indexByteSize_;
     }
 
@@ -605,18 +602,26 @@ ge::graphStatus GatherPaKvCacheTiling::DoOpTiling()
     uint32_t nonContigFlag = 0;
     if (!isKCacheContiguous_) {
         nonContigFlag |= (1 << 0);
-        if (isKCacheSlotNonContig_) nonContigFlag |= (1 << 4);
-        if (isKCacheHeadNonContig_) nonContigFlag |= (1 << 5);
+        if (isKCacheSlotNonContig_)
+            nonContigFlag |= (1 << 4);
+        if (isKCacheHeadNonContig_)
+            nonContigFlag |= (1 << 5);
     }
     if (!isVCacheContiguous_) {
         nonContigFlag |= (1 << 1);
-        if (isVCacheSlotNonContig_) nonContigFlag |= (1 << 6);
-        if (isVCacheHeadNonContig_) nonContigFlag |= (1 << 7);
+        if (isVCacheSlotNonContig_)
+            nonContigFlag |= (1 << 6);
+        if (isVCacheHeadNonContig_)
+            nonContigFlag |= (1 << 7);
     }
-    if (!isKeyOutContiguous_)   nonContigFlag |= (1 << 2);
-    if (!isValueOutContiguous_) nonContigFlag |= (1 << 3);
-    if (isKeyOutHeadNonContig_)   nonContigFlag |= (1 << 8);
-    if (isValueOutHeadNonContig_) nonContigFlag |= (1 << 9);
+    if (!isKeyOutContiguous_)
+        nonContigFlag |= (1 << 2);
+    if (!isValueOutContiguous_)
+        nonContigFlag |= (1 << 3);
+    if (isKeyOutHeadNonContig_)
+        nonContigFlag |= (1 << 8);
+    if (isValueOutHeadNonContig_)
+        nonContigFlag |= (1 << 9);
 
     tilingData_.set_nonContiguousFlag(nonContigFlag);
 
@@ -647,32 +652,35 @@ ge::graphStatus GatherPaKvCacheTiling::DoOpTiling()
 
     // key/value输出stride (ND和NZ模式都支持)
     // stride0=token(dim0)步长, stride1=head(dim1)步长。连续时填稠密值:
-    //   ND: stride0=hiddenSize(=num_heads*head_size), stride1=head_size; NZ: 无dim1, stride1填hiddenSize(不被kernel使用)。
+    //   ND: stride0=hiddenSize(=num_heads*head_size), stride1=head_size; NZ: 无dim1,
+    //   stride1填hiddenSize(不被kernel使用)。
     if (!isKeyOutContiguous_) {
         tilingData_.set_keyOutStride0(keyOutStride_.GetStride(0));
         tilingData_.set_keyOutStride1(keyOutStride_.GetStride(1));
     } else {
-        tilingData_.set_keyOutStride0(static_cast<int64_t>(keyShape_.GetDim(0)) > 0 ?
-            static_cast<int64_t>(hiddenSizeK_) : 0);
+        tilingData_.set_keyOutStride0(
+            static_cast<int64_t>(keyShape_.GetDim(0)) > 0 ? static_cast<int64_t>(hiddenSizeK_) : 0);
         tilingData_.set_keyOutStride1((isCacheModeNorm_ && numHeadsK_ > 0) ?
-            static_cast<int64_t>(hiddenSizeK_ / numHeadsK_) : static_cast<int64_t>(hiddenSizeK_));
+                                          static_cast<int64_t>(hiddenSizeK_ / numHeadsK_) :
+                                          static_cast<int64_t>(hiddenSizeK_));
     }
 
     if (!isValueOutContiguous_) {
         tilingData_.set_valueOutStride0(valueOutStride_.GetStride(0));
         tilingData_.set_valueOutStride1(valueOutStride_.GetStride(1));
     } else {
-        tilingData_.set_valueOutStride0(static_cast<int64_t>(valueShape_.GetDim(0)) > 0 ?
-            static_cast<int64_t>(hiddenSizeV_) : 0);
+        tilingData_.set_valueOutStride0(
+            static_cast<int64_t>(valueShape_.GetDim(0)) > 0 ? static_cast<int64_t>(hiddenSizeV_) : 0);
         tilingData_.set_valueOutStride1((isCacheModeNorm_ && numHeadsV_ > 0) ?
-            static_cast<int64_t>(hiddenSizeV_ / numHeadsV_) : static_cast<int64_t>(hiddenSizeV_));
+                                            static_cast<int64_t>(hiddenSizeV_ / numHeadsV_) :
+                                            static_cast<int64_t>(hiddenSizeV_));
     }
 
     tilingData_.set_numHeadsK(numHeadsK_);
     tilingData_.set_numHeadsV(numHeadsV_);
 
     // 根据属性设置tilingkey
-    for (const auto &item : tilingKeyTable) {
+    for (const auto& item : tilingKeyTable) {
         if (item.isCacheModeNorm == isCacheModeNorm_ && item.isSeqLenCumSum == isSeqLenCumSum_ &&
             item.hasSeqOffset == hasSeqOffset_) {
             tilingKey_ = item.tilingKey;
@@ -703,7 +711,7 @@ ge::graphStatus GatherPaKvCacheTiling::PostTiling()
 {
     context_->SetTilingKey(GetTilingKey());
     context_->SetBlockDim(needCoreNum_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
     workspaces[0] = workspaceSize_;
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
@@ -711,7 +719,7 @@ ge::graphStatus GatherPaKvCacheTiling::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GatherPaKvCacheTiling::GetContiguousTensorInfo(gert::Shape &shape, gert::Stride &stride, size_t idx)
+ge::graphStatus GatherPaKvCacheTiling::GetContiguousTensorInfo(gert::Shape& shape, gert::Stride& stride, size_t idx)
 {
     auto xStorageShape = context_->GetInputShape(idx);
     OP_CHECK_NULL_WITH_CONTEXT(context_, xStorageShape);
@@ -726,11 +734,11 @@ ge::graphStatus GatherPaKvCacheTiling::GetContiguousTensorInfo(gert::Shape &shap
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GatherPaKvCacheTiling::GetTensorInfo(gert::Shape &shape, gert::Stride &stride, size_t idx)
+ge::graphStatus GatherPaKvCacheTiling::GetTensorInfo(gert::Shape& shape, gert::Stride& stride, size_t idx)
 {
     bool isView = context_->InputIsView(idx);
     if (isView) {
-        auto *inputStride = context_->GetInputStride(idx);
+        auto* inputStride = context_->GetInputStride(idx);
         if (inputStride == nullptr || inputStride->GetDimNum() == 0) {
             return GetContiguousTensorInfo(shape, stride, idx);
         } else {
@@ -743,7 +751,7 @@ ge::graphStatus GatherPaKvCacheTiling::GetTensorInfo(gert::Shape &shape, gert::S
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingForGatherPaKvCache(gert::TilingContext *context)
+ge::graphStatus TilingForGatherPaKvCache(gert::TilingContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("TilingForGatherPaKvCache", "Tiling context is nullptr");
@@ -760,7 +768,7 @@ ge::graphStatus TilingForGatherPaKvCache(gert::TilingContext *context)
     return tiling.DoTiling();
 }
 
-ge::graphStatus TilingPrepareForGatherPaKvCache(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForGatherPaKvCache(gert::TilingParseContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("TilingPrepareForGatherPaKvCache", "Tiling context is nullptr");

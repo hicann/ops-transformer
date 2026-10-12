@@ -13,8 +13,8 @@
 
 namespace op_api {
 
-at::Tensor lightning_indexer_kl_loss(const at::Tensor &targetScore, const at::Tensor &indexProbs, float eps,
-                                     const std::string &weightType)
+at::Tensor lightning_indexer_kl_loss(const at::Tensor& targetScore, const at::Tensor& indexProbs, float eps,
+                                     const std::string& weightType)
 {
     TORCH_CHECK((eps > 0), "eps should be greater than 0, current is: ", eps);
     TORCH_CHECK((weightType == "logits" || weightType == "probs"),
@@ -34,7 +34,7 @@ at::Tensor lightning_indexer_kl_loss(const at::Tensor &targetScore, const at::Te
         loss = at::empty({}, targetScore.options());
     }
 
-    char *weightTypePtr = const_cast<char *>(weightType.c_str());
+    char* weightTypePtr = const_cast<char*>(weightType.c_str());
     ACLNN_CMD(aclnnLightningIndexerKLLoss, targetScore, indexProbs, eps, weightTypePtr, loss);
 
     return loss;

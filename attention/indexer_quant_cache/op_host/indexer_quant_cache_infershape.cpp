@@ -26,8 +26,8 @@ graphStatus InferShape4IndexerQuantCache(gert::InferShapeContext* context)
     const gert::Shape* cacheScaleShape = context->GetInputShape(1);
     gert::Shape* outCacheShape = context->GetOutputShape(0);
     gert::Shape* outCacheScaleShape = context->GetOutputShape(1);
-    if (cacheShape == nullptr || cacheScaleShape == nullptr ||
-        outCacheShape == nullptr || outCacheScaleShape == nullptr) {
+    if (cacheShape == nullptr || cacheScaleShape == nullptr || outCacheShape == nullptr ||
+        outCacheScaleShape == nullptr) {
         return ge::GRAPH_FAILED;
     }
     *outCacheShape = *cacheShape;
@@ -46,4 +46,4 @@ graphStatus InferDtype4IndexerQuantCache(gert::InferDataTypeContext* context)
 IMPL_OP_INFERSHAPE(IndexerQuantCache)
     .InferShape(InferShape4IndexerQuantCache)
     .InferDataType(InferDtype4IndexerQuantCache);
-}  // namespace ops
+} // namespace ops

@@ -40,17 +40,16 @@ class FusedFloydAttentionEmptyInputTiling {
 public:
     FusedFloydAttentionTilingData tilingData;
 
-    void FusedFloydAttentionSetEmptyInputTilingData(gert::TilingContext *context,
-                                                    FusedFloydAttentionTilingData &faTilingData);
-    void GetTilingKeyAttentionScore4EmptyInput(uint32_t &tilingKey, const gert::TilingContext *context);
+    void FusedFloydAttentionSetEmptyInputTilingData(gert::TilingContext* context,
+                                                    FusedFloydAttentionTilingData& faTilingData);
+    void GetTilingKeyAttentionScore4EmptyInput(uint32_t& tilingKey, const gert::TilingContext* context);
 };
 
-void FusedFloydAttentionEmptyInputTiling::GetTilingKeyAttentionScore4EmptyInput(uint32_t &tilingKey,
-                                                                                const gert::TilingContext *context)
+void FusedFloydAttentionEmptyInputTiling::GetTilingKeyAttentionScore4EmptyInput(uint32_t& tilingKey,
+                                                                                const gert::TilingContext* context)
 {
     OP_CHECK_IF(context->GetInputDesc(KEY1_INPUT_INDEX) == nullptr,
-        OP_LOGE(context, "GetTilingKeyAttentionScore4EmptyInput occurs nullptr!"),
-        return);
+                OP_LOGE(context, "GetTilingKeyAttentionScore4EmptyInput occurs nullptr!"), return);
     auto kernelType = context->GetInputDesc(KEY1_INPUT_INDEX)->GetDataType();
     if (kernelType == ge::DT_FLOAT16) {
         tilingKey = TILING_KEY_FP16;
@@ -62,20 +61,19 @@ void FusedFloydAttentionEmptyInputTiling::GetTilingKeyAttentionScore4EmptyInput(
 }
 
 void FusedFloydAttentionEmptyInputTiling::FusedFloydAttentionSetEmptyInputTilingData(
-    gert::TilingContext *context, FusedFloydAttentionTilingData &faTilingData)
+    gert::TilingContext* context, FusedFloydAttentionTilingData& faTilingData)
 {
     OP_CHECK_IF(context->GetRawTilingData() == nullptr,
-        OP_LOGE(context, "FusedFloydAttentionSetEmptyInputTilingData occurs nullptr!"),
-        return);
+                OP_LOGE(context, "FusedFloydAttentionSetEmptyInputTilingData occurs nullptr!"), return);
     faTilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
     context->GetRawTilingData()->SetDataSize(faTilingData.GetDataSize());
 }
 
-static ge::graphStatus CheckParams(gert::TilingContext *context)
+static ge::graphStatus CheckParams(gert::TilingContext* context)
 {
     if (context->GetInputShape(QUERY_INPUT_INDEX) != nullptr && context->GetInputShape(KEY1_INPUT_INDEX) != nullptr &&
         context->GetInputShape(VALUE1_INPUT_INDEX) != nullptr && context->GetInputShape(KEY2_INPUT_INDEX) != nullptr &&
-        context->GetInputShape(VALUE2_INPUT_INDEX) && context->GetAttrs() != nullptr ) {
+        context->GetInputShape(VALUE2_INPUT_INDEX) && context->GetAttrs() != nullptr) {
         if (CheckBaseInput(context) == ge::GRAPH_FAILED) {
             OP_LOGW(context, "fail to get shape or attr from context");
             return ge::GRAPH_FAILED;
@@ -84,7 +82,7 @@ static ge::graphStatus CheckParams(gert::TilingContext *context)
     return ge::SUCCESS;
 }
 
-static bool IsEmptyInput(gert::TilingContext *context)
+static bool IsEmptyInput(gert::TilingContext* context)
 {
     auto attenOutShape = context->GetOutputShape(ATTENTIONOUT_OUTPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, attenOutShape);
@@ -120,15 +118,12 @@ static bool IsEmptyInput(gert::TilingContext *context)
         */
         auto kernelType = context->GetInputDesc(KEY1_INPUT_INDEX)->GetDataType();
         FusedFloydAttentionEmptyInputTiling emptyInputTiling;
-        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context->GetCompileInfo());
-        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context, "compileInfoPtr is null"),
-                   return false);
+        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context->GetCompileInfo());
+        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context, "compileInfoPtr is null"), return false);
         uint32_t coreNum = compileInfoPtr->aivNum;
-        OP_CHECK_IF((coreNum <= 0),
-                   OP_LOGE(context, "platform info is invalid, coreNum=%u.", coreNum), return false);
+        OP_CHECK_IF((coreNum <= 0), OP_LOGE(context, "platform info is invalid, coreNum=%u.", coreNum), return false);
         OP_CHECK_IF((kernelType != ge::DT_FLOAT16 && kernelType != ge::DT_FLOAT && kernelType != ge::DT_BF16),
-                   OP_LOGE(context, "kernelType is invalid, kernelType is %d", kernelType),
-                   return false);
+                    OP_LOGE(context, "kernelType is invalid, kernelType is %d", kernelType), return false);
         uint32_t attentionOutFormerNum;          // attentionOut的主核
         uint32_t attentionOutTailNum;            // attentionOut的尾核
         uint32_t softmaxMaxFormerNum;            // softmaxMax 和 softmaxSum的主核
@@ -144,13 +139,13 @@ static bool IsEmptyInput(gert::TilingContext *context)
         uint64_t softmaxSumBlockSize = 0;
 
         // 计算 MIN_COPY_UINT_SIZE 块数（按 64 位域计算，避免收窄）
-        attentionOutBlockSize = Ceil(static_cast<uint64_t>(attentionOutShapeSize) *
-                                         static_cast<uint64_t>(ge::GetSizeByDataType(kernelType)),
-                                     static_cast<uint64_t>(MIN_COPY_UINT_SIZE));
+        attentionOutBlockSize = Ceil(
+            static_cast<uint64_t>(attentionOutShapeSize) * static_cast<uint64_t>(ge::GetSizeByDataType(kernelType)),
+            static_cast<uint64_t>(MIN_COPY_UINT_SIZE));
         // softmaxSum 和 softmaxMax 输出为 fp32
-        softmaxSumBlockSize = Ceil(static_cast<uint64_t>(softmaxSumShapeSize) *
-                                       static_cast<uint64_t>(ge::GetSizeByDataType(ge::DT_FLOAT)),
-                                   static_cast<uint64_t>(MIN_COPY_UINT_SIZE));
+        softmaxSumBlockSize = Ceil(
+            static_cast<uint64_t>(softmaxSumShapeSize) * static_cast<uint64_t>(ge::GetSizeByDataType(ge::DT_FLOAT)),
+            static_cast<uint64_t>(MIN_COPY_UINT_SIZE));
 
         if (attentionOutShapeSize != 0) {
             if (attentionOutBlockSize % coreNum == 0) {
@@ -234,7 +229,7 @@ static bool IsEmptyInput(gert::TilingContext *context)
         uint32_t aivActualNum =
             std::max((attentionOutFormerNum + attentionOutTailNum), (softmaxMaxFormerNum + softmaxMaxTailNum));
         context->SetBlockDim(optiling::FFA::FloydCalcTschBlockDim(aivActualNum, 0, compileInfoPtr->aivNum));
-        size_t *workspaces = context->GetWorkspaceSizes(1);
+        size_t* workspaces = context->GetWorkspaceSizes(1);
         // workspace上预留100M
         workspaces[0] = 100 * 1024 * 1024;
 
@@ -243,7 +238,7 @@ static bool IsEmptyInput(gert::TilingContext *context)
     return false;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingFusedFloydAttention(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingFusedFloydAttention(gert::TilingContext* context)
 {
     if (CheckParams(context) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -256,17 +251,13 @@ ASCENDC_EXTERN_C ge::graphStatus TilingFusedFloydAttention(gert::TilingContext *
     }
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFusedFloydAttention(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFusedFloydAttention(gert::TilingParseContext* context)
 {
     auto platformInfoPtr = context->GetPlatformInfo();
-    OP_CHECK_IF(platformInfoPtr == nullptr,
-        OP_LOGE(context, "platformInfoPtr is null"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context, "platformInfoPtr is null"), return ge::GRAPH_FAILED);
 
     auto compileInfoPtr = context->GetCompiledInfo<FlashAttentionScoreGradCompileInfo>();
-    OP_CHECK_IF(compileInfoPtr == nullptr,
-        OP_LOGE(context, "compileInfoPtr is null"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context, "compileInfoPtr is null"), return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -280,7 +271,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFusedFloydAttention(gert::Tilin
 
 IMPL_OP(FusedFloydAttention)
     .Tiling(TilingFusedFloydAttention)
-    .TilingParse<FlashAttentionScoreGradCompileInfo>(TilingPrepareForFusedFloydAttention);  // 向框架注册入口函数
+    .TilingParse<FlashAttentionScoreGradCompileInfo>(TilingPrepareForFusedFloydAttention); // 向框架注册入口函数
 
 } // namespace FFA
 } // namespace optiling

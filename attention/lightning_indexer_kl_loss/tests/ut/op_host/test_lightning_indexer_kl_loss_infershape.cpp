@@ -23,7 +23,7 @@
 namespace {
 using OpAttr = gert::InfershapeContextPara::OpAttr;
 
-constexpr const char *kOpName = "LightningIndexerKLLoss";
+constexpr const char* kOpName = "LightningIndexerKLLoss";
 
 std::vector<OpAttr> MakeAttrs(float eps = 1e-9f, bool deterministic = false)
 {
@@ -65,9 +65,15 @@ gert::InfershapeContextPara MakeShapeMismatchPara(ge::DataType dataType = ge::DT
 
 class LightningIndexerKLLossProto : public testing::Test {
 protected:
-    static void SetUpTestCase() { std::cout << "LightningIndexerKLLossProto SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "LightningIndexerKLLossProto SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "LightningIndexerKLLossProto TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "LightningIndexerKLLossProto TearDown" << std::endl;
+    }
 };
 
 TEST_F(LightningIndexerKLLossProto, infershape_2d_fp32_success)

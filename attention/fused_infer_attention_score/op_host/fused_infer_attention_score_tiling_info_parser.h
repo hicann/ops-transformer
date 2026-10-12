@@ -28,7 +28,7 @@ namespace optiling {
 constexpr int64_t SPARSE_MODE_INT_MAX = 2147483647;
 class FiaInfoParser {
 public:
-    explicit FiaInfoParser(const gert::TilingContext *context)
+    explicit FiaInfoParser(const gert::TilingContext* context)
         : context_(context)
     {}
     ~FiaInfoParser() = default;
@@ -36,7 +36,7 @@ public:
     ge::graphStatus CheckRequiredInOutExistence() const;
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckRequiredParaExistence() const;
-    ge::graphStatus GetActualSeqLenQSize(uint32_t &size);
+    ge::graphStatus GetActualSeqLenQSize(uint32_t& size);
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
     ge::graphStatus GetStrides();
@@ -55,8 +55,8 @@ public:
     void GetOutputParaInfo();
     ge::graphStatus GetAttrParaInfo();
     ge::graphStatus GetKvCache();
-    ge::graphStatus GetTensorListCache(uint32_t index, const std::string &name,
-                                       std::vector<gert::StorageShape *> &cache, std::vector<gert::Stride *> &strides);
+    ge::graphStatus GetTensorListCache(uint32_t index, const std::string& name, std::vector<gert::StorageShape*>& cache,
+                                       std::vector<gert::Stride*>& strides);
     ge::graphStatus GetOpParaInfo();
 
     ge::graphStatus GetEmptyTensorFlag();
@@ -76,8 +76,8 @@ public:
     FIA_PARSER_UT_VISIBLE void GetKvIsContiguous();
     FIA_PARSER_UT_VISIBLE ge::graphStatus GetKvStrideValues();
     void SetFiaShape();
-    ge::graphStatus GetMaxActualSeq(const gert::Tensor *actualSeqLensTensor, FiaLayout layout,
-                                    int64_t &maxActualSeqLen);
+    ge::graphStatus GetMaxActualSeq(const gert::Tensor* actualSeqLensTensor, FiaLayout layout,
+                                    int64_t& maxActualSeqLen);
     ge::graphStatus GetS2SizeFromActualSeqLens();
     ge::graphStatus GetS2SizeForBatchContinuous();
     ge::graphStatus GetS2SizeForTensorList();
@@ -100,8 +100,8 @@ public:
     ge::graphStatus GetAttenMaskInfo();
     void GetPaddingSizeFlag();
     ge::graphStatus GetActualSeqInfo();
-    void ProcessKVActualSeqLoop(const int64_t *actualLenData, uint32_t loop);
-    void ProcessQActualSeqLoop(const int64_t *actualLenQData, uint32_t loop);
+    void ProcessKVActualSeqLoop(const int64_t* actualLenData, uint32_t loop);
+    void ProcessQActualSeqLoop(const int64_t* actualLenQData, uint32_t loop);
     void GetPreNextToken();
     void UpdatePreNextTokenBySparseMode();
     void ClampPreNextToken();
@@ -111,21 +111,21 @@ public:
     ge::graphStatus GetFullQuantMode();
     ge::graphStatus GetOldIfaGqaFlag();
     ge::graphStatus GetAntiQuantInfo();
-    TilingKeyLayout MapStringToLayout(FiaLayout &layoutString) const;
-    void GenerateAxisInfo(FiaTilingInfo &fiaInfo);
-    void GenerateDtypeInfo(FiaTilingInfo &fiaInfo);
-    void GenerateFeatureInfo(FiaTilingInfo &fiaInfo);
-    void GenerateLayoutInfo(FiaTilingInfo &fiaInfo);
-    void GenerateInfo(FiaTilingInfo &fiaInfo);
+    TilingKeyLayout MapStringToLayout(FiaLayout& layoutString) const;
+    void GenerateAxisInfo(FiaTilingInfo& fiaInfo);
+    void GenerateDtypeInfo(FiaTilingInfo& fiaInfo);
+    void GenerateFeatureInfo(FiaTilingInfo& fiaInfo);
+    void GenerateLayoutInfo(FiaTilingInfo& fiaInfo);
+    void GenerateInfo(FiaTilingInfo& fiaInfo);
     ge::graphStatus ParseAxisInfo();
     ge::graphStatus ParseFeatureInfo();
-    ge::graphStatus Parse(FiaTilingInfo &fiaInfo);
+    ge::graphStatus Parse(FiaTilingInfo& fiaInfo);
 
 public:
-    const gert::TilingContext *context_ = nullptr;
+    const gert::TilingContext* context_ = nullptr;
 
-    const char *opName_ = nullptr;
-    fe::PlatFormInfos *platformInfo_ = nullptr;
+    const char* opName_ = nullptr;
+    fe::PlatFormInfos* platformInfo_ = nullptr;
     FIAParaInfo opParamInfo_;
     enum class IfaPseType : int64_t {
         PSE_OUTER_MUL_ADD_TYPE = 0,
@@ -146,20 +146,20 @@ public:
     uint32_t queryTSize_ = 0; // 仅TND/NTD时生效
     uint32_t keyTSize_ = 0;
     // 增加strides参数，预计5个，k/v/krope/kscale/vscale
-    const gert::Stride *keyStrides_ = nullptr;
-    const gert::Stride *valueStrides_ = nullptr;
+    const gert::Stride* keyStrides_ = nullptr;
+    const gert::Stride* valueStrides_ = nullptr;
     gert::Stride keyContiguousStrides_;
     gert::Stride valueContiguousStrides_;
     gert::Stride keyRopeContiguousStrides_;
-    const gert::Stride *kRopeStrides_ = nullptr;
+    const gert::Stride* kRopeStrides_ = nullptr;
     gert::Stride keyScaleContiguousStrides_;
     gert::Stride valueScaleContiguousStrides_;
     gert::Stride keyOffsetContiguousStrides_;
     gert::Stride valueOffsetContiguousStrides_;
-    const gert::Stride *kScaleStrides_ = nullptr;
-    const gert::Stride *vScaleStrides_ = nullptr;
-    const gert::Stride *kOffsetStrides_ = nullptr;
-    const gert::Stride *vOffsetStrides_ = nullptr;
+    const gert::Stride* kScaleStrides_ = nullptr;
+    const gert::Stride* vScaleStrides_ = nullptr;
+    const gert::Stride* kOffsetStrides_ = nullptr;
+    const gert::Stride* vOffsetStrides_ = nullptr;
     bool hasViewStride_ = true;
     uint64_t keyBnStride_ = 0;
     uint64_t keyN2Stride_ = 0;
@@ -205,10 +205,10 @@ public:
     ge::DataType inputKRopeType_ = ge::DT_FLOAT16;
 
     uint64_t l2CacheSize_ = 0;
-    std::vector<gert::StorageShape *> kCache_ = {};
-    std::vector<gert::StorageShape *> vCache_ = {};
-    std::vector<gert::Stride *> kStrideCache_ = {};
-    std::vector<gert::Stride *> vStrideCache_ = {};
+    std::vector<gert::StorageShape*> kCache_ = {};
+    std::vector<gert::StorageShape*> vCache_ = {};
+    std::vector<gert::Stride*> kStrideCache_ = {};
+    std::vector<gert::Stride*> vStrideCache_ = {};
 
     std::vector<int32_t> qSize_ = {};
     std::vector<int32_t> kvSize_ = {};

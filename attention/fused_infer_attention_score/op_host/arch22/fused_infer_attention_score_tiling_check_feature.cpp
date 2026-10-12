@@ -283,7 +283,7 @@ ge::graphStatus FiaTilingCheck::CheckFeatureMask() const
     return ge::GRAPH_SUCCESS;
 }
 
-int64_t FiaTilingCheck::GetQActualSeqLenForPostQuant(uint32_t batchIdx, const gert::Tensor *tempData,
+int64_t FiaTilingCheck::GetQActualSeqLenForPostQuant(uint32_t batchIdx, const gert::Tensor* tempData,
                                                      int64_t actualLenDims) const
 {
     if ((actualLenDims == 0) || (tempData == nullptr) || (tempData->GetData<int64_t>() == nullptr)) {
@@ -300,7 +300,7 @@ int64_t FiaTilingCheck::GetQActualSeqLenForPostQuant(uint32_t batchIdx, const ge
            static_cast<uint32_t>(tempData->GetData<int64_t>()[batchIdx - 1]);
 }
 
-int64_t FiaTilingCheck::GetKVActualSeqLenForPostQuant(uint32_t batchIdx, const gert::Tensor *tempDataKV,
+int64_t FiaTilingCheck::GetKVActualSeqLenForPostQuant(uint32_t batchIdx, const gert::Tensor* tempDataKV,
                                                       int64_t actualLenDimsKV) const
 {
     if ((actualLenDimsKV == 0) || (tempDataKV == nullptr) || (tempDataKV->GetData<int64_t>() == nullptr)) {
@@ -320,7 +320,7 @@ int64_t FiaTilingCheck::GetKVActualSeqLenForPostQuant(uint32_t batchIdx, const g
            static_cast<uint32_t>(tempDataKV->GetData<int64_t>()[batchIdx - 1]);
 }
 
-void FiaTilingCheck::CalcPostQuantTokensPerBatch(int64_t &preTokensPerbatch, int64_t &nextTokensPerbatch,
+void FiaTilingCheck::CalcPostQuantTokensPerBatch(int64_t& preTokensPerbatch, int64_t& nextTokensPerbatch,
                                                  int64_t actualSeqLenKV, int64_t actualSeqLenQ) const
 {
     if (fiaInfo_.sparseMode == SPARSE_MODE_RIGHT_DOWN) {
@@ -409,8 +409,8 @@ ge::graphStatus FiaTilingCheck::CheckFeaturePostQuant() const
         (opParamInfo_.quantOffset2.tensor->GetStorageShape().GetShapeSize() != 0);
 
     if (!fiaInfo_.isMaxWorkspace) {
-        const gert::Tensor *tempData = fiaInfo_.opParamInfo.actualSeqLengthsQ.tensor;
-        const gert::Tensor *tempDataKV = fiaInfo_.opParamInfo.actualSeqLengths.tensor;
+        const gert::Tensor* tempData = fiaInfo_.opParamInfo.actualSeqLengthsQ.tensor;
+        const gert::Tensor* tempDataKV = fiaInfo_.opParamInfo.actualSeqLengths.tensor;
         const int64_t preTokens = fiaInfo_.opParamInfo.preToken == nullptr ? 0 : *opParamInfo_.preToken;
         const int64_t nextTokens = fiaInfo_.opParamInfo.nextToken == nullptr ? 0 : *opParamInfo_.nextToken;
         int64_t actualLenDims = (tempData != nullptr) ? tempData->GetShapeSize() : 0;
@@ -793,7 +793,7 @@ ge::graphStatus FiaTilingCheck::CheckFeatureGqaPrefix() const
         return ge::GRAPH_FAILED;
     }
     int32_t sparseMode = *opParamInfo_.sparseMode;
-    auto *maskTensor = opParamInfo_.attenMask.tensor;
+    auto* maskTensor = opParamInfo_.attenMask.tensor;
     if (attenMaskFlag_ && (sparseMode == SPARSE_MODE_NO_MASK || sparseMode == SPARSE_MODE_ALL_MASK)) {
         uint32_t maskS2 = maskTensor->GetStorageShape().GetDim(maskTensor->GetStorageShape().GetDimNum() - 1);
         uint32_t totalLen = fiaInfo_.systemPrefixLen + fiaInfo_.maxActualseq;
@@ -987,8 +987,8 @@ ge::graphStatus FiaTilingCheck::CheckFeatureActualSeqLensExistence() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FiaTilingCheck::GetActualSeqLenSize(uint32_t &size, const gert::Tensor *tensor, const FiaLayout &layout,
-                                                    const std::string &actualSeqLenName, const std::string &attrName)
+ge::graphStatus FiaTilingCheck::GetActualSeqLenSize(uint32_t& size, const gert::Tensor* tensor, const FiaLayout& layout,
+                                                    const std::string& actualSeqLenName, const std::string& attrName)
 {
     if (tensor == nullptr) {
         OP_LOGE(opName_, "when layout of %s is %s, %s must be provided.", attrName.c_str(),
@@ -1011,7 +1011,7 @@ ge::graphStatus FiaTilingCheck::CheckFeatureActualSeqLensQData()
         return ge::GRAPH_SUCCESS;
     }
 
-    const int64_t *actualSeq = opParamInfo_.actualSeqLengthsQ.tensor->GetData<int64_t>();
+    const int64_t* actualSeq = opParamInfo_.actualSeqLengthsQ.tensor->GetData<int64_t>();
     if (actualSeq == nullptr) {
         qSize.push_back(s1Size_);
         return ge::GRAPH_SUCCESS;
@@ -1067,7 +1067,7 @@ ge::graphStatus FiaTilingCheck::CheckFeatureActualSeqLensKvData()
         return ge::GRAPH_SUCCESS;
     }
 
-    const int64_t *actualSeq = opParamInfo_.actualSeqLengths.tensor->GetData<int64_t>();
+    const int64_t* actualSeq = opParamInfo_.actualSeqLengths.tensor->GetData<int64_t>();
     if (actualSeq == nullptr) {
         kvSize.push_back(s2Size_);
         return ge::GRAPH_SUCCESS;

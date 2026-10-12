@@ -26,25 +26,26 @@
 namespace optiling {
 class BaseChecker {
 public:
-    BaseChecker(bool enableNonQuant, bool enableFullQuant, bool enableAntiQuant) :
-                enableNonQuant_(enableNonQuant),
-                enableFullQuant_(enableFullQuant),
-                enableAntiQuant_(enableAntiQuant) {}
+    BaseChecker(bool enableNonQuant, bool enableFullQuant, bool enableAntiQuant)
+        : enableNonQuant_(enableNonQuant),
+          enableFullQuant_(enableFullQuant),
+          enableAntiQuant_(enableAntiQuant)
+    {}
     virtual ~BaseChecker() = default;
 
 protected:
-    virtual ge::graphStatus CheckSinglePara(const FiaTilingInfo &fiaInfo) = 0;
-    virtual ge::graphStatus CheckParaExistence(const FiaTilingInfo &fiaInfo) = 0;
-    virtual ge::graphStatus CheckCrossFeature(const FiaTilingInfo &fiaInfo) = 0;
-    virtual ge::graphStatus CheckMultiParaConsistency(const FiaTilingInfo &fiaInfo) = 0;
+    virtual ge::graphStatus CheckSinglePara(const FiaTilingInfo& fiaInfo) = 0;
+    virtual ge::graphStatus CheckParaExistence(const FiaTilingInfo& fiaInfo) = 0;
+    virtual ge::graphStatus CheckCrossFeature(const FiaTilingInfo& fiaInfo) = 0;
+    virtual ge::graphStatus CheckMultiParaConsistency(const FiaTilingInfo& fiaInfo) = 0;
 
     // public check funcs
-    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
-    ge::graphStatus CheckFormatSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
+    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc* desc, const std::string& name) const;
+    ge::graphStatus CheckFormatSupport(const gert::CompileTimeTensorDesc* desc, const std::string& name) const;
     template <typename T>
-    ge::graphStatus CheckValueSupport(const T value, const std::vector<T> &expectValList) const;
-    ge::graphStatus CheckTensorContiguous(const uint32_t &tensorDimNum, const gert::Shape &inputShape,
-        const gert::Stride *Strides, int32_t &index) const;
+    ge::graphStatus CheckValueSupport(const T value, const std::vector<T>& expectValList) const;
+    ge::graphStatus CheckTensorContiguous(const uint32_t& tensorDimNum, const gert::Shape& inputShape,
+                                          const gert::Stride* Strides, int32_t& index) const;
 
     // public funcs
     std::string DataTypeToSerialString(ge::DataType type) const;
@@ -56,4 +57,3 @@ protected:
 };
 } // namespace optiling
 #endif // BASE_CHECKER_FUSED_INFER_H
-

@@ -30,13 +30,13 @@
 namespace optiling {
 // ----------公共定义----------
 struct TilingRequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct TilingOptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 // ----------算子TilingData定义----------
@@ -73,7 +73,7 @@ struct IndexerQuantCacheCompileInfo {
 // ----------算子Tiling入参信息解析及check类----------
 class IndexerQuantCacheTiling {
 public:
-    explicit IndexerQuantCacheTiling(gert::TilingContext *tilingContext)
+    explicit IndexerQuantCacheTiling(gert::TilingContext* tilingContext)
         : context_(tilingContext)
     {}
     ~IndexerQuantCacheTiling() = default;
@@ -85,15 +85,15 @@ public:
     ge::graphStatus GetAttr();
     ge::graphStatus GetShapeAttrsInfoInner();
     ge::graphStatus CalcOpTiling();
-    bool GetCacheViewLayout(size_t inputIdx, int64_t &blockSize, int64_t &rowStride, int64_t &blockStride);
+    bool GetCacheViewLayout(size_t inputIdx, int64_t& blockSize, int64_t& rowStride, int64_t& blockStride);
     // 4D-only 契约门禁: 校验 inputIdx 张量逻辑 shape 恰为 4D [blockNum, blockSize, 1, headDim]
     // (倒数第二维 == 1), 并回传其末维(headDim, 张量自身元素单位)。失败返回 GRAPH_FAILED。
-    ge::graphStatus ValidateCache4D(size_t inputIdx, const char *name, int64_t &lastDim);
+    ge::graphStatus ValidateCache4D(size_t inputIdx, const char* name, int64_t& lastDim);
     // MX-FP4 模式下校验 stride(fp4元素单位) 必须为偶数, 否则半字节偏移无法表达
-    ge::graphStatus CheckMxfp4EvenStride(int64_t stride, const char *name);
+    ge::graphStatus CheckMxfp4EvenStride(int64_t stride, const char* name);
 
 private:
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     IndexerQuantCacheTilingData tilingData_;
     uint64_t coreNum_ = 0;
     uint64_t workspaceSize_ = 0;

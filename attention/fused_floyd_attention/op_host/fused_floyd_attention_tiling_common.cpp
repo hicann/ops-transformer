@@ -27,7 +27,7 @@ uint32_t FloydCalcTschBlockDim(uint32_t sliceNum, uint32_t aicCoreNum, uint32_t 
     return (sliceNum + (ration - 1)) / ration;
 }
 
-ge::graphStatus CheckAttentionMaskShape(gert::TilingContext *context, int64_t b, int64_t n, int64_t k)
+ge::graphStatus CheckAttentionMaskShape(gert::TilingContext* context, int64_t b, int64_t n, int64_t k)
 {
     auto attentionMaskShape = context->GetOptionalInputShape(ATTENTION_MASK_INPUT_INDEX);
     if (attentionMaskShape == nullptr) {
@@ -44,21 +44,21 @@ ge::graphStatus CheckAttentionMaskShape(gert::TilingContext *context, int64_t b,
     auto dim3 = attentionMaskShape->GetStorageShape().GetDim(3); // 3:1
     auto dim4 = attentionMaskShape->GetStorageShape().GetDim(4); // 4:k
 
-    OP_CHECK_IF((dim0 != b || dim1 != 1 || dim2 != n || dim3 != 1 || dim4 != k),
-                OP_LOGE(context,
-                        "The shape of atten_mask is invalid, got (%ld,%ld,%ld,%ld,%ld), should be (%ld,1,%ld,1,%ld)",
-                        dim0, dim1, dim2, dim3, dim4, b, n, k),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (dim0 != b || dim1 != 1 || dim2 != n || dim3 != 1 || dim4 != k),
+        OP_LOGE(context, "The shape of atten_mask is invalid, got (%ld,%ld,%ld,%ld,%ld), should be (%ld,1,%ld,1,%ld)",
+                dim0, dim1, dim2, dim3, dim4, b, n, k),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckSupportShape(gert::TilingContext *context)
+ge::graphStatus CheckSupportShape(gert::TilingContext* context)
 {
-    const gert::StorageShape *key1Shape = context->GetInputShape(KEY1_INPUT_INDEX);
-    const gert::StorageShape *value1Shape = context->GetInputShape(VALUE1_INPUT_INDEX);
-    const gert::StorageShape *key2Shape = context->GetInputShape(KEY2_INPUT_INDEX);
-    const gert::StorageShape *value2Shape = context->GetInputShape(VALUE2_INPUT_INDEX);
+    const gert::StorageShape* key1Shape = context->GetInputShape(KEY1_INPUT_INDEX);
+    const gert::StorageShape* value1Shape = context->GetInputShape(VALUE1_INPUT_INDEX);
+    const gert::StorageShape* key2Shape = context->GetInputShape(KEY2_INPUT_INDEX);
+    const gert::StorageShape* value2Shape = context->GetInputShape(VALUE2_INPUT_INDEX);
 
     OP_CHECK_IF(!CheckSameShape(key1Shape, value1Shape),
                 OP_LOGE(context, "key1's shape and value1's shape is different"), return ge::GRAPH_FAILED);
@@ -68,7 +68,7 @@ ge::graphStatus CheckSupportShape(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckInputShapeValid(gert::TilingContext *context, int64_t b, int64_t n, int64_t s1, int64_t s2,
+ge::graphStatus CheckInputShapeValid(gert::TilingContext* context, int64_t b, int64_t n, int64_t s1, int64_t s2,
                                      int64_t s3, int64_t d)
 {
     auto isShapeInValid = (b == 0 || n == 0 || s1 == 0 || s2 == 0 || s3 == 0 || d == 0);
@@ -88,10 +88,10 @@ ge::graphStatus CheckInputShapeValid(gert::TilingContext *context, int64_t b, in
     return ge::GRAPH_SUCCESS;
 }
 
-bool CheckSameShape(const gert::StorageShape *aShape, const gert::StorageShape *bShape) {
+bool CheckSameShape(const gert::StorageShape* aShape, const gert::StorageShape* bShape)
+{
     OP_CHECK_IF((aShape == nullptr) || (bShape == nullptr),
-               OP_LOGW("fused_floyd_attention_tiling_common", "aShape or bShape is nullptr."),
-               return false);
+                OP_LOGW("fused_floyd_attention_tiling_common", "aShape or bShape is nullptr."), return false);
     uint32_t dimSizeA = aShape->GetStorageShape().GetDimNum();
     uint32_t dimSizeB = bShape->GetStorageShape().GetDimNum();
     if (dimSizeA != SUPPORT_DIM_NUM || dimSizeA != dimSizeB) {
@@ -108,22 +108,22 @@ bool CheckSameShape(const gert::StorageShape *aShape, const gert::StorageShape *
     return true;
 }
 
-ge::graphStatus CheckAttrs(gert::TilingContext *context)
+ge::graphStatus CheckAttrs(gert::TilingContext* context)
 {
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
     auto scaleValuePtr = attrs->GetAttrPointer<float>(0);
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
 
     OP_CHECK_NULL_WITH_CONTEXT(context, scaleValuePtr);
     OP_CHECK_NULL_WITH_CONTEXT(context, workspaces);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckBaseInput(gert::TilingContext *context)
+ge::graphStatus CheckBaseInput(gert::TilingContext* context)
 {
-    auto &queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
-    auto &keyShape = context->GetInputShape(KEY1_INPUT_INDEX)->GetStorageShape();
+    auto& queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
+    auto& keyShape = context->GetInputShape(KEY1_INPUT_INDEX)->GetStorageShape();
     int64_t b = queryShape.GetDim(0);
     int64_t n = queryShape.GetDim(1);
     int64_t s1 = queryShape.GetDim(2);

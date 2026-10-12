@@ -28,12 +28,12 @@ namespace {
 
 #define CHECK_RET(cond) ((cond) ? true : (false))
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -42,7 +42,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
@@ -66,8 +66,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -102,11 +102,12 @@ void Finalize(int32_t deviceId, aclrtStream stream)
     aclFinalize();
 }
 
-float fp16_to_float(uint16_t h) {
+float fp16_to_float(uint16_t h)
+{
     uint32_t sign = ((h >> 15) & 1);
     uint32_t exponent = ((h >> 10) & 0x1F);
     uint32_t mantissa = (h & 0x3FF);
-    
+
     uint32_t f32;
     if (exponent == 0x1F) {
         exponent = 0xFF;
@@ -123,12 +124,12 @@ float fp16_to_float(uint16_t h) {
     } else {
         exponent += (127 - 15);
     }
-    
+
     f32 = (sign << 31) | (exponent << 23) | (mantissa << 13);
     return *((float*)&f32);
 }
 
-int aclnnFusedInferAttentionScoreV5FullQuantTest(int32_t deviceId, aclrtStream &stream)
+int aclnnFusedInferAttentionScoreV5FullQuantTest(int32_t deviceId, aclrtStream& stream)
 {
     auto ret = Init(deviceId, &stream);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
@@ -141,33 +142,33 @@ int aclnnFusedInferAttentionScoreV5FullQuantTest(int32_t deviceId, aclrtStream &
     std::vector<int64_t> valueShape = {64, 2, 64}; // TND
     std::vector<int64_t> actualSeqlenVector = {4, 8, 16, 32, 64};
     auto actualSeqLengths = aclCreateIntArray(actualSeqlenVector.data(), actualSeqlenVector.size());
-    std::unique_ptr<aclIntArray, aclnnStatus (*)(const aclIntArray *)> actualSeqLengthsPtr(actualSeqLengths,
-                                                                                           aclDestroyIntArray);
+    std::unique_ptr<aclIntArray, aclnnStatus (*)(const aclIntArray*)> actualSeqLengthsPtr(actualSeqLengths,
+                                                                                          aclDestroyIntArray);
     std::vector<int64_t> actualSeqlenKvVector = {4, 8, 16, 32, 64};
     auto actualSeqLengthsKv = aclCreateIntArray(actualSeqlenKvVector.data(), actualSeqlenKvVector.size());
-    std::unique_ptr<aclIntArray, aclnnStatus (*)(const aclIntArray *)> actualSeqLengthsKvPtr(actualSeqLengthsKv,
-                                                                                             aclDestroyIntArray);
+    std::unique_ptr<aclIntArray, aclnnStatus (*)(const aclIntArray*)> actualSeqLengthsKvPtr(actualSeqLengthsKv,
+                                                                                            aclDestroyIntArray);
     std::vector<int64_t> quantScale1Shape = {1};                   // 1
     std::vector<int64_t> keyAntiquantScaleShape = {64, 2, 1, 2};   // （KV_T, KV_N, D/64, 2）
     std::vector<int64_t> valueAntiquantScaleShape = {5, 2, 64, 2}; // （KV_T/64, KV_N, D, 2）
     std::vector<int64_t> dequantScaleQueryShape = {64, 2, 1, 2};   // （Q_T, Q_N, D/64, 2）
     std::vector<int64_t> outShape = {64, 2, 64};                   // TND
-    void *queryDeviceAddr = nullptr;
-    void *keyDeviceAddr = nullptr;
-    void *valueDeviceAddr = nullptr;
-    void *quantScale1DeviceAddr = nullptr;
-    void *dequantScaleQueryDeviceAddr = nullptr;
-    void *keyAntiquantScaleDeviceAddr = nullptr;
-    void *valueAntiquantScaleDeviceAddr = nullptr;
-    void *outDeviceAddr = nullptr;
-    aclTensor *queryTensor = nullptr;
-    aclTensor *keyTensor = nullptr;
-    aclTensor *valueTensor = nullptr;
-    aclTensor *quantScale1Tensor = nullptr;
-    aclTensor *dequantScaleQueryTensor = nullptr;
-    aclTensor *keyAntiquantScaleTensor = nullptr;
-    aclTensor *valueAntiquantScaleTensor = nullptr;
-    aclTensor *outTensor = nullptr;
+    void* queryDeviceAddr = nullptr;
+    void* keyDeviceAddr = nullptr;
+    void* valueDeviceAddr = nullptr;
+    void* quantScale1DeviceAddr = nullptr;
+    void* dequantScaleQueryDeviceAddr = nullptr;
+    void* keyAntiquantScaleDeviceAddr = nullptr;
+    void* valueAntiquantScaleDeviceAddr = nullptr;
+    void* outDeviceAddr = nullptr;
+    aclTensor* queryTensor = nullptr;
+    aclTensor* keyTensor = nullptr;
+    aclTensor* valueTensor = nullptr;
+    aclTensor* quantScale1Tensor = nullptr;
+    aclTensor* dequantScaleQueryTensor = nullptr;
+    aclTensor* keyAntiquantScaleTensor = nullptr;
+    aclTensor* valueAntiquantScaleTensor = nullptr;
+    aclTensor* outTensor = nullptr;
     int64_t queryShapeSize = GetShapeSize(queryShape);                             // TND
     int64_t keyShapeSize = GetShapeSize(keyShape);                                 // BNSD
     int64_t valueShapeSize = GetShapeSize(valueShape);                             // BNSD
@@ -176,7 +177,7 @@ int aclnnFusedInferAttentionScoreV5FullQuantTest(int32_t deviceId, aclrtStream &
     int64_t keyAntiquantScaleShapeSize = GetShapeSize(keyAntiquantScaleShape);     // （KV_T, KV_N, D/64, 2）
     int64_t valueAntiquantScaleShapeSize = GetShapeSize(valueAntiquantScaleShape); // （KV_T/64, KV_N, D, 2）
     int64_t outShapeSize = GetShapeSize(outShape);                                 // BNSD
-    std::vector<uint8_t> queryHostData(queryShapeSize, 0b00111000); // fp8_e4m3 1.0
+    std::vector<uint8_t> queryHostData(queryShapeSize, 0b00111000);                // fp8_e4m3 1.0
     std::vector<uint8_t> keyHostData(keyShapeSize, 0b00111000);
     std::vector<uint8_t> valueHostData(valueShapeSize, 0b00111000);
     std::vector<float> quantScale1HostData(quantScale1ShapeSize, 1);
@@ -189,62 +190,62 @@ int aclnnFusedInferAttentionScoreV5FullQuantTest(int32_t deviceId, aclrtStream &
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
-    std::unique_ptr<void, aclError (*)(void *)> queryDeviceAddrPtr(queryDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> queryTensorPtr(queryTensor, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> queryDeviceAddrPtr(queryDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> queryTensorPtr(queryTensor, aclDestroyTensor);
 
     ret = CreateAclTensor(keyHostData, keyShape, &keyDeviceAddr, aclDataType::ACL_FLOAT8_E4M3FN, &keyTensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
-    std::unique_ptr<void, aclError (*)(void *)> keyDeviceAddrPtr(keyDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> keyTensorPtr(keyTensor, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> keyDeviceAddrPtr(keyDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> keyTensorPtr(keyTensor, aclDestroyTensor);
 
     int kvTensorNum = 1;
-    aclTensor *tensorsOfKey[kvTensorNum];
+    aclTensor* tensorsOfKey[kvTensorNum];
     tensorsOfKey[0] = keyTensor;
     auto tensorKeyList = aclCreateTensorList(tensorsOfKey, kvTensorNum);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> tensorKeyListPtr(tensorKeyList,
-                                                                                            aclDestroyTensorList);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> tensorKeyListPtr(tensorKeyList,
+                                                                                           aclDestroyTensorList);
 
     ret = CreateAclTensor(valueHostData, valueShape, &valueDeviceAddr, aclDataType::ACL_FLOAT8_E4M3FN, &valueTensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
-    std::unique_ptr<void, aclError (*)(void *)> valueDeviceAddrPtr(valueDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> valueTensorPtr(valueTensor, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> valueDeviceAddrPtr(valueDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> valueTensorPtr(valueTensor, aclDestroyTensor);
 
-    aclTensor *tensorsOfValue[kvTensorNum];
+    aclTensor* tensorsOfValue[kvTensorNum];
     tensorsOfValue[0] = valueTensor;
     auto tensorValueList = aclCreateTensorList(tensorsOfValue, kvTensorNum);
-    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList *)> tensorValueListPtr(tensorValueList,
-                                                                                              aclDestroyTensorList);
+    std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> tensorValueListPtr(tensorValueList,
+                                                                                             aclDestroyTensorList);
 
     ret = CreateAclTensor(quantScale1HostData, quantScale1Shape, &quantScale1DeviceAddr, aclDataType::ACL_FLOAT,
                           &quantScale1Tensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
-    std::unique_ptr<void, aclError (*)(void *)> quantScale1DeviceAddrPtr(quantScale1DeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> quantScale1TensorPtr(quantScale1Tensor,
-                                                                                        aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> quantScale1DeviceAddrPtr(quantScale1DeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> quantScale1TensorPtr(quantScale1Tensor,
+                                                                                       aclDestroyTensor);
 
     ret = CreateAclTensor(keyAntiquantScaleHostData, keyAntiquantScaleShape, &keyAntiquantScaleDeviceAddr,
                           aclDataType::ACL_FLOAT8_E8M0, &keyAntiquantScaleTensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
-    std::unique_ptr<void, aclError (*)(void *)> keyAntiquantScaleDeviceAddrPtr(keyAntiquantScaleDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> keyAntiquantScaleTensorPtr(keyAntiquantScaleTensor,
-                                                                                              aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> keyAntiquantScaleDeviceAddrPtr(keyAntiquantScaleDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> keyAntiquantScaleTensorPtr(keyAntiquantScaleTensor,
+                                                                                             aclDestroyTensor);
 
     ret = CreateAclTensor(valueAntiquantScaleHostData, valueAntiquantScaleShape, &valueAntiquantScaleDeviceAddr,
                           aclDataType::ACL_FLOAT8_E8M0, &valueAntiquantScaleTensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
-    std::unique_ptr<void, aclError (*)(void *)> valueAntiquantScaleDeviceAddrPtr(valueAntiquantScaleDeviceAddr,
-                                                                                 aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> valueAntiquantScaleTensorPtr(
+    std::unique_ptr<void, aclError (*)(void*)> valueAntiquantScaleDeviceAddrPtr(valueAntiquantScaleDeviceAddr,
+                                                                                aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> valueAntiquantScaleTensorPtr(
         valueAntiquantScaleTensor, aclDestroyTensor);
 
     ret = CreateAclTensor(dequantScaleQueryHostData, dequantScaleQueryShape, &dequantScaleQueryDeviceAddr,
@@ -252,16 +253,16 @@ int aclnnFusedInferAttentionScoreV5FullQuantTest(int32_t deviceId, aclrtStream &
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
-    std::unique_ptr<void, aclError (*)(void *)> dequantScaleQueryDeviceAddrPtr(dequantScaleQueryDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> dequantScaleQueryTensorPtr(dequantScaleQueryTensor,
-                                                                                              aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> dequantScaleQueryDeviceAddrPtr(dequantScaleQueryDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> dequantScaleQueryTensorPtr(dequantScaleQueryTensor,
+                                                                                             aclDestroyTensor);
 
     ret = CreateAclTensor(outHostData, outShape, &outDeviceAddr, aclDataType::ACL_FLOAT16, &outTensor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         return ret;
     }
-    std::unique_ptr<void, aclError (*)(void *)> outDeviceAddrPtr(outDeviceAddr, aclrtFree);
-    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor *)> outTensorPtr(outTensor, aclDestroyTensor);
+    std::unique_ptr<void, aclError (*)(void*)> outDeviceAddrPtr(outDeviceAddr, aclrtFree);
+    std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> outTensorPtr(outTensor, aclDestroyTensor);
 
     int64_t numHeads = 2; // N
     int64_t numKeyValueHeads = 2;
@@ -281,7 +282,7 @@ int aclnnFusedInferAttentionScoreV5FullQuantTest(int32_t deviceId, aclrtStream &
     int64_t valueAntiquantMode = 8;
     int64_t pseType = 0;
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     ret = aclnnFusedInferAttentionScoreV5GetWorkspaceSize(
         queryTensor, tensorKeyList, tensorValueList, nullptr, nullptr, actualSeqLengths, actualSeqLengthsKv, nullptr,
         quantScale1Tensor, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
@@ -293,8 +294,8 @@ int aclnnFusedInferAttentionScoreV5FullQuantTest(int32_t deviceId, aclrtStream &
         LOG_PRINT("aclnnFusedInferAttentionScoreV5GetWorkspaceSize failed. ERROR: %d\n", ret);
         return ret;
     }
-    void *workspaceAddr = nullptr;
-    std::unique_ptr<void, aclError (*)(void *)> workspaceAddrPtr(nullptr, aclrtFree);
+    void* workspaceAddr = nullptr;
+    std::unique_ptr<void, aclError (*)(void*)> workspaceAddrPtr(nullptr, aclrtFree);
     if (workspaceSize > 0U) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         if (!CHECK_RET(ret == ACL_SUCCESS)) {

@@ -95,7 +95,7 @@ protected:
     static constexpr ActualSeqLensMode Q_MODE = GetQActSeqMode<layout>();
     static constexpr ActualSeqLensMode KV_MODE = GetKvActSeqMode<layout, isPa>();
     // tensorlist
-    __gm__ uint8_t *keyPtr = nullptr;
+    __gm__ uint8_t* keyPtr = nullptr;
     ActualSeqLensParser<Q_MODE> qActSeqLensParser;
     ActualSeqLensParser<KV_MODE> kvActSeqLensParser;
 
@@ -103,14 +103,14 @@ protected:
     int64_t nextTokensPerBatch = 0;
 
     static constexpr T BOOL_ATTEN_MASK_SCALAR_VALUE = -1000000000000.0; // 用于mask为bool类型
-    uint32_t negativeIntScalar = *((uint32_t *)&BOOL_ATTEN_MASK_SCALAR_VALUE);
+    uint32_t negativeIntScalar = *((uint32_t*)&BOOL_ATTEN_MASK_SCALAR_VALUE);
     static constexpr bool learnableSinkFlag = false;
 
     uint64_t actSeqLensKv = 0;
     uint64_t actSeqLensQ = 0;
     // ================================类成员变量====================================
     // 结构体
-    const ConstInfoX &constInfo;
+    const ConstInfoX& constInfo;
     TaskInfoMla taskInfo{};
 
 private:
@@ -134,13 +134,13 @@ private:
     TBuf<> fdLseUbBuf;
 
 public:
-    __aicore__ inline FiaBlockVecFlashDecodeMla(ConstInfoX &constInfo)
+    __aicore__ inline FiaBlockVecFlashDecodeMla(ConstInfoX& constInfo)
         : constInfo(constInfo){};
 
     __aicore__ inline void InitGlobalTensor(GlobalTensor<float> lseMaxFdGm, GlobalTensor<float> lseSumFdGm,
                                             GlobalTensor<float> accumOutGm, GlobalTensor<OUTPUT_T> attentionOutGm,
                                             GlobalTensor<uint64_t> actualSeqLengthsGmQ,
-                                            GlobalTensor<uint64_t> actualSeqLengthsGm, __gm__ uint8_t *key)
+                                            GlobalTensor<uint64_t> actualSeqLengthsGm, __gm__ uint8_t* key)
     {
         this->lseMaxFdGm = lseMaxFdGm;
         this->lseSumFdGm = lseSumFdGm;
@@ -162,7 +162,7 @@ public:
     {
         this->dSizeV_Align = AttentionCommon::Align(constInfo.dSizeV, FP32_REPEAT_ELEMENT_NUM);
     }
-    __aicore__ inline void InitBuffers(TPipe *pipe)
+    __aicore__ inline void InitBuffers(TPipe* pipe)
     {
         if ASCEND_IS_AIV {
             pipe->Reset();
@@ -215,7 +215,7 @@ public:
     }
 
 protected:
-    __aicore__ inline void CopyAccumOutIn(LocalTensor<T> &accumOutLocal, uint32_t splitKVIndex, uint32_t startRow,
+    __aicore__ inline void CopyAccumOutIn(LocalTensor<T>& accumOutLocal, uint32_t splitKVIndex, uint32_t startRow,
                                           uint32_t dealRowCount)
     {
         DataCopyExtParams copyInParams;
@@ -251,7 +251,7 @@ protected:
                      dealRowCountAlign);
         }
     }
-    __aicore__ inline void ComputeScaleValue(LocalTensor<T> &lseExp, uint32_t dealRowCount,
+    __aicore__ inline void ComputeScaleValue(LocalTensor<T>& lseExp, uint32_t dealRowCount,
                                              uint32_t actualCombineLoopSize, uint32_t cntM, uint32_t startRow)
     {
         LocalTensor<T> lseSum = (cntM & 1) == 0 ? fdSumBuf1.Get<T>() : fdSumBuf2.Get<T>();
@@ -264,7 +264,7 @@ protected:
                                 actualCombineLoopSize, constInfo.isSoftmaxLseEnable, learnableSinkFlag);
     }
 
-    __aicore__ inline void Bmm2DataCopyOutTrans(LocalTensor<OUTPUT_T> &attenOutUb, uint32_t startRow,
+    __aicore__ inline void Bmm2DataCopyOutTrans(LocalTensor<OUTPUT_T>& attenOutUb, uint32_t startRow,
                                                 uint32_t dealRowCount, uint32_t columnCount)
     {
         FaUbTensor<OUTPUT_T> ubTensor{
@@ -321,13 +321,13 @@ protected:
             copyAttenOutUbToGm(outGmTensor, ubTensor, gmCoord);
         }
     }
-    __aicore__ inline void ReduceFinalRes(LocalTensor<T> &reduceOut, LocalTensor<T> &mm2Res, LocalTensor<T> &lseLocal,
+    __aicore__ inline void ReduceFinalRes(LocalTensor<T>& reduceOut, LocalTensor<T>& mm2Res, LocalTensor<T>& lseLocal,
                                           uint32_t cntKV, uint32_t dealRowCount)
     {
         uint64_t dSizeV_Align = (uint64_t)this->dSizeV_Align;
         ReduceFinalRes_VF<T>(reduceOut, lseLocal, mm2Res, dealRowCount, dSizeV_Align, cntKV);
     }
-    __aicore__ inline void CopyFinalResOut(LocalTensor<T> &accumOutLocal, uint32_t startRow, uint32_t dealRowCount,
+    __aicore__ inline void CopyFinalResOut(LocalTensor<T>& accumOutLocal, uint32_t startRow, uint32_t dealRowCount,
                                            uint32_t cntM)
     {
         LocalTensor<OUTPUT_T> tmpBmm2ResCastTensor = fdOutputBuf.Get<OUTPUT_T>();
@@ -370,7 +370,7 @@ protected:
     }
 
     template <typename UBOUT_T>
-    __aicore__ inline void DealInvalidRows(LocalTensor<UBOUT_T> &attenOutUb, uint32_t startRow, uint32_t dealRowCount,
+    __aicore__ inline void DealInvalidRows(LocalTensor<UBOUT_T>& attenOutUb, uint32_t startRow, uint32_t dealRowCount,
                                            uint32_t columnCount)
     {
         if (!attenMaskFlag) {
@@ -396,7 +396,7 @@ protected:
     }
 
     template <typename UBOUT_T>
-    __aicore__ inline void DealInvalidMaskRows(LocalTensor<UBOUT_T> &attenOutUb, uint32_t startRow,
+    __aicore__ inline void DealInvalidMaskRows(LocalTensor<UBOUT_T>& attenOutUb, uint32_t startRow,
                                                uint32_t dealRowCount, uint32_t columnCount, uint32_t cntM)
     {
         if (!constInfo.isRowInvalidOpen || !attenMaskFlag) {
@@ -467,7 +467,7 @@ public:
         }
     }
 
-    __aicore__ inline void FlashDecode(FDparamsX &fd)
+    __aicore__ inline void FlashDecode(FDparamsX& fd)
     {
         if (!fd.fdCoreEnable) {
             return;
@@ -531,7 +531,7 @@ template <typename INPUT_T, typename T, typename OUTPUT_T, LayOutTypeEnum layout
 class FiaBlockVecFlashDecodeMlaDummy {
 public:
     using ConstInfoX = ConstInfo_t;
-    __aicore__ inline FiaBlockVecFlashDecodeMlaDummy(ConstInfoX &constInfo){};
+    __aicore__ inline FiaBlockVecFlashDecodeMlaDummy(ConstInfoX& constInfo){};
 };
 
 } // namespace BaseApi

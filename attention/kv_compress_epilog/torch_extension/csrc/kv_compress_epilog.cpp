@@ -26,7 +26,7 @@ constexpr int64_t QUANT_MODE_MIN = 0;
 constexpr int64_t QUANT_MODE_MAX = 2; // 0:group(bf16) 1:group(e8m0) 2:rope hifloat8 + nope FLOAT4_E2M1
 } // namespace
 
-void KvCompressEpilog(at::Tensor &cache, const at::Tensor &x, const at::Tensor &slotMapping, int64_t quantGroupSize,
+void KvCompressEpilog(at::Tensor& cache, const at::Tensor& x, const at::Tensor& slotMapping, int64_t quantGroupSize,
                       int64_t quantMode, bool roundScale, double xScale)
 {
     TORCH_CHECK(cache.numel() > 0, "Tensor cache is empty.");
@@ -49,5 +49,8 @@ void KvCompressEpilog(at::Tensor &cache, const at::Tensor &x, const at::Tensor &
               xScaleF);
 }
 
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) { m.def("kv_compress_epilog", &KvCompressEpilog, "kv_compress_epilog"); }
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
+{
+    m.def("kv_compress_epilog", &KvCompressEpilog, "kv_compress_epilog");
+}
 } // namespace op_api

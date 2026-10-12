@@ -25,33 +25,34 @@ namespace optiling {
 
 class ActualSeqLenChecker : public BaseChecker {
 public:
-    ActualSeqLenChecker(bool enableNonQuant, bool enableFullQuant, bool enableAntiQuant) :
-        BaseChecker(enableNonQuant, enableFullQuant, enableAntiQuant) {}
+    ActualSeqLenChecker(bool enableNonQuant, bool enableFullQuant, bool enableAntiQuant)
+        : BaseChecker(enableNonQuant, enableFullQuant, enableAntiQuant)
+    {}
     ~ActualSeqLenChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const FiaTilingInfo &fiaInfo) override;
-    ge::graphStatus CheckParaExistence(const FiaTilingInfo &fiaInfo) override;
-    ge::graphStatus CheckCrossFeature(const FiaTilingInfo &fiaInfo) override;
-    ge::graphStatus CheckMultiParaConsistency(const FiaTilingInfo &fiaInfo) override;
+    ge::graphStatus CheckSinglePara(const FiaTilingInfo& fiaInfo) override;
+    ge::graphStatus CheckParaExistence(const FiaTilingInfo& fiaInfo) override;
+    ge::graphStatus CheckCrossFeature(const FiaTilingInfo& fiaInfo) override;
+    ge::graphStatus CheckMultiParaConsistency(const FiaTilingInfo& fiaInfo) override;
 
 private:
     // 公共校验函数
     // singlepara
-    ge::graphStatus CheckActualSeqLenQDim(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckActualSeqLenQData(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckActualSeqLenKvDim(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckActualSeqLenKvData(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckActualSeqLenQDim(const FiaTilingInfo& fiaInfo);
+    ge::graphStatus CheckActualSeqLenQData(const FiaTilingInfo& fiaInfo);
+    ge::graphStatus CheckActualSeqLenKvDim(const FiaTilingInfo& fiaInfo);
+    ge::graphStatus CheckActualSeqLenKvData(const FiaTilingInfo& fiaInfo);
 
     // existence
-    ge::graphStatus CheckExistenceActualSeqLenQ(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckExistenceActualSeqLenKv(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckExistenceActualSeqLenQ(const FiaTilingInfo& fiaInfo);
+    ge::graphStatus CheckExistenceActualSeqLenKv(const FiaTilingInfo& fiaInfo);
 
     // feature
-    ge::graphStatus CheckFeatureIFAMLA(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckFeatureIFAMLA(const FiaTilingInfo& fiaInfo);
 
     // multipara
-    ge::graphStatus CheckActualSeqLenQTNDLastData(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckActualSeqLenKvTNDLastData(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckActualSeqLenQTNDLastData(const FiaTilingInfo& fiaInfo);
+    ge::graphStatus CheckActualSeqLenKvTNDLastData(const FiaTilingInfo& fiaInfo);
 };
 
 } // namespace optiling

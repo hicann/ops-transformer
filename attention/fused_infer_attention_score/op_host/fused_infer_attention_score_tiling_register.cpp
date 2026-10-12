@@ -18,7 +18,7 @@
 #include "op_host/tiling_templates_registry.h"
 
 namespace optiling {
-static ge::graphStatus TilingPrepareForFusedInferAttentionScore(gert::TilingParseContext * /* context */)
+static ge::graphStatus TilingPrepareForFusedInferAttentionScore(gert::TilingParseContext* /* context */)
 {
     return ge::GRAPH_SUCCESS;
 }
@@ -27,6 +27,7 @@ IMPL_OP_OPTILING(FusedInferAttentionScore)
                                  KV_PADDING_SIZE_INDEX, ACTUAL_SHARED_PREFIX_LEN_INDEX},
                                 {gert::TilingPlacement::TILING_ON_HOST, gert::TilingPlacement::TILING_ON_AICPU})
     .Tiling(DoOpTilingFusedInferAttentionScore)
-    .TilingParse<FusedInferAttentionScoreCompileInfo>(TilingPrepareForFusedInferAttentionScore); // Register entrance functions to the framework
+    .TilingParse<FusedInferAttentionScoreCompileInfo>(
+        TilingPrepareForFusedInferAttentionScore); // Register entrance functions to the framework
 
 } // namespace optiling

@@ -38,9 +38,9 @@
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void indexer_quant_cache(
-    GM_ADDR cache, GM_ADDR cache_scale, GM_ADDR x, GM_ADDR slot_mapping,
-    GM_ADDR cache_out, GM_ADDR cache_scale_out, GM_ADDR workspace, GM_ADDR tiling);
+extern "C" __global__ __aicore__ void indexer_quant_cache(GM_ADDR cache, GM_ADDR cache_scale, GM_ADDR x,
+                                                          GM_ADDR slot_mapping, GM_ADDR cache_out,
+                                                          GM_ADDR cache_scale_out, GM_ADDR workspace, GM_ADDR tiling);
 
 namespace {
 constexpr int64_t BLOCK_SIZE = 32;
@@ -51,7 +51,10 @@ constexpr int64_t HIFLOAT_QUANT_MODE = 2;
 constexpr int64_t MXFP4_QUANT_MODE = 3;
 constexpr size_t SYS_WORKSPACE = 16 * 1024 * 1024;
 
-inline int64_t CeilDiv(int64_t a, int64_t b) { return b == 0 ? a : (a + b - 1) / b; }
+inline int64_t CeilDiv(int64_t a, int64_t b)
+{
+    return b == 0 ? a : (a + b - 1) / b;
+}
 
 template <typename T>
 T* GmAllocWrapper(size_t size)
@@ -69,14 +72,14 @@ void FillHalf(uint8_t* gm, int64_t numElem)
         p[i] = (i & 1) ? 0xB800 : 0x3C00;
     }
 }
-}  // namespace
+} // namespace
 
 struct IqcParams {
     int64_t bs;
     int64_t d;
     int64_t quantMode;
     int64_t roundScale;
-    bool singleRow;  // true -> rowFactor=1 (single_row 模板), false -> multi_row
+    bool singleRow; // true -> rowFactor=1 (single_row 模板), false -> multi_row
     int64_t blockDim;
     bool withSkip;
     std::string desc;
@@ -86,9 +89,8 @@ class IndexerQuantCacheKernelTest : public testing::TestWithParam<IqcParams> {
 protected:
     void ComputeTiling(IndexerQuantCacheTilingData& t, const IqcParams& p)
     {
-        int64_t scaleCol = (p.quantMode == MXFP8_QUANT_MODE || p.quantMode == MXFP4_QUANT_MODE)
-                               ? CeilDiv(p.d, MX_BLOCK)
-                               : 1;
+        int64_t scaleCol =
+            (p.quantMode == MXFP8_QUANT_MODE || p.quantMode == MXFP4_QUANT_MODE) ? CeilDiv(p.d, MX_BLOCK) : 1;
         int64_t coreNum = p.blockDim;
         int64_t rowOfFormer = CeilDiv(p.bs, coreNum);
         int64_t usedCore = std::min(CeilDiv(p.bs, rowOfFormer), coreNum);
@@ -148,15 +150,14 @@ TEST_P(IndexerQuantCacheKernelTest, RunKernel)
     std::memset(&tilingData, 0, sizeof(tilingData));
     ComputeTiling(tilingData, p);
 
-    std::cout << "[IndexerQuantCache] " << p.desc << " bs=" << p.bs << " d=" << p.d
-              << " quantMode=" << p.quantMode << " roundScale=" << p.roundScale
-              << " singleRow=" << p.singleRow << " blockDim=" << p.blockDim
+    std::cout << "[IndexerQuantCache] " << p.desc << " bs=" << p.bs << " d=" << p.d << " quantMode=" << p.quantMode
+              << " roundScale=" << p.roundScale << " singleRow=" << p.singleRow << " blockDim=" << p.blockDim
               << " tilingKey=" << tilingKey_ << std::endl;
 
     int64_t cacheRows = p.bs + 1;
-    size_t shapeX = static_cast<size_t>(p.bs) * p.d * sizeof(uint16_t);  // half
+    size_t shapeX = static_cast<size_t>(p.bs) * p.d * sizeof(uint16_t); // half
     size_t shapeSlot = static_cast<size_t>(p.bs) * sizeof(int32_t);
-    size_t shapeCache = static_cast<size_t>(cacheRows) * p.d * sizeof(uint8_t) + 512;       // 覆盖 d / (d+1)/2
+    size_t shapeCache = static_cast<size_t>(cacheRows) * p.d * sizeof(uint8_t) + 512; // 覆盖 d / (d+1)/2
     size_t shapeScale = static_cast<size_t>(cacheRows) * scaleCol_ * sizeof(float) + 512;
 
     uint8_t* cacheGm = GmAllocWrapper<uint8_t>(shapeCache);
@@ -190,8 +191,8 @@ TEST_P(IndexerQuantCacheKernelTest, RunKernel)
 
     uint32_t blockDim = static_cast<uint32_t>(usedCore_);
     ICPU_SET_TILING_KEY(static_cast<uint64_t>(tilingKey_));
-    ICPU_RUN_KF(indexer_quant_cache, blockDim, cacheGm, scaleGm, xGm, slotGm, cacheOutGm, scaleOutGm,
-                workspace, tilingGm);
+    ICPU_RUN_KF(indexer_quant_cache, blockDim, cacheGm, scaleGm, xGm, slotGm, cacheOutGm, scaleOutGm, workspace,
+                tilingGm);
 
     bool anyNonZero = false;
     for (int64_t i = 0; i < p.bs && !anyNonZero; ++i) {
@@ -220,25 +221,24 @@ TEST_P(IndexerQuantCacheKernelTest, RunKernel)
     AscendC::GmFree(tilingGm);
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    QuantBranches, IndexerQuantCacheKernelTest,
-    testing::Values(
-        // Normal 动态量化 (key 10001 single / 10011 multi), roundScale true/false
-        IqcParams{32, 128, NORMAL_QUANT_MODE, 1, true, 1, false, "normal_single_round"},
-        IqcParams{32, 128, NORMAL_QUANT_MODE, 0, true, 1, false, "normal_single_noround"},
-        IqcParams{32, 128, NORMAL_QUANT_MODE, 1, false, 1, false, "normal_multi_round"},
-        IqcParams{30, 128, NORMAL_QUANT_MODE, 1, false, 1, true, "normal_multi_skip"},
-        IqcParams{48, 128, NORMAL_QUANT_MODE, 1, false, 2, false, "normal_multi_multicore"},
-        IqcParams{32, 64, NORMAL_QUANT_MODE, 1, true, 1, false, "normal_single_d64"},
-        // HiFloat8 整行量化 (key 10001 single / 10011 multi)
-        IqcParams{32, 128, HIFLOAT_QUANT_MODE, 1, true, 1, false, "hifloat_single"},
-        IqcParams{32, 128, HIFLOAT_QUANT_MODE, 1, false, 1, false, "hifloat_multi"},
-        // MX-FP8 (key 10000 single / 10010 multi)
-        IqcParams{32, 128, MXFP8_QUANT_MODE, 1, true, 1, false, "mxfp8_single"},
-        IqcParams{32, 128, MXFP8_QUANT_MODE, 1, false, 1, false, "mxfp8_multi"},
-        // MX-FP4 (key 10002 single / 10012 multi)
-        IqcParams{32, 128, MXFP4_QUANT_MODE, 1, true, 1, false, "mxfp4_single"},
-        IqcParams{32, 128, MXFP4_QUANT_MODE, 1, false, 1, false, "mxfp4_multi"}));
+INSTANTIATE_TEST_SUITE_P(QuantBranches, IndexerQuantCacheKernelTest,
+                         testing::Values(
+                             // Normal 动态量化 (key 10001 single / 10011 multi), roundScale true/false
+                             IqcParams{32, 128, NORMAL_QUANT_MODE, 1, true, 1, false, "normal_single_round"},
+                             IqcParams{32, 128, NORMAL_QUANT_MODE, 0, true, 1, false, "normal_single_noround"},
+                             IqcParams{32, 128, NORMAL_QUANT_MODE, 1, false, 1, false, "normal_multi_round"},
+                             IqcParams{30, 128, NORMAL_QUANT_MODE, 1, false, 1, true, "normal_multi_skip"},
+                             IqcParams{48, 128, NORMAL_QUANT_MODE, 1, false, 2, false, "normal_multi_multicore"},
+                             IqcParams{32, 64, NORMAL_QUANT_MODE, 1, true, 1, false, "normal_single_d64"},
+                             // HiFloat8 整行量化 (key 10001 single / 10011 multi)
+                             IqcParams{32, 128, HIFLOAT_QUANT_MODE, 1, true, 1, false, "hifloat_single"},
+                             IqcParams{32, 128, HIFLOAT_QUANT_MODE, 1, false, 1, false, "hifloat_multi"},
+                             // MX-FP8 (key 10000 single / 10010 multi)
+                             IqcParams{32, 128, MXFP8_QUANT_MODE, 1, true, 1, false, "mxfp8_single"},
+                             IqcParams{32, 128, MXFP8_QUANT_MODE, 1, false, 1, false, "mxfp8_multi"},
+                             // MX-FP4 (key 10002 single / 10012 multi)
+                             IqcParams{32, 128, MXFP4_QUANT_MODE, 1, true, 1, false, "mxfp4_single"},
+                             IqcParams{32, 128, MXFP4_QUANT_MODE, 1, false, 1, false, "mxfp4_multi"}));
 
 // 结构体字段 sanity (保留原 tiling-data 校验意图)。
 TEST(IndexerQuantCacheTilingStruct, FieldsWritable)
@@ -270,9 +270,9 @@ TEST(IndexerQuantCacheKernelReadingB, WideHeadDimLeavesTailUntouched)
 
     const int64_t bs = 8;
     const int64_t d = 128;
-    const int64_t headDim = 160;          // > cacheCol(=d=128)
-    const int64_t cacheCol = d;           // mode1: cacheCol == d
-    const int64_t scaleCol = 1;           // mode1: 整行一个 float scale
+    const int64_t headDim = 160; // > cacheCol(=d=128)
+    const int64_t cacheCol = d;  // mode1: cacheCol == d
+    const int64_t scaleCol = 1;  // mode1: 整行一个 float scale
     const uint8_t SENTINEL = 0xAB;
 
     IndexerQuantCacheTilingData t;
@@ -282,7 +282,7 @@ TEST(IndexerQuantCacheKernelReadingB, WideHeadDimLeavesTailUntouched)
     t.scaleCol = scaleCol;
     t.rowOfFormerBlock = bs;
     t.rowOfTailBlock = bs;
-    t.rowLoopOfFormerBlock = bs;          // single-row: rowFactor=1
+    t.rowLoopOfFormerBlock = bs; // single-row: rowFactor=1
     t.rowLoopOfTailBlock = bs;
     t.rowFactor = 1;
     t.tailRowFactorOfFormerBlock = 1;
@@ -290,13 +290,13 @@ TEST(IndexerQuantCacheKernelReadingB, WideHeadDimLeavesTailUntouched)
     t.quantMode = NORMAL_QUANT_MODE;
     t.roundScale = 1;
     t.scalesAttr = 1.0f;
-    t.blockSize = 1;                      // contiguous flat slots
-    t.cacheRowStride = headDim;           // 行宽 = headDim (> cacheCol)
+    t.blockSize = 1;            // contiguous flat slots
+    t.cacheRowStride = headDim; // 行宽 = headDim (> cacheCol)
     t.cacheBlockStride = headDim;
     t.scaleRowStride = scaleCol;
     t.scaleBlockStride = scaleCol;
 
-    int64_t tilingKey = 10001;            // mode1 single-row
+    int64_t tilingKey = 10001; // mode1 single-row
 
     int64_t cacheRows = bs + 1;
     size_t shapeX = static_cast<size_t>(bs) * d * sizeof(uint16_t);
@@ -314,7 +314,7 @@ TEST(IndexerQuantCacheKernelReadingB, WideHeadDimLeavesTailUntouched)
     uint8_t* tilingGm = GmAllocWrapper<uint8_t>(sizeof(IndexerQuantCacheTilingData));
 
     FillHalf(xGm, static_cast<int64_t>(bs) * d);
-    std::memset(cacheGm, SENTINEL, shapeCache);   // 哨兵: 验证未写区保持原值
+    std::memset(cacheGm, SENTINEL, shapeCache); // 哨兵: 验证未写区保持原值
     std::memset(scaleGm, 0, shapeScale);
     std::memset(cacheOutGm, 0, shapeCache);
     std::memset(scaleOutGm, 0, shapeScale);
@@ -327,8 +327,7 @@ TEST(IndexerQuantCacheKernelReadingB, WideHeadDimLeavesTailUntouched)
     }
 
     ICPU_SET_TILING_KEY(static_cast<uint64_t>(tilingKey));
-    ICPU_RUN_KF(indexer_quant_cache, 1, cacheGm, scaleGm, xGm, slotGm, cacheOutGm, scaleOutGm,
-                workspace, tilingGm);
+    ICPU_RUN_KF(indexer_quant_cache, 1, cacheGm, scaleGm, xGm, slotGm, cacheOutGm, scaleOutGm, workspace, tilingGm);
 
     bool anyWritten = false;
     bool tailPreserved = true;
@@ -336,12 +335,12 @@ TEST(IndexerQuantCacheKernelReadingB, WideHeadDimLeavesTailUntouched)
         uint8_t* row = cacheGm + slot[i] * headDim;
         for (int64_t c = 0; c < cacheCol; ++c) {
             if (row[c] != SENTINEL) {
-                anyWritten = true;   // 写出区被改写(量化输出)
+                anyWritten = true; // 写出区被改写(量化输出)
             }
         }
         for (int64_t c = cacheCol; c < headDim; ++c) {
             if (row[c] != SENTINEL) {
-                tailPreserved = false;  // 行尾 [cacheCol, headDim) 不应被改写
+                tailPreserved = false; // 行尾 [cacheCol, headDim) 不应被改写
             }
         }
     }

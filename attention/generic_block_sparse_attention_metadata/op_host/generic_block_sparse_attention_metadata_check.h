@@ -44,18 +44,18 @@ constexpr int64_t GBSA_CURRENT_MASK_TYPE = 1;
 constexpr int64_t GBSA_CURRENT_WINDOW_SIZE = -1;
 constexpr int64_t GBSA_DEFAULT_MAX_SEQ_LEN = -1;
 
-bool GbsaTensorValid(const aclTensor *tensor)
+bool GbsaTensorValid(const aclTensor* tensor)
 {
     return tensor != nullptr && tensor->GetViewShape().GetDimNum() > 0;
 }
 
-bool GbsaIsLayout(const char *layout, const char *expected)
+bool GbsaIsLayout(const char* layout, const char* expected)
 {
     return layout != nullptr && std::strcmp(layout, expected) == 0;
 }
 
-aclnnStatus CheckGbsaTensorDataType(const aclTensor *tensor, aclDataType expectedDataType, const char *expectedTypeName,
-                                    const char *tensorName)
+aclnnStatus CheckGbsaTensorDataType(const aclTensor* tensor, aclDataType expectedDataType, const char* expectedTypeName,
+                                    const char* tensorName)
 {
     aclDataType dataType = ACL_DT_UNDEFINED;
     aclGetDataType(tensor, &dataType);
@@ -66,7 +66,7 @@ aclnnStatus CheckGbsaTensorDataType(const aclTensor *tensor, aclDataType expecte
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckGbsaTensorDim(const aclTensor *tensor, int64_t expectedDim, const char *tensorName)
+aclnnStatus CheckGbsaTensorDim(const aclTensor* tensor, int64_t expectedDim, const char* tensorName)
 {
     if (tensor->GetViewShape().GetDimNum() != expectedDim) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s dimension must be %ld.", tensorName, expectedDim);
@@ -75,7 +75,7 @@ aclnnStatus CheckGbsaTensorDim(const aclTensor *tensor, int64_t expectedDim, con
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckGbsaRequiredInt32Tensor(const aclTensor *tensor, const char *tensorName)
+aclnnStatus CheckGbsaRequiredInt32Tensor(const aclTensor* tensor, const char* tensorName)
 {
     if (!GbsaTensorValid(tensor)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s must be provided.", tensorName);
@@ -84,8 +84,8 @@ aclnnStatus CheckGbsaRequiredInt32Tensor(const aclTensor *tensor, const char *te
     return CheckGbsaTensorDataType(tensor, ACL_INT32, "INT32", tensorName);
 }
 
-aclnnStatus CheckGbsaRequiredInputs(const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
-                                    const aclTensor *metadata)
+aclnnStatus CheckGbsaRequiredInputs(const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount,
+                                    const aclTensor* metadata)
 {
     aclnnStatus status = CheckGbsaRequiredInt32Tensor(sparseBlockIdx, "sparseBlockIdx");
     if (status != ACLNN_SUCCESS) {
@@ -98,7 +98,7 @@ aclnnStatus CheckGbsaRequiredInputs(const aclTensor *sparseBlockIdx, const aclTe
     return CheckGbsaRequiredInt32Tensor(metadata, "metadata");
 }
 
-aclnnStatus CheckGbsaMetadataShape(const aclTensor *metadata)
+aclnnStatus CheckGbsaMetadataShape(const aclTensor* metadata)
 {
     aclnnStatus status = CheckGbsaTensorDim(metadata, GBSA_METADATA_DIM_NUM, "metadata");
     if (status != ACLNN_SUCCESS) {
@@ -113,7 +113,7 @@ aclnnStatus CheckGbsaMetadataShape(const aclTensor *metadata)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckGbsaPositiveScalarAttr(int64_t attrValue, const char *attrName)
+aclnnStatus CheckGbsaPositiveScalarAttr(int64_t attrValue, const char* attrName)
 {
     if (attrValue <= 0) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s must be greater than 0, but got %lld.", attrName, attrValue);
@@ -166,10 +166,10 @@ aclnnStatus CheckGbsaScalarAttrs(int64_t numQHeads, int64_t numKvHeads, int64_t 
 {
     const struct {
         int64_t value;
-        const char *name;
+        const char* name;
     } positiveAttrs[] = {
         {numQHeads, "numQHeads"}, {numKvHeads, "numKvHeads"}, {headDim, "headDim"}, {blockShapeY, "blockShapeY"}};
-    for (const auto &attr : positiveAttrs) {
+    for (const auto& attr : positiveAttrs) {
         const aclnnStatus status = CheckGbsaPositiveScalarAttr(attr.value, attr.name);
         if (status != ACLNN_SUCCESS) {
             return status;
@@ -187,7 +187,7 @@ aclnnStatus CheckGbsaScalarAttrs(int64_t numQHeads, int64_t numKvHeads, int64_t 
     return CheckGbsaBlockAttrs(blockShapeX, blockShapeY, layoutSparsePattern);
 }
 
-aclnnStatus CheckGbsaMaxSeqLenAttr(int64_t maxSeqLen, const char *attrName)
+aclnnStatus CheckGbsaMaxSeqLenAttr(int64_t maxSeqLen, const char* attrName)
 {
     if (maxSeqLen < GBSA_DEFAULT_MAX_SEQ_LEN) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s must be -1 or greater than or equal to 0, but got %lld.", attrName,
@@ -206,7 +206,7 @@ aclnnStatus CheckGbsaMaxSeqLenAttrs(int64_t maxQSeqLen, int64_t maxKvSeqLen)
     return CheckGbsaMaxSeqLenAttr(maxKvSeqLen, "maxKvSeqLen");
 }
 
-aclnnStatus CheckGbsaLayouts(const char *qInputLayout, const char *kvInputLayout)
+aclnnStatus CheckGbsaLayouts(const char* qInputLayout, const char* kvInputLayout)
 {
     if (!GbsaIsLayout(qInputLayout, "TND")) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "qInputLayout currently only supports TND.");
@@ -219,8 +219,8 @@ aclnnStatus CheckGbsaLayouts(const char *qInputLayout, const char *kvInputLayout
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckGbsaOptionalSeqLength(const aclTensor *tensor, int64_t batch, aclDataType dataType,
-                                       int64_t expectedElements, const char *typeName, const char *tensorName)
+aclnnStatus CheckGbsaOptionalSeqLength(const aclTensor* tensor, int64_t batch, aclDataType dataType,
+                                       int64_t expectedElements, const char* typeName, const char* tensorName)
 {
     if (!GbsaTensorValid(tensor)) {
         return ACLNN_SUCCESS;
@@ -240,8 +240,8 @@ aclnnStatus CheckGbsaOptionalSeqLength(const aclTensor *tensor, int64_t batch, a
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus GetGbsaBatch(const aclTensor *sparseBlockIdx, const aclTensor *cuSeqLengthsOptional,
-                         const char *qInputLayout, int64_t &batch)
+aclnnStatus GetGbsaBatch(const aclTensor* sparseBlockIdx, const aclTensor* cuSeqLengthsOptional,
+                         const char* qInputLayout, int64_t& batch)
 {
     if (!GbsaIsLayout(qInputLayout, "TND")) {
         batch = sparseBlockIdx->GetViewShape().GetDim(0);
@@ -260,9 +260,9 @@ aclnnStatus GetGbsaBatch(const aclTensor *sparseBlockIdx, const aclTensor *cuSeq
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckGbsaSparseTensorShapes(const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
+aclnnStatus CheckGbsaSparseTensorShapes(const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount,
                                         int64_t maxQSeqLen, int64_t numQHeads, int64_t numKvHeads, int64_t blockShapeX,
-                                        int64_t layoutSparsePattern, const char *qInputLayout, int64_t batch)
+                                        int64_t layoutSparsePattern, const char* qInputLayout, int64_t batch)
 {
     const int64_t sparseHeads = layoutSparsePattern == GBSA_LAYOUT_SPARSE_KVN_TOTALQB_KB ? numKvHeads : numQHeads;
     if (GbsaIsLayout(qInputLayout, "TND")) {
@@ -299,9 +299,9 @@ aclnnStatus CheckGbsaSparseTensorShapes(const aclTensor *sparseBlockIdx, const a
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckGbsaSeqLengthInputs(const aclTensor *cuSeqLengthsOptional, const aclTensor *cuSeqLengthsKvOptional,
-                                     const aclTensor *seqUsedQOptional, const aclTensor *seqUsedKvOptional,
-                                     int64_t batch, const char *qInputLayout, const char *kvInputLayout)
+aclnnStatus CheckGbsaSeqLengthInputs(const aclTensor* cuSeqLengthsOptional, const aclTensor* cuSeqLengthsKvOptional,
+                                     const aclTensor* seqUsedQOptional, const aclTensor* seqUsedKvOptional,
+                                     int64_t batch, const char* qInputLayout, const char* kvInputLayout)
 {
     // Legacy issue: when BSND/BNSD provides both cuSeqLengths and seqUsedQ, the device side does not yet verify that
     // seqUsedQ is no greater than the corresponding prefix-sum difference.
@@ -407,7 +407,7 @@ aclnnStatus CheckGbsaMaskAttrs(int64_t maskType, int64_t windowSizeLeft, int64_t
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckGbsaSparseBlockCapacity(const aclTensor *sparseBlockIdx)
+aclnnStatus CheckGbsaSparseBlockCapacity(const aclTensor* sparseBlockIdx)
 {
     const int64_t dimNum = sparseBlockIdx->GetViewShape().GetDimNum();
     const int64_t capacity = sparseBlockIdx->GetViewShape().GetDim(dimNum - 1);
@@ -419,15 +419,15 @@ aclnnStatus CheckGbsaSparseBlockCapacity(const aclTensor *sparseBlockIdx)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckGbsaMetadataParams(const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
-                                    const aclTensor *cuSeqLengthsOptional, const aclTensor *cuSeqLengthsKvOptional,
-                                    const aclTensor *seqUsedQOptional, const aclTensor *seqUsedKvOptional,
+aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount,
+                                    const aclTensor* cuSeqLengthsOptional, const aclTensor* cuSeqLengthsKvOptional,
+                                    const aclTensor* seqUsedQOptional, const aclTensor* seqUsedKvOptional,
                                     int64_t maxQSeqLen, int64_t maxKvSeqLen, int64_t numQHeads, int64_t numKvHeads,
-                                    int64_t headDim, int64_t blockShapeX, int64_t blockShapeY, const char *qInputLayout,
-                                    const char *kvInputLayout, int64_t layoutSparsePattern, int64_t maskType,
+                                    int64_t headDim, int64_t blockShapeX, int64_t blockShapeY, const char* qInputLayout,
+                                    const char* kvInputLayout, int64_t layoutSparsePattern, int64_t maskType,
                                     int64_t quantType, int64_t softmaxPrecision, int64_t windowSizeLeft,
                                     int64_t windowSizeRight, int64_t residualBlockMode, bool isArch35,
-                                    const aclTensor *metadata)
+                                    const aclTensor* metadata)
 {
     aclnnStatus status = CheckGbsaRequiredInputs(sparseBlockIdx, sparseBlockCount, metadata);
     if (status != ACLNN_SUCCESS) {

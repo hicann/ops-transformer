@@ -39,7 +39,7 @@
 
 namespace {
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -66,7 +66,7 @@ float Bf16ToFloat(uint16_t h)
     return result;
 }
 
-void PrintOutResult(const std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(const std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<uint16_t> resultData(size, 0);
@@ -78,7 +78,7 @@ void PrintOutResult(const std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -94,8 +94,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     if (size > 0) {
@@ -184,41 +184,41 @@ int main()
     std::vector<int64_t> softmaxLseShape = {T1, N1, 1};
     std::vector<int64_t> emptyShape = {0};
 
-    void *qDeviceAddr = nullptr;
-    void *oriKvDeviceAddr = nullptr;
-    void *cmpKvDeviceAddr = nullptr;
-    void *cmpSparseIndicesDeviceAddr = nullptr;
-    void *oriBlockTableDeviceAddr = nullptr;
-    void *cmpBlockTableDeviceAddr = nullptr;
-    void *cuSeqLensQDeviceAddr = nullptr;
-    void *cuSeqLensOriKvDeviceAddr = nullptr;
-    void *cuSeqLensCmpKvDeviceAddr = nullptr;
-    void *seqUsedQDeviceAddr = nullptr;
-    void *seqUsedOriKvDeviceAddr = nullptr;
-    void *seqUsedCmpKvDeviceAddr = nullptr;
-    void *cmpResidualKvDeviceAddr = nullptr;
-    void *sinksDeviceAddr = nullptr;
-    void *metadataDeviceAddr = nullptr;
-    void *attnOutDeviceAddr = nullptr;
-    void *softmaxLseDeviceAddr = nullptr;
+    void* qDeviceAddr = nullptr;
+    void* oriKvDeviceAddr = nullptr;
+    void* cmpKvDeviceAddr = nullptr;
+    void* cmpSparseIndicesDeviceAddr = nullptr;
+    void* oriBlockTableDeviceAddr = nullptr;
+    void* cmpBlockTableDeviceAddr = nullptr;
+    void* cuSeqLensQDeviceAddr = nullptr;
+    void* cuSeqLensOriKvDeviceAddr = nullptr;
+    void* cuSeqLensCmpKvDeviceAddr = nullptr;
+    void* seqUsedQDeviceAddr = nullptr;
+    void* seqUsedOriKvDeviceAddr = nullptr;
+    void* seqUsedCmpKvDeviceAddr = nullptr;
+    void* cmpResidualKvDeviceAddr = nullptr;
+    void* sinksDeviceAddr = nullptr;
+    void* metadataDeviceAddr = nullptr;
+    void* attnOutDeviceAddr = nullptr;
+    void* softmaxLseDeviceAddr = nullptr;
 
-    aclTensor *q = nullptr;
-    aclTensor *oriKv = nullptr;
-    aclTensor *cmpKv = nullptr;
-    aclTensor *cmpSparseIndices = nullptr;
-    aclTensor *oriBlockTable = nullptr;
-    aclTensor *cmpBlockTable = nullptr;
-    aclTensor *cuSeqLensQ = nullptr;
-    aclTensor *cuSeqLensOriKv = nullptr;
-    aclTensor *cuSeqLensCmpKv = nullptr;
-    aclTensor *seqUsedQ = nullptr;
-    aclTensor *seqUsedOriKv = nullptr;
-    aclTensor *seqUsedCmpKv = nullptr;
-    aclTensor *cmpResidualKv = nullptr;
-    aclTensor *sinks = nullptr;
-    aclTensor *metadata = nullptr;
-    aclTensor *attnOut = nullptr;
-    aclTensor *softmaxLse = nullptr;
+    aclTensor* q = nullptr;
+    aclTensor* oriKv = nullptr;
+    aclTensor* cmpKv = nullptr;
+    aclTensor* cmpSparseIndices = nullptr;
+    aclTensor* oriBlockTable = nullptr;
+    aclTensor* cmpBlockTable = nullptr;
+    aclTensor* cuSeqLensQ = nullptr;
+    aclTensor* cuSeqLensOriKv = nullptr;
+    aclTensor* cuSeqLensCmpKv = nullptr;
+    aclTensor* seqUsedQ = nullptr;
+    aclTensor* seqUsedOriKv = nullptr;
+    aclTensor* seqUsedCmpKv = nullptr;
+    aclTensor* cmpResidualKv = nullptr;
+    aclTensor* sinks = nullptr;
+    aclTensor* metadata = nullptr;
+    aclTensor* attnOut = nullptr;
+    aclTensor* softmaxLse = nullptr;
 
     int64_t qSize = GetShapeSize(qShape);
     int64_t oriKvSize = GetShapeSize(oriKvShape);
@@ -311,7 +311,7 @@ int main()
     char layoutKv[] = "PA_BBND";
 
     uint64_t metadataWorkspaceSize = 0;
-    aclOpExecutor *metadataExecutor = nullptr;
+    aclOpExecutor* metadataExecutor = nullptr;
 
     ret = aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
         cuSeqLensQ, cuSeqLensOriKv, cuSeqLensCmpKv, seqUsedQ, seqUsedOriKv, seqUsedCmpKv, cmpResidualKv, nullptr,
@@ -321,7 +321,7 @@ int main()
               LOG_PRINT("aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *metadataWorkspaceAddr = nullptr;
+    void* metadataWorkspaceAddr = nullptr;
     if (metadataWorkspaceSize > 0) {
         ret = aclrtMalloc(&metadataWorkspaceAddr, metadataWorkspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate metadata workspace failed. ERROR: %d\n", ret); return ret);
@@ -336,7 +336,7 @@ int main()
               return ret);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     ret = aclnnMixedQuantSparseFlashMlaGetWorkspaceSize(
         q, oriKv, cmpKv, nullptr, cmpSparseIndices, oriBlockTable, cmpBlockTable, cuSeqLensQ, nullptr, nullptr, nullptr,
@@ -346,7 +346,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMixedQuantSparseFlashMlaGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

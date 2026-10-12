@@ -22,12 +22,12 @@ namespace l0op {
 
 OP_TYPE_REGISTER(GenericBlockSparseAttentionMetadata);
 
-const aclTensor *GenericBlockSparseAttentionMetadata(
-    const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount, const aclTensor *cuSeqLengthsOptional,
-    const aclTensor *cuSeqLengthsKvOptional, const aclTensor *seqUsedQOptional, const aclTensor *seqUsedKvOptional,
+const aclTensor* GenericBlockSparseAttentionMetadata(
+    const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount, const aclTensor* cuSeqLengthsOptional,
+    const aclTensor* cuSeqLengthsKvOptional, const aclTensor* seqUsedQOptional, const aclTensor* seqUsedKvOptional,
     int64_t maxQSeqLen, int64_t numQHeads, int64_t numKvHeads, int64_t headDim, int64_t blockShapeX,
-    int64_t blockShapeY, int64_t isPackedGQA, const char *qInputLayout, int64_t aicCoreNum, int64_t residualBlockMode,
-    int64_t isConsistentTopk, const aclTensor *metadata, aclOpExecutor *executor)
+    int64_t blockShapeY, int64_t isPackedGQA, const char* qInputLayout, int64_t aicCoreNum, int64_t residualBlockMode,
+    int64_t isConsistentTopk, const aclTensor* metadata, aclOpExecutor* executor)
 {
     static internal::AicpuTaskSpace space("GenericBlockSparseAttentionMetadata");
     auto ret = ADD_TO_LAUNCHER_LIST_AICPU(

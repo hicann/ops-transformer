@@ -23,7 +23,7 @@
 namespace {
 using OpAttr = gert::TilingContextPara::OpAttr;
 
-constexpr const char *kOpName = "LightningIndexerGrad";
+constexpr const char* kOpName = "LightningIndexerGrad";
 constexpr uint32_t kCoreNum = 1U;
 constexpr uint64_t kUbSize = 196608ULL;
 constexpr size_t kTilingDataSize = 8192;
@@ -36,7 +36,7 @@ optiling::LIGCompileInfo MakeCompileInfo()
     return {};
 }
 
-std::vector<OpAttr> MakeAttrs(const std::string &layout, int64_t sparseMode = 3, bool determinstic = false)
+std::vector<OpAttr> MakeAttrs(const std::string& layout, int64_t sparseMode = 3, bool determinstic = false)
 {
     return {{"headNum", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)},
             {"layout", Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)},
@@ -46,8 +46,8 @@ std::vector<OpAttr> MakeAttrs(const std::string &layout, int64_t sparseMode = 3,
             {"determinstic", Ops::Transformer::AnyValue::CreateFrom<bool>(determinstic)}};
 }
 
-gert::TilingContextPara MakeBsndPara(optiling::LIGCompileInfo &compileInfo, ge::DataType dataType = ge::DT_FLOAT16,
-                                     const std::string &layout = "BSND", int64_t sparseMode = 3, int64_t headNumQ = 64,
+gert::TilingContextPara MakeBsndPara(optiling::LIGCompileInfo& compileInfo, ge::DataType dataType = ge::DT_FLOAT16,
+                                     const std::string& layout = "BSND", int64_t sparseMode = 3, int64_t headNumQ = 64,
                                      int64_t headNumK = 1, int64_t headDim = 128, uint32_t coreNum = kCoreNum,
                                      bool deterministic = false)
 {
@@ -67,7 +67,7 @@ gert::TilingContextPara MakeBsndPara(optiling::LIGCompileInfo &compileInfo, ge::
                                    &compileInfo, "Ascend910B", coreNum, kUbSize, kTilingDataSize);
 }
 
-gert::TilingContextPara MakeTndPara(optiling::LIGCompileInfo &compileInfo, int32_t *actualSeqQ, int32_t *actualSeqK,
+gert::TilingContextPara MakeTndPara(optiling::LIGCompileInfo& compileInfo, int32_t* actualSeqQ, int32_t* actualSeqK,
                                     bool withActualSeq = true, ge::DataType dataType = ge::DT_BF16,
                                     int64_t sparseMode = 3, int64_t headNumQ = 64, int64_t headNumK = 1,
                                     int64_t headDim = 128, uint32_t actualSeqCount = 1, uint32_t coreNum = kCoreNum)
@@ -134,7 +134,7 @@ TEST_F(LightningIndexerGradTiling, tiling_bsnd_uniform_global_s1_split_success)
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
     ASSERT_GE(tilingInfo.tilingDataSize, sizeof(optiling::LIGTilingData));
 
-    auto tilingData = reinterpret_cast<const optiling::LIGTilingData *>(tilingInfo.tilingData.get());
+    auto tilingData = reinterpret_cast<const optiling::LIGTilingData*>(tilingInfo.tilingData.get());
     EXPECT_EQ(tilingInfo.blockNum, 4U);
     EXPECT_EQ(tilingData->get_totalS1(), 16U);
     EXPECT_EQ(tilingData->get_usedCoreNum(), 8U);
@@ -152,7 +152,7 @@ TEST_F(LightningIndexerGradTiling, tiling_bsnd_deterministic_keeps_original_core
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
     ASSERT_GE(tilingInfo.tilingDataSize, sizeof(optiling::LIGTilingData));
 
-    auto tilingData = reinterpret_cast<const optiling::LIGTilingData *>(tilingInfo.tilingData.get());
+    auto tilingData = reinterpret_cast<const optiling::LIGTilingData*>(tilingInfo.tilingData.get());
     EXPECT_EQ(tilingInfo.blockNum, 20U);
     EXPECT_EQ(tilingData->get_usedCoreNum(), 40U);
     EXPECT_EQ(tilingData->get_totalS1(), 0U);
@@ -177,7 +177,7 @@ TEST_F(LightningIndexerGradTiling, tiling_tnd_uniform_global_t1_split_success)
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
     ASSERT_GE(tilingInfo.tilingDataSize, sizeof(optiling::LIGTilingData));
 
-    auto tilingData = reinterpret_cast<const optiling::LIGTilingData *>(tilingInfo.tilingData.get());
+    auto tilingData = reinterpret_cast<const optiling::LIGTilingData*>(tilingInfo.tilingData.get());
     EXPECT_EQ(tilingInfo.blockNum, 4U);
     EXPECT_EQ(tilingData->get_totalS1(), 64U);
     EXPECT_EQ(tilingData->get_usedCoreNum(), 8U);

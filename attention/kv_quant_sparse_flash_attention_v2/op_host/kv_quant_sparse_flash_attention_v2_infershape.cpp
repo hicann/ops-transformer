@@ -38,8 +38,8 @@ constexpr uint32_t QSFA_DIM_NUM_4 = 4;
 constexpr uint32_t DIM_NUM_1 = 1;
 
 // 设置attention_out的shape: query shape去掉rope_head_dim维度
-inline void SetQSFAAttentionOutShape(const gert::Shape *queryShape, gert::Shape *attentionOutShape,
-                                     const std::string &inputLayoutQueryPtrStr, const int64_t ropeHeadDim)
+inline void SetQSFAAttentionOutShape(const gert::Shape* queryShape, gert::Shape* attentionOutShape,
+                                     const std::string& inputLayoutQueryPtrStr, const int64_t ropeHeadDim)
 {
     *attentionOutShape = *queryShape;
     if (inputLayoutQueryPtrStr == "BSND") {
@@ -60,30 +60,30 @@ inline void SetQSFAAttentionOutShape(const gert::Shape *queryShape, gert::Shape 
     }
 }
 
-ge::graphStatus InferShapeKvQuantSparseFlashAttentionV2(gert::InferShapeContext *context)
+ge::graphStatus InferShapeKvQuantSparseFlashAttentionV2(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("KvQuantSparseFlashAttentionV2", "InferShapeContext is nullptr"),
                 return ge::GRAPH_FAILED);
-    const gert::Shape *queryShape = context->GetInputShape(QSFA_QUERY_INPUT_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(QSFA_QUERY_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(KEY_INPUT_INDEX);
+    const gert::Shape* keyShape = context->GetInputShape(KEY_INPUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    gert::Shape *attentionOutShape = context->GetOutputShape(0);
+    gert::Shape* attentionOutShape = context->GetOutputShape(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
-    gert::Shape *softmaxMaxShape = context->GetOutputShape(1);
+    gert::Shape* softmaxMaxShape = context->GetOutputShape(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxMaxShape);
-    gert::Shape *softmaxSumShape = context->GetOutputShape(2);
+    gert::Shape* softmaxSumShape = context->GetOutputShape(2);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxSumShape);
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const char *inputLayoutQueryPtr = attrs->GetAttrPointer<char>(QSFA_LAYOUT_QUERY_ATTR_INDEX);
+    const char* inputLayoutQueryPtr = attrs->GetAttrPointer<char>(QSFA_LAYOUT_QUERY_ATTR_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutQueryPtr);
     std::string inputLayoutQueryPtrStr = std::string(inputLayoutQueryPtr);
-    const char *inputLayoutKvPtr = attrs->GetAttrPointer<char>(LAYOUT_KV_ATTR_INDEX);
+    const char* inputLayoutKvPtr = attrs->GetAttrPointer<char>(LAYOUT_KV_ATTR_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutKvPtr);
     std::string inputLayoutKvPtrStr = std::string(inputLayoutKvPtr);
     const int64_t ropeHeadDim = *attrs->GetAttrPointer<int64_t>(QSFA_ROPE_HEAD_DIM_ATTR_INDEX);
-    const bool *returnSoftmaxLsePtr = attrs->GetAttrPointer<bool>(RETURN_SOFTMAX_LSE_ATTR_INDEX);
+    const bool* returnSoftmaxLsePtr = attrs->GetAttrPointer<bool>(RETURN_SOFTMAX_LSE_ATTR_INDEX);
     bool returnSoftmaxLse = (returnSoftmaxLsePtr != nullptr) ? *returnSoftmaxLsePtr : false;
 
     SetQSFAAttentionOutShape(queryShape, attentionOutShape, inputLayoutQueryPtrStr, ropeHeadDim);
@@ -137,7 +137,7 @@ ge::graphStatus InferShapeKvQuantSparseFlashAttentionV2(gert::InferShapeContext 
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeKvQuantSparseFlashAttentionV2(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeKvQuantSparseFlashAttentionV2(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("KvQuantSparseFlashAttentionV2", "InferShapeContext is nullptr"),
                 return ge::GRAPH_FAILED);

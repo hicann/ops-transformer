@@ -57,10 +57,10 @@ class GenericBlockSparseAttentionGradMetadataCpuKernelArch35 : public CpuKernel 
 public:
     GenericBlockSparseAttentionGradMetadataCpuKernelArch35() = default;
     ~GenericBlockSparseAttentionGradMetadataCpuKernelArch35() override = default;
-    uint32_t Compute(CpuKernelContext &ctx) override;
+    uint32_t Compute(CpuKernelContext& ctx) override;
 
 private:
-    bool Prepare(CpuKernelContext &ctx);
+    bool Prepare(CpuKernelContext& ctx);
     bool ParamsCheck();
     bool ParamsInit();
     uint32_t GetKvSeqLen(uint32_t bIdx) const;
@@ -72,13 +72,13 @@ private:
     bool GenMetadata();
 
 private:
-    Tensor *sparseBlockIdx_ = nullptr;
-    Tensor *sparseBlockCount_ = nullptr;
-    Tensor *cuSeqLengthsQ_ = nullptr;
-    Tensor *cuSeqLengthsKv_ = nullptr;
-    Tensor *sequsedQ_ = nullptr;
-    Tensor *sequsedKv_ = nullptr;
-    Tensor *metadata_ = nullptr;
+    Tensor* sparseBlockIdx_ = nullptr;
+    Tensor* sparseBlockCount_ = nullptr;
+    Tensor* cuSeqLengthsQ_ = nullptr;
+    Tensor* cuSeqLengthsKv_ = nullptr;
+    Tensor* sequsedQ_ = nullptr;
+    Tensor* sequsedKv_ = nullptr;
+    Tensor* metadata_ = nullptr;
 
     int32_t maxQSeqlen_ = 0;
     int32_t maxKvSeqlen_ = 0;

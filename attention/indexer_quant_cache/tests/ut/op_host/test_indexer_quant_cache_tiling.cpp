@@ -557,7 +557,7 @@ TEST_F(IndexerQuantCacheTiling, InvalidCacheBlockDimensionsRejected)
     const int64_t maxDim = std::numeric_limits<int64_t>::max();
     const int64_t cases[][4] = {{0, 1, 4, 1}, {4, 0, 4, 1},      {4, 1, 0, 1},
                                 {4, 1, 4, 0}, {maxDim, 2, 4, 1}, {4, 1, maxDim, 2}};
-    for (const auto &dims : cases) {
+    for (const auto& dims : cases) {
         SCOPED_TRACE(::testing::Message() << dims[0] << "," << dims[1] << "," << dims[2] << "," << dims[3]);
         gert::TilingContextPara para(
             "IndexerQuantCache",

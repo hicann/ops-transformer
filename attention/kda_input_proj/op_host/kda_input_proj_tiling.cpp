@@ -35,14 +35,14 @@ constexpr uint32_t DIM_NUM_THREE = 3U;
 constexpr int64_t MX_BLOCK_SIZE = 64L;
 constexpr int64_t WEIGHT_QKV_SCALE_PACK_NUM = 2L;
 
-static bool GetAttrOrDefault(const bool *ptr, bool defaultValue)
+static bool GetAttrOrDefault(const bool* ptr, bool defaultValue)
 {
     return (ptr != nullptr) ? *ptr : defaultValue;
 }
 
-static const gert::Shape &GetWeightLogicShape(const gert::StorageShape *shape)
+static const gert::Shape& GetWeightLogicShape(const gert::StorageShape* shape)
 {
-    const auto &origin = shape->GetOriginShape();
+    const auto& origin = shape->GetOriginShape();
     if (origin.GetDimNum() == DIM_NUM_TWO) {
         return origin;
     }
@@ -50,13 +50,13 @@ static const gert::Shape &GetWeightLogicShape(const gert::StorageShape *shape)
 }
 
 // trans=true：存储 [N, K]，N=dim0；trans=false：逻辑 [K, N]，N=dim1。
-static uint32_t InferOutFeatures(const gert::Shape &weightShape, bool transWeight)
+static uint32_t InferOutFeatures(const gert::Shape& weightShape, bool transWeight)
 {
     return static_cast<uint32_t>(transWeight ? weightShape.GetDim(DIM_IDX_ZERO) : weightShape.GetDim(DIM_IDX_ONE));
 }
 
-ge::graphStatus CheckExpectDataType(ge::DataType actual, ge::DataType expect, const char *tensorName,
-                                    const char *expectName, const char *opName)
+ge::graphStatus CheckExpectDataType(ge::DataType actual, ge::DataType expect, const char* tensorName,
+                                    const char* expectName, const char* opName)
 {
     OP_CHECK_IF(actual != expect, OP_LOGE(opName, "%s dtype must be %s.", tensorName, expectName),
                 return ge::GRAPH_FAILED);
@@ -68,7 +68,7 @@ ge::graphStatus KdaInputProjInfoParser::GetOpName()
 {
     OP_CHECK_IF(context_ == nullptr, OPS_REPORT_VECTOR_INNER_ERR("KdaInputProj", "Tiling context is null."),
                 return ge::GRAPH_FAILED);
-    const char *opName = context_->GetNodeName();
+    const char* opName = context_->GetNodeName();
     OP_CHECK_IF(opName == nullptr, OPS_REPORT_VECTOR_INNER_ERR("KdaInputProj", "Node name is null."),
                 return ge::GRAPH_FAILED);
     opName_ = opName;
@@ -134,7 +134,7 @@ void KdaInputProjInfoParser::GetOutputParaInfo()
 
 ge::graphStatus KdaInputProjInfoParser::GetAndCheckAttrParaInfo()
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     if (attrs != nullptr) {
         opParamInfo_.transWeightQkv = attrs->GetAttrPointer<bool>(ATTR_TRANS_WEIGHT_QKV_INDEX);
         opParamInfo_.transWeightBeta = attrs->GetAttrPointer<bool>(ATTR_TRANS_WEIGHT_BETA_INDEX);
@@ -251,7 +251,7 @@ ge::graphStatus KdaInputProjInfoParser::CheckShapeDim()
 
 ge::graphStatus KdaInputProjInfoParser::GetBaseShapeInfo()
 {
-    const auto &xShape = opParamInfo_.x.shape->GetStorageShape();
+    const auto& xShape = opParamInfo_.x.shape->GetStorageShape();
     baseParams_.tSize = static_cast<uint32_t>(xShape.GetDim(DIM_IDX_ZERO));
     baseParams_.hiddenSize = static_cast<uint32_t>(xShape.GetDim(DIM_IDX_ONE));
     OP_CHECK_IF(baseParams_.tSize == 0 || baseParams_.hiddenSize == 0,
@@ -281,7 +281,7 @@ ge::graphStatus KdaInputProjInfoParser::ValidateInputShapesMatch()
     const int64_t hiddenSize = static_cast<int64_t>(baseParams_.hiddenSize);
     const int64_t qkvSize = static_cast<int64_t>(baseParams_.qkvSize);
     const int64_t mxHiddenSize = (hiddenSize + MX_BLOCK_SIZE - 1L) / MX_BLOCK_SIZE;
-    const auto &weightQkvScaleStorage = opParamInfo_.weightQkvScale.shape->GetStorageShape();
+    const auto& weightQkvScaleStorage = opParamInfo_.weightQkvScale.shape->GetStorageShape();
     const int64_t scaleDim0 = weightQkvScaleStorage.GetDim(0);
     const int64_t scaleDim1 = weightQkvScaleStorage.GetDim(1);
     const int64_t scaleDim2 = weightQkvScaleStorage.GetDim(2);
@@ -296,7 +296,7 @@ ge::graphStatus KdaInputProjInfoParser::ValidateInputShapesMatch()
     return ge::GRAPH_SUCCESS;
 }
 
-void KdaInputProjInfoParser::GenerateInfo(KdaInputProjTilingInfo &tilingInfo)
+void KdaInputProjInfoParser::GenerateInfo(KdaInputProjTilingInfo& tilingInfo)
 {
     tilingInfo.opName = opName_;
     tilingInfo.platformInfo = platformInfo_;
@@ -318,7 +318,7 @@ void KdaInputProjInfoParser::GenerateInfo(KdaInputProjTilingInfo &tilingInfo)
             tilingInfo.aicNum, tilingInfo.aivNum, tilingInfo.l1Size, tilingInfo.l0cSize, tilingInfo.ubSize);
 }
 
-ge::graphStatus KdaInputProjInfoParser::ParseAndCheck(KdaInputProjTilingInfo &tilingInfo)
+ge::graphStatus KdaInputProjInfoParser::ParseAndCheck(KdaInputProjTilingInfo& tilingInfo)
 {
     if (GetOpName() != ge::GRAPH_SUCCESS || GetNpuInfo() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -341,18 +341,18 @@ ge::graphStatus KdaInputProjInfoParser::ParseAndCheck(KdaInputProjTilingInfo &ti
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingPrepareForKdaInputProj(gert::TilingParseContext * /* context */)
+static ge::graphStatus TilingPrepareForKdaInputProj(gert::TilingParseContext* /* context */)
 {
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KdaInputProjTiling::FillBaseParams(const KdaInputProjTilingInfo &tilingInfo)
+ge::graphStatus KdaInputProjTiling::FillBaseParams(const KdaInputProjTilingInfo& tilingInfo)
 {
     tilingData_.baseParams = tilingInfo.baseParams;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KdaInputProjTiling::CalcModuleTilings(const KdaInputProjTilingInfo &tilingInfo)
+ge::graphStatus KdaInputProjTiling::CalcModuleTilings(const KdaInputProjTilingInfo& tilingInfo)
 {
     // 与 kernel 四组件一一对应；跨模块 workspace / 核数协调在编排层汇总
     if (KdaInputProjMmBggTiling(tilingInfo, context_).CalcTiling(tilingData_.mmBggParams) != ge::GRAPH_SUCCESS ||
@@ -364,14 +364,14 @@ ge::graphStatus KdaInputProjTiling::CalcModuleTilings(const KdaInputProjTilingIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KdaInputProjTiling::CalcWorkspaceSize(const KdaInputProjTilingInfo &tilingInfo)
+ge::graphStatus KdaInputProjTiling::CalcWorkspaceSize(const KdaInputProjTilingInfo& tilingInfo)
 {
-    const auto &base = tilingInfo.baseParams;
+    const auto& base = tilingInfo.baseParams;
     workspaceSize_ = KdaInputProj::KdaInputProjWorkspace::TotalBytes(base.tSize, base.hiddenSize);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KdaInputProjTiling::SetTilingKey(const KdaInputProjTilingInfo &tilingInfo)
+ge::graphStatus KdaInputProjTiling::SetTilingKey(const KdaInputProjTilingInfo& tilingInfo)
 {
     // 与 ASCENDC_TPL_ARGS_DECL 顺序一致：TRANS_WEIGHT_{QKV,BETA,GATE,G}
     const uint64_t tilingKey = GET_TPL_TILING_KEY(tilingInfo.transWeightQkv, tilingInfo.transWeightBeta,
@@ -384,9 +384,9 @@ ge::graphStatus KdaInputProjTiling::SetTilingKey(const KdaInputProjTilingInfo &t
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KdaInputProjTiling::WriteTilingResult(const KdaInputProjTilingInfo &tilingInfo)
+ge::graphStatus KdaInputProjTiling::WriteTilingResult(const KdaInputProjTilingInfo& tilingInfo)
 {
-    const char *opName = tilingInfo.opName != nullptr ? tilingInfo.opName : "KdaInputProj";
+    const char* opName = tilingInfo.opName != nullptr ? tilingInfo.opName : "KdaInputProj";
     OP_CHECK_IF(tilingInfo.platformInfo == nullptr, OPS_REPORT_VECTOR_INNER_ERR(opName, "platformInfo is null."),
                 return ge::GRAPH_FAILED);
 
@@ -420,12 +420,12 @@ ge::graphStatus KdaInputProjTiling::WriteTilingResult(const KdaInputProjTilingIn
     context_->SetScheduleMode(1);
 
     const uint32_t sysWorkspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_IF(workspaces == nullptr, OPS_REPORT_VECTOR_INNER_ERR(opName, "GetWorkspaceSizes returned nullptr."),
                 return ge::GRAPH_FAILED);
     workspaces[0] = static_cast<size_t>(workspaceSize_) + static_cast<size_t>(sysWorkspaceSize);
 
-    KdaInputProjTilingData *outTiling = context_->GetTilingData<KdaInputProjTilingData>();
+    KdaInputProjTilingData* outTiling = context_->GetTilingData<KdaInputProjTilingData>();
     OP_CHECK_IF(outTiling == nullptr, OPS_REPORT_VECTOR_INNER_ERR(opName, "GetTilingData returned nullptr."),
                 return ge::GRAPH_FAILED);
     *outTiling = tilingData_;
@@ -435,7 +435,7 @@ ge::graphStatus KdaInputProjTiling::WriteTilingResult(const KdaInputProjTilingIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KdaInputProjTiling::DoTiling(const KdaInputProjTilingInfo *tilingInfo)
+ge::graphStatus KdaInputProjTiling::DoTiling(const KdaInputProjTilingInfo* tilingInfo)
 {
     OP_CHECK_IF(tilingInfo == nullptr, OPS_REPORT_VECTOR_INNER_ERR("KdaInputProj", "Tiling info is null."),
                 return ge::GRAPH_FAILED);
@@ -448,7 +448,7 @@ ge::graphStatus KdaInputProjTiling::DoTiling(const KdaInputProjTilingInfo *tilin
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingForKdaInputProj(gert::TilingContext *context)
+ge::graphStatus TilingForKdaInputProj(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("KdaInputProj", "Tiling context is null."),
                 return ge::GRAPH_FAILED);

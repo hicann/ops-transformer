@@ -62,30 +62,30 @@ public:
     static constexpr Epilogue::SinkMode SINK_MODE = EpilogueOnlineSoftmax::SINK_MODE;
 
     struct GlobalTensorBundle {
-        AscendC::GlobalTensor<ElementQ> &gQ;
-        AscendC::GlobalTensor<ElementK> &gK;
-        AscendC::GlobalTensor<ElementK> &gV;
-        AscendC::GlobalTensor<ElementQ> &gPseShift;
-        AscendC::GlobalTensor<ElementMask> &gMask;
-        AscendC::GlobalTensor<int32_t> &gBlockTable;
-        AscendC::GlobalTensor<int64_t> &gActualQseqlen;
-        AscendC::GlobalTensor<int64_t> &gActualKvseqlen;
-        AscendC::GlobalTensor<ElementO> &gO;
-        AscendC::GlobalTensor<ElementLse> &gLse;
-        AscendC::GlobalTensor<ElementLse> &gLseFD;
-        AscendC::GlobalTensor<ElementLse> &gOFD;
-        AscendC::GlobalTensor<ElementS> &gS;
-        AscendC::GlobalTensor<ElementP> &gP;
-        AscendC::GlobalTensor<ElementOTmp> &gOTmp;
-        AscendC::GlobalTensor<ElementOTmp> &gOUpdate;
-        AscendC::GlobalTensor<ElementSink> &gSink;
+        AscendC::GlobalTensor<ElementQ>& gQ;
+        AscendC::GlobalTensor<ElementK>& gK;
+        AscendC::GlobalTensor<ElementK>& gV;
+        AscendC::GlobalTensor<ElementQ>& gPseShift;
+        AscendC::GlobalTensor<ElementMask>& gMask;
+        AscendC::GlobalTensor<int32_t>& gBlockTable;
+        AscendC::GlobalTensor<int64_t>& gActualQseqlen;
+        AscendC::GlobalTensor<int64_t>& gActualKvseqlen;
+        AscendC::GlobalTensor<ElementO>& gO;
+        AscendC::GlobalTensor<ElementLse>& gLse;
+        AscendC::GlobalTensor<ElementLse>& gLseFD;
+        AscendC::GlobalTensor<ElementLse>& gOFD;
+        AscendC::GlobalTensor<ElementS>& gS;
+        AscendC::GlobalTensor<ElementP>& gP;
+        AscendC::GlobalTensor<ElementOTmp>& gOTmp;
+        AscendC::GlobalTensor<ElementOTmp>& gOUpdate;
+        AscendC::GlobalTensor<ElementSink>& gSink;
     };
 
     __aicore__ inline FAInferKernel() {}
 
-    __aicore__ inline void operator()(FAIKernelParams const &params)
+    __aicore__ inline void operator()(FAIKernelParams const& params)
     {
-        __gm__ FAInferTilingData *fATilingData = reinterpret_cast<__gm__ FAInferTilingData *>(params.tiling);
+        __gm__ FAInferTilingData* fATilingData = reinterpret_cast<__gm__ FAInferTilingData*>(params.tiling);
         mm1OutSize = fATilingData->mm1OutSize;
         smOnlineOutSize = fATilingData->smOnlineOutSize;
         mm2OutSize = fATilingData->mm2OutSize;
@@ -116,47 +116,47 @@ public:
         }
 
         AscendC::GlobalTensor<ElementQ> gQ;
-        gQ.SetGlobalBuffer((__gm__ ElementQ *)params.q);
-        AscendC::ListTensorDesc keyListTensorDescInit((__gm__ void *)params.k);
-        __gm__ uint8_t *currentKey = (__gm__ uint8_t *)keyListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
-        AscendC::ListTensorDesc valueListTensorDescInit((__gm__ void *)params.v);
-        __gm__ uint8_t *currentValue = (__gm__ uint8_t *)valueListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
+        gQ.SetGlobalBuffer((__gm__ ElementQ*)params.q);
+        AscendC::ListTensorDesc keyListTensorDescInit((__gm__ void*)params.k);
+        __gm__ uint8_t* currentKey = (__gm__ uint8_t*)keyListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
+        AscendC::ListTensorDesc valueListTensorDescInit((__gm__ void*)params.v);
+        __gm__ uint8_t* currentValue = (__gm__ uint8_t*)valueListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
         AscendC::GlobalTensor<ElementK> gK;
-        gK.SetGlobalBuffer((__gm__ ElementK *)currentKey);
+        gK.SetGlobalBuffer((__gm__ ElementK*)currentKey);
         AscendC::GlobalTensor<ElementK> gV;
-        gV.SetGlobalBuffer((__gm__ ElementK *)currentValue);
+        gV.SetGlobalBuffer((__gm__ ElementK*)currentValue);
         AscendC::GlobalTensor<ElementQ> gPseShift;
-        gPseShift.SetGlobalBuffer((__gm__ ElementQ *)params.pseShift);
+        gPseShift.SetGlobalBuffer((__gm__ ElementQ*)params.pseShift);
         AscendC::GlobalTensor<int64_t> gActualQseqlen;
         AscendC::GlobalTensor<ElementMask> gMask;
-        gMask.SetGlobalBuffer((__gm__ ElementMask *)params.mask);
+        gMask.SetGlobalBuffer((__gm__ ElementMask*)params.mask);
         AscendC::GlobalTensor<int32_t> gBlockTable;
-        gBlockTable.SetGlobalBuffer((__gm__ int32_t *)(params.blockTables));
-        gActualQseqlen.SetGlobalBuffer((__gm__ int64_t *)params.actualQseqlen);
+        gBlockTable.SetGlobalBuffer((__gm__ int32_t*)(params.blockTables));
+        gActualQseqlen.SetGlobalBuffer((__gm__ int64_t*)params.actualQseqlen);
         AscendC::GlobalTensor<int64_t> gActualKvseqlen;
-        gActualKvseqlen.SetGlobalBuffer((__gm__ int64_t *)params.actualKvseqlen);
+        gActualKvseqlen.SetGlobalBuffer((__gm__ int64_t*)params.actualKvseqlen);
         AscendC::GlobalTensor<ElementO> gO;
-        gO.SetGlobalBuffer((__gm__ ElementO *)params.o);
+        gO.SetGlobalBuffer((__gm__ ElementO*)params.o);
         AscendC::GlobalTensor<ElementLse> gLse;
-        gLse.SetGlobalBuffer((__gm__ ElementLse *)params.lse);
+        gLse.SetGlobalBuffer((__gm__ ElementLse*)params.lse);
         AscendC::GlobalTensor<ElementLse> gLseFD;
         AscendC::GlobalTensor<ElementLse> gOFD;
         if constexpr (IS_FD) {
-            gLseFD.SetGlobalBuffer((__gm__ ElementLse *)(params.workSpace));
-            gOFD.SetGlobalBuffer((__gm__ ElementLse *)(params.workSpace + Lsesize));
+            gLseFD.SetGlobalBuffer((__gm__ ElementLse*)(params.workSpace));
+            gOFD.SetGlobalBuffer((__gm__ ElementLse*)(params.workSpace + Lsesize));
         }
         AscendC::GlobalTensor<ElementS> gS;
-        gS.SetGlobalBuffer((__gm__ ElementS *)(params.workSpace + Lsesize + Losize));
+        gS.SetGlobalBuffer((__gm__ ElementS*)(params.workSpace + Lsesize + Losize));
         AscendC::GlobalTensor<ElementP> gP;
-        gP.SetGlobalBuffer((__gm__ ElementP *)(params.workSpace + Lsesize + Losize + mm1OutSize));
+        gP.SetGlobalBuffer((__gm__ ElementP*)(params.workSpace + Lsesize + Losize + mm1OutSize));
         AscendC::GlobalTensor<ElementOTmp> gOTmp;
         gOTmp.SetGlobalBuffer(
-            (__gm__ ElementOTmp *)(params.workSpace + Lsesize + Losize + mm1OutSize + smOnlineOutSize));
+            (__gm__ ElementOTmp*)(params.workSpace + Lsesize + Losize + mm1OutSize + smOnlineOutSize));
         AscendC::GlobalTensor<ElementOTmp> gOUpdate;
         gOUpdate.SetGlobalBuffer(
-            (__gm__ ElementOTmp *)(params.workSpace + Lsesize + Losize + mm1OutSize + smOnlineOutSize + mm2OutSize));
+            (__gm__ ElementOTmp*)(params.workSpace + Lsesize + Losize + mm1OutSize + smOnlineOutSize + mm2OutSize));
         AscendC::GlobalTensor<ElementSink> gSink;
-        gSink.SetGlobalBuffer((__gm__ ElementSink *)(params.sink));
+        gSink.SetGlobalBuffer((__gm__ ElementSink*)(params.sink));
 
         GlobalTensorBundle globalTensors{
             gQ,     gK,   gV, gPseShift, gMask, gBlockTable, gActualQseqlen, gActualKvseqlen, gO, gLse,
@@ -415,26 +415,26 @@ public:
 
     __aicore__ inline void runMainLoop(uint32_t coreIdx, uint32_t BIdx, uint32_t qNBlockIdx, uint32_t qSBlockIdx,
                                        bool isSplitKV, int32_t stS2IdxNow, int32_t enS2IdxNow, uint64_t gmOffsetLseFD,
-                                       uint64_t gmOffsetOFD, GlobalTensorBundle &globalTensors, int64_t pseQ,
+                                       uint64_t gmOffsetOFD, GlobalTensorBundle& globalTensors, int64_t pseQ,
                                        int64_t pseKv)
     {
-        auto &gQ = globalTensors.gQ;
-        auto &gK = globalTensors.gK;
-        auto &gV = globalTensors.gV;
-        auto &gPseShift = globalTensors.gPseShift;
-        auto &gMask = globalTensors.gMask;
-        auto &gBlockTable = globalTensors.gBlockTable;
-        auto &gActualQseqlen = globalTensors.gActualQseqlen;
-        auto &gActualKvseqlen = globalTensors.gActualKvseqlen;
-        auto &gO = globalTensors.gO;
-        auto &gLse = globalTensors.gLse;
-        auto &gLseFD = globalTensors.gLseFD;
-        auto &gOFD = globalTensors.gOFD;
-        auto &gS = globalTensors.gS;
-        auto &gP = globalTensors.gP;
-        auto &gOTmp = globalTensors.gOTmp;
-        auto &gOUpdate = globalTensors.gOUpdate;
-        auto &gSink = globalTensors.gSink;
+        auto& gQ = globalTensors.gQ;
+        auto& gK = globalTensors.gK;
+        auto& gV = globalTensors.gV;
+        auto& gPseShift = globalTensors.gPseShift;
+        auto& gMask = globalTensors.gMask;
+        auto& gBlockTable = globalTensors.gBlockTable;
+        auto& gActualQseqlen = globalTensors.gActualQseqlen;
+        auto& gActualKvseqlen = globalTensors.gActualKvseqlen;
+        auto& gO = globalTensors.gO;
+        auto& gLse = globalTensors.gLse;
+        auto& gLseFD = globalTensors.gLseFD;
+        auto& gOFD = globalTensors.gOFD;
+        auto& gS = globalTensors.gS;
+        auto& gP = globalTensors.gP;
+        auto& gOTmp = globalTensors.gOTmp;
+        auto& gOUpdate = globalTensors.gOUpdate;
+        auto& gSink = globalTensors.gSink;
 
         uint32_t qSeqlen = static_cast<uint32_t>(gActualQseqlen.GetValue(BIdx));
         uint32_t kvSeqlen = static_cast<uint32_t>(gActualKvseqlen.GetValue(BIdx));

@@ -24,44 +24,25 @@
 
 namespace NpuArch::Epilogue::Block {
 
-struct SinkLoopParam
-{
+struct SinkLoopParam {
     uint32_t rowOffsetIoGm;
     uint32_t rowNumCurLoop;
     uint32_t qSBlockSize;
     uint32_t rowOffsetThisSubBlock;
 
-    __aicore__ inline
-    SinkLoopParam(
-        uint32_t rowOffsetIoGm_,
-        uint32_t rowNumCurLoop_,
-        uint32_t qSeqBlockSize_,
-        uint32_t rowOffsetThisSubBlock_
-    ) :
-        rowOffsetIoGm(rowOffsetIoGm_),
-        rowNumCurLoop(rowNumCurLoop_),
-        qSBlockSize(qSeqBlockSize_),
-        rowOffsetThisSubBlock(rowOffsetThisSubBlock_)
+    __aicore__ inline SinkLoopParam(uint32_t rowOffsetIoGm_, uint32_t rowNumCurLoop_, uint32_t qSeqBlockSize_,
+                                    uint32_t rowOffsetThisSubBlock_)
+        : rowOffsetIoGm(rowOffsetIoGm_),
+          rowNumCurLoop(rowNumCurLoop_),
+          qSBlockSize(qSeqBlockSize_),
+          rowOffsetThisSubBlock(rowOffsetThisSubBlock_)
     {}
 };
 
-template <
-    class OutputType_,
-    class InputType_,
-    class MaskType_,
-    class SinkType_,
-    class FullType_,
-    LseMode LSE_MODE_,
-    SinkMode SINK_MODE_,
-    MaskMode MASK_MODE_>
-class BlockEpilogue<
-    EpilogueAtlasA2OnlineSoftmax<LSE_MODE_, SINK_MODE_, MASK_MODE_, float>,
-    OutputType_,
-    InputType_,
-    MaskType_,
-    SinkType_,
-    FullType_>
-{
+template <class OutputType_, class InputType_, class MaskType_, class SinkType_, class FullType_, LseMode LSE_MODE_,
+          SinkMode SINK_MODE_, MaskMode MASK_MODE_>
+class BlockEpilogue<EpilogueAtlasA2OnlineSoftmax<LSE_MODE_, SINK_MODE_, MASK_MODE_, float>, OutputType_, InputType_,
+                    MaskType_, SinkType_, FullType_> {
 public:
     using DispatchPolicy = EpilogueAtlasA2OnlineSoftmax<LSE_MODE_, SINK_MODE_, MASK_MODE_, float>;
     using ArchTag = typename DispatchPolicy::ArchTag;
@@ -100,11 +81,9 @@ public:
 
     static constexpr float NEG_INF = -std::numeric_limits<float>::infinity();
 
-    __aicore__ inline
-    BlockEpilogue() {}
+    __aicore__ inline BlockEpilogue() {}
 
-    __aicore__ inline
-    void init(Arch::Resource<ArchTag> &resource, float scaleValue_)
+    __aicore__ inline void init(Arch::Resource<ArchTag>& resource, float scaleValue_)
     {
         // Allocate UB space
         constexpr uint32_t LS_UB_TENSOR_OFFSET = 0;
@@ -145,21 +124,20 @@ public:
         tempMaskTensor = resource.ubBuf.template GetBufferByByte<half>(MASK_UB_PREMASK_TENSOR_OFFSET);
     }
 
-    __aicore__ inline
-    ~BlockEpilogue() {}
+    __aicore__ inline ~BlockEpilogue() {}
 
     template <typename T>
     __aicore__ inline T Min(T a, T b)
     {
         return (a > b) ? b : a;
     }
-    #include "online_softmax/fused_block_epilogue_online_softmax_row_ops.inc.hpp"
-    #include "online_softmax/fused_block_epilogue_online_softmax_data_copy.inc.hpp"
-    #include "online_softmax/fused_block_epilogue_online_softmax_mask.inc.hpp"
-    #include "online_softmax/fused_block_epilogue_online_softmax_softmax.inc.hpp"
-    #include "online_softmax/fused_block_epilogue_online_softmax_subcore.inc.hpp"
-    #include "online_softmax/fused_block_epilogue_online_softmax_sink.inc.hpp"
-    #include "online_softmax/fused_block_epilogue_online_softmax_operator.inc.hpp"
+#include "online_softmax/fused_block_epilogue_online_softmax_row_ops.inc.hpp"
+#include "online_softmax/fused_block_epilogue_online_softmax_data_copy.inc.hpp"
+#include "online_softmax/fused_block_epilogue_online_softmax_mask.inc.hpp"
+#include "online_softmax/fused_block_epilogue_online_softmax_softmax.inc.hpp"
+#include "online_softmax/fused_block_epilogue_online_softmax_subcore.inc.hpp"
+#include "online_softmax/fused_block_epilogue_online_softmax_sink.inc.hpp"
+#include "online_softmax/fused_block_epilogue_online_softmax_operator.inc.hpp"
 private:
     uint32_t kvheadIdx = 0;
     float scaleValue;
@@ -181,6 +159,6 @@ private:
     AscendC::LocalTensor<half> tempMaskTensor;
     AscendC::LocalTensor<uint8_t> selMaskUbTensor;
 };
-}
+} // namespace NpuArch::Epilogue::Block
 
-#endif  // EPILOGUE_BLOCK_BLOCK_EPILOGUE_ONLINE_SOFTMAX_HPP
+#endif // EPILOGUE_BLOCK_BLOCK_EPILOGUE_ONLINE_SOFTMAX_HPP

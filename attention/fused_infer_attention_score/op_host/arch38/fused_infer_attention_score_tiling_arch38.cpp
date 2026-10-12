@@ -121,7 +121,7 @@ constexpr uint32_t PSE_TYPE_INDEX = 14;
 
 constexpr uint32_t SOFTMAX_LSE_INDEX = 1;
 
-static bool CheckEmptyTensorList(ContextParamsForPFATiling &contextKeyParams, int64_t validBatchOfK)
+static bool CheckEmptyTensorList(ContextParamsForPFATiling& contextKeyParams, int64_t validBatchOfK)
 {
     for (int64_t tmpIdx = 0; tmpIdx < validBatchOfK; ++tmpIdx) {
         if (contextKeyParams.kTensorList[tmpIdx]->GetStorageShape().GetShapeSize() != 0) {
@@ -135,8 +135,8 @@ static bool CheckEmptyTensorList(ContextParamsForPFATiling &contextKeyParams, in
     return true;
 }
 
-static bool GetKeyRopeSeqLenAndCheckBatch(gert::TilingContext *context, ContextParamsForPFATiling &contextKeyParams,
-                                          int64_t validBatchOfK, int64_t keyRopeSDimIdx, int64_t &keyRopeS)
+static bool GetKeyRopeSeqLenAndCheckBatch(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams,
+                                          int64_t validBatchOfK, int64_t keyRopeSDimIdx, int64_t& keyRopeS)
 {
     keyRopeS = 0;
     if (contextKeyParams.keyRopeInputShape != nullptr) {
@@ -151,7 +151,7 @@ static bool GetKeyRopeSeqLenAndCheckBatch(gert::TilingContext *context, ContextP
     return true;
 }
 
-static bool CheckNormalTensorListBSH(gert::TilingContext *context, ContextParamsForPFATiling &contextKeyParams,
+static bool CheckNormalTensorListBSH(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams,
                                      int64_t validBatchOfK)
 {
     auto standardKH = contextKeyParams.kTensorList[0]->GetStorageShape().GetDim(KV_DIM_2);
@@ -196,7 +196,7 @@ static bool CheckNormalTensorListBSH(gert::TilingContext *context, ContextParams
     return true;
 }
 
-static bool CheckNormalTensorListBNSD(gert::TilingContext *context, ContextParamsForPFATiling &contextKeyParams,
+static bool CheckNormalTensorListBNSD(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams,
                                       int64_t validBatchOfK)
 {
     auto standardN = contextKeyParams.kTensorList[0]->GetStorageShape().GetDim(1);
@@ -260,7 +260,7 @@ static bool CheckNormalTensorListBNSD(gert::TilingContext *context, ContextParam
     return true;
 }
 
-static bool CheckNormalTensorListBSND(gert::TilingContext *context, ContextParamsForPFATiling &contextKeyParams,
+static bool CheckNormalTensorListBSND(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams,
                                       int64_t validBatchOfK)
 {
     auto standardN = contextKeyParams.kTensorList[0]->GetStorageShape().GetDim(KV_DIM_2);
@@ -323,7 +323,7 @@ static bool CheckNormalTensorListBSND(gert::TilingContext *context, ContextParam
     return true;
 }
 
-static bool CheckNormalTensorList(gert::TilingContext *context, ContextParamsForPFATiling &contextKeyParams,
+static bool CheckNormalTensorList(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams,
                                   const string layoutStr, int64_t validBatchOfK)
 {
     bool ret = false;
@@ -340,7 +340,7 @@ static bool CheckNormalTensorList(gert::TilingContext *context, ContextParamsFor
     return ret;
 }
 
-static bool CheckTensorList(gert::TilingContext *context, ContextParamsForPFATiling &contextKeyParams,
+static bool CheckTensorList(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams,
                             const string layoutStr, int64_t batchOfQ)
 {
     int64_t validBatchOfK = 0;
@@ -398,7 +398,7 @@ static bool CheckTensorList(gert::TilingContext *context, ContextParamsForPFATil
     return true;
 }
 
-static bool CheckKVPaddingCrossover(gert::TilingContext *context, ContextParamsForPFATiling &contextKeyParams)
+static bool CheckKVPaddingCrossover(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams)
 {
     OP_CHECK_IF(((contextKeyParams.queryPaddingSize != nullptr) &&
                  (contextKeyParams.queryPaddingSize->GetStorageShape().GetShapeSize() != 1 ||
@@ -437,7 +437,7 @@ static bool CheckKVPaddingCrossover(gert::TilingContext *context, ContextParamsF
 }
 
 // 0 不转置; 1 BNSD_BSND; 2 BSND_BNSD; 3 BSH_BNSD; 4 BNSD_NBSD; 5 BSND_NBSD; 6 BSH_NBSD; 7 NTD_TND; 8 TND_NTD
-static uint32_t GetTransposeLayout(const std::string &layout)
+static uint32_t GetTransposeLayout(const std::string& layout)
 {
     const std::map<std::string, uint32_t> transposeLayoutMp = {{"BNSD_BSND", 1}, {"BSND_BNSD", 2}, {"BSH_BNSD", 3},
                                                                {"BNSD_NBSD", 4}, {"BSND_NBSD", 5}, {"BSH_NBSD", 6},
@@ -448,8 +448,8 @@ static uint32_t GetTransposeLayout(const std::string &layout)
     return 0;
 }
 
-static ge::graphStatus ConvertQuantOptionalInputs(const gert::TilingContext *context,
-                                                  ContextParamsForPFATiling &contextKeyParams)
+static ge::graphStatus ConvertQuantOptionalInputs(const gert::TilingContext* context,
+                                                  ContextParamsForPFATiling& contextKeyParams)
 {
     contextKeyParams.deqScale1Shape = context->GetOptionalInputShape(DEQUANT_SCALE1_INDEX);
     contextKeyParams.scale1Shape = context->GetOptionalInputShape(QUANT_SCALE1_INDEX);
@@ -490,8 +490,8 @@ static ge::graphStatus ConvertQuantOptionalInputs(const gert::TilingContext *con
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext *context,
-                                                 ContextParamsForPFATiling &contextKeyParams, bool isMaxWorkspace)
+static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext* context,
+                                                 ContextParamsForPFATiling& contextKeyParams, bool isMaxWorkspace)
 {
     contextKeyParams.opName = context->GetNodeName();
 
@@ -606,7 +606,7 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext *context,
             batchOfQ = contextKeyParams.queryInputShape->GetStorageShape().GetDim(QUERY_DIM_0);
         } else {
             if (!isMaxWorkspace) {
-                const gert::Tensor *actSeqLenData = contextKeyParams.actualSequenceLengthQ;
+                const gert::Tensor* actSeqLenData = contextKeyParams.actualSequenceLengthQ;
                 int64_t actSeqLenDims = (actSeqLenData != nullptr) ? actSeqLenData->GetShapeSize() : 0;
                 OP_CHECK_IF(((actSeqLenData == nullptr) || (actSeqLenDims == 0) ||
                              (actSeqLenData->GetData<int64_t>() == nullptr)),
@@ -614,7 +614,7 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext *context,
                                 contextKeyParams.opName,
                                 "When layout is TND/NTD/TND_NTD/NTD_TND, actualSequenceLengthQ is required"),
                             return ge::GRAPH_FAILED);
-                const gert::Tensor *actSeqLenDataKV = contextKeyParams.actualSequenceLengthKV;
+                const gert::Tensor* actSeqLenDataKV = contextKeyParams.actualSequenceLengthKV;
                 int64_t actSeqLenKVDims = (actSeqLenDataKV != nullptr) ? actSeqLenDataKV->GetShapeSize() : 0;
                 OP_CHECK_IF(((actSeqLenDataKV == nullptr) || (actSeqLenKVDims == 0) ||
                              (actSeqLenDataKV->GetData<int64_t>() == nullptr)),
@@ -668,7 +668,7 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ConvertContextToParamsIFA(gert::TilingContext &context, IncreFlashAttentionContext &ifaContext,
+static ge::graphStatus ConvertContextToParamsIFA(gert::TilingContext& context, IncreFlashAttentionContext& ifaContext,
                                                  bool isMaxWorkspace)
 {
     if (context.GetNodeName() == nullptr) {
@@ -779,14 +779,14 @@ static ge::graphStatus ConvertContextToParamsIFA(gert::TilingContext &context, I
         ifaContext.kCache.resize(batchOfQuery);
         ifaContext.vCache.resize(batchOfQuery);
         for (int64_t size = 0; size < batchOfQuery; ++size) {
-            ifaContext.kCache[size] = const_cast<gert::StorageShape *>(context.GetDynamicInputShape(KEY_INDEX, size));
-            ifaContext.vCache[size] = const_cast<gert::StorageShape *>(context.GetDynamicInputShape(VALUE_INDEX, size));
+            ifaContext.kCache[size] = const_cast<gert::StorageShape*>(context.GetDynamicInputShape(KEY_INDEX, size));
+            ifaContext.vCache[size] = const_cast<gert::StorageShape*>(context.GetDynamicInputShape(VALUE_INDEX, size));
         }
     } else {
         ifaContext.kCache.resize(1);
         ifaContext.vCache.resize(1);
-        ifaContext.kCache[0] = const_cast<gert::StorageShape *>(context.GetDynamicInputShape(KEY_INDEX, 0));
-        ifaContext.vCache[0] = const_cast<gert::StorageShape *>(context.GetDynamicInputShape(VALUE_INDEX, 0));
+        ifaContext.kCache[0] = const_cast<gert::StorageShape*>(context.GetDynamicInputShape(KEY_INDEX, 0));
+        ifaContext.vCache[0] = const_cast<gert::StorageShape*>(context.GetDynamicInputShape(VALUE_INDEX, 0));
     }
 
     OP_CHECK_IF(context.GetWorkspaceSizes(1) == nullptr,
@@ -803,7 +803,7 @@ static ge::graphStatus ConvertContextToParamsIFA(gert::TilingContext &context, I
     return ge::GRAPH_SUCCESS;
 }
 
-static bool GetMaxWorkspaceFlag(gert::TilingContext &context)
+static bool GetMaxWorkspaceFlag(gert::TilingContext& context)
 {
     bool res = (context.GetOptionalInputTensor(ACTUAL_SEQ_Q_INDEX) != nullptr &&
                 context.GetOptionalInputTensor(ACTUAL_SEQ_Q_INDEX)->GetData<int64_t>() == nullptr) ||
@@ -812,7 +812,7 @@ static bool GetMaxWorkspaceFlag(gert::TilingContext &context)
     return res;
 }
 
-ge::graphStatus TilingFusedInferAttentionScoreArch38(gert::TilingContext *context)
+ge::graphStatus TilingFusedInferAttentionScoreArch38(gert::TilingContext* context)
 {
     FusedInferAttentionScoreTilingArch38 FIATilingArch38(context);
     auto ret = FIATilingArch38.DoTiling(nullptr);
@@ -886,7 +886,7 @@ ge::graphStatus FusedInferAttentionScoreTilingArch38::DoOpTiling()
             t = tempQ->GetStorageShape().GetDim(QUERY_DIM_0);
             s = tempQ->GetStorageShape().GetDim(QUERY_DIM_0);
         } else {
-            const gert::Tensor *actualSeqLength = context_->GetOptionalInputTensor(ACTUAL_SEQ_Q_INDEX);
+            const gert::Tensor* actualSeqLength = context_->GetOptionalInputTensor(ACTUAL_SEQ_Q_INDEX);
             int64_t actSeqLenDims = (actualSeqLength != nullptr) ? actualSeqLength->GetShapeSize() : 0;
             OP_CHECK_IF(((actualSeqLength == nullptr) || (actSeqLenDims == 0) ||
                          (actualSeqLength->GetData<int64_t>() == nullptr)),
@@ -904,7 +904,7 @@ ge::graphStatus FusedInferAttentionScoreTilingArch38::DoOpTiling()
             t = tempQ->GetStorageShape().GetDim(QUERY_DIM_1);
             s = tempQ->GetStorageShape().GetDim(QUERY_DIM_1);
         } else {
-            const gert::Tensor *actualSeqLength = context_->GetOptionalInputTensor(ACTUAL_SEQ_Q_INDEX);
+            const gert::Tensor* actualSeqLength = context_->GetOptionalInputTensor(ACTUAL_SEQ_Q_INDEX);
             int64_t actSeqLenDims = (actualSeqLength != nullptr) ? actualSeqLength->GetShapeSize() : 0;
             OP_CHECK_IF(((actualSeqLength == nullptr) || (actSeqLenDims == 0) ||
                          (actualSeqLength->GetData<int64_t>() == nullptr)),

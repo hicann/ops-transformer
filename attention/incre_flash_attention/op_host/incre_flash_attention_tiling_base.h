@@ -17,7 +17,6 @@
 
 #include <map>
 
-
 namespace optiling {
 using namespace ge;
 
@@ -57,8 +56,7 @@ const std::map<ge::DataType, std::string> DATATYPE_TO_STRING_MAP = {
     {ge::DT_UINT2, "DT_UINT2"},
     {ge::DT_HIFLOAT8, "DT_HIFLOAT8"},
     {ge::DT_FLOAT8_E4M3FN, "DT_FLOAT8_E4M3FN"},
-    {ge::DT_FLOAT4_E2M1, "DT_FLOAT4_E2M1"}
-};
+    {ge::DT_FLOAT4_E2M1, "DT_FLOAT4_E2M1"}};
 
 constexpr uint32_t QUERY_INPUT_INDEX = 0;
 constexpr uint32_t KEY_INPUT_INDEX = 1;
@@ -114,8 +112,8 @@ constexpr uint32_t PSE_SHIFT_N = 1;
 constexpr uint32_t PSE_SHIFT_S0 = 2;
 constexpr uint32_t PSE_SHIFT_S1 = 3;
 constexpr uint32_t ITER_NUM = 2;
-constexpr uint32_t HIGH_PRECISION_ITER_NUM = 3;  // 高精度场景的迭代次数
-constexpr uint32_t KVINT4_ITER_NUM = 4;  // kv int4量化的迭代次数
+constexpr uint32_t HIGH_PRECISION_ITER_NUM = 3; // 高精度场景的迭代次数
+constexpr uint32_t KVINT4_ITER_NUM = 4;         // kv int4量化的迭代次数
 constexpr uint32_t IFA_HIGH_PRECISION = 0;
 constexpr uint32_t IFA_HIGH_PERFORMANCE = 1;
 constexpr int64_t MSD_VEC_LOAD = 1024;
@@ -166,7 +164,7 @@ constexpr uint32_t BLOCK_SIZE = 16;
 constexpr uint32_t PER_TOKEN_N = 0;
 constexpr uint32_t PER_TOKEN_B = 1;
 constexpr uint32_t PER_TOKEN_S = 2;
-constexpr uint32_t FIA_BALANCE_SG_BASIC_SIZE = 128;   // 均衡分核格式，cube M轴的tiling大小
+constexpr uint32_t FIA_BALANCE_SG_BASIC_SIZE = 128; // 均衡分核格式，cube M轴的tiling大小
 constexpr uint32_t DIM_B = 0;
 constexpr uint32_t DOUBLE_BUFFER_NUM = 2;
 constexpr uint32_t BLOCKSIZE_CALC_256 = 256;
@@ -196,7 +194,6 @@ constexpr uint32_t NUM128 = 128;
 constexpr uint32_t NUM256 = 256;
 constexpr uint32_t NUM512 = 512;
 constexpr uint32_t NUM1024 = 1024;
-}// namespace optiling
-
+} // namespace optiling
 
 #endif // INCRE_FLASH_ATTENTION_TILING_BASE_H

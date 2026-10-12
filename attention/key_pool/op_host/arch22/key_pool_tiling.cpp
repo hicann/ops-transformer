@@ -25,7 +25,7 @@
 using namespace ge;
 using namespace AscendC;
 namespace optiling {
-void KeyPoolTiling::ConvertRequiredParams(gert::TilingContext &context, KeyPoolContext &key_poolContext)
+void KeyPoolTiling::ConvertRequiredParams(gert::TilingContext& context, KeyPoolContext& key_poolContext)
 {
     key_poolContext.hidden_states.desc = context.GetRequiredInputDesc(HIDDEN_STATES_INPUT_INDEX);
     key_poolContext.hidden_states.shape = context.GetRequiredInputShape(HIDDEN_STATES_INPUT_INDEX);
@@ -50,7 +50,7 @@ void KeyPoolTiling::ConvertRequiredParams(gert::TilingContext &context, KeyPoolC
     }
 }
 
-void KeyPoolTiling::ConvertOptionalParams(gert::TilingContext &context, KeyPoolContext &key_poolContext)
+void KeyPoolTiling::ConvertOptionalParams(gert::TilingContext& context, KeyPoolContext& key_poolContext)
 {
     key_poolContext.cacheBlockTable.desc = context.GetRequiredInputDesc(CACHE_BLOCK_TABLE_INPUT_INDEX);
     key_poolContext.cacheBlockTable.shape = context.GetRequiredInputShape(CACHE_BLOCK_TABLE_INPUT_INDEX);
@@ -70,7 +70,7 @@ void KeyPoolTiling::ConvertOptionalParams(gert::TilingContext &context, KeyPoolC
     key_poolContext.seqUsed.shape = context.GetOptionalInputShape(SEQUSED_INPUT_INDEX);
 }
 
-ge::graphStatus KeyPoolTiling::ConvertContext(gert::TilingContext &context, KeyPoolContext &key_poolContext)
+ge::graphStatus KeyPoolTiling::ConvertContext(gert::TilingContext& context, KeyPoolContext& key_poolContext)
 {
     if (context.GetNodeName() == nullptr) {
         OP_LOGE("KeyPool", "opName got from TilingContext is nullptr");
@@ -292,7 +292,7 @@ ge::graphStatus KeyPoolTiling::CheckEmptyTensor() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KeyPoolTiling::RunBigKernelTiling(KeyPoolTilingData *tilingData)
+ge::graphStatus KeyPoolTiling::RunBigKernelTiling(KeyPoolTilingData* tilingData)
 {
     this->baseParams_ = &tilingData->baseParams;
     this->pageAttentionParams_ = &tilingData->pageAttentionParams;
@@ -311,7 +311,7 @@ ge::graphStatus KeyPoolTiling::RunBigKernelTiling(KeyPoolTilingData *tilingData)
                                                     std::bind(&KeyPoolTiling::SetTemplateId, this),
                                                     std::bind(&KeyPoolTiling::SetInnerSplitInfo, this),
                                                     std::bind(&KeyPoolTiling::SetWorkSpaceInfo, this)};
-    for (const auto &func : requiredTilingFuncs) {
+    for (const auto& func : requiredTilingFuncs) {
         if (func() != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
@@ -328,7 +328,7 @@ ge::graphStatus KeyPoolTiling::RunBigKernelTiling(KeyPoolTilingData *tilingData)
     }
     std::vector<StatusFunction> optionalTilingFuncs{std::bind(&KeyPoolTiling::CalcWorkSpace, this),
                                                     std::bind(&KeyPoolTiling::GenTilingKey, this)};
-    for (const auto &func : optionalTilingFuncs) {
+    for (const auto& func : optionalTilingFuncs) {
         if (func() != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
@@ -387,9 +387,9 @@ ge::graphStatus KeyPoolTiling::CheckSinglePara() const
 }
 
 template <typename T>
-ge::graphStatus KeyPoolTiling::CheckFeatureValueSupport(const T *featureValue,
-                                                        const std::vector<T> &expectFeatureValList,
-                                                        const std::string &name) const
+ge::graphStatus KeyPoolTiling::CheckFeatureValueSupport(const T* featureValue,
+                                                        const std::vector<T>& expectFeatureValList,
+                                                        const std::string& name) const
 {
     if (std::find(expectFeatureValList.begin(), expectFeatureValList.end(), *featureValue) ==
         expectFeatureValList.end()) {
@@ -400,8 +400,8 @@ ge::graphStatus KeyPoolTiling::CheckFeatureValueSupport(const T *featureValue,
 }
 
 template <typename T>
-ge::graphStatus KeyPoolTiling::CheckAttrValueSupport(const T *attrValue, const std::vector<T> &expectAttrValList,
-                                                     const std::string &name) const
+ge::graphStatus KeyPoolTiling::CheckAttrValueSupport(const T* attrValue, const std::vector<T>& expectAttrValList,
+                                                     const std::string& name) const
 {
     if (attrValue == nullptr) {
         return ge::GRAPH_SUCCESS;
@@ -416,7 +416,7 @@ ge::graphStatus KeyPoolTiling::CheckAttrValueSupport(const T *attrValue, const s
 }
 
 template <typename T>
-std::string to_string(const T &value)
+std::string to_string(const T& value)
 {
     if (std::is_same_v<T, bool>) {
         return value ? "true" : "false";
@@ -426,8 +426,8 @@ std::string to_string(const T &value)
 }
 
 template <typename T>
-void KeyPoolTiling::LogErrorNumberSupport(const std::vector<T> &expectNumberList, const T &actualValue,
-                                          const std::string &name, const std::string subName) const
+void KeyPoolTiling::LogErrorNumberSupport(const std::vector<T>& expectNumberList, const T& actualValue,
+                                          const std::string& name, const std::string subName) const
 {
     std::ostringstream oss;
     for (size_t i = 0; i < expectNumberList.size(); ++i) {
@@ -453,10 +453,10 @@ static std::string LayoutTypeToStr(LayoutType layout)
     }
 }
 
-ge::graphStatus KeyPoolTiling::CheckDimNumInLayoutSupport(const std::string &layout, const gert::StorageShape *shape,
-                                                          const std::string &name) const
+ge::graphStatus KeyPoolTiling::CheckDimNumInLayoutSupport(const std::string& layout, const gert::StorageShape* shape,
+                                                          const std::string& name) const
 {
-    const auto &dimIt = LAYOUT_DIM_MAP.find(layout);
+    const auto& dimIt = LAYOUT_DIM_MAP.find(layout);
     OP_CHECK_IF(shape->GetStorageShape().GetDimNum() != dimIt->second,
                 OP_LOGE(context_->opName, "When layout is %s, %s dimension should be %u, but it's %zu", layout.c_str(),
                         name.c_str(), dimIt->second, shape->GetStorageShape().GetDimNum()),
@@ -464,15 +464,15 @@ ge::graphStatus KeyPoolTiling::CheckDimNumInLayoutSupport(const std::string &lay
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KeyPoolTiling::CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const
+ge::graphStatus KeyPoolTiling::CheckDtypeSupport(const gert::CompileTimeTensorDesc* desc, const std::string& name) const
 {
     if (desc != nullptr) {
-        const auto &it = DTYPE_SUPPORT_MAP.find(name);
+        const auto& it = DTYPE_SUPPORT_MAP.find(name);
         OP_CHECK_IF(
             it == DTYPE_SUPPORT_MAP.end(),
             OP_LOGE(context_->opName, "%s datatype support list should be specify in DTYPE_SUPPORT_MAP", name.c_str()),
             return ge::GRAPH_FAILED);
-        auto &expectDtypeList = it->second;
+        auto& expectDtypeList = it->second;
         OP_CHECK_IF(
             std::find(expectDtypeList.begin(), expectDtypeList.end(), desc->GetDataType()) == expectDtypeList.end(),
             LogErrorDtypeSupport(expectDtypeList, desc->GetDataType(), name), return ge::GRAPH_FAILED);
@@ -480,8 +480,8 @@ ge::graphStatus KeyPoolTiling::CheckDtypeSupport(const gert::CompileTimeTensorDe
     return ge::GRAPH_SUCCESS;
 }
 
-void KeyPoolTiling::LogErrorDtypeSupport(const std::vector<ge::DataType> &expectDtypeList,
-                                         const ge::DataType &actualDtype, const std::string &name) const
+void KeyPoolTiling::LogErrorDtypeSupport(const std::vector<ge::DataType>& expectDtypeList,
+                                         const ge::DataType& actualDtype, const std::string& name) const
 {
     std::ostringstream oss;
     for (size_t i = 0; i < expectDtypeList.size(); ++i) {
@@ -505,16 +505,16 @@ static std::string DataTypeToSerialString(ge::DataType type)
     }
 }
 
-ge::graphStatus KeyPoolTiling::CheckDimNumSupport(const gert::StorageShape *shape, const std::string &name) const
+ge::graphStatus KeyPoolTiling::CheckDimNumSupport(const gert::StorageShape* shape, const std::string& name) const
 {
     if (shape == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
-    const auto &it = DIM_NUM_MAP.find(name);
+    const auto& it = DIM_NUM_MAP.find(name);
     OP_CHECK_IF(it == DIM_NUM_MAP.end(),
                 OP_LOGE(context_->opName, "%s dim number support list should be specify in DIM_NUM_MAP", name.c_str()),
                 return ge::GRAPH_FAILED);
-    auto &expectDimNumList = it->second;
+    auto& expectDimNumList = it->second;
     OP_CHECK_IF(std::find(expectDimNumList.begin(), expectDimNumList.end(), shape->GetStorageShape().GetDimNum()) ==
                     expectDimNumList.end(),
                 LogErrorNumberSupport(expectDimNumList, static_cast<uint32_t>(shape->GetStorageShape().GetDimNum()),
@@ -752,9 +752,9 @@ ge::graphStatus KeyPoolTiling::CheckFeature() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KeyPoolTiling::LogErrorShapeConsistency(const std::string &name, const gert::StorageShape *shape,
-                                                        const uint32_t &dimNum, const std::string &subName,
-                                                        const uint32_t &expectNum) const
+ge::graphStatus KeyPoolTiling::LogErrorShapeConsistency(const std::string& name, const gert::StorageShape* shape,
+                                                        const uint32_t& dimNum, const std::string& subName,
+                                                        const uint32_t& expectNum) const
 {
     if (shape == nullptr) {
         return ge::GRAPH_SUCCESS;
@@ -810,8 +810,8 @@ ge::graphStatus KeyPoolTiling::CheckShapeConsistency() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus KeyPoolTiling::CheckDtypeConsistencyHiddenStates(const gert::CompileTimeTensorDesc *desc,
-                                                                 const std::string &name) const
+ge::graphStatus KeyPoolTiling::CheckDtypeConsistencyHiddenStates(const gert::CompileTimeTensorDesc* desc,
+                                                                 const std::string& name) const
 {
     const auto actualDtype = desc->GetDataType();
     OP_CHECK_IF(actualDtype != context_->dtype,
@@ -833,7 +833,7 @@ ge::graphStatus KeyPoolTiling::CheckDtypeConsistency() const
 
 ge::graphStatus KeyPoolTiling::CheckDimNumConsistency() const
 {
-    const auto &outputShape = context_->pooledKey.shape->GetStorageShape();
+    const auto& outputShape = context_->pooledKey.shape->GetStorageShape();
     const bool isBsh = context_->layout == LayoutType::LAYOUT_BSH;
     const uint32_t rank = isBsh ? KEY_POOL_DIM_NUM_3 : KEY_POOL_DIM_NUM_2;
     OP_CHECK_IF(outputShape.GetDimNum() != rank,
@@ -865,7 +865,7 @@ ge::graphStatus KeyPoolTiling::CheckMultiParaConsistency() const
     return ge::GRAPH_SUCCESS;
 }
 
-CMP_EXTERN_C ge::graphStatus TilingKeyPool(gert::TilingContext *context)
+CMP_EXTERN_C ge::graphStatus TilingKeyPool(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("KeyPool", "Context is nullptr."),
                 return ge::GRAPH_FAILED);
@@ -878,7 +878,7 @@ CMP_EXTERN_C ge::graphStatus TilingKeyPool(gert::TilingContext *context)
         return ge::GRAPH_FAILED;
     }
     KeyPoolTiling key_poolTiling(&key_poolContext);
-    KeyPoolTilingData *tilingData = context->GetTilingData<KeyPoolTilingData>();
+    KeyPoolTilingData* tilingData = context->GetTilingData<KeyPoolTilingData>();
     OP_CHECK_IF(tilingData == nullptr, OPS_REPORT_VECTOR_INNER_ERR(key_poolContext.opName, "TilingData is nullptr."),
                 return ge::GRAPH_FAILED);
     // 使用SyncAll，需要设置为batchmode模式，所有核同时启动，否则多流方式下执行可能会卡死
@@ -892,7 +892,7 @@ CMP_EXTERN_C ge::graphStatus TilingKeyPool(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingPrepareForKeyPool(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForKeyPool(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

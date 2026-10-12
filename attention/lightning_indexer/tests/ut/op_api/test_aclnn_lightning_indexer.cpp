@@ -18,7 +18,7 @@ using namespace std;
 using namespace op;
 
 namespace {
-void DestroyAclTensor(aclTensor *tensor)
+void DestroyAclTensor(aclTensor* tensor)
 {
     Release(tensor);
 }
@@ -44,7 +44,7 @@ TEST_F(lightning_indexer_opapi_ut, lightning_indexer_aclnn_0)
     char layoutQuery[] = "BSND";
     char layoutKey[] = "BSND";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerGetWorkspaceSize(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                                                                layoutQuery, layoutKey, 4, 3, INT64_MAX, INT64_MAX, true,
@@ -68,7 +68,7 @@ TEST_F(lightning_indexer_opapi_ut, lightning_indexer_aclnn_1)
     auto sparseIndicesOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({1, 8, 1, 4}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerGetWorkspaceSize(
         query.get(), key.get(), weights.get(), nullptr, nullptr, nullptr, layoutQuery, layoutKey, 4, 3, INT64_MAX,
@@ -90,7 +90,7 @@ TEST_F(lightning_indexer_opapi_ut, lightning_indexer_aclnn_2)
     auto sparseIndicesOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({1, 8, 1, 4}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerGetWorkspaceSize(
         query.get(), nullptr, weights.get(), nullptr, nullptr, nullptr, layoutQuery, layoutKey, 4, 3, INT64_MAX,

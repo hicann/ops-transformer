@@ -28,7 +28,7 @@ using std::pair;
 using namespace ge;
 using namespace AscendC;
 
-ge::graphStatus FIAChecker::Init(const FiaTilingInfo &fiaInfo)
+ge::graphStatus FIAChecker::Init(const FiaTilingInfo& fiaInfo)
 {
     if (fiaInfo.inputQType != fiaInfo.inputKvType) {
         enableAntiQuant_ = true;
@@ -55,7 +55,7 @@ ge::graphStatus FIAChecker::Init(const FiaTilingInfo &fiaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FIAChecker::CheckSinglePara(const FiaTilingInfo &fiaInfo)
+ge::graphStatus FIAChecker::CheckSinglePara(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != commonChecker_->CheckSinglePara(fiaInfo)) {
         return ge::GRAPH_FAILED;
@@ -96,7 +96,7 @@ ge::graphStatus FIAChecker::CheckSinglePara(const FiaTilingInfo &fiaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FIAChecker::CheckParaExistence(const FiaTilingInfo &fiaInfo)
+ge::graphStatus FIAChecker::CheckParaExistence(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != commonChecker_->CheckParaExistence(fiaInfo)) {
         return ge::GRAPH_FAILED;
@@ -137,7 +137,7 @@ ge::graphStatus FIAChecker::CheckParaExistence(const FiaTilingInfo &fiaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FIAChecker::CheckCrossFeature(const FiaTilingInfo &fiaInfo)
+ge::graphStatus FIAChecker::CheckCrossFeature(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != commonChecker_->CheckCrossFeature(fiaInfo)) {
         return ge::GRAPH_FAILED;
@@ -179,7 +179,7 @@ ge::graphStatus FIAChecker::CheckCrossFeature(const FiaTilingInfo &fiaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FIAChecker::CheckMultiParaConsistency(const FiaTilingInfo &fiaInfo)
+ge::graphStatus FIAChecker::CheckMultiParaConsistency(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != commonChecker_->CheckMultiParaConsistency(fiaInfo)) {
         return ge::GRAPH_FAILED;
@@ -220,7 +220,7 @@ ge::graphStatus FIAChecker::CheckMultiParaConsistency(const FiaTilingInfo &fiaIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FIAChecker::Process(const FiaTilingInfo &fiaInfo)
+ge::graphStatus FIAChecker::Process(const FiaTilingInfo& fiaInfo)
 {
     if (fiaInfo.emptyTensorFlag) {
         return ge::GRAPH_SUCCESS;
@@ -241,4 +241,4 @@ ge::graphStatus FIAChecker::Process(const FiaTilingInfo &fiaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-}  // namespace optiling
+} // namespace optiling

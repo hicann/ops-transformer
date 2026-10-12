@@ -34,7 +34,7 @@ constexpr static MatmulConfig NORM_DISABLE_INIT = {true,  false, false, 0,     0
                                                    false, false, 0,     0,     0,     0,     0,     0,
                                                    0,     0,     true,  false, false, false, false, false};
 
-__aicore__ inline void AttenMaskBoolCopyIn(LocalTensor<uint8_t> &dstTensor, GlobalTensor<uint8_t> &srcTensor,
+__aicore__ inline void AttenMaskBoolCopyIn(LocalTensor<uint8_t>& dstTensor, GlobalTensor<uint8_t>& srcTensor,
                                            int64_t srcOffset, uint32_t s1Size, uint32_t s2Size, int64_t totalS2Size,
                                            int64_t attenMaskShapeType = 0)
 {
@@ -89,10 +89,10 @@ __aicore__ inline void AttenMaskBoolCopyIn(LocalTensor<uint8_t> &dstTensor, Glob
     }
 }
 
-__aicore__ inline void DataCopyOut(const __gm__ void *gm, const LocalTensor<int8_t> &co1Local,
-                                   const void *dataCopyOutParams, const uint64_t tilingPtr, const uint64_t dataPtr)
+__aicore__ inline void DataCopyOut(const __gm__ void* gm, const LocalTensor<int8_t>& co1Local,
+                                   const void* dataCopyOutParams, const uint64_t tilingPtr, const uint64_t dataPtr)
 {
-    const DataCopyOutParams *param = reinterpret_cast<const DataCopyOutParams *>(dataCopyOutParams);
+    const DataCopyOutParams* param = reinterpret_cast<const DataCopyOutParams*>(dataCopyOutParams);
     uint64_t dstStride = dataPtr * 16 / 8 - param->burstLen;
 
 #if defined(__DAV_C310__)
@@ -108,7 +108,7 @@ __aicore__ inline void DataCopyOut(const __gm__ void *gm, const LocalTensor<int8
     }
     LocalTensor<float> tmpLocal = co1Local.template ReinterpretCast<float>();
     GlobalTensor<float> tmpGm;
-    tmpGm.SetGlobalBuffer((__gm__ float *)(gm));
+    tmpGm.SetGlobalBuffer((__gm__ float*)(gm));
     Fixpipe(tmpGm, tmpLocal, fixpipeParams);
 }
 
@@ -119,23 +119,23 @@ class FusedFloydAttentionGradS1s2Bn2gs1s2 {
 public:
     __aicore__ inline FusedFloydAttentionGradS1s2Bn2gs1s2(){};
 
-    __aicore__ inline void Init(__gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *key_1,
-                                __gm__ uint8_t *value_1, __gm__ uint8_t *dx, __gm__ uint8_t *query,
-                                __gm__ uint8_t *atten_mask, __gm__ uint8_t *forward_res, __gm__ uint8_t *softmax_max,
-                                __gm__ uint8_t *softmax_sum, __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv,
-                                __gm__ uint8_t *dk_1, __gm__ uint8_t *dv_1, __gm__ uint8_t *workspace,
-                                const FusedFloydAttentionGradTilingDataS1s2Bn2gs1s2 *__restrict ordTilingData,
-                                TPipe *pipe_in);
-    __aicore__ inline void CopyInSoftMaxGrad(LocalTensor<T1> &dstTensor, LocalTensor<T1> &dstTensor2,
+    __aicore__ inline void Init(__gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* key_1,
+                                __gm__ uint8_t* value_1, __gm__ uint8_t* dx, __gm__ uint8_t* query,
+                                __gm__ uint8_t* atten_mask, __gm__ uint8_t* forward_res, __gm__ uint8_t* softmax_max,
+                                __gm__ uint8_t* softmax_sum, __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv,
+                                __gm__ uint8_t* dk_1, __gm__ uint8_t* dv_1, __gm__ uint8_t* workspace,
+                                const FusedFloydAttentionGradTilingDataS1s2Bn2gs1s2* __restrict ordTilingData,
+                                TPipe* pipe_in);
+    __aicore__ inline void CopyInSoftMaxGrad(LocalTensor<T1>& dstTensor, LocalTensor<T1>& dstTensor2,
                                              int64_t softmaxGradOffset, uint32_t s1Extend, uint32_t dExtend,
                                              uint32_t dExtendAlign);
-    __aicore__ inline void CalcSoftMaxGrad(LocalTensor<float> &sfmgClc3, int64_t aTensorOffset, uint32_t s1Extend);
-    __aicore__ inline void CopyInSoftMax(LocalTensor<float> &dstTensor, uint32_t s1Extend, uint32_t softMaxOffset);
-    __aicore__ inline void CalcSoftMax(LocalTensor<T2> &dstTensor, LocalTensor<float> &srcTensor, uint32_t s1Extend,
-                                       uint32_t s2Extend, uint32_t s2ExtendAlign, const SoftMaxTiling &tiling);
-    __aicore__ inline void CopyInAttenMaskBool(const LocalTensor<uint8_t> &dstTensor, int64_t attenMaskOffset,
+    __aicore__ inline void CalcSoftMaxGrad(LocalTensor<float>& sfmgClc3, int64_t aTensorOffset, uint32_t s1Extend);
+    __aicore__ inline void CopyInSoftMax(LocalTensor<float>& dstTensor, uint32_t s1Extend, uint32_t softMaxOffset);
+    __aicore__ inline void CalcSoftMax(LocalTensor<T2>& dstTensor, LocalTensor<float>& srcTensor, uint32_t s1Extend,
+                                       uint32_t s2Extend, uint32_t s2ExtendAlign, const SoftMaxTiling& tiling);
+    __aicore__ inline void CopyInAttenMaskBool(const LocalTensor<uint8_t>& dstTensor, int64_t attenMaskOffset,
                                                uint32_t s1Extend, uint32_t s2Extend);
-    __aicore__ inline void CalcAttenMaskBool(LocalTensor<T2> &dstTensor, LocalTensor<uint8_t> srcTensor,
+    __aicore__ inline void CalcAttenMaskBool(LocalTensor<T2>& dstTensor, LocalTensor<uint8_t> srcTensor,
                                              uint32_t s1Extend, uint32_t s2Extend, uint8_t maskType = 0);
 
     __aicore__ inline void ComputeBMMK1(uint32_t aTensorOffsetCv, uint32_t bTensorOffsetCv, uint32_t s1StrideSize,
@@ -151,13 +151,13 @@ public:
     __aicore__ inline bool IsCubeBlockNeedCompute(int64_t baseIndex);
     __aicore__ inline void InitIndex(int64_t index);
     __aicore__ inline void SubGrapA(int64_t curIdx, int64_t curS1Idx, int64_t curS2Idx, int64_t LoopGIdx,
-                                    EvenvIdList &eventIdList);
+                                    EvenvIdList& eventIdList);
     __aicore__ inline void SubGrapB(int64_t curIdx, int64_t curS1Idx, int64_t curS2Idx, int64_t LoopGIdx,
-                                    EvenvIdList &eventIdList);
+                                    EvenvIdList& eventIdList);
     __aicore__ inline void Compute(int64_t preIndex, int64_t nextIndex);
     __aicore__ inline void SyncALLCores();
-    __aicore__ inline void LocalAllocEventID(EvenvIdList &eventIdList);
-    __aicore__ inline void LocalReleaseEventID(EvenvIdList &eventIdList);
+    __aicore__ inline void LocalAllocEventID(EvenvIdList& eventIdList);
+    __aicore__ inline void LocalReleaseEventID(EvenvIdList& eventIdList);
 
     using aType1 = MatmulType<TPosition::GM, CubeFormat::ND, T1>;
     using bType1 = MatmulType<TPosition::GM, CubeFormat::ND, T1, true>;
@@ -199,22 +199,22 @@ public:
     using cTypeBmmqkv = MatmulType<TPosition::GM, CubeFormat::ND, T2, false, LayoutMode::BNGS1S2>;
     matmul::Matmul<aTypeBmm3, bTypeBmm3, cTypeBmm3, biasType, LIMIT_CFG> bmmqkv;
 
-    __aicore__ inline void NZCopyIn(int64_t mmAddr, GlobalTensor<T2> &mmWspGm, LocalTensor<T2> &mmTensorCurr,
+    __aicore__ inline void NZCopyIn(int64_t mmAddr, GlobalTensor<T2>& mmWspGm, LocalTensor<T2>& mmTensorCurr,
                                     uint32_t s1VecSize, uint32_t s2VecSize);
-    __aicore__ inline void NZ2ND(LocalTensor<T2> &mmTensorCurr, LocalTensor<T2> &tmpTensor, uint32_t s1VecSize,
+    __aicore__ inline void NZ2ND(LocalTensor<T2>& mmTensorCurr, LocalTensor<T2>& tmpTensor, uint32_t s1VecSize,
                                  uint32_t s2VecSize);
-    __aicore__ inline void ND2NZ(LocalTensor<T1> &mmTensorCurr, LocalTensor<T1> &tmpTensor, uint32_t s1VecSize,
+    __aicore__ inline void ND2NZ(LocalTensor<T1>& mmTensorCurr, LocalTensor<T1>& tmpTensor, uint32_t s1VecSize,
                                  uint32_t s2VecSize);
 
 protected:
-    TPipe *pipe;
+    TPipe* pipe;
     TBuf<> ubBuffer;
     TBuf<> tmpBuffer;
     TBuf<> vecClc3;
 
     uint32_t coreNum;
     int64_t cBlockIdx;
-    const FusedFloydAttentionGradTilingDataS1s2Bn2gs1s2 *__restrict TilingData;
+    const FusedFloydAttentionGradTilingDataS1s2Bn2gs1s2* __restrict TilingData;
 
     // input
     GlobalTensor<T1> keyGm, valueGm, dxGm, queryGm, forwardResGm, keyGm1, valueGm1;
@@ -229,8 +229,8 @@ protected:
     GlobalTensor<T2> mm1WorkspaceGm;
     GlobalTensor<T2> mm2WorkspaceGm;
 
-    __gm__ uint8_t *actual_seq_qlen_addr;
-    __gm__ uint8_t *actual_seq_kvlen_addr;
+    __gm__ uint8_t* actual_seq_qlen_addr;
+    __gm__ uint8_t* actual_seq_kvlen_addr;
 
     // AscendC
     GlobalTensor<int32_t> syncGlobal;
@@ -294,8 +294,8 @@ protected:
     int64_t blockOuter;
 
     // sparse block info
-    const int64_t *blockStarts;
-    const int64_t *blockEnds;
+    const int64_t* blockStarts;
+    const int64_t* blockEnds;
 
     // buferinfo
     uint32_t matmalWorkspaceSize;
@@ -381,7 +381,7 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
           const uint32_t TND_S1_PP>
 __aicore__ inline void
 FusedFloydAttentionGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT, INPUT_LAYOUT, MM2_OUT_FORMAT,
-                                    TND_S1_PP>::CopyInAttenMaskBool(const LocalTensor<uint8_t> &dstTensor,
+                                    TND_S1_PP>::CopyInAttenMaskBool(const LocalTensor<uint8_t>& dstTensor,
                                                                     int64_t attenMaskOffset, uint32_t s1Extend,
                                                                     uint32_t s2Extend)
 {
@@ -399,7 +399,7 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
           const uint32_t TND_S1_PP>
 __aicore__ inline void
 FusedFloydAttentionGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT, INPUT_LAYOUT, MM2_OUT_FORMAT,
-                                    TND_S1_PP>::CalcAttenMaskBool(LocalTensor<T2> &dstTensor,
+                                    TND_S1_PP>::CalcAttenMaskBool(LocalTensor<T2>& dstTensor,
                                                                   LocalTensor<uint8_t> srcTensor, uint32_t s1Extend,
                                                                   uint32_t s2Extend, uint8_t maskType)
 {
@@ -408,10 +408,10 @@ FusedFloydAttentionGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_O
     T2 scalar;
     if constexpr (IsSameType<T2, float>::value) {
         uint32_t tmp = 0xFF7FFFFF;
-        scalar = *((float *)&tmp);
+        scalar = *((float*)&tmp);
     } else {
         uint16_t tmp = 0xFBFF;
-        scalar = *((half *)&tmp);
+        scalar = *((half*)&tmp);
     }
 
     SelectWithBytesMaskShapeInfo info;
@@ -432,24 +432,24 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
           const uint32_t TND_S1_PP>
 __aicore__ inline void FusedFloydAttentionGradS1s2Bn2gs1s2<
     T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT, INPUT_LAYOUT, MM2_OUT_FORMAT,
-    TND_S1_PP>::Init(__gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *key_1, __gm__ uint8_t *value_1,
-                     __gm__ uint8_t *dx, __gm__ uint8_t *query, __gm__ uint8_t *atten_mask, __gm__ uint8_t *forward_res,
-                     __gm__ uint8_t *softmax_max, __gm__ uint8_t *softmax_sum, __gm__ uint8_t *dq, __gm__ uint8_t *dk,
-                     __gm__ uint8_t *dv, __gm__ uint8_t *dk_1, __gm__ uint8_t *dv_1, __gm__ uint8_t *workspace,
-                     const FusedFloydAttentionGradTilingDataS1s2Bn2gs1s2 *__restrict ordTilingData, TPipe *pipe_in)
+    TND_S1_PP>::Init(__gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* key_1, __gm__ uint8_t* value_1,
+                     __gm__ uint8_t* dx, __gm__ uint8_t* query, __gm__ uint8_t* atten_mask, __gm__ uint8_t* forward_res,
+                     __gm__ uint8_t* softmax_max, __gm__ uint8_t* softmax_sum, __gm__ uint8_t* dq, __gm__ uint8_t* dk,
+                     __gm__ uint8_t* dv, __gm__ uint8_t* dk_1, __gm__ uint8_t* dv_1, __gm__ uint8_t* workspace,
+                     const FusedFloydAttentionGradTilingDataS1s2Bn2gs1s2* __restrict ordTilingData, TPipe* pipe_in)
 {
-    keyGm.SetGlobalBuffer((__gm__ T1 *)key);
-    valueGm.SetGlobalBuffer((__gm__ T1 *)value);
-    keyGm1.SetGlobalBuffer((__gm__ T1 *)key_1);
-    valueGm1.SetGlobalBuffer((__gm__ T1 *)value_1);
-    dxGm.SetGlobalBuffer((__gm__ T1 *)dx);
-    queryGm.SetGlobalBuffer((__gm__ T1 *)query);
-    forwardResGm.SetGlobalBuffer((__gm__ T1 *)forward_res);
+    keyGm.SetGlobalBuffer((__gm__ T1*)key);
+    valueGm.SetGlobalBuffer((__gm__ T1*)value);
+    keyGm1.SetGlobalBuffer((__gm__ T1*)key_1);
+    valueGm1.SetGlobalBuffer((__gm__ T1*)value_1);
+    dxGm.SetGlobalBuffer((__gm__ T1*)dx);
+    queryGm.SetGlobalBuffer((__gm__ T1*)query);
+    forwardResGm.SetGlobalBuffer((__gm__ T1*)forward_res);
 
-    attenMaskU8Gm.SetGlobalBuffer((__gm__ uint8_t *)atten_mask);
-    softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmax_max);
-    softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmax_sum);
-    dvGm.SetGlobalBuffer((__gm__ float *)dv);
+    attenMaskU8Gm.SetGlobalBuffer((__gm__ uint8_t*)atten_mask);
+    softmaxMaxGm.SetGlobalBuffer((__gm__ float*)softmax_max);
+    softmaxSumGm.SetGlobalBuffer((__gm__ float*)softmax_sum);
+    dvGm.SetGlobalBuffer((__gm__ float*)dv);
 
     // init current core tilingInfo
     cBlockIdx = GetBlockIdx();
@@ -518,21 +518,21 @@ __aicore__ inline void FusedFloydAttentionGradS1s2Bn2gs1s2<
     int64_t k1v1PostBlockTotal = TilingData->postTilingData.k1v1SizeAlign;
 
     // init workspace address
-    syncGlobal.SetGlobalBuffer((__gm__ int32_t *)workspace);
+    syncGlobal.SetGlobalBuffer((__gm__ int32_t*)workspace);
     int64_t workspaceOffsets = SYNC_GLOBAL_WORKSPACE_SIZE;
-    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + workspaceOffsets / sizeof(T2));
+    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + workspaceOffsets / sizeof(T2));
     workspaceOffsets =
         (workspaceOffsets + qPostBlockTotal * sizeof(float) + ADDR_ALIGN_SIZE) / ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
-    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + workspaceOffsets / sizeof(T2));
+    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + workspaceOffsets / sizeof(T2));
     workspaceOffsets =
         (workspaceOffsets + kvPostBlockTotal * sizeof(float) + ADDR_ALIGN_SIZE) / ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
-    dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + workspaceOffsets / sizeof(T2));
+    dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + workspaceOffsets / sizeof(T2));
     workspaceOffsets =
         (workspaceOffsets + kvPostBlockTotal * sizeof(float) + ADDR_ALIGN_SIZE) / ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
-    dk1WorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + workspaceOffsets / sizeof(T2));
+    dk1WorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + workspaceOffsets / sizeof(T2));
     workspaceOffsets =
         (workspaceOffsets + k1v1PostBlockTotal * sizeof(float) + ADDR_ALIGN_SIZE) / ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
-    dv1WorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + workspaceOffsets / sizeof(T2));
+    dv1WorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + workspaceOffsets / sizeof(T2));
     workspaceOffsets =
         (workspaceOffsets + k1v1PostBlockTotal * sizeof(float) + ADDR_ALIGN_SIZE) / ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
 
@@ -542,23 +542,23 @@ __aicore__ inline void FusedFloydAttentionGradS1s2Bn2gs1s2<
 
     // matmal1 and matmal2 workspace size
     matmalWorkspaceSize = cubeBaseMN * sizeof(float);
-    mm1WorkspaceGm.SetGlobalBuffer((__gm__ T2 *)(workspace + workspaceOffsets + cBlockIdx * matmalWorkspaceSize));
+    mm1WorkspaceGm.SetGlobalBuffer((__gm__ T2*)(workspace + workspaceOffsets + cBlockIdx * matmalWorkspaceSize));
     mm2WorkspaceGm.SetGlobalBuffer(
-        (__gm__ T2 *)(workspace + workspaceOffsets + coreNum * matmalWorkspaceSize + cBlockIdx * matmalWorkspaceSize));
+        (__gm__ T2*)(workspace + workspaceOffsets + coreNum * matmalWorkspaceSize + cBlockIdx * matmalWorkspaceSize));
 
     // drop workspace offset
     workspaceOffsets = (workspaceOffsets + coreNum * cubeBaseMN * sizeof(float) * INPUT_NUMS + ADDR_ALIGN_SIZE) /
                        ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
-    dropWorkSpaceGm.SetGlobalBuffer((__gm__ T1 *)workspace + workspaceOffsets / sizeof(T1));
+    dropWorkSpaceGm.SetGlobalBuffer((__gm__ T1*)workspace + workspaceOffsets / sizeof(T1));
 
     // mul workspace offset
     workspaceOffsets = (workspaceOffsets + coreNum * cubeBaseMN * sizeof(T1) * 2 + ADDR_ALIGN_SIZE) / ADDR_ALIGN_SIZE *
                        ADDR_ALIGN_SIZE;
-    mulWorkSpaceGm.SetGlobalBuffer((__gm__ T1 *)workspace + workspaceOffsets / sizeof(T1));
+    mulWorkSpaceGm.SetGlobalBuffer((__gm__ T1*)workspace + workspaceOffsets / sizeof(T1));
 
     uint64_t pseAlibiAddr = (workspaceOffsets + coreNum * cubeBaseMN * sizeof(T1) * 2 + ADDR_ALIGN_SIZE) /
                             ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
-    this->pseAlibiGm.SetGlobalBuffer((__gm__ half *)(workspace + pseAlibiAddr + cBlockIdx * pseAlibiOffset));
+    this->pseAlibiGm.SetGlobalBuffer((__gm__ half*)(workspace + pseAlibiAddr + cBlockIdx * pseAlibiOffset));
 
     InitOutput<int32_t>(syncGlobal[GetBlockIdx() * 8], 8, 0);
 
@@ -663,8 +663,8 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
           const uint32_t TND_S1_PP>
 __aicore__ inline void
 FusedFloydAttentionGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT, INPUT_LAYOUT, MM2_OUT_FORMAT,
-                                    TND_S1_PP>::CopyInSoftMaxGrad(LocalTensor<T1> &dstTensor,
-                                                                  LocalTensor<T1> &dstTensor2,
+                                    TND_S1_PP>::CopyInSoftMaxGrad(LocalTensor<T1>& dstTensor,
+                                                                  LocalTensor<T1>& dstTensor2,
                                                                   int64_t softmaxGradFrontOffset, uint32_t s1Extend,
                                                                   uint32_t dExtend, uint32_t dExtendAlign)
 {
@@ -692,7 +692,7 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
           const uint32_t TND_S1_PP>
 __aicore__ inline void
 FusedFloydAttentionGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT, INPUT_LAYOUT, MM2_OUT_FORMAT,
-                                    TND_S1_PP>::CalcSoftMaxGrad(LocalTensor<float> &sfmgClc3, int64_t aTensorOffset,
+                                    TND_S1_PP>::CalcSoftMaxGrad(LocalTensor<float>& sfmgClc3, int64_t aTensorOffset,
                                                                 uint32_t s1Extend)
 {
     LocalTensor<float> sfmgClc1 = ubBuffer.GetWithOffset<float>(32 * 1024 / sizeof(T2), 0);
@@ -762,7 +762,7 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
           const uint32_t TND_S1_PP>
 __aicore__ inline void
 FusedFloydAttentionGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT, INPUT_LAYOUT, MM2_OUT_FORMAT,
-                                    TND_S1_PP>::CopyInSoftMax(LocalTensor<float> &dstTensor, uint32_t s1Extend,
+                                    TND_S1_PP>::CopyInSoftMax(LocalTensor<float>& dstTensor, uint32_t s1Extend,
                                                               uint32_t softMaxOffset)
 {
     DataCopyPad(dstTensor, softmaxSumGm[softMaxOffset], {1, static_cast<uint16_t>(s1Extend * 32), 0, 0},
@@ -779,9 +779,9 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
           const uint32_t TND_S1_PP>
 __aicore__ inline void
 FusedFloydAttentionGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT, INPUT_LAYOUT, MM2_OUT_FORMAT,
-                                    TND_S1_PP>::CalcSoftMax(LocalTensor<T2> &dstTensor, LocalTensor<float> &srcTensor,
+                                    TND_S1_PP>::CalcSoftMax(LocalTensor<T2>& dstTensor, LocalTensor<float>& srcTensor,
                                                             uint32_t s1Extend, uint32_t s2Extend,
-                                                            uint32_t s2ExtendAlign, const SoftMaxTiling &tiling)
+                                                            uint32_t s2ExtendAlign, const SoftMaxTiling& tiling)
 {
     bool isBasicBlock = (s1Extend % 8 == 0) && (s2Extend % 64 == 0);
 
@@ -877,8 +877,8 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
           const uint32_t TND_S1_PP>
 __aicore__ inline void
 FusedFloydAttentionGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT, INPUT_LAYOUT, MM2_OUT_FORMAT,
-                                    TND_S1_PP>::NZCopyIn(int64_t mmAddr, GlobalTensor<T2> &mmWspGm,
-                                                         LocalTensor<T2> &mmTensorCurr, uint32_t s1VecSize,
+                                    TND_S1_PP>::NZCopyIn(int64_t mmAddr, GlobalTensor<T2>& mmWspGm,
+                                                         LocalTensor<T2>& mmTensorCurr, uint32_t s1VecSize,
                                                          uint32_t s2VecSize)
 {
     /*
@@ -898,7 +898,7 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
           const uint32_t TND_S1_PP>
 __aicore__ inline void
 FusedFloydAttentionGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT, INPUT_LAYOUT, MM2_OUT_FORMAT,
-                                    TND_S1_PP>::NZ2ND(LocalTensor<T2> &mmTensorCurr, LocalTensor<T2> &tmpTensor,
+                                    TND_S1_PP>::NZ2ND(LocalTensor<T2>& mmTensorCurr, LocalTensor<T2>& tmpTensor,
                                                       uint32_t s1VecSize, uint32_t s2VecSize)
 {
     /*
@@ -935,7 +935,7 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
           const uint32_t TND_S1_PP>
 __aicore__ inline void
 FusedFloydAttentionGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT, INPUT_LAYOUT, MM2_OUT_FORMAT,
-                                    TND_S1_PP>::ND2NZ(LocalTensor<T1> &mmTensorCurr, LocalTensor<T1> &tmpTensor,
+                                    TND_S1_PP>::ND2NZ(LocalTensor<T1>& mmTensorCurr, LocalTensor<T1>& tmpTensor,
                                                       uint32_t s1VecSize, uint32_t s2VecSize)
 {
     /*
@@ -992,7 +992,7 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
 __aicore__ inline void
 FusedFloydAttentionGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT, INPUT_LAYOUT, MM2_OUT_FORMAT,
                                     TND_S1_PP>::SubGrapA(int64_t curIdx, int64_t curS1Idx, int64_t curS2Idx,
-                                                         int64_t LoopGIdx, EvenvIdList &eventIdList)
+                                                         int64_t LoopGIdx, EvenvIdList& eventIdList)
 {
     int64_t actualS1Len;
     int64_t actualS2Len;
@@ -1162,7 +1162,7 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
 __aicore__ inline void
 FusedFloydAttentionGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT, INPUT_LAYOUT, MM2_OUT_FORMAT,
                                     TND_S1_PP>::SubGrapB(int64_t curIdx, int64_t curS1Idx, int64_t curS2Idx,
-                                                         int64_t LoopGIdx, EvenvIdList &eventIdList)
+                                                         int64_t LoopGIdx, EvenvIdList& eventIdList)
 {
     bool isPing = ((curIdx % 2) == 0);
     event_t curEventId = isPing ? eventIdList.structMte2WaitMte3Ping : eventIdList.structMte2WaitMte3Pong;
@@ -1566,7 +1566,7 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
           const uint32_t TND_S1_PP>
 __aicore__ inline void
 FusedFloydAttentionGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT, INPUT_LAYOUT, MM2_OUT_FORMAT,
-                                    TND_S1_PP>::LocalAllocEventID(EvenvIdList &eventIdList)
+                                    TND_S1_PP>::LocalAllocEventID(EvenvIdList& eventIdList)
 {
     eventIdList.structVWaitMte2Ping = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>());
     eventIdList.structVWaitMte2Pong = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>());
@@ -1583,7 +1583,7 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
           const uint32_t TND_S1_PP>
 __aicore__ inline void
 FusedFloydAttentionGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT, INPUT_LAYOUT, MM2_OUT_FORMAT,
-                                    TND_S1_PP>::LocalReleaseEventID(EvenvIdList &eventIdList)
+                                    TND_S1_PP>::LocalReleaseEventID(EvenvIdList& eventIdList)
 {
     GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(eventIdList.structVWaitMte2Ping);
     GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(eventIdList.structVWaitMte2Pong);

@@ -85,7 +85,7 @@ public:
     /// Construct
     __aicore__ inline BlockMmad() {}
 
-    __aicore__ inline void init(Arch::Resource<ArchTag> &resource, uint32_t nDynamic, uint32_t kDynamic,
+    __aicore__ inline void init(Arch::Resource<ArchTag>& resource, uint32_t nDynamic, uint32_t kDynamic,
                                 uint32_t l1BufAddrStart = 0)
     {
         // Allocate L1 memory space
@@ -105,8 +105,8 @@ public:
     /// Destructor
     __aicore__ inline ~BlockMmad() {}
 
-    __aicore__ inline void getBlockShape(GemmCoord &actualShape, uint32_t &nowNIdx, uint32_t &nLoop, uint32_t &kvSeqlen,
-                                         uint32_t &blockSize)
+    __aicore__ inline void getBlockShape(GemmCoord& actualShape, uint32_t& nowNIdx, uint32_t& nLoop, uint32_t& kvSeqlen,
+                                         uint32_t& blockSize)
     {
         uint32_t nSplitSize = blockSize;
         if (nowNIdx == nLoop - 1U) {
@@ -115,8 +115,8 @@ public:
         actualShape[COORD_DIM2] = nSplitSize;
     }
 
-    __aicore__ inline void getKVOffset(AscendC::GlobalTensor<int32_t> &gBlockTable, uint64_t &kOffset,
-                                       uint32_t &nowNIdx, uint32_t &strideKV, uint32_t &blockSize,
+    __aicore__ inline void getKVOffset(AscendC::GlobalTensor<int32_t>& gBlockTable, uint64_t& kOffset,
+                                       uint32_t& nowNIdx, uint32_t& strideKV, uint32_t& blockSize,
                                        uint64_t valueBnStride)
     {
         if constexpr (PAGED_CACHE_FLAG_) {
@@ -134,7 +134,7 @@ public:
     __aicore__ inline void operator()(AscendC::GlobalTensor<ElementA> gA, AscendC::GlobalTensor<ElementB> gB,
                                       AscendC::GlobalTensor<ElementC> gC, AscendC::GlobalTensor<int32_t> gBlockTable,
                                       LayoutA layoutA, LayoutB layoutB, LayoutC layoutC, GemmCoord actualOriShape,
-                                      uint32_t &nIdx, uint32_t &nLoop, uint32_t &blockSize, uint32_t kvSeqlen,
+                                      uint32_t& nIdx, uint32_t& nLoop, uint32_t& blockSize, uint32_t kvSeqlen,
                                       uint32_t strideKV, uint32_t blockStackNum, Arch::CrossCoreFlag softmaxFlag,
                                       uint32_t crossCoreSyncTrigger, uint64_t valueBnStride)
     {

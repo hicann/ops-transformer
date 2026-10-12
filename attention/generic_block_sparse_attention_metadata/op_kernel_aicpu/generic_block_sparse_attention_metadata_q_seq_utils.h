@@ -24,9 +24,9 @@ inline int64_t CeilDivQSeq(int64_t value, int64_t divisor)
     return value == 0 ? 0 : (value - 1) / divisor + 1;
 }
 
-inline bool BuildTndQSeqLayout(const std::vector<int64_t> &cuSeqLengths, const std::vector<int64_t> &seqUsedQ,
+inline bool BuildTndQSeqLayout(const std::vector<int64_t>& cuSeqLengths, const std::vector<int64_t>& seqUsedQ,
                                bool hasSeqUsedQ, int64_t blockShapeX, int64_t qBlockStorageNum,
-                               std::vector<int64_t> &actualQSeqLens, std::vector<int64_t> &qStorageBlockStarts)
+                               std::vector<int64_t>& actualQSeqLens, std::vector<int64_t>& qStorageBlockStarts)
 {
     if (cuSeqLengths.empty() || cuSeqLengths.front() != 0 || blockShapeX <= 0 || qBlockStorageNum < 0) {
         return false;
@@ -63,11 +63,11 @@ inline bool BuildTndQSeqLayout(const std::vector<int64_t> &cuSeqLengths, const s
     return storageBlockBase == qBlockStorageNum;
 }
 
-inline bool GatherTndValidBlockNums(const int32_t *counts, int64_t sparseHeadNum, int64_t qBlockStorageNum,
+inline bool GatherTndValidBlockNums(const int32_t* counts, int64_t sparseHeadNum, int64_t qBlockStorageNum,
                                     int64_t blockShapeX, int64_t blockIndexStride,
-                                    const std::vector<int64_t> &actualQSeqLens,
-                                    const std::vector<int64_t> &qStorageBlockStarts,
-                                    std::vector<int64_t> &validBlockNums)
+                                    const std::vector<int64_t>& actualQSeqLens,
+                                    const std::vector<int64_t>& qStorageBlockStarts,
+                                    std::vector<int64_t>& validBlockNums)
 {
     if (counts == nullptr || sparseHeadNum <= 0 || qBlockStorageNum < 0 || blockShapeX <= 0 || blockIndexStride <= 0 ||
         actualQSeqLens.size() != qStorageBlockStarts.size()) {

@@ -103,14 +103,14 @@ class KdaInputProjMxQuant {
 public:
     __aicore__ inline KdaInputProjMxQuant() {}
 
-    __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *quantX, __gm__ uint8_t *xScale,
-                                const optiling::KdaInputProjTilingData *__restrict tiling);
+    __aicore__ inline void Init(__gm__ uint8_t* x, __gm__ uint8_t* quantX, __gm__ uint8_t* xScale,
+                                const optiling::KdaInputProjTilingData* __restrict tiling);
     __aicore__ inline void Process();
 
 private:
     using DtypeX = typename TypePack::DtypeX;
 
-    __aicore__ inline void ParseTilingData(const optiling::KdaInputProjMxQuantParams *tilingData);
+    __aicore__ inline void ParseTilingData(const optiling::KdaInputProjMxQuantParams* tilingData);
     __aicore__ inline void GetGmParams();
     __aicore__ inline void GetUbParams();
     __aicore__ inline void InitUbLayout();
@@ -120,13 +120,13 @@ private:
     __aicore__ inline void Compute(int64_t ubFactorRowBlockNum, int64_t ubFactorColBlockNum, int64_t bufSlot);
     __aicore__ inline void CopyOut(int64_t dim0LoopIdx, int64_t dim1LoopIdx, int64_t ubFactorRowNum,
                                    int64_t ubFactorColNum, int64_t ubFactorColBlockNum, int64_t bufSlot);
-    __aicore__ inline void ComputeMaxExpOcpBf16(__ubuf__ bfloat16_t *xLocalAddr, __ubuf__ uint16_t *maxExpAddr,
+    __aicore__ inline void ComputeMaxExpOcpBf16(__ubuf__ bfloat16_t* xLocalAddr, __ubuf__ uint16_t* maxExpAddr,
                                                 uint16_t loopNum2VF);
-    __aicore__ inline void ComputeScaleOcp(__ubuf__ uint16_t *maxExpAddr, __ubuf__ uint16_t *mxScaleLocalAddr,
-                                           __ubuf__ uint16_t *recipScaleLocalAddr, uint16_t loopNum1VF,
+    __aicore__ inline void ComputeScaleOcp(__ubuf__ uint16_t* maxExpAddr, __ubuf__ uint16_t* mxScaleLocalAddr,
+                                           __ubuf__ uint16_t* recipScaleLocalAddr, uint16_t loopNum1VF,
                                            uint32_t totalScaleInUB);
-    __aicore__ inline void ComputeData(__ubuf__ bfloat16_t *xLocalAddr, __ubuf__ uint16_t *recipScaleLocalAddr,
-                                       __ubuf__ int8_t *yLocalAddr, uint16_t loopNum2VF);
+    __aicore__ inline void ComputeData(__ubuf__ bfloat16_t* xLocalAddr, __ubuf__ uint16_t* recipScaleLocalAddr,
+                                       __ubuf__ int8_t* yLocalAddr, uint16_t loopNum2VF);
 
     GlobalTensor<DtypeX> xGm_;
     GlobalTensor<uint8_t> yGm_;
@@ -139,7 +139,7 @@ private:
     LocalTensor<uint16_t> maxExpLocal_[DB_BUFFER];
     LocalTensor<uint16_t> recipScaleLocal_[DB_BUFFER];
 
-    const optiling::KdaInputProjTilingData *tiling_{nullptr};
+    const optiling::KdaInputProjTilingData* tiling_{nullptr};
 
     int64_t blockSize_{0};
     int64_t totalCoreNum_{0};
@@ -177,9 +177,9 @@ private:
 };
 
 template <typename TypePack>
-__aicore__ inline void KdaInputProjMxQuant<TypePack>::Init(__gm__ uint8_t *x, __gm__ uint8_t *quantX,
-                                                           __gm__ uint8_t *xScale,
-                                                           const optiling::KdaInputProjTilingData *__restrict tiling)
+__aicore__ inline void KdaInputProjMxQuant<TypePack>::Init(__gm__ uint8_t* x, __gm__ uint8_t* quantX,
+                                                           __gm__ uint8_t* xScale,
+                                                           const optiling::KdaInputProjTilingData* __restrict tiling)
 {
     tiling_ = tiling;
     if ASCEND_IS_AIC {
@@ -194,9 +194,9 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::Init(__gm__ uint8_t *x, __
     GetUbParams();
     InitUbLayout();
 
-    xGm_.SetGlobalBuffer(reinterpret_cast<__gm__ DtypeX *>(x) + xGmOffset_);
-    yGm_.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t *>(quantX) + xGmOffset_);
-    scaleGm_.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t *>(xScale) + scaleGmOffset_);
+    xGm_.SetGlobalBuffer(reinterpret_cast<__gm__ DtypeX*>(x) + xGmOffset_);
+    yGm_.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t*>(quantX) + xGmOffset_);
+    scaleGm_.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t*>(xScale) + scaleGmOffset_);
 
     f8Emax_ = FP8_E4M3_MAX_EXP;
 }
@@ -238,7 +238,7 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::InitUbLayout()
 
 template <typename TypePack>
 __aicore__ inline void KdaInputProjMxQuant<TypePack>::ParseTilingData(
-    const optiling::KdaInputProjMxQuantParams *tilingData)
+    const optiling::KdaInputProjMxQuantParams* tilingData)
 {
     blockSize_ = tilingData->blockSize;
     totalCoreNum_ = tilingData->totalCoreNum;
@@ -422,8 +422,8 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::CopyOut(int64_t dim0LoopId
 }
 
 template <typename TypePack>
-__aicore__ inline void KdaInputProjMxQuant<TypePack>::ComputeMaxExpOcpBf16(__ubuf__ bfloat16_t *xLocalAddr,
-                                                                           __ubuf__ uint16_t *maxExpAddr,
+__aicore__ inline void KdaInputProjMxQuant<TypePack>::ComputeMaxExpOcpBf16(__ubuf__ bfloat16_t* xLocalAddr,
+                                                                           __ubuf__ uint16_t* maxExpAddr,
                                                                            uint16_t loopNum2VF)
 {
     __VEC_SCOPE__
@@ -443,8 +443,8 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::ComputeMaxExpOcpBf16(__ubu
         for (uint16_t i = 0; i < loopNum2VF; i++) {
             Reg::LoadAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B16>(
                 x0, x1, xLocalAddr, VF_LEN_16_DOUBLE);
-            Reg::And(xExpExtract0, (Reg::RegTensor<uint16_t> &)x0, expMaskBF16, mask);
-            Reg::And(xExpExtract1, (Reg::RegTensor<uint16_t> &)x1, expMaskBF16, mask);
+            Reg::And(xExpExtract0, (Reg::RegTensor<uint16_t>&)x0, expMaskBF16, mask);
+            Reg::And(xExpExtract1, (Reg::RegTensor<uint16_t>&)x1, expMaskBF16, mask);
             Reg::Max(xMaxExp, xExpExtract0, xExpExtract1, mask);
             Reg::ReduceDataBlock<ReduceType::MAX>(xMaxExp, xMaxExp, mask);
 
@@ -456,9 +456,9 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::ComputeMaxExpOcpBf16(__ubu
 }
 
 template <typename TypePack>
-__aicore__ inline void KdaInputProjMxQuant<TypePack>::ComputeScaleOcp(__ubuf__ uint16_t *maxExpAddr,
-                                                                      __ubuf__ uint16_t *mxScaleLocalAddr,
-                                                                      __ubuf__ uint16_t *recipScaleLocalAddr,
+__aicore__ inline void KdaInputProjMxQuant<TypePack>::ComputeScaleOcp(__ubuf__ uint16_t* maxExpAddr,
+                                                                      __ubuf__ uint16_t* mxScaleLocalAddr,
+                                                                      __ubuf__ uint16_t* recipScaleLocalAddr,
                                                                       uint16_t loopNum1VF, uint32_t totalScaleInUB)
 {
     __VEC_SCOPE__
@@ -518,9 +518,9 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::ComputeScaleOcp(__ubuf__ u
 }
 
 template <typename TypePack>
-__aicore__ inline void KdaInputProjMxQuant<TypePack>::ComputeData(__ubuf__ bfloat16_t *xLocalAddr,
-                                                                  __ubuf__ uint16_t *recipScaleLocalAddr,
-                                                                  __ubuf__ int8_t *yLocalAddr, uint16_t loopNum2VF)
+__aicore__ inline void KdaInputProjMxQuant<TypePack>::ComputeData(__ubuf__ bfloat16_t* xLocalAddr,
+                                                                  __ubuf__ uint16_t* recipScaleLocalAddr,
+                                                                  __ubuf__ int8_t* yLocalAddr, uint16_t loopNum2VF)
 {
     __VEC_SCOPE__
     {
@@ -559,8 +559,8 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::ComputeData(__ubuf__ bfloa
             Reg::LoadAlign<uint16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_E2B_B16>(
                 halfScaleForMul, recipScaleLocalAddr, ELEMENT_AFTER_REDUCE_);
 
-            Reg::Mul(x0, x0, (Reg::RegTensor<bfloat16_t> &)halfScaleForMul, dataMask1);
-            Reg::Mul(x1, x1, (Reg::RegTensor<bfloat16_t> &)halfScaleForMul, dataMask1);
+            Reg::Mul(x0, x0, (Reg::RegTensor<bfloat16_t>&)halfScaleForMul, dataMask1);
+            Reg::Mul(x1, x1, (Reg::RegTensor<bfloat16_t>&)halfScaleForMul, dataMask1);
 
             Reg::Cast<float, bfloat16_t, castTraitZero>(x0ZeroFP32, x0, dataMask1);
             Reg::Cast<float, bfloat16_t, castTraitOne>(x0OneFP32, x0, dataMask1);
@@ -572,15 +572,15 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::ComputeData(__ubuf__ bfloa
             Reg::Cast<fp8_e4m3fn_t, float, castTrait32to82>(x0OneFP8, x0OneFP32, dataMask3);
             Reg::Cast<fp8_e4m3fn_t, float, castTrait32to83>(x1OneFP8, x1OneFP32, dataMask4);
 
-            Reg::Add((Reg::RegTensor<uint8_t> &)x0ZeroFP8, (Reg::RegTensor<uint8_t> &)x0ZeroFP8,
-                     (Reg::RegTensor<uint8_t> &)x0OneFP8, dataMask5);
-            Reg::Add((Reg::RegTensor<uint8_t> &)x1ZeroFP8, (Reg::RegTensor<uint8_t> &)x1ZeroFP8,
-                     (Reg::RegTensor<uint8_t> &)x1OneFP8, dataMask5);
-            Reg::Add((Reg::RegTensor<uint8_t> &)x0ZeroFP8, (Reg::RegTensor<uint8_t> &)x0ZeroFP8,
-                     (Reg::RegTensor<uint8_t> &)x1ZeroFP8, dataMask5);
+            Reg::Add((Reg::RegTensor<uint8_t>&)x0ZeroFP8, (Reg::RegTensor<uint8_t>&)x0ZeroFP8,
+                     (Reg::RegTensor<uint8_t>&)x0OneFP8, dataMask5);
+            Reg::Add((Reg::RegTensor<uint8_t>&)x1ZeroFP8, (Reg::RegTensor<uint8_t>&)x1ZeroFP8,
+                     (Reg::RegTensor<uint8_t>&)x1OneFP8, dataMask5);
+            Reg::Add((Reg::RegTensor<uint8_t>&)x0ZeroFP8, (Reg::RegTensor<uint8_t>&)x0ZeroFP8,
+                     (Reg::RegTensor<uint8_t>&)x1ZeroFP8, dataMask5);
 
             Reg::StoreAlign<int8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B8>(
-                yLocalAddr, (Reg::RegTensor<int8_t> &)x0ZeroFP8, VF_LEN_16_DOUBLE, dataMask5);
+                yLocalAddr, (Reg::RegTensor<int8_t>&)x0ZeroFP8, VF_LEN_16_DOUBLE, dataMask5);
         }
     }
 }
@@ -600,11 +600,11 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::Compute(int64_t ubFactorRo
     uint16_t loopNum1VF =
         static_cast<uint16_t>(CeilDiv(static_cast<uint32_t>(totalBlockNum), static_cast<uint32_t>(VF_LEN_16)));
 
-    auto xLocalAddr = reinterpret_cast<__ubuf__ bfloat16_t *>(xLocal_[bufSlot].GetPhyAddr());
-    auto scaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t *>(scaleLocal_[bufSlot].GetPhyAddr());
-    auto yLocalAddr = reinterpret_cast<__ubuf__ int8_t *>(yLocal_[bufSlot].GetPhyAddr());
-    auto maxExpLocalAddr = reinterpret_cast<__ubuf__ uint16_t *>(maxExpLocal_[bufSlot].GetPhyAddr());
-    auto recipScaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t *>(recipScaleLocal_[bufSlot].GetPhyAddr());
+    auto xLocalAddr = reinterpret_cast<__ubuf__ bfloat16_t*>(xLocal_[bufSlot].GetPhyAddr());
+    auto scaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t*>(scaleLocal_[bufSlot].GetPhyAddr());
+    auto yLocalAddr = reinterpret_cast<__ubuf__ int8_t*>(yLocal_[bufSlot].GetPhyAddr());
+    auto maxExpLocalAddr = reinterpret_cast<__ubuf__ uint16_t*>(maxExpLocal_[bufSlot].GetPhyAddr());
+    auto recipScaleLocalAddr = reinterpret_cast<__ubuf__ uint16_t*>(recipScaleLocal_[bufSlot].GetPhyAddr());
 
     ComputeMaxExpOcpBf16(xLocalAddr, maxExpLocalAddr, loopNum2VF);
     ComputeScaleOcp(maxExpLocalAddr, scaleLocalAddr, recipScaleLocalAddr, loopNum1VF, totalBlockNum);

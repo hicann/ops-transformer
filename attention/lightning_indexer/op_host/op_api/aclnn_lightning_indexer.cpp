@@ -33,24 +33,24 @@ extern "C" {
 namespace {
 
 extern aclnnStatus aclnnInnerLightningIndexerGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *weights,
-    const aclTensor *actualSeqLengthsQueryOptional, const aclTensor *actualSeqLengthsKeyOptional,
-    const aclTensor *blockTableOptional, char *layoutQueryOptional, char *layoutKeyOptional, int64_t sparseCount,
-    int64_t sparseMode, int64_t preTokens, int64_t nextTokens, bool returnValues, const aclTensor *sparseIndicesOut,
-    const aclTensor *sparseValuesOut, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* query, const aclTensor* key, const aclTensor* weights,
+    const aclTensor* actualSeqLengthsQueryOptional, const aclTensor* actualSeqLengthsKeyOptional,
+    const aclTensor* blockTableOptional, char* layoutQueryOptional, char* layoutKeyOptional, int64_t sparseCount,
+    int64_t sparseMode, int64_t preTokens, int64_t nextTokens, bool returnValues, const aclTensor* sparseIndicesOut,
+    const aclTensor* sparseValuesOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
-extern aclnnStatus aclnnInnerLightningIndexer(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern aclnnStatus aclnnInnerLightningIndexer(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                               const aclrtStream stream);
 
 class LightningIndexerOutputHolder {
 public:
-    LightningIndexerOutputHolder(const aclTensor *&output, aclDataType dataType)
+    LightningIndexerOutputHolder(const aclTensor*& output, aclDataType dataType)
     {
         if (output == nullptr) {
             std::vector<int64_t> shape = {0};
             int64_t addr = 0xff;
             inner_ = aclCreateTensor(shape.data(), shape.size(), dataType, shape.data(), 0, ACL_FORMAT_ND, shape.data(),
-                                     shape.size(), static_cast<void *>(&addr));
+                                     shape.size(), static_cast<void*>(&addr));
             output = inner_;
         }
     }
@@ -64,15 +64,15 @@ public:
     }
 
 private:
-    const aclTensor *inner_ = nullptr;
+    const aclTensor* inner_ = nullptr;
 };
 
 aclnnStatus aclnnLightningIndexerGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *weights,
-    const aclTensor *actualSeqLengthsQueryOptional, const aclTensor *actualSeqLengthsKeyOptional,
-    const aclTensor *blockTableOptional, char *layoutQueryOptional, char *layoutKeyOptional, int64_t sparseCount,
-    int64_t sparseMode, int64_t preTokens, int64_t nextTokens, bool returnValues, const aclTensor *sparseIndicesOut,
-    const aclTensor *sparseValuesOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensor* key, const aclTensor* weights,
+    const aclTensor* actualSeqLengthsQueryOptional, const aclTensor* actualSeqLengthsKeyOptional,
+    const aclTensor* blockTableOptional, char* layoutQueryOptional, char* layoutKeyOptional, int64_t sparseCount,
+    int64_t sparseMode, int64_t preTokens, int64_t nextTokens, bool returnValues, const aclTensor* sparseIndicesOut,
+    const aclTensor* sparseValuesOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (query == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "Query pointer is null, cannot get data type!");
@@ -98,7 +98,7 @@ aclnnStatus aclnnLightningIndexerGetWorkspaceSize(
         sparseIndicesOut, sparseValuesOut, workspaceSize, executor);
 }
 
-aclnnStatus aclnnLightningIndexer(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnLightningIndexer(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                   const aclrtStream stream)
 {
     return aclnnInnerLightningIndexer(workspace, workspaceSize, executor, stream);

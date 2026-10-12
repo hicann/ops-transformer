@@ -15,7 +15,6 @@
 #ifndef AIR_CXX_RUNTIME_V2_OP_IMPL_INCREFLASHATTENTIONSCORE_CONTEXT_H_
 #define AIR_CXX_RUNTIME_V2_OP_IMPL_INCREFLASHATTENTIONSCORE_CONTEXT_H_
 
-
 #ifdef ASCENDC_OP_TEST
 #define IFA_EXTERN_C extern "C"
 #else
@@ -23,18 +22,18 @@
 #endif
 namespace optiling {
 struct RequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct OptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 struct IncreFlashAttentionContext {
-    const char *opName = nullptr;
-    fe::PlatFormInfos *platformInfo = nullptr;
+    const char* opName = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     RequiredParaInfo query = {nullptr, nullptr};
     RequiredParaInfo key = {nullptr, nullptr};
     RequiredParaInfo value = {nullptr, nullptr};
@@ -69,28 +68,28 @@ struct IncreFlashAttentionContext {
     RequiredParaInfo attenOut = {nullptr, nullptr};
     RequiredParaInfo lseOut = {nullptr, nullptr};
 
-    const uint32_t *numHeads = nullptr;
-    const int64_t *preToken = nullptr;
-    const int64_t *nextToken = nullptr;
-    const float *scaleValue = nullptr;
-    const uint32_t *kvHeadNums = nullptr;
-    const char *layOut = nullptr;
-    const uint32_t *blockSize = nullptr;
-    const uint32_t *innerPrecise = nullptr;
-    const int64_t *antiquantMode = nullptr;
-    const bool *softmaxLseFlag = nullptr;
-    const int64_t *keyAntiquantMode = nullptr;
-    const int64_t *valueAntiquantMode = nullptr;
-    const uint32_t *sparseMode = nullptr;
-    const int64_t *queryQuantMode = nullptr;
-    const int64_t *pseType = nullptr;
-    const int64_t *windowSize = nullptr;
-    const gert::StorageShape *queryRopeInputShape = nullptr;
-    const gert::StorageShape *keyRopeInputShape = nullptr;
+    const uint32_t* numHeads = nullptr;
+    const int64_t* preToken = nullptr;
+    const int64_t* nextToken = nullptr;
+    const float* scaleValue = nullptr;
+    const uint32_t* kvHeadNums = nullptr;
+    const char* layOut = nullptr;
+    const uint32_t* blockSize = nullptr;
+    const uint32_t* innerPrecise = nullptr;
+    const int64_t* antiquantMode = nullptr;
+    const bool* softmaxLseFlag = nullptr;
+    const int64_t* keyAntiquantMode = nullptr;
+    const int64_t* valueAntiquantMode = nullptr;
+    const uint32_t* sparseMode = nullptr;
+    const int64_t* queryQuantMode = nullptr;
+    const int64_t* pseType = nullptr;
+    const int64_t* windowSize = nullptr;
+    const gert::StorageShape* queryRopeInputShape = nullptr;
+    const gert::StorageShape* keyRopeInputShape = nullptr;
 
-    size_t *workSpaces = nullptr;
-    std::vector<gert::StorageShape *> kCache = {nullptr};
-    std::vector<gert::StorageShape *> vCache = {nullptr};
+    size_t* workSpaces = nullptr;
+    std::vector<gert::StorageShape*> kCache = {nullptr};
+    std::vector<gert::StorageShape*> vCache = {nullptr};
     uint64_t tilingKey = 0;
     uint32_t numBlocks = 0;
     uint32_t transposeLayout = 0;

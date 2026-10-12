@@ -84,7 +84,7 @@ CaseTensors MakeTransposedCase()
     return c;
 }
 
-aclnnStatus RunCase(const CaseTensors &c)
+aclnnStatus RunCase(const CaseTensors& c)
 {
     auto ut = OP_API_UT(aclnnKdaInputProj, INPUT(c.x, c.wQkv, c.wBeta, c.wGate, c.wG, c.scale),
                         OUTPUT(c.qkv, c.beta, c.gate, c.gOut));

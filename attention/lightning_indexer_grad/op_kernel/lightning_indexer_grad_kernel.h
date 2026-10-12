@@ -40,28 +40,28 @@ template <typename LIGT>
 class LIGKernel {
 public:
     __aicore__ inline LIGKernel(){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *dy,
-                                __gm__ uint8_t *sparse_indices, __gm__ uint8_t *weights,
-                                __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *dq,
-                                __gm__ uint8_t *dk, __gm__ uint8_t *dweights, __gm__ uint8_t *workspace,
-                                const LIGTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* dy,
+                                __gm__ uint8_t* sparse_indices, __gm__ uint8_t* weights,
+                                __gm__ uint8_t* actualSeqLengthsQ, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* dq,
+                                __gm__ uint8_t* dk, __gm__ uint8_t* dweights, __gm__ uint8_t* workspace,
+                                const LIGTilingData* __restrict tiling, TPipe* tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessDeterministic();
     __aicore__ inline void ProcessNonDeterministic();
-    __aicore__ inline void InitActualSeqLen(__gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengthsK);
-    __aicore__ inline uint32_t GetActualSeqLen(uint32_t bIdx, GlobalTensor<uint32_t> &actualSeqLengthsGm);
-    __aicore__ inline uint32_t GetPrefixSeqLen(uint32_t bIdx, GlobalTensor<uint32_t> &actualSeqLengthsGm);
-    __aicore__ inline void InitRunInfo(uint64_t bIndex, const CoreSplitInfo &split,
-                                       const CoreSplitInfo &determineSplit);
-    __aicore__ inline void UpdateRunInfo(uint64_t bIndex, LIGCommon::RunInfo &runInfo, uint64_t taskId);
+    __aicore__ inline void InitActualSeqLen(__gm__ uint8_t* actualSeqLengthsQ, __gm__ uint8_t* actualSeqLengthsK);
+    __aicore__ inline uint32_t GetActualSeqLen(uint32_t bIdx, GlobalTensor<uint32_t>& actualSeqLengthsGm);
+    __aicore__ inline uint32_t GetPrefixSeqLen(uint32_t bIdx, GlobalTensor<uint32_t>& actualSeqLengthsGm);
+    __aicore__ inline void InitRunInfo(uint64_t bIndex, const CoreSplitInfo& split,
+                                       const CoreSplitInfo& determineSplit);
+    __aicore__ inline void UpdateRunInfo(uint64_t bIndex, LIGCommon::RunInfo& runInfo, uint64_t taskId);
     __aicore__ inline void InitUniformRunInfo();
-    __aicore__ inline void UpdateUniformRunInfo(LIGCommon::RunInfo &runInfo, uint64_t taskId);
+    __aicore__ inline void UpdateUniformRunInfo(LIGCommon::RunInfo& runInfo, uint64_t taskId);
     __aicore__ inline void SetUniformS1RunInfo(uint64_t globalS1Idx);
     __aicore__ inline CoreSplitInfo DoSplit(uint64_t totalLoopSize, uint64_t coreIdx, uint64_t coreNum);
     __aicore__ inline CoreSplitInfo SplitCore(uint64_t bIndex, uint64_t coreIdx, uint64_t coreNum);
     __aicore__ inline CoreSplitInfo CalculateDetermineLoopTimes(uint64_t bIndex, uint64_t coreIdx, uint64_t coreNum);
-    __aicore__ inline void CopyRunInfo(LIGCommon::RunInfo &dstRunInfo, LIGCommon::RunInfo srcRunInfo);
-    __aicore__ inline uint64_t CalcRealTopk(LIGCommon::RunInfo &runInfo);
+    __aicore__ inline void CopyRunInfo(LIGCommon::RunInfo& dstRunInfo, LIGCommon::RunInfo srcRunInfo);
+    __aicore__ inline uint64_t CalcRealTopk(LIGCommon::RunInfo& runInfo);
     __aicore__ inline void ProcessVec1(uint64_t taskId);
     __aicore__ inline void ProcessVec2(uint64_t taskId);
     __aicore__ inline void ProcessVec3(uint64_t taskId);
@@ -81,7 +81,7 @@ public:
     static constexpr uint64_t SYNC_C2_V1_FLAG = 11;
 
 protected:
-    TPipe *pipe = nullptr;
+    TPipe* pipe = nullptr;
 
     uint32_t tmpBlockIdx = 0U;
     uint32_t aiCoreIdx = 0U;
@@ -138,11 +138,11 @@ protected:
     LIGCommon::RunInfo runInfo;
 
     // ================================Init functions=====================================
-    __aicore__ inline void InitTilingData(const LIGTilingData *__restrict tilingData);
+    __aicore__ inline void InitTilingData(const LIGTilingData* __restrict tilingData);
 };
 
 template <typename LIGT>
-__aicore__ inline void LIGKernel<LIGT>::InitTilingData(const LIGTilingData *__restrict tilingData)
+__aicore__ inline void LIGKernel<LIGT>::InitTilingData(const LIGTilingData* __restrict tilingData)
 {
     constInfo.batch = tilingData->batch;
     constInfo.seqlenQ = tilingData->seqlenQ;
@@ -171,19 +171,19 @@ __aicore__ inline void LIGKernel<LIGT>::InitTilingData(const LIGTilingData *__re
 }
 
 template <typename LIGT>
-__aicore__ inline void LIGKernel<LIGT>::InitActualSeqLen(__gm__ uint8_t *actualSeqLengthsQ,
-                                                         __gm__ uint8_t *actualSeqLengthsK)
+__aicore__ inline void LIGKernel<LIGT>::InitActualSeqLen(__gm__ uint8_t* actualSeqLengthsQ,
+                                                         __gm__ uint8_t* actualSeqLengthsK)
 {
     if (actualSeqLengthsQ != nullptr) {
-        actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ uint32_t *)actualSeqLengthsQ, constInfo.batch);
+        actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ uint32_t*)actualSeqLengthsQ, constInfo.batch);
     }
     if (actualSeqLengthsK != nullptr) {
-        actualSeqLengthsGmK.SetGlobalBuffer((__gm__ uint32_t *)actualSeqLengthsK, constInfo.batch);
+        actualSeqLengthsGmK.SetGlobalBuffer((__gm__ uint32_t*)actualSeqLengthsK, constInfo.batch);
     }
 }
 
 template <typename LIGT>
-__aicore__ inline uint32_t LIGKernel<LIGT>::GetActualSeqLen(uint32_t bIdx, GlobalTensor<uint32_t> &actualSeqLengthsGm)
+__aicore__ inline uint32_t LIGKernel<LIGT>::GetActualSeqLen(uint32_t bIdx, GlobalTensor<uint32_t>& actualSeqLengthsGm)
 {
     if (bIdx > 0) {
         return actualSeqLengthsGm.GetValue(bIdx) - actualSeqLengthsGm.GetValue(bIdx - 1);
@@ -193,7 +193,7 @@ __aicore__ inline uint32_t LIGKernel<LIGT>::GetActualSeqLen(uint32_t bIdx, Globa
 }
 
 template <typename LIGT>
-__aicore__ inline uint32_t LIGKernel<LIGT>::GetPrefixSeqLen(uint32_t bIdx, GlobalTensor<uint32_t> &actualSeqLengthsGm)
+__aicore__ inline uint32_t LIGKernel<LIGT>::GetPrefixSeqLen(uint32_t bIdx, GlobalTensor<uint32_t>& actualSeqLengthsGm)
 {
     if (bIdx > 0) {
         return actualSeqLengthsGm.GetValue(bIdx - 1);
@@ -203,7 +203,7 @@ __aicore__ inline uint32_t LIGKernel<LIGT>::GetPrefixSeqLen(uint32_t bIdx, Globa
 }
 
 template <typename LIGT>
-__aicore__ inline uint64_t LIGKernel<LIGT>::CalcRealTopk(LIGCommon::RunInfo &runInfo)
+__aicore__ inline uint64_t LIGKernel<LIGT>::CalcRealTopk(LIGCommon::RunInfo& runInfo)
 {
     if (constInfo.sparseMode == 0) {
         return constInfo.topK;
@@ -218,8 +218,8 @@ __aicore__ inline uint64_t LIGKernel<LIGT>::CalcRealTopk(LIGCommon::RunInfo &run
 }
 
 template <typename LIGT>
-__aicore__ inline void LIGKernel<LIGT>::InitRunInfo(uint64_t bIndex, const CoreSplitInfo &split,
-                                                    const CoreSplitInfo &determineSplit)
+__aicore__ inline void LIGKernel<LIGT>::InitRunInfo(uint64_t bIndex, const CoreSplitInfo& split,
+                                                    const CoreSplitInfo& determineSplit)
 {
     // B -> S1 -> N2 -> G -> D
     if constexpr (LIGT::layout == LIG_LAYOUT::BSND) {
@@ -266,7 +266,7 @@ __aicore__ inline void LIGKernel<LIGT>::InitRunInfo(uint64_t bIndex, const CoreS
 }
 
 template <typename LIGT>
-__aicore__ inline void LIGKernel<LIGT>::UpdateRunInfo(uint64_t bIndex, LIGCommon::RunInfo &runInfo, uint64_t taskId)
+__aicore__ inline void LIGKernel<LIGT>::UpdateRunInfo(uint64_t bIndex, LIGCommon::RunInfo& runInfo, uint64_t taskId)
 {
     uint32_t maxSeqQ = (LIGT::layout == LIG_LAYOUT::BSND) ? constInfo.seqlenQ : runInfo.actualSeqQ;
 
@@ -347,7 +347,7 @@ __aicore__ inline void LIGKernel<LIGT>::InitUniformRunInfo()
 }
 
 template <typename LIGT>
-__aicore__ inline void LIGKernel<LIGT>::UpdateUniformRunInfo(LIGCommon::RunInfo &runInfo, uint64_t taskId)
+__aicore__ inline void LIGKernel<LIGT>::UpdateUniformRunInfo(LIGCommon::RunInfo& runInfo, uint64_t taskId)
 {
     runInfo.n2Idx++;
     if (runInfo.n2Idx < constInfo.headNumK) {
@@ -427,12 +427,12 @@ __aicore__ inline CoreSplitInfo LIGKernel<LIGT>::CalculateDetermineLoopTimes(uin
 }
 
 template <typename LIGT>
-__aicore__ inline void LIGKernel<LIGT>::Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *dy,
-                                             __gm__ uint8_t *sparse_indices, __gm__ uint8_t *weights,
-                                             __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengthsK,
-                                             __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dweights,
-                                             __gm__ uint8_t *workspace, const LIGTilingData *__restrict tiling,
-                                             TPipe *tPipe)
+__aicore__ inline void LIGKernel<LIGT>::Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* dy,
+                                             __gm__ uint8_t* sparse_indices, __gm__ uint8_t* weights,
+                                             __gm__ uint8_t* actualSeqLengthsQ, __gm__ uint8_t* actualSeqLengthsK,
+                                             __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dweights,
+                                             __gm__ uint8_t* workspace, const LIGTilingData* __restrict tiling,
+                                             TPipe* tPipe)
 {
     if ASCEND_IS_AIV {
         tmpBlockIdx = GetBlockIdx(); // vec:0-47
@@ -446,47 +446,46 @@ __aicore__ inline void LIGKernel<LIGT>::Init(__gm__ uint8_t *query, __gm__ uint8
     InitTilingData(tiling);
 
     // init input global tensor
-    queryGm.SetGlobalBuffer((__gm__ D_T *)query);
-    keyGm.SetGlobalBuffer((__gm__ D_T *)key);
-    dyGm.SetGlobalBuffer((__gm__ D_T *)dy);
-    weightsGm.SetGlobalBuffer((__gm__ D_T *)weights);
-    sparseIndicesGm.SetGlobalBuffer((__gm__ int32_t *)sparse_indices);
+    queryGm.SetGlobalBuffer((__gm__ D_T*)query);
+    keyGm.SetGlobalBuffer((__gm__ D_T*)key);
+    dyGm.SetGlobalBuffer((__gm__ D_T*)dy);
+    weightsGm.SetGlobalBuffer((__gm__ D_T*)weights);
+    sparseIndicesGm.SetGlobalBuffer((__gm__ int32_t*)sparse_indices);
     InitActualSeqLen(actualSeqLengthsQ, actualSeqLengthsK);
 
     // init output global tensor
-    dqGm.SetGlobalBuffer((__gm__ D_T *)dq);
-    dkGm.SetGlobalBuffer((__gm__ D_T *)dk);
-    dweightsGm.SetGlobalBuffer((__gm__ D_T *)dweights);
+    dqGm.SetGlobalBuffer((__gm__ D_T*)dq);
+    dkGm.SetGlobalBuffer((__gm__ D_T*)dk);
+    dweightsGm.SetGlobalBuffer((__gm__ D_T*)dweights);
 
     // init workspace global tensor
-    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + constInfo.dkWorkSpaceOffset / sizeof(float));
+    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + constInfo.dkWorkSpaceOffset / sizeof(float));
 
     uint64_t keyCoreSize = constInfo.seqlenK * constInfo.headDim * sizeof(float);
-    dkCoreWorkspaceGM.SetGlobalBuffer((__gm__ float *)workspace + constInfo.dkCoreWorkspaceOffset / sizeof(float));
+    dkCoreWorkspaceGM.SetGlobalBuffer((__gm__ float*)workspace + constInfo.dkCoreWorkspaceOffset / sizeof(float));
 
     uint64_t keyGatherSize = 2048 * 128 * sizeof(D_T) * 2;
     keyGatherPingGm.SetGlobalBuffer(
-        (__gm__ D_T *)(workspace + constInfo.keyGatherWorkspaceOffset + aiCoreIdx * keyGatherSize));
+        (__gm__ D_T*)(workspace + constInfo.keyGatherWorkspaceOffset + aiCoreIdx * keyGatherSize));
     keyGatherPongGm.SetGlobalBuffer(
-        (__gm__ D_T *)(workspace + constInfo.keyGatherWorkspaceOffset + aiCoreIdx * keyGatherSize + keyGatherSize / 2));
+        (__gm__ D_T*)(workspace + constInfo.keyGatherWorkspaceOffset + aiCoreIdx * keyGatherSize + keyGatherSize / 2));
 
     uint64_t reluInSize = 64 * 2048 * sizeof(float) * 2;
-    reluInPingGm.SetGlobalBuffer(
-        (__gm__ float *)(workspace + constInfo.reluInWorkspaceOffset + aiCoreIdx * reluInSize));
+    reluInPingGm.SetGlobalBuffer((__gm__ float*)(workspace + constInfo.reluInWorkspaceOffset + aiCoreIdx * reluInSize));
     reluInPongGm.SetGlobalBuffer(
-        (__gm__ float *)(workspace + constInfo.reluInWorkspaceOffset + aiCoreIdx * reluInSize + reluInSize / 2));
+        (__gm__ float*)(workspace + constInfo.reluInWorkspaceOffset + aiCoreIdx * reluInSize + reluInSize / 2));
 
     uint64_t reluGradSize = 64 * 2048 * sizeof(D_T) * 2;
     reluGradPingGm.SetGlobalBuffer(
-        (__gm__ D_T *)(workspace + constInfo.reluGradWorkspaceOffset + aiCoreIdx * reluGradSize));
+        (__gm__ D_T*)(workspace + constInfo.reluGradWorkspaceOffset + aiCoreIdx * reluGradSize));
     reluGradPongGm.SetGlobalBuffer(
-        (__gm__ D_T *)(workspace + constInfo.reluGradWorkspaceOffset + aiCoreIdx * reluGradSize + reluGradSize / 2));
+        (__gm__ D_T*)(workspace + constInfo.reluGradWorkspaceOffset + aiCoreIdx * reluGradSize + reluGradSize / 2));
 
     uint64_t scatterAddSize = 2048 * 128 * sizeof(float) * 2;
     scatterAddPingGm.SetGlobalBuffer(
-        (__gm__ float *)(workspace + constInfo.scatterAddWorkspaceOffset + aiCoreIdx * scatterAddSize));
-    scatterAddPongGm.SetGlobalBuffer((__gm__ float *)(workspace + constInfo.scatterAddWorkspaceOffset +
-                                                      aiCoreIdx * scatterAddSize + scatterAddSize / 2));
+        (__gm__ float*)(workspace + constInfo.scatterAddWorkspaceOffset + aiCoreIdx * scatterAddSize));
+    scatterAddPongGm.SetGlobalBuffer((__gm__ float*)(workspace + constInfo.scatterAddWorkspaceOffset +
+                                                     aiCoreIdx * scatterAddSize + scatterAddSize / 2));
 
     if ASCEND_IS_AIV {
         vectorService.Init(pipe);
@@ -497,7 +496,7 @@ __aicore__ inline void LIGKernel<LIGT>::Init(__gm__ uint8_t *query, __gm__ uint8
 }
 
 template <typename LIGT>
-__aicore__ inline void LIGKernel<LIGT>::CopyRunInfo(LIGCommon::RunInfo &dstRunInfo, LIGCommon::RunInfo srcRunInfo)
+__aicore__ inline void LIGKernel<LIGT>::CopyRunInfo(LIGCommon::RunInfo& dstRunInfo, LIGCommon::RunInfo srcRunInfo)
 {
     dstRunInfo.bIdx = srcRunInfo.bIdx;
     dstRunInfo.n2Idx = srcRunInfo.n2Idx;

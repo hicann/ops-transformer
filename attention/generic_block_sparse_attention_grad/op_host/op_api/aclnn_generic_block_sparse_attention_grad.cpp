@@ -45,7 +45,7 @@ struct LayoutDims {
     int64_t headDim;
 };
 
-aclnnStatus CheckRequiredTensor(const aclTensor *t, const char *name)
+aclnnStatus CheckRequiredTensor(const aclTensor* t, const char* name)
 {
     if (t == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "GenericBlockSparseAttentionGrad: %s is nullptr.", name);
@@ -59,9 +59,9 @@ aclnnStatus CheckRequiredTensor(const aclTensor *t, const char *name)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckTensorPositiveDims(const aclTensor *t, const char *name)
+aclnnStatus CheckTensorPositiveDims(const aclTensor* t, const char* name)
 {
-    const auto &shape = t->GetViewShape();
+    const auto& shape = t->GetViewShape();
     const size_t dimNum = shape.GetDimNum();
     for (size_t i = 0; i < dimNum; ++i) {
         const int64_t dim = shape.GetDim(static_cast<int64_t>(i));
@@ -74,9 +74,9 @@ aclnnStatus CheckTensorPositiveDims(const aclTensor *t, const char *name)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckLayoutTensorRank(const aclTensor *t, const char *name, const char *layout, size_t expectRank)
+aclnnStatus CheckLayoutTensorRank(const aclTensor* t, const char* name, const char* layout, size_t expectRank)
 {
-    const auto &shape = t->GetViewShape();
+    const auto& shape = t->GetViewShape();
     const size_t dimNum = shape.GetDimNum();
     if (dimNum != expectRank) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
@@ -87,12 +87,12 @@ aclnnStatus CheckLayoutTensorRank(const aclTensor *t, const char *name, const ch
     return ACLNN_SUCCESS;
 }
 
-bool IsTndLayout(const char *layout)
+bool IsTndLayout(const char* layout)
 {
     return strcmp(layout, "TND") == 0;
 }
 
-LayoutDims GetLayoutDims(const char *layout)
+LayoutDims GetLayoutDims(const char* layout)
 {
     if (IsTndLayout(layout)) {
         return {-1, 0, 1, 2}; // [T, N, D]
@@ -103,27 +103,27 @@ LayoutDims GetLayoutDims(const char *layout)
     return {0, 1, 2, 3}; // BSND
 }
 
-int64_t GetHeadNum(const aclTensor *t, const char *layout)
+int64_t GetHeadNum(const aclTensor* t, const char* layout)
 {
-    const auto &shape = t->GetViewShape();
+    const auto& shape = t->GetViewShape();
     const LayoutDims dims = GetLayoutDims(layout);
     return shape.GetDimNum() > static_cast<size_t>(dims.head) ? shape.GetDim(dims.head) : -1;
 }
 
-bool IsSupportedLayout(const char *layout)
+bool IsSupportedLayout(const char* layout)
 {
     return layout != nullptr &&
            (strcmp(layout, "TND") == 0 || strcmp(layout, "BNSD") == 0 || strcmp(layout, "BSND") == 0);
 }
 
-aclnnStatus CheckQkvShapesByLayout(const aclTensor *query, const aclTensor *key, const aclTensor *value,
-                                   const aclTensor *dout, const aclTensor *out, const aclTensor *dQuery,
-                                   const aclTensor *dKey, const aclTensor *dValue, const char *layout)
+aclnnStatus CheckQkvShapesByLayout(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                   const aclTensor* dout, const aclTensor* out, const aclTensor* dQuery,
+                                   const aclTensor* dKey, const aclTensor* dValue, const char* layout)
 {
     const size_t expectQRank = (strcmp(layout, "TND") == 0) ? 3U : 4U;
     const size_t expectKvRank = expectQRank;
-    const aclTensor *qLike[] = {query, dout, out, dQuery};
-    const char *qLikeNames[] = {"query", "dout", "out", "dQuery"};
+    const aclTensor* qLike[] = {query, dout, out, dQuery};
+    const char* qLikeNames[] = {"query", "dout", "out", "dQuery"};
     for (size_t i = 0; i < sizeof(qLike) / sizeof(qLike[0]); ++i) {
         aclnnStatus st = CheckLayoutTensorRank(qLike[i], qLikeNames[i], layout, expectQRank);
         if (st != ACLNN_SUCCESS) {
@@ -134,8 +134,8 @@ aclnnStatus CheckQkvShapesByLayout(const aclTensor *query, const aclTensor *key,
             return st;
         }
     }
-    const aclTensor *kvLike[] = {key, value, dKey, dValue};
-    const char *kvLikeNames[] = {"key", "value", "dKey", "dValue"};
+    const aclTensor* kvLike[] = {key, value, dKey, dValue};
+    const char* kvLikeNames[] = {"key", "value", "dKey", "dValue"};
     for (size_t i = 0; i < sizeof(kvLike) / sizeof(kvLike[0]); ++i) {
         aclnnStatus st = CheckLayoutTensorRank(kvLike[i], kvLikeNames[i], layout, expectKvRank);
         if (st != ACLNN_SUCCESS) {
@@ -149,10 +149,10 @@ aclnnStatus CheckQkvShapesByLayout(const aclTensor *query, const aclTensor *key,
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckShapeEqual(const aclTensor *lhs, const aclTensor *rhs, const char *lhsName, const char *rhsName)
+aclnnStatus CheckShapeEqual(const aclTensor* lhs, const aclTensor* rhs, const char* lhsName, const char* rhsName)
 {
-    const auto &lhsShape = lhs->GetViewShape();
-    const auto &rhsShape = rhs->GetViewShape();
+    const auto& lhsShape = lhs->GetViewShape();
+    const auto& rhsShape = rhs->GetViewShape();
     bool same = lhsShape.GetDimNum() == rhsShape.GetDimNum();
     for (size_t i = 0; same && i < lhsShape.GetDimNum(); ++i) {
         same = lhsShape.GetDim(static_cast<int64_t>(i)) == rhsShape.GetDim(static_cast<int64_t>(i));
@@ -165,18 +165,18 @@ aclnnStatus CheckShapeEqual(const aclTensor *lhs, const aclTensor *rhs, const ch
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckCrossTensorShapes(const aclTensor *query, const aclTensor *key, const aclTensor *value,
-                                   const aclTensor *dout, const aclTensor *out, const aclTensor *dQuery,
-                                   const aclTensor *dKey, const aclTensor *dValue, const char *layout)
+aclnnStatus CheckCrossTensorShapes(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                   const aclTensor* dout, const aclTensor* out, const aclTensor* dQuery,
+                                   const aclTensor* dKey, const aclTensor* dValue, const char* layout)
 {
     const struct {
-        const aclTensor *lhs;
-        const aclTensor *rhs;
-        const char *lhsName;
-        const char *rhsName;
+        const aclTensor* lhs;
+        const aclTensor* rhs;
+        const char* lhsName;
+        const char* rhsName;
     } pairs[] = {{dout, query, "dout", "query"}, {out, query, "out", "query"}, {dQuery, query, "dQuery", "query"},
                  {value, key, "value", "key"},   {dKey, key, "dKey", "key"},   {dValue, key, "dValue", "key"}};
-    for (const auto &pair : pairs) {
+    for (const auto& pair : pairs) {
         aclnnStatus st = CheckShapeEqual(pair.lhs, pair.rhs, pair.lhsName, pair.rhsName);
         if (st != ACLNN_SUCCESS) {
             return st;
@@ -184,8 +184,8 @@ aclnnStatus CheckCrossTensorShapes(const aclTensor *query, const aclTensor *key,
     }
 
     const LayoutDims dims = GetLayoutDims(layout);
-    const auto &qShape = query->GetViewShape();
-    const auto &kShape = key->GetViewShape();
+    const auto& qShape = query->GetViewShape();
+    const auto& kShape = key->GetViewShape();
     if (dims.batch >= 0 && qShape.GetDim(dims.batch) != kShape.GetDim(dims.batch)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                 "GenericBlockSparseAttentionGrad: query batch(%ld) must equal key batch(%ld), layout=%s.",
@@ -202,13 +202,13 @@ aclnnStatus CheckCrossTensorShapes(const aclTensor *query, const aclTensor *key,
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckLseShape(const aclTensor *lse, const aclTensor *query, const char *layout, int64_t qHeadNum)
+aclnnStatus CheckLseShape(const aclTensor* lse, const aclTensor* query, const char* layout, int64_t qHeadNum)
 {
     const LayoutDims dims = GetLayoutDims(layout);
-    const auto &qShape = query->GetViewShape();
+    const auto& qShape = query->GetViewShape();
     const int64_t qSeqLen = qShape.GetDim(dims.seq);
     const int64_t batch = dims.batch >= 0 ? qShape.GetDim(dims.batch) : 1;
-    const auto &lseShape = lse->GetViewShape();
+    const auto& lseShape = lse->GetViewShape();
     if (lseShape.GetShapeSize() != batch * qHeadNum * qSeqLen ||
         lseShape.GetDim(0) != (dims.batch >= 0 ? batch : qSeqLen)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
@@ -220,13 +220,13 @@ aclnnStatus CheckLseShape(const aclTensor *lse, const aclTensor *query, const ch
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckSparseAndSeqShapes(const aclTensor *query, const aclTensor *sparseBlockIdx,
-                                    const aclTensor *sparseBlockCount, const aclTensor *metadata,
-                                    const aclTensor *cuSeqLengthsQ, const aclTensor *cuSeqLengthsKv,
-                                    const aclTensor *sequsedQ, const aclTensor *sequsedKv, const char *layout)
+aclnnStatus CheckSparseAndSeqShapes(const aclTensor* query, const aclTensor* sparseBlockIdx,
+                                    const aclTensor* sparseBlockCount, const aclTensor* metadata,
+                                    const aclTensor* cuSeqLengthsQ, const aclTensor* cuSeqLengthsKv,
+                                    const aclTensor* sequsedQ, const aclTensor* sequsedKv, const char* layout)
 {
-    const auto &idxShape = sparseBlockIdx->GetViewShape();
-    const auto &cntShape = sparseBlockCount->GetViewShape();
+    const auto& idxShape = sparseBlockIdx->GetViewShape();
+    const auto& cntShape = sparseBlockCount->GetViewShape();
     if (idxShape.GetDimNum() != GSAG_SPARSE_IDX_RANK || cntShape.GetDimNum() != GSAG_SPARSE_CNT_RANK ||
         cntShape.GetDim(0) != idxShape.GetDim(0) || cntShape.GetDim(1) != idxShape.GetDim(1) ||
         cntShape.GetDim(2) != idxShape.GetDim(2)) {
@@ -252,15 +252,15 @@ aclnnStatus CheckSparseAndSeqShapes(const aclTensor *query, const aclTensor *spa
     }
     const int64_t batch = isTnd ? idxShape.GetDim(0) : query->GetViewShape().GetDim(0);
     const struct {
-        const aclTensor *tensor;
-        const char *name;
+        const aclTensor* tensor;
+        const char* name;
         DataType dtype;
         int64_t elems;
     } seqTensors[] = {{cuSeqLengthsQ, "cuSeqLengthsQ", DataType::DT_INT64, batch + 1},
                       {cuSeqLengthsKv, "cuSeqLengthsKv", DataType::DT_INT64, batch + 1},
                       {sequsedQ, "sequsedQ", DataType::DT_INT32, batch},
                       {sequsedKv, "sequsedKv", DataType::DT_INT32, batch}};
-    for (const auto &seq : seqTensors) {
+    for (const auto& seq : seqTensors) {
         if (seq.tensor == nullptr) {
             continue;
         }
@@ -275,19 +275,19 @@ aclnnStatus CheckSparseAndSeqShapes(const aclTensor *query, const aclTensor *spa
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus Validate(const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *dout,
-                     const aclTensor *out, const aclTensor *lse, const aclTensor *sparseBlockIdx,
-                     const aclTensor *sparseBlockCount, const aclTensor *metadataOptional,
-                     const aclTensor *attenMaskOptional, const aclTensor *cuSeqLengthsQOptional,
-                     const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional,
-                     const aclTensor *sequsedKvOptional, const aclIntArray *blockShape, char *layoutQ, char *layoutKv,
+aclnnStatus Validate(const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* dout,
+                     const aclTensor* out, const aclTensor* lse, const aclTensor* sparseBlockIdx,
+                     const aclTensor* sparseBlockCount, const aclTensor* metadataOptional,
+                     const aclTensor* attenMaskOptional, const aclTensor* cuSeqLengthsQOptional,
+                     const aclTensor* cuSeqLengthsKvOptional, const aclTensor* sequsedQOptional,
+                     const aclTensor* sequsedKvOptional, const aclIntArray* blockShape, char* layoutQ, char* layoutKv,
                      int64_t layoutSparsePattern, int64_t maskType, int64_t softmaxPrecision, int64_t winLeft,
-                     int64_t winRight, int64_t residualBlockMode, bool isConsistentTopk, const aclTensor *dQuery,
-                     const aclTensor *dKey, const aclTensor *dValue)
+                     int64_t winRight, int64_t residualBlockMode, bool isConsistentTopk, const aclTensor* dQuery,
+                     const aclTensor* dKey, const aclTensor* dValue)
 {
-    const aclTensor *required[] = {
+    const aclTensor* required[] = {
         query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount, metadataOptional, dQuery, dKey, dValue};
-    const char *requiredNames[] = {"query",    "key",    "value",          "dout",
+    const char* requiredNames[] = {"query",    "key",    "value",          "dout",
                                    "out",      "lse",    "sparseBlockIdx", "sparseBlockCount",
                                    "metadata", "dQuery", "dKey",           "dValue"};
     for (size_t i = 0; i < sizeof(required) / sizeof(required[0]); ++i) {
@@ -317,8 +317,8 @@ aclnnStatus Validate(const aclTensor *query, const aclTensor *key, const aclTens
         }
     }
     {
-        const aclTensor *otherTensors[] = {lse, sparseBlockIdx, sparseBlockCount, metadataOptional};
-        const char *otherNames[] = {"lse", "sparseBlockIdx", "sparseBlockCount", "metadata"};
+        const aclTensor* otherTensors[] = {lse, sparseBlockIdx, sparseBlockCount, metadataOptional};
+        const char* otherNames[] = {"lse", "sparseBlockIdx", "sparseBlockCount", "metadata"};
         for (size_t i = 0; i < sizeof(otherTensors) / sizeof(otherTensors[0]); ++i) {
             aclnnStatus st = CheckTensorPositiveDims(otherTensors[i], otherNames[i]);
             if (st != ACLNN_SUCCESS) {
@@ -480,14 +480,14 @@ aclnnStatus Validate(const aclTensor *query, const aclTensor *key, const aclTens
 } // namespace
 
 aclnnStatus aclnnGenericBlockSparseAttentionGradGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *dout, const aclTensor *out,
-    const aclTensor *lse, const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
-    const aclTensor *metadataOptional, const aclTensor *attenMaskOptional, const aclTensor *cuSeqLengthsQOptional,
-    const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
-    const aclIntArray *blockShape, char *layoutQ, char *layoutKv, int64_t layoutSparsePattern, double scaleValue,
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* dout, const aclTensor* out,
+    const aclTensor* lse, const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount,
+    const aclTensor* metadataOptional, const aclTensor* attenMaskOptional, const aclTensor* cuSeqLengthsQOptional,
+    const aclTensor* cuSeqLengthsKvOptional, const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional,
+    const aclIntArray* blockShape, char* layoutQ, char* layoutKv, int64_t layoutSparsePattern, double scaleValue,
     int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode,
-    bool isConsistentTopk, aclTensor *dQuery, aclTensor *dKey, aclTensor *dValue, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    bool isConsistentTopk, aclTensor* dQuery, aclTensor* dKey, aclTensor* dValue, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     CHECK_RET(workspaceSize != nullptr && executor != nullptr, ACLNN_ERR_INNER_NULLPTR);
     L2_DFX_PHASE_1(aclnnGenericBlockSparseAttentionGrad,
@@ -517,23 +517,23 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradGetWorkspaceSize(
     auto metaC = l0op::Contiguous(metadataOptional, uniqueExecutor.get());
     CHECK_RET(queryC && keyC && valueC && doutC && outC && lseC && idxC && cntC && metaC, ACLNN_ERR_INNER_NULLPTR);
 
-    const aclTensor *attenC = nullptr;
-    const aclTensor *cuQC = nullptr;
+    const aclTensor* attenC = nullptr;
+    const aclTensor* cuQC = nullptr;
     if (cuSeqLengthsQOptional != nullptr) {
         cuQC = l0op::Contiguous(cuSeqLengthsQOptional, uniqueExecutor.get());
         CHECK_RET(cuQC != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
-    const aclTensor *cuKvC = nullptr;
+    const aclTensor* cuKvC = nullptr;
     if (cuSeqLengthsKvOptional != nullptr) {
         cuKvC = l0op::Contiguous(cuSeqLengthsKvOptional, uniqueExecutor.get());
         CHECK_RET(cuKvC != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
-    const aclTensor *sequsedQC = nullptr;
+    const aclTensor* sequsedQC = nullptr;
     if (sequsedQOptional != nullptr) {
         sequsedQC = l0op::Contiguous(sequsedQOptional, uniqueExecutor.get());
         CHECK_RET(sequsedQC != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
-    const aclTensor *sequsedKvC = nullptr;
+    const aclTensor* sequsedKvC = nullptr;
     if (sequsedKvOptional != nullptr) {
         sequsedKvC = l0op::Contiguous(sequsedKvOptional, uniqueExecutor.get());
         CHECK_RET(sequsedKvC != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -555,9 +555,9 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-__attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttentionGrad(void *workspace,
+__attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttentionGrad(void* workspace,
                                                                                         uint64_t workspaceSize,
-                                                                                        aclOpExecutor *executor,
+                                                                                        aclOpExecutor* executor,
                                                                                         const aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnGenericBlockSparseAttentionGrad);

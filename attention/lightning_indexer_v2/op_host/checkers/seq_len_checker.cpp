@@ -24,7 +24,7 @@ constexpr int64_t MIN_CU_SEQLENS_SIZE = 1;
 constexpr uint32_t SEQ_LEN_RANK = 1U;
 } // namespace
 
-ge::graphStatus SeqLenChecker::CheckSinglePara(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus SeqLenChecker::CheckSinglePara(const LightningIndexerV2CheckerInfo& info) const
 {
     if (CheckRank(info, info.cuSeqlensQ, "cu_seqlens_q", SEQ_LEN_RANK) != ge::GRAPH_SUCCESS ||
         CheckRank(info, info.cuSeqlensK, "cu_seqlens_k", SEQ_LEN_RANK) != ge::GRAPH_SUCCESS ||
@@ -51,7 +51,7 @@ ge::graphStatus SeqLenChecker::CheckSinglePara(const LightningIndexerV2CheckerIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckParaExistence(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus SeqLenChecker::CheckParaExistence(const LightningIndexerV2CheckerInfo& info) const
 {
     if (info.layoutK == CheckerLayout::TND && !info.cuSeqlensK.IsPresent()) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(info.opName, "cu_seqlens_k",
@@ -81,7 +81,7 @@ ge::graphStatus SeqLenChecker::CheckParaExistence(const LightningIndexerV2Checke
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckMultiPara(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus SeqLenChecker::CheckMultiPara(const LightningIndexerV2CheckerInfo& info) const
 {
     if (info.layoutQ == CheckerLayout::TND) {
         const int64_t cuQSize = info.cuSeqlensQ.GetShape()->GetShapeSize();

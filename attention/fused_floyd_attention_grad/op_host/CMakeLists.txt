@@ -32,4 +32,3 @@ else()
     )
     add_modules_sources(OPTYPE fused_floyd_attention_grad ACLNNTYPE aclnn)
 endif()
-

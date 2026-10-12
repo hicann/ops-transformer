@@ -43,17 +43,17 @@ public:
 
     __aicore__ inline KeyPoolBlockVectorPerf(){};
     // =================================设置参数=================================
-    __aicore__ inline void InitParams(const ConstInfo &constInfo, const KeyPoolTools<COMP> &tools);
-    __aicore__ inline void Init(__gm__ uint8_t *hidden_states, __gm__ uint8_t *wk, __gm__ uint8_t *gateWeight,
-                                __gm__ uint8_t *normWeight, __gm__ uint8_t *normBias, __gm__ uint8_t *stateCache,
-                                __gm__ uint8_t *ape, __gm__ uint8_t *cacheBlockTable, __gm__ uint8_t *seqLens,
-                                __gm__ uint8_t *seqUsed, __gm__ uint8_t *startPos, __gm__ uint8_t *pooledKeyOut);
+    __aicore__ inline void InitParams(const ConstInfo& constInfo, const KeyPoolTools<COMP>& tools);
+    __aicore__ inline void Init(__gm__ uint8_t* hidden_states, __gm__ uint8_t* wk, __gm__ uint8_t* gateWeight,
+                                __gm__ uint8_t* normWeight, __gm__ uint8_t* normBias, __gm__ uint8_t* stateCache,
+                                __gm__ uint8_t* ape, __gm__ uint8_t* cacheBlockTable, __gm__ uint8_t* seqLens,
+                                __gm__ uint8_t* seqUsed, __gm__ uint8_t* startPos, __gm__ uint8_t* pooledKeyOut);
     // =================================资源管理=================================
-    __aicore__ inline void InitBuffers(TPipe *pipe);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
     // =================================执行计算=================================
-    __aicore__ inline void ComputeVec1(const Vec1RunInfo &info);
+    __aicore__ inline void ComputeVec1(const Vec1RunInfo& info);
     __aicore__ inline void InitVec1GlobalTensor(GlobalTensor<T> kvMm1ResGm, GlobalTensor<T> scoreMm1ResGm,
                                                 GlobalTensor<T> kvCacheTcGm, GlobalTensor<T> scoreCacheTcGm,
                                                 GlobalTensor<T> normalizedKvGm);
@@ -69,14 +69,14 @@ private:
     __aicore__ inline uint32_t GetSeqUsed(uint32_t bIdx);
     __aicore__ inline uint32_t GetStartPos(uint32_t bIdx);
     __aicore__ inline uint32_t GetSeqLength(uint32_t bIdx);
-    __aicore__ inline void DealVec1BaseBlock(const Vec1RunInfo &info, KeyPoolVec1SliceIterator<COMP> &sliceIterator,
-                                             const LoopInfo &loopInfo, uint32_t dStartIdx, uint32_t dDealSize,
+    __aicore__ inline void DealVec1BaseBlock(const Vec1RunInfo& info, KeyPoolVec1SliceIterator<COMP>& sliceIterator,
+                                             const LoopInfo& loopInfo, uint32_t dStartIdx, uint32_t dDealSize,
                                              uint32_t dBaseSize);
-    __aicore__ inline void CopyInApe(const LocalTensor<T> &apeUb, uint32_t dStartIdx, uint32_t dDealSize);
-    __aicore__ inline void AddApeToScore(const LocalTensor<T> &scoreLocal, const LocalTensor<T> &apeUb,
-                                         const Vec1SliceInfo &sliceInfo, uint32_t dDealSize);
-    __aicore__ inline void AddSingleApeToScore(const LocalTensor<T> &scoreLocal, const LocalTensor<T> &apeUb,
-                                               const Vec1SliceInfo &sliceInfo, uint32_t dDealSize);
+    __aicore__ inline void CopyInApe(const LocalTensor<T>& apeUb, uint32_t dStartIdx, uint32_t dDealSize);
+    __aicore__ inline void AddApeToScore(const LocalTensor<T>& scoreLocal, const LocalTensor<T>& apeUb,
+                                         const Vec1SliceInfo& sliceInfo, uint32_t dDealSize);
+    __aicore__ inline void AddSingleApeToScore(const LocalTensor<T>& scoreLocal, const LocalTensor<T>& apeUb,
+                                               const Vec1SliceInfo& sliceInfo, uint32_t dDealSize);
     template <typename O>
     __aicore__ inline void DataCopyAlignUbToUb(const LocalTensor<O> dstLocal, const LocalTensor<O> srcLocal,
                                                uint32_t copyRowCount, uint32_t copyColCount, uint32_t srcSingleRowCount,
@@ -94,66 +94,66 @@ private:
                                                  uint32_t copyRowCount, uint32_t copyColCount,
                                                  uint32_t srcSingleRowCount, uint32_t dstSingleRowCount);
     __aicore__ inline void PadAlign(const LocalTensor<T> dstLocal, const LocalTensor<T> srcLocal,
-                                    const Vec1SliceInfo &sliceInfo, uint32_t dStartIdx, uint32_t dDealSize);
+                                    const Vec1SliceInfo& sliceInfo, uint32_t dStartIdx, uint32_t dDealSize);
     template <bool IS_SCORE>
     __aicore__ inline void OverLap(const LocalTensor<T> dstLocal, const LocalTensor<T> srcLocal,
-                                   const GlobalTensor<T> &srcGm, const GlobalTensor<T> &stateGm,
-                                   const GlobalTensor<int32_t> &blockTableGm, const GlobalTensor<T> &cacheTcGm,
-                                   const Vec1RunInfo &info, const Vec1SliceInfo &sliceInfo, const LoopInfo &loopInfo,
+                                   const GlobalTensor<T>& srcGm, const GlobalTensor<T>& stateGm,
+                                   const GlobalTensor<int32_t>& blockTableGm, const GlobalTensor<T>& cacheTcGm,
+                                   const Vec1RunInfo& info, const Vec1SliceInfo& sliceInfo, const LoopInfo& loopInfo,
                                    uint32_t dStartIdx, uint32_t globalSeqIdx, uint32_t dDealSize);
-    __aicore__ inline void FromWokrSpaceToUb(const LocalTensor<T> &dstLocal, const GlobalTensor<T> &srcGm,
-                                             const Vec1SliceInfo &sliceInfo, const StatisticInfo &statisticInfo,
+    __aicore__ inline void FromWokrSpaceToUb(const LocalTensor<T>& dstLocal, const GlobalTensor<T>& srcGm,
+                                             const Vec1SliceInfo& sliceInfo, const StatisticInfo& statisticInfo,
                                              uint32_t dStartIdx, uint32_t dDealSize);
-    __aicore__ inline void WriteToCacheState(const GlobalTensor<T> &state, const GlobalTensor<int32_t> &blockTableGm,
-                                             const LocalTensor<T> &input, uint32_t batchIdx, uint32_t startSeqIdx,
+    __aicore__ inline void WriteToCacheState(const GlobalTensor<T>& state, const GlobalTensor<int32_t>& blockTableGm,
+                                             const LocalTensor<T>& input, uint32_t batchIdx, uint32_t startSeqIdx,
                                              uint32_t endSeqIdx, uint32_t dStartIdx, uint32_t dDealSize,
                                              uint32_t stateIdx);
-    __aicore__ inline void ReadFromCacheState(const LocalTensor<T> &output, const GlobalTensor<T> &state,
-                                              const GlobalTensor<int32_t> &blockTableGm, uint32_t batchIdx,
+    __aicore__ inline void ReadFromCacheState(const LocalTensor<T>& output, const GlobalTensor<T>& state,
+                                              const GlobalTensor<int32_t>& blockTableGm, uint32_t batchIdx,
                                               uint32_t startSeqIdx, uint32_t endSeqIdx, uint32_t dStartIdx,
                                               uint32_t dDealSize, uint32_t stateIdx);
-    __aicore__ inline void SaveToWorkSpace(const LocalTensor<T> srcLocal, const GlobalTensor<T> &cacheTcGm,
-                                           const Vec1SliceInfo &sliceInfo, const LoopInfo &loopInfo, uint32_t dStartIdx,
+    __aicore__ inline void SaveToWorkSpace(const LocalTensor<T> srcLocal, const GlobalTensor<T>& cacheTcGm,
+                                           const Vec1SliceInfo& sliceInfo, const LoopInfo& loopInfo, uint32_t dStartIdx,
                                            uint32_t dDealSize);
-    __aicore__ inline void LoadFromWorkSpace(const LocalTensor<T> dstLocal, const GlobalTensor<T> &cacheTcGm,
-                                             const GlobalTensor<T> &srcGm, const LocalTensor<T> srcLocal,
-                                             const Vec1SliceInfo &sliceInfo, const LoopInfo &loopInfo,
+    __aicore__ inline void LoadFromWorkSpace(const LocalTensor<T> dstLocal, const GlobalTensor<T>& cacheTcGm,
+                                             const GlobalTensor<T>& srcGm, const LocalTensor<T> srcLocal,
+                                             const Vec1SliceInfo& sliceInfo, const LoopInfo& loopInfo,
                                              uint32_t dStartIdx, uint32_t globalSeqIdx, uint32_t dDealSize);
-    __aicore__ inline void SoftmaxDN(const LocalTensor<T> &scoreLocal, const LocalTensor<T> &tmpUb, uint32_t tcDealSize,
+    __aicore__ inline void SoftmaxDN(const LocalTensor<T>& scoreLocal, const LocalTensor<T>& tmpUb, uint32_t tcDealSize,
                                      uint32_t dDealSize);
-    __aicore__ inline void RoundToHiddenDtype(const LocalTensor<T> &srcLocal, uint32_t elementCount);
-    __aicore__ inline void AddApeToPooledScore(const LocalTensor<T> &scoreLocal, const LocalTensor<T> &apeLocal,
+    __aicore__ inline void RoundToHiddenDtype(const LocalTensor<T>& srcLocal, uint32_t elementCount);
+    __aicore__ inline void AddApeToPooledScore(const LocalTensor<T>& scoreLocal, const LocalTensor<T>& apeLocal,
                                                uint32_t poolCount, uint32_t dDealSize);
-    __aicore__ inline void KvMulReduceScore(const LocalTensor<T> &kvLocal, const LocalTensor<T> &scoreLocal,
-                                            const LocalTensor<T> &dstLocal, const LocalTensor<T> &tmpUb,
+    __aicore__ inline void KvMulReduceScore(const LocalTensor<T>& kvLocal, const LocalTensor<T>& scoreLocal,
+                                            const LocalTensor<T>& dstLocal, const LocalTensor<T>& tmpUb,
                                             uint32_t tcDealSize, uint32_t dDealSize);
-    __aicore__ inline void OverLapScoreKv(const LocalTensor<T> &scoreLocal, const LocalTensor<T> &kvLocal,
-                                          const Vec1RunInfo &info, const LoopInfo &loopInfo,
-                                          const StatisticInfo &statisticInfo, const Vec1SliceInfo &originSliceInfo,
+    __aicore__ inline void OverLapScoreKv(const LocalTensor<T>& scoreLocal, const LocalTensor<T>& kvLocal,
+                                          const Vec1RunInfo& info, const LoopInfo& loopInfo,
+                                          const StatisticInfo& statisticInfo, const Vec1SliceInfo& originSliceInfo,
                                           uint32_t dStartIdx, uint32_t dDealSize, uint32_t dBaseSize,
                                           uint32_t needDealTcSize);
-    __aicore__ inline void GatherKvForNorm(const LocalTensor<T> &kvLocal, const Vec1RunInfo &info,
-                                           const LoopInfo &loopInfo, const StatisticInfo &statisticInfo,
-                                           const Vec1SliceInfo &originSliceInfo, uint32_t dStartIdx, uint32_t dDealSize,
+    __aicore__ inline void GatherKvForNorm(const LocalTensor<T>& kvLocal, const Vec1RunInfo& info,
+                                           const LoopInfo& loopInfo, const StatisticInfo& statisticInfo,
+                                           const Vec1SliceInfo& originSliceInfo, uint32_t dStartIdx, uint32_t dDealSize,
                                            uint32_t needDealTcSize);
-    __aicore__ inline void PrepareNormalizedKv(const Vec1RunInfo &info, const Vec1SplitInfo &splitInfo,
-                                               const LoopInfo &loopInfo);
-    __aicore__ inline void CopyOutVec1ResToOutput(const LocalTensor<T> &comperssoredUb, const Vec1SliceInfo &sliceInfo,
+    __aicore__ inline void PrepareNormalizedKv(const Vec1RunInfo& info, const Vec1SplitInfo& splitInfo,
+                                               const LoopInfo& loopInfo);
+    __aicore__ inline void CopyOutVec1ResToOutput(const LocalTensor<T>& comperssoredUb, const Vec1SliceInfo& sliceInfo,
                                                   uint32_t compressTcSize, uint32_t dStartIdx, uint32_t dDealSize);
-    __aicore__ inline void CalcGroupInfo(const Vec1RunInfo &info, Vec1SplitInfo &splitInfo);
-    __aicore__ inline void CalcTaskDistribution(const Vec1RunInfo &info, Vec1SplitInfo &splitInfo);
-    __aicore__ inline void UpdateIteratorState(const Vec1RunInfo &info, Vec1SplitInfo &splitInfo);
-    __aicore__ inline void CalcTilingStrategy(Vec1SplitInfo &splitInfo);
-    __aicore__ inline Vec1SplitInfo SplitCoreV1(const Vec1RunInfo &info);
-    __aicore__ inline void SaveState(const LocalTensor<T> &srcLocal, const GlobalTensor<T> &stateGm,
-                                     const GlobalTensor<int32_t> &blockTableGm, const Vec1SliceInfo &sliceInfo,
+    __aicore__ inline void CalcGroupInfo(const Vec1RunInfo& info, Vec1SplitInfo& splitInfo);
+    __aicore__ inline void CalcTaskDistribution(const Vec1RunInfo& info, Vec1SplitInfo& splitInfo);
+    __aicore__ inline void UpdateIteratorState(const Vec1RunInfo& info, Vec1SplitInfo& splitInfo);
+    __aicore__ inline void CalcTilingStrategy(Vec1SplitInfo& splitInfo);
+    __aicore__ inline Vec1SplitInfo SplitCoreV1(const Vec1RunInfo& info);
+    __aicore__ inline void SaveState(const LocalTensor<T>& srcLocal, const GlobalTensor<T>& stateGm,
+                                     const GlobalTensor<int32_t>& blockTableGm, const Vec1SliceInfo& sliceInfo,
                                      uint32_t dStartIdx, uint32_t dDealSize, uint32_t stateIdx);
     template <bool IS_SCORE>
-    __aicore__ inline void DuplicateFirstBlock(const LocalTensor<T> &dstLocal, uint32_t duplicateRowCount,
+    __aicore__ inline void DuplicateFirstBlock(const LocalTensor<T>& dstLocal, uint32_t duplicateRowCount,
                                                uint32_t duplicateColCount, uint32_t singleRowCount);
     template <bool IS_SCORE>
-    __aicore__ inline void ReadState(const LocalTensor<T> &srcLocal, const GlobalTensor<T> &stateGm,
-                                     const GlobalTensor<int32_t> &blockTableGm, const Vec1SliceInfo &sliceInfo,
+    __aicore__ inline void ReadState(const LocalTensor<T>& srcLocal, const GlobalTensor<T>& stateGm,
+                                     const GlobalTensor<int32_t>& blockTableGm, const Vec1SliceInfo& sliceInfo,
                                      uint32_t dStartIdx, uint32_t dDealSize, uint32_t stateIdx);
     uint32_t cmpRatio_ = 0U;
     uint32_t coff_ = 0U;
@@ -202,8 +202,8 @@ private:
 };
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::InitParams(const ConstInfo &constInfo,
-                                                                const KeyPoolTools<COMP> &tools)
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::InitParams(const ConstInfo& constInfo,
+                                                                const KeyPoolTools<COMP>& tools)
 {
     this->constInfo_ = constInfo;
     this->tools_ = tools;
@@ -212,37 +212,37 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::InitParams(const ConstInfo 
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::Init(__gm__ uint8_t *hidden_states, __gm__ uint8_t *wk,
-                                                          __gm__ uint8_t *gateWeight, __gm__ uint8_t *normWeight,
-                                                          __gm__ uint8_t *normBias, __gm__ uint8_t *stateCache,
-                                                          __gm__ uint8_t *ape, __gm__ uint8_t *cacheBlockTable,
-                                                          __gm__ uint8_t *seqLens, __gm__ uint8_t *seqUsed,
-                                                          __gm__ uint8_t *startPos, __gm__ uint8_t *pooledKeyOut)
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::Init(__gm__ uint8_t* hidden_states, __gm__ uint8_t* wk,
+                                                          __gm__ uint8_t* gateWeight, __gm__ uint8_t* normWeight,
+                                                          __gm__ uint8_t* normBias, __gm__ uint8_t* stateCache,
+                                                          __gm__ uint8_t* ape, __gm__ uint8_t* cacheBlockTable,
+                                                          __gm__ uint8_t* seqLens, __gm__ uint8_t* seqUsed,
+                                                          __gm__ uint8_t* startPos, __gm__ uint8_t* pooledKeyOut)
 {
-    stateBlockTableGm_.SetGlobalBuffer((__gm__ int32_t *)cacheBlockTable);
-    stateCacheGm_.SetGlobalBuffer((__gm__ T *)stateCache);
+    stateBlockTableGm_.SetGlobalBuffer((__gm__ int32_t*)cacheBlockTable);
+    stateCacheGm_.SetGlobalBuffer((__gm__ T*)stateCache);
     hasLayerNorm_ = (normWeight != nullptr);
     if (hasLayerNorm_) {
-        normWeightGm_.SetGlobalBuffer((__gm__ T *)normWeight);
-        normBiasGm_.SetGlobalBuffer((__gm__ T *)normBias);
+        normWeightGm_.SetGlobalBuffer((__gm__ T*)normWeight);
+        normBiasGm_.SetGlobalBuffer((__gm__ T*)normBias);
     }
-    apeGm_.SetGlobalBuffer((__gm__ T *)ape);
-    cmpKvOutGm_.SetGlobalBuffer((__gm__ HIDDEN_STATES_T *)pooledKeyOut);
+    apeGm_.SetGlobalBuffer((__gm__ T*)ape);
+    cmpKvOutGm_.SetGlobalBuffer((__gm__ HIDDEN_STATES_T*)pooledKeyOut);
     isExistSeqUsed = (seqUsed != nullptr);
     isExistStartPos = (startPos != nullptr);
     if constexpr (COMP::hiddenStatesLayout == HIDDEN_STATES_LAYOUT::TH) {
-        cuSeqlensGm_.SetGlobalBuffer((__gm__ int32_t *)seqLens);
+        cuSeqlensGm_.SetGlobalBuffer((__gm__ int32_t*)seqLens);
     }
     if (isExistSeqUsed) {
-        sequsedGm_.SetGlobalBuffer((__gm__ int32_t *)seqUsed);
+        sequsedGm_.SetGlobalBuffer((__gm__ int32_t*)seqUsed);
     }
     if (isExistStartPos) {
-        startPosGm_.SetGlobalBuffer((__gm__ int32_t *)startPos);
+        startPosGm_.SetGlobalBuffer((__gm__ int32_t*)startPos);
     }
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::InitBuffers(TPipe *pipe)
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(inputQue1, 1, BUFFER_SIZE_BYTE_32K);
     pipe->InitBuffer(tmpBuff1, BUFFER_SIZE_BYTE_32K);
@@ -309,7 +309,7 @@ __aicore__ inline uint32_t KeyPoolBlockVectorPerf<COMP>::GetSeqLength(uint32_t b
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CopyInApe(const LocalTensor<T> &apeUb, uint32_t dStartIdx,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CopyInApe(const LocalTensor<T>& apeUb, uint32_t dStartIdx,
                                                                uint32_t dDealSize)
 {
     LocalTensor<T> apeUbTmp = inputQue1.AllocTensor<T>();
@@ -329,9 +329,9 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CopyInApe(const LocalTensor
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::AddApeToScore(const LocalTensor<T> &scoreLocal,
-                                                                   const LocalTensor<T> &apeUb,
-                                                                   const Vec1SliceInfo &sliceInfo, uint32_t dDealSize)
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::AddApeToScore(const LocalTensor<T>& scoreLocal,
+                                                                   const LocalTensor<T>& apeUb,
+                                                                   const Vec1SliceInfo& sliceInfo, uint32_t dDealSize)
 {
     uint32_t singleRowElemNum = dDealSize * coff_;
     uint64_t scoreOffset = sliceInfo.dealedSeqCnt * singleRowElemNum;
@@ -365,9 +365,9 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::AddApeToScore(const LocalTe
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::AddSingleApeToScore(const LocalTensor<T> &scoreLocal,
-                                                                         const LocalTensor<T> &apeUb,
-                                                                         const Vec1SliceInfo &sliceInfo,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::AddSingleApeToScore(const LocalTensor<T>& scoreLocal,
+                                                                         const LocalTensor<T>& apeUb,
+                                                                         const Vec1SliceInfo& sliceInfo,
                                                                          uint32_t dDealSize)
 {
     uint32_t SingleRowElemNum = dDealSize * coff_;
@@ -476,7 +476,7 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::DataCopyWithOutputQue(const
 template <typename COMP>
 __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::PadAlign(const LocalTensor<T> dstLocal,
                                                               const LocalTensor<T> srcLocal,
-                                                              const Vec1SliceInfo &sliceInfo, uint32_t dStartIdx,
+                                                              const Vec1SliceInfo& sliceInfo, uint32_t dStartIdx,
                                                               uint32_t dDealSize)
 {
     // Ub data layout after overlap when r = 4 and coff = 2:
@@ -515,9 +515,9 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::PadAlign(const LocalTensor<
 template <typename COMP>
 template <bool IS_SCORE>
 __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::OverLap(
-    const LocalTensor<T> dstLocal, const LocalTensor<T> srcLocal, const GlobalTensor<T> &srcGm,
-    const GlobalTensor<T> &stateGm, const GlobalTensor<int32_t> &blockTableGm, const GlobalTensor<T> &cacheTcGm,
-    const Vec1RunInfo &info, const Vec1SliceInfo &sliceInfo, const LoopInfo &loopInfo, uint32_t dStartIdx,
+    const LocalTensor<T> dstLocal, const LocalTensor<T> srcLocal, const GlobalTensor<T>& srcGm,
+    const GlobalTensor<T>& stateGm, const GlobalTensor<int32_t>& blockTableGm, const GlobalTensor<T>& cacheTcGm,
+    const Vec1RunInfo& info, const Vec1SliceInfo& sliceInfo, const LoopInfo& loopInfo, uint32_t dStartIdx,
     uint32_t globalSeqIdx, uint32_t dDealSize)
 {
     if (sliceInfo.dealTcSize == 0) {
@@ -554,10 +554,10 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::OverLap(
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::FromWokrSpaceToUb(const LocalTensor<T> &dstLocal,
-                                                                       const GlobalTensor<T> &srcGm,
-                                                                       const Vec1SliceInfo &sliceInfo,
-                                                                       const StatisticInfo &statisticInfo,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::FromWokrSpaceToUb(const LocalTensor<T>& dstLocal,
+                                                                       const GlobalTensor<T>& srcGm,
+                                                                       const Vec1SliceInfo& sliceInfo,
+                                                                       const StatisticInfo& statisticInfo,
                                                                        uint32_t dStartIdx, uint32_t dDealSize)
 {
     uint32_t srcSingleRowElemNum = constInfo_.headDim;
@@ -571,9 +571,9 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::FromWokrSpaceToUb(const Loc
 
 template <typename COMP>
 __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::SaveToWorkSpace(const LocalTensor<T> srcLocal,
-                                                                     const GlobalTensor<T> &cacheTcGm,
-                                                                     const Vec1SliceInfo &sliceInfo,
-                                                                     const LoopInfo &loopInfo, uint32_t dStartIdx,
+                                                                     const GlobalTensor<T>& cacheTcGm,
+                                                                     const Vec1SliceInfo& sliceInfo,
+                                                                     const LoopInfo& loopInfo, uint32_t dStartIdx,
                                                                      uint32_t dDealSize)
 {
     uint64_t curSeqLen = sliceInfo.bStartPos + sliceInfo.sIdx + sliceInfo.validSeqCnt;
@@ -593,8 +593,8 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::SaveToWorkSpace(const Local
 
 template <typename COMP>
 __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::LoadFromWorkSpace(
-    const LocalTensor<T> dstLocal, const GlobalTensor<T> &cacheTcGm, const GlobalTensor<T> &srcGm,
-    const LocalTensor<T> srcLocal, const Vec1SliceInfo &sliceInfo, const LoopInfo &loopInfo, uint32_t dStartIdx,
+    const LocalTensor<T> dstLocal, const GlobalTensor<T>& cacheTcGm, const GlobalTensor<T>& srcGm,
+    const LocalTensor<T> srcLocal, const Vec1SliceInfo& sliceInfo, const LoopInfo& loopInfo, uint32_t dStartIdx,
     uint32_t globalSeqIdx, uint32_t dDealSize)
 {
     if (sliceInfo.sIdx == 0) {
@@ -624,9 +624,9 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::LoadFromWorkSpace(
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::ReadFromCacheState(const LocalTensor<T> &output,
-                                                                        const GlobalTensor<T> &state,
-                                                                        const GlobalTensor<int32_t> &blockTableGm,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::ReadFromCacheState(const LocalTensor<T>& output,
+                                                                        const GlobalTensor<T>& state,
+                                                                        const GlobalTensor<int32_t>& blockTableGm,
                                                                         uint32_t batchIdx, uint32_t startSeqIdx,
                                                                         uint32_t endSeqIdx, uint32_t dStartIdx,
                                                                         uint32_t dDealSize, uint32_t stateIdx)
@@ -655,9 +655,9 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::ReadFromCacheState(const Lo
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::WriteToCacheState(const GlobalTensor<T> &state,
-                                                                       const GlobalTensor<int32_t> &blockTableGm,
-                                                                       const LocalTensor<T> &input, uint32_t batchIdx,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::WriteToCacheState(const GlobalTensor<T>& state,
+                                                                       const GlobalTensor<int32_t>& blockTableGm,
+                                                                       const LocalTensor<T>& input, uint32_t batchIdx,
                                                                        uint32_t startSeqIdx, uint32_t endSeqIdx,
                                                                        uint32_t dStartIdx, uint32_t dDealSize,
                                                                        uint32_t stateIdx)
@@ -688,10 +688,10 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::WriteToCacheState(const Glo
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::SaveState(const LocalTensor<T> &srcLocal,
-                                                               const GlobalTensor<T> &stateGm,
-                                                               const GlobalTensor<int32_t> &blockTableGm,
-                                                               const Vec1SliceInfo &sliceInfo, uint32_t dStartIdx,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::SaveState(const LocalTensor<T>& srcLocal,
+                                                               const GlobalTensor<T>& stateGm,
+                                                               const GlobalTensor<int32_t>& blockTableGm,
+                                                               const Vec1SliceInfo& sliceInfo, uint32_t dStartIdx,
                                                                uint32_t dDealSize, uint32_t stateIdx)
 {
     uint64_t startSeqIdx = sliceInfo.bStartPos + sliceInfo.sIdx;
@@ -728,7 +728,7 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::SaveState(const LocalTensor
 
 template <typename COMP>
 template <bool IS_SCORE>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::DuplicateFirstBlock(const LocalTensor<T> &dstLocal,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::DuplicateFirstBlock(const LocalTensor<T>& dstLocal,
                                                                          uint32_t duplicateRowCount,
                                                                          uint32_t duplicateColCount,
                                                                          uint32_t singleRowCount)
@@ -747,10 +747,10 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::DuplicateFirstBlock(const L
 
 template <typename COMP>
 template <bool IS_SCORE>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::ReadState(const LocalTensor<T> &dstLocal,
-                                                               const GlobalTensor<T> &stateGm,
-                                                               const GlobalTensor<int32_t> &blockTableGm,
-                                                               const Vec1SliceInfo &sliceInfo, uint32_t dStartIdx,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::ReadState(const LocalTensor<T>& dstLocal,
+                                                               const GlobalTensor<T>& stateGm,
+                                                               const GlobalTensor<int32_t>& blockTableGm,
+                                                               const Vec1SliceInfo& sliceInfo, uint32_t dStartIdx,
                                                                uint32_t dDealSize, uint32_t stateIdx)
 {
     // 没有需要压缩的块时, 不需要读state的信息
@@ -799,8 +799,8 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::ReadState(const LocalTensor
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::SoftmaxDN(const LocalTensor<T> &scoreLocal,
-                                                               const LocalTensor<T> &tmpUb, uint32_t tcDealSize,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::SoftmaxDN(const LocalTensor<T>& scoreLocal,
+                                                               const LocalTensor<T>& tmpUb, uint32_t tcDealSize,
                                                                uint32_t dDealSize)
 {
     float minValue = SOFTMAX_MIN_VALUE;
@@ -812,7 +812,7 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::SoftmaxDN(const LocalTensor
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::RoundToHiddenDtype(const LocalTensor<T> &srcLocal,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::RoundToHiddenDtype(const LocalTensor<T>& srcLocal,
                                                                         uint32_t elementCount)
 {
     constexpr uint32_t maxRoundCount = BUFFER_SIZE_BYTE_16K / sizeof(HIDDEN_STATES_T);
@@ -828,8 +828,8 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::RoundToHiddenDtype(const Lo
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::AddApeToPooledScore(const LocalTensor<T> &scoreLocal,
-                                                                         const LocalTensor<T> &apeLocal,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::AddApeToPooledScore(const LocalTensor<T>& scoreLocal,
+                                                                         const LocalTensor<T>& apeLocal,
                                                                          uint32_t poolCount, uint32_t dDealSize)
 {
     uint32_t poolElementCount = cmpRatio_ * dDealSize;
@@ -839,10 +839,10 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::AddApeToPooledScore(const L
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::KvMulReduceScore(const LocalTensor<T> &kvLocal,
-                                                                      const LocalTensor<T> &scoreLocal,
-                                                                      const LocalTensor<T> &dstLocal,
-                                                                      const LocalTensor<T> &tmpUb, uint32_t tcDealSize,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::KvMulReduceScore(const LocalTensor<T>& kvLocal,
+                                                                      const LocalTensor<T>& scoreLocal,
+                                                                      const LocalTensor<T>& dstLocal,
+                                                                      const LocalTensor<T>& tmpUb, uint32_t tcDealSize,
                                                                       uint32_t dDealSize)
 {
     uint32_t ReduceSize = coff_ * constInfo_.cmpRatio;
@@ -855,8 +855,8 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::KvMulReduceScore(const Loca
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CopyOutVec1ResToOutput(const LocalTensor<T> &comperssoredUb,
-                                                                            const Vec1SliceInfo &sliceInfo,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CopyOutVec1ResToOutput(const LocalTensor<T>& comperssoredUb,
+                                                                            const Vec1SliceInfo& sliceInfo,
                                                                             uint32_t compressTcSize, uint32_t dStartIdx,
                                                                             uint32_t dDealSize)
 {
@@ -897,13 +897,13 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CopyOutVec1ResToOutput(cons
 
 template <typename COMP>
 __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::OverLapScoreKv(
-    const LocalTensor<T> &scoreLocal, const LocalTensor<T> &kvLocal, const Vec1RunInfo &info, const LoopInfo &loopInfo,
-    const StatisticInfo &statisticInfo, const Vec1SliceInfo &originSliceInfo, uint32_t dStartIdx, uint32_t dDealSize,
+    const LocalTensor<T>& scoreLocal, const LocalTensor<T>& kvLocal, const Vec1RunInfo& info, const LoopInfo& loopInfo,
+    const StatisticInfo& statisticInfo, const Vec1SliceInfo& originSliceInfo, uint32_t dStartIdx, uint32_t dDealSize,
     uint32_t dBaseSize, uint32_t needDealTcSize)
 {
     KeyPoolVec1SliceIterator overLapSliceIterator(tools_);
     overLapSliceIterator.SetMaxBatchSize(constInfo_.batchSize);
-    Vec1SliceInfo &overLapSliceInfo = overLapSliceIterator.GetSlice();
+    Vec1SliceInfo& overLapSliceInfo = overLapSliceIterator.GetSlice();
 
     GlobalTensor<T> scoreDBMm1ResGm = scoreMm1ResGm_[info.c1v1DbIdx * constInfo_.dbSize];
     LocalTensor<T> scoreUb = inputQue1.AllocTensor<T>();
@@ -962,10 +962,10 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::OverLapScoreKv(
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::GatherKvForNorm(const LocalTensor<T> &kvLocal,
-                                                                     const Vec1RunInfo &info, const LoopInfo &loopInfo,
-                                                                     const StatisticInfo &statisticInfo,
-                                                                     const Vec1SliceInfo &originSliceInfo,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::GatherKvForNorm(const LocalTensor<T>& kvLocal,
+                                                                     const Vec1RunInfo& info, const LoopInfo& loopInfo,
+                                                                     const StatisticInfo& statisticInfo,
+                                                                     const Vec1SliceInfo& originSliceInfo,
                                                                      uint32_t dStartIdx, uint32_t dDealSize,
                                                                      uint32_t needDealTcSize)
 {
@@ -978,7 +978,7 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::GatherKvForNorm(const Local
 
     KeyPoolVec1SliceIterator<COMP> overLapSliceIterator(tools_);
     overLapSliceIterator.SetMaxBatchSize(constInfo_.batchSize);
-    Vec1SliceInfo &overLapSliceInfo = overLapSliceIterator.GetSlice();
+    Vec1SliceInfo& overLapSliceInfo = overLapSliceIterator.GetSlice();
     overLapSliceIterator.Reset(originSliceInfo.bIdx, originSliceInfo.sIdx, 0U, 0U);
     overLapSliceIterator.SetNeedDealTcSize(needDealTcSize);
     while (!overLapSliceIterator.IsEnd()) {
@@ -992,9 +992,9 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::GatherKvForNorm(const Local
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::PrepareNormalizedKv(const Vec1RunInfo &info,
-                                                                         const Vec1SplitInfo &splitInfo,
-                                                                         const LoopInfo &loopInfo)
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::PrepareNormalizedKv(const Vec1RunInfo& info,
+                                                                         const Vec1SplitInfo& splitInfo,
+                                                                         const LoopInfo& loopInfo)
 {
     GlobalTensor<T> kvDBMm1ResGm = kvMm1ResGm_[info.c1v1DbIdx * constInfo_.dbSize];
     normalizedKvDbOffset_ =
@@ -1011,7 +1011,7 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::PrepareNormalizedKv(const V
         sliceIterator.SetNeedDealTcSize(actDealTcSize);
         Vec1SliceInfo originSliceInfo = sliceIterator.GetSlice();
         uint32_t needDealTcSize = sliceIterator.GetNeedDealTcSize();
-        StatisticInfo &statisticInfo = sliceIterator.template FullIteratorSlice<true>();
+        StatisticInfo& statisticInfo = sliceIterator.template FullIteratorSlice<true>();
         if (statisticInfo.key_poolScCnt > 0) {
             LocalTensor<T> kvLocal = tmpBuff2.Get<T>();
             GatherKvForNorm(kvLocal, info, loopInfo, statisticInfo, originSliceInfo, 0U, constInfo_.headDim,
@@ -1098,14 +1098,14 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::PrepareNormalizedKv(const V
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::DealVec1BaseBlock(const Vec1RunInfo &info,
-                                                                       KeyPoolVec1SliceIterator<COMP> &sliceIterator,
-                                                                       const LoopInfo &loopInfo, uint32_t dStartIdx,
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::DealVec1BaseBlock(const Vec1RunInfo& info,
+                                                                       KeyPoolVec1SliceIterator<COMP>& sliceIterator,
+                                                                       const LoopInfo& loopInfo, uint32_t dStartIdx,
                                                                        uint32_t dDealSize, uint32_t dBaseSize)
 {
     Vec1SliceInfo originSliceInfo = sliceIterator.GetSlice();
     uint32_t needDealTcSize = sliceIterator.GetNeedDealTcSize();
-    StatisticInfo &statisticInfo = sliceIterator.template FullIteratorSlice<true>();
+    StatisticInfo& statisticInfo = sliceIterator.template FullIteratorSlice<true>();
     if (statisticInfo.actualTcCnt == 0) {
         return;
     }
@@ -1132,7 +1132,7 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::DealVec1BaseBlock(const Vec
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CalcGroupInfo(const Vec1RunInfo &info, Vec1SplitInfo &splitInfo)
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CalcGroupInfo(const Vec1RunInfo& info, Vec1SplitInfo& splitInfo)
 {
     uint32_t aiCoreNum = constInfo_.usedCoreNum * 2;
     if (hasLayerNorm_) {
@@ -1148,8 +1148,8 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CalcGroupInfo(const Vec1Run
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CalcTaskDistribution(const Vec1RunInfo &info,
-                                                                          Vec1SplitInfo &splitInfo)
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CalcTaskDistribution(const Vec1RunInfo& info,
+                                                                          Vec1SplitInfo& splitInfo)
 {
     uint32_t blockIdx = GetBlockIdx();
     uint32_t groupSize = splitInfo.vec1GroupSize;
@@ -1169,18 +1169,18 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CalcTaskDistribution(const 
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::UpdateIteratorState(const Vec1RunInfo &info,
-                                                                         Vec1SplitInfo &splitInfo)
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::UpdateIteratorState(const Vec1RunInfo& info,
+                                                                         Vec1SplitInfo& splitInfo)
 {
     KeyPoolVec1SliceIterator sliceIterator(tools_);
     sliceIterator.SetMaxBatchSize(constInfo_.batchSize);
     sliceIterator.Reset(info.bStart, info.sStart, 0U, 0U);
-    Vec1SliceInfo &sliceInfo = sliceIterator.GetSlice();
+    Vec1SliceInfo& sliceInfo = sliceIterator.GetSlice();
 
     // 处理前序任务量，更新起始索引
     if (splitInfo.preDealTcSize > 0) {
         sliceIterator.SetNeedDealTcSize(splitInfo.preDealTcSize);
-        StatisticInfo &statisticInfo = sliceIterator.template FullIteratorSlice<true>();
+        StatisticInfo& statisticInfo = sliceIterator.template FullIteratorSlice<true>();
         splitInfo.curCompressedCnt = statisticInfo.key_poolScCnt;
         splitInfo.dealSeqStartIdx = sliceInfo.dealedSeqCnt;
         splitInfo.curBStart = sliceInfo.bIdx;
@@ -1194,12 +1194,12 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::UpdateIteratorState(const V
 
     // 处理当前核实际要跑的任务量
     sliceIterator.SetNeedDealTcSize(info.dealTcNum - splitInfo.preDealTcSize);
-    StatisticInfo &statisticInfo = sliceIterator.template FullIteratorSlice<true>();
+    StatisticInfo& statisticInfo = sliceIterator.template FullIteratorSlice<true>();
     splitInfo.totalCompressedCnt = splitInfo.curCompressedCnt + statisticInfo.key_poolScCnt;
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CalcTilingStrategy(Vec1SplitInfo &splitInfo)
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CalcTilingStrategy(Vec1SplitInfo& splitInfo)
 {
     // 计算headDim和Tc方向切分大小
     uint32_t maxDealColNum = BUFFER_SIZE_BYTE_32K / (constInfo_.cmpRatio * coff_ * sizeof(T));
@@ -1217,7 +1217,7 @@ __aicore__ inline void KeyPoolBlockVectorPerf<COMP>::CalcTilingStrategy(Vec1Spli
 }
 
 template <typename COMP>
-__aicore__ inline Vec1SplitInfo KeyPoolBlockVectorPerf<COMP>::SplitCoreV1(const Vec1RunInfo &info)
+__aicore__ inline Vec1SplitInfo KeyPoolBlockVectorPerf<COMP>::SplitCoreV1(const Vec1RunInfo& info)
 {
     Vec1SplitInfo splitInfo;
 
@@ -1241,7 +1241,7 @@ __aicore__ inline Vec1SplitInfo KeyPoolBlockVectorPerf<COMP>::SplitCoreV1(const 
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::ComputeVec1(const Vec1RunInfo &info)
+__aicore__ inline void KeyPoolBlockVectorPerf<COMP>::ComputeVec1(const Vec1RunInfo& info)
 {
     if (info.dealTcNum == 0) {
         return;

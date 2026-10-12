@@ -16,11 +16,11 @@ namespace {
 
 constexpr int64_t DIM_TWO = 2;
 
-std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> ConstructKdaInputProjOutputs(const at::Tensor &x,
-                                                                                        const at::Tensor &weight_qkv,
-                                                                                        const at::Tensor &weight_beta,
-                                                                                        const at::Tensor &weight_gate,
-                                                                                        const at::Tensor &weight_g)
+std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> ConstructKdaInputProjOutputs(const at::Tensor& x,
+                                                                                        const at::Tensor& weight_qkv,
+                                                                                        const at::Tensor& weight_beta,
+                                                                                        const at::Tensor& weight_gate,
+                                                                                        const at::Tensor& weight_g)
 {
     TORCH_CHECK(x.dim() == DIM_TWO, "x must be 2D [T, hidden], but got ", x.dim(), "D.");
     TORCH_CHECK(x.size(0) > 0 && x.size(1) > 0, "All values within x's shape should be greater than 0.");
@@ -45,8 +45,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> ConstructKdaInputProj
 } // namespace
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> kda_input_proj(
-    const at::Tensor &x, const at::Tensor &weight_qkv, const at::Tensor &weight_beta, const at::Tensor &weight_gate,
-    const at::Tensor &weight_g, const at::Tensor &weight_qkv_scale)
+    const at::Tensor& x, const at::Tensor& weight_qkv, const at::Tensor& weight_beta, const at::Tensor& weight_gate,
+    const at::Tensor& weight_g, const at::Tensor& weight_qkv_scale)
 {
     TORCH_CHECK(x.numel() > 0, "Tensor x is empty.");
     TORCH_CHECK(x.scalar_type() == at::ScalarType::BFloat16, "x dtype must be bfloat16, but got ", x.scalar_type(),

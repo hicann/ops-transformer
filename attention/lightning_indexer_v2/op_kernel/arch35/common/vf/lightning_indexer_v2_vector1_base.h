@@ -50,7 +50,7 @@ struct UIntSortConstCtx {
 };
 
 template <typename FloatT>
-__simd_callee__ inline void InitUIntSortConstCtx(UIntSortConstCtx<FloatT> &ctx, AscendC::Reg::MaskReg &maskAll)
+__simd_callee__ inline void InitUIntSortConstCtx(UIntSortConstCtx<FloatT>& ctx, AscendC::Reg::MaskReg& maskAll)
 {
     using Traits = UIntSortTraits<FloatT>;
     AscendC::Reg::Duplicate(ctx.zeros, Traits::ZERO, maskAll);
@@ -60,9 +60,9 @@ __simd_callee__ inline void InitUIntSortConstCtx(UIntSortConstCtx<FloatT> &ctx, 
 }
 
 template <typename FloatT>
-__simd_callee__ inline void UIntToSortableKey(AscendC::Reg::RegTensor<FloatT> &outKey,
-                                              AscendC::Reg::RegTensor<typename UIntSortConstCtx<FloatT>::UInt> &inVal,
-                                              UIntSortConstCtx<FloatT> &ctx, AscendC::Reg::MaskReg &maskAll)
+__simd_callee__ inline void UIntToSortableKey(AscendC::Reg::RegTensor<FloatT>& outKey,
+                                              AscendC::Reg::RegTensor<typename UIntSortConstCtx<FloatT>::UInt>& inVal,
+                                              UIntSortConstCtx<FloatT>& ctx, AscendC::Reg::MaskReg& maskAll)
 {
     using Traits = UIntSortTraits<FloatT>;
     using UInt = typename Traits::UInt;
@@ -72,23 +72,22 @@ __simd_callee__ inline void UIntToSortableKey(AscendC::Reg::RegTensor<FloatT> &o
     AscendC::Reg::MaskReg regSelectZero;
     AscendC::Reg::MaskReg regSelectSign;
 
-    auto &inBits = inVal;
+    auto& inBits = inVal;
 
     // 1. 0 check
     AscendC::Reg::Compare<UInt, CMPMODE::EQ>(regSelectZero, inBits, ctx.zeros, maskAll);
 
     // 2. 0 -> -NAN
-    AscendC::Reg::Select((AscendC::Reg::RegTensor<UInt> &)outKey, ctx.nan, inBits, regSelectZero);
+    AscendC::Reg::Select((AscendC::Reg::RegTensor<UInt>&)outKey, ctx.nan, inBits, regSelectZero);
 
     // 3. sign bit
-    AscendC::Reg::And(regTemp, (AscendC::Reg::RegTensor<UInt> &)outKey, ctx.signMask, maskAll);
+    AscendC::Reg::And(regTemp, (AscendC::Reg::RegTensor<UInt>&)outKey, ctx.signMask, maskAll);
 
     AscendC::Reg::Compare<UInt, CMPMODE::GT>(regSelectSign, regTemp, ctx.zeros, maskAll);
 
     // 4. xor mask
     AscendC::Reg::Select(regMask, ctx.signMask, ctx.allOne, regSelectSign);
-    AscendC::Reg::Xor((AscendC::Reg::RegTensor<UInt> &)outKey, (AscendC::Reg::RegTensor<UInt> &)outKey, regMask,
-                      maskAll);
+    AscendC::Reg::Xor((AscendC::Reg::RegTensor<UInt>&)outKey, (AscendC::Reg::RegTensor<UInt>&)outKey, regMask, maskAll);
 }
 
 template <typename T>
@@ -125,7 +124,7 @@ struct FloatSortConstCtx {
 };
 
 template <typename FloatT>
-__simd_callee__ inline void InitFloatSortConstCtx(FloatSortConstCtx<FloatT> &ctx, AscendC::Reg::MaskReg &maskAll)
+__simd_callee__ inline void InitFloatSortConstCtx(FloatSortConstCtx<FloatT>& ctx, AscendC::Reg::MaskReg& maskAll)
 {
     using Traits = FloatSortTraits<FloatT>;
     AscendC::Reg::Duplicate(ctx.zeros, Traits::ZERO, maskAll);
@@ -135,9 +134,9 @@ __simd_callee__ inline void InitFloatSortConstCtx(FloatSortConstCtx<FloatT> &ctx
 }
 
 template <typename FloatT>
-__simd_callee__ inline void FloatToSortableKey(Reg::RegTensor<typename FloatSortTraits<FloatT>::UInt> &outKey,
-                                               Reg::RegTensor<FloatT> &inVal, FloatSortConstCtx<FloatT> &ctx,
-                                               Reg::MaskReg &maskAll)
+__simd_callee__ inline void FloatToSortableKey(Reg::RegTensor<typename FloatSortTraits<FloatT>::UInt>& outKey,
+                                               Reg::RegTensor<FloatT>& inVal, FloatSortConstCtx<FloatT>& ctx,
+                                               Reg::MaskReg& maskAll)
 {
     using Traits = FloatSortTraits<FloatT>;
     using UInt = typename Traits::UInt;
@@ -147,7 +146,7 @@ __simd_callee__ inline void FloatToSortableKey(Reg::RegTensor<typename FloatSort
     AscendC::Reg::MaskReg regSelectNan;
     AscendC::Reg::MaskReg regSelectSign;
 
-    auto &inBits = (AscendC::Reg::RegTensor<UInt> &)inVal;
+    auto& inBits = (AscendC::Reg::RegTensor<UInt>&)inVal;
 
     // 1. NaN check
     AscendC::Reg::Compare<UInt, CMPMODE::EQ>(regSelectNan, inBits, ctx.nan, maskAll);
@@ -166,10 +165,10 @@ __simd_callee__ inline void FloatToSortableKey(Reg::RegTensor<typename FloatSort
 }
 
 template <typename FloatT>
-__simd_callee__ inline void FloatX2ToSortableKey(Reg::RegTensor<typename FloatSortTraits<FloatT>::UInt> &outKey0,
-                                                 Reg::RegTensor<typename FloatSortTraits<FloatT>::UInt> &outKey1,
-                                                 Reg::RegTensor<FloatT> &inVal0, Reg::RegTensor<FloatT> &inVal1,
-                                                 FloatSortConstCtx<FloatT> &ctx, Reg::MaskReg &maskAll)
+__simd_callee__ inline void FloatX2ToSortableKey(Reg::RegTensor<typename FloatSortTraits<FloatT>::UInt>& outKey0,
+                                                 Reg::RegTensor<typename FloatSortTraits<FloatT>::UInt>& outKey1,
+                                                 Reg::RegTensor<FloatT>& inVal0, Reg::RegTensor<FloatT>& inVal1,
+                                                 FloatSortConstCtx<FloatT>& ctx, Reg::MaskReg& maskAll)
 {
     using Traits = FloatSortTraits<FloatT>;
     using UInt = typename Traits::UInt;
@@ -179,8 +178,8 @@ __simd_callee__ inline void FloatX2ToSortableKey(Reg::RegTensor<typename FloatSo
     AscendC::Reg::MaskReg regSelectNan[2];
     AscendC::Reg::MaskReg regSelectSign[2];
 
-    auto &inBits0 = (AscendC::Reg::RegTensor<UInt> &)inVal0;
-    auto &inBits1 = (AscendC::Reg::RegTensor<UInt> &)inVal1;
+    auto& inBits0 = (AscendC::Reg::RegTensor<UInt>&)inVal0;
+    auto& inBits1 = (AscendC::Reg::RegTensor<UInt>&)inVal1;
 
     // 1. NaN check
     AscendC::Reg::Compare<UInt, CMPMODE::EQ>(regSelectNan[0], inBits0, ctx.nan, maskAll);
@@ -205,7 +204,7 @@ __simd_callee__ inline void FloatX2ToSortableKey(Reg::RegTensor<typename FloatSo
 }
 
 template <typename T, size_t N>
-__simd_callee__ inline void DuplicateZero(AscendC::Reg::RegTensor<T> (&regArray)[N], AscendC::Reg::MaskReg &mask)
+__simd_callee__ inline void DuplicateZero(AscendC::Reg::RegTensor<T> (&regArray)[N], AscendC::Reg::MaskReg& mask)
 {
     static_assert(N <= 4, "N must be <= 4");
     // 不能用循环, 会导致fatal error: error in backend: Unsupported Inst must be hoisted.
@@ -225,8 +224,8 @@ __simd_callee__ inline void DuplicateZero(AscendC::Reg::RegTensor<T> (&regArray)
 
 template <typename T, size_t N, bool ApplyRelu = true>
 __simd_callee__ inline void WeightedAccum(AscendC::Reg::RegTensor<T> (&accum)[N],
-                                          AscendC::Reg::RegTensor<T> (&input)[N], AscendC::Reg::RegTensor<T> &weight,
-                                          AscendC::Reg::MaskReg &mask)
+                                          AscendC::Reg::RegTensor<T> (&input)[N], AscendC::Reg::RegTensor<T>& weight,
+                                          AscendC::Reg::MaskReg& mask)
 {
     static_assert(N <= 2, "N must be <= 2");
     // ---- Relu block ----
@@ -247,7 +246,7 @@ __simd_callee__ inline void WeightedAccum(AscendC::Reg::RegTensor<T> (&accum)[N]
     }
 }
 
-__simd_callee__ inline void BroadcastLane(AscendC::Reg::RegTensor<float> &dst, AscendC::Reg::RegTensor<float> &src,
+__simd_callee__ inline void BroadcastLane(AscendC::Reg::RegTensor<float>& dst, AscendC::Reg::RegTensor<float>& src,
                                           uint16_t laneIdx)
 {
     AscendC::Reg::RegTensor<uint32_t> brcGatherIndex;
@@ -255,15 +254,15 @@ __simd_callee__ inline void BroadcastLane(AscendC::Reg::RegTensor<float> &dst, A
     AscendC::Reg::Gather(dst, src, brcGatherIndex);
 }
 
-__simd_callee__ inline void BroadcastLane(AscendC::Reg::RegTensor<bfloat16_t> &dst,
-                                          AscendC::Reg::RegTensor<bfloat16_t> &src, uint16_t laneIdx)
+__simd_callee__ inline void BroadcastLane(AscendC::Reg::RegTensor<bfloat16_t>& dst,
+                                          AscendC::Reg::RegTensor<bfloat16_t>& src, uint16_t laneIdx)
 {
     AscendC::Reg::RegTensor<uint16_t> brcGatherIndex;
     AscendC::Reg::Duplicate(brcGatherIndex, laneIdx);
     AscendC::Reg::Gather(dst, src, brcGatherIndex);
 }
 
-__simd_callee__ inline void BroadcastLane(AscendC::Reg::RegTensor<float> &dst, __ubuf__ float *src, uint16_t laneIdx)
+__simd_callee__ inline void BroadcastLane(AscendC::Reg::RegTensor<float>& dst, __ubuf__ float* src, uint16_t laneIdx)
 {
     AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(dst, src + laneIdx);
 }

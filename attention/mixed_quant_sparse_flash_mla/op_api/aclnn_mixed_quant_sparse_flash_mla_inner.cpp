@@ -22,19 +22,19 @@ namespace {
 
 constexpr int64_t TURBO_QUANT_MODE = 3;
 
-void MixedQuantSparseFlashMlaKvTensorPreProcess(const aclTensor *&kvTensor, const char *tensorName, int64_t quantMode)
+void MixedQuantSparseFlashMlaKvTensorPreProcess(const aclTensor*& kvTensor, const char* tensorName, int64_t quantMode)
 {
     if (quantMode != TURBO_QUANT_MODE && kvTensor != nullptr && kvTensor->GetDataType() == DataType::DT_UINT8) {
-        auto tensor = const_cast<aclTensor *>(kvTensor);
+        auto tensor = const_cast<aclTensor*>(kvTensor);
         tensor->SetDataType(DataType::DT_FLOAT8_E4M3FN);
         OP_LOGD("%s dtype is converted from uint8 to float8_e4m3fn.", tensorName);
     }
 }
 
-void MixedQuantSparseFlashMlaProcessSinks(const aclTensor *&sinksOptional)
+void MixedQuantSparseFlashMlaProcessSinks(const aclTensor*& sinksOptional)
 {
     if (sinksOptional != nullptr) {
-        const auto &shape = sinksOptional->GetViewShape();
+        const auto& shape = sinksOptional->GetViewShape();
         if (shape.GetDimNum() == 1U && shape[0] == 0) {
             OP_LOGD("sinks shape is {0}, treat as nullptr.");
             sinksOptional = nullptr;

@@ -44,21 +44,21 @@ template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename
 class FiaKernelNonQuantMla {
 public:
     __aicore__ inline FiaKernelNonQuantMla(){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                __gm__ uint8_t *pseShift, __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengthsQ,
-                                __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *deqScale1,
-                                __gm__ uint8_t *quantScale1, __gm__ uint8_t *deqScale2, __gm__ uint8_t *quantScale2,
-                                __gm__ uint8_t *quantOffset2, __gm__ uint8_t *antiquantScale,
-                                __gm__ uint8_t *antiquantOffset, __gm__ uint8_t *blockTable,
-                                __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-                                __gm__ uint8_t *keyAntiquantScale, __gm__ uint8_t *keyAntiquantOffset,
-                                __gm__ uint8_t *valueAntiquantScale, __gm__ uint8_t *valueAntiquantOffset,
-                                __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
-                                __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *queryRope,
-                                __gm__ uint8_t *keyRope, __gm__ uint8_t *keyRopeAntiquantScale,
-                                __gm__ uint8_t *learnableSink, __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
-                                __gm__ uint8_t *workspace, const FusedInferAttentionScoreTilingData *__restrict tiling,
-                                __gm__ uint8_t *gmTiling, TPipe *tPipe, bool isPrefix = false);
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                __gm__ uint8_t* pseShift, __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengthsQ,
+                                __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* deqScale1,
+                                __gm__ uint8_t* quantScale1, __gm__ uint8_t* deqScale2, __gm__ uint8_t* quantScale2,
+                                __gm__ uint8_t* quantOffset2, __gm__ uint8_t* antiquantScale,
+                                __gm__ uint8_t* antiquantOffset, __gm__ uint8_t* blockTable,
+                                __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+                                __gm__ uint8_t* keyAntiquantScale, __gm__ uint8_t* keyAntiquantOffset,
+                                __gm__ uint8_t* valueAntiquantScale, __gm__ uint8_t* valueAntiquantOffset,
+                                __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix,
+                                __gm__ uint8_t* actualSharedPrefixLen, __gm__ uint8_t* queryRope,
+                                __gm__ uint8_t* keyRope, __gm__ uint8_t* keyRopeAntiquantScale,
+                                __gm__ uint8_t* learnableSink, __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse,
+                                __gm__ uint8_t* workspace, const FusedInferAttentionScoreTilingData* __restrict tiling,
+                                __gm__ uint8_t* gmTiling, TPipe* tPipe, bool isPrefix = false);
     __aicore__ inline void Process();
 
     // =================================类型定义区=================================
@@ -108,8 +108,8 @@ public:
 
     static constexpr bool POST_QUANT = IsSameType<OUT_T, int8_t>::value;
     // ==============================TilingData&TPipe==============================
-    const FusedInferAttentionScoreTilingData *__restrict tilingData = nullptr;
-    TPipe *pipe = nullptr;
+    const FusedInferAttentionScoreTilingData* __restrict tilingData = nullptr;
+    TPipe* pipe = nullptr;
 
     // for workspace pingpong
     const uint32_t dbWorkspaceRatio = PRELOAD_NUM;
@@ -118,8 +118,8 @@ public:
     GlobalTensor<OUT_T> attentionOutGm;
     GlobalTensor<float> softmaxLseGm;
 
-    __gm__ uint8_t *keyPtr = nullptr;
-    __gm__ uint8_t *valuePtr = nullptr;
+    __gm__ uint8_t* keyPtr = nullptr;
+    __gm__ uint8_t* valuePtr = nullptr;
 
     GlobalTensor<uint64_t> actualSeqLengthsGmQ;
     GlobalTensor<uint64_t> actualSeqLengthsGm;
@@ -169,32 +169,32 @@ public:
     // ================================Init functions==================================
     __aicore__ inline void InitTilingData();
     __aicore__ inline void InitCalcParamsEach();
-    __aicore__ inline void InitActualSeqLenQ(__gm__ uint8_t *actualSeqLengthsQ);
-    __aicore__ inline void InitActualSeqLenKV(__gm__ uint8_t *actualSeqLengths);
+    __aicore__ inline void InitActualSeqLenQ(__gm__ uint8_t* actualSeqLengthsQ);
+    __aicore__ inline void InitActualSeqLenKV(__gm__ uint8_t* actualSeqLengths);
     __aicore__ inline bool IsInitAttentionOutGm();
     __aicore__ inline void InitOutputSingleCore();
     // ================================Tool============================================
     __aicore__ inline uint32_t GetBIdx(uint32_t bN2Idx);
     __aicore__ inline uint32_t GetN2Idx(uint32_t bN2Idx);
-    __aicore__ inline void GetPreNextTokenLeftUp(int64_t actSeqLensQ, int64_t actSeqLensKv, int64_t &preToken,
-                                                 int64_t &nextToken);
+    __aicore__ inline void GetPreNextTokenLeftUp(int64_t actSeqLensQ, int64_t actSeqLensKv, int64_t& preToken,
+                                                 int64_t& nextToken);
     // ================================Process functions================================
     __aicore__ inline void FlashAttention();
-    __aicore__ inline void CalcParams(uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur, RunInfo &info);
+    __aicore__ inline void CalcParams(uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur, RunInfo& info);
     __aicore__ inline void CalcCurS2StartEndNoSparse(uint32_t bN2Cur, uint32_t gS1Cur);
     __aicore__ inline void CalcCurS2StartEndWithSparse(uint32_t bN2Cur, uint32_t gS1Cur);
     __aicore__ inline TASK_DEAL_MODE GetTaskDealMode(uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur);
-    __aicore__ inline void ComputeMm1(const RunInfo &info);
-    __aicore__ inline void ComputeMm2(const RunInfo &info);
-    __aicore__ inline void ComputeVec1(const RunInfo &info);
-    __aicore__ inline void ComputeVec2(const RunInfo &info);
+    __aicore__ inline void ComputeMm1(const RunInfo& info);
+    __aicore__ inline void ComputeMm2(const RunInfo& info);
+    __aicore__ inline void ComputeVec1(const RunInfo& info);
+    __aicore__ inline void ComputeVec2(const RunInfo& info);
     __aicore__ inline void FlashDecode();
     // ================================PIPE Control=====================================
     __aicore__ inline bool ShouldDispatchTask(uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur);
 
-    __aicore__ inline void DealZeroActSeqLen(uint32_t &bN2Cur, uint32_t &gS1Cur, uint32_t &s2Cur);
+    __aicore__ inline void DealZeroActSeqLen(uint32_t& bN2Cur, uint32_t& gS1Cur, uint32_t& s2Cur);
     __aicore__ inline bool IsSkip(uint32_t bN2Cur);
-    __aicore__ inline void UpdateAxisInfo(uint32_t &bN2Cur, uint32_t &gS1Cur, uint32_t &s2Cur);
+    __aicore__ inline void UpdateAxisInfo(uint32_t& bN2Cur, uint32_t& gS1Cur, uint32_t& s2Cur);
     __aicore__ inline void CreateTask(uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur,
                                       RunInfo extraInfo[FIA_PRELOAD_TASK_CACHE_SIZE]);
     __aicore__ inline bool ShouldExecuteTask(RunInfo extraInfo[FIA_PRELOAD_TASK_CACHE_SIZE]);
@@ -252,24 +252,24 @@ __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, F
 
 template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename FdBlockType>
 __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, FdBlockType>::InitActualSeqLenQ(
-    __gm__ uint8_t *actualSeqLengthsQ)
+    __gm__ uint8_t* actualSeqLengthsQ)
 {
     constInfo.actualLenQDims = tilingData->baseParams.actualSeqS1Dims;
     constInfo.accumQSeqFlag = tilingData->baseParams.accumQSeqFlag;
     if (constInfo.actualLenQDims != 0) {
-        actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ uint64_t *)actualSeqLengthsQ, constInfo.actualLenQDims);
+        actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ uint64_t*)actualSeqLengthsQ, constInfo.actualLenQDims);
     }
     qActSeqLensParser.Init(actualSeqLengthsGmQ, constInfo.actualLenQDims, constInfo.qSeqSize);
 }
 
 template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename FdBlockType>
 __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, FdBlockType>::InitActualSeqLenKV(
-    __gm__ uint8_t *actualSeqLengths)
+    __gm__ uint8_t* actualSeqLengths)
 {
     constInfo.actualLenDims = tilingData->baseParams.actualSeqS2Dims;
     constInfo.accumKVSeqFlag = tilingData->baseParams.accumKVSeqFlag;
     if (constInfo.actualLenDims != 0) {
-        actualSeqLengthsGm.SetGlobalBuffer((__gm__ uint64_t *)actualSeqLengths, constInfo.actualLenDims);
+        actualSeqLengthsGm.SetGlobalBuffer((__gm__ uint64_t*)actualSeqLengths, constInfo.actualLenDims);
     }
     kvActSeqLensParser.Init(actualSeqLengthsGm, constInfo.actualLenDims, constInfo.kvSeqSize);
 }
@@ -345,17 +345,17 @@ __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, F
 
 template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename FdBlockType>
 __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, FdBlockType>::Init(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-    __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths,
-    __gm__ uint8_t *deqScale1, __gm__ uint8_t *quantScale1, __gm__ uint8_t *deqScale2, __gm__ uint8_t *quantScale2,
-    __gm__ uint8_t *quantOffset2, __gm__ uint8_t *antiquantScale, __gm__ uint8_t *antiquantOffset,
-    __gm__ uint8_t *blockTable, __gm__ uint8_t *queryPaddingSize, __gm__ uint8_t *kvPaddingSize,
-    __gm__ uint8_t *keyAntiquantScale, __gm__ uint8_t *keyAntiquantOffset, __gm__ uint8_t *valueAntiquantScale,
-    __gm__ uint8_t *valueAntiquantOffset, __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
-    __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-    __gm__ uint8_t *keyRopeAntiquantScale, __gm__ uint8_t *learnableSink, __gm__ uint8_t *attentionOut,
-    __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, const FusedInferAttentionScoreTilingData *__restrict tiling,
-    __gm__ uint8_t *gmTiling, TPipe *tPipe, bool isPrefix)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+    __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengthsQ, __gm__ uint8_t* actualSeqLengths,
+    __gm__ uint8_t* deqScale1, __gm__ uint8_t* quantScale1, __gm__ uint8_t* deqScale2, __gm__ uint8_t* quantScale2,
+    __gm__ uint8_t* quantOffset2, __gm__ uint8_t* antiquantScale, __gm__ uint8_t* antiquantOffset,
+    __gm__ uint8_t* blockTable, __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+    __gm__ uint8_t* keyAntiquantScale, __gm__ uint8_t* keyAntiquantOffset, __gm__ uint8_t* valueAntiquantScale,
+    __gm__ uint8_t* valueAntiquantOffset, __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix,
+    __gm__ uint8_t* actualSharedPrefixLen, __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+    __gm__ uint8_t* keyRopeAntiquantScale, __gm__ uint8_t* learnableSink, __gm__ uint8_t* attentionOut,
+    __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, const FusedInferAttentionScoreTilingData* __restrict tiling,
+    __gm__ uint8_t* gmTiling, TPipe* tPipe, bool isPrefix)
 {
     if ASCEND_IS_AIV {
         constInfo.subBlockNum = GetSubBlockNum(); // CV1:2场景,返回值为2，其他场景返回值为1
@@ -391,9 +391,9 @@ __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, F
     valuePtr = value;
 
     // init global buffer
-    attentionOutGm.SetGlobalBuffer((__gm__ OUT_T *)attentionOut);
+    attentionOutGm.SetGlobalBuffer((__gm__ OUT_T*)attentionOut);
     if (constInfo.softmaxLseFlag) {
-        softmaxLseGm.SetGlobalBuffer((__gm__ float *)softmaxLse);
+        softmaxLseGm.SetGlobalBuffer((__gm__ float*)softmaxLse);
     }
 
     if ASCEND_IS_AIV {
@@ -404,30 +404,30 @@ __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, F
     uint64_t offset = 0;
 
     mm1ResGm.SetGlobalBuffer(
-        (__gm__ MM1_OUT_T *)(workspace + offset +
-                             aiCoreIdx * dbWorkspaceRatio * constInfo.mmResUbSize * sizeof(MM1_OUT_T)));
+        (__gm__ MM1_OUT_T*)(workspace + offset +
+                            aiCoreIdx * dbWorkspaceRatio * constInfo.mmResUbSize * sizeof(MM1_OUT_T)));
     offset += GetBlockNum() * dbWorkspaceRatio * constInfo.mmResUbSize * sizeof(MM1_OUT_T);
 
     vec1ResGm.SetGlobalBuffer(
-        (__gm__ KV_T *)(workspace + offset + aiCoreIdx * dbWorkspaceRatio * constInfo.mmResUbSize * sizeof(KV_T)));
+        (__gm__ KV_T*)(workspace + offset + aiCoreIdx * dbWorkspaceRatio * constInfo.mmResUbSize * sizeof(KV_T)));
     offset += GetBlockNum() * dbWorkspaceRatio * constInfo.mmResUbSize * sizeof(KV_T);
 
     mm2ResGm.SetGlobalBuffer(
-        (__gm__ MM2_OUT_T *)(workspace + offset +
-                             aiCoreIdx * dbWorkspaceRatio * constInfo.bmm2ResUbSize * sizeof(MM2_OUT_T)));
+        (__gm__ MM2_OUT_T*)(workspace + offset +
+                            aiCoreIdx * dbWorkspaceRatio * constInfo.bmm2ResUbSize * sizeof(MM2_OUT_T)));
     offset += GetBlockNum() * dbWorkspaceRatio * constInfo.bmm2ResUbSize * sizeof(MM2_OUT_T);
-    mm2ResInt32Gm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(mm2ResGm.GetPhyAddr(0)));
+    mm2ResInt32Gm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(mm2ResGm.GetPhyAddr(0)));
 
     vec2ResGm.SetGlobalBuffer(
-        (__gm__ T *)(workspace + offset + aiCoreIdx * dbWorkspaceRatio * constInfo.bmm2ResUbSize * sizeof(T)));
+        (__gm__ T*)(workspace + offset + aiCoreIdx * dbWorkspaceRatio * constInfo.bmm2ResUbSize * sizeof(T)));
     offset += GetBlockNum() * dbWorkspaceRatio * constInfo.bmm2ResUbSize * sizeof(T);
 
     if ASCEND_IS_AIV {
         if constexpr (FLASH_DECODE) {
-            accumOutGm.SetGlobalBuffer((__gm__ float *)(workspace + offset));
+            accumOutGm.SetGlobalBuffer((__gm__ float*)(workspace + offset));
             offset = offset + tilingData->workspaceParams.fdAccumOutSize * sizeof(float);
-            lseSumFdGm.SetGlobalBuffer((__gm__ float *)(workspace + offset));
-            lseMaxFdGm.SetGlobalBuffer((__gm__ float *)(workspace + offset) +
+            lseSumFdGm.SetGlobalBuffer((__gm__ float*)(workspace + offset));
+            lseMaxFdGm.SetGlobalBuffer((__gm__ float*)(workspace + offset) +
                                        tilingData->workspaceParams.fdLogSumExpSize / 2);
             offset = offset + tilingData->workspaceParams.fdLogSumExpSize * sizeof(float);
 
@@ -469,19 +469,19 @@ __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, F
     // 定义一个局部数组变量coreSidxEnd(存在栈上)，使用copy_data_align64接口拷贝tiling中数组的内容到栈上
     // 其他非数组的tiling成员在不使用时不需要做Tiling拷贝，从而优化Tiling拷贝耗时
 #ifdef ASCENDC_CPU_DEBUG
-    const uint32_t *bN2End = tilingData->outerSplitParams.bN2End;
-    const uint32_t *gS1End = tilingData->outerSplitParams.gS1End;
-    const uint32_t *s2End = tilingData->outerSplitParams.s2End;
-    const uint32_t *s2SplitStartIdxOfCore = tilingData->fdParams.s2SplitStartIdxOfCore;
+    const uint32_t* bN2End = tilingData->outerSplitParams.bN2End;
+    const uint32_t* gS1End = tilingData->outerSplitParams.gS1End;
+    const uint32_t* s2End = tilingData->outerSplitParams.s2End;
+    const uint32_t* s2SplitStartIdxOfCore = tilingData->fdParams.s2SplitStartIdxOfCore;
 #else
     uint32_t bN2End[ARRAY_SIZE(tilingData->outerSplitParams.bN2End)];
     uint32_t gS1End[ARRAY_SIZE(tilingData->outerSplitParams.gS1End)];
     uint32_t s2End[ARRAY_SIZE(tilingData->outerSplitParams.s2End)];
     uint32_t s2SplitStartIdxOfCore[ARRAY_SIZE(tilingData->fdParams.s2SplitStartIdxOfCore)];
-    copy_data_align64((uint8_t *)bN2End, (uint8_t *)(tilingData->outerSplitParams.bN2End), sizeof(bN2End));
-    copy_data_align64((uint8_t *)gS1End, (uint8_t *)(tilingData->outerSplitParams.gS1End), sizeof(gS1End));
-    copy_data_align64((uint8_t *)s2End, (uint8_t *)(tilingData->outerSplitParams.s2End), sizeof(s2End));
-    copy_data_align64((uint8_t *)s2SplitStartIdxOfCore, (uint8_t *)(tilingData->fdParams.s2SplitStartIdxOfCore),
+    copy_data_align64((uint8_t*)bN2End, (uint8_t*)(tilingData->outerSplitParams.bN2End), sizeof(bN2End));
+    copy_data_align64((uint8_t*)gS1End, (uint8_t*)(tilingData->outerSplitParams.gS1End), sizeof(gS1End));
+    copy_data_align64((uint8_t*)s2End, (uint8_t*)(tilingData->outerSplitParams.s2End), sizeof(s2End));
+    copy_data_align64((uint8_t*)s2SplitStartIdxOfCore, (uint8_t*)(tilingData->fdParams.s2SplitStartIdxOfCore),
                       sizeof(s2SplitStartIdxOfCore));
 #endif
     // 任务起始位置
@@ -508,7 +508,7 @@ __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, F
 
 template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename FdBlockType>
 __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, FdBlockType>::CalcParams(
-    uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur, RunInfo &info)
+    uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur, RunInfo& info)
 {
     info.loop = loop;
     info.isValid = true; // info.isValid = s2LoopIdx < tempLoopInfo.s2LoopTimes;
@@ -591,28 +591,28 @@ __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, F
 
 template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename FdBlockType>
 __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, FdBlockType>::ComputeMm1(
-    const RunInfo &info)
+    const RunInfo& info)
 {
     matmulService.ComputeMm1(info);
 }
 
 template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename FdBlockType>
 __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, FdBlockType>::ComputeMm2(
-    const RunInfo &info)
+    const RunInfo& info)
 {
     matmulService.ComputeMm2(info);
 }
 
 template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename FdBlockType>
 __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, FdBlockType>::ComputeVec1(
-    const RunInfo &info)
+    const RunInfo& info)
 {
     vectorService.ProcessVec1L(info);
 }
 
 template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename FdBlockType>
 __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, FdBlockType>::ComputeVec2(
-    const RunInfo &info)
+    const RunInfo& info)
 {
     vectorService.ProcessVec2L(info);
 }
@@ -625,13 +625,13 @@ __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, F
         fdService.InitBuffers(pipe);
         AscendC::ICachePreLoad(fdPrefetchLen);
 #ifdef ASCENDC_CPU_DEBUG
-        const uint32_t *bN2IdxOfFdHead = tilingData->fdParams.bN2IdxOfFdHead;
-        const uint32_t *gS1IdxOfFdHead = tilingData->fdParams.gS1IdxOfFdHead;
-        const uint32_t *s2SplitNumOfFdHead = tilingData->fdParams.s2SplitNumOfFdHead;
-        const uint32_t *gS1IdxEndOfFdHead = tilingData->fdParams.gS1IdxEndOfFdHead;
-        const uint32_t *gS1IdxEndOfFdHeadSplit = tilingData->fdParams.gS1IdxEndOfFdHeadSplit;
-        const uint32_t *gS1SplitNumOfFdHead = tilingData->fdParams.gS1SplitNumOfFdHead;
-        const uint32_t *gS1LastPartSizeOfFdHead = tilingData->fdParams.gS1LastPartSizeOfFdHead;
+        const uint32_t* bN2IdxOfFdHead = tilingData->fdParams.bN2IdxOfFdHead;
+        const uint32_t* gS1IdxOfFdHead = tilingData->fdParams.gS1IdxOfFdHead;
+        const uint32_t* s2SplitNumOfFdHead = tilingData->fdParams.s2SplitNumOfFdHead;
+        const uint32_t* gS1IdxEndOfFdHead = tilingData->fdParams.gS1IdxEndOfFdHead;
+        const uint32_t* gS1IdxEndOfFdHeadSplit = tilingData->fdParams.gS1IdxEndOfFdHeadSplit;
+        const uint32_t* gS1SplitNumOfFdHead = tilingData->fdParams.gS1SplitNumOfFdHead;
+        const uint32_t* gS1LastPartSizeOfFdHead = tilingData->fdParams.gS1LastPartSizeOfFdHead;
 #else
         uint32_t bN2IdxOfFdHead[ARRAY_SIZE(tilingData->fdParams.bN2IdxOfFdHead)];
         uint32_t gS1IdxOfFdHead[ARRAY_SIZE(tilingData->fdParams.gS1IdxOfFdHead)];
@@ -640,19 +640,19 @@ __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, F
         uint32_t gS1IdxEndOfFdHeadSplit[ARRAY_SIZE(tilingData->fdParams.gS1IdxEndOfFdHeadSplit)];
         uint32_t gS1SplitNumOfFdHead[ARRAY_SIZE(tilingData->fdParams.gS1SplitNumOfFdHead)];
         uint32_t gS1LastPartSizeOfFdHead[ARRAY_SIZE(tilingData->fdParams.gS1LastPartSizeOfFdHead)];
-        copy_data_align64((uint8_t *)bN2IdxOfFdHead, (uint8_t *)(tilingData->fdParams.bN2IdxOfFdHead),
+        copy_data_align64((uint8_t*)bN2IdxOfFdHead, (uint8_t*)(tilingData->fdParams.bN2IdxOfFdHead),
                           sizeof(bN2IdxOfFdHead));
-        copy_data_align64((uint8_t *)gS1IdxOfFdHead, (uint8_t *)(tilingData->fdParams.gS1IdxOfFdHead),
+        copy_data_align64((uint8_t*)gS1IdxOfFdHead, (uint8_t*)(tilingData->fdParams.gS1IdxOfFdHead),
                           sizeof(gS1IdxOfFdHead));
-        copy_data_align64((uint8_t *)s2SplitNumOfFdHead, (uint8_t *)(tilingData->fdParams.s2SplitNumOfFdHead),
+        copy_data_align64((uint8_t*)s2SplitNumOfFdHead, (uint8_t*)(tilingData->fdParams.s2SplitNumOfFdHead),
                           sizeof(s2SplitNumOfFdHead));
-        copy_data_align64((uint8_t *)gS1IdxEndOfFdHead, (uint8_t *)(tilingData->fdParams.gS1IdxEndOfFdHead),
+        copy_data_align64((uint8_t*)gS1IdxEndOfFdHead, (uint8_t*)(tilingData->fdParams.gS1IdxEndOfFdHead),
                           sizeof(gS1IdxEndOfFdHead));
-        copy_data_align64((uint8_t *)gS1IdxEndOfFdHeadSplit, (uint8_t *)(tilingData->fdParams.gS1IdxEndOfFdHeadSplit),
+        copy_data_align64((uint8_t*)gS1IdxEndOfFdHeadSplit, (uint8_t*)(tilingData->fdParams.gS1IdxEndOfFdHeadSplit),
                           sizeof(gS1IdxEndOfFdHeadSplit));
-        copy_data_align64((uint8_t *)gS1SplitNumOfFdHead, (uint8_t *)(tilingData->fdParams.gS1SplitNumOfFdHead),
+        copy_data_align64((uint8_t*)gS1SplitNumOfFdHead, (uint8_t*)(tilingData->fdParams.gS1SplitNumOfFdHead),
                           sizeof(gS1SplitNumOfFdHead));
-        copy_data_align64((uint8_t *)gS1LastPartSizeOfFdHead, (uint8_t *)(tilingData->fdParams.gS1LastPartSizeOfFdHead),
+        copy_data_align64((uint8_t*)gS1LastPartSizeOfFdHead, (uint8_t*)(tilingData->fdParams.gS1LastPartSizeOfFdHead),
                           sizeof(gS1LastPartSizeOfFdHead));
 #endif
         fdParams = {bN2IdxOfFdHead,
@@ -727,14 +727,14 @@ __aicore__ inline bool FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, F
 
 template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename FdBlockType>
 __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, FdBlockType>::DealZeroActSeqLen(
-    uint32_t &bN2Cur, uint32_t &gS1Cur, uint32_t &s2Cur)
+    uint32_t& bN2Cur, uint32_t& gS1Cur, uint32_t& s2Cur)
 {
     // 全局预清零已覆盖空batch清零，无需逐batch刷零
 }
 
 template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename FdBlockType>
 __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, FdBlockType>::UpdateAxisInfo(
-    uint32_t &bN2Cur, uint32_t &gS1Cur, uint32_t &s2Cur)
+    uint32_t& bN2Cur, uint32_t& gS1Cur, uint32_t& s2Cur)
 {
     uint64_t gS1Size = actSeqLensQ * constInfo.gSize;
     uint64_t gS1LoopTimes = (gS1Size + constInfo.mBaseSize - 1) / constInfo.mBaseSize;
@@ -762,9 +762,9 @@ template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename
 __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, FdBlockType>::CreateTask(
     uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur, RunInfo extraInfo[FIA_PRELOAD_TASK_CACHE_SIZE])
 {
-    RunInfo &extraInfo0 = extraInfo[loop % FIA_PRELOAD_TASK_CACHE_SIZE];       // 本轮任务
-    RunInfo &extraInfo2 = extraInfo[(loop + 2) % FIA_PRELOAD_TASK_CACHE_SIZE]; // 上一轮任务
-    RunInfo &extraInfo1 = extraInfo[(loop + 1) % FIA_PRELOAD_TASK_CACHE_SIZE]; // 上两轮任务
+    RunInfo& extraInfo0 = extraInfo[loop % FIA_PRELOAD_TASK_CACHE_SIZE];       // 本轮任务
+    RunInfo& extraInfo2 = extraInfo[(loop + 2) % FIA_PRELOAD_TASK_CACHE_SIZE]; // 上一轮任务
+    RunInfo& extraInfo1 = extraInfo[(loop + 1) % FIA_PRELOAD_TASK_CACHE_SIZE]; // 上两轮任务
 
     CalcParams(loop, bN2Cur, gS1Cur, s2Cur, extraInfo0);
     extraInfo0.isValid = true;
@@ -786,9 +786,9 @@ template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename
 __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, FdBlockType>::ExecuteTask(
     uint64_t loop, RunInfo extraInfo[FIA_PRELOAD_TASK_CACHE_SIZE])
 {
-    RunInfo &extraInfo0 = extraInfo[loop % FIA_PRELOAD_TASK_CACHE_SIZE];       // 本轮任务
-    RunInfo &extraInfo2 = extraInfo[(loop + 2) % FIA_PRELOAD_TASK_CACHE_SIZE]; // 上一轮任务
-    RunInfo &extraInfo1 = extraInfo[(loop + 1) % FIA_PRELOAD_TASK_CACHE_SIZE]; // 上两轮任务
+    RunInfo& extraInfo0 = extraInfo[loop % FIA_PRELOAD_TASK_CACHE_SIZE];       // 本轮任务
+    RunInfo& extraInfo2 = extraInfo[(loop + 2) % FIA_PRELOAD_TASK_CACHE_SIZE]; // 上一轮任务
+    RunInfo& extraInfo1 = extraInfo[(loop + 1) % FIA_PRELOAD_TASK_CACHE_SIZE]; // 上两轮任务
 
     if (extraInfo0.isValid) {
         if ASCEND_IS_AIC {
@@ -857,7 +857,7 @@ __aicore__ inline TASK_DEAL_MODE FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBl
 
 template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename FdBlockType>
 __aicore__ inline void FiaKernelNonQuantMla<FIAT, CubeBlockType, VecBlockType, FdBlockType>::GetPreNextTokenLeftUp(
-    int64_t actSeqLensQ, int64_t actSeqLensKv, int64_t &preTokenLeftUp, int64_t &nextTokenLeftUp)
+    int64_t actSeqLensQ, int64_t actSeqLensKv, int64_t& preTokenLeftUp, int64_t& nextTokenLeftUp)
 {
     preTokenLeftUp = constInfo.preToken;
     nextTokenLeftUp = constInfo.nextToken;

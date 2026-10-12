@@ -32,11 +32,11 @@ inline int64_t CalcGsagMetadataSize(int64_t batchSize, int64_t numQHeads, int64_
 } // namespace
 
 at::Tensor GenericBlockSparseAttentionGradMetadata(
-    const at::Tensor &sparseBlockIdx, const at::Tensor &sparseBlockCount, const c10::optional<at::Tensor> &cuSeqLengths,
-    const c10::optional<at::Tensor> &cuSeqLengthsKv, const c10::optional<at::Tensor> &sequsedQ,
-    const c10::optional<at::Tensor> &sequsedKv, int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads,
-    int64_t numKvHeads, int64_t headDim, at::IntArrayRef blockShape, const std::string &layoutQ,
-    const std::string &layoutKv, int64_t layoutSparsePattern, int64_t maskType, int64_t softmaxPrecision,
+    const at::Tensor& sparseBlockIdx, const at::Tensor& sparseBlockCount, const c10::optional<at::Tensor>& cuSeqLengths,
+    const c10::optional<at::Tensor>& cuSeqLengthsKv, const c10::optional<at::Tensor>& sequsedQ,
+    const c10::optional<at::Tensor>& sequsedKv, int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads,
+    int64_t numKvHeads, int64_t headDim, at::IntArrayRef blockShape, const std::string& layoutQ,
+    const std::string& layoutKv, int64_t layoutSparsePattern, int64_t maskType, int64_t softmaxPrecision,
     int64_t winLeft, int64_t winRight, int64_t residualBlockMode, bool isConsistentTopk)
 {
     TORCH_CHECK(sparseBlockIdx.dim() == 4, "sparse_block_idx must be 4D [B, N2, J, maxS1]");
@@ -48,13 +48,13 @@ at::Tensor GenericBlockSparseAttentionGradMetadata(
     at::Tensor metadata =
         torch::empty({metadataSize}, torch::TensorOptions().dtype(torch::kInt32).device(sparseBlockIdx.device()));
 
-    const at::Tensor &cuSeqLengthsValue = cuSeqLengths.value_or(at::Tensor());
-    const at::Tensor &cuSeqLengthsKvValue = cuSeqLengthsKv.value_or(at::Tensor());
-    const at::Tensor &sequsedQValue = sequsedQ.value_or(at::Tensor());
-    const at::Tensor &sequsedKvValue = sequsedKv.value_or(at::Tensor());
+    const at::Tensor& cuSeqLengthsValue = cuSeqLengths.value_or(at::Tensor());
+    const at::Tensor& cuSeqLengthsKvValue = cuSeqLengthsKv.value_or(at::Tensor());
+    const at::Tensor& sequsedQValue = sequsedQ.value_or(at::Tensor());
+    const at::Tensor& sequsedKvValue = sequsedKv.value_or(at::Tensor());
 
-    char *layoutQPtr = const_cast<char *>(layoutQ.c_str());
-    char *layoutKvPtr = const_cast<char *>(layoutKv.c_str());
+    char* layoutQPtr = const_cast<char*>(layoutQ.c_str());
+    char* layoutKvPtr = const_cast<char*>(layoutKv.c_str());
 
     ACLNN_CMD(aclnnGenericBlockSparseAttentionGradMetadata, sparseBlockIdx, sparseBlockCount, cuSeqLengthsValue,
               cuSeqLengthsKvValue, sequsedQValue, sequsedKvValue, maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads,
@@ -65,28 +65,28 @@ at::Tensor GenericBlockSparseAttentionGradMetadata(
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> GenericBlockSparseAttentionGrad(
-    const at::Tensor &query, const at::Tensor &key, const at::Tensor &value, const at::Tensor &dout,
-    const at::Tensor &out, const at::Tensor &lse, const at::Tensor &sparseBlockIdx, const at::Tensor &sparseBlockCount,
-    const c10::optional<at::Tensor> &metadata, const c10::optional<at::Tensor> &attenMask,
-    const c10::optional<at::Tensor> &cuSeqLengths, const c10::optional<at::Tensor> &cuSeqLengthsKv,
-    const c10::optional<at::Tensor> &sequsedQ, const c10::optional<at::Tensor> &sequsedKv, at::IntArrayRef blockShape,
-    const std::string &layoutQ, const std::string &layoutKv, int64_t layoutSparsePattern, double scaleValue,
+    const at::Tensor& query, const at::Tensor& key, const at::Tensor& value, const at::Tensor& dout,
+    const at::Tensor& out, const at::Tensor& lse, const at::Tensor& sparseBlockIdx, const at::Tensor& sparseBlockCount,
+    const c10::optional<at::Tensor>& metadata, const c10::optional<at::Tensor>& attenMask,
+    const c10::optional<at::Tensor>& cuSeqLengths, const c10::optional<at::Tensor>& cuSeqLengthsKv,
+    const c10::optional<at::Tensor>& sequsedQ, const c10::optional<at::Tensor>& sequsedKv, at::IntArrayRef blockShape,
+    const std::string& layoutQ, const std::string& layoutKv, int64_t layoutSparsePattern, double scaleValue,
     int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode,
     bool isConsistentTopk)
 {
-    const at::Tensor &metadataValue = metadata.value_or(at::Tensor());
-    const at::Tensor &attenMaskValue = attenMask.value_or(at::Tensor());
-    const at::Tensor &cuSeqLengthsValue = cuSeqLengths.value_or(at::Tensor());
-    const at::Tensor &cuSeqLengthsKvValue = cuSeqLengthsKv.value_or(at::Tensor());
-    const at::Tensor &sequsedQValue = sequsedQ.value_or(at::Tensor());
-    const at::Tensor &sequsedKvValue = sequsedKv.value_or(at::Tensor());
+    const at::Tensor& metadataValue = metadata.value_or(at::Tensor());
+    const at::Tensor& attenMaskValue = attenMask.value_or(at::Tensor());
+    const at::Tensor& cuSeqLengthsValue = cuSeqLengths.value_or(at::Tensor());
+    const at::Tensor& cuSeqLengthsKvValue = cuSeqLengthsKv.value_or(at::Tensor());
+    const at::Tensor& sequsedQValue = sequsedQ.value_or(at::Tensor());
+    const at::Tensor& sequsedKvValue = sequsedKv.value_or(at::Tensor());
 
     at::Tensor dQuery = at::empty_like(query);
     at::Tensor dKey = at::empty_like(key);
     at::Tensor dValue = at::empty_like(value);
 
-    char *layoutQPtr = const_cast<char *>(layoutQ.c_str());
-    char *layoutKvPtr = const_cast<char *>(layoutKv.c_str());
+    char* layoutQPtr = const_cast<char*>(layoutQ.c_str());
+    char* layoutKvPtr = const_cast<char*>(layoutKv.c_str());
 
     ACLNN_CMD(aclnnGenericBlockSparseAttentionGrad, query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount,
               metadataValue, attenMaskValue, cuSeqLengthsValue, cuSeqLengthsKvValue, sequsedQValue, sequsedKvValue,

@@ -173,13 +173,13 @@ struct KeyPoolCompileInfo {
 };
 
 struct RequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct OptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 enum class LayoutType {
@@ -193,7 +193,7 @@ enum class TemplateId : uint8_t {
     FULL_LOAD = 2
 };
 
-CMP_EXTERN_C ge::graphStatus TilingKeyPool(gert::TilingContext *context);
+CMP_EXTERN_C ge::graphStatus TilingKeyPool(gert::TilingContext* context);
 #ifdef DAY0_SCOPE
 const std::vector<int> CMP_RATIO{4, 128};
 #else
@@ -202,9 +202,9 @@ const std::vector<int> CMP_RATIO{2, 4, 8, 16, 32, 64, 128};
 const std::vector<uint32_t> HEAD_DIM{128, 512};
 
 struct KeyPoolContext {
-    const char *opName;
-    const char *opType;
-    fe::PlatFormInfos *platformInfo;
+    const char* opName;
+    const char* opType;
+    fe::PlatFormInfos* platformInfo;
 
     RequiredParaInfo hidden_states;
     RequiredParaInfo wk;
@@ -221,34 +221,34 @@ struct KeyPoolContext {
     OptionalParaInfo sin;
     RequiredParaInfo pooledKey;
 
-    const int *cmpRatio;
-    const float *normEps;
-    const int *rotaryMode;
-    const int *stateCacheStrideDim0;
+    const int* cmpRatio;
+    const float* normEps;
+    const int* rotaryMode;
+    const int* stateCacheStrideDim0;
     TemplateId templateId;
 
     ge::DataType dtype = ge::DT_BF16;
     LayoutType layout = LayoutType::LAYOUT_BSH;
 
-    size_t *workSpaces;
+    size_t* workSpaces;
     uint64_t tilingKey;
     uint32_t blockDim;
 };
 
 class KeyPoolTiling {
 public:
-    explicit KeyPoolTiling(KeyPoolContext *context)
+    explicit KeyPoolTiling(KeyPoolContext* context)
         : context_(context)
     {}
     ~KeyPoolTiling() = default;
 
-    static ge::graphStatus ConvertContext(gert::TilingContext &context, KeyPoolContext &key_poolContext);
-    ge::graphStatus RunBigKernelTiling(KeyPoolTilingData *tilingData);
+    static ge::graphStatus ConvertContext(gert::TilingContext& context, KeyPoolContext& key_poolContext);
+    ge::graphStatus RunBigKernelTiling(KeyPoolTilingData* tilingData);
 
 private:
-    static void ConvertRequiredParams(gert::TilingContext &context, KeyPoolContext &key_poolContext);
+    static void ConvertRequiredParams(gert::TilingContext& context, KeyPoolContext& key_poolContext);
 
-    static void ConvertOptionalParams(gert::TilingContext &context, KeyPoolContext &key_poolContext);
+    static void ConvertOptionalParams(gert::TilingContext& context, KeyPoolContext& key_poolContext);
     ge::graphStatus GetNpuInfo();
     ge::graphStatus SetBaseInfo();
     ge::graphStatus SetPageAttentionInfo();
@@ -259,23 +259,23 @@ private:
     ge::graphStatus CheckSinglePara() const;
     ge::graphStatus GenTilingKey() const;
     template <typename T>
-    ge::graphStatus CheckFeatureValueSupport(const T *featureValue, const std::vector<T> &expectFeatureValList,
-                                             const std::string &name) const;
+    ge::graphStatus CheckFeatureValueSupport(const T* featureValue, const std::vector<T>& expectFeatureValList,
+                                             const std::string& name) const;
     template <typename T>
-    ge::graphStatus CheckAttrValueSupport(const T *attrValue, const std::vector<T> &expectAttrValList,
-                                          const std::string &name) const;
+    ge::graphStatus CheckAttrValueSupport(const T* attrValue, const std::vector<T>& expectAttrValList,
+                                          const std::string& name) const;
     template <typename T>
-    void LogErrorNumberSupport(const std::vector<T> &expectNumberList, const T &actualValue, const std::string &name,
+    void LogErrorNumberSupport(const std::vector<T>& expectNumberList, const T& actualValue, const std::string& name,
                                const std::string subName) const;
-    ge::graphStatus CheckDimNumInLayoutSupport(const std::string &layout, const gert::StorageShape *shape,
-                                               const std::string &name) const;
-    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
-    void LogErrorDtypeSupport(const std::vector<ge::DataType> &expectDtypeList, const ge::DataType &actualDtype,
-                              const std::string &name) const;
-    ge::graphStatus CheckDimNumSupport(const gert::StorageShape *shape, const std::string &name) const;
-    ge::graphStatus LogErrorShapeConsistency(const std::string &name, const gert::StorageShape *shape,
-                                             const uint32_t &dimNum, const std::string &subName,
-                                             const uint32_t &expectNum) const;
+    ge::graphStatus CheckDimNumInLayoutSupport(const std::string& layout, const gert::StorageShape* shape,
+                                               const std::string& name) const;
+    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc* desc, const std::string& name) const;
+    void LogErrorDtypeSupport(const std::vector<ge::DataType>& expectDtypeList, const ge::DataType& actualDtype,
+                              const std::string& name) const;
+    ge::graphStatus CheckDimNumSupport(const gert::StorageShape* shape, const std::string& name) const;
+    ge::graphStatus LogErrorShapeConsistency(const std::string& name, const gert::StorageShape* shape,
+                                             const uint32_t& dimNum, const std::string& subName,
+                                             const uint32_t& expectNum) const;
     ge::graphStatus CheckSingleParaHiddenStates() const;
     ge::graphStatus CheckSingleParaWk() const;
     ge::graphStatus CheckSingleParaGateWeight() const;
@@ -294,8 +294,8 @@ private:
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckFeature() const;
     ge::graphStatus CheckShapeConsistency() const;
-    ge::graphStatus CheckDtypeConsistencyHiddenStates(const gert::CompileTimeTensorDesc *desc,
-                                                      const std::string &name) const;
+    ge::graphStatus CheckDtypeConsistencyHiddenStates(const gert::CompileTimeTensorDesc* desc,
+                                                      const std::string& name) const;
     ge::graphStatus CheckDtypeConsistency() const;
     ge::graphStatus CheckMultiParaConsistency() const;
     ge::graphStatus CheckDimNumConsistency() const;
@@ -311,11 +311,11 @@ private:
     platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND910B;
     size_t libapiSize_ = 0;
     size_t workspaceSize_ = 0;
-    KeyPoolContext *context_ = nullptr;
-    KeyPoolBaseParams *baseParams_ = nullptr;
-    KeyPoolPageAttentionParams *pageAttentionParams_ = nullptr;
-    KeyPoolInnerSplitParams *innerSplitParams_ = nullptr;
-    KeyPoolWorkspaceParams *workspaceParams_ = nullptr;
+    KeyPoolContext* context_ = nullptr;
+    KeyPoolBaseParams* baseParams_ = nullptr;
+    KeyPoolPageAttentionParams* pageAttentionParams_ = nullptr;
+    KeyPoolInnerSplitParams* innerSplitParams_ = nullptr;
+    KeyPoolWorkspaceParams* workspaceParams_ = nullptr;
 };
 
 } // namespace optiling

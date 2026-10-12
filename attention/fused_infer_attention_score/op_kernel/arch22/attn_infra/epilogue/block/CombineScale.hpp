@@ -19,9 +19,7 @@
 
 namespace NpuArch::Epilogue::Block {
 
-template <
-    class OutputType_,
-    class LseType_>
+template <class OutputType_, class LseType_>
 class CombineScale {
 public:
     using ElementOutput = typename OutputType_::Element;
@@ -29,16 +27,14 @@ public:
     using ArchTag = Arch::AtlasA2;
 
     static constexpr uint32_t STAGE2_UB_UINT8_BLOCK_SIZE = 6144; // 24 * 64 * 4
-    static constexpr uint32_t UB_UINT8_LINE_SIZE = 32768; // 1 * 64 * 128 * 4
+    static constexpr uint32_t UB_UINT8_LINE_SIZE = 32768;        // 1 * 64 * 128 * 4
 
-    __aicore__ inline
-    CombineScale() {}
+    __aicore__ inline CombineScale() {}
 
-    __aicore__ inline
-    ~CombineScale() {}
+    __aicore__ inline ~CombineScale() {}
 
-    __aicore__ inline
-    void init(Arch::Resource<ArchTag> &resource) {
+    __aicore__ inline void init(Arch::Resource<ArchTag>& resource)
+    {
         constexpr uint32_t LL_UB_OFFSET = 0;
         constexpr uint32_t LM_UB_OFFSET = 1 * STAGE2_UB_UINT8_BLOCK_SIZE;
         constexpr uint32_t BROADCAST_OFFSET = 2 * STAGE2_UB_UINT8_BLOCK_SIZE;
@@ -69,18 +65,12 @@ public:
     }
 
     __aicore__ inline void operator()(
-        uint32_t qHeads,
-        uint32_t kvSplitCoreNum,
-        uint32_t headSizeV,
-        __gm__ splitNode *splitInfo,
-        AscendC::GlobalTensor<ElementLse> lGmTensor,
-        AscendC::GlobalTensor<ElementLse> oCoreTmpGmTensor,
-        AscendC::GlobalTensor<ElementOutput> oGmTensor,
-        AscendC::GlobalTensor<int64_t> gActualQseqlen,
-        bool inputLayoutTND = true,
-        bool outputLse = false,
-        AscendC::GlobalTensor<ElementLse> oLseGmTensor = AscendC::GlobalTensor<ElementLse>()
-    ) {
+        uint32_t qHeads, uint32_t kvSplitCoreNum, uint32_t headSizeV, __gm__ splitNode* splitInfo,
+        AscendC::GlobalTensor<ElementLse> lGmTensor, AscendC::GlobalTensor<ElementLse> oCoreTmpGmTensor,
+        AscendC::GlobalTensor<ElementOutput> oGmTensor, AscendC::GlobalTensor<int64_t> gActualQseqlen,
+        bool inputLayoutTND = true, bool outputLse = false,
+        AscendC::GlobalTensor<ElementLse> oLseGmTensor = AscendC::GlobalTensor<ElementLse>())
+    {
         AscendC::SetAtomicNone();
         AscendC::SetMaskNorm();
         AscendC::SetVectorMask<int8_t>((uint64_t)-1, (uint64_t)-1);
@@ -90,12 +80,11 @@ public:
         int64_t subBlockID = AscendC::GetBlockIdx();
 
         for (uint32_t process = subBlockID; process < kvSplitCoreNum * 2; process += subBlockNum) {
-            uint32_t batchIdx = splitInfo->batchIdx[process/2];
-            uint32_t headStartIndx = splitInfo->headStartIdx[process/2];
-            uint32_t headEndIndx = splitInfo->headEndIdx[process/2];
-            uint32_t qStartIndx = splitInfo->qStartIdx[process/2];
-            uint32_t qEndIndx = splitInfo->qEndIdx[process/2];
-
+            uint32_t batchIdx = splitInfo->batchIdx[process / 2];
+            uint32_t headStartIndx = splitInfo->headStartIdx[process / 2];
+            uint32_t headEndIndx = splitInfo->headEndIdx[process / 2];
+            uint32_t qStartIndx = splitInfo->qStartIdx[process / 2];
+            uint32_t qEndIndx = splitInfo->qEndIdx[process / 2];
 
             uint32_t q_len = (qEndIndx - qStartIndx);
             uint32_t n_len = (headEndIndx - headStartIndx);
@@ -103,33 +92,33 @@ public:
             uint32_t sum = q_len * n_len;
             uint32_t sum_former = q_len == 1 ? sum / 2 : (q_len / 2) * n_len;
 
-            uint32_t addrLOffset = vectorsubBlockID == 0 ? splitInfo->lseTaskOffset[process/2] : splitInfo->lseTaskOffset[process/2] + sum_former;
-            uint32_t addrOOffset = vectorsubBlockID == 0 ? splitInfo->oTaskOffset[process/2] : splitInfo->oTaskOffset[process/2] + sum_former * headSizeV;
+            uint32_t addrLOffset = vectorsubBlockID == 0 ? splitInfo->lseTaskOffset[process / 2] :
+                                                           splitInfo->lseTaskOffset[process / 2] + sum_former;
+            uint32_t addrOOffset = vectorsubBlockID == 0 ? splitInfo->oTaskOffset[process / 2] :
+                                                           splitInfo->oTaskOffset[process / 2] + sum_former * headSizeV;
 
             uint32_t prevQSeqlenSum = 0;
             if (inputLayoutTND) {
-                prevQSeqlenSum = (batchIdx == 0) ?
-                    0 : static_cast<uint32_t>(gActualQseqlen.GetValue(batchIdx - 1));
+                prevQSeqlenSum = (batchIdx == 0) ? 0 : static_cast<uint32_t>(gActualQseqlen.GetValue(batchIdx - 1));
             }
-            uint32_t baseGmOffset = prevQSeqlenSum * qHeads * headSizeV + qStartIndx * qHeads * headSizeV + headStartIndx * headSizeV;
+            uint32_t baseGmOffset =
+                prevQSeqlenSum * qHeads * headSizeV + qStartIndx * qHeads * headSizeV + headStartIndx * headSizeV;
             uint32_t gmOScalar = 0;
             if (q_len == 1) {
-                gmOScalar = vectorsubBlockID == 0 ? baseGmOffset
-                                                : baseGmOffset + sum_former * headSizeV;
+                gmOScalar = vectorsubBlockID == 0 ? baseGmOffset : baseGmOffset + sum_former * headSizeV;
             } else {
                 uint32_t q_half = q_len / 2;
-                gmOScalar = vectorsubBlockID == 0 ? baseGmOffset
-                                                : baseGmOffset + q_half * qHeads * headSizeV;
+                gmOScalar = vectorsubBlockID == 0 ? baseGmOffset : baseGmOffset + q_half * qHeads * headSizeV;
             }
 
-            uint32_t splitNum = splitInfo->splitNum[process/2];
+            uint32_t splitNum = splitInfo->splitNum[process / 2];
 
-            uint32_t splitNumAlign = (splitNum + 7) / 8 * 8;  // 32b align
+            uint32_t splitNumAlign = (splitNum + 7) / 8 * 8; // 32b align
             uint32_t lseBlock = vectorsubBlockID == 0 ? sum_former : sum - sum_former;
             if (lseBlock == 0) {
                 continue;
             }
-            uint32_t lseBlockAlign = (lseBlock + 7) / 8 * 8;  // 32b align
+            uint32_t lseBlockAlign = (lseBlock + 7) / 8 * 8; // 32b align
             int32_t count = splitNum * lseBlockAlign;
             int32_t lnCount = 1 * lseBlockAlign;
             // Initialize LSE UB space
@@ -148,22 +137,25 @@ public:
 
             // Copy LSE from GM to UB
             uint32_t srcStride = vectorsubBlockID == 0 ? sum - sum_former : sum_former;
-            AscendC::DataCopyPad(llUbTensor, lGmTensor[addrLOffset],
-                                AscendC::DataCopyExtParams(splitNum, lseBlock * sizeof(float), srcStride * sizeof(float), 0, 0),
-                                AscendC::DataCopyPadExtParams<float>(false, 0, lseBlockAlign - lseBlock, 0));
+            AscendC::DataCopyPad(
+                llUbTensor, lGmTensor[addrLOffset],
+                AscendC::DataCopyExtParams(splitNum, lseBlock * sizeof(float), srcStride * sizeof(float), 0, 0),
+                AscendC::DataCopyPadExtParams<float>(false, 0, lseBlockAlign - lseBlock, 0));
 
             AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
 
             // ReduceMax
-            uint32_t reduceMaxShape[] = { splitNumAlign, lseBlockAlign };
-            AscendC::ReduceMax<float, AscendC::Pattern::Reduce::RA, false>(lmUbTensor, llUbTensor, tempReduceMax, reduceMaxShape, true);
+            uint32_t reduceMaxShape[] = {splitNumAlign, lseBlockAlign};
+            AscendC::ReduceMax<float, AscendC::Pattern::Reduce::RA, false>(lmUbTensor, llUbTensor, tempReduceMax,
+                                                                           reduceMaxShape, true);
             AscendC::PipeBarrier<PIPE_V>();
 
             // Broadcast Max
-            uint32_t dstShapeBroadcast[] = { splitNum, lseBlockAlign };
-            uint32_t srcShapeBroadcast[] = { 1, lseBlockAlign };
-            AscendC::BroadCast<float, 2, 0>(broadCastTensor, lmUbTensor, dstShapeBroadcast, srcShapeBroadcast, tempReduceSum);
+            uint32_t dstShapeBroadcast[] = {splitNum, lseBlockAlign};
+            uint32_t srcShapeBroadcast[] = {1, lseBlockAlign};
+            AscendC::BroadCast<float, 2, 0>(broadCastTensor, lmUbTensor, dstShapeBroadcast, srcShapeBroadcast,
+                                            tempReduceSum);
             AscendC::PipeBarrier<PIPE_V>();
 
             AscendC::Sub(tlUbTensor, llUbTensor, broadCastTensor, count);
@@ -174,8 +166,9 @@ public:
             AscendC::PipeBarrier<PIPE_V>();
 
             // ReduceSum
-            uint32_t reduceSumShape[] = { splitNumAlign, lseBlockAlign };
-            AscendC::ReduceSum<float, AscendC::Pattern::Reduce::RA, false>(rsUbTensor, tlUbTensor, tempReduceSum, reduceSumShape, true);
+            uint32_t reduceSumShape[] = {splitNumAlign, lseBlockAlign};
+            AscendC::ReduceSum<float, AscendC::Pattern::Reduce::RA, false>(rsUbTensor, tlUbTensor, tempReduceSum,
+                                                                           reduceSumShape, true);
             AscendC::PipeBarrier<PIPE_V>();
 
             // Ln
@@ -186,28 +179,23 @@ public:
             AscendC::PipeBarrier<PIPE_V>();
 
             if (outputLse) {
-                uint32_t baseGmOffsetLse =
-                    prevQSeqlenSum * qHeads + qStartIndx * qHeads + headStartIndx;
+                uint32_t baseGmOffsetLse = prevQSeqlenSum * qHeads + qStartIndx * qHeads + headStartIndx;
                 uint32_t gmLseScalar = 0;
                 if (q_len == 1) {
-                    gmLseScalar = (vectorsubBlockID == 0) ? baseGmOffsetLse
-                                                          : baseGmOffsetLse + sum_former;
+                    gmLseScalar = (vectorsubBlockID == 0) ? baseGmOffsetLse : baseGmOffsetLse + sum_former;
                 } else {
                     uint32_t q_half = q_len / 2;
-                    gmLseScalar = (vectorsubBlockID == 0) ? baseGmOffsetLse
-                                                          : baseGmOffsetLse + q_half * qHeads;
+                    gmLseScalar = (vectorsubBlockID == 0) ? baseGmOffsetLse : baseGmOffsetLse + q_half * qHeads;
                 }
 
                 if (q_len == 1) {
                     AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID3);
                     AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID3);
 
-                    AscendC::DataCopyPad(
-                        oLseGmTensor[gmLseScalar], tsUbTensor,
-                        AscendC::DataCopyExtParams(1, lseBlock * sizeof(float), 0, 0, 0));
+                    AscendC::DataCopyPad(oLseGmTensor[gmLseScalar], tsUbTensor,
+                                         AscendC::DataCopyExtParams(1, lseBlock * sizeof(float), 0, 0, 0));
                 } else {
-                    AscendC::Brcb(loFloatUbTensor.ReinterpretCast<uint32_t>(),
-                                  tsUbTensor.ReinterpretCast<uint32_t>(),
+                    AscendC::Brcb(loFloatUbTensor.ReinterpretCast<uint32_t>(), tsUbTensor.ReinterpretCast<uint32_t>(),
                                   (lseBlockAlign + FLOAT_PER_BLOCK - 1) / FLOAT_PER_BLOCK,
                                   AscendC::BrcbRepeatParams(1, 8));
                     AscendC::PipeBarrier<PIPE_V>();
@@ -217,10 +205,9 @@ public:
 
                     uint32_t qTile = lseBlock / n_len;
                     for (uint32_t qi = 0; qi < qTile; ++qi) {
-                        AscendC::DataCopyPad(
-                            oLseGmTensor[gmLseScalar + qi * qHeads],
-                            loFloatUbTensor[qi * n_len * FLOAT_PER_BLOCK],
-                            AscendC::DataCopyExtParams(n_len, sizeof(float), 0, 0, 0));
+                        AscendC::DataCopyPad(oLseGmTensor[gmLseScalar + qi * qHeads],
+                                             loFloatUbTensor[qi * n_len * FLOAT_PER_BLOCK],
+                                             AscendC::DataCopyExtParams(n_len, sizeof(float), 0, 0, 0));
                     }
                 }
 
@@ -229,7 +216,8 @@ public:
             }
 
             // Broadcast scale
-            AscendC::BroadCast<float, 2, 0>(broadCastScaleTensor, tsUbTensor, dstShapeBroadcast, srcShapeBroadcast, tempReduceSum);
+            AscendC::BroadCast<float, 2, 0>(broadCastScaleTensor, tsUbTensor, dstShapeBroadcast, srcShapeBroadcast,
+                                            tempReduceSum);
             AscendC::PipeBarrier<PIPE_V>();
 
             AscendC::Sub(glUbTensor, llUbTensor, broadCastScaleTensor, count);
@@ -246,8 +234,7 @@ public:
             AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
 
             for (uint32_t tileStart = 0; tileStart < lseBlock; tileStart += tokenTile) {
-                uint32_t curTile = (tileStart + tokenTile <= lseBlock) ?
-                                    tokenTile : (lseBlock - tileStart);
+                uint32_t curTile = (tileStart + tokenTile <= lseBlock) ? tokenTile : (lseBlock - tileStart);
                 uint32_t curTileAlign = (curTile + 7) / 8 * 8;
                 uint32_t oTileCount = curTile * headSizeV;
                 uint32_t oTileCountPad = curTile * headSizeVPad;
@@ -258,26 +245,24 @@ public:
 
                 uint32_t blockLenWrite = headSizeV * sizeof(ElementOutput);
                 uint32_t blockLenWriteAligned = (blockLenWrite + 31) / 32 * 32;
-                uint32_t srcStrideWrite = (headSizeVPad * sizeof(ElementOutput) - blockLenWriteAligned) / 32;                
+                uint32_t srcStrideWrite = (headSizeVPad * sizeof(ElementOutput) - blockLenWriteAligned) / 32;
 
                 AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
                 AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID2);
                 for (uint32_t nIdx = 0; nIdx < splitNum; nIdx++) {
-
                     AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID2);
- 
-                    AscendC::DataCopyPad(loFloatUbTensor,
-                        oCoreTmpGmTensor[addrOOffset + tileStart * headSizeV + nIdx * oCount_vector],
+
+                    AscendC::DataCopyPad(
+                        loFloatUbTensor, oCoreTmpGmTensor[addrOOffset + tileStart * headSizeV + nIdx * oCount_vector],
                         AscendC::DataCopyExtParams(curTile, headSizeV * sizeof(float), 0, dstStrideReadFloat, 0),
                         AscendC::DataCopyPadExtParams<float>(true, 0, rightPadFloat, 0));
 
                     AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID1);
                     AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID1);
-                    uint32_t dstShapeO[2] = { curTileAlign, headSizeVPad };
-                    uint32_t srcShapeO[2] = { curTileAlign, 1 };
-                    AscendC::BroadCast<float, 2, 1>(broadCastOTensor,
-                        glUbTensor[nIdx * lseBlockAlign + tileStart],
-                        dstShapeO, srcShapeO, tempReduceSum);
+                    uint32_t dstShapeO[2] = {curTileAlign, headSizeVPad};
+                    uint32_t srcShapeO[2] = {curTileAlign, 1};
+                    AscendC::BroadCast<float, 2, 1>(broadCastOTensor, glUbTensor[nIdx * lseBlockAlign + tileStart],
+                                                    dstShapeO, srcShapeO, tempReduceSum);
                     AscendC::PipeBarrier<PIPE_V>();
 
                     AscendC::Mul(toUbTensor, loFloatUbTensor, broadCastOTensor, oTileCountPad);
@@ -307,7 +292,7 @@ public:
 
                 if (q_len == 1) {
                     AscendC::DataCopyPad(oGmTensor[gmOScalar + tileStart * headSizeV], go16UbTensor,
-                        AscendC::DataCopyExtParams(curTile, blockLenWrite, srcStrideWrite, 0, 0));
+                                         AscendC::DataCopyExtParams(curTile, blockLenWrite, srcStrideWrite, 0, 0));
                 } else if (tileStart % n_len == 0 && curTile % n_len == 0) {
                     uint32_t qTile = curTile / n_len;
                     uint32_t gmTileOffset = (tileStart / n_len) * qHeads * headSizeV;
@@ -315,7 +300,7 @@ public:
                         uint32_t ubQiOffset = qi * n_len * headSizeVPad;
                         uint32_t gmQiOffset = gmOScalar + gmTileOffset + qi * qHeads * headSizeV;
                         AscendC::DataCopyPad(oGmTensor[gmQiOffset], go16UbTensor[ubQiOffset],
-                            AscendC::DataCopyExtParams(n_len, blockLenWrite, srcStrideWrite, 0, 0));
+                                             AscendC::DataCopyExtParams(n_len, blockLenWrite, srcStrideWrite, 0, 0));
                     }
                 } else {
                     uint32_t remaining = curTile;
@@ -324,13 +309,11 @@ public:
                     while (remaining > 0) {
                         uint32_t qIdx = flatIdx / n_len;
                         uint32_t nStart = flatIdx % n_len;
-                        uint32_t nCount = (n_len - nStart < remaining) ?
-                                           (n_len - nStart) : remaining;
+                        uint32_t nCount = (n_len - nStart < remaining) ? (n_len - nStart) : remaining;
                         uint32_t gmOff = qIdx * qHeads * headSizeV + nStart * headSizeV;
                         uint32_t ubOffset = ubRow * headSizeVPad;
-                        AscendC::DataCopyPad(oGmTensor[gmOScalar + gmOff],
-                            go16UbTensor[ubOffset],
-                            AscendC::DataCopyExtParams(nCount, blockLenWrite, srcStrideWrite, 0, 0));
+                        AscendC::DataCopyPad(oGmTensor[gmOScalar + gmOff], go16UbTensor[ubOffset],
+                                             AscendC::DataCopyExtParams(nCount, blockLenWrite, srcStrideWrite, 0, 0));
                         ubRow += nCount;
                         flatIdx += nCount;
                         remaining -= nCount;
@@ -360,6 +343,6 @@ private:
     AscendC::LocalTensor<float> broadCastScaleTensor;
     AscendC::LocalTensor<float> broadCastOTensor;
 };
-}
+} // namespace NpuArch::Epilogue::Block
 
 #endif // EPILOGUE_BLOCK_COMBINE_SCALE_HPP

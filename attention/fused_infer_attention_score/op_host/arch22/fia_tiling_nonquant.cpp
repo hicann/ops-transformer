@@ -70,7 +70,10 @@ inline auto Align(T num, T rnd) -> T
     return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
 }
 
-constexpr uint64_t RecursiveSum() { return 0; }
+constexpr uint64_t RecursiveSum()
+{
+    return 0;
+}
 
 template <typename T, typename... Args>
 constexpr uint64_t RecursiveSum(T templateId, Args... templateIds)
@@ -84,7 +87,10 @@ constexpr uint64_t FIA_GET_TILINGKEY(Args... templateIds)
     return RecursiveSum(templateIds...);
 }
 
-void FiaTilingNonQuant::InitTilingInfo(TilingInfo *tilingInfo) { fiaInfo_ = static_cast<FiaTilingInfo *>(tilingInfo); }
+void FiaTilingNonQuant::InitTilingInfo(TilingInfo* tilingInfo)
+{
+    fiaInfo_ = static_cast<FiaTilingInfo*>(tilingInfo);
+}
 
 ge::graphStatus FiaTilingNonQuant::GetPlatformInfo()
 {
@@ -329,7 +335,7 @@ void FiaTilingNonQuant::CalcMBaseSize()
             sInnerSize_, sInnerSizeAlign_, mBaseSize_, softmaxWithBrcbFlag_);
 }
 
-void FiaTilingNonQuant::CreateSplitInput(BaseInfo &baseInfo, SplitParam &splitParam) const
+void FiaTilingNonQuant::CreateSplitInput(BaseInfo& baseInfo, SplitParam& splitParam) const
 {
     // 构造分核输入参数
     baseInfo.bSize = fiaInfo_->bSize;
@@ -349,14 +355,14 @@ void FiaTilingNonQuant::CreateSplitInput(BaseInfo &baseInfo, SplitParam &splitPa
     if (fiaInfo_->opParamInfo.actualSeqLengthsQ.tensor != nullptr) {
         baseInfo.isAccumSeqS1 = fiaInfo_->isAccumQSeq;
         baseInfo.actualSeqS1Size.reserve(fiaInfo_->bSize);
-        const int64_t *s1Ptr = fiaInfo_->opParamInfo.actualSeqLengthsQ.tensor->GetData<int64_t>();
+        const int64_t* s1Ptr = fiaInfo_->opParamInfo.actualSeqLengthsQ.tensor->GetData<int64_t>();
         for (uint32_t i = 0; i < fiaInfo_->bSize; ++i) {
             baseInfo.actualSeqS1Size.emplace_back(s1Ptr[i]);
         }
     }
     if (fiaInfo_->opParamInfo.actualSeqLengths.tensor != nullptr) {
         baseInfo.isAccumSeqS2 = fiaInfo_->isAccumKVSeq;
-        const int64_t *s2Ptr = fiaInfo_->opParamInfo.actualSeqLengths.tensor->GetData<int64_t>();
+        const int64_t* s2Ptr = fiaInfo_->opParamInfo.actualSeqLengths.tensor->GetData<int64_t>();
         for (uint32_t i = 0; i < fiaInfo_->bSize; ++i) {
             baseInfo.actualSeqS2Size.emplace_back(s2Ptr[i]);
         }
@@ -375,19 +381,19 @@ void FiaTilingNonQuant::CreateSplitInput(BaseInfo &baseInfo, SplitParam &splitPa
     splitParam.gS1BaseSizeOfFd = mFdBaseSize_;
 }
 
-void FiaTilingNonQuant::SetSplitOutput(const SplitResult &res)
+void FiaTilingNonQuant::SetSplitOutput(const SplitResult& res)
 {
-    uint32_t *bN2EndPtr = tilingData_.outerSplitParams.get_bN2End();
-    uint32_t *gS1EndPtr = tilingData_.outerSplitParams.get_gS1End();
-    uint32_t *s2EndPtr = tilingData_.outerSplitParams.get_s2End();
-    uint32_t *bN2IdxOfFdHead = tilingData_.fdParams.get_bN2IdxOfFdHead();
-    uint32_t *gS1IdxOfFdHead = tilingData_.fdParams.get_gS1IdxOfFdHead();
-    uint32_t *s2SplitNumOfFdHead = tilingData_.fdParams.get_s2SplitNumOfFdHead();
-    uint32_t *s2SplitStartIdxOfCore = tilingData_.fdParams.get_s2SplitStartIdxOfCore();
-    uint32_t *gS1SplitNumOfFdHead = tilingData_.fdParams.get_gS1SplitNumOfFdHead();
-    uint32_t *gS1LastPartSizeOfFdHead = tilingData_.fdParams.get_gS1LastPartSizeOfFdHead();
-    uint32_t *gS1IdxEndOfFdHead = tilingData_.fdParams.get_gS1IdxEndOfFdHead();
-    uint32_t *gS1IdxEndOfFdHeadSplit = tilingData_.fdParams.get_gS1IdxEndOfFdHeadSplit();
+    uint32_t* bN2EndPtr = tilingData_.outerSplitParams.get_bN2End();
+    uint32_t* gS1EndPtr = tilingData_.outerSplitParams.get_gS1End();
+    uint32_t* s2EndPtr = tilingData_.outerSplitParams.get_s2End();
+    uint32_t* bN2IdxOfFdHead = tilingData_.fdParams.get_bN2IdxOfFdHead();
+    uint32_t* gS1IdxOfFdHead = tilingData_.fdParams.get_gS1IdxOfFdHead();
+    uint32_t* s2SplitNumOfFdHead = tilingData_.fdParams.get_s2SplitNumOfFdHead();
+    uint32_t* s2SplitStartIdxOfCore = tilingData_.fdParams.get_s2SplitStartIdxOfCore();
+    uint32_t* gS1SplitNumOfFdHead = tilingData_.fdParams.get_gS1SplitNumOfFdHead();
+    uint32_t* gS1LastPartSizeOfFdHead = tilingData_.fdParams.get_gS1LastPartSizeOfFdHead();
+    uint32_t* gS1IdxEndOfFdHead = tilingData_.fdParams.get_gS1IdxEndOfFdHead();
+    uint32_t* gS1IdxEndOfFdHeadSplit = tilingData_.fdParams.get_gS1IdxEndOfFdHeadSplit();
 
     for (uint32_t i = 0; i < res.usedCoreNum; ++i) {
         bN2EndPtr[i] = res.bN2End[i];
@@ -654,7 +660,7 @@ void FiaTilingNonQuant::CalcScheduleMode()
 }
 
 void FiaTilingNonQuant::GetSafeActToken(SparseMode mode, int64_t actSeqLensQ, int64_t actSeqLensKv,
-                                        int64_t &safePreToken, int64_t &safeNextToken) const
+                                        int64_t& safePreToken, int64_t& safeNextToken) const
 {
     if (mode == SparseMode::DEFAULT_MASK) {
         safePreToken = std::max(-actSeqLensKv, safePreToken);
@@ -669,7 +675,7 @@ void FiaTilingNonQuant::GetSafeActToken(SparseMode mode, int64_t actSeqLensQ, in
     }
 }
 
-bool FiaTilingNonQuant::IsExistRowInvalid(const BaseInfo &baseInfo) const
+bool FiaTilingNonQuant::IsExistRowInvalid(const BaseInfo& baseInfo) const
 {
     if (!baseInfo.attenMaskFlag) {
         return false;
@@ -724,7 +730,7 @@ bool FiaTilingNonQuant::GetIsEmptyBatchOverHalf() const
 
     std::vector<uint8_t> emptyBatchs(fiaInfo_->bSize, 0);
     if (fiaInfo_->opParamInfo.actualSeqLengthsQ.tensor != nullptr) {
-        const int64_t *s1Ptr = fiaInfo_->opParamInfo.actualSeqLengthsQ.tensor->GetData<int64_t>();
+        const int64_t* s1Ptr = fiaInfo_->opParamInfo.actualSeqLengthsQ.tensor->GetData<int64_t>();
         for (uint32_t i = 0; i < fiaInfo_->bSize; ++i) {
             int64_t s1Size = (i == 0) ? s1Ptr[i] : s1Ptr[i] - s1Ptr[i - 1];
             if (s1Size == 0) {
@@ -734,7 +740,7 @@ bool FiaTilingNonQuant::GetIsEmptyBatchOverHalf() const
     }
 
     if (fiaInfo_->opParamInfo.actualSeqLengths.tensor != nullptr) {
-        const int64_t *s2Ptr = fiaInfo_->opParamInfo.actualSeqLengths.tensor->GetData<int64_t>();
+        const int64_t* s2Ptr = fiaInfo_->opParamInfo.actualSeqLengths.tensor->GetData<int64_t>();
         for (uint32_t i = 0; i < fiaInfo_->bSize; ++i) {
             int64_t s2Size = (i == 0) ? s2Ptr[i] : s2Ptr[i] - s2Ptr[i - 1];
             if (s2Size == 0) {

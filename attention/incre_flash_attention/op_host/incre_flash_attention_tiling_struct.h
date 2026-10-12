@@ -15,7 +15,6 @@
 #ifndef AIR_CXX_RUNTIME_V2_OP_IMPL_INCREFLASHATTENTIONSCORE_STRUCT_H_
 #define AIR_CXX_RUNTIME_V2_OP_IMPL_INCREFLASHATTENTIONSCORE_STRUCT_H_
 
-
 #ifdef ASCENDC_OP_TEST
 #define IFA_EXTERN_C extern "C"
 #else
@@ -30,42 +29,46 @@ struct ActualSeqInfo {
     std::vector<int64_t> actualSeqQ;
     int64_t maxActualseqkv;
 
-    ActualSeqInfo(uint32_t bSize, int64_t maxVal) : actualSeqQ(bSize), maxActualseqkv(maxVal) {};
+    ActualSeqInfo(uint32_t bSize, int64_t maxVal)
+        : actualSeqQ(bSize),
+          maxActualseqkv(maxVal) {};
     ActualSeqInfo() = delete;
 };
 
 struct SeqTilingInfo {
-    std::vector<uint32_t> s1OuterNum;                           // S1方向，切了多少个基本块
-    std::vector<uint32_t> s2OuterNum;                           // S2方向，切了多少个基本块
+    std::vector<uint32_t> s1OuterNum; // S1方向，切了多少个基本块
+    std::vector<uint32_t> s2OuterNum; // S2方向，切了多少个基本块
     uint32_t lastValidBIdx = 0U;
     uint64_t avgS2Length = 1U;
 
-    explicit SeqTilingInfo(uint32_t bSize) : s1OuterNum(bSize), s2OuterNum(bSize) {};
+    explicit SeqTilingInfo(uint32_t bSize)
+        : s1OuterNum(bSize),
+          s2OuterNum(bSize) {};
     SeqTilingInfo() = delete;
 };
 
-struct BalancedSplitTilingInfo
-{
+struct BalancedSplitTilingInfo {
     std::vector<uint64_t> coreLoad;
-    uint64_t accumS2Length = 0U;       // 当前累积的权重
+    uint64_t accumS2Length = 0U; // 当前累积的权重
     uint32_t currCoreIdx = 0U;
     bool needUpdate = false;
     uint32_t maxKvSplitPart = 0U;
     uint32_t tndFDCoreArrLen = 0U;
 
-    explicit BalancedSplitTilingInfo(uint32_t coreNum) : coreLoad(coreNum) {};
+    explicit BalancedSplitTilingInfo(uint32_t coreNum)
+        : coreLoad(coreNum) {};
 
     BalancedSplitTilingInfo() = delete;
 };
 
 struct IfaWorkSpaceSizeParams {
-    uint32_t mmResElemSize = 4U;         // 4:fp32
-    uint32_t vec1ResElemSize = 2U;       // 2:fp16/bf16
-    uint32_t bmm2ResElemSize = 4U;       // 4:fp32
-    uint32_t vec2ResElemSize = 4U;       // 4:fp32
-    uint32_t qPreProcResElemSize = 0U;   // 普通场景不涉及Q预处理
-    uint32_t nUpdateElemSize = 4U;   // 4:int32
-    uint32_t softmaxSumElemSize = 4U;   // 4:int32
+    uint32_t mmResElemSize = 4U;       // 4:fp32
+    uint32_t vec1ResElemSize = 2U;     // 2:fp16/bf16
+    uint32_t bmm2ResElemSize = 4U;     // 4:fp32
+    uint32_t vec2ResElemSize = 4U;     // 4:fp32
+    uint32_t qPreProcResElemSize = 0U; // 普通场景不涉及Q预处理
+    uint32_t nUpdateElemSize = 4U;     // 4:int32
+    uint32_t softmaxSumElemSize = 4U;  // 4:int32
     float kvDtypeRatio = 1.0;
 };
 
@@ -79,8 +82,16 @@ struct TilingIndexes {
     uint32_t s1Idx;
     uint32_t s2Idx;
 
-    TilingIndexes() : bIdx(0U), s1Idx(0U), s2Idx(0U) {}
-    TilingIndexes(uint32_t b, uint32_t s1, uint32_t s2) : bIdx(b), s1Idx(s1), s2Idx(s2) {}
+    TilingIndexes()
+        : bIdx(0U),
+          s1Idx(0U),
+          s2Idx(0U)
+    {}
+    TilingIndexes(uint32_t b, uint32_t s1, uint32_t s2)
+        : bIdx(b),
+          s1Idx(s1),
+          s2Idx(s2)
+    {}
 };
 
 enum class KvCacheLayout : uint32_t {
@@ -108,12 +119,12 @@ enum class TilingInOutMode : uint32_t {
 
 enum class IfaPerfMode : uint32_t {
     NORMAL = 0,
-    BMM_ALL_BY_VEC, // 1
-    C1_V1, // 2
-    CUBE_VIEW_MM, // 3
+    BMM_ALL_BY_VEC,         // 1
+    C1_V1,                  // 2
+    CUBE_VIEW_MM,           // 3
     CUBE_VIEW_MM_FULL_LOAD, // 4
-    CUBE_VIEW_MM_MLA,  // 5
-    CUBE_VIEW_MM_DD  // 6
+    CUBE_VIEW_MM_MLA,       // 5
+    CUBE_VIEW_MM_DD         // 6
 };
 
 enum class IfaSocVersion : uint32_t {
@@ -121,7 +132,6 @@ enum class IfaSocVersion : uint32_t {
     SOC_ASCEND_310P = 1,
     SOC_ASCEND_950 = 2,
 };
-
 
 enum class IfaLayout : uint32_t {
     BSH_BSND = 0,

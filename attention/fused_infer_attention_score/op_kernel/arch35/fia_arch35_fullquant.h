@@ -49,18 +49,18 @@ template <uint8_t inOutLayoutType, uint16_t config, uint8_t pseMode, uint8_t qua
           uint8_t KvLayoutType, bool isFd, bool emptyTensor, bool enableKVPrefix, bool enableS1OutSplit,
           bool isReconstructTemp>
 inline __aicore__ void fia_fullquant_regbase(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-    __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
-    __gm__ uint8_t *deq_scale1, __gm__ uint8_t *quant_scale1, __gm__ uint8_t *deq_scale2,
-    __gm__ uint8_t *postQuantScale, __gm__ uint8_t *postQuantOffset, __gm__ uint8_t *antiquant_scale,
-    __gm__ uint8_t *antiquant_offset, __gm__ uint8_t *blocktable, __gm__ uint8_t *queryPaddingSize,
-    __gm__ uint8_t *kvPaddingSize, __gm__ uint8_t *key_antiquant_scale, __gm__ uint8_t *key_antiquant_offset,
-    __gm__ uint8_t *value_antiquant_scale, __gm__ uint8_t *value_antiquant_offset, __gm__ uint8_t *keySharedPrefix,
-    __gm__ uint8_t *valueSharedPrefix, __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *queryRope,
-    __gm__ uint8_t *keyRope, __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *learnableSink,
-    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+    __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+    __gm__ uint8_t* deq_scale1, __gm__ uint8_t* quant_scale1, __gm__ uint8_t* deq_scale2,
+    __gm__ uint8_t* postQuantScale, __gm__ uint8_t* postQuantOffset, __gm__ uint8_t* antiquant_scale,
+    __gm__ uint8_t* antiquant_offset, __gm__ uint8_t* blocktable, __gm__ uint8_t* queryPaddingSize,
+    __gm__ uint8_t* kvPaddingSize, __gm__ uint8_t* key_antiquant_scale, __gm__ uint8_t* key_antiquant_offset,
+    __gm__ uint8_t* value_antiquant_scale, __gm__ uint8_t* value_antiquant_offset, __gm__ uint8_t* keySharedPrefix,
+    __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen, __gm__ uint8_t* queryRope,
+    __gm__ uint8_t* keyRope, __gm__ uint8_t* dequantScaleQuery, __gm__ uint8_t* learnableSink,
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
 
 #if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);

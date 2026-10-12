@@ -36,23 +36,28 @@
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void kv_compress_epilog(
-    GM_ADDR cache, GM_ADDR x, GM_ADDR slot_mapping, GM_ADDR cache_out,
-    GM_ADDR workspace, GM_ADDR tiling);
+extern "C" __global__ __aicore__ void kv_compress_epilog(GM_ADDR cache, GM_ADDR x, GM_ADDR slot_mapping,
+                                                         GM_ADDR cache_out, GM_ADDR workspace, GM_ADDR tiling);
 
 namespace {
 constexpr int64_t SLICE_SIZE = 64;
 constexpr int64_t QUANT_GROUP = 128;
 constexpr int64_t QUANT_MODE_GROUP_BF16 = 0;
 constexpr int64_t QUANT_MODE_GROUP_E8M0 = 1;
-constexpr int64_t QUANT_MODE_HIF8_FP4 = 2;  // rope hifloat8 + nope FLOAT4_E2M1 (bf16 scale)
+constexpr int64_t QUANT_MODE_HIF8_FP4 = 2; // rope hifloat8 + nope FLOAT4_E2M1 (bf16 scale)
 constexpr int64_t KV_CACHE_ROW_ALIGN = 128;
 constexpr int64_t ROPE_HIF8_BYTES = 64;
 constexpr int64_t FP4_SCALE_BYTES = 2;
 constexpr size_t SYS_WORKSPACE = 16 * 1024 * 1024;
 
-inline int64_t CeilDiv(int64_t a, int64_t b) { return b == 0 ? a : (a + b - 1) / b; }
-inline int64_t RoundUp(int64_t a, int64_t b) { return CeilDiv(a, b) * b; }
+inline int64_t CeilDiv(int64_t a, int64_t b)
+{
+    return b == 0 ? a : (a + b - 1) / b;
+}
+inline int64_t RoundUp(int64_t a, int64_t b)
+{
+    return CeilDiv(a, b) * b;
+}
 
 template <typename T>
 T* GmAllocWrapper(size_t size)
@@ -70,7 +75,7 @@ void FillBf16(uint8_t* gm, int64_t numElem)
         p[i] = (i & 1) ? 0xBF00 /*-0.5*/ : 0x3F80 /*1.0*/;
     }
 }
-}  // namespace
+} // namespace
 
 struct KvParams {
     int64_t bs;
@@ -78,9 +83,9 @@ struct KvParams {
     int64_t quantMode;
     int64_t roundScale;
     int64_t blockDim;
-    bool withSkip;  // 部分 slot 置 -1, 验证 skip 分支
+    bool withSkip; // 部分 slot 置 -1, 验证 skip 分支
     std::string desc;
-    int64_t quantGroup = QUANT_GROUP;  // mode2 下取 16/32/64; mode0/1 沿用默认 128
+    int64_t quantGroup = QUANT_GROUP; // mode2 下取 16/32/64; mode0/1 沿用默认 128
     // >0 时强制 rowFactor (每核 UB tile 行数), 用于构造 rowLoopOfFormerBlock>1 的多 tile 流水路径。
     // 默认 0 = 沿用 rowOfFormer(单 tile)。
     int64_t rowFactorOverride = 0;
@@ -104,7 +109,7 @@ protected:
         if (p.quantMode == QUANT_MODE_HIF8_FP4) {
             // mode2 行布局: [rope hifloat8 64B][nope FLOAT4_E2M1 (d-64)/2 B][nope bf16 scale nGroup*2 B][pad]
             perGroup = p.quantGroup;
-            scaleCol = (p.d - SLICE_SIZE) / perGroup;  // nGroup
+            scaleCol = (p.d - SLICE_SIZE) / perGroup; // nGroup
             concatCol = ROPE_HIF8_BYTES + (p.d - SLICE_SIZE) / 2 + scaleCol * FP4_SCALE_BYTES;
             kvCacheCol = RoundUp(concatCol, KV_CACHE_ROW_ALIGN);
             padCol = kvCacheCol - concatCol;
@@ -155,15 +160,14 @@ protected:
 
     int64_t usedCore_ = 1;
     int64_t kvCacheCol_ = 0;
-    int64_t rowStride_ = 0;  // cache 行步长(headDim), >= kvCacheCol_
+    int64_t rowStride_ = 0; // cache 行步长(headDim), >= kvCacheCol_
 };
 
 TEST_P(KvCompressEpilogKernelTest, RunKernel)
 {
     auto p = GetParam();
-    std::cout << "[KvCompressEpilog] " << p.desc << " bs=" << p.bs << " d=" << p.d
-              << " quantMode=" << p.quantMode << " roundScale=" << p.roundScale
-              << " blockDim=" << p.blockDim << std::endl;
+    std::cout << "[KvCompressEpilog] " << p.desc << " bs=" << p.bs << " d=" << p.d << " quantMode=" << p.quantMode
+              << " roundScale=" << p.roundScale << " blockDim=" << p.blockDim << std::endl;
 
     AscendC::SetKernelMode(KernelMode::AIV_MODE);
 
@@ -173,7 +177,7 @@ TEST_P(KvCompressEpilogKernelTest, RunKernel)
 
     // slot 上限 (= bs-1), cache 大小按 (maxSlot+1)*rowStride(headDim) 预留并留余量。
     int64_t cacheRows = p.bs + 1;
-    size_t shapeX = static_cast<size_t>(p.bs) * p.d * sizeof(uint16_t);  // bf16
+    size_t shapeX = static_cast<size_t>(p.bs) * p.d * sizeof(uint16_t); // bf16
     size_t shapeCache = static_cast<size_t>(cacheRows) * rowStride_ * sizeof(uint8_t) + 512;
     size_t shapeSlot = static_cast<size_t>(p.bs) * sizeof(int32_t);
 
@@ -191,7 +195,7 @@ TEST_P(KvCompressEpilogKernelTest, RunKernel)
     auto Marker1 = [](int64_t r) -> uint16_t { return static_cast<uint16_t>(0xA000 | (r & 0x0FFF)); };
     if (p.verifyRope) {
         uint16_t* xp = reinterpret_cast<uint16_t*>(xGm);
-        int64_t ropeBase = p.d - SLICE_SIZE;  // rope 段在每行的列偏移
+        int64_t ropeBase = p.d - SLICE_SIZE; // rope 段在每行的列偏移
         for (int64_t r = 0; r < p.bs; ++r) {
             xp[r * p.d + ropeBase + 0] = Marker0(r);
             xp[r * p.d + ropeBase + 1] = Marker1(r);
@@ -208,7 +212,7 @@ TEST_P(KvCompressEpilogKernelTest, RunKernel)
     }
     int64_t skippedSlots = 0;
     if (p.withSkip) {
-        for (int64_t i = 0; i < p.bs; i += 3) {  // 每 3 行 skip 一行
+        for (int64_t i = 0; i < p.bs; i += 3) { // 每 3 行 skip 一行
             slot[i] = -1;
             ++skippedSlots;
         }
@@ -253,11 +257,12 @@ TEST_P(KvCompressEpilogKernelTest, RunKernel)
                 ++mismatches;
             }
         }
-        EXPECT_EQ(mismatches, 0)
-            << "rope x-row<->slot mispairing: " << mismatches << "/" << p.bs
-            << " rows; first bad row=" << firstBad
-            << " (rowFactor=" << p.rowFactorOverride << ", rowLoop="
-            << (p.rowFactorOverride > 0 ? CeilDiv(CeilDiv(p.bs, p.blockDim), p.rowFactorOverride) : 1) << ")";
+        EXPECT_EQ(mismatches, 0) << "rope x-row<->slot mispairing: " << mismatches << "/" << p.bs
+                                 << " rows; first bad row=" << firstBad << " (rowFactor=" << p.rowFactorOverride
+                                 << ", rowLoop="
+                                 << (p.rowFactorOverride > 0 ? CeilDiv(CeilDiv(p.bs, p.blockDim), p.rowFactorOverride) :
+                                                               1)
+                                 << ")";
     }
 
     AscendC::GmFree(xGm);
@@ -287,19 +292,20 @@ INSTANTIATE_TEST_SUITE_P(
         // ===== 多 tile (rowLoopOfFormerBlock>1) x行↔slot 配对回归 (rowFactorOverride>0 + verifyRope) =====
         // 这些用例复现并固化大 bs 数据错乱 bug: 每核需多个 UB tile, 校验每个 slot 落的是正确 x 行的 rope。
         // KvParams{bs, d, mode, round, blockDim, withSkip, desc, quantGroup, rowFactorOverride, verifyRope}
-        KvParams{512, 384, QUANT_MODE_GROUP_BF16, 1, 1, false, "multitile_bf16_rf64",   QUANT_GROUP, 64, true},
-        KvParams{512, 384, QUANT_MODE_GROUP_E8M0, 1, 1, false, "multitile_e8m0_rf64",   QUANT_GROUP, 64, true},
-        KvParams{200, 384, QUANT_MODE_GROUP_E8M0, 1, 1, false, "multitile_e8m0_tail",   QUANT_GROUP, 64, true},
-        KvParams{300, 384, QUANT_MODE_GROUP_BF16, 1, 2, false, "multitile_bf16_2core",  QUANT_GROUP, 64, true},
-        KvParams{260, 384, QUANT_MODE_GROUP_E8M0, 1, 1, true,  "multitile_e8m0_skip",   QUANT_GROUP, 64, true},
+        KvParams{512, 384, QUANT_MODE_GROUP_BF16, 1, 1, false, "multitile_bf16_rf64", QUANT_GROUP, 64, true},
+        KvParams{512, 384, QUANT_MODE_GROUP_E8M0, 1, 1, false, "multitile_e8m0_rf64", QUANT_GROUP, 64, true},
+        KvParams{200, 384, QUANT_MODE_GROUP_E8M0, 1, 1, false, "multitile_e8m0_tail", QUANT_GROUP, 64, true},
+        KvParams{300, 384, QUANT_MODE_GROUP_BF16, 1, 2, false, "multitile_bf16_2core", QUANT_GROUP, 64, true},
+        KvParams{260, 384, QUANT_MODE_GROUP_E8M0, 1, 1, true, "multitile_e8m0_skip", QUANT_GROUP, 64, true},
         // mode2 多 tile 路径(共用同一 Process 流水), sanity: 不崩溃且有效 slot 非全 0。
-        KvParams{512, 384, QUANT_MODE_HIF8_FP4,   0, 1, false, "multitile_hif8fp4_rf64", 64,          64, false},
+        KvParams{512, 384, QUANT_MODE_HIF8_FP4, 0, 1, false, "multitile_hif8fp4_rf64", 64, 64, false},
         // ===== 4D cache 行内 pad (headDim>kvCacheCol) 回归: 行步长=headDim, 每行只写 kvCacheCol 字节 =====
         // KvParams{bs, d, mode, round, blockDim, withSkip, desc, quantGroup, rowFactorOverride, verifyRope, headDim}
         // mode0 d256 kvCacheCol=352, headDim=512: 验证按行步长 512 寻址、写 352 字节, sanity 非全 0。
-        KvParams{32, 256, QUANT_MODE_GROUP_BF16, 1, 1, false, "bf16_intrarow_pad_hd512", QUANT_GROUP, 0,  false, 512},
+        KvParams{32, 256, QUANT_MODE_GROUP_BF16, 1, 1, false, "bf16_intrarow_pad_hd512", QUANT_GROUP, 0, false, 512},
         // e8m0 d384 kvCacheCol=453, headDim=640 + 多 tile + rope 配对: 验证 pad 下 slot*headDim 寻址正确。
-        KvParams{512, 384, QUANT_MODE_GROUP_E8M0, 1, 1, false, "multitile_e8m0_pad_hd640", QUANT_GROUP, 64, true, 640}));
+        KvParams{512, 384, QUANT_MODE_GROUP_E8M0, 1, 1, false, "multitile_e8m0_pad_hd640", QUANT_GROUP, 64, true,
+                 640}));
 
 // 结构体字段 sanity (保留原 tiling-data 校验意图: 字段可写、布局可用)。
 TEST(KvCompressEpilogTilingStruct, FieldsWritable)

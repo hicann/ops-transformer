@@ -33,7 +33,7 @@ struct InplaceFusedCausalConv1dCompileInfo {
     uint64_t ubSize = 0;
 };
 
-static ge::graphStatus TilingInplaceFusedCausalConv1d(gert::TilingContext *context)
+static ge::graphStatus TilingInplaceFusedCausalConv1d(gert::TilingContext* context)
 {
     OP_LOGD(context->GetNodeName(), "InplaceFusedCausalConv1dTiling tiling start");
 
@@ -71,7 +71,7 @@ static ge::graphStatus TilingInplaceFusedCausalConv1d(gert::TilingContext *conte
     return status;
 }
 
-static ge::graphStatus TilingPrepareInplaceFusedCausalConv1d(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareInplaceFusedCausalConv1d(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("InplaceFusedCausalConv1d", "context is null"), return ge::GRAPH_FAILED);
 

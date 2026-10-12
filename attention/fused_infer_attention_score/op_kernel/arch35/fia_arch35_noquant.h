@@ -26,12 +26,12 @@ using namespace regbaseutil;
 
 #define REGBASE_COPY_TILING_DATA_ASCEND950_KVSAME_BASEAPI(tiling) \
     GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreSimplifiedTilingData, tilingDataIn, tiling); \
-    const FlashAttentionScoreSimplifiedTilingData *__restrict tilingData = &tilingDataIn
+    const FlashAttentionScoreSimplifiedTilingData* __restrict tilingData = &tilingDataIn
 
 #define INVOKE_FA_OP_IMPL_ASCEND950_KVSAME_BASEAPI(templateClass, ...) \
     do { \
         TPipe tPipe; \
-        __gm__ uint8_t *user = GetUserWorkspace(workspace); \
+        __gm__ uint8_t* user = GetUserWorkspace(workspace); \
         REGBASE_COPY_TILING_DATA_ASCEND950_KVSAME_BASEAPI(tiling); \
         using CubeBlockType = FABlockCubeNoquantMla<__VA_ARGS__>; \
         using VecBlockType = BaseApi::FANoQuantBlockVecInfer<__VA_ARGS__>; \
@@ -68,18 +68,18 @@ template <uint8_t inOutLayoutType, uint16_t config, uint8_t pseMode, uint8_t qua
           uint8_t KvLayoutType, bool isFd, bool emptyTensor, bool enableKVPrefix, bool enableS1OutSplit,
           bool isReconstructTemp>
 inline __aicore__ void fia_noquant_regbase(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-    __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
-    __gm__ uint8_t *deq_scale1, __gm__ uint8_t *quant_scale1, __gm__ uint8_t *deq_scale2,
-    __gm__ uint8_t *postQuantScale, __gm__ uint8_t *postQuantOffset, __gm__ uint8_t *antiquant_scale,
-    __gm__ uint8_t *antiquant_offset, __gm__ uint8_t *blocktable, __gm__ uint8_t *queryPaddingSize,
-    __gm__ uint8_t *kvPaddingSize, __gm__ uint8_t *key_antiquant_scale, __gm__ uint8_t *key_antiquant_offset,
-    __gm__ uint8_t *value_antiquant_scale, __gm__ uint8_t *value_antiquant_offset, __gm__ uint8_t *keySharedPrefix,
-    __gm__ uint8_t *valueSharedPrefix, __gm__ uint8_t *actualSharedPrefixLen, __gm__ uint8_t *queryRope,
-    __gm__ uint8_t *keyRope, __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *learnableSink,
-    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+    __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+    __gm__ uint8_t* deq_scale1, __gm__ uint8_t* quant_scale1, __gm__ uint8_t* deq_scale2,
+    __gm__ uint8_t* postQuantScale, __gm__ uint8_t* postQuantOffset, __gm__ uint8_t* antiquant_scale,
+    __gm__ uint8_t* antiquant_offset, __gm__ uint8_t* blocktable, __gm__ uint8_t* queryPaddingSize,
+    __gm__ uint8_t* kvPaddingSize, __gm__ uint8_t* key_antiquant_scale, __gm__ uint8_t* key_antiquant_offset,
+    __gm__ uint8_t* value_antiquant_scale, __gm__ uint8_t* value_antiquant_offset, __gm__ uint8_t* keySharedPrefix,
+    __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen, __gm__ uint8_t* queryRope,
+    __gm__ uint8_t* keyRope, __gm__ uint8_t* dequantScaleQuery, __gm__ uint8_t* learnableSink,
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
 
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     constexpr bool isPa = KvLayoutType != 0;
@@ -87,13 +87,15 @@ inline __aicore__ void fia_noquant_regbase(
     // 解析两个合并字段
     if constexpr (isReconstructTemp == true) {
         if constexpr (config == Config_S1Aligned64_S2Aligned128_DAligned576_DVAligned512 && hasRope) {
-            run_fia_noquant_mla_kernel<half, half, inOutLayoutType, config, hasAttenMask, KvLayoutType,
-                                       isFd, emptyTensor, enableS1OutSplit>(query, key, value, attenMask, actualSeqLengths, actualSeqLengthsKV,
-                                                                            blocktable, queryRope, keyRope, attentionOut, softmaxLse, user, tiling);
+            run_fia_noquant_mla_kernel<half, half, inOutLayoutType, config, hasAttenMask, KvLayoutType, isFd,
+                                       emptyTensor, enableS1OutSplit>(query, key, value, attenMask, actualSeqLengths,
+                                                                      actualSeqLengthsKV, blocktable, queryRope,
+                                                                      keyRope, attentionOut, softmaxLse, user, tiling);
         } else {
             run_fia_noquant_gqa_kernel<half, half, inOutLayoutType, config, hasAttenMask, KvLayoutType, isFd,
                                        emptyTensor, enableS1OutSplit>(query, key, value, attenMask, actualSeqLengths,
-                                                                      actualSeqLengthsKV, blocktable, queryRope, keyRope, attentionOut, softmaxLse, user, tiling);
+                                                                      actualSeqLengthsKV, blocktable, queryRope,
+                                                                      keyRope, attentionOut, softmaxLse, user, tiling);
         }
     } else {
         PARSE_PARAMS_NoQuant(inOutLayoutType, config, pseMode, quantMode, hasAttenMask, hasRope, isPa, isFd,
@@ -142,12 +144,14 @@ inline __aicore__ void fia_noquant_regbase(
     if constexpr (isReconstructTemp == true) {
         if constexpr (config == Config_S1Aligned64_S2Aligned128_DAligned576_DVAligned512 && hasRope) {
             run_fia_noquant_mla_kernel<bfloat16_t, bfloat16_t, inOutLayoutType, config, hasAttenMask, KvLayoutType,
-                                       isFd, emptyTensor, enableS1OutSplit>(query, key, value, attenMask, actualSeqLengths, actualSeqLengthsKV,
-                                                                            blocktable, queryRope, keyRope, attentionOut, softmaxLse, user, tiling);
+                                       isFd, emptyTensor, enableS1OutSplit>(
+                query, key, value, attenMask, actualSeqLengths, actualSeqLengthsKV, blocktable, queryRope, keyRope,
+                attentionOut, softmaxLse, user, tiling);
         } else {
             run_fia_noquant_gqa_kernel<bfloat16_t, bfloat16_t, inOutLayoutType, config, hasAttenMask, KvLayoutType,
-                                       isFd, emptyTensor, enableS1OutSplit>(query, key, value, attenMask, actualSeqLengths,
-                                                                            actualSeqLengthsKV, blocktable, queryRope, keyRope, attentionOut, softmaxLse, user, tiling);
+                                       isFd, emptyTensor, enableS1OutSplit>(
+                query, key, value, attenMask, actualSeqLengths, actualSeqLengthsKV, blocktable, queryRope, keyRope,
+                attentionOut, softmaxLse, user, tiling);
         }
     } else {
         PARSE_PARAMS_NoQuant(inOutLayoutType, config, pseMode, quantMode, hasAttenMask, hasRope, isPa, isFd,

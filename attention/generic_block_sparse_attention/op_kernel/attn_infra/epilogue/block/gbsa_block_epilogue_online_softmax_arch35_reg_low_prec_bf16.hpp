@@ -73,7 +73,7 @@ public:
 
     static constexpr bool FULL_QUANT_FP8 = AscendC::IsSameType<ElementOutput, fp8_e4m3fn_t>::value;
 
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource, float scaleValue_)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource, float scaleValue_)
     {
         // Allocate UB space
         constexpr uint32_t LS_UB_TENSOR_OFFSET = 0;
@@ -103,7 +103,7 @@ public:
     __aicore__ inline ~BlockEpilogue() {}
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void CopyPUbToPL1(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint32_t m)
+    __aicore__ inline void CopyPUbToPL1(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint32_t m)
     {
         const uint32_t blockCount = tla::get<1, 1>(srcTensor.shape());
         const uint32_t blockLen = tla::get<0, 0>(srcTensor.shape()) * tla::get<0, 1>(srcTensor.shape());
@@ -129,7 +129,7 @@ public:
     }
 
     template <uint32_t MODE, pipe_t PIPE>
-    __aicore__ inline void SetCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
+    __aicore__ inline void SetCrossCoreSync(Arch::CrossCoreFlag& crossCoreFlag)
     {
         // in mode 4, AIC set for 2 AIVs seperately
         if constexpr (MODE == 4U) {
@@ -138,7 +138,7 @@ public:
     }
 
     template <uint32_t MODE, pipe_t PIPE>
-    __aicore__ inline void WaitCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
+    __aicore__ inline void WaitCrossCoreSync(Arch::CrossCoreFlag& crossCoreFlag)
     {
         // in mode 4, AIC wait for 2 AIVs seperately
         if constexpr (MODE == 4U) {
@@ -147,7 +147,7 @@ public:
     }
 
     template <class TensorP>
-    __aicore__ inline void operator()(TensorP &l1PTensorTla, GemmCoord actualBlockShape, uint32_t isFirstKvSTile,
+    __aicore__ inline void operator()(TensorP& l1PTensorTla, GemmCoord actualBlockShape, uint32_t isFirstKvSTile,
                                       uint32_t ubSBufId, uint32_t l1PBufId, Arch::CrossCoreFlag mm1ToSmFlag,
                                       Arch::CrossCoreFlag smToMm2Flag)
     {
@@ -172,14 +172,14 @@ public:
         int16_t mLoops = AscendC::CeilDivision(m, vlFloatSize) - 1;
         uint32_t tailM = (m - 1) % vlFloatSize + 1;
         uint32_t nPadding = (tailN + BLOCK_SIZE_IN_BYTE - 1) / BLOCK_SIZE_IN_BYTE * BLOCK_SIZE_IN_BYTE;
-        __ubuf__ ElementOutput *pAddr = (__ubuf__ ElementOutput *)lpUbTensor[ubSBufId * MAX_UB_S_ELEM_NUM].GetPhyAddr();
-        __ubuf__ ElementInput *sAddr = (__ubuf__ ElementInput *)lsUbTensor[ubSBufId * MAX_UB_S_ELEM_NUM].GetPhyAddr();
-        __ubuf__ float *lastMaxAddr = (__ubuf__ float *)gmUbTensor.GetPhyAddr();
-        __ubuf__ float *lastSumAddr = (__ubuf__ float *)glUbTensor.GetPhyAddr();
-        __ubuf__ ElementInput *nowMaxAddr = (__ubuf__ ElementInput *)lmUbTensor.GetPhyAddr();
-        __ubuf__ float *nowMaxFloatAddr = (__ubuf__ float *)lmUbFloatTensor.GetPhyAddr();
-        __ubuf__ float *nowSumAddr = (__ubuf__ float *)llUbFloatTensor.GetPhyAddr();
-        __ubuf__ float *expMaxUbAddr = (__ubuf__ float *)dmUbTensor[l1PBufId * DM_UB_GLOBAL_ELEM_NUM].GetPhyAddr();
+        __ubuf__ ElementOutput* pAddr = (__ubuf__ ElementOutput*)lpUbTensor[ubSBufId * MAX_UB_S_ELEM_NUM].GetPhyAddr();
+        __ubuf__ ElementInput* sAddr = (__ubuf__ ElementInput*)lsUbTensor[ubSBufId * MAX_UB_S_ELEM_NUM].GetPhyAddr();
+        __ubuf__ float* lastMaxAddr = (__ubuf__ float*)gmUbTensor.GetPhyAddr();
+        __ubuf__ float* lastSumAddr = (__ubuf__ float*)glUbTensor.GetPhyAddr();
+        __ubuf__ ElementInput* nowMaxAddr = (__ubuf__ ElementInput*)lmUbTensor.GetPhyAddr();
+        __ubuf__ float* nowMaxFloatAddr = (__ubuf__ float*)lmUbFloatTensor.GetPhyAddr();
+        __ubuf__ float* nowSumAddr = (__ubuf__ float*)llUbFloatTensor.GetPhyAddr();
+        __ubuf__ float* expMaxUbAddr = (__ubuf__ float*)dmUbTensor[l1PBufId * DM_UB_GLOBAL_ELEM_NUM].GetPhyAddr();
 
         // wait QK Fixpipe finsh
         WaitCrossCoreSync<4, PIPE_V>(mm1ToSmFlag);
@@ -258,7 +258,7 @@ private:
     ElementInput MIN_VALUE;
 
     template <KvBaseTileRegSplitStagesBf16 kvBaseTileRegSplitStages>
-    __simd_vf__ inline void ComputeScaleAndMax(__ubuf__ ElementInput *srcUb, __ubuf__ float *newMaxUb, uint16_t m,
+    __simd_vf__ inline void ComputeScaleAndMax(__ubuf__ ElementInput* srcUb, __ubuf__ float* newMaxUb, uint16_t m,
                                                uint32_t tailN, uint32_t nPadding, ElementInput dScale,
                                                uint16_t S2BaseSize)
     {
@@ -268,8 +268,8 @@ private:
     }
 
     template <>
-    __simd_vf__ inline void ComputeScaleAndMax<KvBaseTileRegSplitStagesBf16::ONE>(__ubuf__ ElementInput *srcUb,
-                                                                                  __ubuf__ float *newMaxUb, uint16_t m,
+    __simd_vf__ inline void ComputeScaleAndMax<KvBaseTileRegSplitStagesBf16::ONE>(__ubuf__ ElementInput* srcUb,
+                                                                                  __ubuf__ float* newMaxUb, uint16_t m,
                                                                                   uint32_t tailN, uint32_t nPadding,
                                                                                   ElementInput dScale,
                                                                                   uint16_t S2BaseSize)
@@ -324,8 +324,8 @@ private:
     }
 
     template <>
-    __simd_vf__ inline void ComputeScaleAndMax<KvBaseTileRegSplitStagesBf16::TWO>(__ubuf__ ElementInput *srcUb,
-                                                                                  __ubuf__ float *newMaxUb, uint16_t m,
+    __simd_vf__ inline void ComputeScaleAndMax<KvBaseTileRegSplitStagesBf16::TWO>(__ubuf__ ElementInput* srcUb,
+                                                                                  __ubuf__ float* newMaxUb, uint16_t m,
                                                                                   uint32_t tailN, uint32_t nPadding,
                                                                                   ElementInput dScale,
                                                                                   uint16_t S2BaseSize)
@@ -385,7 +385,7 @@ private:
     }
 
     template <typename ElementS>
-    __simd_vf__ inline void CastMax(__ubuf__ ElementS *nowMaxUb, __ubuf__ float *nowMaxFloatUb, uint16_t mLoops,
+    __simd_vf__ inline void CastMax(__ubuf__ ElementS* nowMaxUb, __ubuf__ float* nowMaxFloatUb, uint16_t mLoops,
                                     uint32_t tailM)
     {
         using namespace AscendC::Reg;
@@ -416,7 +416,7 @@ private:
                                                     pregFloatTailM);
     }
 
-    __simd_vf__ inline void UpdateMax(__ubuf__ float *nowMaxUb, __ubuf__ float *lastMaxUb, uint16_t mLoops,
+    __simd_vf__ inline void UpdateMax(__ubuf__ float* nowMaxUb, __ubuf__ float* lastMaxUb, uint16_t mLoops,
                                       uint32_t tailM)
     {
         using namespace AscendC::Reg;
@@ -440,8 +440,8 @@ private:
     }
 
     template <KvBaseTileRegSplitStagesBf16 kvBaseTileRegSplitStages>
-    __simd_vf__ inline void ComputeExpSubSum16(__ubuf__ ElementOutput *expUb, __ubuf__ ElementInput *srcUb,
-                                               __ubuf__ float *nowMaxUb, __ubuf__ float *expSumUb, uint16_t m,
+    __simd_vf__ inline void ComputeExpSubSum16(__ubuf__ ElementOutput* expUb, __ubuf__ ElementInput* srcUb,
+                                               __ubuf__ float* nowMaxUb, __ubuf__ float* expSumUb, uint16_t m,
                                                uint32_t tailN, uint32_t blockStride, uint16_t S2BaseSize,
                                                uint32_t tailNOdd, uint32_t tailNEven)
     {
@@ -452,7 +452,7 @@ private:
 
     template <>
     __simd_vf__ inline void ComputeExpSubSum16<KvBaseTileRegSplitStagesBf16::ONE>(
-        __ubuf__ ElementOutput *expUb, __ubuf__ ElementInput *srcUb, __ubuf__ float *nowMaxUb, __ubuf__ float *expSumUb,
+        __ubuf__ ElementOutput* expUb, __ubuf__ ElementInput* srcUb, __ubuf__ float* nowMaxUb, __ubuf__ float* expSumUb,
         uint16_t m, uint32_t tailN, uint32_t blockStride, uint16_t S2BaseSize, uint32_t tailNOdd, uint32_t tailNEven)
     {
         using namespace AscendC::Reg;
@@ -514,8 +514,8 @@ private:
             Add<float, MaskMergeMode::MERGING>(expSumVreg, expSumVreg, expDstFloatVreg1, pregtailNOdd);
             Cast<ElementInput, float, castTraitZeroDown>(expDstVreg0, expDstFloatVreg0, pregFloatFull);
             Cast<ElementInput, float, castTraitOneDown>(expDstVreg1, expDstFloatVreg1, pregFloatFull);
-            Or((RegTensor<uint16_t> &)expDstVreg, (RegTensor<uint16_t> &)expDstVreg0,
-               (RegTensor<uint16_t> &)expDstVreg1, pregFull);
+            Or((RegTensor<uint16_t>&)expDstVreg, (RegTensor<uint16_t>&)expDstVreg0, (RegTensor<uint16_t>&)expDstVreg1,
+               pregFull);
             StoreAlign<ElementOutput, DataCopyMode::DATA_BLOCK_COPY>(expUb + i * ELE_NUM_PER_C0, expDstVreg,
                                                                      blockStride, pregTailN);
             ReduceSum(expSumVreg, expSumVreg, pregFull);
@@ -526,7 +526,7 @@ private:
 
     template <>
     __simd_vf__ inline void ComputeExpSubSum16<KvBaseTileRegSplitStagesBf16::TWO>(
-        __ubuf__ ElementOutput *expUb, __ubuf__ ElementInput *srcUb, __ubuf__ float *nowMaxUb, __ubuf__ float *expSumUb,
+        __ubuf__ ElementOutput* expUb, __ubuf__ ElementInput* srcUb, __ubuf__ float* nowMaxUb, __ubuf__ float* expSumUb,
         uint16_t m, uint32_t tailN, uint32_t blockStride, uint16_t S2BaseSize, uint32_t tailNOdd, uint32_t tailNEven)
     {
         using namespace AscendC::Reg;
@@ -605,10 +605,10 @@ private:
             Cast<ElementInput, float, castTraitOneDown>(expDstVreg1, expDstFloatVreg1, pregFloatFull);
             Cast<ElementInput, float, castTraitZeroDown>(expDstVreg2, expDstFloatVreg2, pregFloatFull);
             Cast<ElementInput, float, castTraitOneDown>(expDstVreg3, expDstFloatVreg3, pregFloatFull);
-            Or((RegTensor<uint16_t> &)expOutVreg0, (RegTensor<uint16_t> &)expDstVreg0,
-               (RegTensor<uint16_t> &)expDstVreg1, pregFull);
-            Or((RegTensor<uint16_t> &)expOutVreg1, (RegTensor<uint16_t> &)expDstVreg2,
-               (RegTensor<uint16_t> &)expDstVreg3, pregFull);
+            Or((RegTensor<uint16_t>&)expOutVreg0, (RegTensor<uint16_t>&)expDstVreg0, (RegTensor<uint16_t>&)expDstVreg1,
+               pregFull);
+            Or((RegTensor<uint16_t>&)expOutVreg1, (RegTensor<uint16_t>&)expDstVreg2, (RegTensor<uint16_t>&)expDstVreg3,
+               pregFull);
             StoreAlign<ElementOutput, DataCopyMode::DATA_BLOCK_COPY>(expUb + i * ELE_NUM_PER_C0, expOutVreg0,
                                                                      blockStride, pregFull);
             StoreAlign<ElementOutput, DataCopyMode::DATA_BLOCK_COPY>(
@@ -622,8 +622,8 @@ private:
     }
 
     template <KvBaseTileRegSplitStagesBf16 kvBaseTileRegSplitStages>
-    __simd_vf__ inline void ComputeExpSubSum16FP8(__ubuf__ ElementOutput *expUb, __ubuf__ ElementInput *srcUb,
-                                                  __ubuf__ float *nowMaxUb, __ubuf__ float *expSumUb, uint16_t m,
+    __simd_vf__ inline void ComputeExpSubSum16FP8(__ubuf__ ElementOutput* expUb, __ubuf__ ElementInput* srcUb,
+                                                  __ubuf__ float* nowMaxUb, __ubuf__ float* expSumUb, uint16_t m,
                                                   uint32_t tailN, uint32_t blockStride, uint16_t S2BaseSize,
                                                   uint32_t tailNOdd, uint32_t tailNEven)
     {
@@ -634,7 +634,7 @@ private:
 
     template <>
     __simd_vf__ inline void ComputeExpSubSum16FP8<KvBaseTileRegSplitStagesBf16::ONE>(
-        __ubuf__ ElementOutput *expUb, __ubuf__ ElementInput *srcUb, __ubuf__ float *nowMaxUb, __ubuf__ float *expSumUb,
+        __ubuf__ ElementOutput* expUb, __ubuf__ ElementInput* srcUb, __ubuf__ float* nowMaxUb, __ubuf__ float* expSumUb,
         uint16_t m, uint32_t tailN, uint32_t blockStride, uint16_t S2BaseSize, uint32_t tailNOdd, uint32_t tailNEven)
     {
         using namespace AscendC::Reg;
@@ -709,7 +709,7 @@ private:
             Cast<ElementOutput, float, castTraitZeroRINT>(pVreg0, expDstFloatVreg0, pRegFp32All);
             Cast<ElementOutput, float, castTraitTwoRINT>(pVreg1, expDstFloatVreg1, pRegFp32All);
 
-            Or((RegTensor<uint8_t> &)pVreg0, (RegTensor<uint8_t> &)pVreg0, (RegTensor<uint8_t> &)pVreg1, pRegUint8All);
+            Or((RegTensor<uint8_t>&)pVreg0, (RegTensor<uint8_t>&)pVreg0, (RegTensor<uint8_t>&)pVreg1, pRegUint8All);
             DeInterleave(deInterleaveVreg0, deInterleaveVreg1, pVreg0, pVreg0);
 
             StoreAlign<ElementOutput, DataCopyMode::DATA_BLOCK_COPY>(expUb + i * ELE_NUM_PER_C0_FP8, deInterleaveVreg0,
@@ -722,7 +722,7 @@ private:
 
     template <>
     __simd_vf__ inline void ComputeExpSubSum16FP8<KvBaseTileRegSplitStagesBf16::TWO>(
-        __ubuf__ ElementOutput *expUb, __ubuf__ ElementInput *srcUb, __ubuf__ float *nowMaxUb, __ubuf__ float *expSumUb,
+        __ubuf__ ElementOutput* expUb, __ubuf__ ElementInput* srcUb, __ubuf__ float* nowMaxUb, __ubuf__ float* expSumUb,
         uint16_t m, uint32_t tailN, uint32_t blockStride, uint16_t S2BaseSize, uint32_t tailNOdd, uint32_t tailNEven)
     {
         using namespace AscendC::Reg;
@@ -821,8 +821,8 @@ private:
             Cast<ElementOutput, float, castTraitZeroRINT>(pVreg2, expDstFloatVreg2, pRegFp32All);
             Cast<ElementOutput, float, castTraitTwoRINT>(pVreg3, expDstFloatVreg3, pRegFp32All);
 
-            Or((RegTensor<uint8_t> &)pVreg0, (RegTensor<uint8_t> &)pVreg0, (RegTensor<uint8_t> &)pVreg1, pRegUint8All);
-            Or((RegTensor<uint8_t> &)pVreg2, (RegTensor<uint8_t> &)pVreg2, (RegTensor<uint8_t> &)pVreg3, pRegUint8All);
+            Or((RegTensor<uint8_t>&)pVreg0, (RegTensor<uint8_t>&)pVreg0, (RegTensor<uint8_t>&)pVreg1, pRegUint8All);
+            Or((RegTensor<uint8_t>&)pVreg2, (RegTensor<uint8_t>&)pVreg2, (RegTensor<uint8_t>&)pVreg3, pRegUint8All);
             DeInterleave(deInterleaveVreg0, deInterleaveVreg1, pVreg0, pVreg0);
             DeInterleave(deInterleaveVreg2, deInterleaveVreg3, pVreg2, pVreg2);
 
@@ -837,9 +837,9 @@ private:
         vstas(expSumUreg, expSumUb, 0, POST_UPDATE);
     }
 
-    __simd_vf__ inline void UpdateExpSumAndExpMax(__ubuf__ float *sumUb, __ubuf__ float *expMaxUb,
-                                                  __ubuf__ float *maxUb, __ubuf__ float *expSumUb,
-                                                  __ubuf__ float *nowMaxUb, uint16_t mLoops, uint32_t tailM)
+    __simd_vf__ inline void UpdateExpSumAndExpMax(__ubuf__ float* sumUb, __ubuf__ float* expMaxUb,
+                                                  __ubuf__ float* maxUb, __ubuf__ float* expSumUb,
+                                                  __ubuf__ float* nowMaxUb, uint16_t mLoops, uint32_t tailM)
     {
         using namespace AscendC::Reg;
 

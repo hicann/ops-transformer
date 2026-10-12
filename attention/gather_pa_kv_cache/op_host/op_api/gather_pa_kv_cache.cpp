@@ -20,44 +20,35 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(GatherPaKvCache);
 
-std::tuple<const aclTensor*, const aclTensor*> GatherPaKvCache(
-    const aclTensor *keyCache,
-    const aclTensor *valueCache,
-    const aclTensor *blockTables,
-    const aclTensor *seqLens,
-    aclTensor *keyRef,
-    aclTensor *valueRef,
-    const aclTensor *seqOffsetOptional,
-    char *cacheMode,
-    bool isSeqLensCumsum,
-    aclOpExecutor *executor)
+std::tuple<const aclTensor*, const aclTensor*> GatherPaKvCache(const aclTensor* keyCache, const aclTensor* valueCache,
+                                                               const aclTensor* blockTables, const aclTensor* seqLens,
+                                                               aclTensor* keyRef, aclTensor* valueRef,
+                                                               const aclTensor* seqOffsetOptional, char* cacheMode,
+                                                               bool isSeqLensCumsum, aclOpExecutor* executor)
 {
-    L0_DFX(GatherPaKvCache, keyCache, valueCache, blockTables, seqLens, keyRef, valueRef,
-           seqOffsetOptional, cacheMode, isSeqLensCumsum);
+    L0_DFX(GatherPaKvCache, keyCache, valueCache, blockTables, seqLens, keyRef, valueRef, seqOffsetOptional, cacheMode,
+           isSeqLensCumsum);
 
     auto& platformInfo = op::GetCurrentPlatformInfo();
     auto socVersion = platformInfo.GetCurNpuArch();
     bool isArch35 = (socVersion == NpuArch::DAV_3510);
 
-    const aclTensor *seqOffset = seqOffsetOptional;
+    const aclTensor* seqOffset = seqOffsetOptional;
     if (!isArch35 && seqOffset == nullptr) {
         seqOffset = executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
     }
 
-    auto ret = INFER_SHAPE(GatherPaKvCache,
-                           OP_INPUT(keyCache, valueCache, blockTables, seqLens, keyRef, valueRef, seqOffset),
-                           OP_OUTPUT(keyRef, valueRef),
-                           OP_ATTR(cacheMode, isSeqLensCumsum));
+    auto ret =
+        INFER_SHAPE(GatherPaKvCache, OP_INPUT(keyCache, valueCache, blockTables, seqLens, keyRef, valueRef, seqOffset),
+                    OP_OUTPUT(keyRef, valueRef), OP_ATTR(cacheMode, isSeqLensCumsum));
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "InferShape failed.");
         return {nullptr, nullptr};
     }
 
-    ret = ADD_TO_LAUNCHER_LIST_AICORE(
-        GatherPaKvCache,
-        OP_INPUT(keyCache, valueCache, blockTables, seqLens, keyRef, valueRef, seqOffset),
-        OP_OUTPUT(keyRef, valueRef),
-        OP_ATTR(cacheMode, isSeqLensCumsum));
+    ret = ADD_TO_LAUNCHER_LIST_AICORE(GatherPaKvCache,
+                                      OP_INPUT(keyCache, valueCache, blockTables, seqLens, keyRef, valueRef, seqOffset),
+                                      OP_OUTPUT(keyRef, valueRef), OP_ATTR(cacheMode, isSeqLensCumsum));
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "ADD_TO_LAUNCHER_LIST_AICORE failed.");
         return {nullptr, nullptr};

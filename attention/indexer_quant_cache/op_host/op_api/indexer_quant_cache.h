@@ -20,9 +20,9 @@
 
 namespace l0op {
 
-const aclTensor *IndexerQuantCache(aclTensor *cache, aclTensor *cacheScale, const aclTensor *x,
-                                   const aclTensor *slotMapping, int64_t quantMode, bool roundScale, float xScale,
-                                   aclOpExecutor *executor);
+const aclTensor* IndexerQuantCache(aclTensor* cache, aclTensor* cacheScale, const aclTensor* x,
+                                   const aclTensor* slotMapping, int64_t quantMode, bool roundScale, float xScale,
+                                   aclOpExecutor* executor);
 
 } // namespace l0op
 

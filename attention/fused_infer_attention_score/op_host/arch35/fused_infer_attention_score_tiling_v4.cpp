@@ -19,7 +19,8 @@
 #include "../checkers/fia_checker.h"
 
 namespace optiling {
-ge::graphStatus TilingFusedInferAttentionScoreV4(gert::TilingContext *context) {
+ge::graphStatus TilingFusedInferAttentionScoreV4(gert::TilingContext* context)
+{
     // Parse -> Check -> DoOpTiling
     FiaTilingInfo fiaInfo;
     FiaInfoParser fiaInfoParser(context);

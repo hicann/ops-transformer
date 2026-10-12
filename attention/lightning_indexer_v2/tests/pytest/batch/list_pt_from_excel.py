@@ -15,6 +15,7 @@ import sys
 import argparse
 import pandas as pd
 
+
 def list_pt_from_excel(excel_path, sheet_name, pt_dir):
     if not os.path.exists(excel_path):
         print(f"ERROR: Excel file not found: {excel_path}", file=sys.stderr)
@@ -26,7 +27,10 @@ def list_pt_from_excel(excel_path, sheet_name, pt_dir):
 
     df = pd.read_excel(excel_path, sheet_name=sheet_name)
     if "Testcase_Name" not in df.columns:
-        print(f"ERROR: Column 'Testcase_Name' not found in sheet '{sheet_name}'", file=sys.stderr)
+        print(
+            f"ERROR: Column 'Testcase_Name' not found in sheet '{sheet_name}'",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     pt_files = []
@@ -39,10 +43,15 @@ def list_pt_from_excel(excel_path, sheet_name, pt_dir):
             missing.append(case_name)
 
     if missing:
-        print(f"WARNING: {len(missing)} cases have no matching .pt file: {missing}", file=sys.stderr)
+        print(
+            f"WARNING: {len(missing)} cases have no matching .pt file: {missing}",
+            file=sys.stderr,
+        )
 
     if not pt_files:
-        print(f"ERROR: No matching .pt files found for any case in Excel", file=sys.stderr)
+        print(
+            "ERROR: No matching .pt files found for any case in Excel", file=sys.stderr
+        )
         sys.exit(1)
 
     print(",".join(pt_files))
@@ -54,7 +63,9 @@ def main():
     )
     parser.add_argument("excel_path", type=str, help="Path to Excel file")
     parser.add_argument("pt_dir", type=str, help="Directory containing .pt files")
-    parser.add_argument("--sheet", "-S", type=str, default="Sheet1", help="Sheet name (default: Sheet1)")
+    parser.add_argument(
+        "--sheet", "-S", type=str, default="Sheet1", help="Sheet name (default: Sheet1)"
+    )
     args = parser.parse_args()
 
     list_pt_from_excel(args.excel_path, args.sheet, args.pt_dir)

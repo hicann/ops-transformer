@@ -31,13 +31,13 @@ public:
     using K_T = typename LIT::keyType;
 
     __aicore__ inline LightningIndexerServiceCube(){};
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitMm1GlobalTensor(const GlobalTensor<int32_t> &blkTableGm, const GlobalTensor<K_T> &keyGm,
-                                               const GlobalTensor<Q_T> &queryGm, const GlobalTensor<float> &mm1ResGm);
-    __aicore__ inline void InitParams(const ConstInfo &constInfo);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void InitMm1GlobalTensor(const GlobalTensor<int32_t>& blkTableGm, const GlobalTensor<K_T>& keyGm,
+                                               const GlobalTensor<Q_T>& queryGm, const GlobalTensor<float>& mm1ResGm);
+    __aicore__ inline void InitParams(const ConstInfo& constInfo);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void ComputeMm1(const LICommon::RunInfo &runInfo);
+    __aicore__ inline void ComputeMm1(const LICommon::RunInfo& runInfo);
 
     static constexpr IsResetLoad3dConfig LOAD3DV2_CONFIG = {true, true}; // isSetFMatrix isSetPadding;
     static constexpr uint64_t KEY_BUF_NUM = 3;
@@ -66,15 +66,15 @@ public:
 
 protected:
     __aicore__ inline void Fixp(uint64_t s1gGmOffset, uint64_t s2GmOffset, uint64_t s1gL0RealSize,
-                                uint64_t s2L0RealSize, const LICommon::RunInfo &runInfo);
-    __aicore__ inline void ComuteL0c(uint64_t s1gL0RealSize, uint64_t s2L0RealSize, const LICommon::RunInfo &runInfo);
+                                uint64_t s2L0RealSize, const LICommon::RunInfo& runInfo);
+    __aicore__ inline void ComuteL0c(uint64_t s1gL0RealSize, uint64_t s2L0RealSize, const LICommon::RunInfo& runInfo);
     __aicore__ inline void LoadKeyToL0b(uint64_t s2L0Offset, uint64_t s2L1RealSize, uint64_t s2L0RealSize,
-                                        const LICommon::RunInfo &runInfo);
+                                        const LICommon::RunInfo& runInfo);
     __aicore__ inline void LoadQueryToL0a(uint64_t s1gL1Offset, uint64_t s1gL0Offset, uint64_t s1gL1RealSize,
-                                          uint64_t s1gL0RealSize, const LICommon::RunInfo &runInfo);
-    __aicore__ inline void QueryNd2Nz(uint64_t s1gL1RealSize, uint64_t s1gL1Offset, const LICommon::RunInfo &runInfo);
-    __aicore__ inline void KeyNd2Nz(uint64_t s2L1RealSize, uint64_t s2GmOffset, const LICommon::RunInfo &runInfo);
-    __aicore__ inline void KeyNd2NzForPA(uint64_t s2L1RealSize, uint64_t s2GmOffset, const LICommon::RunInfo &runInfo);
+                                          uint64_t s1gL0RealSize, const LICommon::RunInfo& runInfo);
+    __aicore__ inline void QueryNd2Nz(uint64_t s1gL1RealSize, uint64_t s1gL1Offset, const LICommon::RunInfo& runInfo);
+    __aicore__ inline void KeyNd2Nz(uint64_t s2L1RealSize, uint64_t s2GmOffset, const LICommon::RunInfo& runInfo);
+    __aicore__ inline void KeyNd2NzForPA(uint64_t s2L1RealSize, uint64_t s2GmOffset, const LICommon::RunInfo& runInfo);
     GlobalTensor<int32_t> blkTableGm_;
     GlobalTensor<K_T> keyGm_;
     GlobalTensor<Q_T> queryGm_;
@@ -105,13 +105,13 @@ private:
 };
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceCube<LIT>::InitParams(const ConstInfo &constInfo)
+__aicore__ inline void LightningIndexerServiceCube<LIT>::InitParams(const ConstInfo& constInfo)
 {
     constInfo_ = constInfo;
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceCube<LIT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void LightningIndexerServiceCube<LIT>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(bufQL1_, QUERY_BUF_NUM * M_BASIC_BLOCK * D_BASIC_BLOCK * sizeof(Q_T));
     queryL1_ = bufQL1_.Get<Q_T>();
@@ -128,10 +128,10 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::InitBuffers(TPipe *pipe
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceCube<LIT>::InitMm1GlobalTensor(const GlobalTensor<int32_t> &blkTableGm,
-                                                                             const GlobalTensor<K_T> &keyGm,
-                                                                             const GlobalTensor<Q_T> &queryGm,
-                                                                             const GlobalTensor<float> &mm1ResGm)
+__aicore__ inline void LightningIndexerServiceCube<LIT>::InitMm1GlobalTensor(const GlobalTensor<int32_t>& blkTableGm,
+                                                                             const GlobalTensor<K_T>& keyGm,
+                                                                             const GlobalTensor<Q_T>& queryGm,
+                                                                             const GlobalTensor<float>& mm1ResGm)
 {
     blkTableGm_ = blkTableGm;
     keyGm_ = keyGm;
@@ -140,7 +140,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::InitMm1GlobalTensor(con
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceCube<LIT>::ComputeMm1(const LICommon::RunInfo &runInfo)
+__aicore__ inline void LightningIndexerServiceCube<LIT>::ComputeMm1(const LICommon::RunInfo& runInfo)
 {
     uint64_t s2GmBaseOffset = runInfo.s2Idx * constInfo_.s2BaseSize;
     uint64_t s1gProcessSize = runInfo.actMBaseSize;
@@ -205,7 +205,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::ComputeMm1(const LIComm
 
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::KeyNd2Nz(uint64_t s2L1RealSize, uint64_t s2GmOffset,
-                                                                  const LICommon::RunInfo &runInfo)
+                                                                  const LICommon::RunInfo& runInfo)
 {
     uint64_t s2L1Offset = 0;
     while (s2L1Offset < s2L1RealSize) {
@@ -242,7 +242,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::KeyNd2Nz(uint64_t s2L1R
 // blkNum, blkSize, N2, D
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::KeyNd2NzForPA(uint64_t s2L1RealSize, uint64_t s2GmOffset,
-                                                                       const LICommon::RunInfo &runInfo)
+                                                                       const LICommon::RunInfo& runInfo)
 {
     uint64_t s2L1Offset = 0;
     while (s2L1Offset < s2L1RealSize) {
@@ -284,7 +284,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::KeyNd2NzForPA(uint64_t 
 // batch, s1, n2, g, d
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::QueryNd2Nz(uint64_t s1gL1RealSize, uint64_t s1gGmOffset,
-                                                                    const LICommon::RunInfo &runInfo)
+                                                                    const LICommon::RunInfo& runInfo)
 {
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
@@ -303,7 +303,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::QueryNd2Nz(uint64_t s1g
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::LoadQueryToL0a(uint64_t s1gGmOffset, uint64_t s1gL1Offset,
                                                                         uint64_t s1gL1RealSize, uint64_t s1gL0RealSize,
-                                                                        const LICommon::RunInfo &runInfo)
+                                                                        const LICommon::RunInfo& runInfo)
 {
     LoadData3DParamsV2<Q_T> loadData3DParams;
     // SetFmatrixParams
@@ -340,7 +340,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::LoadQueryToL0a(uint64_t
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::LoadKeyToL0b(uint64_t s2L1Offset, uint64_t s2L1RealSize,
                                                                       uint64_t s2L0RealSize,
-                                                                      const LICommon::RunInfo &runInfo)
+                                                                      const LICommon::RunInfo& runInfo)
 {
     uint64_t keyL1Offset = s2L1Offset >= S2_BASIC_BLOCK_L0 ? S2_BASIC_BLOCK_L0 * D_BASIC_BLOCK_L0 : 0;
     LoadData2DParams loadData2DParams;
@@ -355,7 +355,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::LoadKeyToL0b(uint64_t s
 
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::ComuteL0c(uint64_t s1gL0RealSize, uint64_t s2L0RealSize,
-                                                                   const LICommon::RunInfo &runInfo)
+                                                                   const LICommon::RunInfo& runInfo)
 {
     MmadParams mmadParams;
     mmadParams.m = CeilAlign(s1gL0RealSize, BLOCK_CUBE);
@@ -374,7 +374,7 @@ __aicore__ inline void LightningIndexerServiceCube<LIT>::ComuteL0c(uint64_t s1gL
 template <typename LIT>
 __aicore__ inline void LightningIndexerServiceCube<LIT>::Fixp(uint64_t s1gGmOffset, uint64_t s2GmOffset,
                                                               uint64_t s1gL0RealSize, uint64_t s2L0RealSize,
-                                                              const LICommon::RunInfo &runInfo)
+                                                              const LICommon::RunInfo& runInfo)
 {
     AscendC::DataCopyCO12DstParams intriParams;
     intriParams.mSize = CeilAlign(s1gL0RealSize, BLOCK_CUBE);

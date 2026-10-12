@@ -27,7 +27,7 @@ constexpr int64_t INPUT_CONV_STATES_INDEX = 2;
 constexpr int64_t OUTPUT_CONV_STATES_INDEX = 0;
 constexpr int64_t OUTPUT_X_INDEX = 1;
 
-ge::graphStatus InferShape4InplaceFusedCausalConv1d(gert::InferShapeContext *context)
+ge::graphStatus InferShape4InplaceFusedCausalConv1d(gert::InferShapeContext* context)
 {
     OP_LOGD(context, "Begin to do InferShape4InplaceFusedCausalConv1d");
 
@@ -49,7 +49,7 @@ ge::graphStatus InferShape4InplaceFusedCausalConv1d(gert::InferShapeContext *con
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataType4InplaceFusedCausalConv1d(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataType4InplaceFusedCausalConv1d(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context, "Begin to do InferDataType4InplaceFusedCausalConv1d");
 

@@ -111,28 +111,28 @@ struct MQSMLAParaInfo {
     MQSMLATilingRequiredParaInfo attnOut = {nullptr, nullptr};
     MQSMLATilingRequiredParaInfo softmaxLse = {nullptr, nullptr};
 
-    const int64_t *quantMode = nullptr;
-    const int64_t *tileSize = nullptr;
-    const int64_t *ropeHeadDim = nullptr;
-    const float *softmaxScale = nullptr;
-    const int64_t *oriKvStride = nullptr;
-    const int64_t *cmpKvStride = nullptr;
-    const int64_t *cmpRatio = nullptr;
-    const uint32_t *oriMaskMode = nullptr;
-    const uint32_t *cmpMaskMode = nullptr;
-    const int64_t *oriWinLeft = nullptr;
-    const int64_t *oriWinRight = nullptr;
-    const char *layoutQ = nullptr;
-    const char *layoutKv = nullptr;
-    const int64_t *topkValueMode = nullptr;
-    const bool *returnSoftmaxLse = nullptr;
+    const int64_t* quantMode = nullptr;
+    const int64_t* tileSize = nullptr;
+    const int64_t* ropeHeadDim = nullptr;
+    const float* softmaxScale = nullptr;
+    const int64_t* oriKvStride = nullptr;
+    const int64_t* cmpKvStride = nullptr;
+    const int64_t* cmpRatio = nullptr;
+    const uint32_t* oriMaskMode = nullptr;
+    const uint32_t* cmpMaskMode = nullptr;
+    const int64_t* oriWinLeft = nullptr;
+    const int64_t* oriWinRight = nullptr;
+    const char* layoutQ = nullptr;
+    const char* layoutKv = nullptr;
+    const int64_t* topkValueMode = nullptr;
+    const bool* returnSoftmaxLse = nullptr;
 };
 
 // -----------算子Tiling入参信息类---------------
 class MQSMLATilingInfo {
 public:
-    const char *opName = nullptr;
-    fe::PlatFormInfos *platformInfo = nullptr;
+    const char* opName = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     MQSMLAParaInfo opParamInfo;
 
     // Base Param
@@ -206,7 +206,7 @@ public:
 
 class MQSMLAInfoParser {
 public:
-    explicit MQSMLAInfoParser(gert::TilingContext *context)
+    explicit MQSMLAInfoParser(gert::TilingContext* context)
         : context_(context)
     {}
     ~MQSMLAInfoParser() = default;
@@ -215,9 +215,9 @@ public:
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckRequiredParaExistence() const;
 
-    ge::graphStatus GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor, MQSMLALayout &layout,
-                                        const std::string &name) const;
-    ge::graphStatus GetActualSeqLenQSize(int64_t &size);
+    ge::graphStatus GetActualSeqLenSize(int64_t& size, const gert::Tensor* tensor, MQSMLALayout& layout,
+                                        const std::string& name) const;
+    ge::graphStatus GetActualSeqLenQSize(int64_t& size);
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
     void GetOptionalInputParaInfo();
@@ -247,18 +247,18 @@ public:
     ge::graphStatus GetDSizeQ();
     ge::graphStatus GetDSizeKV();
     ge::graphStatus GetKvstride();
-    void GenerateInfo(MQSMLATilingInfo &qsmlaInfo);
-    ge::graphStatus Parse(MQSMLATilingInfo &qsmlaInfo);
+    void GenerateInfo(MQSMLATilingInfo& qsmlaInfo);
+    ge::graphStatus Parse(MQSMLATilingInfo& qsmlaInfo);
 
 public:
-    gert::TilingContext *context_ = nullptr;
-    const char *mqsmlaOpName_;
-    fe::PlatFormInfos *mqsmlaPlatformInfo_;
+    gert::TilingContext* context_ = nullptr;
+    const char* mqsmlaOpName_;
+    fe::PlatFormInfos* mqsmlaPlatformInfo_;
     MQSMLAParaInfo mqsmlaParams_;
 
-    bool HasAxis(const MQSMLAAxis &axis, const MQSMLALayout &layout, const gert::Shape &shape) const;
-    size_t GetAxisIdx(const MQSMLAAxis &axis, const MQSMLALayout &layout) const;
-    int64_t GetAxisNum(const gert::Shape &shape, const MQSMLAAxis &axis, const MQSMLALayout &layout) const;
+    bool HasAxis(const MQSMLAAxis& axis, const MQSMLALayout& layout, const gert::Shape& shape) const;
+    size_t GetAxisIdx(const MQSMLAAxis& axis, const MQSMLALayout& layout) const;
+    int64_t GetAxisNum(const gert::Shape& shape, const MQSMLAAxis& axis, const MQSMLALayout& layout) const;
     static constexpr int64_t invalidDimValue_ = std::numeric_limits<int64_t>::min();
 
     // BaseParams

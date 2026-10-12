@@ -77,12 +77,12 @@ public:
     GlobalTensor<uint64_t> actualSeqLengthsGm;
     GlobalTensor<uint32_t> fiaMetaDataGm;
     GlobalTensor<float> softmaxLseGm;
-    __gm__ uint8_t *keyPtr = nullptr;
-    __gm__ uint8_t *valuePtr = nullptr;
+    __gm__ uint8_t* keyPtr = nullptr;
+    __gm__ uint8_t* valuePtr = nullptr;
 
     ConstInfoX constInfo;
-    const FullQuantTiling *__restrict tilingData;
-    TPipe *pipe = nullptr;
+    const FullQuantTiling* __restrict tilingData;
+    TPipe* pipe = nullptr;
     CubeBlockType cubeBlock;
     VecFaBlockType vecFaBlock;
     VecFdBlockType vecFdBlock;
@@ -110,18 +110,18 @@ public:
           vecFaBlock(constInfo),
           vecFdBlock(constInfo){};
 
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                                __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *blockTable,
-                                __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *dequantScaleKey,
-                                __gm__ uint8_t *dequantScaleValue, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-                                __gm__ uint8_t *softmaxLse, __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-                                __gm__ uint8_t *fiaMetaData, const FullQuantTiling *__restrict tiling, TPipe *tPipe)
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
+                                __gm__ uint8_t* actualSeqLengthsKv, __gm__ uint8_t* blockTable,
+                                __gm__ uint8_t* dequantScaleQuery, __gm__ uint8_t* dequantScaleKey,
+                                __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+                                __gm__ uint8_t* softmaxLse, __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace,
+                                __gm__ uint8_t* fiaMetaData, const FullQuantTiling* __restrict tiling, TPipe* tPipe)
     {
         this->pipe = tPipe;
         this->tilingData = tiling;
 
-        fiaMetaDataGm.SetGlobalBuffer((__gm__ uint32_t *)fiaMetaData,
+        fiaMetaDataGm.SetGlobalBuffer((__gm__ uint32_t*)fiaMetaData,
                                       NPU_AIC_CORE_NUM * FA_METADATA_SIZE + NPU_AIV_CORE_NUM * FD_METADATA_SIZE);
 
         InitConstInfo();
@@ -129,10 +129,10 @@ public:
         keyPtr = key;
         valuePtr = value;
 
-        actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ uint64_t *)actualSeqLengths, constInfo.actualSeqLenSize);
+        actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ uint64_t*)actualSeqLengths, constInfo.actualSeqLenSize);
         qActSeqLensParser.Init(actualSeqLengthsGmQ, constInfo.actualSeqLenSize, constInfo.s1Size);
 
-        actualSeqLengthsGm.SetGlobalBuffer((__gm__ uint64_t *)actualSeqLengthsKv, constInfo.actualSeqLenKVSize);
+        actualSeqLengthsGm.SetGlobalBuffer((__gm__ uint64_t*)actualSeqLengthsKv, constInfo.actualSeqLenKVSize);
         kvActSeqLensParser.Init(actualSeqLengthsGm, constInfo.actualSeqLenKVSize, constInfo.s2Size);
 
         InitMMResBuf(workspace);
@@ -155,14 +155,14 @@ public:
                                             this->vecFaBlock.accumOutGm, this->vecFaBlock.attentionOutGm,
                                             this->actualSeqLengthsGmQ, this->actualSeqLengthsGm, keyPtr);
                 if (constInfo.isSoftmaxLseEnable) {
-                    softmaxLseGm.SetGlobalBuffer((__gm__ float *)softmaxLse);
+                    softmaxLseGm.SetGlobalBuffer((__gm__ float*)softmaxLse);
                     vecFdBlock.InitSoftmaxLseGm(softmaxLseGm);
                 }
             }
         }
     }
 
-    __aicore__ inline void InitMMResBuf(__gm__ uint8_t *&workspace)
+    __aicore__ inline void InitMMResBuf(__gm__ uint8_t*& workspace)
     {
         constexpr uint32_t mm1OutDtype = sizeof(T);
         constexpr uint32_t mm1ResultSize = mBaseSize / CV_RATIO * s2BaseSize * mm1OutDtype;
@@ -472,8 +472,8 @@ public:
         }
     }
 
-    __aicore__ inline void GetPreNextTokenLeftUp(int64_t actSeqLensQ, int64_t actSeqLensKv, int64_t &preTokenLeftUp,
-                                                 int64_t &nextTokenLeftUp)
+    __aicore__ inline void GetPreNextTokenLeftUp(int64_t actSeqLensQ, int64_t actSeqLensKv, int64_t& preTokenLeftUp,
+                                                 int64_t& nextTokenLeftUp)
     {
         preTokenLeftUp = constInfo.preTokens;
         nextTokenLeftUp = constInfo.nextTokens;
@@ -492,8 +492,8 @@ public:
 
     __aicore__ inline void ExecuteTask(uint64_t loop, RunInfoX taskRunInfo[PRELOAD_TASK_CACHE_SIZE])
     {
-        RunInfoX &runInfo0 = taskRunInfo[loop % PRELOAD_TASK_CACHE_SIZE];
-        RunInfoX &runInfoNegN = taskRunInfo[(loop - PRELOAD_N) % PRELOAD_TASK_CACHE_SIZE];
+        RunInfoX& runInfo0 = taskRunInfo[loop % PRELOAD_TASK_CACHE_SIZE];
+        RunInfoX& runInfoNegN = taskRunInfo[(loop - PRELOAD_N) % PRELOAD_TASK_CACHE_SIZE];
         if (runInfo0.isValid) {
             if ASCEND_IS_AIC {
                 ComputeMm1(runInfo0);
@@ -514,12 +514,12 @@ public:
         }
     }
 
-    __aicore__ inline void ComputeMm1(RunInfoX &runInfo)
+    __aicore__ inline void ComputeMm1(RunInfoX& runInfo)
     {
         cubeBlock.IterateBmm1(this->bmm1Buffers.Get(), runInfo);
     }
 
-    __aicore__ inline void ComputeMm2(RunInfoX &runInfo)
+    __aicore__ inline void ComputeMm2(RunInfoX& runInfo)
     {
         if constexpr (BMM2_TOUB) {
             cubeBlock.IterateBmm2(this->bmm2Buffers.Get(), this->l1PBuffers, runInfo);
@@ -528,12 +528,12 @@ public:
         }
     }
 
-    __aicore__ inline void ComputeVec1(RunInfoX &runInfo)
+    __aicore__ inline void ComputeVec1(RunInfoX& runInfo)
     {
         vecFaBlock.ProcessVec1(this->l1PBuffers.Get(), this->bmm1Buffers.Get(), runInfo);
     }
 
-    __aicore__ inline void ComputeVec2(RunInfoX &runInfo)
+    __aicore__ inline void ComputeVec2(RunInfoX& runInfo)
     {
         if constexpr (BMM2_TOUB) {
             this->vecFaBlock.ProcessVec2(this->bmm2Buffers.Get(), runInfo);
@@ -545,12 +545,12 @@ public:
     __aicore__ inline void CreateTask(uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur,
                                       RunInfoX taskRunInfo[PRELOAD_TASK_CACHE_SIZE])
     {
-        RunInfoX &runInfo = taskRunInfo[loop % PRELOAD_TASK_CACHE_SIZE];
+        RunInfoX& runInfo = taskRunInfo[loop % PRELOAD_TASK_CACHE_SIZE];
         CalcParams(loop, bN2Cur, gS1Cur, s2Cur, runInfo);
         runInfo.isValid = true;
     }
 
-    __aicore__ inline void CalcParams(uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur, RunInfoX &info)
+    __aicore__ inline void CalcParams(uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur, RunInfoX& info)
     {
         info.loop = loop;
         info.mloop = mloop;
@@ -610,8 +610,8 @@ public:
         }
     }
 
-    __aicore__ inline void UpdateAxisInfo(TASK_DEAL_MODE taskDealMode, uint32_t &bN2Cur, uint32_t &gS1Cur,
-                                          uint32_t &s2Cur)
+    __aicore__ inline void UpdateAxisInfo(TASK_DEAL_MODE taskDealMode, uint32_t& bN2Cur, uint32_t& gS1Cur,
+                                          uint32_t& s2Cur)
     {
         uint64_t s2LoopTimes = (actSeqLensKv + s2BaseSize - 1) / s2BaseSize;
         uint64_t gS1Size = actSeqLensQ * constInfo.realGSize;

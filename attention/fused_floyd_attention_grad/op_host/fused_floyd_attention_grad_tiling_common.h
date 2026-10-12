@@ -24,11 +24,11 @@ constexpr int64_t BYTE_PER_BLOCK = 32; // 32 B in block
 constexpr int HIGH_PRECISION = 0;
 constexpr int HIGH_PERFORMANCE = 1;
 
-constexpr const char *BSH_STR = "BSH";
-constexpr const char *SBH_STR = "SBH";
-constexpr const char *BNSD_STR = "BNSD";
-constexpr const char *BSND_STR = "BSND";
-constexpr const char *TND_STR = "TND";
+constexpr const char* BSH_STR = "BSH";
+constexpr const char* SBH_STR = "SBH";
+constexpr const char* BNSD_STR = "BNSD";
+constexpr const char* BSND_STR = "BSND";
+constexpr const char* TND_STR = "TND";
 constexpr size_t DIM_0 = 0;
 constexpr size_t DIM_1 = 1;
 constexpr size_t DIM_2 = 2;
@@ -223,14 +223,14 @@ static T AlignUp(T num1, T num2)
     }
     return (num1 + num2 - 1) / num2 * num2;
 }
-ge::graphStatus CheckSoftmaxMaxAndSumShape(gert::TilingContext *context, int64_t b, int64_t n, int64_t s1, int64_t s2,
+ge::graphStatus CheckSoftmaxMaxAndSumShape(gert::TilingContext* context, int64_t b, int64_t n, int64_t s1, int64_t s2,
                                            uint8_t inputIdx);
-ge::graphStatus CheckAttentionMaskShape(gert::TilingContext *context, int64_t b, int64_t s1, int64_t s3);
-ge::graphStatus CheckSupportShape(gert::TilingContext *context);
-ge::graphStatus CheckInputShapeValid(gert::TilingContext *context, int64_t b, int64_t n, int64_t s1, int64_t s2,
+ge::graphStatus CheckAttentionMaskShape(gert::TilingContext* context, int64_t b, int64_t s1, int64_t s3);
+ge::graphStatus CheckSupportShape(gert::TilingContext* context);
+ge::graphStatus CheckInputShapeValid(gert::TilingContext* context, int64_t b, int64_t n, int64_t s1, int64_t s2,
                                      int64_t s3, int64_t d);
-bool CheckSameShape(const gert::StorageShape *aShape, const gert::StorageShape *bShape);
-bool isTndSABHit(gert::TilingContext *context);
+bool CheckSameShape(const gert::StorageShape* aShape, const gert::StorageShape* bShape);
+bool isTndSABHit(gert::TilingContext* context);
 
 // dq/dv/dk vdup and dropMask bit2bool
 BEGIN_TILING_DATA_DEF(FFAGPreParams)

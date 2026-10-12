@@ -42,7 +42,7 @@ static const size_t KV_HEAD_NUM_INDEX = 3;
 static const size_t BLOCK_SIZE_INDEX = 4;
 static const size_t INNER_PRECISE_INDEX = 5;
 
-graphStatus IncreHostExecuteFunc(OpExecutePrepareContext *host_api_ctx)
+graphStatus IncreHostExecuteFunc(OpExecutePrepareContext* host_api_ctx)
 {
     OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE("aclnnfallback", "host_api_ctx is null"), return GRAPH_FAILED);
 
@@ -58,10 +58,10 @@ graphStatus IncreHostExecuteFunc(OpExecutePrepareContext *host_api_ctx)
     auto output = host_api_ctx->GetOutputTensor(0);
     OP_CHECK_IF(output == nullptr, OP_LOGE(host_api_ctx->GetNodeName(), "output is null"), return GRAPH_FAILED);
 
-    std::vector<const gert::Tensor *> ge_tenserListKey;
+    std::vector<const gert::Tensor*> ge_tenserListKey;
     ge_tenserListKey.push_back(key);
 
-    std::vector<const gert::Tensor *> ge_tenserListValue;
+    std::vector<const gert::Tensor*> ge_tenserListValue;
     ge_tenserListValue.push_back(value);
 
     auto pseShiftGe = host_api_ctx->GetOptionalInputTensor(PSE_SHIFT_INDEX);
@@ -79,7 +79,7 @@ graphStatus IncreHostExecuteFunc(OpExecutePrepareContext *host_api_ctx)
 
     std::vector<int64_t> actSeqArray;
     if (actualSeqLengthsGe != nullptr) {
-        const int64_t *actSeqData = actualSeqLengthsGe->GetData<int64_t>();
+        const int64_t* actSeqData = actualSeqLengthsGe->GetData<int64_t>();
         const size_t len = static_cast<size_t>(actualSeqLengthsGe->GetShapeSize());
         for (size_t i = 0; i < len; i++) {
             actSeqArray.push_back(actSeqData[i]);
@@ -87,18 +87,18 @@ graphStatus IncreHostExecuteFunc(OpExecutePrepareContext *host_api_ctx)
     }
 
     auto attrs = host_api_ctx->GetAttrs();
-    const uint32_t *num_heads = attrs->GetAttrPointer<uint32_t>(NUM_HEADS_INDEX);
-    const float *scaleValue = attrs->GetAttrPointer<float>(SCALE_VALUE_INDEX);
-    const char *layout = attrs->GetAttrPointer<char>(LAYOUT_INDEX);
-    const uint32_t *kvHeadNum = attrs->GetAttrPointer<uint32_t>(KV_HEAD_NUM_INDEX);
-    const uint32_t *blockSize = attrs->GetAttrPointer<uint32_t>(BLOCK_SIZE_INDEX);
+    const uint32_t* num_heads = attrs->GetAttrPointer<uint32_t>(NUM_HEADS_INDEX);
+    const float* scaleValue = attrs->GetAttrPointer<float>(SCALE_VALUE_INDEX);
+    const char* layout = attrs->GetAttrPointer<char>(LAYOUT_INDEX);
+    const uint32_t* kvHeadNum = attrs->GetAttrPointer<uint32_t>(KV_HEAD_NUM_INDEX);
+    const uint32_t* blockSize = attrs->GetAttrPointer<uint32_t>(BLOCK_SIZE_INDEX);
     OP_CHECK_IF(blockSize == nullptr,
                 OP_LOGE(host_api_ctx->GetNodeName(),
                         "In block-wise attention computation, blockSize is a required parameter (controls matrix block "
                         "dimension), must not be null, but a null was actually passed."),
                 return GRAPH_FAILED);
 
-    const uint32_t *innerPrecise = attrs->GetAttrPointer<uint32_t>(INNER_PRECISE_INDEX);
+    const uint32_t* innerPrecise = attrs->GetAttrPointer<uint32_t>(INNER_PRECISE_INDEX);
     OP_CHECK_IF(innerPrecise == nullptr,
                 OP_LOGE(host_api_ctx->GetNodeName(),
                         "In internal operations (e.g., attention matrix multiplication, softmax), innerPrecise is a "

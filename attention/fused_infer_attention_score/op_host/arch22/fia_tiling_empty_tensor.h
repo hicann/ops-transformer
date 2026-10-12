@@ -25,13 +25,13 @@ namespace optiling {
 
 class FiaTilingEmptyTensor : public FiaTilingBase {
 public:
-    explicit FiaTilingEmptyTensor(gert::TilingContext *context) : FiaTilingBase(context)
-    {
-    }
+    explicit FiaTilingEmptyTensor(gert::TilingContext* context)
+        : FiaTilingBase(context)
+    {}
     ~FiaTilingEmptyTensor() override = default;
 
 protected:
-    void InitTilingInfo(TilingInfo *tilingInfo) override;
+    void InitTilingInfo(TilingInfo* tilingInfo) override;
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
 
@@ -59,7 +59,7 @@ private:
     uint64_t tilingKey_{0};
 
     // Tiling Info
-    FiaTilingInfo *fiaInfo_ = nullptr;
+    FiaTilingInfo* fiaInfo_ = nullptr;
 };
 
 } // namespace optiling

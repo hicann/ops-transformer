@@ -60,21 +60,21 @@ TEST_F(gather_pa_kv_cache_test, test_tiling_key_577)
     size_t seqOffset_size = seqOffset_shape * sizeof(int32_t);
     size_t tiling_data_size = sizeof(GatherPaKvCacheTilingDataTest);
 
-    uint8_t *keyCache = (uint8_t *)AscendC::GmAlloc(keyCache_size);
-    uint8_t *valueCache = (uint8_t *)AscendC::GmAlloc(valueCache_size);
-    uint8_t *blockTables = (uint8_t *)AscendC::GmAlloc(blockTables_size);
-    uint8_t *seqLens = (uint8_t *)AscendC::GmAlloc(seqLens_size);
-    uint8_t *key = (uint8_t *)AscendC::GmAlloc(key_size);
-    uint8_t *value = (uint8_t *)AscendC::GmAlloc(value_size);
-    uint8_t *seqOffset = (uint8_t *)AscendC::GmAlloc(seqOffset_size);
-    uint8_t *keyOut = (uint8_t *)AscendC::GmAlloc(key_size);
-    uint8_t *valueOut = (uint8_t *)AscendC::GmAlloc(value_size);
+    uint8_t* keyCache = (uint8_t*)AscendC::GmAlloc(keyCache_size);
+    uint8_t* valueCache = (uint8_t*)AscendC::GmAlloc(valueCache_size);
+    uint8_t* blockTables = (uint8_t*)AscendC::GmAlloc(blockTables_size);
+    uint8_t* seqLens = (uint8_t*)AscendC::GmAlloc(seqLens_size);
+    uint8_t* key = (uint8_t*)AscendC::GmAlloc(key_size);
+    uint8_t* value = (uint8_t*)AscendC::GmAlloc(value_size);
+    uint8_t* seqOffset = (uint8_t*)AscendC::GmAlloc(seqOffset_size);
+    uint8_t* keyOut = (uint8_t*)AscendC::GmAlloc(key_size);
+    uint8_t* valueOut = (uint8_t*)AscendC::GmAlloc(value_size);
 
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tiling_data_size);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);
     uint32_t blockDim = 1;
 
-    GatherPaKvCacheTilingDataTest *tilingDatafromBin = reinterpret_cast<GatherPaKvCacheTilingDataTest *>(tiling);
+    GatherPaKvCacheTilingDataTest* tilingDatafromBin = reinterpret_cast<GatherPaKvCacheTilingDataTest*>(tiling);
 
     tilingDatafromBin->blockSize = 128;
     tilingDatafromBin->numTokens = 36;
@@ -87,7 +87,7 @@ TEST_F(gather_pa_kv_cache_test, test_tiling_key_577)
 
     ICPU_SET_TILING_KEY(577);
     ICPU_RUN_KF(gather_pa_kv_cache, blockDim, keyCache, valueCache, blockTables, seqLens, key, value, seqOffset, keyOut,
-                valueOut, workspace, (uint8_t *)(tilingDatafromBin));
+                valueOut, workspace, (uint8_t*)(tilingDatafromBin));
     AscendC::GmFree(keyCache);
     AscendC::GmFree(valueCache);
     AscendC::GmFree(blockTables);
@@ -111,7 +111,6 @@ TEST_F(gather_pa_kv_cache_test, test_tiling_key_619)
     uint32_t value_shape = 8931 * 16 * 128;
     uint32_t seqOffset_shape = 16;
 
-
     size_t keyCache_size = keyCache_shape * sizeof(half);
     size_t valueCache_size = valueCache_shape * sizeof(half);
     size_t blockTables_size = blockTables_shape * sizeof(int32_t);
@@ -121,21 +120,21 @@ TEST_F(gather_pa_kv_cache_test, test_tiling_key_619)
     size_t seqOffset_size = seqOffset_shape * sizeof(int32_t);
     size_t tiling_data_size = sizeof(GatherPaKvCacheTilingDataTest);
 
-    uint8_t *keyCache = (uint8_t *)AscendC::GmAlloc(keyCache_size);
-    uint8_t *valueCache = (uint8_t *)AscendC::GmAlloc(valueCache_size);
-    uint8_t *blockTables = (uint8_t *)AscendC::GmAlloc(blockTables_size);
-    uint8_t *seqLens = (uint8_t *)AscendC::GmAlloc(seqLens_size);
-    uint8_t *key = (uint8_t *)AscendC::GmAlloc(key_size);
-    uint8_t *value = (uint8_t *)AscendC::GmAlloc(value_size);
-    uint8_t *seqOffset = (uint8_t *)AscendC::GmAlloc(seqOffset_size);
-    uint8_t *keyOut = (uint8_t *)AscendC::GmAlloc(key_size);
-    uint8_t *valueOut = (uint8_t *)AscendC::GmAlloc(value_size);
+    uint8_t* keyCache = (uint8_t*)AscendC::GmAlloc(keyCache_size);
+    uint8_t* valueCache = (uint8_t*)AscendC::GmAlloc(valueCache_size);
+    uint8_t* blockTables = (uint8_t*)AscendC::GmAlloc(blockTables_size);
+    uint8_t* seqLens = (uint8_t*)AscendC::GmAlloc(seqLens_size);
+    uint8_t* key = (uint8_t*)AscendC::GmAlloc(key_size);
+    uint8_t* value = (uint8_t*)AscendC::GmAlloc(value_size);
+    uint8_t* seqOffset = (uint8_t*)AscendC::GmAlloc(seqOffset_size);
+    uint8_t* keyOut = (uint8_t*)AscendC::GmAlloc(key_size);
+    uint8_t* valueOut = (uint8_t*)AscendC::GmAlloc(value_size);
 
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tiling_data_size);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);
     uint32_t blockDim = 1;
 
-    GatherPaKvCacheTilingDataTest *tilingDatafromBin = reinterpret_cast<GatherPaKvCacheTilingDataTest *>(tiling);
+    GatherPaKvCacheTilingDataTest* tilingDatafromBin = reinterpret_cast<GatherPaKvCacheTilingDataTest*>(tiling);
 
     tilingDatafromBin->blockSize = 128;
     tilingDatafromBin->numTokens = 16;
@@ -148,7 +147,7 @@ TEST_F(gather_pa_kv_cache_test, test_tiling_key_619)
 
     ICPU_SET_TILING_KEY(619);
     ICPU_RUN_KF(gather_pa_kv_cache, blockDim, keyCache, valueCache, blockTables, seqLens, key, value, seqOffset, keyOut,
-                valueOut, workspace, (uint8_t *)(tilingDatafromBin));
+                valueOut, workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(keyCache);
     AscendC::GmFree(valueCache);
@@ -173,7 +172,6 @@ TEST_F(gather_pa_kv_cache_test, test_tiling_key_618)
     uint32_t value_shape = 9547 * 16 * 128;
     uint32_t seqOffset_shape = 16;
 
-
     size_t keyCache_size = keyCache_shape * sizeof(int8_t);
     size_t valueCache_size = valueCache_shape * sizeof(int8_t);
     size_t blockTables_size = blockTables_shape * sizeof(int32_t);
@@ -183,21 +181,21 @@ TEST_F(gather_pa_kv_cache_test, test_tiling_key_618)
     size_t seqOffset_size = seqOffset_shape * sizeof(int32_t);
     size_t tiling_data_size = sizeof(GatherPaKvCacheTilingDataTest);
 
-    uint8_t *keyCache = (uint8_t *)AscendC::GmAlloc(keyCache_size);
-    uint8_t *valueCache = (uint8_t *)AscendC::GmAlloc(valueCache_size);
-    uint8_t *blockTables = (uint8_t *)AscendC::GmAlloc(blockTables_size);
-    uint8_t *seqLens = (uint8_t *)AscendC::GmAlloc(seqLens_size);
-    uint8_t *key = (uint8_t *)AscendC::GmAlloc(key_size);
-    uint8_t *value = (uint8_t *)AscendC::GmAlloc(value_size);
-    uint8_t *seqOffset = (uint8_t *)AscendC::GmAlloc(seqOffset_size);
-    uint8_t *keyOut = (uint8_t *)AscendC::GmAlloc(key_size);
-    uint8_t *valueOut = (uint8_t *)AscendC::GmAlloc(value_size);
+    uint8_t* keyCache = (uint8_t*)AscendC::GmAlloc(keyCache_size);
+    uint8_t* valueCache = (uint8_t*)AscendC::GmAlloc(valueCache_size);
+    uint8_t* blockTables = (uint8_t*)AscendC::GmAlloc(blockTables_size);
+    uint8_t* seqLens = (uint8_t*)AscendC::GmAlloc(seqLens_size);
+    uint8_t* key = (uint8_t*)AscendC::GmAlloc(key_size);
+    uint8_t* value = (uint8_t*)AscendC::GmAlloc(value_size);
+    uint8_t* seqOffset = (uint8_t*)AscendC::GmAlloc(seqOffset_size);
+    uint8_t* keyOut = (uint8_t*)AscendC::GmAlloc(key_size);
+    uint8_t* valueOut = (uint8_t*)AscendC::GmAlloc(value_size);
 
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(16);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tiling_data_size);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(16);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);
     uint32_t blockDim = 1;
 
-    GatherPaKvCacheTilingDataTest *tilingDatafromBin = reinterpret_cast<GatherPaKvCacheTilingDataTest *>(tiling);
+    GatherPaKvCacheTilingDataTest* tilingDatafromBin = reinterpret_cast<GatherPaKvCacheTilingDataTest*>(tiling);
 
     tilingDatafromBin->blockSize = 128;
     tilingDatafromBin->numTokens = 16;
@@ -210,7 +208,7 @@ TEST_F(gather_pa_kv_cache_test, test_tiling_key_618)
 
     ICPU_SET_TILING_KEY(618);
     ICPU_RUN_KF(gather_pa_kv_cache, blockDim, keyCache, valueCache, blockTables, seqLens, key, value, seqOffset, keyOut,
-                valueOut, workspace, (uint8_t *)(tilingDatafromBin));
+                valueOut, workspace, (uint8_t*)(tilingDatafromBin));
 
     AscendC::GmFree(keyCache);
     AscendC::GmFree(valueCache);

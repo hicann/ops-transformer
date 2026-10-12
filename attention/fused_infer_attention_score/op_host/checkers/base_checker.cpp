@@ -26,15 +26,15 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35FIA;
 
-ge::graphStatus BaseChecker::CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const
+ge::graphStatus BaseChecker::CheckDtypeSupport(const gert::CompileTimeTensorDesc* desc, const std::string& name) const
 {
     if (desc != nullptr) {
-        const auto &it = DTYPE_SUPPORT_MAP.find(name);
+        const auto& it = DTYPE_SUPPORT_MAP.find(name);
         OP_CHECK_IF(it == DTYPE_SUPPORT_MAP.end(),
                     OP_LOGE("FusedInferAttentionScore",
                             "%s dtype support list should be specified in DTYPE_SUPPORT_MAP", name.c_str()),
                     return ge::GRAPH_FAILED);
-        auto &expectDtypeList = it->second;
+        auto& expectDtypeList = it->second;
         if (std::find(expectDtypeList.begin(), expectDtypeList.end(), desc->GetDataType()) == expectDtypeList.end()) {
             return ge::GRAPH_FAILED;
         }
@@ -42,7 +42,7 @@ ge::graphStatus BaseChecker::CheckDtypeSupport(const gert::CompileTimeTensorDesc
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BaseChecker::CheckFormatSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const
+ge::graphStatus BaseChecker::CheckFormatSupport(const gert::CompileTimeTensorDesc* desc, const std::string& name) const
 {
     if (desc != nullptr) {
         auto format = desc->GetOriginFormat();
@@ -56,8 +56,8 @@ ge::graphStatus BaseChecker::CheckFormatSupport(const gert::CompileTimeTensorDes
 }
 
 // 判断tensor是否连续
-ge::graphStatus BaseChecker::CheckTensorContiguous(const uint32_t &tensorDimNum, const gert::Shape &inputShape,
-                                                   const gert::Stride *Strides, int32_t &index) const
+ge::graphStatus BaseChecker::CheckTensorContiguous(const uint32_t& tensorDimNum, const gert::Shape& inputShape,
+                                                   const gert::Stride* Strides, int32_t& index) const
 {
     // 根据kv kvscale krope算出连续场景的strides，如果存在某一维不相等则表示不连续
     if (Strides == nullptr || Strides->GetDimNum() == 0) {
@@ -81,7 +81,7 @@ ge::graphStatus BaseChecker::CheckTensorContiguous(const uint32_t &tensorDimNum,
 }
 
 template <typename T>
-ge::graphStatus BaseChecker::CheckValueSupport(const T value, const std::vector<T> &expectValList) const
+ge::graphStatus BaseChecker::CheckValueSupport(const T value, const std::vector<T>& expectValList) const
 {
     if (std::find(expectValList.begin(), expectValList.end(), value) == expectValList.end()) {
         return ge::GRAPH_FAILED;
@@ -104,7 +104,7 @@ std::string BaseChecker::DataTypeToSerialString(ge::DataType type) const
 // explicit instantiation
 template ge::graphStatus BaseChecker::CheckValueSupport(
     const std::tuple<ge::DataType, ge::DataType, ge::DataType> value,
-    const std::vector<std::tuple<ge::DataType, ge::DataType, ge::DataType>> &expectValList) const;
+    const std::vector<std::tuple<ge::DataType, ge::DataType, ge::DataType>>& expectValList) const;
 template ge::graphStatus BaseChecker::CheckValueSupport(const int32_t value,
-                                                        const std::vector<int32_t> &expectValList) const;
+                                                        const std::vector<int32_t>& expectValList) const;
 } // namespace optiling

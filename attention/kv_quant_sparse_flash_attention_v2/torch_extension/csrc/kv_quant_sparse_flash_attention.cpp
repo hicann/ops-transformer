@@ -24,12 +24,12 @@ const int DIM_1 = 1;
 const int DIM_2 = 2;
 const int DIM_3 = 3;
 
-inline TensorWrapper MakeWrapper(const at::Tensor &tensor, aclDataType tensorAclType)
+inline TensorWrapper MakeWrapper(const at::Tensor& tensor, aclDataType tensorAclType)
 {
     return {tensor, tensorAclType};
 }
 
-int64_t GetKvHeadNum(const at::Tensor &key, const std::string &layoutKvStr)
+int64_t GetKvHeadNum(const at::Tensor& key, const std::string& layoutKvStr)
 {
     if (layoutKvStr == "TND") {
         return key.size(DIM_1);
@@ -38,14 +38,14 @@ int64_t GetKvHeadNum(const at::Tensor &key, const std::string &layoutKvStr)
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> KvQuantSparseFlashAttention(
-    const at::Tensor &query, const at::Tensor &key, const at::Tensor &value, const at::Tensor &sparseIndices,
-    const c10::optional<at::Tensor> &keyDequantScale, const c10::optional<at::Tensor> &valueDequantScale,
-    const c10::optional<at::Tensor> &blockTable, const c10::optional<at::Tensor> &actualSeqLengthsQuery,
-    const c10::optional<at::Tensor> &actualSeqLengthsKv, double scaleValue, int64_t keyQuantMode,
+    const at::Tensor& query, const at::Tensor& key, const at::Tensor& value, const at::Tensor& sparseIndices,
+    const c10::optional<at::Tensor>& keyDequantScale, const c10::optional<at::Tensor>& valueDequantScale,
+    const c10::optional<at::Tensor>& blockTable, const c10::optional<at::Tensor>& actualSeqLengthsQuery,
+    const c10::optional<at::Tensor>& actualSeqLengthsKv, double scaleValue, int64_t keyQuantMode,
     int64_t valueQuantMode, int64_t sparseBlockSize, c10::string_view layoutQuery, c10::string_view layoutKv,
     int64_t sparseMode, int64_t preTokens, int64_t nextTokens, int64_t attentionMode, int64_t quantScaleRepoMode,
     int64_t tileSize, int64_t ropeHeadDim, c10::optional<int64_t> keyDtype, c10::optional<int64_t> valueDtype,
-    const c10::optional<at::Tensor> &sinks, bool returnSoftmaxLse)
+    const c10::optional<at::Tensor>& sinks, bool returnSoftmaxLse)
 {
     TORCH_CHECK(query.numel() > 0, "Tensor query is empty.")
     TORCH_CHECK(key.numel() > 0, "Tensor key is empty.")
@@ -53,8 +53,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> KvQuantSparseFlashAttention(
 
     std::string layoutQStr(layoutQuery);
     std::string layoutKvStr(layoutKv);
-    const char *layoutQPtr = layoutQStr.c_str();
-    const char *layoutKvPtr = layoutKvStr.c_str();
+    const char* layoutQPtr = layoutQStr.c_str();
+    const char* layoutKvPtr = layoutKvStr.c_str();
 
     auto outSizes = query.sizes().vec();
     outSizes.back() -= ropeHeadDim;

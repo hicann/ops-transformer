@@ -18,14 +18,15 @@
 extern "C" {
 #endif
 aclnnStatus aclnnIncreFlashAttentionV2GetWorkspaceSize(
-    const aclTensor *query, const aclTensorList *key, const aclTensorList *value, const aclTensor *pseShift,
-    const aclTensor *attenMask, const aclIntArray *actualSeqLengths, const aclTensor *dequantScale1,
-    const aclTensor *quantScale1, const aclTensor *dequantScale2, const aclTensor *quantScale2,
-    const aclTensor *quantOffset2, int64_t numHeads, double scaleValue, char *inputLayout, int64_t numKeyValueHeads,
-    const aclTensor *attentionOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* query, const aclTensorList* key, const aclTensorList* value, const aclTensor* pseShift,
+    const aclTensor* attenMask, const aclIntArray* actualSeqLengths, const aclTensor* dequantScale1,
+    const aclTensor* quantScale1, const aclTensor* dequantScale2, const aclTensor* quantScale2,
+    const aclTensor* quantOffset2, int64_t numHeads, double scaleValue, char* inputLayout, int64_t numKeyValueHeads,
+    const aclTensor* attentionOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
-        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "Interface aclnnIncreFlashAttention versions V1 to V4 are no longer supported on Ascend950.");
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
+                "Interface aclnnIncreFlashAttention versions V1 to V4 are no longer supported on Ascend950.");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     static bool isFirstCall = true;
@@ -35,7 +36,7 @@ aclnnStatus aclnnIncreFlashAttentionV2GetWorkspaceSize(
                 "We apologize for any inconvenience caused and appreciate your timely migration to the new interface.");
         isFirstCall = false;
     }
-    (void) pseShift;
+    (void)pseShift;
     aclnnStatus ret = aclnnInnerIncreFlashAttentionGetWorkspaceSize(
         query, key, value, nullptr, attenMask, actualSeqLengths, dequantScale1, quantScale1, dequantScale2, quantScale2,
         quantOffset2, nullptr, nullptr, nullptr, nullptr, numHeads, scaleValue, inputLayout, numKeyValueHeads, 0, 1,
@@ -44,11 +45,12 @@ aclnnStatus aclnnIncreFlashAttentionV2GetWorkspaceSize(
     return ret;
 }
 
-aclnnStatus aclnnIncreFlashAttentionV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnIncreFlashAttentionV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                        const aclrtStream stream)
 {
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
-        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "Interface aclnnIncreFlashAttention versions V1 to V4 are no longer supported on Ascend950.");
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
+                "Interface aclnnIncreFlashAttention versions V1 to V4 are no longer supported on Ascend950.");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     static bool isFirstCall = true;

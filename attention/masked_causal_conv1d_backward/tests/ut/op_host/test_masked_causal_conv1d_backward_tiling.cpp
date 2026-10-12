@@ -34,7 +34,6 @@ protected:
     }
 };
 
-
 TEST_F(MaskedCausalConv1dBackwardTilingArch35, MaskedCausalConv1dBackward_950)
 {
     optiling::MaskedCausalConv1dBackwardArch35CompileInfo compileInfo = {64, 261888};

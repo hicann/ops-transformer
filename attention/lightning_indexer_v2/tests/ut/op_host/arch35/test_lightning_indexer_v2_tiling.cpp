@@ -749,14 +749,14 @@ enum ShapeInput : size_t {
 };
 
 struct ShapeCase {
-    const char *name;
-    const char *layout;
+    const char* name;
+    const char* layout;
     ShapeInput input;
     std::vector<int64_t> shape;
     ge::graphStatus expected = ge::GRAPH_FAILED;
 };
 
-gert::TilingContextPara::TensorDescription MakeShapeTensor(const std::vector<int64_t> &dims, ge::DataType dtype)
+gert::TilingContextPara::TensorDescription MakeShapeTensor(const std::vector<int64_t>& dims, ge::DataType dtype)
 {
     gert::StorageShape shape;
     shape.MutableShape().SetDimNum(dims.size());
@@ -768,7 +768,7 @@ gert::TilingContextPara::TensorDescription MakeShapeTensor(const std::vector<int
     return {shape, dtype, ge::FORMAT_ND};
 }
 
-void RunShapeCase(const ShapeCase &test)
+void RunShapeCase(const ShapeCase& test)
 {
     const bool tnd = std::string(test.layout) == "TND" || std::string(test.layout) == "TND_PA";
     const bool paged = std::string(test.layout) == "PA_BBND" || std::string(test.layout) == "TND_PA";
@@ -906,7 +906,7 @@ INSTANTIATE_TEST_SUITE_P(
         ShapeCase{"TND_cu_seqlens_q_rank2", "TND", CU_SEQLENS_Q_INPUT, {TEST_SINGLETON_DIM, TEST_CU_SEQLENS_SIZE}},
         ShapeCase{"TND_cu_seqlens_k_rank2", "TND", CU_SEQLENS_K_INPUT, {TEST_SINGLETON_DIM, TEST_CU_SEQLENS_SIZE}},
         ShapeCase{"BSND_cu_seqlens_k_forbidden", "BSND", CU_SEQLENS_K_INPUT, {TEST_CU_SEQLENS_SIZE}}),
-    [](const testing::TestParamInfo<ShapeCase> &info) { return info.param.name; });
+    [](const testing::TestParamInfo<ShapeCase>& info) { return info.param.name; });
 
 // Ascend950 PA_BBND: seqused_k must be provided when layout_k is PA_BBND (missing should fail)
 TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_pa_seqused_k_missing_failed)

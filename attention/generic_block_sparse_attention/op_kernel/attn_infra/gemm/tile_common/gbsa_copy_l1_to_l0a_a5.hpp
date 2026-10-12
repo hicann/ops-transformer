@@ -33,7 +33,7 @@ struct TileCopyTla<Arch::AtlasA5,
     __aicore__ inline TileCopyTla(){};
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor)
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor)
     {
         static_assert(
             tla::detail::iszN<typename TensorSrc::Element, typename TensorSrc::Layout>::value &&
@@ -61,7 +61,7 @@ struct TileCopyTla<Arch::AtlasA5,
     }
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint32_t l0Batch)
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint32_t l0Batch)
     {
         static_assert(
             tla::detail::iszN<typename TensorSrc::Element, typename TensorSrc::Layout>::value &&
@@ -104,7 +104,7 @@ struct TileCopyTla<Arch::AtlasA5,
     __aicore__ inline TileCopyTla(){};
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor)
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor)
     {
         static_assert(
             !AscendC::Std::is_one_of_v<typename TensorSrc::Element, int8_t, float8_e4m3_t, float8_e5m2_t> &&
@@ -134,7 +134,7 @@ struct TileCopyTla<Arch::AtlasA5,
     }
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint32_t l0Batch)
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint32_t l0Batch)
     {
         static_assert(
             !AscendC::Std::is_one_of_v<typename TensorSrc::Element, int8_t, float8_e4m3_t, float8_e5m2_t> &&
@@ -184,7 +184,7 @@ struct TileCopyTla<Arch::AtlasA5,
     __aicore__ inline TileCopyTla(){};
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor)
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor)
     {
         static_assert(
             AscendC::Std::is_one_of_v<typename TensorSrc::Element, int8_t, float8_e4m3_t, float8_e5m2_t> &&
@@ -230,7 +230,7 @@ struct TileCopyTla<Arch::AtlasA5,
     }
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint32_t l0Batch)
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint32_t l0Batch)
     {
         static_assert(
             AscendC::Std::is_one_of_v<typename TensorSrc::Element, int8_t, float8_e4m3_t, float8_e5m2_t> &&
@@ -291,7 +291,7 @@ struct TileCopyTla<Arch::AtlasA5,
     __aicore__ inline TileCopyTla(){};
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor)
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor)
     {
         uint16_t aL1M = tla::get<0, 0>(srcTensor.stride());
         uint16_t madM = tla::get<1, 1>(dstTensor.stride());

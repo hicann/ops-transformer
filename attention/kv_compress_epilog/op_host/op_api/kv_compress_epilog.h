@@ -20,9 +20,9 @@
 
 namespace l0op {
 
-const aclTensor *KvCompressEpilog(aclTensor *cache, const aclTensor *x, const aclTensor *slotMapping,
+const aclTensor* KvCompressEpilog(aclTensor* cache, const aclTensor* x, const aclTensor* slotMapping,
                                   int64_t quantGroupSize, int64_t quantMode, bool roundScale, float xScale,
-                                  aclOpExecutor *executor);
+                                  aclOpExecutor* executor);
 
 } // namespace l0op
 

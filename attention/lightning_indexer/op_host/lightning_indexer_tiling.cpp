@@ -71,7 +71,7 @@ static std::string LIDataTypeToSerialString(ge::DataType type)
     }
 }
 
-static std::string ToStringRaw(const gert::Shape &shape)
+static std::string ToStringRaw(const gert::Shape& shape)
 {
     std::ostringstream oss;
     for (size_t dimIndex = 0; dimIndex < shape.GetDimNum(); ++dimIndex) {
@@ -531,7 +531,7 @@ ge::graphStatus LIInfoParser::CheckKeyContiguous() const
     // PA_BBND: axis 0 allows non-contiguous, check starts from axis 1
     // Non-PA_BBND: check total shape size
     if (keyStride0_ != 0 && liParams_.key.shape != nullptr) {
-        auto &shape = liParams_.key.shape->GetStorageShape();
+        auto& shape = liParams_.key.shape->GetStorageShape();
         uint64_t totalElements = 0;
         uint64_t shapeSize = 0;
 
@@ -584,8 +584,8 @@ ge::graphStatus LIInfoParser::GetN1Size()
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus LiGetActualSeqLenSize(int64_t &liSize, const gert::Tensor *liTensor,
-                                             const std::string &liActualSeqLenName, const char *liOpName)
+static ge::graphStatus LiGetActualSeqLenSize(int64_t& liSize, const gert::Tensor* liTensor,
+                                             const std::string& liActualSeqLenName, const char* liOpName)
 {
     liSize = static_cast<uint32_t>(liTensor->GetShapeSize());
     if (liSize == 0) {
@@ -597,8 +597,8 @@ static ge::graphStatus LiGetActualSeqLenSize(int64_t &liSize, const gert::Tensor
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus LIInfoParser::GetActualSeqLenSize(int64_t &liSize, const gert::Tensor *liTensor,
-                                                  const std::string &liSeqLenName) const
+ge::graphStatus LIInfoParser::GetActualSeqLenSize(int64_t& liSize, const gert::Tensor* liTensor,
+                                                  const std::string& liSeqLenName) const
 {
     return LiGetActualSeqLenSize(liSize, liTensor, liSeqLenName, opName_);
 }
@@ -642,8 +642,8 @@ ge::graphStatus LIInfoParser::GetBatchSize()
     }
 }
 
-static ge::graphStatus LiGetHeadDim(const TilingRequiredParaInfo &liQuery, DataLayout liQLayout, const char *liOpName,
-                                    int64_t &liHeadDim)
+static ge::graphStatus LiGetHeadDim(const TilingRequiredParaInfo& liQuery, DataLayout liQLayout, const char* liOpName,
+                                    int64_t& liHeadDim)
 {
     uint32_t liDIndex = DIM_IDX_TWO;
     switch (liQLayout) {
@@ -1002,7 +1002,7 @@ ge::graphStatus LIInfoParser::ValidateInputShapesMatch()
     return ge::GRAPH_SUCCESS;
 }
 
-void LIInfoParser::GenerateInfo(LITilingInfo &liInfo)
+void LIInfoParser::GenerateInfo(LITilingInfo& liInfo)
 {
     liInfo.opName = opName_;
     liInfo.platformInfo = platformInfo_;
@@ -1081,7 +1081,7 @@ ge::graphStatus LIInfoParser::CheckFeatureMlaNoQuantShape() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus LIInfoParser::ParseAndCheck(LITilingInfo &liInfo)
+ge::graphStatus LIInfoParser::ParseAndCheck(LITilingInfo& liInfo)
 {
     if (ge::GRAPH_SUCCESS != GetOpName() || ge::GRAPH_SUCCESS != GetNpuInfo() || ge::GRAPH_SUCCESS != GetOpParaInfo() ||
         ge::GRAPH_SUCCESS != CheckLiRequiredParameters()) {
@@ -1121,13 +1121,13 @@ ge::graphStatus LIInfoParser::ParseAndCheck(LITilingInfo &liInfo)
 }
 
 // --------------------------TilingPrepare函数定义-------------------------------------
-static ge::graphStatus TilingPrepareForLightningIndexer(gert::TilingParseContext * /* context */)
+static ge::graphStatus TilingPrepareForLightningIndexer(gert::TilingParseContext* /* context */)
 {
     return ge::GRAPH_SUCCESS;
 }
 
 // --------------------------LightningIndexerTiling类成员函数定义-----------------------
-static uint64_t LiCalcWorkspaceSize(const platform_ascendc::PlatformAscendC &liPlatform, int64_t liS2Size,
+static uint64_t LiCalcWorkspaceSize(const platform_ascendc::PlatformAscendC& liPlatform, int64_t liS2Size,
                                     uint32_t liAicNum)
 {
     constexpr uint32_t liMm1ResElemSize = 4;
@@ -1158,7 +1158,7 @@ static uint64_t LiCalcWorkspaceSize(const platform_ascendc::PlatformAscendC &liP
     return liWorkspaceSize;
 }
 
-ge::graphStatus LightningIndexerTiling::DoTiling(LITilingInfo *tilingInfo)
+ge::graphStatus LightningIndexerTiling::DoTiling(LITilingInfo* tilingInfo)
 {
     // -------------set blockdim-----------------
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo->platformInfo);
@@ -1169,7 +1169,7 @@ ge::graphStatus LightningIndexerTiling::DoTiling(LITilingInfo *tilingInfo)
 
     // -------------set workspacesize-----------------
     uint64_t workspaceSize = LiCalcWorkspaceSize(ascendcPlatform, tilingInfo->s2Size, aicNum);
-    size_t *liWorkSpaces = context_->GetWorkspaceSizes(1);
+    size_t* liWorkSpaces = context_->GetWorkspaceSizes(1);
     liWorkSpaces[0] = workspaceSize;
 
     // -------------set tilingdata-----------------
@@ -1208,7 +1208,7 @@ ge::graphStatus LightningIndexerTiling::DoTiling(LITilingInfo *tilingInfo)
 }
 
 // --------------------------Tiling函数定义---------------------------
-ge::graphStatus TilingForLightningIndexer(gert::TilingContext *context)
+ge::graphStatus TilingForLightningIndexer(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("LightningIndexer", "Tiling context is null."),
                 return ge::GRAPH_FAILED);

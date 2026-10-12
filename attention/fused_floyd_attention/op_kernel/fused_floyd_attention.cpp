@@ -26,11 +26,11 @@ using namespace AscendC;
     GET_TILING_DATA_MEMBER(FusedFloydAttentionGeneralTilingData, bmm1k1TilingData, bmm1k1TilingDataVar, tiling); \
     GET_TILING_DATA_MEMBER(FusedFloydAttentionGeneralTilingData, bmm2TilingData, bmm2TilingDataVar, tiling); \
     GET_TILING_DATA_MEMBER(FusedFloydAttentionGeneralTilingData, bmm2v2TilingData, bmm2v2TilingDataVar, tiling); \
-    const FusedFloydAttentionGeneralTilingData *__restrict tilingData = nullptr; \
-    const TCubeTiling *__restrict bmm1tiling = &bmm1TilingDataVar; \
-    const TCubeTiling *__restrict bmm1k1tiling = &bmm1k1TilingDataVar; \
-    const TCubeTiling *__restrict bmm2tiling = &bmm2TilingDataVar; \
-    const TCubeTiling *__restrict bmm2v2tiling = &bmm2v2TilingDataVar;
+    const FusedFloydAttentionGeneralTilingData* __restrict tilingData = nullptr; \
+    const TCubeTiling* __restrict bmm1tiling = &bmm1TilingDataVar; \
+    const TCubeTiling* __restrict bmm1k1tiling = &bmm1k1TilingDataVar; \
+    const TCubeTiling* __restrict bmm2tiling = &bmm2TilingDataVar; \
+    const TCubeTiling* __restrict bmm2v2tiling = &bmm2v2TilingDataVar;
 
 #define INVOKE_FA_GENERAL_OP_IMPL(templateClass, ...) \
     do { \
@@ -68,15 +68,15 @@ using namespace AscendC;
 
 #define COPY_TILING_DATA(tiling) \
     GET_TILING_DATA_WITH_STRUCT(FusedFloydAttentionGeneralTilingData, tilingDataIn, tiling); \
-    const FusedFloydAttentionGeneralTilingData *__restrict tilingData = &tilingDataIn; \
-    const TCubeTiling *__restrict bmm1tiling = &(tilingData->bmm1TilingData); \
-    const TCubeTiling *__restrict bmm1k1tiling = &(tilingData->bmm1k1TilingData); \
-    const TCubeTiling *__restrict bmm2tiling = &(tilingData->bmm2TilingData); \
-    const TCubeTiling *__restrict bmm2v2tiling = &(tilingData->bmm2v2TilingData);
+    const FusedFloydAttentionGeneralTilingData* __restrict tilingData = &tilingDataIn; \
+    const TCubeTiling* __restrict bmm1tiling = &(tilingData->bmm1TilingData); \
+    const TCubeTiling* __restrict bmm1k1tiling = &(tilingData->bmm1k1TilingData); \
+    const TCubeTiling* __restrict bmm2tiling = &(tilingData->bmm2TilingData); \
+    const TCubeTiling* __restrict bmm2v2tiling = &(tilingData->bmm2v2TilingData);
 
 #define INVOKE_FA_GENERAL_OP_IMPL(templateClass, ...) \
     do { \
-        __gm__ uint8_t *user = GetUserWorkspace(workspace); \
+        __gm__ uint8_t* user = GetUserWorkspace(workspace); \
         COPY_TILING_DATA(tiling); \
         templateClass<__VA_ARGS__> op; \
         REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.bmm1, bmm1tiling, op.bmm1k1, bmm1k1tiling, op.bmm2, \
@@ -88,7 +88,7 @@ using namespace AscendC;
 
 #define INVOKE_FA_GENERAL_OP_IMPL_BMM1NZ(templateClass, ...) \
     do { \
-        __gm__ uint8_t *user = GetUserWorkspace(workspace); \
+        __gm__ uint8_t* user = GetUserWorkspace(workspace); \
         COPY_TILING_DATA(tiling); \
         templateClass<__VA_ARGS__> op; \
         REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.bmm1, bmm1tiling, op.bmm1Nz, bmm1tiling, op.bmm2, \
@@ -100,7 +100,7 @@ using namespace AscendC;
 
 #define INVOKE_FA_GENERAL_OP_IMPL_BMM2NZ(templateClass, ...) \
     do { \
-        __gm__ uint8_t *user = GetUserWorkspace(workspace); \
+        __gm__ uint8_t* user = GetUserWorkspace(workspace); \
         COPY_TILING_DATA(tiling); \
         templateClass<__VA_ARGS__> op; \
         REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.bmm1, bmm1tiling, op.bmm2, bmm2tiling, op.bmm2Nz, \
@@ -112,12 +112,12 @@ using namespace AscendC;
 
 #endif
 
-extern "C" __global__ __aicore__ void fused_floyd_attention(__gm__ uint8_t *query, __gm__ uint8_t *key_1,
-                                                            __gm__ uint8_t *value_1, __gm__ uint8_t *key_2,
-                                                            __gm__ uint8_t *value_2, __gm__ uint8_t *attenMask,
-                                                            __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
-                                                            __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-                                                            __gm__ uint8_t *tiling)
+extern "C" __global__ __aicore__ void fused_floyd_attention(__gm__ uint8_t* query, __gm__ uint8_t* key_1,
+                                                            __gm__ uint8_t* value_1, __gm__ uint8_t* key_2,
+                                                            __gm__ uint8_t* value_2, __gm__ uint8_t* attenMask,
+                                                            __gm__ uint8_t* softmaxMax, __gm__ uint8_t* softmaxSum,
+                                                            __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace,
+                                                            __gm__ uint8_t* tiling)
 {
     TPipe tPipe;
     SetMaskNorm();

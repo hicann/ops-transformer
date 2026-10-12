@@ -31,24 +31,24 @@ template <typename T>
 class FiaZeroOutput {
 public:
     __aicore__ inline FiaZeroOutput(){};
-    __aicore__ inline void Init(__gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
-                                const optiling::FlashAttentionScoreSimplifiedTilingData *__restrict tiling);
+    __aicore__ inline void Init(__gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse,
+                                const optiling::FlashAttentionScoreSimplifiedTilingData* __restrict tiling);
     __aicore__ inline void Process();
     static constexpr bool POST_QUANT = !IsSameType<T, half>::value;
 
 protected:
-    const optiling::FlashAttentionScoreSimplifiedTilingData *__restrict tilingData;
+    const optiling::FlashAttentionScoreSimplifiedTilingData* __restrict tilingData;
     GlobalTensor<half> attentionOutGm;
     GlobalTensor<float> softmaxLseGm;
 };
 
 template <typename T>
 __aicore__ inline void FiaZeroOutput<T>::Init(
-    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
-    const optiling::FlashAttentionScoreSimplifiedTilingData *__restrict tiling)
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse,
+    const optiling::FlashAttentionScoreSimplifiedTilingData* __restrict tiling)
 {
-    attentionOutGm.SetGlobalBuffer((__gm__ half *)attentionOut);
-    softmaxLseGm.SetGlobalBuffer((__gm__ float *)softmaxLse);
+    attentionOutGm.SetGlobalBuffer((__gm__ half*)attentionOut);
+    softmaxLseGm.SetGlobalBuffer((__gm__ float*)softmaxLse);
     tilingData = tiling;
 }
 
@@ -56,7 +56,7 @@ template <typename T>
 __aicore__ inline void FiaZeroOutput<T>::Process()
 {
     uint32_t tmp_block_idx = GetBlockIdx();
-    auto &initParams = tilingData->initOutputParams;
+    auto& initParams = tilingData->initOutputParams;
     uint32_t tailSize = initParams.totalOutputSize - tmp_block_idx * initParams.singleCoreSize;
     uint32_t singleInitOutputSize = tailSize < initParams.singleCoreSize ? tailSize : initParams.singleCoreSize;
     if (singleInitOutputSize > 0) {

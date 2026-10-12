@@ -187,7 +187,7 @@ public:
 
     uint32_t GetRawTilingKey() const
     {
-        return *(reinterpret_cast<const uint32_t *>(this));
+        return *(reinterpret_cast<const uint32_t*>(this));
     }
 
     std::string ToString() const
@@ -206,7 +206,7 @@ public:
     uint32_t reserved : 23; // to fullfil 32 bit, if add new template bit then decrease this number
 };
 
-inline bool operator==(const TilingKey &left, const TilingKey &right)
+inline bool operator==(const TilingKey& left, const TilingKey& right)
 {
     return left.GetRawTilingKey() == right.GetRawTilingKey();
 }
@@ -223,21 +223,21 @@ public:
 
 class FusedFloydAttentionTilingBase : public TilingBaseClass {
 public:
-    explicit FusedFloydAttentionTilingBase(gert::TilingContext *context)
+    explicit FusedFloydAttentionTilingBase(gert::TilingContext* context)
         : TilingBaseClass(context)
     {
         Reset();
     }
     ~FusedFloydAttentionTilingBase() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();
     }
 
 protected:
-    [[nodiscard]] gert::TilingContext *GetContext()
+    [[nodiscard]] gert::TilingContext* GetContext()
     {
         return context_;
     }
@@ -249,7 +249,7 @@ protected:
     ge::graphStatus GetPlatformInfo() override;
     // 2、获取INPUT/OUTPUT/ATTR信息
     ge::graphStatus GetShapeAttrsInfo() override;
-    void SetSparseTilingInfo(SparseEnum &sparseType);
+    void SetSparseTilingInfo(SparseEnum& sparseType);
     // 3、计算数据切分TilingData
     ge::graphStatus DoOpTiling() override;
     // 4、计算高阶API的TilingData
@@ -261,7 +261,7 @@ protected:
     // 7、保存Tiling数据
     ge::graphStatus PostTiling() override;
 
-    virtual void GetBufferNum(BufferNum &bufferNum) const = 0;
+    virtual void GetBufferNum(BufferNum& bufferNum) const = 0;
 
     void Reset();
 
@@ -281,28 +281,28 @@ protected:
     virtual bool AnalyzeDtype();
     bool AnalyzeAttrs();
     bool AnalyzeLayout();
-    bool Analyze4DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape, const gert::Shape &attenShape);
+    bool Analyze4DimLayout(const gert::Shape& queryShape, const gert::Shape& keyShape, const gert::Shape& attenShape);
     bool AnalyzeOptionalInput();
     bool MatchTemplate();
     virtual void CalcS1S2BasicBlock() = 0;
     virtual void CalcDBasicBlock() = 0;
-    int64_t CalcMaxS1BasicBlockSize(int64_t actualD, const BufferNum &bufferNum) const;
-    int64_t CalcMaxS2BasicBlockSize(const BufferNum &bufferNum, int64_t tmpS1BasicBlock) const;
+    int64_t CalcMaxS1BasicBlockSize(int64_t actualD, const BufferNum& bufferNum) const;
+    int64_t CalcMaxS2BasicBlockSize(const BufferNum& bufferNum, int64_t tmpS1BasicBlock) const;
     virtual bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock) = 0;
-    bool IsBasicBlockInSoftMax(const ge::Shape &shape) const;
+    bool IsBasicBlockInSoftMax(const ge::Shape& shape) const;
     virtual bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                                    matmul_tiling::MatmulApiTiling &bmm1);
+                                    matmul_tiling::MatmulApiTiling& bmm1);
     virtual bool SetBmm1k1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                                      matmul_tiling::MatmulApiTiling &bmm1) = 0;
+                                      matmul_tiling::MatmulApiTiling& bmm1) = 0;
     virtual bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                                    matmul_tiling::MatmulApiTiling &bmm2) = 0;
+                                    matmul_tiling::MatmulApiTiling& bmm2) = 0;
 
     virtual bool SetBmm2v2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                                      matmul_tiling::MatmulApiTiling &bmm2v2) = 0;
+                                      matmul_tiling::MatmulApiTiling& bmm2v2) = 0;
 
-    bool SetMatMulTiling(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, matmul_tiling::MatmulApiTiling &bmm1,
-                         matmul_tiling::MatmulApiTiling &bmm1k1, matmul_tiling::MatmulApiTiling &bmm2,
-                         matmul_tiling::MatmulApiTiling &bmm2v2);
+    bool SetMatMulTiling(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, matmul_tiling::MatmulApiTiling& bmm1,
+                         matmul_tiling::MatmulApiTiling& bmm1k1, matmul_tiling::MatmulApiTiling& bmm2,
+                         matmul_tiling::MatmulApiTiling& bmm2v2);
     bool SetMatMulTiling(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock);
     bool CaclBmmBatch(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock);
     virtual void SetCoreParams();
@@ -385,10 +385,10 @@ protected:
     int64_t minUsedUBSize;
     int64_t maxValidS2Len;
 
-    const char *templateName = "base";
-    const char *opName;
-    const char *inputLayout;
-    const int64_t *prefixNData;
+    const char* templateName = "base";
+    const char* opName;
+    const char* inputLayout;
+    const int64_t* prefixNData;
     TemplateType expectTemplate;
     TemplateType actualTemplate;
 
@@ -409,7 +409,7 @@ ge::graphStatus FusedFloydAttentionTilingBase::GetPlatformInfo()
 {
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OPS_REPORT_VECTOR_INNER_ERR(opName, "compileInfoPtr is null."),
                     return ge::GRAPH_FAILED);
         aivNum = compileInfoPtr->aivNum;
@@ -436,7 +436,7 @@ ge::graphStatus FusedFloydAttentionTilingBase::CheckContext()
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
     size_t idx = 0;
     auto scaleValuePtr = attrs->GetAttrPointer<float>(idx++);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
 
     OP_CHECK_NULL_WITH_CONTEXT(context_, scaleValuePtr);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
@@ -455,9 +455,9 @@ ge::graphStatus FusedFloydAttentionTilingBase::CheckContext()
     return ge::GRAPH_SUCCESS;
 }
 
-void FusedFloydAttentionTilingBase::SetSparseTilingInfo(SparseEnum &sparseType)
+void FusedFloydAttentionTilingBase::SetSparseTilingInfo(SparseEnum& sparseType)
 {
-    auto &inputParams = tilingData.inputParams;
+    auto& inputParams = tilingData.inputParams;
     inputParams.set_attenMaskCompressMode(attenMaskCompressMode);
     inputParams.set_sparseType(static_cast<uint8_t>(sparseType));
 }
@@ -483,7 +483,7 @@ ge::graphStatus FusedFloydAttentionTilingBase::GetShapeAttrsInfo()
     OP_CHECK_IF(alignedD <= 0, OPS_REPORT_VECTOR_INNER_ERR(opName, "invalid alignedD %ld.", alignedD),
                 return ge::GRAPH_FAILED);
 
-    auto &inputParams = tilingData.inputParams;
+    auto& inputParams = tilingData.inputParams;
     inputParams.set_bSize(bSize);
     inputParams.set_n2Size(n2Size);
     inputParams.set_gSize(gSize);
@@ -619,7 +619,7 @@ bool FusedFloydAttentionTilingBase::AnalyzeAttrs()
     size_t idx = 0;
     auto scaleValuePtr = attrs->GetAttrPointer<float>(idx++);
 
-    auto &queryShape = context_->GetInputShape(0)->GetStorageShape();
+    auto& queryShape = context_->GetInputShape(0)->GetStorageShape();
     auto n1SizePtr = queryShape.GetDim(2);
     inputLayout = "BNSD";
 
@@ -635,17 +635,17 @@ bool FusedFloydAttentionTilingBase::AnalyzeAttrs()
 
 bool FusedFloydAttentionTilingBase::AnalyzeLayout()
 {
-    auto &queryShape = context_->GetInputShape(0)->GetStorageShape();
-    auto &keyShape = context_->GetInputShape(1)->GetStorageShape();
-    auto &attenShape = context_->GetInputShape(ATTENTION_MASK_INPUT_INDEX)->GetStorageShape();
+    auto& queryShape = context_->GetInputShape(0)->GetStorageShape();
+    auto& keyShape = context_->GetInputShape(1)->GetStorageShape();
+    auto& attenShape = context_->GetInputShape(ATTENTION_MASK_INPUT_INDEX)->GetStorageShape();
 
     OP_CHECK_IF(!Analyze4DimLayout(queryShape, keyShape, attenShape),
                 OPS_REPORT_VECTOR_INNER_ERR(opName, "Get unsupported layout: %s", inputLayout), return false);
     return true;
 }
 
-bool FusedFloydAttentionTilingBase::Analyze4DimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape,
-                                                      const gert::Shape &attenShape)
+bool FusedFloydAttentionTilingBase::Analyze4DimLayout(const gert::Shape& queryShape, const gert::Shape& keyShape,
+                                                      const gert::Shape& attenShape)
 {
     // Q:   B H N M D
     // key: B H N K D
@@ -670,7 +670,7 @@ bool FusedFloydAttentionTilingBase::AnalyzeOptionalInput()
     attenMaskExistFlag = 1;
     tilingData.inputParams.set_attenMaskDataType(1);
     AttenMaskShapeType attenMaskShapeType = ATTEN_B_N2_G_S1_S2;
-    auto &attenMaskStorageShape = attenMaskShape->GetStorageShape();
+    auto& attenMaskStorageShape = attenMaskShape->GetStorageShape();
     auto attenMaskDimNum = attenMaskStorageShape.GetDimNum();
     if (attenMaskDimNum == 3) { // 3:shape is B_N2_1_1_S2
         attenMaskShapeType = ATTEN_B_N2_1_1_S2;
@@ -695,7 +695,7 @@ bool FusedFloydAttentionTilingBase::AnalyzeOptionalInput()
 
 ge::graphStatus FusedFloydAttentionTilingBase::DoOpTiling()
 {
-    auto &inputParams = tilingData.inputParams;
+    auto& inputParams = tilingData.inputParams;
     OP_LOGD(context_, "[%s]try template[%s]", templateName, expectTemplate.ToString().c_str());
     if (!MatchTemplate()) {
         OP_LOGI(context_,
@@ -761,7 +761,7 @@ void FusedFloydAttentionTilingBase::CalcDBasicBlock()
     return;
 }
 
-int64_t FusedFloydAttentionTilingBase::CalcMaxS1BasicBlockSize(int64_t actualD, const BufferNum &bufferNum) const
+int64_t FusedFloydAttentionTilingBase::CalcMaxS1BasicBlockSize(int64_t actualD, const BufferNum& bufferNum) const
 {
     // if S2 basic block is min value 16, s1 basic block can reach max value, then we get:
     // s1 * 16 * X * sizeof(T) + s1d * Y * sizeof(T) + s1 * expNum * 32 + s1 * 64 + apiTmp =>
@@ -775,7 +775,7 @@ int64_t FusedFloydAttentionTilingBase::CalcMaxS1BasicBlockSize(int64_t actualD, 
     return AlignDown(maxS1BasicBlock, FRACTAL_NUM);
 }
 
-int64_t FusedFloydAttentionTilingBase::CalcMaxS2BasicBlockSize(const BufferNum &bufferNum,
+int64_t FusedFloydAttentionTilingBase::CalcMaxS2BasicBlockSize(const BufferNum& bufferNum,
                                                                int64_t tmpS1BasicBlock) const
 {
     // used UB: s1s2 * X * sizeof(T) + s1d * Y * sizeof(T) + s1 * expNum * 32 + s1 * 64 + apiTmp
@@ -796,7 +796,7 @@ int64_t FusedFloydAttentionTilingBase::CalcMaxS2BasicBlockSize(const BufferNum &
     return std::min(AlignDown(tmpS2BasicBlock, FRACTAL_NUM), alignedS2);
 }
 
-bool FusedFloydAttentionTilingBase::IsBasicBlockInSoftMax(const ge::Shape &shape) const
+bool FusedFloydAttentionTilingBase::IsBasicBlockInSoftMax(const ge::Shape& shape) const
 {
     // 2 axes at least
     if (shape.GetDimNum() < 2) {
@@ -822,7 +822,7 @@ bool FusedFloydAttentionTilingBase::IsBasicBlockInSoftMax(const ge::Shape &shape
 
 void FusedFloydAttentionTilingBase::SetCoreParams()
 {
-    auto &coreParams = tilingData.coreParams;
+    auto& coreParams = tilingData.coreParams;
     coreParams.set_s1BaseSize(s1BasicBlock);
     coreParams.set_s1BaseTailSize(CalcTailSize(s1Size, s1BasicBlock));
     coreParams.set_s1OuterSize(CeilDivision(s1Size, s1BasicBlock));
@@ -851,7 +851,7 @@ void FusedFloydAttentionTilingBase::SetCoreParams()
 
 void FusedFloydAttentionTilingBase::SetMultiBatchCoreParams()
 {
-    auto &coreParams = tilingData.coreParams;
+    auto& coreParams = tilingData.coreParams;
     coreParams.set_bBaseSize(1);
     coreParams.set_bBaseTailSize(1);
     coreParams.set_bOuterSize(bSize);
@@ -868,8 +868,8 @@ void FusedFloydAttentionTilingBase::SetMultiBatchCoreParams()
 
 void FusedFloydAttentionTilingBase::SetMultiCoreParams()
 {
-    auto &multiCoreParams = tilingData.multiCoreParams;
-    auto &coreParams = tilingData.coreParams;
+    auto& multiCoreParams = tilingData.multiCoreParams;
+    auto& coreParams = tilingData.coreParams;
     int64_t totalSize = coreParams.get_bOuterSize() * coreParams.get_n2OuterSize() * coreParams.get_gOuterSize() *
                         coreParams.get_s1OuterSize();
     int64_t actualUsedAivNum = std::min(totalSize, static_cast<int64_t>(aivNum));
@@ -895,7 +895,7 @@ ge::graphStatus FusedFloydAttentionTilingBase::PostTiling()
     context_->GetRawTilingData()->SetDataSize(tilingData.GetDataSize()); // already check capcity in CheckContext
     auto blockDim = optiling::FFA::FloydCalcTschBlockDim(tilingData.multiCoreParams.get_coreNum(), aicNum, aivNum);
     context_->SetBlockDim(blockDim);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
 
     OP_LOGD(context_, "[%s] final workspace size:%zu, pseAlibiBaseS1:%ld, pseAlibiBaseS2:%ld.", templateName,
             workspaces[0], pseAlibiBaseS1, pseAlibiBaseS2);
@@ -905,7 +905,7 @@ ge::graphStatus FusedFloydAttentionTilingBase::PostTiling()
 }
 
 bool FusedFloydAttentionTilingBase::SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                                                       matmul_tiling::MatmulApiTiling &bmm1)
+                                                       matmul_tiling::MatmulApiTiling& bmm1)
 {
     bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
     bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
@@ -947,10 +947,10 @@ bool FusedFloydAttentionTilingBase::CaclBmmBatch(int64_t tmpS1BasicBlock, int64_
 }
 
 bool FusedFloydAttentionTilingBase::SetMatMulTiling(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                                                    matmul_tiling::MatmulApiTiling &bmm1,
-                                                    matmul_tiling::MatmulApiTiling &bmm1k1,
-                                                    matmul_tiling::MatmulApiTiling &bmm2,
-                                                    matmul_tiling::MatmulApiTiling &bmm2v2)
+                                                    matmul_tiling::MatmulApiTiling& bmm1,
+                                                    matmul_tiling::MatmulApiTiling& bmm1k1,
+                                                    matmul_tiling::MatmulApiTiling& bmm2,
+                                                    matmul_tiling::MatmulApiTiling& bmm2v2)
 {
     if (!CaclBmmBatch(tmpS1BasicBlock, tmpS2BasicBlock)) {
         return false;
@@ -1033,7 +1033,7 @@ void FusedFloydAttentionTilingBase::SetSoftMaxTiling()
 
 void FusedFloydAttentionTilingBase::SetDataCopyTransposeTiling()
 {
-    auto &coreParams = tilingData.coreParams;
+    auto& coreParams = tilingData.coreParams;
     auto transposeSrcShape = ge::Shape({coreParams.get_bBaseSize(), 1, std::min(s1BasicBlock, alignedS1),
                                         coreParams.get_gBaseSize() * std::min(dBasicBlock, alignedD)});
     auto transposeDstShape = ge::Shape({bSize, n1Size, s1Size, n1Size * dSize});
@@ -1042,8 +1042,8 @@ void FusedFloydAttentionTilingBase::SetDataCopyTransposeTiling()
 
 void FusedFloydAttentionTilingBase::SetTensorSizeParams()
 {
-    auto &tensorSizeParams = tilingData.tensorSizeParams;
-    auto &coreParams = tilingData.coreParams;
+    auto& tensorSizeParams = tilingData.tensorSizeParams;
+    auto& coreParams = tilingData.coreParams;
     int64_t batchInnerSize = coreParams.get_bBaseSize() * coreParams.get_n2BaseSize() * coreParams.get_gBaseSize();
     tensorSizeParams.set_bmm1ResUbSize(batchInnerSize * s1BasicBlock * s2BasicBlock);
     tensorSizeParams.set_attenMaskUbSize(attenMaskExistFlag * batchInnerSize * s1BasicBlock * s2BasicBlock);
@@ -1073,10 +1073,10 @@ void FusedFloydAttentionTilingBase::SetTensorSizeParams()
 
 ge::graphStatus FusedFloydAttentionTilingBase::GetWorkspaceSize()
 {
-    auto &tensorSizeParams = tilingData.tensorSizeParams;
-    auto &coreParams = tilingData.coreParams;
+    auto& tensorSizeParams = tilingData.tensorSizeParams;
+    auto& coreParams = tilingData.coreParams;
 
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     int64_t bmm1Byetes = coreParams.get_nRatio() * tensorSizeParams.get_bmm1ResUbSize() * calcTypeSize;
     int64_t bmm2Byetes = tensorSizeParams.get_bmm2ResUbSize() * calcTypeSize;
     workspaces[0] = static_cast<size_t>((bmm1Byetes + bmm2Byetes) * aivNum) + WORK_SPACE_RESERVE_SIZE;
@@ -1085,7 +1085,7 @@ ge::graphStatus FusedFloydAttentionTilingBase::GetWorkspaceSize()
 
 class FusedFloydAttentionTilingS1s2Bn2gs1 : public FusedFloydAttentionTilingBase {
 public:
-    explicit FusedFloydAttentionTilingS1s2Bn2gs1(gert::TilingContext *context)
+    explicit FusedFloydAttentionTilingS1s2Bn2gs1(gert::TilingContext* context)
         : FusedFloydAttentionTilingBase(context)
     {
         expectTemplate.splitS1 = 1;
@@ -1104,7 +1104,7 @@ protected:
         return 64L;
     }
 
-    void GetBufferNum(BufferNum &bufferNum) const override
+    void GetBufferNum(BufferNum& bufferNum) const override
     {
         bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM;
     }
@@ -1169,7 +1169,7 @@ protected:
     }
 
     bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                            matmul_tiling::MatmulApiTiling &bmm1) override
+                            matmul_tiling::MatmulApiTiling& bmm1) override
     {
         bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
@@ -1188,7 +1188,7 @@ protected:
     }
 
     bool SetBmm1k1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                              matmul_tiling::MatmulApiTiling &bmm1) override
+                              matmul_tiling::MatmulApiTiling& bmm1) override
     {
         bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
@@ -1209,7 +1209,7 @@ protected:
     }
 
     bool SetBmm2v2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                              matmul_tiling::MatmulApiTiling &bmm2v2) override
+                              matmul_tiling::MatmulApiTiling& bmm2v2) override
     {
         bmm2v2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2v2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
@@ -1231,7 +1231,7 @@ protected:
     }
 
     bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                            matmul_tiling::MatmulApiTiling &bmm2v2) override
+                            matmul_tiling::MatmulApiTiling& bmm2v2) override
     {
         bmm2v2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2v2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
@@ -1279,7 +1279,7 @@ protected:
     {
         SetEnableL1Reuse();
         if (enableL1Reuse) {
-            auto &multiCoreParams = tilingData.multiCoreParams;
+            auto& multiCoreParams = tilingData.multiCoreParams;
             int64_t totalSize = multiCoreParams.get_totalSize();
             multiCoreParams.set_splitFactorSize(
                 CeilDivision(totalSize, static_cast<int64_t>(multiCoreParams.get_coreNum())) * AICAIV_RATIO_2);
@@ -1291,10 +1291,10 @@ protected:
     {
         RefreshSplitFactor();
 
-        auto &tensorSizeParams = tilingData.tensorSizeParams;
-        auto &coreParams = tilingData.coreParams;
+        auto& tensorSizeParams = tilingData.tensorSizeParams;
+        auto& coreParams = tilingData.coreParams;
 
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
         int64_t bmm1Bytes = coreParams.get_nRatio() * tensorSizeParams.get_bmm1ResUbSize() * calcTypeSize;
 
         // dSize小于64的场景，无需切D， workspace占用较小
@@ -1360,7 +1360,7 @@ protected:
 
 class FusedFloydAttentionTilingS1s2Bn2gs1Special : public FusedFloydAttentionTilingBase {
 public:
-    explicit FusedFloydAttentionTilingS1s2Bn2gs1Special(gert::TilingContext *context)
+    explicit FusedFloydAttentionTilingS1s2Bn2gs1Special(gert::TilingContext* context)
         : FusedFloydAttentionTilingBase(context)
     {
         expectTemplate.splitS1 = 1;
@@ -1387,7 +1387,7 @@ protected:
         }
     }
 
-    void GetBufferNum(BufferNum &bufferNum) const override
+    void GetBufferNum(BufferNum& bufferNum) const override
     {
         bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM;
     }
@@ -1452,7 +1452,7 @@ protected:
     }
 
     bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                            matmul_tiling::MatmulApiTiling &bmm1) override
+                            matmul_tiling::MatmulApiTiling& bmm1) override
     {
         bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
@@ -1471,7 +1471,7 @@ protected:
     }
 
     bool SetBmm1k1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                              matmul_tiling::MatmulApiTiling &bmm1) override
+                              matmul_tiling::MatmulApiTiling& bmm1) override
     {
         bmm1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
@@ -1492,7 +1492,7 @@ protected:
     }
 
     bool SetBmm2v2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                              matmul_tiling::MatmulApiTiling &bmm2v2) override
+                              matmul_tiling::MatmulApiTiling& bmm2v2) override
     {
         bmm2v2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2v2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
@@ -1514,7 +1514,7 @@ protected:
     }
 
     bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                            matmul_tiling::MatmulApiTiling &bmm2v2) override
+                            matmul_tiling::MatmulApiTiling& bmm2v2) override
     {
         bmm2v2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2v2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, true);
@@ -1562,7 +1562,7 @@ protected:
     {
         SetEnableL1Reuse();
         if (enableL1Reuse) {
-            auto &multiCoreParams = tilingData.multiCoreParams;
+            auto& multiCoreParams = tilingData.multiCoreParams;
             int64_t totalSize = multiCoreParams.get_totalSize();
             multiCoreParams.set_splitFactorSize(
                 CeilDivision(totalSize, static_cast<int64_t>(multiCoreParams.get_coreNum())) * AICAIV_RATIO_2);
@@ -1574,10 +1574,10 @@ protected:
     {
         RefreshSplitFactor();
 
-        auto &tensorSizeParams = tilingData.tensorSizeParams;
-        auto &coreParams = tilingData.coreParams;
+        auto& tensorSizeParams = tilingData.tensorSizeParams;
+        auto& coreParams = tilingData.coreParams;
 
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
         int64_t bmm1Bytes = coreParams.get_nRatio() * tensorSizeParams.get_bmm1ResUbSize() * calcTypeSize;
 
         int64_t softmaxExpBytes = 2 * n2BasicBlock * s1BasicBlock * 32;

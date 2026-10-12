@@ -19,7 +19,7 @@
 #include "lightning_indexer_v2_tiling.h"
 
 namespace optiling {
-ge::graphStatus ParseAndCheckLIV2Arch35(gert::TilingContext *context, LIV2TilingInfo &tilingInfo);
+ge::graphStatus ParseAndCheckLIV2Arch35(gert::TilingContext* context, LIV2TilingInfo& tilingInfo);
 } // namespace optiling
 
 #endif // LIGHTNING_INDEXER_V2_TILING_INFO_PARSER_H_

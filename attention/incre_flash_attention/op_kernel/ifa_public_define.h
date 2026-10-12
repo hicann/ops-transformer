@@ -155,7 +155,9 @@ constexpr MatmulConfig CFG_MDL_EXCEED_INIT_CALLBACK{.doNorm = false,
 constexpr SoftmaxConfig IFA_SOFTMAX_FLASHV2_CFG = {false}; // 将isCheckTiling设置为false
 
 #define IFA_SOFTMAX_WITHOUT_BRC
-constexpr SoftmaxConfig IFA_SOFTMAX_FLASHV2_CFG_WITHOUT_BRC = {false, 0, 0, SoftmaxMode::SOFTMAX_OUTPUT_WITHOUT_BRC}; // 将isCheckTiling设置为false, 输入输出的max&sum&exp的shape为(m, 1)
+constexpr SoftmaxConfig IFA_SOFTMAX_FLASHV2_CFG_WITHOUT_BRC = {
+    false, 0, 0,
+    SoftmaxMode::SOFTMAX_OUTPUT_WITHOUT_BRC}; // 将isCheckTiling设置为false, 输入输出的max&sum&exp的shape为(m, 1)
 
 constexpr float FLOAT_ZERO = 0;
 constexpr float FLOAT_MAX = FLT_MAX;
@@ -191,12 +193,11 @@ constexpr int32_t UB_FLOAT_LINE_SIZE_I = 256;
 constexpr int32_t UB_HALF_LINE_SIZE_I = 512;
 constexpr uint32_t MAX_LEN_64_BYTES = 64;
 constexpr uint32_t DEC_UB_UINT8_BLOCK_SIZE = 8192;
-constexpr uint32_t REPEATE_STRIDE_UP_BOUND = 256; 
+constexpr uint32_t REPEATE_STRIDE_UP_BOUND = 256;
 // repeat stride不能超过256
 
-enum class CalcMode
-{
-    CALC_MODE_DEFAULT = 0, 
+enum class CalcMode {
+    CALC_MODE_DEFAULT = 0,
     CALC_MODE_PREFILL = 1
 };
 
@@ -224,7 +225,6 @@ struct TNDFDSplitInfo {
     uint64_t combineTaskPrefixSum = 0;
 };
 
-
 template <typename Q_T, typename KV_T, typename OUT_T, typename ORIGIN_T, const bool PAGE_ATTENTION = false,
           const bool FLASH_DECODE = false, LAYOUT LAYOUT_T = LAYOUT::BSH, const uint8_t ANTIQUANT_MODE = 0,
           const bool SHARED_PREFIX = false, LAYOUT KV_LAYOUT_T = LAYOUT::BSH, const AMLAMODE AMLA = AMLAMODE::NORMAL,
@@ -235,7 +235,7 @@ struct IFAType {
     using kvType = KV_T;
     using outputType = OUT_T;
     using orginalType = ORIGIN_T;
-	using TilingType = TILING_T;
+    using TilingType = TILING_T;
     static constexpr bool pageAttention = PAGE_ATTENTION;
     static constexpr bool flashDecode = FLASH_DECODE;
     static constexpr LAYOUT layout = LAYOUT_T;
@@ -324,7 +324,7 @@ __aicore__ inline void MatDivVec(LocalTensor<float> dstUb, LocalTensor<float> sr
 }
 
 __aicore__ inline void VecMulBlkMat(LocalTensor<float> dstUb, LocalTensor<float> src0Ub, LocalTensor<float> src1Ub,
-                                 uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount)
+                                    uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount)
 {
     // vec mul by row
     // src0Ub:[1, columnCount] src1Ub:[dealRowCount, 8] dstUb:[dealRowCount, columnCount]
@@ -462,7 +462,7 @@ __aicore__ inline void RowMuls(LocalTensor<T> dstUb, LocalTensor<T> src0Ub, Loca
     if constexpr (std::is_same<T, half>::value) {
         // 此限制由于每个repeat至多连续读取256B数据
         repeatElementNum = FP32_REPEAT_ELEMENT_NUM * 2; // 256/4 * 2=128
-        blockElementNum = FP32_BLOCK_ELEMENT_NUM * 2; // 32/4 * 2 = 16
+        blockElementNum = FP32_BLOCK_ELEMENT_NUM * 2;   // 32/4 * 2 = 16
     }
 
     // 每次只能连续读取256B的数据进行计算，故每次只能处理256B/sizeof(dType)=
@@ -516,18 +516,19 @@ __aicore__ inline void RowMuls(LocalTensor<T> dstUb, LocalTensor<T> src0Ub, Loca
         // 每次计算一行，共计算dealRowCount行
         for (uint32_t i = 0; i < dealRowCount; i++) {
             // 计算一行中的dLoop个repeat, 每个repeat计算256/block_size 个data_block
-            Mul(dstUb[i * columnCount], src0Ub[i * columnCount], src1Ub[i * blockElementNum],
-                repeatElementNum, dLoop, repeatParams);
+            Mul(dstUb[i * columnCount], src0Ub[i * columnCount], src1Ub[i * blockElementNum], repeatElementNum, dLoop,
+                repeatParams);
             //  计算一行中的尾块
             if (dRemain > 0) {
-                Mul(dstUb[i * columnCount + dLoop * repeatElementNum], src0Ub[i * columnCount + dLoop * repeatElementNum],
-                    src1Ub[i * blockElementNum], dRemain, 1, repeatParams);
+                Mul(dstUb[i * columnCount + dLoop * repeatElementNum],
+                    src0Ub[i * columnCount + dLoop * repeatElementNum], src1Ub[i * blockElementNum], dRemain, 1,
+                    repeatParams);
             }
         }
     }
 }
 
-__aicore__ inline void RowSum(LocalTensor<float> &dstUb, LocalTensor<float> srcUb, uint32_t dealRowCount,
+__aicore__ inline void RowSum(LocalTensor<float>& dstUb, LocalTensor<float> srcUb, uint32_t dealRowCount,
                               uint32_t columnCount, uint32_t actualColumnCount)
 {
     // sum by row, 按行求和
@@ -550,7 +551,8 @@ __aicore__ inline void RowSum(LocalTensor<float> &dstUb, LocalTensor<float> srcU
         PipeBarrier<PIPE_V>();
     }
 
-    for (uint32_t loopCount = blockCount / BLOCK_EXPAND_ROUNDS; loopCount > 0; loopCount = blockCount / BLOCK_EXPAND_ROUNDS) {
+    for (uint32_t loopCount = blockCount / BLOCK_EXPAND_ROUNDS; loopCount > 0;
+         loopCount = blockCount / BLOCK_EXPAND_ROUNDS) {
         blockCount = (blockCount + 1) / BLOCK_EXPAND_ROUNDS;
         for (uint32_t j = 0; j < loopCount; j++) {
             Add(srcUb[j * dtypeMask], srcUb[j * dtypeMask], srcUb[(j + blockCount) * dtypeMask], dtypeMask,
@@ -572,8 +574,8 @@ __aicore__ inline uint32_t GetMinPowerTwo(uint32_t cap)
     return i;
 }
 
-__aicore__ inline void RowSumForLongColumnCount(LocalTensor<float> &dstUb, LocalTensor<float> srcUb, uint32_t dealRowCount,
-                              uint32_t columnCount, uint32_t actualColumnCount)
+__aicore__ inline void RowSumForLongColumnCount(LocalTensor<float>& dstUb, LocalTensor<float> srcUb,
+                                                uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount)
 {
     // sum by row, 按行求和
     // dstUb[i] = sum(srcUb[i, :])
@@ -619,7 +621,7 @@ __aicore__ inline void RowSumForLongColumnCount(LocalTensor<float> &dstUb, Local
     RowSum(dstUb, srcUb, dealRowCount, newColumnCount, newActualColumnCount);
 }
 
-__aicore__ inline void RowMax(LocalTensor<float> &dstUb, LocalTensor<float> &srcUb, uint32_t dealRowCount,
+__aicore__ inline void RowMax(LocalTensor<float>& dstUb, LocalTensor<float>& srcUb, uint32_t dealRowCount,
                               uint32_t columnCount, uint32_t actualColumnCount)
 {
     // max by row, 按行求最大值
@@ -641,8 +643,8 @@ __aicore__ inline void RowMax(LocalTensor<float> &dstUb, LocalTensor<float> &src
         PipeBarrier<PIPE_V>();
     }
 
-    for (uint32_t loopCount = blockCount / 2; loopCount > 0; loopCount = blockCount / 2) {  // 2: 二分
-        blockCount = (blockCount + 1) / 2;  // 2: 除2向上取整
+    for (uint32_t loopCount = blockCount / 2; loopCount > 0; loopCount = blockCount / 2) { // 2: 二分
+        blockCount = (blockCount + 1) / 2;                                                 // 2: 除2向上取整
         for (uint32_t j = 0; j < loopCount; j++) {
             Max(srcUb[j * dtypeMask], srcUb[j * dtypeMask], srcUb[(j + blockCount) * dtypeMask], dtypeMask,
                 dealRowCount, repeatParamsMax);
@@ -654,8 +656,8 @@ __aicore__ inline void RowMax(LocalTensor<float> &dstUb, LocalTensor<float> &src
                    columnCount / FP32_BLOCK_ELEMENT_NUM, ReduceOrder::ORDER_ONLY_VALUE);
 }
 
-__aicore__ inline void RowMaxForLongColumnCount(LocalTensor<float> &dstUb, LocalTensor<float> srcUb, uint32_t dealRowCount,
-                              uint32_t columnCount, uint32_t actualColumnCount)
+__aicore__ inline void RowMaxForLongColumnCount(LocalTensor<float>& dstUb, LocalTensor<float> srcUb,
+                                                uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount)
 {
     // max by row, 按行求最大值
     // dstUb[i] = max(srcUb[i, :])
@@ -711,7 +713,8 @@ class BufferManager {
 public:
     __aicore__ inline BufferManager() {}
 
-    __aicore__ inline void Init() {
+    __aicore__ inline void Init()
+    {
         for (uint8_t i = 0; i < BUFFER_NUM; i++) {
             if constexpr (pos == TPosition::A1 || pos == TPosition::B1) {
                 srcEventIds_[i] = GetTPipePtr()->AllocEventID<HardEvent::MTE2_MTE1>();
@@ -729,7 +732,8 @@ public:
         }
     }
 
-    __aicore__ inline uint8_t GetBuffer() {
+    __aicore__ inline uint8_t GetBuffer()
+    {
         if constexpr (pos == TPosition::A1 || pos == TPosition::B1) {
             WaitFlag<HardEvent::MTE1_MTE2>(dstEventIds_[bufferId_]);
         } else if constexpr (pos == TPosition::A2 || pos == TPosition::B2) {
@@ -740,7 +744,8 @@ public:
         return bufferId_;
     }
 
-    __aicore__ inline void EnQue() {
+    __aicore__ inline void EnQue()
+    {
         if constexpr (pos == TPosition::A1 || pos == TPosition::B1) {
             SetFlag<HardEvent::MTE2_MTE1>(srcEventIds_[bufferId_]);
         } else if constexpr (pos == TPosition::A2 || pos == TPosition::B2) {
@@ -750,7 +755,8 @@ public:
         }
     }
 
-    __aicore__ inline uint8_t DeQue() {
+    __aicore__ inline uint8_t DeQue()
+    {
         if constexpr (pos == TPosition::A1 || pos == TPosition::B1) {
             WaitFlag<HardEvent::MTE2_MTE1>(srcEventIds_[bufferId_]);
         } else if constexpr (pos == TPosition::A2 || pos == TPosition::B2) {
@@ -761,7 +767,8 @@ public:
         return bufferId_;
     }
 
-    __aicore__ inline void ReleaseBuffer() {
+    __aicore__ inline void ReleaseBuffer()
+    {
         if constexpr (pos == TPosition::A1 || pos == TPosition::B1) {
             SetFlag<HardEvent::MTE1_MTE2>(dstEventIds_[bufferId_]);
         } else if constexpr (pos == TPosition::A2 || pos == TPosition::B2) {
@@ -774,7 +781,8 @@ public:
         }
     }
 
-    __aicore__ inline void Destory() {
+    __aicore__ inline void Destory()
+    {
         for (uint8_t i = 0; i < BUFFER_NUM; i++) {
             if constexpr (pos == TPosition::A1 || pos == TPosition::B1) {
                 WaitFlag<HardEvent::MTE1_MTE2>(dstEventIds_[i]);

@@ -23,11 +23,14 @@ using namespace op;
 using namespace std;
 
 namespace {
-void DestroyAclTensor(aclTensor *tensor) { Release(tensor); }
+void DestroyAclTensor(aclTensor* tensor)
+{
+    Release(tensor);
+}
 
 using AclTensorPtr = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>;
 
-AclTensorPtr MakeTensor(const vector<int64_t> &shape, aclDataType dtype, aclFormat format = ACL_FORMAT_ND)
+AclTensorPtr MakeTensor(const vector<int64_t>& shape, aclDataType dtype, aclFormat format = ACL_FORMAT_ND)
 {
     return AclTensorPtr(TensorDesc(shape, dtype, format).ToAclTypeRawPtr(), DestroyAclTensor);
 }
@@ -41,7 +44,10 @@ protected:
         cout << "LightningIndexerKLLossOpapiUt SetUp" << endl;
     }
 
-    static void TearDownTestCase() { cout << "LightningIndexerKLLossOpapiUt TearDown" << endl; }
+    static void TearDownTestCase()
+    {
+        cout << "LightningIndexerKLLossOpapiUt TearDown" << endl;
+    }
 };
 
 TEST_F(LightningIndexerKLLossOpapiUt, A1_BSK_fp16_logits_success)
@@ -54,7 +60,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, A1_BSK_fp16_logits_success)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, loss.get(), &workspaceSize, &executor);
@@ -73,7 +79,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, A2_TK_bf16_logits_success)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, loss.get(), &workspaceSize, &executor);
@@ -92,7 +98,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, A3_BSK_fp32_logits_success)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, loss.get(), &workspaceSize, &executor);
@@ -111,7 +117,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, A4_BSK_fp16_probs_success)
     char weightType[] = "probs";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, loss.get(), &workspaceSize, &executor);
@@ -129,7 +135,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, E1_null_targetScore_failed)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(nullptr, indexProbs.get(), eps, weightType,
                                                                      loss.get(), &workspaceSize, &executor);
@@ -147,7 +153,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, E2_null_indexProbs_failed)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), nullptr, eps, weightType,
                                                                      loss.get(), &workspaceSize, &executor);
@@ -165,7 +171,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, E3_null_loss_failed)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, nullptr, &workspaceSize, &executor);
@@ -184,7 +190,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, E4_dtype_mismatch_failed)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, loss.get(), &workspaceSize, &executor);
@@ -203,7 +209,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, E5_shape_mismatch_failed)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, loss.get(), &workspaceSize, &executor);
@@ -221,7 +227,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, E6_null_weightType_failed)
     double eps = 1e-12;
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps, nullptr,
                                                                      loss.get(), &workspaceSize, &executor);
@@ -240,7 +246,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, E7_invalid_weightType_failed)
     char weightType[] = "invalid";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, loss.get(), &workspaceSize, &executor);
@@ -259,7 +265,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, E8_last_dim_zero_failed)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, loss.get(), &workspaceSize, &executor);
@@ -278,7 +284,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, A5_last_dim_8192_success)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, loss.get(), &workspaceSize, &executor);
@@ -297,7 +303,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, A6_TK_8192_success)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, loss.get(), &workspaceSize, &executor);
@@ -316,7 +322,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, E9_last_dim_8193_failed)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, loss.get(), &workspaceSize, &executor);
@@ -336,7 +342,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, A7_batch_512_success)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, loss.get(), &workspaceSize, &executor);
@@ -355,7 +361,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, E10_batch_zero_failed)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, loss.get(), &workspaceSize, &executor);
@@ -374,7 +380,7 @@ TEST_F(LightningIndexerKLLossOpapiUt, E11_batch_513_failed)
     char weightType[] = "logits";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
                                                                      weightType, loss.get(), &workspaceSize, &executor);

@@ -46,7 +46,7 @@ class GatherPaKvCacheNz {
     static constexpr uint32_t VL_NUMS = GetVRegSize() / sizeof(T);
 
 public:
-    __aicore__ inline GatherPaKvCacheNz(TPipe *pipe, const GatherPaKvCacheTilingDataV35 *__restrict tiling)
+    __aicore__ inline GatherPaKvCacheNz(TPipe* pipe, const GatherPaKvCacheTilingDataV35* __restrict tiling)
         : pipe_(pipe),
           tl_(tiling){};
 
@@ -56,14 +56,14 @@ public:
     {
         InitParams();
 
-        keyCacheGm_.SetGlobalBuffer((__gm__ T *)(key_cache));
-        valueCacheGm_.SetGlobalBuffer((__gm__ T *)(value_cache));
-        blockTablesGm_.SetGlobalBuffer((__gm__ T_INDEX *)block_tables);
-        seqLensGm_.SetGlobalBuffer((__gm__ T_INDEX *)(seq_lens));
-        seqOffsetGm_.SetGlobalBuffer((__gm__ T_INDEX *)(seq_offset));
+        keyCacheGm_.SetGlobalBuffer((__gm__ T*)(key_cache));
+        valueCacheGm_.SetGlobalBuffer((__gm__ T*)(value_cache));
+        blockTablesGm_.SetGlobalBuffer((__gm__ T_INDEX*)block_tables);
+        seqLensGm_.SetGlobalBuffer((__gm__ T_INDEX*)(seq_lens));
+        seqOffsetGm_.SetGlobalBuffer((__gm__ T_INDEX*)(seq_offset));
 
-        outKeyGm_.SetGlobalBuffer((__gm__ T *)(key_out));
-        outValueGm_.SetGlobalBuffer((__gm__ T *)(value_out));
+        outKeyGm_.SetGlobalBuffer((__gm__ T*)(key_out));
+        outValueGm_.SetGlobalBuffer((__gm__ T*)(value_out));
 
         pipe_->InitBuffer(cacheQueue_, DOUBLE_BUFFER, (maxUbHiddenSize_) * sizeof(T));
         pipe_->InitBuffer(seqLensQueue_, DOUBLE_BUFFER, (seqLenAccumSize_) * sizeof(T_INDEX));
@@ -72,7 +72,7 @@ public:
     }
 
 private:
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQueBind<QuePosition::VECIN, QuePosition::VECOUT, BUFFER_DEPTH> cacheQueue_;
     TQue<QuePosition::VECIN, BUFFER_DEPTH> keyCacheQueue_;
     TQue<QuePosition::VECIN, BUFFER_DEPTH> valueCacheQueue_;
@@ -82,7 +82,7 @@ private:
 
     TBuf<TPosition::VECCALC> sumBuffer;
 
-    const GatherPaKvCacheTilingDataV35 *tl_;
+    const GatherPaKvCacheTilingDataV35* tl_;
 
     GlobalTensor<T> keyCacheGm_;
     GlobalTensor<T> valueCacheGm_;

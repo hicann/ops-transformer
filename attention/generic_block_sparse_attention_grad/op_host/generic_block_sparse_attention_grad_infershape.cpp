@@ -25,25 +25,25 @@ static constexpr uint32_t DQ_OUT_INDEX = 0;
 static constexpr uint32_t DK_OUT_INDEX = 1;
 static constexpr uint32_t DV_OUT_INDEX = 2;
 
-static ge::graphStatus InferShapeGenericBlockSparseAttentionGrad(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeGenericBlockSparseAttentionGrad(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("GenericBlockSparseAttentionGrad", "context is nullptr!");
         return ge::GRAPH_FAILED;
     }
 
-    const gert::Shape *queryShape = context->GetInputShape(QUERY_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
-    const gert::Shape *keyShape = context->GetInputShape(KEY_INDEX);
+    const gert::Shape* keyShape = context->GetInputShape(KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
-    const gert::Shape *valueShape = context->GetInputShape(VALUE_INDEX);
+    const gert::Shape* valueShape = context->GetInputShape(VALUE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
 
-    gert::Shape *dqOutShape = context->GetOutputShape(DQ_OUT_INDEX);
+    gert::Shape* dqOutShape = context->GetOutputShape(DQ_OUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, dqOutShape);
-    gert::Shape *dkOutShape = context->GetOutputShape(DK_OUT_INDEX);
+    gert::Shape* dkOutShape = context->GetOutputShape(DK_OUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, dkOutShape);
-    gert::Shape *dvOutShape = context->GetOutputShape(DV_OUT_INDEX);
+    gert::Shape* dvOutShape = context->GetOutputShape(DV_OUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, dvOutShape);
 
     *dqOutShape = *queryShape;

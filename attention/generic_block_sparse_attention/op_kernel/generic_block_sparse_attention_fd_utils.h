@@ -27,7 +27,7 @@ __aicore__ inline uint32_t HashConfigValue(uint32_t hash, uint32_t value)
 }
 
 __aicore__ inline uint32_t CalculateConfigSignature(
-    __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData *tilingData)
+    __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData)
 {
     uint32_t hash = 2166136261U;
     hash = HashConfigValue(hash, tilingData->batch);
@@ -46,8 +46,8 @@ __aicore__ inline uint32_t CalculateConfigSignature(
 }
 
 __aicore__ inline bool ValidateMetadata(
-    __gm__ const GbsaMetadata::Metadata *meta,
-    __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData *tilingData, uint32_t physicalAicNum)
+    __gm__ const GbsaMetadata::Metadata* meta,
+    __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData, uint32_t physicalAicNum)
 {
     if (meta == nullptr || meta->magic != GbsaMetadata::METADATA_MAGIC ||
         meta->version != GbsaMetadata::METADATA_VERSION ||
@@ -76,7 +76,7 @@ __aicore__ inline bool ValidateMetadata(
     }
 
     for (int32_t core = 0; core < meta->fdActiveCoreNum; ++core) {
-        const __gm__ GbsaMetadata::DecodeSchedule &schedule = meta->decodeSchedules[core];
+        const __gm__ GbsaMetadata::DecodeSchedule& schedule = meta->decodeSchedules[core];
         if (schedule.baseTaskStart < 0 || schedule.baseTaskEnd < schedule.baseTaskStart ||
             schedule.baseTaskEnd > meta->saTotalTaskNum || schedule.firstBlockStart < 0 ||
             schedule.firstBlockStart > static_cast<int32_t>(tilingData->topK) || schedule.lastBlockEnd < 0 ||
@@ -86,7 +86,7 @@ __aicore__ inline bool ValidateMetadata(
     }
     uint32_t scheduledPartialTaskNum = 0U;
     for (int32_t combineIdx = 0; combineIdx < meta->combineTaskNum; ++combineIdx) {
-        const __gm__ GbsaMetadata::CombineSchedule &combine = meta->combineSchedules[combineIdx];
+        const __gm__ GbsaMetadata::CombineSchedule& combine = meta->combineSchedules[combineIdx];
         if (combine.baseTask < 0 || combine.baseTask >= meta->saTotalTaskNum || combine.firstCore < 0 ||
             combine.partialCount <= 1 ||
             combine.partialCount > static_cast<int32_t>(GbsaMetadata::MAX_FD_PARTIAL_PER_BASE_TASK) ||
@@ -102,13 +102,13 @@ __aicore__ inline bool ValidateMetadata(
     return scheduledPartialTaskNum == static_cast<uint32_t>(meta->fdPartialTaskNum);
 }
 
-__aicore__ inline bool FindPartialTask(__gm__ const GbsaMetadata::Metadata *meta, uint32_t baseTask, uint32_t coreIdx,
-                                       uint32_t &partialTaskId, uint32_t &partialCount)
+__aicore__ inline bool FindPartialTask(__gm__ const GbsaMetadata::Metadata* meta, uint32_t baseTask, uint32_t coreIdx,
+                                       uint32_t& partialTaskId, uint32_t& partialCount)
 {
     partialTaskId = 0U;
     partialCount = 0U;
     for (int32_t combineIdx = 0; combineIdx < meta->combineTaskNum; ++combineIdx) {
-        const __gm__ GbsaMetadata::CombineSchedule &combine = meta->combineSchedules[combineIdx];
+        const __gm__ GbsaMetadata::CombineSchedule& combine = meta->combineSchedules[combineIdx];
         if (combine.baseTask != static_cast<int32_t>(baseTask)) {
             continue;
         }
@@ -124,9 +124,9 @@ __aicore__ inline bool FindPartialTask(__gm__ const GbsaMetadata::Metadata *meta
 }
 
 template <class CuSeqTensor, class SeqUsedTensor>
-__aicore__ inline bool DecodeTaskStorage(uint32_t taskIdx, uint32_t kvHeads, uint32_t batch, CuSeqTensor &gCuSeqLengths,
-                                         SeqUsedTensor &gSeqUsedQ, bool hasSeqUsedQ, uint32_t &qStorageToken,
-                                         uint32_t &qTokenInBatch, uint32_t &batchIdx, uint32_t &kvHeadIdx)
+__aicore__ inline bool DecodeTaskStorage(uint32_t taskIdx, uint32_t kvHeads, uint32_t batch, CuSeqTensor& gCuSeqLengths,
+                                         SeqUsedTensor& gSeqUsedQ, bool hasSeqUsedQ, uint32_t& qStorageToken,
+                                         uint32_t& qTokenInBatch, uint32_t& batchIdx, uint32_t& kvHeadIdx)
 {
     if (kvHeads == 0U) {
         return false;

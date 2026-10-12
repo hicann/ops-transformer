@@ -23,9 +23,9 @@ namespace lightning_indexer_v2_checker {
 
 class CompressionChecker : public LightningIndexerV2BaseChecker {
 public:
-    ge::graphStatus CheckParaExistence(const LightningIndexerV2CheckerInfo &info) const override;
-    ge::graphStatus CheckSinglePara(const LightningIndexerV2CheckerInfo &info) const override;
-    ge::graphStatus CheckMultiPara(const LightningIndexerV2CheckerInfo &info) const override;
+    ge::graphStatus CheckParaExistence(const LightningIndexerV2CheckerInfo& info) const override;
+    ge::graphStatus CheckSinglePara(const LightningIndexerV2CheckerInfo& info) const override;
+    ge::graphStatus CheckMultiPara(const LightningIndexerV2CheckerInfo& info) const override;
 };
 
 } // namespace lightning_indexer_v2_checker

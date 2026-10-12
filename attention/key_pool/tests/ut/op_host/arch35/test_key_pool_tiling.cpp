@@ -24,7 +24,7 @@ namespace {
 using TensorDesc = gert::TilingContextPara::TensorDescription;
 using OpAttr = gert::TilingContextPara::OpAttr;
 
-const char *kA5SocInfo = "{"
+const char* kA5SocInfo = "{"
                          "\"hardware_info\":{"
                          "\"BT_SIZE\":0,"
                          "\"load3d_constraints\":\"1\","
@@ -44,7 +44,7 @@ const char *kA5SocInfo = "{"
                          "}"
                          "}";
 
-TensorDesc Desc(const std::vector<int64_t> &dims, ge::DataType dtype)
+TensorDesc Desc(const std::vector<int64_t>& dims, ge::DataType dtype)
 {
     return TensorDesc(ops::ut::MakeGertStorageShape(dims), dtype, ge::FORMAT_ND);
 }
@@ -54,7 +54,7 @@ TensorDesc Empty(ge::DataType dtype)
     return Desc({}, dtype);
 }
 
-gert::TilingContextPara MakePara(const std::string &layout, ge::DataType dtype, int64_t batch, int64_t sequence,
+gert::TilingContextPara MakePara(const std::string& layout, ge::DataType dtype, int64_t batch, int64_t sequence,
                                  int64_t hidden, int64_t headDim, int64_t cmpRatio, int64_t blockSize,
                                  int64_t maxBlocks, bool withNorm = false)
 {

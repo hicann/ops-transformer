@@ -1,5 +1,5 @@
 /**
-* Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -26,28 +26,16 @@ namespace l0op {
 
 OP_TYPE_REGISTER(KvCompressEpilog);
 
-const aclTensor *KvCompressEpilog(
-    aclTensor *cache,
-    const aclTensor *x,
-    const aclTensor *slotMapping,
-    int64_t quantGroupSize,
-    int64_t quantMode,
-    bool roundScale,
-    float xScale,
-    aclOpExecutor *executor)
+const aclTensor* KvCompressEpilog(aclTensor* cache, const aclTensor* x, const aclTensor* slotMapping,
+                                  int64_t quantGroupSize, int64_t quantMode, bool roundScale, float xScale,
+                                  aclOpExecutor* executor)
 {
-    L0_DFX(KvCompressEpilog,
-           cache,
-           x, slotMapping,
-           quantGroupSize, quantMode, roundScale, xScale);
+    L0_DFX(KvCompressEpilog, cache, x, slotMapping, quantGroupSize, quantMode, roundScale, xScale);
 
-    ADD_TO_LAUNCHER_LIST_AICORE(KvCompressEpilog,
-                                OP_INPUT(cache,
-                                         x, slotMapping),
-                                OP_OUTPUT(cache),
+    ADD_TO_LAUNCHER_LIST_AICORE(KvCompressEpilog, OP_INPUT(cache, x, slotMapping), OP_OUTPUT(cache),
                                 OP_ATTR(quantGroupSize, quantMode, roundScale, xScale));
 
     return cache;
 }
 
-}  // namespace l0op
+} // namespace l0op

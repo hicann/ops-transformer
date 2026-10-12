@@ -89,7 +89,7 @@ REGISTER_TILING_DATA_CLASS(IncreFlashAttentionBaseParamsOp, IncreFlashAttentionB
 
 BEGIN_TILING_DATA_DEF(IncreFlashAttentionCoreParams)
 TILING_DATA_FIELD_DEF_ARR(uint32_t, 50, coreSidxEnd); // 50:MAX_CORE_NUM of 910b coreSidxEnd数组首地址要保证8字节对齐
-TILING_DATA_FIELD_DEF_ARR(uint32_t, 66, coreSidxEndRegbase); // 66:MAX_CORE_NUM of Ascend 950
+TILING_DATA_FIELD_DEF_ARR(uint32_t, 66, coreSidxEndRegbase);   // 66:MAX_CORE_NUM of Ascend 950
 TILING_DATA_FIELD_DEF_ARR(uint32_t, 66, coreSposStartRegbase); // 66:MAX_CORE_NUM of Ascend 950
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(IncreFlashAttentionCoreParamsOp, IncreFlashAttentionCoreParams);
@@ -104,9 +104,9 @@ TILING_DATA_FIELD_DEF(uint32_t, maxSeqlen)
 TILING_DATA_FIELD_DEF(uint32_t, totalQBlockNum)
 TILING_DATA_FIELD_DEF(uint32_t, seqStepQ)
 TILING_DATA_FIELD_DEF(uint32_t, seqStepKv)
-TILING_DATA_FIELD_DEF_ARR(uint32_t, 50, startBlk); 
-TILING_DATA_FIELD_DEF_ARR(uint32_t, 50, endBlk); 
-TILING_DATA_FIELD_DEF_ARR(uint32_t, 50, startBatch); 
+TILING_DATA_FIELD_DEF_ARR(uint32_t, 50, startBlk);
+TILING_DATA_FIELD_DEF_ARR(uint32_t, 50, endBlk);
+TILING_DATA_FIELD_DEF_ARR(uint32_t, 50, startBatch);
 TILING_DATA_FIELD_DEF_ARR(uint32_t, 50, endBatch);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(IncreFlashAttentionSplitCoreParamsOp, IncreFlashAttentionSplitCoreParams);

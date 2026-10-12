@@ -26,7 +26,7 @@ constexpr AscendC::Reg::CastTrait castTraitFp322Fp16Even = {
 };
 
 template <typename T1>
-__aicore__ inline void CastND2NZ(const LocalTensor<T1> &dstTensor, const LocalTensor<float> &srcTensor,
+__aicore__ inline void CastND2NZ(const LocalTensor<T1>& dstTensor, const LocalTensor<float>& srcTensor,
                                  const uint32_t srcM, const uint32_t srcN)
 {
     const uint32_t blockSize = 32;
@@ -49,19 +49,19 @@ __aicore__ inline void CastND2NZ(const LocalTensor<T1> &dstTensor, const LocalTe
 
         for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
             DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B32>(
-                vregSrcEven, vregSrcOdd, ((__ubuf__ float *&)srcLocalInt), fullExeSize);
+                vregSrcEven, vregSrcOdd, ((__ubuf__ float*&)srcLocalInt), fullExeSize);
             Cast<T1, float, castTraitFp322Fp16Even>(vregCastEven, vregSrcEven, pregFullExe);
             Cast<T1, float, castTraitFp322Fp16Odd>(vregCastOdd, vregSrcOdd, pregFullExe);
-            Or((RegTensor<uint16_t> &)vregCastRes, (RegTensor<uint16_t> &)vregCastEven,
-               (RegTensor<uint16_t> &)vregCastOdd, pregFullExe);
+            Or((RegTensor<uint16_t>&)vregCastRes, (RegTensor<uint16_t>&)vregCastEven, (RegTensor<uint16_t>&)vregCastOdd,
+               pregFullExe);
             DataCopy<T1, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                ((__ubuf__ T1 *&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregValidN);
+                ((__ubuf__ T1*&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregValidN);
         }
     }
 }
 
 template <typename T>
-__aicore__ inline void TransdataND2NZ(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor,
+__aicore__ inline void TransdataND2NZ(const LocalTensor<T>& dstTensor, const LocalTensor<T>& srcTensor,
                                       const uint32_t srcM, const uint32_t srcN)
 {
     constexpr uint32_t BLOCK_SIZE = 32;
@@ -78,9 +78,9 @@ __aicore__ inline void TransdataND2NZ(const LocalTensor<T> &dstTensor, const Loc
 
         for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); ++m) {
             LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(
-                vregSrc, ((__ubuf__ T *&)srcLocalInt), srcN);
+                vregSrc, ((__ubuf__ T*&)srcLocalInt), srcN);
             DataCopy<T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                ((__ubuf__ T *&)dstLocalInt), vregSrc, blockStride, repeatStride, pregFullExe);
+                ((__ubuf__ T*&)dstLocalInt), vregSrc, blockStride, repeatStride, pregFullExe);
         }
     }
 }

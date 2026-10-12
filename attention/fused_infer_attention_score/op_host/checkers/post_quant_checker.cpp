@@ -31,7 +31,7 @@ using namespace arch35FIA;
 constexpr int64_t SPARSE_MODE_INT_MAX = 2147483647;
 
 // CheckSingle
-ge::graphStatus PostQuantChecker::CheckSingleDtype(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus PostQuantChecker::CheckSingleDtype(const FiaTilingInfo& fiaInfo) const
 {
     // QuantScale2 and quantOffset2 only support bf16/fp32 data type.
     if (ge::GRAPH_SUCCESS != CheckDtypeSupport(fiaInfo.opParamInfo.quantScale2.desc, QUANT_SCALE2_NAME)) {
@@ -50,7 +50,7 @@ ge::graphStatus PostQuantChecker::CheckSingleDtype(const FiaTilingInfo &fiaInfo)
 }
 
 // CheckParaExistence
-ge::graphStatus PostQuantChecker::CheckExistenceQuantScale2(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus PostQuantChecker::CheckExistenceQuantScale2(const FiaTilingInfo& fiaInfo) const
 {
     // Post-quantization scenarios must include quantScale2.
     if (fiaInfo.isOutQuantEnable) {
@@ -75,7 +75,7 @@ ge::graphStatus PostQuantChecker::CheckExistenceQuantScale2(const FiaTilingInfo 
 }
 
 // CheckFeature
-ge::graphStatus PostQuantChecker::CheckFeatureAttenOut(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus PostQuantChecker::CheckFeatureAttenOut(const FiaTilingInfo& fiaInfo) const
 {
     // post-quantization scenarios only support int8/fp8_e4m3fn/hifloat8 output data type
     if (fiaInfo.isOutQuantEnable) {
@@ -91,7 +91,7 @@ ge::graphStatus PostQuantChecker::CheckFeatureAttenOut(const FiaTilingInfo &fiaI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PostQuantChecker::CheckFeatureQueryDType(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus PostQuantChecker::CheckFeatureQueryDType(const FiaTilingInfo& fiaInfo) const
 {
     // Post-quantization scale dtype must be FP32. BF16 is allowed only if the query is BF16
     if (fiaInfo.isOutQuantEnable) {
@@ -105,7 +105,7 @@ ge::graphStatus PostQuantChecker::CheckFeatureQueryDType(const FiaTilingInfo &fi
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PostQuantChecker::CheckFeatureLayout(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus PostQuantChecker::CheckFeatureLayout(const FiaTilingInfo& fiaInfo) const
 {
     // For post quant per-tensor, quant scale/offset only support [1].
     // For post quant per-channel, quant scale/offset dim multiply result only support qN * vD.
@@ -163,7 +163,7 @@ ge::graphStatus PostQuantChecker::CheckFeatureLayout(const FiaTilingInfo &fiaInf
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PostQuantChecker::CheckFeatureOutputEqual(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus PostQuantChecker::CheckFeatureOutputEqual(const FiaTilingInfo& fiaInfo) const
 {
     // In the Anti-quantization scenario,
     // only KV input and post-quantization outputs with the same data type are supported.
@@ -180,7 +180,7 @@ ge::graphStatus PostQuantChecker::CheckFeatureOutputEqual(const FiaTilingInfo &f
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PostQuantChecker::CheckFeatureMLAOutQuant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus PostQuantChecker::CheckFeatureMLAOutQuant(const FiaTilingInfo& fiaInfo) const
 {
     // 非量化 MLA decode 场景下，后量化不支持
     if (fiaInfo.isOutQuantEnable && fiaInfo.mlaMode == MlaMode::ROPE_SPLIT_D512 && enableNonQuant_) {
@@ -192,7 +192,7 @@ ge::graphStatus PostQuantChecker::CheckFeatureMLAOutQuant(const FiaTilingInfo &f
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PostQuantChecker::CheckFeaturePrefix(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus PostQuantChecker::CheckFeaturePrefix(const FiaTilingInfo& fiaInfo) const
 {
     // When prefix exists, post-quantization scenarios only support int8 output data types.
     if (fiaInfo.isOutQuantEnable) {
@@ -206,7 +206,7 @@ ge::graphStatus PostQuantChecker::CheckFeaturePrefix(const FiaTilingInfo &fiaInf
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PostQuantChecker::CheckFeatureRowValid(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus PostQuantChecker::CheckFeatureRowValid(const FiaTilingInfo& fiaInfo) const
 {
     if (!fiaInfo.isOutQuantEnable) {
         return ge::GRAPH_SUCCESS;
@@ -222,8 +222,8 @@ ge::graphStatus PostQuantChecker::CheckFeatureRowValid(const FiaTilingInfo &fiaI
             actualSeqLengthsKV.resize(fiaInfo.bSize);
             actualSeqLengths.resize(fiaInfo.bSize);
 
-            const gert::Tensor *tempData = fiaInfo.opParamInfo.actualSeqLengthsQ.tensor;
-            const gert::Tensor *tempDataKV = fiaInfo.opParamInfo.actualSeqLengths.tensor;
+            const gert::Tensor* tempData = fiaInfo.opParamInfo.actualSeqLengthsQ.tensor;
+            const gert::Tensor* tempDataKV = fiaInfo.opParamInfo.actualSeqLengths.tensor;
             const int64_t preTokens = fiaInfo.opParamInfo.preToken == nullptr ? 0 : *fiaInfo.opParamInfo.preToken;
             const int64_t nextTokens = fiaInfo.opParamInfo.nextToken == nullptr ? 0 : *fiaInfo.opParamInfo.nextToken;
             uint32_t actualLenDims = (tempData != nullptr) ? tempData->GetShapeSize() : 0;
@@ -283,7 +283,7 @@ ge::graphStatus PostQuantChecker::CheckFeatureRowValid(const FiaTilingInfo &fiaI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PostQuantChecker::CheckAntiquantNotSupport(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus PostQuantChecker::CheckAntiquantNotSupport(const FiaTilingInfo& fiaInfo) const
 {
     int64_t keyAntiquantMode = 0;
     int64_t valueAntiquantMode = 0;
@@ -320,7 +320,7 @@ ge::graphStatus PostQuantChecker::CheckAntiquantNotSupport(const FiaTilingInfo &
 }
 
 // CheckCheckMultiPara
-ge::graphStatus PostQuantChecker::CheckMultiParaQuantOffset2(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus PostQuantChecker::CheckMultiParaQuantOffset2(const FiaTilingInfo& fiaInfo) const
 {
     // Scale2 and offset2 should have same dtype and shape
     if (fiaInfo.isOutQuantEnable && fiaInfo.opParamInfo.quantOffset2.tensor != nullptr &&
@@ -355,7 +355,7 @@ ge::graphStatus PostQuantChecker::CheckMultiParaQuantOffset2(const FiaTilingInfo
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PostQuantChecker::CheckSinglePara(const FiaTilingInfo &fiaInfo)
+ge::graphStatus PostQuantChecker::CheckSinglePara(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckSingleDtype(fiaInfo)) {
         return ge::GRAPH_FAILED;
@@ -363,7 +363,7 @@ ge::graphStatus PostQuantChecker::CheckSinglePara(const FiaTilingInfo &fiaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PostQuantChecker::CheckParaExistence(const FiaTilingInfo &fiaInfo)
+ge::graphStatus PostQuantChecker::CheckParaExistence(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckExistenceQuantScale2(fiaInfo)) {
         return ge::GRAPH_FAILED;
@@ -371,7 +371,7 @@ ge::graphStatus PostQuantChecker::CheckParaExistence(const FiaTilingInfo &fiaInf
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PostQuantChecker::CheckCrossFeature(const FiaTilingInfo &fiaInfo)
+ge::graphStatus PostQuantChecker::CheckCrossFeature(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckFeatureAttenOut(fiaInfo) || ge::GRAPH_SUCCESS != CheckFeatureQueryDType(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckFeatureLayout(fiaInfo)) {
@@ -398,7 +398,7 @@ ge::graphStatus PostQuantChecker::CheckCrossFeature(const FiaTilingInfo &fiaInfo
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PostQuantChecker::CheckMultiParaConsistency(const FiaTilingInfo &fiaInfo)
+ge::graphStatus PostQuantChecker::CheckMultiParaConsistency(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckMultiParaQuantOffset2(fiaInfo)) {
         return ge::GRAPH_FAILED;

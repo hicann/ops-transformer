@@ -20,20 +20,20 @@ namespace tla {
 // Common Operations
 //
 
-template <class T, class U, TLA_REQUIRES(std::is_arithmetic<T>::value &&std::is_arithmetic<U>::value)>
-HOST_DEVICE constexpr auto max(T const &t, U const &u)
+template <class T, class U, TLA_REQUIRES(std::is_arithmetic<T>::value&& std::is_arithmetic<U>::value)>
+HOST_DEVICE constexpr auto max(T const& t, U const& u)
 {
     return t < u ? u : t;
 }
 
-template <class T, class U, TLA_REQUIRES(std::is_arithmetic<T>::value &&std::is_arithmetic<U>::value)>
-HOST_DEVICE constexpr auto min(T const &t, U const &u)
+template <class T, class U, TLA_REQUIRES(std::is_arithmetic<T>::value&& std::is_arithmetic<U>::value)>
+HOST_DEVICE constexpr auto min(T const& t, U const& u)
 {
     return t < u ? t : u;
 }
 
-template <class T, class U, TLA_REQUIRES(std::is_arithmetic<T>::value &&std::is_arithmetic<U>::value)>
-HOST_DEVICE constexpr auto add(T const &t, U const &u)
+template <class T, class U, TLA_REQUIRES(std::is_arithmetic<T>::value&& std::is_arithmetic<U>::value)>
+HOST_DEVICE constexpr auto add(T const& t, U const& u)
 {
     return t + u;
 }

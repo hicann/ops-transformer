@@ -37,7 +37,7 @@ int64_t AlignTo(int64_t x, int64_t align)
 
 class GenericBlockSparseAttentionGradArch35Tiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit GenericBlockSparseAttentionGradArch35Tiling(gert::TilingContext *context_)
+    explicit GenericBlockSparseAttentionGradArch35Tiling(gert::TilingContext* context_)
         : TilingBaseClass(context_)
     {}
 
@@ -83,14 +83,14 @@ protected:
     ge::graphStatus GetShapeAttrsInfo() override
     {
         auto qInputDesc = context_->GetInputDesc(0);
-        const gert::StorageShape *queryShape = context_->GetInputShape(0);
-        const gert::StorageShape *keyShape = context_->GetInputShape(1);
-        const gert::StorageShape *valueShape = context_->GetInputShape(2);
-        const gert::StorageShape *idxShape = context_->GetInputShape(6);
-        const gert::StorageShape *cntShape = context_->GetInputShape(7);
-        const gert::StorageShape *metaShape = context_->GetOptionalInputShape(8);
+        const gert::StorageShape* queryShape = context_->GetInputShape(0);
+        const gert::StorageShape* keyShape = context_->GetInputShape(1);
+        const gert::StorageShape* valueShape = context_->GetInputShape(2);
+        const gert::StorageShape* idxShape = context_->GetInputShape(6);
+        const gert::StorageShape* cntShape = context_->GetInputShape(7);
+        const gert::StorageShape* metaShape = context_->GetOptionalInputShape(8);
 
-        const auto *attrs = context_->GetAttrs();
+        const auto* attrs = context_->GetAttrs();
         if (attrs == nullptr || qInputDesc == nullptr || queryShape == nullptr || keyShape == nullptr ||
             valueShape == nullptr || idxShape == nullptr || cntShape == nullptr) {
             OP_LOGE(context_->GetNodeName(), "required inputs/attrs are null.");
@@ -103,11 +103,11 @@ protected:
 
         dataType_ = qInputDesc->GetDataType();
 
-        const auto *blockShapeList = attrs->GetListInt(0);
+        const auto* blockShapeList = attrs->GetListInt(0);
         qLayout_ = attrs->GetAttrPointer<char>(1);
         kvLayout_ = attrs->GetAttrPointer<char>(2);
-        const auto *sparseLayout = attrs->GetAttrPointer<int64_t>(3);
-        const auto *residualMode = attrs->GetAttrPointer<int64_t>(9);
+        const auto* sparseLayout = attrs->GetAttrPointer<int64_t>(3);
+        const auto* residualMode = attrs->GetAttrPointer<int64_t>(9);
         layoutSparsePattern_ = sparseLayout != nullptr ? *sparseLayout : 1;
         residualBlockMode_ = residualMode != nullptr ? *residualMode : 0;
         if (layoutSparsePattern_ != 1 || residualBlockMode_ != 0) {
@@ -136,7 +136,7 @@ protected:
                     blockShapeList->GetSize());
             return ge::GRAPH_FAILED;
         }
-        const int64_t *data = blockShapeList->GetData();
+        const int64_t* data = blockShapeList->GetData();
         blockShapeX_ = static_cast<int32_t>(data[0]);
         blockShapeY_ = static_cast<int32_t>(data[1]);
         if (blockShapeY_ <= 0) {
@@ -148,8 +148,8 @@ protected:
             OP_LOGE(context_->GetNodeName(), "sparse_block_idx must be 4D and sparse_block_count must be 3D.");
             return ge::GRAPH_FAILED;
         }
-        const auto &idxStorage = idxShape->GetStorageShape();
-        const auto &cntStorage = cntShape->GetStorageShape();
+        const auto& idxStorage = idxShape->GetStorageShape();
+        const auto& cntStorage = cntShape->GetStorageShape();
         const int64_t idxBatchNum = idxStorage.GetDim(0);
         const int64_t idxKvHeadNum = idxStorage.GetDim(1);
         numJ_ = idxStorage.GetDim(2);
@@ -169,8 +169,8 @@ protected:
                 OP_LOGE(context_->GetNodeName(), "TND query must be 3D.");
                 return ge::GRAPH_FAILED;
             }
-            const gert::StorageShape *cuQShape = context_->GetOptionalInputShape(10);
-            const gert::StorageShape *cuKvShape = context_->GetOptionalInputShape(11);
+            const gert::StorageShape* cuQShape = context_->GetOptionalInputShape(10);
+            const gert::StorageShape* cuKvShape = context_->GetOptionalInputShape(11);
             if (cuQShape == nullptr || cuKvShape == nullptr) {
                 OP_LOGE(context_->GetNodeName(), "TND requires cu_seq_lengths_q and cu_seq_lengths_kv.");
                 return ge::GRAPH_FAILED;
@@ -184,7 +184,7 @@ protected:
                 return ge::GRAPH_FAILED;
             }
             for (int32_t idx = 12; idx <= 13; ++idx) {
-                const gert::StorageShape *shape = context_->GetOptionalInputShape(idx);
+                const gert::StorageShape* shape = context_->GetOptionalInputShape(idx);
                 if (shape != nullptr && shape->GetStorageShape().GetShapeSize() != idxBatchNum) {
                     OP_LOGE(context_->GetNodeName(), "seqused (input %d) must hold B=%ld lengths, got %ld.", idx,
                             idxBatchNum, shape->GetStorageShape().GetShapeSize());
@@ -358,11 +358,11 @@ protected:
 private:
     GenericBlockSparseAttentionGradTilingDataArch35 tilingData_;
     ge::DataType dataType_{ge::DT_FLOAT16};
-    const char *qLayout_{nullptr};
-    const char *kvLayout_{nullptr};
-    static constexpr const char *BSND_STR = "BSND";
-    static constexpr const char *BNSD_STR = "BNSD";
-    static constexpr const char *TND_STR = "TND";
+    const char* qLayout_{nullptr};
+    const char* kvLayout_{nullptr};
+    static constexpr const char* BSND_STR = "BSND";
+    static constexpr const char* BNSD_STR = "BNSD";
+    static constexpr const char* TND_STR = "TND";
     int64_t batchNum_{0};
     int64_t qSeqLen_{0};
     int64_t kvSeqLen_{0};

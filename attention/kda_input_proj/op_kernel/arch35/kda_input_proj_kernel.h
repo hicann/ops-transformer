@@ -31,11 +31,11 @@ namespace KdaInputProj {
 template <typename TypePack>
 class KdaInputProjKernel {
 public:
-    __aicore__ inline KdaInputProjKernel(__gm__ uint8_t *x, __gm__ uint8_t *weightQkv, __gm__ uint8_t *weightBeta,
-                                         __gm__ uint8_t *weightGate, __gm__ uint8_t *weightG,
-                                         __gm__ uint8_t *weightQkvScale, __gm__ uint8_t *qkv, __gm__ uint8_t *beta,
-                                         __gm__ uint8_t *gate, __gm__ uint8_t *g, __gm__ uint8_t *workspace,
-                                         const optiling::KdaInputProjTilingData *__restrict tiling)
+    __aicore__ inline KdaInputProjKernel(__gm__ uint8_t* x, __gm__ uint8_t* weightQkv, __gm__ uint8_t* weightBeta,
+                                         __gm__ uint8_t* weightGate, __gm__ uint8_t* weightG,
+                                         __gm__ uint8_t* weightQkvScale, __gm__ uint8_t* qkv, __gm__ uint8_t* beta,
+                                         __gm__ uint8_t* gate, __gm__ uint8_t* g, __gm__ uint8_t* workspace,
+                                         const optiling::KdaInputProjTilingData* __restrict tiling)
         : x_(x),
           weightQkv_(weightQkv),
           weightBeta_(weightBeta),
@@ -49,9 +49,9 @@ public:
           workspace_(workspace),
           tiling_(tiling)
     {
-        const auto &base = tiling_->baseParams;
-        __gm__ uint8_t *quantX = workspace_ + KdaInputProjWorkspace::OffsetQuantX();
-        __gm__ uint8_t *scaleX = workspace_ + KdaInputProjWorkspace::OffsetScaleX(base.tSize, base.hiddenSize);
+        const auto& base = tiling_->baseParams;
+        __gm__ uint8_t* quantX = workspace_ + KdaInputProjWorkspace::OffsetQuantX();
+        __gm__ uint8_t* scaleX = workspace_ + KdaInputProjWorkspace::OffsetScaleX(base.tSize, base.hiddenSize);
 
         mmBgg_.Init(x_, weightBeta_, weightGate_, weightG_, beta_, gate_, g_, workspace_, tiling_);
         mxQuant_.Init(x_, quantX, scaleX, tiling_);
@@ -70,18 +70,18 @@ protected:
     KdaInputProjQmmQkv<TypePack> qmmQkv_;
     KdaInputProjSigmoid<TypePack> sigmoid_;
 
-    const optiling::KdaInputProjTilingData *tiling_{nullptr};
-    __gm__ uint8_t *x_{nullptr};
-    __gm__ uint8_t *weightQkv_{nullptr};
-    __gm__ uint8_t *weightBeta_{nullptr};
-    __gm__ uint8_t *weightGate_{nullptr};
-    __gm__ uint8_t *weightG_{nullptr};
-    __gm__ uint8_t *weightQkvScale_{nullptr};
-    __gm__ uint8_t *qkv_{nullptr};
-    __gm__ uint8_t *beta_{nullptr};
-    __gm__ uint8_t *gate_{nullptr};
-    __gm__ uint8_t *g_{nullptr};
-    __gm__ uint8_t *workspace_{nullptr};
+    const optiling::KdaInputProjTilingData* tiling_{nullptr};
+    __gm__ uint8_t* x_{nullptr};
+    __gm__ uint8_t* weightQkv_{nullptr};
+    __gm__ uint8_t* weightBeta_{nullptr};
+    __gm__ uint8_t* weightGate_{nullptr};
+    __gm__ uint8_t* weightG_{nullptr};
+    __gm__ uint8_t* weightQkvScale_{nullptr};
+    __gm__ uint8_t* qkv_{nullptr};
+    __gm__ uint8_t* beta_{nullptr};
+    __gm__ uint8_t* gate_{nullptr};
+    __gm__ uint8_t* g_{nullptr};
+    __gm__ uint8_t* workspace_{nullptr};
 };
 
 template <typename TypePack>

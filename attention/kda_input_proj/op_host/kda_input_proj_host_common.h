@@ -40,22 +40,22 @@ constexpr uint32_t ATTR_TRANS_WEIGHT_GATE_INDEX = 2;
 constexpr uint32_t ATTR_TRANS_WEIGHT_G_INDEX = 3;
 
 // IR names (must match OpDef)
-inline constexpr const char *X_NAME = "x";
-inline constexpr const char *WEIGHT_QKV_NAME = "weight_qkv";
-inline constexpr const char *WEIGHT_BETA_NAME = "weight_beta";
-inline constexpr const char *WEIGHT_GATE_NAME = "weight_gate";
-inline constexpr const char *WEIGHT_G_NAME = "weight_g";
-inline constexpr const char *WEIGHT_QKV_SCALE_NAME = "weight_qkv_scale";
+inline constexpr const char* X_NAME = "x";
+inline constexpr const char* WEIGHT_QKV_NAME = "weight_qkv";
+inline constexpr const char* WEIGHT_BETA_NAME = "weight_beta";
+inline constexpr const char* WEIGHT_GATE_NAME = "weight_gate";
+inline constexpr const char* WEIGHT_G_NAME = "weight_g";
+inline constexpr const char* WEIGHT_QKV_SCALE_NAME = "weight_qkv_scale";
 
-inline constexpr const char *QKV_NAME = "qkv";
-inline constexpr const char *BETA_NAME = "beta";
-inline constexpr const char *GATE_NAME = "gate";
-inline constexpr const char *G_NAME = "g";
+inline constexpr const char* QKV_NAME = "qkv";
+inline constexpr const char* BETA_NAME = "beta";
+inline constexpr const char* GATE_NAME = "gate";
+inline constexpr const char* G_NAME = "g";
 
-inline constexpr const char *ATTR_TRANS_WEIGHT_QKV_NAME = "trans_weight_qkv";
-inline constexpr const char *ATTR_TRANS_WEIGHT_BETA_NAME = "trans_weight_beta";
-inline constexpr const char *ATTR_TRANS_WEIGHT_GATE_NAME = "trans_weight_gate";
-inline constexpr const char *ATTR_TRANS_WEIGHT_G_NAME = "trans_weight_g";
+inline constexpr const char* ATTR_TRANS_WEIGHT_QKV_NAME = "trans_weight_qkv";
+inline constexpr const char* ATTR_TRANS_WEIGHT_BETA_NAME = "trans_weight_beta";
+inline constexpr const char* ATTR_TRANS_WEIGHT_GATE_NAME = "trans_weight_gate";
+inline constexpr const char* ATTR_TRANS_WEIGHT_G_NAME = "trans_weight_g";
 } // namespace kda_input_proj
 
 #endif // KDA_INPUT_PROJ_HOST_COMMON_H

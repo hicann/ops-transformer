@@ -24,7 +24,7 @@ namespace liV2Topk {
 template <typename T>
 class LIV2Topk {
 public:
-    __aicore__ inline void operator()(LocalTensor<uint32_t> &outputIdxLocal, LocalTensor<T> &inputLocal,
+    __aicore__ inline void operator()(LocalTensor<uint32_t>& outputIdxLocal, LocalTensor<T>& inputLocal,
                                       uint32_t s2SeqLen)
     {}
 };
@@ -44,7 +44,7 @@ public:
         this->liV2TrunkLength = liV2TrunkLength;
     }
 
-    __aicore__ inline void InitBuffers(LocalTensor<uint32_t> &liV2SharedBuffer, LocalTensor<uint32_t> &liV2IndicesOut)
+    __aicore__ inline void InitBuffers(LocalTensor<uint32_t>& liV2SharedBuffer, LocalTensor<uint32_t>& liV2IndicesOut)
     {
         LocalTensor<uint32_t> hisIndexLocal1 = liV2IndicesOut;
         LocalTensor<uint32_t> hisIndexLocal2 = liV2SharedBuffer[0];
@@ -59,8 +59,8 @@ public:
         tmpIndexLocal = nkValueLocal[64]; // 64：单核/单线程输出元素容量（G维度切分阈值）
     }
 
-    __aicore__ inline void operator()(LocalTensor<uint32_t> &mrgValueLocal, LocalTensor<uint32_t> &liV2IndicesOut,
-                                      LocalTensor<uint32_t> &hisValueLocal, uint32_t s2SeqLen, uint32_t loopIdx,
+    __aicore__ inline void operator()(LocalTensor<uint32_t>& mrgValueLocal, LocalTensor<uint32_t>& liV2IndicesOut,
+                                      LocalTensor<uint32_t>& hisValueLocal, uint32_t s2SeqLen, uint32_t loopIdx,
                                       uint32_t s2LoopNum, bool isNeedLD, bool returnValueFlag, uint32_t outputIdxOffset)
     {
         if (s2LoopNum == 1) {
@@ -114,8 +114,8 @@ public:
         }
     }
 
-    __aicore__ inline void LdTopK(LocalTensor<uint32_t> &mrgValueLocal, LocalTensor<uint32_t> indexLocal,
-                                  LocalTensor<uint32_t> &liV2IndicesOut, LocalTensor<uint32_t> &hisValueLocal,
+    __aicore__ inline void LdTopK(LocalTensor<uint32_t>& mrgValueLocal, LocalTensor<uint32_t> indexLocal,
+                                  LocalTensor<uint32_t>& liV2IndicesOut, LocalTensor<uint32_t>& hisValueLocal,
                                   uint32_t s2SeqLen, uint32_t loopIdx, uint32_t s2LoopNum)
     {
         liV2Topkb32gather::LiV2TopKVF<true>(tmpIndexLocal, hisValueLocal, mrgValueLocal, histogramsLocal, idx0Local,

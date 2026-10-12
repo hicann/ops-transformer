@@ -33,7 +33,7 @@ static constexpr size_t DIM_6 = 6;
 static constexpr size_t IS_SEQ_LENS_CUMSUM_INDEX = 1;
 static constexpr size_t CACHE_MODE_INDEX = 0;
 
-static ge::graphStatus CheckCommonPagedCacheLoad(gert::InferShapeContext *context)
+static ge::graphStatus CheckCommonPagedCacheLoad(gert::InferShapeContext* context)
 {
     auto blockTables_shape = context->GetInputShape(DIM_2);
     OP_CHECK_NULL_WITH_CONTEXT(context, blockTables_shape);
@@ -66,7 +66,7 @@ static ge::graphStatus CheckCommonPagedCacheLoad(gert::InferShapeContext *contex
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferShape4GatherPaKvCacheNz(gert::InferShapeContext *context)
+static ge::graphStatus InferShape4GatherPaKvCacheNz(gert::InferShapeContext* context)
 {
     auto valueCacheShape = context->GetInputShape(DIM_1);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueCacheShape);
@@ -88,8 +88,7 @@ static ge::graphStatus InferShape4GatherPaKvCacheNz(gert::InferShapeContext *con
     return ge::GRAPH_SUCCESS;
 }
 
-
-static ge::graphStatus InferShape4GatherPaKvCacheNd(gert::InferShapeContext *context)
+static ge::graphStatus InferShape4GatherPaKvCacheNd(gert::InferShapeContext* context)
 {
     auto keyCacheShape = context->GetInputShape(DIM_0);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyCacheShape);
@@ -111,7 +110,7 @@ static ge::graphStatus InferShape4GatherPaKvCacheNd(gert::InferShapeContext *con
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferShape4GatherPaKvCache(gert::InferShapeContext *context)
+static ge::graphStatus InferShape4GatherPaKvCache(gert::InferShapeContext* context)
 {
     OP_LOGD(context, "Begin to do InferShape4GatherPaKvCache");
     auto tensorKeyIn_shape = context->GetInputShape(DIM_4);
@@ -126,7 +125,7 @@ static ge::graphStatus InferShape4GatherPaKvCache(gert::InferShapeContext *conte
     *output1_shape = *tensorValueIn_shape;
 
     for (uint32_t i = 0; i < context->GetComputeNodeInputNum(); i++) {
-        const gert::Shape *shape = context->GetInputShape(i);
+        const gert::Shape* shape = context->GetInputShape(i);
         if (Ops::Base::IsUnknownRank(*shape)) {
             Ops::Base::SetUnknownRank(*output0_shape);
             Ops::Base::SetUnknownRank(*output1_shape);
@@ -152,7 +151,7 @@ static ge::graphStatus InferShape4GatherPaKvCache(gert::InferShapeContext *conte
                 OP_LOGE(context, "Failed to check common launch param."), return ge::GRAPH_FAILED);
 
     auto attrs = context->GetAttrs();
-    const char *mode = attrs->GetAttrPointer<char>(CACHE_MODE_INDEX);
+    const char* mode = attrs->GetAttrPointer<char>(CACHE_MODE_INDEX);
     if (mode == nullptr || strcmp(mode, "Norm") == 0) {
         return InferShape4GatherPaKvCacheNd(context);
     } else if (strcmp(mode, "PA_NZ") == 0) {
@@ -162,7 +161,7 @@ static ge::graphStatus InferShape4GatherPaKvCache(gert::InferShapeContext *conte
     return ge::GRAPH_FAILED;
 }
 
-static graphStatus InferDataType4GatherPaKvCache(gert::InferDataTypeContext *context)
+static graphStatus InferDataType4GatherPaKvCache(gert::InferDataTypeContext* context)
 {
     context->SetOutputDataType(DIM_0, context->GetInputDataType(DIM_0));
     context->SetOutputDataType(DIM_1, context->GetInputDataType(DIM_1));

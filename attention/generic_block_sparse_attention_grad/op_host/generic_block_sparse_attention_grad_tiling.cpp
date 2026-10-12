@@ -23,7 +23,7 @@ using namespace ge;
 namespace optiling {
 namespace gsag {
 
-ASCENDC_EXTERN_C ge::graphStatus TilingGenericBlockSparseAttentionGrad(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingGenericBlockSparseAttentionGrad(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr,
                 OPS_REPORT_VECTOR_INNER_ERR("GenericBlockSparseAttentionGrad", "Context is nullptr."),
@@ -31,7 +31,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingGenericBlockSparseAttentionGrad(gert::Til
     return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareGenericBlockSparseAttentionGrad(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareGenericBlockSparseAttentionGrad(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

@@ -32,7 +32,7 @@ class LightningIndexerKLLoss {
 public:
     __aicore__ inline LightningIndexerKLLoss(){};
     __aicore__ inline void Init(GM_ADDR targetScore, GM_ADDR indexProbs, GM_ADDR loss, GM_ADDR workspace,
-                                const LightningIndexerKLLossTilingData *tilingData, TPipe *pipe);
+                                const LightningIndexerKLLossTilingData* tilingData, TPipe* pipe);
     __aicore__ inline void ZeroAccZone();
     __aicore__ inline void InitHalfBufs();
     __aicore__ inline void Process();
@@ -47,7 +47,7 @@ private:
     // 纯 MTE3 搬运累加
     __aicore__ inline void CopyOut();
 
-    TPipe *pipePtr;
+    TPipe* pipePtr;
     TBuf<TPosition::VECCALC> tmpBuf_;
     GM_ADDR userWorkspace_;
 
@@ -97,7 +97,7 @@ private:
 template <typename T, bool isDeterministic, bool weightType>
 __aicore__ inline void LightningIndexerKLLoss<T, isDeterministic, weightType>::Init(
     GM_ADDR targetScore, GM_ADDR indexProbs, GM_ADDR loss, GM_ADDR workspace,
-    const LightningIndexerKLLossTilingData *tilingData, TPipe *pipe)
+    const LightningIndexerKLLossTilingData* tilingData, TPipe* pipe)
 {
     totalLength_ = tilingData->totalLength;
     K_ = tilingData->K;
@@ -113,11 +113,11 @@ __aicore__ inline void LightningIndexerKLLoss<T, isDeterministic, weightType>::I
     blockIdx_ = GetBlockIdx();
     blocksPerCore_ = (blockIdx_ < formerNum_) ? formerTileNum_ : tailTileNum_;
 
-    inputGMTargetScore.SetGlobalBuffer((__gm__ T *)targetScore, totalLength_ * K_);
-    inputGMIndexProbs.SetGlobalBuffer((__gm__ T *)indexProbs, totalLength_ * K_);
-    outputGMLoss.SetGlobalBuffer((__gm__ T *)loss, 1);
+    inputGMTargetScore.SetGlobalBuffer((__gm__ T*)targetScore, totalLength_ * K_);
+    inputGMIndexProbs.SetGlobalBuffer((__gm__ T*)indexProbs, totalLength_ * K_);
+    outputGMLoss.SetGlobalBuffer((__gm__ T*)loss, 1);
     if constexpr (!(std::is_same_v<T, float> && !isDeterministic)) {
-        perCoreSumWS.SetGlobalBuffer((__gm__ float *)(workspace) + blockIdx_ * FLOAT_BLOCK_SIZE, FLOAT_BLOCK_SIZE);
+        perCoreSumWS.SetGlobalBuffer((__gm__ float*)(workspace) + blockIdx_ * FLOAT_BLOCK_SIZE, FLOAT_BLOCK_SIZE);
         userWorkspace_ = workspace;
     }
 
@@ -408,7 +408,7 @@ __aicore__ inline void LightningIndexerKLLoss<T, isDeterministic, weightType>::W
         GlobalTensor<float> ws;
         uint32_t count = coreNum_ * FLOAT_BLOCK_SIZE;
         LocalTensor<float> ubCoreSum = tmpBuf_.Get<float>(count);
-        ws.SetGlobalBuffer((__gm__ float *)userWorkspace_, count);
+        ws.SetGlobalBuffer((__gm__ float*)userWorkspace_, count);
         DataCopy(ubCoreSum, ws, count);
         SetFlag<HardEvent::MTE2_V>(eventMTE2YToV_);
         WaitFlag<HardEvent::MTE2_V>(eventMTE2YToV_);

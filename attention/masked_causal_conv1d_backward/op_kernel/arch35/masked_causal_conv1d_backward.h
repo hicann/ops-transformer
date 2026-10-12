@@ -35,7 +35,7 @@ public:
     __aicore__ inline MaskedCausalConv1dBackward();
 
     __aicore__ inline void Init(GM_ADDR grad_y, GM_ADDR x, GM_ADDR weight, GM_ADDR mask, GM_ADDR grad_x,
-                                GM_ADDR grad_weight, const MaskedCausalConv1dBackwardTilingDataV35 *td, TPipe *pipe);
+                                GM_ADDR grad_weight, const MaskedCausalConv1dBackwardTilingDataV35* td, TPipe* pipe);
 
     __aicore__ inline void Process();
 
@@ -44,15 +44,15 @@ private:
     __aicore__ inline void CopyInX(int64_t bTile, int64_t sTile, int64_t hTile, int64_t sLen, int64_t hLenThis);
     __aicore__ inline void CopyInWeight(int64_t hTile, int64_t hLenThis);
     __aicore__ inline void CopyInMask(int64_t bTile, int64_t sTile, int64_t sLen);
-    __aicore__ inline void ApplyMaskToGradY(LocalTensor<DT> &goLocal, int64_t sEff, int64_t hLenThis);
-    __aicore__ inline void ComputeGradXWeight(LocalTensor<DT> &goLocal, LocalTensor<DT> &inLocal,
-                                              LocalTensor<DT> &wLocal, int64_t sLen, int64_t hLenThis);
+    __aicore__ inline void ApplyMaskToGradY(LocalTensor<DT>& goLocal, int64_t sEff, int64_t hLenThis);
+    __aicore__ inline void ComputeGradXWeight(LocalTensor<DT>& goLocal, LocalTensor<DT>& inLocal,
+                                              LocalTensor<DT>& wLocal, int64_t sLen, int64_t hLenThis);
     __aicore__ inline void CopyOutGradX(int64_t bTile, int64_t sTile, int64_t hTile, int64_t sLen, int64_t hLenThis);
     __aicore__ inline void ReduceSTile(int64_t sTile, int64_t sLen, int64_t hLenThis);
     __aicore__ inline void ReduceWsTile(int64_t bTile, int64_t hLenThis);
     __aicore__ inline void ReduceBTileAndCopyOut(int64_t hTile, int64_t hLenThis);
     __aicore__ inline void AccumulateLevels(uint32_t kIdx, int64_t hLenThis, uint32_t wsBase, uint32_t wsStrideBytes,
-                                            LocalTensor<float> &sumUb);
+                                            LocalTensor<float>& sumUb);
 
     template <HardEvent event>
     __aicore__ inline void SetWaitFlag(HardEvent evt)
@@ -63,8 +63,8 @@ private:
     }
 
 private:
-    TPipe *pipe_;
-    const MaskedCausalConv1dBackwardTilingDataV35 *td_;
+    TPipe* pipe_;
+    const MaskedCausalConv1dBackwardTilingDataV35* td_;
     TQue<QuePosition::VECIN, kBufferNum> gradOutQ_;
     TQue<QuePosition::VECIN, kBufferNum> xQ_;
     TQue<QuePosition::VECIN, kBufferNum> weightQ_;
@@ -114,8 +114,8 @@ __aicore__ inline MaskedCausalConv1dBackward<DT>::MaskedCausalConv1dBackward()
 template <typename DT>
 __aicore__ inline void MaskedCausalConv1dBackward<DT>::Init(GM_ADDR grad_y, GM_ADDR x, GM_ADDR weight, GM_ADDR mask,
                                                             GM_ADDR grad_x, GM_ADDR grad_weight,
-                                                            const MaskedCausalConv1dBackwardTilingDataV35 *td,
-                                                            TPipe *pipe)
+                                                            const MaskedCausalConv1dBackwardTilingDataV35* td,
+                                                            TPipe* pipe)
 {
     pipe_ = pipe;
     td_ = td;
@@ -149,13 +149,13 @@ __aicore__ inline void MaskedCausalConv1dBackward<DT>::Init(GM_ADDR grad_y, GM_A
     sMainCntCur_ = td->ubMainFactorSCount;
     sTailCntCur_ = td->ubTailFactorSCount;
 
-    gradYGm_.SetGlobalBuffer((__gm__ DT *)grad_y, S_ * B_ * H_);
-    xGm_.SetGlobalBuffer((__gm__ DT *)x, S_ * B_ * H_);
-    weightGm_.SetGlobalBuffer((__gm__ DT *)weight, kW * H_);
-    gradInGm_.SetGlobalBuffer((__gm__ DT *)grad_x, S_ * B_ * H_);
-    gradWeightGm_.SetGlobalBuffer((__gm__ DT *)grad_weight, kW * H_);
+    gradYGm_.SetGlobalBuffer((__gm__ DT*)grad_y, S_ * B_ * H_);
+    xGm_.SetGlobalBuffer((__gm__ DT*)x, S_ * B_ * H_);
+    weightGm_.SetGlobalBuffer((__gm__ DT*)weight, kW * H_);
+    gradInGm_.SetGlobalBuffer((__gm__ DT*)grad_x, S_ * B_ * H_);
+    gradWeightGm_.SetGlobalBuffer((__gm__ DT*)grad_weight, kW * H_);
     if (hasMask_) {
-        maskGm_.SetGlobalBuffer((__gm__ bool *)mask, B_ * S_);
+        maskGm_.SetGlobalBuffer((__gm__ bool*)mask, B_ * S_);
     }
 
     pipe_->InitBuffer(gradOutQ_, kBufferNum, static_cast<uint32_t>(ubMainHCur_ * (ubMainSCur_ + NUM_2) * sizeof(DT)));
@@ -237,9 +237,9 @@ __aicore__ inline void MaskedCausalConv1dBackward<DT>::Process()
 }
 
 template <typename DT>
-__aicore__ inline void MaskedCausalConv1dBackward<DT>::ComputeGradXWeight(LocalTensor<DT> &goLocal,
-                                                                          LocalTensor<DT> &inLocal,
-                                                                          LocalTensor<DT> &wLocal, int64_t sLen,
+__aicore__ inline void MaskedCausalConv1dBackward<DT>::ComputeGradXWeight(LocalTensor<DT>& goLocal,
+                                                                          LocalTensor<DT>& inLocal,
+                                                                          LocalTensor<DT>& wLocal, int64_t sLen,
                                                                           int64_t hLenThis)
 {
     LocalTensor<DT> giLocal = gradInQ_.AllocTensor<DT>();
@@ -369,7 +369,7 @@ __aicore__ inline void MaskedCausalConv1dBackward<DT>::ReduceWsTile(int64_t bTil
 template <typename DT>
 __aicore__ inline void MaskedCausalConv1dBackward<DT>::AccumulateLevels(uint32_t kIdx, int64_t hLenThis,
                                                                         uint32_t wsBase, uint32_t wsStrideBytes,
-                                                                        LocalTensor<float> &sumUb)
+                                                                        LocalTensor<float>& sumUb)
 {
     Duplicate(sumUb, 0.0f, static_cast<uint32_t>(hLenThis));
     PipeBarrier<PIPE_V>();
@@ -386,7 +386,7 @@ __aicore__ inline void MaskedCausalConv1dBackward<DT>::AccumulateLevels(uint32_t
 }
 
 template <typename DT>
-__aicore__ inline void MaskedCausalConv1dBackward<DT>::ApplyMaskToGradY(LocalTensor<DT> &goLocal, int64_t sEff,
+__aicore__ inline void MaskedCausalConv1dBackward<DT>::ApplyMaskToGradY(LocalTensor<DT>& goLocal, int64_t sEff,
                                                                         int64_t hLenThis)
 {
     LocalTensor<bool> mRawBool = maskQ_.DeQue<bool>();

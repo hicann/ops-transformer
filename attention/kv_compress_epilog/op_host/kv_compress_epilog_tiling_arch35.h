@@ -116,7 +116,7 @@ struct KvCompressEpilogCompileInfo {
 // ---------- Tiling Class ----------
 class KvCompressEpilogTilingArch35 {
 public:
-    explicit KvCompressEpilogTilingArch35(gert::TilingContext *context)
+    explicit KvCompressEpilogTilingArch35(gert::TilingContext* context)
         : context_(context)
     {}
     ~KvCompressEpilogTilingArch35() = default;
@@ -135,7 +135,7 @@ protected:
     ge::graphStatus GetAttributes();
     ge::graphStatus GetDtypeInfo();
     ge::graphStatus GetKvCacheLayout();
-    bool GetCacheViewLayout(size_t inputIdx, int64_t &blockSize, int64_t &rowStride, int64_t &blockStride);
+    bool GetCacheViewLayout(size_t inputIdx, int64_t& blockSize, int64_t& rowStride, int64_t& blockStride);
     void CountTilingKey();
 
     // Validation
@@ -148,7 +148,7 @@ protected:
 
 private:
     // Context
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     KvCompressEpilogTilingData tilingData_;
     uint64_t tilingKey_ = 0;
 

@@ -27,7 +27,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -36,7 +36,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<float> resultData(size, 0);
@@ -48,7 +48,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -64,8 +64,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -124,13 +124,13 @@ int main()
     // loss 初始值任意
     std::vector<float> lossHostData(1, 0.0f);
 
-    void *targetScoreDeviceAddr = nullptr;
-    void *indexProbsDeviceAddr = nullptr;
-    void *lossDeviceAddr = nullptr;
+    void* targetScoreDeviceAddr = nullptr;
+    void* indexProbsDeviceAddr = nullptr;
+    void* lossDeviceAddr = nullptr;
 
-    aclTensor *targetScore = nullptr;
-    aclTensor *indexProbs = nullptr;
-    aclTensor *loss = nullptr;
+    aclTensor* targetScore = nullptr;
+    aclTensor* indexProbs = nullptr;
+    aclTensor* loss = nullptr;
 
     ret =
         CreateAclTensor(targetScoreHostData, inputShape, &targetScoreDeviceAddr, aclDataType::ACL_FLOAT, &targetScore);
@@ -144,11 +144,11 @@ int main()
     double eps = 1e-9;
 
     // weight_type 参数（默认 'logits'）
-    const char *weightType = "logits";
+    const char* weightType = "logits";
 
     // 3. 调用 C(A)NN 算子库 API
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     // 4. 调用 aclnnLightningIndexerKLLoss 第一段接口
     ret = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore, indexProbs, eps, weightType, loss, &workspaceSize,
@@ -157,7 +157,7 @@ int main()
               return ret);
 
     // 根据 workspaceSize 申请 device 内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > static_cast<uint64_t>(0)) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

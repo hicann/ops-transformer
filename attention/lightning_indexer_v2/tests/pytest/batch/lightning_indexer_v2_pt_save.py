@@ -16,6 +16,7 @@ from lightning_indexer_v2_golden import generate_liv2_test_data
 import pandas as pd
 import numpy as np
 import torch
+
 try:
     import torch_npu
 except ImportError:
@@ -26,8 +27,8 @@ import math
 import ast
 import argparse
 
-def load_excel_test_cases(excel_file_path: str, sheetname: str):
 
+def load_excel_test_cases(excel_file_path: str, sheetname: str):
     """
     从 Excel 文件加载测试用例。
 
@@ -41,7 +42,7 @@ def load_excel_test_cases(excel_file_path: str, sheetname: str):
     """
     # 优先使用传入的 sheetname，否则尝试从环境变量获取
     if sheetname is None:
-        sheetname = 'Sheet1'
+        sheetname = "Sheet1"
 
     # 检查文件是否存在
     if not os.path.exists(excel_file_path):
@@ -54,59 +55,87 @@ def load_excel_test_cases(excel_file_path: str, sheetname: str):
 
         # 定义必需的列名
         required_columns = [
-            'Testcase_Name', 'batch_size', 'q_seq','k_seq','q_t_size', 'k_t_size',
-            'q_head_num', 'k_head_num', 'head_dim', 'block_size', 'block_num',
-            'qk_dtype', 'cu_seqlens_q', 'cu_seqlens_k', 'seqused_q', 'seqused_k',
-            'cmp_residual_k', 'output_idx_offset', 'layout_q', 'layout_k', 'topk',
-            'mask_mode', 'query_datarange', 'key_datarange', 'weights_datarange',
-            'cmp_ratio', 'return_value', 'max_seqlen_q'
+            "Testcase_Name",
+            "batch_size",
+            "q_seq",
+            "k_seq",
+            "q_t_size",
+            "k_t_size",
+            "q_head_num",
+            "k_head_num",
+            "head_dim",
+            "block_size",
+            "block_num",
+            "qk_dtype",
+            "cu_seqlens_q",
+            "cu_seqlens_k",
+            "seqused_q",
+            "seqused_k",
+            "cmp_residual_k",
+            "output_idx_offset",
+            "layout_q",
+            "layout_k",
+            "topk",
+            "mask_mode",
+            "query_datarange",
+            "key_datarange",
+            "weights_datarange",
+            "cmp_ratio",
+            "return_value",
+            "max_seqlen_q",
         ]
 
         # 检查是否缺少必要列
         missing_cols = [col for col in required_columns if col not in df.columns]
         if missing_cols:
-            pytest.skip(f"Missing required columns in Excel: {missing_cols}", allow_module_level=True)
+            pytest.skip(
+                f"Missing required columns in Excel: {missing_cols}",
+                allow_module_level=True,
+            )
 
         df["block_size"] = df["block_size"].fillna(0).astype(int)
         # 构建测试用例列表
         test_cases = []
         for _, row in df.iterrows():
-            test_cases.append((
-                row['Testcase_Name'],
-                row['batch_size'],
-                row['q_seq'],
-                row['k_seq'],
-                row['q_t_size'],
-                row['k_t_size'],
-                row['q_head_num'],
-                row['k_head_num'],
-                row['head_dim'],
-                row['block_size'],
-                row['block_num'],
-                row['qk_dtype'],
-                row['cu_seqlens_q'],
-                row['cu_seqlens_k'],
-                row['seqused_q'],
-                row['seqused_k'],
-                row['cmp_residual_k'],
-                row['output_idx_offset'],
-                row['layout_q'],
-                row['layout_k'],
-                row['topk'],
-                row['mask_mode'],
-                row['query_datarange'],
-                row['key_datarange'],
-                row['weights_datarange'],
-                row['cmp_ratio'],
-                row['return_value'],
-                row['max_seqlen_q']
-            ))
+            test_cases.append(
+                (
+                    row["Testcase_Name"],
+                    row["batch_size"],
+                    row["q_seq"],
+                    row["k_seq"],
+                    row["q_t_size"],
+                    row["k_t_size"],
+                    row["q_head_num"],
+                    row["k_head_num"],
+                    row["head_dim"],
+                    row["block_size"],
+                    row["block_num"],
+                    row["qk_dtype"],
+                    row["cu_seqlens_q"],
+                    row["cu_seqlens_k"],
+                    row["seqused_q"],
+                    row["seqused_k"],
+                    row["cmp_residual_k"],
+                    row["output_idx_offset"],
+                    row["layout_q"],
+                    row["layout_k"],
+                    row["topk"],
+                    row["mask_mode"],
+                    row["query_datarange"],
+                    row["key_datarange"],
+                    row["weights_datarange"],
+                    row["cmp_ratio"],
+                    row["return_value"],
+                    row["max_seqlen_q"],
+                )
+            )
 
         return test_cases
 
     except Exception as e:
         pytest.skip(f"Failed to read Excel file: {e}", allow_module_level=True)
         return None
+
 
 def save_test_case(test_cases, file_path):
     print("正在保存pt文件...")
@@ -129,16 +158,20 @@ def save_test_case(test_cases, file_path):
             print(f"[失败] 生成 pt 文件失败: {case[0]} (索引: {idx})")
             print(f"错误详情: {e}")
 
+
 def main():
-    parser = argparse.ArgumentParser(description='liv2_pt_save.py 接收路径参数')
-    parser.add_argument('path1', type=str, help='第一个路径')
-    parser.add_argument('path2', type=str, help='第二个路径')
-    parser.add_argument('--sheet', '-S', type=str, default='Sheet1', help='Sheet 页名（默认: Sheet1）')
+    parser = argparse.ArgumentParser(description="liv2_pt_save.py 接收路径参数")
+    parser.add_argument("path1", type=str, help="第一个路径")
+    parser.add_argument("path2", type=str, help="第二个路径")
+    parser.add_argument(
+        "--sheet", "-S", type=str, default="Sheet1", help="Sheet 页名（默认: Sheet1）"
+    )
     args = parser.parse_args()
     path1 = args.path1
     path2 = args.path2
-    testcase =  load_excel_test_cases(path1, args.sheet)
+    testcase = load_excel_test_cases(path1, args.sheet)
     save_test_case(testcase, path2)
+
 
 if __name__ == "__main__":
     main()

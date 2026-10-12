@@ -30,20 +30,20 @@ template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uin
 class FusedFloydAttentionGradPost {
 public:
     __aicore__ inline FusedFloydAttentionGradPost(){};
-    __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dk_1,
-                                __gm__ uint8_t *dv_1, __gm__ uint8_t *workspace,
-                                const TILING_TYPE *__restrict ordTilingData, TPipe *pipe_in);
+    __aicore__ inline void Init(__gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* dk_1,
+                                __gm__ uint8_t* dv_1, __gm__ uint8_t* workspace,
+                                const TILING_TYPE* __restrict ordTilingData, TPipe* pipe_in);
     __aicore__ inline void Process();
-    __aicore__ inline void InitIndex(uint64_t startIdx, int64_t curG, int64_t &curS, GM_ADDR seqS);
-    __aicore__ inline void NZ2ND(LocalTensor<float> &dstTensor, LocalTensor<float> &srcTensor, uint64_t sLen,
+    __aicore__ inline void InitIndex(uint64_t startIdx, int64_t curG, int64_t& curS, GM_ADDR seqS);
+    __aicore__ inline void NZ2ND(LocalTensor<float>& dstTensor, LocalTensor<float>& srcTensor, uint64_t sLen,
                                  uint64_t ubOffset, uint64_t srcUbOffset);
     __aicore__ inline void NZVecClc(GlobalTensor<float> srcGm, GlobalTensor<OUT_TYPE> dstGm, uint64_t dataSize,
-                                    GM_ADDR seqS, int64_t curG, int64_t &curS, bool needMuls, int64_t flag);
+                                    GM_ADDR seqS, int64_t curG, int64_t& curS, bool needMuls, int64_t flag);
     __aicore__ inline void NZProcess();
-    __aicore__ inline void ComputeDataCopyOffset(int64_t curG, int64_t &curS);
+    __aicore__ inline void ComputeDataCopyOffset(int64_t curG, int64_t& curS);
 
     constexpr static uint32_t BUFFER_NUM = 1;
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, BUFFER_NUM> inQueue;
     TQue<QuePosition::VECOUT, BUFFER_NUM> outQueue;
 
@@ -59,7 +59,7 @@ public:
     // input
     AscendC::GlobalTensor<float> dqWorkSpaceGm, dkWorkSpaceGm, dvWorkSpaceGm, dk1WorkSpaceGm, dv1WorkSpaceGm;
 
-    const TILING_TYPE *__restrict tilingData;
+    const TILING_TYPE* __restrict tilingData;
     constexpr static uint32_t SYNC_GLOBAL_WORKSPACE_SIZE = 16 * 1024;
     constexpr static uint32_t ADDR_ALIGN_SIZE = 512;
     constexpr static uint64_t C0_SIZE = 16;
@@ -121,19 +121,19 @@ public:
 template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uint32_t LAYOUT,
           const uint32_t INPUT_FORMAT>
 __aicore__ inline void FusedFloydAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT>::Init(
-    __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dk_1, __gm__ uint8_t *dv_1,
-    __gm__ uint8_t *workspace, const TILING_TYPE *__restrict ordTilingData, TPipe *pipe_in)
+    __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* dk_1, __gm__ uint8_t* dv_1,
+    __gm__ uint8_t* workspace, const TILING_TYPE* __restrict ordTilingData, TPipe* pipe_in)
 {
     cBlockIdx = GetBlockIdx();
 
     tilingData = ordTilingData;
     pipe = pipe_in;
 
-    dqGm.SetGlobalBuffer((__gm__ OUT_TYPE *)dq);
-    dkGm.SetGlobalBuffer((__gm__ OUT_TYPE *)dk);
-    dvGm.SetGlobalBuffer((__gm__ OUT_TYPE *)dv);
-    dk1Gm.SetGlobalBuffer((__gm__ OUT_TYPE *)dk_1);
-    dv1Gm.SetGlobalBuffer((__gm__ OUT_TYPE *)dv_1);
+    dqGm.SetGlobalBuffer((__gm__ OUT_TYPE*)dq);
+    dkGm.SetGlobalBuffer((__gm__ OUT_TYPE*)dk);
+    dvGm.SetGlobalBuffer((__gm__ OUT_TYPE*)dv);
+    dk1Gm.SetGlobalBuffer((__gm__ OUT_TYPE*)dk_1);
+    dv1Gm.SetGlobalBuffer((__gm__ OUT_TYPE*)dv_1);
 
     // tiling_data
     usedCoreNum = tilingData->postTilingData.coreNum;
@@ -168,17 +168,17 @@ __aicore__ inline void FusedFloydAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_D
         actual_seq_kvlen_addr = nullptr;
     }
 
-    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                   tilingData->postTilingData.dqWorkSpaceOffset / sizeof(float));
-    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                   tilingData->postTilingData.dkWorkSpaceOffset / sizeof(float));
-    dk1WorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+    dk1WorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                    tilingData->postTilingData.dk1WorkSpaceOffset / sizeof(float));
 
     if constexpr (CAST_DV) {
-        dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                       tilingData->postTilingData.dvWorkSpaceOffset / sizeof(float));
-        dv1WorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dv1WorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                        tilingData->postTilingData.dv1WorkSpaceOffset / sizeof(float));
     }
 
@@ -198,7 +198,7 @@ __aicore__ inline void FusedFloydAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_D
 template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uint32_t LAYOUT,
           const uint32_t INPUT_FORMAT>
 __aicore__ inline void FusedFloydAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT>::InitIndex(
-    uint64_t startIdx, int64_t curG, int64_t &curS, GM_ADDR seqS)
+    uint64_t startIdx, int64_t curG, int64_t& curS, GM_ADDR seqS)
 {
     bIdx = startIdx / (n2 * curG * curS * d);
     uint64_t bTail = startIdx % (n2 * curG * curS * d);
@@ -212,7 +212,7 @@ template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uin
           const uint32_t INPUT_FORMAT>
 __aicore__ inline void
 FusedFloydAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT>::ComputeDataCopyOffset(int64_t curG,
-                                                                                                         int64_t &curS)
+                                                                                                         int64_t& curS)
 {
     // src BNSD
     scrOffsetBase = bIdx * n2 * curS * curG * dAlign;
@@ -225,7 +225,7 @@ FusedFloydAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT
 template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uint32_t LAYOUT,
           const uint32_t INPUT_FORMAT>
 __aicore__ inline void FusedFloydAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT>::NZ2ND(
-    LocalTensor<float> &dstTensor, LocalTensor<float> &srcTensor, uint64_t sLen, uint64_t ubOffset,
+    LocalTensor<float>& dstTensor, LocalTensor<float>& srcTensor, uint64_t sLen, uint64_t ubOffset,
     uint64_t srcUbOffset)
 {
     /*
@@ -260,7 +260,7 @@ template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uin
           const uint32_t INPUT_FORMAT>
 __aicore__ inline void FusedFloydAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT>::NZVecClc(
     GlobalTensor<float> srcGm, GlobalTensor<OUT_TYPE> dstGm, uint64_t dataSize, GM_ADDR seqS, int64_t curG,
-    int64_t &curS, bool needMuls, int64_t flag)
+    int64_t& curS, bool needMuls, int64_t flag)
 {
     if (dataSize == 0) {
         return;
@@ -360,7 +360,7 @@ __aicore__ inline void FusedFloydAttentionGradPost<OUT_TYPE, TILING_TYPE, CAST_D
             if constexpr (LAYOUT == TND) {
                 scrOffsetBase += curS * n2 * curG * dAlign;
                 dstOffsetBase += curS * n2 * curG * d;
-                curS = ((__gm__ int64_t *)seqS)[bIdx] - ((__gm__ int64_t *)seqS)[bIdx - 1];
+                curS = ((__gm__ int64_t*)seqS)[bIdx] - ((__gm__ int64_t*)seqS)[bIdx - 1];
             }
         } else {
             sIdx = 0;

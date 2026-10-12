@@ -24,8 +24,8 @@ const int64_t MAX_DIM_SIZE = 8;
 const int64_t VALUE_0 = 0;
 const int64_t VALUE_1 = 1;
 
-at::Tensor ConstructKeyPoolOutputTensor(const at::Tensor &hidden_states, const at::Tensor &wk,
-                                        const at::Tensor &stateCache, const at::Tensor &cacheBlockTable,
+at::Tensor ConstructKeyPoolOutputTensor(const at::Tensor& hidden_states, const at::Tensor& wk,
+                                        const at::Tensor& stateCache, const at::Tensor& cacheBlockTable,
                                         int64_t cmpRatio)
 {
     auto hiddenStatesDim = hidden_states.dim();
@@ -52,12 +52,12 @@ at::Tensor ConstructKeyPoolOutputTensor(const at::Tensor &hidden_states, const a
     return pooledKey;
 }
 
-at::Tensor KeyPool(const at::Tensor &hidden_states, const at::Tensor &wk, const at::Tensor &gate_weight,
-                   const at::Tensor &ape, at::Tensor &stateCache, const at::Tensor &cacheBlockTable,
-                   const at::Tensor &startPos, const c10::optional<at::Tensor> &normWeight,
-                   const c10::optional<at::Tensor> &normBias, const c10::optional<at::Tensor> &cos,
-                   const c10::optional<at::Tensor> &sin, const c10::optional<at::Tensor> &cuSeqlens,
-                   const c10::optional<at::Tensor> &seqused, int64_t cmpRatio, double normEps, int64_t rotaryMode)
+at::Tensor KeyPool(const at::Tensor& hidden_states, const at::Tensor& wk, const at::Tensor& gate_weight,
+                   const at::Tensor& ape, at::Tensor& stateCache, const at::Tensor& cacheBlockTable,
+                   const at::Tensor& startPos, const c10::optional<at::Tensor>& normWeight,
+                   const c10::optional<at::Tensor>& normBias, const c10::optional<at::Tensor>& cos,
+                   const c10::optional<at::Tensor>& sin, const c10::optional<at::Tensor>& cuSeqlens,
+                   const c10::optional<at::Tensor>& seqused, int64_t cmpRatio, double normEps, int64_t rotaryMode)
 {
     TORCH_CHECK(hidden_states.defined(), "Check hidden_states != nullptr failed");
     auto hiddenStatesDim = hidden_states.dim();

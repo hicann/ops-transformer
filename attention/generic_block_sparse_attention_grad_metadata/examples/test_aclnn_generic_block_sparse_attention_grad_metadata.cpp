@@ -35,7 +35,7 @@
 
 namespace {
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -44,7 +44,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -60,8 +60,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * static_cast<int64_t>(sizeof(T));
     auto ret = aclrtMalloc(deviceAddr, static_cast<size_t>(size), ACL_MEM_MALLOC_HUGE_FIRST);
@@ -81,7 +81,7 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-void PrintMetadataHeader(void **deviceAddr)
+void PrintMetadataHeader(void** deviceAddr)
 {
     std::vector<int32_t> header(8, 0);
     auto ret = aclrtMemcpy(header.data(), header.size() * sizeof(int32_t), *deviceAddr, header.size() * sizeof(int32_t),
@@ -134,12 +134,12 @@ int main()
     }
     cntHost[0] = static_cast<int32_t>(S1);
 
-    void *idxAddr = nullptr;
-    void *cntAddr = nullptr;
-    void *metaAddr = nullptr;
-    aclTensor *idx = nullptr;
-    aclTensor *cnt = nullptr;
-    aclTensor *metadata = nullptr;
+    void* idxAddr = nullptr;
+    void* cntAddr = nullptr;
+    void* metaAddr = nullptr;
+    aclTensor* idx = nullptr;
+    aclTensor* cnt = nullptr;
+    aclTensor* metadata = nullptr;
 
     ret = CreateAclTensor(idxHost, idxShape, &idxAddr, aclDataType::ACL_INT32, &idx);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -149,13 +149,13 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     const int64_t blockShapeData[] = {blockX, blockY};
-    aclIntArray *blockShape = aclCreateIntArray(blockShapeData, 2);
+    aclIntArray* blockShape = aclCreateIntArray(blockShapeData, 2);
     CHECK_RET(blockShape != nullptr, LOG_PRINT("aclCreateIntArray failed\n"); return -1);
 
     char layout[] = "BNSD";
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     LOG_PRINT("Calling aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize...\n");
     ret = aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
         idx, cnt, nullptr, nullptr, nullptr, nullptr, S1, S2, N1, N2, D, blockShape, layout, layout,
@@ -165,7 +165,7 @@ int main()
               LOG_PRINT("aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *workspace = nullptr;
+    void* workspace = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspace, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

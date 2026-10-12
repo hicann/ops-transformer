@@ -38,17 +38,17 @@ enum class CheckerLayout : uint32_t {
 };
 
 struct CheckerTensor {
-    const gert::CompileTimeTensorDesc *desc = nullptr;
-    const gert::StorageShape *storageShape = nullptr;
-    const gert::Tensor *tensor = nullptr;
-    const gert::Stride *stride = nullptr;
+    const gert::CompileTimeTensorDesc* desc = nullptr;
+    const gert::StorageShape* storageShape = nullptr;
+    const gert::Tensor* tensor = nullptr;
+    const gert::Stride* stride = nullptr;
 
     bool IsPresent() const
     {
         return storageShape != nullptr || tensor != nullptr;
     }
 
-    const gert::Shape *GetShape() const
+    const gert::Shape* GetShape() const
     {
         if (storageShape != nullptr) {
             return &storageShape->GetStorageShape();
@@ -58,7 +58,7 @@ struct CheckerTensor {
 };
 
 struct LightningIndexerV2CheckerInfo {
-    const char *opName = nullptr;
+    const char* opName = nullptr;
     bool quantized = false;
 
     CheckerTensor query;

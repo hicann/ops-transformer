@@ -17,13 +17,13 @@ namespace optiling {
 
 class MixedQuantSparseFlashMlaChecker {
 public:
-    explicit MixedQuantSparseFlashMlaChecker(const MQSMLATilingInfo &info)
+    explicit MixedQuantSparseFlashMlaChecker(const MQSMLATilingInfo& info)
         : info_(info)
     {}
     ge::graphStatus Process() const;
 
 private:
-    const MQSMLATilingInfo &info_;
+    const MQSMLATilingInfo& info_;
 };
 
 } // namespace optiling

@@ -28,13 +28,13 @@
 namespace optiling {
 // ------------------公共定义--------------------------
 struct TilingRequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct TilingOptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 enum class DataLayout : uint32_t {
@@ -126,23 +126,23 @@ struct LiV2ParaInfo {
     TilingRequiredParaInfo attenOut = {nullptr, nullptr};
     TilingRequiredParaInfo valuesOut = {nullptr, nullptr};
 
-    const char *layOut = nullptr;
-    const char *layOutKey = nullptr;
-    const int32_t *blockSize = nullptr;
-    const int32_t *maskMode = nullptr;
-    const int32_t *topk = nullptr;
-    const int32_t *maxSeqlenQ = nullptr;
-    const int64_t *preTokens = nullptr;
-    const int64_t *nextTokens = nullptr;
-    const int64_t *cmpRatio = nullptr;
-    const int32_t *returnValue = nullptr;
+    const char* layOut = nullptr;
+    const char* layOutKey = nullptr;
+    const int32_t* blockSize = nullptr;
+    const int32_t* maskMode = nullptr;
+    const int32_t* topk = nullptr;
+    const int32_t* maxSeqlenQ = nullptr;
+    const int64_t* preTokens = nullptr;
+    const int64_t* nextTokens = nullptr;
+    const int64_t* cmpRatio = nullptr;
+    const int32_t* returnValue = nullptr;
 };
 
 // -----------算子Tiling入参信息类---------------
 class LIV2TilingInfo {
 public:
-    const char *opName = nullptr;
-    fe::PlatFormInfos *platformInfo = nullptr;
+    const char* opName = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     LiV2ParaInfo opParamInfo;
     // Base Param
     platform_ascendc::SocVersion socVersion = platform_ascendc::SocVersion::ASCEND910B;
@@ -182,7 +182,7 @@ public:
 // -----------算子Tiling入参信息解析及Check类---------------
 class LIV2InfoParser {
 public:
-    explicit LIV2InfoParser(gert::TilingContext *context)
+    explicit LIV2InfoParser(gert::TilingContext* context)
         : context_(context)
     {}
     ~LIV2InfoParser() = default;
@@ -190,8 +190,8 @@ public:
     ge::graphStatus CheckRequiredInOutExistence() const;
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckLiv2RequiredParameters() const;
-    ge::graphStatus GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor,
-                                        const std::string &actualSeqLenName) const;
+    ge::graphStatus GetActualSeqLenSize(int64_t& size, const gert::Tensor* tensor,
+                                        const std::string& actualSeqLenName) const;
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
     void GetOptionalInputParaInfo();
@@ -219,13 +219,13 @@ public:
     ge::graphStatus GetAttenMaskInfo();
     ge::graphStatus GetActualSeqInfo();
     ge::graphStatus CheckKeyContiguous() const;
-    void GenerateInfo(LIV2TilingInfo &liInfo);
-    ge::graphStatus ParseAndCheck(LIV2TilingInfo &liInfo);
+    void GenerateInfo(LIV2TilingInfo& liInfo);
+    ge::graphStatus ParseAndCheck(LIV2TilingInfo& liInfo);
 
 public:
-    gert::TilingContext *context_ = nullptr;
-    const char *opName_ = nullptr;
-    fe::PlatFormInfos *platformInfo_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
+    const char* opName_ = nullptr;
+    fe::PlatFormInfos* platformInfo_ = nullptr;
     LiV2ParaInfo liV2Params_;
 
     // BaseParams
@@ -259,12 +259,12 @@ public:
 // ---------------算子Tiling类---------------
 class LightningIndexerV2Tiling {
 public:
-    explicit LightningIndexerV2Tiling(gert::TilingContext *context)
+    explicit LightningIndexerV2Tiling(gert::TilingContext* context)
         : context_(context) {};
-    ge::graphStatus DoTiling(LIV2TilingInfo *tilingInfo);
+    ge::graphStatus DoTiling(LIV2TilingInfo* tilingInfo);
 
 private:
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     LIV2TilingData tilingData_;
 };
 } // namespace optiling

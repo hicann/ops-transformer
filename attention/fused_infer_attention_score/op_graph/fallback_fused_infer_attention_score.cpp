@@ -77,42 +77,42 @@ static const size_t SOFTMAX_LSE_INDEX = 1;
 static constexpr int64_t SPARSE_MODE_INT_MAX = 2147483647;
 
 struct FusedInferHostTensorParams {
-    const gert::Tensor *query = nullptr;
-    const gert::Tensor *key = nullptr;
-    const gert::Tensor *value = nullptr;
-    const gert::Tensor *output = nullptr;
-    const gert::Tensor *softmaxLse = nullptr;
-    const gert::Tensor *pseShiftGe = nullptr;
-    const gert::Tensor *attenMaskGe = nullptr;
-    const gert::Tensor *actualSeqLengthsGe = nullptr;
-    const gert::Tensor *actualSeqLengthsGeKv = nullptr;
-    const gert::Tensor *deqScale1 = nullptr;
-    const gert::Tensor *quantScale1 = nullptr;
-    const gert::Tensor *deqScale2 = nullptr;
-    const gert::Tensor *quantScale2 = nullptr;
-    const gert::Tensor *quantOffset2 = nullptr;
-    const gert::Tensor *antiquantScaleGe = nullptr;
-    const gert::Tensor *antiquantOffsetGe = nullptr;
-    const gert::Tensor *blocktableGe = nullptr;
-    const gert::Tensor *queryPaddingGe = nullptr;
-    const gert::Tensor *kvPaddingGe = nullptr;
-    const gert::Tensor *keyAntiquantScaleGe = nullptr;
-    const gert::Tensor *keyAntiquantOffsetGe = nullptr;
-    const gert::Tensor *valueAntiquantScaleGe = nullptr;
-    const gert::Tensor *valueAntiquantOffsetGe = nullptr;
-    const gert::Tensor *keySharedPrefixGe = nullptr;
-    const gert::Tensor *valueSharedPrefixGe = nullptr;
-    const gert::Tensor *actualSharedPrefixLenGe = nullptr;
-    const gert::Tensor *queryRopeGe = nullptr;
-    const gert::Tensor *keyRopeGe = nullptr;
-    const gert::Tensor *keyRopeAntiquantScaleGe = nullptr;
-    const gert::Tensor *dequantScaleQueryGe = nullptr;
-    const gert::Tensor *learnableSinkGe = nullptr;
-    const gert::Tensor *qStartIdx = nullptr;  // not supported in Pytorch interfaces, default nullptr
-    const gert::Tensor *kvStartIdx = nullptr; // not supported in Pytorch interfaces, default nullptr
+    const gert::Tensor* query = nullptr;
+    const gert::Tensor* key = nullptr;
+    const gert::Tensor* value = nullptr;
+    const gert::Tensor* output = nullptr;
+    const gert::Tensor* softmaxLse = nullptr;
+    const gert::Tensor* pseShiftGe = nullptr;
+    const gert::Tensor* attenMaskGe = nullptr;
+    const gert::Tensor* actualSeqLengthsGe = nullptr;
+    const gert::Tensor* actualSeqLengthsGeKv = nullptr;
+    const gert::Tensor* deqScale1 = nullptr;
+    const gert::Tensor* quantScale1 = nullptr;
+    const gert::Tensor* deqScale2 = nullptr;
+    const gert::Tensor* quantScale2 = nullptr;
+    const gert::Tensor* quantOffset2 = nullptr;
+    const gert::Tensor* antiquantScaleGe = nullptr;
+    const gert::Tensor* antiquantOffsetGe = nullptr;
+    const gert::Tensor* blocktableGe = nullptr;
+    const gert::Tensor* queryPaddingGe = nullptr;
+    const gert::Tensor* kvPaddingGe = nullptr;
+    const gert::Tensor* keyAntiquantScaleGe = nullptr;
+    const gert::Tensor* keyAntiquantOffsetGe = nullptr;
+    const gert::Tensor* valueAntiquantScaleGe = nullptr;
+    const gert::Tensor* valueAntiquantOffsetGe = nullptr;
+    const gert::Tensor* keySharedPrefixGe = nullptr;
+    const gert::Tensor* valueSharedPrefixGe = nullptr;
+    const gert::Tensor* actualSharedPrefixLenGe = nullptr;
+    const gert::Tensor* queryRopeGe = nullptr;
+    const gert::Tensor* keyRopeGe = nullptr;
+    const gert::Tensor* keyRopeAntiquantScaleGe = nullptr;
+    const gert::Tensor* dequantScaleQueryGe = nullptr;
+    const gert::Tensor* learnableSinkGe = nullptr;
+    const gert::Tensor* qStartIdx = nullptr;  // not supported in Pytorch interfaces, default nullptr
+    const gert::Tensor* kvStartIdx = nullptr; // not supported in Pytorch interfaces, default nullptr
 };
 
-static graphStatus FiaFillTensorParams(const OpExecuteContext *host_api_ctx, FusedInferHostTensorParams &fiaTensors)
+static graphStatus FiaFillTensorParams(const OpExecuteContext* host_api_ctx, FusedInferHostTensorParams& fiaTensors)
 {
     fiaTensors.query = host_api_ctx->GetInputTensor(QUERY_INDEX);
     if (fiaTensors.query == nullptr) {
@@ -180,10 +180,10 @@ struct ActualSeqInfo {
     std::vector<int64_t> actSeqSharedPrefix;
 };
 
-static void FillActualSeqInfo(const FusedInferHostTensorParams &fiaTensors, ActualSeqInfo &actualSeqInfo)
+static void FillActualSeqInfo(const FusedInferHostTensorParams& fiaTensors, ActualSeqInfo& actualSeqInfo)
 {
     if (fiaTensors.actualSeqLengthsGe != nullptr) {
-        const int64_t *actSeqData = fiaTensors.actualSeqLengthsGe->GetData<int64_t>();
+        const int64_t* actSeqData = fiaTensors.actualSeqLengthsGe->GetData<int64_t>();
         const size_t len = static_cast<size_t>(fiaTensors.actualSeqLengthsGe->GetShapeSize());
         for (size_t i = 0; i < len; i++) {
             actualSeqInfo.actSeqArray.push_back(actSeqData[i]);
@@ -191,7 +191,7 @@ static void FillActualSeqInfo(const FusedInferHostTensorParams &fiaTensors, Actu
     }
 
     if (fiaTensors.actualSeqLengthsGeKv != nullptr) {
-        const int64_t *actSeqData = fiaTensors.actualSeqLengthsGeKv->GetData<int64_t>();
+        const int64_t* actSeqData = fiaTensors.actualSeqLengthsGeKv->GetData<int64_t>();
         const size_t len = static_cast<size_t>(fiaTensors.actualSeqLengthsGeKv->GetShapeSize());
         for (size_t i = 0; i < len; i++) {
             actualSeqInfo.actSeqArrayKv.push_back(actSeqData[i]);
@@ -200,7 +200,7 @@ static void FillActualSeqInfo(const FusedInferHostTensorParams &fiaTensors, Actu
 
     std::vector<int64_t> actSeqSharedPrefix;
     if (fiaTensors.actualSharedPrefixLenGe != nullptr) {
-        const int64_t *actSeqData = fiaTensors.actualSharedPrefixLenGe->GetData<int64_t>();
+        const int64_t* actSeqData = fiaTensors.actualSharedPrefixLenGe->GetData<int64_t>();
         const size_t len = static_cast<size_t>(fiaTensors.actualSharedPrefixLenGe->GetShapeSize());
         for (size_t i = 0; i < len; i++) {
             actualSeqInfo.actSeqSharedPrefix.push_back(actSeqData[i]);
@@ -209,24 +209,24 @@ static void FillActualSeqInfo(const FusedInferHostTensorParams &fiaTensors, Actu
 }
 
 struct FusedInferHostAttrPtrs {
-    const uint32_t *getNumHeads = nullptr;
-    const float *scaleValue = nullptr;
-    const int64_t *getPreTokens = nullptr;
-    const int64_t *getNextTokens = nullptr;
-    const char *layout = nullptr;
-    const uint32_t *getKVHeadNum = nullptr;
-    const uint32_t *getSparseMode = nullptr;
-    const uint32_t *getInnerPrecise = nullptr;
-    const uint32_t *getBlockSize = nullptr;
-    const uint32_t *getAntiquantMode = nullptr;
-    const bool *getSoftmaxLseFlag = nullptr;
-    const uint32_t *getKeyAntiquantMode = nullptr;
-    const uint32_t *getValueAntiquantMode = nullptr;
-    const uint32_t *getQueryQuantMode = nullptr;
-    const int64_t *getPseType = nullptr;
+    const uint32_t* getNumHeads = nullptr;
+    const float* scaleValue = nullptr;
+    const int64_t* getPreTokens = nullptr;
+    const int64_t* getNextTokens = nullptr;
+    const char* layout = nullptr;
+    const uint32_t* getKVHeadNum = nullptr;
+    const uint32_t* getSparseMode = nullptr;
+    const uint32_t* getInnerPrecise = nullptr;
+    const uint32_t* getBlockSize = nullptr;
+    const uint32_t* getAntiquantMode = nullptr;
+    const bool* getSoftmaxLseFlag = nullptr;
+    const uint32_t* getKeyAntiquantMode = nullptr;
+    const uint32_t* getValueAntiquantMode = nullptr;
+    const uint32_t* getQueryQuantMode = nullptr;
+    const int64_t* getPseType = nullptr;
 };
 
-static void FillAttrPointers(const gert::RuntimeAttrs *attrs, FusedInferHostAttrPtrs &attrPtrs)
+static void FillAttrPointers(const gert::RuntimeAttrs* attrs, FusedInferHostAttrPtrs& attrPtrs)
 {
     attrPtrs.getNumHeads = attrs->GetAttrPointer<uint32_t>(ATTR_N_INDEX);
     attrPtrs.scaleValue = attrs->GetAttrPointer<float>(ATTR_SCALE_INDEX);
@@ -262,8 +262,8 @@ struct FusedInferHostScalarParams {
     int64_t pseType = 0; // not supported in Pytorch interfaces, default 0
 };
 
-static void GetFusedInferHostScalarParams(const FusedInferHostAttrPtrs &attrPointers,
-                                          FusedInferHostScalarParams &params)
+static void GetFusedInferHostScalarParams(const FusedInferHostAttrPtrs& attrPointers,
+                                          FusedInferHostScalarParams& params)
 {
     params.numHeads = *(attrPointers.getNumHeads);
     params.dScaleValue = *(attrPointers.scaleValue);
@@ -281,17 +281,17 @@ static void GetFusedInferHostScalarParams(const FusedInferHostAttrPtrs &attrPoin
     params.pseType = *(attrPointers.getPseType);
 }
 
-static graphStatus FusedInferHostExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus FusedInferHostExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE("aclnnfallback", "host_api_ctx is null"), return GRAPH_FAILED);
     FusedInferHostTensorParams fiaTensors{};
     auto apiRet = FiaFillTensorParams(host_api_ctx, fiaTensors);
     OP_CHECK_IF(apiRet != GRAPH_SUCCESS, OP_LOGE("aclnnfallback", "Input Tensors invalid"), return GRAPH_FAILED);
 
-    std::vector<const gert::Tensor *> ge_tenserListKey;
+    std::vector<const gert::Tensor*> ge_tenserListKey;
     ge_tenserListKey.push_back(fiaTensors.key);
 
-    std::vector<const gert::Tensor *> ge_tenserListValue;
+    std::vector<const gert::Tensor*> ge_tenserListValue;
     ge_tenserListValue.push_back(fiaTensors.value);
 
     ActualSeqInfo actualSeqInfo{};

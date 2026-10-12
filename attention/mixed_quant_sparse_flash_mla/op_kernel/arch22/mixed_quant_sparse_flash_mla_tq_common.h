@@ -113,7 +113,7 @@ struct MqPaPosition {
 // L1按NZ格式存储
 // GM的行、列、列的stride
 template <typename T>
-__aicore__ inline void MqDataCopyGmNDToL1(LocalTensor<T> &l1Tensor, GlobalTensor<T> &gmTensor, uint32_t rowAct,
+__aicore__ inline void MqDataCopyGmNDToL1(LocalTensor<T>& l1Tensor, GlobalTensor<T>& gmTensor, uint32_t rowAct,
                                           uint32_t rowAlign, uint32_t col,
                                           uint32_t colStride) // D or N*D
 {
@@ -137,9 +137,9 @@ __aicore__ inline void MqDataCopyGmNDToL1(LocalTensor<T> &l1Tensor, GlobalTensor
     shape.copyRowNumAlign 需要16字节对齐，如拷贝k矩阵，一次拷贝128*512，遇到尾块 10*512 需对齐到16*512
 */
 template <typename T, SAS_LAYOUT SRC_LAYOUT = SAS_LAYOUT::PA_BSND>
-__aicore__ inline void MqDataCopyPA(LocalTensor<T> &dstTensor, GlobalTensor<T> &srcTensor,
-                                    GlobalTensor<int32_t> &blockTableGm, const MqPaShape &shape,
-                                    const MqPaPosition &startPos)
+__aicore__ inline void MqDataCopyPA(LocalTensor<T>& dstTensor, GlobalTensor<T>& srcTensor,
+                                    GlobalTensor<int32_t>& blockTableGm, const MqPaShape& shape,
+                                    const MqPaPosition& startPos)
 {
     uint32_t copyFinishRowCnt = 0;
     uint64_t blockTableBaseOffset = startPos.bIdx * shape.maxblockNumPerBatch;

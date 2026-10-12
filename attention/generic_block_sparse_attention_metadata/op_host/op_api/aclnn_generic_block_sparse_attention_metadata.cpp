@@ -27,7 +27,7 @@ extern "C" {
 
 namespace {
 
-aclnnStatus ParseBlockShape(const aclIntArray *blockShape, int64_t &blockShapeX, int64_t &blockShapeY)
+aclnnStatus ParseBlockShape(const aclIntArray* blockShape, int64_t& blockShapeX, int64_t& blockShapeY)
 {
     if (blockShape == nullptr || blockShape->Size() != 2U || blockShape->GetData() == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "blockShape must contain exactly two elements [x, y].");
@@ -38,7 +38,7 @@ aclnnStatus ParseBlockShape(const aclIntArray *blockShape, int64_t &blockShapeX,
     return ACLNN_SUCCESS;
 }
 
-const aclTensor *MakeContiguousOptional(const aclTensor *tensor, aclOpExecutor *executor)
+const aclTensor* MakeContiguousOptional(const aclTensor* tensor, aclOpExecutor* executor)
 {
     return tensor == nullptr ? nullptr : l0op::Contiguous(tensor, executor);
 }
@@ -46,13 +46,13 @@ const aclTensor *MakeContiguousOptional(const aclTensor *tensor, aclOpExecutor *
 } // namespace
 
 aclnnStatus aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
-    const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount, const aclTensor *cuSeqLengthsQOptional,
-    const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
+    const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount, const aclTensor* cuSeqLengthsQOptional,
+    const aclTensor* cuSeqLengthsKvOptional, const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional,
     int64_t maxQSeqLen, int64_t maxKvSeqLen, int64_t numQHeads, int64_t numKvHeads, int64_t headDim,
-    const aclIntArray *blockShape, const char *layoutQ, const char *layoutKv, int64_t layoutSparsePattern,
+    const aclIntArray* blockShape, const char* layoutQ, const char* layoutKv, int64_t layoutSparsePattern,
     int64_t maskType, int64_t quantType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight,
-    int64_t residualBlockMode, bool isConsistentTopk, const aclTensor *metadataOptional, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    int64_t residualBlockMode, bool isConsistentTopk, const aclTensor* metadataOptional, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     if (workspaceSize == nullptr || executor == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "workspaceSize/executor must not be null.");
@@ -65,7 +65,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-    const op::PlatformInfo &platformInfo = op::GetCurrentPlatformInfo();
+    const op::PlatformInfo& platformInfo = op::GetCurrentPlatformInfo();
     const uint32_t aicCoreNum = platformInfo.GetCubeCoreNum();
     const bool isArch35 = platformInfo.GetCurNpuArch() == NpuArch::DAV_3510;
     status = CheckGbsaMetadataParams(sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional,
@@ -80,16 +80,16 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
     // is_consistent_topk crosses the AICPU attr boundary as an int64 flag (0/1).
     const int64_t isConsistentTopkFlag = isConsistentTopk ? 1 : 0;
 
-    const aclTensor *idxContiguous = l0op::Contiguous(sparseBlockIdx, uniqueExecutor.get());
+    const aclTensor* idxContiguous = l0op::Contiguous(sparseBlockIdx, uniqueExecutor.get());
     CHECK_RET(idxContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor *countContiguous = l0op::Contiguous(sparseBlockCount, uniqueExecutor.get());
+    const aclTensor* countContiguous = l0op::Contiguous(sparseBlockCount, uniqueExecutor.get());
     CHECK_RET(countContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor *cuQContiguous = MakeContiguousOptional(cuSeqLengthsQOptional, uniqueExecutor.get());
+    const aclTensor* cuQContiguous = MakeContiguousOptional(cuSeqLengthsQOptional, uniqueExecutor.get());
     CHECK_RET(cuSeqLengthsQOptional == nullptr || cuQContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor *seqUsedQContiguous = MakeContiguousOptional(sequsedQOptional, uniqueExecutor.get());
+    const aclTensor* seqUsedQContiguous = MakeContiguousOptional(sequsedQOptional, uniqueExecutor.get());
     CHECK_RET(sequsedQOptional == nullptr || seqUsedQContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    const aclTensor *output = l0op::GenericBlockSparseAttentionMetadata(
+    const aclTensor* output = l0op::GenericBlockSparseAttentionMetadata(
         idxContiguous, countContiguous, cuQContiguous, cuSeqLengthsKvOptional, seqUsedQContiguous, sequsedKvOptional,
         maxQSeqLen, numQHeads, numKvHeads, headDim, blockShapeX, blockShapeY, isPackedGqaFlag, layoutQ, aicCoreNum,
         residualBlockMode, isConsistentTopkFlag, metadataOptional, uniqueExecutor.get());
@@ -99,7 +99,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnGenericBlockSparseAttentionMetadata(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnGenericBlockSparseAttentionMetadata(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                      aclrtStream stream)
 {
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);

@@ -24,39 +24,45 @@
 #define TILING_KEY_1001 1001
 #define TILING_KEY_1000 1000
 
-extern "C" __global__ __aicore__ void gather_pa_kv_cache(GM_ADDR key_cache, GM_ADDR value_cache,
-                                                         GM_ADDR block_tables, GM_ADDR seq_lens,
-                                                         GM_ADDR key_in, GM_ADDR value_in, GM_ADDR seq_offset,
-                                                         GM_ADDR key_out, GM_ADDR value_out,
+extern "C" __global__ __aicore__ void gather_pa_kv_cache(GM_ADDR key_cache, GM_ADDR value_cache, GM_ADDR block_tables,
+                                                         GM_ADDR seq_lens, GM_ADDR key_in, GM_ADDR value_in,
+                                                         GM_ADDR seq_offset, GM_ADDR key_out, GM_ADDR value_out,
                                                          GM_ADDR workspace, GM_ADDR tiling)
 {
 // 宏封装，简化分支代码
 // B8几种类型编译DataCopyPad报错，用uint8_t代替规避
-#define TILING_KEY_BRANCH(tilingKey, isCacheModeNorm, isSeqLenCumSum, hasSeqOffset) {                                                           \
-    if (TILING_KEY_IS(tilingKey)) {                                                                                                             \
-        if constexpr (isCacheModeNorm == true) {                                                                                                \
-            GatherPaKvCacheV35::GatherPaKvCacheNd<uint8_t, DTYPE_SEQ_LENS, isSeqLenCumSum, hasSeqOffset> op(&pipe, &tilingData);                \
-            op.Init(key_cache, value_cache, block_tables, seq_lens, key_in, value_in, seq_offset, key_out, value_out);                          \
-            op.Process();                                                                                                                       \
-        } else {                                                                                                                                \
-            GatherPaKvCacheV35::GatherPaKvCacheNz<uint8_t, DTYPE_SEQ_LENS, isSeqLenCumSum, hasSeqOffset> op(&pipe, &tilingData);                \
-            op.Init(key_cache, value_cache, block_tables, seq_lens, key_in, value_in, seq_offset, key_out, value_out);                          \
-            op.Process();                                                                                                                       \
-        }                                                                                                                                       \
-    }                                                                                                                                           \
-} while(0);
+#define TILING_KEY_BRANCH(tilingKey, isCacheModeNorm, isSeqLenCumSum, hasSeqOffset) \
+    { \
+        if (TILING_KEY_IS(tilingKey)) { \
+            if constexpr (isCacheModeNorm == true) { \
+                GatherPaKvCacheV35::GatherPaKvCacheNd<uint8_t, DTYPE_SEQ_LENS, isSeqLenCumSum, hasSeqOffset> op( \
+                    &pipe, &tilingData); \
+                op.Init(key_cache, value_cache, block_tables, seq_lens, key_in, value_in, seq_offset, key_out, \
+                        value_out); \
+                op.Process(); \
+            } else { \
+                GatherPaKvCacheV35::GatherPaKvCacheNz<uint8_t, DTYPE_SEQ_LENS, isSeqLenCumSum, hasSeqOffset> op( \
+                    &pipe, &tilingData); \
+                op.Init(key_cache, value_cache, block_tables, seq_lens, key_in, value_in, seq_offset, key_out, \
+                        value_out); \
+                op.Process(); \
+            } \
+        } \
+    } \
+    while (0) \
+        ;
 
     AscendC::TPipe pipe;
     GET_TILING_DATA_WITH_STRUCT(GatherPaKvCacheTilingDataV35, tilingData, tiling);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
 
     // tilingKey, isCacheModeNorm, isSeqLenCumSum, hasSeqOffset
-    TILING_KEY_BRANCH(TILING_KEY_1111, true,   true,   true)
-    TILING_KEY_BRANCH(TILING_KEY_1110, true,   true,   false)
-    TILING_KEY_BRANCH(TILING_KEY_1101, true,   false,  true)
-    TILING_KEY_BRANCH(TILING_KEY_1100, true,   false,  false)
-    TILING_KEY_BRANCH(TILING_KEY_1011, false,  true,   true)
-    TILING_KEY_BRANCH(TILING_KEY_1010, false,  true,   false)
-    TILING_KEY_BRANCH(TILING_KEY_1001, false,  false,  true)
-    TILING_KEY_BRANCH(TILING_KEY_1000, false,  false,  false)
+    TILING_KEY_BRANCH(TILING_KEY_1111, true, true, true)
+    TILING_KEY_BRANCH(TILING_KEY_1110, true, true, false)
+    TILING_KEY_BRANCH(TILING_KEY_1101, true, false, true)
+    TILING_KEY_BRANCH(TILING_KEY_1100, true, false, false)
+    TILING_KEY_BRANCH(TILING_KEY_1011, false, true, true)
+    TILING_KEY_BRANCH(TILING_KEY_1010, false, true, false)
+    TILING_KEY_BRANCH(TILING_KEY_1001, false, false, true)
+    TILING_KEY_BRANCH(TILING_KEY_1000, false, false, false)
 }

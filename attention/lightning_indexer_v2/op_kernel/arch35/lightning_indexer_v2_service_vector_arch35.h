@@ -51,14 +51,14 @@ public:
     using W_T = float;
 
     __aicore__ inline LightningIndexerV2ServiceVector(){};
-    __aicore__ inline void ProcessVec1(const LIV2Common::RunInfo &info);
-    __aicore__ inline void ProcessTopK(const LIV2Common::RunInfo &info);
+    __aicore__ inline void ProcessVec1(const LIV2Common::RunInfo& info);
+    __aicore__ inline void ProcessTopK(const LIV2Common::RunInfo& info);
     __aicore__ inline void ProcessLD();
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitParams(const struct LIV2Common::ConstInfo &constInfo,
-                                      const LIV2Common::LdSplitCoreInfo &ldInfo,
-                                      const LIV2TilingData *__restrict tilingData);
-    __aicore__ inline void InitLDBuffers(TPipe *pipe, const LIV2Common::LdSplitCoreInfo &ldInfo);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void InitParams(const struct LIV2Common::ConstInfo& constInfo,
+                                      const LIV2Common::LdSplitCoreInfo& ldInfo,
+                                      const LIV2TilingData* __restrict tilingData);
+    __aicore__ inline void InitLDBuffers(TPipe* pipe, const LIV2Common::LdSplitCoreInfo& ldInfo);
     __aicore__ inline void InitVecWorkspaceTensor(GlobalTensor<SCORE_T> liv2ScoreGm,
                                                   GlobalTensor<SCORE_T> liv2LdScoreGm,
                                                   GlobalTensor<int32_t> liv2LdIndexGm);
@@ -67,7 +67,7 @@ public:
                                               GlobalTensor<int32_t> liv2BlockTableGm,
                                               GlobalTensor<int32_t> liv2OutputIdxOffsetGm);
     __aicore__ inline void CleanInvalidOutput(int64_t invalidS1offset);
-    __aicore__ inline void DoTndPadding(const LIV2Common::RunInfo &runInfo);
+    __aicore__ inline void DoTndPadding(const LIV2Common::RunInfo& runInfo);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
 
@@ -155,7 +155,7 @@ private:
 };
 
 template <typename Liv2ServiceTraits>
-__aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::InitBuffers(TPipe *pipe)
+__aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(liv2ResMm1Buf_, 2 * CeilDiv(M_BASIC_BLOCK, 2) * liv2S2BaseSize_ * sizeof(float));
     liv2ResMm1Ub_ = liv2ResMm1Buf_.Get<float>();
@@ -192,8 +192,8 @@ __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::InitB
 
 template <typename Liv2ServiceTraits>
 __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::InitParams(
-    const struct LIV2Common::ConstInfo &constInfo, const LIV2Common::LdSplitCoreInfo &ldInfo,
-    const LIV2TilingData *__restrict tilingData)
+    const struct LIV2Common::ConstInfo& constInfo, const LIV2Common::LdSplitCoreInfo& ldInfo,
+    const LIV2TilingData* __restrict tilingData)
 {
     this->liv2ConstInfo_ = constInfo;
     this->liv2LdInfo_ = ldInfo;
@@ -220,7 +220,7 @@ __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::InitP
 
 template <typename Liv2ServiceTraits>
 __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::InitLDBuffers(
-    TPipe *pipe, const LIV2Common::LdSplitCoreInfo &ldInfo)
+    TPipe* pipe, const LIV2Common::LdSplitCoreInfo& ldInfo)
 {
     liv2LdIndexLocal_ = liv2ResMm1Ub_.template ReinterpretCast<uint32_t>();
 }
@@ -300,7 +300,7 @@ __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::Clean
 
 template <typename Liv2ServiceTraits>
 __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::DoTndPadding(
-    const LIV2Common::RunInfo &runInfo)
+    const LIV2Common::RunInfo& runInfo)
 {
     LIV2Common::DoTndPadding(runInfo, liv2ConstInfo_.topk, liv2ConstInfo_.returnValueFlag, liv2ConstInfo_.NEG_INF_FLOAT,
                              liv2ConstInfo_.kHeadNum, liv2ConstInfo_.INVALID_IDX, MTE3_V_EVENT, liv2IndiceOutGm,
@@ -308,7 +308,7 @@ __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::DoTnd
 }
 
 template <typename Liv2ServiceTraits>
-__aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::ProcessVec1(const LIV2Common::RunInfo &info)
+__aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::ProcessVec1(const LIV2Common::RunInfo& info)
 {
     auto pingpong = info.loop % 2;
     // CV同步
@@ -376,7 +376,7 @@ __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::Proce
 }
 
 template <typename Liv2ServiceTraits>
-__aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::ProcessTopK(const LIV2Common::RunInfo &info)
+__aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::ProcessTopK(const LIV2Common::RunInfo& info)
 {
     SetFlag<HardEvent::MTE3_MTE2>(MTE3_MTE2_EVENT);
     WaitFlag<HardEvent::MTE3_MTE2>(MTE3_MTE2_EVENT);

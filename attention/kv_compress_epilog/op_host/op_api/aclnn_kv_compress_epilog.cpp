@@ -25,21 +25,12 @@ using namespace op;
 extern "C" {
 #endif
 
-aclnnStatus aclnnKvCompressEpilogGetWorkspaceSize(
-    aclTensor *cacheRef,
-    const aclTensor *x,
-    const aclTensor *slotMapping,
-    int64_t quantGroupSize,
-    int64_t quantMode,
-    bool roundScale,
-    float xScale,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+aclnnStatus aclnnKvCompressEpilogGetWorkspaceSize(aclTensor* cacheRef, const aclTensor* x, const aclTensor* slotMapping,
+                                                  int64_t quantGroupSize, int64_t quantMode, bool roundScale,
+                                                  float xScale, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnKvCompressEpilog,
-                   DFX_IN(cacheRef,
-                          x, slotMapping, quantGroupSize, quantMode, roundScale, xScale),
-                   DFX_OUT());
+                   DFX_IN(cacheRef, x, slotMapping, quantGroupSize, quantMode, roundScale, xScale), DFX_OUT());
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -53,18 +44,12 @@ aclnnStatus aclnnKvCompressEpilogGetWorkspaceSize(
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    auto kvCacheView = uniqueExecutor->CreateView(cacheRef,
-                                                  cacheRef->GetViewShape(),
-                                                  cacheRef->GetStorageShape(),
-                                                  cacheRef->GetViewStrides(),
-                                                  cacheRef->GetViewOffset());
+    auto kvCacheView = uniqueExecutor->CreateView(cacheRef, cacheRef->GetViewShape(), cacheRef->GetStorageShape(),
+                                                  cacheRef->GetViewStrides(), cacheRef->GetViewOffset());
     CHECK_RET(kvCacheView != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    auto output = l0op::KvCompressEpilog(
-        const_cast<aclTensor *>(kvCacheView),
-        x, slotMapping,
-        quantGroupSize, quantMode, roundScale, xScale,
-        uniqueExecutor.get());
+    auto output = l0op::KvCompressEpilog(const_cast<aclTensor*>(kvCacheView), x, slotMapping, quantGroupSize, quantMode,
+                                         roundScale, xScale, uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
@@ -72,11 +57,7 @@ aclnnStatus aclnnKvCompressEpilogGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnKvCompressEpilog(
-    void *workspace,
-    uint64_t workspaceSize,
-    aclOpExecutor *executor,
-    aclrtStream stream)
+aclnnStatus aclnnKvCompressEpilog(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnKvCompressEpilog);
 

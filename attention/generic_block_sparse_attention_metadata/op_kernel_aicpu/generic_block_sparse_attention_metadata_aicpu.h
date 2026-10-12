@@ -28,22 +28,22 @@ class GenericBlockSparseAttentionMetadataAicpu : public CpuKernel {
 public:
     GenericBlockSparseAttentionMetadataAicpu() = default;
     ~GenericBlockSparseAttentionMetadataAicpu() = default;
-    uint32_t Compute(CpuKernelContext &ctx) override;
+    uint32_t Compute(CpuKernelContext& ctx) override;
 
 private:
-    bool Prepare(CpuKernelContext &ctx);
+    bool Prepare(CpuKernelContext& ctx);
     bool CheckInputs();
-    bool ParseQSeqLens(std::vector<int64_t> &qSeqLens, std::vector<int64_t> &qStorageBlockStarts) const;
-    bool ParseValidBlockNums(const std::vector<int64_t> &qSeqLens, const std::vector<int64_t> &qStorageBlockStarts,
-                             std::vector<int64_t> &validBlockNums) const;
-    bool GenerateMetadata(const std::vector<int64_t> &qSeqLens, const std::vector<int64_t> &validBlockNums) const;
-    bool CheckOptionalTensor(const Tensor *tensor, DataType dataType, int64_t elementNum, const char *tensorName) const;
+    bool ParseQSeqLens(std::vector<int64_t>& qSeqLens, std::vector<int64_t>& qStorageBlockStarts) const;
+    bool ParseValidBlockNums(const std::vector<int64_t>& qSeqLens, const std::vector<int64_t>& qStorageBlockStarts,
+                             std::vector<int64_t>& validBlockNums) const;
+    bool GenerateMetadata(const std::vector<int64_t>& qSeqLens, const std::vector<int64_t>& validBlockNums) const;
+    bool CheckOptionalTensor(const Tensor* tensor, DataType dataType, int64_t elementNum, const char* tensorName) const;
 
-    Tensor *sparseBlockIdx_ = nullptr;
-    Tensor *sparseBlockCount_ = nullptr;
-    Tensor *cuSeqLengths_ = nullptr;
-    Tensor *seqUsedQ_ = nullptr;
-    Tensor *metadata_ = nullptr;
+    Tensor* sparseBlockIdx_ = nullptr;
+    Tensor* sparseBlockCount_ = nullptr;
+    Tensor* cuSeqLengths_ = nullptr;
+    Tensor* seqUsedQ_ = nullptr;
+    Tensor* metadata_ = nullptr;
 
     int64_t batchSize_ = 0;
     int64_t maxQSeqLen_ = 0;

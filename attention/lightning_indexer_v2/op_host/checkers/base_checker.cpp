@@ -22,27 +22,27 @@
 namespace optiling {
 namespace lightning_indexer_v2_checker {
 
-ge::graphStatus LightningIndexerV2BaseChecker::CheckParaExistence(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus LightningIndexerV2BaseChecker::CheckParaExistence(const LightningIndexerV2CheckerInfo& info) const
 {
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus LightningIndexerV2BaseChecker::CheckSinglePara(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus LightningIndexerV2BaseChecker::CheckSinglePara(const LightningIndexerV2CheckerInfo& info) const
 {
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus LightningIndexerV2BaseChecker::CheckFeature(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus LightningIndexerV2BaseChecker::CheckFeature(const LightningIndexerV2CheckerInfo& info) const
 {
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus LightningIndexerV2BaseChecker::CheckMultiPara(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus LightningIndexerV2BaseChecker::CheckMultiPara(const LightningIndexerV2CheckerInfo& info) const
 {
     return ge::GRAPH_SUCCESS;
 }
 
-std::string LightningIndexerV2BaseChecker::DtypesToString(const std::vector<ge::DataType> &dtypes)
+std::string LightningIndexerV2BaseChecker::DtypesToString(const std::vector<ge::DataType>& dtypes)
 {
     std::string result;
     for (size_t i = 0; i < dtypes.size(); ++i) {
@@ -54,15 +54,15 @@ std::string LightningIndexerV2BaseChecker::DtypesToString(const std::vector<ge::
     return result;
 }
 
-std::string LightningIndexerV2BaseChecker::ShapeToString(const CheckerTensor &tensor)
+std::string LightningIndexerV2BaseChecker::ShapeToString(const CheckerTensor& tensor)
 {
-    const gert::Shape *shape = tensor.GetShape();
+    const gert::Shape* shape = tensor.GetShape();
     return shape == nullptr ? "null" : Ops::Base::ToString(*shape);
 }
 
-ge::graphStatus LightningIndexerV2BaseChecker::CheckDtype(const LightningIndexerV2CheckerInfo &info,
-                                                          const CheckerTensor &tensor, const char *name,
-                                                          const std::vector<ge::DataType> &expected) const
+ge::graphStatus LightningIndexerV2BaseChecker::CheckDtype(const LightningIndexerV2CheckerInfo& info,
+                                                          const CheckerTensor& tensor, const char* name,
+                                                          const std::vector<ge::DataType>& expected) const
 {
     if (!tensor.IsPresent()) {
         return ge::GRAPH_SUCCESS;
@@ -81,14 +81,14 @@ ge::graphStatus LightningIndexerV2BaseChecker::CheckDtype(const LightningIndexer
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus LightningIndexerV2BaseChecker::CheckRank(const LightningIndexerV2CheckerInfo &info,
-                                                         const CheckerTensor &tensor, const char *name,
-                                                         uint32_t expected, const std::string &condition) const
+ge::graphStatus LightningIndexerV2BaseChecker::CheckRank(const LightningIndexerV2CheckerInfo& info,
+                                                         const CheckerTensor& tensor, const char* name,
+                                                         uint32_t expected, const std::string& condition) const
 {
     if (!tensor.IsPresent()) {
         return ge::GRAPH_SUCCESS;
     }
-    const gert::Shape *shape = tensor.GetShape();
+    const gert::Shape* shape = tensor.GetShape();
     if (shape == nullptr) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(info.opName, name, "Tensor shape cannot be null");
         return ge::GRAPH_FAILED;
@@ -108,14 +108,14 @@ ge::graphStatus LightningIndexerV2BaseChecker::CheckRank(const LightningIndexerV
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus LightningIndexerV2BaseChecker::CheckElementCount(const LightningIndexerV2CheckerInfo &info,
-                                                                 const CheckerTensor &tensor, const char *name,
+ge::graphStatus LightningIndexerV2BaseChecker::CheckElementCount(const LightningIndexerV2CheckerInfo& info,
+                                                                 const CheckerTensor& tensor, const char* name,
                                                                  int64_t expected) const
 {
     if (!tensor.IsPresent()) {
         return ge::GRAPH_SUCCESS;
     }
-    const gert::Shape *shape = tensor.GetShape();
+    const gert::Shape* shape = tensor.GetShape();
     if (shape == nullptr) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(info.opName, name, "Tensor shape cannot be null");
         return ge::GRAPH_FAILED;

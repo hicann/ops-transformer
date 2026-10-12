@@ -57,13 +57,13 @@ struct FiaMlaPlatFormInfo {
 
 class FiaTilingNonQuantMlaArch35 : public FiaTilingBase {
 public:
-    explicit FiaTilingNonQuantMlaArch35(gert::TilingContext *context)
+    explicit FiaTilingNonQuantMlaArch35(gert::TilingContext* context)
         : FiaTilingBase(context)
     {}
     ~FiaTilingNonQuantMlaArch35() override = default;
 
 protected:
-    void InitTilingInfo(TilingInfo *tilingInfo) override;
+    void InitTilingInfo(TilingInfo* tilingInfo) override;
     bool IsCapable() override;
     bool IsCapableBasicCheckMla();
     bool IsCapableFeatureCheckMla();
@@ -88,19 +88,19 @@ private:
     void SetFATilingData();
     void AdjustSinnerAndSouter();
     void InitImplParam();
-    int64_t GetActSeqLenMla(const gert::Tensor *tensor, uint32_t dims, FiaLayout layout, uint32_t bIdx);
-    bool IsExistRowInvalid(const split_core_v2::BaseInfo &baseInfo);
-    bool IsActualSeqLengthsKVHasZero(const split_core_v2::BaseInfo &baseInfo);
+    int64_t GetActSeqLenMla(const gert::Tensor* tensor, uint32_t dims, FiaLayout layout, uint32_t bIdx);
+    bool IsExistRowInvalid(const split_core_v2::BaseInfo& baseInfo);
+    bool IsActualSeqLengthsKVHasZero(const split_core_v2::BaseInfo& baseInfo);
     void GetSafeActToken(split_core_v2::SparseMode mode, int64_t actSeqLensQ, int64_t actSeqLensKv,
-                         int64_t &safePreToken, int64_t &safeNextToken);
+                         int64_t& safePreToken, int64_t& safeNextToken);
     void PrintAllTilingData();
     void CalcMaxWorkspaceSize();
     void CalcScheduleMode();
-    void CreateSplitInput(split_core_v2::BaseInfo &baseInfo, split_core_v2::SplitParam &splitParam);
-    void SetSplitOutput(const split_core_v2::FAMetaData &splitRes);
+    void CreateSplitInput(split_core_v2::BaseInfo& baseInfo, split_core_v2::SplitParam& splitParam);
+    void SetSplitOutput(const split_core_v2::FAMetaData& splitRes);
     void CalcNumBlocks(uint32_t coreNum);
     void FillTiling();
-    ge::graphStatus SetTilingData(FusedInferAttentionScoreTilingData &tilingData);
+    ge::graphStatus SetTilingData(FusedInferAttentionScoreTilingData& tilingData);
 
     FusedInferAttentionScoreTilingData tilingData_;
     FiaMlaTilingKeyInfo tilingKeyInfo_;
@@ -120,7 +120,7 @@ private:
     int32_t numBlocks_ = 0;
 
     // Tiling Info
-    FiaTilingInfo *fiaInfo_ = nullptr;
+    FiaTilingInfo* fiaInfo_ = nullptr;
 };
 
 } // namespace optiling

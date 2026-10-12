@@ -34,12 +34,12 @@ void CheckerRunner::Add(std::unique_ptr<LightningIndexerV2BaseChecker> checker)
     checkers_.push_back(std::move(checker));
 }
 
-ge::graphStatus CheckerRunner::Run(CheckMethod method, const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CheckerRunner::Run(CheckMethod method, const LightningIndexerV2CheckerInfo& info) const
 {
-    for (const auto &checker : checkers_) {
-        const auto *checkerPtr = checker.get();
+    for (const auto& checker : checkers_) {
+        const auto* checkerPtr = checker.get();
         if (checkerPtr == nullptr) {
-            const char *opName = info.opName == nullptr ? CHECKER_RUNNER_NAME : info.opName;
+            const char* opName = info.opName == nullptr ? CHECKER_RUNNER_NAME : info.opName;
             OP_LOGE(opName, "Checker must not be null.");
             return ge::GRAPH_FAILED;
         }
@@ -50,7 +50,7 @@ ge::graphStatus CheckerRunner::Run(CheckMethod method, const LightningIndexerV2C
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckerRunner::Process(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CheckerRunner::Process(const LightningIndexerV2CheckerInfo& info) const
 {
     if (Run(&LightningIndexerV2BaseChecker::CheckSinglePara, info) != ge::GRAPH_SUCCESS ||
         Run(&LightningIndexerV2BaseChecker::CheckParaExistence, info) != ge::GRAPH_SUCCESS ||
@@ -61,7 +61,7 @@ ge::graphStatus CheckerRunner::Process(const LightningIndexerV2CheckerInfo &info
     return ge::GRAPH_SUCCESS;
 }
 
-void RegisterCommonCheckers(CheckerRunner &runner)
+void RegisterCommonCheckers(CheckerRunner& runner)
 {
     runner.Add(std::make_unique<CommonChecker>());
     runner.Add(std::make_unique<SeqLenChecker>());

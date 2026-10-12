@@ -22,8 +22,8 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(LightningIndexerKLLoss);
 
-const aclTensor *LightningIndexerKLLoss(const aclTensor *targetScore, const aclTensor *indexProbs, double eps,
-                                        const char *weightType, aclOpExecutor *executor)
+const aclTensor* LightningIndexerKLLoss(const aclTensor* targetScore, const aclTensor* indexProbs, double eps,
+                                        const char* weightType, aclOpExecutor* executor)
 {
     L0_DFX(LightningIndexerKLLoss, targetScore, indexProbs, eps, weightType);
     DataType outputDtype = targetScore->GetDataType();

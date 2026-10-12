@@ -27,17 +27,17 @@ public:
     __aicore__ inline IndexerQuantCacheSingleRow() {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR slotMapping, GM_ADDR cache, GM_ADDR cacheScale, GM_ADDR workspace,
-                                const IndexerQuantCacheTilingData *tilingDataPtr, TPipe *pipePtr)
+                                const IndexerQuantCacheTilingData* tilingDataPtr, TPipe* pipePtr)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
         scalesAttr_ = tilingData->scalesAttr;
         quantMode_ = tilingData->quantMode;
 
-        xGm.SetGlobalBuffer((__gm__ T0 *)x);
-        slotMappingGm.SetGlobalBuffer((__gm__ int32_t *)slotMapping);
-        cacheGm.SetGlobalBuffer((__gm__ T1 *)cache);
-        cacheScaleGm.SetGlobalBuffer((__gm__ float *)cacheScale);
+        xGm.SetGlobalBuffer((__gm__ T0*)x);
+        slotMappingGm.SetGlobalBuffer((__gm__ int32_t*)slotMapping);
+        cacheGm.SetGlobalBuffer((__gm__ T1*)cache);
+        cacheScaleGm.SetGlobalBuffer((__gm__ float*)cacheScale);
 
         pipe->InitBuffer(xQue, 2, tilingData->rowFactor * RoundUp<T0>(tilingData->d) * sizeof(T0));
         pipe->InitBuffer(cacheQue, 2, tilingData->rowFactor * RoundUp<T1>(tilingData->d) * sizeof(T1));
@@ -114,8 +114,8 @@ public:
     }
 
 private:
-    TPipe *pipe;
-    const IndexerQuantCacheTilingData *tilingData;
+    TPipe* pipe;
+    const IndexerQuantCacheTilingData* tilingData;
     GlobalTensor<T0> xGm;
     GlobalTensor<int32_t> slotMappingGm;
     GlobalTensor<T1> cacheGm;

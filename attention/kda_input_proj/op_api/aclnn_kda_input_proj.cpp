@@ -21,12 +21,12 @@ using namespace op;
 namespace {
 
 extern "C" aclnnStatus aclnnInnerKdaInputProjGetWorkspaceSize(
-    const aclTensor *x, const aclTensor *weightQkv, const aclTensor *weightBeta, const aclTensor *weightGate,
-    const aclTensor *weightG, const aclTensor *weightQkvScale, bool transWeightQkv, bool transWeightBeta,
-    bool transWeightGate, bool transWeightG, const aclTensor *qkvOut, const aclTensor *betaOut,
-    const aclTensor *gateOut, const aclTensor *gOut, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* x, const aclTensor* weightQkv, const aclTensor* weightBeta, const aclTensor* weightGate,
+    const aclTensor* weightG, const aclTensor* weightQkvScale, bool transWeightQkv, bool transWeightBeta,
+    bool transWeightGate, bool transWeightG, const aclTensor* qkvOut, const aclTensor* betaOut,
+    const aclTensor* gateOut, const aclTensor* gOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
-extern "C" aclnnStatus aclnnInnerKdaInputProj(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern "C" aclnnStatus aclnnInnerKdaInputProj(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                               aclrtStream stream);
 
 constexpr int64_t LAST_DIM = 1;
@@ -35,7 +35,7 @@ constexpr size_t DIM_NUM_TWO = 2;
 constexpr size_t DIM_IDX_ZERO = 0;
 constexpr size_t DIM_IDX_ONE = 1;
 
-op::Shape SwapLastTwoDimValue(const op::Shape &tensorShape)
+op::Shape SwapLastTwoDimValue(const op::Shape& tensorShape)
 {
     op::Shape swapped = tensorShape;
     const int64_t dimNum = tensorShape.GetDimNum();
@@ -47,7 +47,7 @@ op::Shape SwapLastTwoDimValue(const op::Shape &tensorShape)
     return swapped;
 }
 
-bool IsTransposeLastTwoDims(const aclTensor *tensor)
+bool IsTransposeLastTwoDims(const aclTensor* tensor)
 {
     if (tensor == nullptr) {
         return false;
@@ -56,7 +56,7 @@ bool IsTransposeLastTwoDims(const aclTensor *tensor)
     if (dimNum < SECOND_LAST_DIM) {
         return false;
     }
-    const auto &strides = tensor->GetViewStrides();
+    const auto& strides = tensor->GetViewStrides();
     if (static_cast<int64_t>(strides.size()) < dimNum) {
         return false;
     }
@@ -71,27 +71,27 @@ bool IsTransposeLastTwoDims(const aclTensor *tensor)
     return false;
 }
 
-void NormalizeTransposedWeight(aclTensor *weight)
+void NormalizeTransposedWeight(aclTensor* weight)
 {
     // MatMulV3 WeightNz: only swap view shape; keep original strides (column-major of [N,K]).
     weight->SetViewShape(SwapLastTwoDimValue(weight->GetViewShape()));
 }
 
-const aclTensor *PrepareWeightForInner(const aclTensor *weight, bool &trans)
+const aclTensor* PrepareWeightForInner(const aclTensor* weight, bool& trans)
 {
     trans = IsTransposeLastTwoDims(weight);
     if (!trans) {
         return weight;
     }
-    aclTensor *mut = const_cast<aclTensor *>(weight);
+    aclTensor* mut = const_cast<aclTensor*>(weight);
     NormalizeTransposedWeight(mut);
     return mut;
 }
 
-inline static bool CheckNotNull(const aclTensor *x, const aclTensor *weightQkv, const aclTensor *weightBeta,
-                                const aclTensor *weightGate, const aclTensor *weightG, const aclTensor *weightQkvScale,
-                                const aclTensor *qkvOut, const aclTensor *betaOut, const aclTensor *gateOut,
-                                const aclTensor *gOut)
+inline static bool CheckNotNull(const aclTensor* x, const aclTensor* weightQkv, const aclTensor* weightBeta,
+                                const aclTensor* weightGate, const aclTensor* weightG, const aclTensor* weightQkvScale,
+                                const aclTensor* qkvOut, const aclTensor* betaOut, const aclTensor* gateOut,
+                                const aclTensor* gOut)
 {
     OP_CHECK_NULL(x, return false);
     OP_CHECK_NULL(weightQkv, return false);
@@ -106,10 +106,10 @@ inline static bool CheckNotNull(const aclTensor *x, const aclTensor *weightQkv, 
     return true;
 }
 
-inline static bool CheckDtype(const aclTensor *x, const aclTensor *weightQkv, const aclTensor *weightBeta,
-                              const aclTensor *weightGate, const aclTensor *weightG, const aclTensor *weightQkvScale,
-                              const aclTensor *qkvOut, const aclTensor *betaOut, const aclTensor *gateOut,
-                              const aclTensor *gOut)
+inline static bool CheckDtype(const aclTensor* x, const aclTensor* weightQkv, const aclTensor* weightBeta,
+                              const aclTensor* weightGate, const aclTensor* weightG, const aclTensor* weightQkvScale,
+                              const aclTensor* qkvOut, const aclTensor* betaOut, const aclTensor* gateOut,
+                              const aclTensor* gOut)
 {
     OP_CHECK_DTYPE_NOT_MATCH(x, DataType::DT_BF16, return false);
     OP_CHECK_DTYPE_NOT_MATCH(weightQkv, DataType::DT_FLOAT8_E4M3FN, return false);
@@ -131,7 +131,7 @@ inline static bool IsNdLikeFormat(op::Format format)
            format == Format::FORMAT_NHWC;
 }
 
-inline static bool CheckNdFormat(const aclTensor *tensor)
+inline static bool CheckNdFormat(const aclTensor* tensor)
 {
     const auto format = tensor->GetStorageFormat();
     if (!IsNdLikeFormat(format)) {
@@ -142,10 +142,10 @@ inline static bool CheckNdFormat(const aclTensor *tensor)
     return true;
 }
 
-static bool CheckFormat(const aclTensor *x, const aclTensor *weightQkv, const aclTensor *weightBeta,
-                        const aclTensor *weightGate, const aclTensor *weightG, const aclTensor *weightQkvScale,
-                        const aclTensor *qkvOut, const aclTensor *betaOut, const aclTensor *gateOut,
-                        const aclTensor *gOut)
+static bool CheckFormat(const aclTensor* x, const aclTensor* weightQkv, const aclTensor* weightBeta,
+                        const aclTensor* weightGate, const aclTensor* weightG, const aclTensor* weightQkvScale,
+                        const aclTensor* qkvOut, const aclTensor* betaOut, const aclTensor* gateOut,
+                        const aclTensor* gOut)
 {
     return CheckNdFormat(x) && CheckNdFormat(weightQkv) && CheckNdFormat(weightBeta) && CheckNdFormat(weightGate) &&
            CheckNdFormat(weightG) && CheckNdFormat(weightQkvScale) && CheckNdFormat(qkvOut) && CheckNdFormat(betaOut) &&
@@ -153,11 +153,11 @@ static bool CheckFormat(const aclTensor *x, const aclTensor *weightQkv, const ac
 }
 
 // Public weight view is [K, N]. K must equal x.dim1; out must be [M, N] = [x.dim0, weight.dim1].
-static bool CheckWeightKAndOut(const aclTensor *x, const aclTensor *weight, const aclTensor *out,
-                               const char *weightName, const char *outName)
+static bool CheckWeightKAndOut(const aclTensor* x, const aclTensor* weight, const aclTensor* out,
+                               const char* weightName, const char* outName)
 {
-    const op::Shape &xShape = x->GetViewShape();
-    const op::Shape &wShape = weight->GetViewShape();
+    const op::Shape& xShape = x->GetViewShape();
+    const op::Shape& wShape = weight->GetViewShape();
     OP_CHECK_WRONG_DIMENSION(weight, DIM_NUM_TWO, return false);
     OP_CHECK_WRONG_DIMENSION(out, DIM_NUM_TWO, return false);
 
@@ -183,9 +183,9 @@ static bool CheckWeightKAndOut(const aclTensor *x, const aclTensor *weight, cons
     return true;
 }
 
-static bool CheckShapeValid(const aclTensor *x, const aclTensor *weightQkv, const aclTensor *weightBeta,
-                            const aclTensor *weightGate, const aclTensor *weightG, const aclTensor *qkvOut,
-                            const aclTensor *betaOut, const aclTensor *gateOut, const aclTensor *gOut)
+static bool CheckShapeValid(const aclTensor* x, const aclTensor* weightQkv, const aclTensor* weightBeta,
+                            const aclTensor* weightGate, const aclTensor* weightG, const aclTensor* qkvOut,
+                            const aclTensor* betaOut, const aclTensor* gateOut, const aclTensor* gOut)
 {
     OP_CHECK_WRONG_DIMENSION(x, DIM_NUM_TWO, return false);
     return CheckWeightKAndOut(x, weightQkv, qkvOut, "weightQkv", "qkvOut") &&
@@ -194,10 +194,10 @@ static bool CheckShapeValid(const aclTensor *x, const aclTensor *weightQkv, cons
            CheckWeightKAndOut(x, weightG, gOut, "weightG", "gOut");
 }
 
-inline static aclnnStatus CheckInputParams(const aclTensor *x, const aclTensor *weightQkv, const aclTensor *weightBeta,
-                                           const aclTensor *weightGate, const aclTensor *weightG,
-                                           const aclTensor *weightQkvScale, const aclTensor *qkvOut,
-                                           const aclTensor *betaOut, const aclTensor *gateOut, const aclTensor *gOut)
+inline static aclnnStatus CheckInputParams(const aclTensor* x, const aclTensor* weightQkv, const aclTensor* weightBeta,
+                                           const aclTensor* weightGate, const aclTensor* weightG,
+                                           const aclTensor* weightQkvScale, const aclTensor* qkvOut,
+                                           const aclTensor* betaOut, const aclTensor* gateOut, const aclTensor* gOut)
 {
     // 1. 空值校验
     CHECK_RET(
@@ -222,12 +222,12 @@ inline static aclnnStatus CheckInputParams(const aclTensor *x, const aclTensor *
 
 } // namespace
 
-extern "C" aclnnStatus aclnnKdaInputProjGetWorkspaceSize(const aclTensor *x, const aclTensor *weightQkv,
-                                                         const aclTensor *weightBeta, const aclTensor *weightGate,
-                                                         const aclTensor *weightG, const aclTensor *weightQkvScale,
-                                                         const aclTensor *qkvOut, const aclTensor *betaOut,
-                                                         const aclTensor *gateOut, const aclTensor *gOut,
-                                                         uint64_t *workspaceSize, aclOpExecutor **executor)
+extern "C" aclnnStatus aclnnKdaInputProjGetWorkspaceSize(const aclTensor* x, const aclTensor* weightQkv,
+                                                         const aclTensor* weightBeta, const aclTensor* weightGate,
+                                                         const aclTensor* weightG, const aclTensor* weightQkvScale,
+                                                         const aclTensor* qkvOut, const aclTensor* betaOut,
+                                                         const aclTensor* gateOut, const aclTensor* gOut,
+                                                         uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     auto ret =
@@ -238,10 +238,10 @@ extern "C" aclnnStatus aclnnKdaInputProjGetWorkspaceSize(const aclTensor *x, con
     bool transBeta = false;
     bool transGate = false;
     bool transG = false;
-    const aclTensor *innerQkv = PrepareWeightForInner(weightQkv, transQkv);
-    const aclTensor *innerBeta = PrepareWeightForInner(weightBeta, transBeta);
-    const aclTensor *innerGate = PrepareWeightForInner(weightGate, transGate);
-    const aclTensor *innerG = PrepareWeightForInner(weightG, transG);
+    const aclTensor* innerQkv = PrepareWeightForInner(weightQkv, transQkv);
+    const aclTensor* innerBeta = PrepareWeightForInner(weightBeta, transBeta);
+    const aclTensor* innerGate = PrepareWeightForInner(weightGate, transGate);
+    const aclTensor* innerG = PrepareWeightForInner(weightG, transG);
 
     OP_LOGI("KdaInputProj infer trans from stride: qkv=%d beta=%d gate=%d g=%d.", static_cast<int32_t>(transQkv),
             static_cast<int32_t>(transBeta), static_cast<int32_t>(transGate), static_cast<int32_t>(transG));
@@ -251,7 +251,7 @@ extern "C" aclnnStatus aclnnKdaInputProjGetWorkspaceSize(const aclTensor *x, con
                                                   workspaceSize, executor);
 }
 
-extern "C" aclnnStatus aclnnKdaInputProj(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern "C" aclnnStatus aclnnKdaInputProj(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                          aclrtStream stream)
 {
     return aclnnInnerKdaInputProj(workspace, workspaceSize, executor, stream);

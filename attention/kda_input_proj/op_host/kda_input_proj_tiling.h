@@ -44,8 +44,8 @@ using kda_input_proj::ATTR_TRANS_WEIGHT_GATE_INDEX;
 using kda_input_proj::ATTR_TRANS_WEIGHT_G_INDEX;
 
 struct TilingRequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc = nullptr;
-    const gert::StorageShape *shape = nullptr;
+    const gert::CompileTimeTensorDesc* desc = nullptr;
+    const gert::StorageShape* shape = nullptr;
 };
 
 struct KdaInputProjCompileInfo {};
@@ -57,21 +57,21 @@ struct KdaInputProjParaInfo {
     TilingRequiredParaInfo weightGate;
     TilingRequiredParaInfo weightG;
     TilingRequiredParaInfo weightQkvScale;
-    const gert::CompileTimeTensorDesc *qkvOutDesc = nullptr;
-    const gert::CompileTimeTensorDesc *betaOutDesc = nullptr;
-    const gert::CompileTimeTensorDesc *gateOutDesc = nullptr;
-    const gert::CompileTimeTensorDesc *gOutDesc = nullptr;
+    const gert::CompileTimeTensorDesc* qkvOutDesc = nullptr;
+    const gert::CompileTimeTensorDesc* betaOutDesc = nullptr;
+    const gert::CompileTimeTensorDesc* gateOutDesc = nullptr;
+    const gert::CompileTimeTensorDesc* gOutDesc = nullptr;
 
-    const bool *transWeightQkv = nullptr;
-    const bool *transWeightBeta = nullptr;
-    const bool *transWeightGate = nullptr;
-    const bool *transWeightG = nullptr;
+    const bool* transWeightQkv = nullptr;
+    const bool* transWeightBeta = nullptr;
+    const bool* transWeightGate = nullptr;
+    const bool* transWeightG = nullptr;
 };
 
 class KdaInputProjTilingInfo {
 public:
-    const char *opName = nullptr;
-    fe::PlatFormInfos *platformInfo = nullptr;
+    const char* opName = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     KdaInputProjBaseParams baseParams; // 与 tiling_data.baseParams 对齐；核数运行时经 platform 获取
     bool transWeightQkv = true;
     bool transWeightBeta = true;
@@ -86,7 +86,7 @@ public:
 
 class KdaInputProjInfoParser {
 public:
-    explicit KdaInputProjInfoParser(gert::TilingContext *context)
+    explicit KdaInputProjInfoParser(gert::TilingContext* context)
         : context_(context)
     {}
     ~KdaInputProjInfoParser() = default;
@@ -101,13 +101,13 @@ public:
     ge::graphStatus CheckShapeDim();
     ge::graphStatus GetBaseShapeInfo();
     ge::graphStatus ValidateInputShapesMatch();
-    ge::graphStatus ParseAndCheck(KdaInputProjTilingInfo &tilingInfo);
-    void GenerateInfo(KdaInputProjTilingInfo &tilingInfo);
+    ge::graphStatus ParseAndCheck(KdaInputProjTilingInfo& tilingInfo);
+    void GenerateInfo(KdaInputProjTilingInfo& tilingInfo);
 
 private:
-    gert::TilingContext *context_ = nullptr;
-    const char *opName_ = nullptr;
-    fe::PlatFormInfos *platformInfo_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
+    const char* opName_ = nullptr;
+    fe::PlatFormInfos* platformInfo_ = nullptr;
     KdaInputProjParaInfo opParamInfo_;
     KdaInputProjBaseParams baseParams_;
     uint32_t aicNum_ = 0;
@@ -119,19 +119,19 @@ private:
 
 class KdaInputProjTiling {
 public:
-    explicit KdaInputProjTiling(gert::TilingContext *context)
+    explicit KdaInputProjTiling(gert::TilingContext* context)
         : context_(context)
     {}
-    ge::graphStatus DoTiling(const KdaInputProjTilingInfo *tilingInfo);
+    ge::graphStatus DoTiling(const KdaInputProjTilingInfo* tilingInfo);
 
 private:
-    ge::graphStatus FillBaseParams(const KdaInputProjTilingInfo &tilingInfo);
-    ge::graphStatus CalcModuleTilings(const KdaInputProjTilingInfo &tilingInfo);
-    ge::graphStatus CalcWorkspaceSize(const KdaInputProjTilingInfo &tilingInfo);
-    ge::graphStatus SetTilingKey(const KdaInputProjTilingInfo &tilingInfo);
-    ge::graphStatus WriteTilingResult(const KdaInputProjTilingInfo &tilingInfo);
+    ge::graphStatus FillBaseParams(const KdaInputProjTilingInfo& tilingInfo);
+    ge::graphStatus CalcModuleTilings(const KdaInputProjTilingInfo& tilingInfo);
+    ge::graphStatus CalcWorkspaceSize(const KdaInputProjTilingInfo& tilingInfo);
+    ge::graphStatus SetTilingKey(const KdaInputProjTilingInfo& tilingInfo);
+    ge::graphStatus WriteTilingResult(const KdaInputProjTilingInfo& tilingInfo);
 
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     KdaInputProjTilingData tilingData_;
     uint64_t workspaceSize_ = 0;
 };

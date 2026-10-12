@@ -19,4 +19,4 @@
 #include "matrix/fused_matrix_padding.hpp"
 #include "matrix/fused_matrix_nn.hpp"
 
-#endif  // FUSED_MATRIX_HPP
+#endif // FUSED_MATRIX_HPP

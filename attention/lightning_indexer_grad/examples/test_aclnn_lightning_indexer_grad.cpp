@@ -34,7 +34,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -44,7 +44,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<T> resultData(size, 0);
@@ -56,7 +56,7 @@ void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -76,8 +76,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -100,11 +100,11 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-void FreeResource(aclTensor *q, aclTensor *k, aclTensor *dy, aclTensor *sparseIndices, aclTensor *weights,
-                  aclTensor *dQuery, aclTensor *dKey, aclTensor *dWeights, void *qDeviceAddr, void *kDeviceAddr,
-                  void *dyDeviceAddr, void *sparseIndicesDeviceAddr, void *weightsDeviceAddr, void *dQueryAddr,
-                  void *dKeyAddr, void *dWeightsAddr, uint64_t workspaceSize, void *workspaceAddr, int32_t deviceId,
-                  aclrtContext *context, aclrtStream *stream)
+void FreeResource(aclTensor* q, aclTensor* k, aclTensor* dy, aclTensor* sparseIndices, aclTensor* weights,
+                  aclTensor* dQuery, aclTensor* dKey, aclTensor* dWeights, void* qDeviceAddr, void* kDeviceAddr,
+                  void* dyDeviceAddr, void* sparseIndicesDeviceAddr, void* weightsDeviceAddr, void* dQueryAddr,
+                  void* dKeyAddr, void* dWeightsAddr, uint64_t workspaceSize, void* workspaceAddr, int32_t deviceId,
+                  aclrtContext* context, aclrtStream* stream)
 {
     // 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
     if (q != nullptr) {
@@ -206,23 +206,23 @@ int main()
     int64_t preToken = 65536;
     int64_t nextToken = 65536;
 
-    void *qDeviceAddr = nullptr;
-    void *kDeviceAddr = nullptr;
-    void *dyDeviceAddr = nullptr;
-    void *sparseIndicesDeviceAddr = nullptr;
-    void *weightsDeviceAddr = nullptr;
-    void *dQueryAddr = nullptr;
-    void *dKeyAddr = nullptr;
-    void *dWeightsAddr = nullptr;
+    void* qDeviceAddr = nullptr;
+    void* kDeviceAddr = nullptr;
+    void* dyDeviceAddr = nullptr;
+    void* sparseIndicesDeviceAddr = nullptr;
+    void* weightsDeviceAddr = nullptr;
+    void* dQueryAddr = nullptr;
+    void* dKeyAddr = nullptr;
+    void* dWeightsAddr = nullptr;
 
-    aclTensor *q = nullptr;
-    aclTensor *k = nullptr;
-    aclTensor *dy = nullptr;
-    aclTensor *sparseIndices = nullptr;
-    aclTensor *weights = nullptr;
-    aclTensor *dQuery = nullptr;
-    aclTensor *dKey = nullptr;
-    aclTensor *dWeights = nullptr;
+    aclTensor* q = nullptr;
+    aclTensor* k = nullptr;
+    aclTensor* dy = nullptr;
+    aclTensor* sparseIndices = nullptr;
+    aclTensor* weights = nullptr;
+    aclTensor* dQuery = nullptr;
+    aclTensor* dKey = nullptr;
+    aclTensor* dWeights = nullptr;
 
     std::vector<aclFloat16> qHostData(GetShapeSize(qShape), 1.0);
     std::vector<aclFloat16> kHostData(GetShapeSize(kShape), 1.0);
@@ -234,7 +234,7 @@ int main()
     std::vector<aclFloat16> dWeightsHostData(GetShapeSize(dWeightsShape), 1.0);
 
     uint64_t workspaceSize = 0;
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
 
     // 创建acl Tensor
     ret = CreateAclTensor(qHostData, qShape, &qDeviceAddr, aclDataType::ACL_FLOAT16, &q);
@@ -289,7 +289,7 @@ int main()
               return ret);
 
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     // 调用aclnnLightningIndexerGrad第一段接口
     ret = aclnnLightningIndexerGradGetWorkspaceSize(q, k, dy, sparseIndices, weights, nullptr, nullptr, headNum,

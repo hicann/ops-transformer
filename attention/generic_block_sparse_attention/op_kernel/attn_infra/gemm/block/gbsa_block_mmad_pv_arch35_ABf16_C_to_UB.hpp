@@ -91,8 +91,8 @@ public:
     static constexpr uint32_t MAX_L1_STAGES = 3; // 编译期常量，为静态L1Tensor数组开辟准备。取一个buffer份数的极大值
     static constexpr uint32_t V0_V1_FLAG_ID_OFFSET = 16; // 核间同步mode4，AIC侧需要两个flagId分别对应两个AIV
 
-    __aicore__ inline BlockMmadTla(Arch::Resource<ArchTag> &resource, uint32_t l1BufAddrStart,
-                                   Mm2L1TileHelper &mm2L1TileHelper)
+    __aicore__ inline BlockMmadTla(Arch::Resource<ArchTag>& resource, uint32_t l1BufAddrStart,
+                                   Mm2L1TileHelper& mm2L1TileHelper)
     {
         l1ATileM = mm2L1TileHelper.mm2L1TileM;
         l1BTileN = mm2L1TileHelper.mm2L1TileN;
@@ -121,7 +121,7 @@ public:
     __aicore__ inline ~BlockMmadTla() {}
 
     template <uint32_t MODE, pipe_t PIPE>
-    __aicore__ inline void SetCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
+    __aicore__ inline void SetCrossCoreSync(Arch::CrossCoreFlag& crossCoreFlag)
     {
         // in mode 4, AIC set for 2 AIVs seperately
         if constexpr (MODE == 4U) {
@@ -134,7 +134,7 @@ public:
     }
 
     template <uint32_t MODE, pipe_t PIPE>
-    __aicore__ inline void WaitCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
+    __aicore__ inline void WaitCrossCoreSync(Arch::CrossCoreFlag& crossCoreFlag)
     {
         // in mode 4, AIC wait for 2 AIVs seperately
         if constexpr (MODE == 4U) {
@@ -152,7 +152,7 @@ public:
     }
 
     template <class TensorB, class TensorL1B>
-    __aicore__ inline void SparseVBaseTileL1FullLoad(TensorB &gBTensor, TensorL1B &l1BTensorTla,
+    __aicore__ inline void SparseVBaseTileL1FullLoad(TensorB& gBTensor, TensorL1B& l1BTensorTla,
                                                      AscendC::GlobalTensor<int32_t> gSparseBlockIdx,
                                                      uint32_t gatheredKvSTileIdx, uint32_t kvSeqlen,
                                                      uint32_t kvSBaseTile, uint32_t blockShapeY, uint32_t yBlockNumAval,
@@ -207,7 +207,7 @@ public:
     }
 
     template <class TensorB, class TensorC>
-    __aicore__ inline void operator()(TensorB &gBTensor, TensorC &ubCTensor,
+    __aicore__ inline void operator()(TensorB& gBTensor, TensorC& ubCTensor,
                                       AscendC::GlobalTensor<int32_t> gSparseBlockIdx, GemmCoord actualOriShape,
                                       uint32_t gatheredKvSTileIdx, uint32_t kvSeqlen, uint32_t kvSBaseTile,
                                       uint32_t blockShapeY, uint32_t yBlockNumAval, uint32_t yBlockNumSparse,

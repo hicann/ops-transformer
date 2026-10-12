@@ -21,9 +21,9 @@ using namespace Ops::Transformer::OpTiling;
 
 struct LightningIndexerKLLossCompileInfo {};
 
-static ge::graphStatus GetPlatformInfo(gert::TilingContext *context, uint64_t &ubSize, int64_t &coreNum)
+static ge::graphStatus GetPlatformInfo(gert::TilingContext* context, uint64_t& ubSize, int64_t& coreNum)
 {
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfoPtr);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     coreNum = ascendcPlatform.GetCoreNumAiv();
@@ -56,9 +56,9 @@ int Ceil(int a, int b)
     return (a + b - 1) / b;
 }
 
-ge::graphStatus GetWorkspaceSize(gert::TilingContext *context, bool deterministic, bool isHalf, int64_t coreNum)
+ge::graphStatus GetWorkspaceSize(gert::TilingContext* context, bool deterministic, bool isHalf, int64_t coreNum)
 {
-    size_t *currentWorkspace = context->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, currentWorkspace);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint32_t sysWorkspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
@@ -70,7 +70,7 @@ ge::graphStatus GetWorkspaceSize(gert::TilingContext *context, bool deterministi
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckInputDim(gert::TilingContext *context)
+static ge::graphStatus CheckInputDim(gert::TilingContext* context)
 {
     const auto targetScoreShape = context->GetInputShape(0);
     const auto indexProbsShape = context->GetInputShape(1);
@@ -108,7 +108,7 @@ static ge::graphStatus CheckInputDim(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus LightningIndexerKLLossTilingFunc(gert::TilingContext *context)
+static ge::graphStatus LightningIndexerKLLossTilingFunc(gert::TilingContext* context)
 {
     uint64_t ubSize;
     int64_t coreNum;
@@ -145,7 +145,7 @@ static ge::graphStatus LightningIndexerKLLossTilingFunc(gert::TilingContext *con
     int64_t formerTileNum = (totalTileNum + coreNum - 1) / coreNum;
     int64_t tailTileNum = totalTileNum / coreNum;
 
-    LightningIndexerKLLossTilingData *tiling = context->GetTilingData<LightningIndexerKLLossTilingData>();
+    LightningIndexerKLLossTilingData* tiling = context->GetTilingData<LightningIndexerKLLossTilingData>();
     OP_CHECK_NULL_WITH_CONTEXT(context, tiling);
     OP_CHECK_IF(
         memset_s(tiling, sizeof(LightningIndexerKLLossTilingData), 0, sizeof(LightningIndexerKLLossTilingData)) != EOK,
@@ -174,7 +174,7 @@ static ge::graphStatus LightningIndexerKLLossTilingFunc(gert::TilingContext *con
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingParseForLightningIndexerKLLoss([[maybe_unused]] gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForLightningIndexerKLLoss([[maybe_unused]] gert::TilingParseContext* context)
 {
     return ge::GRAPH_SUCCESS;
 }

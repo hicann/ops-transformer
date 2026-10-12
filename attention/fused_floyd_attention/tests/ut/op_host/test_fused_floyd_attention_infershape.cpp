@@ -14,8 +14,7 @@
 #include "infer_shape_case_executor.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 
-class FusedFloydAttentionTest : public testing::Test
-{
+class FusedFloydAttentionTest : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -30,48 +29,52 @@ protected:
 
 TEST_F(FusedFloydAttentionTest, fused_floyd_attention_infer_dtype_fp16)
 {
-    gert::InfershapeContextPara infershapeContextPara("FusedFloydAttention",
-    { // input info
-        {{{2, 4, 16, 256, 128}, {2, 4, 16, 256, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // query
-        {{{2, 4, 16, 384, 128}, {2, 4, 16, 384, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // key1
-        {{{2, 4, 16, 384, 128}, {2, 4, 16, 384, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // value1
-        {{{2, 4, 384, 256, 128}, {2, 4, 384, 256, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // key2
-        {{{2, 4, 384, 256, 128}, {2, 4, 384, 256, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // value2
-        {{{2, 1, 16, 1, 384}, {2, 1, 16, 1, 384}}, ge::DT_BOOL, ge::FORMAT_ND}, // atten_mask
-    },
-    { // output info
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-    }, 
-    { // attr
-        {"scale_value",Ops::Transformer::AnyValue::CreateFrom<float>(1.0)}
-    }
-    );
-    std::vector<std::vector<int64_t>> expectOutputShape = {{2, 4, 16, 256, 8}, {2, 4, 16, 256, 8}, {2, 4, 16, 256, 128}};
+    gert::InfershapeContextPara infershapeContextPara(
+        "FusedFloydAttention",
+        {
+            // input info
+            {{{2, 4, 16, 256, 128}, {2, 4, 16, 256, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // query
+            {{{2, 4, 16, 384, 128}, {2, 4, 16, 384, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // key1
+            {{{2, 4, 16, 384, 128}, {2, 4, 16, 384, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // value1
+            {{{2, 4, 384, 256, 128}, {2, 4, 384, 256, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // key2
+            {{{2, 4, 384, 256, 128}, {2, 4, 384, 256, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // value2
+            {{{2, 1, 16, 1, 384}, {2, 1, 16, 1, 384}}, ge::DT_BOOL, ge::FORMAT_ND},          // atten_mask
+        },
+        {
+            // output info
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {// attr
+         {"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(1.0)}});
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {2, 4, 16, 256, 8}, {2, 4, 16, 256, 8}, {2, 4, 16, 256, 128}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(FusedFloydAttentionTest, fused_floyd_attention_infer_dtype_bf16)
 {
-    gert::InfershapeContextPara infershapeContextPara("FusedFloydAttention",
-    { // input info
-        {{{2, 4, 16, 256, 128}, {2, 4, 16, 256, 128}}, ge::DT_BF16, ge::FORMAT_ND}, // query
-        {{{2, 4, 16, 384, 128}, {2, 4, 16, 384, 128}}, ge::DT_BF16, ge::FORMAT_ND}, // key1
-        {{{2, 4, 16, 384, 128}, {2, 4, 16, 384, 128}}, ge::DT_BF16, ge::FORMAT_ND}, // value1
-        {{{2, 4, 384, 256, 128}, {2, 4, 384, 256, 128}}, ge::DT_BF16, ge::FORMAT_ND}, // key2
-        {{{2, 4, 384, 256, 128}, {2, 4, 384, 256, 128}}, ge::DT_BF16, ge::FORMAT_ND}, // value2
-        {{{2, 1, 16, 1, 384}, {2, 1, 16, 1, 384}}, ge::DT_BOOL, ge::FORMAT_ND}, // atten_mask
-    }, 
-    { // output info
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
-        {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
-    }, 
-    { // attr
-        {"scale_value",Ops::Transformer::AnyValue::CreateFrom<float>(1.0)}
-    }
-    );
-    std::vector<std::vector<int64_t>> expectOutputShape = {{2, 4, 16, 256, 8}, {2, 4, 16, 256, 8}, {2, 4, 16, 256, 128}};
+    gert::InfershapeContextPara infershapeContextPara(
+        "FusedFloydAttention",
+        {
+            // input info
+            {{{2, 4, 16, 256, 128}, {2, 4, 16, 256, 128}}, ge::DT_BF16, ge::FORMAT_ND},   // query
+            {{{2, 4, 16, 384, 128}, {2, 4, 16, 384, 128}}, ge::DT_BF16, ge::FORMAT_ND},   // key1
+            {{{2, 4, 16, 384, 128}, {2, 4, 16, 384, 128}}, ge::DT_BF16, ge::FORMAT_ND},   // value1
+            {{{2, 4, 384, 256, 128}, {2, 4, 384, 256, 128}}, ge::DT_BF16, ge::FORMAT_ND}, // key2
+            {{{2, 4, 384, 256, 128}, {2, 4, 384, 256, 128}}, ge::DT_BF16, ge::FORMAT_ND}, // value2
+            {{{2, 1, 16, 1, 384}, {2, 1, 16, 1, 384}}, ge::DT_BOOL, ge::FORMAT_ND},       // atten_mask
+        },
+        {
+            // output info
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+        },
+        {// attr
+         {"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(1.0)}});
+    std::vector<std::vector<int64_t>> expectOutputShape = {
+        {2, 4, 16, 256, 8}, {2, 4, 16, 256, 8}, {2, 4, 16, 256, 128}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }

@@ -73,11 +73,11 @@ public:
     uint64_t usedCoreNum = 0;
     uint64_t ubsize = 0;
 
-    __aicore__ inline BlockEpilogue(Params const &params)
+    __aicore__ inline BlockEpilogue(Params const& params)
     {
         cBlockIdx = GetBlockIdx();
-        __gm__ GenericBlockSparseAttentionGradTilingData *tilingData =
-            reinterpret_cast<__gm__ GenericBlockSparseAttentionGradTilingData *>(params.tilingData);
+        __gm__ GenericBlockSparseAttentionGradTilingData* tilingData =
+            reinterpret_cast<__gm__ GenericBlockSparseAttentionGradTilingData*>(params.tilingData);
         usedCoreNum = tilingData->usedVecCoreNum; // 先按这个把，得适配
 
         qSizeAlign = tilingData->dqSize;
@@ -95,9 +95,9 @@ public:
         kvPreTailNumTmp = kvSizeAlign % kvPreBlockFactor;
         kvPreTailNum = kvPreTailNumTmp == 0 ? kvPreBlockFactor : kvPreTailNumTmp;
 
-        dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)params.dqWrk);
-        dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)params.dkWrk);
-        dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)params.dvWrk);
+        dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)params.dqWrk);
+        dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)params.dkWrk);
+        dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)params.dvWrk);
 
         initdqSize = cBlockIdx == qPreBlockTotal - 1 ? qPreTailNum : qPreBlockFactor;
         dqOffset = ((uint64_t)cBlockIdx) * qPreBlockFactor;

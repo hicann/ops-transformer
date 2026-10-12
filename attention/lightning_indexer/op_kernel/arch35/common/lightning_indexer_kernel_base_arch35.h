@@ -22,26 +22,26 @@
 namespace LICommon {
 
 template <typename ConstInfoT>
-__aicore__ inline void InitActualSeqLen(__gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengthsK,
-                                        ConstInfoT &constInfo, AscendC::GlobalTensor<uint32_t> &actualSeqLengthsGmQ,
-                                        AscendC::GlobalTensor<uint32_t> &actualSeqLengthsGmK)
+__aicore__ inline void InitActualSeqLen(__gm__ uint8_t* actualSeqLengthsQ, __gm__ uint8_t* actualSeqLengthsK,
+                                        ConstInfoT& constInfo, AscendC::GlobalTensor<uint32_t>& actualSeqLengthsGmQ,
+                                        AscendC::GlobalTensor<uint32_t>& actualSeqLengthsGmK)
 {
     if (actualSeqLengthsQ == nullptr) {
         constInfo.actualLenQDims = 0;
     } else {
         constInfo.actualLenQDims = constInfo.batchSize;
-        actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ uint32_t *)actualSeqLengthsQ, constInfo.actualLenQDims);
+        actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ uint32_t*)actualSeqLengthsQ, constInfo.actualLenQDims);
     }
     if (actualSeqLengthsK == nullptr) {
         constInfo.actualLenDims = 0;
     } else {
         constInfo.actualLenDims = constInfo.batchSize;
-        actualSeqLengthsGmK.SetGlobalBuffer((__gm__ uint32_t *)actualSeqLengthsK, constInfo.actualLenDims);
+        actualSeqLengthsGmK.SetGlobalBuffer((__gm__ uint32_t*)actualSeqLengthsK, constInfo.actualLenDims);
     }
 }
 
 __aicore__ inline uint32_t GetActualSeqLen(uint32_t bIdx, uint32_t actualLenDims, bool isAccumSeq,
-                                           AscendC::GlobalTensor<uint32_t> &actualSeqLengthsGm, uint32_t defaultSeqLen)
+                                           AscendC::GlobalTensor<uint32_t>& actualSeqLengthsGm, uint32_t defaultSeqLen)
 {
     if (actualLenDims == 0) {
         return defaultSeqLen;

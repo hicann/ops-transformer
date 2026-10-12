@@ -16,17 +16,17 @@
 
 namespace l0op {
 
-const std::array<const aclTensor *, 2> GenericBlockSparseAttention(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *sparseBlockIdx,
-    const aclTensor *sparseBlockCount, const aclTensor *metadataOptional, const aclTensor *attenMaskOptional,
-    const aclTensor *qDequantScaleOptional, const aclTensor *kDequantScaleOptional,
-    const aclTensor *vDequantScaleOptional, const aclTensor *pQuantScaleOptional,
-    const aclTensor *cuSeqLengthsQOptional, const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKvOptional, const aclTensor *blockTableOptional, const aclIntArray *blockShape,
-    const char *layoutQ, const char *layoutKv, int64_t layoutSparsePattern, double scaleValue, int64_t maskType,
+const std::array<const aclTensor*, 2> GenericBlockSparseAttention(
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* sparseBlockIdx,
+    const aclTensor* sparseBlockCount, const aclTensor* metadataOptional, const aclTensor* attenMaskOptional,
+    const aclTensor* qDequantScaleOptional, const aclTensor* kDequantScaleOptional,
+    const aclTensor* vDequantScaleOptional, const aclTensor* pQuantScaleOptional,
+    const aclTensor* cuSeqLengthsQOptional, const aclTensor* cuSeqLengthsKvOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKvOptional, const aclTensor* blockTableOptional, const aclIntArray* blockShape,
+    const char* layoutQ, const char* layoutKv, int64_t layoutSparsePattern, double scaleValue, int64_t maskType,
     int64_t quantType, double dstTypeMax, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight,
-    int64_t returnSoftmaxlse, int64_t residualBlockMode, bool isConsistentTopk, const aclTensor *attentionOut,
-    aclOpExecutor *executor);
+    int64_t returnSoftmaxlse, int64_t residualBlockMode, bool isConsistentTopk, const aclTensor* attentionOut,
+    aclOpExecutor* executor);
 
 } // namespace l0op
 

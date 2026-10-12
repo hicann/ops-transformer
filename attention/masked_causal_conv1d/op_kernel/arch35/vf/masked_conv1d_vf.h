@@ -68,7 +68,7 @@ constexpr uint32_t H_REG = 64;
 //   bStride = (2*sMain + 2) * ubFactorH  (sCur = 2*sMain)
 // ============================================================================
 template <typename T>
-__simd_vf__ void MaskedConv1dVFNoTail(__ubuf__ T *ioBase, __ubuf__ T *wBase, uint32_t sMain, uint32_t bUbCur,
+__simd_vf__ void MaskedConv1dVFNoTail(__ubuf__ T* ioBase, __ubuf__ T* wBase, uint32_t sMain, uint32_t bUbCur,
                                       uint32_t ubFactorH)
 {
     Reg::MaskReg maskFull = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
@@ -79,7 +79,7 @@ __simd_vf__ void MaskedConv1dVFNoTail(__ubuf__ T *ioBase, __ubuf__ T *wBase, uin
     uint32_t bStride = (2 * sMain + 2) * ubFactorH; // sCur=2*sMain, sCur+2 rows per batch
 
     for (uint32_t b = 0; b < bUbCur; ++b) {
-        __ubuf__ T *bBase = ioBase + b * bStride;
+        __ubuf__ T* bBase = ioBase + b * bStride;
 
         for (uint32_t c = 0; c < numHReg; ++c) {
             Reg::RegTensor<T> w0B16, w1B16, w2B16;
@@ -91,7 +91,7 @@ __simd_vf__ void MaskedConv1dVFNoTail(__ubuf__ T *ioBase, __ubuf__ T *wBase, uin
             Reg::Cast<float, T, castTraitB162B32>(w1F32, w1B16, maskFull);
             Reg::Cast<float, T, castTraitB162B32>(w2F32, w2B16, maskFull);
 
-            __ubuf__ T *p = bBase + c * H_REG;
+            __ubuf__ T* p = bBase + c * H_REG;
 
             for (uint32_t si = 0; si < sMain; ++si) {
                 // 6 independent loads: 3 for s=2si, 3 for s=2si+1
@@ -146,7 +146,7 @@ __simd_vf__ void MaskedConv1dVFNoTail(__ubuf__ T *ioBase, __ubuf__ T *wBase, uin
 //   bStride = (2*sMain + 3) * ubFactorH  (sCur = 2*sMain+1)
 // ============================================================================
 template <typename T>
-__simd_vf__ void MaskedConv1dVFWithTail(__ubuf__ T *ioBase, __ubuf__ T *wBase, uint32_t sMain, uint32_t bUbCur,
+__simd_vf__ void MaskedConv1dVFWithTail(__ubuf__ T* ioBase, __ubuf__ T* wBase, uint32_t sMain, uint32_t bUbCur,
                                         uint32_t ubFactorH)
 {
     Reg::MaskReg maskFull = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
@@ -157,7 +157,7 @@ __simd_vf__ void MaskedConv1dVFWithTail(__ubuf__ T *ioBase, __ubuf__ T *wBase, u
     uint32_t bStride = (2 * sMain + 3) * ubFactorH; // sCur=2*sMain+1, sCur+2 rows per batch
 
     for (uint32_t b = 0; b < bUbCur; ++b) {
-        __ubuf__ T *bBase = ioBase + b * bStride;
+        __ubuf__ T* bBase = ioBase + b * bStride;
 
         for (uint32_t c = 0; c < numHReg; ++c) {
             Reg::RegTensor<T> w0B16, w1B16, w2B16;
@@ -169,7 +169,7 @@ __simd_vf__ void MaskedConv1dVFWithTail(__ubuf__ T *ioBase, __ubuf__ T *wBase, u
             Reg::Cast<float, T, castTraitB162B32>(w1F32, w1B16, maskFull);
             Reg::Cast<float, T, castTraitB162B32>(w2F32, w2B16, maskFull);
 
-            __ubuf__ T *p = bBase + c * H_REG;
+            __ubuf__ T* p = bBase + c * H_REG;
 
             for (uint32_t si = 0; si < sMain; ++si) {
                 // 6 independent loads: 3 for s=2si, 3 for s=2si+1
@@ -250,8 +250,8 @@ template <typename T>
 __aicore__ inline void CallMaskedConv1dVF(LocalTensor<T> ioBuf, LocalTensor<T> wBuf, uint32_t sCur, uint32_t bUbCur,
                                           uint32_t ubFactorH)
 {
-    __ubuf__ T *ioBase = (__ubuf__ T *)ioBuf.GetPhyAddr();
-    __ubuf__ T *wBase = (__ubuf__ T *)wBuf.GetPhyAddr();
+    __ubuf__ T* ioBase = (__ubuf__ T*)ioBuf.GetPhyAddr();
+    __ubuf__ T* wBase = (__ubuf__ T*)wBuf.GetPhyAddr();
     uint32_t sMain = sCur / 2;
     if (sCur & 1u) {
         MaskedConv1dVFWithTail<T>(ioBase, wBase, sMain, bUbCur, ubFactorH);

@@ -33,12 +33,12 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
-    const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount, const aclTensor *cuSeqLengthsQOptional,
-    const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
+    const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount, const aclTensor* cuSeqLengthsQOptional,
+    const aclTensor* cuSeqLengthsKvOptional, const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional,
     int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads, int64_t headDim,
-    const aclIntArray *blockShape, char *layoutQ, char *layoutKv, int64_t layoutSparsePattern, int64_t maskType,
+    const aclIntArray* blockShape, char* layoutQ, char* layoutKv, int64_t layoutSparsePattern, int64_t maskType,
     int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode, bool isConsistentTopk,
-    aclTensor *metadata, uint64_t *workspaceSize, aclOpExecutor **executor)
+    aclTensor* metadata, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (workspaceSize == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "workspaceSize is nullptr");
@@ -58,11 +58,11 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
+    const op::PlatformInfo& npuInfo = op::GetCurrentPlatformInfo();
     uint32_t aicCoreNum = npuInfo.GetCubeCoreNum();
     uint32_t aivCoreNum = npuInfo.GetVectorCoreNum();
     std::string socVersionStr = npuInfo.GetSocLongVersion();
-    const char *socVersion = socVersionStr.c_str();
+    const char* socVersion = socVersionStr.c_str();
 
     int64_t blockShapeX = 1;
     int64_t blockShapeY = 128;
@@ -82,27 +82,27 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
                     residualBlockMode, isConsistentTopk, aicCoreNum, aivCoreNum, socVersion, metadata);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
-    const aclTensor *sparseBlockIdxContiguous = l0op::Contiguous(sparseBlockIdx, uniqueExecutor.get());
+    const aclTensor* sparseBlockIdxContiguous = l0op::Contiguous(sparseBlockIdx, uniqueExecutor.get());
     CHECK_RET(sparseBlockIdxContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    const aclTensor *sparseBlockCountContiguous = l0op::Contiguous(sparseBlockCount, uniqueExecutor.get());
+    const aclTensor* sparseBlockCountContiguous = l0op::Contiguous(sparseBlockCount, uniqueExecutor.get());
     CHECK_RET(sparseBlockCountContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    const aclTensor *cuSeqLengthsQOptionalContiguous = nullptr;
+    const aclTensor* cuSeqLengthsQOptionalContiguous = nullptr;
     if (cuSeqLengthsQOptional != nullptr) {
         cuSeqLengthsQOptionalContiguous = l0op::Contiguous(cuSeqLengthsQOptional, uniqueExecutor.get());
         CHECK_RET(cuSeqLengthsQOptionalContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
-    const aclTensor *cuSeqLengthsKvOptionalContiguous = nullptr;
+    const aclTensor* cuSeqLengthsKvOptionalContiguous = nullptr;
     if (cuSeqLengthsKvOptional != nullptr) {
         cuSeqLengthsKvOptionalContiguous = l0op::Contiguous(cuSeqLengthsKvOptional, uniqueExecutor.get());
         CHECK_RET(cuSeqLengthsKvOptionalContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
-    const aclTensor *sequsedQOptionalContiguous = nullptr;
+    const aclTensor* sequsedQOptionalContiguous = nullptr;
     if (sequsedQOptional != nullptr) {
         sequsedQOptionalContiguous = l0op::Contiguous(sequsedQOptional, uniqueExecutor.get());
         CHECK_RET(sequsedQOptionalContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
-    const aclTensor *sequsedKvOptionalContiguous = nullptr;
+    const aclTensor* sequsedKvOptionalContiguous = nullptr;
     if (sequsedKvOptional != nullptr) {
         sequsedKvOptionalContiguous = l0op::Contiguous(sequsedKvOptional, uniqueExecutor.get());
         CHECK_RET(sequsedKvOptionalContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -121,9 +121,9 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-__attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(void *workspace,
+__attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(void* workspace,
                                                                                                 uint64_t workspaceSize,
-                                                                                                aclOpExecutor *executor,
+                                                                                                aclOpExecutor* executor,
                                                                                                 aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnGenericBlockSparseAttentionGradMetadata);

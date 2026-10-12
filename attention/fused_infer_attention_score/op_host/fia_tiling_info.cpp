@@ -15,9 +15,7 @@
 
 #include "fia_tiling_info.h"
 
-
 namespace optiling {
-
 
 std::string QuantModeToSerialString(FiaQuantMode fiaQuantMode)
 {

@@ -40,8 +40,8 @@ constexpr uint32_t REGSIZE = 256;
 constexpr uint32_t B32_REP_SIZE = REGSIZE / sizeof(float); // 64 floats per vector reg
 
 template <typename T>
-__simd_vf__ void GradXAndWeightNoTail(__ubuf__ T *goAddr, __ubuf__ T *wAddr, __ubuf__ T *inAddr, __ubuf__ T *giAddr,
-                                      __ubuf__ float *p0Addr, __ubuf__ float *p1Addr, __ubuf__ float *p2Addr,
+__simd_vf__ void GradXAndWeightNoTail(__ubuf__ T* goAddr, __ubuf__ T* wAddr, __ubuf__ T* inAddr, __ubuf__ T* giAddr,
+                                      __ubuf__ float* p0Addr, __ubuf__ float* p1Addr, __ubuf__ float* p2Addr,
                                       uint32_t sMain, uint32_t dimLen)
 {
     Reg::MaskReg fullMask = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
@@ -127,8 +127,8 @@ __simd_vf__ void GradXAndWeightNoTail(__ubuf__ T *goAddr, __ubuf__ T *wAddr, __u
 }
 
 template <typename T>
-__simd_vf__ void GradXAndWeightWithTail(__ubuf__ T *goAddr, __ubuf__ T *wAddr, __ubuf__ T *inAddr, __ubuf__ T *giAddr,
-                                        __ubuf__ float *p0Addr, __ubuf__ float *p1Addr, __ubuf__ float *p2Addr,
+__simd_vf__ void GradXAndWeightWithTail(__ubuf__ T* goAddr, __ubuf__ T* wAddr, __ubuf__ T* inAddr, __ubuf__ T* giAddr,
+                                        __ubuf__ float* p0Addr, __ubuf__ float* p1Addr, __ubuf__ float* p2Addr,
                                         uint32_t sMain, uint32_t dimLen)
 {
     Reg::MaskReg fullMask = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
@@ -237,7 +237,7 @@ __simd_vf__ void GradXAndWeightWithTail(__ubuf__ T *goAddr, __ubuf__ T *wAddr, _
 }
 
 template <typename T>
-__simd_vf__ void CastRowB32ToDT(__ubuf__ float *srcAddr, __ubuf__ T *dstAddr, uint32_t dimLen)
+__simd_vf__ void CastRowB32ToDT(__ubuf__ float* srcAddr, __ubuf__ T* dstAddr, uint32_t dimLen)
 {
     Reg::MaskReg fullMask = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
     uint32_t dimLoopNum = dimLen / B32_REP_SIZE;
@@ -253,17 +253,17 @@ __simd_vf__ void CastRowB32ToDT(__ubuf__ float *srcAddr, __ubuf__ T *dstAddr, ui
 }
 
 template <typename T>
-__aicore__ inline void DoGradXWeight(LocalTensor<T> &goUb, LocalTensor<T> &wUb, LocalTensor<T> &inUb,
-                                     LocalTensor<T> &giUb, LocalTensor<float> &p0Ub, LocalTensor<float> &p1Ub,
-                                     LocalTensor<float> &p2Ub, uint32_t sLen, uint32_t dimLen)
+__aicore__ inline void DoGradXWeight(LocalTensor<T>& goUb, LocalTensor<T>& wUb, LocalTensor<T>& inUb,
+                                     LocalTensor<T>& giUb, LocalTensor<float>& p0Ub, LocalTensor<float>& p1Ub,
+                                     LocalTensor<float>& p2Ub, uint32_t sLen, uint32_t dimLen)
 {
-    __ubuf__ T *goAddr = (__ubuf__ T *)goUb.GetPhyAddr();
-    __ubuf__ T *wAddr = (__ubuf__ T *)wUb.GetPhyAddr();
-    __ubuf__ T *inAddr = (__ubuf__ T *)inUb.GetPhyAddr();
-    __ubuf__ T *giAddr = (__ubuf__ T *)giUb.GetPhyAddr();
-    __ubuf__ float *p0Addr = (__ubuf__ float *)p0Ub.GetPhyAddr();
-    __ubuf__ float *p1Addr = (__ubuf__ float *)p1Ub.GetPhyAddr();
-    __ubuf__ float *p2Addr = (__ubuf__ float *)p2Ub.GetPhyAddr();
+    __ubuf__ T* goAddr = (__ubuf__ T*)goUb.GetPhyAddr();
+    __ubuf__ T* wAddr = (__ubuf__ T*)wUb.GetPhyAddr();
+    __ubuf__ T* inAddr = (__ubuf__ T*)inUb.GetPhyAddr();
+    __ubuf__ T* giAddr = (__ubuf__ T*)giUb.GetPhyAddr();
+    __ubuf__ float* p0Addr = (__ubuf__ float*)p0Ub.GetPhyAddr();
+    __ubuf__ float* p1Addr = (__ubuf__ float*)p1Ub.GetPhyAddr();
+    __ubuf__ float* p2Addr = (__ubuf__ float*)p2Ub.GetPhyAddr();
 
     uint32_t sMain = sLen >> 1; // sLen/2
     if ((sLen & 1U) != 0U) {
@@ -274,10 +274,10 @@ __aicore__ inline void DoGradXWeight(LocalTensor<T> &goUb, LocalTensor<T> &wUb, 
 }
 
 template <typename T>
-__aicore__ inline void DoCastToDT(LocalTensor<float> &inUb, uint32_t dimLen, LocalTensor<T> &outUb)
+__aicore__ inline void DoCastToDT(LocalTensor<float>& inUb, uint32_t dimLen, LocalTensor<T>& outUb)
 {
-    __ubuf__ float *src = (__ubuf__ float *)inUb.GetPhyAddr();
-    __ubuf__ T *dst = (__ubuf__ T *)outUb.GetPhyAddr();
+    __ubuf__ float* src = (__ubuf__ float*)inUb.GetPhyAddr();
+    __ubuf__ T* dst = (__ubuf__ T*)outUb.GetPhyAddr();
     CastRowB32ToDT<T>(src, dst, dimLen);
 }
 

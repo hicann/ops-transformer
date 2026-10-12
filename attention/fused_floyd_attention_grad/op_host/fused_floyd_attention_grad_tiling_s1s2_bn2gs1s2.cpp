@@ -124,9 +124,8 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::GetPlatformInfo()
 
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context_->GetCompileInfo());
-        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile_info is null"),
-                   return ge::GRAPH_FAILED);
+        auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context_->GetCompileInfo());
+        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile_info is null"), return ge::GRAPH_FAILED);
 
         fBaseParams.coreNum = compileInfoPtr->aivNum;
         fBaseParams.aicNum = compileInfoPtr->aicNum;
@@ -146,32 +145,27 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::GetPlatformInfo()
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, fBaseParams.l0cSize);
     }
     OP_CHECK_IF((fBaseParams.coreNum == 0) || (fBaseParams.aicNum == 0),
-                OP_LOGE(context_, "num of coreNum(aivNum) is %ld, num of aicNum is %ld.",
-                fBaseParams.coreNum, fBaseParams.aicNum),
+                OP_LOGE(context_, "num of coreNum(aivNum) is %ld, num of aicNum is %ld.", fBaseParams.coreNum,
+                        fBaseParams.aicNum),
                 return ge::GRAPH_FAILED);
 
     fBaseParams.ubSize -= MATMUL_SIZE;
-    OP_CHECK_IF(fBaseParams.ubSize <= 0,
-               OP_LOGE(context_, "ubSize is invalid."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(fBaseParams.ubSize <= 0, OP_LOGE(context_, "ubSize is invalid."), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo() {
+ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo()
+{
     // 待公共模板实现后，会删除该函数  直接继承基类
-    const gert::StorageShape *queryShape = context_->GetInputShape(QUERY); // [B, N2, G, S1, D]
-    const gert::StorageShape *keyShape = context_->GetInputShape(KEY_1);     // [B, N2, 1, S2, D]
+    const gert::StorageShape* queryShape = context_->GetInputShape(QUERY); // [B, N2, G, S1, D]
+    const gert::StorageShape* keyShape = context_->GetInputShape(KEY_1);   // [B, N2, 1, S2, D]
 
-    const char *inputLayout = "BNSD";
+    const char* inputLayout = "BNSD";
 
-    OP_CHECK_IF(queryShape == nullptr,
-               OP_LOGE(context_, "queryShape is nullptr."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(queryShape == nullptr, OP_LOGE(context_, "queryShape is nullptr."), return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(keyShape == nullptr,
-               OP_LOGE(context_, "keyShape is nullptr."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(keyShape == nullptr, OP_LOGE(context_, "keyShape is nullptr."), return ge::GRAPH_FAILED);
 
     if (strcmp(inputLayout, "BNSD") == 0) {
         OP_LOGD(context_, "inputLayout == BNSD queryShape");
@@ -183,28 +177,21 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo() {
         fBaseParams.d = queryShape->GetStorageShape().GetDim(4);
         fBaseParams.s2 = keyShape->GetStorageShape().GetDim(3);
         OP_LOGD(context_, "inputLayout == BNSD queryShape", "%ld, %ld, %ld, %ld,",
-                  queryShape->GetStorageShape().GetDim(DIM_0), queryShape->GetStorageShape().GetDim(DIM_1),
-                  queryShape->GetStorageShape().GetDim(DIM_2), queryShape->GetStorageShape().GetDim(DIM_3));
+                queryShape->GetStorageShape().GetDim(DIM_0), queryShape->GetStorageShape().GetDim(DIM_1),
+                queryShape->GetStorageShape().GetDim(DIM_2), queryShape->GetStorageShape().GetDim(DIM_3));
     } else {
         OP_LOGE(context_, "FAG inputLayout is invalid");
         return ge::GRAPH_FAILED;
     }
-    OP_CHECK_IF(fBaseParams.n2 == 0,
-            OP_LOGE(context_, "n2 is 0."),
-            return ge::GRAPH_FAILED);
+    OP_CHECK_IF(fBaseParams.n2 == 0, OP_LOGE(context_, "n2 is 0."), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
-
 ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::GetShapeAttrsInfo()
 {
-    OP_CHECK_IF(context_ == nullptr,
-               OP_LOGE(context_, "context is nullptr."),
-               return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->GetAttrs() == nullptr,
-               OP_LOGE(context_, "GetAttrs is nullptr."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context_ == nullptr, OP_LOGE(context_, "context is nullptr."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context_->GetAttrs() == nullptr, OP_LOGE(context_, "GetAttrs is nullptr."), return ge::GRAPH_FAILED);
 
     auto ret = GetBaseShapeInfo();
     if (ret != ge::GRAPH_SUCCESS) {
@@ -223,9 +210,8 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::GetShapeAttrsInfo()
     fBaseParams.dropMaskSize = fBaseParams.b * fBaseParams.n2 * fBaseParams.g * fBaseParams.s2 * fBaseParams.s1;
 
     // mBaseParams is used for matmal tiling module
-    OP_CHECK_IF(context_->GetInputDesc(QUERY) == nullptr,
-               OP_LOGE(context_, "InputDesc of query is nullptr."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context_->GetInputDesc(QUERY) == nullptr, OP_LOGE(context_, "InputDesc of query is nullptr."),
+                return ge::GRAPH_FAILED);
     auto queryType = context_->GetInputDesc(QUERY)->GetDataType();
     fBaseParams.queryType = queryType;
     fBaseParams.isBf16 = queryType == ge::DT_BF16 ? true : false;
@@ -261,8 +247,7 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::GetShapeAttrsInfo()
 
     fBaseParams.scaleValue = *(context_->GetAttrs()->GetAttrPointer<float>(0));
     fBaseParams.keepProb = 1;
-    OP_CHECK_IF((fBaseParams.keepProb <= 0 || fBaseParams.keepProb > 1),
-                OP_LOGE(context_, "keepProb is illegal."),
+    OP_CHECK_IF((fBaseParams.keepProb <= 0 || fBaseParams.keepProb > 1), OP_LOGE(context_, "keepProb is illegal."),
                 return ge::GRAPH_FAILED);
 
     fBaseParams.dropoutIsDivisibleBy8 = 1;
@@ -277,40 +262,33 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::GetShapeAttrsInfo()
         fBaseParams.attenMaskOptional = NORMAL_TENSOR;
         auto attenMaskType = attenMask->GetDataType();
         OP_CHECK_IF(attenMaskType != ge::DT_BOOL && attenMaskType != ge::DT_UINT8,
-                   OP_LOGE(context_, "invalid attenMask dtype[%s], only support bool or uint8.",
-                                               ge::TypeUtils::DataTypeToSerialString(attenMaskType).c_str()),
-                   return ge::GRAPH_FAILED);
+                    OP_LOGE(context_, "invalid attenMask dtype[%s], only support bool or uint8.",
+                            ge::TypeUtils::DataTypeToSerialString(attenMaskType).c_str()),
+                    return ge::GRAPH_FAILED);
         fBaseParams.attenMaskDtype = ATTEN_MASK_TYPE_U8_BOOL;
     }
 
     fBaseParams.isSparse = false;
     OP_LOGD(context_, "FAG S1s2Bn2gs1s2 sparse mode = %u, sparse %s.", fBaseParams.sparseMode,
-              fBaseParams.isSparse ? "enable" : "disable");
+            fBaseParams.isSparse ? "enable" : "disable");
 
-    return CheckInputShapeValid(context_, fBaseParams.b, fBaseParams.n2, fBaseParams.g, fBaseParams.s1, fBaseParams.s2, fBaseParams.d);
+    return CheckInputShapeValid(context_, fBaseParams.b, fBaseParams.n2, fBaseParams.g, fBaseParams.s1, fBaseParams.s2,
+                                fBaseParams.d);
 }
 
 ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoOpTiling()
 {
     auto ret = DoSplit();
-    OP_CHECK_IF(ret != ge::GRAPH_SUCCESS,
-               OP_LOGW(context_, "get DoSplit fail."),
-               return ret);
+    OP_CHECK_IF(ret != ge::GRAPH_SUCCESS, OP_LOGW(context_, "get DoSplit fail."), return ret);
 
     ret = DoSparse();
-    OP_CHECK_IF(ret != ge::GRAPH_SUCCESS,
-               OP_LOGW(context_, "get DoSparse fail."),
-               return ret);
+    OP_CHECK_IF(ret != ge::GRAPH_SUCCESS, OP_LOGW(context_, "get DoSparse fail."), return ret);
 
     ret = DoPreTiling();
-    OP_CHECK_IF(ret != ge::GRAPH_SUCCESS,
-               OP_LOGW(context_, "get DoPreTiling fail."),
-               return ret);
+    OP_CHECK_IF(ret != ge::GRAPH_SUCCESS, OP_LOGW(context_, "get DoPreTiling fail."), return ret);
 
     ret = DoPostTiling();
-    OP_CHECK_IF(ret != ge::GRAPH_SUCCESS,
-               OP_LOGW(context_, "get DoPostTiling fail."),
-               return ret);
+    OP_CHECK_IF(ret != ge::GRAPH_SUCCESS, OP_LOGW(context_, "get DoPostTiling fail."), return ret);
     DetermineMode();
 
     return ge::GRAPH_SUCCESS;
@@ -318,8 +296,8 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoOpTiling()
 
 ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoSplit()
 {
-    fBaseParams.s1CvRatio = 1; //1
-    fBaseParams.s2CvRatio = 1; //8
+    fBaseParams.s1CvRatio = 1; // 1
+    fBaseParams.s2CvRatio = 1; // 8
     if (fBaseParams.d == 64) { // d size is 64
         fBaseParams.s2CvRatio = CV_RATIO_16;
         if (fBaseParams.s1 >= 256) {     // 256 is s1 size
@@ -329,29 +307,27 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoSplit()
             }
         }
     }
-    fBaseParams.s1CvRatio = 1; //1
-    fBaseParams.s2CvRatio = 1; //8
+    fBaseParams.s1CvRatio = 1; // 1
+    fBaseParams.s2CvRatio = 1; // 8
 
     uint32_t s1Inner = 64;
     uint32_t s2Inner = 128;
-    fBaseParams.gInner = 16; 
+    fBaseParams.gInner = 16;
     fBaseParams.bmmS1base = 8;
     if (fBaseParams.d == 32) {
         fBaseParams.bmmS1base = 16;
     }
 
-    uint32_t tmpBufferSize =
-        (fBaseParams.ubSize - s1Inner * s2Inner * BASIC_BLOCK_MULTIPLE - s1Inner * SHAPE_INFO * fBaseParams.calTypeSize) /
-        BYTE_BLOCK * BYTE_BLOCK;
+    uint32_t tmpBufferSize = (fBaseParams.ubSize - s1Inner * s2Inner * BASIC_BLOCK_MULTIPLE -
+                              s1Inner * SHAPE_INFO * fBaseParams.calTypeSize) /
+                             BYTE_BLOCK * BYTE_BLOCK;
     if (fBaseParams.mm1IsNZOut) {
         tmpBufferSize = tmpBufferSize - TEMP_BUFFER_REMAIN_SIZE;
     }
     fBaseParams.tmpBufferSize = tmpBufferSize;
 
     uint32_t s1CvInner = s1Inner * fBaseParams.s1CvRatio;
-    OP_CHECK_IF(s1CvInner == 0,
-               OP_LOGE(context_, "divisor s1CvInner is 0."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(s1CvInner == 0, OP_LOGE(context_, "divisor s1CvInner is 0."), return ge::GRAPH_FAILED);
     int64_t s1Outer = (fBaseParams.s1 + s1CvInner - 1) / s1CvInner;
     uint32_t s1TailTmp = fBaseParams.s1 % s1Inner;
     uint32_t s1CvTailTmp = fBaseParams.s1 % s1CvInner;
@@ -362,9 +338,7 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoSplit()
     fBaseParams.s1Outer = s1Outer;
 
     uint32_t cvS2Inner = s2Inner * fBaseParams.s2CvRatio;
-    OP_CHECK_IF(cvS2Inner == 0,
-               OP_LOGE(context_, "divisor cvS2Inner is 0."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(cvS2Inner == 0, OP_LOGE(context_, "divisor cvS2Inner is 0."), return ge::GRAPH_FAILED);
     int64_t s2Outer = (fBaseParams.s2 + cvS2Inner - 1) / cvS2Inner;
     uint32_t s2TailTmp = fBaseParams.s2 % s2Inner;
     uint32_t s2CvTailTmp = fBaseParams.s2 % cvS2Inner;
@@ -378,16 +352,12 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoSplit()
     fBaseParams.gTail = fBaseParams.g - (fBaseParams.gOuter - 1) * fBaseParams.gInner;
     fBaseParams.baseMN = fBaseParams.gInner * s1Inner * s2Inner;
 
-    OP_CHECK_IF(
-        (fBaseParams.baseMN == 0 || fBaseParams.s2Outer == 0 || fBaseParams.s1Outer == 0),
-        OP_LOGE(context_, "baseMN or s2Outer or s1Outer is 0."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((fBaseParams.baseMN == 0 || fBaseParams.s2Outer == 0 || fBaseParams.s1Outer == 0),
+                OP_LOGE(context_, "baseMN or s2Outer or s1Outer is 0."), return ge::GRAPH_FAILED);
 
-    uint32_t sfmgdInner = 128; //先写死
+    uint32_t sfmgdInner = 128; // 先写死
 
-    OP_CHECK_IF(sfmgdInner == 0,
-               OP_LOGE(context_, "divisor sfmgdInner is 0."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(sfmgdInner == 0, OP_LOGE(context_, "divisor sfmgdInner is 0."), return ge::GRAPH_FAILED);
     uint32_t sfmgdOuter = (fBaseParams.d + sfmgdInner - 1) / sfmgdInner;
     uint32_t sfmgdTailTmp = fBaseParams.d % sfmgdInner;
     uint32_t sfmgdTail = sfmgdTailTmp == 0 ? sfmgdInner : sfmgdTailTmp;
@@ -399,22 +369,18 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoSplit()
 
 ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoSparse()
 {
-
     int64_t blockStarts[CORE_LIST_NUM];
     int64_t blockEnds[CORE_LIST_NUM];
     // block split
     int64_t fusedOuter = static_cast<int64_t>(fBaseParams.b) * fBaseParams.n2 * fBaseParams.gOuter *
-                            fBaseParams.s1Outer * fBaseParams.s2Outer;                     // 总块数
+                         fBaseParams.s1Outer * fBaseParams.s2Outer; // 总块数
     // coreNum前面已做非0校验
     int64_t blockFactor = (fusedOuter + fBaseParams.coreNum - 1) / fBaseParams.coreNum; // 单核块数
     // 除0校验
-    OP_CHECK_IF(blockFactor == 0,
-                OP_LOGE(context_, "divisor blockFactor is 0."),
-                return ge::GRAPH_FAILED);
-    int64_t blockOuter = (fusedOuter + blockFactor - 1) / blockFactor;                  // 实际核数
+    OP_CHECK_IF(blockFactor == 0, OP_LOGE(context_, "divisor blockFactor is 0."), return ge::GRAPH_FAILED);
+    int64_t blockOuter = (fusedOuter + blockFactor - 1) / blockFactor; // 实际核数
     // 防止下标越界
-    OP_CHECK_IF(blockOuter > CORE_LIST_NUM,
-                OP_LOGE(context_, "blockStarts and blockEnds array bound."),
+    OP_CHECK_IF(blockOuter > CORE_LIST_NUM, OP_LOGE(context_, "blockStarts and blockEnds array bound."),
                 return ge::GRAPH_FAILED);
 
     fBaseParams.blockOuter = blockOuter;
@@ -431,7 +397,7 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoSparse()
 
     std::copy(std::begin(blockStarts), std::end(blockStarts), std::begin(fBaseParams.blockStarts));
     std::copy(std::begin(blockEnds), std::end(blockEnds), std::begin(fBaseParams.blockEnds));
-    
+
     return ge::GRAPH_SUCCESS;
 }
 
@@ -442,7 +408,7 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
     matmul_tiling::MatmulApiTiling mm2;
     matmul_tiling::MatmulApiTiling mm3;
     matmul_tiling::DataType inputAType = matmul_tiling::DataType::DT_FLOAT;
-    if(fBaseParams.mode == FP32) {
+    if (fBaseParams.mode == FP32) {
         inputAType = matmul_tiling::DataType::DT_FLOAT;
     } else {
         inputAType = matmul_tiling::DataType::DT_BFLOAT16;
@@ -456,11 +422,12 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
     }
     // format left[B, N2, G, S1, D] right[B, N2, 1, S2, D] result[B, N2, G, S1, S2]
     mm1.SetOrgShape(mmS1, fBaseParams.s2, fBaseParams.d);
-    mm1.SetShape(fBaseParams.s1Inner * fBaseParams.s1CvRatio, fBaseParams.s2Inner * fBaseParams.s2CvRatio, fBaseParams.d);
+    mm1.SetShape(fBaseParams.s1Inner * fBaseParams.s1CvRatio, fBaseParams.s2Inner * fBaseParams.s2CvRatio,
+                 fBaseParams.d);
     mm1.SetBias(false);
 
-    if (fBaseParams.cvS2Inner > 128) {                       // 128 for perf when s2 cv ratio
-        if (fBaseParams.d > 64) {                            // 64 for d
+    if (fBaseParams.cvS2Inner > 128) { // 128 for perf when s2 cv ratio
+        if (fBaseParams.d > 64) {      // 64 for d
             uint32_t minBaseM = std::min(fBaseParams.s1CvInner, FIX_BASEMN_256);
             mm1.SetFixSplit(minBaseM, FIX_BASEMN_128, -1); // 128 for baseN
         } else {
@@ -471,37 +438,32 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
         mm1.SetFixSplit(-1, -1, -1);
     }
 
-    OP_CHECK_IF(mm1.GetTiling(tilingData.mm1TilingData) != 0,
-              OP_LOGE(context_, "matmul1 tilingData get fail."),
-              return ge::GRAPH_FAILED);
+    OP_CHECK_IF(mm1.GetTiling(tilingData.mm1TilingData) != 0, OP_LOGE(context_, "matmul1 tilingData get fail."),
+                return ge::GRAPH_FAILED);
     SetMatmulTilingBufferInfo(tilingData.mm1TilingData);
-
 
     matmul_tiling::MatmulApiTiling bmm1k1;
     SetBmm1k1TilingInput(bmm1k1, inputAType);
-    OP_CHECK_IF(bmm1k1.GetTiling(tilingData.bmm1TilingData) != 0,
-            OP_LOGE(context_, "bmm1k1 tilingData get fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(bmm1k1.GetTiling(tilingData.bmm1TilingData) != 0, OP_LOGE(context_, "bmm1k1 tilingData get fail."),
+                return ge::GRAPH_FAILED);
     SetMatmulTilingBufferInfo(tilingData.bmm1TilingData);
 
     matmul_tiling::MatmulApiTiling bmm2k1;
     SetBmm2k1TilingInput(bmm2k1, inputAType);
-    OP_CHECK_IF(bmm2k1.GetTiling(tilingData.bmm2TilingData) != 0,
-            OP_LOGE(context_, "bmm2k1 tilingData get fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(bmm2k1.GetTiling(tilingData.bmm2TilingData) != 0, OP_LOGE(context_, "bmm2k1 tilingData get fail."),
+                return ge::GRAPH_FAILED);
     SetMatmulTilingBufferInfo(tilingData.bmm2TilingData);
 
     matmul_tiling::MatmulApiTiling bmm3k1v1;
     SetBmm3k1V1TilingInput(bmm3k1v1, inputAType);
-    OP_CHECK_IF(bmm3k1v1.GetTiling(tilingData.bmm3TilingData) != 0,
-            OP_LOGE(context_, "bmm3k1v1 tilingData get fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(bmm3k1v1.GetTiling(tilingData.bmm3TilingData) != 0, OP_LOGE(context_, "bmm3k1v1 tilingData get fail."),
+                return ge::GRAPH_FAILED);
     SetMatmulTilingBufferInfo(tilingData.bmm3TilingData);
-
 
     // format left[B, N2, G, S1, S2] right[B, N2, G, S1, D] result[B, N2, G, S2, D]
     // matmal3/5
-    mm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType,
-                 true);
-    mm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType,
-                 false);
+    mm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType, true);
+    mm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType, false);
     auto outFormat = fBaseParams.mm2IsNZOut ? matmul_tiling::CubeFormat::NZ : matmul_tiling::CubeFormat::ND;
     mm2.SetCType(matmul_tiling::TPosition::GM, outFormat, matmul_tiling::DataType::DT_FLOAT);
 
@@ -511,24 +473,20 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
                  fBaseParams.s1Inner * fBaseParams.s1CvRatio);
     mm2.SetBias(false);
 
-
     mm2.SetFixSplit(-1, -1, -1);
 
-    OP_CHECK_IF(mm2.GetTiling(tilingData.mm2TilingData) != 0,
-              OP_LOGE(context_, "matmul2 tilingData get fail."),
-              return ge::GRAPH_FAILED);
+    OP_CHECK_IF(mm2.GetTiling(tilingData.mm2TilingData) != 0, OP_LOGE(context_, "matmul2 tilingData get fail."),
+                return ge::GRAPH_FAILED);
     SetMatmulTilingBufferInfo(tilingData.mm2TilingData);
 
     // format left[B, N2, G, S1, S2] right[B, N2, 1, S2, D] result[B, N2, G, S1, D]
     // matmal4
-    mm3.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType,
-                 false);
-    mm3.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType,
-                 false);
+    mm3.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType, false);
+    mm3.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType, false);
     mm3.SetCType(matmul_tiling::TPosition::GM, outFormat, matmul_tiling::DataType::DT_FLOAT);
 
     mm3.SetOrgShape(fBaseParams.s1, fBaseParams.d, fBaseParams.s2);
-    
+
     mm3.SetShape(fBaseParams.s1Inner * fBaseParams.s1CvRatio, fBaseParams.d,
                  fBaseParams.s2Inner * fBaseParams.s2CvRatio);
     mm3.SetBias(false);
@@ -539,9 +497,8 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
     } else {
         mm3.SetFixSplit(-1, -1, -1);
     }
-    OP_CHECK_IF(mm3.GetTiling(tilingData.mm3TilingData) != 0,
-              OP_LOGE(context_, "matmul3 tilingData get fail."),
-              return ge::GRAPH_FAILED);
+    OP_CHECK_IF(mm3.GetTiling(tilingData.mm3TilingData) != 0, OP_LOGE(context_, "matmul3 tilingData get fail."),
+                return ge::GRAPH_FAILED);
     SetMatmulTilingBufferInfo(tilingData.mm3TilingData);
 
     uint32_t cvS2Inner = fBaseParams.s2Inner * fBaseParams.s2CvRatio;
@@ -558,31 +515,31 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::SetBmm1k1TilingInput(
-                                              matmul_tiling::MatmulApiTiling &bmm1k1, matmul_tiling::DataType inputAType)
+ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::SetBmm1k1TilingInput(matmul_tiling::MatmulApiTiling& bmm1k1,
+                                                                                matmul_tiling::DataType inputAType)
 {
-  //BNGS1D x BNS2S1D（中间做batch轴）, M=G， N = S2， K = D，batch = S1
-  bmm1k1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType, false);
-  bmm1k1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType, true);
-  bmm1k1.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT);
+    // BNGS1D x BNS2S1D（中间做batch轴）, M=G， N = S2， K = D，batch = S1
+    bmm1k1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType, false);
+    bmm1k1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType, true);
+    bmm1k1.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT);
 
-  bmm1k1.SetShape(fBaseParams.gInner, fBaseParams.cvS2Inner, fBaseParams.d); // 32 * 32 * 128
-  bmm1k1.SetOrgShape(fBaseParams.g, fBaseParams.s2, fBaseParams.d);
-  bmm1k1.SetBias(false);
-  bmm1k1.SetBufferSpace(-1, -1, -1);
-  // B S N G D   SBNGD
-  bmm1k1.SetALayout(1, fBaseParams.g, 1, fBaseParams.s1, fBaseParams.d);
-  bmm1k1.SetBLayout(1, fBaseParams.s2, 1, fBaseParams.s1, fBaseParams.d);
-  bmm1k1.SetCLayout(1, fBaseParams.gInner, 1, fBaseParams.s1CvInner, fBaseParams.cvS2Inner);
-  bmm1k1.SetBatchNum(fBaseParams.bmmS1base);
+    bmm1k1.SetShape(fBaseParams.gInner, fBaseParams.cvS2Inner, fBaseParams.d); // 32 * 32 * 128
+    bmm1k1.SetOrgShape(fBaseParams.g, fBaseParams.s2, fBaseParams.d);
+    bmm1k1.SetBias(false);
+    bmm1k1.SetBufferSpace(-1, -1, -1);
+    // B S N G D   SBNGD
+    bmm1k1.SetALayout(1, fBaseParams.g, 1, fBaseParams.s1, fBaseParams.d);
+    bmm1k1.SetBLayout(1, fBaseParams.s2, 1, fBaseParams.s1, fBaseParams.d);
+    bmm1k1.SetCLayout(1, fBaseParams.gInner, 1, fBaseParams.s1CvInner, fBaseParams.cvS2Inner);
+    bmm1k1.SetBatchNum(fBaseParams.bmmS1base);
 
-  return ge::GRAPH_SUCCESS;
+    return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::SetBmm2k1TilingInput(
-                                            matmul_tiling::MatmulApiTiling &bmm2k1, matmul_tiling::DataType inputAType)
+ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::SetBmm2k1TilingInput(matmul_tiling::MatmulApiTiling& bmm2k1,
+                                                                                matmul_tiling::DataType inputAType)
 {
-    //BNGS1S2 x BNS2S1D（中间做batch轴）= BNGS1D, M=G， N = D， K = S2，batch = S1
+    // BNGS1S2 x BNS2S1D（中间做batch轴）= BNGS1D, M=G， N = D， K = S2，batch = S1
     bmm2k1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType, false);
     bmm2k1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType, false);
     bmm2k1.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT);
@@ -602,9 +559,9 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::SetBmm2k1TilingInput(
 }
 
 ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::SetBmm3k1V1TilingInput(
-                                            matmul_tiling::MatmulApiTiling &bmm3k1v1, matmul_tiling::DataType inputAType)
+    matmul_tiling::MatmulApiTiling& bmm3k1v1, matmul_tiling::DataType inputAType)
 {
-    //BNGS1S2 x BNGS1D（中间做batch轴）= BNS2S1D,  M=S2， N = D， K = G，batch = S1
+    // BNGS1S2 x BNGS1D（中间做batch轴）= BNS2S1D,  M=S2， N = D， K = G，batch = S1
     bmm3k1v1.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType, true);
     bmm3k1v1.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, inputAType, false);
     bmm3k1v1.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT);
@@ -615,16 +572,15 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::SetBmm3k1V1TilingInpu
     bmm3k1v1.SetBias(false);
     bmm3k1v1.SetBufferSpace(-1, -1, -1);
     // 输入顺序B S N G D   SBNGD
-    bmm3k1v1.SetALayout(1, fBaseParams.gInner, 1, fBaseParams.s1CvInner, fBaseParams.cvS2Inner); //BNGS1S2
-    bmm3k1v1.SetBLayout(1, fBaseParams.g, 1, fBaseParams.s1, fBaseParams.d); //BNGS1D
-    bmm3k1v1.SetCLayout(1, fBaseParams.s2, 1, fBaseParams.s1, fBaseParams.d); //BNS2S1D
+    bmm3k1v1.SetALayout(1, fBaseParams.gInner, 1, fBaseParams.s1CvInner, fBaseParams.cvS2Inner); // BNGS1S2
+    bmm3k1v1.SetBLayout(1, fBaseParams.g, 1, fBaseParams.s1, fBaseParams.d);                     // BNGS1D
+    bmm3k1v1.SetCLayout(1, fBaseParams.s2, 1, fBaseParams.s1, fBaseParams.d);                    // BNS2S1D
     bmm3k1v1.SetBatchNum(fBaseParams.bmmS1base);
 
     return true;
 }
 
-
-void FusedFloydAttentionGradTilingS1s2Bn2gs1s2::SetMatmulTilingBufferInfo(TCubeTiling &mmTiling)
+void FusedFloydAttentionGradTilingS1s2Bn2gs1s2::SetMatmulTilingBufferInfo(TCubeTiling& mmTiling)
 {
     mmTiling.set_shareMode(0);
     mmTiling.set_shareL1Size(fBaseParams.l1Size);
@@ -633,12 +589,10 @@ void FusedFloydAttentionGradTilingS1s2Bn2gs1s2::SetMatmulTilingBufferInfo(TCubeT
 
 ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     size_t workspaceSize = MUL_CORE_SYNC_BUFFER;
     uint32_t s1Inner = std::min(INITIAL_S1_SPLIT_NUM, fBaseParams.s1Align);
-    OP_CHECK_IF(s1Inner <= 0,
-                OP_LOGE(context_,
-                "s1Inner is less than or equal to 0, s1Inner is %u.", s1Inner),
+    OP_CHECK_IF(s1Inner <= 0, OP_LOGE(context_, "s1Inner is less than or equal to 0, s1Inner is %u.", s1Inner),
                 return ge::GRAPH_FAILED);
 
     // matmal3 q
@@ -665,41 +619,39 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::GetWorkspaceSize()
     // matmal1/matmal2 workspace size
     size_t vectorCoreNum = fBaseParams.coreNum;
     workspaceSize = (workspaceSize +
-                     vectorCoreNum *  fBaseParams.gInner * fBaseParams.s1CvRatio * fBaseParams.s2CvRatio * fBaseParams.baseMN * FP32_BYTES *
-                         MATMAL_INPUT_NUMS +
+                     vectorCoreNum * fBaseParams.gInner * fBaseParams.s1CvRatio * fBaseParams.s2CvRatio *
+                         fBaseParams.baseMN * FP32_BYTES * MATMAL_INPUT_NUMS +
                      GM_ALIGN) /
                     GM_ALIGN * GM_ALIGN;
     // CV ratio workspace size fp16
     // drop workspace size
     workspaceSize = (workspaceSize +
-                     vectorCoreNum *  fBaseParams.gInner * fBaseParams.s1CvRatio * fBaseParams.s2CvRatio * fBaseParams.baseMN *
-                     fBaseParams.dataTypeSize *
-                         2 // 2 means pingpong
+                     vectorCoreNum * fBaseParams.gInner * fBaseParams.s1CvRatio * fBaseParams.s2CvRatio *
+                         fBaseParams.baseMN * fBaseParams.dataTypeSize * 2 // 2 means pingpong
                      + GM_ALIGN) /
                     GM_ALIGN * GM_ALIGN;
     // mul workspace size
     workspaceSize = (workspaceSize +
-                     vectorCoreNum *  fBaseParams.gInner * fBaseParams.s1CvRatio * fBaseParams.s2CvRatio * fBaseParams.baseMN *
-                     fBaseParams.dataTypeSize *
-                         2 // 2 means pingpong
+                     vectorCoreNum * fBaseParams.gInner * fBaseParams.s1CvRatio * fBaseParams.s2CvRatio *
+                         fBaseParams.baseMN * fBaseParams.dataTypeSize * 2 // 2 means pingpong
                      + GM_ALIGN) /
                     GM_ALIGN * GM_ALIGN;
     workspaceSize += WORKSPACE_BUFFER;
     workspaces[0] = workspaceSize;
 
-    if (fBaseParams.pseType == PSE_INNER_MUL_ADD_TYPE ||
-        fBaseParams.pseType == PSE_INNER_MUL_ADD_SQRT_TYPE) {
+    if (fBaseParams.pseType == PSE_INNER_MUL_ADD_TYPE || fBaseParams.pseType == PSE_INNER_MUL_ADD_SQRT_TYPE) {
         fBaseParams.pseAlibiBaseS2 = PSE_ALIBI_S2_LIMIT_SIZE;
         int64_t s2Tail = fBaseParams.s2 % PSE_ALIBI_S2_LIMIT_SIZE;
         if (s2Tail != 0) {
-            fBaseParams.pseAlibiBaseS1 = std::min(static_cast<int64_t>(s1Inner),
-                                                  UB_BASIC_LIMIT_SIZE / AlignUp(s2Tail, FRACTAL_NUM));
+            fBaseParams.pseAlibiBaseS1 =
+                std::min(static_cast<int64_t>(s1Inner), UB_BASIC_LIMIT_SIZE / AlignUp(s2Tail, FRACTAL_NUM));
         } else {
-            fBaseParams.pseAlibiBaseS1 = std::min(static_cast<int64_t>(s1Inner),
-                                                  UB_BASIC_LIMIT_SIZE / fBaseParams.pseAlibiBaseS2);
+            fBaseParams.pseAlibiBaseS1 =
+                std::min(static_cast<int64_t>(s1Inner), UB_BASIC_LIMIT_SIZE / fBaseParams.pseAlibiBaseS2);
         }
         fBaseParams.pseAlibiBaseS1 = std::max(fBaseParams.pseAlibiBaseS1, UB_BASIC_LIMIT_SIZE / s1Inner);
-        int64_t pseAlibiBytes = AlignUp(fBaseParams.pseAlibiBaseS2 * fBaseParams.pseAlibiBaseS1 * 2, GM_ALIGN) * fBaseParams.coreNum;
+        int64_t pseAlibiBytes =
+            AlignUp(fBaseParams.pseAlibiBaseS2 * fBaseParams.pseAlibiBaseS1 * 2, GM_ALIGN) * fBaseParams.coreNum;
         workspaces[0] += pseAlibiBytes;
     }
     return ge::GRAPH_SUCCESS;
@@ -710,11 +662,10 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::PostTiling()
     SaveToTilingData();
     auto blockdim = CalcTschBlockDim(tilingData.s1s2BNGS1S2SplitCoreParams.get_blockOuter(), fBaseParams.aicNum,
                                      fBaseParams.coreNum);
-    OP_CHECK_IF(blockdim == 0,
-               OP_LOGE(context_,
-                                           "blockdim is 0, aicNum is %ld, aivNum is %ld.", fBaseParams.aicNum,
-                                           fBaseParams.coreNum),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        blockdim == 0,
+        OP_LOGE(context_, "blockdim is 0, aicNum is %ld, aivNum is %ld.", fBaseParams.aicNum, fBaseParams.coreNum),
+        return ge::GRAPH_FAILED);
     context_->SetBlockDim(blockdim);
     context_->SetScheduleMode(1);
 
@@ -780,8 +731,7 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::SaveToTilingData()
     tilingData.s1s2BNGS1S2BlockNumList.set_blockEnds(fBaseParams.blockEnds);
     tilingData.s1s2BNGS1S2SplitCoreParams.set_blockOuter(fBaseParams.blockOuter);
 
-    if (fBaseParams.pseType == PSE_INNER_MUL_ADD_TYPE ||
-        fBaseParams.pseType == PSE_INNER_MUL_ADD_SQRT_TYPE) {
+    if (fBaseParams.pseType == PSE_INNER_MUL_ADD_TYPE || fBaseParams.pseType == PSE_INNER_MUL_ADD_SQRT_TYPE) {
         tilingData.s1s2BNGS1S2BaseParams.set_pseAlibiBaseS1(fBaseParams.pseAlibiBaseS1);
         tilingData.s1s2BNGS1S2BaseParams.set_pseAlibiBaseS2(fBaseParams.pseAlibiBaseS2);
     }
@@ -820,29 +770,22 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoPreTiling()
     tilingData.preTilingData.set_maskTailCoreLoop(tailCoreUBLoop);
     tilingData.preTilingData.set_maskTailCoreLastLoopNum(tailCoreUBLastLoopNum);
 
-    OP_CHECK_IF(maskUsedCoreNum == 0,
-               OP_LOGE(context_, "divisor maskUsedCoreNum is 0."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(maskUsedCoreNum == 0, OP_LOGE(context_, "divisor maskUsedCoreNum is 0."), return ge::GRAPH_FAILED);
     int64_t qPreBlockFactor = (fBaseParams.qSizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
-    OP_CHECK_IF(qPreBlockFactor == 0,
-               OP_LOGE(context_, "divisor qPreBlockFactor is 0."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(qPreBlockFactor == 0, OP_LOGE(context_, "divisor qPreBlockFactor is 0."), return ge::GRAPH_FAILED);
     int64_t qPreBlockTotal = (fBaseParams.qSizeAlign + qPreBlockFactor - 1) / qPreBlockFactor;
     int64_t qPreTailNumTmp = fBaseParams.qSizeAlign % qPreBlockFactor;
     int64_t qPreTailNum = qPreTailNumTmp == 0 ? qPreBlockFactor : qPreTailNumTmp;
 
     int64_t kvPreBlockFactor = (fBaseParams.kvSizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
-    OP_CHECK_IF(kvPreBlockFactor == 0,
-               OP_LOGE(context_, "divisor kvPreBlockFactor is 0."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(kvPreBlockFactor == 0, OP_LOGE(context_, "divisor kvPreBlockFactor is 0."), return ge::GRAPH_FAILED);
     int64_t kvPreBlockTotal = (fBaseParams.kvSizeAlign + kvPreBlockFactor - 1) / kvPreBlockFactor;
     int64_t kvPreTailNumTmp = fBaseParams.kvSizeAlign % kvPreBlockFactor;
     int64_t kvPreTailNum = kvPreTailNumTmp == 0 ? kvPreBlockFactor : kvPreTailNumTmp;
 
     int64_t k1v1PreBlockFactor = (fBaseParams.k1v1SizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
-    OP_CHECK_IF(k1v1PreBlockFactor == 0,
-               OP_LOGE(context_, "divisor k1v1PreBlockFactor is 0."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(k1v1PreBlockFactor == 0, OP_LOGE(context_, "divisor k1v1PreBlockFactor is 0."),
+                return ge::GRAPH_FAILED);
     int64_t k1v1PreBlockTotal = (fBaseParams.k1v1SizeAlign + k1v1PreBlockFactor - 1) / k1v1PreBlockFactor;
     int64_t k1v1PreTailNumTmp = fBaseParams.k1v1SizeAlign % k1v1PreBlockFactor;
     int64_t k1v1PreTailNum = k1v1PreTailNumTmp == 0 ? k1v1PreBlockFactor : k1v1PreTailNumTmp;
@@ -876,18 +819,16 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoPostTiling()
     int64_t dAlign = (fBaseParams.d + FP16_BLOCK_NUMS - 1) / FP16_BLOCK_NUMS * FP16_BLOCK_NUMS;
     int64_t curPostCoexNode = fBaseParams.mm2IsNZOut ? POST_NZ_COEX_NODE : POST_COEX_NODE;
     int64_t nzReservedSize = fBaseParams.mm2IsNZOut ? dAlign / C0_SIZE * BLOCK_SIZE * POST_NZ_RESERVED_N : 0;
-    int64_t postUbBaseSize = (fBaseParams.ubSize - 2 * nzReservedSize) / curPostCoexNode / BUFFER_NUM /  // 开DB预留2份nzReservedSize
+    int64_t postUbBaseSize = (fBaseParams.ubSize - 2 * nzReservedSize) / curPostCoexNode /
+                             BUFFER_NUM / // 开DB预留2份nzReservedSize
                              WORKSPACE_NUM_ALIGN * WORKSPACE_NUM_ALIGN;
 
-    int64_t qPostBaseNum =
-        fBaseParams.mm2IsNZOut ? (postUbBaseSize / fBaseParams.dataTypeSize / dAlign * fBaseParams.d)
-        : (postUbBaseSize / fBaseParams.dataTypeSize);
-    OP_CHECK_IF(qPostBaseNum == 0,
-               OP_LOGE(context_, "divisor qPostBaseNum is 0."),
-               return ge::GRAPH_FAILED);
-    OP_CHECK_IF(fBaseParams.blockOuter == 0,
-               OP_LOGE(context_, "divisor fBaseParams.blockOuter is 0."),
-               return ge::GRAPH_FAILED);
+    int64_t qPostBaseNum = fBaseParams.mm2IsNZOut ?
+                               (postUbBaseSize / fBaseParams.dataTypeSize / dAlign * fBaseParams.d) :
+                               (postUbBaseSize / fBaseParams.dataTypeSize);
+    OP_CHECK_IF(qPostBaseNum == 0, OP_LOGE(context_, "divisor qPostBaseNum is 0."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(fBaseParams.blockOuter == 0, OP_LOGE(context_, "divisor fBaseParams.blockOuter is 0."),
+                return ge::GRAPH_FAILED);
     int64_t qPostBlockTotal = fBaseParams.qSize;
     int64_t qPostTailNumTmp = qPostBlockTotal % qPostBaseNum;
     int64_t qPostTailNum = qPostTailNumTmp == 0 ? qPostBaseNum : qPostTailNumTmp;
@@ -895,9 +836,7 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoPostTiling()
     int64_t qPostBlockFactor = (qPostBlockOuterTotal + fBaseParams.blockOuter - 1) / fBaseParams.blockOuter;
 
     int64_t kvPostBaseNum = qPostBaseNum;
-    OP_CHECK_IF(kvPostBaseNum == 0,
-               OP_LOGE(context_, "divisor kvPostBaseNum is 0."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(kvPostBaseNum == 0, OP_LOGE(context_, "divisor kvPostBaseNum is 0."), return ge::GRAPH_FAILED);
     int64_t kvPostBlockTotal = fBaseParams.kvSize;
     int64_t kvPostTailNumTmp = kvPostBlockTotal % kvPostBaseNum;
     int64_t kvPostTailNum = kvPostTailNumTmp == 0 ? kvPostBaseNum : kvPostTailNumTmp;
@@ -905,9 +844,7 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoPostTiling()
     int64_t kvPostBlockFactor = (kvPostBlockOuterTotal + fBaseParams.blockOuter - 1) / fBaseParams.blockOuter;
 
     int64_t k1v1PostBaseNum = qPostBaseNum;
-    OP_CHECK_IF(k1v1PostBaseNum == 0,
-               OP_LOGE(context_, "divisor k1v1PostBaseNum is 0."),
-               return ge::GRAPH_FAILED);
+    OP_CHECK_IF(k1v1PostBaseNum == 0, OP_LOGE(context_, "divisor k1v1PostBaseNum is 0."), return ge::GRAPH_FAILED);
     int64_t k1v1PostBlockTotal = fBaseParams.k1v1Size;
     int64_t k1v1PostTailNumTmp = k1v1PostBlockTotal % k1v1PostBaseNum;
     int64_t k1v1PostTailNum = k1v1PostTailNumTmp == 0 ? k1v1PostBaseNum : k1v1PostTailNumTmp;
@@ -924,7 +861,6 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoPostTiling()
     tilingData.postTilingData.set_qPostTailNum(qPostTailNum);
     tilingData.postTilingData.set_qSizeAlign(fBaseParams.qSizeAlign);
 
-
     tilingData.postTilingData.set_kvPostBlockFactor(kvPostBlockFactor);
     tilingData.postTilingData.set_kvPostBlockTotal(kvPostBlockTotal);
     tilingData.postTilingData.set_kvPostBaseNum(kvPostBaseNum);
@@ -936,7 +872,6 @@ ge::graphStatus FusedFloydAttentionGradTilingS1s2Bn2gs1s2::DoPostTiling()
     tilingData.postTilingData.set_k1v1PostBaseNum(k1v1PostBaseNum);
     tilingData.postTilingData.set_k1v1PostTailNum(k1v1PostTailNum);
     tilingData.postTilingData.set_k1v1SizeAlign(fBaseParams.k1v1SizeAlign);
-
 
     int64_t workspaceOffsets = MUL_CORE_SYNC_BUFFER;
     tilingData.postTilingData.set_dqWorkSpaceOffset(workspaceOffsets);

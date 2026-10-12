@@ -19,7 +19,7 @@
 namespace FusedInferAttentionScoreUT {
 namespace {
 
-void SetStride(gert::Stride &stride, std::initializer_list<int64_t> values)
+void SetStride(gert::Stride& stride, std::initializer_list<int64_t> values)
 {
     stride.SetDimNum(static_cast<uint32_t>(values.size()));
     uint32_t index = 0;
@@ -28,8 +28,7 @@ void SetStride(gert::Stride &stride, std::initializer_list<int64_t> values)
     }
 }
 
-optiling::FiaTilingInfo MakeArch22MlaD512Info(int32_t keyDim = -1, int32_t valueDim = -1,
-                                              int32_t keyRopeDim = -1)
+optiling::FiaTilingInfo MakeArch22MlaD512Info(int32_t keyDim = -1, int32_t valueDim = -1, int32_t keyRopeDim = -1)
 {
     static const char layout[] = "TND";
     optiling::FiaTilingInfo fiaInfo;
@@ -63,7 +62,7 @@ optiling::FiaTilingInfo MakeArch22MlaD512Info(int32_t keyDim = -1, int32_t value
     return fiaInfo;
 }
 
-ge::graphStatus CheckNonContiguousInfo(const optiling::FiaTilingInfo &fiaInfo)
+ge::graphStatus CheckNonContiguousInfo(const optiling::FiaTilingInfo& fiaInfo)
 {
     optiling::PagedAttentionChecker checker(true, false, false);
     return checker.CheckMultiParaConsistency(fiaInfo);

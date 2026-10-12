@@ -29,9 +29,9 @@ using AscendC::CMPMODE;
 using AscendC::LocalTensor;
 using AscendC::RoundMode;
 
-__simd_callee__ inline void StoreHistogramResult(__ubuf__ uint32_t *histogramsBuf, Reg::RegTensor<uint16_t> &cout0,
-                                                 Reg::RegTensor<uint16_t> &cout1, Reg::MaskReg &pregB16,
-                                                 Reg::MaskReg &pregB32)
+__simd_callee__ inline void StoreHistogramResult(__ubuf__ uint32_t* histogramsBuf, Reg::RegTensor<uint16_t>& cout0,
+                                                 Reg::RegTensor<uint16_t>& cout1, Reg::MaskReg& pregB16,
+                                                 Reg::MaskReg& pregB32)
 {
     Reg::RegTensor<uint32_t> cout0U32Even;
     Reg::RegTensor<uint32_t> cout0U32Odd;
@@ -53,9 +53,9 @@ __simd_callee__ inline void StoreHistogramResult(__ubuf__ uint32_t *histogramsBu
     Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(histogramsBuf + 128, cout1U32Even, cout1U32Odd, pregB32);
 }
 
-__simd_callee__ inline void FindTargetBinAndUpdateNextK(__ubuf__ uint32_t *idxBuf, __ubuf__ uint32_t *nkValueBuf,
-                                                        __ubuf__ uint32_t *histogramsBuf,
-                                                        Reg::RegTensor<uint32_t> &btmK, Reg::MaskReg &pregB32)
+__simd_callee__ inline void FindTargetBinAndUpdateNextK(__ubuf__ uint32_t* idxBuf, __ubuf__ uint32_t* nkValueBuf,
+                                                        __ubuf__ uint32_t* histogramsBuf,
+                                                        Reg::RegTensor<uint32_t>& btmK, Reg::MaskReg& pregB32)
 {
     Reg::UnalignRegForStore alignIdx;
 
@@ -69,7 +69,7 @@ __simd_callee__ inline void FindTargetBinAndUpdateNextK(__ubuf__ uint32_t *idxBu
         Reg::Arange(idxC, i * 64);
         Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(cout, histogramsBuf + i * 64);
         Reg::Compare<uint32_t, CMPMODE::GE>(pregGE, cout, btmK, pregB32);
-        Reg::Squeeze<uint32_t, Reg::GatherMaskMode::STORE_REG>(sqzIdx, (Reg::RegTensor<uint32_t> &)idxC, pregGE);
+        Reg::Squeeze<uint32_t, Reg::GatherMaskMode::STORE_REG>(sqzIdx, (Reg::RegTensor<uint32_t>&)idxC, pregGE);
         Reg::StoreUnAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>(idxBuf, sqzIdx, alignIdx);
     }
     Reg::StoreUnAlignPost(idxBuf, alignIdx);
@@ -89,7 +89,7 @@ __simd_callee__ inline void FindTargetBinAndUpdateNextK(__ubuf__ uint32_t *idxBu
 
     Reg::MaskReg pregZero = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
     Reg::Compare<uint32_t, CMPMODE::EQ>(pregZero, idx, zeroAll, pregB32);
-    Reg::Sub(idxPrev, idx, (Reg::RegTensor<uint32_t> &)idxAll1, pregB32);
+    Reg::Sub(idxPrev, idx, (Reg::RegTensor<uint32_t>&)idxAll1, pregB32);
     Reg::ShiftRights(idxPrev, idxPrev, (int16_t)24, pregB32);
 
     Reg::Gather(prevBinValue, histogramsBuf, idxPrev, pregB32);
@@ -100,7 +100,7 @@ __simd_callee__ inline void FindTargetBinAndUpdateNextK(__ubuf__ uint32_t *idxBu
     Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_NORM>(nkValueBuf, nextK, pregB32);
 }
 
-__simd_vf__ void IndicesAddOffsetVF(__ubuf__ uint32_t *indicesOutBuf, uint32_t outputIdxOffset, uint32_t vfLoop)
+__simd_vf__ void IndicesAddOffsetVF(__ubuf__ uint32_t* indicesOutBuf, uint32_t outputIdxOffset, uint32_t vfLoop)
 {
     Reg::MaskReg pregB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
 
@@ -113,10 +113,10 @@ __simd_vf__ void IndicesAddOffsetVF(__ubuf__ uint32_t *indicesOutBuf, uint32_t o
     }
 }
 
-__aicore__ inline void IndicesAddOffset(const LocalTensor<uint32_t> &indicesOutLocal, uint32_t outputIdxOffset,
+__aicore__ inline void IndicesAddOffset(const LocalTensor<uint32_t>& indicesOutLocal, uint32_t outputIdxOffset,
                                         uint32_t topK)
 {
-    __ubuf__ uint32_t *indicesOutBuf = (__ubuf__ uint32_t *)indicesOutLocal.GetPhyAddr();
+    __ubuf__ uint32_t* indicesOutBuf = (__ubuf__ uint32_t*)indicesOutLocal.GetPhyAddr();
     const uint16_t repeatSize32 = 64;
     uint16_t topkLoopNum32 = (topK + repeatSize32 - 1) / repeatSize32;
     IndicesAddOffsetVF(indicesOutBuf, outputIdxOffset, topkLoopNum32);

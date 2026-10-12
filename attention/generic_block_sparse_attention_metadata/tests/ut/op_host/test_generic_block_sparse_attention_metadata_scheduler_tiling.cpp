@@ -251,7 +251,7 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, ActiveCoreCapacityAcros
     ASSERT_EQ(result.combineTaskNum, ACTIVE_BASE_TASK_NUM);
     int64_t partialTaskNum = 0;
     for (int64_t task = 0; task < result.combineTaskNum; ++task) {
-        const CombineSchedule &combine = result.combineSchedules[static_cast<size_t>(task)];
+        const CombineSchedule& combine = result.combineSchedules[static_cast<size_t>(task)];
         ASSERT_TRUE(combine.partialCount > 1);
         ASSERT_TRUE(combine.partialCount <= static_cast<int64_t>(MAX_FD_PARTIAL_PER_BASE_TASK));
         ASSERT_TRUE(combine.firstCore + combine.partialCount <= result.fdActiveCoreNum);
@@ -303,7 +303,7 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, PartialWorkspaceUpperBo
                 ASSERT_TRUE(result.fdPartialTaskNum <= actualIntersectionUpperBound);
                 ASSERT_TRUE(result.fdPartialTaskNum <= hostCapacity);
                 for (int64_t combineIdx = 0; combineIdx < result.combineTaskNum; ++combineIdx) {
-                    const CombineSchedule &combine = result.combineSchedules[static_cast<size_t>(combineIdx)];
+                    const CombineSchedule& combine = result.combineSchedules[static_cast<size_t>(combineIdx)];
                     ASSERT_TRUE(combine.partialStart >= 0);
                     ASSERT_TRUE(combine.partialStart + combine.partialCount <= result.fdPartialTaskNum);
                 }

@@ -54,32 +54,32 @@ public:
 
     __aicore__ inline MqsmlaCsaBlockCube(){};
     __aicore__ inline void InitLocalBuffer(uint32_t l1BaseAddr);
-    __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t *query, __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ,
-                                            const ConstInfo<HIGH_PERF> &constInfo);
-    __aicore__ inline void IterateLoadQK(Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD> &v0ResGm,
-                                         RunInfo<HIGH_PERF> &runInfo, ConstInfo<HIGH_PERF> &constInfo,
+    __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t* query, __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* sequsedQ,
+                                            const ConstInfo<HIGH_PERF>& constInfo);
+    __aicore__ inline void IterateLoadQK(Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD>& v0ResGm,
+                                         RunInfo<HIGH_PERF>& runInfo, ConstInfo<HIGH_PERF>& constInfo,
                                          bool isFirstLoop);
-    __aicore__ inline void IterateBmm1(StaticBuffer<T> &outputBuf,
-                                       Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD> &v0ResGm,
-                                       bool notLastTwoLoop, RunInfo<HIGH_PERF> &runInfoNext,
-                                       RunInfo<HIGH_PERF> &runInfo, ConstInfo<HIGH_PERF> &constInfo);
+    __aicore__ inline void IterateBmm1(StaticBuffer<T>& outputBuf,
+                                       Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD>& v0ResGm,
+                                       bool notLastTwoLoop, RunInfo<HIGH_PERF>& runInfoNext,
+                                       RunInfo<HIGH_PERF>& runInfo, ConstInfo<HIGH_PERF>& constInfo);
     __aicore__ inline void ReleaseMqsmlaCubeEvents();
 
-    __aicore__ inline void IterateBmm2(StaticBuffer<T> &outputBuf, StaticBuffer<Q_T> &l1PBuffer,
-                                       RunInfo<HIGH_PERF> &runInfo, ConstInfo<HIGH_PERF> &constInfo);
+    __aicore__ inline void IterateBmm2(StaticBuffer<T>& outputBuf, StaticBuffer<Q_T>& l1PBuffer,
+                                       RunInfo<HIGH_PERF>& runInfo, ConstInfo<HIGH_PERF>& constInfo);
 
 private:
-    __aicore__ inline void InitGmTensor(__gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ,
-                                        const ConstInfo<HIGH_PERF> &constInfo);
-    __aicore__ inline void CopyQGmToL1(RunInfo<HIGH_PERF> &runInfo, ConstInfo<HIGH_PERF> &constInfo);
-    __aicore__ inline void IterateBmm1CSA(StaticBuffer<T> &outputBuf,
-                                          Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD> &v0ResGm,
-                                          bool notLastTwoLoop, RunInfo<HIGH_PERF> &runInfoNext,
-                                          RunInfo<HIGH_PERF> &runInfo, ConstInfo<HIGH_PERF> &constInfo);
+    __aicore__ inline void InitGmTensor(__gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* sequsedQ,
+                                        const ConstInfo<HIGH_PERF>& constInfo);
+    __aicore__ inline void CopyQGmToL1(RunInfo<HIGH_PERF>& runInfo, ConstInfo<HIGH_PERF>& constInfo);
+    __aicore__ inline void IterateBmm1CSA(StaticBuffer<T>& outputBuf,
+                                          Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD>& v0ResGm,
+                                          bool notLastTwoLoop, RunInfo<HIGH_PERF>& runInfoNext,
+                                          RunInfo<HIGH_PERF>& runInfo, ConstInfo<HIGH_PERF>& constInfo);
 
     // --------------------Bmm2--------------------------
-    __aicore__ inline void IterateBmm2CSA(StaticBuffer<T> &outputBuf, StaticBuffer<Q_T> &l1PBuffer,
-                                          RunInfo<HIGH_PERF> &runInfo, ConstInfo<HIGH_PERF> &constInfo);
+    __aicore__ inline void IterateBmm2CSA(StaticBuffer<T>& outputBuf, StaticBuffer<Q_T>& l1PBuffer,
+                                          RunInfo<HIGH_PERF>& runInfo, ConstInfo<HIGH_PERF>& constInfo);
     /* =====================GM变量==================== */
     static constexpr GmFormat Q_FORMAT = GetQueryGmFormat<LAYOUT_T>();
     static constexpr bool Q_WITH_ZERO_HEAD = (LAYOUT_T == QSMLA_LAYOUT::TND);
@@ -109,13 +109,13 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::InitLocalBuffer(uint32
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::InitGlobalBuffer(__gm__ uint8_t *query,
-                                                                           __gm__ uint8_t *cuSeqlensQ,
-                                                                           __gm__ uint8_t *sequsedQ,
-                                                                           const ConstInfo<HIGH_PERF> &constInfo)
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::InitGlobalBuffer(__gm__ uint8_t* query,
+                                                                           __gm__ uint8_t* cuSeqlensQ,
+                                                                           __gm__ uint8_t* sequsedQ,
+                                                                           const ConstInfo<HIGH_PERF>& constInfo)
 {
     if ASCEND_IS_AIC {
-        this->queryGm.gmTensor.SetGlobalBuffer((__gm__ Q_T *)query);
+        this->queryGm.gmTensor.SetGlobalBuffer((__gm__ Q_T*)query);
         InitGmTensor(cuSeqlensQ, sequsedQ, constInfo);
     }
 }
@@ -136,9 +136,9 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::ReleaseMqsmlaCubeEvent
 }
 /* 初始化GmTensor,设置shape信息并计算strides */
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::InitGmTensor(__gm__ uint8_t *cuSeqlensQ,
-                                                                       __gm__ uint8_t *sequsedQ,
-                                                                       const ConstInfo<HIGH_PERF> &constInfo)
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::InitGmTensor(__gm__ uint8_t* cuSeqlensQ,
+                                                                       __gm__ uint8_t* sequsedQ,
+                                                                       const ConstInfo<HIGH_PERF>& constInfo)
 {
     if constexpr (LAYOUT_T == QSMLA_LAYOUT::BSND) {
         this->queryGm.offsetCalculator.Init(constInfo.bSize, constInfo.n2Size, constInfo.gSize, constInfo.s1Size,
@@ -153,24 +153,24 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::InitGmTensor(__gm__ ui
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm1(
-    StaticBuffer<T> &outputBuf, Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD> &v0ResGm,
-    bool notLastTwoLoop, RunInfo<HIGH_PERF> &runInfoNext, RunInfo<HIGH_PERF> &runInfo, ConstInfo<HIGH_PERF> &constInfo)
+    StaticBuffer<T>& outputBuf, Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD>& v0ResGm,
+    bool notLastTwoLoop, RunInfo<HIGH_PERF>& runInfoNext, RunInfo<HIGH_PERF>& runInfo, ConstInfo<HIGH_PERF>& constInfo)
 {
     IterateBmm1CSA(outputBuf, v0ResGm, notLastTwoLoop, runInfoNext, runInfo, constInfo);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm2(StaticBuffer<T> &outputBuf,
-                                                                      StaticBuffer<Q_T> &l1PBuffer,
-                                                                      RunInfo<HIGH_PERF> &runInfo,
-                                                                      ConstInfo<HIGH_PERF> &constInfo)
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm2(StaticBuffer<T>& outputBuf,
+                                                                      StaticBuffer<Q_T>& l1PBuffer,
+                                                                      RunInfo<HIGH_PERF>& runInfo,
+                                                                      ConstInfo<HIGH_PERF>& constInfo)
 {
     IterateBmm2CSA(outputBuf, l1PBuffer, runInfo, constInfo);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::CopyQGmToL1(RunInfo<HIGH_PERF> &runInfo,
-                                                                      ConstInfo<HIGH_PERF> &constInfo)
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::CopyQGmToL1(RunInfo<HIGH_PERF>& runInfo,
+                                                                      ConstInfo<HIGH_PERF>& constInfo)
 {
     uint64_t gmOffset = this->queryGm.offsetCalculator.GetOffset(runInfo.boIdx, runInfo.n2oIdx, runInfo.goIdx,
                                                                  runInfo.s1oIdx * runInfo.qSNumInOneBlock, 0);
@@ -186,8 +186,8 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::CopyQGmToL1(RunInfo<HI
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateLoadQK(
-    Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD> &v0ResGm, RunInfo<HIGH_PERF> &runInfo,
-    ConstInfo<HIGH_PERF> &constInfo, bool isFirstLoop)
+    Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD>& v0ResGm, RunInfo<HIGH_PERF>& runInfo,
+    ConstInfo<HIGH_PERF>& constInfo, bool isFirstLoop)
 {
     if (unlikely(isFirstLoop)) {
         CopyQGmToL1(runInfo, constInfo);
@@ -207,13 +207,13 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateLoadQK(
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
-    StaticBuffer<T> &outputBuf, Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD> &v0ResGm,
-    bool notLastTwoLoop, RunInfo<HIGH_PERF> &runInfoNext, RunInfo<HIGH_PERF> &runInfo, ConstInfo<HIGH_PERF> &constInfo)
+    StaticBuffer<T>& outputBuf, Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD>& v0ResGm,
+    bool notLastTwoLoop, RunInfo<HIGH_PERF>& runInfoNext, RunInfo<HIGH_PERF>& runInfo, ConstInfo<HIGH_PERF>& constInfo)
 {
     WaitFlag<HardEvent::MTE2_MTE1>(INNERCORE_L1KV(mqsmlaL1KvBmm1Cursor));
     mqsmlaL1KvBmm1Cursor = (mqsmlaL1KvBmm1Cursor + 1) % 3U;
 
-    StaticBuffer<T> &mqsmlaCBuf = l0C.GetNext();
+    StaticBuffer<T>& mqsmlaCBuf = l0C.GetNext();
     WaitFlag<HardEvent::FIX_M>(INNERCORE_L0C(mqsmlaCBuf.idx));
     MMParam mqsmlaParam = {
         static_cast<uint32_t>(runInfo.mRealSize),    // singleM
@@ -277,15 +277,15 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm2CSA(StaticBuffer<T> &outputBuf,
-                                                                         StaticBuffer<Q_T> &l1PBuffer,
-                                                                         RunInfo<HIGH_PERF> &runInfo,
-                                                                         ConstInfo<HIGH_PERF> &constInfo)
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm2CSA(StaticBuffer<T>& outputBuf,
+                                                                         StaticBuffer<Q_T>& l1PBuffer,
+                                                                         RunInfo<HIGH_PERF>& runInfo,
+                                                                         ConstInfo<HIGH_PERF>& constInfo)
 {
     CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(CROSSCORE_L1P(l1PBuffer.idx));
     CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(CROSSCORE_L1P(l1PBuffer.idx) + AIV0_AIV1_OFFSET);
 
-    StaticBuffer<T> &mqsmlaCBuf = l0C.GetNext();
+    StaticBuffer<T>& mqsmlaCBuf = l0C.GetNext();
     WaitFlag<HardEvent::FIX_M>(INNERCORE_L0C(mqsmlaCBuf.idx));
     MMParam mqsmlaParam = {
         static_cast<uint32_t>(runInfo.mRealSize),  // singleM 64
@@ -330,8 +330,8 @@ class MqsmlaCsaBlockCubeDummy {
 public:
     __aicore__ inline MqsmlaCsaBlockCubeDummy(){};
     __aicore__ inline void InitLocalBuffer(uint32_t l1BaseAddr) {}
-    __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t *query, __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ,
-                                            const ConstInfo<HIGH_PERF> &constInfo)
+    __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t* query, __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* sequsedQ,
+                                            const ConstInfo<HIGH_PERF>& constInfo)
     {}
     __aicore__ inline void ReleaseMqsmlaCubeEvents() {}
 };

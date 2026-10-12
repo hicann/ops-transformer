@@ -34,9 +34,9 @@ class KdaInputProjMmBgg {
 public:
     __aicore__ inline KdaInputProjMmBgg() {}
 
-    __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *weightBeta, __gm__ uint8_t *weightGate,
-                                __gm__ uint8_t *weightG, __gm__ uint8_t *beta, __gm__ uint8_t *gate, __gm__ uint8_t *g,
-                                __gm__ uint8_t *workspace, const optiling::KdaInputProjTilingData *__restrict tiling);
+    __aicore__ inline void Init(__gm__ uint8_t* x, __gm__ uint8_t* weightBeta, __gm__ uint8_t* weightGate,
+                                __gm__ uint8_t* weightG, __gm__ uint8_t* beta, __gm__ uint8_t* gate, __gm__ uint8_t* g,
+                                __gm__ uint8_t* workspace, const optiling::KdaInputProjTilingData* __restrict tiling);
     __aicore__ inline void Process();
 
 protected:
@@ -64,17 +64,17 @@ protected:
 
     template <class LayoutB, class DtypeC>
     __aicore__ inline void ProcessPath(uint32_t pathBegin, uint32_t pathCnt, uint32_t pathN, uint32_t nTile,
-                                       __gm__ DtypeX *wAddr, __gm__ DtypeC *cAddr);
+                                       __gm__ DtypeX* wAddr, __gm__ DtypeC* cAddr);
 
-    const optiling::KdaInputProjTilingData *tiling_{nullptr};
-    __gm__ uint8_t *workspace_{nullptr};
-    __gm__ DtypeX *xAddr_{nullptr};
-    __gm__ DtypeX *wBetaAddr_{nullptr};
-    __gm__ DtypeX *wGateAddr_{nullptr};
-    __gm__ DtypeX *wGAddr_{nullptr};
-    __gm__ DtypeBeta *betaAddr_{nullptr};
-    __gm__ DtypeGate *gateAddr_{nullptr};
-    __gm__ DtypeG *gAddr_{nullptr};
+    const optiling::KdaInputProjTilingData* tiling_{nullptr};
+    __gm__ uint8_t* workspace_{nullptr};
+    __gm__ DtypeX* xAddr_{nullptr};
+    __gm__ DtypeX* wBetaAddr_{nullptr};
+    __gm__ DtypeX* wGateAddr_{nullptr};
+    __gm__ DtypeX* wGAddr_{nullptr};
+    __gm__ DtypeBeta* betaAddr_{nullptr};
+    __gm__ DtypeGate* gateAddr_{nullptr};
+    __gm__ DtypeG* gAddr_{nullptr};
 
     // 任务池视图：basicIdx = mIdx * nCntAll_ + nIdxAll，nIdxAll 按 beta|gate|g 顺序拼接。
     uint32_t nCntAll_{0};
@@ -84,21 +84,21 @@ protected:
 };
 
 template <typename TypePack>
-__aicore__ inline void KdaInputProjMmBgg<TypePack>::Init(__gm__ uint8_t *x, __gm__ uint8_t *weightBeta,
-                                                         __gm__ uint8_t *weightGate, __gm__ uint8_t *weightG,
-                                                         __gm__ uint8_t *beta, __gm__ uint8_t *gate, __gm__ uint8_t *g,
-                                                         __gm__ uint8_t *workspace,
-                                                         const optiling::KdaInputProjTilingData *__restrict tiling)
+__aicore__ inline void KdaInputProjMmBgg<TypePack>::Init(__gm__ uint8_t* x, __gm__ uint8_t* weightBeta,
+                                                         __gm__ uint8_t* weightGate, __gm__ uint8_t* weightG,
+                                                         __gm__ uint8_t* beta, __gm__ uint8_t* gate, __gm__ uint8_t* g,
+                                                         __gm__ uint8_t* workspace,
+                                                         const optiling::KdaInputProjTilingData* __restrict tiling)
 {
     workspace_ = workspace;
     tiling_ = tiling;
-    xAddr_ = reinterpret_cast<__gm__ DtypeX *>(x);
-    wBetaAddr_ = reinterpret_cast<__gm__ DtypeX *>(weightBeta);
-    wGateAddr_ = reinterpret_cast<__gm__ DtypeX *>(weightGate);
-    wGAddr_ = reinterpret_cast<__gm__ DtypeX *>(weightG);
-    betaAddr_ = reinterpret_cast<__gm__ DtypeBeta *>(beta);
-    gateAddr_ = reinterpret_cast<__gm__ DtypeGate *>(gate);
-    gAddr_ = reinterpret_cast<__gm__ DtypeG *>(g);
+    xAddr_ = reinterpret_cast<__gm__ DtypeX*>(x);
+    wBetaAddr_ = reinterpret_cast<__gm__ DtypeX*>(weightBeta);
+    wGateAddr_ = reinterpret_cast<__gm__ DtypeX*>(weightGate);
+    wGAddr_ = reinterpret_cast<__gm__ DtypeX*>(weightG);
+    betaAddr_ = reinterpret_cast<__gm__ DtypeBeta*>(beta);
+    gateAddr_ = reinterpret_cast<__gm__ DtypeGate*>(gate);
+    gAddr_ = reinterpret_cast<__gm__ DtypeG*>(g);
 }
 
 template <typename TypePack>
@@ -110,8 +110,8 @@ __aicore__ inline void KdaInputProjMmBgg<TypePack>::Process()
     if (tiling_ == nullptr) {
         return;
     }
-    const optiling::KdaInputProjMmBggParams &mm = tiling_->mmBggParams;
-    const optiling::KdaInputProjBaseParams &base = tiling_->baseParams;
+    const optiling::KdaInputProjMmBggParams& mm = tiling_->mmBggParams;
+    const optiling::KdaInputProjBaseParams& base = tiling_->baseParams;
     if (mm.tTile == 0U || mm.betaTile == 0U || mm.gateTile == 0U || mm.gTile == 0U || mm.hiddenstatesTile == 0U ||
         mm.hiddenstatesL0Tile == 0U || mm.tDim == 0U || base.tSize == 0U || base.hiddenSize == 0U) {
         return;
@@ -140,8 +140,8 @@ __aicore__ inline void KdaInputProjMmBgg<TypePack>::Process()
 template <typename TypePack>
 template <class LayoutB, class DtypeC>
 __aicore__ inline void KdaInputProjMmBgg<TypePack>::ProcessPath(uint32_t pathBegin, uint32_t pathCnt, uint32_t pathN,
-                                                                uint32_t nTile, __gm__ DtypeX *wAddr,
-                                                                __gm__ DtypeC *cAddr)
+                                                                uint32_t nTile, __gm__ DtypeX* wAddr,
+                                                                __gm__ DtypeC* cAddr)
 {
     if (pathCnt == 0U || pathN == 0U || nTile == 0U || wAddr == nullptr || cAddr == nullptr) {
         return;
@@ -161,8 +161,8 @@ __aicore__ inline void KdaInputProjMmBgg<TypePack>::ProcessPath(uint32_t pathBeg
         return;
     }
 
-    const optiling::KdaInputProjMmBggParams &mm = tiling_->mmBggParams;
-    const optiling::KdaInputProjBaseParams &base = tiling_->baseParams;
+    const optiling::KdaInputProjMmBggParams& mm = tiling_->mmBggParams;
+    const optiling::KdaInputProjBaseParams& base = tiling_->baseParams;
 
     using BlockMmad = Blaze::Gemm::Block::BlockMmad<DispatchPolicy, DtypeX, LayoutA, DtypeX, LayoutB, DtypeC, LayoutC,
                                                     BiasType, LayoutBias>;
@@ -191,7 +191,7 @@ __aicore__ inline void KdaInputProjMmBgg<TypePack>::ProcessPath(uint32_t pathBeg
     auto gmC = AscendC::Te::MakeTensor(AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>(cAddr), layoutC);
     // biasGmAddr 为空 => BlockMmad::isBias_ = false，bias 张量只作描述符、不会被读，
     // 且 initCmatrix 置真直接清零 L0C，比搬一遍零 bias 更省。
-    __gm__ BiasType *biasAddr = nullptr;
+    __gm__ BiasType* biasAddr = nullptr;
     auto gmBias = AscendC::Te::MakeTensor(AscendC::Te::MakeMemPtr<AscendC::Te::Location::GM>(biasAddr), layoutBias);
 
     BlockMmad blockMmad;

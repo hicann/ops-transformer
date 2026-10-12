@@ -61,18 +61,18 @@ public:
     using MM1_OUT_T = float;
 
     __aicore__ inline LightningIndexerServiceVector(){};
-    __aicore__ inline void ProcessVec(const LICommon::RunInfo &info);
+    __aicore__ inline void ProcessVec(const LICommon::RunInfo& info);
     __aicore__ inline void ProcessLD();
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitParams(const struct LICommon::ConstInfo &constInfo,
-                                      const LITilingData *__restrict tilingData);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void InitParams(const struct LICommon::ConstInfo& constInfo,
+                                      const LITilingData* __restrict tilingData);
     __aicore__ inline void InitVec1GlobalTensor(GlobalTensor<MM1_OUT_T> mm1ResGm, GlobalTensor<float> vec1ResGm,
                                                 GlobalTensor<int64_t> vec1ParamGm, GlobalTensor<W_T> weightsGm,
                                                 GlobalTensor<int32_t> indiceOutGm, GlobalTensor<K_T> valueOutGm);
     __aicore__ inline void CleanInvalidOutput(int64_t invalidS1offset);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void InitLDBuffers(TPipe *pipe);
+    __aicore__ inline void InitLDBuffers(TPipe* pipe);
 
 protected:
     GlobalTensor<MM1_OUT_T> mm1ResGm;
@@ -129,7 +129,7 @@ private:
 };
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceVector<LIT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void LightningIndexerServiceVector<LIT>::InitBuffers(TPipe* pipe)
 {
     uint32_t outNeedBufSize = (BASE_TOPK * 2) * 2 * sizeof(float);
     uint32_t reduceCacheSize = REDUCE_BANK_CONFLICT_OFFSETS + groupInner_ * s2BaseSize_ * sizeof(float);
@@ -172,7 +172,7 @@ __aicore__ inline void LightningIndexerServiceVector<LIT>::InitBuffers(TPipe *pi
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceVector<LIT>::InitLDBuffers(TPipe *pipe)
+__aicore__ inline void LightningIndexerServiceVector<LIT>::InitLDBuffers(TPipe* pipe)
 {
     pipe->Reset();
     pipe->InitBuffer(ldToBeMrgBuf_, 2 * BASE_TOPK * mrgListNum_ * sizeof(float)); // 2：value + index
@@ -182,8 +182,8 @@ __aicore__ inline void LightningIndexerServiceVector<LIT>::InitLDBuffers(TPipe *
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceVector<LIT>::InitParams(const struct LICommon::ConstInfo &constInfo,
-                                                                      const LITilingData *__restrict tilingData)
+__aicore__ inline void LightningIndexerServiceVector<LIT>::InitParams(const struct LICommon::ConstInfo& constInfo,
+                                                                      const LITilingData* __restrict tilingData)
 {
     this->constInfo_ = constInfo;
     blockS2StartIdx_ = 0;
@@ -253,14 +253,14 @@ __aicore__ inline void LightningIndexerServiceVector<LIT>::CleanInvalidOutput(in
         outQueue_.EnQue<uint16_t>(valueULocal);
         valueULocal = outQueue_.DeQue<uint16_t>();
         GlobalTensor<uint16_t> valueOutGmTmp;
-        valueOutGmTmp.SetGlobalBuffer((__gm__ uint16_t *)valueOutGm.GetPhyAddr());
+        valueOutGmTmp.SetGlobalBuffer((__gm__ uint16_t*)valueOutGm.GetPhyAddr());
         LIServiceVec::CopyOut(valueOutGmTmp[invalidS1offset], valueULocal, constInfo_.sparseCount);
         outQueue_.FreeTensor(valueULocal);
     }
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceVector<LIT>::ProcessVec(const LICommon::RunInfo &info)
+__aicore__ inline void LightningIndexerServiceVector<LIT>::ProcessVec(const LICommon::RunInfo& info)
 {
     int32_t cuBaseS1Idx = info.gS1Idx * s1BaseSize_;
     int32_t cuBaseS2Idx = info.s2Idx * s2BaseSize_;

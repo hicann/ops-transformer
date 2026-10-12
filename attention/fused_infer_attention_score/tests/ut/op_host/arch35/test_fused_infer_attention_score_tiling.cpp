@@ -144,10 +144,10 @@ TEST_P(FusedInferAttentionScoreArch35TilingTest, param)
     std::vector<uint32_t> inputInstanceNum;
     inputTensors.emplace_back(allInputs[0]);
     inputInstanceNum.emplace_back(1);
-    for (auto &t : param.keyList)
+    for (auto& t : param.keyList)
         inputTensors.emplace_back(t);
     inputInstanceNum.emplace_back(static_cast<uint32_t>(param.keyList.size()));
-    for (auto &t : param.valueList)
+    for (auto& t : param.valueList)
         inputTensors.emplace_back(t);
     inputInstanceNum.emplace_back(static_cast<uint32_t>(param.valueList.size()));
     for (size_t i = 3; i < allInputs.size(); i++) {
@@ -229,12 +229,12 @@ TEST_F(FusedInferAttentionScoreArch35ManualTilingTest, tensorlist_kv_batch_not_1
     inputTensors.emplace_back(queryShape, ge::DT_BF16, ge::FORMAT_ND);
     inputInstanceNum.emplace_back(1);
     for (int i = 0; i < 4; i++) {
-        const gert::StorageShape &kvShape = (i == 0) ? kvShapeBad : kvShapeGood;
+        const gert::StorageShape& kvShape = (i == 0) ? kvShapeBad : kvShapeGood;
         inputTensors.emplace_back(kvShape, ge::DT_BF16, ge::FORMAT_ND);
     }
     inputInstanceNum.emplace_back(4);
     for (int i = 0; i < 4; i++) {
-        const gert::StorageShape &kvShape = (i == 0) ? kvShapeBad : kvShapeGood;
+        const gert::StorageShape& kvShape = (i == 0) ? kvShapeBad : kvShapeGood;
         inputTensors.emplace_back(kvShape, ge::DT_BF16, ge::FORMAT_ND);
     }
     inputInstanceNum.emplace_back(4);

@@ -19,7 +19,6 @@
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 
-
 using namespace std;
 
 class MaskedCausalConv1dTiling : public testing::Test {

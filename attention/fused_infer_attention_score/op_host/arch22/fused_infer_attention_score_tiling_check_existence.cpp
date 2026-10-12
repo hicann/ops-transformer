@@ -58,7 +58,7 @@ ge::graphStatus FiaTilingCheck::CheckRopeExistence() const
     return ge::GRAPH_SUCCESS;
 }
 
-static std::string DtypeListToStr(const std::vector<DataType> &dtypeList)
+static std::string DtypeListToStr(const std::vector<DataType>& dtypeList)
 {
     std::ostringstream oss;
     oss << "[";
@@ -72,7 +72,7 @@ static std::string DtypeListToStr(const std::vector<DataType> &dtypeList)
     return oss.str();
 }
 
-static std::string DtypeDoubleListToStr(const std::vector<std::vector<DataType>> &dtypeDoubleList)
+static std::string DtypeDoubleListToStr(const std::vector<std::vector<DataType>>& dtypeDoubleList)
 {
     std::ostringstream oss;
     for (size_t i = 0; i < dtypeDoubleList.size(); ++i) {
@@ -168,7 +168,7 @@ ge::graphStatus FiaTilingCheck::CheckDtypeAndSetQuantFlag()
     }
 }
 
-ge::graphStatus FiaTilingCheck::CheckExists(const void *pointer, const std::string &name) const
+ge::graphStatus FiaTilingCheck::CheckExists(const void* pointer, const std::string& name) const
 {
     OP_CHECK_IF(
         pointer == nullptr,
@@ -178,7 +178,7 @@ ge::graphStatus FiaTilingCheck::CheckExists(const void *pointer, const std::stri
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FiaTilingCheck::CheckNotExists(const void *pointer, const std::string &name) const
+ge::graphStatus FiaTilingCheck::CheckNotExists(const void* pointer, const std::string& name) const
 {
     OP_CHECK_IF(pointer != nullptr,
                 OP_LOGE(opName_, "In %s, %s situation, %s should be null", QuantModeToSerialString(quantMode_).c_str(),
@@ -187,9 +187,9 @@ ge::graphStatus FiaTilingCheck::CheckNotExists(const void *pointer, const std::s
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FiaTilingCheck::CheckExistsByMap(const std::map<std::string, const void *> &paramMap) const
+ge::graphStatus FiaTilingCheck::CheckExistsByMap(const std::map<std::string, const void*>& paramMap) const
 {
-    for (const auto &kv : paramMap) {
+    for (const auto& kv : paramMap) {
         if (CheckExists(kv.second, kv.first) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
@@ -197,9 +197,9 @@ ge::graphStatus FiaTilingCheck::CheckExistsByMap(const std::map<std::string, con
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FiaTilingCheck::CheckNotExistsByMap(const std::map<std::string, const void *> &paramMap) const
+ge::graphStatus FiaTilingCheck::CheckNotExistsByMap(const std::map<std::string, const void*>& paramMap) const
 {
-    for (const auto &kv : paramMap) {
+    for (const auto& kv : paramMap) {
         if (CheckNotExists(kv.second, kv.first) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
@@ -207,8 +207,8 @@ ge::graphStatus FiaTilingCheck::CheckNotExistsByMap(const std::map<std::string, 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FiaTilingCheck::CheckExistenceByMap(std::map<std::string, const void *> &existMap,
-                                                    std::map<std::string, const void *> &notExistMap) const
+ge::graphStatus FiaTilingCheck::CheckExistenceByMap(std::map<std::string, const void*>& existMap,
+                                                    std::map<std::string, const void*>& notExistMap) const
 {
     if (CheckExistsByMap(existMap) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -219,7 +219,7 @@ ge::graphStatus FiaTilingCheck::CheckExistenceByMap(std::map<std::string, const 
     return ge::GRAPH_SUCCESS;
 }
 
-void FiaTilingCheck::LogErrorExistenceEqual(std::map<std::string, const void *> &paramMap) const
+void FiaTilingCheck::LogErrorExistenceEqual(std::map<std::string, const void*>& paramMap) const
 {
     std::ostringstream oss;
     for (auto it = paramMap.begin(); it != paramMap.end(); ++it) {
@@ -238,7 +238,7 @@ void FiaTilingCheck::LogErrorExistenceEqual(std::map<std::string, const void *> 
             QuantModeToSerialString(quantMode_).c_str(), oss.str().c_str());
 }
 
-ge::graphStatus FiaTilingCheck::CheckParaExistenceEqual(std::map<std::string, const void *> &paramMap) const
+ge::graphStatus FiaTilingCheck::CheckParaExistenceEqual(std::map<std::string, const void*>& paramMap) const
 {
     if (paramMap.empty()) {
         return ge::GRAPH_SUCCESS;
@@ -264,11 +264,11 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceEqual(std::map<std::string, co
 }
 
 template <typename T>
-ge::graphStatus FiaTilingCheck::CheckAttrValueByMap(std::map<std::string, std::pair<const T *, T>> &attrMap) const
+ge::graphStatus FiaTilingCheck::CheckAttrValueByMap(std::map<std::string, std::pair<const T*, T>>& attrMap) const
 {
-    for (auto const &kv : attrMap) {
-        const std::string &name = kv.first;
-        const std::pair<const T *, T> &pointerValuePair = kv.second;
+    for (auto const& kv : attrMap) {
+        const std::string& name = kv.first;
+        const std::pair<const T*, T>& pointerValuePair = kv.second;
         if (pointerValuePair.first == nullptr) {
             OP_LOGE(opName_, "%s should not be nullptr", name.c_str());
             return ge::GRAPH_FAILED;
@@ -290,8 +290,8 @@ ge::graphStatus FiaTilingCheck::CheckAttrValueByMap(std::map<std::string, std::p
 
 ge::graphStatus FiaTilingCheck::CheckParaExistenceMlaNoquant() const
 {
-    std::map<std::string, const void *> mlaNoquantParamExistMap = {};
-    std::map<std::string, const void *> mlaNoquantParamNotExistMap = {
+    std::map<std::string, const void*> mlaNoquantParamExistMap = {};
+    std::map<std::string, const void*> mlaNoquantParamNotExistMap = {
         // antiquantParam
         {ANTIQUANT_SCALE_NAME, opParamInfo_.antiquantScale.tensor},
         {ANTIQUANT_OFFSET_NAME, opParamInfo_.antiquantOffset.tensor},
@@ -313,7 +313,7 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceMlaNoquant() const
         {VALUE_SHARED_PREFIX_NAME, opParamInfo_.valueSharedPrefix.tensor},
     };
 
-    std::map<std::string, std::pair<const int64_t *, int64_t>> attrDefaultValueMap = {
+    std::map<std::string, std::pair<const int64_t*, int64_t>> attrDefaultValueMap = {
         {ANTIQUANT_MODE_NAME, {opParamInfo_.antiquantMode, ANTI_QUANT_MODE_DEFAULT_VALUE}},
         {KEY_ANTIQUANT_MODE_NAME, {opParamInfo_.keyAntiquantMode, KEY_ANTI_QUANT_MODE_DEFAULT_VALUE}},
         {VALUE_ANTIQUANT_MODE_NAME, {opParamInfo_.valueAntiquantMode, VALUE_ANTI_QUANT_MODE_DEFAULT_VALUE}},
@@ -334,7 +334,7 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceMlaNoquant() const
 
 ge::graphStatus FiaTilingCheck::CheckParaExistenceMlaAntiquant() const
 {
-    std::map<std::string, const void *> mlaAntiquantParamExistMap = {
+    std::map<std::string, const void*> mlaAntiquantParamExistMap = {
         // paParamMap
         {ACTUAL_SEQ_KV_LEN_NAME, opParamInfo_.actualSeqLengths.tensor},
         {BLOCK_TABLE_NAME, opParamInfo_.blockTable.tensor},
@@ -344,7 +344,7 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceMlaAntiquant() const
         {KEY_ROPE_ANTIQUANT_SCALE_NAME, opParamInfo_.keyRopeAntiquantScale.tensor},
     };
 
-    std::map<std::string, const void *> mlaAntiquantParamNotExistMap = {
+    std::map<std::string, const void*> mlaAntiquantParamNotExistMap = {
         // antiquantParam
         {ANTIQUANT_SCALE_NAME, opParamInfo_.antiquantScale.tensor},
         {ANTIQUANT_OFFSET_NAME, opParamInfo_.antiquantOffset.tensor},
@@ -366,7 +366,7 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceMlaAntiquant() const
         {VALUE_SHARED_PREFIX_NAME, opParamInfo_.valueSharedPrefix.tensor},
     };
 
-    std::map<std::string, std::pair<const int64_t *, int64_t>> attrDefaultValueMap = {
+    std::map<std::string, std::pair<const int64_t*, int64_t>> attrDefaultValueMap = {
         {ANTIQUANT_MODE_NAME, {opParamInfo_.antiquantMode, ANTI_QUANT_MODE_DEFAULT_VALUE}},
         {QUERY_QUANT_MODE_NAME, {opParamInfo_.queryQuantMode, QUERY_QUANT_MODE_DEFAULT_VALUE}},
     };
@@ -384,7 +384,7 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceMlaAntiquant() const
 
 ge::graphStatus FiaTilingCheck::CheckParaExistenceMlaFullquant() const
 {
-    std::map<std::string, const void *> mlaFullquantParamExistMap = {
+    std::map<std::string, const void*> mlaFullquantParamExistMap = {
         // paParamMap
         {ACTUAL_SEQ_KV_LEN_NAME, opParamInfo_.actualSeqLengths.tensor},
         {BLOCK_TABLE_NAME, opParamInfo_.blockTable.tensor},
@@ -394,7 +394,7 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceMlaFullquant() const
         {DEQUANT_SCALE_QUERY_NAME, opParamInfo_.dequantScaleQuery.tensor},
     };
 
-    std::map<std::string, const void *> mlaFullquantParamNotExistMap = {
+    std::map<std::string, const void*> mlaFullquantParamNotExistMap = {
         // antiquantParam
         {ANTIQUANT_SCALE_NAME, opParamInfo_.antiquantScale.tensor},
         {ANTIQUANT_OFFSET_NAME, opParamInfo_.antiquantOffset.tensor},
@@ -416,7 +416,7 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceMlaFullquant() const
         {VALUE_SHARED_PREFIX_NAME, opParamInfo_.valueSharedPrefix.tensor},
     };
 
-    std::map<std::string, std::pair<const int64_t *, int64_t>> attrDefaultValueMap = {
+    std::map<std::string, std::pair<const int64_t*, int64_t>> attrDefaultValueMap = {
         {ANTIQUANT_MODE_NAME, {opParamInfo_.antiquantMode, ANTI_QUANT_MODE_DEFAULT_VALUE}},
     };
     if (CheckExistenceByMap(mlaFullquantParamExistMap, mlaFullquantParamNotExistMap) != ge::GRAPH_SUCCESS ||
@@ -439,7 +439,7 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaNoquantForFullquant() const
         (s1Size_ > 1) && (inputQType_ == ge::DT_INT8 || outputType_ != ge::DT_INT8)) {
         return ge::GRAPH_SUCCESS;
     } else {
-        std::map<std::string, const void *> gqaNoquantParamNotExistMap = {
+        std::map<std::string, const void*> gqaNoquantParamNotExistMap = {
             // fullquantParam
             {DEQUANT_SCALE1_NAME, opParamInfo_.deqScale1.tensor},
             {QUANT_SCALE1_NAME, opParamInfo_.quantScale1.tensor},
@@ -454,9 +454,9 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaNoquantForFullquant() const
 
 ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaNoquant() const
 {
-    std::map<std::string, const void *> gqaNoquantParamExistMap = {};
+    std::map<std::string, const void*> gqaNoquantParamExistMap = {};
 
-    std::map<std::string, const void *> gqaNoquantParamNotExistMap = {
+    std::map<std::string, const void*> gqaNoquantParamNotExistMap = {
         // antiquantParam
         {ANTIQUANT_SCALE_NAME, opParamInfo_.antiquantScale.tensor},
         {ANTIQUANT_OFFSET_NAME, opParamInfo_.antiquantOffset.tensor},
@@ -469,7 +469,7 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaNoquant() const
         {DEQUANT_SCALE_QUERY_NAME, opParamInfo_.dequantScaleQuery.tensor},
     };
 
-    std::map<std::string, std::pair<const int64_t *, int64_t>> attrDefaultValueMap = {
+    std::map<std::string, std::pair<const int64_t*, int64_t>> attrDefaultValueMap = {
         {ANTIQUANT_MODE_NAME, {opParamInfo_.antiquantMode, ANTI_QUANT_MODE_DEFAULT_VALUE}},
         {KEY_ANTIQUANT_MODE_NAME, {opParamInfo_.keyAntiquantMode, KEY_ANTI_QUANT_MODE_DEFAULT_VALUE}},
         {VALUE_ANTIQUANT_MODE_NAME, {opParamInfo_.valueAntiquantMode, VALUE_ANTI_QUANT_MODE_DEFAULT_VALUE}},
@@ -515,11 +515,11 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaAntiquantInt8Inner() const
 
 ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaAntiquantInt8() const
 {
-    std::map<std::string, const void *> kvAntiquantScaleMap = {
+    std::map<std::string, const void*> kvAntiquantScaleMap = {
         {KEY_ANTIQUANT_SCALE_NAME, opParamInfo_.keyAntiquantScale.tensor},
         {VALUE_ANTIQUANT_SCALE_NAME, opParamInfo_.valueAntiquantScale.tensor},
     };
-    std::map<std::string, const void *> kvAntiquantOffsetMap = {
+    std::map<std::string, const void*> kvAntiquantOffsetMap = {
         {KEY_ANTIQUANT_OFFSET_NAME, opParamInfo_.keyAntiquantOffset.tensor},
         {VALUE_ANTIQUANT_OFFSET_NAME, opParamInfo_.valueAntiquantOffset.tensor},
     };
@@ -528,8 +528,8 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaAntiquantInt8() const
         return ge::GRAPH_FAILED;
     }
 
-    std::map<std::string, const void *> gqaAntiquantInt8ParamExistMap = {};
-    std::map<std::string, const void *> gqaAntiquantInt8ParamNotExistMap = {
+    std::map<std::string, const void*> gqaAntiquantInt8ParamExistMap = {};
+    std::map<std::string, const void*> gqaAntiquantInt8ParamNotExistMap = {
         // antiquantParam
         {KEY_ROPE_ANTIQUANT_SCALE_NAME, opParamInfo_.keyRopeAntiquantScale.tensor},
         // fullquantParam
@@ -539,7 +539,7 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaAntiquantInt8() const
         {DEQUANT_SCALE_QUERY_NAME, opParamInfo_.dequantScaleQuery.tensor},
     };
 
-    std::map<std::string, std::pair<const int64_t *, int64_t>> attrDefaultValueMap = {
+    std::map<std::string, std::pair<const int64_t*, int64_t>> attrDefaultValueMap = {
         {QUERY_QUANT_MODE_NAME, {opParamInfo_.queryQuantMode, QUERY_QUANT_MODE_DEFAULT_VALUE}},
     };
     if (CheckExistenceByMap(gqaAntiquantInt8ParamExistMap, gqaAntiquantInt8ParamNotExistMap) != ge::GRAPH_SUCCESS ||
@@ -552,7 +552,7 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaAntiquantInt8() const
 
 ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaAntiquantInt4() const
 {
-    std::map<std::string, const void *> kvAntiquantScaleMap = {
+    std::map<std::string, const void*> kvAntiquantScaleMap = {
         {KEY_ANTIQUANT_OFFSET_NAME, opParamInfo_.keyAntiquantOffset.tensor},
         {VALUE_ANTIQUANT_OFFSET_NAME, opParamInfo_.valueAntiquantOffset.tensor},
     };
@@ -560,8 +560,8 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaAntiquantInt4() const
         return ge::GRAPH_FAILED;
     }
 
-    std::map<std::string, const void *> gqaAntiquantInt4ParamExistMap = {};
-    std::map<std::string, const void *> gqaAntiquantInt4ParamNotExistMap = {
+    std::map<std::string, const void*> gqaAntiquantInt4ParamExistMap = {};
+    std::map<std::string, const void*> gqaAntiquantInt4ParamNotExistMap = {
         // antiquantParam
         {KEY_ROPE_ANTIQUANT_SCALE_NAME, opParamInfo_.keyRopeAntiquantScale.tensor},
         // fullquantParam
@@ -574,7 +574,7 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaAntiquantInt4() const
         {QUANT_OFFSET2_NAME, opParamInfo_.quantOffset2.tensor},
     };
 
-    std::map<std::string, std::pair<const int64_t *, int64_t>> attrDefaultValueMap = {
+    std::map<std::string, std::pair<const int64_t*, int64_t>> attrDefaultValueMap = {
         {QUERY_QUANT_MODE_NAME, {opParamInfo_.queryQuantMode, QUERY_QUANT_MODE_DEFAULT_VALUE}},
     };
     if (CheckExistenceByMap(gqaAntiquantInt4ParamExistMap, gqaAntiquantInt4ParamNotExistMap) != ge::GRAPH_SUCCESS ||
@@ -595,14 +595,14 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaAntiquant() const
 
 ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaFullquant() const
 {
-    std::map<std::string, const void *> gqaFullquantParamExistMap = {
+    std::map<std::string, const void*> gqaFullquantParamExistMap = {
         // fullquantParam
         {DEQUANT_SCALE1_NAME, opParamInfo_.deqScale1.tensor},
         {QUANT_SCALE1_NAME, opParamInfo_.quantScale1.tensor},
         {DEQUANT_SCALE2_NAME, opParamInfo_.deqScale2.tensor},
     };
 
-    std::map<std::string, const void *> gqaFullquantParamNotExistMap = {
+    std::map<std::string, const void*> gqaFullquantParamNotExistMap = {
         // antiquantParam
         {ANTIQUANT_SCALE_NAME, opParamInfo_.antiquantScale.tensor},
         {ANTIQUANT_OFFSET_NAME, opParamInfo_.antiquantOffset.tensor},
@@ -618,7 +618,7 @@ ge::graphStatus FiaTilingCheck::CheckParaExistenceGqaFullquant() const
         {VALUE_SHARED_PREFIX_NAME, opParamInfo_.valueSharedPrefix.tensor},
         {ACTUAL_SHARED_PREFIX_LEN_NAME, opParamInfo_.actualSharedPrefixLen.tensor}};
 
-    std::map<std::string, std::pair<const int64_t *, int64_t>> attrDefaultValueMap = {
+    std::map<std::string, std::pair<const int64_t*, int64_t>> attrDefaultValueMap = {
         {ANTIQUANT_MODE_NAME, {opParamInfo_.antiquantMode, ANTI_QUANT_MODE_DEFAULT_VALUE}},
         {KEY_ANTIQUANT_MODE_NAME, {opParamInfo_.keyAntiquantMode, KEY_ANTI_QUANT_MODE_DEFAULT_VALUE}},
         {VALUE_ANTIQUANT_MODE_NAME, {opParamInfo_.valueAntiquantMode, VALUE_ANTI_QUANT_MODE_DEFAULT_VALUE}},

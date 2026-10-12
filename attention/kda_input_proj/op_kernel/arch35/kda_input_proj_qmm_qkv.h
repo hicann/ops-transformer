@@ -32,9 +32,9 @@ class KdaInputProjQmmQkv {
 public:
     __aicore__ inline KdaInputProjQmmQkv() {}
 
-    __aicore__ inline void Init(__gm__ uint8_t *quantX, __gm__ uint8_t *weightQkv, __gm__ uint8_t *xScale,
-                                __gm__ uint8_t *weightQkvScale, __gm__ uint8_t *qkv,
-                                const optiling::KdaInputProjTilingData *__restrict tiling);
+    __aicore__ inline void Init(__gm__ uint8_t* quantX, __gm__ uint8_t* weightQkv, __gm__ uint8_t* xScale,
+                                __gm__ uint8_t* weightQkvScale, __gm__ uint8_t* qkv,
+                                const optiling::KdaInputProjTilingData* __restrict tiling);
     __aicore__ inline void Process();
 
 protected:
@@ -66,19 +66,19 @@ protected:
 
     __aicore__ inline Params BuildBlazeParams() const;
 
-    const optiling::KdaInputProjTilingData *tiling_{nullptr};
-    __gm__ uint8_t *quantX_{nullptr};
-    __gm__ uint8_t *weightQkv_{nullptr};
-    __gm__ uint8_t *xScale_{nullptr};
-    __gm__ uint8_t *weightQkvScale_{nullptr};
-    __gm__ uint8_t *qkv_{nullptr};
+    const optiling::KdaInputProjTilingData* tiling_{nullptr};
+    __gm__ uint8_t* quantX_{nullptr};
+    __gm__ uint8_t* weightQkv_{nullptr};
+    __gm__ uint8_t* xScale_{nullptr};
+    __gm__ uint8_t* weightQkvScale_{nullptr};
+    __gm__ uint8_t* qkv_{nullptr};
 };
 
 template <typename TypePack>
-__aicore__ inline void KdaInputProjQmmQkv<TypePack>::Init(__gm__ uint8_t *quantX, __gm__ uint8_t *weightQkv,
-                                                          __gm__ uint8_t *xScale, __gm__ uint8_t *weightQkvScale,
-                                                          __gm__ uint8_t *qkv,
-                                                          const optiling::KdaInputProjTilingData *__restrict tiling)
+__aicore__ inline void KdaInputProjQmmQkv<TypePack>::Init(__gm__ uint8_t* quantX, __gm__ uint8_t* weightQkv,
+                                                          __gm__ uint8_t* xScale, __gm__ uint8_t* weightQkvScale,
+                                                          __gm__ uint8_t* qkv,
+                                                          const optiling::KdaInputProjTilingData* __restrict tiling)
 {
     quantX_ = quantX;
     weightQkv_ = weightQkv;
@@ -91,8 +91,8 @@ __aicore__ inline void KdaInputProjQmmQkv<TypePack>::Init(__gm__ uint8_t *quantX
 template <typename TypePack>
 __aicore__ inline typename KdaInputProjQmmQkv<TypePack>::Params KdaInputProjQmmQkv<TypePack>::BuildBlazeParams() const
 {
-    const auto &base = tiling_->baseParams;
-    const auto &td = tiling_->qmmQkvParams;
+    const auto& base = tiling_->baseParams;
+    const auto& td = tiling_->qmmQkvParams;
     Params params{};
     params.problemShape = ProblemShape{static_cast<int64_t>(base.tSize), static_cast<int64_t>(base.qkvSize),
                                        static_cast<int64_t>(base.hiddenSize), NO_BATCH};

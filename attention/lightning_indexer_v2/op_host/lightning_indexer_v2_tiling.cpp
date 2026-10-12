@@ -71,7 +71,7 @@ std::string LIV2DataTypeToSerialString(ge::DataType type)
     }
 }
 
-static std::string ToStringRaw(const gert::Shape &shape)
+static std::string ToStringRaw(const gert::Shape& shape)
 {
     std::ostringstream liV2Oss;
     const size_t liV2DimCount = shape.GetDimNum();
@@ -628,7 +628,7 @@ ge::graphStatus LIV2InfoParser::CheckKeyContiguous() const
     // Non-PA_BBND: check starts from axis 0
     size_t checkStartIdx = (kLayout_ == DataLayout::PA_BBND) ? 1 : 0;
     if (!keyStridesVec_.empty() && liV2Params_.key.shape != nullptr) {
-        auto &shape = liV2Params_.key.shape->GetStorageShape();
+        auto& shape = liV2Params_.key.shape->GetStorageShape();
         std::vector<uint32_t> expectedStrides;
         if (kLayout_ == DataLayout::BSND || kLayout_ == DataLayout::PA_BBND) {
             expectedStrides = {shape.GetDim(1) * shape.GetDim(2) * shape.GetDim(3), shape.GetDim(2) * shape.GetDim(3),
@@ -666,8 +666,8 @@ ge::graphStatus LIV2InfoParser::GetN1Size()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus LIV2InfoParser::GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor,
-                                                    const std::string &actualSeqLenName) const
+ge::graphStatus LIV2InfoParser::GetActualSeqLenSize(int64_t& size, const gert::Tensor* tensor,
+                                                    const std::string& actualSeqLenName) const
 {
     size = tensor->GetShapeSize() - 1;
     if (size <= 0) {
@@ -1058,7 +1058,7 @@ ge::graphStatus LIV2InfoParser::ValidateInputShapesMatch()
     return ge::GRAPH_SUCCESS;
 }
 
-void LIV2InfoParser::GenerateInfo(LIV2TilingInfo &liInfo)
+void LIV2InfoParser::GenerateInfo(LIV2TilingInfo& liInfo)
 {
     liInfo.opName = opName_;
     liInfo.platformInfo = platformInfo_;
@@ -1098,7 +1098,7 @@ void LIV2InfoParser::GenerateInfo(LIV2TilingInfo &liInfo)
     liInfo.inputKLayout = kLayout_;
 }
 
-ge::graphStatus LIV2InfoParser::ParseAndCheck(LIV2TilingInfo &liInfo)
+ge::graphStatus LIV2InfoParser::ParseAndCheck(LIV2TilingInfo& liInfo)
 {
     if (ge::GRAPH_SUCCESS != GetOpName() || ge::GRAPH_SUCCESS != GetNpuInfo() || ge::GRAPH_SUCCESS != GetOpParaInfo() ||
         ge::GRAPH_SUCCESS != CheckLiv2RequiredParameters()) {
@@ -1130,13 +1130,13 @@ ge::graphStatus LIV2InfoParser::ParseAndCheck(LIV2TilingInfo &liInfo)
 }
 
 // --------------------------TilingPrepare函数定义-------------------------------------
-static ge::graphStatus TilingPrepareForLightningIndexerV2(gert::TilingParseContext * /* context */)
+static ge::graphStatus TilingPrepareForLightningIndexerV2(gert::TilingParseContext* /* context */)
 {
     return ge::GRAPH_SUCCESS;
 }
 
 // --------------------------LightningIndexerV2Tiling类成员函数定义-----------------------
-ge::graphStatus LightningIndexerV2Tiling::DoTiling(LIV2TilingInfo *tilingInfo)
+ge::graphStatus LightningIndexerV2Tiling::DoTiling(LIV2TilingInfo* tilingInfo)
 {
     // -------------set blockdim-----------------
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo->platformInfo);
@@ -1178,7 +1178,7 @@ ge::graphStatus LightningIndexerV2Tiling::DoTiling(LIV2TilingInfo *tilingInfo)
         workspaceSize += V1_DECODE_DATA_NUM * S1_BASE_SIZE * V1_DECODE_PARAM_NUM * V1_DECODE_PARAM_ELEM_SIZE * aicNum;
     }
 
-    size_t *liV2WorkSpaces = context_->GetWorkspaceSizes(1);
+    size_t* liV2WorkSpaces = context_->GetWorkspaceSizes(1);
     liV2WorkSpaces[0] = workspaceSize;
 
     // -------------set tilingdata-----------------
@@ -1218,7 +1218,7 @@ ge::graphStatus LightningIndexerV2Tiling::DoTiling(LIV2TilingInfo *tilingInfo)
 }
 
 // --------------------------Tiling函数定义---------------------------
-ge::graphStatus TilingForLightningIndexerV2(gert::TilingContext *context)
+ge::graphStatus TilingForLightningIndexerV2(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("LightningIndexerV2", "Tiling context is null."),
                 return ge::GRAPH_FAILED);

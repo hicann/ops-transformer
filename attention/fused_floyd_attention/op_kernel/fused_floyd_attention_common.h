@@ -127,7 +127,7 @@ __aicore__ inline bool hasInvalidLine(uint16_t softMaxCheckRes, uint32_t bitIdx)
     return ((softMaxCheckRes >> bitIdx) & 0x01);
 }
 
-__aicore__ inline void UpdateSoftMaxCheckRes(uint16_t &softMaxCheckRes, uint32_t bitIdx, bool bitValue)
+__aicore__ inline void UpdateSoftMaxCheckRes(uint16_t& softMaxCheckRes, uint32_t bitIdx, bool bitValue)
 {
     if (bitIdx >= SOFTMAX_CHECK_RES_BITS) {
         return;
@@ -168,23 +168,23 @@ __aicore__ inline bool IsIncludeInvalidLine(uint16_t softMaxCheckRes, uint32_t b
 }
 
 template <typename T>
-__aicore__ inline void GetExtremeValue(T &negativeScalar, T &positiveScalar)
+__aicore__ inline void GetExtremeValue(T& negativeScalar, T& positiveScalar)
 {
     if constexpr (IsSameType<T, float>::value) {
         uint32_t tmp1 = NEGATIVE_MIN_VAULE_FP32;
         uint32_t tmp2 = POSITIVE_MAX_VALUE_FP32;
-        negativeScalar = *((float *)&tmp1);
-        positiveScalar = *((float *)&tmp2);
+        negativeScalar = *((float*)&tmp1);
+        positiveScalar = *((float*)&tmp2);
     } else {
         uint16_t tmp1 = NEGATIVE_MIN_VAULE_FP16;
         uint16_t tmp2 = POSITIVE_MAX_VALUE_FP16;
-        negativeScalar = *((half *)&tmp1);
-        positiveScalar = *((half *)&tmp2);
+        negativeScalar = *((half*)&tmp1);
+        positiveScalar = *((half*)&tmp2);
     }
 }
 
 template <typename T>
-__aicore__ inline void DataCopy2D(const LocalTensor<T> &dstLocal, const GlobalTensor<T> &srcGlobal, const uint32_t d0,
+__aicore__ inline void DataCopy2D(const LocalTensor<T>& dstLocal, const GlobalTensor<T>& srcGlobal, const uint32_t d0,
                                   const uint32_t d1, const uint32_t orgD1, uint64_t paddingValue = 0)
 {
     if (d1 % (BLOCK_BYTE / sizeof(T)) == 0 && orgD1 % (BLOCK_BYTE / sizeof(T)) == 0) {
@@ -202,8 +202,8 @@ __aicore__ inline void DataCopy2D(const LocalTensor<T> &dstLocal, const GlobalTe
     }
 }
 
-__aicore__ inline int64_t ComputeOffsetForCausal(const int64_t &delta, const uint32_t &s1BaseSize,
-                                                 const uint32_t &s2BaseSize, const uint32_t &attenMaskS2Size)
+__aicore__ inline int64_t ComputeOffsetForCausal(const int64_t& delta, const uint32_t& s1BaseSize,
+                                                 const uint32_t& s2BaseSize, const uint32_t& attenMaskS2Size)
 {
     if (delta <= 0) {
         return Min(-1 * delta, s1BaseSize);
@@ -212,8 +212,8 @@ __aicore__ inline int64_t ComputeOffsetForCausal(const int64_t &delta, const uin
     }
 }
 
-__aicore__ inline int64_t ComputeOffsetForPrefixRectangle(const int64_t &delta, const uint32_t &s2BaseSize,
-                                                          const uint32_t &attenMaskS2Size)
+__aicore__ inline int64_t ComputeOffsetForPrefixRectangle(const int64_t& delta, const uint32_t& s2BaseSize,
+                                                          const uint32_t& attenMaskS2Size)
 {
     // attenMask S1 is same to S2
     if (delta <= 0) {
@@ -226,8 +226,8 @@ __aicore__ inline int64_t ComputeOffsetForPrefixRectangle(const int64_t &delta, 
 }
 
 template <typename T>
-__aicore__ inline void NzToNd(Nz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmResGm, LocalTensor<T> &tempUb,
-                              LocalTensor<T> &bmmResUb)
+__aicore__ inline void NzToNd(Nz2NdInfo& nz2NdInfo, const GlobalTensor<T>& bmmResGm, LocalTensor<T>& tempUb,
+                              LocalTensor<T>& bmmResUb)
 {
     // 1.将bmm1结果由GM搬至UB，每块数据在UB上间隔1个block，防止BANK冲突
     DataCopyParams dataCopyParams;

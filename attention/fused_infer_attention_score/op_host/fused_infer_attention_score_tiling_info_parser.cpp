@@ -32,8 +32,8 @@ namespace optiling {
 
 namespace {
 // 判断tensor是否连续，逻辑与 BaseChecker::CheckTensorContiguous 一致
-ge::graphStatus CheckTensorContiguousLocal(const uint32_t &tensorDimNum, const gert::Shape &inputShape,
-                                           const gert::Stride *strides, int32_t &index)
+ge::graphStatus CheckTensorContiguousLocal(const uint32_t& tensorDimNum, const gert::Shape& inputShape,
+                                           const gert::Stride* strides, int32_t& index)
 {
     if (strides == nullptr || strides->GetDimNum() == 0) {
         return ge::GRAPH_SUCCESS;
@@ -58,8 +58,8 @@ ge::graphStatus CheckTensorContiguousLocal(const uint32_t &tensorDimNum, const g
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus ValidateStrideLocal(const char *opName, const char *tensorName, const gert::Shape &inputShape,
-                                    const gert::Stride *strides)
+ge::graphStatus ValidateStrideLocal(const char* opName, const char* tensorName, const gert::Shape& inputShape,
+                                    const gert::Stride* strides)
 {
     OP_CHECK_IF(strides == nullptr, OP_LOGE(opName, "Failed to get stride metadata for view input %s.", tensorName),
                 return ge::GRAPH_FAILED);
@@ -80,7 +80,7 @@ ge::graphStatus ValidateStrideLocal(const char *opName, const char *tensorName, 
     return ge::GRAPH_SUCCESS;
 }
 
-void BuildContiguousStride(const gert::Shape &shape, gert::Stride &strides)
+void BuildContiguousStride(const gert::Shape& shape, gert::Stride& strides)
 {
     strides.SetDimNum(shape.GetDimNum());
     uint64_t stride = 1;
@@ -90,8 +90,8 @@ void BuildContiguousStride(const gert::Shape &shape, gert::Stride &strides)
     }
 }
 
-ge::graphStatus ValidateForwardedStrideRankLocal(const char *opName, const char *tensorName,
-                                                 const gert::Stride *strides, uint32_t requiredRank)
+ge::graphStatus ValidateForwardedStrideRankLocal(const char* opName, const char* tensorName,
+                                                 const gert::Stride* strides, uint32_t requiredRank)
 {
     OP_CHECK_IF(strides == nullptr || strides->GetDimNum() < requiredRank,
                 OP_LOGE(opName, "The stride rank of %s must be at least %u for the selected PA layout.", tensorName,
@@ -100,14 +100,14 @@ ge::graphStatus ValidateForwardedStrideRankLocal(const char *opName, const char 
     return ge::GRAPH_SUCCESS;
 }
 
-bool HasUsableStride(const gert::Stride *stride)
+bool HasUsableStride(const gert::Stride* stride)
 {
     return stride != nullptr && stride->GetDimNum() > 0;
 }
 
-bool HasStrideMetadata(const std::vector<gert::Stride *> &strides)
+bool HasStrideMetadata(const std::vector<gert::Stride*>& strides)
 {
-    for (const gert::Stride *stride : strides) {
+    for (const gert::Stride* stride : strides) {
         if (HasUsableStride(stride)) {
             return true;
         }
@@ -236,12 +236,12 @@ ge::graphStatus FiaInfoParser::GetEmptyTensorFlag()
             return ge::GRAPH_FAILED;
         }
     }
-    for (auto &kTensor : kCache_) {
+    for (auto& kTensor : kCache_) {
         if (kTensor->GetStorageShape().GetShapeSize() != 0) {
             return ge::GRAPH_SUCCESS;
         }
     }
-    for (auto &vTensor : vCache_) {
+    for (auto& vTensor : vCache_) {
         if (vTensor->GetStorageShape().GetShapeSize() != 0) {
             return ge::GRAPH_SUCCESS;
         }
@@ -281,7 +281,7 @@ ge::graphStatus FiaInfoParser::GetLegacyIfaFlag()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FiaInfoParser::GetActualSeqLenQSize(uint32_t &size)
+ge::graphStatus FiaInfoParser::GetActualSeqLenQSize(uint32_t& size)
 {
     if (opParamInfo_.actualSeqLengthsQ.tensor == nullptr) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
@@ -846,16 +846,16 @@ void FiaInfoParser::GetPreNextToken()
     }
 }
 
-ge::graphStatus FiaInfoParser::GetTensorListCache(uint32_t index, const std::string &name,
-                                                  std::vector<gert::StorageShape *> &cache,
-                                                  std::vector<gert::Stride *> &strides)
+ge::graphStatus FiaInfoParser::GetTensorListCache(uint32_t index, const std::string& name,
+                                                  std::vector<gert::StorageShape*>& cache,
+                                                  std::vector<gert::Stride*>& strides)
 {
     cache.clear();
     strides.clear();
     uint32_t bIdx = 0;
     while ((context_->GetDynamicInputShape(index, bIdx)) != nullptr) {
-        cache.push_back(const_cast<gert::StorageShape *>(context_->GetDynamicInputShape(index, bIdx)));
-        strides.push_back(const_cast<gert::Stride *>(context_->GetDynamicInputStride(index, bIdx)));
+        cache.push_back(const_cast<gert::StorageShape*>(context_->GetDynamicInputShape(index, bIdx)));
+        strides.push_back(const_cast<gert::Stride*>(context_->GetDynamicInputStride(index, bIdx)));
         bIdx++;
     }
     if (bIdx == 0) {
@@ -971,7 +971,7 @@ ge::graphStatus FiaInfoParser::GetS1Size()
         if (GetActualSeqLenQSize(b) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
-        const int64_t *actualSeqQ = opParamInfo_.actualSeqLengthsQ.tensor->GetData<int64_t>();
+        const int64_t* actualSeqQ = opParamInfo_.actualSeqLengthsQ.tensor->GetData<int64_t>();
         if (actualSeqQ == nullptr) {
             if (queryShape_->CheckHasShapeT(__func__) != ge::GRAPH_SUCCESS) {
                 return ge::GRAPH_FAILED;
@@ -1052,11 +1052,11 @@ ge::graphStatus FiaInfoParser::GetKvLayout()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FiaInfoParser::GetMaxActualSeq(const gert::Tensor *actualSeqLensTensor, FiaLayout layout,
-                                               int64_t &maxActualSeqLen)
+ge::graphStatus FiaInfoParser::GetMaxActualSeq(const gert::Tensor* actualSeqLensTensor, FiaLayout layout,
+                                               int64_t& maxActualSeqLen)
 {
     maxActualSeqLen = 0;
-    const int64_t *actualLenData = actualSeqLensTensor->GetData<int64_t>();
+    const int64_t* actualLenData = actualSeqLensTensor->GetData<int64_t>();
     if (actualLenData != nullptr) {
         uint32_t loop = std::min(static_cast<uint32_t>(actualSeqLensTensor->GetShapeSize()), bSize_);
         for (uint32_t i = 0; i < loop; i++) {
@@ -1135,7 +1135,7 @@ ge::graphStatus FiaInfoParser::GetMaxBlockNumPerBatch()
         }
         maxBlockNumPerBatch_ = opParamInfo_.blockTable.tensor->GetStorageShape().GetDim(1);
     } else {
-        const gert::Tensor *actSeqLenKV = opParamInfo_.actualSeqLengths.tensor;
+        const gert::Tensor* actSeqLenKV = opParamInfo_.actualSeqLengths.tensor;
         int32_t actualSeqKVPerBatch = 0;
         int32_t blockNumPerBatch = 0;
         int64_t blockNumValid = 0;
@@ -1396,7 +1396,7 @@ ge::graphStatus FiaInfoParser::GetGSize()
 ge::graphStatus FiaInfoParser::GetAttenMaskSparse9Info()
 {
     // sparse9时，mask形状：TND时传入∑s1²，其余场景传入[B,S1,S1]
-    auto *maskTensor = opParamInfo_.attenMask.tensor;
+    auto* maskTensor = opParamInfo_.attenMask.tensor;
     uint32_t maskDimNum = maskTensor->GetStorageShape().GetDimNum();
 
     // TND传入的mask
@@ -1497,7 +1497,7 @@ ge::graphStatus FiaInfoParser::GetAttenMaskInfo()
         if (sparseMode == 9U) {
             return GetAttenMaskSparse9Info();
         }
-        auto *maskTensor = opParamInfo_.attenMask.tensor;
+        auto* maskTensor = opParamInfo_.attenMask.tensor;
         uint32_t maskDimNum = maskTensor->GetStorageShape().GetDimNum();
         if (maskDimNum == 2U) {
             if (s1Size_ == 1U) { // qs=1 仅支持BS
@@ -1559,13 +1559,13 @@ void FiaInfoParser::GetPaddingSizeFlag()
 
 void FiaInfoParser::GetMaskFlag()
 {
-    auto *maskTensor = opParamInfo_.attenMask.tensor;
+    auto* maskTensor = opParamInfo_.attenMask.tensor;
     attenMaskFlag_ = (maskTensor != nullptr) && (maskTensor->GetStorageShape().GetShapeSize() != 0);
 }
 
 ge::graphStatus FiaInfoParser::GetPseShiftFlag()
 {
-    const gert::StorageShape *pseShiftShape = context_->GetOptionalInputShape(PSE_SHIFT_INDEX);
+    const gert::StorageShape* pseShiftShape = context_->GetOptionalInputShape(PSE_SHIFT_INDEX);
     if (opParamInfo_.pseType != nullptr) {
         pseType_ = *opParamInfo_.pseType;
         if (pseType_ != static_cast<int64_t>(IfaPseType::PSE_OUTER_MUL_ADD_TYPE)) {
@@ -1626,7 +1626,7 @@ ge::graphStatus FiaInfoParser::GetSystemPrefix()
     return ge::GRAPH_SUCCESS;
 }
 
-void FiaInfoParser::ProcessKVActualSeqLoop(const int64_t *actualLenData, uint32_t loop)
+void FiaInfoParser::ProcessKVActualSeqLoop(const int64_t* actualLenData, uint32_t loop)
 {
     int64_t preActualLen = 0;
     for (uint32_t i = 0; i < loop; i++) {
@@ -1655,7 +1655,7 @@ void FiaInfoParser::ProcessKVActualSeqLoop(const int64_t *actualLenData, uint32_
     }
 }
 
-void FiaInfoParser::ProcessQActualSeqLoop(const int64_t *actualLenQData, uint32_t loop)
+void FiaInfoParser::ProcessQActualSeqLoop(const int64_t* actualLenQData, uint32_t loop)
 {
     int64_t preActualLen = 0;
     for (uint32_t i = 0; i < loop; i++) {
@@ -1684,7 +1684,7 @@ ge::graphStatus FiaInfoParser::GetActualSeqInfo()
             isAccumKVSeq_ = true;
         }
         if (opParamInfo_.actualSeqLengths.tensor->GetData<int64_t>() != nullptr) {
-            const int64_t *actualLenData = opParamInfo_.actualSeqLengths.tensor->GetData<int64_t>();
+            const int64_t* actualLenData = opParamInfo_.actualSeqLengths.tensor->GetData<int64_t>();
             uint32_t loop = ((actualLenDims_ == 1) && (kvListSeqLens_.size() == 1)) ? 1 : bSize_;
             loop = std::min(loop, actualLenDims_);
             ProcessKVActualSeqLoop(actualLenData, loop);
@@ -1694,7 +1694,7 @@ ge::graphStatus FiaInfoParser::GetActualSeqInfo()
     }
 
     if (opParamInfo_.actualSeqLengthsQ.tensor != nullptr) {
-        const int64_t *actualLenQData = opParamInfo_.actualSeqLengthsQ.tensor->GetData<int64_t>();
+        const int64_t* actualLenQData = opParamInfo_.actualSeqLengthsQ.tensor->GetData<int64_t>();
         actualLenQDims_ = opParamInfo_.actualSeqLengthsQ.tensor->GetShapeSize();
         if ((qLayout_ == FiaLayout::TND) || (qLayout_ == FiaLayout::NTD)) {
             isAccumQSeq_ = true;
@@ -1756,7 +1756,7 @@ ge::graphStatus FiaInfoParser::GetFullQuantMode()
     return ge::GRAPH_SUCCESS;
 }
 
-TilingKeyLayout FiaInfoParser::MapStringToLayout(FiaLayout &layoutString) const
+TilingKeyLayout FiaInfoParser::MapStringToLayout(FiaLayout& layoutString) const
 {
     const std::map<FiaLayout, TilingKeyLayout> layoutMap = {
         {FiaLayout::BSH, TilingKeyLayout::BSH_BSND}, {FiaLayout::BSND, TilingKeyLayout::BSH_BSND},
@@ -1773,7 +1773,7 @@ TilingKeyLayout FiaInfoParser::MapStringToLayout(FiaLayout &layoutString) const
     return TilingKeyLayout::BSH_BSND;
 }
 
-void FiaInfoParser::GenerateFeatureInfo(FiaTilingInfo &fiaInfo)
+void FiaInfoParser::GenerateFeatureInfo(FiaTilingInfo& fiaInfo)
 {
     // empty tensor
     fiaInfo.emptyTensorFlag = emptyTensorFlag_;
@@ -1827,7 +1827,7 @@ void FiaInfoParser::GenerateFeatureInfo(FiaTilingInfo &fiaInfo)
     fiaInfo.isOutQuantEnable = isPostQuantEnable_;
 }
 
-void FiaInfoParser::GenerateLayoutInfo(FiaTilingInfo &fiaInfo)
+void FiaInfoParser::GenerateLayoutInfo(FiaTilingInfo& fiaInfo)
 {
     fiaInfo.qLayout = qLayout_;
     fiaInfo.kvLayout = kvLayout_;
@@ -1845,7 +1845,7 @@ void FiaInfoParser::GenerateLayoutInfo(FiaTilingInfo &fiaInfo)
     }
 }
 
-void FiaInfoParser::GenerateInfo(FiaTilingInfo &fiaInfo)
+void FiaInfoParser::GenerateInfo(FiaTilingInfo& fiaInfo)
 {
     fiaInfo.opName = opName_;
     fiaInfo.platformInfo = platformInfo_;
@@ -1921,7 +1921,7 @@ void FiaInfoParser::GenerateInfo(FiaTilingInfo &fiaInfo)
     GenerateLayoutInfo(fiaInfo);
 }
 
-void FiaInfoParser::GenerateAxisInfo(FiaTilingInfo &fiaInfo)
+void FiaInfoParser::GenerateAxisInfo(FiaTilingInfo& fiaInfo)
 {
     fiaInfo.bSize = bSize_;
     fiaInfo.n1Size = n1Size_;
@@ -1936,7 +1936,7 @@ void FiaInfoParser::GenerateAxisInfo(FiaTilingInfo &fiaInfo)
     fiaInfo.kTSize = keyTSize_;
 }
 
-void FiaInfoParser::GenerateDtypeInfo(FiaTilingInfo &fiaInfo)
+void FiaInfoParser::GenerateDtypeInfo(FiaTilingInfo& fiaInfo)
 {
     fiaInfo.inputQType = inputQType_;
     fiaInfo.inputKvType = inputKvType_;
@@ -1945,7 +1945,7 @@ void FiaInfoParser::GenerateDtypeInfo(FiaTilingInfo &fiaInfo)
     fiaInfo.outputType = outputType_;
 }
 
-ge::graphStatus FiaInfoParser::Parse(FiaTilingInfo &fiaInfo)
+ge::graphStatus FiaInfoParser::Parse(FiaTilingInfo& fiaInfo)
 {
     if (context_ == nullptr) {
         OP_LOGE(fiaInfo.opName, "tiling context is nullptr!");

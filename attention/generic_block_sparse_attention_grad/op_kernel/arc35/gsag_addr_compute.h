@@ -29,9 +29,9 @@ class AddrComputeModule {
     static constexpr uint32_t INPUT_LAYOUT = GSAG_TYPE::input_layout;
 
 public:
-    __aicore__ inline void Init(const TILING_CLASS *tilingData, __gm__ uint8_t *cuSeqQ, __gm__ uint8_t *cuSeqKv,
-                                __gm__ uint8_t *sequsedQ, __gm__ uint8_t *sequsedKv, __gm__ uint8_t *sparseBlockIdx,
-                                __gm__ uint8_t *sparseBlockCount, __gm__ uint8_t *metadata)
+    __aicore__ inline void Init(const TILING_CLASS* tilingData, __gm__ uint8_t* cuSeqQ, __gm__ uint8_t* cuSeqKv,
+                                __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sequsedKv, __gm__ uint8_t* sparseBlockIdx,
+                                __gm__ uint8_t* sparseBlockCount, __gm__ uint8_t* metadata)
     {
         tilingData_ = tilingData;
         cuSeqQ_ = cuSeqQ;
@@ -40,7 +40,7 @@ public:
         sequsedKv_ = sequsedKv;
         sparseBlockIdx_ = sparseBlockIdx;
         sparseBlockCount_ = sparseBlockCount;
-        metadata_ = reinterpret_cast<__gm__ int32_t *>(metadata);
+        metadata_ = reinterpret_cast<__gm__ int32_t*>(metadata);
 
         cubeCoreIdx_ = GetBlockIdx();
         if ASCEND_IS_AIV {
@@ -74,7 +74,7 @@ public:
         inMetaTask_ = false;
     }
 
-    __aicore__ inline void GetRunTimeInfo(RunTimeInfo &info)
+    __aicore__ inline void GetRunTimeInfo(RunTimeInfo& info)
     {
         info = {};
         if (!inMetaTask_) {
@@ -131,7 +131,7 @@ private:
 
             const int64_t countOffset =
                 (static_cast<int64_t>(curB_) * constInfo_.kv_head_num + curN2_) * constInfo_.num_j + curJ_;
-            curCount_ = reinterpret_cast<__gm__ int32_t *>(sparseBlockCount_)[countOffset];
+            curCount_ = reinterpret_cast<__gm__ int32_t*>(sparseBlockCount_)[countOffset];
             if (curCount_ < 0) {
                 curCount_ = 0;
             } else if (curCount_ > constInfo_.max_s1) {
@@ -161,7 +161,7 @@ private:
         return false;
     }
 
-    __aicore__ inline void FillRunTimeInfo(RunTimeInfo &info, int32_t m, int32_t n)
+    __aicore__ inline void FillRunTimeInfo(RunTimeInfo& info, int32_t m, int32_t n)
     {
         const int32_t n1Cur = curN2_ * constInfo_.group_size + curG_;
         const int32_t tileS2Start = curBlockS2Start_ + s2Offset_;
@@ -204,14 +204,14 @@ private:
         info.is_singlekv_last = lastS1OfS2 ? 1 : 0;
     }
 
-    const TILING_CLASS *tilingData_{nullptr};
-    __gm__ uint8_t *cuSeqQ_{nullptr};
-    __gm__ uint8_t *cuSeqKv_{nullptr};
-    __gm__ uint8_t *sequsedQ_{nullptr};
-    __gm__ uint8_t *sequsedKv_{nullptr};
-    __gm__ uint8_t *sparseBlockIdx_{nullptr};
-    __gm__ uint8_t *sparseBlockCount_{nullptr};
-    __gm__ int32_t *metadata_{nullptr};
+    const TILING_CLASS* tilingData_{nullptr};
+    __gm__ uint8_t* cuSeqQ_{nullptr};
+    __gm__ uint8_t* cuSeqKv_{nullptr};
+    __gm__ uint8_t* sequsedQ_{nullptr};
+    __gm__ uint8_t* sequsedKv_{nullptr};
+    __gm__ uint8_t* sparseBlockIdx_{nullptr};
+    __gm__ uint8_t* sparseBlockCount_{nullptr};
+    __gm__ int32_t* metadata_{nullptr};
     ConstInfo constInfo_{};
     int32_t cubeCoreIdx_{0};
     int32_t taskStart_{0};

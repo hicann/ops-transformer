@@ -30,62 +30,67 @@ protected:
 
 TEST_F(KvCompressEpilogProto, kv_compress_epilog_infershape_bf16)
 {
-    gert::InfershapeContextPara infershapeContextPara("KvCompressEpilog",
-                                                      {
-                                                          {{{128, 16, 1, 384}, {128, 16, 1, 384}}, ge::DT_UINT8, ge::FORMAT_ND}, // cache 4D [blockNum,blockSize,1,headDim]
-                                                          {{{1024, 256}, {1024, 256}}, ge::DT_BF16, ge::FORMAT_ND},              // x
-                                                          {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND},                       // slotMapping
-                                                      },
-                                                      {
-                                                          {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND}, // cacheOut (in-place)
-                                                      },
-                                                      {
-                                                          {"quant_group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
-                                                          {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                          {"round_scale", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
-                                                          {"x_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
-                                                      });
+    gert::InfershapeContextPara infershapeContextPara(
+        "KvCompressEpilog",
+        {
+            {{{128, 16, 1, 384}, {128, 16, 1, 384}},
+             ge::DT_UINT8,
+             ge::FORMAT_ND},                                          // cache 4D [blockNum,blockSize,1,headDim]
+            {{{1024, 256}, {1024, 256}}, ge::DT_BF16, ge::FORMAT_ND}, // x
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND},          // slotMapping
+        },
+        {
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND}, // cacheOut (in-place)
+        },
+        {
+            {"quant_group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
+            {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"round_scale", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+            {"x_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+        });
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS);
 }
 
 TEST_F(KvCompressEpilogProto, kv_compress_epilog_infershape_hif8_fp4_mode2)
 {
     // mode2(rope hifloat8 + nope FLOAT4_E2M1): 输出 cache 仍与输入 cache 同 shape/dtype, 与 quant_mode 无关。
-    gert::InfershapeContextPara infershapeContextPara("KvCompressEpilog",
-                                                      {
-                                                          {{{128, 16, 1, 256}, {128, 16, 1, 256}}, ge::DT_UINT8, ge::FORMAT_ND}, // cache 4D
-                                                          {{{1024, 256}, {1024, 256}}, ge::DT_BF16, ge::FORMAT_ND},              // x (d=256 -> nope=192)
-                                                          {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND},                       // slotMapping
-                                                      },
-                                                      {
-                                                          {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND}, // cacheOut (in-place)
-                                                      },
-                                                      {
-                                                          {"quant_group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)},
-                                                          {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
-                                                          {"round_scale", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
-                                                          {"x_scale", Ops::Transformer::AnyValue::CreateFrom<float>(0.5f)},
-                                                      });
+    gert::InfershapeContextPara infershapeContextPara(
+        "KvCompressEpilog",
+        {
+            {{{128, 16, 1, 256}, {128, 16, 1, 256}}, ge::DT_UINT8, ge::FORMAT_ND}, // cache 4D
+            {{{1024, 256}, {1024, 256}}, ge::DT_BF16, ge::FORMAT_ND},              // x (d=256 -> nope=192)
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND},                       // slotMapping
+        },
+        {
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND}, // cacheOut (in-place)
+        },
+        {
+            {"quant_group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)},
+            {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"round_scale", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+            {"x_scale", Ops::Transformer::AnyValue::CreateFrom<float>(0.5f)},
+        });
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS);
 }
 
 TEST_F(KvCompressEpilogProto, kv_compress_epilog_infershape_dynamic)
 {
-    gert::InfershapeContextPara infershapeContextPara("KvCompressEpilog",
-                                                      {
-                                                          {{{-2}, {128, 16, 1, 384}}, ge::DT_UINT8, ge::FORMAT_ND},
-                                                          {{{-2}, {1024, 256}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                          {{{-2}, {1024}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                          {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
-                                                      },
-                                                      {
-                                                          {"quant_group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
-                                                          {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-                                                          {"round_scale", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
-                                                          {"x_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
-                                                      });
+    gert::InfershapeContextPara infershapeContextPara(
+        "KvCompressEpilog",
+        {
+            {{{-2}, {128, 16, 1, 384}}, ge::DT_UINT8, ge::FORMAT_ND},
+            {{{-2}, {1024, 256}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{-2}, {1024}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+        },
+        {
+            {"quant_group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
+            {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"round_scale", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+            {"x_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+        });
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS);
 }
 

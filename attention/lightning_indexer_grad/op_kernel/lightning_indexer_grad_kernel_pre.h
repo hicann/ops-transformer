@@ -34,21 +34,21 @@ public:
     using dataType = typename LIGT::dataType;
 
     __aicore__ inline LIGVectorPre(){};
-    __aicore__ inline void Init(TPipe *pipe_in, __gm__ uint8_t *dq, __gm__ uint8_t *dweights, __gm__ uint8_t *workspace,
-                                const LIGTilingData *__restrict orgTilingData, __gm__ uint8_t *actualSeqLengthsQ);
+    __aicore__ inline void Init(TPipe* pipe_in, __gm__ uint8_t* dq, __gm__ uint8_t* dweights, __gm__ uint8_t* workspace,
+                                const LIGTilingData* __restrict orgTilingData, __gm__ uint8_t* actualSeqLengthsQ);
     __aicore__ inline void Process();
     __aicore__ inline void SyncALLCores();
-    __aicore__ inline void DoSplitOnGM(uint32_t coreNum, uint32_t gmSize, uint32_t &PreBlockTotal, int64_t &initSize,
-                                       int64_t &Offset);
+    __aicore__ inline void DoSplitOnGM(uint32_t coreNum, uint32_t gmSize, uint32_t& PreBlockTotal, int64_t& initSize,
+                                       int64_t& Offset);
 
     using D_T = typename LIGT::dataType;
 
 protected:
-    TPipe *pipe;
+    TPipe* pipe;
     GlobalTensor<float> dkWorkSpaceGm;
     GlobalTensor<float> dkCoreWorkspaceGM;
 
-    const LIGTilingData *__restrict tilingData;
+    const LIGTilingData* __restrict tilingData;
 
     uint32_t cBlockIdx;
     uint32_t kPreBlockTotal;
@@ -70,8 +70,8 @@ protected:
 };
 
 template <typename LIGT>
-__aicore__ inline void LIGVectorPre<LIGT>::DoSplitOnGM(uint32_t coreNum, uint32_t gmSize, uint32_t &PreBlockTotal,
-                                                       int64_t &initSize, int64_t &Offset)
+__aicore__ inline void LIGVectorPre<LIGT>::DoSplitOnGM(uint32_t coreNum, uint32_t gmSize, uint32_t& PreBlockTotal,
+                                                       int64_t& initSize, int64_t& Offset)
 {
     uint32_t PreBlockFactor = CeilDiv(gmSize, coreNum);
     PreBlockTotal = CeilDiv(gmSize, PreBlockFactor);
@@ -82,27 +82,27 @@ __aicore__ inline void LIGVectorPre<LIGT>::DoSplitOnGM(uint32_t coreNum, uint32_
 }
 
 template <typename LIGT>
-__aicore__ inline void LIGVectorPre<LIGT>::Init(TPipe *pipe_in, __gm__ uint8_t *dq, __gm__ uint8_t *dweights,
-                                                __gm__ uint8_t *workspace,
-                                                const LIGTilingData *__restrict orgTilingData,
-                                                __gm__ uint8_t *actualSeqLengthsQ)
+__aicore__ inline void LIGVectorPre<LIGT>::Init(TPipe* pipe_in, __gm__ uint8_t* dq, __gm__ uint8_t* dweights,
+                                                __gm__ uint8_t* workspace,
+                                                const LIGTilingData* __restrict orgTilingData,
+                                                __gm__ uint8_t* actualSeqLengthsQ)
 {
     cBlockIdx = GetBlockIdx();
     pipe = pipe_in;
     tilingData = orgTilingData;
 
-    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + tilingData->dkWorkSpaceOffset / sizeof(float));
+    dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace + tilingData->dkWorkSpaceOffset / sizeof(float));
 
     // Init workspace to store per-core dKey partial results.
-    dkCoreWorkspaceGM.SetGlobalBuffer((__gm__ float *)workspace + tilingData->dkCoreWorkspaceOffset / sizeof(float));
+    dkCoreWorkspaceGM.SetGlobalBuffer((__gm__ float*)workspace + tilingData->dkCoreWorkspaceOffset / sizeof(float));
 
     DoSplitOnGM(tilingData->usedCoreNum, tilingData->dkSize, kPreBlockTotal, initdkSize, dkOffset);
 
     if (LIGT::layout == LIG_LAYOUT::TND) {
-        dqGm.SetGlobalBuffer((__gm__ D_T *)dq);
-        dweightsGm.SetGlobalBuffer((__gm__ D_T *)dweights);
+        dqGm.SetGlobalBuffer((__gm__ D_T*)dq);
+        dweightsGm.SetGlobalBuffer((__gm__ D_T*)dweights);
         if (actualSeqLengthsQ != nullptr) {
-            actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ uint32_t *)actualSeqLengthsQ, tilingData->batch);
+            actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ uint32_t*)actualSeqLengthsQ, tilingData->batch);
         }
         uint32_t actualSeqTotalLenQ = 0;
         if (tilingData->batch > 0) {

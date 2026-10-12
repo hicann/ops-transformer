@@ -253,8 +253,8 @@ ge::graphStatus MaskedCausalConv1dTilingArch35::GetShapeAttrsInfo()
 }
 
 // ---- CalcLoopParams ----
-ge::graphStatus MaskedCausalConv1dTilingArch35::CalcLoopParams(int64_t len, int64_t factor, int64_t &loopNum,
-                                                               int64_t &tailFactor)
+ge::graphStatus MaskedCausalConv1dTilingArch35::CalcLoopParams(int64_t len, int64_t factor, int64_t& loopNum,
+                                                               int64_t& tailFactor)
 {
     if (factor == 0) {
         OP_LOGE(context_->GetNodeName(), "CalcLoopParams: factor is 0");
@@ -562,7 +562,7 @@ ge::graphStatus MaskedCausalConv1dTilingArch35::PostTiling()
 
     auto tilingDataSize = sizeof(MaskedCausalConv1dTilingData);
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&td), tilingDataSize);
+                           reinterpret_cast<void*>(&td), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;

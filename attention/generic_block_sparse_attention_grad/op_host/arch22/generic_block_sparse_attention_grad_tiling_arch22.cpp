@@ -118,12 +118,12 @@ static inline uint32_t CeilDiv(uint32_t n1, uint32_t n2)
 // 非 null，且标量 GetShapeSize()==1（空乘积）。因此不能用 GetShapeSize() 判定 presence，
 // 这里按仓库通行口径（causal_conv1d / grouped_matmul / moe_finalize_routing）用 rank 判定：
 // dim_num==0 或 [0] 视为缺省。绝不读 device 数据值。
-static inline const gert::Tensor *NormalizeOptionalTensor(const gert::Tensor *tensor)
+static inline const gert::Tensor* NormalizeOptionalTensor(const gert::Tensor* tensor)
 {
     if (tensor == nullptr) {
         return nullptr;
     }
-    const auto &shape = tensor->GetStorageShape();
+    const auto& shape = tensor->GetStorageShape();
     const size_t dimNum = shape.GetDimNum();
     const bool absent = (dimNum == 0) || (dimNum == 1 && shape.GetDim(0) <= 0);
     return absent ? nullptr : tensor;
@@ -135,24 +135,24 @@ public:
     GBSAGTiling() = default;
     ~GBSAGTiling() = default;
 
-    ge::graphStatus GetGBSAGTiling(gert::TilingContext *context, GenericBlockSparseAttentionGradTilingData &tilingData);
-    ge::graphStatus SetTilingData(gert::TilingContext *context, GenericBlockSparseAttentionGradTilingData &tilingData);
+    ge::graphStatus GetGBSAGTiling(gert::TilingContext* context, GenericBlockSparseAttentionGradTilingData& tilingData);
+    ge::graphStatus SetTilingData(gert::TilingContext* context, GenericBlockSparseAttentionGradTilingData& tilingData);
 
 private:
-    ge::graphStatus GetNpuInfo(gert::TilingContext *context);
-    ge::graphStatus ProcessInput(gert::TilingContext *context);
-    ge::graphStatus CalculateTaskSplit(gert::TilingContext *context);
-    ge::graphStatus CalculateWorkSpace(gert::TilingContext *context);
-    ge::graphStatus FillTilingData(gert::TilingContext *context);
+    ge::graphStatus GetNpuInfo(gert::TilingContext* context);
+    ge::graphStatus ProcessInput(gert::TilingContext* context);
+    ge::graphStatus CalculateTaskSplit(gert::TilingContext* context);
+    ge::graphStatus CalculateWorkSpace(gert::TilingContext* context);
+    ge::graphStatus FillTilingData(gert::TilingContext* context);
 
-    ge::graphStatus CalculatePostUbBaseSize(gert::TilingContext *context);
-    ge::graphStatus CalculateSoftmaxGradTiling(gert::TilingContext *context);
+    ge::graphStatus CalculatePostUbBaseSize(gert::TilingContext* context);
+    ge::graphStatus CalculateSoftmaxGradTiling(gert::TilingContext* context);
 
-    ge::graphStatus ProcessTND(gert::TilingContext *context);
-    ge::graphStatus ProcessBNSD(gert::TilingContext *context);
-    ge::graphStatus ProcessBSND(gert::TilingContext *context);
+    ge::graphStatus ProcessTND(gert::TilingContext* context);
+    ge::graphStatus ProcessBNSD(gert::TilingContext* context);
+    ge::graphStatus ProcessBSND(gert::TilingContext* context);
 
-    ge::graphStatus ProcessAttrs(gert::TilingContext *context);
+    ge::graphStatus ProcessAttrs(gert::TilingContext* context);
 
     uint64_t GenerateTilingKey() const;
 
@@ -201,10 +201,10 @@ private:
 
     ge::DataType dataType_ = ge::DT_FLOAT16;
 
-    GenericBlockSparseAttentionGradTilingData *tilingData_ = nullptr;
+    GenericBlockSparseAttentionGradTilingData* tilingData_ = nullptr;
 };
 
-ge::graphStatus GBSAGTiling::GetNpuInfo(gert::TilingContext *context)
+ge::graphStatus GBSAGTiling::GetNpuInfo(gert::TilingContext* context)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
 
@@ -218,10 +218,10 @@ ge::graphStatus GBSAGTiling::GetNpuInfo(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GBSAGTiling::ProcessTND(gert::TilingContext *context)
+ge::graphStatus GBSAGTiling::ProcessTND(gert::TilingContext* context)
 {
-    const auto *queryShape = context->GetInputShape(ToIndex(InputId::Query));
-    const auto *kvShape = context->GetInputShape(ToIndex(InputId::Key));
+    const auto* queryShape = context->GetInputShape(ToIndex(InputId::Query));
+    const auto* kvShape = context->GetInputShape(ToIndex(InputId::Key));
     if (queryShape->GetOriginShape().GetDimNum() != TND_DIM_NUM ||
         kvShape->GetOriginShape().GetDimNum() != TND_DIM_NUM) {
         OP_LOGE(context->GetNodeName(), "TND format must have 3 dimensions");
@@ -257,16 +257,16 @@ ge::graphStatus GBSAGTiling::ProcessTND(gert::TilingContext *context)
 
     // 迭代 2 不在主算子 Host 侧读取动态长度 tensor 的值。最大物理维度只
     // 用于静态 workspace/stride 规划，动态调度和实际长度由 metadata/K_OUT 消费。
-    const auto *idxShape = context->GetInputShape(ToIndex(InputId::RsvdBlockIdx));
+    const auto* idxShape = context->GetInputShape(ToIndex(InputId::RsvdBlockIdx));
     maxQSeqlen_ = static_cast<uint32_t>(idxShape->GetOriginShape().GetDim(3));
     maxKvSeqlen_ = 0;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GBSAGTiling::ProcessBNSD(gert::TilingContext *context)
+ge::graphStatus GBSAGTiling::ProcessBNSD(gert::TilingContext* context)
 {
-    const auto *queryShape = context->GetInputShape(ToIndex(InputId::Query));
-    const auto *kvShape = context->GetInputShape(ToIndex(InputId::Key));
+    const auto* queryShape = context->GetInputShape(ToIndex(InputId::Query));
+    const auto* kvShape = context->GetInputShape(ToIndex(InputId::Key));
     auto idxShape = context->GetInputShape(ToIndex(InputId::RsvdBlockIdx));
     auto countShape = context->GetInputShape(ToIndex(InputId::RsvdBlockCount));
     if (queryShape->GetOriginShape().GetDimNum() != BNSD_DIM_NUM ||
@@ -308,10 +308,10 @@ ge::graphStatus GBSAGTiling::ProcessBNSD(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GBSAGTiling::ProcessBSND(gert::TilingContext *context)
+ge::graphStatus GBSAGTiling::ProcessBSND(gert::TilingContext* context)
 {
-    const auto *queryShape = context->GetInputShape(ToIndex(InputId::Query));
-    const auto *kvShape = context->GetInputShape(ToIndex(InputId::Key));
+    const auto* queryShape = context->GetInputShape(ToIndex(InputId::Query));
+    const auto* kvShape = context->GetInputShape(ToIndex(InputId::Key));
     batch_ = static_cast<uint32_t>(queryShape->GetOriginShape().GetDim(BNSD_DIM_B));
     maxQSeqlen_ = static_cast<uint32_t>(queryShape->GetOriginShape().GetDim(BNSD_DIM_N));
     numHeads_ = static_cast<uint32_t>(queryShape->GetOriginShape().GetDim(BNSD_DIM_S));
@@ -345,11 +345,11 @@ ge::graphStatus GBSAGTiling::ProcessBSND(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GBSAGTiling::ProcessAttrs(gert::TilingContext *context)
+ge::graphStatus GBSAGTiling::ProcessAttrs(gert::TilingContext* context)
 {
     // block_shape 为 def 级 OPTIONAL ListInt 属性（默认 {1, 128}），与前向算子一致；
     // aclnn 路径总是显式传入，图模式缺省时框架会落地 def 默认值。
-    const auto *blockShapeArr = context->GetAttrs()->GetListInt(ToIndex(AttrId::BlockShape));
+    const auto* blockShapeArr = context->GetAttrs()->GetListInt(ToIndex(AttrId::BlockShape));
     if (blockShapeArr == nullptr) {
         OP_LOGE(context->GetNodeName(), "block_shape attr is missing");
         return ge::GRAPH_FAILED;
@@ -372,7 +372,7 @@ ge::graphStatus GBSAGTiling::ProcessAttrs(gert::TilingContext *context)
         blockShapeY_ = normalizedY;
     }
     if (layout_ == GsagInputLayout::TND) {
-        const auto *countShape = context->GetInputShape(ToIndex(InputId::RsvdBlockCount));
+        const auto* countShape = context->GetInputShape(ToIndex(InputId::RsvdBlockCount));
         maxKvSeqlen_ =
             static_cast<uint32_t>(countShape->GetOriginShape().GetDim(2)) * static_cast<uint32_t>(blockShapeY_);
     }
@@ -401,8 +401,8 @@ ge::graphStatus GBSAGTiling::ProcessAttrs(gert::TilingContext *context)
         maskType_ = 0;
     }
 
-    const auto *sparseLayout = context->GetAttrs()->GetAttrPointer<int64_t>(ToIndex(AttrId::LayoutSparsePattern));
-    const auto *residualMode = context->GetAttrs()->GetAttrPointer<int64_t>(ToIndex(AttrId::ResidualBlockMode));
+    const auto* sparseLayout = context->GetAttrs()->GetAttrPointer<int64_t>(ToIndex(AttrId::LayoutSparsePattern));
+    const auto* residualMode = context->GetAttrs()->GetAttrPointer<int64_t>(ToIndex(AttrId::ResidualBlockMode));
     const int64_t layoutSparsePattern = sparseLayout != nullptr ? *sparseLayout : 1;
     const int64_t residualBlockMode = residualMode != nullptr ? *residualMode : 0;
     if (layoutSparsePattern != 1 || residualBlockMode != 0) {
@@ -454,7 +454,7 @@ ge::graphStatus GBSAGTiling::ProcessAttrs(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GBSAGTiling::ProcessInput(gert::TilingContext *context)
+ge::graphStatus GBSAGTiling::ProcessInput(gert::TilingContext* context)
 {
     if (context->GetAttrs()->GetAttrPointer<char>(ToIndex(AttrId::QInputLayout)) == nullptr) {
         return ge::GRAPH_FAILED;
@@ -490,8 +490,8 @@ ge::graphStatus GBSAGTiling::ProcessInput(gert::TilingContext *context)
         OP_LOGE(context->GetNodeName(), "rsvdBlockCount shape is null");
         return ge::GRAPH_FAILED;
     }
-    const auto *rsvdBlockIdxShape = context->GetInputShape(ToIndex(InputId::RsvdBlockIdx));
-    const auto *rsvdBlockCountShape = context->GetInputShape(ToIndex(InputId::RsvdBlockCount));
+    const auto* rsvdBlockIdxShape = context->GetInputShape(ToIndex(InputId::RsvdBlockIdx));
+    const auto* rsvdBlockCountShape = context->GetInputShape(ToIndex(InputId::RsvdBlockCount));
     if (rsvdBlockIdxShape->GetOriginShape().GetDimNum() != 4 ||
         rsvdBlockCountShape->GetOriginShape().GetDimNum() != 3) {
         OP_LOGE(context->GetNodeName(), "rsvdBlockIdx/count must be rank 4/3");
@@ -515,7 +515,7 @@ ge::graphStatus GBSAGTiling::ProcessInput(gert::TilingContext *context)
     return ProcessAttrs(context);
 }
 
-ge::graphStatus GBSAGTiling::CalculatePostUbBaseSize(gert::TilingContext *context)
+ge::graphStatus GBSAGTiling::CalculatePostUbBaseSize(gert::TilingContext* context)
 {
     // post 计算：划分空间块数，256 字节对齐
     postUbBaseSize_ = static_cast<uint64_t>(ubSize_ - sizeof(GenericBlockSparseAttentionGradTilingData) - 2 * 1024) /
@@ -523,7 +523,7 @@ ge::graphStatus GBSAGTiling::CalculatePostUbBaseSize(gert::TilingContext *contex
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GBSAGTiling::CalculateSoftmaxGradTiling(gert::TilingContext *context)
+ge::graphStatus GBSAGTiling::CalculateSoftmaxGradTiling(gert::TilingContext* context)
 {
     // 安全校验：防止除以 0 导致 Core Dump 崩溃
     if (headDim_ == 0) {
@@ -544,7 +544,7 @@ ge::graphStatus GBSAGTiling::CalculateSoftmaxGradTiling(gert::TilingContext *con
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GBSAGTiling::CalculateTaskSplit(gert::TilingContext *context)
+ge::graphStatus GBSAGTiling::CalculateTaskSplit(gert::TilingContext* context)
 {
     (void)context;
     if (aicNum_ == 0) {
@@ -554,7 +554,7 @@ ge::graphStatus GBSAGTiling::CalculateTaskSplit(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GBSAGTiling::CalculateWorkSpace(gert::TilingContext *context)
+ge::graphStatus GBSAGTiling::CalculateWorkSpace(gert::TilingContext* context)
 {
     if (blockDim_ == 0) {
         OP_LOGE(context->GetNodeName(), "blockDim is 0");
@@ -584,7 +584,7 @@ ge::graphStatus GBSAGTiling::CalculateWorkSpace(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GBSAGTiling::FillTilingData(gert::TilingContext *context)
+ge::graphStatus GBSAGTiling::FillTilingData(gert::TilingContext* context)
 {
     if (tilingData_ == nullptr) {
         return ge::GRAPH_FAILED;
@@ -646,8 +646,8 @@ uint64_t GBSAGTiling::GenerateTilingKey() const
     return tilingKey;
 }
 
-ge::graphStatus GBSAGTiling::GetGBSAGTiling(gert::TilingContext *context,
-                                            GenericBlockSparseAttentionGradTilingData &tilingData)
+ge::graphStatus GBSAGTiling::GetGBSAGTiling(gert::TilingContext* context,
+                                            GenericBlockSparseAttentionGradTilingData& tilingData)
 {
     tilingData_ = &tilingData;
     ge::graphStatus ret = GetNpuInfo(context);
@@ -695,8 +695,8 @@ ge::graphStatus GBSAGTiling::GetGBSAGTiling(gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GBSAGTiling::SetTilingData(gert::TilingContext *context,
-                                           GenericBlockSparseAttentionGradTilingData &tilingData)
+ge::graphStatus GBSAGTiling::SetTilingData(gert::TilingContext* context,
+                                           GenericBlockSparseAttentionGradTilingData& tilingData)
 {
     OP_CHECK_IF(
         context->GetRawTilingData() == nullptr,
@@ -709,7 +709,7 @@ ge::graphStatus GBSAGTiling::SetTilingData(gert::TilingContext *context,
 
 class GenericBlockSparseAttentionGradArch22Tiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit GenericBlockSparseAttentionGradArch22Tiling(gert::TilingContext *context)
+    explicit GenericBlockSparseAttentionGradArch22Tiling(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 

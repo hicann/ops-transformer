@@ -146,6 +146,6 @@ TEST_F(KvQuantSparseFlashAttentionV2TilingArch35, KvQuantSparseFlashAttentionV2_
 // Tiling data classes are registered for the op
 TEST_F(KvQuantSparseFlashAttentionV2TilingArch35, KvQuantSparseFlashAttentionV2_tiling_data_class_registered)
 {
-    auto &factory = optiling::CTilingDataClassFactory::GetInstance();
+    auto& factory = optiling::CTilingDataClassFactory::GetInstance();
     EXPECT_NE(factory.CreateTilingDataInstance("KvQuantSparseFlashAttentionV2"), nullptr);
 }

@@ -72,9 +72,9 @@ template <FIA_LAYOUT KV_LAYOUT_T, const bool PAGE_ATTENTION>
 __aicore__ inline constexpr GmFormat GetKVFormat()
 {
     if constexpr (PAGE_ATTENTION) {
-        static_assert((KV_LAYOUT_T == FIA_LAYOUT::BSH) || (KV_LAYOUT_T == FIA_LAYOUT::BNSD) ||
-                          (KV_LAYOUT_T == FIA_LAYOUT::NZ),
-                      "Get Key or Value GmFormat fail, KV_LAYOUT_T is incorrect when PageAttention");
+        static_assert(
+            (KV_LAYOUT_T == FIA_LAYOUT::BSH) || (KV_LAYOUT_T == FIA_LAYOUT::BNSD) || (KV_LAYOUT_T == FIA_LAYOUT::NZ),
+            "Get Key or Value GmFormat fail, KV_LAYOUT_T is incorrect when PageAttention");
         if constexpr (KV_LAYOUT_T == FIA_LAYOUT::BSH) {
             return GmFormat::PA_BnBsND;
         } else if constexpr (KV_LAYOUT_T == FIA_LAYOUT::BNSD) {
@@ -156,10 +156,11 @@ __aicore__ inline constexpr UbFormat GetPseUbFormat()
 
 // ----------------------------------------------Copy LSE UB To Gm arch22--------------------------------
 template <typename T, ActualSeqLensMode Q_MODE, bool WITH_ZERO_HEAD = false, typename ACTLEN_T = uint64_t>
-__aicore__ inline void
-DataCopySoftmaxLseBSND(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc, uint64_t bN2Offset, uint32_t mOffset,
-                       uint32_t dealCount, const AttentionCommon::ConstInfo &constInfo,
-                       ActualSeqLensParser<Q_MODE, ACTLEN_T, WITH_ZERO_HEAD> qActSeqLensParser, uint64_t bIdx)
+__aicore__ inline void DataCopySoftmaxLseBSND(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc,
+                                              uint64_t bN2Offset, uint32_t mOffset, uint32_t dealCount,
+                                              const AttentionCommon::ConstInfo& constInfo,
+                                              ActualSeqLensParser<Q_MODE, ACTLEN_T, WITH_ZERO_HEAD> qActSeqLensParser,
+                                              uint64_t bIdx)
 {
     uint32_t startS1Idx = mOffset / constInfo.gSize;
     uint32_t startGIdx = mOffset % constInfo.gSize;
@@ -193,10 +194,11 @@ DataCopySoftmaxLseBSND(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc, 
 }
 
 template <typename T, ActualSeqLensMode Q_MODE, bool WITH_ZERO_HEAD = false, typename ACTLEN_T = uint64_t>
-__aicore__ inline void
-DataCopySoftmaxLseBNSD(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc, uint64_t bN2Offset, uint32_t mOffset,
-                       uint32_t dealCount, const AttentionCommon::ConstInfo &constInfo,
-                       ActualSeqLensParser<Q_MODE, ACTLEN_T, WITH_ZERO_HEAD> qActSeqLensParser, uint64_t bIdx)
+__aicore__ inline void DataCopySoftmaxLseBNSD(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc,
+                                              uint64_t bN2Offset, uint32_t mOffset, uint32_t dealCount,
+                                              const AttentionCommon::ConstInfo& constInfo,
+                                              ActualSeqLensParser<Q_MODE, ACTLEN_T, WITH_ZERO_HEAD> qActSeqLensParser,
+                                              uint64_t bIdx)
 {
     uint64_t gOffset = mOffset / qActSeqLensParser.GetActualSeqLength(bIdx) * constInfo.qSeqSize;
     uint64_t seqOffset = mOffset % qActSeqLensParser.GetActualSeqLength(bIdx);
@@ -255,7 +257,7 @@ DataCopySoftmaxLseBNSD(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc, 
 template <typename T>
 __aicore__ inline void DataCopySoftmaxLseTND(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc,
                                              uint64_t bN2Offset, uint32_t mOffset, uint32_t dealCount,
-                                             const AttentionCommon::ConstInfo &constInfo)
+                                             const AttentionCommon::ConstInfo& constInfo)
 {
     uint32_t startS1Idx = mOffset / constInfo.gSize;
     uint32_t startGIdx = mOffset % constInfo.gSize;
@@ -286,7 +288,7 @@ __aicore__ inline void DataCopySoftmaxLseTND(GlobalTensor<float> softmaxLseGm, L
 template <typename T>
 __aicore__ inline void DataCopySoftmaxLseNTD(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc,
                                              uint64_t bN2Offset, uint32_t mOffset, uint32_t dealCount,
-                                             const AttentionCommon::ConstInfo &constInfo, uint32_t s1Size)
+                                             const AttentionCommon::ConstInfo& constInfo, uint32_t s1Size)
 {
     uint32_t startS1Idx = mOffset % s1Size;
     uint32_t startGIdx = mOffset / s1Size;
@@ -316,8 +318,8 @@ __aicore__ inline void DataCopySoftmaxLseNTD(GlobalTensor<float> softmaxLseGm, L
 
 // ---------------------------------------Set attention Gm To Zero--------------------------------
 template <GmFormat FORMAT, typename OUT_T, typename OffsetCalcType>
-__aicore__ inline void DealActSeqLenIsZero(uint32_t bIdx, uint32_t n2Idx, OffsetCalcType &offsetCalculator,
-                                           GlobalTensor<OUT_T> &attentionOutGm)
+__aicore__ inline void DealActSeqLenIsZero(uint32_t bIdx, uint32_t n2Idx, OffsetCalcType& offsetCalculator,
+                                           GlobalTensor<OUT_T>& attentionOutGm)
 {
     if constexpr (FORMAT == GmFormat::TNGD) {
         uint32_t s1Count = offsetCalculator.actualSeqLensQParser.GetTBase(bIdx + 1) -

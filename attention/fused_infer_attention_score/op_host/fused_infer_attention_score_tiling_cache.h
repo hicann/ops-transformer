@@ -44,7 +44,7 @@ public:
           maxBytes_(bytes)
     {}
 
-    static FusedInferAttentionScoreTilingCache &GetInstance()
+    static FusedInferAttentionScoreTilingCache& GetInstance()
     {
         static FusedInferAttentionScoreTilingCache instance;
         return instance;
@@ -53,13 +53,13 @@ public:
     static bool IsCacheDisabled()
     {
         static const bool disabled = [] {
-            const char *value = std::getenv("FIA_TILING_CACHE_DISABLE");
+            const char* value = std::getenv("FIA_TILING_CACHE_DISABLE");
             return value != nullptr && value[0] != '\0' && std::strcmp(value, "0") != 0;
         }();
         return disabled;
     }
 
-    static bool BuildKey(gert::TilingContext *context, std::string &key)
+    static bool BuildKey(gert::TilingContext* context, std::string& key)
     {
         if (context == nullptr || context->GetAttrs() == nullptr || context->GetPlatformInfo() == nullptr) {
             return false;
@@ -84,12 +84,12 @@ public:
         }
         Append<int32_t>(key, context->GetDeterministic());
 
-        const auto *attrs = context->GetAttrs();
+        const auto* attrs = context->GetAttrs();
         AppendAttr<int64_t>(key, attrs, ATTR_N_INDEX);
         AppendAttr<float>(key, attrs, ATTR_SCALE_INDEX);
         AppendAttr<int64_t>(key, attrs, ATTR_PRE_TOKEN_INDEX);
         AppendAttr<int64_t>(key, attrs, ATTR_NEXT_TOKEN_INDEX);
-        const char *layout = attrs->GetAttrPointer<char>(ATTR_INPUT_LAYOUT_INDEX);
+        const char* layout = attrs->GetAttrPointer<char>(ATTR_INPUT_LAYOUT_INDEX);
         if (layout == nullptr) {
             return false;
         }
@@ -135,19 +135,19 @@ public:
         return key.size() <= kMaxKeyBytes;
     }
 
-    static bool Snapshot(gert::TilingContext *context, const FiaTilingScheduleRecorder::Scope &scope,
-                         TilingResult &result)
+    static bool Snapshot(gert::TilingContext* context, const FiaTilingScheduleRecorder::Scope& scope,
+                         TilingResult& result)
     {
         if (context == nullptr || context->GetWorkspaceNum() != 1) {
             return false;
         }
-        auto *data = context->GetRawTilingData();
-        auto *workspace = context->GetWorkspaceSizes(1); // all cached FIA routes produce exactly one workspace
+        auto* data = context->GetRawTilingData();
+        auto* workspace = context->GetWorkspaceSizes(1); // all cached FIA routes produce exactly one workspace
         if (data == nullptr || data->GetData() == nullptr || workspace == nullptr ||
             data->GetDataSize() > data->GetCapacity() || data->GetDataSize() > kMaxBlobBytes) {
             return false;
         }
-        result.tilingDataBlob.assign(reinterpret_cast<const char *>(data->GetData()), data->GetDataSize());
+        result.tilingDataBlob.assign(reinterpret_cast<const char*>(data->GetData()), data->GetDataSize());
         result.tilingKey = context->GetTilingKey();
         result.blockDim = context->GetBlockDim();
         result.workspaceSize = workspace[0];
@@ -155,13 +155,13 @@ public:
         return true;
     }
 
-    static ge::graphStatus Restore(gert::TilingContext *context, const TilingResult &result)
+    static ge::graphStatus Restore(gert::TilingContext* context, const TilingResult& result)
     {
         if (context == nullptr) {
             return ge::GRAPH_FAILED;
         }
-        auto *data = context->GetRawTilingData();
-        auto *workspace = context->GetWorkspaceSizes(1);
+        auto* data = context->GetRawTilingData();
+        auto* workspace = context->GetWorkspaceSizes(1);
         if (data == nullptr || data->GetData() == nullptr || workspace == nullptr ||
             data->GetCapacity() < result.tilingDataBlob.size()) {
             return ge::GRAPH_FAILED;
@@ -178,7 +178,7 @@ public:
         return ge::GRAPH_SUCCESS;
     }
 
-    ResultPtr Get(const std::string &key)
+    ResultPtr Get(const std::string& key)
     {
         std::lock_guard<std::mutex> lock(mutex_);
         const auto iter = entries_.find(key);
@@ -189,7 +189,7 @@ public:
         return iter->second.result; // immutable shared ownership; restore/copy happens outside the lock
     }
 
-    bool Add(const std::string &key, const TilingResult &result)
+    bool Add(const std::string& key, const TilingResult& result)
     {
         if (key.size() > kMaxKeyBytes || result.tilingDataBlob.size() > kMaxBlobBytes) {
             return false;
@@ -240,28 +240,28 @@ private:
     std::unordered_map<std::string, Entry> entries_;
 
     template <typename T>
-    static void Append(std::string &key, const T &value)
+    static void Append(std::string& key, const T& value)
     {
-        key.append(reinterpret_cast<const char *>(&value), sizeof(T));
+        key.append(reinterpret_cast<const char*>(&value), sizeof(T));
     }
     template <typename T>
-    static void AppendAttr(std::string &key, const gert::RuntimeAttrs *attrs, uint32_t index)
+    static void AppendAttr(std::string& key, const gert::RuntimeAttrs* attrs, uint32_t index)
     {
-        const T *value = attrs->GetAttrPointer<T>(index);
+        const T* value = attrs->GetAttrPointer<T>(index);
         key.push_back(value != nullptr);
         if (value != nullptr) {
             Append(key, *value);
         }
     }
-    static void AppendShape(std::string &key, const gert::Shape &shape)
+    static void AppendShape(std::string& key, const gert::Shape& shape)
     {
         Append<uint32_t>(key, static_cast<uint32_t>(shape.GetDimNum()));
         for (size_t i = 0; i < shape.GetDimNum(); ++i) {
             Append<int64_t>(key, shape.GetDim(i));
         }
     }
-    static void AppendTensorMeta(std::string &key, const gert::StorageShape *shape,
-                                 const gert::CompileTimeTensorDesc *desc, const gert::Stride *stride)
+    static void AppendTensorMeta(std::string& key, const gert::StorageShape* shape,
+                                 const gert::CompileTimeTensorDesc* desc, const gert::Stride* stride)
     {
         key.push_back(shape != nullptr);
         if (shape != nullptr) {
@@ -282,10 +282,10 @@ private:
             }
         }
     }
-    static bool AppendDynamicInputs(std::string &key, gert::TilingContext *context, uint32_t index)
+    static bool AppendDynamicInputs(std::string& key, gert::TilingContext* context, uint32_t index)
     {
         for (uint32_t i = 0; i < kMaxDynamicTensors; ++i) {
-            const auto *shape = context->GetDynamicInputShape(index, i);
+            const auto* shape = context->GetDynamicInputShape(index, i);
             key.push_back(shape != nullptr);
             if (shape == nullptr) {
                 return true;
@@ -300,9 +300,9 @@ private:
         key.push_back(0);
         return true;
     }
-    static bool AppendHostTensorData(std::string &key, gert::TilingContext *context, uint32_t index)
+    static bool AppendHostTensorData(std::string& key, gert::TilingContext* context, uint32_t index)
     {
-        const auto *tensor = context->GetOptionalInputTensor(index);
+        const auto* tensor = context->GetOptionalInputTensor(index);
         key.push_back(tensor != nullptr);
         if (tensor == nullptr) {
             return true;
@@ -318,11 +318,11 @@ private:
         if (tensor->GetPlacement() != gert::kOnHost && tensor->GetPlacement() != gert::kFollowing) {
             return false; // never dereference device contents or cache an incomplete value key
         }
-        const auto *data = tensor->GetData<int64_t>();
+        const auto* data = tensor->GetData<int64_t>();
         if (data == nullptr) {
             return false;
         }
-        key.append(reinterpret_cast<const char *>(data), static_cast<size_t>(count) * sizeof(int64_t));
+        key.append(reinterpret_cast<const char*>(data), static_cast<size_t>(count) * sizeof(int64_t));
         return key.size() <= kMaxKeyBytes;
     }
 };

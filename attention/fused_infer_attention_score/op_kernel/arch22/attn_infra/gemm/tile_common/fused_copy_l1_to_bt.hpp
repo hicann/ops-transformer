@@ -16,9 +16,7 @@
 #include "../../../attn_infra/layout/fused_layout.hpp"
 #include "../../../attn_infra/gemm/fused_gemm_type.hpp"
 
-
 namespace NpuArch::Gemm::Tile {
-
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

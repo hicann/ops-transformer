@@ -26,7 +26,7 @@ struct MaskedCausalConv1dCompileInfo {
     uint64_t ubSize = 0;
 };
 
-static ge::graphStatus TilingMaskedCausalConv1d(gert::TilingContext *context)
+static ge::graphStatus TilingMaskedCausalConv1d(gert::TilingContext* context)
 {
     OP_LOGD(context->GetNodeName(), "MaskedCausalConv1d tiling start");
     MaskedCausalConv1dTilingArch35 tilingImpl(context);
@@ -35,7 +35,7 @@ static ge::graphStatus TilingMaskedCausalConv1d(gert::TilingContext *context)
     return status;
 }
 
-static ge::graphStatus TilingPrepareMaskedCausalConv1d(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareMaskedCausalConv1d(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("MaskedCausalConv1d", "context is null"), return ge::GRAPH_FAILED);
 

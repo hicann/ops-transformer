@@ -35,12 +35,12 @@ public:
                                                CubeBlockType, VecBlockType>;
 
     __aicore__ inline void InitUniqueConstInfo();
-    __aicore__ inline void InitUniqueRunInfo(const RunParamStr<isInfer> &runParam, RunInfo<isInfer> &runInfo);
+    __aicore__ inline void InitUniqueRunInfo(const RunParamStr<isInfer>& runParam, RunInfo<isInfer>& runInfo);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessMainLoop();
 
 private:
-    __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index, RunParamStr<isInfer> &runParam);
+    __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index, RunParamStr<isInfer>& runParam);
 };
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -88,7 +88,7 @@ __aicore__ inline void FlashAttentionScoreKernelInferMlaFullquant<CubeBlockType,
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreKernelInferMlaFullquant<CubeBlockType, VecBlockType>::InitUniqueRunInfo(
-    const RunParamStr<isInfer> &runParam, RunInfo<isInfer> &runInfo)
+    const RunParamStr<isInfer>& runParam, RunInfo<isInfer>& runInfo)
 {
     InitTaskParamByRun<CHILD_SPEC_TEMPLATE_ARGS, BaseClass::useDn, BaseClass::enableKVPrefix>(runParam, runInfo);
     ComputeOffset<CHILD_SPEC_TEMPLATE_ARGS, BaseClass::useDn, BaseClass::enableKVPrefix>(
@@ -211,7 +211,7 @@ __aicore__ inline void FlashAttentionScoreKernelInferMlaFullquant<CubeBlockType,
 
             for (int64_t s2LoopCount = 0; s2LoopCount <= s2LoopLimit; ++s2LoopCount) {
                 if (notLastThreeLoops) {
-                    RunInfo<isInfer> &runInfo1 = runInfo[taskIdx & 3];
+                    RunInfo<isInfer>& runInfo1 = runInfo[taskIdx & 3];
                     this->SetRunInfo(runInfo1, runParam, taskIdx, s2LoopCount, s2LoopLimit, multiCoreInnerIdx);
                     if ASCEND_IS_AIC {
                         this->cubeBlock.IterateBmm1(this->bmm1Buffers.Get(), runInfo1, this->constInfo);
@@ -219,14 +219,14 @@ __aicore__ inline void FlashAttentionScoreKernelInferMlaFullquant<CubeBlockType,
                 }
                 if (taskIdx > 0 && notLastTwoLoops) {
                     if ASCEND_IS_AIV {
-                        auto &runInfo3 = runInfo[(taskIdx + 3) & 3];
+                        auto& runInfo3 = runInfo[(taskIdx + 3) & 3];
                         this->vecBlock.ProcessVec1(this->l1PBuffers.Get(), this->bmm1Buffers.Get(), runInfo3,
                                                    this->constInfo);
                     }
                 }
                 if (taskIdx > 1 && notLast) {
                     if ASCEND_IS_AIC {
-                        RunInfo<isInfer> &runInfo2 = runInfo[(taskIdx + 2) & 3];
+                        RunInfo<isInfer>& runInfo2 = runInfo[(taskIdx + 2) & 3];
                         if constexpr (BaseClass::bmm2Write2Ub) {
                             this->cubeBlock.IterateBmm2(this->bmm2Buffers.Get(), this->l1PBuffers, runInfo2,
                                                         this->constInfo);
@@ -238,7 +238,7 @@ __aicore__ inline void FlashAttentionScoreKernelInferMlaFullquant<CubeBlockType,
                 }
                 if (taskIdx > 2) {
                     if ASCEND_IS_AIV {
-                        RunInfo<isInfer> &runInfo3 = runInfo[(taskIdx + 1) & 3];
+                        RunInfo<isInfer>& runInfo3 = runInfo[(taskIdx + 1) & 3];
                         if constexpr (BaseClass::bmm2Write2Ub) {
                             this->vecBlock.ProcessVec2(this->bmm2Buffers.Get(), runInfo3, this->constInfo);
                         } else {
@@ -274,7 +274,7 @@ __aicore__ inline void FlashAttentionScoreKernelInferMlaFullquant<CubeBlockType,
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void
 FlashAttentionScoreKernelInferMlaFullquant<CubeBlockType, VecBlockType>::ComputeAxisIdxByBnAndGs1(
-    int64_t bnIndex, int64_t gS1Index, RunParamStr<isInfer> &runParam)
+    int64_t bnIndex, int64_t gS1Index, RunParamStr<isInfer>& runParam)
 {
     runParam.goIdx = gS1Index / this->constInfo.s1OuterSize;
     runParam.s1oIdx = gS1Index % this->constInfo.s1OuterSize;

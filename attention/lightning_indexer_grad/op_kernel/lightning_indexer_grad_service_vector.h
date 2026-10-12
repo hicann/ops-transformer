@@ -34,7 +34,7 @@ public:
     using dataType = typename LIGT::dataType;
 
     __aicore__ inline LIGVector(){};
-    __aicore__ inline void Init(TPipe *pipe);
+    __aicore__ inline void Init(TPipe* pipe);
     __aicore__ inline void InitBuffers();
     __aicore__ inline void AllocEvents();
     __aicore__ inline void ReleaseEvents();
@@ -54,7 +54,7 @@ public:
                                     GlobalTensor<dataType> dweightsGmTensor, LIGCommon::ConstInfo constInfo,
                                     LIGCommon::RunInfo runInfo);
     __aicore__ inline void DeterministicMerge(GlobalTensor<float> dkCoreWorkspaceGM, GlobalTensor<float> dkWorkSpaceGm,
-                                              const LIGCommon::ConstInfo &constInfo, const LIGCommon::RunInfo &runInfo);
+                                              const LIGCommon::ConstInfo& constInfo, const LIGCommon::RunInfo& runInfo);
 
 protected:
     constexpr static int64_t TOTAL_SIZE = 189 * 1024;
@@ -113,7 +113,7 @@ protected:
     constexpr static int64_t zeroDataUbOffset = reduceUbOffset + reduceUbSize;
     constexpr static int64_t MAX_UB_SIZE = TOTAL_SIZE / sizeof(float) / 2;
 
-    TPipe *pipe;
+    TPipe* pipe;
     TBuf<> unifiedBuffer;
 
     event_t eventIdMte2ToV;
@@ -135,7 +135,7 @@ protected:
 };
 
 template <typename LIGT>
-__aicore__ inline void LIGVector<LIGT>::Init(TPipe *pipeIn)
+__aicore__ inline void LIGVector<LIGT>::Init(TPipe* pipeIn)
 {
     pipe = pipeIn;
     InitBuffers();
@@ -231,7 +231,7 @@ __aicore__ inline void LIGVector<LIGT>::GatherTopk(GlobalTensor<int32_t> sparseI
             ((cnt / splitDataCopyLen) & 1) ? eventIdMte2ToMTE3Ping : eventIdMte2ToMTE3Pong;
         event_t eventIdMte3ToMTE2PingPong =
             ((cnt / splitDataCopyLen) & 1) ? eventIdMte3ToMTE2Ping : eventIdMte3ToMTE2Pong;
-        LocalTensor<dataType> &gatherPingPongUb = ((cnt / splitDataCopyLen) & 1) ? gatherPingUb : gatherPongUb;
+        LocalTensor<dataType>& gatherPingPongUb = ((cnt / splitDataCopyLen) & 1) ? gatherPingUb : gatherPongUb;
         int64_t singleIndice = indiceUb.GetValue(i);
         bool isDualPrefetch = (i + 1 < loopEnd) && (indiceUb.GetValue(i + 1) == singleIndice + 1) &&
                               ((cnt % splitDataCopyLen) < splitDataCopyLen - 1);
@@ -312,7 +312,7 @@ __aicore__ inline void LIGVector<LIGT>::ScatterAdd(GlobalTensor<int32_t> sparseI
 
         event_t eventIdMte2ToMTE3 = (batch & 1) ? eventIdMte2ToMTE3Ping : eventIdMte2ToMTE3Pong;
         event_t eventIdMte3ToMTE2 = (batch & 1) ? eventIdMte3ToMTE2Ping : eventIdMte3ToMTE2Pong;
-        LocalTensor<float> &gatherPingPongUb = (batch & 1) ? gatherPingUb : gatherPongUb;
+        LocalTensor<float>& gatherPingPongUb = (batch & 1) ? gatherPingUb : gatherPongUb;
 
         AscendC::WaitFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMTE2);
 
@@ -358,8 +358,8 @@ __aicore__ inline void LIGVector<LIGT>::ScatterAdd(GlobalTensor<int32_t> sparseI
 template <typename LIGT>
 __aicore__ inline void LIGVector<LIGT>::DeterministicMerge(GlobalTensor<float> dkCoreWorkspaceGM,
                                                            GlobalTensor<float> dkWorkSpaceGm,
-                                                           const LIGCommon::ConstInfo &constInfo,
-                                                           const LIGCommon::RunInfo &runInfo)
+                                                           const LIGCommon::ConstInfo& constInfo,
+                                                           const LIGCommon::RunInfo& runInfo)
 {
     uint64_t determinLen = constInfo.determinLen;
     uint64_t determinBeginPos = constInfo.determinBeginPos;

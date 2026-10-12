@@ -20,16 +20,16 @@ using namespace ge;
 namespace ops {
 static constexpr int64_t IDX_0 = 0;
 
-static ge::graphStatus InferShapeLightningIndexerKLLoss(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeLightningIndexerKLLoss(gert::InferShapeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferShapeLightningIndexerKLLoss");
 
     // get input shapes
-    const gert::Shape *targetScoreShape = context->GetInputShape(IDX_0);
+    const gert::Shape* targetScoreShape = context->GetInputShape(IDX_0);
     OP_CHECK_NULL_WITH_CONTEXT(context, targetScoreShape);
 
     // get output shapes
-    gert::Shape *lossShape = context->GetOutputShape(IDX_0);
+    gert::Shape* lossShape = context->GetOutputShape(IDX_0);
     OP_CHECK_NULL_WITH_CONTEXT(context, lossShape);
 
     // 填充输出shape大小
@@ -41,7 +41,7 @@ static ge::graphStatus InferShapeLightningIndexerKLLoss(gert::InferShapeContext 
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeLightningIndexerKLLoss(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeLightningIndexerKLLoss(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferDataTypeLightningIndexerKLLoss");
 

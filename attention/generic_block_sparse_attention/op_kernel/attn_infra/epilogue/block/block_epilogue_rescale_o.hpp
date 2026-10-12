@@ -59,7 +59,7 @@ public:
     static constexpr uint32_t MAX_ROW_NUM_SUB_CORE = 256;
     static constexpr uint32_t SIZE_OF_16BIT = 2;
 
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource)
     {
         // Allocate UB space
         constexpr uint32_t LO_UB_TENSOR_OFFSET = 6 * UB_UINT8_BLOCK_SIZE;
@@ -134,12 +134,12 @@ public:
     __aicore__ inline void SubCoreCompute(
         AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementInput> gInput,
         AscendC::GlobalTensor<ElementUpdate> gUpdate, AscendC::GlobalTensor<ElementLse> gLse,
-        const LayoutOutput &layoutOutput, const LayoutInput &layoutInput, const LayoutUpdate &layoutUpdate,
-        const LayoutLse &layoutLse, uint32_t qNThisSubBlock, uint32_t qSThisSubBlock, uint32_t totalRowNum,
+        const LayoutOutput& layoutOutput, const LayoutInput& layoutInput, const LayoutUpdate& layoutUpdate,
+        const LayoutLse& layoutLse, uint32_t qNThisSubBlock, uint32_t qSThisSubBlock, uint32_t totalRowNum,
         uint32_t isFirstStackTile, uint32_t isLastStackTile, uint32_t curStackTileMod, uint32_t needRowLoop,
         uint32_t isLastRowLoop, uint32_t rowOffsetLoop, uint32_t proTokenIdx, uint32_t proTokenNum,
-        uint32_t epiTokenNum, uint32_t integralHeadNum, AscendC::GlobalTensor<float> &gPartialO,
-        AscendC::GlobalTensor<float> &gPartialLse, uint32_t fdTaskId, uint32_t groupRowOffset, uint32_t groupSize,
+        uint32_t epiTokenNum, uint32_t integralHeadNum, AscendC::GlobalTensor<float>& gPartialO,
+        AscendC::GlobalTensor<float>& gPartialLse, uint32_t fdTaskId, uint32_t groupRowOffset, uint32_t groupSize,
         uint32_t fdLseSubStride)
     {
         uint32_t curRowNum = layoutInput.shape(0);
@@ -314,11 +314,11 @@ public:
     __aicore__ inline void Process(AscendC::GlobalTensor<ElementOutput> gOutput,
                                    AscendC::GlobalTensor<ElementInput> gInput,
                                    AscendC::GlobalTensor<ElementUpdate> gUpdate, AscendC::GlobalTensor<ElementLse> gLse,
-                                   const LayoutOutput &layoutOutput, const LayoutInput &layoutInput,
-                                   const LayoutUpdate &layoutUpdate, const LayoutLse &layoutLse,
+                                   const LayoutOutput& layoutOutput, const LayoutInput& layoutInput,
+                                   const LayoutUpdate& layoutUpdate, const LayoutLse& layoutLse,
                                    GemmCoord actualBlockShape, uint32_t qSBlockSize, uint32_t qNBlockSize,
                                    uint32_t isFirstStackTile, uint32_t isLastStackTile, uint32_t curStackTileMod,
-                                   AscendC::GlobalTensor<float> &gPartialO, AscendC::GlobalTensor<float> &gPartialLse,
+                                   AscendC::GlobalTensor<float>& gPartialO, AscendC::GlobalTensor<float>& gPartialLse,
                                    uint32_t fdTaskId, uint32_t fdLseSubStride)
     {
         uint32_t rowNum = actualBlockShape.m();
@@ -396,9 +396,9 @@ public:
     __aicore__ inline void operator()(AscendC::GlobalTensor<ElementOutput> gOutput,
                                       AscendC::GlobalTensor<ElementInput> gInput,
                                       AscendC::GlobalTensor<ElementUpdate> gUpdate,
-                                      AscendC::GlobalTensor<ElementLse> gLse, const LayoutOutput &layoutOutput,
-                                      const LayoutInput &layoutInput, const LayoutUpdate &layoutUpdate,
-                                      const LayoutLse &layoutLse, GemmCoord actualBlockShape, uint32_t qSBlockSize,
+                                      AscendC::GlobalTensor<ElementLse> gLse, const LayoutOutput& layoutOutput,
+                                      const LayoutInput& layoutInput, const LayoutUpdate& layoutUpdate,
+                                      const LayoutLse& layoutLse, GemmCoord actualBlockShape, uint32_t qSBlockSize,
                                       uint32_t qNBlockSize, uint32_t isFirstStackTile, uint32_t isLastStackTile,
                                       uint32_t curStackTileMod)
     {
@@ -412,12 +412,12 @@ public:
     __aicore__ inline void ProcessPartial(AscendC::GlobalTensor<ElementOutput> gOutput,
                                           AscendC::GlobalTensor<ElementInput> gInput,
                                           AscendC::GlobalTensor<ElementUpdate> gUpdate,
-                                          AscendC::GlobalTensor<ElementLse> gLse, const LayoutOutput &layoutOutput,
-                                          const LayoutInput &layoutInput, const LayoutUpdate &layoutUpdate,
-                                          const LayoutLse &layoutLse, GemmCoord actualBlockShape, uint32_t qSBlockSize,
+                                          AscendC::GlobalTensor<ElementLse> gLse, const LayoutOutput& layoutOutput,
+                                          const LayoutInput& layoutInput, const LayoutUpdate& layoutUpdate,
+                                          const LayoutLse& layoutLse, GemmCoord actualBlockShape, uint32_t qSBlockSize,
                                           uint32_t qNBlockSize, uint32_t isFirstStackTile, uint32_t isLastStackTile,
-                                          uint32_t curStackTileMod, AscendC::GlobalTensor<float> &gPartialO,
-                                          AscendC::GlobalTensor<float> &gPartialLse, uint32_t fdTaskId,
+                                          uint32_t curStackTileMod, AscendC::GlobalTensor<float>& gPartialO,
+                                          AscendC::GlobalTensor<float>& gPartialLse, uint32_t fdTaskId,
                                           uint32_t fdLseSubStride)
     {
         Process<true>(gOutput, gInput, gUpdate, gLse, layoutOutput, layoutInput, layoutUpdate, layoutLse,
@@ -425,8 +425,8 @@ public:
                       gPartialO, gPartialLse, fdTaskId, fdLseSubStride);
     }
 
-    __aicore__ inline void WriteNeutralPartial(AscendC::GlobalTensor<float> &gPartialO,
-                                               AscendC::GlobalTensor<float> &gPartialLse, uint32_t fdTaskId,
+    __aicore__ inline void WriteNeutralPartial(AscendC::GlobalTensor<float>& gPartialO,
+                                               AscendC::GlobalTensor<float>& gPartialLse, uint32_t fdTaskId,
                                                uint32_t groupSize, uint32_t colNum, uint32_t fdLseSubStride)
     {
         const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();

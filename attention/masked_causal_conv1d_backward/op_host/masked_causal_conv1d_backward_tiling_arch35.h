@@ -62,7 +62,7 @@ constexpr int64_t NUM_3 = 3;
 
 class MaskedCausalConv1dBackwardTilingArch35 : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MaskedCausalConv1dBackwardTilingArch35(gert::TilingContext *context)
+    explicit MaskedCausalConv1dBackwardTilingArch35(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 

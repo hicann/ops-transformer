@@ -28,18 +28,18 @@ constexpr uint16_t DATA_COPY_MAX_BLKCNT = 4095;
 template <typename T>
 class GatherPaKvCacheNz {
 public:
-    __aicore__ inline GatherPaKvCacheNz(AscendC::TPipe *p)
+    __aicore__ inline GatherPaKvCacheNz(AscendC::TPipe* p)
         : pipe(p){};
     __aicore__ inline void Init(GM_ADDR keyCacheInGm, GM_ADDR valueCacheInGm, GM_ADDR blockTablesInGm,
                                 GM_ADDR seqLensInGm, GM_ADDR seqOffsetInGm, GM_ADDR keyOutGm, GM_ADDR valueOutGm,
-                                const GatherPaKvCacheTilingData *__restrict tilingData);
+                                const GatherPaKvCacheTilingData* __restrict tilingData);
     __aicore__ inline void Process();
     __aicore__ inline void CopyLocateInfoIn(int32_t tokenId);
     __aicore__ inline void RestoreDataFromCache(int32_t blkTabValue, int32_t blockOffset, int32_t numRsltProc,
                                                 int32_t ctxtId, bool isKeyValue);
 
 private:
-    AscendC::TPipe *pipe;
+    AscendC::TPipe* pipe;
 
     // input
 
@@ -78,7 +78,7 @@ template <typename T>
 __aicore__ inline void GatherPaKvCacheNz<T>::Init(GM_ADDR keyCacheInGm, GM_ADDR valueCacheInGm, GM_ADDR blockTablesInGm,
                                                   GM_ADDR seqLensInGm, GM_ADDR seqOffsetInGm, GM_ADDR keyOutGm,
                                                   GM_ADDR valueOutGm,
-                                                  const GatherPaKvCacheTilingData *__restrict tilingData)
+                                                  const GatherPaKvCacheTilingData* __restrict tilingData)
 {
     this->blockSize = tilingData->blockSize;
     this->numTokens = tilingData->numTokens;
@@ -89,14 +89,14 @@ __aicore__ inline void GatherPaKvCacheNz<T>::Init(GM_ADDR keyCacheInGm, GM_ADDR 
     this->hasSeqStarts = tilingData->hasSeqStarts;
     this->isSeqLensCumsum = tilingData->isSeqLensCumsum;
     // input
-    this->inKeyCacheGM.SetGlobalBuffer((__gm__ T *)keyCacheInGm);
-    this->inValueCacheGM.SetGlobalBuffer((__gm__ T *)valueCacheInGm);
-    this->inBlockTableGM.SetGlobalBuffer((__gm__ int32_t *)blockTablesInGm);
-    this->inContextLenGM.SetGlobalBuffer((__gm__ int32_t *)seqLensInGm);
-    this->inseqOffsetGM.SetGlobalBuffer((__gm__ int32_t *)seqOffsetInGm);
+    this->inKeyCacheGM.SetGlobalBuffer((__gm__ T*)keyCacheInGm);
+    this->inValueCacheGM.SetGlobalBuffer((__gm__ T*)valueCacheInGm);
+    this->inBlockTableGM.SetGlobalBuffer((__gm__ int32_t*)blockTablesInGm);
+    this->inContextLenGM.SetGlobalBuffer((__gm__ int32_t*)seqLensInGm);
+    this->inseqOffsetGM.SetGlobalBuffer((__gm__ int32_t*)seqOffsetInGm);
     // output
-    this->outKeyGM.SetGlobalBuffer((__gm__ T *)keyOutGm);
-    this->outValueGM.SetGlobalBuffer((__gm__ T *)valueOutGm);
+    this->outKeyGM.SetGlobalBuffer((__gm__ T*)keyOutGm);
+    this->outValueGM.SetGlobalBuffer((__gm__ T*)valueOutGm);
 
     this->pipe->InitBuffer(this->locateInfoBuf, UB_LOCATE_INFO_SIZE); // 40kb, save context len and block table
     this->pipe->InitBuffer(this->tmpBuf, UB_TMP_BUF_SIZE);            // ensure the size of one token less than 148kb

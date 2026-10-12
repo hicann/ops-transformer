@@ -56,8 +56,8 @@ __aicore__ inline uint32_t ScaleRowAlignMxFp4(uint32_t scaleCol)
 }
 
 template <typename T, typename U>
-__simd_callee__ inline void FP16ConvertMXFP4(AscendC::Reg::RegTensor<half> &output,
-                                             AscendC::Reg::RegTensor<half> &input, AscendC::Reg::MaskReg &mask)
+__simd_callee__ inline void FP16ConvertMXFP4(AscendC::Reg::RegTensor<half>& output,
+                                             AscendC::Reg::RegTensor<half>& input, AscendC::Reg::MaskReg& mask)
 {
     {
         AscendC::Reg::RegTensor<uint16_t> specialValueTensor;
@@ -72,19 +72,19 @@ __simd_callee__ inline void FP16ConvertMXFP4(AscendC::Reg::RegTensor<half> &outp
         }
         AscendC::Reg::Duplicate(specialValueTensor, specialValue);
         AscendC::Reg::Duplicate(newMantissa, NEW_MANTISSA_MAXFP4);
-        AscendC::Reg::And(andResult, (AscendC::Reg::RegTensor<uint16_t> &)input, specialValueTensor, mask);
+        AscendC::Reg::And(andResult, (AscendC::Reg::RegTensor<uint16_t>&)input, specialValueTensor, mask);
         AscendC::Reg::Compares<uint16_t, CMPMODE::GT>(nonzeroMask, andResult, 0, mask);
         AscendC::Reg::Compares<uint16_t, CMPMODE::LT>(specialMask, andResult, NEW_MANTISSA_MAXFP4, mask);
         AscendC::Reg::And(specialMask, specialMask, nonzeroMask, mask);
-        AscendC::Reg::Or(newValue, (AscendC::Reg::RegTensor<uint16_t> &)input, newMantissa, mask);
-        AscendC::Reg::Select<uint16_t>((AscendC::Reg::RegTensor<uint16_t> &)output, newValue,
-                                       (AscendC::Reg::RegTensor<uint16_t> &)input, specialMask);
+        AscendC::Reg::Or(newValue, (AscendC::Reg::RegTensor<uint16_t>&)input, newMantissa, mask);
+        AscendC::Reg::Select<uint16_t>((AscendC::Reg::RegTensor<uint16_t>&)output, newValue,
+                                       (AscendC::Reg::RegTensor<uint16_t>&)input, specialMask);
     }
 }
 
 // 计算每个 MX 块(32元素)的最大指数, 输出到 maxExpAddr
 template <typename T, typename U>
-__simd_vf__ inline void vfComputeMaxExpMXFP4(__ubuf__ T *srcAddr, __ubuf__ uint16_t *maxExpAddr,
+__simd_vf__ inline void vfComputeMaxExpMXFP4(__ubuf__ T* srcAddr, __ubuf__ uint16_t* maxExpAddr,
                                              uint32_t totalCountInUB, uint16_t loopNum, uint32_t vlForB16,
                                              uint32_t numUbBlocksPerVReg)
 {
@@ -118,9 +118,9 @@ __simd_vf__ inline void vfComputeMaxExpMXFP4(__ubuf__ T *srcAddr, __ubuf__ uint1
                                                                              vlForB16 * DIGIT_TWO_MAXFP4);
 
             if constexpr (IsSameType<T, half>::value) {
-                AscendC::Reg::And(vdExpSelect0, (AscendC::Reg::RegTensor<uint16_t> &)vdExp0, invalidmaskfp16,
+                AscendC::Reg::And(vdExpSelect0, (AscendC::Reg::RegTensor<uint16_t>&)vdExp0, invalidmaskfp16,
                                   scaleMask1);
-                AscendC::Reg::And(vdExpSelect1, (AscendC::Reg::RegTensor<uint16_t> &)vdExp1, invalidmaskfp16,
+                AscendC::Reg::And(vdExpSelect1, (AscendC::Reg::RegTensor<uint16_t>&)vdExp1, invalidmaskfp16,
                                   scaleMask1);
                 AscendC::Reg::Compare<uint16_t, CMPMODE::NE>(invalidDataMask0, vdExpSelect0, invalidmaskfp16,
                                                              scaleMask1);
@@ -128,15 +128,15 @@ __simd_vf__ inline void vfComputeMaxExpMXFP4(__ubuf__ T *srcAddr, __ubuf__ uint1
                                                              scaleMask1);
                 AscendC::Reg::Cast<bfloat16_t, T, castTraitHalf2Bf16>(vdExp0BF16, vdExp0, scaleMask1);
                 AscendC::Reg::Cast<bfloat16_t, T, castTraitHalf2Bf16>(vdExp1BF16, vdExp1, scaleMask1);
-                AscendC::Reg::And(vdExpExtract0, (AscendC::Reg::RegTensor<uint16_t> &)vdExp0BF16, expMaskBF16,
+                AscendC::Reg::And(vdExpExtract0, (AscendC::Reg::RegTensor<uint16_t>&)vdExp0BF16, expMaskBF16,
                                   scaleMask1);
-                AscendC::Reg::And(vdExpExtract1, (AscendC::Reg::RegTensor<uint16_t> &)vdExp1BF16, expMaskBF16,
+                AscendC::Reg::And(vdExpExtract1, (AscendC::Reg::RegTensor<uint16_t>&)vdExp1BF16, expMaskBF16,
                                   scaleMask1);
                 AscendC::Reg::Select<uint16_t>(vdExpExtract0, vdExpExtract0, expMaskBF16, invalidDataMask0);
                 AscendC::Reg::Select<uint16_t>(vdExpExtract1, vdExpExtract1, expMaskBF16, invalidDataMask1);
             } else {
-                AscendC::Reg::And(vdExpExtract0, (AscendC::Reg::RegTensor<uint16_t> &)vdExp0, expMaskBF16, scaleMask1);
-                AscendC::Reg::And(vdExpExtract1, (AscendC::Reg::RegTensor<uint16_t> &)vdExp1, expMaskBF16, scaleMask1);
+                AscendC::Reg::And(vdExpExtract0, (AscendC::Reg::RegTensor<uint16_t>&)vdExp0, expMaskBF16, scaleMask1);
+                AscendC::Reg::And(vdExpExtract1, (AscendC::Reg::RegTensor<uint16_t>&)vdExp1, expMaskBF16, scaleMask1);
             }
 
             AscendC::Reg::Max(vdMaxExp, vdExpExtract0, vdExpExtract1, scaleMask1);
@@ -151,8 +151,8 @@ __simd_vf__ inline void vfComputeMaxExpMXFP4(__ubuf__ T *srcAddr, __ubuf__ uint1
 }
 
 template <typename T, typename U>
-__simd_vf__ inline void vfComputeScaleMXFP4(__ubuf__ uint16_t *maxExpAddr, __ubuf__ uint16_t *mxScaleLocalAddr,
-                                            __ubuf__ uint16_t *halfScaleLocalAddr, uint32_t validScaleInUB,
+__simd_vf__ inline void vfComputeScaleMXFP4(__ubuf__ uint16_t* maxExpAddr, __ubuf__ uint16_t* mxScaleLocalAddr,
+                                            __ubuf__ uint16_t* halfScaleLocalAddr, uint32_t validScaleInUB,
                                             uint32_t packScaleInUB, uint16_t loopNumScale, uint16_t f4Emax,
                                             uint32_t vlForB16)
 {
@@ -217,8 +217,8 @@ __simd_vf__ inline void vfComputeScaleMXFP4(__ubuf__ uint16_t *maxExpAddr, __ubu
 
 // 用 halfScale 量化 x 并将 fp4 打包(2个/字节)写到 outLocalAddr
 template <typename T, typename U>
-__simd_vf__ inline void vfComputeDataMXFP4(__ubuf__ T *srcAddr, __ubuf__ uint16_t *halfScaleLocalAddr,
-                                           __ubuf__ int8_t *outLocalAddr, uint32_t totalCountInUB, uint16_t loopNum,
+__simd_vf__ inline void vfComputeDataMXFP4(__ubuf__ T* srcAddr, __ubuf__ uint16_t* halfScaleLocalAddr,
+                                           __ubuf__ int8_t* outLocalAddr, uint32_t totalCountInUB, uint16_t loopNum,
                                            uint32_t vlForB16, uint32_t numUbBlocksPerVReg)
 {
     {
@@ -253,16 +253,16 @@ __simd_vf__ inline void vfComputeDataMXFP4(__ubuf__ T *srcAddr, __ubuf__ uint16_
                 FP16ConvertMXFP4<T, U>(vdExp1, vdExp1, dataMask1);
                 AscendC::Reg::Cast<bfloat16_t, T, castTraitHalf2Bf16>(vdExp0BF16, vdExp0, dataMask1);
                 AscendC::Reg::Cast<bfloat16_t, T, castTraitHalf2Bf16>(vdExp1BF16, vdExp1, dataMask1);
-                AscendC::Reg::Mul(vdExp0BF16, vdExp0BF16, (AscendC::Reg::RegTensor<bfloat16_t> &)halfScaleForMul,
+                AscendC::Reg::Mul(vdExp0BF16, vdExp0BF16, (AscendC::Reg::RegTensor<bfloat16_t>&)halfScaleForMul,
                                   dataMask1);
-                AscendC::Reg::Mul(vdExp1BF16, vdExp1BF16, (AscendC::Reg::RegTensor<bfloat16_t> &)halfScaleForMul,
+                AscendC::Reg::Mul(vdExp1BF16, vdExp1BF16, (AscendC::Reg::RegTensor<bfloat16_t>&)halfScaleForMul,
                                   dataMask1);
                 AscendC::Reg::Interleave(vdExp0BF16, vdExp1BF16, vdExp0BF16, vdExp1BF16);
                 AscendC::Reg::Cast<U, bfloat16_t, castTrait>(vdExp0FP4, vdExp0BF16, dataMask1);
                 AscendC::Reg::Cast<U, bfloat16_t, castTrait>(vdExp1FP4, vdExp1BF16, dataMask1);
             } else {
-                AscendC::Reg::Mul(vdExp0, vdExp0, (AscendC::Reg::RegTensor<T> &)halfScaleForMul, dataMask1);
-                AscendC::Reg::Mul(vdExp1, vdExp1, (AscendC::Reg::RegTensor<T> &)halfScaleForMul, dataMask1);
+                AscendC::Reg::Mul(vdExp0, vdExp0, (AscendC::Reg::RegTensor<T>&)halfScaleForMul, dataMask1);
+                AscendC::Reg::Mul(vdExp1, vdExp1, (AscendC::Reg::RegTensor<T>&)halfScaleForMul, dataMask1);
                 AscendC::Reg::Interleave(vdExp0, vdExp1, vdExp0, vdExp1);
                 AscendC::Reg::Cast<U, T, castTrait>(vdExp0FP4, vdExp0, dataMask1);
                 AscendC::Reg::Cast<U, T, castTrait>(vdExp1FP4, vdExp1, dataMask1);
@@ -270,19 +270,19 @@ __simd_vf__ inline void vfComputeDataMXFP4(__ubuf__ T *srcAddr, __ubuf__ uint16_
 
             AscendC::Reg::StoreAlign<int8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
                                      AscendC::Reg::StoreDist::DIST_PACK4_B32>(
-                outLocalAddr, (AscendC::Reg::RegTensor<int8_t> &)vdExp0FP4, OUT_ELE_NUM_ONE_BLK_MAXFP4, dataMask1);
+                outLocalAddr, (AscendC::Reg::RegTensor<int8_t>&)vdExp0FP4, OUT_ELE_NUM_ONE_BLK_MAXFP4, dataMask1);
             AscendC::Reg::StoreAlign<int8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE,
                                      AscendC::Reg::StoreDist::DIST_PACK4_B32>(
-                outLocalAddr, (AscendC::Reg::RegTensor<int8_t> &)vdExp1FP4, OUT_ELE_NUM_ONE_BLK_MAXFP4, dataMask1);
+                outLocalAddr, (AscendC::Reg::RegTensor<int8_t>&)vdExp1FP4, OUT_ELE_NUM_ONE_BLK_MAXFP4, dataMask1);
         }
     }
 }
 
 template <typename TCache, typename TScale, typename TX>
-__aicore__ inline void VFProcessDynamicMxFp4Quant(const LocalTensor<int8_t> &yLocal,
-                                                  const LocalTensor<TScale> &scaleLocal, const LocalTensor<TX> &xLocal,
-                                                  const LocalTensor<uint16_t> &maxExpLocal,
-                                                  const LocalTensor<uint16_t> &halfScaleLocal, const uint16_t curRowNum,
+__aicore__ inline void VFProcessDynamicMxFp4Quant(const LocalTensor<int8_t>& yLocal,
+                                                  const LocalTensor<TScale>& scaleLocal, const LocalTensor<TX>& xLocal,
+                                                  const LocalTensor<uint16_t>& maxExpLocal,
+                                                  const LocalTensor<uint16_t>& halfScaleLocal, const uint16_t curRowNum,
                                                   const uint32_t curColNum)
 {
     constexpr bool isE1M2 = AscendC::IsSameType<TCache, float4_e1m2x2_t>::value;
@@ -302,16 +302,16 @@ __aicore__ inline void VFProcessDynamicMxFp4Quant(const LocalTensor<int8_t> &yLo
     uint16_t loopNumScale = static_cast<uint16_t>((scaleColPack + vlForB16 - 1) / vlForB16);
     const uint32_t scaleRowBytes = ((scaleCol * static_cast<uint32_t>(sizeof(TScale)) + 63U) / 64U) * 64U;
 
-    auto xAddr = reinterpret_cast<__ubuf__ TX *>(xLocal.GetPhyAddr());
-    auto cacheAddr = reinterpret_cast<__ubuf__ int8_t *>(yLocal.GetPhyAddr());
-    auto scaleByteAddr = reinterpret_cast<__ubuf__ uint8_t *>(scaleLocal.GetPhyAddr());
-    auto maxExpAddr = reinterpret_cast<__ubuf__ uint16_t *>(maxExpLocal.GetPhyAddr());
-    auto halfScaleAddr = reinterpret_cast<__ubuf__ uint16_t *>(halfScaleLocal.GetPhyAddr());
+    auto xAddr = reinterpret_cast<__ubuf__ TX*>(xLocal.GetPhyAddr());
+    auto cacheAddr = reinterpret_cast<__ubuf__ int8_t*>(yLocal.GetPhyAddr());
+    auto scaleByteAddr = reinterpret_cast<__ubuf__ uint8_t*>(scaleLocal.GetPhyAddr());
+    auto maxExpAddr = reinterpret_cast<__ubuf__ uint16_t*>(maxExpLocal.GetPhyAddr());
+    auto halfScaleAddr = reinterpret_cast<__ubuf__ uint16_t*>(halfScaleLocal.GetPhyAddr());
 
     for (uint16_t r = 0; r < curRowNum; r++) {
-        __ubuf__ TX *rowXAddr = xAddr + r * xRowAlign;
-        __ubuf__ int8_t *rowCacheAddr = cacheAddr + r * cacheRowAlign;
-        __ubuf__ uint16_t *rowScaleAddr = reinterpret_cast<__ubuf__ uint16_t *>(scaleByteAddr + r * scaleRowBytes);
+        __ubuf__ TX* rowXAddr = xAddr + r * xRowAlign;
+        __ubuf__ int8_t* rowCacheAddr = cacheAddr + r * cacheRowAlign;
+        __ubuf__ uint16_t* rowScaleAddr = reinterpret_cast<__ubuf__ uint16_t*>(scaleByteAddr + r * scaleRowBytes);
 
         if constexpr (isE1M2) {
             vfComputeMaxExpMXFP4<TX, fp4x2_e1m2_t>(rowXAddr, maxExpAddr, curColNum, loopNumX, vlForB16,

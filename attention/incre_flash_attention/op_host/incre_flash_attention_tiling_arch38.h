@@ -28,20 +28,20 @@ namespace arch38 {
 
 class IFATilingArch38 : public FiaTilingBase {
 public:
-    IFATilingArch38(gert::TilingContext *context)
+    IFATilingArch38(gert::TilingContext* context)
         : FiaTilingBase(context)
     {}
     ~IFATilingArch38() override = default;
-    void InitTilingInfo(TilingInfo *tilingInfo) override {}
+    void InitTilingInfo(TilingInfo* tilingInfo) override {}
     bool IsCapable() override
     {
         return true;
     }
     ge::graphStatus DoOpTiling() override;
-    ge::graphStatus DoSubOpTiling(IncreFlashAttentionContext &ifaContext);
-    static ge::graphStatus ConvertContext(gert::TilingContext &context, IncreFlashAttentionContext &ifaContext);
+    ge::graphStatus DoSubOpTiling(IncreFlashAttentionContext& ifaContext);
+    static ge::graphStatus ConvertContext(gert::TilingContext& context, IncreFlashAttentionContext& ifaContext);
     // FIA 在非伪量化的 IFA 场景下复用 PFA 模板，单独调用本门禁
-    bool CheckArch38ScenarioSupported(const IncreFlashAttentionContext &ifaContext) const;
+    bool CheckArch38ScenarioSupported(const IncreFlashAttentionContext& ifaContext) const;
 };
 
 } // namespace arch38

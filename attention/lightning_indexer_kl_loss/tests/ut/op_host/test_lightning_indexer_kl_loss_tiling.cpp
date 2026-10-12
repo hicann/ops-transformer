@@ -22,7 +22,7 @@
 namespace {
 using OpAttr = gert::TilingContextPara::OpAttr;
 
-constexpr const char *kOpName = "LightningIndexerKLLoss";
+constexpr const char* kOpName = "LightningIndexerKLLoss";
 constexpr uint32_t kCoreNum = 48U;
 constexpr uint64_t kUbSize = 196608ULL;
 constexpr size_t kTilingDataSize = 8192;
@@ -34,7 +34,10 @@ static const uint64_t kTilingKeyDetFp16 = GET_TPL_TILING_KEY(LightningIndexerKLL
 static const uint64_t kTilingKeyDetFp32 = GET_TPL_TILING_KEY(LightningIndexerKLLoss, 1, 1);
 static const uint64_t kTilingKeyDetBf16 = GET_TPL_TILING_KEY(LightningIndexerKLLoss, 1, 2);
 
-optiling::LightningIndexerKLLossCompileInfo MakeCompileInfo() { return {}; }
+optiling::LightningIndexerKLLossCompileInfo MakeCompileInfo()
+{
+    return {};
+}
 
 std::vector<OpAttr> MakeAttrs(float eps = 1e-9f, bool deterministic = false)
 {
@@ -42,7 +45,7 @@ std::vector<OpAttr> MakeAttrs(float eps = 1e-9f, bool deterministic = false)
             {"deterministic", Ops::Transformer::AnyValue::CreateFrom<bool>(deterministic)}};
 }
 
-gert::TilingContextPara MakePara(optiling::LightningIndexerKLLossCompileInfo &compileInfo,
+gert::TilingContextPara MakePara(optiling::LightningIndexerKLLossCompileInfo& compileInfo,
                                  ge::DataType dataType = ge::DT_FLOAT, std::initializer_list<int64_t> shape = {8, 22},
                                  float eps = 1e-9f, bool deterministic = false)
 {
@@ -55,11 +58,17 @@ gert::TilingContextPara MakePara(optiling::LightningIndexerKLLossCompileInfo &co
 
 class LightningIndexerKLLossTiling : public testing::Test {
 protected:
-    static void SetUpTestCase() { std::cout << "LightningIndexerKLLossTiling SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "LightningIndexerKLLossTiling SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "LightningIndexerKLLossTiling TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "LightningIndexerKLLossTiling TearDown" << std::endl;
+    }
 
-    void VerifyTilingData(const LightningIndexerKLLossTilingData &tiling, int64_t expectedTotalLength,
+    void VerifyTilingData(const LightningIndexerKLLossTilingData& tiling, int64_t expectedTotalLength,
                           int64_t expectedK, int64_t expectedKAligned)
     {
         EXPECT_EQ(tiling.totalLength, expectedTotalLength);

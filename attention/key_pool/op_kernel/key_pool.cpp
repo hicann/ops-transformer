@@ -32,12 +32,12 @@ using namespace KeyPool;
     } while (0)
 
 template <uint8_t HiddenStatesLayout, uint8_t HiddenStatesDtype, uint8_t TemplateId>
-__global__ __aicore__ void key_pool(__gm__ uint8_t *hidden_states, __gm__ uint8_t *wk, __gm__ uint8_t *gateWeight,
-                                    __gm__ uint8_t *ape, __gm__ uint8_t *stateCache, __gm__ uint8_t *cacheBlockTable,
-                                    __gm__ uint8_t *startPos, __gm__ uint8_t *normWeight, __gm__ uint8_t *normBias,
-                                    __gm__ uint8_t *cos, __gm__ uint8_t *sin, __gm__ uint8_t *seqLens,
-                                    __gm__ uint8_t *seqused, __gm__ uint8_t *pooledKeyOut, __gm__ uint8_t *workspace,
-                                    __gm__ uint8_t *tiling)
+__global__ __aicore__ void key_pool(__gm__ uint8_t* hidden_states, __gm__ uint8_t* wk, __gm__ uint8_t* gateWeight,
+                                    __gm__ uint8_t* ape, __gm__ uint8_t* stateCache, __gm__ uint8_t* cacheBlockTable,
+                                    __gm__ uint8_t* startPos, __gm__ uint8_t* normWeight, __gm__ uint8_t* normBias,
+                                    __gm__ uint8_t* cos, __gm__ uint8_t* sin, __gm__ uint8_t* seqLens,
+                                    __gm__ uint8_t* seqused, __gm__ uint8_t* pooledKeyOut, __gm__ uint8_t* workspace,
+                                    __gm__ uint8_t* tiling)
 {
     REGISTER_TILING_DEFAULT(optiling::KeyPoolTilingData);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
@@ -45,7 +45,7 @@ __global__ __aicore__ void key_pool(__gm__ uint8_t *hidden_states, __gm__ uint8_
     if constexpr (static_cast<TEMPLATE_ID>(TemplateId) == TEMPLATE_ID::EMPTY_HIDDEN_STATES) {
         return;
     }
-    const optiling::KeyPoolTilingData *__restrict tilingData = &tilingDataIn;
+    const optiling::KeyPoolTilingData* __restrict tilingData = &tilingDataIn;
     TPipe pipe;
     constexpr auto hiddenStatesLayout = static_cast<HIDDEN_STATES_LAYOUT>(HiddenStatesLayout);
     constexpr auto hiddenStatesDtype = static_cast<HIDDEN_STATES_DTYPE>(HiddenStatesDtype);

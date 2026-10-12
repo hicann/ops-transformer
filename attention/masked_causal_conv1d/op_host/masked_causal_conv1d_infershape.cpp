@@ -23,7 +23,7 @@ namespace ops {
 constexpr int64_t INPUT_X_INDEX = 0;
 constexpr int64_t OUTPUT_Y_INDEX = 0;
 
-ge::graphStatus InferShape4MaskedCausalConv1d(gert::InferShapeContext *context)
+ge::graphStatus InferShape4MaskedCausalConv1d(gert::InferShapeContext* context)
 {
     OP_LOGD(context, "Begin InferShape4MaskedCausalConv1d");
     auto inputXShape = context->GetInputShape(INPUT_X_INDEX);
@@ -35,7 +35,7 @@ ge::graphStatus InferShape4MaskedCausalConv1d(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataType4MaskedCausalConv1d(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataType4MaskedCausalConv1d(gert::InferDataTypeContext* context)
 {
     context->SetOutputDataType(OUTPUT_Y_INDEX, context->GetInputDataType(INPUT_X_INDEX));
     return ge::GRAPH_SUCCESS;

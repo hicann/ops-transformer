@@ -29,7 +29,7 @@ TEST_P(FusedInferAttentionScoreInferDTypeTest, param)
 {
     auto param = GetParam();
 
-    std::vector<void *> inputDataTypes;
+    std::vector<void*> inputDataTypes;
     if (param.inputInstance[0] == 1)
         inputDataTypes.emplace_back(&param.query);
     if (param.inputInstance[1] == 1)
@@ -93,7 +93,7 @@ TEST_P(FusedInferAttentionScoreInferDTypeTest, param)
     if (param.inputInstance[30] == 1)
         inputDataTypes.emplace_back(&param.kv_start_idx);
 
-    std::vector<void *> outputDataTypes;
+    std::vector<void*> outputDataTypes;
     if (param.outputInstance[0] == 1)
         outputDataTypes.emplace_back(&param.attention_out);
     if (param.outputInstance[1] == 1)

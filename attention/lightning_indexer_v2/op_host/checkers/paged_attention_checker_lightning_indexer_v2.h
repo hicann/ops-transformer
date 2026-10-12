@@ -23,13 +23,13 @@ namespace lightning_indexer_v2_checker {
 
 class PagedAttentionChecker : public LightningIndexerV2BaseChecker {
 public:
-    ge::graphStatus CheckParaExistence(const LightningIndexerV2CheckerInfo &info) const override;
-    ge::graphStatus CheckSinglePara(const LightningIndexerV2CheckerInfo &info) const override;
-    ge::graphStatus CheckMultiPara(const LightningIndexerV2CheckerInfo &info) const override;
+    ge::graphStatus CheckParaExistence(const LightningIndexerV2CheckerInfo& info) const override;
+    ge::graphStatus CheckSinglePara(const LightningIndexerV2CheckerInfo& info) const override;
+    ge::graphStatus CheckMultiPara(const LightningIndexerV2CheckerInfo& info) const override;
 
 private:
-    ge::graphStatus CheckContiguous(const LightningIndexerV2CheckerInfo &info, const CheckerTensor &tensor,
-                                    const char *name, uint32_t firstCheckedAxis) const;
+    ge::graphStatus CheckContiguous(const LightningIndexerV2CheckerInfo& info, const CheckerTensor& tensor,
+                                    const char* name, uint32_t firstCheckedAxis) const;
 };
 
 } // namespace lightning_indexer_v2_checker

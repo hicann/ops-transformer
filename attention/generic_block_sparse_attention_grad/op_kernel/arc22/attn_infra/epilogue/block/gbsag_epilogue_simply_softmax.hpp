@@ -83,7 +83,7 @@ public:
         __aicore__ inline Params(GM_ADDR s_, GM_ADDR softmaxLse_, GM_ADDR dp_, GM_ADDR pWorkspace_,
                                  GM_ADDR dsWorkspace_, GM_ADDR tilingData_, uint64_t acutualRow_, uint64_t actualCol_,
                                  uint64_t processNums_, uint64_t curN1_, uint64_t curS1_, uint64_t qBatchBaseOffset_,
-                                 uint32_t qSeqlen_, uint32_t headDim_, GBSAG::QPacket const &packet_,
+                                 uint32_t qSeqlen_, uint32_t headDim_, GBSAG::QPacket const& packet_,
                                  uint32_t maskType_, uint32_t curKSeqIdx_, uint32_t kvSeqlen_)
             : s(s_),
               softmaxLse(softmaxLse_),
@@ -106,7 +106,7 @@ public:
         {}
     };
 
-    NpuArch::Arch::Resource<ArchTag> &resource;
+    NpuArch::Arch::Resource<ArchTag>& resource;
 
     // Keep one 64-row buffer: event synchronization, not buffer count, is the
     // dominant serialization point in this epilogue.
@@ -169,7 +169,7 @@ public:
 
     constexpr static uint32_t MASK_TYPE_CAUSAL = 1;
 
-    __aicore__ inline explicit SimpltSoftmax(NpuArch::Arch::Resource<ArchTag> &resource_)
+    __aicore__ inline explicit SimpltSoftmax(NpuArch::Arch::Resource<ArchTag>& resource_)
         : resource(resource_)
     {
         // baseM =  128;
@@ -212,18 +212,18 @@ public:
     __aicore__ inline ~SimpltSoftmax() {}
 
     template <int32_t CORE_TYPE = g_coreType>
-    __aicore__ inline void operator()(Params const &params);
+    __aicore__ inline void operator()(Params const& params);
 
     template <>
-    __aicore__ inline void operator()<AscendC::AIC>(Params const &params)
+    __aicore__ inline void operator()<AscendC::AIC>(Params const& params)
     {}
 
-    __aicore__ inline void Init(Params const &params)
+    __aicore__ inline void Init(Params const& params)
     {
         vecCoreIdx = GetBlockIdx();
         cBlockIdx = vecCoreIdx;
-        __gm__ GenericBlockSparseAttentionGradTilingData *tilingData =
-            reinterpret_cast<__gm__ GenericBlockSparseAttentionGradTilingData *>(params.tilingData);
+        __gm__ GenericBlockSparseAttentionGradTilingData* tilingData =
+            reinterpret_cast<__gm__ GenericBlockSparseAttentionGradTilingData*>(params.tilingData);
         usedVecCoreNums = tilingData->usedVecCoreNum;
 
         if (cBlockIdx >= usedVecCoreNums) {
@@ -256,15 +256,15 @@ public:
         }
 
         // 初始化 GM
-        sGm.SetGlobalBuffer((__gm__ float *)params.s);
-        softmaxLseGm.SetGlobalBuffer((__gm__ float *)params.softmaxLse);
-        dpGm.SetGlobalBuffer((__gm__ float *)params.dp);
-        pWorkspaceGm.SetGlobalBuffer((__gm__ InputDType *)params.pWorkspace);
-        dsWorkspaceGm.SetGlobalBuffer((__gm__ InputDType *)params.dsWorkspace);
+        sGm.SetGlobalBuffer((__gm__ float*)params.s);
+        softmaxLseGm.SetGlobalBuffer((__gm__ float*)params.softmaxLse);
+        dpGm.SetGlobalBuffer((__gm__ float*)params.dp);
+        pWorkspaceGm.SetGlobalBuffer((__gm__ InputDType*)params.pWorkspace);
+        dsWorkspaceGm.SetGlobalBuffer((__gm__ InputDType*)params.dsWorkspace);
     }
 
     template <>
-    __aicore__ inline void operator()<AscendC::AIV>(Params const &params)
+    __aicore__ inline void operator()<AscendC::AIV>(Params const& params)
     {
         Init(params);
 
@@ -335,7 +335,7 @@ public:
         CalDs(runDsInfo, row, col, curS1Idx, ping);
     }
 
-    __aicore__ inline void ApplyCausalMaskByRow(LocalTensor<float> &pLocal, uint32_t localRowStart, uint32_t rows,
+    __aicore__ inline void ApplyCausalMaskByRow(LocalTensor<float>& pLocal, uint32_t localRowStart, uint32_t rows,
                                                 uint32_t col, uint32_t rowStride, uint32_t packetRowBegin)
     {
         if (maskType != MASK_TYPE_CAUSAL || rows == 0 || col == 0 || packet.tileCount == 0) {
@@ -458,7 +458,7 @@ public:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void ApplyCausalMaskToPacketRuns(LocalTensor<float> &pLocal, uint32_t rows, uint32_t col,
+    __aicore__ inline void ApplyCausalMaskToPacketRuns(LocalTensor<float>& pLocal, uint32_t rows, uint32_t col,
                                                        uint32_t rowStride, uint32_t packetRowBegin)
     {
         ApplyCausalMaskByRow(pLocal, 0, rows, col, rowStride, packetRowBegin);
@@ -475,10 +475,10 @@ public:
                                          uint64_t curS1Idx, uint64_t ping)
     {
         // simply softtmax
-        LocalTensor<float> &sLocal = runSftInfo.sTensor;
-        LocalTensor<float> &lseFp32Brc = runSftInfo.lseBrocTensor;
-        LocalTensor<float> &p32Local = runSftInfo.pFp32Tensor;
-        LocalTensor<InputDType> &p16Local = runSftInfo.pFp16Tensor;
+        LocalTensor<float>& sLocal = runSftInfo.sTensor;
+        LocalTensor<float>& lseFp32Brc = runSftInfo.lseBrocTensor;
+        LocalTensor<float>& p32Local = runSftInfo.pFp32Tensor;
+        LocalTensor<InputDType>& p16Local = runSftInfo.pFp16Tensor;
 
         GlobalTensor<float> s = runSftInfo.sGm;
         GlobalTensor<float> lseGm = runSftInfo.lseGm;
@@ -538,7 +538,7 @@ public:
         LocalTensor<float> dpLocal = runDsInfo.dpFp32Tensor;
         LocalTensor<float> dLocal = runDsInfo.softmaxGradTensor;
         LocalTensor<InputDType> ds16Tensor = runDsInfo.dsFp16Tensor;
-        LocalTensor<float> &p32Local = runDsInfo.pFp32Tensor;
+        LocalTensor<float>& p32Local = runDsInfo.pFp32Tensor;
 
         GlobalTensor<float> dp = runDsInfo.dpGm;
         GlobalTensor<InputDType> ds = runDsInfo.dsGm;
@@ -600,7 +600,7 @@ public:
      * out shape (b n s 8) or (n s 8)
      * dtype float
      */
-    __aicore__ inline void LseCopy(GlobalTensor<float> &LseGm, LocalTensor<float> &lseFp32Brc, uint64_t count,
+    __aicore__ inline void LseCopy(GlobalTensor<float>& LseGm, LocalTensor<float>& lseFp32Brc, uint64_t count,
                                    uint64_t curS1Idx)
     {
         constexpr uint32_t FP32_BYTES = sizeof(float);
@@ -692,8 +692,8 @@ public:
      * brief: Compute the elementwise multiplication of a tensor of shape (m, n) and a tensor of shape
      * ubIn0:[m, n], ubIn1[m, 8]
      */
-    __aicore__ inline void SubBrcb(LocalTensor<float> const &ubOut, LocalTensor<float> const &ubIn0,
-                                   LocalTensor<float> const &ubIn1, uint64_t row, uint64_t col)
+    __aicore__ inline void SubBrcb(LocalTensor<float> const& ubOut, LocalTensor<float> const& ubIn0,
+                                   LocalTensor<float> const& ubIn1, uint64_t row, uint64_t col)
     {
         // 分核逻辑的关系，矩阵shape不会超过[128,128], 若启动俩个vector，shape不会超过[64, 128]
         // 所以，一次sub， 最大可计算[128, 64], 迭代次数为行数, 一次迭代计算元素大小最多为64

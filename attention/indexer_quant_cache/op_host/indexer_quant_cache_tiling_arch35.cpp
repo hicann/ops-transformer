@@ -95,7 +95,7 @@ ge::graphStatus IndexerQuantCacheTiling::GetPlatformInfo()
 
 ge::graphStatus IndexerQuantCacheTiling::GetAttr()
 {
-    auto *attrs = context_->GetAttrs();
+    auto* attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
     auto quantMode = attrs->GetAttrPointer<int64_t>(ATTR_QUANT_MODE_INDEX);
@@ -110,21 +110,21 @@ ge::graphStatus IndexerQuantCacheTiling::GetAttr()
     return ge::GRAPH_SUCCESS;
 }
 
-bool IndexerQuantCacheTiling::GetCacheViewLayout(size_t inputIdx, int64_t &blockSize, int64_t &rowStride,
-                                                 int64_t &blockStride)
+bool IndexerQuantCacheTiling::GetCacheViewLayout(size_t inputIdx, int64_t& blockSize, int64_t& rowStride,
+                                                 int64_t& blockStride)
 {
     if (!context_->InputIsView(inputIdx)) {
         return false;
     }
-    auto *inputStride = context_->GetInputStride(inputIdx);
+    auto* inputStride = context_->GetInputStride(inputIdx);
     if (inputStride == nullptr || inputStride->GetDimNum() != CACHE_VIEW_DIM_NUM) {
         return false;
     }
-    auto *inputShape = context_->GetInputShape(inputIdx);
+    auto* inputShape = context_->GetInputShape(inputIdx);
     if (inputShape == nullptr) {
         return false;
     }
-    const auto &viewShape = inputShape->GetShape();
+    const auto& viewShape = inputShape->GetShape();
     if (viewShape.GetDimNum() != CACHE_VIEW_DIM_NUM) {
         return false;
     }
@@ -142,14 +142,14 @@ bool IndexerQuantCacheTiling::GetCacheViewLayout(size_t inputIdx, int64_t &block
     return true;
 }
 
-ge::graphStatus IndexerQuantCacheTiling::ValidateCache4D(size_t inputIdx, const char *inputName, int64_t &lastDim)
+ge::graphStatus IndexerQuantCacheTiling::ValidateCache4D(size_t inputIdx, const char* inputName, int64_t& lastDim)
 {
     // 4D-only 契约: 用逻辑(origin/view) shape 做维数门禁。连续 4D tensor 与 4D 分页 strided view
     // 的 origin shape 均为该 4D 逻辑形状(GetShape()), 与 GetCacheViewLayout 经 inputShape->GetShape()
     // 读取的 viewShape 同源; strided view 的 storage shape 可能是底层扁平 buffer。
     auto shapePtr = context_->GetInputShape(inputIdx);
     OP_CHECK_NULL_WITH_CONTEXT(context_, shapePtr);
-    const auto &logical = shapePtr->GetShape();
+    const auto& logical = shapePtr->GetShape();
     OP_CHECK_IF(logical.GetDimNum() != CACHE_VIEW_DIM_NUM,
                 OP_LOGE(context_->GetNodeName(), "%s must be 4D [blockNum, blockSize, 1, headDim], got dimNum=%zu",
                         inputName, logical.GetDimNum()),
@@ -160,7 +160,7 @@ ge::graphStatus IndexerQuantCacheTiling::ValidateCache4D(size_t inputIdx, const 
                 inputName, logical.GetDim(CACHE_ONE_DIM)),
         return ge::GRAPH_FAILED);
     // 连续场景的行宽(headDim)取末维; 分页 view 下随后由 view stride 覆盖, 此处仅作连续默认值。
-    const auto &storage = shapePtr->GetStorageShape();
+    const auto& storage = shapePtr->GetStorageShape();
     OP_CHECK_IF(storage.GetDimNum() == 0 || logical.GetDim(CACHE_HEAD_DIM) <= 0,
                 OP_LOGE(context_->GetNodeName(), "%s has invalid storage or headDim", inputName),
                 return ge::GRAPH_FAILED);
@@ -448,14 +448,14 @@ ge::graphStatus IndexerQuantCacheTiling::GetWorkspaceSize()
 ge::graphStatus IndexerQuantCacheTiling::PostTiling()
 {
     context_->SetBlockDim(usedCoreNums_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = workspaceSize_;
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IndexerQuantCacheTiling::CheckMxfp4EvenStride(int64_t stride, const char *name)
+ge::graphStatus IndexerQuantCacheTiling::CheckMxfp4EvenStride(int64_t stride, const char* name)
 {
     if (quantMode_ == MXFP4_QUANT_MODE && stride % FP4_PACK_NUM != 0) {
         const std::string strideStr = std::to_string(stride);
@@ -466,13 +466,13 @@ ge::graphStatus IndexerQuantCacheTiling::CheckMxfp4EvenStride(int64_t stride, co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingPrepareForIndexerQuantCache(gert::TilingParseContext *context)
+ge::graphStatus TilingPrepareForIndexerQuantCache(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingForIndexerQuantCache(gert::TilingContext *context)
+ge::graphStatus TilingForIndexerQuantCache(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("IndexerQuantCache", "Tiling context is null"),
                 return ge::GRAPH_FAILED);

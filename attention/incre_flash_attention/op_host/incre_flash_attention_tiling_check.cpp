@@ -245,7 +245,7 @@ ge::graphStatus IFATiling::ProcessCheckATBInputWithPage() const
 
 ge::graphStatus IFATiling::CheckKeyShapeInput() const
 {
-    const gert::StorageShape *keyShape = ifaContext_->kCache[0];
+    const gert::StorageShape* keyShape = ifaContext_->kCache[0];
     OP_CHECK_IF((keyShape->GetStorageShape().GetDimNum() != KV_CACHE_DIM_NUM),
                 OP_LOGE(ifaContext_->opName, "key dim num %lu, invalid, should be %lu",
                         keyShape->GetStorageShape().GetDimNum(), KV_CACHE_DIM_NUM),
@@ -258,7 +258,7 @@ ge::graphStatus IFATiling::CheckKeyShapeInput() const
 
 ge::graphStatus IFATiling::CheckValueShapeInput() const
 {
-    const gert::StorageShape *valueShape = ifaContext_->vCache[0];
+    const gert::StorageShape* valueShape = ifaContext_->vCache[0];
     OP_CHECK_IF((valueShape->GetStorageShape().GetDimNum() != KV_CACHE_DIM_NUM),
                 OP_LOGE(ifaContext_->opName, "value dim num %lu, invalid, should be %lu",
                         valueShape->GetStorageShape().GetDimNum(), KV_CACHE_DIM_NUM),
@@ -283,7 +283,7 @@ ge::graphStatus IFATiling::ProcessCheckATBInput()
         return ge::GRAPH_FAILED);
 
     static const size_t Q_CACHE_DIM_NUM = 4;
-    const gert::StorageShape *queryShape = ifaContext_->query.shape;
+    const gert::StorageShape* queryShape = ifaContext_->query.shape;
 
     OP_CHECK_IF((inputQType_ != ge::DT_FLOAT16),
                 OP_LOGE(ifaContext_->opName, "query dtype %d invalid, should be float16", inputQType_),
@@ -428,7 +428,7 @@ ge::graphStatus IFATiling::CheckInputFormatAndLimits()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IFATiling::CheckKVHeadNum(const gert::StorageShape *inputShape) const
+ge::graphStatus IFATiling::CheckKVHeadNum(const gert::StorageShape* inputShape) const
 {
     uint32_t tmpNumHeads = 0;
     std::string layOutStr = ifaContext_->layOut;
@@ -451,8 +451,8 @@ ge::graphStatus IFATiling::CheckKVHeadNum(const gert::StorageShape *inputShape) 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IFATiling::CheckKVShape(const size_t &size, const gert::StorageShape *keyTensorInList,
-                                        const gert::StorageShape *valueTensorInList) const
+ge::graphStatus IFATiling::CheckKVShape(const size_t& size, const gert::StorageShape* keyTensorInList,
+                                        const gert::StorageShape* valueTensorInList) const
 {
     /* kv not continuous */
     std::string layOutStr = ifaContext_->layOut;
@@ -497,8 +497,8 @@ ge::graphStatus IFATiling::CheckKVShape(const size_t &size, const gert::StorageS
 }
 
 ge::graphStatus IFATiling::CheckQKOutShapeBsh(size_t dimOfQ, size_t dimOfK, size_t dimOfOut,
-                                              const gert::StorageShape *queryShape,
-                                              const gert::StorageShape *keyShape) const
+                                              const gert::StorageShape* queryShape,
+                                              const gert::StorageShape* keyShape) const
 {
     const std::string inputLayoutStr = ifaContext_->layOut;
     auto outExpectDim = inputLayoutStr == "BSH" ? DIM_BSH : DIM_BNSD;
@@ -524,8 +524,8 @@ ge::graphStatus IFATiling::CheckQKOutShapeBsh(size_t dimOfQ, size_t dimOfK, size
 }
 
 ge::graphStatus IFATiling::CheckQKOutShapeTnd(size_t dimOfQ, size_t dimOfK, size_t dimOfOut,
-                                              const gert::StorageShape *queryShape,
-                                              const gert::StorageShape *keyShape) const
+                                              const gert::StorageShape* queryShape,
+                                              const gert::StorageShape* keyShape) const
 {
     OP_CHECK_IF((dimOfQ != DIM_TND) || (dimOfK != DIM_TND) || (dimOfOut != DIM_TND),
                 OP_LOGE(ifaContext_->opName,
@@ -544,8 +544,8 @@ ge::graphStatus IFATiling::CheckQKOutShapeTnd(size_t dimOfQ, size_t dimOfK, size
 }
 
 ge::graphStatus IFATiling::CheckQKOutShapeBnsdOrBsnd(size_t dimOfQ, size_t dimOfK, size_t dimOfOut,
-                                                     const gert::StorageShape *queryShape,
-                                                     const gert::StorageShape *keyShape) const
+                                                     const gert::StorageShape* queryShape,
+                                                     const gert::StorageShape* keyShape) const
 {
     OP_CHECK_IF((dimOfQ != DIM_BNSD_OR_BSND) || (dimOfK != DIM_BNSD_OR_BSND) || (dimOfOut != DIM_BNSD_OR_BSND),
                 OP_LOGE(ifaContext_->opName,
@@ -567,8 +567,8 @@ ge::graphStatus IFATiling::CheckQKOutShape() const
     if (pageAttentionFlag_) { // page_attention don't check this place
         return ge::GRAPH_SUCCESS;
     }
-    const gert::StorageShape *queryShape = ifaContext_->query.shape;
-    const gert::StorageShape *keyShape = ifaContext_->kCache[0];
+    const gert::StorageShape* queryShape = ifaContext_->query.shape;
+    const gert::StorageShape* keyShape = ifaContext_->kCache[0];
     const std::string inputLayoutStr = ifaContext_->layOut;
 
     auto dimOfQ = queryShape->GetStorageShape().GetDimNum();
@@ -584,7 +584,7 @@ ge::graphStatus IFATiling::CheckQKOutShape() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IFATiling::CheckKeyShapeTensor(const gert::Shape &aShape) const
+ge::graphStatus IFATiling::CheckKeyShapeTensor(const gert::Shape& aShape) const
 {
     auto firstKeyShape = ifaContext_->kCache[0];
     std::string layOutStr = ifaContext_->layOut;
@@ -629,7 +629,7 @@ bool IFATiling::CheckIfRollBack() const
     return true;
 }
 
-bool IFATiling::ShapeEqual(const gert::Shape &aShape, const gert::Shape &bShape) const
+bool IFATiling::ShapeEqual(const gert::Shape& aShape, const gert::Shape& bShape) const
 {
     if (aShape.GetDimNum() != bShape.GetDimNum()) {
         return false;
@@ -663,7 +663,7 @@ bool IFATiling::CanChangeToNew() const
     return false;
 }
 
-static bool IsQuant2ShapeValid(const gert::Shape &inputParaShape, uint32_t headnum, uint32_t headsize)
+static bool IsQuant2ShapeValid(const gert::Shape& inputParaShape, uint32_t headnum, uint32_t headsize)
 {
     gert::Shape expectParamShapeBNSD = gert::Shape({1, headnum, 1, headsize});
     gert::Shape expectParamShapeBNSD_2 = gert::Shape({headnum, 1, headsize});
@@ -684,7 +684,7 @@ static bool IsQuant2ShapeValid(const gert::Shape &inputParaShape, uint32_t headn
     return validShape;
 }
 
-ge::graphStatus IFATiling::CheckQuant2Shape(const gert::Shape &inputParaShape) const
+ge::graphStatus IFATiling::CheckQuant2Shape(const gert::Shape& inputParaShape) const
 {
     auto headsize = headDim_; // D
     auto headnum = numHeads_; // Q's N
@@ -722,7 +722,7 @@ ge::graphStatus IFATiling::CheckQuant2Shape(const gert::Shape &inputParaShape) c
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IFATiling::CheckKVAntiQuantPerHead(const gert::Shape &inputParaShape) const
+ge::graphStatus IFATiling::CheckKVAntiQuantPerHead(const gert::Shape& inputParaShape) const
 {
     if (antiquantMode_ == PER_TOKEN_MODE) {            // per-token head
         OP_CHECK_IF((inputParaShape.GetDimNum() != 3), // 3: Dim of BGS is 3
@@ -755,7 +755,7 @@ ge::graphStatus IFATiling::CheckKVAntiQuantPerHead(const gert::Shape &inputParaS
     }
 }
 
-ge::graphStatus IFATiling::CheckKVAntiQuantPerChannel(const gert::Shape &inputParaShape) const
+ge::graphStatus IFATiling::CheckKVAntiQuantPerChannel(const gert::Shape& inputParaShape) const
 {
     std::string layOutStr = ifaContext_->layOut;
     if (gqaKvNZFlag_ && kvAntiParamSplitFlag_) {
@@ -797,7 +797,7 @@ ge::graphStatus IFATiling::CheckKVAntiQuantPerChannel(const gert::Shape &inputPa
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IFATiling::CheckGqaAntiQuantPerChannel(const gert::Shape &inputParaShape) const
+ge::graphStatus IFATiling::CheckGqaAntiQuantPerChannel(const gert::Shape& inputParaShape) const
 {
     std::string layOutStr = ifaContext_->layOut;
     if (layOutStr == "BNSD") {
@@ -849,10 +849,10 @@ ge::graphStatus IFATiling::CheckGqaAntiQuantPerChannel(const gert::Shape &inputP
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IFATiling::CheckAntiQuantParam(const gert::Tensor *antiquantScaleTensor,
-                                               const gert::Tensor *antiquantOffsetTensor,
-                                               const gert::CompileTimeTensorDesc *antiquantScaleDesc,
-                                               const gert::CompileTimeTensorDesc *antiquantOffsetDesc)
+ge::graphStatus IFATiling::CheckAntiQuantParam(const gert::Tensor* antiquantScaleTensor,
+                                               const gert::Tensor* antiquantOffsetTensor,
+                                               const gert::CompileTimeTensorDesc* antiquantScaleDesc,
+                                               const gert::CompileTimeTensorDesc* antiquantOffsetDesc)
 {
     OP_CHECK_IF(
         (antiquantMode_ != 0) && (antiquantMode_ != 1) && (antiquantMode_ != 2), // unseparated antiquant need this
@@ -904,8 +904,8 @@ ge::graphStatus IFATiling::CheckAntiQuantParam(const gert::Tensor *antiquantScal
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IFATiling::CheckAntiquantOffsetType(const gert::Tensor *antiquantOffsetTensor,
-                                                    const gert::CompileTimeTensorDesc *antiquantOffsetDesc,
+ge::graphStatus IFATiling::CheckAntiquantOffsetType(const gert::Tensor* antiquantOffsetTensor,
+                                                    const gert::CompileTimeTensorDesc* antiquantOffsetDesc,
                                                     ge::DataType antiquantScaleType) const
 {
     if (antiquantOffsetTensor != nullptr && antiquantOffsetDesc != nullptr) {
@@ -966,7 +966,7 @@ ge::graphStatus IFATiling::SharedPrefixCheckBasic()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IFATiling::SharedPrefixCheckShapes(const gert::Shape &keyShape, const gert::Shape &valueShape) const
+ge::graphStatus IFATiling::SharedPrefixCheckShapes(const gert::Shape& keyShape, const gert::Shape& valueShape) const
 {
     OP_CHECK_IF(!ShapeEqual(keyShape, valueShape),
                 OP_LOGE(ifaContext_->opName, "tensor shape of key_shared_prefix and value_shared_prefix not equal."),
@@ -1200,8 +1200,8 @@ bool IFATiling::HasZeroSeqBatch() const
 }
 
 bool IFATiling::IsKvZeroBatchSplit(bool needUpdate, uint32_t lastValidBMoreIdx, uint32_t bSize,
-                                   const std::vector<uint32_t> &s1OuterNum,
-                                   const std::vector<uint32_t> &s2OuterNum) const
+                                   const std::vector<uint32_t>& s1OuterNum,
+                                   const std::vector<uint32_t>& s2OuterNum) const
 {
     if (needUpdate) {
         return false;
@@ -1398,8 +1398,8 @@ ge::graphStatus IFATiling::CheckTreeSparseMask()
 
     // 补充s2 >= s1的拦截，在MLA全量化场景，必须开启PA(NZ)，所以actualSeqKV不进行累加
     if (inputLayout_ == IfaLayout::TND) {
-        const int64_t *actualSeqQTnd = ifaContext_->actualSeqLengthsQ.tensor->GetData<int64_t>();
-        const int64_t *actualSeqKVTnd = ifaContext_->actualSeqLengths.tensor->GetData<int64_t>();
+        const int64_t* actualSeqQTnd = ifaContext_->actualSeqLengthsQ.tensor->GetData<int64_t>();
+        const int64_t* actualSeqKVTnd = ifaContext_->actualSeqLengths.tensor->GetData<int64_t>();
         int64_t qActSize = 0;
         int64_t kvActSize = 0;
 

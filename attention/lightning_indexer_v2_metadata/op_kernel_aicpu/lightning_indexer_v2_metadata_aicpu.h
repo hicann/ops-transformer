@@ -217,10 +217,10 @@ class LightningIndexerV2MetadataCpuKernel : public CpuKernel {
 public:
     LightningIndexerV2MetadataCpuKernel() = default;
     ~LightningIndexerV2MetadataCpuKernel() = default;
-    uint32_t Compute(CpuKernelContext &ctx) override;
+    uint32_t Compute(CpuKernelContext& ctx) override;
 
 private:
-    bool Prepare(CpuKernelContext &ctx);
+    bool Prepare(CpuKernelContext& ctx);
     bool ParamsCheck();
     bool CheckCuSeqlensQ(int32_t batchSize) const;
     bool CheckCuSeqlensK(int32_t batchSize) const;
@@ -230,8 +230,8 @@ private:
     int32_t GetQueryBatchSize();
     ValidSocVersion ProcessSocVersion();
     bool ParamsInit();
-    bool BalanceSchedule(SplitResult &splitRes);
-    bool GenMetadata(SplitResult &splitRes);
+    bool BalanceSchedule(SplitResult& splitRes);
+    bool GenMetadata(SplitResult& splitRes);
 
     // util
     uint32_t GetS1SeqSize(uint32_t bIdx);
@@ -239,46 +239,46 @@ private:
     uint64_t GetRevertS2Size(uint32_t bIdx);
     int64_t CalcPreTokenLeftUp(uint32_t s1Size, uint64_t s2Size) const;
     int64_t CalcNextTokenLeftUp(uint32_t s1Size, uint64_t s2Size) const;
-    Range<int64_t> CalcS2TokenRange(uint32_t s1GIdx, const BatchCache &batchCache);
+    Range<int64_t> CalcS2TokenRange(uint32_t s1GIdx, const BatchCache& batchCache);
     int64_t CalcCost(uint32_t basicM, uint32_t basicS2) const;
     BlockCost<int64_t> CalcCostTable(uint32_t s1NormalSize, uint32_t s2NormalSize, uint32_t s1GTailSize,
                                      uint32_t s2TailSize) const;
 
     // cache calculation
-    void CalcBatchCache(uint32_t bIdx, const SplitContext &splitContext, BatchCache &batchCache);
-    void CalcS1GCache(uint32_t s1GIdx, const SplitContext &splitContext, const BatchCache &batchCache,
-                      S1GCache &s1GCache);
+    void CalcBatchCache(uint32_t bIdx, const SplitContext& splitContext, BatchCache& batchCache);
+    void CalcS1GCache(uint32_t s1GIdx, const SplitContext& splitContext, const BatchCache& batchCache,
+                      S1GCache& s1GCache);
 
     // preprocess
-    void CalcSplitInfo(SplitContext &splitContext);
-    void CalcBatchCost(uint32_t bIdx, const SplitContext &splitContext, CostInfo &costInfo);
-    void CalcCostInfo(SplitContext &splitContext);
+    void CalcSplitInfo(SplitContext& splitContext);
+    void CalcBatchCost(uint32_t bIdx, const SplitContext& splitContext, CostInfo& costInfo);
+    void CalcCostInfo(SplitContext& splitContext);
 
     // assign
-    void UpdateCursor(const SplitContext &splitContext, AssignContext &assignContext);
-    void AssignByBatch(const SplitContext &splitContext, AssignContext &assignContext);
-    void AssignByRow(const SplitContext &splitContext, AssignContext &assignContext);
-    void AssignByBlock(const SplitContext &splitContext, AssignContext &assignContext);
-    void ForceAssign(const SplitContext &splitContext, AssignContext &assignContext);
-    void AssignBlockToCore(const SplitContext &splitContext, AssignContext &assignContext, SplitResult &result);
+    void UpdateCursor(const SplitContext& splitContext, AssignContext& assignContext);
+    void AssignByBatch(const SplitContext& splitContext, AssignContext& assignContext);
+    void AssignByRow(const SplitContext& splitContext, AssignContext& assignContext);
+    void AssignByBlock(const SplitContext& splitContext, AssignContext& assignContext);
+    void ForceAssign(const SplitContext& splitContext, AssignContext& assignContext);
+    void AssignBlockToCore(const SplitContext& splitContext, AssignContext& assignContext, SplitResult& result);
 
     // FD
-    bool IsNeedRecordFDInfo(const AssignContext &assignContext, const SplitResult &splitRes);
-    void RecordFDInfo(const SplitContext &splitContext, const AssignContext &assignContext, SplitResult &result);
+    bool IsNeedRecordFDInfo(const AssignContext& assignContext, const SplitResult& splitRes);
+    void RecordFDInfo(const SplitContext& splitContext, const AssignContext& assignContext, SplitResult& result);
 
     // main
-    void SplitFD(SplitResult &splitRes);
-    void CalcSplitPlan(int64_t costLimit, const SplitContext &splitContext, SplitResult &result);
+    void SplitFD(SplitResult& splitRes);
+    void CalcSplitPlan(int64_t costLimit, const SplitContext& splitContext, SplitResult& result);
 
 private:
     // input
-    Tensor *cuSeqlensQ_ = nullptr;
-    Tensor *cuSeqlensK_ = nullptr;
-    Tensor *sequsedQ_ = nullptr;
-    Tensor *sequsedK_ = nullptr;
-    Tensor *cmpResidualK_ = nullptr;
+    Tensor* cuSeqlensQ_ = nullptr;
+    Tensor* cuSeqlensK_ = nullptr;
+    Tensor* sequsedQ_ = nullptr;
+    Tensor* sequsedK_ = nullptr;
+    Tensor* cmpResidualK_ = nullptr;
     // output
-    Tensor *metadata_ = nullptr;
+    Tensor* metadata_ = nullptr;
     // attributes
     std::string socVersion_ = "";
     bool supportFd_ = true;

@@ -96,11 +96,11 @@ struct TaskInfo {
     int64_t qHeadCount = 0;
 };
 
-inline BSAScheduleStatus BuildSchedule(const ScheduleInput &input, ScheduleResult &result);
-inline BSAScheduleStatus DecodeTask(const ScheduleInput &input, const ScheduleResult &result, int64_t taskIdx,
-                                    TaskInfo &taskInfo);
-inline BSAScheduleStatus EncodeMetadata(const ScheduleResult &result,
-                                        optiling::generic_block_sparse_attention_metadata::MetadataType *metadata,
+inline BSAScheduleStatus BuildSchedule(const ScheduleInput& input, ScheduleResult& result);
+inline BSAScheduleStatus DecodeTask(const ScheduleInput& input, const ScheduleResult& result, int64_t taskIdx,
+                                    TaskInfo& taskInfo);
+inline BSAScheduleStatus EncodeMetadata(const ScheduleResult& result,
+                                        optiling::generic_block_sparse_attention_metadata::MetadataType* metadata,
                                         size_t metadataElementNum);
 
 namespace {
@@ -122,7 +122,7 @@ inline uint32_t HashConfigValue(uint32_t hash, uint32_t value)
     return hash;
 }
 
-inline uint32_t CalculateConfigSignature(const ScheduleInput &input)
+inline uint32_t CalculateConfigSignature(const ScheduleInput& input)
 {
     uint32_t hash = 2166136261U;
     hash = HashConfigValue(hash, static_cast<uint32_t>(input.batchSize));
@@ -141,7 +141,7 @@ inline uint32_t CalculateConfigSignature(const ScheduleInput &input)
     return hash;
 }
 
-inline bool AddOverflow(int64_t lhs, int64_t rhs, int64_t &result)
+inline bool AddOverflow(int64_t lhs, int64_t rhs, int64_t& result)
 {
     if (lhs < 0 || rhs < 0 || lhs > std::numeric_limits<int64_t>::max() - rhs) {
         return true;
@@ -150,7 +150,7 @@ inline bool AddOverflow(int64_t lhs, int64_t rhs, int64_t &result)
     return false;
 }
 
-inline bool MulOverflow(int64_t lhs, int64_t rhs, int64_t &result)
+inline bool MulOverflow(int64_t lhs, int64_t rhs, int64_t& result)
 {
     if (lhs < 0 || rhs < 0 || (lhs != 0 && rhs > std::numeric_limits<int64_t>::max() / lhs)) {
         return true;
@@ -159,7 +159,7 @@ inline bool MulOverflow(int64_t lhs, int64_t rhs, int64_t &result)
     return false;
 }
 
-inline bool AddOverflow(uint64_t lhs, uint64_t rhs, uint64_t &result)
+inline bool AddOverflow(uint64_t lhs, uint64_t rhs, uint64_t& result)
 {
     if (lhs > std::numeric_limits<uint64_t>::max() - rhs) {
         return true;
@@ -168,7 +168,7 @@ inline bool AddOverflow(uint64_t lhs, uint64_t rhs, uint64_t &result)
     return false;
 }
 
-inline bool MulOverflow(uint64_t lhs, uint64_t rhs, uint64_t &result)
+inline bool MulOverflow(uint64_t lhs, uint64_t rhs, uint64_t& result)
 {
     if (lhs != 0U && rhs > std::numeric_limits<uint64_t>::max() / lhs) {
         return true;
@@ -199,8 +199,8 @@ inline uint32_t CalcFdBestCore(uint64_t totalCost, uint64_t launchCost, uint32_t
     return std::max(1U, std::min(bestCore, maxCore));
 }
 
-inline BSAScheduleStatus AccumulateFdCost(int64_t m16, int64_t validBlockNum, uint64_t &totalCost,
-                                          uint64_t &totalValidBlockNum)
+inline BSAScheduleStatus AccumulateFdCost(int64_t m16, int64_t validBlockNum, uint64_t& totalCost,
+                                          uint64_t& totalValidBlockNum)
 {
     uint64_t mCost = 0U;
     uint64_t nCost = 0U;
@@ -218,7 +218,7 @@ inline BSAScheduleStatus AccumulateFdCost(int64_t m16, int64_t validBlockNum, ui
     return BSAScheduleStatus::BSA_SUCCESS;
 }
 
-inline bool IsScheduleInputValid(const ScheduleInput &input)
+inline bool IsScheduleInputValid(const ScheduleInput& input)
 {
     using namespace optiling::generic_block_sparse_attention_metadata;
     return input.batchSize >= 0 && input.numQHeads > 0 && input.numKvHeads > 0 && input.headDim > 0 &&
@@ -227,7 +227,7 @@ inline bool IsScheduleInputValid(const ScheduleInput &input)
            input.aicCoreNum <= MAX_AIC_CORE_NUM && input.qSeqLens.size() == static_cast<size_t>(input.batchSize);
 }
 
-inline BSAScheduleStatus BuildSaTaskInfo(const ScheduleInput &input, ScheduleResult &result)
+inline BSAScheduleStatus BuildSaTaskInfo(const ScheduleInput& input, ScheduleResult& result)
 {
     result.groupSize = input.numQHeads / input.numKvHeads;
     result.sparseHeadNum = input.isPackedGQA == 1 ? input.numKvHeads : input.numQHeads;
@@ -257,8 +257,8 @@ inline BSAScheduleStatus BuildSaTaskInfo(const ScheduleInput &input, ScheduleRes
     return BSAScheduleStatus::BSA_SUCCESS;
 }
 
-inline BSAScheduleStatus BuildBlockPrefix(const ScheduleInput &input, ScheduleResult &result, uint64_t &totalCost,
-                                          uint64_t &totalValidBlockNum)
+inline BSAScheduleStatus BuildBlockPrefix(const ScheduleInput& input, ScheduleResult& result, uint64_t& totalCost,
+                                          uint64_t& totalValidBlockNum)
 {
     result.blockPrefix.resize(static_cast<size_t>(result.saTotalTaskNum) + 1U, 0);
     const int64_t qHeadCount = input.isPackedGQA == 1 ? result.groupSize : 1;
@@ -284,7 +284,7 @@ inline BSAScheduleStatus BuildBlockPrefix(const ScheduleInput &input, ScheduleRe
     return BSAScheduleStatus::BSA_SUCCESS;
 }
 
-inline bool ShouldBuildDecodeSchedule(const ScheduleInput &input, const ScheduleResult &result, uint64_t totalCost,
+inline bool ShouldBuildDecodeSchedule(const ScheduleInput& input, const ScheduleResult& result, uint64_t totalCost,
                                       uint64_t totalValidBlockNum)
 {
     const int64_t totalSplitTaskNum = result.blockPrefix.back();
@@ -298,10 +298,10 @@ inline bool ShouldBuildDecodeSchedule(const ScheduleInput &input, const Schedule
     return fdShapeSupported && totalSplitTaskNum > result.saUsedCoreNum && totalCost > 0U && totalValidBlockNum > 0U;
 }
 
-inline BSAScheduleStatus BuildDecodeCoreSchedules(ScheduleResult &result, int64_t totalSplitTaskNum)
+inline BSAScheduleStatus BuildDecodeCoreSchedules(ScheduleResult& result, int64_t totalSplitTaskNum)
 {
     for (int64_t coreIdx = 0; coreIdx < result.fdActiveCoreNum; ++coreIdx) {
-        DecodeSchedule &schedule = result.decodeSchedules[static_cast<size_t>(coreIdx)];
+        DecodeSchedule& schedule = result.decodeSchedules[static_cast<size_t>(coreIdx)];
         const int64_t flatStart = std::min(coreIdx * result.decodePerCoreTaskNum, totalSplitTaskNum);
         const int64_t flatEnd = std::min(flatStart + result.decodePerCoreTaskNum, totalSplitTaskNum);
         if (flatStart == flatEnd) {
@@ -322,7 +322,7 @@ inline BSAScheduleStatus BuildDecodeCoreSchedules(ScheduleResult &result, int64_
     return BSAScheduleStatus::BSA_SUCCESS;
 }
 
-inline BSAScheduleStatus BuildCombineSchedules(ScheduleResult &result)
+inline BSAScheduleStatus BuildCombineSchedules(ScheduleResult& result)
 {
     using namespace optiling::generic_block_sparse_attention_metadata;
     int64_t partialTaskNum = 0;
@@ -346,7 +346,7 @@ inline BSAScheduleStatus BuildCombineSchedules(ScheduleResult &result)
         if (result.combineTaskNum >= MAX_COMBINE_TASK_NUM) {
             return BSAScheduleStatus::BSA_SCHEDULE_TOO_LARGE;
         }
-        CombineSchedule &combine = result.combineSchedules[static_cast<size_t>(result.combineTaskNum++)];
+        CombineSchedule& combine = result.combineSchedules[static_cast<size_t>(result.combineTaskNum++)];
         combine.baseTask = task;
         combine.firstCore = firstCore;
         combine.partialStart = partialTaskNum;
@@ -361,7 +361,7 @@ inline BSAScheduleStatus BuildCombineSchedules(ScheduleResult &result)
 
 } // namespace
 
-inline BSAScheduleStatus BuildSchedule(const ScheduleInput &input, ScheduleResult &result)
+inline BSAScheduleStatus BuildSchedule(const ScheduleInput& input, ScheduleResult& result)
 {
     using namespace optiling::generic_block_sparse_attention_metadata;
     result = {};
@@ -406,8 +406,8 @@ inline BSAScheduleStatus BuildSchedule(const ScheduleInput &input, ScheduleResul
     return status;
 }
 
-inline BSAScheduleStatus DecodeTask(const ScheduleInput &input, const ScheduleResult &result, int64_t taskIdx,
-                                    TaskInfo &taskInfo)
+inline BSAScheduleStatus DecodeTask(const ScheduleInput& input, const ScheduleResult& result, int64_t taskIdx,
+                                    TaskInfo& taskInfo)
 {
     if (taskIdx < 0 || taskIdx >= result.saTotalTaskNum || result.sparseHeadNum <= 0 ||
         result.qLogicalStarts.size() != static_cast<size_t>(input.batchSize) + 1U) {
@@ -440,7 +440,7 @@ inline BSAScheduleStatus DecodeTask(const ScheduleInput &input, const ScheduleRe
     return BSAScheduleStatus::BSA_SUCCESS;
 }
 
-inline BSAScheduleStatus EncodeMetadata(const ScheduleResult &result, MetadataType *metadata, size_t metadataElementNum)
+inline BSAScheduleStatus EncodeMetadata(const ScheduleResult& result, MetadataType* metadata, size_t metadataElementNum)
 {
     using namespace optiling::generic_block_sparse_attention_metadata;
     if (metadata == nullptr || metadataElementNum < METADATA_TOTAL_SIZE || result.fdActiveCoreNum < 0 ||
@@ -463,7 +463,7 @@ inline BSAScheduleStatus EncodeMetadata(const ScheduleResult &result, MetadataTy
     metadata[CONFIG_SIGNATURE_INDEX] = static_cast<MetadataType>(result.configSignature);
 
     for (uint32_t coreIdx = 0; coreIdx < MAX_DECODE_CORE_NUM; ++coreIdx) {
-        const DecodeSchedule &schedule = result.decodeSchedules[coreIdx];
+        const DecodeSchedule& schedule = result.decodeSchedules[coreIdx];
         metadata[GetDecodeScheduleIndex(coreIdx, DECODE_BASE_TASK_START_INDEX)] =
             static_cast<MetadataType>(schedule.baseTaskStart);
         metadata[GetDecodeScheduleIndex(coreIdx, DECODE_BASE_TASK_END_INDEX)] =
@@ -474,7 +474,7 @@ inline BSAScheduleStatus EncodeMetadata(const ScheduleResult &result, MetadataTy
             static_cast<MetadataType>(schedule.lastBlockEnd);
     }
     for (uint32_t combineIdx = 0; combineIdx < MAX_COMBINE_TASK_NUM; ++combineIdx) {
-        const CombineSchedule &schedule = result.combineSchedules[combineIdx];
+        const CombineSchedule& schedule = result.combineSchedules[combineIdx];
         metadata[GetCombineScheduleIndex(combineIdx, COMBINE_BASE_TASK_INDEX)] =
             static_cast<MetadataType>(schedule.baseTask);
         metadata[GetCombineScheduleIndex(combineIdx, COMBINE_FIRST_CORE_INDEX)] =

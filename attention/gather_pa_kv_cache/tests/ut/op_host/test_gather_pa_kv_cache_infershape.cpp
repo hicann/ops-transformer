@@ -15,8 +15,7 @@
 #include "infer_shape_case_executor.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 
-class GatherPaKvCacheProto : public testing::Test
-{
+class GatherPaKvCacheProto : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
@@ -31,16 +30,17 @@ protected:
 
 TEST_F(GatherPaKvCacheProto, gather_pa_kv_cache_infershape_0)
 {
-    gert::InfershapeContextPara infershapeContextPara("GatherPaKvCache",
+    gert::InfershapeContextPara infershapeContextPara(
+        "GatherPaKvCache",
         {
             {{{30, 101, 128, 32}, {30, 101, 128, 32}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ}, // keyCache
             {{{30, 101, 128, 32}, {30, 101, 128, 32}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ}, // valueCache
-            {{{16, 12}, {16, 12}}, ge::DT_INT32, ge::FORMAT_ND}, // blocktables
-            {{{16}, {16}}, ge::DT_INT32, ge::FORMAT_ND}, // seqLens
-            {{{18933, 3232}, {18933, 3232}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ}, // key
-            {{{18933, 3232}, {18933, 3232}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ}, // value
-            {{{16}, {16}}, ge::DT_INT32, ge::FORMAT_ND}, // seqOffset
-            
+            {{{16, 12}, {16, 12}}, ge::DT_INT32, ge::FORMAT_ND},                            // blocktables
+            {{{16}, {16}}, ge::DT_INT32, ge::FORMAT_ND},                                    // seqLens
+            {{{18933, 3232}, {18933, 3232}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ},           // key
+            {{{18933, 3232}, {18933, 3232}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ},           // value
+            {{{16}, {16}}, ge::DT_INT32, ge::FORMAT_ND},                                    // seqOffset
+
         },
         {
             {{{}, {}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ}, // key
@@ -49,24 +49,24 @@ TEST_F(GatherPaKvCacheProto, gather_pa_kv_cache_infershape_0)
         {
             {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_NZ")},
             {"is_seq_lens_cumsum", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-        }
-    );
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{18933, 3232}, {18933, 3232}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(GatherPaKvCacheProto, gather_pa_kv_cache_infershape_1)
 {
-    gert::InfershapeContextPara infershapeContextPara("GatherPaKvCache",
+    gert::InfershapeContextPara infershapeContextPara(
+        "GatherPaKvCache",
         {
             {{{128, 128, 16, 144}, {128, 128, 16, 144}}, ge::DT_INT8, ge::FORMAT_ND}, // keyCache
             {{{128, 128, 16, 128}, {128, 128, 16, 128}}, ge::DT_INT8, ge::FORMAT_ND}, // valueCache
-            {{{16, 12}, {16, 12}}, ge::DT_INT32, ge::FORMAT_ND}, // blocktables
-            {{{16}, {16}}, ge::DT_INT32, ge::FORMAT_ND}, // seqLens
-            {{{9547, 16, 144}, {9547, 16, 144}}, ge::DT_INT8, ge::FORMAT_ND}, // key
-            {{{9547, 16, 128}, {9547, 16, 128}}, ge::DT_INT8, ge::FORMAT_ND}, // value
-            {{{16}, {16}}, ge::DT_INT32, ge::FORMAT_ND}, // seqOffset
-            
+            {{{16, 12}, {16, 12}}, ge::DT_INT32, ge::FORMAT_ND},                      // blocktables
+            {{{16}, {16}}, ge::DT_INT32, ge::FORMAT_ND},                              // seqLens
+            {{{9547, 16, 144}, {9547, 16, 144}}, ge::DT_INT8, ge::FORMAT_ND},         // key
+            {{{9547, 16, 128}, {9547, 16, 128}}, ge::DT_INT8, ge::FORMAT_ND},         // value
+            {{{16}, {16}}, ge::DT_INT32, ge::FORMAT_ND},                              // seqOffset
+
         },
         {
             {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND}, // key
@@ -75,24 +75,24 @@ TEST_F(GatherPaKvCacheProto, gather_pa_kv_cache_infershape_1)
         {
             {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("Norm")},
             {"is_seq_lens_cumsum", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-        }
-    );
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{9547, 16, 144}, {9547, 16, 128}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(GatherPaKvCacheProto, gather_pa_kv_cache_infershape_2)
 {
-    gert::InfershapeContextPara infershapeContextPara("GatherPaKvCache",
+    gert::InfershapeContextPara infershapeContextPara(
+        "GatherPaKvCache",
         {
             {{{-1, -1, -1, -1}, {128, 128, 16, 144}}, ge::DT_INT8, ge::FORMAT_ND}, // keyCache
             {{{-1, -1, -1, -1}, {128, 128, 16, 128}}, ge::DT_INT8, ge::FORMAT_ND}, // valueCache
-            {{{-1, -1}, {16, 12}}, ge::DT_INT32, ge::FORMAT_ND}, // blocktables
-            {{{1-1}, {16}}, ge::DT_INT32, ge::FORMAT_ND}, // seqLens
-            {{{-1, -1, -1}, {9547, 16, 144}}, ge::DT_INT8, ge::FORMAT_ND}, // key
-            {{{-1, -1, -1}, {9547, 16, 128}}, ge::DT_INT8, ge::FORMAT_ND}, // value
-            {{{-1}, {-1}}, ge::DT_INT32, ge::FORMAT_ND}, // seqOffset
-            
+            {{{-1, -1}, {16, 12}}, ge::DT_INT32, ge::FORMAT_ND},                   // blocktables
+            {{{1 - 1}, {16}}, ge::DT_INT32, ge::FORMAT_ND},                        // seqLens
+            {{{-1, -1, -1}, {9547, 16, 144}}, ge::DT_INT8, ge::FORMAT_ND},         // key
+            {{{-1, -1, -1}, {9547, 16, 128}}, ge::DT_INT8, ge::FORMAT_ND},         // value
+            {{{-1}, {-1}}, ge::DT_INT32, ge::FORMAT_ND},                           // seqOffset
+
         },
         {
             {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND}, // key
@@ -101,24 +101,24 @@ TEST_F(GatherPaKvCacheProto, gather_pa_kv_cache_infershape_2)
         {
             {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("Norm")},
             {"is_seq_lens_cumsum", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-        }
-    );
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{-1, -1, -1}, {-1, -1, -1}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 TEST_F(GatherPaKvCacheProto, gather_pa_kv_cache_infershape_3)
 {
-    gert::InfershapeContextPara infershapeContextPara("GatherPaKvCache",
+    gert::InfershapeContextPara infershapeContextPara(
+        "GatherPaKvCache",
         {
             {{{-2}, {128, 128, 16, 144}}, ge::DT_INT8, ge::FORMAT_ND}, // keyCache
             {{{-2}, {128, 128, 16, 128}}, ge::DT_INT8, ge::FORMAT_ND}, // valueCache
-            {{{-2}, {16, 12}}, ge::DT_INT32, ge::FORMAT_ND}, // blocktables
-            {{{-2}, {16}}, ge::DT_INT32, ge::FORMAT_ND}, // seqLens
-            {{{-2}, {9547, 16, 144}}, ge::DT_INT8, ge::FORMAT_ND}, // key
-            {{{-2}, {9547, 16, 128}}, ge::DT_INT8, ge::FORMAT_ND}, // value
-            {{{-2}, {16}}, ge::DT_INT32, ge::FORMAT_ND}, // seqOffset
-            
+            {{{-2}, {16, 12}}, ge::DT_INT32, ge::FORMAT_ND},           // blocktables
+            {{{-2}, {16}}, ge::DT_INT32, ge::FORMAT_ND},               // seqLens
+            {{{-2}, {9547, 16, 144}}, ge::DT_INT8, ge::FORMAT_ND},     // key
+            {{{-2}, {9547, 16, 128}}, ge::DT_INT8, ge::FORMAT_ND},     // value
+            {{{-2}, {16}}, ge::DT_INT32, ge::FORMAT_ND},               // seqOffset
+
         },
         {
             {{{}, {}}, ge::DT_INT8, ge::FORMAT_ND}, // key
@@ -127,8 +127,7 @@ TEST_F(GatherPaKvCacheProto, gather_pa_kv_cache_infershape_3)
         {
             {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("Norm")},
             {"is_seq_lens_cumsum", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
-        }
-    );
+        });
     std::vector<std::vector<int64_t>> expectOutputShape = {{-2}, {-2}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }

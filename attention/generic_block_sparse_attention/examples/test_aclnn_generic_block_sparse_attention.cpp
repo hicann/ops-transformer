@@ -40,7 +40,7 @@
 
 namespace {
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -83,7 +83,7 @@ float Fp16ToFloat(uint16_t h)
     return result;
 }
 
-void PrintOutResult(const std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(const std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<uint16_t> resultData(size, 0);
@@ -95,7 +95,7 @@ void PrintOutResult(const std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -111,8 +111,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     if (size > 0) {
@@ -179,27 +179,27 @@ int main()
     std::vector<int64_t> metadataShape = {1024};
     std::vector<int64_t> attnOutShape = {T, N1, D};
 
-    void *qDeviceAddr = nullptr;
-    void *kDeviceAddr = nullptr;
-    void *vDeviceAddr = nullptr;
-    void *sparseIdxDeviceAddr = nullptr;
-    void *sparseCountDeviceAddr = nullptr;
-    void *metadataDeviceAddr = nullptr;
-    void *cuSeqQDeviceAddr = nullptr;
-    void *sequsedKvDeviceAddr = nullptr;
-    void *blockTableDeviceAddr = nullptr;
-    void *attnOutDeviceAddr = nullptr;
+    void* qDeviceAddr = nullptr;
+    void* kDeviceAddr = nullptr;
+    void* vDeviceAddr = nullptr;
+    void* sparseIdxDeviceAddr = nullptr;
+    void* sparseCountDeviceAddr = nullptr;
+    void* metadataDeviceAddr = nullptr;
+    void* cuSeqQDeviceAddr = nullptr;
+    void* sequsedKvDeviceAddr = nullptr;
+    void* blockTableDeviceAddr = nullptr;
+    void* attnOutDeviceAddr = nullptr;
 
-    aclTensor *q = nullptr;
-    aclTensor *k = nullptr;
-    aclTensor *v = nullptr;
-    aclTensor *sparseIdx = nullptr;
-    aclTensor *sparseCount = nullptr;
-    aclTensor *metadata = nullptr;
-    aclTensor *cuSeqQ = nullptr;
-    aclTensor *sequsedKv = nullptr;
-    aclTensor *blockTable = nullptr;
-    aclTensor *attnOut = nullptr;
+    aclTensor* q = nullptr;
+    aclTensor* k = nullptr;
+    aclTensor* v = nullptr;
+    aclTensor* sparseIdx = nullptr;
+    aclTensor* sparseCount = nullptr;
+    aclTensor* metadata = nullptr;
+    aclTensor* cuSeqQ = nullptr;
+    aclTensor* sequsedKv = nullptr;
+    aclTensor* blockTable = nullptr;
+    aclTensor* attnOut = nullptr;
 
     int64_t qSize = GetShapeSize(qShape);
     int64_t kvSize = GetShapeSize(kvShape);
@@ -257,7 +257,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     const int64_t blockShapeData[] = {blockShapeX, blockSize};
-    aclIntArray *blockShape = aclCreateIntArray(blockShapeData, 2);
+    aclIntArray* blockShape = aclCreateIntArray(blockShapeData, 2);
     CHECK_RET(blockShape != nullptr, LOG_PRINT("aclCreateIntArray failed\n"); return -1);
 
     char layoutQ[] = "TND";
@@ -266,7 +266,7 @@ int main()
 
     // 3. 先调用 Metadata，再调用主算子
     uint64_t metadataWorkspaceSize = 0;
-    aclOpExecutor *metadataExecutor = nullptr;
+    aclOpExecutor* metadataExecutor = nullptr;
     ret = aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
         sparseIdx, sparseCount, cuSeqQ, nullptr, nullptr, sequsedKv, S1, S2, N1, N2, D, blockShape, layoutQ, layoutKv,
         4, 1, 0, 1, -1, -1, 0, false, metadata, &metadataWorkspaceSize, &metadataExecutor);
@@ -274,7 +274,7 @@ int main()
               LOG_PRINT("aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *metadataWorkspaceAddr = nullptr;
+    void* metadataWorkspaceAddr = nullptr;
     if (metadataWorkspaceSize > 0) {
         ret = aclrtMalloc(&metadataWorkspaceAddr, metadataWorkspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate metadata workspace failed. ERROR: %d\n", ret); return ret);
@@ -291,7 +291,7 @@ int main()
               return ret);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     ret = aclnnGenericBlockSparseAttentionGetWorkspaceSize(
         q, k, v, sparseIdx, sparseCount, metadata, nullptr, nullptr, nullptr, nullptr, nullptr, cuSeqQ, nullptr,
         nullptr, sequsedKv, blockTable, blockShape, layoutQ, layoutKv, layoutSparse, scaleValue, 1, 0, 0.0, 1, -1, -1,
@@ -300,7 +300,7 @@ int main()
               LOG_PRINT("aclnnGenericBlockSparseAttentionGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

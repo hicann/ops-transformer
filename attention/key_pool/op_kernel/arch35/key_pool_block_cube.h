@@ -29,38 +29,38 @@ class KeyPoolBlockCube {
 
 public:
     __aicore__ inline KeyPoolBlockCube(){};
-    __aicore__ inline void InitParams(const ConstInfo &constInfo, const KeyPoolTools<COMP> &tools);
-    __aicore__ inline void Init(__gm__ uint8_t *hidden_states, __gm__ uint8_t *wk, __gm__ uint8_t *gateWeight,
-                                __gm__ uint8_t *stateCache, __gm__ uint8_t *ape, __gm__ uint8_t *cacheBlockTable,
-                                __gm__ uint8_t *seqLens, __gm__ uint8_t *seqUsed, __gm__ uint8_t *startPos,
-                                __gm__ uint8_t *pooledKeyOut);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitGlobalBuffers(const GlobalTensor<MM1_OUT_T> &kvMm1ResGm,
-                                             const GlobalTensor<MM1_OUT_T> &scoreMm1ResGm);
-    __aicore__ inline void AllocEventID(TPipe *pipe);
-    __aicore__ inline void FreeEventID(TPipe *pipe);
-    __aicore__ inline void ComputeMm1(const RunInfo &info);
+    __aicore__ inline void InitParams(const ConstInfo& constInfo, const KeyPoolTools<COMP>& tools);
+    __aicore__ inline void Init(__gm__ uint8_t* hidden_states, __gm__ uint8_t* wk, __gm__ uint8_t* gateWeight,
+                                __gm__ uint8_t* stateCache, __gm__ uint8_t* ape, __gm__ uint8_t* cacheBlockTable,
+                                __gm__ uint8_t* seqLens, __gm__ uint8_t* seqUsed, __gm__ uint8_t* startPos,
+                                __gm__ uint8_t* pooledKeyOut);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void InitGlobalBuffers(const GlobalTensor<MM1_OUT_T>& kvMm1ResGm,
+                                             const GlobalTensor<MM1_OUT_T>& scoreMm1ResGm);
+    __aicore__ inline void AllocEventID(TPipe* pipe);
+    __aicore__ inline void FreeEventID(TPipe* pipe);
+    __aicore__ inline void ComputeMm1(const RunInfo& info);
 
 private:
     using T = float;
     using HIDDEN_STATES_T =
         typename AscendC::Conditional<COMP::hiddenStatesDtype == HIDDEN_STATES_DTYPE::BF16, bfloat16_t, half>::type;
 
-    __aicore__ inline uint32_t GetMSize(const RunInfo &info, uint32_t coffId);
-    __aicore__ inline void CopyXGmToL1(const RunInfo &info, LocalTensor<HIDDEN_STATES_T> xL1Tensor, uint32_t hIdx,
+    __aicore__ inline uint32_t GetMSize(const RunInfo& info, uint32_t coffId);
+    __aicore__ inline void CopyXGmToL1(const RunInfo& info, LocalTensor<HIDDEN_STATES_T> xL1Tensor, uint32_t hIdx,
                                        uint32_t kBase);
     __aicore__ inline void CopyWeightGmToL1(LocalTensor<HIDDEN_STATES_T> wL1Tensor, uint32_t hIdx, uint32_t kBase,
                                             uint32_t coffId);
-    __aicore__ inline void LoadAToL0(const RunInfo &info, LocalTensor<HIDDEN_STATES_T> aL0Tensor,
+    __aicore__ inline void LoadAToL0(const RunInfo& info, LocalTensor<HIDDEN_STATES_T> aL0Tensor,
                                      LocalTensor<HIDDEN_STATES_T> xL1Tensor, uint32_t kStart, uint32_t kBase,
                                      uint32_t mStart, uint32_t mDealSize);
-    __aicore__ inline void LoadBToL0(const RunInfo &info, LocalTensor<HIDDEN_STATES_T> bL0Tensor,
+    __aicore__ inline void LoadBToL0(const RunInfo& info, LocalTensor<HIDDEN_STATES_T> bL0Tensor,
                                      LocalTensor<HIDDEN_STATES_T> wL1Tensor, uint32_t kStart, uint32_t kBase,
                                      uint32_t nStart, uint32_t nDealSize);
     __aicore__ inline void MatrixMmad(LocalTensor<T> cL0Tensor, LocalTensor<HIDDEN_STATES_T> aL0Tensor,
                                       LocalTensor<HIDDEN_STATES_T> bL0Tensor, uint32_t mActSize, uint32_t nDealSize,
                                       uint32_t kActSize, bool isInitL0C);
-    __aicore__ inline void CopyOutMm1Res(const RunInfo &info, LocalTensor<T> cL0Tensor, uint32_t coffId,
+    __aicore__ inline void CopyOutMm1Res(const RunInfo& info, LocalTensor<T> cL0Tensor, uint32_t coffId,
                                          uint32_t mStart, uint32_t mDealSize, uint32_t nStart, uint32_t nDealSize);
 
     ConstInfo constInfo_ = {};
@@ -121,34 +121,34 @@ private:
 };
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockCube<COMP>::InitParams(const ConstInfo &constInfo, const KeyPoolTools<COMP> &tools)
+__aicore__ inline void KeyPoolBlockCube<COMP>::InitParams(const ConstInfo& constInfo, const KeyPoolTools<COMP>& tools)
 {
     this->constInfo_ = constInfo;
     this->tools_ = tools;
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockCube<COMP>::Init(__gm__ uint8_t *hidden_states, __gm__ uint8_t *wk,
-                                                    __gm__ uint8_t *gateWeight, __gm__ uint8_t *stateCache,
-                                                    __gm__ uint8_t *ape, __gm__ uint8_t *cacheBlockTable,
-                                                    __gm__ uint8_t *seqLens, __gm__ uint8_t *seqUsed,
-                                                    __gm__ uint8_t *startPos, __gm__ uint8_t *pooledKeyOut)
+__aicore__ inline void KeyPoolBlockCube<COMP>::Init(__gm__ uint8_t* hidden_states, __gm__ uint8_t* wk,
+                                                    __gm__ uint8_t* gateWeight, __gm__ uint8_t* stateCache,
+                                                    __gm__ uint8_t* ape, __gm__ uint8_t* cacheBlockTable,
+                                                    __gm__ uint8_t* seqLens, __gm__ uint8_t* seqUsed,
+                                                    __gm__ uint8_t* startPos, __gm__ uint8_t* pooledKeyOut)
 {
-    hiddenStatesGm_.SetGlobalBuffer((__gm__ HIDDEN_STATES_T *)hidden_states);
-    wkvGm_.SetGlobalBuffer((__gm__ HIDDEN_STATES_T *)wk);
-    wgateGm_.SetGlobalBuffer((__gm__ HIDDEN_STATES_T *)gateWeight);
-    startPosGm_.SetGlobalBuffer((__gm__ int32_t *)startPos);
+    hiddenStatesGm_.SetGlobalBuffer((__gm__ HIDDEN_STATES_T*)hidden_states);
+    wkvGm_.SetGlobalBuffer((__gm__ HIDDEN_STATES_T*)wk);
+    wgateGm_.SetGlobalBuffer((__gm__ HIDDEN_STATES_T*)gateWeight);
+    startPosGm_.SetGlobalBuffer((__gm__ int32_t*)startPos);
     isExistSeqUsed = (seqUsed != nullptr);
     if (isExistSeqUsed) {
-        sequsedGm_.SetGlobalBuffer((__gm__ int32_t *)seqUsed);
+        sequsedGm_.SetGlobalBuffer((__gm__ int32_t*)seqUsed);
     }
     if constexpr (COMP::hiddenStatesLayout == HIDDEN_STATES_LAYOUT::TH) {
-        cuSeqlensGm_.SetGlobalBuffer((__gm__ int32_t *)seqLens);
+        cuSeqlensGm_.SetGlobalBuffer((__gm__ int32_t*)seqLens);
     }
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockCube<COMP>::InitBuffers(TPipe *pipe)
+__aicore__ inline void KeyPoolBlockCube<COMP>::InitBuffers(TPipe* pipe)
 {
     // L1
     // 1. coff=1时, mBase=256, kL1=256, X单次拷贝到L1的数据量最大为mBase*kL1*sizeof(BF16/FP16)=256*256*2=128K
@@ -165,15 +165,15 @@ __aicore__ inline void KeyPoolBlockCube<COMP>::InitBuffers(TPipe *pipe)
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockCube<COMP>::InitGlobalBuffers(const GlobalTensor<MM1_OUT_T> &kvMm1ResGm,
-                                                                 const GlobalTensor<MM1_OUT_T> &scoreMm1ResGm)
+__aicore__ inline void KeyPoolBlockCube<COMP>::InitGlobalBuffers(const GlobalTensor<MM1_OUT_T>& kvMm1ResGm,
+                                                                 const GlobalTensor<MM1_OUT_T>& scoreMm1ResGm)
 {
     this->kvMm1ResGm = kvMm1ResGm;
     this->scoreMm1ResGm = scoreMm1ResGm;
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockCube<COMP>::AllocEventID(TPipe *pipe)
+__aicore__ inline void KeyPoolBlockCube<COMP>::AllocEventID(TPipe* pipe)
 {
     SetFlag<HardEvent::MTE1_MTE2>(X_EVENT0);
     SetFlag<HardEvent::MTE1_MTE2>(X_EVENT1);
@@ -193,7 +193,7 @@ __aicore__ inline void KeyPoolBlockCube<COMP>::AllocEventID(TPipe *pipe)
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockCube<COMP>::FreeEventID(TPipe *pipe)
+__aicore__ inline void KeyPoolBlockCube<COMP>::FreeEventID(TPipe* pipe)
 {
     WaitFlag<HardEvent::MTE1_MTE2>(X_EVENT0);
     WaitFlag<HardEvent::MTE1_MTE2>(X_EVENT1);
@@ -213,7 +213,7 @@ __aicore__ inline void KeyPoolBlockCube<COMP>::FreeEventID(TPipe *pipe)
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockCube<COMP>::CopyXGmToL1(const RunInfo &info, LocalTensor<HIDDEN_STATES_T> xL1Tensor,
+__aicore__ inline void KeyPoolBlockCube<COMP>::CopyXGmToL1(const RunInfo& info, LocalTensor<HIDDEN_STATES_T> xL1Tensor,
                                                            uint32_t hIdx, uint32_t kBase)
 {
     uint64_t tStart = tools_.GetTIdxByBatch(info.bStart) + info.sStart; // 此基本块在整个序列中的位置
@@ -249,7 +249,7 @@ __aicore__ inline void KeyPoolBlockCube<COMP>::CopyWeightGmToL1(LocalTensor<HIDD
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockCube<COMP>::LoadAToL0(const RunInfo &info, LocalTensor<HIDDEN_STATES_T> aL0Tensor,
+__aicore__ inline void KeyPoolBlockCube<COMP>::LoadAToL0(const RunInfo& info, LocalTensor<HIDDEN_STATES_T> aL0Tensor,
                                                          LocalTensor<HIDDEN_STATES_T> xL1Tensor, uint32_t kStart,
                                                          uint32_t kBase, uint32_t mStart, uint32_t mDealSize)
 {
@@ -271,7 +271,7 @@ __aicore__ inline void KeyPoolBlockCube<COMP>::LoadAToL0(const RunInfo &info, Lo
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockCube<COMP>::LoadBToL0(const RunInfo &info, LocalTensor<HIDDEN_STATES_T> bL0Tensor,
+__aicore__ inline void KeyPoolBlockCube<COMP>::LoadBToL0(const RunInfo& info, LocalTensor<HIDDEN_STATES_T> bL0Tensor,
                                                          LocalTensor<HIDDEN_STATES_T> wL1Tensor, uint32_t kStart,
                                                          uint32_t kBase, uint32_t nStart, uint32_t nDealSize)
 {
@@ -308,7 +308,7 @@ __aicore__ inline void KeyPoolBlockCube<COMP>::MatrixMmad(LocalTensor<T> cL0Tens
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockCube<COMP>::CopyOutMm1Res(const RunInfo &info, LocalTensor<T> cL0Tensor,
+__aicore__ inline void KeyPoolBlockCube<COMP>::CopyOutMm1Res(const RunInfo& info, LocalTensor<T> cL0Tensor,
                                                              uint32_t coffId, uint32_t mStart, uint32_t mDealSize,
                                                              uint32_t nStart, uint32_t nDealSize)
 {
@@ -336,13 +336,13 @@ __aicore__ inline void KeyPoolBlockCube<COMP>::CopyOutMm1Res(const RunInfo &info
 }
 
 template <typename COMP>
-__aicore__ inline uint32_t KeyPoolBlockCube<COMP>::GetMSize(const RunInfo &info, uint32_t coffId)
+__aicore__ inline uint32_t KeyPoolBlockCube<COMP>::GetMSize(const RunInfo& info, uint32_t coffId)
 {
     return info.dealSeqCnt;
 }
 
 template <typename COMP>
-__aicore__ inline void KeyPoolBlockCube<COMP>::ComputeMm1(const RunInfo &info)
+__aicore__ inline void KeyPoolBlockCube<COMP>::ComputeMm1(const RunInfo& info)
 {
     static constexpr uint32_t K_L1_BASE = 256;
     static constexpr uint32_t M_L0_BASE = 128;

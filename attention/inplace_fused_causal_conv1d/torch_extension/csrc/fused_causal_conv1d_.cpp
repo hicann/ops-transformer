@@ -16,7 +16,7 @@
 #include "aclnn_common.h"
 
 namespace op_api {
-static int64_t parseActivation(const c10::optional<c10::string_view> &activation)
+static int64_t parseActivation(const c10::optional<c10::string_view>& activation)
 {
     c10::string_view activation_str = activation.value_or("None");
     std::string input_activation = std::string(activation_str);
@@ -29,12 +29,12 @@ static int64_t parseActivation(const c10::optional<c10::string_view> &activation
 }
 
 void InplaceFusedCausalConv1d(
-    const at::Tensor &x, const at::Tensor &weight, at::Tensor &conv_states,
-    const c10::optional<at::Tensor> &query_start_loc, const c10::optional<at::Tensor> &cache_indices,
-    const c10::optional<at::Tensor> &initial_state_mode, const c10::optional<at::Tensor> &bias,
-    const c10::optional<at::Tensor> &num_accepted_tokens, const c10::optional<at::Tensor> &num_computed_tokens,
-    const c10::optional<at::Tensor> &block_idx_first_scheduled_token,
-    const c10::optional<at::Tensor> &block_idx_last_scheduled_token, const c10::optional<at::Tensor> &initial_state_idx,
+    const at::Tensor& x, const at::Tensor& weight, at::Tensor& conv_states,
+    const c10::optional<at::Tensor>& query_start_loc, const c10::optional<at::Tensor>& cache_indices,
+    const c10::optional<at::Tensor>& initial_state_mode, const c10::optional<at::Tensor>& bias,
+    const c10::optional<at::Tensor>& num_accepted_tokens, const c10::optional<at::Tensor>& num_computed_tokens,
+    const c10::optional<at::Tensor>& block_idx_first_scheduled_token,
+    const c10::optional<at::Tensor>& block_idx_last_scheduled_token, const c10::optional<at::Tensor>& initial_state_idx,
     c10::optional<c10::string_view> activation, c10::optional<int64_t> pad_slot_id,
     c10::optional<int64_t> max_query_len, c10::optional<int64_t> residual_connection, c10::optional<int64_t> block_size,
     c10::optional<int64_t> conv_mode, c10::optional<int64_t> max_draft_tokens)

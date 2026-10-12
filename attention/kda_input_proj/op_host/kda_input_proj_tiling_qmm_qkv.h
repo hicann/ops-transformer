@@ -27,7 +27,7 @@ namespace optiling {
 
 class KdaInputProjQmmQkvTiling {
 public:
-    explicit KdaInputProjQmmQkvTiling(const KdaInputProjTilingInfo &tilingInfo)
+    explicit KdaInputProjQmmQkvTiling(const KdaInputProjTilingInfo& tilingInfo)
         : opName_(tilingInfo.opName != nullptr ? tilingInfo.opName : "KdaInputProj"),
           m_(tilingInfo.baseParams.tSize),
           n_(tilingInfo.baseParams.qkvSize),
@@ -38,7 +38,7 @@ public:
           l0cSize_(tilingInfo.l0cSize)
     {}
 
-    ge::graphStatus CalcTiling(KdaInputProjQmmQkvParams &params) const
+    ge::graphStatus CalcTiling(KdaInputProjQmmQkvParams& params) const
     {
         params = KdaInputProjQmmQkvParams{};
 
@@ -119,7 +119,7 @@ private:
         uint64_t baseN{0};
     };
 
-    bool CalcBasicBlock(uint64_t &baseM, uint64_t &baseN, uint64_t &baseK) const
+    bool CalcBasicBlock(uint64_t& baseM, uint64_t& baseN, uint64_t& baseK) const
     {
         if (m_ == 0UL || n_ == 0UL || k_ == 0UL) {
             OP_LOGE(opName_, "Invalid QMM shape: m=%lu n=%lu k=%lu", m_, n_, k_);
@@ -159,8 +159,8 @@ private:
         return depth == 1UL ? depth : depth / INDEX;
     }
 
-    bool CalStepKAndDepthK(uint64_t baseK, uint64_t &depthKa, uint64_t &depthKb, uint64_t &stepKa,
-                           uint64_t &stepKb) const
+    bool CalStepKAndDepthK(uint64_t baseK, uint64_t& depthKa, uint64_t& depthKb, uint64_t& stepKa,
+                           uint64_t& stepKb) const
     {
         stepKa = depthKa / DOUBLE_BUFFER;
         stepKb = depthKb / DOUBLE_BUFFER;
@@ -187,7 +187,7 @@ private:
     }
 
     bool CalScaleFactors(uint64_t baseM, uint64_t baseN, uint64_t baseK, uint64_t depthKa, uint64_t depthKb,
-                         uint64_t stepKa, uint64_t stepKb, uint64_t &scaleFactor) const
+                         uint64_t stepKa, uint64_t stepKb, uint64_t& scaleFactor) const
     {
         const uint64_t baseASize = baseM * baseK;
         const uint64_t baseBSize = baseN * baseK;
@@ -214,8 +214,8 @@ private:
         return scaleFactor > 0UL;
     }
 
-    bool CalcL1Tiling(uint64_t baseM, uint64_t baseN, uint64_t baseK, uint64_t &stepKa, uint64_t &stepKb,
-                      uint64_t &scaleFactor) const
+    bool CalcL1Tiling(uint64_t baseM, uint64_t baseN, uint64_t baseK, uint64_t& stepKa, uint64_t& stepKb,
+                      uint64_t& scaleFactor) const
     {
         uint64_t depthKa = GetDepthA1B1(baseM, baseN, baseK);
         uint64_t depthKb = depthKa;
@@ -225,7 +225,7 @@ private:
         return CalScaleFactors(baseM, baseN, baseK, depthKa, depthKb, stepKa, stepKb, scaleFactor);
     }
 
-    uint64_t CalcUsedL1Size(const L1Estimate &est, uint32_t l1BufferNum) const
+    uint64_t CalcUsedL1Size(const L1Estimate& est, uint32_t l1BufferNum) const
     {
         uint64_t used = est.baseN * est.kL1 * l1BufferNum;
         used += est.baseN * Ops::Base::CeilDiv(est.scaleKL1, MX_GROUP_SIZE) * L1_TWO_BUFFER;
@@ -234,7 +234,7 @@ private:
         return used;
     }
 
-    bool CanFitL1BufferNum(const L1Estimate &est, uint32_t l1BufferNum) const
+    bool CanFitL1BufferNum(const L1Estimate& est, uint32_t l1BufferNum) const
     {
         return CalcUsedL1Size(est, l1BufferNum) <= l1Size_;
     }
@@ -264,8 +264,8 @@ private:
         return CanFitL1BufferNum(params, l1BufferNum) ? fullCover : fallback;
     }
 
-    void ApplyMultiBuffer(const L1Estimate &params, uint32_t l1BufferNum, uint64_t &kL1, uint64_t &scaleKL1,
-                          uint8_t &nBufferNum) const
+    void ApplyMultiBuffer(const L1Estimate& params, uint32_t l1BufferNum, uint64_t& kL1, uint64_t& scaleKL1,
+                          uint8_t& nBufferNum) const
     {
         kL1 = params.kL1;
         scaleKL1 = GetFullCoverScaleKL1IfPossible(params, l1BufferNum);
@@ -273,7 +273,7 @@ private:
     }
 
     bool TryL1Config(uint64_t baseM, uint64_t baseN, uint64_t kL1Cand, uint64_t initScaleKL1, uint32_t l1BufferNum,
-                     L1Estimate &out) const
+                     L1Estimate& out) const
     {
         if (kL1Cand == 0UL || l1BufferNum < L1_TWO_BUFFER) {
             return false;
@@ -294,7 +294,7 @@ private:
     }
 
     void CalcNBufferNum(uint64_t baseM, uint64_t baseN, uint64_t baseK, uint64_t stepKa, uint64_t stepKb,
-                        uint64_t initScaleKL1, uint64_t &kL1, uint64_t &scaleKL1, uint8_t &nBufferNum) const
+                        uint64_t initScaleKL1, uint64_t& kL1, uint64_t& scaleKL1, uint8_t& nBufferNum) const
     {
         const uint64_t kAlign = std::max(baseK, L2_ALIGN_SIZE);
         const uint64_t kL1Max = Ops::Base::FloorAlign(k_, kAlign);
@@ -339,7 +339,7 @@ private:
         return need <= l0cSize_ ? static_cast<uint8_t>(DOUBLE_BUFFER) : 1U;
     }
 
-    void CalcTailTiles(uint64_t baseM, uint64_t baseN, uint32_t usedAic, KdaInputProjQmmQkvParams &params) const
+    void CalcTailTiles(uint64_t baseM, uint64_t baseN, uint32_t usedAic, KdaInputProjQmmQkvParams& params) const
     {
         params.mTailTile = 1;
         params.nTailTile = 1;
@@ -373,7 +373,7 @@ private:
         params.nTailTile = static_cast<uint32_t>(bestN);
     }
 
-    const char *opName_{nullptr};
+    const char* opName_{nullptr};
     const uint64_t m_{0};
     const uint64_t n_{0};
     const uint64_t k_{0};

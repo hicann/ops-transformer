@@ -19,7 +19,7 @@ using namespace std;
 using namespace op;
 
 namespace {
-void DestroyAclTensor(aclTensor *tensor)
+void DestroyAclTensor(aclTensor* tensor)
 {
     Release(tensor);
 }
@@ -43,7 +43,7 @@ protected:
 TEST_F(mixed_quant_sparse_flash_mla_opapi_ut, mixed_quant_sparse_flash_mla_aclnn_0)
 {
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnMixedQuantSparseFlashMlaGetWorkspaceSize(
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
@@ -74,7 +74,7 @@ TEST_F(mixed_quant_sparse_flash_mla_opapi_ut, mixed_quant_sparse_flash_mla_aclnn
     auto attnOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({512, 64, 512}, ACL_BF16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnMixedQuantSparseFlashMlaGetWorkspaceSize(
         q.get(), oriKv.get(), cmpKv.get(), oriSparseIndices.get(), nullptr, oriBlockTable.get(), nullptr,
@@ -98,7 +98,7 @@ TEST_F(mixed_quant_sparse_flash_mla_opapi_ut, mixed_quant_sparse_flash_mla_aclnn
     auto attnOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({512, 64, 512}, ACL_BF16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnMixedQuantSparseFlashMlaGetWorkspaceSize(
         q.get(), oriKv.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
@@ -119,7 +119,7 @@ TEST_F(mixed_quant_sparse_flash_mla_opapi_ut, mixed_quant_sparse_flash_mla_aclnn
     auto attnOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({512, 64, 512}, ACL_BF16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnMixedQuantSparseFlashMlaGetWorkspaceSize(
         q.get(), oriKv.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
@@ -141,7 +141,7 @@ TEST_F(mixed_quant_sparse_flash_mla_opapi_ut, mixed_quant_sparse_flash_mla_aclnn
     auto attnOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
         TensorDesc({512, 64, 512}, ACL_BF16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnMixedQuantSparseFlashMlaGetWorkspaceSize(
         q.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,

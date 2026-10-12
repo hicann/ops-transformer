@@ -62,14 +62,14 @@ public:
                                                GlobalTensor<MM2_OUT_T> mm2ResGm, GlobalTensor<OUT_T> attentionOutGm);
     __aicore__ inline void InitPageAttentionInfo(GlobalTensor<int32_t> blockTableGm, uint32_t blockSize,
                                                  uint32_t maxBlockNumPerBatch);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
     __aicore__ inline void UpdateKey(GlobalTensor<KV_T> keyGm);
     __aicore__ inline void UpdateValue(GlobalTensor<KV_T> valueGm);
 
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void ComputeMm1(const ExtraInfoMla &info);
-    __aicore__ inline void ComputeMm2(const ExtraInfoMla &info);
+    __aicore__ inline void ComputeMm1(const ExtraInfoMla& info);
+    __aicore__ inline void ComputeMm2(const ExtraInfoMla& info);
 
 protected:
     template <typename T>
@@ -89,39 +89,39 @@ protected:
     }
 
     template <typename DT>
-    __aicore__ inline void CopyGmToL1(LocalTensor<DT> &l1Tensor, GlobalTensor<DT> &gmSrcTensor, uint32_t srcN,
+    __aicore__ inline void CopyGmToL1(LocalTensor<DT>& l1Tensor, GlobalTensor<DT>& gmSrcTensor, uint32_t srcN,
                                       uint32_t srcD, uint32_t srcDstride, uint32_t dstNAlign = 16);
-    __aicore__ inline void CopyInMm1AToL1(LocalTensor<KV_T> &aL1Tensor, const ExtraInfoMla &info, uint32_t mSize,
+    __aicore__ inline void CopyInMm1AToL1(LocalTensor<KV_T>& aL1Tensor, const ExtraInfoMla& info, uint32_t mSize,
                                           uint64_t mOffset);
-    __aicore__ inline void CopyInMm1ARopeToL1(LocalTensor<ROPE_T> &aL1Tensor, const ExtraInfoMla &info, uint32_t mSize,
+    __aicore__ inline void CopyInMm1ARopeToL1(LocalTensor<ROPE_T>& aL1Tensor, const ExtraInfoMla& info, uint32_t mSize,
                                               uint64_t mOffset);
-    __aicore__ inline void CopyInMm1BToL1(LocalTensor<KV_T> &bL1Tensor, const ExtraInfoMla &info, uint32_t subNid,
+    __aicore__ inline void CopyInMm1BToL1(LocalTensor<KV_T>& bL1Tensor, const ExtraInfoMla& info, uint32_t subNid,
                                           uint32_t subNSize, uint32_t nSplitSize);
-    __aicore__ inline void CopyInMm1BRopeToL1(LocalTensor<ROPE_T> &bL1Tensor, const ExtraInfoMla &info, uint32_t subNid,
+    __aicore__ inline void CopyInMm1BRopeToL1(LocalTensor<ROPE_T>& bL1Tensor, const ExtraInfoMla& info, uint32_t subNid,
                                               uint32_t subNSize, uint32_t nSplitSize);
-    __aicore__ inline void CopyInMm1BToL1ForPA(LocalTensor<KV_T> &bL1Tensor, const uint64_t keyGmBaseOffset,
+    __aicore__ inline void CopyInMm1BToL1ForPA(LocalTensor<KV_T>& bL1Tensor, const uint64_t keyGmBaseOffset,
                                                uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                                uint32_t nActCopyRowCount);
-    __aicore__ inline void CopyInMm1BRopeToL1ForPA(LocalTensor<ROPE_T> &bL1Tensor, const uint64_t keyGmBaseOffset,
+    __aicore__ inline void CopyInMm1BRopeToL1ForPA(LocalTensor<ROPE_T>& bL1Tensor, const uint64_t keyGmBaseOffset,
                                                    uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                                    uint32_t nActCopyRowCount);
-    __aicore__ inline void CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor, const ExtraInfoMla &info, uint32_t mSize,
+    __aicore__ inline void CopyInMm2AToL1(LocalTensor<KV_T>& aL1Tensor, const ExtraInfoMla& info, uint32_t mSize,
                                           uint64_t mOffset);
-    __aicore__ inline void CopyInMm2BToL1(LocalTensor<KV_T> &aL1Tensor, const ExtraInfoMla &info, uint32_t subKid,
+    __aicore__ inline void CopyInMm2BToL1(LocalTensor<KV_T>& aL1Tensor, const ExtraInfoMla& info, uint32_t subKid,
                                           uint32_t kSplitSize, uint32_t subNid, uint32_t nSplitSize, uint32_t subKSize,
                                           uint32_t subNSize);
-    __aicore__ inline void CopyInMm2BToL1ForPA(LocalTensor<KV_T> &bL1Tensor, const uint64_t valueGmBaseOffset,
+    __aicore__ inline void CopyInMm2BToL1ForPA(LocalTensor<KV_T>& bL1Tensor, const uint64_t valueGmBaseOffset,
                                                uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                                uint32_t nActCopyRowCount, uint32_t copyStartColumnCount,
                                                uint32_t copyColumnCount);
 
     template <typename DT>
-    __aicore__ inline void LoadDataL0A(LocalTensor<DT> &aL0Tensor, const LocalTensor<DT> &aL1Tensor, uint32_t kidx,
+    __aicore__ inline void LoadDataL0A(LocalTensor<DT>& aL0Tensor, const LocalTensor<DT>& aL1Tensor, uint32_t kidx,
                                        uint32_t kSplitSize, uint32_t mSize, uint32_t subkSize);
     template <typename DT>
-    __aicore__ inline void LoadDataMm1B(LocalTensor<DT> &bL0Tensor, LocalTensor<DT> &bL1Tensor, uint32_t idx,
+    __aicore__ inline void LoadDataMm1B(LocalTensor<DT>& bL0Tensor, LocalTensor<DT>& bL1Tensor, uint32_t idx,
                                         uint32_t kSplitSize, uint32_t kSize, uint32_t nSize);
-    __aicore__ inline void LoadDataMm2B(LocalTensor<KV_T> &bL0Tensor, LocalTensor<KV_T> &bL1Tensor, uint32_t idx,
+    __aicore__ inline void LoadDataMm2B(LocalTensor<KV_T>& bL0Tensor, LocalTensor<KV_T>& bL1Tensor, uint32_t idx,
                                         uint32_t nSize, uint32_t subkSize, uint32_t kSplitSize, uint32_t kSize);
 
 protected:
@@ -277,7 +277,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::InitPageAttentionInfo(GlobalTen
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(qpBufL1, L1_PQ_SIZE * 2);
     qpL1Tensor = qpBufL1.Get<KV_T>();
@@ -351,7 +351,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::FreeEventID()
 
 template <typename IFAT>
 template <typename DT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyGmToL1(LocalTensor<DT> &l1Tensor, GlobalTensor<DT> &gmSrcTensor,
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyGmToL1(LocalTensor<DT>& l1Tensor, GlobalTensor<DT>& gmSrcTensor,
                                                             uint32_t srcN, uint32_t srcD, uint32_t srcDstride,
                                                             uint32_t dstNAlign)
 {
@@ -373,7 +373,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyGmToL1(LocalTensor<DT> &l1T
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1AToL1(LocalTensor<KV_T> &l1Tensor, const ExtraInfoMla &info,
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1AToL1(LocalTensor<KV_T>& l1Tensor, const ExtraInfoMla& info,
                                                                 uint32_t mSize, uint64_t mOffset)
 {
     auto srcGm = queryGm[info.tensorAOffset + mOffset];
@@ -381,8 +381,8 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1AToL1(LocalTensor<KV_T
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1ARopeToL1(LocalTensor<ROPE_T> &l1Tensor,
-                                                                    const ExtraInfoMla &info, uint32_t mSize,
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1ARopeToL1(LocalTensor<ROPE_T>& l1Tensor,
+                                                                    const ExtraInfoMla& info, uint32_t mSize,
                                                                     uint64_t mOffset)
 {
     auto srcGm = qRopeGm[info.tensorARopeOffset + mOffset];
@@ -390,7 +390,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1ARopeToL1(LocalTensor<
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BToL1(LocalTensor<KV_T> &bL1Tensor, const ExtraInfoMla &info,
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BToL1(LocalTensor<KV_T>& bL1Tensor, const ExtraInfoMla& info,
                                                                 uint32_t subNid, uint32_t subNSize, uint32_t nSplitSize)
 {
     uint64_t dStride = headDim;
@@ -403,8 +403,8 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BToL1(LocalTensor<KV_T
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BRopeToL1(LocalTensor<ROPE_T> &bL1Tensor,
-                                                                    const ExtraInfoMla &info, uint32_t subNid,
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BRopeToL1(LocalTensor<ROPE_T>& bL1Tensor,
+                                                                    const ExtraInfoMla& info, uint32_t subNid,
                                                                     uint32_t subNSize, uint32_t nSplitSize)
 {
     uint64_t dStride = headDimRope;
@@ -416,7 +416,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BRopeToL1(LocalTensor<
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BToL1ForPA(LocalTensor<KV_T> &bL1Tensor,
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BToL1ForPA(LocalTensor<KV_T>& bL1Tensor,
                                                                      const uint64_t keyGmBaseOffset,
                                                                      uint32_t copyTotalRowCntAlign,
                                                                      uint32_t copyStartRowCnt,
@@ -464,7 +464,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BToL1ForPA(LocalTensor
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BRopeToL1ForPA(LocalTensor<ROPE_T> &bL1Tensor,
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BRopeToL1ForPA(LocalTensor<ROPE_T>& bL1Tensor,
                                                                          const uint64_t kRopeGmBaseOffset,
                                                                          uint32_t copyTotalRowCntAlign,
                                                                          uint32_t copyStartRowCnt,
@@ -513,8 +513,8 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BRopeToL1ForPA(LocalTe
 
 template <typename IFAT>
 template <typename DT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataL0A(LocalTensor<DT> &aL0Tensor,
-                                                             const LocalTensor<DT> &aL1Tensor, uint32_t kIdx,
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataL0A(LocalTensor<DT>& aL0Tensor,
+                                                             const LocalTensor<DT>& aL1Tensor, uint32_t kIdx,
                                                              uint32_t kSplitSize, uint32_t mSize, uint32_t subkSize)
 {
     LocalTensor<DT> srcTensor = aL1Tensor[mSize * kSplitSize * kIdx];
@@ -548,7 +548,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataL0A(LocalTensor<DT> &aL
 
 template <typename IFAT>
 template <typename DT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataMm1B(LocalTensor<DT> &l0Tensor, LocalTensor<DT> &l1Tensor,
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataMm1B(LocalTensor<DT>& l0Tensor, LocalTensor<DT>& l1Tensor,
                                                               uint32_t idx, uint32_t kSplitSize, uint32_t kSize,
                                                               uint32_t nSize)
 {
@@ -570,7 +570,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataMm1B(LocalTensor<DT> &l
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor, const ExtraInfoMla &info,
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2AToL1(LocalTensor<KV_T>& aL1Tensor, const ExtraInfoMla& info,
                                                                 uint32_t mSize, uint64_t mOffset)
 {
     // 全量拷贝
@@ -579,7 +579,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2AToL1(LocalTensor<KV_T
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2BToL1(LocalTensor<KV_T> &bL1Tensor, const ExtraInfoMla &info,
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2BToL1(LocalTensor<KV_T>& bL1Tensor, const ExtraInfoMla& info,
                                                                 uint32_t subKid, uint32_t kSplitSize, uint32_t subNid,
                                                                 uint32_t nSplitSize, uint32_t subKSize,
                                                                 uint32_t subNSize)
@@ -595,7 +595,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2BToL1(LocalTensor<KV_T
 
 template <typename IFAT>
 __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2BToL1ForPA(
-    LocalTensor<KV_T> &bL1Tensor, const uint64_t valueGmBaseOffset, uint32_t copyTotalRowCntAlign,
+    LocalTensor<KV_T>& bL1Tensor, const uint64_t valueGmBaseOffset, uint32_t copyTotalRowCntAlign,
     uint32_t copyStartRowCnt, uint32_t nActCopyRowCount, uint32_t copyStartColumnCount, uint32_t copyColumnCount)
 {
     if constexpr (KV_LAYOUT_T == LAYOUT::NZ) {
@@ -643,8 +643,8 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2BToL1ForPA(
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataMm2B(LocalTensor<KV_T> &bL0Tensor,
-                                                              LocalTensor<KV_T> &bL1Tensor, uint32_t idx,
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataMm2B(LocalTensor<KV_T>& bL0Tensor,
+                                                              LocalTensor<KV_T>& bL1Tensor, uint32_t idx,
                                                               uint32_t nSize, uint32_t subkSize, uint32_t kSplitSize,
                                                               uint32_t kSize)
 {
@@ -677,7 +677,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataMm2B(LocalTensor<KV_T> 
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla &info)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla& info)
 {
     uint32_t mSizeAct = info.gSize * info.s1Size;
     uint32_t mSize = Align(mSizeAct, 16U);
@@ -995,7 +995,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla &
                     auto tmpDstGm = mm1ResGm[(info.loop % (PRE_LOAD_NUM_MLA)) * mmResUbSize + offset];
                     auto ropeGmPtr = tmpDstGm.GetPhyAddr();
                     GlobalTensor<T> dstGm;
-                    dstGm.SetGlobalBuffer((__gm__ T *)ropeGmPtr);
+                    dstGm.SetGlobalBuffer((__gm__ T*)ropeGmPtr);
                     Fixpipe(dstGm[m * mSplitSizeL0 * info.actualSingleProcessSInnerSizeAlign + n * nSplitSize],
                             cL0Tensor, fixParams);
 
@@ -1081,7 +1081,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla &
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm2(const ExtraInfoMla &info)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm2(const ExtraInfoMla& info)
 {
     uint32_t mSizeAct = info.gSize * info.s1Size;
 

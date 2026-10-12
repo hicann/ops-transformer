@@ -31,7 +31,7 @@ constexpr char LAYOUT_BSND[] = "BSND";
 constexpr char LAYOUT_TND[] = "TND";
 constexpr char LAYOUT_PA_BBND[] = "PA_BBND";
 
-CheckerLayout ParseLayout(const std::string &layout)
+CheckerLayout ParseLayout(const std::string& layout)
 {
     if (layout == LAYOUT_BSND) {
         return CheckerLayout::BSND;
@@ -45,7 +45,7 @@ CheckerLayout ParseLayout(const std::string &layout)
     return CheckerLayout::INVALID;
 }
 
-void PopulateQueryInfo(LightningIndexerV2CheckerInfo &info, const gert::Shape &qShape)
+void PopulateQueryInfo(LightningIndexerV2CheckerInfo& info, const gert::Shape& qShape)
 {
     const uint32_t qRank = qShape.GetDimNum();
     if ((info.layoutQ != CheckerLayout::BSND && info.layoutQ != CheckerLayout::TND) ||
@@ -59,7 +59,7 @@ void PopulateQueryInfo(LightningIndexerV2CheckerInfo &info, const gert::Shape &q
     info.headDim = qShape.GetDim(info.layoutQ == CheckerLayout::BSND ? DIM_3 : DIM_2);
 }
 
-void PopulateKeyInfo(LightningIndexerV2CheckerInfo &info, const gert::Shape &kShape)
+void PopulateKeyInfo(LightningIndexerV2CheckerInfo& info, const gert::Shape& kShape)
 {
     const uint32_t kRank = kShape.GetDimNum();
     if ((info.layoutK != CheckerLayout::TND && kRank < BSND_RANK) ||
@@ -72,7 +72,7 @@ void PopulateKeyInfo(LightningIndexerV2CheckerInfo &info, const gert::Shape &kSh
         return;
     }
     info.blockSize = kShape.GetDim(DIM_1);
-    const gert::Shape *blockTableShape = info.blockTable.GetShape();
+    const gert::Shape* blockTableShape = info.blockTable.GetShape();
     if (blockTableShape == nullptr || blockTableShape->GetDimNum() < BLOCK_TABLE_RANK) {
         return;
     }
@@ -84,7 +84,7 @@ void PopulateKeyInfo(LightningIndexerV2CheckerInfo &info, const gert::Shape &kSh
     }
 }
 
-void PopulateTndBatch(LightningIndexerV2CheckerInfo &info)
+void PopulateTndBatch(LightningIndexerV2CheckerInfo& info)
 {
     if (info.layoutQ != CheckerLayout::TND || !info.cuSeqlensQ.IsPresent()) {
         return;
@@ -94,7 +94,7 @@ void PopulateTndBatch(LightningIndexerV2CheckerInfo &info)
 }
 } // namespace
 
-CheckerTensor MakeRequiredTensor(const gert::TilingContext *context, uint32_t index)
+CheckerTensor MakeRequiredTensor(const gert::TilingContext* context, uint32_t index)
 {
     if (context == nullptr) {
         return {};
@@ -103,7 +103,7 @@ CheckerTensor MakeRequiredTensor(const gert::TilingContext *context, uint32_t in
             context->GetDynamicInputStride(index, 0)};
 }
 
-CheckerTensor MakeOptionalTensor(const gert::TilingContext *context, uint32_t index)
+CheckerTensor MakeOptionalTensor(const gert::TilingContext* context, uint32_t index)
 {
     if (context == nullptr) {
         return {};
@@ -112,7 +112,7 @@ CheckerTensor MakeOptionalTensor(const gert::TilingContext *context, uint32_t in
             context->GetOptionalInputTensor(index), context->GetDynamicInputStride(index, 0)};
 }
 
-CheckerTensor MakeOutputTensor(const gert::TilingContext *context, uint32_t index)
+CheckerTensor MakeOutputTensor(const gert::TilingContext* context, uint32_t index)
 {
     if (context == nullptr) {
         return {};
@@ -120,12 +120,12 @@ CheckerTensor MakeOutputTensor(const gert::TilingContext *context, uint32_t inde
     return {context->GetOutputDesc(index), context->GetOutputShape(index), nullptr, nullptr};
 }
 
-void PopulateDerivedInfo(LightningIndexerV2CheckerInfo &info)
+void PopulateDerivedInfo(LightningIndexerV2CheckerInfo& info)
 {
     info.layoutQ = ParseLayout(info.layoutQText);
     info.layoutK = ParseLayout(info.layoutKText);
-    const gert::Shape *qShape = info.query.GetShape();
-    const gert::Shape *kShape = info.key.GetShape();
+    const gert::Shape* qShape = info.query.GetShape();
+    const gert::Shape* kShape = info.key.GetShape();
     if (qShape == nullptr || kShape == nullptr || info.layoutQ == CheckerLayout::INVALID ||
         info.layoutK == CheckerLayout::INVALID) {
         return;

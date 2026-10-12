@@ -57,7 +57,7 @@ float BFloat16ToFloat(BFloat16 value)
     return result;
 }
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (const auto dim : shape) {
@@ -66,7 +66,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -79,8 +79,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     const auto size = GetShapeSize(shape) * static_cast<int64_t>(sizeof(T));
     // 调用aclrtMalloc申请device侧内存
@@ -103,7 +103,7 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return ACL_SUCCESS;
 }
 
-void PrintBFloat16Tensor(const char *name, const std::vector<int64_t> &shape, void *deviceAddr)
+void PrintBFloat16Tensor(const char* name, const std::vector<int64_t>& shape, void* deviceAddr)
 {
     const auto elementCount = GetShapeSize(shape);
     std::vector<BFloat16> hostData(elementCount);
@@ -180,27 +180,27 @@ int main()
         apeHost[i] = 0.01f * static_cast<float>((i % cmpRatio) - 1);
     }
 
-    void *hiddenStatesDeviceAddr = nullptr;
-    void *wkDeviceAddr = nullptr;
-    void *gateWeightDeviceAddr = nullptr;
-    void *apeDeviceAddr = nullptr;
-    void *stateCacheDeviceAddr = nullptr;
-    void *cacheBlockTableDeviceAddr = nullptr;
-    void *startPosDeviceAddr = nullptr;
-    void *normWeightDeviceAddr = nullptr;
-    void *normBiasDeviceAddr = nullptr;
-    void *pooledKeyDeviceAddr = nullptr;
+    void* hiddenStatesDeviceAddr = nullptr;
+    void* wkDeviceAddr = nullptr;
+    void* gateWeightDeviceAddr = nullptr;
+    void* apeDeviceAddr = nullptr;
+    void* stateCacheDeviceAddr = nullptr;
+    void* cacheBlockTableDeviceAddr = nullptr;
+    void* startPosDeviceAddr = nullptr;
+    void* normWeightDeviceAddr = nullptr;
+    void* normBiasDeviceAddr = nullptr;
+    void* pooledKeyDeviceAddr = nullptr;
 
-    aclTensor *hiddenStates = nullptr;
-    aclTensor *wk = nullptr;
-    aclTensor *gateWeight = nullptr;
-    aclTensor *ape = nullptr;
-    aclTensor *stateCacheRef = nullptr;
-    aclTensor *cacheBlockTable = nullptr;
-    aclTensor *startPos = nullptr;
-    aclTensor *normWeight = nullptr;
-    aclTensor *normBias = nullptr;
-    aclTensor *pooledKeyOut = nullptr;
+    aclTensor* hiddenStates = nullptr;
+    aclTensor* wk = nullptr;
+    aclTensor* gateWeight = nullptr;
+    aclTensor* ape = nullptr;
+    aclTensor* stateCacheRef = nullptr;
+    aclTensor* cacheBlockTable = nullptr;
+    aclTensor* startPos = nullptr;
+    aclTensor* normWeight = nullptr;
+    aclTensor* normBias = nullptr;
+    aclTensor* pooledKeyOut = nullptr;
 
     ret = CreateAclTensor(hiddenStatesHost, hiddenStatesShape, &hiddenStatesDeviceAddr, ACL_BF16, &hiddenStates);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -226,7 +226,7 @@ int main()
 
     // 3. 调用CANN算子库API，需要修改为具体的API名称
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     // 调用aclnnKeyPool第一段接口
     ret = aclnnKeyPoolGetWorkspaceSize(hiddenStates, wk, gateWeight, ape, stateCacheRef, cacheBlockTable, startPos,
                                        normWeight, normBias, nullptr, nullptr, nullptr, nullptr, cmpRatio, normEps,
@@ -234,7 +234,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnKeyPoolGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
 
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

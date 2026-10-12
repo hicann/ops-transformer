@@ -22,10 +22,10 @@
 namespace optiling {
 namespace lightning_indexer_v2_checker {
 
-CheckerTensor MakeRequiredTensor(const gert::TilingContext *context, uint32_t index);
-CheckerTensor MakeOptionalTensor(const gert::TilingContext *context, uint32_t index);
-CheckerTensor MakeOutputTensor(const gert::TilingContext *context, uint32_t index);
-void PopulateDerivedInfo(LightningIndexerV2CheckerInfo &info);
+CheckerTensor MakeRequiredTensor(const gert::TilingContext* context, uint32_t index);
+CheckerTensor MakeOptionalTensor(const gert::TilingContext* context, uint32_t index);
+CheckerTensor MakeOutputTensor(const gert::TilingContext* context, uint32_t index);
+void PopulateDerivedInfo(LightningIndexerV2CheckerInfo& info);
 
 } // namespace lightning_indexer_v2_checker
 } // namespace optiling

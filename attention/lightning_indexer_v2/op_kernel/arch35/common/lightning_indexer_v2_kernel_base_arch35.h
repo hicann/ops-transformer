@@ -21,8 +21,8 @@
 namespace LIV2Common {
 
 __aicore__ inline uint32_t GetActualSeqLen(uint32_t batchIdx, bool hasCuSeqlens, bool hasSeqused,
-                                           AscendC::GlobalTensor<uint32_t> &cuSeqlensGm,
-                                           AscendC::GlobalTensor<uint32_t> &sequsedGm, uint32_t defaultSeqLen)
+                                           AscendC::GlobalTensor<uint32_t>& cuSeqlensGm,
+                                           AscendC::GlobalTensor<uint32_t>& sequsedGm, uint32_t defaultSeqLen)
 {
     if (hasSeqused) {
         return sequsedGm.GetValue(batchIdx);
@@ -36,7 +36,7 @@ __aicore__ inline uint32_t GetActualSeqLen(uint32_t batchIdx, bool hasCuSeqlens,
 template <typename RatioT>
 __aicore__ inline uint32_t GetMaskedS2BaseBlockNum(uint32_t s1gIdx, uint32_t actS1Size, uint32_t actS2SizeOrig,
                                                    uint32_t s1BaseSize, RatioT cmpRatio, uint32_t s2BaseSize,
-                                                   uint32_t *validLength = nullptr)
+                                                   uint32_t* validLength = nullptr)
 {
     if (actS2SizeOrig / cmpRatio == 0) {
         return 0;
@@ -55,7 +55,7 @@ __aicore__ inline uint32_t GetMaskedS2BaseBlockNum(uint32_t s1gIdx, uint32_t act
 }
 
 template <typename TempLoopInfoT, typename ConstInfoT>
-__aicore__ inline void GetBN2Idx(TempLoopInfoT &tempLoopInfo, const ConstInfoT &constInfo, uint32_t bN2Idx)
+__aicore__ inline void GetBN2Idx(TempLoopInfoT& tempLoopInfo, const ConstInfoT& constInfo, uint32_t bN2Idx)
 {
     tempLoopInfo.bN2Idx = bN2Idx;
     tempLoopInfo.bIdx = bN2Idx / constInfo.kHeadNum;
@@ -63,8 +63,8 @@ __aicore__ inline void GetBN2Idx(TempLoopInfoT &tempLoopInfo, const ConstInfoT &
 }
 
 template <bool IS_BSND, typename TempLoopInfoT, typename ConstInfoT, typename SplitCoreInfoT>
-__aicore__ inline void CalcGS1LoopParams(TempLoopInfoT &tempLoopInfo, const ConstInfoT &constInfo,
-                                         const SplitCoreInfoT &splitCoreInfo, uint32_t bN2LoopIdx)
+__aicore__ inline void CalcGS1LoopParams(TempLoopInfoT& tempLoopInfo, const ConstInfoT& constInfo,
+                                         const SplitCoreInfoT& splitCoreInfo, uint32_t bN2LoopIdx)
 {
     if ((tempLoopInfo.actS2Size == 0) || (tempLoopInfo.actS1Size == 0)) {
         tempLoopInfo.curActSeqLenIsZero = true;
@@ -88,9 +88,9 @@ __aicore__ inline void CalcGS1LoopParams(TempLoopInfoT &tempLoopInfo, const Cons
 }
 
 template <bool UPDATE_LD, typename TempLoopInfoT, typename ConstInfoT, typename SplitCoreInfoT, typename RatioT>
-__aicore__ inline void CalcS2LoopParams(TempLoopInfoT &tempLoopInfo, const ConstInfoT &constInfo,
-                                        const SplitCoreInfoT &splitCoreInfo, uint32_t bN2LoopIdx, uint32_t gS1LoopIdx,
-                                        RatioT cmpRatio, uint32_t *validS2Len = nullptr)
+__aicore__ inline void CalcS2LoopParams(TempLoopInfoT& tempLoopInfo, const ConstInfoT& constInfo,
+                                        const SplitCoreInfoT& splitCoreInfo, uint32_t bN2LoopIdx, uint32_t gS1LoopIdx,
+                                        RatioT cmpRatio, uint32_t* validS2Len = nullptr)
 {
     tempLoopInfo.gS1Idx = gS1LoopIdx;
     tempLoopInfo.actMBaseSize = constInfo.mBaseSize;
@@ -118,9 +118,9 @@ __aicore__ inline void CalcS2LoopParams(TempLoopInfoT &tempLoopInfo, const Const
 }
 
 template <typename RunInfoT, typename TempLoopInfoT, typename ConstInfoT, typename SplitCoreInfoT>
-__aicore__ inline bool InitRunInfoBase(uint32_t loop, uint32_t s2LoopIdx, RunInfoT &runInfo,
-                                       const TempLoopInfoT &tempLoopInfo, const ConstInfoT &constInfo,
-                                       const SplitCoreInfoT &splitCoreInfo)
+__aicore__ inline bool InitRunInfoBase(uint32_t loop, uint32_t s2LoopIdx, RunInfoT& runInfo,
+                                       const TempLoopInfoT& tempLoopInfo, const ConstInfoT& constInfo,
+                                       const SplitCoreInfoT& splitCoreInfo)
 {
     runInfo.loop = loop;
     runInfo.bIdx = tempLoopInfo.bIdx;
@@ -154,9 +154,9 @@ __aicore__ inline bool InitRunInfoBase(uint32_t loop, uint32_t s2LoopIdx, RunInf
 
 template <typename RunInfoT, typename TempLoopInfoT, typename ConstInfoT, typename SplitCoreInfoT,
           typename LdSplitCoreInfoT>
-__aicore__ inline bool InitRunInfo(uint32_t loop, uint32_t s2LoopIdx, RunInfoT &runInfo,
-                                   const TempLoopInfoT &tempLoopInfo, const ConstInfoT &constInfo,
-                                   const SplitCoreInfoT &splitCoreInfo, LdSplitCoreInfoT &ldInfo,
+__aicore__ inline bool InitRunInfo(uint32_t loop, uint32_t s2LoopIdx, RunInfoT& runInfo,
+                                   const TempLoopInfoT& tempLoopInfo, const ConstInfoT& constInfo,
+                                   const SplitCoreInfoT& splitCoreInfo, LdSplitCoreInfoT& ldInfo,
                                    bool isOutputIdxOffsetValid)
 {
     runInfo.isNeedLD = tempLoopInfo.isNeedLD;
@@ -173,8 +173,8 @@ __aicore__ inline bool InitRunInfo(uint32_t loop, uint32_t s2LoopIdx, RunInfoT &
 
 template <auto TND_LAYOUT, auto BSND_LAYOUT, typename ConstInfoT, typename VectorServiceT>
 __aicore__ inline void DealActSeqLenIsZero(uint32_t bIdx, uint32_t n2Idx, uint32_t s1Start, uint32_t tBase,
-                                           uint32_t s1Count, uint32_t topk, const ConstInfoT &constInfo,
-                                           VectorServiceT &vectorService)
+                                           uint32_t s1Count, uint32_t topk, const ConstInfoT& constInfo,
+                                           VectorServiceT& vectorService)
 {
     if ASCEND_IS_AIV {
         if (constInfo.outputLayout == TND_LAYOUT) {
@@ -197,7 +197,7 @@ __aicore__ inline void DealActSeqLenIsZero(uint32_t bIdx, uint32_t n2Idx, uint32
 }
 
 template <typename VectorServiceT, typename MatmulServiceT, typename PipeT>
-__aicore__ inline void InitBuffers(VectorServiceT &vectorService, MatmulServiceT &matmulService, PipeT *pipe)
+__aicore__ inline void InitBuffers(VectorServiceT& vectorService, MatmulServiceT& matmulService, PipeT* pipe)
 {
     if ASCEND_IS_AIV {
         vectorService.InitBuffers(pipe);

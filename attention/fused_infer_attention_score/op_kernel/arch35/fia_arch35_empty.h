@@ -19,8 +19,8 @@
 #include "fia_arch35_common.h"
 #include "fia_arch35_zero_output.h"
 
-inline __aicore__ void fia_empty_regbase(__gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
-                                         __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+inline __aicore__ void fia_empty_regbase(__gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse,
+                                         __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     TPipe tPipe;
     FIA_REGBASE_COPY_TILING_DATA(tiling);

@@ -44,7 +44,7 @@ struct PAShape {
 // L1按NZ格式存储
 // GM的行、列、列的stride
 template <typename T>
-__aicore__ inline void DataCopyGmNDToL1(LocalTensor<T> &l1Tensor, GlobalTensor<T> &gmTensor, uint32_t rowAct,
+__aicore__ inline void DataCopyGmNDToL1(LocalTensor<T>& l1Tensor, GlobalTensor<T>& gmTensor, uint32_t rowAct,
                                         uint32_t rowAlign,
                                         uint32_t col,       // D
                                         uint32_t colStride) // D or N*D
@@ -69,11 +69,11 @@ __aicore__ inline void DataCopyGmNDToL1(LocalTensor<T> &l1Tensor, GlobalTensor<T
     shape.copyRowNumAlign 需要16字节对齐，如拷贝k矩阵，一次拷贝128*512，遇到尾块 10*512 需对齐到16*512
 */
 template <typename T, QSFA_LAYOUT SRC_LAYOUT>
-__aicore__ inline void DataCopyPA(LocalTensor<T> &dstTensor,  // l1
-                                  GlobalTensor<T> &srcTensor, // gm
-                                  GlobalTensor<int32_t> &blockTableGm,
-                                  const PAShape &shape,     // blockSize, headNum, headDim
-                                  const Position &startPos) // bacthIdx nIdx curSeqIdx
+__aicore__ inline void DataCopyPA(LocalTensor<T>& dstTensor,  // l1
+                                  GlobalTensor<T>& srcTensor, // gm
+                                  GlobalTensor<int32_t>& blockTableGm,
+                                  const PAShape& shape,     // blockSize, headNum, headDim
+                                  const Position& startPos) // bacthIdx nIdx curSeqIdx
 {
     uint32_t copyFinishRowCnt = 0;
     uint64_t blockTableBaseOffset = startPos.bIdx * shape.maxblockNumPerBatch;
@@ -124,26 +124,26 @@ public:
     using MM_OUT_T = T;
 
     __aicore__ inline QSFAMatmulService(){};
-    __aicore__ inline void InitParams(const ConstInfo &constInfo);
+    __aicore__ inline void InitParams(const ConstInfo& constInfo);
     __aicore__ inline void InitMm1GlobalTensor(GlobalTensor<Q_T> queryGm, GlobalTensor<Q_T> qRopeGm,
                                                GlobalTensor<KV_T> keyGm, GlobalTensor<K_ROPE_T> kRopeGm,
                                                GlobalTensor<MM_OUT_T> mm1ResGm);
     __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<K_ROPE_T> vec1ResGm, GlobalTensor<KV_T> valueGm,
                                                GlobalTensor<MM_OUT_T> mm2ResGm, GlobalTensor<OUT_T> attentionOutGm);
-    __aicore__ inline void InitPageAttentionInfo(const GlobalTensor<K_ROPE_T> &kvMergeGm,
+    __aicore__ inline void InitPageAttentionInfo(const GlobalTensor<K_ROPE_T>& kvMergeGm,
                                                  GlobalTensor<int32_t> blockTableGm, GlobalTensor<int32_t> topKGm,
                                                  uint32_t blockSize, uint32_t maxBlockNumPerBatch);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
     __aicore__ inline void UpdateKey(GlobalTensor<KV_T> keyGm);
     __aicore__ inline void UpdateValue(GlobalTensor<KV_T> valueGm);
 
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void CalcTopKBlockInfo(const RunInfo &info, uint32_t &curTopKIdx,
-                                             uint64_t &curOffsetInSparseBlock, uint32_t curSeqIdx, uint32_t &copyRowCnt,
-                                             uint64_t &idInTopK);
-    __aicore__ inline void ComputeMm1(const RunInfo &info, const MSplitInfo mSplitInfo);
-    __aicore__ inline void ComputeMm2(const RunInfo &info, const MSplitInfo mSplitInfo);
+    __aicore__ inline void CalcTopKBlockInfo(const RunInfo& info, uint32_t& curTopKIdx,
+                                             uint64_t& curOffsetInSparseBlock, uint32_t curSeqIdx, uint32_t& copyRowCnt,
+                                             uint64_t& idInTopK);
+    __aicore__ inline void ComputeMm1(const RunInfo& info, const MSplitInfo mSplitInfo);
+    __aicore__ inline void ComputeMm2(const RunInfo& info, const MSplitInfo mSplitInfo);
 
 private:
     static constexpr bool PAGE_ATTENTION = QSFAT::pageAttention;
@@ -238,42 +238,42 @@ private:
         return idxMap[mIdx % 2] + k1Idx;
     }
 
-    __aicore__ inline void CopyGmToL1(LocalTensor<K_ROPE_T> &l1Tensor, GlobalTensor<K_ROPE_T> &gmSrcTensor,
+    __aicore__ inline void CopyGmToL1(LocalTensor<K_ROPE_T>& l1Tensor, GlobalTensor<K_ROPE_T>& gmSrcTensor,
                                       uint32_t srcN, uint32_t srcD, uint32_t srcDstride);
-    __aicore__ inline void CopyInMm1AToL1(LocalTensor<K_ROPE_T> &aL1Tensor, const RunInfo &info, uint32_t mSeqIdx,
+    __aicore__ inline void CopyInMm1AToL1(LocalTensor<K_ROPE_T>& aL1Tensor, const RunInfo& info, uint32_t mSeqIdx,
                                           uint32_t mSizeAct, uint32_t headSize, uint32_t headOffset);
-    __aicore__ inline void CopyInMm1ARopeToL1(LocalTensor<K_ROPE_T> &aL1Tensor, const RunInfo &info, uint32_t mSeqIdx,
+    __aicore__ inline void CopyInMm1ARopeToL1(LocalTensor<K_ROPE_T>& aL1Tensor, const RunInfo& info, uint32_t mSeqIdx,
                                               uint32_t mSizeAct);
-    __aicore__ inline void CopyInMm1BToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const uint64_t keyGmBaseOffset,
+    __aicore__ inline void CopyInMm1BToL1(LocalTensor<K_ROPE_T>& bL1Tensor, const uint64_t keyGmBaseOffset,
                                           uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                           uint32_t nActCopyRowCount, uint32_t headSize);
-    __aicore__ inline void CopyInMm1BRopeToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const uint64_t keyGmBaseOffset,
+    __aicore__ inline void CopyInMm1BRopeToL1(LocalTensor<K_ROPE_T>& bL1Tensor, const uint64_t keyGmBaseOffset,
                                               uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                               uint32_t nActCopyRowCount, uint32_t headSize);
-    __aicore__ inline void CopyInMm1BTq4ToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const RunInfo &info, uint32_t nL1,
+    __aicore__ inline void CopyInMm1BTq4ToL1(LocalTensor<K_ROPE_T>& bL1Tensor, const RunInfo& info, uint32_t nL1,
                                              uint32_t nL1Size, uint32_t nL1SizeAlign, uint32_t kL1, uint32_t kSize);
-    __aicore__ inline void CopyInMm1KVToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const RunInfo &info, uint32_t nL1,
+    __aicore__ inline void CopyInMm1KVToL1(LocalTensor<K_ROPE_T>& bL1Tensor, const RunInfo& info, uint32_t nL1,
                                            uint32_t nL1Size, uint32_t nL1SizeAlign, uint32_t kL1, uint32_t kSize);
-    __aicore__ inline void CopyInMm2AToL1(LocalTensor<K_ROPE_T> &aL1Tensor, const RunInfo &info, uint32_t mSeqIdx,
+    __aicore__ inline void CopyInMm2AToL1(LocalTensor<K_ROPE_T>& aL1Tensor, const RunInfo& info, uint32_t mSeqIdx,
                                           uint32_t subMSizeAct, uint32_t nSize, uint32_t nOffset);
-    __aicore__ inline void CopyInMm2BToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const uint64_t valueGmBaseOffset,
+    __aicore__ inline void CopyInMm2BToL1(LocalTensor<K_ROPE_T>& bL1Tensor, const uint64_t valueGmBaseOffset,
                                           uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                           uint32_t nActCopyRowCount, uint32_t copyStartColumnCount,
                                           uint32_t copyColumnCount);
-    __aicore__ inline void CopyInMm2BTq4ToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const RunInfo &info, uint32_t nL1,
+    __aicore__ inline void CopyInMm2BTq4ToL1(LocalTensor<K_ROPE_T>& bL1Tensor, const RunInfo& info, uint32_t nL1,
                                              uint32_t qsfaKL1, uint32_t qsfaKOffset, uint32_t kL0Size,
                                              uint32_t kL0SizeAlign, uint32_t nL1Size);
-    __aicore__ inline void CopyInMm2KVToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const RunInfo &info, uint32_t nL1,
+    __aicore__ inline void CopyInMm2KVToL1(LocalTensor<K_ROPE_T>& bL1Tensor, const RunInfo& info, uint32_t nL1,
                                            uint32_t qsfaKL1, uint32_t qsfaKOffset, uint32_t kL0Size,
                                            uint32_t kL0SizeAlign, uint32_t nL1Size);
-    __aicore__ inline void LoadDataMm1A(LocalTensor<K_ROPE_T> &aL0Tensor, LocalTensor<K_ROPE_T> &aL1Tensor,
+    __aicore__ inline void LoadDataMm1A(LocalTensor<K_ROPE_T>& aL0Tensor, LocalTensor<K_ROPE_T>& aL1Tensor,
                                         uint32_t idx, uint32_t kSplitSize, uint32_t mSize, uint32_t kSize);
-    __aicore__ inline void LoadDataMm1B(LocalTensor<K_ROPE_T> &bL0Tensor, LocalTensor<K_ROPE_T> &bL1Tensor,
+    __aicore__ inline void LoadDataMm1B(LocalTensor<K_ROPE_T>& bL0Tensor, LocalTensor<K_ROPE_T>& bL1Tensor,
                                         uint32_t idx, uint32_t kSplitSize, uint32_t kSize, uint32_t nSize);
 };
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::InitParams(const ConstInfo &constInfo)
+__aicore__ inline void QSFAMatmulService<QSFAT>::InitParams(const ConstInfo& constInfo)
 {
     this->constInfo = constInfo;
 }
@@ -307,7 +307,7 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::InitMm2GlobalTensor(GlobalTenso
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::InitPageAttentionInfo(const GlobalTensor<K_ROPE_T> &kvMergeGm,
+__aicore__ inline void QSFAMatmulService<QSFAT>::InitPageAttentionInfo(const GlobalTensor<K_ROPE_T>& kvMergeGm,
                                                                        GlobalTensor<int32_t> blockTableGm,
                                                                        GlobalTensor<int32_t> topKGm, uint32_t blockSize,
                                                                        uint32_t maxBlockNumPerBatch)
@@ -320,7 +320,7 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::InitPageAttentionInfo(const Glo
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void QSFAMatmulService<QSFAT>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(bufQPL1, L1_BLOCK_SIZE * 4); // (64K + 8K) * 4
     l1QPTensor = bufQPL1.Get<Q_T>();
@@ -379,8 +379,8 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::FreeEventID()
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::CopyGmToL1(LocalTensor<K_ROPE_T> &l1Tensor,
-                                                            GlobalTensor<K_ROPE_T> &gmSrcTensor, uint32_t srcN,
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyGmToL1(LocalTensor<K_ROPE_T>& l1Tensor,
+                                                            GlobalTensor<K_ROPE_T>& gmSrcTensor, uint32_t srcN,
                                                             uint32_t srcD, uint32_t srcDstride)
 {
     Nd2NzParams nd2nzPara;
@@ -396,7 +396,7 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::CopyGmToL1(LocalTensor<K_ROPE_T
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1AToL1(LocalTensor<K_ROPE_T> &l1Tensor, const RunInfo &info,
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1AToL1(LocalTensor<K_ROPE_T>& l1Tensor, const RunInfo& info,
                                                                 uint32_t mSeqIdx, uint32_t mSizeAct, uint32_t headSize,
                                                                 uint32_t headOffset)
 {
@@ -405,8 +405,8 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1AToL1(LocalTensor<K_RO
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1ARopeToL1(LocalTensor<K_ROPE_T> &l1Tensor,
-                                                                    const RunInfo &info, uint32_t mSeqIdx,
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1ARopeToL1(LocalTensor<K_ROPE_T>& l1Tensor,
+                                                                    const RunInfo& info, uint32_t mSeqIdx,
                                                                     uint32_t mSizeAct)
 {
     auto srcGm = qRopeGm[info.tensorARopeOffset + mSeqIdx * constInfo.headDimRope];
@@ -414,7 +414,7 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1ARopeToL1(LocalTensor<
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1BToL1(LocalTensor<K_ROPE_T> &bL1Tensor,
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1BToL1(LocalTensor<K_ROPE_T>& bL1Tensor,
                                                                 const uint64_t keyGmBaseOffset,
                                                                 uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                                                 uint32_t nActCopyRowCount, uint32_t headSize)
@@ -439,7 +439,7 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1BToL1(LocalTensor<K_RO
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1BRopeToL1(LocalTensor<K_ROPE_T> &bL1Tensor,
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1BRopeToL1(LocalTensor<K_ROPE_T>& bL1Tensor,
                                                                     const uint64_t kRopeGmBaseOffset,
                                                                     uint32_t copyTotalRowCntAlign,
                                                                     uint32_t copyStartRowCnt, uint32_t nActCopyRowCount,
@@ -465,8 +465,8 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1BRopeToL1(LocalTensor<
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1BTq4ToL1(LocalTensor<K_ROPE_T> &bL1Tensor,
-                                                                   const RunInfo &info, uint32_t nL1, uint32_t nL1Size,
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1BTq4ToL1(LocalTensor<K_ROPE_T>& bL1Tensor,
+                                                                   const RunInfo& info, uint32_t nL1, uint32_t nL1Size,
                                                                    uint32_t nL1SizeAlign, uint32_t kL1, uint32_t kSize)
 {
     // TQ4 的 vector 输出是行主序 [N, 576]：第一段 K 切分取前 288 个值，
@@ -485,7 +485,7 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1BTq4ToL1(LocalTensor<K
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1KVToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const RunInfo &info,
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1KVToL1(LocalTensor<K_ROPE_T>& bL1Tensor, const RunInfo& info,
                                                                  uint32_t nL1, uint32_t nL1Size, uint32_t nL1SizeAlign,
                                                                  uint32_t kL1, uint32_t kSize)
 {
@@ -517,8 +517,8 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1KVToL1(LocalTensor<K_R
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::LoadDataMm1A(LocalTensor<K_ROPE_T> &aL0Tensor,
-                                                              LocalTensor<K_ROPE_T> &aL1Tensor, uint32_t idx,
+__aicore__ inline void QSFAMatmulService<QSFAT>::LoadDataMm1A(LocalTensor<K_ROPE_T>& aL0Tensor,
+                                                              LocalTensor<K_ROPE_T>& aL1Tensor, uint32_t idx,
                                                               uint32_t kSplitSize, uint32_t mSize, uint32_t kSize)
 {
     LocalTensor<K_ROPE_T> srcTensor = aL1Tensor[mSize * kSplitSize * idx];
@@ -551,8 +551,8 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::LoadDataMm1A(LocalTensor<K_ROPE
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::LoadDataMm1B(LocalTensor<K_ROPE_T> &l0Tensor,
-                                                              LocalTensor<K_ROPE_T> &l1Tensor, uint32_t idx,
+__aicore__ inline void QSFAMatmulService<QSFAT>::LoadDataMm1B(LocalTensor<K_ROPE_T>& l0Tensor,
+                                                              LocalTensor<K_ROPE_T>& l1Tensor, uint32_t idx,
                                                               uint32_t kSplitSize, uint32_t kSize, uint32_t nSize)
 {
     // N 方向全载
@@ -568,7 +568,7 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::LoadDataMm1B(LocalTensor<K_ROPE
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2AToL1(LocalTensor<K_ROPE_T> &aL1Tensor, const RunInfo &info,
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2AToL1(LocalTensor<K_ROPE_T>& aL1Tensor, const RunInfo& info,
                                                                 uint32_t mSeqIdx, uint32_t subMSizeAct, uint32_t nSize,
                                                                 uint32_t nOffset)
 {
@@ -578,7 +578,7 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2AToL1(LocalTensor<K_RO
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2BToL1(LocalTensor<K_ROPE_T> &bL1Tensor,
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2BToL1(LocalTensor<K_ROPE_T>& bL1Tensor,
                                                                 const uint64_t valueGmBaseOffset,
                                                                 uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                                                 uint32_t nActCopyRowCount,
@@ -605,8 +605,8 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2BToL1(LocalTensor<K_RO
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2BTq4ToL1(LocalTensor<K_ROPE_T> &bL1Tensor,
-                                                                   const RunInfo &info, uint32_t nL1, uint32_t qsfaKL1,
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2BTq4ToL1(LocalTensor<K_ROPE_T>& bL1Tensor,
+                                                                   const RunInfo& info, uint32_t nL1, uint32_t qsfaKL1,
                                                                    uint32_t qsfaKOffset, uint32_t kL0Size,
                                                                    uint32_t kL0SizeAlign, uint32_t nL1Size)
 {
@@ -621,7 +621,7 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2BTq4ToL1(LocalTensor<K
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2KVToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const RunInfo &info,
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2KVToL1(LocalTensor<K_ROPE_T>& bL1Tensor, const RunInfo& info,
                                                                  uint32_t nL1, uint32_t qsfaKL1, uint32_t qsfaKOffset,
                                                                  uint32_t kL0Size, uint32_t kL0SizeAlign,
                                                                  uint32_t nL1Size)
@@ -642,9 +642,9 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2KVToL1(LocalTensor<K_R
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::CalcTopKBlockInfo(const RunInfo &info, uint32_t &curTopKIdx,
-                                                                   uint64_t &curOffsetInSparseBlock, uint32_t curSeqIdx,
-                                                                   uint32_t &copyRowCnt, uint64_t &idInTopK)
+__aicore__ inline void QSFAMatmulService<QSFAT>::CalcTopKBlockInfo(const RunInfo& info, uint32_t& curTopKIdx,
+                                                                   uint64_t& curOffsetInSparseBlock, uint32_t curSeqIdx,
+                                                                   uint32_t& copyRowCnt, uint64_t& idInTopK)
 {
     if (curTopKIdx == 0 && curOffsetInSparseBlock == 0 && copyRowCnt == 0) {
         uint64_t sparseLen = 0;
@@ -706,7 +706,7 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::CalcTopKBlockInfo(const RunInfo
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::ComputeMm1(const RunInfo &info, const MSplitInfo mSplitInfo)
+__aicore__ inline void QSFAMatmulService<QSFAT>::ComputeMm1(const RunInfo& info, const MSplitInfo mSplitInfo)
 {
     // 最外层还需要一层m的循环
     uint32_t mSize = mSplitInfo.nBufferDealM;
@@ -820,7 +820,7 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::ComputeMm1(const RunInfo &info,
 }
 
 template <typename QSFAT>
-__aicore__ inline void QSFAMatmulService<QSFAT>::ComputeMm2(const RunInfo &info, const MSplitInfo mSplitInfo)
+__aicore__ inline void QSFAMatmulService<QSFAT>::ComputeMm2(const RunInfo& info, const MSplitInfo mSplitInfo)
 {
     uint32_t mSize = mSplitInfo.nBufferDealM;
     uint32_t mSizeAlign = (mSize + 16 - 1) / 16;

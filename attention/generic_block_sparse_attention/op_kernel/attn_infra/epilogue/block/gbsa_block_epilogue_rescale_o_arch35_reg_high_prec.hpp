@@ -53,7 +53,7 @@ public:
     static constexpr uint32_t RESCALE_VREG_SIZE = 256 / sizeof(ElementOTmp);
     static constexpr float MAX_VALUE_RECIPROCAL_FP8 = 1.0f / 448.0f;
     static constexpr bool FULL_QUANT_FP8 = AscendC::IsSameType<ElementKV, fp8_e4m3fn_t>::value;
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource)
     {
         constexpr uint32_t LO_UB_TENSOR_OFFSET = 4 * UB_UINT8_BLOCK_SIZE;
         constexpr uint32_t GO_UB_TENSOR_OFFSET = 6 * UB_UINT8_BLOCK_SIZE;
@@ -79,7 +79,7 @@ public:
     __aicore__ inline ~BlockEpilogue() {}
 
     template <uint32_t MODE, pipe_t PIPE>
-    __aicore__ inline void SetCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
+    __aicore__ inline void SetCrossCoreSync(Arch::CrossCoreFlag& crossCoreFlag)
     {
         // in mode 4, AIC set for 2 AIVs seperately
         if constexpr (MODE == 4U) {
@@ -88,7 +88,7 @@ public:
     }
 
     template <uint32_t MODE, pipe_t PIPE>
-    __aicore__ inline void WaitCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
+    __aicore__ inline void WaitCrossCoreSync(Arch::CrossCoreFlag& crossCoreFlag)
     {
         // in mode 4, AIC wait for 2 AIVs seperately
         if constexpr (MODE == 4U) {
@@ -97,7 +97,7 @@ public:
     }
 
     template <class TensorLseGm, class TensorLseUb>
-    __aicore__ inline void CopyUbToGmLse(TensorLseGm const &gLseTensorTlaTile, TensorLseUb const &ubLseTensorTla)
+    __aicore__ inline void CopyUbToGmLse(TensorLseGm const& gLseTensorTlaTile, TensorLseUb const& ubLseTensorTla)
     {
         AscendC::DataCopyExtParams repeatParams;
         if constexpr ((DispatchPolicy::LSE_FORMAT == LseFormat::TN1) ||
@@ -118,11 +118,11 @@ public:
     }
 
     template <bool IS_FD, class TensorO, class TensorLse>
-    __aicore__ inline void SubCoreCompute(TensorO &gOTensorTlaTile, TensorLse &gLseTensorTlaTile, uint32_t curTileMod,
+    __aicore__ inline void SubCoreCompute(TensorO& gOTensorTlaTile, TensorLse& gLseTensorTlaTile, uint32_t curTileMod,
                                           uint32_t ubOTmpBufId, bool isFirstKvSTile, bool isLastKvSTile,
                                           uint32_t colStrideCurSubCore, Arch::CrossCoreFlag mm2ToReFlag,
-                                          AscendC::GlobalTensor<float> &gPartialO,
-                                          AscendC::GlobalTensor<float> &gPartialLse, uint32_t fdTaskId,
+                                          AscendC::GlobalTensor<float>& gPartialO,
+                                          AscendC::GlobalTensor<float>& gPartialLse, uint32_t fdTaskId,
                                           uint32_t groupRowOffset, uint32_t groupSize, uint32_t fdLseSubStride)
     {
         uint32_t rowNumCurSubCore = tla::get<0>(gOTensorTlaTile.shape());
@@ -132,13 +132,13 @@ public:
         uint32_t colTail = (colNumCurSubCore - 1) % vlElemNum + 1;
         uint32_t dStages = CeilDiv(colNumCurSubCore, RESCALE_VREG_SIZE);
 
-        __ubuf__ ElementOTmp *goUb = (__ubuf__ ElementOTmp *)goUbTensor32.GetPhyAddr();
-        __ubuf__ ElementOTmp *loUb = (__ubuf__ ElementOTmp *)loUbTensor[ubOTmpBufId].GetPhyAddr();
-        __ubuf__ ElementOTmp *glUb = (__ubuf__ ElementOTmp *)glUbTensor32.GetPhyAddr();
-        __ubuf__ ElementOTmp *dmUb =
-            (__ubuf__ ElementOTmp *)dmUbTensor32[curTileMod * DM_UB_GLOBAL_ELEM_NUM].GetPhyAddr();
-        __ubuf__ float *gmUb = (__ubuf__ float *)gmUbTensor32.GetPhyAddr();
-        __ubuf__ float *lseUb = (__ubuf__ float *)lseUbTensor32.GetPhyAddr();
+        __ubuf__ ElementOTmp* goUb = (__ubuf__ ElementOTmp*)goUbTensor32.GetPhyAddr();
+        __ubuf__ ElementOTmp* loUb = (__ubuf__ ElementOTmp*)loUbTensor[ubOTmpBufId].GetPhyAddr();
+        __ubuf__ ElementOTmp* glUb = (__ubuf__ ElementOTmp*)glUbTensor32.GetPhyAddr();
+        __ubuf__ ElementOTmp* dmUb =
+            (__ubuf__ ElementOTmp*)dmUbTensor32[curTileMod * DM_UB_GLOBAL_ELEM_NUM].GetPhyAddr();
+        __ubuf__ float* gmUb = (__ubuf__ float*)gmUbTensor32.GetPhyAddr();
+        __ubuf__ float* lseUb = (__ubuf__ float*)lseUbTensor32.GetPhyAddr();
 
         WaitCrossCoreSync<4, PIPE_V>(mm2ToReFlag);
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID4);
@@ -237,14 +237,14 @@ public:
     }
 
     template <DRegSplitStages dRegSplitStages>
-    __simd_vf__ inline void RescaleFunc(__ubuf__ ElementOTmp *goUb, __ubuf__ ElementOTmp *loUb,
-                                        __ubuf__ ElementOTmp *dmUb, uint32_t row, uint32_t colStride, uint32_t colTail,
+    __simd_vf__ inline void RescaleFunc(__ubuf__ ElementOTmp* goUb, __ubuf__ ElementOTmp* loUb,
+                                        __ubuf__ ElementOTmp* dmUb, uint32_t row, uint32_t colStride, uint32_t colTail,
                                         uint32_t vlElemNum)
     {}
 
     template <>
-    __simd_vf__ inline void RescaleFunc<DRegSplitStages::ONE>(__ubuf__ ElementOTmp *goUb, __ubuf__ ElementOTmp *loUb,
-                                                              __ubuf__ ElementOTmp *dmUb, uint32_t row,
+    __simd_vf__ inline void RescaleFunc<DRegSplitStages::ONE>(__ubuf__ ElementOTmp* goUb, __ubuf__ ElementOTmp* loUb,
+                                                              __ubuf__ ElementOTmp* dmUb, uint32_t row,
                                                               uint32_t colStride, uint32_t colTail, uint32_t vlElemNum)
     {
         using namespace AscendC::Reg;
@@ -265,8 +265,8 @@ public:
     }
 
     template <>
-    __simd_vf__ inline void RescaleFunc<DRegSplitStages::TWO>(__ubuf__ ElementOTmp *goUb, __ubuf__ ElementOTmp *loUb,
-                                                              __ubuf__ ElementOTmp *dmUb, uint32_t row,
+    __simd_vf__ inline void RescaleFunc<DRegSplitStages::TWO>(__ubuf__ ElementOTmp* goUb, __ubuf__ ElementOTmp* loUb,
+                                                              __ubuf__ ElementOTmp* dmUb, uint32_t row,
                                                               uint32_t colStride, uint32_t colTail, uint32_t vlElemNum)
     {
         using namespace AscendC::Reg;
@@ -297,15 +297,15 @@ public:
     }
 
     template <DRegSplitStages dRegSplitStages>
-    __simd_vf__ inline void RescaleFuncLastNotFirst(__ubuf__ ElementOTmp *goUb, __ubuf__ ElementOTmp *loUb,
-                                                    __ubuf__ ElementOTmp *dmUb, __ubuf__ ElementOTmp *glUb,
+    __simd_vf__ inline void RescaleFuncLastNotFirst(__ubuf__ ElementOTmp* goUb, __ubuf__ ElementOTmp* loUb,
+                                                    __ubuf__ ElementOTmp* dmUb, __ubuf__ ElementOTmp* glUb,
                                                     uint32_t row, uint32_t colStride, uint32_t colTail,
                                                     uint32_t vlElemNum)
     {}
 
     template <>
     __simd_vf__ inline void RescaleFuncLastNotFirst<DRegSplitStages::ONE>(
-        __ubuf__ ElementOTmp *goUb, __ubuf__ ElementOTmp *loUb, __ubuf__ ElementOTmp *dmUb, __ubuf__ ElementOTmp *glUb,
+        __ubuf__ ElementOTmp* goUb, __ubuf__ ElementOTmp* loUb, __ubuf__ ElementOTmp* dmUb, __ubuf__ ElementOTmp* glUb,
         uint32_t row, uint32_t colStride, uint32_t colTail, uint32_t vlElemNum)
     {
         using namespace AscendC::Reg;
@@ -334,7 +334,7 @@ public:
 
     template <>
     __simd_vf__ inline void RescaleFuncLastNotFirst<DRegSplitStages::TWO>(
-        __ubuf__ ElementOTmp *goUb, __ubuf__ ElementOTmp *loUb, __ubuf__ ElementOTmp *dmUb, __ubuf__ ElementOTmp *glUb,
+        __ubuf__ ElementOTmp* goUb, __ubuf__ ElementOTmp* loUb, __ubuf__ ElementOTmp* dmUb, __ubuf__ ElementOTmp* glUb,
         uint32_t row, uint32_t colStride, uint32_t colTail, uint32_t vlElemNum)
     {
         using namespace AscendC::Reg;
@@ -375,15 +375,15 @@ public:
     }
 
     template <DRegSplitStages dRegSplitStages>
-    __simd_vf__ inline void DivFuncLastAndFirst(__ubuf__ ElementOTmp *goUb, __ubuf__ ElementOTmp *loUb,
-                                                __ubuf__ ElementOTmp *glUb, uint32_t row, uint32_t colStride,
+    __simd_vf__ inline void DivFuncLastAndFirst(__ubuf__ ElementOTmp* goUb, __ubuf__ ElementOTmp* loUb,
+                                                __ubuf__ ElementOTmp* glUb, uint32_t row, uint32_t colStride,
                                                 uint32_t colTail, uint32_t vlElemNum)
     {}
 
     template <>
-    __simd_vf__ inline void DivFuncLastAndFirst<DRegSplitStages::ONE>(__ubuf__ ElementOTmp *goUb,
-                                                                      __ubuf__ ElementOTmp *loUb,
-                                                                      __ubuf__ ElementOTmp *glUb, uint32_t row,
+    __simd_vf__ inline void DivFuncLastAndFirst<DRegSplitStages::ONE>(__ubuf__ ElementOTmp* goUb,
+                                                                      __ubuf__ ElementOTmp* loUb,
+                                                                      __ubuf__ ElementOTmp* glUb, uint32_t row,
                                                                       uint32_t colStride, uint32_t colTail,
                                                                       uint32_t vlElemNum)
     {
@@ -404,9 +404,9 @@ public:
     }
 
     template <>
-    __simd_vf__ inline void DivFuncLastAndFirst<DRegSplitStages::TWO>(__ubuf__ ElementOTmp *goUb,
-                                                                      __ubuf__ ElementOTmp *loUb,
-                                                                      __ubuf__ ElementOTmp *glUb, uint32_t row,
+    __simd_vf__ inline void DivFuncLastAndFirst<DRegSplitStages::TWO>(__ubuf__ ElementOTmp* goUb,
+                                                                      __ubuf__ ElementOTmp* loUb,
+                                                                      __ubuf__ ElementOTmp* glUb, uint32_t row,
                                                                       uint32_t colStride, uint32_t colTail,
                                                                       uint32_t vlElemNum)
     {
@@ -435,8 +435,8 @@ public:
 
     // When qS can be copied from UB to GM continuously,
     // qS would be stored from reg to UB continuously.
-    __simd_vf__ inline void LogSumExpFuncQSAxisContinuous(__ubuf__ float *gmUb, __ubuf__ float *glUb,
-                                                          __ubuf__ float *lseUb, uint32_t row)
+    __simd_vf__ inline void LogSumExpFuncQSAxisContinuous(__ubuf__ float* gmUb, __ubuf__ float* glUb,
+                                                          __ubuf__ float* lseUb, uint32_t row)
     {
         // This vf works only when the rowNum in each AIV does not exceed 64
         using namespace AscendC::Reg;
@@ -457,8 +457,8 @@ public:
 
     // When qS cannot be copied from UB to GM continuously,
     // lse would be broadcasted and then stored from reg to UB continuously.
-    __simd_vf__ inline void LogSumExpFuncQSAxisIncontinuous(__ubuf__ float *gmUb, __ubuf__ float *glUb,
-                                                            __ubuf__ float *lseUb, uint32_t row)
+    __simd_vf__ inline void LogSumExpFuncQSAxisIncontinuous(__ubuf__ float* gmUb, __ubuf__ float* glUb,
+                                                            __ubuf__ float* lseUb, uint32_t row)
     {
         using namespace AscendC::Reg;
         RegTensor<float> gmRowwiseVreg0;
@@ -492,7 +492,7 @@ public:
     }
 
     template <class TensorO, class TensorLse>
-    __aicore__ inline void operator()(TensorO &gOTensor, TensorLse &gLseTensor, GemmCoord actualOriShape,
+    __aicore__ inline void operator()(TensorO& gOTensor, TensorLse& gLseTensor, GemmCoord actualOriShape,
                                       uint32_t curTileMod, uint32_t gatheredKvSTileIdx, bool isFirstKvSTile,
                                       bool isLastKvSTile, Arch::CrossCoreFlag mm2ToReFlag)
     {
@@ -530,11 +530,11 @@ public:
     }
 
     template <class TensorO, class TensorLse>
-    __aicore__ inline void ProcessPartial(TensorO &gOTensor, TensorLse &gLseTensor, GemmCoord actualOriShape,
+    __aicore__ inline void ProcessPartial(TensorO& gOTensor, TensorLse& gLseTensor, GemmCoord actualOriShape,
                                           uint32_t curTileMod, uint32_t gatheredKvSTileIdx, bool isFirstKvSTile,
                                           bool isLastKvSTile, Arch::CrossCoreFlag mm2ToReFlag,
-                                          AscendC::GlobalTensor<float> &gPartialO,
-                                          AscendC::GlobalTensor<float> &gPartialLse, uint32_t fdTaskId,
+                                          AscendC::GlobalTensor<float>& gPartialO,
+                                          AscendC::GlobalTensor<float>& gPartialLse, uint32_t fdTaskId,
                                           uint32_t fdLseSubStride)
     {
         const uint32_t rowNumOri = actualOriShape[0];
@@ -560,8 +560,8 @@ public:
         }
     }
 
-    __aicore__ inline void WriteNeutralPartial(AscendC::GlobalTensor<float> &gPartialO,
-                                               AscendC::GlobalTensor<float> &gPartialLse, uint32_t fdTaskId,
+    __aicore__ inline void WriteNeutralPartial(AscendC::GlobalTensor<float>& gPartialO,
+                                               AscendC::GlobalTensor<float>& gPartialLse, uint32_t fdTaskId,
                                                uint32_t groupSize, uint32_t colNum, uint32_t fdLseSubStride)
     {
         const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
@@ -590,7 +590,7 @@ public:
     }
 
     template <class TensorO, class TensorLse>
-    __aicore__ inline void WriteEmptyOutput(TensorO &gOTensor, TensorLse &gLseTensor, GemmCoord actualOriShape)
+    __aicore__ inline void WriteEmptyOutput(TensorO& gOTensor, TensorLse& gLseTensor, GemmCoord actualOriShape)
     {
         const uint32_t rowNumOri = actualOriShape[0];
         const uint32_t colNumOri = actualOriShape[1];

@@ -36,7 +36,7 @@ constexpr size_t BNSD_DIM_NUM = 4U;
 constexpr size_t BNSD_DIM_S = 2U;
 constexpr size_t BNSD_DIM_D = 3U;
 
-ge::graphStatus PFAConvertContext(ContextParamsForPFATiling &contextKeyParams, gert::TilingContext *context)
+ge::graphStatus PFAConvertContext(ContextParamsForPFATiling& contextKeyParams, gert::TilingContext* context)
 {
     contextKeyParams.opName = context->GetNodeName();
     contextKeyParams.isKvContinuous = 1U;
@@ -105,14 +105,14 @@ ge::graphStatus PFAConvertContext(ContextParamsForPFATiling &contextKeyParams, g
     contextKeyParams.nextToken = &tokenDefault;
     contextKeyParams.workspaceSize = context->GetWorkspaceSizes(1);
     contextKeyParams.compileInfoPtr =
-        reinterpret_cast<const PromptFlashAttentionCompileInfo *>(context->GetCompileInfo());
+        reinterpret_cast<const PromptFlashAttentionCompileInfo*>(context->GetCompileInfo());
     contextKeyParams.isBSNDOut = (string(contextKeyParams.layout) == "BNSD_BSND") ? 1U : 0U;
 
     return ge::GRAPH_SUCCESS;
 }
 
-void TilingGetTempCompileInfo(platform_ascendc::PlatformAscendC &ascendcPlatform,
-                              PromptFlashAttentionCompileInfo &compileInfo)
+void TilingGetTempCompileInfo(platform_ascendc::PlatformAscendC& ascendcPlatform,
+                              PromptFlashAttentionCompileInfo& compileInfo)
 {
     compileInfo.aivNum = ascendcPlatform.GetCoreNumAiv();
     compileInfo.aicNum = ascendcPlatform.GetCoreNumAic();
@@ -124,7 +124,7 @@ void TilingGetTempCompileInfo(platform_ascendc::PlatformAscendC &ascendcPlatform
     compileInfo.defaultSysWorkspaceSize = 0U;
 }
 
-ge::graphStatus IFATilingArch38::ConvertContext(gert::TilingContext &context, IncreFlashAttentionContext &ifaContext)
+ge::graphStatus IFATilingArch38::ConvertContext(gert::TilingContext& context, IncreFlashAttentionContext& ifaContext)
 {
     OP_CHECK_IF(context.GetNodeName() == nullptr,
                 OP_LOGE("IncreFlashAttention", "OpName got from TilingContext is null."), return ge::GRAPH_FAILED);
@@ -143,15 +143,15 @@ ge::graphStatus IFATilingArch38::ConvertContext(gert::TilingContext &context, In
         ifaContext.vCache.resize(batchOfQuery);
         for (int64_t size = 0; size < batchOfQuery; ++size) {
             ifaContext.kCache[size] =
-                const_cast<gert::StorageShape *>(context.GetDynamicInputShape(KEY_INPUT_INDEX, size));
+                const_cast<gert::StorageShape*>(context.GetDynamicInputShape(KEY_INPUT_INDEX, size));
             ifaContext.vCache[size] =
-                const_cast<gert::StorageShape *>(context.GetDynamicInputShape(VALUE_INPUT_INDEX, size));
+                const_cast<gert::StorageShape*>(context.GetDynamicInputShape(VALUE_INPUT_INDEX, size));
         }
     } else {
         ifaContext.kCache.resize(NUM1);
         ifaContext.vCache.resize(NUM1);
-        ifaContext.kCache[0] = const_cast<gert::StorageShape *>(context.GetDynamicInputShape(KEY_INPUT_INDEX, 0));
-        ifaContext.vCache[0] = const_cast<gert::StorageShape *>(context.GetDynamicInputShape(VALUE_INPUT_INDEX, 0));
+        ifaContext.kCache[0] = const_cast<gert::StorageShape*>(context.GetDynamicInputShape(KEY_INPUT_INDEX, 0));
+        ifaContext.vCache[0] = const_cast<gert::StorageShape*>(context.GetDynamicInputShape(VALUE_INPUT_INDEX, 0));
     }
 
     ifaContext.value.desc = context.GetInputDesc(VALUE_INPUT_INDEX);
@@ -210,9 +210,9 @@ ge::graphStatus IFATilingArch38::DoOpTiling()
     return ret;
 }
 
-bool IFATilingArch38::CheckArch38ScenarioSupported(const IncreFlashAttentionContext &ifaContext) const
+bool IFATilingArch38::CheckArch38ScenarioSupported(const IncreFlashAttentionContext& ifaContext) const
 {
-    const char *opName = context_->GetNodeName();
+    const char* opName = context_->GetNodeName();
     // PagedAttention lays key out by block, its shape carries no real kv seq length for the check below
     OP_CHECK_IF((ifaContext.blockTable.tensor != nullptr),
                 OPS_REPORT_VECTOR_INNER_ERR(opName, "PagedAttention is not supported on this platform."), return false);
@@ -226,9 +226,9 @@ bool IFATilingArch38::CheckArch38ScenarioSupported(const IncreFlashAttentionCont
                  (ifaContext.value.shape == nullptr)),
                 OPS_REPORT_VECTOR_INNER_ERR(opName, "shape of query, key or value is null."), return false);
 
-    const auto &queryShape = ifaContext.query.shape->GetStorageShape();
-    const auto &keyShape = ifaContext.key.shape->GetStorageShape();
-    const auto &valueShape = ifaContext.value.shape->GetStorageShape();
+    const auto& queryShape = ifaContext.query.shape->GetStorageShape();
+    const auto& keyShape = ifaContext.key.shape->GetStorageShape();
+    const auto& valueShape = ifaContext.value.shape->GetStorageShape();
     OP_CHECK_IF(((queryShape.GetDimNum() != BNSD_DIM_NUM) || (keyShape.GetDimNum() != BNSD_DIM_NUM) ||
                  (valueShape.GetDimNum() != BNSD_DIM_NUM)),
                 OPS_REPORT_VECTOR_INNER_ERR(opName, "BNSD layout requires 4-dim query, key and value shapes."),
@@ -270,7 +270,7 @@ bool IFATilingArch38::CheckArch38ScenarioSupported(const IncreFlashAttentionCont
     return true;
 }
 
-ge::graphStatus IFATilingArch38::DoSubOpTiling(IncreFlashAttentionContext &ifaContext)
+ge::graphStatus IFATilingArch38::DoSubOpTiling(IncreFlashAttentionContext& ifaContext)
 {
     OP_CHECK_IF(!CheckArch38ScenarioSupported(ifaContext),
                 OP_LOGE(context_->GetNodeName(), "unsupported scenario on this platform."), return ge::GRAPH_FAILED);

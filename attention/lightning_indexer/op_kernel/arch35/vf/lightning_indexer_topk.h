@@ -23,7 +23,7 @@ namespace topk {
 template <typename T>
 class LITopk {
 public:
-    __aicore__ inline void operator()(LocalTensor<uint32_t> &outputIdxLocal, LocalTensor<T> &inputLocal,
+    __aicore__ inline void operator()(LocalTensor<uint32_t>& outputIdxLocal, LocalTensor<T>& inputLocal,
                                       uint32_t s2SeqLen)
     {}
 };
@@ -42,7 +42,7 @@ public:
         this->liTrunkLength = liTrunkLength;
     }
 
-    __aicore__ inline void InitBuffers(LocalTensor<uint32_t> &liSharedBuffer, LocalTensor<uint32_t> &liIndicesOut)
+    __aicore__ inline void InitBuffers(LocalTensor<uint32_t>& liSharedBuffer, LocalTensor<uint32_t>& liIndicesOut)
     {
         LocalTensor<uint32_t> hisIndexLocal1 = liIndicesOut;
         LocalTensor<uint32_t> hisIndexLocal2 = liSharedBuffer[0];
@@ -57,8 +57,8 @@ public:
         tmpIndexLocal = nkValueLocal[64]; // 64: 单核/单线程输出元素容量（G维度切分阈值）
     }
 
-    __aicore__ inline void operator()(LocalTensor<uint32_t> &mrgValueLocal, LocalTensor<uint32_t> &liIndicesOut,
-                                      LocalTensor<uint32_t> &hisValueLocal, uint32_t s2SeqLen, uint32_t loopIdx,
+    __aicore__ inline void operator()(LocalTensor<uint32_t>& mrgValueLocal, LocalTensor<uint32_t>& liIndicesOut,
+                                      LocalTensor<uint32_t>& hisValueLocal, uint32_t s2SeqLen, uint32_t loopIdx,
                                       uint32_t s2LoopNum, bool returnValueFlag)
     {
         if (s2LoopNum == 1) {

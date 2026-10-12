@@ -37,9 +37,9 @@ struct TileMmad {
 
     __aicore__ inline TileMmad() {}
 
-    __aicore__ inline void operator()(AscendC::LocalTensor<ElementAccumulator> const &l0CTensor,
-                                      AscendC::LocalTensor<ElementA> const &l0ATensor,
-                                      AscendC::LocalTensor<ElementB> const &l0BTensor, uint32_t m, uint32_t n,
+    __aicore__ inline void operator()(AscendC::LocalTensor<ElementAccumulator> const& l0CTensor,
+                                      AscendC::LocalTensor<ElementA> const& l0ATensor,
+                                      AscendC::LocalTensor<ElementB> const& l0BTensor, uint32_t m, uint32_t n,
                                       uint32_t k, bool initC = true, uint8_t unitFlag = 0)
     {
         AscendC::MmadParams mmadParams;
@@ -60,10 +60,10 @@ struct TileMmad {
         }
     }
 
-    __aicore__ inline void operator()(AscendC::LocalTensor<ElementAccumulator> const &l0CTensor,
-                                      AscendC::LocalTensor<ElementA> const &l0ATensor,
-                                      AscendC::LocalTensor<ElementB> const &l0BTensor,
-                                      AscendC::LocalTensor<ElementAccumulator> const &l0BiasTensor, uint32_t m,
+    __aicore__ inline void operator()(AscendC::LocalTensor<ElementAccumulator> const& l0CTensor,
+                                      AscendC::LocalTensor<ElementA> const& l0ATensor,
+                                      AscendC::LocalTensor<ElementB> const& l0BTensor,
+                                      AscendC::LocalTensor<ElementAccumulator> const& l0BiasTensor, uint32_t m,
                                       uint32_t n, uint32_t k, bool initC = true, uint8_t unitFlag = 0)
     {
         AscendC::MmadParams mmadParams;
@@ -98,7 +98,7 @@ struct TileMmadTla {
     __aicore__ inline TileMmadTla() {}
 
     template <class TensorC, class TensorA, class TensorB>
-    __aicore__ inline void operator()(TensorC const &l0CTensor, TensorA const &l0ATensor, TensorB const &l0BTensor,
+    __aicore__ inline void operator()(TensorC const& l0CTensor, TensorA const& l0ATensor, TensorB const& l0BTensor,
                                       uint32_t m, uint32_t n, uint32_t k, bool initC = true, uint8_t unitFlag = 0)
     {
         AscendC::MmadParams mmadParams;
@@ -129,8 +129,8 @@ struct TileMmadTla {
     }
 
     template <class TensorC, class TensorA, class TensorB, class TensorBias>
-    __aicore__ inline void operator()(TensorC const &l0CTensor, TensorA const &l0ATensor, TensorB const &l0BTensor,
-                                      TensorBias const &l0BiasTensor, uint32_t m, uint32_t n, uint32_t k,
+    __aicore__ inline void operator()(TensorC const& l0CTensor, TensorA const& l0ATensor, TensorB const& l0BTensor,
+                                      TensorBias const& l0BiasTensor, uint32_t m, uint32_t n, uint32_t k,
                                       bool initC = true, uint8_t unitFlag = 0)
     {
         AscendC::MmadParams mmadParams;
@@ -157,7 +157,7 @@ struct TileMmadTla {
     }
 
     template <class TensorC, class TensorA, class TensorB>
-    __aicore__ inline void operator()(TensorC const &l0CTensor, TensorA const &l0ATensor, TensorB const &l0BTensor,
+    __aicore__ inline void operator()(TensorC const& l0CTensor, TensorA const& l0ATensor, TensorB const& l0BTensor,
                                       uint32_t m, uint32_t n, uint32_t k, uint32_t l0Batch)
     {
         const uint32_t L0AM = tla::get<0, 0>(l0ATensor.shape()) * tla::get<0, 1>(l0ATensor.shape());

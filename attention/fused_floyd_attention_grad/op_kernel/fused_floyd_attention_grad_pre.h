@@ -22,13 +22,13 @@ template <typename T1, typename T2, typename TILING_TYPE, const bool INIT_OUTPUT
 class FusedFloydAttentionGradPre {
 public:
     __aicore__ inline FusedFloydAttentionGradPre(){};
-    __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dk_1,
-                                __gm__ uint8_t *dv_1, __gm__ uint8_t *workspace, const TILING_TYPE *ordTilingData,
-                                TPipe *pipe_in);
+    __aicore__ inline void Init(__gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* dk_1,
+                                __gm__ uint8_t* dv_1, __gm__ uint8_t* workspace, const TILING_TYPE* ordTilingData,
+                                TPipe* pipe_in);
     __aicore__ inline void Process();
     __aicore__ inline void SyncALLCores();
 
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> helpQue;
     TQue<QuePosition::VECIN, 1> inputQue;
     TQue<QuePosition::VECIN, 1> castQue;
@@ -37,7 +37,7 @@ public:
     GlobalTensor<float> dqWorkSpaceGm, dkWorkSpaceGm, dvWorkSpaceGm, dvGm, dv1Gm, dk1WorkSpaceGm, dv1WorkSpaceGm;
     GlobalTensor<uint8_t> maskWorkSpaceGm;
 
-    const TILING_TYPE *TilingData;
+    const TILING_TYPE* TilingData;
     constexpr static uint32_t HELP_LEN = 256;
     constexpr static uint32_t BIT8 = 8;
     constexpr static uint32_t NUMBER_8 = 8;
@@ -79,8 +79,8 @@ public:
 
 template <typename T1, typename T2, typename TILING_TYPE, const bool INIT_OUTPUT>
 __aicore__ inline void FusedFloydAttentionGradPre<T1, T2, TILING_TYPE, INIT_OUTPUT>::Init(
-    __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dk_1, __gm__ uint8_t *dv_1,
-    __gm__ uint8_t *workspace, const TILING_TYPE *orgTilingData, TPipe *pipe_in)
+    __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dv, __gm__ uint8_t* dk_1, __gm__ uint8_t* dv_1,
+    __gm__ uint8_t* workspace, const TILING_TYPE* orgTilingData, TPipe* pipe_in)
 {
     cBlockIdx = GetBlockIdx();
 
@@ -89,8 +89,8 @@ __aicore__ inline void FusedFloydAttentionGradPre<T1, T2, TILING_TYPE, INIT_OUTP
 
     maskUsedCoreNum = TilingData->preTilingData.maskCoreNum;
 
-    dvGm.SetGlobalBuffer((__gm__ float *)dv);
-    dv1Gm.SetGlobalBuffer((__gm__ float *)dv_1);
+    dvGm.SetGlobalBuffer((__gm__ float*)dv);
+    dv1Gm.SetGlobalBuffer((__gm__ float*)dv_1);
 
     if constexpr (INIT_OUTPUT) {
         // tiling_data
@@ -108,15 +108,15 @@ __aicore__ inline void FusedFloydAttentionGradPre<T1, T2, TILING_TYPE, INIT_OUTP
         k1v1PreBlockTail = TilingData->preTilingData.k1v1PreBlockTail;
         k1v1SizeAlign = TilingData->postTilingData.k1v1SizeAlign;
 
-        dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                       TilingData->postTilingData.dqWorkSpaceOffset / sizeof(float));
-        dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                       TilingData->postTilingData.dkWorkSpaceOffset / sizeof(float));
-        dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                       TilingData->postTilingData.dvWorkSpaceOffset / sizeof(float));
-        dk1WorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dk1WorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                        TilingData->postTilingData.dk1WorkSpaceOffset / sizeof(float));
-        dv1WorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dv1WorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                        TilingData->postTilingData.dv1WorkSpaceOffset / sizeof(float));
 
         initdqSize = cBlockIdx == qPreBlockTotal - 1 ? qPreBlockTail : qPreBlockFactor;

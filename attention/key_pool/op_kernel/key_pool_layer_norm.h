@@ -13,9 +13,9 @@
 
 namespace KeyPool {
 
-__aicore__ inline void KeyPoolLayerNorm(const LocalTensor<float> &data, const LocalTensor<float> &in,
-                                        const LocalTensor<float> &out, const LocalTensor<float> &mean,
-                                        const LocalTensor<float> &gamma, const LocalTensor<float> &beta, float eps,
+__aicore__ inline void KeyPoolLayerNorm(const LocalTensor<float>& data, const LocalTensor<float>& in,
+                                        const LocalTensor<float>& out, const LocalTensor<float>& mean,
+                                        const LocalTensor<float>& gamma, const LocalTensor<float>& beta, float eps,
                                         uint32_t count)
 {
     const float reciprocal = 1.0f / static_cast<float>(static_cast<int64_t>(count));
@@ -63,9 +63,9 @@ __aicore__ inline void KeyPoolLayerNorm(const LocalTensor<float> &data, const Lo
 // Normalize complete current K rows before they enter the pooling path. The
 // caller provides a scratch tensor with room for input/output and three
 // vectors: mean, gamma, and beta.
-__aicore__ inline void KeyPoolLayerNormRowsInplace(const LocalTensor<float> &data, const LocalTensor<float> &scratch,
-                                                   const GlobalTensor<float> &normWeight,
-                                                   const GlobalTensor<float> &normBias, float eps, uint32_t rowCount,
+__aicore__ inline void KeyPoolLayerNormRowsInplace(const LocalTensor<float>& data, const LocalTensor<float>& scratch,
+                                                   const GlobalTensor<float>& normWeight,
+                                                   const GlobalTensor<float>& normBias, float eps, uint32_t rowCount,
                                                    uint32_t rowStride, uint32_t headDim)
 {
     if (rowCount == 0 || rowStride < headDim) {
@@ -85,7 +85,7 @@ __aicore__ inline void KeyPoolLayerNormRowsInplace(const LocalTensor<float> &dat
     }
 }
 
-__aicore__ inline void ApplyKeyPoolRotaryPlaceholder(const LocalTensor<float> &, uint32_t)
+__aicore__ inline void ApplyKeyPoolRotaryPlaceholder(const LocalTensor<float>&, uint32_t)
 {
     // RoPE inputs are rejected by the Host in this version. Keep the transform
     // boundary explicit so a later RoPE implementation is inserted between

@@ -36,7 +36,7 @@ struct CopyL0CToUBTla<
     static constexpr auto reluEn = ReluEnable_;
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint8_t unitFlag = 0)
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint8_t unitFlag = 0)
     {
         static_assert(
             tla::detail::isRowMajor<typename TensorDst::Layout>::value &&
@@ -65,7 +65,7 @@ struct CopyL0CToUBTla<
     }
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, bool subBlockId,
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, bool subBlockId,
                                       uint8_t unitFlag = 0)
     {
         static_assert(
@@ -111,7 +111,7 @@ struct CopyL0CToUBTla<
     static constexpr auto reluEn = ReluEnable_;
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint8_t unitFlag = 0)
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint8_t unitFlag = 0)
     {
         static_assert(
             tla::detail::isRowMajor<typename TensorDst::Layout>::value &&
@@ -155,7 +155,7 @@ struct CopyL0CToUBTla<
     static constexpr auto reluEn = ReluEnable_;
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint8_t unitFlag = 0)
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint8_t unitFlag = 0)
     {
         static_assert(
             tla::detail::isRowMajor<typename TensorDst::Layout>::value &&
@@ -199,7 +199,7 @@ struct CopyL0CToUBTla<
     static constexpr auto reluEn = ReluEnable_;
 
     template <class TensorDst, class TensorSrc>
-    __aicore__ inline void operator()(TensorDst const &dstTensor, TensorSrc const &srcTensor, uint64_t deqScalar,
+    __aicore__ inline void operator()(TensorDst const& dstTensor, TensorSrc const& srcTensor, uint64_t deqScalar,
                                       bool subBlockId, uint8_t unitFlag = 0)
     {
         static_assert(

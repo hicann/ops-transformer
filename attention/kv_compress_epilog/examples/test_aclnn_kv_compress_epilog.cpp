@@ -20,7 +20,7 @@
     } while (0)
 
 namespace {
-bool Check(aclError status, const char *operation)
+bool Check(aclError status, const char* operation)
 {
     if (status == ACL_SUCCESS) {
         return true;
@@ -33,9 +33,9 @@ struct Resources {
     bool initialized = false;
     bool deviceSet = false;
     aclrtStream stream = nullptr;
-    void *workspace = nullptr;
-    std::vector<void *> buffers;
-    std::vector<aclTensor *> tensors;
+    void* workspace = nullptr;
+    std::vector<void*> buffers;
+    std::vector<aclTensor*> tensors;
 
     ~Resources()
     {
@@ -62,9 +62,9 @@ struct Resources {
         }
     }
 
-    aclTensor *CreateTensor(const std::vector<int64_t> &shape, aclDataType dtype, const void *data, size_t bytes)
+    aclTensor* CreateTensor(const std::vector<int64_t>& shape, aclDataType dtype, const void* data, size_t bytes)
     {
-        void *deviceData = nullptr;
+        void* deviceData = nullptr;
         if (!Check(aclrtMalloc(&deviceData, bytes, ACL_MEM_MALLOC_NORMAL_ONLY), "aclrtMalloc tensor")) {
             return nullptr;
         }
@@ -131,7 +131,7 @@ int main()
     bool roundScale = true;
     float xScale = 1.0f;
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     if (!Check(aclnnKvCompressEpilogGetWorkspaceSize(cache, x, slotMapping, quantGroupSize, quantMode, roundScale,
                                                      xScale, &workspaceSize, &executor),
                "aclnnKvCompressEpilogGetWorkspaceSize")) {

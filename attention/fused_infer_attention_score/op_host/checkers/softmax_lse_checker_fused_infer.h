@@ -23,20 +23,21 @@
 namespace optiling {
 class SoftmaxLSEChecker : public BaseChecker {
 public:
-    SoftmaxLSEChecker(bool enableNonQuant, bool enableFullQuant, bool enableAntiQuant) :
-        BaseChecker(enableNonQuant, enableFullQuant, enableAntiQuant) {}
+    SoftmaxLSEChecker(bool enableNonQuant, bool enableFullQuant, bool enableAntiQuant)
+        : BaseChecker(enableNonQuant, enableFullQuant, enableAntiQuant)
+    {}
     ~SoftmaxLSEChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const FiaTilingInfo &fiaInfo) override;
-    ge::graphStatus CheckParaExistence(const FiaTilingInfo &fiaInfo) override;
-    ge::graphStatus CheckCrossFeature(const FiaTilingInfo &fiaInfo) override;
-    ge::graphStatus CheckMultiParaConsistency(const FiaTilingInfo &fiaInfo) override;
+    ge::graphStatus CheckSinglePara(const FiaTilingInfo& fiaInfo) override;
+    ge::graphStatus CheckParaExistence(const FiaTilingInfo& fiaInfo) override;
+    ge::graphStatus CheckCrossFeature(const FiaTilingInfo& fiaInfo) override;
+    ge::graphStatus CheckMultiParaConsistency(const FiaTilingInfo& fiaInfo) override;
 
 private:
     // 公共校验函数
-    ge::graphStatus CheckSingleDtype(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckExistenceShapeAndDesc(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckFeatureDimAndShape(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckSingleDtype(const FiaTilingInfo& fiaInfo);
+    ge::graphStatus CheckExistenceShapeAndDesc(const FiaTilingInfo& fiaInfo) const;
+    ge::graphStatus CheckFeatureDimAndShape(const FiaTilingInfo& fiaInfo) const;
 
 private:
 };

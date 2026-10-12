@@ -29,22 +29,22 @@ constexpr int32_t FOUR_UNFOLD = 4; // 拷出按 4 行展开
 template <typename T0, typename U, typename T1>
 class KvCompressEpilog {
 public:
-    __aicore__ inline KvCompressEpilog(TPipe *pipe)
+    __aicore__ inline KvCompressEpilog(TPipe* pipe)
         : pipe_(pipe)
     {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR slotMapping, GM_ADDR kvCache,
-                                const KvCompressEpilogTilingData *tilingData);
+                                const KvCompressEpilogTilingData* tilingData);
 
     __aicore__ inline void Process();
 
     __aicore__ inline void SetMaxValue();
 
-    __aicore__ inline void Scatter(const LocalTensor<T1> &kvLocal, int64_t slotBase, int64_t rf, int64_t blkSize,
+    __aicore__ inline void Scatter(const LocalTensor<T1>& kvLocal, int64_t slotBase, int64_t rf, int64_t blkSize,
                                    int64_t blkStride, int64_t rowStride, uint32_t cacheCol, int64_t cacheColAlign);
 
 private:
-    TPipe *pipe_ = nullptr;
+    TPipe* pipe_ = nullptr;
 
     GlobalTensor<T0> xGm;
     GlobalTensor<U> slotMappingGm;
@@ -64,23 +64,23 @@ private:
     float scalesAttr = 1.0f;
 
     // Tiling data
-    const KvCompressEpilogTilingData *tilingData = nullptr;
+    const KvCompressEpilogTilingData* tilingData = nullptr;
 };
 
 // Template implementations
 
 template <typename T0, typename U, typename T1>
 __aicore__ inline void KvCompressEpilog<T0, U, T1>::Init(GM_ADDR x, GM_ADDR slotMapping, GM_ADDR kvCache,
-                                                         const KvCompressEpilogTilingData *tilingDataPtr)
+                                                         const KvCompressEpilogTilingData* tilingDataPtr)
 {
     tilingData = tilingDataPtr;
     scalesAttr = tilingData->scalesAttr;
 
     int64_t xGmBaseOffset = GetBlockIdx() * tilingData->rowOfFormerBlock * tilingData->d;
 
-    xGm.SetGlobalBuffer((__gm__ T0 *)x + xGmBaseOffset);
-    kvCacheGm.SetGlobalBuffer((__gm__ T1 *)kvCache);
-    slotMappingGm.SetGlobalBuffer((__gm__ U *)slotMapping);
+    xGm.SetGlobalBuffer((__gm__ T0*)x + xGmBaseOffset);
+    kvCacheGm.SetGlobalBuffer((__gm__ T1*)kvCache);
+    slotMappingGm.SetGlobalBuffer((__gm__ U*)slotMapping);
 
     pipe_->InitBuffer(xQue, 2, tilingData->rowFactor * RoundUp<T0>(tilingData->d) * sizeof(T0));
     pipe_->InitBuffer(kvCacheQue, 2, tilingData->rowFactor * RoundUp<T1>(tilingData->kvCacheCol) * sizeof(T1));
@@ -191,7 +191,7 @@ __aicore__ inline void KvCompressEpilog<T0, U, T1>::Process()
 }
 
 template <typename T0, typename U, typename T1>
-__aicore__ inline void KvCompressEpilog<T0, U, T1>::Scatter(const LocalTensor<T1> &kvLocal, int64_t slotBase,
+__aicore__ inline void KvCompressEpilog<T0, U, T1>::Scatter(const LocalTensor<T1>& kvLocal, int64_t slotBase,
                                                             int64_t rf, int64_t blkSize, int64_t blkStride,
                                                             int64_t rowStride, uint32_t cacheCol, int64_t cacheColAlign)
 {

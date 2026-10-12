@@ -32,12 +32,12 @@ using namespace optiling;
 
 #ifdef __DAV_C310_CUBE__ // CUBE 实现
 #define FIA_REGBASE_COPY_TILING_DATA(tiling) \
-    const FlashAttentionScoreSimplifiedTilingData *__restrict tilingData = nullptr
+    const FlashAttentionScoreSimplifiedTilingData* __restrict tilingData = nullptr
 
 #else // VECTOR 实现
 #define FIA_REGBASE_COPY_TILING_DATA(tiling) \
     GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreSimplifiedTilingData, tilingDataIn, tiling); \
-    const FlashAttentionScoreSimplifiedTilingData *__restrict tilingData = &tilingDataIn
+    const FlashAttentionScoreSimplifiedTilingData* __restrict tilingData = &tilingDataIn
 #endif
 
 #endif // FIA_ARCH35_COMMON_H_

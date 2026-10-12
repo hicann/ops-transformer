@@ -33,7 +33,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto dim : shape) {
@@ -42,7 +42,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -54,8 +54,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * static_cast<int64_t>(sizeof(T));
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -74,8 +74,8 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
 
 // Linear.weight 存储 [N, K]，公开接口传入 matmul 右操作数 view [K, N]（stride=(1,K)），由 aclnn 推断转置。
 template <typename T>
-int CreateAclMatmulRhsFromNk(const std::vector<T> &hostData, int64_t nSize, int64_t kSize, void **deviceAddr,
-                             aclDataType dataType, aclTensor **tensor)
+int CreateAclMatmulRhsFromNk(const std::vector<T>& hostData, int64_t nSize, int64_t kSize, void** deviceAddr,
+                             aclDataType dataType, aclTensor** tensor)
 {
     std::vector<int64_t> storageShape = {nSize, kSize};
     auto size = GetShapeSize(storageShape) * static_cast<int64_t>(sizeof(T));
@@ -92,7 +92,7 @@ int CreateAclMatmulRhsFromNk(const std::vector<T> &hostData, int64_t nSize, int6
     return 0;
 }
 
-void DestroyTensor(aclTensor *tensor, void *deviceAddr)
+void DestroyTensor(aclTensor* tensor, void* deviceAddr)
 {
     if (tensor != nullptr) {
         aclDestroyTensor(tensor);
@@ -141,27 +141,27 @@ int main()
     std::vector<uint16_t> gateOutHost(GetShapeSize(gateOutShape), 0);
     std::vector<uint16_t> gOutHost(GetShapeSize(gOutShape), 0);
 
-    void *xDevice = nullptr;
-    void *weightQkvDevice = nullptr;
-    void *weightBetaDevice = nullptr;
-    void *weightGateDevice = nullptr;
-    void *weightGDevice = nullptr;
-    void *weightQkvScaleDevice = nullptr;
-    void *qkvOutDevice = nullptr;
-    void *betaOutDevice = nullptr;
-    void *gateOutDevice = nullptr;
-    void *gOutDevice = nullptr;
+    void* xDevice = nullptr;
+    void* weightQkvDevice = nullptr;
+    void* weightBetaDevice = nullptr;
+    void* weightGateDevice = nullptr;
+    void* weightGDevice = nullptr;
+    void* weightQkvScaleDevice = nullptr;
+    void* qkvOutDevice = nullptr;
+    void* betaOutDevice = nullptr;
+    void* gateOutDevice = nullptr;
+    void* gOutDevice = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *weightQkv = nullptr;
-    aclTensor *weightBeta = nullptr;
-    aclTensor *weightGate = nullptr;
-    aclTensor *weightG = nullptr;
-    aclTensor *weightQkvScale = nullptr;
-    aclTensor *qkvOut = nullptr;
-    aclTensor *betaOut = nullptr;
-    aclTensor *gateOut = nullptr;
-    aclTensor *gOut = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* weightQkv = nullptr;
+    aclTensor* weightBeta = nullptr;
+    aclTensor* weightGate = nullptr;
+    aclTensor* weightG = nullptr;
+    aclTensor* weightQkvScale = nullptr;
+    aclTensor* qkvOut = nullptr;
+    aclTensor* betaOut = nullptr;
+    aclTensor* gateOut = nullptr;
+    aclTensor* gOut = nullptr;
 
     ret = CreateAclTensor(xHost, xShape, &xDevice, ACL_BF16, &x);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -186,12 +186,12 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     ret = aclnnKdaInputProjGetWorkspaceSize(x, weightQkv, weightBeta, weightGate, weightG, weightQkvScale, qkvOut,
                                             betaOut, gateOut, gOut, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnKdaInputProjGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
 
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

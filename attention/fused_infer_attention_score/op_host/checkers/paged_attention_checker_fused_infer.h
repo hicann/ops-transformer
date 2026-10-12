@@ -34,51 +34,51 @@ public:
     {}
     ~PagedAttentionChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const FiaTilingInfo &fiaInfo) override;
-    ge::graphStatus CheckParaExistence(const FiaTilingInfo &fiaInfo) override;
-    ge::graphStatus CheckCrossFeature(const FiaTilingInfo &fiaInfo) override;
-    ge::graphStatus CheckMultiParaConsistency(const FiaTilingInfo &fiaInfo) override;
+    ge::graphStatus CheckSinglePara(const FiaTilingInfo& fiaInfo) override;
+    ge::graphStatus CheckParaExistence(const FiaTilingInfo& fiaInfo) override;
+    ge::graphStatus CheckCrossFeature(const FiaTilingInfo& fiaInfo) override;
+    ge::graphStatus CheckMultiParaConsistency(const FiaTilingInfo& fiaInfo) override;
 
 private:
     // 公共校验函数
 
-    ge::graphStatus CheckBlockTableDtype(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckBlockTableShapeSize(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckBlockSize(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckBlockTableDtype(const FiaTilingInfo& fiaInfo) const;
+    ge::graphStatus CheckBlockTableShapeSize(const FiaTilingInfo& fiaInfo) const;
+    ge::graphStatus CheckBlockSize(const FiaTilingInfo& fiaInfo) const;
 
-    ge::graphStatus CheckBlockTableExistence(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckFeatureSupport(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckSeqLengthKVExistence(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckQDtypeSupport(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckBlockTableExistence(const FiaTilingInfo& fiaInfo) const;
+    ge::graphStatus CheckFeatureSupport(const FiaTilingInfo& fiaInfo) const;
+    ge::graphStatus CheckSeqLengthKVExistence(const FiaTilingInfo& fiaInfo) const;
+    ge::graphStatus CheckQDtypeSupport(const FiaTilingInfo& fiaInfo);
 
-    int64_t GetMaxBlockNumPerBatch(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckMaskShape(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckPseShape(const FiaTilingInfo &fiaInfo) const;
+    int64_t GetMaxBlockNumPerBatch(const FiaTilingInfo& fiaInfo) const;
+    ge::graphStatus CheckMaskShape(const FiaTilingInfo& fiaInfo);
+    ge::graphStatus CheckPseShape(const FiaTilingInfo& fiaInfo) const;
 
-    ge::graphStatus CheckBlockTableShape(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckBlockSizeSupport(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckNonContiguousSupport(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckKVLayout(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckBlockTableShape(const FiaTilingInfo& fiaInfo);
+    ge::graphStatus CheckBlockSizeSupport(const FiaTilingInfo& fiaInfo);
+    ge::graphStatus CheckNonContiguousSupport(const FiaTilingInfo& fiaInfo) const;
+    ge::graphStatus CheckKVLayout(const FiaTilingInfo& fiaInfo) const;
 
-    ge::graphStatus CheckPACacheShape3D(const FiaTilingInfo &fiaInfo, const gert::Shape &tempShape,
-                                        const std::string &inputName, uint32_t compareD,
-                                        const std::string &shapeStr) const;
-    ge::graphStatus CheckPACacheShape4D(const FiaTilingInfo &fiaInfo, const gert::Shape &tempShape,
-                                        const std::string &inputName, uint32_t compareD,
-                                        const std::string &shapeStr) const;
-    ge::graphStatus CheckPACacheShapeNZAntiquant(const FiaTilingInfo &fiaInfo, const std::string &inputName,
-                                                 const std::string &shapeStr, uint32_t compareD, int64_t tempD0,
+    ge::graphStatus CheckPACacheShape3D(const FiaTilingInfo& fiaInfo, const gert::Shape& tempShape,
+                                        const std::string& inputName, uint32_t compareD,
+                                        const std::string& shapeStr) const;
+    ge::graphStatus CheckPACacheShape4D(const FiaTilingInfo& fiaInfo, const gert::Shape& tempShape,
+                                        const std::string& inputName, uint32_t compareD,
+                                        const std::string& shapeStr) const;
+    ge::graphStatus CheckPACacheShapeNZAntiquant(const FiaTilingInfo& fiaInfo, const std::string& inputName,
+                                                 const std::string& shapeStr, uint32_t compareD, int64_t tempD0,
                                                  int64_t tempD1) const;
-    ge::graphStatus CheckPACacheShapeNZNonAntiquant(const FiaTilingInfo &fiaInfo, const std::string &inputName,
-                                                    const std::string &shapeStr, uint32_t compareD, int64_t tempD0,
+    ge::graphStatus CheckPACacheShapeNZNonAntiquant(const FiaTilingInfo& fiaInfo, const std::string& inputName,
+                                                    const std::string& shapeStr, uint32_t compareD, int64_t tempD0,
                                                     int64_t tempD1) const;
-    ge::graphStatus CheckPACacheShape(const FiaTilingInfo &fiaInfo, const gert::Shape tempShape,
-                                      const std::string &inputName) const;
-    ge::graphStatus CheckBlockSizeNonQuant910B(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckBlockSizeNonQuantOther(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckBlockSizeAntiquant(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckFeatureQueryS(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckFeatureInputLayoutForAntiquant(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckPACacheShape(const FiaTilingInfo& fiaInfo, const gert::Shape tempShape,
+                                      const std::string& inputName) const;
+    ge::graphStatus CheckBlockSizeNonQuant910B(const FiaTilingInfo& fiaInfo) const;
+    ge::graphStatus CheckBlockSizeNonQuantOther(const FiaTilingInfo& fiaInfo) const;
+    ge::graphStatus CheckBlockSizeAntiquant(const FiaTilingInfo& fiaInfo) const;
+    ge::graphStatus CheckFeatureQueryS(const FiaTilingInfo& fiaInfo) const;
+    ge::graphStatus CheckFeatureInputLayoutForAntiquant(const FiaTilingInfo& fiaInfo) const;
 };
 #undef FIA_CHECKER_UT_VISIBLE
 

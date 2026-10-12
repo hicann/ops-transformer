@@ -33,17 +33,17 @@
 namespace optiling {
 class KdaInputProjMmBggTiling {
 public:
-    KdaInputProjMmBggTiling(const KdaInputProjTilingInfo &tilingInfo, gert::TilingContext *context)
+    KdaInputProjMmBggTiling(const KdaInputProjTilingInfo& tilingInfo, gert::TilingContext* context)
         : tilingInfo_(tilingInfo),
           context_(context)
     {}
 
-    ge::graphStatus CalcTiling(KdaInputProjMmBggParams &params) const
+    ge::graphStatus CalcTiling(KdaInputProjMmBggParams& params) const
     {
-        const KdaInputProjBaseParams &bp = tilingInfo_.baseParams;
+        const KdaInputProjBaseParams& bp = tilingInfo_.baseParams;
         const uint32_t aicNum = GetAicNum();
         params = {};
-        const char *opName = tilingInfo_.opName != nullptr ? tilingInfo_.opName : "KdaInputProj";
+        const char* opName = tilingInfo_.opName != nullptr ? tilingInfo_.opName : "KdaInputProj";
         if (bp.tSize == 0 || bp.hiddenSize == 0) {
             return ge::GRAPH_SUCCESS;
         }
@@ -196,7 +196,7 @@ private:
     ge::DataType GetInputXType() const
     {
         if (context_ != nullptr) {
-            const auto *desc = context_->GetInputDesc(X_INDEX);
+            const auto* desc = context_->GetInputDesc(X_INDEX);
             if (desc != nullptr) {
                 return desc->GetDataType();
             }
@@ -210,7 +210,7 @@ private:
         return (sz > 0) ? static_cast<uint32_t>(sz) : 0U;
     }
 
-    uint32_t ComputeL0K(const HwLimit &hw, uint32_t l1M, uint32_t l1N, uint32_t l1K) const
+    uint32_t ComputeL0K(const HwLimit& hw, uint32_t l1M, uint32_t l1N, uint32_t l1K) const
     {
         const uint32_t sizeA = ElemAB();
         const uint32_t sizeB = sizeA;
@@ -236,7 +236,7 @@ private:
         return l0K;
     }
 
-    bool JudgeSpace(const HwLimit &hw, uint32_t l1M, uint32_t l1N, uint32_t l1K) const
+    bool JudgeSpace(const HwLimit& hw, uint32_t l1M, uint32_t l1N, uint32_t l1K) const
     {
         const uint32_t sizeA = ElemAB();
         const uint32_t sizeB = sizeA;
@@ -269,7 +269,7 @@ private:
         return l0aBytes <= hw.l0ASize && l0bBytes <= hw.l0BSize;
     }
 
-    uint32_t GetMaxK1(const HwLimit &hw, uint32_t m1, uint32_t n1) const
+    uint32_t GetMaxK1(const HwLimit& hw, uint32_t m1, uint32_t n1) const
     {
         if (JudgeSpace(hw, m1, n1, 512)) {
             return 512;
@@ -283,12 +283,12 @@ private:
         return 64;
     }
 
-    static bool ParseNonNegInt(const std::string &str, int64_t &out)
+    static bool ParseNonNegInt(const std::string& str, int64_t& out)
     {
         if (str.empty()) {
             return false;
         }
-        char *endPtr = nullptr;
+        char* endPtr = nullptr;
         errno = 0;
         const long long parsed = std::strtoll(str.c_str(), &endPtr, 10);
         if (errno != 0 || endPtr == str.c_str() || *endPtr != '\0' || parsed < 0) {
@@ -298,7 +298,7 @@ private:
         return true;
     }
 
-    int64_t GetPlatformIntWithDefault(const char *label, const char *key, int64_t defaultValue) const
+    int64_t GetPlatformIntWithDefault(const char* label, const char* key, int64_t defaultValue) const
     {
         std::string val;
         if (tilingInfo_.platformInfo != nullptr) {
@@ -311,10 +311,10 @@ private:
         return out;
     }
 
-    bool QueryHwLimit(HwLimit &hw) const
+    bool QueryHwLimit(HwLimit& hw) const
     {
         hw = {};
-        const char *opName = tilingInfo_.opName != nullptr ? tilingInfo_.opName : "KdaInputProj";
+        const char* opName = tilingInfo_.opName != nullptr ? tilingInfo_.opName : "KdaInputProj";
         if (tilingInfo_.platformInfo == nullptr) {
             OP_LOGE(opName, "MmBgg platformInfo is null.");
             return false;
@@ -349,7 +349,7 @@ private:
     }
 
     // 与 V3 GetMaxBaseWithLimit 同构；N 用三路最大宽，避免 N_cat 虚构出超单路的 baseN 上界。
-    static uint64_t GetMaxBaseWithLimit(const HwLimit &hw, uint64_t shapeValue, uint64_t kValue, uint64_t dtypeSize,
+    static uint64_t GetMaxBaseWithLimit(const HwLimit& hw, uint64_t shapeValue, uint64_t kValue, uint64_t dtypeSize,
                                         bool isATrans, bool isBTrans, uint64_t baseMNBufferLimit,
                                         uint64_t baseAlignUnit, bool isRightMatrix, bool isMemoryBound)
     {
@@ -403,8 +403,8 @@ private:
         return workPerCore / ((static_cast<double>(mainRound) + tailRound) * baseM * baseN);
     }
 
-    bool GetRebalanceBlock(const KdaInputProjBaseParams &bp, uint32_t aicNum, const HwLimit &hw, uint32_t &tTile,
-                           uint32_t &nTile) const
+    bool GetRebalanceBlock(const KdaInputProjBaseParams& bp, uint32_t aicNum, const HwLimit& hw, uint32_t& tTile,
+                           uint32_t& nTile) const
     {
         const uint32_t t = bp.tSize;
         const uint32_t k = bp.hiddenSize;
@@ -419,7 +419,7 @@ private:
         nTile = MinU(kCubeMNMax, MaxU(kAlign, CeilAlign(MinU(nMax, kCubeMNMax), kAlign)));
 
         if (k == 0U) {
-            const char *opName = tilingInfo_.opName != nullptr ? tilingInfo_.opName : "KdaInputProj";
+            const char* opName = tilingInfo_.opName != nullptr ? tilingInfo_.opName : "KdaInputProj";
             OP_LOGE(opName, "MmBgg hiddenSize K is 0.");
             return false;
         }
@@ -535,8 +535,8 @@ private:
         return static_cast<uint32_t>(plat.GetCoreNumAic());
     }
 
-    const KdaInputProjTilingInfo &tilingInfo_;
-    gert::TilingContext *context_{nullptr};
+    const KdaInputProjTilingInfo& tilingInfo_;
+    gert::TilingContext* context_{nullptr};
 };
 } // namespace optiling
 

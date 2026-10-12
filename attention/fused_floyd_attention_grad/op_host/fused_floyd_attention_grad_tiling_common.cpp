@@ -19,10 +19,10 @@
 
 namespace optiling {
 namespace FFAG {
-bool CheckSameShape(const gert::StorageShape *aShape, const gert::StorageShape *bShape) {
+bool CheckSameShape(const gert::StorageShape* aShape, const gert::StorageShape* bShape)
+{
     OP_CHECK_IF((aShape == nullptr) || (bShape == nullptr),
-               OP_LOGW("fused_floyd_attention_grad_tiling_common", "aShape or bShape is nullptr."),
-               return false);
+                OP_LOGW("fused_floyd_attention_grad_tiling_common", "aShape or bShape is nullptr."), return false);
     uint32_t dimNumA = aShape->GetStorageShape().GetDimNum();
     uint32_t dimNumB = bShape->GetStorageShape().GetDimNum();
     if (dimNumA != dimNumB || dimNumA != SUPPORT_DIM_NUM) {
@@ -39,25 +39,29 @@ bool CheckSameShape(const gert::StorageShape *aShape, const gert::StorageShape *
     return true;
 }
 
-ge::graphStatus CheckSupportShape(gert::TilingContext *context)
+ge::graphStatus CheckSupportShape(gert::TilingContext* context)
 {
-    const gert::StorageShape *queryShape = context->GetInputShape(QUERY);
-    const gert::StorageShape *key1Shape = context->GetInputShape(KEY_1);
-    const gert::StorageShape *value1Shape = context->GetInputShape(VALUE_1);
-    const gert::StorageShape *key2Shape = context->GetInputShape(KEY_2);
-    const gert::StorageShape *value2Shape = context->GetInputShape(VALUE_2);
-    const gert::StorageShape *dyShape = context->GetInputShape(DY);
-    const gert::StorageShape *attentionInShape = context->GetInputShape(ATTENTION_IN);
+    const gert::StorageShape* queryShape = context->GetInputShape(QUERY);
+    const gert::StorageShape* key1Shape = context->GetInputShape(KEY_1);
+    const gert::StorageShape* value1Shape = context->GetInputShape(VALUE_1);
+    const gert::StorageShape* key2Shape = context->GetInputShape(KEY_2);
+    const gert::StorageShape* value2Shape = context->GetInputShape(VALUE_2);
+    const gert::StorageShape* dyShape = context->GetInputShape(DY);
+    const gert::StorageShape* attentionInShape = context->GetInputShape(ATTENTION_IN);
 
-    OP_CHECK_IF(!CheckSameShape(key1Shape, value1Shape), OP_LOGE(context, "key1's shape and value1's shape is different"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(!CheckSameShape(key2Shape, value2Shape), OP_LOGE(context, "key2's shape and value2's shape is different"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(!CheckSameShape(queryShape, dyShape), OP_LOGE(context, "query's shape and dy's shape is different"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(!CheckSameShape(queryShape, attentionInShape), OP_LOGE(context, "query's shape and attentionIn's shape is different"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!CheckSameShape(key1Shape, value1Shape),
+                OP_LOGE(context, "key1's shape and value1's shape is different"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!CheckSameShape(key2Shape, value2Shape),
+                OP_LOGE(context, "key2's shape and value2's shape is different"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!CheckSameShape(queryShape, dyShape), OP_LOGE(context, "query's shape and dy's shape is different"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!CheckSameShape(queryShape, attentionInShape),
+                OP_LOGE(context, "query's shape and attentionIn's shape is different"), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckAttentionMaskShape(gert::TilingContext *context, int64_t b, int64_t s1, int64_t s3)
+ge::graphStatus CheckAttentionMaskShape(gert::TilingContext* context, int64_t b, int64_t s1, int64_t s3)
 {
     auto attentionMaskShape = context->GetOptionalInputShape(ATTEN_MASK);
     if (attentionMaskShape == nullptr) {
@@ -74,15 +78,17 @@ ge::graphStatus CheckAttentionMaskShape(gert::TilingContext *context, int64_t b,
     auto dim3 = attentionMaskShape->GetStorageShape().GetDim(3); // 3:1
     auto dim4 = attentionMaskShape->GetStorageShape().GetDim(4); // 4:s3
 
-    OP_CHECK_IF((dim0 != b || dim1 != 1 || dim2 != s1 || dim3 != 1 || dim4 != s3),
-              OP_LOGE(context, "The shape of atten_mask is invalid, got (%ld,%ld,%ld,%ld,%ld), should be (%ld,1,%ld,1,%ld)",
-                        dim0, dim1, dim2, dim3, dim4, b, s1, s3),
-              return ge::GRAPH_FAILED);
-    
+    OP_CHECK_IF(
+        (dim0 != b || dim1 != 1 || dim2 != s1 || dim3 != 1 || dim4 != s3),
+        OP_LOGE(context, "The shape of atten_mask is invalid, got (%ld,%ld,%ld,%ld,%ld), should be (%ld,1,%ld,1,%ld)",
+                dim0, dim1, dim2, dim3, dim4, b, s1, s3),
+        return ge::GRAPH_FAILED);
+
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckSoftmaxMaxAndSumShape(gert::TilingContext *context, int64_t b, int64_t n, int64_t s1, int64_t s2, uint8_t inputIdx)
+ge::graphStatus CheckSoftmaxMaxAndSumShape(gert::TilingContext* context, int64_t b, int64_t n, int64_t s1, int64_t s2,
+                                           uint8_t inputIdx)
 {
     auto softmaxMaxAndSumShape = context->GetOptionalInputShape(inputIdx);
     if (softmaxMaxAndSumShape == nullptr) {
@@ -100,15 +106,19 @@ ge::graphStatus CheckSoftmaxMaxAndSumShape(gert::TilingContext *context, int64_t
     auto dim4 = softmaxMaxAndSumShape->GetStorageShape().GetDim(4); // 4:8
 
     // softmaxMaxAndSum pad to 8
-    OP_CHECK_IF((dim0 != b || dim1 != n || dim2 != s1 || dim3 != s2 || dim4 != 8),
-              OP_LOGE(context, "The shape of softmaxMax/softmaxSum is invalid, got (%ld,%ld,%ld,%ld,%ld), should be (%ld,%ld,%ld,%ld,8)",
-                        dim0, dim1, dim2, dim3, dim4, b, n, s1, s2),
-              return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (dim0 != b || dim1 != n || dim2 != s1 || dim3 != s2 || dim4 != 8),
+        OP_LOGE(
+            context,
+            "The shape of softmaxMax/softmaxSum is invalid, got (%ld,%ld,%ld,%ld,%ld), should be (%ld,%ld,%ld,%ld,8)",
+            dim0, dim1, dim2, dim3, dim4, b, n, s1, s2),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckInputShapeValid(gert::TilingContext *context, int64_t b, int64_t n, int64_t s1, int64_t s2, int64_t s3, int64_t d)
+ge::graphStatus CheckInputShapeValid(gert::TilingContext* context, int64_t b, int64_t n, int64_t s1, int64_t s2,
+                                     int64_t s3, int64_t d)
 {
     OP_CHECK_IF((b == 0 || n == 0 || s1 == 0 || s2 == 0 || s3 == 0 || d == 0),
                 OP_LOGE(context, "input shape error, got 0 in bhmnkd(%ld,%ld,%ld,%ld,%ld,%ld)", b, n, s1, s2, s3, d),

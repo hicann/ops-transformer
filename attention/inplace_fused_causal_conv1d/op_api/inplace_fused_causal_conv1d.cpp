@@ -24,14 +24,14 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(InplaceFusedCausalConv1d);
 
-bool InplaceFusedCausalConv1d(aclTensor *x, const aclTensor *weight, aclTensor *convStates,
-                              const aclTensor *queryStartLoc, const aclTensor *cacheIndices,
-                              const aclTensor *initialStateMode, const aclTensor *bias,
-                              const aclTensor *numAcceptedTokens, const aclTensor *numComputedTokens,
-                              const aclTensor *blockIdxFirstScheduledToken, const aclTensor *blockIdxLastScheduledToken,
-                              const aclTensor *initialStateIdx, int64_t activationMode, int64_t padSlotId,
+bool InplaceFusedCausalConv1d(aclTensor* x, const aclTensor* weight, aclTensor* convStates,
+                              const aclTensor* queryStartLoc, const aclTensor* cacheIndices,
+                              const aclTensor* initialStateMode, const aclTensor* bias,
+                              const aclTensor* numAcceptedTokens, const aclTensor* numComputedTokens,
+                              const aclTensor* blockIdxFirstScheduledToken, const aclTensor* blockIdxLastScheduledToken,
+                              const aclTensor* initialStateIdx, int64_t activationMode, int64_t padSlotId,
                               int64_t runMode, int64_t maxQueryLen, int64_t residualConnection, int64_t blockSize,
-                              int64_t convMode, int64_t maxDraftTokens, aclOpExecutor *executor)
+                              int64_t convMode, int64_t maxDraftTokens, aclOpExecutor* executor)
 {
     L0_DFX(InplaceFusedCausalConv1d, x, weight, convStates, queryStartLoc, cacheIndices, initialStateMode, bias,
            numAcceptedTokens, numComputedTokens, blockIdxFirstScheduledToken, blockIdxLastScheduledToken,

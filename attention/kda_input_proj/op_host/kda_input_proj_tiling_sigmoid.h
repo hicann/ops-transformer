@@ -25,15 +25,15 @@
 namespace optiling {
 class KdaInputProjSigmoidTiling {
 public:
-    explicit KdaInputProjSigmoidTiling(const KdaInputProjTilingInfo &tilingInfo)
+    explicit KdaInputProjSigmoidTiling(const KdaInputProjTilingInfo& tilingInfo)
         : tilingInfo_(tilingInfo)
     {}
 
-    ge::graphStatus CalcTiling(KdaInputProjSigmoidParams &params) const
+    ge::graphStatus CalcTiling(KdaInputProjSigmoidParams& params) const
     {
         params = {};
-        const KdaInputProjBaseParams &bp = tilingInfo_.baseParams;
-        const char *opName = tilingInfo_.opName != nullptr ? tilingInfo_.opName : "KdaInputProj";
+        const KdaInputProjBaseParams& bp = tilingInfo_.baseParams;
+        const char* opName = tilingInfo_.opName != nullptr ? tilingInfo_.opName : "KdaInputProj";
 
         const uint64_t elemNumU64 = static_cast<uint64_t>(bp.tSize) * static_cast<uint64_t>(bp.betaSize);
         OP_CHECK_IF(elemNumU64 > UINT32_MAX, OP_LOGE(opName, "Sigmoid elemNum T*N_beta overflow."),
@@ -59,9 +59,9 @@ public:
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus FillAivSplit(KdaInputProjSigmoidParams &params, uint32_t launchedAiv) const
+    ge::graphStatus FillAivSplit(KdaInputProjSigmoidParams& params, uint32_t launchedAiv) const
     {
-        const char *opName = tilingInfo_.opName != nullptr ? tilingInfo_.opName : "KdaInputProj";
+        const char* opName = tilingInfo_.opName != nullptr ? tilingInfo_.opName : "KdaInputProj";
         if (params.elemNum == 0) {
             params.aivNum = 0;
             params.blockTile = 0;
@@ -120,7 +120,7 @@ private:
         return (align == 0) ? a : CeilDiv(a, align) * align;
     }
 
-    static void FillUbLoops(KdaInputProjSigmoidParams &params, uint32_t blockNum)
+    static void FillUbLoops(KdaInputProjSigmoidParams& params, uint32_t blockNum)
     {
         params.aivNum = blockNum;
         params.ubLoop = CeilDiv(params.blockTile, params.ubTile);
@@ -130,7 +130,7 @@ private:
         params.tailUbTail = blockTail - (params.tailUbLoop - 1U) * params.ubTile;
     }
 
-    const KdaInputProjTilingInfo &tilingInfo_;
+    const KdaInputProjTilingInfo& tilingInfo_;
 };
 } // namespace optiling
 

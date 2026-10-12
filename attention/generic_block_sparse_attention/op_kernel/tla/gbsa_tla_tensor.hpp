@@ -30,7 +30,7 @@ struct Tensor {
 
     HOST_DEVICE constexpr Tensor() {}
 
-    HOST_DEVICE constexpr Tensor(BuiltinTensor const &builtinTensor, Layout const &layout, Coord const &coord = {})
+    HOST_DEVICE constexpr Tensor(BuiltinTensor const& builtinTensor, Layout const& layout, Coord const& coord = {})
         : rep_(builtinTensor, layout, coord)
     {}
 
@@ -79,21 +79,21 @@ struct Tensor {
 };
 
 template <class BuiltinTensor, class Layout, class PositionType>
-HOST_DEVICE constexpr auto MakeTensor(BuiltinTensor const &builtinTensor, Layout const &layout, PositionType)
+HOST_DEVICE constexpr auto MakeTensor(BuiltinTensor const& builtinTensor, Layout const& layout, PositionType)
 {
     using Coord = detail::MakeZeroTuple<Layout::rank>;
     return Tensor<BuiltinTensor, Layout, Coord, PositionType::value>(builtinTensor, layout);
 }
 
 template <class BuiltinTensor, class Layout, class Coord, class PositionType>
-HOST_DEVICE constexpr auto MakeTensor(BuiltinTensor const &builtinTensor, Layout const &layout, Coord const &coord,
+HOST_DEVICE constexpr auto MakeTensor(BuiltinTensor const& builtinTensor, Layout const& layout, Coord const& coord,
                                       PositionType)
 {
     return Tensor<BuiltinTensor, Layout, Coord, PositionType::value>(builtinTensor, layout, coord);
 }
 
 template <class Tensor, class Coord, class Shape>
-__aicore__ inline constexpr auto GetTile(Tensor const &tensor, Coord const &coord, Shape const &shape)
+__aicore__ inline constexpr auto GetTile(Tensor const& tensor, Coord const& coord, Shape const& shape)
 {
     auto layout = tensor.layout();
     auto builtinTensor = tensor.data();

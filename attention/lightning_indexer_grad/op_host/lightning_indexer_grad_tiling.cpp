@@ -51,7 +51,7 @@ uint64_t GetS1Load(uint64_t sparseMode, uint64_t actualSeqQ, uint64_t actualSeqK
     return std::min(alignedS2, topK);
 }
 
-void SplitContinuousS1ByLoad(const std::vector<uint64_t> &s1Load, uint32_t coreNum, uint64_t *coreStartIdx)
+void SplitContinuousS1ByLoad(const std::vector<uint64_t>& s1Load, uint32_t coreNum, uint64_t* coreStartIdx)
 {
     uint64_t totalS1 = s1Load.size();
     std::fill(coreStartIdx, coreStartIdx + LIG_MAX_CORE_NUM + 1, totalS1);
@@ -102,7 +102,7 @@ ge::graphStatus LightningIndexerGradTiling::DoTiling()
 
     uint64_t workspaceOffset = ascendcPlatform.GetLibApiWorkSpaceSize();
     ;
-    size_t *workSpaces = context_->GetWorkspaceSizes(1);
+    size_t* workSpaces = context_->GetWorkspaceSizes(1);
 
     // input tensor
     opParamInfo.query.desc = context_->GetInputDesc(QUERY_INDEX);
@@ -293,12 +293,12 @@ ge::graphStatus LightningIndexerGradTiling::DoTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingPrepareForLightningIndexerGrad(gert::TilingParseContext * /* context */)
+static ge::graphStatus TilingPrepareForLightningIndexerGrad(gert::TilingParseContext* /* context */)
 {
     return ge::GRAPH_SUCCESS;
 }
 
-extern "C" ge::graphStatus TilingForLightningIndexerGrad(gert::TilingContext *context)
+extern "C" ge::graphStatus TilingForLightningIndexerGrad(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("LightningIndexerGrad", "Tiling context is null."),
                 return ge::GRAPH_FAILED);

@@ -64,7 +64,7 @@ TEST_F(LightningIndexerTiling, LightningIndexer_910b_tiling_1)
 {
     struct LightningIndexerCompileInfo {
     } compileInfo;
-    int64_t *actual_seq_qlist = nullptr;
+    int64_t* actual_seq_qlist = nullptr;
     int64_t actual_seq_kvlist[] = {16484, 16484, 16484, 16484};
     gert::TilingContextPara tilingContextPara(
         "LightningIndexer",
@@ -509,6 +509,6 @@ TEST_F(LightningIndexerTiling, LightningIndexer_910b_tiling_14)
 // Tiling data classes are registered for the op
 TEST_F(LightningIndexerTiling, LightningIndexer_tiling_data_class_registered)
 {
-    auto &factory = optiling::CTilingDataClassFactory::GetInstance();
+    auto& factory = optiling::CTilingDataClassFactory::GetInstance();
     EXPECT_NE(factory.CreateTilingDataInstance("LightningIndexer"), nullptr);
 }

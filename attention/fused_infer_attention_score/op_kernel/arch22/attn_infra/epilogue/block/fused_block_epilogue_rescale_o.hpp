@@ -64,13 +64,13 @@ public:
         bool isSplitkv = false;
         AscendC::GlobalTensor<ElementLse> gCombineLse;
         AscendC::GlobalTensor<ElementLse> gCombineo;
-        const LayoutLse *layoutgmLse = nullptr;
-        const LayoutInput *layoutgmLo = nullptr;
+        const LayoutLse* layoutgmLse = nullptr;
+        const LayoutInput* layoutgmLo = nullptr;
     };
 
     __aicore__ inline BlockEpilogue() {}
 
-    __aicore__ inline void init(Arch::Resource<ArchTag> &resource)
+    __aicore__ inline void init(Arch::Resource<ArchTag>& resource)
     {
         // Allocate UB space
         constexpr uint32_t TV_UB_TENSOR_OFFSET = 10 * UB_UINT8_BLOCK_SIZE;
@@ -215,9 +215,9 @@ public:
     __aicore__ inline void SubCoreCompute(AscendC::GlobalTensor<ElementOutput> gOutput,
                                           AscendC::GlobalTensor<ElementInput> gInput,
                                           AscendC::GlobalTensor<ElementUpdate> gUpdate,
-                                          AscendC::GlobalTensor<ElementLse> gLse, const LayoutOutput &layoutOutput,
-                                          const LayoutInput &layoutInput, const LayoutUpdate &layoutUpdate,
-                                          const LayoutLse &layoutLse, uint32_t qNThisSubBlock, uint32_t qSThisSubBlock,
+                                          AscendC::GlobalTensor<ElementLse> gLse, const LayoutOutput& layoutOutput,
+                                          const LayoutInput& layoutInput, const LayoutUpdate& layoutUpdate,
+                                          const LayoutLse& layoutLse, uint32_t qNThisSubBlock, uint32_t qSThisSubBlock,
                                           uint32_t totalRowNum, uint32_t isFirstStackTile, uint32_t LastStackTileFlag,
                                           uint32_t curStackTileMod, uint32_t needRowLoopFlag, uint32_t isLastRowLoop,
                                           uint32_t rowOffsetLoop, uint32_t proTokenIdx, uint32_t proTokenNum,
@@ -374,13 +374,13 @@ public:
     __aicore__ inline void SubCoreCompute(
         AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementInput> gInput,
         AscendC::GlobalTensor<ElementUpdate> gUpdate, AscendC::GlobalTensor<ElementLse> gLse,
-        const LayoutOutput &layoutOutput, const LayoutInput &layoutInput, const LayoutUpdate &layoutUpdate,
-        const LayoutLse &layoutLse, uint32_t qNThisSubBlock, uint32_t qSThisSubBlock, uint32_t totalRowNum,
+        const LayoutOutput& layoutOutput, const LayoutInput& layoutInput, const LayoutUpdate& layoutUpdate,
+        const LayoutLse& layoutLse, uint32_t qNThisSubBlock, uint32_t qSThisSubBlock, uint32_t totalRowNum,
         uint32_t isFirstStackTile, uint32_t isLastStackTile, uint32_t curStackTileMod, uint32_t needRowLoop,
         uint32_t LastRowLoopFlag, uint32_t rowOffsetLoop, uint32_t proTokenIdx, uint32_t proTokenNum,
         uint32_t epiTokenNum, uint32_t integralHeadNum, uint32_t rowOffsetCurLoop, int32_t delStartRow,
         int32_t delEndRow, uint32_t qSeqlen, uint32_t qSBlockIdx, uint32_t rowNum, uint32_t inRowOffsetThisSubBlock,
-        const SplitKVParams &splitParams, uint32_t curQNBlockTile)
+        const SplitKVParams& splitParams, uint32_t curQNBlockTile)
     {
         uint32_t curRowNum = layoutInput.shape(0);
         uint32_t embedV = layoutInput.shape(1);
@@ -669,9 +669,9 @@ public:
     __aicore__ inline void operator()(AscendC::GlobalTensor<ElementOutput> gOutput,
                                       AscendC::GlobalTensor<ElementInput> gInput,
                                       AscendC::GlobalTensor<ElementUpdate> gUpdate,
-                                      AscendC::GlobalTensor<ElementLse> gLse, const LayoutOutput &layoutOutput,
-                                      const LayoutInput &layoutInput, const LayoutUpdate &layoutUpdate,
-                                      const LayoutLse &layoutLse, GemmCoord actualBlockShape, uint32_t qSBlockSize,
+                                      AscendC::GlobalTensor<ElementLse> gLse, const LayoutOutput& layoutOutput,
+                                      const LayoutInput& layoutInput, const LayoutUpdate& layoutUpdate,
+                                      const LayoutLse& layoutLse, GemmCoord actualBlockShape, uint32_t qSBlockSize,
                                       uint32_t qNBlockSize, uint32_t kvNBlockSize, uint32_t isFirstStackTile,
                                       uint32_t isLastStackTile, uint32_t curStackTileMod, uint32_t isNew)
     {
@@ -771,13 +771,13 @@ public:
     __aicore__ inline void operator()(AscendC::GlobalTensor<ElementOutput> gOutput,
                                       AscendC::GlobalTensor<ElementInput> gInput,
                                       AscendC::GlobalTensor<ElementUpdate> gUpdate,
-                                      AscendC::GlobalTensor<ElementLse> gLseOutput, const LayoutOutput &layoutOutput,
-                                      const LayoutInput &layoutInput, const LayoutUpdate &layoutUpdate,
-                                      const LayoutLse &layoutLse, GemmCoord actualBlockShape, uint32_t qSBlockSize,
+                                      AscendC::GlobalTensor<ElementLse> gLseOutput, const LayoutOutput& layoutOutput,
+                                      const LayoutInput& layoutInput, const LayoutUpdate& layoutUpdate,
+                                      const LayoutLse& layoutLse, GemmCoord actualBlockShape, uint32_t qSBlockSize,
                                       uint32_t qNBlockSize, uint32_t isFirstStackTile, uint32_t isLastStackTile,
                                       uint32_t curStackTileMod, int32_t delStartRow, int32_t delEndRow,
                                       uint32_t qSeqlen, uint32_t qSBlockIdx, uint32_t curQNBlockTile,
-                                      const SplitKVParams &splitParams = SplitKVParams())
+                                      const SplitKVParams& splitParams = SplitKVParams())
     {
         uint32_t rowNum = actualBlockShape.m();
         uint32_t embedV = actualBlockShape.n();

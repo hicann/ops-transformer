@@ -23,10 +23,10 @@ namespace {
 constexpr uint32_t BLOCK_TABLE_RANK = 2U;
 constexpr char OP_NAME[] = "LightningIndexerV2";
 
-ge::graphStatus InitCheckerInfo(gert::TilingContext *context, LIV2TilingInfo &tilingInfo,
-                                lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo &checkerInfo)
+ge::graphStatus InitCheckerInfo(gert::TilingContext* context, LIV2TilingInfo& tilingInfo,
+                                lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo& checkerInfo)
 {
-    const char *liV2OpName = context->GetNodeName();
+    const char* liV2OpName = context->GetNodeName();
     liV2OpName = liV2OpName == nullptr ? OP_NAME : liV2OpName;
     tilingInfo.platformInfo = context->GetPlatformInfo();
     if (tilingInfo.platformInfo == nullptr) {
@@ -54,8 +54,8 @@ ge::graphStatus InitCheckerInfo(gert::TilingContext *context, LIV2TilingInfo &ti
     return ge::GRAPH_SUCCESS;
 }
 
-void PopulateCheckerTensors(const gert::TilingContext *context,
-                            lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo &info)
+void PopulateCheckerTensors(const gert::TilingContext* context,
+                            lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo& info)
 {
     info.query = lightning_indexer_v2_checker::MakeRequiredTensor(context, QUERY_INDEX);
     info.key = lightning_indexer_v2_checker::MakeRequiredTensor(context, KEY_INDEX);
@@ -72,21 +72,21 @@ void PopulateCheckerTensors(const gert::TilingContext *context,
     info.sparseValues = lightning_indexer_v2_checker::MakeOutputTensor(context, LIGHTNING_VALUES);
 }
 
-ge::graphStatus ParseCheckerAttrs(const gert::TilingContext *context,
-                                  lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo &info)
+ge::graphStatus ParseCheckerAttrs(const gert::TilingContext* context,
+                                  lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo& info)
 {
-    const auto *attrs = context->GetAttrs();
+    const auto* attrs = context->GetAttrs();
     if (attrs == nullptr) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(info.opName, "attrs", "Operator attributes must be provided");
         return ge::GRAPH_FAILED;
     }
-    const int64_t *topk = attrs->GetAttrPointer<int64_t>(ATTR_TOPK_INDEX);
-    const int64_t *maxSeqlenQ = attrs->GetAttrPointer<int64_t>(ATTR_MAX_SEQLEN_Q_INDEX);
-    const char *layoutQ = attrs->GetStr(ATTR_QUERY_LAYOUT_INDEX);
-    const char *layoutK = attrs->GetStr(ATTR_KEY_LAYOUT_INDEX);
-    const int64_t *maskMode = attrs->GetAttrPointer<int64_t>(ATTR_MASK_MODE_INDEX);
-    const int64_t *cmpRatio = attrs->GetAttrPointer<int64_t>(ATTR_CMP_RATIO_INDEX);
-    const int64_t *returnValue = attrs->GetAttrPointer<int64_t>(ATTR_RETURN_VALUE_INDEX);
+    const int64_t* topk = attrs->GetAttrPointer<int64_t>(ATTR_TOPK_INDEX);
+    const int64_t* maxSeqlenQ = attrs->GetAttrPointer<int64_t>(ATTR_MAX_SEQLEN_Q_INDEX);
+    const char* layoutQ = attrs->GetStr(ATTR_QUERY_LAYOUT_INDEX);
+    const char* layoutK = attrs->GetStr(ATTR_KEY_LAYOUT_INDEX);
+    const int64_t* maskMode = attrs->GetAttrPointer<int64_t>(ATTR_MASK_MODE_INDEX);
+    const int64_t* cmpRatio = attrs->GetAttrPointer<int64_t>(ATTR_CMP_RATIO_INDEX);
+    const int64_t* returnValue = attrs->GetAttrPointer<int64_t>(ATTR_RETURN_VALUE_INDEX);
     if (topk == nullptr || maxSeqlenQ == nullptr || layoutQ == nullptr || layoutK == nullptr || maskMode == nullptr ||
         cmpRatio == nullptr || returnValue == nullptr) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(info.opName, "attrs", "Required/defaulted attributes are missing");
@@ -103,7 +103,7 @@ ge::graphStatus ParseCheckerAttrs(const gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-void SetDataLayouts(const lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo &info, LIV2TilingInfo &tilingInfo)
+void SetDataLayouts(const lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo& info, LIV2TilingInfo& tilingInfo)
 {
     if (info.layoutQ == lightning_indexer_v2_checker::CheckerLayout::TND) {
         tilingInfo.inputQLayout = DataLayout::TND;
@@ -119,8 +119,8 @@ void SetDataLayouts(const lightning_indexer_v2_checker::LightningIndexerV2Checke
     }
 }
 
-void PopulateTilingInfo(const lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo &info,
-                        LIV2TilingInfo &tilingInfo)
+void PopulateTilingInfo(const lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo& info,
+                        LIV2TilingInfo& tilingInfo)
 {
     tilingInfo.bSize = static_cast<uint32_t>(info.batch);
     tilingInfo.n1Size = static_cast<uint32_t>(info.qHeads);
@@ -132,7 +132,7 @@ void PopulateTilingInfo(const lightning_indexer_v2_checker::LightningIndexerV2Ch
     tilingInfo.gSize = info.kHeads == 0 ? 0U : static_cast<uint32_t>(info.qHeads / info.kHeads);
     tilingInfo.pageAttentionFlag = info.layoutK == lightning_indexer_v2_checker::CheckerLayout::PA_BBND;
     tilingInfo.blockSize = static_cast<int32_t>(info.blockSize);
-    const gert::Shape *liV2BlockShape = info.blockTable.GetShape();
+    const gert::Shape* liV2BlockShape = info.blockTable.GetShape();
     if (tilingInfo.pageAttentionFlag && liV2BlockShape != nullptr && liV2BlockShape->GetDimNum() >= BLOCK_TABLE_RANK) {
         tilingInfo.maxBlockNumPerBatch = static_cast<uint32_t>(liV2BlockShape->GetDim(DIM_IDX_ONE));
     }
@@ -154,7 +154,7 @@ void PopulateTilingInfo(const lightning_indexer_v2_checker::LightningIndexerV2Ch
 }
 } // namespace
 
-ge::graphStatus ParseAndCheckLIV2Arch35(gert::TilingContext *context, LIV2TilingInfo &tilingInfo)
+ge::graphStatus ParseAndCheckLIV2Arch35(gert::TilingContext* context, LIV2TilingInfo& tilingInfo)
 {
     if (context == nullptr) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(OP_NAME, "context", "Tiling context must not be null");

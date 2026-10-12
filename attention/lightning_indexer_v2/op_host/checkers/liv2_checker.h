@@ -23,7 +23,7 @@ namespace lightning_indexer_v2_checker {
 
 class LIV2Checker {
 public:
-    explicit LIV2Checker(const LightningIndexerV2CheckerInfo &info)
+    explicit LIV2Checker(const LightningIndexerV2CheckerInfo& info)
         : info_(info)
     {}
     ge::graphStatus Process() const;

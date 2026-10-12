@@ -49,47 +49,44 @@ public:
 
     /// Constructor
     HOST_DEVICE
-    nN(Index orgRows = 0,  /// Number of rows of origin matrices
-    Index orgCols = 0,  /// Number of cols of origin matrices
+    nN(Index orgRows = 0, /// Number of rows of origin matrices
+       Index orgCols = 0, /// Number of cols of origin matrices
 
-    Index rowsInFractal = 0,  /// Number of rows inside the fractal
-    Index rowsByFractal = 0,  /// number of rows by the fractal
-    Index colsInFractal = 0,  /// number of cols inside the fractal
-    Index colsByFractal = 0,  /// number of cols by the fractal
+       Index rowsInFractal = 0, /// Number of rows inside the fractal
+       Index rowsByFractal = 0, /// number of rows by the fractal
+       Index colsInFractal = 0, /// number of cols inside the fractal
+       Index colsByFractal = 0, /// number of cols by the fractal
 
-    LongIndex strideRowsInFractal = 0,  /// number of elements between adjacent rows inside the fractal
-    LongIndex strideRowsByFractal = 0,  /// number of elements between adjacent fractal rows
-    LongIndex strideColsInFractal = 0,  /// number of elements between adjacent cols inside the fractal
-    LongIndex strideColsByFractal = 0)  /// number of elements between adjacent fractal cols
+       LongIndex strideRowsInFractal = 0, /// number of elements between adjacent rows inside the fractal
+       LongIndex strideRowsByFractal = 0, /// number of elements between adjacent fractal rows
+       LongIndex strideColsInFractal = 0, /// number of elements between adjacent cols inside the fractal
+       LongIndex strideColsByFractal = 0) /// number of elements between adjacent fractal cols
         : orgShape_(MakeCoord(orgRows, orgCols)),
-        shape_(MakeCoord(rowsInFractal, rowsByFractal, colsInFractal, colsByFractal)),
-        stride_(MakeCoord(strideRowsInFractal, strideRowsByFractal, strideColsInFractal, strideColsByFractal)) {
-    }
+          shape_(MakeCoord(rowsInFractal, rowsByFractal, colsInFractal, colsByFractal)),
+          stride_(MakeCoord(strideRowsInFractal, strideRowsByFractal, strideColsInFractal, strideColsByFractal))
+    {}
 
     /// Ctor
     HOST_DEVICE
     nN(OrgShape orgShape, Shape shape, Stride stride)
-        : orgShape_(orgShape), shape_(shape), stride_(stride) {}
+        : orgShape_(orgShape),
+          shape_(shape),
+          stride_(stride)
+    {}
 
     /// Make the layout of a coordinate (row, column)
     template <class Element>
-    HOST_DEVICE static nN MakeLayout(Index orgRows, Index orgCols) {
+    HOST_DEVICE static nN MakeLayout(Index orgRows, Index orgCols)
+    {
         static constexpr uint32_t ELE_NUM_PER_C0 = BYTE_PER_C0 / sizeof(Element);
         static constexpr uint32_t ELE_NUM_PER_FRACTAL = BYTE_PER_FRACTAL / sizeof(Element);
         Index rowsRound = NpuArch::Detail::Alignment::RoundUp<ELE_NUM_PER_C0>(orgRows);
         Index colsRound = NpuArch::Detail::Alignment::RoundUp<C0_NUM_PER_FRACTAL>(orgCols);
-        return nN(orgRows,
-                orgCols,
+        return nN(orgRows, orgCols,
 
-                ELE_NUM_PER_C0,
-                rowsRound / ELE_NUM_PER_C0,
-                C0_NUM_PER_FRACTAL,
-                colsRound / C0_NUM_PER_FRACTAL,
+                  ELE_NUM_PER_C0, rowsRound / ELE_NUM_PER_C0, C0_NUM_PER_FRACTAL, colsRound / C0_NUM_PER_FRACTAL,
 
-                1,
-                ELE_NUM_PER_FRACTAL,
-                ELE_NUM_PER_C0,
-                rowsRound * C0_NUM_PER_FRACTAL);
+                  1, ELE_NUM_PER_FRACTAL, ELE_NUM_PER_C0, rowsRound * C0_NUM_PER_FRACTAL);
     }
 
     /// Returns the offset of a coordinate in linear memory.
@@ -181,6 +178,6 @@ private:
     Stride stride_;
 };
 
-}  // namespace NpuArch::layout
+} // namespace NpuArch::layout
 
-#endif  // FUSED_MATRIX_NN_HPP
+#endif // FUSED_MATRIX_NN_HPP

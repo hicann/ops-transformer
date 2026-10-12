@@ -51,7 +51,7 @@ struct LiUIntSortConstCtx {
 };
 
 template <typename FloatT>
-__simd_callee__ inline void InitLiUIntSortConstCtx(LiUIntSortConstCtx<FloatT> &ctx, AscendC::Reg::MaskReg &maskAll)
+__simd_callee__ inline void InitLiUIntSortConstCtx(LiUIntSortConstCtx<FloatT>& ctx, AscendC::Reg::MaskReg& maskAll)
 {
     using Traits = LiUIntSortTraits<FloatT>;
     AscendC::Reg::Duplicate(ctx.zeros, Traits::ZERO, maskAll);
@@ -62,8 +62,8 @@ __simd_callee__ inline void InitLiUIntSortConstCtx(LiUIntSortConstCtx<FloatT> &c
 
 template <typename FloatT>
 __simd_callee__ inline void LiUIntToSortableKey(
-    AscendC::Reg::RegTensor<FloatT> &outKey, AscendC::Reg::RegTensor<typename LiUIntSortConstCtx<FloatT>::UInt> &inVal,
-    LiUIntSortConstCtx<FloatT> &ctx, AscendC::Reg::MaskReg &maskAll)
+    AscendC::Reg::RegTensor<FloatT>& outKey, AscendC::Reg::RegTensor<typename LiUIntSortConstCtx<FloatT>::UInt>& inVal,
+    LiUIntSortConstCtx<FloatT>& ctx, AscendC::Reg::MaskReg& maskAll)
 {
     using Traits = LiUIntSortTraits<FloatT>;
     using UInt = typename Traits::UInt;
@@ -73,30 +73,30 @@ __simd_callee__ inline void LiUIntToSortableKey(
     AscendC::Reg::MaskReg liRegSelectZero;
     AscendC::Reg::MaskReg liRegSelectSign;
 
-    auto &liInBits = inVal;
+    auto& liInBits = inVal;
 
     // 1. 0 check
     AscendC::Reg::Compare<UInt, CMPMODE::EQ>(liRegSelectZero, liInBits, ctx.zeros, maskAll);
 
     // 2. 0 -> -NAN
-    AscendC::Reg::Select((AscendC::Reg::RegTensor<UInt> &)outKey, ctx.nan, liInBits, liRegSelectZero);
+    AscendC::Reg::Select((AscendC::Reg::RegTensor<UInt>&)outKey, ctx.nan, liInBits, liRegSelectZero);
 
     // 3. sign bit
-    AscendC::Reg::And(liRegTemp, (AscendC::Reg::RegTensor<UInt> &)outKey, ctx.signMask, maskAll);
+    AscendC::Reg::And(liRegTemp, (AscendC::Reg::RegTensor<UInt>&)outKey, ctx.signMask, maskAll);
 
     AscendC::Reg::Compare<UInt, CMPMODE::GT>(liRegSelectSign, liRegTemp, ctx.zeros, maskAll);
 
     // 4. xor mask
     AscendC::Reg::Select(liRegMask, ctx.signMask, ctx.allOne, liRegSelectSign);
-    AscendC::Reg::Xor((AscendC::Reg::RegTensor<UInt> &)outKey, (AscendC::Reg::RegTensor<UInt> &)outKey, liRegMask,
+    AscendC::Reg::Xor((AscendC::Reg::RegTensor<UInt>&)outKey, (AscendC::Reg::RegTensor<UInt>&)outKey, liRegMask,
                       maskAll);
 }
 
-__aicore__ inline void LiUIntToFloatReturnValue(const LocalTensor<bfloat16_t> &out_, const LocalTensor<uint32_t> &in,
+__aicore__ inline void LiUIntToFloatReturnValue(const LocalTensor<bfloat16_t>& out_, const LocalTensor<uint32_t>& in,
                                                 const uint32_t topK)
 {
-    auto outBuf = (__local_mem__ bfloat16_t *)out_.GetPhyAddr();
-    auto inBuf = (__local_mem__ uint32_t *)in.GetPhyAddr();
+    auto outBuf = (__local_mem__ bfloat16_t*)out_.GetPhyAddr();
+    auto inBuf = (__local_mem__ uint32_t*)in.GetPhyAddr();
 
     const uint16_t repeatSize32 = 128;
     uint16_t topkLoopNum = (topK + repeatSize32 - 1) / repeatSize32;
@@ -131,11 +131,11 @@ __aicore__ inline void LiUIntToFloatReturnValue(const LocalTensor<bfloat16_t> &o
     }
 }
 
-__aicore__ inline void LiUIntToFloatReturnValue(const LocalTensor<half> &out_, const LocalTensor<uint32_t> &in,
+__aicore__ inline void LiUIntToFloatReturnValue(const LocalTensor<half>& out_, const LocalTensor<uint32_t>& in,
                                                 const uint32_t topK)
 {
-    auto outBuf = (__local_mem__ half *)out_.GetPhyAddr();
-    auto inBuf = (__local_mem__ uint32_t *)in.GetPhyAddr();
+    auto outBuf = (__local_mem__ half*)out_.GetPhyAddr();
+    auto inBuf = (__local_mem__ uint32_t*)in.GetPhyAddr();
 
     const uint16_t repeatSize32 = 128;
     uint16_t topkLoopNum = (topK + repeatSize32 - 1) / repeatSize32;
@@ -171,18 +171,18 @@ __aicore__ inline void LiUIntToFloatReturnValue(const LocalTensor<half> &out_, c
 }
 
 template <typename W_T>
-__aicore__ inline void MulWeightAndReduceSum(const LocalTensor<uint32_t> &out, // out    [S2Base]     [128   ] 2
-                                             const LocalTensor<float> &qk,     // q*k^t  [G, S2Base]  [64 128] 2
-                                             const LocalTensor<W_T> &weight,   // w      [G]          [64    ] 1
+__aicore__ inline void MulWeightAndReduceSum(const LocalTensor<uint32_t>& out, // out    [S2Base]     [128   ] 2
+                                             const LocalTensor<float>& qk,     // q*k^t  [G, S2Base]  [64 128] 2
+                                             const LocalTensor<W_T>& weight,   // w      [G]          [64    ] 1
                                              const int gSize)                  // G 64
 {
-    __local_mem__ W_T *weight_ = (__local_mem__ W_T *)weight.GetPhyAddr();
+    __local_mem__ W_T* weight_ = (__local_mem__ W_T*)weight.GetPhyAddr();
 
     constexpr uint32_t VL = 64; // vector length
 
-    auto qk0 = (__local_mem__ float *)qk.GetPhyAddr();
+    auto qk0 = (__local_mem__ float*)qk.GetPhyAddr();
     auto qk1 = qk0 + VL;
-    auto out0 = (__local_mem__ uint32_t *)out.GetPhyAddr();
+    auto out0 = (__local_mem__ uint32_t*)out.GetPhyAddr();
     auto out1 = out0 + VL;
 
     __VEC_SCOPE__

@@ -23,22 +23,22 @@ namespace lightning_indexer_v2_checker {
 
 class CommonChecker : public LightningIndexerV2BaseChecker {
 public:
-    ge::graphStatus CheckParaExistence(const LightningIndexerV2CheckerInfo &info) const override;
-    ge::graphStatus CheckSinglePara(const LightningIndexerV2CheckerInfo &info) const override;
-    ge::graphStatus CheckFeature(const LightningIndexerV2CheckerInfo &info) const override;
-    ge::graphStatus CheckMultiPara(const LightningIndexerV2CheckerInfo &info) const override;
+    ge::graphStatus CheckParaExistence(const LightningIndexerV2CheckerInfo& info) const override;
+    ge::graphStatus CheckSinglePara(const LightningIndexerV2CheckerInfo& info) const override;
+    ge::graphStatus CheckFeature(const LightningIndexerV2CheckerInfo& info) const override;
+    ge::graphStatus CheckMultiPara(const LightningIndexerV2CheckerInfo& info) const override;
 
 private:
-    ge::graphStatus CheckTensorBasics(const LightningIndexerV2CheckerInfo &info) const;
-    ge::graphStatus CheckAttrs(const LightningIndexerV2CheckerInfo &info) const;
-    ge::graphStatus CheckLayouts(const LightningIndexerV2CheckerInfo &info) const;
-    ge::graphStatus CheckTopk(const LightningIndexerV2CheckerInfo &info) const;
-    ge::graphStatus CheckCompressionAttrs(const LightningIndexerV2CheckerInfo &info) const;
-    ge::graphStatus CheckReturnValue(const LightningIndexerV2CheckerInfo &info) const;
-    ge::graphStatus CheckHeadFeature(const LightningIndexerV2CheckerInfo &info) const;
-    ge::graphStatus CheckFeatureRanges(const LightningIndexerV2CheckerInfo &info) const;
-    ge::graphStatus CheckMainShapes(const LightningIndexerV2CheckerInfo &info) const;
-    ge::graphStatus CheckOutputShapes(const LightningIndexerV2CheckerInfo &info) const;
+    ge::graphStatus CheckTensorBasics(const LightningIndexerV2CheckerInfo& info) const;
+    ge::graphStatus CheckAttrs(const LightningIndexerV2CheckerInfo& info) const;
+    ge::graphStatus CheckLayouts(const LightningIndexerV2CheckerInfo& info) const;
+    ge::graphStatus CheckTopk(const LightningIndexerV2CheckerInfo& info) const;
+    ge::graphStatus CheckCompressionAttrs(const LightningIndexerV2CheckerInfo& info) const;
+    ge::graphStatus CheckReturnValue(const LightningIndexerV2CheckerInfo& info) const;
+    ge::graphStatus CheckHeadFeature(const LightningIndexerV2CheckerInfo& info) const;
+    ge::graphStatus CheckFeatureRanges(const LightningIndexerV2CheckerInfo& info) const;
+    ge::graphStatus CheckMainShapes(const LightningIndexerV2CheckerInfo& info) const;
+    ge::graphStatus CheckOutputShapes(const LightningIndexerV2CheckerInfo& info) const;
 };
 
 } // namespace lightning_indexer_v2_checker

@@ -142,55 +142,55 @@ public:
                                                 Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_FORWARD>>::type;
 
     __aicore__ inline FABlockCubeMlaFullquant(){};
-    __aicore__ inline void InitCubeBlock(TPipe *pipe, BufferManager<BufferType::L1> *l1BufferManagerPtr,
-                                         __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                         __gm__ uint8_t *blockTable, __gm__ uint8_t *queryRope,
-                                         __gm__ uint8_t *keyRope);
-    __aicore__ inline void InitCubeInput(__gm__ uint8_t *key, __gm__ uint8_t *value,
-                                         CVSharedParams<isInfer, isPa> *sharedParams, AttenMaskInfo *attenMaskInfo,
-                                         __gm__ int64_t *actualSeqQlenAddr, __gm__ int64_t *actualSeqKvlenAddr,
-                                         __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
-                                         __gm__ uint8_t *actualSharedPrefixLen);
-    __aicore__ inline void IterateBmm1(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &output,
-                                       RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo);
+    __aicore__ inline void InitCubeBlock(TPipe* pipe, BufferManager<BufferType::L1>* l1BufferManagerPtr,
+                                         __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                         __gm__ uint8_t* blockTable, __gm__ uint8_t* queryRope,
+                                         __gm__ uint8_t* keyRope);
+    __aicore__ inline void InitCubeInput(__gm__ uint8_t* key, __gm__ uint8_t* value,
+                                         CVSharedParams<isInfer, isPa>* sharedParams, AttenMaskInfo* attenMaskInfo,
+                                         __gm__ int64_t* actualSeqQlenAddr, __gm__ int64_t* actualSeqKvlenAddr,
+                                         __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix,
+                                         __gm__ uint8_t* actualSharedPrefixLen);
+    __aicore__ inline void IterateBmm1(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& output,
+                                       RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo);
 
-    __aicore__ inline void IterateBmm2(mm2ResPos &outputBuf,
-                                       BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &inputBuf,
-                                       RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo);
-    __aicore__ inline void InitDequantParams(__gm__ uint8_t *deqScaleQ, __gm__ uint8_t *deqScaleK,
-                                             __gm__ uint8_t *deqScaleV) {};
+    __aicore__ inline void IterateBmm2(mm2ResPos& outputBuf,
+                                       BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& inputBuf,
+                                       RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo);
+    __aicore__ inline void InitDequantParams(__gm__ uint8_t* deqScaleQ, __gm__ uint8_t* deqScaleK,
+                                             __gm__ uint8_t* deqScaleV) {};
 
 private:
     __aicore__ inline void InitLocalBuffer();
-    __aicore__ inline void InitGmTensor(CVSharedParams<isInfer, isPa> *sharedParams, __gm__ int64_t *actualSeqQlenAddr,
-                                        __gm__ int64_t *actualSeqKvlenAddr);
-    __aicore__ inline void CalcS1Coord(RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo);
-    __aicore__ inline void CalcS2Coord(RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo);
-    __aicore__ inline void GetKvByTensorList(RunInfo<isInfer> &runInfo, const ConstInfo<isInfer, hasRope> &constInfo,
-                                             GlobalTensor<INPUT_T> &keyValueGm, GlobalTensor<INPUT_T> &tempKeyValueGm);
-    __aicore__ inline GlobalTensor<INPUT_T> GetKeyGm(RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo);
-    __aicore__ inline GlobalTensor<INPUT_T> GetValueGm(RunInfo<isInfer> &runInfo,
-                                                       ConstInfo<isInfer, hasRope> &constInfo);
-    __aicore__ inline void IterateBmm1MLAFullQuant(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf,
-                                                   RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo);
-    __aicore__ inline void MatmulFromValues(const float avalue, const float bvalue, const LocalTensor<T> &cL0Tensor,
-                                            const MMParam &param, RunInfo<isInfer> &runInfo);
+    __aicore__ inline void InitGmTensor(CVSharedParams<isInfer, isPa>* sharedParams, __gm__ int64_t* actualSeqQlenAddr,
+                                        __gm__ int64_t* actualSeqKvlenAddr);
+    __aicore__ inline void CalcS1Coord(RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo);
+    __aicore__ inline void CalcS2Coord(RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo);
+    __aicore__ inline void GetKvByTensorList(RunInfo<isInfer>& runInfo, const ConstInfo<isInfer, hasRope>& constInfo,
+                                             GlobalTensor<INPUT_T>& keyValueGm, GlobalTensor<INPUT_T>& tempKeyValueGm);
+    __aicore__ inline GlobalTensor<INPUT_T> GetKeyGm(RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo);
+    __aicore__ inline GlobalTensor<INPUT_T> GetValueGm(RunInfo<isInfer>& runInfo,
+                                                       ConstInfo<isInfer, hasRope>& constInfo);
+    __aicore__ inline void IterateBmm1MLAFullQuant(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf,
+                                                   RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo);
+    __aicore__ inline void MatmulFromValues(const float avalue, const float bvalue, const LocalTensor<T>& cL0Tensor,
+                                            const MMParam& param, RunInfo<isInfer>& runInfo);
     __aicore__ inline void IterateBmm1MLAFullQuantInt8(
-        Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf, RunInfo<isInfer> &runInfo,
-        ConstInfo<isInfer, hasRope> &constInfo);
+        Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf, RunInfo<isInfer>& runInfo,
+        ConstInfo<isInfer, hasRope>& constInfo);
 
     // --------------------Bmm2--------------------------
     __aicore__ inline void IterateBmm2MLAFullQuant(
-        mm2ResPos &outputBuf, BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &inputBuf,
-        RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo);
-    __aicore__ inline bool IsGS1Merge(ConstInfo<isInfer, hasRope> &constInfo);
+        mm2ResPos& outputBuf, BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& inputBuf,
+        RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo);
+    __aicore__ inline bool IsGS1Merge(ConstInfo<isInfer, hasRope>& constInfo);
 
-    TPipe *tPipe;
+    TPipe* tPipe;
 
     /* =====================GM变量==================== */
-    __gm__ uint8_t *currentKey;         // pageattention需要
-    __gm__ uint8_t *currentValue;       // pageattention需要
-    __gm__ uint8_t *blocktablePtr;      // pageattention需要
+    __gm__ uint8_t* currentKey;         // pageattention需要
+    __gm__ uint8_t* currentValue;       // pageattention需要
+    __gm__ uint8_t* blocktablePtr;      // pageattention需要
     GlobalTensor<int32_t> blockTableGm; // pageattention需要
     static constexpr GmFormat Q_FORMAT = BlockCubeMlaFullquant::GetQueryGmFormat<layout>();
     static constexpr GmFormat KV_FORMAT = BlockCubeMlaFullquant::GetKVGmFormat<layout>();
@@ -213,7 +213,7 @@ private:
     CubeCoordInfo coordInfo[3];
 
     /* =====================LocalBuffer变量==================== */
-    BufferManager<BufferType::L1> *l1BufferManagerPtr;
+    BufferManager<BufferType::L1>* l1BufferManagerPtr;
     BufferManager<BufferType::L0A> l0aBufferManager;
     BufferManager<BufferType::L0B> l0bBufferManager;
     BufferManager<BufferType::L0C> l0cBufferManager;
@@ -247,23 +247,23 @@ private:
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::InitCubeBlock(
-    TPipe *pipe, BufferManager<BufferType::L1> *l1BuffMgr, __gm__ uint8_t *query, __gm__ uint8_t *key,
-    __gm__ uint8_t *value, __gm__ uint8_t *blockTable, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope)
+    TPipe* pipe, BufferManager<BufferType::L1>* l1BuffMgr, __gm__ uint8_t* query, __gm__ uint8_t* key,
+    __gm__ uint8_t* value, __gm__ uint8_t* blockTable, __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope)
 {
     if ASCEND_IS_AIC {
         tPipe = pipe;
         l1BufferManagerPtr = l1BuffMgr;
-        this->queryGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T *)query);
+        this->queryGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T*)query);
         if constexpr (!isInfer) {
-            this->keyGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T *)key);
-            this->valueGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T *)value);
+            this->keyGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T*)key);
+            this->valueGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T*)value);
         }
         if constexpr (isPa) {
             blocktablePtr = blockTable;
         }
         if constexpr (hasRope) {
-            this->queryRopeGm.gmTensor.SetGlobalBuffer((__gm__ ROPE_T *)queryRope);
-            this->keyRopeGm.gmTensor.SetGlobalBuffer((__gm__ ROPE_T *)keyRope);
+            this->queryRopeGm.gmTensor.SetGlobalBuffer((__gm__ ROPE_T*)queryRope);
+            this->keyRopeGm.gmTensor.SetGlobalBuffer((__gm__ ROPE_T*)keyRope);
         }
         InitLocalBuffer();
     }
@@ -271,31 +271,31 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::InitCubeBlock(
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::InitCubeInput(
-    __gm__ uint8_t *key, __gm__ uint8_t *value, CVSharedParams<isInfer, isPa> *sharedParams,
-    AttenMaskInfo *attenMaskInfo, __gm__ int64_t *actualSeqQlenAddr, __gm__ int64_t *actualSeqKvlenAddr,
-    __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix, __gm__ uint8_t *actualSharedPrefixLen)
+    __gm__ uint8_t* key, __gm__ uint8_t* value, CVSharedParams<isInfer, isPa>* sharedParams,
+    AttenMaskInfo* attenMaskInfo, __gm__ int64_t* actualSeqQlenAddr, __gm__ int64_t* actualSeqKvlenAddr,
+    __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen)
 {
     if ASCEND_IS_AIC {
         if constexpr (isInfer) {
             if (sharedParams->fromFused) {
-                ListTensorDesc keyListTensorDescInit((__gm__ void *)key);
-                ListTensorDesc valueListTensorDescInit((__gm__ void *)value);
-                currentValue = (__gm__ uint8_t *)valueListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
-                currentKey = (__gm__ uint8_t *)keyListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
+                ListTensorDesc keyListTensorDescInit((__gm__ void*)key);
+                ListTensorDesc valueListTensorDescInit((__gm__ void*)value);
+                currentValue = (__gm__ uint8_t*)valueListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
+                currentKey = (__gm__ uint8_t*)keyListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
                 if (sharedParams->isKvContinuous == 1) {
-                    this->keyGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T *)currentKey);
-                    this->valueGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T *)currentValue);
+                    this->keyGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T*)currentKey);
+                    this->valueGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T*)currentValue);
                 } else {
-                    this->valueGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T *)value);
-                    this->keyGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T *)key);
+                    this->valueGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T*)value);
+                    this->keyGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T*)key);
                 }
             } else {
-                this->keyGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T *)key);
-                this->valueGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T *)value);
+                this->keyGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T*)key);
+                this->valueGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T*)value);
             }
             if constexpr (enableKVPrefix) {
-                this->keySharedPrefixGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T *)keySharedPrefix);
-                this->valueSharedPrefixGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T *)valueSharedPrefix);
+                this->keySharedPrefixGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T*)keySharedPrefix);
+                this->valueSharedPrefixGm.gmTensor.SetGlobalBuffer((__gm__ INPUT_T*)valueSharedPrefix);
             }
             attenMaskInfo->compressMode = sharedParams->compressMode;
             attenMaskInfo->attenMaskS1Size = sharedParams->attenMaskS1Size;
@@ -303,7 +303,7 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::InitCubeInput(
             attenMaskInfo->preTokens = sharedParams->preTokens;
             attenMaskInfo->nextTokens = sharedParams->nextTokens;
             if constexpr (isPa) {
-                this->blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blocktablePtr);
+                this->blockTableGm.SetGlobalBuffer((__gm__ int32_t*)blocktablePtr);
                 this->kvCacheBlockSize = sharedParams->blockSize;
                 this->maxBlockNumPerBatch = sharedParams->blockTableDim2;
                 if (sharedParams->paLayoutType == 2) { // NZ下paLayoutType == 2
@@ -355,8 +355,8 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::InitLocalBuffer()
 /* 初始化GmTensor,设置shape信息并计算strides */
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::InitGmTensor(
-    CVSharedParams<isInfer, isPa> *cvSharedParams, __gm__ int64_t *actualSeqQlenAddr,
-    __gm__ int64_t *actualSeqKvlenAddr)
+    CVSharedParams<isInfer, isPa>* cvSharedParams, __gm__ int64_t* actualSeqQlenAddr,
+    __gm__ int64_t* actualSeqKvlenAddr)
 {
     if constexpr (GmLayoutParams<Q_FORMAT>::CATEGORY == FormatCategory::GM_Q_OUT_BNGSD) {
         this->queryGm.offsetCalculator.Init(cvSharedParams->bSize, cvSharedParams->n2Size, cvSharedParams->gSize,
@@ -368,7 +368,7 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::InitGmTensor(
         }
     } else { // GM_Q_OUT_TND
         GlobalTensor<uint64_t> actualSeqQLen;
-        actualSeqQLen.SetGlobalBuffer((__gm__ uint64_t *)actualSeqQlenAddr);
+        actualSeqQLen.SetGlobalBuffer((__gm__ uint64_t*)actualSeqQlenAddr);
         if constexpr (isInfer) {
             this->queryGm.offsetCalculator.Init(cvSharedParams->n2Size, cvSharedParams->gSize, cvSharedParams->dSize,
                                                 actualSeqQLen, cvSharedParams->actualSeqLengthsSize);
@@ -404,7 +404,7 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::InitGmTensor(
         }
     } else { // GM_KV_TND
         GlobalTensor<uint64_t> actualSeqKVLen;
-        actualSeqKVLen.SetGlobalBuffer((__gm__ uint64_t *)actualSeqKvlenAddr);
+        actualSeqKVLen.SetGlobalBuffer((__gm__ uint64_t*)actualSeqKvlenAddr);
         if constexpr (isInfer) {
             this->keyGm.offsetCalculator.Init(cvSharedParams->n2Size, cvSharedParams->dSize, actualSeqKVLen,
                                               cvSharedParams->actualSeqLengthsKVSize);
@@ -428,8 +428,8 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::InitGmTensor(
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::CalcS1Coord(RunInfo<isInfer> &runInfo,
-                                                                           ConstInfo<isInfer, hasRope> &constInfo)
+__aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::CalcS1Coord(RunInfo<isInfer>& runInfo,
+                                                                           ConstInfo<isInfer, hasRope>& constInfo)
 {
     // 计算s1方向偏移
     coordInfo[runInfo.taskIdMod3].s1Coord = runInfo.s1oIdx * s1BaseSize;
@@ -441,8 +441,8 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::CalcS1Coord(RunIn
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::CalcS2Coord(RunInfo<isInfer> &runInfo,
-                                                                           ConstInfo<isInfer, hasRope> &constInfo)
+__aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::CalcS2Coord(RunInfo<isInfer>& runInfo,
+                                                                           ConstInfo<isInfer, hasRope>& constInfo)
 {
     coordInfo[runInfo.taskIdMod3].s2Coord = runInfo.s2StartIdx + runInfo.s2LoopCount * s2BaseSize;
     coordInfo[runInfo.taskIdMod3].curBIdx = runInfo.boIdx;
@@ -467,8 +467,8 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::CalcS2Coord(RunIn
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IterateBmm1(
-    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf, RunInfo<isInfer> &runInfo,
-    ConstInfo<isInfer, hasRope> &constInfo)
+    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf, RunInfo<isInfer>& runInfo,
+    ConstInfo<isInfer, hasRope>& constInfo)
 {
     CalcS1Coord(runInfo, constInfo);
     CalcS2Coord(runInfo, constInfo);
@@ -482,8 +482,8 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IterateBmm1(
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IterateBmm2(
-    mm2ResPos &outputBuf, BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &inputBuf,
-    RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo)
+    mm2ResPos& outputBuf, BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& inputBuf,
+    RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo)
 {
     if constexpr (isMlaFullQuant) {
         IterateBmm2MLAFullQuant(outputBuf, inputBuf, runInfo, constInfo);
@@ -492,20 +492,20 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IterateBmm2(
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::GetKvByTensorList(
-    RunInfo<isInfer> &runInfo, const ConstInfo<isInfer, hasRope> &constInfo, GlobalTensor<INPUT_T> &keyValueGm,
-    GlobalTensor<INPUT_T> &tempKeyValueGm)
+    RunInfo<isInfer>& runInfo, const ConstInfo<isInfer, hasRope>& constInfo, GlobalTensor<INPUT_T>& keyValueGm,
+    GlobalTensor<INPUT_T>& tempKeyValueGm)
 {
     if (constInfo.isKvContinuous != 0) {
         return;
     }
-    ListTensorDesc kvListTensorDesc((__gm__ void *)keyValueGm.GetPhyAddr());
-    __gm__ uint8_t *tempkvGmPtr = (__gm__ uint8_t *)kvListTensorDesc.GetDataPtr<__gm__ uint8_t>(runInfo.boIdx);
-    tempKeyValueGm.SetGlobalBuffer((__gm__ INPUT_T *)tempkvGmPtr);
+    ListTensorDesc kvListTensorDesc((__gm__ void*)keyValueGm.GetPhyAddr());
+    __gm__ uint8_t* tempkvGmPtr = (__gm__ uint8_t*)kvListTensorDesc.GetDataPtr<__gm__ uint8_t>(runInfo.boIdx);
+    tempKeyValueGm.SetGlobalBuffer((__gm__ INPUT_T*)tempkvGmPtr);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline GlobalTensor<INPUT_T> FABlockCubeMlaFullquant<TEMPLATE_ARGS>::GetKeyGm(
-    RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo)
+    RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo)
 {
     if constexpr (isInfer) {
         GlobalTensor<INPUT_T> tmpKeyGm = this->keyGm.gmTensor;
@@ -518,7 +518,7 @@ __aicore__ inline GlobalTensor<INPUT_T> FABlockCubeMlaFullquant<TEMPLATE_ARGS>::
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline GlobalTensor<INPUT_T> FABlockCubeMlaFullquant<TEMPLATE_ARGS>::GetValueGm(
-    RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo)
+    RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo)
 {
     if constexpr (isInfer) {
         GlobalTensor<INPUT_T> tmpValueGm = this->valueGm.gmTensor;
@@ -532,8 +532,8 @@ __aicore__ inline GlobalTensor<INPUT_T> FABlockCubeMlaFullquant<TEMPLATE_ARGS>::
 /* 针对MLA的bmm1*/
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IterateBmm1MLAFullQuant(
-    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf, RunInfo<isInfer> &runInfo,
-    ConstInfo<isInfer, hasRope> &constInfo)
+    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf, RunInfo<isInfer>& runInfo,
+    ConstInfo<isInfer, hasRope>& constInfo)
 {
     uint32_t dTypeRATIO = sizeof(bfloat16_t) / sizeof(INPUT_T);
     Buffer<BufferType::L1> mm1A;
@@ -665,8 +665,8 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IterateBmm1MLAFul
 // MLA全量化新增的bmm2,L1上切N
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IterateBmm2MLAFullQuant(
-    mm2ResPos &outputBuf, BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &inputBuf,
-    RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo)
+    mm2ResPos& outputBuf, BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& inputBuf,
+    RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo)
 {
     Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> mm2A = inputBuf.Get();
     mm2A.WaitCrossCore();
@@ -723,9 +723,9 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IterateBmm2MLAFul
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::MatmulFromValues(const float avalue, const float bvalue,
-                                                                                const LocalTensor<T> &cL0Tensor,
-                                                                                const MMParam &param,
-                                                                                RunInfo<isInfer> &runInfo)
+                                                                                const LocalTensor<T>& cL0Tensor,
+                                                                                const MMParam& param,
+                                                                                RunInfo<isInfer>& runInfo)
 {
     InitConstValueParams<float> paramsA(1, 512, 0, avalue); // n*k*4/32B=128*32*4/32
     InitConstValueParams<float> paramsB(1, 512, 0, bvalue); // n*k*4/32B=128*32*4/32
@@ -782,8 +782,8 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::MatmulFromValues(
 /* 针对MLA INT8的bmm1*/
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IterateBmm1MLAFullQuantInt8(
-    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf, RunInfo<isInfer> &runInfo,
-    ConstInfo<isInfer, hasRope> &constInfo)
+    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf, RunInfo<isInfer>& runInfo,
+    ConstInfo<isInfer, hasRope>& constInfo)
 {
     uint32_t dTypeRATIO = sizeof(bfloat16_t) / sizeof(INPUT_T);
     Buffer<BufferType::L1> mm1A;
@@ -959,7 +959,7 @@ __aicore__ inline void FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IterateBmm1MLAFul
 
 // 判断是否GS1合轴
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline bool FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IsGS1Merge(ConstInfo<isInfer, hasRope> &constInfo)
+__aicore__ inline bool FABlockCubeMlaFullquant<TEMPLATE_ARGS>::IsGS1Merge(ConstInfo<isInfer, hasRope>& constInfo)
 {
     return (Q_FORMAT == GmFormat::BSNGD || Q_FORMAT == GmFormat::TNGD) && constInfo.isPfaGS1Merge;
 }
@@ -975,31 +975,31 @@ public:
     static constexpr bool bmm2Write2Ub = FABlockCubeMlaFullquant<TEMPLATE_ARGS>::bmm2Write2Ub;
     static constexpr bool splitD = FABlockCubeMlaFullquant<TEMPLATE_ARGS>::splitD;
     __aicore__ inline FABlockCubeMlaFullquantDummy(){};
-    __aicore__ inline void InitCubeInput(__gm__ uint8_t *key, __gm__ uint8_t *value,
-                                         CVSharedParams<isInfer, isPa> *sharedParams, AttenMaskInfo *attenMaskInfo,
-                                         __gm__ int64_t *actualSeqQlenAddr, __gm__ int64_t *actualSeqKvlenAddr,
-                                         __gm__ uint8_t *keySharedPrefix, __gm__ uint8_t *valueSharedPrefix,
-                                         __gm__ uint8_t *actualSharedPrefixLen)
+    __aicore__ inline void InitCubeInput(__gm__ uint8_t* key, __gm__ uint8_t* value,
+                                         CVSharedParams<isInfer, isPa>* sharedParams, AttenMaskInfo* attenMaskInfo,
+                                         __gm__ int64_t* actualSeqQlenAddr, __gm__ int64_t* actualSeqKvlenAddr,
+                                         __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix,
+                                         __gm__ uint8_t* actualSharedPrefixLen)
     {}
-    __aicore__ inline void InitCubeBlock(TPipe *pipe, BufferManager<BufferType::L1> *l1BufferManagerPtr,
-                                         __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                         __gm__ uint8_t *blockTable, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope)
+    __aicore__ inline void InitCubeBlock(TPipe* pipe, BufferManager<BufferType::L1>* l1BufferManagerPtr,
+                                         __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                         __gm__ uint8_t* blockTable, __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope)
     {}
-    __aicore__ inline void IterateBmm1(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf,
-                                       RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo)
+    __aicore__ inline void IterateBmm1(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf,
+                                       RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo)
     {}
-    __aicore__ inline void IterateBmm1Nz(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf,
-                                         RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo)
+    __aicore__ inline void IterateBmm1Nz(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf,
+                                         RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo)
     {}
 
     using mm2ResPos = typename std::conditional<bmm2Write2Ub, Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>,
                                                 Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_FORWARD>>::type;
-    __aicore__ inline void InitDequantParams(__gm__ uint8_t *deqScaleQ, __gm__ uint8_t *deqScaleK,
-                                             __gm__ uint8_t *deqScaleV)
+    __aicore__ inline void InitDequantParams(__gm__ uint8_t* deqScaleQ, __gm__ uint8_t* deqScaleK,
+                                             __gm__ uint8_t* deqScaleV)
     {}
-    __aicore__ inline void IterateBmm2(mm2ResPos &outputBuf,
-                                       BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &inputBuf,
-                                       RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo)
+    __aicore__ inline void IterateBmm2(mm2ResPos& outputBuf,
+                                       BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& inputBuf,
+                                       RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo)
     {}
 };
 

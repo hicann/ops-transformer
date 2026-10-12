@@ -42,28 +42,35 @@ public:
     /// Constructor
     HOST_DEVICE
     ColumnMajor(Index rows = 0, Index cols = 0)
-        : shape_(MakeCoord(rows, cols)), stride_(MakeCoord(LongIndex(1), LongIndex(rows))) {}
+        : shape_(MakeCoord(rows, cols)),
+          stride_(MakeCoord(LongIndex(1), LongIndex(rows)))
+    {}
 
     /// Constructor
     HOST_DEVICE
     ColumnMajor(Index rows, Index cols, LongIndex ldm)
-        : shape_(MakeCoord(rows, cols)), stride_(MakeCoord(LongIndex(1), ldm)) {}
+        : shape_(MakeCoord(rows, cols)),
+          stride_(MakeCoord(LongIndex(1), ldm))
+    {}
 
     /// Ctor
     HOST_DEVICE
-    ColumnMajor(Shape shape, Stride stride) : shape_(shape), stride_(stride) {}
+    ColumnMajor(Shape shape, Stride stride)
+        : shape_(shape),
+          stride_(stride)
+    {}
 
     /// Returns the offset of a coordinate in linear memory.
     /// Assumes coordinate has convention (row, column)
     HOST_DEVICE
-    LongIndex GetOffset(MatrixCoord const &coord) const
+    LongIndex GetOffset(MatrixCoord const& coord) const
     {
         return LongIndex(coord.row()) + LongIndex(coord.column()) * stride_[1];
     }
 
     /// Returns the layout of a tile_common.
     HOST_DEVICE
-    ColumnMajor GetTileLayout(MatrixCoord const &tileShape) const
+    ColumnMajor GetTileLayout(MatrixCoord const& tileShape) const
     {
         return ColumnMajor(tileShape, stride());
     }
@@ -77,7 +84,7 @@ public:
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape &shape()
+    Shape& shape()
     {
         return shape_;
     }
@@ -91,7 +98,7 @@ public:
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index &shape(int idx)
+    typename Shape::Index& shape(int idx)
     {
         return shape_[idx];
     }
@@ -105,7 +112,7 @@ public:
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride &stride()
+    Stride& stride()
     {
         return stride_;
     }
@@ -119,7 +126,7 @@ public:
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index &stride(int idx)
+    typename Stride::Index& stride(int idx)
     {
         return stride_[idx];
     }
@@ -136,6 +143,6 @@ private:
     Stride stride_;
 };
 
-}  // namespace NpuArch::layout
+} // namespace NpuArch::layout
 
-#endif  // FUSED_MATRIX_COL_MAJOR_HPP
+#endif // FUSED_MATRIX_COL_MAJOR_HPP

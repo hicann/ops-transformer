@@ -57,11 +57,11 @@ public:
         typename LightningIndexerTypeTraits<Q_T, typename std::conditional<DT_W_FLAG, float, void>::type>::weightsType;
 
     __aicore__ inline LightningIndexerServiceVector(){};
-    __aicore__ inline void ProcessVec1(const LICommon::RunInfo &info);
-    __aicore__ inline void ProcessTopK(const LICommon::RunInfo &info);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
-    __aicore__ inline void InitParams(const struct LICommon::ConstInfo &constInfo,
-                                      const LITilingData *__restrict tilingData);
+    __aicore__ inline void ProcessVec1(const LICommon::RunInfo& info);
+    __aicore__ inline void ProcessTopK(const LICommon::RunInfo& info);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
+    __aicore__ inline void InitParams(const struct LICommon::ConstInfo& constInfo,
+                                      const LITilingData* __restrict tilingData);
     __aicore__ inline void InitVecWorkspaceTensor(GlobalTensor<SCORE_T> scoreGm);
     __aicore__ inline void InitVecInputTensor(GlobalTensor<W_T> weightsGm, GlobalTensor<int32_t> indiceOutGm,
                                               GlobalTensor<K_T> valueOutGm, GlobalTensor<int32_t> blockTableGm);
@@ -144,7 +144,7 @@ private:
 };
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceVector<LIT>::InitBuffers(TPipe *pipe)
+__aicore__ inline void LightningIndexerServiceVector<LIT>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(resMm1Buf_, 2 * CeilDiv(constInfo_.mBaseSize, 2) * s2BaseSize_ * sizeof(float));
     resMm1UB_ = resMm1Buf_.Get<float>();
@@ -180,8 +180,8 @@ __aicore__ inline void LightningIndexerServiceVector<LIT>::InitBuffers(TPipe *pi
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceVector<LIT>::InitParams(const struct LICommon::ConstInfo &constInfo,
-                                                                      const LITilingData *__restrict tilingData)
+__aicore__ inline void LightningIndexerServiceVector<LIT>::InitParams(const struct LICommon::ConstInfo& constInfo,
+                                                                      const LITilingData* __restrict tilingData)
 {
     this->constInfo_ = constInfo;
     blockS2StartIdx_ = 0;
@@ -274,7 +274,7 @@ __aicore__ inline void LightningIndexerServiceVector<LIT>::CleanInvalidOutput(in
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceVector<LIT>::ProcessVec1(const LICommon::RunInfo &info)
+__aicore__ inline void LightningIndexerServiceVector<LIT>::ProcessVec1(const LICommon::RunInfo& info)
 {
     auto pingpong = (info.loop % 2);
     // CV同步, V核等C核计算完mm1，mm1Res已搬运到UB
@@ -333,7 +333,7 @@ __aicore__ inline void LightningIndexerServiceVector<LIT>::ProcessVec1(const LIC
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerServiceVector<LIT>::ProcessTopK(const LICommon::RunInfo &info)
+__aicore__ inline void LightningIndexerServiceVector<LIT>::ProcessTopK(const LICommon::RunInfo& info)
 {
     SetFlag<HardEvent::MTE3_MTE2>(MTE3_MTE2_EVENT);
     WaitFlag<HardEvent::MTE3_MTE2>(MTE3_MTE2_EVENT);

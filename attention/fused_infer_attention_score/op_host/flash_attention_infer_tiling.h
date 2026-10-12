@@ -149,14 +149,14 @@ inline uint64_t CalcFdBlockCost(uint32_t mRows, uint32_t s2Len)
 }
 
 // 第 s1Idx 个 S1 块（一个 query 块）的 q 行数（与切核循环内的 remainingQ 口径一致）
-inline uint32_t CalcFdQRows(const BatchParams &p, uint32_t s1Idx)
+inline uint32_t CalcFdQRows(const BatchParams& p, uint32_t s1Idx)
 {
     return (s1Idx < p.curQSBlockNum - 1U) ? p.curQSBlockTile :
                                             (p.qSeqlen - s1Idx * p.curQSBlockTile) * p.curQNBlockTile;
 }
 
 // 单个 S2 块 (s1Idx, s2Idx) 的加权代价
-inline uint64_t CalcFdS2BlockCost(const BatchParams &p, uint32_t s1Idx, uint32_t s2Idx)
+inline uint64_t CalcFdS2BlockCost(const BatchParams& p, uint32_t s1Idx, uint32_t s2Idx)
 {
     uint32_t mRows = CalcFdQRows(p, s1Idx);
     uint32_t s2Len = (s2Idx < p.curKSBlockNum - 1U) ? p.curKSBlockTile : (p.kvSeqlen - s2Idx * p.curKSBlockTile);
@@ -164,7 +164,7 @@ inline uint64_t CalcFdS2BlockCost(const BatchParams &p, uint32_t s1Idx, uint32_t
 }
 
 // 单个 S1 块（一个 query 块）在 KV 方向所有 S2 块的总加权代价（满块 + 尾块）
-inline uint64_t CalcFdS1BlockCost(const BatchParams &p, uint32_t s1Idx)
+inline uint64_t CalcFdS1BlockCost(const BatchParams& p, uint32_t s1Idx)
 {
     if (p.curKSBlockNum == 0U) {
         return 0U;
@@ -176,7 +176,7 @@ inline uint64_t CalcFdS1BlockCost(const BatchParams &p, uint32_t s1Idx)
 }
 
 // 当前 N1 块从 s1Start 起剩余 S1 块的总加权代价
-inline uint64_t CalcFdN1RestCost(const BatchParams &p, uint32_t s1Start)
+inline uint64_t CalcFdN1RestCost(const BatchParams& p, uint32_t s1Start)
 {
     uint64_t cost = 0U;
     for (uint32_t s1 = s1Start; s1 < p.curQSBlockNum; ++s1) {
@@ -186,7 +186,7 @@ inline uint64_t CalcFdN1RestCost(const BatchParams &p, uint32_t s1Start)
 }
 
 // 当前 batch 从 (n1Start, s1Start) 起剩余的总加权代价
-inline uint64_t CalcFdBatchRestCost(const BatchParams &p, uint32_t n1Start, uint32_t s1Start)
+inline uint64_t CalcFdBatchRestCost(const BatchParams& p, uint32_t n1Start, uint32_t s1Start)
 {
     uint64_t cost = CalcFdN1RestCost(p, s1Start);
     if (p.curQNBlockNum > n1Start + 1U) {
@@ -196,7 +196,7 @@ inline uint64_t CalcFdBatchRestCost(const BatchParams &p, uint32_t n1Start, uint
 }
 
 // 容差：半个满块的代价，避免因微小差异拆 batch/行
-inline int64_t CalcFdTolerance(const BatchParams &p)
+inline int64_t CalcFdTolerance(const BatchParams& p)
 {
     return static_cast<int64_t>(CalcFdBlockCost(CalcFdQRows(p, 0U), p.curKSBlockTile) / FD_TOLERANCE_RATIO);
 }
@@ -219,10 +219,10 @@ struct FAInferContext {
     int64_t nextToken = 0;
     int32_t sparseMode = 0;
     uint32_t maxNumBlocksPerBatch = 0;
-    const int64_t *qSeqlenList{nullptr};
-    const int64_t *kvSeqlenList{nullptr};
+    const int64_t* qSeqlenList{nullptr};
+    const int64_t* kvSeqlenList{nullptr};
     float scaleValue = 0.0;
-    size_t *workspaces{nullptr};
+    size_t* workspaces{nullptr};
     MaskType maskType = MaskType::MASK_SPEC;
     DataType dataType = DataType::FP16;
     bool pagedCacheFlag = false;
@@ -241,8 +241,8 @@ struct FAInferContext {
 class FAInferTiling {
 public:
     FAInferTiling() = default;
-    explicit FAInferTiling(const FAInferContext &faInfo);
-    ge::graphStatus DoTiling(FAInferTilingData &tilingdata);
+    explicit FAInferTiling(const FAInferContext& faInfo);
+    ge::graphStatus DoTiling(FAInferTilingData& tilingdata);
     void SetCoreNum(uint32_t blockNum)
     {
         this->blockNum_ = blockNum;
@@ -254,39 +254,39 @@ public:
     uint64_t GetTilingKey();
 
 private:
-    void FillSplitCoreTilingData(FAInferTilingData &tilingdata);
-    void FillWorkSpaceTilingData(FAInferTilingData &faTilingData);
+    void FillSplitCoreTilingData(FAInferTilingData& tilingdata);
+    void FillWorkSpaceTilingData(FAInferTilingData& faTilingData);
     uint32_t GetQSBlockTile(int64_t kvSeqlen);
     uint32_t GetQSBlockTileDecode(int64_t qSeqlen);
     uint32_t GetKvNBlockTile(uint32_t rowNumPerQSGTile, uint32_t kvHead);
     uint32_t GetKSBlockTile(int64_t kvSeqlen);
     uint32_t GetQNBlockTile(uint32_t qSeqlen, uint32_t groupSize);
-    void FillBasicTilingData(FAInferTilingData &faTilingData);
-    void splitBN2S1GS2(FAInferTilingData &faTilingData);
-    void SplitCoreDecodeBS1GN2(FAInferTilingData &faTilingData);
+    void FillBasicTilingData(FAInferTilingData& faTilingData);
+    void splitBN2S1GS2(FAInferTilingData& faTilingData);
+    void SplitCoreDecodeBS1GN2(FAInferTilingData& faTilingData);
     BatchParams getBatchParams(uint32_t bIdx, uint32_t groupSize);
-    uint64_t fillCoreInfoForFlashDecode(FAInferTilingData &faTilingData, uint32_t groupSize, uint64_t totalCost,
+    uint64_t fillCoreInfoForFlashDecode(FAInferTilingData& faTilingData, uint32_t groupSize, uint64_t totalCost,
                                         uint32_t coreNumUsed);
-    void fillSplitInfoForFlashDecode(FAInferTilingData &faTilingData, uint32_t groupSize);
-    void InitCoreInfoArrays(FAInferTilingData &faTilingData);
-    void ConsumeS2BlocksFD(uint32_t groupSize, int64_t &resTaskNum, uint32_t &nowBIdx, uint32_t &nowS1Idx,
-                           uint32_t &nowS2Idx);
-    void ConsumeRemainingBatchesFD(uint32_t groupSize, int64_t &resTaskNum, uint32_t &nowBIdx, uint32_t &nowN1Idx,
-                                   uint32_t &nowS1Idx, uint32_t &nowS2Idx);
-    void ConsumeRemainingN1GroupsFD(int64_t &resTaskNum, const BatchParams &p, uint32_t &nowN1Idx, uint32_t &nowS1Idx,
-                                    uint32_t &nowS2Idx);
-    void ConsumeRemainingS1GroupsFD(int64_t &resTaskNum, const BatchParams &p, uint32_t &nowS1Idx, uint32_t &nowS2Idx);
-    void InitSplitInfoArrays(FAInferTilingData &faTilingData);
-    void ProcessCoreSplitInfo(FAInferTilingData &faTilingData, uint32_t groupSize, uint32_t coreIdx, int32_t &splitIdx,
-                              int32_t &prevBIdx, int32_t &prevN1Idx, int32_t &prevS1Idx, int64_t &currentLseTaskOffset,
-                              int64_t &currentOTaskOffset);
+    void fillSplitInfoForFlashDecode(FAInferTilingData& faTilingData, uint32_t groupSize);
+    void InitCoreInfoArrays(FAInferTilingData& faTilingData);
+    void ConsumeS2BlocksFD(uint32_t groupSize, int64_t& resTaskNum, uint32_t& nowBIdx, uint32_t& nowS1Idx,
+                           uint32_t& nowS2Idx);
+    void ConsumeRemainingBatchesFD(uint32_t groupSize, int64_t& resTaskNum, uint32_t& nowBIdx, uint32_t& nowN1Idx,
+                                   uint32_t& nowS1Idx, uint32_t& nowS2Idx);
+    void ConsumeRemainingN1GroupsFD(int64_t& resTaskNum, const BatchParams& p, uint32_t& nowN1Idx, uint32_t& nowS1Idx,
+                                    uint32_t& nowS2Idx);
+    void ConsumeRemainingS1GroupsFD(int64_t& resTaskNum, const BatchParams& p, uint32_t& nowS1Idx, uint32_t& nowS2Idx);
+    void InitSplitInfoArrays(FAInferTilingData& faTilingData);
+    void ProcessCoreSplitInfo(FAInferTilingData& faTilingData, uint32_t groupSize, uint32_t coreIdx, int32_t& splitIdx,
+                              int32_t& prevBIdx, int32_t& prevN1Idx, int32_t& prevS1Idx, int64_t& currentLseTaskOffset,
+                              int64_t& currentOTaskOffset);
 
 private:
     FAInferContext faInfo_;
     uint32_t blockNum_;
 };
 
-FAInferTiling::FAInferTiling(const FAInferContext &faInfo)
+FAInferTiling::FAInferTiling(const FAInferContext& faInfo)
     : faInfo_(faInfo)
 {}
 
@@ -325,7 +325,7 @@ uint32_t FAInferTiling::GetKSBlockTile(int64_t kvSeqlen)
     return kSBlockTile;
 }
 
-void FAInferTiling::FillBasicTilingData(FAInferTilingData &faTilingData)
+void FAInferTiling::FillBasicTilingData(FAInferTilingData& faTilingData)
 {
     faTilingData.set_batch(static_cast<uint32_t>(faInfo_.batch));
     faTilingData.set_numHeads(static_cast<uint32_t>(faInfo_.numHeads));
@@ -413,7 +413,7 @@ uint64_t FAInferTiling::GetTilingKey()
     return tilingKey;
 }
 
-void FAInferTiling::FillWorkSpaceTilingData(FAInferTilingData &faTilingData)
+void FAInferTiling::FillWorkSpaceTilingData(FAInferTilingData& faTilingData)
 {
     uint64_t mm1OutSize = static_cast<uint64_t>(blockNum_) * WORKSPACE_BLOCK_SIZE_DB * SIZE_OF_32BIT * PRELANCH_NUM;
     uint64_t smOnlineOutSize =
@@ -444,7 +444,7 @@ void FAInferTiling::FillWorkSpaceTilingData(FAInferTilingData &faTilingData)
     faTilingData.set_workSpaceSize(workSpaceSize);
 }
 
-void FAInferTiling::FillSplitCoreTilingData(FAInferTilingData &faTilingData)
+void FAInferTiling::FillSplitCoreTilingData(FAInferTilingData& faTilingData)
 {
     uint32_t totalTaskNum = 0;
     uint32_t groupSize = faInfo_.numHeads / faInfo_.kvHeads;
@@ -496,7 +496,7 @@ BatchParams FAInferTiling::getBatchParams(uint32_t bIdx, uint32_t groupSize)
     return p;
 }
 
-void FAInferTiling::InitCoreInfoArrays(FAInferTilingData &faTilingData)
+void FAInferTiling::InitCoreInfoArrays(FAInferTilingData& faTilingData)
 {
     for (uint32_t coreIdx = 0; coreIdx < blockNum_; coreIdx++) {
         faTilingData.coreInfo.get_startBIdx()[coreIdx] = 0;
@@ -510,8 +510,8 @@ void FAInferTiling::InitCoreInfoArrays(FAInferTilingData &faTilingData)
     }
 }
 
-void FAInferTiling::ConsumeS2BlocksFD(uint32_t groupSize, int64_t &resTaskNum, uint32_t &nowBIdx, uint32_t &nowS1Idx,
-                                      uint32_t &nowS2Idx)
+void FAInferTiling::ConsumeS2BlocksFD(uint32_t groupSize, int64_t& resTaskNum, uint32_t& nowBIdx, uint32_t& nowS1Idx,
+                                      uint32_t& nowS2Idx)
 {
     while (nowS2Idx < getBatchParams(nowBIdx, groupSize).curKSBlockNum && resTaskNum > 0) {
         BatchParams p = getBatchParams(nowBIdx, groupSize);
@@ -520,8 +520,8 @@ void FAInferTiling::ConsumeS2BlocksFD(uint32_t groupSize, int64_t &resTaskNum, u
     }
 }
 
-void FAInferTiling::ConsumeRemainingBatchesFD(uint32_t groupSize, int64_t &resTaskNum, uint32_t &nowBIdx,
-                                              uint32_t &nowN1Idx, uint32_t &nowS1Idx, uint32_t &nowS2Idx)
+void FAInferTiling::ConsumeRemainingBatchesFD(uint32_t groupSize, int64_t& resTaskNum, uint32_t& nowBIdx,
+                                              uint32_t& nowN1Idx, uint32_t& nowS1Idx, uint32_t& nowS2Idx)
 {
     while (nowBIdx < static_cast<uint32_t>(faInfo_.batch) && resTaskNum > 0) {
         BatchParams p = getBatchParams(nowBIdx, groupSize);
@@ -538,8 +538,8 @@ void FAInferTiling::ConsumeRemainingBatchesFD(uint32_t groupSize, int64_t &resTa
     }
 }
 
-void FAInferTiling::ConsumeRemainingN1GroupsFD(int64_t &resTaskNum, const BatchParams &p, uint32_t &nowN1Idx,
-                                               uint32_t &nowS1Idx, uint32_t &nowS2Idx)
+void FAInferTiling::ConsumeRemainingN1GroupsFD(int64_t& resTaskNum, const BatchParams& p, uint32_t& nowN1Idx,
+                                               uint32_t& nowS1Idx, uint32_t& nowS2Idx)
 {
     while (nowN1Idx < p.curQNBlockNum && resTaskNum > 0) {
         int64_t restN1Cost = static_cast<int64_t>(CalcFdN1RestCost(p, nowS1Idx));
@@ -554,8 +554,8 @@ void FAInferTiling::ConsumeRemainingN1GroupsFD(int64_t &resTaskNum, const BatchP
     }
 }
 
-void FAInferTiling::ConsumeRemainingS1GroupsFD(int64_t &resTaskNum, const BatchParams &p, uint32_t &nowS1Idx,
-                                               uint32_t &nowS2Idx)
+void FAInferTiling::ConsumeRemainingS1GroupsFD(int64_t& resTaskNum, const BatchParams& p, uint32_t& nowS1Idx,
+                                               uint32_t& nowS2Idx)
 {
     while (nowS1Idx < p.curQSBlockNum && resTaskNum > 0) {
         int64_t s1Cost = static_cast<int64_t>(CalcFdS1BlockCost(p, nowS1Idx));
@@ -570,7 +570,7 @@ void FAInferTiling::ConsumeRemainingS1GroupsFD(int64_t &resTaskNum, const BatchP
 }
 
 // coreNumUsed：使用的核数（动态负载上限 = 剩余开销 / 剩余核数）。
-uint64_t FAInferTiling::fillCoreInfoForFlashDecode(FAInferTilingData &faTilingData, uint32_t groupSize,
+uint64_t FAInferTiling::fillCoreInfoForFlashDecode(FAInferTilingData& faTilingData, uint32_t groupSize,
                                                    uint64_t totalCost, uint32_t coreNumUsed)
 {
     uint32_t nowBIdx = 0;
@@ -707,7 +707,7 @@ uint64_t FAInferTiling::fillCoreInfoForFlashDecode(FAInferTilingData &faTilingDa
     return maxCost;
 }
 
-void FAInferTiling::InitSplitInfoArrays(FAInferTilingData &faTilingData)
+void FAInferTiling::InitSplitInfoArrays(FAInferTilingData& faTilingData)
 {
     for (uint32_t splitIdx = 0; splitIdx < blockNum_ + 1; splitIdx++) {
         faTilingData.splitInfo.get_batchIdx()[splitIdx] = 0;
@@ -721,9 +721,9 @@ void FAInferTiling::InitSplitInfoArrays(FAInferTilingData &faTilingData)
     }
 }
 
-void FAInferTiling::ProcessCoreSplitInfo(FAInferTilingData &faTilingData, uint32_t groupSize, uint32_t coreIdx,
-                                         int32_t &splitIdx, int32_t &prevBIdx, int32_t &prevN1Idx, int32_t &prevS1Idx,
-                                         int64_t &currentLseTaskOffset, int64_t &currentOTaskOffset)
+void FAInferTiling::ProcessCoreSplitInfo(FAInferTilingData& faTilingData, uint32_t groupSize, uint32_t coreIdx,
+                                         int32_t& splitIdx, int32_t& prevBIdx, int32_t& prevN1Idx, int32_t& prevS1Idx,
+                                         int64_t& currentLseTaskOffset, int64_t& currentOTaskOffset)
 {
     int32_t startBIdx = faTilingData.coreInfo.get_startBIdx()[coreIdx];
     int32_t startN1Idx = faTilingData.coreInfo.get_startN1Idx()[coreIdx];
@@ -800,7 +800,7 @@ void FAInferTiling::ProcessCoreSplitInfo(FAInferTilingData &faTilingData, uint32
     }
 }
 
-void FAInferTiling::fillSplitInfoForFlashDecode(FAInferTilingData &faTilingData, uint32_t groupSize)
+void FAInferTiling::fillSplitInfoForFlashDecode(FAInferTilingData& faTilingData, uint32_t groupSize)
 {
     InitSplitInfoArrays(faTilingData);
 
@@ -822,7 +822,7 @@ void FAInferTiling::fillSplitInfoForFlashDecode(FAInferTilingData &faTilingData,
     faTilingData.set_splitOTotalSize(currentOTaskOffset * SIZE_OF_32BIT);
 }
 
-void FAInferTiling::splitBN2S1GS2(FAInferTilingData &faTilingData)
+void FAInferTiling::splitBN2S1GS2(FAInferTilingData& faTilingData)
 {
     uint32_t groupSize = faInfo_.numHeads / faInfo_.kvHeads;
 
@@ -856,7 +856,7 @@ void FAInferTiling::splitBN2S1GS2(FAInferTilingData &faTilingData)
     fillSplitInfoForFlashDecode(faTilingData, groupSize);
 }
 
-void FAInferTiling::SplitCoreDecodeBS1GN2(FAInferTilingData &faTilingData)
+void FAInferTiling::SplitCoreDecodeBS1GN2(FAInferTilingData& faTilingData)
 {
     uint32_t groupSize = faInfo_.numHeads / faInfo_.kvHeads;
     uint32_t coreNum = this->blockNum_;
@@ -900,7 +900,7 @@ void FAInferTiling::SplitCoreDecodeBS1GN2(FAInferTilingData &faTilingData)
     faTilingData.set_tailKvNBlockTile(tailKvNBlockTile);
 }
 
-ge::graphStatus FAInferTiling::DoTiling(FAInferTilingData &tilingdata)
+ge::graphStatus FAInferTiling::DoTiling(FAInferTilingData& tilingdata)
 {
     FillBasicTilingData(tilingdata);
     if (!faInfo_.isTilingSink) {

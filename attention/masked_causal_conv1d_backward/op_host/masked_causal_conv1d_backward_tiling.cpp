@@ -21,13 +21,13 @@
 
 namespace optiling {
 
-static ge::graphStatus TilingMaskedCausalConv1dBackward(gert::TilingContext *context)
+static ge::graphStatus TilingMaskedCausalConv1dBackward(gert::TilingContext* context)
 {
     MaskedCausalConv1dBackwardTilingArch35 tiling(context);
     return tiling.DoTiling();
 }
 
-static ge::graphStatus TilingPrepareForMaskedCausalConv1dBackward(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForMaskedCausalConv1dBackward(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("MaskedCausalConv1dBackward", "context is null"), return ge::GRAPH_FAILED);
 
@@ -37,7 +37,6 @@ static ge::graphStatus TilingPrepareForMaskedCausalConv1dBackward(gert::TilingPa
 
     return ge::GRAPH_SUCCESS;
 }
-
 
 // Register main tiling entry
 IMPL_OP_OPTILING(MaskedCausalConv1dBackward)

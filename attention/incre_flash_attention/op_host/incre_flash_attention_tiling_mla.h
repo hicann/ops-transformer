@@ -40,7 +40,7 @@ TILING_DATA_FIELD_DEF(uint32_t, attenMaskSize)
 TILING_DATA_FIELD_DEF(uint32_t, sparseMode)
 TILING_DATA_FIELD_DEF(uint32_t, outputLayout) // 输出Layout
 TILING_DATA_FIELD_DEF(uint32_t, softmaxLseFlag)
-TILING_DATA_FIELD_DEF(uint32_t, tSeqSize)   // TND T轴总长度（含padding）
+TILING_DATA_FIELD_DEF(uint32_t, tSeqSize) // TND T轴总长度（含padding）
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(IncreFlashAttentionBaseParamsMlaOp, IncreFlashAttentionBaseParamsMla)
 
@@ -67,18 +67,18 @@ END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(IncreFlashAttentionSingleCoreTensorSizeMlaOp, IncreFlashAttentionSingleCoreTensorSizeMla)
 
 BEGIN_TILING_DATA_DEF(IncreFlashAttentionSplitKVParamsMla)
-TILING_DATA_FIELD_DEF(uint32_t, s2)             // S2切分份数
-TILING_DATA_FIELD_DEF(uint32_t, sInnerLoopSize) 
-TILING_DATA_FIELD_DEF(uint32_t, accumOutSize)   // FD workspace
-TILING_DATA_FIELD_DEF(uint32_t, logSumExpSize)  // FD workspace
+TILING_DATA_FIELD_DEF(uint32_t, s2) // S2切分份数
+TILING_DATA_FIELD_DEF(uint32_t, sInnerLoopSize)
+TILING_DATA_FIELD_DEF(uint32_t, accumOutSize)  // FD workspace
+TILING_DATA_FIELD_DEF(uint32_t, logSumExpSize) // FD workspace
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(IncreFlashAttentionSplitKVParamsMlaOp, IncreFlashAttentionSplitKVParamsMla)
 
 BEGIN_TILING_DATA_DEF(IncreFlashAttentionTNDSplitCoreParamsMla) // TND flashDecode相关
 TILING_DATA_FIELD_DEF(uint32_t, tndFDCoreArrLen);
 TILING_DATA_FIELD_DEF(uint32_t, reserve);
-TILING_DATA_FIELD_DEF_ARR(uint32_t, MAX_AIC_CORE_NUM, balanceFDCoreBArr);  // Bidx
-TILING_DATA_FIELD_DEF_ARR(uint32_t, MAX_AIC_CORE_NUM, balanceFDCoreS1Arr); // s1Idx
+TILING_DATA_FIELD_DEF_ARR(uint32_t, MAX_AIC_CORE_NUM, balanceFDCoreBArr);       // Bidx
+TILING_DATA_FIELD_DEF_ARR(uint32_t, MAX_AIC_CORE_NUM, balanceFDCoreS1Arr);      // s1Idx
 TILING_DATA_FIELD_DEF_ARR(uint32_t, MAX_AIC_CORE_NUM, balanceFDCoreKVSplitArr); // 规约任务对应的切分份数
 TILING_DATA_FIELD_DEF_ARR(uint32_t, MAX_AIC_CORE_NUM, balanceFDCoreStartKVSplitNum); // 当前核的第一个块对应的S2外切索引
 TILING_DATA_FIELD_DEF_ARR(uint32_t, MAX_AIC_CORE_NUM * 2, gS1IdxEndOfFdHead);

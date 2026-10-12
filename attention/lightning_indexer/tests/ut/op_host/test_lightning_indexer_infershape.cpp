@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include <gtest/gtest.h> 
+#include <gtest/gtest.h>
 #include <iostream>
 #include "infer_shape_context_faker.h"
 #include "infer_datatype_context_faker.h"
@@ -37,33 +37,31 @@ TEST_F(LightningIndexerProto, LightningIndexer_infershape_0)
         "LightningIndexer",
         // 输入Tensor
         {
-            {{{1, 1856, 8, 128}, {1, 1856, 8, 128}}, ge::DT_BF16, ge::FORMAT_ND},       // query        input0
-            {{{1, 131072, 1, 128}, {1, 131072, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND},   // key          input1
-            {{{1, 1856, 8}, {1, 1856, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},                // weights      input2
-            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_qlist},          // actual_seq_lengths_query
-            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_kvlist},         // actual_seq_lengths_key 
-            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND}                                   // block_table  input3
+            {{{1, 1856, 8, 128}, {1, 1856, 8, 128}}, ge::DT_BF16, ge::FORMAT_ND},     // query        input0
+            {{{1, 131072, 1, 128}, {1, 131072, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND}, // key          input1
+            {{{1, 1856, 8}, {1, 1856, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},              // weights      input2
+            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_qlist},        // actual_seq_lengths_query
+            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_kvlist},       // actual_seq_lengths_key
+            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND}                                 // block_table  input3
         },
-        {// 输出Tensor
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},    // sparse_indices
-            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}      // sparse_values
+        {
+            // 输出Tensor
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}   // sparse_values
         },
         {// 属性
-            {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-            {"sparse_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1024)},
-            {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
-            {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
-            {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
-            {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}
-        }
-    );
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"sparse_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1024)},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = { // 预期输出
-        {1, 1856, 1, 1024},
-        {1, 1856, 1, 1024}
-    };
-    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);   // 比对成功返回SUCCESS
+    std::vector<std::vector<int64_t>> expectOutputShape = {// 预期输出
+                                                           {1, 1856, 1, 1024},
+                                                           {1, 1856, 1, 1024}};
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape); // 比对成功返回SUCCESS
 }
 
 // PA_TND
@@ -75,33 +73,31 @@ TEST_F(LightningIndexerProto, LightningIndexer_infershape_1)
         "LightningIndexer",
         // 输入Tensor
         {
-            {{{1, 64, 128}, {1, 64, 128}}, ge::DT_BF16, ge::FORMAT_ND},                 // query        input0
-            {{{1, 1, 8191, 128}, {1, 1, 8191, 128}}, ge::DT_BF16, ge::FORMAT_ND},       // key          input1
-            {{{1, 64}, {1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                           // weights      input2
-            {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_qlist},          // actual_seq_lengths_query
-            {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_kvlist},         // actual_seq_lengths_key 
-            {{{1, 32}, {1, 32}}, ge::DT_INT32, ge::FORMAT_ND}                           // block_table  input3
+            {{{1, 64, 128}, {1, 64, 128}}, ge::DT_BF16, ge::FORMAT_ND},           // query        input0
+            {{{1, 1, 8191, 128}, {1, 1, 8191, 128}}, ge::DT_BF16, ge::FORMAT_ND}, // key          input1
+            {{{1, 64}, {1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                     // weights      input2
+            {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_qlist},    // actual_seq_lengths_query
+            {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_kvlist},   // actual_seq_lengths_key
+            {{{1, 32}, {1, 32}}, ge::DT_INT32, ge::FORMAT_ND}                     // block_table  input3
         },
-        {// 输出Tensor
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},    // sparse_indices
-            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}      // sparse_values
+        {
+            // 输出Tensor
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}   // sparse_values
         },
         {// 属性
-            {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
-            {"sparse_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
-            {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
-            {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
-            {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}
-        }
-    );
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+         {"sparse_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = { // 预期输出
-        {1, 8191, 2048},
-        {0}
-    };
-    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);   // 比对成功返回SUCCESS
+    std::vector<std::vector<int64_t>> expectOutputShape = {// 预期输出
+                                                           {1, 8191, 2048},
+                                                           {0}};
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape); // 比对成功返回SUCCESS
 }
 
 // TND_TND
@@ -113,33 +109,31 @@ TEST_F(LightningIndexerProto, LightningIndexer_infershape_2)
         "LightningIndexer",
         // 输入Tensor
         {
-            {{{420, 64, 128}, {420, 64, 128}}, ge::DT_BF16, ge::FORMAT_ND},         // query        input0
-            {{{1344, 1, 128}, {1344, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND},         // key          input1
-            {{{420, 64}, {420, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},                  // weights      input2
-            {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_qlist},      // actual_seq_lengths_query
-            {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_kvlist},     // actual_seq_lengths_key 
-            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND}                               // block_table  input3
+            {{{420, 64, 128}, {420, 64, 128}}, ge::DT_BF16, ge::FORMAT_ND},     // query        input0
+            {{{1344, 1, 128}, {1344, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND},     // key          input1
+            {{{420, 64}, {420, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},              // weights      input2
+            {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_qlist},  // actual_seq_lengths_query
+            {{{6}, {6}}, ge::DT_INT32, ge::FORMAT_ND, true, actual_seq_kvlist}, // actual_seq_lengths_key
+            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND}                           // block_table  input3
         },
-        {// 输出Tensor
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},    // sparse_indices
-            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}      // sparse_values
+        {
+            // 输出Tensor
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}   // sparse_values
         },
         {// 属性
-            {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-            {"sparse_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(5120)},
-            {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
-            {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
-            {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
-            {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}
-        }
-    );
+         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"sparse_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(5120)},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = { // 预期输出
-        {420, 1, 5120},
-        {420, 1, 5120}
-    };
-    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);   // 比对成功返回SUCCESS
+    std::vector<std::vector<int64_t>> expectOutputShape = {// 预期输出
+                                                           {420, 1, 5120},
+                                                           {420, 1, 5120}};
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape); // 比对成功返回SUCCESS
 }
 
 // infer dataType
@@ -160,15 +154,13 @@ TEST_F(LightningIndexerProto, LightningIndexer_inferdtype)
                 .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
                 .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
                 .InputDataTypes({&input_ref0, &input_ref0, &input_ref1, &input_ref2, &input_ref2, &input_ref2})
-                .NodeAttrs({   
-                    {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-                    {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
-                    {"sparse_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
-                    {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
-                    {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
-                    {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
-                    {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}
-                })
+                .NodeAttrs({{"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+                            {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+                            {"sparse_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+                            {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+                            {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+                            {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+                            {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}})
                 .Build();
         auto context = context_holder.GetContext<gert::InferDataTypeContext>();
         EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
@@ -176,6 +168,5 @@ TEST_F(LightningIndexerProto, LightningIndexer_inferdtype)
 
         EXPECT_EQ(context->GetOutputDataType(0), output_ref0);
         EXPECT_EQ(context->GetOutputDataType(1), output_ref1);
-
     }
 }

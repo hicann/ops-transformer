@@ -22,7 +22,7 @@ namespace {
 using TensorDesc = gert::InfershapeContextPara::TensorDescription;
 using OpAttr = gert::InfershapeContextPara::OpAttr;
 
-TensorDesc Desc(const std::vector<int64_t> &dims, ge::DataType dtype)
+TensorDesc Desc(const std::vector<int64_t>& dims, ge::DataType dtype)
 {
     return TensorDesc(ops::ut::MakeGertStorageShape(dims), dtype, ge::FORMAT_ND);
 }
@@ -32,7 +32,7 @@ TensorDesc Empty(ge::DataType dtype)
     return Desc({}, dtype);
 }
 
-gert::InfershapeContextPara MakePara(const std::string &layout, ge::DataType dtype, int64_t batch, int64_t sequence,
+gert::InfershapeContextPara MakePara(const std::string& layout, ge::DataType dtype, int64_t batch, int64_t sequence,
                                      int64_t hidden, int64_t headDim, int64_t cmpRatio, int64_t blockSize,
                                      int64_t maxBlocks, bool withNorm = false)
 {

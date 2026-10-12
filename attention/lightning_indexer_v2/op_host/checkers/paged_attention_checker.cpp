@@ -27,7 +27,7 @@ constexpr int64_t BLOCK_SIZE_LIMIT = 1024;
 constexpr uint32_t BLOCK_TABLE_RANK = 2U;
 } // namespace
 
-ge::graphStatus PagedAttentionChecker::CheckParaExistence(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus PagedAttentionChecker::CheckParaExistence(const LightningIndexerV2CheckerInfo& info) const
 {
     const bool paged = info.layoutK == CheckerLayout::PA_BBND;
     if (paged != info.blockTable.IsPresent()) {
@@ -43,7 +43,7 @@ ge::graphStatus PagedAttentionChecker::CheckParaExistence(const LightningIndexer
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckSinglePara(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus PagedAttentionChecker::CheckSinglePara(const LightningIndexerV2CheckerInfo& info) const
 {
     if (info.layoutK != CheckerLayout::PA_BBND) {
         return ge::GRAPH_SUCCESS;
@@ -59,7 +59,7 @@ ge::graphStatus PagedAttentionChecker::CheckSinglePara(const LightningIndexerV2C
                                               "Block_size must be a multiple of 16 in [16, 1024]");
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape *keyShape = info.key.GetShape();
+    const gert::Shape* keyShape = info.key.GetShape();
     if (keyShape == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
@@ -71,11 +71,11 @@ ge::graphStatus PagedAttentionChecker::CheckSinglePara(const LightningIndexerV2C
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckContiguous(const LightningIndexerV2CheckerInfo &info,
-                                                       const CheckerTensor &tensor, const char *name,
+ge::graphStatus PagedAttentionChecker::CheckContiguous(const LightningIndexerV2CheckerInfo& info,
+                                                       const CheckerTensor& tensor, const char* name,
                                                        uint32_t firstCheckedAxis) const
 {
-    const gert::Shape *shape = tensor.GetShape();
+    const gert::Shape* shape = tensor.GetShape();
     if (!tensor.IsPresent() || tensor.stride == nullptr || tensor.stride->GetDimNum() == 0 || shape == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
@@ -103,10 +103,10 @@ ge::graphStatus PagedAttentionChecker::CheckContiguous(const LightningIndexerV2C
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckMultiPara(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus PagedAttentionChecker::CheckMultiPara(const LightningIndexerV2CheckerInfo& info) const
 {
     if (info.layoutK == CheckerLayout::PA_BBND) {
-        const gert::Shape *blockShape = info.blockTable.GetShape();
+        const gert::Shape* blockShape = info.blockTable.GetShape();
         if (blockShape->GetDim(0) != info.batch) {
             const std::string actual = ShapeToString(info.blockTable);
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(info.opName, "block_table", actual.c_str(),

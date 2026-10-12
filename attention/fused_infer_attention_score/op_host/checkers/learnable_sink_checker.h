@@ -23,21 +23,22 @@
 namespace optiling {
 class LearnableSinkChecker : public BaseChecker {
 public:
-    LearnableSinkChecker(bool enableNonQuant, bool enableFullQuant, bool enableAntiQuant) :
-        BaseChecker(enableNonQuant, enableFullQuant, enableAntiQuant) {}
+    LearnableSinkChecker(bool enableNonQuant, bool enableFullQuant, bool enableAntiQuant)
+        : BaseChecker(enableNonQuant, enableFullQuant, enableAntiQuant)
+    {}
     ~LearnableSinkChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const FiaTilingInfo &fiaInfo) override;
-    ge::graphStatus CheckParaExistence(const FiaTilingInfo &fiaInfo) override;
-    ge::graphStatus CheckCrossFeature(const FiaTilingInfo &fiaInfo) override;
-    ge::graphStatus CheckMultiParaConsistency(const FiaTilingInfo &fiaInfo) override;
+    ge::graphStatus CheckSinglePara(const FiaTilingInfo& fiaInfo) override;
+    ge::graphStatus CheckParaExistence(const FiaTilingInfo& fiaInfo) override;
+    ge::graphStatus CheckCrossFeature(const FiaTilingInfo& fiaInfo) override;
+    ge::graphStatus CheckMultiParaConsistency(const FiaTilingInfo& fiaInfo) override;
 
 private:
     // 公共校验函数
-    ge::graphStatus CheckSinkDtypeSupport(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckFeatureSupport(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckSinkShapeSupport(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckAxisSupport(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckSinkDtypeSupport(const FiaTilingInfo& fiaInfo);
+    ge::graphStatus CheckFeatureSupport(const FiaTilingInfo& fiaInfo);
+    ge::graphStatus CheckSinkShapeSupport(const FiaTilingInfo& fiaInfo);
+    ge::graphStatus CheckAxisSupport(const FiaTilingInfo& fiaInfo);
 
 private:
 };

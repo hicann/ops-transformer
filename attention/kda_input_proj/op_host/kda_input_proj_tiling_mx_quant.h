@@ -71,15 +71,15 @@ inline int64_t UbBytesForBlockNum(int64_t blockNum)
 
 class KdaInputProjMxQuantTiling {
 public:
-    explicit KdaInputProjMxQuantTiling(const KdaInputProjTilingInfo &tilingInfo)
+    explicit KdaInputProjMxQuantTiling(const KdaInputProjTilingInfo& tilingInfo)
         : tilingInfo_(tilingInfo)
     {}
 
-    ge::graphStatus CalcTiling(KdaInputProjMxQuantParams &params) const
+    ge::graphStatus CalcTiling(KdaInputProjMxQuantParams& params) const
     {
         using namespace kda_input_proj_mx_quant;
 
-        const char *opName = tilingInfo_.opName != nullptr ? tilingInfo_.opName : "KdaInputProj";
+        const char* opName = tilingInfo_.opName != nullptr ? tilingInfo_.opName : "KdaInputProj";
         const int64_t rowNum = static_cast<int64_t>(tilingInfo_.baseParams.tSize);
         const int64_t colNum = static_cast<int64_t>(tilingInfo_.baseParams.hiddenSize);
         const int64_t totalCoreNum = static_cast<int64_t>(tilingInfo_.aivNum);
@@ -195,7 +195,7 @@ public:
 
 private:
     // UB 能容纳的 32-block 数量，按 8 的倍数对齐（kernel 以 8 个 block 为一次 VF 迭代）
-    static ge::graphStatus CalcMaxUbBlockNum(int64_t ubSize, int64_t &maxUbBlockNum)
+    static ge::graphStatus CalcMaxUbBlockNum(int64_t ubSize, int64_t& maxUbBlockNum)
     {
         using namespace kda_input_proj_mx_quant;
 
@@ -217,7 +217,7 @@ private:
 
     // 枚举 rowTileNum * colTileNum 的组合，取尾块浪费最小、优先切行的方案
     static ge::graphStatus SplitCores(int64_t totalCoreNum, int64_t rowBlockLoopNum, int64_t colBlockLoopNum,
-                                      int64_t &rowTileNum, int64_t &colTileNum)
+                                      int64_t& rowTileNum, int64_t& colTileNum)
     {
         using namespace kda_input_proj_mx_quant;
 
@@ -266,7 +266,7 @@ private:
         constexpr size_t COL_TILE_IDX = 1U;
         constexpr size_t DELTA_IDX = 2U;
         std::sort(
-            candidates.begin(), candidates.end(), [](const std::vector<int64_t> &a, const std::vector<int64_t> &b) {
+            candidates.begin(), candidates.end(), [](const std::vector<int64_t>& a, const std::vector<int64_t>& b) {
                 // delta 相同时优先切行（colTileNum 更小），减少 scale 尾块拼接
                 return std::make_pair(a[DELTA_IDX], a[COL_TILE_IDX]) < std::make_pair(b[DELTA_IDX], b[COL_TILE_IDX]);
             });
@@ -276,7 +276,7 @@ private:
         return ge::GRAPH_SUCCESS;
     }
 
-    const KdaInputProjTilingInfo &tilingInfo_;
+    const KdaInputProjTilingInfo& tilingInfo_;
 };
 } // namespace optiling
 

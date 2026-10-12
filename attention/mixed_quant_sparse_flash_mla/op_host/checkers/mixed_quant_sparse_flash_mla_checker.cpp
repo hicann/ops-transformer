@@ -17,7 +17,7 @@
 namespace optiling {
 namespace {
 using sparse_mla_checker::CheckContext;
-CheckContext BuildContext(const MQSMLATilingInfo &info)
+CheckContext BuildContext(const MQSMLATilingInfo& info)
 {
     CheckContext context;
     sparse_mla_checker::PopulateCommonContext(context, info);

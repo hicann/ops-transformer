@@ -141,7 +141,7 @@ public:
      * @brief GBSAG K_OUT Kernel 统一入口，仅编排初始化和计算流程。
      * @param params Kernel 输入、输出、workspace 和 tiling 参数。
      */
-    __aicore__ inline void operator()(Params const &params)
+    __aicore__ inline void operator()(Params const& params)
     {
         if (!Init(params)) {
             return;
@@ -230,7 +230,7 @@ private:
      * @param params Kernel 输入、输出、workspace 和 tiling 参数。
      * @return 参数合法时返回 true，否则返回 false。
      */
-    __aicore__ inline bool Init(Params const &params)
+    __aicore__ inline bool Init(Params const& params)
     {
         if (!InitKernelFields(params)) {
             return false;
@@ -245,10 +245,10 @@ private:
      * @param params Kernel 参数，提供 tiling 地址。
      * @return 基础参数合法时返回 true，否则返回 false。
      */
-    __aicore__ inline bool InitKernelFields(Params const &params)
+    __aicore__ inline bool InitKernelFields(Params const& params)
     {
-        tilingData = reinterpret_cast<__gm__ GenericBlockSparseAttentionGradTilingData *>(params.tiling);
-        gMetadata.SetGlobalBuffer((__gm__ int32_t *)params.metadata);
+        tilingData = reinterpret_cast<__gm__ GenericBlockSparseAttentionGradTilingData*>(params.tiling);
+        gMetadata.SetGlobalBuffer((__gm__ int32_t*)params.metadata);
         if (params.metadata == nullptr) {
             return false;
         }
@@ -326,21 +326,21 @@ private:
      * @brief 绑定输入数据、实际序列长度和稀疏索引 GlobalTensor。
      * @param params Kernel 输入参数。
      */
-    __aicore__ inline void InitInputGlobalTensors(Params const &params)
+    __aicore__ inline void InitInputGlobalTensors(Params const& params)
     {
-        gMetadata.SetGlobalBuffer((__gm__ int32_t *)params.metadata);
-        gCuSeqLengthsQ.SetGlobalBuffer((__gm__ int64_t *)params.cuSeqLengthsQ);
-        gCuSeqLengthsKv.SetGlobalBuffer((__gm__ int64_t *)params.cuSeqLengthsKv);
-        gDout.SetGlobalBuffer((__gm__ ElementInput *)params.dout);
-        gOut.SetGlobalBuffer((__gm__ ElementInput *)params.out);
-        gQ.SetGlobalBuffer((__gm__ ElementInput *)params.q);
-        gRsvdBlockIdx.SetGlobalBuffer((__gm__ int32_t *)params.rsvdBlockIdx);
-        gRsvdBlockCount.SetGlobalBuffer((__gm__ int32_t *)params.rsvdBlockCount);
-        gActualQseqlen.SetGlobalBuffer((__gm__ int32_t *)params.actualQseqlen);
-        gActualKvseqlen.SetGlobalBuffer((__gm__ int32_t *)params.actualKvseqlen);
+        gMetadata.SetGlobalBuffer((__gm__ int32_t*)params.metadata);
+        gCuSeqLengthsQ.SetGlobalBuffer((__gm__ int64_t*)params.cuSeqLengthsQ);
+        gCuSeqLengthsKv.SetGlobalBuffer((__gm__ int64_t*)params.cuSeqLengthsKv);
+        gDout.SetGlobalBuffer((__gm__ ElementInput*)params.dout);
+        gOut.SetGlobalBuffer((__gm__ ElementInput*)params.out);
+        gQ.SetGlobalBuffer((__gm__ ElementInput*)params.q);
+        gRsvdBlockIdx.SetGlobalBuffer((__gm__ int32_t*)params.rsvdBlockIdx);
+        gRsvdBlockCount.SetGlobalBuffer((__gm__ int32_t*)params.rsvdBlockCount);
+        gActualQseqlen.SetGlobalBuffer((__gm__ int32_t*)params.actualQseqlen);
+        gActualKvseqlen.SetGlobalBuffer((__gm__ int32_t*)params.actualKvseqlen);
 #ifdef __DAV_C220_CUBE__
-        gK.SetGlobalBuffer((__gm__ ElementInput *)params.k);
-        gV.SetGlobalBuffer((__gm__ ElementInput *)params.v);
+        gK.SetGlobalBuffer((__gm__ ElementInput*)params.k);
+        gV.SetGlobalBuffer((__gm__ ElementInput*)params.v);
 #endif
     }
 
@@ -348,24 +348,24 @@ private:
      * @brief 按既有地址公式绑定公共、Packet 和 Cube workspace GlobalTensor。
      * @param params Kernel workspace 参数。
      */
-    __aicore__ inline void InitWorkspaceGlobalTensors(Params const &params)
+    __aicore__ inline void InitWorkspaceGlobalTensors(Params const& params)
     {
-        gDq.SetGlobalBuffer((__gm__ float *)(params.workspace + workspaceLayout.dqBase));
-        gQPack.SetGlobalBuffer((__gm__ ElementInput *)(params.workspace + corePacketBase));
+        gDq.SetGlobalBuffer((__gm__ float*)(params.workspace + workspaceLayout.dqBase));
+        gQPack.SetGlobalBuffer((__gm__ ElementInput*)(params.workspace + corePacketBase));
         gDoutPack.SetGlobalBuffer(
-            (__gm__ ElementInput *)(params.workspace + corePacketBase + PACKET_DOUT_BASE_SLOT * inputSlotBytes));
+            (__gm__ ElementInput*)(params.workspace + corePacketBase + PACKET_DOUT_BASE_SLOT * inputSlotBytes));
         gOutPack.SetGlobalBuffer(
-            (__gm__ ElementInput *)(params.workspace + corePacketBase + PACKET_OUT_BASE_SLOT * inputSlotBytes));
+            (__gm__ ElementInput*)(params.workspace + corePacketBase + PACKET_OUT_BASE_SLOT * inputSlotBytes));
         gDqPack.SetGlobalBuffer(
-            (__gm__ float *)(params.workspace + corePacketBase + PACKET_DQ_BASE_SLOT * inputSlotBytes));
+            (__gm__ float*)(params.workspace + corePacketBase + PACKET_DQ_BASE_SLOT * inputSlotBytes));
 
 #ifdef __DAV_C220_CUBE__
-        gS.SetGlobalBuffer((__gm__ float *)params.workspace);
-        gP.SetGlobalBuffer((__gm__ ElementInput *)(params.workspace + workspaceLayout.pBase));
-        gDp.SetGlobalBuffer((__gm__ float *)(params.workspace + workspaceLayout.dpBase));
-        gDs.SetGlobalBuffer((__gm__ ElementInput *)(params.workspace + workspaceLayout.dsBase));
-        gDk.SetGlobalBuffer((__gm__ float *)(params.workspace + workspaceLayout.dkBase));
-        gDv.SetGlobalBuffer((__gm__ float *)(params.workspace + workspaceLayout.dvBase));
+        gS.SetGlobalBuffer((__gm__ float*)params.workspace);
+        gP.SetGlobalBuffer((__gm__ ElementInput*)(params.workspace + workspaceLayout.pBase));
+        gDp.SetGlobalBuffer((__gm__ float*)(params.workspace + workspaceLayout.dpBase));
+        gDs.SetGlobalBuffer((__gm__ ElementInput*)(params.workspace + workspaceLayout.dsBase));
+        gDk.SetGlobalBuffer((__gm__ float*)(params.workspace + workspaceLayout.dkBase));
+        gDv.SetGlobalBuffer((__gm__ float*)(params.workspace + workspaceLayout.dvBase));
 #endif
     }
 
@@ -373,7 +373,7 @@ private:
      * @brief 执行 K_OUT 前处理、K/Q/Packet 主循环和结果后处理。
      * @param params Kernel 输入、输出、workspace 和 tiling 参数。
      */
-    __aicore__ inline void Process(Params const &params)
+    __aicore__ inline void Process(Params const& params)
     {
         // 首个 K task 属于计算遍历状态，在计算流程开始时初始化。
         if (!inactiveCore) {
@@ -465,7 +465,7 @@ private:
                     aggregateOp.AggregateScalars(curInfo.qPacket);
 #endif
                     // 后续阶段只读消费 TaskInfo 中的当前 Packet 映射。
-                    const QPacket &packet = curInfo.qPacket;
+                    const QPacket& packet = curInfo.qPacket;
                     curInfo.curHeadIdx = qHeadBegin;
                     // 当前 Packet 首个 tile 对应的原始 Q 行（仅 VEC 侧；qStart 只在 AIV 填充）。
 #ifdef __DAV_C220_VEC__
@@ -577,7 +577,7 @@ private:
      * KV offset、K block 和 KV 计算尺寸会在推进完成后重新计算，
      * 因此这里只复制确定下一任务位置所需的基础状态。
      */
-    __aicore__ inline void CopyKTaskState(const TaskInfo &src, TaskInfo &dst)
+    __aicore__ inline void CopyKTaskState(const TaskInfo& src, TaskInfo& dst)
     {
         dst.curBatchIdx = src.curBatchIdx;
         dst.qSeqlen = src.qSeqlen;
@@ -638,7 +638,7 @@ private:
      * @param basicKVBlockSize 单个 K task 的最大计算行数。
      * @param taskInfo K task 状态；函数更新 curKBlockIdx 和 curCalKVSize。
      */
-    __aicore__ inline void UpdateKTaskCalSize(uint32_t blockShapeY, uint32_t basicKVBlockSize, TaskInfo &taskInfo)
+    __aicore__ inline void UpdateKTaskCalSize(uint32_t blockShapeY, uint32_t basicKVBlockSize, TaskInfo& taskInfo)
     {
         taskInfo.curKBlockIdx = taskInfo.curKSeqIdx / blockShapeY;
         const uint32_t sparseEnd = (taskInfo.curKBlockIdx + 1) * blockShapeY;
@@ -665,10 +665,10 @@ private:
      */
     __aicore__ inline void InitKTaskInfo(AscendC::GlobalTensor<int32_t> gActualQseqlen,
                                          AscendC::GlobalTensor<int32_t> gActualKvseqlen,
-                                         __gm__ GenericBlockSparseAttentionGradTilingData *tilingData,
+                                         __gm__ GenericBlockSparseAttentionGradTilingData* tilingData,
                                          uint32_t numHeads, uint32_t kvHeads, uint32_t headDim, uint32_t maxQSeqlen,
                                          uint32_t maxKvSeqlen, uint32_t blockShapeY, uint32_t basicKVBlockSize,
-                                         uint32_t inputLayout, uint32_t coreIdx, TaskInfo &taskInfo)
+                                         uint32_t inputLayout, uint32_t coreIdx, TaskInfo& taskInfo)
     {
         const uint32_t taskBase = static_cast<uint32_t>(gMetadata.GetValue(GBSAGMeta::OFF_TASK_TABLE_OFFSET)) +
                                   coreIdx * static_cast<uint32_t>(gMetadata.GetValue(GBSAGMeta::OFF_TASK_WORDS));
@@ -733,7 +733,7 @@ private:
                                                AscendC::GlobalTensor<int32_t> gActualKvseqlen, uint32_t numHeads,
                                                uint32_t kvHeads, uint32_t headDim, uint32_t maxQSeqlen,
                                                uint32_t maxKvSeqlen, uint32_t blockShapeY, uint32_t basicKVBlockSize,
-                                               uint32_t inputLayout, const TaskInfo &cur, TaskInfo &next)
+                                               uint32_t inputLayout, const TaskInfo& cur, TaskInfo& next)
     {
         CopyKTaskState(cur, next);
         bool nextBatch = false;
@@ -803,8 +803,8 @@ private:
      * @param packet 离散 Q 行到连续 Packet 行的映射。
      * @param gatherOp Q/dOut 聚合服务对象。
      */
-    __aicore__ inline void GatherPacket(const TaskInfo &curInfo, uint32_t qHead, uint32_t pingpongFlag,
-                                        const QPacket &packet, GBSAGGater<ElementInput> &gatherOp)
+    __aicore__ inline void GatherPacket(const TaskInfo& curInfo, uint32_t qHead, uint32_t pingpongFlag,
+                                        const QPacket& packet, GBSAGGater<ElementInput>& gatherOp)
     {
         const uint32_t tileRows = GBSAG::GetQPacketTileRows(groupSize);
         typename GBSAGGater<ElementInput>::Params qGatherParams(
@@ -821,8 +821,8 @@ private:
     /**
      * @brief 将当前 Packet 的离散 out 行聚合到独立连续 Packet workspace。
      */
-    __aicore__ inline void GatherOutPacket(const TaskInfo &curInfo, uint32_t qHead, uint32_t pingpongFlag,
-                                           const QPacket &packet, GBSAGGater<ElementInput> &gatherOp)
+    __aicore__ inline void GatherOutPacket(const TaskInfo& curInfo, uint32_t qHead, uint32_t pingpongFlag,
+                                           const QPacket& packet, GBSAGGater<ElementInput>& gatherOp)
     {
         const uint32_t tileRows = GBSAG::GetQPacketTileRows(groupSize);
         typename GBSAGGater<ElementInput>::Params outGatherParams(
@@ -840,8 +840,8 @@ private:
      * @param blockMmad1 Cube1 MatMul 服务对象。
      * @param mmadFlag MatMul 服务使用的流水标志。
      */
-    __aicore__ inline void ComputeScoreAndDp(const TaskInfo &curInfo, uint32_t pingpongFlag,
-                                             BlockMmadGBSAG1 &blockMmad1, uint32_t &mmadFlag)
+    __aicore__ inline void ComputeScoreAndDp(const TaskInfo& curInfo, uint32_t pingpongFlag,
+                                             BlockMmadGBSAG1& blockMmad1, uint32_t& mmadFlag)
     {
         LayoutA1 layoutA1;
         LayoutB1 layoutB1;
@@ -872,8 +872,8 @@ private:
      * @param packet 当前 Packet 行映射。
      * @param softmaxOp SAndDs 服务对象。
      */
-    __aicore__ inline void ComputeSAndDs(Params const &params, const TaskInfo &curInfo, uint32_t qHead,
-                                         uint32_t pingpongFlag, const QPacket &packet, EpilogueFAGOp &softmaxOp)
+    __aicore__ inline void ComputeSAndDs(Params const& params, const TaskInfo& curInfo, uint32_t qHead,
+                                         uint32_t pingpongFlag, const QPacket& packet, EpilogueFAGOp& softmaxOp)
     {
         // 两个 AIV 按 Packet 实际行数二分，尾 Packet 不使用固定 128 行。
         const QPacketAivRange aivRange = GetQPacketAivRange(packet.rows);
@@ -909,8 +909,8 @@ private:
      * @param blockMmad3 dK/dV MatMul 服务对象。
      * @param mmadFlag MatMul 服务使用的流水标志。
      */
-    __aicore__ inline void ComputeDqDkDv(const TaskInfo &curInfo, uint32_t pingpongFlag, BlockMmadGBSAG2 &blockMmad2,
-                                         BlockMmadGBSAG3 &blockMmad3, uint32_t &mmadFlag)
+    __aicore__ inline void ComputeDqDkDv(const TaskInfo& curInfo, uint32_t pingpongFlag, BlockMmadGBSAG2& blockMmad2,
+                                         BlockMmadGBSAG3& blockMmad3, uint32_t& mmadFlag)
     {
         LayoutA2 layoutA2(curInfo.curCalQSize, curInfo.curCalKVSize);
         LayoutB2 layoutB2;
@@ -952,8 +952,8 @@ private:
      * @param packet 当前 Packet 行映射。
      * @param scatterOp dQ 恢复服务对象。
      */
-    __aicore__ inline void ScatterDqPacket(const TaskInfo &curInfo, uint32_t qHead, uint32_t pingpongFlag,
-                                           const QPacket &packet, GBSAGScateer<float> &scatterOp)
+    __aicore__ inline void ScatterDqPacket(const TaskInfo& curInfo, uint32_t qHead, uint32_t pingpongFlag,
+                                           const QPacket& packet, GBSAGScateer<float>& scatterOp)
     {
         const uint32_t tileRows = GBSAG::GetQPacketTileRows(groupSize);
         typename GBSAGScateer<float>::Params scatterParams(
@@ -966,8 +966,8 @@ private:
     /**
      * @brief 按当前 AIV 的 Packet 行范围计算 D = sum(dOut * out)。
      */
-    __aicore__ inline void VecPrepareD(Params const &params, const TaskInfo &curInfo, uint32_t pingpongFlag,
-                                       const QPacket &packet, EpilogueFAGSfmg &sfmgOp)
+    __aicore__ inline void VecPrepareD(Params const& params, const TaskInfo& curInfo, uint32_t pingpongFlag,
+                                       const QPacket& packet, EpilogueFAGSfmg& sfmgOp)
     {
         const QPacketAivRange range = GetQPacketAivRange(packet.rows);
         if (range.rows > 0) {
@@ -978,7 +978,7 @@ private:
         }
     }
 
-    __aicore__ inline void VecPost(Params const &params)
+    __aicore__ inline void VecPost(Params const& params)
     {
         GM_ADDR gDqGm = params.workspace + workspaceLayout.dqBase;
         GM_ADDR gDkGm = params.workspace + workspaceLayout.dkBase;
@@ -990,7 +990,7 @@ private:
         vecPost();
     }
 
-    __aicore__ inline void VecPre(Params const &params)
+    __aicore__ inline void VecPre(Params const& params)
     {
         GM_ADDR gDqWrkGm = params.workspace + workspaceLayout.dqBase;
         GM_ADDR gDkWrkGm = params.workspace + workspaceLayout.dkBase;
@@ -1003,7 +1003,7 @@ private:
 
     // 设备资源与 tiling。
     NpuArch::Arch::Resource<ArchTag> resource;                    // 当前架构的设备资源。
-    __gm__ GenericBlockSparseAttentionGradTilingData *tilingData; // Host 下发的 tiling 数据。
+    __gm__ GenericBlockSparseAttentionGradTilingData* tilingData; // Host 下发的 tiling 数据。
 
     // 核索引、shape 和布局参数。
     uint32_t blockIdx;    // 当前物理 AIC/AIV 核索引。

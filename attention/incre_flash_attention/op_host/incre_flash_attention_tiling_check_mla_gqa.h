@@ -45,7 +45,7 @@ ge::graphStatus IFATiling::CheckMlaQueryRopeDesc() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IFATiling::CheckMlaQueryRopeBsndLayout(const gert::Shape &qRopeShape, const gert::Shape &qShape)
+ge::graphStatus IFATiling::CheckMlaQueryRopeBsndLayout(const gert::Shape& qRopeShape, const gert::Shape& qShape)
 {
     OP_CHECK_IF(qRopeShape.GetDim(0) != qShape.GetDim(0),
                 OP_LOGE(ifaContext_->opName, "queryRope [%ld] and query [%ld] must have same 'B'", qRopeShape.GetDim(0),
@@ -72,7 +72,7 @@ ge::graphStatus IFATiling::CheckMlaQueryRopeBsndLayout(const gert::Shape &qRopeS
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IFATiling::CheckMlaQueryRopeBnsdLayout(const gert::Shape &qRopeShape, const gert::Shape &qShape)
+ge::graphStatus IFATiling::CheckMlaQueryRopeBnsdLayout(const gert::Shape& qRopeShape, const gert::Shape& qShape)
 {
     OP_CHECK_IF((qRopeShape.GetDim(0) != qShape.GetDim(0)) || (qRopeShape.GetDim(1) != qShape.GetDim(1)) ||
                     (qRopeShape.GetDim(2) != qShape.GetDim(2)), // 2: S
@@ -86,7 +86,7 @@ ge::graphStatus IFATiling::CheckMlaQueryRopeBnsdLayout(const gert::Shape &qRopeS
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IFATiling::CheckMlaQueryRopeNzLayout(const gert::Shape &qRopeShape, const gert::Shape &qShape)
+ge::graphStatus IFATiling::CheckMlaQueryRopeNzLayout(const gert::Shape& qRopeShape, const gert::Shape& qShape)
 {
     OP_CHECK_IF(
         (qRopeShape.GetDim(0) != qShape.GetDim(0)) || (qRopeShape.GetDim(1) != qShape.GetDim(1)),

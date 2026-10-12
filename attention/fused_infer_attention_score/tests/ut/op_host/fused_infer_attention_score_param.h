@@ -35,7 +35,7 @@ struct FusedInferAttentionHostUtParamBase : public HostUtParamBase {
     int64_t pse_type;
     int64_t out_dtype;
 
-    FusedInferAttentionHostUtParamBase(const csv_map &csvMap)
+    FusedInferAttentionHostUtParamBase(const csv_map& csvMap)
         : HostUtParamBase(csvMap)
     {
         this->num_heads = std::stoll(ReadMap(csvMap, "num_heads"));
@@ -104,9 +104,9 @@ struct FusedInferAttentionTilingUtParam : public FusedInferAttentionHostUtParamB
     std::vector<gert::TilingContextPara::TensorDescription> keyList;
     std::vector<gert::TilingContextPara::TensorDescription> valueList;
 
-    static void ApplyConstData(const csv_map &csvMap, const std::string &name,
-                               gert::TilingContextPara::TensorDescription &desc,
-                               std::shared_ptr<std::vector<int64_t>> &buf)
+    static void ApplyConstData(const csv_map& csvMap, const std::string& name,
+                               gert::TilingContextPara::TensorDescription& desc,
+                               std::shared_ptr<std::vector<int64_t>>& buf)
     {
         std::string dataStr = ReadMap(csvMap, name + "_data");
         if (!dataStr.empty()) {
@@ -120,7 +120,7 @@ struct FusedInferAttentionTilingUtParam : public FusedInferAttentionHostUtParamB
         }
     }
 
-    FusedInferAttentionTilingUtParam(const csv_map &csvMap)
+    FusedInferAttentionTilingUtParam(const csv_map& csvMap)
         : FusedInferAttentionHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(
@@ -261,7 +261,7 @@ struct FusedInferAttentionInferShapeUtParam : public FusedInferAttentionHostUtPa
 
     std::vector<std::vector<int64_t>> expectOutputShape;
 
-    FusedInferAttentionInferShapeUtParam(const csv_map &csvMap)
+    FusedInferAttentionInferShapeUtParam(const csv_map& csvMap)
         : FusedInferAttentionHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(
@@ -379,7 +379,7 @@ struct FusedInferAttentionInferDTypeUtParam : public FusedInferAttentionHostUtPa
     ge::DataType attention_out = ge::DT_UNDEFINED;
     ge::DataType softmax_lse = ge::DT_UNDEFINED;
 
-    FusedInferAttentionInferDTypeUtParam(const csv_map &csvMap)
+    FusedInferAttentionInferDTypeUtParam(const csv_map& csvMap)
         : FusedInferAttentionHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetDataTypeGE(csvMap, "query_dtype", this->query));

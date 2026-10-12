@@ -29,11 +29,11 @@ const int DIM_3 = 3;
 constexpr int64_t LI_V2_METADATA_SIZE = 1024;
 
 at::Tensor LightningIndexerMetadata(int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk,
-                                    const c10::optional<at::Tensor> &cuSeqlensQ,
-                                    const c10::optional<at::Tensor> &cuSeqlensK,
-                                    const c10::optional<at::Tensor> &sequsedQ,
-                                    const c10::optional<at::Tensor> &sequsedK,
-                                    const c10::optional<at::Tensor> &cmpResidualK, int64_t batchSize,
+                                    const c10::optional<at::Tensor>& cuSeqlensQ,
+                                    const c10::optional<at::Tensor>& cuSeqlensK,
+                                    const c10::optional<at::Tensor>& sequsedQ,
+                                    const c10::optional<at::Tensor>& sequsedK,
+                                    const c10::optional<at::Tensor>& cmpResidualK, int64_t batchSize,
                                     int64_t maxSeqlenQ, int64_t maxSeqlenK, c10::string_view layoutQ,
                                     c10::string_view layoutK, int64_t maskMode, int64_t cmpRatio)
 {
@@ -59,8 +59,8 @@ at::Tensor LightningIndexerMetadata(int64_t numHeadsQ, int64_t numHeadsK, int64_
 
     std::string layoutQStr = std::string(layoutQ);
     std::string layoutKStr = std::string(layoutK);
-    char *layoutQPtr = const_cast<char *>(layoutQStr.c_str());
-    char *layoutKPtr = const_cast<char *>(layoutKStr.c_str());
+    char* layoutQPtr = const_cast<char*>(layoutQStr.c_str());
+    char* layoutKPtr = const_cast<char*>(layoutKStr.c_str());
 
     ACLNN_CMD(aclnnLightningIndexerV2Metadata, cuSeqlensQVal, cuSeqlensKVal, sequsedQVal, sequsedKVal, cmpResidualKVal,
               numHeadsQ, numHeadsK, headDim, topk, batchSize, maxSeqlenQ, maxSeqlenK, layoutQPtr, layoutKPtr, maskMode,
@@ -69,7 +69,7 @@ at::Tensor LightningIndexerMetadata(int64_t numHeadsQ, int64_t numHeadsK, int64_
 }
 
 // 工具函数，推导输出shape
-std::tuple<at::Tensor, at::Tensor> ConstructLightningIndexerOutputTensor(const at::Tensor &query, const at::Tensor &key,
+std::tuple<at::Tensor, at::Tensor> ConstructLightningIndexerOutputTensor(const at::Tensor& query, const at::Tensor& key,
                                                                          int64_t topk, std::string queryLayoutStr,
                                                                          std::string keyLayoutStr, bool returnValue)
 {
@@ -107,11 +107,11 @@ std::tuple<at::Tensor, at::Tensor> ConstructLightningIndexerOutputTensor(const a
 }
 
 std::tuple<at::Tensor, at::Tensor> LightningIndexer(
-    const at::Tensor &q, const at::Tensor &k, const at::Tensor &w, int64_t topk,
-    const c10::optional<at::Tensor> &cuSeqlensQ, const c10::optional<at::Tensor> &cuSeqlensK,
-    const c10::optional<at::Tensor> &sequsedQ, const c10::optional<at::Tensor> &sequsedK,
-    const c10::optional<at::Tensor> &cmpResidualK, const c10::optional<at::Tensor> &blockTable,
-    const c10::optional<at::Tensor> &outputIdxOffset, const c10::optional<at::Tensor> &metadata, int64_t maxSeqlenQ,
+    const at::Tensor& q, const at::Tensor& k, const at::Tensor& w, int64_t topk,
+    const c10::optional<at::Tensor>& cuSeqlensQ, const c10::optional<at::Tensor>& cuSeqlensK,
+    const c10::optional<at::Tensor>& sequsedQ, const c10::optional<at::Tensor>& sequsedK,
+    const c10::optional<at::Tensor>& cmpResidualK, const c10::optional<at::Tensor>& blockTable,
+    const c10::optional<at::Tensor>& outputIdxOffset, const c10::optional<at::Tensor>& metadata, int64_t maxSeqlenQ,
     c10::string_view layoutQ, c10::string_view layoutK, int64_t maskMode, int64_t cmpRatio, int64_t returnValue)
 {
     TORCH_CHECK(q.numel() > 0, "Tensor q is empty.")
@@ -126,8 +126,8 @@ std::tuple<at::Tensor, at::Tensor> LightningIndexer(
     at::Tensor sparseIndicesOut = std::get<0>(lightningIndexerOutput);
     at::Tensor sparseValuesOut = std::get<1>(lightningIndexerOutput);
     // convert str
-    char *queryLayoutPtr = const_cast<char *>(queryLayoutStr.c_str());
-    char *keyLayoutPtr = const_cast<char *>(keyLayoutStr.c_str());
+    char* queryLayoutPtr = const_cast<char*>(queryLayoutStr.c_str());
+    char* keyLayoutPtr = const_cast<char*>(keyLayoutStr.c_str());
 
     ACLNN_CMD(aclnnLightningIndexerV2, q, k, w, cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, blockTable,
               outputIdxOffset, metadata, topk, maxSeqlenQ, queryLayoutPtr, keyLayoutPtr, maskMode, cmpRatio,

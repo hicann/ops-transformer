@@ -88,7 +88,7 @@ gert::StorageShape ScaleShape(int64_t nSize, int64_t kSize, bool transQkv)
     return transQkv ? Shape3D(nSize, mxK, kScalePack) : Shape3D(mxK, nSize, kScalePack);
 }
 
-std::string MakeSocInfo(uint64_t ubSize, uint64_t l1Size, const char *socVersion)
+std::string MakeSocInfo(uint64_t ubSize, uint64_t l1Size, const char* socVersion)
 {
     std::ostringstream oss;
     oss << R"({"hardware_info":{"BT_SIZE":0,"load3d_constraints":"1",)"
@@ -116,7 +116,7 @@ struct ShapeCfg {
     bool withAttrs = true;
     uint64_t ubSize = kDefaultUb;
     uint64_t l1Size = kDefaultL1;
-    const char *socVersion = "Ascend950";
+    const char* socVersion = "Ascend950";
     ge::DataType xDtype = ge::DT_BF16;
     ge::DataType wQkvDtype = ge::DT_FLOAT8_E4M3FN;
     ge::DataType wBetaDtype = ge::DT_BF16;
@@ -134,7 +134,7 @@ struct ShapeCfg {
     bool mismatchScale = false;
 };
 
-std::vector<gert::TilingContextPara::OpAttr> MakeAttrs(const ShapeCfg &cfg)
+std::vector<gert::TilingContextPara::OpAttr> MakeAttrs(const ShapeCfg& cfg)
 {
     if (!cfg.withAttrs) {
         return {};
@@ -147,7 +147,7 @@ std::vector<gert::TilingContextPara::OpAttr> MakeAttrs(const ShapeCfg &cfg)
     };
 }
 
-gert::TilingContextPara BuildPara(const ShapeCfg &cfg)
+gert::TilingContextPara BuildPara(const ShapeCfg& cfg)
 {
     gert::StorageShape xShape = cfg.xRankExtra > 0 ? Shape3D(cfg.t, cfg.k, 1) : Shape2D(cfg.t, cfg.k);
     gert::StorageShape scale = ScaleShape(cfg.nQkv, cfg.k, cfg.transQkv);
@@ -183,17 +183,17 @@ gert::TilingContextPara BuildPara(const ShapeCfg &cfg)
                                    socInfo, kTilingDataSize);
 }
 
-const KdaInputProjTilingData *AsTilingData(const TilingInfo &info)
+const KdaInputProjTilingData* AsTilingData(const TilingInfo& info)
 {
     EXPECT_GE(info.tilingDataSize, sizeof(KdaInputProjTilingData));
-    return reinterpret_cast<const KdaInputProjTilingData *>(info.tilingData.get());
+    return reinterpret_cast<const KdaInputProjTilingData*>(info.tilingData.get());
 }
 
-void CheckCommon(const TilingInfo &info, const ShapeCfg &cfg)
+void CheckCommon(const TilingInfo& info, const ShapeCfg& cfg)
 {
     EXPECT_EQ(info.tilingKey, GET_TPL_TILING_KEY(cfg.transQkv, cfg.transBeta, cfg.transGate, cfg.transG));
     EXPECT_GT(info.blockNum, 0U);
-    const auto *td = AsTilingData(info);
+    const auto* td = AsTilingData(info);
     ASSERT_NE(td, nullptr);
     EXPECT_EQ(td->baseParams.tSize, static_cast<uint32_t>(cfg.t));
     EXPECT_EQ(td->baseParams.hiddenSize, static_cast<uint32_t>(cfg.k));
@@ -234,7 +234,7 @@ void CheckCommon(const TilingInfo &info, const ShapeCfg &cfg)
                                                                                       static_cast<uint32_t>(cfg.k)));
 }
 
-bool RunSuccess(const ShapeCfg &cfg, TilingInfo &info)
+bool RunSuccess(const ShapeCfg& cfg, TilingInfo& info)
 {
     auto para = BuildPara(cfg);
     return ExecuteTiling(para, info);
@@ -265,7 +265,7 @@ TEST_F(KdaInputProjTilingTest, tiling_success_prod_all_trans_true)
     TilingInfo info;
     ASSERT_TRUE(RunSuccess(cfg, info));
     CheckCommon(info, cfg);
-    const auto *td = AsTilingData(info);
+    const auto* td = AsTilingData(info);
     EXPECT_EQ(td->mxQuantParams.colTileNum, 1); // full-row：K/32=224 能进默认 UB
     EXPECT_EQ(td->qmmQkvParams.bMustHitL2, 0);  // T=8 → mCnt=1
     EXPECT_EQ(td->qmmQkvParams.dbL0C, 2);       // 16x256 L0C 双缓冲放得下
@@ -314,7 +314,7 @@ TEST_F(KdaInputProjTilingTest, tiling_success_t1_min_path)
     TilingInfo info;
     ASSERT_TRUE(RunSuccess(cfg, info));
     CheckCommon(info, cfg);
-    const auto *td = AsTilingData(info);
+    const auto* td = AsTilingData(info);
     EXPECT_EQ(td->sigmoidParams.elemNum, static_cast<uint32_t>(cfg.nBeta));
 }
 
@@ -331,7 +331,7 @@ TEST_F(KdaInputProjTilingTest, tiling_success_t257_qmm_mcnt_hit_l2)
     TilingInfo info;
     ASSERT_TRUE(RunSuccess(cfg, info));
     CheckCommon(info, cfg);
-    const auto *td = AsTilingData(info);
+    const auto* td = AsTilingData(info);
     EXPECT_EQ(td->qmmQkvParams.bMustHitL2, 1);
     EXPECT_EQ(td->qmmQkvParams.dbL0C, 1);
     EXPECT_EQ(td->qmmQkvParams.baseM, 256U);
@@ -349,7 +349,7 @@ TEST_F(KdaInputProjTilingTest, tiling_success_t512_sigmoid_multicore)
     TilingInfo info;
     ASSERT_TRUE(RunSuccess(cfg, info));
     CheckCommon(info, cfg);
-    const auto *td = AsTilingData(info);
+    const auto* td = AsTilingData(info);
     EXPECT_GT(td->sigmoidParams.aivNum, 1U);
 }
 
@@ -382,7 +382,7 @@ TEST_F(KdaInputProjTilingTest, tiling_success_mxquant_col_split_slice256)
     TilingInfo info;
     ASSERT_TRUE(RunSuccess(cfg, info));
     CheckCommon(info, cfg);
-    const auto *td = AsTilingData(info);
+    const auto* td = AsTilingData(info);
     EXPECT_GT(td->mxQuantParams.colTileNum, 1);
     EXPECT_EQ(td->mxQuantParams.colNum, 1024);
     // sliceSize=256 → colNormalBlockNum 以 256 为单位，整除后为 1
@@ -400,7 +400,7 @@ TEST_F(KdaInputProjTilingTest, tiling_success_mxquant_col_split_slice512)
     TilingInfo info;
     ASSERT_TRUE(RunSuccess(cfg, info));
     CheckCommon(info, cfg);
-    const auto *td = AsTilingData(info);
+    const auto* td = AsTilingData(info);
     EXPECT_GT(td->mxQuantParams.colTileNum, 1);
     EXPECT_EQ(td->mxQuantParams.colNormalBlockNum, 2);
 }
@@ -413,7 +413,7 @@ TEST_F(KdaInputProjTilingTest, tiling_success_qmm_nbuffer_2_3_4)
         uint8_t nBuffer;
     };
     const Case cases[] = {{180000, 2}, {250000, 3}, {kDefaultL1, 4}};
-    for (const auto &c : cases) {
+    for (const auto& c : cases) {
         ShapeCfg cfg;
         cfg.nQkv = 256;
         cfg.l1Size = c.l1Size;
@@ -663,7 +663,7 @@ TEST_F(KdaInputProjTilingTest, tiling_success_mxquant_col_split_col_tail)
     TilingInfo info;
     ASSERT_TRUE(RunSuccess(cfg, info));
     CheckCommon(info, cfg);
-    const auto *td = AsTilingData(info);
+    const auto* td = AsTilingData(info);
     EXPECT_GT(td->mxQuantParams.colTileNum, 1);
     EXPECT_GT(td->mxQuantParams.colTailLen, 0);
     EXPECT_NE(td->mxQuantParams.colTailLen, td->mxQuantParams.colNum);
@@ -678,7 +678,7 @@ TEST_F(KdaInputProjTilingTest, tiling_success_t41_fullrow_row_tail)
     TilingInfo info;
     ASSERT_TRUE(RunSuccess(cfg, info));
     CheckCommon(info, cfg);
-    const auto *td = AsTilingData(info);
+    const auto* td = AsTilingData(info);
     EXPECT_EQ(td->mxQuantParams.colTileNum, 1);
     EXPECT_EQ(td->mxQuantParams.rowNormalBlockNum, 2);
     EXPECT_EQ(td->mxQuantParams.rowTailLen, 1);

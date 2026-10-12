@@ -22,10 +22,10 @@
 namespace LIV2Common {
 
 template <typename ValueBits, typename ValueOutT, typename RunInfoT>
-__aicore__ inline void DoTndPadding(const RunInfoT &runInfo, uint64_t topk, bool returnValue,
+__aicore__ inline void DoTndPadding(const RunInfoT& runInfo, uint64_t topk, bool returnValue,
                                     ValueBits negativeInfinity, uint64_t kHeadNum, int32_t invalidIdx,
-                                    uint32_t mte3VEvent, AscendC::GlobalTensor<int32_t> &indiceOutGm,
-                                    AscendC::GlobalTensor<ValueOutT> &valueOutGm)
+                                    uint32_t mte3VEvent, AscendC::GlobalTensor<int32_t>& indiceOutGm,
+                                    AscendC::GlobalTensor<ValueOutT>& valueOutGm)
 {
     uint32_t paddingLen = runInfo.curCuSeqlensQ - runInfo.curSequsedQ;
     uint64_t paddingOffset = runInfo.indiceOutOffset + runInfo.curSequsedQ * kHeadNum * topk;
@@ -36,7 +36,7 @@ __aicore__ inline void DoTndPadding(const RunInfoT &runInfo, uint64_t topk, bool
         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(mte3VEvent);
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(mte3VEvent);
         AscendC::GlobalTensor<ValueBits> valueOutGmTmp;
-        valueOutGmTmp.SetGlobalBuffer((__gm__ ValueBits *)valueOutGm.GetPhyAddr());
+        valueOutGmTmp.SetGlobalBuffer((__gm__ ValueBits*)valueOutGm.GetPhyAddr());
         AscendC::GlobalTensor<ValueBits> valueOut = valueOutGmTmp[paddingOffset];
         AscendC::InitGlobalMemory(valueOut, dealSize, negativeInfinity);
         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(mte3VEvent);
@@ -45,7 +45,7 @@ __aicore__ inline void DoTndPadding(const RunInfoT &runInfo, uint64_t topk, bool
 }
 
 template <typename LdInfoT>
-__aicore__ inline uint64_t GetLdGmOffset(const LdInfoT &ldInfo, uint32_t s1BaseSize, uint32_t topkCountAlign16,
+__aicore__ inline uint64_t GetLdGmOffset(const LdInfoT& ldInfo, uint32_t s1BaseSize, uint32_t topkCountAlign16,
                                          uint32_t row, uint32_t block, uint32_t workspaceCount)
 {
     return ldInfo.workspaceIdx * s1BaseSize * topkCountAlign16 + topkCountAlign16 * (ldInfo.mStart + row) +

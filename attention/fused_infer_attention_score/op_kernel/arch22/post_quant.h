@@ -31,33 +31,33 @@ template <UbFormat UB_FORMAT>
 class PostQuant {
 public:
     template <typename PARAM_T, GmFormat GM_FORMAT>
-    __aicore__ inline void InitPerChannel(FaGmTensor<PARAM_T, GM_FORMAT> &srcTensor, __gm__ uint8_t *quantParam,
+    __aicore__ inline void InitPerChannel(FaGmTensor<PARAM_T, GM_FORMAT>& srcTensor, __gm__ uint8_t* quantParam,
                                           uint32_t n2Size, uint32_t gSize, uint32_t dSize)
     {
         GlobalTensor<PARAM_T> quantParamGm;
-        quantParamGm.SetGlobalBuffer((__gm__ PARAM_T *)quantParam);
+        quantParamGm.SetGlobalBuffer((__gm__ PARAM_T*)quantParam);
         srcTensor.gmTensor = quantParamGm;
         srcTensor.offsetCalculator.Init(n2Size, gSize, dSize);
     }
 
-    __aicore__ inline void InitPerTensor(float &value, __gm__ uint8_t *quantParam, bool isQuant2Bf16)
+    __aicore__ inline void InitPerTensor(float& value, __gm__ uint8_t* quantParam, bool isQuant2Bf16)
     {
         if (isQuant2Bf16) {
             GlobalTensor<bfloat16_t> quantParamGm;
-            quantParamGm.SetGlobalBuffer((__gm__ bfloat16_t *)quantParam);
+            quantParamGm.SetGlobalBuffer((__gm__ bfloat16_t*)quantParam);
             value = ToFloat(quantParamGm.GetValue(0));
         } else {
             GlobalTensor<float> quantParamGm;
-            quantParamGm.SetGlobalBuffer((__gm__ float *)quantParam);
+            quantParamGm.SetGlobalBuffer((__gm__ float*)quantParam);
             value = quantParamGm.GetValue(0);
         }
     }
 
     template <typename PARAM_T, GmFormat GM_FORMAT>
-    __aicore__ inline void CopyParamsGmToUb(LocalTensor<PARAM_T> &dstUb, FaGmTensor<PARAM_T, GM_FORMAT> &srcTensor,
-                                            PostQuantInfo_V2 &postQuantInfo)
+    __aicore__ inline void CopyParamsGmToUb(LocalTensor<PARAM_T>& dstUb, FaGmTensor<PARAM_T, GM_FORMAT>& srcTensor,
+                                            PostQuantInfo_V2& postQuantInfo)
     {
-        OffsetCalculator<GM_FORMAT> &offsetCalculator = srcTensor.offsetCalculator;
+        OffsetCalculator<GM_FORMAT>& offsetCalculator = srcTensor.offsetCalculator;
 
         if constexpr (UB_FORMAT == UbFormat::S1G) {
             uint32_t s1IdxStart = postQuantInfo.gS1Idx / offsetCalculator.GetDimG();
@@ -108,8 +108,8 @@ public:
     }
 
     // src0Ub为需要量化的数据, src1为存放scale/offset参数的UB
-    __aicore__ inline void AddOffset(LocalTensor<float> &dstUb, LocalTensor<float> &src0Ub, LocalTensor<float> &src1Ub,
-                                     PostQuantInfo_V2 &postQuantInfo)
+    __aicore__ inline void AddOffset(LocalTensor<float>& dstUb, LocalTensor<float>& src0Ub, LocalTensor<float>& src1Ub,
+                                     PostQuantInfo_V2& postQuantInfo)
     {
         if constexpr (UB_FORMAT == UbFormat::S1G) {
             uint32_t s1IdxStart = postQuantInfo.gS1Idx / postQuantInfo.gSize;
@@ -182,8 +182,8 @@ public:
     }
 
     // src0Ub为需要量化的数据, src1为存放scale/offset参数的UB
-    __aicore__ inline void MulScale(LocalTensor<float> &dstUb, LocalTensor<float> &src0Ub, LocalTensor<float> &src1Ub,
-                                    PostQuantInfo_V2 &postQuantInfo)
+    __aicore__ inline void MulScale(LocalTensor<float>& dstUb, LocalTensor<float>& src0Ub, LocalTensor<float>& src1Ub,
+                                    PostQuantInfo_V2& postQuantInfo)
     {
         if constexpr (UB_FORMAT == UbFormat::S1G) {
             uint32_t s1IdxStart = postQuantInfo.gS1Idx / postQuantInfo.gSize;

@@ -29,19 +29,18 @@ namespace optiling {
 #define FIA_MLA_UT_VISIBLE
 #endif
 
-FIA_MLA_UT_VISIBLE void FillArch22MlaKvStrideParams(
-    FusedInferAttentionKvStrideParams &params, const FiaTilingInfo &fiaInfo);
+FIA_MLA_UT_VISIBLE void FillArch22MlaKvStrideParams(FusedInferAttentionKvStrideParams& params,
+                                                    const FiaTilingInfo& fiaInfo);
 
 class FiaTilingNonQuantMla : public FiaTilingBase {
 public:
-    explicit FiaTilingNonQuantMla(gert::TilingContext *context)
+    explicit FiaTilingNonQuantMla(gert::TilingContext* context)
         : FiaTilingBase(context)
-    {
-    }
+    {}
     ~FiaTilingNonQuantMla() override = default;
 
 protected:
-    void InitTilingInfo(TilingInfo *tilingInfo) override;
+    void InitTilingInfo(TilingInfo* tilingInfo) override;
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
 
@@ -53,8 +52,8 @@ private:
     void EmptyTensorProcess() const;
     void InitParams();
 
-    void CreateSplitInput(BaseInfo &baseInfo, SplitParam &splitParam) const;
-    void SetSplitOutput(SplitResult &res);
+    void CreateSplitInput(BaseInfo& baseInfo, SplitParam& splitParam) const;
+    void SetSplitOutput(SplitResult& res);
     void Split();
     void CalcInnerSize(uint32_t seqSize);
     void CalcMBaseSize();
@@ -112,7 +111,7 @@ private:
     uint32_t mFdBaseSize_ = 8;
 
     // Tiling Info
-    FiaTilingInfo *fiaInfo_ = nullptr;
+    FiaTilingInfo* fiaInfo_ = nullptr;
 };
 #undef FIA_MLA_UT_VISIBLE
 

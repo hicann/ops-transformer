@@ -17,7 +17,7 @@
 namespace FusedInferAttentionScoreUT {
 namespace {
 
-const char *A2_SOC_INFO = "{\n"
+const char* A2_SOC_INFO = "{\n"
                           "  \"hardware_info\": {\n"
                           "    \"BT_SIZE\": 0,\n"
                           "    \"load3d_constraints\": \"1\",\n"

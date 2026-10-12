@@ -49,19 +49,19 @@ constexpr uint32_t TND_HEAD_AXIS = 1U;
 constexpr uint32_t TND_HEAD_DIM_AXIS = 2U;
 constexpr uint32_t BLOCK_TABLE_BLOCK_COUNT_AXIS = 1U;
 
-bool SameDim(const gert::Shape &lhs, uint32_t lhsIndex, const gert::Shape &rhs, uint32_t rhsIndex)
+bool SameDim(const gert::Shape& lhs, uint32_t lhsIndex, const gert::Shape& rhs, uint32_t rhsIndex)
 {
     return lhs.GetDim(lhsIndex) == rhs.GetDim(rhsIndex);
 }
 
-ge::graphStatus LogShapeMismatch(const LightningIndexerV2CheckerInfo &info, const char *names,
-                                 const std::string &actual, const std::string &reason)
+ge::graphStatus LogShapeMismatch(const LightningIndexerV2CheckerInfo& info, const char* names,
+                                 const std::string& actual, const std::string& reason)
 {
     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(info.opName, names, actual.c_str(), reason.c_str());
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus CheckUint32Range(const LightningIndexerV2CheckerInfo &info, const char *name, int64_t value)
+ge::graphStatus CheckUint32Range(const LightningIndexerV2CheckerInfo& info, const char* name, int64_t value)
 {
     if (value >= 0 && value <= std::numeric_limits<uint32_t>::max()) {
         return ge::GRAPH_SUCCESS;
@@ -72,11 +72,11 @@ ge::graphStatus CheckUint32Range(const LightningIndexerV2CheckerInfo &info, cons
 }
 } // namespace
 
-ge::graphStatus CommonChecker::CheckParaExistence(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CommonChecker::CheckParaExistence(const LightningIndexerV2CheckerInfo& info) const
 {
-    const std::pair<const CheckerTensor *, const char *> required[] = {
+    const std::pair<const CheckerTensor*, const char*> required[] = {
         {&info.query, "q"}, {&info.key, "k"}, {&info.weights, "w"}, {&info.sparseIndices, "sparse_indices"}};
-    for (const auto &item : required) {
+    for (const auto& item : required) {
         if (!item.first->IsPresent() || item.first->desc == nullptr || item.first->GetShape() == nullptr) {
             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(info.opName, item.second,
                                                      "Required tensor, descriptor and shape must be provided");
@@ -102,7 +102,7 @@ ge::graphStatus CommonChecker::CheckParaExistence(const LightningIndexerV2Checke
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckTensorBasics(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CommonChecker::CheckTensorBasics(const LightningIndexerV2CheckerInfo& info) const
 {
     if (CheckDtype(info, info.sparseIndices, "sparse_indices", {ge::DT_INT32}) != ge::GRAPH_SUCCESS ||
         CheckDtype(info, info.outputIdxOffset, "output_idx_offset", {ge::DT_INT32}) != ge::GRAPH_SUCCESS) {
@@ -111,7 +111,7 @@ ge::graphStatus CommonChecker::CheckTensorBasics(const LightningIndexerV2Checker
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckAttrs(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CommonChecker::CheckAttrs(const LightningIndexerV2CheckerInfo& info) const
 {
     if (CheckLayouts(info) != ge::GRAPH_SUCCESS || CheckTopk(info) != ge::GRAPH_SUCCESS ||
         CheckCompressionAttrs(info) != ge::GRAPH_SUCCESS || CheckReturnValue(info) != ge::GRAPH_SUCCESS) {
@@ -120,7 +120,7 @@ ge::graphStatus CommonChecker::CheckAttrs(const LightningIndexerV2CheckerInfo &i
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckLayouts(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CommonChecker::CheckLayouts(const LightningIndexerV2CheckerInfo& info) const
 {
     if (info.layoutQ != CheckerLayout::BSND && info.layoutQ != CheckerLayout::TND) {
         OP_LOGE_FOR_INVALID_VALUE(info.opName, "layout_q", info.layoutQText.c_str(), "BSND or TND");
@@ -140,7 +140,7 @@ ge::graphStatus CommonChecker::CheckLayouts(const LightningIndexerV2CheckerInfo 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckTopk(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CommonChecker::CheckTopk(const LightningIndexerV2CheckerInfo& info) const
 {
     if (info.topk < TOPK_MIN || info.topk > TOPK_8K) {
         const std::string actual = std::to_string(info.topk);
@@ -150,7 +150,7 @@ ge::graphStatus CommonChecker::CheckTopk(const LightningIndexerV2CheckerInfo &in
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckCompressionAttrs(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CommonChecker::CheckCompressionAttrs(const LightningIndexerV2CheckerInfo& info) const
 {
     if (info.maskMode != MASK_MODE_NONE && info.maskMode != MASK_MODE_COMPRESS) {
         const std::string actual = std::to_string(info.maskMode);
@@ -176,7 +176,7 @@ ge::graphStatus CommonChecker::CheckCompressionAttrs(const LightningIndexerV2Che
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckReturnValue(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CommonChecker::CheckReturnValue(const LightningIndexerV2CheckerInfo& info) const
 {
     if (info.returnValue != RETURN_VALUE_INDICES && info.returnValue != RETURN_VALUE_WITH_VALUES) {
         const std::string actual = std::to_string(info.returnValue);
@@ -186,7 +186,7 @@ ge::graphStatus CommonChecker::CheckReturnValue(const LightningIndexerV2CheckerI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckSinglePara(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CommonChecker::CheckSinglePara(const LightningIndexerV2CheckerInfo& info) const
 {
     if (CheckTensorBasics(info) != ge::GRAPH_SUCCESS || CheckAttrs(info) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -212,7 +212,7 @@ ge::graphStatus CommonChecker::CheckSinglePara(const LightningIndexerV2CheckerIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckFeature(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CommonChecker::CheckFeature(const LightningIndexerV2CheckerInfo& info) const
 {
     if (CheckHeadFeature(info) != ge::GRAPH_SUCCESS || CheckFeatureRanges(info) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -220,7 +220,7 @@ ge::graphStatus CommonChecker::CheckFeature(const LightningIndexerV2CheckerInfo 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckHeadFeature(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CommonChecker::CheckHeadFeature(const LightningIndexerV2CheckerInfo& info) const
 {
     if (info.kHeads != K_HEAD_COUNT || info.headDim != HEAD_DIM) {
         const std::string actual = ShapeToString(info.query) + " and " + ShapeToString(info.key);
@@ -233,7 +233,7 @@ ge::graphStatus CommonChecker::CheckHeadFeature(const LightningIndexerV2CheckerI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckFeatureRanges(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CommonChecker::CheckFeatureRanges(const LightningIndexerV2CheckerInfo& info) const
 {
     if (CheckUint32Range(info, "batch", info.batch) != ge::GRAPH_SUCCESS ||
         CheckUint32Range(info, "k sequence length", info.kSeq) != ge::GRAPH_SUCCESS ||
@@ -243,7 +243,7 @@ ge::graphStatus CommonChecker::CheckFeatureRanges(const LightningIndexerV2Checke
         return ge::GRAPH_FAILED;
     }
     if (info.layoutK == CheckerLayout::PA_BBND) {
-        const gert::Shape *blockTableShape = info.blockTable.GetShape();
+        const gert::Shape* blockTableShape = info.blockTable.GetShape();
         if (blockTableShape != nullptr && blockTableShape->GetDimNum() >= BLOCK_TABLE_RANK &&
             CheckUint32Range(info, "block_table dim 1", blockTableShape->GetDim(BLOCK_TABLE_BLOCK_COUNT_AXIS)) !=
                 ge::GRAPH_SUCCESS) {
@@ -261,11 +261,11 @@ ge::graphStatus CommonChecker::CheckFeatureRanges(const LightningIndexerV2Checke
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckMainShapes(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CommonChecker::CheckMainShapes(const LightningIndexerV2CheckerInfo& info) const
 {
-    const gert::Shape &q = *info.query.GetShape();
-    const gert::Shape &k = *info.key.GetShape();
-    const gert::Shape &w = *info.weights.GetShape();
+    const gert::Shape& q = *info.query.GetShape();
+    const gert::Shape& k = *info.key.GetShape();
+    const gert::Shape& w = *info.weights.GetShape();
     const uint32_t qD = info.layoutQ == CheckerLayout::BSND ? BSND_HEAD_DIM_AXIS : TND_HEAD_DIM_AXIS;
     const uint32_t kN = info.layoutK == CheckerLayout::TND ? TND_HEAD_AXIS : BSND_HEAD_AXIS;
     const uint32_t kD = info.layoutK == CheckerLayout::TND ? TND_HEAD_DIM_AXIS : BSND_HEAD_DIM_AXIS;
@@ -294,10 +294,10 @@ ge::graphStatus CommonChecker::CheckMainShapes(const LightningIndexerV2CheckerIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckOutputShapes(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CommonChecker::CheckOutputShapes(const LightningIndexerV2CheckerInfo& info) const
 {
-    const gert::Shape &q = *info.query.GetShape();
-    const gert::Shape &out = *info.sparseIndices.GetShape();
+    const gert::Shape& q = *info.query.GetShape();
+    const gert::Shape& out = *info.sparseIndices.GetShape();
     const uint32_t outN = info.layoutQ == CheckerLayout::BSND ? BSND_HEAD_AXIS : TND_HEAD_AXIS;
     if (out.GetDim(TND_TOKEN_AXIS) != q.GetDim(TND_TOKEN_AXIS) ||
         (info.layoutQ == CheckerLayout::BSND && out.GetDim(BSND_SEQ_AXIS) != q.GetDim(BSND_SEQ_AXIS)) ||
@@ -307,7 +307,7 @@ ge::graphStatus CommonChecker::CheckOutputShapes(const LightningIndexerV2Checker
                                 "Sparse_indices must be [B,S1,N2,topk] or [T1,N2,topk]");
     }
     if (info.returnValue == RETURN_VALUE_WITH_VALUES) {
-        const gert::Shape &values = *info.sparseValues.GetShape();
+        const gert::Shape& values = *info.sparseValues.GetShape();
         if ((info.layoutQ == CheckerLayout::TND && values.GetDim(TND_TOKEN_AXIS) != q.GetDim(TND_TOKEN_AXIS)) ||
             values.GetDim(outN) != info.kHeads || values.GetDim(outN + 1U) != info.topk) {
             const std::string actual = ShapeToString(info.query) + " and " + ShapeToString(info.sparseValues);
@@ -316,7 +316,7 @@ ge::graphStatus CommonChecker::CheckOutputShapes(const LightningIndexerV2Checker
         }
     }
     if (info.outputIdxOffset.IsPresent()) {
-        const gert::Shape &offset = *info.outputIdxOffset.GetShape();
+        const gert::Shape& offset = *info.outputIdxOffset.GetShape();
         const uint32_t offsetN = info.layoutQ == CheckerLayout::BSND ? BSND_HEAD_AXIS : TND_HEAD_AXIS;
         if (!SameDim(q, TND_TOKEN_AXIS, offset, TND_TOKEN_AXIS) ||
             (info.layoutQ == CheckerLayout::BSND && !SameDim(q, BSND_SEQ_AXIS, offset, BSND_SEQ_AXIS)) ||
@@ -329,7 +329,7 @@ ge::graphStatus CommonChecker::CheckOutputShapes(const LightningIndexerV2Checker
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonChecker::CheckMultiPara(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CommonChecker::CheckMultiPara(const LightningIndexerV2CheckerInfo& info) const
 {
     if (CheckMainShapes(info) != ge::GRAPH_SUCCESS || CheckOutputShapes(info) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;

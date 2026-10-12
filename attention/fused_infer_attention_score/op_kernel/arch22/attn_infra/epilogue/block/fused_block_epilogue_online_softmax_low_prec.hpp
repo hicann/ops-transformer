@@ -22,23 +22,10 @@
 
 namespace NpuArch::Epilogue::Block {
 
-template <
-    class OutputType_,
-    class InputType_,
-    class MaskType_,
-    class SinkType_,
-    class FullType_,
-    LseMode LSE_MODE_,
-    SinkMode SINK_MODE_,
-    MaskMode MASK_MODE_>
-class BlockEpilogue<
-    EpilogueAtlasA2OnlineSoftmax<LSE_MODE_, SINK_MODE_, MASK_MODE_, half>,
-    OutputType_,
-    InputType_,
-    MaskType_,
-    SinkType_,
-    FullType_>
-{
+template <class OutputType_, class InputType_, class MaskType_, class SinkType_, class FullType_, LseMode LSE_MODE_,
+          SinkMode SINK_MODE_, MaskMode MASK_MODE_>
+class BlockEpilogue<EpilogueAtlasA2OnlineSoftmax<LSE_MODE_, SINK_MODE_, MASK_MODE_, half>, OutputType_, InputType_,
+                    MaskType_, SinkType_, FullType_> {
 public:
     using DispatchPolicy = EpilogueAtlasA2OnlineSoftmax<LSE_MODE_, SINK_MODE_, MASK_MODE_, half>;
     using ArchTag = typename DispatchPolicy::ArchTag;
@@ -51,7 +38,7 @@ public:
     using LayoutInput = typename InputType_::Layout;
     using LayoutMask = typename MaskType_::Layout;
     using LayoutFull = typename FullType_::Layout;
-    
+
     static constexpr LseMode LSE_MODE = DispatchPolicy::LSE_MODE;
     static constexpr SinkMode SINK_MODE = DispatchPolicy::SINK_MODE;
 
@@ -76,11 +63,9 @@ public:
 
     static constexpr uint32_t SPLIT_COL_IDX_2 = 2;
     static constexpr uint32_t SPLIT_COL_IDX_3 = 3;
-    __aicore__ inline
-    BlockEpilogue() {}
+    __aicore__ inline BlockEpilogue() {}
 
-    __aicore__ inline
-    void init(Arch::Resource<ArchTag> &resource, float scaleValue_)
+    __aicore__ inline void init(Arch::Resource<ArchTag>& resource, float scaleValue_)
     {
         // Allocate UB space
         constexpr uint32_t LS_UB_TENSOR_OFFSET = 0;
@@ -114,14 +99,13 @@ public:
         glUbTensor = resource.ubBuf.template GetBufferByByte<half>(GL_UB_TENSOR_OFFSET);
     }
 
-    __aicore__ inline
-    ~BlockEpilogue() {}
-    #include "online_softmax_low_prec/fused_block_epilogue_online_softmax_low_prec_row_ops.inc.hpp"
-    #include "online_softmax_low_prec/fused_block_epilogue_online_softmax_low_prec_data_copy.inc.hpp"
-    #include "online_softmax_low_prec/fused_block_epilogue_online_softmax_low_prec_mask.inc.hpp"
-    #include "online_softmax_low_prec/fused_block_epilogue_online_softmax_low_prec_softmax.inc.hpp"
-    #include "online_softmax_low_prec/fused_block_epilogue_online_softmax_low_prec_subcore.inc.hpp"
-    #include "online_softmax_low_prec/fused_block_epilogue_online_softmax_low_prec_operator.inc.hpp"
+    __aicore__ inline ~BlockEpilogue() {}
+#include "online_softmax_low_prec/fused_block_epilogue_online_softmax_low_prec_row_ops.inc.hpp"
+#include "online_softmax_low_prec/fused_block_epilogue_online_softmax_low_prec_data_copy.inc.hpp"
+#include "online_softmax_low_prec/fused_block_epilogue_online_softmax_low_prec_mask.inc.hpp"
+#include "online_softmax_low_prec/fused_block_epilogue_online_softmax_low_prec_softmax.inc.hpp"
+#include "online_softmax_low_prec/fused_block_epilogue_online_softmax_low_prec_subcore.inc.hpp"
+#include "online_softmax_low_prec/fused_block_epilogue_online_softmax_low_prec_operator.inc.hpp"
 private:
     half scaleValue;
     AscendC::LocalTensor<half> lsUbTensor;
@@ -137,6 +121,6 @@ private:
     AscendC::LocalTensor<half> tvUbTensor;
     AscendC::LocalTensor<half> glUbTensor;
 };
-}
+} // namespace NpuArch::Epilogue::Block
 
-#endif  // EPILOGUE_BLOCK_BLOCK_EPILOGUE_ONLINE_SOFTMAX_LOW_PREC_HPP
+#endif // EPILOGUE_BLOCK_BLOCK_EPILOGUE_ONLINE_SOFTMAX_LOW_PREC_HPP

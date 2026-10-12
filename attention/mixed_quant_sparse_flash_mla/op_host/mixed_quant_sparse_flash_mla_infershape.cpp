@@ -22,7 +22,7 @@ using namespace ge;
 using namespace optiling;
 
 namespace ops {
-ge::graphStatus InferShapeMixedQuantSparseFlashMla(gert::InferShapeContext *context)
+ge::graphStatus InferShapeMixedQuantSparseFlashMla(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("MixedQuantSparseFlashMla", "InferShapeContext is nullptr"),
                 return ge::GRAPH_FAILED);
@@ -30,7 +30,7 @@ ge::graphStatus InferShapeMixedQuantSparseFlashMla(gert::InferShapeContext *cont
                           MQ_ATTR_LAYOUT_KV_INDEX);
 }
 
-ge::graphStatus InferDataTypeMixedQuantSparseFlashMla(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeMixedQuantSparseFlashMla(gert::InferDataTypeContext* context)
 {
     return SMLAInferDataTypeByInput(context, "MixedQuantSparseFlashMla");
 }

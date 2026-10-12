@@ -144,10 +144,10 @@ TEST_P(FusedInferAttentionScoreArch22TilingTest, param)
     std::vector<uint32_t> inputInstanceNum;
     inputTensors.emplace_back(allInputs[0]);
     inputInstanceNum.emplace_back(1);
-    for (auto &t : param.keyList)
+    for (auto& t : param.keyList)
         inputTensors.emplace_back(t);
     inputInstanceNum.emplace_back(static_cast<uint32_t>(param.keyList.size()));
-    for (auto &t : param.valueList)
+    for (auto& t : param.valueList)
         inputTensors.emplace_back(t);
     inputInstanceNum.emplace_back(static_cast<uint32_t>(param.valueList.size()));
     for (size_t i = 3; i < allInputs.size(); i++) {

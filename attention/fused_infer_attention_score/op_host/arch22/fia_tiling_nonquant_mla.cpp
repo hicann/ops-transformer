@@ -26,7 +26,7 @@ using namespace ge;
 using namespace AscendC;
 namespace optiling {
 
-void FillArch22MlaKvStrideParams(FusedInferAttentionKvStrideParams &params, const FiaTilingInfo &fiaInfo)
+void FillArch22MlaKvStrideParams(FusedInferAttentionKvStrideParams& params, const FiaTilingInfo& fiaInfo)
 {
     params.set_keyBnStride(fiaInfo.keyNonContigDim == 0 ? fiaInfo.keyBnStride : 0);
     params.set_valueBnStride(fiaInfo.valueNonContigDim == 0 ? fiaInfo.valueBnStride : 0);
@@ -60,9 +60,9 @@ constexpr uint64_t FIA_GET_TILINGKEY(Args... templateIds)
     return RecursiveSum(templateIds...);
 }
 
-void FiaTilingNonQuantMla::InitTilingInfo(TilingInfo *tilingInfo)
+void FiaTilingNonQuantMla::InitTilingInfo(TilingInfo* tilingInfo)
 {
-    fiaInfo_ = static_cast<FiaTilingInfo *>(tilingInfo);
+    fiaInfo_ = static_cast<FiaTilingInfo*>(tilingInfo);
 }
 
 ge::graphStatus FiaTilingNonQuantMla::GetPlatformInfo()
@@ -135,7 +135,7 @@ bool FiaTilingNonQuantMla::IsCapable()
 
     // 支持的input_layout范围
     std::string layout = fiaInfo_->opParamInfo.layOut;
-    const std::vector<std::string> layoutSupportList = {"BSH", "BSND", "BNSD", "TND",
+    const std::vector<std::string> layoutSupportList = {"BSH",      "BSND",      "BNSD",      "TND",
                                                         "BSH_NBSD", "BSND_NBSD", "BNSD_NBSD", "TND_NTD"};
     if (std::find(layoutSupportList.begin(), layoutSupportList.end(), layout) == layoutSupportList.end()) {
         return false;
@@ -323,7 +323,7 @@ void FiaTilingNonQuantMla::CalcMBaseSize()
     mBaseSize_ = mBaseSizeTmp; // 满足以上条件则更新mBaseSize
 }
 
-void FiaTilingNonQuantMla::CreateSplitInput(BaseInfo &baseInfo, SplitParam &splitParam) const
+void FiaTilingNonQuantMla::CreateSplitInput(BaseInfo& baseInfo, SplitParam& splitParam) const
 {
     // 构造分核输入参数
     baseInfo.bSize = fiaInfo_->bSize;
@@ -343,7 +343,7 @@ void FiaTilingNonQuantMla::CreateSplitInput(BaseInfo &baseInfo, SplitParam &spli
     if (fiaInfo_->opParamInfo.actualSeqLengthsQ.tensor != nullptr) {
         baseInfo.isAccumSeqS1 = fiaInfo_->isAccumQSeq;
         baseInfo.actualSeqS1Size.reserve(fiaInfo_->bSize);
-        const int64_t *s1Ptr = fiaInfo_->opParamInfo.actualSeqLengthsQ.tensor->GetData<int64_t>();
+        const int64_t* s1Ptr = fiaInfo_->opParamInfo.actualSeqLengthsQ.tensor->GetData<int64_t>();
         for (uint32_t i = 0; i < fiaInfo_->bSize; ++i) {
             baseInfo.actualSeqS1Size.emplace_back(s1Ptr[i]);
         }
@@ -351,7 +351,7 @@ void FiaTilingNonQuantMla::CreateSplitInput(BaseInfo &baseInfo, SplitParam &spli
     if (fiaInfo_->opParamInfo.actualSeqLengths.tensor != nullptr) {
         baseInfo.isAccumSeqS2 = fiaInfo_->isAccumKVSeq;
         baseInfo.actualSeqS2Size.reserve(fiaInfo_->bSize);
-        const int64_t *s2Ptr = fiaInfo_->opParamInfo.actualSeqLengths.tensor->GetData<int64_t>();
+        const int64_t* s2Ptr = fiaInfo_->opParamInfo.actualSeqLengths.tensor->GetData<int64_t>();
         for (uint32_t i = 0; i < fiaInfo_->bSize; ++i) {
             baseInfo.actualSeqS2Size.emplace_back(s2Ptr[i]);
         }
@@ -361,19 +361,19 @@ void FiaTilingNonQuantMla::CreateSplitInput(BaseInfo &baseInfo, SplitParam &spli
     splitParam.gS1BaseSizeOfFd = mFdBaseSize_;
 }
 
-void FiaTilingNonQuantMla::SetSplitOutput(SplitResult &res)
+void FiaTilingNonQuantMla::SetSplitOutput(SplitResult& res)
 {
-    uint32_t *bN2EndPtr = tilingData_.outerSplitParams.get_bN2End();
-    uint32_t *gS1EndPtr = tilingData_.outerSplitParams.get_gS1End();
-    uint32_t *s2EndPtr = tilingData_.outerSplitParams.get_s2End();
-    uint32_t *bN2IdxOfFdHead = tilingData_.fdParams.get_bN2IdxOfFdHead();
-    uint32_t *gS1IdxOfFdHead = tilingData_.fdParams.get_gS1IdxOfFdHead();
-    uint32_t *s2SplitNumOfFdHead = tilingData_.fdParams.get_s2SplitNumOfFdHead();
-    uint32_t *s2SplitStartIdxOfCore = tilingData_.fdParams.get_s2SplitStartIdxOfCore();
-    uint32_t *gS1SplitNumOfFdHead = tilingData_.fdParams.get_gS1SplitNumOfFdHead();
-    uint32_t *gS1LastPartSizeOfFdHead = tilingData_.fdParams.get_gS1LastPartSizeOfFdHead();
-    uint32_t *gS1IdxEndOfFdHeadSplit = tilingData_.fdParams.get_gS1IdxEndOfFdHeadSplit();
-    uint32_t *gS1IdxEndOfFdHead = tilingData_.fdParams.get_gS1IdxEndOfFdHead();
+    uint32_t* bN2EndPtr = tilingData_.outerSplitParams.get_bN2End();
+    uint32_t* gS1EndPtr = tilingData_.outerSplitParams.get_gS1End();
+    uint32_t* s2EndPtr = tilingData_.outerSplitParams.get_s2End();
+    uint32_t* bN2IdxOfFdHead = tilingData_.fdParams.get_bN2IdxOfFdHead();
+    uint32_t* gS1IdxOfFdHead = tilingData_.fdParams.get_gS1IdxOfFdHead();
+    uint32_t* s2SplitNumOfFdHead = tilingData_.fdParams.get_s2SplitNumOfFdHead();
+    uint32_t* s2SplitStartIdxOfCore = tilingData_.fdParams.get_s2SplitStartIdxOfCore();
+    uint32_t* gS1SplitNumOfFdHead = tilingData_.fdParams.get_gS1SplitNumOfFdHead();
+    uint32_t* gS1LastPartSizeOfFdHead = tilingData_.fdParams.get_gS1LastPartSizeOfFdHead();
+    uint32_t* gS1IdxEndOfFdHeadSplit = tilingData_.fdParams.get_gS1IdxEndOfFdHeadSplit();
+    uint32_t* gS1IdxEndOfFdHead = tilingData_.fdParams.get_gS1IdxEndOfFdHead();
 
     for (uint32_t i = 0; i < res.usedCoreNum; ++i) {
         bN2EndPtr[i] = res.bN2End[i];

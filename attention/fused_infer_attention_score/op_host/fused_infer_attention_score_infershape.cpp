@@ -66,8 +66,8 @@ static const std::map<int64_t, std::string> TORCH_DTYOE_NOT_SUPPORT_MAP = {
     {23, "DT_FLOAT8_E5M2"},
 };
 
-static ge::graphStatus GetQueryAndOutLayout(std::string &queryLayout, std::string &attentionOutLayout,
-                                            const gert::Shape *queryShape, const char *inputLayoutPtr)
+static ge::graphStatus GetQueryAndOutLayout(std::string& queryLayout, std::string& attentionOutLayout,
+                                            const gert::Shape* queryShape, const char* inputLayoutPtr)
 {
     struct parserLayout {
         std::string qLayout;
@@ -109,8 +109,8 @@ static ge::graphStatus GetQueryAndOutLayout(std::string &queryLayout, std::strin
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus GetQueryBSND(const gert::Shape *queryShape, const std::string queryLayout,
-                                    const int64_t *numHeadsPtr, int64_t &b, int64_t &s1, int64_t &n1, int64_t &d1)
+static ge::graphStatus GetQueryBSND(const gert::Shape* queryShape, const std::string queryLayout,
+                                    const int64_t* numHeadsPtr, int64_t& b, int64_t& s1, int64_t& n1, int64_t& d1)
 {
     if (queryLayout == "BSH") {
         b = (*queryShape)[FIA_LAYOUT_DIM0];
@@ -144,8 +144,8 @@ static ge::graphStatus GetQueryBSND(const gert::Shape *queryShape, const std::st
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus GetQueryTND(const gert::Shape *queryShape, const std::string queryLayout, int64_t &t,
-                                   int64_t &n1, int64_t &d1)
+static ge::graphStatus GetQueryTND(const gert::Shape* queryShape, const std::string queryLayout, int64_t& t,
+                                   int64_t& n1, int64_t& d1)
 {
     if (queryLayout == "TND") {
         t = (*queryShape)[FIA_LAYOUT_DIM0];
@@ -162,8 +162,8 @@ static ge::graphStatus GetQueryTND(const gert::Shape *queryShape, const std::str
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus GetValueD(bool isPageAttention, int64_t &valueD, const gert::Shape *valueShape,
-                                 const gert::Shape *queryShape, const std::string queryLayout, int64_t numKeyValueHeads)
+static ge::graphStatus GetValueD(bool isPageAttention, int64_t& valueD, const gert::Shape* valueShape,
+                                 const gert::Shape* queryShape, const std::string queryLayout, int64_t numKeyValueHeads)
 {
     if (isPageAttention) { // PA场景
         if (valueShape->GetDimNum() == LAYOUT_PA_BBH_DIM_NUMS) {
@@ -199,9 +199,9 @@ static ge::graphStatus GetValueD(bool isPageAttention, int64_t &valueD, const ge
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferAttentionOutShape(std::string attentionOutLayout, gert::Shape *attentionOutShape,
-                                              const gert::Shape *queryShape, const gert::Shape *valueShape,
-                                              const std::string queryLayout, const int64_t *numHeadsPtr, int64_t valueD)
+static ge::graphStatus InferAttentionOutShape(std::string attentionOutLayout, gert::Shape* attentionOutShape,
+                                              const gert::Shape* queryShape, const gert::Shape* valueShape,
+                                              const std::string queryLayout, const int64_t* numHeadsPtr, int64_t valueD)
 {
     int64_t b = 0;
     int64_t s1 = 0;
@@ -256,9 +256,9 @@ static ge::graphStatus InferAttentionOutShape(std::string attentionOutLayout, ge
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferLseOutShape(const char *inputLayoutPtr, gert::Shape *softmaxLseShape,
-                                        const gert::Shape *queryShape, const std::string queryLayout,
-                                        const int64_t *numHeadsPtr)
+static ge::graphStatus InferLseOutShape(const char* inputLayoutPtr, gert::Shape* softmaxLseShape,
+                                        const gert::Shape* queryShape, const std::string queryLayout,
+                                        const int64_t* numHeadsPtr)
 {
     int64_t b = 0;
     int64_t s1 = 0;
@@ -278,7 +278,7 @@ static ge::graphStatus InferLseOutShape(const char *inputLayoutPtr, gert::Shape 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferShapeFusedInferAttentionScore(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeFusedInferAttentionScore(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("FusedInferAttentionScore", "context is nullptr!");
@@ -286,32 +286,32 @@ static ge::graphStatus InferShapeFusedInferAttentionScore(gert::InferShapeContex
     }
     OP_LOGD(context->GetNodeName(), "Enter FusedInferAttentionScore InferShape impl.");
     // query shape
-    const gert::Shape *queryShape = context->GetInputShape(FIA_QUERY_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(FIA_QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
 
     // value shape
-    const gert::Shape *valueShape = context->GetDynamicInputShape(FIA_VALUE_INDEX, FIA_DYNAMIC_VALUE_INDEX);
+    const gert::Shape* valueShape = context->GetDynamicInputShape(FIA_VALUE_INDEX, FIA_DYNAMIC_VALUE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
 
     // Page Attention
     bool isPageAttention = (context->GetOptionalInputShape(FIA_BLOCK_TABLE_INDEX) == nullptr) ? false : true;
 
     // attentionOut
-    gert::Shape *attentionOutShape = context->GetOutputShape(FIA_ATTENTION_OUT_INDEX);
+    gert::Shape* attentionOutShape = context->GetOutputShape(FIA_ATTENTION_OUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
 
     // lseout
-    gert::Shape *softmaxLseShape = context->GetOutputShape(FIA_SOFTMAX_LSE_INDEX);
+    gert::Shape* softmaxLseShape = context->GetOutputShape(FIA_SOFTMAX_LSE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxLseShape);
 
     // Get attr
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const char *inputLayoutPtr = attrs->GetAttrPointer<char>(FIA_ATTR_INPUT_LAYOUT_INDEX);
+    const char* inputLayoutPtr = attrs->GetAttrPointer<char>(FIA_ATTR_INPUT_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutPtr);
-    const int64_t *numHeadsPtr = attrs->GetInt(FIA_ATTR_NUM_HEADS_INDEX);
+    const int64_t* numHeadsPtr = attrs->GetInt(FIA_ATTR_NUM_HEADS_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, numHeadsPtr);
-    const int64_t *numKeyValueHeadsPtr = attrs->GetInt(FIA_ATTR_NUM_KV_HEADS_INDEX);
+    const int64_t* numKeyValueHeadsPtr = attrs->GetInt(FIA_ATTR_NUM_KV_HEADS_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, numKeyValueHeadsPtr);
 
     // KV_N除零保护, 当KV_N为零时KV_N = Q_N
@@ -354,7 +354,7 @@ static ge::graphStatus InferShapeFusedInferAttentionScore(gert::InferShapeContex
         return ge::GRAPH_FAILED;
     }
 
-    const bool *softmaxLsePtr = attrs->GetAttrPointer<bool>(FIA_ATTR_INPUT_SOFTMAX_LSE_FLAG_INDEX);
+    const bool* softmaxLsePtr = attrs->GetAttrPointer<bool>(FIA_ATTR_INPUT_SOFTMAX_LSE_FLAG_INDEX);
     bool softmaxLseFlag = (softmaxLsePtr != nullptr) ? *softmaxLsePtr : false;
     if (softmaxLseFlag) {
         if (InferLseOutShape(inputLayoutPtr, softmaxLseShape, queryShape, queryLayout, numHeadsPtr) !=
@@ -370,7 +370,7 @@ static ge::graphStatus InferShapeFusedInferAttentionScore(gert::InferShapeContex
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeFusedInferAttentionScore(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeFusedInferAttentionScore(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("FusedInferAttentionScore", "context is nullptr!");
@@ -385,7 +385,7 @@ static ge::graphStatus InferDataTypeFusedInferAttentionScore(gert::InferDataType
 
         auto attrs = context->GetAttrs();
         OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-        const int64_t *outTypePtr = attrs->GetInt(FIA_OUT_DTYPE_INDEX);
+        const int64_t* outTypePtr = attrs->GetInt(FIA_OUT_DTYPE_INDEX);
         if (outTypePtr != nullptr) {
             auto it = TORCH_DTYOE_NOT_SUPPORT_MAP.find(*outTypePtr);
             if (it != TORCH_DTYOE_NOT_SUPPORT_MAP.end()) {
@@ -410,7 +410,7 @@ static ge::graphStatus InferDataTypeFusedInferAttentionScore(gert::InferDataType
         }
         auto attrs = context->GetAttrs();
         OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-        const int64_t *outTypePtr = attrs->GetInt(FIA_OUT_DTYPE_INDEX);
+        const int64_t* outTypePtr = attrs->GetInt(FIA_OUT_DTYPE_INDEX);
         if (outTypePtr != nullptr) {
             auto iter = TORCH_DTYPE_ENUM_VALUE_TO_GE_DTYPE_MAP.find(*outTypePtr);
             if (iter != TORCH_DTYPE_ENUM_VALUE_TO_GE_DTYPE_MAP.end()) {

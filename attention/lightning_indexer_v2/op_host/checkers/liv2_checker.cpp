@@ -24,7 +24,7 @@ namespace lightning_indexer_v2_checker {
 namespace {
 class LightningIndexerV2TypeChecker : public LightningIndexerV2BaseChecker {
 public:
-    ge::graphStatus CheckSinglePara(const LightningIndexerV2CheckerInfo &info) const override
+    ge::graphStatus CheckSinglePara(const LightningIndexerV2CheckerInfo& info) const override
     {
         if (CheckDtype(info, info.query, "q", {ge::DT_FLOAT16, ge::DT_BF16}) != ge::GRAPH_SUCCESS ||
             CheckDtype(info, info.key, "k", {ge::DT_FLOAT16, ge::DT_BF16}) != ge::GRAPH_SUCCESS ||

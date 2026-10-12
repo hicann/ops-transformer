@@ -35,7 +35,7 @@ static constexpr uint32_t IFA_ATTR_INPUT_LAYOUT_INDEX = 2;
 static constexpr uint32_t IFA_INPUT_ACTUAL_SEQ_LENGTHS_INDEX = 5;
 static constexpr uint32_t IFA_QUANT_SCALE2_INDEX = 9;
 
-static ge::graphStatus InferShapeIncreFlashAttention(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeIncreFlashAttention(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("IncreFlashAttention", "context is nullptr!");
@@ -43,11 +43,11 @@ static ge::graphStatus InferShapeIncreFlashAttention(gert::InferShapeContext *co
     }
     OP_LOGD(context->GetNodeName(), "Enter IncreFlashAttention inferShape impl.");
     // query shape
-    const gert::Shape *queryShape = context->GetInputShape(IFA_QUERY_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(IFA_QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
 
     // attentionOut
-    gert::Shape *attentionOutShape = context->GetOutputShape(IFA_ATTENTION_OUT_INDEX);
+    gert::Shape* attentionOutShape = context->GetOutputShape(IFA_ATTENTION_OUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
 
     // Set output shape
@@ -64,7 +64,7 @@ static ge::graphStatus InferShapeIncreFlashAttention(gert::InferShapeContext *co
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const char *inputLayoutPtr = attrs->GetAttrPointer<char>(IFA_ATTR_INPUT_LAYOUT_INDEX);
+    const char* inputLayoutPtr = attrs->GetAttrPointer<char>(IFA_ATTR_INPUT_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutPtr);
 
     if (strcmp(inputLayoutPtr, "SH") == 0) {
@@ -101,7 +101,7 @@ static ge::graphStatus InferShapeIncreFlashAttention(gert::InferShapeContext *co
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeIncreFlashAttention(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeIncreFlashAttention(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("IncreFlashAttention", "context is nullptr!");

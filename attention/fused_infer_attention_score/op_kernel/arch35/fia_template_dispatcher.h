@@ -24,12 +24,12 @@
 
 template <typename INPUT_T, typename OUT_T, uint8_t inOutLayoutType, uint16_t config, bool hasAttenMask,
           uint8_t KvLayoutType, bool isFd, bool emptyTensor, bool enableS1OutSplit>
-inline __aicore__ void run_fia_noquant_gqa_kernel(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                                  __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                                                  __gm__ uint8_t *actualSeqLengthsKV, __gm__ uint8_t *blocktable,
-                                                  __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-                                                  __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
-                                                  __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+inline __aicore__ void run_fia_noquant_gqa_kernel(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                                  __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
+                                                  __gm__ uint8_t* actualSeqLengthsKV, __gm__ uint8_t* blocktable,
+                                                  __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+                                                  __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse,
+                                                  __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     PARSE_PARAMS_NoQuant(inOutLayoutType, config, 9, ...); // 9: None
 
@@ -64,8 +64,8 @@ inline __aicore__ void run_fia_noquant_gqa_kernel(__gm__ uint8_t *query, __gm__ 
     using Kernel = FlashAttentionNoQuantGqaKernel<CubBlock, VecFaBlock, VecFdBlock>;
 
     GET_TILING_DATA_MEMBER(FusedInferAttentionScoreTilingData, baseTiling, baseTilingIn, tiling);
-    const NoQuantTilingArch35 *__restrict tilingData = &baseTilingIn;
-    __gm__ uint8_t *fiaMetaData = tiling + offsetof(FusedInferAttentionScoreTilingData, fiaMetaData);
+    const NoQuantTilingArch35* __restrict tilingData = &baseTilingIn;
+    __gm__ uint8_t* fiaMetaData = tiling + offsetof(FusedInferAttentionScoreTilingData, fiaMetaData);
     TPipe tPipe;
     Kernel op;
     op.Init(query, key, value, attenMask, actualSeqLengths, actualSeqLengthsKV, blocktable, queryRope, keyRope,
@@ -75,12 +75,12 @@ inline __aicore__ void run_fia_noquant_gqa_kernel(__gm__ uint8_t *query, __gm__ 
 
 template <typename INPUT_T, typename OUT_T, uint8_t inOutLayoutType, uint16_t config, bool hasAttenMask,
           uint8_t KvLayoutType, bool isFd, bool emptyTensor, bool enableS1OutSplit>
-inline __aicore__ void run_fia_noquant_mla_kernel(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                                  __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                                                  __gm__ uint8_t *actualSeqLengthsKV, __gm__ uint8_t *blocktable,
-                                                  __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-                                                  __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
-                                                  __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+inline __aicore__ void run_fia_noquant_mla_kernel(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                                  __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
+                                                  __gm__ uint8_t* actualSeqLengthsKV, __gm__ uint8_t* blocktable,
+                                                  __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+                                                  __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse,
+                                                  __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     PARSE_PARAMS_NoQuant(inOutLayoutType, config, 9, ...); // 9: None
 
@@ -116,8 +116,8 @@ inline __aicore__ void run_fia_noquant_mla_kernel(__gm__ uint8_t *query, __gm__ 
     using Kernel = FlashAttentionNoQuantMlaKernel<CubBlock, VecFaBlock, VecFdBlock>;
 
     GET_TILING_DATA_MEMBER(FusedInferAttentionScoreTilingData, baseTiling, baseTilingIn, tiling);
-    const NoQuantTilingArch35 *__restrict tilingData = &baseTilingIn;
-    __gm__ uint8_t *fiaMetaData = tiling + offsetof(FusedInferAttentionScoreTilingData, fiaMetaData);
+    const NoQuantTilingArch35* __restrict tilingData = &baseTilingIn;
+    __gm__ uint8_t* fiaMetaData = tiling + offsetof(FusedInferAttentionScoreTilingData, fiaMetaData);
     TPipe tPipe;
     Kernel op;
     op.Init(query, key, value, attenMask, actualSeqLengths, actualSeqLengthsKV, blocktable, queryRope, keyRope,
@@ -129,11 +129,11 @@ template <typename INPUT_T, typename OUT_T, uint8_t inOutLayoutType, uint16_t co
           uint8_t quantMode, bool hasAttenMask, bool hasRope, uint8_t KvLayoutType, bool isFd, bool emptyTensor,
           bool enableKVPrefix, bool enableS1OutSplit>
 inline __aicore__ void run_fia_fullquant_mx_kernel(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-    __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
-    __gm__ uint8_t *blockTable, __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *dequantScaleKey,
-    __gm__ uint8_t *dequantScaleValue, __gm__ uint8_t *pScale, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+    __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+    __gm__ uint8_t* blockTable, __gm__ uint8_t* dequantScaleQuery, __gm__ uint8_t* dequantScaleKey,
+    __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* pScale, __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     PARSE_PARAMS_FullQuant(inOutLayoutType, config, pseMode, ...);
     fa_base_matmul::ResetIdCounter();
@@ -183,8 +183,8 @@ inline __aicore__ void run_fia_fullquant_mx_kernel(
     using Kernel = FlashAttentionFullQuantMxKernel<CubBlock, VecFaBlock, VecFdBlock>;
 
     GET_TILING_DATA_MEMBER(FusedInferAttentionScoreFullQuantTilingData, baseTiling, baseTilingIn, tiling);
-    const FullQuantTiling *__restrict tilingData = &baseTilingIn;
-    __gm__ uint8_t *fiaMetaData = tiling + offsetof(FusedInferAttentionScoreFullQuantTilingData, fiaMetaData);
+    const FullQuantTiling* __restrict tilingData = &baseTilingIn;
+    __gm__ uint8_t* fiaMetaData = tiling + offsetof(FusedInferAttentionScoreFullQuantTilingData, fiaMetaData);
     TPipe tPipe;
     Kernel op;
     op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKV, blockTable, dequantScaleQuery,
@@ -196,14 +196,14 @@ inline __aicore__ void run_fia_fullquant_mx_kernel(
 template <typename INPUT_T, typename OUT_T, uint8_t inOutLayoutType, uint16_t config, uint8_t pseMode,
           uint8_t quantMode, bool hasAttenMask, bool hasRope, uint8_t KvLayoutType, bool isFd, bool emptyTensor,
           bool enableKVPrefix, bool enableS1OutSplit>
-inline __aicore__ void run_fia_fullquant_gqa_kernel(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                                    __gm__ uint8_t *pseShift, __gm__ uint8_t *actualSeqLengths,
-                                                    __gm__ uint8_t *actualSeqLengthsKV, __gm__ uint8_t *blockTable,
-                                                    __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *dequantScaleKey,
-                                                    __gm__ uint8_t *dequantScaleValue, __gm__ uint8_t *pScale,
-                                                    __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-                                                    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
-                                                    __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+inline __aicore__ void run_fia_fullquant_gqa_kernel(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                                    __gm__ uint8_t* pseShift, __gm__ uint8_t* actualSeqLengths,
+                                                    __gm__ uint8_t* actualSeqLengthsKV, __gm__ uint8_t* blockTable,
+                                                    __gm__ uint8_t* dequantScaleQuery, __gm__ uint8_t* dequantScaleKey,
+                                                    __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* pScale,
+                                                    __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+                                                    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse,
+                                                    __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     PARSE_PARAMS_FullQuant(inOutLayoutType, config, pseMode, ...);
     fa_base_matmul::ResetIdCounter();
@@ -253,8 +253,8 @@ inline __aicore__ void run_fia_fullquant_gqa_kernel(__gm__ uint8_t *query, __gm_
     using Kernel = FlashAttentionFullQuantGqaKernel<CubBlock, VecFaBlock, VecFdBlock>;
 
     GET_TILING_DATA_MEMBER(FusedInferAttentionScoreFullQuantTilingData, baseTiling, baseTilingIn, tiling);
-    const FullQuantTiling *__restrict tilingData = &baseTilingIn;
-    __gm__ uint8_t *fiaMetaData = tiling + offsetof(FusedInferAttentionScoreFullQuantTilingData, fiaMetaData);
+    const FullQuantTiling* __restrict tilingData = &baseTilingIn;
+    __gm__ uint8_t* fiaMetaData = tiling + offsetof(FusedInferAttentionScoreFullQuantTilingData, fiaMetaData);
     TPipe tPipe;
     Kernel op;
     op.Init(query, key, value, pseShift, actualSeqLengths, actualSeqLengthsKV, blockTable, dequantScaleQuery,
@@ -267,11 +267,11 @@ template <typename INPUT_T, typename OUT_T, uint8_t inOutLayoutType, uint16_t co
           uint8_t quantMode, bool hasAttenMask, bool hasRope, uint8_t KvLayoutType, bool isFd, bool emptyTensor,
           bool enableKVPrefix, bool enableS1OutSplit>
 inline __aicore__ void run_fia_fullquant_mla_kernel(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pseShift,
-    __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKV,
-    __gm__ uint8_t *blockTable, __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *dequantScaleKey,
-    __gm__ uint8_t *dequantScaleValue, __gm__ uint8_t *pScale, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
+    __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+    __gm__ uint8_t* blockTable, __gm__ uint8_t* dequantScaleQuery, __gm__ uint8_t* dequantScaleKey,
+    __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* pScale, __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     PARSE_PARAMS_FullQuant(inOutLayoutType, config, pseMode, ...);
     fa_base_matmul::ResetIdCounter();
@@ -316,8 +316,8 @@ inline __aicore__ void run_fia_fullquant_mla_kernel(
     // KernelType - MLA decode场景开启FD
     using Kernel = FlashAttentionFullQuantMlaKernel<CubBlock, VecFaBlock, VecFdBlock>;
     GET_TILING_DATA_MEMBER(FusedInferAttentionScoreFullQuantTilingData, baseTiling, baseTilingIn, tiling);
-    const FullQuantTiling *__restrict tilingData = &baseTilingIn;
-    __gm__ uint8_t *fiaMetaData = tiling + offsetof(FusedInferAttentionScoreFullQuantTilingData, fiaMetaData);
+    const FullQuantTiling* __restrict tilingData = &baseTilingIn;
+    __gm__ uint8_t* fiaMetaData = tiling + offsetof(FusedInferAttentionScoreFullQuantTilingData, fiaMetaData);
     TPipe tPipe;
     Kernel op;
     op.Init(query, key, value, attenMask, actualSeqLengths, actualSeqLengthsKV, blockTable, dequantScaleQuery,

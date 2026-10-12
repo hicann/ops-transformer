@@ -32,7 +32,7 @@ using namespace Ops::Transformer::OpTiling;
 
 class MaskedCausalConv1dTilingArch35 : public TilingBaseClass {
 public:
-    explicit MaskedCausalConv1dTilingArch35(gert::TilingContext *context)
+    explicit MaskedCausalConv1dTilingArch35(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 
@@ -53,7 +53,7 @@ private:
     ge::graphStatus CheckInputParams();
     ge::graphStatus SearchBestCoreSplit();
     ge::graphStatus CalcUbTiling();
-    ge::graphStatus CalcLoopParams(int64_t len, int64_t factor, int64_t &loopNum, int64_t &tailFactor);
+    ge::graphStatus CalcLoopParams(int64_t len, int64_t factor, int64_t& loopNum, int64_t& tailFactor);
 
     // Hardware
     uint64_t ubSize_ = 0;

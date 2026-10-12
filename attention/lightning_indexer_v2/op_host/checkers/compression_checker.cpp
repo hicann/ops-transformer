@@ -23,7 +23,7 @@ namespace {
 constexpr uint32_t CMP_RESIDUAL_RANK = 1U;
 } // namespace
 
-ge::graphStatus CompressionChecker::CheckParaExistence(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CompressionChecker::CheckParaExistence(const LightningIndexerV2CheckerInfo& info) const
 {
     const bool needResidual = info.cmpRatio != 1 && info.maskMode != 0;
     if (needResidual != info.cmpResidualK.IsPresent()) {
@@ -35,7 +35,7 @@ ge::graphStatus CompressionChecker::CheckParaExistence(const LightningIndexerV2C
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CompressionChecker::CheckSinglePara(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CompressionChecker::CheckSinglePara(const LightningIndexerV2CheckerInfo& info) const
 {
     if (CheckRank(info, info.cmpResidualK, "cmp_residual_k", CMP_RESIDUAL_RANK) != ge::GRAPH_SUCCESS ||
         CheckDtype(info, info.cmpResidualK, "cmp_residual_k", {ge::DT_INT32}) != ge::GRAPH_SUCCESS) {
@@ -44,7 +44,7 @@ ge::graphStatus CompressionChecker::CheckSinglePara(const LightningIndexerV2Chec
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CompressionChecker::CheckMultiPara(const LightningIndexerV2CheckerInfo &info) const
+ge::graphStatus CompressionChecker::CheckMultiPara(const LightningIndexerV2CheckerInfo& info) const
 {
     if (CheckElementCount(info, info.cmpResidualK, "cmp_residual_k", info.batch) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;

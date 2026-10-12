@@ -114,11 +114,11 @@ public:
     uint64_t s2 = 0;
     uint64_t d = 0;
 
-    __aicore__ inline BlockPost(Params const &params)
+    __aicore__ inline BlockPost(Params const& params)
     {
         cBlockIdx = GetBlockIdx();
-        __gm__ GenericBlockSparseAttentionGradTilingData *tilingData =
-            reinterpret_cast<__gm__ GenericBlockSparseAttentionGradTilingData *>(params.tilingData);
+        __gm__ GenericBlockSparseAttentionGradTilingData* tilingData =
+            reinterpret_cast<__gm__ GenericBlockSparseAttentionGradTilingData*>(params.tilingData);
         usedCoreNum = tilingData->usedVecCoreNum;
         if (cBlockIdx >= usedCoreNum) {
             return;
@@ -163,18 +163,18 @@ public:
                                                    kvPostBlockEeachCore; // 当前核需要计算的dkv的行数
         dkvOffset = ((uint64_t)cBlockIdx) * kvPostBlockNumEeachCore;     // 当前核dkv的偏移元素个数
 
-        dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)params.dqWrk + dqOffset);
-        dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)params.dkWrk + dkvOffset);
-        dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)params.dvWrk + dkvOffset);
+        dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)params.dqWrk + dqOffset);
+        dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)params.dkWrk + dkvOffset);
+        dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)params.dvWrk + dkvOffset);
 
         if constexpr (INPUT_LAYOUT == TND) {
-            dqGm.SetGlobalBuffer((__gm__ OutputDtype_ *)params.dq + dqOffset);
-            dkGm.SetGlobalBuffer((__gm__ OutputDtype_ *)params.dk + dkvOffset);
-            dvGm.SetGlobalBuffer((__gm__ OutputDtype_ *)params.dv + dkvOffset);
+            dqGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dq + dqOffset);
+            dkGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dk + dkvOffset);
+            dvGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dv + dkvOffset);
         } else if constexpr (INPUT_LAYOUT == BNSD || INPUT_LAYOUT == BSND) {
-            dqGm.SetGlobalBuffer((__gm__ OutputDtype_ *)params.dq);
-            dkGm.SetGlobalBuffer((__gm__ OutputDtype_ *)params.dk);
-            dvGm.SetGlobalBuffer((__gm__ OutputDtype_ *)params.dv);
+            dqGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dq);
+            dkGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dk);
+            dvGm.SetGlobalBuffer((__gm__ OutputDtype_*)params.dv);
         }
 
         ubBasePreBufferSize = ubBaseSize / BUFFER_NUM / BASE_BLOCK_BYTE * BASE_BLOCK_BYTE; // double buffer
@@ -206,21 +206,21 @@ public:
      */
     __aicore__ inline uint64_t GetSeqLen(GM_ADDR cuS, uint64_t batchIdx) const
     {
-        return static_cast<uint64_t>(((__gm__ int64_t *)cuS)[batchIdx + 1] - ((__gm__ int64_t *)cuS)[batchIdx]);
+        return static_cast<uint64_t>(((__gm__ int64_t*)cuS)[batchIdx + 1] - ((__gm__ int64_t*)cuS)[batchIdx]);
     }
 
     __aicore__ inline uint64_t GetSeqPrefix(GM_ADDR cuS, uint64_t batchIdx) const
     {
-        return static_cast<uint64_t>(((__gm__ int64_t *)cuS)[batchIdx]);
+        return static_cast<uint64_t>(((__gm__ int64_t*)cuS)[batchIdx]);
     }
-    __aicore__ inline void InitIndex(uint64_t startIdx, uint64_t &curS, GM_ADDR cuS, uint64_t &bIdx, uint64_t &nIdx,
-                                     uint64_t &sIdx, struct ShapeBnsd shape)
+    __aicore__ inline void InitIndex(uint64_t startIdx, uint64_t& curS, GM_ADDR cuS, uint64_t& bIdx, uint64_t& nIdx,
+                                     uint64_t& sIdx, struct ShapeBnsd shape)
     {
         if constexpr (INPUT_LAYOUT == TND) {
             // batch 边界直接取 cuSeq 前缀和（cuS[b+1]*n*d）：每轮仅一次 GM 读，
             // 免差分、免累加（原实现每轮双 GM 读 + prefixSum 累加）。
             // 变长 batch 的定位无法闭式，线性搜索已是最简；b 较大时可再改二分。
-            const __gm__ int64_t *cu = (__gm__ int64_t *)cuS;
+            const __gm__ int64_t* cu = (__gm__ int64_t*)cuS;
             for (uint64_t bDimIdx = 0; bDimIdx < shape.b; bDimIdx++) {
                 const uint64_t batchEndElements = static_cast<uint64_t>(cu[bDimIdx + 1]) * shape.n * shape.d;
                 if (startIdx < batchEndElements) {
@@ -279,10 +279,10 @@ public:
         uint64_t n = (qkvFlag > 0) ? n1 : n2;
         uint64_t s = (qkvFlag > 0) ? s1 : s2;
         uint64_t dstOffset = 0;
-        uint64_t &nIdx = (qkvFlag > 0) ? curN1Idx : curN2Idx;
+        uint64_t& nIdx = (qkvFlag > 0) ? curN1Idx : curN2Idx;
         GM_ADDR cuS = (qkvFlag > 0) ? cuSeqQ : cuSeqKv;
-        uint64_t &sIdx = (qkvFlag > 0) ? curS1Idx : curS2Idx;
-        uint64_t &bIdx = (qkvFlag > 0) ? curBatch1 : curBatch2;
+        uint64_t& sIdx = (qkvFlag > 0) ? curS1Idx : curS2Idx;
+        uint64_t& bIdx = (qkvFlag > 0) ? curBatch1 : curBatch2;
 
         // 要兼容BNSD没有seqList的情况，得从tiling传个参数过来
         uint64_t curS = s;

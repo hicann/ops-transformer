@@ -182,7 +182,7 @@ public:
      * @brief 绑定当前稀疏索引行，计算闭式常量并重置计数器。
      * @param params 当前 KV head group、K block 对应的聚合参数。
      */
-    __aicore__ inline void Init(Params const &params)
+    __aicore__ inline void Init(Params const& params)
     {
         params_ = params;
         // groupSize 至少为 1；GQA 场景恒 >= 1。
@@ -213,7 +213,7 @@ public:
      *
      * rows/tileCount/headStart0 与 AIV 路径完全一致（同一计数器驱动）。
      */
-    __aicore__ inline void AggregateScalars(QPacket &packet)
+    __aicore__ inline void AggregateScalars(QPacket& packet)
     {
         const uint32_t tiles = remainingTiles_ < tilesPerPacket_ ? remainingTiles_ : tilesPerPacket_;
         packet.tileCount = tiles;
@@ -231,7 +231,7 @@ public:
      * 走查为顺序推进，无逐 head 簿记。输入契约：稀疏索引升序且有效，
      * 估算与实际 tile 数一致；若上游给出非法索引，包按实际走查截断。
      */
-    __aicore__ inline void Aggregate(QPacket &packet)
+    __aicore__ inline void Aggregate(QPacket& packet)
     {
         AggregateScalars(packet);
         if (!walkInit_) {
@@ -395,7 +395,7 @@ public:
      *
      * Q 和 dOut 按顺序执行 Gather，因此复用同一个 LocalTensor。
      */
-    __aicore__ inline explicit GBSAGGater(NpuArch::Arch::Resource<ArchTag> &resource_)
+    __aicore__ inline explicit GBSAGGater(NpuArch::Arch::Resource<ArchTag>& resource_)
         : resource(resource_)
     {
         localTensor = resource.ubBuf.template GetBufferByByte<InputType>(0);
@@ -409,7 +409,7 @@ public:
      * 整 token 切分下 tile 恒均匀：packStart = s * tileRows、segmentRows = tileRows、
      * headStart = headStart0，全部寄存器闭式计算，仅 qStart 需要数组读。
      */
-    __aicore__ inline void Gather(Params const &params, QPacket const &packet)
+    __aicore__ inline void Gather(Params const& params, QPacket const& packet)
     {
         const QPacketAivRange range = GetQPacketAivRange(packet.rows);
         if (range.rows == 0) {
@@ -476,7 +476,7 @@ public:
     }
 
 private:
-    NpuArch::Arch::Resource<ArchTag> &resource;  // 复用 Kernel 的架构资源和 UB 访问入口。
+    NpuArch::Arch::Resource<ArchTag>& resource;  // 复用 Kernel 的架构资源和 UB 访问入口。
     AscendC::LocalTensor<InputType> localTensor; // 当前 AIV 最多 64 行的 Gather 临时缓冲。
 };
 
@@ -523,7 +523,7 @@ public:
     /**
      * @brief 初始化 Scatter 使用的 UB 视图。
      */
-    __aicore__ inline explicit GBSAGScateer(NpuArch::Arch::Resource<ArchTag> &resource_)
+    __aicore__ inline explicit GBSAGScateer(NpuArch::Arch::Resource<ArchTag>& resource_)
         : resource(resource_)
     {
         localTensor = resource.ubBuf.template GetBufferByByte<InputType>(0);
@@ -537,7 +537,7 @@ public:
      *
      * 整 token 切分下 tile 恒均匀，地址映射与 Gather 完全同构。
      */
-    __aicore__ inline void Scatter(Params const &params, QPacket const &packet, bool enableAtomicAdd)
+    __aicore__ inline void Scatter(Params const& params, QPacket const& packet, bool enableAtomicAdd)
     {
         const QPacketAivRange range = GetQPacketAivRange(packet.rows);
         if (range.rows == 0) {
@@ -604,7 +604,7 @@ public:
     }
 
 private:
-    NpuArch::Arch::Resource<ArchTag> &resource;  // 复用 Kernel 的架构资源和 UB 访问入口。
+    NpuArch::Arch::Resource<ArchTag>& resource;  // 复用 Kernel 的架构资源和 UB 访问入口。
     AscendC::LocalTensor<InputType> localTensor; // 当前 AIV 最多 64 行的 Scatter 临时缓冲。
 };
 

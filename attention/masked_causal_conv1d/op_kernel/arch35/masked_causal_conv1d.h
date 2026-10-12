@@ -45,15 +45,15 @@ public:
     __aicore__ inline MaskedCausalConv1d() {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR mask, GM_ADDR y,
-                                const MaskedCausalConv1dTilingData *tiling);
+                                const MaskedCausalConv1dTilingData* tiling);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void ParseTilingData(const MaskedCausalConv1dTilingData *tiling);
+    __aicore__ inline void ParseTilingData(const MaskedCausalConv1dTilingData* tiling);
     __aicore__ inline void CopyIn(uint32_t s0, uint32_t sCur, uint32_t b0, uint32_t bUbCur, uint32_t h0,
                                   uint32_t ubFactorHCur);
     __aicore__ inline void Compute(uint32_t s0, uint32_t sCur, uint32_t b0, uint32_t bUbCur, uint32_t ubFactorHCur,
-                                   LocalTensor<T> &wBuf, int32_t eventIdToMTE2);
+                                   LocalTensor<T>& wBuf, int32_t eventIdToMTE2);
     __aicore__ inline void CopyOut(uint32_t s0, uint32_t sCur, uint32_t b0, uint32_t bUbCur, uint32_t h0,
                                    uint32_t ubFactorHCur);
 
@@ -139,7 +139,7 @@ private:
 // ParseTilingData
 // ============================================================================
 template <typename T>
-__aicore__ inline void MaskedCausalConv1d<T>::ParseTilingData(const MaskedCausalConv1dTilingData *tiling)
+__aicore__ inline void MaskedCausalConv1d<T>::ParseTilingData(const MaskedCausalConv1dTilingData* tiling)
 {
     S_ = tiling->S;
     B_ = tiling->B;
@@ -188,7 +188,7 @@ __aicore__ inline void MaskedCausalConv1d<T>::ParseTilingData(const MaskedCausal
 // ============================================================================
 template <typename T>
 __aicore__ inline void MaskedCausalConv1d<T>::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR mask, GM_ADDR y,
-                                                   const MaskedCausalConv1dTilingData *tiling)
+                                                   const MaskedCausalConv1dTilingData* tiling)
 {
     ParseTilingData(tiling);
 
@@ -239,10 +239,10 @@ __aicore__ inline void MaskedCausalConv1d<T>::Init(GM_ADDR x, GM_ADDR weight, GM
     myUbTailFactorS_ = isSTail ? tailBlockUbTailFactorS_ : ubTailFactorS_;
 
     // Bind GM — x and y are contiguous [S][B][H]
-    xGM_.SetGlobalBuffer((__gm__ T *)x, (uint64_t)S_ * B_ * H_);
-    weightGM_.SetGlobalBuffer((__gm__ T *)weight, (uint64_t)3 * H_);
-    maskGM_.SetGlobalBuffer((__gm__ uint8_t *)mask, (uint64_t)B_ * S_);
-    yGM_.SetGlobalBuffer((__gm__ T *)y, (uint64_t)S_ * B_ * H_);
+    xGM_.SetGlobalBuffer((__gm__ T*)x, (uint64_t)S_ * B_ * H_);
+    weightGM_.SetGlobalBuffer((__gm__ T*)weight, (uint64_t)3 * H_);
+    maskGM_.SetGlobalBuffer((__gm__ uint8_t*)mask, (uint64_t)B_ * S_);
+    yGM_.SetGlobalBuffer((__gm__ T*)y, (uint64_t)S_ * B_ * H_);
 
     // ioQueue: [bUb][sUb+2][ubFactorH] T — 2 prefix rows + sCur data rows, each row ubFactorH wide
     uint32_t ioBufBytes = AlignUp(ubFactorB_ * (ubFactorS_ + PREFIX_NUM) * ubFactorH_ * sizeof(T), ALIGN_BYTES);
@@ -337,7 +337,7 @@ __aicore__ inline void MaskedCausalConv1d<T>::CopyIn(uint32_t s0, uint32_t sCur,
 // ============================================================================
 template <typename T>
 __aicore__ inline void MaskedCausalConv1d<T>::Compute(uint32_t s0, uint32_t sCur, uint32_t b0, uint32_t bUbCur,
-                                                      uint32_t ubFactorHCur, LocalTensor<T> &wBuf,
+                                                      uint32_t ubFactorHCur, LocalTensor<T>& wBuf,
                                                       int32_t eventIdToMTE2)
 {
     WaitFlag<HardEvent::MTE2_V>(eventIdToMTE2);

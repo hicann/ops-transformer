@@ -40,7 +40,7 @@
 
 namespace {
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -49,7 +49,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(const std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(const std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<uint16_t> resultData(static_cast<size_t>(size), 0);
@@ -61,7 +61,7 @@ void PrintOutResult(const std::vector<int64_t> &shape, void **deviceAddr)
     }
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -77,8 +77,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * static_cast<int64_t>(sizeof(T));
     auto ret = aclrtMalloc(deviceAddr, static_cast<size_t>(size), ACL_MEM_MALLOC_HUGE_FIRST);
@@ -153,31 +153,31 @@ int main()
     }
     cntHost[0] = static_cast<int32_t>(S1);
 
-    void *qAddr = nullptr;
-    void *kAddr = nullptr;
-    void *vAddr = nullptr;
-    void *doutAddr = nullptr;
-    void *outAddr = nullptr;
-    void *lseAddr = nullptr;
-    void *idxAddr = nullptr;
-    void *cntAddr = nullptr;
-    void *metaAddr = nullptr;
-    void *dqAddr = nullptr;
-    void *dkAddr = nullptr;
-    void *dvAddr = nullptr;
+    void* qAddr = nullptr;
+    void* kAddr = nullptr;
+    void* vAddr = nullptr;
+    void* doutAddr = nullptr;
+    void* outAddr = nullptr;
+    void* lseAddr = nullptr;
+    void* idxAddr = nullptr;
+    void* cntAddr = nullptr;
+    void* metaAddr = nullptr;
+    void* dqAddr = nullptr;
+    void* dkAddr = nullptr;
+    void* dvAddr = nullptr;
 
-    aclTensor *q = nullptr;
-    aclTensor *k = nullptr;
-    aclTensor *v = nullptr;
-    aclTensor *dout = nullptr;
-    aclTensor *out = nullptr;
-    aclTensor *lse = nullptr;
-    aclTensor *idx = nullptr;
-    aclTensor *cnt = nullptr;
-    aclTensor *metadata = nullptr;
-    aclTensor *dq = nullptr;
-    aclTensor *dk = nullptr;
-    aclTensor *dv = nullptr;
+    aclTensor* q = nullptr;
+    aclTensor* k = nullptr;
+    aclTensor* v = nullptr;
+    aclTensor* dout = nullptr;
+    aclTensor* out = nullptr;
+    aclTensor* lse = nullptr;
+    aclTensor* idx = nullptr;
+    aclTensor* cnt = nullptr;
+    aclTensor* metadata = nullptr;
+    aclTensor* dq = nullptr;
+    aclTensor* dk = nullptr;
+    aclTensor* dv = nullptr;
 
     ret = CreateAclTensor(qHost, qShape, &qAddr, aclDataType::ACL_FLOAT16, &q);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -205,7 +205,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     const int64_t blockShapeData[] = {blockX, blockY};
-    aclIntArray *blockShape = aclCreateIntArray(blockShapeData, 2);
+    aclIntArray* blockShape = aclCreateIntArray(blockShapeData, 2);
     CHECK_RET(blockShape != nullptr, LOG_PRINT("aclCreateIntArray failed\n"); return -1);
 
     char qLayout[] = "BNSD";
@@ -213,7 +213,7 @@ int main()
 
     // 4. 先跑 Metadata
     uint64_t metaWsSize = 0;
-    aclOpExecutor *metaExecutor = nullptr;
+    aclOpExecutor* metaExecutor = nullptr;
     LOG_PRINT("Calling aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize...\n");
     ret = aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
         idx, cnt, nullptr, nullptr, nullptr, nullptr, S1, S2, N1, N2, D, blockShape, qLayout, kvLayout,
@@ -223,7 +223,7 @@ int main()
               LOG_PRINT("aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *metaWs = nullptr;
+    void* metaWs = nullptr;
     if (metaWsSize > 0) {
         ret = aclrtMalloc(&metaWs, metaWsSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate metadata workspace failed. ERROR: %d\n", ret); return ret);
@@ -234,7 +234,7 @@ int main()
 
     // 5. 再跑 Grad
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     LOG_PRINT("Calling aclnnGenericBlockSparseAttentionGradGetWorkspaceSize...\n");
     ret = aclnnGenericBlockSparseAttentionGradGetWorkspaceSize(
         q, k, v, dout, out, lse, idx, cnt, metadata, nullptr /*attenMask*/, nullptr /*cuQ*/, nullptr /*cuKv*/,
@@ -247,7 +247,7 @@ int main()
     CHECK_RET(executor != nullptr, LOG_PRINT("executor is null\n"); return -1);
     LOG_PRINT("Workspace size required: %lu bytes\n", static_cast<unsigned long>(workspaceSize));
 
-    void *workspace = nullptr;
+    void* workspace = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspace, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

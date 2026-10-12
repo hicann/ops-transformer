@@ -32,16 +32,16 @@ extern "C" {
 #endif
 
 struct LightningIndexerKLLossParams {
-    const aclTensor *targetScore = nullptr;
-    const aclTensor *indexProbs = nullptr;
+    const aclTensor* targetScore = nullptr;
+    const aclTensor* indexProbs = nullptr;
     double eps;
-    const char *weightType = nullptr;
-    const aclTensor *loss = nullptr;
+    const char* weightType = nullptr;
+    const aclTensor* loss = nullptr;
 };
 
-static bool CheckShape(const aclTensor *targetScore)
+static bool CheckShape(const aclTensor* targetScore)
 {
-    const auto &viewShape = targetScore->GetViewShape();
+    const auto& viewShape = targetScore->GetViewShape();
     int64_t dimNum = static_cast<int64_t>(viewShape.GetDimNum());
     if (dimNum != 2 && dimNum != 3) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "targetScore dimNum %ld is not 2 or 3.", dimNum);
@@ -67,7 +67,7 @@ static bool CheckShape(const aclTensor *targetScore)
     return true;
 }
 
-static aclnnStatus CheckParams(const LightningIndexerKLLossParams &params)
+static aclnnStatus CheckParams(const LightningIndexerKLLossParams& params)
 {
     CHECK_COND(params.targetScore != nullptr, ACLNN_ERR_PARAM_NULLPTR, "targetScore must not be nullptr.");
     CHECK_COND(params.indexProbs != nullptr, ACLNN_ERR_PARAM_NULLPTR, "indexProbs must not be nullptr.");
@@ -85,8 +85,8 @@ static aclnnStatus CheckParams(const LightningIndexerKLLossParams &params)
         return ACLNN_ERR_PARAM_INVALID;
     }
     // shape 一致性校验（逐维比较）
-    const auto &targetShape = params.targetScore->GetViewShape();
-    const auto &indexShape = params.indexProbs->GetViewShape();
+    const auto& targetShape = params.targetScore->GetViewShape();
+    const auto& indexShape = params.indexProbs->GetViewShape();
     if (targetShape.GetDimNum() != indexShape.GetDimNum()) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "targetScore dimNum %u != indexProbs dimNum %u.", targetShape.GetDimNum(),
                 indexShape.GetDimNum());
@@ -108,8 +108,8 @@ static aclnnStatus CheckParams(const LightningIndexerKLLossParams &params)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ContiguousAndLightningIndexerKLLoss(const LightningIndexerKLLossParams &params,
-                                                       aclOpExecutor *executor, const aclTensor *loss)
+static aclnnStatus ContiguousAndLightningIndexerKLLoss(const LightningIndexerKLLossParams& params,
+                                                       aclOpExecutor* executor, const aclTensor* loss)
 {
     auto targetScoreContiguous = l0op::Contiguous(params.targetScore, executor);
     CHECK_RET(targetScoreContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -129,9 +129,9 @@ static aclnnStatus ContiguousAndLightningIndexerKLLoss(const LightningIndexerKLL
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnLightningIndexerKLLossGetWorkspaceSize(const aclTensor *targetScore, const aclTensor *indexProbs,
-                                                        double eps, const char *weightType, const aclTensor *loss,
-                                                        uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnLightningIndexerKLLossGetWorkspaceSize(const aclTensor* targetScore, const aclTensor* indexProbs,
+                                                        double eps, const char* weightType, const aclTensor* loss,
+                                                        uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnLightningIndexerKLLoss, DFX_IN(targetScore, indexProbs, eps, weightType), DFX_OUT(loss));
     LightningIndexerKLLossParams params{targetScore, indexProbs, eps, weightType, loss};
@@ -158,7 +158,7 @@ aclnnStatus aclnnLightningIndexerKLLossGetWorkspaceSize(const aclTensor *targetS
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnLightningIndexerKLLoss(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnLightningIndexerKLLoss(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                         aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnLightningIndexerKLLoss);

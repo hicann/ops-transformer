@@ -73,13 +73,13 @@ struct FIAType {
 };
 
 struct FDparams {
-    uint32_t *bN2IdxOfFdHead;
-    uint32_t *gS1IdxOfFdHead;
-    uint32_t *s2SplitNumOfFdHead;
-    uint32_t *gS1SplitNumOfFdHead;
-    uint32_t *gS1LastPartSizeOfFdHead;
-    uint32_t *gS1IdxEndOfFdHead;
-    uint32_t *gS1IdxEndOfFdHeadSplit;
+    uint32_t* bN2IdxOfFdHead;
+    uint32_t* gS1IdxOfFdHead;
+    uint32_t* s2SplitNumOfFdHead;
+    uint32_t* gS1SplitNumOfFdHead;
+    uint32_t* gS1LastPartSizeOfFdHead;
+    uint32_t* gS1IdxEndOfFdHead;
+    uint32_t* gS1IdxEndOfFdHeadSplit;
     uint32_t usedVecNumOfFd;
     uint32_t gS1BaseSizeOfFd;
 };
@@ -252,8 +252,8 @@ struct MSplitInfo {
 };
 
 template <FIA_LAYOUT LAYOUT_T>
-__aicore__ inline void GetGS1Idx(uint32_t gS1Idx, uint32_t &gIdx, uint32_t &s1Idx,
-                                 AttentionCommon::ConstInfo &constInfo)
+__aicore__ inline void GetGS1Idx(uint32_t gS1Idx, uint32_t& gIdx, uint32_t& s1Idx,
+                                 AttentionCommon::ConstInfo& constInfo)
 {
     // GS1
     if constexpr (LAYOUT_T == FIA_LAYOUT::BNSD || LAYOUT_T == FIA_LAYOUT::NBSD || LAYOUT_T == FIA_LAYOUT::NTD) {

@@ -45,12 +45,12 @@ static constexpr uint32_t LSE_DIM_D = 1;
 
 static constexpr int32_t UNKNOWN_DIMS = -2;
 
-static bool IsUnknownRankShape(const gert::Shape *shape)
+static bool IsUnknownRankShape(const gert::Shape* shape)
 {
     return shape != nullptr && shape->GetDimNum() == 1 && shape->GetDim(0) == UNKNOWN_DIMS;
 }
 
-static void SetUnknownOutShapes(gert::Shape *attentionOutShape, gert::Shape *softmaxLseShape)
+static void SetUnknownOutShapes(gert::Shape* attentionOutShape, gert::Shape* softmaxLseShape)
 {
     attentionOutShape->SetDimNum(1);
     (*attentionOutShape)[0] = UNKNOWN_DIMS;
@@ -58,14 +58,14 @@ static void SetUnknownOutShapes(gert::Shape *attentionOutShape, gert::Shape *sof
     (*softmaxLseShape)[0] = UNKNOWN_DIMS;
 }
 
-static void SetEmptyLseShape(gert::Shape *softmaxLseShape)
+static void SetEmptyLseShape(gert::Shape* softmaxLseShape)
 {
     // return_softmax_lse=0 → placeholder {0}.
     softmaxLseShape->SetDimNum(1);
     (*softmaxLseShape)[0] = 0;
 }
 
-static ge::graphStatus InferShapeGenericBlockSparseAttention(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeGenericBlockSparseAttention(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         OP_LOGE("GenericBlockSparseAttention", "context is nullptr!");
@@ -74,19 +74,19 @@ static ge::graphStatus InferShapeGenericBlockSparseAttention(gert::InferShapeCon
 
     OP_LOGD(context->GetNodeName(), "Enter GenericBlockSparseAttention InferShape impl.");
 
-    const gert::Shape *queryShape = context->GetInputShape(QUERY_INDEX);
+    const gert::Shape* queryShape = context->GetInputShape(QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
 
-    const gert::Shape *keyShape = context->GetInputShape(KEY_INDEX);
+    const gert::Shape* keyShape = context->GetInputShape(KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
 
-    const gert::Shape *valueShape = context->GetInputShape(VALUE_INDEX);
+    const gert::Shape* valueShape = context->GetInputShape(VALUE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
 
-    gert::Shape *attentionOutShape = context->GetOutputShape(ATTENTION_OUT_INDEX);
+    gert::Shape* attentionOutShape = context->GetOutputShape(ATTENTION_OUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
 
-    gert::Shape *softmaxLseShape = context->GetOutputShape(SOFTMAX_LSE_INDEX);
+    gert::Shape* softmaxLseShape = context->GetOutputShape(SOFTMAX_LSE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, softmaxLseShape);
 
     // Any of Q/K/V unknown-rank → propagate unknown outs.
@@ -98,8 +98,8 @@ static ge::graphStatus InferShapeGenericBlockSparseAttention(gert::InferShapeCon
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
-    const char *layoutQPtr = attrs->GetAttrPointer<char>(ATTR_LAYOUT_Q_INDEX);
-    const char *layoutKvPtr = attrs->GetAttrPointer<char>(ATTR_LAYOUT_KV_INDEX);
+    const char* layoutQPtr = attrs->GetAttrPointer<char>(ATTR_LAYOUT_Q_INDEX);
+    const char* layoutKvPtr = attrs->GetAttrPointer<char>(ATTR_LAYOUT_KV_INDEX);
     const std::string layoutQ = (layoutQPtr != nullptr) ? layoutQPtr : "TND";
     const std::string layoutKv = (layoutKvPtr != nullptr) ? layoutKvPtr : "TND";
 
@@ -150,7 +150,7 @@ static ge::graphStatus InferShapeGenericBlockSparseAttention(gert::InferShapeCon
         return ge::GRAPH_FAILED;
     }
 
-    const gert::Shape *blockTableShape = context->GetOptionalInputShape(BLOCK_TABLE_INDEX);
+    const gert::Shape* blockTableShape = context->GetOptionalInputShape(BLOCK_TABLE_INDEX);
     if (blockTableShape == nullptr) {
         OP_LOGE(context->GetNodeName(), "layout_kv=PA_BBND requires block_table, but it is nullptr.");
         return ge::GRAPH_FAILED;
@@ -158,7 +158,7 @@ static ge::graphStatus InferShapeGenericBlockSparseAttention(gert::InferShapeCon
 
     *attentionOutShape = *queryShape;
 
-    const int64_t *lseFlagPtr = attrs->GetAttrPointer<int64_t>(ATTR_RETURN_SOFTMAX_LSE_INDEX);
+    const int64_t* lseFlagPtr = attrs->GetAttrPointer<int64_t>(ATTR_RETURN_SOFTMAX_LSE_INDEX);
     const int64_t returnSoftmaxLse = (lseFlagPtr != nullptr) ? *lseFlagPtr : 0;
     if (returnSoftmaxLse != 0 && returnSoftmaxLse != 1) {
         OP_LOGE(context->GetNodeName(), "Unsupported return_softmax_lse=%ld, only 0 or 1 are supported.",
@@ -179,7 +179,7 @@ static ge::graphStatus InferShapeGenericBlockSparseAttention(gert::InferShapeCon
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeGenericBlockSparseAttention(gert::InferDataTypeContext *context)
+ge::graphStatus InferDataTypeGenericBlockSparseAttention(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         return ge::GRAPH_FAILED;

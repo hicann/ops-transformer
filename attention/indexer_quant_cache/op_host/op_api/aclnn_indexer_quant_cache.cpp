@@ -25,21 +25,12 @@ using namespace op;
 extern "C" {
 #endif
 
-aclnnStatus aclnnIndexerQuantCacheGetWorkspaceSize(
-    aclTensor *cacheRef,
-    aclTensor *cacheScaleRef,
-    const aclTensor *x,
-    const aclTensor *slotMapping,
-    int64_t quantMode,
-    bool roundScale,
-    float xScale,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+aclnnStatus aclnnIndexerQuantCacheGetWorkspaceSize(aclTensor* cacheRef, aclTensor* cacheScaleRef, const aclTensor* x,
+                                                   const aclTensor* slotMapping, int64_t quantMode, bool roundScale,
+                                                   float xScale, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnIndexerQuantCache,
-                   DFX_IN(cacheRef, cacheScaleRef,
-                          x, slotMapping, quantMode, roundScale, xScale),
-                   DFX_OUT());
+                   DFX_IN(cacheRef, cacheScaleRef, x, slotMapping, quantMode, roundScale, xScale), DFX_OUT());
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -54,25 +45,17 @@ aclnnStatus aclnnIndexerQuantCacheGetWorkspaceSize(
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    auto cacheView = uniqueExecutor->CreateView(cacheRef,
-                                                cacheRef->GetViewShape(),
-                                                cacheRef->GetStorageShape(),
-                                                cacheRef->GetViewStrides(),
-                                                cacheRef->GetViewOffset());
+    auto cacheView = uniqueExecutor->CreateView(cacheRef, cacheRef->GetViewShape(), cacheRef->GetStorageShape(),
+                                                cacheRef->GetViewStrides(), cacheRef->GetViewOffset());
     CHECK_RET(cacheView != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    auto scaleView = uniqueExecutor->CreateView(cacheScaleRef,
-                                                cacheScaleRef->GetViewShape(),
-                                                cacheScaleRef->GetStorageShape(),
-                                                cacheScaleRef->GetViewStrides(),
-                                                cacheScaleRef->GetViewOffset());
+    auto scaleView =
+        uniqueExecutor->CreateView(cacheScaleRef, cacheScaleRef->GetViewShape(), cacheScaleRef->GetStorageShape(),
+                                   cacheScaleRef->GetViewStrides(), cacheScaleRef->GetViewOffset());
     CHECK_RET(scaleView != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    auto output = l0op::IndexerQuantCache(
-        const_cast<aclTensor *>(cacheView), const_cast<aclTensor *>(scaleView),
-        x, slotMapping,
-        quantMode, roundScale, xScale,
-        uniqueExecutor.get());
+    auto output = l0op::IndexerQuantCache(const_cast<aclTensor*>(cacheView), const_cast<aclTensor*>(scaleView), x,
+                                          slotMapping, quantMode, roundScale, xScale, uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
@@ -80,11 +63,7 @@ aclnnStatus aclnnIndexerQuantCacheGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnIndexerQuantCache(
-    void *workspace,
-    uint64_t workspaceSize,
-    aclOpExecutor *executor,
-    aclrtStream stream)
+aclnnStatus aclnnIndexerQuantCache(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnIndexerQuantCache);
 

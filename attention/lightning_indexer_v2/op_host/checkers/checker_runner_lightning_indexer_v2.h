@@ -30,16 +30,16 @@ public:
     ~CheckerRunner() = default;
 
     void Add(std::unique_ptr<LightningIndexerV2BaseChecker> checker);
-    ge::graphStatus Process(const LightningIndexerV2CheckerInfo &info) const;
+    ge::graphStatus Process(const LightningIndexerV2CheckerInfo& info) const;
 
 private:
-    using CheckMethod = ge::graphStatus (LightningIndexerV2BaseChecker::*)(const LightningIndexerV2CheckerInfo &) const;
+    using CheckMethod = ge::graphStatus (LightningIndexerV2BaseChecker::*)(const LightningIndexerV2CheckerInfo&) const;
 
-    ge::graphStatus Run(CheckMethod method, const LightningIndexerV2CheckerInfo &info) const;
+    ge::graphStatus Run(CheckMethod method, const LightningIndexerV2CheckerInfo& info) const;
     std::vector<std::unique_ptr<LightningIndexerV2BaseChecker>> checkers_;
 };
 
-void RegisterCommonCheckers(CheckerRunner &runner);
+void RegisterCommonCheckers(CheckerRunner& runner);
 
 } // namespace lightning_indexer_v2_checker
 } // namespace optiling

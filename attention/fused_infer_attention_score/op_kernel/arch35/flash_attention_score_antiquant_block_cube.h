@@ -37,29 +37,29 @@ public:
 
     /*Public Function*/
     __aicore__ inline FABlockCubeAntiquant(){};
-    __aicore__ inline void InitCubeBlock(__gm__ uint8_t *query,
-                                         const FlashAttentionScoreSimplifiedTilingData *__restrict tiling, TPipe *tPipe,
-                                         BufferManager<BufferType::L1> *l1BuffMgr);
+    __aicore__ inline void InitCubeBlock(__gm__ uint8_t* query,
+                                         const FlashAttentionScoreSimplifiedTilingData* __restrict tiling, TPipe* tPipe,
+                                         BufferManager<BufferType::L1>* l1BuffMgr);
     __aicore__ inline void SetCrossCoreFlag();
     __aicore__ inline void WaitCrossCoreFlag();
     __aicore__ inline void InitLocalBuffer();
     __aicore__ inline void UninitLocalBuffer();
-    __aicore__ inline void CopyToL1Nd2Nz(const LocalTensor<Q_T> &l1Tensor, const GlobalTensor<Q_T> &gmTensor,
+    __aicore__ inline void CopyToL1Nd2Nz(const LocalTensor<Q_T>& l1Tensor, const GlobalTensor<Q_T>& gmTensor,
                                          uint32_t ndNum, uint32_t nValue, uint32_t dValue, uint32_t srcNdMatrixStride,
                                          uint32_t srcDValue, uint32_t dstNzC0Stride, uint32_t dstNzMatrixStride);
-    __aicore__ inline void PrepareMm1Input(Buffer<BufferType::L1> &mm1A, RunInfo<isInfer> &runInfo,
-                                           RunParamStr<isInfer> &runParam, ConstInfo<isInfer, hasRope> &constInfo);
-    __aicore__ inline void IterateBmm1(RunInfo<isInfer> &runInfo, RunParamStr<isInfer> &runParam,
-                                       const int64_t &subTaskId, Buffer<BufferType::L1> &mm1B,
-                                       LocalTensor<T> &outputTensor, ConstInfo<isInfer, hasRope> &constInfo);
-    __aicore__ inline void IterateBmm2(const int64_t &subTaskId, const RunInfo<isInfer> &runInfo,
-                                       Buffer<BufferType::L1> &inputBufA, Buffer<BufferType::L1> &inputBufB,
-                                       LocalTensor<T> &outputTensor, ConstInfo<isInfer, hasRope> &constInfo);
+    __aicore__ inline void PrepareMm1Input(Buffer<BufferType::L1>& mm1A, RunInfo<isInfer>& runInfo,
+                                           RunParamStr<isInfer>& runParam, ConstInfo<isInfer, hasRope>& constInfo);
+    __aicore__ inline void IterateBmm1(RunInfo<isInfer>& runInfo, RunParamStr<isInfer>& runParam,
+                                       const int64_t& subTaskId, Buffer<BufferType::L1>& mm1B,
+                                       LocalTensor<T>& outputTensor, ConstInfo<isInfer, hasRope>& constInfo);
+    __aicore__ inline void IterateBmm2(const int64_t& subTaskId, const RunInfo<isInfer>& runInfo,
+                                       Buffer<BufferType::L1>& inputBufA, Buffer<BufferType::L1>& inputBufB,
+                                       LocalTensor<T>& outputTensor, ConstInfo<isInfer, hasRope>& constInfo);
 
     GlobalTensor<Q_T> queryGm;
 
 private:
-    BufferManager<BufferType::L1> *l1BufferManagerPtr;
+    BufferManager<BufferType::L1>* l1BufferManagerPtr;
     BufferManager<BufferType::L0A> l0aBufferManager;
     BufferManager<BufferType::L0B> l0bBufferManager;
     BufferManager<BufferType::L0C> l0cBufferManager;
@@ -67,19 +67,19 @@ private:
     BuffersPolicyDB<BufferType::L0A> mmL0ABuffers;
     BuffersPolicyDB<BufferType::L0B> mmL0BBuffers;
     BuffersPolicyDB<BufferType::L0C> mmL0CBuffers;
-    TPipe *tPipe;
-    const FlashAttentionScoreSimplifiedTilingData *__restrict tilingData;
+    TPipe* tPipe;
+    const FlashAttentionScoreSimplifiedTilingData* __restrict tilingData;
 };
 
 ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::InitCubeBlock(
-    __gm__ uint8_t *query, const FlashAttentionScoreSimplifiedTilingData *__restrict tiling, TPipe *pipe,
-    BufferManager<BufferType::L1> *l1BuffMgr)
+    __gm__ uint8_t* query, const FlashAttentionScoreSimplifiedTilingData* __restrict tiling, TPipe* pipe,
+    BufferManager<BufferType::L1>* l1BuffMgr)
 {
     this->tPipe = pipe;
     this->tilingData = tiling;
     this->l1BufferManagerPtr = l1BuffMgr;
-    this->queryGm.SetGlobalBuffer((__gm__ Q_T *)query);
+    this->queryGm.SetGlobalBuffer((__gm__ Q_T*)query);
 }
 
 ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
@@ -143,7 +143,7 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::UninitLoca
 
 ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::CopyToL1Nd2Nz(
-    const LocalTensor<Q_T> &l1Tensor, const GlobalTensor<Q_T> &gmTensor, uint32_t ndNum, uint32_t nValue,
+    const LocalTensor<Q_T>& l1Tensor, const GlobalTensor<Q_T>& gmTensor, uint32_t ndNum, uint32_t nValue,
     uint32_t dValue, uint32_t srcNdMatrixStride, uint32_t srcDValue, uint32_t dstNzC0Stride, uint32_t dstNzMatrixStride)
 {
     Nd2NzParams gm2L1Nd2NzParams;
@@ -162,8 +162,8 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::CopyToL1Nd
 
 ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::PrepareMm1Input(
-    Buffer<BufferType::L1> &mm1A, RunInfo<isInfer> &runInfo, RunParamStr<isInfer> &runParam,
-    ConstInfo<isInfer, hasRope> &constInfo)
+    Buffer<BufferType::L1>& mm1A, RunInfo<isInfer>& runInfo, RunParamStr<isInfer>& runParam,
+    ConstInfo<isInfer, hasRope>& constInfo)
 {
     if (unlikely(runInfo.s2LoopCount == 0)) {
         mm1A = mm1AL1Buffers.Get();
@@ -196,8 +196,8 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::PrepareMm1
 
 ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::IterateBmm1(
-    RunInfo<isInfer> &runInfo, RunParamStr<isInfer> &runParam, const int64_t &subTaskId, Buffer<BufferType::L1> &mm1B,
-    LocalTensor<T> &outputTensor, ConstInfo<isInfer, hasRope> &constInfo)
+    RunInfo<isInfer>& runInfo, RunParamStr<isInfer>& runParam, const int64_t& subTaskId, Buffer<BufferType::L1>& mm1B,
+    LocalTensor<T>& outputTensor, ConstInfo<isInfer, hasRope>& constInfo)
 {
     Buffer<BufferType::L1> mm1A;
     PrepareMm1Input(mm1A, runInfo, runParam, constInfo);
@@ -276,8 +276,8 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::IterateBmm
 
 ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::IterateBmm2(
-    const int64_t &subTaskId, const RunInfo<isInfer> &runInfo, Buffer<BufferType::L1> &inputBufA,
-    Buffer<BufferType::L1> &inputBufB, LocalTensor<T> &outputTensor, ConstInfo<isInfer, hasRope> &constInfo)
+    const int64_t& subTaskId, const RunInfo<isInfer>& runInfo, Buffer<BufferType::L1>& inputBufA,
+    Buffer<BufferType::L1>& inputBufB, LocalTensor<T>& outputTensor, ConstInfo<isInfer, hasRope>& constInfo)
 {
 #if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
     CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(VC_L1_EVENT[subTaskId % 2]); // 2 is double buffer
@@ -344,9 +344,9 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::IterateBmm
 ANTIQUANT_TEMPLATES_DEF
 class FABlockCubeAntiquantDummy {
 public:
-    __aicore__ inline void InitCubeBlock(__gm__ uint8_t *query,
-                                         const FlashAttentionScoreSimplifiedTilingData *__restrict tiling, TPipe *pipe,
-                                         BufferManager<BufferType::L1> *l1BuffMgr)
+    __aicore__ inline void InitCubeBlock(__gm__ uint8_t* query,
+                                         const FlashAttentionScoreSimplifiedTilingData* __restrict tiling, TPipe* pipe,
+                                         BufferManager<BufferType::L1>* l1BuffMgr)
     {}
     __aicore__ inline void SetCrossCoreFlag() {}
     __aicore__ inline void WaitCrossCoreFlag() {}

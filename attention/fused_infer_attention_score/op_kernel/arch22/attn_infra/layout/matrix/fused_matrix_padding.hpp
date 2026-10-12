@@ -49,27 +49,26 @@ public:
     HOST_DEVICE
     PaddingRowMajor(Index orgRows = 0, Index orgCols = 0, Index blockRows = 0, Index blockCols = 0)
         : orgShape_(MakeCoord(orgRows, orgCols)),
-          shape_(MakeCoord(blockRows, NpuArch::Detail::Alignment::CeilDiv(orgRows, blockRows),
-              blockCols, NpuArch::Detail::Alignment::CeilDiv(orgCols, blockCols))),
+          shape_(MakeCoord(blockRows, NpuArch::Detail::Alignment::CeilDiv(orgRows, blockRows), blockCols,
+                           NpuArch::Detail::Alignment::CeilDiv(orgCols, blockCols))),
           stride_(MakeCoord((LongIndex)blockCols,
-              (LongIndex)blockRows * (LongIndex)NpuArch::Detail::Alignment::RoundUp(orgCols, blockCols),
-              (LongIndex)1, (LongIndex)blockRows * (LongIndex)blockCols)) {}
+                            (LongIndex)blockRows * (LongIndex)NpuArch::Detail::Alignment::RoundUp(orgCols, blockCols),
+                            (LongIndex)1, (LongIndex)blockRows * (LongIndex)blockCols))
+    {}
 
     /// Returns the offset of a coordinate in linear memory.
     /// Assumes coordinate has convention (row, column)
     HOST_DEVICE
-    LongIndex GetOffset(MatrixCoord const &coord) const
+    LongIndex GetOffset(MatrixCoord const& coord) const
     {
         LongIndex blockRows = (LongIndex)shape_[0];
         LongIndex blockCols = (LongIndex)shape_[2];
-        return (LongIndex)coord.row() / blockRows * stride_[1]
-            + (LongIndex)coord.column() / blockCols * stride_[3]
-            + (LongIndex)coord.row() % blockRows * stride_[0]
-            + (LongIndex)coord.column() % blockCols;
+        return (LongIndex)coord.row() / blockRows * stride_[1] + (LongIndex)coord.column() / blockCols * stride_[3] +
+               (LongIndex)coord.row() % blockRows * stride_[0] + (LongIndex)coord.column() % blockCols;
     }
 
     HOST_DEVICE
-    PaddingRowMajor GetTileLayout(MatrixCoord const &tileShape) const
+    PaddingRowMajor GetTileLayout(MatrixCoord const& tileShape) const
     {
         return PaddingRowMajor(tileShape.row(), tileShape.column(), shape_[0], shape_[2]);
     }
@@ -83,7 +82,7 @@ public:
 
     /// Returns the origin shape of the layout
     HOST_DEVICE
-    typename OrgShape::Index &orgShape(int idx)
+    typename OrgShape::Index& orgShape(int idx)
     {
         return orgShape_[idx];
     }
@@ -97,7 +96,7 @@ public:
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape &shape()
+    Shape& shape()
     {
         return shape_;
     }
@@ -111,7 +110,7 @@ public:
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index &shape(int idx)
+    typename Shape::Index& shape(int idx)
     {
         return shape_[idx];
     }
@@ -125,7 +124,7 @@ public:
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride &stride()
+    Stride& stride()
     {
         return stride_;
     }
@@ -139,7 +138,7 @@ public:
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index &stride(int idx)
+    typename Stride::Index& stride(int idx)
     {
         return stride_[idx];
     }
@@ -190,26 +189,25 @@ public:
     HOST_DEVICE
     PaddingColumnMajor(Index orgRows = 0, Index orgCols = 0, Index blockRows = 0, Index blockCols = 0)
         : orgShape_(MakeCoord(orgRows, orgCols)),
-          shape_(MakeCoord(blockRows, NpuArch::Detail::Alignment::CeilDiv(orgRows, blockRows),
-              blockCols, NpuArch::Detail::Alignment::CeilDiv(orgCols, blockCols))),
+          shape_(MakeCoord(blockRows, NpuArch::Detail::Alignment::CeilDiv(orgRows, blockRows), blockCols,
+                           NpuArch::Detail::Alignment::CeilDiv(orgCols, blockCols))),
           stride_(MakeCoord((LongIndex)1, (LongIndex)blockRows * (LongIndex)blockCols, (LongIndex)blockRows,
-              (LongIndex)NpuArch::Detail::Alignment::RoundUp(orgRows, blockRows) * (LongIndex)blockCols)) {}
+                            (LongIndex)NpuArch::Detail::Alignment::RoundUp(orgRows, blockRows) * (LongIndex)blockCols))
+    {}
 
     /// Returns the offset of a coordinate in linear memory.
     /// Assumes coordinate has convention (row, column)
     HOST_DEVICE
-    LongIndex GetOffset(MatrixCoord const &coord) const
+    LongIndex GetOffset(MatrixCoord const& coord) const
     {
         LongIndex blockRows = (LongIndex)shape_[0];
         LongIndex blockCols = (LongIndex)shape_[2];
-        return (LongIndex)coord.row() / blockRows * stride_[1]
-            + (LongIndex)coord.column() / blockCols * stride_[3]
-            + (LongIndex)coord.row() % blockRows
-            + (LongIndex)coord.column() % blockCols * stride_[2];
+        return (LongIndex)coord.row() / blockRows * stride_[1] + (LongIndex)coord.column() / blockCols * stride_[3] +
+               (LongIndex)coord.row() % blockRows + (LongIndex)coord.column() % blockCols * stride_[2];
     }
 
     HOST_DEVICE
-    PaddingColumnMajor GetTileLayout(MatrixCoord const &tileShape) const
+    PaddingColumnMajor GetTileLayout(MatrixCoord const& tileShape) const
     {
         return PaddingColumnMajor(tileShape.row(), tileShape.column(), shape_[0], shape_[2]);
     }
@@ -223,7 +221,7 @@ public:
 
     /// Returns the origin shape of the layout
     HOST_DEVICE
-    typename OrgShape::Index &orgShape(int idx)
+    typename OrgShape::Index& orgShape(int idx)
     {
         return orgShape_[idx];
     }
@@ -237,7 +235,7 @@ public:
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    Shape &shape()
+    Shape& shape()
     {
         return shape_;
     }
@@ -251,7 +249,7 @@ public:
 
     /// Returns the shape of the layout
     HOST_DEVICE
-    typename Shape::Index &shape(int idx)
+    typename Shape::Index& shape(int idx)
     {
         return shape_[idx];
     }
@@ -265,7 +263,7 @@ public:
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    Stride &stride()
+    Stride& stride()
     {
         return stride_;
     }
@@ -279,7 +277,7 @@ public:
 
     /// Returns the stride of the layout
     HOST_DEVICE
-    typename Stride::Index &stride(int idx)
+    typename Stride::Index& stride(int idx)
     {
         return stride_[idx];
     }
@@ -299,6 +297,6 @@ private:
     Stride stride_;
 };
 
-}  // namespace NpuArch::layout
+} // namespace NpuArch::layout
 
-#endif  // FUSED_MATRIX_PADDING_HPP
+#endif // FUSED_MATRIX_PADDING_HPP

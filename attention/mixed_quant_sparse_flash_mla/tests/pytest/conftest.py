@@ -29,12 +29,12 @@ def pytest_runtest_makereport(item, call):
         except AttributeError:
             pass
         if msg and msg.startswith("Failed: "):
-            msg = msg[len("Failed: "):]
+            msg = msg[len("Failed: ") :]
         _fail_msgs[rep.nodeid] = msg
 
 
 def _custom_get_line(config, rep, tw, word_markup):
-    if hasattr(rep, 'when') and rep.when == "call" and rep.failed:
+    if hasattr(rep, "when") and rep.when == "call" and rep.failed:
         fail_msg = _fail_msgs.get(rep.nodeid)
         if fail_msg:
             verbose_word, verbose_markup = rep._get_verbose_word_with_markup(

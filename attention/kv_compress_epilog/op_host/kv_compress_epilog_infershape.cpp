@@ -38,7 +38,5 @@ graphStatus InferDtype4KvCompressEpilog(gert::InferDataTypeContext* context)
     return GRAPH_SUCCESS;
 }
 
-IMPL_OP_INFERSHAPE(KvCompressEpilog)
-    .InferShape(InferShape4KvCompressEpilog)
-    .InferDataType(InferDtype4KvCompressEpilog);
-}  // namespace ops
+IMPL_OP_INFERSHAPE(KvCompressEpilog).InferShape(InferShape4KvCompressEpilog).InferDataType(InferDtype4KvCompressEpilog);
+} // namespace ops

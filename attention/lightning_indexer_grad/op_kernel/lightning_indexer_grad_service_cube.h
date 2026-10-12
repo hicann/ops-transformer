@@ -32,7 +32,7 @@ public:
     using dataType = typename LIGT::dataType;
 
     __aicore__ inline LIGMatmul(){};
-    __aicore__ inline void Init(TPipe *pipe);
+    __aicore__ inline void Init(TPipe* pipe);
     __aicore__ inline void InitBuffers();
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
@@ -56,7 +56,7 @@ public:
     static constexpr uint32_t B_CONFLICT_FLAG_SHIFT = 5;
 
 protected:
-    TPipe *pipe;
+    TPipe* pipe;
 
     TBuf<TPosition::A1> leftMatrixL1Buf;
     LocalTensor<dataType> leftMatrixL1PingTensor;
@@ -93,7 +93,7 @@ protected:
 };
 
 template <typename LIT>
-__aicore__ inline void LIGMatmul<LIT>::Init(TPipe *pipeIn)
+__aicore__ inline void LIGMatmul<LIT>::Init(TPipe* pipeIn)
 {
     pipe = pipeIn;
 #if __CCE_AICORE__ == 310

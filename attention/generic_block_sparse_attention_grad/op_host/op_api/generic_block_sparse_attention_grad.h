@@ -15,14 +15,14 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const std::array<const aclTensor *, 3> GenericBlockSparseAttentionGrad(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *dout, const aclTensor *out,
-    const aclTensor *lse, const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
-    const aclTensor *metadataOptional, const aclTensor *attenMaskOptional, const aclTensor *cuSeqLengthsQOptional,
-    const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
-    const aclIntArray *blockShape, char *layoutQ, char *layoutKv, int64_t layoutSparsePattern, double scaleValue,
+const std::array<const aclTensor*, 3> GenericBlockSparseAttentionGrad(
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* dout, const aclTensor* out,
+    const aclTensor* lse, const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount,
+    const aclTensor* metadataOptional, const aclTensor* attenMaskOptional, const aclTensor* cuSeqLengthsQOptional,
+    const aclTensor* cuSeqLengthsKvOptional, const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional,
+    const aclIntArray* blockShape, char* layoutQ, char* layoutKv, int64_t layoutSparsePattern, double scaleValue,
     int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode,
-    bool isConsistentTopk, aclOpExecutor *executor);
+    bool isConsistentTopk, aclOpExecutor* executor);
 } // namespace l0op
 
 #endif

@@ -82,8 +82,8 @@ static bool IsValidDim(int64_t dim)
     return dim == UNKNOWN_DIM_VALUE || dim > 0;
 }
 
-static ge::graphStatus CheckRank(const gert::Shape *shape, size_t expectRank, const char *tensorName,
-                                 const char *opName)
+static ge::graphStatus CheckRank(const gert::Shape* shape, size_t expectRank, const char* tensorName,
+                                 const char* opName)
 {
     OP_CHECK_IF(shape->GetDimNum() != expectRank,
                 OP_LOGE(opName, "%s must be %zuD, but got %zuD.", tensorName, expectRank, shape->GetDimNum()),
@@ -91,16 +91,16 @@ static ge::graphStatus CheckRank(const gert::Shape *shape, size_t expectRank, co
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckDimValue(int64_t dim, const char *tensorName, const char *dimName, const char *opName)
+static ge::graphStatus CheckDimValue(int64_t dim, const char* tensorName, const char* dimName, const char* opName)
 {
     OP_CHECK_IF(!IsValidDim(dim), OP_LOGE(opName, "%s.%s=%ld is invalid (expect >0 or -1).", tensorName, dimName, dim),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckInputShapes(const gert::Shape *xShape, const gert::Shape *weightQkvShape,
-                                        const gert::Shape *weightBetaShape, const gert::Shape *weightGateShape,
-                                        const gert::Shape *weightGShape, const char *opName)
+static ge::graphStatus CheckInputShapes(const gert::Shape* xShape, const gert::Shape* weightQkvShape,
+                                        const gert::Shape* weightBetaShape, const gert::Shape* weightGateShape,
+                                        const gert::Shape* weightGShape, const char* opName)
 {
     if (CheckRank(xShape, DIM_NUM_TWO, X_NAME, opName) != ge::GRAPH_SUCCESS ||
         CheckRank(weightQkvShape, DIM_NUM_TWO, WEIGHT_QKV_NAME, opName) != ge::GRAPH_SUCCESS ||
@@ -119,8 +119,8 @@ static ge::graphStatus CheckInputShapes(const gert::Shape *xShape, const gert::S
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckWeightQkvScaleShape(const gert::Shape *weightQkvScaleShape, int64_t hiddenSize,
-                                                int64_t qkvSize, bool transWeightQkv, const char *opName)
+static ge::graphStatus CheckWeightQkvScaleShape(const gert::Shape* weightQkvScaleShape, int64_t hiddenSize,
+                                                int64_t qkvSize, bool transWeightQkv, const char* opName)
 {
     if (CheckRank(weightQkvScaleShape, DIM_NUM_THREE, WEIGHT_QKV_SCALE_NAME, opName) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -176,17 +176,17 @@ static ge::graphStatus CheckWeightQkvScaleShape(const gert::Shape *weightQkvScal
     return ge::GRAPH_SUCCESS;
 }
 
-static bool GetOptionalBoolAttr(const gert::InferShapeContext *context, uint32_t attrIndex, bool defaultValue)
+static bool GetOptionalBoolAttr(const gert::InferShapeContext* context, uint32_t attrIndex, bool defaultValue)
 {
-    const auto *attrs = context->GetAttrs();
+    const auto* attrs = context->GetAttrs();
     if (attrs == nullptr) {
         return defaultValue;
     }
-    const bool *attr = attrs->GetAttrPointer<bool>(attrIndex);
+    const bool* attr = attrs->GetAttrPointer<bool>(attrIndex);
     return (attr != nullptr) ? *attr : defaultValue;
 }
 
-static void GetTransWeightAttrs(const gert::InferShapeContext *context, KdaInputProjTransAttrs &transAttrs)
+static void GetTransWeightAttrs(const gert::InferShapeContext* context, KdaInputProjTransAttrs& transAttrs)
 {
     transAttrs.transWeightQkv = GetOptionalBoolAttr(context, ATTR_TRANS_WEIGHT_QKV_INDEX, true);
     transAttrs.transWeightBeta = GetOptionalBoolAttr(context, ATTR_TRANS_WEIGHT_BETA_INDEX, true);
@@ -195,8 +195,8 @@ static void GetTransWeightAttrs(const gert::InferShapeContext *context, KdaInput
 }
 
 // trans=true: weight=[outFeatures, inFeatures]；trans=false: weight=[inFeatures, outFeatures]
-static ge::graphStatus InferOutFeatures(const gert::Shape *weightShape, int64_t xDim1, bool transWeight,
-                                        const char *weightName, const char *opName, int64_t &outFeatures)
+static ge::graphStatus InferOutFeatures(const gert::Shape* weightShape, int64_t xDim1, bool transWeight,
+                                        const char* weightName, const char* opName, int64_t& outFeatures)
 {
     const int64_t dim0 = weightShape->GetDim(DIM_IDX_ZERO);
     const int64_t dim1 = weightShape->GetDim(DIM_IDX_ONE);
@@ -218,10 +218,10 @@ static ge::graphStatus InferOutFeatures(const gert::Shape *weightShape, int64_t 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus FillShapeParam(const gert::Shape *xShape, const gert::Shape *weightQkvShape,
-                                      const gert::Shape *weightBetaShape, const gert::Shape *weightGateShape,
-                                      const gert::Shape *weightGShape, const KdaInputProjTransAttrs &transAttrs,
-                                      const char *opName, KdaInputProjShapeParam &shapeParam)
+static ge::graphStatus FillShapeParam(const gert::Shape* xShape, const gert::Shape* weightQkvShape,
+                                      const gert::Shape* weightBetaShape, const gert::Shape* weightGateShape,
+                                      const gert::Shape* weightGShape, const KdaInputProjTransAttrs& transAttrs,
+                                      const char* opName, KdaInputProjShapeParam& shapeParam)
 {
     shapeParam.tSize = xShape->GetDim(DIM_IDX_ZERO);
     shapeParam.hiddenSize = xShape->GetDim(DIM_IDX_ONE);
@@ -238,22 +238,22 @@ static ge::graphStatus FillShapeParam(const gert::Shape *xShape, const gert::Sha
     return ge::GRAPH_SUCCESS;
 }
 
-static void SetOutputShape2D(gert::Shape *outShape, int64_t tSize, int64_t outFeatures)
+static void SetOutputShape2D(gert::Shape* outShape, int64_t tSize, int64_t outFeatures)
 {
     outShape->SetDimNum(DIM_NUM_TWO);
     outShape->SetDim(DIM_IDX_ZERO, tSize);
     outShape->SetDim(DIM_IDX_ONE, outFeatures);
 }
 
-static ge::graphStatus SetOutputShapes(gert::InferShapeContext *context, const KdaInputProjShapeParam &shapeParam)
+static ge::graphStatus SetOutputShapes(gert::InferShapeContext* context, const KdaInputProjShapeParam& shapeParam)
 {
-    gert::Shape *qkvShape = context->GetOutputShape(QKV_INDEX);
+    gert::Shape* qkvShape = context->GetOutputShape(QKV_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, qkvShape);
-    gert::Shape *betaShape = context->GetOutputShape(BETA_INDEX);
+    gert::Shape* betaShape = context->GetOutputShape(BETA_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, betaShape);
-    gert::Shape *gateShape = context->GetOutputShape(GATE_INDEX);
+    gert::Shape* gateShape = context->GetOutputShape(GATE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, gateShape);
-    gert::Shape *gShape = context->GetOutputShape(G_INDEX);
+    gert::Shape* gShape = context->GetOutputShape(G_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, gShape);
 
     SetOutputShape2D(qkvShape, shapeParam.tSize, shapeParam.qkvSize);
@@ -263,22 +263,22 @@ static ge::graphStatus SetOutputShapes(gert::InferShapeContext *context, const K
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferShapeKdaInputProj(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeKdaInputProj(gert::InferShapeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("KdaInputProj", "InferShapeContext is nullptr!"), return ge::GRAPH_FAILED);
-    const char *opName = context->GetNodeName();
+    const char* opName = context->GetNodeName();
 
-    const gert::Shape *xShape = context->GetInputShape(X_INDEX);
+    const gert::Shape* xShape = context->GetInputShape(X_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
-    const gert::Shape *weightQkvShape = context->GetInputShape(WEIGHT_QKV_INDEX);
+    const gert::Shape* weightQkvShape = context->GetInputShape(WEIGHT_QKV_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, weightQkvShape);
-    const gert::Shape *weightBetaShape = context->GetInputShape(WEIGHT_BETA_INDEX);
+    const gert::Shape* weightBetaShape = context->GetInputShape(WEIGHT_BETA_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, weightBetaShape);
-    const gert::Shape *weightGateShape = context->GetInputShape(WEIGHT_GATE_INDEX);
+    const gert::Shape* weightGateShape = context->GetInputShape(WEIGHT_GATE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, weightGateShape);
-    const gert::Shape *weightGShape = context->GetInputShape(WEIGHT_G_INDEX);
+    const gert::Shape* weightGShape = context->GetInputShape(WEIGHT_G_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, weightGShape);
-    const gert::Shape *weightQkvScaleShape = context->GetInputShape(WEIGHT_QKV_SCALE_INDEX);
+    const gert::Shape* weightQkvScaleShape = context->GetInputShape(WEIGHT_QKV_SCALE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, weightQkvScaleShape);
 
     if (CheckInputShapes(xShape, weightQkvShape, weightBetaShape, weightGateShape, weightGShape, opName) !=
@@ -310,8 +310,8 @@ static ge::graphStatus InferShapeKdaInputProj(gert::InferShapeContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckExpectDataType(ge::DataType actual, ge::DataType expect, const char *tensorName,
-                                           const char *opName)
+static ge::graphStatus CheckExpectDataType(ge::DataType actual, ge::DataType expect, const char* tensorName,
+                                           const char* opName)
 {
     OP_CHECK_IF(actual != expect,
                 OP_LOGE(opName, "%s dtype %s does not match expected %s.", tensorName,
@@ -321,11 +321,11 @@ static ge::graphStatus CheckExpectDataType(ge::DataType actual, ge::DataType exp
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeKdaInputProj(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeKdaInputProj(gert::InferDataTypeContext* context)
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("KdaInputProj", "InferDataTypeContext is nullptr!"),
                 return ge::GRAPH_FAILED);
-    const char *opName = context->GetNodeName();
+    const char* opName = context->GetNodeName();
 
     // 与 op_def / 设计说明对齐
     const ge::DataType xDtype = context->GetInputDataType(X_INDEX);

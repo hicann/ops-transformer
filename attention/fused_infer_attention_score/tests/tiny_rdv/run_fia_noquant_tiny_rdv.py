@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # -----------------------------------------------------------------------------------------------------------
 # Copyright (c) 2026 Huawei Technologies Co., Ltd.
-# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
@@ -15,6 +15,7 @@ import os
 import subprocess
 from fused_infer_attention_test import print_log
 
+
 def get_all_json_files(folder_path):
     """
     读取文件夹下所有 .json 结尾的文件，返回路径列表
@@ -22,7 +23,7 @@ def get_all_json_files(folder_path):
     :return: 所有 .json 文件的路径 list
     """
     json_files = []
-    
+
     # 遍历文件夹
     for file_name in os.listdir(folder_path):
         # 判断是否以 .json 结尾（忽略大小写：.JSON / .Json 也能识别）
@@ -32,8 +33,9 @@ def get_all_json_files(folder_path):
             # 只添加文件，排除文件夹
             if os.path.isfile(full_path):
                 json_files.append(full_path)
-    
+
     return json_files
+
 
 def parse_input(cmd_list, key, value):
     if key == "act_seq_lens_q" or key == "act_seq_lens_kv":
@@ -51,6 +53,7 @@ def parse_input(cmd_list, key, value):
         cmd_list.append(f"--{key}")
         cmd_list.append(str(value))
     return
+
 
 if __name__ == "__main__":
     TARGET_FOLDER = "./case_json"

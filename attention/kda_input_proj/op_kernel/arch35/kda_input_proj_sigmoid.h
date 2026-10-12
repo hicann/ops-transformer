@@ -27,12 +27,12 @@ class KdaInputProjSigmoid {
 public:
     __aicore__ inline KdaInputProjSigmoid() {}
 
-    __aicore__ inline void Init(__gm__ uint8_t *beta, const optiling::KdaInputProjTilingData *__restrict tiling);
+    __aicore__ inline void Init(__gm__ uint8_t* beta, const optiling::KdaInputProjTilingData* __restrict tiling);
     __aicore__ inline void Process();
 
 protected:
-    const optiling::KdaInputProjTilingData *tiling_{nullptr};
-    __gm__ uint8_t *beta_{nullptr};
+    const optiling::KdaInputProjTilingData* tiling_{nullptr};
+    __gm__ uint8_t* beta_{nullptr};
 
 #ifndef __DAV_CUBE__
     using QueIn = AscendC::TQue<AscendC::QuePosition::VECIN, 2>;
@@ -40,17 +40,17 @@ protected:
 
     __aicore__ inline void ProcessAiv();
     __aicore__ inline uint32_t ExtentOf(uint32_t loopIdx, uint32_t loopNum, uint32_t ubTile, uint32_t tailExt) const;
-    __aicore__ inline void CopyIn(QueIn &queIn, uint64_t gmOffset, uint32_t extent);
-    __aicore__ inline void Compute(QueIn &queIn, QueOut &queOut, uint32_t extent);
-    __aicore__ inline void CopyOut(QueOut &queOut, uint64_t gmOffset, uint32_t extent);
+    __aicore__ inline void CopyIn(QueIn& queIn, uint64_t gmOffset, uint32_t extent);
+    __aicore__ inline void Compute(QueIn& queIn, QueOut& queOut, uint32_t extent);
+    __aicore__ inline void CopyOut(QueOut& queOut, uint64_t gmOffset, uint32_t extent);
 
     AscendC::GlobalTensor<float> betaGm_;
 #endif
 };
 
 template <typename TypePack>
-__aicore__ inline void KdaInputProjSigmoid<TypePack>::Init(__gm__ uint8_t *beta,
-                                                           const optiling::KdaInputProjTilingData *__restrict tiling)
+__aicore__ inline void KdaInputProjSigmoid<TypePack>::Init(__gm__ uint8_t* beta,
+                                                           const optiling::KdaInputProjTilingData* __restrict tiling)
 {
     beta_ = beta;
     tiling_ = tiling;
@@ -78,7 +78,7 @@ __aicore__ inline void KdaInputProjSigmoid<TypePack>::ProcessAiv()
     if (tiling_ == nullptr || beta_ == nullptr) {
         return;
     }
-    const optiling::KdaInputProjSigmoidParams &sp = tiling_->sigmoidParams;
+    const optiling::KdaInputProjSigmoidParams& sp = tiling_->sigmoidParams;
     if (sp.aivNum == 0 || sp.elemNum == 0 || sp.ubTile == 0) {
         return;
     }
@@ -102,7 +102,7 @@ __aicore__ inline void KdaInputProjSigmoid<TypePack>::ProcessAiv()
     QueOut queOut;
     pipe.InitBuffer(queIn, bufNum, sp.ubTile * sizeof(float));
     pipe.InitBuffer(queOut, bufNum, sp.ubTile * sizeof(float));
-    betaGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(beta_));
+    betaGm_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(beta_));
 
     CopyIn(queIn, blockOff, ExtentOf(0, loopNum, sp.ubTile, tailExt));
     for (uint32_t i = 0; i < loopNum; ++i) {
@@ -117,7 +117,7 @@ __aicore__ inline void KdaInputProjSigmoid<TypePack>::ProcessAiv()
 }
 
 template <typename TypePack>
-__aicore__ inline void KdaInputProjSigmoid<TypePack>::CopyIn(QueIn &queIn, uint64_t gmOffset, uint32_t extent)
+__aicore__ inline void KdaInputProjSigmoid<TypePack>::CopyIn(QueIn& queIn, uint64_t gmOffset, uint32_t extent)
 {
     AscendC::LocalTensor<float> in = queIn.template AllocTensor<float>();
     AscendC::DataCopyExtParams copyParams;
@@ -136,7 +136,7 @@ __aicore__ inline void KdaInputProjSigmoid<TypePack>::CopyIn(QueIn &queIn, uint6
 }
 
 template <typename TypePack>
-__aicore__ inline void KdaInputProjSigmoid<TypePack>::Compute(QueIn &queIn, QueOut &queOut, uint32_t extent)
+__aicore__ inline void KdaInputProjSigmoid<TypePack>::Compute(QueIn& queIn, QueOut& queOut, uint32_t extent)
 {
     AscendC::LocalTensor<float> in = queIn.template DeQue<float>();
     AscendC::LocalTensor<float> out = queOut.template AllocTensor<float>();
@@ -156,8 +156,8 @@ __aicore__ inline void KdaInputProjSigmoid<TypePack>::Compute(QueIn &queIn, QueO
                                                                                     pregMask);
         const uint16_t vfLoopNum = static_cast<uint16_t>((extent + (AscendC::VECTOR_REG_WIDTH / sizeof(float)) - 1) /
                                                          (AscendC::VECTOR_REG_WIDTH / sizeof(float)));
-        __local_mem__ float *inAddr = (__local_mem__ float *)in.GetPhyAddr();
-        __local_mem__ float *outAddr = (__local_mem__ float *)out.GetPhyAddr();
+        __local_mem__ float* inAddr = (__local_mem__ float*)in.GetPhyAddr();
+        __local_mem__ float* outAddr = (__local_mem__ float*)out.GetPhyAddr();
         for (uint16_t i = 0; i < vfLoopNum; i++) {
             pregMask = AscendC::Reg::UpdateMask<float>(remain);
             AscendC::Reg::DataCopy<float, AscendC::Reg::LoadDist::DIST_NORM>(
@@ -177,7 +177,7 @@ __aicore__ inline void KdaInputProjSigmoid<TypePack>::Compute(QueIn &queIn, QueO
 }
 
 template <typename TypePack>
-__aicore__ inline void KdaInputProjSigmoid<TypePack>::CopyOut(QueOut &queOut, uint64_t gmOffset, uint32_t extent)
+__aicore__ inline void KdaInputProjSigmoid<TypePack>::CopyOut(QueOut& queOut, uint64_t gmOffset, uint32_t extent)
 {
     AscendC::LocalTensor<float> out = queOut.template DeQue<float>();
     AscendC::DataCopyExtParams copyParams;

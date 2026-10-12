@@ -51,14 +51,14 @@ public:
 
     __aicore__ inline GbsaRegularKernelArch35() {}
 
-    __aicore__ inline void operator()(GbsaKernelParamsArch35 const &params)
+    __aicore__ inline void operator()(GbsaKernelParamsArch35 const& params)
     {
-        __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData *tilingData =
-            reinterpret_cast<__gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData *>(params.tiling);
+        __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData =
+            reinterpret_cast<__gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData*>(params.tiling);
         FetchBaseShapeInfo(tilingData, params.metaData);
         CalcOnChipBufTileInfo(tilingData);
-        __gm__ const GbsaMetadata::Metadata *meta =
-            reinterpret_cast<__gm__ const GbsaMetadata::Metadata *>(params.metaData);
+        __gm__ const GbsaMetadata::Metadata* meta =
+            reinterpret_cast<__gm__ const GbsaMetadata::Metadata*>(params.metaData);
         uint32_t coreIdx = AscendC::GetBlockIdx();
         const uint32_t coreNum = AscendC::GetBlockNum();
         if (!GsaFd::ValidateMetadata(meta, tilingData, coreNum)) {
@@ -68,40 +68,40 @@ public:
                                (static_cast<uint32_t>(meta->fdScheduleFlags) & GbsaMetadata::FD_SCHEDULE_ENABLED) != 0U;
 
         AscendC::GlobalTensor<ElementQ> gQ;
-        gQ.SetGlobalBuffer((__gm__ ElementQ *)params.q);
+        gQ.SetGlobalBuffer((__gm__ ElementQ*)params.q);
         AscendC::GlobalTensor<ElementK> gK;
-        gK.SetGlobalBuffer((__gm__ ElementK *)params.k);
+        gK.SetGlobalBuffer((__gm__ ElementK*)params.k);
         AscendC::GlobalTensor<ElementK> gV;
-        gV.SetGlobalBuffer((__gm__ ElementK *)params.v);
+        gV.SetGlobalBuffer((__gm__ ElementK*)params.v);
         AscendC::GlobalTensor<int32_t> gSparseBlockIdx;
-        gSparseBlockIdx.SetGlobalBuffer((__gm__ int32_t *)params.sparseBlockIdx);
+        gSparseBlockIdx.SetGlobalBuffer((__gm__ int32_t*)params.sparseBlockIdx);
         AscendC::GlobalTensor<int32_t> gBlockTable;
-        gBlockTable.SetGlobalBuffer((__gm__ int32_t *)params.blockTable);
+        gBlockTable.SetGlobalBuffer((__gm__ int32_t*)params.blockTable);
         AscendC::GlobalTensor<int32_t> gSparseBlockCount;
-        gSparseBlockCount.SetGlobalBuffer((__gm__ int32_t *)params.sparseBlockCount);
+        gSparseBlockCount.SetGlobalBuffer((__gm__ int32_t*)params.sparseBlockCount);
         AscendC::GlobalTensor<int64_t> gCuSeqLengths;
         if (params.cuSeqLengths != nullptr) {
-            gCuSeqLengths.SetGlobalBuffer((__gm__ int64_t *)params.cuSeqLengths);
+            gCuSeqLengths.SetGlobalBuffer((__gm__ int64_t*)params.cuSeqLengths);
         }
         AscendC::GlobalTensor<int32_t> gSequsedQ;
         const bool hasSequsedQ = (params.sequsedQ != nullptr);
         if (hasSequsedQ) {
-            gSequsedQ.SetGlobalBuffer((__gm__ int32_t *)params.sequsedQ);
+            gSequsedQ.SetGlobalBuffer((__gm__ int32_t*)params.sequsedQ);
         }
         AscendC::GlobalTensor<int32_t> gSequsedKv;
         if (params.sequsedKv != nullptr) {
-            gSequsedKv.SetGlobalBuffer((__gm__ int32_t *)params.sequsedKv);
+            gSequsedKv.SetGlobalBuffer((__gm__ int32_t*)params.sequsedKv);
         }
         AscendC::GlobalTensor<ElementO> gO;
-        gO.SetGlobalBuffer((__gm__ ElementO *)params.o);
+        gO.SetGlobalBuffer((__gm__ ElementO*)params.o);
         AscendC::GlobalTensor<ElementLse> gLse;
-        gLse.SetGlobalBuffer((__gm__ ElementLse *)params.softmaxLse);
+        gLse.SetGlobalBuffer((__gm__ ElementLse*)params.softmaxLse);
         AscendC::GlobalTensor<int32_t> gIdentityIdx;
-        gIdentityIdx.SetGlobalBuffer((__gm__ int32_t *)params.workSpace);
+        gIdentityIdx.SetGlobalBuffer((__gm__ int32_t*)params.workSpace);
         AscendC::GlobalTensor<float> gPartialLse;
-        gPartialLse.SetGlobalBuffer((__gm__ float *)(params.workSpace + tilingData->fdPartialLseOffset));
+        gPartialLse.SetGlobalBuffer((__gm__ float*)(params.workSpace + tilingData->fdPartialLseOffset));
         AscendC::GlobalTensor<float> gPartialO;
-        gPartialO.SetGlobalBuffer((__gm__ float *)(params.workSpace + tilingData->fdPartialOOffset));
+        gPartialO.SetGlobalBuffer((__gm__ float*)(params.workSpace + tilingData->fdPartialOOffset));
 
         AscendC::LocalTensor<ElementP> l1PTensor[MAX_CROSS_CORE_BUF_STAGES];
         AscendC::LocalTensor<ElementS> ubSTensor[UB_S_OTMP_BUF_STAGES];
@@ -172,7 +172,7 @@ public:
             taskLoopEnd = totalTaskNum_;
             taskLoopStep = 1U;
             if (coreIdx < static_cast<uint32_t>(meta->fdActiveCoreNum)) {
-                const __gm__ GbsaMetadata::DecodeSchedule &schedule = meta->decodeSchedules[coreIdx];
+                const __gm__ GbsaMetadata::DecodeSchedule& schedule = meta->decodeSchedules[coreIdx];
                 taskLoopStart = static_cast<uint32_t>(schedule.baseTaskStart);
                 taskLoopEnd = static_cast<uint32_t>(schedule.baseTaskEnd);
                 scheduleFirstBlock = static_cast<uint32_t>(schedule.firstBlockStart);
@@ -415,7 +415,7 @@ public:
 
 private:
     __aicore__ inline void FetchBaseShapeInfo(
-        __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData *tilingData, GM_ADDR metaData)
+        __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData, GM_ADDR metaData)
     {
         batch_ = tilingData->batch;
         qHeads_ = tilingData->numHeads;
@@ -428,7 +428,7 @@ private:
         topK_ = tilingData->topK;
         maxBlocksPerBatch_ = tilingData->maxBlocksPerBatch;
         // Full AICPU metadata protocol overlay (no tiling fallback for task schedule).
-        __gm__ GbsaMetadata::Metadata *meta = reinterpret_cast<__gm__ GbsaMetadata::Metadata *>(metaData);
+        __gm__ GbsaMetadata::Metadata* meta = reinterpret_cast<__gm__ GbsaMetadata::Metadata*>(metaData);
         totalTaskNum_ = static_cast<uint32_t>(meta->saTotalTaskNum);
         scaleValue_ = tilingData->scaleValue;
         groupSize_ = tilingData->groupSize;
@@ -441,7 +441,7 @@ private:
     }
 
     __aicore__ inline void CalcOnChipBufTileInfo(
-        __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData *tilingData)
+        __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData)
     {
         mm1L1TileM_ = tilingData->mm1L1TileM;
         mm1L1TileN_ = tilingData->mm1L1TileN;

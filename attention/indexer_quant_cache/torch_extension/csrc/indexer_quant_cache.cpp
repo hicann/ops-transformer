@@ -33,7 +33,7 @@ enum class TensorRole {
     CACHE_SCALE
 };
 
-TensorWrapper MakeTensorWrapper(const at::Tensor &tensor, int64_t quantMode, TensorRole role)
+TensorWrapper MakeTensorWrapper(const at::Tensor& tensor, int64_t quantMode, TensorRole role)
 {
     const auto tensorType = tensor.scalar_type();
     switch (quantMode) {
@@ -89,7 +89,7 @@ TensorWrapper MakeTensorWrapper(const at::Tensor &tensor, int64_t quantMode, Ten
 }
 } // namespace
 
-void IndexerQuantCache(at::Tensor &cache, at::Tensor &cacheScale, const at::Tensor &x, const at::Tensor &slotMapping,
+void IndexerQuantCache(at::Tensor& cache, at::Tensor& cacheScale, const at::Tensor& x, const at::Tensor& slotMapping,
                        int64_t quantMode, bool roundScale, double xScale)
 {
     // 入参校验
