@@ -69,12 +69,15 @@ public:
             perCoreDoRowWork = tailBlockFactor;
         }
         for (int64_t n = 0; n < perCoreDoRowWork; n++) {
+            int64_t slotmappingValue = static_cast<int64_t>(slotmappingGm.GetValue(n));
+            if (slotmappingValue < 0) {
+                continue;
+            }
             keyInPerCoreOffset = n * perCoreDoKeyCount;
             valueInPerCoreOffset = n * perCoreDoValueCount;
             DataCopyIn<T1>(keyIn, keyInGm[keyInPerCoreOffset], perCoreDoKeyCount);
             DataCopyIn<T1>(valueIn, valueInGm[valueInPerCoreOffset], perCoreDoValueCount);
             PipeSync<AscendC::HardEvent::MTE2_MTE3>();
-            int64_t slotmappingValue = static_cast<int64_t>(slotmappingGm.GetValue(n));
             blockIndex = slotmappingValue / blockSize;
             blockOffset = slotmappingValue % blockSize;
             if (kCacheBlockStride > 0) {
