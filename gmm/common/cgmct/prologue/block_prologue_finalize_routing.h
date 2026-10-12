@@ -264,15 +264,10 @@ BlockPrologueFinalizeRouting<BLOCK_PROLOGUE_BLOCK_FINALIZE_ROUTING_FUNC_LOCAL_PA
     auto sharedInputOffset = params_->sharedInputOffset;
     auto sharedInputLen = params_->sharedInputLen;
     uint64_t firstZeroSize = params_->n * sharedInputOffset;
-    // sharedInput is None,only do InitOutputWithZeros, all shape(batch,n) ,then finish
+    // Output y is initialized by InitValue before this kernel runs.
     if (sharedInputLen == 0) {
-        InitOutputWithZeros(0, params_->n * params_->batch);
         return;
     }
-
-    InitOutputWithZeros(0, firstZeroSize);
-    uint64_t tail = sharedInputOffset + sharedInputLen;
-    InitOutputWithZeros(tail * params_->n, params_->n * (params_->batch - tail));
 
     uint64_t totalOutput = static_cast<uint64_t>(params_->n) * sharedInputLen;
     uint64_t singleCount = CeilDiv(totalOutput, static_cast<uint64_t>(vectorCoreNum_));
