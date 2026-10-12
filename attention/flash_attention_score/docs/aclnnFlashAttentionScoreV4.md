@@ -170,7 +170,7 @@ aclnnStatus aclnnFlashAttentionScoreV4(
         <td>数据类型与attentionOut的数据类型一致。</td>
         <td>FLOAT16、BFLOAT16、FLOAT32</td>
         <td>ND</td>
-        <td>[B,N,Sq,Skv]、[B,N,1,Skv]、[1,N,Sq,Skv]、[B,N,1024,Skv]、[1,N,1024,Skv]、[B,N]、[N]</td>
+        <td>[B,N,Sq,Skv]、[B,N,1,Skv]、[1,N,Sq,Skv]、[B,N,1024,Skv]、[1,N,1024,Skv]、[pseTotalLen]、[B,N]、[N]</td>
         <td>√</td>
       </tr>
       <tr>
@@ -630,6 +630,7 @@ aclnnStatus aclnnFlashAttentionScoreV4(
 - realShiftOptional：如果Sq大于1024且每个batch的Sq与Skv等长且是sparseMode为0、2、3的下三角掩码场景，可开启alibi位置编码压缩，此时只需要输入原始PSE最后1024行，实现内存优化，即alibi_compress = ori_pse[:, :, -1024:, :]，具体如下：
   - 参数每个batch不相同时，shape为BNHSkv(H=1024)。
   - 每个batch相同时，shape为1NHSkv(H=1024)。
+  - TND场景下，每个batch段内部仍按[N, Sq\_i, Skv\_i]生成，但存储与传参时统一flatten。若第i个batch段的真实query长度为Sq\_i、真实key/value长度为Skv\_i，则该段PSE元素个数为N\*Sq_i\*Skv_i，整段PSE总长度pseTotalLen为sum_i(N\*Sq_i\*Skv_i)。
   - 如果pseType为2或3的时候，数据类型需为FLOAT32,对应shape支持范围是[B,N]或[N]。
   - 如果不开启该参数，realShiftOptional需要传入nullptr，pseType需要传入1。
 
