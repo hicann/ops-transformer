@@ -596,6 +596,7 @@ constexpr int64_t ROW_IDX_TYPE_GATHER = 0LL;
 
 using ShapeList = std::initializer_list<int64_t>;
 
+namespace {
 ge::DataType GetExpandedXDtype(ge::DataType xDtype, int64_t quantMode)
 {
     switch (quantMode) {
@@ -726,6 +727,8 @@ void RunQuantInferShape(ShapeList xShape, ge::DataType xDtype, ShapeList expertI
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
+} // namespace
+
 // MXFP8 E5M2 量化 + h为32倍数
 TEST_F(MoeInitRoutingV4, moe_init_routing_v4_infershape_mxfp8_e5m2)
 {
@@ -851,6 +854,7 @@ TEST_F(MoeInitRoutingV4, moe_init_routing_v4_infershape_int4_dynamic_2)
                        {256}, {256}, {256});
 }
 
+namespace {
 void RunTestcaseInferDataType(ge::DataType xDtype, int64_t quantMode, ge::DataType expectOutDtype0,
                               ge::DataType expectOutDtype3)
 {
@@ -910,6 +914,8 @@ void RunSuccessTestcaseInferDataType(ge::DataType xDtype, int64_t quantMode)
     ge::DataType expandedScaleDtype = GetExpandedScaleDtype(quantMode);
     RunTestcaseInferDataType(xDtype, quantMode, expandedXDtype, expandedScaleDtype);
 }
+
+} // namespace
 
 // ====== inferDataType 成功用例 ======
 
