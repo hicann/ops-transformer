@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file kv_rms_norm_rope_cache_tiling_base.cpp
@@ -259,6 +259,54 @@ bool KvRmsNormRopeCacheTilingBase::CheckVCacheValid(const gert::TilingContext* c
     return CheckCacheValid(context, batchSize, numHead, cacheLen, headSize, V_CACHE_INDEX, "v_cache");
 }
 
+bool KvRmsNormRopeCacheTilingBase::CheckCacheValidPA(const gert::TilingContext* context, int64_t headSize,
+                                                     size_t cacheIndex, const char* cacheName)
+{
+    // Default PA format cache check
+    // In PageAttention mode, cache dimensions are in [block_num, block_size, N, hDim].
+    auto cacheShapeTuple = GetShapeTuple(context, cacheIndex);
+    int64_t cacheBlkNum = std::get<SHAPE_IDX_BLOCK_NUM>(cacheShapeTuple);
+    int64_t cacheBlkSize = std::get<SHAPE_IDX_BLOCK_SIZE>(cacheShapeTuple);
+    int64_t cacheN = std::get<DIM_TWO>(cacheShapeTuple);
+    int64_t cacheD = std::get<SHAPE_IDX_D>(cacheShapeTuple);
+
+    if (cacheBlkSize < DIM_ONE) {
+        // block size must be larger than 0 under all PageAttention modes.
+        OP_LOGE(context_->GetNodeName(), "Block size of [%s] must be positive integer, but got %ld.", cacheName,
+                cacheBlkSize);
+        return false;
+    }
+    if (cacheN != this->numHeadKv_) {
+        OP_LOGE(context_->GetNodeName(), "Numhead of [%s] must be consist with input kv(%ld), but got %ld.", cacheName,
+                this->numHeadKv_, cacheN);
+        return false;
+    }
+    if (cacheD != headSize) {
+        // Inconsist cache hDim size with the expected value headSize
+        OP_LOGE(context_->GetNodeName(), "Expected hDim size of [%s] is %ld, but got %ld.", cacheName, headSize,
+                cacheD);
+        return false;
+    }
+
+    // Total PA slots shall meet cache demands
+    bool enoughSlots = false;
+    const CacheMode& mode = currentCacheMode_;
+    if (mode == CacheMode::Norm || mode == CacheMode::PA || mode == CacheMode::PA_NZ) {
+        // For non-block modes, block_num * block_size ≥ Bkv × Skv
+        enoughSlots = (cacheBlkNum * cacheBlkSize >= this->batchKv_ * this->seqLenKv_);
+    } else {
+        // For PA_BLK_* modes, block_num ≥ Ceil(Skv / block_size) ∗ Bkv
+        enoughSlots = (cacheBlkNum >= ((this->seqLenKv_ + cacheBlkSize - 1) / cacheBlkSize) * this->batchKv_);
+    }
+    if (!enoughSlots) {
+        // Note developer to check index contents if inputs are expected to be filtered into compact caches.
+        OP_LOGW(context_->GetNodeName(),
+                "ATTENTION: Potential insufficient cache slots for %s, make sure the slotmapping indices are safe.",
+                cacheName);
+    }
+    return true;
+}
+
 bool KvRmsNormRopeCacheTilingBase::CheckKCacheValidPA(const gert::TilingContext* context, int64_t numHead,
                                                       int64_t headSize)
 {
@@ -357,11 +405,18 @@ int64_t KvRmsNormRopeCacheTilingBase::GetQuantMode(const gert::TilingContext* co
     auto scale1Shape = context->GetOptionalInputShape(K_ROPE_SCALE_IDX);
     auto scale2Shape = context->GetOptionalInputShape(C_KV_SCALE_IDX);
     bool allNullPtr = (scale1Shape == nullptr) && (scale2Shape == nullptr);
-    if (allNullPtr) {
-        return NON_QUANT_MODE;
-    } else {
-        return QUANT_MODE;
+    int64_t qmode = allNullPtr ? NON_QUANT_MODE : QUANT_MODE;
+
+    // Check and warn dissociated quant offsets
+    auto offset1Shape = context->GetOptionalInputShape(K_ROPE_OFFSET_IDX);
+    auto offset2Shape = context->GetOptionalInputShape(C_KV_OFFSET_IDX);
+    if (scale1Shape == nullptr && offset1Shape != nullptr) {
+        OP_LOGW(context_->GetNodeName(), "Orphan quant offset for k_cache without quant scale will be ignored.");
     }
+    if (scale2Shape == nullptr && offset2Shape != nullptr) {
+        OP_LOGW(context_->GetNodeName(), "Orphan quant offset for ckv_cache without quant scale will be ignored.");
+    }
+    return qmode;
 }
 
 ge::graphStatus KvRmsNormRopeCacheTilingBase::GetPlatformInfo()
@@ -386,16 +441,42 @@ ge::graphStatus KvRmsNormRopeCacheTilingBase::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 }
 
+/* Guarantee shape consistency between k_cache and ckv_cache except the last hDim.*/
+bool KvRmsNormRopeCacheTilingBase::ValidateCacheShapes()
+{
+    auto kCacheShapeTuple = GetShapeTuple(context_, K_CACHE_INDEX);
+    auto vCacheShapeTuple = GetShapeTuple(context_, V_CACHE_INDEX);
+
+    if (std::get<SHAPE_IDX_BLOCK_NUM>(kCacheShapeTuple) != std::get<SHAPE_IDX_BLOCK_NUM>(vCacheShapeTuple)) {
+        // Must have same blocknum or batch size for cache
+        OP_LOGE(context_->GetNodeName(), "Sizes of the dim-0 MUST be CONSIST between kCache and c_kvCache.");
+        return false;
+    }
+
+    this->cacheLength_ = std::get<SHAPE_IDX_S>(kCacheShapeTuple);
+    this->blockSize_ = std::get<SHAPE_IDX_BLOCK_SIZE>(kCacheShapeTuple);
+
+    if (cacheLength_ != std::get<SHAPE_IDX_S>(vCacheShapeTuple) ||
+        blockSize_ != std::get<SHAPE_IDX_BLOCK_SIZE>(vCacheShapeTuple)) {
+        OP_LOGE(context_->GetNodeName(),
+                "Both sizes of the dim-1 and dim-2 MUST be CONSIST between kCache and c_kvCache.");
+        return false;
+    }
+    return (this->cacheLength_ > 0 && this->blockSize_ > 0);
+}
+
 ge::graphStatus KvRmsNormRopeCacheTilingBase::GetShapeAttrsInfo()
 {
-    OP_CHECK_IF(context_ == nullptr, OP_LOGE(context_->GetNodeName(), "context_ can not be nullptr."),
-                return ge::GRAPH_FAILED);
+    if (context_ == nullptr) {
+        // CANNOT OP_LOGE on nullptr context_ : "context_ can not be nullptr."
+        return ge::GRAPH_FAILED;
+    }
+
     isRegbase_ = Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_);
     // GetQuantMode
     quantMode_ = GetQuantMode(context_);
     // Basic info
     auto kvShapeTuple = GetShapeTuple(context_, KV_INDEX);
-    auto kCacheShapeTuple = GetShapeTuple(context_, K_CACHE_INDEX);
     // Dk
     auto cosShapeTuple = GetShapeTuple(context_, COS_INDEX);
     // Dv
@@ -417,8 +498,15 @@ ge::graphStatus KvRmsNormRopeCacheTilingBase::GetShapeAttrsInfo()
     int64_t batchSize = std::get<SHAPE_IDX_B>(kvShapeTuple);
     int64_t numHead = std::get<SHAPE_IDX_N>(kvShapeTuple);
     int64_t seqLen = std::get<SHAPE_IDX_S>(kvShapeTuple);
-    cacheLength_ = std::get<SHAPE_IDX_S>(kCacheShapeTuple);
-    blockSize_ = std::get<SHAPE_IDX_BLOCK_SIZE>(kCacheShapeTuple);
+    this->batchKv_ = batchSize;
+    this->seqLenKv_ = seqLen;
+    this->numHeadKv_ = numHead;
+
+    OP_CHECK_IF(!ValidateCacheShapes(),
+                OP_LOGE(context_->GetNodeName(),
+                        "Normal axes between k_cache and v_cache must have same sizes except for the LAST DIM."),
+                return ge::GRAPH_FAILED);
+
     isMTP_ = (seqLen > 1);
     auto kvStorageShape = context_->GetInputShape(KV_INDEX)->GetStorageShape();
     std::string kvStorageShapeStr = ToString(kvStorageShape);

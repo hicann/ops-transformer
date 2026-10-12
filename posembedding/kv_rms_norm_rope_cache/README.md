@@ -396,16 +396,23 @@
     | cachemode| k_cache 形状 | ckv_cache 形状 | index 形状 | 说明 |
     | :------: | :------: | :------: | :------: | :------ |
     |Norm|[Bkv, N, Scache, Dk]|[Bkv, N, Scache, Dv]|[Bkv, Skv]|KV-Cache 更新模式，index 表示每个 Batch 下的偏移。<br>要求index的value值范围为[-1,Scache)。不同的Bkv下，value数值可以重复。<br>$Scache \ge Skv$|
-    |PA/PA_BNSD|[block_num, block_size, N, Dk]|[block_num, block_size, N, Dv]|[Bkv × Skv]|PagedAttention 模式，index 表示每个 token 的偏移。<br>要求index的value值范围为[-1,block_num * block_size)。value数值不能重复。<br>$block\_size>1,\\ block\_num \ge Ceil(Skv / block\_size) * Bkv$|
-    |PA_NZ|[block_num, block_size, N, Dk]|[block_num, block_size, N, Dv]|[Bkv × Skv]|Cache 数据格式为 FRACTAL_NZ 的 PagedAttention 模式，index表示每个 token 的偏移。<br>要求index的value值范围为[-1,block_num * block_size)。value数值不能重复。<br>$block\_size>1,\\ block\_num \ge Ceil(Skv / block\_size) * Bkv$|
+    |PA/PA_BNSD|[block_num, block_size, N, Dk]|[block_num, block_size, N, Dv]|[Bkv × Skv]|PagedAttention 模式，index 表示每个 token 的偏移。<br>要求index的value值范围为[-1,block_num * block_size)。value数值不能重复。<br>$block\_size>1,\\ block\_num \ge Ceil(Skv * Bkv / block\_size)$|
+    |PA_NZ|[block_num, block_size, N, Dk]|[block_num, block_size, N, Dv]|[Bkv × Skv]|Cache 数据格式为 FRACTAL_NZ 的 PagedAttention 模式，index表示每个 token 的偏移。<br>要求index的value值范围为[-1,block_num * block_size)。value数值不能重复。<br>$block\_size>1,\\ block\_num \ge Ceil(Skv * Bkv / block\_size)$|
     |PA_BLK_BNSD|[block_num, block_size, N, Dk]|[block_num, block_size, N, Dv]|[Bkv × ceil(Skv / block_size)]|特殊 PagedAttention 模式，index 表示每个 block 的起始偏移（不与 token逐一对应）。<br>要求index的value的数值范围为[-1,block_num * block_size)。value/block_size的值不能重复。<br>$block\_size>1,\\ block\_num \ge Ceil(Skv / block\_size) * Bkv$|
     |PA_BLK_NZ|[block_num, block_size, N, Dk]|[block_num, block_size, N, Dv]|[Bkv × ceil(Skv / block_size)]|Cache 数据格式为 FRACTAL_NZ 的特殊的 PagedAttention 模式，index 表示每个 block 的起始偏移。<br>要求index的value的数值范围为[-1,block_num * block_size)。value/block_size的值不能重复。<br>$block\_size>1,\\ block\_num \ge Ceil(Skv / block\_size) * Bkv$|
 
-    * 在所有cachemode下，cache所提供的slot总数，都不能少于index的元素数：
-      * 对于Norm模式：$Bkv * Scache \ge Bkv * Skv$
-      * 对于非Norm模式：$block\_num * block\_size \ge Bkv * Skv$
-    * Scache为输入cache的sequence length，大小由用户输入场景决定，无明确限制。
-    * 当cache_mode为Norm时，shape为2维[Bkv,Skv]，要求index的value值范围为[-1,Scache)。不同的Bkv下，value数值可以重复。
+    * 本算子支持下述slotmapping模式：
+
+      | slotmapping模式 | kv和cache的尺寸关系 | index额外约束 |
+      | :---: | :--------: | :-------- |
+      |超额映射|Norm模式：$Bkv * Scache < Bkv * Skv$<br>非Norm模式：$block\_num * block\_size < Bkv * Skv$|输入KV的bs数量超过cache的Slot数量，用于缓存压缩或门控。<br>Norm模式：每个Bkv内，有效元素的数量不超过Scache个，其余元素全部为-1。<br>非Norm模式：有效元素的总数不超过$block\_num * block\_size$，其余元素全部为-1。|
+      |密集映射|Norm模式：$Bkv * Scache = Bkv * Skv$<br>非Norm模式：$block\_num * block\_size = Bkv * Skv$|输入KV的bs数量精确对应cache的Slot数量。|
+      |稀疏映射|Norm模式：$Bkv * Scache > Bkv * Skv$<br>非Norm模式：$block\_num * block\_size > Bkv * Skv$|输入KV的bs数量少于cache的Slot数量。|
+
+    * 当cache_mode为Norm时：
+      * index的shape为2维[Bkv, Skv]，要求index的value值范围为[-1, Scache)。不同的Bkv下，value数值可以重复。
+      * 输入cache的B轴尺寸必须和$Bkv$完全一致。
+      * Scache为输入cache的sequence length，大小由用户输入场景决定，无明确限制。
     * 当cache_mode为PA_BNSD、PA_NZ、PA_BLK_BNSD、PA_BLK_NZ时，cache中的数据排布方式为：
       * 非量化模式下：k_cache 为 [block_num, Dk//16, block_size, 1, 16]；ckv_cache 为 [block_num, Dv//16, block_size, 1, 16]。
       * 静态量化模式下：k_cache 为 [block_num, Dk//32, block_size, 1, 32]；ckv_cache 为 [block_num, Dv//32, block_size, 1, 32]。

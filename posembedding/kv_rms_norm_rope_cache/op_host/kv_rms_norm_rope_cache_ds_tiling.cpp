@@ -138,6 +138,47 @@ bool KvRmsNormRopeCacheTilingDs::CheckOffsetValid(const gert::TilingContext* con
     return isValid;
 }
 
+bool KvRmsNormRopeCacheTilingDs::CheckCacheValid(const gert::TilingContext* context, int64_t batchSize, int64_t numHead,
+                                                 int64_t sKv, int64_t headSize, size_t cacheIndex,
+                                                 const char* cacheName)
+{
+    auto cacheShapeTuple = GetShapeTuple(context, cacheIndex);
+    int64_t cacheB = std::get<SHAPE_IDX_B>(cacheShapeTuple);
+    int64_t cacheN = std::get<SHAPE_IDX_N>(cacheShapeTuple);
+    int64_t cacheS = std::get<SHAPE_IDX_S>(cacheShapeTuple);
+    int64_t cacheD = std::get<SHAPE_IDX_D>(cacheShapeTuple);
+    // Batch and headnum of cache Must be consist with input kv
+    bool irregularCacheShape = false;
+    if (cacheB != batchSize) {
+        // Norm mode does not support cache shrink on the Batch dim
+        OP_LOGE(context->GetNodeName(), "In CacheMode::Norm, inconsist B dimension %ld of %s with kv %ld.", cacheB,
+                cacheName, batchSize);
+        return false;
+    }
+    if (cacheN != numHead) {
+        OP_LOGE(context->GetNodeName(), "In CacheMode::Norm, inconsist N dimension %ld of %s with kv %ld.", cacheN,
+                cacheName, numHead);
+        return false;
+    }
+    if (cacheD != headSize) {
+        OP_LOGE(context->GetNodeName(), "In CacheMode::Norm, inconsist D dimension %ld of %s with kv %ld.", cacheD,
+                cacheName, headSize);
+        return false;
+    }
+    if (cacheS < sKv) {
+        irregularCacheShape = true;
+        // Sparsification/compact cache, warn user to watch out bs size of the cache
+        OP_LOGW(context->GetNodeName(), "ATTTENTION: In CacheMode::Norm, Scache %ld of %s is smaller than kv %ld.",
+                cacheS, cacheName, sKv);
+    }
+    if (irregularCacheShape) {
+        OP_LOGW(context->GetNodeName(), "ATTTENTION: Inconsist %s BS Shape [%ld, %ld] with the input kv [%ld, %ld], \
+                watch out your slotmapping INDEX.",
+                cacheName, cacheB, cacheS, batchSize, sKv);
+    }
+    return true;
+}
+
 bool KvRmsNormRopeCacheTilingDs::IsCapable()
 {
     return !isRegbase_;
@@ -167,14 +208,42 @@ ge::graphStatus KvRmsNormRopeCacheTilingDs::DoOpTiling()
 {
     RMS_NORM_LENGTH = RMS_NORM_LENGTHS[methodMode_];
     auto kvShapeTuple = GetShapeTuple(context_, KV_INDEX);
-    tilingData_.set_batchSize(std::get<SHAPE_IDX_B>(kvShapeTuple));
-    tilingData_.set_numHead(std::get<SHAPE_IDX_N>(kvShapeTuple));
-    tilingData_.set_seqLength(std::get<SHAPE_IDX_S>(kvShapeTuple));
+    int64_t batchSize = std::get<SHAPE_IDX_B>(kvShapeTuple);
+    int64_t numHead = std::get<SHAPE_IDX_N>(kvShapeTuple);
+    int64_t seqLength = std::get<SHAPE_IDX_S>(kvShapeTuple);
+
+    tilingData_.set_batchSize(batchSize);
+    tilingData_.set_numHead(numHead);
+    tilingData_.set_seqLength(seqLength);
     tilingData_.set_cacheLength(cacheLength_);
     tilingData_.set_blockSize(blockSize_);
     tilingData_.set_reciprocal(reciprocal_);
     tilingData_.set_epsilon(epsilon_);
     tilingData_.set_methodMode(methodMode_);
+
+    if (methodMode_ == 0) {
+        hDimKCache = ROPE_LENGTH;     // k_cache hDim
+        hDimVCache = RMS_NORM_LENGTH; // ckv_cache hDim
+    } else if (methodMode_ == 1) {
+        hDimKCache = RMS_NORM_LENGTH;
+        hDimVCache = V_LENGTH;
+    } else {
+        OP_LOGE(context_->GetNodeName(), "Unsupported hDim size configuration.");
+        return ge::GRAPH_FAILED;
+    }
+
+    // Validate cache shapes
+    if (currentCacheMode_ == CacheMode::Norm) {
+        OP_CHECK_IF(!CheckKCacheValid(context_, batchSize, numHead, seqLength, hDimKCache),
+                    OP_LOGE(context_->GetNodeName(), "k_cache shape invalid."), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(!CheckVCacheValid(context_, batchSize, numHead, seqLength, hDimVCache),
+                    OP_LOGE(context_->GetNodeName(), "ckv_cache shape invalid."), return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(!CheckCacheValidPA(context_, hDimKCache, K_CACHE_INDEX, "k_cache"),
+                    OP_LOGE(context_->GetNodeName(), "k_cache shape invalid."), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(!CheckCacheValidPA(context_, hDimVCache, V_CACHE_INDEX, "ckv_cache"),
+                    OP_LOGE(context_->GetNodeName(), "ckv_cache shape invalid."), return ge::GRAPH_FAILED);
+    }
 
     if (isOutputKv_) {
         tilingData_.set_isOutputKv(1);
@@ -290,12 +359,8 @@ ge::graphStatus KvRmsNormRopeCacheTilingDs::DoOpTiling()
         return ge::GRAPH_SUCCESS;
     }
 
-    int64_t batchSize = tilingData_.get_batchSize();
-    int64_t seqLen = tilingData_.get_seqLength();
-    int64_t numHead = tilingData_.get_numHead();
-
     if (IsB1SD(context_)) {
-        int64_t bns = batchSize * numHead * seqLen;
+        int64_t bns = batchSize * numHead * seqLength;
         int64_t blockFactor = (bns + coreNum_ - 1) / coreNum_;
         int64_t numBlocks = (bns + blockFactor - 1) / blockFactor;
         tilingData_.set_blockFactor(blockFactor);

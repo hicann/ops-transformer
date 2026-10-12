@@ -189,7 +189,7 @@ constexpr int64_t FLOAT16_BYTES = 2;
 constexpr int64_t FP32_BLOCK_ALIGN_NUM = 8;
 constexpr int64_t FP16_BLOCK_ALIGN_NUM = 16;
 constexpr int64_t INT8_BLOCK_ALIGN_NUM = 32;
-;
+
 constexpr int64_t DIM_SIZE = 4;
 constexpr int64_t DIM_ONE = 1;
 constexpr int64_t DIM_TWO = 2;
@@ -215,6 +215,10 @@ public:
     int64_t vlFp32_ = 0;
     int64_t vlFp16_ = 0;
     bool isRegbase_{false};
+
+    int64_t batchKv_ = 0;
+    int64_t seqLenKv_ = 0;
+    int64_t numHeadKv_ = 0;
 
     int64_t kv_{DIM_NUM_ONE};
     int64_t dv_{DIM_NUM_ONE};
@@ -283,14 +287,21 @@ protected:
                           int64_t headSize);
     bool CheckVCacheValid(const gert::TilingContext* context, int64_t batchSize, int64_t numHead, int64_t cacheLen,
                           int64_t headSize);
-    bool CheckCacheValid(const gert::TilingContext* context, int64_t batchSize, int64_t numHead, int64_t cacheLen,
-                         int64_t headSize, size_t cacheIndex, const char* cacheName);
+    virtual bool CheckCacheValid(const gert::TilingContext* context, int64_t batchSize, int64_t numHead,
+                                 int64_t cacheLen, int64_t headSize, size_t cacheIndex, const char* cacheName);
+    virtual bool CheckCacheValidPA(const gert::TilingContext* context, int64_t headSize, size_t cacheIndex,
+                                   const char* cacheName);
     bool CheckKCacheValidPA(const gert::TilingContext* context, int64_t numHead, int64_t headSize);
     bool CheckVCacheValidPA(const gert::TilingContext* context, int64_t numHead, int64_t headSize);
     bool CheckIndexValid(const gert::TilingContext* context, int64_t batchSize, int64_t seqLen, int64_t pageSize,
                          CacheMode mode);
     int64_t GetQuantMode(const gert::TilingContext* context);
+
+private:
+    bool ValidateCacheShapes();
 };
+
+// Atlas A2/A3 tiling
 
 class KvRmsNormRopeCacheTilingDs : virtual public KvRmsNormRopeCacheTilingBase {
 public:
@@ -308,10 +319,16 @@ protected:
     void DoOpTilingPaBlkNz();
     bool CheckScaleValid(const gert::TilingContext* context);
     bool CheckOffsetValid(const gert::TilingContext* context);
+    bool CheckCacheValid(const gert::TilingContext* context, int64_t batchSize, int64_t numHead, int64_t cacheLen,
+                         int64_t headSize, size_t cacheIndex, const char* cacheName) override;
 
 private:
+    int64_t hDimKCache{0};
+    int64_t hDimVCache{0};
     KvRmsNormRopeCacheTilingData tilingData_;
 };
+
+// 950 PR/DT Tiling
 
 class KvRmsNormRopeCacheRegbaseFullLoadTiling : virtual public KvRmsNormRopeCacheTilingBase {
 public:
