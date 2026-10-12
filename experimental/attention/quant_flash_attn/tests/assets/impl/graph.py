@@ -74,6 +74,9 @@ class QuantFlashAttnMxfp4AclGraph(torch.nn.Module):
         sinks: torch.Tensor = None,
         attn_mask: torch.Tensor = None,
         metadata: torch.Tensor = None,
+        v_tail: torch.Tensor = None,
+        block_table_tail: torch.Tensor = None,
+        seqused_v_tail: torch.Tensor = None,
         softmax_scale: float = 1.0,
         mask_mode: int = 0,
         win_left: int = -1,
@@ -111,6 +114,21 @@ class QuantFlashAttnMxfp4AclGraph(torch.nn.Module):
         cu_seqlens_kv_t = _none_if_empty(cu_seqlens_kv)
         seqused_q_t = _none_if_empty(seqused_q)
         seqused_kv_t = _none_if_empty(seqused_kv)
+
+        def _vtail_none(t):
+            if t is None or not isinstance(t, torch.Tensor) or t.numel() == 0:
+                return None
+            return t
+
+        v_tail_arg = _vtail_none(v_tail)
+        block_table_tail_arg = _vtail_none(block_table_tail)
+        seqused_v_tail_arg = _vtail_none(seqused_v_tail)
+        if seqused_v_tail_arg is not None and all(
+            int(x) == 0 for x in seqused_v_tail_arg.detach().cpu().flatten().tolist()
+        ):
+            v_tail_arg = None
+            block_table_tail_arg = None
+            seqused_v_tail_arg = None
 
         torch.npu.synchronize()
 
@@ -162,6 +180,9 @@ class QuantFlashAttnMxfp4AclGraph(torch.nn.Module):
         self.seqused_kv = seqused_kv_t
         self.sinks = sinks
         self.attn_mask = attn_mask
+        self.v_tail = v_tail_arg
+        self.block_table_tail = block_table_tail_arg
+        self.seqused_v_tail = seqused_v_tail_arg
         self.softmax_scale = softmax_scale
         self.mask_mode = int(mask_mode)
         self.win_left = int(win_left)
@@ -200,6 +221,9 @@ class QuantFlashAttnMxfp4AclGraph(torch.nn.Module):
             sinks=self.sinks,
             attn_mask=self.attn_mask,
             metadata=self.metadata,
+            v_tail=self.v_tail,
+            block_table_tail=self.block_table_tail,
+            seqused_v_tail=self.seqused_v_tail,
             softmax_scale=self.softmax_scale,
             mask_mode=self.mask_mode,
             win_left=self.win_left,

@@ -308,6 +308,9 @@ def excel_row_to_csv_row(ws, row_idx, col_map, api_name, testcase_suffix):
         sinks_shape,
         attn_mask_shape,
         metadata_shape,
+        None,
+        None,
+        None,
     ]
     tensor_view_shapes = repr(tuple(shapes))
 
@@ -344,6 +347,9 @@ def excel_row_to_csv_row(ws, row_idx, col_map, api_name, testcase_suffix):
         _csv_dtype("learnable_sink_dtype", "float32"),
         _csv_dtype("attn_mask_dtype", "int8"),
         _csv_dtype("metadata_dtype", "int32"),
+        repr("bfloat16"),
+        repr("int32"),
+        repr("int32"),
     ]
     tensor_dtypes = "(" + ",".join(dtypes) + ")"
 
