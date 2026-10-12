@@ -157,7 +157,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>输入</td>
         <td>mm左矩阵反量化参数。</td>
         <td>支持传入空指针场景。</td>
-        <td>FLOAT16、BFLOAT16、FLOAT、FLOAT8_E8M0</td>
+        <td>FLOAT、FLOAT8_E8M0</td>
         <td>ND</td>
         <td>1-3</td>
         <td>×</td>
@@ -167,7 +167,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>输入</td>
         <td>mm右矩阵反量化参数。</td>
         <td>支持传入空指针场景。MX量化场景下x2Scale支持转置/不转置输入。</td>
-        <td>FLOAT16、BFLOAT16、FLOAT、INT64、FLOAT8_E8M0</td>
+        <td>FLOAT、INT64、FLOAT8_E8M0</td>
         <td>ND</td>
         <td>1-3</td>
         <td>√（仅适用转置场景）</td>
