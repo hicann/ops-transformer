@@ -123,15 +123,18 @@ def floyd_attn_backward(
     grad = grad.to(golden_dtype)
     atten_in = atten_in.to(golden_dtype)
 
-    s = torch.einsum("bhikc,bhijc->bhikj", Q.to(dtype), K1.to(dtype)).to(
+    matmul_dtype = golden_dtype if dtype in (torch.float16, torch.bfloat16) else dtype
+    s = torch.einsum("bhikc,bhijc->bhikj", Q.to(matmul_dtype), K1.to(matmul_dtype)).to(
         golden_dtype
-    ) + torch.einsum("bhikc,bhjkc->bhikj", Q.to(dtype), K2.to(dtype)).to(golden_dtype)
-
-    dp = torch.einsum("bhikc,bhijc->bhikj", grad.to(dtype), V1.to(dtype)).to(
-        golden_dtype
-    ) + torch.einsum("bhikc,bhjkc->bhikj", grad.to(dtype), V2.to(dtype)).to(
+    ) + torch.einsum("bhikc,bhjkc->bhikj", Q.to(matmul_dtype), K2.to(matmul_dtype)).to(
         golden_dtype
     )
+
+    dp = torch.einsum(
+        "bhikc,bhijc->bhikj", grad.to(matmul_dtype), V1.to(matmul_dtype)
+    ).to(golden_dtype) + torch.einsum(
+        "bhikc,bhjkc->bhikj", grad.to(matmul_dtype), V2.to(matmul_dtype)
+    ).to(golden_dtype)
     s = s.to(golden_dtype)
     dp = dp.to(golden_dtype)
 
@@ -146,7 +149,16 @@ def floyd_attn_backward(
     dQ = torch.einsum("bhikj,bhijc->bhikc", ds.to(dtype), K1.to(dtype)).to(
         golden_dtype
     ) + torch.einsum("bhikj,bhjkc->bhikc", ds.to(dtype), K2.to(dtype)).to(golden_dtype)
-    dK1 = torch.einsum("bhikj,bhikc->bhijc", ds.to(dtype), Q.to(dtype)).to(golden_dtype)
+
+    dk1_matmul_dtype = (
+        torch.float32 if dtype in (torch.float16, torch.bfloat16) else dtype
+    )
+    dK1 = torch.einsum(
+        "bhikj,bhikc->bhijc",
+        ds.to(dk1_matmul_dtype),
+        Q.to(dk1_matmul_dtype),
+    ).to(golden_dtype)
+
     dK2 = torch.einsum("bhikj,bhikc->bhjkc", ds.to(dtype), Q.to(dtype)).to(golden_dtype)
     dV1 = torch.einsum("bhikj,bhikc->bhijc", p.to(dtype), grad.to(dtype)).to(
         golden_dtype

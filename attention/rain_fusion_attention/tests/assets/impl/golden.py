@@ -64,15 +64,26 @@ def _online_softmax_attention_torch_high(q_block, kv_blocks, scale):
     return O_final
 
 
-def _online_softmax_attention_torch(q_block, kv_blocks, scale, torch_dtype):
+def _online_softmax_attention_torch(
+    q_block, kv_blocks, scale, torch_dtype, inner_precise
+):
     q_block = q_block.cpu()
     device = torch.device("cpu")
     q_len = q_block.shape[1]
     head_size = q_block.shape[2]
 
-    m_i = torch.full((1, q_len, 1), -float("inf"), dtype=torch.float32, device=device)
-    l_i = torch.zeros((1, q_len, 1), dtype=torch.float32, device=device)
-    O_i = torch.zeros((1, q_len, head_size), dtype=torch.float32, device=device)
+    if inner_precise == 1:
+        m_i = torch.full(
+            (1, q_len, 1), -float("inf"), dtype=torch.float16, device=device
+        )
+        l_i = torch.zeros((1, q_len, 1), dtype=torch.float16, device=device)
+        O_i = torch.zeros((1, q_len, head_size), dtype=torch.float16, device=device)
+    else:
+        m_i = torch.full(
+            (1, q_len, 1), -float("inf"), dtype=torch.float32, device=device
+        )
+        l_i = torch.zeros((1, q_len, 1), dtype=torch.float32, device=device)
+        O_i = torch.zeros((1, q_len, head_size), dtype=torch.float32, device=device)
 
     for k_block, v_block in kv_blocks:
         k_block = k_block.cpu()
@@ -82,7 +93,10 @@ def _online_softmax_attention_torch(q_block, kv_blocks, scale, torch_dtype):
         m_block, _ = torch.max(S_i, dim=-1, keepdim=True)
         m_new = torch.maximum(m_i, m_block)
         alpha = torch.exp(m_i - m_new).to(torch_dtype)
-        P_i = torch.exp(S_i - m_new).to(torch_dtype)
+        if inner_precise == 1:
+            P_i = torch.exp((S_i - m_new).to(torch_dtype)).to(torch_dtype)
+        else:
+            P_i = torch.exp(S_i - m_new).to(torch_dtype)
         l_i = alpha * l_i + torch.sum(P_i, dim=-1, keepdim=True)
         O_i = alpha * O_i + torch.matmul(P_i, v_block).to(torch_dtype)
         m_i = m_new
@@ -216,7 +230,7 @@ def _ref_select_idx_attention_torch(
                     )
                 else:
                     out_block = _online_softmax_attention_torch(
-                        q_block, kv_blocks, scale, torch_dtype
+                        q_block, kv_blocks, scale, torch_dtype, inner_precise
                     )
 
                 out[head : head + 1, q_start_global:q_end_global, :] = out_block

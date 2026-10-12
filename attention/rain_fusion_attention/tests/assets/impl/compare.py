@@ -801,6 +801,22 @@ def compare(*outputs, compare_context=None, **kwargs):
             results.append({"pass": True, "precision": 100.0, "error_info": None})
             continue
 
+        # TTK 可能传入 numpy array, 统一转为 torch tensor
+        if not isinstance(output, torch.Tensor):
+            import numpy as _np
+
+            if str(output.dtype) in ("bfloat16", "ml_dtypes.bfloat16"):
+                output = torch.from_numpy(output.astype(_np.float32)).to(torch.bfloat16)
+            else:
+                output = torch.from_numpy(output)
+        if not isinstance(golden, torch.Tensor):
+            import numpy as _np
+
+            if str(golden.dtype) in ("bfloat16", "ml_dtypes.bfloat16"):
+                golden = torch.from_numpy(golden.astype(_np.float32)).to(torch.bfloat16)
+            else:
+                golden = torch.from_numpy(golden)
+
         # 计算fp16标杆输出: 用原dtype完整重新计算RFA算子
         benchmark_output = _compute_benchmark_output(compare_context, golden)
 

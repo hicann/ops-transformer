@@ -778,14 +778,14 @@ def compare(*outputs, compare_context=None, **kwargs):
         if not isinstance(output, torch.Tensor):
             import numpy as _np
 
-            if output.dtype == _np.dtype("bfloat16") or str(output.dtype) == "bfloat16":
+            if str(output.dtype) in ("bfloat16", "ml_dtypes.bfloat16"):
                 output = torch.from_numpy(output.astype(_np.float32)).to(torch.bfloat16)
             else:
                 output = torch.from_numpy(output)
         if not isinstance(golden, torch.Tensor):
             import numpy as _np
 
-            if golden.dtype == _np.dtype("bfloat16") or str(golden.dtype) == "bfloat16":
+            if str(golden.dtype) in ("bfloat16", "ml_dtypes.bfloat16"):
                 golden = torch.from_numpy(golden.astype(_np.float32)).to(torch.bfloat16)
             else:
                 golden = torch.from_numpy(golden)
