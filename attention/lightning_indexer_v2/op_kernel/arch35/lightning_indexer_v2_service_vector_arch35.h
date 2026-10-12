@@ -617,6 +617,8 @@ __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::Proce
             if (info.isNeedLD || liv2ReturnValueFlag) {
                 SetFlag<HardEvent::V_MTE2>(V_MTE2_EVENT1);
                 WaitFlag<HardEvent::V_MTE2>(V_MTE2_EVENT1);
+                SetFlag<HardEvent::MTE3_MTE2>(MTE3_MTE2_EVENT);
+                WaitFlag<HardEvent::MTE3_MTE2>(MTE3_MTE2_EVENT);
                 copyInParams.blockLen = LIV2Common::Align(validS2Len, (int32_t)32) * sizeof(SCORE_T);
                 AscendC::DataCopyPad(liv2ScoreOutLocal_,
                                      liv2ScoreGm[vecOffset * LIV2Common::Align((uint64_t)liv2ConstInfo_.kSeqSize,
