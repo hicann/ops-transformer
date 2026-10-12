@@ -265,6 +265,7 @@ __aicore__ inline void MoeSortMultiCore<T>::VBSProcess()
     if (this->blockIdx < this->vbsTilingData->needCoreNum) {
         OneCoreVMSProcess(sortCoreLoops, sortCoreLoopElements, sortCoreLastLoopElements);
     }
+    AscendC::SyncAll();
 }
 
 template <typename T>
