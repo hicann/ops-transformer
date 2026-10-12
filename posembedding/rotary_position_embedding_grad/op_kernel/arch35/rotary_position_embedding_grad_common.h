@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file rotary_position_embedding_grad_common.h
@@ -62,12 +62,19 @@ __aicore__ inline void HalfGradAlignVF(const LocalTensor<T>& sinTensor, const Lo
                     ops::LoadTwoTensorForDtypeT<T>(currCosUb, currCosUb, vregCos, vregHalfCos, preg, preg, offset,
                                                    halfOffset);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                    Mul(vregOut, vregCos, vregIn, preg);
+                    MulAddDst(vregOut, vregHalfSin, vregHalfIn, preg);
+                    Mul(vregHalfOut, vregHalfCos, vregHalfIn, preg);
+                    FusedMulSubDst(vregHalfOut, vregSin, vregIn, preg);
+#else
                     Mul(vregOut, vregCos, vregIn, preg);
                     Mul(vregHalfSin, vregHalfSin, vregHalfIn, preg);
                     Add(vregOut, vregOut, vregHalfSin, preg);
                     Mul(vregSin, vregSin, vregIn, preg);
                     Mul(vregHalfCos, vregHalfCos, vregHalfIn, preg);
                     Sub(vregHalfOut, vregHalfCos, vregSin, preg);
+#endif
 
                     ops::StoreOneTensorForDtypeT<T>(currOutUb, vregOut, preg, offset);
                     ops::StoreOneTensorForDtypeT<T>(currOutUb, vregHalfOut, preg, halfOffset);
@@ -127,6 +134,16 @@ __aicore__ inline void QuarterGradAlignVF(const LocalTensor<T>& sinTensor, const
                     ops::LoadTwoTensorForDtypeT<T>(currCosUb, currCosUb, vregQ2Cos, vregQ3Cos, preg, preg, q2Offset,
                                                    q3Offset);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                    Mul(vregOut, vregCos, vregIn, preg);
+                    MulAddDst(vregOut, vregQ1Sin, vregQ1In, preg);
+                    Mul(vregQ1Out, vregQ1Cos, vregQ1In, preg);
+                    FusedMulSubDst(vregQ1Out, vregSin, vregIn, preg);
+                    Mul(vregQ2Out, vregQ2Cos, vregQ2In, preg);
+                    MulAddDst(vregQ2Out, vregQ3Sin, vregQ3In, preg);
+                    Mul(vregQ3Out, vregQ3Cos, vregQ3In, preg);
+                    FusedMulSubDst(vregQ3Out, vregQ2Sin, vregQ2In, preg);
+#else
                     Mul(vregOut, vregCos, vregIn, preg);
                     Mul(vregQ1Sin, vregQ1Sin, vregQ1In, preg);
                     Add(vregOut, vregOut, vregQ1Sin, preg);
@@ -139,6 +156,7 @@ __aicore__ inline void QuarterGradAlignVF(const LocalTensor<T>& sinTensor, const
                     Mul(vregQ2Sin, vregQ2Sin, vregQ2In, preg);
                     Mul(vregQ3Cos, vregQ3Cos, vregQ3In, preg);
                     Sub(vregQ3Out, vregQ3Cos, vregQ2Sin, preg);
+#endif
 
                     ops::StoreOneTensorForDtypeT<T>(currOutUb, vregOut, preg, offset);
                     ops::StoreOneTensorForDtypeT<T>(currOutUb, vregQ1Out, preg, q1Offset);
@@ -273,12 +291,19 @@ __aicore__ inline void DeepSeekInterleaveModeGradVF(const LocalTensor<T>& sinTen
                                                    offset, halfOffset);
                     ops::LoadTwoTensorForDtypeT<T>(currCosUb, currCosUb, vregCos, vregHalfCos, pregLoop, pregLoop,
                                                    offset, halfOffset);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                    Mul(vregCos, vregIn, vregCos, pregLoop);
+                    MulAddDst(vregCos, vregHalfSin, vregHalfIn, pregLoop);
+                    Mul(vregHalfCos, vregHalfIn, vregHalfCos, pregLoop);
+                    FusedMulSubDst(vregHalfCos, vregSin, vregIn, pregLoop);
+#else
                     Mul(vregCos, vregIn, vregCos, pregLoop);
                     Mul(vregHalfSin, vregHalfSin, vregHalfIn, pregLoop);
                     Add(vregCos, vregCos, vregHalfSin, pregLoop);
                     Mul(vregHalfCos, vregHalfIn, vregHalfCos, pregLoop);
                     Mul(vregSin, vregIn, vregSin, pregLoop);
                     Sub(vregHalfCos, vregHalfCos, vregSin, pregLoop);
+#endif
                     Reg::Interleave<float>(vregOut, vregHalfOut, vregCos, vregHalfCos);
                     ops::StoreOneTensorForDtypeT<T>(currOutUb, vregOut, pregPart1, outOffset);
                     ops::StoreOneTensorForDtypeT<T>(currOutUb, vregHalfOut, pregPart2, outOffset + VL_FLOAT32_SIZE);
@@ -333,12 +358,19 @@ __aicore__ inline void BatchHalfGradAlignVF(__ubuf__ T* in, __ubuf__ T* cos, __u
                         ops::LoadOneTensorForDtypeT<T>(currSinUb, sinPart2Reg, pregLoop,
                                                        i * VL_FLOAT32_SIZE + dHalfOffset);
                         // 计算
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                        Mul(cosPart1Reg, inPart1Reg, cosPart1Reg, pregLoop);
+                        MulAddDst(cosPart1Reg, sinPart2Reg, inPart2Reg, pregLoop);
+                        Mul(cosPart2Reg, inPart2Reg, cosPart2Reg, pregLoop);
+                        FusedMulSubDst(cosPart2Reg, sinPart1Reg, inPart1Reg, pregLoop);
+#else
                         Mul(cosPart1Reg, inPart1Reg, cosPart1Reg, pregLoop);
                         Mul(sinPart2Reg, sinPart2Reg, inPart2Reg, pregLoop);
                         Add(cosPart1Reg, cosPart1Reg, sinPart2Reg, pregLoop);
                         Mul(cosPart2Reg, inPart2Reg, cosPart2Reg, pregLoop);
                         Mul(sinPart1Reg, inPart1Reg, sinPart1Reg, pregLoop);
                         Sub(cosPart2Reg, cosPart2Reg, sinPart1Reg, pregLoop);
+#endif
                         // 拷贝回UB
                         ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart1Reg, pregLoop, i * VL_FLOAT32_SIZE);
                         ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart2Reg, pregLoop,
@@ -406,6 +438,16 @@ __aicore__ inline void BatchQuarterGradAlignVF(__ubuf__ T* in, __ubuf__ T* cos, 
                                                        pregLoop, i * VL_FLOAT32_SIZE + dHalfOffset,
                                                        i * VL_FLOAT32_SIZE + dThreeQuarterOffset);
                         // 计算
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                        Mul(cosPart1Reg, inPart1Reg, cosPart1Reg, pregLoop);
+                        MulAddDst(cosPart1Reg, sinPart2Reg, inPart2Reg, pregLoop);
+                        Mul(cosPart2Reg, inPart2Reg, cosPart2Reg, pregLoop);
+                        FusedMulSubDst(cosPart2Reg, sinPart1Reg, inPart1Reg, pregLoop);
+                        Mul(cosPart3Reg, inPart3Reg, cosPart3Reg, pregLoop);
+                        MulAddDst(cosPart3Reg, sinPart4Reg, inPart4Reg, pregLoop);
+                        Mul(cosPart4Reg, inPart4Reg, cosPart4Reg, pregLoop);
+                        FusedMulSubDst(cosPart4Reg, sinPart3Reg, inPart3Reg, pregLoop);
+#else
                         Mul(cosPart1Reg, inPart1Reg, cosPart1Reg, pregLoop);
                         Mul(sinPart2Reg, sinPart2Reg, inPart2Reg, pregLoop);
                         Add(cosPart1Reg, cosPart1Reg, sinPart2Reg, pregLoop);
@@ -418,6 +460,7 @@ __aicore__ inline void BatchQuarterGradAlignVF(__ubuf__ T* in, __ubuf__ T* cos, 
                         Mul(cosPart4Reg, inPart4Reg, cosPart4Reg, pregLoop);
                         Mul(sinPart3Reg, inPart3Reg, sinPart3Reg, pregLoop);
                         Sub(cosPart4Reg, cosPart4Reg, sinPart3Reg, pregLoop);
+#endif
                         // 拷贝回UB
                         ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart1Reg, pregLoop, i * VL_FLOAT32_SIZE);
                         ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart2Reg, pregLoop,
@@ -583,12 +626,19 @@ __aicore__ inline void BatchDeepSeekInterleaveModeGradVF(__ubuf__ T* in, __ubuf_
                         ops::LoadOneTensorForDtypeT<T>(currSinUb, sinPart1Reg, pregLoop, i * VL_FLOAT32_SIZE);
                         ops::LoadOneTensorForDtypeT<T>(currSinUb, sinPart2Reg, pregLoop,
                                                        i * VL_FLOAT32_SIZE + dHalfOffset);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                        Mul(cosPart1Reg, inPart1Reg, cosPart1Reg, pregLoop);
+                        MulAddDst(cosPart1Reg, sinPart2Reg, inPart2Reg, pregLoop);
+                        Mul(cosPart2Reg, inPart2Reg, cosPart2Reg, pregLoop);
+                        FusedMulSubDst(cosPart2Reg, sinPart1Reg, inPart1Reg, pregLoop);
+#else
                         Mul(cosPart1Reg, inPart1Reg, cosPart1Reg, pregLoop);
                         Mul(sinPart2Reg, sinPart2Reg, inPart2Reg, pregLoop);
                         Add(cosPart1Reg, cosPart1Reg, sinPart2Reg, pregLoop);
                         Mul(cosPart2Reg, inPart2Reg, cosPart2Reg, pregLoop);
                         Mul(sinPart1Reg, inPart1Reg, sinPart1Reg, pregLoop);
                         Sub(cosPart2Reg, cosPart2Reg, sinPart1Reg, pregLoop);
+#endif
                         Reg::Interleave<float>(cosPart1Reg, cosPart2Reg, cosPart1Reg, cosPart2Reg);
                         ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart1Reg, pregPart1, i * loopSize);
                         ops::StoreOneTensorForDtypeT<T>(currOutUb, cosPart2Reg, pregPart2,
