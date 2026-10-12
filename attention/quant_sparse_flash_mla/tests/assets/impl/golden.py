@@ -95,12 +95,13 @@ def activate_case_data(testcase_name):
 
 def cpu_quant_sparse_flash_mla(
     q,
+    quant_mode,
     *,
     return_softmax_lse=False,
     testcase_name=None,
     **kwargs,
 ):
-    del q, kwargs
+    del q, quant_mode, kwargs
     data = activate_case_data(testcase_name)
     softmax_lse = data.get("cpu_lse") if bool(return_softmax_lse) else None
     return data["cpu_output"], softmax_lse

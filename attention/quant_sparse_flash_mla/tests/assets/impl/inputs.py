@@ -386,6 +386,7 @@ def zero_metadata(metadata):
 
 def generate_quant_sparse_flash_mla_inputs(
     q,
+    quant_mode,
     *,
     ori_kv=None,
     cmp_kv=None,
@@ -407,7 +408,6 @@ def generate_quant_sparse_flash_mla_inputs(
     cmp_topk_length=None,
     sinks=None,
     metadata=None,
-    quant_mode=None,
     softmax_scale=1.0,
     cmp_ratio=1,
     ori_mask_mode=4,

@@ -293,11 +293,11 @@ def run_metadata(arguments, metadata):
 
 def run(
     q,
+    quant_mode,
     *,
     ori_kv=None,
     cmp_kv=None,
     metadata=None,
-    quant_mode=None,
     _metadata_target=None,
     **kwargs,
 ):
