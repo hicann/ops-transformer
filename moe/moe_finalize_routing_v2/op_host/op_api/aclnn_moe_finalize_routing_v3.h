@@ -28,16 +28,16 @@ extern "C" {
  * @domain aclnn_ops_infer
  */
 ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV3GetWorkspaceSize(
-    const aclTensor* expandedX, const aclTensor* expandedRowIdx, const aclTensor* x1Optional,
-    const aclTensor* x2Optional, const aclTensor* biasOptional, const aclTensor* scalesOptional,
-    const aclTensor* expertIdxOptional, const aclTensor* xOptional, const aclTensor* a1Optional,
-    const aclTensor* a2Optional, const aclTensor* vOptional, int64_t dropPadMode, const aclIntArray* zeroExpertRange,
-    const aclIntArray* copyExpertRange, const aclIntArray* constantExpertRange, const aclTensor* out,
-    uint64_t* workspaceSize, aclOpExecutor** executor);
+    const aclTensor *expandedX, const aclTensor *expandedRowIdx, const aclTensor *x1Optional,
+    const aclTensor *x2Optional, const aclTensor *biasOptional, const aclTensor *scalesOptional,
+    const aclTensor *expertIdxOptional, const aclTensor *xOptional, const aclTensor *alpha1Optional,
+    const aclTensor *alpha2Optional, const aclTensor *vOptional, int64_t dropPadMode,
+    const aclIntArray *zeroExpertRange, const aclIntArray *copyExpertRange, const aclIntArray *constantExpertRange,
+    const aclTensor *out, uint64_t *workspaceSize, aclOpExecutor **executor);
 
 /* @brief aclnnMoeFinalizeRoutingV3的第二段接口，用于执行计算。 */
-ACLNN_API aclnnStatus
-aclnnMoeFinalizeRoutingV3(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
+ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV3(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+                                                aclrtStream stream);
 
 #ifdef __cplusplus
 }

@@ -176,7 +176,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV4(
   <tr>
     <td>alpha1Optional(aclTensor*)</td>
     <td>输入</td>
-    <td>公式中的a1。</td>
+    <td>公式中的alpha1。</td>
     <td>-</td>
     <td>与expandedX一致。</td>
     <td>ND</td>
@@ -186,7 +186,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV4(
   <tr>
     <td>alpha2Optional(aclTensor*)</td>
     <td>输入</td>
-    <td>公式中的a2。</td>
+    <td>公式中的alpha2。</td>
     <td>-</td>
     <td>与expandedX一致。</td>
     <td>ND</td>
