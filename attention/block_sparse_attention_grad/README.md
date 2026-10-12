@@ -372,7 +372,6 @@ BlockSparseAttentionGrad输入dout、query、key、value, attentionOut的数据�
   - <term>Atlas A2训练系列产品</term>、<term>Atlas A3训练系列产品</term>：当 qInputLayout或kvInputLayout 为 "BNSD" 时，如配置该项，算子会按指定的有效长度处理，忽略 Padding 部分的数据，提升性能；如不配置（传 nullptr），算子将默认把 query shape 中的 S 维度作为有效长度进行全量处理。
 
   - <term>Ascend 950PR&950DT系列产品</term>：当qInputLayout或kvInputLayout为非"TND"时，会忽略这两个入参。
-* 不支持确定性计算场景。
 
 ## 调用说明
 
