@@ -173,6 +173,7 @@ __aicore__ inline void CompressorKernelPerf<COMP>::InitTilingData()
     constInfo.stateCacheStrideDim0 = tilingData_->baseParams.stateCacheStrideDim0;
 
     constInfo.nSize = tilingData_->baseParams.nSize;
+    constInfo.batchConsistency = tilingData_->baseParams.batchConsistency;
     constInfo.vec1TailCacheSize = tilingData_->workspaceParams.vec1TailCacheSize;
     constInfo.dbWorkspaceRatio = tilingData_->workspaceParams.dbWorkspaceRatio;
 }
@@ -219,7 +220,10 @@ __aicore__ inline void CompressorKernelPerf<COMP>::SetBaseSize()
     uint32_t aiCoreNum = constInfo.usedCoreNum;
     constInfo.dBaseSize = 64;
     uint32_t dBaseBlockNum = constInfo.headDim / constInfo.dBaseSize;
-    if (sameSeqUsed && mSize <= (constInfo.mBaseSize * (aiCoreNum / dBaseBlockNum))) {
+    // batch一致性模式下不做动态D分块细切(悬崖): dBaseSize切换会改变列归属chunk号,
+    // 导致hIdxStart相位变化 -> K轴累加顺序变化 -> 结果与batch大小相关
+    if (sameSeqUsed && mSize <= (constInfo.mBaseSize * (aiCoreNum / dBaseBlockNum)) &&
+        constInfo.batchConsistency != BATCH_CONSISTENCY) {
         if (constInfo.headDim == 128) {
             dBaseBlockNum = 8;
         } else if (constInfo.headDim == 512) {

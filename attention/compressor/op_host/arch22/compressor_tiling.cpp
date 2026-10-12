@@ -100,6 +100,8 @@ ge::graphStatus CompressorTiling::ConvertContext(gert::TilingContext& context, C
     compressorContext.cacheMode = attrs->GetAttrPointer<int>(CACHE_MODE_ATTR_INDEX);
     compressorContext.stateCacheStrideDim0 = attrs->GetAttrPointer<int>(STATE_CACHE_STRIDE_DIM0_ATTR_INDEX);
     compressorContext.gradEnabled = attrs->GetAttrPointer<bool>(GRAD_ENABLED_ATTR_INDEX);
+    compressorContext.batchConsistency = context.GetDeterministicLevel();
+    OP_LOGD(context.GetNodeName(), "deterministic_level=%d", context.GetDeterministicLevel());
 
     OP_CHECK_IF(
         context.GetWorkspaceSizes(1) == nullptr,
@@ -179,6 +181,7 @@ ge::graphStatus CompressorTiling::SetBaseInfo()
     baseParams_->stateCacheStrideDim0 = static_cast<uint64_t>(*context_->stateCacheStrideDim0);
     baseParams_->nSize = 2; // 2:每个核处理两个基本块后做全核同步
     baseParams_->usedCoreNum = aicNum_;
+    baseParams_->batchConsistency = static_cast<uint32_t>(context_->batchConsistency);
 
     OP_LOGI(context_->opName, "[TILING] bSize:%u  tSize:%u cmpRatio:%u coff:%u", baseParams_->batchSize,
             baseParams_->tokenSize, baseParams_->cmpRatio, coff);
@@ -239,7 +242,9 @@ ge::graphStatus CompressorTiling::SetInnerSplitInfo()
         baseParams_->coreGroupNum = baseParams_->usedCoreNum / dBaseNum;
         baseParams_->kBaseNum = 1;
         baseParams_->kBaseSize = baseParams_->hiddenSize;
-        if ((dBaseNum * mBaseNum) < baseParams_->usedCoreNum) {
+
+        // batch一致性模式下不切K: 切K会改变MM1的K轴归约树(部分和+vec求和), 导致结果与batch大小相关
+        if ((dBaseNum * mBaseNum) < baseParams_->usedCoreNum && baseParams_->batchConsistency != BATCH_CONSISTENCY) {
             // Each Split-K part must own at least one 128-wide K block. Empty
             // parts do not produce a Cube partial sum but were read by Vector
             // as stale workspace data.
@@ -266,6 +271,18 @@ ge::graphStatus CompressorTiling::SetInnerSplitInfo()
                 baseParams_->splitCoreParam[i].kEnd = baseParams_->splitCoreParam[i].kStart + dealKSize;
                 baseParams_->splitCoreParam[i].mStart = 0;
                 baseParams_->splitCoreParam[i].mEnd = baseParams_->tokenSize;
+                baseParams_->mLoopNum = 1;
+            } else if (baseParams_->batchConsistency == BATCH_CONSISTENCY) {
+                // batch一致性模式(不切K): 每核全M全K; FULL_LOAD kernel无M分组机制(mStart直接作GM偏移),
+                // 组号超界(curGroupIdx>=1)的核置mEnd=0空转, 防止workspace越区写。空转条件从超界组扩展到所有非 0
+                // 组、复用既有同步保留机制
+                baseParams_->splitCoreParam[i].kStart = 0;
+                baseParams_->splitCoreParam[i].kEnd = baseParams_->hiddenSize;
+                baseParams_->splitCoreParam[i].mStart = 0;
+                baseParams_->splitCoreParam[i].mEnd = baseParams_->tokenSize;
+                if ((i / dBaseNum) >= 1) {
+                    baseParams_->splitCoreParam[i].mEnd = 0; // 空转(dealSeqCnt=0, kernel提前返回)
+                }
                 baseParams_->mLoopNum = 1;
             } else {
                 baseParams_->splitCoreParam[i].kStart = 0;

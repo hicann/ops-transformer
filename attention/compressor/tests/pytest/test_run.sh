@@ -10,6 +10,7 @@
 # -----------------------------------------------------------------------------------------------------------
 
 # ====================== 配置区======================
+# 确保 环境(torch_npu 26.2.0-beta.1, 支持 deterministic level=3)生效
 # 需要读取的用例excel表格路径，如下：
 PATH1="./excel/*"
 # 用例pt的文件存放路径，如下：
@@ -20,6 +21,7 @@ Compressor_PT_SAVE_SCRIPT="./batch/compressor_pt_save.py"
 TEST_Compressor_BATCH_SCRIPT="test_compressor_batch.py"
 REPLACE_PATH_SCRIPT="./batch/replace_path.py"
 TEST_Compressor_SINGLE_SCRIPT="test_compressor_single.py"
+TEST_Compressor_BITLEVEL_SCRIPT="test_compressor_bitlevel.py"
 
 # ====================== 执行区======================
 
@@ -28,6 +30,13 @@ run_single() {
     echo "===== 执行单用例算子调测 ====="
     python3 -m pytest -rA -s $TEST_Compressor_SINGLE_SCRIPT -v -m ci -W ignore::UserWarning -W ignore::DeprecationWarning
 }
+
+# 位级一致性调测(跨模板/动态D分块悬崖/位置一致性)
+run_bitlevel() {
+    echo "===== 执行位级一致性调测 ====="
+    python3 -m pytest -rA -s $TEST_Compressor_BITLEVEL_SCRIPT -v -m ci -W ignore::UserWarning -W ignore::DeprecationWarning
+}
+
 
 # 用例批量生成调试
 run_batch() {
@@ -72,27 +81,32 @@ run_batch() {
 # 显示帮助信息
 show_help() {
     echo "用法: $0 [参数]"
-    echo "参数说明："
+    echo "参数说明:"
     echo "  single    执行单算子用例调测"
+    echo "  bitlevel  执行位级一致性调测(跨模板/动态D分块悬崖/batch位置一致性)"
     echo "  batch     执行用例批量生成调试"
     echo "  help      显示本帮助信息"
-    echo "示例："
-    echo "  $0 single  # 执行single模式"
+    echo "示例:"
+    echo "  $0 single    # 执行single模式"
+    echo "  $0 bitlevel  # 执行bitlevel模式"
     echo "  $0 batch   # 执行batch模式"
 }
 
 # ====================== 主逻辑 ======================
 # 检查传入的参数数量
 if [ $# -ne 1 ]; then
-    echo "错误：必须传入且仅传入一个参数（single/batch/help）"
+    echo "错误：必须传入且仅传入一个参数（single/bitlevel/batch/help）"
     show_help
     exit 1
 fi
 
-# 根据参数执行对应函数
+# 根据参数执行相应函数
 case "$1" in
     single)
         run_single
+        ;;
+    bitlevel)
+        run_bitlevel
         ;;
     batch)
         run_batch
@@ -101,7 +115,7 @@ case "$1" in
         show_help
         ;;
     *)
-        echo "错误：未知参数 '$1'，仅支持 single/batch/help"
+        echo "错误：未知参数 '$1'，仅支持 single/bitlevel/batch/help"
         show_help
         exit 1
         ;;

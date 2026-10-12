@@ -332,6 +332,8 @@ __aicore__ inline void CompressorBlockCubePerf<COMP>::ComputeMm1(const RunInfo& 
             bool isFirst = (h == 0 && k == 0);
             bool isLast = ((h + K_SIZE >= hSize) && (k + K_L1_BASE >= K_SIZE));
             uint32_t hIdx = (h + k + hIdxStart) % hSize; // h方向错位搬运
+            // batch一致性: 关闭h方向错位, K轴按规范顺序累加(与FULL_LOAD模板对齐, 保证跨模板位级一致)
+            hIdx = constInfo_.batchConsistency == BATCH_CONSISTENCY ? (h + k) : hIdx;
             WaitFlag<HardEvent::MTE1_MTE2>(X_EVENT0 + xBufId);
             LocalTensor<X_T> xL1Tensor = xBufL1.GetWithOffset<X_T>(L1_X_SIZE / sizeof(X_T), xBufId * L1_X_SIZE);
             CopyXGmToL1(info, xL1Tensor, hIdx, K_L1_BASE);

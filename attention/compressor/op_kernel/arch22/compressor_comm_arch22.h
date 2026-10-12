@@ -208,6 +208,7 @@ struct ConstInfo {
     uint32_t kStart = 0;
     uint32_t kEnd = 0;
     uint32_t mLoopNum = 0;
+    uint32_t batchConsistency = 0; // batch一致性等级, ==BATCH_CONSISTENCY时关闭切K/动态D分块/h错位
     uint32_t bIdxOfLastTc = 0;
     uint32_t sIdxOfLastTc = 0;
     uint32_t mGroupNum = 0;

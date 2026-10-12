@@ -238,6 +238,7 @@ struct CompressorContext {
     const int* cacheMode;
     const int* stateCacheStrideDim0;
     const bool* gradEnabled;
+    int batchConsistency = 0; // ACL_OPT_DETERMINISTIC等级, ==BATCH_CONSISTENCY(3)时开启batch一致性
     TemplateId templateId;
 
     ge::DataType dtype = ge::DT_BF16;

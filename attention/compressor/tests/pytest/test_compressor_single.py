@@ -8,6 +8,8 @@
 # -----------------------------------------------------------------------------------------------------------
 
 import itertools
+import os
+
 import torch
 import torch_npu
 
@@ -17,6 +19,13 @@ from test_compressor_paramset import ENABLED_PARAMS
 # ******CPU侧算子逻辑实现获取golden与npu算子直调结果
 import compressor_operator_single
 import pytest
+
+# 确定性/batch一致性等级: 与 bitlevel 同口径, 必须在任何 NPU 调用之前设置.
+# 默认0(不开启); 用法: CMP_TEST_DET_LEVEL=3 bash test_run.sh single
+_DET_LEVEL = int(os.environ.get("CMP_TEST_DET_LEVEL", "0"))
+if _DET_LEVEL > 0:
+    torch_npu.npu.set_deterministic_level(_DET_LEVEL)
+    print("[single] torch_npu.npu.set_deterministic_level(%d)" % _DET_LEVEL)
 
 locals()["param_combinations"] = []
 

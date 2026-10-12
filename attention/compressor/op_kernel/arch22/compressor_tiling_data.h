@@ -19,6 +19,10 @@
 #include "kernel_tiling/kernel_tiling.h"
 
 const uint32_t CMP_MAX_AIC_CORE_NUM = 24;
+// batch一致性等级(与arch35对齐): 对应 aclrtSetSysParamOpt(ACL_OPT_DETERMINISTIC, 3),
+// 开启后: FULL_LOAD不切K轴、PERF不做动态D分块细切(悬崖)、Cube关闭h方向错位搬运,
+// 保证计算结果与batch大小/位置无关(位级一致)
+constexpr uint32_t BATCH_CONSISTENCY = 3;
 
 namespace optiling {
 struct CompressorSplitCoreParams {
@@ -46,6 +50,7 @@ struct CompressorBaseParams {
     uint32_t kBaseSize = 0;
     uint32_t coreGroupNum = 0;
     uint32_t mLoopNum = 0;
+    uint32_t batchConsistency = 0; // batch一致性等级(aclrtSetSysParamOpt ACL_OPT_DETERMINISTIC)
     CompressorSplitCoreParams splitCoreParam[CMP_MAX_AIC_CORE_NUM];
 };
 
