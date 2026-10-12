@@ -1248,9 +1248,7 @@ bool CheckSpecConditions(const gert::TilingContext* context)
     bool isMha = (kvHeadNum == 0) || (headNum == kvHeadNum);
     bool mhaConditions = isMha && !((qDataType == ge::DT_BF16) && (innerPrecise == 1)) &&
                          !((sparseMode == 0) && (tempAttnMaskShape != nullptr));
-    bool nonMhaConditions =
-        !isMha && (innerPrecise == 0) &&
-        !((sparseMode == 0) && (tempAttnMaskShape != nullptr) && (tempQ->GetStorageShape().GetDim(DIM_2) == 256));
+    bool nonMhaConditions = !isMha && (innerPrecise == 0);
     bool quantScale2Flag = context->GetOptionalInputTensor(QUANT_SCALE2_INDEX) != nullptr ? true : false;
     if (!(isLayoutSupported && isLearnableSinkFlag && !isRopeSplitMla && sparseModeSupported &&
           (nonMhaConditions || mhaConditions) && !quantScale2Flag)) {
@@ -1424,15 +1422,13 @@ bool RouteToFia(gert::TilingContext* context)
 
     const std::string inputLayoutStr = std::string(context->GetAttrs()->GetAttrPointer<char>(ATTR_INPUT_LAYOUT_INDEX));
 
-    // For TND without rope, only the full-mask scenarios (sparseMode=1 allMask, or sparseMode=0 with an
-    // external default mask) are handled by FIA V3 at headDim=256. All other TND headDim=256 configs
-    // (sparse 0/3/4 without full mask, 4D BNBD page attention, learnable sink, ...) keep the original
-    // route, so cases that already passed continue to run on their previous path (no route/performance change).
+    // For TND without rope, only sparseMode=1 (allMask) at headDim=256 is handled by FIA V3. All other
+    // TND headDim=256 configs (sparseMode=0, sparse 3/4, 4D BNBD page attention, learnable sink, ...) keep
+    // the original route, so cases that already passed continue to run on their previous path (no
+    // route/performance change).
     const int64_t sparseMode = *(attrs->GetAttrPointer<int64_t>(ATTR_SPARSE_MODE_INDEX));
-    const bool attenMaskPresent = (context->GetOptionalInputShape(ATTEN_MASK_INDEX) != nullptr);
     const bool isTndNoRopeD256 = (inputLayoutStr == "TND" && queryRopeD == 0 && queryD == valueD && queryD == 256);
-    const bool isFullMaskD256 = isTndNoRopeD256 && (sparseMode == 1 || (sparseMode == 0 && attenMaskPresent));
-    if (isTndNoRopeD256 && !isFullMaskD256) {
+    if (isTndNoRopeD256 && sparseMode != 1) {
         return false;
     }
 
