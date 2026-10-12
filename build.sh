@@ -2497,10 +2497,11 @@ elif [[ "$ENABLE_BUILT_CUSTOM" == "TRUE" ]]; then      # --ops, --vendor 新命�
     CUSTOM_OPTION="${CUSTOM_OPTION}  -DENABLE_BUILT_IN=OFF -DENABLE_OPS_HOST=ON -DENABLE_OPS_KERNEL=${ops_kernel_value}"
     if [[ "$ENABLE_BUILD_PKG" == "TRUE" ]]; then      # --pkg 新命令新使用
         cmake_config " -DENABLE_BUILD_PKG=ON"
+        build_package
     else
         cmake_config " -DENABLE_BUILD_PKG=OFF"
+        build all
     fi
-    build_package
 elif [[ "$ENABLE_BUILD_PKG" == "TRUE" ]]; then      # --pkg 新命令新使用
     # 构建 torch_extension whl 包
     build_torch_extension_whl || exit 1
