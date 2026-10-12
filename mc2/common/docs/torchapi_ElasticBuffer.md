@@ -408,18 +408,12 @@ ElasticBuffer.dispatch(
 
 ### combine
 
-**功能**：需与 [dispatch](#dispatch) 配套使用，相当于按dispatch算子收集数据的路径原路返回。该接口将专家处理后的token数据根据dispatch阶段记录的元数据信息，通过逆向路由和加权聚合，将token数据组合还原为原始序列顺序。
+**功能**：需与 [dispatch](#dispatch) 配套使用，相当于按dispatch算子收集数据的路径原路返回。该接口将专家处理后的token数据根据dispatch阶段记录的元数据信息，通过逆向路由和纯累加聚合，将token数据组合还原为原始序列顺序。
 
-- 支持带 `topk_weights` 加权聚合和纯累加两种模式。
+- 当前版本仅支持纯累加模式。
 - 当前版本不支持bias参数。
 
 **计算公式**：
-
-当提供 `topk_weights` 时：
-
-$$combined\_x_i = \sum_{k=0}^{K-1} topk\_weights_{i,k} \times x_{slot(i,k)}$$
-
-当不提供 `topk_weights` 时（纯累加）：
 
 $$combined\_x_i = \sum_{k=0}^{K-1} x_{slot(i,k)}$$
 
@@ -436,7 +430,7 @@ ElasticBuffer.combine(
 - **x** (`Tensor`)：必选参数，表示经过专家计算后的token数据，即 [dispatch](#dispatch) 输出的 `recv_x` 经过专家网络处理后的结果。要求为2 维张量，shape为 `(A, H)`，数据类型支持 `bfloat16`、`float16`，数据格式为 $ND$。
 - **handle** (`EPHandle`)：必选参数，表示 [dispatch](#dispatch) 返回的handle对象，包含slot索引、接收元数据等信息。handle的属性参见 [dispatch](#dispatch) 输出说明。
 - <strong>*</strong>：其之前的变量是位置相关的；之后的变量是可选参数，需要使用键值对赋值，不赋值会使用默认值。
-- **topk_weights** (`Tensor`)：可选参数，表示每个token对应的topK专家权重，用于加权聚合。要求为1 维张量，shape为 `(A,)`，数据类型支持 `float32`，数据格式为 $ND$，对应 [dispatch](#dispatch) 的 `recv_topk_weights` 输出。若不提供，则进行纯累加combine，输出 `combined_topk_weights` 为 `None`。
+- **topk_weights** (`Tensor`)：可选参数，用于训练反向场景，表示专家权重的梯度，要求为1 维张量，shape为 `(A,)`，数据类型支持 `float32`，数据格式为 $ND$，传入时按[dispatch](#dispatch) 输入的 `topk_idx` 顺序输出`combined_topk_weights`。若不提供，输出 `combined_topk_weights` 为 `None`。
 - **bias** (`Tensor` 或 `Tuple[Tensor, Tensor]`)：可选参数，当前版本不支持bias，传入 `None` 即可。预留支持单个bias张量或 `bias_0`、`bias_1` 双张量模式。
 - **async_with_compute_stream** (`bool`)：可选参数，表示是否启用异步调用，默认为 `False`。设为 `True` 时返回event对象，可在执行独立计算后调用 `event.current_stream_wait()` 获取combine结果。
 
@@ -448,7 +442,7 @@ ElasticBuffer.combine(
 两种方式的最终结果内容、顺序和类型一致，各项说明如下：
 
 - **combined_x** (`Tensor`)：表示combine后的token数据，还原为原始序列顺序。要求为2 维张量，shape为 `(BS, H)`，数据类型与 `x` 一致（`bfloat16` 或 `float16`），数据格式为 $ND$，不支持非连续的Tensor。
-- **combined_topk_weights** (`Tensor | None`)：表示combine后的topK专家权重。当 `topk_weights` 输入不为 `None` 时，要求为2 维张量，shape为 `(BS, K)`，数据类型为 `float32`，数据格式为 $ND$；当 `topk_weights` 输入为 `None` 时，返回 `None`。
+- **combined_topk_weights** (`Tensor | None`)：表示combine后的专家权重梯度。当 `topk_weights` 输入不为 `None` 时，要求为2 维张量，shape为 `(BS, K)`，数据类型为 `float32`，数据格式为 $ND$；当 `topk_weights` 输入为 `None` 时，返回 `None`。
 
 ### get_moe_ep_ccl_buffer_size（静态方法）
 
