@@ -12,6 +12,7 @@
 #include <memory>
 #include <vector>
 
+#include "acl/acl_rt.h"
 #include "gtest/gtest.h"
 #include "../../../op_host/op_api/aclnn_sparse_flash_attention_grad.h"
 #include "../../../op_host/op_api/aclnn_sparse_flash_attention_grad_v2.h"
@@ -21,6 +22,14 @@
 
 using namespace std;
 using namespace op;
+
+extern "C" aclError aclrtCtxGetFloatOverflowAddr(void** overflowAddr)
+{
+    // 仅用于不执行 kernel 的 GetWorkspaceSize 单元测试。
+    // 0x005 为非空占位地址，测试路径不读写该地址，不可解引用。
+    *overflowAddr = reinterpret_cast<void*>(0x005);
+    return ACL_SUCCESS;
+}
 
 namespace {
 void DestroyAclTensor(aclTensor* tensor)
