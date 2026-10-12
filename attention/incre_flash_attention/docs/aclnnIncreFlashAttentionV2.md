@@ -189,7 +189,7 @@ aclnnStatus aclnnIncreFlashAttentionV2(
         <td>输入</td>
         <td>BMM2前面量化的量化因子。</td>
         <td><ul><li>支持空Tensor。</li><li>支持per-tensor（scalar）。</li></ul></td>
-        <td>FLOAT32、BFLOAT16</td>
+        <td>FLOAT32</td>
         <td>ND</td>
         <td>-</td>
         <td>×</td>
