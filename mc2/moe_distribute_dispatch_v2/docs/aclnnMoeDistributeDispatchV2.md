@@ -1511,11 +1511,11 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
         }
         if (IS_TEST_A2) {
             LOG_PRINT("Example on <Atlas A2> will be executed!\n");
-            int ret = run_example_on_A2();
+            return run_example_on_A2();
         }
         else if (IS_TEST_A3A5) {
             LOG_PRINT("Example on <Atlas A3> or <Atlas A5> will be executed!\n");
-            int ret = run_example_on_A3A5();
+            return run_example_on_A3A5();
         }
 
         return 0;

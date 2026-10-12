@@ -723,7 +723,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
       - <term>Atlas A2系列产品</term>：
           - commAlg配置为""或nullptr：依照HCCL_INTRA_PCIE_ENABLE和HCCL_INTRA_ROCE_ENABLE环境变量配置，选择"fullmesh"或"hierarchy"公式。
           - commAlg配置为"fullmesh": 当`x`的数据类型为`INT32`时，设置大小要求 >= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* (H \* sizeof(int32) + 32B) + 2MB)；其他数据类型设置大小要求 >= 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB)。
-          - commAlg配置为"hierarchy": 设置大小要求 >= (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1B + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512。
+          - commAlg配置为"hierarchy": 设置大小要求 >= (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1Byte + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512。
       <!-- end id16 -->
       <!-- npu="950,A3" id17 -->
       - <term>Atlas A3系列产品</term>、Ascend 950DT系列产品：
@@ -876,7 +876,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
             CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed, ret %d\n", ret); return ret);
             char hcomEpName[128] = {0};
             ret = HcclGetCommName(args.hcclEpComm, hcomEpName);
-            CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetEpCommName failed, ret %d\n", ret); return -1);
+            CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetCommName failed, ret %d\n", ret); return -1);
             LOG_PRINT("[INFO] rank = %d, hcomEpName = %s, dispatchV3Stream = %p, combineV3Stream = %p, \
                         context = %p\n", args.rankId, hcomEpName, args.dispatchV3Stream, args.combineV3Stream,                 \
                         args.context);
@@ -1292,7 +1292,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
 
         char hcomEpName[128] = {0};
         ret = HcclGetCommName(args.hcclEpComm, hcomEpName);
-        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetEpCommName failed, ret %d\n", ret); return -1);
+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetCommName failed, ret %d\n", ret); return -1);
         LOG_PRINT("[INFO] rank = %d, hcomEpName = %s, dispatchStream = %p, combineStream = %p, \
                     context = %p\n", args.rankId, hcomEpName, args.dispatchStream, args.combineStream,                 \
                     args.context);
