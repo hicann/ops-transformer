@@ -19,6 +19,7 @@ namespace ArchInfo {
 constexpr uint32_t CV_RATIO = 2;
 }
 
+#define ATTN_KERNEL_TYPE KERNEL_TYPE_MIX_AIC_1_2
 #define ATTN_MUTEX_ENABLE
 
 #endif

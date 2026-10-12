@@ -25,7 +25,7 @@
 #include "../../../common/op_kernel/const_def.h"
 #include "../../../common/op_kernel/vector_common.h"
 #include "../../../common/op_kernel/init_output.h"
-#include "memory_copy_arch35.h"
+#include "../memory_copy_arch35.h"
 #include "../utils/attn_sink_gs1.h"
 #include "../../../common/op_kernel/arch_info.h"
 

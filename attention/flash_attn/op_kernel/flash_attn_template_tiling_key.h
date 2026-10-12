@@ -17,7 +17,7 @@
 #define TEMPLATE_TILING_KEY_FLASH_ATTN_H_
 
 #include "ascendc/host_api/tiling/template_argument.h"
-#include "../utils/flash_attn_common_def.h"
+#include "utils/flash_attn_common_def.h"
 #include "flash_attn_tiling_data.h"
 
 #ifndef ORIG_DTYPE_QUERY

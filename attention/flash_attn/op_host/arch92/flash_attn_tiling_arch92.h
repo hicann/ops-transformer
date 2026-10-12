@@ -19,8 +19,8 @@
 #include "exe_graph/runtime/tiling_context.h"
 #include "../fa_tiling_info.h"
 #include "tiling/tiling_api.h"
-#include "../../op_kernel/arch92/flash_attn_tiling_data_arch92.h"
-#include "../../op_kernel/arch92/flash_attn_template_tiling_key_arch92.h"
+#include "../../op_kernel/flash_attn_tiling_data.h"
+#include "../../op_kernel/flash_attn_template_tiling_key.h"
 
 namespace optiling {
 namespace flash_attn {

@@ -16,10 +16,16 @@
 #ifndef FLASH_ATTN_KERNEL_ND_H_
 #define FLASH_ATTN_KERNEL_ND_H_
 
-#include "../utils/flash_attn_common_def.h"
+#include "utils/flash_attn_common_def.h"
 
-#include "flash_attn_block_cube_nd.h"
-#include "flash_attn_block_vec_nd.h"
+#if __NPU_ARCH__ == 3510
+#include "arch35/flash_attn_block_cube_nd.h"
+#include "arch35/flash_attn_block_vec_nd.h"
+#else
+#include "arch92/flash_attn_block_cube_nd_arch92.h"
+#include "arch92/flash_attn_block_vec_nd_arch92.h"
+#endif
+
 #include "memory_copy_arch35.h"
 #include "flash_attn_block_vec_flashdecode.h"
 
@@ -30,7 +36,7 @@
 #endif
 
 #include "flash_attn_tiling_data.h"
-#include "../../../common/op_kernel/arch_info.h"
+#include "../../common/op_kernel/arch_info.h"
 
 using namespace AscendC;
 using namespace optiling;

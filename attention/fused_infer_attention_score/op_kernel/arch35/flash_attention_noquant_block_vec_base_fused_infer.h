@@ -21,7 +21,11 @@
 #include "kernel_operator_list_tensor_intf.h"
 #include "adv_api/activation/softmax.h"
 #include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz.h"
+#if __NPU_ARCH__ == 3510
 #include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_dn.h"
+#else
+#include "../../../common/op_kernel/arch92/vf/vf_mul_sel_softmaxflashv2_cast_nz_dn_arch92.h"
+#endif
 #include "../../../common/op_kernel/arch35/vf/vf_flashupdate_new.h"
 #include "../../../common/op_kernel/arch35/vf/vf_div_cast_arch35.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
@@ -651,7 +655,6 @@ __aicore__ inline void FANoQuantBlockVecBase<TEMPLATE_BASE_ARGS>::ProcessVec1Dn(
 
     LocalTensor<T> mmRes = bmm1ResBuf.template GetTensor<T>();
     LocalTensor<uint8_t> dropMaskUb;
-    GetDerived()->GenerateDropoutMaskDn(runInfo, constInfo, dropMaskUb);
 
     LocalTensor<uint8_t> indexesUb;
     float slopes = 0.0f;

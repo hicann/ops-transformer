@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file flash_attn_block_cube_dn_arch92.h
- * \brief FANoQuantGqaBlockCubeDn
+ * \file flash_attn_block_cube_dn_unmerged_arch92.h
+ * \brief FANoQuantGqaBlockCubeDnUnmerged
  */
-#ifndef FLASH_ATTN_BLOCK_CUBE_DN_ARCH92_H_
-#define FLASH_ATTN_BLOCK_CUBE_DN_ARCH92_H_
+#ifndef FLASH_ATTN_BLOCK_CUBE_DN_UNMERGED_ARCH92_H_
+#define FLASH_ATTN_BLOCK_CUBE_DN_UNMERGED_ARCH92_H_
 
 #include "../utils/flash_attn_type.h"
 #include "../../../common/op_kernel/matmul.h"
@@ -21,11 +21,11 @@
 
 using namespace fa_base_matmul;
 
-namespace BaseApi {
+namespace FlashAttnKernel {
 using ArchInfo::CV_RATIO;
 
 template <typename FA_T>
-class FANoQuantGqaBlockCubeDn {
+class FANoQuantGqaBlockCubeDnUnmerged {
 public:
     using INPUT_T = typename FA_T::inputType;
     using OUTPUT_T = typename FA_T::outputType;
@@ -44,7 +44,7 @@ public:
     using KV_T = INPUT_T;
     using MM_T = float;
 
-    using ConstInfoX = ConstInfo_t<FiaKernelType::NO_QUANT>;
+    using ConstInfoX = ConstInfo_t;
     const ConstInfoX& constInfo_;
 
     using SEQLEN_T = uint32_t;
@@ -124,8 +124,9 @@ public:
     LocalTensor<uint8_t> l0CBuffers_;
     uint32_t l0cBufId_ = 0U;
 
-    __aicore__ inline FANoQuantGqaBlockCubeDn(ConstInfoX& constInfo, SeqLensTool<LAYOUT_T, SEQLEN_T>& qSeqLensTool,
-                                              SeqLensTool<LAYOUT_KV, SEQLEN_T>& kvSeqLensTool)
+    __aicore__ inline FANoQuantGqaBlockCubeDnUnmerged(ConstInfoX& constInfo,
+                                                      SeqLensTool<LAYOUT_T, SEQLEN_T>& qSeqLensTool,
+                                                      SeqLensTool<LAYOUT_KV, SEQLEN_T>& kvSeqLensTool)
         : constInfo_(constInfo),
           qSeqLensTool_(qSeqLensTool),
           kvSeqLensTool_(kvSeqLensTool){};
@@ -216,6 +217,10 @@ public:
 
     __aicore__ inline void InitCrossCoreSync() {}
 
+    __aicore__ inline void AllocEventID() {}
+
+    __aicore__ inline void FreeEventID() {}
+
     __aicore__ inline void UnInitCrossCoreSync()
     {
         for (int bufferId = 0; bufferId < UB_MM1_RES_BUFCNT; ++bufferId) {
@@ -227,7 +232,7 @@ public:
     }
 
     __aicore__ inline void CopyQuerySlice(const LocalTensor<Q_T>& dstTensor, uint32_t dOffset, uint32_t dRealSize,
-                                          RunInfoS1Only& runInfo)
+                                          RunInfo& runInfo)
     {
         uint32_t dstStride = (runInfo.actMSize + 15) >> 4 << 4;
         FaL1Tensor<Q_T, L1Format::NZ> l1Tensor{.tensor = dstTensor, .rowCount = dstStride};
@@ -243,7 +248,7 @@ public:
     }
 
     __aicore__ inline void CopyKeySlice(const LocalTensor<KV_T>& dstTensor, uint32_t dOffset, uint32_t dRealSize,
-                                        RunInfoS1Only& runInfo)
+                                        RunInfo& runInfo)
     {
         uint32_t dstStride = (runInfo.actSingleLoopS2Size + 15) >> 4 << 4;
         FaL1Tensor<KV_T, L1Format::NZ> l1Tensor{.tensor = dstTensor, .rowCount = dstStride};
@@ -258,7 +263,7 @@ public:
     }
 
     __aicore__ inline void CopyValueSlice(const LocalTensor<KV_T>& dstTensor, uint32_t dOffset, uint32_t dRealSize,
-                                          RunInfoS1Only& runInfo)
+                                          RunInfo& runInfo)
     {
         FaL1Tensor<KV_T, L1Format::NZ> l1Tensor{.tensor = dstTensor,
                                                 .rowCount = AttentionCommon::Align(runInfo.actSingleLoopS2Size, 16U)};
@@ -272,7 +277,7 @@ public:
         copyKvGmToL1_(l1Tensor, valueGm_, gmCoord);
     }
 
-    __aicore__ inline void IterateBmm1(RunInfoS1Only& runInfo)
+    __aicore__ inline void IterateBmm1(RunInfo& runInfo)
     {
         uint32_t mm1ResUbBufId = runInfo.loop % UB_MM1_RES_BUFCNT;
         LocalTensor<MM_T> mm1ResUbTensor =
@@ -284,7 +289,7 @@ public:
         CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(c1v1CrossCoreSyncIdx);
     }
 
-    __aicore__ inline void IterateBmm1Dn(LocalTensor<MM_T>& mm1ResUbTensor, RunInfoS1Only& runInfo)
+    __aicore__ inline void IterateBmm1Dn(LocalTensor<MM_T>& mm1ResUbTensor, RunInfo& runInfo)
     {
         LocalTensor<Q_T> qL1Tensor = l1QBuffers_[qL1BufId_ * L1_Q_BUF_BYTES].template ReinterpretCast<Q_T>();
         if (unlikely(runInfo.isFirstS2Loop)) {
@@ -369,7 +374,7 @@ public:
     }
 
     __aicore__ inline void FixpipeMm1Dn(const LocalTensor<MM_T>& dstTensor, const LocalTensor<MM_T>& l0C,
-                                        uint32_t mSize, RunInfoS1Only& runInfo)
+                                        uint32_t mSize, RunInfo& runInfo)
     {
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
         fixpipeParams.nSize = ((runInfo.actMSize + 7) >> 3) << 3; // 使能NZ2ND功能，nSize*sizeof(T)必须为32的倍数
@@ -384,7 +389,7 @@ public:
         Fixpipe<MM_T, MM_T, FIXPIPE_ROW_MAJOR_UB>(dstTensor, l0C, fixpipeParams);
     }
 
-    __aicore__ inline void IterateBmm2(RunInfoS1Only& runInfo)
+    __aicore__ inline void IterateBmm2(RunInfo& runInfo)
     {
         uint32_t mm2ResUbBufId = runInfo.loop % UB_MM2_RES_BUFCNT;
         uint32_t pL1BufId = runInfo.loop % L1_P_BUFCNT;
@@ -400,7 +405,7 @@ public:
 
     template <typename DST_TENSOR_T>
     __aicore__ inline void FixpipeMm2PartialN(const DST_TENSOR_T& dstTensor, const LocalTensor<MM_T>& l0C,
-                                              uint32_t realN, RunInfoS1Only& runInfo)
+                                              uint32_t realN, RunInfo& runInfo)
     {
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
         fixpipeParams.nSize = (realN + 7) >> 3 << 3;
@@ -416,7 +421,7 @@ public:
     }
 
     __aicore__ inline void IterateBmm2l0Split(LocalTensor<MM_T>& mm2ResUbTensor, LocalTensor<Q_T>& pL1Tensor,
-                                              RunInfoS1Only& runInfo)
+                                              RunInfo& runInfo)
     {
         LocalTensor<KV_T> vL1Tensor = l1KvBuffers_[kvL1BufId_ * L1_KV_BUF_BYTES].template ReinterpretCast<KV_T>();
         Mutex::Lock<PIPE_MTE2>(KV_L1_BUFFER_ID0 + kvL1BufId_);
@@ -490,21 +495,22 @@ public:
         Mutex::Unlock<PIPE_MTE1>(KV_L1_BUFFER_ID0 + kvL1BufId_);
         kvL1BufId_ = (kvL1BufId_ + 1) % L1_KV_BUFCNT;
     }
-}; // FANoQuantGqaBlockCubeDn
+}; // FANoQuantGqaBlockCubeDnUnmerged
 
 // AIC/AIV 分编译占位（Mix kernel 在 AIV 侧重编译时使用）
 template <typename FA_T>
-class FANoQuantGqaBlockCubeDummyDn {
+class FANoQuantGqaBlockCubeDummyDnUnmerged {
 public:
     static constexpr FA_LAYOUT LAYOUT_T = FA_T::qLayout;
     static constexpr FA_LAYOUT LAYOUT_KV = FA_T::kvLayout;
     using SEQLEN_T = uint32_t;
-    using ConstInfoX = ConstInfo_t<FiaKernelType::NO_QUANT>;
+    using ConstInfoX = ConstInfo_t;
 
-    __aicore__ inline FANoQuantGqaBlockCubeDummyDn(ConstInfoX& constInfo, SeqLensTool<LAYOUT_T, SEQLEN_T>& qSeqLensTool,
-                                                   SeqLensTool<LAYOUT_KV, SEQLEN_T>& kvSeqLensTool){};
+    __aicore__ inline FANoQuantGqaBlockCubeDummyDnUnmerged(ConstInfoX& constInfo,
+                                                           SeqLensTool<LAYOUT_T, SEQLEN_T>& qSeqLensTool,
+                                                           SeqLensTool<LAYOUT_KV, SEQLEN_T>& kvSeqLensTool){};
 };
 
-} // namespace BaseApi
+} // namespace FlashAttnKernel
 
-#endif // FLASH_ATTN_BLOCK_CUBE_DN_H_
+#endif // FLASH_ATTN_BLOCK_CUBE_DN_UNMERGED_ARCH92_H_

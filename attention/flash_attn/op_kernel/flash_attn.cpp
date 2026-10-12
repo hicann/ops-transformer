@@ -14,12 +14,15 @@
  *        参考 quant_flash_attn.cpp 单层 __global__ 风格。
  */
 
-#include "arch35/flash_attn_template_tiling_key.h"
+#include "flash_attn_template_tiling_key.h"
 #include "utils/flash_attn_common_def.h"
 #include "../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
-#include "arch35/flash_attn_kernel_dn.h"
-#include "arch35/flash_attn_kernel_dn_unmerged.h"
-#include "arch35/flash_attn_kernel_nd.h"
+// 合轴 DN 模板仅 arch35 提供; arch92 的 DN 即不合轴模板(经 templateId=2 路由), host 不会下发 templateId=1
+#if __NPU_ARCH__ == 3510
+#include "flash_attn_kernel_dn.h"
+#endif
+#include "flash_attn_kernel_dn_unmerged.h"
+#include "flash_attn_kernel_nd.h"
 
 using namespace AscendC;
 
@@ -89,7 +92,7 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t* query, __gm__ uint8_t* key
 {
     REGISTER_TILING_DEFAULT(optiling::FlashAttnTilingData);
     __gm__ uint8_t* user = GetUserWorkspace(workspace);
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+    KERNEL_TASK_TYPE_DEFAULT(ATTN_KERNEL_TYPE);
     if constexpr (inOutLayoutType == InOutLayoutType_TND && KvLayoutType == KvLayoutType_NO_PA) {
         dc_preload(reinterpret_cast<__gm__ uint64_t*>(cuSeqLensQ), 0);
         dc_preload(reinterpret_cast<__gm__ uint64_t*>(cuSeqLensKv), 0);
@@ -111,10 +114,17 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t* query, __gm__ uint8_t* key
     constexpr FA_LAYOUT kvLayout = GetKvLayout<inOutLayoutType, KvLayoutType>();
     constexpr bool pageAttention = IsPageAttention<KvLayoutType>();
 
-    constexpr S1TemplateType s1TemplateType = static_cast<S1TemplateType>(ConfigValue[config].s1);
-    constexpr S2TemplateType s2TemplateType = static_cast<S2TemplateType>(ConfigValue[config].s2);
-    constexpr DTemplateType dTemplateType = static_cast<DTemplateType>(ConfigValue[config].d);
-    constexpr DTemplateType dVTemplateType = static_cast<DTemplateType>(ConfigValue[config].dv);
+    // 按架构选择 config 档位表: arch35 与 arch92 的 config 编号语义不同
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+    constexpr const ConfigParams& cfg = ConfigValue[config];
+#else
+    constexpr const ConfigParams& cfg = ConfigValueArch92[config];
+#endif
+
+    constexpr S1TemplateType s1TemplateType = static_cast<S1TemplateType>(cfg.s1);
+    constexpr S2TemplateType s2TemplateType = static_cast<S2TemplateType>(cfg.s2);
+    constexpr DTemplateType dTemplateType = static_cast<DTemplateType>(cfg.d);
+    constexpr DTemplateType dVTemplateType = static_cast<DTemplateType>(cfg.dv);
 
     // 根因（静态图）：固定 shape 下 tiling 是编译期常量字节数组而非 __gm__ buffer，
     // 不能直接 reinterpret_cast 成结构体指针访问，必须先拷贝到栈局部结构体对象再取指针。
@@ -126,7 +136,9 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t* query, __gm__ uint8_t* key
     InitSocState();
 
     using FA_T = FlashAttnKernel::FAType<INPUT_T, OUT_T, pageAttention, qLayout, kvLayout, outLayout, s1TemplateType,
-                                         s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask>;
+                                         s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask,
+                                         cfg.ubMm1ResBufcnt, cfg.ubMm2ResBufcnt, cfg.ubVec1ResBufcnt, cfg.ubMaskBufcnt,
+                                         cfg.l1PBufcnt, cfg.l1QBufcnt, cfg.l1KvBufcnt>;
 
     if constexpr (templateId == FA_Template_DN_Unmerged) {
         // 不合轴 DN(预埋): BN1_S1 分核, 独立文件(*_dn_unmerged.h), 全部注册维度/有无 mask 实例化;
@@ -147,6 +159,7 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t* query, __gm__ uint8_t* key
                 attnOut, softmaxLse, user, &tilingData->baseTiling);
         op.Process();
     } else if constexpr (templateId == FA_Template_DN) {
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
         using CubeBlock = FlashAttnKernel::FANoQuantGqaBlockCubeDn<FA_T>;
         using VecFaBlock = FlashAttnKernel::FANoQuantGqaBlockVecDn<FA_T>;
         using VecFdBlock = FlashAttnKernel::FiaBlockVecFlashDecode<FA_T>;
@@ -161,6 +174,7 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t* query, __gm__ uint8_t* key
         op.Init(query, key, value, blockTable, cuSeqLensQ, cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata,
                 attnOut, softmaxLse, user, &tilingData->baseTiling);
         op.Process();
+#endif
     } else {
         using CubeBlock = FlashAttnKernel::FANoQuantGqaBlockCubeNd<FA_T>;
         using VecFaBlock = FlashAttnKernel::FANoQuantGqaBlockVecNd<FA_T>;

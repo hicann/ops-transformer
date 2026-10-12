@@ -16,6 +16,7 @@
 #include "flash_attn_tiling_arch92.h"
 #include "../flash_attn_tiling.h"
 #include "../fa_adjust_sinner_souter.h"
+#include "fa_adjust_sinner_souter_arch92.h"
 #include <map>
 #include <vector>
 #include <numeric>
@@ -23,7 +24,7 @@
 #include <graph/utils/type_utils.h>
 #include "log/log.h"
 #include "../flash_attn_tiling_utils.h"
-#include "../../op_kernel/arch92/flash_attn_template_tiling_key_arch92.h"
+#include "../../op_kernel/flash_attn_template_tiling_key.h"
 #include "../../../common/op_host/fia_tiling_templates_registry.h"
 
 using namespace ge;
@@ -308,6 +309,7 @@ void FlashAttnTilingImplArch92::SetFATilingData()
     tilingData_.baseTiling.flashAttnBaseParams.bSize = faInfo_->bSize;
     tilingData_.baseTiling.flashAttnBaseParams.t1Size = faInfo_->qTSize;
     tilingData_.baseTiling.flashAttnBaseParams.t2Size = faInfo_->kTSize;
+    tilingData_.baseTiling.flashAttnBaseParams.n1Size = faInfo_->n1Size;
     tilingData_.baseTiling.flashAttnBaseParams.n2Size = faInfo_->n2Size;
     tilingData_.baseTiling.flashAttnBaseParams.gSize = faInfo_->gSize;
     tilingData_.baseTiling.flashAttnBaseParams.s1Size = faInfo_->s1Size;
@@ -321,7 +323,6 @@ void FlashAttnTilingImplArch92::SetFATilingData()
         faInfo_->kvLayout == FaLayout::TND ? (faInfo_->bSize + 1) : 0;
     tilingData_.baseTiling.flashAttnBaseParams.seqUsedQSize = seqUsedQFlag_ ? faInfo_->bSize : 0;
     tilingData_.baseTiling.flashAttnBaseParams.seqUsedKvSize = seqUsedKvFlag_ ? faInfo_->bSize : 0;
-    tilingData_.baseTiling.flashAttnBaseParams.isKvContinuous = true;
     tilingData_.baseTiling.flashAttnBaseParams.isSoftMaxLseEnable = faInfo_->softmaxLseFlag;
     tilingData_.baseTiling.flashAttnBaseParams.iscuSeqLengthsNull = !cuSeqLenQFlag_;
     tilingData_.baseTiling.flashAttnBaseParams.iscuSeqLengthsKVNull = !cuSeqLenKVFlag_;
@@ -415,7 +416,6 @@ void FlashAttnTilingImplArch92::PrintAllTilingData()
     OP_LOGD(faInfo_->opName, "scaleValue:%f", flashAttnBaseParams.scaleValue);
     OP_LOGD(faInfo_->opName, "iscuSeqLengthsNull:%d", flashAttnBaseParams.iscuSeqLengthsNull);
     OP_LOGD(faInfo_->opName, "iscuSeqLengthsKVNull:%d", flashAttnBaseParams.iscuSeqLengthsKVNull);
-    OP_LOGD(faInfo_->opName, "isKvContinuous:%d", flashAttnBaseParams.isKvContinuous);
     OP_LOGD(faInfo_->opName, "isSoftMaxLseEnable:%d", flashAttnBaseParams.isSoftMaxLseEnable);
     OP_LOGD(faInfo_->opName, "coreNum:%d", flashAttnBaseParams.coreNum);
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -9,36 +9,25 @@
  */
 
 /*!
- * \file flash_attn_block_vec_dn_arch92.h
- * \brief FANoQuantGqaBlockVecDn —— Dn 路径专用 Vec Block 模板（独立类，无 base 基类）。
+ * \file flash_attn_block_vec_dn_unmerged_arch92.h
+ * \brief FANoQuantGqaBlockVecDnUnmerged —— Dn 路径专用 Vec Block 模板（独立类，无 base 基类）。
  */
-#ifndef FLASH_ATTN_BLOCK_VEC_DN_ARCH92_H_
-#define FLASH_ATTN_BLOCK_VEC_DN_ARCH92_H_
+#ifndef FLASH_ATTN_BLOCK_VEC_DN_UNMERGED_ARCH92_H_
+#define FLASH_ATTN_BLOCK_VEC_DN_UNMERGED_ARCH92_H_
 
 #include <limits>
-
-#if __has_include("../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h")
 #include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
-#include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz.h"
-#include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_dn.h"
+#include "../../../common/op_kernel/arch92/vf/vf_mul_sel_softmaxflashv2_cast_nz_dn_arch92.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flashupdate_new.h"
 #include "../../../common/op_kernel/arch35/vf/vf_div_cast_arch35.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
+#include "../../../common/op_kernel/const_def.h"
 #include "../../../common/op_kernel/vector_common.h"
 #include "../../../common/op_kernel/init_output.h"
-#else
-#include "../../common/arch35/flash_attention_score_common_regbase_arch35.h"
-#include "../../common/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz.h"
-#include "../../common/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_dn.h"
-#include "../../common/arch35/vf/vf_flashupdate_new.h"
-#include "../../common/arch35/vf/vf_div_cast_arch35.h"
-#include "../../common/arch35/vf/vf_flash_decode_arch35.h"
-#include "../../common/vector_common.h"
-#include "../../common/init_output.h"
-#endif
-
+#include "../memory_copy_arch35.h"
+#include "../utils/attn_sink_gs1.h"
 #include "../utils/attenmask_gs1.h"
-#include "memory_copy_arch92.h"
+#include "../../../common/op_kernel/arch_info.h"
 
 using namespace AscendC;
 using namespace FaVectorApi;
@@ -46,11 +35,11 @@ using namespace AscendC::Impl::Detail;
 using namespace regbaseutil;
 using namespace AttentionCommon;
 
-namespace BaseApi {
+namespace FlashAttnKernel {
 using ArchInfo::CV_RATIO;
 
 template <typename FA_T>
-class FANoQuantGqaBlockVecDn {
+class FANoQuantGqaBlockVecDnUnmerged {
 public:
     using INPUT_T = typename FA_T::inputType;
     using OUTPUT_T = typename FA_T::outputType;
@@ -65,7 +54,7 @@ public:
     static constexpr bool HAS_MASK = FA_T::hasMask;
 
     using T = float;
-    static constexpr uint32_t dTemplateAlign64 = Align64Func((uint16_t)FA_T::dVBaseSize);
+    static constexpr uint32_t dTemplateAlign64 = BaseApi::Align64Func((uint16_t)FA_T::dVBaseSize);
 
     // 核间同步ID
     static constexpr uint64_t CROSS_CORE_SYNC_MODE = 4;
@@ -134,7 +123,7 @@ public:
     LocalTensor<uint8_t> ubLseOutBuffers_;
     uint32_t lseOutUbBufId_ = 0;
 
-    using ConstInfoX = ConstInfo_t<FiaKernelType::NO_QUANT>;
+    using ConstInfoX = ConstInfo_t;
     const ConstInfoX& constInfo_;
 
     using SEQLEN_T = uint32_t;
@@ -152,14 +141,16 @@ public:
     GlobalTensor<float> accumOutGm_;
     GlobalTensor<float> softmaxFDSumGm_;
     GlobalTensor<float> softmaxFDMaxGm_;
+    GlobalTensor<float> sinkGm_;
 
     static constexpr T BOOL_ATTEN_MASK_SCALAR_VALUE = -1000000000000.0; // 用于mask为bool类型
     uint32_t negativeIntScalar_ = *((uint32_t*)&BOOL_ATTEN_MASK_SCALAR_VALUE);
     T negativeFloatScalar_;
 
     // ==================== Functions ======================
-    __aicore__ inline FANoQuantGqaBlockVecDn(ConstInfoX& constInfo, SeqLensTool<LAYOUT_T, SEQLEN_T>& qSeqLensTool,
-                                             SeqLensTool<LAYOUT_KV, SEQLEN_T>& kvSeqLensTool)
+    __aicore__ inline FANoQuantGqaBlockVecDnUnmerged(ConstInfoX& constInfo,
+                                                     SeqLensTool<LAYOUT_T, SEQLEN_T>& qSeqLensTool,
+                                                     SeqLensTool<LAYOUT_KV, SEQLEN_T>& kvSeqLensTool)
         : constInfo_(constInfo),
           qSeqLensTool_(qSeqLensTool),
           kvSeqLensTool_(kvSeqLensTool){};
@@ -181,6 +172,10 @@ public:
 
         if constexpr (HAS_MASK) {
             attenMaskGmInt_.SetGlobalBuffer((__gm__ uint8_t*)attenMask);
+        }
+
+        if (constInfo_.learnableSinkFlag) {
+            sinkGm_.SetGlobalBuffer((__gm__ float*)learnableSink);
         }
 
         if (constInfo_.enableFlashDecode) {
@@ -237,13 +232,42 @@ public:
                                                 SIZE_OF_MEMBER(UbLayout, lseOutBuffers));
     }
 
-    __aicore__ inline void ResetSoftmaxBuffer(uint32_t slotIdx)
+    __aicore__ inline void ResetSoftmaxBuffer(uint32_t slotIdx, const RunInfo& runInfo)
     {
+        if (runInfo.actVecMSize == 0) {
+            return;
+        }
         constexpr uint32_t softmaxBufElementCount = UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T);
         LocalTensor<T> sumUb = softmaxSumBuf_[slotIdx * softmaxBufElementCount];
         LocalTensor<T> maxUb = softmaxMaxBuf_[slotIdx * softmaxBufElementCount];
-        FaVectorApi::ResetSoftmaxBuffer<T, softmaxBufElementCount>(
-            sumUb, maxUb, static_cast<T>(0), static_cast<T>(-std::numeric_limits<float>::infinity()));
+        if (constInfo_.learnableSinkFlag && runInfo.isFirstFdBlock) {
+            // sink 参与归一分母: sum 初始化为 1, max 由 sink 值按 GS1 坐标展开写入
+            Duplicate<T>(sumUb, static_cast<T>(1), softmaxBufElementCount);
+
+            // 不合轴 DN: 每任务仅一个 query 头, sink 按 GS 线性坐标定位: g * S1 + s1
+            uint32_t gs1Start = runInfo.gIdx * runInfo.actS1Size + runInfo.s1Idx + runInfo.vecMbaseIdx;
+
+            Mutex::Lock<PIPE_MTE2>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
+            {
+                LocalTensor<float> sinkTmpUb =
+                    ubVec1ResBuffers_[vec1ResUbBufId_ * UB_VEC1_RES_BUF_BYTES].template ReinterpretCast<float>();
+                AttentionCommon::SinkCopyInGS1(sinkTmpUb, sinkGm_, gs1Start, runInfo.actVecMSize, runInfo.actS1Size,
+                                               runInfo.n2Idx, constInfo_.gSize);
+            }
+            Mutex::Unlock<PIPE_MTE2>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
+
+            Mutex::Lock<PIPE_V>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
+            {
+                LocalTensor<float> sinkTmpUb =
+                    ubVec1ResBuffers_[vec1ResUbBufId_ * UB_VEC1_RES_BUF_BYTES].template ReinterpretCast<float>();
+                AttentionCommon::SinkExpandMaxVf<T, float, true>(maxUb, sinkTmpUb, gs1Start, runInfo.actVecMSize,
+                                                                 runInfo.actS1Size, constInfo_.gSize);
+            }
+            Mutex::Unlock<PIPE_V>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
+        } else {
+            Duplicate<T>(sumUb, static_cast<T>(0), softmaxBufElementCount);
+            Duplicate<T>(maxUb, static_cast<T>(-std::numeric_limits<float>::infinity()), softmaxBufElementCount);
+        }
     }
 
     __aicore__ inline void InitCrossCoreSync()
@@ -262,7 +286,7 @@ public:
 
     __aicore__ inline void FreeEventID() {}
 
-    __aicore__ inline void ProcessVec1(RunInfoS1Only& runInfo)
+    __aicore__ inline void ProcessVec1(RunInfo& runInfo)
     {
         uint32_t mm1ResUbBufId = runInfo.loop % UB_MM1_RES_BUFCNT;
         uint32_t pL1BufId = runInfo.loop % L1_P_BUFCNT;
@@ -272,7 +296,7 @@ public:
         auto mm1ResUbTensor = ubMm1ResBuffers_[mm1ResUbBufId * UB_MM1_RES_BUF_BYTES].template ReinterpretCast<T>();
 
         if (unlikely(runInfo.isFirstS2Loop)) {
-            ResetSoftmaxBuffer(runInfo.mloop % UB_SOFTMAX_SUM_BUFCNT);
+            ResetSoftmaxBuffer(runInfo.mloop % UB_SOFTMAX_SUM_BUFCNT, runInfo);
         }
 
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(c1v1CrossCoreSyncIdx);
@@ -324,8 +348,7 @@ public:
         }
     }
 
-    __aicore__ inline void SoftmaxDataCopyOut(RunInfoS1Only& runInfo, LocalTensor<float>& sumUb,
-                                              LocalTensor<float>& maxUb)
+    __aicore__ inline void SoftmaxDataCopyOut(RunInfo& runInfo, LocalTensor<float>& sumUb, LocalTensor<float>& maxUb)
     {
         if (constInfo_.enableFlashDecode) {
             if (runInfo.isS2SplitCore) {
@@ -345,7 +368,7 @@ public:
     }
 
     __aicore__ inline void SoftmaxLseCopyOut(LocalTensor<float>& softmaxSumTmp, LocalTensor<float>& softmaxMaxTmp,
-                                             RunInfoS1Only& runInfo)
+                                             RunInfo& runInfo)
     {
         if (unlikely(runInfo.actVecMSize == 0)) {
             return;
@@ -378,7 +401,7 @@ public:
     }
 
     __aicore__ inline void ProcessVec1Dn(LocalTensor<INPUT_T>& pL1Tensor, LocalTensor<T>& mm1ResUbTensor,
-                                         RunInfoS1Only& runInfo)
+                                         RunInfo& runInfo)
     {
         if (unlikely(runInfo.actVecMSize == 0)) {
             return;
@@ -444,7 +467,7 @@ public:
         vec1ResUbBufId_ = (vec1ResUbBufId_ + 1U) % UB_VEC1_RES_BUFCNT;
     }
 
-    __aicore__ inline void Vec1PostProcess(RunInfoS1Only& runInfo)
+    __aicore__ inline void Vec1PostProcess(RunInfo& runInfo)
     {
         LocalTensor<T> sumUb =
             softmaxSumBuf_[(runInfo.mloop % UB_SOFTMAX_SUM_BUFCNT) * (UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T))];
@@ -456,7 +479,7 @@ public:
         }
     }
 
-    __aicore__ inline bool CalcBlockNeedRowInvalid(RunInfoS1Only& runInfo, int64_t s1FirstValidToken,
+    __aicore__ inline bool CalcBlockNeedRowInvalid(RunInfo& runInfo, int64_t s1FirstValidToken,
                                                    int64_t s1LastValidToken)
     {
         int32_t s1StartTdx = runInfo.s1Idx + runInfo.vecMbaseIdx;
@@ -467,7 +490,7 @@ public:
 
     template <typename VEC2_RES_T>
     __aicore__ inline void RowInvalid(LocalTensor<VEC2_RES_T>& ubVec2Res, int64_t mStartVec, int64_t mDealSize,
-                                      RunInfoS1Only& runInfo, int64_t dSizeAligned64)
+                                      RunInfo& runInfo, int64_t dSizeAligned64)
     {
         if constexpr (HAS_MASK) {
             int64_t s1FirstValidToken =
@@ -494,7 +517,7 @@ public:
         }
     }
 
-    __aicore__ inline void Bmm2DataCopyOutTrans(const RunInfoS1Only& info, LocalTensor<OUTPUT_T>& attenOutUb,
+    __aicore__ inline void Bmm2DataCopyOutTrans(const RunInfo& info, LocalTensor<OUTPUT_T>& attenOutUb,
                                                 uint32_t vecMIdx, uint32_t dealRowCount)
     {
         FaUbTensor<OUTPUT_T> ubTensor{.tensor = attenOutUb, .rowCount = dealRowCount, .colCount = dTemplateAlign64};
@@ -508,7 +531,7 @@ public:
         copyAttenOutUbToGm_(outGmTensor_, ubTensor, gmCoord);
     }
 
-    __aicore__ inline void BroadCastAndCopyOut(const RunInfoS1Only& runInfo, LocalTensor<float>& sumUb,
+    __aicore__ inline void BroadCastAndCopyOut(const RunInfo& runInfo, LocalTensor<float>& sumUb,
                                                LocalTensor<float>& maxUb, int64_t gmOffset, int64_t calculateSize)
     {
         LocalTensor<float> sumBrdcstBuf =
@@ -532,7 +555,7 @@ public:
         lseOutUbBufId_ = (lseOutUbBufId_ + 1U) % UB_LSE_OUT_BUFCNT;
     }
 
-    __aicore__ inline void ComputeLogSumExpAndCopyToGm(const RunInfoS1Only& runInfo, LocalTensor<float>& sumUb,
+    __aicore__ inline void ComputeLogSumExpAndCopyToGm(const RunInfo& runInfo, LocalTensor<float>& sumUb,
                                                        LocalTensor<float>& maxUb)
     {
         if (unlikely(runInfo.actVecMSize == 0)) {
@@ -544,8 +567,8 @@ public:
         BroadCastAndCopyOut(runInfo, sumUb, maxUb, gmOffset, calculateSize);
     }
 
-    __aicore__ inline void Bmm2ResForFDCopyOut(const RunInfoS1Only& runInfo, LocalTensor<T>& ubVec2Res,
-                                               uint32_t mStartVec, uint32_t mDealSize)
+    __aicore__ inline void Bmm2ResForFDCopyOut(const RunInfo& runInfo, LocalTensor<T>& ubVec2Res, uint32_t mStartVec,
+                                               uint32_t mDealSize)
     {
         int64_t dSizeAligned64 = (int64_t)dVBaseSize;
         uint64_t gmOffset = runInfo.faTmpOutWsPos * mBaseSize * constInfo_.dSizeV +
@@ -554,13 +577,13 @@ public:
         DataCopyExtParams dataCopyParams;
         dataCopyParams.blockCount = mDealSize;
         dataCopyParams.blockLen = constInfo_.dSizeV * sizeof(T);
-        dataCopyParams.srcStride = (dSizeAligned64 - constInfo_.dSizeV) / (FA_BYTE_BLOCK / sizeof(T));
+        dataCopyParams.srcStride = (dSizeAligned64 - constInfo_.dSizeV) / (BaseApi::FA_BYTE_BLOCK / sizeof(T));
         dataCopyParams.dstStride = 0;
 
         DataCopyPad(accumOutGm_[gmOffset], ubVec2Res, dataCopyParams);
     }
 
-    __aicore__ inline void ProcessVec2(RunInfoS1Only& runInfo)
+    __aicore__ inline void ProcessVec2(RunInfo& runInfo)
     {
         uint32_t mm2ResUbBufId = runInfo.loop % UB_MM2_RES_BUFCNT;
         uint32_t c2v2CrossCoreSyncIdx = CC_BMM2_0 + mm2ResUbBufId;
@@ -636,7 +659,7 @@ public:
     }
 
     __aicore__ inline void AttenMaskCopyInDn(LocalTensor<uint8_t> attenMaskUb, uint32_t vecMIdx, uint32_t mDealSize,
-                                             bool& isSkipMask, RunInfoS1Only& runInfo)
+                                             bool& isSkipMask, RunInfo& runInfo)
     {
         uint32_t s2RealSize = runInfo.actSingleLoopS2Size;
         MaskInfo<MaskFormat::S1_ONLY> maskInfo;
@@ -669,16 +692,17 @@ public:
 
 // AIC/AIV 分编译占位（Mix kernel 在 AIC 侧重编译时使用）
 template <typename FA_T>
-class FANoQuantGqaBlockVecDummyDn {
+class FANoQuantGqaBlockVecDummyDnUnmerged {
 public:
     static constexpr FA_LAYOUT LAYOUT_T = FA_T::qLayout;
     static constexpr FA_LAYOUT LAYOUT_KV = FA_T::kvLayout;
     using SEQLEN_T = uint32_t;
-    using ConstInfoX = ConstInfo_t<FiaKernelType::NO_QUANT>;
+    using ConstInfoX = ConstInfo_t;
 
-    __aicore__ inline FANoQuantGqaBlockVecDummyDn(ConstInfoX& constInfo, SeqLensTool<LAYOUT_T, SEQLEN_T>& qSeqLensTool,
-                                                  SeqLensTool<LAYOUT_KV, SEQLEN_T>& kvSeqLensTool){};
+    __aicore__ inline FANoQuantGqaBlockVecDummyDnUnmerged(ConstInfoX& constInfo,
+                                                          SeqLensTool<LAYOUT_T, SEQLEN_T>& qSeqLensTool,
+                                                          SeqLensTool<LAYOUT_KV, SEQLEN_T>& kvSeqLensTool){};
 };
 
-} // namespace BaseApi
-#endif // FLASH_ATTENTION_BLOCK_VEC_DN_H_
+} // namespace FlashAttnKernel
+#endif // FLASH_ATTN_BLOCK_VEC_DN_UNMERGED_ARCH92_H_

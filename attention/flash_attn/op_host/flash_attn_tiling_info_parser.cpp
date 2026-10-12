@@ -132,10 +132,6 @@ ge::graphStatus FaInfoParser::GetNpuInfo()
     uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
     OP_CHECK_IF(aicNum == 0 || aivNum == 0, OP_LOGE(opName_, "num of core obtained is 0."), return GRAPH_FAILED);
     npuArch_ = ascendcPlatform.GetCurNpuArch();
-    if (npuArch_ != NpuArch::DAV_3510) {
-        OP_LOGE(opName_, "NpuArch[%d] is not supported.", static_cast<int32_t>(npuArch_));
-        return GRAPH_FAILED;
-    }
 
     return ge::GRAPH_SUCCESS;
 }

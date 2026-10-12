@@ -27,7 +27,7 @@
 #include "../../../common/op_kernel/const_def.h"
 #include "../../../common/op_kernel/vector_common.h"
 #include "../../../common/op_kernel/init_output.h"
-#include "memory_copy_arch35.h"
+#include "../memory_copy_arch35.h"
 #include "../utils/attn_sink_gs1.h"
 #include "../../../common/op_kernel/arch_info.h"
 
@@ -723,7 +723,7 @@ public:
                                            RunInfo& runInfo)
     {
         const uint32_t bufIdx = runInfo.loop & (DB - 1);
-        MaskInfo maskInfo;
+        MaskInfo<MASK_LAYOUT> maskInfo;
         maskInfo.gs1StartIdx = runInfo.gS1Idx + runInfo.vecMbaseIdx + vecMIdx;
         maskInfo.gs1dealNum = mDealSize;
         maskInfo.s1Size = runInfo.actS1Size;
@@ -742,7 +742,6 @@ public:
         maskInfo.maskValue = negativeIntScalar_;
         maskInfo.s1LeftPaddingSize = 0;
         maskInfo.s2LeftPaddingSize = 0;
-        maskInfo.maskFormat = MASK_LAYOUT;
         maskInfo.attenMaskType = MASK_BOOL; // compatible with int8/uint8
 
         bool IsSkipMask = IsSkipAttentionmask(maskInfo);

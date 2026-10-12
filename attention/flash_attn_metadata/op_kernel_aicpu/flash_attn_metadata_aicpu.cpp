@@ -23,6 +23,7 @@
 #include "flash_attn_grad_metadata_split.h"
 #include "../../common/op_kernel/aicpu_common.h"
 #include "../../flash_attn/op_host/fa_adjust_sinner_souter.h"
+#include "../../flash_attn/op_host/arch92/fa_adjust_sinner_souter_arch92.h"
 
 constexpr uint32_t FA_KERNEL_STATUS_OK = 0;
 constexpr uint32_t FA_KERNEL_STATUS_PARAM_INVALID = 1;
@@ -233,16 +234,27 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
         qlayout = optiling::flash_attn::fa_tiling_util::LAYOUT_TND;
     }
     uint32_t gSize = static_cast<uint32_t>(numHeadsQ_ / numHeadsKv_);
-    optiling::flash_attn::fa_tiling_util::AdjustSinnerAndSouter(headDimV_, gSize, maxSeqlenQ_, maxSeqlenKv_, maskMode_,
-                                                                baseInfo.preToken, baseInfo.nextToken, qlayout,
-                                                                mBaseSize_, s2BaseSize_);
-    // 不合轴 DN(预埋): 路由开关打开时按 BN1_S1 分核(B轴*N1轴, M轴=纯S1); 判定逻辑与 host
-    // 侧 UpdateTilingKeyTemplateId 共享 fa_tiling_util::GetFlashAttnTemplateId, 保证 metadata
-    // 分核模式与 kernel 模板选择严格一致; 开关关闭时维持原 BN2_S1G 分核, 不影响现网行为。
-    bool dnUnmergedRouted = optiling::flash_attn::fa_tiling_util::DN_UNMERGED_ROUTE_ENABLED &&
-                            optiling::flash_attn::fa_tiling_util::GetFlashAttnTemplateId(
-                                static_cast<uint32_t>(headDim_), static_cast<uint32_t>(headDimV_)) ==
-                                optiling::flash_attn::fa_tiling_util::FA_TEMPLATE_DN_UNMERGED;
+    bool dnUnmergedRouted = false;
+    if (socVersion_.find("Ascend960") != std::string::npos) {
+        // arch92: 基本块按 vHeadDim 档位决定, 同步输出 templateId/mBaseSize/s2BaseSize
+        uint32_t templateId = 0;
+        optiling::flash_attn::fa_tiling_util::GetConfigInfo(static_cast<uint32_t>(headDimV_), maskMode_, maxSeqlenQ_,
+                                                            templateId, mBaseSize_, s2BaseSize_);
+        dnUnmergedRouted = templateId == optiling::flash_attn::fa_tiling_util::FA_TEMPLATE_DN_UNMERGED;
+        param.costFunc = nullptr;
+    } else {
+        optiling::flash_attn::fa_tiling_util::AdjustSinnerAndSouter(headDimV_, gSize, maxSeqlenQ_, maxSeqlenKv_,
+                                                                    maskMode_, baseInfo.preToken, baseInfo.nextToken,
+                                                                    qlayout, mBaseSize_, s2BaseSize_);
+        // 不合轴 DN(预埋): 路由开关打开时按 BN1_S1 分核(B轴*N1轴, M轴=纯S1); 判定逻辑与 host
+        // 侧 UpdateTilingKeyTemplateId 共享 fa_tiling_util::GetFlashAttnTemplateId, 保证 metadata
+        // 分核模式与 kernel 模板选择严格一致; 开关关闭时维持原 BN2_S1G 分核, 不影响现网行为。
+        dnUnmergedRouted = optiling::flash_attn::fa_tiling_util::DN_UNMERGED_ROUTE_ENABLED &&
+                           optiling::flash_attn::fa_tiling_util::GetFlashAttnTemplateId(
+                               static_cast<uint32_t>(headDim_), static_cast<uint32_t>(headDimV_)) ==
+                               optiling::flash_attn::fa_tiling_util::FA_TEMPLATE_DN_UNMERGED;
+        param.costFunc = FlashAttnMetadataCpuKernel::CostFunc;
+    }
     mBaseSize_ *= (aivCoreNum_ / aicCoreNum_);
     param.mBaseSize = mBaseSize_;
     param.s2BaseSize = s2BaseSize_;
@@ -250,7 +262,6 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
     param.fdTolerance = 10;             // 10: tolerance block
     param.fdLeastBlock = 3;             // 3: least block
     param.fdOn = true;
-    param.costFunc = FlashAttnMetadataCpuKernel::CostFunc;
     param.kernelSplitMode =
         dnUnmergedRouted ? load_balance::KernelSplitMode::BN1_S1_S2 : load_balance::KernelSplitMode::BN2_S1G_S2;
 }

@@ -8,23 +8,20 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-
 /*!
-* \file flash_attn_def.cpp
-* \brief FlashAttn算子定义（训练推理归一，仅非量化）
-*        输入数据类型仅支持FLOAT16和BFLOAT16。
-*/
-
+ * \file flash_attn_def.cpp
+ * \brief FlashAttn算子定义（训练推理归一，仅非量化）
+ *        输入数据类型仅支持FLOAT16和BFLOAT16。
+ */
 
 #include "register/op_def_registry.h"
 
-
 namespace ops {
-
 
 class FlashAttn : public OpDef {
 public:
-    explicit FlashAttn(const char *name) : OpDef(name)
+    explicit FlashAttn(const char* name)
+        : OpDef(name)
     {
         this->Input("q")
             .ParamType(REQUIRED)
@@ -95,37 +92,16 @@ public:
             .DataTypeList({ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
-        this->Attr("softmax_scale")
-            .AttrType(OPTIONAL)
-            .Float(0.0f);
-        this->Attr("mask_mode")
-            .AttrType(OPTIONAL)
-            .Int(0);
-        this->Attr("win_left")
-            .AttrType(OPTIONAL)
-            .Int(-1);
-        this->Attr("win_right")
-            .AttrType(OPTIONAL)
-            .Int(-1);
-        this->Attr("max_seqlen_q")
-            .AttrType(OPTIONAL)
-            .Int(-1);
-        this->Attr("max_seqlen_kv")
-            .AttrType(OPTIONAL)
-            .Int(-1);
-        this->Attr("layout_q")
-            .AttrType(OPTIONAL)
-            .String("BSND");
-        this->Attr("layout_kv")
-            .AttrType(OPTIONAL)
-            .String("BSND");
-        this->Attr("layout_out")
-            .AttrType(OPTIONAL)
-            .String("BSND");
-        this->Attr("return_softmax_lse")
-            .AttrType(OPTIONAL)
-            .Int(0);
-
+        this->Attr("softmax_scale").AttrType(OPTIONAL).Float(0.0f);
+        this->Attr("mask_mode").AttrType(OPTIONAL).Int(0);
+        this->Attr("win_left").AttrType(OPTIONAL).Int(-1);
+        this->Attr("win_right").AttrType(OPTIONAL).Int(-1);
+        this->Attr("max_seqlen_q").AttrType(OPTIONAL).Int(-1);
+        this->Attr("max_seqlen_kv").AttrType(OPTIONAL).Int(-1);
+        this->Attr("layout_q").AttrType(OPTIONAL).String("BSND");
+        this->Attr("layout_kv").AttrType(OPTIONAL).String("BSND");
+        this->Attr("layout_out").AttrType(OPTIONAL).String("BSND");
+        this->Attr("return_softmax_lse").AttrType(OPTIONAL).Int(0);
 
         OpAICoreConfig aicore_config_95;
         aicore_config_95.DynamicCompileStaticFlag(true)
@@ -138,13 +114,11 @@ public:
             .ExtendCfgInfo("coreType.value", "AiCore")
             .ExtendCfgInfo("opFile.value", "flash_attn");
 
-
         this->AICore().AddConfig("ascend950", aicore_config_95);
+        this->AICore().AddConfig("ascend960dt", aicore_config_95);
     }
 };
 
-
 OP_ADD(FlashAttn);
 
-
-}  // namespace ops
+} // namespace ops

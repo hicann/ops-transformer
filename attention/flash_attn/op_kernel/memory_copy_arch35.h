@@ -8,15 +8,15 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef MEMORY_COPY_ARCH92_H
-#define MEMORY_COPY_ARCH92_H
+#ifndef MEMORY_COPY_ARCH35_H
+#define MEMORY_COPY_ARCH35_H
 
 #include "adv_api/activation/softmax.h"
-#if __has_include("../../../common/op_kernel/vector_common.h")
-#include "../../../common/op_kernel/vector_common.h"
-#include "../../../common/op_kernel/memcopy/fa_gm_tensor.h"
-#include "../../../common/op_kernel/memcopy/attn_copy_gm_to_l1.h"
-#include "../../../common/op_kernel/memcopy/copy_ub_to_gm.h"
+#if __has_include("../../common/op_kernel/vector_common.h")
+#include "../../common/op_kernel/vector_common.h"
+#include "../../common/op_kernel/memcopy/fa_gm_tensor.h"
+#include "../../common/op_kernel/memcopy/attn_copy_gm_to_l1.h"
+#include "../../common/op_kernel/memcopy/copy_ub_to_gm.h"
 #else
 #include "../../common/vector_common.h"
 #include "../../common/memcopy/fa_gm_tensor.h"
@@ -142,6 +142,27 @@ __aicore__ inline void DataCopySoftmaxLseTNDtoNTArch35(GlobalTensor<float> softm
         startGIdx = 0;
         ubOffset += curDealRowCount * AttentionCommon::FP32_BLOCK_ELEMENT_NUM;
     }
+}
+
+// DN 不合轴: 每个任务只属于一个 query 头, LSE 输出按 (b, n1, s1) 定位, 不存在跨 G 行
+template <FA_LAYOUT LAYOUT_T, typename CONST_INFO_T, typename SEQ_TOOL>
+__aicore__ inline void DataCopySoftmaxLseS1Only(GlobalTensor<float> softmaxLseGm, LocalTensor<float> lseSrc, uint32_t b,
+                                                uint32_t n2, uint32_t g, uint32_t s1, uint32_t rows,
+                                                const CONST_INFO_T& info, SEQ_TOOL& seq)
+{
+    uint64_t head = static_cast<uint64_t>(n2) * info.gSize + g;
+    uint64_t offset;
+    if constexpr (LAYOUT_T == FA_LAYOUT::TND) {
+        offset = head * info.t1Size + seq.cuSeqLensParser.GetTBase(b) + s1;
+    } else {
+        offset = (static_cast<uint64_t>(b) * info.n2Size * info.gSize + head) * info.s1Size + s1;
+    }
+    DataCopyExtParams dataCopyParams;
+    dataCopyParams.blockCount = rows;
+    dataCopyParams.blockLen = sizeof(float);
+    dataCopyParams.srcStride = 0;
+    dataCopyParams.dstStride = 0;
+    DataCopyPad(softmaxLseGm[offset], lseSrc, dataCopyParams);
 }
 
 // ----------------------------------------------Copy LSE UB To Gm arch35 (S1_ONLY)--------------------------------

@@ -23,7 +23,7 @@
 #include <graph/utils/type_utils.h>
 #include "log/log.h"
 #include "../flash_attn_tiling_utils.h"
-#include "../../op_kernel/arch35/flash_attn_template_tiling_key.h"
+#include "../../op_kernel/flash_attn_template_tiling_key.h"
 #include "../../../common/op_host/fia_tiling_templates_registry.h"
 
 using namespace ge;

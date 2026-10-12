@@ -16,7 +16,7 @@
 #define FLASH_ATTN_TYPE_H_
 
 #include "flash_attn_common_def.h"
-#include "../arch35/memory_copy_arch35.h"
+#include "../memory_copy_arch35.h"
 #include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
 
 using namespace AscendC;
@@ -101,7 +101,8 @@ template <typename INPUT_T, typename OUTPUT_T, bool PAGE_ATTENTION, FA_LAYOUT LA
           regbaseutil::S2TemplateType s2TemplateType = regbaseutil::S2TemplateType::Aligned128,
           regbaseutil::DTemplateType dTemplateType = regbaseutil::DTemplateType::Aligned128,
           regbaseutil::DTemplateType dVTemplateType = regbaseutil::DTemplateType::Aligned128, bool HAS_MASK = false,
-          typename... Args>
+          uint32_t ubMm1ResBufcnt = 0, uint32_t ubMm2ResBufcnt = 0, uint32_t ubVec1ResBufcnt = 0,
+          uint32_t ubMaskBufcnt = 0, uint32_t l1PBufcnt = 0, uint32_t l1QBufcnt = 0, uint32_t l1KvBufcnt = 0>
 struct FAType {
     using inputType = INPUT_T;
     using outputType = OUTPUT_T;
@@ -114,6 +115,14 @@ struct FAType {
     static constexpr regbaseutil::DTemplateType dBaseSize = dTemplateType;
     static constexpr regbaseutil::DTemplateType dVBaseSize = dVTemplateType;
     static constexpr bool hasMask = HAS_MASK;
+    // buffer 档位: 由入口按 config 从 ConfigValue/ConfigValueArch92 填充; arch35 block 不读取, 保持默认 0
+    static constexpr uint32_t UB_MM1_RES_BUFCNT = ubMm1ResBufcnt;
+    static constexpr uint32_t UB_MM2_RES_BUFCNT = ubMm2ResBufcnt;
+    static constexpr uint32_t UB_VEC1_RES_BUFCNT = ubVec1ResBufcnt;
+    static constexpr uint32_t UB_MASK_BUFCNT = ubMaskBufcnt;
+    static constexpr uint32_t L1_P_BUFCNT = l1PBufcnt;
+    static constexpr uint32_t L1_Q_BUFCNT = l1QBufcnt;
+    static constexpr uint32_t L1_KV_BUFCNT = l1KvBufcnt;
 };
 
 template <FA_LAYOUT LAYOUT_T, typename SEQLEN_T>
