@@ -2823,13 +2823,7 @@ def preload_attn_mask(run_info, const_info, tensor_info):
         return
     real_s1 = run_info.inner_s1_real_size[run_info.s1_idx]
     first_half_s1 = ceil(real_s1, QUANT_S1_BASE_COUNT) * QUANT_S1_BASE_COUNT // 2
-    current_real_s1 = (
-        first_half_s1 if const_info.sub_id == 0 else real_s1 - first_half_s1
-    )
-    if layout == 2:
-        current_real_s1 = min(
-            current_real_s1, real_s1 - const_info.sub_id * first_half_s1
-        )
+    current_real_s1 = min(first_half_s1, real_s1 - const_info.sub_id * first_half_s1)
     if current_real_s1 <= 0:
         return
 
@@ -2846,13 +2840,7 @@ def iterate_p_ds(p_l1_bit8, ds_l1_bit8, sdp_id, const_info, run_info, tensor_inf
     real_s1 = run_info.inner_s1_real_size[run_info.s1_idx]
     real_s2 = run_info.inner_s2_real_size[run_info.s2_idx]
     first_half_s1 = ceil(real_s1, QUANT_S1_BASE_COUNT) * QUANT_S1_BASE_COUNT // 2
-    current_real_s1 = (
-        first_half_s1 if const_info.sub_id == 0 else real_s1 - first_half_s1
-    )
-    if layout == 2:
-        current_real_s1 = min(
-            current_real_s1, real_s1 - const_info.sub_id * first_half_s1
-        )
+    current_real_s1 = min(first_half_s1, real_s1 - const_info.sub_id * first_half_s1)
     current_real_s2 = ceil(real_s2, QUANT_S2_BASE_COUNT) * QUANT_S2_BASE_COUNT
 
     lse_vec = tensor_info.lse_vec.next()
