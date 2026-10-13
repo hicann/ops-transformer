@@ -43,11 +43,9 @@
 
     其中的Reduce计算是将来自不同rank的数据进行reduce计算。
 
-    - 情形1：如果x数据类型为float8_e4m3fn、float8_e5m2、int8和hifloat8时，入参scale为float32且shape为(1)时，先进行reduce_scatter通信，然后进行pertensor反量化，得到bfloat16、float16或者float32数据类型的输出。
+    - 情形1：如果x数据类型为float8_e4m3fn、float8_e5m2、int8和hifloat8时，入参scale为float32且shape维度与x相同时，先进行reduce_scatter通信，然后进行pertoken-pergroup反量化，得到bfloat16、float16或者float32数据类型的输出。
 
-    - 情形2：如果x数据类型为float8_e4m3fn、float8_e5m2、int8和hifloat8时，入参scale为float32且shape维度与x相同时，先进行reduce_scatter通信，然后进行pertoken-pergroup反量化，得到bfloat16、float16或者float32数据类型的输出。
-
-    - 情形3：如果x数据类型为float8_e4m3fn、float8_e5m2时，入参scales为float8_e8m0时，先进行reduce_scatter通信，然后进行MX反量化，得到bfloat16、float16或者float32数据类型的输出。
+    - 情形2：如果x数据类型为float8_e4m3fn、float8_e5m2时，入参scales为float8_e8m0时，先进行reduce_scatter通信，然后进行MX反量化，得到bfloat16、float16或者float32数据类型的输出。
 
 ## 函数原型
 
@@ -123,7 +121,7 @@ cann_ops_transformer.ops.quant_reduce_scatter(
     </tr></thead>
     <tbody>
     <tr>
-        <td>pertensor量化<br>pertoken-pergroup量化</td>
+        <td>pertoken-pergroup量化</td>
         <td>hifloat8、int8、float8_e4m3fn、float8_e5m2</td>
         <td>float32</td>
         <td>float16、bfloat16、float32</td>
@@ -150,11 +148,6 @@ cann_ops_transformer.ops.quant_reduce_scatter(
         <th>scales</th>
     </tr></thead>
     <tbody>
-    <tr>
-        <td>pertensor量化</td>
-        <td>2维tensor，shape为(bs, h)<br>3维tensor，shape为(b, s, h)</td>
-        <td>1维tensor，shape为(1)</td>
-    </tr>
     <tr>
         <td>pertoken-pergroup量化</td>
         <td>2维tensor，shape为(bs, h)</td>
