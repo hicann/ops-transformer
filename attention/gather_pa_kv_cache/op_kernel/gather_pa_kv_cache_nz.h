@@ -53,7 +53,7 @@ private:
     AscendC::GlobalTensor<T> outKeyGM;
     AscendC::GlobalTensor<T> outValueGM;
 
-    AscendC::TBuf<AscendC::QuePosition::VECCALC> locateInfoBuf;
+    AscendC::TBuf<AscendC::QuePosition::VECIN> locateInfoBuf;
     AscendC::TBuf<AscendC::QuePosition::VECCALC> tmpBuf;
 
     AscendC::LocalTensor<int32_t> contextLenTensor;
@@ -101,11 +101,12 @@ __aicore__ inline void GatherPaKvCacheNz<T>::Init(GM_ADDR keyCacheInGm, GM_ADDR 
     this->pipe->InitBuffer(this->locateInfoBuf, UB_LOCATE_INFO_SIZE); // 40kb, save context len and block table
     this->pipe->InitBuffer(this->tmpBuf, UB_TMP_BUF_SIZE);            // ensure the size of one token less than 148kb
 
-    // max number of context len per copy
+    // Reserve two alignment blocks for the cumsum endpoint and both tensors' padding.
     this->maxNumTokens =
         (UB_LOCATE_INFO_SIZE - BUF_NUM_LOCATE_INFO * BLOCK_SIZE) / sizeof(int32_t) / (this->numblkTabCol + 1);
 
-    int32_t maxBlkNumTokensRnd = (this->maxNumTokens * sizeof(int32_t) - 1) / BLOCK_SIZE + 1;
+    int32_t maxContextLen = this->maxNumTokens + (this->isSeqLensCumsum ? 1 : 0);
+    int32_t maxBlkNumTokensRnd = (maxContextLen * sizeof(int32_t) - 1) / BLOCK_SIZE + 1;
     int32_t maxNumTokensRnd = maxBlkNumTokensRnd * BLOCK_SIZE / sizeof(int32_t);
 
     AscendC::LocalTensor<int32_t> locateInfoTensor = locateInfoBuf.Get<int32_t>();
@@ -123,15 +124,16 @@ __aicore__ inline void GatherPaKvCacheNz<T>::CopyLocateInfoIn(int32_t tokenId)
         copyNum = this->maxNumTokens;
     }
 
-    uint16_t ctxtLenBlkNum = (copyNum * sizeof(int32_t) - 1) / BLOCK_SIZE + 1;                     // block number
-    uint16_t blkTabBlkNum = (copyNum * this->numblkTabCol * sizeof(int32_t) - 1) / BLOCK_SIZE + 1; // block number
+    uint32_t ctxtLenBytes = (copyNum + (this->isSeqLensCumsum ? 1 : 0)) * sizeof(int32_t);
+    uint32_t blkTabBytes = copyNum * this->numblkTabCol * sizeof(int32_t);
+    AscendC::DataCopyExtParams ctxtLenCopyParams = {1, ctxtLenBytes, 0, 0, 0};
+    AscendC::DataCopyExtParams blkTabCopyParams = {1, blkTabBytes, 0, 0, 0};
+    AscendC::DataCopyPadExtParams<int32_t> padParams = {false, 0, 0, 0};
 
-    AscendC::DataCopyParams ctxtLenCopyParams = {1, ctxtLenBlkNum, 0, 0};
-    AscendC::DataCopyParams blkTabCopyParams = {1, blkTabBlkNum, 0, 0};
-
-    DataCopy(this->contextLenTensor, this->inContextLenGM[static_cast<uint64_t>(tokenId)], ctxtLenCopyParams);
-    DataCopy(this->blockTableTensor, this->inBlockTableGM[static_cast<uint64_t>(tokenId * this->numblkTabCol)],
-             blkTabCopyParams);
+    DataCopyPad(this->contextLenTensor, this->inContextLenGM[static_cast<uint64_t>(tokenId)], ctxtLenCopyParams,
+                padParams);
+    DataCopyPad(this->blockTableTensor, this->inBlockTableGM[static_cast<uint64_t>(tokenId) * this->numblkTabCol],
+                blkTabCopyParams, padParams);
     AscendC::PipeBarrier<PIPE_ALL>();
 }
 
@@ -190,8 +192,6 @@ __aicore__ inline void GatherPaKvCacheNz<T>::Process()
 
     int32_t numRsltProc = 0;
     int32_t ctxtStart = 0;
-    if (this->isSeqLensCumsum)
-        ctxtStart = this->contextLenTensor.GetValue(0);
 
     for (int32_t tokenId = 0; tokenId < this->numTokens; tokenId++) {
         int32_t localtokenId = tokenId % this->maxNumTokens;
@@ -199,6 +199,9 @@ __aicore__ inline void GatherPaKvCacheNz<T>::Process()
         // copy partial block table in ub when local data is used up
         if (localtokenId == 0) {
             CopyLocateInfoIn(tokenId);
+            if (this->isSeqLensCumsum) {
+                ctxtStart = this->contextLenTensor.GetValue(0);
+            }
         }
 
         // get the context len of current token
