@@ -109,10 +109,11 @@ public:
         this->Attr("norm_eps").AttrType(OPTIONAL).Float(1e-6f);
         this->Attr("mrope_section").AttrType(OPTIONAL).ListInt({});
 
-        // 仅支持 Ascend 950（DAV_3510, arch35）
+        // 仅支持 RegBase 平台 Ascend 950/350（DAV_3510, arch35）
         OpAICoreConfig regbaseCfg;
         regbaseCfg.DynamicCompileStaticFlag(true).DynamicShapeSupportFlag(true).DynamicRankSupportFlag(true);
         this->AICore().AddConfig("ascend950", regbaseCfg);
+        this->AICore().AddConfig("ascend350", regbaseCfg);
     }
 };
 
