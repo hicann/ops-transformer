@@ -12,6 +12,7 @@
 #include "test_allto_all_matmul_v2_api_ut_param.h"
 #include "op_api_ut_common/tensor_desc.h"
 #include "op_api_ut_common/op_api_ut.h"
+#include "opdev/op_dfx.h"
 #include "opdev/platform.h"
 
 using namespace op;
@@ -32,10 +33,42 @@ extern "C" aclnnStatus AlltoAllMatmulV2(void* workspace, uint64_t workspaceSize,
 
 namespace AlltoAllMatmulV2UT {
 
+namespace {
+// NnopbaseGetExecutor 在进程内已有算子注册过二进制元数据后，会要求当前算子同样完成注册，
+// 否则 executor 构建返回空并使 aclnnInner 段错误码退化为 ACLNN_ERR_PARAM_NULLPTR。
+// 全量 UT 链接多个算子时（如 SparseFlashAttentionGrad 先行注册），AlltoAllMatmulV2
+// 未注册会受全局状态影响；此处注册占位资源，保证本算子用例不依赖执行顺序。
+void RegisterOpapiUtResource()
+{
+    static const char opDesc[] = R"({
+        "binList": [{
+            "simplifiedKey": ["AlltoAllMatmulV2/d=0,p=0/1,2"],
+            "binInfo": {"jsonFilePath": "allto_all_matmul_v2_opapi_ut.json"}
+        }]
+    })";
+    static const char binDesc[] = R"({
+        "coreType": "AiCore",
+        "filePath": "allto_all_matmul_v2_opapi_ut.json",
+        "supportInfo": {"simplifiedKey": ["AlltoAllMatmulV2/d=0,p=0/1,2"]}
+    })";
+    // Never launched: these tests only exercise GetWorkspaceSize with runtime stubs.
+    static const uint8_t binary[] = {0};
+    const auto* opDescBegin = reinterpret_cast<const uint8_t*>(opDesc);
+    const auto* binDescBegin = reinterpret_cast<const uint8_t*>(binDesc);
+    const op::OP_BINARY_RES binaryResource = {{opDescBegin, opDescBegin + sizeof(opDesc) - 1},
+                                              {binDescBegin, binDescBegin + sizeof(binDesc) - 1},
+                                              {binary, binary + sizeof(binary)}};
+    const op::OP_RESOURCES resources = {
+        {"AlltoAllMatmulV2", {op::OP_HOST_FUNC_HANDLE{}, binaryResource, op::OP_RUNTIME_KB_RES{}}}};
+    op::GenOpTypeId("AlltoAllMatmulV2", resources);
+}
+} // namespace
+
 class AclnnAlltoAllMatmulV2Test : public testing::TestWithParam<AlltoAllMatmulV2ApiUtParam> {
 protected:
     static void SetUpTestCase()
     {
+        RegisterOpapiUtResource();
         std::cout << "AlltoAllMatmulV2 AclnnAlltoAllMatmulV2Test SetUp" << std::endl;
     }
 

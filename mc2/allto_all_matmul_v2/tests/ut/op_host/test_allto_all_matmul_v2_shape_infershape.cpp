@@ -14,20 +14,20 @@
 
 namespace AlltoAllMatmulV2UT {
 
-class InferShapeTest : public testing::TestWithParam<AlltoAllMatmulV2InferShapeUtParam> {
+class InferShapeTestV2 : public testing::TestWithParam<AlltoAllMatmulV2InferShapeUtParam> {
 protected:
     static void SetUpTestCase()
     {
-        std::cout << "AlltoAllMatmulV2 InferShapeTest SetUp" << std::endl;
+        std::cout << "AlltoAllMatmulV2 InferShapeTestV2 SetUp" << std::endl;
     }
 
     static void TearDownTestCase()
     {
-        std::cout << "AlltoAllMatmulV2 InferShapeTest TearDown" << std::endl;
+        std::cout << "AlltoAllMatmulV2 InferShapeTestV2 TearDown" << std::endl;
     }
 };
 
-TEST_P(InferShapeTest, param)
+TEST_P(InferShapeTestV2, param)
 {
     auto param = GetParam();
     std::vector<gert::InfershapeContextPara::TensorDescription> inputTensorDesc;
@@ -71,7 +71,7 @@ TEST_P(InferShapeTest, param)
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    AlltoAllMatmulV2, InferShapeTest,
+    AlltoAllMatmulV2, InferShapeTestV2,
     testing::ValuesIn(GetCasesFromCsv<AlltoAllMatmulV2InferShapeUtParam>(ReplaceFileExtension2Csv(__FILE__))),
     PrintCaseInfoString<AlltoAllMatmulV2InferShapeUtParam>);
 
