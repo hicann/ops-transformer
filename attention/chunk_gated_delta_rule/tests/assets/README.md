@@ -153,7 +153,7 @@ python3 -m ttk aclnn \
   -o $OUT
 ```
 
-仅准备 input（replay 时再现算 golden）：
+仅准备 input（replay 时重算 golden）：
 
 ```bash
 python3 -m ttk e2e \

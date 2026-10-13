@@ -140,7 +140,7 @@
 | kv_input_layout | 输入 | key的数据排布格式。指示输入张量在内存中的具体排布。当前仅支持"TND"、"BNSD"，且需与q_input_layout保持一致。 | String | - |
 | num_key_value_heads | 输入 | key的注意力头数，即公式中key张量的多头数N。当前仅支持MHA，必须与query的head数保持一致。 | Int | - |
 | scale_value | 输入 | 缩放系数，即公式中的`scale`。用于注意力分数的归一化处理，一般设置为1 / sqrt(D)。 | Float | - |
-| sparsity | 输入 | 稀疏度保留比例，即公式中的`sparsity`。指定公式中attn_score中需要保留的块位置占全部块位置的比例。取值范围(0.0, 1.0)。 | Float | - |
+| sparsity | 输入 | 稀疏度保留比例，即公式中的`sparsity`。指定attn_score中需要保留的块位置占全部块位置的比例。取值范围(0.0, 1.0)。 | Float | - |
 | block_sparse_mask_out | 输出 | 块状稀疏掩码输出，即公式中的`blockSparseMaskOut`。表示根据Q/K内容自适应生成的稀疏pattern，可直接作为BSA算子的blockSparseMask输入。shape随post_block_shape变化：post_block_shape非null时为[B, N, postXBlocks, postYBlocks]（粗粒度），postXBlocks = ceilDiv(Xblocks, postBlockShapeX)，postYBlocks = ceilDiv(Yblocks, postBlockShapeY)；post_block_shape为null时为[B, N, Xblocks, Yblocks]（细粒度）。值为1表示该block参与注意力计算，值为0表示不参与。 | INT8 | ND |
 
 ## 约束说明

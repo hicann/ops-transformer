@@ -63,7 +63,7 @@
     - --experimental（可选）：表示编译experimental贡献目录下的算子，${experimental_op}为新贡献算子目录名。
     - --opkernel_aicpu（可选）：开启ENABLE_AICPU_KERNEL，编译kernel_aicpu。
 
-    > **说明**：编译纯AICPU算子（仅含op_kernel_aicpu目录的算子）时，必须添加--opkernel_aicpu选项，否则会报"OpFileNotExistsError: File aic-*-ops-info.ini does not exist"错误，详见下方FAQ章节。
+    > **说明**：编译纯AI CPU算子（仅含op_kernel_aicpu目录的算子）时，必须添加--opkernel_aicpu选项，否则会报"OpFileNotExistsError: File aic-*-ops-info.ini does not exist"错误，详见下方FAQ章节。
 
     若\$\{vendor\_name\}和\$\{op\_list\}都不传入编译的是ops-transformer包；若编译所有算子的自定义算子包，需传入\$\{vendor\_name\}。当提示如下信息，说明编译成功。
 
@@ -298,7 +298,7 @@ ERROR: No matching distribution found for setuptools>=40.8.0
 
 ### 单独编译aicpu算子报错
 
-单独编译纯AICPU算子（仅含op_kernel_aicpu目录的算子）时，若未添加--opkernel_aicpu选项，会出现如下报错：
+单独编译纯AI CPU算子（仅含op_kernel_aicpu目录的算子）时，若未添加--opkernel_aicpu选项，会出现如下报错：
 
 ```bash
 OpFileNotExistsError: File aic-*-ops-info.ini does not exist in directory [...]

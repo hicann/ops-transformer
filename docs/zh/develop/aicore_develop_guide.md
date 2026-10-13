@@ -226,7 +226,7 @@ TilingKey是一个算子内为了区分不同的实现而将kernel代码进行�
 
 如需查看详细实现，请参考[add_example_tiling_key.h](../../../examples/add_example/op_kernel/add_example_tiling_key.h)。
 
-> **说明：** 如需实现复杂参数组合完成分支选择（涉及多TilingKey场景），请参考[《Ascend C算子开发接口》](https://hiascend.com/document/redirect/CannCommunityAscendCApi)中“Utils API > Tiling模版编程 > 模版参数含义”。
+> **说明：** 如需实现复杂参数组合完成分支选择（涉及多TilingKey场景），请参考[《Ascend C算子开发接口》](https://hiascend.com/document/redirect/CannCommunityAscendCApi)中“Utils API > Tiling模板编程 > 模板参数含义”。
 
 ```CPP
 // ${op_name}_tiling_key.h

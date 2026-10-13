@@ -334,7 +334,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✗</td>
     <td>AI Core</td>
-    <td>SparselightningIndexerGradKlLoss算子是LightningIndexer的反向算子，再额外融合了Loss计算功能输出。</td>
+    <td>SparselightningIndexerGradKlLoss算子是LightningIndexer的反向算子，再额外融合了Loss计算功能。</td>
   </tr>
   <tr>
     <td>attention</td>
@@ -344,7 +344,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>AI Core</td>
-    <td>大模型推理动态稀疏注意力机制的前置评分模块，为block-sparse-attention的前置评分模块。</td>
+    <td>大模型推理动态稀疏注意力机制的前置评分模块，为block-sparse-attention提供前置评分。</td>
   </tr>
   <tr>
     <td>attention</td>
@@ -1254,7 +1254,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>AI Core</td>
-    <td>基于用Sinkhorn-Knopp迭代算法将超连接的混合矩阵投影到双随机矩阵流形，以此稳定深度网络信号传播、解决梯度消失/爆炸问题。</td>
+    <td>使用Sinkhorn-Knopp迭代算法将超连接的混合矩阵投影到双随机矩阵流形，以此稳定深度网络信号传播、解决梯度消失/爆炸问题。</td>
   </tr>
   <tr>
     <td>mhc</td>

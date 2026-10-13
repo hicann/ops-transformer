@@ -24,7 +24,7 @@ x = combineOut + residualX\\
 y = \frac{x}{RMS(x)} * gamma,\quad\text{where}RMS(x) = \sqrt{\frac{1}{H}\sum_{i=1}^{H}x_{i}^{2}+normEps}
 $$
 
-注意该接口必须与aclnnMoeDistributeDispatchV2配套使用，相当于按MoeDistributeDispatchV2算子收集数据的路径原路返还。
+注意该接口必须与aclnnMoeDistributeDispatchV2配套使用，相当于按MoeDistributeDispatchV2算子收集数据的路径原路返回。
 
 ## 参数说明
 
@@ -54,7 +54,7 @@ $$
 <tr>
 <td>expandX</td>
 <td>输入</td>
-<td>根据expertIds进行扩展过的token特征。</td>
+<td>根据expertIds扩展过的token特征。</td>
 <td>要求为2D Tensor，shape为(A , H)。</td>
 <td>BFLOAT16</td>
 <td>ND</td>

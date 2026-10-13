@@ -8,7 +8,7 @@
 
 ## 使用说明
 
-目前大部分算子API都是支持ND数据格式的。例如aclnnAdd接口，均标明支持的数据格式是ND（即多维Tensor的，低维度优先连续排布的规则）。对于aclnnConvolution，其属于CNN类API，要求输入的aclTensor设置具有业务语义的格式，而不是ND格式。此类算子，在计算过程中需要知道Tensor中的业务语义才可以进行对应的计算。例如2D卷积中，需要知道Batch维度、Channel维度、Height维度、Width维度与Tensor维度的对应关系是什么。
+目前大部分算子API都是支持ND数据格式的。例如aclnnAdd接口，均标明支持的数据格式是ND（即多维Tensor低维度优先连续排布的规则）。对于aclnnConvolution，其属于CNN类API，要求输入的aclTensor设置具有业务语义的格式，而不是ND格式。此类算子，在计算过程中需要知道Tensor中的业务语义才可以进行对应的计算。例如2D卷积中，需要知道Batch维度、Channel维度、Height维度、Width维度与Tensor维度的对应关系是什么。
 
 >**说明：**
 >

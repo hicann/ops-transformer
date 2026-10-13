@@ -237,7 +237,7 @@ aclnnStatus aclnnBlitzSparseAttention(
         <td>输出的量化因子。</td>
         <td><ul><li>支持per-tensor，per-channel。 </li></ul>
             <ul><li>不使用该功能时可传入nullptr。</li></ul></td>
-        <td>UINT64、FLOAT32</td>
+        <td>FLOAT32、BFLOAT16</td>
         <td>ND</td>
         <td>1</td>
         <td>-</td>
@@ -248,7 +248,7 @@ aclnnStatus aclnnBlitzSparseAttention(
         <td>输出的量化偏移。</td>
         <td><ul><li>支持per-tensor，per-channel。 </li></ul>
             <ul><li>不使用该功能时可传入nullptr。</li></ul></td>
-        <td>FLOAT32</td>
+        <td>FLOAT32、BFLOAT16</td>
         <td>ND</td>
         <td>1</td>
         <td>-</td>
@@ -455,7 +455,7 @@ aclnnStatus aclnnBlitzSparseAttention(
 
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
 
-- 入参为空的处理：算子内部需要判断参数query是否为空，如果是空则直接返回。参数query不为空Tensor，参数key、value为空tensor（即S2为0），则attentionOut填充为全零。attentionOut为空Tensor时，AscendCLNN框架会处理。其余在上述参数说明中标注了“可传入nullptr”的入参为空指针时，不进行处理。
+- 入参为空的处理：算子内部需要判断参数query是否为空，如果是空则直接返回。参数query不为空Tensor，参数key、value为空tensor（即S2为0），则attentionOut填充为全零。attentionOut为空Tensor时，aclnn接口会处理。其余在上述参数说明中标注了“可传入nullptr”的入参为空指针时，不进行处理。
 
 - query、key、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N，T表示所有Batch输入样本序列长度的累加和。
 

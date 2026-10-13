@@ -121,7 +121,7 @@
 | 参数名 | 输入/输出/属性 | 描述 | 数据类型 | 数据格式 |
 | :--- | :--- | :--- | :--- | :--- |
 | q | 输入 | 公式中的Query。`BSND`为(B, S, H, K)，`BNSD`为(B, H, S, K)，`TND`为(T, H, K)，`NTD`为(H, T, K)。 | FLOAT16、BFLOAT16 | ND |
-| k | 输入 | 公式中的Key。shape和数据类型必须与`q`相同。 | FLOAT16、BFLOAT16 | ND |
+| k | 输入 | 公式中的Key，shape和数据类型必须与`q`相同。 | FLOAT16、BFLOAT16 | ND |
 | v | 输入 | 公式中的Value。`BSND`为(B, S, HV, V)，`BNSD`为(B, HV, S, V)，`TND`为(T, HV, V)，`NTD`为(HV, T, V)。数据类型必须与`q`相同。 | FLOAT16、BFLOAT16 | ND |
 | g | 输入 | raw gate或已激活的自然对数gate。`BSND`为(B, S, HV, K)，`BNSD`为(B, HV, S, K)，`TND`为(T, HV, K)，`NTD`为(HV, T, K)。 | FLOAT、BFLOAT16 | ND |
 | beta | 输入 | 公式中的Delta系数。`BSND`为(B, S, HV)，`BNSD`为(B, HV, S)，`TND`为(T, HV)，`NTD`为(HV, T)。 | FLOAT、BFLOAT16 | ND |

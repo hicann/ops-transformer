@@ -170,7 +170,7 @@ npusim report [options]
     npusim report -e /path/to/npusim_{timestamp}_${user_app} -o /path/to/report -n '0-1, 11-12'
     ```
 
-3. 命令执行完后，会在output配置的目录下生成对应的流水文件，文件格式为json格式，输出结果示例如下：
+3. 命令执行完后，会在output配置的目录下生成对应的流水文件，文件格式为json，输出结果示例如下：
 
     ```bash
     trace_core0.json

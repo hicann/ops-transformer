@@ -410,7 +410,7 @@ int main()
     void *queryDeviceAddr = nullptr;
     void *keyDeviceAddr = nullptr;
     void *valueDeviceAddr = nullptr;
-    void *gamaDeviceAddr = nullptr;
+    void *gammaDeviceAddr = nullptr;
     void *betaDeviceAddr = nullptr;
     void *initStateDeviceAddr = nullptr;
     void *actSeqLenDeviceAddr = nullptr;
@@ -420,7 +420,7 @@ int main()
     aclTensor *query = nullptr;
     aclTensor *key = nullptr;
     aclTensor *value = nullptr;
-    aclTensor *gama = nullptr;
+    aclTensor *gamma = nullptr;
     aclTensor *beta = nullptr;
     aclTensor *initState = nullptr;
     aclTensor *actSeqLen = nullptr;
@@ -439,14 +439,14 @@ int main()
     std::vector<int64_t> stateShape = {batchSize, headVNum, dimV, dimK};
     std::vector<int64_t> qkShape = {batchSize * seqLength, headKNum, dimK};
     std::vector<int64_t> vShape = {batchSize * seqLength, headVNum, dimV};
-    std::vector<int64_t> gamaShape = {batchSize * seqLength, headVNum};
+    std::vector<int64_t> gammaShape = {batchSize * seqLength, headVNum};
     std::vector<int64_t> actSeqLenShape = {batchSize};
     std::vector<int16_t> initStateHostData(GetShapeSize(stateShape));
     std::vector<int16_t> queryHostData(GetShapeSize(qkShape));
     std::vector<int16_t> keyHostData(GetShapeSize(qkShape));
     std::vector<int16_t> valueHostData(GetShapeSize(vShape));
-    std::vector<float> gamaHostData(GetShapeSize(gamaShape));
-    std::vector<int16_t> betaHostData(GetShapeSize(gamaShape));
+    std::vector<float> gammaHostData(GetShapeSize(gammaShape));
+    std::vector<int16_t> betaHostData(GetShapeSize(gammaShape));
     std::vector<int32_t> actSeqLenHostData(batchSize, seqLength);
     int16_t bfloatHalf = 16128;   // int16_t的16128的二进制对应bfloat16的0.5
     int16_t bfloatQuarter = 15936; // int16_t的15936的二进制对应bfloat16的0.25
@@ -465,8 +465,8 @@ int main()
     for (int i = 0; i < betaHostData.size(); i++) {
         betaHostData[i] = bfloatHalf;
     }
-    for (int i = 0; i < gamaHostData.size(); i++) {
-        gamaHostData[i] = -0.5f;
+    for (int i = 0; i < gammaHostData.size(); i++) {
+        gammaHostData[i] = -0.5f;
     }
 
     std::vector<int16_t> attnOutHostData(valueHostData);
@@ -480,9 +480,9 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(valueHostData, vShape, &valueDeviceAddr, aclDataType::ACL_BF16, &value);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(gamaHostData, gamaShape, &gamaDeviceAddr, aclDataType::ACL_FLOAT, &gama);
+    ret = CreateAclTensor(gammaHostData, gammaShape, &gammaDeviceAddr, aclDataType::ACL_FLOAT, &gamma);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(betaHostData, gamaShape, &betaDeviceAddr, aclDataType::ACL_BF16, &beta);
+    ret = CreateAclTensor(betaHostData, gammaShape, &betaDeviceAddr, aclDataType::ACL_BF16, &beta);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(actSeqLenHostData, actSeqLenShape, &actSeqLenDeviceAddr, aclDataType::ACL_INT32, &actSeqLen);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -496,7 +496,7 @@ int main()
     float scale = 1.0;
     aclOpExecutor *executor;
     // 调用aclnnChunkGatedDeltaRuleGetWorkspaceSize第一段接口
-    ret = aclnnChunkGatedDeltaRuleGetWorkspaceSize(query, key, value, beta, initState, actSeqLen, gama,
+    ret = aclnnChunkGatedDeltaRuleGetWorkspaceSize(query, key, value, beta, initState, actSeqLen, gamma,
                                                        scale, attnOut, finalState, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnChunkGatedDeltaRuleGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
@@ -524,7 +524,7 @@ int main()
     aclDestroyTensor(query);
     aclDestroyTensor(key);
     aclDestroyTensor(value);
-    aclDestroyTensor(gama);
+    aclDestroyTensor(gamma);
     aclDestroyTensor(beta);
     aclDestroyTensor(initState);
     aclDestroyTensor(actSeqLen);
@@ -535,7 +535,7 @@ int main()
     aclrtFree(queryDeviceAddr);
     aclrtFree(keyDeviceAddr);
     aclrtFree(valueDeviceAddr);
-    aclrtFree(gamaDeviceAddr);
+    aclrtFree(gammaDeviceAddr);
     aclrtFree(betaDeviceAddr);
     aclrtFree(initStateDeviceAddr);
     aclrtFree(actSeqLenDeviceAddr);

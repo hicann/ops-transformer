@@ -7,7 +7,7 @@ BlockSparseAttention是一个基于CATLASS模板库实现的高性能稀疏注�
 ## 功能特性
 
 - **灵活的稀疏块模式**: 支持自定义的x*y块级稀疏模式，通过blockShape参数指定
-- **多种KV Cache布局**: 支持TND [T, N, D]和BNSD [B, N, S, D]的的KV cache布局
+- **多种KV Cache布局**: 支持TND [T, N, D]和BNSD [B, N, S, D]的KV cache布局
 - **多种Q输入布局**: 支持TND [T, N, D]和BNSD [B, N, S, D]两种Query输入布局
 - **高性能计算**: 基于CATLASS模板库，充分利用昇腾A2硬件特性
 - **多精度支持**: 支持FP16和BF16两种精度

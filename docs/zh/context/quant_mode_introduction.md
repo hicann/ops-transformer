@@ -16,7 +16,7 @@ CANN算子量化是指对神经网络中Matmul等矩阵（cube）类算子的输
 >- m、n、k变量分别表示Tensor计算的不同轴大小。
 >- 左矩阵、右矩阵分别指cube算子中用于矩阵乘法计算的两个输入Tensor，一般左矩阵代表激活activation、右矩阵代表权重weight，请用户按实际情况理解和使用。
 
-- pertensor量化（简称T量化）：量化对象既可以是左矩阵，也可以是右矩阵，每个Tensor共用一个相同的量化参数。
+- pertensor量化（简称T量化）：量化对象既可以是左矩阵，也可以是右矩阵，每个Tensor共用一个量化参数。
 
   假设左矩阵shape为(m, k)，右矩阵shape为(k, n)，k为reduce轴，生成量化参数的shape为(1, )。
 
@@ -56,4 +56,4 @@ CANN算子量化是指对神经网络中Matmul等矩阵（cube）类算子的输
   - pertensor-perchannel-pergroup量化模式（简称T-CG量化模式）
   - perblock-perblock量化模式（简称B-B量化模式）
 - 伪量化：一般是指对权重矩阵（weight）进行量化的模式，包括perchannel量化模式（简称C量化模式）。
-- MX量化（Microscaling Formats）：指由开放计算项目（OCP）制定的低精度数据表示方式。属于pergroup量化模式，表示量化参数类型为FLOAT8\_E8M0且gourp size为32的特例情况。
+- MX量化（Microscaling Formats）：指由开放计算项目（OCP）制定的低精度数据表示方式。属于pergroup量化模式，表示量化参数类型为FLOAT8\_E8M0且group size为32的特例。

@@ -2,7 +2,7 @@ Rope-Matrix
 Compile and test:
 
 ```bash
-# How to run this sub-project$, please first read the reade at "experimental/npu_ops_transformer_ext"
+# How to run this sub-project$, please first read the readme at "experimental/npu_ops_transformer_ext"
 path="path for experimental"
 cd $path$/npu_ops_transformer_ext
 python -m build --wheel -n
@@ -22,7 +22,7 @@ For example: x = [1, 24, 28800, 128], y = [128, 128], cos/sin = [1, 1, 28800, 12
 ### Design
 
 As the fig shows, we design a Mathematical Equivalence algorithm "Rope-Matrix(ROME)" to accelerate rope.
-The key is to replace tensor rearrage operator by matrix.
+The key is to replace tensor rearrange operator by matrix.
 ![image.png](https://raw.atomgit.com/user-images/assets/7673863/75dd5e40-a660-4956-b052-95079eae8f8d/image.png 'image.png')
 Besides, for 3D-ROPE situation, origin rope-fused need call three times, we just need to call once.
 ![image.png](https://raw.atomgit.com/user-images/assets/7673863/9a6d1aa0-9e73-4908-a0c7-c3cebfeda407/image.png 'image.png')
@@ -91,7 +91,7 @@ A. design 'torch_interface.cpp':
 Add "m.def("rope_matrix(Tensor x, Tensor y, Tensor sin, Tensor cos) -> Tensor");"
 into "TORCH_LIBRARY" function in "npu_ops_transformer_ext/npu_ops_def.cpp"
 
-Then use TORCH_LIBRARY_IMPL to register your function, fuc must have same inputs and output,
+Then use TORCH_LIBRARY_IMPL to register your function, func must have same inputs and output,
 speciel operator like '&' should both have or not.
 
 // Register Ascend implementations for RopeMatrix

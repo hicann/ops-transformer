@@ -41,7 +41,7 @@ Set the `ALL_CAPS` constants at the top of the file to control what gets run. Wh
 * `N_REPEATS`: how many runs to do to estimate time
 * `N_WARMUP`: how many warmup runs before running `N_REPEATS` calls
 * `SPARSITY_VALS`: how many blocks to activate: randomly chosen, but each Q-block row will have the same number of blocks. The block-sparse pattern is the only kernel mode the benchmark exercises.
-* `BLOCK_SHAPES`: List of `(BLOCK_SIZE_Q, BLOCK_SIZE_KV)` pairs to sweep. The kernel accepts every combination of `BLOCK_SIZE_Q ∈ {128, 256, 512, 1024}` and `BLOCK_SIZE_KV ∈ {128, 256, 512, 1024}` at runtime via the `block_shape` op-attr — no rebuild needed to switch granularities. The default sweep is the full 4 × 4 = 16-combination grid. The first column of the benchmark output labels every row with its active block shape. `BLOCK_SIZE_Q` and `BLOCK_SIZE_KV` aliases (set to `BLOCK_SHAPES[0]` for backward compatibility) are still readable from the top of `benchmark.py`. 
+* `BLOCK_SHAPES`: List of `(BLOCK_SIZE_Q, BLOCK_SIZE_KV)` pairs to sweep. The kernel accepts every combination of `BLOCK_SIZE_Q ∈ {128, 256, 512, 1024}` and `BLOCK_SIZE_KV ∈ {128, 256, 512, 1024}` at runtime via the `block_shape` op-attr — no rebuild needed to switch granularities. The default sweep is the full 4 × 4 = 16-combination grid. The first column of the benchmark output labels every row with its active block shape. `BLOCK_SIZE_Q` and `BLOCK_SIZE_KV` aliases (set to `BLOCK_SHAPES[0]` for backward compatibility) are still readable from the top of `benchmark.py`.
 * `BLOCK_MASK_SEED`: for reproducibility of random sampling. Can set to any value to change random sampling
 * `FRAMES_BY_BLOCK_SHAPE`: 2-D dict keyed by `(BLOCK_SIZE_Q, BLOCK_SIZE_KV)` returning a `FrameWidths(left_cols, right_cols, top_rows, bottom_rows)` namedtuple — extra blocks forced active on top of the sparsity budget. Models a typical sink/streaming pattern. Per-pair entries scale to keep the forced-token footprint comparable across granularities; see Example 2 for the derivation.
 * `PRINT_OUTPUTS`: For manual visualization of output tensors
@@ -60,7 +60,7 @@ Adjust the following values in the `===== Begin of Parameter Sweep Definitions =
 
 ```python
 DTYPE = torch.bfloat16
-INPUT_LAYOUT = "BNSD"  # [batch_size, num_hea
+INPUT_LAYOUT = "BNSD"  # [batch_size, num_heads, seq_len, head_dim]
 B_VALS = [1]
 H_VALS = [16, 14]
 S_VALS = [4096, 10_000]  # S_q = S_kv

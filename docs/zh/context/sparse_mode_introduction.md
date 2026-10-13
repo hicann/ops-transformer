@@ -147,7 +147,7 @@ Masked $QK^T$矩阵示意如下，在第二个batch对query进行切分，key和
 **说明**：
 
 - sparseMode=8，band表示的是第一个非空tensor的Batch的sparse类型；如果只有一个batch，用户需按照band模式的要求来配置参数；sparseMode=8时，用户需要输入2048x2048的下三角mask作为该融合算子的输入。
-- 基于sparseMode=2进行外切产生的band模式的sparse的参数应符合以下条件：
+- 基于sparseMode=2进行外切产生的band模式的sparse参数应符合以下条件：
   - preTokens >= first_Skv。
   - nextTokens >= first_Sq - first_Skv，根据实际情况进行配置。
   - 当前模式下不支持可选输入pse。
