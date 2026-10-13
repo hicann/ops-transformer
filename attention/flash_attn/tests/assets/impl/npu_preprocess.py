@@ -13,9 +13,10 @@
 
 This module is intentionally independent from TTK.  The framework passes the
 main API arguments after H2D; this hook invokes the companion torch operator
-``flash_attn_metadata``. Dynamic slots return the generated tensor by parameter
-name; static slots are updated in place and return None. Profiling and result
-handling remain in TTK.
+``flash_attn_metadata``. Dynamic (-1) slots return the generated tensor by
+parameter name; concrete slots keep the random fake tensor prepared by
+``customize_inputs``; slots absent from the case file (dtype None) are left
+untouched. Profiling and result handling remain in TTK.
 """
 
 import importlib.util
@@ -28,6 +29,16 @@ import torch
 
 OPERATOR = "flash_attn"
 METADATA_INDEX = 10
+
+
+def metadata_slot_declared(tensor_dtypes):
+    """True when the case file declares the metadata slot (dtype is present)."""
+    if tensor_dtypes is None:
+        return True
+    try:
+        return tensor_dtypes[METADATA_INDEX] is not None
+    except (IndexError, TypeError):
+        return True
 
 
 def load_metadata_protocol():
@@ -258,10 +269,12 @@ def run(
     """Generate and copy metadata for a main FlashAttn invocation."""
     protocol = load_metadata_protocol()
     testcase_name = kwargs.get("testcase_name")
+    if metadata is None and not metadata_slot_declared(kwargs.get("tensor_dtypes")):
+        # Case file does not declare the metadata slot (dtype None): stay absent.
+        return None
     if metadata is not None and protocol.metadata_is_materialized(metadata):
-        # In the E2E flow customize_inputs zeroes the placeholder, so this
-        # branch is unreachable there; replay correctness comes from the
-        # idempotent re-derivation below, so it is not a bug.
+        # E2E concrete slots carry the fake tensor prepared by customize_inputs;
+        # a nonzero metadata input is authoritative in every execution mode.
         logging.info("[%s] reuse nonzero FlashAttn metadata input", testcase_name)
         return None
 

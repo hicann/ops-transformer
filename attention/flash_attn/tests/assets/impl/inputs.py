@@ -71,11 +71,16 @@ def _fill_attn_mask(attn_mask, mask_mode, win_left=-1, win_right=-1):
     attn_mask.copy_(mask.to(dtype=attn_mask.dtype, device=attn_mask.device))
 
 
-def zero_metadata(metadata):
+def randomize_metadata(metadata):
+    """Fill a provided concrete metadata slot with a random fake tensor."""
     if metadata is None:
         return
     if torch.is_tensor(metadata):
-        metadata.zero_()
+        if metadata.is_floating_point():
+            fake = torch.rand(metadata.shape).to(metadata.dtype)
+        else:
+            fake = torch.randint(0, 1024, metadata.shape, dtype=metadata.dtype)
+        metadata.copy_(fake)
     else:
         metadata[...] = 0
 
@@ -133,4 +138,4 @@ def customize_inputs(
     if mask_mode in (3, 4):
         _fill_attn_mask(attn_mask, mask_mode, win_left, win_right)
 
-    zero_metadata(metadata)
+    randomize_metadata(metadata)

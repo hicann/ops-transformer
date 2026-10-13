@@ -13,6 +13,18 @@
 from .metadata import build_metadata
 
 
+METADATA_SLOT_INDEX = 7
+
+
+def metadata_slot_declared(tensor_dtypes):
+    if tensor_dtypes is None:
+        return True
+    try:
+        return tensor_dtypes[METADATA_SLOT_INDEX] is not None
+    except (IndexError, TypeError):
+        return True
+
+
 def run(
     q,
     k_cache,
@@ -33,6 +45,12 @@ def run(
     return_softmax_lse=False,
     **kwargs,
 ):
+    if metadata is not None and metadata.numel() != 0:
+        # Concrete slot: keep the random fake tensor prepared by customize_inputs.
+        return None
+    if metadata is None and not metadata_slot_declared(kwargs.get("tensor_dtypes")):
+        # Case file does not declare the metadata slot (dtype None): stay absent.
+        return None
     generated = build_metadata(
         q,
         k_cache,

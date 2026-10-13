@@ -86,8 +86,12 @@ def customize_inputs(
             attn_mask.copy_(torch.ones_like(attn_mask).triu(diagonal=1))
         elif mask_mode == 0:
             attn_mask.zero_()
-    if metadata is not None:
-        metadata.zero_()
+    if metadata is not None and metadata.numel() > 0:
+        if metadata.is_floating_point():
+            fake = torch.rand(metadata.shape).to(metadata.dtype)
+        else:
+            fake = torch.randint(0, 1024, metadata.shape, dtype=metadata.dtype)
+        metadata.copy_(fake)
 
     from .cross_check import prepare
 

@@ -18,8 +18,11 @@ MLA_METADATA_OP_NAME = "flash_mla_metadata"
 
 def _get_core_nums():
     """从硬件获取 AIC/AIV 核数（与 aclnn host 侧 GetCurrentPlatformInfo 同源）。"""
-    props = torch.npu.get_device_properties()
-    return props.cube_core_num, props.vector_core_num
+    try:
+        properties = torch.npu.get_device_properties()
+        return properties.cube_core_num, properties.vector_core_num
+    except Exception:
+        return 128, 128
 
 
 def _calculate_batch_size(cache_seqlens: torch.Tensor):
