@@ -24,35 +24,41 @@ namespace ge {
  * @brief The fusion operator of RMSNorm, RotaryPositionEmbedding and Update KVCache.
  *
  * @par Inputs:
- * @li kv: A tensor. The type supports float32, float16 and bfloat16. Its shape is [Bkv, N, Skv, D] or [Bkv, N, Skv, Dk] when v is not None. Format: ND.
+ * @li kv: A tensor. The type supports float32, float16 and bfloat16. Its shape is [Bkv, N, Skv, D] or [Bkv, N, Skv, Dk]
+ * when v is not None. Format: ND.
  * @li gamma: A tensor, used in RMS Norm. Its type is consistent with kv. Its shape is [Dv,]. Format: ND.
  * @li cos: A tensor, from position embedding. Its type is consistent with kv. Its shape is [Bkv, 1, Skv, Dk] or
  * [Bkv, 1, 1, Dk]. Format: ND.
  * @li sin: A tensor, from position embedding. Its type is consistent with kv. Its shape is [Bkv, 1, Skv, Dk] or
  * [Bkv, 1, 1, Dk]. The shape of sin should be consistent with that of cos. Format: ND.
- * @li index: A tensor. The type supports int64. When the cache_mode is Norm, its shape is [Bkv, Skv]. When the cache_mode
- * is PA_BNSD or PA_NZ, its shape is [Bkv * Skv]. When the cache_mode is PA_BLK_BNSD or PA_BLK_NZ, its shape is
- * [Bkv * ceil_div(Skv, BlockSize)]. Format: ND.
- * @li k_cache: A tensor. Its type must be either consistent with kv, or one of: int8, hifloat8, float8_e5m2, float8_e4m3fn. When the cache_mode is in PA scenario(cache_mode is
- * PA_BNSD, PA_NZ, PA_BLK_BNSD or PA_BLK_NZ), its shape is [BlockNum, BlockSize, N, Dk]. When the cache_mode is Norm, its
- * shape is [Bcache, N, Scache, Dk]. Format: ND.
- * @li ckv_cache: A tensor. Its type must be either consistent with kv, or one of: int8, hifloat8, float8_e5m2, float8_e4m3fn. When the cache_mode is in PA scenario, its shape is
- * [BlockNum, BlockSize, N, Dv]. When the cache_mode is Norm, its shape is [Bcache, N, Scache, Dv]. Format: ND.
+ * @li index: A tensor. The type supports int64. When the cache_mode is Norm, its shape is [Bkv, Skv]. When the
+ * cache_mode is PA_BNSD or PA_NZ, its shape is [Bkv * Skv]. When the cache_mode is PA_BLK_BNSD or PA_BLK_NZ, its shape
+ * is [Bkv * ceil_div(Skv, BlockSize)]. Format: ND.
+ * @li k_cache: A tensor. Its type must be either consistent with kv, or one of: int8, hifloat8, float8_e5m2,
+ * float8_e4m3fn. When the cache_mode is in PA scenario(cache_mode is PA_BNSD, PA_NZ, PA_BLK_BNSD or PA_BLK_NZ), its
+ * shape is [BlockNum, BlockSize, N, Dk]. When the cache_mode is Norm, its shape is [Bcache, N, Scache, Dk]. Format: ND.
+ * @li ckv_cache: A tensor. Its type must be either consistent with kv, or one of: int8, hifloat8, float8_e5m2,
+ * float8_e4m3fn. When the cache_mode is in PA scenario, its shape is [BlockNum, BlockSize, N, Dv]. When the cache_mode
+ * is Norm, its shape is [Bcache, N, Scache, Dv]. Format: ND.
  * @li k_rope_scale: A tensor. The type supports float32. This input parameter is required when the data type of k_cache
  * is int8, hifloat8, float8_e5m2, float8_e4m3fn. Its shape can be [N, Dk], [Dk,] or [1,]. Format: ND.
  * @li c_kv_scale: A tensor. The type supports float32. This input parameter is required when the data type of ckv_cache
  * is int8, hifloat8, float8_e5m2, float8_e4m3fn. Its shape can be [N, Dv], [Dv,] or [1,]. Format: ND.
- * @li k_rope_offset: A tensor. The type supports float32. This parameter is required when k_cache is quantized (int8, hifloat8, float8_e5m2, float8_e4m3fn)
- * and asymmetric quantization is used. Its shape can be [N, Dk], [Dk,] or [1,]. Format: ND.
- * @li c_kv_offset: A tensor. The type supports float32. This parameter is required when ckv_cache is quantized (int8, hifloat8, float8_e5m2, float8_e4m3fn)
- * and asymmetric quantization is used. Its shape can be [N, Dv], [Dv,] or [1,]. Format: ND.
+ * @li k_rope_offset: A tensor. The type supports float32. This parameter is required when k_cache is quantized (int8,
+ * hifloat8, float8_e5m2, float8_e4m3fn) and asymmetric quantization is used. Its shape can be [N, Dk], [Dk,] or [1,].
+ * Format: ND.
+ * @li c_kv_offset: A tensor. The type supports float32. This parameter is required when ckv_cache is quantized (int8,
+ * hifloat8, float8_e5m2, float8_e4m3fn) and asymmetric quantization is used. Its shape can be [N, Dv], [Dv,] or [1,].
+ * Format: ND.
  * @li v: A tensor. Its type is consistent with kv. Its shape is [Bkv, N, Skv, Dv]. Format: ND.
  *
  * @par Outputs:
- * @li k_cache: A tensor. Its type must be either consistent with kv, or one of: int8, hifloat8, float8_e5m2, float8_e4m3fn. When the cache_mode is in PA scenario, its shape is
- * [BlockNum, BlockSize, N, Dk]. When the cache_mode is Norm, its shape is [Bcache, N, Scache, Dk]. Format: ND.
- * @li ckv_cache: A tensor. Its type must be either consistent with kv, or one of: int8, hifloat8, float8_e5m2, float8_e4m3fn. When the cache_mode is in PA scenario, its shape is
- * [BlockNum, BlockSize, N, Dv]. When the cache_mode is Norm, its shape is [Bcache, N, Scache, Dv]. Format: ND.
+ * @li k_cache: A tensor. Its type must be either consistent with kv, or one of: int8, hifloat8, float8_e5m2,
+ * float8_e4m3fn. When the cache_mode is in PA scenario, its shape is [BlockNum, BlockSize, N, Dk]. When the cache_mode
+ * is Norm, its shape is [Bcache, N, Scache, Dk]. Format: ND.
+ * @li ckv_cache: A tensor. Its type must be either consistent with kv, or one of: int8, hifloat8, float8_e5m2,
+ * float8_e4m3fn. When the cache_mode is in PA scenario, its shape is [BlockNum, BlockSize, N, Dv]. When the cache_mode
+ * is Norm, its shape is [Bcache, N, Scache, Dv]. Format: ND.
  * @li k_rope: A tensor. Its type is consistent with kv. If is_output_kv is true, this parameter output is required.
  * Its shape is [Bkv, N, Skv, Dk]. Format: ND.
  * @li c_kv: A tensor. Its type is consistent with kv. If is_output_kv is true, this parameter output is required.
@@ -77,8 +83,9 @@ namespace ge {
  *     If cache_mode is an NZ scenario(cache_mode is PA_NZ or PA_BLK_NZ), Dk and Dv need to be 32B aligned.
  *     - If cache_mode is a PA scenario, the BlockSize needs to be 32B aligned.
  *     - Regarding the above-mentioned 32B alignment situation, the alignment value is determined by the data type
- *     of the cache. Take BlockSize as an example. If the data type of the cache is int8, hifloat8, float8_e5m2, float8_e4m3fn then BlockSize % 32 = 0 is
- *     required. If the data type of the cache is flaot16, then BlockSize % 16=0 is required.
+ *     of the cache. Take BlockSize as an example. If the data type of the cache is int8, hifloat8, float8_e5m2,
+ * float8_e4m3fn then BlockSize % 32 = 0 is required. If the data type of the cache is flaot16, then BlockSize % 16=0 is
+ * required.
  *     - Bcache is the batch size of the input cache, and Scache is the sequence length of the input cache. The size
  *     is input by the user.
  *     - BlockNum is the number of memory blocks written to the cache, and its size is determined by the user's input
@@ -91,9 +98,11 @@ namespace ge {
  *     - When cache_mode is PA_BLK_BNSD and PA_BLK_NZ, the shape is [Bkv * ceil_div(Skv, BlockSize)]. The value
  *     range of index should be [-1, BlockNum * BlockSize). The values of value / BlockSize cannot be repeated.
  * @li Constraints related to the quantization scenario:
- *     -Quantized scenario supported case 1: The data type of k_cache is float16 or bfloat16, and the data type of ckv_cache is int8, hifloat8, float8_e5m2, float8_e4m3fn.
- *     -Quantized scenario supported case 2: The data type of ckv_cache is float16 or bfloat16, and the data type of k_cache is int8, hifloat8, float8_e5m2, float8_e4m3fn.
- *     -Quantized scenario supported case 3: The data types of k_cache and ckv_cache are the same, being int8, hifloat8, float8_e5m2, float8_e4m3fn.
+ *     -Quantized scenario supported case 1: The data type of k_cache is float16 or bfloat16, and the data type of
+ * ckv_cache is int8, hifloat8, float8_e5m2, float8_e4m3fn. -Quantized scenario supported case 2: The data type of
+ * ckv_cache is float16 or bfloat16, and the data type of k_cache is int8, hifloat8, float8_e5m2, float8_e4m3fn.
+ *     -Quantized scenario supported case 3: The data types of k_cache and ckv_cache are the same, being int8, hifloat8,
+ * float8_e5m2, float8_e4m3fn.
  *
  * @par Restrictions:
  * Warning: THIS FUNCTION IS EXPERIMENTAL. Please do not use.

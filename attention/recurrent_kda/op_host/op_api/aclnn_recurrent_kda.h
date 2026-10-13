@@ -49,13 +49,13 @@ extern "C" {
  * @return aclnnStatus: 返回状态码
  */
 ACLNN_API aclnnStatus aclnnRecurrentKdaGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *gate, const aclTensor *beta,
-    aclTensor *initialStateRef, const aclTensor *cuSeqlensOptional, const aclTensor *ssmStateIndicesOptional,
-    const aclTensor *aLogOptional, const aclTensor *dtBiasOptional, const aclTensor *numAcceptedTokensOptional,
-    const char *layout, double scale, bool outputFinalState, bool inplaceFinalState, bool useQkL2normInKernel,
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* gate, const aclTensor* beta,
+    aclTensor* initialStateRef, const aclTensor* cuSeqlensOptional, const aclTensor* ssmStateIndicesOptional,
+    const aclTensor* aLogOptional, const aclTensor* dtBiasOptional, const aclTensor* numAcceptedTokensOptional,
+    const char* layout, double scale, bool outputFinalState, bool inplaceFinalState, bool useQkL2normInKernel,
     bool useGateInKernel, bool useBetaSigmoidInKernel, bool allowNegEigval, bool safeGate, double lowerBound,
-    bool stateVFirst, const aclTensor *attnOut, const aclTensor *finalState, uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    bool stateVFirst, const aclTensor* attnOut, const aclTensor* finalState, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
 /**
  * @brief RecurrentKda 的第二段接口，用于执行算子计算。
@@ -66,7 +66,7 @@ ACLNN_API aclnnStatus aclnnRecurrentKdaGetWorkspaceSize(
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnRecurrentKda(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnRecurrentKda(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                         aclrtStream stream);
 
 #ifdef __cplusplus

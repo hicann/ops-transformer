@@ -19,38 +19,23 @@ extern "C" {
 #endif
 
 /**
- * @brief The first interface of aclnnLightningIndexerGetWorkspaceSize calculates the workspace size based on the specific calculation process.
+ * @brief The first interface of aclnnLightningIndexerGetWorkspaceSize calculates the workspace size based on the
+ * specific calculation process.
  * @domain aclnn_ops_infer
  */
-__attribute__((visibility("default")))
-aclnnStatus aclnnLightningIndexerGetWorkspaceSize(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *weights,
-    const aclTensor *actualSeqLengthsQueryOptional,
-    const aclTensor *actualSeqLengthsKeyOptional,
-    const aclTensor *blockTableOptional,
-    char *layoutQueryOptional,
-    char *layoutKeyOptional,
-    int64_t sparseCount,
-    int64_t sparseMode,
-    int64_t preTokens,
-    int64_t nextTokens,
-    bool returnValues,
-    const aclTensor *sparseIndicesOut,
-    const aclTensor *sparseValuesOut,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+__attribute__((visibility("default"))) aclnnStatus aclnnLightningIndexerGetWorkspaceSize(
+    const aclTensor* query, const aclTensor* key, const aclTensor* weights,
+    const aclTensor* actualSeqLengthsQueryOptional, const aclTensor* actualSeqLengthsKeyOptional,
+    const aclTensor* blockTableOptional, char* layoutQueryOptional, char* layoutKeyOptional, int64_t sparseCount,
+    int64_t sparseMode, int64_t preTokens, int64_t nextTokens, bool returnValues, const aclTensor* sparseIndicesOut,
+    const aclTensor* sparseValuesOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief The second interface of aclnnLightningIndexer is used to perform calculations.
  */
-__attribute__((visibility("default")))
-aclnnStatus aclnnLightningIndexer(
-    void *workspace,
-    uint64_t workspaceSize,
-    aclOpExecutor *executor,
-    const aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnLightningIndexer(void* workspace, uint64_t workspaceSize,
+                                                                         aclOpExecutor* executor,
+                                                                         const aclrtStream stream);
 
 #ifdef __cplusplus
 }

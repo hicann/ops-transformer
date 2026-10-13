@@ -27,17 +27,17 @@ extern "C" {
  * @domain aclnn_ops_train
  */
 aclnnStatus aclnnNsaSelectedAttentionGradGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *attentionOut,
-    const aclTensor *attentionOutGrad, const aclTensor *softmaxMax, const aclTensor *softmaxSum,
-    const aclTensor *topkIndices, const aclIntArray *actualSeqQLenOptional, const aclIntArray *actualSeqKvLenOptional,
-    const aclTensor *attenMaskOptional, double scaleValue, int64_t selectedBlockSize, int64_t selectedBlockCount,
-    int64_t headNum, char *inputLayout, int64_t sparseMode, const aclTensor *dqOut, const aclTensor *dkOut,
-    const aclTensor *dvOut, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* attentionOut,
+    const aclTensor* attentionOutGrad, const aclTensor* softmaxMax, const aclTensor* softmaxSum,
+    const aclTensor* topkIndices, const aclIntArray* actualSeqQLenOptional, const aclIntArray* actualSeqKvLenOptional,
+    const aclTensor* attenMaskOptional, double scaleValue, int64_t selectedBlockSize, int64_t selectedBlockCount,
+    int64_t headNum, char* inputLayout, int64_t sparseMode, const aclTensor* dqOut, const aclTensor* dkOut,
+    const aclTensor* dvOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnNsaSelectedAttentionGrad的第二段接口，用于执行计算。
  */
-aclnnStatus aclnnNsaSelectedAttentionGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnNsaSelectedAttentionGrad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                           aclrtStream stream);
 
 #ifdef __cplusplus

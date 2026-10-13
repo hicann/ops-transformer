@@ -27,24 +27,24 @@ extern "C" {
  * @domain aclnn_ops_train
  */
 aclnnStatus aclnnNormRopeConcatBackwardGetWorkspaceSize(
-    const aclTensor *gradQueryOutput, const aclTensor *gradKeyOutput, const aclTensor *gradValueOutput,
-    const aclTensor *query, const aclTensor *key, const aclTensor *encoderQuery, const aclTensor *encoderKey,
-    const aclTensor *normQueryWeight, const aclTensor *normQueryMean, const aclTensor *normQueryRstd,
-    const aclTensor *normKeyWeight, const aclTensor *normKeyMean, const aclTensor *normKeyRstd,
-    const aclTensor *normAddedQueryWeight, const aclTensor *normAddedQueryMean, const aclTensor *normAddedQueryRstd,
-    const aclTensor *normAddedKeyWeight, const aclTensor *normAddedKeyMean, const aclTensor *normAddedKeyRstd,
-    const aclTensor *ropeSin, const aclTensor *ropeCos, int64_t normType, int64_t normAddedType, int64_t ropeType,
-    int64_t concatOrder, const aclTensor *gradQuery, const aclTensor *gradKey, const aclTensor *gradValue,
-    const aclTensor *gradEncoderQuery, const aclTensor *gradEncoderKey, const aclTensor *gradEncoderValue,
-    const aclTensor *gradNormQueryWeight, const aclTensor *gradNormQueryBias, const aclTensor *gradNormKeyWeight,
-    const aclTensor *gradNormKeyBias, const aclTensor *gradNormAddedQueryWeight,
-    const aclTensor *gradNormAddedQueryBias, const aclTensor *gradNormAddedKeyWeight,
-    const aclTensor *gradNormAddedKeyBias, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* gradQueryOutput, const aclTensor* gradKeyOutput, const aclTensor* gradValueOutput,
+    const aclTensor* query, const aclTensor* key, const aclTensor* encoderQuery, const aclTensor* encoderKey,
+    const aclTensor* normQueryWeight, const aclTensor* normQueryMean, const aclTensor* normQueryRstd,
+    const aclTensor* normKeyWeight, const aclTensor* normKeyMean, const aclTensor* normKeyRstd,
+    const aclTensor* normAddedQueryWeight, const aclTensor* normAddedQueryMean, const aclTensor* normAddedQueryRstd,
+    const aclTensor* normAddedKeyWeight, const aclTensor* normAddedKeyMean, const aclTensor* normAddedKeyRstd,
+    const aclTensor* ropeSin, const aclTensor* ropeCos, int64_t normType, int64_t normAddedType, int64_t ropeType,
+    int64_t concatOrder, const aclTensor* gradQuery, const aclTensor* gradKey, const aclTensor* gradValue,
+    const aclTensor* gradEncoderQuery, const aclTensor* gradEncoderKey, const aclTensor* gradEncoderValue,
+    const aclTensor* gradNormQueryWeight, const aclTensor* gradNormQueryBias, const aclTensor* gradNormKeyWeight,
+    const aclTensor* gradNormKeyBias, const aclTensor* gradNormAddedQueryWeight,
+    const aclTensor* gradNormAddedQueryBias, const aclTensor* gradNormAddedKeyWeight,
+    const aclTensor* gradNormAddedKeyBias, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnNormRopeConcatBackward的第二段接口，用于执行计算。
  */
-aclnnStatus aclnnNormRopeConcatBackward(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnNormRopeConcatBackward(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                         aclrtStream stream);
 
 #ifdef __cplusplus

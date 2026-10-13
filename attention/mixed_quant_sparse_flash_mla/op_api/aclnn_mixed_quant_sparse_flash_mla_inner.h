@@ -19,24 +19,24 @@ extern "C" {
 #endif
 
 extern aclnnStatus aclnnInnerMixedQuantSparseFlashMlaGetWorkspaceSize(
-    const aclTensor *q, const aclTensor *oriKvOptional, const aclTensor *cmpKvOptional,
-    const aclTensor *oriSparseIndicesOptional, const aclTensor *cmpSparseIndicesOptional,
-    const aclTensor *oriBlockTableOptional, const aclTensor *cmpBlockTableOptional, const aclTensor *cuSeqlensQOptional,
-    const aclTensor *cuSeqlensOriKvOptional, const aclTensor *cuSeqlensCmpKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedOriKvOptional, const aclTensor *sequsedCmpKvOptional,
-    const aclTensor *cmpResidualKvOptional, const aclTensor *oriTopkLengthOptional,
-    const aclTensor *cmpTopkLengthOptional, const aclTensor *sinksOptional, const aclTensor *metadataOptional,
+    const aclTensor* q, const aclTensor* oriKvOptional, const aclTensor* cmpKvOptional,
+    const aclTensor* oriSparseIndicesOptional, const aclTensor* cmpSparseIndicesOptional,
+    const aclTensor* oriBlockTableOptional, const aclTensor* cmpBlockTableOptional, const aclTensor* cuSeqlensQOptional,
+    const aclTensor* cuSeqlensOriKvOptional, const aclTensor* cuSeqlensCmpKvOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedOriKvOptional, const aclTensor* sequsedCmpKvOptional,
+    const aclTensor* cmpResidualKvOptional, const aclTensor* oriTopkLengthOptional,
+    const aclTensor* cmpTopkLengthOptional, const aclTensor* sinksOptional, const aclTensor* metadataOptional,
     int64_t quantMode, int64_t ropeHeadDim, double softmaxScale, int64_t cmpRatio, int64_t oriMaskMode,
-    int64_t cmpMaskMode, int64_t oriWinLeft, int64_t oriWinRight, const char *layoutQOptional,
-    const char *layoutKvOptional, int64_t topkValueMode, bool returnSoftmaxLse, const aclTensor *attnOut,
-    const aclTensor *softmaxLse, uint64_t *workspaceSize, aclOpExecutor **executor);
+    int64_t cmpMaskMode, int64_t oriWinLeft, int64_t oriWinRight, const char* layoutQOptional,
+    const char* layoutKvOptional, int64_t topkValueMode, bool returnSoftmaxLse, const aclTensor* attnOut,
+    const aclTensor* softmaxLse, uint64_t* workspaceSize, aclOpExecutor** executor);
 
-extern aclnnStatus aclnnInnerMixedQuantSparseFlashMla(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern aclnnStatus aclnnInnerMixedQuantSparseFlashMla(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                       const aclrtStream stream);
 
-void MixedQuantSparseFlashMlaKvTensorPreProcess(const aclTensor *&kvTensor, const char *tensorName, int64_t quantMode);
+void MixedQuantSparseFlashMlaKvTensorPreProcess(const aclTensor*& kvTensor, const char* tensorName, int64_t quantMode);
 
-void MixedQuantSparseFlashMlaProcessSinks(const aclTensor *&sinksOptional);
+void MixedQuantSparseFlashMlaProcessSinks(const aclTensor*& sinksOptional);
 
 #ifdef __cplusplus
 }

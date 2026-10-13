@@ -10,7 +10,8 @@
 
 #ifndef ACLNN_PROMPT_FLASH_ATTENTION_H_
 #define ACLNN_PROMPT_FLASH_ATTENTION_H_
-#warning "aclnn_prompt_flash_attention.h is scheduled to be deprecated in December 2026, and will be replaced by the aclnn_prompt_flash_attention_v3.h. We apologize for any inconvenience caused and appreciate your timely migration to the new interface. "
+#warning \
+    "aclnn_prompt_flash_attention.h is scheduled to be deprecated in December 2026, and will be replaced by the aclnn_prompt_flash_attention_v3.h. We apologize for any inconvenience caused and appreciate your timely migration to the new interface. "
 #include "aclnn/acl_meta.h"
 #include "aclnn/aclnn_base.h"
 
@@ -19,38 +20,31 @@ extern "C" {
 #endif
 
 /**
- * @brief The first interface of aclnnPromptFlashAttention is used to calculate the workspace size based on the specific calculation process.
+ * @brief The first interface of aclnnPromptFlashAttention is used to calculate the workspace size based on the specific
+ * calculation process.
  * @domain aclnn_math
-*/
-__attribute__((deprecated("aclnnPromptFlashAttentionGetWorkspaceSize is scheduled to be deprecated in December 2026, and will be replaced by the aclnnPromptFlashAttentionV3GetWorkspaceSize. "
- 	                      "We apologize for any inconvenience caused and appreciate your timely migration to the new interface. ")))
-__attribute__ ((visibility("default"))) aclnnStatus aclnnPromptFlashAttentionGetWorkspaceSize(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *pseShift,
-    const aclTensor *attenMask,
-    const aclIntArray *actualSeqLengths,
-    int64_t numHeads,
-    double scaleValue,
-    int64_t preTokens,
-    int64_t nextTokens,
-    char *inputLayout,
-    int64_t numKeyValueHeads,
-    const aclTensor *attentionOut,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+ */
+__attribute__((deprecated(
+    "aclnnPromptFlashAttentionGetWorkspaceSize is scheduled to be deprecated in December 2026, and will be replaced by "
+    "the aclnnPromptFlashAttentionV3GetWorkspaceSize. "
+    "We apologize for any inconvenience caused and appreciate your timely migration to the new interface. ")))
+__attribute__((visibility("default"))) aclnnStatus
+aclnnPromptFlashAttentionGetWorkspaceSize(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                          const aclTensor* pseShift, const aclTensor* attenMask,
+                                          const aclIntArray* actualSeqLengths, int64_t numHeads, double scaleValue,
+                                          int64_t preTokens, int64_t nextTokens, char* inputLayout,
+                                          int64_t numKeyValueHeads, const aclTensor* attentionOut,
+                                          uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief The second interface of aclnnPromptFlashAttention is used to perform calculations.
-*/
-__attribute__((deprecated("aclnnPromptFlashAttention is scheduled to be deprecated in December 2026, and will be replaced by the aclnnPromptFlashAttentionV3. "
- 	                      "We apologize for any inconvenience caused and appreciate your timely migration to the new interface. ")))
-__attribute__ ((visibility("default"))) aclnnStatus aclnnPromptFlashAttention(
-    void *workspace,
-    uint64_t workspaceSize,
-    aclOpExecutor *executor,
-    const aclrtStream stream);
+ */
+__attribute__((deprecated(
+    "aclnnPromptFlashAttention is scheduled to be deprecated in December 2026, and will be replaced by the "
+    "aclnnPromptFlashAttentionV3. "
+    "We apologize for any inconvenience caused and appreciate your timely migration to the new interface. ")))
+__attribute__((visibility("default"))) aclnnStatus
+aclnnPromptFlashAttention(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, const aclrtStream stream);
 
 #ifdef __cplusplus
 }

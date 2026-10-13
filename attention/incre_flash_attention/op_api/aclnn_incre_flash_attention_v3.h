@@ -10,7 +10,8 @@
 
 #ifndef ACLNN_INCRE_FLASH_ATTENTION_V3_H_
 #define ACLNN_INCRE_FLASH_ATTENTION_V3_H_
-#warning "aclnn_incre_flash_attention_v3.h is scheduled to be deprecated in December 2026, and will be replaced by the aclnn_incre_flash_attention_v4.h. We apologize for any inconvenience caused and appreciate your timely migration to the new interface. "
+#warning \
+    "aclnn_incre_flash_attention_v3.h is scheduled to be deprecated in December 2026, and will be replaced by the aclnn_incre_flash_attention_v4.h. We apologize for any inconvenience caused and appreciate your timely migration to the new interface. "
 
 #include "aclnn/aclnn_base.h"
 
@@ -47,16 +48,21 @@ extern "C" {
  * @param [out] executor : executor context(output).
  * @return aclnnStatus: 返回状态码
  */
-__attribute__((deprecated("aclnnIncreFlashAttentionV3GetWorkspaceSize is scheduled to be deprecated in December 2026, and will be replaced by the aclnnIncreFlashAttentionV4GetWorkspaceSize. "
- 	                      "We apologize for any inconvenience caused and appreciate your timely migration to the new interface. ")))
-__attribute__((visibility("default"))) aclnnStatus aclnnIncreFlashAttentionV3GetWorkspaceSize(
-    const aclTensor *query, const aclTensorList *key, const aclTensorList *value, const aclTensor *pseShift,
-    const aclTensor *attenMask, const aclIntArray *actualSeqLengths, const aclTensor *dequantScale1,
-    const aclTensor *quantScale1, const aclTensor *dequantScale2, const aclTensor *quantScale2,
-    const aclTensor *quantOffset2, const aclTensor *antiquantScale, const aclTensor *antiquantOffset,
-    const aclTensor *blocktable, int64_t numHeads, double scaleValue, char *inputLayout, int64_t numKeyValueHeads,
-    int64_t blockSize, int64_t innerPrecise, const aclTensor *attentionOut, uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+__attribute__((deprecated(
+    "aclnnIncreFlashAttentionV3GetWorkspaceSize is scheduled to be deprecated in December 2026, and will be replaced "
+    "by the aclnnIncreFlashAttentionV4GetWorkspaceSize. "
+    "We apologize for any inconvenience caused and appreciate your timely migration to the new interface. ")))
+__attribute__((visibility("default"))) aclnnStatus
+aclnnIncreFlashAttentionV3GetWorkspaceSize(const aclTensor* query, const aclTensorList* key, const aclTensorList* value,
+                                           const aclTensor* pseShift, const aclTensor* attenMask,
+                                           const aclIntArray* actualSeqLengths, const aclTensor* dequantScale1,
+                                           const aclTensor* quantScale1, const aclTensor* dequantScale2,
+                                           const aclTensor* quantScale2, const aclTensor* quantOffset2,
+                                           const aclTensor* antiquantScale, const aclTensor* antiquantOffset,
+                                           const aclTensor* blocktable, int64_t numHeads, double scaleValue,
+                                           char* inputLayout, int64_t numKeyValueHeads, int64_t blockSize,
+                                           int64_t innerPrecise, const aclTensor* attentionOut, uint64_t* workspaceSize,
+                                           aclOpExecutor** executor);
 
 /**
  * funtion: aclnnIncreFlashAttentionV3
@@ -66,11 +72,12 @@ __attribute__((visibility("default"))) aclnnStatus aclnnIncreFlashAttentionV3Get
  * @param [in] stream : acl stream.
  * @return aclnnStatus: 返回状态码
  */
-__attribute__((deprecated("aclnnIncreFlashAttentionV3 is scheduled to be deprecated in December 2026, and will be replaced by the aclnnIncreFlashAttentionV4. "
- 	                      "We apologize for any inconvenience caused and appreciate your timely migration to the new interface. ")))
-__attribute__((visibility("default"))) aclnnStatus aclnnIncreFlashAttentionV3(void *workspace, uint64_t workspaceSize,
-                                                                              aclOpExecutor *executor,
-                                                                              const aclrtStream stream);
+__attribute__((deprecated(
+    "aclnnIncreFlashAttentionV3 is scheduled to be deprecated in December 2026, and will be replaced by the "
+    "aclnnIncreFlashAttentionV4. "
+    "We apologize for any inconvenience caused and appreciate your timely migration to the new interface. ")))
+__attribute__((visibility("default"))) aclnnStatus
+aclnnIncreFlashAttentionV3(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, const aclrtStream stream);
 
 #ifdef __cplusplus
 }

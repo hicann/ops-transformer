@@ -18,16 +18,16 @@ extern "C" {
 #endif
 
 __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
-    const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount, const aclTensor *cuSeqLengthsQOptional,
-    const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
+    const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount, const aclTensor* cuSeqLengthsQOptional,
+    const aclTensor* cuSeqLengthsKvOptional, const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional,
     int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads, int64_t headDim,
-    const aclIntArray *blockShape, char *layoutQ, char *layoutKv, int64_t layoutSparsePattern, int64_t maskType,
+    const aclIntArray* blockShape, char* layoutQ, char* layoutKv, int64_t layoutSparsePattern, int64_t maskType,
     int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode, bool isConsistentTopk,
-    aclTensor *metadata, uint64_t *workspaceSize, aclOpExecutor **executor);
+    aclTensor* metadata, uint64_t* workspaceSize, aclOpExecutor** executor);
 
-__attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(void *workspace,
+__attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(void* workspace,
                                                                                                 uint64_t workspaceSize,
-                                                                                                aclOpExecutor *executor,
+                                                                                                aclOpExecutor* executor,
                                                                                                 aclrtStream stream);
 
 #ifdef __cplusplus

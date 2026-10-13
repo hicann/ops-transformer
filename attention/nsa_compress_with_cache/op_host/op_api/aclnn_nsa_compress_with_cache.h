@@ -21,16 +21,16 @@ extern "C" {
  * @brief aclnnNsaCompressWithCache的第一段接口，根据具体的计算流程，计算workspace大小。
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnNsaCompressWithCacheGetWorkspaceSize(
-    const aclTensor *input, const aclTensor *weight, const aclTensor *slotMapping, const aclIntArray *actSeqLenOptional,
-    const aclTensor *blockTableOptional, char *layoutOptional, int64_t compressBlockSize, int64_t compressStride,
-    int64_t actSeqLenType, int64_t pageBlockSize, aclTensor *outputCache, uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    const aclTensor* input, const aclTensor* weight, const aclTensor* slotMapping, const aclIntArray* actSeqLenOptional,
+    const aclTensor* blockTableOptional, char* layoutOptional, int64_t compressBlockSize, int64_t compressStride,
+    int64_t actSeqLenType, int64_t pageBlockSize, aclTensor* outputCache, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
 /**
  * @brief aclnnNsaCompressWithCache的第二段接口，用于执行计算。。
  */
-__attribute__((visibility("default"))) aclnnStatus aclnnNsaCompressWithCache(void *workspace, uint64_t workspaceSize,
-                                                                             aclOpExecutor *executor,
+__attribute__((visibility("default"))) aclnnStatus aclnnNsaCompressWithCache(void* workspace, uint64_t workspaceSize,
+                                                                             aclOpExecutor* executor,
                                                                              aclrtStream stream);
 
 #ifdef __cplusplus

@@ -22,17 +22,15 @@
 extern "C" {
 #endif
 
-__attribute__((visibility("default")))
-aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadataGetWorkspaceSize(
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKOptional, const aclTensor *cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
-    int64_t maxSeqlenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk, char *layoutQOptional,
-    char *layoutKOptional, int64_t maskMode, int64_t cmpRatio, const aclTensor *metadata, uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+__attribute__((visibility("default"))) aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadataGetWorkspaceSize(
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional, int64_t batchSize, int64_t maxSeqlenQ,
+    int64_t maxSeqlenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk, char* layoutQOptional,
+    char* layoutKOptional, int64_t maskMode, int64_t cmpRatio, const aclTensor* metadata, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
-__attribute__((visibility("default")))
-aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(void *workspace, uint64_t workspaceSize,
-    aclOpExecutor *executor, aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
+    void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

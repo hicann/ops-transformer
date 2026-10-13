@@ -66,10 +66,9 @@ extern "C" {
 ACLNN_API aclnnStatus aclnnUndGenQkvRmsNormRopeCacheGetWorkspaceSize(
     const aclTensor* undQkv, const aclTensor* undWeightsQ, const aclTensor* undWeightsK, const aclTensor* cosSinCache,
     aclTensor* kCacheRef, aclTensor* vCacheRef, const aclTensor* slotMapping, const aclTensor* positions,
-    const aclTensor* genQkvOptional, const aclTensor* genWeightsQOptional,
-    const aclTensor* genWeightsKOptional, const aclTensor* catIndicesOptional,
-    int64_t numHeadsQ, int64_t numHeadsK, int64_t numHeadsV, double normEps, const aclIntArray* mropeSection,
-    aclTensor* qOut, uint64_t* workspaceSize, aclOpExecutor** executor);
+    const aclTensor* genQkvOptional, const aclTensor* genWeightsQOptional, const aclTensor* genWeightsKOptional,
+    const aclTensor* catIndicesOptional, int64_t numHeadsQ, int64_t numHeadsK, int64_t numHeadsV, double normEps,
+    const aclIntArray* mropeSection, aclTensor* qOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnUndGenQkvRmsNormRopeCache的第二段接口，用于执行计算。
@@ -79,8 +78,8 @@ ACLNN_API aclnnStatus aclnnUndGenQkvRmsNormRopeCacheGetWorkspaceSize(
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码。
  */
-ACLNN_API aclnnStatus aclnnUndGenQkvRmsNormRopeCache(
-    void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
+ACLNN_API aclnnStatus aclnnUndGenQkvRmsNormRopeCache(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                                     aclrtStream stream);
 
 #ifdef __cplusplus
 }

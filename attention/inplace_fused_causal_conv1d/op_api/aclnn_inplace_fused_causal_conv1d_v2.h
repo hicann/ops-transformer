@@ -23,16 +23,16 @@ extern "C" {
  * @domain aclnn_ops_infer
  */
 ACLNN_API aclnnStatus aclnnInplaceFusedCausalConv1dV2GetWorkspaceSize(
-    aclTensor *x, const aclTensor *weight, aclTensor *convStates, const aclTensor *queryStartLoc,
-    const aclTensor *cacheIndices, const aclTensor *initialStateMode, const aclTensor *bias,
-    const aclTensor *numAcceptedTokens, const aclTensor *numComputedTokens,
-    const aclTensor *blockIdxFirstScheduledToken, const aclTensor *blockIdxLastScheduledToken,
-    const aclTensor *initialStateIdx, int64_t activationMode, int64_t padSlotId, int64_t runMode, int64_t maxQueryLen,
-    int64_t residualConnection, int64_t blockSize, int64_t convMode, int64_t maxDraftTokens, uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    aclTensor* x, const aclTensor* weight, aclTensor* convStates, const aclTensor* queryStartLoc,
+    const aclTensor* cacheIndices, const aclTensor* initialStateMode, const aclTensor* bias,
+    const aclTensor* numAcceptedTokens, const aclTensor* numComputedTokens,
+    const aclTensor* blockIdxFirstScheduledToken, const aclTensor* blockIdxLastScheduledToken,
+    const aclTensor* initialStateIdx, int64_t activationMode, int64_t padSlotId, int64_t runMode, int64_t maxQueryLen,
+    int64_t residualConnection, int64_t blockSize, int64_t convMode, int64_t maxDraftTokens, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
 /* @brief aclnnInplaceFusedCausalConv1dV2的第二段接口，用于执行计算。 */
-ACLNN_API aclnnStatus aclnnInplaceFusedCausalConv1dV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnInplaceFusedCausalConv1dV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                       aclrtStream stream);
 
 #ifdef __cplusplus

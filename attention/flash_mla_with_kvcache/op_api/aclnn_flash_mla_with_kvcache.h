@@ -67,12 +67,12 @@ extern "C" {
  * @return aclnnStatus 执行状态。ACLNN_SUCCESS表示成功。
  */
 aclnnStatus aclnnFlashMlaWithKvcacheGetWorkspaceSize(
-    const aclTensor *q, const aclTensor *kCache, const aclTensor *blockTableOptional,
-    const aclTensor *cacheSeqlensOptional, const aclTensor *cuSeqlensQOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *attnMaskOptional, const aclTensor *metadataOptional, int64_t headDimV, double softmaxScale,
-    int64_t maskMode, int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char *layoutQ, const char *layoutKv,
-    const char *layoutOut, int64_t returnSoftmaxLse, const aclTensor *attnOut, const aclTensor *softmaxLseOptional,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* q, const aclTensor* kCache, const aclTensor* blockTableOptional,
+    const aclTensor* cacheSeqlensOptional, const aclTensor* cuSeqlensQOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* attnMaskOptional, const aclTensor* metadataOptional, int64_t headDimV, double softmaxScale,
+    int64_t maskMode, int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char* layoutQ, const char* layoutKv,
+    const char* layoutOut, int64_t returnSoftmaxLse, const aclTensor* attnOut, const aclTensor* softmaxLseOptional,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnFlashMlaWithKvcache的第二段接口，用于执行计算。
@@ -82,7 +82,7 @@ aclnnStatus aclnnFlashMlaWithKvcacheGetWorkspaceSize(
  * @param stream          [IN] 用于执行计算的acl stream。
  * @return aclnnStatus 执行状态。
  */
-aclnnStatus aclnnFlashMlaWithKvcache(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnFlashMlaWithKvcache(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                      const aclrtStream stream);
 
 #ifdef __cplusplus

@@ -40,7 +40,8 @@ namespace ge {
 * @li scale_value: A float. The scale value. Default: 1.0.
 * @li pre_tokens: An int. Previous tokens. Default: 214748647.
 * @li next_tokens: An int. Next tokens. Default: 0.
-* @li input_layout: A string. Specifies the layout of `query`, the value must be one of ["BSH", "BNSD", "BSND", "BNSD_BSND"]. Default: "BSH".
+* @li input_layout: A string. Specifies the layout of `query`, the value must be one of ["BSH", "BNSD", "BSND",
+"BNSD_BSND"]. Default: "BSH".
 * @li num_key_value_heads: Key value num heads. Default: 0.
 * @li sparse_mode: Sparse mode. Default: 0.
 * @li inner_precise: An int. 0, float16 high precision. 1, high performance. Default: 1.
@@ -50,16 +51,22 @@ namespace ge {
 
 * @attention Constraints:
 * @li Ensure CANN and PyTorch package version compatibility when using this interface with PyTorch.
-* @li Handle empty input: If 'query' is empty, return directly. If 'query' is non-empty and 'key', 'value' are empty tensors (S2=0), fill 'attention_out' with zeros of the corresponding shape.
+* @li Handle empty input: If 'query' is empty, return directly. If 'query' is non-empty and 'key', 'value' are empty
+tensors (S2=0), fill 'attention_out' with zeros of the corresponding shape.
 * If 'attention_out' is an empty tensor, AscendCLNN will process it.
 * @li The 'sparseMode' parameter currently only supports values 0, 1, 2, 3, and 4; other values will cause an error.
-* @li Output is INT8. 'quantOffset2' must be a non-empty pointer and tensor. 'sparseMode', 'preTokens', and 'nextTokens' must meet certain conditions.
-* If some rows of the matrix do not participate in calculations, resulting in computational errors, this scenario will be blocked
-* (solution: if you want this scenario not to be blocked, post-quantization operations should be performed outside the PFA interface, not enabled within).
-* For `sparseMode = 0`, if `attenMask` is a non-empty pointer, the condition for interception is `actualSeqLengths - actualSeqLengthsKV - preTokens > 0` or `nextTokens < 0` per batch.
+* @li Output is INT8. 'quantOffset2' must be a non-empty pointer and tensor. 'sparseMode', 'preTokens', and 'nextTokens'
+must meet certain conditions.
+* If some rows of the matrix do not participate in calculations, resulting in computational errors, this scenario will
+be blocked
+* (solution: if you want this scenario not to be blocked, post-quantization operations should be performed outside the
+PFA interface, not enabled within).
+* For `sparseMode = 0`, if `attenMask` is a non-empty pointer, the condition for interception is `actualSeqLengths -
+actualSeqLengthsKV - preTokens > 0` or `nextTokens < 0` per batch.
 * For `sparseMode = 1` or `2`, no interception conditions are met.
 * For `sparseMode = 3`, the condition for interception is `actualSeqLengthsKV - actualSeqLengths < 0` per batch.
-* For `sparseMode = 4`, the condition for interception is `preTokens < 0` or `nextTokens + actualSeqLengthsKV - actualSeqLengths < 0` per batch.
+* For `sparseMode = 4`, the condition for interception is `preTokens < 0` or `nextTokens + actualSeqLengthsKV -
+actualSeqLengths < 0` per batch.
 */
 REG_OP(PromptFlashAttention)
     .INPUT(query, TensorType({DT_FLOAT16, DT_BF16, DT_INT8}))
@@ -84,6 +91,6 @@ REG_OP(PromptFlashAttention)
     .ATTR(sparse_mode, Int, 0)
     .ATTR(inner_precise, Int, 1)
     .OP_END_FACTORY_REG(PromptFlashAttention)
-}  // namespace ge
+} // namespace ge
 
 #endif // OPS_OP_PROTO_INC_PROMPT_FLASH_ATTENTION_OPS_H_

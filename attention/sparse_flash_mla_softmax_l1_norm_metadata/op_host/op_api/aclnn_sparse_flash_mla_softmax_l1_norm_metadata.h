@@ -23,15 +23,15 @@ extern "C" {
 #endif
 
 __attribute__((visibility("default"))) aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadataGetWorkspaceSize(
-    const aclTensor *cuSeqLensQOptional, const aclTensor *cuSeqLensKOptional, const aclTensor *seqUsedQOptional,
-    const aclTensor *seqUsedKOptional, const aclTensor *cmpResidualKOptional, const aclTensor *topkLengthOptional,
+    const aclTensor* cuSeqLensQOptional, const aclTensor* cuSeqLensKOptional, const aclTensor* seqUsedQOptional,
+    const aclTensor* seqUsedKOptional, const aclTensor* cmpResidualKOptional, const aclTensor* topkLengthOptional,
     int64_t batchSize, int64_t maxSeqLenQ, int64_t maxSeqLenK, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim,
-    int64_t topk, int64_t cmpRatio, int64_t maskMode, char *layoutQ, char *layoutK, const aclTensor *metadata,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    int64_t topk, int64_t cmpRatio, int64_t maskMode, char* layoutQ, char* layoutK, const aclTensor* metadata,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
-__attribute__((visibility("default"))) aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(void *workspace,
+__attribute__((visibility("default"))) aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(void* workspace,
                                                                                             uint64_t workspaceSize,
-                                                                                            aclOpExecutor *executor,
+                                                                                            aclOpExecutor* executor,
                                                                                             aclrtStream stream);
 
 #ifdef __cplusplus

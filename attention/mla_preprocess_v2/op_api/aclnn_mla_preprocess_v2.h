@@ -69,17 +69,17 @@ extern "C" {
  * @return aclnnStatus 成功时返回ACLNN_SUCCESS，否则返回对应错误码。
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnMlaPreprocessV2GetWorkspaceSize(
-    const aclTensor *input, const aclTensor *gamma0, const aclTensor *beta0, const aclTensor *quantScale0,
-    const aclTensor *quantOffset0, const aclTensor *wdqkv, const aclTensor *descale0, const aclTensor *bias0,
-    const aclTensor *gamma1, const aclTensor *beta1, const aclTensor *quantScale1, const aclTensor *quantOffset1,
-    const aclTensor *wuq, const aclTensor *descale1, const aclTensor *bias1, const aclTensor *gamma2,
-    const aclTensor *cos, const aclTensor *sin, const aclTensor *wuk, const aclTensor *kvCache,
-    const aclTensor *kvCacheRope, const aclTensor *slotMapping, const aclTensor *ctkvScale,
-    const aclTensor *qNopeScale, int64_t wdqDim, int64_t qRopeDim, int64_t kRopeDim, double epsilon,
-    int64_t qRotaryCoeff, int64_t kRotaryCoeff, bool transeposeWdq, bool transeposeWuq, bool transeposeWuk,
-    int64_t cacheMode, int64_t quantMode, bool doRmsNorm, int64_t wdkvSplitCount, bool qDownOutFlag,
-    const aclTensor *qOutOut, const aclTensor *kvCacheOutOut, const aclTensor *qRopeOutOut,
-    const aclTensor *krCacheOutOut, const aclTensor *qDownOutOut, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* input, const aclTensor* gamma0, const aclTensor* beta0, const aclTensor* quantScale0,
+    const aclTensor* quantOffset0, const aclTensor* wdqkv, const aclTensor* descale0, const aclTensor* bias0,
+    const aclTensor* gamma1, const aclTensor* beta1, const aclTensor* quantScale1, const aclTensor* quantOffset1,
+    const aclTensor* wuq, const aclTensor* descale1, const aclTensor* bias1, const aclTensor* gamma2,
+    const aclTensor* cos, const aclTensor* sin, const aclTensor* wuk, const aclTensor* kvCache,
+    const aclTensor* kvCacheRope, const aclTensor* slotMapping, const aclTensor* ctkvScale, const aclTensor* qNopeScale,
+    int64_t wdqDim, int64_t qRopeDim, int64_t kRopeDim, double epsilon, int64_t qRotaryCoeff, int64_t kRotaryCoeff,
+    bool transeposeWdq, bool transeposeWuq, bool transeposeWuk, int64_t cacheMode, int64_t quantMode, bool doRmsNorm,
+    int64_t wdkvSplitCount, bool qDownOutFlag, const aclTensor* qOutOut, const aclTensor* kvCacheOutOut,
+    const aclTensor* qRopeOutOut, const aclTensor* krCacheOutOut, const aclTensor* qDownOutOut, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
 /**
  * @brief 使用aclnnMlaPreprocessV2GetWorkspaceSize创建的执行器异步执行MlaPreprocessV2。
@@ -90,11 +90,11 @@ __attribute__((visibility("default"))) aclnnStatus aclnnMlaPreprocessV2GetWorksp
  * @param stream [IN] 执行算子使用的ACL运行时Stream。
  * @return aclnnStatus 下发成功时返回ACLNN_SUCCESS，否则返回对应错误码。
  */
-__attribute__((visibility("default"))) aclnnStatus aclnnMlaPreprocessV2(
-    void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnMlaPreprocessV2(void* workspace, uint64_t workspaceSize,
+                                                                        aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // ACLNN_MLA_PREPROCESS_V2_H
+#endif // ACLNN_MLA_PREPROCESS_V2_H

@@ -18,39 +18,20 @@ extern "C" {
 #endif
 
 __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGetWorkspaceSize(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *blockSparseMaskOptional,
-    const aclTensor *attenMaskOptional,
-    const aclIntArray *blockShapeOptional,
-    const aclIntArray *actualSeqLengthsOptional,
-    const aclIntArray *actualSeqLengthsKvOptional,
-    const aclTensor *blockTableOptional,
-    char *qInputLayout,
-    char *kvInputLayout,
-    int64_t numKeyValueHeads,
-    int64_t maskType,
-    double scaleValue,
-    int64_t innerPrecise,
-    int64_t blockSize,
-    int64_t preTokens,
-    int64_t nextTokens,
-    int64_t softmaxLseFlag,
-    aclTensor *attentionOut,
-    aclTensor *softmaxLseOptional,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* blockSparseMaskOptional,
+    const aclTensor* attenMaskOptional, const aclIntArray* blockShapeOptional,
+    const aclIntArray* actualSeqLengthsOptional, const aclIntArray* actualSeqLengthsKvOptional,
+    const aclTensor* blockTableOptional, char* qInputLayout, char* kvInputLayout, int64_t numKeyValueHeads,
+    int64_t maskType, double scaleValue, int64_t innerPrecise, int64_t blockSize, int64_t preTokens, int64_t nextTokens,
+    int64_t softmaxLseFlag, aclTensor* attentionOut, aclTensor* softmaxLseOptional, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
-__attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttention(
-    void *workspace,
-    uint64_t workspaceSize,
-    aclOpExecutor *executor,
-    aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttention(void* workspace, uint64_t workspaceSize,
+                                                                             aclOpExecutor* executor,
+                                                                             aclrtStream stream);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // ACLNN_BLOCK_SPARSE_ATTENTION_H_
-
+#endif // ACLNN_BLOCK_SPARSE_ATTENTION_H_

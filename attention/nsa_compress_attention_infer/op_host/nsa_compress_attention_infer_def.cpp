@@ -76,7 +76,7 @@ public:
             .DataType({ge::DT_INT32, ge::DT_INT32})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND});
-        
+
         this->Attr("numHeads").AttrType(OPTIONAL).Int(1);
         this->Attr("numKeyValueHeads").AttrType(OPTIONAL).Int(0);
         this->Attr("selectBlockSize").AttrType(OPTIONAL).Int(0);

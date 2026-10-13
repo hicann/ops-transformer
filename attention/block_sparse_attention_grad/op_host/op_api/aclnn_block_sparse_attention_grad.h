@@ -20,7 +20,7 @@ extern "C" {
 /**
  * @brief aclnnBlockSparseAttentionGrad的第一段接口,根据具体的计算流程,计算workspace大小
  * @domain aclnn_ops_infer
- * 
+ *
  * @param [in] dout: attention out 梯度输入
  * @param [in] query: Query tensor输入
  * @param [in] key: Key tensor输入
@@ -47,48 +47,29 @@ extern "C" {
  * @return aclnnStatus: 返回状态码
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGradGetWorkspaceSize(
-    const aclTensor *dout,
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *attentionOut,
-    const aclTensor *softmaxLse,
-    const aclTensor *blockSparseMaskOptional,
-    const aclTensor *attenMaskOptional,
-    const aclIntArray *blockShapeOptional,
-    const aclIntArray *actualSeqLengthsOptional,
-    const aclIntArray *actualSeqLengthsKvOptional,
-    char *qInputLayout,
-    char *kvInputLayout,
-    int64_t numKeyValueHeads,
-    int64_t maskType,
-    double scaleValue,
-    int64_t preTokens,
-    int64_t nextTokens,
-    aclTensor *dq,
-    aclTensor *dk,
-    aclTensor *dv,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    const aclTensor* dout, const aclTensor* query, const aclTensor* key, const aclTensor* value,
+    const aclTensor* attentionOut, const aclTensor* softmaxLse, const aclTensor* blockSparseMaskOptional,
+    const aclTensor* attenMaskOptional, const aclIntArray* blockShapeOptional,
+    const aclIntArray* actualSeqLengthsOptional, const aclIntArray* actualSeqLengthsKvOptional, char* qInputLayout,
+    char* kvInputLayout, int64_t numKeyValueHeads, int64_t maskType, double scaleValue, int64_t preTokens,
+    int64_t nextTokens, aclTensor* dq, aclTensor* dk, aclTensor* dv, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnBlockSparseAttentionGrad的第二段接口,用于执行计算
- * 
+ *
  * @param [in] workspace: 工作空间地址
  * @param [in] workspaceSize: 工作空间大小
  * @param [in] executor: op执行器
  * @param [in] stream: acl stream流
  * @return aclnnStatus: 返回状态码
  */
-__attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGrad(
-    void *workspace,
-    uint64_t workspaceSize,
-    aclOpExecutor *executor,
-    const aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionGrad(void* workspace,
+                                                                                 uint64_t workspaceSize,
+                                                                                 aclOpExecutor* executor,
+                                                                                 const aclrtStream stream);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // ACLNN_BLOCK_SPARSE_ATTENTION_GRAD_H
-
+#endif // ACLNN_BLOCK_SPARSE_ATTENTION_GRAD_H

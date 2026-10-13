@@ -20,7 +20,7 @@ extern "C" {
 /**
  * @brief aclnnRainFusionAttention的第一段接口,根据具体的计算流程,计算workspace大小
  * @domain aclnn_ops_infer
- * 
+ *
  * @param [in] query: Query tensor输入
  * @param [in] key: Key tensor输入
  * @param [in] value: Value tensor输入
@@ -45,46 +45,28 @@ extern "C" {
  * @return aclnnStatus: 返回状态码
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnRainFusionAttentionGetWorkspaceSize(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *selectIdx,
-    const aclTensor *selectNumIdx,
-    const aclIntArray *blockShape,
-    const aclTensor *attenMaskOptional,
-    const aclIntArray *actualSeqLengthsOptional,
-    const aclIntArray *actualSeqLengthsKvOptional,
-    const aclTensor *blockTableOptional,
-    char *qInputLayout,
-    char *kvInputLayout,
-    int64_t numKeyValueHeads,
-    int64_t maskType,
-    double scaleValue,
-    int64_t innerPrecise,
-    int64_t blockSize,
-    const aclTensor *attentionOut,
-    const aclTensor *softmaxLseOptional,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* selectIdx,
+    const aclTensor* selectNumIdx, const aclIntArray* blockShape, const aclTensor* attenMaskOptional,
+    const aclIntArray* actualSeqLengthsOptional, const aclIntArray* actualSeqLengthsKvOptional,
+    const aclTensor* blockTableOptional, char* qInputLayout, char* kvInputLayout, int64_t numKeyValueHeads,
+    int64_t maskType, double scaleValue, int64_t innerPrecise, int64_t blockSize, const aclTensor* attentionOut,
+    const aclTensor* softmaxLseOptional, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnRainFusionAttention的第二段接口,用于执行计算
- * 
+ *
  * @param [in] workspace: 工作空间地址
  * @param [in] workspaceSize: 工作空间大小
  * @param [in] executor: op执行器
  * @param [in] stream: acl stream流
  * @return aclnnStatus: 返回状态码
  */
-__attribute__((visibility("default"))) aclnnStatus aclnnRainFusionAttention(
-    void *workspace,
-    uint64_t workspaceSize,
-    aclOpExecutor *executor,
-    const aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnRainFusionAttention(void* workspace, uint64_t workspaceSize,
+                                                                            aclOpExecutor* executor,
+                                                                            const aclrtStream stream);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // ACLNN_RAIN_FUSION_ATTENTION_H_
-
+#endif // ACLNN_RAIN_FUSION_ATTENTION_H_

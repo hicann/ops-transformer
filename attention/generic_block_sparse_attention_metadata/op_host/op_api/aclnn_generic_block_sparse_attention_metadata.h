@@ -18,17 +18,17 @@ extern "C" {
 #endif
 
 __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
-    const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount, const aclTensor *cuSeqLengthsQOptional,
-    const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
+    const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount, const aclTensor* cuSeqLengthsQOptional,
+    const aclTensor* cuSeqLengthsKvOptional, const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional,
     int64_t maxQSeqLen, int64_t maxKvSeqLen, int64_t numQHeads, int64_t numKvHeads, int64_t headDim,
-    const aclIntArray *blockShape, const char *layoutQ, const char *layoutKv, int64_t layoutSparsePattern,
+    const aclIntArray* blockShape, const char* layoutQ, const char* layoutKv, int64_t layoutSparsePattern,
     int64_t maskType, int64_t quantType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight,
-    int64_t residualBlockMode, bool isConsistentTopk, const aclTensor *metadataOptional, uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    int64_t residualBlockMode, bool isConsistentTopk, const aclTensor* metadataOptional, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
-__attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttentionMetadata(void *workspace,
+__attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttentionMetadata(void* workspace,
                                                                                             uint64_t workspaceSize,
-                                                                                            aclOpExecutor *executor,
+                                                                                            aclOpExecutor* executor,
                                                                                             aclrtStream stream);
 
 #ifdef __cplusplus

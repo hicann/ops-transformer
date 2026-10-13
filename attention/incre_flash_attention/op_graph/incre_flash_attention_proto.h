@@ -26,7 +26,8 @@ namespace ge {
 * @li key: It's a dynamic input. A matrix Tensor. The type support float16, bf16, int8.
 * @li value: It's a dynamic input. A matrix Tensor. The type support float16, bf16, int8.
 * @li pse_shift: A matrix Tensor. Position coding inside the attention structure. The type support float16, bf16.
-* @li atten_mask: A matrix Tensor. Mask the result of multiplying query by key to indicate whether to calculate the correlation between tokens.
+* @li atten_mask: A matrix Tensor. Mask the result of multiplying query by key to indicate whether to calculate the
+correlation between tokens.
 * The type support bool, int8, uint8.
 * @li actual_seq_lengths: A matrix Tensor. Indicates the valid sequence length of the key/value in different batches.
 * The type support int64.
@@ -48,7 +49,8 @@ namespace ge {
 * @par Attributes:
 * @li num_heads: A required int. The number of the heads.
 * @li scale_value: An optional float. The scale value. Default: 1.0.
-* @li input_layout: An optional string. Specifies the layout of query, the value must be one of ["BSH", "BNSD", "BSND"]. Default: "BSH".
+* @li input_layout: An optional string. Specifies the layout of query, the value must be one of ["BSH", "BNSD", "BSND"].
+Default: "BSH".
 * @li num_key_value_heads: An optional int. Key value num heads. Default: 1.
 * @li block_size: An optional int. Max length in pageattention's kv block. Default: 0.
 * @li inner_precise: An optional int. When innerPrecise is 0, the high-precision mode is used.
@@ -68,7 +70,8 @@ namespace ge {
 * - Constraints for int8 quantization:
 * @li Specific parameter existence and data format requirements based on input/output data formats.
 * @li Both input and output int8: need deqScale1, quantScale1, deqScale2, quantScale2.
-* @li Input int8, output float16: need deqScale1, quantScale1, deqScale2; error if quantOffset2 or quantScale2 not nullptr.
+* @li Input int8, output float16: need deqScale1, quantScale1, deqScale2; error if quantOffset2 or quantScale2 not
+nullptr.
 * @li Input float16/bf16, output int8: only quantScale2 needs to exist.
 *
 * - Constraints for antiquant:
@@ -106,6 +109,6 @@ REG_OP(IncreFlashAttention)
     .ATTR(block_size, Int, 0)
     .ATTR(inner_precise, Int, 1)
     .OP_END_FACTORY_REG(IncreFlashAttention)
-}  // namespace ge
+} // namespace ge
 
 #endif // OPS_OP_PROTO_INC_INCRE_FLASH_ATTENTION_OPS_H_

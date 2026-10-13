@@ -18,12 +18,12 @@ extern "C" {
 #endif
 
 __attribute__((visibility("default"))) aclnnStatus aclnnNsaCompressGetWorkspaceSize(
-    const aclTensor *input, const aclTensor *weight, const aclIntArray *actSeqLenOptional, char *layoutOptional,
-    int64_t compressBlockSize, int64_t compressStride, int64_t actSeqLenType, aclTensor *output,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* input, const aclTensor* weight, const aclIntArray* actSeqLenOptional, char* layoutOptional,
+    int64_t compressBlockSize, int64_t compressStride, int64_t actSeqLenType, aclTensor* output,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
-__attribute__((visibility("default"))) aclnnStatus aclnnNsaCompress(void *workspace, uint64_t workspaceSize,
-                                                                    aclOpExecutor *executor, aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnNsaCompress(void* workspace, uint64_t workspaceSize,
+                                                                    aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

@@ -40,15 +40,15 @@ extern "C" {
  * @return aclnnStatus 成功时返回ACLNN_SUCCESS。
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnKdaInputProjGetWorkspaceSize(
-    const aclTensor *x, const aclTensor *weightQkv, const aclTensor *weightBeta, const aclTensor *weightGate,
-    const aclTensor *weightG, const aclTensor *weightQkvScale, const aclTensor *qkvOut, const aclTensor *betaOut,
-    const aclTensor *gateOut, const aclTensor *gOut, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* x, const aclTensor* weightQkv, const aclTensor* weightBeta, const aclTensor* weightGate,
+    const aclTensor* weightG, const aclTensor* weightQkvScale, const aclTensor* qkvOut, const aclTensor* betaOut,
+    const aclTensor* gateOut, const aclTensor* gOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief 使用aclnnKdaInputProjGetWorkspaceSize创建的执行器异步执行KdaInputProj。
  */
-__attribute__((visibility("default"))) aclnnStatus aclnnKdaInputProj(void *workspace, uint64_t workspaceSize,
-                                                                     aclOpExecutor *executor, aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnKdaInputProj(void* workspace, uint64_t workspaceSize,
+                                                                     aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

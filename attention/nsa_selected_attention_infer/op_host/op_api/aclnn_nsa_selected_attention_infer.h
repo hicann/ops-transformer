@@ -23,38 +23,21 @@ extern "C" {
 #endif
 
 /**
-* @brief aclnnNsaSelectedAttentionInfer的第一段接口，根据具体的计算流程，计算workspace大小。
-* @domain aclnn_ops_infer
-*/
+ * @brief aclnnNsaSelectedAttentionInfer的第一段接口，根据具体的计算流程，计算workspace大小。
+ * @domain aclnn_ops_infer
+ */
 aclnnStatus aclnnNsaSelectedAttentionInferGetWorkspaceSize(
-    const aclTensor *query, 
-    const aclTensor *key, 
-    const aclTensor *value, 
-    const aclTensor *topkIndices, 
-    const aclTensor *attenMaskOptional,
-    const aclTensor *blockTableOptional,
-    const aclIntArray *actualQSeqLenOptional,
-    const aclIntArray *actualKvSeqLenOptional,
-    char *layoutOptional,
-    int64_t numHeads,
-    int64_t numKeyValueHeads,
-    int64_t selectBlockSize,
-    int64_t selectBlockCount,
-    int64_t pageBlockSize,
-    double scaleValue,
-    int64_t sparseMode,
-    aclTensor *output,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* topkIndices,
+    const aclTensor* attenMaskOptional, const aclTensor* blockTableOptional, const aclIntArray* actualQSeqLenOptional,
+    const aclIntArray* actualKvSeqLenOptional, char* layoutOptional, int64_t numHeads, int64_t numKeyValueHeads,
+    int64_t selectBlockSize, int64_t selectBlockCount, int64_t pageBlockSize, double scaleValue, int64_t sparseMode,
+    aclTensor* output, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
-* @brief aclnnNsaSelectedAttentionInfer的第二段接口，用于执行计算。
-*/
-aclnnStatus aclnnNsaSelectedAttentionInfer(
-    void *workspace, 
-    uint64_t workspaceSize, 
-    aclOpExecutor *executor,
-    const aclrtStream stream);
+ * @brief aclnnNsaSelectedAttentionInfer的第二段接口，用于执行计算。
+ */
+aclnnStatus aclnnNsaSelectedAttentionInfer(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                           const aclrtStream stream);
 
 #ifdef __cplusplus
 }

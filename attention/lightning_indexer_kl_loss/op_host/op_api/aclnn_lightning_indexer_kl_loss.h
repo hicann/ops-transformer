@@ -21,14 +21,14 @@ extern "C" {
  * @brief aclnnLightningIndexerKLLoss的第一段接口，根据具体的计算流程，计算workspace大小。
  * @domain aclnn_ops_train
  */
-aclnnStatus aclnnLightningIndexerKLLossGetWorkspaceSize(const aclTensor *targetScore, const aclTensor *indexProbs,
-                                                        double eps, const char *weightType, const aclTensor *loss,
-                                                        uint64_t *workspaceSize, aclOpExecutor **executor);
+aclnnStatus aclnnLightningIndexerKLLossGetWorkspaceSize(const aclTensor* targetScore, const aclTensor* indexProbs,
+                                                        double eps, const char* weightType, const aclTensor* loss,
+                                                        uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnLightningIndexerKLLoss的第二段接口，用于执行计算。
  */
-aclnnStatus aclnnLightningIndexerKLLoss(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnLightningIndexerKLLoss(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                         aclrtStream stream);
 
 #ifdef __cplusplus

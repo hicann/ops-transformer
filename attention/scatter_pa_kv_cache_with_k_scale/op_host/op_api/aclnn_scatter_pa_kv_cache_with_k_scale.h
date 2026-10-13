@@ -40,9 +40,11 @@ extern "C" {
  * @param executor             [OUT] op执行器句柄，供第二段接口使用。
  * @return aclnnStatus 执行状态。ACLNN_SUCCESS表示成功。
  */
-aclnnStatus aclnnScatterPaKvCacheWithKScaleGetWorkspaceSize(const aclTensor *key, const aclTensor *value,
-    aclTensor *keyCacheRef, aclTensor *valueCacheRef, const aclTensor *slotMapping, aclTensor *keyScale,
-    aclTensor *keyScaleCacheRef, char *cacheLayoutOptional, uint64_t *workspaceSize, aclOpExecutor **executor);
+aclnnStatus aclnnScatterPaKvCacheWithKScaleGetWorkspaceSize(const aclTensor* key, const aclTensor* value,
+                                                            aclTensor* keyCacheRef, aclTensor* valueCacheRef,
+                                                            const aclTensor* slotMapping, aclTensor* keyScale,
+                                                            aclTensor* keyScaleCacheRef, char* cacheLayoutOptional,
+                                                            uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnScatterPaKvCacheWithKScale的第二段接口，用于执行计算。
@@ -52,8 +54,8 @@ aclnnStatus aclnnScatterPaKvCacheWithKScaleGetWorkspaceSize(const aclTensor *key
  * @param stream          [IN] 用于执行计算的acl stream。
  * @return aclnnStatus 执行状态。
  */
-aclnnStatus aclnnScatterPaKvCacheWithKScale(
-    void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+aclnnStatus aclnnScatterPaKvCacheWithKScale(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                            aclrtStream stream);
 
 #ifdef __cplusplus
 }

@@ -41,12 +41,13 @@ extern "C" {
  * @return aclnnStatus: 返回状态码。
  */
 ACLNN_API aclnnStatus aclnnRotaryPositionEmbeddingV2GetWorkspaceSize(const aclTensor* x, const aclTensor* cos,
-                                                                     const aclTensor* sin, int64_t mode, const aclTensor* rotate,
-                                                                     aclTensor* out, uint64_t* workspaceSize,
-                                                                     aclOpExecutor** executor);
+                                                                     const aclTensor* sin, int64_t mode,
+                                                                     const aclTensor* rotate, aclTensor* out,
+                                                                     uint64_t* workspaceSize, aclOpExecutor** executor);
 /* @brief aclnnRotaryPositionEmbeddingV2的第二段接口，用于执行计算.
  * @param [in] workspace: 在npu device侧申请的workspace内存起址
- * @param [in] workspaceSize: 在npu device侧申请的workspace大小，由第一段接口aclnnRotaryPositionEmbeddingV2GetWorkspaceSize获取。
+ * @param [in] workspaceSize: 在npu
+ * device侧申请的workspace大小，由第一段接口aclnnRotaryPositionEmbeddingV2GetWorkspaceSize获取。
  * @param [in] executor: op执行器，包含了算子计算流程。
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码。

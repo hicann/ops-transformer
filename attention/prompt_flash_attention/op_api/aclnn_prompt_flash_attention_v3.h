@@ -18,42 +18,27 @@ extern "C" {
 #endif
 
 /**
- * @brief The first interface of aclnnPromptFlashAttentionV3 is used to calculate the workspace size based on the specific calculation process.
+ * @brief The first interface of aclnnPromptFlashAttentionV3 is used to calculate the workspace size based on the
+ * specific calculation process.
  * @domain aclnn_ops_infer
-*/
-__attribute__ ((visibility("default"))) aclnnStatus aclnnPromptFlashAttentionV3GetWorkspaceSize(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *pseShift,
-    const aclTensor *attenMask, // attenMask of V3
-    const aclIntArray *actualSeqLengths,
-    const aclIntArray *actualSeqLengthsKv,
-    const aclTensor *deqScale1,
-    const aclTensor *quantScale1,
-    const aclTensor *deqScale2,
-    const aclTensor *quantScale2,
-    const aclTensor *quantOffset2,
+ */
+__attribute__((visibility("default"))) aclnnStatus aclnnPromptFlashAttentionV3GetWorkspaceSize(
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* pseShift,
+    const aclTensor* attenMask, // attenMask of V3
+    const aclIntArray* actualSeqLengths, const aclIntArray* actualSeqLengthsKv, const aclTensor* deqScale1,
+    const aclTensor* quantScale1, const aclTensor* deqScale2, const aclTensor* quantScale2,
+    const aclTensor* quantOffset2,
     int64_t numHeads, // q_n of V3
-    double scaleValue,
-    int64_t preTokens,
-    int64_t nextTokens,
-    char *inputLayout,
-    int64_t numKeyValueHeads,
+    double scaleValue, int64_t preTokens, int64_t nextTokens, char* inputLayout, int64_t numKeyValueHeads,
     int64_t sparseMode, // sparse of V3
-    int64_t innerPrecise,
-    const aclTensor *attentionOut,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    int64_t innerPrecise, const aclTensor* attentionOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief The second interface of aclnnPromptFlashAttentionV3 is used to perform calculations.
-*/
-__attribute__ ((visibility("default"))) aclnnStatus aclnnPromptFlashAttentionV3(
-    void *workspace,
-    uint64_t workspaceSize,
-    aclOpExecutor *executor,
-    const aclrtStream stream);
+ */
+__attribute__((visibility("default"))) aclnnStatus aclnnPromptFlashAttentionV3(void* workspace, uint64_t workspaceSize,
+                                                                               aclOpExecutor* executor,
+                                                                               const aclrtStream stream);
 
 #ifdef __cplusplus
 }

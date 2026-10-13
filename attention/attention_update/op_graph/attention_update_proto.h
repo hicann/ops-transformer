@@ -30,7 +30,7 @@ namespace ge {
 * @par Outputs:
 * Two outputs, including:
 * @li output: A tensor. Type is float32, float16, bfloat16.
-* @li lse_m: A tensor. Type is float32.  
+* @li lse_m: A tensor. Type is float32.
 
 * @par Attributes:
 * Two attributes, including:

@@ -70,17 +70,17 @@ extern "C" {
  * @param [out] executor: 返回op执行器
  * @return aclnnStatus: 返回状态码
  */
-aclnnStatus aclnnChunkKdaFwdGetWorkspaceSize(const aclTensor *q, const aclTensor *k, const aclTensor *v,
-                                             const aclTensor *g, const aclTensor *beta, const aclTensor *aLogOptional,
-                                             const aclTensor *dtBiasOptional, const aclTensor *initialStateOptional,
-                                             const aclIntArray *cuSeqlensOptional,
-                                             const aclIntArray *chunkIndicesOptional, const char *layout, double scale,
+aclnnStatus aclnnChunkKdaFwdGetWorkspaceSize(const aclTensor* q, const aclTensor* k, const aclTensor* v,
+                                             const aclTensor* g, const aclTensor* beta, const aclTensor* aLogOptional,
+                                             const aclTensor* dtBiasOptional, const aclTensor* initialStateOptional,
+                                             const aclIntArray* cuSeqlensOptional,
+                                             const aclIntArray* chunkIndicesOptional, const char* layout, double scale,
                                              int64_t chunkSize, bool safeGate, double lowerBound, bool useGateInKernel,
-                                             bool stateVFirst, const aclTensor *attnOut, const aclTensor *finalStateOut,
-                                             const aclTensor *gkOut, const aclTensor *aqkOut, const aclTensor *akkOut,
-                                             const aclTensor *wOut, const aclTensor *uOut, const aclTensor *qgOut,
-                                             const aclTensor *kgOut, const aclTensor *vNewOut, const aclTensor *hOut,
-                                             uint64_t *workspaceSize, aclOpExecutor **executor);
+                                             bool stateVFirst, const aclTensor* attnOut, const aclTensor* finalStateOut,
+                                             const aclTensor* gkOut, const aclTensor* aqkOut, const aclTensor* akkOut,
+                                             const aclTensor* wOut, const aclTensor* uOut, const aclTensor* qgOut,
+                                             const aclTensor* kgOut, const aclTensor* vNewOut, const aclTensor* hOut,
+                                             uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnChunkKdaFwd的第二段接口,用于执行计算
@@ -91,7 +91,7 @@ aclnnStatus aclnnChunkKdaFwdGetWorkspaceSize(const aclTensor *q, const aclTensor
  * @param [in] stream: acl stream流
  * @return aclnnStatus: 返回状态码
  */
-aclnnStatus aclnnChunkKdaFwd(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+aclnnStatus aclnnChunkKdaFwd(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

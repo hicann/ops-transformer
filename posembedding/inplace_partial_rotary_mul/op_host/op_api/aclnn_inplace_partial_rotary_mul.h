@@ -38,7 +38,7 @@ extern "C" {
  */
 ACLNN_API aclnnStatus aclnnInplacePartialRotaryMulGetWorkspaceSize(const aclTensor* xRef, const aclTensor* cos,
                                                                    const aclTensor* sin, int64_t rotary_mode,
-                                                                   const aclIntArray *partialSlice,
+                                                                   const aclIntArray* partialSlice,
                                                                    uint64_t* workspaceSize, aclOpExecutor** executor);
 /* @brief aclnnInplacePartialRotaryMul的第二段接口，用于执行计算.
  * @param [in] workspace: 在npu device侧申请的workspace内存起址
