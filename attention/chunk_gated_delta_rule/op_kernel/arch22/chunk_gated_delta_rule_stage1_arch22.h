@@ -640,11 +640,14 @@ private:
                                         LocalTensor<float> valueUbFloat, uint32_t subValidRows)
     {
         uint64_t vBeginOffset = subOffset_ * vRowStride_;
-        DataCopyInBf16WithStride(subValidRows, dv_, valueGm[vBeginOffset], vRowStride_);
-        valueLocal_ = inQueue_.DeQue<bfloat16_t>();
-        Cast(valueUbFloat, valueLocal_, AscendC::RoundMode::CAST_NONE, subValidRows * dvAligned_);
-        PipeBarrier<PIPE_V>();
-        inQueue_.FreeTensor(valueLocal_);
+        // subValidRows 为 0 时源指针会越过 value 张量末尾，跳过拷入，仅保留清零填充路径
+        if (subValidRows > 0) {
+            DataCopyInBf16WithStride(subValidRows, dv_, valueGm[vBeginOffset], vRowStride_);
+            valueLocal_ = inQueue_.DeQue<bfloat16_t>();
+            Cast(valueUbFloat, valueLocal_, AscendC::RoundMode::CAST_NONE, subValidRows * dvAligned_);
+            PipeBarrier<PIPE_V>();
+            inQueue_.FreeTensor(valueLocal_);
+        }
         if (subValidRows < halfChunkSize_) {
             Duplicate(valueUbFloat[subValidRows * dvAligned_], static_cast<float>(0.0f),
                       (halfChunkSize_ - subValidRows) * dvAligned_);
@@ -716,18 +719,25 @@ private:
                                                 uint32_t subValidRows)
     {
         uint64_t betaBeginOffset = subOffset_ * nv_;
-        DataCopyInBf16WithStride(subValidRows, 1, src[betaBeginOffset], nv_);
-        betaLocal_ = inQueue_.DeQue<bfloat16_t>();
+        // subValidRows 为 0 时源指针会越过 beta 张量末尾，跳过拷入，仅保留清零填充路径
+        if (subValidRows > 0) {
+            DataCopyInBf16WithStride(subValidRows, 1, src[betaBeginOffset], nv_);
+            betaLocal_ = inQueue_.DeQue<bfloat16_t>();
+        }
         if (subValidRows < halfChunkSize_) {
             Duplicate(betaUbBfloat16_, bfloat16_t(0.0f), halfChunkSize_);
             PipeBarrier<PIPE_V>();
         }
-        Gather(betaUbBfloat16_, betaLocal_, inputGatherBuffer_, static_cast<uint32_t>(0), subValidRows);
-        PipeBarrier<PIPE_V>();
+        if (subValidRows > 0) {
+            Gather(betaUbBfloat16_, betaLocal_, inputGatherBuffer_, static_cast<uint32_t>(0), subValidRows);
+            PipeBarrier<PIPE_V>();
+        }
 
         Cast(betaUbFloat, betaUbBfloat16_, AscendC::RoundMode::CAST_NONE, halfChunkSize_);
         PipeBarrier<PIPE_V>();
-        inQueue_.FreeTensor(betaLocal_);
+        if (subValidRows > 0) {
+            inQueue_.FreeTensor(betaLocal_);
+        }
     }
 
     __aicore__ inline void GCopyInWithStride(const GlobalTensor<float> src, uint32_t validLen)
