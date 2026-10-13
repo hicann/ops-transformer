@@ -26,6 +26,7 @@
 #include "arch92/quant_flash_attn_common_def_arch92.h"
 #include "arch92/quant_flash_attn_kernel_mxfp8_arch92.h"
 #include "arch92/quant_flash_attn_kernel_mxfp8_nd_arch92.h"
+#include "arch92/quant_flash_attn_kernel_hifp4.h"
 #include "arch92/quant_flash_attn_template_tiling_key_arch92.h"
 #include "arch92/quant_flash_attn_tiling_data_arch92.h"
 
@@ -172,13 +173,81 @@ __aicore__ inline void quant_flash_attn_mxfp8_nd(__gm__ uint8_t* query, __gm__ u
 
 template <uint8_t inOutLayoutType, uint16_t config, uint8_t quantMode, bool hasAttenMask, uint8_t KvLayoutType,
           bool isFd>
-__global__ __aicore__ void quant_flash_attn(
+__aicore__ inline void quant_flash_attn_hifp4(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* dequantScaleQuery,
     __gm__ uint8_t* dequantScaleKey, __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
     __gm__ uint8_t* pScale, __gm__ uint8_t* cuSeqLensQ, __gm__ uint8_t* cuSeqLensKv, __gm__ uint8_t* sequsedQ,
     __gm__ uint8_t* sequsedKv, __gm__ uint8_t* sinks, __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
     __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
+    using INPUT_T = hifloat4x2_t;
+    using OUT_T = bfloat16_t;
+
+    fa_base_matmul::idCounterNum = 0;
+
+    constexpr LayOutTypeEnum inputLayoutType = static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][0]);
+    constexpr LayOutTypeEnum outputLayoutType = static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][1]);
+
+    constexpr S1TemplateType s1TemplateType = static_cast<S1TemplateType>(ConfigValue[config].s1);
+    constexpr S2TemplateType s2TemplateType = static_cast<S2TemplateType>(ConfigValue[config].s2);
+    constexpr DTemplateType dTemplateType = static_cast<DTemplateType>(ConfigValue[config].d);
+    constexpr DTemplateType dVTemplateType = static_cast<DTemplateType>(ConfigValue[config].dv);
+
+    constexpr bool isFdConst = false;
+    constexpr bool useDn = (quantMode == QFA_HIFP4_FP16_PREFILL);
+
+    using CubeBlock =
+        BaseApi::QuantFlashAttnBlockCubeHifp4<INPUT_T, float, inputLayoutType, s1TemplateType, s2TemplateType,
+                                              dTemplateType, dVTemplateType, KvLayoutType, useDn>;
+    using VecFaBlock =
+        BaseApi::QuantFlashAttnBlockVecHifp4<INPUT_T, half, OUT_T, inputLayoutType, outputLayoutType, s1TemplateType,
+                                             s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask, KvLayoutType,
+                                             isFdConst, useDn>;
+    using VecFdBlock =
+        BaseApi::QuantFlashAttnBlockVecFlashDecode<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
+                                                   s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
+                                                   hasAttenMask, KvLayoutType, useDn>;
+
+    using CubeBlockDummy =
+        BaseApi::QuantFlashAttnBlockCubeHifp4Dummy<INPUT_T, float, inputLayoutType, s1TemplateType, s2TemplateType,
+                                                   dTemplateType, dVTemplateType, KvLayoutType, useDn>;
+    using VecFaBlockDummy =
+        BaseApi::QuantFlashAttnBlockVecHifp4Dummy<INPUT_T, half, OUT_T, inputLayoutType, outputLayoutType,
+                                                  s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
+                                                  hasAttenMask, KvLayoutType, isFdConst, useDn>;
+    using VecFdBlockDummy =
+        BaseApi::QuantFlashAttnBlockVecFlashDecodeDummy<INPUT_T, float, OUT_T, inputLayoutType, outputLayoutType,
+                                                        s1TemplateType, s2TemplateType, dTemplateType, dVTemplateType,
+                                                        hasAttenMask, KvLayoutType, useDn>;
+
+#ifdef __DAV_CUBE__
+    using Kernel = BaseApi::QuantFlashAttnKernelHifp4<CubeBlock, VecFaBlockDummy, VecFdBlockDummy>;
+#else
+    using Kernel = BaseApi::QuantFlashAttnKernelHifp4<CubeBlockDummy, VecFaBlock, VecFdBlock>;
+#endif
+
+    const __gm__ QuantFlashAttnTilingData* __restrict tilingData =
+        (const __gm__ QuantFlashAttnTilingData* __restrict)tiling;
+
+    Kernel op;
+    op.Init(query, key, value, sinks, attnMask, cuSeqLensQ, cuSeqLensKv, blockTable, dequantScaleQuery, dequantScaleKey,
+            dequantScaleValue, pScale, softmaxLse, attnOut, workspace, metadata, sequsedQ, sequsedKv, tilingData);
+    op.Process();
+}
+
+template <uint8_t inOutLayoutType, uint16_t config, uint8_t quantMode, bool hasAttenMask, uint8_t KvLayoutType,
+          bool isFd>
+__global__ __aicore__ void quant_flash_attn(
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* dequantScaleQuery,
+    __gm__ uint8_t* dequantScaleKey, __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
+    __gm__ uint8_t* pScale, __gm__ uint8_t* cuSeqLensQ, __gm__ uint8_t* cuSeqLensKv, __gm__ uint8_t* sequsedQ,
+    __gm__ uint8_t* sequsedKv, __gm__ uint8_t* sinks, __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
+    __gm__ uint8_t* vTail, __gm__ uint8_t* blockTableTail, __gm__ uint8_t* sequsedVTail, __gm__ uint8_t* attnOut,
+    __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
+{
+    (void)vTail;
+    (void)blockTableTail;
+    (void)sequsedVTail;
     REGISTER_TILING_DEFAULT(QuantFlashAttnTilingData);
     // SK/静态图兼容：tiling 在外层入口统一经宏取一次（动=GM零拷贝/静=栈拷贝），向下传参
     GET_TILING_DATA(tilingData, tiling);
@@ -197,6 +266,13 @@ __global__ __aicore__ void quant_flash_attn(
             cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata, attnOut, softmaxLse, workspace, tilingData);
         return;
     }
+#endif
+#if (ORIG_DTYPE_Q == DT_HIFLOAT4)
+    InitSocState();
+    quant_flash_attn_hifp4<inOutLayoutType, config, quantMode, hasAttenMask, KvLayoutType, isFd>(
+        query, key, value, dequantScaleQuery, dequantScaleKey, dequantScaleValue, blockTable, pScale, cuSeqLensQ,
+        cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata, attnOut, softmaxLse, user, tiling);
+    PipeBarrier<PIPE_ALL>();
 #endif
 }
 

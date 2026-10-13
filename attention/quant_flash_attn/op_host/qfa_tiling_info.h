@@ -22,6 +22,7 @@
 #include <vector>
 #include <cstdint>
 #include "../../common/op_host/fia_tiling_base.h"
+#include "tiling/platform/platform_ascendc.h"
 
 namespace optiling {
 namespace quant_flash_attn {
@@ -154,7 +155,8 @@ enum class QfaAxis : uint32_t {
 enum class QfaQuantMode : uint32_t {
     A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 1,
     A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32 = 6,
-    A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32 = 0
+    A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32 = 0,
+    A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16 = 10
 };
 
 enum class KvStorageMode : uint32_t {
@@ -230,6 +232,7 @@ class QfaTilingInfo : public TilingInfo {
 public:
     const char* opName = nullptr;
     fe::PlatFormInfos* platformInfo = nullptr;
+    NpuArch npuArch = NpuArch::DAV_3510;
     QfaParaInfo opParamInfo;
 
     // Base Param
@@ -375,15 +378,17 @@ const std::map<ge::DataType, std::string> DATATYPE_TO_STRING_MAP = {{ge::DT_UNDE
                                                                     {ge::DT_HIFLOAT8, "DT_HIFLOAT8"},
                                                                     {ge::DT_FLOAT8_E4M3FN, "DT_FLOAT8_E4M3FN"},
                                                                     {ge::DT_FLOAT8_E8M0, "DT_FLOAT8_E8M0FN"},
-                                                                    {ge::DT_FLOAT4_E2M1, "DT_FLOAT4_E2M1"}};
+                                                                    {ge::DT_FLOAT4_E2M1, "DT_FLOAT4_E2M1"},
+                                                                    {ge::DT_HIFLOAT4_SCALE, "DT_HIFLOAT4_SCALE"},
+                                                                    {ge::DT_HIFLOAT4, "DT_HIFLOAT4"}};
 
 const std::map<std::string, std::vector<ge::DataType>> DTYPE_SUPPORT_MAP = {
-    {QUERY_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8}},
-    {KEY_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8}},
-    {VALUE_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8}},
-    {Q_DESCALE_NAME, {ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT8_E8M0}},
-    {K_DESCALE_NAME, {ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT8_E8M0}},
-    {V_DESCALE_NAME, {ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT8_E8M0}},
+    {QUERY_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8, ge::DT_HIFLOAT4}},
+    {KEY_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8, ge::DT_HIFLOAT4}},
+    {VALUE_NAME, {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8, ge::DT_HIFLOAT4}},
+    {Q_DESCALE_NAME, {ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT8_E8M0, ge::DT_HIFLOAT4_SCALE}},
+    {K_DESCALE_NAME, {ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT8_E8M0, ge::DT_HIFLOAT4_SCALE}},
+    {V_DESCALE_NAME, {ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT8_E8M0, ge::DT_HIFLOAT4_SCALE}},
     {BLOCK_TABLE_NAME, {ge::DT_INT32}},
     {P_SCALE_NAME, {ge::DT_FLOAT}},
     {ATTN_MASK_NAME, {ge::DT_INT8}},

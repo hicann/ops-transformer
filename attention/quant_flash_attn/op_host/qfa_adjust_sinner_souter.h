@@ -29,6 +29,7 @@ constexpr uint32_t SOUTER_128 = 128;
 constexpr uint32_t SINNER_128 = 128;
 constexpr uint32_t SINNER_256 = 256;
 constexpr uint32_t SINNER_512 = 512;
+constexpr uint32_t SINNER_1024 = 1024;
 constexpr uint32_t DSIZE_256 = 256;
 
 /**
@@ -112,6 +113,9 @@ inline void AdjustSinnerAndSouterArch92(uint32_t vHeadDim, int64_t maxSeqQ, int6
         // prefill，dim=256：128x128
         sOuterFactor = SOUTER_128;
         sInnerFactor = SINNER_128;
+    } else if (quantMode == 10) {
+        sOuterFactor = SOUTER_128;
+        sInnerFactor = SINNER_1024;
     } else {
         // prefill，其余 dim：128x256
         sOuterFactor = SOUTER_128;

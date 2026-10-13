@@ -186,7 +186,8 @@ typedef struct {
 
 inline bool Is4BitDtype(const aclDataType acl_data_type)
 {
-    return acl_data_type == ACL_FLOAT4_E2M1 || acl_data_type == ACL_FLOAT4_E1M2 || acl_data_type == ACL_INT4;
+    return acl_data_type == ACL_FLOAT4_E2M1 || acl_data_type == ACL_FLOAT4_E1M2 || acl_data_type == ACL_INT4 ||
+           acl_data_type == ACL_HIFLOAT4;
 }
 
 inline int64_t ConvertToAclStorageOffset(const at::Tensor& at_tensor, const aclDataType acl_data_type)

@@ -159,6 +159,7 @@ static constexpr ConfigParams ConfigValue[] = {{inferS1TemplateType::Aligned128,
 
 #define QFA_MXFP8_FP32_PREFILL 1
 #define QFA_MXFP8_FP32_DECODE 2
+#define QFA_HIFP4_FP16_PREFILL 10
 
 #define false 0
 #define true 1

@@ -280,19 +280,30 @@ ge::graphStatus QfaInfoParser::GetQuantMode()
     }
     int64_t quantModeVal = *opParamInfo_.quantMode;
     using QM = QfaQuantMode;
-    if (quantModeVal != static_cast<int64_t>(QM::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) &&
-        quantModeVal !=
-            static_cast<int64_t>(
-                QM::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) &&
-        quantModeVal != static_cast<int64_t>(QM::A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32)) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "quant_mode", std::to_string(quantModeVal).c_str(),
-                                              "quant_mode must be 0 "
-                                              "(A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32) or "
-                                              "1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) or "
-                                              "6 (A8C8_QK_FP8_"
-                                              "E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_"
-                                              "P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32)");
-        return ge::GRAPH_FAILED;
+    if (npuArch_ == NpuArch::DAV_3510) {
+        if (quantModeVal != static_cast<int64_t>(QM::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) &&
+            quantModeVal !=
+                static_cast<int64_t>(
+                    QM::A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) &&
+            quantModeVal != static_cast<int64_t>(QM::A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32)) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "quant_mode", std::to_string(quantModeVal).c_str(),
+                                                  "quant_mode must be 0 "
+                                                  "(A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32) or "
+                                                  "1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) or "
+                                                  "6 (A8C8_QK_FP8_"
+                                                  "E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_"
+                                                  "P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32)");
+            return ge::GRAPH_FAILED;
+        }
+    } else if (npuArch_ == NpuArch::DAV_9201) {
+        if (quantModeVal != static_cast<int64_t>(QM::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) &&
+            quantModeVal != static_cast<int64_t>(QM::A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16)) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                opName_, "quant_mode", std::to_string(quantModeVal).c_str(),
+                "quant_mode must be 1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) or "
+                "10 (A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16)");
+            return ge::GRAPH_FAILED;
+        }
     }
     quantMode_ = static_cast<QfaQuantMode>(quantModeVal);
     return ge::GRAPH_SUCCESS;
@@ -621,6 +632,7 @@ void QfaInfoParser::GenerateInfo(QfaTilingInfo& qfaInfo)
 {
     qfaInfo.opName = opName_;
     qfaInfo.platformInfo = platformInfo_;
+    qfaInfo.npuArch = npuArch_;
     qfaInfo.opParamInfo = opParamInfo_;
     qfaInfo.hasStride = hasStride_;
     qfaInfo.keyStrides = keyStrides_;

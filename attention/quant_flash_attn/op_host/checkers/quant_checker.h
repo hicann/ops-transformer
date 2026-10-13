@@ -44,12 +44,15 @@ private:
     ge::graphStatus CheckSingleParaPScale(const QfaTilingInfo& qfaInfo);
 
     // --- SinglePara: descale shape dim 校验 (按量化场景分发) ---
+    ge::graphStatus CheckQDescaleDimHiF4(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckQDescaleDimMxFp8(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckQDescaleDimGqaFp8(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckQDescaleDimHif8(const QfaTilingInfo& qfaInfo) const;
+    ge::graphStatus CheckKDescaleDimHiF4(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckKDescaleDimMxFp8(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckKDescaleDimGqaFp8(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckKDescaleDimHif8(const QfaTilingInfo& qfaInfo) const;
+    ge::graphStatus CheckVDescaleDimHiF4(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckVDescaleDimMxFp8(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckVDescaleDimGqaFp8(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckVDescaleDimHif8(const QfaTilingInfo& qfaInfo) const;
@@ -60,12 +63,15 @@ private:
     // --- MultiPara: descale shape consistency (descale_shape匹配关系表) ---
     ge::graphStatus CheckDescaleShape(const QfaTilingInfo& qfaInfo);
     ge::graphStatus CheckQDescaleShape(const QfaTilingInfo& qfaInfo) const;
+    ge::graphStatus CheckQDescaleShapeHiF4(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckQDescaleShapeMxFp8(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckQDescaleShapeGqaFp8(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckKDescaleShape(const QfaTilingInfo& qfaInfo) const;
+    ge::graphStatus CheckKDescaleShapeHiF4(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckKDescaleShapeMxFp8(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckKDescaleShapeGqaFp8(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckVDescaleShape(const QfaTilingInfo& qfaInfo) const;
+    ge::graphStatus CheckVDescaleShapeHiF4(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckVDescaleShapeMxFp8(const QfaTilingInfo& qfaInfo) const;
     ge::graphStatus CheckVDescaleShapeGqaFp8(const QfaTilingInfo& qfaInfo) const;
 

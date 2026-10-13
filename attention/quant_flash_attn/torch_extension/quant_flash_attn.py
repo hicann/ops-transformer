@@ -34,6 +34,7 @@ class QuantMode(IntEnum):
     A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16 = 7
     A4C4_QKV_HIF4_P_HIF4_LEVEL2_SOFTMAX_FP16 = 8
     A4C4_QKV_HIF4_P_HIF4_LEVEL3_SOFTMAX_FP16 = 9
+    A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16 = 10
 
 
 class MaskMode(IntEnum):
@@ -377,12 +378,13 @@ def quant_flash_attn_metadata(
     'PrivateUse1' is dispatch key for custom NPU backends.
     """
     torch._check(
-        quant_mode in (0, 1, 3, 5, 6),
+        quant_mode in (0, 1, 3, 5, 6, 10),
         lambda: f"The quant_mode of quant_flash_attn_metadata only supports 0 (A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32), "
         f"1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32), "
         f"3 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP16), "
         f"5 (A4C4_QKV_MXFP4_P_MXFP4_SOFTMAX_FP16) "
-        f"or 6 (A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32), but got {quant_mode}",
+        f"6 (A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) "
+        f"or 10 (A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16), but got {quant_mode}",
     )
     if layout_q == "TND":
         torch._check(
@@ -523,12 +525,13 @@ def quant_flash_attn(
     'PrivateUse1' is the combine key for custom NPU backends.
     """
     torch._check(
-        quant_mode in (0, 1, 3, 5, 6),
+        quant_mode in (0, 1, 3, 5, 6, 10),
         lambda: f"The quant_mode of quant_flash_attn only supports 0 (A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32), "
         f"1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32), "
         f"3 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP16), "
         f"5 (A4C4_QKV_MXFP4_P_MXFP4_SOFTMAX_FP16) "
-        f"or 6 (A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32), but got {quant_mode}",
+        f"6 (A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) "
+        f"or 10 (A4C4_QKV_HIF4_P_FP8_E4M3_SOFTMAX_FP16), but got {quant_mode}",
     )
     quant_mode = _resolve_quant_mode(quant_mode)
     mask_mode = _resolve_mask_mode(mask_mode)

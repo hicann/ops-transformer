@@ -21,15 +21,18 @@ const int64_t DIM_THREE = 3;
 const int64_t MAX_DIM_SIZE = 8;
 const int64_t QUANT_MODE_MXFP4 = 5;
 const int64_t QUANT_MODE_HIF8 = 0;
+const int64_t QUANT_MODE_HIF4 = 10;
 const int64_t FLOAT4_E2M1 = 296;
 const int64_t FLOAT8_E8M0 = 293;
 const int64_t HIFLOAT8 = 34;
+const int64_t HIFLOAT4 = 298;
+const int64_t HIFLOAT4_SCALE = static_cast<int64_t>(ACL_HIFLOAT4_SCALE);
 
 inline int64_t GetQkvDtypeRatio(int64_t quant_mode)
 {
     // mxfp4 时 q/k/v 在 Python 端被 pack 成 uint8（每 byte 2 个 fp4 元素），
     // 因此 v.size(-1) 是 packed 维度（d/2），output 需要展开为逻辑 d（即 2 倍）。
-    if (quant_mode == QUANT_MODE_MXFP4) {
+    if (quant_mode == QUANT_MODE_MXFP4 || quant_mode == QUANT_MODE_HIF4) {
         return 2;
     }
     return 1;
@@ -46,7 +49,12 @@ TensorWrapper make_wrapper(const at::Tensor& tensor, const int64_t real_dtype)
             wrapper.dtype = ACL_FLOAT8_E8M0;
         } else if (real_dtype == HIFLOAT8) {
             wrapper.dtype = ACL_HIFLOAT8;
+        } else if (real_dtype == HIFLOAT4) {
+            wrapper.dtype = ACL_HIFLOAT4;
         }
+    } else if (kATenScalarTypeToAclDataTypeTable[static_cast<int64_t>(tensor.scalar_type())] == ACL_FLOAT &&
+               real_dtype == HIFLOAT4_SCALE) {
+        wrapper.dtype = ACL_HIFLOAT4_SCALE;
     } else {
         wrapper.dtype = kATenScalarTypeToAclDataTypeTable[static_cast<int64_t>(tensor.scalar_type())];
     }
@@ -157,6 +165,18 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_attn(
                   block_table_tail, seqused_v_tail, quant_mode, softmax_scale, mask_mode, win_left, win_right,
                   max_seqlen_q, max_seqlen_kv, layout_q_ptr, layout_q_descale_ptr, layout_kv_ptr, layout_out_ptr,
                   return_softmax_lse, attentionOutput, softmaxLse);
+    } else if (quant_mode == QUANT_MODE_HIF4) {
+        TensorWrapper q_wrapper = make_wrapper(q, HIFLOAT4);
+        TensorWrapper k_wrapper = make_wrapper(k, HIFLOAT4);
+        TensorWrapper v_wrapper = make_wrapper(v, HIFLOAT4);
+        TensorWrapper q_descale_wrapper = make_wrapper(q_descale, HIFLOAT4_SCALE);
+        TensorWrapper k_descale_wrapper = make_wrapper(k_descale, HIFLOAT4_SCALE);
+        TensorWrapper v_descale_wrapper = make_wrapper(v_descale, HIFLOAT4_SCALE);
+        ACLNN_CMD(aclnnQuantFlashAttn, q_wrapper, k_wrapper, v_wrapper, q_descale_wrapper, k_descale_wrapper,
+                  v_descale_wrapper, block_table, p_scale, cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv, sinks,
+                  attn_mask, metadata, v_tail, block_table_tail, seqused_v_tail, quant_mode, softmax_scale, mask_mode,
+                  win_left, win_right, max_seqlen_q, max_seqlen_kv, layout_q_ptr, layout_q_descale_ptr, layout_kv_ptr,
+                  layout_out_ptr, return_softmax_lse, attentionOutput, softmaxLse);
     } else {
         ACLNN_CMD(aclnnQuantFlashAttn, q, k, v, q_descale, k_descale, v_descale, block_table, p_scale, cu_seqlens_q,
                   cu_seqlens_kv, seqused_q, seqused_kv, sinks, attn_mask, metadata, v_tail, block_table_tail,

@@ -26,32 +26,56 @@ public:
     {
         this->Input("q")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8})
+            .DataType({
+                ge::DT_FLOAT8_E4M3FN,
+                ge::DT_FLOAT8_E4M3FN,
+                ge::DT_HIFLOAT8,
+            })
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("k")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8})
+            .DataType({
+                ge::DT_FLOAT8_E4M3FN,
+                ge::DT_FLOAT8_E4M3FN,
+                ge::DT_HIFLOAT8,
+            })
             .FormatList({ge::FORMAT_ND})
             .IgnoreContiguous();
         this->Input("v")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8})
+            .DataType({
+                ge::DT_FLOAT8_E4M3FN,
+                ge::DT_FLOAT8_E4M3FN,
+                ge::DT_HIFLOAT8,
+            })
             .FormatList({ge::FORMAT_ND})
             .IgnoreContiguous();
         this->Input("q_descale")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT8_E8M0, ge::DT_FLOAT, ge::DT_FLOAT})
+            .DataType({
+                ge::DT_FLOAT8_E8M0,
+                ge::DT_FLOAT,
+                ge::DT_FLOAT,
+            })
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("k_descale")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT8_E8M0, ge::DT_FLOAT, ge::DT_FLOAT})
+            .DataType({
+                ge::DT_FLOAT8_E8M0,
+                ge::DT_FLOAT,
+                ge::DT_FLOAT,
+            })
             .FormatList({ge::FORMAT_ND})
             .IgnoreContiguous();
         this->Input("v_descale")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT8_E8M0, ge::DT_FLOAT, ge::DT_FLOAT})
+            .DataType({
+                ge::DT_FLOAT8_E8M0,
+                ge::DT_FLOAT,
+                ge::DT_FLOAT,
+            })
             .FormatList({ge::FORMAT_ND})
             .IgnoreContiguous();
         this->Input("block_table")
@@ -116,7 +140,11 @@ public:
             .AutoContiguous();
         this->Output("attn_out")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_BF16, ge::DT_BF16, ge::DT_BF16})
+            .DataType({
+                ge::DT_BF16,
+                ge::DT_BF16,
+                ge::DT_BF16,
+            })
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Output("softmax_lse")
@@ -149,7 +177,75 @@ public:
             .ExtendCfgInfo("opFile.value", "quant_flash_attn");
 
         this->AICore().AddConfig("ascend950", aicore_config_95);
-        this->AICore().AddConfig("ascend960dt", aicore_config_95);
+
+        OpAICoreConfig aicore_config_96;
+        aicore_config_96.Input("q")
+            .ParamType(REQUIRED)
+            .DataType({
+                ge::DT_FLOAT8_E4M3FN,
+                ge::DT_HIFLOAT4,
+            })
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_96.Input("k")
+            .ParamType(REQUIRED)
+            .DataType({
+                ge::DT_FLOAT8_E4M3FN,
+                ge::DT_HIFLOAT4,
+            })
+            .FormatList({ge::FORMAT_ND})
+            .IgnoreContiguous();
+        aicore_config_96.Input("v")
+            .ParamType(REQUIRED)
+            .DataType({
+                ge::DT_FLOAT8_E4M3FN,
+                ge::DT_HIFLOAT4,
+            })
+            .FormatList({ge::FORMAT_ND})
+            .IgnoreContiguous();
+        aicore_config_96.Input("q_descale")
+            .ParamType(REQUIRED)
+            .DataType({
+                ge::DT_FLOAT8_E8M0,
+                ge::DT_HIFLOAT4_SCALE,
+            })
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_96.Input("k_descale")
+            .ParamType(REQUIRED)
+            .DataType({
+                ge::DT_FLOAT8_E8M0,
+                ge::DT_HIFLOAT4_SCALE,
+            })
+            .FormatList({ge::FORMAT_ND})
+            .IgnoreContiguous();
+        aicore_config_96.Input("v_descale")
+            .ParamType(REQUIRED)
+            .DataType({
+                ge::DT_FLOAT8_E8M0,
+                ge::DT_HIFLOAT4_SCALE,
+            })
+            .FormatList({ge::FORMAT_ND})
+            .IgnoreContiguous();
+        aicore_config_96.Output("attn_out")
+            .ParamType(REQUIRED)
+            .DataType({
+                ge::DT_BF16,
+                ge::DT_BF16,
+            })
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_96.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
+            .ExtendCfgInfo("coreType.value", "AiCore")
+            .ExtendCfgInfo("opFile.value", "quant_flash_attn");
+
+        this->AICore().AddConfig("ascend960dt", aicore_config_96);
     }
 };
 

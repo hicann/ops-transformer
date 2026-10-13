@@ -4,7 +4,7 @@
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
@@ -79,6 +79,14 @@ ASCENDC_TPL_SEL(
         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA, KvLayoutType_PA_BBND,
                              KvLayoutType_PA_BNBD),
-        ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)));
+        ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
+    // HiF4
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BNSD_BNSD),
+                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
+                                              Config_S1Aligned128_S2Aligned1024_DAligned128_DVAligned128),
+                         ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_HIFP4_FP16_PREFILL),
+                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false),
+                         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA),
+                         ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)));
 
 #endif // QUANT_FLASH_ATTN_TEMPLATE_TILING_KEY_ARCH92_H_

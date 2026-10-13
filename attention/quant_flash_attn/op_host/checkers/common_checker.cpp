@@ -82,7 +82,15 @@ ge::graphStatus CommonChecker::CheckSingleParaLayout(const QfaTilingInfo& qfaInf
 
 ge::graphStatus CommonChecker::CheckSingleParaDtype(const QfaTilingInfo& qfaInfo)
 {
-    const std::vector<ge::DataType> supportedQuantDtypes = {ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8};
+    std::vector<ge::DataType> supportedQuantDtypes;
+    std::string supportedQuantDtypesStr;
+    if (qfaInfo.npuArch == NpuArch::DAV_3510) {
+        supportedQuantDtypes = {ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8};
+        supportedQuantDtypesStr = "FLOAT8_E4M3FN/HIFLOAT8";
+    } else if (qfaInfo.npuArch == NpuArch::DAV_9201) {
+        supportedQuantDtypes = {ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT4};
+        supportedQuantDtypesStr = "FLOAT8_E4M3FN/DT_HIFLOAT4";
+    }
     const auto checkQuantDtype = [&](const gert::CompileTimeTensorDesc* desc,
                                      const std::string& name) -> ge::graphStatus {
         if (desc == nullptr) {
@@ -92,7 +100,7 @@ ge::graphStatus CommonChecker::CheckSingleParaDtype(const QfaTilingInfo& qfaInfo
             std::find(supportedQuantDtypes.begin(), supportedQuantDtypes.end(), desc->GetDataType()) ==
                 supportedQuantDtypes.end(),
             OP_LOGE_FOR_INVALID_DTYPE(qfaInfo.opName, name.c_str(), DataTypeToSerialString(desc->GetDataType()).c_str(),
-                                      "FLOAT8_E4M3FN/HIFLOAT8"),
+                                      supportedQuantDtypesStr.c_str()),
             return ge::GRAPH_FAILED);
         if (CheckFormatSupport(desc, name) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
