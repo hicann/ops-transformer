@@ -281,7 +281,6 @@ __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::Clean
     AscendC::InitGlobalMemory(indexOutput, dealSize, liv2ConstInfo_.INVALID_IDX);
 
     if (liv2ReturnValueFlag) {
-        SetFlag<HardEvent::MTE3_V>(TOPK_MTE3_V_EVENT);
         WaitFlag<HardEvent::MTE3_V>(TOPK_MTE3_V_EVENT);
         Duplicate(liv2ValueOutLocal_.template ReinterpretCast<uint32_t>(), liv2ConstInfo_.NEG_INF_FLOAT,
                   liv2ConstInfo_.topk);
@@ -295,6 +294,7 @@ __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::Clean
         copyOutValueParams.srcStride = 0;
         copyOutValueParams.dstStride = 0;
         AscendC::DataCopyPad(liv2ValueOutGm[invalidS1Offset], liv2ValueOutLocal_, copyOutValueParams);
+        SetFlag<HardEvent::MTE3_V>(TOPK_MTE3_V_EVENT);
     }
 }
 
