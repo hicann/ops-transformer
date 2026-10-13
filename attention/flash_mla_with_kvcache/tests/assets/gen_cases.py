@@ -38,7 +38,7 @@ HEADER = [
     "precision_tolerances",
     "absolute_precision",
 ]
-API = "torch.ops.cann_ops_transformer.flash_mla_with_kvcache"
+API = "torch.ops.cann_ops_transformer.flash_mla"
 DTYPES = ("float16", "bfloat16")
 COVERAGE_HEADER = HEADER + [
     "tensor_storage_shapes",

@@ -50,7 +50,7 @@ import sys
 
 API_NAMES = {
     "flash_mla_with_kvcache_ttk_ops.flash_mla_with_kvcache_ttk",
-    "torch.ops.cann_ops_transformer.flash_mla_with_kvcache",
+    "torch.ops.cann_ops_transformer.flash_mla",
 }
 METRIC_FIELDS = (
     "metrics_duration_us",

@@ -279,7 +279,7 @@ def main():
                     case_attrs[f"{key}_values"] = aux_cpu[key].tolist()
                 tensors = (q_cpu, kv_cpu, *aux_cpu.values())
                 common = dict(
-                    api_name="torch.ops.cann_ops_transformer.flash_mla_with_kvcache",
+                    api_name="torch.ops.cann_ops_transformer.flash_mla",
                     tensor_view_shapes=repr(
                         tuple(
                             tuple(t.shape) if t is not None else None for t in tensors

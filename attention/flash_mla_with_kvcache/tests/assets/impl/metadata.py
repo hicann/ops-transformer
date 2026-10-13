@@ -33,7 +33,7 @@ def build_metadata(
 
     if cache_seqlens is None:
         raise ValueError("cache_seqlens is required for MLA metadata")
-    return torch.ops.cann_ops_transformer.flash_mla_with_kvcache_metadata(
+    return torch.ops.cann_ops_transformer.flash_mla_metadata(
         cache_seqlens,
         int(q.shape[1 if layout_q in ("TND", "BNSD") else 2]),
         int(k_cache.shape[2 if layout_kv == "PA_BBND" else 1]),

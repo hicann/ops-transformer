@@ -1,4 +1,4 @@
-# flash_mla_with_kvcache
+# flash_mla
 
 ## 产品支持情况
 
@@ -25,15 +25,15 @@
 
 - **接口功能**：
 
-  `flash_mla_with_kvcache`是基于`TorchNPU`的`cann_ops_transformer`扩展接口，用于非量化 MLA 注意力计算。输入`q`和`k_cache`已合并512维nope与64维rope，算子不执行KV压缩或RoPE变换。
+  `flash_mla`是基于`TorchNPU`的`cann_ops_transformer`扩展接口，用于非量化 MLA 注意力计算。输入`q`和`k_cache`已合并512维nope与64维rope，算子不执行KV压缩或RoPE变换。
 
   `k_cache`同时提供Key和Value：Key使用全部576维，Value使用前512维，不单独传入`v`、`q_rope`或`k_rope`。
 
-  `flash_mla_with_kvcache_metadata`是主算子的元数据生成接口，记录AICore/AIVCore任务切分结果。典型调用流程如下：
+  `flash_mla_metadata`是主算子的元数据生成接口，记录AICore/AIVCore任务切分结果。典型调用流程如下：
 
   1. 准备Query、分页KV缓存、块表和序列长度。
-  2. 调用`flash_mla_with_kvcache_metadata`生成`metadata`。
-  3. 将`metadata`和对应输入传入`flash_mla_with_kvcache`。
+  2. 调用`flash_mla_metadata`生成`metadata`。
+  3. 将`metadata`和对应输入传入`flash_mla`。
 
 - **计算公式**：
 
@@ -65,10 +65,10 @@
 
 ## 函数原型
 
-调用flash_mla_with_kvcache接口之前，请先调用前置接口flash_mla_with_kvcache_metadata，完成负载均衡的计算。
+调用flash_mla接口之前，请先调用前置接口flash_mla_metadata，完成负载均衡的计算。
 
 ```python
-cann_ops_transformer.flash_mla_with_kvcache_metadata(
+cann_ops_transformer.flash_mla_metadata(
     cache_seqlens,
     num_heads_q,
     num_heads_kv,
@@ -84,7 +84,7 @@ cann_ops_transformer.flash_mla_with_kvcache_metadata(
 ```
 
 ```python
-cann_ops_transformer.flash_mla_with_kvcache(
+cann_ops_transformer.flash_mla(
     q,
     k_cache,
     block_table=None,
@@ -107,7 +107,7 @@ cann_ops_transformer.flash_mla_with_kvcache(
 
 ## 参数说明
 
-### flash_mla_with_kvcache_metadata
+### flash_mla_metadata
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -123,7 +123,7 @@ cann_ops_transformer.flash_mla_with_kvcache(
 | mask_mode | int | 可选 | 0或3；默认None归一化为0，与主算子一致 | int32 | - | - |
 | layout_q | string | 可选 | 当前须显式传TND，不使用历史默认值BSND | string | - | - |
 
-### flash_mla_with_kvcache
+### flash_mla
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -147,7 +147,7 @@ cann_ops_transformer.flash_mla_with_kvcache(
 
 ## 返回值说明
 
-### flash_mla_with_kvcache_metadata
+### flash_mla_metadata
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -155,7 +155,7 @@ cann_ops_transformer.flash_mla_with_kvcache(
 
 metadata的shape根据batch数和设备核数动态计算。
 
-### flash_mla_with_kvcache
+### flash_mla
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -278,7 +278,7 @@ attn_mask = torch.triu(
     torch.ones(2048, 2048, dtype=torch.int8, device=device), diagonal=1
 )
 
-metadata = cann_ops_transformer.ops.flash_mla_with_kvcache_metadata(
+metadata = cann_ops_transformer.ops.flash_mla_metadata(
     cache_seqlens,
     num_heads_q=96,
     num_heads_kv=1,
@@ -289,7 +289,7 @@ metadata = cann_ops_transformer.ops.flash_mla_with_kvcache_metadata(
     layout_q="TND",
 )
 
-attn_out, softmax_lse = cann_ops_transformer.ops.flash_mla_with_kvcache(
+attn_out, softmax_lse = cann_ops_transformer.ops.flash_mla(
     q,
     k_cache,
     block_table=block_table,

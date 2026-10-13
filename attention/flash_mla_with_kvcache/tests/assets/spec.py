@@ -58,5 +58,5 @@ class FlashMlaWithKvcacheSpec:
 
 
 __spec__ = {
-    "torch.ops.cann_ops_transformer.flash_mla_with_kvcache": "FlashMlaWithKvcacheSpec",
+    "torch.ops.cann_ops_transformer.flash_mla": "FlashMlaWithKvcacheSpec",
 }

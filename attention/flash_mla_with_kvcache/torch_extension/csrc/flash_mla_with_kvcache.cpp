@@ -10,7 +10,7 @@
 
 /*!
  * \file flash_mla_with_kvcache.cpp
- * \brief ACLNN wrapper for flash_mla_with_kvcache / flash_mla_with_kvcache_metadata (DeepSeek MLA, m0070 interface).
+ * \brief ACLNN wrapper for flash_mla / flash_mla_metadata (DeepSeek MLA, m0070 interface).
  *        Interface: q, k_cache, block_table, cache_seqlens, cu_seqlens_q, seqused_q, attn_mask, metadata
  *        + attrs head_dim_v, softmax_scale, mask_mode, max_seqlen_q, max_seqlen_kv,
  *          layout_q, layout_kv, layout_out, return_softmax_lse
@@ -69,7 +69,7 @@ at::Tensor FlashMlaWithKvcacheMetadata(const c10::optional<at::Tensor>& cuSeqlen
                 " bytes for batch_size=", batchSize, " (capacity = ((aic ", aicCoreNum, " + aiv ", aivCoreNum,
                 ") * batch_size * 1 + 1) * 16 int32 words, "
                 "aligned to 4096 int32 elements; kv head num is 1 for MLA). Use the buffer returned by "
-                "flash_mla_with_kvcache_metadata.");
+                "flash_mla_metadata.");
 
     auto cuSeqlensQVal = get_valid_tensor(cuSeqlensQ, outputDevice);
     auto sequsedQVal = get_valid_tensor(sequsedQ, outputDevice);
@@ -150,7 +150,7 @@ std::tuple<at::Tensor, at::Tensor> FlashMlaWithKvcache(
         int64_t words = metadata.value().numel();
         TORCH_CHECK(words >= aicCoreNum + aivCoreNum, "The metadata tensor is too small: ", words,
                     " words, expected the buffer produced by "
-                    "flash_mla_with_kvcache_metadata (capacity = ((aic + aiv) * batch_size * 1 + 1) * 16 words, kv "
+                    "flash_mla_metadata (capacity = ((aic + aiv) * batch_size * 1 + 1) * 16 words, kv "
                     "head num == 1).");
     }
 
@@ -167,10 +167,10 @@ std::tuple<at::Tensor, at::Tensor> FlashMlaWithKvcache(
 }
 
 // Bind the C++ function to the Python module (names must match the schema names exactly).
-// torch 公开接口名 = flash_mla_with_kvcache；内部 aclnn/op 名 FlashMlaWithKvcache/flash_mla_with_kvcache。
+// torch 公开接口名 = flash_mla/flash_mla_metadata；内部 aclnn/op 名 FlashMlaWithKvcache/flash_mla_with_kvcache。
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
-    m.def("flash_mla_with_kvcache", &FlashMlaWithKvcache, "flash_mla_with_kvcache");
-    m.def("flash_mla_with_kvcache_metadata", &FlashMlaWithKvcacheMetadata, "flash_mla_with_kvcache_metadata");
+    m.def("flash_mla", &FlashMlaWithKvcache, "flash_mla");
+    m.def("flash_mla_metadata", &FlashMlaWithKvcacheMetadata, "flash_mla_metadata");
 }
 } // namespace op_api

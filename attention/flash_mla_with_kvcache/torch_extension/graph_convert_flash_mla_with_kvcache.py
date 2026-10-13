@@ -69,9 +69,7 @@ if _TORCHAIR_AVAILABLE:
         result = q.new_empty(q.size())
         return result
 
-    @register_fx_node_ge_converter(
-        torch.ops.cann_ops_transformer.flash_mla_with_kvcache.default
-    )
+    @register_fx_node_ge_converter(torch.ops.cann_ops_transformer.flash_mla.default)
     def convert_flash_mla_with_kvcache(
         q: Tensor,
         k_cache: Tensor,

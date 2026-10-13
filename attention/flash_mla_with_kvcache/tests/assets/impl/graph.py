@@ -61,6 +61,6 @@ class FlashMlaWithKvcacheAclGraph(torch.nn.Module):
         )
         if metadata is None or metadata.numel() == 0:
             raise ValueError("MLA graph requires metadata prepared by npu_preprocess")
-        return torch.ops.cann_ops_transformer.flash_mla_with_kvcache(
+        return torch.ops.cann_ops_transformer.flash_mla(
             q, k_cache, **tensors, metadata=metadata, **self.attrs
         )

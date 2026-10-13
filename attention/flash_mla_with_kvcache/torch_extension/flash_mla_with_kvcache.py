@@ -13,7 +13,7 @@ from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
 
-MLA_METADATA_OP_NAME = "flash_mla_with_kvcache_metadata"
+MLA_METADATA_OP_NAME = "flash_mla_metadata"
 
 
 def _get_core_nums():
@@ -55,7 +55,7 @@ class FlashMlaWithKvcacheOpBuilder(OpBuilder):
         # Builder name == torch 公开接口名（照 flash_attn.py 惯例）；仅用作 JIT 缓存键与
         # @impl 注册名，sources() 指向同名 cpp（csrc/attention/flash_mla_with_kvcache.cpp）。
         super(FlashMlaWithKvcacheOpBuilder, self).__init__(
-            "flash_mla_with_kvcache", category="attention"
+            "flash_mla", category="attention"
         )
 
     def sources(self):
@@ -65,12 +65,12 @@ class FlashMlaWithKvcacheOpBuilder(OpBuilder):
     def schema(self) -> str:
         """PyTorch operator signature (m0070 interface: no v, no q_rope/k_rope)."""
         return [
-            "flash_mla_with_kvcache_metadata(Tensor cache_seqlens, int num_heads_q, int num_heads_kv, "
+            "flash_mla_metadata(Tensor cache_seqlens, int num_heads_q, int num_heads_kv, "
             "Tensor? cu_seqlens_q=None, Tensor? seqused_q=None, "
             "int? max_seqlen_q=None, int? max_seqlen_kv=None, "
             "int head_dim_qk=576, int head_dim_v=512, "
             'int? mask_mode=None, str? layout_q="BSND") -> Tensor',
-            "flash_mla_with_kvcache(Tensor q, Tensor k_cache, "
+            "flash_mla(Tensor q, Tensor k_cache, "
             "Tensor? block_table=None, Tensor? cache_seqlens=None, "
             "Tensor? cu_seqlens_q=None, Tensor? seqused_q=None, "
             "Tensor? attn_mask=None, Tensor? metadata=None, "
@@ -87,7 +87,7 @@ class FlashMlaWithKvcacheOpBuilder(OpBuilder):
         """
 
         @torch.library.register_fake("cann_ops_transformer::" + MLA_METADATA_OP_NAME)
-        def flash_mla_with_kvcache_metadata_meta(
+        def flash_mla_metadata_meta(
             cache_seqlens: torch.Tensor,
             num_heads_q: int,
             num_heads_kv: int,
@@ -105,7 +105,7 @@ class FlashMlaWithKvcacheOpBuilder(OpBuilder):
             metadata_size = _calculate_metadata_size(b_size, aic_core_num, aiv_core_num)
             return torch.empty((metadata_size,), dtype=torch.int32, device="meta")
 
-        @torch.library.register_fake("cann_ops_transformer::flash_mla_with_kvcache")
+        @torch.library.register_fake("cann_ops_transformer::flash_mla")
         def flash_mla_meta(
             q: torch.Tensor,
             k_cache: torch.Tensor,
@@ -172,12 +172,12 @@ class FlashMlaWithKvcacheOpBuilder(OpBuilder):
 
 
 # Instantiate the builder
-flash_mla_with_kvcache_op_builder = FlashMlaWithKvcacheOpBuilder()
-flash_mla_with_kvcache_op_builder._ensure_initialized()  # 照 flash_attn.py:167：加载时延迟初始化（define schema）
+flash_mla_op_builder = FlashMlaWithKvcacheOpBuilder()
+flash_mla_op_builder._ensure_initialized()  # 照 flash_attn.py:167：加载时延迟初始化（define schema）
 
 
 @impl(get_as_library(), MLA_METADATA_OP_NAME, "PrivateUse1")
-def flash_mla_with_kvcache_metadata(
+def flash_mla_metadata(
     cache_seqlens: torch.Tensor,
     num_heads_q: int,
     num_heads_kv: int,
@@ -202,11 +202,11 @@ def flash_mla_with_kvcache_metadata(
     mask_mode = 0 if mask_mode is None else mask_mode
     layout_q = "BSND" if layout_q is None else layout_q
 
-    op_module = flash_mla_with_kvcache_op_builder.load()
+    op_module = flash_mla_op_builder.load()
     metadata_size = _calculate_metadata_size(b_size, aic_core_num, aiv_core_num)
     output = torch.empty((metadata_size,), dtype=torch.int32, device="npu")
 
-    return op_module.flash_mla_with_kvcache_metadata(
+    return op_module.flash_mla_metadata(
         cu_seqlens_q,
         cache_seqlens,
         seqused_q,
@@ -224,8 +224,8 @@ def flash_mla_with_kvcache_metadata(
     )
 
 
-@impl(get_as_library(), flash_mla_with_kvcache_op_builder.name, "PrivateUse1")
-def flash_mla_with_kvcache(
+@impl(get_as_library(), flash_mla_op_builder.name, "PrivateUse1")
+def flash_mla(
     q: torch.Tensor,
     k_cache: torch.Tensor,
     block_table: Optional[torch.Tensor] = None,
@@ -264,8 +264,8 @@ def flash_mla_with_kvcache(
     layout_out = "BSND" if layout_out is None else layout_out
     softmax_scale = 1.0 if softmax_scale is None else softmax_scale
 
-    op_module = flash_mla_with_kvcache_op_builder.load()
-    return op_module.flash_mla_with_kvcache(
+    op_module = flash_mla_op_builder.load()
+    return op_module.flash_mla(
         q,
         k_cache,
         block_table,
@@ -288,7 +288,5 @@ def flash_mla_with_kvcache(
     )
 
 
-flash_mla_with_kvcache = torch.ops.cann_ops_transformer.flash_mla_with_kvcache
-flash_mla_with_kvcache_metadata = (
-    torch.ops.cann_ops_transformer.flash_mla_with_kvcache_metadata
-)
+flash_mla = torch.ops.cann_ops_transformer.flash_mla
+flash_mla_metadata = torch.ops.cann_ops_transformer.flash_mla_metadata
