@@ -17,7 +17,7 @@
 
 #include "mat_mul_base_block.h"
 #include "mat_mul_base_kernel.h"
-#include "mat_mul_nd2nz.h"
+#include "mc2_mat_mul_nd2nz.h"
 
 using namespace AscendC;
 using namespace matmul;

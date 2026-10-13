@@ -17,7 +17,7 @@
 
 #include "mat_mul_v3_common.h"
 #include "mat_mul_sc_splitk_block.h"
-#include "mat_mul_nd2nz.h"
+#include "mc2_mat_mul_nd2nz.h"
 
 using namespace AscendC;
 using namespace matmul;

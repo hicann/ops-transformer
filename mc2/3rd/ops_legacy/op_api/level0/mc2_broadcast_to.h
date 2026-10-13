@@ -8,11 +8,16 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef OP_API_INC_LEVEL0_SHAPE_OP_H
-#define OP_API_INC_LEVEL0_SHAPE_OP_H
-#include "opdev/op_executor.h"
-namespace l0op {
-const aclTensor* Shape_op(const aclTensor* x, aclOpExecutor* executor);
-}
+#ifndef MC2_BROADCAST_TO_H
+#define MC2_BROADCAST_TO_H
 
-#endif
+#include "opdev/op_def.h"
+
+namespace l0op {
+
+const aclTensor* BroadcastTo(const aclTensor* x, const aclTensor* y, const aclTensor* shape, aclOpExecutor* executor);
+const aclTensor* BroadcastTo(const aclTensor* x, const aclIntArray* shape, aclOpExecutor* executor);
+
+} // namespace l0op
+
+#endif // MC2_BROADCAST_TO_H

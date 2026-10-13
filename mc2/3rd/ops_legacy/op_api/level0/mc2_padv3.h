@@ -8,18 +8,14 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef COMMON_INC_EXTERNAL_ACLNN_KERNELS_SLICE_H
-#define COMMON_INC_EXTERNAL_ACLNN_KERNELS_SLICE_H
+#ifndef MC2_PADV3_H
+#define MC2_PADV3_H
 
-#include "opdev/op_def.h"
+#include "opdev/op_executor.h"
+#include "opdev/make_op_executor.h"
 
 namespace l0op {
-
-const aclTensor* Slice(const aclTensor* x, const aclTensor* y, const aclTensor* offset, const aclTensor* size,
-                       aclOpExecutor* executor);
-
-const aclTensor* Slice(const aclTensor* x, const aclIntArray* offsets, const aclIntArray* size,
-                       aclOpExecutor* executor);
-} // namespace l0op
-
-#endif // COMMON_INC_EXTERNAL_ACLNN_KERNELS_SLICE_H
+const aclTensor* PadV3(const aclTensor* self, const aclTensor* paddings, const aclTensor* constant_values,
+                       const std::string& mode, const bool paddingsContiguous, aclOpExecutor* executor);
+}
+#endif // MC2_PADV3_H

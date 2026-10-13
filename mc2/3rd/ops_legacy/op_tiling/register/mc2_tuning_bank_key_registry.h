@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef __INC_REGISTER_TUNING_BANK_KEY_REGISTRY_HEADER__
-#define __INC_REGISTER_TUNING_BANK_KEY_REGISTRY_HEADER__
+#ifndef MC2_TUNING_BANK_KEY_REGISTRY_H
+#define MC2_TUNING_BANK_KEY_REGISTRY_H
 #include <memory>
 #include <unordered_map>
 #include <nlohmann/json.hpp>

@@ -8,13 +8,14 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef COMMON_INC_EXTERNAL_ACLNN_KERNELS_PAD_H
-#define COMMON_INC_EXTERNAL_ACLNN_KERNELS_PAD_H
+#ifndef MC2_FILL_H
+#define MC2_FILL_H
 
 #include "opdev/op_executor.h"
-#include "opdev/make_op_executor.h"
 
 namespace l0op {
-const aclTensor* Pad(const aclTensor* self, const aclTensor* paddings, aclOpExecutor* executor);
+const aclTensor* Fill(const aclTensor* dims, const aclTensor* value, const aclIntArray* outShape,
+                      aclOpExecutor* executor);
 }
-#endif // COMMON_INC_EXTERNAL_ACLNN_KERNELS_PAD_H
+
+#endif

@@ -16,7 +16,7 @@
 #define MC2_QBMM_CUSTOM_MM_POLICY_H
 
 #include "lib/matmul_intf.h"
-#include "qbmm_copy_cube_out.h"
+#include "mc2_qbmm_copy_cube_out.h"
 
 namespace AscendC {
 template <const auto& MM_CFG, typename IMPL, typename A_TYPE, typename B_TYPE, typename C_TYPE, typename BIAS_TYPE>

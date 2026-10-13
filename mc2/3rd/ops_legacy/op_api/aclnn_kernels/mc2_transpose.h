@@ -8,14 +8,15 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef OP_API_OP_API_COMMON_INC_LEVEL0_OP_REDUCE_SUM_OP_H_
-#define OP_API_OP_API_COMMON_INC_LEVEL0_OP_REDUCE_SUM_OP_H_
+#ifndef MC2_TRANSPOSE_H
+#define MC2_TRANSPOSE_H
 
-#include "opdev/op_executor.h"
-#include "opdev/make_op_executor.h"
+#include "opdev/op_def.h"
 
 namespace l0op {
-const aclTensor* ReduceSumOp(const aclTensor* x, const aclIntArray* axes, bool keep_dims, aclOpExecutor* executor);
-}
 
-#endif // OP_API_OP_API_COMMON_INC_LEVEL0_OP_REDUCE_SUM_OP_H_
+const aclTensor* Transpose(const aclTensor* x, const aclTensor* y, const aclTensor* perm, aclOpExecutor* executor);
+const aclTensor* Transpose(const aclTensor* x, const aclIntArray* perm, aclOpExecutor* executor);
+} // namespace l0op
+
+#endif // MC2_TRANSPOSE_H

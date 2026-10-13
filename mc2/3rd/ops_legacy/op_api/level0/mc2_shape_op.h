@@ -8,14 +8,11 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef OP_API_INC_LEVEL0_REDUCE_MEAN_H
-#define OP_API_INC_LEVEL0_REDUCE_MEAN_H
+#ifndef MC2_SHAPE_OP_H
+#define MC2_SHAPE_OP_H
 #include "opdev/op_executor.h"
-
 namespace l0op {
-const aclTensor* ReduceMean(const aclTensor* self, const aclIntArray* dim, bool keepDim, aclOpExecutor* executor);
-const aclTensor* ReduceMean(const aclTensor* self, const aclIntArray* dim, bool keepDim, bool noopWithEmptyAxes,
-                            aclOpExecutor* executor);
-} // namespace l0op
+const aclTensor* Shape_op(const aclTensor* x, aclOpExecutor* executor);
+}
 
 #endif

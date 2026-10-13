@@ -22,7 +22,7 @@ struct NoOpHook {
     __aicore__ inline void operator()() const {}
 };
 #include "sort_lib/sort_lib_core.h"
-#include "sort_lib/sort_lib_one_core.h"
+#include "sort_lib/engram_sort_lib_one_core.h"
 
 namespace SortLib {
 

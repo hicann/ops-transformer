@@ -30,7 +30,7 @@
 #include "kernel_tiling/kernel_tiling.h"
 
 #include "../../common/op_kernel/mc2_tiling_struct.h"
-#include "../../3rd/mat_mul_v3/op_kernel/mat_mul_nd2nz.h"
+#include "../../3rd/mat_mul_v3/op_kernel/mc2_mat_mul_nd2nz.h"
 
 namespace AscendC {
 using namespace matmul;

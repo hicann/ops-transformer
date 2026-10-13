@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef COMMON_INC_EXTERNAL_ACLNN_KERNELS_RESHAPE_H
-#define COMMON_INC_EXTERNAL_ACLNN_KERNELS_RESHAPE_H
+#ifndef MC2_RESHAPE_H
+#define MC2_RESHAPE_H
 
 #include "opdev/shape_utils.h"
 #include "opdev/op_def.h"
@@ -34,4 +34,4 @@ const aclTensor* Reshape(const aclTensor* x, const op::Shape& shape, aclOpExecut
 const aclTensor* Reshape(const aclTensor* x, const aclIntArray* shape, aclOpExecutor* executor);
 } // namespace l0op
 
-#endif // COMMON_INC_EXTERNAL_ACLNN_KERNELS_RESHAPE_H
+#endif // MC2_RESHAPE_H

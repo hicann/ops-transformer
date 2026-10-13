@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef COMMON_INC_EXTERNAL_ACLNN_KERNELS_CONTIGUOUS_H
-#define COMMON_INC_EXTERNAL_ACLNN_KERNELS_CONTIGUOUS_H
+#ifndef MC2_CONTIGUOUS_H
+#define MC2_CONTIGUOUS_H
 
 #include "opdev/op_def.h"
 #include "opdev/common_types.h"
@@ -85,4 +85,4 @@ bool CanOptimizeView(const op::Shape& viewShape, const op::Strides& strides, int
 // ============内部接口=============
 } // namespace l0op
 
-#endif // COMMON_INC_EXTERNAL_ACLNN_KERNELS_CONTIGUOUS_H
+#endif // MC2_CONTIGUOUS_H

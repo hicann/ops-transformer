@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file op_cache_tiling.h
+ * \file mc2_op_cache_def_tiling.h
  * \brief
  */
 
-#ifndef OPS_BUILT_IN_OP_TILING_OP_CACHE_DEF_TILING_H
-#define OPS_BUILT_IN_OP_TILING_OP_CACHE_DEF_TILING_H
+#ifndef MC2_OP_CACHE_DEF_TILING_H
+#define MC2_OP_CACHE_DEF_TILING_H
 
 #include <array>
 #include "exe_graph/runtime/tiling_context.h"

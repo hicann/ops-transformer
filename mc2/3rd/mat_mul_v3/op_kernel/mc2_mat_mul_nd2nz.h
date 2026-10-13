@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file mat_mul_nd2nz.h
+ * \file mc2_mat_mul_nd2nz.h
  * \brief
  */
-#ifndef __OP_KERNEL_MATMUL_V3_ND2NZ_H__
-#define __OP_KERNEL_MATMUL_V3_ND2NZ_H__
+#ifndef MC2_MAT_MUL_ND2NZ_H
+#define MC2_MAT_MUL_ND2NZ_H
 
 #include "mat_mul_nd2nz_util.h"
 #include "mat_mul_nd2nz_kernel.h"

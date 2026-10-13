@@ -8,16 +8,13 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef OP_API_INC_LEVEL0_BROADCAST_TO_H
-#define OP_API_INC_LEVEL0_BROADCAST_TO_H
+#ifndef MC2_PAD_H
+#define MC2_PAD_H
 
-#include "opdev/op_def.h"
+#include "opdev/op_executor.h"
+#include "opdev/make_op_executor.h"
 
 namespace l0op {
-
-const aclTensor* BroadcastTo(const aclTensor* x, const aclTensor* y, const aclTensor* shape, aclOpExecutor* executor);
-const aclTensor* BroadcastTo(const aclTensor* x, const aclIntArray* shape, aclOpExecutor* executor);
-
-} // namespace l0op
-
-#endif // OP_API_INC_LEVEL0_BROADCAST_TO_H
+const aclTensor* Pad(const aclTensor* self, const aclTensor* paddings, aclOpExecutor* executor);
+}
+#endif // MC2_PAD_H

@@ -15,7 +15,7 @@
 #ifndef __OP_KERNEL_MATMUL_V3_UNALIGNED_DETERMINISTIC_SPLITK_KERNEL_H__
 #define __OP_KERNEL_MATMUL_V3_UNALIGNED_DETERMINISTIC_SPLITK_KERNEL_H__
 
-#include "mat_mul_nd2nz.h"
+#include "mc2_mat_mul_nd2nz.h"
 #include "mat_mul_deterministic_splitk_kernel.h"
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE,

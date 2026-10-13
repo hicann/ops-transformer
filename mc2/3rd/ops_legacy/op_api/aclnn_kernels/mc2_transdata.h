@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef COMMON_INC_EXTERNAL_ACLNN_KERNELS_TRANSDATA_H
-#define COMMON_INC_EXTERNAL_ACLNN_KERNELS_TRANSDATA_H
+#ifndef MC2_TRANSDATA_H
+#define MC2_TRANSDATA_H
 
 #include "opdev/op_executor.h"
 
@@ -53,4 +53,4 @@ const aclTensor* TransDataSpecial(const aclTensor* x, op::Format dstPrimaryForma
 
 } // namespace l0op
 
-#endif // COMMON_INC_EXTERNAL_ACLNN_KERNELS_TRANSDATA_H
+#endif // MC2_TRANSDATA_H

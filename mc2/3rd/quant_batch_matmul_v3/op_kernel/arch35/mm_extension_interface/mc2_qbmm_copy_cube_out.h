@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file qbmm_copy_cube_out.h
+ * \file mc2_qbmm_copy_cube_out.h
  * \brief
  */
 #ifndef MC2_QBMM_COPY_CUBE_OUT_H
@@ -221,4 +221,4 @@ private:
 };
 
 } // namespace AscendC
-#endif // QBMM_COPY_CUBE_OUT_H
+#endif // MC2_QBMM_COPY_CUBE_OUT_H

@@ -9,15 +9,15 @@
  */
 
 /*!
- * \file sort_lib_one_core.h
+ * \file engram_sort_lib_one_core.h
  * \brief 单核 radix sort 类 (SortRadixOneCore)。
  *        小 N 时直接调用 AscendC::Sort(RADIX_SORT)，0 SyncAll、0 GM workspace。
  *
  * \internal  Do not include directly — use sort_lib.h instead.
  */
 
-#ifndef SORT_LIB_ONE_CORE_H
-#define SORT_LIB_ONE_CORE_H
+#ifndef ENGRAM_SORT_LIB_ONE_CORE_H
+#define ENGRAM_SORT_LIB_ONE_CORE_H
 
 #include "kernel_operator.h"
 #include "sort_util.h"
@@ -124,4 +124,4 @@ __aicore__ inline void SortRadixOneCore<ValT, IdxT, isDescend>::Process()
 
 } // namespace SortLib::detail
 
-#endif // SORT_LIB_ONE_CORE_H
+#endif // ENGRAM_SORT_LIB_ONE_CORE_H

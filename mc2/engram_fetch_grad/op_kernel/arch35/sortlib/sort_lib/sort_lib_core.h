@@ -11,7 +11,7 @@
 /*!
  * \file sort_lib_core.h
  * \brief Flat multi-core radix sort class (SortRadixMoreCore).
- *        SIMD micro-operations are in sort_lib_vf.h; constants in sort_lib_constants.h.
+ *        SIMD micro-operations are in engram_sort_lib_vf.h; constants in sort_lib_constants.h.
  *
  * \internal  Do not include directly — use sort_lib.h instead.
  */
@@ -24,7 +24,7 @@
 #include "sort_util.h"
 #include "sort_lib_constants.h"
 #include "sort_lib_params.h"
-#include "sort_lib_vf.h"
+#include "engram_sort_lib_vf.h"
 
 namespace SortLib::detail {
 

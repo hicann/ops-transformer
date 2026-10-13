@@ -32,7 +32,7 @@
 
 #include "./semaphore.h"
 #include "../block/block_mx_mm_aic_to_aiv_builder.h"
-#include "../epilogue/block_epilogue_finalize_routing.h"
+#include "../epilogue/cgmct_block_epilogue_finalize_routing.h"
 #include "../prologue/block_prologue_finalize_routing.h"
 
 #include "../block/block_scheduler_utils.h"

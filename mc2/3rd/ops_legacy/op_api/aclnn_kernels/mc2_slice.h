@@ -7,14 +7,19 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
-#ifndef OP_API_INC_LEVEL0_OP_FILL_OP_H_
-#define OP_API_INC_LEVEL0_OP_FILL_OP_H_
 
-#include "opdev/op_executor.h"
+#ifndef MC2_SLICE_H
+#define MC2_SLICE_H
+
+#include "opdev/op_def.h"
 
 namespace l0op {
-const aclTensor* Fill(const aclTensor* dims, const aclTensor* value, const aclIntArray* outShape,
-                      aclOpExecutor* executor);
-}
 
-#endif
+const aclTensor* Slice(const aclTensor* x, const aclTensor* y, const aclTensor* offset, const aclTensor* size,
+                       aclOpExecutor* executor);
+
+const aclTensor* Slice(const aclTensor* x, const aclIntArray* offsets, const aclIntArray* size,
+                       aclOpExecutor* executor);
+} // namespace l0op
+
+#endif // MC2_SLICE_H

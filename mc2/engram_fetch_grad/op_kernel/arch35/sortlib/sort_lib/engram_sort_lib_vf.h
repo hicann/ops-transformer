@@ -9,14 +9,14 @@
  */
 
 /*!
- * \file sort_lib_vf.h
+ * \file engram_sort_lib_vf.h
  * \brief SIMD VF micro-operations for radix sort (histogram, scatter, lookback, twiddle).
  *
  * \internal  Do not include directly — used internally by sort_lib_core.h.
  */
 
-#ifndef SORT_LIB_VF_H
-#define SORT_LIB_VF_H
+#ifndef ENGRAM_SORT_LIB_VF_H
+#define ENGRAM_SORT_LIB_VF_H
 
 #include "kernel_operator.h"
 #include "simt_api/asc_simt.h"
@@ -800,4 +800,4 @@ __simt_vf__ LAUNCH_BOUND(THREAD_DIM_NUM) __aicore__
 
 } // namespace SortLib::detail
 
-#endif // SORT_LIB_VF_H
+#endif // ENGRAM_SORT_LIB_VF_H

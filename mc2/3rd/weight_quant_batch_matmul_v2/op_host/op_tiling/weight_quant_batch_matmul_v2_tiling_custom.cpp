@@ -19,7 +19,7 @@
 #include "weight_quant_batch_matmul_v2_white_list.h"
 #include "op_host/tiling_key.h"
 #include "ops_legacy/op_tiling/op_cache_tiling.h"
-#include "ops_legacy/op_tiling/op_cache_def_tiling.h"
+#include "ops_legacy/op_tiling/mc2_op_cache_def_tiling.h"
 #include "../../op_kernel/weight_quant_batch_matmul_v2_kernel_tiling_key.h"
 
 using Ops::Transformer::OpTiling::RecursiveSum;
