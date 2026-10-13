@@ -518,7 +518,7 @@ int ReleaseAddr(vector<TensorInfo>& tensorList, map<string, int64_t> &addrMap) {
 
 int DestroyTensor(void* items[], int item_type[], int num) {
   for (size_t i = 0; i < num; ++i) {
-    if (items[i] != nullptr) {
+    if (items[i] == nullptr) {
       continue;
     }
     if (item_type[i] == 0) {
