@@ -257,7 +257,6 @@ __aicore__ inline void LightningIndexerServiceVector<LIT>::CleanInvalidOutput(in
     GlobalTensor<int32_t> indexOutput = indiceOutGm[invalidS1Offset];
     AscendC::InitGlobalMemory(indexOutput, dealSize, constInfo_.INVALID_IDX);
     if (returnValueFlag) {
-        SetFlag<HardEvent::MTE3_V>(TOPK_MTE3_V_EVENT);
         WaitFlag<HardEvent::MTE3_V>(TOPK_MTE3_V_EVENT);
         Duplicate(valueOutLocal_.template ReinterpretCast<uint16_t>(), constInfo_.INVALID_VAL, constInfo_.sparseCount);
 
@@ -270,6 +269,7 @@ __aicore__ inline void LightningIndexerServiceVector<LIT>::CleanInvalidOutput(in
         copyOutValueParams.srcStride = 0;
         copyOutValueParams.dstStride = 0;
         AscendC::DataCopyPad(valueOutGm[invalidS1Offset], valueOutLocal_, copyOutValueParams);
+        SetFlag<HardEvent::MTE3_V>(TOPK_MTE3_V_EVENT);
     }
 }
 
