@@ -20,72 +20,52 @@ extern "C" {
 /**
  * @brief aclnnNsaCompressAttentionInfer的第一段接口，根据具体的计算流程，计算workspace大小。
  * @domain aclnn_ops_infer
- * funtion: aclnnNsaCompressAttentionInferGetWorkspaceSize
- * param [in] query : required
- * param [in] key : required
- * param [in] value : required
- * param [in] attentionMaskOptional : optional
- * param [in] blockTableOptional : optional
- * param [in] actualQSeqLenOptional : optional
- * param [in] actualCmpKvSeqLenOptional : optional
- * param [in] actualSelKvSeqLenOptional : optional
- * param [in] topkMaskOptional : optional
- * param [in] numHeads : optional
- * param [in] numKeyValueHeads : optional
- * param [in] selectBlockSize : optional
- * param [in] selectBlockCount : optional
- * param [in] compressBlockSize : optional
- * param [in] compressStride : optional   【aclnn中是compressBlockStride】
- * param [in] scaleValue : optional
- * param [in] layoutOptional : optional
- * param [in] pageBlockSize : optional
- * param [in] sparseMode : optional
+ * @param [in] query : required
+ * @param [in] key : required
+ * @param [in] value : required
+ * @param [in] attentionMaskOptional : optional
+ * @param [in] blockTableOptional : optional
+ * @param [in] actualQSeqLenOptional : optional
+ * @param [in] actualCmpKvSeqLenOptional : optional
+ * @param [in] actualSelKvSeqLenOptional : optional
+ * @param [in] topKMaskOptional : optional
+ * @param [in] numHeads : optional
+ * @param [in] numKeyValueHeads : optional
+ * @param [in] selectBlockSize : optional
+ * @param [in] selectBlockCount : optional
+ * @param [in] compressBlockSize : optional
+ * @param [in] compressBlockStride : optional
+ * @param [in] scaleValue : optional
+ * @param [in] layoutOptional : optional
+ * @param [in] pageBlockSize : optional
+ * @param [in] sparseMode : optional
  * @param [out] output : required
- * @param [out] topkIndicesOut : required   【aclnn中是topKOutput】
+ * @param [out] topKOutput : required
  * @param [out] workspaceSize : size of workspace(output).
  * @param [out] executor : executor context(output).
  * @return aclnnStatus: 返回状态码
  */
 
 aclnnStatus aclnnNsaCompressAttentionInferGetWorkspaceSize(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *value,
-    const aclTensor *attentionMaskOptional,
-    const aclTensor *blockTableOptional,
-    const aclIntArray *actualQSeqLenOptional,
-    const aclIntArray *actualCmpKvSeqLenOptional,
-    const aclIntArray *actualSelKvSeqLenOptional,
-    const aclTensor *topKMaskOptional, 
-    int64_t numHeads,
-    int64_t numKeyValueHeads,
-    int64_t selectBlockSize,
-    int64_t selectBlockCount,
-    int64_t compressBlockSize,
-    int64_t compressBlockStride,
-    double scaleValue,
-    char *layoutOptional,
-    int64_t pageBlockSize,
-    int64_t sparseMode,
-    const aclTensor *output,
-    const aclTensor *topKOutput,
-    uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* attentionMaskOptional,
+    const aclTensor* blockTableOptional, const aclIntArray* actualQSeqLenOptional,
+    const aclIntArray* actualCmpKvSeqLenOptional, const aclIntArray* actualSelKvSeqLenOptional,
+    const aclTensor* topKMaskOptional, int64_t numHeads, int64_t numKeyValueHeads, int64_t selectBlockSize,
+    int64_t selectBlockCount, int64_t compressBlockSize, int64_t compressBlockStride, double scaleValue,
+    char* layoutOptional, int64_t pageBlockSize, int64_t sparseMode, const aclTensor* output,
+    const aclTensor* topKOutput, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
- * funtion: aclnnNsaCompressAttentionInfer
- * param [in] workspace : workspace memory addr(input).
- * param [in] workspaceSize : size of workspace(input).
- * param [in] executor : executor context(input).
- * param [in] stream : acl stream.
+ * @brief aclnnNsaCompressAttentionInfer的第二段接口，用于执行计算。
+ * @param [in] workspace : workspace memory addr(input).
+ * @param [in] workspaceSize : size of workspace(input).
+ * @param [in] executor : executor context(input).
+ * @param [in] stream : acl stream.
  * @return aclnnStatus: 返回状态码
  */
 
-aclnnStatus aclnnNsaCompressAttentionInfer(
-    void *workspace,
-    uint64_t workspaceSize,
-    aclOpExecutor *executor,
-    aclrtStream stream);
+aclnnStatus aclnnNsaCompressAttentionInfer(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                           aclrtStream stream);
 
 #ifdef __cplusplus
 }
