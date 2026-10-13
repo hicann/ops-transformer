@@ -33,6 +33,8 @@ def customize_inputs(
     return_softmax_lse=False,
     **kwargs,
 ):
+    arguments = dict(locals())
+    arguments.pop("kwargs")
     for name, tensor in (
         ("cache_seqlens", cache_seqlens),
         ("cu_seqlens_q", cu_seqlens_q),
@@ -86,3 +88,7 @@ def customize_inputs(
             attn_mask.zero_()
     if metadata is not None:
         metadata.zero_()
+
+    from .cross_check import prepare
+
+    prepare(arguments, kwargs.get("testcase_name"))

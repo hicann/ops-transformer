@@ -57,6 +57,9 @@ class FlashMlaWithKvcacheGolden:
     内部参数 device_mode: 'cpu' 时辅助张量搬 CPU 计算)。
     """
 
+    # Layout/length handling is shared; numerical backends may override this hook.
+    _attention_single = staticmethod(attention_single)
+
     TILE_SIZE = 2048
     EPSILON = 1e-20
     TILED_CROSSOVER = 3 * 1024 * 1024  # S1*S2 > this -> tiled saves memory
@@ -497,7 +500,7 @@ class FlashMlaWithKvcacheGolden:
                         last_q = sq - 1 if qs // sq != (qe - 1) // sq else (qe - 1) % sq
                         return 0, last_q + delta + 1
 
-                    o, l = attention_single(
+                    o, l = self._attention_single(
                         flat_q,
                         k_bh,
                         v_bh,
@@ -591,7 +594,7 @@ class FlashMlaWithKvcacheGolden:
                 return self._build_mask_mode_mask(q_idx, k_idx, delta)
             return None if mask is None else mask[qs:qe, ks:ke]
 
-        return attention_single(
+        return self._attention_single(
             q,
             k,
             v,
@@ -614,7 +617,7 @@ class FlashMlaWithKvcacheGolden:
         scale: float,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """One-tile mixed-precision reference; exp weights round before PV."""
-        return attention_single(
+        return self._attention_single(
             q,
             k,
             v,

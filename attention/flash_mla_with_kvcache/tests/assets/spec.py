@@ -40,7 +40,13 @@ class FlashMlaWithKvcacheSpec:
         return _load("inputs").customize_inputs(*args, **kwargs)
 
     @staticmethod
-    def compare(*outputs, **kwargs):
+    def compare(*outputs, compare_context=None, **kwargs):
+        cross_check = _load("cross_check")
+        if cross_check.enabled():
+            return cross_check.compare(
+                *outputs,
+                testcase_name=getattr(compare_context, "testcase_name", None),
+            )
         return _load("compare").compare(*outputs)
 
     tolerance = {

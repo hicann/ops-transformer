@@ -122,6 +122,10 @@ __global__ __aicore__ void flash_mla_with_kvcache(__gm__ uint8_t* query, __gm__ 
     GET_TILING_DATA_MEMBER(optiling::FlashMlaWithKvcacheTilingData, baseTiling, baseTilingIn, tiling);
     const optiling::FlashMlaWithKvcacheNoQuantTilingArch35* __restrict tilingData = &baseTilingIn;
 
+    // 静态 Tensor 编程（无 TPipe）：入口手动复位 SoC 全局状态（原子累加/Mask 模式/SPR 等），
+    // 避免继承前序算子留下的不确定状态，语义对齐 flash_attn.cpp 入口的 InitSocState()。
+    AscendC::InitSocState();
+
     // —— 模板参数聚合（cube/vec/fd 参数集不一致 → 各建聚合类型，见 utils/flash_mla_with_kvcache_type.h）——
     using FA_T_Cube = FlashAttnKernel::FATypeCube<INPUT_T, float, qLayout, s1TemplateType, s2TemplateType,
                                                   dTemplateType, dVTemplateType, KvLayoutType>;

@@ -46,6 +46,10 @@ class FlashAttnComparator:
             print(f"[INFO] [Output {output_index}] {line}", flush=True)
 
     @staticmethod
+    def output_name(output_index):
+        return {0: "ATTENTION", 1: "LSE"}.get(output_index, f"OUTPUT {output_index}")
+
+    @staticmethod
     def table_header():
         header = (
             f"{'Loop':>8}  "
@@ -65,7 +69,8 @@ class FlashAttnComparator:
         """Print bounded first/last samples regardless of comparison status."""
         header, separator = cls.table_header()
         lines = [
-            f"{'PASS' if passed else 'FAIL'}: precision={precision:.6g}%, "
+            f"{cls.output_name(output_index)} {'PASS' if passed else 'FAIL'} "
+            f"| Output samples: precision={precision:.6g}%, "
             f"shape={npu.shape}, elements={npu.size}",
             separator,
             header,
@@ -73,12 +78,12 @@ class FlashAttnComparator:
         ]
         indices = (
             list(range(npu.size))
-            if npu.size <= 21
+            if npu.size <= 20
             else [*range(10), *range(npu.size - 10, npu.size)]
         )
         actual, expected = npu.reshape(-1), golden.reshape(-1)
         for position, index in enumerate(indices):
-            if npu.size > 21 and position == 10:
+            if npu.size > 20 and position == 10:
                 lines.append("...")
             a, e = float(actual[index]), float(expected[index])
             absolute = abs(a - e)
@@ -117,37 +122,23 @@ class FlashAttnComparator:
 
         header, separator = cls.table_header()
         lines = [
-            f"{'PASS' if passed else 'FAIL'}: precision={precision:.6g}%, "
+            f"{cls.output_name(output_index)} {'PASS' if passed else 'FAIL'} "
+            f"| Failed points: precision={precision:.6g}%, "
             f"shape={npu.shape}, elements={npu.size}",
-            f"Error Line: {diff_idx.size} mismatches (ranks 1-9 and 91-99 shown)",
+            f"Error Line: {diff_idx.size} mismatches (first 10 and last 10 shown; no duplicates)",
             separator,
             header,
             separator,
         ]
-        lines.extend(point(i) for i in range(min(9, diff_idx.size)))
-        if diff_idx.size > 9:
-            lines.append("...")
-        lines.extend(point(i) for i in range(90, min(99, diff_idx.size)))
-        if diff_idx.size > 99:
-            lines.append("...")
-        # Non-finite mismatches cannot be ranked by a numeric relative error.
-        nonfinite = np.flatnonzero(~np.isfinite(relative))
-        if nonfinite.size:
-            lines.extend(
-                [
-                    separator,
-                    "Non-finite error points (up to 3 shown):",
-                    header,
-                    separator,
-                ]
-            )
-            lines.extend(point(int(i)) for i in nonfinite[:3])
-        finite = np.flatnonzero(np.isfinite(relative))
-        if finite.size:
-            maximum = np.max(relative[finite])
-            worst = finite[relative[finite] == maximum][:3]
-            lines.extend([separator, "Max-RE line (up to 3 shown):", header, separator])
-            lines.extend(point(int(i)) for i in worst)
+        positions = (
+            list(range(diff_idx.size))
+            if diff_idx.size <= 20
+            else [*range(10), *range(diff_idx.size - 10, diff_idx.size)]
+        )
+        for count, position in enumerate(positions):
+            if diff_idx.size > 20 and count == 10:
+                lines.append("...")
+            lines.append(point(position))
         lines.append(separator)
         cls.print_log("\n".join(lines), output_index)
 
@@ -155,11 +146,16 @@ class FlashAttnComparator:
     def compare_output(cls, npu_out, golden_out, output_index=0):
         if golden_out is None:
             cls.print_log(
-                "SUPPRESSED: golden output is None; comparison skipped", output_index
+                f"{cls.output_name(output_index)} SUPPRESSED: "
+                "golden output is None; comparison skipped",
+                output_index,
             )
             return {"pass": True, "precision": "SUPPRESSED"}
         if npu_out is None:
-            cls.print_log("FAIL: NPU output is None", output_index)
+            cls.print_log(
+                f"{cls.output_name(output_index)} FAIL: NPU output is None",
+                output_index,
+            )
             return {
                 "pass": False,
                 "precision": "NO_OUTPUT",
@@ -173,7 +169,8 @@ class FlashAttnComparator:
         golden = cls.as_float32(golden_out)
         if npu.shape != golden.shape:
             cls.print_log(
-                f"FAIL: output shape mismatch: npu={npu.shape}, golden={golden.shape}",
+                f"{cls.output_name(output_index)} FAIL: "
+                f"output shape mismatch: npu={npu.shape}, golden={golden.shape}",
                 output_index,
             )
             return {
@@ -217,7 +214,7 @@ class FlashAttnComparator:
             )
             cls.print_log(error_info, output_index)
         cls.display_samples(npu, golden, precision, output_index, passed=passed)
-        if diff_idx.size:
+        if not passed and diff_idx.size:
             cls.display_error_output(
                 npu, golden, diff_idx, output_index, passed=passed, precision=precision
             )
