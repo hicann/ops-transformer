@@ -272,7 +272,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>metadataOptional</td>
                 <td>输入</td>
                 <td>由aclnnSparseLightningIndexerKLLossGradMetadata生成的分核信息。</td>
-                <td>可选输入。传入后kernel将使用metadata中的分核切分。</td>
+                <td>可选输入。传入后kernel将使用metadata中的分核切分。<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>传入seqUsedQOptional或seqUsedKOptional时，必须同时传入本参数。</td>
                 <td>INT32</td>
                 <td>ND</td>
                 <td>(x,)</td>

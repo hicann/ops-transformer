@@ -487,6 +487,43 @@ aclnnStatus ParamsCheckSli(const aclTensor* cuSeqlensQOptional, const aclTensor*
                                        socVersion, SLI_TOPK_UPPER_BOUND_A3);
         CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
         CHECK_RET(metadata != nullptr, ACLNN_ERR_PARAM_NULLPTR);
+        if (cmpRatio != SLI_CMP_RATIO_LOWER_BOUND && maskMode == SLI_CAUSAL_MASK_MODE &&
+            !IsTensorExistSli(cmpResidualKOptional)) {
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(SLI_ACLNN_OP_NAME, "cmp_residual_k",
+                                                     "When cmp_ratio is not 1 and mask_mode is CAUSAL, "
+                                                     "cmp_residual_k cannot be empty");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (IsTensorExistSli(cmpResidualKOptional)) {
+            auto dimNum = GetDimNumSli(cmpResidualKOptional);
+            if (dimNum != 1) {
+                OP_LOGE_FOR_INVALID_SHAPEDIM(SLI_ACLNN_OP_NAME, "cmp_residual_k", std::to_string(dimNum), "1");
+                return ACLNN_ERR_PARAM_INVALID;
+            }
+            auto dataType = GetDataTypeSli(cmpResidualKOptional);
+            if (dataType != aclDataType::ACL_INT32) {
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(SLI_ACLNN_OP_NAME, "cmp_residual_k",
+                                                      ToString(dataType).GetString(),
+                                                      "The dtype of cmp_residual_k must be int32");
+                return ACLNN_ERR_PARAM_INVALID;
+            }
+            int64_t queryBatchSize = batchSize;
+            if (queryBatchSize <= 0) {
+                if (IsTensorExistSli(sequsedQOptional)) {
+                    queryBatchSize = sequsedQOptional->GetViewShape().GetDim(0);
+                } else if (strcmp(layoutQOptional, "TND") == 0 && IsTensorExistSli(cuSeqlensQOptional)) {
+                    queryBatchSize = cuSeqlensQOptional->GetViewShape().GetDim(0) - 1;
+                }
+            }
+            auto cmpResidualKBatch = cmpResidualKOptional->GetViewShape().GetDim(0);
+            if (cmpResidualKBatch != queryBatchSize) {
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                    SLI_ACLNN_OP_NAME, "cmp_residual_k", std::to_string(cmpResidualKBatch),
+                    "The length of cmp_residual_k must equal the effective batch size " +
+                        std::to_string(queryBatchSize));
+                return ACLNN_ERR_PARAM_INVALID;
+            }
+        }
         return ACLNN_SUCCESS;
     }
     // A5 校验

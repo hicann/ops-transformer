@@ -147,7 +147,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       <td>batchSize（int64_t）</td>
       <td>输入</td>
       <td>表示batch数量。</td>
-      <td><ul><li>支持非负数。TND场景可填0，并通过cuSeqlensQOptional推导。</li><li>建议值为0。</li></ul></td>
+      <td><ul><li>支持非负数，填0时按特殊约束中的Batch取值规则推导。</li><li>BSND场景建议显式传入batch数量。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -291,10 +291,10 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
     <li><term>Ascend 950PR&950DT系列产品</term> ：topk仅支持[1, 2048]。</li>
     <!-- end id7 -->
     <!-- npu="A3" id8 -->
-    <li><term>Atlas A3系列产品</term> ：不支持sequsedQOptional、sequsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
+    <li><term>Atlas A3系列产品</term> ：支持sequsedQOptional、sequsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
     <!-- end id8 -->
     <!-- npu="910b" id9 -->
-    <li><term>Atlas A2系列产品</term> ：不支持sequsedQOptional、sequsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
+    <li><term>Atlas A2系列产品</term> ：支持sequsedQOptional、sequsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
     <!-- end id9 -->
   </ul>
 
@@ -383,6 +383,8 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
   - B（Batch）表示输入样本批量大小，q为配套的aclnnSparseLightningIndexerKLLossGrad算子的入参，S1表示layoutQOptional=BSND时，q shape中的S轴的大小。
   - 参数cuSeqlensQOptional、cuSeqlensKOptional要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
   - 参数sequsedQOptional、sequsedKOptional要求其值表示每个Batch中的有效token数。
+  - 参数sequsedQOptional、sequsedKOptional、cmpResidualKOptional传入时均须为shape为(B,)的一维INT32张量，长度必须等于实际Batch数B。
+  - cmpRatio不为1且maskMode为3时，cmpResidualKOptional必须传入非空张量。
   - 参数cmpResidualKOptional需满足cmpResidualKOptional[i] < cmpRatio。
   - layoutQOptional、layoutKOptional须相同。
   - numHeadsQ必须能被numHeadsK整除。
@@ -396,18 +398,18 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
   <!-- npu="A3" id11 -->
   - <term>Atlas A3系列产品</term>约束：
     - BSND场景
-      - 必传batchSize、maxSeqlenQ、maxSeqlenK和topk参数，以获取shape信息。
+      - 必传maxSeqlenQ、maxSeqlenK和topk参数；batchSize大于0，或通过sequsedQOptional的shape推导batch。
     - TND场景
       - 必传cuSeqlensQOptional、cuSeqlensKOptional和topk参数，以获取正确shape信息。
-      - 当batchSize为0时，通过cuSeqlensQOptional的shape推导batch。
+      - 当batchSize为0时，优先通过sequsedQOptional的shape推导batch，未传入时通过cuSeqlensQOptional的shape推导batch。
   <!-- end id11 -->
   <!-- npu="910b" id12 -->
   - <term>Atlas A2系列产品</term>约束：
     - BSND场景
-      - 必传batchSize、maxSeqlenQ、maxSeqlenK和topk参数，以获取shape信息。
+      - 必传maxSeqlenQ、maxSeqlenK和topk参数；batchSize大于0，或通过sequsedQOptional的shape推导batch。
     - TND场景
       - 必传cuSeqlensQOptional、cuSeqlensKOptional和topk参数，以获取正确shape信息。
-      - 当batchSize为0时，通过cuSeqlensQOptional的shape推导batch。
+      - 当batchSize为0时，优先通过sequsedQOptional的shape推导batch，未传入时通过cuSeqlensQOptional的shape推导batch。
   <!-- end id12 -->
 
 <details>
@@ -455,11 +457,12 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
   - Atlas A3系列产品约束：
     - Batch取值规则
       - 如果batchSize大于0，优先使用batchSize。
-      - 如果batchSize小于等于0，且layoutQOptional为TND，则通过cuSeqlensQOptional的shape推导batch。
-      - 如果batchSize小于等于0，且layoutQOptional为BSND，则报错。
+      - 如果batchSize为0，优先通过sequsedQOptional的shape推导batch。
+      - 如果batchSize为0且未传入sequsedQOptional，layoutQOptional为TND时通过cuSeqlensQOptional的shape推导batch，BSND时则报错。
+      - 推导出的batch必须大于0。
     - Seqlen取值规则
-      - TND场景下，通过cuSeqlensQOptional和cuSeqlensKOptional计算每个batch的实际q/k长度。
-      - BSND场景下，通过maxSeqlenQ和maxSeqlenK获取q/k长度。
+      - 传入sequsedQOptional、sequsedKOptional时，分别使用其对应元素作为实际q/k有效长度，取值不得超过对应batch的分配长度。
+      - 未传入对应seqused参数时，TND场景通过对应cuSeqlens相邻元素之差获取实际长度，BSND场景通过maxSeqlenQ和maxSeqlenK获取实际长度。
     - layout约束
       - layoutQOptional必须为BSND或TND。
       - layoutKOptional支持BSND和TND，建议与layoutQOptional保持一致。
@@ -475,11 +478,12 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
   - Atlas A2系列产品约束：
     - Batch取值规则
       - 如果batchSize大于0，优先使用batchSize。
-      - 如果batchSize小于等于0，且layoutQOptional为TND，则通过cuSeqlensQOptional的shape推导batch。
-      - 如果batchSize小于等于0，且layoutQOptional为BSND，则报错。
+      - 如果batchSize为0，优先通过sequsedQOptional的shape推导batch。
+      - 如果batchSize为0且未传入sequsedQOptional，layoutQOptional为TND时通过cuSeqlensQOptional的shape推导batch，BSND时则报错。
+      - 推导出的batch必须大于0。
     - Seqlen取值规则
-      - TND场景下，通过cuSeqlensQOptional和cuSeqlensKOptional计算每个batch的实际q/k长度。
-      - BSND场景下，通过maxSeqlenQ和maxSeqlenK获取q/k长度。
+      - 传入sequsedQOptional、sequsedKOptional时，分别使用其对应元素作为实际q/k有效长度，取值不得超过对应batch的分配长度。
+      - 未传入对应seqused参数时，TND场景通过对应cuSeqlens相邻元素之差获取实际长度，BSND场景通过maxSeqlenQ和maxSeqlenK获取实际长度。
     - layout约束
       - layoutQOptional必须为BSND或TND。
       - layoutKOptional支持BSND和TND，建议与layoutQOptional保持一致。

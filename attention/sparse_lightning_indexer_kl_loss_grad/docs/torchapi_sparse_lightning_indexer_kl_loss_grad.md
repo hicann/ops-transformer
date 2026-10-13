@@ -144,7 +144,7 @@ cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
 | cmp_ratio | 可选属性 | key压缩比例。 | `int` | 取值范围 `[1, 128]`，默认 `1`。 |
 
 <!-- npu="A3,910b" id5 -->
-- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：暂不支持`seqused_q`、`seqused_k`参数。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持`seqused_q`、`seqused_k`、`cmp_residual_k`，传入时均须为shape为(B,)的一维INT32张量。传入`seqused_q`或`seqused_k`时，必须同时传入配套metadata算子生成的`metadata`。
 <!-- end id5 -->
 
 ### sparse_lightning_indexer_kl_loss_grad_metadata
@@ -159,7 +159,7 @@ cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
 | seqused_q | Tensor | 可选 | 表示每个batch实际使用的query长度。数据格式为ND，支持非连续的Tensor。 | int32 | (B, ) |
 | seqused_k | Tensor | 可选 | 表示每个batch实际使用的key长度。数据格式为ND，支持非连续的Tensor。 | int32 | (B, ) |
 | cmp_residual_k | Tensor | 可选 | 压缩key场景下的残差长度。数据格式为ND，支持非连续的Tensor。 | int32 | (B, ) |
-| batch_size | int | 可选 | batch大小。BSND场景建议显式传入，TND场景也可由 `cu_seqlens_q` 推导，默认值为0。 | int32 | - |
+| batch_size | int | 可选 | batch大小，默认值为0，各产品的推导规则见下方约束。 | int32 | - |
 | max_seqlen_q | int | 可选 | 单个batch中最大的query序列长度，默认值为0。 | int32 | - |
 | max_seqlen_k | int | 可选 | 单个batch中最大的压缩后key序列长度，默认值为0。 | int32 | - |
 | topk | int | 可选 | top-k大小，即 `sparse_indices` 最后一维 `K`，当前支持[1, 2048]和4096、8192。 | int32 | - |
@@ -172,7 +172,11 @@ cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
 - <term>Ascend 950PR&950DT系列产品</term> ：`topk`仅支持[1, 2048]。
 <!-- end id6 -->
 <!-- npu="A3,910b" id7 -->
-- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：暂不支持`seqused_q`、`seqused_k`、`cmp_residual_k`，`num_heads_q`仅支持8/16/32/64，`topk`仅支持512/1024/2048/4096/8192。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持`seqused_q`、`seqused_k`、`cmp_residual_k`，`num_heads_q`仅支持8/16/32/64，`topk`仅支持512/1024/2048/4096/8192。
+- `seqused_q`、`seqused_k`、`cmp_residual_k`传入时均须为shape为(B,)的一维INT32张量，长度必须等于实际Batch数B。
+- `cmp_ratio!=1`且`mask_mode=3`时，必须传入非空`cmp_residual_k`。
+- Batch取值规则：`batch_size>0`时优先使用`batch_size`；`batch_size=0`时优先通过`seqused_q`的shape推导，未传入且`layout_q="TND"`时通过`cu_seqlens_q`的shape推导；无法推导出正数batch时，报错。
+- `seqused_q`、`seqused_k`传入时，分别使用其对应元素作为实际q/k有效长度，取值不得超过对应Batch的分配长度。
 <!-- end id7 -->
 
 ## 返回值说明

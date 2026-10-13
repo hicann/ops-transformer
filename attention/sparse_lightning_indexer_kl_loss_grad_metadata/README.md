@@ -158,8 +158,8 @@
 
   <ul>
     <li><term>Ascend 950PR&950DT系列产品</term> ：topk仅支持[1, 2048]。</li>
-    <li><term>Atlas A3系列产品</term> ：不支持seqused_q、seqused_k、cmp_residual_k，num_heads_q仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
-    <li><term>Atlas A2系列产品</term> ：不支持seqused_q、seqused_k、cmp_residual_k，num_heads_q仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
+    <li><term>Atlas A3系列产品</term> ：支持seqused_q、seqused_k、cmp_residual_k，num_heads_q仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
+    <li><term>Atlas A2系列产品</term> ：支持seqused_q、seqused_k、cmp_residual_k，num_heads_q仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
   </ul>
 
 ## 约束说明
@@ -169,6 +169,7 @@
 - layout_q、layout_k须相同。
 - 参数cu_seqlens_q、cu_seqlens_k要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
 - 参数seqused_q、seqused_k要求其值表示每个Batch中的有效token数。
+- 参数seqused_q、seqused_k、cmp_residual_k传入时均须为shape为(B,)的一维INT32张量，长度必须等于实际Batch数B。
 - 参数cmp_residual_k需满足cmp_residual_k[i] < cmp_ratio。
 - mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../docs/zh/context/sparse_mode_introduction.md)。
 - Ascend 950PR&950DT系列产品约束：
@@ -182,6 +183,15 @@
   - q Seqlen取值规则
     - layout_q为BSND时，优先通过seqused_q中的元素获取seqlen，seqused_q未传入则通过max_seqlen_q获取seqlen。
     - layout_q为TND时，优先通过seqused_q中的元素获取seqlen，seqused_q未传入则通过cu_seqlens_q中的元素获取seqlen。
+
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>约束：
+  - Batch取值规则
+    - batch_size大于0时，优先使用batch_size。
+    - batch_size为0时，优先通过seqused_q的shape推导batch；seqused_q未传入且layout_q为TND时，通过cu_seqlens_q的shape推导batch。
+    - 无法推导出正数batch时，报错。
+  - 有效序列长度规则
+    - seqused_q、seqused_k传入时，分别使用其对应元素作为实际q/k有效长度，取值不得超过对应Batch的分配长度。
+    - 未传入对应seqused参数时，BSND场景使用max_seqlen_q/max_seqlen_k，TND场景使用对应cu_seqlens相邻元素之差。
 
 ## 调用说明
 

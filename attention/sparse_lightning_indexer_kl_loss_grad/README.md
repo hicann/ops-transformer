@@ -155,7 +155,7 @@
     <tr>
         <td>cmpResidualKOptional</td>
         <td>可选输入</td>
-        <td>maskMode=3且cmpRatio!=1时的预留字段。</td>
+        <td>压缩key的残差长度。maskMode=3且cmpRatio!=1时需要传入，shape为(B,)。</td>
         <td>INT32</td>
         <td>ND</td>
     </tr>
@@ -227,7 +227,7 @@
 
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
   - T1支持大于等于cuSeqLensQOptional的最后一个元素，T2支持大于等于cuSeqLensKOptional的最后一个元素。
-- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：暂不支持seqUsedQOptional、seqUsedKOptional字段。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持seqUsedQOptional、seqUsedKOptional和cmpResidualKOptional，传入时均须为shape为(B,)的一维INT32张量。传入seqUsedQOptional或seqUsedKOptional时，必须同时传入配套metadata算子生成的metadataOptional。
 
 ## 约束说明
 
