@@ -23,6 +23,20 @@ if("${CONDITION_UNIT}" STREQUAL "ascend950")
         COMPUTE_UNIT Ascend950PR_9599
         OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
     )
+elseif("${CONDITION_UNIT}" STREQUAL "ascend960dt")
+    set(sparse_flash_attention_grad_depends attention/common CACHE INTERNAL "Dependencies for sparse_flash_attention_grad")
+    add_ops_compile_options(
+        OP_NAME sparse_flash_attention_grad
+        COMPUTE_UNIT ascend960dt_968B7
+        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
+    )
+elseif("${CONDITION_UNIT}" STREQUAL "ascend960pr")
+    set(sparse_flash_attention_grad_depends attention/common CACHE INTERNAL "Dependencies for sparse_flash_attention_grad")
+    add_ops_compile_options(
+        OP_NAME sparse_flash_attention_grad
+        COMPUTE_UNIT Ascend960PR_969A1
+        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
+    )
 endif()
 
 if (BUILD_OPS_RTY_KERNEL) # 回黄kernel
@@ -52,5 +66,7 @@ if(NOT BUILD_OPS_RTY_KERNEL)
         ./arch22/sparse_flash_attention_grad_tiling_bs1_basic.h
         ./arch35/sparse_flash_attention_grad_tiling_bs1_regbase.cpp
         ./arch35/sparse_flash_attention_grad_tiling_bs1_regbase.h
+        ./arch92/sparse_flash_attention_grad_tiling_bs1_regbase.cpp
+        ./arch92/sparse_flash_attention_grad_tiling_bs1_regbase.h
     )
 endif()
