@@ -749,8 +749,10 @@ macro(add_graph_plugin_sources)
   endif()
 
   # only built-in build fusion_pass
+  # op_graph UT(test_*_pass.cpp) 直接实例化/继承 fusion pass 类, 需要其实现参与链接
+  # (vtable/typeinfo/Run/Patterns 等符号定义在 pass 的 .cpp 中), 故 UT 场景一并编译
   file(GLOB GRAPH_PLUGIN_SRCS ${SOURCE_DIR}/*_graph_plugin*.cpp)
-  if(ENABLE_BUILT_IN)
+  if(ENABLE_BUILT_IN OR UT_TEST_ALL OR OP_GRAPH_UT)
     file(GLOB GRAPH_PLUGIN_FUSION_SRCS ${SOURCE_DIR}/fusion_pass/*fusion_pass*.cpp)
     list(APPEND GRAPH_PLUGIN_SRCS ${GRAPH_PLUGIN_FUSION_SRCS})
   endif()
