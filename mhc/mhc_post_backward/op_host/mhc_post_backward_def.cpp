@@ -91,7 +91,6 @@ public:
             .DynamicShapeSupportFlag(true)
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true)
-            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
             .ExtendCfgInfo("opFile.value", "mhc_post_backward");
         this->AICore().AddConfig("ascend910b", aicore_Config_910b);
         this->AICore().AddConfig("ascend910_93", aicore_Config_910b);
@@ -103,7 +102,6 @@ public:
             .DynamicShapeSupportFlag(true)
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true)
-            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
             .ExtendCfgInfo("opFile.value", "mhc_post_backward_apt");
         this->AICore().AddConfig("ascend950", aicore_Config_950);
         this->AICore().AddConfig("ascend350", aicore_Config_950);
