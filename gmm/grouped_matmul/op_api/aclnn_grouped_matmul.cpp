@@ -7,6 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
+#include "../../common/op_api/gmm_tensor_storage_check.h"
 #include "aclnn_grouped_matmul.h"
 #include "aclnn_grouped_matmul_v2.h"
 #include "aclnn_grouped_matmul_v3.h"
@@ -14,6 +15,7 @@
 #include "aclnn_grouped_matmul_v5.h"
 #include "aclnn_grouped_matmul_weight_nz.h"
 
+#include <algorithm>
 #include <dlfcn.h>
 #include <new>
 
@@ -3298,6 +3300,53 @@ static void UnpackWeightQuantInputs(const aclTensorList* x, const aclTensorList*
     }
 }
 
+static bool CheckWeightNzAntiquantScaleStorageBounds(const aclTensorList* tensors, const aclTensorList* weight,
+                                                     int64_t groupType, const char* opName)
+{
+    const char* name = "antiquantScaleOptional";
+    if (tensors == nullptr || tensors->Size() == 0 || (*tensors)[0] == nullptr || weight->Size() == 0 ||
+        (*weight)[0] == nullptr || groupType == gmm::SPLIT_K ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510 ||
+        !gmm::IsTransposeLastTwoDims((*weight)[0])) {
+        return gmm::CheckTensorListStorageBounds(tensors, opName, name);
+    }
+
+    const size_t firstRank = (*tensors)[0]->GetViewShape().GetDimNum();
+    if (firstRank != ANTIQUANT_SCALE_3D_DIMS && firstRank != ANTIQUANT_SCALE_4D_DIMS) {
+        return gmm::CheckTensorListStorageBounds(tensors, opName, name);
+    }
+    const bool isMxScale = (*tensors)[0]->GetDataType() == DataType::DT_FLOAT8_E8M0;
+    for (size_t i = 0; i < tensors->Size(); ++i) {
+        const aclTensor* tensor = (*tensors)[i];
+        const std::string indexedName = std::string(name) + "[" + std::to_string(i) + "]";
+        if (tensor == nullptr) {
+            continue;
+        }
+        op::Shape effectiveShape = tensor->GetViewShape();
+        const size_t rank = effectiveShape.GetDimNum();
+        if (rank != ANTIQUANT_SCALE_3D_DIMS && rank != ANTIQUANT_SCALE_4D_DIMS) {
+            if (!gmm::CheckTensorStorageBounds(tensor, opName, indexedName.c_str())) {
+                return false;
+            }
+            continue;
+        }
+        // SetTransposedScaleTensorListContiguous creates this view before reading the scale.
+        const size_t firstAxis = isMxScale ? rank - 3 : rank - 2;
+        const auto& strides = tensor->GetViewStrides();
+        if (strides.size() != rank || strides[firstAxis] >= strides[firstAxis + 1]) {
+            if (!gmm::CheckTensorStorageBounds(tensor, opName, indexedName.c_str())) {
+                return false;
+            }
+            continue;
+        }
+        std::swap(effectiveShape[firstAxis], effectiveShape[firstAxis + 1]);
+        if (!gmm::CheckTensorStorageBoundsWithViewShape(tensor, effectiveShape, opName, indexedName.c_str())) {
+            return false;
+        }
+    }
+    return true;
+}
+
 aclnnStatus aclnnGroupedMatmulWeightNzGetWorkspaceSize(
     const aclTensorList* x, const aclTensorList* weight, const aclTensorList* biasOptional,
     const aclTensorList* scaleOptional, const aclTensorList* offsetOptional,
@@ -3312,6 +3361,29 @@ aclnnStatus aclnnGroupedMatmulWeightNzGetWorkspaceSize(
     const char* opName = "grouped_matmul";
     CHECK_COND(CheckNotNull(x, weight, out) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR,
                "In op [%s], required inputs must not be nullptr.", opName);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(x, opName, "x"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(weight, opName, "weight"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(biasOptional, opName, "biasOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(scaleOptional, opName, "scaleOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(offsetOptional, opName, "offsetOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckWeightNzAntiquantScaleStorageBounds(antiquantScaleOptional, weight, groupType, opName),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(antiquantOffsetOptional, opName, "antiquantOffsetOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(perTokenScaleOptional, opName, "perTokenScaleOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorStorageBounds(groupListOptional, opName, "groupListOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(activationInputOptional, opName, "activationInputOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(activationQuantScaleOptional, opName, "activationQuantScaleOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(activationQuantOffsetOptional, opName, "activationQuantOffsetOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(out, opName, "out"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(activationFeatureOutOptional, opName, "activationFeatureOutOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(dynQuantScaleOutOptional, opName, "dynQuantScaleOutOptional"),
+              ACLNN_ERR_PARAM_INVALID);
     // Standard syntax, Check parameters.
     L2_DFX_PHASE_1(aclnnGroupedMatmulWeightNz,
                    DFX_IN(x, weight, biasOptional, scaleOptional, offsetOptional, antiquantScaleOptional,
@@ -3360,6 +3432,29 @@ aclnnStatus aclnnGroupedMatmulV5GetWorkspaceSize(
     const char* opName = "grouped_matmul";
     CHECK_COND(CheckNotNull(x, weight, out) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR,
                "In op [%s], required inputs must not be nullptr.", opName);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(x, opName, "x"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(weight, opName, "weight"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(biasOptional, opName, "biasOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(scaleOptional, opName, "scaleOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(offsetOptional, opName, "offsetOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(antiquantScaleOptional, opName, "antiquantScaleOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(antiquantOffsetOptional, opName, "antiquantOffsetOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(perTokenScaleOptional, opName, "perTokenScaleOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorStorageBounds(groupListOptional, opName, "groupListOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(activationInputOptional, opName, "activationInputOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(activationQuantScaleOptional, opName, "activationQuantScaleOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(activationQuantOffsetOptional, opName, "activationQuantOffsetOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(out, opName, "out"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(activationFeatureOutOptional, opName, "activationFeatureOutOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(dynQuantScaleOutOptional, opName, "dynQuantScaleOutOptional"),
+              ACLNN_ERR_PARAM_INVALID);
     // Standard syntax, Check parameters.
     L2_DFX_PHASE_1(
         aclnnGroupedMatmulV5,
@@ -3407,6 +3502,29 @@ aclnnStatus aclnnGroupedMatmulV4GetWorkspaceSize(
     DEPRECATED_API_WARN_ONCE("aclnnGroupedMatmulV4GetWorkspaceSize", "aclnnGroupedMatmulV5GetWorkspaceSize");
     CHECK_COND(CheckNotNull(x, weight, out) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR,
                "In op [%s], required inputs must not be nullptr.", opName);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(x, opName, "x"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(weight, opName, "weight"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(biasOptional, opName, "biasOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(scaleOptional, opName, "scaleOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(offsetOptional, opName, "offsetOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(antiquantScaleOptional, opName, "antiquantScaleOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(antiquantOffsetOptional, opName, "antiquantOffsetOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(perTokenScaleOptional, opName, "perTokenScaleOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorStorageBounds(groupListOptional, opName, "groupListOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(activationInputOptional, opName, "activationInputOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(activationQuantScaleOptional, opName, "activationQuantScaleOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(activationQuantOffsetOptional, opName, "activationQuantOffsetOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(out, opName, "out"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(activationFeatureOutOptional, opName, "activationFeatureOutOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(dynQuantScaleOutOptional, opName, "dynQuantScaleOutOptional"),
+              ACLNN_ERR_PARAM_INVALID);
     // Standard syntax, Check parameters.
     L2_DFX_PHASE_1(
         aclnnGroupedMatmulV4,
@@ -3450,6 +3568,17 @@ aclnnStatus aclnnGroupedMatmulV3GetWorkspaceSize(const aclTensorList* x, const a
     DEPRECATED_API_WARN_ONCE("aclnnGroupedMatmulV3GetWorkspaceSize", "aclnnGroupedMatmulV5GetWorkspaceSize");
     CHECK_COND(CheckNotNull(x, weight, y) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR,
                "In op [%s], required inputs must not be nullptr.", opName);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(x, opName, "x"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(weight, opName, "weight"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(biasOptional, opName, "biasOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(scaleOptional, opName, "scaleOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(offsetOptional, opName, "offsetOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(antiquantScaleOptional, opName, "antiquantScaleOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(antiquantOffsetOptional, opName, "antiquantOffsetOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorStorageBounds(groupListOptional, opName, "groupListOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(y, opName, "y"), ACLNN_ERR_PARAM_INVALID);
     // Standard syntax, Check parameters.
     L2_DFX_PHASE_1(aclnnGroupedMatmulV3,
                    DFX_IN(x, weight, biasOptional, scaleOptional, offsetOptional, antiquantScaleOptional,
@@ -3486,6 +3615,16 @@ aclnnStatus aclnnGroupedMatmulV2GetWorkspaceSize(const aclTensorList* x, const a
     DEPRECATED_API_WARN_ONCE("aclnnGroupedMatmulV2GetWorkspaceSize", "aclnnGroupedMatmulV5GetWorkspaceSize");
     CHECK_COND(CheckNotNull(x, weight, y) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR,
                "In op [%s], required inputs must not be nullptr.", opName);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(x, opName, "x"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(weight, opName, "weight"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(biasOptional, opName, "biasOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(scaleOptional, opName, "scaleOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(offsetOptional, opName, "offsetOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(antiquantScaleOptional, opName, "antiquantScaleOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(antiquantOffsetOptional, opName, "antiquantOffsetOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(y, opName, "y"), ACLNN_ERR_PARAM_INVALID);
     bool is310P = GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND310P;
     CHECK_COND(!is310P, ACLNN_ERR_PARAM_INVALID, "In op [%s], [%s] is not supported, got [%s].", opName,
                "ASCEND310P platform", "aclnnGroupedMatmulV2GetWorkspaceSize");
@@ -3515,6 +3654,16 @@ aclnnStatus aclnnGroupedMatmulGetWorkspaceSize(const aclTensorList* x, const acl
     DEPRECATED_API_WARN_ONCE("aclnnGroupedMatmulGetWorkspaceSize", "aclnnGroupedMatmulV5GetWorkspaceSize");
     CHECK_COND(CheckNotNull(x, weight, y) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR,
                "In op [%s], required inputs must not be nullptr.", opName);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(x, opName, "x"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(weight, opName, "weight"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(biasOptional, opName, "biasOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(scaleOptional, opName, "scaleOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(offsetOptional, opName, "offsetOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(antiquantScaleOptional, opName, "antiquantScaleOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(antiquantOffsetOptional, opName, "antiquantOffsetOptional"),
+              ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(y, opName, "y"), ACLNN_ERR_PARAM_INVALID);
     bool is310P = GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND310P;
     CHECK_COND(!is310P, ACLNN_ERR_PARAM_INVALID, "In op [%s], [%s] is not supported, got [%s].", opName,
                "ASCEND310P platform", "aclnnGroupedMatmulGetWorkspaceSize");

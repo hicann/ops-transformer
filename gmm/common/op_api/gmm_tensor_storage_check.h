@@ -16,6 +16,7 @@
 
 #include "log/log.h"
 #include "opdev/common_types.h"
+#include "opdev/format_utils.h"
 #include "opdev/shape_utils.h"
 
 namespace gmm {
@@ -32,15 +33,16 @@ inline bool ReportInvalidTensorStorage(const aclTensor* tensor, const char* opNa
 
 // Check the caller's descriptor before any unpacking, CreateView, Contiguous or kernel preparation.
 // Use the caller's declared element counts before reinterpreting packed weights as four-bit tensors.
-// Format-specific physical layout checks remain the responsibility of each operator.
+// The packed FP4 NZ layout uses bytes in its innermost storage dimension and
+// 4-bit elements in its view; other format-specific checks belong to each operator.
 // This validates the declared storage only; aclTensor does not expose the caller's allocation size.
-inline bool CheckTensorStorageBounds(const aclTensor* tensor, const char* opName, const char* name)
+inline bool CheckTensorStorageBoundsWithViewShape(const aclTensor* tensor, const op::Shape& viewShape,
+                                                  const char* opName, const char* name)
 {
     // Required/optional null semantics belong to each operator's existing parameter checks.
     if (tensor == nullptr) {
         return true;
     }
-    const auto& viewShape = tensor->GetViewShape();
     const auto& strides = tensor->GetViewStrides();
     const auto& storageShape = tensor->GetStorageShape();
     const int64_t offset = tensor->GetViewOffset();
@@ -81,6 +83,18 @@ inline bool CheckTensorStorageBounds(const aclTensor* tensor, const char* opName
         }
         storageElements *= dim;
     }
+    // MXA8W4 FRACTAL_NZ with C0=32 stores two FP4 values per storage-shape entry.
+    // MXFP4 with C0=64 and INT4 layouts use logical element counts as before.
+    const auto dtype = tensor->GetDataType();
+    const auto format = ge::GetPrimaryFormat(tensor->GetStorageFormat());
+    const bool isFp4 = dtype == op::DataType::DT_FLOAT4_E2M1 || dtype == op::DataType::DT_FLOAT4_E1M2;
+    const bool isNz = format == op::Format::FORMAT_FRACTAL_NZ || format == op::Format::FORMAT_FRACTAL_NZ_C0_32;
+    if (isFp4 && isNz && storageShape.GetDimNum() > 0 && storageShape.GetDim(storageShape.GetDimNum() - 1) == 32) {
+        if (storageElements > std::numeric_limits<int64_t>::max() / 2) {
+            return ReportInvalidTensorStorage(tensor, opName, name, "packed FP4 storage element count overflows int64");
+        }
+        storageElements *= 2;
+    }
     if (offset >= storageElements) {
         return ReportInvalidTensorStorage(tensor, opName, name, "offset is outside storage");
     }
@@ -95,6 +109,14 @@ inline bool CheckTensorStorageBounds(const aclTensor* tensor, const char* opName
         remaining -= steps * strides[i];
     }
     return true;
+}
+
+inline bool CheckTensorStorageBounds(const aclTensor* tensor, const char* opName, const char* name)
+{
+    if (tensor == nullptr) {
+        return true;
+    }
+    return CheckTensorStorageBoundsWithViewShape(tensor, tensor->GetViewShape(), opName, name);
 }
 
 inline bool CheckTensorListStorageBounds(const aclTensorList* tensors, const char* opName, const char* name)

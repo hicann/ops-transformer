@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include "../../common/op_api/gmm_tensor_storage_check.h"
 #include "aclnn_grouped_matmul_activation_quant_weight_nz.h"
 
 #include <cmath>
@@ -767,6 +768,14 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNzGetWorkspaceSize(
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     aclnnStatus checkRet = CheckRequiredParams(x, groupList, weight, weightScale, activationType, y, yScale);
     CHECK_RET(checkRet == ACLNN_SUCCESS, checkRet);
+    CHECK_RET(gmm::CheckTensorStorageBounds(x, OP_NAME, "x"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorStorageBounds(groupList, OP_NAME, "groupList"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(weight, OP_NAME, "weight"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(weightScale, OP_NAME, "weightScale"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorListStorageBounds(bias, OP_NAME, "bias"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorStorageBounds(xScaleOptional, OP_NAME, "xScaleOptional"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorStorageBounds(y, OP_NAME, "y"), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(gmm::CheckTensorStorageBounds(yScale, OP_NAME, "yScale"), ACLNN_ERR_PARAM_INVALID);
 
     // Validate required inputs before DFX, then initialize DFX before the executor captures its context.
     L2_DFX_PHASE_1(aclnnGroupedMatmulActivationQuantWeightNz,
