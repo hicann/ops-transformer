@@ -9,6 +9,7 @@
  */
 
 #include <cstring>
+#include <cstddef>
 
 #include <gtest/gtest.h>
 
@@ -23,10 +24,8 @@ namespace {
 constexpr int64_t CHUNK_SIZE = 64;
 constexpr uint64_t CORE_NUM = 8;
 
-// Prefix of ChunkGatedDeltaRuleComputeWyTilingData up to the first TCubeTiling. The
-// host serializer emits fields back to back with no padding, so this mirrors the
-// kernel-side #pragma pack(1) struct exactly; a layout drift breaks these reads.
-#pragma pack(push, 1)
+// Mirror the 8-byte-aligned prefix emitted by the host tiling serializer.
+#pragma pack(push, 8)
 struct TilingHead {
     int64_t batch;
     int64_t seqlen;
@@ -45,6 +44,10 @@ struct TilingHead {
 };
 #pragma pack(pop)
 
+static_assert(offsetof(TilingHead, workspaceOffset) == 96, "Unexpected workspaceOffset layout");
+
+static_assert(sizeof(TilingHead) == 104, "Unexpected tiling prefix size");
+
 const std::string SOC_INFO_310P = R"({"hardware_info": {"BT_SIZE": 0, "load3d_constraints": "1", )"
                                   R"("Intrinsic_fix_pipe_l0c2out": false, "Intrinsic_data_move_l12ub": true, )"
                                   R"("Intrinsic_data_move_l0c2ub": true, "Intrinsic_data_move_out2l1_nd2nz": false, )"
@@ -53,7 +56,7 @@ const std::string SOC_INFO_310P = R"({"hardware_info": {"BT_SIZE": 0, "load3d_co
                                   R"("CORE_NUM": 8, "socVersion":"Ascend310P"} })";
 
 gert::TilingContextPara MakeContext(int64_t b, int64_t t, int64_t hk, int64_t hv, int64_t kDim, int64_t vDim,
-                                    int64_t chunkSize, ChunkGatedDeltaRuleComputeWyCompileInfo *compileInfo)
+                                    int64_t chunkSize, ChunkGatedDeltaRuleComputeWyCompileInfo* compileInfo)
 {
     gert::StorageShape qShape = {{b, t, hk, kDim}, {b, t, hk, kDim}};
     gert::StorageShape vShape = {{b, t, hv, vDim}, {b, t, hv, vDim}};

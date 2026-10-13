@@ -13,13 +13,9 @@
 
 #include "kernel_tiling/kernel_tiling.h"
 
-// MUST be pack(1). The host serializer (register/tilingdata_base.h::FieldHandler) lays
-// fields out with no alignment padding at all, so any padding here shifts every field
-// after it. With pack(8) the uint64 workspaceOffset below lands at offset 96 instead of
-// 92 and all four TCubeTiling structs at 104 instead of 100, giving bogus GM staging
-// pointers and garbage matmul tiling ("The DDR address of the MTE instruction is out of
-// range" on 310P).
-#pragma pack(push, 1)
+// Match the host serializer: scalar fields and nested tiling structs use
+// alignment up to 8 bytes. In particular, workspaceOffset starts at byte 96.
+#pragma pack(push, 8)
 struct alignas(8) ChunkGatedDeltaRuleComputeWyTilingData {
     int64_t batch;
     int64_t seqlen;
@@ -41,5 +37,23 @@ struct alignas(8) ChunkGatedDeltaRuleComputeWyTilingData {
     TCubeTiling mmApplyW;
 };
 #pragma pack(pop)
+
+static_assert(__builtin_offsetof(ChunkGatedDeltaRuleComputeWyTilingData, workspaceOffset) == 96,
+              "workspaceOffset must match the host tiling layout");
+
+static_assert(__builtin_offsetof(ChunkGatedDeltaRuleComputeWyTilingData, mmAttn) == 104,
+              "mmAttn must match the host tiling layout");
+
+static_assert(__builtin_offsetof(ChunkGatedDeltaRuleComputeWyTilingData, mmSquare) ==
+                  ((104 + sizeof(TCubeTiling) + 7) / 8) * 8,
+              "mmSquare must match the host tiling layout");
+
+static_assert(__builtin_offsetof(ChunkGatedDeltaRuleComputeWyTilingData, mmApplyU) ==
+                  ((104 + sizeof(TCubeTiling) + 7) / 8) * 8 + ((sizeof(TCubeTiling) + 7) / 8) * 8,
+              "mmApplyU must match the host tiling layout");
+
+static_assert(__builtin_offsetof(ChunkGatedDeltaRuleComputeWyTilingData, mmApplyW) ==
+                  ((104 + sizeof(TCubeTiling) + 7) / 8) * 8 + 2 * ((sizeof(TCubeTiling) + 7) / 8) * 8,
+              "mmApplyW must match the host tiling layout");
 
 #endif // CHUNK_GATED_DELTA_RULE_COMPUTE_WY_TILING_DATA_H

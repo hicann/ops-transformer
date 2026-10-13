@@ -12,6 +12,7 @@ import logging
 
 import torch
 import torch_npu
+from cann_ops_transformer.ops import fused_gdn_gating
 
 import result_compare_method
 
@@ -132,13 +133,13 @@ def npu_op_exec(
     if not dt_bias.is_contiguous():
         dt_bias = dt_bias.contiguous()
 
-    g, beta_output = torch.ops.custom.npu_fused_gdn_gating(
+    g, beta_output = fused_gdn_gating(
         A_log.npu(),
         a.npu(),
         b.npu(),
         dt_bias.npu(),
-        float(beta),
-        float(threshold),
+        beta=float(beta),
+        threshold=float(threshold),
     )
     return g.cpu(), beta_output.cpu()
 

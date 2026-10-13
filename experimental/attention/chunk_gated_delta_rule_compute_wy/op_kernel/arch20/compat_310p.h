@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include "version/cann_version.h"
 #ifndef CHUNK_GATED_DELTA_RULE_COMPUTE_WY_ARCH20_COMPAT_310P_H
 #define CHUNK_GATED_DELTA_RULE_COMPUTE_WY_ARCH20_COMPAT_310P_H
 
@@ -18,9 +19,13 @@
 // Dummy bfloat16_t only needed on 310P (dav_m200) where the compiler
 // doesn't provide a native bf16 type. On 910B/910C the compiler's
 // __clang_cce_types.h already typedefs bfloat16_t from __bf16.
-#if defined(__CCE_AICORE__) && (__CCE_AICORE__ == 200) && !defined(__bfloat16_t_defined)
-#define __bfloat16_t_defined
+#if defined(__CCE_AICORE__) && (__CCE_AICORE__ == 200)
 #define __COMPAT_310P_ACTIVE__
+
+#if !defined(__bfloat16_t_defined) && \
+    (!defined(__NPU_ARCH__) || (CANN_MAJOR == 9 && CANN_MINOR == 1 && CANN_PATCH == 0))
+#define __bfloat16_t_defined
+
 struct bfloat16_t {
     uint16_t val;
     bfloat16_t() = default;
@@ -34,6 +39,8 @@ struct bfloat16_t {
         return 0.f;
     }
 };
+#endif
+
 #endif
 
 // 310P has no fixpipe unit; post-matmul stores go through MTE3

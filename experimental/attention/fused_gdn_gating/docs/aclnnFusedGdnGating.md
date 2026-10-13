@@ -34,12 +34,12 @@
 
 ## 接口说明
 
-该算子提供底层ACLNN接口`aclnnFusedGdnGating`，并通过PyTorch扩展注册为`torch.ops.custom.npu_fused_gdn_gating`。PyTorch入口负责创建输出Tensor并调用底层ACLNN接口。
+该算子提供底层ACLNN接口`aclnnFusedGdnGating`，并通过统一PyTorch扩展注册为`torch.ops.cann_ops_transformer.fused_gdn_gating`。PyTorch入口负责创建输出Tensor并调用底层ACLNN接口。
 
 ### PyTorch接口原型
 
 ```python
-torch.ops.custom.npu_fused_gdn_gating(
+torch.ops.cann_ops_transformer.fused_gdn_gating(
     A_log: Tensor,      # [num_heads]
     a: Tensor,          # [batch, num_heads]
     b: Tensor,          # [batch, num_heads]
@@ -332,7 +332,7 @@ aclnnStatus aclnnFusedGdnGating(
 ```python
 import torch
 import torch_npu
-import custom_ops  # noqa: F401  注册torch.ops.custom.npu_fused_gdn_gating
+import cann_ops_transformer  # noqa: F401  注册统一PyTorch扩展算子
 
 torch_npu.npu.set_device(0)
 
@@ -344,7 +344,7 @@ a = torch.randn(batch, num_heads, dtype=torch.float16).npu()
 b = torch.randn(batch, num_heads, dtype=torch.float16).npu()
 dt_bias = torch.randn(num_heads, dtype=torch.float16).npu()
 
-g, beta_output = torch.ops.custom.npu_fused_gdn_gating(
+g, beta_output = torch.ops.cann_ops_transformer.fused_gdn_gating(
     A_log, a, b, dt_bias, beta=1.0, threshold=20.0,
 )
 # g:           [1, batch, num_heads], FLOAT32
@@ -518,5 +518,5 @@ int main() {
 
 ## 相关资源
 
-- PyTorch扩展构建与安装见[torch_ops_extension说明](../torch_ops_extension/README.md)。
+- PyTorch扩展构建与安装见[统一torch_extension说明](../../../../torch_extension/README.md)。
 - 更多测试与调用示例见[pytest说明](../tests/pytest/README.md)。

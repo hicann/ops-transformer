@@ -5,7 +5,7 @@
 基于pytest测试框架，实现FusedGdnGating算子的功能验证：
 
 - **CPU侧**：复现算子功能用以生成golden数据
-- **NPU侧**：通过`torch.ops.custom.npu_fused_gdn_gating`进行算子直调获取实际数据
+- **NPU侧**：通过`torch.ops.cann_ops_transformer.fused_gdn_gating`进行算子直调获取实际数据
 - **精度对比**：进行CPU与NPU结果的精度对比验证算子功能
 
 ## 当前实现范围
@@ -42,11 +42,11 @@
 1. TorchNPU安装包下载路径（需及时更换为最新版本）：[TorchNPU安装教程](https://atomgit.com/Ascend/pytorch)
 2. 完成环境安装和环境变量配置，具体操作请参考：[ops-transformer](../../../../../README.md)
 
-### 编译安装torch_ops_extension
+### 编译安装统一Torch扩展
 
 ```bash
-cd experimental/attention/fused_gdn_gating/torch_ops_extension
-bash build_and_install.sh
+bash build.sh --torch_extension
+pip install --force-reinstall build_out/cann_ops_transformer-*.whl
 ```
 
 ### 编译安装算子包
@@ -61,7 +61,7 @@ bash output/custom_opp_*.run
 - test_run.sh                               # 执行脚本
 - pytest.ini                                # 创建ci单算子和graph图模式的测试标记
 - conftest.py                               # pytest环境配置（libstdc++预加载、ASCEND_CUSTOM_OPP_PATH）
-- custom_ops.py                             # torch_ops_extension .so 加载器
+- custom_ops.py                             # cann_ops_transformer 加载器
 - result_compare_method.py                  # 精度对比工具
 - fused_gdn_gating_golden.py                # CPU侧算子golden实现与NPU算子直调
 - fused_gdn_gating_paramset.py              # 测试入参配置

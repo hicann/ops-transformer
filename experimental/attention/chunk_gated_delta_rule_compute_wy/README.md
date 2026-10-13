@@ -62,4 +62,4 @@
 | 调用方式 | 样例代码 | 说明 |
 | :--- | :--- | :--- |
 | aclnn接口 | [test_aclnn_chunk_gated_delta_rule_compute_wy.cpp](./examples/test_aclnn_chunk_gated_delta_rule_compute_wy.cpp) | 通过[aclnnChunkGatedDeltaRuleComputeWy](./docs/aclnnChunkGatedDeltaRuleComputeWy.md)调用ChunkGatedDeltaRuleComputeWy算子。 |
-| torch接口 | [torch_ops_extension](./torch_ops_extension/README.md) | 安装torch_ops_extension后，通过`torch.ops.custom.npu_chunk_gated_delta_rule_compute_wy`调用ChunkGatedDeltaRuleComputeWy算子。 |
+| torch接口 | [torch_extension](./torch_extension/chunk_gated_delta_rule_compute_wy.py) | 通过统一扩展接口`cann_ops_transformer.ops.chunk_gated_delta_rule_compute_wy`或`torch.ops.cann_ops_transformer.chunk_gated_delta_rule_compute_wy`调用。 |

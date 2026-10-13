@@ -166,7 +166,7 @@
 | 调用方式 | 调用样例 | 说明 |
 |----------|----------|------|
 | aclnn调用 | [test_aclnn_fused_gdn_gating](./examples/test_aclnn_fused_gdn_gating.cpp) | 通过aclnn接口方式调用FusedGdnGating算子。 |
-| PyTorch调用 | [torch_ops_extension](./torch_ops_extension/README.md) | 通过PyTorch扩展注册为`torch.ops.custom.npu_fused_gdn_gating`调用，构建与安装见说明文档。 |
+| PyTorch调用 | [torch_extension](./torch_extension/fused_gdn_gating.py) | 通过统一扩展接口`cann_ops_transformer.ops.fused_gdn_gating`或`torch.ops.cann_ops_transformer.fused_gdn_gating`调用。 |
 | pytest测试 | [tests/pytest](./tests/pytest/README.md) | CPU golden与NPU结果精度对比验证，执行`bash test_run.sh single`。 |
 
 ## 参考资源
