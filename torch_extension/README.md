@@ -90,17 +90,29 @@ import torch_npu
 import cann_ops_transformer
 
 # Initialize data on NPU
-x = torch.randn(10, 32, dtype=torch.float32).npu()
+# Layout: batch, sequence, heads, head_dim.
+q, k, v = [torch.randn(1, 16, 1, 64, dtype=torch.float16).npu() for _ in range(3)]
+scale = 64 ** -0.5
+
+# Generate the task metadata required by the operator.
+metadata = cann_ops_transformer.ops.flash_attn_metadata(
+    1, 1, 64, batch_size=1, max_seqlen_q=16, max_seqlen_kv=16,
+    mask_mode=0, win_left=-1, win_right=-1,
+    layout_q="BSND", layout_kv="BSND", layout_out="BSND"
+)
 
 # Call the custom NPU operator
-# This triggers JIT compilation on the first call
-npu_result = cann_ops_transformer.ops.abs(x)
+# The first call compiles and loads the C++ wrapper.
+output, _ = cann_ops_transformer.ops.flash_attn(
+    q, k, v, metadata=metadata, softmax_scale=scale
+)
 
 # Verify against CPU ATen implementation
-cpu_x = x.cpu()
-cpu_result = torch.ops.aten.abs(cpu_x)
-
-assert torch.allclose(cpu_result, npu_result.cpu(), rtol=1e-6)
+q_cpu, k_cpu, v_cpu = [x.cpu().float().transpose(1, 2) for x in (q, k, v)]
+expected = torch.nn.functional.scaled_dot_product_attention(
+    q_cpu, k_cpu, v_cpu, dropout_p=0.0, is_causal=False, scale=scale
+)
+assert torch.allclose(output.cpu().float(), expected.transpose(1, 2), rtol=1e-3, atol=1e-3)
 print("Verification successful!")
 ```
 
