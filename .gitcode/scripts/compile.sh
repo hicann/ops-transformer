@@ -94,6 +94,50 @@ DP_ASSERT_EQUAL()
     fi
 }
 
+# 解析 PR 变更命中且带 examples 的算子。stdout 只输出分号分隔的结果串（可能为空）;
+# 解析脚本自身日志走 stderr,不会污染捕获。pr_filelist或命中为空均或命中为空均输出空串。
+# kirin 过滤：只保留属于 kirinx90/kirin9030 的算子(存在<module>/<op>/ophost/config/{kirinx90|kirin9030}),
+# 全都不属于则输出空串，由调用方走默认算子分支
+IS_KIRIN_OP()
+{
+    local op="$1"
+    local cfg_dir
+    for cfg_dir in "${WORKSPACE}"/*/"${op}"/op_host/config;  do
+        [[ -d "${cfg_dir}" ]] || continue
+        if [[ -d "${cfg_dir}/kirinx90" || -d "${cfg_dir}/kirin9030" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+GET_PR_RELATED_OPS()
+{
+    local ops=""
+    local filtered=""
+    local op op_arr
+    if [ -f "${WORKSPACE}/pr_filelist.txt" ]; then
+        ops=$(python3 "${WORKSPACE}/cmake/scripts/parse_changed_files.py" \
+              -c "${WORKSPACE}/tests/test_config.yaml" \
+              -f "${WORKSPACE}/pr_filelist.txt" get_related_examples 2>/dev/null)
+    else
+        echo "pr_filelist.txt not found" >&2
+    fi
+    LOG_INFO "ops_name raw: ${ops}" >&2
+    IFS=';' read -r -a op_arr <<< "${ops}"
+    for op in "${op_arr[@]}"; do
+        [[ -z "${op}" ]] && continue
+        if IS_KIRIN_OP "${op}"; then
+            filtered="${filtered}${op};"
+            LOG_INFO "kirin filter keep: ${op}" >&2
+        else
+            LOG_INFO "kirin filter drop: ${op}" >&2
+        fi
+    done
+    LOG_INFO "ops_name kirin filtered: ${filtered}" >&2
+    echo "${filtered}"
+}
+
 LOG_HEAD "Build ${REPOSITORY_NAME}."
 cd "${WORKSPACE}/" || exit 1
 
@@ -123,7 +167,15 @@ if [ "${task_name}" == "Pre_Compile" ]; then
 else
     if [ "${GE_ST_RT2}X" == "kirinx90X" ]; then
         if [ "${GIT_TARGET_BRANCH}" = "master" ]; then
-            LOG_DO bash build.sh --pkg --soc=kirinx90 --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
+            ops_names=$(GET_PR_RELATED_OPS)
+            if [ -n "${ops_names}" ]; then
+                LOG_INFO "kirinx90 incremental build for ops: ${ops_names}"
+                LOG_DO bash build.sh --pkg --soc=kirinx90  --PR_PKG ./pr_filelist.txt --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
+            else
+                ops_names="moe_token_unpermute"
+                LOG_INFO "kirinx90 ops_names empty,build default op: ${ops_names}"
+                LOG_DO bash build.sh --pkg --soc=kirinx90 --ops="${ops_names}" --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
+            fi
             DP_ASSERT_EQUAL "$?" "0" "Build ${REPOSITORY_NAME}"
         else
             echo "not need build mobile_station"
@@ -137,7 +189,15 @@ else
             chmod +x *.run
             sudo chmod 777 /home/jenkins/Ascend
             yes "y" | sudo bash cann-asc-devkit_linux-x86_64_ubuntu24.run --full --install-path=/home/jenkins/Ascend
-            LOG_DO bash build.sh --pkg --soc=kirin9030 --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
+            ops_names=$(GET_PR_RELATED_OPS)
+            if [ -n "${ops_names}" ]; then
+                LOG_INFO "kirin9030 incremental build for ops: ${ops_names}"
+                LOG_DO bash build.sh --pkg --soc=kirin9030  --PR_PKG ./pr_filelist.txt --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
+            else
+                ops_names="moe_token_unpermute"
+                LOG_INFO "kirin9030 ops_names empty,build default op: ${ops_names}"
+                LOG_DO bash build.sh --pkg --soc=kirin9030 --ops="${ops_names}" --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
+            fi
             DP_ASSERT_EQUAL "$?" "0" "Build ${REPOSITORY_NAME}"
         else
             echo "not need build mobile_station"
