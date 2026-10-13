@@ -34,10 +34,17 @@ logger = logging.getLogger(__name__)
 try:
     from cann_ops_transformer.ops import quant_flash_attn_metadata
 
-    _HAS_NPU = True
+    _HAS_NPU = bool(torch.npu.is_available())
+    if not _HAS_NPU:
+        logger.info(
+            "[Section] NPU device unavailable: metadata section decode disabled"
+        )
 except ImportError as e:
     logger.warning("Failed to import quant_flash_attn_metadata: %s", e)
     quant_flash_attn_metadata = None
+    _HAS_NPU = False
+except RuntimeError as e:
+    logger.warning("NPU runtime check failed, metadata section decode disabled: %s", e)
     _HAS_NPU = False
 
 # ==============================================================================

@@ -72,6 +72,15 @@ if not _HAS_NPU:
         "Failed to import quant_flash_attn (cann_ops_transformer / custom): %s",
         _NPU_IMPORT_ERR,
     )
+if _HAS_NPU:
+    try:
+        _HAS_NPU = bool(torch.npu.is_available())
+    except RuntimeError:
+        _HAS_NPU = False
+    if not _HAS_NPU:
+        logger.info(
+            "[Section] NPU device unavailable: metadata section decode disabled"
+        )
 
 
 # ==============================================================================
