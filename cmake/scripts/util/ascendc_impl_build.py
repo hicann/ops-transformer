@@ -104,7 +104,9 @@ DTYPE_MAP = {{"float32": ["DT_FLOAT", "float"],
     "float8_e8m0":["DT_FLOAT8_E8M0", "fp8_e8m0_t"],
     "float4_e2m1":["DT_FLOAT4_E2M1", "fp4x2_e2m1_t"],
     "float4_e1m2":["DT_FLOAT4_E1M2", "fp4x2_e1m2_t"],
-    "int2": ["DT_INT2", "int2b_t"]}}
+    "int2": ["DT_INT2", "int2b_t"],
+    "hifloat4":["DT_HIFLOAT4", "hifloat4x2_t"],
+    "hifloat4_scale":["DT_HIFLOAT4_SCALE", "hif4_scale"]}}
 
 def add_dtype_fmt_option_single(x, x_n, is_ref: bool = False):
     options = []

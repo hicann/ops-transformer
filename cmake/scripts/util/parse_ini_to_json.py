@@ -80,6 +80,8 @@ DTYPE_LIST = [
     "float4_e2m1",
     "float4_e1m2",
     "int2",
+    "hifloat4",
+    "hifloat4_scale",
 ]
 FORMAT_LIST = [
     "NCHW",
