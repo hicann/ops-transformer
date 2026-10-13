@@ -66,6 +66,14 @@ QUANT_MTE_CONTEXT_TAG = "quant_lowbit_mte"
 # 修改结构体时需同步更新（含 static_assert 校验的 device 侧布局）
 QUANT_MTE_CONTEXT_ELEM_NUM = 2050
 
+# eager 路径 context 按 (group, ctxTag) 复用缓存。
+# context 内容（rankId/rankSizePerServer/各 rank 内置 buffer 地址）在
+# (group, ctxTag) 确定后不变且 kernel 侧只读，重复调用返回同一 tensor 安全。
+# 若每次调用都新建 tensor 并 H2D copy_，会在流内每次下发前插入一个 memcpy 任务，
+# 叠加 host 侧 pybind/HCCL 查询抖动，造成多 rank kernel 下发时序偏移；
+# one-shot push kernel 核内自旋等待对端数据，skew 会被直接计入 kernel 耗时。
+_quant_mte_context_cache: dict = {}
+
 
 class _LazyClassProxy:
     def __init__(self, name, builder):
@@ -100,10 +108,20 @@ class QuantMteContextManager:
         self._group = group
 
     def get_context(self):
-        """获取幂等共享 context，返回 (NPU tensor, hccl buffer size)，eager 路径使用。"""
+        """获取幂等共享 context，返回 (NPU tensor, hccl buffer size)，eager 路径使用。
+
+        首次调用创建并缓存，后续调用直接复用缓存 tensor，保证 eager 稳态下
+        每次算子调用只有 kernel 下发，无额外 H2D memcpy 和 HCCL host 查询。
+        """
+        cache_key = (self._group, QUANT_MTE_CONTEXT_TAG)
+        cached = _quant_mte_context_cache.get(cache_key)
+        if cached is not None:
+            return cached
         module = comm_channel_builder_manager_op_builder.load()
         manager = module.CommChannelBuilderManager(self._group)
-        return manager.create_quant_mte_context(QUANT_MTE_CONTEXT_TAG)
+        context = manager.create_quant_mte_context(QUANT_MTE_CONTEXT_TAG)
+        _quant_mte_context_cache[cache_key] = context
+        return context
 
     def get_context_data(self):
         """获取幂等共享 context 的 host int32 内容，返回 (int32 列表, hccl buffer size)。
