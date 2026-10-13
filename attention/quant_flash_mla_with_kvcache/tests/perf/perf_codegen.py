@@ -32,8 +32,8 @@ import torch_npu
 
 try:
     from cann_ops_transformer.ops import (
-        quant_flash_mla_with_kvcache,
-        quant_flash_mla_with_kvcache_metadata,
+        quant_flash_mla,
+        quant_flash_mla_metadata,
     )
 except ImportError as e:
     print(f'[ERROR] import failed: {e} (请先 source CANN set_env.sh)')
@@ -148,7 +148,7 @@ try:
     torch.npu.synchronize()
 
     # ---- metadata (循环外一次; AI_CPU 算子, 不计入 kernel 时长) ----
-    metadata = quant_flash_mla_with_kvcache_metadata(
+    metadata = quant_flash_mla_metadata(
         cache_seqlens=cache_seqlens_t,
         num_heads_q=N_Q,
         num_heads_kv=N_KV,
@@ -170,7 +170,7 @@ try:
     torch.npu.synchronize()
     for _run_i in range(@RUNS@):
         torch.npu.synchronize()
-        atten_out, lse_out = quant_flash_mla_with_kvcache(
+        atten_out, lse_out = quant_flash_mla(
             q=q_npu,
             k_cache=k_cache_npu,
             q_descale=deq_q_npu,

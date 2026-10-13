@@ -15,7 +15,7 @@ import torch_npu
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 from torch.library import impl
 
-QMLA_METADATA_OP_NAME = "quant_flash_mla_with_kvcache_metadata"
+QMLA_METADATA_OP_NAME = "quant_flash_mla_metadata"
 
 # MLA固定维度: head_dim_qk = nope(512) + rope(64) = 576, head_dim_v = 512
 MLA_HEAD_DIM_QK = 576
@@ -84,7 +84,7 @@ _LAYOUT_KV_EXPECTED_NDIM = {
 class QuantFlashMlaWithKvcacheOpBuilder(OpBuilder):
     def __init__(self):
         super(QuantFlashMlaWithKvcacheOpBuilder, self).__init__(
-            "quant_flash_mla_with_kvcache", category="attention"
+            "quant_flash_mla", category="attention"
         )
 
     def sources(self):
@@ -94,13 +94,13 @@ class QuantFlashMlaWithKvcacheOpBuilder(OpBuilder):
     def schema(self) -> list:
         """PyTorch operator signature."""
         return [
-            "quant_flash_mla_with_kvcache_metadata(Tensor cache_seqlens, int num_heads_q, int num_heads_kv, "
+            "quant_flash_mla_metadata(Tensor cache_seqlens, int num_heads_q, int num_heads_kv, "
             "int quant_mode, *, "
             "Tensor? cu_seqlens_q=None, Tensor? seqused_q=None, "
             "int? max_seqlen_q=-1, int? max_seqlen_kv=-1, "
             "int? head_dim_qk=576, int? head_dim_v=512, int? mask_mode=0, "
             'str? layout_q="BSND") -> Tensor',
-            "quant_flash_mla_with_kvcache(Tensor q, Tensor k_cache, Tensor q_descale, Tensor k_descale, "
+            "quant_flash_mla(Tensor q, Tensor k_cache, Tensor q_descale, Tensor k_descale, "
             "Tensor block_table, Tensor cache_seqlens, int quant_mode, *, "
             "Tensor? cu_seqlens_q=None, Tensor? seqused_q=None, "
             "Tensor? attn_mask=None, Tensor? metadata=None, "
@@ -117,7 +117,7 @@ class QuantFlashMlaWithKvcacheOpBuilder(OpBuilder):
         """
 
         @torch.library.register_fake("cann_ops_transformer::" + QMLA_METADATA_OP_NAME)
-        def quant_flash_mla_with_kvcache_metadata_meta(
+        def quant_flash_mla_metadata_meta(
             cache_seqlens: torch.Tensor,
             num_heads_q: int,
             num_heads_kv: int,
@@ -134,10 +134,8 @@ class QuantFlashMlaWithKvcacheOpBuilder(OpBuilder):
             max_schedule_size = _calculate_max_schedule_size()
             return torch.empty((2, max_schedule_size), dtype=torch.int32, device="meta")
 
-        @torch.library.register_fake(
-            "cann_ops_transformer::quant_flash_mla_with_kvcache"
-        )
-        def quant_flash_mla_with_kvcache_meta(
+        @torch.library.register_fake("cann_ops_transformer::quant_flash_mla")
+        def quant_flash_mla_meta(
             q: torch.Tensor,
             k_cache: torch.Tensor,
             q_descale: torch.Tensor,
@@ -225,7 +223,7 @@ quant_flash_mla_with_kvcache_op_builder.load(verbose=False)
 
 
 @impl(get_as_library(), QMLA_METADATA_OP_NAME, "PrivateUse1")
-def quant_flash_mla_with_kvcache_metadata(
+def quant_flash_mla_metadata(
     cache_seqlens: torch.Tensor,
     num_heads_q: int,
     num_heads_kv: int,
@@ -245,12 +243,12 @@ def quant_flash_mla_with_kvcache_metadata(
     """
     if quant_mode not in (1, 2):
         raise ValueError(
-            f"The quant_mode of quant_flash_mla_with_kvcache_metadata only supports "
+            f"The quant_mode of quant_flash_mla_metadata only supports "
             f"1 (MLA_FP8_E4M3_FULLQUANT) or 2 (MLA_HIF8_FULLQUANT), but got {quant_mode}"
         )
     if num_heads_kv != 1:
         raise ValueError(
-            f"The num_heads_kv of quant_flash_mla_with_kvcache only supports 1 (MLA KV shared), "
+            f"The num_heads_kv of quant_flash_mla only supports 1 (MLA KV shared), "
             f"but got {num_heads_kv}"
         )
     max_seqlen_q = -1 if max_seqlen_q is None else max_seqlen_q
@@ -265,7 +263,7 @@ def quant_flash_mla_with_kvcache_metadata(
     output = torch.empty((2, max_schedule_size), dtype=torch.int32, device="npu")
 
     op_module = quant_flash_mla_with_kvcache_op_builder.load()
-    return op_module.quant_flash_mla_with_kvcache_metadata(
+    return op_module.quant_flash_mla_metadata(
         cache_seqlens,
         num_heads_q,
         num_heads_kv,
@@ -283,7 +281,7 @@ def quant_flash_mla_with_kvcache_metadata(
 
 
 @torch.library.register_kernel("cann_ops_transformer::" + QMLA_METADATA_OP_NAME, None)
-def quant_flash_mla_with_kvcache_metadata_fallback(
+def quant_flash_mla_metadata_fallback(
     cache_seqlens: torch.Tensor,
     num_heads_q: int,
     num_heads_kv: int,
@@ -298,7 +296,7 @@ def quant_flash_mla_with_kvcache_metadata_fallback(
     layout_q: Optional[str] = "BSND",
 ):
     # 处理所有 tensor 都为 None 的情况
-    return quant_flash_mla_with_kvcache_metadata(
+    return quant_flash_mla_metadata(
         cache_seqlens,
         num_heads_q,
         num_heads_kv,
@@ -315,7 +313,7 @@ def quant_flash_mla_with_kvcache_metadata_fallback(
 
 
 @impl(get_as_library(), quant_flash_mla_with_kvcache_op_builder.name, "PrivateUse1")
-def quant_flash_mla_with_kvcache(
+def quant_flash_mla(
     q: torch.Tensor,
     k_cache: torch.Tensor,
     q_descale: torch.Tensor,
@@ -344,7 +342,7 @@ def quant_flash_mla_with_kvcache(
     """
     if quant_mode not in (1, 2):
         raise ValueError(
-            f"The quant_mode of quant_flash_mla_with_kvcache only supports "
+            f"The quant_mode of quant_flash_mla only supports "
             f"1 (MLA_FP8_E4M3_FULLQUANT) or 2 (MLA_HIF8_FULLQUANT), but got {quant_mode}"
         )
     quant_mode = _resolve_quant_mode(quant_mode)
@@ -376,9 +374,7 @@ def quant_flash_mla_with_kvcache(
             f"k_cache with layout {layout_kv} expects {kv_expected} dims, but got {k_cache.dim()} dims"
         )
     if metadata is None:
-        raise ValueError(
-            "metadata should be provided by quant_flash_mla_with_kvcache_metadata"
-        )
+        raise ValueError("metadata should be provided by quant_flash_mla_metadata")
     if quant_mode == int(QuantMode.MLA_FP8_E4M3_FULLQUANT):
         if q.dtype != torch.float8_e4m3fn:
             raise ValueError(
@@ -390,7 +386,7 @@ def quant_flash_mla_with_kvcache(
             )
 
     op_module = quant_flash_mla_with_kvcache_op_builder.load()
-    return op_module.quant_flash_mla_with_kvcache(
+    return op_module.quant_flash_mla(
         q,
         k_cache,
         q_descale,
@@ -414,14 +410,10 @@ def quant_flash_mla_with_kvcache(
     )
 
 
-quant_flash_mla_with_kvcache.QuantMode = QuantMode
-quant_flash_mla_with_kvcache.MaskMode = MaskMode
-quant_flash_mla_with_kvcache_metadata.QuantMode = QuantMode
-quant_flash_mla_with_kvcache_metadata.MaskMode = MaskMode
+quant_flash_mla.QuantMode = QuantMode
+quant_flash_mla.MaskMode = MaskMode
+quant_flash_mla_metadata.QuantMode = QuantMode
+quant_flash_mla_metadata.MaskMode = MaskMode
 
-quant_flash_mla_with_kvcache = (
-    torch.ops.cann_ops_transformer.quant_flash_mla_with_kvcache
-)
-quant_flash_mla_with_kvcache_metadata = (
-    torch.ops.cann_ops_transformer.quant_flash_mla_with_kvcache_metadata
-)
+quant_flash_mla = torch.ops.cann_ops_transformer.quant_flash_mla
+quant_flash_mla_metadata = torch.ops.cann_ops_transformer.quant_flash_mla_metadata

@@ -95,9 +95,9 @@ if _TORCHAIR_AVAILABLE:
         return result
 
     @register_fx_node_ge_converter(
-        torch.ops.cann_ops_transformer.quant_flash_mla_with_kvcache.default
+        torch.ops.cann_ops_transformer.quant_flash_mla.default
     )
-    def convert_quant_flash_mla_with_kvcache(
+    def convert_quant_flash_mla(
         q: Tensor,
         k_cache: Tensor,
         q_descale: Tensor,

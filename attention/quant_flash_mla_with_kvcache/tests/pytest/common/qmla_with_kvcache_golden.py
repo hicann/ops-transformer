@@ -39,18 +39,18 @@ else:
 
 try:
     from cann_ops_transformer_qmla.ops.attention.quant_flash_mla_with_kvcache import (
-        quant_flash_mla_with_kvcache,
-        quant_flash_mla_with_kvcache_metadata,
+        quant_flash_mla,
+        quant_flash_mla_metadata,
     )
 except ImportError:
     try:
         from cann_ops_transformer.ops import (
-            quant_flash_mla_with_kvcache,
-            quant_flash_mla_with_kvcache_metadata,
+            quant_flash_mla,
+            quant_flash_mla_metadata,
         )
     except ImportError:
-        quant_flash_mla_with_kvcache = None
-        quant_flash_mla_with_kvcache_metadata = None
+        quant_flash_mla = None
+        quant_flash_mla_metadata = None
 
 logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
 logger = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
 # 配置区
 # ==============================================================================
 # GRAPH_PATH: 0=单算子, 7=aclgraph, 8=aclgraph+静态kernel
-GRAPH_PATH = 0
+GRAPH_PATH = 8
 # QMLA_PROF=1: 仅对 fa 测量循环 (warmup 之后的 runs) 开启 torch_npu profiler,
 # golden/数据准备不进 profiling, 避免逐分段模拟小算子污染 stream 与结果
 QMLA_PROF = os.environ.get("QMLA_PROF", "0").strip().lower() in ("1", "true")
@@ -76,7 +76,7 @@ N_kv = 1
 D = 512  # nope head dim (Q/K)
 D_V = 512  # V head dim
 D_rope = 64  # rope head dim
-# 新接口 quant_flash_mla_with_kvcache 常量
+# 新接口 quant_flash_mla 常量
 QMLA_QUANT_MODE = 1  # 1=FP8_E4M3（mla 新接口）
 QMLA_QK_HEAD_DIM = D + D_rope  # 576 = nope(512) + rope(64)，q/k_cache 沿末维拼接
 QMLA_V_HEAD_DIM = D_V  # 512
@@ -331,7 +331,7 @@ def _bnsd_to_pa_bf16(
 def generate_data(device="npu"):
     """生成 BNSD FP16 Q/K (nope+rope 合并, head_dim_qk=576) 并做 FP8 量化
 
-    MLA 新接口 quant_flash_mla_with_kvcache: q/k_cache 将 nope(512) 与 rope(64)
+    MLA 新接口 quant_flash_mla: q/k_cache 将 nope(512) 与 rope(64)
     沿末维拼接为 576, 统一量化:
       - Q: per-token-head 动态量化 (作用于整 576 维)
       - K: per-tensor 静态量化 (作用于整 576 维)
@@ -635,7 +635,7 @@ def get_qmla_section_info(seqused_q, cache_seqlens):
 
 
 def _build_qmla_section_info(seqused_q, cache_seqlens):
-    if quant_flash_mla_with_kvcache_metadata is None:
+    if quant_flash_mla_metadata is None:
         logger.warning("[Section] metadata 算子不可用, golden 使用全局量化语义")
         return None
     try:
@@ -659,7 +659,7 @@ def _build_qmla_section_info(seqused_q, cache_seqlens):
         ).contiguous()
         max_sq = MAX_SEQLEN_Q if MAX_SEQLEN_Q > 0 else max(seqused_q)
         max_skv = MAX_SEQLEN_KV if MAX_SEQLEN_KV > 0 else max(cache_seqlens)
-        meta = quant_flash_mla_with_kvcache_metadata(
+        meta = quant_flash_mla_metadata(
             cache_seqlens=cache_seqlens_t,
             num_heads_q=N_q,
             num_heads_kv=N_kv,
@@ -1247,29 +1247,27 @@ class Network(nn.Module):
         # metadata 在图外算好作为输入 tensor 传入:
         # metadata 的 register_fake 硬编码 meta device, 若在图内调用会与
         # npu FakeTensor 混用触发 Unhandled FakeTensor Device Propagation
-        atten_out, lse_out = (
-            torch.ops.cann_ops_transformer.quant_flash_mla_with_kvcache(
-                q_576,
-                k_cache_576,
-                deq_q_flat,
-                deq_k_scalar,
-                block_table,
-                cache_seqlens_t,
-                QMLA_QUANT_MODE,
-                cu_seqlens_q=cu_seqlens_q,
-                seqused_q=seqused_q_t,
-                attn_mask=mask,
-                metadata=metadata,
-                softmax_scale=softmax_scale,
-                mask_mode=MASK_MODE,
-                max_seqlen_q=max_sq,
-                max_seqlen_kv=max_skv,
-                head_dim_v=QMLA_V_HEAD_DIM,
-                layout_q=layout,
-                layout_kv=layout_kv,
-                layout_out=layout,
-                return_softmax_lse=ENABLE_LSE,
-            )
+        atten_out, lse_out = torch.ops.cann_ops_transformer.quant_flash_mla(
+            q_576,
+            k_cache_576,
+            deq_q_flat,
+            deq_k_scalar,
+            block_table,
+            cache_seqlens_t,
+            QMLA_QUANT_MODE,
+            cu_seqlens_q=cu_seqlens_q,
+            seqused_q=seqused_q_t,
+            attn_mask=mask,
+            metadata=metadata,
+            softmax_scale=softmax_scale,
+            mask_mode=MASK_MODE,
+            max_seqlen_q=max_sq,
+            max_seqlen_kv=max_skv,
+            head_dim_v=QMLA_V_HEAD_DIM,
+            layout_q=layout,
+            layout_kv=layout_kv,
+            layout_out=layout,
+            return_softmax_lse=ENABLE_LSE,
         )
         return atten_out, lse_out
 
@@ -1302,29 +1300,27 @@ class QmlaGraphNetwork(nn.Module):
         max_sq,
         max_skv,
     ):
-        atten_out, lse_out = (
-            torch.ops.cann_ops_transformer.quant_flash_mla_with_kvcache(
-                q_576,
-                k_cache_576,
-                deq_q_flat,
-                deq_k_scalar,
-                block_table,
-                cache_seqlens_t,
-                QMLA_QUANT_MODE,
-                cu_seqlens_q=cu_seqlens_q,
-                seqused_q=seqused_q_t,
-                attn_mask=mask,
-                metadata=metadata,
-                softmax_scale=softmax_scale,
-                mask_mode=MASK_MODE,
-                max_seqlen_q=max_sq,
-                max_seqlen_kv=max_skv,
-                head_dim_v=QMLA_V_HEAD_DIM,
-                layout_q=layout,
-                layout_kv=layout_kv,
-                layout_out=layout,
-                return_softmax_lse=ENABLE_LSE,
-            )
+        atten_out, lse_out = torch.ops.cann_ops_transformer.quant_flash_mla(
+            q_576,
+            k_cache_576,
+            deq_q_flat,
+            deq_k_scalar,
+            block_table,
+            cache_seqlens_t,
+            QMLA_QUANT_MODE,
+            cu_seqlens_q=cu_seqlens_q,
+            seqused_q=seqused_q_t,
+            attn_mask=mask,
+            metadata=metadata,
+            softmax_scale=softmax_scale,
+            mask_mode=MASK_MODE,
+            max_seqlen_q=max_sq,
+            max_seqlen_kv=max_skv,
+            head_dim_v=QMLA_V_HEAD_DIM,
+            layout_q=layout,
+            layout_kv=layout_kv,
+            layout_out=layout,
+            return_softmax_lse=ENABLE_LSE,
         )
         return atten_out, lse_out
 
@@ -1346,15 +1342,13 @@ def call_npu_fa_op(
     block_size,
     out_dtype,
 ):
-    """新接口两段式调用：metadata -> 主算子 quant_flash_mla_with_kvcache
+    """新接口两段式调用：metadata -> 主算子 quant_flash_mla
 
     :param q:        Q (T, N_q, 576) fp8, nope(512)+rope(64) 已合并 (fa_run_npu 传入)
     :param k:        K_cache PA (Bn, N, Bs, 576) fp8, 与 Q 相同合并方式
     V 由算子内部从 k_cache 的 nope 前 512 维复用, 无需传入
     """
-    assert quant_flash_mla_with_kvcache is not None, (
-        "cann_ops_transformer not installed"
-    )
+    assert quant_flash_mla is not None, "cann_ops_transformer not installed"
     torch.npu.synchronize()
 
     # ---- 1) q / k_cache 已是 nope+rope 合并后的 576 维 fp8, 直接使用 ----
@@ -1402,7 +1396,7 @@ def call_npu_fa_op(
     # 确保device数据同步完成后再传入metadata算子
     torch.npu.synchronize()
     # ---- 3) 两段式：先 metadata，再主算子 ----
-    metadata = quant_flash_mla_with_kvcache_metadata(
+    metadata = quant_flash_mla_metadata(
         cache_seqlens=cache_seqlens_t,
         num_heads_q=q_n,
         num_heads_kv=kv_n,
@@ -1436,7 +1430,7 @@ def call_npu_fa_op(
             torch.npu.synchronize()
             del flush_buf, flush_sum
             torch.npu.empty_cache()
-        atten_out, lse_out = quant_flash_mla_with_kvcache(
+        atten_out, lse_out = quant_flash_mla(
             q=q_576,
             k_cache=k_cache_576,
             q_descale=deq_q_flat,
@@ -1574,7 +1568,7 @@ def fia_mla_torch_npu(
     layout_kv = _KV_LAYOUT_MAP.get(KV_CACHE_LAYOUT, "PA_BNBD")
     # metadata 图外算好作为图输入 (metadata 的 register_fake 为 meta device,
     # 图内调用会触发 Unhandled FakeTensor Device Propagation)
-    metadata = torch.ops.cann_ops_transformer.quant_flash_mla_with_kvcache_metadata(
+    metadata = torch.ops.cann_ops_transformer.quant_flash_mla_metadata(
         cache_seqlens_t,
         N_q,
         N_kv,

@@ -21,19 +21,18 @@ const int64_t DIM_THREE = 3;
 const int64_t DIM_FOUR = 4;
 const int64_t MAX_DIM_SIZE = 8;
 
-at::Tensor quant_flash_mla_with_kvcache_metadata(const at::Tensor& cache_seqlens, int64_t num_heads_q,
-                                                 int64_t num_heads_kv, int64_t quant_mode,
-                                                 const at::Tensor& cu_seqlens_q, const at::Tensor& seqused_q,
-                                                 int64_t max_seqlen_q, int64_t max_seqlen_kv, int64_t head_dim_qk,
-                                                 int64_t head_dim_v, int64_t mask_mode, std::string layout_q,
-                                                 const at::Tensor& output)
+at::Tensor quant_flash_mla_metadata(const at::Tensor& cache_seqlens, int64_t num_heads_q, int64_t num_heads_kv,
+                                    int64_t quant_mode, const at::Tensor& cu_seqlens_q, const at::Tensor& seqused_q,
+                                    int64_t max_seqlen_q, int64_t max_seqlen_kv, int64_t head_dim_qk,
+                                    int64_t head_dim_v, int64_t mask_mode, std::string layout_q,
+                                    const at::Tensor& output)
 {
     ACLNN_CMD(aclnnQuantFlashMlaWithKvcacheMetadata, cache_seqlens, num_heads_q, num_heads_kv, quant_mode, cu_seqlens_q,
               seqused_q, max_seqlen_q, max_seqlen_kv, head_dim_qk, head_dim_v, mask_mode, layout_q, output);
     return output;
 }
 
-std::tuple<at::Tensor, at::Tensor> quant_flash_mla_with_kvcache(
+std::tuple<at::Tensor, at::Tensor> quant_flash_mla(
     const at::Tensor& q, const at::Tensor& k_cache, const at::Tensor& q_descale, const at::Tensor& k_descale,
     const at::Tensor& block_table, const at::Tensor& cache_seqlens, int64_t quant_mode,
     const c10::optional<at::Tensor>& cu_seqlens_q, const c10::optional<at::Tensor>& seqused_q,
@@ -102,8 +101,7 @@ std::tuple<at::Tensor, at::Tensor> quant_flash_mla_with_kvcache(
 // Bind the C++ function to Python module
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
-    m.def("quant_flash_mla_with_kvcache_metadata", &quant_flash_mla_with_kvcache_metadata,
-          "quant_flash_mla_with_kvcache_metadata");
-    m.def("quant_flash_mla_with_kvcache", &quant_flash_mla_with_kvcache, "quant_flash_mla_with_kvcache");
+    m.def("quant_flash_mla_metadata", &quant_flash_mla_metadata, "quant_flash_mla_metadata");
+    m.def("quant_flash_mla", &quant_flash_mla, "quant_flash_mla");
 }
 } // namespace op_api
