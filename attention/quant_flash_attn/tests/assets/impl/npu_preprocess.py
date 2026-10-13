@@ -164,11 +164,17 @@ def build_metadata_arguments(
     )
     seq_q = _resolve_tensor(seqused_q, kwargs, "seqused_q")
     seq_kv = _resolve_tensor(seqused_kv, kwargs, "seqused_kv")
-    batch_size = (
-        None
-        if is_varlen_q
-        else _derive_batch_size(q_shape, layout_q, cu_q, seq_q, kwargs)
-    )
+    # TND/NTD (varlen): batch 由 cu_seqlens_q 推导, CSV 显式声明的 batch_size
+    # 原样透传给 metadata 算子——torch_extension 校验 TND 下 batch_size 必须为
+    # None ("When the layout of query is TND, the attribute batch_size ...
+    # must be None"), C++ CheckConsistency 进一步校验
+    # cu_seqlens.numel()==batch_size+1。任何非 None 值 (含 -1) 都会被拦截;
+    # 仅 attributes 未声明 batch_size (None) 时视为未传。
+    explicit_bs = get_attribute(kwargs, "batch_size")
+    if is_varlen_q:
+        batch_size = None if explicit_bs is None else int(explicit_bs)
+    else:
+        batch_size = _derive_batch_size(q_shape, layout_q, cu_q, seq_q, kwargs)
 
     return {
         "num_heads_q": num_heads_q,

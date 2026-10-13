@@ -190,6 +190,43 @@ def generate_qfa_mxfp8_inputs(
     seqused_q = kwargs.get("seqused_q_values")
     seqused_kv = kwargs.get("seqused_kv_values")
     input_layout = kwargs.get("input_layout", "TND")
+
+    # 异常用例容忍: N_q/N_kv/D 可能被注入非法值 (如 -1)。非法值不能用于数据合成
+    # (torch.rand 负维度会裸崩, 掩盖真正要验证的异常属性), 按 CSV slot 形状推导
+    # 回退值完成数据生成; 原始非法属性仍由 ttk 透传给 metadata/主算子, 由算子
+    # host 侧校验拦截并给出明确报错 (如 "numHeadsQ must be greater than 0")。
+    def _positive_or_derive(name, value, slot, head_axis):
+        try:
+            ivalue = int(value)
+        except (TypeError, ValueError):
+            ivalue = 0
+        if ivalue > 0:
+            return ivalue
+        shape = tuple(int(dim) for dim in slot.shape)
+        axis = head_axis if head_axis >= 0 else len(shape) + head_axis
+        if not 0 <= axis < len(shape) or shape[axis] <= 0:
+            raise ValueError(
+                f"[INPUTS] attribute {name}={value!r} invalid (must be positive "
+                f"integer) and cannot be derived from CSV slot shape {shape}"
+            )
+        logger.warning(
+            "[INPUTS] attribute %s=%r invalid (must be positive integer) - derive "
+            "%s=%d from CSV slot shape %s for data synthesis; the invalid value is "
+            "still passed through to the op for interception",
+            name,
+            value,
+            name,
+            shape[axis],
+            shape,
+        )
+        return shape[axis]
+
+    _q_head_axis = 2 if str(layout_q).upper() == "BSND" else 1
+    _k_head_axis = 2 if str(layout_kv).upper() == "BSND" else 1
+    N_q = _positive_or_derive("N_q", N_q, q, _q_head_axis)
+    N_kv = _positive_or_derive("N_kv", N_kv, k, _k_head_axis)
+    D = _positive_or_derive("D", D, q, -1)
+
     # cu_seqlens -> actual_seq (差分还原)
     cu_seqlens_q = list(cu_seqlens_q) if cu_seqlens_q is not None else [0]
     cu_seqlens_kv = list(cu_seqlens_kv) if cu_seqlens_kv is not None else [0]
@@ -524,12 +561,39 @@ def generate_qfa_mxfp8_inputs(
         # numpy in-place 拷贝 (同 dtype 同 shape, bit-exact 内存拷贝)
         dst_np[...] = src_np
 
-    q.copy_(q_fp8_final)
-    k.copy_(k_fp8_final)
-    v.copy_(v_fp8_final)
-    dequant_scale_q.copy_(q_scale_e8m0)
-    dequant_scale_k.copy_(k_scale_e8m0)
-    dequant_scale_v.copy_(v_scale_e8m0)
+    def _write_slot(slot, src_torch, slot_name):
+        """形状一致时原位 bit-exact copy_; 不一致时 WARN 并跳过写入。
+
+        异常用例的 CSV slot 形状常与按属性推导的计算结果不一致 (如 q_descale
+        slot 为 N2TGD 形状 (2,32,4,2,2) 而 q_scale_layout='TND' 计算得
+        (32,8,2,2), v_descale slot 首维为 0)。裸 copy_ 的 broadcast 报错
+        ("The size of tensor a (4) must match the size of tensor b (8)") 会
+        掩盖真正注入的异常属性, 且无法定位。跳过写入让非法输入按 CSV 声明的
+        形状透传到算子, 由 host 侧 checker 给出明确拦截报错。
+        """
+        if tuple(slot.shape) == tuple(src_torch.shape):
+            slot.copy_(src_torch)
+            return
+        # 形状不一致: 跳过写入并 WARN, 让非法输入按 CSV 原样透传到算子, 由
+        # host 侧 checker 拦截 (如 "v_descale has empty dimension at axis 0")。
+        # 注: ttk 在算子调用前会从 numpy 底层存储重建 runtime tensor, 插件侧
+        # resize_/set_ 改形状不会传导, 只有共享内存的原位数据写入有效, 因此
+        # 这里不能也不应改写 slot 形状。
+        logger.warning(
+            "[INPUTS] %s shape mismatch: CSV slot %s != computed %s - skip "
+            "in-place write (keep CSV slot data/shape), let op-side validation "
+            "intercept the inconsistent case",
+            slot_name,
+            tuple(slot.shape),
+            tuple(src_torch.shape),
+        )
+
+    _write_slot(q, q_fp8_final, "q (slot 0)")
+    _write_slot(k, k_fp8_final, "k (slot 1)")
+    _write_slot(v, v_fp8_final, "v (slot 2)")
+    _write_slot(dequant_scale_q, q_scale_e8m0, "dequant_scale_q (slot 3)")
+    _write_slot(dequant_scale_k, k_scale_e8m0, "dequant_scale_k (slot 4)")
+    _write_slot(dequant_scale_v, v_scale_e8m0, "dequant_scale_v (slot 5)")
 
     # ----- p_scale: in-place 写 fp32 -----
     p_scale_value = kwargs.get("p_scale_value", 1.0)
