@@ -18,7 +18,7 @@
 namespace ops {
 class SparseLightningIndexerGradKLLoss : public OpDef {
 public:
-    explicit SparseLightningIndexerGradKLLoss(const char *name)
+    explicit SparseLightningIndexerGradKLLoss(const char* name)
         : OpDef(name)
     {
         this->Input("query")
@@ -119,6 +119,17 @@ public:
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn");
         this->AICore().AddConfig("ascend950", aicore_config_95);
+
+        OpAICoreConfig aicore_config_96;
+        aicore_config_96.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn");
+        this->AICore().AddConfig("ascend960dt", aicore_config_96);
+        this->AICore().AddConfig("ascend960pr", aicore_config_96);
 
         OpAICoreConfig aicore_config;
         aicore_config.Input("query")

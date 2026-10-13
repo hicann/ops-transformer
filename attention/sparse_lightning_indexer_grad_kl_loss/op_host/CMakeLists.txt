@@ -25,6 +25,25 @@ if("${CONDITION_UNIT}" STREQUAL "ascend950")
     )
 endif()
 
+set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})
+if("${CONDITION_UNIT}" STREQUAL "ascend960dt")
+    set(sparse_lightning_indexer_grad_kl_loss_depends attention/common CACHE INTERNAL "Dependencies for sparse_lightning_indexer_grad_kl_loss")
+    add_ops_compile_options(
+        OP_NAME SparseLightningIndexerGradKLLoss
+        COMPUTE_UNIT ascend960dt_968B7
+        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
+    )
+endif()
+
+set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})
+if("${CONDITION_UNIT}" STREQUAL "ascend960pr")
+    set(sparse_lightning_indexer_grad_kl_loss_depends attention/common CACHE INTERNAL "Dependencies for sparse_lightning_indexer_grad_kl_loss")
+    add_ops_compile_options(
+        OP_NAME SparseLightningIndexerGradKLLoss
+        COMPUTE_UNIT Ascend960PR_969A1
+        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
+    )
+endif()
 
 if (BUILD_OPS_RTY_KERNEL)
     add_ops_compile_options(
@@ -40,7 +59,7 @@ else()
                     -Wno-deprecated-declarations
                     -Werror
     )
-    add_modules_sources(
+    add_modules_sources_with_soc(
         OPTYPE sparse_lightning_indexer_grad_kl_loss
         ACLNNTYPE aclnn_inner
     )
@@ -53,5 +72,7 @@ if(NOT BUILD_OPS_RTY_KERNEL)
         ./arch22/sparse_lightning_indexer_grad_kl_loss_tiling_general.h
         ./arch35/sparse_lightning_indexer_grad_kl_loss_tiling_general_regbase.cpp
         ./arch35/sparse_lightning_indexer_grad_kl_loss_tiling_general_regbase.h
+        ./arch92/sparse_lightning_indexer_grad_kl_loss_tiling_general_arch92_regbase.cpp
+        ./arch92/sparse_lightning_indexer_grad_kl_loss_tiling_general_arch92_regbase.h
     )
 endif()
