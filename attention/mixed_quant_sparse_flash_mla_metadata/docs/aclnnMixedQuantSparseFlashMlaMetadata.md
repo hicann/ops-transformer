@@ -27,6 +27,14 @@
 
 - 算子功能：`aclnnMixedQuantSparseFlashMlaMetadata`是`aclnnMixedQuantSparseFlashMla`算子的前置算子，用于后续Attention计算生成负载均衡的任务划分方案。本算子不执行实际的Attention计算，而是根据输入参数在AI CPU计算出每个AI Core应处理的Attention计算起止范围，从而最大化计算资源的利用率，避免各Core间负载不均衡的问题。
 
+  <!-- npu="A3,910b" id10 -->
+  <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持TurboQuant TQ4。本接口通过原有量化模式参数`quantMode=3`生成配套分核信息，不执行KV量化或Attention计算，输出仍为INT32、shape为`(1024,)`。
+  <!-- end id10 -->
+
+  <!-- npu="950" id11 -->
+  <term>Ascend 950PR&950DT系列产品</term>：使用`quantMode=1`和`quantMode=2`量化模式。
+  <!-- end id11 -->
+
   **该算子不建议单独使用，建议与aclnnMixedQuantSparseFlashMla算子配合使用，形成完整的工作流。**
     1. 接受aclnnMixedQuantSparseFlashMla算子接口输入数据shape信息，包含batchSize、qSeqlen、kSeqlen、mask。通过对输入分块并模拟计算耗时，均匀分配分块到可用核上，以降低aclnnMixedQuantSparseFlashMla算子的整体计算耗时，并提高硬件利用率。
     2. 分配结果输出后，后续作为输入供aclnnMixedQuantSparseFlashMla算子使用。
@@ -517,13 +525,12 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadata(
 - <term>Ascend 950PR&950DT系列产品</term>：与`aclnnMixedQuantSparseFlashMla`算子配套使用时，仅支持`quantMode=1/2`。
 <!-- end id7 -->
 
-<!-- npu="A3" id8 -->
-- <term>Atlas A3系列产品</term>：与`aclnnMixedQuantSparseFlashMla`算子配套使用时，仅支持`quantMode=3`。
+<!-- npu="A3,910b" id8 -->
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：与`aclnnMixedQuantSparseFlashMla`算子配套使用时，仅支持`quantMode=3`。
 <!-- end id8 -->
-
-<!-- npu="910b" id9 -->
-- <term>Atlas A2系列产品</term>：与`aclnnMixedQuantSparseFlashMla`算子配套使用时，仅支持`quantMode=3`。
-<!-- end id9 -->
+  <!-- npu="A3,910b" id12 -->
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：在TurboQuant TQ4场景，必须显式设置`quantMode=3`。该模式新增的数据类型和布局不适用于其他量化模式。
+  <!-- end id12 -->
   - aclnnMixedQuantSparseFlashMlaMetadata默认确定性实现。
   - B（Batch）表示输入样本批量大小，q、oriKvOptional、cmpKvOptional为配套的aclnnMixedQuantSparseFlashMla算子的入参，S1表示layoutQOptional=BSND时，q shape中的S轴的大小，T1表示layoutQOptional=TND时，q shape中的T轴的大小，S2表示layoutKvOptional=BSND时，oriKvOptional shape中的S轴的大小，S3表示layoutKvOptional=BSND时，cmpKvOptional shape中的S轴的大小，N2表示oriKvOptional、cmpKvOptional shape中的N轴的大小。
   - 参数cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
