@@ -54,7 +54,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
   int64_t            winLeft,
   int64_t            winRight,
   int64_t            residualBlockMode,
-  bool               isConsistentTopK,
+  bool               isConsistentTopk,
   const aclTensor   *metadataOptional,
   uint64_t          *workspaceSize,
   aclOpExecutor    **executor)
@@ -347,7 +347,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>isConsistentTopK</td>
+      <td>isConsistentTopk</td>
       <td>输入</td>
       <td>前置算子进行稀疏块选择时，同一batch同一head内每个Q块选择的KV块最大数量是否一致。</td>
       <td>仅支持0或1。0代表不一致，1代表一致。</td>
