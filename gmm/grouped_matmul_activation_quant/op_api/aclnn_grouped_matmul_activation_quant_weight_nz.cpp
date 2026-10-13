@@ -767,6 +767,13 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNzGetWorkspaceSize(
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
     aclnnStatus checkRet = CheckRequiredParams(x, groupList, weight, weightScale, activationType, y, yScale);
     CHECK_RET(checkRet == ACLNN_SUCCESS, checkRet);
+
+    // Validate required inputs before DFX, then initialize DFX before the executor captures its context.
+    L2_DFX_PHASE_1(aclnnGroupedMatmulActivationQuantWeightNz,
+                   DFX_IN(x, groupList, weight, weightScale, bias, xScaleOptional, activationType, groupListType,
+                          tuningConfig, quantMode, roundMode, scaleAlg, dstTypeMax),
+                   DFX_OUT(y, yScale));
+
     bool transposeWeight = false;
 
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -778,12 +785,6 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNzGetWorkspaceSize(
                            groupListType, quantMode, roundMode, scaleAlg, dstTypeMax, y, yScale, uniqueExecutor.get(),
                            effectiveQuantMode, effectiveRoundMode, effectiveYDtype);
     CHECK_RET(checkRet == ACLNN_SUCCESS, checkRet);
-
-    // Required external inputs are checked before DFX traverses them.
-    L2_DFX_PHASE_1(aclnnGroupedMatmulActivationQuantWeightNz,
-                   DFX_IN(x, groupList, weight, weightScale, bias, xScaleOptional, activationType, groupListType,
-                          tuningConfig, quantMode, roundMode, scaleAlg, dstTypeMax),
-                   DFX_OUT(y, yScale));
 
     if (y->IsEmpty() || groupList->IsEmpty() || yScale->IsEmpty()) {
         *workspaceSize = 0;

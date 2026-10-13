@@ -625,6 +625,13 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3GetWorkspaceSize(
     CHECK_RET(gmm::CheckTensorStorageBounds(outputScale, "GroupedMatmulSwigluQuant", "outputScale"),
               ACLNN_ERR_PARAM_INVALID);
 
+    // Initialize DFX before the executor captures the API name and profiling context.
+    L2_DFX_PHASE_1(aclnnGroupedMatmulSwigluQuantWeightNzV3,
+                   DFX_IN(x, weight, weightScale, weightAssistMatrix, bias, xScale, smoothScale, groupList, dequantMode,
+                          dequantDtype, quantMode, groupListType, tuningConfigOptional, swigluMode, clampLimit,
+                          gluAlpha, gluBias, roundMode, scaleAlg, dstTypeMax),
+                   DFX_OUT(output, outputScale));
+
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     bool transposeWeight = false;
@@ -640,12 +647,6 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3GetWorkspaceSize(
                           swigluMode, clampLimit, gluAlpha, gluBias, roundMode, scaleAlg, dstTypeMax, output,
                           outputScale, transposeWeight) == ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_INVALID);
-
-    L2_DFX_PHASE_1(aclnnGroupedMatmulSwigluQuantWeightNzV3,
-                   DFX_IN(x, weight, weightScale, weightAssistMatrix, bias, xScale, smoothScale, groupList, dequantMode,
-                          dequantDtype, quantMode, groupListType, tuningConfigOptional, swigluMode, clampLimit,
-                          gluAlpha, gluBias, roundMode, scaleAlg, dstTypeMax),
-                   DFX_OUT(output, outputScale));
 
     const aclTensor* xForOp = l0op::Contiguous(x, uniqueExecutor.get());
     const aclTensor* xScaleForOp = l0op::Contiguous(xScale, uniqueExecutor.get());
