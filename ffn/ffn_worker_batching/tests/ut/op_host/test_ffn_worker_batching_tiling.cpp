@@ -607,7 +607,7 @@ TEST_F(FfnWorkerBatchingTilingTest, ffn_wb_tiling_arch35_async_layer_contract)
                     ASSERT_TRUE(ExecuteTiling(para, info));
                     const auto& data =
                         *reinterpret_cast<const FfnWorkerBatchingArch35TilingData*>(info.tilingData.get());
-                    EXPECT_EQ(data.layerNum, mode == 1 && sync ? layers : 0);
+                    EXPECT_EQ(data.layerNum, layers);
                 }
             }
         }
