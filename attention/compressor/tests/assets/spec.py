@@ -40,9 +40,15 @@ class CompressorSpec:
     golden = golden_module.cpu_compressor
     customize_inputs = inputs_module.generate_compressor_inputs
     torch_graph = graph_module.CompressorGraphNetwork
+    # 默认判据用 stat_rel_err：compressor 走插件自定义 compare，standard token 不参与
+    # 实际比对，只决定 need_3party 与 golden Promote。stat_rel_err 既非 cross_check
+    # （不拉 XPU 三方），也不在 PROMOTE_GOLDEN_TOKENS（不升精度），保证三方/两方里
+    # 作为基准的"同精度 CPU golden"不被 ttk 抬精度。
+    # 下方 level/ratio/small_value 保留，供显式 --compare cross_check 时插件按
+    # cross_check 重新解析复用；显式 cross_check 仍会 Promote，属预期。
     tolerance = {
         "float16": {
-            "standard": "cross_check",
+            "standard": "stat_rel_err",
             "level": "L0",
             "mare_ratio": 10.0,
             "mere_ratio": 2.0,
@@ -51,7 +57,7 @@ class CompressorSpec:
             "small_value_atol": 2**-16,
         },
         "bfloat16": {
-            "standard": "cross_check",
+            "standard": "stat_rel_err",
             "level": "L0",
             "mare_ratio": 10.0,
             "mere_ratio": 2.0,
@@ -91,9 +97,10 @@ class CompressorSpec:
 class AclnnCompressorSpec:
     golden = golden_module.aclnn_compressor_golden
     customize_inputs = inputs_module.aclnn_compressor_input
+    # 同 CompressorSpec：默认 stat_rel_err，避免 ttk 对自定义 compare 的算子自动 Promote。
     tolerance = {
         "float16": {
-            "standard": "cross_check",
+            "standard": "stat_rel_err",
             "level": "L0",
             "mare_ratio": 10.0,
             "mere_ratio": 2.0,
@@ -102,7 +109,7 @@ class AclnnCompressorSpec:
             "small_value_atol": 2**-16,
         },
         "bfloat16": {
-            "standard": "cross_check",
+            "standard": "stat_rel_err",
             "level": "L0",
             "mare_ratio": 10.0,
             "mere_ratio": 2.0,

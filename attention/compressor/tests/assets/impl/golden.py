@@ -20,7 +20,7 @@ import numpy as np
 import gc
 
 try:
-    from ttk.utilities.container_utils import get_global_storage
+    from ttk.switches import get_global_storage
 except Exception:
     get_global_storage = None
 

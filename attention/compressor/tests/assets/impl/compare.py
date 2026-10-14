@@ -18,13 +18,13 @@ import numpy as np
 import torch
 
 try:
-    from ttk.utilities.container_utils import get_global_storage
+    from ttk.switches import get_global_storage
 except Exception:
     get_global_storage = None
 
 try:
-    from ttk.core_modules.comparison.cross_check import CrossCheckComparison
-    from ttk.core_modules.comparison.resolve import resolve_tolerance
+    from ttk.core_modules.common.comparison.cross_check import CrossCheckComparison
+    from ttk.core_modules.common.comparison.resolve import resolve_tolerance
 
     _TTK_CROSS_CHECK_AVAILABLE = True
 except Exception:
@@ -50,8 +50,6 @@ _OUTPUT_NAMES = [
     "softmax_score",
     "kv",
 ]
-
-_BATCH_CONSISTENCY_CACHE = {}
 
 
 def _load_pytest_golden_module():
@@ -258,6 +256,7 @@ def _batch_consistency_check(npu_cmp_kv, kwargs):
     cache_key = batch_consistency_id
     result = []
     slice_idx = 0
+    batch_consistency_cache = {}
     for axis_pos, slices, cache_key_idx in zip(batch_axis, batch_slice_info, cache_key):
         if axis_pos is None or slices is None or cache_key_idx is None:
             continue
@@ -315,14 +314,14 @@ def _batch_consistency_check(npu_cmp_kv, kwargs):
                     else:
                         slice_output = npu_np[start:stop, 1:, :]
                 dl = "_".join(kl.split("_")[:2])
-                if dl not in _BATCH_CONSISTENCY_CACHE:
-                    _BATCH_CONSISTENCY_CACHE[dl] = {
+                if dl not in batch_consistency_cache:
+                    batch_consistency_cache[dl] = {
                         "base": slice_output.copy(),
                         "comparisons": [],
                     }
                     print(f"[batch_consistency]: base for id={kl}")
                 else:
-                    cached = _BATCH_CONSISTENCY_CACHE[dl]
+                    cached = batch_consistency_cache[dl]
                     compare_result = _tensor_compare(
                         cached["base"], slice_output, "batch_consistency"
                     )
@@ -653,7 +652,7 @@ def _run_cross_check_loop(npu_sub, golden_sub, bench_sub, names, params):
         npu_out = npu_sub[idx]
         golden_out = golden_sub[idx]
         bench_out = bench_sub[idx] if idx < len(bench_sub) else None
-        if npu_out is None and golden_out is None:
+        if npu_out is None and golden_out is None and bench_out is None:
             results.append(
                 {
                     "pass": True,
@@ -686,7 +685,9 @@ def _split_aclnn_outputs(outputs, kwargs, bench_outputs):
 
     if len(npu_outputs) == 1:
         npu_sub.append(npu_outputs[0][cmp_kv_mask])
-        golden_sub.append(golden_outputs[0][cmp_kv_mask])
+        # third_party 必须是"同精度"标杆：golden 内部按 fp32 算，Promote 只改输出
+        # dtype（且输入抬升均为精确转换），按 NPU dtype 压回即精确还原原生结果。
+        golden_sub.append(golden_outputs[0][cmp_kv_mask].to(npu_outputs[0].dtype))
         bench = bench_outputs[0] if bench_outputs else None
         bench_sub.append(bench[cmp_kv_mask] if bench is not None else None)
         for i in range(1, len(golden_outputs)):
@@ -697,8 +698,10 @@ def _split_aclnn_outputs(outputs, kwargs, bench_outputs):
 
     npu_cmp_kv = npu_outputs[0]
     npu_state_cache = npu_outputs[3]
-    cpu_cmp_kv = golden_outputs[0]
-    cpu_state_cache = golden_outputs[3]
+    # Promote 会把自定义 golden 输出抬精度（cmp_kv bf16→fp32、state fp32→fp64）；
+    # 三方里 golden 槽是高精度 bench，third_party 槽要同精度标杆，故压回 NPU dtype。
+    cpu_cmp_kv = golden_outputs[0].to(npu_cmp_kv.dtype)
+    cpu_state_cache = golden_outputs[3].to(npu_state_cache.dtype)
 
     npu_sub.append(npu_cmp_kv[cmp_kv_mask])
     golden_sub.append(cpu_cmp_kv[cmp_kv_mask])
@@ -706,7 +709,7 @@ def _split_aclnn_outputs(outputs, kwargs, bench_outputs):
 
     bench_state = None
     if bench_outputs and len(bench_outputs) > 1:
-        bench_state = _to_torch(bench_outputs[1])
+        bench_state = _to_torch(bench_outputs[-1])
     sc_npu, sc_golden, sc_bench = _split_state_cache_sub_outputs(
         npu_state_cache, cpu_state_cache, bench_state, update_kv, update_score
     )
@@ -717,10 +720,15 @@ def _split_aclnn_outputs(outputs, kwargs, bench_outputs):
     if gradEnabled:
         npu_sub.append(npu_outputs[1][mid_result_mask])
         npu_sub.append(npu_outputs[2][mid_result_mask])
-        golden_sub.append(golden_outputs[1][mid_result_mask])
-        golden_sub.append(golden_outputs[2][mid_result_mask])
-        bench_sub.append(None)
-        bench_sub.append(None)
+        golden_sub.append(golden_outputs[1][mid_result_mask].to(npu_outputs[1].dtype))
+        golden_sub.append(golden_outputs[2][mid_result_mask].to(npu_outputs[2].dtype))
+        # gradEnabled 下 bench 布局为 [cmp_kv, softmax, kv, state]，mid 结果在 1/2
+        if bench_outputs and len(bench_outputs) > 3:
+            bench_sub.append(_to_torch(bench_outputs[1])[mid_result_mask])
+            bench_sub.append(_to_torch(bench_outputs[2])[mid_result_mask])
+        else:
+            bench_sub.append(None)
+            bench_sub.append(None)
 
     return npu_sub, golden_sub, bench_sub, _OUTPUT_NAMES
 
@@ -764,8 +772,9 @@ def _split_e2e_outputs(outputs, kwargs, bench_outputs):
 
     npu_cmp_kv = npu_outputs[0]
     npu_state_cache = npu_outputs[1]
-    cpu_cmp_kv = golden_outputs[0]
-    cpu_state_cache = golden_outputs[1]
+    # 同 aclnn：third_party 压回 NPU dtype，防 golden 被 Promote 抬精度后判据被稀释。
+    cpu_cmp_kv = golden_outputs[0].to(npu_cmp_kv.dtype)
+    cpu_state_cache = golden_outputs[1].to(npu_state_cache.dtype)
 
     npu_sub.append(npu_cmp_kv[cmp_kv_mask])
     golden_sub.append(cpu_cmp_kv[cmp_kv_mask])
@@ -773,7 +782,7 @@ def _split_e2e_outputs(outputs, kwargs, bench_outputs):
 
     bench_state = None
     if bench_outputs and len(bench_outputs) > 1:
-        bench_state = _to_torch(bench_outputs[1])
+        bench_state = _to_torch(bench_outputs[-1])
     sc_npu, sc_golden, sc_bench = _split_state_cache_sub_outputs(
         npu_state_cache, cpu_state_cache, bench_state, update_kv, update_score
     )
