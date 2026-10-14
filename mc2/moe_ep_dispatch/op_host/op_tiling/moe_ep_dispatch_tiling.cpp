@@ -734,8 +734,6 @@ static ge::graphStatus CheckComputeAttr(const gert::TilingContext* context, cons
     OP_TILING_CHECK(cached && *doCpuSyncPtr,
                     OP_LOGE(nodeName, "do_cpu_sync and cached can't be true at the same time."),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(cached && (context->GetOptionalInputShape(TOPK_WEIGHTS_INDEX) != nullptr),
-                    OP_LOGE(nodeName, "topk_weights is not supported when cached."), return ge::GRAPH_FAILED);
 
     info.cfg.numExperts = static_cast<uint32_t>(*numExpertsPtr);
     info.cfg.numLocalExperts = static_cast<uint32_t>(*numExpertsPtr / epWorldSize);

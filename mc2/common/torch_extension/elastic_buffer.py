@@ -1544,8 +1544,18 @@ class ElasticBuffer:
                 (topk_idx is None), lambda: ("topk_idx is not supported when cached.")
             )
             torch._check(
-                (topk_weights is None),
-                lambda: ("topk_weights is not supported when cached."),
+                (
+                    (topk_weights is None)
+                    or (
+                        isinstance(topk_weights, torch.Tensor)
+                        and tuple(topk_weights.shape) == tuple(handle.topk_idx.shape)
+                    )
+                ),
+                lambda: (
+                    f"cached topk_weights shape must match handle.topk_idx "
+                    f"{tuple(handle.topk_idx.shape)}, got "
+                    f"{getattr(topk_weights, 'shape', None)}"
+                ),
             )
             torch._check(
                 ((do_cpu_sync is None) or (do_cpu_sync is False)),
