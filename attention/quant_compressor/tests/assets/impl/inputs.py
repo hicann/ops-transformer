@@ -278,6 +278,7 @@ def apply_batch_slice_seeded(
     cmp_ratio,
     coff,
     cache_mode,
+    start_pos_list,
     **kwargs,
 ):
     """根据 batch_axis/batch_slice_info/batch_seed 生成切片数据并替换输入。
@@ -379,7 +380,16 @@ def apply_batch_slice_seeded(
                                 )
                             else:
                                 cache_shape = list(state_cache.shape)
-                                cache_shape[0] = length * state_block_table.shape[1]
+                                cache_shape[0] = length
+                                start_seq_id = start_pos_list[start]
+                                cur_seq_id = (
+                                    start_seq_id - start_seq_id % cmp_ratio - cmp_ratio
+                                    if start_seq_id >= cmp_ratio
+                                    else start_seq_id - start_seq_id % cmp_ratio
+                                )
+                                block_id = state_block_table[start][
+                                    int(cur_seq_id // state_cache.shape[1])
+                                ]
                                 cache_rng = np.random.RandomState(seed_value)
                                 cache_range = input_ranges[3]
                                 cache_lo, cache_hi = cache_range[0], cache_range[1]
@@ -387,8 +397,7 @@ def apply_batch_slice_seeded(
                                     cache_lo, cache_hi, size=tuple(cache_shape)
                                 ).astype(np.float32)
                                 state_cache[
-                                    start * state_block_table.shape[1] : end
-                                    * state_block_table.shape[1],
+                                    block_id : (block_id + length),
                                     :,
                                     :,
                                 ] = torch.from_numpy(cache_data).to(state_cache.dtype)
@@ -439,7 +448,16 @@ def apply_batch_slice_seeded(
                                 )
                             else:
                                 cache_shape = list(state_cache.shape)
-                                cache_shape[0] = length * state_block_table.shape[1]
+                                cache_shape[0] = length
+                                start_seq_id = start_pos_list[start]
+                                cur_seq_id = (
+                                    start_seq_id - start_seq_id % cmp_ratio - cmp_ratio
+                                    if start_seq_id >= cmp_ratio
+                                    else start_seq_id - start_seq_id % cmp_ratio
+                                )
+                                block_id = state_block_table[start][
+                                    int(cur_seq_id // state_cache.shape[1])
+                                ]
                                 cache_rng = np.random.RandomState(seed_value)
                                 cache_range = input_ranges[3]
                                 cache_lo, cache_hi = cache_range[0], cache_range[1]
@@ -447,8 +465,7 @@ def apply_batch_slice_seeded(
                                     cache_lo, cache_hi, size=tuple(cache_shape)
                                 ).astype(np.float32)
                                 state_cache[
-                                    start * state_block_table.shape[1] : end
-                                    * state_block_table.shape[1],
+                                    block_id : (block_id + length),
                                     :,
                                     :,
                                 ] = torch.from_numpy(cache_data).to(state_cache.dtype)
@@ -532,6 +549,7 @@ def generate_quant_compressor_inputs(
         cmp_ratio,
         coff,
         cache_mode_val,
+        start_pos_list,
         **kwargs,
     )
 
@@ -613,6 +631,7 @@ def aclnn_quant_compressor_input(
         cmpRatio,
         coff,
         cacheMode,
+        start_pos_list,
         **kwargs,
     )
 
