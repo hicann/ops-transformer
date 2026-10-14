@@ -381,7 +381,8 @@ aclnnStatus ProcessDropAndPadTokensGrad(aclOpExecutor* executor, const aclTensor
     // 当设备类型为A2或A3且index为int32类型时，切为InplaceIndexAddWithSorted算子
     bool useNewOp = (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B ||
                      GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910_93 ||
-                     GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) &&
+                     (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+                      GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201)) &&
                     tokensNum < MAX_SORT_SHAPE_DIM &&
                     (zeroTokensGradOut->GetDataType() == op::DataType::DT_BF16 ||
                      zeroTokensGradOut->GetDataType() == op::DataType::DT_FLOAT16 || deterministicValue);

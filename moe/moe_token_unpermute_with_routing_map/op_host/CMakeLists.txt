@@ -22,6 +22,15 @@ if (BUILD_OPEN_PROJECT)
                     -mllvm
                     -cce-aicore-dcci-before-kernel-end=false
         )
+    elseif(CONDITION_UNIT STREQUAL "ascend960dt")
+        add_ops_compile_options(
+            OP_NAME MoeTokenUnpermuteWithRoutingMap
+            OPTIONS --cce-auto-sync=on
+                    -Wno-deprecated-declarations
+                    -Werror
+                    -mllvm
+                    -cce-aicore-dcci-before-kernel-end=false
+        )
     else()
         add_ops_compile_options(
             OP_NAME MoeTokenUnpermuteWithRoutingMap

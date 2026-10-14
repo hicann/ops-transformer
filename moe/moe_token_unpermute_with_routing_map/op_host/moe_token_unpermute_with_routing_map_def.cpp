@@ -80,6 +80,7 @@ public:
             .DynamicShapeSupportFlag(true)
             .ExtendCfgInfo("opFile.value", "moe_token_unpermute_with_routing_map");
         this->AICore().AddConfig("ascend950", regbaseCfg);
+        this->AICore().AddConfig("ascend960dt", regbaseCfg);
 
         OpAICoreConfig config_kirin;
         config_kirin.DynamicCompileStaticFlag(true)

@@ -14,6 +14,7 @@
  */
 #include "moe_inplace_index_add.h"
 #include "opdev/make_op_executor.h"
+#include "op_host/util/op_const_def.h"
 #include "opdev/op_def.h"
 #include "opdev/op_dfx.h"
 #include "opdev/op_executor.h"
@@ -34,7 +35,8 @@ const aclTensor* MoeInplaceIndexAddAiCore(const aclTensor* self, const int64_t d
     L0_DFX(MoeInplaceIndexAddAiCore, self, dim, index, source, alphaTensor);
     auto indexAddOut = const_cast<aclTensor*>(self);
     auto ret = ACLNN_SUCCESS;
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201) {
         ret = ADD_TO_LAUNCHER_LIST_AICORE(MoeInplaceIndexAdd, OP_INPUT(self, index, source, alphaTensor),
                                           OP_OUTPUT(indexAddOut), OP_ATTR(dim));
     } else {

@@ -76,6 +76,7 @@ public:
             .NeedCheckSupportFlag(false)
             .ExtendCfgInfo("opFile.value", "moe_token_permute_with_routing_map_grad");
         this->AICore().AddConfig("ascend950", config_950);
+        this->AICore().AddConfig("ascend960dt", config_950);
     }
 };
 

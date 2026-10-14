@@ -26,7 +26,7 @@ using namespace op;
  */
 inline static bool IsRegbase(NpuArch npuArch)
 {
-    const static std::set<NpuArch> regbaseNpuArchs = {Ops::Base::DAV_3510, Ops::Base::DAV_5102};
+    const static std::set<NpuArch> regbaseNpuArchs = {Ops::Base::DAV_3510, Ops::Base::DAV_5102, Ops::Base::DAV_9201};
     return regbaseNpuArchs.find(npuArch) != regbaseNpuArchs.end();
 }
 

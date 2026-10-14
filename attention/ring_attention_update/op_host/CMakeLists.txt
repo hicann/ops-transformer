@@ -26,6 +26,14 @@ if (BUILD_OPEN_PROJECT)
                     -mllvm
                     -cce-aicore-dcci-before-kernel-end=false
         )
+    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960dt")
+        add_ops_compile_options(
+            OP_NAME RingAttentionUpdate
+            COMPUTE_UNIT Ascend960DT_968B7
+            OPTIONS --cce-auto-sync=off
+                    -mllvm
+                    -cce-aicore-dcci-before-kernel-end=false
+        )
     endif()
 endif()
 

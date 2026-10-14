@@ -64,6 +64,7 @@ class MoeMaskedScatter : public OpDef {
         .NeedCheckSupportFlag(false)
         .PrecisionReduceFlag(true);
     this->AICore().AddConfig("ascend950", aicore_config);
+    this->AICore().AddConfig("ascend960dt", aicore_config);
   }
 };
 

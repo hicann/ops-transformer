@@ -365,7 +365,8 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(
             // 当设备类型为A2或A3且index为int32类型时，切为InplaceIndexAddWithSorted算子
             bool useNewOp = (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B ||
                              GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910_93 ||
-                             GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) &&
+                             (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+                              GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201)) &&
                             unpermutedTokens->GetViewShape().GetDim(0) < MAX_SORT_SHAPE_DIM &&
                             (unpermutedTokensOut->GetDataType() == op::DataType::DT_BF16 ||
                              unpermutedTokensOut->GetDataType() == op::DataType::DT_FLOAT16 || is910Deterministic);

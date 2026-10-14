@@ -25,7 +25,7 @@ using namespace AscendC;
  */
 __aicore__ inline constexpr uint32_t GetVRegSize()
 {
-#if __CCE_AICORE__ == 310
+#if (__CCE_AICORE__ == 310) || (defined(__NPU_ARCH__) && __NPU_ARCH__ == 9201)
     return AscendC::VECTOR_REG_WIDTH;
 #else
     return 256U;

@@ -62,6 +62,7 @@ public:
             .NeedCheckSupportFlag(false)
             .ExtendCfgInfo("opFile.value", "moe_inplace_index_add_with_sorted");
         this->AICore().AddConfig("ascend950", config_950);
+        this->AICore().AddConfig("ascend960dt", config_950);
     }
 };
 

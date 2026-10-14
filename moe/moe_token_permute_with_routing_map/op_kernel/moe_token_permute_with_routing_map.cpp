@@ -25,7 +25,7 @@
 #include "moe_routing_rank_multi_core.h"
 #include "moe_sortindices_scatter_multi_core.h"
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201)
 #include "arch35/gather_v2_simd_two_dim.h"
 #include "arch35/gather_v2_simt_two_dim.h"
 #endif
@@ -129,7 +129,7 @@ using namespace MoeTokenPermute;
         } \
     } while (0)
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201)
 #define GENERAL_PAD_OP_IMPL_3510(sortClass1, sortClass2, indexCopyClass, ...) \
     do { \
         TPipe sortPipe2; \
@@ -193,7 +193,7 @@ extern "C" __global__ __aicore__ void moe_token_permute_with_routing_map(GM_ADDR
     } else if (TILING_KEY_IS(8)) {
         GENERAL_OP_IMPL(MoeSortMultiCore, MoeSortMultiCore, MoeindexCopySplitDOp, DTYPE_TOKENS, true);
     } else if (TILING_KEY_IS(9)) {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201)
         GENERAL_PAD_OP_IMPL_3510(MoeSortMultiCore, MoeSortMultiCore, MoeindexCopySplitDOp, DTYPE_TOKENS, true);
         AscendC::SyncAll();
         TPipe MoeindexCopyPipe;

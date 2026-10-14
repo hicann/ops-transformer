@@ -14,6 +14,7 @@
  */
 #include "moe_masked_scatter.h"
 #include "opdev/data_type_utils.h"
+#include "op_host/util/op_const_def.h"
 #include "opdev/op_def.h"
 #include "opdev/op_executor.h"
 #include "opdev/make_op_executor.h"
@@ -45,7 +46,8 @@ static bool CheckShapeLimit(const aclTensor* self, const aclTensor* mask)
 static bool IsAiCoreSupport(const aclTensor* self, const aclTensor* mask)
 {
     // 只需要判断dtype
-    auto supportList = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ?
+    auto supportList = (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+                        op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201) ?
                            AICORE_DTYPE_SUPPORT_LIST_950 :
                            AICORE_DTYPE_SUPPORT_LIST;
     bool result = CheckType(self->GetDataType(), supportList);
@@ -60,7 +62,8 @@ static const aclTensor* MoeMaskedScatterAiCore(const aclTensor* self, const aclT
 {
     L0_DFX(MoeMaskedScatterAiCore, self, mask, source, output);
     auto ret = ACLNN_SUCCESS;
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510)
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201)
         ret = ADD_TO_LAUNCHER_LIST_AICORE(MoeMaskedScatter, OP_INPUT(self, mask, source), OP_OUTPUT(output));
     else {
         ret = ADD_TO_LAUNCHER_LIST_AICORE(MaskedScatter, OP_INPUT(self, mask, source), OP_OUTPUT(output));
