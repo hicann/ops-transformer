@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file vf_broadcast_sub_mul_sfag.h
+ * \file vf_broadcast_sub_mul_sfag_arch92.h
  */
 #ifndef MY_BROADCAST_SUB_MUL_INTERFACE_SFAG_H
 #define MY_BROADCAST_SUB_MUL_INTERFACE_SFAG_H

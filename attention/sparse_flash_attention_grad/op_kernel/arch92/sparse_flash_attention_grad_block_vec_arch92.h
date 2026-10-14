@@ -9,17 +9,17 @@
  */
 
 /*!
- * \file sparse_flash_attention_grad_block_vec.h
+ * \file sparse_flash_attention_grad_block_vec_arch92.h
  * \brief
  */
 
 #ifndef SPARSE_FLASH_ATTENTION_GRAD_BLOCK_VEC_H
 #define SPARSE_FLASH_ATTENTION_GRAD_BLOCK_VEC_H
 
-#include "sparse_flash_attention_grad_common.h"
-#include "vector_api/pse_atten_mask_muls_simple_softmax_sfag.h"
-#include "vector_api/vf_broadcast_sub_mul_sfag.h"
-#include "vector_api/vf_cast_transdata_deconflict_sfag.h"
+#include "sparse_flash_attention_grad_common_arch92.h"
+#include "vector_api/pse_atten_mask_muls_simple_softmax_sfag_arch92.h"
+#include "vector_api/vf_broadcast_sub_mul_sfag_arch92.h"
+#include "vector_api/vf_cast_transdata_deconflict_sfag_arch92.h"
 namespace SfagBaseApi {
 constexpr uint32_t NUM_TWO = 2;
 constexpr uint32_t SYNC_V0_V1_DS_A_MAX_DONE_FLAG = 10;
@@ -94,7 +94,7 @@ public:
     constexpr static uint32_t FRACTAL_NZ_C0_SIZE = 32 / sizeof(INPUT_TYPE);
     constexpr static uint32_t DETER_EXCEED_USE_SIZE = 2 * 1024;
     constexpr static uint32_t TOPK_UB_SIZE = SFAG_GATHER_S2_HEAD_N * sizeof(int32_t);
-    // 尾部 +VREG_SIZE 是 ND→NZ 的 bank conflict 规避垫片（见 vf_cast_transdata_deconflict_sfag.h），
+    // 尾部 +VREG_SIZE 是 ND→NZ 的 bank conflict 规避垫片（见 vf_cast_transdata_deconflict_sfag_arch92.h），
     // 与 BASE_M 无关，只跟 srcN/sizeof(INPUT_TYPE) 有关，128 列 b16 下恒为一个 VREG
     constexpr static uint32_t DS_OUT_QUE_SIZE = BASE_M * VREG_SIZE + VREG_SIZE + DETER_EXCEED_USE_SIZE;
     constexpr static uint32_t P_OUT_QUE_SIZE = BASE_M * VREG_SIZE + VREG_SIZE;

@@ -10,11 +10,11 @@
 
 /*!
  * \file softmax_grad_pre_sfag.h
- * \brief D=512 softmaxGrad VF。pre 主流程在 sparse_flash_attention_grad_pre_regbase.h。
+ * \brief D=512 softmaxGrad VF。pre 主流程在 sparse_flash_attention_grad_pre_regbase_arch92.h。
  */
 #ifndef SOFTMAX_GRAD_PRE_SFAG_H
 #define SOFTMAX_GRAD_PRE_SFAG_H
-#include "./vf_softmax_grad_front_cast_sfag.h"
+#include "./vf_softmax_grad_front_cast_sfag_arch92.h"
 
 namespace SfagPreApi {
 using namespace AscendC;

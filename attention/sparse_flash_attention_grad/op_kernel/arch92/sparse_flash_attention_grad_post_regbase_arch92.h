@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file sparse_flash_attention_grad_post_regbase.h
+ * \file sparse_flash_attention_grad_post_regbase_arch92.h
  * \brief
  */
 #ifndef SPARSE_FLASH_ATTENTION_GRAD_POST_KERNEL_REGBASE_H_

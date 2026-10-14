@@ -66,7 +66,7 @@ if(NOT BUILD_OPS_RTY_KERNEL)
         ./arch22/sparse_flash_attention_grad_tiling_bs1_basic.h
         ./arch35/sparse_flash_attention_grad_tiling_bs1_regbase.cpp
         ./arch35/sparse_flash_attention_grad_tiling_bs1_regbase.h
-        ./arch92/sparse_flash_attention_grad_tiling_bs1_regbase.cpp
-        ./arch92/sparse_flash_attention_grad_tiling_bs1_regbase.h
+        ./arch92/sparse_flash_attention_grad_tiling_bs1_regbase_arch92.cpp
+        ./arch92/sparse_flash_attention_grad_tiling_bs1_regbase_arch92.h
     )
 endif()

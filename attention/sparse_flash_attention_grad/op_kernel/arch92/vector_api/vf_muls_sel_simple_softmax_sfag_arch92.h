@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file vf_muls_sel_simple_softmax_sfag.h
+ * \file vf_muls_sel_simple_softmax_sfag_arch92.h
  */
 #ifndef VF_MULS_SEL_SIMPLE_SOFTMAX_SFAG_H
 #define VF_MULS_SEL_SIMPLE_SOFTMAX_SFAG_H

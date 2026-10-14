@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file sparse_flash_attention_grad_tiling_bs1_regbase.cpp
+ * \file sparse_flash_attention_grad_tiling_bs1_regbase_arch92.cpp
  * \brief
  */
 
 #include <set>
-#include "sparse_flash_attention_grad_tiling_bs1_regbase.h"
+#include "sparse_flash_attention_grad_tiling_bs1_regbase_arch92.h"
 #include "op_host/tiling_templates_registry.h"
 #include "op_host/tiling_type.h"
 

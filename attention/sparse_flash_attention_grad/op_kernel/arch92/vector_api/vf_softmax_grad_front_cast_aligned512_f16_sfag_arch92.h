@@ -14,7 +14,7 @@
 #ifndef MY_SOFTMAX_GRAD_CAST_ALIGNED512_F16_INTERFACE_H__SFAG
 #define MY_SOFTMAX_GRAD_CAST_ALIGNED512_F16_INTERFACE_H__SFAG
 #include "kernel_tensor.h"
-#include "vf_common_utils.h"
+#include "vf_common_utils_arch92.h"
 
 namespace AscendC {
 #ifndef __CCE_KT_TEST__

@@ -21,9 +21,9 @@
 #endif
 
 #if SFAG_ARCH92
-#include "arch92/sparse_flash_attention_grad_template_tiling_key.h"
-#include "arch92/sparse_flash_attention_grad_tiling_data_regbase.h"
-#include "arch92/sparse_flash_attention_grad_entry_regbase.h"
+#include "arch92/sparse_flash_attention_grad_template_tiling_key_arch92.h"
+#include "arch92/sparse_flash_attention_grad_tiling_data_regbase_arch92.h"
+#include "arch92/sparse_flash_attention_grad_entry_regbase_arch92.h"
 #elif __CCE_AICORE__ == 310
 #include "arch35/sparse_flash_attention_grad_template_tiling_key.h"
 #include "arch35/sparse_flash_attention_grad_tiling_data_regbase.h"

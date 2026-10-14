@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file sparse_flash_attention_grad_entry_regbase.h
+ * \file sparse_flash_attention_grad_entry_regbase_arch92.h
  * \brief
  */
 
@@ -18,13 +18,13 @@
 
 #include "sparse_flash_attention_grad_arch92_common.h"
 
-#include "sparse_flash_attention_grad_post_regbase.h"
-#include "sparse_flash_attention_grad_pre_regbase.h"
+#include "sparse_flash_attention_grad_post_regbase_arch92.h"
+#include "sparse_flash_attention_grad_pre_regbase_arch92.h"
 #include "kernel_operator.h"
 
-#include "sparse_flash_attention_grad_block_vec.h"
-#include "sparse_flash_attention_grad_block_cube.h"
-#include "sparse_flash_attention_grad_kernel.h"
+#include "sparse_flash_attention_grad_block_vec_arch92.h"
+#include "sparse_flash_attention_grad_block_cube_arch92.h"
+#include "sparse_flash_attention_grad_kernel_arch92.h"
 
 #define INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_REGBASE_IMPL(INPUT_TYPE, CALC_TYPE, OUTDTYPE, IS_DROP, IS_TND, IS_ROPE, \
                                                       IS_DETER, KV_MERGE, IS_SINKS, s2TemplateType, dTemplateType) \

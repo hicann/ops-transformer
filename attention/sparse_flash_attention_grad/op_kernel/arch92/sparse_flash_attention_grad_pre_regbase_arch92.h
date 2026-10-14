@@ -9,15 +9,15 @@
  */
 
 /*!
- * \file sparse_flash_attention_grad_pre_regbase.h
+ * \file sparse_flash_attention_grad_pre_regbase_arch92.h
  * \brief 结构对齐 FAG presfmg：Duplicate 一次 + DoSoftmaxGrad 圈内 CopyIn/VF/CopyDqkv 重叠。
  *        SFAG 仅保留 D=512 连续行、KV_MERGE、sinks。
  */
 #ifndef SPARSE_FLASH_ATTENTION_GRAD_PRE_KERNEL_REGBASE_H_
 #define SPARSE_FLASH_ATTENTION_GRAD_PRE_KERNEL_REGBASE_H_
 #include "kernel_operator.h"
-#include "sparse_flash_attention_grad_common.h"
-#include "vector_api/vf_softmax_grad_front_cast_sfag.h"
+#include "sparse_flash_attention_grad_common_arch92.h"
+#include "vector_api/vf_softmax_grad_front_cast_sfag_arch92.h"
 
 using namespace AscendC;
 

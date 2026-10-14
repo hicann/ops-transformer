@@ -16,8 +16,8 @@
 #ifndef SPARSE_FLASH_ATTENTION_GRAD_KERNEL_BASE_H
 #define SPARSE_FLASH_ATTENTION_GRAD_KERNEL_BASE_H
 
-#include "sparse_flash_attention_grad_common.h"
-#include "sparse_flash_attention_grad_block_cube_nle64.h"
+#include "sparse_flash_attention_grad_common_arch92.h"
+#include "sparse_flash_attention_grad_block_cube_nle64_arch92.h"
 
 namespace SfagBaseApi {
 

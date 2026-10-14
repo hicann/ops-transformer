@@ -9,16 +9,16 @@
  */
 
 /*!
- * \file sparse_flash_attention_grad_kernel.h
+ * \file sparse_flash_attention_grad_kernel_arch92.h
  * \brief
  */
 
 #ifndef SPARSE_FLASH_ATTENTION_GRAD_KERNEL_H
 #define SPARSE_FLASH_ATTENTION_GRAD_KERNEL_H
 
-#include "sparse_flash_attention_grad_common.h"
-#include "sparse_flash_attention_grad_kernel_base.h"
-#include "sparse_flash_attention_grad_tiling_data_regbase.h"
+#include "sparse_flash_attention_grad_common_arch92.h"
+#include "sparse_flash_attention_grad_kernel_base_arch92.h"
+#include "sparse_flash_attention_grad_tiling_data_regbase_arch92.h"
 
 namespace SfagBaseApi {
 

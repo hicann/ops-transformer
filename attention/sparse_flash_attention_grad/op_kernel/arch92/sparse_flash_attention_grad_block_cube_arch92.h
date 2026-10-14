@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file sparse_flash_attention_grad_block_cube.h
+ * \file sparse_flash_attention_grad_block_cube_arch92.h
  * \brief
  */
 

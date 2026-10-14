@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file sparse_flash_attention_grad_common.h
+ * \file sparse_flash_attention_grad_common_arch92.h
  * \brief
  */
 

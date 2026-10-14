@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file vf_common_utils.h
+ * \file vf_common_utils_arch92.h
  * \brief
  */
 #ifndef VF_COMMON_UTILS_H

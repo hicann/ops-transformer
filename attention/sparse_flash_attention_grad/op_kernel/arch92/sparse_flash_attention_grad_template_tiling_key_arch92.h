@@ -9,14 +9,14 @@
  */
 
 /*!
- * \file sparse_flash_attention_grad_template_tiling_key.h
+ * \file sparse_flash_attention_grad_template_tiling_key_arch92.h
  * \brief
  */
 
 #ifndef TEMPLATE_TILING_KEY_SFAG_ARCH92_H_
 #define TEMPLATE_TILING_KEY_SFAG_ARCH92_H_
 #include "ascendc/host_api/tiling/template_argument.h"
-#include "sparse_flash_attention_grad_tiling_data_regbase.h"
+#include "sparse_flash_attention_grad_tiling_data_regbase_arch92.h"
 
 // kernel通过宏定义隔离dtype编译tilingkey，降低耗时。tiling侧没有相关宏
 #ifndef ORIG_DTYPE_QUERY

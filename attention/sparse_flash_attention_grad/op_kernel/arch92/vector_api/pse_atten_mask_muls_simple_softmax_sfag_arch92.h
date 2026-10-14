@@ -9,13 +9,13 @@
  */
 
 /*!
- * \file pse_atten_mask_muls_simple_softmax_sfag.h
+ * \file pse_atten_mask_muls_simple_softmax_sfag_arch92.h
  */
 
 #ifndef PSE_ATTEN_MASK_MULS_SIMPLE_SOFTMAX__SFAG
 #define PSE_ATTEN_MASK_MULS_SIMPLE_SOFTMAX__SFAG
 #include "../sparse_flash_attention_grad_arch92_common.h"
-#include "vf_muls_sel_simple_softmax_sfag.h"
+#include "vf_muls_sel_simple_softmax_sfag_arch92.h"
 
 using namespace commondef;
 

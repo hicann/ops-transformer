@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file vf_softmax_grad_front_cast_sfag.h
+ * \file vf_softmax_grad_front_cast_sfag_arch92.h
  */
 #ifndef MY_SOFTMAX_GRAD_CAST_INTERFACE_H__SFAG
 #define MY_SOFTMAX_GRAD_CAST_INTERFACE_H__SFAG
 #include "kernel_tensor.h"
-#include "vf_softmax_grad_front_cast_aligned512_f16_sfag.h"
+#include "vf_softmax_grad_front_cast_aligned512_f16_sfag_arch92.h"
 
 namespace AscendC {
 #ifndef __CCE_KT_TEST__

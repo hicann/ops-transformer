@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file sparse_flash_attention_grad_block_cube_nle64.h
+ * \file sparse_flash_attention_grad_block_cube_nle64_arch92.h
  * \brief Cube block specialized for gSize/N <= 64 (KV resident in L1).
  */
 
@@ -19,7 +19,7 @@
 #include "../../../common/op_kernel/matmul.h"
 #include "../../../common/op_kernel/FixpipeOut.h"
 #include "../../../common/op_kernel/arch35/util_regbase.h"
-#include "sparse_flash_attention_grad_common.h"
+#include "sparse_flash_attention_grad_common_arch92.h"
 #include "sparse_flash_attention_grad_arch92_common.h"
 
 using namespace commondef;
