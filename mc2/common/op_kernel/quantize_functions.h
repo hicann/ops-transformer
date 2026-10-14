@@ -289,14 +289,16 @@ __aicore__ inline void ComputeScaleClip(__ubuf__ uint16_t* maxExpAddr, __ubuf__ 
         Reg::MaskReg p0;
         Reg::MaskReg p1;
         Reg::MaskReg p2;
-        // Reg::MaskReg maskHalf = Reg::CreateMask<uint16_t>();
-        uint32_t B16_HALF_MASK_ELEMENT_NUM = 64;
-        Reg::MaskReg dataMaskB16Half = Reg::UpdateMask<uint16_t>(B16_HALF_MASK_ELEMENT_NUM);
         Reg::MaskReg maskFloat = Reg::CreateMask<uint32_t>();
 
         static constexpr Reg::CastTrait castTraitHalf2Float = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
                                                                Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
         for (uint16_t i = 0; i < loopNumScale; i++) {
+            // 末尾批次可能不足 vlForHalfNumber(64) 个 scale，按当前批次实际有效数量生成 mask，
+            // 避免 StoreAlign 按固定 64 元素写入、越界覆盖后续三元组区域
+            uint32_t curValidScale = totalScaleInUB - i * vlForHalfNumber;
+            curValidScale = curValidScale < vlForHalfNumber ? curValidScale : vlForHalfNumber;
+            Reg::MaskReg dataMaskB16Half = Reg::UpdateMask<uint16_t>(curValidScale);
             // 单搬 64 个数
             Reg::LoadAlign<uint16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK_B16>(
                 max16, maxExpAddr, vlForHalfNumber);
