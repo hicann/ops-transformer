@@ -10,7 +10,7 @@
 
 - **调用方式**：
 
-  调用torch\_extension接口时，依赖`cann-ops-transformer`模块，定义在`${INSTALL_DIR}/python/sitepackage/cann-ops-transformer`，\$\{INSTALL\_DIR\}表示CANN安装后文件路径。
+  调用torch\_extension接口时，依赖`cann-ops-transformer`模块，定义在`${INSTALL_DIR}/python/sitepackages/cann-ops-transformer`，\$\{INSTALL\_DIR\}表示CANN安装后文件路径。
 
   ```python
   import torch

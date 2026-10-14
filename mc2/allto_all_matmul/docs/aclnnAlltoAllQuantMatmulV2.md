@@ -247,7 +247,7 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
     <tr>
     <td>group</td>
     <td>输入</td>
-    <td>Host侧标识列组的字符串，即通信域名称，通过Hccl接口HcclGetCommName获取commName作为该参数。</td>
+    <td>Host侧标识组的字符串，即通信域名称，通过Hccl接口HcclGetCommName获取commName作为该参数。</td>
     <td>字符串长度要求(0, 128)。</td>
     <td>-</td>
     <td>-</td>
@@ -650,8 +650,8 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
    <!-- end id20 -->
    <!-- npu="950" id21 -->
    - <term>Ascend 950PR&950DT系列产品</term>：
-      - 支持CCU通信和AI_CPU通信。
-      - CCU通信仅支持单机UB域内互联，AI_CPU可支持跨机UB域内互联。
+      - 支持CCU通信和AI CPU通信。
+      - CCU通信仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
       - 通信域约束：同一个通信域内只能使用同一种通信方式。
 
    <!-- end id21 -->

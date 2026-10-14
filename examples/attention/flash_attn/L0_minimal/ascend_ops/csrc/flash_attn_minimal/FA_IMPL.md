@@ -28,7 +28,7 @@ GQA 映射：Cube 和 Vector 在每个 BN1 迭代内通过 `n2Head = n1Head * N2
 for bn1 in range(start, end):          ← 当前 core 负责的 head 区间
     bIdx   = bn1 / N1
     n1Head = bn1 % N1
-    n2Head = n1Head * N2 / N1          ← GQA：query head → KV head 映射
+    n2Head = n1Head * N2 / N1          ← GQA:query head → KV head 映射
     for s1Block in range(numS1Blocks):  ← num S1 blocks = ceil(S1/M_BASE)
         for s2Block in range(numS2Blocks):  ← num S2 blocks = ceil(S2/N_BASE)
             C1(s1Block,s2Block) → V1 → C2 → V2   ← 顺序执行，无软件流水

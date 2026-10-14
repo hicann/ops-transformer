@@ -342,10 +342,10 @@ aclnnStatus aclnnGroupedMatMulAlltoAllv(
 - 通信引擎约束：
 
   <!-- npu="A3" id7 -->
-  - Atlas A3系列产品：支持 AI_CPU 通信。
+  - Atlas A3系列产品：支持 AI CPU 通信。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
-  - Ascend 950DT系列产品：支持 AI_CPU 通信。
+  - Ascend 950DT系列产品：支持 AI CPU 通信。
 
   <!-- end id8 -->
 

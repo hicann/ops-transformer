@@ -569,7 +569,7 @@ aclnnStatus aclnnQuantMatmulAlltoAllV2(
     * 维度约束：
       * H1范围仅支持[1, 65535]。
       * mx量化场景下，x2必须转置，shape为(H2, H1)，transposeX2为True。
-      * mx量化场景下，且x1和x2输入为FLOAT4_E2M1时，H1必须是偶数，且ceil(H1/32)必须是偶数。
+      * mx量化场景下，x1和x2输入为FLOAT4_E2M1时，H1必须是偶数，且ceil(H1/32)必须是偶数。
   <!-- end id17 -->
 
 * 通算融合算子不支持并发调用，不同的通算融合算子也不支持并发调用。
@@ -591,7 +591,7 @@ aclnnStatus aclnnQuantMatmulAlltoAllV2(
    <!-- npu="950" id21 -->
    - <term>Ascend 950PR&950DT系列产品</term>：
       - 支持CCU通信和AI\_CPU通信。
-      - CCU仅支持单机UB域内互联，AI_CPU可支持跨机UB域内互联。
+      - CCU仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
       - 通信域约束：同一个通信域内只能使用同一种通信方式。
 
    <!-- end id21 -->

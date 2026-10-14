@@ -372,13 +372,13 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
 - 通信引擎约束：
 
   <!-- npu="A3" id10 -->
-  - Atlas A3系列产品：支持AI_CPU通信和AIV通信。
+  - Atlas A3系列产品：支持AI CPU通信和AIV通信。
   <!-- end id10 -->
   <!-- npu="910b" id11 -->
   - Atlas A2系列产品：仅支持AIV通信。
   <!-- end id11 -->
   <!-- npu="950" id12 -->
-  - Ascend 950DT系列产品：支持 CCU 通信和 AI_CPU 通信，CCU 仅支持单机 UB 域内互联，AI_CPU 可支持跨机 UB 域内互联。
+  - Ascend 950DT系列产品：支持 CCU 通信和 AI CPU 通信，CCU 仅支持单机 UB 域内互联，AI CPU 可支持跨机 UB 域内互联。
 
   <!-- end id12 -->
 

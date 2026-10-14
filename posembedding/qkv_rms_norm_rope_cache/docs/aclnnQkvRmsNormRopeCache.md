@@ -242,7 +242,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
     <tr>
       <td>qOut</td>
       <td>输入\输出</td>
-      <td>提请申请的cache，输入输出同地址复用。</td>
+      <td>提前申请的cache，输入输出同地址复用。</td>
       <td><ul><li>不支持空Tensor。</li><li>与输入qkv的数据类型相同。</li><li>shape为[B<sub>qkv</sub> * S<sub>qkv</sub>, N<sub>q</sub> * D<sub>qkv</sub>]。</li></ul></td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
@@ -252,7 +252,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
     <tr>
       <td>kCache</td>
       <td>输入\输出</td>
-      <td>提请申请的cache，输入输出同地址复用。</td>
+      <td>提前申请的cache，输入输出同地址复用。</td>
       <td><ul><li>不支持空Tensor。</li><li>与输入qkv的数据类型相同（k不量化），或者INT8（k量化）。</li><li>shape为[BlockNum, N<sub>k</sub> * D<sub>qkv</sub> // 16, BlockSize, 16]（k不量化），或者[BlockNum, N<sub>k</sub> * D<sub>qkv</sub> // 32, BlockSize, 32]（k量化）。</li></ul></td>
       <td>FLOAT16、BFLOAT16、INT8</td>
       <td>ND</td>
@@ -262,7 +262,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
     <tr>
       <td>vCache</td>
       <td>输入\输出</td>
-      <td>提请申请的cache，输入输出同地址复用。</td>
+      <td>提前申请的cache，输入输出同地址复用。</td>
       <td><ul><li>不支持空Tensor。</li><li>与输入qkv的数据类型相同（v不量化），或者INT8（v量化）。</li><li>shape为[BlockNum, N<sub>k</sub> * D<sub>qkv</sub> // 16, BlockSize, 16]（v不量化），或者[BlockNum, N<sub>k</sub> * D<sub>qkv</sub> // 32, BlockSize, 32]（v量化）。</li></ul></td>
       <td>FLOAT16、BFLOAT16、INT8</td>
       <td>ND</td>

@@ -27,7 +27,7 @@
     <th style="width:37.5%;">Ascend 950（以 Ascend950PR Server 档为例）</th>
   </tr>
   <tr>
-    <td rowspan="4">AICore</td>
+    <td rowspan="4">AI Core</td>
     <td>Cube核数</td>
     <td>24</td>
     <td>32</td>

@@ -393,12 +393,12 @@ aclnnStatus aclnnAlltoAllMatmulV2(
    - <term>Atlas A2系列产品</term>：支持MTE通信。
    <!-- end id24 -->
    <!-- npu="A3" id25 -->
-   - <term>Atlas A3系列产品</term>  ：支持AI_CPU通信。
+   - <term>Atlas A3系列产品</term>  ：支持AI CPU通信。
    <!-- end id25 -->
    <!-- npu="950" id26 -->
    - <term>Ascend 950PR&950DT系列产品</term>：
-      - 支持CCU通信和AI_CPU通信。
-      - CCU通信仅支持单机UB域内互联，AI_CPU可支持跨机UB域内互联。
+      - 支持CCU通信和AI CPU通信。
+      - CCU通信仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
       - 通信域约束：同一个通信域内只能使用同一种通信方式。
 
    <!-- end id26 -->

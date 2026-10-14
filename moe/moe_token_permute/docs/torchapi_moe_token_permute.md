@@ -75,9 +75,9 @@ permuted_tokens, sorted_indices, expanded_scale
 F = indices.numel()
 H = tokens.shape[1]
 
-num_out_tokens is None或num_out_tokens == 0：M = F
-num_out_tokens > 0：                              M = min(num_out_tokens, F)
-num_out_tokens < 0：                              M = max(F + num_out_tokens, 0)
+num_out_tokens is None或num_out_tokens == 0:M = F
+num_out_tokens > 0:                              M = min(num_out_tokens, F)
+num_out_tokens < 0:                              M = max(F + num_out_tokens, 0)
 ```
 
 各量化模式的输出如下：

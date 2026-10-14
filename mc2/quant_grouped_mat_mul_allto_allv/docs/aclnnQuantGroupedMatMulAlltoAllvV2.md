@@ -535,10 +535,10 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
 - 通信引擎约束：
 
   <!-- npu="950" id8 -->
-  - Ascend 950DT系列产品：支持 CCU 通信和 AI_CPU 通信，CCU 仅支持单机 UB 域内互联，AI_CPU 可支持跨机 UB 域内互联。
+  - Ascend 950DT系列产品：支持CCU通信和AI CPU通信，CCU仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
   <!-- end id8 -->
 
-- e * epWorldSize 乘积最大支持 256，其中 e（单卡专家数），最大支持 32，epWorldSize 支持 2/4/8/16/32/64/128/256;
+- e * epWorldSize 乘积最大支持256，其中e（单卡专家数），最大支持32，epWorldSize支持2/4/8/16/32/64/128/256;
 - gmmX的shape(A, H1)，A为sendCounts之和，H1取值范围(0, 65536);
 - gmmWeight的shape(e, H1, N1)，N1取值范围(0, 65536);
 - y的shape为(BSK, N1)，第一维其中K的范围[2, 8]，BSK为recvCounts之和;

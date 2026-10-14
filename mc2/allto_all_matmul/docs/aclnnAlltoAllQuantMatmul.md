@@ -615,7 +615,7 @@ aclnnStatus aclnnAlltoAllQuantMatmul(
    - <term>Atlas A2系列产品</term>：支持MTE通信，且通信缓冲区大于等于200MB。
    <!-- end id16 -->
    <!-- npu="950" id17 -->
-   - <term>Ascend 950PR&950DT系列产品</term>：支持AI_CPU通信。
+   - <term>Ascend 950PR&950DT系列产品</term>：支持AI CPU通信。
 
    <!-- end id17 -->
 

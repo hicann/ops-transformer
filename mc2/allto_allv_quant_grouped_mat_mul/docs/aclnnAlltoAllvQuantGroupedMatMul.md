@@ -482,7 +482,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMul(
 
 ## 约束说明
 
-- 通信引擎约束：仅支持 AI_CPU 通信。
+- 通信引擎约束：仅支持 AI CPU 通信。
 
 - 确定性计算：
   - `aclnnAlltoAllvQuantGroupedMatMul`默认确定性实现。

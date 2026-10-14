@@ -166,7 +166,7 @@
 
 - 通信引擎约束：
   - <term>Atlas A3系列产品</term>：支持AICPU通信。
-  - <term>Ascend 950DT系列产品</term>：支持CCU通信和AICPU通信，CCU仅支持单机UB域内互联，AI_CPU可支持跨机UB域内互联。
+  - <term>Ascend 950DT系列产品</term>：支持CCU通信和AICPU通信，CCU仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
 
 - 确定性计算：
   - aclnnAlltoAllvGroupedMatMul默认确定性实现。

@@ -32,13 +32,13 @@
     ataOut = AllToAllV(expandX)\\
     $$
 
-    按MoeDistributeDispatchSetup和MoeDistributeDispatchTeardown算子收集数据的路径原路返还，本算子只做通信状态和通信数据的发送，数据发送后即刻退出，无需等待通信完成，通信状态确认和数据后处理由aclnnMoeDistributeCombineTeardown完成。
+    按MoeDistributeDispatchSetup和MoeDistributeDispatchTeardown算子收集数据的路径原路返回，本算子只做通信状态和通信数据的发送，数据发送后即刻退出，无需等待通信完成，通信状态确认和数据后处理由aclnnMoeDistributeCombineTeardown完成。
 
 - **注意**：该接口必须与aclnnMoeDistributeDispatchSetup、aclnnMoeDistributeDispatchTeardown及aclnnMoeDistributeCombineTeardown配套使用。
 
 ## 函数原型
 
-该算子分为两段式接口，必须先调用“`aclnnMoeDistributeCombineSetupGetWorkspaceSize`”接口获取入参并根据计算流程计算所需workspace大小获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“`aclnnMoeDistributeCombineSetup`”接口执行计算。为用户提供“aclnnMoeDistributeCombineSetupTeardownCalcOutputSize”接口计算“aclnnMoeDistributeCombineSetup”部分输出的size大小。
+该算子分为两段式接口，必须先调用“`aclnnMoeDistributeCombineSetupGetWorkspaceSize`”接口获取入参并根据计算流程获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“`aclnnMoeDistributeCombineSetup`”接口执行计算。为用户提供“aclnnMoeDistributeCombineSetupTeardownCalcOutputSize”接口计算“aclnnMoeDistributeCombineSetup”部分输出的size大小。
 
 ```cpp
 aclnnStatus aclnnMoeDistributeCombineSetupGetWorkspaceSize(

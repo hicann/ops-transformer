@@ -236,7 +236,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>groupSize（int64_t）</td>
         <td>输入</td>
         <td>用于表示反量化中x1Scale/x2Scale输入的一个数在其所在的对应维度方向上可以用于该方向x1/x2输入的多少个数的反量化。</td>
-        <td>groupSize输入由3个方向的groupSizeM、groupSizeN、groupSizeK三个值拼接组成，每个值占16位，计算公式为groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32。</td>
+        <td>groupSize输入由groupSizeM、groupSizeN、groupSizeK三个值拼接组成，每个值占16位，计算公式为groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32。</td>
         <td>-</td>
         <td>-</td>
         <td>-</td>

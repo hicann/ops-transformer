@@ -502,7 +502,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2(
 
 ## 约束说明
 
-- 通信引擎约束：支持 CCU 通信和 AI_CPU 通信，CCU 仅支持单机 UB 域内互联，AI_CPU 可支持跨机 UB 域内互联。
+- 通信引擎约束：支持 CCU 通信和 AI CPU 通信，CCU 仅支持单机 UB 域内互联，AI CPU 可支持跨机 UB 域内互联。
 
 - 确定性计算：
   - `aclnnAlltoAllvQuantGroupedMatMulV2`默认确定性实现。
