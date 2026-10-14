@@ -267,7 +267,7 @@ moe_distribute_dispatch_v2_generic Kernel基于HCCL Window机制实现MoE分发�
 
 ### Context在Kernel内的使用
 
-在Kernel内，context addr取代了`GetBaseWindAddrByRankId()`函数获取目标rank的Window地址：当使用Context方式时，直接从根据对端rankID从`mc2Context_->epHcclBuffer_[rankId]`数组获取。
+在Kernel内，context addr取代了`GetBaseWindAddrByRankId()`函数获取目标rank的Window地址：当使用Context方式时，直接根据对端rankID从`mc2Context_->epHcclBuffer_[rankId]`数组获取。
 
 获取对端地址后，前1MB作为状态区地址，后面作为数据区地址。
 

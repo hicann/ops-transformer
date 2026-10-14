@@ -257,7 +257,7 @@ x1QuantMode、x2QuantMode、commQuantMode的枚举值与[量化模式](../../doc
 * x1、x2和bias计算输入的数据类型根据不同设备型号有不同的限制：
     - <term>Atlas A2系列产品</term>：
         - 非量化场景下，x1/x2计算输入的数据类型为FLOAT16时，bias计算输入的数据类型支持FLOAT16；x1/x2计算输入的数据类型为BFLOAT16时，bias计算输入的数据类型支持FLOAT32。
-        - 量化场景下，支持K-C量化模式后加bias，x1、x2计算输入的数据类型必须为INT8；output计算输出的数据类型为BFLOAT16时，bias的数据类型为FLOAT或BFLOAT16；output的数据类型为FLOAT16时，bias的数据类型为FLOAT16。
+        - 量化场景下，支持K-C量化模式后加bias，x1、x2计算输入的数据类型必须为INT8；output计算输出的数据类型为BFLOAT16时，bias的数据类型为FLOAT32或BFLOAT16；output的数据类型为FLOAT16时，bias的数据类型为FLOAT16。
     - <term>Atlas A3系列产品</term>  ：
         - 非量化场景下，output计算输出的数据类型为FLOAT16时，bias计算输入的数据类型支持FLOAT16；output计算输出的数据类型为BFLOAT16时，bias计算输入的数据类型支持FLOAT32。
         - A3目前不支持量化场景。

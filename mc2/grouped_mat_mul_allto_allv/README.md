@@ -152,7 +152,7 @@
 
 - 通信引擎约束：
   - <term>Atlas A2系列产品</term>：仅支持AIV通信
-  - <term>Atlas A3系列产品</term>：支持AI_CPU通信和AIV通信。
+  - <term>Atlas A3系列产品</term>：支持AI CPU通信和AIV通信。
   - <term>Ascend 950DT系列产品</term>：支持CCU通信和AI_CPU通信，CCCU仅支持单机UB域内互联，AI_CPU可支持跨机UB域内互联。
 
 - 参数说明里shape使用的变量：

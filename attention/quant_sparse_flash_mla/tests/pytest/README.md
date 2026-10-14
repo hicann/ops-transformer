@@ -39,7 +39,7 @@
 单用例测试：
 
 - test_quant_sparse_flash_mla_single.py              # pytest测试单用例运行主程序
-- quant_sparse_flash_mla_paramset.py                 # 单用例入参数配置
+- quant_sparse_flash_mla_paramset.py                 # 单用例入参配置
 
 批量测试：
 

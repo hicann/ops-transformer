@@ -245,7 +245,7 @@
     <tr>
       <td>head_nums</td>
       <td>属性</td>
-      <td>按[N<sub>q</sub>, N<sub>k</sub>, N<sub>v</sub>]顺序传入，提供输入参数qkv矩阵中，qkv分量单元中分的N维度具体尺寸。</td>
+      <td>按[N<sub>q</sub>, N<sub>k</sub>, N<sub>v</sub>]顺序传入，提供输入参数qkv矩阵中，qkv分量单元中N维度的具体尺寸。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>

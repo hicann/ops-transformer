@@ -215,7 +215,7 @@
     <tr>
       <td style="white-space: nowrap">kOut</td>
       <td style="white-space: nowrap">输出</td>
-      <td style="white-space: nowrap">表示输入的qkv进行切分的长度。</td>
+      <td style="white-space: nowrap">表示经过处理的k，Device侧的aclTensor。</td>
       <td style="white-space: nowrap">FLOAT16、BFLOAT16</td>
       <td style="white-space: nowrap">ND</td>
     </tr>

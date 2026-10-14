@@ -279,7 +279,7 @@
         - `epWorldSize`：取值支持16、32、64。
         - `moeExpertNum`：需满足`moeExpertNum` / `epWorldSize` <= 24。
             - 环境变量`HCCL_INTRA_PCIE_ENABLE` = 1和`HCCL_INTRA_ROCE_ENABLE` = 0时，无上述约束。
-        - `globalBS`：当每个rank的`BS`数一致时，`globalBS` = `BS` *`epWorldSize`或`globalBS` = 0；当每个rank的`BS`数不一致时，`globalBS` = `maxBS`* `epWorldSize`或者`globalBS` = 256 *`epWorldSize`，其中`maxBS`表示表示单rank `BS`最大值，建议按`maxBS`* `epWorldSize`传入，固定按256 * `epWorldSize`传入在后续版本BS支持大于256的场景下会无法支持。
+        - `globalBS`：当每个rank的`BS`数一致时，`globalBS` = `BS` *`epWorldSize`或`globalBS` = 0；当每个rank的`BS`数不一致时，`globalBS` = `maxBS`* `epWorldSize`或者`globalBS` = 256 *`epWorldSize`，其中`maxBS`表示单rank `BS`最大值，建议按`maxBS`* `epWorldSize`传入，固定按256 * `epWorldSize`传入在后续版本BS支持大于256的场景下会无法支持。
         - `commQuantMode`取值范围0或2，0表示通信不量化，2表示通信int8量化（2仅当HCCL_INTRA_PCIE_ENABLE=1、HCCL_INTRA_ROCE_ENABLE=0且驱动版本≥25.0.RC1.1时支持）。
     - 组网约束：多机场景仅支持交换机组网，不支持双机直连组网。
 

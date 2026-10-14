@@ -15,7 +15,7 @@
 
 - 算子功能：根据topkIndices对key和value选取大小为selectedBlockSize的数据重排，接着进行训练场景下计算注意力的反向输出。
 
-- 计算公式：根据传入的topkIndice对keyIn和value选取数量为selectedBlockCount个大小为selectedBlockSize的数据重排，公式如下：
+- 计算公式：根据传入的topkIndice对keyIn和value选取selectedBlockCount个大小为selectedBlockSize的数据重排，公式如下：
 
   $$
    selectedKey\text{ }=\text{ }Gather \left( key,topkIndices \left[ i \left]  \left) ,\text{ }0\text{ } < =i < \text{ }selectBlockCount\right. \right. \right. \right.

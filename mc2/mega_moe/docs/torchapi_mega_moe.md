@@ -716,7 +716,7 @@ sym_buffer.update_group(group) -> None
         <td>max_recv_token_num</td>
         <td>int</td>
         <td>可选</td>
-        <td>每个Rank最大可接收Token数，默认值为0表示自动计算。默认值为0。</td>
+        <td>每个Rank最大可接收Token数，默认值为0表示自动计算。</td>
     </tr>
     <tr>
         <td>dispatch_quant_mode</td>

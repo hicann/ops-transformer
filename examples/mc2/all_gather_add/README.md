@@ -116,7 +116,7 @@
 
 ## 调用说明
 
-调用本算子前，请确保已本地下载代码仓，并安装好如下基础依赖、NPU驱动和固件已安装。
+调用本算子前，请确保已本地下载代码仓，并安装好如下基础依赖、NPU驱动和固件。
 
 本项目源码编译用到的依赖如下，请参考[算子调用](../../../docs/zh/invocation/quick_op_invocation.md)文档中的**前提条件**和**环境准备**章节，完成环境依赖的下载和CANN包的准备，其中，**环境准备**章节中的**安装最新版CANN ops-math包**部分可以跳过。
 
@@ -201,7 +201,7 @@
 - **注意事项**
     - 本示例算子仅接受固定shape的tensor为参数，且仅支持在2个昇腾AI处理器上执行。
 
-      本算子执行代码[test_aclnn_all_gather_add.cpp](examples/test_aclnn_all_gather_add.cpp)中的rankId为昇腾AI处理器的逻辑ID，代码中的rankId被赋值为0，1使得算子在ID为：0、1的昇腾AI处理器上执行算子，实际执行过程中可能存在多个进程竞争处理器0、1的问题，导致如下错误：
+      本算子执行代码[test_aclnn_all_gather_add.cpp](examples/test_aclnn_all_gather_add.cpp)中的rankId为昇腾AI处理器的逻辑ID，代码中的rankId被赋值为0，1使得算子在ID为：0、1的昇腾AI处理器上执行，实际执行过程中可能存在多个进程竞争处理器0、1的问题，导致如下错误：
 
         ```bash
         [ERROR] HcclCommInit failed. ret = 4

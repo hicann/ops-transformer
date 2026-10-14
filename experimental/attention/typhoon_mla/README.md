@@ -1,7 +1,7 @@
 
 ## TyphoonMLA
 
-TyphoonMLA is a mixed naive-absorb MLA kernel for shared prefix. For more technical details on TyphoonMLA, check out our preprint [paper](arxiv.org/abs/2509.21081).
+TyphoonMLA is a mixed naive-absorb MLA kernel for shared prefix. For more technical details on TyphoonMLA, check out our preprint [paper](https://arxiv.org/abs/2509.21081).
 
 ### Folder structure
 
@@ -28,7 +28,7 @@ typhoon_mla/
 ### Requirements
 
 * CATLASS v1.0.0
-* CANN toolkit 
+* CANN toolkit
 * CANN-NNAL (required for TorchNPU absorb baseline)
 * Torch & TorchNPU
 
@@ -38,7 +38,7 @@ typhoon_mla/
 
 ```
 git clone https://gitee.com/ascend/catlass.git
-cd catlass 
+cd catlass
 git checkout v1.0.0
 export CATLASS_DIR=$(pwd)
 cd ..
@@ -48,7 +48,7 @@ cd ..
 
 ```
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-source /usr/local/Ascend/driver/bin/setenv.bash 
+source /usr/local/Ascend/driver/bin/setenv.bash
 source /usr/local/Ascend/nnal/atb/set_env.sh # Required for the torch_npu absorb baseline
 ```
 
@@ -63,7 +63,7 @@ cd ..
 ### Run TyphoonMLA kernel
 
 ```
-python example.py 
+python example.py
 ```
 
 ### Verify functional correctness

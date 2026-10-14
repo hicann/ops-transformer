@@ -13,7 +13,7 @@
 
 ## 功能说明
 
-- 算子功能：该算子为AICPU算子，是`SparseFlashMlaSoftmaxL1Norm`算子的前置算子。根据`SparseFlashMlaSoftmaxL1Norm`算子的输入shape、layout、mask和压缩比例信息，计算并输出分核切分metadata，减少主算子tiling阶段对host array的访问。
+- 算子功能：该算子为AI CPU算子，是`SparseFlashMlaSoftmaxL1Norm`算子的前置算子。根据`SparseFlashMlaSoftmaxL1Norm`算子的输入shape、layout、mask和压缩比例信息，计算并输出分核切分metadata，减少主算子tiling阶段对host array的访问。
 
   **该算子不建议单独使用，建议与`SparseFlashMlaSoftmaxL1Norm`算子配合使用，形成完整的工作流。**
 

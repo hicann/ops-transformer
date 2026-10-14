@@ -134,7 +134,7 @@
     - kvCache的搬运起点计算公式为：Smax - kvPaddingSize - actualSeqLengths；kvCache的搬运终点计算公式为：Smax - kvPaddingSize。其中kvCache的搬运起点或终点小于0时，返回数据结果为全0。
     - kvPaddingSize小于0时将被置为0。
     - 需要与actualSeqLengths参数一起开启，否则默认为kv右padding场景。
-    - 与Attention Mask参数一起开启时，需要保证Attention Mask含义正确，即能够正确的对无效数据进行隐藏。否则将引入精度问题。
+    - 与Attention Mask参数一起开启时，需要保证Attention Mask含义正确，即能够正确地对无效数据进行隐藏。否则将引入精度问题。
 
 ## 调用说明
 

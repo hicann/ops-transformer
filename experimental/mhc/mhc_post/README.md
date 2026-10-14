@@ -1,4 +1,4 @@
-# mhc_post AscendC Operator
+# mhc_post Ascend C Operator
 
 Broadcast single stream to multiple streams with per-stream scaling (post-connection in mHC).
 

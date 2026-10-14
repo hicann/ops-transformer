@@ -52,7 +52,7 @@
     <tr>
     <td style="white-space: nowrap">layerId</td>
     <td style="white-space: nowrap">输入</td>
-    <td style="white-space: nowrap">表示当前模型层数的Id，1D Tensor，shape为 <code>(X, )。</code></td>
+    <td style="white-space: nowrap">表示当前模型层的Id，1D Tensor，shape为 <code>(X, )。</code></td>
     <td style="white-space: nowrap">INT32</td>
     <td style="white-space: nowrap">ND</td>
     </tr>

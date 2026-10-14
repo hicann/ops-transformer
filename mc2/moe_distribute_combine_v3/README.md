@@ -320,7 +320,7 @@
 
 - 在不同产品型号、不同通信算法或不同版本中，`MoeDistributeDispatchV3`的Tensor输出`assist_info_for_combine_out`、`ep_recv_counts_out`、`expand_scales_out`中的元素值可能不同，使用时直接将上述Tensor传给`CombineV3`系列算子对应参数即可，模型其他业务逻辑不应对其存在依赖。`tp_recv_counts_out`为预留输出，当前版本不支持，传空指针即可。
 
-- 调用算子过程中使用的`ep_world_size`、`moe_expert_num`、`ccl_buffer_size`、`expert_shard_type`、`shared_expert_num`、`shared_expert_num`、`global_bs`、`comm_alg`参数取值所有卡需保持一致，网络中不同层中也需保持一致，且和`MoeDistributeDispatchV3`算子对应参数也保持一致。`tp_world_size`为预留参数，当前版本不支持。
+- 调用算子过程中使用的`ep_world_size`、`moe_expert_num`、`ccl_buffer_size`、`expert_shard_type`、`shared_expert_num`、`global_bs`、`comm_alg`参数取值所有卡需保持一致，网络中不同层中也需保持一致，且和`MoeDistributeDispatchV3`算子对应参数也保持一致。`tp_world_size`为预留参数，当前版本不支持。
 
 - 参数说明里shape格式说明：
     - `A`：表示本卡可能接收的最大token数量，取值范围如下：

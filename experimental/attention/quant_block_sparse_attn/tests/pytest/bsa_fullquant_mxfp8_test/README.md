@@ -77,7 +77,7 @@ python experimental/attention/quant_block_sparse_attn/tests/pytest/bsa_fullquant
 | `Case` | case 名称 |
 
 其中 `mfu*time` 在每个 case 的数据生成阶段会同时打印 FLOPS 与算力的完整计算过程，包括基本块数量、
-基本块 shape、单基本块计算量、FLOPS 公式、最小分型 shape、算力公式，以及最终
+基本块 shape、单基本块计算量、FLOPS 公式、最小分形 shape、算力公式，以及最终
 `FLOPS / 算力 = MFU * 时间(us)`。
 
 ## 指定单个 Case

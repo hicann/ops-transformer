@@ -555,7 +555,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
       if is_quant:
           expand_x = expand_x.to(input_dtype)
 
-      # 再调用combine，将dispatch的输出原路返回回收：assist_info_for_combine、ep_recv_counts直接配套传入，按topk_weights乘权重再相加
+      # 再调用combine，将dispatch的输出原路返回：assist_info_for_combine、ep_recv_counts直接配套传入，按topk_weights乘权重再相加
       x = distribute_buffer.low_latency_combine(x=expand_x,
                                               topk_idx=topk_idx,
                                               topk_weights=topk_weights,

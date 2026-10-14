@@ -15,7 +15,7 @@
 
 ## 功能说明
 
-- 算子功能：根据sortedIndices存储的下标位置，去获取permutedTokens中的输入数据与probs相乘，并进行合并累加。
+- 算子功能：根据sortedIndices存储的下标位置，获取permutedTokens中的输入数据与probs相乘，并进行合并累加。
 - 计算公式：
 
 $$
