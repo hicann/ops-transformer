@@ -472,8 +472,8 @@ __simd_vf__ inline void ProcessVec1Dn64VF(__ubuf__ T2* x_exp, __ubuf__ float* in
                 Cast<T2, T, castTraitZero>(vreg_exp_cast_2, vreg_exp_2, preg_input);
                 Cast<T2, T, castTraitZero>(vreg_exp_cast_3, vreg_exp_3, preg_input);
             }
-            DeInterleaveV2<T2, Reg::HighLowPart::LOWEST>(vreg_exp_pack_0, vreg_exp_cast_0, vreg_exp_cast_1);
-            DeInterleaveV2<T2, Reg::HighLowPart::LOWEST>(vreg_exp_pack_1, vreg_exp_cast_2, vreg_exp_cast_3);
+            DeInterleave<T2, Reg::HighLowPart::LOWEST>(vreg_exp_pack_0, vreg_exp_cast_0, vreg_exp_cast_1);
+            DeInterleave<T2, Reg::HighLowPart::LOWEST>(vreg_exp_pack_1, vreg_exp_cast_2, vreg_exp_cast_3);
 
             /* vreg_exp_pack_0会不连续的存储在x_exp上，shape为2*4*64*16， 其中每64*16个的head之间跳129 * 16
                 个数，中间跳的部分就是vreg_exp_pack_1的 */
