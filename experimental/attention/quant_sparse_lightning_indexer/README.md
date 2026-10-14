@@ -6,14 +6,14 @@
 
 | 产品                                                         | 是否支持 |
 | ------------------------------------------------------------ | :------: |
-|<term>Ascend 950PR/Ascend 950DT</term>|      ×     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      ×     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+|<term>Ascend 950PR&950DT系列产品</term>|      ×     |
+|<term>Atlas A3系列产品</term>|      √     |
+|<term>Atlas A2系列产品</term>|      √     |
+|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
+|<term>Atlas推理系列产品</term>|      ×     |
+|<term>Atlas训练系列产品</term>|      ×     |
 
-> Ascend 950PR/Ascend 950DT 不支持：本分支已移除 arch35 实现（`--soc=ascend950` 构建该算子会直接报错），def 只注册 ascend910b/ascend910_93，仅保留 arch22 (910B/910_93) 实现。
+> Ascend 950PR&950DT系列产品 不支持：本分支已移除 arch35 实现（`--soc=ascend950` 构建该算子会直接报错），def 只注册 ascend910b/ascend910_93，仅保留 arch22 (910B/910_93) 实现。
 
 ## 功能说明
 
@@ -63,7 +63,7 @@
 
 ## 约束说明
 
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - 本算子当前仅在此两类产品（arch22）上可用。
   - `quant_mode`仅支持2。
   - `q`、`k`支持INT8，不支持FLOAT8_e4m3fn、HIFLOAT8和FLOAT4_e2m1。
@@ -81,7 +81,7 @@
   - `candidate_block_length`为预留接口（N4/O13，本期不消费），仅接受空 tensor，传入非空值会在 tiling 报错。
   - `metadata`为必传输入，不能为空。
   - `output_idx_offset`的维数必须比`sparse_indices`少1。
-- <term>Ascend 950PR/Ascend 950DT</term>：不支持（本分支已移除 arch35 实现）。
+- <term>Ascend 950PR&950DT系列产品</term>：不支持（本分支已移除 arch35 实现）。
 
 ## 调用示例
 

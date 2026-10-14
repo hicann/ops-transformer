@@ -10,9 +10,9 @@
 |<term>Atlas A3推理系列产品</term>|      ×     |
 |<term>Atlas A2训练系列产品</term>|      ×     |
 |<term>Atlas A2推理系列产品</term>|      ×     |
-|<term> Atlas 200I/500 A2推理产品</term>                                         |    ×    |
-|<term> Atlas推理系列产品</term>                                                 |    ×    |
-|<term> Atlas训练系列产品</term>                                                 |    ×    |
+|<term>Atlas 200I/500 A2推理产品</term>                                         |    ×    |
+|<term>Atlas推理系列产品</term>                                                 |    ×    |
+|<term>Atlas训练系列产品</term>                                                 |    ×    |
 
 > 仅 <term>Ascend 950PR&950DT系列产品</term> 支持，使用 arch35 实现。
 

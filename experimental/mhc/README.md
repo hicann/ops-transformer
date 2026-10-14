@@ -52,7 +52,7 @@ x_{l+1} = H_res · x_l + H_post^T · F(H_pre · x_l, W_l)
 
 | 算子 | 说明 |
 |------|------|
-| `mhc_pre_sinkhorn_premix` | 由正式算子 `mhc/mhc_pre_sinkhorn` 迁移并增强：新增 premix 可选输入（仅 Ascend 950PR/950DT），传入时 hin 使用 premix 加权；needBackward 时仍输出 hPre 等中间变量。构建需开启 `--experimental`，详见 [mhc_pre_sinkhorn_premix/README.md](mhc_pre_sinkhorn_premix/README.md) |
+| `mhc_pre_sinkhorn_premix` | 由正式算子 `mhc/mhc_pre_sinkhorn` 迁移并增强：新增 premix 可选输入（仅 Ascend 950PR&950DT系列产品），传入时 hin 使用 premix 加权；needBackward 时仍输出 hPre 等中间变量。构建需开启 `--experimental`，详见 [mhc_pre_sinkhorn_premix/README.md](mhc_pre_sinkhorn_premix/README.md) |
 
 ## 硬件要求
 

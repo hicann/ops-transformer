@@ -205,7 +205,7 @@
         - krCache的维度应包含0，支持shape为(0)。
 
 - 特殊约束
-  - Atlas A2训练系列产品/Atlas A2推理系列产品、Atlas A3训练系列产品/Atlas A3推理系列产品、Ascend 950PR&950DT系列产品上，kvCache和krCache支持首轴非连续；除首轴外的其余轴必须连续。
+  - Atlas A2系列产品、Atlas A3系列产品、Ascend 950PR&950DT系列产品上，kvCache和krCache支持首轴非连续；除首轴外的其余轴必须连续。
   - actualSeqLenOptional传入时，actualSeqLenOptional最后一个数需与T保持一致。
   - pertoken-pergroup量化模式下，ckvkrRepoMode和quantScaleRepoMode必须同时为1；其他量化模式以及非量化场景下，ckvkrRepoMode和quantScaleRepoMode必须同时为0。
   - pertoken-pergroup量化模式下，CacheMode只支持PA_BSND, BSND和TND。

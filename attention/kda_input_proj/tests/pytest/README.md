@@ -21,7 +21,7 @@ pytest/
 - **beta**：FP32 `sigmoid(x @ w_beta)`。
 - **gate / g**：BF16 矩阵乘。
 
-仅支持 Ascend 950PR/950DT。非该器件时用例会 skip。
+仅支持 Ascend 950PR&950DT系列产品。非该器件时用例会 skip。
 
 可通过环境变量 `TEST_DEVICE_ID` 指定 NPU；未设置时会跳过已被占用、无法 `set_device` 的卡。
 

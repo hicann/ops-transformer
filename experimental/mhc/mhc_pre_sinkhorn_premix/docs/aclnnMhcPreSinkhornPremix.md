@@ -188,7 +188,7 @@ aclnnStatus aclnnMhcPreSinkhornPremix(
       <tr>
         <td>premix（aclTensor*）</td>
         <td>输入</td>
-        <td>可选输入， premix加权系数（通常填上一轮输出的hPre）。传入时hin使用premix而非本轮内部计算的hPre进行加权求和；needBackward为true时hPre等中间变量仍正常输出。仅Ascend 950PR/950DT支持。</td>
+        <td>可选输入， premix加权系数（通常填上一轮输出的hPre）。传入时hin使用premix而非本轮内部计算的hPre进行加权求和；needBackward为true时hPre等中间变量仍正常输出。仅Ascend 950PR&950DT系列产品支持。</td>
         <td>可为nullptr（不传）。</td>
         <td>FLOAT32</td>
         <td>ND</td>

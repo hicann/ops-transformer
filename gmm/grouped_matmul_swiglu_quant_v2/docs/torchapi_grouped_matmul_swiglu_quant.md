@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-  `cann_ops_transformer.grouped_matmul_swiglu_quant`融合GroupedMatmul、dequant、SwiGLU和quant。当前仅支持Ascend 950PR/Ascend 950DT上的单Tensor、MXFP8、weight FRACTAL_NZ场景，且`swiglu_mode`必须显式设置为2。原V2场景请使用`torch_npu.npu_grouped_matmul_swiglu_quant_v2`。
+  `cann_ops_transformer.grouped_matmul_swiglu_quant`融合GroupedMatmul、dequant、SwiGLU和quant。当前仅支持Ascend 950PR&950DT系列产品上的单Tensor、MXFP8、weight FRACTAL_NZ场景，且`swiglu_mode`必须显式设置为2。原V2场景请使用`torch_npu.npu_grouped_matmul_swiglu_quant_v2`。
 
 - **计算公式**：
 

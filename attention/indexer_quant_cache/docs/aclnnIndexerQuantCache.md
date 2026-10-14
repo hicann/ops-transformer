@@ -25,7 +25,7 @@
 
 ## 功能说明
 
-- 接口功能：在Indexer注意力机制的Epilog阶段，对KV Cache进行原地压缩更新。将`float16`/`bfloat16`的激活值按逐块动态量化（Per-Block Dynamic Quantization）压缩为FP8（E4M3/E5M2）、INT8（`uint8`）或MX-FP4格式，并按`slotMapping`将量化结果与对应`cacheScale`散写到cache，值为 -1的token跳过不处理。支持MX-FP8、Normal、HiFloat8、MX-FP4四种量化模式。
+- 接口功能：在Indexer注意力机制的Epilogue阶段，对KV Cache进行原地压缩更新。将`float16`/`bfloat16`的激活值按逐块动态量化（Per-Block Dynamic Quantization）压缩为FP8（E4M3/E5M2）、INT8（`uint8`）或MX-FP4格式，并按`slotMapping`将量化结果与对应`cacheScale`散写到cache，值为 -1的token跳过不处理。支持MX-FP8、Normal、HiFloat8、MX-FP4四种量化模式。
 
 - 计算公式：
 

@@ -4,12 +4,12 @@
 
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      ×     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+|<term>Ascend 950PR&950DT系列产品</term>|      √     |
+|<term>Atlas A3系列产品</term>|      √     |
+|<term>Atlas A2系列产品</term>|      √     |
+|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
+|<term>Atlas推理系列产品</term>|      ×     |
+|<term>Atlas训练系列产品</term>|      ×     |
 
 ## 功能说明
 
@@ -164,8 +164,8 @@
   </table>
 
   <ul>
-    <li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> ：num_heads_q仅支持64，不支持quant_mode = 1/3/4/5，topk仅支持[1, 2048]，不支持layout_k = BSND/TND，不支持cmp_ratio在[1，128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。</li>
-    <li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：num_heads_q仅支持64，不支持quant_mode = 1/3/4/5，topk仅支持[1, 2048]，不支持layout_k = BSND/TND，不支持cmp_ratio在[1，128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。</li>
+    <li><term>Atlas A3系列产品</term> ：num_heads_q仅支持64，不支持quant_mode = 1/3/4/5，topk仅支持[1, 2048]，不支持layout_k = BSND/TND，不支持cmp_ratio在[1，128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。</li>
+    <li><term>Atlas A2系列产品</term> ：num_heads_q仅支持64，不支持quant_mode = 1/3/4/5，topk仅支持[1, 2048]，不支持layout_k = BSND/TND，不支持cmp_ratio在[1，128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。</li>
   </ul>
 
 ## 约束说明

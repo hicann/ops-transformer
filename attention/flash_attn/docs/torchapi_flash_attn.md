@@ -27,7 +27,7 @@
 
   `flash_attn`是基于`TorchNPU`的`cann_ops_transformer`扩展接口，用于调用`FlashAttn`算子完成共享KV（Key和Value使用同一份输入）的非量化注意力计算，训练推理归一化。
 
-  `flash_attn_metadata`是`flash_attn`的元数据生成接口，用于在主算子执行前生成metadata。metadata记录AICore/AIVCore的任务切分结果，主算子可选择传入该metadata以优化调度。典型调用流程如下：
+  `flash_attn_metadata`是`flash_attn`的元数据生成接口，用于在主算子执行前生成metadata。metadata记录AI Core/AIVCore的任务切分结果，主算子可选择传入该metadata以优化调度。典型调用流程如下：
 
   1. 准备`q`、`k`、`v`等输入。
   2. 调用`flash_attn_metadata`生成`metadata`。
@@ -148,10 +148,10 @@ cann_ops_transformer.flash_attn(
 | num_heads_kv | int | 必选 | Key/Value head数 | int32 | - | - |
 | head_dim | int | 必选 | Query/Key 每个注意力头的维度 | int32 | - | - |
 | head_dim_v | int | 可选 | Value 每个注意力头的维度。缺省 None（内部传 -1）表示等于 head_dim；QK 与 V 维度不同（如 QK 192 / V 128）时必须传入，且需与后续 flash_attn 调用中 value 的 head_dim 一致（连续布局为 value 末维；PA_NZ 布局 value 形状为 (blocks, N2, D/16, block_size, 16)，head_dim = dim2*dim4） | int32 | - | - |
-| cu_seqlens_q | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,)
-| cu_seqlens_kv | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,)
-| seqused_q | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,)
-| seqused_kv | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,)
+| cu_seqlens_q | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,)|
+| cu_seqlens_kv | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,)|
+| seqused_q | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,)|
+| seqused_kv | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,)|
 | batch_size | int | 可选 | batch大小。若未传入，则从cu_seqlens_q或seqused_q推导。默认值为None | int32 | - | - |
 | max_seqlen_q | int | 可选 | 指定查询q序列的长度上限 | int32 | - | - |
 | max_seqlen_kv | int | 可选 | 指定键k和值v序列的长度上限 | int32 | - | - |
@@ -185,7 +185,7 @@ cann_ops_transformer.flash_attn(
 | metadata | Tensor | 可选 | `flash_attn_metadata`生成的任务切分结果，传入后可优化调度 | int32 | ND | (max_schedule_size,) |
 | softmax_scale | float | 可选 | 可显式设置缩放因子，覆盖默认计算 | float32 | - | - |
 | mask_mode | int | 可选 | 掩码模式 | int32 | - | - |
-| attn_mask | Tensor | 可选 | 掩码矩阵 | int8 | ND | (2048, 2048)
+| attn_mask | Tensor | 可选 | 掩码矩阵 | int8 | ND | (2048, 2048)|
 | win_left | int | 可选 | window左界限 | int32 | - | - |
 | win_right | int | 可选 | window右界限 | int32 | - | - |
 | max_seqlen_q | int | 可选 | 指定查询q序列的长度上限 | int32 | - | - |

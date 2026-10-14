@@ -46,9 +46,9 @@
     activationMode: (暂不支持)
     padSlotId: 默认值 -1
     runMode: (暂不支持)
-    residualConnection: 不做残差: 0, 做残差：1
+    residualConnection: 不做残差:0, 做残差:1
     blockSize: 典型值128/256
-    convMode：Qwen3-Next模式: 0, Pangu V2: 1
+    convMode:Qwen3-Next模式: 0, Pangu V2: 1
     y: [cuSeqLen, dim]
     ```
 
@@ -72,9 +72,9 @@
     activationMode: (暂不支持)
     padSlotId: 默认值 -1
     runMode: (暂不支持)
-    residualConnection: 不做残差: 0, 做残差：1
+    residualConnection: 不做残差: 0, 做残差: 1
     blockSize: 典型值128/256
-    convMode：Qwen3-Next模式: 0, Pangu V2: 1
+    convMode: Qwen3-Next模式: 0, Pangu V2: 1
     y: [cuSeqLen, dim]
     ```
 
@@ -98,9 +98,9 @@
     activationMode: (暂不支持)
     padSlotId: 默认值 -1
     runMode: (暂不支持)
-    residualConnection: 不做残差: 0, 做残差：1
+    residualConnection: 不做残差: 0, 做残差: 1
     blockSize: 典型值128/256
-    convMode：Qwen3-Next模式: 0, Pangu V2: 1
+    convMode: Qwen3-Next模式: 0, Pangu V2: 1
     y: [cuSeqLen, dim]
     ```
 
@@ -124,9 +124,9 @@
     activationMode: (暂不支持)
     padSlotId: 默认值 -1
     runMode: (暂不支持)
-    residualConnection: 不做残差: 0, 做残差：1
+    residualConnection: 不做残差: 0, 做残差: 1
     blockSize: 典型值128/256
-    convMode：Qwen3-Next模式: 0, Pangu V2: 1
+    convMode: Qwen3-Next模式: 0, Pangu V2: 1
     y: [batch, m+1, dim]
     ```
 

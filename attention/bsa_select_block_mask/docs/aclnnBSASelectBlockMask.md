@@ -246,7 +246,7 @@ aclnnStatus aclnnBSASelectBlockMask(
     <td>actualSeqLengthsKV（aclIntArray*）</td>
     <td>输入</td>
     <td>key的实际序列长度数组，即公式中Skv在各batch的实际有效值。<br>用于描述变长序列场景下（即含有Padding填充数据的场景），每个Batch中实际有效的key token数量。</td>
-    <td><ul><li>变长序列场景（当kvInputLayout为 "TND" 时）：该项输入必须配置。</li><li>>定长/变长场景（当kvInputLayout为 "BNSD" 时）：<ul><li>如配置该项，算子会按指定的有效长度处理，忽略Padding部分的数据，提升性能；</li><li>如不配置（传nullptr），算子将默认把key shape中的S维度作为有效长度进行全量处理。</li></ul></li></ul></td>
+    <td><ul><li>变长序列场景（当kvInputLayout为 "TND" 时）：该项输入必须配置。</li><li>定长/变长场景（当kvInputLayout为 "BNSD" 时）：<ul><li>如配置该项，算子会按指定的有效长度处理，忽略Padding部分的数据，提升性能；</li><li>如不配置（传nullptr），算子将默认把key shape中的S维度作为有效长度进行全量处理。</li></ul></li></ul></td>
     <td>INT64</td>
     <td>-</td>
     <td>1</td>

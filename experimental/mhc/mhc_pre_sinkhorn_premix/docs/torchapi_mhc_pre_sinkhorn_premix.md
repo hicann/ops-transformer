@@ -146,7 +146,7 @@ mhc_pre_sinkhorn_premix(x, phi, alpha, bias, premix=None, hc_mult=4, num_iters=2
         <td>premix</td>
         <td>Tensor</td>
         <td>可选</td>
-        <td>premix加权系数（通常填上一轮输出的hPre）。传入时hin使用premix而非本轮内部计算的hPre进行加权求和；outFlag为true时hPre等中间变量仍正常输出（为本轮内部计算值，可供反向使用）。仅Ascend 950PR/950DT支持，可传None。</td>
+        <td>premix加权系数（通常填上一轮输出的hPre）。传入时hin使用premix而非本轮内部计算的hPre进行加权求和；outFlag为true时hPre等中间变量仍正常输出（为本轮内部计算值，可供反向使用）。仅Ascend 950PR&950DT系列产品支持，可传None。</td>
         <td>float32</td>
         <td>
             <ul>
@@ -259,7 +259,7 @@ mhc_pre_sinkhorn_premix(x, phi, alpha, bias, premix=None, hc_mult=4, num_iters=2
 
 - 该接口支持训练、推理场景下使用。
 - 该接口支持单算子模式和图模式调用。
-- 参数约束：x、phi、alpha、bias不支持空Tensor；premix为可选输入，仅在Ascend 950PR/950DT上支持传入。
+- 参数约束：x、phi、alpha、bias不支持空Tensor；premix为可选输入，仅在Ascend 950PR&950DT系列产品上支持传入。
 - 规格约束：
   - numIters：表示迭代次数，目前仅支持20。
   - N：目前仅支持4。
@@ -309,7 +309,7 @@ mhc_pre_sinkhorn_premix(x, phi, alpha, bias, premix=None, hc_mult=4, num_iters=2
   phi = torch.randn(N * N + 2 * N, N * C, dtype=torch.float32).npu()
   alpha = torch.randn(3, dtype=torch.float32).npu()
   bias = torch.randn(N * N + 2 * N, dtype=torch.float32).npu()
-  # 可选：premix 输入（上一轮输出的 h_pre），仅 Ascend 950PR/950DT 支持
+  # 可选：premix 输入（上一轮输出的 h_pre），仅 Ascend 950PR&950DT系列产品 支持
   premix = torch.rand(B, S, N, dtype=torch.float32).npu()
 
   hcMult = 4

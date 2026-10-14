@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：不支持
+- <term>Ascend 950PR&950DT系列产品</term>：不支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -463,7 +463,7 @@ aclnnStatus aclnnLightningIndexerV2(
 - 传入的cmpResidualKOptional中每一个元素的值都应小于压缩率cmpRatio。
 
 <!-- npu="A3,910b" id7 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - topk取值范围当前仅支持[1, 2048]，以及3072、4096、5120、6144、7168、8192。
   - 不支持sequsedQOptional、outputIdxOffsetOptional、metadataOptional与maxSeqlenQ≠-1：
     arch22 kernel 不消费这些输入，传入即由 host 侧校验拒绝并返回明确错误（输入位在算子原型中保留仅为 IR 兼容）。
@@ -472,7 +472,7 @@ aclnnStatus aclnnLightningIndexerV2(
   - 两级TopK候选源（source）模式仅在本系列产品上支持：candidateTopkBlocks传入非-1即开启；开启时topk仅支持[1, 2048]、returnValue必须为0，且必须传入实际的candidateTopkIndicesOut输出tensor（shape为[B, S1, N2, candidateTopkBlocks]或[T1, N2, candidateTopkBlocks]）。
 <!-- end id7 -->
 <!-- npu="950" id8 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：不支持（本 experimental 版不注册 ascend950，
+- <term>Ascend 950PR&950DT系列产品</term>：不支持（本 experimental 版不注册 ascend950，
   aclnn 库中无该 SoC 产物，按文档调用将在库查找或运行期失败。）
 <!-- end id8 -->
 

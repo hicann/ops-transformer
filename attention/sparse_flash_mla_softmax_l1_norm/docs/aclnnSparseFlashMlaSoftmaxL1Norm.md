@@ -25,7 +25,7 @@
 ## 功能说明
 
 - 接口功能：计算`SparseFlashMla`注意力的Softmax L1Norm结果，支持Compressed Attention以及Sparse Compressed Attention场景。该接口为`aclnnDenseLightningIndexerKLLossGrad`反向算子的配套接口，输出可用于反向梯度计算。调用过程中，需先调用`aclnnSparseFlashMlaSoftmaxL1NormMetadata`接口完成负载均衡计算，再调用`aclnnSparseFlashMlaSoftmaxL1Norm`接口完成算子计算过程。
-    - `aclnnSparseFlashMlaSoftmaxL1NormMetadata`接口：根据主算子的shape、layout、mask等信息，采用strided方式将任务均衡切分到可用AIC核上，输出metadata供主算子使用。
+    - `aclnnSparseFlashMlaSoftmaxL1NormMetadata`接口：根据主算子的shape、layout、mask等信息，采用strided方式将任务均衡切分到可用AI Core上，输出metadata供主算子使用。
     - `aclnnSparseFlashMlaSoftmaxL1Norm`接口：根据metadata中的分核信息，对Q和K计算Softmax L1Norm。
 
 - 计算公式：
@@ -483,7 +483,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
         <tr>
             <td>S1、S2</td>
             <td>支持泛化</td>
-            <td>支持S1、S2支持不等长</td>
+            <td>支持S1、S2不等长</td>
         </tr>
         <tr>
             <td>N1</td>

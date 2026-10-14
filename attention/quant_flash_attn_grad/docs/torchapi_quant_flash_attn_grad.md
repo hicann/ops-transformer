@@ -27,7 +27,7 @@
 
   `quant_flash_attn_grad`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`QuantFlashAttnGrad`算子完成HIFLOAT8量化场景下的注意力反向梯度计算。该接口为`quant_flash_attn`正向算子的配套反向接口，用于计算Query、Key、Value的梯度（dq、dk、dv）以及sink梯度（dsink）。当前支持HIFLOAT8量化数据类型，支持BSND、BNSD、TND三种数据排布格式；支持全计算（mask_mode=0）、Causal（mask_mode=3）和Sliding Window（mask_mode=4）三种mask模式。
   在TND排布下，Q、K、V按变长序列打包存储，需通过cu_seqlens_q、cu_seqlens_kv描述各batch的序列长度，也可通过seqused_q、seqused_kv进一步指定各batch实际参与运算的序列长度；在BSND、BNSD排布下可通过seqused_q、seqused_kv截断各batch的冗余运算。
-   `quant_flash_attn_grad`的元数据生成接口复用`quant_flash_attn_metadata`，用于在主算子执行前生成metadata。metadata记录AICore/AIVCore的任务切分结果，主算子可选择传入该metadata以优化调度。在TND排布或传入seqused_q、seqused_kv的变长场景下，metadata还携带逐batch的调度信息，必须由`quant_flash_attn_metadata`生成并传入。典型调用流程如下：
+   `quant_flash_attn_grad`的元数据生成接口复用`quant_flash_attn_metadata`，用于在主算子执行前生成metadata。metadata记录AI Core/AIVCore的任务切分结果，主算子可选择传入该metadata以优化调度。在TND排布或传入seqused_q、seqused_kv的变长场景下，metadata还携带逐batch的调度信息，必须由`quant_flash_attn_metadata`生成并传入。典型调用流程如下：
 
   1. 准备`q`、`k`、`v`等输入。
   2. 调用`quant_flash_attn_metadata`生成`metadata`。
@@ -55,7 +55,7 @@
   dO_{fp} = dO_{quant} \times do\_descale
   $$
 
-  阶段二：计算Softmax梯度（PreSfmg阶段）
+  阶段二：计算Softmax梯度（PreSoftmax阶段）
 
   $$
   dP = dO \times V

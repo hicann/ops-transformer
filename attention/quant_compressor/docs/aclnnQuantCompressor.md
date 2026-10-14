@@ -382,7 +382,7 @@ aclnnStatus aclnnQuantCompressor(
         <tr>
           <td>ACLNN_ERR_RUNTIME_ERROR</td>
           <td>361001</td>
-          <td>API内存调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
+          <td>API调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
         </tr>
         <tr>
           <td>ACLNN_ERR_INNER_TILING_ERROR</td>
@@ -444,7 +444,7 @@ aclnnStatus aclnnQuantCompressor(
     - stateCache支持输入shape[block_num,block_size,2\*coff\*D]，要求blockNum>0，cacheMode=2时，需要满足blockSize >= coff * cmp_ratio + S - 1。
     - 若x的维度采用BS合轴，即x的输入shape为[T,H]
         - cuSeqlensOptional输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须为0，最后一位必须为T。
-        - sequsedOptional，支持输入shape[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即sequsedOptional[n] <= cuSeqlensOptional[n+1] - cuSeqlensOptional[n]，且不小于0。
+        - sequsedOptional，支持输入shape[B,]，要求每个Batch的有效token数小于等于对应Sequence Length长度，即sequsedOptional[n] <= cuSeqlensOptional[n+1] - cuSeqlensOptional[n]，且不小于0。
         - cacheMode=1时，stateBlockTableOptional支持输入shape[B,ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(startPosOptional)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n])。cacheMode=2时，stateBlockTableOptional支持输入shape[B]。
         - cmpKv，输出shape为[min(T,T//cmp_ratio+B),D]：compressed_tokens + compressed_tokens + ... + compressed_tokens + pad。
     - 若x的维度不采用BS合轴，即x的输入shape为[B,S,H]
