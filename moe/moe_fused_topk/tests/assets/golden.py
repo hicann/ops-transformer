@@ -138,7 +138,9 @@ def _torch_moe_fused_topk(
                 "mapping_num and mapping_table are required when expert mapping is enabled"
             )
         raw_indices = selected_indices
-        counts = mapping_num[raw_indices].to(torch.int64).clamp_min(1)
+        counts = (
+            mapping_num[raw_indices].to(torch.int64).clamp(1, mapping_table.shape[1])
+        )
         token_offsets = torch.arange(
             token_num, device=raw_indices.device, dtype=torch.int64
         ).unsqueeze(1)
@@ -209,8 +211,21 @@ def _write_tensor(target, value) -> None:
         target.copy_(torch.as_tensor(value, device=target.device, dtype=target.dtype))
 
 
-def _customize_inputs(x, add_num, testcase_name):
-    """Leave normal random inputs intact; inject only declared IEEE specials."""
+def _customize_inputs(x, add_num, testcase_name, mapping_table=None):
+    """Apply declared IEEE specials and deterministic mapping regression inputs."""
+    if testcase_name and testcase_name.startswith("moe_fused_topk_mapping_"):
+        # Distinct expert scores and mapping entries expose reads across rows.
+        # Keep mapping counts from the CSV to cover signed INT32 boundaries.
+        if mapping_table is None:
+            raise ValueError("Mapping regression cases require mapping_table")
+        _write_tensor(x, 0)
+        _write_tensor(add_num, np.arange(add_num.shape[0]))
+        _write_tensor(
+            mapping_table,
+            np.arange(np.prod(mapping_table.shape), dtype=np.int32).reshape(
+                mapping_table.shape
+            ),
+        )
     for name, value in _special_inputs().get(testcase_name, {}).items():
         _write_tensor(x if name == "x" else add_num, float(value))
     return x, add_num
@@ -293,7 +308,7 @@ class MoeFusedTopkTestSpec:
         testcase_name=None,
         **_kwargs,
     ):
-        _customize_inputs(x, add_num, testcase_name)
+        _customize_inputs(x, add_num, testcase_name, mapping_table)
         return x, add_num, mapping_num, mapping_table
 
 
@@ -306,7 +321,7 @@ def moe_fused_topk_input(
     testcase_name=None,
     **_kwargs,
 ):
-    _customize_inputs(x, add_num, testcase_name)
+    _customize_inputs(x, add_num, testcase_name, mapping_table)
     return x, add_num, mapping_num, mapping_table
 
 
@@ -329,9 +344,9 @@ def aclnn_moe_fused_topk_input(
     testcase_name=None,
     **_kwargs,
 ):
-    del mappingNum, mappingTable, groupNum, groupTopk, topN, topK
+    del mappingNum, groupNum, groupTopk, topN, topK
     del activateType, isNorm, scale, enableExpertMapping, y, indices
-    _customize_inputs(x, addNum, testcase_name)
+    _customize_inputs(x, addNum, testcase_name, mappingTable)
 
 
 def moe_fused_topk_golden(
@@ -408,6 +423,16 @@ class AclnnMoeFusedTopkTestSpec:
 
     golden = staticmethod(aclnn_moe_fused_topk_golden)
     customize_inputs = staticmethod(aclnn_moe_fused_topk_input)
+
+    def pre_compare(y, indices, golden_y, golden_indices):
+        # TTK's binary comparator hashes a contiguous buffer. Copy logical
+        # view elements without including padding or changing their values.
+        return [
+            value.contiguous()
+            if isinstance(value, torch.Tensor)
+            else np.ascontiguousarray(value)
+            for value in (y, indices, golden_y, golden_indices)
+        ]
 
     class TorchImpl:
         def __init__(

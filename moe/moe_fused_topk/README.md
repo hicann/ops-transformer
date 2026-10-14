@@ -172,3 +172,17 @@
 | 调用方式   | 样例代码           | 说明                                         |
 | ---------------- | --------------------------- | --------------------------------------------------- |
 | aclnn接口  | [test_aclnn_moe_fused_topk](examples/test_aclnn_moe_fused_topk.cpp) | 通过[aclnnMoeFusedTopk](docs/aclnnMoeFusedTopk.md)接口方式调用MoeFusedTopk算子。 |
+
+## 测试说明
+
+ACLNN 回归用例统一放在 [ttk_aclnn_moe_fused_topk.csv](tests/st/arch35/ttk_aclnn_moe_fused_topk.csv)，使用 [golden.py](tests/assets/golden.py)。安装对应产品的算子包并配置 CANN 环境后，在 TTK 仓库目录执行（`OP_DIR` 指向本算子目录）：
+
+```bash
+python3 -m ttk aclnn -i "$OP_DIR/tests/st/arch35/ttk_aclnn_moe_fused_topk.csv" \
+  --plugin "$OP_DIR/tests/assets/" --compare stat_rel_err --run 3 --dl 1
+python3 -m ttk aclnn -i "$OP_DIR/tests/st/arch35/ttk_aclnn_moe_fused_topk.csv" \
+  --plugin "$OP_DIR/tests/assets/" --ti 0-20 --compare binary --run 3 --dl 1
+```
+
+- 前 21 条覆盖 FP32、FP16、BF16 下的映射数量边界，包括 INT32 最小值、负数、零、有效数量、超过映射表宽度的数量和 INT32 最大值。Golden 为这些用例生成可区分的专家分数和映射表，映射数量小于等于零时使用首列，超过表宽时按表宽取模；第二条命令逐元素精确比较输出。
+- 后 24 条覆盖 `y` 和 `indices` 的输出布局：14 条合法布局应通过精度和确定性检查，10 条元素重叠布局应在 `aclnnMoeFusedTopkGetWorkspaceSize` 返回 `ACLNN_ERR_PARAM_INVALID`（161002），且不进入二阶段执行。各用例的 `remark.expected_acl_status` 记录预期返回码。TTK 不会自动把该字段作为断言，预期拒绝用例在原生报告中显示为 N/A，需核对返回码；API 单元测试中的 `output_layouts` 同时断言这些布局的返回码。

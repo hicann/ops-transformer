@@ -27,6 +27,7 @@
 #include "opdev/tensor_view_utils.h"
 #include "opdev/platform.h"
 #include "aclnn_kernels/common/op_error_check.h"
+#include <numeric>
 
 using namespace op;
 
@@ -204,6 +205,31 @@ static inline bool CheckShape(const aclTensor* x, const aclTensor* addNum, const
     return true;
 }
 
+static bool CheckOutputLayout(const aclTensor* output, const char* name)
+{
+    const auto& shape = output->GetViewShape();
+    const auto& strides = output->GetViewStrides();
+    OP_CHECK(strides.size() == Y_DIM_NUM,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Output %s must have two view strides.", name), return false);
+    auto magnitude = [](int64_t stride) -> uint64_t {
+        return stride < 0 ? static_cast<uint64_t>(-(stride + 1)) + 1 : static_cast<uint64_t>(stride);
+    };
+    const auto rows = static_cast<uint64_t>(shape.GetDim(0));
+    const auto columns = static_cast<uint64_t>(shape.GetDim(1));
+    const auto rowStride = magnitude(strides[0]);
+    const auto columnStride = magnitude(strides[1]);
+    bool overlaps = (rows > 1 && rowStride == 0) || (columns > 1 && columnStride == 0);
+    if (!overlaps && rows > 1 && columns > 1) {
+        // The smallest colliding index differences are (columnStride/gcd, rowStride/gcd).
+        const auto divisor = std::gcd(rowStride, columnStride);
+        overlaps = columnStride / divisor < rows && rowStride / divisor < columns;
+    }
+    OP_CHECK(!overlaps,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Output %s has overlapping elements in its view strides.", name),
+             return false);
+    return true;
+}
+
 static aclnnStatus CheckParams(const aclTensor* x, const aclTensor* addNum, const aclTensor* mappingNum,
                                const aclTensor* mappingTable, uint32_t groupNum, uint32_t groupTopk, uint32_t topN,
                                uint32_t topK, uint32_t activateType, bool isNorm, float scale, bool enableExpertMapping,
@@ -221,6 +247,10 @@ static aclnnStatus CheckParams(const aclTensor* x, const aclTensor* addNum, cons
     CHECK_RET(CheckShape(x, addNum, mappingNum, mappingTable, groupNum, groupTopk, topN, topK, activateType, isNorm,
                          scale, enableExpertMapping, y, indices),
               ACLNN_ERR_PARAM_INVALID);
+
+    if (!x->IsEmpty()) {
+        CHECK_RET(CheckOutputLayout(y, "y") && CheckOutputLayout(indices, "indices"), ACLNN_ERR_PARAM_INVALID);
+    }
 
     return ACLNN_SUCCESS;
 }

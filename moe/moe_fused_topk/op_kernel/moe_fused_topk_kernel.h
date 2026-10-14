@@ -445,8 +445,11 @@ __aicore__ inline void MoeFusedTopk<inputT, calT, enableExpertMapping>::CopyOut(
 
         for (size_t kI = 0; kI < k_; kI++) {
             uint32_t expertId = indicesLocal.GetValue(kI);
-            uint32_t expertMappingNum = mappingNumLocal.GetValue(expertId);
-            uint32_t redundantOffset = expertMappingNum == 0 ? 0 : (batchOffset_ + loop) % expertMappingNum;
+            int32_t expertMappingNum = mappingNumLocal.GetValue(expertId);
+            // Keep invalid counts from addressing outside this expert's mapping row.
+            uint32_t mappingCount = expertMappingNum > 0 ? static_cast<uint32_t>(expertMappingNum) : 0U;
+            mappingCount = mappingCount > tableDim_ ? tableDim_ : mappingCount;
+            uint32_t redundantOffset = mappingCount == 0 ? 0 : (batchOffset_ + loop) % mappingCount;
             uint32_t tableOffset = expertId * tableDim_ + redundantOffset;
             indicesLocal.SetValue(kI, mappingTableGm_[tableOffset].GetValue(0));
         }

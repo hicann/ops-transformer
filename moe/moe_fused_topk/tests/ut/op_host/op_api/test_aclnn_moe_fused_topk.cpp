@@ -75,6 +75,61 @@ TEST_F(l2_moe_fused_topk_ascend950_test, Ascend950_moe_fused_topk_fp16_with_mapp
     // workspace and execution are covered by the Ascend950 ACLNN smoke test.
 }
 
+static void TestOutputLayouts()
+{
+    struct LayoutCase {
+        vector<int64_t> shape;
+        vector<int64_t> strides;
+        vector<int64_t> storage;
+        aclnnStatus expected;
+    };
+    const vector<LayoutCase> cases = {
+        {{3, 4}, {0, 0}, {1}, ACLNN_ERR_PARAM_INVALID},
+        {{3, 4}, {0, 1}, {4}, ACLNN_ERR_PARAM_INVALID},
+        {{3, 4}, {1, 0}, {3}, ACLNN_ERR_PARAM_INVALID},
+        {{3, 4}, {1, 1}, {6}, ACLNN_ERR_PARAM_INVALID},
+        {{3, 4}, {4, 2}, {15}, ACLNN_ERR_PARAM_INVALID},
+        {{3, 4}, {4, 1}, {3, 4}, ACLNN_SUCCESS},
+        {{3, 4}, {1, 3}, {4, 3}, ACLNN_SUCCESS},
+        {{3, 4}, {8, 2}, {23}, ACLNN_SUCCESS},
+        // Interleaved rows are safe even though their address ranges overlap.
+        {{3, 2}, {2, 3}, {8}, ACLNN_SUCCESS},
+        {{1, 4}, {0, 1}, {4}, ACLNN_SUCCESS},
+        {{3, 1}, {1, 0}, {3}, ACLNN_SUCCESS},
+        {{1, 1}, {0, 0}, {1}, ACLNN_SUCCESS},
+    };
+    for (size_t i = 0; i < cases.size(); ++i) {
+        const auto& test = cases[i];
+        for (bool checkY : {false, true}) {
+            SCOPED_TRACE("output layout " + to_string(i) + (checkY ? " y" : " indices"));
+            auto x = TensorDesc({test.shape[0], 8}, ACL_FLOAT, ACL_FORMAT_ND);
+            auto addNum = TensorDesc({8}, ACL_FLOAT, ACL_FORMAT_ND);
+            auto mappingNum = TensorDesc({8}, ACL_INT32, ACL_FORMAT_ND).ValueRange(1L, 1L);
+            auto mappingTable = TensorDesc({8, 1}, ACL_INT32, ACL_FORMAT_ND);
+            auto y = checkY ? TensorDesc(test.shape, ACL_FLOAT, ACL_FORMAT_ND, test.strides, 0, test.storage) :
+                              TensorDesc(test.shape, ACL_FLOAT, ACL_FORMAT_ND);
+            auto indices = checkY ? TensorDesc(test.shape, ACL_INT32, ACL_FORMAT_ND) :
+                                    TensorDesc(test.shape, ACL_INT32, ACL_FORMAT_ND, test.strides, 0, test.storage);
+            auto ut =
+                OP_API_UT(aclnnMoeFusedTopk,
+                          INPUT(x, addNum, mappingNum, mappingTable, 1, 1, 1, test.shape[1], 0, false, 1.0f, false),
+                          OUTPUT(y, indices));
+            uint64_t workspaceSize = 0;
+            EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), test.expected);
+        }
+    }
+}
+
+TEST_F(l2_moe_fused_topk_ascend950_test, output_layouts)
+{
+    TestOutputLayouts();
+}
+
+TEST_F(l2_moe_fused_topk_test, output_layouts)
+{
+    TestOutputLayouts();
+}
+
 TEST_F(l2_moe_fused_topk_test, ascend910B2_test_moe_fused_topk_1)
 {
     int64_t num_token = 256;
