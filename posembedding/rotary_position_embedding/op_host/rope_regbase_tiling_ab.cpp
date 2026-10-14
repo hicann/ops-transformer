@@ -19,7 +19,6 @@
 
 namespace optiling {
 
-constexpr size_t RESERVERD_WORKSPACE_SIZE = static_cast<size_t>(16 * 1024 * 1024);
 constexpr int64_t MAX_COPY_BLOCK_COUNT = 4095;
 constexpr int64_t CONST_TWO = 2;
 constexpr int64_t CONST_FOUR = 4;
@@ -122,7 +121,7 @@ ge::graphStatus RopeRegBaseTilingClassAB::PostTiling()
     context_->SetTilingKey(GetTilingKey());
     context_->SetBlockDim(blockNumBS_ * blockNumN_);
     size_t* workspaces = context_->GetWorkspaceSizes(1);
-    workspaces[0] = RESERVERD_WORKSPACE_SIZE;
+    workspaces[0] = DEFAULT_WORKSPACE_SIZE;
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
 

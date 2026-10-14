@@ -15,6 +15,7 @@
 #ifndef OPS_BUILD_IN_OP_TILING_RUNTIME_ROTARY_POSITION_EMBEDDING_H
 #define OPS_BUILD_IN_OP_TILING_RUNTIME_ROTARY_POSITION_EMBEDDING_H
 
+#include <cstddef>
 #include "register/tilingdata_base.h"
 #include "register/op_def_registry.h"
 #include "op_host/tiling_templates_registry.h"
@@ -24,6 +25,8 @@
 #include "platform/platform_info.h"
 #include "util/math_util.h"
 namespace optiling {
+
+constexpr std::size_t DEFAULT_WORKSPACE_SIZE = 0;
 
 BEGIN_TILING_DATA_DEF(RotateMatrixParams)
 TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, matmulTiling);

@@ -15,6 +15,7 @@
 #ifndef AIR_RUNTIME_V2_OP_IMPL_APPLY_ROTARY_POS_EMB_TILING_H
 #define AIR_RUNTIME_V2_OP_IMPL_APPLY_ROTARY_POS_EMB_TILING_H
 
+#include <cstddef>
 #include "register/tilingdata_base.h"
 #include "register/op_def_registry.h"
 #include "op_host/tiling_templates_registry.h"
@@ -23,6 +24,8 @@
 #include "platform/platform_infos_def.h"
 
 namespace optiling {
+
+constexpr std::size_t DEFAULT_WORKSPACE_SIZE = 0;
 
 BEGIN_TILING_DATA_DEF(ApplyRotaryPosEmbTilingData)
 TILING_DATA_FIELD_DEF(int64_t, useCoreNum);

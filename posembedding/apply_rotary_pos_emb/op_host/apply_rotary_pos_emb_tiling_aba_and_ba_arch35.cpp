@@ -248,10 +248,7 @@ uint64_t ApplyRotaryPosEmbTilingABAAndBA::GetTilingKey() const
 
 ge::graphStatus ApplyRotaryPosEmbTilingABAAndBA::GetWorkspaceSize()
 {
-    auto platformInfo = context_->GetPlatformInfo();
-    OP_CHECK_NULL_WITH_CONTEXT(context_, platformInfo);
-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-    workspaceSize_ = ascendcPlatform.GetLibApiWorkSpaceSize();
+    workspaceSize_ = DEFAULT_WORKSPACE_SIZE;
     return ge::GRAPH_SUCCESS;
 }
 

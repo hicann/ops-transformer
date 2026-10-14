@@ -1468,7 +1468,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp16_small_Ascend950)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20030;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1491,7 +1491,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp16_BNSD_BA_Ascend950)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20011;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1514,7 +1514,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp32_BNSD_BA_B40_Ascend950)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20011;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1537,7 +1537,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp16_BNSD_ABA_S40_Ascend950)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20010;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1560,7 +1560,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_bf16_BNSD_BA_Ascend950)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20011;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1583,7 +1583,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp16_BNSD_ABA_LargeD_Ascend950)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20010;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1606,7 +1606,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp32_BNSD_BA_LargeN_Ascend950)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20011;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1630,7 +1630,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp16_BNSD_BA_interleave_Ascend950)
          {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("interleave")}},
         &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20011;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1654,7 +1654,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp16_BNSD_ABA_quarter_Ascend950)
          {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("quarter")}},
         &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20010;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1677,7 +1677,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp32_BNSD_ABA_Ascend950)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20010;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1700,7 +1700,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_bf16_BNSD_ABA_Ascend950)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20010;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1723,7 +1723,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp16_BNSD_BA_D64_Ascend950)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20011;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1746,7 +1746,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp16_BNSD_ABA_NonDiv_Ascend950)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20010;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1772,7 +1772,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp16_compute_ab_Ascend950)
          {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
         &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20030;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1797,7 +1797,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp16_small_BNSD_Ascend950)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20010;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1822,7 +1822,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp32_compute_ab_BNSD_Ascend950)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20010;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1847,7 +1847,7 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_bf16_compute_ab_cast_BNSD_Ascend950)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20010;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
 
@@ -1872,6 +1872,6 @@ TEST_F(ApplyRotaryPosEmbTiling, arpe_fp16_small_BNSD_Ascend950_D64)
                                                {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<string>("half")}},
                                               &compileInfo, "Ascend950", 40, 196608);
     uint64_t expectTilingKey = 20010;
-    std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    std::vector<size_t> expectWorkspaces = {optiling::DEFAULT_WORKSPACE_SIZE};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }

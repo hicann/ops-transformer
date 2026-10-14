@@ -359,7 +359,7 @@ ge::graphStatus KvCompressEpilogTilingArch35::PostTiling()
     size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_IF(workspaces == nullptr, OP_LOGE(context_->GetNodeName(), "get workspaces nullptr"),
                 return ge::GRAPH_FAILED);
-    workspaces[0] = static_cast<size_t>(DEFAULT_WORKSPACE_SIZE);
+    workspaces[0] = DEFAULT_WORKSPACE_SIZE;
 
     // Save tiling data to buffer
     OP_CHECK_IF(context_->GetRawTilingData() == nullptr, OP_LOGE(context_->GetNodeName(), "get tilingdata nullptr"),

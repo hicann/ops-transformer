@@ -23,7 +23,6 @@ constexpr uint64_t ROPE_A_AND_B_TILING_PRIORITY = 40000;
 constexpr int64_t DOUBLE_BUFFER = 2;
 constexpr int64_t UB_FACTOR = 4;
 constexpr int64_t MAX_COPY_BLOCK_COUNT = 4095;
-constexpr int32_t WORKSPACE_SIZE = 16 * 1024 * 1024;
 constexpr uint64_t TILING_KEY_A = 20040;
 constexpr uint64_t TILING_KEY_B = 20041;
 constexpr int64_t HALF_INTERLEAVE_COEF = 2;
@@ -179,7 +178,7 @@ uint64_t RopeRegBaseTilingClassAAndB::GetTilingKey() const
 
 ge::graphStatus RopeRegBaseTilingClassAAndB::GetWorkspaceSize()
 {
-    workspaceSize_ = WORKSPACE_SIZE;
+    workspaceSize_ = DEFAULT_WORKSPACE_SIZE;
     return ge::GRAPH_SUCCESS;
 }
 

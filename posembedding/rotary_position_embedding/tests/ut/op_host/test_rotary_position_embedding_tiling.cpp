@@ -173,7 +173,7 @@ TEST_F(RotaryPositionEmbeddingTiling, RotaryPositionEmbedding_fp16_3d_bsd_broadc
     ASSERT_EQ(tilingInfo.tilingKey, 20020);
     ASSERT_EQ(tilingInfo.blockNum, 40);
     ASSERT_EQ(tilingInfo.workspaceSizes.size(), 1);
-    ASSERT_EQ(tilingInfo.workspaceSizes[0], 16 * 1024 * 1024);
+    ASSERT_EQ(tilingInfo.workspaceSizes[0], optiling::DEFAULT_WORKSPACE_SIZE);
 
     auto tilingData = reinterpret_cast<const int64_t*>(tilingInfo.tilingData.get());
     EXPECT_EQ(tilingInfo.tilingDataSize / sizeof(int64_t), 19);

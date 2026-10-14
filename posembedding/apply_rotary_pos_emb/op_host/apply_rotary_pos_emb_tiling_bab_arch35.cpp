@@ -21,7 +21,6 @@ constexpr uint64_t ROPE_BAB_TILING_PRIORITY = 30000;
 constexpr int64_t MIN_UB_LOAD_D_NUM = 4; // q/k, qout/kout 或sin, cos开doublebuffer
 constexpr uint32_t DOUBLE_BUFFER = 2;
 constexpr int64_t MIN_COPY_BLOCK_COUNT = 4095;
-constexpr size_t WORK_SPACE_SIZE = static_cast<size_t>(16) * 1024 * 1024;
 constexpr int64_t TILING_KEY_BAB = 20020;
 
 class ApplyRotaryPosEmbTilingBAB : public ApplyRotaryPosEmbRegbaseTilingBaseClass {
@@ -233,7 +232,7 @@ ge::graphStatus ApplyRotaryPosEmbTilingBAB::PostTiling()
     context_->SetBlockDim(usedCoreNum_);
     context_->SetTilingKey(tilingKey_);
     size_t* workspaces = context_->GetWorkspaceSizes(1);
-    workspaces[0] = WORK_SPACE_SIZE;
+    workspaces[0] = DEFAULT_WORKSPACE_SIZE;
     PrintTilingData();
     return ge::GRAPH_SUCCESS;
 }

@@ -57,7 +57,7 @@ constexpr int64_t FP4_SCRATCH_SLOTS_PER_CHUNK = 16;
 constexpr int64_t FP4_GROUP_SIZE_16 = 16;
 constexpr int64_t FP4_GROUP_SIZE_32 = 32;
 constexpr int64_t FP4_GROUP_SIZE_64 = 64;
-constexpr int64_t DEFAULT_WORKSPACE_SIZE = 32;
+constexpr int64_t DEFAULT_WORKSPACE_SIZE = 0;
 constexpr int64_t D_LENGTH_FULL_LOAD = 8192;
 
 constexpr int64_t SLICE_SIZE = 64;
