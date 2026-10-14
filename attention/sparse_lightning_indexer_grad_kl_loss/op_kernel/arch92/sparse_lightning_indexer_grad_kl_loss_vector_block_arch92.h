@@ -9,21 +9,21 @@
  */
 
 /*!
- * \file sparse_lightning_indexer_grad_kl_loss_vector_block.h
+ * \file sparse_lightning_indexer_grad_kl_loss_vector_block_arch92.h
  * \brief
  */
 
-#ifndef SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_VECTOR_BLOCK_H
-#define SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_VECTOR_BLOCK_H
-#include "sparse_lightning_indexer_grad_kl_loss_regbase_common.h"
-#include "vf/vf_process_vec0.h"
-#include "vf/vf_process_vec1.h"
-#include "vf/vf_process_vec2.h"
-#include "vf/vf_process_vec4.h"
-#include "vf/vf_process_vec5.h"
-#include "vf/vf_process_vec6.h"
-#include "vf/vf_cast_dup.h"
-#include "vf/vf_sink.h"
+#ifndef SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_VECTOR_BLOCK_ARCH92_H
+#define SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_VECTOR_BLOCK_ARCH92_H
+#include "sparse_lightning_indexer_grad_kl_loss_regbase_common_arch92.h"
+#include "vf/vf_process_vec0_arch92.h"
+#include "vf/vf_process_vec1_arch92.h"
+#include "vf/vf_process_vec2_arch92.h"
+#include "vf/vf_process_vec4_arch92.h"
+#include "vf/vf_process_vec5_arch92.h"
+#include "vf/vf_process_vec6_arch92.h"
+#include "vf/vf_cast_dup_arch92.h"
+#include "vf/vf_sink_arch92.h"
 
 namespace SligKlLoss {
 

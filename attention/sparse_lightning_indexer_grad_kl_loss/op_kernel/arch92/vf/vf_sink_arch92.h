@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file vf_sink.h
+ * \file vf_sink_arch92.h
  * \brief
  */
-#ifndef VF_SINK_H
-#define VF_SINK_H
+#ifndef VF_SINK_ARCH92_H
+#define VF_SINK_ARCH92_H
 
 #include "kernel_tensor.h"
 
@@ -84,4 +84,4 @@ __aicore__ inline void ComputePsinkPartial(const LocalTensor<T>& dstTensor, cons
 }
 } // namespace AscendC
 
-#endif // VF_SINK_H
+#endif // VF_SINK_ARCH92_H

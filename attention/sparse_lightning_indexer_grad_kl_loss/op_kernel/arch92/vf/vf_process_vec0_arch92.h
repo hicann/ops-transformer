@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file vf_process_vec0.h
+ * \file vf_process_vec0_arch92.h
  * \brief
  */
-#ifndef VF_PROCESS_VEC0_H
-#define VF_PROCESS_VEC0_H
+#ifndef VF_PROCESS_VEC0_ARCH92_H
+#define VF_PROCESS_VEC0_ARCH92_H
 
 #include "kernel_tensor.h"
 
@@ -83,4 +83,4 @@ __aicore__ inline void Ub2UbNd2Nz(const LocalTensor<INPUT_T>& dstTensor, const L
 
 } // namespace AscendC
 
-#endif // VF_PROCESS_VEC0_H
+#endif // VF_PROCESS_VEC0_ARCH92_H

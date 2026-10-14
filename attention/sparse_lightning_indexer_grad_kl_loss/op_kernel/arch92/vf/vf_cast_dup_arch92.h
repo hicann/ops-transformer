@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file vf_cast_dup.h
+ * \file vf_cast_dup_arch92.h
  * \brief
  */
-#ifndef VF_CAST_DUP_H
-#define VF_CAST_DUP_H
+#ifndef VF_CAST_DUP_ARCH92_H
+#define VF_CAST_DUP_ARCH92_H
 
 #include "kernel_tensor.h"
 
@@ -64,4 +64,4 @@ __aicore__ inline void CastDupVf(const LocalTensor<WEIGHT_T>& dstTensor, const L
 }
 } // namespace AscendC
 
-#endif // VF_CAST_DUP_H
+#endif // VF_CAST_DUP_ARCH92_H

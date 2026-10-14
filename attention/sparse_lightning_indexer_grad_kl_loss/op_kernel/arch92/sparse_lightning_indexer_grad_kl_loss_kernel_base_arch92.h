@@ -9,17 +9,17 @@
  */
 
 /*!
- * \file sparse_lightning_indexer_grad_kl_loss_kernel_base.h
+ * \file sparse_lightning_indexer_grad_kl_loss_kernel_base_arch92.h
  * \brief
  */
 
-#ifndef SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_KERNEL_BASE_H
-#define SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_KERNEL_BASE_H
+#ifndef SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_KERNEL_BASE_ARCH92_H
+#define SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_KERNEL_BASE_ARCH92_H
 
-#include "sparse_lightning_indexer_grad_kl_loss_tiling_regbase.h"
-#include "sparse_lightning_indexer_grad_kl_loss_regbase_common.h"
-#include "sparse_lightning_indexer_grad_kl_loss_cube_block.h"
-#include "sparse_lightning_indexer_grad_kl_loss_vector_block.h"
+#include "sparse_lightning_indexer_grad_kl_loss_tiling_regbase_arch92.h"
+#include "sparse_lightning_indexer_grad_kl_loss_regbase_common_arch92.h"
+#include "sparse_lightning_indexer_grad_kl_loss_cube_block_arch92.h"
+#include "sparse_lightning_indexer_grad_kl_loss_vector_block_arch92.h"
 
 namespace SligKlLoss {
 template <typename CubeBlockType, typename VecBlockType>

@@ -9,15 +9,15 @@
  */
 
 /*!
- * \file sparse_lightning_indexer_grad_kl_loss_cube_block.h
+ * \file sparse_lightning_indexer_grad_kl_loss_cube_block_arch92.h
  * \brief
  */
-#ifndef SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_CUBE_BLOCK_H
-#define SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_CUBE_BLOCK_H
+#ifndef SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_CUBE_BLOCK_ARCH92_H
+#define SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_CUBE_BLOCK_ARCH92_H
 
 #include "../../../common/op_kernel/matmul.h"
 #include "../../../common/op_kernel/FixpipeOut.h"
-#include "sparse_lightning_indexer_grad_kl_loss_regbase_common.h"
+#include "sparse_lightning_indexer_grad_kl_loss_regbase_common_arch92.h"
 namespace SligKlLoss {
 using T = float;
 TEMPLATES_DEF

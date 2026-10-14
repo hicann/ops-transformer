@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file vf_process_vec4.h
+ * \file vf_process_vec4_arch92.h
  * \brief
  */
-#ifndef VF_PROCESS_VEC4_H
-#define VF_PROCESS_VEC4_H
+#ifndef VF_PROCESS_VEC4_ARCH92_H
+#define VF_PROCESS_VEC4_ARCH92_H
 
 #include "kernel_tensor.h"
 
@@ -72,4 +72,4 @@ __aicore__ inline void ProcessVec4Vf(const LocalTensor<T>& dstTensor, const Loca
 }
 } // namespace AscendC
 
-#endif // VF_PROCESS_VEC4_H
+#endif // VF_PROCESS_VEC4_ARCH92_H

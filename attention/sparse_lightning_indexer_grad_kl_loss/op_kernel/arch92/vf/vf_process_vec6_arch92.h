@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file vf_process_vec6.h
+ * \file vf_process_vec6_arch92.h
  * \brief
  */
-#ifndef VF_PROCESS_VEC6_H
-#define VF_PROCESS_VEC6_H
+#ifndef VF_PROCESS_VEC6_ARCH92_H
+#define VF_PROCESS_VEC6_ARCH92_H
 
 #include "kernel_tensor.h"
 
@@ -165,4 +165,4 @@ __aicore__ inline void ProcessVec6Vf(const LocalTensor<INPUT_T>& dstTensor, cons
 }
 } // namespace AscendC
 
-#endif // VF_PROCESS_VEC6_H
+#endif // VF_PROCESS_VEC6_ARCH92_H

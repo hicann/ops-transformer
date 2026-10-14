@@ -16,12 +16,12 @@
 using namespace AscendC;
 
 #if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
-#include "arch92/sparse_lightning_indexer_grad_kl_loss_regbase_common.h"
-#include "arch92/sparse_lightning_indexer_grad_kl_loss_tiling_regbase.h"
-#include "arch92/sparse_lightning_indexer_grad_kl_loss_template_tiling_key_regbase.h"
-#include "arch92/sparse_lightning_indexer_grad_kl_loss_vector_block.h"
-#include "arch92/sparse_lightning_indexer_grad_kl_loss_cube_block.h"
-#include "arch92/sparse_lightning_indexer_grad_kl_loss_kernel_base.h"
+#include "arch92/sparse_lightning_indexer_grad_kl_loss_regbase_common_arch92.h"
+#include "arch92/sparse_lightning_indexer_grad_kl_loss_tiling_regbase_arch92.h"
+#include "arch92/sparse_lightning_indexer_grad_kl_loss_template_tiling_key_regbase_arch92.h"
+#include "arch92/sparse_lightning_indexer_grad_kl_loss_vector_block_arch92.h"
+#include "arch92/sparse_lightning_indexer_grad_kl_loss_cube_block_arch92.h"
+#include "arch92/sparse_lightning_indexer_grad_kl_loss_kernel_base_arch92.h"
 #elif __CCE_AICORE__ == 310
 #include "arch35/sparse_lightning_indexer_grad_kl_loss_regbase_common.h"
 #include "arch35/sparse_lightning_indexer_grad_kl_loss_tiling_regbase.h"

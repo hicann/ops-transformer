@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file sparse_lightning_indexer_grad_kl_loss_template_tiling_key_regbase.h
+ * \file sparse_lightning_indexer_grad_kl_loss_template_tiling_key_regbase_arch92.h
  * \brief
  */
 
-#ifndef SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_TEMPLATE_TILING_KEY_REGBASE_H
-#define SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_TEMPLATE_TILING_KEY_REGBASE_H
+#ifndef SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_TEMPLATE_TILING_KEY_REGBASE_ARCH92_H
+#define SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_TEMPLATE_TILING_KEY_REGBASE_ARCH92_H
 
 #include "ascendc/host_api/tiling/template_argument.h"
 
