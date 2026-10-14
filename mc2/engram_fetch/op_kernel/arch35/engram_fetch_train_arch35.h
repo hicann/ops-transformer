@@ -54,6 +54,7 @@ __aicore__ inline void EngramFetchTrainSyncFunc()
 constexpr uint32_t ENGRAM_TIMEOUT_US = 60U * 1000U * 1000U;
 constexpr uint32_t ENGRAM_CYCLES_PER_US = 1000U;
 constexpr uint32_t ENGRAM_LOCAL_PIPE_DEPTH = 16U;
+constexpr uint32_t ENGRAM_SEND_CHUNK_ROWS = 128U;
 constexpr int STATUS_FLAGS_TIME_CHECK = 1;
 constexpr int SEND_INDICES_REMOTE_TIME_CHECK = 2;
 constexpr int RECV_INDICES_FROM_PEER_TIME_CHECK = 3;
@@ -1485,6 +1486,9 @@ __aicore__ inline void EngramFetchTrainArch35::LocalReadTableAndSendRemote(uint3
         uint32_t spaceToEnd = maxTokensPerSlot_ - (totalSent % maxTokensPerSlot_);
         if (chunkLen > spaceToEnd) {
             chunkLen = spaceToEnd;
+        }
+        if (chunkLen > ENGRAM_SEND_CHUNK_ROWS) {
+            chunkLen = ENGRAM_SEND_CHUNK_ROWS;
         }
         ascendc_assert(chunkLen != 0U, "LocalReadTableAndSend chunkLen is 0");
         int64_t cur = static_cast<int64_t>(rdispl + myStart + totalSent);
