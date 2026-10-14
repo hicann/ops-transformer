@@ -30,43 +30,6 @@ using namespace op;
 extern "C" {
 #endif
 
-// 将int4打包为int32输入的Tensor还原回int4
-aclTensorList* ConvertTensorListToInt4(const aclTensorList* input, aclOpExecutor* executor)
-{
-    if (input == nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "ConvertTensorListToInt4: input is null.");
-        return nullptr;
-    }
-    if (executor == nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "ConvertTensorListToInt4: executor is null.");
-        return nullptr;
-    }
-    constexpr int64_t INT4_NUMS_IN_INT32 = 8; // 每个int32包含8个int4
-    std::vector<aclTensor*> tensors;
-    const int tensorCount = input->Size();
-    for (int i = 0; i < tensorCount; ++i) {
-        auto tensor = (*input)[i];
-        auto viewShape = tensor->GetViewShape();
-        viewShape[viewShape.GetDimNum() - 1] = viewShape[viewShape.GetDimNum() - 1] * INT4_NUMS_IN_INT32;
-        auto inputTemp = executor->CreateView(tensor, viewShape, tensor->GetViewOffset());
-        if (inputTemp == nullptr) {
-            OP_LOGE(ACLNN_ERR_INNER, "ConvertTensorListToInt4: CreateView failed at index %d.", i);
-            return nullptr;
-        }
-        inputTemp->SetDataType(DataType::DT_INT4);
-        inputTemp->SetStorageFormat(Format::FORMAT_FRACTAL_NZ);
-        inputTemp->SetViewFormat(Format::FORMAT_FRACTAL_NZ);
-        tensors.push_back(inputTemp);
-    }
-    aclTensorList* newInput = executor->AllocTensorList(tensors.data(), tensors.size());
-    if (newInput == nullptr) {
-        OP_LOGE(ACLNN_ERR_INNER, "ConvertTensorListToInt4: AllocTensorList failed.");
-        return nullptr;
-    }
-    OP_LOGD("The conversion from int32 to int4 is completed.");
-    return newInput;
-}
-
 static void CreateEmptyTensor(aclDataType dataType, const aclTensorList*& ioList, aclTensorList*& outList,
                               aclOpExecutor* executor)
 {
@@ -153,24 +116,6 @@ aclnnStatus aclnnMegaMoeGetWorkspaceSize(
     CreateEmptyTensor(weightScalesDtype, weightScales2Optional, tmpScaleList, *executor);
     CreateEmptyTensor(weightScalesDtype, sharedWeightScales1Optional, tmpSharedScaleList, *executor);
     CreateEmptyTensor(weightScalesDtype, sharedWeightScales2Optional, tmpSharedScaleList, *executor);
-
-    // 只在DAV_2201架构上对weight进行int32到int4的转换预处理
-    if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_2201) {
-        if (weight1 != nullptr && weight1->Size() > 0 && (*weight1)[0]->GetDataType() == DataType::DT_INT32) {
-            weight1 = ConvertTensorListToInt4(weight1, *executor);
-        }
-        if (weight2 != nullptr && weight2->Size() > 0 && (*weight2)[0]->GetDataType() == DataType::DT_INT32) {
-            weight2 = ConvertTensorListToInt4(weight2, *executor);
-        }
-        if (sharedWeight1Optional != nullptr && sharedWeight1Optional->Size() > 0 &&
-            (*sharedWeight1Optional)[0]->GetDataType() == DataType::DT_INT32) {
-            sharedWeight1Optional = ConvertTensorListToInt4(sharedWeight1Optional, *executor);
-        }
-        if (sharedWeight2Optional != nullptr && sharedWeight2Optional->Size() > 0 &&
-            (*sharedWeight2Optional)[0]->GetDataType() == DataType::DT_INT32) {
-            sharedWeight2Optional = ConvertTensorListToInt4(sharedWeight2Optional, *executor);
-        }
-    }
 
     // shared weight 为空时，使用 MoE weight 的 dtype/format 创建占位 tensor 以完成原型匹配。
     aclDataType moeWeight1Dtype = (weight1 != nullptr && weight1->Size() > 0) ?
