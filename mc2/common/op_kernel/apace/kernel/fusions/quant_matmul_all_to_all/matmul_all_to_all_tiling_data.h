@@ -10,11 +10,13 @@
 
 /*!
  * \file matmul_all_to_all_tiling_data.h
- * \brief Serialized tiling data passed from the host launcher to the kernel.
+ * \brief Serialized tiling data for the MatmulAlltoAll Apace path (Udma and Hcomm variants).
  */
 
 #pragma once
 
+#include <cstdint>
+#include "kernel_tiling/kernel_tiling.h"
 #include "../../../tiling/quant_matmul_tiling_data.h"
 #include "../../../tiling/comm_tiling_data.h"
 #include "../../../core/aiv_comm/collective_comm_context.h"
@@ -29,4 +31,27 @@ struct MatmulAllToAllTilingData {
 struct CommContext {
     Apace::AivComm::CommUdmaContext udmaCtx;
     Apace::AivComm::CommUbmemContext ubmemCtx;
+};
+
+// The legacy operator tiling structure is intentionally not extended.  The Apace
+// branch owns a compact payload whose fields match its Blaze + Hcomm direct
+// pipeline. Blaze already emits the rank-major communication layout.
+struct MatmulAllToAllApaceTilingInfo {
+    uint32_t tileM{0};
+    uint32_t tileCnt{0};
+    uint32_t tailM{0};
+    uint32_t tailCnt{0};
+    uint32_t rankM{0};
+    uint32_t rankN{0};
+    uint32_t rankK{0};
+    uint32_t rankDim{0};
+    uint64_t hcclDataType{0};
+};
+
+struct hcommMatmulAllToAllTilingData {
+    Mc2InitTiling mc2InitTiling;
+    Mc2CcTiling mc2CcTiling;
+    MatmulAllToAllApaceTilingInfo matmulAllToAllTilingInfo;
+    QuantMatmulTilingData tileQbmmTilingData;
+    QuantMatmulTilingData tailQbmmTilingData;
 };

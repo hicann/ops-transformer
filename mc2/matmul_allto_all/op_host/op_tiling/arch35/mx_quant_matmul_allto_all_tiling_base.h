@@ -27,6 +27,7 @@
 #include "quant_batch_matmul_v3/op_kernel/arch35/qbmv3_arch35_tiling_data.h"
 #include "../../../op_kernel/arch35/matmul_allto_all_tiling_data.h"
 #include "../../../op_kernel/arch35/matmul_allto_all_tiling_key.h"
+#include "apace/kernel/fusions/quant_matmul_all_to_all/matmul_all_to_all_tiling_data.h"
 
 namespace MC2Tiling {
 using namespace optiling;
@@ -53,11 +54,13 @@ protected:
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
     ge::graphStatus PostTiling() override;
+    ge::graphStatus GetWorkspaceSize() override;
     uint64_t GetTilingKey() const override;
     CutResult GetTilingResult() override;
     ge::graphStatus CheckOpInputInfo();
     ge::graphStatus InitTilingContextParameters();
     ge::graphStatus DoMxQuantMMTiling();
+    ge::graphStatus DoHcommMxQuantMMTiling();
     ge::graphStatus SetHcclTiling();
     ge::graphStatus CheckMxQuantTensorDataType(const gert::TilingContext* context, const char* opName);
     ge::graphStatus CheckX2Transpose(const gert::TilingContext* context, const char* opName,
@@ -73,13 +76,17 @@ protected:
                                       TilingContextInfo& contextInfo);
     ge::graphStatus CheckMxQuantScaleDataType(const gert::TilingContext* context, const char* opName);
     void SetTilingInfo(MatmulAlltoAllTilingInfo& tilingInfo) const;
+    void SetHcommTilingInfo(MatmulAllToAllApaceTilingInfo& tilingInfo) const;
+    void AlignCutResForKernel(CutResult& cutRes, uint64_t mValue) const;
     void PrintMxQuantMatmulAlltoAllTilingData(QuantMatmulAlltoAllTilingData& outTilingData);
 
 private:
     QuantMatmulAlltoAllTilingData localTilingData_;
     uint64_t mmMvalueLen_ = 0;
+    hcommMatmulAllToAllTilingData hcommTilingData_;
     bool isMxfp4_ = false;
     void PrintMxQuantMatmulAlltoAllTilingInfo(const std::string& opName, MatmulAlltoAllTilingInfo& tilingInfo);
+    bool usingApaceImpl_ = false;
     void PrintMxQuantMMV3TilingData(const std::string& opName,
                                     DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& tiling);
     void PrintExtendMatmulTiling(const std::string& opName, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& tiling);

@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file matmul_allto_all_tiling_key.h
+ * \file matmul_all_to_all_tiling_key.h
  * \brief 定义tiling_key
  */
 #ifndef MATMUL_ALLTO_ALL_TILING_KEY_H
@@ -46,27 +46,43 @@ ASCENDC_TPL_ARGS_DECL(MatmulAlltoAll,
                       ASCENDC_TPL_UINT_DECL(COMMMODE, ASCENDC_TPL_1_BW, ASCENDC_TPL_UI_LIST, COMMMODE_CCU,
                                             COMMMODE_AICPU),
                       ASCENDC_TPL_UINT_DECL(ADDBIASSPLITMODE, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_LIST, ADDBIAS_OFF,
-                                            ADDBIAS_M_SPLIT, ADDBIAS_N_SPLIT, ADDBIAS_MN_SPLIT), );
+                                            ADDBIAS_M_SPLIT, ADDBIAS_N_SPLIT, ADDBIAS_MN_SPLIT),
+                      ASCENDC_TPL_BOOL_DECL(USING_APACE_IMPL, 0, 1), );
 
 // 模板参数组合
-// NON_QUANT_MODE: X2TRANSPOSE(0,1) x DTYPEBIAS(0,1) x COMMMODE(0,1) x ADDBIASSPLITMODE(0,1,2,3)
+// NON_QUANT_MODE: X2TRANSPOSE(0,1) x DTYPEBIAS(0,1) x COMMMODE(0,1) x ADDBIASSPLITMODE(0,1,2,3) x USING_APACE_IMPL(0)
 // KC/MX_QUANT_MODE: ADDBIASSPLITMODE 恒为 OFF
-ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(QUANTMODE, ASCENDC_TPL_UI_LIST, NON_QUANT_MODE),
+// MX_QUANT_MODE + USING_APACE_IMPL(1): Apace 路径, AIC only, 仅支持 X2TRANSPOSE=1
+// 用于调用GET_TPL_TILING_KEY获取TilingKey时，接口内部校验TilingKey是否合法
+ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_2),
+                                     ASCENDC_TPL_UINT_SEL(QUANTMODE, ASCENDC_TPL_UI_LIST, NON_QUANT_MODE),
                                      ASCENDC_TPL_BOOL_SEL(X2TRANSPOSE, 0, 1),
                                      ASCENDC_TPL_UINT_SEL(DTYPEBIAS, ASCENDC_TPL_UI_LIST, DTYPE_BIAS_SAME_WITH_X,
                                                           DTYPE_BIAS_FP32),
                                      ASCENDC_TPL_UINT_SEL(COMMMODE, ASCENDC_TPL_UI_LIST, COMMMODE_CCU, COMMMODE_AICPU),
                                      ASCENDC_TPL_UINT_SEL(ADDBIASSPLITMODE, ASCENDC_TPL_UI_LIST, ADDBIAS_OFF,
-                                                          ADDBIAS_M_SPLIT, ADDBIAS_N_SPLIT, ADDBIAS_MN_SPLIT)),
-                ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(QUANTMODE, ASCENDC_TPL_UI_LIST, KC_QUANT_MODE),
+                                                          ADDBIAS_M_SPLIT, ADDBIAS_N_SPLIT, ADDBIAS_MN_SPLIT),
+                                     ASCENDC_TPL_BOOL_SEL(USING_APACE_IMPL, 0)),
+                ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_2),
+                                     ASCENDC_TPL_UINT_SEL(QUANTMODE, ASCENDC_TPL_UI_LIST, KC_QUANT_MODE),
                                      ASCENDC_TPL_BOOL_SEL(X2TRANSPOSE, 0, 1),
                                      ASCENDC_TPL_UINT_SEL(DTYPEBIAS, ASCENDC_TPL_UI_LIST, DTYPE_BIAS_FP32),
                                      ASCENDC_TPL_UINT_SEL(COMMMODE, ASCENDC_TPL_UI_LIST, COMMMODE_CCU, COMMMODE_AICPU),
-                                     ASCENDC_TPL_UINT_SEL(ADDBIASSPLITMODE, ASCENDC_TPL_UI_LIST, ADDBIAS_OFF)),
-                ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(QUANTMODE, ASCENDC_TPL_UI_LIST, MX_QUANT_MODE),
+                                     ASCENDC_TPL_UINT_SEL(ADDBIASSPLITMODE, ASCENDC_TPL_UI_LIST, ADDBIAS_OFF),
+                                     ASCENDC_TPL_BOOL_SEL(USING_APACE_IMPL, 0)),
+                ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_2),
+                                     ASCENDC_TPL_UINT_SEL(QUANTMODE, ASCENDC_TPL_UI_LIST, MX_QUANT_MODE),
                                      ASCENDC_TPL_BOOL_SEL(X2TRANSPOSE, 0, 1),
                                      ASCENDC_TPL_UINT_SEL(DTYPEBIAS, ASCENDC_TPL_UI_LIST, DTYPE_BIAS_FP32),
                                      ASCENDC_TPL_UINT_SEL(COMMMODE, ASCENDC_TPL_UI_LIST, COMMMODE_CCU, COMMMODE_AICPU),
-                                     ASCENDC_TPL_UINT_SEL(ADDBIASSPLITMODE, ASCENDC_TPL_UI_LIST, ADDBIAS_OFF)), );
+                                     ASCENDC_TPL_UINT_SEL(ADDBIASSPLITMODE, ASCENDC_TPL_UI_LIST, ADDBIAS_OFF),
+                                     ASCENDC_TPL_BOOL_SEL(USING_APACE_IMPL, 0)),
+                ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_AIC_ONLY),
+                                     ASCENDC_TPL_UINT_SEL(QUANTMODE, ASCENDC_TPL_UI_LIST, MX_QUANT_MODE),
+                                     ASCENDC_TPL_BOOL_SEL(X2TRANSPOSE, 1),
+                                     ASCENDC_TPL_UINT_SEL(DTYPEBIAS, ASCENDC_TPL_UI_LIST, DTYPE_BIAS_FP32),
+                                     ASCENDC_TPL_UINT_SEL(COMMMODE, ASCENDC_TPL_UI_LIST, COMMMODE_CCU, COMMMODE_AICPU),
+                                     ASCENDC_TPL_UINT_SEL(ADDBIASSPLITMODE, ASCENDC_TPL_UI_LIST, ADDBIAS_OFF),
+                                     ASCENDC_TPL_BOOL_SEL(USING_APACE_IMPL, 1)));
 
 #endif // MATMUL_ALLTO_ALL_TILING_KEY_H

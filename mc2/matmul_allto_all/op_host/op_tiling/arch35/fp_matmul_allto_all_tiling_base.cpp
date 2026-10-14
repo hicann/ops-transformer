@@ -285,8 +285,10 @@ uint64_t FpMatmulAllToAllTilingBase::GetTilingKey() const
 
     uint8_t addBiasSplitMode = contextInfo.args_.isBias ? ChooseAddBiasSplitMode() : ADDBIAS_OFF;
     const uint64_t tilingKey =
-        GET_TPL_TILING_KEY(NON_QUANT_MODE, x2TransposeFlag, biasDType, commMode, addBiasSplitMode);
-    OP_LOGD(opName_, "QUANTMODE,X2TRANSPOSE,DTYPEBIAS,COMMMODE,ADDBIASSPLITMODE: [%d,%d,%d,%d,%d], TilingKey is [%lu].",
+        GET_TPL_TILING_KEY(NON_QUANT_MODE, x2TransposeFlag, biasDType, commMode, addBiasSplitMode, false);
+    OP_LOGD(opName_,
+            "QUANTMODE,X2TRANSPOSE,DTYPEBIAS,COMMMODE,ADDBIASSPLITMODE,USING_APACE_IMPL: [%d,%d,%d,%d,%d,0], "
+            "TilingKey is [%lu].",
             NON_QUANT_MODE, x2TransposeFlag, biasDType, commMode, addBiasSplitMode, tilingKey);
     return tilingKey;
 }

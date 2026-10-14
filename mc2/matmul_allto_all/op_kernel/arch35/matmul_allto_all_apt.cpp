@@ -27,6 +27,8 @@
 #include "matmul_allto_all_tiling_data.h"
 #include "kc_quant_matmul_allto_all_arch35.h"
 #include "mx_quant_matmul_allto_all_arch35.h"
+#include "../../../common/op_kernel/apace/kernel/fusions/quant_matmul_all_to_all/matmul_all_to_all_tiling_data.h"
+#include "../../../common/op_kernel/apace/kernel/fusions/quant_matmul_all_to_all/matmul_all_to_all_mx_quant_matmul_hcomm_impl.h"
 
 using AscendC::HcclServerType;
 using AscendC::TPipe;
@@ -126,12 +128,23 @@ using MC2KernelTemplate::MC2AlltoAllPrimitives;
     } while (0)
 #endif
 
-template <uint32_t QUANTMODE, bool X2TRANSPOSE, uint32_t DTYPEBIAS, uint32_t COMMMODE, uint32_t ADDBIASSPLITMODE>
+#ifndef MATMUL_ALLTO_ALL_APACE_MX_QUANT_IMPL
+#define MATMUL_ALLTO_ALL_APACE_MX_QUANT_IMPL(tilingData, ServerType) \
+    do { \
+        Apace::MatmulAllToAllMxQuantMatmulHcommImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, hcommMatmulAllToAllTilingData, \
+                                                    ServerType> \
+            op(&tilingData); \
+        op.Init(x1, x2, bias, y, x1Scale, x2Scale, workspaceGM); \
+        op.Run(); \
+    } while (0)
+#endif
+
+template <uint32_t QUANTMODE, bool X2TRANSPOSE, uint32_t DTYPEBIAS, uint32_t COMMMODE, uint32_t ADDBIASSPLITMODE,
+          bool USING_APACE_IMPL>
 __global__ __aicore__ void matmul_allto_all(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR x1Scale, GM_ADDR x2Scale,
                                             GM_ADDR commScale, GM_ADDR x1Offset, GM_ADDR x2Offset, GM_ADDR y,
                                             GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     TPipe pipe;
     constexpr HcclServerType commServerType =
         (COMMMODE == COMMMODE_CCU) ? HcclServerType::HCCL_SERVER_TYPE_CCU : HcclServerType::HCCL_SERVER_TYPE_AICPU;
@@ -148,17 +161,26 @@ __global__ __aicore__ void matmul_allto_all(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias
     }
 #elif ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && (ORIG_DTYPE_X1 == DT_FLOAT4_E2M1))
     REGISTER_TILING_DEFAULT(QuantMatmulAlltoAllTilingData);
-    GET_TILING_DATA_WITH_STRUCT(QuantMatmulAlltoAllTilingData, tilingData, tilingGM);
-
-    MATMUL_ALLTO_ALL_APT_MX_QUANT_IMPL(tilingData, pipe, commServerType);
+    if constexpr (USING_APACE_IMPL) {
+        GET_TILING_DATA_WITH_STRUCT(hcommMatmulAllToAllTilingData, tilingData, tilingGM);
+        MATMUL_ALLTO_ALL_APACE_MX_QUANT_IMPL(tilingData, commServerType);
+    } else {
+        GET_TILING_DATA_WITH_STRUCT(QuantMatmulAlltoAllTilingData, tilingData, tilingGM);
+        MATMUL_ALLTO_ALL_APT_MX_QUANT_IMPL(tilingData, pipe, commServerType);
+    }
 #else
     REGISTER_TILING_DEFAULT(QuantMatmulAlltoAllTilingData);
-    GET_TILING_DATA_WITH_STRUCT(QuantMatmulAlltoAllTilingData, tilingData, tilingGM);
-
     if constexpr (QUANTMODE == KC_QUANT_MODE) {
+        GET_TILING_DATA_WITH_STRUCT(QuantMatmulAlltoAllTilingData, tilingData, tilingGM);
         MATMUL_ALLTO_ALL_APT_KC_QUANT_IMPL(tilingData, pipe, commServerType);
     } else if constexpr (QUANTMODE == MX_QUANT_MODE) {
-        MATMUL_ALLTO_ALL_APT_MX_QUANT_IMPL(tilingData, pipe, commServerType);
+        if constexpr (USING_APACE_IMPL) {
+            GET_TILING_DATA_WITH_STRUCT(hcommMatmulAllToAllTilingData, tilingData, tilingGM);
+            MATMUL_ALLTO_ALL_APACE_MX_QUANT_IMPL(tilingData, commServerType);
+        } else {
+            GET_TILING_DATA_WITH_STRUCT(QuantMatmulAlltoAllTilingData, tilingData, tilingGM);
+            MATMUL_ALLTO_ALL_APT_MX_QUANT_IMPL(tilingData, pipe, commServerType);
+        }
     }
 #endif
 }
