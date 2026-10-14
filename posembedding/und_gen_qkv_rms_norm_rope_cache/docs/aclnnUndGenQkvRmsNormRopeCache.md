@@ -327,7 +327,7 @@ aclnnStatus aclnnUndGenQkvRmsNormRopeCache(
         <td>BFLOAT16</td>
         <td>ND</td>
         <td><code>[T,Hq,D]</code></td>
-        <td>×</td>
+        <td>√</td>
       </tr>
       <tr>
         <td>workspaceSize（uint64_t*）</td>
