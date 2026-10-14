@@ -22,7 +22,7 @@ constexpr int64_t DIM_2 = 2;
 constexpr int64_t DIM_3 = 3;
 constexpr int64_t DIM_4 = 4;
 
-constexpr int64_t SMLA_METADATA_SIZE = 1024;
+constexpr int64_t SMLA_METADATA_SIZE = 2048;
 
 at::Tensor SparseFlashMlaMetadata(
     int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, const c10::optional<at::Tensor>& cuSeqlensQ,

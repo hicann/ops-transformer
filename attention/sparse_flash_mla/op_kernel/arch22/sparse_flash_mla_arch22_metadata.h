@@ -21,9 +21,9 @@
 namespace optiling {
 
 // Constants
-constexpr uint32_t AIC_CORE_NUM = 36;
-constexpr uint32_t AIV_CORE_NUM = 72;
-constexpr uint32_t SMLA_META_SIZE = 1024;
+constexpr uint32_t AIC_CORE_NUM = 80;
+constexpr uint32_t AIV_CORE_NUM = 80;
+constexpr uint32_t SMLA_META_SIZE = 2048;
 using SMLA_METADATA_T = int32_t;
 
 constexpr uint32_t FA_METADATA_SIZE = 9;

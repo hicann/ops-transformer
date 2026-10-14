@@ -66,7 +66,7 @@ struct SmlaCase {
     std::vector<int64_t> attnOutShape = {};
     ge::DataType softmaxLseType = ge::DT_FLOAT;
     bool returnSoftmaxLse = false;
-    std::vector<int64_t> metadataShape = {1024};
+    std::vector<int64_t> metadataShape = {2048};
     std::vector<int64_t> sinksShape = {64};
     ge::DataType sinksType = ge::DT_FLOAT;
     ge::DataType cuSeqLensQType = ge::DT_INT32;
@@ -391,7 +391,7 @@ TEST_F(SparseFlashMlaTilingArch35, test_tiling_950_sinks_dim_failed)
     RunSmlaTilingCase(c, ge::GRAPH_FAILED);
 }
 
-// metadata size must be 1024 on Ascend950
+// metadata size must be 2048 on Ascend950
 TEST_F(SparseFlashMlaTilingArch35, test_tiling_950_metadata_size_failed)
 {
     SmlaCase c;
@@ -786,7 +786,7 @@ TEST_F(SparseFlashMlaTilingArch35, test_tiling_910b_sinks_dtype_failed)
     RunSmlaTilingCase(c, ge::GRAPH_FAILED);
 }
 
-// 910B SWA: metadata size must be 1024
+// 910B SWA: metadata size must be 2048
 TEST_F(SparseFlashMlaTilingArch35, test_tiling_910b_metadata_size_failed)
 {
     SmlaCase c = Make910bCase();

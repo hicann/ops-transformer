@@ -21,7 +21,8 @@
 
 namespace optiling {
 
-constexpr uint32_t SMLA_METADATA_TOTAL_SIZE = 1024;
+constexpr uint32_t SMLA_METADATA_TOTAL_SIZE = 2048;
+
 using SMLA_METADATA_T = int32_t;
 
 namespace detail {

@@ -12,7 +12,8 @@ import torch_npu
 from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
-QSMLA_METADATA_SIZE = 1024
+QSMLA_METADATA_SIZE = 2048
+
 QSMLA_METADATA_OP_NAME = "quant_sparse_flash_mla_metadata"
 
 

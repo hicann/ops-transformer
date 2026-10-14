@@ -14,6 +14,8 @@
 namespace optiling {
 namespace sparse_mla_checker {
 namespace {
+constexpr int64_t METADATA_SIZE_DEFAULT = 2048;
+
 const char* Op(const CheckContext& context)
 {
     return context.opName == nullptr ? "SparseMla" : context.opName;
@@ -26,7 +28,7 @@ ge::graphStatus MetadataChecker::CheckSinglePara(const CheckContext& context) co
         return ge::GRAPH_SUCCESS;
     }
     if (CheckTensorDesc(context, context.metadata, "metadata", {ge::DT_INT32}) != ge::GRAPH_SUCCESS ||
-        CheckShape(context, context.metadata, "metadata", {1024}) != ge::GRAPH_SUCCESS) {
+        CheckShape(context, context.metadata, "metadata", {METADATA_SIZE_DEFAULT}) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;

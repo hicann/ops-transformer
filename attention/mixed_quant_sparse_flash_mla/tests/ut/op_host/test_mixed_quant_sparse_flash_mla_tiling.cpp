@@ -57,7 +57,7 @@ struct MQSmlaCase {
     std::vector<int64_t> oriTopkLengthShape = {};
     std::vector<int64_t> cmpTopkLengthShape = {};
     std::vector<int64_t> sinksShape = {64};
-    std::vector<int64_t> metadataShape = {1024};
+    std::vector<int64_t> metadataShape = {2048};
     ge::DataType qType = ge::DT_BF16;
     ge::DataType kvType = ge::DT_FLOAT8_E4M3FN;
     ge::DataType cmpKvType = ge::DT_FLOAT8_E4M3FN;

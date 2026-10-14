@@ -404,8 +404,12 @@ void SparseFlashMlaMetadataCpuKernel::CalcCmpMaskMode()
 
 ValidSocVersion SparseFlashMlaMetadataCpuKernel::ProcessSocVersion()
 {
+    const std::string ascend960Dt = "Ascend960DT";
+    const std::string ascend960Pr = "Ascend960PR";
     const std::string ascend950 = "Ascend950";
-    if (socVersion_.find(ascend950) != std::string::npos) {
+    if (socVersion_.find(ascend960Dt) != std::string::npos || socVersion_.find(ascend960Pr) != std::string::npos) {
+        return ValidSocVersion::ASCEND960;
+    } else if (socVersion_.find(ascend950) != std::string::npos) {
         return ValidSocVersion::ASCEND950;
     } else {
         return ValidSocVersion::ASCEND910;
@@ -440,10 +444,10 @@ bool SparseFlashMlaMetadataCpuKernel::ParamsInit()
             mBaseSize_ = isSparseCmpKv_ ? groupSize_ : (256U / groupSize_) * groupSize_;
         }
         s2BaseSize_ = 512U;
-    } else if (validSocVersion == ValidSocVersion::ASCEND950) {
+    } else if (validSocVersion == ValidSocVersion::ASCEND950 || validSocVersion == ValidSocVersion::ASCEND960) {
         if (groupSize_ > 64U) {
             isSplitG_ = true;
-            aicCoreNum_ /= 2;
+            aicCoreNum_ /= NUM_2;
         }
         mBaseSize_ = groupSize_;
         s2BaseSize_ = 128U;

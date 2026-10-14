@@ -21,7 +21,8 @@
 
 namespace optiling {
 
-constexpr uint32_t MQSMLA_METADATA_TOTAL_SIZE = 1024;
+constexpr uint32_t MQSMLA_METADATA_TOTAL_SIZE = 2048;
+
 using MQSMLA_METADATA_T = int32_t;
 
 namespace detail {

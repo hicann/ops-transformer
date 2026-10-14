@@ -13,7 +13,8 @@ import torch
 from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
-SMLA_METADATA_SIZE = 1024
+SMLA_METADATA_SIZE = 2048
+
 SMLA_METADATA_OP_NAME = "sparse_flash_mla_metadata"
 
 

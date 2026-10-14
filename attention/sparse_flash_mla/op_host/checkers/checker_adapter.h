@@ -75,6 +75,7 @@ void PopulateCommonContext(CheckContext& context, const TilingInfo& info)
 
     context.qLayout = static_cast<Layout>(static_cast<uint32_t>(info.qLayout));
     context.kvLayout = static_cast<Layout>(static_cast<uint32_t>(info.kvLayout));
+    context.npuArch = info.npuArch;
     context.bSize = info.bSize;
     context.qNumHeads = info.n1Size;
     context.kvNumHeads = info.n2Size;

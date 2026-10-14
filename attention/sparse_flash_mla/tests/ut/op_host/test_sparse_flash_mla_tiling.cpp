@@ -89,7 +89,7 @@ void RunA2SwaOnlyOriKvFp16(int64_t topkValueMode, ge::graphStatus expectedStatus
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -149,7 +149,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_swa_only_ori_kv_bf16_tnd_pa_nd)
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_BF16, ge::FORMAT_ND},
@@ -200,7 +200,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_hca_ori_and_cmp_kv_fp16_tnd_pa_nd)
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -251,7 +251,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_csa_with_sparse_indices_fp16_tnd_pa_nd)
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -302,7 +302,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_csa_with_sparse_indices_bf16_tnd_pa_nd)
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_BF16, ge::FORMAT_ND},
@@ -351,7 +351,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_n1_not_64_failed)
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
         },
         {
             {{{512, 32, 512}, {512, 32, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -400,7 +400,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_ori_kv_null_failed)
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -449,7 +449,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_cmp_sparse_indices_without_cmp_kv_faile
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -498,7 +498,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_unsupported_dtype_failed)
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{}, ge::DT_UNDEFINED, ge::FORMAT_ND},
             {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData},
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
@@ -932,7 +932,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_mock_950_swa_only_ori_kv_fp16_tnd_pa_bb
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                   // ori_topk_length
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                   // cmp_topk_length
             {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},                               // sinks
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData}        // metadata
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND, true, metadataData}        // metadata
         },
         {
             {{{512, 64, 512}, {512, 64, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // attn_out

@@ -22,8 +22,8 @@
 namespace optiling {
 
 // Constants
-constexpr uint32_t AIC_CORE_MAX_NUM = 36;
-constexpr uint32_t AIV_CORE_MAX_NUM = 72;
+constexpr uint32_t AIC_CORE_MAX_NUM = 80;
+constexpr uint32_t AIV_CORE_MAX_NUM = 80;
 
 constexpr uint32_t FA_METADATA_SIZE = 9;
 constexpr uint32_t FD_METADATA_SIZE = 8;

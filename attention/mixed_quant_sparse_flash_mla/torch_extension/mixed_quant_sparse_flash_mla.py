@@ -11,7 +11,8 @@ import torch
 from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
-MQSMLA_METADATA_SIZE = 1024
+MQSMLA_METADATA_SIZE = 2048
+
 MQSMLA_METADATA_OP_NAME = "mixed_quant_sparse_flash_mla_metadata"
 
 

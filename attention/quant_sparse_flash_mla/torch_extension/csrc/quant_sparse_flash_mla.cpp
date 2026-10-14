@@ -26,7 +26,7 @@ const int DIM_2 = 2;
 const int DIM_3 = 3;
 const int DIM_4 = 4;
 
-constexpr int64_t QSMLA_METADATA_SIZE = 1024;
+constexpr int64_t QSMLA_METADATA_SIZE = 2048;
 
 inline TensorWrapper QsmlaMakeWrapper(const at::Tensor& tensor, aclDataType tensorAcltype)
 {
