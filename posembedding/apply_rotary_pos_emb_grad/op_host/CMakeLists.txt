@@ -18,6 +18,8 @@ endif()
 set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})
 if("${CONDITION_UNIT}" STREQUAL "ascend950")
     set(apply_rotary_pos_emb_grad_apt_depends posembedding/apply_rotary_pos_emb CACHE INTERNAL "Dependencies for apply_rotary_pos_emb_grad")
+elseif("${CONDITION_UNIT}" STREQUAL "ascend350")
+    set(apply_rotary_pos_emb_grad_apt_depends posembedding/apply_rotary_pos_emb CACHE INTERNAL "Dependencies for apply_rotary_pos_emb_grad")
 endif()
 
 if (BUILD_OPS_RTY_KERNEL)
