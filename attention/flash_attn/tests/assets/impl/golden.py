@@ -12,7 +12,10 @@
 
 """FlashAttn golden reference implementation and TTK adapter."""
 
+import importlib.util
 import math
+import sys
+from pathlib import Path
 from typing import Optional, Tuple
 
 import torch
@@ -95,6 +98,8 @@ class FlashAttnGolden:
                     )
 
         orig_dtype = q.dtype
+        # P 的量化精度(算子 vector->Cube 交接时 exp 权重 cast 到输入精度)
+        self._p_dtype = orig_dtype
         scale = softmax_scale if softmax_scale is not None else self._softmax_scale
 
         if device_mode == "cpu":
@@ -484,13 +489,20 @@ class FlashAttnGolden:
         TILES_KV = (Skv + BS - 1) // BS
 
         out = torch.zeros(Sq, dv, dtype=torch.float32, device=q.device)
-        o_sum = torch.zeros(Sq, 1, dtype=torch.float32, device=q.device)
-        o_max = torch.full(
-            (Sq, 1),
-            torch.finfo(torch.float32).min,
-            dtype=torch.float32,
-            device=q.device,
-        )
+        if sink is not None:
+            # attention sink 等效于一个恒有 exp(sink) 权重、value=0 的虚拟 KV
+            o_sum = torch.ones(Sq, 1, dtype=torch.float32, device=q.device)
+            o_max = torch.full(
+                (Sq, 1), float(sink), dtype=torch.float32, device=q.device
+            )
+        else:
+            o_sum = torch.zeros(Sq, 1, dtype=torch.float32, device=q.device)
+            o_max = torch.full(
+                (Sq, 1),
+                torch.finfo(torch.float32).min,
+                dtype=torch.float32,
+                device=q.device,
+            )
 
         Q_BLOCKS = list(torch.split(q, BS, dim=0))
         K_BLOCKS = list(torch.split(k, BS, dim=0))
@@ -539,7 +551,9 @@ class FlashAttnGolden:
                 s_block = P_ij.sum(dim=-1, keepdim=True)
 
                 update_old = torch.exp(mi - m_new)
-                P_V = torch.matmul(P_ij, Vj[: Kj.shape[0], :])
+                # 与 FlashMLA golden 对齐: PV 用量化到输入精度的 exp 权重,
+                # sum 与累加仍是 FP32。
+                P_V = torch.matmul(P_ij.to(self._p_dtype).float(), Vj[: Kj.shape[0], :])
 
                 o_BLOCKS[i] = update_old * oi + P_V
                 s_BLOCKS[i] = update_old * si + s_block
@@ -577,10 +591,13 @@ class FlashAttnGolden:
         row_sum = exp_scores.sum(dim=-1, keepdim=True)
 
         if sink is not None:
-            row_sum = row_sum + math.exp(sink - row_max)
+            row_sum = row_sum + torch.exp(sink - row_max)
 
-        probs = exp_scores / (row_sum + self.EPSILON)
-        out = torch.matmul(probs, v)
+        # 与 FlashMLA golden 对齐: 未归一化 exp 权重先量化到输入精度再进
+        # PV(算子 vector->Cube 交接的 P cast), sum 用未舍入权重, PV FP32
+        # 累加, 最后除以 FP32 sum。
+        quantized = exp_scores.to(self._p_dtype).float()
+        out = torch.matmul(quantized, v) / (row_sum + self.EPSILON)
 
         lse = torch.log(row_sum + self.EPSILON) + row_max
         lse = lse.squeeze(-1)
@@ -687,6 +704,77 @@ def _derive_head_dims(q, k, layout_q, layout_kv):
     return num_heads_q, num_heads_kv, head_dim
 
 
+def _load_cross_check():
+    """Lazily load the sibling cross_check module by a stable module name."""
+    name = "fa_ttk_flash_attn_cross_check"
+    if name in sys.modules:
+        return sys.modules[name]
+    path = Path(__file__).with_name("cross_check.py")
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot create import spec for {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(name, None)
+        raise
+    return module
+
+
+def _run_reference(golden_cls, arguments):
+    """Shared CPU adapter: derive heads, run forward_golden, drop suppressed LSE."""
+    layout_q = arguments["layout_q"]
+    layout_kv = arguments["layout_kv"]
+    q_cpu = _to_cpu(arguments["q"])
+    k_cpu = _to_cpu(arguments["k"])
+    v_cpu = _to_cpu(arguments["v"])
+
+    num_heads_q, num_heads_kv, head_dim = _derive_head_dims(
+        q_cpu, k_cpu, layout_q, layout_kv
+    )
+
+    golden = golden_cls(
+        num_heads_q=num_heads_q,
+        num_heads_kv=num_heads_kv,
+        head_dim=head_dim,
+        softmax_scale=float(arguments["softmax_scale"]),
+    )
+
+    out, lse = golden.forward_golden(
+        q_cpu,
+        k_cpu,
+        v_cpu,
+        block_table=_to_cpu(arguments.get("block_table")),
+        cu_seqlens_q=_to_cpu(arguments.get("cu_seqlens_q")),
+        cu_seqlens_kv=_to_cpu(arguments.get("cu_seqlens_kv")),
+        seqused_q=_to_cpu(arguments.get("seqused_q")),
+        seqused_kv=_to_cpu(arguments.get("seqused_kv")),
+        sinks=_to_cpu(arguments.get("sinks")),
+        softmax_scale=float(arguments["softmax_scale"]),
+        mask_mode=int(arguments["mask_mode"]),
+        win_left=int(arguments["win_left"]),
+        win_right=int(arguments["win_right"]),
+        max_seqlen_q=int(arguments["max_seqlen_q"])
+        if arguments.get("max_seqlen_q") is not None
+        else -1,
+        max_seqlen_kv=int(arguments["max_seqlen_kv"])
+        if arguments.get("max_seqlen_kv") is not None
+        else -1,
+        layout_q=layout_q,
+        layout_kv=layout_kv,
+        layout_out=arguments["layout_out"],
+        return_softmax_lse=bool(arguments["return_softmax_lse"]),
+        device_mode="cpu",
+        compute_mode="full",
+    )
+
+    if not arguments["return_softmax_lse"]:
+        lse = None
+    return out, lse
+
+
 def cpu_flash_attn(
     q: torch.Tensor,
     k: torch.Tensor,
@@ -714,56 +802,10 @@ def cpu_flash_attn(
     **_unused,
 ):
     """Compute CPU golden reference using FlashAttnGolden."""
-    if sinks is not None:
-        message = "FlashAttn golden does not support sinks yet"
-        print(message)
-        raise NotImplementedError(message)
-
-    q_cpu = _to_cpu(q)
-    k_cpu = _to_cpu(k)
-    v_cpu = _to_cpu(v)
-    bt_cpu = _to_cpu(block_table)
-    cu_q_cpu = _to_cpu(cu_seqlens_q)
-    cu_kv_cpu = _to_cpu(cu_seqlens_kv)
-    sq_cpu = _to_cpu(seqused_q)
-    skv_cpu = _to_cpu(seqused_kv)
-    sinks_cpu = _to_cpu(sinks)
-
-    num_heads_q, num_heads_kv, head_dim = _derive_head_dims(
-        q_cpu, k_cpu, layout_q, layout_kv
-    )
-
-    golden = FlashAttnGolden(
-        num_heads_q=num_heads_q,
-        num_heads_kv=num_heads_kv,
-        head_dim=head_dim,
-        softmax_scale=float(softmax_scale),
-    )
-
-    out, lse = golden.forward_golden(
-        q_cpu,
-        k_cpu,
-        v_cpu,
-        block_table=bt_cpu,
-        cu_seqlens_q=cu_q_cpu,
-        cu_seqlens_kv=cu_kv_cpu,
-        seqused_q=sq_cpu,
-        seqused_kv=skv_cpu,
-        sinks=sinks_cpu,
-        softmax_scale=float(softmax_scale),
-        mask_mode=int(mask_mode),
-        win_left=int(win_left),
-        win_right=int(win_right),
-        max_seqlen_q=int(max_seqlen_q) if max_seqlen_q is not None else -1,
-        max_seqlen_kv=int(max_seqlen_kv) if max_seqlen_kv is not None else -1,
-        layout_q=layout_q,
-        layout_kv=layout_kv,
-        layout_out=layout_out,
-        return_softmax_lse=bool(return_softmax_lse),
-        device_mode="cpu",
-        compute_mode="full",
-    )
-
-    if not return_softmax_lse:
-        lse = None
-    return out, lse
+    cross_check = _load_cross_check()
+    if cross_check.enabled():
+        return cross_check.get_case(_unused.get("testcase_name"))[0]
+    arguments = dict(locals())
+    arguments.pop("_unused")
+    arguments.pop("cross_check")
+    return _run_reference(FlashAttnGolden, arguments)

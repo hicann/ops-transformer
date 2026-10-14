@@ -16,11 +16,25 @@ All impl modules are loaded lazily to avoid import-time failures.
 """
 
 import importlib.util
+import sys
 from pathlib import Path
 
 ASSET_IMPL_DIR = Path(__file__).with_name("impl")
 
 _impl_cache = {}
+
+
+def _load_cross_check_module():
+    """Lazily load cross_check by a stable module name (shared with impl)."""
+    name = "fa_ttk_flash_attn_cross_check"
+    if name in sys.modules:
+        return sys.modules[name]
+    path = ASSET_IMPL_DIR / "cross_check.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def _load_impl_module(stem):
@@ -72,8 +86,14 @@ class FlashAttnSpec:
     }
 
     @staticmethod
-    def compare(*outputs, **kwargs):
-        return _load_impl_module("compare").compare(*outputs, **kwargs)
+    def compare(*outputs, compare_context=None, **kwargs):
+        cross_check = _load_cross_check_module()
+        if cross_check.enabled():
+            return cross_check.compare(
+                *outputs,
+                testcase_name=getattr(compare_context, "testcase_name", None),
+            )
+        return _load_impl_module("compare").compare(*outputs)
 
     torch_graph = _load_impl_module("graph").FlashAttnAclGraph
 

@@ -19,7 +19,30 @@ Rule: only fill tensors that are provided (not None). Do not auto-generate
 missing parameters — use them if present, skip if absent.
 """
 
+import importlib.util
+import sys
+from pathlib import Path
+
 import torch
+
+
+def _load_cross_check():
+    """Lazily load the sibling cross_check module by a stable module name."""
+    name = "fa_ttk_flash_attn_cross_check"
+    if name in sys.modules:
+        return sys.modules[name]
+    path = Path(__file__).with_name("cross_check.py")
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot create import spec for {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(name, None)
+        raise
+    return module
 
 
 def _to_int_list(value):
@@ -116,6 +139,8 @@ def customize_inputs(
     All data is generated on CPU then copied to the target tensor's device.
     Only fills tensors that are provided; missing parameters are left as-is.
     """
+    arguments = dict(locals())
+    arguments.pop("kwargs")
     block_size = kwargs.get("block_size")
 
     # 小整数张量(cu_seqlens/seqused)的值经 *_values attr 传入(避免与
@@ -139,3 +164,5 @@ def customize_inputs(
         _fill_attn_mask(attn_mask, mask_mode, win_left, win_right)
 
     randomize_metadata(metadata)
+
+    _load_cross_check().prepare(arguments, kwargs.get("testcase_name"))
