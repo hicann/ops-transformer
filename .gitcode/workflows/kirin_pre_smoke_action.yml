@@ -28,6 +28,14 @@ on:
         required: false
         type: string
         default: 'attention ffn gmm mamba mc2 mhc moe posembedding'
+      kirin_repo_url:
+        required: false
+        type: string
+        default: 'https://gitcode.com/funna2000/kirin_cann_test.git'
+      kirin_repo_ref:
+        required: false
+        type: string
+        default: 'v1.0.0'
 
 env:
   org_name: ${{ vars.ORG_NAME }}
@@ -82,11 +90,41 @@ jobs:
           cd ${{ steps.process_checkout.outputs.path }}
           echo "#########################打印SN号#########################"
           hdc list targets
-          echo "#########################下载kirin_cann_test代码仓#########################"
+          echo "#########################下载kirin_cann_test代码仓（固定tag，失败重试并确认文件完整性）#########################"
+          max_attempts=3
+          wait_seconds=5
+          attempt=1
+          cases_baseline="${{ inputs.cases_baseline }}"
+          if [[ -z "${cases_baseline}" ]]; then
+            cases_baseline="transformer.json"
+          fi
           rm -rf kirin_cann_test
-          git clone https://gitcode.com/funna2000/kirin_cann_test.git
+          while true; do
+            echo "clone attempt ${attempt}/${max_attempts} (ref: ${{ inputs.kirin_repo_ref }})"
+            clone_ok=0
+            if git clone --depth 1 -b "${{ inputs.kirin_repo_ref }}" "${{ inputs.kirin_repo_url }}"; then
+              # 确认文件完整性：后续步骤依赖的目录与基线用例文件必须存在（缺失则清理后重下）
+              if [[ -d kirin_cann_test/harmony-infer-chs && -f "kirin_cann_test/harmony-infer-chs/${cases_baseline}" ]]; then
+                clone_ok=1
+              else
+                echo "integrity check failed: missing harmony-infer-chs or baseline cases file (${cases_baseline})"
+              fi
+            fi
+            if [[ "${clone_ok}" == "1" ]]; then
+              break
+            fi
+            rm -rf kirin_cann_test
+            if [[ "${attempt}" -ge "${max_attempts}" ]]; then
+              echo "ERROR: failed to download complete kirin_cann_test (ref: ${{ inputs.kirin_repo_ref }}) after ${max_attempts} attempts"
+              exit 1
+            fi
+            echo "attempt ${attempt} failed, retrying in ${wait_seconds}s"
+            sleep "${wait_seconds}"
+            attempt=$((attempt + 1))
+            wait_seconds=$((wait_seconds * 2))
+          done
+          echo "kirin_cann_test downloaded and integrity verified: ref=${{ inputs.kirin_repo_ref }}"
           cd kirin_cann_test/harmony-infer-chs
-          cp ../entry-default-signed.hap ./
       -
         name: filter_cases_by_pr_filelist
         identifier: filter_cases
