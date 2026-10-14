@@ -18,7 +18,7 @@ SMLAG_METADATA_OP_NAME = "sparse_flash_mla_grad_metadata"
 
 def _is_ascend950():
     try:
-        return "Ascend950" in torch.npu.get_device_name(0)
+        return ("Ascend950" or "Ascend960") in torch.npu.get_device_name(0)
     except Exception:
         return False
 

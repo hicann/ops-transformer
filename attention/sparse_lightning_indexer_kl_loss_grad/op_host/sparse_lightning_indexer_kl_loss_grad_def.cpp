@@ -18,7 +18,8 @@
 namespace ops {
 class SparseLightningIndexerKLLossGrad : public OpDef {
 public:
-    explicit SparseLightningIndexerKLLossGrad(const char *name) : OpDef(name)
+    explicit SparseLightningIndexerKLLossGrad(const char* name)
+        : OpDef(name)
     {
         this->Input("q")
             .ParamType(REQUIRED)
@@ -106,7 +107,9 @@ public:
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn");
         this->AICore().AddConfig("ascend910b", aicore_config);
         this->AICore().AddConfig("ascend910_93", aicore_config);
-		this->AICore().AddConfig("ascend950", aicore_config);
+        this->AICore().AddConfig("ascend950", aicore_config);
+        this->AICore().AddConfig("ascend960dt", aicore_config);
+        this->AICore().AddConfig("ascend960pr", aicore_config);
     }
 };
 OP_ADD(SparseLightningIndexerKLLossGrad);

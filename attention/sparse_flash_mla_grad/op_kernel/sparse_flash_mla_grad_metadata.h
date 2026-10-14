@@ -21,8 +21,8 @@
 namespace optiling {
 
 // Constants
-constexpr uint32_t AIC_CORE_MAX_NUM = 36;
-constexpr uint32_t AIV_CORE_MAX_NUM = 72;
+constexpr uint32_t AIC_CORE_MAX_NUM = 80;
+constexpr uint32_t AIV_CORE_MAX_NUM = 80;
 constexpr uint32_t SMLAG_METADATA_TOTAL_SIZE = 1024;
 using SMLAG_METADATA_T = int32_t;
 

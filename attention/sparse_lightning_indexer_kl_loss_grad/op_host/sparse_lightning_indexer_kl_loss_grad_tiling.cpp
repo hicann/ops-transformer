@@ -81,6 +81,9 @@ ge::graphStatus TilingSparseLightningIndexerKLLossGrad(gert::TilingContext* cont
     if (sligPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
         OP_LOGW(context, "Current npu arch is dav-3510.");
         return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);
+    } else if (sligPlatform.GetCurNpuArch() == NpuArch::DAV_9201 || sligPlatform.GetCurNpuArch() == NpuArch::DAV_9202) {
+        OP_LOGW(context, "Current npu arch is dav-9201 or dav-9202.");
+        return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);
     } else {
         OP_LOGW(context, "Current npu arch is not dav-3510.");
         SparseLightningIndexerKLLossGradTilingBase sligKLLossTiling(context);

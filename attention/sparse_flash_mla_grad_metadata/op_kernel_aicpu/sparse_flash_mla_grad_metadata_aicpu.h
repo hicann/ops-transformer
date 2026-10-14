@@ -57,7 +57,8 @@ enum class SparseMode : uint8_t {
 
 enum class ValidSocVersion {
     ASCEND910 = 0,
-    ASCEND950
+    ASCEND950,
+    ASCEND960
 };
 
 template <class T>

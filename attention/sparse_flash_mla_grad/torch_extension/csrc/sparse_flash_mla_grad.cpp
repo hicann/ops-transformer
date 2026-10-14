@@ -24,7 +24,8 @@ constexpr int64_t SMLAG_METADATA_SIZE = 1024;
 bool IsAscend950()
 {
     const char* socName = aclrtGetSocName();
-    return socName != nullptr && std::strstr(socName, "Ascend950") != nullptr;
+    return socName != nullptr &&
+           (std::strstr(socName, "Ascend950") != nullptr || std::strstr(socName, "Ascend960") != nullptr);
 }
 
 at::Tensor SparseFlashMlaGradMetadata(

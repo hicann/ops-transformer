@@ -481,7 +481,8 @@ aclnnStatus ParamsCheckSli(const aclTensor* cuSeqlensQOptional, const aclTensor*
 {
     // A2/A3 校验
     const std::string ascend950 = "Ascend950";
-    if (socVersion.find(ascend950) == std::string::npos) {
+    const std::string ascend960 = "Ascend960";
+    if (socVersion.find(ascend950) == std::string::npos && socVersion.find(ascend960) == std::string::npos) {
         auto ret = CheckSingleParamSli(batchSize, maxSeqlenQ, maxSeqlenK, numHeadsQ, numHeadsK, headDim, topk,
                                        layoutQOptional, layoutKOptional, maskMode, cmpRatio, aicCoreNum, aivCoreNum,
                                        socVersion, SLI_TOPK_UPPER_BOUND_A3);

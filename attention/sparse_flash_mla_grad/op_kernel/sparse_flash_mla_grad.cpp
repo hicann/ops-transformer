@@ -17,6 +17,10 @@
 #include "arch35/sparse_flash_mla_grad_template_tiling_key.h"
 #include "arch35/sparse_flash_mla_grad_tiling_data_regbase.h"
 #include "arch35/sparse_flash_mla_grad_entry_regbase.h"
+#elif (defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)))
+#include "arch92/sparse_flash_mla_grad_template_tiling_key.h"
+#include "arch92/sparse_flash_mla_grad_tiling_data_regbase.h"
+#include "arch92/sparse_flash_mla_grad_entry_regbase.h"
 #else
 #include "lib/matmul_intf.h"
 #include "sparse_flash_mla_grad_template_tiling_key.h"
@@ -26,7 +30,7 @@
 #include "kernel_operator.h"
 using namespace AscendC;
 
-#if __CCE_AICORE__ == 310
+#if (__CCE_AICORE__ == 310) || (defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)))
 template <uint8_t inputDType, bool isTnd, uint16_t gTemplateType, uint16_t s2TemplateType, uint16_t dTemplateType,
           bool isOriKVExist, bool isCmpKVExist, bool isOriKVSparse, bool isCmpKVSparse, bool deterministic>
 __global__ __aicore__ void sparse_flash_mla_grad(
@@ -71,7 +75,11 @@ __global__ __aicore__ void sparse_flash_mla_grad(
     __gm__ uint8_t* d_cmp_kv, __gm__ uint8_t* d_sinks, __gm__ uint8_t* ori_softmax_l1_norm,
     __gm__ uint8_t* cmp_softmax_l1_norm, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling_data)
 {
+#if (defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)))
+    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+#else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+#endif
 
     if constexpr (ORIG_DTYPE_QUERY == DT_FLOAT16) {
         if (MODE == SMLAG_SCFA_MODE) {

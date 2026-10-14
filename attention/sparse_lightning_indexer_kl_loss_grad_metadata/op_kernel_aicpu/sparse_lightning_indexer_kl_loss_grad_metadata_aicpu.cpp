@@ -16,6 +16,7 @@
 #include "sparse_lightning_indexer_kl_loss_grad_metadata_aicpu.h"
 #include "arch22/sparse_lightning_indexer_kl_loss_grad_metadata_aicpu_arch22.h"
 #include "arch35/sparse_lightning_indexer_kl_loss_grad_metadata_aicpu_arch35.h"
+#include "arch92/sparse_lightning_indexer_kl_loss_grad_metadata_aicpu_arch92.h"
 
 namespace aicpu {
 
@@ -32,14 +33,17 @@ public:
         }
         if (socVersion.find("Ascend910") != std::string::npos) {
             return arch22Kernel_.Compute(ctx);
-        } else {
+        } else if (socVersion.find("Ascend950") != std::string::npos) {
             return arch35Kernel_.Compute(ctx);
+        } else {
+            return arch92Kernel_.Compute(ctx);
         }
     }
 
 private:
     SparseLightningIndexerKLLossGradMetadataCpuKernelArch22 arch22Kernel_;
     SparseLightningIndexerKLLossGradMetadataCpuKernelArch35 arch35Kernel_;
+    SparseLightningIndexerKLLossGradMetadataCpuKernelArch92 arch92Kernel_;
 };
 
 static const char* kernelType = "SparseLightningIndexerKLLossGradMetadata";

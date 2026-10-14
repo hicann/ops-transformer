@@ -398,8 +398,11 @@ void SparseFlashMlaGradMetadataCpuKernel::CalcCmpMaskMode()
 ValidSocVersion SparseFlashMlaGradMetadataCpuKernel::ProcessSocVersion()
 {
     const std::string ascend950 = "Ascend950";
+    const std::string ascend960 = "Ascend960";
     if (socVersion_.find(ascend950) != std::string::npos) {
         return ValidSocVersion::ASCEND950;
+    } else if (socVersion_.find(ascend960) != std::string::npos) {
+        return ValidSocVersion::ASCEND960;
     } else {
         return ValidSocVersion::ASCEND910;
     }

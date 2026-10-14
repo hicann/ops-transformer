@@ -18,7 +18,8 @@
 namespace ops {
 class SparseFlashMlaGrad : public OpDef {
 public:
-    explicit SparseFlashMlaGrad(const char *name) : OpDef(name)
+    explicit SparseFlashMlaGrad(const char* name)
+        : OpDef(name)
     {
         this->Input("query")
             .ParamType(REQUIRED)
@@ -212,6 +213,8 @@ public:
         this->AICore().AddConfig("ascend910b", aicore_config);
         this->AICore().AddConfig("ascend910_93", aicore_config);
         this->AICore().AddConfig("ascend950", aicore_config);
+        this->AICore().AddConfig("ascend960dt", aicore_config);
+        this->AICore().AddConfig("ascend960pr", aicore_config);
     }
 };
 OP_ADD(SparseFlashMlaGrad);
