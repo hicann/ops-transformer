@@ -34,6 +34,7 @@ extern "C" {
  * moe专家对各个token的logit大小，矩阵乘的计算输出与该logit做乘法，然后索引进行combine，数据类型支持：float32。
  * @param [in] rowIndexOptional:
  * moe专家输出按照该rowIndex进行combine，其中的值即为combine做scatter add的索引，数据类型支持：int64。
+ * @param [in] dtype: 计算的输出类型，0：FLOAT32；1：FLOAT16；2：BFLOAT16。目前仅支持0。
  * @param [in] sharedInputWeight:
  * 共享专家与moe专家进行combine的系数，shareInput先于该参数乘，然后在和moe专家结果累加，数据类型支持：float32。
  * @param [in] sharedInputOffset: 共享专家输出的在总输出中的偏移，数据类型支持：int64。
