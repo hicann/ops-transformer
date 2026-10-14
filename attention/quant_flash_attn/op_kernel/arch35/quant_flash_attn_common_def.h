@@ -198,20 +198,18 @@ struct RunInfoX {
     uint32_t actSingleLoopS2SizeAlign;
     bool isS2SplitCore = false;
     uint32_t faTmpOutWsPos = 0;
-    uint32_t kvTailLen = 0; // Number of BF16 V tail tokens in the current batch (<64).
-    // 本task为v_tail尾task(纯尾或拆分尾半步): 强制按ND范式执行
-    // (Mmad0/FixpipeMm1/VF bf16直出/L1直搬/尾片乘全部复用decode已验证路径),
-    // 主体task保持DN; DN的FixpipeMm1Dn双核交错布局不适用于尾task的P直搬链
-    bool isVtailTask = false;
-    // 本行最后一个DN主体task(最后块主体半步或非拆分末块):
-    // IterateBmm1Dn据此释放l1Q slot(尾task的ND范式Q装载需Wait)
-    bool isLastDnTask = false;
 
     int64_t preTokensLeftUp = 0;
     int64_t nextTokensLeftUp = 0;
 
     uint64_t qPaddingBeginOffset = 0;
     uint64_t kvPaddingBeginOffset = 0;
+};
+
+struct RunInfoVTailX : RunInfoX {
+    uint32_t kvTailLen = 0;
+    bool isVtailTask = false;
+    bool isLastDnTask = false;
 };
 
 struct StridesConstInfo {
@@ -253,10 +251,6 @@ struct CommonConstInfo {
     uint32_t accumOutSize;
     uint32_t logSumExpSize;
 
-    // V tail (高精窗口)
-    uint32_t seqUsedKvTailSize = 0;
-    uint32_t tailMaxBlockNum = 0;
-
     FA_LAYOUT outputLayout;
     bool needInitOutput;
     bool enableFlashDecode;
@@ -265,7 +259,6 @@ struct CommonConstInfo {
     StridesConstInfo valueStrides;
     StridesConstInfo kDescaleStrides;
     StridesConstInfo vDescaleStrides;
-    StridesConstInfo vTailStrides;
 };
 
 struct PAConstInfo {
@@ -283,5 +276,11 @@ struct SinkConstInfo {
 };
 
 struct ConstInfo_t : CommonConstInfo, PAConstInfo, LseConstInfo, SinkConstInfo {};
+
+struct ConstInfoVTail_t : ConstInfo_t {
+    uint32_t seqUsedKvTailSize = 0;
+    uint32_t tailMaxBlockNum = 0;
+    StridesConstInfo vTailStrides;
+};
 
 #endif // QUANT_FLASH_ATTN_COMMON_DEF_H_

@@ -54,13 +54,25 @@ __aicore__ inline constexpr GmFormat GetKVGmFormat()
     }
 }
 
+// Only the enabled specialization owns the BF16 V-tail addressing objects.
+template <bool hasVTail, GmFormat kvFormat>
+struct QuantFlashAttnCubeVTailState {};
+
+template <GmFormat kvFormat>
+struct QuantFlashAttnCubeVTailState<true, kvFormat> {
+    CopyKvGmToL1<bfloat16_t, kvFormat> copyVTailGmToL1_;
+    FaGmTensor<bfloat16_t, kvFormat, int32_t, GmLayoutParams<kvFormat>::CATEGORY == FormatCategory::GM_KV_TND> vTailGm_;
+    GlobalTensor<int32_t> vTailBttGm_;
+};
+
 template <typename INPUT_T, typename T, LayOutTypeEnum layout = LayOutTypeEnum::None,
           S1TemplateType s1TemplateType = S1TemplateType::Aligned128,
           S2TemplateType s2TemplateType = S2TemplateType::Aligned128,
           DTemplateType dTemplateType = DTemplateType::Aligned128,
           DTemplateType dVTemplateType = DTemplateType::Aligned128, uint8_t KvLayoutType = 0, bool useDn = false,
           bool isDAligned = true, bool hasVTail = false>
-class QuantFlashAttnBlockCubeMxfp8 {
+class QuantFlashAttnBlockCubeMxfp8
+    : private QuantFlashAttnCubeVTailState<hasVTail, GetKVGmFormat<layout, KvLayoutType, (KvLayoutType > 0)>()> {
 public:
     /* ============确定L0A的类型============= */
     struct L0ABuffSel {
@@ -158,7 +170,8 @@ public:
     using FaGmTensorKScale = FaGmTensor<SCALE_T, K_SCALE_FORMAT, int32_t, KV_NEEDS_WZH>;
     using FaGmTensorVScale = FaGmTensor<SCALE_T, V_SCALE_FORMAT, int32_t, KV_NEEDS_WZH>;
 
-    using ConstInfoX = ConstInfo_t;
+    using ConstInfoX = std::conditional_t<HAS_V_TAIL, ConstInfoVTail_t, ConstInfo_t>;
+    using RunInfoX = std::conditional_t<HAS_V_TAIL, RunInfoVTailX, ::RunInfoX>;
     TPipe* tPipe_ = nullptr;
     /* =====================GM变量(with layout)==================== */
     FaGmTensorQ queryGm_;
@@ -174,10 +187,6 @@ public:
 
     CopyQueryGmToL1<Q_T, Q_FORMAT, L1Format::NZ, Q_M_LAYOUT> copyQueryGmToL1_;
     CopyKvGmToL1<KV_T, KV_FORMAT> copyKvGmToL1_;
-    // VTAIL uses the same paged layout as the main KV cache.
-    CopyKvGmToL1<bfloat16_t, KV_FORMAT> copyVTailGmToL1_;
-    FaGmTensor<bfloat16_t, KV_FORMAT, int32_t, KV_NEEDS_WZH> vTailGm_; // v_tail GM视图(同主KV布局)
-    GlobalTensor<int32_t> vTailBttGm_;                                 // v_tail专用block table(PA)
     CopyQueryScaleGmToL1<SCALE_T, Q_SCALE_FORMAT> copyQueryScaleGmToL1_;
     KeyScaleGmToL1Type copyKeyScaleGmToL1_;
     ValueScaleGmToL1Type copyValueScaleGmToL1_;
@@ -287,25 +296,33 @@ public:
         }
     }
 
+    __aicore__ inline bool IsLastDnTask(const RunInfoX& runInfo) const
+    {
+        if constexpr (HAS_V_TAIL) {
+            return runInfo.isLastDnTask;
+        }
+        return runInfo.isLastS2Loop;
+    }
+
     __aicore__ inline void InitVTailBuffer(__gm__ uint8_t* vTail, __gm__ uint8_t* blockTableTail)
     {
         if (vTail == nullptr) {
             return;
         }
-        vTailGm_.gmTensor.SetGlobalBuffer((__gm__ bfloat16_t*)vTail);
+        this->vTailGm_.gmTensor.SetGlobalBuffer((__gm__ bfloat16_t*)vTail);
         if constexpr (PAGE_ATTENTION) {
             // v_tail与主KV同布局, btt=block_table_tail寻址; 尾窗<64落单块(blockIdxInBatch=0)
-            vTailBttGm_.SetGlobalBuffer((__gm__ int32_t*)blockTableTail);
+            this->vTailBttGm_.SetGlobalBuffer((__gm__ int32_t*)blockTableTail);
             if constexpr (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_PA_NZ) {
                 // dSizeV/nzD0整除: host侧vtailDimOk已保证PA_NZ下D%16==0(拒绝D=72), 此处无余数
                 constexpr uint32_t nzD0 = 32 / sizeof(bfloat16_t);
-                vTailGm_.offsetCalculator.Init(constInfo_.n2Size, constInfo_.blockSize, constInfo_.dSizeV / nzD0, nzD0,
-                                               vTailBttGm_, constInfo_.tailMaxBlockNum,
-                                               constInfo_.vTailStrides.bnStride, constInfo_.vTailStrides.n2Stride);
+                this->vTailGm_.offsetCalculator.Init(
+                    constInfo_.n2Size, constInfo_.blockSize, constInfo_.dSizeV / nzD0, nzD0, this->vTailBttGm_,
+                    constInfo_.tailMaxBlockNum, constInfo_.vTailStrides.bnStride, constInfo_.vTailStrides.n2Stride);
             } else {
-                vTailGm_.offsetCalculator.Init(constInfo_.n2Size, constInfo_.blockSize, constInfo_.dSizeV, vTailBttGm_,
-                                               constInfo_.tailMaxBlockNum, constInfo_.vTailStrides.bnStride,
-                                               constInfo_.vTailStrides.n2Stride);
+                this->vTailGm_.offsetCalculator.Init(
+                    constInfo_.n2Size, constInfo_.blockSize, constInfo_.dSizeV, this->vTailBttGm_,
+                    constInfo_.tailMaxBlockNum, constInfo_.vTailStrides.bnStride, constInfo_.vTailStrides.n2Stride);
             }
         }
         // 非PA(TND等)不支持v_tail(checker入口拒绝), 无需初始化
@@ -663,8 +680,8 @@ public:
             mm1B.GetTensor<SCALE_T>(kScaleOffset));
 
         // Release Q at the last main task even when a tail task follows.
-        if (unlikely(runInfo.isLastDnTask && (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
-                                              (runInfo.actSingleLoopS2Size <= s2SplitSize)))) {
+        if (unlikely(IsLastDnTask(runInfo) && (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
+                                               (runInfo.actSingleLoopS2Size <= s2SplitSize)))) {
             mm1A.Set<HardEvent::MTE1_MTE2>();
         }
         mm1B.Set<HardEvent::MTE1_MTE2>();   // 释放L1B
@@ -809,8 +826,8 @@ public:
             mm1B.GetTensor<SCALE_T>(qScaleOffset));
 
         // Release Q at the last main task even when a tail task follows.
-        if (unlikely(runInfo.isLastDnTask && (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
-                                              (runInfo.actSingleLoopS2Size <= s2SplitSize)))) {
+        if (unlikely(IsLastDnTask(runInfo) && (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
+                                               (runInfo.actSingleLoopS2Size <= s2SplitSize)))) {
             mm1B.Set<HardEvent::MTE1_MTE2>();
         }
         mm1A.Set<HardEvent::MTE1_MTE2>();   // 释放L1B
@@ -873,8 +890,8 @@ public:
             mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(kScaleOffset),
             mm1B.GetTensor<SCALE_T>(qScaleOffset));
 
-        if (unlikely(runInfo.isLastDnTask && (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
-                                              (runInfo.actSingleLoopS2Size <= s2SplitSize)))) {
+        if (unlikely(IsLastDnTask(runInfo) && (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
+                                               (runInfo.actSingleLoopS2Size <= s2SplitSize)))) {
             mm1B.Set<HardEvent::MTE1_MTE2>();
         }
         mm1A.Set<HardEvent::MTE1_MTE2>();   // 释放L1B
@@ -938,8 +955,8 @@ public:
             mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(qScaleOffset),
             mm1B.GetTensor<SCALE_T>(kScaleOffset));
 
-        if (unlikely(runInfo.isLastDnTask && (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
-                                              (runInfo.actSingleLoopS2Size <= s2SplitSize)))) {
+        if (unlikely(IsLastDnTask(runInfo) && (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
+                                               (runInfo.actSingleLoopS2Size <= s2SplitSize)))) {
             mm1A.Set<HardEvent::MTE1_MTE2>();
         }
         mm1B.Set<HardEvent::MTE1_MTE2>();   // 释放L1B
@@ -1069,7 +1086,7 @@ public:
                                   .dIdx = 0,
                                   .s2DealSize = MXFP8_V_TAIL_BOUNDARY, // Padding is cleared before MTE1 reads L1.
                                   .dDealSize = constInfo_.dSizeV};
-                copyVTailGmToL1_(l1Tensor, vTailGm_, gmCoord);
+                this->copyVTailGmToL1_(l1Tensor, this->vTailGm_, gmCoord);
             }
             // Finish the GM copy before overwriting its padding in L1.
             AscendC::PipeBarrier<PIPE_MTE2>();
@@ -1128,7 +1145,7 @@ public:
                                   .dIdx = 0,
                                   .s2DealSize = MXFP8_V_TAIL_BOUNDARY, // Padding is cleared before MTE1 reads L1.
                                   .dDealSize = constInfo_.dSizeV};
-                copyVTailGmToL1_(l1Tensor, vTailGm_, gmCoord);
+                this->copyVTailGmToL1_(l1Tensor, this->vTailGm_, gmCoord);
             }
             // Finish the GM copy before overwriting its padding in L1.
             AscendC::PipeBarrier<PIPE_MTE2>();
@@ -1336,7 +1353,8 @@ public:
     using MM2_ABUF_T = Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>;
     using MM2_DBUF_T = Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>;
 
-    using ConstInfoX = ConstInfo_t;
+    using ConstInfoX = std::conditional_t<HAS_V_TAIL, ConstInfoVTail_t, ConstInfo_t>;
+    using RunInfoX = std::conditional_t<HAS_V_TAIL, RunInfoVTailX, ::RunInfoX>;
     __aicore__ inline QuantFlashAttnBlockCubeMxfp8Dummy(ConstInfoX& constInfo){};
 };
 } // namespace BaseApi

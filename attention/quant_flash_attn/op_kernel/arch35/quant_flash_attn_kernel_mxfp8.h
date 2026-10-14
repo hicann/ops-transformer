@@ -44,8 +44,19 @@ __aicore__ inline int64_t ClipSInnerToken(int64_t sInnerToken, int64_t minValue,
     return sInnerToken;
 }
 
+// The disabled specialization carries no tail state or initialization.
+template <bool hasVTail>
+struct QuantFlashAttnKernelVTailState {};
+
+template <>
+struct QuantFlashAttnKernelVTailState<true> {
+    GlobalTensor<int32_t> seqUsedKvTailGm_;
+    uint32_t actTailLen_ = 0;
+    uint32_t tailSplitStep_ = 0;
+};
+
 template <typename CubeBlockType, typename VecFaBlockType, typename VecFdBlockType>
-class QuantFlashAttnKernelMxfp8 {
+class QuantFlashAttnKernelMxfp8 : private QuantFlashAttnKernelVTailState<CubeBlockType::HAS_V_TAIL> {
 public:
     static constexpr uint32_t mBaseSize = CubeBlockType::mBaseSize;
     static constexpr uint32_t s2BaseSize = CubeBlockType::s2BaseSize;
@@ -80,6 +91,7 @@ public:
     using T = typename CubeBlockType::MM_T;
     using OUT_T = typename VecFaBlockType::OUT_T;
     using ConstInfoX = typename CubeBlockType::ConstInfoX;
+    using RunInfoX = typename CubeBlockType::RunInfoX;
 
     // CV buffers
     BufferManager<BufferType::GM> gmBufferManager_;
@@ -98,7 +110,6 @@ public:
     GlobalTensor<int32_t> cuSeqLensGmKv_;
     GlobalTensor<int32_t> seqUsedGmQ_;
     GlobalTensor<int32_t> seqUsedGmKv_;
-    GlobalTensor<int32_t> seqUsedKvTailGm_;
     GlobalTensor<uint32_t> faMetaDataGm_;
     GlobalTensor<uint32_t> fdMetaDataGm_;
     GlobalTensor<float> softmaxLseGm_;
@@ -116,7 +127,6 @@ public:
     // schduler params
     uint64_t actSeqLensKv_ = 0;
     uint64_t actSeqLensQ_ = 0;
-    uint32_t actTailLen_ = 0;
     uint32_t curS2Start_ = 0;
     uint32_t curS2End_ = 0;
     uint32_t prevBIdx_ = 0;
@@ -125,8 +135,6 @@ public:
     uint32_t mloop_ = 0;
     bool headS2Split_ = false;
     bool tailS2Split_ = false;
-    // Split the last KV block into a main task followed by a BF16 tail task.
-    uint32_t tailSplitStep_ = 0;
 
     // metadata
     uint32_t sectionNum_;
@@ -191,7 +199,7 @@ public:
         }
         if constexpr (HAS_V_TAIL) {
             if (constInfo_.seqUsedKvTailSize > 0) {
-                seqUsedKvTailGm_.SetGlobalBuffer((__gm__ int32_t*)sequsedVTail, constInfo_.seqUsedKvTailSize);
+                this->seqUsedKvTailGm_.SetGlobalBuffer((__gm__ int32_t*)sequsedVTail, constInfo_.seqUsedKvTailSize);
             }
         }
         sectionNum_ = ((__gm__ uint32_t*)metadata)[METADATA_HEADER_SECTION_NUM_INDEX];
@@ -321,12 +329,13 @@ public:
         constInfo_.accumOutSize = qfaWorkspaceParams.accumOutSize;
         constInfo_.logSumExpSize = qfaWorkspaceParams.logSumExpSize;
 
-        // V tail params
-        const auto& qfaVTailParams = tiling.baseTiling.quantFlashAttnVTailParams;
-        constInfo_.seqUsedKvTailSize = qfaVTailParams.seqUsedKvTailSize;
-        constInfo_.tailMaxBlockNum = qfaVTailParams.tailMaxBlockNum;
-        constInfo_.vTailStrides.bnStride = qfaVTailParams.vTailStrides.bnStride;
-        constInfo_.vTailStrides.n2Stride = qfaVTailParams.vTailStrides.n2Stride;
+        if constexpr (HAS_V_TAIL) {
+            const auto& qfaVTailParams = tiling.baseTiling.quantFlashAttnVTailParams;
+            constInfo_.seqUsedKvTailSize = qfaVTailParams.seqUsedKvTailSize;
+            constInfo_.tailMaxBlockNum = qfaVTailParams.tailMaxBlockNum;
+            constInfo_.vTailStrides.bnStride = qfaVTailParams.vTailStrides.bnStride;
+            constInfo_.vTailStrides.n2Stride = qfaVTailParams.vTailStrides.n2Stride;
+        }
 
         // strides
         constInfo_.keyStrides.bnStride = qfaBaseParams.keyStrides.bnStride;
@@ -418,7 +427,9 @@ public:
         mloop_ = 0;
         headS2Split_ = false;
         tailS2Split_ = false;
-        tailSplitStep_ = 0;
+        if constexpr (HAS_V_TAIL) {
+            this->tailSplitStep_ = 0;
+        }
 
         uint32_t bN2Cur = bN2Start_;
         uint32_t gS1Cur = gS1OStart_;
@@ -485,16 +496,16 @@ public:
             if constexpr (HAS_V_TAIL) {
                 // Keep the main KV length aligned to 64 for V-scale addressing.
                 if (constInfo_.seqUsedKvTailSize > 0) {
-                    int32_t tailInput = seqUsedKvTailGm_.GetValue(bIdx);
+                    int32_t tailInput = this->seqUsedKvTailGm_.GetValue(bIdx);
                     uint32_t kvLen = static_cast<uint32_t>(actSeqLensKv_);
                     uint32_t alignedDown = kvLen / MXFP8_V_TAIL_BOUNDARY * MXFP8_V_TAIL_BOUNDARY;
                     uint32_t tailLenU = (tailInput < 0) ? 0 : static_cast<uint32_t>(tailInput);
                     if ((tailLenU >= MXFP8_V_TAIL_BOUNDARY) || (kvLen - tailLenU != alignedDown)) {
                         tailLenU = kvLen - alignedDown;
                     }
-                    actTailLen_ = tailLenU;
+                    this->actTailLen_ = tailLenU;
                 } else {
-                    actTailLen_ = 0;
+                    this->actTailLen_ = 0;
                 }
             }
         }
@@ -530,7 +541,11 @@ public:
         }
 
         // Main and tail tasks share the same softmax state slot.
-        if (s2Cur == curS2Start_ && tailSplitStep_ == 0) {
+        if constexpr (HAS_V_TAIL) {
+            if (s2Cur == curS2Start_ && this->tailSplitStep_ == 0) {
+                mloop_++;
+            }
+        } else if (s2Cur == curS2Start_) {
             mloop_++;
         }
 
@@ -543,7 +558,7 @@ public:
         if constexpr (!HAS_V_TAIL) {
             return false;
         } else {
-            if (actTailLen_ == 0) {
+            if (this->actTailLen_ == 0) {
                 return false;
             }
             uint64_t s2LoopTimes = (actSeqLensKv_ + s2BaseSize - 1) / s2BaseSize;
@@ -551,7 +566,7 @@ public:
                 return false; // 非序列最后一块
             }
             uint32_t lastBlock = static_cast<uint32_t>(actSeqLensKv_) - s2Cur * s2BaseSize;
-            return lastBlock > actTailLen_; // kMain>0才拆(kMain==0为纯尾task)
+            return lastBlock > this->actTailLen_; // kMain>0才拆(kMain==0为纯尾task)
         }
     }
 
@@ -739,7 +754,9 @@ public:
         if (((gS1Cur + 1) * mBaseSize) > gS1Size) {
             info.actMSize = gS1Size - gS1Cur * mBaseSize;
         }
-        info.kvTailLen = actTailLen_;
+        if constexpr (HAS_V_TAIL) {
+            info.kvTailLen = this->actTailLen_;
+        }
         info.actSingleLoopS2Size = s2BaseSize;
         if (((s2Cur + 1) * s2BaseSize) > info.actS2Size) {
             info.actSingleLoopS2Size = info.actS2Size - s2Cur * s2BaseSize;
@@ -748,13 +765,13 @@ public:
         bool splitCurBlock = false;
         if constexpr (HAS_V_TAIL) {
             splitCurBlock = NeedSplitTailTask(s2Cur);
-            if (tailSplitStep_ == 1) {
-                info.s2Idx += info.actSingleLoopS2Size - actTailLen_;
-                info.actSingleLoopS2Size = actTailLen_;
+            if (this->tailSplitStep_ == 1) {
+                info.s2Idx += info.actSingleLoopS2Size - this->actTailLen_;
+                info.actSingleLoopS2Size = this->actTailLen_;
             } else if (splitCurBlock) {
-                info.actSingleLoopS2Size -= actTailLen_;
+                info.actSingleLoopS2Size -= this->actTailLen_;
             }
-            info.isVtailTask = (actTailLen_ > 0) && (info.actSingleLoopS2Size == actTailLen_) &&
+            info.isVtailTask = (this->actTailLen_ > 0) && (info.actSingleLoopS2Size == this->actTailLen_) &&
                                (info.s2Idx + info.actSingleLoopS2Size >= info.actS2Size);
         }
         info.actSingleLoopS2SizeAlign =
@@ -769,14 +786,22 @@ public:
         // 情况3: loop=0时, 如果(bN2Start, gS1OStart, s2Start)任务无效,
         // 下一个有效任务一定是某个head的第一个S2外切块，s2Cur=0
         // 拆分的尾半步不是首个task(主体半步必先建), 排除以免误初始化sum/max
-        info.isFirstS2Loop = ((loop == 0) || (s2Cur == curS2Start_)) && (tailSplitStep_ == 0);
+        info.isFirstS2Loop = (loop == 0) || (s2Cur == curS2Start_);
+        if constexpr (HAS_V_TAIL) {
+            info.isFirstS2Loop = info.isFirstS2Loop && this->tailSplitStep_ == 0;
+        }
         info.isS2SplitCore = false;
         info.faTmpOutWsPos = coreFirstTmpOutWsPos_;
         // 需拆分的主体半步不是本核最后task(尾task在后, Vec2需走FlashUpdateNew累加
         // 而非LastNew提前除sum, FD/GM写出也须推迟到尾task)
-        info.isLastS2Loop = (s2Cur + 1 == curS2End_) && !(splitCurBlock && tailSplitStep_ == 0);
+        info.isLastS2Loop = s2Cur + 1 == curS2End_;
+        if constexpr (HAS_V_TAIL) {
+            info.isLastS2Loop = info.isLastS2Loop && !(splitCurBlock && this->tailSplitStep_ == 0);
+        }
         // Release the main task's Q slot before the tail task reuses it.
-        info.isLastDnTask = (s2Cur + 1 == curS2End_) && (tailSplitStep_ == 0);
+        if constexpr (HAS_V_TAIL) {
+            info.isLastDnTask = (s2Cur + 1 == curS2End_) && (this->tailSplitStep_ == 0);
+        }
 
         info.actMSizeAlign32 = (info.actMSize + 31) >> 5 << 5;
         if constexpr (USE_DN) {
@@ -811,14 +836,16 @@ public:
                                           uint32_t& s2Cur)
     {
         // Process the tail half before advancing to the next S2 block.
-        if (taskDealMode == TASK_DEAL_MODE::CREATE_TASK) {
-            if (tailSplitStep_ == 0) {
-                if (NeedSplitTailTask(s2Cur)) {
-                    tailSplitStep_ = 1;
-                    return;
+        if constexpr (HAS_V_TAIL) {
+            if (taskDealMode == TASK_DEAL_MODE::CREATE_TASK) {
+                if (this->tailSplitStep_ == 0) {
+                    if (NeedSplitTailTask(s2Cur)) {
+                        this->tailSplitStep_ = 1;
+                        return;
+                    }
+                } else {
+                    this->tailSplitStep_ = 0;
                 }
-            } else {
-                tailSplitStep_ = 0;
             }
         }
         uint64_t s2LoopTimes = (actSeqLensKv_ + s2BaseSize - 1) / s2BaseSize;
