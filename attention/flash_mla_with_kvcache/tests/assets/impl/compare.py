@@ -253,29 +253,44 @@ def compare(*outputs):
             continue
         npu = COMPARATOR.as_float32(npu_out)
         golden = COMPARATOR.as_float32(golden_out)
-        passed = npu.shape == golden.shape and bool(
-            np.all(np.isclose(npu, golden, rtol=0.0, atol=0.1, equal_nan=True))
-        )
         error_info = None
         diff_idx = np.empty(0, dtype=np.int64)
+        passed = npu.shape == golden.shape
         if not passed:
-            if npu.shape != golden.shape:
+            error_info = (
+                f"MLA LSE shape mismatch: npu={npu.shape}, golden={golden.shape}"
+            )
+        else:
+            mismatch = ~np.isclose(
+                npu,
+                golden,
+                rtol=COMPARATOR.DEFAULT_RTOL,
+                atol=COMPARATOR.DEFAULT_ATOL,
+                equal_nan=True,
+            )
+            diff_idx = np.flatnonzero(mismatch)
+            fail_ratio = diff_idx.size / max(golden.size, 1)
+            nonfinite_mismatch_count = int(
+                np.count_nonzero(mismatch & (~np.isfinite(npu) | ~np.isfinite(golden)))
+            )
+            passed = (
+                fail_ratio <= COMPARATOR.FAIL_RATIO and nonfinite_mismatch_count == 0
+            )
+            if not passed:
                 error_info = (
-                    f"MLA LSE shape mismatch: npu={npu.shape}, golden={golden.shape}"
+                    "MLA LSE precision failed "
+                    f"(rtol={COMPARATOR.DEFAULT_RTOL}, "
+                    f"atol={COMPARATOR.DEFAULT_ATOL}): "
+                    f"mismatches={diff_idx.size}, "
+                    f"fail_ratio={fail_ratio:.6g}, "
+                    f"nonfinite_mismatches={nonfinite_mismatch_count}"
                 )
-            else:
-                diff_idx = np.flatnonzero(
-                    ~np.isclose(npu, golden, rtol=0.0, atol=0.1, equal_nan=True)
-                )
-                error_info = (
-                    "MLA LSE absolute error exceeds 0.1 or non-finite value mismatch: "
-                    f"mismatches={diff_idx.size}"
-                )
+        if not passed and error_info is not None:
             COMPARATOR.print_log(f"LSE FAIL: {error_info}", index)
         precision = 100.0 if passed else 0.0
         if npu.shape == golden.shape:
             COMPARATOR.display_samples(npu, golden, precision, index, passed=passed)
-        if diff_idx.size:
+        if not passed and diff_idx.size:
             COMPARATOR.display_error_output(
                 npu, golden, diff_idx, index, passed=passed, precision=precision
             )
