@@ -307,8 +307,47 @@ __aicore__ inline void CopyInLineAlign(const LocalTensor<T>& dstUb, const Global
     copyInParams.blockLen = copyLineLength * sizeof(T);
     copyInParams.srcStride = (srcLineLength - copyLineLength) * sizeof(T);
     copyInParams.dstStride = 0;
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+    DataCopyPad(dstUb, srcGm, copyInParams, padParams, false);
+#else
     DataCopyPad(dstUb, srcGm, copyInParams, padParams);
+#endif
 }
+
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+template <typename T>
+__aicore__ inline void BroadcastQuantParamNddma(const LocalTensor<T>& dstUb, const GlobalTensor<T>& srcGm,
+                                                uint32_t broadcastCount)
+{
+    constexpr uint8_t NDDMA_DIM = 1;
+    MultiCopyParams<T, NDDMA_DIM> params{};
+    params.constantValue = static_cast<T>(0);
+    params.loopInfo.loopSize[0] = broadcastCount;
+    params.loopInfo.loopSrcStride[0] = 0;
+    params.loopInfo.loopDstStride[0] = 1;
+    params.loopInfo.loopLpSize[0] = 0;
+    params.loopInfo.loopRpSize[0] = 0;
+    AscendC::NdDmaDci();
+    DataCopy<T, NDDMA_DIM, kDefaultNdDmaConfig>(dstUb, srcGm, params, false);
+}
+#endif
+
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+template <typename T>
+__aicore__ inline void CopyInPad(const LocalTensor<T>& dst, const GlobalTensor<T>& src,
+                                 const DataCopyParams& copyParams, const DataCopyPadParams& padParams,
+                                 bool enablePreAllocation)
+{
+    DataCopyPad(dst, src, copyParams, padParams, enablePreAllocation);
+}
+#else
+template <typename T>
+__aicore__ inline void CopyInPad(const LocalTensor<T>& dst, const GlobalTensor<T>& src,
+                                 const DataCopyParams& copyParams, const DataCopyPadParams& padParams, bool)
+{
+    DataCopyPad(dst, src, copyParams, padParams);
+}
+#endif
 
 /*
 ub->gm拷出
@@ -469,27 +508,41 @@ __aicore__ inline void KvRmsNormRopeCacheRegbase<T_KV, T_K_CACHE, T_V_CACHE>::Rm
             dst = (__ubuf__ float*)wsLocal.GetPhyAddr() + i * outerLoopDstStride;
             // 完全能折叠
             for (uint16_t j = 0; j < mainFoldLoopTimes; ++j) {
-                AscendC::Reg::RegTensor<float> reg0, reg1, reg2, reg2_1;
+                AscendC::Reg::RegTensor<float> reg0, reg1, reg2;
                 LoadTensorForDtypeT<T_KV>(foldSrcX0A, reg0, pFull, i * outerLoopStride + j * innerLoopStride);
                 LoadTensorForDtypeT<T_KV>(foldSrcX0B, reg1, pFull, i * outerLoopStride + j * innerLoopStride);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                AscendC::Reg::Mul(reg2, reg0, reg0, pFull);
+                AscendC::Reg::MulAddDst<float, AscendC::Reg::MaskMergeMode::ZEROING>(reg2, reg1, reg1, pFull);
+#else
+                AscendC::Reg::RegTensor<float> reg2_1;
                 AscendC::Reg::Mul(reg2, reg0, reg0, pFull);
                 AscendC::Reg::Mul(reg2_1, reg1, reg1, pFull);
                 Add<float, AscendC::Reg::MaskMergeMode::ZEROING>(reg2, reg2, reg2_1, pFull);
+#endif
                 AscendC::Reg::Reduce<AscendC::Reg::ReduceType::SUM>(reg2, reg2, pFull);
                 AscendC::Reg::StoreUnAlign((__ubuf__ float*&)dst, reg2, UReg, 1);
             }
             // 一个能折叠，另外一个短了
             for (uint16_t j = 0; j < tailFoldLoopTimes; ++j) {
                 uint32_t count = static_cast<uint32_t>(tailFoldElemCount);
-                AscendC::Reg::RegTensor<float> reg0, reg1, reg2, reg2_1;
+                AscendC::Reg::RegTensor<float> reg0, reg1, reg2;
                 AscendC::Reg::MaskReg pMask = AscendC::Reg::UpdateMask<float>(count);
                 LoadTensorForDtypeT<T_KV>(tailSrcX0A, reg0, pFull, i * outerLoopStride + j * innerLoopStride);
                 LoadTensorForDtypeT<T_KV>(tailSrcX0B, reg1, pMask, i * outerLoopStride + j * innerLoopStride);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                AscendC::Reg::RegTensor<float> reg2_1;
+                AscendC::Reg::Mul(reg2, reg0, reg0, pFull);
+                AscendC::Reg::Mul(reg2_1, reg1, reg1, pMask);
+                AscendC::Reg::Add<float, AscendC::Reg::MaskMergeMode::MERGING>(reg2, reg2, reg2_1, pMask);
+#else
+                AscendC::Reg::RegTensor<float> reg2_1;
                 AscendC::Reg::Mul(reg2, reg0, reg0, pFull);
                 AscendC::Reg::Mul(reg2_1, reg1, reg1, pMask);
                 Add<float, AscendC::Reg::MaskMergeMode::ZEROING>(reg2_1, reg2, reg2_1, pMask);
                 AscendC::Reg::Move<float, AscendC::Reg::MaskMergeMode::MERGING>(reg2, reg2_1, pMask);
+#endif
                 AscendC::Reg::Reduce<AscendC::Reg::ReduceType::SUM>(reg2, reg2, pFull);
                 AscendC::Reg::StoreUnAlign((__ubuf__ float*&)dst, reg2, UReg, 1);
             }
@@ -665,8 +718,13 @@ __aicore__ inline void KvRmsNormRopeCacheRegbase<T_KV, T_K_CACHE, T_V_CACHE>::Rm
                     StoreTensorForDtypeTOut<T_KV>(dst, reg8, maskOri, addrPtr);
                     LoadTensorForDtypeT<float>(vScale, scale, maskOri, j * VL_FP32);
                     LoadTensorForDtypeT<float>(vOffset, offset, maskOri, j * VL_FP32);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                    // FMA: offset = offset + rms_norm_result * scale
+                    AscendC::Reg::MulAddDst(offset, reg8, scale, maskOri);
+#else
                     AscendC::Reg::Mul(scale, reg8, scale, maskOri);
                     AscendC::Reg::Add(offset, offset, scale, maskOri);
+#endif
 
                     if constexpr (IsSameType<T_V_CACHE, int8_t>::value) {
                         AscendC::Reg::Cast<int16_t, float, CAST_FP32_TO_INT16>(tmp_int16, offset, maskOri);
@@ -729,8 +787,13 @@ __aicore__ inline void KvRmsNormRopeCacheRegbase<T_KV, T_K_CACHE, T_V_CACHE>::Rm
                     StoreTensorForDtypeTOut<T_KV>(dst, reg8, maskOri, addrPtr);
                     LoadTensorForDtypeT<float>(vScale, scale, maskOri, j * VL_FP32);
                     LoadTensorForDtypeT<float>(vOffset, offset, maskOri, j * VL_FP32);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                    // FMA: offset = offset + rms_norm_result * scale
+                    AscendC::Reg::MulAddDst(offset, reg8, scale, maskOri);
+#else
                     AscendC::Reg::Mul(scale, reg8, scale, maskOri);
                     AscendC::Reg::Add(offset, offset, scale, maskOri);
+#endif
 
                     if constexpr (IsSameType<T_V_CACHE, int8_t>::value) {
                         AscendC::Reg::Cast<int16_t, float, CAST_FP32_TO_INT16>(tmp_int16, offset, maskOri);
@@ -950,8 +1013,13 @@ __aicore__ inline void KvRmsNormRopeCacheRegbase<T_KV, T_K_CACHE, T_V_CACHE>::Rm
                     AscendC::Reg::Mul(reg8, reg7, reg6, maskOri);
                     LoadTensorForDtypeT<float>(vScale, scale, maskOri, j * VL_FP32);
                     LoadTensorForDtypeT<float>(vOffset, offset, maskOri, j * VL_FP32);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                    // FMA: offset = offset + rms_norm_result * scale
+                    AscendC::Reg::MulAddDst(offset, reg8, scale, maskOri);
+#else
                     AscendC::Reg::Mul(scale, reg8, scale, maskOri);
                     AscendC::Reg::Add(offset, offset, scale, maskOri);
+#endif
 
                     if constexpr (IsSameType<T_V_CACHE, int8_t>::value) {
                         AscendC::Reg::Cast<int16_t, float, CAST_FP32_TO_INT16>(tmp_int16, offset, maskOri);
@@ -1012,8 +1080,13 @@ __aicore__ inline void KvRmsNormRopeCacheRegbase<T_KV, T_K_CACHE, T_V_CACHE>::Rm
                     AscendC::Reg::Mul(reg8, reg7, reg6, maskOri);
                     LoadTensorForDtypeT<float>(vScale, scale, maskOri, j * VL_FP32);
                     LoadTensorForDtypeT<float>(vOffset, offset, maskOri, j * VL_FP32);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                    // FMA: offset = offset + rms_norm_result * scale
+                    AscendC::Reg::MulAddDst(offset, reg8, scale, maskOri);
+#else
                     AscendC::Reg::Mul(scale, reg8, scale, maskOri);
                     AscendC::Reg::Add(offset, offset, scale, maskOri);
+#endif
 
                     if constexpr (IsSameType<T_V_CACHE, int8_t>::value) {
                         AscendC::Reg::Cast<int16_t, float, CAST_FP32_TO_INT16>(tmp_int16, offset, maskOri);
@@ -1245,8 +1318,13 @@ __aicore__ inline void KvRmsNormRopeCacheRegbase<T_KV, T_K_CACHE, T_V_CACHE>::Rm
                     StoreTensorForDtypeTOut<T_KV>(dst, x, mask, i * VL_FP32 + rowId * alignedCol);
                     LoadTensorForDtypeT<float>(vScale, scale, mask, i * VL_FP32);
                     LoadTensorForDtypeT<float>(vOffset, offset, mask, i * VL_FP32);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                    // FMA: offset = offset + rms_norm_result * scale
+                    AscendC::Reg::MulAddDst(offset, x, scale, mask);
+#else
                     AscendC::Reg::Mul(scale, x, scale, mask);
                     AscendC::Reg::Add(offset, offset, scale, mask);
+#endif
 
                     if constexpr (IsSameType<T_V_CACHE, int8_t>::value) {
                         AscendC::Reg::Cast<int16_t, float, CAST_FP32_TO_INT16>(tmp_int16, offset, mask);
@@ -1370,8 +1448,13 @@ __aicore__ inline void KvRmsNormRopeCacheRegbase<T_KV, T_K_CACHE, T_V_CACHE>::Rm
                     LoadTensorForDtypeT<float>(ws, x, mask, i * VL_FP32 + rowId * alignedCol);
                     LoadTensorForDtypeT<float>(vScale, scale, mask, i * VL_FP32);
                     LoadTensorForDtypeT<float>(vOffset, offset, mask, i * VL_FP32);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                    // FMA: offset = offset + rms_norm_result * scale
+                    AscendC::Reg::MulAddDst(offset, x, scale, mask);
+#else
                     AscendC::Reg::Mul(scale, x, scale, mask);
                     AscendC::Reg::Add(offset, offset, scale, mask);
+#endif
 
                     if constexpr (IsSameType<T_V_CACHE, int8_t>::value) {
                         AscendC::Reg::Cast<int16_t, float, CAST_FP32_TO_INT16>(tmp_int16, offset, mask);

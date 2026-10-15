@@ -135,6 +135,9 @@ public:
         int64_t batchId = 0;
         int64_t gmOffset = 0;
         for (int64_t i = 0; i < rows; i++) {
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            AscendC::WaitPreTaskEnd();
+#endif
             seqIndex = this->indexGm(startIdx + i);
             SetFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
             WaitFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
@@ -174,6 +177,9 @@ public:
             int64_t tokenIdInCurrentBatch = tokenId % tilingData_->seqLength;
             int64_t indexPageId = tokenIdInCurrentBatch / tilingData_->blockSize;
             int64_t indexOffset = batchId * indexPageLength + indexPageId;
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            AscendC::WaitPreTaskEnd();
+#endif
             int64_t pageOffset = this->indexGm(indexOffset);
             SetFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
             WaitFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
@@ -204,6 +210,9 @@ public:
         int64_t batchId = 0;
         int64_t gmOffset = 0;
         for (int64_t i = 0; i < rows; i++) {
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            AscendC::WaitPreTaskEnd();
+#endif
             seqIndex = this->indexGm(startIdx + i);
             SetFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
             WaitFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
@@ -243,6 +252,9 @@ public:
             int64_t tokenIdInCurrentBatch = tokenId % tilingData_->seqLength;
             int64_t indexPageId = tokenIdInCurrentBatch / tilingData_->blockSize;
             int64_t indexOffset = batchId * indexPageLength + indexPageId;
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            AscendC::WaitPreTaskEnd();
+#endif
             int64_t pageOffset = this->indexGm(indexOffset);
             SetFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
             WaitFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
@@ -291,12 +303,17 @@ public:
                     StoreUnAlignOneTensor<T_KV>(out1, sin_1, UReg1, mask, VL_FP32);
                     LoadTensorForDtypeT(realKScale, scale_0, mask, i * VL_FP32);
                     LoadTensorForDtypeT(imgKScale, scale_1, mask, i * VL_FP32);
-                    AscendC::Reg::Mul(scale_0, sin_0, scale_0, mask);
-                    AscendC::Reg::Mul(scale_1, sin_1, scale_1, mask);
                     LoadTensorForDtypeT(realKOffset, offset_0, mask, i * VL_FP32);
                     LoadTensorForDtypeT(imgKOffset, offset_1, mask, i * VL_FP32);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                    AscendC::Reg::MulAddDst(offset_0, sin_0, scale_0, mask);
+                    AscendC::Reg::MulAddDst(offset_1, sin_1, scale_1, mask);
+#else
+                    AscendC::Reg::Mul(scale_0, sin_0, scale_0, mask);
+                    AscendC::Reg::Mul(scale_1, sin_1, scale_1, mask);
                     AscendC::Reg::Add(offset_0, offset_0, scale_0, mask);
                     AscendC::Reg::Add(offset_1, offset_1, scale_1, mask);
+#endif
                     StoreUnAlignOneTensor<T_K_CACHE>(out2, offset_0, UReg2, mask, VL_FP32);
                     StoreUnAlignOneTensor<T_K_CACHE>(out3, offset_1, UReg3, mask, VL_FP32);
                 }
@@ -307,12 +324,17 @@ public:
                 StoreUnAlignOneTensor<T_KV>(out1, sin_1, UReg1, mask, kVFTail);
                 LoadTensorForDtypeT(realKScale, scale_0, mask, colLoopCount * VL_FP32);
                 LoadTensorForDtypeT(imgKScale, scale_1, mask, colLoopCount * VL_FP32);
-                AscendC::Reg::Mul(scale_0, sin_0, scale_0, mask);
-                AscendC::Reg::Mul(scale_1, sin_1, scale_1, mask);
                 LoadTensorForDtypeT(realKOffset, offset_0, mask, colLoopCount * VL_FP32);
                 LoadTensorForDtypeT(imgKOffset, offset_1, mask, colLoopCount * VL_FP32);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                AscendC::Reg::MulAddDst(offset_0, sin_0, scale_0, mask);
+                AscendC::Reg::MulAddDst(offset_1, sin_1, scale_1, mask);
+#else
+                AscendC::Reg::Mul(scale_0, sin_0, scale_0, mask);
+                AscendC::Reg::Mul(scale_1, sin_1, scale_1, mask);
                 AscendC::Reg::Add(offset_0, offset_0, scale_0, mask);
                 AscendC::Reg::Add(offset_1, offset_1, scale_1, mask);
+#endif
                 StoreUnAlignOneTensor<T_K_CACHE>(out2, offset_0, UReg2, mask, kVFTail);
                 StoreUnAlignOneTensor<T_K_CACHE>(out3, offset_1, UReg3, mask, kVFTail);
                 AscendC::Reg::StoreUnAlignPost(out0, UReg0, 0);
@@ -395,6 +417,17 @@ public:
                     mask = AscendC::Reg::UpdateMask<float>(sreg);
                     RopeBasicComputeVF(x, x_0, x_1, cos_0, cos_1, sin_0, sin_1, realCos, imgCos, realSin, imgSin, ws,
                                        xOffset, cosSinOffset, rowId, i, mask, maskAll);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                    // FMA: offset = offset + rope_result * scale
+                    LoadTensorForDtypeT(realKScale, scale_0, mask, i * VL_FP32);
+                    LoadTensorForDtypeT(imgKScale, scale_1, mask, i * VL_FP32);
+                    LoadTensorForDtypeT(realKOffset, offset_0, mask, i * VL_FP32);
+                    LoadTensorForDtypeT(imgKOffset, offset_1, mask, i * VL_FP32);
+                    AscendC::Reg::MulAddDst(offset_0, sin_0, scale_0, mask);
+                    AscendC::Reg::MulAddDst(offset_1, sin_1, scale_1, mask);
+                    StoreUnAlignOneTensor<T_K_CACHE>(out2, offset_0, UReg2, mask, VL_FP32);
+                    StoreUnAlignOneTensor<T_K_CACHE>(out3, offset_1, UReg3, mask, VL_FP32);
+#else
                     LoadTensorForDtypeT(realKScale, scale_0, mask, i * VL_FP32);
                     LoadTensorForDtypeT(imgKScale, scale_1, mask, i * VL_FP32);
                     AscendC::Reg::Mul(scale_0, sin_0, scale_0, mask);
@@ -405,10 +438,22 @@ public:
                     AscendC::Reg::Add(offset_1, offset_1, scale_1, mask);
                     StoreUnAlignOneTensor<T_K_CACHE>(out2, offset_0, UReg2, mask, VL_FP32);
                     StoreUnAlignOneTensor<T_K_CACHE>(out3, offset_1, UReg3, mask, VL_FP32);
+#endif
                 }
                 mask = AscendC::Reg::UpdateMask<float>(sreg);
                 RopeBasicComputeVF(x, x_0, x_1, cos_0, cos_1, sin_0, sin_1, realCos, imgCos, realSin, imgSin, ws,
                                    xOffset, cosSinOffset, rowId, colLoopCount, mask, maskAll);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                // FMA: offset = offset + rope_result * scale
+                LoadTensorForDtypeT(realKScale, scale_0, mask, colLoopCount * VL_FP32);
+                LoadTensorForDtypeT(imgKScale, scale_1, mask, colLoopCount * VL_FP32);
+                LoadTensorForDtypeT(realKOffset, offset_0, mask, colLoopCount * VL_FP32);
+                LoadTensorForDtypeT(imgKOffset, offset_1, mask, colLoopCount * VL_FP32);
+                AscendC::Reg::MulAddDst(offset_0, sin_0, scale_0, mask);
+                AscendC::Reg::MulAddDst(offset_1, sin_1, scale_1, mask);
+                StoreUnAlignOneTensor<T_K_CACHE>(out2, offset_0, UReg2, mask, kVFTail);
+                StoreUnAlignOneTensor<T_K_CACHE>(out3, offset_1, UReg3, mask, kVFTail);
+#else
                 LoadTensorForDtypeT(realKScale, scale_0, mask, colLoopCount * VL_FP32);
                 LoadTensorForDtypeT(imgKScale, scale_1, mask, colLoopCount * VL_FP32);
                 AscendC::Reg::Mul(scale_0, sin_0, scale_0, mask);
@@ -419,6 +464,7 @@ public:
                 AscendC::Reg::Add(offset_1, offset_1, scale_1, mask);
                 StoreUnAlignOneTensor<T_K_CACHE>(out2, offset_0, UReg2, mask, kVFTail);
                 StoreUnAlignOneTensor<T_K_CACHE>(out3, offset_1, UReg3, mask, kVFTail);
+#endif
                 AscendC::Reg::StoreUnAlignPost(out2, UReg2, 0);
                 AscendC::Reg::StoreUnAlignPost(out3, UReg3, 0);
             }
@@ -488,6 +534,14 @@ public:
         LoadTensorForDtypeT(imgCos, cos_1, mask, colId * VL_FP32 + rowId * cosSinOffset);
         LoadTensorForDtypeT(realSin, sin_0, mask, colId * VL_FP32 + rowId * cosSinOffset);
         LoadTensorForDtypeT(imgSin, sin_1, mask, colId * VL_FP32 + rowId * cosSinOffset);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+        // FMA: kReal = -x1*sin + x0*cos, kImag = x0*sin + x1*cos
+        AscendC::Reg::Mul(sin_0, x_1, sin_0, mask);
+        AscendC::Reg::Muls(sin_0, sin_0, -1.0f, mask);
+        AscendC::Reg::MulAddDst(sin_0, x_0, cos_0, mask);
+        AscendC::Reg::Mul(sin_1, x_0, sin_1, mask);
+        AscendC::Reg::MulAddDst(sin_1, x_1, cos_1, mask);
+#else
         AscendC::Reg::Mul(cos_0, x_0, cos_0, mask);
         AscendC::Reg::Mul(cos_1, x_1, cos_1, mask);
         AscendC::Reg::Muls(x_1, x_1, -1, mask);
@@ -495,6 +549,7 @@ public:
         AscendC::Reg::Mul(sin_1, x_0, sin_1, mask);
         AscendC::Reg::Add(sin_0, cos_0, sin_0, mask);
         AscendC::Reg::Add(sin_1, cos_1, sin_1, mask);
+#endif
     }
 
     __aicore__ inline void RopeVF(__ubuf__ T_KV* outFront, __ubuf__ T_KV* outBack, __ubuf__ T_KV* x,
@@ -662,6 +717,28 @@ public:
             imgKScaleLocal = realKScaleLocal[tilingData_->halfDkAlign];
             realKOffsetLocal = imgKScaleLocal[tilingData_->halfDkAlign];
             imgKOffsetLocal = realKOffsetLocal[tilingData_->halfDkAlign];
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            if (tilingData_->kScaleType == 1) {
+                BroadcastQuantParamNddma<float>(realKScaleLocal, this->kScaleGm, tilingData_->halfDkAlign);
+                BroadcastQuantParamNddma<float>(imgKScaleLocal, this->kScaleGm, tilingData_->halfDkAlign);
+            } else {
+                CopyInLineAlign<float>(realKScaleLocal, this->kScaleGm, 1, kScaleCopyLen, kScaleCopyLen);
+                CopyInLineAlign<float>(imgKScaleLocal, this->kScaleGm[kScaleCopyOffset], 1, kScaleCopyLen,
+                                       kScaleCopyLen);
+            }
+            if (tilingData_->kOffsetType > 0) {
+                if (tilingData_->kOffsetType == 1) {
+                    BroadcastQuantParamNddma<float>(realKOffsetLocal, this->kOffsetGm, tilingData_->halfDkAlign);
+                    BroadcastQuantParamNddma<float>(imgKOffsetLocal, this->kOffsetGm, tilingData_->halfDkAlign);
+                } else {
+                    CopyInLineAlign<float>(realKOffsetLocal, this->kOffsetGm, 1, kOffsetCopyLen, kOffsetCopyLen);
+                    CopyInLineAlign<float>(imgKOffsetLocal, this->kOffsetGm[kOffsetCopyOffset], 1, kOffsetCopyLen,
+                                           kOffsetCopyLen);
+                }
+            }
+            kScaleOffsetQueue.EnQue(realKScaleLocal);
+            realKScaleLocal = kScaleOffsetQueue.DeQue<float>();
+#else
             CopyInLineAlign<float>(realKScaleLocal, this->kScaleGm, 1, kScaleCopyLen, kScaleCopyLen);
             CopyInLineAlign<float>(imgKScaleLocal, this->kScaleGm[kScaleCopyOffset], 1, kScaleCopyLen, kScaleCopyLen);
             if (tilingData_->kOffsetType > 0) {
@@ -680,11 +757,28 @@ public:
                 Duplicate<float>(realKOffsetLocal, realKOffsetLocal, tilingData_->halfDkAlign);
                 Duplicate<float>(imgKOffsetLocal, imgKOffsetLocal, tilingData_->halfDkAlign);
             }
+#endif
         }
         if constexpr (IsSameType<T_V_CACHE, int8_t>::value || IsSameType<T_V_CACHE, hifloat8_t>::value ||
                       IsSameType<T_V_CACHE, fp8_e5m2_t>::value || IsSameType<T_V_CACHE, fp8_e4m3fn_t>::value) {
             vScaleLocal = vScaleOffsetQueue.AllocTensor<float>();
             vOffsetLocal = vScaleLocal[tilingData_->dvAlign];
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            if (tilingData_->vScaleType == 1) {
+                BroadcastQuantParamNddma<float>(vScaleLocal, this->vScaleGm, tilingData_->dvAlign);
+            } else {
+                CopyInLineAlign<float>(vScaleLocal, this->vScaleGm, 1, vScaleCopyLen, vScaleCopyLen);
+            }
+            if (tilingData_->vOffsetType > 0) {
+                if (tilingData_->vOffsetType == 1) {
+                    BroadcastQuantParamNddma<float>(vOffsetLocal, this->vOffsetGm, tilingData_->dvAlign);
+                } else {
+                    CopyInLineAlign<float>(vOffsetLocal, this->vOffsetGm, 1, vOffsetCopyLen, vOffsetCopyLen);
+                }
+            }
+            vScaleOffsetQueue.EnQue(vScaleLocal);
+            vScaleLocal = vScaleOffsetQueue.DeQue<float>();
+#else
             CopyInLineAlign<float>(vScaleLocal, this->vScaleGm, 1, vScaleCopyLen, vScaleCopyLen);
             if (tilingData_->vOffsetType > 0) {
                 CopyInLineAlign<float>(vOffsetLocal, this->vOffsetGm, 1, vOffsetCopyLen, vOffsetCopyLen);
@@ -698,6 +792,7 @@ public:
             if (tilingData_->vOffsetType == 1) {
                 Duplicate<float>(vOffsetLocal, vOffsetLocal, tilingData_->dvAlign);
             }
+#endif
         }
         for (int64_t loopIdx = 0; loopIdx < this->ubLoop; ++loopIdx) {
             if (loopIdx == this->ubLoop - 1) {

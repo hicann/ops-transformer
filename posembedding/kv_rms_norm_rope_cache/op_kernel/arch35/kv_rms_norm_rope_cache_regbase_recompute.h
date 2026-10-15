@@ -326,7 +326,7 @@ public:
             __ubuf__ T_KV* xPtr = (__ubuf__ T_KV*)xLocal.GetPhyAddr();
 
             xDataCopyParams.blockLen = singleBlockFactor * sizeof(T_KV);
-            AscendC::DataCopyPad(xLocal, this->kvGm[xDimOffset], xDataCopyParams, padParams);
+            CopyInPad(xLocal, this->kvGm[xDimOffset], xDataCopyParams, padParams, true);
             inQueueX.EnQue<T_KV>(xLocal);
             xLocal = inQueueX.DeQue<T_KV>();
 
@@ -349,7 +349,7 @@ public:
 
             // Get the fold block x1
             xDataCopyParams.blockLen = this->ubFactor * sizeof(T_KV);
-            AscendC::DataCopyPad(x1Local, this->kvGm[xUbOffset1], xDataCopyParams, padParams);
+            CopyInPad(x1Local, this->kvGm[xUbOffset1], xDataCopyParams, padParams, true);
             inQueueX.EnQue<T_KV>(x1Local);
             x1Local = inQueueX.DeQue<T_KV>();
 
@@ -361,14 +361,14 @@ public:
             __ubuf__ T_KV* x2Ptr = (__ubuf__ T_KV*)x2Local.GetPhyAddr();
             if (basicBlockIdx < this->mainFoldCount) {
                 xDataCopyParams.blockLen = this->ubFactor * sizeof(T_KV);
-                AscendC::DataCopyPad(x2Local, this->kvGm[xUbOffset2], xDataCopyParams, padParams);
+                CopyInPad(x2Local, this->kvGm[xUbOffset2], xDataCopyParams, padParams, true);
                 inQueueX.EnQue<T_KV>(x2Local);
                 x2Local = inQueueX.DeQue<T_KV>();
                 CastPowVF(x2Fp32Ptr, x2Ptr, this->ubFactor);
                 FoldBlockVF(x1Fp32Ptr, x2Fp32Ptr, this->ubFactor);
             } else if ((basicBlockIdx == mainFoldCount) && (ubFactorDvTail > 0)) {
                 xDataCopyParams.blockLen = ubFactorDvTail * sizeof(T_KV); // x2 is the tail of ub block here.
-                AscendC::DataCopyPad(x2Local, this->kvGm[xUbOffset2], xDataCopyParams, padParams);
+                CopyInPad(x2Local, this->kvGm[xUbOffset2], xDataCopyParams, padParams, true);
                 inQueueX.EnQue<T_KV>(x2Local);
                 x2Local = inQueueX.DeQue<T_KV>();
                 CastPowVF(x2Fp32Ptr, x2Ptr, ubFactorDvTail);
@@ -411,8 +411,8 @@ public:
             }
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV);
 
-            AscendC::DataCopyPad(xLocal, this->kvGm[xUbOffset], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(gammaLocal, this->gammaGm[gammaUbOffset], xDataCopyParams, padParams);
+            CopyInPad(xLocal, this->kvGm[xUbOffset], xDataCopyParams, padParams, true);
+            CopyInPad(gammaLocal, this->gammaGm[gammaUbOffset], xDataCopyParams, padParams, true);
 
             inQueueX.EnQue<T_KV>(xLocal);
             inQueueGamma.EnQue<T_KV>(gammaLocal);
@@ -482,11 +482,19 @@ public:
                 AscendC::Reg::Mul(vregTmp, vregTmp, vregGamma, mask);
                 StoreDataAndCastFromFp32(outAddr, vregTmp, uReg, mask, width);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                // FMA: offset = offset + rms_norm_result * scale
+                LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
+                LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
+                AscendC::Reg::MulAddDst(vregOffset, vregTmp, vregScale, mask);
+                StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregOffset, mask);
+#else
                 LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
                 LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
                 AscendC::Reg::Mul(vregTmp, vregTmp, vregScale, mask);
                 AscendC::Reg::Add(vregTmp, vregTmp, vregOffset, mask);
                 StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregTmp, mask);
+#endif
             }
 
             // 尾VL
@@ -504,11 +512,19 @@ public:
             AscendC::Reg::Mul(vregTmp, vregTmp, vregGamma, mask);
             StoreDataAndCastFromFp32(outAddr, vregTmp, uReg, mask, width);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            // FMA: offset = offset + rms_norm_result * scale
+            LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
+            LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
+            AscendC::Reg::MulAddDst(vregOffset, vregTmp, vregScale, mask);
+            StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregOffset, mask);
+#else
             LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
             LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
             AscendC::Reg::Mul(vregTmp, vregTmp, vregScale, mask);
             AscendC::Reg::Add(vregTmp, vregTmp, vregOffset, mask);
             StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregTmp, mask);
+#endif
         }
     }
 
@@ -548,24 +564,40 @@ public:
             }
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV);
 
-            AscendC::DataCopyPad(xLocal, this->kvGm[xUbOffset], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(gammaLocal, this->gammaGm[gammaUbOffset], xDataCopyParams, padParams);
+            CopyInPad(xLocal, this->kvGm[xUbOffset], xDataCopyParams, padParams, true);
+            CopyInPad(gammaLocal, this->gammaGm[gammaUbOffset], xDataCopyParams, padParams, true);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            if (tilingData_->vScaleType == 1) {
+                BroadcastQuantParamNddma<float>(vScaleLocal, this->vScaleGm, this->ubFactor);
+            } else {
+                xDataCopyParams.blockLen = tmpFactor * sizeof(float);
+                CopyInPad(vScaleLocal, this->vScaleGm[vScaleUbOffset], xDataCopyParams, padParams, true);
+            }
+
+            if (tilingData_->vOffsetType == 1) {
+                BroadcastQuantParamNddma<float>(vOffsetLocal, this->vOffsetGm, this->ubFactor);
+            } else if (tilingData_->vOffsetType > 1) {
+                xDataCopyParams.blockLen = tmpFactor * sizeof(float);
+                CopyInPad(vOffsetLocal, this->vOffsetGm[vOffsetUbOffset], xDataCopyParams, padParams, true);
+            }
+#else
             if (tilingData_->vScaleType > 1) {
                 xDataCopyParams.blockLen = tmpFactor * sizeof(float);
-                AscendC::DataCopyPad(vScaleLocal, this->vScaleGm[vScaleUbOffset], xDataCopyParams, padParams);
+                CopyInPad(vScaleLocal, this->vScaleGm[vScaleUbOffset], xDataCopyParams, padParams, true);
             } else {
                 xDataCopyParams.blockLen = sizeof(float);
-                AscendC::DataCopyPad(vScaleLocal, this->vScaleGm, xDataCopyParams, padParams);
+                CopyInPad(vScaleLocal, this->vScaleGm, xDataCopyParams, padParams, false);
             }
 
             if (tilingData_->vOffsetType > 1) {
                 xDataCopyParams.blockLen = tmpFactor * sizeof(float);
-                AscendC::DataCopyPad(vOffsetLocal, this->vOffsetGm[vOffsetUbOffset], xDataCopyParams, padParams);
+                CopyInPad(vOffsetLocal, this->vOffsetGm[vOffsetUbOffset], xDataCopyParams, padParams, true);
             } else {
                 xDataCopyParams.blockLen = sizeof(float);
-                AscendC::DataCopyPad(vOffsetLocal, this->vOffsetGm, xDataCopyParams, padParams);
+                CopyInPad(vOffsetLocal, this->vOffsetGm, xDataCopyParams, padParams, false);
             }
+#endif
 
             inQueueX.EnQue<T_KV>(xLocal);
             inQueueGamma.EnQue<T_KV>(gammaLocal);
@@ -574,6 +606,7 @@ public:
             vScaleOffsetQueue.EnQue<float>(vScaleLocal);
             vScaleLocal = vScaleOffsetQueue.DeQue<float>();
 
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
             // 将scale和offset Brc方便VF处理
             if (tilingData_->vScaleType == 1) {
                 AscendC::Duplicate<float>(vScaleLocal, vScaleLocal, this->ubFactor);
@@ -582,6 +615,7 @@ public:
             if (tilingData_->vOffsetType == 1) {
                 AscendC::Duplicate<float>(vOffsetLocal, vOffsetLocal, this->ubFactor);
             }
+#endif
 
             CalculateVOutAsymQuantWithKvVF(vPtr, xPtr, gammaPtr, xSumPtr, vScalePtr, vOffsetPtr, vQuantPtr, tmpFactor);
 
@@ -703,16 +737,25 @@ public:
             }
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV);
 
-            AscendC::DataCopyPad(xLocal, this->kvGm[xUbOffset], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(gammaLocal, this->gammaGm[gammaUbOffset], xDataCopyParams, padParams);
+            CopyInPad(xLocal, this->kvGm[xUbOffset], xDataCopyParams, padParams, true);
+            CopyInPad(gammaLocal, this->gammaGm[gammaUbOffset], xDataCopyParams, padParams, true);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            if (tilingData_->vScaleType == 1) {
+                BroadcastQuantParamNddma<float>(vScaleLocal, this->vScaleGm, this->ubFactor);
+            } else {
+                xDataCopyParams.blockLen = tmpFactor * sizeof(float);
+                CopyInPad(vScaleLocal, this->vScaleGm[vScaleUbOffset], xDataCopyParams, padParams, true);
+            }
+#else
             if (tilingData_->vScaleType > 1) {
                 xDataCopyParams.blockLen = tmpFactor * sizeof(float);
-                AscendC::DataCopyPad(vScaleLocal, this->vScaleGm[vScaleUbOffset], xDataCopyParams, padParams);
+                CopyInPad(vScaleLocal, this->vScaleGm[vScaleUbOffset], xDataCopyParams, padParams, true);
             } else {
                 xDataCopyParams.blockLen = sizeof(float);
-                AscendC::DataCopyPad(vScaleLocal, this->vScaleGm, xDataCopyParams, padParams);
+                CopyInPad(vScaleLocal, this->vScaleGm, xDataCopyParams, padParams, false);
             }
+#endif
 
             inQueueX.EnQue<T_KV>(xLocal);
             inQueueGamma.EnQue<T_KV>(gammaLocal);
@@ -721,10 +764,12 @@ public:
             vScaleOffsetQueue.EnQue<float>(vScaleLocal);
             vScaleLocal = vScaleOffsetQueue.DeQue<float>();
 
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
             // 将scale Brc方便VF处理
             if (tilingData_->vScaleType == 1) {
                 AscendC::Duplicate<float>(vScaleLocal, vScaleLocal, this->ubFactor);
             }
+#endif
 
             CalculateVOutSymQuantWithKvVF(vPtr, xPtr, gammaPtr, xSumPtr, vScalePtr, vQuantPtr, tmpFactor);
 
@@ -787,11 +832,19 @@ public:
                 AscendC::Reg::Div(vregTmp, vregX, sumReg, mask);
                 AscendC::Reg::Mul(vregTmp, vregTmp, vregGamma, mask);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                // FMA: offset = offset + rms_norm_result * scale
+                LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
+                LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
+                AscendC::Reg::MulAddDst(vregOffset, vregTmp, vregScale, mask);
+                StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregOffset, mask);
+#else
                 LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
                 LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
                 AscendC::Reg::Mul(vregTmp, vregTmp, vregScale, mask);
                 AscendC::Reg::Add(vregTmp, vregTmp, vregOffset, mask);
                 StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregTmp, mask);
+#endif
             }
 
             // 尾VL
@@ -807,11 +860,19 @@ public:
             AscendC::Reg::Div(vregTmp, vregX, sumReg, mask);
             AscendC::Reg::Mul(vregTmp, vregTmp, vregGamma, mask);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            // FMA: offset = offset + rms_norm_result * scale
+            LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
+            LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
+            AscendC::Reg::MulAddDst(vregOffset, vregTmp, vregScale, mask);
+            StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregOffset, mask);
+#else
             LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
             LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
             AscendC::Reg::Mul(vregTmp, vregTmp, vregScale, mask);
             AscendC::Reg::Add(vregTmp, vregTmp, vregOffset, mask);
             StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregTmp, mask);
+#endif
         }
     }
 
@@ -848,24 +909,40 @@ public:
             }
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV);
 
-            AscendC::DataCopyPad(xLocal, this->kvGm[xUbOffset], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(gammaLocal, this->gammaGm[gammaUbOffset], xDataCopyParams, padParams);
+            CopyInPad(xLocal, this->kvGm[xUbOffset], xDataCopyParams, padParams, true);
+            CopyInPad(gammaLocal, this->gammaGm[gammaUbOffset], xDataCopyParams, padParams, true);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            if (tilingData_->vScaleType == 1) {
+                BroadcastQuantParamNddma<float>(vScaleLocal, this->vScaleGm, this->ubFactor);
+            } else {
+                xDataCopyParams.blockLen = tmpFactor * sizeof(float);
+                CopyInPad(vScaleLocal, this->vScaleGm[vScaleUbOffset], xDataCopyParams, padParams, true);
+            }
+
+            if (tilingData_->vOffsetType == 1) {
+                BroadcastQuantParamNddma<float>(vOffsetLocal, this->vOffsetGm, this->ubFactor);
+            } else if (tilingData_->vOffsetType > 1) {
+                xDataCopyParams.blockLen = tmpFactor * sizeof(float);
+                CopyInPad(vOffsetLocal, this->vOffsetGm[vOffsetUbOffset], xDataCopyParams, padParams, true);
+            }
+#else
             if (tilingData_->vScaleType > 1) {
                 xDataCopyParams.blockLen = tmpFactor * sizeof(float);
-                AscendC::DataCopyPad(vScaleLocal, this->vScaleGm[vScaleUbOffset], xDataCopyParams, padParams);
+                CopyInPad(vScaleLocal, this->vScaleGm[vScaleUbOffset], xDataCopyParams, padParams, true);
             } else {
                 xDataCopyParams.blockLen = sizeof(float);
-                AscendC::DataCopyPad(vScaleLocal, this->vScaleGm, xDataCopyParams, padParams);
+                CopyInPad(vScaleLocal, this->vScaleGm, xDataCopyParams, padParams, false);
             }
 
             if (tilingData_->vOffsetType > 1) {
                 xDataCopyParams.blockLen = tmpFactor * sizeof(float);
-                AscendC::DataCopyPad(vOffsetLocal, this->vOffsetGm[vOffsetUbOffset], xDataCopyParams, padParams);
+                CopyInPad(vOffsetLocal, this->vOffsetGm[vOffsetUbOffset], xDataCopyParams, padParams, true);
             } else {
                 xDataCopyParams.blockLen = sizeof(float);
-                AscendC::DataCopyPad(vOffsetLocal, this->vOffsetGm, xDataCopyParams, padParams);
+                CopyInPad(vOffsetLocal, this->vOffsetGm, xDataCopyParams, padParams, false);
             }
+#endif
 
             inQueueX.EnQue<T_KV>(xLocal);
             xLocal = inQueueX.DeQue<T_KV>();
@@ -874,6 +951,7 @@ public:
             vScaleOffsetQueue.EnQue<float>(vScaleLocal);
             vScaleLocal = vScaleOffsetQueue.DeQue<float>();
 
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
             // 将scale和offset Brc方便VF处理
             if (tilingData_->vScaleType == 1) {
                 AscendC::Duplicate<float>(vScaleLocal, vScaleLocal, this->ubFactor);
@@ -882,6 +960,7 @@ public:
             if (tilingData_->vOffsetType == 1) {
                 AscendC::Duplicate<float>(vOffsetLocal, vOffsetLocal, this->ubFactor);
             }
+#endif
 
             CalculateVOutAsymQuantVF(xPtr, gammaPtr, xSumPtr, vScalePtr, vOffsetPtr, vQuantPtr, tmpFactor);
 
@@ -968,6 +1047,9 @@ public:
         eventIDSToMTE3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE3));
         int64_t batchIdx = rowIdx / tilingData_->seqLength;
         int64_t seqIdx = rowIdx % tilingData_->seqLength;
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+        AscendC::WaitPreTaskEnd();
+#endif
         int64_t vCacheIdx = this->indexGm(rowIdx);
         SetFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
         WaitFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
@@ -1031,6 +1113,9 @@ public:
         int64_t seqIdx = rowIdx % tilingData_->seqLength;
         int64_t blkIdx = seqIdx / tilingData_->blockSize;
         int64_t idx = batchIdx * ceilValue + blkIdx;
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+        AscendC::WaitPreTaskEnd();
+#endif
         int64_t vCacheIdx = this->indexGm(idx);
         SetFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
         WaitFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
@@ -1108,16 +1193,25 @@ public:
             }
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV);
 
-            AscendC::DataCopyPad(xLocal, this->kvGm[xUbOffset], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(gammaLocal, this->gammaGm[gammaUbOffset], xDataCopyParams, padParams);
+            CopyInPad(xLocal, this->kvGm[xUbOffset], xDataCopyParams, padParams, true);
+            CopyInPad(gammaLocal, this->gammaGm[gammaUbOffset], xDataCopyParams, padParams, true);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            if (tilingData_->vScaleType == 1) {
+                BroadcastQuantParamNddma<float>(vScaleLocal, this->vScaleGm, this->ubFactor);
+            } else {
+                xDataCopyParams.blockLen = tmpFactor * sizeof(float);
+                CopyInPad(vScaleLocal, this->vScaleGm[vScaleUbOffset], xDataCopyParams, padParams, true);
+            }
+#else
             if (tilingData_->vScaleType > 1) {
                 xDataCopyParams.blockLen = tmpFactor * sizeof(float);
-                AscendC::DataCopyPad(vScaleLocal, this->vScaleGm[vScaleUbOffset], xDataCopyParams, padParams);
+                CopyInPad(vScaleLocal, this->vScaleGm[vScaleUbOffset], xDataCopyParams, padParams, true);
             } else {
                 xDataCopyParams.blockLen = sizeof(float);
-                AscendC::DataCopyPad(vScaleLocal, this->vScaleGm, xDataCopyParams, padParams);
+                CopyInPad(vScaleLocal, this->vScaleGm, xDataCopyParams, padParams, false);
             }
+#endif
 
             inQueueX.EnQue<T_KV>(xLocal);
             xLocal = inQueueX.DeQue<T_KV>();
@@ -1126,10 +1220,12 @@ public:
             vScaleOffsetQueue.EnQue<float>(vScaleLocal);
             vScaleLocal = vScaleOffsetQueue.DeQue<float>();
 
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
             // 将scale Brc方便VF处理
             if (tilingData_->vScaleType == 1) {
                 AscendC::Duplicate<float>(vScaleLocal, vScaleLocal, this->ubFactor);
             }
+#endif
 
             CalculateVOutSymQuantVF(vQuantPtr, xPtr, gammaPtr, xSumPtr, vScalePtr, tmpFactor);
 
@@ -1218,6 +1314,14 @@ public:
                 LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
                 LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
+                AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
+                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
+                AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
+                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
+                AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
+#else
                 AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
                 AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
                 AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
@@ -1225,6 +1329,7 @@ public:
                 AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
                 AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
                 AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
+#endif
 
                 StoreDataAndCastFromFp32(outAddr1, vregCos1Fp32, uReg, mask, width);
                 StoreDataAndCastFromFp32(outAddr2, vregCos2Fp32, uReg, mask, width);
@@ -1253,6 +1358,14 @@ public:
             LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
             LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
+            AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
+            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
+            AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
+            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
+            AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
+#else
             AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
             AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
             AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
@@ -1260,6 +1373,7 @@ public:
             AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
             AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
             AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
+#endif
 
             width = regTailWidth;
             mask = AscendC::Reg::UpdateMask<float>(width);
@@ -1315,6 +1429,14 @@ public:
                 LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
                 LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
+                AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
+                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
+                AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
+                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
+                AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
+#else
                 AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
                 AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
                 AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
@@ -1322,6 +1444,7 @@ public:
                 AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
                 AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
                 AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
+#endif
 
                 // 量化部分
                 LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
@@ -1359,6 +1482,14 @@ public:
             LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
             LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
+            AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
+            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
+            AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
+            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
+            AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
+#else
             AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
             AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
             AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
@@ -1366,6 +1497,7 @@ public:
             AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
             AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
             AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
+#endif
 
             // 量化部分
             width = regTailWidth;
@@ -1432,6 +1564,14 @@ public:
                 LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
                 LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
+                AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
+                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
+                AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
+                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
+                AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
+#else
                 AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
                 AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
                 AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
@@ -1439,6 +1579,7 @@ public:
                 AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
                 AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
                 AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
+#endif
 
                 // 中间结果
                 StoreDataAndCastFromFp32(kOutAddr1, vregCos1Fp32, uReg, mask, width);
@@ -1482,6 +1623,14 @@ public:
             LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
             LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
+            AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
+            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
+            AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
+            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
+            AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
+#else
             AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
             AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
             AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
@@ -1489,6 +1638,7 @@ public:
             AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
             AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
             AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
+#endif
 
             // 中间结果
             width = regTailWidth;
@@ -1558,21 +1708,31 @@ public:
             __ubuf__ float* tmpBufferPtr = (__ubuf__ float*)tmpLocal.GetPhyAddr();
 
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV);
-            AscendC::DataCopyPad(ropeLocal, this->kvGm[kInOffset], xDataCopyParams, padParams);
+            CopyInPad(ropeLocal, this->kvGm[kInOffset], xDataCopyParams, padParams, true);
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV) / CONST_TWO;
-            AscendC::DataCopyPad(cosLocalPart1, this->cosGm[cosSinOffset1], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(cosLocalPart2, this->cosGm[cosSinOffset2], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(sinLocalPart1, this->sinGm[cosSinOffset1], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(sinLocalPart2, this->sinGm[cosSinOffset2], xDataCopyParams, padParams);
+            CopyInPad(cosLocalPart1, this->cosGm[cosSinOffset1], xDataCopyParams, padParams, true);
+            CopyInPad(cosLocalPart2, this->cosGm[cosSinOffset2], xDataCopyParams, padParams, true);
+            CopyInPad(sinLocalPart1, this->sinGm[cosSinOffset1], xDataCopyParams, padParams, true);
+            CopyInPad(sinLocalPart2, this->sinGm[cosSinOffset2], xDataCopyParams, padParams, true);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            if (tilingData_->kScaleType == 1) {
+                BroadcastQuantParamNddma<float>(kScaleLocalPart1, this->kScaleGm, this->ubFactor);
+            } else {
+                xDataCopyParams.blockLen = cosSinLen * sizeof(float);
+                CopyInPad(kScaleLocalPart1, this->kScaleGm[kScaleOffset1], xDataCopyParams, padParams, true);
+                CopyInPad(kScaleLocalPart2, this->kScaleGm[kScaleOffset2], xDataCopyParams, padParams, true);
+            }
+#else
             if (tilingData_->kScaleType > 1) {
                 xDataCopyParams.blockLen = cosSinLen * sizeof(float);
-                AscendC::DataCopyPad(kScaleLocalPart1, this->kScaleGm[kScaleOffset1], xDataCopyParams, padParams);
-                AscendC::DataCopyPad(kScaleLocalPart2, this->kScaleGm[kScaleOffset2], xDataCopyParams, padParams);
+                CopyInPad(kScaleLocalPart1, this->kScaleGm[kScaleOffset1], xDataCopyParams, padParams, true);
+                CopyInPad(kScaleLocalPart2, this->kScaleGm[kScaleOffset2], xDataCopyParams, padParams, true);
             } else {
                 xDataCopyParams.blockLen = sizeof(float);
-                AscendC::DataCopyPad(kScaleLocalPart1, this->kScaleGm, xDataCopyParams, padParams);
+                CopyInPad(kScaleLocalPart1, this->kScaleGm, xDataCopyParams, padParams, false);
             }
+#endif
 
             inQueueX.EnQue<T_KV>(ropeLocal);
             ropeLocal = inQueueX.DeQue<T_KV>();
@@ -1581,10 +1741,12 @@ public:
             kScaleOffsetQueue.EnQue<float>(kScaleLocalPart1);
             kScaleLocalPart1 = kScaleOffsetQueue.DeQue<float>();
 
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
             // 将scale brc
             if (tilingData_->kScaleType == 1) {
                 AscendC::Duplicate<float>(kScaleLocalPart1, kScaleLocalPart1, this->ubFactor);
             }
+#endif
 
             RopeSymQuantWithVF(kOutPtr1, kOutPtr2, kQuantPtr1, kQuantPtr2, ropePtr, cosPtr1, cosPtr2, sinPtr1, sinPtr2,
                                scalePtr1, scalePtr2, tmpBufferPtr, tmpFactor);
@@ -1660,6 +1822,14 @@ public:
                 LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
                 LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
+                AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
+                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
+                AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
+                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
+                AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
+#else
                 AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
                 AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
                 AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
@@ -1667,7 +1837,21 @@ public:
                 AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
                 AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
                 AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
+#endif
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                // FMA: offset = offset + rope_result * scale
+                LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
+                LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
+                LoadDataAndCast2Fp32<float>(vregOffset1Fp32, offsetAdd1, mask);
+                LoadDataAndCast2Fp32<float>(vregOffset2Fp32, offsetAdd2, mask);
+                AscendC::Reg::MulAddDst(vregOffset1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
+                AscendC::Reg::MulAddDst(vregOffset2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
+
+                // 将结果cast成对应的量化类型
+                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregOffset1Fp32, mask);
+                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregOffset2Fp32, mask);
+#else
                 // 量化部分
                 LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
                 LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
@@ -1681,6 +1865,7 @@ public:
                 // 将结果cast成对应的量化类型
                 StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregCos1Fp32, mask);
                 StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregCos2Fp32, mask);
+#endif
             }
 
             // 尾VL计算范式
@@ -1710,6 +1895,14 @@ public:
             LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
             LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
+            AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
+            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
+            AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
+            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
+            AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
+#else
             AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
             AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
             AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
@@ -1717,7 +1910,23 @@ public:
             AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
             AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
             AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
+#endif
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            // FMA: offset = offset + rope_result * scale
+            width = regTailWidth;
+            mask = AscendC::Reg::UpdateMask<float>(width);
+            LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
+            LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
+            LoadDataAndCast2Fp32<float>(vregOffset1Fp32, offsetAdd1, mask);
+            LoadDataAndCast2Fp32<float>(vregOffset2Fp32, offsetAdd2, mask);
+            AscendC::Reg::MulAddDst(vregOffset1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
+            AscendC::Reg::MulAddDst(vregOffset2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
+
+            // 将结果cast成对应的量化类型
+            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregOffset1Fp32, mask);
+            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregOffset2Fp32, mask);
+#else
             // 量化部分
             width = regTailWidth;
             mask = AscendC::Reg::UpdateMask<float>(width);
@@ -1733,6 +1942,7 @@ public:
             // 将结果cast成对应的量化类型
             StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregCos1Fp32, mask);
             StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregCos2Fp32, mask);
+#endif
         }
     }
 
@@ -1783,30 +1993,48 @@ public:
             __ubuf__ float* tmpBufferPtr = (__ubuf__ float*)tmpLocal.GetPhyAddr();
 
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV);
-            AscendC::DataCopyPad(ropeLocal, this->kvGm[kInOffset], xDataCopyParams, padParams);
+            CopyInPad(ropeLocal, this->kvGm[kInOffset], xDataCopyParams, padParams, true);
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV) / CONST_TWO;
-            AscendC::DataCopyPad(cosLocalPart1, this->cosGm[cosSinOffset1], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(cosLocalPart2, this->cosGm[cosSinOffset2], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(sinLocalPart1, this->sinGm[cosSinOffset1], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(sinLocalPart2, this->sinGm[cosSinOffset2], xDataCopyParams, padParams);
+            CopyInPad(cosLocalPart1, this->cosGm[cosSinOffset1], xDataCopyParams, padParams, true);
+            CopyInPad(cosLocalPart2, this->cosGm[cosSinOffset2], xDataCopyParams, padParams, true);
+            CopyInPad(sinLocalPart1, this->sinGm[cosSinOffset1], xDataCopyParams, padParams, true);
+            CopyInPad(sinLocalPart2, this->sinGm[cosSinOffset2], xDataCopyParams, padParams, true);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            if (tilingData_->kScaleType == 1) {
+                BroadcastQuantParamNddma<float>(kScaleLocalPart1, this->kScaleGm, this->ubFactor);
+            } else {
+                xDataCopyParams.blockLen = cosSinLen * sizeof(float);
+                CopyInPad(kScaleLocalPart1, this->kScaleGm[kScaleOffset1], xDataCopyParams, padParams, true);
+                CopyInPad(kScaleLocalPart2, this->kScaleGm[kScaleOffset2], xDataCopyParams, padParams, true);
+            }
+
+            if (tilingData_->kOffsetType == 1) {
+                BroadcastQuantParamNddma<float>(kOffsetLocalPart1, this->kOffsetGm, this->ubFactor);
+            } else if (tilingData_->kOffsetType > 1) {
+                xDataCopyParams.blockLen = cosSinLen * sizeof(float);
+                CopyInPad(kOffsetLocalPart1, this->kOffsetGm[kOffset1], xDataCopyParams, padParams, true);
+                CopyInPad(kOffsetLocalPart2, this->kOffsetGm[kOffset2], xDataCopyParams, padParams, true);
+            }
+#else
             if (tilingData_->kScaleType > 1) {
                 xDataCopyParams.blockLen = cosSinLen * sizeof(float);
-                AscendC::DataCopyPad(kScaleLocalPart1, this->kScaleGm[kScaleOffset1], xDataCopyParams, padParams);
-                AscendC::DataCopyPad(kScaleLocalPart2, this->kScaleGm[kScaleOffset2], xDataCopyParams, padParams);
+                CopyInPad(kScaleLocalPart1, this->kScaleGm[kScaleOffset1], xDataCopyParams, padParams, true);
+                CopyInPad(kScaleLocalPart2, this->kScaleGm[kScaleOffset2], xDataCopyParams, padParams, true);
             } else {
                 xDataCopyParams.blockLen = sizeof(float);
-                AscendC::DataCopyPad(kScaleLocalPart1, this->kScaleGm, xDataCopyParams, padParams);
+                CopyInPad(kScaleLocalPart1, this->kScaleGm, xDataCopyParams, padParams, false);
             }
 
             if (tilingData_->kOffsetType > 1) {
                 xDataCopyParams.blockLen = cosSinLen * sizeof(float);
-                AscendC::DataCopyPad(kOffsetLocalPart1, this->kOffsetGm[kOffset1], xDataCopyParams, padParams);
-                AscendC::DataCopyPad(kOffsetLocalPart2, this->kOffsetGm[kOffset2], xDataCopyParams, padParams);
+                CopyInPad(kOffsetLocalPart1, this->kOffsetGm[kOffset1], xDataCopyParams, padParams, true);
+                CopyInPad(kOffsetLocalPart2, this->kOffsetGm[kOffset2], xDataCopyParams, padParams, true);
             } else {
                 xDataCopyParams.blockLen = sizeof(float);
-                AscendC::DataCopyPad(kOffsetLocalPart1, this->kOffsetGm, xDataCopyParams, padParams);
+                CopyInPad(kOffsetLocalPart1, this->kOffsetGm, xDataCopyParams, padParams, false);
             }
+#endif
 
             inQueueX.EnQue<T_KV>(ropeLocal);
             ropeLocal = inQueueX.DeQue<T_KV>();
@@ -1815,6 +2043,7 @@ public:
             kScaleOffsetQueue.EnQue<float>(kScaleLocalPart1);
             kScaleLocalPart1 = kScaleOffsetQueue.DeQue<float>();
 
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
             // 将scale brc方便处理
             if (tilingData_->kScaleType == 1) {
                 AscendC::Duplicate<float>(kScaleLocalPart1, kScaleLocalPart1, this->ubFactor);
@@ -1823,6 +2052,7 @@ public:
             if (tilingData_->kOffsetType == 1) {
                 AscendC::Duplicate<float>(kOffsetLocalPart1, kOffsetLocalPart1, this->ubFactor);
             }
+#endif
 
             RopeAsymQuantVF(kQuantPtr1, kQuantPtr2, ropePtr, cosPtr1, cosPtr2, sinPtr1, sinPtr2, scalePtr1, scalePtr2,
                             offsetPtr1, offsetPtr2, tmpBufferPtr, tmpFactor);
@@ -1948,6 +2178,9 @@ public:
         eventIDSToMTE3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE3));
         int64_t batchIdx = rowIdx / tilingData_->seqLength;
         int64_t seqIdx = rowIdx % tilingData_->seqLength;
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+        AscendC::WaitPreTaskEnd();
+#endif
         int64_t kCacheIdx = this->indexGm(rowIdx);
         SetFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
         WaitFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
@@ -2027,6 +2260,9 @@ public:
         int64_t seqIdx = rowIdx % tilingData_->seqLength;
         int64_t blkIdx = seqIdx / tilingData_->blockSize;
         int64_t idx = batchIdx * ceilValue + blkIdx;
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+        AscendC::WaitPreTaskEnd();
+#endif
         int64_t kCacheIdx = this->indexGm(idx);
         SetFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
         WaitFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
@@ -2127,21 +2363,31 @@ public:
             __ubuf__ float* tmpBufferPtr = (__ubuf__ float*)tmpLocal.GetPhyAddr();
 
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV);
-            AscendC::DataCopyPad(ropeLocal, this->kvGm[kInOffset], xDataCopyParams, padParams);
+            CopyInPad(ropeLocal, this->kvGm[kInOffset], xDataCopyParams, padParams, true);
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV) / CONST_TWO;
-            AscendC::DataCopyPad(cosLocalPart1, this->cosGm[cosSinOffset1], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(cosLocalPart2, this->cosGm[cosSinOffset2], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(sinLocalPart1, this->sinGm[cosSinOffset1], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(sinLocalPart2, this->sinGm[cosSinOffset2], xDataCopyParams, padParams);
+            CopyInPad(cosLocalPart1, this->cosGm[cosSinOffset1], xDataCopyParams, padParams, true);
+            CopyInPad(cosLocalPart2, this->cosGm[cosSinOffset2], xDataCopyParams, padParams, true);
+            CopyInPad(sinLocalPart1, this->sinGm[cosSinOffset1], xDataCopyParams, padParams, true);
+            CopyInPad(sinLocalPart2, this->sinGm[cosSinOffset2], xDataCopyParams, padParams, true);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            if (tilingData_->kScaleType == 1) {
+                BroadcastQuantParamNddma<float>(kScaleLocalPart1, this->kScaleGm, this->ubFactor);
+            } else {
+                xDataCopyParams.blockLen = cosSinLen * sizeof(float);
+                CopyInPad(kScaleLocalPart1, this->kScaleGm[kScaleOffset1], xDataCopyParams, padParams, true);
+                CopyInPad(kScaleLocalPart2, this->kScaleGm[kScaleOffset2], xDataCopyParams, padParams, true);
+            }
+#else
             if (tilingData_->kScaleType > 1) {
                 xDataCopyParams.blockLen = cosSinLen * sizeof(float);
-                AscendC::DataCopyPad(kScaleLocalPart1, this->kScaleGm[kScaleOffset1], xDataCopyParams, padParams);
-                AscendC::DataCopyPad(kScaleLocalPart2, this->kScaleGm[kScaleOffset2], xDataCopyParams, padParams);
+                CopyInPad(kScaleLocalPart1, this->kScaleGm[kScaleOffset1], xDataCopyParams, padParams, true);
+                CopyInPad(kScaleLocalPart2, this->kScaleGm[kScaleOffset2], xDataCopyParams, padParams, true);
             } else {
                 xDataCopyParams.blockLen = sizeof(float);
-                AscendC::DataCopyPad(kScaleLocalPart1, this->kScaleGm, xDataCopyParams, padParams);
+                CopyInPad(kScaleLocalPart1, this->kScaleGm, xDataCopyParams, padParams, false);
             }
+#endif
 
             inQueueX.EnQue<T_KV>(ropeLocal);
             ropeLocal = inQueueX.DeQue<T_KV>();
@@ -2150,10 +2396,12 @@ public:
             kScaleOffsetQueue.EnQue<float>(kScaleLocalPart1);
             kScaleLocalPart1 = kScaleOffsetQueue.DeQue<float>();
 
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
             // 将scale brc
             if (tilingData_->kScaleType == 1) {
                 AscendC::Duplicate<float>(kScaleLocalPart1, kScaleLocalPart1, this->ubFactor);
             }
+#endif
 
             RopeSymQuantVF(kQuantPtr1, kQuantPtr2, ropePtr, cosPtr1, cosPtr2, sinPtr1, sinPtr2, scalePtr1, scalePtr2,
                            tmpBufferPtr, tmpFactor);
@@ -2213,12 +2461,12 @@ public:
             __ubuf__ float* tmpBufferPtr = (__ubuf__ float*)tmpLocal.GetPhyAddr();
 
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV);
-            AscendC::DataCopyPad(ropeLocal, this->kvGm[kInOffset], xDataCopyParams, padParams);
+            CopyInPad(ropeLocal, this->kvGm[kInOffset], xDataCopyParams, padParams, true);
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV) / CONST_TWO;
-            AscendC::DataCopyPad(cosLocalPart1, this->cosGm[cosSinOffset1], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(cosLocalPart2, this->cosGm[cosSinOffset2], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(sinLocalPart1, this->sinGm[cosSinOffset1], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(sinLocalPart2, this->sinGm[cosSinOffset2], xDataCopyParams, padParams);
+            CopyInPad(cosLocalPart1, this->cosGm[cosSinOffset1], xDataCopyParams, padParams, true);
+            CopyInPad(cosLocalPart2, this->cosGm[cosSinOffset2], xDataCopyParams, padParams, true);
+            CopyInPad(sinLocalPart1, this->sinGm[cosSinOffset1], xDataCopyParams, padParams, true);
+            CopyInPad(sinLocalPart2, this->sinGm[cosSinOffset2], xDataCopyParams, padParams, true);
 
             inQueueX.EnQue<T_KV>(ropeLocal);
             ropeLocal = inQueueX.DeQue<T_KV>();
@@ -2299,6 +2547,14 @@ public:
                 LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
                 LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
+                AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
+                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
+                AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
+                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
+                AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
+#else
                 AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
                 AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
                 AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
@@ -2306,10 +2562,24 @@ public:
                 AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
                 AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
                 AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
+#endif
                 // 中间结果
                 StoreDataAndCastFromFp32(kOutAddr1, vregCos1Fp32, uReg, mask, width);
                 StoreDataAndCastFromFp32(kOutAddr2, vregCos2Fp32, uReg, mask, width);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                // FMA: offset = offset + rope_result * scale
+                LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
+                LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
+                LoadDataAndCast2Fp32<float>(vregOffset1Fp32, offsetAdd1, mask);
+                LoadDataAndCast2Fp32<float>(vregOffset2Fp32, offsetAdd2, mask);
+                AscendC::Reg::MulAddDst(vregOffset1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
+                AscendC::Reg::MulAddDst(vregOffset2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
+
+                // 将结果cast成对应的量化类型
+                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregOffset1Fp32, mask);
+                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregOffset2Fp32, mask);
+#else
                 // 量化部分
                 LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
                 LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
@@ -2323,6 +2593,7 @@ public:
                 // 将结果cast成对应的量化类型
                 StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregCos1Fp32, mask);
                 StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregCos2Fp32, mask);
+#endif
             }
 
             // 尾VL计算范式
@@ -2354,6 +2625,14 @@ public:
             LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
             LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
+            AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
+            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
+            AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
+            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
+            AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
+#else
             AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
             AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
             AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
@@ -2361,12 +2640,26 @@ public:
             AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
             AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
             AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
+#endif
             // 中间结果
             width = regTailWidth;
             mask = AscendC::Reg::UpdateMask<float>(width);
             StoreDataAndCastFromFp32(kOutAddr1, vregCos1Fp32, uReg, mask, width);
             StoreDataAndCastFromFp32(kOutAddr2, vregCos2Fp32, uReg, mask, width);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            // FMA: offset = offset + rope_result * scale
+            LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
+            LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
+            LoadDataAndCast2Fp32<float>(vregOffset1Fp32, offsetAdd1, mask);
+            LoadDataAndCast2Fp32<float>(vregOffset2Fp32, offsetAdd2, mask);
+            AscendC::Reg::MulAddDst(vregOffset1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
+            AscendC::Reg::MulAddDst(vregOffset2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
+
+            // 将结果cast成对应的量化类型
+            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregOffset1Fp32, mask);
+            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregOffset2Fp32, mask);
+#else
             // 量化部分
             LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
             LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
@@ -2380,6 +2673,7 @@ public:
             // 将结果cast成对应的量化类型
             StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregCos1Fp32, mask);
             StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregCos2Fp32, mask);
+#endif
         }
     }
 
@@ -2439,30 +2733,48 @@ public:
             __ubuf__ float* tmpBufferPtr = (__ubuf__ float*)tmpLocal.GetPhyAddr();
 
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV);
-            AscendC::DataCopyPad(ropeLocal, this->kvGm[kInOffset], xDataCopyParams, padParams);
+            CopyInPad(ropeLocal, this->kvGm[kInOffset], xDataCopyParams, padParams, true);
             xDataCopyParams.blockLen = tmpFactor * sizeof(T_KV) / CONST_TWO;
-            AscendC::DataCopyPad(cosLocalPart1, this->cosGm[cosSinOffset1], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(cosLocalPart2, this->cosGm[cosSinOffset2], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(sinLocalPart1, this->sinGm[cosSinOffset1], xDataCopyParams, padParams);
-            AscendC::DataCopyPad(sinLocalPart2, this->sinGm[cosSinOffset2], xDataCopyParams, padParams);
+            CopyInPad(cosLocalPart1, this->cosGm[cosSinOffset1], xDataCopyParams, padParams, true);
+            CopyInPad(cosLocalPart2, this->cosGm[cosSinOffset2], xDataCopyParams, padParams, true);
+            CopyInPad(sinLocalPart1, this->sinGm[cosSinOffset1], xDataCopyParams, padParams, true);
+            CopyInPad(sinLocalPart2, this->sinGm[cosSinOffset2], xDataCopyParams, padParams, true);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            if (tilingData_->kScaleType == 1) {
+                BroadcastQuantParamNddma<float>(kScaleLocalPart1, this->kScaleGm, this->ubFactor);
+            } else {
+                xDataCopyParams.blockLen = cosSinLen * sizeof(float);
+                CopyInPad(kScaleLocalPart1, this->kScaleGm[kScaleOffset1], xDataCopyParams, padParams, true);
+                CopyInPad(kScaleLocalPart2, this->kScaleGm[kScaleOffset2], xDataCopyParams, padParams, true);
+            }
+
+            if (tilingData_->kOffsetType == 1) {
+                BroadcastQuantParamNddma<float>(kOffsetLocalPart1, this->kOffsetGm, this->ubFactor);
+            } else if (tilingData_->kOffsetType > 1) {
+                xDataCopyParams.blockLen = cosSinLen * sizeof(float);
+                CopyInPad(kOffsetLocalPart1, this->kOffsetGm[kOffset1], xDataCopyParams, padParams, true);
+                CopyInPad(kOffsetLocalPart2, this->kOffsetGm[kOffset2], xDataCopyParams, padParams, true);
+            }
+#else
             if (tilingData_->kScaleType > 1) {
                 xDataCopyParams.blockLen = cosSinLen * sizeof(float);
-                AscendC::DataCopyPad(kScaleLocalPart1, this->kScaleGm[kScaleOffset1], xDataCopyParams, padParams);
-                AscendC::DataCopyPad(kScaleLocalPart2, this->kScaleGm[kScaleOffset2], xDataCopyParams, padParams);
+                CopyInPad(kScaleLocalPart1, this->kScaleGm[kScaleOffset1], xDataCopyParams, padParams, true);
+                CopyInPad(kScaleLocalPart2, this->kScaleGm[kScaleOffset2], xDataCopyParams, padParams, true);
             } else {
                 xDataCopyParams.blockLen = sizeof(float);
-                AscendC::DataCopyPad(kScaleLocalPart1, this->kScaleGm, xDataCopyParams, padParams);
+                CopyInPad(kScaleLocalPart1, this->kScaleGm, xDataCopyParams, padParams, false);
             }
 
             if (tilingData_->kOffsetType > 1) {
                 xDataCopyParams.blockLen = cosSinLen * sizeof(float);
-                AscendC::DataCopyPad(kOffsetLocalPart1, this->kOffsetGm[kOffset1], xDataCopyParams, padParams);
-                AscendC::DataCopyPad(kOffsetLocalPart2, this->kOffsetGm[kOffset2], xDataCopyParams, padParams);
+                CopyInPad(kOffsetLocalPart1, this->kOffsetGm[kOffset1], xDataCopyParams, padParams, true);
+                CopyInPad(kOffsetLocalPart2, this->kOffsetGm[kOffset2], xDataCopyParams, padParams, true);
             } else {
                 xDataCopyParams.blockLen = sizeof(float);
-                AscendC::DataCopyPad(kOffsetLocalPart1, this->kOffsetGm, xDataCopyParams, padParams);
+                CopyInPad(kOffsetLocalPart1, this->kOffsetGm, xDataCopyParams, padParams, false);
             }
+#endif
 
             inQueueX.EnQue<T_KV>(ropeLocal);
             ropeLocal = inQueueX.DeQue<T_KV>();
@@ -2471,6 +2783,7 @@ public:
             kScaleOffsetQueue.EnQue<float>(kScaleLocalPart1);
             kScaleLocalPart1 = kScaleOffsetQueue.DeQue<float>();
 
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
             // 将scale brc方便处理
             if (tilingData_->kScaleType == 1) {
                 AscendC::Duplicate<float>(kScaleLocalPart1, kScaleLocalPart1, this->ubFactor);
@@ -2479,6 +2792,7 @@ public:
             if (tilingData_->kOffsetType == 1) {
                 AscendC::Duplicate<float>(kOffsetLocalPart1, kOffsetLocalPart1, this->ubFactor);
             }
+#endif
 
             RopeAsymQuantWithKvVF(kOutPtr1, kOutPtr2, kQuantPtr1, kQuantPtr2, ropePtr, cosPtr1, cosPtr2, sinPtr1,
                                   sinPtr2, scalePtr1, scalePtr2, offsetPtr1, offsetPtr2, tmpBufferPtr, tmpFactor);
