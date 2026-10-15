@@ -69,7 +69,7 @@ cann_ops_transformer.ops.quant_reduce_scatter(
 
 - x（Tensor）：必选参数，代表需要进行通信的数据，数据类型支持float8_e4m3fn、float8_e5m2、int8和hifloat8，数据格式支持ND，输入shape支持2维和3维，形如(bs, h)和(b, s, h)，且h满足128对齐。该参数不支持空tensor。
 
-- scales（Tensor）：必选参数，代表通信数据的量化系数，数据类型支持float32、float8_e8m0，数据格式支持ND，当数据类型为float32，量化模式根据shape而定。当scales的shape为(1)时为pertensor量化；当scales的shape维度与x的相同时为pertoken-pergroup量化（KG量化），若x为2维(bs, h)，则scales为2维(bs, h/128)，若x为3维(b, s, h)，则scales为3维(b, s, h/128)。当数据类型为float8_e8m0，且x数据类型为float8_e4m3fn，float8_e5m2时，量化模式为MX量化，若x为2维，scales的shape则为3维(bs, h/64, 2)，若x为3维，scales的shape则为4维(b, s, h/64, 2)。h的范围在[1024, 8192]内，且h满足128对齐。该参数不支持空tensor。
+- scales（Tensor）：必选参数，代表通信数据的量化系数，数据类型支持float32、float8_e8m0，数据格式支持ND，当数据类型为float32，量化模式为pertoken-pergroup量化（KG量化），若x为2维(bs, h)，则scales为2维(bs, h/128)，若x为3维(b, s, h)，则scales为3维(b, s, h/128)。当数据类型为float8_e8m0，且x数据类型为float8_e4m3fn，float8_e5m2时，量化模式为MX量化，若x为2维，scales的shape则为3维(bs, h/64, 2)，若x为3维，scales的shape则为4维(b, s, h/64, 2)。h的范围在[1024, 8192]内，且h满足128对齐。该参数不支持空tensor。
 
 - hcom（str）：必选参数，表示通信域handle名。通过get_hccl_comm_name接口获取。
 
