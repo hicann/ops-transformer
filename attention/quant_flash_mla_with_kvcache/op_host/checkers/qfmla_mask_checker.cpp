@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file mask_checker.cpp
+ * \file qfmla_mask_checker.cpp
  * \brief Checker for mask_mode, attn_mask ( Mask参数组)
  */
 
@@ -19,7 +19,7 @@
 #include "err/ops_err.h"
 #include "../qmla_tiling_info.h"
 #include "../qmla_tiling_info_parser.h"
-#include "mask_checker.h"
+#include "qfmla_mask_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {

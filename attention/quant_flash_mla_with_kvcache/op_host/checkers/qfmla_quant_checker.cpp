@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file quant_checker.cpp
+ * \file qfmla_quant_checker.cpp
  * \brief Checker for quant_mode, q_descale, k_descale ( 全量化参数组)
  */
 
@@ -19,7 +19,7 @@
 #include "err/ops_err.h"
 #include "../qmla_tiling_info.h"
 #include "../qmla_tiling_info_parser.h"
-#include "quant_checker.h"
+#include "qfmla_quant_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {

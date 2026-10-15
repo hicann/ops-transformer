@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file common_checker.cpp
+ * \file qfmla_common_checker.cpp
  * \brief Common checker for layout, dtype, shape, axis parameters ( 公共参数组)
  */
 
@@ -19,7 +19,7 @@
 #include "err/ops_err.h"
 #include "../qmla_tiling_info.h"
 #include "../qmla_tiling_info_parser.h"
-#include "common_checker.h"
+#include "qfmla_common_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {
@@ -153,60 +153,11 @@ ge::graphStatus CommonChecker::CheckSingleParaSoftmaxScale(const QmlaTilingInfo&
     return ge::GRAPH_SUCCESS;
 }
 
-// ============================================================================
-// SinglePara — metadata
-// ============================================================================
-
-ge::graphStatus CommonChecker::CheckSingleParaMetadata(const QmlaTilingInfo& qmlaInfo)
-{
-    // metadata 传入时校验 dtype=int32
-    if (qmlaInfo.opParamInfo.metadata.desc != nullptr) {
-        OP_CHECK_IF(
-            qmlaInfo.opParamInfo.metadata.desc->GetDataType() != ge::DT_INT32,
-            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                qmlaInfo.opName, METADATA_NAME,
-                ge::TypeUtils::DataTypeToSerialString(qmlaInfo.opParamInfo.metadata.desc->GetDataType()).c_str(),
-                "The dtype of metadata must be int32"),
-            return ge::GRAPH_FAILED);
-
-        // format: ND
-        if (CheckFormatSupport(qmlaInfo.opParamInfo.metadata.desc, METADATA_NAME) != ge::GRAPH_SUCCESS) {
-            return ge::GRAPH_FAILED;
-        }
-
-        // metadata 必须为 2D: (2, max_schedule_size)
-        // dim0=2: 第一维存 AICore 调度数据, 第二维存 AIVCore 调度数据
-        // dim1=max_schedule_size: 由 quant_flash_mla_metadata 动态计算, 必须 > 0
-        const auto& metaShape = qmlaInfo.opParamInfo.metadata.shape->GetStorageShape();
-        OP_CHECK_IF(metaShape.GetDimNum() != 2,
-                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                        qmlaInfo.opName, METADATA_NAME, (std::to_string(metaShape.GetDimNum()) + "D").c_str(),
-                        "The shape dim of metadata must be 2D (2, max_schedule_size)"),
-                    return ge::GRAPH_FAILED);
-
-        // dim0 必须为 2 (AICore + AIVCore)
-        OP_CHECK_IF(metaShape.GetDim(0) != 2,
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        qmlaInfo.opName, METADATA_NAME, ("[" + std::to_string(metaShape.GetDim(0)) + ", ...]").c_str(),
-                        "The dim0 of metadata must be 2 (AICore + AIVCore)"),
-                    return ge::GRAPH_FAILED);
-
-        // dim1 (max_schedule_size) 必须 > 0
-        OP_CHECK_IF(metaShape.GetDim(1) <= 0,
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        qmlaInfo.opName, METADATA_NAME, ("[..., " + std::to_string(metaShape.GetDim(1)) + "]").c_str(),
-                        "The dim1 (max_schedule_size) of metadata must be greater than 0"),
-                    return ge::GRAPH_FAILED);
-    }
-    return ge::GRAPH_SUCCESS;
-}
-
 ge::graphStatus CommonChecker::CheckSinglePara(const QmlaTilingInfo& qmlaInfo)
 {
     if (CheckSingleParaLayout(qmlaInfo) != ge::GRAPH_SUCCESS || CheckSingleParaDtype(qmlaInfo) != ge::GRAPH_SUCCESS ||
         CheckSingleParaShapeDim(qmlaInfo) != ge::GRAPH_SUCCESS ||
-        CheckSingleParaSoftmaxScale(qmlaInfo) != ge::GRAPH_SUCCESS ||
-        CheckSingleParaMetadata(qmlaInfo) != ge::GRAPH_SUCCESS) {
+        CheckSingleParaSoftmaxScale(qmlaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -226,11 +177,6 @@ ge::graphStatus CommonChecker::CheckParaExistence(const QmlaTilingInfo& qmlaInfo
                 OP_LOGE_WITH_INVALID_INPUT(opName, K_CACHE_NAME), return ge::GRAPH_FAILED);
     OP_CHECK_IF(qmlaInfo.opParamInfo.attnOut.desc == nullptr || qmlaInfo.opParamInfo.attnOut.shape == nullptr,
                 OP_LOGE_WITH_INVALID_INPUT(opName, ATTN_OUT_NAME), return ge::GRAPH_FAILED);
-    // metadata 必须传入
-    OP_CHECK_IF(!qmlaInfo.metadataFlag,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, METADATA_NAME, "provided",
-                                                      "metadata must be provided, it is required for scheduling"),
-                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

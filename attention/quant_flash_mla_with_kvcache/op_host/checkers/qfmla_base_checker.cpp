@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file base_checker.cpp
+ * \file qfmla_base_checker.cpp
  * \brief Base checker implementation for quant_flash_mla_with_kvcache parameters
  */
 
-#include "base_checker.h"
+#include "qfmla_base_checker.h"
 #include "log/log.h"
 #include "log/error_code.h"
 #include "err/ops_err.h"

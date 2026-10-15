@@ -19,7 +19,7 @@
 #include "op_host/tiling_templates_registry.h"
 #include "quant_flash_mla_with_kvcache_tiling.h"
 #include "qmla_tiling_info_parser.h"
-#include "checkers/qmla_checker.h"
+#include "checkers/qfmla_checker.h"
 #include "../../common/op_host/fia_tiling_templates_registry.h"
 
 using namespace ge;

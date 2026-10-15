@@ -9,14 +9,14 @@
  */
 
 /*!
- * \file mask_checker.h
+ * \file qfmla_mask_checker.h
  * \brief Checker for mask_mode, attn_mask ( Mask参数组)
  */
 
-#ifndef QMLA_MASK_CHECKER_H
-#define QMLA_MASK_CHECKER_H
+#ifndef QFMLA_MASK_CHECKER_H
+#define QFMLA_MASK_CHECKER_H
 
-#include "base_checker.h"
+#include "qfmla_base_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {
@@ -39,4 +39,4 @@ private:
 
 } // namespace quant_flash_mla_with_kvcache
 } // namespace optiling
-#endif // QMLA_MASK_CHECKER_H
+#endif // QFMLA_MASK_CHECKER_H

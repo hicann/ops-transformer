@@ -9,14 +9,14 @@
  */
 
 /*!
- * \file seq_len_checker.h
+ * \file qfmla_seq_len_checker.h
  * \brief Checker for cu_seqlens_q, seqused_q, max_seqlen_q/kv ( SeqLengths参数组)
  */
 
-#ifndef QMLA_SEQ_LEN_CHECKER_H
-#define QMLA_SEQ_LEN_CHECKER_H
+#ifndef QFMLA_SEQ_LEN_CHECKER_H
+#define QFMLA_SEQ_LEN_CHECKER_H
 
-#include "base_checker.h"
+#include "qfmla_base_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {
@@ -43,4 +43,4 @@ private:
 
 } // namespace quant_flash_mla_with_kvcache
 } // namespace optiling
-#endif // QMLA_SEQ_LEN_CHECKER_H
+#endif // QFMLA_SEQ_LEN_CHECKER_H

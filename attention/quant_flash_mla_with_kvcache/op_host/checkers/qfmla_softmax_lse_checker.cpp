@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file softmax_lse_checker.cpp
+ * \file qfmla_softmax_lse_checker.cpp
  * \brief Checker for return_softmax_lse, softmax_lse ( SoftmaxLSE参数组)
  */
 
@@ -19,7 +19,7 @@
 #include "err/ops_err.h"
 #include "../qmla_tiling_info.h"
 #include "../qmla_tiling_info_parser.h"
-#include "softmax_lse_checker.h"
+#include "qfmla_softmax_lse_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {

@@ -9,27 +9,27 @@
  */
 
 /*!
- * \file softmax_lse_checker.h
- * \brief Checker for return_softmax_lse, softmax_lse ( SoftmaxLSE参数组)
+ * \file qfmla_metadata_checker.h
+ * \brief Checker for metadata parameter ( 公共参数组 - metadata)
  */
 
-#ifndef QMLA_SOFTMAX_LSE_CHECKER_H
-#define QMLA_SOFTMAX_LSE_CHECKER_H
+#ifndef QFMLA_METADATA_CHECKER_H
+#define QFMLA_METADATA_CHECKER_H
 
-#include "base_checker.h"
+#include "qfmla_base_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {
 
-class SoftmaxLSEChecker : public QmlaBaseChecker {
+class MetadataChecker : public QmlaBaseChecker {
 public:
-    SoftmaxLSEChecker() = default;
-    ~SoftmaxLSEChecker() override = default;
+    MetadataChecker() = default;
+    ~MetadataChecker() = default;
 
     ge::graphStatus CheckSinglePara(const QmlaTilingInfo& qmlaInfo) override;
-    ge::graphStatus CheckMultiPara(const QmlaTilingInfo& qmlaInfo) override;
+    ge::graphStatus CheckParaExistence(const QmlaTilingInfo& qmlaInfo) override;
 };
 
 } // namespace quant_flash_mla_with_kvcache
 } // namespace optiling
-#endif // QMLA_SOFTMAX_LSE_CHECKER_H
+#endif // QFMLA_METADATA_CHECKER_H

@@ -9,13 +9,13 @@
  */
 
 /*!
- * \file qmla_checker.cpp
+ * \file qfmla_checker.cpp
  * \brief QmlaChecker implementation using Composite Pattern
  */
 
 #include "log/log.h"
 #include "../qmla_tiling_info.h"
-#include "qmla_checker.h"
+#include "qfmla_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {
@@ -25,6 +25,7 @@ namespace quant_flash_mla_with_kvcache {
 void QmlaChecker::RegisterCheckers()
 {
     checkers_.push_back(std::make_unique<CommonChecker>());
+    checkers_.push_back(std::make_unique<MetadataChecker>());
     checkers_.push_back(std::make_unique<QuantChecker>());
     checkers_.push_back(std::make_unique<MaskChecker>());
     checkers_.push_back(std::make_unique<SeqLenChecker>());

@@ -9,14 +9,14 @@
  */
 
 /*!
- * \file common_checker.h
+ * \file qfmla_common_checker.h
  * \brief Common checker for layout, dtype, shape, axis parameters ( 公共参数组)
  */
 
-#ifndef QMLA_COMMON_CHECKER_H
-#define QMLA_COMMON_CHECKER_H
+#ifndef QFMLA_COMMON_CHECKER_H
+#define QFMLA_COMMON_CHECKER_H
 
-#include "base_checker.h"
+#include "qfmla_base_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {
@@ -40,8 +40,6 @@ private:
     ge::graphStatus CheckSingleParaShapeDim(const QmlaTilingInfo& qmlaInfo);
     // --- SinglePara: softmax_scale 校验 ---
     ge::graphStatus CheckSingleParaSoftmaxScale(const QmlaTilingInfo& qmlaInfo);
-    // --- SinglePara: metadata dtype/format 校验 ---
-    ge::graphStatus CheckSingleParaMetadata(const QmlaTilingInfo& qmlaInfo);
 
     // --- Feature: 轴校验 (head_dim_qk, head_dim_v, KV_N, Q_N, S, B, Q_T) ---
     ge::graphStatus CheckAxis(const QmlaTilingInfo& qmlaInfo);
@@ -56,4 +54,4 @@ private:
 
 } // namespace quant_flash_mla_with_kvcache
 } // namespace optiling
-#endif // QMLA_COMMON_CHECKER_H
+#endif // QFMLA_COMMON_CHECKER_H

@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file base_checker.h
+ * \file qfmla_base_checker.h
  * \brief Base checker class for quant_flash_mla_with_kvcache parameters
  */
 
-#ifndef QMLA_BASE_CHECKER_H
-#define QMLA_BASE_CHECKER_H
+#ifndef QFMLA_BASE_CHECKER_H
+#define QFMLA_BASE_CHECKER_H
 
 #include <algorithm>
 #include <vector>
@@ -71,4 +71,4 @@ public:
 
 } // namespace quant_flash_mla_with_kvcache
 } // namespace optiling
-#endif // QMLA_BASE_CHECKER_H
+#endif // QFMLA_BASE_CHECKER_H

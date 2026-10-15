@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file paged_attention_checker.cpp
+ * \file qfmla_paged_attention_checker.cpp
  * \brief Checker for block_table, cache_seqlens, k_cache non-contiguous ( Paged Attention参数组)
  */
 
@@ -19,7 +19,7 @@
 #include "err/ops_err.h"
 #include "../qmla_tiling_info.h"
 #include "../qmla_tiling_info_parser.h"
-#include "paged_attention_checker.h"
+#include "qfmla_paged_attention_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {

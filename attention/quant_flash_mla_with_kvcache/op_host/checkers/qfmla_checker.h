@@ -9,26 +9,27 @@
  */
 
 /*!
- * \file qmla_checker.h
+ * \file qfmla_checker.h
  * \brief QmlaChecker using Composite Pattern - manages all checkers uniformly
  */
 
-#ifndef QMLA_CHECKER_H
-#define QMLA_CHECKER_H
+#ifndef QFMLA_CHECKER_H
+#define QFMLA_CHECKER_H
 
 #include <memory>
 #include <vector>
 #include <functional>
 #include "tiling/tiling_api.h"
-#include "base_checker.h"
+#include "qfmla_base_checker.h"
 #include "../qmla_tiling_info.h"
 
-#include "common_checker.h"
-#include "quant_checker.h"
-#include "mask_checker.h"
-#include "seq_len_checker.h"
-#include "paged_attention_checker.h"
-#include "softmax_lse_checker.h"
+#include "qfmla_common_checker.h"
+#include "qfmla_metadata_checker.h"
+#include "qfmla_quant_checker.h"
+#include "qfmla_mask_checker.h"
+#include "qfmla_seq_len_checker.h"
+#include "qfmla_paged_attention_checker.h"
+#include "qfmla_softmax_lse_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {
@@ -52,4 +53,4 @@ private:
 
 } // namespace quant_flash_mla_with_kvcache
 } // namespace optiling
-#endif // QMLA_CHECKER_H
+#endif // QFMLA_CHECKER_H

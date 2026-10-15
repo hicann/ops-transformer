@@ -9,14 +9,14 @@
  */
 
 /*!
- * \file quant_checker.h
+ * \file qfmla_quant_checker.h
  * \brief Checker for quant_mode, q_descale, k_descale ( 全量化参数组)
  */
 
-#ifndef QMLA_QUANT_CHECKER_H
-#define QMLA_QUANT_CHECKER_H
+#ifndef QFMLA_QUANT_CHECKER_H
+#define QFMLA_QUANT_CHECKER_H
 
-#include "base_checker.h"
+#include "qfmla_base_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {
@@ -45,4 +45,4 @@ private:
 
 } // namespace quant_flash_mla_with_kvcache
 } // namespace optiling
-#endif // QMLA_QUANT_CHECKER_H
+#endif // QFMLA_QUANT_CHECKER_H

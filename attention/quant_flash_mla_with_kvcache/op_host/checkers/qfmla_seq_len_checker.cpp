@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file seq_len_checker.cpp
+ * \file qfmla_seq_len_checker.cpp
  * \brief Checker for cu_seqlens_q, seqused_q, max_seqlen_q/kv ( SeqLengths参数组)
  */
 
@@ -19,7 +19,7 @@
 #include "err/ops_err.h"
 #include "../qmla_tiling_info.h"
 #include "../qmla_tiling_info_parser.h"
-#include "seq_len_checker.h"
+#include "qfmla_seq_len_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {

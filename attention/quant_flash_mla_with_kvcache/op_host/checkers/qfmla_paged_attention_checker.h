@@ -9,14 +9,14 @@
  */
 
 /*!
- * \file paged_attention_checker.h
+ * \file qfmla_paged_attention_checker.h
  * \brief Checker for block_table, cache_seqlens, k_cache non-contiguous ( Paged Attention参数组)
  */
 
-#ifndef QMLA_PAGED_ATTENTION_CHECKER_H
-#define QMLA_PAGED_ATTENTION_CHECKER_H
+#ifndef QFMLA_PAGED_ATTENTION_CHECKER_H
+#define QFMLA_PAGED_ATTENTION_CHECKER_H
 
-#include "base_checker.h"
+#include "qfmla_base_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {
@@ -39,4 +39,4 @@ private:
 
 } // namespace quant_flash_mla_with_kvcache
 } // namespace optiling
-#endif // QMLA_PAGED_ATTENTION_CHECKER_H
+#endif // QFMLA_PAGED_ATTENTION_CHECKER_H
