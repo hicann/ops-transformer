@@ -215,6 +215,9 @@ public:
         : context_(context)
     {}
 
+    // 派生类经 unique_ptr<基类> 持有，必须虚析构
+    virtual ~InplacePartialRopeRegBaseTilingClass() = default;
+
     void Reset(gert::TilingContext* context)
     {
         InplacePartialRopeRegBaseTilingClass::Reset(context);
