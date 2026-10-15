@@ -385,6 +385,14 @@ def quant_flash_mla(
                 f"In FP8_E4M3 mode (quant_mode=1), k_cache must be float8_e4m3fn, but got {k_cache.dtype}"
             )
 
+    # MLA 不支持 k_cache 的 stride 中含 0（仅 k_cache 支持 PA 非连续）
+    for name, tensor in (("k_cache", k_cache),):
+        if tensor is not None and 0 in tensor.stride():
+            raise ValueError(
+                f"quant_flash_mla does not support {name} with stride containing 0, "
+                f"got {name}.stride() = {tensor.stride()}"
+            )
+
     op_module = quant_flash_mla_with_kvcache_op_builder.load()
     return op_module.quant_flash_mla(
         q,

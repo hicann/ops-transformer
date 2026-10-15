@@ -91,6 +91,8 @@ public:
 
     // metadata
     uint32_t sectionNum_ = 0;
+    uint32_t aicCoreNum_ = 0;
+    uint32_t aivCoreNum_ = 0;
     // fa metadata
     uint32_t bN2Start_;
     uint32_t bN2End_;
@@ -123,17 +125,19 @@ public:
     {
         InitConstInfo(tiling);
 
-        // metadata header: [0]=sectionNum
+        // metadata header: [0]=sectionNum, [4]=aicCoreNum, [5]=aivCoreNum
         sectionNum_ = ((__gm__ uint32_t*)metadata)[QMLA_HEAD_SECTION_NUM_INDEX];
+        aicCoreNum_ = ((__gm__ uint32_t*)metadata)[QMLA_HEAD_AIC_NUM_INDEX];
+        aivCoreNum_ = ((__gm__ uint32_t*)metadata)[QMLA_HEAD_AIV_NUM_INDEX];
         // FA区: header之后, 布局[section][aicIdx][16]
         faMetaDataGm_.SetGlobalBuffer((__gm__ uint32_t*)(metadata + QMLA_METADATA_HEADER_SIZE * sizeof(uint32_t)),
-                                      QMLA_AIC_CORE_NUM * QMLA_FA_METADATA_SIZE * sectionNum_);
+                                      aicCoreNum_ * QMLA_FA_METADATA_SIZE * sectionNum_);
         // FD区: FA区之后, 布局[section][aivIdx][16]
         fdMetaDataGm_.SetGlobalBuffer(
             (__gm__ uint32_t*)(metadata +
-                               (QMLA_METADATA_HEADER_SIZE + sectionNum_ * QMLA_AIC_CORE_NUM * QMLA_FA_METADATA_SIZE) *
+                               (QMLA_METADATA_HEADER_SIZE + sectionNum_ * aicCoreNum_ * QMLA_FA_METADATA_SIZE) *
                                    sizeof(uint32_t)),
-            QMLA_AIV_CORE_NUM * QMLA_FD_METADATA_SIZE * sectionNum_);
+            aivCoreNum_ * QMLA_FD_METADATA_SIZE * sectionNum_);
 
         // Q序列解析: cu_seqlens_q(B+1) + seqused_q(B)
         // cuSeqLensQSize为tiling已算好的元素个数(B+1), 此处不得再+1:
@@ -236,12 +240,12 @@ public:
 
     __aicore__ inline uint32_t GetFAMetaDataIndex(uint32_t coreIdx, uint32_t metaIdx, uint32_t sectionIdx)
     {
-        return QMLA_FA_METADATA_SIZE * QMLA_AIC_CORE_NUM * sectionIdx + QMLA_FA_METADATA_SIZE * coreIdx + metaIdx;
+        return QMLA_FA_METADATA_SIZE * aicCoreNum_ * sectionIdx + QMLA_FA_METADATA_SIZE * coreIdx + metaIdx;
     }
 
     __aicore__ inline uint32_t GetFDMetaDataIndex(uint32_t coreIdx, uint32_t metaIdx, uint32_t sectionIdx)
     {
-        return QMLA_FD_METADATA_SIZE * QMLA_AIV_CORE_NUM * sectionIdx + QMLA_FD_METADATA_SIZE * coreIdx + metaIdx;
+        return QMLA_FD_METADATA_SIZE * aivCoreNum_ * sectionIdx + QMLA_FD_METADATA_SIZE * coreIdx + metaIdx;
     }
 
     __aicore__ inline void CrossCoreBufferInit()

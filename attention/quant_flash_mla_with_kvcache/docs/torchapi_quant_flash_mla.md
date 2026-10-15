@@ -203,7 +203,7 @@ cann_ops_transformer.quant_flash_mla(
 | cu_seqlens_q | Tensor | 可选 | Q的累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (batch_size+1,) | × |
 | seqused_q | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (batch_size,) | × |
 | attn_mask | Tensor | 可选 | 掩码矩阵，仅在mask_mode为3（CAUSAL）时需要 | int8 | ND | (2048, 2048) | × |
-| metadata | Tensor | 可选 | `quant_flash_mla_metadata`生成的任务切分结果，传入后可优化调度 | int32 | ND | (max_schedule_size,) | x |
+| metadata | Tensor | 可选 | `quant_flash_mla_metadata`生成的任务切分结果，传入后可优化调度 | int32 | ND | (2, max_schedule_size) | x |
 | quant_mode | int | 必选 | 量化模式，支持传入枚举或对应 int 值 | int32 | - | - | - |
 | head_dim_v | int | 可选 | v的每个注意力头维度，默认值为512，当前仅支持512 | int32 | - | - | - |
 | softmax_scale | float | 可选 | 可显式设置缩放因子。不传入时默认取 1/sqrt(headdim) | float32 | - | - | - |

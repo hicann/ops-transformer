@@ -31,9 +31,10 @@ using namespace load_balance;
 
 namespace aicpu {
 
-// MLA固定切分: SOuter=32, SInner=128 (与FIA MLA tiling保持一致)
-static const int64_t NUM_128 = 128L;
+// MLA固定切分: SOuter=64, SInner=256
+static const int64_t NUM_256 = 256L;
 static const int64_t NUM_32 = 32L;
+static const int64_t NUM_64 = 64L;
 
 class QuantFlashMlaWithKvcacheMetadataCpuKernel : public CpuKernel {
 public:

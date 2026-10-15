@@ -1673,6 +1673,7 @@ TEST_PARAMS = {
     },
 }
 
+
 CASES = expand_paramset_to_cases(TEST_PARAMS)
 
 # 已知失败 case 集合（来源: build_out/res_0817.log 2026-08-17 跑批结果）

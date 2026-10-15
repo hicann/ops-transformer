@@ -90,7 +90,7 @@ INPUT_LAYOUT = "TND"
 OUTPUT_LAYOUT = INPUT_LAYOUT
 
 # PA KV Cache Layout：BnBsND、BnNBsD、NZ
-KV_CACHE_LAYOUT = "NZ"  # 新接口仅支持 PA_BNBD
+KV_CACHE_LAYOUT = "BnBsND"
 
 # Data Range (lo, hi)
 Q_DATA_RANGE = (-1.0, 1.0)
@@ -103,7 +103,7 @@ ENABLE_PA = True
 ENABLE_LSE = False
 GOLDEN_MODE = True
 BLOCK_SIZE = 128
-MASK_MODE = 3
+MASK_MODE = 0
 SCALE_VALUE = None
 IS_CONTIGUOUS = True
 
@@ -642,8 +642,8 @@ def _build_qmla_section_info(seqused_q, cache_seqlens):
         cache_seqlens_t = torch.tensor(
             cache_seqlens, dtype=torch.int32, device="npu"
         ).contiguous()
-        # 非 TND (BNSD/BSND) 时 op 不支持 cu_seqlens_q, 传 None
-        if INPUT_LAYOUT == "TND":
+        # 非 TND/NTD_TND (BNSD/BSND) 时 op 不支持 cu_seqlens_q, 传 None
+        if INPUT_LAYOUT in ("TND", "NTD_TND"):
             cu_q = [0]
             acc = 0
             for s in seqused_q:
@@ -684,17 +684,18 @@ def _build_qmla_section_info(seqused_q, cache_seqlens):
 
 
 def _decode_qmla_sections(meta_flat, seqused_q, cache_seqlens):
-    """解码 metadata: header[16] + FA区[section][aicCore(36)][16] + FD区
+    """解码 metadata: header[16] + FA区[section][aicNum][16] + FD区
 
     每个 FA chunk 是 (bn, m, s2) 线性迭代空间上的一段 [start, end),
     m 轴为 GS1 合轴: bn 内 row = s1 * group + g。
+    aicNum/aivNum 从 metadata header[4]/header[5] 动态读取。
     """
-    AIC_CORE_NUM = 36
     META_SIZE = 16
     HEAD_SIZE = 16
     section_num = int(meta_flat[0])
     m_base = int(meta_flat[2])
     s2_base = int(meta_flat[3])
+    aic_core_num = int(meta_flat[4])  # HEAD_AIC_NUM_INDEX = 4
     if section_num <= 0 or m_base <= 0 or s2_base <= 0:
         raise ValueError(
             f"invalid metadata header: section={section_num}, mBase={m_base}, s2Base={s2_base}"
@@ -710,8 +711,8 @@ def _decode_qmla_sections(meta_flat, seqused_q, cache_seqlens):
     segments = [[[] for _ in range(m_blocks[b // N_kv])] for b in range(bn_total)]
 
     for sec in range(section_num):
-        for core in range(AIC_CORE_NUM):
-            base_idx = HEAD_SIZE + (sec * AIC_CORE_NUM + core) * META_SIZE
+        for core in range(aic_core_num):
+            base_idx = HEAD_SIZE + (sec * aic_core_num + core) * META_SIZE
             bn_s, m_s, s2_s, bn_e, m_e, s2_e = (
                 int(v) for v in meta_flat[base_idx : base_idx + 6]
             )
@@ -862,7 +863,7 @@ def _fp8_fullquant_mla_golden_sectioned(
                             sij == float("-inf"), torch.zeros_like(pij), pij
                         )
                         s_blk = torch.sum(pij, dim=-1, keepdims=True)
-                        # MLA rescale: P 直接乘 fp8 max 量化 (无 rowmax_p 重标定)
+                        # MLA: P 直接量化 by 448 (匹配 kernel QmlaSoftmax256 行为)
                         pij_scaled = (
                             (pij * fp8_e4m3_max).to(FP8_DTYPE).to(torch.float32)
                         )
@@ -1051,7 +1052,7 @@ def fp8_fullquant_mla_golden(
             pij = torch.where(sij == float("-inf"), torch.zeros_like(pij), pij)
             s_block = torch.sum(pij, dim=-1, keepdims=True)
 
-            # MLA rescale: P 直接乘 fp8 max 量化 (无 rowmax_p 重标定, 与 NPU isMlaFullQuant=true 一致)
+            # MLA: P 直接量化 by 448 (匹配 kernel QmlaSoftmax256 行为)
             pij_scaled = (pij * fp8_e4m3_max).to(FP8_DTYPE).to(torch.float32)
 
             # bmm2: P_fp8 @ V (deq_v 在最终输出时统一乘)
@@ -1121,6 +1122,17 @@ def convert_q_bnsd_to_layout(tensor_bnsd, seq_lens, layout):
             t += act_s
         return result.contiguous()
     elif layout == "NTD_TND":
+        T = sum(seq_lens)
+        result = torch.zeros((n, T, d), dtype=tensor.dtype, device=tensor.device)
+        t = 0
+        for b_idx in range(b):
+            act_s = seq_lens[b_idx]
+            for n_idx in range(n):
+                result[n_idx, t : t + act_s, :] = tensor[b_idx, n_idx, :act_s, :]
+            t += act_s
+        return result.contiguous()
+    elif layout == "NTD":
+        # NTD: (N, T, D) 与 NTD_TND 数据排布一致
         T = sum(seq_lens)
         result = torch.zeros((n, T, d), dtype=tensor.dtype, device=tensor.device)
         t = 0
@@ -1266,7 +1278,7 @@ class Network(nn.Module):
             head_dim_v=QMLA_V_HEAD_DIM,
             layout_q=layout,
             layout_kv=layout_kv,
-            layout_out=layout,
+            layout_out=OUTPUT_LAYOUT,
             return_softmax_lse=ENABLE_LSE,
         )
         return atten_out, lse_out
@@ -1319,7 +1331,7 @@ class QmlaGraphNetwork(nn.Module):
             head_dim_v=QMLA_V_HEAD_DIM,
             layout_q=layout,
             layout_kv=layout_kv,
-            layout_out=layout,
+            layout_out=OUTPUT_LAYOUT,
             return_softmax_lse=ENABLE_LSE,
         )
         return atten_out, lse_out
@@ -1356,9 +1368,9 @@ def call_npu_fa_op(
     # k_cache 保持原 stride (非连续 view 不做 contiguous 拷贝), 由算子按 tiling stride 寻址
     k_cache_576 = k if k.dtype == FP8_DTYPE else k.to(FP8_DTYPE)
 
-    # ---- 2) per-token-head Q descale: TND -> (T, N_q) 2D; BNSD/BSND -> 3D (B,N,S)/(B,S,N) ----
+    # ---- 2) per-token-head Q descale: TND/NTD_TND -> (T, N_q) 2D; BNSD/BSND -> 3D (B,N,S)/(B,S,N) ----
     deq_q_flat = dequant_scale_q.float().contiguous()
-    if layout == "TND":
+    if layout in ("TND", "NTD_TND"):
         if deq_q_flat.dim() == 3:  # (T, N, 1) -> (T, N)
             deq_q_flat = deq_q_flat.squeeze(-1)
         if deq_q_flat.dim() == 4:  # (B, N, S, 1) -> TND (T, N)
@@ -1380,9 +1392,9 @@ def call_npu_fa_op(
     cache_seqlens_t = torch.tensor(
         cache_seqlens, dtype=torch.int32, device="npu"
     ).contiguous()
-    # cu_seqlens_q (TND): 累计序列，含前导 0 -> [0, l1, l1+l2, ...]
-    # 非 TND (BNSD/BSND) 时 op 不支持 cu_seqlens_q, 传 None
-    if layout == "TND":
+    # cu_seqlens_q (TND/NTD_TND): 累计序列，含前导 0 -> [0, l1, l1+l2, ...]
+    # 非 TND/NTD_TND (BNSD/BSND) 时 op 不支持 cu_seqlens_q, 传 None
+    if layout in ("TND", "NTD_TND"):
         cu_q = [0]
         _acc = 0
         for _s in seqused_q:
@@ -1449,7 +1461,7 @@ def call_npu_fa_op(
             head_dim_v=QMLA_V_HEAD_DIM,
             layout_q=layout,
             layout_kv=_KV_LAYOUT_MAP.get(KV_CACHE_LAYOUT, "PA_BNBD"),
-            layout_out=layout,
+            layout_out=OUTPUT_LAYOUT,
             return_softmax_lse=ENABLE_LSE,
         )
         if OP_FLUSH_L2 or iteration + 1 == OP_WARMUP:
@@ -1526,9 +1538,9 @@ def fia_mla_torch_npu(
     q_576 = q.to(FP8_DTYPE).contiguous()
     k_cache_576 = k.to(FP8_DTYPE).contiguous()
 
-    # Q descale: TND -> (T, N_q) 2D; BNSD/BSND -> 3D (B,N,S)/(B,S,N)
+    # Q descale: TND/NTD_TND -> (T, N_q) 2D; BNSD/BSND -> 3D (B,N,S)/(B,S,N)
     deq_q_flat = dequant_scale_q.float().contiguous()
-    if layout == "TND":
+    if layout in ("TND", "NTD_TND"):
         if deq_q_flat.dim() == 3:
             deq_q_flat = deq_q_flat.squeeze(-1)
         if deq_q_flat.dim() == 4:
@@ -1548,9 +1560,9 @@ def fia_mla_torch_npu(
     cache_seqlens_t = torch.tensor(
         cache_seqlens, dtype=torch.int32, device="npu"
     ).contiguous()
-    # cu_seqlens_q (TND): 累计序列，含前导 0 -> [0, l1, l1+l2, ...]
-    # 非 TND (BNSD/BSND) 时 op 不支持 cu_seqlens_q, 传 None
-    if layout == "TND":
+    # cu_seqlens_q (TND/NTD_TND): 累计序列，含前导 0 -> [0, l1, l1+l2, ...]
+    # 非 TND/NTD_TND (BNSD/BSND) 时 op 不支持 cu_seqlens_q, 传 None
+    if layout in ("TND", "NTD_TND"):
         cu_q = [0]
         _acc = 0
         for _s in seqused_q:
@@ -1695,12 +1707,9 @@ def fa_run_npu(
     """将数据转移到NPU上并调用NPU算子"""
     torch_npu.npu.set_device(int(DEVICE_ID))
 
-    # 非 TND 场景 (BNSD/BSND) 不传 cu_seqlens_q, seqused_q 由 tensor shape 推断 S
+    # 非 TND 场景 (BNSD/BSND): 使用传入的 per-batch seqused_q (不从 tensor shape 推断,
+    # 因为 tensor S 维是 max_sq, 会覆盖 batch 间不等的实际值导致 causal mask delta 错误)
     if layout not in ("TND", "NTD_TND"):
-        if layout == "BSND":
-            seqused_q = [int(q.shape[1])] * int(q.shape[0])
-        else:  # BNSD
-            seqused_q = [int(q.shape[2])] * int(q.shape[0])
         cache_seqlens = None
     if ENABLE_PA:
         cache_seqlens = CACHE_SEQLENS
@@ -1717,7 +1726,7 @@ def fa_run_npu(
     block_table = block_table.int().npu() if ENABLE_PA else None
 
     if mask is not None:
-        mask = mask.bool().npu()
+        mask = mask.to(torch.int8).npu()
 
     # PA cache 按 kv_layout 切到 block_size 行 (Bs 维)
     if ENABLE_PA:
@@ -1794,8 +1803,7 @@ def npu_fp8_full_quant_mla(
             f"KV_CACHE_LAYOUT must be in {{BnNBsD, BnBsND, NZ}} when ENABLE_PA, got {KV_CACHE_LAYOUT}"
         )
 
-    d_total = D
-    softmax_scale = 1.0 / math.sqrt(d_total)
+    softmax_scale = get_softmax_scale(SCALE_VALUE, D)
     out_dtype = OUTPUT_DETYPE
 
     accum_seq_q = (
@@ -1807,9 +1815,11 @@ def npu_fp8_full_quant_mla(
     deq_q_npu = convert_scale_to_layout(dequant_scale_q, SEQUSED_Q, "deq_q")
 
     if MASK_MODE == 3:
-        mask = torch.triu(
-            torch.ones(2048, 2048, dtype=torch.bool, device=q_fp8.device), diagonal=1
-        ).npu()
+        mask = (
+            (torch.triu(torch.ones(2048, 2048, dtype=torch.bool), diagonal=1))
+            .to(torch.int8)
+            .npu()
+        )
     else:
         mask = None
 
@@ -1974,12 +1984,52 @@ if __name__ == "__main__":
     )
     parser.add_argument("--warmup", type=int, default=0)
     parser.add_argument("--runs", type=int, default=1)
+    parser.add_argument(
+        "--input-layout",
+        choices=("BNSD", "BSND", "TND", "NTD_TND"),
+        default=None,
+        help="覆盖 INPUT_LAYOUT (同时覆盖 OUTPUT_LAYOUT)",
+    )
+    parser.add_argument(
+        "--kv-cache-layout",
+        choices=("BnNBsD", "BnBsND", "NZ"),
+        default=None,
+        help="覆盖 KV_CACHE_LAYOUT",
+    )
+    parser.add_argument("--enable-lse", action="store_true", default=None)
+    parser.add_argument("--mask-mode", type=int, default=None)
+    parser.add_argument("--B", type=int, default=None, help="覆盖 batch size")
+    parser.add_argument("--N-q", type=int, default=None, help="覆盖 query head 数")
+    parser.add_argument(
+        "--seqused-q", type=str, default=None, help="覆盖 seqused_q, 逗号分隔"
+    )
+    parser.add_argument(
+        "--cache-seqlens", type=str, default=None, help="覆盖 cache_seqlens, 逗号分隔"
+    )
     args = parser.parse_args()
     if args.warmup < 0 or args.runs < 1:
         parser.error("--warmup must be >= 0 and --runs must be >= 1")
     OP_WARMUP, OP_RUNS = args.warmup, args.runs
     OP_FLUSH_L2 = args.flush_l2
     DEVICE_ID = args.device_id
+    if args.input_layout is not None:
+        INPUT_LAYOUT = args.input_layout
+        # NTD_TND: 输入NTD_TND, 输出NTD (与operator InOutLayoutTypeValue映射一致)
+        OUTPUT_LAYOUT = "NTD" if INPUT_LAYOUT == "NTD_TND" else INPUT_LAYOUT
+    if args.kv_cache_layout is not None:
+        KV_CACHE_LAYOUT = args.kv_cache_layout
+    if args.enable_lse is not None:
+        ENABLE_LSE = args.enable_lse
+    if args.mask_mode is not None:
+        MASK_MODE = args.mask_mode
+    if args.B is not None:
+        B = args.B
+    if args.N_q is not None:
+        N_q = args.N_q
+    if args.seqused_q is not None:
+        SEQUSED_Q = [int(x) for x in args.seqused_q.split(",")]
+    if args.cache_seqlens is not None:
+        CACHE_SEQLENS = [int(x) for x in args.cache_seqlens.split(",")]
     torch.npu.set_device(DEVICE_ID)
     if args.golden_device == "npu":
         # Keep FP32 reference matmul from silently using reduced precision.
@@ -2158,24 +2208,50 @@ if __name__ == "__main__":
             golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)
 
     logger.info("\n[Step 4] Atten OUT 精度对比")
-    # layout_out 恒等于 INPUT_LAYOUT, PA 与非 PA 均按 INPUT_LAYOUT 对比
-    compare_layout = INPUT_LAYOUT
+    # layout_out 按 OUTPUT_LAYOUT 对比 (NTD_TND输入时输出为NTD)
+    compare_layout = OUTPUT_LAYOUT
     cpu_tnd_torch = convert_q_bnsd_to_layout(cpu_out, SEQUSED_Q, compare_layout)
+    # BNSD/BSND: 不等seqused_q跨batch时, padded Q rows (seqused_q[b]~max_sq) 在
+    # golden中被置零(all_masked), 但NPU不保证清零, 对比前两侧统一置零
+    if compare_layout in ("BNSD", "BSND") and len(SEQUSED_Q) > 1:
+        _max_sq = max(SEQUSED_Q)
+        for _b, _sq in enumerate(SEQUSED_Q):
+            if _sq >= _max_sq:
+                continue
+            if compare_layout == "BNSD":
+                cpu_tnd_torch[_b, :, _sq:_max_sq, :] = 0
+                atten_out[_b, :, _sq:_max_sq, :] = 0
+            else:  # BSND
+                cpu_tnd_torch[_b, _sq:_max_sq, :, :] = 0
+                atten_out[_b, _sq:_max_sq, :, :] = 0
     status, _, _ = result_compare_method.check_result_device(cpu_tnd_torch, atten_out)
     if status != "Pass":
         raise AssertionError("Attention output comparison failed")
 
     if ENABLE_LSE:
         logger.info("\n[Step 5] LSE 精度对比")
-        # LSE输出规格: BSND/BNSD输入 -> BNS[B,N,S]; TND/TND_NTD输入 -> NT
+        # LSE输出规格: BSND/BNSD输入 -> BNS[B,N,S]; TND/NTD_TND输入 -> TN/NT (2D)
         lse_compare_layout = (
             "BNSD" if INPUT_LAYOUT in ("BSND", "BNSD") else compare_layout
         )
         cpu_lse_tnd_torch = convert_q_bnsd_to_layout(
             cpu_lse, SEQUSED_Q, lse_compare_layout
         )
+        if cpu_lse_tnd_torch.dim() == 4:
+            cpu_lse_tnd_torch = cpu_lse_tnd_torch.squeeze(-1).contiguous()
+        elif cpu_lse_tnd_torch.dim() == 3 and cpu_lse_tnd_torch.shape[-1] == 1:
+            cpu_lse_tnd_torch = cpu_lse_tnd_torch.squeeze(-1).contiguous()
+        # BNSD/BSND: padded Q rows 的 LSE 同样需两侧统一置零
+        if lse_compare_layout == "BNSD" and len(SEQUSED_Q) > 1:
+            _max_sq = max(SEQUSED_Q)
+            for _b, _sq in enumerate(SEQUSED_Q):
+                if _sq >= _max_sq:
+                    continue
+                cpu_lse_tnd_torch[_b, :, _sq:_max_sq] = 0
+                lse_out[_b, :, _sq:_max_sq] = 0
+        cpu_lse_nt_torch = cpu_lse_tnd_torch.squeeze(-1).permute(1, 0).contiguous()
         status, _, _ = result_compare_method.check_result_device(
-            cpu_lse_tnd_torch, lse_out
+            cpu_lse_nt_torch, lse_out
         )
         if status != "Pass":
             raise AssertionError("LSE comparison failed")

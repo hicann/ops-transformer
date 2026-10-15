@@ -41,6 +41,7 @@ PARAM_MAP = {
     "output_layout": "OUTPUT_LAYOUT",
     "kv_cache_layout": "KV_CACHE_LAYOUT",
     "p_scale": "P_SCALE",
+    "softmax_scale": "SCALE_VALUE",
     "scale_value": "SCALE_VALUE",
     "is_contiguous": "IS_CONTIGUOUS",
     "num_blocks": "NUM_BLOCKS",
@@ -58,10 +59,45 @@ PARAM_MAP = {
 }
 
 
+_LAYOUT_MAP = {
+    "PA_BNBD": "BnNBsD",
+    "PA_BBND": "BnBsND",
+    "PA_NZ": "NZ",
+    "BnNBsD": "BnNBsD",
+    "BnBsND": "BnBsND",
+    "NZ": "NZ",
+}
+
+
 def apply_params(params):
     for param_key, golden_attr in PARAM_MAP.items():
         if param_key in params:
-            setattr(golden, golden_attr, params[param_key])
+            val = params[param_key]
+            # cache_seqlens 为 None 时用默认值 [max_seqlen_kv] * B
+            if param_key == "cache_seqlens" and val is None:
+                max_skv = params.get("max_seqlen_kv", 1024)
+                if max_skv is None or int(max_skv) < 0:
+                    max_skv = 1024
+                val = [int(max_skv)] * int(params.get("B", 1))
+            # kv_cache_layout: PA_BBND → BnBsND
+            if param_key == "kv_cache_layout" and val is not None:
+                val = _LAYOUT_MAP.get(val, val)
+            setattr(golden, golden_attr, val)
+    # 推导 QMLA_QK_HEAD_DIM 和 QMLA_V_HEAD_DIM
+    D = params.get("D", 512)
+    D_rope = params.get("D_rope") or 64
+    D_V = params.get("D_V") or params.get("D_v") or D
+    golden.D = D
+    golden.D_rope = D_rope
+    golden.D_V = D_V
+    golden.QMLA_QK_HEAD_DIM = D + D_rope
+    golden.QMLA_V_HEAD_DIM = D_V
+    golden.GOLDEN_MODE = True
+    golden.ENABLE_PA = True
+    golden.INPUT_LAYOUT = params.get("input_layout", "TND")
+    golden.OUTPUT_LAYOUT = params.get("output_layout", "TND")
+    golden.GRAPH_PATH = 0
+    golden.NUM_BLOCKS = 0
 
 
 def execute_test(params, mode, cdir=None):
@@ -204,7 +240,12 @@ def execute_test(params, mode, cdir=None):
             golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)
 
     # ---- Step 4/5: 精度对比 ----
-    compare_layout = "TND" if golden.ENABLE_PA else golden.INPUT_LAYOUT
+    # 非 TND 输入(BSND/BNSD)时算子输出 layout 与输入相同, 直接按输入 layout 对比;
+    # TND 输入(PA 或非 PA)按 TND 对比
+    if golden.INPUT_LAYOUT in ("BSND", "BNSD"):
+        compare_layout = golden.INPUT_LAYOUT
+    else:
+        compare_layout = "TND" if golden.ENABLE_PA else golden.INPUT_LAYOUT
     cpu_cmp = golden.convert_q_bnsd_to_layout(cpu_out, golden.SEQUSED_Q, compare_layout)
     logger.info("========== Attn OUT 精度对比 ==========")
     logger.info("CPU shape: %s, NPU shape: %s", cpu_cmp.shape, npu_out.shape)
@@ -212,11 +253,17 @@ def execute_test(params, mode, cdir=None):
 
     lse_result = None
     if golden.ENABLE_LSE:
-        lse_cmp = golden.convert_q_bnsd_to_layout(
-            cpu_lse, golden.SEQUSED_Q, compare_layout
+        # 算子输出 LSE 规格: BSND/BNSD输入 -> BNS(B,N,S); TND输入 -> NT(N,T)
+        lse_layout = (
+            "BNSD" if golden.INPUT_LAYOUT in ("BSND", "BNSD") else compare_layout
         )
-        # 算子输出 LSE 为 NT layout (N, T)，需将 CPU LSE 从 BNSD 转为 NT
-        lse_cmp = lse_cmp.permute(1, 0, 2).squeeze(-1).contiguous()
+        lse_cmp = golden.convert_q_bnsd_to_layout(cpu_lse, golden.SEQUSED_Q, lse_layout)
+        if lse_cmp.dim() == 4:
+            # BSND/BNSD输入: cpu_lse (B,N,S,1) → squeeze → (B,N,S) 与 npu LSE 对比
+            lse_cmp = lse_cmp.squeeze(-1).contiguous()
+        else:
+            # TND输入: 算子输出 LSE 为 NT (N,T), 需将 CPU (T,N,1) 转为 NT
+            lse_cmp = lse_cmp.permute(1, 0, 2).squeeze(-1).contiguous()
         logger.info("========== LSE 精度对比 ==========")
         logger.info(
             "CPU LSE shape: %s, NPU LSE shape: %s", lse_cmp.shape, lse_out.shape

@@ -18,10 +18,6 @@
 
 namespace optiling {
 
-// 数组长度
-constexpr uint32_t QMLA_AIC_CORE_NUM = 36;
-constexpr uint32_t QMLA_AIV_CORE_NUM = 72;
-
 // metadata内存布局: header(16个uint32) + FA区(sectionNum*36*16) + FD区(sectionNum*72*16)
 // 与 quant_flash_mla_with_kvcache_metadata 算子写入布局一致
 constexpr uint32_t QMLA_FA_METADATA_SIZE = 16;
@@ -33,6 +29,8 @@ constexpr uint32_t QMLA_HEAD_SECTION_NUM_INDEX = 0;
 constexpr uint32_t QMLA_HEAD_IS_FD_INDEX = 1;
 constexpr uint32_t QMLA_HEAD_M_BASE_SIZE_INDEX = 2;
 constexpr uint32_t QMLA_HEAD_S2_BASE_SIZE_INDEX = 3;
+constexpr uint32_t QMLA_HEAD_AIC_NUM_INDEX = 4;
+constexpr uint32_t QMLA_HEAD_AIV_NUM_INDEX = 5;
 constexpr uint32_t QMLA_HEAD_NEED_INIT_OUTPUT_INDEX = 15;
 
 // FA Metadata Index Definitions（多section: sectionIdx*36*16 + aicIdx*16 + idx）

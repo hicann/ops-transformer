@@ -108,6 +108,7 @@ public:
             .ExtendCfgInfo("opFile.value", "quant_flash_mla_with_kvcache");
 
         this->AICore().AddConfig("ascend950", aicore_config_95);
+        this->AICore().AddConfig("ascend960dt", aicore_config_95);
     }
 };
 

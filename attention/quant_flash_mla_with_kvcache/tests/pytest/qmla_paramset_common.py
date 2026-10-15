@@ -82,10 +82,35 @@ TEST_PARAMS_DEFAULTS = {
 }
 
 
+def _split_layout_spec(val):
+    """layout 参数格式: "输入layout_输出layout"（如 TND_BSND/TND_NTD）；
+    无下划线（如 BSND/BNSD）时输入输出 layout 相同"""
+    if "_" in val:
+        in_layout, out_layout = val.split("_", 1)
+        return in_layout, out_layout
+    return val, val
+
+
 def expand_paramset_to_cases(test_params):
     cases = []
     for name, params in test_params.items():
         expanded = dict(params)
+        # layout 参数: 解析为 input_layout/output_layout，优先级高于二者显式配置。
+        # 展开后 input_layout/output_layout 会进入笛卡尔积，需按原始配对过滤非法组合
+        layout_pair_to_spec = None
+        if "layout" in expanded:
+            layout_vals = expanded.pop("layout")
+            in_vals, out_vals = [], []
+            for layout_val in layout_vals:
+                in_l, out_l = _split_layout_spec(layout_val)
+                in_vals.append(in_l)
+                out_vals.append(out_l)
+            expanded["input_layout"] = in_vals
+            expanded["output_layout"] = out_vals
+            layout_pair_to_spec = {
+                (in_l, out_l): spec
+                for spec, in_l, out_l in zip(layout_vals, in_vals, out_vals)
+            }
         for key, default_vals in TEST_PARAMS_DEFAULTS.items():
             if key not in expanded:
                 expanded[key] = default_vals
@@ -99,5 +124,11 @@ def expand_paramset_to_cases(test_params):
             case = {"name": name}
             for key, val in zip(PARAM_NAMES, combo):
                 case[key] = val
+            # 过滤 layout 笛卡尔积产生的非法配对，保留原始 layout 配置串用于 case id
+            if layout_pair_to_spec is not None:
+                pair = (case["input_layout"], case["output_layout"])
+                if pair not in layout_pair_to_spec:
+                    continue
+                case["layout"] = layout_pair_to_spec[pair]
             cases.append(case)
     return cases

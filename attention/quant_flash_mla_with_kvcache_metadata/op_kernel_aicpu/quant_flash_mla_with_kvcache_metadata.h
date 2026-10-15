@@ -21,11 +21,10 @@
 
 namespace optiling {
 
-constexpr uint32_t AIC_CORE_NUM = 36U;
-constexpr uint32_t AIV_CORE_NUM = 72U;
-constexpr uint32_t FA_META_SIZE = 1024U;
 using FA_METADATA_T = uint32_t;
 
+// AICPU metadata format: 16 fields per core (FA and FD both)
+constexpr uint32_t METADATA_STRIDE = 16U;
 constexpr uint32_t HEAD_METADATA_SIZE = 16U;
 constexpr uint32_t FA_METADATA_SIZE = 16U;
 constexpr uint32_t FD_METADATA_SIZE = 16U;
@@ -34,6 +33,8 @@ constexpr uint32_t HEAD_SECTION_NUM_INDEX = 0U;
 constexpr uint32_t HEAD_IS_FD_INDEX = 1U;
 constexpr uint32_t HEAD_M_BASE_SIZE_INDEX = 2U;
 constexpr uint32_t HEAD_S2_BASE_SIZE_INDEX = 3U;
+constexpr uint32_t HEAD_AIC_NUM_INDEX = 4U;
+constexpr uint32_t HEAD_AIV_NUM_INDEX = 5U;
 constexpr uint32_t HEAD_NEED_INIT_OUTPUT_INDEX = 15U;
 
 constexpr uint32_t FA_BN_START_INDEX = 0U;
@@ -54,16 +55,33 @@ constexpr uint32_t FD_M_NUM_INDEX = 5U;
 namespace detail {
 struct FaMetaData {
     uint32_t sectionNum;
-    uint32_t* headMedata;
-    uint32_t* faMetadata;
-    uint32_t* fdMetadata;
-    FaMetaData(void* metadataPtr, uint32_t sectionNum)
+    uint32_t aicNum;
+    uint32_t aivNum;
+    FA_METADATA_T* headMedata; // [HEAD_METADATA_SIZE];
+    FA_METADATA_T* faMetadata; // [sectionNum][aicNum][FA_METADATA_SIZE];
+    FA_METADATA_T* fdMetadata; // [sectionNum][aivNum][FD_METADATA_SIZE];
+    FaMetaData(uint32_t aicNum, uint32_t aivNum, uint32_t sectionNum, void* metadataPtr)
         : sectionNum(sectionNum),
-          headMedata(static_cast<uint32_t*>(metadataPtr)),
+          aicNum(aicNum),
+          aivNum(aivNum),
+          headMedata(static_cast<FA_METADATA_T*>(metadataPtr)),
           faMetadata(headMedata + HEAD_METADATA_SIZE),
-          fdMetadata(faMetadata + sectionNum * AIC_CORE_NUM * FA_METADATA_SIZE)
+          fdMetadata(faMetadata + sectionNum * aicNum * FA_METADATA_SIZE)
     {
         headMedata[0] = sectionNum;
+    }
+
+    void Clear()
+    {
+        for (size_t i = 0; i < HEAD_METADATA_SIZE; ++i) {
+            headMedata[i] = 0U;
+        }
+        for (size_t i = 0; i < sectionNum * aicNum * FA_METADATA_SIZE; ++i) {
+            faMetadata[i] = 0U;
+        }
+        for (size_t i = 0; i < sectionNum * aivNum * FD_METADATA_SIZE; ++i) {
+            fdMetadata[i] = 0U;
+        }
     }
 
     void SetHeadMedata(uint32_t metaIdx, uint32_t val)
@@ -81,33 +99,33 @@ struct FaMetaData {
     void SetFaMetadata(uint32_t sectionIdx, uint32_t aicIdx, uint32_t metaIdx, uint32_t val)
     {
         assert(sectionIdx < sectionNum);
-        assert(aicIdx < AIC_CORE_NUM);
+        assert(aicIdx < aicNum);
         assert(metaIdx < FA_METADATA_SIZE);
-        faMetadata[sectionIdx * AIC_CORE_NUM * FA_METADATA_SIZE + aicIdx * FA_METADATA_SIZE + metaIdx] = val;
+        faMetadata[sectionIdx * aicNum * FA_METADATA_SIZE + aicIdx * FA_METADATA_SIZE + metaIdx] = val;
     }
 
     uint32_t GetFaMetadata(uint32_t sectionIdx, uint32_t aicIdx, uint32_t metaIdx)
     {
         assert(sectionIdx < sectionNum);
-        assert(aicIdx < AIC_CORE_NUM);
+        assert(aicIdx < aicNum);
         assert(metaIdx < FA_METADATA_SIZE);
-        return faMetadata[AIC_CORE_NUM * FA_METADATA_SIZE * sectionIdx + FA_METADATA_SIZE * aicIdx + metaIdx];
+        return faMetadata[aicNum * FA_METADATA_SIZE * sectionIdx + FA_METADATA_SIZE * aicIdx + metaIdx];
     }
 
     void SetFdMetadata(uint32_t sectionIdx, uint32_t aivIdx, uint32_t metaIdx, uint32_t val)
     {
         assert(sectionIdx < sectionNum);
-        assert(aivIdx < AIV_CORE_NUM);
+        assert(aivIdx < aivNum);
         assert(metaIdx < FD_METADATA_SIZE);
-        fdMetadata[AIV_CORE_NUM * FD_METADATA_SIZE * sectionIdx + FD_METADATA_SIZE * aivIdx + metaIdx] = val;
+        fdMetadata[aivNum * FD_METADATA_SIZE * sectionIdx + FD_METADATA_SIZE * aivIdx + metaIdx] = val;
     }
 
     uint32_t GetFdMetadata(uint32_t sectionIdx, uint32_t aivIdx, uint32_t metaIdx)
     {
         assert(sectionIdx < sectionNum);
-        assert(aivIdx < AIV_CORE_NUM);
+        assert(aivIdx < aivNum);
         assert(metaIdx < FD_METADATA_SIZE);
-        return fdMetadata[AIV_CORE_NUM * FD_METADATA_SIZE * sectionIdx + FD_METADATA_SIZE * aivIdx + metaIdx];
+        return fdMetadata[aivNum * FD_METADATA_SIZE * sectionIdx + FD_METADATA_SIZE * aivIdx + metaIdx];
     }
 };
 } // namespace detail

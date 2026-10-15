@@ -204,6 +204,10 @@ bool QuantFlashMlaWithKvcacheMetadataCpuKernel::ParamsInit()
     // MLA固定切分: SOuter=32, SInner=256 (与QMLA kernel保持一致)
     s2BaseSize_ = 256U;                                // SInner
     mBaseSize_ = NUM_32 * (aivCoreNum_ / aicCoreNum_); // SOuter * cvRatio
+    if (socVersion_.find("Ascend960") != std::string::npos) {
+        s2BaseSize_ = NUM_256; // SInner
+        mBaseSize_ = NUM_64;   // SOuter * cvRatio
+    }
     param.mBaseSize = mBaseSize_;
     param.s2BaseSize = s2BaseSize_;
     param.l2Byte = 96 * 1024 * 1024;
@@ -288,7 +292,9 @@ bool QuantFlashMlaWithKvcacheMetadataCpuKernel::GenMetaData(SectionStreamKResult
         return false;
     }
     uint32_t sectionNum = splitRes.sectionNum;
-    detail::FaMetaData faMetadata(metaData_->GetData(), sectionNum);
+    detail::FaMetaData faMetadata(static_cast<uint32_t>(aicCoreNum_), static_cast<uint32_t>(aivCoreNum_), sectionNum,
+                                  metaData_->GetData());
+    faMetadata.Clear();
     faMetadata.SetHeadMedata(optiling::HEAD_SECTION_NUM_INDEX, sectionNum);
 
     faMetadata.SetHeadMedata(optiling::HEAD_IS_FD_INDEX, 0);
@@ -301,26 +307,10 @@ bool QuantFlashMlaWithKvcacheMetadataCpuKernel::GenMetaData(SectionStreamKResult
 
     faMetadata.SetHeadMedata(optiling::HEAD_M_BASE_SIZE_INDEX, mBaseSize_);
     faMetadata.SetHeadMedata(optiling::HEAD_S2_BASE_SIZE_INDEX, s2BaseSize_);
+    faMetadata.SetHeadMedata(optiling::HEAD_AIC_NUM_INDEX, static_cast<uint32_t>(aicCoreNum_));
+    faMetadata.SetHeadMedata(optiling::HEAD_AIV_NUM_INDEX, static_cast<uint32_t>(aivCoreNum_));
 
     for (uint32_t sectionId = 0; sectionId < sectionNum; ++sectionId) {
-        for (uint32_t i = 0; i < AIC_CORE_NUM; ++i) {
-            faMetadata.SetFaMetadata(sectionId, i, optiling::FA_BN_START_INDEX, 0U);
-            faMetadata.SetFaMetadata(sectionId, i, optiling::FA_M_START_INDEX, 0U);
-            faMetadata.SetFaMetadata(sectionId, i, optiling::FA_S2_START_INDEX, 0U);
-            faMetadata.SetFaMetadata(sectionId, i, optiling::FA_BN_END_INDEX, 0U);
-            faMetadata.SetFaMetadata(sectionId, i, optiling::FA_M_END_INDEX, 0U);
-            faMetadata.SetFaMetadata(sectionId, i, optiling::FA_S2_END_INDEX, 0U);
-            faMetadata.SetFaMetadata(sectionId, i, optiling::FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX, 0U);
-        }
-        for (uint32_t i = 0; i < AIV_CORE_NUM; ++i) {
-            faMetadata.SetFdMetadata(sectionId, i, optiling::FD_BN_IDX_INDEX, 0U);
-            faMetadata.SetFdMetadata(sectionId, i, optiling::FD_M_IDX_INDEX, 0U);
-            faMetadata.SetFdMetadata(sectionId, i, optiling::FD_WORKSPACE_IDX_INDEX, 0U);
-            faMetadata.SetFdMetadata(sectionId, i, optiling::FD_WORKSPACE_NUM_INDEX, 0U);
-            faMetadata.SetFdMetadata(sectionId, i, optiling::FD_M_START_INDEX, 0U);
-            faMetadata.SetFdMetadata(sectionId, i, optiling::FD_M_NUM_INDEX, 0U);
-        }
-
         auto faSplitRes = splitRes.sectionFaResult[sectionId];
         for (uint32_t i = 0; i < faSplitRes.usedCoreNum; ++i) {
             if (i > 0) {

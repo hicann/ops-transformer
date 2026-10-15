@@ -10,15 +10,25 @@
 
 /*!
  * \file qmla_checker.h
- * \brief QuantFlashMlaWithKvcache 参数校验
+ * \brief QmlaChecker using Composite Pattern - manages all checkers uniformly
  */
 
 #ifndef QMLA_CHECKER_H
 #define QMLA_CHECKER_H
 
+#include <memory>
 #include <vector>
+#include <functional>
 #include "tiling/tiling_api.h"
+#include "base_checker.h"
 #include "../qmla_tiling_info.h"
+
+#include "common_checker.h"
+#include "quant_checker.h"
+#include "mask_checker.h"
+#include "seq_len_checker.h"
+#include "paged_attention_checker.h"
+#include "softmax_lse_checker.h"
 
 namespace optiling {
 namespace quant_flash_mla_with_kvcache {
@@ -32,19 +42,14 @@ public:
     ge::graphStatus Process(const QmlaTilingInfo& qmlaInfo);
 
 private:
-    ge::graphStatus CheckAxisPara(const QmlaTilingInfo& qmlaInfo);
-    ge::graphStatus CheckSeqLenPara(const QmlaTilingInfo& qmlaInfo);
-    ge::graphStatus CheckMaskPara(const QmlaTilingInfo& qmlaInfo);
-    ge::graphStatus CheckQuantPara(const QmlaTilingInfo& qmlaInfo);
-    ge::graphStatus CheckLayoutPara(const QmlaTilingInfo& qmlaInfo);
-    ge::graphStatus CheckSoftmaxLsePara(const QmlaTilingInfo& qmlaInfo);
-    ge::graphStatus CheckNonContiguousSupport(const QmlaTilingInfo& qmlaInfo);
-    // 从最后一维向前推算连续期望stride, 返回第一个不连续维的下标
-    ge::graphStatus CheckTensorContiguous(const gert::Shape& inputShape, const gert::Stride* strides,
-                                          int32_t& index) const;
+    using CheckMethod = std::function<ge::graphStatus(QmlaBaseChecker*, const QmlaTilingInfo&)>;
+
+    ge::graphStatus RunCheck(const CheckMethod& method, const QmlaTilingInfo& qmlaInfo);
+    void RegisterCheckers();
+
+    std::vector<std::unique_ptr<QmlaBaseChecker>> checkers_;
 };
 
 } // namespace quant_flash_mla_with_kvcache
 } // namespace optiling
-
 #endif // QMLA_CHECKER_H
