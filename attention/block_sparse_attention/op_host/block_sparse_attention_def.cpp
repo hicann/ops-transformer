@@ -20,55 +20,56 @@ public:
         this->Input("query")
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1,
-                       ge::DT_FLOAT4_E2M1})
+                       ge::DT_FLOAT4_E2M1, ge::DT_HIFLOAT8, ge::DT_HIFLOAT8})
             .FormatList({ge::FORMAT_ND});
         this->Input("key")
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1,
-                       ge::DT_FLOAT4_E2M1})
+                       ge::DT_FLOAT4_E2M1, ge::DT_HIFLOAT8, ge::DT_HIFLOAT8})
             .FormatList({ge::FORMAT_ND});
         this->Input("value")
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1,
-                       ge::DT_FLOAT4_E2M1})
+                       ge::DT_FLOAT4_E2M1, ge::DT_HIFLOAT8, ge::DT_HIFLOAT8})
             .FormatList({ge::FORMAT_ND});
-        this->Input("blockSparseMask").ParamType(OPTIONAL).DataTypeList({ge::DT_INT8}).FormatList({ge::FORMAT_ND});
-        this->Input("attenMask").ParamType(OPTIONAL).DataTypeList({ge::DT_INT8}).FormatList({ge::FORMAT_ND});
-        this->Input("blockShape").ParamType(OPTIONAL).DataTypeList({ge::DT_INT64}).FormatList({ge::FORMAT_ND});
-        this->Input("actualSeqLengths").ParamType(OPTIONAL).DataTypeList({ge::DT_INT64}).FormatList({ge::FORMAT_ND});
-        this->Input("actualSeqLengthsKv").ParamType(OPTIONAL).DataTypeList({ge::DT_INT64}).FormatList({ge::FORMAT_ND});
-        this->Input("blockTable").ParamType(OPTIONAL).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
-        this->Input("qDequantScaleOptional")
+        this->Input("block_sparse_mask").ParamType(OPTIONAL).DataTypeList({ge::DT_INT8}).FormatList({ge::FORMAT_ND});
+        this->Input("atten_mask").ParamType(OPTIONAL).DataTypeList({ge::DT_INT8}).FormatList({ge::FORMAT_ND});
+        this->Input("block_shape").ParamType(OPTIONAL).DataTypeList({ge::DT_INT64}).FormatList({ge::FORMAT_ND});
+        this->Input("actual_seq_lengths").ParamType(OPTIONAL).DataTypeList({ge::DT_INT64}).FormatList({ge::FORMAT_ND});
+        this->Input("actual_seq_lengths_kv").ParamType(OPTIONAL).DataTypeList({ge::DT_INT64}).FormatList({ge::FORMAT_ND});
+        this->Input("block_table").ParamType(OPTIONAL).DataTypeList({ge::DT_INT32}).FormatList({ge::FORMAT_ND});
+        this->Input("q_dequant_scale")
             .ParamType(OPTIONAL)
             .DataTypeList({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0})
             .FormatList({ge::FORMAT_ND});
-        this->Input("kDequantScaleOptional")
+        this->Input("k_dequant_scale")
             .ParamType(OPTIONAL)
             .DataTypeList({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0})
             .FormatList({ge::FORMAT_ND});
-        this->Input("vDequantScaleOptional")
+        this->Input("v_dequant_scale")
             .ParamType(OPTIONAL)
             .DataTypeList({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0})
             .FormatList({ge::FORMAT_ND});
-        this->Input("pQuantScaleOptional").ParamType(OPTIONAL).DataTypeList({ge::DT_FLOAT}).FormatList({ge::FORMAT_ND});
-        this->Output("attentionOut")
+        this->Input("p_quant_scale").ParamType(OPTIONAL).DataTypeList({ge::DT_FLOAT}).FormatList({ge::FORMAT_ND});
+        this->Output("attention_out")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16})
+            .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16,
+                       ge::DT_FLOAT16, ge::DT_BF16})
             .FormatList({ge::FORMAT_ND});
-        this->Output("softmaxLse").ParamType(OPTIONAL).DataTypeList({ge::DT_FLOAT}).FormatList({ge::FORMAT_ND});
+        this->Output("softmax_lse").ParamType(OPTIONAL).DataTypeList({ge::DT_FLOAT}).FormatList({ge::FORMAT_ND});
 
-        this->Attr("qInputLayout").AttrType(OPTIONAL).String("TND");
-        this->Attr("kvInputLayout").AttrType(OPTIONAL).String("TND");
-        this->Attr("numKeyValueHeads").AttrType(OPTIONAL).Int(1);
-        this->Attr("maskType").AttrType(OPTIONAL).Int(0);
-        this->Attr("scaleValue").AttrType(OPTIONAL).Float(0.0);
-        this->Attr("innerPrecise").AttrType(OPTIONAL).Int(0);
-        this->Attr("blockSize").AttrType(OPTIONAL).Int(0);
-        this->Attr("preTokens").AttrType(OPTIONAL).Int(2147483647);
-        this->Attr("nextTokens").AttrType(OPTIONAL).Int(2147483647);
-        this->Attr("softmaxLseFlag").AttrType(OPTIONAL).Int(0);
-        this->Attr("quantMode").AttrType(OPTIONAL).Int(0);
-        this->Attr("dstTypeMax").AttrType(OPTIONAL).Float(0.0);
+        this->Attr("q_input_layout").AttrType(OPTIONAL).String("TND");
+        this->Attr("kv_input_layout").AttrType(OPTIONAL).String("TND");
+        this->Attr("num_key_value_heads").AttrType(OPTIONAL).Int(1);
+        this->Attr("mask_type").AttrType(OPTIONAL).Int(0);
+        this->Attr("scale_value").AttrType(OPTIONAL).Float(0.0);
+        this->Attr("inner_precise").AttrType(OPTIONAL).Int(0);
+        this->Attr("block_size").AttrType(OPTIONAL).Int(0);
+        this->Attr("pre_tokens").AttrType(OPTIONAL).Int(2147483647);
+        this->Attr("next_tokens").AttrType(OPTIONAL).Int(2147483647);
+        this->Attr("softmax_lse_flag").AttrType(OPTIONAL).Int(0);
+        this->Attr("quant_mode").AttrType(OPTIONAL).Int(0);
+        this->Attr("dst_type_max").AttrType(OPTIONAL).Float(0.0);
 
         this->AICore().AddConfig("ascend910b");
         this->AICore().AddConfig("ascend910_93");

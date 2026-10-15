@@ -33,13 +33,14 @@ namespace {
 static constexpr uint64_t LSE_OUT = 1;
 
 // V3 新增:量化模式枚举
-// 0=不量化, 1=FP8 量化, 2=mxfp4 量化
+// 0=不量化, 1=FP8 量化, 2=mxfp4 OCP, 3=mxfp4 CX, 4=MXFP8 OCP, 5=HIF8 per-tensor
 enum QuantMode : int64_t {
     NO_QUANT = 0,
     FP8_QUANT = 1,
     MXFP4_OCP_QUANT = 2,
     MXFP4_CX_QUANT = 3,
     MXFP8_OCP_QUANT = 4,
+    HIF8_PER_TENSOR_QUANT = 5,
 };
 
 static bool CheckDataType(const aclTensor* query, const aclTensor* key, const aclTensor* value)
@@ -53,7 +54,8 @@ static bool CheckDataType(const aclTensor* query, const aclTensor* key, const ac
         {DataType::DT_FLOAT16, {DataType::DT_FLOAT16}},
         {DataType::DT_BF16, {DataType::DT_BF16}},
         {DataType::DT_FLOAT8_E4M3FN, {DataType::DT_FLOAT8_E4M3FN}},
-        {DataType::DT_FLOAT4_E2M1, {DataType::DT_FLOAT4_E2M1}}};
+        {DataType::DT_FLOAT4_E2M1, {DataType::DT_FLOAT4_E2M1}},
+        {DataType::DT_HIFLOAT8, {DataType::DT_HIFLOAT8}}};
 
     auto iter = validKvType.find(qDtype);
     if (iter == validKvType.end()) {
@@ -74,6 +76,46 @@ static bool CheckDataType(const aclTensor* query, const aclTensor* key, const ac
 static bool CheckScaleMatchDtype(const aclTensor* scale, DataType expectedScaleDtype)
 {
     return scale != nullptr && scale->GetDataType() == expectedScaleDtype;
+}
+
+static bool CheckPerTensorScale(const aclTensor* scale, const char* name)
+{
+    if (scale == nullptr) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s must be non-null for quantMode 5.", name);
+        return false;
+    }
+    if (scale->GetDataType() != DataType::DT_FLOAT) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s must have dtype DT_FLOAT for quantMode 5.", name);
+        return false;
+    }
+    const auto& storageShape = scale->GetStorageShape();
+    if (storageShape.GetDimNum() != 1 || storageShape.GetDim(0) != 1) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s must have storage shape [1] for quantMode 5.", name);
+        return false;
+    }
+    return true;
+}
+
+// 可选的 per-tensor scale(如 pQuantScale):空指针合法(缺省 per-tensor p scale=16),
+// 非空时仍需满足 per-tensor 的 dtype/shape 约束。
+static bool CheckOptionalPerTensorScale(const aclTensor* scale, const char* name)
+{
+    return scale == nullptr || CheckPerTensorScale(scale, name);
+}
+
+static bool CheckHif8PerTensorParams(const aclTensor* query, const aclTensor* key, const aclTensor* value,
+                                     const aclTensor* qScale, const aclTensor* kScale, const aclTensor* vScale,
+                                     const aclTensor* pScale)
+{
+    if (query->GetDataType() != DataType::DT_HIFLOAT8 || key->GetDataType() != DataType::DT_HIFLOAT8 ||
+        value->GetDataType() != DataType::DT_HIFLOAT8) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "quantMode 5 requires Q/K/V dtype HIFLOAT8.");
+        return false;
+    }
+    return CheckPerTensorScale(qScale, "qDequantScaleOptional") &&
+           CheckPerTensorScale(kScale, "kDequantScaleOptional") &&
+           CheckPerTensorScale(vScale, "vDequantScaleOptional") &&
+           CheckOptionalPerTensorScale(pScale, "pQuantScaleOptional");
 }
 
 // quantMode=0 校验: QKV=FP16/BF16(相同) + scales=null
@@ -115,7 +157,7 @@ static bool CheckQuantParams(const aclTensor* query, const aclTensor* key, const
 // V3 新增:按 quantMode 分发校验 QKV dtype 及 scales
 static bool CheckQuantModeAndDtype(int64_t quantMode, const aclTensor* query, const aclTensor* key,
                                    const aclTensor* value, const aclTensor* qScale, const aclTensor* kScale,
-                                   const aclTensor* vScale)
+                                   const aclTensor* vScale, const aclTensor* pScale)
 {
     switch (quantMode) {
         case NO_QUANT:
@@ -130,8 +172,10 @@ static bool CheckQuantModeAndDtype(int64_t quantMode, const aclTensor* query, co
         case MXFP8_OCP_QUANT: // quantMode=4: QKV=FP8_E4M3FN, scales=FP8_E8M0 (OCP only)
             return CheckQuantParams(query, key, value, qScale, kScale, vScale, DataType::DT_FLOAT8_E4M3FN,
                                     DataType::DT_FLOAT8_E8M0, quantMode, "FP8_E4M3FN", "FP8_E8M0");
+        case HIF8_PER_TENSOR_QUANT:
+            return CheckHif8PerTensorParams(query, key, value, qScale, kScale, vScale, pScale);
         default:
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Invalid quantMode %ld, must be 0/1/2/3/4.", quantMode);
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Invalid quantMode %ld, must be 0/1/2/3/4/5.", quantMode);
             return false;
     }
 }
@@ -172,8 +216,8 @@ static aclnnStatus ParseblockShapeOptional(const aclIntArray* blockShapeOptional
 static aclnnStatus ValidateParams(const aclTensor* query, const aclTensor* key, const aclTensor* value,
                                   const aclTensor* attentionOut, const aclTensor* qDequantScaleOptional,
                                   const aclTensor* kDequantScaleOptional, const aclTensor* vDequantScaleOptional,
-                                  char* qInputLayout, char* kvInputLayout, const aclIntArray* blockShapeOptional,
-                                  int64_t quantMode)
+                                  const aclTensor* pQuantScaleOptional, char* qInputLayout, char* kvInputLayout,
+                                  const aclIntArray* blockShapeOptional, int64_t quantMode)
 {
     CHECK_RET(CheckMandatoryTensors(query, key, value) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR);
 
@@ -183,7 +227,11 @@ static aclnnStatus ValidateParams(const aclTensor* query, const aclTensor* key, 
 
     // V3 新增:校验 quantMode 与 QKV dtype 及 scales 一致性
     if (!CheckQuantModeAndDtype(quantMode, query, key, value, qDequantScaleOptional, kDequantScaleOptional,
-                                vDequantScaleOptional)) {
+                                vDequantScaleOptional, pQuantScaleOptional)) {
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (quantMode != HIF8_PER_TENSOR_QUANT && pQuantScaleOptional != nullptr) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "pQuantScaleOptional must be nullptr unless quantMode is 5.");
         return ACLNN_ERR_PARAM_INVALID;
     }
 
@@ -308,12 +356,19 @@ static aclnnStatus MakeContiguous(const aclTensor*& query, const aclTensor*& key
         if (ret != ACLNN_SUCCESS) {
             return ret;
         }
-    }
-
-    // pQuantScaleOptional: 当前所有 quantMode 下都必须为 nullptr
-    if (pQuantScaleOptional != nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "pQuantScaleOptional must be nullptr in current quantMode(%lld).", quantMode);
-        return ACLNN_ERR_PARAM_INVALID;
+    } else if (quantMode == HIF8_PER_TENSOR_QUANT) {
+        // q/k/v scale 已校验为必选 FP32 [1]，p scale 已校验为可选 FP32 [1]。
+        // 此处仅做连续化；空的 p scale 保持 nullptr 并原样透传。
+        qDequantScaleOptional = l0op::Contiguous(qDequantScaleOptional, executor);
+        CHECK_RET(qDequantScaleOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        kDequantScaleOptional = l0op::Contiguous(kDequantScaleOptional, executor);
+        CHECK_RET(kDequantScaleOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        vDequantScaleOptional = l0op::Contiguous(vDequantScaleOptional, executor);
+        CHECK_RET(vDequantScaleOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        if (pQuantScaleOptional != nullptr) {
+            pQuantScaleOptional = l0op::Contiguous(pQuantScaleOptional, executor);
+            CHECK_RET(pQuantScaleOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        }
     }
 
     return ACLNN_SUCCESS;
@@ -325,6 +380,11 @@ static aclnnStatus ValidateAdditionalParams(int64_t innerPrecise, int64_t quantM
 {
     if (innerPrecise != 0 && innerPrecise != 1 && innerPrecise != 4) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "innerPrecise must be 0 or 1 or 4, got %ld.", innerPrecise);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+
+    if (quantMode == HIF8_PER_TENSOR_QUANT && innerPrecise != 0) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "quantMode 5 requires innerPrecise=0, got %ld.", innerPrecise);
         return ACLNN_ERR_PARAM_INVALID;
     }
 
@@ -393,8 +453,9 @@ __attribute__((visibility("default"))) aclnnStatus aclnnBlockSparseAttentionV3Ge
     double dstTypeMax, aclTensor* attentionOut, aclTensor* softmaxLseOptional, uint64_t* workspaceSize,
     aclOpExecutor** executor)
 {
-    aclnnStatus ret = ValidateParams(query, key, value, attentionOut, qDequantScaleOptional, kDequantScaleOptional,
-                                     vDequantScaleOptional, qInputLayout, kvInputLayout, blockShape, quantMode);
+    aclnnStatus ret =
+        ValidateParams(query, key, value, attentionOut, qDequantScaleOptional, kDequantScaleOptional,
+                       vDequantScaleOptional, pQuantScaleOptional, qInputLayout, kvInputLayout, blockShape, quantMode);
     if (ret != ACLNN_SUCCESS) {
         return ret;
     }

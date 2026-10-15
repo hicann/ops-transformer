@@ -250,7 +250,7 @@ ge::graphStatus InferDataTypeBlockSparseAttention(gert::InferDataTypeContext* co
         return ge::GRAPH_FAILED;
     }
     auto dtype = context->GetInputDataType(QUERY_INDEX);
-    if (dtype == ge::DT_FLOAT8_E4M3FN || dtype == ge::DT_FLOAT4_E2M1) {
+    if (dtype == ge::DT_FLOAT8_E4M3FN || dtype == ge::DT_FLOAT4_E2M1 || dtype == ge::DT_HIFLOAT8) {
         dtype = context->GetOutputDataType(ATTENTION_OUT_INDEX);
     }
     context->SetOutputDataType(ATTENTION_OUT_INDEX, dtype);

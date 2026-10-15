@@ -19,7 +19,6 @@
 #include "../../../attn_infra/bsa_gemm_coord.hpp"
 #include "../../../attn_infra/bsa_matrix_coord.hpp"
 #include "../../../tla/tensor_bsa.hpp"
-#include "../../../tla/layout_bsa.hpp"
 
 namespace NpuArch::Epilogue::Block {
 
@@ -46,7 +45,8 @@ public:
 
     using CopyUbToGmO = typename TileCopy::CopyUbToGmO;
 
-    static constexpr uint32_t UB_OTMP_BUF_STAGES = 2;
+    static constexpr bool FULL_QUANT_HIF8 = AscendC::IsSameType<ElementKV, hifloat8_t>::value;
+    static constexpr uint32_t UB_OTMP_BUF_STAGES = FULL_QUANT_HIF8 ? 1 : 2;
     static constexpr uint32_t UB_DM_BUF_MAX_STAGES = 3;
     static constexpr uint32_t UB_UINT8_BLOCK_SIZE = 32768;
     static constexpr uint32_t DM_UB_GLOBAL_ELEM_NUM = 64;
@@ -56,8 +56,11 @@ public:
     static constexpr float MAX_VALUE_RECIPROCAL_FP8 = 1.0f / 448.0f;
     static constexpr bool FULL_QUANT_FP8 = AscendC::IsSameType<ElementKV, fp8_e4m3fn_t>::value;
 
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource, UBufTileHelper& uBufTileHelper)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource, UBufTileHelper& uBufTileHelper,
+                                    float pScaleValue_ = 1.0f, float vScaleValue_ = 1.0f)
     {
+        pScaleValue = pScaleValue_;
+        vScaleValue = vScaleValue_;
         for (uint32_t i = 0; i < UB_OTMP_BUF_STAGES; i++) {
             loUbTensor[i] = resource.ubBuf.template GetBufferByByte<ElementOTmp>(
                 uBufTileHelper.loStartOffset +
@@ -282,6 +285,9 @@ public:
             if constexpr (FULL_QUANT_FP8 && !zNOnlineSoftmax_) {
                 Muls(divVreg, divVreg, MAX_VALUE_RECIPROCAL_FP8, pregTail);
             }
+            if constexpr (FULL_QUANT_HIF8) {
+                Muls(divVreg, divVreg, vScaleValue, pregTail);
+            }
             StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + i * colStride, divVreg, pregTail);
         }
     }
@@ -323,6 +329,10 @@ public:
                 Muls(divVreg0, divVreg0, MAX_VALUE_RECIPROCAL_FP8, pregFull);
                 Muls(divVreg1, divVreg1, MAX_VALUE_RECIPROCAL_FP8, pregTail);
             }
+            if constexpr (FULL_QUANT_HIF8) {
+                Muls(divVreg0, divVreg0, vScaleValue, pregFull);
+                Muls(divVreg1, divVreg1, vScaleValue, pregTail);
+            }
             StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + i * colStride, divVreg0, pregFull);
             StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + i * colStride + vlElemNum, divVreg1, pregTail);
         }
@@ -353,6 +363,9 @@ public:
             if constexpr (FULL_QUANT_FP8 && !zNOnlineSoftmax_) {
                 Muls(divVreg, divVreg, MAX_VALUE_RECIPROCAL_FP8, pregTail);
             }
+            if constexpr (FULL_QUANT_HIF8) {
+                Muls(divVreg, divVreg, vScaleValue, pregTail);
+            }
             StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + i * colStride, divVreg, pregTail);
         }
     }
@@ -382,6 +395,10 @@ public:
                 Muls(divVreg0, divVreg0, MAX_VALUE_RECIPROCAL_FP8, pregFull);
                 Muls(divVreg1, divVreg1, MAX_VALUE_RECIPROCAL_FP8, pregTail);
             }
+            if constexpr (FULL_QUANT_HIF8) {
+                Muls(divVreg0, divVreg0, vScaleValue, pregFull);
+                Muls(divVreg1, divVreg1, vScaleValue, pregTail);
+            }
             StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + i * colStride, divVreg0, pregFull);
             StoreAlign<ElementOTmp, StoreDist::DIST_NORM_B32>(goUb + i * colStride + vlElemNum, divVreg1, pregTail);
         }
@@ -398,6 +415,8 @@ public:
         RegTensor<float> glVreg;
         RegTensor<float> logGlVreg;
         RegTensor<float> lseVreg;
+        RegTensor<float> pScaleVreg;
+        RegTensor<float> lnPScaleVreg;
         MaskReg pregFull = CreateMask<float, MaskPattern::ALL>();
         MaskReg pregTail = UpdateMask<float>(row);
         static constexpr LnSpecificMode mode = {MaskMergeMode::ZEROING, AscendC::LnAlgo::PRECISION_1ULP_FTZ_FALSE};
@@ -406,6 +425,11 @@ public:
         LoadAlign<float, LoadDist::DIST_NORM>(gmVreg, gmUb);
         Ln<float, &mode>(logGlVreg, glVreg, pregTail);
         Add(lseVreg, logGlVreg, gmVreg, pregTail);
+        if constexpr (FULL_QUANT_HIF8) {
+            Duplicate(pScaleVreg, pScaleValue);
+            Ln<float, &mode>(lnPScaleVreg, pScaleVreg, pregTail);
+            Sub(lseVreg, lseVreg, lnPScaleVreg, pregTail);
+        }
         StoreAlign<float, StoreDist::DIST_NORM_B32>(lseUb, lseVreg, pregTail);
     }
 
@@ -423,11 +447,18 @@ public:
         RegTensor<float> logGlRowwiseVreg1;
         RegTensor<float> lseRowwiseVreg0;
         RegTensor<float> lseRowwiseVreg1;
+        RegTensor<float> pScaleVreg;
+        RegTensor<float> lnPScaleVreg;
         UnalignReg rowwiseUreg0;
         UnalignReg rowwiseUreg1;
         MaskReg pregFull = CreateMask<float, MaskPattern::ALL>();
         static constexpr LnSpecificMode mode = {MaskMergeMode::ZEROING, AscendC::LnAlgo::PRECISION_1ULP_FTZ_FALSE};
         static constexpr uint32_t postUpdateStride = 32 / sizeof(float);
+
+        if constexpr (FULL_QUANT_HIF8) {
+            Duplicate(pScaleVreg, pScaleValue);
+            Ln<float, &mode>(lnPScaleVreg, pScaleVreg, pregFull);
+        }
 
         for (uint16_t i = 0; i < row; i += 2) {
             LoadAlign<ElementOTmp, LoadDist::DIST_BRC_B32>(glRowwiseVreg0, glUb + i);
@@ -438,6 +469,10 @@ public:
             Ln<float, &mode>(logGlRowwiseVreg1, glRowwiseVreg1, pregFull);
             Add(lseRowwiseVreg0, logGlRowwiseVreg0, gmRowwiseVreg0, pregFull);
             Add(lseRowwiseVreg1, logGlRowwiseVreg1, gmRowwiseVreg1, pregFull);
+            if constexpr (FULL_QUANT_HIF8) {
+                Sub(lseRowwiseVreg0, lseRowwiseVreg0, lnPScaleVreg, pregFull);
+                Sub(lseRowwiseVreg1, lseRowwiseVreg1, lnPScaleVreg, pregFull);
+            }
             StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(lseUb, lseRowwiseVreg0, rowwiseUreg0, postUpdateStride);
             StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(lseUb, lseRowwiseVreg1, rowwiseUreg1, postUpdateStride);
         }
@@ -486,6 +521,10 @@ public:
     }
 
 private:
+    float pScaleValue{1.0f};
+    // Per-tensor V dequantization scale. Only used for the full-quant HIF8 path, where the MM2
+    // Fixpipe no longer applies it; applied on the normalized output below.
+    float vScaleValue{1.0f};
     AscendC::LocalTensor<ElementOTmp> loUbTensor[UB_OTMP_BUF_STAGES];
     AscendC::LocalTensor<float> gmUbTensor32;
     AscendC::LocalTensor<float> dmUbTensor32[UB_DM_BUF_MAX_STAGES];

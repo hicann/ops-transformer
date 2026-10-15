@@ -126,6 +126,11 @@ struct ElementAccumulatorSelector<float8_e5m2_t, float8_e4m3_t> {
 };
 
 template <>
+struct ElementAccumulatorSelector<hifloat8_t, hifloat8_t> {
+    using ElementAccumulator = float;
+};
+
+template <>
 struct ElementAccumulatorSelector<fp4x2_e2m1_t, fp4x2_e2m1_t> {
     using ElementAccumulator = float;
 };

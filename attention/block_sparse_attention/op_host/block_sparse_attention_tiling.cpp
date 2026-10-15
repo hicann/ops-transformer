@@ -69,6 +69,7 @@ constexpr int BLOCK_TABLE_INDEX = 8;
 constexpr int Q_DEQUANT_SCALE_INDEX = 9;
 constexpr int K_DEQUANT_SCALE_INDEX = 10;
 constexpr int V_DEQUANT_SCALE_INDEX = 11;
+constexpr int P_QUANT_SCALE_INDEX = 12;
 
 constexpr int Q_INPUT_LAYOUT_INDEX = 0;
 constexpr int KV_INPUT_LAYOUT_INDEX = 1;
@@ -119,6 +120,7 @@ enum QuantMode : int64_t {
     MXFP4_OCP_QUANT = 2,
     MXFP4_CX_QUANT = 3,
     MXFP8_OCP_QUANT = 4,
+    HIF8_PER_TENSOR_QUANT = 5,
 };
 
 // 判断是否为 mxfp4 量化(OCP 或 CX)
@@ -135,12 +137,18 @@ static bool IsMxFullQuant(int64_t qm)
     return IsMxfp4Quant(qm) || IsMxfp8Quant(qm);
 }
 
+static bool IsHif8Quant(int64_t qm)
+{
+    return qm == HIF8_PER_TENSOR_QUANT;
+}
+
 static std::string DataTypeToString(ge::DataType dataType)
 {
     static const ::unordered_map<ge::DataType, std::string> DataTypeToStringMap = {
         {ge::DT_FLOAT8_E4M3FN, "ge::DT_FLOAT8_E4M3FN"},
         {ge::DT_FLOAT8_E8M0, "ge::DT_FLOAT8_E8M0"},
         {ge::DT_FLOAT4_E2M1, "ge::DT_FLOAT4_E2M1"},
+        {ge::DT_HIFLOAT8, "ge::DT_HIFLOAT8"},
         {ge::DT_BF16, "ge::DT_BF16"},
         {ge::DT_FLOAT16, "ge::DT_FLOAT16"},
         {ge::DT_FLOAT, "ge::DT_FLOAT"},
@@ -261,6 +269,12 @@ ge::graphStatus BSATiling::CheckNDFormat(gert::TilingContext* bsaContext)
         OP_CHECK_IF(CheckFormat(vDequantScaleFormat) != ge::GRAPH_SUCCESS,
                     OP_LOGE(bsaContext->GetNodeName(), "vDequantScale check format failed"), return ge::GRAPH_FAILED);
     }
+    const auto* pQuantScaleTensor = bsaContext->GetOptionalInputTensor(P_QUANT_SCALE_INDEX);
+    if (pQuantScaleTensor != nullptr) {
+        auto pQuantScaleFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(pQuantScaleTensor->GetStorageFormat()));
+        OP_CHECK_IF(CheckFormat(pQuantScaleFormat) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(bsaContext->GetNodeName(), "pQuantScale check format failed"), return ge::GRAPH_FAILED);
+    }
 
     auto attentionOutFormat = static_cast<ge::Format>(
         ge::GetPrimaryFormat(bsaContext->GetOutputDesc(ATTENTION_OUT_INDEX)->GetStorageFormat()));
@@ -355,9 +369,9 @@ ge::graphStatus BSATiling::CheckQKVDtype(gert::TilingContext* bsaContext)
 
     if (socVer_ == SOC_VER_950_CODE) {
         if (dataType_ != ge::DT_FLOAT16 && dataType_ != ge::DT_BF16 && dataType_ != ge::DT_FLOAT8_E4M3FN &&
-            dataType_ != ge::DT_FLOAT4_E2M1) {
+            dataType_ != ge::DT_FLOAT4_E2M1 && dataType_ != ge::DT_HIFLOAT8) {
             OP_LOGE(bsaContext->GetNodeName(), "On chip 950, the supported dtype of query/key/value is float16, "
-                                               "bfloat16, float8_e4m3fn or float4_e2m1.");
+                                               "bfloat16, float8_e4m3fn, float4_e2m1 or hifloat8.");
             return ge::GRAPH_FAILED;
         }
     } else {
@@ -370,6 +384,11 @@ ge::graphStatus BSATiling::CheckQKVDtype(gert::TilingContext* bsaContext)
 
     if (dataType_ != kDataType || dataType_ != vDataType) {
         OP_LOGE(bsaContext->GetNodeName(), "Tensor query/key/value must have consistent dtype with each other.");
+        return ge::GRAPH_FAILED;
+    }
+    if (IsHif8Quant(quantMode_) != (dataType_ == ge::DT_HIFLOAT8)) {
+        OP_LOGE(bsaContext->GetNodeName(),
+                "quantMode 5 must correspond exactly to Q/K/V=HIFLOAT8, and non-5 modes must not use HIFLOAT8.");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -519,12 +538,12 @@ ge::graphStatus BSATiling::ParseQKVInBSND(gert::TilingContext* bsaContext)
 
 ge::graphStatus BSATiling::CheckAttentionOutDtype(gert::TilingContext* bsaContext)
 {
-    if (dataType_ == ge::DT_FLOAT8_E4M3FN) {
+    if (dataType_ == ge::DT_FLOAT8_E4M3FN || dataType_ == ge::DT_HIFLOAT8) {
         attentionOutDataType_ = bsaContext->GetOutputDesc(ATTENTION_OUT_INDEX)->GetDataType();
         if (attentionOutDataType_ != ge::DT_FLOAT16 && attentionOutDataType_ != ge::DT_BF16) {
             OP_LOGE(bsaContext->GetNodeName(),
                     "The supported dtype of attentionOut is float16 or bfloat16 when the dtype of query/key/value is "
-                    "all float8_e4m3fn, but now it is %s.",
+                    "all float8_e4m3fn or hifloat8, but now it is %s.",
                     DataTypeToString(attentionOutDataType_).c_str());
             return ge::GRAPH_FAILED;
         }
@@ -746,6 +765,16 @@ ge::graphStatus BSATiling::ParseSparsePattern(gert::TilingContext* bsaContext)
             return ge::GRAPH_FAILED;
         }
     }
+    // HIF8 keeps a fixed 128x256 internal base tile, but sparse X/Y block
+    // boundaries may be smaller and are handled through the existing Q/KV
+    // tail and cross-block gather paths, requiring the Cube minimum alignment
+    // for both logical sparse block dimensions.
+    if (IsHif8Quant(quantMode_) && (blockShapeX_ % MIN_BLOCK_ALIGN != 0 || blockShapeY_ % MIN_BLOCK_ALIGN != 0)) {
+        OP_LOGE(bsaContext->GetNodeName(),
+                "quantMode 5 requires blockShapeX and blockShapeY to be divisible by %ld, but got [%ld, %ld].",
+                MIN_BLOCK_ALIGN, blockShapeX_, blockShapeY_);
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -764,6 +793,32 @@ ge::graphStatus BSATiling::ParseBlockTable(gert::TilingContext* bsaContext)
     const auto* blockTableTensor = bsaContext->GetOptionalInputTensor(BLOCK_TABLE_INDEX);
     if (blockTableTensor != nullptr) {
         OP_LOGE(bsaContext->GetNodeName(), "Paged cache is NOT YET supported, therefore blockTable should be nullptr.");
+        return ge::GRAPH_FAILED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus ValidateHif8PerTensorScale(gert::TilingContext* bsaContext, const int parameterIndex,
+                                                  const char* parameterName, bool optional)
+{
+    const auto* scaleTensor = bsaContext->GetOptionalInputTensor(parameterIndex);
+    if (scaleTensor == nullptr) {
+        if (!optional) {
+            OP_LOGE(bsaContext->GetNodeName(), "%s must be provided for quantMode 5.", parameterName);
+            return ge::GRAPH_FAILED;
+        }
+        return ge::GRAPH_SUCCESS;
+    }
+
+    const auto* scaleDesc = bsaContext->GetOptionalInputDesc(parameterIndex);
+    if (scaleDesc == nullptr || scaleDesc->GetDataType() != ge::DT_FLOAT) {
+        OP_LOGE(bsaContext->GetNodeName(), "%s must have dtype DT_FLOAT for quantMode 5.", parameterName);
+        return ge::GRAPH_FAILED;
+    }
+    const auto* scaleShape = bsaContext->GetOptionalInputShape(parameterIndex);
+    if (scaleShape == nullptr || scaleShape->GetStorageShape().GetDimNum() != 1 ||
+        scaleShape->GetStorageShape().GetDim(0) != NUM_1) {
+        OP_LOGE(bsaContext->GetNodeName(), "%s must have storage shape [1] for quantMode 5.", parameterName);
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -788,7 +843,9 @@ ge::graphStatus BSATiling::ValidateGenericDequantScale(gert::TilingContext* bsaC
     }
 
     const auto* dequantScaleTensor = bsaContext->GetOptionalInputTensor(parameterIndex);
-    if (quantMode_ == FP8_QUANT) {
+    if (quantMode_ == HIF8_PER_TENSOR_QUANT) {
+        return ValidateHif8PerTensorScale(bsaContext, parameterIndex, parameterName.c_str(), false);
+    } else if (quantMode_ == FP8_QUANT) {
         if (dequantScaleTensor == nullptr) {
             OP_LOGE(bsaContext->GetNodeName(), "Parameter %s must not be nullptr when the dtype is float8_e4m3fn.",
                     parameterName.c_str());
@@ -963,6 +1020,16 @@ ge::graphStatus BSATiling::ParseOptionalTensors(gert::TilingContext* bsaContext)
         }
     }
 
+    const auto* pQuantScaleTensor = bsaContext->GetOptionalInputTensor(P_QUANT_SCALE_INDEX);
+    if (IsHif8Quant(quantMode_)) {
+        if (ValidateHif8PerTensorScale(bsaContext, P_QUANT_SCALE_INDEX, "pQuantScale", true) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
+    } else if (pQuantScaleTensor != nullptr) {
+        OP_LOGE(bsaContext->GetNodeName(), "pQuantScale must be nullptr unless quantMode is 5.");
+        return ge::GRAPH_FAILED;
+    }
+
     return ge::GRAPH_SUCCESS;
 }
 
@@ -991,9 +1058,37 @@ ge::graphStatus BSATiling::ParseAttrs(gert::TilingContext* bsaContext)
         maskType_ = *attrs->GetAttrPointer<uint32_t>(MASK_TYPE_INDEX);
     }
 
+    // Read quantization attributes before validating innerPrecise because HIF8 uses innerPrecise=0.
+    auto quantModePtr = attrs->GetAttrPointer<int64_t>(QUANT_MODE_INDEX);
+    int64_t quantModeValue = (quantModePtr == nullptr) ? 0 : *quantModePtr;
+    if (quantModeValue != NO_QUANT && quantModeValue != FP8_QUANT && quantModeValue != MXFP4_OCP_QUANT &&
+        quantModeValue != MXFP4_CX_QUANT && quantModeValue != MXFP8_OCP_QUANT &&
+        quantModeValue != HIF8_PER_TENSOR_QUANT) {
+        OP_LOGE(bsaContext->GetNodeName(), "Invalid quantMode %ld. Supported: 0/1/2/3/4/5.", quantModeValue);
+        return ge::GRAPH_FAILED;
+    }
+    quantMode_ = static_cast<uint32_t>(quantModeValue);
+    if (IsHif8Quant(quantMode_) && socVer_ != SOC_VER_950_CODE) {
+        OP_LOGE(bsaContext->GetNodeName(), "quantMode 5 (HIF8 per-tensor) is supported only on chip 950.");
+        return ge::GRAPH_FAILED;
+    }
+    if (IsHif8Quant(quantMode_) && maskType_ != 0) {
+        OP_LOGE(bsaContext->GetNodeName(), "quantMode 5 requires maskType=0, but got %u.", maskType_);
+        return ge::GRAPH_FAILED;
+    }
+
+    auto dstTypeMaxPtr = attrs->GetAttrPointer<float>(DST_TYPE_MAX_INDEX);
+    if (dstTypeMaxPtr == nullptr) {
+        dstTypeMax_ = 0.0f; // 默认值,与 def.cpp 中 .Float(0) 一致
+    } else {
+        dstTypeMax_ = *dstTypeMaxPtr;
+    }
+
     // 获取innerPrecise参数
     if (attrs->GetAttrPointer<uint32_t>(INNER_PRECISE_INDEX) != nullptr) {
         innerPrecise_ = *attrs->GetAttrPointer<uint32_t>(INNER_PRECISE_INDEX);
+    } else if (IsHif8Quant(quantMode_)) {
+        innerPrecise_ = BsaInnerCalcPrec::ALL_HIGH;
     }
     auto qInputDesc = bsaContext->GetInputDesc(QUERY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(bsaContext, qInputDesc);
@@ -1007,6 +1102,11 @@ ge::graphStatus BSATiling::ParseAttrs(gert::TilingContext* bsaContext)
                     "innerPrec = 0 or 4 is supported, but got %u.",
                     innerPrecise_);
             return ge::GRAPH_FAILED;
+        } else if (IsHif8Quant(quantMode_)) {
+            if (innerPrecise_ != BsaInnerCalcPrec::ALL_HIGH) {
+                OP_LOGE(bsaContext->GetNodeName(), "quantMode 5 requires innerPrecise=0, but got %u.", innerPrecise_);
+                return ge::GRAPH_FAILED;
+            }
         } else if (!isFp16OrBf16 && innerPrecise_ != BsaInnerCalcPrec::LOW_HIGH_MIXED) {
             OP_LOGE(bsaContext->GetNodeName(),
                     "On chip 950, when query dtype is %s, only innerPrec = 4 is "
@@ -1061,18 +1161,6 @@ ge::graphStatus BSATiling::ParseAttrs(gert::TilingContext* bsaContext)
     }
 
     // V3 新增:读取量化参数 quantMode / dstTypeMax
-    auto quantModePtr = attrs->GetAttrPointer<int64_t>(QUANT_MODE_INDEX);
-    if (quantModePtr == nullptr) {
-        quantMode_ = 0; // 默认值,与 def.cpp 中 .Int(0) 一致
-    } else {
-        quantMode_ = static_cast<uint32_t>(*quantModePtr);
-    }
-    auto dstTypeMaxPtr = attrs->GetAttrPointer<float>(DST_TYPE_MAX_INDEX);
-    if (dstTypeMaxPtr == nullptr) {
-        dstTypeMax_ = 0.0f; // 默认值,与 def.cpp 中 .Float(0) 一致
-    } else {
-        dstTypeMax_ = *dstTypeMaxPtr;
-    }
     if (quantMode_ == MXFP4_CX_QUANT) {
         if (dstTypeMax_ == 0.0f) {
             dstTypeMax_ = MXFP4_DEFAULT_DST_TYPE_MAX_LOG2;
@@ -1150,6 +1238,11 @@ static inline uint32_t CalcFp8KvBaseTile(uint32_t blockShapeY, uint32_t preferre
 
 void BSATiling::CalcBaseTileTilingParams950()
 {
+    if (IsHif8Quant(quantMode_)) {
+        qBaseTile_ = TILE_SIZE_128;
+        kvBaseTile_ = TILE_SIZE_256;
+        return;
+    }
     qBaseTile_ = (blockShapeX_ > TILE_SIZE_128) ? TILE_SIZE_128 : static_cast<uint32_t>(blockShapeX_);
     const bool isMixedPrecision = (innerPrecise_ == BsaInnerCalcPrec::LOW_HIGH_MIXED && embeddingSize_ <= D_SIZE_128);
     kvBaseTile_ = isMixedPrecision ? TILE_SIZE_256 : TILE_SIZE_128;
@@ -1166,7 +1259,7 @@ void BSATiling::CalcBaseTileTilingParams950()
 
 void BSATiling::TransposedMatmulConfig950()
 {
-    if (innerPrecise_ == BsaInnerCalcPrec::ALL_HIGH && maskType_ == 0) {
+    if (IsHif8Quant(quantMode_) || (innerPrecise_ == BsaInnerCalcPrec::ALL_HIGH && maskType_ == 0)) {
         transposedMm1_ = true;
     } else {
         transposedMm1_ = false;
@@ -1334,7 +1427,7 @@ void BSATiling::CalcMatmulPhaseL1TileInfo950()
         mm2L1TileKLeft_ = kvBaseTileAligned128;
         pL1BufNum_ = TRIO_BUF;
     }
-    if (quantMode_ == FP8_QUANT) {
+    if (quantMode_ == FP8_QUANT || IsHif8Quant(quantMode_)) {
         B8FullQuantKVPL1TileInfo950(qBaseTileAligned128, embeddingSizeAligned128, kvBaseTileAligned128);
     }
 }
@@ -1474,6 +1567,14 @@ uint64_t BSATiling::GenerateTilingKey(gert::TilingContext* bsaContext)
         // using zN onlineSoftmax tactic(with S/P sharing UB space)
         if (kvBaseTile_ == 512) {
             tilingKey += 100000000000000;
+        }
+    } else if (IsHif8Quant(quantMode_)) {
+        // HIF8 per-tensor output suffixes are independent of the existing FP8/MxFP4 suffixes.
+        // F16=+61, BF16=+60; mode5 is always transposed on 950.
+        if (attentionOutDataType_ == ge::DT_FLOAT16) {
+            tilingKey += 61;
+        } else if (attentionOutDataType_ == ge::DT_BF16) {
+            tilingKey += 60;
         }
     }
 

@@ -161,7 +161,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         <li>BSND: [batch, maxQSeqLength, headNum, headDim]。</li>
         </ul>
       </td>
-      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT4_E2M1 </td>
+      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT4_E2M1、HIFLOAT8</td>
       <td>ND</td>
       <td>3/4</td>
       <td>×</td>
@@ -177,7 +177,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
           <li>BSND: [batch, maxKvSeqLength, numKeyValueHeads, headDim]。</li>
         </ul>
       </td>
-      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT4_E2M1、 </td>
+      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT4_E2M1、HIFLOAT8</td>
       <td>ND</td>
       <td>3/4</td>
       <td>×</td>
@@ -194,7 +194,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
           <li>BSND: [batch, maxKvSeqLength, numKeyValueHeads, headDim]。</li>
         </ul>
       </td>
-      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT4_E2M1、</td>
+      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT4_E2M1、HIFLOAT8</td>
       <td>ND</td>
       <td>3/4</td>
       <td>×</td>
@@ -304,11 +304,12 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         <ul>
           <li>当quantMode=1, shape为[batch, headNum, ceilDiv(maxQSeqLength, 128), 1]。</li>
   		   <li>quantMode=2/3/4, 约束见<a href="#MXFP4量化模式的量化缩放因子">MX量化模式的量化缩放因子。</a></li>
+          <li>当quantMode=5时，必须传入FLOAT32类型的per-tensor反量化缩放因子，shape为[1]，所有batch、head及token共用一个缩放因子。</li>
         </ul>
       </td>
       <td>FLOAT32、FLOAT8_E8M0</td>
       <td>ND</td>
-      <td>4/5</td>
+      <td>1/4/5</td>
       <td>×</td>
     </tr>
     <tr>
@@ -325,11 +326,12 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         <ul>
           <li>当quantMode=1,shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 256), 1]或shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 512), 1]。</li>
   		 <li>quantMode=2/3/4, 约束见<a href="#MXFP4量化模式的量化缩放因子">MX量化模式的量化缩放因子。</a></li>
+          <li>当quantMode=5时，必须传入FLOAT32类型的per-tensor反量化缩放因子，shape为[1]，所有batch、head及token共用一个缩放因子。</li>
         </ul>
       </td>
       <td>FLOAT32、FLOAT8_E8M0</td>
       <td>ND</td>
-      <td>4/5</td>
+      <td>1/4/5</td>
       <td>×</td>
     </tr>
     <tr>
@@ -346,11 +348,12 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         <ul>
           <li>当quantMode=1, shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 256), 1]或shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 512), 1]。</li>
          <li>quantMode=2/3/4, 约束见<a href="#MXFP4量化模式的量化缩放因子">MX量化模式的量化缩放因子。</a></li>
+          <li>当quantMode=5时，必须传入FLOAT32类型的per-tensor反量化缩放因子，shape为[1]，所有batch、head及token共用一个缩放因子。</li>
         </ul>
       </td>
       <td>FLOAT32、FLOAT8_E8M0</td>
       <td>ND</td>
-      <td>4/5</td>
+      <td>1/4/5</td>
       <td>×</td>
     </tr>
     <tr>
@@ -360,12 +363,13 @@ aclnnStatus aclnnBlockSparseAttentionV3(
       <td>
         可选输入：
         <ul>
-          <li> 预留参数, 暂不支持, 此参数应传入nullptr。</li>
+          <li>当quantMode=5时，可传入FLOAT32类型的per-tensor量化缩放因子，shape为[1]；传入nullptr时默认使用16.0。</li>
+          <li>当quantMode不为5时，必须传入nullptr。</li>
         </ul>
       </td>
       <td>FLOAT32</td>
       <td>ND</td>
-      <td>-</td>
+      <td>1</td>
       <td>×</td>
     </tr>
     <tr>
@@ -428,7 +432,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
       <td>输入</td>
       <td>Softmax计算采取的精度级别。</td>
       <td>
-        控制online softmax阶段以及rescale阶段运算使用的数据类型。当前只支持传0或1或4，各产品支持的取值详见<a href="#constraint_rule">约束说明</a>。
+        控制online softmax阶段以及rescale阶段运算使用的数据类型。当前只支持传0或1或4，HIF8量化模式（quantMode=5）仅支持传0，各产品支持的取值详见<a href="#constraint_rule">约束说明</a>。
         <ul>
           <li>0：表示online softmax和rescale全部采取fp32数据类型，适合追求计算精度的场景使用。</li>
           <li>1：仅支持输入的query、key、value均为fp16数据类型时配置，表示online softmax和rescale全部采取fp16数据类型，性能更好，但精度较低，且可能发生计算时的数值溢出，使用者需根据值域范围自行判断是否使用。</li>
@@ -491,13 +495,14 @@ aclnnStatus aclnnBlockSparseAttentionV3(
       <td>输入</td>
       <td>量化模式选择标志位。</td>
       <td>
-        当前只支持传0、1、2、3、4。
+        当前只支持传0、1、2、3、4、5。
         <ul>
           <li>0：表示非量化。</li>
           <li>1：表示FP8量化。</li>
           <li>2：表示MXFP4 OCP量化(量化scale向下截断)。</li>
           <li>3：表示MXFP4 CX量化(自定义量化量程, 量化scale向上截断)。</li>
           <li>4：表示MXFP8 OCP量化(QKV为FLOAT8_E4M3FN，scale为FLOAT8_E8M0)。</li>
+          <li>5：表示HIF8 per-tensor量化，仅Ascend 950PR/Ascend 950DT支持，query、key、value必须均为HIFLOAT8。</li>
           <li>详见<a href="#constraint_rule">约束说明</a>。</li>
         </ul>
       </td>
@@ -511,7 +516,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
       <td>输入</td>
       <td>MXFP4 CX量化时,传入的自定义量化量程。</td>
       <td>
-        当前仅当quantMode=2,3时候，支持设置该值0.0，或者[6.0, 12.0]。
+        当前仅当quantMode=2,3时候，支持设置该值0.0，或者[6.0, 12.0]。HIF8量化模式（quantMode=5）不使用该参数，建议传入0.0。
         <ul>
           <li>0.0：代表Amax(DType)为量化结果数据类型的最大值。</li>
           <li>[6.0, 12.0]：取值为6.0-12.0代表Amax(DType)为传入值。</li>
@@ -526,7 +531,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
       <td>attentionOut（aclTensor*）</td>
       <td>输出</td>
       <td>公式中的attentionOut。</td>
-      <td>数据类型和shape与query保持一致。</td>
+      <td>shape与query保持一致。非量化模式下，数据类型与query保持一致；量化模式下（quantMode=1/2/3/4/5），数据类型支持FLOAT16或BFLOAT16。</td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>3/4</td>
@@ -661,11 +666,11 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 - qInputLayout当前仅支持"TND"和"BNSD"和"BSND"。
 - kvInputLayout当前仅支持"TND"和"BNSD"和"BSND"。
 - 当前query、key、value的InputLayout必须保持一致。
-- 输入query、key、value的数据类型必须一致，支持FLOAT16和BFLOAT16。
+- 输入query、key、value的数据类型必须一致：非量化模式（quantMode=0）支持FLOAT16和BFLOAT16；quantMode=1/4支持FLOAT8_E4M3FN；quantMode=2/3支持FLOAT4_E2M1；quantMode=5支持HIFLOAT8。量化模式仅Ascend 950PR/Ascend 950DT支持。
 - query、key、value的D轴当前仅支持配置为64或128
 - blockShapeOptional如果传入，则必须包含两个元素[blockShapeX, blockShapeY]，且值必须大于0。blockShapeX/blockShapeY在不同产品上的倍数约束如下：
   <!-- npu="950" id7 -->
-  - 在<term>Ascend 950PR&950DT系列产品</term>上：blockShapeY须为16的倍数；MXFP4量化（quantMode=2/3）与MXFP8量化（quantMode=4）时，blockShapeX和blockShapeY均只支持64的倍数。
+  - 在<term>Ascend 950PR/Ascend 950DT</term>上：blockShapeY须为16的倍数；MXFP4量化（quantMode=2/3）与MXFP8量化（quantMode=4）时，blockShapeX和blockShapeY均只支持64的倍数；HIF8量化（quantMode=5）时，blockShapeX和blockShapeY均须为16的倍数。
   <!-- end id7 -->
   <!-- npu="910b,A3" id8 -->
   - 在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上：blockShapeY须为128的倍数。
@@ -676,7 +681,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 - actualSeqLengthsOptional与actualSeqLengthsKvOptional当前必须同时配置或同时不配置，仅配置其中之一的行为将被算子拦截。
 - blockTableOptional当前只支持传入nullptr，表示不开启PagedAttention特性。
 <!-- npu="950,A3,910b" id9 -->
-- innerPrecise必须为0或1或4，其中，<term>Ascend 950PR&950DT系列产品</term>仅支持配置为4，<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>仅支持配置为0或1。
+- innerPrecise必须为0或1或4，其中，<term>Ascend 950PR/Ascend 950DT</term>在FLOAT16/BFLOAT16输入时支持配置为0或4，FP8/MXFP4/MXFP8量化（quantMode=1/2/3/4）时仅支持4，HIF8量化（quantMode=5）时仅支持0；<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>仅支持配置为0或1。
 <!-- end id9 -->
 - softmaxLseFlag仅支持配置0或1，分别表示不开启/开启softmaxLse输出。
 - qSeqlen和kvSeqlen不需要被blockShape整除，支持非对齐场景，实际分块数通过向上取整计算。
@@ -741,6 +746,19 @@ aclnnStatus aclnnBlockSparseAttentionV3(
     - **OCP 量化公式**
 
       $$ P_{\text{Scale}} = 2^{\lfloor \log_2 P_{\text{max}} \rfloor - 8} $$
+
+- **quantMode=5（HIF8 per-tensor量化模式）相关约束**：
+
+  - 仅Ascend 950PR/Ascend 950DT支持。query、key、value必须均为HIFLOAT8，且HIFLOAT8输入必须使用quantMode=5。
+  - qInputLayout与kvInputLayout必须一致，支持TND、BNSD、BSND；D轴支持64或128。
+  - qDequantScaleOptional、kDequantScaleOptional、vDequantScaleOptional必须传入，均为FLOAT32类型，shape必须为一维[1]，每个输入张量共用一个反量化缩放因子，不支持per-token或per-channel缩放因子。
+  - pQuantScaleOptional可选；传入时必须为FLOAT32类型，shape为一维[1]，取值必须为有限正数，用于softmax结果P的量化；传入nullptr时默认使用16.0。
+  - qDequantScaleOptional、kDequantScaleOptional、vDequantScaleOptional及scaleValue必须为有限数；有效缩放因子qDequantScaleOptional × kDequantScaleOptional × scaleValue必须为有限非负数。上述数值约束由调用者保证，host侧仅校验缩放因子的类型和shape。
+  - innerPrecise必须为0，online softmax和rescale均采用FLOAT32计算。
+  - blockSparseMaskOptional必须传入；blockShapeX和blockShapeY必须为正数且均为16的倍数，省略blockShapeOptional时默认为[128,128]。Q/KV序列长度无需被稀疏块大小整除。
+  - maskType必须为0，attenMaskOptional和blockTableOptional必须为nullptr，blockSize必须为0，preTokens和nextTokens必须为2147483647。
+  - attentionOut的shape与query一致，数据类型支持FLOAT16或BFLOAT16；softmaxLseFlag支持0或1，可选输出FLOAT32类型的softmaxLse。
+  - dstTypeMax在此模式下不参与计算，建议传入0.0。
 
 ## 调用示例
 
