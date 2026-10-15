@@ -747,6 +747,7 @@ def dense_lightning_indexer_softmax_lse_v2_inner(
                 if is_s1_valid:
                     s2_tiles = (valid_k_size + TKV - 1) // TKV
                     s2_tail_size = TKV + valid_k_size - s2_tiles * TKV
+                    pl.set_validshape(weight_vec_nxt, [1, n1_dim])
                     pl.load(weight_vec_nxt, weight, [q_offset, 0, 0])
 
             if j > 0 and prev_is_s1_valid:
