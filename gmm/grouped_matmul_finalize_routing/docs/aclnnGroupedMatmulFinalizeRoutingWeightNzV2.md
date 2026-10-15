@@ -488,8 +488,6 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
 
     | x1 | x2 | scale | bias | offsetOptional | antiquantScaleOptional | antiquantOffsetOptional | pertokenScaleOptional | groupList | sharedInput | logit | rowIndex | out | tuningConfigOptional |
     |------|------|------|------|------|------|------|------|------|------|------|------|------|------|
-    | FLOAT8_E4M3FN | FLOAT8_E4M3FN | FLOAT8_E8M0 | BFLOAT16/null | null | null | null | FLOAT8_E8M0 | INT64 | BFLOAT16/null | FLOAT | INT64 | FLOAT | null |
-    | FLOAT4_E2M1 | FLOAT4_E2M1 | FLOAT8_E8M0 | BFLOAT16/null | null | null | null | FLOAT8_E8M0 | INT64 | BFLOAT16/null | FLOAT | INT64 | FLOAT | null |
     | FLOAT8_E4M3FN | FLOAT8_E4M3FN | FLOAT8_E8M0 | null | null | null | null | FLOAT8_E8M0 | INT64 | BFLOAT16/null | FLOAT/BFLOAT16 | INT32 | BFLOAT16 | null |
     | FLOAT4_E2M1 | FLOAT4_E2M1 | FLOAT8_E8M0 | null | null | null | null | FLOAT8_E8M0 | INT64 | BFLOAT16/null | FLOAT/BFLOAT16 | INT32 | BFLOAT16 | null |
 
