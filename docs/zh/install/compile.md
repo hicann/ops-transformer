@@ -251,7 +251,7 @@
 # 安装根目录下test相关requirements.txt依赖
 pip3 install -r tests/requirements.txt
 # 方式1: 编译并执行指定算子和对应功能的UT测试用例（选其一）
-bash build.sh -u --[opapi|ophost|opkernel] --ops=abs
+bash build.sh -u --[opapi|ophost|opkernel] --ops=add_example
 # 方式2: 编译并执行所有的UT测试用例
 # bash build.sh -u
 # 方式3: 编译所有的UT测试用例但不执行
