@@ -579,7 +579,11 @@ public:
 
         outputBuf.SetCrossCore();
         if (!runInfo.isFirstS2Loop) {
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+            UpdateExpSumAndExpMax<T, mBaseSize>(sumUb, maxUb, expUb, sumUb, maxUb, apiTmpBuffer, runInfo.actVecMSize);
+#else
             UpdateExpSumAndExpMax<T>(sumUb, maxUb, expUb, sumUb, maxUb, apiTmpBuffer, runInfo.actVecMSize);
+#endif
         }
         if (unlikely(runInfo.isLastS2Loop)) {
             SetFlag<HardEvent::V_MTE2>(vToMte2Id[runInfo.mloop % DB]);
