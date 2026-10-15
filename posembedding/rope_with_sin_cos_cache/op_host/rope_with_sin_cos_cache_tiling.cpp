@@ -356,12 +356,14 @@ static ge::graphStatus TilingRopeWithSinCosCache(gert::TilingContext* context)
     params.head_size = static_cast<uint64_t>(*attrHeadSize);
 
     const auto attrMRopeSection = attrs->GetAttrPointer<gert::ContinuousVector>(3);
-    const uint64_t* attrMRopeSectionData = reinterpret_cast<const uint64_t*>(attrMRopeSection->GetData());
-    if (attrMRopeSectionData != nullptr) {
+    OP_CHECK_NULL_WITH_CONTEXT(context, attrMRopeSection);
+    const size_t mropeSectionSize = attrMRopeSection->GetSize();
+    if (mropeSectionSize > 0) {
+        const uint64_t* attrMRopeSectionData = reinterpret_cast<const uint64_t*>(attrMRopeSection->GetData());
         params.mrope_section0 = attrMRopeSectionData[0];
         params.mrope_section1 = attrMRopeSectionData[1];
         params.mrope_section2 = attrMRopeSectionData[2];
-        params.mrope_section3 = attrMRopeSection->GetSize() == MRopeSectionMaxSize ? attrMRopeSectionData[3] : 0;
+        params.mrope_section3 = mropeSectionSize == MRopeSectionMaxSize ? attrMRopeSectionData[3] : 0;
     }
 
     const uint64_t* attrQStride = attrs->GetAttrPointer<uint64_t>(4);
