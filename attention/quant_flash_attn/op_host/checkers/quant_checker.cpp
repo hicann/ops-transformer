@@ -1135,29 +1135,53 @@ ge::graphStatus QuantChecker::CheckFeature(const QfaTilingInfo& qfaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
+// 三件套提供判定: 与parser的isEmptyOptional同语义(tensor/desc/shapeSize三重判空)
+static bool VTailParaProvided(const QfaOptionalParaInfo& para)
+{
+    return (para.tensor != nullptr) && (para.desc != nullptr) && (para.tensor->GetStorageShape().GetShapeSize() != 0);
+}
+
+// 三件套缺参报错统一value字段: "v_tail=1, seqused_v_tail=0, block_table_tail=1"
+static std::string BuildVTailTripleValue(const QfaTilingInfo& qfaInfo)
+{
+    return std::string("v_tail=") + (VTailParaProvided(qfaInfo.opParamInfo.vTail) ? "1" : "0") +
+           ", seqused_v_tail=" + (VTailParaProvided(qfaInfo.opParamInfo.sequsedVTail) ? "1" : "0") +
+           ", block_table_tail=" + (VTailParaProvided(qfaInfo.opParamInfo.blockTableTail) ? "1" : "0");
+}
+
+// 三件套缺参报错统一reason字段: "... must be provided together; missing: xxx"
+static std::string BuildVTailMissingReason(const std::string& missing)
+{
+    return "v_tail, seqused_v_tail and block_table_tail (PA) must be provided together; missing: " + missing;
+}
+
 ge::graphStatus QuantChecker::CheckVTailFeature(const QfaTilingInfo& qfaInfo) const
 {
-    // 占位空tensor(非nullptr但shapeSize==0)视为未传入, 与parser的isEmptyOptional语义一致
-    auto isProvided = [](const gert::Tensor* tensor) {
-        return (tensor != nullptr) && (tensor->GetStorageShape().GetShapeSize() != 0);
-    };
     if (!qfaInfo.hasVTail) {
         // 未启用尾块功能时, 三个参数必须全部为空(占位空tensor除外)。
-        // hasVTail的判定要求v_tail与seqused_v_tail同时非空(PA下block_table_tail再由
-        // CheckVTailExistence补查) — "三缺一"部分提供即落于此分支: 先打一条成组约束
-        // 提示, 便于调用方定位缺了哪个伙伴参数(下方逐参报错仅点名"不该提供的参数")。
-        if (isProvided(qfaInfo.opParamInfo.vTail.tensor) || isProvided(qfaInfo.opParamInfo.blockTableTail.tensor) ||
-            isProvided(qfaInfo.opParamInfo.sequsedVTail.tensor)) {
-            OP_LOGE(qfaInfo.opName,
-                    "v_tail, seqused_v_tail and block_table_tail (PA) must be provided together: hasVTail "
-                    "requires both v_tail and seqused_v_tail non-empty, and block_table_tail non-empty under PA.");
+        // "三缺一"部分提供时, 与 CheckVTailExistence 统一value/reason句式, 点名缺失的伙伴参数。
+        const bool hasVTailArg = VTailParaProvided(qfaInfo.opParamInfo.vTail);
+        const bool hasSeqUsedVTailArg = VTailParaProvided(qfaInfo.opParamInfo.sequsedVTail);
+        const bool hasBlockTableTailArg = VTailParaProvided(qfaInfo.opParamInfo.blockTableTail);
+        if (hasVTailArg || hasSeqUsedVTailArg || hasBlockTableTailArg) {
+            std::string missing;
+            if (!hasVTailArg) {
+                missing += "v_tail ";
+            }
+            if (!hasSeqUsedVTailArg) {
+                missing += "seqused_v_tail ";
+            }
+            if (qfaInfo.pageAttentionFlag && !hasBlockTableTailArg) {
+                missing += "block_table_tail ";
+            }
+            if (!missing.empty()) {
+                missing.pop_back(); // 去掉末尾空格, 由日志宏统一补句号
+            }
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, V_TAIL_NAME.c_str(),
+                                                  BuildVTailTripleValue(qfaInfo).c_str(),
+                                                  BuildVTailMissingReason(missing).c_str());
+            return ge::GRAPH_FAILED;
         }
-        OP_CHECK_IF(isProvided(qfaInfo.opParamInfo.vTail.tensor),
-                    OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, V_TAIL_NAME.c_str()), return ge::GRAPH_FAILED);
-        OP_CHECK_IF(isProvided(qfaInfo.opParamInfo.blockTableTail.tensor),
-                    OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, BLOCK_TABLE_TAIL_NAME.c_str()), return ge::GRAPH_FAILED);
-        OP_CHECK_IF(isProvided(qfaInfo.opParamInfo.sequsedVTail.tensor),
-                    OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, SEQUSED_V_TAIL_NAME.c_str()), return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }
     if (qfaInfo.quantMode != QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) {
@@ -1199,13 +1223,22 @@ ge::graphStatus QuantChecker::CheckVTailExistence(const QfaTilingInfo& qfaInfo) 
         return (tensor != nullptr) && (tensor->GetStorageShape().GetShapeSize() != 0);
     };
     OP_CHECK_IF(qfaInfo.opParamInfo.vTail.desc == nullptr,
-                OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, V_TAIL_NAME.c_str()), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, V_TAIL_NAME.c_str(),
+                                                      BuildVTailTripleValue(qfaInfo).c_str(),
+                                                      BuildVTailMissingReason("v_tail").c_str()),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(!isProvided(qfaInfo.opParamInfo.sequsedVTail.tensor),
-                OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, SEQUSED_V_TAIL_NAME.c_str()), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, SEQUSED_V_TAIL_NAME.c_str(),
+                                                      BuildVTailTripleValue(qfaInfo).c_str(),
+                                                      BuildVTailMissingReason("seqused_v_tail").c_str()),
+                return ge::GRAPH_FAILED);
     // PA场景 block_table_tail 必选, TND场景可空
     if (qfaInfo.pageAttentionFlag) {
         OP_CHECK_IF(!isProvided(qfaInfo.opParamInfo.blockTableTail.tensor),
-                    OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, BLOCK_TABLE_TAIL_NAME.c_str()), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, BLOCK_TABLE_TAIL_NAME.c_str(),
+                                                          BuildVTailTripleValue(qfaInfo).c_str(),
+                                                          BuildVTailMissingReason("block_table_tail").c_str()),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -1259,62 +1292,52 @@ ge::graphStatus QuantChecker::CheckVTailShape(const QfaTilingInfo& qfaInfo) cons
                     return ge::GRAPH_FAILED);
     }
     if ((vTail != nullptr) && (vTail->GetStorageShape().GetShapeSize() != 0)) {
-        uint32_t vTailDimNum = vTail->GetStorageShape().GetDimNum();
-        if (qfaInfo.kvLayout == QfaLayout::PA_NZ) {
-            OP_CHECK_IF(vTailDimNum != DIM_NUM_5,
-                        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                            qfaInfo.opName, V_TAIL_NAME.c_str(), (std::to_string(vTailDimNum) + "D").c_str(),
-                            "The shape dim of v_tail must be 5D (Bn, N2, D/16, Bs, 16) when layout_kv is PA_NZ"),
-                        return ge::GRAPH_FAILED);
-            constexpr uint32_t nzD0 = 16U; // bf16的32B分形内径
-            OP_CHECK_IF(vTail->GetStorageShape().GetDim(1) != qfaInfo.n2Size ||
-                            vTail->GetStorageShape().GetDim(2) != qfaInfo.vHeadDim / nzD0 ||
-                            vTail->GetStorageShape().GetDim(3) != qfaInfo.blockSize ||
-                            vTail->GetStorageShape().GetDim(4) != nzD0,
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                            qfaInfo.opName, V_TAIL_NAME.c_str(),
-                            ("dims=" + std::to_string(vTail->GetStorageShape().GetDim(1)) + "," +
-                             std::to_string(vTail->GetStorageShape().GetDim(2)) + "," +
-                             std::to_string(vTail->GetStorageShape().GetDim(3)) + "," +
-                             std::to_string(vTail->GetStorageShape().GetDim(4)))
-                                .c_str(),
-                            ("v_tail must be (Bn, " + std::to_string(qfaInfo.n2Size) + ", " +
-                             std::to_string(qfaInfo.vHeadDim / nzD0) + ", " + std::to_string(qfaInfo.blockSize) +
-                             ", 16) matching main v cache NZ layout")
-                                .c_str()),
-                        return ge::GRAPH_FAILED);
-        } else {
-            OP_CHECK_IF(vTailDimNum != DIM_NUM_4,
-                        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                            qfaInfo.opName, V_TAIL_NAME.c_str(), (std::to_string(vTailDimNum) + "D").c_str(),
-                            "The shape dim of v_tail must be 4D matching main v cache layout"),
-                        return ge::GRAPH_FAILED);
-            // dim1/dim2按布局: BnNBsD=(N2,Bs), BnBsND=(Bs,N2) — 非PA已在入口拒绝
-            uint32_t expectedDim1 = qfaInfo.n2Size;
-            uint32_t expectedDim2 = static_cast<uint32_t>(qfaInfo.blockSize);
-            if (qfaInfo.kvLayout == QfaLayout::PA_BBND) {
-                expectedDim1 = static_cast<uint32_t>(qfaInfo.blockSize);
-                expectedDim2 = qfaInfo.n2Size;
-            }
-            OP_CHECK_IF(
-                vTail->GetStorageShape().GetDim(1) != expectedDim1 ||
-                    vTail->GetStorageShape().GetDim(2) != expectedDim2,
-                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                    qfaInfo.opName, V_TAIL_NAME.c_str(),
-                    ("dim1,2=" + std::to_string(vTail->GetStorageShape().GetDim(1)) + "," +
-                     std::to_string(vTail->GetStorageShape().GetDim(2)))
-                        .c_str(),
-                    ("v_tail dim1,dim2 must be " + std::to_string(expectedDim1) + "," + std::to_string(expectedDim2) +
-                     " (" + QfaLayoutToSerialString(qfaInfo.kvLayout) + " layout, same as main v cache)")
-                        .c_str()),
-                return ge::GRAPH_FAILED);
-            OP_CHECK_IF(vTail->GetStorageShape().GetDim(3) != qfaInfo.vHeadDim,
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                            qfaInfo.opName, V_TAIL_NAME.c_str(),
-                            ("dim3=" + std::to_string(vTail->GetStorageShape().GetDim(3))).c_str(),
-                            ("The dim3(D) of v_tail must be " + std::to_string(qfaInfo.vHeadDim)).c_str()),
-                        return ge::GRAPH_FAILED);
+        const gert::Shape& vTailShape = vTail->GetStorageShape();
+        const uint32_t vTailDimNum = vTailShape.GetDimNum();
+        const bool isNzLayout = qfaInfo.kvLayout == QfaLayout::PA_NZ;
+        constexpr uint32_t nzD0 = 16U; // bf16的32B分形内径
+        const uint32_t expectDimNum = isNzLayout ? DIM_NUM_5 : DIM_NUM_4;
+        // 期望形状按布局给出: PA_BNBD(Bn,N2,Bs,D) / PA_BBND(Bn,Bs,N2,D) / PA_NZ(Bn,N2,D/16,Bs,16)。
+        // dim0为物理块数(下方单独校验), 此处只比对布局维度, 三种布局的报错文案保持一致。
+        std::vector<int64_t> expectDims = {-1, static_cast<int64_t>(qfaInfo.n2Size),
+                                           static_cast<int64_t>(qfaInfo.blockSize),
+                                           static_cast<int64_t>(qfaInfo.vHeadDim)};
+        if (isNzLayout) {
+            expectDims = {-1, static_cast<int64_t>(qfaInfo.n2Size),
+                          static_cast<int64_t>(qfaInfo.vHeadDim) / static_cast<int64_t>(nzD0),
+                          static_cast<int64_t>(qfaInfo.blockSize), static_cast<int64_t>(nzD0)};
+        } else if (qfaInfo.kvLayout == QfaLayout::PA_BBND) {
+            expectDims = {-1, static_cast<int64_t>(qfaInfo.blockSize), static_cast<int64_t>(qfaInfo.n2Size),
+                          static_cast<int64_t>(qfaInfo.vHeadDim)};
         }
+        std::string expectShape = "(Bn";
+        for (size_t i = 1; i < expectDims.size(); ++i) {
+            expectShape += ", " + std::to_string(expectDims[i]);
+        }
+        expectShape += ")";
+        std::string actualShape = "shape=[";
+        for (uint32_t i = 0; i < vTailDimNum; ++i) {
+            actualShape += std::string(i == 0 ? "" : ", ") + std::to_string(vTailShape.GetDim(i));
+        }
+        actualShape += "]";
+        OP_CHECK_IF(vTailDimNum != expectDimNum,
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                        qfaInfo.opName, V_TAIL_NAME.c_str(), (std::to_string(vTailDimNum) + "D").c_str(),
+                        ("The shape dim of v_tail must be " + std::to_string(expectDimNum) + "D " + expectShape +
+                         " when layout_kv is " + QfaLayoutToSerialString(qfaInfo.kvLayout))
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
+        bool dimsMatched = true;
+        for (uint32_t i = 1; i < expectDimNum; ++i) {
+            dimsMatched = dimsMatched && (vTailShape.GetDim(i) == expectDims[i]);
+        }
+        OP_CHECK_IF(
+            !dimsMatched,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(qfaInfo.opName, V_TAIL_NAME.c_str(), actualShape.c_str(),
+                                                  ("v_tail must be " + expectShape + " matching main v cache (" +
+                                                   QfaLayoutToSerialString(qfaInfo.kvLayout) + " layout)")
+                                                      .c_str()),
+            return ge::GRAPH_FAILED);
         // Allocate enough physical blocks for a full 64-token tail window.
         OP_CHECK_IF(qfaInfo.blockSize <= 0,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, "block_size",
@@ -1322,10 +1345,9 @@ ge::graphStatus QuantChecker::CheckVTailShape(const QfaTilingInfo& qfaInfo) cons
                                                           "block_size must be positive when v_tail is provided"),
                     return ge::GRAPH_FAILED);
         int64_t vTailExpectBlocks = (64 + qfaInfo.blockSize - 1) / qfaInfo.blockSize;
-        OP_CHECK_IF(vTail->GetStorageShape().GetDim(0) < vTailExpectBlocks,
+        OP_CHECK_IF(vTailShape.GetDim(0) < vTailExpectBlocks,
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                        qfaInfo.opName, V_TAIL_NAME.c_str(),
-                        ("dim0=" + std::to_string(vTail->GetStorageShape().GetDim(0))).c_str(),
+                        qfaInfo.opName, V_TAIL_NAME.c_str(), actualShape.c_str(),
                         ("The dim0 of v_tail must be >= ceil(64/blockSize)=" + std::to_string(vTailExpectBlocks) +
                          " to cover one tail window (block_table_tail values index into v_tail dim0)")
                             .c_str()),
@@ -1334,6 +1356,17 @@ ge::graphStatus QuantChecker::CheckVTailShape(const QfaTilingInfo& qfaInfo) cons
 
     const gert::Tensor* blockTableTail = qfaInfo.opParamInfo.blockTableTail.tensor;
     if ((blockTableTail != nullptr) && (blockTableTail->GetStorageShape().GetShapeSize() != 0)) {
+        const gert::CompileTimeTensorDesc* blockTableTailDesc = qfaInfo.opParamInfo.blockTableTail.desc;
+        OP_CHECK_IF(blockTableTailDesc == nullptr,
+                    OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, BLOCK_TABLE_TAIL_NAME.c_str()), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            blockTableTailDesc->GetDataType() != ge::DT_INT32,
+            OP_LOGE_FOR_INVALID_DTYPE(qfaInfo.opName, BLOCK_TABLE_TAIL_NAME.c_str(),
+                                      DataTypeToSerialString(blockTableTailDesc->GetDataType()).c_str(), "INT32"),
+            return ge::GRAPH_FAILED);
+        if (ge::GRAPH_SUCCESS != CheckFormatSupport(blockTableTailDesc, BLOCK_TABLE_TAIL_NAME)) {
+            return ge::GRAPH_FAILED;
+        }
         uint32_t btDimNum = blockTableTail->GetStorageShape().GetDimNum();
         OP_CHECK_IF(btDimNum != DIM_NUM_2,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(qfaInfo.opName, BLOCK_TABLE_TAIL_NAME.c_str(),
