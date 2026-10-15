@@ -27,17 +27,23 @@
 #endif
 
 #include "kernel_tiling/kernel_tiling.h"
-#include "../../../common/op_kernel/mc2_kernel_utils.h"
 #include "kernel_operator_list_tensor_intf.h"
+
+#include "../../../common/op_kernel/mc2_kernel_utils.h"
+#include "../../../common/op_kernel/quantize_functions.h"
+
 #include "common/mega_moe_types.h"
 #include "common/mega_moe_workspace.h"
 #include "common/mega_moe_utils.h"
+#include "common/mega_moe_mxfp8_utils.h"
+#include "common/mega_moe_layered_comm.h"
+
 #include "blaze/epilogue/block_epilogue_activation_mx_quant.h"
+
 #include "stage/mega_moe_token_quant.h"
 #include "stage/mega_moe_gmm1_activation.h"
 #include "stage/mega_moe_gmm2_combine.h"
-#include "common/mega_moe_mxfp8_utils.h"
-#include "../../../common/op_kernel/quantize_functions.h"
+#include "stage/mega_moe_layered_combine_send.h"
 
 namespace MegaMoeImpl {
 
@@ -55,13 +61,16 @@ using BlockOffset = Shape<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, 
 // 预留：XType OutputType TopkWeightsType Weight1Type
 #define TemplateMegaMoeLayeredTypeClass \
     typename XType, typename OutputType, typename TopkWeightsType, typename Weight1Type, int32_t QuantMode, \
-        int32_t CombineQuantMode, bool TopkWeightsPrefetch
+        int32_t CombineQuantMode, bool TopkWeightsPrefetch, typename CommPolicy
 #define TemplateMegaMoeLayeredTypeFunc \
-    XType, OutputType, TopkWeightsType, Weight1Type, QuantMode, CombineQuantMode, TopkWeightsPrefetch
+    XType, OutputType, TopkWeightsType, Weight1Type, QuantMode, CombineQuantMode, TopkWeightsPrefetch, CommPolicy
 
-template <TemplateMegaMoeLayeredTypeClass>
+template <typename XType, typename OutputType, typename TopkWeightsType, typename Weight1Type, int32_t QuantMode,
+          int32_t CombineQuantMode, bool TopkWeightsPrefetch, typename CommPolicy = LayeredUrmaComm>
 class MegaMoeLayered {
 public:
+    using BatchHandle = typename CommPolicy::BatchHandle;
+    using CombineBatchState = CombineImpl::LayeredCombineBatchState<CommPolicy>;
     template <int32_t QM>
     struct QuantTraits {
         using OutType = fp8_e4m3fn_t;
@@ -84,16 +93,19 @@ public:
         // Rows before the current expert, kept per cursor for dispatch/GMM prefetch state split.
         uint32_t expertBeforeCnt = 0;
     };
-    __aicore__ inline MegaMoeLayered(){};
-    __aicore__ inline void Init(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1,
-                                GM_ADDR weight2, GM_ADDR xActiveMask, GM_ADDR weightScales1, GM_ADDR weightScales2,
-                                GM_ADDR scales, GM_ADDR sharedWeight1, GM_ADDR sharedWeight2,
-                                GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut,
-                                GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, MegaMoeTilingData* tilingData);
+    __aicore__ inline explicit MegaMoeLayered(GM_ADDR context)
+        : mc2Context_(reinterpret_cast<__gm__ Mc2MoeContext*>(context)),
+          comm_(mc2Context_)
+    {}
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1, GM_ADDR weight2,
+                                GM_ADDR xActiveMask, GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR scales,
+                                GM_ADDR sharedWeight1, GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1,
+                                GM_ADDR sharedWeightScales2, GM_ADDR yOut, GM_ADDR expertTokenNumsOut,
+                                GM_ADDR workspaceGM, MegaMoeTilingData* tilingData);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void InitTopology(GM_ADDR context, const MegaMoeTilingData* tilingData);
+    __aicore__ inline void InitTopology(const MegaMoeTilingData* tilingData);
     __aicore__ inline void InitDispatchLayout(const MegaMoeTilingData* tilingData);
     __aicore__ inline void InitWorkspace(GM_ADDR workspaceGM, MegaMoeTilingData* tilingData);
     __aicore__ inline uint32_t InitResetBatch();
@@ -169,13 +181,12 @@ private:
     __aicore__ inline void SendDispatchRelayQueues();
     __aicore__ inline void BuildDispatchRelayQueues();
     __aicore__ inline void AppendTokenToDispatchRelayQueues(GlobalTensor<int32_t>& topkIdsGlobal, uint32_t tokenIdx);
-    __aicore__ inline void AppendDispatchRelayData(uint32_t targetServer, uint32_t relayRank,
-                                                   HcommBatchHandle& batchHandle, int32_t slot);
-    __aicore__ inline void AppendDispatchRelayFlag(uint32_t targetServer, uint32_t relayRank,
-                                                   HcommBatchHandle& batchHandle, int32_t slot, bool firstFlag);
-    __aicore__ inline void CommitDispatchRelayBatch(uint32_t targetServer, uint32_t relayRank,
-                                                    HcommBatchHandle& batchHandle, int32_t batchStart,
-                                                    uint32_t batchTokenCount);
+    __aicore__ inline void AppendDispatchRelayData(uint32_t targetServer, uint32_t relayRank, BatchHandle& batchHandle,
+                                                   int32_t slot);
+    __aicore__ inline void AppendDispatchRelayFlag(uint32_t targetServer, uint32_t relayRank, BatchHandle& batchHandle,
+                                                   int32_t slot, bool firstFlag);
+    __aicore__ inline void CommitDispatchRelayBatch(uint32_t targetServer, uint32_t relayRank, BatchHandle& batchHandle,
+                                                    int32_t batchStart, uint32_t batchTokenCount);
     __aicore__ inline void LoadTokenFromLocalRelay(uint32_t srcServer, uint32_t tokenIndex, int32_t bufferIdx,
                                                    uint32_t copyInNum);
     __aicore__ inline void CopyTokensFromLocalRelay(int32_t rowDstOffsetInCore, uint32_t srcServer, int32_t copyNum,
@@ -214,13 +225,13 @@ private:
     __aicore__ inline bool GetCombineRankRange(uint32_t expertIdx, uint32_t dstRank, uint32_t& rowStart,
                                                uint32_t& tokenCount);
     __aicore__ inline void ProcessCombineRank(const GMMAddrInfo& gmmAddrInfo, const ExpertLoopState& gmm2State,
-                                              uint32_t expertIdx, CombineImpl::LayeredCombineBatchState& batchState);
+                                              uint32_t expertIdx, CombineBatchState& batchState);
     __aicore__ inline void LockOwnedRemoteChannels();
     __aicore__ inline void DrainAndUnlockOwnedRemoteChannels();
 
     __gm__ Mc2MoeContext* mc2Context_{nullptr};
     __gm__ int32_t* gmmToEpilogueFlag_{nullptr};
-    Hcomm<COMM_PROTOCOL_UBC_CTP> hcomm_;
+    CommPolicy comm_;
     LocalTensor<uint8_t> hcommBatchWqeTensor_;
     Params params_{};
 
@@ -315,14 +326,6 @@ private:
     static constexpr uint32_t LAYERED_LATENCY_ROWS_PER_EXPERT = L1_TILE_M_256;
     static constexpr uint32_t LAYERED_THROUGHPUT_ROWS_PER_EXPERT = 2048U;
     static constexpr uint32_t LAYERED_FEW_EXPERT_THRESHOLD = 8U;
-    // Dispatch 一级通信严格按“数据批次先提交、就绪标志批次后提交”发布。
-    // 仅这一段关闭 CQE；Dispatch 二级读和 Combine 写均使用 Hcomm 默认 WQE 配置。
-    static constexpr struct UrmaWqeEntry DISPATCH_DATA_WQE_CONFIG = {
-        .odr = 5, .fence = 1, .se = 0, .cqe = 0, .inlineEn = 0};
-    static constexpr struct UrmaWqeEntry DISPATCH_FIRST_FLAG_WQE_CONFIG = {
-        .odr = 6, .fence = 1, .se = 0, .cqe = 0, .inlineEn = 0};
-    static constexpr struct UrmaWqeEntry DISPATCH_FLAG_WQE_CONFIG = {
-        .odr = 5, .fence = 1, .se = 0, .cqe = 0, .inlineEn = 0};
     // 一级发送尽量吃满 64 KiB WQE 区；二级接收仍以 256 token 作为完整就绪边界。
     static constexpr uint32_t DISPATCH_RELAY_QUEUE_ENTRY_BYTES = ALIGN_32;
     static constexpr uint32_t DISPATCH_SEND_BATCH_TOKEN_CAPACITY = LAYERED_HCOMM_BATCH_WQE_CAPACITY;
@@ -463,8 +466,7 @@ __aicore__ inline uint32_t MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CalcS
 }
 
 template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitTopology(GM_ADDR context,
-                                                                                    const MegaMoeTilingData* tilingData)
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitTopology(const MegaMoeTilingData* tilingData)
 {
     m_ = tilingData->bs;
     k_ = tilingData->h;
@@ -481,7 +483,6 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitTopol
         Ops::Base::CeilDiv(static_cast<int64_t>(maxOutputSize_), static_cast<int64_t>(L1_TILE_M_256)));
     dispatchFlagSlotsPerExpert_ = maxWavesPerExpert_ * INT_CACHELINE;
     hiddenDim_ = tilingData->hiddenDim;
-    mc2Context_ = reinterpret_cast<__gm__ Mc2MoeContext*>(context);
     rankId_ = mc2Context_->epRankId;
     rankNumPerServer_ = tilingData->rankNumPerServer;
     if (rankNumPerServer_ == 0U || rankNumPerServer_ > worldSize_) {
@@ -568,12 +569,12 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitWorks
 // ========================
 template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Init(
-    GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1, GM_ADDR weight2,
-    GM_ADDR xActiveMask, GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR scales, GM_ADDR sharedWeight1,
-    GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut,
-    GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, MegaMoeTilingData* tilingData)
+    GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1, GM_ADDR weight2, GM_ADDR xActiveMask,
+    GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR scales, GM_ADDR sharedWeight1, GM_ADDR sharedWeight2,
+    GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut, GM_ADDR expertTokenNumsOut,
+    GM_ADDR workspaceGM, MegaMoeTilingData* tilingData)
 {
-    InitTopology(context, tilingData);
+    InitTopology(tilingData);
     params_.aGmAddr = x;
     params_.expertIdxGmAddr = topkIds;
     // 保留 TensorList 入口；每个 expert 更新地址时再按 2D-list/3D-stacked 布局解析。
@@ -585,7 +586,6 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Init(
     params_.sharedB2GmAddr = sharedWeight2;
     params_.sharedBScaleGmAddr = sharedWeightScales1;
     params_.sharedB2ScaleGmAddr = sharedWeightScales2;
-    params_.combineCommParams.hcomm = &hcomm_;
 
     params_.y2GmAddr = yOut;
     params_.expertTokenNumsOutGmAddr = expertTokenNumsOut;
@@ -801,7 +801,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::LockOwned
         if (rank == rankId_ || !IsChannelOwner(rank)) {
             continue;
         }
-        hcomm_.Lock(GetUrmaCommHandle(mc2Context_, rank, rankId_));
+        comm_.Lock(comm_.GetChannel(rank));
     }
 }
 
@@ -821,12 +821,12 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::DrainAndU
         if (rank == rankId_ || !IsChannelOwner(rank)) {
             continue;
         }
-        ChannelHandle channel = GetUrmaCommHandle(mc2Context_, rank, rankId_);
-        HcommBatchHandle batchHandle = hcomm_.MakeBatchHandle(
-            channel, hcommBatchWqeTensor_, LAYERED_HCOMM_BATCH_UB_BYTES, GetRankWinAddrWithOffset(rank, 0));
+        ChannelHandle channel = comm_.GetChannel(rank);
+        BatchHandle batchHandle = comm_.MakeBatchHandle(channel, hcommBatchWqeTensor_, LAYERED_HCOMM_BATCH_UB_BYTES,
+                                                        GetRankWinAddrWithOffset(rank, 0));
         // 同一通道可能同时残留 Dispatch 一级和 Combine 的已提交批次，统一按批量句柄等待完成。
-        hcomm_.Drain(batchHandle);
-        hcomm_.Unlock(channel);
+        comm_.Drain(batchHandle);
+        comm_.Unlock(channel);
     }
 }
 
@@ -852,24 +852,24 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CrossRank
         if (rankIndex == rankId_) {
             continue;
         }
-        ChannelHandle channel = GetUrmaCommHandle(mc2Context_, rankIndex, rankId_);
+        ChannelHandle channel = comm_.GetChannel(rankIndex);
         if (!reuseSendMaskChannelLock) {
             // Wave 结束后同步任务重新按物理 AIV 分核，可能不同于 Wave 的固定归属核，因此先取得通道锁。
-            hcomm_.Lock(channel);
+            comm_.Lock(channel);
         }
         __gm__ int32_t* syncRemoteAddr = (__gm__ int32_t*)(g_winRankAddr_[rankIndex]) + rankId_ * 16;
-        hcomm_.WriteNbi(channel, (GM_ADDR)syncRemoteAddr, (GM_ADDR)syncCount, static_cast<int64_t>(sizeof(int32_t)));
+        comm_.WriteNbi(channel, (GM_ADDR)syncRemoteAddr, (GM_ADDR)syncCount, static_cast<int64_t>(sizeof(int32_t)));
     }
     for (int rankIndex = aivCoreIdx_; rankIndex < worldSize_; rankIndex += blockAivNum_) {
         if (rankIndex == rankId_) {
             continue;
         }
-        ChannelHandle channel = GetUrmaCommHandle(mc2Context_, rankIndex, rankId_);
+        ChannelHandle channel = comm_.GetChannel(rankIndex);
         auto syncCheck = syncRank + rankIndex * 16;
         GmSignalWaitBarrier(syncCheck, count);
         // Drain 后 Unlock 发布通道 counter。第一次调用释放 SendMask 延续的锁，第二次调用释放本函数取得的锁。
-        hcomm_.Drain(channel);
-        hcomm_.Unlock(channel);
+        comm_.Drain(channel);
+        comm_.Unlock(channel);
     }
     PipeBarrier<PIPE_ALL>();
     SyncAll<true>();

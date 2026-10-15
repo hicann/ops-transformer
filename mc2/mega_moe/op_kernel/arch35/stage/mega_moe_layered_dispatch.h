@@ -111,8 +111,6 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::DispatchB
     // Dispatch 阶段 UB 布局：Hcomm 私有区、专家计数/前缀和、分轮索引/掩码、
     // 中继标志快照/本地搬运缓冲、专家计数输出和元数据区依次排列。
     // 按最大 256 行元数据预留后，通信工作区不得越过 184 KiB 处的 Hcomm WQE 专用区。
-    LocalTensor<uint8_t> hcommTensor = LocalTensor<uint8_t>(TPosition::VECCALC, 0, ALIGN_512);
-    hcomm_.Init(hcommTensor, ALIGN_512 / sizeof(uint8_t));
     hcommBatchWqeTensor_ = LocalTensor<uint8_t>(TPosition::VECCALC, LAYERED_HCOMM_BATCH_UB_OFFSET,
                                                 LAYERED_HCOMM_BATCH_UB_BYTES / sizeof(uint8_t));
     uint32_t expertTokenCntTensorAddr = ALIGN_512;
@@ -256,8 +254,9 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendAndQu
     }
     // 输入准备与 DispatchBuffInit 生命期不重叠，可复用同一 UB 地址。
     // 减去 Hcomm 和分批清零区后，按 8R + R/4 + 64 字节计算单轮容量，避免清零区随 GM 总量增长。
+    // 仅在此初始化策略的 scratch 视图；各阶段通信期间仍保留 UB 前 512 字节。
     LocalTensor<uint8_t> hcommTensor = LocalTensor<uint8_t>(TPosition::VECCALC, 0, ALIGN_512 / sizeof(uint8_t));
-    hcomm_.Init(hcommTensor, ALIGN_512);
+    comm_.Init(hcommTensor, ALIGN_512);
     hcommBatchWqeTensor_ = LocalTensor<uint8_t>(TPosition::VECCALC, LAYERED_HCOMM_BATCH_UB_OFFSET,
                                                 LAYERED_HCOMM_BATCH_UB_BYTES / sizeof(uint8_t));
 
@@ -449,10 +448,10 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendMaskC
     for (uint32_t curRankId = aivCoreIdx_; curRankId < static_cast<uint32_t>(totalExperts); curRankId += blockAivNum_) {
         ChannelHandle maskChannel{};
         if (curRankId != rankId_) {
-            maskChannel = GetUrmaCommHandle(mc2Context_, curRankId, rankId_);
+            maskChannel = comm_.GetChannel(curRankId);
             // SendMask 与紧随其后的第一次全卡同步由同一物理 AIV 负责，锁跨两个阶段复用，
             // 避免在中间没有换核时提前 Unlock 刷新通道 counter。
-            hcomm_.Lock(maskChannel);
+            comm_.Lock(maskChannel);
         }
         for (uint32_t expertIdIndex = 0; expertIdIndex < moeExpertPerRank_; ++expertIdIndex) { // 按专家处理
             int32_t curExpertId = static_cast<int32_t>(curRankId * moeExpertPerRank_ + expertIdIndex);
@@ -477,7 +476,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendMaskC
                 PipeBarrier<PIPE_ALL>();
                 GM_ADDR remoteDataAddr = GetRankWinAddrWithOffset(curRankId, dstOffset);
                 GM_ADDR localGmAddr = params_.workspaceInfo.maskSlotPtr + srcOffset;
-                hcomm_.WriteNbi(maskChannel, remoteDataAddr, localGmAddr, maskSlotSize_);
+                comm_.WriteNbi(maskChannel, remoteDataAddr, localGmAddr, maskSlotSize_);
             }
         }
     }
@@ -487,8 +486,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendMaskC
         if (curRankId == rankId_) {
             continue;
         }
-        ChannelHandle maskChannel = GetUrmaCommHandle(mc2Context_, curRankId, rankId_);
-        hcomm_.Drain(maskChannel);
+        ChannelHandle maskChannel = comm_.GetChannel(curRankId);
+        comm_.Drain(maskChannel);
     }
 }
 
@@ -743,8 +742,10 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::BuildDisp
 }
 
 template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::AppendDispatchRelayData(
-    uint32_t targetServer, uint32_t relayRank, HcommBatchHandle& batchHandle, int32_t slot)
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::AppendDispatchRelayData(uint32_t targetServer,
+                                                                                               uint32_t relayRank,
+                                                                                               BatchHandle& batchHandle,
+                                                                                               int32_t slot)
 {
     uint64_t metaOffset = DispatchRelayQueueServerOffset(targetServer) + ALIGN_32 +
                           static_cast<uint64_t>(slot) * DISPATCH_RELAY_QUEUE_ENTRY_BYTES;
@@ -754,12 +755,12 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::AppendDis
     uint64_t relayOffset = RelayTokenOffset(serverId_, static_cast<uint32_t>(tokenIdx));
     GM_ADDR srcAddr = GetRankWinAddrWithOffset(rankId_, dispatchWinOffset_) + relayOffset;
     GM_ADDR dstAddr = GetRankWinAddrWithOffset(relayRank, dispatchWinOffset_) + relayOffset;
-    hcomm_.WriteNbi<DISPATCH_DATA_WQE_CONFIG>(batchHandle, dstAddr, srcAddr, mxQuantTokenScaleAlignBytes_);
+    comm_.WriteRelaxedNbi(batchHandle, dstAddr, srcAddr, mxQuantTokenScaleAlignBytes_);
 }
 
 template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::AppendDispatchRelayFlag(
-    uint32_t targetServer, uint32_t relayRank, HcommBatchHandle& batchHandle, int32_t slot, bool firstFlag)
+    uint32_t targetServer, uint32_t relayRank, BatchHandle& batchHandle, int32_t slot, bool firstFlag)
 {
     uint64_t metaOffset = DispatchRelayQueueServerOffset(targetServer) + ALIGN_32 +
                           static_cast<uint64_t>(slot) * DISPATCH_RELAY_QUEUE_ENTRY_BYTES;
@@ -770,28 +771,27 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::AppendDis
     GM_ADDR localFlagAddr = GetRankWinAddrWithOffset(rankId_, dispatchFlagWinOffset_) + flagOffset;
     GM_ADDR remoteFlagAddr = GetRankWinAddrWithOffset(relayRank, dispatchFlagWinOffset_) + flagOffset;
     if (firstFlag) {
-        hcomm_.WriteNbi<DISPATCH_FIRST_FLAG_WQE_CONFIG>(batchHandle, remoteFlagAddr, localFlagAddr, sizeof(uint64_t));
+        comm_.WriteStrongNbi(batchHandle, remoteFlagAddr, localFlagAddr, sizeof(uint64_t));
     } else {
-        hcomm_.WriteNbi<DISPATCH_FLAG_WQE_CONFIG>(batchHandle, remoteFlagAddr, localFlagAddr, sizeof(uint64_t));
+        comm_.WriteRelaxedNbi(batchHandle, remoteFlagAddr, localFlagAddr, sizeof(uint64_t));
     }
 }
 
 template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CommitDispatchRelayBatch(
-    uint32_t targetServer, uint32_t relayRank, HcommBatchHandle& batchHandle, int32_t batchStart,
-    uint32_t batchTokenCount)
+    uint32_t targetServer, uint32_t relayRank, BatchHandle& batchHandle, int32_t batchStart, uint32_t batchTokenCount)
 {
     // 先提交本批全部 token 数据，再单独组装并提交 flag。首条 flag 使用 odr=6 建立批次边界；
     // 后续 flag 使用 odr=5。三种 WQE 均关闭 CQE，这一配置不外溢到二级读和 Combine。
     for (uint32_t index = 0U; index < batchTokenCount; ++index) {
         AppendDispatchRelayData(targetServer, relayRank, batchHandle, batchStart + static_cast<int32_t>(index));
     }
-    hcomm_.BatchCommit(batchHandle);
+    comm_.BatchCommit(batchHandle);
     for (uint32_t index = 0U; index < batchTokenCount; ++index) {
         AppendDispatchRelayFlag(targetServer, relayRank, batchHandle, batchStart + static_cast<int32_t>(index),
                                 index == 0U);
     }
-    hcomm_.BatchCommit(batchHandle);
+    comm_.BatchCommit(batchHandle);
 }
 
 template <TemplateMegaMoeLayeredTypeClass>
@@ -808,9 +808,9 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendDispa
             continue;
         }
 
-        ChannelHandle channel = GetUrmaCommHandle(mc2Context_, relayRank, rankId_);
-        HcommBatchHandle batchHandle = hcomm_.MakeBatchHandle(
-            channel, hcommBatchWqeTensor_, LAYERED_HCOMM_BATCH_UB_BYTES, GetRankWinAddrWithOffset(relayRank, 0));
+        ChannelHandle channel = comm_.GetChannel(relayRank);
+        BatchHandle batchHandle = comm_.MakeBatchHandle(channel, hcommBatchWqeTensor_, LAYERED_HCOMM_BATCH_UB_BYTES,
+                                                        GetRankWinAddrWithOffset(relayRank, 0));
         // 队列已经由全部 AIV 构建并同步完成，[0, count) 可直接按连续 slot 分批发送。
         __gm__ int32_t* countPtr = reinterpret_cast<__gm__ int32_t*>(params_.workspaceInfo.dispatchRelaySendQueuePtr +
                                                                      DispatchRelayQueueServerOffset(targetServer));
@@ -1047,7 +1047,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveRe
     GlobalTensor<uint64_t> scratchFlagGlobalTensor;
     scratchFlagGlobalTensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t*>(scratchAddr));
     DataCopyPadExtParams<uint64_t> flagCopyPadParams{true, 0U, 0U, 0U};
-    ChannelHandle channel = GetUrmaCommHandle(mc2Context_, relayRank, rankId_);
+    ChannelHandle channel = comm_.GetChannel(relayRank);
 
     // 批次可以跨专家和源 Server，但不能跨 relay 通道。ready flag 按 token-id 的 256 槽窗口读取，
     // 只处理当前批次实际命中的窗口。token id 属于源 Rank，上界必须用全卡容量而非本卡 m_。
@@ -1083,8 +1083,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveRe
                 GetRankWinAddrWithOffset(relayRank, dispatchFlagWinOffset_) + RelayFlagOffset(srcServer, windowStart);
             bool windowTokensReady = false;
             while (!windowTokensReady) {
-                hcomm_.ReadNbi(channel, scratchAddr, remoteFlagAddr, flagSnapshotBytes);
-                hcomm_.Drain(channel);
+                comm_.ReadNbi(channel, scratchAddr, remoteFlagAddr, flagSnapshotBytes);
+                comm_.Drain(channel);
                 SyncFuncStatic<AscendC::HardEvent::MTE3_MTE2, SYNC_EVENT_ID1>();
                 DataCopyPad(relayFlagTensor_, scratchFlagGlobalTensor, flagCopyParams, flagCopyPadParams);
                 SyncFuncStatic<AscendC::HardEvent::MTE2_S, SYNC_EVENT_ID1>();
@@ -1106,8 +1106,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveRe
         }
     }
 
-    HcommBatchHandle batchHandle = hcomm_.MakeBatchHandle(channel, hcommBatchWqeTensor_, LAYERED_HCOMM_BATCH_UB_BYTES,
-                                                          GetRankWinAddrWithOffset(relayRank, 0));
+    BatchHandle batchHandle = comm_.MakeBatchHandle(channel, hcommBatchWqeTensor_, LAYERED_HCOMM_BATCH_UB_BYTES,
+                                                    GetRankWinAddrWithOffset(relayRank, 0));
     int64_t widthA = k_ / A_ELEMS_PER_BYTE;
     int64_t widthAScale =
         Ops::Base::CeilDiv(static_cast<int64_t>(k_), static_cast<int64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
@@ -1122,18 +1122,18 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveRe
             params_.workspaceInfo.dispatchRevDataPtr + static_cast<uint64_t>(dstRow) * widthA * sizeof(ActivationType);
         GM_ADDR scaleDstAddr = params_.workspaceInfo.dispatchRevScalePtr +
                                static_cast<uint64_t>(dstRow) * widthAScale * sizeof(QuantScaleOutType);
-        hcomm_.ReadNbi(batchHandle, tokenDstAddr, remoteRecordAddr, widthA * sizeof(ActivationType));
-        hcomm_.ReadNbi(batchHandle, scaleDstAddr, remoteRecordAddr + mxQuantTokenAlignBytes_,
-                       widthAScale * sizeof(QuantScaleOutType));
+        comm_.ReadNbi(batchHandle, tokenDstAddr, remoteRecordAddr, widthA * sizeof(ActivationType));
+        comm_.ReadNbi(batchHandle, scaleDstAddr, remoteRecordAddr + mxQuantTokenAlignBytes_,
+                      widthAScale * sizeof(QuantScaleOutType));
         if constexpr (TopkWeightsPrefetch) {
             GM_ADDR weightDstAddr =
                 params_.workspaceInfo.dispatchRevWeightsPtr + static_cast<uint64_t>(dstRow) * weightAlignBytes_;
-            hcomm_.ReadNbi(batchHandle, weightDstAddr,
-                           remoteRecordAddr + mxQuantTokenAlignBytes_ + mxQuantScaleAlignBytes_, weightAlignBytes_);
+            comm_.ReadNbi(batchHandle, weightDstAddr,
+                          remoteRecordAddr + mxQuantTokenAlignBytes_ + mxQuantScaleAlignBytes_, weightAlignBytes_);
         }
     }
-    hcomm_.BatchCommit(batchHandle);
-    hcomm_.Drain(batchHandle);
+    comm_.BatchCommit(batchHandle);
+    comm_.Drain(batchHandle);
 
     if constexpr (TopkWeightsPrefetch) {
         for (uint32_t index = 0U; index < batchTokenCount; ++index) {

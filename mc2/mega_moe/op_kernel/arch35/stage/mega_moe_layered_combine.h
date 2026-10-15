@@ -49,8 +49,6 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitCombi
     if constexpr (g_coreType == AIV) {
         // Combine 仅在当前 AIV1 完成 Dispatch 张量使用后启动，并从 UB 首地址重建视图。
         // Hcomm 使用前 512 字节；Combine metadata 和计算临时区从其后开始复用 UB。
-        LocalTensor<uint8_t> hcommTensor = LocalTensor<uint8_t>(TPosition::VECCALC, 0, ALIGN_512 / sizeof(uint8_t));
-        hcomm_.Init(hcommTensor, ALIGN_512);
         uint32_t nAlign32 = Ops::Base::CeilAlign(k_, static_cast<uint32_t>(ALIGN_32));
         uint32_t nScale = Ops::Base::CeilDiv(k_, uint32_t(MXFP_SCALE_GROUP_NUM));
         uint32_t quantTokenSizeBytes = Ops::Base::CeilAlign(k_ + nScale, static_cast<uint32_t>(ALIGN_32));
@@ -90,8 +88,7 @@ __aicore__ inline bool MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::GetCombin
 
 template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessCombineRank(
-    const GMMAddrInfo& gmmAddrInfo, const ExpertLoopState& gmm2State, uint32_t expertIdx,
-    CombineImpl::LayeredCombineBatchState& batchState)
+    const GMMAddrInfo& gmmAddrInfo, const ExpertLoopState& gmm2State, uint32_t expertIdx, CombineBatchState& batchState)
 {
     constexpr bool IsQuantized = CombineQuantMode != COMBINE_NO_QUANT;
     uint32_t rowStart = 0U;
@@ -136,9 +133,9 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessCo
         SyncFuncStatic<AscendC::HardEvent::S_MTE2, SYNC_EVENT_ID1>();
         AscendC::DataCopy(metaInfoTensor, metaInfoGm, batchCount * META_INFO_SIZE);
 
-        CombineImpl::CombineTokenGroup<CombineQuantMode, bfloat16_t, true, IsQuantized>(
+        CombineImpl::CombineTokenGroup<CombineQuantMode, bfloat16_t, IsQuantized>(
             currentRow, batchCount, k_, expertIdx, rankId_, gmmAddrInfo.gmm2OutGlobal, params_, metaInfoTensor,
-            combineUbTensorSize_, offset, quantTokenSizeBytes, batchState);
+            combineUbTensorSize_, offset, quantTokenSizeBytes, comm_, batchState);
         processedCount += batchCount;
     }
 }
@@ -161,12 +158,12 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessCo
         if (!IsChannelOwner(dstRank)) {
             continue;
         }
-        CombineImpl::LayeredCombineBatchState batchState{};
+        CombineBatchState batchState{};
         batchState.dstRankId = dstRank;
         if (dstRank != rankId_) {
-            ChannelHandle channel = GetUrmaCommHandle(mc2Context_, dstRank, rankId_);
-            batchState.batchHandle = hcomm_.MakeBatchHandle(channel, hcommBatchWqeTensor_, LAYERED_HCOMM_BATCH_UB_BYTES,
-                                                            GetRankWinAddrWithOffset(dstRank, 0));
+            ChannelHandle channel = comm_.GetChannel(dstRank);
+            batchState.batchHandle = comm_.MakeBatchHandle(channel, hcommBatchWqeTensor_, LAYERED_HCOMM_BATCH_UB_BYTES,
+                                                           GetRankWinAddrWithOffset(dstRank, 0));
         }
 
         ExpertLoopState combineState = waveBeginState;
@@ -179,7 +176,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessCo
             ProcessCombineRank(combineAddrInfo, combineState, expertIdx, batchState);
         }
         if (dstRank != rankId_ && batchState.pendingTokenCount != 0U) {
-            hcomm_.BatchCommit(batchState.batchHandle);
+            comm_.BatchCommit(batchState.batchHandle);
             batchState.pendingTokenCount = 0U;
         }
     }
