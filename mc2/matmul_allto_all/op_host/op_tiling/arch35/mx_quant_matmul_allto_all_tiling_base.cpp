@@ -16,7 +16,7 @@
 #include "mc2_log.h"
 #include "mx_quant_matmul_allto_all_tiling_base.h"
 #include "matmul_allto_all_fit_balance_tiling.h"
-#include "apace/tiling/quant_matmul_tiling_swat.h"
+#include "apace/tiling/matmul_tiling/quant_matmul_tiling.h"
 
 using namespace Mc2Log;
 using namespace AscendC;

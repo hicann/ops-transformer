@@ -31,7 +31,7 @@
 #include "apace/basic/fragment_tensor/fragment_tensor.h"
 #include "apace/basic/fragment_tensor/fragment_tensor_api.h"
 #include "apace/basic/buffer/buffer_channel.h"
-#include "apace/tiling/quant_matmul_tiling_data.h"
+#include "apace/tiling/matmul_tiling/quant_matmul_tiling_data.h"
 #include "../../../utils/op_state_dump.h"
 
 namespace Apace {

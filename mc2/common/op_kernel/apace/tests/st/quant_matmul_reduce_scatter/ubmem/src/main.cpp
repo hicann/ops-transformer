@@ -42,8 +42,8 @@
 #include "apace_st_utils.h"
 #include "apace/utils/apace_constant.h"
 #include "apace/utils/apace_common_utils.h"
-#include "apace/tiling/quant_matmul_tiling_swat.h"
-#include "apace/tiling/quant_matmul_tiling_data.h"
+#include "apace/tiling/matmul_tiling/quant_matmul_tiling.h"
+#include "apace/tiling/matmul_tiling/quant_matmul_tiling_data.h"
 #include "tiling/hccl/hccl_tiling.h"
 #include "apace_qmrs_kernel_launcher.h"
 

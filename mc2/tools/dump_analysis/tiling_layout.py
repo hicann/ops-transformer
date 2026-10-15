@@ -102,8 +102,8 @@ RUNTIME_INFO_CORE_MAX = 128
 ALLTO_ALL_TILING_INFO_SIZE = 88
 
 # Apace (CCU/URMA 路径, 不含 TCubeTiling, 无 CANN 版本漂移)
-# — mc2/common/op_kernel/apace/tiling/comm_tiling_data.h (6×u64)
-# — mc2/common/op_kernel/apace/tiling/quant_matmul_tiling_data.h (定长 u32 字段)
+# — mc2/common/op_kernel/apace/tiling/tiling_data_struct_define.h (CommTilingData, 6×u64 含 slotNum)
+# — mc2/common/op_kernel/apace/tiling/matmul_tiling/quant_matmul_tiling_data.h (定长 u32 字段)
 APACE_COMM_TILING_SIZE = 48
 APACE_QUANT_MATMUL_SIZE = 64
 

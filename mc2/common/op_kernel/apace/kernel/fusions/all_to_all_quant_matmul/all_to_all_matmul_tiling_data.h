@@ -17,8 +17,8 @@
 
 #include <cstdint>
 #include "kernel_tiling/kernel_tiling.h"
-#include "../../../tiling/quant_matmul_tiling_data.h"
-#include "../../../tiling/comm_tiling_data.h"
+#include "../../../tiling/matmul_tiling/quant_matmul_tiling_data.h"
+#include "../../../tiling/tiling_data_struct_define.h"
 #include "../../../core/aiv_comm/collective_comm_context.h"
 #include "../../../../mc2_tiling_struct.h"
 

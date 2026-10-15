@@ -27,7 +27,7 @@
 #include "tiling/platform/platform_ascendc.h"
 #include "ascendc/host_api/tiling/template_argument.h"
 #include "apace/kernel/fusions/all_gather_quant_matmul/all_gather_mx_matmul_tiling_data.h"
-#include "apace/tiling/quant_matmul_tiling_swat.h"
+#include "apace/tiling/matmul_tiling/quant_matmul_tiling.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "../../../op_kernel/arch35/all_gather_matmul_v3_tiling_key.h"
 #include "mc2_exception_dump.h"

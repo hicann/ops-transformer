@@ -38,7 +38,7 @@
 #include <cstdlib>
 #include "apace_st_utils.h"
 #include "apace/utils/apace_constant.h"
-#include "apace/tiling/quant_matmul_tiling_swat.h"
+#include "apace/tiling/matmul_tiling/quant_matmul_tiling.h"
 #include "apace/kernel/fusions/quant_matmul_all_to_all/matmul_all_to_all_tiling_data.h"
 #include "kernel_launcher.h"
 #include "apace/utils/comm_channel_builder.h"

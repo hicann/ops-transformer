@@ -25,7 +25,7 @@
 #pragma once
 
 #include "basic_api/kernel_basic_intf.h"
-#include "apace/tiling/quant_matmul_tiling_data.h"
+#include "apace/tiling/matmul_tiling/quant_matmul_tiling_data.h"
 #include "blaze/gemm/policy/dispatch_policy.h"
 #include "blaze/gemm/block/block_scheduler_qbmm.h"
 #include "blaze/gemm/block/block_mmad.h"

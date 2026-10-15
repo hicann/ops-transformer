@@ -638,7 +638,7 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::DoOpTiling()
         return ge::GRAPH_FAILED;
     }
 
-    apace::CommTilingBase::GetCommTilingData(m_, n_, ka, mm, td->commTilingData, td->scaleCommTilingData);
+    CoreOccupancyFirstTiling::GetCommTilingData(m_, n_, ka, mm, td->commTilingData, td->scaleCommTilingData);
 
     // MXFP4 打包存储(2 个 fp4 占 1 字节)，数据通信的 K 轴字节数需减半；
     // scale 仍是 e8m0(每 32 元素 1 字节)，不受 fp4 影响。

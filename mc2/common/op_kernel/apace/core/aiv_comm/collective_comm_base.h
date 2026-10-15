@@ -16,7 +16,7 @@
 #pragma once
 
 #include "collective_comm_context.h"
-#include "apace/tiling/comm_tiling_data.h"
+#include "apace/tiling/tiling_data_struct_define.h"
 #include "tensor_api/tensor/pointer.h"
 #include "barrier/barrier_ubmem.h"
 

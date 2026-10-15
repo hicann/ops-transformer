@@ -25,7 +25,7 @@
 #include "blaze/gemm/kernel/kernel_qbmm_mx.h"
 #include "blaze/gemm/utils/common_utils.h"
 #include "apace/utils/comm_resource_builder.h"
-#include "apace/tiling/quant_matmul_tiling_data.h"
+#include "apace/tiling/matmul_tiling/quant_matmul_tiling_data.h"
 
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"

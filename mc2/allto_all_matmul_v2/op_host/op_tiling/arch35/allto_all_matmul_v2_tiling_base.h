@@ -18,8 +18,8 @@
 #include <ascendc/host_api/tiling/template_argument.h>
 #include "securec.h"
 #include "apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_matmul_tiling_data.h"
-#include "apace/tiling/quant_matmul_tiling_swat.h"
-#include "apace/tiling/comm_tiling_base.h"
+#include "apace/tiling/matmul_tiling/quant_matmul_tiling.h"
+#include "apace/tiling/core_occupancy_first_tiling.h"
 #include "tiling/platform/platform_ascendc.h"
 #include "op_host/tiling_base.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"

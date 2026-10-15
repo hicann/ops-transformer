@@ -22,7 +22,7 @@
 #include "../../matmul/quant_batch_matmul/matmul_all_to_all_qbmm_mx_kernel.h"
 #include "../../../../mc2_templates/communication/communicator/hccl_communicator.h"
 #include "../../../../mc2_templates/communication/primitives/hccl_primitives.h"
-#include "../../../tiling/quant_matmul_tiling_data.h"
+#include "../../../tiling/matmul_tiling/quant_matmul_tiling_data.h"
 
 namespace Apace {
 

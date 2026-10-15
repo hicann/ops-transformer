@@ -4,20 +4,272 @@
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
 /*!
- * \file quant_matmul_tiling_swat.h
- * \brief SWAT tiling specialization for the MX non-full-load path.
+ * \file quant_matmul_tiling.h
+ * \brief MX 量化 Matmul tiling 引擎（host 侧）。
+ *
+ * 按三段组织：
+ *   1) 共享类型：平台信息 / 问题 shape / tiling 中间状态
+ *   2) 公共工作流基类：状态准备 + 平台查询 + 虚函数分派
+ *   3) SWAT 特化：MX 非全载路径的分块搜索 / 尾块处理 / L1 深度决策
+ *
+ * 序列化结果结构见同目录 quant_matmul_tiling_data.h（host-device 契约，独立维护）。
  */
 
 #pragma once
 
 #include <algorithm>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <optional>
 
-#include "quant_matmul_tiling_base.h"
+#include "../../utils/apace_common_utils.h"
+#include "../../utils/apace_constant.h"
+#include "quant_matmul_tiling_data.h"
+#include "tiling/platform/platform_ascendc.h"
+
+// ============================================================================
+// Section 1: 共享类型（原 quant_matmul_tiling_common.h）
+// ============================================================================
+
+// Static hardware information queried from the Ascend platform runtime.
+struct QuantMatmulPlatformInfo {
+    uint64_t aicNum{0UL};
+    uint64_t aivNum{0UL};
+    uint64_t ubSize{0UL};
+    uint64_t l1Size{0UL};
+    uint64_t l2Size{0UL};
+    uint64_t l0cSize{0UL};
+    uint64_t l0aSize{0UL};
+    uint64_t l0bSize{0UL};
+    uint64_t btSize{0UL};
+    platform_ascendc::SocVersion socVersion;
+};
+
+// Original problem shape provided by the caller.
+struct QuantMatmulArgs {
+    uint64_t m = 0UL;
+    uint64_t k = 0UL;
+    uint64_t n = 0UL;
+    uint64_t batch = 1UL;
+    bool transA = false;
+    bool transB = true;
+};
+
+// Intermediate tiling state built step by step by the tiling engine.
+//
+// The engine first determines a basic block shape, then derives tail-handling
+// policy, L1/L0 buffering depth, and finally the information consumed by the
+// kernel launch path.
+struct QuantMatmulRunInfo {
+    // Base tile shape used by the scheduler and compute pipeline.
+    uint64_t baseM{0UL};
+    uint64_t baseN{0UL};
+    uint64_t baseK{0UL};
+
+    // stepKa/stepKb count how many baseK tiles one outer streaming step spans.
+    uint64_t stepKa{0UL};
+    uint64_t stepKb{0UL};
+    uint64_t depthA1{0UL};
+    uint64_t depthB1{0UL};
+
+    // Reserved fields for future L1 shape bookkeeping.
+    uint64_t mL1{0UL};
+    uint64_t nL1{0UL};
+    uint64_t kL1{0UL};
+
+    // L1 bytes reserved for the kernel-side bias ping-pong buffers.
+    uint64_t biasL1Size{0UL};
+
+    // Reserved fields for future tail-count and buffer bookkeeping.
+    uint64_t mTailCnt{0UL};
+    uint64_t nTailCnt{0UL};
+    uint64_t l1BufferNum{0UL};
+
+    // Output buffering mode in L0C.
+    uint64_t dbL0c{0UL};
+
+    // Basic scheduler statistics after the base tile is selected.
+    uint64_t mBlockCnt{0UL};
+    uint64_t nBlockCnt{0UL};
+    uint64_t totalBlockCnt{0UL};
+
+    // Tail split factors used when the last scheduling round is further divided.
+    uint64_t mTailTile{1UL};
+    uint64_t nTailTile{1UL};
+    uint64_t mTailSize{0UL};
+    uint64_t nTailSize{0UL};
+    uint64_t tailBlockCnt{0UL};
+
+    // Load-balance metadata for merged tail blocks on M and N.
+    uint64_t mBaseTailSplitCnt{1UL};
+    uint64_t mTailMain{0UL};
+    uint64_t nBaseTailSplitCnt{1UL};
+    uint64_t nTailMain{0UL};
+
+    // Scale reuse factors in L1 for A and B.
+    uint64_t scaleFactorA{0UL};
+    uint64_t scaleFactorB{0UL};
+
+    // Whether the current shape allows the "A full load" fast path.
+    bool isAFullLoad{false};
+};
+
+// ============================================================================
+// Section 2: 公共工作流基类（原 quant_matmul_tiling_base.h）
+// ============================================================================
+
+template <mm::DataType aDataType, mm::DataType bDataType>
+class QuantMatmulTilingBase {
+public:
+    QuantMatmulTilingBase() = default;
+    virtual ~QuantMatmulTilingBase() = default;
+
+    void GetTilingData(uint64_t m, uint64_t n, uint64_t k, bool transA, bool transB, QuantMatmulTilingData& tilingData,
+                       uint64_t batch = 1)
+    {
+        // Clear the cached state so one tiling object can safely be reused for
+        // multiple shapes without leaking the previous decision.
+        args_ = {};
+        platformInfo_ = {};
+        runInfo_ = {};
+
+        // The public entry only prepares the shared state. Path-specific tiling
+        // is delegated to one virtual operation so the derived class owns the
+        // complete strategy-specific decision flow.
+        InitCompileInfo();
+        InitShapeArgs(m, n, k, batch, transA, transB);
+        DoOpTiling(tilingData);
+        PrintTilingData(tilingData);
+    }
+
+    void GetTilingData(uint64_t m, uint64_t n, uint64_t k, QuantMatmulTilingData& tilingData, uint64_t batch = 1)
+    {
+        // Keep compatibility with the common sample default:
+        // A is not transposed and B is transposed.
+        GetTilingData(m, n, k, false, true, tilingData, batch);
+    }
+
+    void SetOptimizeEnable(bool enable)
+    {
+        isOpenOptimize_ = enable;
+    }
+    void SetMTailAlignEnable(bool enable)
+    {
+        enableMTailAlign_ = enable;
+    }
+    void SetPlatformInfoPtr(fe::PlatFormInfos* ptr)
+    {
+        platformInfoPtr_ = ptr;
+    }
+
+    // 允许调用方限制计算tiling的核
+    void SetCoreLimit(uint32_t aicNum, uint32_t aivNum)
+    {
+        coreLimitAicNum_ = aicNum;
+        coreLimitAivNum_ = aivNum;
+        hasCoreLimit_ = true;
+    }
+    void SetAdjustBasicBlockEnable(bool enable)
+    {
+        enableAdjustBasicBlock_ = enable;
+    }
+
+protected:
+    QuantMatmulArgs args_{};
+    QuantMatmulPlatformInfo platformInfo_{};
+    QuantMatmulRunInfo runInfo_{};
+
+    bool isOpenOptimize_{true};
+    bool hasCoreLimit_{false};
+    uint32_t coreLimitAicNum_{0};
+    uint32_t coreLimitAivNum_{0};
+    bool enableMTailAlign_{false};
+    fe::PlatFormInfos* platformInfoPtr_{nullptr};
+    bool enableAdjustBasicBlock_{true};
+
+    virtual const char* TilingName() const = 0;
+
+    virtual void DoOpTiling(QuantMatmulTilingData& tilingData) = 0;
+
+private:
+    // 仅当全局日志级别为 DEBUG(ASCEND_GLOBAL_LOG_LEVEL=0) 时打印 tiling 调试信息，默认级别下不打印。
+    void PrintTilingData(const QuantMatmulTilingData& tilingData) const
+    {
+        const char* level = std::getenv("ASCEND_GLOBAL_LOG_LEVEL");
+        if (level == nullptr || level[0] != '0') {
+            return;
+        }
+        printf("[QuantMatmul Strategy]\n");
+        printf("  strategy           : %s\n", TilingName());
+        printf("[QuantMatmul Tiling Data]\n");
+        printf("  usedCoreNum        : %u\n", tilingData.usedCoreNum);
+        printf("  m                  : %u\n", tilingData.m);
+        printf("  n                  : %u\n", tilingData.n);
+        printf("  k                  : %u\n", tilingData.k);
+        printf("  baseM              : %u\n", tilingData.baseM);
+        printf("  baseN              : %u\n", tilingData.baseN);
+        printf("  baseK              : %u\n", tilingData.baseK);
+        printf("  scaleKL1           : %u\n", tilingData.scaleKL1);
+        printf("  mTailTile          : %u\n", tilingData.mTailTile);
+        printf("  nTailTile          : %u\n", tilingData.nTailTile);
+        printf("  mBaseTailSplitCnt  : %u\n", tilingData.mBaseTailSplitCnt);
+        printf("  nBaseTailSplitCnt  : %u\n", tilingData.nBaseTailSplitCnt);
+        printf("  mTailMain          : %u\n", tilingData.mTailMain);
+        printf("  nTailMain          : %u\n", tilingData.nTailMain);
+        printf("  stepK              : %u\n", tilingData.stepK);
+        printf("  nBufferNum         : %u\n", tilingData.nBufferNum);
+        printf("  dbL0c              : %u\n", tilingData.dbL0c);
+    }
+
+    void InitCompileInfo()
+    {
+        // Query the platform once per tiling request so later decisions can
+        // use the real cache sizes and core count of the current device.
+        // Prefer the context-injected platform info (UT-friendly); fall back
+        // to the global manager singleton for standalone host launchers.
+        std::optional<platform_ascendc::PlatformAscendC> ctxPlatform;
+        platform_ascendc::PlatformAscendC* ascendcPlatform = nullptr;
+        if (platformInfoPtr_ != nullptr) {
+            ctxPlatform.emplace(platformInfoPtr_);
+            ascendcPlatform = &(*ctxPlatform);
+        } else {
+            ascendcPlatform = platform_ascendc::PlatformAscendCManager::GetInstance();
+        }
+        platformInfo_.aicNum = ascendcPlatform->GetCoreNumAic();
+        platformInfo_.aivNum = ascendcPlatform->GetCoreNumAiv();
+        if (hasCoreLimit_) {
+            platformInfo_.aicNum = std::min(coreLimitAicNum_, coreLimitAivNum_);
+        }
+        platformInfo_.socVersion = ascendcPlatform->GetSocVersion();
+        ascendcPlatform->GetCoreMemSize(platform_ascendc::CoreMemType::UB, platformInfo_.ubSize);
+        ascendcPlatform->GetCoreMemSize(platform_ascendc::CoreMemType::L1, platformInfo_.l1Size);
+        ascendcPlatform->GetCoreMemSize(platform_ascendc::CoreMemType::L0_A, platformInfo_.l0aSize);
+        ascendcPlatform->GetCoreMemSize(platform_ascendc::CoreMemType::L0_B, platformInfo_.l0bSize);
+        ascendcPlatform->GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, platformInfo_.l0cSize);
+        ascendcPlatform->GetCoreMemSize(platform_ascendc::CoreMemType::L2, platformInfo_.l2Size);
+        ascendcPlatform->GetCoreMemSize(platform_ascendc::CoreMemType::BT, platformInfo_.btSize);
+    }
+
+    void InitShapeArgs(uint64_t m, uint64_t n, uint64_t k, uint64_t batch, bool transA, bool transB)
+    {
+        args_.m = m;
+        args_.n = n;
+        args_.k = k;
+        args_.batch = batch;
+        args_.transA = transA;
+        args_.transB = transB;
+    }
+};
+
+// ============================================================================
+// Section 3: SWAT 特化（原 quant_matmul_tiling_swat.h）
+// ============================================================================
 
 template <mm::DataType aDataType, mm::DataType bDataType, mm::BiasDataType biasDtype>
 class QuantMatmulTilingSwat : public QuantMatmulTilingBase<aDataType, bDataType> {
