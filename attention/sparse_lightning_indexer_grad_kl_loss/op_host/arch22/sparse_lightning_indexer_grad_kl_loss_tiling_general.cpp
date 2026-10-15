@@ -48,6 +48,11 @@ static constexpr uint32_t DINDEX_SIZE_128 = 128;
 static constexpr uint32_t DROPE_SIZE_64 = 64;
 static constexpr uint32_t TOPK_SIZE_2048 = 2048;
 static constexpr int64_t SPARSE_MODE_SIZE_3 = 3;
+static constexpr size_t SIZE_1 = 1;
+static const uint64_t DIM_NUM_0 = 0;
+static const uint64_t DIM_NUM_1 = 1;
+static const uint64_t DIM_NUM_2 = 2;
+static const uint64_t DIM_NUM_3 = 3;
 
 template <typename T>
 static auto AlignUp(T num1, T num2) -> T
@@ -96,6 +101,58 @@ static auto CalcTailSize(T num1, T num2) -> T
     }
     T mod = num1 % num2;
     return mod != 0 ? mod : num2;
+}
+
+// 比较维度数值与输入是否能够对应
+ge::graphStatus SparseLightningIndexerGradKLLossTilingBase::CheckOutPut()
+{
+    auto queryIndexShape = context_->GetInputShape(QUERY_INDEX_INPUT_INDEX)->GetStorageShape();
+    auto keyIndexShape = context_->GetInputShape(KEY_INDEX_INPUT_INDEX)->GetStorageShape();
+    auto weightsShape = context_->GetInputShape(WEIGHT_INPUT_INDEX)->GetStorageShape();
+    auto dQueryIndexShape = context_->GetOutputShape(D_QUERY_INDEX_OUTPUT_INDEX)->GetStorageShape();
+    auto dkeyIndexShape = context_->GetOutputShape(D_KEY_INDEX_OUTPUT_INDEX)->GetStorageShape();
+    auto dWeightsShape = context_->GetOutputShape(D_WEIGHTS_OUTPUT_INDEX)->GetStorageShape();
+
+    {
+        auto qIdxDimNum = queryIndexShape.GetDimNum();
+        if (qIdxDimNum != dQueryIndexShape.GetDimNum() ||
+            queryIndexShape.GetDim(DIM_NUM_0) != dQueryIndexShape.GetDim(DIM_NUM_0) ||
+            queryIndexShape.GetDim(DIM_NUM_1) != dQueryIndexShape.GetDim(DIM_NUM_1) ||
+            (qIdxDimNum > DIM_NUM_2 && queryIndexShape.GetDim(DIM_NUM_2) != dQueryIndexShape.GetDim(DIM_NUM_2)) ||
+            (qIdxDimNum > DIM_NUM_3 && queryIndexShape.GetDim(DIM_NUM_3) != dQueryIndexShape.GetDim(DIM_NUM_3))) {
+            OP_LOGE(context_,
+                    "SparseLightningIndexerGradKLLoss Input query_index %s is not equal to Output d_query_index %s",
+                    Ops::Base::ToString(queryIndexShape).c_str(), Ops::Base::ToString(dQueryIndexShape).c_str());
+            return ge::GRAPH_FAILED;
+        }
+    }
+
+    {
+        auto kIdxDimNum = keyIndexShape.GetDimNum();
+        if (kIdxDimNum != dkeyIndexShape.GetDimNum() ||
+            keyIndexShape.GetDim(DIM_NUM_0) != dkeyIndexShape.GetDim(DIM_NUM_0) ||
+            keyIndexShape.GetDim(DIM_NUM_1) != dkeyIndexShape.GetDim(DIM_NUM_1) ||
+            (kIdxDimNum > DIM_NUM_2 && keyIndexShape.GetDim(DIM_NUM_2) != dkeyIndexShape.GetDim(DIM_NUM_2)) ||
+            (kIdxDimNum > DIM_NUM_3 && keyIndexShape.GetDim(DIM_NUM_3) != dkeyIndexShape.GetDim(DIM_NUM_3))) {
+            OP_LOGE(context_,
+                    "SparseLightningIndexerGradKLLoss Input key_index %s is not equal to Output d_key_index %s",
+                    Ops::Base::ToString(keyIndexShape).c_str(), Ops::Base::ToString(dkeyIndexShape).c_str());
+            return ge::GRAPH_FAILED;
+        }
+    }
+
+    {
+        auto wDimNum = weightsShape.GetDimNum();
+        if (wDimNum != dWeightsShape.GetDimNum() || weightsShape.GetDim(DIM_NUM_0) != dWeightsShape.GetDim(DIM_NUM_0) ||
+            weightsShape.GetDim(DIM_NUM_1) != dWeightsShape.GetDim(DIM_NUM_1) ||
+            (wDimNum > DIM_NUM_2 && weightsShape.GetDim(DIM_NUM_2) != dWeightsShape.GetDim(DIM_NUM_2))) {
+            OP_LOGE(context_, "SparseLightningIndexerGradKLLoss Input weights %s is not equal to Output d_weights %s",
+                    Ops::Base::ToString(weightsShape).c_str(), Ops::Base::ToString(dWeightsShape).c_str());
+            return ge::GRAPH_FAILED;
+        }
+    }
+
+    return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus SparseLightningIndexerGradKLLossTilingBase::CheckContext()
@@ -147,6 +204,16 @@ ge::graphStatus SparseLightningIndexerGradKLLossTilingBase::CheckContext()
     OP_CHECK_NULL_WITH_CONTEXT(context_, context_->GetRawTilingData());
     OP_CHECK_NULL_WITH_CONTEXT(context_, context_->GetRawTilingData()->GetData());
 
+    if (lossShape->GetStorageShape().GetShapeSize() != SIZE_1) {
+        OP_LOGE(context_, "The Shape Len of Loss should be 1, but got %ld.",
+                lossShape->GetStorageShape().GetShapeSize());
+        return GRAPH_FAILED;
+    } else if (lossShape->GetStorageShape().GetDim(DIM_NUM_0) != SIZE_1) {
+        OP_LOGE(context_, "The Shape data of Loss should be 1, but got %ld.",
+                lossShape->GetStorageShape().GetDim(DIM_NUM_0));
+        return GRAPH_FAILED;
+    }
+
     return ge::GRAPH_SUCCESS;
 }
 
@@ -171,6 +238,10 @@ bool SparseLightningIndexerGradKLLossTilingBase::AnalyzeAttrs()
     OP_CHECK_IF(strcmp(inputLayout, "TND") != 0 && strcmp(inputLayout, "BSND") != 0,
                 OP_LOGE(opName, "Layout only support TND or BSND, now layout is %s.", inputLayout), return false);
     OP_LOGD(context_, "attrs: scaleValue[%f] input_layout[%s] sparse_mode[%ld].", scaleValue, inputLayout, sparseMode);
+
+    if (CheckOutPut() == ge::GRAPH_FAILED) {
+        return false;
+    }
     return true;
 }
 
