@@ -69,7 +69,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormGetWorkspaceSize(
     int64_t          expertShardType,
     int64_t          sharedExpertNum,
     int64_t          sharedExpertRankNum,
-    int64_t          globalBS,
+    int64_t          globalBs,
     int64_t          outDtype,
     int64_t          commQuantMode,
     int64_t          groupListType,
@@ -358,10 +358,10 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
     <td>-</td>
     </tr>
     <tr>
-    <td>globalBS</td>
+    <td>globalBs</td>
     <td>输入</td>
     <td>EP域全局的batch size大小。</td>
-    <td><ul><li>各rank Bs一致时，globalBS = Bs * epWorldSize或0。</li><li>各rank Bs不一致时，globalBS = maxBs * epWorldSize（maxBs为单卡Bs最大值）。</li></ul></td>
+    <td><ul><li>各rank Bs一致时，globalBs = Bs * epWorldSize或0。</li><li>各rank Bs不一致时，globalBs = maxBs * epWorldSize（maxBs为单卡Bs最大值）。</li></ul></td>
     <td>INT64</td>
     <td>ND</td>
     <td>-</td>
@@ -561,14 +561,14 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
 
 2. `aclnnMoeDistributeDispatchV2`接口与`aclnnMoeDistributeCombineAddRmsNorm`接口必须配套使用，具体参考调用示例。
 
-3. 调用接口过程中使用的`groupEp`、`epWorldSize`、`moeExpertNum`、`groupTp`、`tpWorldSize`、`expertShardType`、`sharedExpertNum`、`sharedExpertRankNum`、`globalBS`参数取值所有卡需保持一致，网络中不同层也需保持一致，且和`aclnnMoeDistributeDispatchV2`对应参数也保持一致。
+3. 调用接口过程中使用的`groupEp`、`epWorldSize`、`moeExpertNum`、`groupTp`、`tpWorldSize`、`expertShardType`、`sharedExpertNum`、`sharedExpertRankNum`、`globalBs`参数取值所有卡需保持一致，网络中不同层也需保持一致，且和`aclnnMoeDistributeDispatchV2`对应参数也保持一致。
 
 4. <term>Atlas A3系列产品</term>  ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
 
 5. 参数说明里shape格式说明：
     - **A**：表示本卡需要分发的最大token数量，取值范围如下：
       - 对于共享专家，需满足(A = Bs *epWorldSize* sharedExpertNum / sharedExpertRankNum)。
-      - 对于MoE专家，当`globalBS`为0时，需满足(A >= Bs *epWorldSize* min(localExpertNum, K))；当`globalBS`非0时，需满足(A >= globalBS * min(localExpertNum, K))。
+      - 对于MoE专家，当`globalBs`为0时，需满足(A >= Bs *epWorldSize* min(localExpertNum, K))；当`globalBs`非0时，需满足(A >= globalBs * min(localExpertNum, K))。
     - **H**：表示hidden size（隐藏层大小），取值范围为[1024, 8192]。
     - **Bs**：表示batch sequence size（本卡最终输出的token数量），取值范围为(0 < Bs ≤ 512)。
     - **K**：表示选取topK个专家，取值范围为(0 < K ≤ 16)且满足(0 < K ≤ moeExpertNum)。
@@ -688,7 +688,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
         int64_t sharedExpertRankNum = 0;
         int64_t moeExpertNum = 8;
         int64_t quantMode = 0;
-        int64_t globalBS = BS * EP_WORLD_SIZE;
+        int64_t globalBs = BS * EP_WORLD_SIZE;
         int64_t expertTokenNumsType = 1;
         int64_t outDtype = 0;
         int64_t commQuantMode = 0;
@@ -698,11 +698,11 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
         if (args.epRankId < sharedExpertRankNum) {
             // 共享专家卡
             localExpertNum = 1;
-            A = globalBS / sharedExpertRankNum;
+            A = globalBs / sharedExpertRankNum;
         } else {
             // Moe专家卡
             localExpertNum = moeExpertNum / (EP_WORLD_SIZE - sharedExpertRankNum);
-            A = globalBS * (localExpertNum < K ? localExpertNum : K);
+            A = globalBs * (localExpertNum < K ? localExpertNum : K);
         }
 
         /* 根据当前场景，构造device侧输入输出变量 */
@@ -855,7 +855,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
 
         ret = aclnnMoeDistributeDispatchV2GetWorkspaceSize(x, expertIds, (quantMode > 0 ? scales : nullptr), nullptr,
                 expertScales, hcomEpName, EP_WORLD_SIZE, args.epRankId, moeExpertNum, "", 0,
-                0, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode, globalBS,
+                0, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode, globalBs,
                 expertTokenNumsType, nullptr, expandX, dynamicScales, expandIdx, expertTokenNums, epRecvCounts,
                 tpRecvCounts, expandScales, &dispatchWorkspaceSize, &dispatchExecutor);
 
@@ -878,7 +878,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
         ret = aclnnMoeDistributeCombineAddRmsNormGetWorkspaceSize(
             expandX, expertIds, expandIdx, epRecvCounts, expertScales, residualX, gamma, tpRecvCounts, nullptr, nullptr,
             nullptr, nullptr, nullptr, sharedExpertX, hcomEpName, EP_WORLD_SIZE, args.epRankId, moeExpertNum, "", 0,
-            0, expertShardType, sharedExpertNum, sharedExpertRankNum, globalBS, outDtype, commQuantMode,
+            0, expertShardType, sharedExpertNum, sharedExpertRankNum, globalBs, outDtype, commQuantMode,
             groupList_type, nullptr, 1e-6, yOut, rstdOut, xOut, &combineAddRmsNormWorkspaceSize, &combineAddRmsNormExecutor);
         CHECK_RET(ret == ACL_SUCCESS,
             LOG_PRINT("[ERROR] aclnnMoeDistributeCombineAddRmsNormGetWorkspaceSize failed. ret = %d \n", ret); return ret);

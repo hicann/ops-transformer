@@ -833,7 +833,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
         int64_t sharedExpertRankNum = 0;
         int64_t moeExpertNum = 8;
         int64_t quantMode = 0;
-        int64_t globalBS = BS * EP_WORLD_SIZE;
+        int64_t globalBs = BS * EP_WORLD_SIZE;
         int64_t expertTokenNumsType = 1;
         int64_t outDtype = 0;
         int64_t commQuantMode = 0;
@@ -846,11 +846,11 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
         if (args.epRankId < sharedExpertRankNum) {
             // 共享专家卡
             localExpertNum = 1;
-            A = globalBS / sharedExpertRankNum;
+            A = globalBs / sharedExpertRankNum;
         } else {
             // Moe专家卡
             localExpertNum = moeExpertNum / (EP_WORLD_SIZE - sharedExpertRankNum);
-            A = globalBS * (localExpertNum < K ? localExpertNum : K);
+            A = globalBs * (localExpertNum < K ? localExpertNum : K);
         }
 
         /* 根据当前场景，构造device侧输入输出变量 */
@@ -1045,7 +1045,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
         /**************************************** 调用dispatch warm up********************************************/
         ret = aclnnMoeDistributeDispatchV3GetWorkspaceSize(x, expertIds, (quantMode > 0 ? scales : nullptr), nullptr,
                 expertScales, nullptr, hcomEpName, EP_WORLD_SIZE, args.epRankId, moeExpertNum, "", 0,
-                0, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode, globalBS,
+                0, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode, globalBs,
                 expertTokenNumsType, nullptr, zeroExpertNum, copyExpertNum, constExpertNum, expandX, dynamicScales, expandIdx, expertTokenNums, epRecvCounts,
                 tpRecvCounts, expandScales, &dispatchWorkspaceSize, &dispatchExecutor);
 
@@ -1069,7 +1069,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
         // 调用第一阶段接口
         ret = aclnnMoeDistributeDispatchV3GetWorkspaceSize(x, expertIds, (quantMode > 0 ? scales : nullptr), nullptr,
                 expertScales, elasticInfo, hcomEpName, EP_WORLD_SIZE, args.epRankId, moeExpertNum, "", 0,
-                0, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode, globalBS,
+                0, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode, globalBs,
                 expertTokenNumsType, nullptr, zeroExpertNum, copyExpertNum, constExpertNum, expandX, dynamicScales, expandIdx, expertTokenNums, epRecvCounts,
                 tpRecvCounts, expandScales, &dispatchWorkspaceSize, &dispatchExecutor);
 
@@ -1096,7 +1096,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
             expandX, expertIds, expandIdx, epRecvCounts, expertScales, residualX, gamma, tpRecvCounts, nullptr, nullptr,
             nullptr, nullptr, nullptr, sharedExpertX, elasticInfo, oriX, constExpertAlpha1, constExpertAlpha2, constExpertV,
             hcomEpName, EP_WORLD_SIZE, args.epRankId, moeExpertNum, "", 0,
-            0, expertShardType, sharedExpertNum, sharedExpertRankNum, globalBS, outDtype, commQuantMode,
+            0, expertShardType, sharedExpertNum, sharedExpertRankNum, globalBs, outDtype, commQuantMode,
             groupList_type, nullptr, 1e-6, zeroExpertNum, copyExpertNum, constExpertNum, yOut, rstdOut, xOut,
             &combineAddRmsNormWorkspaceSize, &combineAddRmsNormExecutor);
         CHECK_RET(ret == ACL_SUCCESS,

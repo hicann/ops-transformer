@@ -292,10 +292,10 @@ $$
 <td>-</td>
 </tr>
 <tr>
-<td>globalBS</td>
+<td>globalBs</td>
 <td>输入</td>
 <td>EP域全局的batch size大小。</td>
-<td><ul><li>各rank Bs一致时，globalBS = Bs * epWorldSize或0。</li><li>各rank Bs不一致时，globalBS = maxBs * epWorldSize（maxBs为单卡Bs最大值）。</li></ul></td>
+<td><ul><li>各rank Bs一致时，globalBs = Bs * epWorldSize或0。</li><li>各rank Bs不一致时，globalBs = maxBs * epWorldSize（maxBs为单卡Bs最大值）。</li></ul></td>
 <td>INT64</td>
 <td>ND</td>
 <td>-</td>

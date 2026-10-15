@@ -132,6 +132,7 @@
 - 所有rank使用的`group`、`worldSize`、`tokenInfoTableShape`、`tokenDataShape`和`cclBufferSize`必须保持一致。
 - 本算子与`attention_to_ffn`共用同一rank通信窗口（注册tag相同），本算子的flag source区与地址表/count行区布局在全部N个会话的下发接收区之后，与对侧会话数据区互不重叠。会话数`N`（即对侧`attentionWorkerNum`/`ffn_token_data_shape[0]`）的确定方式：传入`attnRankTable`时`N`为其dim0（须满足`0 < N < worldSize`），tiling按N精确校验`cclBufferSize`并精确布局；未传入时按`cclBufferSize`所能容纳的最大会话数推导布局，此时`cclBufferSize`须按保守容量（`worldSize - 1`个会话，即`get_ffn_to_attention_ccl_buffer_size`的默认计算结果）分配，以保证推导出的会话数不小于真实值。
 - 所有rank必须先完成MC2 context初始化。FFN Worker执行算子期间，Attention Worker必须保持context、通信window和通信域有效。
+- 通信内存的销毁必须晚于接收算子执行完成，否则URMA写的源地址与目标地址失效，将导致数据丢失、写入异常或业务挂死。本算子通过URMA单向写将token数据与flag异步写入Attention侧窗口，发送侧算子返回不代表对侧已完成数据消费。
 - shape取值需满足以下约束：
     - `Y`表示本rank需要分发的最大token数量。
     - `tokenInfoTableShape`为`[1, BS, expertNumPerToken]`，`tokenDataShape`为`[1, BS, expertNumPerToken, HS]`，两个shape的前三维必须相同。

@@ -26,8 +26,8 @@
 算子功能：完成通信域内的全卡同步，xRef仅用于构建Tensor依赖，接口内不对xRef做任何操作。
 
 - 相较于`aclnnDistributeBarrier`接口，该接口变更如下：
-    - 新增`elasticInfoOptional`参数。
-    - 新增`timeOutOptional`参数。
+    - 新增`elasticInfo`参数。
+    - 新增`timeOut`参数。
 
 ## 函数原型
 
@@ -36,8 +36,8 @@
 ```cpp
 aclnnStatus aclnnDistributeBarrierV2GetWorkspaceSize(
     const aclTensor *xRef,
-    const aclTensor *timeOutOptional,
-    const aclTensor *elasticInfoOptional,
+    const aclTensor *timeOut,
+    const aclTensor *elasticInfo,
     const char      *group,
     int64_t          worldSize,
     uint64_t        *workspaceSize,
@@ -90,7 +90,7 @@ aclnnStatus aclnnDistributeBarrierV2(
     <td>√</td>
     </tr>
     <tr>
-    <td>timeOutOptional</td>
+    <td>timeOut</td>
     <td>输入</td>
     <td>超时时间设置，如果在此时间内所在卡未完成全卡同步，则认为该卡存在超时异常。</td>
     <td>可选择传入有效数据或填空指针。</td>
@@ -100,7 +100,7 @@ aclnnStatus aclnnDistributeBarrierV2(
     <td>√</td>
     </tr>
     <tr>
-    <td>elasticInfoOptional</td>
+    <td>elasticInfo</td>
     <td>输入</td>
     <td>EP通信域动态缩容信息。</td>
     <td>可选择传入有效数据或填空指针，传入空指针时表示不开启动态缩容功能。</td>
@@ -159,7 +159,7 @@ aclnnStatus aclnnDistributeBarrierV2(
     <!-- end id7 -->
     <!-- npu="950" id8 -->
     - <term>Ascend 950DT系列产品</term>：
-        - timeOutOptional参数里的超时时间单位为us，建议配置5000000us，根据实际环境不同超时时间下限可能不同。
+        - timeOut参数里的超时时间单位为us，建议配置5000000us，根据实际环境不同超时时间下限可能不同。
         - `epWorldSize`取值支持[2, 1024]。
 
     <!-- end id8 -->
@@ -258,7 +258,7 @@ aclnnStatus aclnnDistributeBarrierV2(
     - 可以连续调用，入图时，需将上个算子的输入、下个算子的输出作为入参传入接口。
 
 - 参数一致性约束：
-  - 开启`elasticInfoOptional`时，需确保`aclnnMoeDistributeDispatchV3`与`aclnnMoeDistributeCombineV3`或`aclnnMoeDistributeCombineAddRmsNormV2`也开启此参数，并且其取值与对应的`elasticInfoOptional`参数保持一致。
+  - 开启`elasticInfo`时，需确保`aclnnMoeDistributeDispatchV3`与`aclnnMoeDistributeCombineV3`或`aclnnMoeDistributeCombineAddRmsNormV2`也开启此参数，并且其取值与对应的`elasticInfo`参数保持一致。
 
 ## 调用示例
 
@@ -677,7 +677,7 @@ aclnnStatus aclnnDistributeBarrierV2(
             aclDestroyTensor(elasticInfo);
         }
         if (timeOut != nullptr) {
-            aclDestroyTensor(elasticInfo);
+            aclDestroyTensor(timeOut);
         }
         if (xOut != nullptr) {
             aclDestroyTensor(xOut);

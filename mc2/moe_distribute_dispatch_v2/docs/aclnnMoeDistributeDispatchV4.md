@@ -79,7 +79,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4GetWorkspaceSize(
     int64_t          sharedExpertNum,
     int64_t          sharedExpertRankNum,
     int64_t          quantMode,
-    int64_t          globalBS,
+    int64_t          globalBs,
     int64_t          expertTokenNumsType,
     const char*      commAlg,
     int64_t          zeroExpertNum,
@@ -312,10 +312,10 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     <td>-</td>
     </tr>
     <tr>
-    <td>globalBS</td>
+    <td>globalBs</td>
     <td>输入</td>
     <td>EP域全局batch size。</td>
-    <td><br> <li> 各卡BS一致时：<code>globalBS = BS * epWorldSize</code> 或0；</li> <li> 各卡BS不一致时：<code>globalBS = maxBS * epWorldSize</code>，其中maxBS为业务配置的单rank BS容量上限，且不小于任意rank的实际BS；所有rank需传入相同且非0的globalBS。</li></td>
+    <td><br> <li> 各卡BS一致时：<code>globalBs = BS * epWorldSize</code> 或0；</li> <li> 各卡BS不一致时：<code>globalBs = maxBS * epWorldSize</code>，其中maxBS为业务配置的单rank BS容量上限，且不小于任意rank的实际BS；所有rank需传入相同且非0的globalBs。</li></td>
     <td>INT64</td>
     <td>-</td>
     <td>-</td>
@@ -418,7 +418,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     <td>1D Tensor。</td>
     <td>INT32</td>
     <td>-</td>
-    <td><code>(moeExpertNum + 2 * globalBS * K * serverNum,)</code></td>
+    <td><code>(moeExpertNum + 2 * globalBs * K * serverNum,)</code></td>
     <td>√</td>
     </tr>
     <tr>
@@ -477,7 +477,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     - moeExpertNum依commAlg取值，"fullmesh"支持(0, 1024]，"hierarchy"支持(0, 512]。
     - groupTp当前版本不支持，传空字符串即可。
     - tpWorldSize、tpRankId、expertShardType、sharedExpertNum、sharedExpertRankNum当前版本不支持，传0即可。
-    - epRecvCountsOut的shape为(moeExpertNum + 2 \* globalBS \* K \* serverNum,)（前moeExpertNum个为接收token数，剩余为通信前reduce相关信息）。
+    - epRecvCountsOut的shape为(moeExpertNum + 2 \* globalBs \* K \* serverNum,)（前moeExpertNum个为接收token数，剩余为通信前reduce相关信息）。
     - 当前不支持TP域通信。
     - expandScalesOut要求为1D Tensor，shape为(A,)。
     - quantMode支持0（非量化）、2（动态量化）。
@@ -494,7 +494,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     <summary><term>Atlas A3系列产品</term>  ：</summary>
 
     - dynamicScalesOut仅quantMode取值为2时有输出。
-    - commAlg支持""，"fullmesh_v1"，"fullmesh_v2", "hierarchy"三种输入方式。""：默认值，不开启fullmesh_v2模板；"fullmesh_v1"：不开启fullmesh_v2模板；"fullmesh_v2"：开启fullmesh_v2模板；"hierarchy": 开启跨超模板，该模板支持各rank BS不一致，仅支持tpWorldSize为1、共享专家为0的场景，且不支持二维mask、特殊专家、performanceInfo场景。可变BS场景需为所有rank配置相同且非0的globalBS容量，并且不传xActiveMaskOptional。
+    - commAlg支持""，"fullmesh_v1"，"fullmesh_v2", "hierarchy"三种输入方式。""：默认值，不开启fullmesh_v2模板；"fullmesh_v1"：不开启fullmesh_v2模板；"fullmesh_v2"：开启fullmesh_v2模板；"hierarchy": 开启跨超模板，该模板支持各rank BS不一致，仅支持tpWorldSize为1、共享专家为0的场景，且不支持二维mask、特殊专家、performanceInfo场景。可变BS场景需为所有rank配置相同且非0的globalBs容量，并且不传xActiveMaskOptional。
     - xActiveMaskOptional要求为1D或2D Tensor（1D时shape为(BS, )，2D时shape为(BS, K)）；1D时true需排在false前，2D时token对应K个值全为false则不参与通信。
     - expertScalesOptional当commAlg="hierarchy"场景时，要求为2D Tensor，shape为(BS, K)；当commAlg=""、"fullmesh_v1"、"fullmesh_v2"场景时，`传空指针即可。
     - epWorldSize取值范围[2, 768]；当commAlg="hierarchy"场景时，取值范围为[16, 256]，且为16的整数倍。
@@ -644,7 +644,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
 
 - **参数一致性约束**：
 
-  - 所有卡的`groupEp`、`epWorldSize`、`moeExpertNum`、`groupTp`、`tpWorldSize`、`expertShardType`、`sharedExpertNum`、`sharedExpertRankNum`、`globalBS`、`commAlg`参数及`HCCL_BUFFSIZE`取值需保持一致，且与CombineV4系列算子对应参数一致。
+  - 所有卡的`groupEp`、`epWorldSize`、`moeExpertNum`、`groupTp`、`tpWorldSize`、`expertShardType`、`sharedExpertNum`、`sharedExpertRankNum`、`globalBs`、`commAlg`参数及`HCCL_BUFFSIZE`取值需保持一致，且与CombineV4系列算子对应参数一致。
 
 - **产品特定约束**：
 
@@ -657,7 +657,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
 
   | 变量         | 定义与取值范围                                                                 |
   | :----------- | :----------------------------------------------------------------------------- |
-  | A            | 表示本卡需要分发的最大token数量，取值范围如下：<ul> <li>对于共享专家，要满足A = BS \* epWorldSize \* sharedExpertNum / sharedExpertRankNum。</li><li>对于MoE专家，当globalBS为0时，要满足A >= BS \* epWorldSize \* min(localExpertNum, K)；当globalBS非0时，要满足A >= globalBS \* min(localExpertNum, K)。</li></ul>|
+  | A            | 表示本卡需要分发的最大token数量，取值范围如下：<ul> <li>对于共享专家，要满足A = BS \* epWorldSize \* sharedExpertNum / sharedExpertRankNum。</li><li>对于MoE专家，当globalBs为0时，要满足A >= BS \* epWorldSize \* min(localExpertNum, K)；当globalBs非0时，要满足A >= globalBs \* min(localExpertNum, K)。</li></ul>|
   | H（hidden size） | 表示hidden size隐藏层大小。<ul><li><term>Atlas A2系列产品</term>：当`x`的数据类型为INT32时，取值范围为(0, 5120]且为32的整数倍；其他数据类型的取值范围为(0, 10240]且为32的整数倍。</li> <li><term>Atlas A3系列产品</term>  ：依commAlg取值，当commAlg="hierarchy"时，H取值范围为[1024, 7168]，且为32的整数倍；其余场景下取值范围[1024, 8192]。</li><li><term>Ascend 950DT系列产品</term>：取值范围[1024, 8192]。</li></ul> |
   | BS           | 表示本卡最终输出token数。<ul><li><term>Atlas A2系列产品</term>：依commAlg取值，"fullmesh"取值范围为(0 < BS ≤ 256)；"hierarchy"并且驱动版本≥25.0.RC1.1时取值范围为(0 < BS ≤ 512)；</li><li><term>Atlas A3训练系列产品/Atlas A3推理系列产品</term>  ：依commAlg取值，"fullmesh_v2"和"hierarchy"取值范围为(0 < BS ≤ 256)，"fullmesh_v1"和""取值范围为(0 < BS ≤ 512)。</li><li><term>Ascend 950DT系列产品</term>：0 < BS ≤ 512。</li></ul> |
   | K    | 表示选取topK个专家，取值范围为0 < K ≤16，且<code>0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>。<br> <term>Atlas A3系列产品</term>、Ascend 950DT系列产品：当commAlg为"fullmesh_v2"时，取值范围为0 < K ≤ 12。|
@@ -901,7 +901,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
             int64_t sharedExpertRankNum = 0;
             int64_t moeExpertNum = 256;
             int64_t quantMode = 0;
-            int64_t globalBS = BS * EP_WORLD_SIZE_A2;
+            int64_t globalBs = BS * EP_WORLD_SIZE_A2;
             int64_t expertTokenNumsType = 1;
             int64_t outDtype = 0;
             int64_t commQuantMode = 0;
@@ -914,10 +914,10 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
             std::string commAlg = "fullmesh";
             if (args.epRankId < sharedExpertRankNum) {
                 localExpertNum = 1;
-                A = globalBS / sharedExpertRankNum;
+                A = globalBs / sharedExpertRankNum;
             } else {
                 localExpertNum = moeExpertNum / (EP_WORLD_SIZE_A2 - sharedExpertRankNum);
-                A = globalBS * (localExpertNum < K ? localExpertNum : K);
+                A = globalBs * (localExpertNum < K ? localExpertNum : K);
             }
 
             void *xDeviceAddr = nullptr;
@@ -1080,7 +1080,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
             // 调用第一阶段接口
             ret = aclnnMoeDistributeDispatchV4GetWorkspaceSize(x, expertIds, (quantMode > 0 ? scales : nullptr), xActiveMask,
                     expertScales, elasticInfo, performanceInfo, hcomEpName, EP_WORLD_SIZE_A2, args.epRankId, moeExpertNum, "", 0,
-                    0, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode, globalBS,
+                    0, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode, globalBs,
                     expertTokenNumsType, commAlg.c_str(), zeroExpertNum, copyExpertNum, constExpertNum, expandX, dynamicScales, assistInfoForCombine, expertTokenNums, epRecvCounts,
                     tpRecvCounts, expandScales, &dispatchWorkspaceSize, &dispatchExecutor);
 
@@ -1110,7 +1110,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
                                                                 elasticInfo, oriX, constExpertAlpha1, constExpertAlpha2, constExpertV, performanceInfo,
                                                                 hcomEpName, EP_WORLD_SIZE_A2, args.epRankId, moeExpertNum,
                                                                 "", 0, 0, expertShardType,
-                                                                sharedExpertNum, sharedExpertRankNum, globalBS, outDtype,
+                                                                sharedExpertNum, sharedExpertRankNum, globalBs, outDtype,
                                                                 commQuantMode, groupList_type, commAlg.c_str(), zeroExpertNum, copyExpertNum, constExpertNum, xOut,
                                                                 &combineWorkspaceSize, &combineExecutor);
             CHECK_RET(ret == ACL_SUCCESS,
@@ -1333,7 +1333,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
         int64_t sharedExpertRankNum = 1;
         int64_t moeExpertNum = 7;
         int64_t quantMode = 0;
-        int64_t globalBS = BS * EP_WORLD_SIZE;
+        int64_t globalBs = BS * EP_WORLD_SIZE;
         int64_t expertTokenNumsType = 1;
         int64_t outDtype = 0;
         int64_t commQuantMode = 0;
@@ -1345,10 +1345,10 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
         int64_t constExpertNum = 1;
         if (args.epRankId < sharedExpertRankNum) {
             localExpertNum = 1;
-            A = globalBS / sharedExpertRankNum;
+            A = globalBs / sharedExpertRankNum;
         } else {
             localExpertNum = moeExpertNum / (EP_WORLD_SIZE - sharedExpertRankNum);
-            A = globalBS * (localExpertNum < K ? localExpertNum : K);
+            A = globalBs * (localExpertNum < K ? localExpertNum : K);
         }
 
         void *xDeviceAddr = nullptr;
@@ -1529,7 +1529,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
         ret = aclnnMoeDistributeDispatchV4GetWorkspaceSize(x, expertIds, (quantMode > 0 ? scales : nullptr), nullptr,
                 expertScales, elasticInfo, nullptr,// performanceInfoOptional
                 hcomEpName, EP_WORLD_SIZE, args.epRankId, moeExpertNum, "", 0,
-                0, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode, globalBS,
+                0, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode, globalBs,
                 expertTokenNumsType, nullptr, zeroExpertNum, copyExpertNum, constExpertNum, expandX, dynamicScales, expandIdx, expertTokenNums, epRecvCounts,
                 tpRecvCounts, expandScales, &dispatchWorkspaceSize, &dispatchExecutor);
 
@@ -1559,7 +1559,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
                                                             nullptr,// performanceInfoOptional
                                                             hcomEpName, EP_WORLD_SIZE, args.epRankId, moeExpertNum,
                                                             "", 0, 0, expertShardType,
-                                                            sharedExpertNum, sharedExpertRankNum, globalBS, outDtype,
+                                                            sharedExpertNum, sharedExpertRankNum, globalBs, outDtype,
                                                             commQuantMode, groupList_type, nullptr, zeroExpertNum, copyExpertNum, constExpertNum, xOut,
                                                             &combineWorkspaceSize, &combineExecutor);
         CHECK_RET(ret == ACL_SUCCESS,

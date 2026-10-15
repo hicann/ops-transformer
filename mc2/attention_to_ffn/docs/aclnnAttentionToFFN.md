@@ -37,8 +37,8 @@ aclnnStatus aclnnAttentionToFFNGetWorkspaceSize(
     const aclTensor    *layerId,
     const aclTensor    *expertIds,
     const aclTensor    *expertRankTable,
-    const aclTensor    *scalesOptional,
-    const aclTensor    *activeMaskOptional,
+    const aclTensor    *scales,
+    const aclTensor    *activeMask,
     const char         *group,
     int64_t             worldSize,
     const aclIntArray  *ffnTokenInfoTableShape,
@@ -147,7 +147,7 @@ aclnnStatus aclnnAttentionToFFN(
         <td>√</td>
       </tr>
       <tr>
-        <td>scalesOptional</td>
+        <td>scales</td>
         <td>输入</td>
         <td>每个专家的量化平滑参数。</td>
         <td>非量化场景下必须传空指针，动态量化可传有效数据或空指针，shape为(L, moeExpertNum + sharedExpertNum, H)。</td>
@@ -157,7 +157,7 @@ aclnnStatus aclnnAttentionToFFN(
         <td>√</td>
       </tr>
       <tr>
-        <td>activeMaskOptional</td>
+        <td>activeMask</td>
         <td>输入</td>
         <td>表示token是否参与通信，可传有效数据或空指针。</td>
         <td>传空指针时，默认所有token参与通信；传值时，shape为(X, Bs)，true表示该token参与通信，且true需排在false前。</td>

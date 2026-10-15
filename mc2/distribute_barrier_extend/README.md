@@ -52,14 +52,14 @@
    <td>ND</td>
   </tr>
   <tr>
-   <td>timeOutOptional</td>
+   <td>timeOut</td>
    <td>输入</td>
    <td>超时时间设置，如果在此时间内无响应，则认为超时。</td>
    <td>INT32</td>
    <td>ND</td>
   </tr>
   <tr>
-   <td>elasticInfoOptional</td>
+   <td>elasticInfo</td>
    <td>输入</td>
    <td>EP通信域动态缩容信息：<br><term>Atlas A2系列产品</term>：不支持，传空指针；<br><term>Atlas A3系列产品</term>：1D Tensor（shape <code>4 + 2 * epWorldSize,</code>），INT32类型，前4位为缩容配置，后2*epWorldSize为rank映射表。</td>
    <td>INT32</td>
@@ -81,7 +81,7 @@
   </tr>
  </tbody></table>
 
-  - <term>Ascend 950PR&950DT系列产品</term>：timeOutOptional参数里的超时时间单位为us，建议配置5000000us，根据实际环境不同超时时间下限可能不同。
+  - <term>Ascend 950PR&950DT系列产品</term>：timeOut参数里的超时时间单位为us，建议配置5000000us，根据实际环境不同超时时间下限可能不同。
 
 ## 约束说明
 

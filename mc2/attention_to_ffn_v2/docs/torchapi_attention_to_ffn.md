@@ -317,7 +317,7 @@ attention_to_ffn(buffer, x, session_id, micro_batch_id, layer_id, expert_ids, ex
         <td>sync_flag</td>
         <td>int</td>
         <td>可选</td>
-        <td>同步模式。0表示异步，1表示同步。默认值为0。</td>
+        <td>同步模式。0表示同步，1表示异步。默认值为0。</td>
         <td>int</td>
         <td>-</td>
         <td>-</td>

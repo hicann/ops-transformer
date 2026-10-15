@@ -71,14 +71,14 @@
     <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
-    <td style="white-space: nowrap">scalesOptional</td>
+    <td style="white-space: nowrap">scales</td>
     <td style="white-space: nowrap">输入</td>
     <td style="white-space: nowrap">可选参数，表示每个专家的量化平滑参数，3D Tensor，shape为 <code>(L, moeExpertNum + sharedExpertNum, H)。</code></td>
     <td style="white-space: nowrap">FLOAT32</td>
     <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
-    <td style="white-space: nowrap">activeMaskOptional</td>
+    <td style="white-space: nowrap">activeMask</td>
     <td style="white-space: nowrap">输入</td>
     <td style="white-space: nowrap">可选参数，表示token是否参与通信，可传有效数据或空指针，2D Tensor，shape为 <code>(X, Bs)。</code></td>
     <td style="white-space: nowrap">BOOL</td>

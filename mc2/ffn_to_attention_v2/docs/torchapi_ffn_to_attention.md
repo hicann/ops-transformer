@@ -272,7 +272,7 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{recvIn
     - `attnRankNum`：表示Attention Worker数量，取值范围为0 < `attnRankNum` < `worldSize`。
     - `ffnRankNum`：表示FFN Worker数量，取值范围为0 < `ffnRankNum` < `worldSize`。
     - `sharedExpertNum`：表示共享专家数量，取值范围为0 ≤ `sharedExpertNum` ≤ 4。
-    - `worldSize`：通信域大小，取值区间[2, 768]。
+    - `worldSize`：通信域大小，取值区间[2, 1024]。
 
 - 通信域使用约束：
     - ffn_to_attention算子的通信域中不允许有其他算子。

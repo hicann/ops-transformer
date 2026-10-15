@@ -37,7 +37,7 @@ aclnnStatus aclnnFFNToAttentionGetWorkspaceSize(
     const aclTensor   *tokenIds,
     const aclTensor   *expertOffsets,
     const aclTensor   *actualTokenNum,
-    const aclTensor   *attnRankTableOptional,
+    const aclTensor   *attnRankTable,
     const char        *group,
     int64_t            worldSize,
     const aclIntArray *tokenInfoTableShape,
@@ -142,7 +142,7 @@ aclnnStatus aclnnFFNToAttention(
       <td>√</td>
     </tr>
     <tr>
-      <td>attnRankTableOptional</td>
+      <td>attnRankTable</td>
       <td>可选输入</td>
       <td>映射每一个Attention Worker对应的卡Id。</td>
       <td>Attention Worker必须从0卡开始连续部署；若传空指针，采用默认策略：每张卡的Id作为对应Attention Worker的Id，取值区间为[0, attnRankNum-1]。</td>

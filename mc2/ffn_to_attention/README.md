@@ -71,7 +71,7 @@
     <td>ND</td>
     </tr>
     <tr>
-    <td>attnRankTableOptional</td>
+    <td>attnRankTable</td>
     <td>可选输入</td>
     <td>映射每一个Attention Worker对应的卡Id。
     <br>Attention Worker必须从0卡开始连续部署；
