@@ -143,7 +143,7 @@
 - 确定性计算：aclnnKdaInputProj 默认为确定性实现。
 - shape 约束
   - $T$、$K$、$N_{qkv}$、$N_{beta}$、$N_{gate}$、$N_{g}$ 均大于 0。
-  - 各权重矩阵的 K 维必须与 `x` 的 K 维一致。
+  - 各权重矩阵的 K 维必须与 `x` 的 K 维一致，K 维当前只支持32倍数。
   - `weightQkv`、`weightBeta`、`weightGate`、`weightG`、`weightQkvScale` 仅支持转置非连续。
 - 数据类型约束
   - `x`、`weightBeta`、`weightGate`、`weightG`、`gateOut`、`gOut`、`qkvOut`：BF16。

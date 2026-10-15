@@ -311,7 +311,7 @@ aclnnStatus aclnnKdaInputProj(
   - aclnnKdaInputProj默认确定性实现。
 - shape字段含义及约束
     - T：token个数，取值范围大于0。
-    - K：隐藏层大小，取值范围大于0。
+    - K：隐藏层大小，取值范围大于0, 当前只支持32倍数。
     - N_qkv / N_beta / N_gate / N_g：各路投影输出特征数，取值范围大于0。
 - 数据类型约束
     - x、weightBeta、weightGate、weightG、gateOut、gOut、qkvOut：BF16。
