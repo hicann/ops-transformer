@@ -95,8 +95,9 @@ constexpr uint32_t BATCH_SCHEDULE_MODE = 1;
 namespace optiling {
 
 constexpr uint32_t BASIC_BLOCK_SIZE = 128;
-// 三槽软流水：单槽 = 「FP32 S/dP tile + 低精度 P/dS tile」成对预留（128*128*2 元素）；
-// 每核槽数 = 3（Scatter 延后 2 拍 + 预取 1 拍），须与 kernel 侧 WORKSPACE_SOFTPIPE_SLOT_NUM 一致。
+
+constexpr int64_t ARC22_METADATA_MIN_ELEMS = 198;
+
 constexpr uint32_t WORKSPACE_BLOCK_SIZE = 128 * 128 * 2;
 constexpr uint32_t WORKSPACE_BLOCK_NUM = 3;
 constexpr uint32_t Q_AGGREGATE_M = 128;                     // Cube 单次计算允许的最大聚合 Q 行数
@@ -113,11 +114,6 @@ static inline uint32_t CeilDiv(uint32_t n1, uint32_t n2)
     return (n2 != 0) ? ((n1 + n2 - 1) / n2) : n1;
 }
 
-// 可选 aclTensor 的 shape-only presence 归一化：op_api 对「未传入」的可选输入会分配空的
-// 占位 tensor（AllocTensor 无 shape，dim_num==0 的标量），GetOptionalInputTensor 仍返回
-// 非 null，且标量 GetShapeSize()==1（空乘积）。因此不能用 GetShapeSize() 判定 presence，
-// 这里按仓库通行口径（causal_conv1d / grouped_matmul / moe_finalize_routing）用 rank 判定：
-// dim_num==0 或 [0] 视为缺省。绝不读 device 数据值。
 static inline const gert::Tensor* NormalizeOptionalTensor(const gert::Tensor* tensor)
 {
     if (tensor == nullptr) {
@@ -255,7 +251,6 @@ ge::graphStatus GBSAGTiling::ProcessTND(gert::TilingContext* context)
     useUniformQSeqlen_ = false;
     useUniformKvSeqlen_ = false;
 
-    // 迭代 2 不在主算子 Host 侧读取动态长度 tensor 的值。最大物理维度只
     // 用于静态 workspace/stride 规划，动态调度和实际长度由 metadata/K_OUT 消费。
     const auto* idxShape = context->GetInputShape(ToIndex(InputId::RsvdBlockIdx));
     maxQSeqlen_ = static_cast<uint32_t>(idxShape->GetOriginShape().GetDim(3));
@@ -289,22 +284,15 @@ ge::graphStatus GBSAGTiling::ProcessBNSD(gert::TilingContext* context)
         OP_LOGE(context->GetNodeName(), "cuSeqLengths are only valid for TND");
         return ge::GRAPH_FAILED;
     }
-    auto usedQ = NormalizeOptionalTensor(context->GetOptionalInputTensor(ToIndex(InputId::ActualSeqLengths)));
-    auto usedKv = NormalizeOptionalTensor(context->GetOptionalInputTensor(ToIndex(InputId::ActualSeqLengthsKv)));
-    useUniformQSeqlen_ = usedQ == nullptr;
-    useUniformKvSeqlen_ = usedKv == nullptr;
-    if (!useUniformQSeqlen_) {
-        if (usedQ->GetShapeSize() != batch_) {
-            OP_LOGE(context->GetNodeName(), "sequsedQ must contain one value per batch for BNSD");
-            return ge::GRAPH_FAILED;
-        }
+    // seqused 仅 TND 生效：BNSD 为定长布局，长度一律取物理 S 维，不再读取 seqused。
+    const auto* usedQ = NormalizeOptionalTensor(context->GetOptionalInputTensor(ToIndex(InputId::ActualSeqLengths)));
+    const auto* usedKv = NormalizeOptionalTensor(context->GetOptionalInputTensor(ToIndex(InputId::ActualSeqLengthsKv)));
+    if (usedQ != nullptr || usedKv != nullptr) {
+        OP_LOGW(context->GetNodeName(),
+                "sequsedQ/sequsedKv only take effect for TND and are ignored for BNSD; must be nullptr.");
     }
-    if (!useUniformKvSeqlen_) {
-        if (usedKv->GetShapeSize() != batch_) {
-            OP_LOGE(context->GetNodeName(), "sequsedKv must contain one value per batch for BNSD");
-            return ge::GRAPH_FAILED;
-        }
-    }
+    useUniformQSeqlen_ = true;
+    useUniformKvSeqlen_ = true;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -326,22 +314,15 @@ ge::graphStatus GBSAGTiling::ProcessBSND(gert::TilingContext* context)
         OP_LOGE(context->GetNodeName(), "cuSeqLengths are only valid for TND");
         return ge::GRAPH_FAILED;
     }
-    auto usedQ = NormalizeOptionalTensor(context->GetOptionalInputTensor(ToIndex(InputId::ActualSeqLengths)));
-    auto usedKv = NormalizeOptionalTensor(context->GetOptionalInputTensor(ToIndex(InputId::ActualSeqLengthsKv)));
-    useUniformQSeqlen_ = usedQ == nullptr;
-    useUniformKvSeqlen_ = usedKv == nullptr;
-    if (!useUniformQSeqlen_) {
-        if (usedQ->GetShapeSize() != batch_) {
-            OP_LOGE(context->GetNodeName(), "sequsedQ must contain one value per batch for BSND");
-            return ge::GRAPH_FAILED;
-        }
+    // seqused 仅 TND 生效：BSND 为定长布局，长度一律取物理 S 维，不再读取 seqused。
+    const auto* usedQ = NormalizeOptionalTensor(context->GetOptionalInputTensor(ToIndex(InputId::ActualSeqLengths)));
+    const auto* usedKv = NormalizeOptionalTensor(context->GetOptionalInputTensor(ToIndex(InputId::ActualSeqLengthsKv)));
+    if (usedQ != nullptr || usedKv != nullptr) {
+        OP_LOGW(context->GetNodeName(),
+                "sequsedQ/sequsedKv only take effect for TND and are ignored for BSND; must be nullptr.");
     }
-    if (!useUniformKvSeqlen_) {
-        if (usedKv->GetShapeSize() != batch_) {
-            OP_LOGE(context->GetNodeName(), "sequsedKv must contain one value per batch for BSND");
-            return ge::GRAPH_FAILED;
-        }
-    }
+    useUniformQSeqlen_ = true;
+    useUniformKvSeqlen_ = true;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -361,15 +342,14 @@ ge::graphStatus GBSAGTiling::ProcessAttrs(gert::TilingContext* context)
     }
     blockShapeX_ = blockShapeArr->GetData()[0];
     blockShapeY_ = blockShapeArr->GetData()[1];
+
     if (blockShapeX_ != 1) {
-        OP_LOGW(context->GetNodeName(), "blockShapeX=%ld is unsupported; using 1", blockShapeX_);
-        blockShapeX_ = 1;
+        OP_LOGE(context->GetNodeName(), "only support block_shape[0] == 1, got %ld.", blockShapeX_);
+        return ge::GRAPH_FAILED;
     }
     if (blockShapeY_ < 128 || (blockShapeY_ % 64) != 0) {
-        int64_t normalizedY = std::max<int64_t>(128, blockShapeY_);
-        normalizedY = ((normalizedY + 63) / 64) * 64;
-        OP_LOGW(context->GetNodeName(), "blockShapeY=%ld is unsupported; using %ld", blockShapeY_, normalizedY);
-        blockShapeY_ = normalizedY;
+        OP_LOGE(context->GetNodeName(), "block_shape[1] must be >= 128 and 64-aligned, got %ld.", blockShapeY_);
+        return ge::GRAPH_FAILED;
     }
     if (layout_ == GsagInputLayout::TND) {
         const auto* countShape = context->GetInputShape(ToIndex(InputId::RsvdBlockCount));
@@ -391,15 +371,17 @@ ge::graphStatus GBSAGTiling::ProcessAttrs(gert::TilingContext* context)
         scaleValue_ = *context->GetAttrs()->GetAttrPointer<float>(ToIndex(AttrId::ScaleValue));
     }
 
+    // maskType 仅支持 1（CAUSAL）：缺失或非 1 直接拒绝。
     auto maskTypeAttr = context->GetAttrs()->GetAttrPointer<int64_t>(ToIndex(AttrId::MaskType));
     if (maskTypeAttr == nullptr) {
-        maskType_ = 0;
-    } else if (*maskTypeAttr == 0 || *maskTypeAttr == 1) {
-        maskType_ = static_cast<uint32_t>(*maskTypeAttr);
-    } else {
-        OP_LOGW(context->GetNodeName(), "maskType=%ld is unsupported; using 0", *maskTypeAttr);
-        maskType_ = 0;
+        OP_LOGE(context->GetNodeName(), "mask_type attr is missing.");
+        return ge::GRAPH_FAILED;
     }
+    if (*maskTypeAttr != 1) {
+        OP_LOGE(context->GetNodeName(), "only support mask_type == 1, got %ld.", *maskTypeAttr);
+        return ge::GRAPH_FAILED;
+    }
+    maskType_ = static_cast<uint32_t>(*maskTypeAttr);
 
     const auto* sparseLayout = context->GetAttrs()->GetAttrPointer<int64_t>(ToIndex(AttrId::LayoutSparsePattern));
     const auto* residualMode = context->GetAttrs()->GetAttrPointer<int64_t>(ToIndex(AttrId::ResidualBlockMode));
@@ -498,6 +480,20 @@ ge::graphStatus GBSAGTiling::ProcessInput(gert::TilingContext* context)
         return ge::GRAPH_FAILED;
     }
 
+    // metadata 为必传输入；arch22 ABI 按最大核数固定预留，容量须 >= 198 个 int32。
+    const auto* metadataTensor = NormalizeOptionalTensor(context->GetOptionalInputTensor(ToIndex(InputId::Metadata)));
+    if (metadataTensor == nullptr) {
+        OP_LOGE(context->GetNodeName(), "metadata must be provided.");
+        return ge::GRAPH_FAILED;
+    }
+    const int64_t metadataElems = metadataTensor->GetShapeSize();
+    if (metadataElems < ARC22_METADATA_MIN_ELEMS) {
+        OP_LOGE(context->GetNodeName(),
+                "metadata must hold at least %ld int32 elements for arch22 (6 + 64 * 3), got %ld.",
+                ARC22_METADATA_MIN_ELEMS, metadataElems);
+        return ge::GRAPH_FAILED;
+    }
+
     if (layout_ == GsagInputLayout::TND) {
         if (ProcessTND(context) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
@@ -510,6 +506,16 @@ ge::graphStatus GBSAGTiling::ProcessInput(gert::TilingContext* context)
         if (ProcessBSND(context) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
+    }
+
+    // 稀疏张量的 batch/kv-head 维必须与 Q/K 对齐
+    const int64_t idxBatchNum = rsvdBlockIdxShape->GetOriginShape().GetDim(0);
+    const int64_t idxKvHeadNum = rsvdBlockIdxShape->GetOriginShape().GetDim(1);
+    if (idxBatchNum != static_cast<int64_t>(batch_) || idxKvHeadNum != static_cast<int64_t>(kvHeads_)) {
+        OP_LOGE(context->GetNodeName(),
+                "sparseBlockIdx [B, N2] = [%ld, %ld] mismatch with query/key [B, N2] = [%u, %u].", idxBatchNum,
+                idxKvHeadNum, batch_, kvHeads_);
+        return ge::GRAPH_FAILED;
     }
 
     return ProcessAttrs(context);

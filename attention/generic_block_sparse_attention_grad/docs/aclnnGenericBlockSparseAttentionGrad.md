@@ -6,10 +6,10 @@
 - <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2推理产品</term>：不支持
@@ -247,7 +247,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   <td>
                       <ul>
                           <li>必须传入。</li>
-                          <li>长度≥80+B×N1×J×4（int32元素个数）。</li>
+                          <li>长度≥max(80+B×N1×J×4, 198)（int32元素个数）。</li>
                       </ul>
                   </td>
                   <td>INT32</td>

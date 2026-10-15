@@ -164,8 +164,8 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch22::Prepare(CpuKernelCo
                    layoutQ_ == "BNSD" ? gbsag_meta::LAYOUT_BNSD :
                                         gbsag_meta::LAYOUT_BSND;
 
-    // 契约：TND 场景 cuSeq 必传（int64 前缀和数组，长度 b+1）；
-    // seqused 仅供 packed 布局（BNSD/BSND）作为可选长度来源。
+    // 契约：TND 场景 cuSeq 必传（int64 前缀和数组，长度 b+1）；seqused 仅 TND 生效，
+    // packed 布局（BNSD/BSND）传入时会被忽略。
     if (inputLayout_ == gbsag_meta::LAYOUT_TND && ((cuSeqQ_ == nullptr || cuSeqQ_->GetData() == nullptr) ||
                                                    (cuSeqKv_ == nullptr || cuSeqKv_->GetData() == nullptr))) {
         KERNEL_LOG_ERROR("TND layout requires both cuSeqQ and cuSeqKv inputs");
@@ -189,9 +189,12 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch22::Prepare(CpuKernelCo
     }
     blockShapeY_ = static_cast<uint32_t>(blockShapeYAttr);
 
-    // Build per-batch lengths. 长度来源语义见 QSeqLen/KvSeqLen：
-    //   TND 取 cuSeq 前缀和差分；BNSD/BSND 取 seqused（可选，缺省回退 attr 物理值，
-    //   保持物理 stride 语义，不能取实际最大值否则 stride 错位）。
+    //   seqused 仅 TND 生效，其他 布局传入时忽略并告警。
+    if (inputLayout_ != gbsag_meta::LAYOUT_TND && ((sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) ||
+                                                   (sequsedKv_ != nullptr && sequsedKv_->GetData() != nullptr))) {
+        KERNEL_LOG_WARN("sequsedQ/sequsedKv only take effect for TND and are ignored for packed layout; "
+                        "must be nullptr.");
+    }
     qSeqlen_.assign(batch_, 0);
     kvSeqlen_.assign(batch_, 0);
     for (uint32_t b = 0; b < batch_; ++b) {
@@ -204,15 +207,17 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch22::Prepare(CpuKernelCo
 
 uint32_t GenericBlockSparseAttentionGradMetadataCpuKernelArch22::QSeqLen(uint32_t b) const
 {
-    // TND 契约：cuSeq 必传（Prepare 已校验），长度取前缀和差分；
-    // packed 布局（BNSD/BSND）seqused 可选，缺省回退物理 max。
+    // TND：优先取 cuSeq 前缀和差分，cuSeq 缺失时才回退 seqused。
+    // packed 布局（BNSD/BSND）为定长，长度取物理 max；seqused 仅 TND 生效，此处不读取。
     if (inputLayout_ == gbsag_meta::LAYOUT_TND) {
-        const int64_t* cu = static_cast<const int64_t*>(cuSeqQ_->GetData());
-        return static_cast<uint32_t>(cu[b + 1] - cu[b]);
-    }
-    if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
-        const int32_t* used = static_cast<const int32_t*>(sequsedQ_->GetData());
-        return static_cast<uint32_t>(used[b]);
+        if (cuSeqQ_ != nullptr && cuSeqQ_->GetData() != nullptr) {
+            const int64_t* cu = static_cast<const int64_t*>(cuSeqQ_->GetData());
+            return static_cast<uint32_t>(cu[b + 1] - cu[b]);
+        }
+        if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
+            const int32_t* used = static_cast<const int32_t*>(sequsedQ_->GetData());
+            return static_cast<uint32_t>(used[b]);
+        }
     }
     return static_cast<uint32_t>(maxQSeqlenAttr_);
 }
@@ -220,12 +225,14 @@ uint32_t GenericBlockSparseAttentionGradMetadataCpuKernelArch22::QSeqLen(uint32_
 uint32_t GenericBlockSparseAttentionGradMetadataCpuKernelArch22::KvSeqLen(uint32_t b) const
 {
     if (inputLayout_ == gbsag_meta::LAYOUT_TND) {
-        const int64_t* cu = static_cast<const int64_t*>(cuSeqKv_->GetData());
-        return static_cast<uint32_t>(cu[b + 1] - cu[b]);
-    }
-    if (sequsedKv_ != nullptr && sequsedKv_->GetData() != nullptr) {
-        const int32_t* used = static_cast<const int32_t*>(sequsedKv_->GetData());
-        return static_cast<uint32_t>(used[b]);
+        if (cuSeqKv_ != nullptr && cuSeqKv_->GetData() != nullptr) {
+            const int64_t* cu = static_cast<const int64_t*>(cuSeqKv_->GetData());
+            return static_cast<uint32_t>(cu[b + 1] - cu[b]);
+        }
+        if (sequsedKv_ != nullptr && sequsedKv_->GetData() != nullptr) {
+            const int32_t* used = static_cast<const int32_t*>(sequsedKv_->GetData());
+            return static_cast<uint32_t>(used[b]);
+        }
     }
     return static_cast<uint32_t>(maxKvSeqlenAttr_);
 }

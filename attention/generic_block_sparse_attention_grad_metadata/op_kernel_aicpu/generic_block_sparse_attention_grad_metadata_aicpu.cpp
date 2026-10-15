@@ -408,10 +408,8 @@ public:
             return KERNEL_STATUS_PARAM_INVALID;
         }
         if (socVersion.find("Ascend950") != std::string::npos) {
-            printf("Ascend950 Ascend950Ascend950 \n");
             return arch35Kernel_.Compute(ctx);
         }
-        printf("Ascend910b Ascend910b Ascend910b \n");
         return arch22Kernel_.Compute(ctx);
     }
 
