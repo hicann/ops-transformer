@@ -1245,6 +1245,11 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize(
                    DFX_OUT(out));
     auto checkInputRet = CheckInputParamsForWeightNzV2(x1, x2, antiquantScaleOptional, antiquantOffsetOptional);
     CHECK_RET(checkInputRet == ACLNN_SUCCESS, checkInputRet);
+    if (dtype != ACLNN_OUT_DTYPE_FLOAT32 && dtype != ACLNN_OUT_DTYPE_BF16) {
+        OP_LOGE_FOR_INVALID_VALUE("aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize", "dtype",
+                                  std::to_string(dtype), "0 or 2");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     auto viewShape = x2->GetViewShape();
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
