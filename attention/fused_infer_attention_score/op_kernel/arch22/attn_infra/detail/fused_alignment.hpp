@@ -18,7 +18,7 @@ namespace NpuArch::Detail::Alignment {
 template <uint32_t ALIGN, typename T>
 HOST_DEVICE constexpr T RoundUp(const T& val)
 {
-    static_assert(ALIGN != 0, "ALIGN must not be 0");
+    static_assert(ALIGN != 0, "ALIGN must not be 0.");
     return (val + ALIGN - 1) / ALIGN * ALIGN;
 }
 
@@ -34,7 +34,7 @@ HOST_DEVICE constexpr auto RoundUp(T const& val, U const& align)
 template <uint32_t ALIGN, typename T>
 HOST_DEVICE constexpr T RoundDown(const T val)
 {
-    static_assert(ALIGN != 0U, "ALIGN must not be 0");
+    static_assert(ALIGN != 0U, "ALIGN must not be 0.");
     return val / ALIGN * ALIGN;
 }
 
@@ -50,7 +50,7 @@ HOST_DEVICE constexpr T RoundDown(const T val, const T align)
 template <uint32_t DIVISOR, typename T>
 HOST_DEVICE constexpr T CeilDiv(const T dividend)
 {
-    static_assert(DIVISOR != 0, "DIVISOR must not be 0");
+    static_assert(DIVISOR != 0, "DIVISOR must not be 0.");
     return (dividend + DIVISOR - 1) / DIVISOR;
 }
 

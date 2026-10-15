@@ -20,7 +20,7 @@ namespace NpuArch::Epilogue::Tile {
 
 template <class ArchTag, class GmType>
 struct CopyUb2Gm {
-    static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy ub to gm, can not find the specialization.");
+    static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy ub to gm, cannot find the specialization.");
 };
 
 template <typename Element>
@@ -64,7 +64,7 @@ struct CopyUb2Gm<Arch::AtlasA2, Gemm::GemmType<Element, layout::VectorLayout>> {
 
 template <class ArchTag, class GmType>
 struct CopyUb2GmAligned {
-    static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy ub to gm aligned, can not find the specialization.");
+    static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy ub to gm aligned, cannot find the specialization.");
 };
 
 template <typename Element>

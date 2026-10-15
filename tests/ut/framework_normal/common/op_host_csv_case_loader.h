@@ -197,7 +197,9 @@ inline gert::Stride ParseStride(const std::string& strideStr, const gert::Storag
     if (strides.empty()) {
         return stride;
     }
-    for (size_t i = 0; i < strides.size() && i < gert::Stride::kMaxDimNum; i++) {
+    const size_t dimNum = std::min(strides.size(), static_cast<size_t>(gert::Stride::kMaxDimNum));
+    stride.SetDimNum(dimNum);
+    for (size_t i = 0; i < dimNum; i++) {
         stride.SetStride(i, strides[i]);
     }
     return stride;

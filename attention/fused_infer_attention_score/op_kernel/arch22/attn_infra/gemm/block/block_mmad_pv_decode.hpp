@@ -80,7 +80,7 @@ public:
     static constexpr uint32_t COORD_DIM2 = 2;
 
     // Check LayoutC
-    static_assert(std::is_same_v<LayoutC, layout::RowMajor>, "LayoutC only support RowMajor yet!");
+    static_assert(std::is_same_v<LayoutC, layout::RowMajor>, "LayoutC only supports RowMajor.");
 
     /// Construct
     __aicore__ inline BlockMmad() {}

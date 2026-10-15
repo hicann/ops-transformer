@@ -27,7 +27,7 @@ enum class ScaleGranularity {
 template <class ArchTag, class ElementSrc, class ElementDst,
           ScaleGranularity DEQUANT_GRANULARITY = ScaleGranularity::NO_QUANT>
 struct CopyL0CToGmQuantMode {
-    static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy l0c to gm, can not find the specialization.");
+    static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy l0c to gm, cannot find the specialization.");
 };
 
 // CopyL0CToGm cast fp32 to fp16
@@ -68,7 +68,7 @@ struct CopyL0CToGmQuantMode<NpuArch::Arch::AtlasA2, int32_t, half, ScaleGranular
 template <class ArchTag, class ElementAccumulator, class GmType,
           ScaleGranularity DEQUANT_GRANULARITY = ScaleGranularity::NO_QUANT, bool ReluEnable = false>
 struct CopyL0CToGm {
-    static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy l0c to gm, can not find the specialization.");
+    static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy l0c to gm, cannot find the specialization.");
 };
 
 template <class ElementAccumulator_, class ElementDst_, bool ReluEnable_>
@@ -144,7 +144,7 @@ template <class ArchTag, class TensorSrc, class TensorDst,
           ScaleGranularity DEQUANT_GRANULARITY = ScaleGranularity::NO_QUANT, bool ReluEnable = false,
           class Enable = void>
 struct CopyL0CToGmTla {
-    static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy l0c to gm, can not find the specialization.");
+    static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy l0c to gm, cannot find the specialization.");
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -17,7 +17,7 @@ namespace NpuArch::Epilogue::Block {
 
 template <class DispatchPolicy, class... Args>
 class BlockEpilogue {
-    static_assert(DEPENDENT_FALSE<DispatchPolicy>, "Could not find an epilogue specialization");
+    static_assert(DEPENDENT_FALSE<DispatchPolicy>, "Could not find an epilogue specialization.");
 };
 
 } // namespace NpuArch::Epilogue::Block

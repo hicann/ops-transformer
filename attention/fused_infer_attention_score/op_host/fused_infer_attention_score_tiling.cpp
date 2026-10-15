@@ -1012,21 +1012,20 @@ ge::graphStatus CheckFAISeqlenDataInTND(const gert::TilingContext* context, bool
         int64_t keyT = keyShape->GetStorageShape().GetDim(DIM_0);
         int64_t valueT = valueShape->GetStorageShape().GetDim(DIM_0);
 
-        OP_CHECK_IF(
-            queryT < lastSeqLen,
-            OPS_REPORT_VECTOR_INNER_ERR(
-                context->GetNodeName(),
-                "When layout is TND, queryT(%ld) shouldn't be less than the last element of actualSeqLengths(%ld)",
-                queryT, lastSeqLen),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(queryT < lastSeqLen,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        context->GetNodeName(), "query", std::to_string(queryT),
+                        "When input layout is TND, the dim0 of query should not be less than the last element of "
+                        "actual_sequence_lengths_q"),
+                    return ge::GRAPH_FAILED);
         if (!isPageAttention) {
             OP_CHECK_IF(
                 (keyT < lastSeqLenKV) || (valueT < lastSeqLenKV),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    context->GetNodeName(),
-                    "When layout is TND and PA not enabled, "
-                    "keyT(%ld) and valueT(%ld) shouldn't be less than the last element of actualSeqLengthsKv(%ld)",
-                    keyT, valueT, lastSeqLenKV),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    context->GetNodeName(), "key and value",
+                    ("dim0: " + std::to_string(keyT) + " and " + std::to_string(valueT)),
+                    "When input layout is TND and paged cache is not used, the dim0 of key and value should not be "
+                    "less than the last element of actual_sequence_lengths_kv"),
                 return ge::GRAPH_FAILED);
         }
     }
@@ -1051,18 +1050,18 @@ ge::graphStatus CheckSparseModeParams(const gert::TilingContext* context, int64_
             minKV = std::min(minKV, currKV);
         }
 
-        OP_CHECK_IF((preToken < 0) && (nextToken < 0),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        context->GetNodeName(),
-                        "preTokens and nextTokens cannot be negative numbers, preTokens = %ld, nextTokens = %ld.",
-                        preToken, nextToken),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            (preToken < 0) && (nextToken < 0),
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context->GetNodeName(), "pre_tokens and next_tokens",
+                                                   (std::to_string(preToken) + " and " + std::to_string(nextToken)),
+                                                   "pre_tokens and next_tokens cannot be negative numbers"),
+            return ge::GRAPH_FAILED);
 
         OP_CHECK_IF((nextToken * (-1)) > preToken,
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        context->GetNodeName(),
-                        "nexttoken line should be higher than pretoken line, preTokens = %ld, nextTokens = %ld.",
-                        preToken, nextToken),
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        context->GetNodeName(), "pre_tokens and next_tokens",
+                        (std::to_string(preToken) + " and " + std::to_string(nextToken)),
+                        "The absolute value of next_tokens must not be greater than pre_tokens"),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -1106,35 +1105,46 @@ ge::graphStatus CheckFAIIsTND(gert::TilingContext* context, bool isPageAttention
     auto kDimNum = keyShape->GetStorageShape().GetDimNum();
     auto vDimNum = valueShape->GetStorageShape().GetDimNum();
     OP_CHECK_IF(qDimNum != 3U,
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "When input layout is TND, Q must have three dims"),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "query", std::to_string(qDimNum),
+                                                         "When input layout is TND, query must have three dims"),
                 return ge::GRAPH_FAILED);
     if (!isPageAttention) {
-        OP_CHECK_IF(kDimNum != 3U || vDimNum != 3U,
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        context->GetNodeName(),
-                        "When input layout is TND and paged cache is not used, K and V must have three dims"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            kDimNum != 3U || vDimNum != 3U,
+            OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                context->GetNodeName(), "key and value", (std::to_string(kDimNum) + " and " + std::to_string(vDimNum)),
+                "When input layout is TND and paged cache is not used, key and value must have three dims"),
+            return ge::GRAPH_FAILED);
     } else if (kDimNum == 3U || vDimNum == 3U) {
-        OP_CHECK_IF(kDimNum != vDimNum,
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        context->GetNodeName(),
-                        "When input layout is TND and paged cache and kvnd is used, the K and V must have three dims"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            kDimNum != vDimNum,
+            OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                context->GetNodeName(), "key and value", (std::to_string(kDimNum) + " and " + std::to_string(vDimNum)),
+                "When input layout is TND and paged cache with kvnd layout is used, key and value must have "
+                "the same number of dims"),
+            return ge::GRAPH_FAILED);
     } else if (kDimNum == 4U || vDimNum == 4U) {
-        OP_CHECK_IF(kDimNum != vDimNum,
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        context->GetNodeName(),
-                        "When input layout is TND and paged cache and bnbd is used, the K and V must have four dims"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            kDimNum != vDimNum,
+            OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                context->GetNodeName(), "key and value", (std::to_string(kDimNum) + " and " + std::to_string(vDimNum)),
+                "When input layout is TND and paged cache with bnbd layout is used, key and value must have "
+                "the same number of dims"),
+            return ge::GRAPH_FAILED);
     } else if (kDimNum == 5U || vDimNum == 5U) {
-        OP_CHECK_IF(kDimNum != vDimNum,
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        context->GetNodeName(),
-                        "When input layout is TND and paged cache and kvnz is used, the K and V must have five dims"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            kDimNum != vDimNum,
+            OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                context->GetNodeName(), "key and value", (std::to_string(kDimNum) + " and " + std::to_string(vDimNum)),
+                "When input layout is TND and paged cache with kvnz layout is used, key and value must have "
+                "the same number of dims"),
+            return ge::GRAPH_FAILED);
         OP_CHECK_IF(keyShape->GetStorageShape().GetDim(DIM_1) != valueShape->GetStorageShape().GetDim(DIM_1),
-                    OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                                "When using BNBD layout, K and V must have same kvHeads."),
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        context->GetNodeName(), "key and value",
+                        ("dim1: " + std::to_string(keyShape->GetStorageShape().GetDim(DIM_1)) + " and " +
+                         std::to_string(valueShape->GetStorageShape().GetDim(DIM_1))),
+                        "When using the bnbd layout, key and value must have the same kvHeads"),
                     return ge::GRAPH_FAILED);
         if (CheckKVNzShape(context) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
@@ -1145,25 +1155,25 @@ ge::graphStatus CheckFAIIsTND(gert::TilingContext* context, bool isPageAttention
     const gert::Tensor* actSeqLenDataKV = context->GetOptionalInputTensor(ACTUAL_SEQ_KV_INDEX);
     int64_t actSeqLenDims = (actSeqLenData != nullptr) ? actSeqLenData->GetShapeSize() : 0;
     int64_t actSeqLenKVDims = (actSeqLenDataKV != nullptr) ? actSeqLenDataKV->GetShapeSize() : 0;
-    OP_CHECK_IF(
-        (actSeqLenData == nullptr),
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                    "When layout is TND, actualSequenceLengthQ is required, but now is nullptr!"),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        (actSeqLenDataKV == nullptr),
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                    "When layout is TND, actualSequenceLengthKV is required, but now is nullptr!"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((actSeqLenData == nullptr),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    context->GetNodeName(), "actual_sequence_lengths_q",
+                    "When input layout is TND, actual_sequence_lengths_q is required, but got nullptr"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF((actSeqLenDataKV == nullptr),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    context->GetNodeName(), "actual_sequence_lengths_kv",
+                    "When input layout is TND, actual_sequence_lengths_kv is required, but got nullptr"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF((actSeqLenDims == 0),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    context->GetNodeName(),
-                    "When layout is TND, actualSequenceLengthQ is required, but the number of element in it is 0!"),
+                OP_LOGE_FOR_INVALID_LISTSIZE_WITH_REASON(
+                    context->GetNodeName(), "actual_sequence_lengths_q", std::to_string(actSeqLenDims),
+                    "When input layout is TND, actual_sequence_lengths_q must contain at least one element"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF((actSeqLenKVDims == 0),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    context->GetNodeName(),
-                    "When layout is TND, actualSequenceLengthKV is required, but the number of element in it is 0!"),
+                OP_LOGE_FOR_INVALID_LISTSIZE_WITH_REASON(
+                    context->GetNodeName(), "actual_sequence_lengths_kv", std::to_string(actSeqLenKVDims),
+                    "When input layout is TND, actual_sequence_lengths_kv must contain at least one element"),
                 return ge::GRAPH_FAILED);
     if (CheckFAISeqlenDataInTND(context, isPageAttention, actSeqLenDims, actSeqLenKVDims) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -1180,13 +1190,18 @@ ge::graphStatus CheckFAIQKV(gert::TilingContext* context, bool isPageAttention)
     auto qDataType = context->GetInputDesc(QUERY_INDEX)->GetDataType();
     auto kDataType = context->GetInputDesc(KEY_INDEX)->GetDataType();
     auto vDataType = context->GetInputDesc(VALUE_INDEX)->GetDataType();
-    OP_CHECK_IF((qDataType != kDataType) || (qDataType != vDataType),
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "Input dtype of Q, K, and V must be consistent"),
-                return ge::GRAPH_FAILED);
     OP_CHECK_IF(
-        (qDataType != ge::DT_FLOAT16) && (qDataType != ge::DT_BF16),
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "Input dtype of Q, K, and V must be FLOAT16 or BFLOAT16"),
+        (qDataType != kDataType) || (qDataType != vDataType),
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context->GetNodeName(), "query, key and value",
+                                               (Ops::Base::ToString(qDataType) + ", " + Ops::Base::ToString(kDataType) +
+                                                " and " + Ops::Base::ToString(vDataType)),
+                                               "The input dtypes of query, key and value must be consistent"),
         return ge::GRAPH_FAILED);
+    OP_CHECK_IF((qDataType != ge::DT_FLOAT16) && (qDataType != ge::DT_BF16),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                    context->GetNodeName(), "query, key and value", Ops::Base::ToString(qDataType),
+                    "The input dtypes of query, key and value must be FLOAT16 or BFLOAT16"),
+                return ge::GRAPH_FAILED);
 
     int64_t validBatchOfK = 0;
     int64_t validBatchOfV = 0;
@@ -1203,8 +1218,10 @@ ge::graphStatus CheckFAIQKV(gert::TilingContext* context, bool isPageAttention)
         }
     }
     OP_CHECK_IF((validBatchOfK > 1) || (validBatchOfV > 1),
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                            "Split fuse scenario does not support incontinuous kv tensor list"),
+                OP_LOGE_FOR_INVALID_TENSORNUMS_WITH_REASON(
+                    context->GetNodeName(), "key and value",
+                    (std::to_string(validBatchOfK) + " and " + std::to_string(validBatchOfV)),
+                    "The split fuse scenario does not support incontinuous key/value tensor lists"),
                 return ge::GRAPH_FAILED);
 
     const std::string inputLayoutStr = std::string(context->GetAttrs()->GetAttrPointer<char>(ATTR_INPUT_LAYOUT_INDEX));
@@ -1227,32 +1244,39 @@ ge::graphStatus CheckFAILearnableSink(const gert::TilingContext* context)
     int32_t tempInnerPrecise = static_cast<int32_t>(*(attrs->GetAttrPointer<int64_t>(ATTR_INNER_PRECISE_INDEX)));
     int32_t sparseMode = static_cast<int32_t>(*(attrs->GetAttrPointer<int64_t>(ATTR_SPARSE_MODE_INDEX)));
 
-    OP_CHECK_IF(
-        (sinkDataType != qDataType),
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "Input dtype of Q and learnable sink must be consistent"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((sinkDataType != qDataType),
+                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                    context->GetNodeName(), "query and learnable_sink",
+                    (Ops::Base::ToString(qDataType) + " and " + Ops::Base::ToString(sinkDataType)),
+                    "The input dtypes of query and learnable_sink must be consistent"),
+                return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(((sinkDataType != ge::DT_FLOAT16) && (sinkDataType != ge::DT_BF16)),
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                            "Input dtype of learnable sink must be FLOAT16 or BFLOAT16"),
+                OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), "learnable_sink", Ops::Base::ToString(sinkDataType),
+                                          "FLOAT16 or BFLOAT16"),
                 return ge::GRAPH_FAILED);
 
     auto sinkDim = learnableSinkShape->GetStorageShape().GetDimNum();
-    OP_CHECK_IF(sinkDim != 1U,
-                OP_LOGE(context->GetNodeName(), "learnable_sink enable, sink shape dim(%u) must be 1!", sinkDim),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        sinkDim != 1U,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "learnable_sink", std::to_string(sinkDim),
+                                                 "When learnable_sink is enabled, its shape dim must be 1"),
+        return ge::GRAPH_FAILED);
 
     auto sinkDimValue = learnableSinkShape->GetStorageShape().GetDim(DIM_0);
     auto queryN = queryShape->GetStorageShape().GetDim(DIM_1);
     OP_CHECK_IF(sinkDimValue != queryN,
-                OP_LOGE(context->GetNodeName(), "learnable_sink enable, sink shape(%u) must be equal to queryN(%u)!",
-                        sinkDimValue, queryN),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context->GetNodeName(), "learnable_sink", std::to_string(sinkDimValue),
+                    "When learnable_sink is enabled, its shape dim0 must be equal to the queryN (" +
+                        std::to_string(queryN) + ")"),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF((tempInnerPrecise == 1 || tempInnerPrecise == 2 || tempInnerPrecise == 3),
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                            "When learnable sink is enabled, innerPrecise shall not be 1, 2 or 3"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (tempInnerPrecise == 1 || tempInnerPrecise == 2 || tempInnerPrecise == 3),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "inner_precise", std::to_string(tempInnerPrecise),
+                                              "When learnable_sink is enabled, inner_precise must not be 1, 2 or 3"),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1292,29 +1316,32 @@ ge::graphStatus CheckFAISinglePara(const gert::TilingContext* context, bool isPa
         }
         OP_CHECK_IF(
             inputBlockSize != cacheBlockSize,
-            OPS_REPORT_VECTOR_INNER_ERR(
-                context->GetNodeName(),
-                "When paged cache is used, the first dim of K and V must be consistent with input blockSize attr"),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                context->GetNodeName(), "block_size", std::to_string(inputBlockSize),
+                "When paged cache is used, the block_size attr must be consistent with the cache block size in the "
+                "key and value shapes"),
             return ge::GRAPH_FAILED);
-        OP_CHECK_IF(
-            (inputBlockSize % BLOCK_SIZE_ALIGN_16 != 0),
-            OPS_REPORT_VECTOR_INNER_ERR(
-                context->GetNodeName(),
-                "When input layout is TND and paged cache is used, the input blockSize must be a multiple of 16"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF((inputBlockSize % BLOCK_SIZE_ALIGN_16 != 0),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        context->GetNodeName(), "block_size", std::to_string(inputBlockSize),
+                        "When input layout is TND and paged cache is used, block_size must be a multiple of 16"),
+                    return ge::GRAPH_FAILED);
         OP_CHECK_IF((inputBlockSize > MAX_BLOCK_SIZE),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        context->GetNodeName(),
-                        "When input layout is TND and paged cache is used, the input blockSize must be less than 512"),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        context->GetNodeName(), "block_size", std::to_string(inputBlockSize),
+                        "When input layout is TND and paged cache is used, block_size must not exceed 512"),
                     return ge::GRAPH_FAILED);
     }
     OP_CHECK_IF((tempQD != tempKD) || (tempQD != tempVD),
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "HeadDim of Q, K, and V must be consistent"),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    context->GetNodeName(), "query, key and value",
+                    (std::to_string(tempQD) + ", " + std::to_string(tempKD) + " and " + std::to_string(tempVD)),
+                    "The head dims of query, key and value must be consistent"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        tempQD > 256U,
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "When input layout is TND, headDim shall not exceed 256"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(tempQD > 256U,
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context->GetNodeName(), "query", std::to_string(tempQD),
+                                                          "When input layout is TND, the head dim must not exceed 256"),
+                return ge::GRAPH_FAILED);
 
     if (isLearnableSinkFlag) {
         return CheckFAILearnableSink(context);
@@ -1331,11 +1358,11 @@ ge::graphStatus CheckFAIPseShift(gert::TilingContext* context)
         return ge::GRAPH_SUCCESS;
     }
     uint32_t pseShiftDimNum = pseShiftShape->GetStorageShape().GetDimNum();
-    OP_CHECK_IF(pseShiftDimNum != 4,
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                            "The input shape of pse shift must have 4 dims, current dim num is %u.",
-                                            pseShiftDimNum),
-                return GRAPH_FAILED);
+    OP_CHECK_IF(
+        pseShiftDimNum != 4,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "pse_shift", std::to_string(pseShiftDimNum),
+                                                 "The input shape of pse_shift must have 4 dims"),
+        return ge::GRAPH_FAILED);
     uint32_t pseShiftBatch = pseShiftShape->GetStorageShape().GetDim(PSE_SHIFT_B);
     uint32_t pseShiftN = pseShiftShape->GetStorageShape().GetDim(PSE_SHIFT_N);
     uint32_t pseShiftS1 = pseShiftShape->GetStorageShape().GetDim(PSE_SHIFT_S0);
@@ -1343,7 +1370,7 @@ ge::graphStatus CheckFAIPseShift(gert::TilingContext* context)
     auto numHeadsPtr = context->GetAttrs()->GetAttrPointer<int64_t>(ATTR_N_INDEX);
     auto actualQSeq = context->GetOptionalInputTensor(ACTUAL_SEQ_Q_INDEX);
     OP_CHECK_IF(numHeadsPtr == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "num_heads attr is nullptr"),
+                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "The num_heads attr is a nullptr"),
                 return ge::GRAPH_FAILED);
     uint32_t numHeads = static_cast<uint32_t>(*numHeadsPtr);
     uint32_t batchSize = (actualQSeq != nullptr) ? static_cast<uint32_t>(actualQSeq->GetShapeSize()) : 0;
@@ -1398,21 +1425,21 @@ ge::graphStatus CheckFAIMaskShape(const gert::TilingContext* context)
     while (dimCountDown > 0) {
         int64_t revOrderDim = tempAttnMaskShape->GetStorageShape().GetDim(dimCountDown - 1);
         if (maskDimNum - dimCountDown < EFFECTIVE_CAUSAL_DIMS) {
-            OP_CHECK_IF(revOrderDim != OPT_ATTEN_MASK_LEN,
-                        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                                    "In split fuse scenario, when sparseMode is 3, "
-                                                    "the input mask has %ld dims in total, "
-                                                    "maskDim %ld shall be 2048",
-                                                    maskDimNum, (dimCountDown - 1)),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                revOrderDim != OPT_ATTEN_MASK_LEN,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context->GetNodeName(), "atten_mask", std::to_string(revOrderDim),
+                    "In the split fuse scenario, when sparse_mode is 3, dim " + std::to_string(dimCountDown - 1) +
+                        " of atten_mask (total dims: " + std::to_string(maskDimNum) + ") must be 2048"),
+                return ge::GRAPH_FAILED);
         } else {
-            OP_CHECK_IF(revOrderDim != 1,
-                        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                                    "In split fuse scenario, when sparseMode is 3, "
-                                                    "the input mask has %ld dims in total, "
-                                                    "maskDim %ld shall be 1",
-                                                    maskDimNum, (dimCountDown - 1)),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                revOrderDim != 1,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context->GetNodeName(), "atten_mask", std::to_string(revOrderDim),
+                    "In the split fuse scenario, when sparse_mode is 3, dim " + std::to_string(dimCountDown - 1) +
+                        " of atten_mask (total dims: " + std::to_string(maskDimNum) + ") must be 1"),
+                return ge::GRAPH_FAILED);
         }
         dimCountDown--;
     }
@@ -1424,25 +1451,28 @@ ge::graphStatus CheckFAIMask(gert::TilingContext* context)
     auto tempAttnMaskShape = context->GetOptionalInputShape(ATTEN_MASK_INDEX);
     auto attrs = context->GetAttrs();
     int32_t sparseMode = static_cast<int32_t>(*(attrs->GetAttrPointer<int64_t>(ATTR_SPARSE_MODE_INDEX)));
-    OP_CHECK_IF(
-        (sparseMode != 0) && (sparseMode != 3) && (sparseMode != 4),
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "In split fuse scenario, sparseMode shall be 0 or 3 or 4"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((sparseMode != 0) && (sparseMode != 3) && (sparseMode != 4),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "sparse_mode", std::to_string(sparseMode),
+                                                      "In the split fuse scenario, sparse_mode must be 0, 3 or 4"),
+                return ge::GRAPH_FAILED);
     if (tempAttnMaskShape == nullptr) {
         OP_CHECK_IF(
             sparseMode != 0,
-            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "When attnMask is not provided, sparseMode must be 0"),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "sparse_mode", std::to_string(sparseMode),
+                                                  "When atten_mask is not provided, sparse_mode must be 0"),
             return ge::GRAPH_FAILED);
     } else {
         auto maskDimNum = tempAttnMaskShape->GetStorageShape().GetDimNum();
         OP_CHECK_IF(
             sparseMode != 3 && sparseMode != 4,
-            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "When attnMask is provided, sparseMode must be 3 or 4"),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "sparse_mode", std::to_string(sparseMode),
+                                                  "When atten_mask is provided, sparse_mode must be 3 or 4"),
             return ge::GRAPH_FAILED);
-        OP_CHECK_IF(maskDimNum != 2 && maskDimNum != 3 && maskDimNum != 4,
-                    OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                                "When attnMask is provided, it must have 2 or 3 or 4 dims"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            maskDimNum != 2 && maskDimNum != 3 && maskDimNum != 4,
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "atten_mask", std::to_string(maskDimNum),
+                                                     "When atten_mask is provided, it must have 2, 3 or 4 dims"),
+            return ge::GRAPH_FAILED);
         if (CheckFAIMaskShape(context) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
@@ -1456,21 +1486,23 @@ static ge::graphStatus CheckFAILseOutput(const gert::TilingContext* context)
     bool lseFlag = (softmaxLseFlagPtr != nullptr) ? *softmaxLseFlagPtr : false;
     auto lseShape = context->GetOutputShape(SOFTMAX_LSE_INDEX);
     auto queryShape = context->GetInputShape(QUERY_INDEX);
-    OP_CHECK_IF(
-        ((lseFlag != false) && (lseShape->GetStorageShape().GetDimNum() != 3U)),
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "When layout is TND, SoftmaxLse shape dim must be 3"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(((lseFlag != false) && (lseShape->GetStorageShape().GetDimNum() != 3U)),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    context->GetNodeName(), "softmax_lse", std::to_string(lseShape->GetStorageShape().GetDimNum()),
+                    "When input layout is TND, the shape of softmax_lse must have 3 dims"),
+                return ge::GRAPH_FAILED);
     auto t = queryShape->GetStorageShape().GetDim(DIM_0);
     auto n = queryShape->GetStorageShape().GetDim(DIM_1);
     auto lseDim0 = lseShape->GetStorageShape().GetDim(DIM_0);
     auto lseDim1 = lseShape->GetStorageShape().GetDim(DIM_1);
     auto lseDim2 = lseShape->GetStorageShape().GetDim(DIM_2);
-    OP_CHECK_IF((lseFlag != false) && ((lseDim0 != t) || (lseDim1 != n) || (lseDim2 != 1U)),
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                            "When layout is TND, SoftmaxLse shape must be [T, N, 1]."
-                                            "In this case it is [%ld, %ld, 1]",
-                                            t, n),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (lseFlag != false) && ((lseDim0 != t) || (lseDim1 != n) || (lseDim2 != 1U)),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context->GetNodeName(), "softmax_lse",
+            ("[" + std::to_string(lseDim0) + ", " + std::to_string(lseDim1) + ", " + std::to_string(lseDim2) + "]"),
+            "When input layout is TND, the shape of softmax_lse must be [T, N, 1]"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1523,7 +1555,7 @@ static void SetMaskTypeForFAI(gert::TilingContext* context, FAInferContext& faIn
     if (pseShift == nullptr) {
         faInfo.maskType = sparseMode == DIM_4 ? MaskType::SWA_MASK : static_cast<MaskType>(sparseMode == DIM_3);
     } else if (pseShift != nullptr && pseCheck != ge::GRAPH_SUCCESS) {
-        OP_LOGW(context->GetNodeName(), "Warning, make sure pseshift must be (B/1, N, S1, S2)");
+        OP_LOGW(context->GetNodeName(), "The shape of pse_shift must be (B/1, N, S1, S2)");
         faInfo.maskType = sparseMode == DIM_4 ? MaskType::SWA_MASK : static_cast<MaskType>(sparseMode == DIM_3);
     } else if (pseShift != nullptr && pseCheck == ge::GRAPH_SUCCESS) {
         faInfo.maskType = MaskType::FULL_MASK;
@@ -1778,7 +1810,7 @@ static ge::graphStatus TilingProcess4SplitFuse(gert::TilingContext* context)
                 return ge::GRAPH_FAILED);
     auto platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "PlatformInfoPtr is null"),
+                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "platformInfoPtr is null"),
                 return ge::GRAPH_FAILED);
     // 使用SyncAll，需要设置为batchmode模式，所有核同时启动，否则多流方式下执行可能会卡死
     constexpr uint32_t BATCH_MODE_SCHEDULE = 1;

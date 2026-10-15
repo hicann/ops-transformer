@@ -77,7 +77,7 @@ public:
     static constexpr uint32_t KV_BASE_BLOCK = 512;
     static constexpr uint32_t KV_SPLIT_SIZE = 128;
 
-    static_assert(std::is_same_v<LayoutC, layout::RowMajor>, "LayoutC only support RowMajor yet!");
+    static_assert(std::is_same_v<LayoutC, layout::RowMajor>, "LayoutC only supports RowMajor.");
 
     __aicore__ inline BlockMmad() {}
 
