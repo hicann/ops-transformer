@@ -50,11 +50,13 @@
     进入项目根目录，执行如下编译命令：
 
     ```bash
-    bash build.sh --pkg --soc=${soc_version} [--vendor_name=${vendor_name}] [--ops=${op_list}] [--opkernel_aicpu]
+    bash build.sh --pkg --soc=${soc_version} [--vendor_name=${vendor_name}] [--ops=${op_list}] [--opkernel_aicpu] [--kernel_template_input=${kernel_template_input}]
     # 以FlashAttentionScore算子编译为例
     # bash build.sh --pkg --soc=ascend910b --ops=flash_attention_score
     # 编译experimental贡献目录下的算子
     # bash build.sh --pkg --experimental --soc=ascend910b --ops=${experimental_op}
+    # 指定tilingKey模板，仅编译模板参数匹配的kernel变体（以add_example为例，仅编译float变体）
+    # bash build.sh --pkg --soc=ascend910b --ops=add_example --kernel_template_input="schMode=0"
     ```
 
     - --soc：\$\{soc\_version\}表示NPU型号。Atlas A2系列产品使用"ascend910b"（默认），Atlas A3系列产品使用"ascend910_93"，Ascend 950PR&950DT系列产品使用"ascend950"。
@@ -62,8 +64,17 @@
     - --ops（可选）：\$\{op\_list\}表示待编译算子，不指定时默认编译所有算子。格式形如"apply_rotary_pos_emb,rope_quant_kvcache,..."，多算子之间用英文逗号","分隔。
     - --experimental（可选）：表示编译experimental贡献目录下的算子，${experimental_op}为新贡献算子目录名。
     - --opkernel_aicpu（可选）：开启ENABLE_AICPU_KERNEL，编译kernel_aicpu。
+    - --kernel_template_input（可选）：\$\{kernel\_template\_input\}表示编译kernel时指定的tilingKey模板，仅编译模板参数匹配的kernel变体。格式形如"参数名=值"，多组参数之间用英文逗号","分隔，布尔类型参数取值为false/true；模板参数名及取值范围来源于算子op_kernel目录下`*_tiling_key.h`文件中`ASCENDC_TPL_ARGS_DECL`的声明，其中每个`ASCENDC_TPL_*_DECL`宏的第一个入参为参数名，`ASCENDC_TPL_SEL`中列出各参数的实例化取值。该选项必须与--ops同时使用，且此时--ops仅支持指定单个算子（不支持英文逗号","分隔的多算子），否则编译报错"--kernel_template_input must be used with --ops= and can only specify a single operator"；同时不会编译该算子所依赖的其他算子二进制文件。
 
     > **说明**：编译纯AI CPU算子（仅含op_kernel_aicpu目录的算子）时，必须添加--opkernel_aicpu选项，否则会报"OpFileNotExistsError: File aic-*-ops-info.ini does not exist"错误，详见下方FAQ章节。
+    >
+    > 默认全量编译会生成算子注册的所有tiling key kernel变体，变体数量较多时编译耗时较长。当只需要调试或验证特定模板组合时，可通过--kernel_template_input只编译匹配的变体，加速编译并减小包体积。以add_example为例，该算子在[add_example_tiling_key.h](../../../examples/add_example/op_kernel/add_example_tiling_key.h)中声明了模板参数schMode（0表示float，1表示int32），全量编译会生成2个变体，只编译float变体的命令如下：
+    >
+    > ```bash
+    > bash build.sh --pkg --soc=ascend910b --ops=add_example --kernel_template_input="schMode=0"
+    > ```
+    >
+    > 当算子声明多个模板参数时，可同时指定多组"参数名=值"，格式形如--kernel_template_input="X_LAYOUT=1,X_DTYPE=2,HAS_MASK=true"；只指定部分模板参数时，未指定的参数会按注册取值全组合展开。注意：裁剪后的算子包仅包含指定变体，运行其他模板组合的场景时会因缺少对应kernel二进制而报错，仅适用于对应场景的调试或验证。
 
     若\$\{vendor\_name\}和\$\{op\_list\}都不传入编译的是ops-transformer包；若编译所有算子的自定义算子包，需传入\$\{vendor\_name\}。当提示如下信息，说明编译成功。
 
