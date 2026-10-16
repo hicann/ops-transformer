@@ -117,16 +117,16 @@ class PytestV2TopKComparator:
         half = len(outputs) // 2
         npu_outputs = outputs[:half]
         golden_outputs = outputs[half:]
-        if tuple(getattr(npu_outputs[0], "shape", ())) != tuple(
-            getattr(golden_outputs[0], "shape", ())
-        ):
+        npu_indices = self.to_torch(npu_outputs[0])
+        golden_indices = self.to_torch(golden_outputs[0])
+        # Manual-data bin Goldens are flat streams; pytest restores the TopK rows.
+        if npu_indices.numel() != golden_indices.numel():
             return {
                 "pass": False,
-                "precision": "shape_mismatch",
+                "precision": "size_mismatch",
                 "error_info": (
-                    "index output shape mismatch: "
-                    f"npu={getattr(npu_outputs[0], 'shape', None)}, "
-                    f"golden={getattr(golden_outputs[0], 'shape', None)}"
+                    "index output element count mismatch: "
+                    f"npu={npu_indices.numel()}, golden={golden_indices.numel()}"
                 ),
             }
         return_value = bool(params[-2])
@@ -136,27 +136,20 @@ class PytestV2TopKComparator:
                 "precision": "missing_output",
                 "error_info": "return_value is enabled but the NPU sparse-value output is missing",
             }
-        npu_values = npu_outputs[1] if half > 1 else torch.empty(0)
-        golden_values = golden_outputs[1] if half > 1 else torch.empty(0)
-        if return_value and tuple(getattr(npu_values, "shape", ())) != tuple(
-            getattr(golden_values, "shape", ())
-        ):
+        npu_values = self.to_torch(npu_outputs[1]) if half > 1 else torch.empty(0)
+        golden_values = self.to_torch(golden_outputs[1]) if half > 1 else torch.empty(0)
+        if return_value and npu_values.numel() != golden_values.numel():
             return {
                 "pass": False,
-                "precision": "shape_mismatch",
+                "precision": "size_mismatch",
                 "error_info": (
-                    "sparse-value output shape mismatch: "
-                    f"npu={getattr(npu_values, 'shape', None)}, "
-                    f"golden={getattr(golden_values, 'shape', None)}"
+                    "sparse-value output element count mismatch: "
+                    f"npu={npu_values.numel()}, golden={golden_values.numel()}"
                 ),
             }
-        npu_indices = self.to_torch(npu_outputs[0])
-        npu_values = self.to_torch(npu_values)
-        golden_values = self.to_torch(golden_values)
         if return_value:
             npu_values, sort_order = npu_values.sort(dim=-1, descending=True)
             npu_indices = torch.gather(npu_indices, dim=-1, index=sort_order)
-        golden_indices = self.to_torch(golden_outputs[0])
         topk_value = self.to_torch(topk_value)
         output_idx_offset = self.to_torch(compare_data.get("output_idx_offset"))
         golden_values_for_index = golden_values.detach().cpu().float().numpy()
