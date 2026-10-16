@@ -292,6 +292,32 @@ def test_qkv_weight_scale(scale_kind):
     _check_all(x, weights, f"wscale={scale_kind}")
 
 
+def _make_weights_sized(k_size, n_qkv=32, n_beta=8, n_gate=16, n_g=16, seed=1234):
+    """任意 K。scale 的 K 轴按 Ceil(K/64) 取整，权重本身不补零。"""
+    torch.manual_seed(seed)
+    kg = (k_size + MX_SCALE_GROUP_K - 1) // MX_SCALE_GROUP_K
+    weight_qkv = (torch.randn(k_size, n_qkv) * 0.3).to(torch.float8_e4m3fn)
+    exp = torch.randint(120, 132, (kg, n_qkv, 2)).float()
+    weight_qkv_scale = torch.pow(2.0, exp - 127.0).to(torch.float8_e8m0fnu)
+    weight_beta = (torch.randn(k_size, n_beta) * 0.02).to(torch.bfloat16)
+    weight_gate = (torch.randn(k_size, n_gate) * 0.02).to(torch.bfloat16)
+    weight_g = (torch.randn(k_size, n_g) * 0.02).to(torch.bfloat16)
+    return weight_qkv, weight_qkv_scale, weight_beta, weight_gate, weight_g
+
+
+@pytest.mark.ci
+@pytest.mark.parametrize("t_size", [1, 4])
+@pytest.mark.parametrize(
+    "k_size", [1, 16, 31, 32, 33, 48, 63, 65, 96, 97, 127, 129, 256]
+)
+def test_arbitrary_k(t_size, k_size):
+    """K 不是 32 的倍数时，尾块在 UB/L1 内补零，对外仍是真实 K。T>1 覆盖奇数 block 的行间 stride。"""
+    weights = _make_weights_sized(k_size, seed=k_size * 17 + t_size)
+    torch.manual_seed(k_size * 3 + t_size)
+    x = torch.randn(t_size, k_size).to(torch.bfloat16)
+    _check_all(x, weights, f"T={t_size},K={k_size}")
+
+
 @pytest.mark.ci
 @pytest.mark.parametrize("dist", ["normal", "tiny", "huge", "mixed"])
 def test_input_distribution(dist):

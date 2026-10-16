@@ -359,23 +359,28 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::CopyIn(int64_t dim0LoopIdx
                                                              int64_t ubFactorColBlockNum, int64_t bufSlot)
 {
     int64_t scaleIsNotOdd = ubFactorColBlockNum % DIGIT_TWO;
+    // rightPad 把一行补到 32 元素边界；奇数个 32-block 再补到偶数，VF 按整块读。
+    int64_t padRightNumTmp = (ubFactorColNum % 32 > 16) ? (32 - ubFactorColNum % 32) : 16;
+    int64_t padRightNum = (ubFactorColNum % 32 == 0) ? 0 : padRightNumTmp;
+    const bool needZero = (padRightNum != 0) || (scaleIsNotOdd != 0);
 
     WaitFlag<HardEvent::MTE3_MTE2>(EvtMte3Mte2(bufSlot));
 
-    if (scaleIsNotOdd != 0) {
-        // 补零必须先于本次 MTE2 搬入完成，Set/Wait 成对出现，不跨迭代残留
+    if (needZero) {
+        // 补零必须先于本次 MTE2 搬入完成，Set/Wait 成对出现，不跨迭代残留。
+        // 奇数 block 的行间空隙和不满 32 的尾块都靠这块 0，不能只清奇数 block。
         Duplicate<DtypeX>(xLocal_[bufSlot], static_cast<DtypeX>(0), maxUbBlockNum_ * blockSize_);
         SetFlag<HardEvent::V_MTE2>(EvtMte2V(bufSlot));
         WaitFlag<HardEvent::V_MTE2>(EvtMte2V(bufSlot));
     }
 
-    int64_t padRightNumTmp = (ubFactorColNum % 32 > 16) ? (32 - ubFactorColNum % 32) : 16;
-    int64_t padRightNum = (ubFactorColNum % 32 == 0) ? 0 : padRightNumTmp;
     int64_t offset = dim0LoopIdx * ubFactorRowNormalBlockNum_ * colNum_ + dim1LoopIdx * ubFactorColNormalBlockLen_;
     const bool contiguous = (ubFactorColNum == colNum_) && (padRightNum == 0) && (scaleIsNotOdd == 0);
     if (contiguous) {
         DataCopy(xLocal_[bufSlot], xGm_[offset], static_cast<uint32_t>(ubFactorRowNum * ubFactorColNum));
     } else {
+        // dstStride 单位是 32 字节。奇数个 32-block 时填 sizeof(bf16)=2，即再跳 64 字节（32 个 bf16），
+        // 和 rightPad 一起把一行补成偶数个 block。按字节填 64 会让同一核的后续行错位。
         DataCopyExtParams copyInParam = {
             static_cast<uint16_t>(ubFactorRowNum), static_cast<uint32_t>(ubFactorColNum * sizeof(DtypeX)),
             static_cast<uint32_t>((colNum_ - ubFactorColNum) * sizeof(DtypeX)),
@@ -393,11 +398,13 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::CopyOut(int64_t dim0LoopId
                                                               int64_t ubFactorColBlockNum, int64_t bufSlot)
 {
     int64_t scaleIsNotOdd = ubFactorColBlockNum % DIGIT_TWO;
+    // srcStride 单位同样是 32 字节。fp8 一行一个 block 是 32 字节，奇数 block 时 srcStride=1。
+    const bool tightRow = (ubFactorColNum % blockSize_ == 0) && (scaleIsNotOdd == 0);
 
     WaitFlag<HardEvent::V_MTE3>(EvtVMte3(bufSlot));
 
     int64_t offset = dim0LoopIdx * ubFactorRowNormalBlockNum_ * colNum_ + dim1LoopIdx * ubFactorColNormalBlockLen_;
-    if ((ubFactorColNum == colNum_) && (scaleIsNotOdd == 0)) {
+    if ((ubFactorColNum == colNum_) && tightRow) {
         DataCopy(yGm_[offset], yLocal_[bufSlot], static_cast<uint32_t>(ubFactorRowNum * ubFactorColNum));
     } else {
         DataCopyExtParams copyOutParamY = {

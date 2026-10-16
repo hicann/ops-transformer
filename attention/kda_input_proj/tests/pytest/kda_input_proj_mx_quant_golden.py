@@ -56,7 +56,8 @@ def mx_quant_golden(x: torch.Tensor, block_size: int = MX_BLOCK_SIZE):
     """把 bf16 的 ``x[T, K]`` 量化成 mxfp8_e4m3fn。
 
     Args:
-        x: bfloat16 张量，shape ``[T, K]``，K 必须是 ``block_size`` 的整数倍。
+        x: bfloat16 张量，shape ``[T, K]``。K 不是 ``block_size`` 的整数倍时，
+           尾块用 0 补满后再取最大指数，输出仍裁回 K 列。
         block_size: MX 量化块大小，kernel 固定为 32。
 
     Returns:
@@ -69,11 +70,13 @@ def mx_quant_golden(x: torch.Tensor, block_size: int = MX_BLOCK_SIZE):
     if x.dim() != 2:
         raise ValueError(f"x must be 2D [T, K], got {tuple(x.shape)}")
     t_size, k_size = x.shape
-    if k_size % block_size != 0:
-        raise ValueError(f"K={k_size} must be a multiple of block_size={block_size}")
-    num_block = k_size // block_size
+    if k_size <= 0:
+        raise ValueError(f"K={k_size} must be positive")
+    pad = (block_size - k_size % block_size) % block_size
+    x_work = torch.nn.functional.pad(x, (0, pad)) if pad else x
+    num_block = x_work.shape[1] // block_size
 
-    bits = _as_bf16_bits(x).reshape(t_size, num_block, block_size)
+    bits = _as_bf16_bits(x_work).reshape(t_size, num_block, block_size)
 
     # 1) 块内最大指数域
     max_exp = (bits & BF16_EXP_MASK).max(axis=-1).astype(np.uint16)
@@ -96,7 +99,7 @@ def mx_quant_golden(x: torch.Tensor, block_size: int = MX_BLOCK_SIZE):
 
     # 5) bf16 乘法 -> float -> fp8_e4m3fn（RNE + 饱和）
     recip = _bits_to_bf16(recip_bits).reshape(t_size, num_block, 1)
-    scaled = (x.reshape(t_size, num_block, block_size).float() * recip.float()).to(
+    scaled = (x_work.reshape(t_size, num_block, block_size).float() * recip.float()).to(
         torch.bfloat16
     )
     scaled_f32 = scaled.float()
@@ -106,7 +109,9 @@ def mx_quant_golden(x: torch.Tensor, block_size: int = MX_BLOCK_SIZE):
         finite, scaled_f32.clamp(-FP8_E4M3_MAX, FP8_E4M3_MAX), scaled_f32
     )
     quant_x = (
-        scaled_f32.to(torch.float8_e4m3fn).view(torch.uint8).reshape(t_size, k_size)
+        scaled_f32.to(torch.float8_e4m3fn)
+        .view(torch.uint8)
+        .reshape(t_size, -1)[:, :k_size]
     )
 
     # scale 按 pack-2 约定排布：奇数块补零列
@@ -125,10 +130,12 @@ def dequant_mx(
 ) -> torch.Tensor:
     """把 ``(quant_x, x_scale)`` 反量化回 float32，用于端到端 matmul 参考。"""
     t_size, k_size = quant_x.shape
-    num_block = k_size // block_size
+    pad = (block_size - k_size % block_size) % block_size
+    num_block = (k_size + pad) // block_size
+    padded = torch.nn.functional.pad(quant_x, (0, pad)) if pad else quant_x
     elems = (
-        quant_x.view(torch.float8_e4m3fn).float().reshape(t_size, num_block, block_size)
+        padded.view(torch.float8_e4m3fn).float().reshape(t_size, num_block, block_size)
     )
     scale_byte = x_scale.reshape(t_size, -1)[:, :num_block].to(torch.int32)
     scale = torch.pow(2.0, (scale_byte - 127).float()).reshape(t_size, num_block, 1)
-    return (elems * scale).reshape(t_size, k_size)
+    return (elems * scale).reshape(t_size, -1)[:, :k_size]

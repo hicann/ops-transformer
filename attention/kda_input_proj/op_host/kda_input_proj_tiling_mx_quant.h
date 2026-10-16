@@ -90,16 +90,13 @@ public:
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(totalCoreNum <= 0L, OP_LOGE(opName, "MxQuant got aivNum=%ld.", totalCoreNum),
                     return ge::GRAPH_FAILED);
-        // kernel 的 CopyIn/CopyOut 按 32 元素块搬运，量化轴必须整块划分
-        OP_CHECK_IF(colNum % MX_BLOCK_SIZE != 0L,
-                    OP_LOGE(opName, "MxQuant requires hiddenSize=%ld to be a multiple of %ld.", colNum, MX_BLOCK_SIZE),
-                    return ge::GRAPH_FAILED);
 
         int64_t maxUbBlockNum = 0L;
         OP_CHECK_IF(CalcMaxUbBlockNum(ubSize, maxUbBlockNum) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName, "MxQuant failed to fit UB, ubSize=%ld.", ubSize), return ge::GRAPH_FAILED);
 
-        const int64_t colBlocks = colNum / MX_BLOCK_SIZE;
+        // 尾块不满 32 时仍占一个 block，UB 里补零后再量化，不能用整除丢掉。
+        const int64_t colBlocks = CeilDiv(colNum, MX_BLOCK_SIZE);
         // 一行能进 UB 时只按行切核，列方向连续搬。T=8 每核 1 行；T=128 大约 43 核、每核 3 行
         if (colBlocks > 0L && colBlocks <= maxUbBlockNum) {
             const int64_t rowNormalBlockNum = CeilDiv(rowNum, std::min(rowNum, totalCoreNum));

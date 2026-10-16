@@ -130,7 +130,8 @@ private:
         const uint64_t nAlign = transWeight_ ? CUBE_BLOCK : L1_ALIGN_SIZE;
         const uint64_t kAlign = MXFP_DIVISOR_SIZE;
 
-        // 保持 256 级基本块。T=8、N=4608 时 nCnt=18
+        // 保持 256 级基本块。T=8、N=4608 时 nCnt=18。
+        // baseK 对齐的是 L0 tile，允许大于真实 K；Blaze 最后一块会裁回 K 再在 L1 补零。
         baseM = Ops::Base::CeilAlign(std::min(m_, BASIC_BLOCK_256), mAlign);
         baseN = Ops::Base::CeilAlign(std::min(n_, BASIC_BLOCK_256), nAlign);
         baseK = Ops::Base::CeilAlign(std::min(k_, BASIC_BLOCK_128), kAlign);
@@ -239,8 +240,24 @@ private:
         return CalcUsedL1Size(est, l1BufferNum) <= l1Size_;
     }
 
+    // K 不是 64 的倍数时，不用 halfK 裁剪：那个切点会落在 MX group 中间。
+    // 窗口要么盖住 CeilAlign(K, kL1)，要么严格按 kL1 的倍数下降。K 为 64 倍数时保持原逻辑。
     uint64_t GetHalfKFallbackScaleKL1(uint64_t kL1, uint64_t scaleKL1) const
     {
+        if (kL1 == 0UL) {
+            return scaleKL1;
+        }
+        if (k_ % MXFP_DIVISOR_SIZE != 0UL) {
+            const uint64_t fullCover = Ops::Base::CeilAlign(k_, kL1);
+            uint64_t window = Ops::Base::FloorAlign(scaleKL1, kL1);
+            if (window < kL1) {
+                window = kL1;
+            }
+            if (scaleKL1 >= fullCover && window < fullCover) {
+                window = fullCover;
+            }
+            return window;
+        }
         if (scaleKL1 % ESTIMATED_SCALE_K == 0UL) {
             return scaleKL1;
         }
@@ -326,11 +343,16 @@ private:
 
         if (!found) {
             const uint64_t stepK = std::min(stepKa, stepKb);
+            // baseK 已是 64 的倍数，K < 128 时这一窗可以大于真实 K。
             const uint64_t fallbackKL1 = stepK * baseK;
             best = L1Estimate{fallbackKL1, GetHalfKFallbackScaleKL1(fallbackKL1, initScaleKL1), baseM, baseN};
             bestBuf = L1_TWO_BUFFER;
         }
         ApplyMultiBuffer(best, bestBuf, kL1, scaleKL1, nBufferNum);
+        // GetFullCover 在窗口已经不小于全 K 时会原样返回；非对齐 K 再收一次倍数约束。
+        if (k_ % MXFP_DIVISOR_SIZE != 0UL && kL1 != 0UL && scaleKL1 % kL1 != 0UL) {
+            scaleKL1 = GetHalfKFallbackScaleKL1(kL1, scaleKL1);
+        }
     }
 
     uint8_t CalcDbL0C(uint64_t baseM, uint64_t baseN) const

@@ -518,11 +518,25 @@ TEST_F(KdaInputProjTilingTest, tiling_fail_t_zero)
     ExecuteTestCase(BuildPara(cfg), ge::GRAPH_FAILED);
 }
 
-TEST_F(KdaInputProjTilingTest, tiling_fail_hidden_not_multiple_of_32)
+TEST_F(KdaInputProjTilingTest, tiling_success_hidden_not_multiple_of_32)
 {
-    ShapeCfg cfg;
-    cfg.k = 48;
-    ExecuteTestCase(BuildPara(cfg), ge::GRAPH_FAILED);
+    // K 不必是 32/64 的倍数。baseK、kL1 仍是 64 的倍数，scaleKL1 是 kL1 的倍数。
+    const int64_t kList[] = {1, 16, 31, 32, 33, 48, 63, 64, 65, 96, 97, 127, 128, 129};
+    for (int64_t k : kList) {
+        ShapeCfg cfg;
+        cfg.k = k;
+        TilingInfo info;
+        ASSERT_TRUE(RunSuccess(cfg, info)) << "k=" << k;
+        CheckCommon(info, cfg);
+        const auto* td = AsTilingData(info);
+        EXPECT_EQ(td->mxQuantParams.colNum, k) << "k=" << k;
+        EXPECT_GT(td->mxQuantParams.colTailLen, 0) << "k=" << k;
+        EXPECT_EQ(td->qmmQkvParams.baseK % 64U, 0U) << "k=" << k;
+        EXPECT_EQ(td->qmmQkvParams.kL1 % 64U, 0U) << "k=" << k;
+        ASSERT_GT(td->qmmQkvParams.kL1, 0U);
+        EXPECT_EQ(td->qmmQkvParams.scaleKL1 % td->qmmQkvParams.kL1, 0U) << "k=" << k;
+        EXPECT_GE(td->qmmQkvParams.scaleKL1, td->qmmQkvParams.kL1) << "k=" << k;
+    }
 }
 
 TEST_F(KdaInputProjTilingTest, tiling_fail_scale_layout_mismatch)
