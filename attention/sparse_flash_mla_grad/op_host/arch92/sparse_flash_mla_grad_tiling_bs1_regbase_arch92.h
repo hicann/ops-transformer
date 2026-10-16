@@ -9,15 +9,15 @@
  */
 
 /*!
- * \file sparse_flash_mla_grad_tiling_bs1_regbase.h
+ * \file sparse_flash_mla_grad_tiling_bs1_regbase_arch92.h
  * \brief
  */
 
 #pragma once
 
 #include "../sparse_flash_mla_grad_tiling_common.h"
-#include "../../op_kernel/arch92/sparse_flash_mla_grad_tiling_data_regbase.h"
-#include "../../op_kernel/arch92/sparse_flash_mla_grad_template_tiling_key.h"
+#include "../../op_kernel/arch92/sparse_flash_mla_grad_tiling_data_regbase_arch92.h"
+#include "../../op_kernel/arch92/sparse_flash_mla_grad_template_tiling_key_arch92.h"
 #include "op_host/tiling_templates_registry.h"
 #include "op_host/tiling_type.h"
 

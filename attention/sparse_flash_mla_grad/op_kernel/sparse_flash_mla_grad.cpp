@@ -18,9 +18,9 @@
 #include "arch35/sparse_flash_mla_grad_tiling_data_regbase.h"
 #include "arch35/sparse_flash_mla_grad_entry_regbase.h"
 #elif (defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)))
-#include "arch92/sparse_flash_mla_grad_template_tiling_key.h"
-#include "arch92/sparse_flash_mla_grad_tiling_data_regbase.h"
-#include "arch92/sparse_flash_mla_grad_entry_regbase.h"
+#include "arch92/sparse_flash_mla_grad_template_tiling_key_arch92.h"
+#include "arch92/sparse_flash_mla_grad_tiling_data_regbase_arch92.h"
+#include "arch92/sparse_flash_mla_grad_entry_regbase_arch92.h"
 #else
 #include "lib/matmul_intf.h"
 #include "sparse_flash_mla_grad_template_tiling_key.h"

@@ -38,12 +38,12 @@ using namespace Slig;
         op.Process(); \
     } while (0)
 #elif (defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)))
-#include "arch92/sparse_lightning_indexer_kl_loss_grad_regbase_common.h"
-#include "arch92/sparse_lightning_indexer_kl_loss_grad_tiling_regbase.h"
-#include "arch92/sparse_lightning_indexer_kl_loss_grad_template_tiling_key_regbase.h"
-#include "arch92/sparse_lightning_indexer_kl_loss_grad_vector_block.h"
-#include "arch92/sparse_lightning_indexer_kl_loss_grad_cube_block.h"
-#include "arch92/sparse_lightning_indexer_kl_loss_grad_kernel_base.h"
+#include "arch92/sparse_lightning_indexer_kl_loss_grad_regbase_common_arch92.h"
+#include "arch92/sparse_lightning_indexer_kl_loss_grad_tiling_regbase_arch92.h"
+#include "arch92/sparse_lightning_indexer_kl_loss_grad_template_tiling_key_regbase_arch92.h"
+#include "arch92/sparse_lightning_indexer_kl_loss_grad_vector_block_arch92.h"
+#include "arch92/sparse_lightning_indexer_kl_loss_grad_cube_block_arch92.h"
+#include "arch92/sparse_lightning_indexer_kl_loss_grad_kernel_base_arch92.h"
 using namespace Slig;
 #define SLI_OP_IMPL(templateClass, tilingdataClass, ...) \
     do { \
