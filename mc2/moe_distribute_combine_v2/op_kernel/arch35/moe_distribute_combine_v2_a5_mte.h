@@ -44,6 +44,8 @@ constexpr uint32_t SPLIT_BLOCK_SIZE = 512U;
 constexpr uint32_t SPLIT_BLOCK_DATA_SIZE = 480U;
 constexpr uint32_t SPLIT_BLOCK_FLAG_SIZE = 32U;
 constexpr uint32_t SPLIT_BLOCK_FLAG_COUNT = SPLIT_BLOCK_FLAG_SIZE / sizeof(float);
+constexpr uint32_t SEND_GROUP_RANK_NUM = 4U;
+constexpr uint32_t MAX_INDEX_COPY_BLOCK_COUNT = 16U;
 
 using namespace AscendC;
 template <A5MteCombineTypeClass>
@@ -59,6 +61,7 @@ public:
     __aicore__ inline void Process();
 
 private:
+    __aicore__ inline uint32_t GetSendGroupOffset(uint32_t roundId, uint32_t sendRoundNum);
     __aicore__ inline void InitInputAndOutput(GM_ADDR residualX, GM_ADDR gamma, GM_ADDR expandX, GM_ADDR expertIds,
                                               GM_ADDR expandIdx, GM_ADDR epSendCount, GM_ADDR expertScales,
                                               GM_ADDR xActiveMask, GM_ADDR sharedExpertX, GM_ADDR elasticInfo,
@@ -80,7 +83,11 @@ private:
     __aicore__ inline void ExpertAlltoAllDispatchSendToken(uint32_t bufferIndex);
     __aicore__ inline void ExpertAlltoAllDispatchFinishSend();
     __aicore__ inline uint32_t ExpertAlltoAllDispatchBatchCopyAdd(uint32_t tokenOffset, uint32_t currentTokenNum,
-                                                                  uint32_t batchId);
+                                                                  uint32_t batchId, uint32_t sendRoundNum,
+                                                                  uint32_t targetGroup);
+    __aicore__ inline void ExpertAlltoAllDispatchGroupCopyAdd(uint32_t batchTokenNum, uint32_t sendRoundNum);
+    __aicore__ inline uint32_t GetDispatchTokenIndex(uint32_t localIndex);
+    __aicore__ inline void CopyDispatchIndices(uint32_t tokenOffset, uint32_t tokenCount);
     __aicore__ inline void ExpertAlltoAllDispatchCopyAdd();
     __aicore__ inline void ProcessConstantExpert(uint32_t tokenIndex, uint32_t const_expert_idx, float scaleVal);
     __aicore__ inline void AddConstantExpert(uint32_t tokenIndex, uint32_t const_expert_idx, float scaleVal,
@@ -213,6 +220,7 @@ private:
     uint32_t globalBS_{0};
     __gm__ Mc2Kernel::HcclOpParam* epWinContext_{nullptr};
     uint32_t bsKNum_{0};
+    uint32_t indexRecordStride_{EXPAND_IDX_INFO};
     uint32_t startTokenId_{0};
     uint32_t sendCntNum_{0};
     uint32_t dispatchTokenCount_{0};
@@ -287,6 +295,7 @@ private:
     bool isShareExpertRankFlag_ = false;
     bool enableSpecialExpert_ = false;
     bool isMc2Context_ = false;
+    bool enableGroupSend_ = false;
 
     // int8量化
     TBuf<> xAbsBuf_;
@@ -431,9 +440,11 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::InitCo
 {
     uint32_t epRankIdHccl{0};
     uint32_t epWorldSizeHccl{0};
+    // 仅V3从context读取分组开关
     if (isMc2Context_) {
         // Using Mc2Context instead of hccl context
         mc2Context_ = (__gm__ Mc2MoeContext*)mc2Context;
+        enableGroupSend_ = mc2Context_->enableGroupSend;
         epRankIdHccl = mc2Context_->epRankId;
         epWorldSizeHccl = tilingData->moeDistributeCombineV2Info.epWorldSize;
         statusDataSpaceGm_ = (GM_ADDR)(mc2Context_->epHcclBuffer_[epRankIdHccl]);
@@ -499,6 +510,10 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::InitAt
         quantInst_.QuantInit(scaleNum, hExpandXAlign32Size_, hExpandXAlignSize_, scaleNumAlignSize_,
                              hFloatAlign256Size_, tokenScaleCnt_, axisH_);
         commDataBytes_ = tokenScaleCnt_ * sizeof(ExpandXType);
+        if constexpr ((QuantMode == MXFP8_E5M2_COMM_QUANT) || (QuantMode == MXFP8_E4M3_COMM_QUANT)) {
+            // E8M0每个scale只传1字节，量化UB仍保留原有补齐空间
+            commDataBytes_ = Align256<uint32_t>(axisH_) + scaleNum * sizeof(fp8_e8m0_t);
+        }
     }
     blockCntPerToken_ = Ceil(commDataBytes_, SPLIT_BLOCK_DATA_SIZE);
     hAlignWinSize_ = blockCntPerToken_ * SPLIT_BLOCK_SIZE;
@@ -622,12 +637,17 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::Dispat
     uint64_t reservedUbSize = perDispatchBufBytes + UB_ALIGN;
     uint64_t remainUbSize = (ubSize_ > fixedUbSize + reservedUbSize) ? (ubSize_ - fixedUbSize - reservedUbSize) : 0U;
     remainUbSize = remainUbSize / UB_ALIGN * UB_ALIGN;
-    uint32_t tokenBufSize = EXPAND_IDX_INFO * sizeof(ExpandIdxType);
+    if (enableGroupSend_ && (epWorldSizeOriginal_ > SEND_GROUP_RANK_NUM) &&
+        (epWorldSizeOriginal_ % SEND_GROUP_RANK_NUM == 0U)) {
+        // 分散搬入的三元组在UB中按32字节对齐
+        indexRecordStride_ = UB_ALIGN / sizeof(ExpandIdxType);
+    }
+    uint32_t tokenBufSize = indexRecordStride_ * sizeof(ExpandIdxType);
     maxTokenNumInUB_ = MIN(sendCntNum_, static_cast<uint32_t>(remainUbSize / tokenBufSize));
     if (maxTokenNumInUB_ == 0U) {
         maxTokenNumInUB_ = 1U;
     }
-    uint32_t indexCountsBufSize = Ceil(maxTokenNumInUB_ * EXPAND_IDX_INFO * sizeof(int32_t), UB_ALIGN) * UB_ALIGN;
+    uint32_t indexCountsBufSize = Ceil(maxTokenNumInUB_ * tokenBufSize, UB_ALIGN) * UB_ALIGN;
     tpipe_->InitBuffer(indexCountsBuf_, indexCountsBufSize);
 
     tpipe_->InitBuffer(calEndBuf_, UB_ALIGN);
@@ -782,8 +802,79 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::SetWai
 }
 
 template <A5MteCombineTypeClass>
+__aicore__ inline uint32_t MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::GetSendGroupOffset(uint32_t roundId,
+                                                                                                 uint32_t sendRoundNum)
+{
+    // 本组发送放在中间轮次
+    const uint32_t localRound = sendRoundNum / 2U;
+    if (roundId < localRound) {
+        return roundId + 1U;
+    }
+    if (roundId == localRound) {
+        return 0U;
+    }
+    return roundId;
+}
+
+template <A5MteCombineTypeClass>
+__aicore__ inline uint32_t MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::GetDispatchTokenIndex(uint32_t localIndex)
+{
+    if (!enableGroupSend_ || (epWorldSizeOriginal_ <= SEND_GROUP_RANK_NUM) ||
+        (epWorldSizeOriginal_ % SEND_GROUP_RANK_NUM != 0U)) {
+        return startTokenId_ + localIndex;
+    }
+    const uint32_t blockBegin = localIndex * sendAivNum_;
+    const uint32_t remainingRoutes = selfSendCnt_ - blockBegin;
+    const bool isTailBlock = remainingRoutes < sendAivNum_;
+    const uint32_t blockSize = isTailBlock ? remainingRoutes : sendAivNum_;
+    return blockBegin + (coreIdx_ + localIndex) % blockSize;
+}
+
+template <A5MteCombineTypeClass>
+__aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::CopyDispatchIndices(uint32_t tokenOffset,
+                                                                                              uint32_t tokenCount)
+{
+    LocalTensor<ExpandIdxType> expandIdxLocal = indexCountsBuf_.Get<ExpandIdxType>();
+    const uint32_t indexBytes = EXPAND_IDX_INFO * sizeof(ExpandIdxType);
+    const DataCopyPadExtParams<ExpandIdxType> padParams{false, 0U, 0U, 0};
+    if (!enableGroupSend_ || (epWorldSizeOriginal_ <= SEND_GROUP_RANK_NUM) ||
+        (epWorldSizeOriginal_ % SEND_GROUP_RANK_NUM != 0U)) {
+        const DataCopyExtParams copyParams{1U, tokenCount * indexBytes, 0U, 0U, 0U};
+        DataCopyPad(expandIdxLocal, expandIdxGM_[(startTokenId_ + tokenOffset) * EXPAND_IDX_INFO], copyParams,
+                    padParams);
+        return;
+    }
+    const uint32_t fullBlockCount = selfSendCnt_ / sendAivNum_;
+    uint32_t copiedCount = 0U;
+    while (copiedCount < tokenCount) {
+        const uint32_t localIndex = tokenOffset + copiedCount;
+        const uint32_t globalIndex = GetDispatchTokenIndex(localIndex);
+        uint32_t copyCount = 1U;
+        if (localIndex < fullBlockCount) {
+            const uint32_t lane = (coreIdx_ + localIndex) % sendAivNum_;
+            copyCount = tokenCount - copiedCount;
+            if (copyCount > fullBlockCount - localIndex) {
+                copyCount = fullBlockCount - localIndex;
+            }
+            if (copyCount > sendAivNum_ - lane) {
+                copyCount = sendAivNum_ - lane;
+            }
+            if (copyCount > MAX_INDEX_COPY_BLOCK_COUNT) {
+                copyCount = MAX_INDEX_COPY_BLOCK_COUNT;
+            }
+        }
+        // 轮转位置回绕及尾块处拆段，其余索引批量搬入
+        const DataCopyExtParams copyParams{static_cast<uint16_t>(copyCount), indexBytes, sendAivNum_ * indexBytes, 0U,
+                                           0U};
+        DataCopyPad(expandIdxLocal[copiedCount * indexRecordStride_], expandIdxGM_[globalIndex * EXPAND_IDX_INFO],
+                    copyParams, padParams);
+        copiedCount += copyCount;
+    }
+}
+
+template <A5MteCombineTypeClass>
 __aicore__ inline uint32_t MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::ExpertAlltoAllDispatchBatchCopyAdd(
-    uint32_t tokenOffset, uint32_t currentTokenNum, uint32_t batchId)
+    uint32_t tokenOffset, uint32_t currentTokenNum, uint32_t batchId, uint32_t sendRoundNum, uint32_t targetGroup)
 {
     LocalTensor<ExpandIdxType> expandIdxLocal = indexCountsBuf_.Get<ExpandIdxType>();
     uint32_t batchBegin = batchId * recvAivNum_;
@@ -798,7 +889,7 @@ __aicore__ inline uint32_t MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::Ex
     }
     uint32_t localIdx = ((epRankId_ * currentTokenNum) / epWorldSize_) % currentTokenNum;
     for (uint32_t loop = 0U; loop < currentTokenNum; loop++) {
-        uint32_t baseOffset = localIdx * EXPAND_IDX_INFO;
+        uint32_t baseOffset = localIdx * indexRecordStride_;
         uint32_t tokenId = static_cast<uint32_t>(expandIdxLocal(baseOffset + 1U));
         if ((tokenId >= batchBegin) && (tokenId < batchEnd)) {
             uint32_t rankIdExpandIdx = static_cast<uint32_t>(expandIdxLocal(baseOffset));
@@ -807,9 +898,13 @@ __aicore__ inline uint32_t MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::Ex
                 toRankId = elasticInfoTensor_.GetValue(ELASTIC_INFO_OFFSET + epWorldSizeOriginal_ + rankIdExpandIdx);
             }
             uint32_t topkId = static_cast<uint32_t>(expandIdxLocal(baseOffset + 2U));
-            uint32_t tkIndex = startTokenId_ + tokenOffset + localIdx;
-            ExpertAlltoAllDispatchInnerCopyAdd(toRankId, tokenId, topkId, tkIndex);
-            batchSendCount++;
+            uint32_t tkIndex = GetDispatchTokenIndex(tokenOffset + localIdx);
+            const uint32_t destinationGroup = toRankId / SEND_GROUP_RANK_NUM;
+            // 跳过其他组时仍需更新 localIdx
+            if ((sendRoundNum == 1U) || (destinationGroup == targetGroup)) {
+                ExpertAlltoAllDispatchInnerCopyAdd(toRankId, tokenId, topkId, tkIndex);
+                batchSendCount++;
+            }
         }
         localIdx += permStride;
         if (localIdx >= currentTokenNum) {
@@ -820,25 +915,52 @@ __aicore__ inline uint32_t MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::Ex
 }
 
 template <A5MteCombineTypeClass>
+__aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::ExpertAlltoAllDispatchGroupCopyAdd(
+    uint32_t batchTokenNum, uint32_t sendRoundNum)
+{
+    const bool isPowerOfTwo = (sendRoundNum & (sendRoundNum - 1U)) == 0U;
+    const uint32_t sourceGroup = epRankIdOriginal_ / SEND_GROUP_RANK_NUM;
+    uint32_t sendCount = 0U;
+    // 本核同组连续发送，组内仍按token批次推进
+    for (uint32_t roundId = 0U; roundId < sendRoundNum && sendCount < sendCntNum_; ++roundId) {
+        const uint32_t groupOffset = GetSendGroupOffset(roundId, sendRoundNum);
+        const uint32_t targetGroup =
+            isPowerOfTwo ? (sourceGroup ^ groupOffset) : (sourceGroup + groupOffset) % sendRoundNum;
+        for (uint32_t batchId = 0U; batchId < batchTokenNum && sendCount < sendCntNum_; ++batchId) {
+            sendCount += ExpertAlltoAllDispatchBatchCopyAdd(0U, sendCntNum_, batchId, sendRoundNum, targetGroup);
+        }
+    }
+}
+
+template <A5MteCombineTypeClass>
 __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::ExpertAlltoAllDispatchCopyAdd()
 {
     if (sendCntNum_ == 0U) { // 空闲核，直接返回
         return;
     }
 
-    LocalTensor<ExpandIdxType> expandIdxLocal = indexCountsBuf_.Get<ExpandIdxType>();
     uint32_t tokenLoopNum = Ceil(sendCntNum_, maxTokenNumInUB_);
     if (tokenLoopNum == 1U) {
-        const DataCopyExtParams bskParams{1U, static_cast<uint32_t>(sendCntNum_ * EXPAND_IDX_INFO * sizeof(uint32_t)),
-                                          0U, 0U, 0U};
-        const DataCopyPadExtParams<ExpandIdxType> copyPadParams{false, 0U, 0U, 0U};
-        DataCopyPad(expandIdxLocal, expandIdxGM_[startTokenId_ * EXPAND_IDX_INFO], bskParams, copyPadParams);
+        CopyDispatchIndices(0U, sendCntNum_);
         SyncFunc<AscendC::HardEvent::MTE2_S>();
     }
 
     uint32_t maxBs = globalBS_ / epWorldSizeOriginal_;
     uint32_t batchTokenNum = Ceil(maxBs, recvAivNum_);
+    // 按原始通信域 rank 分组，缩容后保持组号不变
+    const bool hasMultipleSendGroups = enableGroupSend_ && (epWorldSizeOriginal_ > SEND_GROUP_RANK_NUM) &&
+                                       (epWorldSizeOriginal_ % SEND_GROUP_RANK_NUM == 0U);
+    const uint32_t sendRoundNum = hasMultipleSendGroups ? epWorldSizeOriginal_ / SEND_GROUP_RANK_NUM : 1U;
+    const bool isPowerOfTwo = (sendRoundNum & (sendRoundNum - 1U)) == 0U;
+    const uint32_t sourceGroup = epRankIdOriginal_ / SEND_GROUP_RANK_NUM;
+    // 索引一次驻留UB时连续发组，不增加索引搬运
+    if (hasMultipleSendGroups && (tokenLoopNum == 1U)) {
+        ExpertAlltoAllDispatchGroupCopyAdd(batchTokenNum, sendRoundNum);
+        ExpertAlltoAllDispatchFinishSend();
+        return;
+    }
     uint32_t batchSendCount = 0U;
+    // 先补齐前面的token，保持接收归约流水
     for (uint32_t batchId = 0U; batchId < batchTokenNum && batchSendCount < sendCntNum_; batchId++) {
         uint32_t firstLoopId = (epRankId_ + batchId) % tokenLoopNum;
         for (uint32_t tokenLoopId = 0U; tokenLoopId < tokenLoopNum; tokenLoopId++) {
@@ -849,17 +971,19 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::Expert
             uint32_t tokenOffset = currentLoopId * maxTokenNumInUB_;
             uint32_t currentTokenNum = MIN(maxTokenNumInUB_, sendCntNum_ - tokenOffset);
             if (sendCntNum_ > maxTokenNumInUB_) {
-                uint32_t copySize = currentTokenNum * EXPAND_IDX_INFO * sizeof(uint32_t);
-                const DataCopyExtParams bskParams{1U, copySize, 0U, 0U, 0U};
-                const DataCopyPadExtParams<ExpandIdxType> copyPadParams{false, 0U, 0U, 0U};
                 SyncFunc<AscendC::HardEvent::S_MTE2>();
-                DataCopyPad(expandIdxLocal, expandIdxGM_[(startTokenId_ + tokenOffset) * EXPAND_IDX_INFO], bskParams,
-                            copyPadParams);
+                CopyDispatchIndices(tokenOffset, currentTokenNum);
                 SyncFunc<AscendC::HardEvent::MTE2_S>();
             }
-            batchSendCount += ExpertAlltoAllDispatchBatchCopyAdd(tokenOffset, currentTokenNum, batchId);
+            for (uint32_t roundId = 0U; roundId < sendRoundNum; ++roundId) {
+                const uint32_t targetGroup =
+                    isPowerOfTwo ? (sourceGroup ^ roundId) : (sourceGroup + roundId) % sendRoundNum;
+                batchSendCount += ExpertAlltoAllDispatchBatchCopyAdd(tokenOffset, currentTokenNum, batchId,
+                                                                     sendRoundNum, targetGroup);
+            }
         }
     }
+    // 跨组保持流水连续，只在全部发送结束后收尾
     ExpertAlltoAllDispatchFinishSend();
 }
 

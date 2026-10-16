@@ -43,10 +43,13 @@ public:
     static aclnnStatus GetMc2RankSize(const char* groupEp, uint32_t& rankSize);
 
 private:
+    struct TopologyInstance;
+
     explicit Mc2Context();
     ~Mc2Context();
 
     aclnnStatus LoadHcclSymbols();
+    aclnnStatus LoadTopologySymbols();
     aclnnStatus GetCommHandle(const char* groupEp, HcclComm& hcclHandle);
     aclnnStatus GetHcclCommLink(const HcclComm& hcclHandle, uint32_t netLayers, uint32_t srcRankId, uint32_t dstRankId,
                                 const CommProtocol& protocol, CommLink*& links);
@@ -70,6 +73,12 @@ private:
     aclnnStatus CheckLinks(uint32_t& netLinkNum, CommLink* linksList);
     aclnnStatus CheckContextCache(const HcclComm& hcclHandle, const std::string& mc2ContextTag,
                                   const CommEngine& engine, void*& ctx, uint64_t& hcclBuffSize);
+    aclnnStatus CheckGroupSendEnabled(const HcclComm& hcclHandle, uint32_t rankSize, uint32_t rank,
+                                      bool& enableGroupSend) const;
+    aclnnStatus CheckGroupLinks(const HcclComm& hcclHandle, const TopologyInstance& instance, uint32_t rank,
+                                std::vector<bool>& mesh, std::vector<bool>& clos) const;
+    aclnnStatus CheckGroupInstances(const HcclComm& hcclHandle, uint32_t layer, uint32_t rank, std::vector<bool>& mesh,
+                                    std::vector<bool>& clos) const;
     const std::string GetLibPath();
     template <typename T>
     T GetHcclLibFunc(void* handle, const std::string& funcName);
@@ -93,6 +102,12 @@ private:
     HcclResult (*HcclGetRankId)(HcclComm, uint32_t*) = nullptr;
     HcclResult (*HcclGetRankSize)(HcclComm, uint32_t*) = nullptr;
     HcclResult (*HcclRankGraphGetRanksByLayer)(HcclComm, uint32_t, uint32_t**, uint32_t*) = nullptr;
+    HcclResult (*HcclRankGraphGetTopoTypeByLayer)(HcclComm, uint32_t, CommTopo*) = nullptr;
+    HcclResult (*HcclRankGraphGetTopoInstsByLayer)(HcclComm, uint32_t, uint32_t**, uint32_t*) = nullptr;
+    HcclResult (*HcclRankGraphGetTopoType)(HcclComm, uint32_t, uint32_t, CommTopo*) = nullptr;
+    HcclResult (*HcclRankGraphGetRanksByTopoInst)(HcclComm, uint32_t, uint32_t, uint32_t**, uint32_t*) = nullptr;
+    HcclResult (*HcclRankGraphGetEndpointNum)(HcclComm, uint32_t, uint32_t, uint32_t*) = nullptr;
+    HcclResult (*HcclRankGraphGetEndpointDesc)(HcclComm, uint32_t, uint32_t, uint32_t*, EndpointDesc*) = nullptr;
 };
 } // namespace Mc2Aclnn
 

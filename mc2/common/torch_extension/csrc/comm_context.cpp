@@ -58,6 +58,7 @@ struct CommContext {
     uint64_t epHcclBuffer_[HCCL_MAX_RANK_SIZE] = {};
     ChannelHandle hcommHandle_[HCCL_MAX_RANK_SIZE] = {}; // ROCE或者URMA通信所需句柄
     uint32_t channelsPerRank = 0; // 每个rank的channel数量，0表示未启用多channel（紧凑布局）
+    bool enableGroupSend = false;
 };
 
 // ======================== Common Types and Utilities ========================

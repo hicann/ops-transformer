@@ -2035,7 +2035,7 @@ static uint64_t GetQuantScratchSize(uint32_t axisH, uint32_t expandXTypeSize, bo
 static void GetCommQuantScratchAndDataSize(const gert::TilingContext* context, const CombineV2Config& config,
                                            uint32_t axisH, uint32_t& hExpandXTypeSize, uint32_t& hExpandXAlign32Size,
                                            uint32_t& scaleNumAlignSize, uint32_t& commDataBytes,
-                                           uint64_t& quantBufferSize, bool& isA5)
+                                           uint32_t& quantResultDataBytes, uint64_t& quantBufferSize, bool& isA5)
 {
     auto attrs = context->GetAttrs();
     auto commQuantModePtr = attrs->GetAttrPointer<int64_t>((config.attrCommQuantModeIndex));
@@ -2061,7 +2061,12 @@ static void GetCommQuantScratchAndDataSize(const gert::TilingContext* context, c
         quantBufferSize =
             GetQuantScratchSize(axisH, expandXTypeSize, isMxFp8Quant, hFloatAlign32Size, hFloatAlign256Size);
     }
+    // 量化输出UB保留原有长度，通信只计算有效scale字节
+    quantResultDataBytes = commDataBytes;
     if (isA5 && isMxFp8Quant) {
+        uint32_t scaleNum = (axisH + UB_ALIGN - 1U) / UB_ALIGN;
+        scaleNum = (scaleNum + 1U) / 2U * 2U;
+        commDataBytes = (axisH + ALIGNED_LEN - 1U) / ALIGNED_LEN * ALIGNED_LEN + scaleNum * sizeof(uint8_t);
         // A5 MXFP8接收端不再分配独立的scaleDiv临时区，预算与kernel保持一致
         scaleNumAlignSize = 0U;
     }
@@ -2078,10 +2083,11 @@ static uint64_t GetCommBufferSize(const gert::TilingContext* context,
     uint32_t hExpandXAlign32Size = 0U;
     uint32_t scaleNumAlignSize = 0U;
     uint32_t commDataBytes = 0U;
+    uint32_t quantResultDataBytes = 0U;
     uint64_t quantBufferSize = 0U;
     bool isA5 = false;
     GetCommQuantScratchAndDataSize(context, config, axisH, hExpandXTypeSize, hExpandXAlign32Size, scaleNumAlignSize,
-                                   commDataBytes, quantBufferSize, isA5);
+                                   commDataBytes, quantResultDataBytes, quantBufferSize, isA5);
     uint32_t blockCntPerToken = (commDataBytes + SPLIT_BLOCK_DATA_SIZE - 1) / SPLIT_BLOCK_DATA_SIZE;
     uint32_t packedDataBytes = blockCntPerToken * SPLIT_BLOCK_DATA_SIZE;
     uint32_t rawPackedDataBytes =
@@ -2094,7 +2100,7 @@ static uint64_t GetCommBufferSize(const gert::TilingContext* context,
     uint32_t clearFlagBufSize = (clearFlagCount * sizeof(float) + UB_ALIGN - 1) / UB_ALIGN * UB_ALIGN;
     uint64_t commBufferSize = static_cast<uint64_t>(scaleNumAlignSize) + clearFlagBufSize;
     dispatchBufferSize =
-        GetDispatchBufferSize(tilingData, moeQueueBytes, commDataBytes, packedDataBytes, quantBufferSize);
+        GetDispatchBufferSize(tilingData, moeQueueBytes, quantResultDataBytes, packedDataBytes, quantBufferSize);
     return commBufferSize;
 }
 

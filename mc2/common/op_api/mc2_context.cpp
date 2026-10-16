@@ -13,6 +13,8 @@
  * \brief MC2 Context management implementation
  */
 
+#include <algorithm>
+#include <cstring>
 #include <cstdlib>
 #include <dlfcn.h>
 #include "mc2_context.h"
@@ -25,9 +27,41 @@ constexpr uint32_t HCCL_COMM_LAYERS_MTE_CCU = 1;
 constexpr uint32_t HCCL_COMM_LAYERS_UB_MEM = 0;
 constexpr uint32_t GET_LOCAL_SERVER_RANK_SIZE_LAYER = 0;
 constexpr uint32_t EP_RANK_OFFSET_STEP = 1024;
+constexpr uint32_t GROUP_RANK_NUM = 4U;
+
+bool MatchesInstanceEndpoint(const EndpointDesc& linkEndpoint, const EndpointDesc& instanceEndpoint)
+{
+    if (linkEndpoint.protocol != instanceEndpoint.protocol ||
+        linkEndpoint.loc.locType != instanceEndpoint.loc.locType ||
+        linkEndpoint.commAddr.type != instanceEndpoint.commAddr.type) {
+        return false;
+    }
+    // 实例查询不填设备位置ID，仅比较有效地址字段
+    const auto& lhs = linkEndpoint.commAddr;
+    const auto& rhs = instanceEndpoint.commAddr;
+    switch (lhs.type) {
+        case COMM_ADDR_TYPE_EID:
+            return std::memcmp(lhs.eid, rhs.eid, sizeof(lhs.eid)) == 0;
+        case COMM_ADDR_TYPE_IP_V4:
+            return std::memcmp(&lhs.addr, &rhs.addr, sizeof(lhs.addr)) == 0;
+        case COMM_ADDR_TYPE_IP_V6:
+            return std::memcmp(&lhs.addr6, &rhs.addr6, sizeof(lhs.addr6)) == 0;
+        case COMM_ADDR_TYPE_ID:
+            return lhs.id == rhs.id;
+        default:
+            return false;
+    }
+}
+
 } // namespace
 
 namespace Mc2Aclnn {
+struct Mc2Context::TopologyInstance {
+    uint32_t layer;
+    CommTopo type;
+    std::vector<uint32_t> ranks;
+    std::vector<EndpointDesc> endpoints;
+};
 
 const std::string Mc2Context::GetLibPath()
 {
@@ -115,6 +149,29 @@ aclnnStatus Mc2Context::LoadHcclSymbols()
         }
     }
     OP_LOGD("All HCCL symbols loaded successfully");
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::LoadTopologySymbols()
+{
+    struct SymbolInfo {
+        void** ptr;
+        const char* name;
+    };
+    SymbolInfo topologySymbols[] = {
+        {reinterpret_cast<void**>(&HcclRankGraphGetTopoTypeByLayer), "HcclRankGraphGetTopoTypeByLayer"},
+        {reinterpret_cast<void**>(&HcclRankGraphGetTopoInstsByLayer), "HcclRankGraphGetTopoInstsByLayer"},
+        {reinterpret_cast<void**>(&HcclRankGraphGetTopoType), "HcclRankGraphGetTopoType"},
+        {reinterpret_cast<void**>(&HcclRankGraphGetRanksByTopoInst), "HcclRankGraphGetRanksByTopoInst"},
+        {reinterpret_cast<void**>(&HcclRankGraphGetEndpointNum), "HcclRankGraphGetEndpointNum"},
+        {reinterpret_cast<void**>(&HcclRankGraphGetEndpointDesc), "HcclRankGraphGetEndpointDesc"},
+    };
+    for (auto& sym : topologySymbols) {
+        *(sym.ptr) = GetHcclLibFunc<void*>(hcclLibHandle_, sym.name);
+        if (*(sym.ptr) == nullptr) {
+            return ACLNN_ERR_INNER;
+        }
+    }
     return ACLNN_SUCCESS;
 }
 
@@ -310,6 +367,165 @@ aclnnStatus Mc2Context::GetHcclCommResource(const HcclComm& hcclHandle, const Co
     return ACLNN_SUCCESS;
 }
 
+aclnnStatus Mc2Context::CheckGroupLinks(const HcclComm& hcclHandle, const TopologyInstance& instance, uint32_t rank,
+                                        std::vector<bool>& mesh, std::vector<bool>& clos) const
+{
+    const bool isMesh = instance.type == COMM_TOPO_1DMESH;
+    if (isMesh) {
+        if (instance.ranks.size() != GROUP_RANK_NUM) {
+            return ACLNN_SUCCESS;
+        }
+        const uint32_t groupStart = rank / GROUP_RANK_NUM * GROUP_RANK_NUM;
+        for (uint32_t i = 0; i < GROUP_RANK_NUM; ++i) {
+            if (std::find(instance.ranks.begin(), instance.ranks.end(), groupStart + i) == instance.ranks.end()) {
+                return ACLNN_SUCCESS;
+            }
+        }
+    }
+    auto& matchedLinks = isMesh ? mesh : clos;
+    for (uint32_t peer : instance.ranks) {
+        const bool isSameGroup = peer / GROUP_RANK_NUM == rank / GROUP_RANK_NUM;
+        if (peer == rank || (!isMesh && isSameGroup)) {
+            continue;
+        }
+        CommLink* links = nullptr;
+        uint32_t count = 0U;
+        HcclResult hcclRet = HcclRankGraphGetLinks(hcclHandle, instance.layer, rank, peer, &links, &count);
+        if (hcclRet != HCCL_SUCCESS) {
+            OP_LOGI("Get topology links failed, rank=%u, peer=%u, layer=%u, ret=%d", rank, peer, instance.layer,
+                    hcclRet);
+            return ACLNN_ERR_INNER;
+        }
+        for (uint32_t i = 0U; i < count; ++i) {
+            if (links[i].linkAttr.linkProtocol != COMM_PROTOCOL_UB_MEM) {
+                continue;
+            }
+            const bool endpointMatched =
+                instance.endpoints.empty() ||
+                std::any_of(instance.endpoints.begin(), instance.endpoints.end(), [&](const EndpointDesc& endpoint) {
+                    return MatchesInstanceEndpoint(links[i].srcEndpointDesc, endpoint);
+                });
+            if (!endpointMatched) {
+                continue;
+            }
+            matchedLinks[peer] = true;
+            break;
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::CheckGroupInstances(const HcclComm& hcclHandle, uint32_t layer, uint32_t rank,
+                                            std::vector<bool>& mesh, std::vector<bool>& clos) const
+{
+    uint32_t* list = nullptr;
+    uint32_t count = 0U;
+    HcclResult hcclRet = HcclRankGraphGetTopoInstsByLayer(hcclHandle, layer, &list, &count);
+    if (hcclRet != HCCL_SUCCESS) {
+        OP_LOGI("Get topology instances failed, ret=%d", hcclRet);
+        return ACLNN_ERR_INNER;
+    }
+    const std::vector<uint32_t> instances(list, list + count);
+    for (uint32_t instance : instances) {
+        CommTopo type = COMM_TOPO_RESERVED;
+        hcclRet = HcclRankGraphGetTopoType(hcclHandle, layer, instance, &type);
+        if (hcclRet != HCCL_SUCCESS) {
+            OP_LOGI("Get topology instance type failed, ret=%d", hcclRet);
+            return ACLNN_ERR_INNER;
+        }
+        OP_LOGD("Group send topology: rank=%u, layer=%u, instance=%u, type=%d", rank, layer, instance, type);
+        if (type != COMM_TOPO_1DMESH && type != COMM_TOPO_CLOS) {
+            continue;
+        }
+        hcclRet = HcclRankGraphGetRanksByTopoInst(hcclHandle, layer, instance, &list, &count);
+        if (hcclRet != HCCL_SUCCESS) {
+            OP_LOGI("Get topology instance ranks failed, ret=%d", hcclRet);
+            return ACLNN_ERR_INNER;
+        }
+        TopologyInstance topology{layer, type, std::vector<uint32_t>(list, list + count), {}};
+        hcclRet = HcclRankGraphGetEndpointNum(hcclHandle, layer, instance, &count);
+        if (hcclRet != HCCL_SUCCESS) {
+            OP_LOGI("Get topology endpoint count failed, ret=%d", hcclRet);
+            return ACLNN_ERR_INNER;
+        }
+        if (count == 0U) {
+            continue;
+        }
+        topology.endpoints.resize(count);
+        hcclRet = HcclRankGraphGetEndpointDesc(hcclHandle, layer, instance, &count, topology.endpoints.data());
+        if (hcclRet != HCCL_SUCCESS) {
+            OP_LOGI("Get topology endpoints failed, ret=%d", hcclRet);
+            return ACLNN_ERR_INNER;
+        }
+        topology.endpoints.resize(count);
+        // CUSTOM层按实例端点筛选，避免混用Mesh和Clos链路
+        if (topology.endpoints.empty()) {
+            continue;
+        }
+        auto ret = CheckGroupLinks(hcclHandle, topology, rank, mesh, clos);
+        if (ret != ACLNN_SUCCESS) {
+            return ret;
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::CheckGroupSendEnabled(const HcclComm& hcclHandle, uint32_t rankSize, uint32_t rank,
+                                              bool& enableGroupSend) const
+{
+    if (rankSize < GROUP_RANK_NUM || rankSize % GROUP_RANK_NUM != 0U || rank >= rankSize) {
+        OP_LOGI("Group send disabled: unsupported rank layout, rank=%u, rankSize=%u, groupSize=%u", rank, rankSize,
+                GROUP_RANK_NUM);
+        return ACLNN_ERR_INNER;
+    }
+    uint32_t* list = nullptr;
+    uint32_t count = 0U;
+    HcclResult hcclRet = HcclRankGraphGetLayers(hcclHandle, &list, &count);
+    if (hcclRet != HCCL_SUCCESS) {
+        OP_LOGI("Get topology layers failed, ret=%d", hcclRet);
+        return ACLNN_ERR_INNER;
+    }
+    // 库内列表可能被后续查询覆盖
+    const std::vector<uint32_t> layers(list, list + count);
+    std::vector<bool> mesh(rankSize, false);
+    std::vector<bool> clos(rankSize, false);
+    for (uint32_t layer : layers) {
+        CommTopo type = COMM_TOPO_RESERVED;
+        hcclRet = HcclRankGraphGetTopoTypeByLayer(hcclHandle, layer, &type);
+        if (hcclRet != HCCL_SUCCESS) {
+            OP_LOGI("Get topology layer type failed, ret=%d", hcclRet);
+            return ACLNN_ERR_INNER;
+        }
+        aclnnStatus ret = ACLNN_SUCCESS;
+        OP_LOGD("Group send topology: rank=%u, layer=%u, type=%d", rank, layer, type);
+        if (type == COMM_TOPO_CUSTOM) {
+            ret = CheckGroupInstances(hcclHandle, layer, rank, mesh, clos);
+        } else if (type == COMM_TOPO_1DMESH || type == COMM_TOPO_CLOS) {
+            hcclRet = HcclRankGraphGetRanksByLayer(hcclHandle, layer, &list, &count);
+            if (hcclRet != HCCL_SUCCESS) {
+                OP_LOGI("Get topology layer ranks failed, ret=%d", hcclRet);
+                return ACLNN_ERR_INNER;
+            }
+            TopologyInstance topology{layer, type, std::vector<uint32_t>(list, list + count), {}};
+            ret = CheckGroupLinks(hcclHandle, topology, rank, mesh, clos);
+        }
+        if (ret != ACLNN_SUCCESS) {
+            return ret;
+        }
+    }
+    for (uint32_t peer = 0U; peer < rankSize; ++peer) {
+        const bool isSameGroup = peer / GROUP_RANK_NUM == rank / GROUP_RANK_NUM;
+        const bool hasRequiredLink = isSameGroup ? mesh[peer] : clos[peer];
+        if (peer != rank && !hasRequiredLink) {
+            OP_LOGI("Group send disabled: missing UB_MEM link, rank=%u, peer=%u, sameGroup=%d, mesh=%d, clos=%d", rank,
+                    peer, isSameGroup, static_cast<bool>(mesh[peer]), static_cast<bool>(clos[peer]));
+            return ACLNN_ERR_INNER;
+        }
+    }
+    enableGroupSend = true;
+    return ACLNN_SUCCESS;
+}
+
 aclnnStatus Mc2Context::CreatMc2Context(const HcclComm& hcclHandle, const std::string& mc2ContextTag,
                                         const CommEngine& engine, const CommProtocol& protocol,
                                         Mc2MoeContext* mc2ContextStruct, void*& ctx, uint64_t& hcclBuffSize)
@@ -348,6 +564,26 @@ aclnnStatus Mc2Context::CreatMc2Context(const HcclComm& hcclHandle, const std::s
         OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Get HCCL communication resource failed");
         return ret;
     }
+
+    mc2ContextStruct->channelsPerRank = 0;
+    mc2ContextStruct->enableGroupSend = false;
+#if __has_include("version/hcomm_version.h")
+    if (protocol == COMM_PROTOCOL_UB_MEM) {
+        ret = LoadTopologySymbols();
+        if (ret == ACLNN_SUCCESS) {
+            OP_LOGI("LoadTopologySymbols success");
+            ret = CheckGroupSendEnabled(hcclHandle, epRankSize_, mc2ContextStruct->epRankId,
+                                        mc2ContextStruct->enableGroupSend);
+            if (ret == ACLNN_SUCCESS) {
+                OP_LOGI("CheckGroupSendEnabled success");
+            } else {
+                OP_LOGI("CheckGroupSendEnabled failed, ret=%d", ret);
+            }
+        } else {
+            OP_LOGI("LoadTopologySymbols failed, ret=%d", ret);
+        }
+    }
+#endif
 
     hcclRet = HcclEngineCtxCopy(hcclHandle, engine, mc2ContextTag.c_str(), mc2ContextStruct, ctxSize,
                                 KOPY_DEFAULT_CTX_OFFSET);
@@ -536,7 +772,7 @@ aclnnStatus Mc2Context::GetMc2ContextTensor(const char* groupEp, const char* opN
     if (hcclBuffSize != 0) { // Cache not found, need to create context
         aclnnRet = instance.CreatMc2ContextTensor(ctx, mc2Context);
         CHECK_RET(aclnnRet == ACLNN_SUCCESS, aclnnRet);
-        OP_LOGI("Found context cache, Get Mc2MoeContext Tensor Success");
+        OP_LOGI("Found context cache, tag=%s, reuse group send setting from context creation", mc2ContextTag.c_str());
         return ACLNN_SUCCESS;
     }
 
