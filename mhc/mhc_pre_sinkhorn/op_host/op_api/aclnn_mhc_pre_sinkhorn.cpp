@@ -42,9 +42,10 @@ static const std::initializer_list<op::DataType> DTYPE_OTHER_SUPPORT_LIST = {op:
 static constexpr int64_t HCMULT_DEFAULT_VALUE = 4;
 static constexpr int64_t NUM_ITERS_DEFAULT_VALUE = 20;
 
-static bool IsAscend950()
+static bool IsPlatformSupportTnd()
 {
-    return GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
+    auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
+    return (npuArch == NpuArch::DAV_3510) || (npuArch == NpuArch::DAV_9201);
 }
 
 static bool CheckNotNull(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha, const aclTensor* bias,
@@ -101,9 +102,11 @@ static bool CheckShape(const aclTensor* x, const aclTensor* phi, const aclTensor
     auto xDim = xShape.GetDimNum();
     bool isTnd = (xDim == 3);
 
-    if (isTnd && !IsAscend950()) {
+    if (isTnd && !IsPlatformSupportTnd()) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "TND format (3D input) is only supported on Ascend950, but got dim = %ld on current platform.", xDim);
+                "TND format (3D input) is only supported on Ascend950 and Ascend960DT, but got dim = %ld on current "
+                "platform.",
+                xDim);
         return false;
     }
 

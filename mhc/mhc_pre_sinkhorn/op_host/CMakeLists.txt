@@ -22,6 +22,17 @@ if (BUILD_OPEN_PROJECT)
                     -mllvm -cce-aicore-hoist-movemask=false
                     --op_relocatable_kernel_binary=true
         )
+    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960dt")
+        add_ops_compile_options(
+            OP_NAME MhcPreSinkhorn
+            COMPUTE_UNIT ascend960dt_968B7
+            OPTIONS --cce-auto-sync=off
+                    -Wno-deprecated-declarations
+                    -Werror
+                    -mllvm -cce-aicore-hoist-movemask=false
+                    -mllvm -cce-aicore-dcci-before-kernel-end=false
+                    --op_relocatable_kernel_binary=true
+        )
     else()
         add_ops_compile_options(
             OP_NAME MhcPreSinkhorn

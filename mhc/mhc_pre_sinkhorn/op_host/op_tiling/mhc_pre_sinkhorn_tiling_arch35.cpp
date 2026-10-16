@@ -61,6 +61,12 @@ constexpr uint64_t TILING_KEY_NO_GRAD_K_SPLIT = 1000;
 constexpr uint64_t TILING_KEY_NO_GRAD_M_SPLIT = 1001;
 constexpr uint64_t TILING_KEY_GRAD_K_SPLIT = 2000;
 constexpr uint64_t TILING_KEY_GRAD_M_SPLIT = 2001;
+constexpr uint64_t TILING_KEY_CV_ONE_NO_GRAD_K_SPLIT = 3000;
+constexpr uint64_t TILING_KEY_CV_ONE_NO_GRAD_M_SPLIT = 3001;
+constexpr uint64_t TILING_KEY_CV_ONE_GRAD_K_SPLIT = 4000;
+constexpr uint64_t TILING_KEY_CV_ONE_GRAD_M_SPLIT = 4001;
+constexpr uint64_t CV_RATIO_ONE = 1;
+constexpr uint64_t CV_RATIO_TWO = 2;
 
 struct CoreRowTiling {
     int64_t rowOfFormerBlock = 0;
@@ -85,10 +91,15 @@ struct UbBufferConfig {
     int64_t hcMultAlign = 0;
     int64_t iterTimes = 0;
     int64_t kBlockNum = 0;
-    int64_t mUbSize = 0;
+    int64_t vectorMSize = 0;
     bool withGradOut = false;
     bool isKSplit = false;
     bool isMpmd = false;
+};
+
+struct CvUbTiling {
+    int64_t kUbSize = 0;
+    int64_t mUbSize = 0;
 };
 
 bool CalcCoreRowTiling(int64_t bs, int64_t coreNum, CoreRowTiling& rowTiling)
@@ -140,20 +151,71 @@ int64_t CalcUbBufferSize(const UbBufferConfig& config, int64_t rowFactor, int64_
                      DOUBLE_BUFFER;                                                                         // normOut
         totalSize += 2 * config.iterTimes * rowFactor * config.hcMultAlign * sizeof(float) * DOUBLE_BUFFER; // sumOut
         totalSize += RoundUp(rowFactor, floatAlign) * sizeof(float) * DOUBLE_BUFFER;                        // invRmsOut
-        const int64_t hcBeforeNormRows = config.isKSplit ? rowFactor : config.mUbSize;
+        const int64_t hcBeforeNormRows = config.isKSplit ? rowFactor : config.vectorMSize;
         totalSize += hcBeforeNormRows * hcMixAlign * sizeof(float) * DOUBLE_BUFFER;  // hcBeforeNorm
         totalSize += rowFactor * config.hcMultAlign * sizeof(float) * DOUBLE_BUFFER; // hPre
     }
     return totalSize;
 }
 
-int64_t CalcMOnlyBufferPool1Size(uint64_t ubSize, int64_t mUbSize, int64_t hcMix, int64_t hcMult, int64_t hcMultAlign)
+int64_t CalcMOnlyBufferPool1Size(uint64_t ubSize, int64_t vectorMSize, int64_t hcMix, int64_t hcMult,
+                                 int64_t hcMultAlign)
 {
     const int64_t floatAlign = BLOCK_SIZE / sizeof(float);
-    const int64_t mmXBufSize = mUbSize * RoundUp(hcMix, floatAlign) * sizeof(float);
-    const int64_t rmsNormBufSize = RoundUp(mUbSize, floatAlign) * sizeof(float);
+    const int64_t mmXBufSize = vectorMSize * RoundUp(hcMix, floatAlign) * sizeof(float);
+    const int64_t rmsNormBufSize = RoundUp(vectorMSize, floatAlign) * sizeof(float);
     const int64_t baseSize = hcMultAlign * sizeof(float) * 2 + hcMult * hcMultAlign * sizeof(float);
     return DownAlign(static_cast<int64_t>(ubSize) - mmXBufSize - rmsNormBufSize - baseSize, BLOCK_SIZE);
+}
+
+int64_t CalcStage1TemporaryUbSize(int64_t kUbSize, int64_t mUbSize)
+{
+    const int64_t b16KAlign = RoundUp(kUbSize, BLOCK_SIZE / sizeof(uint16_t));
+    const int64_t floatKAlign = RoundUp(kUbSize, BLOCK_SIZE / sizeof(float));
+    int64_t totalSize = DOUBLE_BUFFER * mUbSize * b16KAlign * sizeof(uint16_t); // xQue
+    totalSize += mUbSize * (floatKAlign * sizeof(float) + BLOCK_SIZE);          // castBuf
+    totalSize += DOUBLE_BUFFER * RoundUp(mUbSize, BLOCK_SIZE / sizeof(float)) * floatKAlign * sizeof(float);
+    return totalSize; // nd2NzBuf
+}
+
+// Solves the stage-1 vector UB tiling for both ratios.
+bool CalcCvUbTiling(int64_t kL1Size, int64_t mL1Size, uint64_t ubSize, uint64_t cvRatio, bool isKSplit, int64_t hcMix,
+                    int64_t hcMult, int64_t hcMultAlign, CvUbTiling& ubTiling)
+{
+    if (kL1Size <= 0 || mL1Size <= 0 || (cvRatio != CV_RATIO_ONE && cvRatio != CV_RATIO_TWO)) {
+        return false;
+    }
+    if (cvRatio == CV_RATIO_TWO) {
+        ubTiling.kUbSize = CeilDiv(kL1Size, static_cast<int64_t>(cvRatio));
+        ubTiling.mUbSize = CeilDiv(mL1Size, static_cast<int64_t>(cvRatio));
+        return true;
+    }
+
+    ubTiling.kUbSize = kL1Size;
+    const int64_t vectorMSize = mL1Size;
+    int64_t temporaryUbSize = 0;
+    if (isKSplit) {
+        const int64_t rmsQueSize = DOUBLE_BUFFER * RoundUp(vectorMSize, BLOCK_SIZE / sizeof(float)) * sizeof(float);
+        temporaryUbSize = static_cast<int64_t>(ubSize) - rmsQueSize;
+    } else {
+        temporaryUbSize = CalcMOnlyBufferPool1Size(ubSize, vectorMSize, hcMix, hcMult, hcMultAlign);
+    }
+    if (temporaryUbSize <= 0 || CalcStage1TemporaryUbSize(ubTiling.kUbSize, 1) > temporaryUbSize) {
+        return false;
+    }
+
+    int64_t left = 1;
+    int64_t right = vectorMSize;
+    while (left <= right) {
+        const int64_t middle = left + (right - left) / 2;
+        if (CalcStage1TemporaryUbSize(ubTiling.kUbSize, middle) <= temporaryUbSize) {
+            ubTiling.mUbSize = middle;
+            left = middle + 1;
+        } else {
+            right = middle - 1;
+        }
+    }
+    return ubTiling.mUbSize > 0;
 }
 
 template <typename FitsInUb>
@@ -257,13 +319,16 @@ MhcPreSinkhornTilingRegbase::MhcPreSinkhornTilingRegbase(gert::TilingContext* ti
 ge::graphStatus MhcPreSinkhornTilingRegbase::GetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
+    auto compileInfoPtr = context_->GetCompileInfo<MhcPreSinkhornCompileInfo>();
     if (platformInfo == nullptr) {
-        auto compileInfoPtr = context_->GetCompileInfo<MhcPreSinkhornCompileInfo>();
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
         aivCoreNum_ = compileInfoPtr->coreNum;
         aicCoreNum_ = compileInfoPtr->coreNum;
         ubSize_ = compileInfoPtr->ubSize;
         sysWorkspaceSize_ = compileInfoPtr->sysWorkspaceSize;
+        if (compileInfoPtr->cvRatio != 0) {
+            cvRatio_ = compileInfoPtr->cvRatio;
+        }
     } else {
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
         aivCoreNum_ = ascendcPlatform.GetCoreNumAiv();
@@ -273,10 +338,21 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::GetPlatformInfo()
         ubSize_ = ubSizePlatForm;
         sysWorkspaceSize_ = ascendcPlatform.GetLibApiWorkSpaceSize();
         socVersion_ = ascendcPlatform.GetSocVersion();
+        OP_CHECK_IF(aicCoreNum_ == 0 || aivCoreNum_ == 0 || aivCoreNum_ % aicCoreNum_ != 0,
+                    OP_LOGE(context_->GetNodeName(), "Invalid CV core counts: aivCoreNum=%lu, aicCoreNum=%lu",
+                            aivCoreNum_, aicCoreNum_),
+                    return ge::GRAPH_FAILED);
+        cvRatio_ = aivCoreNum_ / aicCoreNum_;
+        if (compileInfoPtr != nullptr && compileInfoPtr->cvRatio != 0) {
+            cvRatio_ = compileInfoPtr->cvRatio;
+        }
     }
+    OP_CHECK_IF(cvRatio_ != CV_RATIO_ONE && cvRatio_ != CV_RATIO_TWO,
+                OP_LOGE(context_->GetNodeName(), "Unsupported CV ratio: %lu", cvRatio_), return ge::GRAPH_FAILED);
     OP_LOGD(context_->GetNodeName(),
-            "MhcPreSinkhorn regbase platform: aivCoreNum=%lu, aicCoreNum=%lu, ubSize=%lu, sysWorkspaceSize=%lu",
-            aivCoreNum_, aicCoreNum_, ubSize_, sysWorkspaceSize_);
+            "MhcPreSinkhorn regbase platform: aivCoreNum=%lu, aicCoreNum=%lu, cvRatio=%lu, ubSize=%lu, "
+            "sysWorkspaceSize=%lu",
+            aivCoreNum_, aicCoreNum_, cvRatio_, ubSize_, sysWorkspaceSize_);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -403,16 +479,23 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcRegbaseCommonTiling(GradOutMode
                 return ge::GRAPH_FAILED);
 
     const int64_t hcMultAlign = RoundUp(hcMult_, BLOCK_SIZE / sizeof(float));
-    // Use half of kL1Size so kUbSize stays below 256 when m reaches its maximum of 256.
-    const int64_t kUbSize = tilingData_.get_kL1Size() / DOUBLE_BUFFER;
-    const int64_t mUbSize = CeilDiv(tilingData_.get_mL1Size(), 2);
+    CvUbTiling ubTiling;
+    OP_CHECK_IF(!CalcCvUbTiling(tilingData_.get_kL1Size(), tilingData_.get_mL1Size(), ubSize_, cvRatio_, isKSplit,
+                                hcMix_, hcMult_, hcMultAlign, ubTiling),
+                OP_LOGE(context_->GetNodeName(),
+                        "Invalid CV UB tiling: kL1Size=%ld, mL1Size=%ld, ubSize=%lu, cvRatio=%lu, isKSplit=%d",
+                        tilingData_.get_kL1Size(), tilingData_.get_mL1Size(), ubSize_, cvRatio_, isKSplit ? 1 : 0),
+                return ge::GRAPH_FAILED);
+    const int64_t kUbSize = ubTiling.kUbSize;
+    const int64_t mUbSize = ubTiling.mUbSize;
+    const int64_t vectorMSize = CeilDiv(tilingData_.get_mL1Size(), static_cast<int64_t>(cvRatio_));
     const int64_t bufferPool0Size = static_cast<int64_t>(ubSize_);
     const int64_t bufferPool1Size =
-        isKSplit ? 0 : CalcMOnlyBufferPool1Size(ubSize_, mUbSize, hcMix_, hcMult_, hcMultAlign);
+        isKSplit ? 0 : CalcMOnlyBufferPool1Size(ubSize_, vectorMSize, hcMix_, hcMult_, hcMultAlign);
     OP_CHECK_IF(!isKSplit && bufferPool1Size < 0,
                 OP_LOGE(context_->GetNodeName(),
-                        "M-split fixed buffers exceed UB: ubSize=%lu, bufferPool1Size=%ld, mUbSize=%ld, hcMix=%ld",
-                        ubSize_, bufferPool1Size, mUbSize, hcMix_),
+                        "M-split fixed buffers exceed UB: ubSize=%lu, bufferPool1Size=%ld, vectorMSize=%ld, hcMix=%ld",
+                        ubSize_, bufferPool1Size, vectorMSize, hcMix_),
                 return ge::GRAPH_FAILED);
     const int64_t availableUbSize = isKSplit ? bufferPool0Size : bufferPool1Size;
 
@@ -422,7 +505,7 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcRegbaseCommonTiling(GradOutMode
     bufferConfig.hcMultAlign = hcMultAlign;
     bufferConfig.iterTimes = iterTimes_;
     bufferConfig.kBlockNum = tilingData_.get_cubeBlockDimK();
-    bufferConfig.mUbSize = mUbSize;
+    bufferConfig.vectorMSize = vectorMSize;
     bufferConfig.withGradOut = withGradOut;
     bufferConfig.isKSplit = isKSplit;
     bufferConfig.isMpmd = tilingData_.get_sinkhornCoreNum() > 0;
@@ -430,7 +513,7 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcRegbaseCommonTiling(GradOutMode
     const auto fitsInUb = [&bufferConfig, availableUbSize](int64_t rowFactor, int64_t dFactor) {
         return CalcUbBufferSize(bufferConfig, rowFactor, dFactor) <= availableUbSize;
     };
-    const int64_t maxRowFactor = isKSplit ? coreRowTiling.rowOfFormerBlock : mUbSize;
+    const int64_t maxRowFactor = isKSplit ? coreRowTiling.rowOfFormerBlock : vectorMSize;
     RowAndDTiling rowAndDTiling;
     OP_CHECK_IF(!CalcRowAndDTiling(d_, maxRowFactor, fitsInUb, rowAndDTiling),
                 OP_LOGE(context_->GetNodeName(),
@@ -469,10 +552,12 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcRegbaseCommonTiling(GradOutMode
     }
 
     OP_LOGD(context_->GetNodeName(),
-            "MhcPreSinkhorn regbase UB tiling: withGradOut=%d, isKSplit=%d, availableUbSize=%ld, "
-            "maxRowFactor=%ld, rowFactor=%ld, dFactor=%ld, dLoop=%ld, tailDFactor=%ld",
-            withGradOut ? 1 : 0, isKSplit ? 1 : 0, availableUbSize, maxRowFactor, rowAndDTiling.rowFactor,
-            rowAndDTiling.dFactor, rowAndDTiling.dLoop, rowAndDTiling.tailDFactor);
+            "MhcPreSinkhorn regbase UB tiling: withGradOut=%d, isKSplit=%d, cvRatio=%lu, availableUbSize=%ld, "
+            "kUbSize=%ld, mUbSize=%ld, vectorMSize=%ld, maxRowFactor=%ld, rowFactor=%ld, dFactor=%ld, dLoop=%ld, "
+            "tailDFactor=%ld",
+            withGradOut ? 1 : 0, isKSplit ? 1 : 0, cvRatio_, availableUbSize, kUbSize, mUbSize, vectorMSize,
+            maxRowFactor, rowAndDTiling.rowFactor, rowAndDTiling.dFactor, rowAndDTiling.dLoop,
+            rowAndDTiling.tailDFactor);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -529,15 +614,23 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcOpTiling()
 
     bool isKSplit = kDimNum != 1;
     if (isKSplit) {
-        tilingKey_ = needGrad_ ? TILING_KEY_GRAD_K_SPLIT : TILING_KEY_NO_GRAD_K_SPLIT;
+        if (cvRatio_ == CV_RATIO_ONE) {
+            tilingKey_ = needGrad_ ? TILING_KEY_CV_ONE_GRAD_K_SPLIT : TILING_KEY_CV_ONE_NO_GRAD_K_SPLIT;
+        } else {
+            tilingKey_ = needGrad_ ? TILING_KEY_GRAD_K_SPLIT : TILING_KEY_NO_GRAD_K_SPLIT;
+        }
     } else {
-        tilingKey_ = needGrad_ ? TILING_KEY_GRAD_M_SPLIT : TILING_KEY_NO_GRAD_M_SPLIT;
+        if (cvRatio_ == CV_RATIO_ONE) {
+            tilingKey_ = needGrad_ ? TILING_KEY_CV_ONE_GRAD_M_SPLIT : TILING_KEY_CV_ONE_NO_GRAD_M_SPLIT;
+        } else {
+            tilingKey_ = needGrad_ ? TILING_KEY_GRAD_M_SPLIT : TILING_KEY_NO_GRAD_M_SPLIT;
+        }
     }
     OP_LOGD(context_->GetNodeName(),
-            "MhcPreSinkhorn regbase tiling decision: tilingKey=%lu, needGrad=%d, deterministicLevel=%d, "
+            "MhcPreSinkhorn regbase tiling decision: tilingKey=%lu, needGrad=%d, cvRatio=%lu, deterministicLevel=%d, "
             "mDimNum=%lu, singleCoreM=%lu, originalKDimNum=%lu, finalKDimNum=%lu, actualKBlockNum=%lu, "
             "splitKSize=%lu, mL1Size=%ld, kL1Size=%ld",
-            tilingKey_, needGrad_ ? 1 : 0, deterministicLevel, mDimNum, singleCoreM, originalKDimNum, kDimNum,
+            tilingKey_, needGrad_ ? 1 : 0, cvRatio_, deterministicLevel, mDimNum, singleCoreM, originalKDimNum, kDimNum,
             actualKBlockNum, splitKSize, tilingData_.get_mL1Size(), tilingData_.get_kL1Size());
     if (isKSplit) {
         return needGrad_ ? CalcMKSplitCorePart2GradoutTiling() : CalcMKSplitCorePart2Tiling();
@@ -573,7 +666,8 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::DoOpTiling()
 ge::graphStatus MhcPreSinkhornTilingRegbase::GetWorkspaceSize()
 {
     workspaceSize_ = sysWorkspaceSize_;
-    if (tilingKey_ == TILING_KEY_NO_GRAD_K_SPLIT || tilingKey_ == TILING_KEY_GRAD_K_SPLIT) {
+    if (tilingKey_ == TILING_KEY_NO_GRAD_K_SPLIT || tilingKey_ == TILING_KEY_GRAD_K_SPLIT ||
+        tilingKey_ == TILING_KEY_CV_ONE_NO_GRAD_K_SPLIT || tilingKey_ == TILING_KEY_CV_ONE_GRAD_K_SPLIT) {
         // K-split uses two float buffers after the system workspace.
         workspaceSize_ +=
             tilingData_.get_kBlockFactor() * tilingData_.get_bs() * tilingData_.get_hcMix() * sizeof(float) +

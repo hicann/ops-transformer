@@ -165,7 +165,8 @@ void DeserializeRegbaseTilingData(const TilingInfo& tilingInfo, optiling::MhcPre
 void ExpectRegbaseTilingData(const RegbaseTilingBaseline& baseline)
 {
     TilingInfo tilingInfo;
-    optiling::MhcPreSinkhornCompileInfo compileInfo = {baseline.coreNum, baseline.ubSize, SYS_WORKSPACE_SIZE};
+    // pin cvRatio=2 explicitly for the Ascend950 baselines.
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {baseline.coreNum, 0, baseline.ubSize, SYS_WORKSPACE_SIZE, 2};
     auto tilingContext = BuildRegbaseTilingContext(baseline, &compileInfo);
     ASSERT_TRUE(ExecuteTiling(*tilingContext, tilingInfo));
     ASSERT_EQ(tilingInfo.tilingKey, baseline.tilingKey);
@@ -212,7 +213,8 @@ void ExpectRegbaseTilingData(const RegbaseTilingBaseline& baseline)
 void ExpectRegbaseTilingFailure(const RegbaseTilingBaseline& baseline)
 {
     TilingInfo tilingInfo;
-    optiling::MhcPreSinkhornCompileInfo compileInfo = {baseline.coreNum, baseline.ubSize, SYS_WORKSPACE_SIZE};
+    // pin cvRatio=2 explicitly for the Ascend950 baselines.
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {baseline.coreNum, 0, baseline.ubSize, SYS_WORKSPACE_SIZE, 2};
     auto tilingContext = BuildRegbaseTilingContext(baseline, &compileInfo);
     EXPECT_FALSE(ExecuteTiling(*tilingContext, tilingInfo));
 }

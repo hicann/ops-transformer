@@ -23,13 +23,13 @@ using namespace AscendC;
 constexpr static uint32_t FINAL_ACCUMULATION = 3;
 constexpr static uint32_t NON_FINAL_ACCUMULATION = 2;
 // constexpr static int32_t C0_SIZE = AscendC::AuxGetC0Size<float>();
-constexpr static bool splitM_ = true;
 constexpr static uint64_t SPLIT_M_ALIGN = 2;
 static constexpr uint64_t L1_ALLOC_SIZE = 512 * 1024;
 static constexpr uint64_t L1_BUF_NUM = 2;
 static constexpr uint64_t L1_BUF_OFFSET = 128 * 256;
 constexpr static int SYNC_MODE4 = 4;
 
+template <bool SplitM = true>
 class MhcPreSinkhornCubeCompute {
 public:
     uint64_t m_{0};
@@ -195,14 +195,14 @@ public:
         AscendC::FixpipeParamsC310<AscendC::CO2Layout::ROW_MAJOR> fixpipeParams; // ROW_MAJOR默认使能NZ2ND
         uint64_t c0 = AscendC::AuxGetC0Size<float>();
         fixpipeParams.nSize = Align(baseN_, c0);
-        fixpipeParams.mSize = splitM_ ? Align(baseM_, SPLIT_M_ALIGN) : baseM_; // 切m需要m是2对齐
+        fixpipeParams.mSize = SplitM ? Align(baseM_, SPLIT_M_ALIGN) : baseM_; // 切m需要m是2对齐
         fixpipeParams.dstStride = fixpipeParams.nSize;
         fixpipeParams.srcStride = Align(baseM_, AscendC::BLOCK_CUBE); // 单位CO_SIZE (16*sizeof(C_T))
 
         fixpipeParams.quantPre = QuantMode_t::NoQuant;
         // fixpipeParams.quantPre = 0;
         // set cvRatio=1:2 默认splitM
-        fixpipeParams.dualDstCtl = splitM_ ? static_cast<uint8_t>(AscendC::McgShfMode::DUAL_DST_SPLIT_M) : 0;
+        fixpipeParams.dualDstCtl = SplitM ? static_cast<uint8_t>(AscendC::McgShfMode::DUAL_DST_SPLIT_M) : 0;
         fixpipeParams.unitFlag = FINAL_ACCUMULATION; // 3 unitflag
         fixpipeParams.params.ndNum = 1;              // ndNum
         fixpipeParams.params.srcNdStride = 1;        // srcNdStride

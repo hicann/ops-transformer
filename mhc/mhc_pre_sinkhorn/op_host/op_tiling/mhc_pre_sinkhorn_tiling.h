@@ -177,12 +177,18 @@ REGISTER_TILING_DATA_CLASS(MhcPreSinkhorn_1000, MhcPreSinkhornRegbaseTilingData)
 REGISTER_TILING_DATA_CLASS(MhcPreSinkhorn_1001, MhcPreSinkhornRegbaseTilingData)
 REGISTER_TILING_DATA_CLASS(MhcPreSinkhorn_2000, MhcPreSinkhornRegbaseTilingData)
 REGISTER_TILING_DATA_CLASS(MhcPreSinkhorn_2001, MhcPreSinkhornRegbaseTilingData)
+REGISTER_TILING_DATA_CLASS(MhcPreSinkhorn_3000, MhcPreSinkhornRegbaseTilingData)
+REGISTER_TILING_DATA_CLASS(MhcPreSinkhorn_3001, MhcPreSinkhornRegbaseTilingData)
+REGISTER_TILING_DATA_CLASS(MhcPreSinkhorn_4000, MhcPreSinkhornRegbaseTilingData)
+REGISTER_TILING_DATA_CLASS(MhcPreSinkhorn_4001, MhcPreSinkhornRegbaseTilingData)
 
 struct MhcPreSinkhornCompileInfo {
     uint64_t coreNum = 0;
     uint64_t aicCoreNum = 0;
     uint64_t ubSize = 0;
     uint64_t sysWorkspaceSize = 0;
+    // Zero means that the runtime platform ratio should be used.
+    uint64_t cvRatio = 0;
 };
 
 class MhcPreSinkhornTiling {
@@ -289,6 +295,7 @@ private:
     uint64_t aicCoreNum_ = 0;
     uint64_t workspaceSize_ = 0;
     uint64_t sysWorkspaceSize_ = 0;
+    uint64_t cvRatio_ = 2;
     uint64_t ubSize_ = 0;
     int64_t bs_ = 0;
     int64_t hcMix_ = 0;
