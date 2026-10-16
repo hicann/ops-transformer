@@ -234,7 +234,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
         </ul></td>
       <td>ND</td>
       <td>2</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>expertIdx（aclTensor）</td>
@@ -244,7 +244,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
       <td>INT32</td>
       <td>ND</td>
       <td>2</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>scaleOptional（aclTensor）</td>
@@ -266,7 +266,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
       <td>FLOAT32、FLOAT8_E8M0</td>
       <td>ND</td>
       <td>1-3</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>offsetOptional（aclTensor）</td>
@@ -279,7 +279,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
       <td>FLOAT32</td>
       <td>ND</td>
       <td>-</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>activeNum（int64_t）</td>
@@ -412,7 +412,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
       <td>FLOAT16、BFLOAT16、FLOAT32、INT8、INT4、FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8、FLOAT4_E2M1</td>
       <td>ND</td>
       <td>2</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>expandedRowIdxOut（aclTensor）</td>
@@ -425,7 +425,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
       <td>INT32</td>
       <td>ND</td>
       <td>1</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>expertTokensCountOrCumsumOut（aclTensor）</td>
@@ -440,7 +440,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
       <td>INT64</td>
       <td>ND</td>
       <td>1-2</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>expandedScaleOut（aclTensor）</td>
@@ -463,7 +463,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
       <td>FLOAT32、FLOAT8_E8M0</td>
       <td>ND</td>
       <td>1-3</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>workspaceSize（uint64_t）</td>

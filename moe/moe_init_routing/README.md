@@ -97,6 +97,10 @@
 
   - expertIdx内的元素的值需要大于-2\*\*24，不超过2\*\*24，否则可能会存在精度问题。
 
+## 精度说明
+
+  - MoeInitRouting为路由重排算子，不改变`x`的数值：`expandedXOut`仅按排序结果对`x`的行做gather搬运，不执行数值运算或数据类型转换；`expandedRowIdxOut`和`expandedExpertIdxOut`为INT32索引输出。输入满足约束时，各输出与golden逐元素一致。
+
 ## 调用说明
 
 | 调用方式   | 样例代码           | 说明                                         |

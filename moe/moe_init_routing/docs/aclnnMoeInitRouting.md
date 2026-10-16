@@ -140,7 +140,7 @@ aclnnStatus aclnnMoeInitRouting(
       <td>与x一致</td>
       <td>ND</td>
       <td>shape为(min(NUM_ROWS, activeNum) * K, H)</td>
-      <td>x</td>
+      <td>-</td>
     </tr>
     <tr>
       <td>expandedRowIdxOut</td>
@@ -150,7 +150,7 @@ aclnnStatus aclnnMoeInitRouting(
       <td>INT32</td>
       <td>ND</td>
       <td>shape为(NUM_ROWS*K, )</td>
-      <td>x</td>
+      <td>-</td>
     </tr>
     <tr>
       <td>expandedExpertIdxOut</td>
@@ -160,7 +160,7 @@ aclnnStatus aclnnMoeInitRouting(
       <td>INT32</td>
       <td>ND</td>
       <td>shape为(NUM_ROWS*K, )</td>
-      <td>x</td>
+      <td>-</td>
     </tr>
     <tr>
       <td>workspaceSize</td>
