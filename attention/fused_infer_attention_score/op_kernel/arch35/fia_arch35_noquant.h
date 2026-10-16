@@ -81,7 +81,7 @@ inline __aicore__ void fia_noquant_regbase(
 {
     __gm__ uint8_t* user = GetUserWorkspace(workspace);
 
-    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+    KERNEL_TASK_TYPE_DEFAULT(FIA_ARCH35_TASK_TYPE);
     constexpr bool isPa = KvLayoutType != 0;
 #if (ORIG_DTYPE_QUERY == DT_FLOAT16 && ORIG_DTYPE_KEY == DT_FLOAT16 && ORIG_DTYPE_ATTENTION_OUT == DT_FLOAT16)
     // 解析两个合并字段
