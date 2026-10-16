@@ -19,7 +19,7 @@ namespace NpuArch::Gemm::helper {
 
 template <class Element, class Layout>
 struct L1AlignHelper {
-    static_assert(DEPENDENT_FALSE<Element>, "Unsupported align helper, cannot find the specialization.");
+    static_assert(DEPENDENT_FALSE<Element>, "Unsupported align helper, can not find the specialization.");
 };
 
 template <class Element>

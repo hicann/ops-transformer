@@ -21,7 +21,7 @@ namespace NpuArch::Gemm::Tile {
 
 template <class ArchTag, class L1Type, class L0Type = void>
 struct CopyL1ToL0B {
-    static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy l1 to l0b, cannot find the specialization.");
+    static_assert(DEPENDENT_FALSE<ArchTag>, "Unsupported copy l1 to l0, can not find the specialization.");
 };
 
 ////////////////////////////////////////
