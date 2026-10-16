@@ -876,6 +876,12 @@ public:
                 InitValueL1BufferNAxis(kvScaleL1Tensor[kvBufId * L1_KV_SCALE_SIZE], s2SplitSize / MXFP_DIVISOR_SIZE,
                                        dVBaseSize * MXFP_MULTI_BASE_SIZE);
                 AscendC::PipeBarrier<PIPE_MTE2>();
+            } else if (unlikely((realK + MXFP_DIVISOR_SIZE - 1) / MXFP_DIVISOR_SIZE <
+                                s2SplitSize / MXFP_DIVISOR_SIZE)) {
+                // D 对齐时也需初始化尾块未搬满的 scale；0x00 是有限 E8M0 编码。
+                InitValueL1BufferNAxis(kvScaleL1Tensor[kvBufId * L1_KV_SCALE_SIZE], s2SplitSize / MXFP_DIVISOR_SIZE,
+                                       dVBaseSize * MXFP_MULTI_BASE_SIZE);
+                AscendC::PipeBarrier<PIPE_MTE2>();
             }
             CopyValueSlice(runInfo.s2Idx + k * baseK, realK, 0, constInfo_.dSizeV, runInfo);
             CopyValueScaleSlice((runInfo.s2Idx + k * baseK) / MXFP_DIVISOR_SIZE,

@@ -261,9 +261,11 @@ __global__ __aicore__ void quant_flash_attn(
         return;
     }
     if constexpr (quantMode == QFA_MXFP8_FP32_DECODE) {
+        InitSocState();
         quant_flash_attn_mxfp8_nd<inOutLayoutType, config, quantMode, hasAttenMask, KvLayoutType, isFd>(
             query, key, value, dequantScaleQuery, dequantScaleKey, dequantScaleValue, blockTable, pScale, cuSeqLensQ,
             cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata, attnOut, softmaxLse, workspace, tilingData);
+        PipeBarrier<PIPE_ALL>();
         return;
     }
 #endif
