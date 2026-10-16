@@ -48,17 +48,13 @@ struct CheckWinSizeData {
     bool isSetFullMeshV2;
     bool isLayered;
     bool isMc2Context;
-    bool reserveA3FullMeshWindowPadding = false;
 };
 
 inline uint64_t CalcMinWinSize(const CheckWinSizeData& winSizeData, uint64_t& tokenNeedSizeDispatch,
                                uint64_t& tokenNeedSizeCombine, uint64_t combineDataAlign = WIN_ADDR_ALIGN)
 {
-    // Both runtime-window and tiling-window checks must reserve the Dispatch offset.
-    // A3 Combine still sends raw data; this padding is only a window reservation.
-    if (winSizeData.reserveA3FullMeshWindowPadding) {
-        combineDataAlign = FULL_MESH_DATA_ALIGN;
-    }
+    // A3 Combine uses raw 512-byte-aligned data for both fullmesh variants.
+    // A5 callers explicitly request the packed-data alignment.
     const uint64_t h = winSizeData.h;
     const uint64_t k = winSizeData.k;
     const uint64_t maxBs = winSizeData.globalBs / winSizeData.epWorldSize;
@@ -205,7 +201,10 @@ inline ge::graphStatus CheckWinSize(const gert::TilingContext* context, const ch
     OP_TILING_CHECK(
         CheckActualWinSize(context, nodeName, winSizeData, maxWindowSizeEp, hcclBufferSizeEp) != ge::GRAPH_SUCCESS,
         OP_LOGE_WITHOUT_REPORT(nodeName, "Tiling check actual window size failed."), return ge::GRAPH_FAILED);
-    uint64_t rankOffsetSize = winSizeData.epWorldSize * EP_RANK_OFFSET_STEP;
+    // A3 context holders start at the data window without a per-rank offset.
+    // Keep the checked capacity intact when splitting its ping-pong windows.
+    const bool isA3FullMesh = mc2tiling::GetSocVersion(context) == "Ascend910_93" && !winSizeData.isLayered;
+    uint64_t rankOffsetSize = isA3FullMesh ? 0UL : winSizeData.epWorldSize * EP_RANK_OFFSET_STEP;
     OP_TILING_CHECK(maxWindowSizeEp < rankOffsetSize,
                     OP_LOGE_WITHOUT_REPORT(nodeName, "maxWindowSizeEp is too small: %lu B < %lu B (epWorldSize=%lu).",
                                            maxWindowSizeEp, rankOffsetSize, winSizeData.epWorldSize),

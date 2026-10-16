@@ -120,7 +120,7 @@ class MoeDistributeBuffer:
             ),
         )
 
-        max_out_dtype_size = 2  # sizeof(int32)
+        max_out_dtype_size = 2  # sizeof(float16/bfloat16)
         mb_conversion = 1024 * 1024
         ub_align = 32  # 32B
         scale_expand_index_buffer = 44  # scale 32B + 3 * 4 expand_idx
@@ -147,6 +147,8 @@ class MoeDistributeBuffer:
             )
         else:
             token_need_size_dispatch = inline_align(token_actual_len, win_addr_align)
+        # A3 Combine uses raw 512-byte-aligned data, including fullmesh_v2.
+        # Keep this reservation consistent with the host check and Dispatch offset.
         token_need_size_combine = inline_align(
             hidden * max_out_dtype_size, win_addr_align
         )
@@ -167,7 +169,8 @@ class MoeDistributeBuffer:
             )
             + mb_conversion
         )
-        ## hccl按照2*bufferSize大小开设
+        # Return the HCCL configuration in MiB, not the data-window size.
+        # HCCL allocates twice this value; the first MiB is reserved for state.
         ccl_buffer_size = (
             inline_align(
                 inline_align(minimum_buffer_size, mb_conversion) // mb_conversion, 2

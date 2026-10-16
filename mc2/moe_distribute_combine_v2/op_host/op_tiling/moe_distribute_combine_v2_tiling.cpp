@@ -2178,7 +2178,6 @@ static ge::graphStatus CheckAndCalWinSize(const gert::TilingContext* context,
     winSizeData.isSetFullMeshV2 = false;
     winSizeData.isLayered = isLayered;
     winSizeData.isMc2Context = config.isMc2Context;
-    winSizeData.reserveA3FullMeshWindowPadding = mc2tiling::GetSocVersion(context) == "Ascend910_93" && !isLayered;
     const bool useRuntimeWinSize =
         !isLayered && !config.isMc2Context && mc2tiling::GetSocVersion(context) == "Ascend910_93";
     const auto ret = useRuntimeWinSize ? CalcMinWinSizeA3(context, nodeName, winSizeData) :

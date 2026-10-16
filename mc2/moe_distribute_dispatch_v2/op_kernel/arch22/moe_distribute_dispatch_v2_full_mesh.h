@@ -425,9 +425,9 @@ __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFu
     tpipe_->InitBuffer(dataStateBuf, UB_ALIGN);
     dataState_ = InitWinState(selfDataStatusGMTensor_, epRankIdHccl, epWorldSizeHccl, epRankIdOriginal_, moeExpertNum_,
                               epWorldSizeOriginal_, globalBS_, dataStateBuf);
-    // Keep the established A3 fullmesh dispatch offset, including the reserved gap.
-    // Combine itself still uses raw 512-byte-aligned payloads and separate flags.
-    uint64_t combineReservedStride = Ceil(axisH_ * COMBINE_IN_DATA_SIZE, SPLIT_BLOCK_DATA_SIZE) * SPLIT_BLOCK_SIZE;
+    // Match the raw Combine payload and get_low_latency_ccl_buffer_size.
+    // Dispatch packets retain their separate 480-byte data / 512-byte block layout.
+    uint64_t combineReservedStride = Ceil(axisH_ * COMBINE_IN_DATA_SIZE, WIN_ADDR_ALIGN) * WIN_ADDR_ALIGN;
     winDataSizeOffset_ =
         dataState_ * (totalWinSize_ / BUFFER_NUM) + axisMaxBS_ * (axisK_ + sharedExpertNum_) * combineReservedStride;
 }
