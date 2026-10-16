@@ -3762,7 +3762,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::SubGrapA
     }
 
     LocalTensor<float> vecClc2Buffer =
-        unifiedBuffer.GetWithOffset<float>(32 * 1024 / sizeof(float), ubBufferOffset + T2Begin);
+        unifiedBuffer.GetWithOffset<float>(33 * 1024 / sizeof(float), ubBufferOffset + T2Begin);
     if constexpr (MM_OUT_FORMAT == CubeFormat::ND) {
         if (s2VecLoop == 1) {
             DataCopy(vecClc2Buffer, mm2WorkspaceGm[pingpongIdx * cubeBaseMN + curS1Idx * s1VecSize * s2ExtendAlign],
@@ -3786,7 +3786,9 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::SubGrapA
         AscendC::SetFlag<HardEvent::MTE2_V>(static_cast<int32_t>(vWaitMte2));
         AscendC::WaitFlag<HardEvent::MTE2_V>(static_cast<int32_t>(vWaitMte2));
         auto tmpTensor = unifiedBuffer.GetWithOffset<T2>(TMP_UB_SIZE / sizeof(T2), TMP_UB_OFFSET);
-        DataCopy(tmpTensor, vecClc2Buffer, s1ExtendSubGraph * s2ExtendAlign + s2ExtendAlign / C0_SIZE * VEC_REPEAT);
+        uint32_t nzBlockCount = s2ExtendAlign / C0_SIZE;
+        uint32_t nzDataSize = s1ExtendSubGraph * s2ExtendAlign + (nzBlockCount - 1) * cal_block_num;
+        DataCopy(tmpTensor, vecClc2Buffer, nzDataSize);
         AscendC::PipeBarrier<PIPE_V>();
         NZ2ND(vecClc2Buffer, tmpTensor, s1ExtendSubGraph, s2ExtendAlign);
     }
@@ -4014,7 +4016,9 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::SubGrapB
         AscendC::SetFlag<HardEvent::MTE2_V>(static_cast<int32_t>(vWaitMte2));
         AscendC::WaitFlag<HardEvent::MTE2_V>(static_cast<int32_t>(vWaitMte2));
         auto tmpTensor = unifiedBuffer.GetWithOffset<T2>(TMP_UB_SIZE / sizeof(T2), TMP_UB_OFFSET);
-        DataCopy(tmpTensor, vecClc1Buffer, s1ExtendSubGraph * s2ExtendAlign + s2ExtendAlign / C0_SIZE * VEC_REPEAT);
+        uint32_t nzBlockCount = s2ExtendAlign / C0_SIZE;
+        uint32_t nzDataSize = s1ExtendSubGraph * s2ExtendAlign + (nzBlockCount - 1) * cal_block_num;
+        DataCopy(tmpTensor, vecClc1Buffer, nzDataSize);
         AscendC::PipeBarrier<PIPE_V>();
         NZ2ND(vecClc1Buffer, tmpTensor, s1ExtendSubGraph, s2ExtendAlign);
     }
