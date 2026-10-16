@@ -44,6 +44,7 @@
 
 // torch_npu stream utilities
 #include "torch_npu/csrc/aten/common/from_blob.h"
+#include "torch_npu/csrc/core/npu/NPUFunctions.h"
 #include "torch_npu/csrc/core/npu/NPUStream.h"
 
 namespace Mc2Api {
@@ -107,6 +108,27 @@ static inline int64_t AlignTo(int64_t x, int64_t y)
     TORCH_CHECK(y > 0, "AlignTo divisor must be positive, got ", y);
     TORCH_CHECK(x <= INT64_MAX - y + 1, "AlignTo overflow: x=", x, " y=", y);
     return CeilDiv(x, y) * y;
+}
+
+static inline uint32_t GetAivCoreNum()
+{
+    static const uint32_t aivCoreNum = [] {
+        int32_t deviceId = 0;
+        aclError derr = c10_npu::GetDevice(&deviceId);
+        if (derr != ACL_SUCCESS) {
+            deviceId = static_cast<int32_t>(c10_npu::current_device());
+        }
+
+        int64_t aiv = 0;
+        aclError ret = aclrtGetDeviceInfo(static_cast<uint32_t>(deviceId), ACL_DEV_ATTR_VECTOR_CORE_NUM, &aiv);
+        if (ret != ACL_SUCCESS || aiv <= 0) {
+            ret = aclGetDeviceCapability(static_cast<uint32_t>(deviceId), ACL_DEVICE_INFO_VECTOR_CORE_NUM, &aiv);
+        }
+        TORCH_CHECK(ret == ACL_SUCCESS && aiv > 0, "Failed to query AIV core num, device=", deviceId,
+                    ", ret=", static_cast<int>(ret), ", aiv=", aiv);
+        return static_cast<uint32_t>(aiv);
+    }();
+    return aivCoreNum;
 }
 
 static inline void CheckMoeEpMetadataTensor(const at::Tensor& metadata, const char* name, int64_t capacity,
@@ -207,17 +229,26 @@ struct MoeSharedBufferEntry {
 static std::mutex gMoeSharedBufferMutex;
 static std::unordered_map<std::string, MoeSharedBufferEntry> gMoeSharedBuffers;
 
-struct EngramContextResources {
-    HcclComm hcclComm = nullptr;
+struct EngramCtxResBase {
     HcclMemHandle memHandle = nullptr;
     void* hostBufPtr = nullptr;
     void* deviceBufPtr = nullptr;
     bool externalRegistered = false;
     int64_t commBufferSize = 0;
     EngramCommContext context;
-    at::Tensor contextTensor;
+    void* sfHostBufPtr = nullptr;
     void* sfDeviceBufPtr = nullptr;
     bool sfExternalRegistered = false;
+
+    void CopyBase(const EngramCtxResBase& o)
+    {
+        static_cast<EngramCtxResBase&>(*this) = o;
+    }
+};
+
+struct EngramContextResources : EngramCtxResBase {
+    HcclComm hcclComm = nullptr;
+    at::Tensor contextTensor;
 };
 
 // 进程级 Engram 通信 buffer 共享池：HCCL 引擎 ctx 以 tag 为单例缓存在通信域内，注册内存
@@ -225,20 +256,26 @@ struct EngramContextResources {
 // 映射内存。因此注册内存生命周期与 tag 绑定并保留至进程级：同 tag 多实例共享，Destroy 仅
 // 解除本实例引用、不释放内存，同 group destroy 后重建 ElasticBuffer 时直接复用(自建 buffer
 // 重建容量不得超过首建值；外部零拷贝 buffer 重建时地址与大小必须与首建注册一致)。
-struct EngramSharedBufferEntry {
-    void* hostBufPtr = nullptr;
-    void* deviceBufPtr = nullptr;
-    HcclMemHandle memHandle = nullptr;
-    bool external = false; // buffer 是否来自调用方零拷贝存储
-    bool externalRegistered = false;
-    int64_t registeredBytes = 0; // 实际已注册的字节数
-    int64_t commBufferSize = 0;
-    EngramCommContext context;
-    void* sfDeviceBufPtr = nullptr;
-    bool sfExternalRegistered = false;
+struct EngramSharedBufferEntry : EngramCtxResBase {
+    bool external = false;         // buffer 是否来自调用方零拷贝存储
+    int64_t registeredBytes = 0;   // 实际已注册的字节数
+    bool sfExternal = false;       // SF 表是否来自调用方零拷贝存储
+    int64_t sfRegisteredBytes = 0; // SF 表实际已注册的字节数
 };
 static std::mutex gEngramSharedBufferMutex;
 static std::unordered_map<std::string, EngramSharedBufferEntry> gEngramSharedBuffers;
+
+static void RollbackExternalHostRegistration(EngramContextResources& resources, void* externalHostPtr, void* sfHostPtr)
+{
+    if (externalHostPtr != nullptr && resources.externalRegistered) {
+        (void)aclrtHostUnregister(externalHostPtr);
+        resources.externalRegistered = false;
+    }
+    if (sfHostPtr != nullptr && resources.sfExternalRegistered) {
+        (void)aclrtHostUnregister(sfHostPtr);
+        resources.sfExternalRegistered = false;
+    }
+}
 
 template <typename ContextT>
 static at::Tensor CreateCommContextTensor(const ContextT& context)
@@ -475,8 +512,8 @@ protected:
         }
         TORCH_CHECK(index < netLinkNum, "No matching communication protocol found in HCCL links, protocol is ",
                     static_cast<int>(protocol));
-        ASCEND_LOGI("Get HCCL Communication link Success,srcRankId %u, dstRankId %u, protocol is: %u", srcRankId,
-                    dstRankId, protocol);
+        ASCEND_LOGI("Get HCCL Communication link Success, srcRankId %u, dstRankId %u, layerId %u, protocol is: %u",
+                    srcRankId, dstRankId, netLayerId, static_cast<int>(protocol));
     }
 
     RankLinkInfo ResolveLinkInfo(uint32_t dstRank, const CommProtocol& protocol, const uint32_t* netLayerList) const
@@ -510,147 +547,104 @@ public:
 
         std::lock_guard<std::mutex> lock(gEngramSharedBufferMutex);
 
-        uint64_t ctxSize = 0;
-        void* ctx = nullptr;
-        auto hcclRet =
-            HcclEngineCtxGetFunc(resources.hcclComm, contextTag.c_str(), CommEngine::COMM_ENGINE_AIV, &ctx, &ctxSize);
-        if (hcclRet != HCCL_SUCCESS) {
-            HostBufferGuard guard;
-            HostBufferGuard sfGuard;
-            try {
-                CreateContext(resources, contextTag, numCpuBytes, guard, externalHostPtr, externalBytes, sfHostPtr,
-                              sfBytes, sfGuard);
-            } catch (...) {
-                if (externalHostPtr != nullptr && resources.externalRegistered) {
-                    (void)aclrtHostUnregister(externalHostPtr);
-                    resources.externalRegistered = false;
-                }
-                if (sfHostPtr != nullptr && resources.sfExternalRegistered) {
-                    (void)aclrtHostUnregister(sfHostPtr);
-                    resources.sfExternalRegistered = false;
-                }
-                throw;
-            }
-            resources.contextTensor = CreateCommContextTensor(resources.context);
-            // 首次创建: 注册内存入共享池(与 tag 绑定的不可销毁资源同生命周期)，Destroy 不释放。
-            // 入池成功前不解除 guard 所有权，入池抛异常时由 guard 析构兜底释放自建 buffer，防资源失联。
-            try {
-                EngramSharedBufferEntry& entry = gEngramSharedBuffers[contextTag];
-                entry.hostBufPtr = resources.hostBufPtr;
-                entry.deviceBufPtr = resources.deviceBufPtr;
-                entry.memHandle = resources.memHandle;
-                entry.external = (externalHostPtr != nullptr);
-                entry.externalRegistered = resources.externalRegistered;
-                entry.registeredBytes =
-                    resources.hostBufPtr != nullptr ? ((externalHostPtr != nullptr) ? externalBytes : numCpuBytes) : 0;
-                entry.commBufferSize = resources.commBufferSize;
-                entry.context = resources.context;
-                entry.sfDeviceBufPtr = resources.sfDeviceBufPtr;
-                entry.sfExternalRegistered = resources.sfExternalRegistered;
-            } catch (...) {
-                ASCEND_LOGW("failed to record engram shared buffer for tag %s, buffer will be rolled back",
-                            contextTag.c_str());
-                throw;
-            }
-            guard.Release();
-            sfGuard.Release();
+        bool ctxCreated = HasEngramCommCtx(resources.hcclComm, contextTag);
+        if (!ctxCreated) {
+            // 首次建链：创建 ctx -> 注册存储 -> 登记共享池
+            CreateEngramContext(resources, contextTag, numCpuBytes, externalHostPtr, externalBytes, sfHostPtr, sfBytes);
             return resources;
         }
         // ctx 已存在(同 group 曾创建过，含 destroy 后重建)：注册内存与 channel 均无反注册接口，
         // 由进程级共享池按 tag 复用，Destroy 不释放。
         EngramSharedBufferEntry entry;
-        {
-            auto iter = gEngramSharedBuffers.find(contextTag);
-            TORCH_CHECK(iter != gEngramSharedBuffers.end(), "Engram comm context of group '", contextTag,
-                        "' exists but its buffer is missing from the shared pool; an earlier build on this "
-                        "group may have failed midway, please use a new comm group");
-            entry = iter->second;
-        }
-        bool callerHasBuffer = (numCpuBytes > 0) || (externalHostPtr != nullptr);
-        if (!callerHasBuffer) {
-            // 仅初始化 ctx(如 engram_barrier 无存储场景)：复用共享池既有状态
-            resources.hostBufPtr = entry.hostBufPtr;
-            resources.deviceBufPtr = entry.deviceBufPtr;
-            resources.memHandle = entry.memHandle;
-            resources.externalRegistered = entry.externalRegistered;
-            resources.commBufferSize = entry.commBufferSize;
-            resources.context = entry.context;
-            resources.contextTensor = CreateCommContextTensor(resources.context);
-            resources.sfDeviceBufPtr = entry.sfDeviceBufPtr;
-            resources.sfExternalRegistered = entry.sfExternalRegistered;
-            return resources;
-        }
+        auto iter = gEngramSharedBuffers.find(contextTag);
+        TORCH_CHECK(iter != gEngramSharedBuffers.end(), "Engram comm context of group '", contextTag,
+                    "' exists but its buffer is missing from the shared pool; an earlier build on this "
+                    "group may have failed midway, please use a new comm group");
+        entry = iter->second;
         if (entry.hostBufPtr == nullptr) {
-            // ctx 已存在但存储尚未注册(先前仅 barrier 初始化)：补注册一次并回填共享池
-            GetRankInfo(resources.hcclComm, resources.context.rankId, resources.context.rankSize);
-            ValidateRankSize(resources.context.rankSize);
-            HostBufferGuard guard;
-            HostBufferGuard sfGuard;
-            try {
-                SetupEngramBuffer(resources, contextTag, numCpuBytes, guard, externalHostPtr, externalBytes, sfHostPtr,
-                                  sfBytes, sfGuard);
-            } catch (...) {
-                if (externalHostPtr != nullptr && resources.externalRegistered) {
-                    (void)aclrtHostUnregister(externalHostPtr);
-                    resources.externalRegistered = false;
-                }
-                if (sfHostPtr != nullptr && resources.sfExternalRegistered) {
-                    (void)aclrtHostUnregister(sfHostPtr);
-                    resources.sfExternalRegistered = false;
-                }
-                throw;
-            }
-            resources.contextTensor = CreateCommContextTensor(resources.context);
-            try {
-                EngramSharedBufferEntry& poolEntry = gEngramSharedBuffers[contextTag];
-                poolEntry.hostBufPtr = resources.hostBufPtr;
-                poolEntry.deviceBufPtr = resources.deviceBufPtr;
-                poolEntry.memHandle = resources.memHandle;
-                poolEntry.external = (externalHostPtr != nullptr);
-                poolEntry.externalRegistered = resources.externalRegistered;
-                poolEntry.registeredBytes = (externalHostPtr != nullptr) ? externalBytes : numCpuBytes;
-                poolEntry.commBufferSize = resources.commBufferSize;
-                poolEntry.context = resources.context;
-                poolEntry.sfDeviceBufPtr = resources.sfDeviceBufPtr;
-                poolEntry.sfExternalRegistered = resources.sfExternalRegistered;
-            } catch (...) {
-                ASCEND_LOGW("failed to record engram shared buffer for tag %s, buffer will be rolled back",
-                            contextTag.c_str());
-                throw;
-            }
-            guard.Release();
-            sfGuard.Release();
-            return resources;
+            // 场景1：ctx 已存在但存储尚未注册(先前仅 barrier 初始化)：补注册一次并回填共享池
+            return CreateEngramContext(resources, contextTag, numCpuBytes, externalHostPtr, externalBytes, sfHostPtr,
+                                       sfBytes, false);
         }
-        if (externalHostPtr != nullptr) {
-            TORCH_CHECK(entry.external && externalHostPtr == entry.hostBufPtr && externalBytes == entry.registeredBytes,
-                        "Engram comm context of group '", contextTag, "' has registered external storage at address ",
-                        entry.hostBufPtr, ", size ", entry.registeredBytes,
-                        "; zero-copy rebuild requires the same pinned storage address and size, please use a new "
-                        "comm group");
-        } else {
-            TORCH_CHECK(!entry.external, "Engram comm context of group '", contextTag,
-                        "' has registered external (zero-copy) storage; self-allocated buffer rebuild is not "
-                        "supported on this group, please use a new comm group");
-            TORCH_CHECK(numCpuBytes <= entry.registeredBytes,
-                        "engram buffer size exceeds the existing buffer of this group, requested ", numCpuBytes,
-                        ", allocated ", entry.registeredBytes,
-                        "; the shared engram storage is sized by the first ElasticBuffer created on this group, "
-                        "destroy and recreate with a larger size is not supported, please use a new comm group");
-        }
-        resources.hostBufPtr = entry.hostBufPtr;
-        resources.deviceBufPtr = entry.deviceBufPtr;
-        resources.memHandle = entry.memHandle;
-        resources.externalRegistered = entry.externalRegistered;
-        resources.commBufferSize = entry.commBufferSize;
-        resources.context = entry.context;
+        // 场景2：重建复用——校验本次参数与首建注册的存储形态/地址/大小一致
+        TORCH_CHECK(entry.external == (externalHostPtr != nullptr) &&
+                        (externalHostPtr == nullptr ||
+                         (externalHostPtr == entry.hostBufPtr && externalBytes == entry.registeredBytes)),
+                    "Engram comm context of group '", contextTag, "' has registered external storage at address ",
+                    entry.hostBufPtr, ", size ", entry.registeredBytes,
+                    "; zero-copy rebuild requires the same pinned storage address and size, self-allocated buffer "
+                    "rebuild is not supported, please use a new comm group");
+        TORCH_CHECK(externalHostPtr != nullptr || numCpuBytes <= entry.registeredBytes,
+                    "engram buffer size exceeds the existing buffer of this group, requested ", numCpuBytes,
+                    ", allocated ", entry.registeredBytes,
+                    "; the shared engram storage is sized by the first ElasticBuffer created on this group, "
+                    "destroy and recreate with a larger size is not supported, please use a new comm group");
+        TORCH_CHECK(
+            entry.sfExternal == (sfHostPtr != nullptr) &&
+                (sfHostPtr == nullptr || (sfHostPtr == entry.sfHostBufPtr && sfBytes == entry.sfRegisteredBytes)),
+            "Engram comm context of group '", contextTag, "' has registered external SF table at address ",
+            entry.sfHostBufPtr, ", size ", entry.sfRegisteredBytes,
+            "; zero-copy rebuild requires the same pinned SF table address and size, rebuild without SF is "
+            "not supported, please use a new comm group");
+        resources.CopyBase(entry);
         resources.contextTensor = CreateCommContextTensor(resources.context);
-        resources.sfDeviceBufPtr = entry.sfDeviceBufPtr;
         return resources;
     }
 
 private:
     bool withGrad_ = false;
+
+    // 功能：将本次建链结果登记进共享池
+    void RegisterBufferPoolEntry(const std::string& contextTag, const EngramContextResources& resources,
+                                 void* externalHostPtr, int64_t externalBytes, void* sfHostPtr, int64_t sfBytes,
+                                 int64_t numCpuBytes)
+    {
+        try {
+            EngramSharedBufferEntry& entry = gEngramSharedBuffers[contextTag];
+            entry.CopyBase(resources);
+            entry.external = (externalHostPtr != nullptr);
+            entry.registeredBytes =
+                resources.hostBufPtr != nullptr ? ((externalHostPtr != nullptr) ? externalBytes : numCpuBytes) : 0;
+            entry.sfExternal = (sfHostPtr != nullptr);
+            entry.sfRegisteredBytes = resources.sfHostBufPtr != nullptr ? sfBytes : 0;
+        } catch (...) {
+            ASCEND_LOGW("failed to record engram shared buffer for tag %s, buffer will be rolled back",
+                        contextTag.c_str());
+            throw;
+        }
+    }
+
+    // 功能：查询同 group 同 tag 的引擎 ctx 是否已创建过
+    bool HasEngramCommCtx(const HcclComm& commHandle, const std::string& contextTag)
+    {
+        uint64_t ctxSize = 0;
+        void* ctx = nullptr;
+        return HcclEngineCtxGetFunc(commHandle, contextTag.c_str(), CommEngine::COMM_ENGINE_AIV, &ctx, &ctxSize) ==
+               HCCL_SUCCESS;
+    }
+
+    // 功能：首次建链——创建 ctx、注册存储并登记共享池（未创建过分支）
+    EngramContextResources CreateEngramContext(EngramContextResources& resources, const std::string& contextTag,
+                                               int64_t numCpuBytes, void* externalHostPtr, int64_t externalBytes,
+                                               void* sfHostPtr, int64_t sfBytes, bool createEngineCtx = true)
+    {
+        HostBufferGuard guard;
+        HostBufferGuard sfGuard;
+        try {
+            CreateContext(resources, contextTag, numCpuBytes, guard, externalHostPtr, externalBytes, sfHostPtr, sfBytes,
+                          sfGuard, createEngineCtx);
+        } catch (...) {
+            RollbackExternalHostRegistration(resources, externalHostPtr, sfHostPtr);
+            throw;
+        }
+        resources.contextTensor = CreateCommContextTensor(resources.context);
+        // 首次创建: 注册内存入共享池(与 tag 绑定的不可销毁资源同生命周期)，Destroy 不释放。
+        // 入池成功前不解除 guard 所有权，入池抛异常时由 guard 析构兜底释放自建 buffer，防资源失联。
+        RegisterBufferPoolEntry(contextTag, resources, externalHostPtr, externalBytes, sfHostPtr, sfBytes, numCpuBytes);
+        guard.Release();
+        sfGuard.Release();
+        return resources;
+    }
 
     static void ValidateRankSize(uint32_t rankSize)
     {
@@ -716,6 +710,7 @@ private:
         TORCH_CHECK(ar == ACL_SUCCESS, "aclrtHostGetDevicePointer failed, ret=", ar,
                     ", storage host memory cannot be mapped to device");
 
+        resources.sfHostBufPtr = sfHostPtr;
         resources.sfDeviceBufPtr = devPtr;
     }
 
@@ -726,64 +721,28 @@ private:
         uint32_t totalChannels = (rankDim - 1) * channelsPerRank;
         channelDesc.reserve(totalChannels);
 
-        uint32_t* netLayers = nullptr;
-        uint32_t netLayerNum = 0;
-        GetNetLayers(commHandle, netLayers, netLayerNum);
-        TORCH_CHECK(netLayerNum > 0, "Get HCCL net layers failed, netLayerNum is ", netLayerNum);
-
         for (uint32_t peer = 0; peer < rankDim; ++peer) {
             if (peer == srcRankId) {
                 continue;
             }
             auto linkIter = rankLinkMap_.find(peer);
-            if (linkIter != rankLinkMap_.end()) {
-                RankLinkInfo linkInfo = linkIter->second;
-                CommLink* links = nullptr;
-                GetHcclCommLink(commHandle, linkInfo.layer, srcRankId, peer, linkInfo.protocol, links);
-                for (uint32_t ch = 0; ch < channelsPerRank; ++ch) {
-                    HcclChannelDesc desc;
-                    HcclResult initRet = HcclChannelDescInit(&desc, 1);
-                    TORCH_CHECK(initRet == HCCL_SUCCESS, "HcclChannelDescInit failed, ret=", initRet);
-                    desc.remoteRank = peer;
-                    desc.channelProtocol = linkInfo.protocol;
-                    desc.localEndpoint = links->srcEndpointDesc;
-                    desc.remoteEndpoint = links->dstEndpointDesc;
-                    desc.notifyNum = 3;
-                    desc.memHandles = &memHandle;
-                    desc.memHandleNum = 1;
-                    channelDesc.push_back(desc);
-                }
-            } else {
-                bool found = false;
-                for (uint32_t li = 0; li < netLayerNum && !found; ++li) {
-                    CommLink* linkList = nullptr;
-                    uint32_t listSize = 0;
-                    if (HcclRankGraphGetLinksFunc(commHandle, netLayers[li], srcRankId, peer, &linkList, &listSize) !=
-                        HCCL_SUCCESS) {
-                        continue;
-                    }
-                    for (uint32_t i = 0; i < listSize && !found; ++i) {
-                        const int p = static_cast<int>(linkList[i].linkAttr.linkProtocol);
-                        if (p != 4 && p != 5 && p != 9) {
-                            continue;
-                        }
-                        for (uint32_t ch = 0; ch < channelsPerRank; ++ch) {
-                            HcclChannelDesc desc;
-                            HcclResult initRet = HcclChannelDescInit(&desc, 1);
-                            TORCH_CHECK(initRet == HCCL_SUCCESS, "HcclChannelDescInit failed, ret=", initRet);
-                            desc.remoteRank = peer;
-                            desc.channelProtocol = linkList[i].linkAttr.linkProtocol;
-                            desc.localEndpoint = linkList[i].srcEndpointDesc;
-                            desc.remoteEndpoint = linkList[i].dstEndpointDesc;
-                            desc.notifyNum = 3;
-                            desc.memHandles = &memHandle;
-                            desc.memHandleNum = 1;
-                            channelDesc.push_back(desc);
-                        }
-                        found = true;
-                    }
-                }
-                TORCH_CHECK(found, "No UB_CTP/UBC_TP/UBG link found for srcRankID ", srcRankId, ", dstRankID ", peer);
+            TORCH_CHECK(linkIter != rankLinkMap_.end(), "No routing info for peer rank ", peer,
+                        " after protocol negotiation");
+            RankLinkInfo linkInfo = linkIter->second;
+            CommLink* links = nullptr;
+            GetHcclCommLink(commHandle, linkInfo.layer, srcRankId, peer, linkInfo.protocol, links);
+            for (uint32_t ch = 0; ch < channelsPerRank; ++ch) {
+                HcclChannelDesc desc;
+                HcclResult initRet = HcclChannelDescInit(&desc, 1);
+                TORCH_CHECK(initRet == HCCL_SUCCESS, "HcclChannelDescInit failed, ret=", initRet);
+                desc.remoteRank = peer;
+                desc.channelProtocol = linkInfo.protocol;
+                desc.localEndpoint = links->srcEndpointDesc;
+                desc.remoteEndpoint = links->dstEndpointDesc;
+                desc.notifyNum = 3;
+                desc.memHandles = &memHandle;
+                desc.memHandleNum = 1;
+                channelDesc.push_back(desc);
             }
         }
     }
@@ -820,9 +779,8 @@ private:
         if (hasUbGPeer) {
             resources.context.channelsPerRank = 1U;
         } else {
-            constexpr uint32_t handleArraySize = 72U;
             resources.context.channelsPerRank =
-                static_cast<uint32_t>(CeilDiv(handleArraySize, resources.context.rankSize));
+                static_cast<uint32_t>(CeilDiv(GetAivCoreNum(), resources.context.rankSize));
             if (resources.context.channelsPerRank == 0U) {
                 resources.context.channelsPerRank = 1U;
             }
@@ -884,8 +842,7 @@ private:
 
         uint32_t channelsPerPeer = 1U;
         if (!hasUbGPeer) {
-            constexpr uint32_t aivNum = 72U;
-            uint32_t numSendCores = aivNum / 2U;
+            uint32_t numSendCores = GetAivCoreNum() / 2U;
             if (numSendCores == 0U) {
                 numSendCores = 1U;
             }
@@ -936,11 +893,13 @@ private:
 
     void CreateContext(EngramContextResources& resources, const std::string& contextTag, int64_t numCpuBytes,
                        HostBufferGuard& guard, void* externalHostPtr, int64_t externalBytes, void* sfHostPtr,
-                       int64_t sfBytes, HostBufferGuard& sfGuard)
+                       int64_t sfBytes, HostBufferGuard& sfGuard, bool createEngineCtx = true)
     {
-        uint64_t contextSize = sizeof(EngramCommContext);
-        void* ctx = nullptr;
-        CreateEngineContext(resources.hcclComm, contextTag, CommEngine::COMM_ENGINE_AIV, contextSize, ctx);
+        if (createEngineCtx) {
+            uint64_t contextSize = sizeof(EngramCommContext);
+            void* ctx = nullptr;
+            CreateEngineContext(resources.hcclComm, contextTag, CommEngine::COMM_ENGINE_AIV, contextSize, ctx);
+        }
 
         GetRankInfo(resources.hcclComm, resources.context.rankId, resources.context.rankSize);
         ValidateRankSize(resources.context.rankSize);
@@ -972,6 +931,12 @@ private:
         GetNetLayers(resources.hcclComm, netLayerList, netLayerNum);
         if (netLayerNum != HCCL_COMM_LAYERS_MTE_CCU) {
             CheckProtocolSupport(resources.hcclComm, netLayerList, netLayerNum, CommProtocol::COMM_PROTOCOL_UB_CTP);
+        } else {
+            for (uint32_t peer = 0; peer < resources.context.rankSize; ++peer) {
+                if (peer != resources.context.rankId) {
+                    rankLinkMap_[peer] = {CommProtocol::COMM_PROTOCOL_UB_CTP, netLayerList[0]};
+                }
+            }
         }
 
         if (withGrad_) {
@@ -1891,7 +1856,8 @@ void ElasticBuffer::EngramWrite(const at::Tensor& storage, const c10::optional<a
         } else {
             externalHostPtr = storage.data_ptr();
             externalBytes = static_cast<int64_t>(storage.nbytes());
-            if (sf.has_value()) {
+            // 空 SF tensor 归一化为无 SF：避免首建登记 sfExternal=true 但未注册映射，导致重建一致性校验必失败
+            if (sf.has_value() && sf.value().nbytes() > 0) {
                 sfHostPtr = sf.value().data_ptr();
                 sfBytes = static_cast<int64_t>(sf.value().nbytes());
             }
