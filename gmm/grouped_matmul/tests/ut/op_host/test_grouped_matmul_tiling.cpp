@@ -402,7 +402,12 @@ const vector<GroupedMatmulTilingCase>& GetAscend950Cases()
 
 const vector<GroupedMatmulTilingCase>& GetAscend910BCases()
 {
-    static const vector<GroupedMatmulTilingCase> cases = LoadCases("Ascend910B");
+    static const vector<GroupedMatmulTilingCase> cases = [] {
+        auto merged = LoadCases("Ascend910B");
+        const auto ascend91093 = LoadCases("Ascend910_93");
+        merged.insert(merged.end(), ascend91093.begin(), ascend91093.end());
+        return merged;
+    }();
     return cases;
 }
 

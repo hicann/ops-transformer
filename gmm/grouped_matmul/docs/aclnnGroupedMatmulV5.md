@@ -648,7 +648,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 | groupType | x | weight | y | splitItem | groupListOptional | 转置 | 其余场景限制 |
 |:---:|:---:|:---:|:---:|:---:|:---|:---|:---|
 | -1 | 多 | 多 | 多 | 0/1 | 必须传空 | x不转置；weight可转置（统一） | x中tensor要求维度一致，支持2维，weight中tensor需为2维，y中tensor维度和x保持一致 |
-| 0 | 单 | 单 | 单 | 2/3 | 必须传；groupListType=0 末值 ≤ x 第一维；groupListType=1 总和 ≤ x 第一维；groupListType=2 第二列总和 ≤ x 第一维；最大 1024 组 | x不转置；weight可转置（A8W4/A4W4 不可） | weight中tensor需为3维，x，y中tensor需为2维 |
+| 0 | 单 | 单 | 单 | 2/3 | 必须传；groupListType=0 末值 ≤ x 第一维；groupListType=1 总和 ≤ x 第一维；groupListType=2 第二列总和 ≤ x 第一维；非量化FLOAT16/BFLOAT16且groupListType=0/1时最大25600组，其他场景最大1024组 | x不转置；weight可转置（A8W4/A4W4 不可） | weight中tensor需为3维，x，y中tensor需为2维 |
 | 0 | 单 | 多 | 单 | 2/3 | 必须传；groupListType=0 末值 ≤ x 第一维；groupListType=1 总和 ≤ x 第一维；groupListType=2 第二列总和 ≤ x 第一维；最大 128 组 | x不转置；weight可转置（统一） | 1）x，weight，y中tensor需为2维；<br>2）weight中每个tensor的N轴必须相等 |
 | 0 | 多 | 多 | 单 | 2/3 | 可选；若传则 groupListType=0 差值 = x 第一维、groupListType=1 数值 = x 第一维、groupListType=2 第二列 = x 第一维；最大 128 组 | x不转置；weight可转置（统一） | 1）x，weight，y中tensor需为2维；<br>2）weight中每个tensor的N轴必须相等 |
 | 2 | 单 | 单 | 单 | 2/3 | 必须传；groupListType=0 末值 ≤ x 第二维；groupListType=1 总和 ≤ x 第二维；groupListType=2 第二列总和 ≤ x 第二维；最大 1024 组 | x必须转置；weight不转置 | 1）x，weight中tensor需为2维，y中tensor需为3维；<br>2）bias必须传空 |

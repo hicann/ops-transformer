@@ -35,6 +35,9 @@
 
 using namespace std;
 
+// Defined only in the GMM L0 API UT translation unit.
+bool& GroupedMatmulInferShapeStubEnabled();
+
 namespace {
 
 using ops::ut::ParseBool;
@@ -71,6 +74,7 @@ void SetupPlatformForCase(const string& socVersion)
     static const map<string, op::SocVersion> socMap = {
         {"Ascend310P", op::SocVersion::ASCEND310P},
         {"Ascend910B", op::SocVersion::ASCEND910B},
+        {"Ascend910_93", op::SocVersion::ASCEND910_93},
         {"Ascend950", op::SocVersion::ASCEND950},
     };
     auto it = socMap.find(socVersion);
@@ -80,6 +84,16 @@ void SetupPlatformForCase(const string& socVersion)
 struct GroupedMatmulOpApiCase {
     void Run() const
     {
+        // Existing CSV cases keep the common no-op inference stub semantics.
+        struct ScopedShapeStub {
+            bool previous = GroupedMatmulInferShapeStubEnabled();
+            ~ScopedShapeStub()
+            {
+                GroupedMatmulInferShapeStubEnabled() = previous;
+            }
+        } shapeStub;
+        GroupedMatmulInferShapeStubEnabled() =
+            caseName.rfind("v5_nonquant_group_list_", 0) == 0 || caseName.rfind("legacy_", 0) == 0;
         SetupPlatformForCase(socVersion);
         TensorListDesc x = BuildAclTensorListDesc(xShape, xDtype, xFormat);
         TensorListDesc weight = BuildAclTensorListDesc(weightShape, weightDtype, weightFormat);

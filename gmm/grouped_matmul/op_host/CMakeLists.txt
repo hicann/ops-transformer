@@ -51,6 +51,12 @@ elseif("${CONDITION_UNIT}" STREQUAL "ascend350")
 endif()
 
 if(NOT BUILD_OPS_RTY_KERNEL)
+    if(UT_TEST_ALL OR OP_API_UT)
+        # Only the GMM L0 source uses this API UT shape stub.
+        set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/../op_api/grouped_matmul.cpp
+            APPEND PROPERTY COMPILE_OPTIONS -include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../tests/ut/op_api/grouped_matmul_infer_shape_stub.h)
+    endif()
     add_modules_sources(
         OP_API_INDEPENDENT ON
         OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api

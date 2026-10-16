@@ -549,11 +549,39 @@ static ge::graphStatus CheckNonQuant(gert::InferShapeContext* context)
     return GRAPH_SUCCESS;
 }
 
+static int64_t GetMaxGroupListSize(const gert::InferShapeContext* context)
+{
+    const auto* attrs = context->GetAttrs();
+    const auto* groupType = attrs == nullptr ? nullptr : attrs->GetInt(GMM_INDEX_ATTR_GROUP_TYPE);
+    const auto* listType = attrs == nullptr ? nullptr : attrs->GetInt(GMM_INDEX_ATTR_GROUP_LIST_TYPE);
+    size_t numX = 0;
+    size_t numWeight = 0;
+    int64_t lenGroupList = 0;
+    if (groupType == nullptr || *groupType != GMM_SPLIT_M || listType == nullptr ||
+        (*listType != 0 && *listType != 1) || GetNumOfInputs(context, numX, numWeight, lenGroupList) != GRAPH_SUCCESS ||
+        numX != 1 || numWeight != 1 || context->GetComputeNodeOutputNum() != 1) {
+        return GMM_MAX_GROUP_LIST_SIZE_TENSOR;
+    }
+    const auto* xDesc = context->GetDynamicInputDesc(GMM_INDEX_IN_X, 0);
+    const auto* wDesc = context->GetDynamicInputDesc(GMM_INDEX_IN_WEIGHT, 0);
+    const auto* wShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
+    if (xDesc == nullptr || wDesc == nullptr || wShape == nullptr ||
+        wShape->GetDimNum() != GMM_SPLIT_M_SINGLE_WEIGHT_DIM) {
+        return GMM_MAX_GROUP_LIST_SIZE_TENSOR;
+    }
+    const auto dtype = xDesc->GetDataType();
+    const bool isNonQuant = dtype == wDesc->GetDataType() && (dtype == DT_FLOAT16 || dtype == DT_BF16);
+    const auto& platform = GetGmmPlatformCache();
+    const bool isSupportedSoc = platform.ret == GRAPH_SUCCESS && (platform.shortSocVersion == "Ascend910B" ||
+                                                                  platform.shortSocVersion == "Ascend910_93");
+    constexpr int64_t maxNonQuantGroupListSize = 25600;
+    return isNonQuant && isSupportedSoc ? maxNonQuantGroupListSize : GMM_MAX_GROUP_LIST_SIZE_TENSOR;
+}
+
 static ge::graphStatus GetGroupSize(const gert::InferShapeContext* context, GMMParamsInfo& paramsInfo)
 {
     size_t groupNum = 1;
-    // all case allows 1024 in infershape, specific check in tiling
-    size_t maxGroupNum = GMM_MAX_GROUP_LIST_SIZE_TENSOR;
+    const size_t maxGroupNum = static_cast<size_t>(GetMaxGroupListSize(context));
     if (paramsInfo.numX > 1UL) {
         groupNum = paramsInfo.numX;
     } else if (paramsInfo.numWeight > 1UL) {
@@ -1388,13 +1416,14 @@ static ge::graphStatus CheckGroupListCommonTensor(const gert::InferShapeContext*
         return GRAPH_SUCCESS;
     }
     int64_t groupListSize = groupTensorOptionalShape->GetDim(0);
-    OP_CHECK_IF(groupListSize > GMM_MAX_GROUP_LIST_SIZE_TENSOR,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                    context->GetNodeName(), "groupList length", std::to_string(groupListSize),
-                    Ops::Transformer::Gmm::FormatString("groupList length must be less than or equal to %ld",
-                                                        GMM_MAX_GROUP_LIST_SIZE_TENSOR)
-                        .c_str()),
-                return GRAPH_FAILED);
+    const int64_t maxGroupListSize = GetMaxGroupListSize(context);
+    OP_CHECK_IF(
+        groupListSize > maxGroupListSize,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context->GetNodeName(), "groupList length", std::to_string(groupListSize),
+            Ops::Transformer::Gmm::FormatString("groupList length must be less than or equal to %ld", maxGroupListSize)
+                .c_str()),
+        return GRAPH_FAILED);
     OP_CHECK_IF(!((groupListSize == groupNum && groupNum > 1) || groupNum == 1),
                 OP_LOGE_FOR_INVALID_LISTSIZE(context->GetNodeName(), "groupList", std::to_string(groupListSize),
                                              std::to_string(groupNum)),
