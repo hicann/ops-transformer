@@ -20,6 +20,7 @@
         dst_path="opp/built-in/op_graph/inc"
         install_path="opp/built-in/op_graph/inc" install_type="all">
         <file value="ops_proto_transformer.h" install_mod="550"/>
+        <file value="op_const_def_transformer.h" install_mod="550"/>
     </file_info>
     <file_info value="opgraph_transformer_lib" copy_type="delivery" src_path=""
         dst_path="opp/built-in/op_graph/lib/linux/$(ARCH)/"

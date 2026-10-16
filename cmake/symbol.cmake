@@ -161,6 +161,9 @@ function(gen_opgraph_symbol)
   install(FILES ${ASCEND_GRAPH_CONF_DST}/ops_proto_transformer.h
     DESTINATION ${OPGRAPH_INC_INSTALL_DIR} OPTIONAL
   )
+  install(FILES ${PROJECT_SOURCE_DIR}/common/include/op_host/op_const_def_transformer.h
+    DESTINATION ${OPGRAPH_INC_INSTALL_DIR} OPTIONAL
+  )
 endfunction()
 
 function(gen_opapi_symbol)
