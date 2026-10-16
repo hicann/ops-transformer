@@ -30,7 +30,7 @@
   attentionOut = Softmax(scale \cdot query \cdot key_{sparse}^T + atten\_mask) \cdot value_{sparse}
   $$
 
-  BlockSparseAttentionV2输入query、key、value的数据排布格式支持从多种维度排布解读，可通过qInputLayout和kvInputLayout传入。
+  BlockSparseAttentionV3输入query、key、value的数据排布格式支持从多种维度排布解读，可通过qInputLayout和kvInputLayout传入。
 
   - B：表示输入样本批量大小（Batch）
   - T：B和S合轴紧密排列的长度（Total tokens）
@@ -43,7 +43,9 @@
 
   - qInputLayout: "TND" "BNSD" "BSND"
   - kvInputLayout: "TND" "BNSD" "BSND"
-- **MXFP4/MXFP8特性说明(仅Ascend 950PR&950DT系列产品支持)**
+
+<!-- npu="950" id10 -->
+- **MXFP4/MXFP8特性说明(仅<term>Ascend 950PR&950DT系列产品</term>支持)**
 
   本接口支持MXFP4（FLOAT4_E2M1，quantMode=2/3）与MXFP8（FLOAT8_E4M3FN，quantMode=4）输入。MX量化模式下需要提供FLOAT8_E8M0缩放因子用于反量化计算，scale shape 与 MXFP4 一致。
 - <summary><a id="MXFP4量化模式的量化缩放因子"></a><strong>MX量化模式的量化缩放因子（quantMode=2/3/4）</strong></summary>
@@ -72,11 +74,12 @@
 
       - BNSD:[B, Nkv, CeilDiv(Skv, 64), D, 2]；
       - BSND:[B, CeilDiv(Skv, 64), Nkv, D, 2]；
-      - TND: [BTkv//64, Nkv, D, 2]。
+      - TND: [BTkv, Nkv, D, 2]。
 
       $$
       BTkv = \sum_{b=0}^{B-1} \left\lceil \frac{Skv_b}{64} \right\rceil
       $$
+<!-- end id10 -->
 
 ## 函数原型
 
@@ -502,7 +505,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
           <li>2：表示MXFP4 OCP量化(量化scale向下截断)。</li>
           <li>3：表示MXFP4 CX量化(自定义量化量程, 量化scale向上截断)。</li>
           <li>4：表示MXFP8 OCP量化(QKV为FLOAT8_E4M3FN，scale为FLOAT8_E8M0)。</li>
-          <li>5：表示HIF8 per-tensor量化，仅Ascend 950PR/Ascend 950DT支持，query、key、value必须均为HIFLOAT8。</li>
+          <li>5：表示HIF8 per-tensor量化，产品支持及输入类型要求详见<a href="#constraint_rule">约束说明</a>。</li>
           <li>详见<a href="#constraint_rule">约束说明</a>。</li>
         </ul>
       </td>
@@ -516,7 +519,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
       <td>输入</td>
       <td>MXFP4 CX量化时,传入的自定义量化量程。</td>
       <td>
-        当前仅当quantMode=2,3时候，支持设置该值0.0，或者[6.0, 12.0]。HIF8量化模式（quantMode=5）不使用该参数，建议传入0.0。
+        仅当quantMode=3（MXFP4 CX）时使用，支持设置为0.0或[6.0, 12.0]。其他量化模式不使用该参数，建议传入0.0。
         <ul>
           <li>0.0：代表Amax(DType)为量化结果数据类型的最大值。</li>
           <li>[6.0, 12.0]：取值为6.0-12.0代表Amax(DType)为传入值。</li>
@@ -608,7 +611,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
       <td>qInputLayout或kvInputLayout不合法。</td>
     </tr>
     <tr>
-      <td>blockShape不合法（元素数量少于2或值小于等于0）。</td>
+      <td>blockShape不合法（元素数量不等于2或值小于等于0）。</td>
     </tr>
     <tr>
       <td>innerPrecise不合法（必须为0、1或4）。</td>
@@ -666,11 +669,11 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 - qInputLayout当前仅支持"TND"和"BNSD"和"BSND"。
 - kvInputLayout当前仅支持"TND"和"BNSD"和"BSND"。
 - 当前query、key、value的InputLayout必须保持一致。
-- 输入query、key、value的数据类型必须一致：非量化模式（quantMode=0）支持FLOAT16和BFLOAT16；quantMode=1/4支持FLOAT8_E4M3FN；quantMode=2/3支持FLOAT4_E2M1；quantMode=5支持HIFLOAT8。量化模式仅Ascend 950PR/Ascend 950DT支持。
+- 输入query、key、value的数据类型必须一致：非量化模式（quantMode=0）支持FLOAT16和BFLOAT16；quantMode=1/4支持FLOAT8_E4M3FN；quantMode=2/3支持FLOAT4_E2M1；quantMode=5支持HIFLOAT8。量化模式仅<term>Ascend 950PR&950DT系列产品</term>支持。
 - query、key、value的D轴当前仅支持配置为64或128
 - blockShapeOptional如果传入，则必须包含两个元素[blockShapeX, blockShapeY]，且值必须大于0。blockShapeX/blockShapeY在不同产品上的倍数约束如下：
   <!-- npu="950" id7 -->
-  - 在<term>Ascend 950PR/Ascend 950DT</term>上：blockShapeY须为16的倍数；MXFP4量化（quantMode=2/3）与MXFP8量化（quantMode=4）时，blockShapeX和blockShapeY均只支持64的倍数；HIF8量化（quantMode=5）时，blockShapeX和blockShapeY均须为16的倍数。
+  - 在<term>Ascend 950PR&950DT系列产品</term>上：blockShapeY须为16的倍数；MXFP4量化（quantMode=2/3）与MXFP8量化（quantMode=4）时，blockShapeX和blockShapeY均只支持64的倍数；HIF8量化（quantMode=5）时，blockShapeX和blockShapeY均须为16的倍数。
   <!-- end id7 -->
   <!-- npu="910b,A3" id8 -->
   - 在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上：blockShapeY须为128的倍数。
@@ -681,7 +684,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 - actualSeqLengthsOptional与actualSeqLengthsKvOptional当前必须同时配置或同时不配置，仅配置其中之一的行为将被算子拦截。
 - blockTableOptional当前只支持传入nullptr，表示不开启PagedAttention特性。
 <!-- npu="950,A3,910b" id9 -->
-- innerPrecise必须为0或1或4，其中，<term>Ascend 950PR/Ascend 950DT</term>在FLOAT16/BFLOAT16输入时支持配置为0或4，FP8/MXFP4/MXFP8量化（quantMode=1/2/3/4）时仅支持4，HIF8量化（quantMode=5）时仅支持0；<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>仅支持配置为0或1。
+- innerPrecise必须为0或1或4，其中，<term>Ascend 950PR&950DT系列产品</term>在FLOAT16/BFLOAT16输入时支持配置为0或4，FP8/MXFP4/MXFP8量化（quantMode=1/2/3/4）时仅支持4，HIF8量化（quantMode=5）时仅支持0；<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>仅支持配置为0或1。
 <!-- end id9 -->
 - softmaxLseFlag仅支持配置0或1，分别表示不开启/开启softmaxLse输出。
 - qSeqlen和kvSeqlen不需要被blockShape整除，支持非对齐场景，实际分块数通过向上取整计算。
@@ -689,9 +692,11 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 - maskType当前只支持输入0，表示不加mask。
 - blockSize当前只支持输入0，表示不支持paged cache。
 - preTokens和nextTokens当前只支持输入2147483647，表示当前token的前后所有token都参与attention运算，即不支持滑窗attention。
+
+<!-- npu="950" id11 -->
 - **quantMode=1(FP8静态量化模式)相关约束**：
 
-  - 仅Ascend 950PR&950DT系列产品支持。
+  - 仅<term>Ascend 950PR&950DT系列产品</term>支持。
   - 输入的query、key、value采用FLOAT8_E4M3FN数据类型，需要提供以下量化缩放因子参数：
     - qDequantScale（query量化缩放因子）
 
@@ -716,9 +721,12 @@ aclnnStatus aclnnBlockSparseAttentionV3(
   - 当query、key、value中任意一个数据类型不为FLOAT8_E4M3FN时，qDequantScale、kDequantScale、vDequantScale必须传入nullptr。
   - blockShapeOptional必须传入。
   - q和kv的量化块大小必须与blockShapeOptional的两个元素大小分别保持一致。
+<!-- end id11 -->
+
+<!-- npu="950" id12 -->
 - **quantMode=2/3 (MXFP4量化模式)相关约束（新增）**
 
-  - 仅Ascend 950PR&950DT系列产品支持
+  - 仅<term>Ascend 950PR&950DT系列产品</term>支持
   - D仅支持64/128;
   - attentionOut数据类型仅支持FLOAT16或BFLOAT16；
   - 暂不支持attenMaskOptional、PagedAttention、softmaxLse等高阶特性。
@@ -726,15 +734,17 @@ aclnnStatus aclnnBlockSparseAttentionV3(
     - 以P的量化为例, 其中 $P_{\text{max}}$ 为一个group（32个元素）内元素绝对值的最大值。
     - **OCP 量化公式**
 
-      $$ P_{\text{Scale}} = 2^{\lfloor \log_2 P_{\text{max}} \rfloor / 4} = 2^{\lfloor \log_2 P_{\text{max}} \rfloor - 2} $$
+      $$ P_{\text{Scale}} = \frac{2^{\lfloor \log_2 P_{\text{max}} \rfloor}}{4} = 2^{\lfloor \log_2 P_{\text{max}} \rfloor - 2} $$
 
     - **CX量化公式**
 
       $$ P_{\text{Scale}} = 2^{\lceil \log_2 \left( P_{\text{max}} / dstTypeMax \right) \rceil} = 2^{\lceil \log_2 P_{\text{max}} - \log_2 dstTypeMax \rceil} $$
+<!-- end id12 -->
 
+<!-- npu="950" id13 -->
 - **quantMode=4 (MXFP8 OCP量化模式)相关约束（新增）**
 
-  - 仅Ascend 950PR&950DT系列产品支持
+  - 仅<term>Ascend 950PR&950DT系列产品</term>支持
   - 输入 query/key/value 为 FLOAT8_E4M3FN，scale 为 FLOAT8_E8M0
   - blockShapeX 与 blockShapeY 均只支持 64 的倍数
   - D仅支持64/128
@@ -746,10 +756,12 @@ aclnnStatus aclnnBlockSparseAttentionV3(
     - **OCP 量化公式**
 
       $$ P_{\text{Scale}} = 2^{\lfloor \log_2 P_{\text{max}} \rfloor - 8} $$
+<!-- end id13 -->
 
+<!-- npu="950" id14 -->
 - **quantMode=5（HIF8 per-tensor量化模式）相关约束**：
 
-  - 仅Ascend 950PR/Ascend 950DT支持。query、key、value必须均为HIFLOAT8，且HIFLOAT8输入必须使用quantMode=5。
+  - 仅<term>Ascend 950PR&950DT系列产品</term>支持。query、key、value必须均为HIFLOAT8，且HIFLOAT8输入必须使用quantMode=5。
   - qInputLayout与kvInputLayout必须一致，支持TND、BNSD、BSND；D轴支持64或128。
   - qDequantScaleOptional、kDequantScaleOptional、vDequantScaleOptional必须传入，均为FLOAT32类型，shape必须为一维[1]，每个输入张量共用一个反量化缩放因子，不支持per-token或per-channel缩放因子。
   - pQuantScaleOptional可选；传入时必须为FLOAT32类型，shape为一维[1]，取值必须为有限正数，用于softmax结果P的量化；传入nullptr时默认使用16.0。
@@ -759,6 +771,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
   - maskType必须为0，attenMaskOptional和blockTableOptional必须为nullptr，blockSize必须为0，preTokens和nextTokens必须为2147483647。
   - attentionOut的shape与query一致，数据类型支持FLOAT16或BFLOAT16；softmaxLseFlag支持0或1，可选输出FLOAT32类型的softmaxLse。
   - dstTypeMax在此模式下不参与计算，建议传入0.0。
+<!-- end id14 -->
 
 ## 调用示例
 
@@ -1071,7 +1084,7 @@ int main() {
         nullptr,                  // qDequantScale
         nullptr,                  // kDequantScale
         nullptr,                  // vDequantScale
-        nullptr,                  // pDequantScale
+        nullptr,                  // pQuantScaleOptional
         qLayoutBuffer,            // qInputLayout
         kvLayoutBuffer,           // kvInputLayout
         numKvHeads,               // numKeyValueHeads
