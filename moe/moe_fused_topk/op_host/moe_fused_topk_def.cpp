@@ -74,6 +74,7 @@ public:
             .DynamicShapeSupportFlag(true)
             .ExtendCfgInfo("opFile.value", "moe_fused_topk_apt");
         this->AICore().AddConfig("ascend950", ascend950Cfg);
+        this->AICore().AddConfig("ascend350", ascend950Cfg);
     }
 };
 

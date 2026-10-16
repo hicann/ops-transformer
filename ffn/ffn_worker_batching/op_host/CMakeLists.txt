@@ -21,8 +21,8 @@ if (BUILD_OPEN_PROJECT)
                         -Werror
         )
     else() # custom
-        # ascend950(arch35) 专属编译选项（dcci）；A2/A3 不进此分支，零回归。
-        if(ASCEND_COMPUTE_UNIT STREQUAL "ascend950")
+        # ascend950/ascend350(arch35) 专属编译选项（dcci）；A2/A3 不进此分支，零回归。
+        if(ASCEND_COMPUTE_UNIT STREQUAL "ascend950" OR ASCEND_COMPUTE_UNIT STREQUAL "ascend350")
             add_ops_compile_options(
                     OP_NAME FfnWorkerBatching
                     OPTIONS --cce-auto-sync=on

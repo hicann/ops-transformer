@@ -1,0 +1,74 @@
+{
+  "op_type": "MoeFusedTopk",
+  "op_list": [
+    {
+      "bin_filename": "MoeFusedTopk_FP32",
+      "inputs": [
+        {"name": "x", "index": 0, "dtype": "float32", "format": "ND", "paramType": "required", "shape": [-2]},
+        {"name": "add_num", "index": 1, "dtype": "float32", "format": "ND", "paramType": "required", "shape": [-2]},
+        {"name": "mapping_num", "index": 2, "dtype": "int32", "format": "ND", "paramType": "optional", "shape": [-2]},
+        {"name": "mapping_table", "index": 3, "dtype": "int32", "format": "ND", "paramType": "optional", "shape": [-2]}
+      ],
+      "outputs": [
+        {"name": "y", "index": 0, "dtype": "float32", "format": "ND", "paramType": "required", "shape": [-2]},
+        {"name": "indices", "index": 1, "dtype": "int32", "format": "ND", "paramType": "required", "shape": [-2]}
+      ],
+      "attrs": [
+        {"name": "group_num", "dtype": "int", "value": 1},
+        {"name": "group_topk", "dtype": "int", "value": 1},
+        {"name": "top_n", "dtype": "int", "value": 1},
+        {"name": "top_k", "dtype": "int", "value": 1},
+        {"name": "activate_type", "dtype": "int", "value": 1},
+        {"name": "is_norm", "dtype": "bool", "value": true},
+        {"name": "scale", "dtype": "float", "value": 1.0},
+        {"name": "enable_expert_mapping", "dtype": "bool", "value": false}
+      ]
+    },
+    {
+      "bin_filename": "MoeFusedTopk_FP16",
+      "inputs": [
+        {"name": "x", "index": 0, "dtype": "float16", "format": "ND", "paramType": "required", "shape": [-2]},
+        {"name": "add_num", "index": 1, "dtype": "float16", "format": "ND", "paramType": "required", "shape": [-2]},
+        {"name": "mapping_num", "index": 2, "dtype": "int32", "format": "ND", "paramType": "optional", "shape": [-2]},
+        {"name": "mapping_table", "index": 3, "dtype": "int32", "format": "ND", "paramType": "optional", "shape": [-2]}
+      ],
+      "outputs": [
+        {"name": "y", "index": 0, "dtype": "float32", "format": "ND", "paramType": "required", "shape": [-2]},
+        {"name": "indices", "index": 1, "dtype": "int32", "format": "ND", "paramType": "required", "shape": [-2]}
+      ],
+      "attrs": [
+        {"name": "group_num", "dtype": "int", "value": 1},
+        {"name": "group_topk", "dtype": "int", "value": 1},
+        {"name": "top_n", "dtype": "int", "value": 1},
+        {"name": "top_k", "dtype": "int", "value": 1},
+        {"name": "activate_type", "dtype": "int", "value": 1},
+        {"name": "is_norm", "dtype": "bool", "value": true},
+        {"name": "scale", "dtype": "float", "value": 1.0},
+        {"name": "enable_expert_mapping", "dtype": "bool", "value": false}
+      ]
+    },
+    {
+      "bin_filename": "MoeFusedTopk_BF16",
+      "inputs": [
+        {"name": "x", "index": 0, "dtype": "bfloat16", "format": "ND", "paramType": "required", "shape": [-2]},
+        {"name": "add_num", "index": 1, "dtype": "bfloat16", "format": "ND", "paramType": "required", "shape": [-2]},
+        {"name": "mapping_num", "index": 2, "dtype": "int32", "format": "ND", "paramType": "optional", "shape": [-2]},
+        {"name": "mapping_table", "index": 3, "dtype": "int32", "format": "ND", "paramType": "optional", "shape": [-2]}
+      ],
+      "outputs": [
+        {"name": "y", "index": 0, "dtype": "float32", "format": "ND", "paramType": "required", "shape": [-2]},
+        {"name": "indices", "index": 1, "dtype": "int32", "format": "ND", "paramType": "required", "shape": [-2]}
+      ],
+      "attrs": [
+        {"name": "group_num", "dtype": "int", "value": 1},
+        {"name": "group_topk", "dtype": "int", "value": 1},
+        {"name": "top_n", "dtype": "int", "value": 1},
+        {"name": "top_k", "dtype": "int", "value": 1},
+        {"name": "activate_type", "dtype": "int", "value": 1},
+        {"name": "is_norm", "dtype": "bool", "value": true},
+        {"name": "scale", "dtype": "float", "value": 1.0},
+        {"name": "enable_expert_mapping", "dtype": "bool", "value": false}
+      ]
+    }
+  ]
+}

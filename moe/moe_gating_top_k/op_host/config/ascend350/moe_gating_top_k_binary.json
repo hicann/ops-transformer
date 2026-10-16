@@ -1,0 +1,398 @@
+{
+    "op_type": "MoeGatingTopK",
+    "op_list": [
+      {
+        "bin_filename": "MoeGatingTopK_1ea4bd0e3cd9df67071f7a7aaec9c732",
+        "inputs": [
+          {
+            "name": "x",
+            "index": 0,
+            "dtype": "float32",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "bias",
+            "index": 1,
+            "dtype": "float32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "input_ids",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "tid2eid",
+            "index": 3,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "y",
+            "index": 0,
+            "dtype": "float32",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "expert_idx",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "out",
+            "index": 2,
+            "dtype": "float32",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          }
+        ],
+        "attrs": [
+          {
+            "name": "k",
+            "dtype": "int",
+            "value": 0
+          },
+          {
+            "name": "k_group",
+            "dtype": "int",
+            "value": 1
+          },
+          {
+            "name": "group_count",
+            "dtype": "int",
+            "value": 1
+          },
+          {
+            "name": "group_select_mode",
+            "dtype": "int",
+            "value": 0
+          },
+          {
+            "name": "renorm",
+            "dtype": "int",
+            "value": 0
+          },
+          {
+            "name": "norm_type",
+            "dtype": "int",
+            "value": 0
+          },
+          {
+            "name": "out_flag",
+            "dtype": "bool",
+            "value": false
+          },
+          {
+            "name": "routed_scaling_factor",
+            "dtype": "float",
+            "value": 1.0
+          },
+          {
+            "name": "eps",
+            "dtype": "float",
+            "value": 1e-20
+          }
+        ]
+      },
+      {
+        "bin_filename": "MoeGatingTopK_1ea4bd0e3cd9df67071f7a7aaec9c733",
+        "inputs": [
+          {
+            "name": "x",
+            "index": 0,
+            "dtype": "float16",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "bias",
+            "index": 1,
+            "dtype": "float16",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "input_ids",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "tid2eid",
+            "index": 3,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "y",
+            "index": 0,
+            "dtype": "float16",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "expert_idx",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "out",
+            "index": 2,
+            "dtype": "float32",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          }
+        ],
+        "attrs": [
+          {
+            "name": "k",
+            "dtype": "int",
+            "value": 0
+          },
+          {
+            "name": "k_group",
+            "dtype": "int",
+            "value": 1
+          },
+          {
+            "name": "group_count",
+            "dtype": "int",
+            "value": 1
+          },
+          {
+            "name": "group_select_mode",
+            "dtype": "int",
+            "value": 0
+          },
+          {
+            "name": "renorm",
+            "dtype": "int",
+            "value": 0
+          },
+          {
+            "name": "norm_type",
+            "dtype": "int",
+            "value": 0
+          },
+          {
+            "name": "out_flag",
+            "dtype": "bool",
+            "value": false
+          },
+          {
+            "name": "routed_scaling_factor",
+            "dtype": "float",
+            "value": 1.0
+          },
+          {
+            "name": "eps",
+            "dtype": "float",
+            "value": 1e-20
+          }
+        ]
+      },
+      {
+        "bin_filename": "MoeGatingTopK_1ea4bd0e3cd9df67071f7a7aaec9c734",
+        "inputs": [
+          {
+            "name": "x",
+            "index": 0,
+            "dtype": "bfloat16",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "bias",
+            "index": 1,
+            "dtype": "bfloat16",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "input_ids",
+            "index": 2,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "tid2eid",
+            "index": 3,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "y",
+            "index": 0,
+            "dtype": "bfloat16",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "expert_idx",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "out",
+            "index": 2,
+            "dtype": "float32",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          }
+        ],
+        "attrs": [
+          {
+            "name": "k",
+            "dtype": "int",
+            "value": 0
+          },
+          {
+            "name": "k_group",
+            "dtype": "int",
+            "value": 1
+          },
+          {
+            "name": "group_count",
+            "dtype": "int",
+            "value": 1
+          },
+          {
+            "name": "group_select_mode",
+            "dtype": "int",
+            "value": 0
+          },
+          {
+            "name": "renorm",
+            "dtype": "int",
+            "value": 0
+          },
+          {
+            "name": "norm_type",
+            "dtype": "int",
+            "value": 0
+          },
+          {
+            "name": "out_flag",
+            "dtype": "bool",
+            "value": false
+          },
+          {
+            "name": "routed_scaling_factor",
+            "dtype": "float",
+            "value": 1.0
+          },
+          {
+            "name": "eps",
+            "dtype": "float",
+            "value": 1e-20
+          }
+        ]
+      }
+    ]
+  }

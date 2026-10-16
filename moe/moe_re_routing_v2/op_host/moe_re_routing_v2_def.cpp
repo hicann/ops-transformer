@@ -199,6 +199,7 @@ public:
             .ExtendCfgInfo("opFile.value", "moe_re_routing_v2_apt");
 
         this->AICore().AddConfig("ascend950", regbaseCfg);
+        this->AICore().AddConfig("ascend350", regbaseCfg);
     }
 };
 

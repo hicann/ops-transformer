@@ -22,7 +22,7 @@ if (BUILD_OPEN_PROJECT)
                         -Werror
         )
     else() # custom
-        if(ASCEND_COMPUTE_UNIT STREQUAL "ascend950")
+        if(ASCEND_COMPUTE_UNIT STREQUAL "ascend950" OR ASCEND_COMPUTE_UNIT STREQUAL "ascend350")
         add_ops_compile_options(
                 OP_NAME AttentionWorkerCombine
                 OPTIONS --cce-auto-sync=on
