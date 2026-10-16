@@ -54,16 +54,17 @@ public:
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
 
-        OpAICoreConfig config_950;
-        config_950.DynamicCompileStaticFlag(true)
+        OpAICoreConfig regbaseCfg;
+        regbaseCfg.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(false)
             .DynamicRankSupportFlag(true)
             .DynamicShapeSupportFlag(true)
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("opFile.value", "masked_causal_conv1d_backward_apt");
-        this->AICore().AddConfig("ascend950", config_950);
-        this->AICore().AddConfig("ascend350", config_950);
+        this->AICore().AddConfig("ascend950", regbaseCfg);
+        this->AICore().AddConfig("ascend350", regbaseCfg);
+        this->AICore().AddConfig("ascend960dt", regbaseCfg);
     }
 };
 

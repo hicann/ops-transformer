@@ -55,16 +55,17 @@ public:
         this->Attr("block_size").AttrType(REQUIRED).Int();          // when APC enabled, it can not be set to 0
         this->Attr("conv_mode").AttrType(REQUIRED).Int();           // 0: for Qwen and Pangu7B  1: for Pangu
         this->Attr("max_draft_tokens").AttrType(OPTIONAL).Int(7);
-        OpAICoreConfig config_950;
-        config_950.DynamicCompileStaticFlag(true)
+        OpAICoreConfig regbaseCfg;
+        regbaseCfg.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(false)
             .DynamicRankSupportFlag(true)
             .DynamicShapeSupportFlag(true)
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("opFile.value", "fused_causal_conv1d_apt");
-        this->AICore().AddConfig("ascend950", config_950);
-        this->AICore().AddConfig("ascend350", config_950);
+        this->AICore().AddConfig("ascend950", regbaseCfg);
+        this->AICore().AddConfig("ascend350", regbaseCfg);
+        this->AICore().AddConfig("ascend960dt", regbaseCfg);
     }
 };
 

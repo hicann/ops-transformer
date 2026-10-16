@@ -76,16 +76,17 @@ public:
         this->Attr("activation_mode").AttrType(OPTIONAL).String("silu");
         this->Attr("null_block_id").AttrType(OPTIONAL).Int(0);
 
-        OpAICoreConfig config_950;
-        config_950.DynamicCompileStaticFlag(true)
+        OpAICoreConfig regbaseCfg;
+        regbaseCfg.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(false)
             .DynamicRankSupportFlag(true)
             .DynamicShapeSupportFlag(true)
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("opFile.value", "causal_conv1d_apt");
-        this->AICore().AddConfig("ascend950", config_950);
-        this->AICore().AddConfig("ascend350", config_950);
+        this->AICore().AddConfig("ascend950", regbaseCfg);
+        this->AICore().AddConfig("ascend350", regbaseCfg);
+        this->AICore().AddConfig("ascend960dt", regbaseCfg);
     }
 };
 OP_ADD(CausalConv1d);
