@@ -53,8 +53,9 @@ static graphStatus MoeInitRoutingExecuteFunc(OpExecuteContext* host_api_ctx)
     auto attrs = host_api_ctx->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE("aclnnfallback", "attrs is null"), return GRAPH_FAILED);
     const int64_t* active_num = attrs->GetAttrPointer<int64_t>(0);
+    OP_CHECK_IF(active_num == nullptr, OP_LOGE("aclnnfallback", "active_num is null"), return GRAPH_FAILED);
     // execute opapi
-    auto api_ret = EXEC_OPAPI_CMD(aclnnMoeInitRouting, x_ge, row_idx_ge, expert_idx_ge, active_num, expanded_x_ge,
+    auto api_ret = EXEC_OPAPI_CMD(aclnnMoeInitRouting, x_ge, row_idx_ge, expert_idx_ge, *active_num, expanded_x_ge,
                                   expanded_row_idx_ge, expanded_expert_idx_ge);
     OP_CHECK_IF(api_ret != GRAPH_SUCCESS, OP_LOGE("aclnnfallback", "api_ret faild:%u", api_ret), return GRAPH_FAILED);
 
