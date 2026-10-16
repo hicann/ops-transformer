@@ -1,0 +1,194 @@
+{
+    "op_type": "AttentionUpdate",
+    "op_list": [
+        {
+            "bin_filename": "AttentionUpdate_ba64f6ac73b9d4f14511676cbb9f0632",
+            "inputs": [
+                [
+                    {
+                        "name": "lse",
+                        "index": 0,
+                        "dtype": "float32",
+                        "format": "ND",
+                        "paramType": "dynamic",
+                        "shape": [
+                            -2
+                        ]
+                    }
+                ],
+                [
+                    {
+                        "name": "go",
+                        "index": 1,
+                        "dtype": "float32",
+                        "format": "ND",
+                        "paramType": "dynamic",
+                        "shape": [
+                            -2
+                        ]
+                    }
+                ]
+            ],
+            "outputs": [
+                {
+                    "name": "output",
+                    "index": 0,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [
+                        -2
+                    ]
+                },
+                {
+                    "name": "lse_m",
+                    "index": 1,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [
+                        -2
+                    ]
+                }
+            ],
+            "attrs": [
+                {
+                    "name": "update_type",
+                    "dtype": "int",
+                    "value": 0
+                },
+                {
+                    "name": "sp",
+                    "dtype": "int",
+                    "value": null
+                }
+            ]
+        },
+        {
+            "bin_filename": "AttentionUpdate_ba64e3ac73b9d4f14511676cbb9f0632",
+            "inputs": [
+                [
+                    {
+                        "name": "lse",
+                        "index": 0,
+                        "dtype": "float32",
+                        "format": "ND",
+                        "paramType": "dynamic",
+                        "shape": [
+                            -2
+                        ]
+                    }
+                ],
+                [
+                    {
+                        "name": "go",
+                        "index": 1,
+                        "dtype": "float16",
+                        "format": "ND",
+                        "paramType": "dynamic",
+                        "shape": [
+                            -2
+                        ]
+                    }
+                ]
+            ],
+            "outputs": [
+                {
+                    "name": "output",
+                    "index": 0,
+                    "dtype": "float16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [
+                        -2
+                    ]
+                },
+                {
+                    "name": "lse_m",
+                    "index": 1,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [
+                        -2
+                    ]
+                }
+            ],
+            "attrs": [
+                {
+                    "name": "update_type",
+                    "dtype": "int",
+                    "value": 0
+                },
+                {
+                    "name": "sp",
+                    "dtype": "int",
+                    "value": null
+                }
+            ]
+        },
+        {
+            "bin_filename": "AttentionUpdate_ba69m3ac73b9d4f14511676cbb9f0632",
+            "inputs": [
+                [
+                    {
+                        "name": "lse",
+                        "index": 0,
+                        "dtype": "float32",
+                        "format": "ND",
+                        "paramType": "dynamic",
+                        "shape": [
+                            -2
+                        ]
+                    }
+                ],
+                [
+                    {
+                        "name": "go",
+                        "index": 1,
+                        "dtype": "bfloat16",
+                        "format": "ND",
+                        "paramType": "dynamic",
+                        "shape": [
+                            -2
+                        ]
+                    }
+                ]
+            ],
+            "outputs": [
+                {
+                    "name": "output",
+                    "index": 0,
+                    "dtype": "bfloat16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [
+                        -2
+                    ]
+                },
+                {
+                    "name": "lse_m",
+                    "index": 1,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [
+                        -2
+                    ]
+                }
+            ],
+            "attrs": [
+                {
+                    "name": "update_type",
+                    "dtype": "int",
+                    "value": 0
+                },
+                {
+                    "name": "sp",
+                    "dtype": "int",
+                    "value": null
+                }
+            ]
+        }
+    ]
+}

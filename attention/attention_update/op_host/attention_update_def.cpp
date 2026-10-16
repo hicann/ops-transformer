@@ -57,6 +57,7 @@ public:
             .ExtendCfgInfo("opFile.value", "attention_update_apt");
 
         this->AICore().AddConfig("ascend950", config_95);
+        this->AICore().AddConfig("ascend960dt", config_95);
         this->AICore().AddConfig("ascend350", config_95);
     }
 };
