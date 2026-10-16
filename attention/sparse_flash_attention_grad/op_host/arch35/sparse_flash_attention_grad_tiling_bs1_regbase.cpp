@@ -294,8 +294,8 @@ ge::graphStatus SparseFlashAttentionGradBs1Regbase::DoCastTiling()
                 return ge::GRAPH_FAILED);
 
     int64_t qPreBlockFactor = (allNumQuery + usedCoreNum - 1) / usedCoreNum;
-    int64_t qPreBlockTotal = (allNumQuery + qPreBlockFactor - 1) / qPreBlockFactor;
-    int64_t qPreBlockTailTmp = allNumQuery % qPreBlockFactor;
+    int64_t qPreBlockTotal = qPreBlockFactor == 0 ? 0 : (allNumQuery + qPreBlockFactor - 1) / qPreBlockFactor;
+    int64_t qPreBlockTailTmp = qPreBlockFactor == 0 ? 0 : allNumQuery % qPreBlockFactor;
     int64_t qPreBlockTail = qPreBlockTailTmp == 0 ? qPreBlockFactor : qPreBlockTailTmp;
 
     int64_t kPreBlockFactor = (allNumKey + usedCoreNum - 1) / usedCoreNum;
