@@ -61,175 +61,175 @@
     <tr>
       <td>cu_seqlens_q</td>
       <td>可选输入</td>
-      <td>表示TND布局下不同batch中`q`的累积序列长度，shape为(B+1, )。</td>
+      <td>表示TND布局下不同batch中`q`的累积序列长度，shape为(B+1, )。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cu_seqlens_ori_kv</td>
       <td>可选输入</td>
-      <td>表示TND布局下不同batch中`ori_kv`的累积序列长度，shape为(B+1, )。</td>
+      <td>表示TND布局下不同batch中`ori_kv`的累积序列长度，shape为(B+1, )。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cu_seqlens_cmp_kv</td>
       <td>可选输入</td>
-      <td>表示TND布局下不同batch中`cmp_kv`的累积序列长度，shape为(B+1, )。</td>
+      <td>表示TND布局下不同batch中`cmp_kv`的累积序列长度，shape为(B+1, )。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>seqused_q</td>
       <td>可选输入</td>
-      <td>表示不同batch中`q`实际参与计算的token数，shape为(B, )。</td>
+      <td>表示不同batch中`q`实际参与计算的token数，shape为(B, )。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>seqused_ori_kv</td>
       <td>可选输入</td>
-      <td>表示不同batch中`ori_kv`实际参与计算的token数，shape为(B, )。</td>
+      <td>表示不同batch中`ori_kv`实际参与计算的token数，shape为(B, )。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>seqused_cmp_kv</td>
       <td>可选输入</td>
-      <td>表示不同batch中`cmp_kv`实际参与计算的token数，shape为(B, )。</td>
+      <td>表示不同batch中`cmp_kv`实际参与计算的token数，shape为(B, )。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cmp_residual_kv</td>
       <td>可选输入</td>
-      <td>表示压缩KV余数，用于恢复cmp侧mask使用的压缩前KV长度，shape为(B, )。</td>
+      <td>表示压缩KV余数，用于恢复cmp侧mask使用的压缩前KV长度，shape为(B, )。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>ori_topk_length</td>
       <td>可选输入</td>
-      <td>SWA稀疏ori_kv场景表示不同q token对应的ori_kv部分关键稀疏token的个数，必须传入，shape为(B, S1, N2)或(T1, N2)。</td>
+      <td>SWA稀疏ori_kv场景表示不同q token对应的ori_kv部分关键稀疏token的个数，必须传入，shape为(B, S1, N2)或(T1, N2)。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cmp_topk_length</td>
       <td>可选输入</td>
-      <td>表示不同q token对应的cmp_kv部分关键稀疏token的个数，shape为(B, S1, N2)或(T1, N2)。</td>
+      <td>表示不同q token对应的cmp_kv部分关键稀疏token的个数，shape为(B, S1, N2)或(T1, N2)。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>batch_size</td>
       <td>可选属性</td>
-      <td>表示输入样本批量大小；传入0时表示由接口推导，默认值为0。</td>
+      <td>表示输入样本批量大小；传入0时表示由接口推导。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>max_seqlen_q</td>
       <td>可选属性</td>
-      <td>表示所有batch中`q`的最大有效token数；传入0时表示由接口推导，默认值为0。</td>
+      <td>表示所有batch中`q`的最大有效token数；传入0时表示由接口推导。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>max_seqlen_ori_kv</td>
       <td>可选属性</td>
-      <td>表示所有batch中`ori_kv`的最大有效token数；传入0时表示由接口推导，默认值为0。</td>
+      <td>表示所有batch中`ori_kv`的最大有效token数；传入0时表示由接口推导。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>max_seqlen_cmp_kv</td>
       <td>可选属性</td>
-      <td>表示所有batch中`cmp_kv`的最大有效token数；传入0时表示由接口推导，默认值为0。</td>
+      <td>表示所有batch中`cmp_kv`的最大有效token数；传入0时表示由接口推导。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>ori_topk</td>
       <td>可选属性</td>
-      <td>表示从`ori_kv`中筛选出的关键稀疏token个数；SWA稀疏ori_kv场景为主算子`ori_sparse_indices`最后一维K且必须大于0，其他场景默认值为0。</td>
+      <td>表示从`ori_kv`中筛选出的关键稀疏token个数；SWA稀疏ori_kv场景为主算子`ori_sparse_indices`最后一维K且必须大于0，其他场景为0。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>cmp_topk</td>
       <td>可选属性</td>
-      <td>表示从`cmp_kv`中筛选出的关键稀疏token个数，默认值为0。</td>
+      <td>表示从`cmp_kv`中筛选出的关键稀疏token个数。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>cmp_ratio</td>
       <td>可选属性</td>
-      <td>表示`cmp_kv`相对于压缩前KV长度的压缩倍率，用于恢复cmp侧mask使用的压缩前KV长度；仅传入`ori_kv`时不参与压缩KV计算。支持[1, 128]，默认值为1。</td>
+      <td>表示`cmp_kv`相对于压缩前KV长度的压缩倍率，用于恢复cmp侧mask使用的压缩前KV长度；仅传入`ori_kv`时不参与压缩KV计算。支持[1, 128]。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>ori_mask_mode</td>
       <td>可选属性</td>
-      <td>表示`q`和`ori_kv`计算的mask模式，默认值为0。<br/>0: No Mask。<br/>3: RightDownCausal模式。<br/>4: Band模式。</td>
+      <td>表示`q`和`ori_kv`计算的mask模式。<br/>0: No Mask。<br/>3: RightDownCausal模式。<br/>4: Band模式。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>cmp_mask_mode</td>
       <td>可选属性</td>
-      <td>表示`q`和`cmp_kv`计算的mask模式，默认值为0。<br/>0: No Mask。<br/>3: RightDownCausal模式。</td>
+      <td>表示`q`和`cmp_kv`计算的mask模式。<br/>0: No Mask。<br/>3: RightDownCausal模式。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>ori_win_left</td>
       <td>可选属性</td>
-      <td>表示`q`和`ori_kv`计算中`q`对过去token计算的数量，支持-1或非负数，其中-1表示窗口不受限，默认值为-1。</td>
+      <td>表示`q`和`ori_kv`计算中`q`对过去token计算的数量，支持-1或非负数，其中-1表示窗口不受限。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>ori_win_right</td>
       <td>可选属性</td>
-      <td>表示`q`和`ori_kv`计算中`q`对未来token计算的数量，支持-1或非负数，其中-1表示窗口不受限，默认值为-1。</td>
+      <td>表示`q`和`ori_kv`计算中`q`对未来token计算的数量，支持-1或非负数，其中-1表示窗口不受限。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
     <tr>
       <td>layout_q</td>
       <td>可选属性</td>
-      <td>表示输入`q`的数据排布格式，支持"BSND"和"TND"，默认值为"BSND"。</td>
+      <td>表示输入`q`的数据排布格式，支持"BSND"和"TND"。</td>
       <td>STRING</td>
       <td>-</td>
     </tr>
     <tr>
       <td>layout_kv</td>
       <td>可选属性</td>
-      <td>表示输入`ori_kv`和`cmp_kv`的数据排布格式，支持"BSND"、"TND"和"PA_BBND"，默认值为"BSND"。</td>
+      <td>表示输入`ori_kv`和`cmp_kv`的数据排布格式，支持"BSND"、"TND"和"PA_BBND"。</td>
       <td>STRING</td>
       <td>-</td>
     </tr>
     <tr>
       <td>has_ori_kv</td>
       <td>可选属性</td>
-      <td>表示`SparseFlashMla`主算子是否传入`ori_kv`，默认值为true。</td>
+      <td>表示`SparseFlashMla`主算子是否传入`ori_kv`。</td>
       <td>BOOL</td>
       <td>-</td>
     </tr>
     <tr>
       <td>has_cmp_kv</td>
       <td>可选属性</td>
-      <td>表示`SparseFlashMla`主算子是否传入`cmp_kv`，默认值为true。</td>
+      <td>表示`SparseFlashMla`主算子是否传入`cmp_kv`。</td>
       <td>BOOL</td>
       <td>-</td>
     </tr>
     <tr>
       <td>metadata</td>
       <td>输出</td>
-      <td>表示`SparseFlashMla`主算子使用的任务切分结果，shape固定为(1024, )。</td>
+      <td>表示`SparseFlashMla`主算子使用的任务切分结果，shape固定为(2048, )。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>

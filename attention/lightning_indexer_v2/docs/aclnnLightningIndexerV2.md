@@ -35,7 +35,7 @@
 
   1. 将某个token对应的输入参数`q`（$Q_{index}\in\R^{g\times d}$）乘以给定上下文`k`（$K_{index}\in\R^{S_{k}\times d}$），得到相关性。
   2. 通过激活函数$ReLU$过滤无效负相关信号后，得到当前Token与所有前序Token的相关性分数向量。
-  3. 将其与权重系数`w`（$W$）相乘后，沿g的方向，选取前$Top-k$个索引值得到输出$sparseIndices$，并输出对应的$sparseValues$，作为Attention的输入。
+  3. 将其与权重系数`w`（$W$）相乘后，沿g的方向，选取前$Top-k$个索引值得到输出$sparseIndicesOut$，并输出对应的$sparseValuesOut$，作为Attention的输入。
 
 ## 参数说明
 
@@ -56,13 +56,13 @@ aclnnStatus aclnnLightningIndexerV2GetWorkspaceSize(
     const aclTensor     *metadataOptional,
     int64_t              topk,
     int64_t              maxSeqlenQ,
-    char                *layoutQ,
-    char                *layoutK,
+    char                *layoutQOptional,
+    char                *layoutKOptional,
     int64_t              maskMode,
     int64_t              cmpRatio,
     int64_t              returnValue,
-    const aclTensor     *sparseIndices,
-    const aclTensor     *sparseValues,
+    const aclTensor     *sparseIndicesOut,
+    const aclTensor     *sparseValuesOut,
     uint64_t            *workspaceSize,
     aclOpExecutor       **executor)
 ```
@@ -108,7 +108,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>不支持空tensor。</td>
     <td>BFLOAT16、FLOAT16</td>
     <td>ND</td>
-    <td><ul><li>layoutQ为BSND时，shape为(B,S1,N1,D)。</li><li>layoutQ为TND时，shape为(T1,N1,D)。</li><li>不支持空tensor。</li></ul></td>
+    <td><ul><li>layoutQOptional为BSND时，shape为(B,S1,N1,D)。</li><li>layoutQOptional为TND时，shape为(T1,N1,D)。</li><li>不支持空tensor。</li></ul></td>
     <td>x</td>
     </tr>
     <tr>
@@ -118,7 +118,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td><ul><li>不支持空tensor。</li><li>block_num为PageAttention时block总数，block_size为一个block的token数。</li></ul></td>
     <td>BFLOAT16、FLOAT16</td>
     <td>ND</td>
-    <td><ul><li>layoutK为PA_BBND时，shape为(block_num, block_size, N2, D)。</li><li>layoutK为BSND时，shape为(B, S2, N2, D)。</li><li>layoutK为TND时，shape为(T2, N2, D)。</li></ul>
+    <td><ul><li>layoutKOptional为PA_BBND时，shape为(block_num, block_size, N2, D)。</li><li>layoutKOptional为BSND时，shape为(B, S2, N2, D)。</li><li>layoutKOptional为TND时，shape为(T2, N2, D)。</li></ul>
     </td>
     <td>✓</td>
     </tr>
@@ -129,7 +129,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>不支持空tensor。</td>
     <td>FLOAT</td>
     <td>ND</td>
-    <td><ul><li>layoutQ为BSND时，shape为(B,S1,N1)。</li><li>layoutQ为TND时，shape为(T1,N1)。</li></ul></td>
+    <td><ul><li>layoutQOptional为BSND时，shape为(B,S1,N1)。</li><li>layoutQOptional为TND时，shape为(T1,N1)。</li></ul></td>
     <td>x</td>
     </tr>
     <tr>
@@ -166,7 +166,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>sequsedKOptional（aclTensor*）</td>
     <td>输入</td>
     <td>不同Batch中k的真实使用长度。</td>
-    <td><ul><li>shape约束为长度为B的一维tensor。</li><li>不能出现负值。</li><li>layoutK为PA_BBND时，该参数必须传入。</li></ul></td>
+    <td><ul><li>shape约束为长度为B的一维tensor。</li><li>不能出现负值。</li><li>layoutKOptional为PA_BBND时，该参数必须传入。</li></ul></td>
     <td>INT32</td>
     <td>ND</td>
     <td>(B,)</td>
@@ -186,7 +186,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>blockTableOptional（aclTensor*）</td>
     <td>输入</td>
     <td>表示PageAttention中KV存储使用的block映射表。</td>
-    <td><ul><li>不支持空tensor。</li><li>PageAttention场景下，block_table必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大的序列长度对应的block数量）</li></ul></td>
+    <td><ul><li>不支持空tensor。</li><li>PageAttention场景下，blockTableOptional必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大的序列长度对应的block数量）</li></ul></td>
     <td>INT32</td>
     <td>ND</td>
     <td>shape支持(B,S2_max/block_size)</td>
@@ -199,7 +199,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td><ul><li>值必须大于等于0。</li><li>加上偏移后，topK index不能超过int32最大值</li></ul></td>
     <td>INT32</td>
     <td>ND</td>
-    <td><ul><li>layoutQ为"BSND"时shape为[B, S1, N2]。</li><li>layoutQ为"TND"时shape为[T1, N2]。</li></ul></td>
+    <td><ul><li>layoutQOptional为"BSND"时shape为[B, S1, N2]。</li><li>layoutQOptional为"TND"时shape为[T1, N2]。</li></ul></td>
     <td>x</td>
     </tr>
     <tr>
@@ -234,7 +234,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>-</td>
     </tr>
     <tr>
-    <td>layoutQ（char*）</td>
+    <td>layoutQOptional（char*）</td>
     <td>输入</td>
     <td>用于标识输入q的数据排布格式。</td>
     <td><ul><li>当前支持BSND、TND。</li><li>建议值是BSND。</li></ul></td>
@@ -244,7 +244,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>-</td>
     </tr>
     <tr>
-    <td>layoutK（char*）</td>
+    <td>layoutKOptional（char*）</td>
     <td>输入</td>
     <td>用于标识输入k的数据排布格式。</td>
     <td><ul><li>当前支持PA_BBND、BSND、TND。</li><li>建议值是BSND。</li></ul></td>
@@ -257,7 +257,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>maskMode（int64_t）</td>
     <td>输入</td>
     <td>表示mask的模式。</td>
-    <td><ul><li>mask_mode为0时，代表defaultMask模式。</li><li>mask_mode为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景。</li><li>建议值是0。</li></ul></td>
+    <td><ul><li>maskMode为0时，代表defaultMask模式。</li><li>maskMode为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景。</li><li>建议值是0。</li></ul></td>
     <td>INT64</td>
     <td>-</td>
     <td>-</td>
@@ -284,23 +284,23 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>-</td>
     </tr>
     <tr>
-    <td>sparseIndices（aclTensor*）</td>
+    <td>sparseIndicesOut（aclTensor*）</td>
     <td>输出</td>
     <td>公式中的Indices输出。</td>
     <td>不支持空tensor。</td>
     <td>INT32</td>
     <td>ND</td>
-    <td><ul><li>layoutQ为"BSND"时输出shape为[B, S1, N2, topk]。</li><li>layoutQ为"TND"时输出shape为[T1, N2, topk]。</li></ul></td>
+    <td><ul><li>layoutQOptional为"BSND"时输出shape为[B, S1, N2, topk]。</li><li>layoutQOptional为"TND"时输出shape为[T1, N2, topk]。</li></ul></td>
     <td>x</td>
     </tr>
     <tr>
-    <td>sparseValues（aclTensor*）</td>
+    <td>sparseValuesOut（aclTensor*）</td>
     <td>输出</td>
     <td>公式中的Indices对应的Values输出。</td>
     <td>returnValue为1时输出对应值；为0时输出shape为(0,)的空tensor。</td>
     <td>FLOAT</td>
     <td>ND</td>
-    <td><ul><li>returnValue为1且layoutQ为"BSND"时输出shape为[B, S1, N2, topk]。</li><li>returnValue为1且layoutQ为"TND"时输出shape为[T1, N2, topk]。</li></ul></td>
+    <td><ul><li>returnValue为1且layoutQOptional为"BSND"时输出shape为[B, S1, N2, topk]。</li><li>returnValue为1且layoutQOptional为"TND"时输出shape为[T1, N2, topk]。</li></ul></td>
     <td>x</td>
     </tr>
     <tr>
@@ -354,7 +354,7 @@ aclnnStatus aclnnLightningIndexerV2(
       <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td>q、k、w、cuSeqlensQ、cuSeqlensK、sequsedQ、sequsedK、cmpResidualK、blockTable、outputIdxOffset、metadata、sparseIndices、sparseValues的数据类型和数据格式不在支持的范围内。</td>
+      <td>q、k、w、cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional、blockTableOptional、outputIdxOffsetOptional、metadataOptional、sparseIndicesOut、sparseValuesOut的数据类型和数据格式不在支持的范围内。</td>
       </tr>
       </tbody>
     </table>
@@ -410,9 +410,9 @@ aclnnStatus aclnnLightningIndexerV2(
 
 - 参数q的N支持1~64，k的N支持1。
 - headdim支持128。
-- pa_kv_cache支持0轴非连续；pa_block_size支持1~1024，满足block大小32Byte对齐。
+- k在PA_BBND场景支持0轴非连续；block_size（k的block维度）支持1~1024，满足block大小32Byte对齐。
 - 参数q、k的数据类型应保持一致。
-- sparseIndices无效部分填-1；sparseValues无效部分填-inf。
+- sparseIndicesOut无效部分填-1；sparseValuesOut无效部分填-inf。
 - 传入的cmpResidualKOptional中每一个元素的值都应小于压缩率cmpRatio。
 
 <!-- npu="A3,910b" id7 -->
@@ -423,15 +423,15 @@ aclnnStatus aclnnLightningIndexerV2(
   - K为BSND时，cuSeqlensKOptional不传；sequsedKOptional可选，不传使用S2，传入使用各样本有效K长度。
   - K为TND时，cuSeqlensKOptional必传，使用累计长度，相邻值之差为样本长度。
   - 当前不支持sequsedQOptional、outputIdxOffsetOptional、maxSeqlenQ功能，不建议传入这些参数。
-  - 当layoutK为PA_BBND时，必须传入sequsedKOptional；当layoutK为BSND或TND时，sequsedKOptional可选传入。
+  - 当layoutKOptional为PA_BBND时，必须传入sequsedKOptional；当layoutKOptional为BSND或TND时，sequsedKOptional可选传入。
 <!-- end id7 -->
 <!-- npu="950" id8 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
-  - 当传入的参数layoutQ为BSND时，不支持传入cuSeqlensQOptional；当layoutK为BSND或PA_BBND时，不支持传入cuSeqlensKOptional。
-  - 当传入参数outputIdxOffsetOptional时，支持大于等于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparseIndice值不超过INT32的最大值。
-  - 当传入的参数layoutQ为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的query长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的query长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的query输出的sparseIndices和sparseValues全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
+  - 当传入的参数layoutQOptional为BSND时，不支持传入cuSeqlensQOptional；当layoutKOptional为BSND或PA_BBND时，不支持传入cuSeqlensKOptional。
+  - 当传入参数outputIdxOffsetOptional时，支持大于等于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparseIndicesOut值不超过INT32的最大值。
+  - 当传入的参数layoutQOptional为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的q长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的q长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的q输出的sparseIndicesOut和sparseValuesOut全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
   - 当传入的cmpRatio > 1且maskMode = 3时，必须传入cmpResidualKOptional，其余情况不传入。
-  - 当传入的参数layoutK为PA_BBND时，必须传入sequsedKOptional。
+  - 当传入的参数layoutKOptional为PA_BBND时，必须传入sequsedKOptional。
   - 参数metadataOptional必须传入。
 
 <!-- end id8 -->

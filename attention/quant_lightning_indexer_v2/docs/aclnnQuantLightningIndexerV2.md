@@ -25,9 +25,9 @@
 
 ## 功能说明
 
-- 接口功能：`QuantLightningIndexerV2`是推理场景下，稀疏attention前处理的计算，选出关键的稀疏token，并对输入query和key进行量化实现存8算8，获取最大收益。
+- 接口功能：`QuantLightningIndexerV2`是推理场景下，稀疏attention前处理的计算，选出关键的稀疏token，并对输入q和k进行量化实现存8算8，获取最大收益。
 
-- 版本演进：在QuantLightningIndexer的基础上，新增压缩key场景、分核计算metadata、稀疏value输出等能力。
+- 版本演进：在QuantLightningIndexer的基础上，新增压缩k场景、分核计算metadata、稀疏value输出等能力。
 
 - 计算公式：
 
@@ -37,9 +37,9 @@ $$
 
 主要计算过程为：
 
-1. 将某个token对应的输入参数`query`（$Q_{index}^{Quant}\in\R^{g\times d}$）乘以给定上下文`key`（$K_{index}^{Quant}\in\R^{S_{k}\times d}$），得到相关性。
-2. 相关性结果与`query`和`key`对应的反量化系数`query_dequant_scale`（$Scale_Q$）和`key_dequant_scale`（$Scale_K^T$）相乘，通过激活函数$ReLU$过滤无效负相关信号后，得到当前Token与所有前序Token的相关性分数向量。
-3. 将其与权重系数`weights`（$W$）相乘后，沿g的方向，选取前$Top-k$个索引值得到输出$out$，作为Attention的输入。
+1. 将某个token对应的输入参数`q`（$Q_{index}^{Quant}\in\R^{g\times d}$）乘以给定上下文`k`（$K_{index}^{Quant}\in\R^{S_{k}\times d}$），得到相关性。
+2. 相关性结果与`q`和`k`对应的反量化系数`qDescale`（$Scale_Q$）和`kDescale`（$Scale_K^T$）相乘，通过激活函数$ReLU$过滤无效负相关信号后，得到当前Token与所有前序Token的相关性分数向量。
+3. 将其与权重系数`w`（$W$）相乘后，沿g的方向，选取前$Top-k$个索引值得到输出$out$，作为Attention的输入。
 
 ## 函数原型
 
@@ -47,13 +47,13 @@ $$
 
 ```Cpp
 aclnnStatus aclnnQuantLightningIndexerV2GetWorkspaceSize(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *weights,
-    const aclTensor *queryDequantScale,
-    const aclTensor *keyDequantScale,
-    const aclTensor *cuSeqLensQOptional,
-    const aclTensor *cuSeqLensKOptional,
+    const aclTensor *q,
+    const aclTensor *k,
+    const aclTensor *w,
+    const aclTensor *qDescale,
+    const aclTensor *kDescale,
+    const aclTensor *cuSeqlensQOptional,
+    const aclTensor *cuSeqlensKOptional,
     const aclTensor *sequsedQOptional,
     const aclTensor *sequsedKOptional,
     const aclTensor *cmpResidualKOptional,
@@ -62,12 +62,12 @@ aclnnStatus aclnnQuantLightningIndexerV2GetWorkspaceSize(
     const aclTensor *metadataOptional,
     int64_t          topk,
     int64_t          quantMode,
-    int64_t          maxSeqlenQOptional,
+    int64_t          maxSeqlenQ,
     char            *layoutQOptional,
     char            *layoutKOptional,
-    int64_t          maskModeOptional,
-    int64_t          cmpRatioOptional,
-    int64_t          returnValueOptional,
+    int64_t          maskMode,
+    int64_t          cmpRatio,
+    int64_t          returnValue,
     const aclTensor *sparseIndicesOut,
     const aclTensor *sparseValuesOut,
     uint64_t        *workspaceSize,
@@ -76,10 +76,10 @@ aclnnStatus aclnnQuantLightningIndexerV2GetWorkspaceSize(
 
 ```Cpp
 aclnnStatus aclnnQuantLightningIndexerV2(
-    void             *workspace,
-    uint64_t          workspaceSize,
-    aclOpExecutor    *executor,
-    const aclrtStream stream)
+    void          *workspace,
+    uint64_t       workspaceSize,
+    aclOpExecutor *executor,
+    aclrtStream    stream)
 ```
 
 ## aclnnQuantLightningIndexerV2GetWorkspaceSize
@@ -88,8 +88,8 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 
 > [!NOTE]
 >
-> - query、key、weights参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、N（Head Num）表示多头数、D（Head Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
-> - S1表示query shape中的S，S2表示key shape中的S，T1表示query shape中的T，T2表示key shape中的T，N1表示query shape中的N，N2表示key shape中的N。
+> - q、k、w参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、N（Head Num）表示多头数、D（Head Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
+> - S1表示q shape中的S，S2表示k shape中的S，T1表示q shape中的T，T2表示k shape中的T，N1表示q shape中的N，N2表示k shape中的N。
 > - maxBlockNumPerSeq表示每个Batch中最大sequsedKOptional对应的block数量，S2_MAX表示sequsedKOptional中的最大值
 
   <table style="undefined;table-layout: fixed; width: 1601px"><colgroup>
@@ -115,7 +115,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
     </tr></thead>
   <tbody>
     <tr>
-      <td>query</td>
+      <td>q</td>
       <td>输入</td>
       <td>公式中量化后的Query。</td>
       <td>不支持空tensor。</td>
@@ -130,7 +130,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>x</td>
     </tr>
     <tr>
-      <td>key</td>
+      <td>k</td>
       <td>输入</td>
       <td>公式中量化后的Key。</td>
       <td>
@@ -149,7 +149,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>支持0轴非连续</td>
     </tr>
     <tr>
-      <td>weights</td>
+      <td>w</td>
       <td>输入</td>
       <td>公式中的权重系数W。</td>
       <td>不支持空tensor。</td>
@@ -164,7 +164,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>x</td>
     </tr>
     <tr>
-      <td>queryDequantScale</td>
+      <td>qDescale</td>
       <td>输入</td>
       <td>公式中Query的反量化系数。</td>
       <td>不支持空tensor。</td>
@@ -174,13 +174,13 @@ aclnnStatus aclnnQuantLightningIndexerV2(
           <ul>
                 <li>quantMode为3/5时，layoutQOptional为BSND时shape为(B,S1,N1,D/64,2)，layoutQOptional为TND时shape为(T1,N1,D/64,2)。</li>
                 <li>quantMode为4时，shape为(1,)。</li>
-                <li>其他场景shape与weights保持一致。</li>
+                <li>其他场景shape与w保持一致。</li>
           </ul>
       </td>
       <td>x</td>
     </tr>
     <tr>
-      <td>keyDequantScale</td>
+      <td>kDescale</td>
       <td>输入</td>
       <td>公式中Key的反量化系数。</td>
       <td>不支持空tensor。</td>
@@ -196,7 +196,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>支持0轴非连续</td>
     </tr>
     <tr>
-      <td>cuSeqLensQOptional</td>
+      <td>cuSeqlensQOptional</td>
       <td>输入</td>
       <td>每个Batch中，Query的有效token数（TND场景使用cu_seqlens格式）。</td>
       <td>
@@ -210,7 +210,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>x</td>
     </tr>
     <tr>
-      <td>cuSeqLensKOptional</td>
+      <td>cuSeqlensKOptional</td>
       <td>输入</td>
       <td>每个Batch中，Key的有效token数（TND场景使用cu_seqlens格式）。</td>
       <td>
@@ -227,7 +227,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>sequsedQOptional</td>
       <td>输入</td>
       <td>每个Batch中，Query的有效token数。</td>
-      <td>该入参中每个Batch的有效token数不超过query中的维度S大小且不小于0。</td>
+      <td>该入参中每个Batch的有效token数不超过q中的维度S大小且不小于0。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>
@@ -239,7 +239,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>每个Batch中，Key的有效token数。</td>
       <td>
           <ul>
-                <li>该入参中每个Batch的有效token数不超过key中的维度S大小且不小于0。</li>
+                <li>该入参中每个Batch的有效token数不超过k中的维度S大小且不小于0。</li>
                 <li>当layoutKOptional为PA_BBND时，该入参必须传入。</li>
           </ul>
       </td>
@@ -252,7 +252,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>cmpResidualKOptional</td>
       <td>输入</td>
       <td>压缩场景下Key的残余长度。</td>
-      <td>需满足0 <= cmpResidualKOptional[i] < cmpRatioOptional。</td>
+      <td>需满足0 <= cmpResidualKOptional[i] < cmpRatio。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>
@@ -265,7 +265,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>
           <ul>
                 <li>不支持空tensor。</li>
-                <li>PageAttention场景下，block_table必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq。</li>
+                <li>PageAttention场景下，blockTableOptional必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -323,7 +323,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>maxSeqlenQOptional</td>
+      <td>maxSeqlenQ</td>
       <td>输入</td>
       <td>Query的最大序列长度。</td>
       <td>-</td>
@@ -361,7 +361,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>maskModeOptional</td>
+      <td>maskMode</td>
       <td>输入</td>
       <td>表示sparse的模式。</td>
       <td>
@@ -376,9 +376,9 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>cmpRatioOptional</td>
+      <td>cmpRatio</td>
       <td>输入</td>
-      <td>key的压缩倍数。</td>
+      <td>k的压缩倍数。</td>
       <td>
           <ul>
                 <li>支持 (0, 128] 内的正整数。</li>
@@ -390,7 +390,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>returnValueOptional</td>
+      <td>returnValue</td>
       <td>输入</td>
       <td>表示是否输出sparseValuesOut。</td>
       <td>
@@ -424,12 +424,12 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>公式中的Indices输出对应的value值。</td>
       <td>
           <ul>
-                <li>returnValueOptional为1时输出有效值，无效部分填bf16负无穷；returnValueOptional为0时输出shape为(0,)的空tensor。</li>
+                <li>returnValue为1时输出有效值，无效部分填bf16负无穷；returnValue为0时输出shape为(0,)的空tensor。</li>
           </ul>
       </td>
       <td>BFLOAT16</td>
       <td>ND</td>
-      <td>returnValueOptional为1时shape与sparseIndicesOut保持一致；returnValueOptional为0时shape为(0,)。</td>
+      <td>returnValue为1时shape与sparseIndicesOut保持一致；returnValue为0时shape为(0,)。</td>
       <td>x</td>
     </tr>
     <tr>
@@ -459,26 +459,26 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 - <term>Ascend 950PR&950DT系列产品</term>：
   - `layoutKOptional`额外支持BSND和TND；支持PA_BBND、BSND、TND。
   - `quantMode`支持1（FLOAT8_e4m3fn量化）、2（INT8量化）、3（MXFP8量化）、4（HIFLOAT8量化）和5（MXFP4量化）。
-  - `cmpRatioOptional`支持(0, 128]内任意正整数。
-  - 支持`returnValueOptional`。
-  - query和key：`quantMode`为1/3时支持FLOAT8_e4m3fn，`quantMode`为2时支持INT8，`quantMode`为4时支持HIFLOAT8，`quantMode`为5时支持FLOAT4_e2m1。
-  - queryDequantScale和keyDequantScale：`quantMode`为1/4时支持FLOAT32，`quantMode`为2时支持FLOAT16，`quantMode`为3/5时支持FLOAT8_e8m0。
-  - weights：`quantMode`为2时支持FLOAT16，`quantMode`为1/3/4/5时支持FLOAT32。
-  - query N1支持[1, 64]，key N2仅支持1。
-  - layoutQOptional为BSND时不允许传入cuSeqLensQOptional；layoutKOptional为BSND或PA_BBND时不允许传入cuSeqLensKOptional。
+  - `cmpRatio`支持(0, 128]内任意正整数。
+  - 支持`returnValue`。
+  - q和k：`quantMode`为1/3时支持FLOAT8_e4m3fn，`quantMode`为2时支持INT8，`quantMode`为4时支持HIFLOAT8，`quantMode`为5时支持FLOAT4_e2m1。
+  - qDescale和kDescale：`quantMode`为1/4时支持FLOAT32，`quantMode`为2时支持FLOAT16，`quantMode`为3/5时支持FLOAT8_e8m0。
+  - w：`quantMode`为2时支持FLOAT16，`quantMode`为1/3/4/5时支持FLOAT32。
+  - q N1支持[1, 64]，k N2仅支持1。
+  - layoutQOptional为BSND时不允许传入cuSeqlensQOptional；layoutKOptional为BSND或PA_BBND时不允许传入cuSeqlensKOptional。
   - layoutKOptional为PA_BBND时必须传入blockTableOptional，其他场景不允许传入。
 <!-- end id10 -->
 <!-- npu="A3,910b" id11 -->
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - `layoutKOptional`仅支持PA_BBND。
   - `quantMode`仅支持2（Per-Token-Head量化）。
-  - `cmpRatioOptional`仅支持2的幂次方且范围为[1, 128]，即1/2/4/8/16/32/64/128。
+  - `cmpRatio`仅支持2的幂次方且范围为[1, 128]，即1/2/4/8/16/32/64/128。
   - 不支持`outputIdxOffsetOptional`。
-  - 不支持`returnValueOptional`。
-  - query和key：支持INT8，不支持FLOAT8_e4m3fn、HIFLOAT8和FLOAT4_e2m1。
-  - queryDequantScale和keyDequantScale：支持FLOAT16，不支持FLOAT32和FLOAT8_e8m0。
-  - weights：支持FLOAT16，不支持FLOAT32。
-  - query N1仅支持64。
+  - 不支持`returnValue`。
+  - q和k：支持INT8，不支持FLOAT8_e4m3fn、HIFLOAT8和FLOAT4_e2m1。
+  - qDescale和kDescale：支持FLOAT16，不支持FLOAT32和FLOAT8_e8m0。
+  - w：支持FLOAT16，不支持FLOAT32。
+  - q N1仅支持64。
   - topk仅支持[1, 2048]。
 <!-- end id11 -->
 
@@ -507,7 +507,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
             <tr>
                 <td>ACLNN_ERR_PARAM_INVALID</td>
                 <td>161002</td>
-                <td>query、key、weights、queryDequantScale、keyDequantScale、cuSeqLensQOptional、cuSeqLensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional、blockTableOptional、metadataOptional、layoutQOptional、layoutKOptional、topk、quantMode、maskModeOptional、cmpRatioOptional、returnValueOptional、sparseIndicesOut、sparseValuesOut的数据类型和数据格式不在支持的范围内。</td>
+                <td>q、k、w、qDescale、kDescale、cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional、blockTableOptional、metadataOptional、layoutQOptional、layoutKOptional、topk、quantMode、maskMode、cmpRatio、returnValue、sparseIndicesOut、sparseValuesOut的数据类型和数据格式不在支持的范围内。</td>
             </tr>
         </tbody>
     </table>
@@ -560,8 +560,8 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 - headdim支持128。
 - block_size取值为16的倍数，最大支持1024。
 - 当`layoutKOptional`不为PA_BBND时，`layoutQOptional`和`layoutKOptional`必须一致。
-- 当`quantMode`为3/5时，`queryDequantScale`和`keyDequantScale`的维数分别比`query`和`key`多1，前缀维度保持一致，末两维为(D/64, 2)；D必须为64的倍数，每个scale对应D轴上连续32个逻辑元素。
-- 当传入的参数layoutQOptional为TND时，必须传入cuSeqLensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的query长度不超过根据cuSeqLensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqLensQOptional计算出的query长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的query输出的sparseIndices和sparseValues全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
+- 当`quantMode`为3/5时，`qDescale`和`kDescale`的维数分别比`q`和`k`多1，前缀维度保持一致，末两维为(D/64, 2)；D必须为64的倍数，每个scale对应D轴上连续32个逻辑元素。
+- 当传入的参数layoutQOptional为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的q长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的q长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的q输出的sparseIndicesOut和sparseValuesOut全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
 - **确定性说明：** aclnnQuantLightningIndexerV2默认确定性实现。
 
 ## 调用示例

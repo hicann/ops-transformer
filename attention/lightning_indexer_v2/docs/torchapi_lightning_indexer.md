@@ -31,7 +31,7 @@
 
   1. 将某个token对应的输入参数`q`（$Q_{index}\in\R^{g\times d}$）乘以给定上下文`k`（$K_{index}\in\R^{S_{k}\times d}$），得到相关性。
   2. 通过激活函数$ReLU$过滤无效负相关信号后，得到当前Token与所有前序Token的相关性分数向量。
-  3. 将其与权重系数`w`（$W$）相乘后，沿g的方向，选取前$Top-k$个索引值得到输出$sparseIndices$，并输出对应的$sparseValues$，作为Attention的输入。
+  3. 将其与权重系数`w`（$W$）相乘后，沿g的方向，选取前$Top-k$个索引值得到输出$sparse\_indices$，并输出对应的$sparse\_values$，作为Attention的输入。
 
 - **计算公式**：
 
@@ -55,13 +55,13 @@ cann_ops_transformer.lightning_indexer_metadata(
   seqused_q=None,
   seqused_k=None,
   cmp_residual_k=None,
-  batch_size=0,
-  max_seqlen_q=-1,
-  max_seqlen_k=-1,
-  layout_q="BSND",
-  layout_k="BSND",
-  mask_mode=0,
-  cmp_ratio=1
+  batch_size=None,
+  max_seqlen_q=None,
+  max_seqlen_k=None,
+  layout_q=None,
+  layout_k=None,
+  mask_mode=None,
+  cmp_ratio=None
 ) -> Tensor
 ```
 
@@ -107,14 +107,14 @@ cann_ops_transformer.lightning_indexer(
 | cu_seqlens_k | Tensor | 可选 | 表示不同batch中k的有效Sequence Length的累加前缀和，仅layout_k为TND场景下必传，第一个值固定为0。数据格式为ND，支持非连续的Tensor。 | int32 | (b+1, ) |
 | seqused_q | Tensor | 可选 | 表示不同batch中q实际参与运算的Sequence Length。数据格式为ND，支持非连续的Tensor。 | int32 | (b, ) |
 | seqused_k | Tensor | 可选 | 表示不同batch中k实际参与运算的Sequence Length。数据格式为ND，支持非连续的Tensor。 | int32 | (b, ) |
-| cmp_residual_k | Tensor | 可选 | 表示不同batch中cmp_kv压缩前Sequence Length除以cmp_ratio的余数，配合cmp_ratio实现cmp_kv部分的mask和负载计算。cmp_ratio不为1且mask_mode为3场景下必传。数据格式为ND，支持非连续的Tensor。 | int32 | (b, ) |
-| batch_size | int | 可选 | 表示batch数量，默认值为0。 | int64 | - |
-| max_seqlen_q | int | 可选 | 表示q的最长Sequence Length，-1表示任意可能长度，默认值为-1。 | int64 | - |
-| max_seqlen_k | int | 可选 | 表示k的最长Sequence Length，-1表示任意可能长度，默认值为-1。 | int64 | - |
-| layout_q | str | 可选 | 表示q的排列格式，支持BSND、TND，默认值为BSND。 | string | - |
-| layout_k | str | 可选 | 表示k的排列格式，支持BSND、TND、PA_BBND，默认值为BSND。 | string | - |
-| mask_mode | int | 可选 | 表示sparse模式，0表示No mask，3表示rightDownCausal模式，默认值为0。 | int64 | - |
-| cmp_ratio | int | 可选 | 表示k的压缩率，取值范围[1, 128]，默认值为1，表示无压缩。 | int64 | - |
+| cmp_residual_k | Tensor | 可选 | 表示不同batch中k压缩前Sequence Length除以cmp_ratio的余数，配合cmp_ratio实现k部分的mask和负载计算。cmp_ratio不为1且mask_mode为3场景下必传。数据格式为ND，支持非连续的Tensor。 | int32 | (b, ) |
+| batch_size | int | 可选 | 表示batch数量，默认值为None。 | int64 | - |
+| max_seqlen_q | int | 可选 | 表示q的最长Sequence Length，-1表示任意可能长度，默认值为None。 | int64 | - |
+| max_seqlen_k | int | 可选 | 表示k的最长Sequence Length，-1表示任意可能长度，默认值为None。 | int64 | - |
+| layout_q | str | 可选 | 表示q的排列格式，支持BSND、TND，默认值为None。 | string | - |
+| layout_k | str | 可选 | 表示k的排列格式，支持BSND、TND、PA_BBND，默认值为None。 | string | - |
+| mask_mode | int | 可选 | 表示sparse模式，0表示No mask，3表示rightDownCausal模式，默认值为None。 | int64 | - |
+| cmp_ratio | int | 可选 | 表示k的压缩率，取值范围[1, 128]，1表示无压缩，默认值为None。 | int64 | - |
 
 ### lightning_indexer
 
@@ -193,7 +193,7 @@ cann_ops_transformer.lightning_indexer(
   - topk取值范围当前仅支持[1, 8192]。
   - 支持num_heads_q = 1~64、q_n = 1~64。
   - cmp_ratio支持[1, 128]。
-  - 当传入output_idx_offset时，支持大于等于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparseIndice值不超过INT32的最大值。
+  - 当传入output_idx_offset时，支持大于等于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparse_indices值不超过INT32的最大值。
   - 当layout_q为TND时，必须传入cu_seqlens_q，如果也传入seqused_q，应保证由seqused_q传入的各个batch的q长度不超过根据cu_seqlens_q计算出的各个batch的q序列长度。当某个batch由seqused_q传入的q序列长度seqlen1小于由cu_seqlens_q计算出的q长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1的差值部分的q输出的sparse_indices和sparse_values全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
   - 参数metadata必须传入，shape为(1024,)。
 <!-- end id8 -->

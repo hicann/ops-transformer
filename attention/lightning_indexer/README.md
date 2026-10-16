@@ -86,7 +86,7 @@
     </tr>
     <tr>
       <td>actual_seq_lengths_query</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>
           <ul>
                 <li>每个Batch中Query的有效token数。</li>
@@ -94,6 +94,7 @@
                 <li>可传入None表示与query的Q_S长度相同。</li>
                 <li>支持长度为B的一维tensor，且每个Batch的有效token数不超过query中的Q_S大小且不小于0。layout_query为TND时该入参必须传入，并以元素数量作为B值。</li>
                 <li>每个元素表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
+                <li>默认值为None。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -101,7 +102,7 @@
     </tr>
     <tr>
       <td>actual_seq_lengths_key</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>
           <ul>
                 <li>每个Batch中Key的有效token数。</li>
@@ -109,6 +110,7 @@
                 <li>可传入None表示与key的K_S长度相同。</li>
                 <li>支持长度为B的一维tensor，且每个Batch的有效token数不超过key中的K_S大小且不小于0。</li>
                 <li>layout_key为TND或PA_BSND时该入参必须传入；其中layout_key为TND时，每个元素表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
+                <li>默认值为None。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -116,13 +118,14 @@
     </tr>
     <tr>
       <td>block_table</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>
           <ul>
                 <li>表示PageAttention中KV存储使用的block映射表。</li>
                 <li>不支持空tensor和非连续。</li>
                 <li>PageAttention场景下，block_table必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（每个batch中最大K_S对应的block数量，即max_K_S/block_size）。</li>
                 <li>shape支持[B, maxBlockNumPerSeq]。</li>
+                <li>默认值为None。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -130,7 +133,7 @@
     </tr>
     <tr>
       <td>layout_query</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>
           <ul>
                 <li>用于标识输入Query的数据排布格式。</li>
@@ -142,7 +145,7 @@
     </tr>
     <tr>
       <td>layout_key</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>
           <ul>
                 <li>用于标识输入Key的数据排布格式。</li>
@@ -154,7 +157,7 @@
     </tr>
     <tr>
       <td>sparse_count</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>
           <ul>
                 <li>topK阶段需要保留的block数量。</li>
@@ -167,7 +170,7 @@
     </tr>
     <tr>
       <td>sparse_mode</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>
           <ul>
                 <li>表示sparse的模式。</li>
@@ -181,24 +184,24 @@
     </tr>
     <tr>
       <td>pre_tokens</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>用于稀疏计算，表示attention需要和前几个Token计算关联，仅支持默认值2^63-1。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
     <tr>
       <td>next_tokens</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>用于稀疏计算，表示attention需要和后几个Token计算关联，仅支持默认值2^63-1。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
     <tr>
       <td>return_values</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>
           <ul>
-                <li>表示是否输出sparseValuesOut。</li>
+                <li>表示是否输出sparse_values。</li>
                 <li>True表示输出，False表示不输出，默认值为False。仅在训练且layout_key不为PA_BSND场景支持。</li>
           </ul>
       </td>
@@ -225,7 +228,7 @@
           <ul>
                 <li>公式中的Indices输出对应的value值。</li>
                 <li>不支持空tensor和非连续。</li>
-                <li>shape与sparseIndicesOut保持一致。</li>
+                <li>shape与sparse_indices保持一致。</li>
           </ul>
       </td>
       <td>FLOAT16、BFLOAT16</td>

@@ -75,49 +75,49 @@
     </tr>
     <tr>
       <td>block_table</td>
-      <td>输入</td>
-      <td>表示PageAttention中kvCache存储使用的block映射表，不支持空tensor和非连续。第二维长度不小于所有batch中最大的KV_S对应的block数量，即KV_S_max / block_size向上取整。shape为[B, KV_S_max/block_size]。</td>
+      <td>可选输入</td>
+      <td>表示PageAttention中kvCache存储使用的block映射表，不支持空tensor和非连续。第二维长度不小于所有batch中最大的KV_S对应的block数量，即KV_S_max / block_size向上取整。shape为[B, KV_S_max/block_size]。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>actual_seq_lengths_query</td>
-      <td>输入</td>
-      <td>表示不同Batch中query的有效token数，不支持空tensor和非连续。可传入None表示与query的Q_S长度相同。shape为[B,]。每个Batch的有效token数不超过query中的Q_S大小且不小于0。layout_query为"TND"时该入参必须传入，且以元素数量作为B值；每个元素表示当前batch与之前所有batch的token数总和（前缀和）。</td>
+      <td>可选输入</td>
+      <td>表示不同Batch中query的有效token数，不支持空tensor和非连续。可传入None表示与query的Q_S长度相同。shape为[B,]。每个Batch的有效token数不超过query中的Q_S大小且不小于0。layout_query为"TND"时该入参必须传入，且以元素数量作为B值；每个元素表示当前batch与之前所有batch的token数总和（前缀和）。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>actual_seq_lengths_kv</td>
-      <td>输入</td>
-      <td>表示不同Batch中key和value的有效token数，不支持空tensor和非连续。可传入None表示与key的KV_S长度相同。shape为[B,]。每个Batch的有效token数不超过key/value中的KV_S大小且不小于0。layout_kv为"TND"或"PA_BSND"时该入参必须传入；其中layout_kv为"TND"时，每个元素表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</td>
+      <td>可选输入</td>
+      <td>表示不同Batch中key和value的有效token数，不支持空tensor和非连续。可传入None表示与key的KV_S长度相同。shape为[B,]。每个Batch的有效token数不超过key/value中的KV_S大小且不小于0。layout_kv为"TND"或"PA_BSND"时该入参必须传入；其中layout_kv为"TND"时，每个元素表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>query_rope</td>
-      <td>输入</td>
-      <td>表示MLA结构中的query的rope信息，不支持空tensor和非连续。layout_query为"BSND"时，shape为[B, Q_S, Q_N, Dr]。layout_query为"TND"时，shape为[Q_T, Q_N, Dr]。</td>
+      <td>可选输入</td>
+      <td>表示MLA结构中的query的rope信息，不支持空tensor和非连续。layout_query为"BSND"时，shape为[B, Q_S, Q_N, Dr]。layout_query为"TND"时，shape为[Q_T, Q_N, Dr]。默认值为None。</td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>key_rope</td>
-      <td>输入</td>
-      <td>表示MLA结构中的key的rope信息，不支持空tensor。layout_kv为"BSND"时，shape为[B, KV_S, KV_N, Dr]。layout_kv为"TND"时，shape为[KV_T, KV_N, Dr]。layout_kv为"PA_BSND"时，shape为[block_num, block_size, KV_N, Dr]。</td>
+      <td>可选输入</td>
+      <td>表示MLA结构中的key的rope信息，不支持空tensor。layout_kv为"BSND"时，shape为[B, KV_S, KV_N, Dr]。layout_kv为"TND"时，shape为[KV_T, KV_N, Dr]。layout_kv为"PA_BSND"时，shape为[block_num, block_size, KV_N, Dr]。默认值为None。</td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>sinks</td>
-      <td>输入</td>
-      <td>attention结构中的可学习的sinks信息。</td>
+      <td>可选输入</td>
+      <td>attention结构中的可学习的sinks信息。默认值为None。</td>
       <td>FLOAT</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>scale_value</td>
-      <td>可选属性</td>
+      <td>属性</td>
       <td>代表缩放系数。</td>
       <td>FLOAT</td>
       <td>-</td>
@@ -125,7 +125,7 @@
     <tr>
       <td>sparse_block_size</td>
       <td>可选属性</td>
-      <td>代表sparse阶段的block大小。sparse_block_size为1时，为Token-wise稀疏化场景；sparse_block_size大于1且小于等于128时，为Block-wise稀疏化场景，块内token共享相同的稀疏化决策。</td>
+      <td>代表sparse阶段的block大小。sparse_block_size为1时，为Token-wise稀疏化场景；sparse_block_size大于1且小于等于128时，为Block-wise稀疏化场景，块内token共享相同的稀疏化决策。默认值为1。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -146,7 +146,7 @@
     <tr>
       <td>sparse_mode</td>
       <td>可选属性</td>
-      <td>表示sparse的模式。sparse_mode为0时代表全部计算；sparse_mode为3时代表rightDownCausal模式的mask，对应以右下顶点往左上为划分线的下三角场景。</td>
+      <td>表示sparse的模式。sparse_mode为0时代表全部计算；sparse_mode为3时代表rightDownCausal模式的mask，对应以右下顶点往左上为划分线的下三角场景。默认值为3。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -186,14 +186,14 @@
       <td>ND</td>
     </tr>
     <tr>
-      <td>softmax_max_out</td>
+      <td>softmax_max</td>
       <td>输出</td>
       <td>Attention算法对query乘key的结果取max得到softmax_max，不支持空tensor和非连续。layout_query为"BSND"时，shape为[B, KV_N, Q_S, Q_N/KV_N]。layout_query为"TND"时，shape为[KV_N, Q_T, Q_N/KV_N]。</td>
       <td>FLOAT</td>
       <td>ND</td>
     </tr>
     <tr>
-      <td>softmax_sum_out</td>
+      <td>softmax_sum</td>
       <td>输出</td>
       <td>Attention算法query乘key的结果减去softmax_max后取exp并求sum，得到softmax_sum，不支持空tensor和非连续。layout_query为"BSND"时，shape为[B, KV_N, Q_S, Q_N/KV_N]。layout_query为"TND"时，shape为[KV_N, Q_T, Q_N/KV_N]。</td>
       <td>FLOAT</td>
@@ -215,7 +215,7 @@
 - <term>Ascend 950PR&950DT系列产品</term>：
   - Q_N支持1~128。
   - sparse_block_size仅支持1。
-  - 仅在layout_key为PA_BSND时，key、value和key_rope支持0轴非连续。
+  - 仅在layout_kv为PA_BSND时，key、value和key_rope支持0轴非连续。
   - return_softmax_lse为True时，支持layout_kv为PA_BSND。
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - Q_N支持1/2/4/8/16/32/64/128。

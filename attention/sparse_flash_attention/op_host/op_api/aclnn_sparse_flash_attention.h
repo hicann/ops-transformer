@@ -19,8 +19,8 @@ extern "C" {
 #endif
 
 /**
- * @brief The first interface of aclnnMlaPrologV2WeightNz calculates the workspace size based on the specific
- * calculation process.
+ * @brief aclnnSparseFlashAttentionGetWorkspaceSize calculates the workspace size
+ * based on the specific calculation process.
  * @domain aclnn_ops_infer
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnSparseFlashAttentionGetWorkspaceSize(
@@ -33,7 +33,7 @@ __attribute__((visibility("default"))) aclnnStatus aclnnSparseFlashAttentionGetW
     aclOpExecutor** executor);
 
 /**
- * @brief The second interface of ACLNN_SPARSE_FLASH_ATTENTION_H is used to perform calculations.
+ * @brief The second interface of aclnnSparseFlashAttention is used to perform calculations.
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnSparseFlashAttention(void* workspace, uint64_t workspaceSize,
                                                                              aclOpExecutor* executor,

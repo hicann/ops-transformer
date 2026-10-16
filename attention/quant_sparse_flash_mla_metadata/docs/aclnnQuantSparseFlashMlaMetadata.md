@@ -183,8 +183,8 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadata(
         <ul>
           <li>支持空Tensor。</li>
           <li>oriTopk!=0且oriMaskMode=0的场景下必传。</li>
-          <li>layoutQ为BSND时：(B, S1, N2)</li>
-          <li>layoutQ为TND时：(T1, N2)</li>
+          <li>layoutQOptional为BSND时：(B, S1, N2)</li>
+          <li>layoutQOptional为TND时：(T1, N2)</li>
         </ul>
       </td>
       <td>INT32</td>
@@ -200,8 +200,8 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadata(
         <ul>
           <li>支持空Tensor。</li>
           <li>cmpTopk!=0且cmpMaskMode=0的场景下必传。</li>
-          <li>layoutQ为BSND时：(B, S1, N2)</li>
-          <li>layoutQ为TND时：(T1, N2)</li>
+          <li>layoutQOptional为BSND时：(B, S1, N2)</li>
+          <li>layoutQOptional为TND时：(T1, N2)</li>
         </ul>
       </td>
       <td>INT32</td>
@@ -406,7 +406,7 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadata(
       <td>-</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>1维，shape固定为(1024)</td>
+      <td>1维，shape固定为(2048)</td>
       <td>×</td>
     </tr>
     <tr>
@@ -560,9 +560,9 @@ aclnnStatus aclnnQuantSparseFlashMlaMetadata(
     } while (0)
 
 // 参考 quant_sparse_flash_mla_metadata.h
-constexpr uint32_t AIC_CORE_MAX_NUM = 36;
-constexpr uint32_t AIV_CORE_MAX_NUM = 72;
-constexpr uint32_t MQSMLA_METADATA_TOTAL_SIZE = 1024;
+constexpr uint32_t AIC_CORE_MAX_NUM = 80;
+constexpr uint32_t AIV_CORE_MAX_NUM = 80;
+constexpr uint32_t MQSMLA_METADATA_TOTAL_SIZE = 2048;
 constexpr uint32_t FA_METADATA_SIZE = 9;
 constexpr uint32_t FD_METADATA_SIZE = 8;
 
@@ -757,7 +757,7 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     context.numHeadsKv = 1;
     context.headDim = 512;
     context.quantMode = 1;
-    ret = CreateTensor(aclDataType::ACL_INT32, {MQSMLA_METADATA_TOTAL_SIZE}, context.metadata); // 1024: Fix size
+    ret = CreateTensor(aclDataType::ACL_INT32, {MQSMLA_METADATA_TOTAL_SIZE}, context.metadata); // 2048: Fix size
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create metadata failed. Error: %d", ret);
     context.oriTopk = 0;
     context.cmpTopk = 0;

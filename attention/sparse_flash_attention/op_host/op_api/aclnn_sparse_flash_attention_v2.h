@@ -20,7 +20,7 @@ extern "C" {
 
 /**
  * @brief The first interface of aclnnSparseFlashAttentionV2
-    calculates the workspace size based on the specific calculation process.
+ * calculates the workspace size based on the specific calculation process.
  * @domain aclnn_ops_infer
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnSparseFlashAttentionV2GetWorkspaceSize(
@@ -33,7 +33,7 @@ __attribute__((visibility("default"))) aclnnStatus aclnnSparseFlashAttentionV2Ge
     uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
- * @brief The second interface of ACLNN_SPARSE_FLASH_ATTENTION_V2_H is used to perform calculations.
+ * @brief The second interface of aclnnSparseFlashAttentionV2 is used to perform calculations.
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnSparseFlashAttentionV2(void* workspace, uint64_t workspaceSize,
                                                                                aclOpExecutor* executor,

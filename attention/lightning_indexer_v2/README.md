@@ -25,7 +25,7 @@
 
   1. 将某个token对应的输入参数`q`（$Q_{index}\in\R^{g\times d}$）乘以给定上下文`k`（$K_{index}\in\R^{S_{k}\times d}$），得到相关性。
   2. 通过激活函数$ReLU$过滤无效负相关信号后，得到当前Token与所有前序Token的相关性分数向量。
-  3. 将其与权重系数`w`（$W$）相乘后，沿g的方向，选取前$Top-k$个索引值得到输出$sparseIndices$，并输出对应的$sparseValues$，作为Attention的输入。
+  3. 将其与权重系数`w`（$W$）相乘后，沿g的方向，选取前$Top-k$个索引值得到输出$sparse\_indices$，并输出对应的$sparse\_values$，作为Attention的输入。
 
 ## 参数说明
 
@@ -67,119 +67,119 @@
     <td>ND</td>
     </tr>
     <tr>
-    <td>cuSeqlensQOptional</td>
-    <td>输入</td>
-    <td>Q为TND时为各Batch有效token数的累计和；Q为BSND时为[0, 各样本有效Q长度]，长度各自不超过S1</td>
+    <td>cu_seqlens_q</td>
+    <td>可选输入</td>
+    <td>Q为TND时为各Batch有效token数的累计和；Q为BSND时为[0, 各样本有效Q长度]，长度各自不超过S1。默认值为None。</td>
     <td>INT32</td>
     <td>ND</td>
     </tr>
     <tr>
-    <td>cuSeqlensKOptional</td>
-    <td>输入</td>
-    <td>K为TND时为各Batch有效token数的累计和；K为BSND时不支持传入该参数。</td>
+    <td>cu_seqlens_k</td>
+    <td>可选输入</td>
+    <td>K为TND时为各Batch有效token数的累计和；K为BSND时不支持传入该参数。默认值为None。</td>
     <td>INT32</td>
     <td>ND</td>
     </tr>
   <tr>
-    <td>sequsedQOptional</td>
-    <td>输入</td>
-    <td>不同Batch中q的真实使用长度。</td>
+    <td>seqused_q</td>
+    <td>可选输入</td>
+    <td>不同Batch中q的真实使用长度。默认值为None。</td>
     <td>INT32</td>
     <td>ND</td>
     </tr>
   <tr>
-    <td>sequsedKOptional</td>
-    <td>输入</td>
-    <td>不同Batch中k的真实使用长度。</td>
+    <td>seqused_k</td>
+    <td>可选输入</td>
+    <td>不同Batch中k的真实使用长度。默认值为None。</td>
     <td>INT32</td>
     <td>ND</td>
     </tr>
   <tr>
-    <td>cmpResidualKOptional</td>
-    <td>输入</td>
-    <td>表示k压缩前token数量除以cmpRatio的余数。</td>
+    <td>cmp_residual_k</td>
+    <td>可选输入</td>
+    <td>表示k压缩前token数量除以cmp_ratio的余数。默认值为None。</td>
     <td>INT32</td>
     <td>ND</td>
     </tr>
     <tr>
-    <td>blockTableOptional</td>
-    <td>输入</td>
-    <td>表示PageAttention中KV存储使用的block映射表。</td>
+    <td>block_table</td>
+    <td>可选输入</td>
+    <td>表示PageAttention中KV存储使用的block映射表。默认值为None。</td>
     <td>INT32</td>
     <td>ND</td>
     </tr>
   <tr>
-    <td>outputIdxOffsetOptional</td>
-    <td>输入</td>
-    <td>表示topK结果输出索引所需要加上的偏移。</td>
+    <td>output_idx_offset</td>
+    <td>可选输入</td>
+    <td>表示topK结果输出索引所需要加上的偏移。默认值为None。</td>
     <td>INT32</td>
     <td>ND</td>
     </tr>
   <tr>
-  <td>metadataOptional</td>
-  <td>输入</td>
-  <td>LightningIndexerV2Metadata算子传入的分核信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容。</td>
+  <td>metadata</td>
+  <td>可选输入</td>
+  <td>LightningIndexerV2Metadata算子传入的分核信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容。默认值为None。</td>
   <td>INT32</td>
   <td>ND</td>
   </tr>
   <tr>
   <td>topk</td>
-  <td>输入</td>
+  <td>属性</td>
   <td>topK阶段需要保留的block数量。</td>
   <td>INT64</td>
   <td>-</td>
   </tr>
   <tr>
-  <td>maxSeqlenQ</td>
-  <td>输入</td>
-  <td>q的最大序列长度。</td>
+  <td>max_seqlen_q</td>
+  <td>可选属性</td>
+  <td>q的最大序列长度。默认值为-1。</td>
   <td>INT64</td>
   <td>-</td>
   </tr>
   <tr>
-  <td>layoutQ</td>
-  <td>输入</td>
-  <td>用于标识输入q的数据排布格式。</td>
+  <td>layout_q</td>
+  <td>可选属性</td>
+  <td>用于标识输入q的数据排布格式。默认值为"BSND"。</td>
   <td>STRING</td>
   <td>-</td>
   </tr>
   <tr>
-  <td>layoutK</td>
-  <td>输入</td>
-  <td>用于标识输入k的数据排布格式。</td>
+  <td>layout_k</td>
+  <td>可选属性</td>
+  <td>用于标识输入k的数据排布格式。默认值为"BSND"。</td>
   <td>STRING</td>
   <td>-</td>
   </tr>
   <tr>
-  <td>maskMode</td>
-  <td>输入</td>
-  <td>表示mask的模式。</td>
+  <td>mask_mode</td>
+  <td>可选属性</td>
+  <td>表示mask的模式。默认值为0。</td>
   <td>INT64</td>
   <td>-</td>
   </tr>
   <tr>
-  <td>cmpRatio</td>
-  <td>输入</td>
-  <td>用于稀疏计算，表示k的压缩倍数。</td>
+  <td>cmp_ratio</td>
+  <td>可选属性</td>
+  <td>用于稀疏计算，表示k的压缩倍数。默认值为1。</td>
   <td>INT64</td>
   <td>-</td>
   </tr>
   <tr>
-  <td>returnValue</td>
-  <td>输入</td>
-  <td>代表是否需要返回Indices对应的Values值。</td>
+  <td>return_value</td>
+  <td>可选属性</td>
+  <td>代表是否需要返回Indices对应的Values值。默认值为0。</td>
   <td>INT64</td>
   <td>-</td>
   </tr>
   <tr>
-  <td>sparseIndices</td>
+  <td>sparse_indices</td>
   <td>输出</td>
   <td>公式中的Indices输出。</td>
   <td>INT32</td>
   <td>ND</td>
   </tr>
   <tr>
-  <td>sparseValues</td>
+  <td>sparse_values</td>
   <td>输出</td>
   <td>公式中的Indices对应的Values输出。</td>
   <td>FLOAT</td>
@@ -197,26 +197,26 @@
 - headdim支持128。
 - pa_kv_cache支持0轴非连续；pa_block_size支持1~1024，满足block大小32Byte对齐。
 - 参数q、k的数据类型应保持一致。
-- sparseIndices无效部分填-1；sparseValues无效部分填-inf。
-- 传入的cmpResidualKOptional中的每一个元素的值都应小于传入的压缩率cmpRatio。
+- sparse_indices无效部分填-1；sparse_values无效部分填-inf。
+- 传入的cmp_residual_k中的每一个元素的值都应小于传入的压缩率cmp_ratio。
 - 确定性计算与batch一致性：
   - 默认确定性实现，相同输入多次调用结果一致。
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。也可通过`torch_npu.npu.set_deterministic_level(3)`设置。
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>:
   - topk取值范围当前仅支持[1, 2048]，以及3072、4096、5120、6144、7168、8192。
-  - 当前不支持sequsedQOptional、outputIdxOffsetOptional、maxSeqlenQ功能，不建议传入这些参数。
-  - Q为BSND时，cuSeqlensQOptional可选；不传使用S1，传入格式为[0, 各样本有效Q长度…]，长度各自不超过S1。
-  - Q为TND时，cuSeqlensQOptional必传，使用累计长度，相邻值之差为样本长度。
-  - K为BSND时，cuSeqlensKOptional不传；sequsedKOptional可选，不传使用S2，传入使用各样本有效K长度。
-  - K为TND时，cuSeqlensKOptional必传，使用累计长度，相邻值之差为样本长度。
-  - 当传入的参数layoutK为PA_BBND时，必须传入sequsedKOptional。
+  - 当前不支持seqused_q、output_idx_offset、max_seqlen_q功能，不建议传入这些参数。
+  - Q为BSND时，cu_seqlens_q可选；不传使用S1，传入格式为[0, 各样本有效Q长度…]，长度各自不超过S1。
+  - Q为TND时，cu_seqlens_q必传，使用累计长度，相邻值之差为样本长度。
+  - K为BSND时，cu_seqlens_k不传；seqused_k可选，不传使用S2，传入使用各样本有效K长度。
+  - K为TND时，cu_seqlens_k必传，使用累计长度，相邻值之差为样本长度。
+  - 当传入的参数layout_k为PA_BBND时，必须传入seqused_k。
 - <term>Ascend 950PR&950DT系列产品</term>:
-  - 当传入的参数layoutQ为BSND时，不支持传入cuSeqlensQOptional；当layoutK为BSND或PA_BBND时，不支持传入cuSeqlensKOptional。
-  - 当传入参数outputIdxOffsetOptional时，只支持大于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparseIndice值不超过INT32的最大值。
-  - 当传入的参数layoutQ为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的query长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的query长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的query输出的sparseIndices和sparseValues全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
-  - 当传入的cmpRatio > 1且maskMode = 3时，必须传入cmpResidualKOptional，其余情况不传入。
-  - 当layoutK为PA_BBND时，必须传入sequsedKOptional。
-  - 参数metadataOptional必须传入，且shape固定为[1024]。
+  - 当传入的参数layout_q为BSND时，不支持传入cu_seqlens_q；当layout_k为BSND或PA_BBND时，不支持传入cu_seqlens_k。
+  - 当传入参数output_idx_offset时，支持大于等于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparse_indices值不超过INT32的最大值。
+  - 当传入的参数layout_q为TND时，必须传入cu_seqlens_q，如果也传入seqused_q，应保证由seqused_q传入的各个batch的q长度不超过根据cu_seqlens_q计算出的各个batch的q序列长度。当某个batch由seqused_q传入的q序列长度seqlen1小于由cu_seqlens_q计算出的q长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的q输出的sparse_indices和sparse_values全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
+  - 当传入的cmp_ratio > 1且mask_mode = 3时，必须传入cmp_residual_k，其余情况不传入。
+  - 当layout_k为PA_BBND时，必须传入seqused_k。
+  - 参数metadata必须传入，且shape固定为[1024]。
 
 ## 调用示例
 

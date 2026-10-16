@@ -167,7 +167,6 @@ def cpu_aclnn_quant_sparse_flash_mla(
         cmp_topk_length,
         sinks,
         metadata,
-        quant_mode,
         softmax_scale,
         cmp_ratio,
         ori_mask_mode,
@@ -182,6 +181,7 @@ def cpu_aclnn_quant_sparse_flash_mla(
     )
     return cpu_quant_sparse_flash_mla(
         q,
+        quant_mode,
         return_softmax_lse=return_softmax_lse,
         testcase_name=testcase_name,
         **kwargs,

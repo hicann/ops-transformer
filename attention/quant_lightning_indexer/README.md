@@ -114,7 +114,7 @@
     </tr>
     <tr>
       <td>actual_seq_lengths_query</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>
           <ul>
                 <li>每个Batch中，Query的有效token数。</li>
@@ -124,6 +124,7 @@
                 <li>该入参中每个Batch的有效token数不超过query中的Q_S大小且不小于0，支持长度为B的一维tensor。</li>
                 <li>当layout_query为TND时，该入参必须传入，且以该入参元素的数量作为B值，该入参中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
                 <li>不能出现负值。</li>
+                <li>默认值为None。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -131,7 +132,7 @@
     </tr>
     <tr>
       <td>actual_seq_lengths_key</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>
           <ul>
                 <li>每个Batch中，Key的有效token数。</li>
@@ -140,6 +141,7 @@
                 <li>如果不指定seqlen可传入None，表示和key的shape的K_S长度相同。</li>
                 <li>该参数中每个Batch的有效token数不超过key中的K_S大小且不小于0，支持长度为B的一维tensor。</li>
                 <li>当layout_key为TND或PA_BSND时，该入参必须传入，layout_key为TND，该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
+                <li>默认值为None。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -147,7 +149,7 @@
     </tr>
     <tr>
       <td>block_table</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>
           <ul>
                 <li>表示PageAttention中KV存储使用的block映射表。</li>
@@ -155,6 +157,7 @@
                 <li>shape支持[B, K_S_max/block_size]</li>
                 <li>PageAttention场景下，block_table必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大actual_seq_lengths_key对应的block数量）</li>
                 <li>block_size取值为16的整数倍，最大支持到1024。</li>
+                <li>默认值为None。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -188,7 +191,7 @@
     </tr>
     <tr>
       <td>layout_query</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>
           <ul>
                 <li>用于标识输入Query的数据排布格式。</li>
@@ -201,7 +204,7 @@
     </tr>
     <tr>
       <td>layout_key</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>
           <ul>
                 <li>用于标识输入Key的数据排布格式。</li>
@@ -215,7 +218,7 @@
     </tr>
     <tr>
       <td>sparse_count</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>
           <ul>
                 <li>topK阶段需要保留的block数量。支持[1, 2048]。</li>
@@ -227,7 +230,7 @@
     </tr>
     <tr>
       <td>sparse_mode</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>
           <ul>
                 <li>表示sparse的模式。</li>
@@ -241,21 +244,21 @@
     </tr>
     <tr>
       <td>pre_tokens</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>用于稀疏计算，表示attention需要和前几个Token计算关联。仅支持默认值2^63-1。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
     <tr>
       <td>next_tokens</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>用于稀疏计算，表示attention需要和后几个Token计算关联。仅支持默认值2^63-1。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
     <tr>
       <td>key_stride0</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>
           <ul>
                 <li>表示key获取stride第0维的信息。</li>
@@ -267,7 +270,7 @@
     </tr>
     <tr>
       <td>key_dequant_scale_stride0</td>
-      <td>属性</td>
+      <td>可选属性</td>
       <td>
           <ul>
                 <li>表示key_dequant_scale获取stride第0维的信息。</li>

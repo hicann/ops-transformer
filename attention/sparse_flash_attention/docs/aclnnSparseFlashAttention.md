@@ -45,23 +45,23 @@ aclnnStatus aclnnSparseFlashAttentionGetWorkspaceSize(
     const aclTensor     *key,
     const aclTensor     *value,
     const aclTensor     *sparseIndices,
-    const aclTensor     *blockTable,
-    const aclTensor     *actualSeqLengthsQuery,
-    const aclTensor     *actualSeqLengthsKv,
-    const aclTensor     *queryRope,
-    const aclTensor     *keyRope,
+    const aclTensor     *blockTableOptional,
+    const aclTensor     *actualSeqLengthsQueryOptional,
+    const aclTensor     *actualSeqLengthsKvOptional,
+    const aclTensor     *queryRopeOptional,
+    const aclTensor     *keyRopeOptional,
     double              scaleValue,
-    int64_t             sparseBlockSize,
-    char                *layoutQuery,
-    char                *layoutKv,
+    int64_t             sparseBlockSizeOptional,
+    char                *layoutQueryOptional,
+    char                *layoutKvOptional,
     int64_t             sparseMode,
     int64_t             preTokens,
     int64_t             nextTokens,
     int64_t             attentionMode,
     bool                returnSoftmaxLse,
     const aclTensor     *attentionOut,
-    const aclTensor     *softmaxMaxOut,
-    const aclTensor     *softmaxSumOut,
+    const aclTensor     *softmaxMax,
+    const aclTensor     *softmaxSum,
     uint64_t            *workspaceSize,
     aclOpExecutor       **executor)
 ```
@@ -114,8 +114,8 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>ND</td>
      <td>
           <ul>
-                <li>layoutQuery为BSND时，shape为(B,S1,N1,D)。</li>
-                <li>layoutQuery为TND时，shape为(T1,N1,D)。</li>
+                <li>layoutQueryOptional为BSND时，shape为(B,S1,N1,D)。</li>
+                <li>layoutQueryOptional为TND时，shape为(T1,N1,D)。</li>
           </ul>
       </td>
       <td>x</td>
@@ -134,9 +134,9 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>ND</td>
       <td>
           <ul>
-                <li>layoutKv为PA_BSND时，shape为(blockNum, blockSize, N2, D)。</li>
-                <li>layoutKv为BSND时，shape为(B, S2, N2, D)。</li>
-                <li>layoutKv为TND时，shape为(T2, N2, D)。</li>
+                <li>layoutKvOptional为PA_BSND时，shape为(blockNum, blockSize, N2, D)。</li>
+                <li>layoutKvOptional为BSND时，shape为(B, S2, N2, D)。</li>
+                <li>layoutKvOptional为TND时，shape为(T2, N2, D)。</li>
           </ul>
       </td>
       <td>✓</td>
@@ -165,14 +165,14 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>ND</td>
       <td>
           <ul>
-                <li>layoutQuery为BSND时，shape为(B, S1, N2, sparseSize)。</li>
-                <li>layoutQuery为TND时，shape为(T1, N2, sparseSize)。</li>
+                <li>layoutQueryOptional为BSND时，shape为(B, S1, N2, sparseSize)。</li>
+                <li>layoutQueryOptional为TND时，shape为(T1, N2, sparseSize)。</li>
           </ul>
       </td>
       <td>x</td>
     </tr>
     <tr>
-      <td>blockTable（aclTensor）</td>
+      <td>blockTableOptional（aclTensor）</td>
       <td>输入</td>
       <td>表示PageAttention中kvCache存储使用的block映射表。</td>
       <td>
@@ -187,7 +187,7 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>x</td>
     </tr>
     <tr>
-      <td>actualSeqLengthsQuery（aclTensor）</td>
+      <td>actualSeqLengthsQueryOptional（aclTensor）</td>
       <td>输入</td>
       <td>表示不同Batch中query的有效token数。</td>
       <td>
@@ -195,7 +195,7 @@ aclnnStatus aclnnSparseFlashAttention(
                 <li>不支持空tensor。</li>
                 <li>如果不指定seqlen可传入None，表示和query的shape的S长度相同。</li>
                 <li>该入参中每个Batch的有效token数不超过query中的维度S大小且不小于0。支持长度为B的一维tensor。</li>
-                <li>layoutQuery为TND时，该入参必须传入，且以该入参元素的数量作为B值，该参数中每个元素的值表示当前batch与之前所有batch的token数总和。</li>
+                <li>layoutQueryOptional为TND时，该入参必须传入，且以该入参元素的数量作为B值，该参数中每个元素的值表示当前batch与之前所有batch的token数总和。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -204,7 +204,7 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>x</td>
     </tr>
     <tr>
-      <td>actualSeqLengthsKv（aclTensor）</td>
+      <td>actualSeqLengthsKvOptional（aclTensor）</td>
       <td>输入</td>
       <td>表示不同Batch中key和value的有效token数。</td>
       <td>
@@ -212,8 +212,8 @@ aclnnStatus aclnnSparseFlashAttention(
                 <li>不支持空tensor。</li>
                 <li>如果不指定seqlen可传入None，表示和key的shape的S长度相同。</li>
                 <li>该参数中每个Batch的有效token数不超过key/value中的维度S大小且不小于0。支持长度为B的一维tensor。</li>
-                <li>当layoutKv为TND或PA_BSND时，该入参必须传入。</li>
-                <li>layoutKv为TND，该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
+                <li>当layoutKvOptional为TND或PA_BSND时，该入参必须传入。</li>
+                <li>layoutKvOptional为TND，该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
           </ul>
       </td>
       <td>INT32</td>
@@ -222,12 +222,12 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>x</td>
     </tr>
     <tr>
-      <td>queryRope（aclTensor）</td>
+      <td>queryRopeOptional（aclTensor）</td>
       <td>输入</td>
       <td>表示MLA结构中的query的rope信息。</td>
       <td>
           <ul>
-                <li>可选项。须与keyRope成对为空指针（不使用rope），或成对传入非空tensor（使用rope，Dr为64）。</li>
+                <li>可选项。须与keyRopeOptional成对为空指针（不使用rope），或成对传入非空tensor（使用rope，Dr为64）。</li>
                 <li>不支持空tensor。</li>
           </ul>
       </td>
@@ -235,19 +235,19 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>ND</td>
       <td>
           <ul>
-                <li>layoutQuery为TND时，shape为(B,S1,N1,Dr)。</li>
-                <li>layoutQuery为BSND时，shape为(T1,N1,Dr)。</li>
+                <li>layoutQueryOptional为TND时，shape为(T1,N1,Dr)。</li>
+                <li>layoutQueryOptional为BSND时，shape为(B,S1,N1,Dr)。</li>
           </ul>
       </td>
       <td>x</td>
     </tr>
     <tr>
-      <td>keyRope（aclTensor）</td>
+      <td>keyRopeOptional（aclTensor）</td>
       <td>输入</td>
       <td>表示MLA结构中的key的rope信息。</td>
       <td>
           <ul>
-                <li>可选项。须与queryRope成对为空指针（不使用rope），或成对传入非空tensor（使用rope，Dr为64）。</li>
+                <li>可选项。须与queryRopeOptional成对为空指针（不使用rope），或成对传入非空tensor（使用rope，Dr为64）。</li>
                 <li>不支持空tensor。</li>
           </ul>
       </td>
@@ -255,9 +255,9 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>ND</td>
       <td>
           <ul>
-                <li>layoutKv为TND时，shape为(B,S1,N1,Dr)。</li>
-                <li>layoutKv为BSND时，shape为(T1,N1,Dr)。</li>
-                <li>layoutKv为PA_BSND时，shape为(blockNum,blockSize,N2,Dr)。</li>
+                <li>layoutKvOptional为TND时，shape为(T2,N2,Dr)。</li>
+                <li>layoutKvOptional为BSND时，shape为(B,S2,N2,Dr)。</li>
+                <li>layoutKvOptional为PA_BSND时，shape为(blockNum,blockSize,N2,Dr)。</li>
           </ul>
       </td>
       <td>✓</td>
@@ -273,13 +273,13 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>-</td>
     </tr>
     <tr>
-      <td>sparseBlockSize（int64_t）</td>
+      <td>sparseBlockSizeOptional（int64_t）</td>
       <td>输入</td>
       <td>代表sparse阶段的block大小。</td>
       <td>
           <ul>
-                <li>sparseBlockSize为1时，为Token-wise稀疏化场景，将每个token视为独立单元，在计算重要性分数时，评估每个查询token与每个键值token之间的独立关联程度。</li>
-                <li>sparseBlockSize为大于1小于等于128时，为Block-wise稀疏化场景，将token序列划分为固定大小的连续块，以块为单位进行重要性评估，块内token共享相同的稀疏化决策。</li>
+                <li>sparseBlockSizeOptional为1时，为Token-wise稀疏化场景，将每个token视为独立单元，在计算重要性分数时，评估每个查询token与每个键值token之间的独立关联程度。</li>
+                <li>sparseBlockSizeOptional为大于1小于等于128时，为Block-wise稀疏化场景，将token序列划分为固定大小的连续块，以块为单位进行重要性评估，块内token共享相同的稀疏化决策。</li>
           </ul>
       </td>
       <td>INT64</td>
@@ -288,7 +288,7 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>-</td>
     </tr>
     <tr>
-      <td>layoutQuery（char）</td>
+      <td>layoutQueryOptional（char）</td>
       <td>输入</td>
       <td>标识输入query的数据排布格式。</td>
       <td>
@@ -303,7 +303,7 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>-</td>
     </tr>
     <tr>
-      <td>layoutKv（char）</td>
+      <td>layoutKvOptional（char）</td>
       <td>输入</td>
       <td>标识输入key的数据排布格式。</td>
       <td>
@@ -385,14 +385,14 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>ND</td>
       <td>
           <ul>
-                <li>layoutQuery为BSND时，shape为(B,S1,N1,D)。</li>
-                <li>layoutQuery为TND时shape为(T1,N1,D)。</li>
+                <li>layoutQueryOptional为BSND时，shape为(B,S1,N1,D)。</li>
+                <li>layoutQueryOptional为TND时shape为(T1,N1,D)。</li>
           </ul>
       </td>
       <td>x</td>
     </tr>
     <tr>
-      <td>softmaxMaxOut（aclTensor）</td>
+      <td>softmaxMax（aclTensor）</td>
       <td>输出</td>
       <td>Attention算法对query乘key的结果，取max得到softmaxMax。</td>
       <td>不支持空tensor。</td>
@@ -400,14 +400,14 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>ND</td>
       <td>
           <ul>
-                <li>layoutQuery为BSND时，shape为(B,N2,S1,N1/N2)。</li>
-                <li>layoutQuery为TND时shape为(N2,T1,N1/N2)。</li>
+                <li>layoutQueryOptional为BSND时，shape为(B,N2,S1,N1/N2)。</li>
+                <li>layoutQueryOptional为TND时shape为(N2,T1,N1/N2)。</li>
           </ul>
       </td>
       <td>x</td>
     </tr>
    <tr>
-      <td>softmaxSumOut（aclTensor）</td>
+      <td>softmaxSum（aclTensor）</td>
       <td>输出</td>
       <td>Attention算法query乘key的结果减去softmaxMax,再取exp，接着求sum，得到softmaxSum。</td>
       <td>不支持空tensor。</td>
@@ -415,8 +415,8 @@ aclnnStatus aclnnSparseFlashAttention(
       <td>ND</td>
       <td>
           <ul>
-                <li>layoutQuery为BSND时，shape为(B,N2,S1,N1/N2)。</li>
-                <li>layoutQuery为TND时shape为(N2,T1,N1/N2)。</li>
+                <li>layoutQueryOptional为BSND时，shape为(B,N2,S1,N1/N2)。</li>
+                <li>layoutQueryOptional为TND时shape为(N2,T1,N1/N2)。</li>
           </ul>
       </td>
       <td>x</td>
@@ -469,7 +469,7 @@ aclnnStatus aclnnSparseFlashAttention(
             <tr>
                 <td>ACLNN_ERR_PARAM_INVALID</td>
                 <td>161002</td>
-                <td>query、key、value、sparseIndices、blockTable、actualSeqLengthsQuery、actualSeqLengthsKv、queryRope、keyRope、scaleValue、sparseBlockSize、layoutQuery、layoutKv、sparseMode、attentionMode、returnSoftmaxLse、attentionOut、softmaxMaxOut、softmaxSumOut的数据类型和数据格式不在支持的范围内。</td>
+                <td>query、key、value、sparseIndices、blockTableOptional、actualSeqLengthsQueryOptional、actualSeqLengthsKvOptional、queryRopeOptional、keyRopeOptional、scaleValue、sparseBlockSizeOptional、layoutQueryOptional、layoutKvOptional、sparseMode、attentionMode、returnSoftmaxLse、attentionOut、softmaxMax、softmaxSum的数据类型和数据格式不在支持的范围内。</td>
             </tr>
         </tbody>
     </table>
@@ -524,18 +524,18 @@ aclnnStatus aclnnSparseFlashAttention(
 - N2仅支持1。
 - blockSize为一个block的token数，blockSize取值为16的倍数，且最大支持1024。
 - 参数query中的D和key、value的D值相等为512。
-- queryRope与keyRope须成对为空指针或成对传入非空tensor：均为空指针时表示不使用rope，仅对512维nope部分做注意力计算；均传入非空tensor时Dr相等为64。不支持空tensor。
+- queryRopeOptional与keyRopeOptional须成对为空指针或成对传入非空tensor：均为空指针时表示不使用rope，仅对512维nope部分做注意力计算；均传入非空tensor时Dr相等为64。不支持空tensor。
 - 参数query、key、value的数据类型必须保持一致。
 - <term>Ascend 950PR&950DT系列产品</term>：
   - N1支持1~128。
-  - 仅支持sparseBlockSize为1。
-  - returnSoftmaxLse为True时，支持layoutKv为PA_BSND。
-  - 当layoutKv为PA_BBND时，key、value和key_rope支持0轴非连续，非连续Tensor的每一维的stride均不能为0。不支持其他非连续。
+  - 仅支持sparseBlockSizeOptional为1。
+  - returnSoftmaxLse为True时，支持layoutKvOptional为PA_BSND。
+  - 当layoutKvOptional为PA_BBND时，key、value和keyRopeOptional支持0轴非连续，非连续Tensor的每一维的stride均不能为0。不支持其他非连续。
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - N1支持1/2/4/8/16/32/64/128。
-  - sparseBlockSize支持[1,128]，且要求是2的幂次方，在PageAttention场景下要求sparseBlockSize整除blockSize。
-  - key、value和key_rope不支持非连续。
-  - returnSoftmaxLse为True时，layoutKv不支持PA_BSND。
+  - sparseBlockSizeOptional支持[1,128]，且要求是2的幂次方，在PageAttention场景下要求sparseBlockSizeOptional整除blockSize。
+  - key、value和keyRopeOptional不支持非连续。
+  - returnSoftmaxLse为True时，layoutKvOptional不支持PA_BSND。
 
 ## 调用示例
 

@@ -37,35 +37,35 @@
     <tr>
       <td>cu_seqlens_q</td>
       <td>可选输入</td>
-      <td>表示不同Batch中q的有效Sequence Length，shape为(B+1, )，仅layout_q为TND场景下必传，第一个值固定为0。</td>
+      <td>表示不同Batch中q的Sequence Length累加前缀和，shape为(B+1, )，仅layout_q为TND场景下必传，第一个值固定为0。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cu_seqlens_k</td>
       <td>可选输入</td>
-      <td>表示不同Batch中k的有效Sequence Length，shape为(B+1, )，仅layout_k为TND场景下必传，第一个值固定为0。</td>
+      <td>表示不同Batch中k的Sequence Length累加前缀和，shape为(B+1, )，仅layout_k为TND场景下必传，第一个值固定为0。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>seqused_q</td>
       <td>可选输入</td>
-      <td>表示不同Batch中q实际参与运算的Sequence Length，shape为(B, )。</td>
+      <td>表示不同Batch中q实际参与运算的Sequence Length，shape为(B, )。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>seqused_k</td>
       <td>可选输入</td>
-      <td>表示不同Batch中k实际参与运算的Sequence Length，shape为(B, )。</td>
+      <td>表示不同Batch中k实际参与运算的Sequence Length，shape为(B, )。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cmp_residual_k</td>
       <td>可选输入</td>
-      <td>表示不同Batch中k压缩后Sequence Length的余数，配合cmp_ratio实现mask和负载计算，shape为(B, )。cmp_ratio不为1且mask_mode为3场景下必传。</td>
+      <td>表示不同Batch中k压缩前Sequence Length除以cmp_ratio的余数，配合cmp_ratio还原压缩前长度，shape为(B, )。cmp_ratio不为1且mask_mode为3场景下必传。默认值为None。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -93,7 +93,7 @@
     <tr>
       <td>topk</td>
       <td>属性</td>
-      <td>表示从q中筛选出的关键稀疏token的个数，当前仅支持[1, 8192]。</td>
+      <td>表示为每个q token保留的k token索引数量，当前仅支持[1, 8192]。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
@@ -107,49 +107,49 @@
     <tr>
       <td>batch_size</td>
       <td>可选属性</td>
-      <td>表示Batch数量，默认值为0。</td>
+      <td>表示Batch数量。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>max_seqlen_q</td>
       <td>可选属性</td>
-      <td>表示q的最长Sequence Length，-1表示任意可能长度，默认值为-1。</td>
+      <td>表示q的最长Sequence Length，-1表示任意可能长度。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>max_seqlen_k</td>
       <td>可选属性</td>
-      <td>表示k的最长Sequence Length，-1表示任意可能长度，默认值为-1。</td>
+      <td>表示k的最长Sequence Length，-1表示任意可能长度。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>layout_q</td>
       <td>可选属性</td>
-      <td>表示q的排列格式，支持BSND、TND，默认值为BSND。</td>
+      <td>表示q的排列格式，支持BSND、TND。</td>
       <td>STRING</td>
       <td>-</td>
     </tr>
     <tr>
       <td>layout_k</td>
       <td>可选属性</td>
-      <td>表示k的排列格式，支持BSND、TND、PA_BBND，默认值为BSND。</td>
+      <td>表示k的排列格式，支持BSND、TND、PA_BBND。</td>
       <td>STRING</td>
       <td>-</td>
     </tr>
     <tr>
       <td>mask_mode</td>
       <td>可选属性</td>
-      <td>表示sparse模式，0表示No mask，3表示rightDownCausal模式，默认值为0。</td>
+      <td>表示sparse模式，0表示No mask，3表示rightDownCausal模式。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>cmp_ratio</td>
       <td>可选属性</td>
-      <td>表示k的压缩率，取值范围[1, 128]，默认值为1，表示无压缩。</td>
+      <td>表示k的压缩率，取值范围[1, 128]，1表示无压缩。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>

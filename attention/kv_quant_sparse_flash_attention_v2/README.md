@@ -96,121 +96,142 @@
       </tr>
       <tr>
           <td>key_dequant_scale</td>
-          <td>输入</td>
-          <td>预留参数。</td>
+          <td>可选输入</td>
+          <td>预留参数。默认值为None。</td>
           <td>-</td>
           <td>-</td>
       </tr>
       <tr>
           <td>value_dequant_scale</td>
-          <td>输入</td>
-          <td>预留参数。</td>
+          <td>可选输入</td>
+          <td>预留参数。默认值为None。</td>
           <td>-</td>
           <td>-</td>
       </tr>
       <tr>
           <td>block_table</td>
-          <td>输入</td>
-          <td>表示PageAttention中kvCache存储使用的block映射表。shape为[B, KV_S_max/block_size]，其中第一维长度为B，第二维长度不小于所有batch中最大的KV_S对应的block数量，即KV_S_max / block_size向上取整。</td>
+          <td>可选输入</td>
+          <td>表示PageAttention中kvCache存储使用的block映射表。shape为[B, KV_S_max/block_size]，其中第一维长度为B，第二维长度不小于所有batch中最大的KV_S对应的block数量，即KV_S_max / block_size向上取整。默认值为None。</td>
           <td>INT32</td>
           <td>ND</td>
       </tr>
       <tr>
           <td>actual_seq_lengths_query</td>
-          <td>输入</td>
-          <td>表示不同Batch中query的有效token数。如果不指定seqlen可传入None，表示和query shape的Q_S长度相同。shape为[B,]。每个Batch的有效token数不超过query中的Q_S大小且不小于0。当layout_query为"TND"时，该入参必须传入，且以该入参元素的数量作为B值，该入参中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</td>
+          <td>可选输入</td>
+          <td>表示不同Batch中query的有效token数。如果不指定seqlen可传入None，表示和query shape的Q_S长度相同。shape为[B,]。每个Batch的有效token数不超过query中的Q_S大小且不小于0。当layout_query为"TND"时，该入参必须传入，且以该入参元素的数量作为B值，该入参中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。默认值为None。</td>
           <td>INT32</td>
           <td>ND</td>
       </tr>
       <tr>
           <td>actual_seq_lengths_kv</td>
-          <td>输入</td>
-          <td>表示不同Batch中key和value的有效token数。如果不指定None，表示和key的shape的KV_S长度相同。shape为[B,]。每个Batch的有效token数不超过key/value中的KV_S大小且不小于0。当layout_kv为"TND"或"PA_BSND"时，该入参必须传入，layout_kv为"TND"时，该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</td>
+          <td>可选输入</td>
+          <td>表示不同Batch中key和value的有效token数。如果不指定None，表示和key的shape的KV_S长度相同。shape为[B,]。每个Batch的有效token数不超过key/value中的KV_S大小且不小于0。当layout_kv为"TND"或"PA_BSND"时，该入参必须传入，layout_kv为"TND"时，该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。默认值为None。</td>
           <td>INT32</td>
           <td>ND</td>
       </tr>
       <tr>
           <td>sinks</td>
-          <td>输入</td>
-          <td>表示attention结构中的可学习的sinks信息。不支持非连续，shape为[Q_N,]。</td>
+          <td>可选输入</td>
+          <td>表示attention结构中的可学习的sinks信息。不支持非连续，shape为[Q_N,]。默认值为None。</td>
           <td>FLOAT</td>
           <td>ND</td>
       </tr>
       <tr>
           <td>sparse_block_size</td>
-          <td>属性</td>
-          <td>代表sparse阶段的block大小。sparse_block_size为1时，为Token-wise稀疏化场景；sparse_block_size大于1且小于等于128时，为Block-wise稀疏化场景，块内token共享相同的稀疏化决策。</td>
+          <td>可选属性</td>
+          <td>代表sparse阶段的block大小。sparse_block_size为1时，为Token-wise稀疏化场景；sparse_block_size大于1且小于等于128时，为Block-wise稀疏化场景，块内token共享相同的稀疏化决策。默认值为1。</td>
           <td>INT64</td>
           <td>-</td>
       </tr>
       <tr>
           <td>layout_query</td>
-          <td>属性</td>
+          <td>可选属性</td>
           <td>用于标识输入query的数据排布格式，默认值"BSND"，支持传入BSND和TND。</td>
           <td>STRING</td>
           <td>-</td>
       </tr>
       <tr>
           <td>layout_kv</td>
-          <td>属性</td>
+          <td>可选属性</td>
           <td>用于标识输入key的数据排布格式，默认值"BSND"，支持传入BSND、TND和PA_BSND，PA_BSND在开启PageAttention时使用。</td>
           <td>STRING</td>
           <td>-</td>
       </tr>
       <tr>
           <td>sparse_mode</td>
-          <td>属性</td>
-          <td>表示sparse的模式。sparse_mode为0时，代表全部计算。sparse_mode为3时，代表rightDownCausal模式的mask，对应以右下顶点往左上为划分线的下三角场景。</td>
+          <td>可选属性</td>
+          <td>表示sparse的模式。sparse_mode为0时，代表全部计算。sparse_mode为3时，代表rightDownCausal模式的mask，对应以右下顶点往左上为划分线的下三角场景。默认值为3。</td>
           <td>INT64</td>
           <td>-</td>
       </tr>
       <tr>
           <td>pre_tokens</td>
-          <td>属性</td>
-          <td>用于稀疏计算，表示attention需要和前几个Token计算关联，仅支持2^63-1。</td>
+          <td>可选属性</td>
+          <td>用于稀疏计算，表示attention需要和前几个Token计算关联，仅支持2^63-1。默认值为2^63-1。</td>
           <td>INT64</td>
           <td>-</td>
       </tr>
       <tr>
           <td>next_tokens</td>
-          <td>属性</td>
-          <td>用于稀疏计算，表示attention需要和后几个Token计算关联，仅支持2^63-1。</td>
+          <td>可选属性</td>
+          <td>用于稀疏计算，表示attention需要和后几个Token计算关联，仅支持2^63-1。默认值为2^63-1。</td>
           <td>INT64</td>
           <td>-</td>
       </tr>
       <tr>
           <td>attention_mode</td>
-          <td>属性</td>
+          <td>可选属性</td>
           <td>表示attention的模式，仅支持传入2，表示MLA-absorb模式，即QK的D包含rope和nope两部分，且KV是同一份。</td>
           <td>INT64</td>
           <td>-</td>
       </tr>
       <tr>
           <td>quant_scale_repo_mode</td>
-          <td>属性</td>
-          <td>表示量化参数的存放模式，仅支持传入1，表示combine模式，即量化参数和数据混合存放。</td>
+          <td>可选属性</td>
+          <td>表示量化参数的存放模式，仅支持传入1，表示combine模式，即量化参数和数据混合存放。默认值为1。</td>
           <td>INT64</td>
           <td>-</td>
       </tr>
       <tr>
           <td>tile_size</td>
-          <td>属性</td>
-          <td>表示per_tile时每个参数对应的数据块大小，仅在per_tile时有效，仅支持128。</td>
+          <td>可选属性</td>
+          <td>表示per_tile时每个参数对应的数据块大小，仅在per_tile时有效，仅支持128。默认值为128。</td>
           <td>INT64</td>
           <td>-</td>
       </tr>
       <tr>
           <td>rope_head_dim</td>
-          <td>属性</td>
-          <td>表示MLA架构下的rope_head_dim大小，仅在attention_mode为2时有效，仅支持64。</td>
+          <td>可选属性</td>
+          <td>表示MLA架构下的rope_head_dim大小，仅在attention_mode为2时有效，仅支持64。默认值为64。</td>
           <td>INT64</td>
           <td>-</td>
       </tr>
       <tr>
-          <td>output</td>
+          <td>return_softmax_lse</td>
+          <td>可选属性</td>
+          <td>表示是否返回softmax统计结果，默认值为False。为True时softmax_max与softmax_sum返回有效结果；为False时返回空的占位Tensor。</td>
+          <td>BOOL</td>
+          <td>-</td>
+      </tr>
+      <tr>
+          <td>attention_out</td>
           <td>输出</td>
           <td>代表公式中的输出Attention。输出shape与入参query的shape保持一致，layout_query为"BSND"时shape为[B, Q_S, Q_N, Q_out_D]，layout_query为"TND"时shape为[Q_T, Q_N, Q_out_D]，其中Q_out_D = Q_D - rope_head_dim。</td>
           <td>FLOAT16、BFLOAT16</td>
+          <td>ND</td>
+      </tr>
+      <tr>
+          <td>softmax_max</td>
+          <td>输出</td>
+          <td>表示每个Query位置的softmax最大值。return_softmax_lse为True时返回有效结果，layout_query为"BSND"时shape为[B, KV_N, Q_S, Q_N/KV_N]，为"TND"时shape为[KV_N, Q_T, Q_N/KV_N]。</td>
+          <td>FLOAT</td>
+          <td>ND</td>
+      </tr>
+      <tr>
+          <td>softmax_sum</td>
+          <td>输出</td>
+          <td>表示每个Query位置的softmax指数求和值。return_softmax_lse为True时返回有效结果，shape与softmax_max保持一致。</td>
+          <td>FLOAT</td>
           <td>ND</td>
       </tr>
       </tbody>
@@ -223,7 +244,7 @@
 - <term>Ascend 950PR&950DT系列产品</term>：
   - 参数key、value数据类型仅支持float8_e4m3、int8、hifloat8数据类型。
   - 参数sparse\_block\_size仅支持1。
-  - 仅在layout_key为PA_BSND时，key支持0轴非连续。
+  - 仅在layout_kv为PA_BSND时，key支持0轴非连续。
   - 支持可选入参sinks。
 
 ## 调用说明

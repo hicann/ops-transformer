@@ -28,7 +28,7 @@
 - 算子功能：`aclnnMixedQuantSparseFlashMlaMetadata`是`aclnnMixedQuantSparseFlashMla`算子的前置算子，用于后续Attention计算生成负载均衡的任务划分方案。本算子不执行实际的Attention计算，而是根据输入参数在AI CPU计算出每个AI Core应处理的Attention计算起止范围，从而最大化计算资源的利用率，避免各Core间负载不均衡的问题。
 
   <!-- npu="A3,910b" id10 -->
-  <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持TurboQuant TQ4。本接口通过原有量化模式参数`quantMode=3`生成配套分核信息，不执行KV量化或Attention计算，输出仍为INT32、shape为`(1024,)`。
+  <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持TurboQuant TQ4。本接口通过原有量化模式参数`quantMode=3`生成配套分核信息，不执行KV量化或Attention计算，输出仍为INT32、shape为`(2048,)`。
   <!-- end id10 -->
 
   <!-- npu="950" id11 -->
@@ -75,7 +75,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
     const char        *layoutKvOptional,
     bool               hasOriKv,
     bool               hasCmpKv,
-    const aclTensor   *metadata,
+    const aclTensor   *metaData,
     uint64_t          *workspaceSize,
     aclOpExecutor    **executor)
 ```
@@ -305,7 +305,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>rope_head_dim（int64_t）</td>
+      <td>ropeHeadDim（int64_t）</td>
       <td>输入</td>
       <td>rope头的维度。</td>
       <td><ul><li>当前仅支持64。</li><li>建议值为64。</li></ul></td>
@@ -405,10 +405,10 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>metadata（aclTensor*）</td>
+      <td>metaData（aclTensor*）</td>
       <td>输出</td>
       <td>表示负载均衡结果输出。</td>
-      <td>shape固定为(1024, )。</td>
+      <td>shape固定为(2048, )。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维</td>
@@ -556,7 +556,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadata(
     - hasOriKv为true，oriTopk不为0且oriMaskMode为0时（oriTopkLengthOptional必传场景），sequsedOriKvOptional可选传入，其他场景sequsedOriKvOptional必须传入。
     - hasCmpKv为true，cmpTopk不为0且cmpMaskMode为0时（cmpTopkLengthOptional必传场景），sequsedCmpKvOptional可选传入，其他场景sequsedCmpKvOptional必须传入。
   - Batch取值规则
-    - layoutQOptional为BSND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过batch_size获取batch数。
+    - layoutQOptional为BSND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过batchSize获取batch数。
     - layoutQOptional为TND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过cuSeqlensQOptional的shape推导batch。
   - q Seqlen取值规则
     - layoutQOptional为BSND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过maxSeqlenQ获取seqlen。
@@ -594,9 +594,9 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadata(
     } while (0)
 
 // 参考 mixed_quant_sparse_flash_mla_metadata.h
-constexpr uint32_t AIC_CORE_MAX_NUM = 36;
-constexpr uint32_t AIV_CORE_MAX_NUM = 72;
-constexpr uint32_t MQSMLA_METADATA_TOTAL_SIZE = 1024;
+constexpr uint32_t AIC_CORE_MAX_NUM = 80;
+constexpr uint32_t AIV_CORE_MAX_NUM = 80;
+constexpr uint32_t MQSMLA_METADATA_TOTAL_SIZE = 2048;
 constexpr uint32_t FA_METADATA_SIZE = 9;
 constexpr uint32_t FD_METADATA_SIZE = 8;
 
@@ -792,7 +792,7 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     context.numHeadsKv = 1;
     context.headDim = 512;
     context.quantMode = 1;
-    ret = CreateTensor(aclDataType::ACL_INT32, { MQSMLA_METADATA_TOTAL_SIZE }, context.metadata);     // 1024: Fix size
+    ret = CreateTensor(aclDataType::ACL_INT32, { MQSMLA_METADATA_TOTAL_SIZE }, context.metadata);     // 2048: Fix size
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create metadata failed. Error: %d", ret);
     context.oriTopk = 0;
     context.cmpTopk = 0;

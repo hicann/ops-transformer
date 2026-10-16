@@ -96,7 +96,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
     <tr>
       <td>cuSeqlensQOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中q的有效Sequence Length。</td>
+      <td>表示不同Batch中q的Sequence Length累加前缀和。</td>
       <td><ul><li>支持空Tensor</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -106,7 +106,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
     <tr>
       <td>cuSeqlensKOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中k的有效Sequence Length。</td>
+      <td>表示不同Batch中k的Sequence Length累加前缀和。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B+1, )。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -136,7 +136,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
     <tr>
       <td>cmpResidualKOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>表示不同Batch中k压缩后Sequence Length的余数，配合cmpRatio实现mask和负载计算。</td>
+      <td>表示不同Batch中k压缩前Sequence Length除以cmpRatio的余数，配合cmpRatio还原压缩前长度。</td>
       <td><ul><li>支持空Tensor。</li><li>cmpRatio不为1，且mask为3场景下必传。</li><li>shape固定为(B, )。</li><li>每个元素值都应小于传入的压缩率cmpRatio。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -176,7 +176,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
     <tr>
       <td>topk（int64_t）</td>
       <td>输入</td>
-      <td>表示从q中筛选出的关键稀疏token的个数。</td>
+      <td>表示为每个q token保留的k token索引数量。</td>
       <td>当前仅支持[1, 8192]。</td>
       <td>-</td>
       <td>-</td>
@@ -389,10 +389,10 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
     - layoutQOptional为TND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过cuSeqlensQOptional的shape推导batch。
   - q Seqlen取值规则
     - layoutQOptional为BSND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过maxSeqlenQ获取seqlen。
-    - layoutQOptional为TND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过cuSeqlensQOptional中的元素获取seqlen。
+    - layoutQOptional为TND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过cuSeqlensQOptional中相邻元素的差值获取seqlen。
   - k Seqlen取值规则
     - layoutKOptional为BSND时，优先通过sequsedKOptional中的元素获取seqlen，sequsedKOptional未传入则通过maxSeqlenK获取seqlen。
-    - layoutKOptional为TND时，优先通过sequsedKOptional中的元素获取seqlen，sequsedKOptional未传入则通过cuSeqlensKOptional中的元素获取seqlen。
+    - layoutKOptional为TND时，优先通过sequsedKOptional中的元素获取seqlen，sequsedKOptional未传入则通过cuSeqlensKOptional中相邻元素的差值获取seqlen。
 
 ## 调用示例
 
