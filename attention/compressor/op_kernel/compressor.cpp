@@ -29,7 +29,8 @@ using namespace Compressor;
 #define INVOKE_COMPRESSOR_GENERAL_OP_IMPL(templateClass, ...) \
     do { \
         templateClass<COMPType<__VA_ARGS__>> op(&pipe, tilingData); \
-        op.Init(x, wKv, wGate, stateCache, ape, stateBlockTable, cuSeqlens, seqUsed, startPos, cmpKvOut, workspace); \
+        op.Init(x, wKv, wGate, stateCache, ape, stateBlockTable, cuSeqlens, seqUsed, startPos, cmpKvOut, \
+                softmaxScoreOut, kvOut, workspace); \
         op.Process(); \
     } while (0)
 #else
@@ -68,9 +69,11 @@ __global__ __aicore__ void compressor(__gm__ uint8_t* x, __gm__ uint8_t* wKv, __
     constexpr auto cacheMode = static_cast<CACHE_MODE>(CacheMode);
 #if (__CCE_AICORE__ == 220)
     if constexpr (static_cast<TEMPLATE_ID>(TemplateId) == TEMPLATE_ID::FULL_LOAD) {
-        INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernelFullLoad, xLayout, xDtype, coff);
+        INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernelFullLoad, xLayout, xDtype, coff, cacheMode,
+                                          static_cast<GRAD_ENABLED>(GradEnabled));
     } else {
-        INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernelPerf, xLayout, xDtype, coff);
+        INVOKE_COMPRESSOR_GENERAL_OP_IMPL(CompressorKernelPerf, xLayout, xDtype, coff, cacheMode,
+                                          static_cast<GRAD_ENABLED>(GradEnabled));
     }
 #else
     constexpr auto gradEnabled = static_cast<GRAD_ENABLED>(GradEnabled);

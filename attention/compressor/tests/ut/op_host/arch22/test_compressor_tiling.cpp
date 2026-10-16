@@ -388,8 +388,8 @@ TEST_F(CompressorTilingArch22, test_cache_mode_ring_buffer_unsupported)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
 }
 
-// A3 only supports grad_enabled=false.
-TEST_F(CompressorTilingArch22, test_grad_enabled_unsupported)
+// A3 accepts grad_enabled when both float32 intermediate outputs have valid specs.
+TEST_F(CompressorTilingArch22, test_grad_enabled_supported)
 {
     optiling::CompressorCompileInfo compileInfo = {};
     gert::TilingContextPara tilingContextPara(
@@ -407,7 +407,8 @@ TEST_F(CompressorTilingArch22, test_grad_enabled_unsupported)
         },
         {
             {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
-            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 4, 512}, {2, 2, 4, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 4, 512}, {2, 2, 4, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
             {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
@@ -417,7 +418,7 @@ TEST_F(CompressorTilingArch22, test_grad_enabled_unsupported)
             {"grad_enabled", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
         },
         &compileInfo, "Ascend910_93", Compressor_tiling_A3SocInfo, 4096);
-    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 2080);
 }
 
 // Unsupported cmp_ratio=3

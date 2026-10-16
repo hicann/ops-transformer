@@ -117,7 +117,7 @@ cann_ops_transformer.compressor(
 | cache_mode | int | 可选 | state_cache的存储模式，默认值为1。<br>1：连续buffer。<br>2：循环buffer。 | int | - |
 
 <!-- npu="A3,910b" id7 -->
-- <term>Atlas A3系列产品</term>：cmp_ratio仅支持2/4/8/16/32/64/128；gradEnabled不支持为true。
+- <term>Atlas A3系列产品</term>：cmp_ratio仅支持2/4/8/16/32/64/128。
 <!-- end id7 -->
 
 ## 返回值说明

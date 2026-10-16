@@ -9,6 +9,12 @@
 import random
 import torch
 import torch_npu
+
+# Keep pytest importable with torchair builds that still reference the pre-2.12 helper name.
+from torch.fx.experimental import symbolic_shapes
+
+if not hasattr(symbolic_shapes, "hint_int"):
+    symbolic_shapes.hint_int = symbolic_shapes.guard_int
 import torchair
 from cann_ops_transformer.ops import compressor
 import numpy as np
@@ -1121,6 +1127,7 @@ def run_compressor_eager(
     ape_datarange=[-10, 10],
     kv_state_datarange=[-10, 10],
     score_state_datarange=[-10, 10],
+    grad_enabled=False,
 ):
     torch_npu.npu.set_device(int(DEVICE_ID))
     # ======================== set input params finish ========================
@@ -1359,7 +1366,7 @@ def run_compressor_eager(
         (cpu_score_state.shape[0], cpu_score_state.shape[1], cpu_score_state.shape[2]),
         dtype=torch.bool,
     )
-    cpu_out, cmp_kv_mask, *_ = cpu_compressor(
+    cpu_out, cmp_kv_mask, cpu_softmax, cpu_kv, mid_result_mask = cpu_compressor(
         x,
         wkv,
         wgate,
@@ -1375,6 +1382,7 @@ def run_compressor_eager(
         cmp_ratio=cmp_ratio,
         coff=coff,
         cache_mode=cache_mode,
+        grad_enabled=grad_enabled,
     )
     # ======================== execute cpu finish ================================
 
@@ -1460,20 +1468,39 @@ def run_compressor_eager(
         seqused = torch.tensor(seqused).to(torch.int32).to("npu:%s" % DEVICE_ID)
     # ======================== execute npu finish ================================
     # start run custom ops
-    npu_out = compressor(
-        x,
-        wkv,
-        wgate,
-        state_cache,
-        ape,
-        cmp_ratio=cmp_ratio,
-        state_block_table=block_table,
-        cu_seqlens=cu_seqlens,
-        seqused=seqused,
-        start_pos=start_pos if exist_start_pos else None,
-        coff=coff,
-        cache_mode=cache_mode,
-    )
+    if grad_enabled:
+        npu_out, npu_softmax, npu_kv = (
+            torch.ops.cann_ops_transformer._compressor_forward(
+                x,
+                wkv,
+                wgate,
+                state_cache,
+                ape,
+                cmp_ratio,
+                block_table,
+                cu_seqlens,
+                seqused,
+                start_pos if exist_start_pos else None,
+                coff,
+                cache_mode,
+                True,
+            )
+        )
+    else:
+        npu_out = compressor(
+            x,
+            wkv,
+            wgate,
+            state_cache,
+            ape,
+            cmp_ratio=cmp_ratio,
+            state_block_table=block_table,
+            cu_seqlens=cu_seqlens,
+            seqused=seqused,
+            start_pos=start_pos if exist_start_pos else None,
+            coff=coff,
+            cache_mode=cache_mode,
+        )
     print(f"x: shape {x.shape}, dtype: {x.dtype}")
     print(f"wkv: shape {wkv.shape}, dtype: {wkv.dtype}")
     print(f"wgate: shape {wgate.shape}, dtype: {wgate.dtype}")
@@ -1497,6 +1524,17 @@ def run_compressor_eager(
         npu_out.cpu()[cmp_kv_mask].to(torch.float32),
         data_type,
     )
+    if grad_enabled:
+        _, results["softmax_score"] = check_result(
+            cpu_softmax[mid_result_mask].to(torch.float32),
+            npu_softmax.cpu()[mid_result_mask].to(torch.float32),
+            "float32",
+        )
+        _, results["kv"] = check_result(
+            cpu_kv[mid_result_mask].to(torch.float32),
+            npu_kv.cpu()[mid_result_mask].to(torch.float32),
+            "float32",
+        )
     print(
         "--------------------------------------------------------------check kv state update-------------------------------------------------------------"
     )
@@ -1584,6 +1622,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--block_size", type=int, default=128)
     parser.add_argument("--cache_mode", type=int, default=1)
+    parser.add_argument("--grad_enabled", action="store_true")
     parser.add_argument(
         "--data_type",
         type=str,
@@ -1624,4 +1663,5 @@ if __name__ == "__main__":
         args.hidden_size,
         args.save_state_seqlens,
         args.cache_mode,
+        grad_enabled=args.grad_enabled,
     )

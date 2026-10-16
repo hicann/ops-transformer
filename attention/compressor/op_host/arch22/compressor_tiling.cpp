@@ -49,6 +49,10 @@ ge::graphStatus CompressorTiling::ConvertRequiredParams(gert::TilingContext& con
 
     compressorContext.cmpKv.desc = context.GetOutputDesc(CMP_KV_OUTPUT_INDEX);
     compressorContext.cmpKv.shape = context.GetOutputShape(CMP_KV_OUTPUT_INDEX);
+    compressorContext.softmaxScore.desc = context.GetOutputDesc(SOFTMAX_SCORE_OUTPUT_INDEX);
+    compressorContext.softmaxScore.shape = context.GetOutputShape(SOFTMAX_SCORE_OUTPUT_INDEX);
+    compressorContext.kv.desc = context.GetOutputDesc(KV_OUTPUT_INDEX);
+    compressorContext.kv.shape = context.GetOutputShape(KV_OUTPUT_INDEX);
 
     compressorContext.dtype = compressorContext.x.desc->GetDataType();
     auto xDimNum = compressorContext.x.shape->GetStorageShape().GetDimNum();
@@ -424,7 +428,8 @@ ge::graphStatus CompressorTiling::GenTilingKey() const
         layout = 1;
     }
 
-    context_->tilingKey = GET_TPL_TILING_KEY(layout, dtype, coff, cacheMode, templateId, 0);
+    const uint8_t gradEnabled = context_->gradEnabled != nullptr && *context_->gradEnabled ? 1 : 0;
+    context_->tilingKey = GET_TPL_TILING_KEY(layout, dtype, coff, cacheMode, templateId, gradEnabled);
     OP_LOGI(context_->opName, "Compressor dtype:%hhu layout:%hhu  coff:%hhu, cacheMode: %u, template_id:%hhu", dtype,
             layout, coff, cacheMode, templateId);
     OP_LOGI(context_->opName, "Compressor tilingKey:%lu", context_->tilingKey);
@@ -772,11 +777,15 @@ ge::graphStatus CompressorTiling::CheckSingleParaCacheMode() const
 
 ge::graphStatus CompressorTiling::CheckSingleParaGradEnabled() const
 {
-    // A3 only supports grad_enabled=false because arch22 has no backward-output path.
-    OP_CHECK_IF(context_->gradEnabled != nullptr && *context_->gradEnabled,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->opName, GRAD_ENABLED_NAME, "true",
-                                                      "grad_enabled only supports false"),
-                return ge::GRAPH_FAILED);
+    if (context_->gradEnabled == nullptr || !*context_->gradEnabled) {
+        return ge::GRAPH_SUCCESS;
+    }
+    if (ge::GRAPH_SUCCESS != CheckDtypeSupport(context_->softmaxScore.desc, SOFTMAX_SCORE_NAME) ||
+        ge::GRAPH_SUCCESS != CheckDimNumSupport(context_->softmaxScore.shape, SOFTMAX_SCORE_NAME) ||
+        ge::GRAPH_SUCCESS != CheckDtypeSupport(context_->kv.desc, KV_NAME) ||
+        ge::GRAPH_SUCCESS != CheckDimNumSupport(context_->kv.shape, KV_NAME)) {
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 

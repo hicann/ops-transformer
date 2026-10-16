@@ -46,7 +46,7 @@ public:
     __aicore__ inline void Init(__gm__ uint8_t* x, __gm__ uint8_t* wKv, __gm__ uint8_t* wGate,
                                 __gm__ uint8_t* stateCache, __gm__ uint8_t* ape, __gm__ uint8_t* stateBlockTable,
                                 __gm__ uint8_t* cuSeqlens, __gm__ uint8_t* seqUsed, __gm__ uint8_t* startPos,
-                                __gm__ uint8_t* cmpKvOut);
+                                __gm__ uint8_t* cmpKvOut, __gm__ uint8_t* softmaxScoreOut, __gm__ uint8_t* kvOut);
     // =================================资源管理=================================
     __aicore__ inline void InitBuffers(TPipe* pipe);
     __aicore__ inline void AllocEventID();
@@ -90,6 +90,10 @@ private:
     __aicore__ inline void DataCopyWithOutputQue(const GlobalTensor<O> dstGm, const LocalTensor<O> srcLocal,
                                                  uint32_t copyRowCount, uint32_t copyColCount,
                                                  uint32_t srcSingleRowCount, uint32_t dstSingleRowCount);
+    template <typename O>
+    __aicore__ inline void DataCopyWithOutputQueAndWait(const GlobalTensor<O> dstGm, const LocalTensor<O> srcLocal,
+                                                        uint32_t copyRowCount, uint32_t copyColCount,
+                                                        uint32_t srcSingleRowCount, uint32_t dstSingleRowCount);
     __aicore__ inline void PadAlign(const LocalTensor<T> dstLocal, const LocalTensor<T> srcLocal,
                                     const Vec1SliceInfo& sliceInfo, uint32_t dStartIdx, uint32_t dDealSize);
     template <bool IS_SCORE>
@@ -121,6 +125,9 @@ private:
     __aicore__ inline void KvMulReduceScore(const LocalTensor<T>& kvLocal, const LocalTensor<T>& scoreLocal,
                                             const LocalTensor<T>& dstLocal, const LocalTensor<T>& tmpUb,
                                             uint32_t tcDealSize, uint32_t dDealSize);
+    __aicore__ inline void CopyOutMidResToOutput(const LocalTensor<T>& kvLocal, const LocalTensor<T>& scoreLocal,
+                                                 const Vec1SliceInfo& sliceInfo, uint32_t compressTcSize,
+                                                 uint32_t dStartIdx, uint32_t dDealSize, uint32_t compressedCnt);
     __aicore__ inline void OverLapScoreKv(const LocalTensor<T>& scoreLocal, const LocalTensor<T>& kvLocal,
                                           const Vec1RunInfo& info, const LoopInfo& loopInfo,
                                           const StatisticInfo& statisticInfo, const Vec1SliceInfo& originSliceInfo,
@@ -167,6 +174,8 @@ private:
     GlobalTensor<T> stateCacheGm_;
     GlobalTensor<T> apeGm_;
     GlobalTensor<X_T> cmpKvOutGm_;
+    GlobalTensor<T> softmaxScoreOutGm_;
+    GlobalTensor<T> kvOutGm_;
 
     // ================================Local Buffer区====================================
     // TBuf<TPosition::VECIN> mm1ResUb;
@@ -199,12 +208,15 @@ __aicore__ inline void CompressorBlockVectorPerf<COMP>::Init(__gm__ uint8_t* x, 
                                                              __gm__ uint8_t* wGate, __gm__ uint8_t* stateCache,
                                                              __gm__ uint8_t* ape, __gm__ uint8_t* stateBlockTable,
                                                              __gm__ uint8_t* cuSeqlens, __gm__ uint8_t* seqUsed,
-                                                             __gm__ uint8_t* startPos, __gm__ uint8_t* cmpKvOut)
+                                                             __gm__ uint8_t* startPos, __gm__ uint8_t* cmpKvOut,
+                                                             __gm__ uint8_t* softmaxScoreOut, __gm__ uint8_t* kvOut)
 {
     stateBlockTableGm_.SetGlobalBuffer((__gm__ int32_t*)stateBlockTable);
     stateCacheGm_.SetGlobalBuffer((__gm__ T*)stateCache);
     apeGm_.SetGlobalBuffer((__gm__ T*)ape);
     cmpKvOutGm_.SetGlobalBuffer((__gm__ X_T*)cmpKvOut);
+    softmaxScoreOutGm_.SetGlobalBuffer((__gm__ T*)softmaxScoreOut);
+    kvOutGm_.SetGlobalBuffer((__gm__ T*)kvOut);
     isExistSeqUsed = (seqUsed != nullptr);
     isExistStartPos = (startPos != nullptr);
     if constexpr (COMP::xLayout == X_LAYOUT::TH) {
@@ -436,6 +448,34 @@ __aicore__ inline void CompressorBlockVectorPerf<COMP>::DataCopyWithOutputQue(
 
         DataCopyAlignUbToGm(dstGm[dstOffset], outputUb, curCopyRowCount, copyColCount, copyColCount, dstSingleRowCount);
 
+        outputQue1.FreeTensor(outputUb);
+    }
+}
+
+template <typename COMP>
+template <typename O>
+__aicore__ inline void CompressorBlockVectorPerf<COMP>::DataCopyWithOutputQueAndWait(
+    const GlobalTensor<O> dstGm, const LocalTensor<O> srcLocal, uint32_t copyRowCount, uint32_t copyColCount,
+    uint32_t srcSingleRowCount, uint32_t dstSingleRowCount)
+{
+    if (copyRowCount == 0) {
+        return;
+    }
+    uint32_t singleCopyRowCount = BUFFER_SIZE_BYTE_16K / (copyColCount * sizeof(O));
+    for (uint32_t rowCount = 0; rowCount < copyRowCount; rowCount += singleCopyRowCount) {
+        uint64_t srcOffset = rowCount * srcSingleRowCount;
+        uint64_t dstOffset = rowCount * dstSingleRowCount;
+        uint32_t curCopyRowCount = min(singleCopyRowCount, copyRowCount - rowCount);
+        LocalTensor<O> outputUb = outputQue1.AllocTensor<O>();
+        DataCopyAlignUbToUb(outputUb, srcLocal[srcOffset], curCopyRowCount, copyColCount, srcSingleRowCount,
+                            copyColCount);
+        PipeBarrier<PIPE_V>();
+        outputQue1.EnQue(outputUb);
+        outputQue1.DeQue<O>();
+        DataCopyAlignUbToGm(dstGm[dstOffset], outputUb, curCopyRowCount, copyColCount, copyColCount, dstSingleRowCount);
+        event_t eventIdMte3ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_V));
+        SetFlag<HardEvent::MTE3_V>(eventIdMte3ToV);
+        WaitFlag<HardEvent::MTE3_V>(eventIdMte3ToV);
         outputQue1.FreeTensor(outputUb);
     }
 }
@@ -788,6 +828,43 @@ __aicore__ inline void CompressorBlockVectorPerf<COMP>::KvMulReduceScore(const L
 }
 
 template <typename COMP>
+__aicore__ inline void CompressorBlockVectorPerf<COMP>::CopyOutMidResToOutput(
+    const LocalTensor<T>& kvLocal, const LocalTensor<T>& scoreLocal, const Vec1SliceInfo& sliceInfo,
+    uint32_t compressTcSize, uint32_t dStartIdx, uint32_t dDealSize, uint32_t compressedCnt)
+{
+    if constexpr (COMP::xLayout == X_LAYOUT::BSH) {
+        uint32_t bOutputScLen = CeilDivT(GetSeqLength(sliceInfo.bIdx), cmpRatio_);
+        uint32_t bIdx = sliceInfo.bIdx;
+        uint32_t sIdx = sliceInfo.sIdx;
+        uint64_t ubOffset = 0;
+        while (compressTcSize > 0) {
+            uint32_t bStartPos = GetStartPos(bIdx);
+            uint32_t preScSize = (sIdx + bStartPos) / cmpRatio_;
+            uint32_t totalScSize = (GetSeqUsed(bIdx) + bStartPos) / cmpRatio_;
+            if (preScSize < totalScSize) {
+                uint32_t curScSize = min(compressTcSize, totalScSize - preScSize);
+                uint64_t padScIdx = bIdx * bOutputScLen + preScSize - (bStartPos / cmpRatio_);
+                uint64_t outGmOffset = padScIdx * coff_ * cmpRatio_ * constInfo_.headDim + dStartIdx;
+                DataCopyWithOutputQueAndWait(softmaxScoreOutGm_[outGmOffset], scoreLocal[ubOffset],
+                                             curScSize * coff_ * cmpRatio_, dDealSize, dDealSize, constInfo_.headDim);
+                DataCopyWithOutputQueAndWait(kvOutGm_[outGmOffset], kvLocal[ubOffset], curScSize * coff_ * cmpRatio_,
+                                             dDealSize, dDealSize, constInfo_.headDim);
+                compressTcSize -= curScSize;
+                ubOffset += curScSize * coff_ * cmpRatio_ * dDealSize;
+            }
+            ++bIdx;
+            sIdx = 0;
+        }
+    } else {
+        uint64_t outGmOffset = compressedCnt * coff_ * cmpRatio_ * constInfo_.headDim + dStartIdx;
+        DataCopyWithOutputQueAndWait(softmaxScoreOutGm_[outGmOffset], scoreLocal, compressTcSize * coff_ * cmpRatio_,
+                                     dDealSize, dDealSize, constInfo_.headDim);
+        DataCopyWithOutputQueAndWait(kvOutGm_[outGmOffset], kvLocal, compressTcSize * coff_ * cmpRatio_, dDealSize,
+                                     dDealSize, constInfo_.headDim);
+    }
+}
+
+template <typename COMP>
 __aicore__ inline void CompressorBlockVectorPerf<COMP>::CopyOutVec1ResToOutput(const LocalTensor<T>& comperssoredUb,
                                                                                const Vec1SliceInfo& sliceInfo,
                                                                                uint32_t compressTcSize,
@@ -896,6 +973,12 @@ __aicore__ inline void CompressorBlockVectorPerf<COMP>::DealVec1BaseBlock(
     if (statisticInfo.compressorScCnt > 0) {
         LocalTensor<T> tmpUb = kvLocal[BUFFER_SIZE_BYTE_32K / sizeof(T)];
         SoftmaxDN(scoreLocal, tmpUb, statisticInfo.compressorScCnt, dDealSize);
+        PipeBarrier<PIPE_V>();
+        if constexpr (COMP::gradEnabled == GRAD_ENABLED::ENABLE) {
+            CopyOutMidResToOutput(kvLocal, scoreLocal, originSliceInfo, statisticInfo.compressorScCnt, dStartIdx,
+                                  dDealSize, compressedCnt_);
+            PipeBarrier<PIPE_V>();
+        }
         LocalTensor<T> comperssoredUb = scoreLocal;
         PipeBarrier<PIPE_V>();
         KvMulReduceScore(kvLocal, scoreLocal, comperssoredUb, tmpUb, statisticInfo.compressorScCnt, dDealSize);

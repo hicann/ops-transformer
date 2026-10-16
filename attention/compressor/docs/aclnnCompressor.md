@@ -307,7 +307,7 @@ aclnnStatus aclnnCompressor(
     <tr>
       <td>kvOut（aclTensor*）</td>
       <td>输出</td>
-      <td>公式中的<span class="math-inline">(S_H)<sub>i</sub></span>，表示softmax结果与kv_state的Hadamard乘积。</td>
+      <td>压缩块原始KV中间结果，对应公式中的kv_state。</td>
       <td>仅在gradEnabled为true时输出有效；支持B=0、S=0、T=0的空Tensor。</td>
       <td>FLOAT</td>
       <td>ND</td>
@@ -342,7 +342,6 @@ aclnnStatus aclnnCompressor(
   <!-- npu="A3,910b" id7 -->
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term> ：
     - cmpRatio仅支持2/4/8/16/32/64/128。
-    - gradEnabled不支持为true。
   <!-- end id7 -->
 
 - **返回值**

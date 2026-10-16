@@ -204,7 +204,7 @@
   <tr>
     <td>kv</td>
     <td>输出</td>
-    <td>softmax权重与kv_state的Hadamard乘积中间结果。仅在grad_enabled为true时输出有效。</td>
+    <td>压缩块原始KV中间结果。仅在grad_enabled为true时输出有效。</td>
     <td>FLOAT</td>
     <td>ND</td>
   </tr>
