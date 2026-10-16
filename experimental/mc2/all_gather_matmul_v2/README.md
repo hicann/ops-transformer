@@ -66,7 +66,7 @@ chmod +x *.run
 cd script
 python test.py
 ```
-该脚本以$worldsize = 4$，$m, k, n = 1024, 10240, 5120$ 为示例shape大小，输入示例数据类型为fp16；运行完成后，该脚本会逐卡比对小算子级联（即AllGhater通信+Matmul计算串行执行）与AllGatherMatmul算子的$output$与$gatherOut$，并打印一致性结果。
+该脚本以$worldsize = 4$，$m, k, n = 1024, 10240, 5120$ 为示例shape大小，输入示例数据类型为fp16；运行完成后，该脚本会逐卡比对小算子级联（即AllGather通信+Matmul计算串行执行）与AllGatherMatmul算子的$output$与$gatherOut$，并打印一致性结果。
 
 > 💡 **提示**：如果遇到环境配置问题，请确保：
 > 1. `ASCEND_HOME_PATH`环境变量已正确设置
