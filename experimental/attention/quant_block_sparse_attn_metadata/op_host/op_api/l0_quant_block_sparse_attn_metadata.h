@@ -14,28 +14,15 @@
 #include "opdev/op_executor.h"
 
 namespace l0op {
-const aclTensor* QuantBlockSparseAttnMetadata(
-    const aclTensor* sparseSeqLen,
-    const aclTensor* cuSeqlensQOptional,
-    const aclTensor* cuSeqlensKvOptional,
-    const aclTensor* sequsedQOptional,
-    const aclTensor* sequsedKvOptional,
-    int64_t batchSize,
-    int64_t numHeadsQ,
-    int64_t numHeadsKv,
-    int64_t headDim,
-    int64_t sparseBlockSizeQ,
-    int64_t sparseBlockSizeK,
-    int64_t quantMode,
-    int64_t maskMode,
-    const char* layoutQOptional,
-    const char* layoutKvOptional,
-    const char* layoutSparseIndicesOptional,
-    const char* socVersion,
-    int64_t aicCoreNum,
-    int64_t aivCoreNum,
-    const aclTensor* metadata,
-    aclOpExecutor* executor);
+const aclTensor* QuantBlockSparseAttnMetadata(const aclTensor* sparseSeqLen, const aclTensor* cuSeqlensQOptional,
+                                              const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+                                              const aclTensor* sequsedKvOptional, int64_t batchSize, int64_t numHeadsQ,
+                                              int64_t numHeadsKv, int64_t headDim, int64_t sparseBlockSizeQ,
+                                              int64_t sparseBlockSizeK, int64_t quantMode, int64_t maskMode,
+                                              const char* layoutQOptional, const char* layoutKvOptional,
+                                              const char* layoutSparseIndicesOptional, const char* socVersion,
+                                              bool isA5, int64_t aicCoreNum, int64_t aivCoreNum,
+                                              const aclTensor* metadata, aclOpExecutor* executor);
 } // namespace l0op
 
 #endif

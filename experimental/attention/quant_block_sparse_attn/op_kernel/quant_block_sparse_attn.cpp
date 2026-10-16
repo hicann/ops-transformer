@@ -17,12 +17,18 @@
 #include "lib/matmul_intf.h"
 #include "quant_block_sparse_attn_template_tiling_key.h"
 #include "quant_block_sparse_attn_common.h"
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+#include "arch92/quant_block_sparse_attn_kernel.h"
+#else
 #include "quant_block_sparse_attn_mx_tiling_data.h"
 #include "arch35/quant_block_sparse_attn_kernel.h"
 #include "arch35/quant_block_sparse_attn_mx_kernel.h"
+#endif
 
 using namespace AscendC;
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
 using namespace optiling;
+#endif
 
 // 仿 kv_quant_sparse_attn_sharedkv.cpp 的 kernel 侧调用写法：
 //   - 按 g_coreType 选择实/Dummy 的 Cube/Vec block（AIC 跑真 Cube + Dummy Vec，AIV 跑 Dummy Cube + 真 Vec）
@@ -50,7 +56,7 @@ using namespace optiling;
 #define QBSA_OP_IMPL(...) \
     do { \
         GET_TILING_DATA_WITH_STRUCT(QuantBlockSparseAttnTilingData, tilingDataIn, tiling); \
-        const QuantBlockSparseAttnTilingData *__restrict tilingData = &tilingDataIn; \
+        const QuantBlockSparseAttnTilingData* __restrict tilingData = &tilingDataIn; \
         QBSA_OP_IMPL_WITH_TILING(tilingData, __VA_ARGS__); \
     } while (0)
 
@@ -67,24 +73,28 @@ using namespace optiling;
 #define QBSA_MX_OP_IMPL(...) \
     do { \
         GET_TILING_DATA_WITH_STRUCT(QuantBlockSparseAttnMxTilingData, tilingDataIn, tiling); \
-        const QuantBlockSparseAttnMxTilingData *__restrict tilingData = &tilingDataIn; \
+        const QuantBlockSparseAttnMxTilingData* __restrict tilingData = &tilingDataIn; \
         QBSA_MX_OP_IMPL_WITH_TILING(tilingData, __VA_ARGS__); \
     } while (0)
 
 template <uint32_t QKV_DTYPE, uint32_t LAYOUT_T, uint32_t KV_LAYOUT_T, uint32_t MASK_MODE, bool RETURN_SOFTMAX_LSE,
           uint32_t Config, uint32_t QUANT_MODE>
 __global__ __aicore__ void quant_block_sparse_attn(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *qScale, __gm__ uint8_t *kScale,
-    __gm__ uint8_t *vScale, __gm__ uint8_t *pScale, __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensKv,
-    __gm__ uint8_t *seqUsedQ, __gm__ uint8_t *seqUsedKv, __gm__ uint8_t *sparseIndices, __gm__ uint8_t *sparseSeqLen,
-    __gm__ uint8_t *blockTable, __gm__ uint8_t *attenMask, __gm__ uint8_t *metadata, __gm__ uint8_t *attentionOut,
-    __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* qScale, __gm__ uint8_t* kScale,
+    __gm__ uint8_t* vScale, __gm__ uint8_t* pScale, __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensKv,
+    __gm__ uint8_t* seqUsedQ, __gm__ uint8_t* seqUsedKv, __gm__ uint8_t* sparseIndices, __gm__ uint8_t* sparseSeqLen,
+    __gm__ uint8_t* blockTable, __gm__ uint8_t* attenMask, __gm__ uint8_t* metadata, __gm__ uint8_t* attentionOut,
+    __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+#else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+#endif
 
     // mask 模式 / softmaxLse 使能同时进入 tilingKey 与 tilingData；LSE 已改为编译期模板参数。
     TPipe tPipe;
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
 
     constexpr QBSALayout layout = static_cast<QBSALayout>(LAYOUT_T);
     constexpr QBSALayout kvLayout = static_cast<QBSALayout>(KV_LAYOUT_T);
@@ -92,6 +102,14 @@ __global__ __aicore__ void quant_block_sparse_attn(
     constexpr bool bsaIsPa = true;
     constexpr bool bsaUseDn = BaseApi::IsDn();
     constexpr bool HAS_ATTENTION = (MASK_MODE == 3);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+    static_assert(QUANT_MODE == FP8QuantMode, "V121 only instantiates the QBSA FP8 kernel");
+    static_assert(Config == Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128,
+                  "V121 FP8QuantMode must use S1=64, S2=512, D=128, DV=128 config");
+    QBSA_OP_IMPL(fp8_e4m3fn_t, float, bfloat16_t, layout, kvLayout, S1TemplateType::Aligned64,
+                 S2TemplateType::Aligned512, DTemplateType::Aligned128, DTemplateType::Aligned128, HAS_ATTENTION,
+                 RETURN_SOFTMAX_LSE, bsaIsPa, bsaUseDn);
+#else
     if constexpr (QUANT_MODE == MXFullQuantMode) {
         int64_t originalCastMode = 0;
         int64_t originalGlobalSatMode = 0;
@@ -134,4 +152,5 @@ __global__ __aicore__ void quant_block_sparse_attn(
                      S2TemplateType::Aligned256, DTemplateType::Aligned128, DTemplateType::Aligned128, HAS_ATTENTION,
                      RETURN_SOFTMAX_LSE, bsaIsPa, bsaUseDn);
     }
+#endif
 }

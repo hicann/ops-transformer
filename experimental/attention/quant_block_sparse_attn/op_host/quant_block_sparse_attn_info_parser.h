@@ -57,14 +57,14 @@ constexpr uint32_t QBSA_MASK_MODE_ATTR_INDEX = 8U;
 constexpr uint32_t QBSA_RETURN_SOFTMAX_LSE_ATTR_INDEX = 9U;
 
 struct QBSARequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc = nullptr;
-    const gert::StorageShape *shape = nullptr;
-    const gert::Stride *stride = nullptr;
+    const gert::CompileTimeTensorDesc* desc = nullptr;
+    const gert::StorageShape* shape = nullptr;
+    const gert::Stride* stride = nullptr;
 };
 
 struct QBSAOptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc = nullptr;
-    const gert::Tensor *tensor = nullptr;
+    const gert::CompileTimeTensorDesc* desc = nullptr;
+    const gert::Tensor* tensor = nullptr;
 };
 
 struct QuantBlockSparseAttnParaInfo {
@@ -89,15 +89,15 @@ struct QuantBlockSparseAttnParaInfo {
     QBSARequiredParaInfo attnOut;
     QBSARequiredParaInfo lseOut;
 
-    const float *softmaxScale = nullptr;
-    const int64_t *qBlockSize = nullptr;
-    const int64_t *kvBlockSize = nullptr;
-    const char *layoutQ = nullptr;
-    const char *layoutKV = nullptr;
-    const char *layoutSparseIndices = nullptr;
-    const int64_t *quantMode = nullptr;
-    const int64_t *maskMode = nullptr;
-    const bool *returnSoftmaxLse = nullptr;
+    const float* softmaxScale = nullptr;
+    const int64_t* qBlockSize = nullptr;
+    const int64_t* kvBlockSize = nullptr;
+    const char* layoutQ = nullptr;
+    const char* layoutKV = nullptr;
+    const char* layoutSparseIndices = nullptr;
+    const int64_t* quantMode = nullptr;
+    const int64_t* maskMode = nullptr;
+    const bool* returnSoftmaxLse = nullptr;
 };
 
 struct QuantBlockSparseAttnTilingInfo {
@@ -135,29 +135,30 @@ struct QuantBlockSparseAttnTilingInfo {
     std::string layoutOutStr = "TND";
     bool returnSoftmaxLseVal = false;
 
+    bool isA5 = true;
     bool isGqa = false;
     bool hasViewStride = true;
 };
 
 class QuantBlockSparseAttnInfoParser {
 public:
-    explicit QuantBlockSparseAttnInfoParser(gert::TilingContext *context);
+    explicit QuantBlockSparseAttnInfoParser(gert::TilingContext* context);
     ~QuantBlockSparseAttnInfoParser() = default;
 
-    ge::graphStatus Parse(QuantBlockSparseAttnTilingInfo &tilingInfo);
+    ge::graphStatus Parse(QuantBlockSparseAttnTilingInfo& tilingInfo);
 
 private:
-    ge::graphStatus ParseQuery(QuantBlockSparseAttnTilingInfo &tilingInfo, const gert::Shape &queryShape,
-                               const gert::Shape &sparseIndicesShape);
-    ge::graphStatus ParseKeyValue(QuantBlockSparseAttnTilingInfo &tilingInfo, const gert::Shape &keyShape,
-                                  const gert::Shape &valueShape, const gert::Shape &kDescaleShape,
-                                  const gert::Stride *keyStride);
-    ge::graphStatus ParseSparseIndices(QuantBlockSparseAttnTilingInfo &tilingInfo,
-                                       const gert::Shape &sparseIndicesShape);
-    ge::graphStatus ParseOptionalInputs(QuantBlockSparseAttnTilingInfo &tilingInfo);
-    ge::graphStatus ParseAttributes(QuantBlockSparseAttnTilingInfo &tilingInfo, const gert::RuntimeAttrs *attrs);
+    ge::graphStatus ParseQuery(QuantBlockSparseAttnTilingInfo& tilingInfo, const gert::Shape& queryShape,
+                               const gert::Shape& sparseIndicesShape);
+    ge::graphStatus ParseKeyValue(QuantBlockSparseAttnTilingInfo& tilingInfo, const gert::Shape& keyShape,
+                                  const gert::Shape& valueShape, const gert::Shape& kDescaleShape,
+                                  const gert::Stride* keyStride);
+    ge::graphStatus ParseSparseIndices(QuantBlockSparseAttnTilingInfo& tilingInfo,
+                                       const gert::Shape& sparseIndicesShape);
+    ge::graphStatus ParseOptionalInputs(QuantBlockSparseAttnTilingInfo& tilingInfo);
+    ge::graphStatus ParseAttributes(QuantBlockSparseAttnTilingInfo& tilingInfo, const gert::RuntimeAttrs* attrs);
 
-    gert::TilingContext *context_;
+    gert::TilingContext* context_;
 };
 
 } // namespace optiling

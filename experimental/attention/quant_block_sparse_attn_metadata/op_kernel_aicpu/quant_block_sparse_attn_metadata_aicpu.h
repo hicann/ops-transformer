@@ -82,36 +82,36 @@ class QuantBlockSparseAttnMetadataCpuKernel : public CpuKernel {
 public:
     QuantBlockSparseAttnMetadataCpuKernel() = default;
     ~QuantBlockSparseAttnMetadataCpuKernel() = default;
-    uint32_t Compute(CpuKernelContext &ctx) override;
+    uint32_t Compute(CpuKernelContext& ctx) override;
 
 private:
-    bool Prepare(CpuKernelContext &ctx);
+    bool Prepare(CpuKernelContext& ctx);
     bool ParamsCheck();
     bool CheckTensorData();
     bool ParamsInit();
-    bool ScheduleSections(std::vector<SectionInfo> &sectionResults);
-    bool GenMetadata(const std::vector<SectionInfo> &sectionResults);
+    bool ScheduleSections(std::vector<SectionInfo>& sectionResults);
+    bool GenMetadata(const std::vector<SectionInfo>& sectionResults);
     uint32_t GetRowBlockNum(uint32_t bIdx, uint32_t n1Idx, uint32_t s1Idx) const;
     void InitBN1BlockInfo();
     uint64_t GetBN1BlockNum(uint32_t bIdx, uint32_t n1Idx) const;
-    uint32_t CalcValidS1Rows(uint32_t bIdx, uint32_t n1Idx, uint32_t &maxS2BlockNum) const;
+    uint32_t CalcValidS1Rows(uint32_t bIdx, uint32_t n1Idx, uint32_t& maxS2BlockNum) const;
     uint64_t CalcBN1Cost(uint32_t bIdx, uint32_t n1Idx) const;
-    bool CalcSectionBoundaries(std::vector<SectionInfo> &sectionResults) const;
-    bool AdvanceToValidRow(AssignContext &assignContext) const;
-    void AssignByBatch(AssignContext &assignContext) const;
-    void AssignByRow(AssignContext &assignContext) const;
-    void ScheduleFa(uint32_t bn1Start, uint32_t bn1End, uint64_t blockNum, SplitResult &result);
+    bool CalcSectionBoundaries(std::vector<SectionInfo>& sectionResults) const;
+    bool AdvanceToValidRow(AssignContext& assignContext) const;
+    void AssignByBatch(AssignContext& assignContext) const;
+    void AssignByRow(AssignContext& assignContext) const;
+    void ScheduleFa(uint32_t bn1Start, uint32_t bn1End, uint64_t blockNum, SplitResult& result);
 
 private:
-    CpuKernelContext *context_ = nullptr;
+    CpuKernelContext* context_ = nullptr;
     // input tensor
-    Tensor *sparseSeqLen_ = nullptr;
-    Tensor *cuSeqlensQ_ = nullptr;
-    Tensor *cuSeqlensKv_ = nullptr;
-    Tensor *sequsedQ_ = nullptr;
-    Tensor *sequsedKv_ = nullptr;
+    Tensor* sparseSeqLen_ = nullptr;
+    Tensor* cuSeqlensQ_ = nullptr;
+    Tensor* cuSeqlensKv_ = nullptr;
+    Tensor* sequsedQ_ = nullptr;
+    Tensor* sequsedKv_ = nullptr;
     // output tensor
-    Tensor *metadata_ = nullptr;
+    Tensor* metadata_ = nullptr;
 
     // attr
     int32_t batchSize_ = 0;
@@ -128,6 +128,8 @@ private:
 
     // platform
     std::string socVersion_ = "";
+    bool isA5_ = true;
+    optiling::MetadataSlotConfig metadataSlotConfig_{36U, 72U, 36U};
     int32_t aicCoreNum_ = 36;
     int32_t aivCoreNum_ = 72;
 

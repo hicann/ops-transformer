@@ -35,12 +35,12 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnQuantBlockSparseAttnMetadataGetWorkspaceSize(
-    const aclTensor *sparseSeqLen, const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional,
-    const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional, int64_t batchSize, int64_t numHeadsQ,
+    const aclTensor* sparseSeqLen, const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional,
+    const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional, int64_t batchSize, int64_t numHeadsQ,
     int64_t numHeadsKv, int64_t headDim, int64_t sparseBlockSizeQ, int64_t sparseBlockSizeK, int64_t quantMode,
-    int64_t maskMode, const char *layoutQOptional, const char *layoutKvOptional,
-    const char *layoutSparseIndicesOptional, const aclTensor *metadata, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    int64_t maskMode, const char* layoutQOptional, const char* layoutKvOptional,
+    const char* layoutSparseIndicesOptional, const aclTensor* metadata, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnQuantBlockSparseAttnMetadata,
                    DFX_IN(sparseSeqLen, cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional,
@@ -51,24 +51,25 @@ aclnnStatus aclnnQuantBlockSparseAttnMetadataGetWorkspaceSize(
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
+    const op::PlatformInfo& npuInfo = op::GetCurrentPlatformInfo();
     uint32_t aicCoreNum = npuInfo.GetCubeCoreNum();
     uint32_t aivCoreNum = npuInfo.GetVectorCoreNum();
-    const char *socVersion = npuInfo.GetSocLongVersion().c_str();
+    const bool isA5 = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
+    const std::string socVersion = npuInfo.GetSocLongVersion();
 
     auto ret = ParamsCheck(sparseSeqLen, cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional,
                            batchSize, numHeadsQ, numHeadsKv, headDim, sparseBlockSizeQ, sparseBlockSizeK, quantMode,
                            maskMode, layoutQOptional, layoutKvOptional, layoutSparseIndicesOptional, aicCoreNum,
-                           aivCoreNum, socVersion, metadata);
+                           aivCoreNum, isA5, metadata);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     // Contiguous conversion - INPUT_TENSOR_ROWS order
-    const aclTensor *sparseSeqLenContiguous = l0op::Contiguous(sparseSeqLen, uniqueExecutor.get());
+    const aclTensor* sparseSeqLenContiguous = l0op::Contiguous(sparseSeqLen, uniqueExecutor.get());
     if (sparseSeqLenContiguous == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "sparse_seq_len contiguous is none");
         return ACLNN_ERR_INNER_NULLPTR;
     }
-    const aclTensor *cuSeqlensQOptionalContiguous = nullptr;
+    const aclTensor* cuSeqlensQOptionalContiguous = nullptr;
     if (cuSeqlensQOptional != nullptr) {
         cuSeqlensQOptionalContiguous = l0op::Contiguous(cuSeqlensQOptional, uniqueExecutor.get());
         if (cuSeqlensQOptionalContiguous == nullptr) {
@@ -76,7 +77,7 @@ aclnnStatus aclnnQuantBlockSparseAttnMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *cuSeqlensKvOptionalContiguous = nullptr;
+    const aclTensor* cuSeqlensKvOptionalContiguous = nullptr;
     if (cuSeqlensKvOptional != nullptr) {
         cuSeqlensKvOptionalContiguous = l0op::Contiguous(cuSeqlensKvOptional, uniqueExecutor.get());
         if (cuSeqlensKvOptionalContiguous == nullptr) {
@@ -84,7 +85,7 @@ aclnnStatus aclnnQuantBlockSparseAttnMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *sequsedQOptionalContiguous = nullptr;
+    const aclTensor* sequsedQOptionalContiguous = nullptr;
     if (sequsedQOptional != nullptr) {
         sequsedQOptionalContiguous = l0op::Contiguous(sequsedQOptional, uniqueExecutor.get());
         if (sequsedQOptionalContiguous == nullptr) {
@@ -92,7 +93,7 @@ aclnnStatus aclnnQuantBlockSparseAttnMetadataGetWorkspaceSize(
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
-    const aclTensor *sequsedKvOptionalContiguous = nullptr;
+    const aclTensor* sequsedKvOptionalContiguous = nullptr;
     if (sequsedKvOptional != nullptr) {
         sequsedKvOptionalContiguous = l0op::Contiguous(sequsedKvOptional, uniqueExecutor.get());
         if (sequsedKvOptionalContiguous == nullptr) {
@@ -102,10 +103,10 @@ aclnnStatus aclnnQuantBlockSparseAttnMetadataGetWorkspaceSize(
     }
 
     auto output = l0op::QuantBlockSparseAttnMetadata(
-        sparseSeqLenContiguous, cuSeqlensQOptionalContiguous, cuSeqlensKvOptionalContiguous,
-        sequsedQOptionalContiguous, sequsedKvOptionalContiguous, batchSize, numHeadsQ, numHeadsKv, headDim,
-        sparseBlockSizeQ, sparseBlockSizeK, quantMode, maskMode, layoutQOptional, layoutKvOptional,
-        layoutSparseIndicesOptional, socVersion, aicCoreNum, aivCoreNum, metadata, uniqueExecutor.get());
+        sparseSeqLenContiguous, cuSeqlensQOptionalContiguous, cuSeqlensKvOptionalContiguous, sequsedQOptionalContiguous,
+        sequsedKvOptionalContiguous, batchSize, numHeadsQ, numHeadsKv, headDim, sparseBlockSizeQ, sparseBlockSizeK,
+        quantMode, maskMode, layoutQOptional, layoutKvOptional, layoutSparseIndicesOptional, socVersion.c_str(), isA5,
+        aicCoreNum, aivCoreNum, metadata, uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
@@ -113,8 +114,10 @@ aclnnStatus aclnnQuantBlockSparseAttnMetadataGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-__attribute__((visibility("default"))) aclnnStatus aclnnQuantBlockSparseAttnMetadata(
-    void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+__attribute__((visibility("default"))) aclnnStatus aclnnQuantBlockSparseAttnMetadata(void* workspace,
+                                                                                     uint64_t workspaceSize,
+                                                                                     aclOpExecutor* executor,
+                                                                                     aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnQuantBlockSparseAttnMetadata);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
