@@ -56,14 +56,18 @@ static inline bool CheckDtypeValid(const aclTensor* unpermutedTokensGrad, const 
     }
     if (permuteTokens != nullptr && permuteTokens->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(permuteTokens, MOE_GRAD_DTYPE_SUPPORT_LIST_X, return false);
-        OP_CHECK_DTYPE_NOT_SAME(unpermutedTokensGrad, permuteTokens, return false);
+        if (unpermutedTokensGrad != nullptr) {
+            OP_CHECK_DTYPE_NOT_SAME(unpermutedTokensGrad, permuteTokens, return false);
+        }
     }
     if (probsOptional != nullptr && probsOptional->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(probsOptional, MOE_GRAD_DTYPE_SUPPORT_LIST_X, return false);
     }
     if (permutedTokensGradOut != nullptr && permutedTokensGradOut->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(permutedTokensGradOut, MOE_GRAD_DTYPE_SUPPORT_LIST_X, return false);
-        OP_CHECK_DTYPE_NOT_SAME(unpermutedTokensGrad, permutedTokensGradOut, return false);
+        if (unpermutedTokensGrad != nullptr) {
+            OP_CHECK_DTYPE_NOT_SAME(unpermutedTokensGrad, permutedTokensGradOut, return false);
+        }
     }
     if (probsGradOut != nullptr && probsGradOut->GetViewShape().GetShapeSize() != 0) {
         OP_CHECK_DTYPE_NOT_SUPPORT(probsGradOut, MOE_GRAD_DTYPE_SUPPORT_LIST_X, return false);

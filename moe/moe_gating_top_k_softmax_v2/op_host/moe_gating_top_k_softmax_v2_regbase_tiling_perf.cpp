@@ -60,7 +60,7 @@ private:
     bool doubleBufferFlag;
     MoeGatingTopKSoftmaxV2PerfRegbaseTilingData tilingData;
 
-    uint32_t calcMaxRowInUb(const int64_t ubSize, const uint32_t blockRow);
+    uint32_t calcMaxRowInUb(const int64_t ubSizeLocal, const uint32_t blockRow);
 
     bool isBufferSizeEnough(const uint32_t curRowInUb, const uint32_t tmpUbSize);
 
