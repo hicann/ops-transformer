@@ -29,10 +29,10 @@ ops:
       - flash_attn
       soc:
       - ascend950
-    flash_mla_with_kvcache_metadata:
+    flash_mla_metadata:
       impact:
-      - flash_mla_with_kvcache_metadata
-      - flash_mla_with_kvcache
+      - flash_mla_metadata
+      - flash_mla
       soc:
       - ascend950
     generic_block_sparse_attention_grad_metadata:

@@ -394,7 +394,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         # 动态槽位 (CSV tensor_view_shapes 含 -1): ttk 在 invoke/apply
         # npu_preprocess 后把 {"metadata": generated} 回填到主算子参数, 再按
         # split_params 传进本模块 __init__; 静态槽位: hook 已原地回填占位 tensor。
-        # 参考 flash_mla_with_kvcache 资产的 graph.py: 只消费, 不重复生成,
+        # 参考 flash_mla 资产的 graph.py: 只消费, 不重复生成,
         # metadata 生成位于图捕获与主算子计时之外。
         if (
             metadata is None

@@ -276,7 +276,7 @@ def run(
 
     动态槽位 (CSV tensor_view_shapes 含 -1, ttk 传 metadata=None): 按参数名返回
     ``{"metadata": generated}``, 由 ttk 回填主算子 args/kwargs (参考
-    flash_mla_with_kvcache 资产); 静态槽位 (旧 (0,) 占位或已有 Tensor):
+    flash_mla 资产); 静态槽位 (旧 (0,) 占位或已有 Tensor):
     原地 resize_/copy_ 回填并隐式返回 None。
     """
     if quant_mode is None:
@@ -361,7 +361,7 @@ def run(
         hook_kwargs,
     )
     # 动态槽位 (CSV tensor_view_shapes 含 -1, ttk 传入 None): 按参数名物化并返回,
-    # 由 ttk 回填主算子调用 (参考 flash_mla_with_kvcache 资产: 返回
+    # 由 ttk 回填主算子调用 (参考 flash_mla 资产: 返回
     # {"metadata": generated}, 键必须是 API 参数名);
     # 静态槽位 (旧 (0,) 占位或已有 Tensor): 原地 copy_ 回填并返回 None。
     # run_metadata 需要设备锚点 tensor, 动态槽位下用 q 提供 device。
