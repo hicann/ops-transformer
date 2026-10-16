@@ -618,7 +618,7 @@ Ascend 950支持的算子分类和算子列表如下：
   </tr>
   <tr>
     <td>attention</td>
-    <td><a href="../../attention/quant_flash_mla_with_kvcache/docs/torchapi_quant_flash_mla_with_kvcache.md">quant_flash_mla_with_kvcache</a></td>
+    <td><a href="../../attention/quant_flash_mla/docs/torchapi_quant_flash_mla.md">quant_flash_mla</a></td>
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
