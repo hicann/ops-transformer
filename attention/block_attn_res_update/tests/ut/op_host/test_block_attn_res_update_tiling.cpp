@@ -44,6 +44,11 @@ constexpr uint64_t VALID_AIC_NUM = 32UL;
 constexpr uint64_t VALID_UB_SIZE = 245760UL;
 constexpr uint64_t VALID_TILING_DATA_CAPACITY = 4096UL;
 
+// OpTilingContextBuilder::Build() rejects a null compile info and returns an empty context,
+// which the tiling case executor dereferences unconditionally, so a non-null placeholder is required.
+struct BlockAttnResUpdateCompileInfo {};
+BlockAttnResUpdateCompileInfo gCompileInfo;
+
 ge::DataType ParseDtype(const std::string& value)
 {
     return ops::ut::ParseGeDtype(ops::ut::Trim(value));
@@ -69,15 +74,13 @@ gert::TilingContextPara MakeValidTilingContextPara()
                                        {ParseShape("3:63"), ge::DT_FLOAT, ge::FORMAT_ND},
                                        {ParseShape("3:63"), ge::DT_BF16, ge::FORMAT_ND},
                                    },
-                                   std::vector<gert::TilingContextPara::OpAttr>{}, nullptr, NPU_ARCH, VALID_AIC_NUM,
-                                   VALID_UB_SIZE, VALID_TILING_DATA_CAPACITY);
+                                   std::vector<gert::TilingContextPara::OpAttr>{}, &gCompileInfo, NPU_ARCH,
+                                   VALID_AIC_NUM, VALID_UB_SIZE, VALID_TILING_DATA_CAPACITY);
 }
 
 struct BlockAttnResUpdateTilingCase {
     void Run() const
     {
-        const uint32_t aicNum = aivNum / 2U;
-
         std::vector<gert::TilingContextPara::OpAttr> attrs;
         if (eps != "DEFAULT") {
             attrs.emplace_back("eps", Ops::Transformer::AnyValue::CreateFrom<float>(std::stof(eps)));
@@ -96,7 +99,7 @@ struct BlockAttnResUpdateTilingCase {
                                          {ParseShape(partialRefShape), partialRefDtype, ge::FORMAT_ND},
                                          {ParseShape(hShape), hDtype, ge::FORMAT_ND},
                                      },
-                                     attrs, nullptr, NPU_ARCH, aicNum, ubSize, tilingDataCapacity);
+                                     attrs, &gCompileInfo, NPU_ARCH, aivNum, ubSize, tilingDataCapacity);
 
         TilingInfo actual;
         const bool actualResult = ExecuteTiling(para, actual);

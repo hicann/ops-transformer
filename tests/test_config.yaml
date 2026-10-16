@@ -90,6 +90,40 @@ attention:
     options:
       - attention_update
 
+  block_attn_res_prepare:
+    module: True
+    src:
+      - attention/block_attn_res_prepare
+    exclude:
+      - attention/block_attn_res_prepare/docs
+      - attention/block_attn_res_prepare/README.md
+    ut_cov_exclude:
+      - attention/block_attn_res_prepare/tests
+      - attention/block_attn_res_prepare/examples
+      - attention/block_attn_res_prepare/op_kernel
+    test:
+      examples: False
+      ut: True
+    options:
+      - block_attn_res_prepare
+
+  block_attn_res_update:
+    module: True
+    src:
+      - attention/block_attn_res_update
+    exclude:
+      - attention/block_attn_res_update/docs
+      - attention/block_attn_res_update/README.md
+    ut_cov_exclude:
+      - attention/block_attn_res_update/tests
+      - attention/block_attn_res_update/examples
+      - attention/block_attn_res_update/op_kernel
+    test:
+      examples: False
+      ut: True
+    options:
+      - block_attn_res_update
+
   bsa_select_block_mask:
     module: True
     src:
