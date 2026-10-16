@@ -46,6 +46,62 @@ void InitParsePlatformInfo(fe::PlatFormInfos& platformInfo)
     platformInfo.SetCoreNumByCoreType("AICore");
     platformInfo.SetPlatformRes("version", versions);
 }
+
+ge::graphStatus RunTilingWithOutputBufferState(bool hasTilingData, bool hasWorkspace)
+{
+    optiling::MoeTokenUnpermuteWithRoutingMapGradCompileInfo compileInfo = {};
+    fe::PlatFormInfos platformInfo;
+    InitParsePlatformInfo(platformInfo);
+
+    std::vector<std::unique_ptr<gert::Tensor>> tensors;
+    std::vector<gert::Tensor*> inputs;
+    std::vector<gert::Tensor*> outputs;
+    auto addTensor = [&tensors](std::vector<gert::Tensor*>& tensorList, const gert::StorageShape& shape,
+                                ge::DataType dataType) {
+        auto tensor = std::make_unique<gert::Tensor>(
+            shape, gert::StorageFormat(ge::FORMAT_ND, ge::FORMAT_ND, gert::ExpandDimsType()),
+            gert::TensorPlacement::kOnHost, dataType, nullptr);
+        tensorList.push_back(tensor.get());
+        tensors.push_back(std::move(tensor));
+    };
+
+    addTensor(inputs, gert::StorageShape({30, 64}, {30, 64}), ge::DT_BF16);
+    addTensor(inputs, gert::StorageShape({30}, {30}), ge::DT_INT32);
+    addTensor(inputs, gert::StorageShape({30}, {30}), ge::DT_INT32);
+    addTensor(inputs, gert::StorageShape({30, 64}, {30, 64}), ge::DT_INT8);
+    addTensor(inputs, gert::StorageShape({30, 64}, {30, 64}), ge::DT_BF16);
+    addTensor(inputs, gert::StorageShape({30, 64}, {30, 64}), ge::DT_BF16);
+    addTensor(outputs, gert::StorageShape({30, 64}, {30, 64}), ge::DT_BF16);
+    addTensor(outputs, gert::StorageShape({30, 64}, {30, 64}), ge::DT_BF16);
+
+    auto tilingData = gert::TilingData::CreateCap(4096);
+    auto workspaceHolder = gert::ContinuousVector::Create<size_t>(4096);
+    auto* workspace = reinterpret_cast<gert::ContinuousVector*>(workspaceHolder.get());
+    auto contextHolder = gert::TilingContextFaker()
+                             .SetOpType("MoeTokenUnpermuteWithRoutingMapGrad")
+                             .IrInstanceNum({1, 1, 1, 1, 1, 1}, {1, 1})
+                             .InputTensors(inputs)
+                             .OutputTensors(outputs)
+                             .Attr("drop_and_pad", false)
+                             .CompileInfo(&compileInfo)
+                             .PlatformInfo(reinterpret_cast<char*>(&platformInfo))
+                             .TilingData(hasTilingData ? tilingData.get() : nullptr)
+                             .Workspace(hasWorkspace ? workspace : nullptr)
+                             .Build();
+    auto* context = contextHolder.GetContext();
+    if (context == nullptr) {
+        ADD_FAILURE() << "Failed to build tiling context";
+        return ge::GRAPH_SUCCESS;
+    }
+
+    auto spaceRegistry = gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry();
+    auto opImpl = spaceRegistry == nullptr ? nullptr : spaceRegistry->GetOpImpl("MoeTokenUnpermuteWithRoutingMapGrad");
+    if (opImpl == nullptr || opImpl->tiling == nullptr) {
+        ADD_FAILURE() << "Failed to get tiling implementation";
+        return ge::GRAPH_SUCCESS;
+    }
+    return opImpl->tiling(context);
+}
 } // namespace
 
 class MoeTokenUnpermuteWithRoutingMapGradTiling : public testing::Test {
@@ -86,6 +142,16 @@ TEST_F(MoeTokenUnpermuteWithRoutingMapGradTiling, test_tiling_prob_not_none_bf16
     string expectTilingData = "30 1 0 64 64 30 30 10 1 0 1 0 64 1 0 64 0 1 16 64 196352 ";
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
+}
+
+TEST_F(MoeTokenUnpermuteWithRoutingMapGradTiling, test_tiling_null_raw_tiling_data)
+{
+    EXPECT_EQ(RunTilingWithOutputBufferState(false, true), ge::GRAPH_FAILED);
+}
+
+TEST_F(MoeTokenUnpermuteWithRoutingMapGradTiling, test_tiling_null_workspace)
+{
+    EXPECT_EQ(RunTilingWithOutputBufferState(true, false), ge::GRAPH_FAILED);
 }
 
 TEST_F(MoeTokenUnpermuteWithRoutingMapGradTiling, test_tiling_prob_not_none_bf16_tilingkey_11)
