@@ -2979,7 +2979,7 @@ protected:
             return false;
         }
         if (tilingKeyBmm2Source == CubeInputSourceEnum::L1) {
-            l1SizeRemain = aicoreParams_.l1Size - alignedS2 * alignedD * elementSize;
+            l1SizeRemain = aicoreParams_.l1Size - alignedS2 * alignedD2 * elementSize;
         } else {
             l1SizeRemain = aicoreParams_.l1Size;
         }
@@ -2995,8 +2995,9 @@ protected:
         bmm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm2OutDtype);
-        bmm2.SetShape(std::min(static_cast<int64_t>(tilingData->coreParams.get_s1BaseSize()), s1Size), dSize, s2Size);
-        bmm2.SetOrgShape(s1Size, s2StrideSize, s2Size, s2StrideSize);
+        // MLA D不等长(d != dv): bmm2 的N轴为 d2Size，B矩阵(V)的K轴步长为 vs2StrideSize
+        bmm2.SetShape(std::min(static_cast<int64_t>(tilingData->coreParams.get_s1BaseSize()), s1Size), d2Size, s2Size);
+        bmm2.SetOrgShape(s1Size, vs2StrideSize, s2Size, vs2StrideSize);
         bmm2.SetBias(false);
         if (bmm2.SetBufferSpace(l1SizeRemain, aicoreParams_.l0cSize) != 0) {
             return false;
@@ -3008,7 +3009,7 @@ protected:
                 return false;
             }
         } else {
-            if (bmm2.SetFixSplit(tmpS1BasicBlock, tmpDBasicBlock) != 0) {
+            if (bmm2.SetFixSplit(tmpS1BasicBlock, std::min(tmpDBasicBlock, alignedD2)) != 0) {
                 return false;
             }
         }
@@ -3103,7 +3104,7 @@ protected:
         /* 计算bmm2需要用的workspace, 大小为CoreNum * s1BaseSize * alignedD (16对齐）,
          * bmm2计算完成后将数据输出在这块workspace上。
          * 这块workspace主要的作用是存放bmm2的后继输出，用来做div softmax sum和cast。 */
-        int64_t bmm2AlignBytes = CeilDivision(coreParams.get_s1BaseSize() * alignedD, 256L) * 256L * calcTypeSize * 2;
+        int64_t bmm2AlignBytes = CeilDivision(coreParams.get_s1BaseSize() * alignedD2, 256L) * 256L * calcTypeSize * 2;
         workspaces[0] = static_cast<size_t>((bmm1AlignBytes + stage1AlignBytes + bmm2AlignBytes) *
                                             tilingData->multiCoreParams.get_coreNum()) +
                         WORK_SPACE_RESERVE_SIZE;
@@ -3181,9 +3182,10 @@ protected:
         coreParams.set_dOuterSize(CeilDivision(dSize, dBasicBlock));
         coreParams.set_s1SparseValidSize(s1SparseValidSize);
         coreParams.set_s2SparseValidSize(s2SparseValidSize);
+        coreParams.set_d2Size(d2Size);
         batchBasic = coreParams.get_bBaseSize() * n2 * g;
-        OP_LOGD(context_, "[b:%ld, n2:%ld, g:%ld, s1:%ld, s2:%ld, batchBasic:%ld].", b, n2, g, s1,
-                inputParams.get_s2Size(), batchBasic);
+        OP_LOGD(context_, "[b:%ld, n2:%ld, g:%ld, s1:%ld, s2:%ld, batchBasic:%ld, d2Size: %ld].", b, n2, g, s1,
+                inputParams.get_s2Size(), batchBasic, d2Size);
         OP_LOGD(context_, "[bBaseSize: %d, bBaseTailSize:%d, bOuterSize:%ld].", coreParams.get_bBaseSize(),
                 coreParams.get_bBaseTailSize(), coreParams.get_bOuterSize());
         OP_LOGD(context_, "[s1BaseSize: %d, s1BaseTailSize:%d, s1OuterSize:%ld].", coreParams.get_s1BaseSize(),
@@ -3242,7 +3244,7 @@ protected:
         tensorSizeParams.set_softmaxSumUbSize(s1BasicBlock * (BYTE_BLOCK / sizeof(float)));
         tensorSizeParams.set_softmaxExpUbSize(s1BasicBlock * (BYTE_BLOCK / calcTypeSize));
         tensorSizeParams.set_apiTmpBufferBytes(apiMaxUBSize);
-        tensorSizeParams.set_bmm2ResUbSize(coreParams.get_s1Vec2BaseSize() * dBasicBlock);
+        tensorSizeParams.set_bmm2ResUbSize(coreParams.get_s1Vec2BaseSize() * alignedD2);
     }
 
     void CalcDBasicBlock() override
@@ -3278,18 +3280,18 @@ protected:
         bmm2.SetAType(matmul_tiling::TPosition::VECCALC, matmul_tiling::CubeFormat::NZ, bmmDtype, false);
         bmm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm2OutDtype);
-        bmm2.SetShape(s1Size, dSize, s2Size);
-        bmm2.SetOrgShape(s1Size, dSize, s2Size); // consider broadcst, N same as A tensor
+        bmm2.SetShape(s1Size, d2Size, s2Size);
+        bmm2.SetOrgShape(s1Size, d2Size, s2Size); // consider broadcst, N same as A tensor
         bmm2.SetALayout(bSize, s1Size, n2Size, gSize, s2Size);
-        bmm2.SetBLayout(bSize, s2Size, n2Size, 1, dSize);
-        bmm2.SetCLayout(bSize, s1Size, n2Size, gSize, dSize);
+        bmm2.SetBLayout(bSize, s2Size, n2Size, 1, d2Size);
+        bmm2.SetCLayout(bSize, s1Size, n2Size, gSize, d2Size);
         bmm2.SetBatchNum(batch);
         bmm2.SetBias(false);
         if (bmm2.SetBufferSpace(aicoreParams_.l1Size, aicoreParams_.l0cSize) != 0) {
             return false;
         }
         int64_t maxDBasicBlock = AlignDown(aicoreParams_.l0cSize / (tmpS1BasicBlock * calcTypeSize), 16UL);
-        if (bmm2.SetFixSplit(tmpS1BasicBlock, std::min(maxDBasicBlock, tmpDBasicBlock)) != 0) {
+        if (bmm2.SetFixSplit(tmpS1BasicBlock, std::min(maxDBasicBlock, alignedD2)) != 0) {
             return false;
         }
         return true;
@@ -3605,14 +3607,15 @@ protected:
         bmm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm2OutDtype);
-        bmm2.SetShape(singleM, dSize, std::min(tmpS2BasicBlock * tilingData->coreParams.get_nRatio(), s2Size));
-        bmm2.SetOrgShape(s1Size, s2StrideSize, std::min(tmpS2BasicBlock * tilingData->coreParams.get_nRatio(), s2Size),
-                         s2StrideSize);
+        // MLA D不等长(d != dv): bmm2 的N轴为 d2Size，B矩阵(V)的K轴步长为 vs2StrideSize
+        bmm2.SetShape(singleM, d2Size, std::min(tmpS2BasicBlock * tilingData->coreParams.get_nRatio(), s2Size));
+        bmm2.SetOrgShape(s1Size, vs2StrideSize, std::min(tmpS2BasicBlock * tilingData->coreParams.get_nRatio(), s2Size),
+                         vs2StrideSize);
         bmm2.SetBias(false);
         if (bmm2.SetBufferSpace(aicoreParams_.l1Size, aicoreParams_.l0cSize) != 0) {
             return false;
         }
-        if (dSize == D_SPECIFIC_SIZE && tilingData->inputParams.get_layoutType() == LAYOUT_BNSD &&
+        if (d2Size == D_SPECIFIC_SIZE && tilingData->inputParams.get_layoutType() == LAYOUT_BNSD &&
             tilingData->inputParams.get_sparseType() == static_cast<uint8_t>(SparseEnum::ALL) &&
             singleM >= BMM2_BASICBLOCK_M_64) {
             if (bmm2.SetFixSplit(BMM2_BASICBLOCK_M_64, BMM2_BASICBLOCK_M_64, BMM2_BASICBLOCK_K_256) != 0) {
@@ -3638,9 +3641,6 @@ protected:
 
     bool IsCapable() override
     {
-        if (dSize != d2Size) { // D不等长(d != dv): S1S2 支持并主动接住
-            return true;
-        }
         if (s2Size > s2sizeLimitMin) {
             return true;
         }
@@ -3685,20 +3685,20 @@ protected:
 
         // 切D场景，stage1占用2倍的空间，stage2占用4倍空间
         workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_2 +
-                                             SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                             SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD2 * calcTypeSize) *
                                             aivNum) +
                         WORK_SPACE_RESERVE_SIZE;
         // NZND场景，stage1占用3倍的空间，stage2占用4倍空间
         if (s2Size % S2_NZTOND_SIZE_64 != 0) {
             workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_3 +
-                                                 SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                                 SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD2 * calcTypeSize) *
                                                 aivNum) +
                             WORK_SPACE_RESERVE_SIZE;
         }
         // FP32场景，stage1占用4倍的空间，stage2占用4倍空间
         if (inputDtypeBytes == DATA_TYPE_FP32) {
             workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_4 +
-                                                 SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) *
+                                                 SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD2 * calcTypeSize) *
                                                 aivNum) +
                             WORK_SPACE_RESERVE_SIZE;
         }
@@ -4161,10 +4161,11 @@ protected:
         bmm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm2OutDtype);
-        bmm2.SetShape(std::min(tmpS1BasicBlock, s1Size), dSize,
+        // MLA D不等长(d != dv): bmm2 的N轴为 d2Size，B矩阵(V)的K轴步长为 vs2StrideSize
+        bmm2.SetShape(std::min(tmpS1BasicBlock, s1Size), d2Size,
                       std::min(tmpS2BasicBlock * tilingData->coreParams.get_nRatio(), s2Size));
-        bmm2.SetOrgShape(s1Size, s2StrideSize, std::min(tmpS2BasicBlock * tilingData->coreParams.get_nRatio(), s2Size),
-                         s2StrideSize);
+        bmm2.SetOrgShape(s1Size, vs2StrideSize, std::min(tmpS2BasicBlock * tilingData->coreParams.get_nRatio(), s2Size),
+                         vs2StrideSize);
         bmm2.SetBias(false);
         if (!isSameAB && inputDtypeBytes != DATA_TYPE_FP32 && !hasRope && s1BasicBlock <= S1_BASIC_BLOCK_L1CARRY_MAX &&
             dSize <= D_SIZE_L1CARRY_MAX && d2Size <= D2_SIZE_L1CARRY_MAX) {
@@ -4390,12 +4391,12 @@ protected:
         if (isMaxWorkspace) {
             auto actualSplitAiCoreNumMax = std::max(aicNum, aivNum);
             workspaces[0] = static_cast<size_t>((bmm1Byetes * SPACE_NUM_3 + stage1Bytes * SPACE_NUM_2 +
-                                                 SPACE_NUM_4 * 512 * alignedD * calcTypeSize + (512 * 1024 * 2)) *
+                                                 SPACE_NUM_4 * 512 * alignedD2 * calcTypeSize + (512 * 1024 * 2)) *
                                                 actualSplitAiCoreNumMax) +
                             WORK_SPACE_RESERVE_SIZE;
         } else {
             workspaces[0] = static_cast<size_t>((bmm1Byetes * SPACE_NUM_3 + stage1Bytes * SPACE_NUM_2 +
-                                                 SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize +
+                                                 SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD2 * calcTypeSize +
                                                  pseAlignSize) *
                                                 actualSplitAiCoreNum) +
                             WORK_SPACE_RESERVE_SIZE;

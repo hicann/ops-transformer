@@ -195,6 +195,8 @@ protected:
     uint32_t s2BaseSize;
     uint32_t dSize;
     int64_t dSizeAlign16;
+    uint32_t d2Size;
+    int64_t d2SizeAlign16;
     // sparse 用函数
     __aicore__ inline void GetS1LoopRange(int64_t& multiCoreInnerOffset, int64_t& multiCoreInnerLimit);
     __aicore__ inline void GetS2LoopRange();
@@ -271,6 +273,21 @@ protected:
     int64_t s1BaseD;
     int64_t bN2G;
     int64_t n2GS2;
+
+    // MLA D不等长，V和OUT为D2
+    int64_t s1D2;
+    int64_t gS1D2;
+    int64_t n2GS1D2;
+    int64_t s2D2;
+    int64_t n2S2D2;
+    int64_t gD2;
+    int64_t n2D2;
+    int64_t bN2D2;
+    int64_t n2GD2;
+    int64_t bN2GD2;
+    int64_t s1BaseN2GD2;
+    int64_t s1BaseBN2GD2;
+    int64_t s1BaseD2;
 
     int64_t softmaxBufSize = 256;
     uint32_t negativeIntScalar = NEGATIVE_MIN_VAULE_FP32;
@@ -400,7 +417,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
     }
 
     // d一定会对齐，这里考虑开乒乓，申请两份workspace
-    int64_t bmm2ResultOffset = CeilDiv(s1BaseSize * this->dSizeAlign16, 256) * 256 * sizeof(T);
+    int64_t bmm2ResultOffset = CeilDiv(s1BaseSize * this->d2SizeAlign16, 256) * 256 * sizeof(T);
     int64_t pseInnerAlibiSize =
         this->tilingData->coreParams.pseAlibiBaseS1 * this->tilingData->coreParams.pseAlibiBaseS2 * sizeof(half);
     int64_t pseAlibiOffset = CeilDiv(pseInnerAlibiSize, 512) * 512;
@@ -474,6 +491,8 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
     this->s2BaseSize = this->tilingData->coreParams.s2BaseSize;
     this->dSize = this->tilingData->inputParams.dSize;
     this->dSizeAlign16 = CeilDiv(this->tilingData->inputParams.dSize, 16) * 16;
+    this->d2Size = this->tilingData->coreParams.d2Size;
+    this->d2SizeAlign16 = CeilDiv(this->d2Size, 16) * 16;
 };
 
 FA_S1BN2GS1_FUNCTION_TEMPLATE
@@ -499,7 +518,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
     this->pipe->InitBuffer(this->softmaxMaxBuf, this->softmaxBufSize * this->blockBytes);
     this->pipe->InitBuffer(this->softmaxExpBuf, this->blockBytes);
     if constexpr (bmm2Source == TPosition::TSCM) {
-        this->pipe->InitBuffer(valueScm, 1, this->tilingData->inputParams.alignedS2 * dSize * sizeof(INPUT_T));
+        this->pipe->InitBuffer(valueScm, 1, this->tilingData->inputParams.alignedS2 * d2SizeAlign16 * sizeof(INPUT_T));
     }
 }
 
@@ -528,6 +547,18 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
     this->n2GS1D = this->tilingData->inputParams.n2Size * this->gS1D;
     this->n2GS1S2 = this->tilingData->inputParams.n2Size * this->gS1S2;
 
+    // MLA D不等长，V和OUT为D2
+    this->s1D2 = this->tilingData->inputParams.s1Size * d2Size;
+    this->s2D2 = this->tilingData->inputParams.s2Size * d2Size;
+    this->gD2 = this->tilingData->inputParams.gSize * d2Size;
+    this->n2D2 = this->tilingData->inputParams.n2Size * d2Size;
+    this->bN2D2 = this->tilingData->inputParams.bSize * this->n2D2;
+    this->gS1D2 = this->tilingData->inputParams.gSize * this->s1D2;
+    this->n2S2D2 = this->tilingData->inputParams.n2Size * this->s2D2;
+    this->n2GD2 = this->tilingData->inputParams.n2Size * this->gD2;
+    this->bN2GD2 = this->tilingData->inputParams.bSize * this->n2GD2;
+    this->n2GS1D2 = this->tilingData->inputParams.n2Size * this->gS1D2;
+
     // 计算切分轴的乘积
     this->s1BaseS2 = s1BaseSize * this->tilingData->inputParams.s2Size;
 
@@ -536,23 +567,26 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
         this->s1BaseN2GD = s1BaseSize * this->n2GD;
         mm1Ka = n2GD;
         mm1Kb = n2D;
-        mm2Kb = this->n2D;
-        srcDValue = n2D;
+        mm2Kb = this->n2D2;
+        srcDValue = n2D2;
+        this->s1BaseN2GD2 = s1BaseSize * this->n2GD2;
     } else if constexpr (layOutType == LayOutTypeEnum::LAYOUT_SBH) {
         // SBH/SBNGD
         this->bN2G = this->tilingData->inputParams.bSize * this->n2G;
         mm1Ka = bN2GD;
         mm1Kb = bN2D;
-        mm2Kb = this->bN2D;
-        srcDValue = bN2D;
+        mm2Kb = this->bN2D2;
+        srcDValue = bN2D2;
         this->s1BaseBN2GD = s1BaseSize * this->tilingData->inputParams.bSize * this->n2GD;
+        this->s1BaseBN2GD2 = s1BaseSize * this->tilingData->inputParams.bSize * this->n2GD2;
     } else if constexpr (layOutType == LayOutTypeEnum::LAYOUT_BNSD) {
         // BNSD
         this->s1BaseD = s1BaseSize * dSize;
         mm1Ka = dSize;
         mm1Kb = dSize;
-        mm2Kb = dSize;
-        srcDValue = dSize;
+        mm2Kb = d2Size;
+        srcDValue = d2Size;
+        this->s1BaseD2 = s1BaseSize * d2Size;
     }
 
     if (this->tilingData->inputParams.pseShapeType == pse1S2) {
@@ -671,10 +705,10 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 {
     BinaryRepeatParams repeatParams;
     repeatParams.src0BlkStride = 1;
-    repeatParams.src0RepStride = this->dSizeAlign16 / this->blockSize;
+    repeatParams.src0RepStride = this->d2SizeAlign16 / this->blockSize;
     repeatParams.src1BlkStride = 0;
     repeatParams.src1RepStride = 1;
-    repeatParams.dstRepStride = this->dSizeAlign16 / this->blockSize;
+    repeatParams.dstRepStride = this->d2SizeAlign16 / this->blockSize;
     int32_t s1OuterLoop = vec2S1RealSize / this->repeatMaxTimes;
     int32_t s1OuterRemain = vec2S1RealSize % this->repeatMaxTimes;
 
@@ -702,10 +736,10 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
     LocalTensor<T>& bmm2Res, LocalTensor<T>& sumTensor, int32_t s1OuterLoop, int32_t s1OuterRemain,
     BinaryRepeatParams repeatParams)
 {
-    int64_t bmm2LoopMaxSize = this->repeatMaxTimes * this->dSizeAlign16;
+    int64_t bmm2LoopMaxSize = this->repeatMaxTimes * this->d2SizeAlign16;
     int64_t softmaxSumMaxSize = this->repeatMaxTimes * 8;
-    int32_t innerLoop = this->dSizeAlign16 / this->repeatMaxSize;
-    int32_t innerRemain = this->dSizeAlign16 % this->repeatMaxSize;
+    int32_t innerLoop = this->d2SizeAlign16 / this->repeatMaxSize;
+    int32_t innerRemain = this->d2SizeAlign16 % this->repeatMaxSize;
     LocalTensor<T> bmm2ResPongUb = this->stage1PongBuf.template Get<T>();
     for (int32_t i = 0; i < s1OuterLoop; ++i) {
         auto bmm2ResTmp = bmm2Res[i * bmm2LoopMaxSize];
@@ -752,25 +786,36 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
     AscendC::WaitFlag<HardEvent::V_MTE3>(eventIdVToMte3);
 
     DataCopyParams dataCopyParams;
-    dataCopyParams.blockLen = dSize * sizeof(INPUT_T);
+    dataCopyParams.blockLen = d2Size * sizeof(INPUT_T);
     dataCopyParams.srcStride = 0;
     if constexpr (IsSameType<INPUT_T, float>::value) {
-        if (this->dSizeAlign16 - this->dSize >= this->blockSize) {
+        if (this->d2SizeAlign16 - this->d2Size >= this->blockSize) {
             dataCopyParams.srcStride = 1;
         }
     }
     int64_t dstStride = 0;
-    int64_t attenOutOffset = dSize;
+    int64_t attenOutOffset = d2Size;
     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_BSH) {
-        attenOutOffset = this->n2GD;
+        attenOutOffset = this->n2GD2;
         dstStride = (this->n2G - 1) * dataCopyParams.blockLen;
     } else if constexpr (layOutType == LayOutTypeEnum::LAYOUT_SBH) {
-        attenOutOffset = this->bN2GD;
+        attenOutOffset = this->bN2GD2;
         dstStride = (this->bN2G - 1) * dataCopyParams.blockLen;
     }
 
     // dataCopyParams.dstStride类型定义uint16_t，65535是其最大值
-    int64_t gmOffset = extraInfo.qCoreOffset + vec2S1Idx * extraInfo.vec2S1BaseSize * attenOutOffset;
+    int64_t outCoreOffset = 0;
+    if constexpr (layOutType == LayOutTypeEnum::LAYOUT_BSH) {
+        outCoreOffset = extraInfo.boIdx * this->n2GS1D2 + extraInfo.s1oIdx * this->s1BaseN2GD2 +
+                        extraInfo.n2oIdx * this->gD2 + extraInfo.goIdx * d2Size;
+    } else if constexpr (layOutType == LayOutTypeEnum::LAYOUT_SBH) {
+        outCoreOffset = extraInfo.s1oIdx * this->s1BaseBN2GD2 + extraInfo.boIdx * this->n2GD2 +
+                        extraInfo.n2oIdx * this->gD2 + extraInfo.goIdx * d2Size;
+    } else if constexpr (layOutType == LayOutTypeEnum::LAYOUT_BNSD) {
+        outCoreOffset = extraInfo.boIdx * this->n2GS1D2 + extraInfo.n2oIdx * this->gS1D2 +
+                        extraInfo.goIdx * this->s1D2 + extraInfo.s1oIdx * this->s1BaseD2;
+    }
+    int64_t gmOffset = outCoreOffset + vec2S1Idx * extraInfo.vec2S1BaseSize * attenOutOffset;
     if (likely(dstStride <= 65535)) {
         dataCopyParams.blockCount = divCastCalcSize;
         dataCopyParams.dstStride = static_cast<uint16_t>(dstStride);
@@ -778,15 +823,15 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
     } else {
         dataCopyParams.blockCount = 1;
         dataCopyParams.dstStride = 0;
-        int64_t datacopyOffset = dSize;
+        int64_t datacopyOffset = d2Size;
         if constexpr (layOutType == LayOutTypeEnum::LAYOUT_BSH) {
-            datacopyOffset = this->n2GD;
+            datacopyOffset = this->n2GD2;
         } else if constexpr (layOutType == LayOutTypeEnum::LAYOUT_SBH) {
-            datacopyOffset = this->bN2G * dSize;
+            datacopyOffset = this->bN2G * d2Size;
         }
 
         for (uint32_t i = 0; i < divCastCalcSize; ++i) {
-            DataCopyPad(this->attentionOutGm[gmOffset + i * datacopyOffset], attentionOut[i * this->dSizeAlign16],
+            DataCopyPad(this->attentionOutGm[gmOffset + i * datacopyOffset], attentionOut[i * this->d2SizeAlign16],
                         dataCopyParams);
         }
     }
@@ -825,17 +870,17 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
     int64_t gOffset = extraInfo.goIdx * this->tilingData->inputParams.s1Size * this->fp32BaseSize;
     int64_t s1Offset = extraInfo.s1oIdx * s1BaseSize * this->fp32BaseSize;
     int64_t sumGmOffset = bOffset + n2Offset + gOffset + s1Offset;
-    int64_t vec2S1DNormalSize = extraInfo.vec2S1BaseSize * this->dSize;
-    int64_t vec2S1DNormalSize1 = extraInfo.vec2S1BaseSize * this->dSizeAlign16;
-    int64_t totalSize = extraInfo.s1RealSize * this->dSize;
-    int64_t totalSize1 = extraInfo.s1RealSize * this->dSizeAlign16;
+    int64_t vec2S1DNormalSize = extraInfo.vec2S1BaseSize * this->d2Size;
+    int64_t vec2S1DNormalSize1 = extraInfo.vec2S1BaseSize * this->d2SizeAlign16;
+    int64_t totalSize = extraInfo.s1RealSize * this->d2Size;
+    int64_t totalSize1 = extraInfo.s1RealSize * this->d2SizeAlign16;
     for (int64_t vec2S1Idx = 0; vec2S1Idx < vec2LoopLimit; ++vec2S1Idx) {
         int64_t divCastCalcSize = 0;
         int64_t divCastCalcSize1 = 0;
         int64_t mm2ResOffset = 0;
         if (extraInfo.s1RealSize < extraInfo.vec2S1BaseSize) {
             divCastCalcSize = totalSize;
-            divCastCalcSize1 = extraInfo.s1RealSize * this->dSizeAlign16;
+            divCastCalcSize1 = extraInfo.s1RealSize * this->d2SizeAlign16;
             mm2ResOffset = 0;
         } else {
             mm2ResOffset = vec2S1Idx * vec2S1DNormalSize;
@@ -843,21 +888,20 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
             divCastCalcSize1 = Min(vec2S1DNormalSize1, totalSize1 - vec2S1Idx * vec2S1DNormalSize1);
         }
 
-        int64_t s1RealSizeInLoop = divCastCalcSize1 / this->dSizeAlign16;
+        int64_t s1RealSizeInLoop = divCastCalcSize1 / this->d2SizeAlign16;
         int64_t sumInnerSize = s1RealSizeInLoop * this->fp32BaseSize;
         int64_t sumGmOffsetLoop = sumGmOffset + vec2S1Idx * extraInfo.vec2S1BaseSize * this->fp32BaseSize;
-        int64_t dAlign8 = (this->dSize + 7) / 8 * 8;
         if (vec2S1Idx > 0) {
             AscendC::WaitFlag<HardEvent::V_MTE2>(eventIdVToMte2);
         }
-        if (likely(this->dSizeAlign16 == this->dSize)) {
+        if (likely(this->d2SizeAlign16 == this->d2Size)) {
             DataCopy(bmm2ResPingUb, this->mm2Res[extraInfo.taskIdMod2][mm2ResOffset], divCastCalcSize);
         } else {
             Nz2NdInfo nz2NdInfo;
             nz2NdInfo.ndFirstAxisRealSize = extraInfo.s1RealSize;
             nz2NdInfo.ndFirstAxisBaseSize = extraInfo.vec2S1BaseSize;
             nz2NdInfo.ndFirstAxisLoopSize = s1RealSizeInLoop;
-            nz2NdInfo.ndLastAxis = this->dSizeAlign16;
+            nz2NdInfo.ndLastAxis = this->d2SizeAlign16;
             nz2NdInfo.loopIdx = vec2S1Idx;
             event_t eventIdVToMTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
             AscendC::SetFlag<HardEvent::V_MTE2>(eventIdVToMTE2);
@@ -961,7 +1005,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
         }
 
         if (taskId > 1) {
-            if (likely(this->dSizeAlign16 == this->dSize)) {
+            if (likely(this->d2SizeAlign16 == this->d2Size)) {
                 WaitBmm2Result(this->bmm2);
             } else {
                 WaitBmm2Result(this->bmm2Nz);
@@ -970,7 +1014,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
         if (taskId > 0 && notLast) {
             AscendC::WaitFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMte2);
-            if (likely(this->dSizeAlign16 == this->dSize)) {
+            if (likely(this->d2SizeAlign16 == this->d2Size)) {
                 this->IterateBmm2(extraInfo[(taskId + 2) % 3], this->bmm2);
             } else {
                 this->IterateBmm2(extraInfo[(taskId + 2) % 3], this->bmm2Nz);
@@ -1758,23 +1802,23 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
 
     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_BSH) {
         // BSH/BSND
-        bOffset = extraInfo.boIdx * this->n2S2D;
-        s2Offset = extraInfo.s2StartIdx * this->n2D;
-        n2Offset = extraInfo.n2oIdx * dSize;
+        bOffset = extraInfo.boIdx * this->n2S2D2;
+        s2Offset = extraInfo.s2StartIdx * this->n2D2;
+        n2Offset = extraInfo.n2oIdx * d2Size;
     } else if constexpr (layOutType == LayOutTypeEnum::LAYOUT_SBH) {
         // SBH/SBND
-        s2Offset = extraInfo.s2StartIdx * this->bN2D;
-        bOffset = extraInfo.boIdx * this->n2D;
-        n2Offset = extraInfo.n2oIdx * dSize;
+        s2Offset = extraInfo.s2StartIdx * this->bN2D2;
+        bOffset = extraInfo.boIdx * this->n2D2;
+        n2Offset = extraInfo.n2oIdx * d2Size;
     } else if constexpr (layOutType == LayOutTypeEnum::LAYOUT_BNSD) {
         // BNSD
-        bOffset = extraInfo.boIdx * this->n2S2D;
-        n2Offset = extraInfo.n2oIdx * this->s2D;
-        s2Offset = extraInfo.s2StartIdx * dSize;
+        bOffset = extraInfo.boIdx * this->n2S2D2;
+        n2Offset = extraInfo.n2oIdx * this->s2D2;
+        s2Offset = extraInfo.s2StartIdx * d2Size;
     }
     int64_t vCoreOffset = bOffset + n2Offset + s2Offset;
     if (extraInfo.s1RealSize != lastVec2S1RealSize || this->tilingData->inputParams.sparseType > 0) {
-        bmm2.SetOrgShape(extraInfo.s1RealSize, mm2Kb, extraInfo.s2RealSizeAlign16, mm2Kb, dSize);
+        bmm2.SetOrgShape(extraInfo.s1RealSize, mm2Kb, extraInfo.s2RealSizeAlign16, mm2Kb, d2Size);
         lastVec2S1RealSize = extraInfo.s1RealSize;
     }
     bmm2.SetTensorA(this->stage1Res[extraInfo.taskIdMod2]);
@@ -1784,19 +1828,19 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
         if (extraInfo.taskId == 0 || n2Offset != bmm2N2OffsetLast || bOffset != bmm2BOffsetLast) {
             bmm2N2OffsetLast = n2Offset;
             bmm2BOffsetLast = bOffset;
-            CopyToL1(this->valueGm[vCoreOffset], valueScmTensor, this->tilingData->inputParams.s2Size, dSize,
+            CopyToL1(this->valueGm[vCoreOffset], valueScmTensor, this->tilingData->inputParams.s2Size, d2Size,
                      srcDValue);
         }
         int64_t vCoreOffsetL1 = s2Offset;
         bmm2.SetTensorB(valueScmTensor[vCoreOffsetL1]);
-        bmm2.SetTail(extraInfo.s1RealSize, this->tilingData->inputParams.dSize, extraInfo.s2RealSize);
+        bmm2.SetTail(extraInfo.s1RealSize, this->tilingData->coreParams.d2Size, extraInfo.s2RealSize);
         valueScm.FreeTensor(valueScmTensor);
     } else {
         bmm2.SetTensorB(this->valueGm[vCoreOffset]);
     }
 
     // 通过extraInfo.s2RealSize来限制一次计算的大小
-    bmm2.SetTail(extraInfo.s1RealSize, this->tilingData->inputParams.dSize, extraInfo.s2RealSize);
+    bmm2.SetTail(extraInfo.s1RealSize, this->tilingData->coreParams.d2Size, extraInfo.s2RealSize);
     if constexpr (enableL1Reuse) {
         bmm2.template IterateAll<false>(this->mm2Res[extraInfo.taskIdMod2], false, false, true, extraInfo.lastNotPair);
     } else {
