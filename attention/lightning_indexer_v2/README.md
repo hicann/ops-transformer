@@ -69,14 +69,14 @@
     <tr>
     <td>cuSeqlensQOptional</td>
     <td>输入</td>
-    <td>当前Batch及前序Batch中q的有效token数的累加和</td>
+    <td>Q为TND时为各Batch有效token数的累计和；Q为BSND时为[0, 各样本有效Q长度]，长度各自不超过S1</td>
     <td>INT32</td>
     <td>ND</td>
     </tr>
     <tr>
     <td>cuSeqlensKOptional</td>
     <td>输入</td>
-    <td>当前Batch及前序Batch中k的有效token数的累加和。</td>
+    <td>K为TND时为各Batch有效token数的累计和；K为BSND时不支持传入该参数。</td>
     <td>INT32</td>
     <td>ND</td>
     </tr>
@@ -199,10 +199,17 @@
 - 参数q、k的数据类型应保持一致。
 - sparseIndices无效部分填-1；sparseValues无效部分填-inf。
 - 传入的cmpResidualKOptional中的每一个元素的值都应小于传入的压缩率cmpRatio。
+- 确定性计算与batch一致性：
+  - 默认确定性实现，相同输入多次调用结果一致。
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。也可通过`torch_npu.npu.set_deterministic_level(3)`设置。
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>:
   - topk取值范围当前仅支持[1, 2048]，以及3072、4096、5120、6144、7168、8192。
   - 当前不支持sequsedQOptional、outputIdxOffsetOptional、maxSeqlenQ功能，不建议传入这些参数。
-  - 当传入的参数layoutK为PA_BBND时，必须传入sequsedKOptional；当layoutK不为PA_BBND时，不支持sequsedKOptional功能，不建议传入该参数。
+  - Q为BSND时，cuSeqlensQOptional可选；不传使用S1，传入格式为[0, 各样本有效Q长度…]，长度各自不超过S1。
+  - Q为TND时，cuSeqlensQOptional必传，使用累计长度，相邻值之差为样本长度。
+  - K为BSND时，cuSeqlensKOptional不传；sequsedKOptional可选，不传使用S2，传入使用各样本有效K长度。
+  - K为TND时，cuSeqlensKOptional必传，使用累计长度，相邻值之差为样本长度。
+  - 当传入的参数layoutK为PA_BBND时，必须传入sequsedKOptional。
 - <term>Ascend 950PR&950DT系列产品</term>:
   - 当传入的参数layoutQ为BSND时，不支持传入cuSeqlensQOptional；当layoutK为BSND或PA_BBND时，不支持传入cuSeqlensKOptional。
   - 当传入参数outputIdxOffsetOptional时，只支持大于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparseIndice值不超过INT32的最大值。

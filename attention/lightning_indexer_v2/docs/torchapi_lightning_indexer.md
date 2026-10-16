@@ -124,8 +124,8 @@ cann_ops_transformer.lightning_indexer(
 | k | Tensor | 必选 | 公式中的输入K。不支持空tensor。数据格式为ND，支持非连续的Tensor（仅PA_BBND场景下0轴支持非连续）。 | bfloat16、float16 | layout_k为BSND时shape为(b,k_s,k_n,d)；layout_k为TND时shape为(k_t,k_n,d)；layout_k为PA_BBND时shape为(block_num,block_size,k_n,d) |
 | w | Tensor | 必选 | 公式中的输入W。不支持空tensor。数据格式为ND。 | float | layout_q为BSND时shape为(b,q_s,q_n)；layout_q为TND时shape为(q_t,q_n) |
 | topk | int | 必选 | topK阶段需要保留的Key token索引数量，当前支持[1, 8192]。 | int64 | - |
-| cu_seqlens_q | Tensor | 可选 | 当前batch及前序batch中q的有效token数的累加和。仅layout_q为TND场景下必传，第一个值固定为0。数据格式为ND。 | int32 | (b+1,) |
-| cu_seqlens_k | Tensor | 可选 | 当前batch及前序batch中k的有效token数的累加和。仅layout_k为TND场景下必传，第一个值固定为0。数据格式为ND。 | int32 | (b+1,) |
+| cu_seqlens_q | Tensor | 可选 | layout_q为TND时为各batch有效token数的累加和（首元素为0，非递减）；layout_q为BSND时为[0, 各样本有效Q长度]，长度各自不超过q_s。仅TND场景下必传。数据格式为ND。 | int32 | (b+1,) |
+| cu_seqlens_k | Tensor | 可选 | layout_k为TND时为各batch有效token数的累加和（首元素为0，非递减）；layout_k为BSND时不支持传入。仅TND场景下必传。数据格式为ND。 | int32 | (b+1,) |
 | seqused_q | Tensor | 可选 | 不同batch中q的真实使用长度。数据格式为ND。 | int32 | (b,) |
 | seqused_k | Tensor | 可选 | 不同batch中k的真实使用长度。数据格式为ND。 | int32 | (b,) |
 | cmp_residual_k | Tensor | 可选 | 表示k压缩前token数量除以cmp_ratio的余数。需要在mask_mode等于3、cmp_ratio不等于1的场景下使用。数据格式为ND。 | int32 | (b,) |
@@ -156,18 +156,22 @@ cann_ops_transformer.lightning_indexer(
 
 ## 约束说明
 
+- 确定性计算与batch一致性：
+  - 默认确定性实现，相同输入多次调用结果一致。
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：batch一致性：通过`torch_npu.npu.set_deterministic_level(3)`开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
+
 - 该接口支持推理场景下使用。
 - 该接口支持单算子模式和TorchAir（aclgraph）图模式调用。
 - lightning_indexer_metadata接口需与lightning_indexer算子配套使用。
 - b（batch）表示输入样本批量大小。
-- 参数cu_seqlens_q、cu_seqlens_k要求其值为当前batch与前序batch有效token数的累加值，第一个元素必须为0，且后一个元素的值必须大于等于前一个元素的值。
+- 参数cu_seqlens_q在layout_q为TND时要求值为累计数组（首元素为0，非递减）；在layout_q为BSND时要求值为[0, 各样本有效Q长度]，各长度不超过q_s。参数cu_seqlens_k在layout_k为TND时要求值为累计数组（首元素为0，非递减）；在layout_k为BSND时不支持传入。
 - 参数seqused_q、seqused_k要求其值表示每个batch中的有效token数。
 - 参数cmp_residual_k需满足cmp_residual_k\[i\] < cmp_ratio。
 - mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../../docs/zh/context/sparse_mode_introduction.md)。
 - pa_kv_cache支持0轴非连续；pa_block_size支持[16, 1024]，且是16的倍数。
 - 参数q、k的数据类型应保持一致。
 - 该接口的TopK排序过程对NaN排序是未定义行为。
-- 当layout_q为BSND时，不支持传入cu_seqlens_q；当layout_k为BSND或PA_BBND时，不支持传入cu_seqlens_k。
+- 当layout_q为BSND时，<term>Ascend 950PR&950DT系列产品</term>不支持传入cu_seqlens_q；当layout_k为BSND或PA_BBND时，<term>Ascend 950PR&950DT系列产品</term>不支持传入cu_seqlens_k。
 - 当传入的cmp_ratio > 1且mask_mode = 3时，必须传入cmp_residual_k，其余情况不传入。
 - sparse_indices无效部分填-1；sparse_values无效部分填-inf。
 <!-- npu="A3,910b" id7 -->
@@ -176,7 +180,11 @@ cann_ops_transformer.lightning_indexer(
   - 当前lightning_indexer接口不支持seqused_q、output_idx_offset、max_seqlen_q功能，不建议传入这些参数。
   - 支持num_heads_q = 1~64、q_n = 1~64。
   - layout_k支持BSND、TND、PA_BBND；非PA_BBND场景下layout_q和layout_k必须一致。
-  - layout_k为PA_BBND时必须传入seqused_k；为BSND或TND时可选传入。
+  - layout_k为PA_BBND时必须传入seqused_k；为BSND时可选，不传使用S2，传入使用各样本有效K长度。
+  - Q为BSND时，cu_seqlens_q可选；不传使用S1，传入格式为[0, 各样本有效Q长度…]，长度各自不超过S1。
+  - Q为TND时，cu_seqlens_q必传，使用累计长度，相邻值之差为样本长度。
+  - K为BSND时，cu_seqlens_k不传。
+  - K为TND时，cu_seqlens_k必传，使用累计长度，相邻值之差为样本长度。
   - cmp_ratio支持[1, 128]。
   - 支持return_value功能，0代表不返回对应值，1代表返回FLOAT32类型的sparse_values。
 <!-- end id7 -->

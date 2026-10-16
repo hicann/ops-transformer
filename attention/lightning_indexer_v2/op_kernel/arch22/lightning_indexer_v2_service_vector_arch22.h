@@ -48,7 +48,8 @@ public:
 
     __aicore__ inline LightningIndexerV2ServiceVector() {}
     __aicore__ inline void ProcessVec(const LIV2Common::RunInfo& info);
-    __aicore__ inline void ProcessLD();
+    __aicore__ inline void ProcessLD(uint32_t fixedMergeCoreNum = 0U, uint32_t fixedS1ProcNum = 0U,
+                                     uint64_t fixedOutOffset = 0ULL);
     __aicore__ inline void InitBuffers(TPipe* pipe);
     __aicore__ inline void InitParams(const struct LIV2Common::ConstInfo& constInfo,
                                       const LIV2TilingData* __restrict tilingData);
@@ -128,7 +129,9 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::InitBuffers(TPipe* 
     pipe->InitBuffer(indexBuf_, s2BaseSize_ * sizeof(int32_t));                           // 2KB
     pipe->InitBuffer(reduceOutBuf_, s2BaseSize_ * 3 * sizeof(float));                     // 6KB
     pipe->InitBuffer(brcBuf_, groupInner_ * 8 * sizeof(float));
-    pipe->InitBuffer(paramBuf_, LD_PARAM_NUM * sizeof(int64_t));
+    if (!constInfo_.batchInvariant) {
+        pipe->InitBuffer(paramBuf_, LD_PARAM_NUM * sizeof(int64_t));
+    }
 
     //
     tmpUb_ = tmpBuf_.Get<float>();
@@ -141,20 +144,21 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::InitBuffers(TPipe* 
     // step1. 初始化一个有序索引 0 - s2BaseSize_
     ArithProgression<int32_t>(globalTopkIndice_, 0, 1, s2BaseSize_);
     // step2. globalTopkUb_ [CeilDiv(s1BaseSize_, 2), BASE_TOPK, 2]   -inf,-1
-    InitSortOutBuf(globalTopkUb_, CeilDiv(s1BaseSize_, 2) * virTopK * 2);
-
-    // step3. 初始化vec1ParamGm，是否进行LD的标志位设为-1(needFd=-1)
-    // vec1ResIn32Gm = [aic, 2, s1BaseSize_, 16] int32
-    // ws清零 [needFd, s2AcSeq, s2Start, s2End, isS2End, bn2idx, s1Idx, ......]
-    LocalTensor<float> tmpfBuff = outQueue_.AllocTensor<float>();
-    Duplicate(tmpfBuff.template ReinterpretCast<int32_t>(), -1, 2 * (s1BaseSize_ / 2) * paramNum_ * 2);
-    SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
-    int64_t wsInfoOffset = (blockId_ / 2) * s1BaseSize_ * 2 * paramNum_ +      // 2个AIV共同地址偏移
-                           (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * paramNum_; // 每个AIV的地址偏移，S1方向
-    DataCopyPad(vec1ParamGm[wsInfoOffset], tmpfBuff.template ReinterpretCast<int64_t>(),
-                {1, static_cast<uint16_t>((s1BaseSize_ / 2) * 2 * paramNum_ * sizeof(int64_t)), 0, 0});
-    SetWaitFlag<HardEvent::MTE3_V>(HardEvent::MTE3_V);
-    outQueue_.FreeTensor(tmpfBuff);
+    if (!constInfo_.batchInvariant) {
+        InitSortOutBuf(globalTopkUb_, CeilDiv(s1BaseSize_, 2) * virTopK * 2);
+        // step3. 初始化vec1ParamGm，是否进行LD的标志位设为-1(needFd=-1)
+        // vec1ResIn32Gm = [aic, 2, s1BaseSize_, 16] int32
+        // ws清零 [needFd, s2AcSeq, s2Start, s2End, isS2End, bn2idx, s1Idx, ......]
+        LocalTensor<float> tmpfBuff = outQueue_.AllocTensor<float>();
+        Duplicate(tmpfBuff.template ReinterpretCast<int32_t>(), -1, 2 * (s1BaseSize_ / 2) * paramNum_ * 2);
+        SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
+        int64_t wsInfoOffset = (blockId_ / 2) * s1BaseSize_ * 2 * paramNum_ +      // 2个AIV共同地址偏移
+                               (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * paramNum_; // 每个AIV的地址偏移，S1方向
+        DataCopyPad(vec1ParamGm[wsInfoOffset], tmpfBuff.template ReinterpretCast<int64_t>(),
+                    {1, static_cast<uint16_t>((s1BaseSize_ / 2) * 2 * paramNum_ * sizeof(int64_t)), 0, 0});
+        SetWaitFlag<HardEvent::MTE3_V>(HardEvent::MTE3_V);
+        outQueue_.FreeTensor(tmpfBuff);
+    }
 }
 
 template <typename LIT>
@@ -248,7 +252,7 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessVec(const LI
     int32_t cuBaseS2Idx = info.s2Idx * s2BaseSize_;
 
     // 计算基本块基地址偏移 偶数循环 -> 0 + aic_offset  奇数循环 -> mBaseSizeAlign*s2BaseSize + aic_offset
-    int64_t mmGmOffset = (info.loop % 2) * (constInfo_.mBaseSizeAlign * s2BaseSize_);
+    int64_t mmGmOffset = (info.mm1ResLoop % 2) * (constInfo_.mBaseSizeAlign * s2BaseSize_);
     // (B,S1,N1,1);(T,N1,1) -> (B,S1,N2,G,1) 当前只切分到S1轴
     int64_t weightGmOffset = info.tensorWeightsOffset + cuBaseS1Idx * kHeadNum_ * gSize_;
 
@@ -268,11 +272,12 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessVec(const LI
     // cut G
     int32_t outerG = CeilDiv(gSize_, groupInner_);
 
-    // 非首个基本块, M(S1)轴发生切换需要初始化
-    if (info.loop != 0 && info.s2Idx == 0) {
+    // BatchInvariant的每个logical task显式重置TopK状态；普通算子保持原有状态切换方式。
+    bool startNewTask = constInfo_.batchInvariant ? info.isFirstS2InnerLoop : (info.loop != 0 && info.s2Idx == 0);
+    if (startNewTask) {
         // globalTopkUb_ value,index=-inf,-1
         InitSortOutBuf(globalTopkUb_, CeilDiv(s1BaseSize_, 2) * virTopK * 2);
-        blockS2StartIdx_ = 0;
+        blockS2StartIdx_ = info.s2Idx;
     } else if (info.loop == 0) {
         blockS2StartIdx_ = info.s2Idx;
     }
@@ -433,27 +438,9 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessVec(const LI
                 }
             } else if (needCopyWsGm) {
                 // vec1Res Gm = [aic, s1BaseSize_, 2, 2, topkOut_] float32
-                // vec1Param Gm = [aic, s1BaseSize_, 2, 16] int64
-                //     16 = [needFd, s2AcSeq, s2Start, s2End, isS2End, bn2idx, s1Idx, S1ProcNum, ......]
-
                 int64_t wsOffset = (blockId_ / 2) * s1BaseSize_ * 2 * 2 * BASE_TOPK + // 2个AIV共同地址偏移
                                    (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * 2 * BASE_TOPK + // 每个AIV的地址偏移，S1方向
                                    (ldS1Offset + innerS1Idx) * 2 * 2 * BASE_TOPK;
-                int64_t wsInfoOffset = (blockId_ / 2) * s1BaseSize_ * 2 * paramNum_ + // 2个AIV共同地址偏移
-                                       (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * paramNum_ + // 每个AIV的地址偏移，S1方向
-                                       (ldS1Offset + innerS1Idx) * 2 * paramNum_;
-
-                LocalTensor<int64_t> tmpiBuff = paramBuf_.Get<int64_t>();
-                SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);
-                tmpiBuff.SetValue(0, static_cast<int64_t>(1));
-                tmpiBuff.SetValue(1, static_cast<int64_t>(cuRealAcSeq));
-                tmpiBuff.SetValue(2, static_cast<int64_t>(blockS2StartIdx_));
-                tmpiBuff.SetValue(3, static_cast<int64_t>(cuBaseS2Idx + cuS2Len));
-                tmpiBuff.SetValue(4, static_cast<int64_t>(isS2End));
-                tmpiBuff.SetValue(5, static_cast<int64_t>(info.bN2Idx));
-                tmpiBuff.SetValue(6, static_cast<int64_t>(cuS1Idx));
-                tmpiBuff.SetValue(7, static_cast<int64_t>(cuS1ProcNum));
-                tmpiBuff.SetValue(8, static_cast<int64_t>(info.indiceOutOffset + cuS1Idx * constInfo_.sparseCount));
                 // 写入头尾判断
                 // [head, tail]
                 // head: 与前面规约，与前后规约
@@ -463,11 +450,32 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessVec(const LI
                 // 跟前面块做规约 写到0偏移 不用做计算 blockS2StartIdx_ == 0 and !isS2End
                 // 跟后面块做规约 写到1偏移  需要 + s1BaseSize_, BASE_TOPK*2
                 if (isTailReduce) { // S2不是最后结束的数据就需要往后做规约，放入第二块ws
-                    wsInfoOffset += paramNum_;
                     wsOffset += 2 * BASE_TOPK;
                 }
-                SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
-                LIServiceVec::CopyOut(vec1ParamGm[wsInfoOffset], tmpiBuff, 16);
+
+                // BatchInvariant由固定wave拓扑驱动LD，仅需写入各partition的TopK结果。
+                if (!constInfo_.batchInvariant) {
+                    // vec1Param Gm = [aic, s1BaseSize_, 2, 16] int64
+                    //     16 = [needFd, s2AcSeq, s2Start, s2End, isS2End, bn2idx, s1Idx, S1ProcNum, ......]
+                    int64_t wsInfoOffset =
+                        (blockId_ / 2) * s1BaseSize_ * 2 * paramNum_ +       // 2个AIV共同地址偏移
+                        (blockId_ % 2) * (s1BaseSize_ / 2) * 2 * paramNum_ + // 每个AIV的地址偏移，S1方向
+                        (ldS1Offset + innerS1Idx) * 2 * paramNum_ + (isTailReduce ? paramNum_ : 0);
+
+                    LocalTensor<int64_t> tmpiBuff = paramBuf_.Get<int64_t>();
+                    SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);
+                    tmpiBuff.SetValue(0, static_cast<int64_t>(1));
+                    tmpiBuff.SetValue(1, static_cast<int64_t>(cuRealAcSeq));
+                    tmpiBuff.SetValue(2, static_cast<int64_t>(blockS2StartIdx_));
+                    tmpiBuff.SetValue(3, static_cast<int64_t>(cuBaseS2Idx + cuS2Len));
+                    tmpiBuff.SetValue(4, static_cast<int64_t>(isS2End));
+                    tmpiBuff.SetValue(5, static_cast<int64_t>(info.bN2Idx));
+                    tmpiBuff.SetValue(6, static_cast<int64_t>(cuS1Idx));
+                    tmpiBuff.SetValue(7, static_cast<int64_t>(cuS1ProcNum));
+                    tmpiBuff.SetValue(8, static_cast<int64_t>(info.indiceOutOffset + cuS1Idx * constInfo_.sparseCount));
+                    SetWaitFlag<HardEvent::S_MTE3>(HardEvent::S_MTE3);
+                    LIServiceVec::CopyOut(vec1ParamGm[wsInfoOffset], tmpiBuff, 16);
+                }
                 SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
                 LIServiceVec::CopyOut(vec1ResGm[wsOffset], globalTopkUb_[innerS1Idx * BASE_TOPK * 2], 2 * BASE_TOPK);
                 SetWaitFlag<HardEvent::MTE3_V>(HardEvent::MTE3_V);
@@ -509,7 +517,8 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessVec(const LI
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessLD()
+__aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessLD(uint32_t fixedMergeCoreNum,
+                                                                       uint32_t fixedS1ProcNum, uint64_t fixedOutOffset)
 {
     int32_t curCubeId = blockId_ / 2;
     int32_t tmpCubeId = curCubeId;
@@ -538,12 +547,18 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessLD()
     // 每个核都忽略自己的头规约，因为必然由前面的核做完
     uint32_t s1LdStartIdx = 0;
     uint32_t s1ProcNum = 0;
-    uint64_t paramGmCoreOffset = tmpCubeId * s1BaseSize_ * 2 * paramNum_;
-    for (uint32_t innerS1Idx = 0; innerS1Idx < s1BaseSize_; innerS1Idx++) {
-        needFd = vec1ParamGm.GetValue(paramGmCoreOffset + innerS1Idx * 2 * paramNum_ + paramNum_);
-        if (needFd == 1) {
-            s1LdStartIdx = (s1ProcNum == 0) ? innerS1Idx : s1LdStartIdx;
-            s1ProcNum++;
+    if (fixedMergeCoreNum > 0) {
+        // BatchInvariant路径由调度器提供固定partition数和S1范围；普通路径仍使用原metadata扫描。
+        s1ProcNum = fixedS1ProcNum;
+        s1LdStartIdx = s1BaseSize_ / 2 - CeilDiv(s1ProcNum, 2U);
+    } else {
+        uint64_t paramGmCoreOffset = tmpCubeId * s1BaseSize_ * 2 * paramNum_;
+        for (uint32_t innerS1Idx = 0; innerS1Idx < s1BaseSize_; innerS1Idx++) {
+            needFd = vec1ParamGm.GetValue(paramGmCoreOffset + innerS1Idx * 2 * paramNum_ + paramNum_);
+            if (needFd == 1) {
+                s1LdStartIdx = (s1ProcNum == 0) ? innerS1Idx : s1LdStartIdx;
+                s1ProcNum++;
+            }
         }
     }
 
@@ -552,6 +567,7 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessLD()
     }
 
     // S1逐行计算
+    uint32_t taskS1LdStartIdx = s1LdStartIdx;
     uint32_t s1VecNum = CeilDiv(s1ProcNum, 2);
     if (blockId_ % 2 == 1) {
         s1LdStartIdx = s1LdStartIdx + s1VecNum;
@@ -575,13 +591,20 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessLD()
 
         // 获取下一个核规约信息
         tmpCubeId++;
-        wsInfoOffset = tmpCubeId * s1BaseSize_ * 2 * paramNum_ + innerS1Idx * 2 * paramNum_;
-        needFd = vec1ParamGm.GetValue(wsInfoOffset);
-        isS2End = vec1ParamGm.GetValue(wsInfoOffset + 4);
-        s1Idx = vec1ParamGm.GetValue(wsInfoOffset + 6);
-        outOffset = vec1ParamGm.GetValue(wsInfoOffset + 8);
+        uint32_t mergeCoreIdx = 1U;
+        if (fixedMergeCoreNum > 0) {
+            needFd = 1;
+            isS2End = 0;
+            outOffset = fixedOutOffset + (innerS1Idx - taskS1LdStartIdx) * constInfo_.sparseCount;
+        } else {
+            wsInfoOffset = tmpCubeId * s1BaseSize_ * 2 * paramNum_ + innerS1Idx * 2 * paramNum_;
+            needFd = vec1ParamGm.GetValue(wsInfoOffset);
+            isS2End = vec1ParamGm.GetValue(wsInfoOffset + 4);
+            s1Idx = vec1ParamGm.GetValue(wsInfoOffset + 6);
+            outOffset = vec1ParamGm.GetValue(wsInfoOffset + 8);
+        }
 
-        while (needFd == 1) {
+        while (fixedMergeCoreNum > 0 ? mergeCoreIdx < fixedMergeCoreNum : needFd == 1) {
             // 搬入头规约数据
             wsOffset = tmpCubeId * s1BaseSize_ * 2 * 2 * BASE_TOPK + // 2个AIV共同地址偏移
                        innerS1Idx * 2 * 2 * BASE_TOPK;
@@ -619,14 +642,17 @@ __aicore__ inline void LightningIndexerV2ServiceVector<LIT>::ProcessLD()
             }
 
             // reduce到S2末尾，则跳出
-            if (isS2End == 1) {
+            if (fixedMergeCoreNum == 0 && isS2End == 1) {
                 break;
             }
 
             tmpCubeId++;
-            wsInfoOffset = tmpCubeId * s1BaseSize_ * 2 * paramNum_ + innerS1Idx * 2 * paramNum_;
-            needFd = vec1ParamGm.GetValue(wsInfoOffset);
-            isS2End = vec1ParamGm.GetValue(wsInfoOffset + 4);
+            mergeCoreIdx++;
+            if (fixedMergeCoreNum == 0) {
+                wsInfoOffset = tmpCubeId * s1BaseSize_ * 2 * paramNum_ + innerS1Idx * 2 * paramNum_;
+                needFd = vec1ParamGm.GetValue(wsInfoOffset);
+                isS2End = vec1ParamGm.GetValue(wsInfoOffset + 4);
+            }
         }
 
         // mrg不足4个list的数据

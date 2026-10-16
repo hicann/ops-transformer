@@ -41,7 +41,8 @@ struct LIV2Type {
 };
 
 struct RunInfo {
-    uint32_t loop;
+    uint32_t loop;       // 当前逻辑任务内的基本块序号
+    uint32_t mm1ResLoop; // mm1ResGm双缓冲的核内连续序号
     uint32_t bN2Idx;
     uint32_t bIdx;
     uint32_t n2Idx = 0;
@@ -100,6 +101,7 @@ struct ConstInfo {
     int64_t preTokens = INT64_MAX;
     int64_t nextTokens = INT64_MAX;
     bool returnValue = false;
+    bool batchInvariant = false;
     int64_t cmpRatio = INT64_MAX;
 
     uint32_t actualLenQDims = 0U;                         // query的actualSeqLength 的维度

@@ -1195,6 +1195,8 @@ ge::graphStatus LightningIndexerV2Tiling::DoTiling(LIV2TilingInfo* tilingInfo)
     tilingData_.set_cmpRatio(tilingInfo->cmpRatio);
     tilingData_.set_keyStride0(tilingInfo->keyStride0);
     tilingData_.set_returnValue(tilingInfo->returnValue);
+    constexpr int32_t BATCH_CONSISTENCY_LEVEL = 3;
+    tilingData_.set_batchInvariant(context_->GetDeterministicLevel() == BATCH_CONSISTENCY_LEVEL ? 1U : 0U);
     tilingData_.set_usedCoreNum(blockDim);
     tilingData_.set_batchSupperFlag(tilingInfo->batchSupperFlag);
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());

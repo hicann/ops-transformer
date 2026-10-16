@@ -37,6 +37,7 @@ public:
     __aicore__ inline void InitParams(const ConstInfo& constInfo);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
+    __aicore__ inline void ResetLogicalTaskState();
     __aicore__ inline void ComputeMm1(const LIV2Common::RunInfo& runInfo);
 
     static constexpr IsResetLoad3dConfig LOAD3DV2_CONFIG = {true, true}; // isSetFMatrix isSetPadding;
@@ -110,6 +111,15 @@ template <typename LIT>
 __aicore__ inline void LightningIndexerV2ServiceCube<LIT>::InitParams(const ConstInfo& constInfo)
 {
     constInfo_ = constInfo;
+}
+
+template <typename LIT>
+__aicore__ inline void LightningIndexerV2ServiceCube<LIT>::ResetLogicalTaskState()
+{
+    keyL1BufIdx_ = 0;
+    queryL1Mte2BufIdx_ = 0;
+    queryL1Mte1BufIdx_ = 0;
+    l0BufIdx_ = 0;
 }
 
 template <typename LIT>
@@ -390,7 +400,7 @@ __aicore__ inline void LightningIndexerV2ServiceCube<LIT>::Fixp(uint64_t s1gGmOf
     intriParams.unitFlag = 0b11; // 3 unitflag
     intriParams.reluPre = 1;
     AscendC::SetFixpipeNz2ndFlag(1, 1, 1);
-    AscendC::DataCopy(mm1ResGm_[(runInfo.loop % 2) * constInfo_.mBaseSizeAlign * constInfo_.s2BaseSize +
+    AscendC::DataCopy(mm1ResGm_[(runInfo.mm1ResLoop % 2) * constInfo_.mBaseSizeAlign * constInfo_.s2BaseSize +
                                 s1gGmOffset * intriParams.dstStride + s2GmOffset],
                       cL0_[(l0BufIdx_ % L0_BUF_NUM) * L0C_BUFFER_OFFSET], intriParams);
 }
