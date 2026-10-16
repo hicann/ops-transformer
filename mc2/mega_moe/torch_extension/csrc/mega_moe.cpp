@@ -467,10 +467,27 @@ constexpr int64_t EXCEPTION_DUMP_REGION_SIZE = 60LL * 1024LL;
 // rankSyncInWorld 同步区
 constexpr int64_t PEERMEM_DATA_OFFSET = 60LL * 1024LL;
 constexpr int64_t PEERMEM_MTE_COUNT_REGION_SIZE = 512LL * 2048LL;
+// 此 JIT 源文件随 wheel 搬移，包中不包含 op_kernel 头文件。下列架构和布局上界须与
+// arch35/common/mega_moe_constants.h、arch35/common/mega_moe_workspace.h 保持一致。
+constexpr int64_t ARCH35_MAX_AIC_NUM = 36LL;
+constexpr int64_t ARCH35_MAX_SHARED_EXPERT_NUM = 4LL;
+constexpr int64_t ARCH35_INT_CACHELINE = 16LL;
+constexpr int64_t ARCH35_MX_SCALE_DIVISOR = 64LL;
+constexpr int64_t ARCH35_MX_MULTI_BASE_SIZE = 2LL;
+constexpr int64_t ARCH35_TILE_M = 256LL;
+constexpr int64_t ARCH35_TILE_N = 256LL;
+constexpr int64_t ARCH35_DEDUP_PREPASS_MAX_CHUNKS = 128LL;
+constexpr int64_t ARCH35_DEDUP_ROW_DESC_HEADER_INT32 = 2LL;
+constexpr int64_t ARCH35_INT32_PER_32B = 8LL;
 
 int64_t CeilAlign(int64_t val, int64_t align)
 {
     return (val + align - 1) / align * align;
+}
+
+int64_t CeilDiv(int64_t val, int64_t divisor)
+{
+    return (val + divisor - 1) / divisor;
 }
 
 int64_t CalcLeastCclBufferSizeA2(int64_t maxRecvTokenNum, int64_t h, int64_t epWorldSize, bool isQuantRouting,
@@ -599,13 +616,205 @@ int64_t CalcUrmaCclBufferSizeA5(int64_t epWorldSize, int64_t moeExpertNum, int64
 
     return dataOffset + maskRecvSize + expertCountRecvSize + relayDataSize + relayFlagSize + combineSendSize;
 }
+
+// 创建 SymmBuffer 时尚未传入具体权重列表，按 WorkspaceLayout 的分配顺序保守预留：
+// A8W4、共享专家独立量化、arch35 核数上界及 4 个共享专家。
+// 根据已知通信模式排除 tiling 不会分配的区域。
+struct CclDataBudget {
+    int64_t epWorldSize;
+    int64_t numMaxTokensPerRank;
+    int64_t numTopk;
+    int64_t hidden;
+    int64_t intermediateHidden;
+    int64_t topkWeightsType;
+    int64_t serverNum;
+    int64_t expertPerRank;
+    int64_t hiddenDim;
+    int64_t maxOutput{0};
+    int64_t wavesPerExpert{0};
+    int64_t sharedTokenGroupCount{0};
+    bool isUrma;
+    bool reserveCombineDedup;
+    bool reserveDedup;
+    bool needsGmm2Ready;
+
+    CclDataBudget(int64_t epWorldSize, int64_t moeExpertNum, int64_t numMaxTokensPerRank, int64_t numTopk,
+                  int64_t hidden, int64_t intermediateHidden, int64_t maxRecvTokenNum, int64_t topkWeightsType,
+                  int64_t serverNum, int64_t combineQuantMode, int64_t combineCommMode)
+        : epWorldSize(epWorldSize),
+          numMaxTokensPerRank(numMaxTokensPerRank),
+          numTopk(numTopk),
+          hidden(hidden),
+          intermediateHidden(intermediateHidden),
+          topkWeightsType(topkWeightsType),
+          serverNum(serverNum),
+          expertPerRank(moeExpertNum / epWorldSize),
+          hiddenDim(intermediateHidden * 2LL),
+          isUrma(serverNum > 0),
+          reserveCombineDedup(!isUrma && combineCommMode == 1),
+          reserveDedup(!isUrma && (numTopk > 1 || reserveCombineDedup)),
+          needsGmm2Ready(combineQuantMode != 0 || reserveCombineDedup)
+    {
+        uint64_t defaultMaxOutputSize =
+            static_cast<uint64_t>(numMaxTokensPerRank) * epWorldSize * std::min(numTopk, expertPerRank);
+        uint64_t maxOutputSize = maxRecvTokenNum == 0 ? defaultMaxOutputSize : static_cast<uint64_t>(maxRecvTokenNum);
+        maxOutput = static_cast<int64_t>(maxOutputSize);
+        wavesPerExpert = CeilDiv(maxOutput, ARCH35_TILE_M);
+        sharedTokenGroupCount = CeilDiv(numMaxTokensPerRank, ARCH35_TILE_M);
+    }
+};
+
+void AccumulateDispatchSize(int64_t& cclDataSize, const CclDataBudget& budget)
+{
+    cclDataSize += CeilAlign(budget.maxOutput * budget.hidden, ALIGN_512);
+    cclDataSize += CeilAlign(
+        budget.maxOutput * CeilDiv(budget.hidden, ARCH35_MX_SCALE_DIVISOR) * ARCH35_MX_MULTI_BASE_SIZE, ALIGN_512);
+
+    // 保留 URMA 的保守权重预算，包含未启用预取的路径。
+    if (budget.isUrma || (budget.reserveCombineDedup && budget.topkWeightsType == 0)) {
+        cclDataSize += CeilAlign(
+            budget.maxOutput * CeilAlign(budget.numTopk * static_cast<int64_t>(sizeof(float)), ALIGN_32), ALIGN_512);
+    }
+}
+
+void AccumulateActivationAndMetadataSize(int64_t& cclDataSize, const CclDataBudget& budget)
+{
+    cclDataSize += CeilAlign(budget.maxOutput * budget.intermediateHidden, ALIGN_512);
+    cclDataSize += CeilAlign(
+        budget.maxOutput * CeilDiv(budget.intermediateHidden, ARCH35_MX_SCALE_DIVISOR) * ARCH35_MX_MULTI_BASE_SIZE,
+        ALIGN_512);
+    int64_t expertRecvTokenCountBytes = budget.isUrma ? budget.expertPerRank * ALIGN_32 * ARCH35_MAX_AIC_NUM :
+                                                        CeilAlign(budget.expertPerRank, ARCH35_INT_CACHELINE) *
+                                                            static_cast<int64_t>(sizeof(int32_t)) * ARCH35_MAX_AIC_NUM;
+    cclDataSize += CeilAlign(expertRecvTokenCountBytes, ALIGN_512);
+    cclDataSize += CeilAlign(budget.maxOutput * ALIGN_32, ALIGN_512);
+}
+
+void AccumulateFlagSize(int64_t& cclDataSize, int64_t slotCount)
+{
+    cclDataSize += static_cast<int64_t>(sizeof(int32_t)) * slotCount * ARCH35_INT_CACHELINE;
+}
+
+void AccumulateSyncSize(int64_t& cclDataSize, const CclDataBudget& budget)
+{
+    // 保持 WorkspaceLayout 的标志位顺序，每个槽位独占一条 64B 缓存行。
+    if (budget.isUrma) {
+        AccumulateFlagSize(cclDataSize, budget.expertPerRank);                         // 激活到 GMM2 的通知。
+        AccumulateFlagSize(cclDataSize, budget.expertPerRank * budget.wavesPerExpert); // 分发到 GMM1 的通知。
+        AccumulateFlagSize(cclDataSize, budget.expertPerRank * ARCH35_MAX_AIC_NUM); // 接收数量元数据就绪通知。
+        AccumulateFlagSize(cclDataSize, ARCH35_MAX_AIC_NUM);                        // GMM 到后处理的通知。
+        int64_t maxTokenGroups = CeilDiv(budget.numMaxTokensPerRank * budget.epWorldSize, ARCH35_TILE_M);
+        int64_t combineSyncSlots = std::max(maxTokenGroups, ARCH35_MAX_AIC_NUM);
+        AccumulateFlagSize(cclDataSize, combineSyncSlots * budget.expertPerRank); // GMM2 到分层合并的通知。
+    } else {
+        AccumulateFlagSize(cclDataSize, budget.expertPerRank * budget.wavesPerExpert); // 激活到 GMM2 的通知。
+        // 共享专家激活到 GMM2 的通知。
+        AccumulateFlagSize(cclDataSize, budget.sharedTokenGroupCount * ARCH35_MAX_SHARED_EXPERT_NUM);
+        AccumulateFlagSize(cclDataSize, budget.expertPerRank * budget.wavesPerExpert); // 分发到 GMM1 的通知。
+        AccumulateFlagSize(cclDataSize, budget.expertPerRank * ARCH35_MAX_AIC_NUM); // 接收数量元数据就绪通知。
+        // topK=1 时收益门必定关闭分发去重；其他情况同时覆盖收益门开启和关闭的结果。
+        if (budget.reserveDedup) {
+            AccumulateFlagSize(cclDataSize, 1LL + budget.epWorldSize * ARCH35_DEDUP_PREPASS_MAX_CHUNKS);
+        }
+        AccumulateFlagSize(cclDataSize, ARCH35_MAX_AIC_NUM); // GMM 到后处理的通知。
+        if (budget.needsGmm2Ready) {
+            AccumulateFlagSize(cclDataSize, budget.expertPerRank * ARCH35_MAX_AIC_NUM);
+        }
+        // 共享专家 GMM2 到最终输出累加的通知。
+        AccumulateFlagSize(cclDataSize, budget.sharedTokenGroupCount * ARCH35_MAX_SHARED_EXPERT_NUM);
+        AccumulateFlagSize(cclDataSize, ARCH35_MAX_AIC_NUM); // 保留已有 AIV1 topK 同步区预算。
+    }
+}
+
+void AccumulateGmmSize(int64_t& cclDataSize, const CclDataBudget& budget)
+{
+    // 依次预留累计计数、A8W4 GMM1 结果和 GMM2 结果；A8W4 覆盖当前最大的路由专家布局。
+    cclDataSize +=
+        CeilAlign(static_cast<int64_t>(sizeof(int32_t)) * budget.expertPerRank * budget.epWorldSize, ALIGN_32) *
+        ARCH35_MAX_AIC_NUM;
+    cclDataSize += static_cast<int64_t>(sizeof(int16_t)) * budget.maxOutput * budget.hiddenDim;
+    if (!budget.isUrma) {
+        // 对齐累计偏移，因此必须包含前面标志位区域的大小。
+        cclDataSize = CeilAlign(cclDataSize, ALIGN_512);
+        cclDataSize += CeilAlign(static_cast<int64_t>(sizeof(int16_t)) * budget.maxOutput * budget.hidden, ALIGN_512);
+    } else {
+        cclDataSize += static_cast<int64_t>(sizeof(int16_t)) * budget.maxOutput * budget.hidden;
+    }
+
+    if (budget.topkWeightsType == 1) {
+        int64_t maxTilesPerExpert =
+            CeilAlign(budget.wavesPerExpert * CeilDiv(budget.hiddenDim, ARCH35_TILE_N), ARCH35_INT_CACHELINE);
+        int64_t statusSlots = budget.expertPerRank * maxTilesPerExpert + 1LL;
+        cclDataSize += CeilAlign(static_cast<int64_t>(sizeof(int32_t)) * statusSlots * ARCH35_INT_CACHELINE, ALIGN_512);
+    }
+}
+
+void AccumulateRoutingAuxSize(int64_t& cclDataSize, const CclDataBudget& budget)
+{
+    if (budget.isUrma) {
+        int64_t alignedRouteCount =
+            CeilAlign(budget.numMaxTokensPerRank * budget.numTopk * static_cast<int64_t>(sizeof(int32_t)), ALIGN_256) /
+            static_cast<int64_t>(sizeof(int32_t));
+        int64_t maskAlignSize = CeilAlign(alignedRouteCount / 8LL, ALIGN_32);
+        cclDataSize += CeilAlign(budget.expertPerRank * budget.epWorldSize * (maskAlignSize + ALIGN_32), ALIGN_512);
+        cclDataSize += CeilAlign(budget.serverNum * (ALIGN_32 + budget.numMaxTokensPerRank * ALIGN_32), ALIGN_512);
+        cclDataSize +=
+            ARCH35_MAX_AIC_NUM * CeilAlign(ARCH35_TILE_M * static_cast<int64_t>(sizeof(uint64_t)), ALIGN_512);
+    } else if (budget.reserveDedup) {
+        int64_t rowDescStride =
+            CeilAlign(ARCH35_DEDUP_ROW_DESC_HEADER_INT32 + 3LL * budget.numTopk, ARCH35_INT32_PER_32B);
+        cclDataSize += CeilAlign(static_cast<int64_t>(sizeof(int32_t)) * rowDescStride * budget.maxOutput, ALIGN_512);
+    }
+}
+
+void AccumulateSharedExpertSize(int64_t& cclDataSize, const CclDataBudget& budget)
+{
+    // 按 arch35 接口上限预留 4 个共享专家，独立量化需要预留 MTE 输入区域。
+    cclDataSize += CeilAlign(static_cast<int64_t>(sizeof(int16_t)) * budget.numMaxTokensPerRank *
+                                 ARCH35_MAX_SHARED_EXPERT_NUM * budget.hidden,
+                             ALIGN_512);
+    cclDataSize += CeilAlign(static_cast<int64_t>(sizeof(int16_t)) * budget.numMaxTokensPerRank *
+                                 ARCH35_MAX_SHARED_EXPERT_NUM * budget.hiddenDim,
+                             ALIGN_512);
+    if (budget.isUrma) {
+        cclDataSize += CeilAlign(budget.numMaxTokensPerRank * budget.hidden, ALIGN_512);
+        cclDataSize += CeilAlign(
+            budget.numMaxTokensPerRank * CeilDiv(budget.hidden, ALIGN_32) * ARCH35_MX_MULTI_BASE_SIZE, ALIGN_512);
+    } else {
+        int64_t sharedRecordBytes =
+            CeilAlign(CeilAlign(budget.hidden, ALIGN_256) + CeilDiv(budget.hidden, ALIGN_32), ALIGN_32);
+        cclDataSize += CeilAlign(budget.numMaxTokensPerRank * sharedRecordBytes, ALIGN_512);
+    }
+    cclDataSize +=
+        CeilAlign(budget.numMaxTokensPerRank * ARCH35_MAX_SHARED_EXPERT_NUM * budget.intermediateHidden, ALIGN_512);
+    cclDataSize +=
+        CeilAlign(budget.numMaxTokensPerRank * ARCH35_MAX_SHARED_EXPERT_NUM *
+                      CeilDiv(budget.intermediateHidden, ARCH35_MX_SCALE_DIVISOR) * ARCH35_MX_MULTI_BASE_SIZE,
+                  ALIGN_512);
+}
+
+int64_t CalcCclDataSizeA5(int64_t epWorldSize, int64_t moeExpertNum, int64_t numMaxTokensPerRank, int64_t numTopk,
+                          int64_t hidden, int64_t intermediateHidden, int64_t maxRecvTokenNum, int64_t topkWeightsType,
+                          int64_t serverNum, int64_t combineQuantMode, int64_t combineCommMode)
+{
+    const CclDataBudget budget(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, intermediateHidden,
+                               maxRecvTokenNum, topkWeightsType, serverNum, combineQuantMode, combineCommMode);
+    int64_t cclDataSize = 0;
+    AccumulateDispatchSize(cclDataSize, budget);
+    AccumulateActivationAndMetadataSize(cclDataSize, budget);
+    AccumulateSyncSize(cclDataSize, budget);
+    AccumulateGmmSize(cclDataSize, budget);
+    AccumulateRoutingAuxSize(cclDataSize, budget);
+    AccumulateSharedExpertSize(cclDataSize, budget);
+    return cclDataSize;
+}
 } // namespace
 
 int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64_t numMaxTokensPerRank, int64_t numTopk,
-                                int64_t hidden, int64_t maxRecvTokenNum, int64_t dispatchQuantMode,
-                                c10::optional<int64_t> dispatchQuantOutDtype, int64_t combineQuantMode,
-                                std::string commAlg, int64_t combineCommMode, int64_t topkWeightsType,
-                                int64_t serverNum)
+                                int64_t hidden, int64_t intermediateHidden, int64_t maxRecvTokenNum,
+                                int64_t dispatchQuantMode, c10::optional<int64_t> dispatchQuantOutDtype,
+                                int64_t combineQuantMode, std::string commAlg, int64_t combineCommMode,
+                                int64_t topkWeightsType, int64_t serverNum)
 {
     TORCH_CHECK(serverNum >= 0, "server_num must be non-negative, but got ", serverNum);
     const char* socName = aclrtGetSocName();
@@ -673,14 +882,21 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
         TORCH_CHECK(maxRecvTokenNum <= maxOutputCapacity,
                     "max_recv_token_num should not exceed the URMA maximum receive token capacity ", maxOutputCapacity,
                     ", but got ", maxRecvTokenNum);
-        return CalcUrmaCclBufferSizeA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden,
-                                       combineQuantMode, topkWeightsType, serverNum);
+        int64_t communicationBufferSize =
+            CalcUrmaCclBufferSizeA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, combineQuantMode,
+                                    topkWeightsType, serverNum);
+        return CeilAlign(communicationBufferSize, ALIGN_512) +
+               CalcCclDataSizeA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, intermediateHidden,
+                                 maxRecvTokenNum, topkWeightsType, serverNum, combineQuantMode, combineCommMode);
     }
     // 与 arch35 host/kernel 的记录带权重段判定同式：tkw=1 或 combine 去重开
-    // 去重位（"dedup"/"dedup_combine"）时记录尾携带 topk 权重段（tkw=0 的 combine 去重在发送端乘权）。
-    int64_t layoutTopkWeights =
-        (topkWeightsType == 1 || combineCommMode == 1 || commAlg == "dedup" || commAlg == "dedup_combine") ? 1 : 0;
-    return CalcMteCclBufferSizeA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, layoutTopkWeights);
+    // Ascend950 不通过 comm_alg 选择去重，仅由 combine_comm_mode 控制合并去重位。
+    int64_t layoutTopkWeights = (topkWeightsType == 1 || combineCommMode == 1) ? 1 : 0;
+    int64_t communicationBufferSize =
+        CalcMteCclBufferSizeA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, layoutTopkWeights);
+    return CeilAlign(communicationBufferSize, ALIGN_512) +
+           CalcCclDataSizeA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, intermediateHidden,
+                             maxRecvTokenNum, topkWeightsType, serverNum, combineQuantMode, combineCommMode);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
@@ -688,9 +904,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
     m.def("npu_mega_moe", &NpuMegaMoe, "npu_mega_moe");
     m.def("get_mega_moe_ccl_buffer_size", &GetMegaMoeCclBufferSize, "get_mega_moe_ccl_buffer_size",
           py::arg("ep_world_size"), py::arg("moe_expert_num"), py::arg("num_max_tokens_per_rank"), py::arg("num_topk"),
-          py::arg("hidden"), py::arg("max_recv_token_num"), py::arg("dispatch_quant_mode"),
-          py::arg("dispatch_quant_out_dtype"), py::arg("combine_quant_mode"), py::arg("comm_alg"),
-          py::arg("combine_comm_mode") = 0, py::arg("topk_weights_type"), py::arg("server_num") = 0);
+          py::arg("hidden"), py::arg("intermediate_hidden"), py::arg("max_recv_token_num"),
+          py::arg("dispatch_quant_mode"), py::arg("dispatch_quant_out_dtype"), py::arg("combine_quant_mode"),
+          py::arg("comm_alg"), py::arg("combine_comm_mode") = 0, py::arg("topk_weights_type"),
+          py::arg("server_num") = 0);
 }
 
 } // namespace op_api

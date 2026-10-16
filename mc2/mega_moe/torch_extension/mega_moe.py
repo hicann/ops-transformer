@@ -280,6 +280,7 @@ class _MegaMoeCclBufferSizeParams:
     num_max_tokens_per_rank: int
     num_topk: int
     hidden: int
+    intermediate_hidden: int
     max_recv_token_num: int
     dispatch_quant_mode: int
     dispatch_quant_out_dtype: Optional[torch.dtype]
@@ -298,6 +299,7 @@ class _MegaMoeCclBufferSizeParams:
             num_max_tokens_per_rank=self.num_max_tokens_per_rank,
             num_topk=self.num_topk,
             hidden=self.hidden,
+            intermediate_hidden=self.intermediate_hidden,
             max_recv_token_num=self.max_recv_token_num,
             dispatch_quant_mode=self.dispatch_quant_mode,
             dispatch_quant_out_dtype=self.dispatch_quant_out_dtype,
@@ -365,6 +367,7 @@ class SymmBuffer:
             num_max_tokens_per_rank=num_max_tokens_per_rank,
             num_topk=num_topk,
             hidden=hidden,
+            intermediate_hidden=intermediate_hidden,
             max_recv_token_num=max_recv_token_num,
             dispatch_quant_mode=dispatch_quant_mode,
             dispatch_quant_out_dtype=dispatch_quant_out_dtype,
@@ -565,6 +568,7 @@ def _get_mega_moe_ccl_buffer_size(
     num_max_tokens_per_rank: int,
     num_topk: int,
     hidden: int,
+    intermediate_hidden: int,
     max_recv_token_num: int = 0,
     dispatch_quant_mode: int = 0,
     dispatch_quant_out_dtype: Optional[torch.dtype] = None,
@@ -582,6 +586,7 @@ def _get_mega_moe_ccl_buffer_size(
         num_max_tokens_per_rank=num_max_tokens_per_rank,
         num_topk=num_topk,
         hidden=hidden,
+        intermediate_hidden=intermediate_hidden,
         max_recv_token_num=max_recv_token_num,
         dispatch_quant_mode=dispatch_quant_mode,
         dispatch_quant_out_dtype=quant_dtype_int,

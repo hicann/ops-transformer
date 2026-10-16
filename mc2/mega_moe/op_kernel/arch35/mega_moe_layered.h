@@ -535,11 +535,12 @@ template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitWorkspace(GM_ADDR workspaceGM,
                                                                                      MegaMoeTilingData* tilingData)
 {
+    (void)workspaceGM;
+    params_.peermemInfo = PeermemInfo(g_winRankAddr_[rankId_], tilingData, A_ELEMS_PER_BYTE, serverNum_);
     {
         WorkspaceLayout workspaceLayout(tilingData, serverNum_);
-        params_.workspaceInfo.Bind(workspaceGM, workspaceLayout);
+        params_.workspaceInfo.Bind(params_.peermemInfo.cclDataPtr, workspaceLayout);
     }
-    params_.peermemInfo = PeermemInfo(g_winRankAddr_[rankId_], tilingData, A_ELEMS_PER_BYTE, serverNum_);
     params_.tilingData = tilingData;
     if constexpr (ENABLE_A8W4 || ENABLE_A4W4) {
         gmmToEpilogueFlag_ = reinterpret_cast<__gm__ int32_t*>(params_.workspaceInfo.flagGmmToEpiloguePtr) +

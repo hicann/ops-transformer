@@ -21,6 +21,8 @@
 
 namespace MegaMoeUT {
 
+constexpr int64_t ARCH35_CCL_BUFFER_SIZE = 1024LL * 1024LL * 1024LL;
+
 class MegaMoeArch35TilingTest : public testing::Test {
 protected:
     static void SetUpTestCase()
@@ -34,7 +36,55 @@ protected:
     }
 };
 
-TEST_F(MegaMoeArch35TilingTest, H4096_BS128_FP8E4M3FN)
+static MegaMoeImpl::PeermemSizeParams MakePeermemSizeParams(const MegaMoeTilingData& tilingData)
+{
+    MegaMoeImpl::PeermemSizeParams peermemParams{};
+    peermemParams.numMaxTokensPerRank = tilingData.numMaxTokensPerRank;
+    peermemParams.topK = tilingData.topK;
+    peermemParams.h = tilingData.h;
+    peermemParams.moeExpertPerRank = tilingData.moeExpertPerRank;
+    peermemParams.epWorldSize = tilingData.epWorldSize;
+    peermemParams.yDtypeSize = sizeof(uint16_t); // 这些用例的输出类型为 BF16。
+    peermemParams.elemsPerByte = MegaMoeImpl::IsA4W4GmmMode(tilingData.moeGmmMode) ? 2U : 1U;
+    peermemParams.topkWeightsPrefetch =
+        tilingData.topkWeightsPrefetch == 1 || MegaMoeImpl::IsCombineDedupOn(tilingData.dedupMode);
+    peermemParams.isQuantCombine = tilingData.combineQuantMode != MegaMoeImpl::COMBINE_NO_QUANT;
+    peermemParams.topoType = tilingData.topoType;
+    peermemParams.serverNum = 1;
+    if (tilingData.topoType == MegaMoeImpl::TOPO_TYPE_URMA) {
+        peermemParams.serverNum = tilingData.epWorldSize / tilingData.rankNumPerServer;
+    }
+    return peermemParams;
+}
+
+static int64_t CalcCclCommunicationCapacity(const MegaMoeTilingData& tilingData)
+{
+    auto peermemParams = MakePeermemSizeParams(tilingData);
+    peermemParams.elemsPerByte = 1U;
+    int64_t communicationSize = MegaMoeImpl::CalcPeermemLeastSize(peermemParams);
+    if (tilingData.topoType == MegaMoeImpl::TOPO_TYPE_MTE) {
+        communicationSize += MegaMoeImpl::EXCEPTION_DUMP_REGION_SIZE;
+    }
+    return Ops::Base::CeilAlign(communicationSize, static_cast<int64_t>(MegaMoeImpl::ALIGN_512));
+}
+
+static void ExpectCclBufferCapacity(const TilingInfo& tilingInfo, int64_t cclBufferSize = ARCH35_CCL_BUFFER_SIZE)
+{
+    ASSERT_GE(tilingInfo.tilingDataSize, sizeof(MegaMoeTilingData));
+    MegaMoeTilingData tilingData{};
+    std::memcpy(&tilingData, tilingInfo.tilingData.get(), sizeof(tilingData));
+    MegaMoeImpl::WorkspaceLayout workspaceLayout(&tilingData);
+    const int64_t communicationCapacity = CalcCclCommunicationCapacity(tilingData);
+
+    ASSERT_GT(workspaceLayout.workspaceSize, 0);
+    EXPECT_GT(communicationCapacity, 0);
+    EXPECT_EQ(communicationCapacity % MegaMoeImpl::ALIGN_512, 0);
+    EXPECT_LE(communicationCapacity + workspaceLayout.workspaceSize, cclBufferSize);
+    ASSERT_EQ(tilingInfo.workspaceSizes.size(), 1U);
+}
+
+static bool RunMteCclBufferCase(int64_t cclBufferSize, TilingInfo& tilingInfo, int64_t maxRecvTokenNum = 0,
+                                int64_t numMaxTokensPerRank = 0)
 {
     struct MegaMoeCompileInfo {
     } compileInfo;
@@ -68,15 +118,15 @@ TEST_F(MegaMoeArch35TilingTest, H4096_BS128_FP8E4M3FN)
         {
             {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
             {"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(12777472)},
-            {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(cclBufferSize)},
+            {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(maxRecvTokenNum)},
             {"dispatch_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
             {"dispatch_quant_out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(36)},
             {"shared_expert_quant_out_dtype",
              Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_UNDEFINED))},
             {"combine_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>("")},
-            {"num_max_tokens_per_rank", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"num_max_tokens_per_rank", Ops::Transformer::AnyValue::CreateFrom<int64_t>(numMaxTokensPerRank)},
             {"activation", Ops::Transformer::AnyValue::CreateFrom<std::string>("swiglu")},
             {"activation_params",
              Ops::Transformer::AnyValue::CreateFrom<std::vector<float>>({std::numeric_limits<float>::max()})},
@@ -91,8 +141,99 @@ TEST_F(MegaMoeArch35TilingTest, H4096_BS128_FP8E4M3FN)
         },
         &compileInfo);
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 4}};
-    uint64_t expectTilingKey = 664612UL;
-    Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, expectTilingKey);
+    Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValues(hcomTopologyMockValues);
+    const bool tilingSucceeded = ExecuteTiling(tilingContextPara, tilingInfo);
+    Mc2Hcom::MC2HcomTopologyMocker::GetInstance().Reset();
+    return tilingSucceeded;
+}
+
+TEST_F(MegaMoeArch35TilingTest, H4096_BS128_FP8E4M3FN)
+{
+    TilingInfo tilingInfo;
+    ASSERT_TRUE(RunMteCclBufferCase(ARCH35_CCL_BUFFER_SIZE, tilingInfo));
+    EXPECT_EQ(tilingInfo.tilingKey, 664612UL);
+    ExpectCclBufferCapacity(tilingInfo);
+}
+
+TEST_F(MegaMoeArch35TilingTest, CclBufferExactCapacityAndOneByteShort)
+{
+    TilingInfo initialInfo;
+    ASSERT_TRUE(RunMteCclBufferCase(ARCH35_CCL_BUFFER_SIZE, initialInfo));
+    ASSERT_GE(initialInfo.tilingDataSize, sizeof(MegaMoeTilingData));
+    MegaMoeTilingData tilingData{};
+    std::memcpy(&tilingData, initialInfo.tilingData.get(), sizeof(tilingData));
+    MegaMoeImpl::WorkspaceLayout workspaceLayout(&tilingData);
+    const int64_t communicationCapacity = CalcCclCommunicationCapacity(tilingData);
+    const int64_t requiredSize = communicationCapacity + workspaceLayout.workspaceSize;
+
+    TilingInfo exactInfo;
+    ASSERT_TRUE(RunMteCclBufferCase(requiredSize, exactInfo));
+    ExpectCclBufferCapacity(exactInfo, requiredSize);
+    TilingInfo shortInfo;
+    EXPECT_FALSE(RunMteCclBufferCase(requiredSize - 1, shortInfo));
+    TilingInfo communicationOnlyInfo;
+    EXPECT_FALSE(RunMteCclBufferCase(communicationCapacity, communicationOnlyInfo));
+
+    TilingInfo largerInfo;
+    ASSERT_TRUE(RunMteCclBufferCase(requiredSize + 512, largerInfo));
+    ExpectCclBufferCapacity(largerInfo, requiredSize + 512);
+}
+
+TEST_F(MegaMoeArch35TilingTest, CclDataOffsetFitsFp4CapacityBudget)
+{
+    for (int64_t topoType : {MegaMoeImpl::TOPO_TYPE_MTE, MegaMoeImpl::TOPO_TYPE_URMA}) {
+        for (int32_t prefetch : {0, 1}) {
+            for (int32_t combineQuantMode : {0, 3, 4}) {
+                for (bool combineDedup : {false, true}) {
+                    if (combineDedup && (topoType == MegaMoeImpl::TOPO_TYPE_URMA ||
+                                         combineQuantMode != MegaMoeImpl::COMBINE_NO_QUANT)) {
+                        continue;
+                    }
+                    SCOPED_TRACE(testing::Message()
+                                 << "topoType=" << topoType << ", prefetch=" << prefetch
+                                 << ", combineQuantMode=" << combineQuantMode << ", combineDedup=" << combineDedup);
+                    MegaMoeImpl::PeermemSizeParams params{};
+                    params.numMaxTokensPerRank = 257;
+                    params.topK = 8;
+                    params.h = 4096;
+                    params.moeExpertPerRank = 2;
+                    params.epWorldSize = 8;
+                    params.yDtypeSize = sizeof(uint16_t);
+                    params.elemsPerByte = 2U;
+                    params.topkWeightsPrefetch = prefetch == 1 || combineDedup;
+                    params.isQuantCombine = combineQuantMode != MegaMoeImpl::COMBINE_NO_QUANT;
+                    params.topoType = topoType;
+                    params.serverNum = topoType == MegaMoeImpl::TOPO_TYPE_URMA ? 2 : 1;
+
+                    auto budgetParams = params;
+                    budgetParams.elemsPerByte = 1U;
+                    const int64_t dumpBytes =
+                        topoType == MegaMoeImpl::TOPO_TYPE_MTE ? MegaMoeImpl::EXCEPTION_DUMP_REGION_SIZE : 0;
+                    const int64_t communicationCapacity = Ops::Base::CeilAlign(
+                        dumpBytes + MegaMoeImpl::CalcPeermemLeastSize(budgetParams), MegaMoeImpl::ALIGN_512);
+                    const int64_t communicationSize = MegaMoeImpl::CalcPeermemLeastSize(params);
+                    const int64_t cclDataOffset = Ops::Base::CeilAlign(communicationSize, MegaMoeImpl::ALIGN_512);
+
+                    // 实际布局按 FP4 压缩记录推进，业务起点位于通信末尾并保持 512B 对齐。
+                    EXPECT_GE(cclDataOffset, communicationSize);
+                    EXPECT_LT(cclDataOffset - communicationSize, MegaMoeImpl::ALIGN_512);
+                    EXPECT_EQ(cclDataOffset % MegaMoeImpl::ALIGN_512, 0);
+                    // MTE 的异常信息区在传入基址之前，保守申请容量仍覆盖实际业务起点。
+                    EXPECT_LT(dumpBytes + cclDataOffset, communicationCapacity);
+                    EXPECT_EQ(params.elemsPerByte, 2U);
+                }
+            }
+        }
+    }
+}
+
+TEST_F(MegaMoeArch35TilingTest, CclBufferRejectsReceiveCapacityTruncation)
+{
+    TilingInfo tilingInfo;
+    const int64_t uint32Max = std::numeric_limits<uint32_t>::max();
+    EXPECT_FALSE(RunMteCclBufferCase(ARCH35_CCL_BUFFER_SIZE, tilingInfo, uint32Max + 1));
+    // 默认接收容量为最大 token 数乘以 EP，再乘以 topK 与本卡专家数的较小值。
+    EXPECT_FALSE(RunMteCclBufferCase(ARCH35_CCL_BUFFER_SIZE, tilingInfo, 0, uint32Max));
 }
 
 TEST_F(MegaMoeArch35TilingTest, H5120_BS256_URMA_InvalidRankNumPerServer)
@@ -129,7 +270,7 @@ TEST_F(MegaMoeArch35TilingTest, H5120_BS256_URMA_InvalidRankNumPerServer)
         {
             {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)},
             {"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
-            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(67108864)},
+            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(ARCH35_CCL_BUFFER_SIZE)},
             {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"dispatch_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
             {"dispatch_quant_out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(35)},
@@ -190,7 +331,7 @@ TEST_F(MegaMoeArch35TilingTest, H7168_BS512_MTE_RankNumIgnored)
         {
             {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
             {"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
-            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(89060352)},
+            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(ARCH35_CCL_BUFFER_SIZE)},
             {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"dispatch_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
             {"dispatch_quant_out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(36)},
@@ -251,7 +392,7 @@ TEST_F(MegaMoeArch35TilingTest, DifferentNConfig)
         {
             {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
             {"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(9598976)},
+            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(ARCH35_CCL_BUFFER_SIZE)},
             {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"dispatch_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
             {"dispatch_quant_out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(35)},
@@ -323,7 +464,7 @@ static void RunUrmaTilingCase(int64_t xBs, int64_t topkIdsBs, int64_t topkWeight
         {
             {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
             {"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
-            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(67108864)},
+            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(ARCH35_CCL_BUFFER_SIZE)},
             {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(maxRecvTokenNum)},
             {"dispatch_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
             {"dispatch_quant_out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(36)},
@@ -348,17 +489,22 @@ static void RunUrmaTilingCase(int64_t xBs, int64_t topkIdsBs, int64_t topkWeight
     const uint64_t expectedTilingKey = expectedStatus == ge::GRAPH_SUCCESS ? 42607652UL : 0UL;
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, expectedStatus, expectedTilingKey);
 
-    if (expectedStatus != ge::GRAPH_SUCCESS || activation != "situglu") {
+    if (expectedStatus != ge::GRAPH_SUCCESS) {
         return;
     }
 
-    ASSERT_TRUE(activationParams.size() == 1U || activationParams.size() == 2U);
     Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValues(hcomTopologyMockValues);
     TilingInfo tilingInfo;
     const bool tilingSucceeded = ExecuteTiling(tilingContextPara, tilingInfo);
     Mc2Hcom::MC2HcomTopologyMocker::GetInstance().Reset();
     ASSERT_TRUE(tilingSucceeded);
+    ExpectCclBufferCapacity(tilingInfo);
 
+    if (activation != "situglu") {
+        return;
+    }
+
+    ASSERT_TRUE(activationParams.size() == 1U || activationParams.size() == 2U);
     ASSERT_GE(tilingInfo.tilingDataSize, sizeof(MegaMoeTilingData));
     MegaMoeTilingData tilingData{};
     std::memcpy(&tilingData, tilingInfo.tilingData.get(), sizeof(tilingData));
@@ -573,7 +719,7 @@ static void RunA8W4FormatCase(ge::Format weightOneFormat, ge::Format weightTwoFo
         {
             {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
             {"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(67108864)},
+            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(ARCH35_CCL_BUFFER_SIZE)},
             {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"dispatch_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
             {"dispatch_quant_out_dtype",
@@ -667,7 +813,7 @@ TEST_F(MegaMoeArch35TilingTest, H4096_BS128_A4W4_URMA)
         {
             {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
             {"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(67108864)},
+            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(ARCH35_CCL_BUFFER_SIZE)},
             {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"dispatch_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
             {"dispatch_quant_out_dtype",
@@ -730,7 +876,7 @@ static void RunA4W4NzFormatCase(ge::Format weightOneFormat, ge::Format weightTwo
         {
             {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
             {"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(67108864)},
+            {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(ARCH35_CCL_BUFFER_SIZE)},
             {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"dispatch_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
             {"dispatch_quant_out_dtype",
@@ -804,7 +950,7 @@ static void RunPerExpertTensorListCase(uint32_t weightTwoTensorCount, ge::graphS
     const std::vector<gert::TilingContextPara::OpAttr> attrs{
         {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
         {"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
-        {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(67108864)},
+        {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(ARCH35_CCL_BUFFER_SIZE)},
         {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
         {"dispatch_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
         {"dispatch_quant_out_dtype",

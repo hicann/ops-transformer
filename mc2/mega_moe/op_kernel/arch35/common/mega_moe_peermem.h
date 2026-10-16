@@ -253,6 +253,7 @@ struct PeermemInfo {
     GM_ADDR dispatchReceivePtr{nullptr};
     GM_ADDR dispatchFlagPtr{nullptr};
     GM_ADDR combineSendPtr{nullptr};
+    GM_ADDR cclDataPtr{nullptr}; // CCL 数据区起始地址，相对 peermem 基址按 512B 对齐。
 
     __aicore__ inline PeermemInfo() = default;
     __aicore__ inline PeermemInfo(GM_ADDR base, const MegaMoeTilingData* tilingData, uint32_t elemsPerByte = 1,
@@ -298,6 +299,8 @@ struct PeermemInfo {
             offset += sizes.relayFlagSize;
         }
         combineSendPtr = base + offset;
+        offset += sizes.combineSendSize;
+        cclDataPtr = base + Ops::Base::CeilAlign(offset, static_cast<int64_t>(ALIGN_512));
     }
 };
 #endif
