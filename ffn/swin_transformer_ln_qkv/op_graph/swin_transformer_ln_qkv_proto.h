@@ -31,9 +31,9 @@ namespace ge {
 * @li bias: A Tensor. Must be one of the following types: float16. \n
 
 * @par Attributes:
-* @li head_num: A optional attribute, the type is int.
-* @li head_dim: A optional attribute, the type is int.
-* @li seq_length: A optional attribute, the type is int.
+* @li head_num: A required attribute, the type is int.
+* @li head_dim: A required attribute, the type is int.
+* @li seq_length: A required attribute, the type is int.
 * @li shifts: A optional attribute, the type is list int. Defaults to ().
 * @li epsilon: A optional attribute, the type is float. Defaults to 1e-7. \n
 

@@ -27,14 +27,14 @@ extern "C" {
  * @param quantScale0 [IN] 第一次RMSNormQuant计算的量化缩放参数。
  * @param quantOffset0 [IN] 第一次RMSNormQuant计算的量化偏移参数。
  * @param wdqkv [IN] 作用于input的降维权重。
- * @param descale0 [IN] wdqkv矩阵乘的反量化缩放参数。
+ * @param deScale0 [IN] wdqkv矩阵乘的反量化缩放参数。
  * @param bias0 [IN] wdqkv矩阵乘的偏置参数。
  * @param gamma1 [IN] 第二次RMSNorm计算的gamma参数。
  * @param beta1 [IN] 第二次RMSNorm计算的beta参数。
  * @param quantScale1 [IN] 第二次RMSNormQuant计算的量化缩放参数。
  * @param quantOffset1 [IN] 第二次RMSNormQuant计算的量化偏移参数。
  * @param wuq [IN] Query升维权重。
- * @param descale1 [IN] wuq矩阵乘的反量化缩放参数。
+ * @param deScale1 [IN] wuq矩阵乘的反量化缩放参数。
  * @param bias1 [IN] wuq矩阵乘的偏置参数。
  * @param gamma2 [IN] 对压缩后的Key/Value执行归一化时使用的gamma参数。
  * @param cos [IN] RoPE计算的余弦Tensor。与sin同时传入nullptr时关闭RoPE，仅一个为nullptr时输入非法。
@@ -51,32 +51,32 @@ extern "C" {
  * @param epsilon [IN] 为防止除零而加到RMSNorm分母上的常数。
  * @param qRotaryCoeff [IN] Query的旋转系数。
  * @param kRotaryCoeff [IN] Key的旋转系数。
- * @param transeposeWdq [IN] 表示wdqkv在矩阵乘计算中是否转置。
- * @param transeposeWuq [IN] 表示wuq在矩阵乘计算中是否转置。
- * @param transeposeWuk [IN] 表示wuk在矩阵乘计算中是否转置。
+ * @param transposeWdq [IN] 表示wdqkv在矩阵乘计算中是否转置。
+ * @param transposeWuq [IN] 表示wuq在矩阵乘计算中是否转置。
+ * @param transposeWuk [IN] 表示wuk在矩阵乘计算中是否转置。
  * @param cacheMode [IN] Cache布局和输出模式，支持0、1、2、3。
  * @param quantMode [IN] RMSNorm量化模式。
  * @param doRmsNorm [IN] 表示第一次量化前是否执行RMSNorm。
  * @param wdkvSplitCount [IN] wdqkv降维权重的拆分段数。
- * @param qOutOut [OUT] Query输出Tensor。
- * @param kvCacheOutOut [OUT] 更新后的Key/Value Cache输出Tensor。
- * @param qRopeOutOut [OUT] Cache拆分模式下的Query RoPE分量输出Tensor。
- * @param krCacheOutOut [OUT] Cache拆分模式下更新后的Key RoPE Cache输出Tensor。
+ * @param qOut [OUT] Query输出Tensor。
+ * @param kvCacheOut [OUT] 更新后的Key/Value Cache输出Tensor。
+ * @param qRopeOut [OUT] Cache拆分模式下的Query RoPE分量输出Tensor。
+ * @param krCacheOut [OUT] Cache拆分模式下更新后的Key RoPE Cache输出Tensor。
  * @param workspaceSize [OUT] 返回Device侧所需的workspace大小，单位为字节。
  * @param executor [OUT] 返回包含算子执行流程的执行器。
  * @return aclnnStatus 成功时返回ACLNN_SUCCESS，否则返回对应错误码。
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnMlaPreprocessGetWorkspaceSize(
     const aclTensor* input, const aclTensor* gamma0, const aclTensor* beta0, const aclTensor* quantScale0,
-    const aclTensor* quantOffset0, const aclTensor* wdqkv, const aclTensor* descale0, const aclTensor* bias0,
+    const aclTensor* quantOffset0, const aclTensor* wdqkv, const aclTensor* deScale0, const aclTensor* bias0,
     const aclTensor* gamma1, const aclTensor* beta1, const aclTensor* quantScale1, const aclTensor* quantOffset1,
-    const aclTensor* wuq, const aclTensor* descale1, const aclTensor* bias1, const aclTensor* gamma2,
+    const aclTensor* wuq, const aclTensor* deScale1, const aclTensor* bias1, const aclTensor* gamma2,
     const aclTensor* cos, const aclTensor* sin, const aclTensor* wuk, const aclTensor* kvCache,
     const aclTensor* kvCacheRope, const aclTensor* slotMapping, const aclTensor* ctkvScale, const aclTensor* qNopeScale,
     int64_t wdqDim, int64_t qRopeDim, int64_t kRopeDim, double epsilon, int64_t qRotaryCoeff, int64_t kRotaryCoeff,
-    bool transeposeWdq, bool transeposeWuq, bool transeposeWuk, int64_t cacheMode, int64_t quantMode, bool doRmsNorm,
-    int64_t wdkvSplitCount, const aclTensor* qOutOut, const aclTensor* kvCacheOutOut, const aclTensor* qRopeOutOut,
-    const aclTensor* krCacheOutOut, uint64_t* workspaceSize, aclOpExecutor** executor);
+    bool transposeWdq, bool transposeWuq, bool transposeWuk, int64_t cacheMode, int64_t quantMode, bool doRmsNorm,
+    int64_t wdkvSplitCount, const aclTensor* qOut, const aclTensor* kvCacheOut, const aclTensor* qRopeOut,
+    const aclTensor* krCacheOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief 使用aclnnMlaPreprocessGetWorkspaceSize创建的执行器异步执行MlaPreprocess。
