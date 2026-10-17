@@ -40,7 +40,11 @@ __global__ __aicore__ void mhc_pre_sinkhorn_backward(GM_ADDR grad_hin, GM_ADDR g
     }
 
     REGISTER_TILING_DEFAULT(MhcPreSinkhornBackwardArch35TilingData);
+#if defined(__DAV_920R1__) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+#else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+#endif
     TPipe pipe;
     if constexpr (DETERMINISTIC) {
         REGISTER_TILING_FOR_TILINGKEY("DETERMINISTIC == true", MhcPreSinkhornBackwardArch35DeterminiticTilingData);

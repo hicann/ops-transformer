@@ -137,6 +137,11 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::GetPlatformInfo()
     OP_CHECK_IF((coreNumAic <= 0), OP_LOGE(opName, "ScatterNdUpdateTiling fails to get coreNumAic."),
                 return ge::GRAPH_FAILED);
     coreNumAic_ = coreNumAic;
+    // Ascend960DT 的 AIC:AIV 为 1:1（KERNEL_TYPE_MIX_AIC_1_1），AIV 核数按 AIC 核数对齐
+    auto socVersion = ascendcPlatform.GetSocVersion();
+    if (socVersion == platform_ascendc::SocVersion::ASCEND960DT) {
+        coreNumAiv_ = coreNumAic_;
+    }
     uint64_t ubSizePlatForm;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
     ubSize_ = static_cast<int64_t>(ubSizePlatForm);

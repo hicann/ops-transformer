@@ -554,7 +554,11 @@ static aclnnStatus CheckParams(const AclnnMhcPreSinkhornBackwardParams& params)
     bool is3D = xShape.GetDimNum() == 3;
     int64_t nVal = is3D ? xShape.GetDim(1) : xShape.GetDim(2);
     int64_t cVal = is3D ? xShape.GetDim(2) : xShape.GetDim(3);
-    if (Ops::Transformer::AclnnUtil::IsRegbase()) {
+    // Ascend960 与 Regbase(950) 共用 arch35 kernel（N 维参数化），N 支持 (0, 8]；
+    // NpuArch 显式判定（SocVersion 枚举中 960 排序在末尾，不可用区间判断）
+    auto curArch = GetCurrentPlatformInfo().GetCurNpuArch();
+    bool isArch92 = (curArch == NpuArch::DAV_9201 || curArch == NpuArch::DAV_9202);
+    if (Ops::Transformer::AclnnUtil::IsRegbase() || isArch92) {
         if (nVal <= 0 || nVal > 8) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "N must be > 0 and <= 8, but got %ld", nVal);
             return ACLNN_ERR_PARAM_INVALID;

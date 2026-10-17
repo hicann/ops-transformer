@@ -122,6 +122,7 @@ public:
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
             .ExtendCfgInfo("opFile.value", "mhc_pre_sinkhorn_backward_apt");
         this->AICore().AddConfig("ascend950", aicore_Config_950);
+        this->AICore().AddConfig("ascend960dt", aicore_Config_950);
     }
 };
 OP_ADD(MhcPreSinkhornBackward);

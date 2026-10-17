@@ -21,11 +21,21 @@
 
 ASCENDC_TPL_ARGS_DECL(MhcPreSinkhornBackward, ASCENDC_TPL_BOOL_DECL(DETERMINISTIC, 0, 1), );
 
-ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_2),
-                                     ASCENDC_TPL_BOOL_SEL(DETERMINISTIC, 0),
-                                     ASCENDC_TPL_TILING_STRUCT_SEL(MhcPreSinkhornBackwardArch35TilingData)),
-                ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_2),
-                                     ASCENDC_TPL_BOOL_SEL(DETERMINISTIC, 1),
-                                     ASCENDC_TPL_TILING_STRUCT_SEL(MhcPreSinkhornBackwardArch35DeterminiticTilingData)))
+ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(
+#if defined(__DAV_920R1__) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+                    ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_1),
+#else
+                    ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_2),
+#endif
+                    ASCENDC_TPL_BOOL_SEL(DETERMINISTIC, 0),
+                    ASCENDC_TPL_TILING_STRUCT_SEL(MhcPreSinkhornBackwardArch35TilingData)),
+                ASCENDC_TPL_ARGS_SEL(
+#if defined(__DAV_920R1__) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+                    ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_1),
+#else
+                    ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_2),
+#endif
+                    ASCENDC_TPL_BOOL_SEL(DETERMINISTIC, 1),
+                    ASCENDC_TPL_TILING_STRUCT_SEL(MhcPreSinkhornBackwardArch35DeterminiticTilingData)))
 
 #endif //  MHC_PRE_SINKHORN_BACKWARD_KEY_ARCH35_H

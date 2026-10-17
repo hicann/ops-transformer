@@ -126,7 +126,11 @@ private:
         batchSize_ = tilingData->batchSize;
         seqLength_ = tilingData->seqLength;
         aivNum_ = tilingData->aivNum;
+#if defined(__DAV_920R1__) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+        aicNum_ = tilingData->aivNum;
+#else
         aicNum_ = tilingData->aivNum / 2;
+#endif
         c_ = tilingData->c;
         n_ = tilingData->n;
         c0_ = tilingData->c0;
@@ -489,6 +493,22 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::Process()
 
     if ASCEND_IS_AIC {
         int8_t ping = 0;
+#if defined(__DAV_920R1__) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+        // Ascend960 (MIX_AIC_1_1, AIC:AIV = 1:1)：AIC i 与 AIV i 一一配对，
+        // AIV i 第 k 轮产出段 [i+kA, i+kA+1)*tile_，AIC i 第 k 轮消费同段，
+        // 逐轮锁步、单 tile 消费，避免 AIC_1_2 的"每迭代聚 2 tile"几何
+        // 读到其他同步组尚未产出的 gradH2 段。
+        for (int32_t taskOffset = blkIdx_ * tile_; taskOffset < totalTasksAligned_; taskOffset += aicNum_ * tile_) {
+            int32_t tileTaskCount = min(tile_, totalTasks_ - taskOffset);
+            CrossCoreWaitFlag<0x2>(ping);
+            ping = (ping + 1) % 10;
+
+            if (tileTaskCount > 0) {
+                ProcessMatmul1(taskOffset, tileTaskCount);
+                ProcessMatmul2(taskOffset, tileTaskCount);
+            }
+        }
+#else
         for (int32_t taskOffset = blkIdx_ * 2 * tile_; taskOffset < totalTasksAligned_;
              taskOffset += aicNum_ * 2 * tile_) {
             int32_t tileTaskCount = min(2 * tile_, totalTasks_ - taskOffset);
@@ -500,6 +520,7 @@ __aicore__ inline void MhcPreSinkhornBackwardOneStage<T, U>::Process()
                 ProcessMatmul2(taskOffset, tileTaskCount);
             }
         }
+#endif
     }
 }
 
