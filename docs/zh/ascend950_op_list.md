@@ -848,16 +848,6 @@ Ascend 950支持的算子分类和算子列表如下：
   </tr>
   <tr>
     <td>mc2</td>
-    <td><a href="../../mc2/3rd/batch_mat_mul_v3/README.md">batch_mat_mul_v3</a></td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✗</td>
-    <td>AI Core</td>
-    <td>实现批量矩阵乘计算。</td>
-  </tr>
-  <tr>
-    <td>mc2</td>
     <td><a href="../../mc2/distribute_barrier/README.md">distribute_barrier</a></td>
     <td>✓</td>
     <td>✓</td>
@@ -885,16 +875,6 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>AI Core</td>
     <td>完成路由专家GroupedMatMul、Unpermute、AlltoAllV融合并实现与共享专家MatMul并行融合，先计算后通信。</td>
-  </tr>
-  <tr>
-    <td>mc2</td>
-    <td><a href="../../mc2/3rd/mat_mul_v3/README.md">mat_mul_v3</a></td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✗</td>
-    <td>AI Core</td>
-    <td>实现矩阵乘计算。</td>
   </tr>
   <tr>
     <td>mc2</td>
@@ -1465,36 +1445,6 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✗</td>
     <td>AI Core</td>
     <td>aclnnMoeTokenUnpermuteWithRoutingMap的反向传播。</td>
-  </tr>
-  <tr>
-    <td>moe</td>
-    <td><a href="../../moe/3rd/moe_inplace_index_add/README.md">moe_inplace_index_add</a></td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✗</td>
-    <td>AI Core</td>
-    <td>MoE中根据索引进行原地加法操作。</td>
-  </tr>
-  <tr>
-    <td>moe</td>
-    <td><a href="../../moe/3rd/moe_inplace_index_add_with_sorted/README.md">moe_inplace_index_add_with_sorted</a></td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✗</td>
-    <td>AI Core</td>
-    <td>MoE中根据排序后的索引进行原地加法操作。</td>
-  </tr>
-  <tr>
-    <td>moe</td>
-    <td><a href="../../moe/3rd/moe_masked_scatter/README.md">moe_masked_scatter</a></td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✓</td>
-    <td>✗</td>
-    <td>AI Core</td>
-    <td>MoE中根据mask进行scatter操作。</td>
   </tr>
   <tr>
     <td>moe</td>
