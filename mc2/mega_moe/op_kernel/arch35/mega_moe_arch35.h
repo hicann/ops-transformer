@@ -64,15 +64,15 @@ public:
                                 GM_ADDR weight2, GM_ADDR xActiveMask, GM_ADDR weightScales1, GM_ADDR weightScales2,
                                 GM_ADDR scales, GM_ADDR sharedWeight1, GM_ADDR sharedWeight2,
                                 GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut,
-                                GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, MegaMoeTilingData* tilingData,
+                                GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData,
                                 GM_ADDR tilingGM);
 
 private:
     using SendMaskBufferConfig = MegaMoeSendMaskBufferConfig;
     using UnpermuteBufferConfig = MegaMoeUnpermuteBufferConfig;
 
-    __aicore__ inline void InitStageConfigs(MegaMoeTilingData* tilingData);
-    __aicore__ inline void InitEpilogueAndCommonConfig(MegaMoeTilingData* tilingData);
+    __aicore__ inline void InitStageConfigs(const MegaMoeTilingData* tilingData);
+    __aicore__ inline void InitEpilogueAndCommonConfig(const MegaMoeTilingData* tilingData);
     __aicore__ inline void InitInputPrepareConfigs();
     __aicore__ inline void InitSyncWorkspaceConfigs(int32_t dispatchFlagSlotsPerExpert,
                                                     int32_t activationFlagSlotsPerExpert);
@@ -244,7 +244,8 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitTokenUnpermuteConfi
 }
 
 template <TemplateMegaMoeTypeClass>
-__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitEpilogueAndCommonConfig(MegaMoeTilingData* tilingData)
+__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitEpilogueAndCommonConfig(
+    const MegaMoeTilingData* tilingData)
 {
     epilogueOp_.Init({.yGmAddr = params_.workspaceInfo.activationQuantDataPtr,
                       .yScaleGmAddr = params_.workspaceInfo.activationQuantScalePtr,
@@ -265,7 +266,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitEpilogueAndCommonCo
 
 // 初始化各阶段配置及同步标志槽数。
 template <TemplateMegaMoeTypeClass>
-__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitStageConfigs(MegaMoeTilingData* tilingData)
+__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitStageConfigs(const MegaMoeTilingData* tilingData)
 {
     InitEpilogueAndCommonConfig(tilingData);
     const int64_t maxOutput = static_cast<int64_t>(tilingData->maxOutputSize);
@@ -289,7 +290,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::Init(
     GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1, GM_ADDR weight2,
     GM_ADDR xActiveMask, GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR scales, GM_ADDR sharedWeight1,
     GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut,
-    GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, MegaMoeTilingData* tilingData, GM_ADDR tilingGM)
+    GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData, GM_ADDR tilingGM)
 {
     k_ = tilingData->h;
     worldSize_ = tilingData->epWorldSize;

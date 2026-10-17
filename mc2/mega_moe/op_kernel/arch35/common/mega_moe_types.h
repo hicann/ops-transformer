@@ -121,7 +121,7 @@ struct Params {
     GM_ADDR expertTokenNumsOutGmAddr;
     WorkspaceInfo workspaceInfo;
     PeermemInfo peermemInfo;
-    MegaMoeTilingData* tilingData;
+    const MegaMoeTilingData* tilingData;
 };
 
 enum class AddrUpdateMode : int32_t {

@@ -101,13 +101,13 @@ public:
                                 GM_ADDR xActiveMask, GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR scales,
                                 GM_ADDR sharedWeight1, GM_ADDR sharedWeight2, GM_ADDR sharedWeightScales1,
                                 GM_ADDR sharedWeightScales2, GM_ADDR yOut, GM_ADDR expertTokenNumsOut,
-                                GM_ADDR workspaceGM, MegaMoeTilingData* tilingData);
+                                GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void InitTopology(const MegaMoeTilingData* tilingData);
     __aicore__ inline void InitDispatchLayout(const MegaMoeTilingData* tilingData);
-    __aicore__ inline void InitWorkspace(GM_ADDR workspaceGM, MegaMoeTilingData* tilingData);
+    __aicore__ inline void InitWorkspace(GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData);
     __aicore__ inline uint32_t InitResetBatch();
     __aicore__ inline void InitSendMaskRounds(uint32_t resetTensorSize);
     __aicore__ inline void InitDispatchRounds(uint32_t fixedBefore, uint32_t dispatchFixedCost);
@@ -532,8 +532,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitDispa
 }
 
 template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitWorkspace(GM_ADDR workspaceGM,
-                                                                                     MegaMoeTilingData* tilingData)
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitWorkspace(
+    GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData)
 {
     (void)workspaceGM;
     params_.peermemInfo = PeermemInfo(g_winRankAddr_[rankId_], tilingData, A_ELEMS_PER_BYTE, serverNum_);
@@ -573,7 +573,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Init(
     GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1, GM_ADDR weight2, GM_ADDR xActiveMask,
     GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR scales, GM_ADDR sharedWeight1, GM_ADDR sharedWeight2,
     GM_ADDR sharedWeightScales1, GM_ADDR sharedWeightScales2, GM_ADDR yOut, GM_ADDR expertTokenNumsOut,
-    GM_ADDR workspaceGM, MegaMoeTilingData* tilingData)
+    GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData)
 {
     InitTopology(tilingData);
     params_.aGmAddr = x;
