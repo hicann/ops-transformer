@@ -78,32 +78,32 @@ public:
     static constexpr uint32_t SOFTMAX_STATE_UB_SIZE = VEC_M_BASE * sizeof(float);
     static constexpr float MX_EMPTY_LSE_VALUE = -3e+99; // 与 CUDA 空 softmax 行的 LSE=-Inf 语义一致。
 
-    __aicore__ inline void Init(TPipe *pipe, __gm__ uint8_t *pScale, __gm__ uint8_t *softmaxLse,
-                                __gm__ uint8_t *attentionOut, __gm__ uint8_t *attenMask, uint32_t attenMaskS2Size,
+    __aicore__ inline void Init(TPipe* pipe, __gm__ uint8_t* pScale, __gm__ uint8_t* softmaxLse,
+                                __gm__ uint8_t* attentionOut, __gm__ uint8_t* attenMask, uint32_t attenMaskS2Size,
                                 uint8_t pScaleDtype)
     {
         if ASCEND_IS_AIV {
             tPipe_ = pipe;
-            attentionOutGm_.SetGlobalBuffer((__gm__ OUTPUT_T *)attentionOut);
+            attentionOutGm_.SetGlobalBuffer((__gm__ OUTPUT_T*)attentionOut);
             if constexpr (HAS_LSE) {
-                softmaxLseGm_.SetGlobalBuffer((__gm__ float *)softmaxLse);
+                softmaxLseGm_.SetGlobalBuffer((__gm__ float*)softmaxLse);
             }
             if (pScale != nullptr) {
                 if (pScaleDtype == optiling::MX_PSCALE_DTYPE_FP32) {
                     GlobalTensor<float> pScaleGmFp32;
-                    pScaleGmFp32.SetGlobalBuffer((__gm__ float *)pScale);
+                    pScaleGmFp32.SetGlobalBuffer((__gm__ float*)pScale);
                     pScaleValue_ = pScaleGmFp32.GetValue(0);
                 } else {
                     GlobalTensor<uint8_t> pScaleGm;
-                    pScaleGm.SetGlobalBuffer((__gm__ uint8_t *)pScale);
+                    pScaleGm.SetGlobalBuffer((__gm__ uint8_t*)pScale);
                     pScaleValue_ = DecodeE8M0Scale(pScaleGm.GetValue(0));
                 }
             }
             if constexpr (HAS_ATTEN) {
-                attenMaskGm_.SetGlobalBuffer((__gm__ uint8_t *)attenMask);
+                attenMaskGm_.SetGlobalBuffer((__gm__ uint8_t*)attenMask);
                 attenMaskS2Size_ = attenMaskS2Size;
             }
-            negativeFloatScalar_ = *((const MM_T *)&NEGATIVE_MIN_VALUE_FP32);
+            negativeFloatScalar_ = *((const MM_T*)&NEGATIVE_MIN_VALUE_FP32);
         }
     }
 
@@ -161,8 +161,18 @@ public:
         }
     }
 
+    __aicore__ inline void UninitBuffers()
+    {
+        if ASCEND_IS_AIV {
+            // InitBuffers seeds this event; each V2 iteration waits and sets it again.
+            WaitFlag<HardEvent::MTE3_V>(mte3ToVId_[0]);
+            GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3Id_[0]);
+            GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVId_[0]);
+        }
+    }
+
     __aicore__ inline void ClearEmptyQBlock(uint32_t n1Idx, uint32_t queryTokenBase, uint32_t actualS1Size,
-                                            uint32_t s1OuterIdx, const MxConstInfo &constInfo)
+                                            uint32_t s1OuterIdx, const MxConstInfo& constInfo)
     {
         if ASCEND_IS_AIV {
             const uint32_t s1Idx = s1OuterIdx * constInfo.qSparseBlockSize;
@@ -225,9 +235,9 @@ public:
 
     // V1：C1[128,S2_SPLIT] -> P/PScale；两个 subLoop 写成 P[128,S2_BASE]。
     template <uint32_t SUB_LOOP>
-    __aicore__ inline void ProcessVec1(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &outputBuf,
-                                       Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm1ResBuf,
-                                       MxRunInfo &runInfo, const MxConstInfo &constInfo)
+    __aicore__ inline void ProcessVec1(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& outputBuf,
+                                       Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm1ResBuf,
+                                       MxRunInfo& runInfo, const MxConstInfo& constInfo)
     {
         static_assert(SUB_LOOP < 2U, "MX V1 only supports subLoop 0/1");
         const bool isLastSubLoop = IsLastSubLoop<SUB_LOOP>(runInfo);
@@ -302,7 +312,7 @@ public:
     }
 
     // V2：更新 C2[128,DV]，最后归一化并写回 bf16。
-    __aicore__ inline void ProcessVec2(MxBmm2Buf &bmm2ResBuf, MxRunInfo &runInfo, const MxConstInfo &constInfo)
+    __aicore__ inline void ProcessVec2(MxBmm2Buf& bmm2ResBuf, MxRunInfo& runInfo, const MxConstInfo& constInfo)
     {
         bmm2ResBuf.WaitCrossCore();
         if (unlikely(runInfo.actVecMSize == 0U)) {
@@ -356,17 +366,17 @@ private:
         // Code 255 is the format's NaN encoding; all other codes map directly
         // to the FP32 exponent field.
         uint32_t bits = scale == 0U ? 0x00400000U : (scale == 0xFFU ? 0x7FC00000U : static_cast<uint32_t>(scale) << 23);
-        return *((float *)&bits);
+        return *((float*)&bits);
     }
 
     template <bool IS_UPDATE, bool VF_HAS_ATTEN, uint32_t SUB_LOOP>
-    __aicore__ inline void RunVec1Vf(const LocalTensor<INPUT_T> &stage1CastTensor, const LocalTensor<float> &sumUb,
-                                     const LocalTensor<float> &maxUb, const LocalTensor<MM_T> &mmRes,
-                                     const LocalTensor<float> &expUb, const LocalTensor<uint8_t> &attenMaskUb,
-                                     const LocalTensor<SCALE_T> &pScaleSubLoopTensor,
-                                     const LocalTensor<float> &preLoopMaxUb, const LocalTensor<float> &preLoopSumUb,
-                                     const LocalTensor<float> &firstLoopSumUb, const MxRunInfo &runInfo,
-                                     const MxConstInfo &constInfo, uint32_t s2CalcSize)
+    __aicore__ inline void RunVec1Vf(const LocalTensor<INPUT_T>& stage1CastTensor, const LocalTensor<float>& sumUb,
+                                     const LocalTensor<float>& maxUb, const LocalTensor<MM_T>& mmRes,
+                                     const LocalTensor<float>& expUb, const LocalTensor<uint8_t>& attenMaskUb,
+                                     const LocalTensor<SCALE_T>& pScaleSubLoopTensor,
+                                     const LocalTensor<float>& preLoopMaxUb, const LocalTensor<float>& preLoopSumUb,
+                                     const LocalTensor<float>& firstLoopSumUb, const MxRunInfo& runInfo,
+                                     const MxConstInfo& constInfo, uint32_t s2CalcSize)
     {
         static_assert(SUB_LOOP < 2U, "MX V1 only supports subLoop 0/1");
         FaVectorApi::ProcessVec1VfDnMxfp8<MM_T, INPUT_T, IS_UPDATE, VF_HAS_ATTEN, S2_SPLIT, SUB_LOOP>(
@@ -376,14 +386,14 @@ private:
     }
 
     template <bool VF_HAS_ATTEN, uint32_t SUB_LOOP>
-    __aicore__ inline void ExecuteVec1Vf(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm1ResBuf,
-                                         const LocalTensor<INPUT_T> &stage1CastTensor, const LocalTensor<float> &sumUb,
-                                         const LocalTensor<float> &maxUb, const LocalTensor<MM_T> &mmRes,
-                                         const LocalTensor<float> &expUb, const LocalTensor<uint8_t> &attenMaskUb,
-                                         const LocalTensor<SCALE_T> &pScaleSubLoopTensor,
-                                         const LocalTensor<float> &preLoopMaxUb, const LocalTensor<float> &preLoopSumUb,
-                                         const LocalTensor<float> &firstLoopSumUb, const MxRunInfo &runInfo,
-                                         const MxConstInfo &constInfo, uint32_t s2CalcSize)
+    __aicore__ inline void ExecuteVec1Vf(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm1ResBuf,
+                                         const LocalTensor<INPUT_T>& stage1CastTensor, const LocalTensor<float>& sumUb,
+                                         const LocalTensor<float>& maxUb, const LocalTensor<MM_T>& mmRes,
+                                         const LocalTensor<float>& expUb, const LocalTensor<uint8_t>& attenMaskUb,
+                                         const LocalTensor<SCALE_T>& pScaleSubLoopTensor,
+                                         const LocalTensor<float>& preLoopMaxUb, const LocalTensor<float>& preLoopSumUb,
+                                         const LocalTensor<float>& firstLoopSumUb, const MxRunInfo& runInfo,
+                                         const MxConstInfo& constInfo, uint32_t s2CalcSize)
     {
         static_assert(!VF_HAS_ATTEN || HAS_ATTEN, "masked VF requires an attention-mask kernel instance");
         // mask搬运发生在调用前；随后等待C1并执行纯编译期mask/subLoop VF实例。
@@ -401,7 +411,7 @@ private:
     }
 
     template <uint32_t SUB_LOOP>
-    __aicore__ inline uint32_t GetSubLoopS2Size(const MxRunInfo &runInfo) const
+    __aicore__ inline uint32_t GetSubLoopS2Size(const MxRunInfo& runInfo) const
     {
         static_assert(SUB_LOOP < 2U, "MX V1 only supports subLoop 0/1");
         if constexpr (SUB_LOOP == 0U) {
@@ -411,7 +421,7 @@ private:
     }
 
     template <uint32_t SUB_LOOP>
-    __aicore__ inline bool IsLastSubLoop(const MxRunInfo &runInfo) const
+    __aicore__ inline bool IsLastSubLoop(const MxRunInfo& runInfo) const
     {
         static_assert(SUB_LOOP < 2U, "MX V1 only supports subLoop 0/1");
         if constexpr (SUB_LOOP == 0U) {
@@ -420,7 +430,7 @@ private:
         return true;
     }
 
-    __aicore__ inline void BoolCopyInMxMask(const LocalTensor<uint8_t> &dstTensor, uint64_t srcOffset, uint32_t s2Len,
+    __aicore__ inline void BoolCopyInMxMask(const LocalTensor<uint8_t>& dstTensor, uint64_t srcOffset, uint32_t s2Len,
                                             uint32_t qLen)
     {
         // DN mask 按 GM row stride 搬到 [S2,64] UB。
@@ -433,7 +443,7 @@ private:
         DataCopy(dstTensor, attenMaskGm_[srcOffset], dataCopyParams);
     }
 
-    __aicore__ inline uint64_t ComputeCausalMaskOffset(const MxRunInfo &runInfo, uint64_t segmentS2TokenOffset) const
+    __aicore__ inline uint64_t ComputeCausalMaskOffset(const MxRunInfo& runInfo, uint64_t segmentS2TokenOffset) const
     {
         const int64_t deltaN = static_cast<int64_t>(runInfo.actS1Size) - static_cast<int64_t>(runInfo.actS2Size);
         const int64_t deltaCausalOrNext =
@@ -443,7 +453,7 @@ private:
         return maskOffset;
     }
 
-    __aicore__ inline bool CopyAttenMaskSegment(LocalTensor<uint8_t> &attenMaskUb, const MxRunInfo &runInfo,
+    __aicore__ inline bool CopyAttenMaskSegment(LocalTensor<uint8_t>& attenMaskUb, const MxRunInfo& runInfo,
                                                 uint32_t dstS2Offset, uint32_t segmentS2Len,
                                                 uint64_t segmentS2TokenOffset, bool needAtten)
     {
@@ -464,7 +474,7 @@ private:
     }
 
     template <uint32_t SUB_LOOP>
-    __aicore__ inline LocalTensor<uint8_t> CopyAttenMaskToUb(const MxRunInfo &runInfo, uint32_t s2CalcSize)
+    __aicore__ inline LocalTensor<uint8_t> CopyAttenMaskToUb(const MxRunInfo& runInfo, uint32_t s2CalcSize)
     {
         static_assert(SUB_LOOP < 2U, "MX V1 only supports subLoop 0/1");
         LocalTensor<uint8_t> attenMaskUb = attenMaskInQue_.template AllocTensor<uint8_t>();
@@ -499,9 +509,9 @@ private:
     }
 
     template <uint32_t SUB_LOOP>
-    __aicore__ inline void CopyPScaleToL1(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &outputBuf,
-                                          LocalTensor<SCALE_T> &pScaleSubLoopTensor, const MxRunInfo &runInfo,
-                                          const MxConstInfo &constInfo)
+    __aicore__ inline void CopyPScaleToL1(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& outputBuf,
+                                          LocalTensor<SCALE_T>& pScaleSubLoopTensor, const MxRunInfo& runInfo,
+                                          const MxConstInfo& constInfo)
     {
         static_assert(SUB_LOOP < 2U, "MX V1 only supports subLoop 0/1");
         // 将 subLoop PScale 整理到完整 P[128,S2_BASE] 后方。
@@ -537,8 +547,8 @@ private:
     }
 
     template <uint32_t SUB_LOOP>
-    __aicore__ inline void CopyPToL1(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &outputBuf,
-                                     LocalTensor<INPUT_T> &stage1CastTensor, const MxConstInfo &constInfo)
+    __aicore__ inline void CopyPToL1(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& outputBuf,
+                                     LocalTensor<INPUT_T>& stage1CastTensor, const MxConstInfo& constInfo)
     {
         static_assert(SUB_LOOP < 2U, "MX V1 only supports subLoop 0/1");
         // 两个 AIV、两个 subLoop 分别写入 P 的对应象限。
@@ -553,8 +563,8 @@ private:
                  {4, S2_SPLIT >> 2, (S2_SPLIT >> 2) + 2U, 0});
     }
 
-    __aicore__ inline void CopyOutAttentionOut(MxRunInfo &runInfo, const MxConstInfo &constInfo,
-                                               LocalTensor<MM_T> &vec2ResUb)
+    __aicore__ inline void CopyOutAttentionOut(MxRunInfo& runInfo, const MxConstInfo& constInfo,
+                                               LocalTensor<MM_T>& vec2ResUb)
     {
         if constexpr (HAS_ATTEN) {
             // 使用所有 S2 loop 累计后的 max 判断整行是否始终无有效 key。
@@ -585,8 +595,8 @@ private:
         DataCopyPad(attentionOutGm_[dstOffset], attenOut, dataCopyParams);
     }
 
-    __aicore__ inline void SoftmaxLseCopyOut(MxRunInfo &runInfo, const MxConstInfo &constInfo,
-                                             LocalTensor<float> &sumUb, LocalTensor<float> &maxUb)
+    __aicore__ inline void SoftmaxLseCopyOut(MxRunInfo& runInfo, const MxConstInfo& constInfo,
+                                             LocalTensor<float>& sumUb, LocalTensor<float>& maxUb)
     {
         LocalTensor<float> lseUb = softmaxLseQueue_.template AllocTensor<float>();
         ComputeLseOutputVF<float, true>(lseUb, sumUb, maxUb, runInfo.actVecMSize);
@@ -603,7 +613,7 @@ private:
         softmaxLseQueue_.template FreeTensor(lseUb);
     }
 
-    TPipe *tPipe_ = nullptr;
+    TPipe* tPipe_ = nullptr;
     GlobalTensor<OUTPUT_T> attentionOutGm_;
     GlobalTensor<float> softmaxLseGm_;
     GlobalTensor<uint8_t> attenMaskGm_;

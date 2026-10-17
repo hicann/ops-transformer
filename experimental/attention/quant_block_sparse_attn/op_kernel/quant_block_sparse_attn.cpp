@@ -81,8 +81,8 @@ template <uint32_t QKV_DTYPE, uint32_t LAYOUT_T, uint32_t KV_LAYOUT_T, uint32_t 
           uint32_t Config, uint32_t QUANT_MODE>
 __global__ __aicore__ void quant_block_sparse_attn(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* qScale, __gm__ uint8_t* kScale,
-    __gm__ uint8_t* vScale, __gm__ uint8_t* pScale, __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensKv,
-    __gm__ uint8_t* seqUsedQ, __gm__ uint8_t* seqUsedKv, __gm__ uint8_t* sparseIndices, __gm__ uint8_t* sparseSeqLen,
+    __gm__ uint8_t* vScale, __gm__ uint8_t* sparseIndices, __gm__ uint8_t* sparseSeqLen, __gm__ uint8_t* pScale,
+    __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensKv, __gm__ uint8_t* seqUsedQ, __gm__ uint8_t* seqUsedKv,
     __gm__ uint8_t* blockTable, __gm__ uint8_t* attenMask, __gm__ uint8_t* metadata, __gm__ uint8_t* attentionOut,
     __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {

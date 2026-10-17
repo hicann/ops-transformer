@@ -560,5 +560,7 @@ public:
 } // namespace ops
 
 namespace optiling {
-IMPL_OP_OPTILING(QuantBlockSparseAttn).Tiling(TilingQuantBlockSparseAttn);
+IMPL_OP_OPTILING(QuantBlockSparseAttn)
+    .Tiling(TilingQuantBlockSparseAttn)
+    .TilingParse<QuantBlockSparseAttnCompileInfo>(ge::TilingPrepareQuantBlockSparseAttn);
 } // namespace optiling

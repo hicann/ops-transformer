@@ -26,9 +26,15 @@ using OpAttr = gert::InfershapeContextPara::OpAttr;
 
 class QuantBlockSparseAttnInferShapeTest : public testing::TestWithParam<QuantBlockSparseAttnInferShapeUtParam> {
 protected:
-    static void SetUpTestCase() { std::cout << "QuantBlockSparseAttnInferShapeTest SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "QuantBlockSparseAttnInferShapeTest SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "QuantBlockSparseAttnInferShapeTest TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "QuantBlockSparseAttnInferShapeTest TearDown" << std::endl;
+    }
 };
 
 TEST_P(QuantBlockSparseAttnInferShapeTest, param)
@@ -43,13 +49,13 @@ TEST_P(QuantBlockSparseAttnInferShapeTest, param)
         param.qDescale,
         param.kDescale,
         param.vDescale,
+        param.sparseIndices,
+        param.sparseSeqLen,
         param.pScale,
         param.cuSeqlensQ,
         param.cuSeqlensKv,
         param.sequsedQ,
         param.sequsedKv,
-        param.sparseIndices,
-        param.sparseSeqLen,
         param.blockTable,
         param.attenMask,
         param.metadata,

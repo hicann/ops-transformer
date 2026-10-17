@@ -28,6 +28,8 @@
 #include "quant_block_sparse_attn_info_parser.h"
 
 namespace optiling {
+struct QuantBlockSparseAttnCompileInfo {};
+
 constexpr uint32_t QBSA_MAX_CORE_NUM = 36U;
 constexpr uint32_t QBSA_MAX_CORE_NUM_ARCH92 = 64U;
 // Shared FP8 payload: both kernel architectures are rebuilt with 65 boundary entries.

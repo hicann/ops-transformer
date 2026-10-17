@@ -62,20 +62,20 @@ public:
     static constexpr uint32_t MX_SCALE_LAST_DIM = 2U;
     static constexpr FixpipeConfig BMM2_FIXPIPE_CONFIG = {CO2Layout::ROW_MAJOR, true};
 
-    __aicore__ inline void Init(TPipe *pipe, BufferManager<BufferType::L1> *l1BuffMgr, __gm__ uint8_t *query,
-                                __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *blockTable,
-                                __gm__ uint8_t *qScale, __gm__ uint8_t *kScale, __gm__ uint8_t *vScale)
+    __aicore__ inline void Init(TPipe* pipe, BufferManager<BufferType::L1>* l1BuffMgr, __gm__ uint8_t* query,
+                                __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* blockTable,
+                                __gm__ uint8_t* qScale, __gm__ uint8_t* kScale, __gm__ uint8_t* vScale)
     {
         if ASCEND_IS_AIC {
             tPipe_ = pipe;
             l1BufferManager_ = l1BuffMgr;
-            queryGm_.SetGlobalBuffer((__gm__ INPUT_T *)query);
-            keyGm_.SetGlobalBuffer((__gm__ INPUT_T *)key);
-            valueGm_.SetGlobalBuffer((__gm__ INPUT_T *)value);
-            blockTableGm_.SetGlobalBuffer((__gm__ int32_t *)blockTable);
-            qScaleGm_.SetGlobalBuffer((__gm__ SCALE_T *)qScale);
-            kScaleGm_.SetGlobalBuffer((__gm__ SCALE_T *)kScale);
-            vScaleGm_.SetGlobalBuffer((__gm__ SCALE_T *)vScale);
+            queryGm_.SetGlobalBuffer((__gm__ INPUT_T*)query);
+            keyGm_.SetGlobalBuffer((__gm__ INPUT_T*)key);
+            valueGm_.SetGlobalBuffer((__gm__ INPUT_T*)value);
+            blockTableGm_.SetGlobalBuffer((__gm__ int32_t*)blockTable);
+            qScaleGm_.SetGlobalBuffer((__gm__ SCALE_T*)qScale);
+            kScaleGm_.SetGlobalBuffer((__gm__ SCALE_T*)kScale);
+            vScaleGm_.SetGlobalBuffer((__gm__ SCALE_T*)vScale);
         }
     }
 
@@ -107,24 +107,37 @@ public:
         }
     }
 
-    __aicore__ inline void IterateBmm1(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf,
-                                       MxRunInfo &runInfo, const MxConstInfo &constInfo)
+    __aicore__ inline void UninitBuffers()
+    {
+        if ASCEND_IS_AIC {
+            // Consume the final free-buffer signals before leaving a SuperKernel sub-kernel.
+            mmL0CBuffers_.Uninit(l0cBufferManager_);
+            mmL0BBuffers_.Uninit(l0bBufferManager_);
+            mmL0ABuffers_.Uninit(l0aBufferManager_);
+            l1VBuffers_.Uninit(*l1BufferManager_);
+            l1KVBuffers_.Uninit(*l1BufferManager_);
+            l1QBuffers_.Uninit(*l1BufferManager_);
+        }
+    }
+
+    __aicore__ inline void IterateBmm1(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf,
+                                       MxRunInfo& runInfo, const MxConstInfo& constInfo)
     {
         IterateBmm1Impl<0U, true, true>(outputBuf, runInfo, constInfo);
     }
 
-    __aicore__ inline void IterateBmm1ReuseQ(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf0,
-                                             Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf1,
-                                             MxRunInfo &runInfo, const MxConstInfo &constInfo)
+    __aicore__ inline void IterateBmm1ReuseQ(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf0,
+                                             Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf1,
+                                             MxRunInfo& runInfo, const MxConstInfo& constInfo)
     {
         // Both C1 subLoops share Q/QScale. Keep Q resident in L0B across the paired MMADs.
         IterateBmm1Impl<0U, true, false>(outputBuf0, runInfo, constInfo);
         IterateBmm1Impl<1U, false, true>(outputBuf1, runInfo, constInfo);
     }
 
-    __aicore__ inline void IterateBmm2(MxBmm2Buf &outputBuf,
-                                       BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &inputBuf,
-                                       MxRunInfo &runInfo, const MxConstInfo &constInfo)
+    __aicore__ inline void IterateBmm2(MxBmm2Buf& outputBuf,
+                                       BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& inputBuf,
+                                       MxRunInfo& runInfo, const MxConstInfo& constInfo)
     {
         // C2: P[128,S2_BASE] x V[S2_BASE,DV]，P/V 均携带 e8m0 scale。
         Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> pBuf = inputBuf.GetCube();
@@ -189,8 +202,8 @@ public:
 
 private:
     template <uint32_t SUB_LOOP, bool LOAD_Q_TO_L0B, bool RELEASE_Q_L0B>
-    __aicore__ inline void IterateBmm1Impl(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf,
-                                           MxRunInfo &runInfo, const MxConstInfo &constInfo)
+    __aicore__ inline void IterateBmm1Impl(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf,
+                                           MxRunInfo& runInfo, const MxConstInfo& constInfo)
     {
         static_assert(SUB_LOOP < 2U, "MX C1 only supports subLoop 0/1");
         // C1: K[S2_SPLIT,D] x Q^T[D,128]；K 由多个 sparse block 拼接。
@@ -285,7 +298,7 @@ private:
     }
 
     template <uint32_t SUB_LOOP>
-    __aicore__ inline uint32_t GetSubLoopS2Size(const MxRunInfo &runInfo) const
+    __aicore__ inline uint32_t GetSubLoopS2Size(const MxRunInfo& runInfo) const
     {
         static_assert(SUB_LOOP < 2U, "MX C1 only supports subLoop 0/1");
         if (runInfo.actSingleLoopS2Size <= S2_SPLIT) {
@@ -310,9 +323,9 @@ private:
         return tileEnd < blockEnd ? tileEnd : blockEnd;
     }
 
-    __aicore__ inline void CopyKeyAndScaleToL1(LocalTensor<INPUT_T> &keyDstTensor,
-                                               LocalTensor<SCALE_T> &keyScaleDstTensor, const MxRunInfo &runInfo,
-                                               const MxConstInfo &constInfo, uint32_t s2CalcSize, uint32_t subLoop)
+    __aicore__ inline void CopyKeyAndScaleToL1(LocalTensor<INPUT_T>& keyDstTensor,
+                                               LocalTensor<SCALE_T>& keyScaleDstTensor, const MxRunInfo& runInfo,
+                                               const MxConstInfo& constInfo, uint32_t s2CalcSize, uint32_t subLoop)
     {
         // PA BNBD K 与 KScale 使用相同的 sparse 顺序和 token overlap。
         const uint32_t tileStart = subLoop * S2_SPLIT;
@@ -372,8 +385,8 @@ private:
         }
     }
 
-    __aicore__ inline void CopyValueToL1(LocalTensor<INPUT_T> &dstTensor, const MxRunInfo &runInfo,
-                                         const MxConstInfo &constInfo, uint32_t realK, uint32_t kIdx)
+    __aicore__ inline void CopyValueToL1(LocalTensor<INPUT_T>& dstTensor, const MxRunInfo& runInfo,
+                                         const MxConstInfo& constInfo, uint32_t realK, uint32_t kIdx)
     {
         // V 使用与 K 相同的 PA 拼接顺序。
         const uint32_t tileStart = kIdx * S2_SPLIT;
@@ -415,8 +428,8 @@ private:
         }
     }
 
-    __aicore__ inline void CopyValueScaleToL1(LocalTensor<SCALE_T> &dstTensor, const MxRunInfo &runInfo,
-                                              const MxConstInfo &constInfo, uint32_t realK, uint32_t kIdx)
+    __aicore__ inline void CopyValueScaleToL1(LocalTensor<SCALE_T>& dstTensor, const MxRunInfo& runInfo,
+                                              const MxConstInfo& constInfo, uint32_t realK, uint32_t kIdx)
     {
         // VScale GM 为 [physicalBlock, kvHeads, blockSize/64, DV, 2]，offset 单位为 64-token group。
         const uint32_t tileStart = kIdx * S2_SPLIT;
@@ -466,8 +479,8 @@ private:
         }
     }
 
-    __aicore__ inline void FixpipeMm1(const LocalTensor<MM_T> &dstTensor, const LocalTensor<MM_T> &l0C,
-                                      const MxRunInfo &runInfo, uint32_t s2RealSize)
+    __aicore__ inline void FixpipeMm1(const LocalTensor<MM_T>& dstTensor, const LocalTensor<MM_T>& l0C,
+                                      const MxRunInfo& runInfo, uint32_t s2RealSize)
     {
         // C1 写为 VF 使用的 row-major UB layout。
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
@@ -482,8 +495,8 @@ private:
         Fixpipe<MM_T, MM_T, PFA_CFG_ROW_MAJOR_UB>(dstTensor, l0C, fixpipeParams);
     }
 
-    __aicore__ inline void FixpipeMm2(const LocalTensor<MM_T> &dstTensor, const LocalTensor<MM_T> &l0C,
-                                      const MxRunInfo &, const MxConstInfo &constInfo)
+    __aicore__ inline void FixpipeMm2(const LocalTensor<MM_T>& dstTensor, const LocalTensor<MM_T>& l0C,
+                                      const MxRunInfo&, const MxConstInfo& constInfo)
     {
         // C2 以 fp32 写入 UB，供 V2 update。
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
@@ -498,7 +511,7 @@ private:
         Fixpipe<MM_T, MM_T, BMM2_FIXPIPE_CONFIG>(dstTensor, l0C, fixpipeParams);
     }
 
-    __aicore__ inline void InitValuePadding(const LocalTensor<INPUT_T> &valueL1, uint32_t realK, uint32_t curN)
+    __aicore__ inline void InitValuePadding(const LocalTensor<INPUT_T>& valueL1, uint32_t realK, uint32_t curN)
     {
         // V tail 补零到 64-token 对齐。
         const uint32_t curPadK = AlignUp64(realK);
@@ -513,8 +526,8 @@ private:
         InitConstValue(valueL1.template ReinterpretCast<half>()[realK << 4U], initConstValueParams);
     }
 
-    TPipe *tPipe_ = nullptr;
-    BufferManager<BufferType::L1> *l1BufferManager_ = nullptr;
+    TPipe* tPipe_ = nullptr;
+    BufferManager<BufferType::L1>* l1BufferManager_ = nullptr;
     GlobalTensor<INPUT_T> queryGm_;
     GlobalTensor<INPUT_T> keyGm_;
     GlobalTensor<INPUT_T> valueGm_;

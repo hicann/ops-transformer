@@ -64,14 +64,13 @@ public:
 
     __aicore__ inline QuantBlockSparseAttnMxKernel() = default;
 
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                __gm__ uint8_t *sparseIndices, __gm__ uint8_t *sparseSeqLen, __gm__ uint8_t *attenMask,
-                                __gm__ uint8_t *metadata, __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *,
-                                __gm__ uint8_t *, __gm__ uint8_t *seqUsedKv, __gm__ uint8_t *blockTable,
-                                __gm__ uint8_t *qScale, __gm__ uint8_t *kScale, __gm__ uint8_t *vScale,
-                                __gm__ uint8_t *pScale, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *attentionOut,
-                                __gm__ uint8_t *, const QuantBlockSparseAttnMxTilingData *__restrict tiling,
-                                TPipe *tPipe)
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                __gm__ uint8_t* sparseIndices, __gm__ uint8_t* sparseSeqLen, __gm__ uint8_t* attenMask,
+                                __gm__ uint8_t* metadata, __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t*, __gm__ uint8_t*,
+                                __gm__ uint8_t* seqUsedKv, __gm__ uint8_t* blockTable, __gm__ uint8_t* qScale,
+                                __gm__ uint8_t* kScale, __gm__ uint8_t* vScale, __gm__ uint8_t* pScale,
+                                __gm__ uint8_t* softmaxLse, __gm__ uint8_t* attentionOut, __gm__ uint8_t*,
+                                const QuantBlockSparseAttnMxTilingData* __restrict tiling, TPipe* tPipe)
     {
         // 跨核 Buffer ID 由核内状态生成，ACL 图重放会复用该状态；每次启动时需重置计数器，
         // 保证 AIC 与 AIV 使用相同的事件 ID 序列。
@@ -82,20 +81,20 @@ public:
         queryPtr = query;
         keyPtr = key;
         valuePtr = value;
-        sparseIndicesGm.SetGlobalBuffer((__gm__ int32_t *)sparseIndices);
-        sparseSeqLenGm.SetGlobalBuffer((__gm__ int32_t *)sparseSeqLen);
-        metadataGm.SetGlobalBuffer((__gm__ int32_t *)metadata);
+        sparseIndicesGm.SetGlobalBuffer((__gm__ int32_t*)sparseIndices);
+        sparseSeqLenGm.SetGlobalBuffer((__gm__ int32_t*)sparseSeqLen);
+        metadataGm.SetGlobalBuffer((__gm__ int32_t*)metadata);
         if constexpr (LAYOUT == QBSALayout::TND) {
-            cuSeqlensQGm.SetGlobalBuffer((__gm__ int32_t *)cuSeqlensQ);
-            dc_preload(reinterpret_cast<__gm__ uint64_t *>(cuSeqlensQ), 0);
+            cuSeqlensQGm.SetGlobalBuffer((__gm__ int32_t*)cuSeqlensQ);
+            dc_preload(reinterpret_cast<__gm__ uint64_t*>(cuSeqlensQ), 0);
         }
-        seqUsedKvGm.SetGlobalBuffer((__gm__ int32_t *)seqUsedKv);
+        seqUsedKvGm.SetGlobalBuffer((__gm__ int32_t*)seqUsedKv);
         // 预取序列长度元数据，重叠 InitBuffers 期间的 HBM 延迟。
-        dc_preload(reinterpret_cast<__gm__ uint64_t *>(seqUsedKv), 0);
+        dc_preload(reinterpret_cast<__gm__ uint64_t*>(seqUsedKv), 0);
         InitConstInfo();
         InitMMResBuf();
         cubeBlock.Init(pipe, &l1BufferManager, queryPtr, keyPtr, valuePtr, blockTable, qScale, kScale, vScale);
-        __gm__ uint8_t *pScalePtr = (tilingData->scaleParams.pScaleShapeSize == 0U) ? nullptr : pScale;
+        __gm__ uint8_t* pScalePtr = (tilingData->scaleParams.pScaleShapeSize == 0U) ? nullptr : pScale;
         vecBlock.Init(pipe, pScalePtr, softmaxLse, attentionOut, attenMask, tilingData->attenMaskParams.attenMaskS2Size,
                       tilingData->scaleParams.pScaleDtype);
     }
@@ -113,6 +112,12 @@ public:
         }
         ProcessMainLoop();
         CrossCoreBufferUninit();
+        // Only active cores reach InitBuffers and this matching cleanup.
+        if ASCEND_IS_AIC {
+            cubeBlock.UninitBuffers();
+        } else {
+            vecBlock.UninitBuffers();
+        }
     }
 
 private:
@@ -126,10 +131,10 @@ private:
             constInfo.subBlockIdx = GetSubBlockIdx();
         }
 
-        const auto &baseParams = tilingData->baseParams;
-        const auto &pageAttentionParams = tilingData->pageAttentionParams;
-        const auto &sparseParams = tilingData->sparseParams;
-        const auto &scaleParams = tilingData->scaleParams;
+        const auto& baseParams = tilingData->baseParams;
+        const auto& pageAttentionParams = tilingData->pageAttentionParams;
+        const auto& sparseParams = tilingData->sparseParams;
+        const auto& scaleParams = tilingData->scaleParams;
 
         constInfo.qSeqSize = baseParams.qSeqSize;
         constInfo.n2Size = baseParams.n2Size;
@@ -228,7 +233,7 @@ private:
         return previousBlockIdx > currentBlockIdx;
     }
 
-    __aicore__ inline void SortSparseBlocks(MxRunInfo &runInfo) const
+    __aicore__ inline void SortSparseBlocks(MxRunInfo& runInfo) const
     {
         // 最多 8 个 block，排序后再统一生成 offset 与 mask 状态。
         for (uint32_t i = 1U; i < runInfo.sparseBlockCount; ++i) {
@@ -243,7 +248,7 @@ private:
         }
     }
 
-    __aicore__ inline void FillRunInfo(MxRunInfo &runInfo, uint64_t loop, uint32_t mLoop, uint32_t bIdx, uint32_t n1Idx,
+    __aicore__ inline void FillRunInfo(MxRunInfo& runInfo, uint64_t loop, uint32_t mLoop, uint32_t bIdx, uint32_t n1Idx,
                                        uint32_t n2Idx, uint32_t queryTokenBase, uint32_t actualS1Size,
                                        uint32_t actualS2Size, uint32_t s1OuterIdx, uint32_t s2LoopIdx,
                                        uint32_t s2LoopEnd, uint32_t sparseBlockCount, uint64_t sparseBase,
@@ -348,20 +353,20 @@ private:
 
     __aicore__ inline void ExecuteTask(uint64_t loop, MxRunInfo taskRunInfo[PIPELINE_TASK_CACHE_SIZE])
     {
-        MxRunInfo &runInfoCur = taskRunInfo[loop % PIPELINE_TASK_CACHE_SIZE];
+        MxRunInfo& runInfoCur = taskRunInfo[loop % PIPELINE_TASK_CACHE_SIZE];
         if ASCEND_IS_AIC {
             // AIC 先生产当前 C1；随后消费两轮前的 P，生产 C2 留给下一轮 V2。
             if (likely(runInfoCur.isValid)) {
                 if (likely(runInfoCur.actSingleLoopS2Size > S2_SPLIT)) {
-                    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &c1Out0 = bmm1Buffers.Get();
-                    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &c1Out1 = bmm1Buffers.Get();
+                    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& c1Out0 = bmm1Buffers.Get();
+                    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& c1Out1 = bmm1Buffers.Get();
                     cubeBlock.IterateBmm1ReuseQ(c1Out0, c1Out1, runInfoCur, constInfo);
                 } else {
                     cubeBlock.IterateBmm1(bmm1Buffers.Get(), runInfoCur, constInfo);
                 }
             }
             if (likely(loop >= C2_DELAY)) {
-                MxRunInfo &runInfoC2 = taskRunInfo[(loop - C2_DELAY) % PIPELINE_TASK_CACHE_SIZE];
+                MxRunInfo& runInfoC2 = taskRunInfo[(loop - C2_DELAY) % PIPELINE_TASK_CACHE_SIZE];
                 if (likely(runInfoC2.isValid)) {
                     cubeBlock.IterateBmm2(bmm2Buffers.Get(), l1PBuffers, runInfoC2, constInfo);
                     runInfoC2.isValid = false;
@@ -370,14 +375,14 @@ private:
         } else {
             // AIV 先消费上一轮已经就绪的 C2，以有效 V2 工作覆盖当前 C1 的生产时间。
             if (likely(loop >= V2_DELAY)) {
-                MxRunInfo &runInfoV2 = taskRunInfo[(loop - V2_DELAY) % PIPELINE_TASK_CACHE_SIZE];
+                MxRunInfo& runInfoV2 = taskRunInfo[(loop - V2_DELAY) % PIPELINE_TASK_CACHE_SIZE];
                 if (likely(runInfoV2.isValid)) {
                     vecBlock.ProcessVec2(bmm2Buffers.Get(), runInfoV2, constInfo);
                     runInfoV2.isValid = false;
                 }
             }
             if (likely(runInfoCur.isValid)) {
-                Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &pBuf = l1PBuffers.GetVec();
+                Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& pBuf = l1PBuffers.GetVec();
                 // ProcessMainLoop已过滤全无效section；有效task固定先跑subLoop0。
                 vecBlock.template ProcessVec1<0U>(pBuf, bmm1Buffers.Get(), runInfoCur, constInfo);
                 if (likely(runInfoCur.actSingleLoopS2Size > S2_SPLIT)) {
@@ -447,7 +452,7 @@ private:
                                                     static_cast<uint64_t>(s1OuterIdx) * constInfo.maxKb;
                         const uint32_t s2LoopEnd = static_cast<uint32_t>(sparseLen - 1);
                         for (uint32_t s2LoopIdx = 0U; s2LoopIdx <= s2LoopEnd; s2LoopIdx += sparseBlocksPerTask) {
-                            MxRunInfo &runInfo = taskRunInfo[loop % PIPELINE_TASK_CACHE_SIZE];
+                            MxRunInfo& runInfo = taskRunInfo[loop % PIPELINE_TASK_CACHE_SIZE];
                             const uint32_t remainSparseBlockCount = static_cast<uint32_t>(sparseLen) - s2LoopIdx;
                             const uint32_t sparseBlockCount = remainSparseBlockCount > sparseBlocksPerTask ?
                                                                   sparseBlocksPerTask :
@@ -484,12 +489,12 @@ private:
         }
     }
 
-    TPipe *pipe = nullptr;
-    const QuantBlockSparseAttnMxTilingData *__restrict tilingData = nullptr;
+    TPipe* pipe = nullptr;
+    const QuantBlockSparseAttnMxTilingData* __restrict tilingData = nullptr;
     regbasemx::MxConstInfo constInfo;
-    __gm__ uint8_t *queryPtr = nullptr;
-    __gm__ uint8_t *keyPtr = nullptr;
-    __gm__ uint8_t *valuePtr = nullptr;
+    __gm__ uint8_t* queryPtr = nullptr;
+    __gm__ uint8_t* keyPtr = nullptr;
+    __gm__ uint8_t* valuePtr = nullptr;
     GlobalTensor<int32_t> sparseIndicesGm;
     GlobalTensor<int32_t> sparseSeqLenGm;
     GlobalTensor<int32_t> metadataGm;

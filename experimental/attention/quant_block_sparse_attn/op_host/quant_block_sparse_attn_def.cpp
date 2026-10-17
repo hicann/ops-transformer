@@ -51,6 +51,16 @@ public:
             .DataType({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
+        this->Input("sparse_indices")
+            .ParamType(REQUIRED)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        this->Input("sparse_seq_len")
+            .ParamType(REQUIRED)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
         this->Input("p_scale")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0})
@@ -73,16 +83,6 @@ public:
             .AutoContiguous();
         this->Input("seqused_kv")
             .ParamType(OPTIONAL)
-            .DataTypeList({ge::DT_INT32})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("sparse_indices")
-            .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_INT32})
-            .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
-        this->Input("sparse_seq_len")
-            .ParamType(REQUIRED)
             .DataTypeList({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
