@@ -481,6 +481,13 @@ def _fp8_cpu_golden(
     cache = getattr(golden_module, "_TTK_FP8_CACHE", {})
     cached = cache.pop(cache_key, None)
     if cached is not None:
+        requested_arch = golden_module._resolve_golden_arch(kwargs)
+        cached_arch = golden_module._resolve_golden_arch(cached["case"])
+        if cached_arch != requested_arch:
+            raise ValueError(
+                f"FP8 golden cache was generated for {cached_arch}, requested "
+                f"{requested_arch}; use the same golden_arch for inputs and golden"
+            )
         golden = cached["data"]["golden"]
         return _format_golden_outputs(
             golden["attention_out"],

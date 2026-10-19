@@ -36,6 +36,22 @@ SCALE_EPSILON = 1e-8
 EMPTY_LSE = float("-inf")
 SOFTMAX_MAX_SENTINEL = EMPTY_LSE
 MASK_VALUE = -10000.0
+A6_EMPTY_LSE = -3.4028234663852886e38
+
+
+def _resolve_golden_arch(params):
+    """Select the CPU reference without requiring an attached NPU.
+
+    Explicit golden_arch overrides QBSA_GOLDEN_ARCH; default A5 preserves
+    existing callers. Set either selector to A6 for the arch92 pipeline.
+    """
+    arch = params.get("golden_arch")
+    if arch is None:
+        arch = os.environ.get("QBSA_GOLDEN_ARCH", "A5")
+    arch = str(arch).strip().upper()
+    if arch not in ("A5", "A6"):
+        raise ValueError(f"golden_arch must be A5 or A6, got {arch!r}")
+    return arch
 
 
 def _fp8_dtype():
@@ -102,7 +118,7 @@ def _fp8_assemble_case(
     **kwargs,
 ):
     """Translate the shared 16-tensor TTK case into the pytest FP8 schema."""
-    del kwargs
+    golden_arch = _resolve_golden_arch(kwargs)
     cu_q = [int(value) for value in cu_seqlens_q_value]
     cu_kv = [int(value) for value in cu_seqlens_kv_value]
     seq_q = [int(value) for value in seqused_q_value]
@@ -130,6 +146,7 @@ def _fp8_assemble_case(
 
     return {
         "Testcase_Name": testcase_name,
+        "golden_arch": golden_arch,
         "B": batch,
         "S1": max(q_lengths),
         "S2": max(seq_kv),
@@ -172,6 +189,7 @@ def _normalize_params(params):
         raise ValueError("quant_block_sparse_attn params should be a dict")
 
     normalized = dict(params)
+    normalized["golden_arch"] = _resolve_golden_arch(params)
     normalized.setdefault("Testcase_Name", None)
     normalized.setdefault("layout_q", "TND")
     normalized.setdefault("layout_kv", "PA_BNBD")
@@ -381,9 +399,10 @@ def _finalize_fp8_attention_rows(
     softmax_max_offset,
     v_scale,
     single_chunk,
+    empty_lse=SOFTMAX_MAX_SENTINEL,
 ):
     """Match the kernel's final zero-sum and invalid-row guards."""
-    active = (softmax_max != SOFTMAX_MAX_SENTINEL) & (softmax_sum != 0)
+    active = (softmax_max != empty_lse) & (softmax_sum != 0)
     safe_sum = torch.where(active, softmax_sum, torch.ones_like(softmax_sum))
     numerator = acc * v_scale if single_chunk else acc
     attention_out = numerator / safe_sum.view(-1, 1)
@@ -394,7 +413,7 @@ def _finalize_fp8_attention_rows(
     softmax_lse = torch.where(
         active,
         softmax_lse,
-        torch.full_like(softmax_lse, SOFTMAX_MAX_SENTINEL),
+        torch.full_like(softmax_lse, empty_lse),
     )
     return attention_out, softmax_lse
 
@@ -622,6 +641,34 @@ def _positions_from_sparse(
     return chunk_positions
 
 
+def _positions_from_sparse_a6(
+    case, sparse_indices, sparse_seq_len, batch_idx, head_idx, qb_idx, kv_len
+):
+    """Build A6 rounds after sorting each four-block kernel task by sparse index."""
+    block_count = int(sparse_seq_len[batch_idx, head_idx, qb_idx].item())
+    round_positions = []
+    for loop_start in range(0, block_count, 4):
+        loop_block_indices = []
+        for sparse_offset in range(loop_start, min(loop_start + 4, block_count)):
+            block_idx = int(
+                sparse_indices[batch_idx, head_idx, qb_idx, sparse_offset].item()
+            )
+            if block_idx >= 0:
+                loop_block_indices.append(block_idx)
+        loop_block_indices.sort()
+
+        for round_start in range(0, len(loop_block_indices), 2):
+            positions = []
+            for block_idx in loop_block_indices[round_start : round_start + 2]:
+                start = block_idx * case["sparse_kv_block_size"]
+                end = min(start + case["sparse_kv_block_size"], kv_len)
+                if start < kv_len:
+                    positions.extend(range(start, end))
+            if positions:
+                round_positions.append(positions)
+    return round_positions
+
+
 def _count_mask_valid_pairs(case, q_start, q_end, kv_start, kv_end, q_len, kv_len):
     q_count = max(0, q_end - q_start)
     kv_count = max(0, kv_end - kv_start)
@@ -811,7 +858,286 @@ def _log_cube_compute_amount(
     return compute_info["cube_compute_amount"], mfu_time
 
 
-def _reference_attention(
+def _reference_attention_a6(
+    case,
+    query,
+    kv_cache_storage,
+    kv_cache_meta,
+    block_table,
+    q_scale,
+    v_scale,
+    p_scale,
+    sparse_indices,
+    sparse_seq_len,
+    cu_seqlens_q,
+    q_lengths,
+    kv_lengths,
+):
+    # 向量化版本（采纳 MR!40 的 einops 思路把 query token 维度批量进 matmul），
+    # 但严格保留参考实现的数据流以保证逐位一致：
+    #  - 标度在 QK matmul 之后乘到 score 上（q_scale*k_scale*softmax_scale），不在 matmul 前缩放 q/k；
+    #  - 每个 round 沿 KV 轴处理 2 个 sparse block，每个 s2LoopCount 处理 2 个 round；
+    #  - 与 A6 kernel 一致，每 4 个 block 内按 sparse index 排序；
+    #  - 实际长度掩码（q>=q_len、kv>=kv_len 无效；causal 对角线为 kv_len - q_len）；
+    #  - 全掩码空行：输出 0、lse = A6_EMPTY_LSE。
+    query = query.to(torch.float32)
+    kv_key, kv_value, kv_k_scale = combined_kv_cache.make_combined_kv_views(
+        kv_cache_storage, kv_cache_meta
+    )
+    # fp8 视图不支持张量索引（"index_cpu" not implemented for float8_e4m3），
+    # 先在循环外整体转成 float32（fp8->fp32 无损）再按索引取值
+    kv_key = kv_key.to(torch.float32)
+    kv_value = kv_value.to(torch.float32)
+
+    layout_q = case["layout_q"]
+    batch = case["B"]
+    n1 = case["N1"]
+    n2 = case["N2"]
+    group = n1 // n2
+    head_dim = case["D"]
+    output_dtype = case["output_dtype"]
+    fp8_dtype = _fp8_dtype()
+    softmax_scale = float(case["softmax_scale"])
+    p_scale_value = 1.0 if p_scale is None else float(p_scale[0].item())
+    ln_p_scale = torch.log(torch.tensor(p_scale_value, dtype=torch.float32)).item()
+    sparse_q_block_size = case["sparse_q_block_size"]
+    sparse_kv_block_size = case["sparse_kv_block_size"]
+    total_q = int(cu_seqlens_q[-1].item())
+    attention_out = torch.zeros((total_q, n1, head_dim), dtype=output_dtype)
+    softmax_lse = torch.full((n1, total_q), A6_EMPTY_LSE, dtype=torch.float32)
+
+    qb_max = math.ceil(case["S1"] / sparse_q_block_size)
+    for batch_idx in range(batch):
+        q_len = q_lengths[batch_idx]
+        kv_len = kv_lengths[batch_idx]
+        for head_idx in range(n1):
+            n2_idx = head_idx // group
+            v_scale_value = float(v_scale[n2_idx].item())
+            for qb_idx in range(qb_max):
+                q_start = qb_idx * sparse_q_block_size
+                if q_start >= q_len:
+                    break
+                q_end = min(q_start + sparse_q_block_size, q_len)
+                q_indices = list(range(q_start, q_end))
+
+                chunk_positions = _positions_from_sparse_a6(
+                    case,
+                    sparse_indices,
+                    sparse_seq_len,
+                    batch_idx,
+                    head_idx,
+                    qb_idx,
+                    kv_len,
+                )
+                if not chunk_positions:
+                    continue
+                positions = [p for chunk in chunk_positions for p in chunk]
+
+                # gather q 向量（批量），shape (nq, D)
+                base = int(cu_seqlens_q[batch_idx].item())
+                if layout_q == "NTD":
+                    q_block = query[head_idx, base + q_start : base + q_end].to(
+                        torch.float32
+                    )
+                    q_scale_block = q_scale[head_idx, base + q_start : base + q_end].to(
+                        torch.float32
+                    )
+                else:
+                    q_block = query[base + q_start : base + q_end, head_idx].to(
+                        torch.float32
+                    )
+                    q_scale_block = q_scale[base + q_start : base + q_end, head_idx].to(
+                        torch.float32
+                    )
+                nq = q_block.shape[0]
+
+                # gather k/v/k_scale（按 positions 顺序）：
+                # 通过 block_table 把逻辑块映射到 kv_cache 物理块，与 kernel 读取路径一致
+                pos_tensor = torch.as_tensor(positions, dtype=torch.long)
+                logical_block = pos_tensor // sparse_kv_block_size
+                token_in_block = pos_tensor % sparse_kv_block_size
+                physical_block = block_table[batch_idx, logical_block]
+                k_mat = kv_key[physical_block, n2_idx, token_in_block].to(
+                    torch.float32
+                )  # (npos, D)
+                v_mat = kv_value[physical_block, n2_idx, token_in_block].to(
+                    torch.float32
+                )  # (npos, D)
+                k_scale_vec = kv_k_scale[physical_block, n2_idx, token_in_block, 0].to(
+                    torch.float32
+                )  # (npos,)
+
+                npos = pos_tensor.shape[0]
+                # valid_mask: (nq, npos) — causal/actlen，与参考 _mask_positions 一致
+                if case["mask_mode"] == 0:
+                    valid_mask = torch.ones((nq, npos), dtype=torch.bool)
+                elif case["mask_mode"] == 3:
+                    q_idx_col = torch.as_tensor(q_indices, dtype=torch.long).view(nq, 1)
+                    limit = q_idx_col + (kv_len - q_len)  # (nq,1)
+                    valid_mask = pos_tensor.view(1, npos) <= limit  # (nq, npos)
+                else:
+                    raise ValueError(f"unsupported mask_mode: {case['mask_mode']}")
+
+                # scores: (nq, npos)，标度在 matmul 之后施加（保持 FP8 桶一致）
+                # 与 kernel 对齐乘法顺序：先将 q_scale 乘以 softmax_scale(dScale)，
+                # 再乘到 QK 结果上，最后乘 k_scale，避免浮点非结合律导致的量化边界差异
+                scores = torch.matmul(q_block, k_mat.transpose(0, 1))
+                scores = (
+                    scores
+                    * (q_scale_block.view(nq, 1) * softmax_scale)
+                    * k_scale_vec.view(1, npos)
+                )
+                scores = torch.where(
+                    valid_mask, scores, torch.full_like(scores, MASK_VALUE)
+                )
+
+                # 按 2-block round 的 online/flash FP8 数据流，向量化到 q 维。
+                # A6 每个 s2LoopCount 有 2 个 round，
+                # round1 更新 max 后会对已经 FP8 量化的 round0 概率再缩放、再量化，
+                # 然后将两个 round 拼接进入同一次 BMM2。
+                # p_scale 通过 ln(pScale) 编入 max（与 kernel FusedExpSub 路径对齐），
+                # 使 exp 的数值路径与 kernel 一致：exp(score - (actual_max - ln(pScale))) = p_c * pScale
+                # v_scale 乘入时机与 kernel 对齐：
+                #   loop 0 (DataCopy): acc = pv_raw（不含 v_scale）
+                #   loop 1 (isUpdatePre=true): acc = acc * rescale * v_scale + pv_raw * v_scale
+                #   loop >1 (isUpdatePre=false): acc = acc * rescale + pv_raw * v_scale
+                #   单 loop 最后除法 (LastDivNew): output = pv_raw * v_scale / sum
+                m_run = torch.full((nq,), A6_EMPTY_LSE, dtype=torch.float32)
+                m_run_offset = torch.full((nq,), A6_EMPTY_LSE, dtype=torch.float32)
+                l_run = torch.zeros((nq,), dtype=torch.float32)
+                acc = torch.zeros((nq, head_dim), dtype=torch.float32)
+                offset = 0
+                round_count = len(chunk_positions)
+                loop_count = math.ceil(round_count / 2)
+                for loop_idx in range(loop_count):
+                    loop_c0 = offset
+                    loop_rescale = torch.ones((nq,), dtype=torch.float32)
+                    p_quant_rounds = []
+                    for round_in_loop in range(2):
+                        round_idx = loop_idx * 2 + round_in_loop
+                        if round_idx >= round_count:
+                            break
+                        round_pos_list = chunk_positions[round_idx]
+                        c0 = offset
+                        c1 = offset + len(round_pos_list)
+                        offset = c1
+                        s_c = scores[:, c0:c1]
+                        vm_c = valid_mask[:, c0:c1]
+                        # 每行的局部 max；无有效位置时保留 kernel 使用的有限哨兵。
+                        masked_scores = torch.where(
+                            vm_c,
+                            s_c,
+                            torch.full_like(s_c, A6_EMPTY_LSE),
+                        )
+                        round_max = masked_scores.max(dim=-1).values  # (nq,)
+                        round_max = torch.maximum(
+                            round_max,
+                            torch.full_like(round_max, A6_EMPTY_LSE),
+                        )
+                        round_has = round_max != A6_EMPTY_LSE
+                        run_started = m_run != A6_EMPTY_LSE
+                        # m_new：未开始的行取 round_max；已开始的行取历史与当前 max。
+                        m_new = torch.where(
+                            run_started, torch.maximum(m_run, round_max), round_max
+                        )
+                        # 该 round 对此行无有效位置 -> 此行本轮不更新
+                        m_new = torch.where(round_has, m_new, m_run)
+                        # 编入 ln(pScale)，与 kernel 的 max0 = actual_max - ln(pScale) 对齐
+                        m_new_offset = m_new - ln_p_scale
+                        # 与 kernel FusedExpSub 对齐：kernel 的 FusedExpSub(x, y) 计算 exp(x - y) 时，
+                        # 减法在硬件内部以更高精度完成（融合，无 float32 中间舍入）。
+                        # golden 用 float64 减法模拟该融合减法，避免 float32 减法舍入导致
+                        # exp 结果落在 FP8 量化边界的错误一侧。
+                        rescale = torch.where(
+                            run_started,
+                            torch.exp(
+                                m_run_offset.double() - m_new_offset.double()
+                            ).float(),
+                            torch.zeros_like(m_run),
+                        )
+                        rescale = torch.where(
+                            torch.isfinite(rescale),
+                            rescale,
+                            torch.zeros_like(rescale),
+                        )
+                        loop_rescale = loop_rescale * rescale
+                        # FusedExpSub 等价：exp(score - (actual_max - ln(pScale))) = p_c * pScale
+                        p_scaled = torch.exp(
+                            s_c.double() - m_new_offset.double().view(nq, 1)
+                        ).float()
+                        p_scaled = torch.where(
+                            vm_c, p_scaled, torch.zeros_like(p_scaled)
+                        )
+                        # 仅对本轮有有效位置的行参与量化累加；其余行贡献 0
+                        p_scaled = torch.where(
+                            round_has.view(nq, 1),
+                            p_scaled,
+                            torch.zeros_like(p_scaled),
+                        )
+                        # FP8 量化：p_scaled 已含 pScale 因子，直接 cast（与 kernel 一致）
+                        p_quant = p_scaled.to(fp8_dtype).to(torch.float32)
+                        if round_in_loop == 1:
+                            # arch-920r1 RescaleRound0：在 round1 刷新 max 后，
+                            # round0 先前的 FP8 结果乘 alpha，再次落回 FP8。
+                            p_quant_rounds[0] = (
+                                (p_quant_rounds[0] * rescale.view(nq, 1))
+                                .to(fp8_dtype)
+                                .to(torch.float32)
+                            )
+                        p_quant_rounds.append(p_quant)
+                        # sum 累加含 pScale 因子的值（与 kernel 一致）
+                        l_run = l_run * rescale + p_scaled.sum(dim=-1)
+                        m_run = torch.where(round_has, m_new, m_run)
+                        m_run_offset = torch.where(
+                            round_has, m_new_offset, m_run_offset
+                        )
+
+                    # A6 将同一 s2LoopCount 的 round0/round1 拼接后执行一次 BMM2。
+                    p_quant_loop = torch.cat(p_quant_rounds, dim=1)
+                    pv_raw = torch.matmul(
+                        p_quant_loop, v_mat[loop_c0:offset]
+                    )  # (nq, D)，不含 v_scale
+                    # 与 kernel FlashUpdate/FlashUpdateLast 的 isUpdatePre 逻辑对齐 v_scale 乘入时机
+                    if loop_idx == 0:
+                        # 第一个 loop：acc = pv_raw（与 kernel DataCopy 一致，不含 v_scale）
+                        acc = pv_raw
+                    elif loop_idx == 1:
+                        # 第二个 loop（isUpdatePre=true）：历史项和当前项首次乘 v_scale
+                        acc = (
+                            acc * loop_rescale.view(nq, 1) * v_scale_value
+                            + pv_raw * v_scale_value
+                        )
+                    else:
+                        # 后续 loop（isUpdatePre=false）：历史项已含 v_scale
+                        acc = acc * loop_rescale.view(nq, 1) + pv_raw * v_scale_value
+
+                attn, lse = _finalize_fp8_attention_rows(
+                    acc,
+                    l_run,
+                    m_run,
+                    m_run_offset,
+                    v_scale_value,
+                    loop_count <= 1,
+                    empty_lse=A6_EMPTY_LSE,
+                )
+
+                for li, q_idx in enumerate(q_indices):
+                    _set_output(
+                        attention_out,
+                        cu_seqlens_q,
+                        batch_idx,
+                        q_idx,
+                        head_idx,
+                        attn[li].to(output_dtype),
+                    )
+                    _set_lse(
+                        softmax_lse, cu_seqlens_q, batch_idx, q_idx, head_idx, lse[li]
+                    )
+
+    return attention_out, softmax_lse
+
+
+def _reference_attention_a5(
     case,
     query,
     kv_cache_storage,
@@ -1061,6 +1387,16 @@ def _reference_attention(
     return attention_out, softmax_lse
 
 
+def _reference_attention(case, *args, **kwargs):
+    """Dispatch to the platform-specific FP8 arithmetic and empty-row semantics."""
+    reference = (
+        _reference_attention_a6
+        if _resolve_golden_arch(case) == "A6"
+        else _reference_attention_a5
+    )
+    return reference(case, *args, **kwargs)
+
+
 def save_test_case(input_data, output_dir):
     os.makedirs(output_dir, exist_ok=True)
     case_name = input_data["Testcase_Name"]
@@ -1071,6 +1407,11 @@ def save_test_case(input_data, output_dir):
 
 
 def generate_and_save_testdata(params, save_pt=False, save_path=""):
+    """Generate CPU inputs/golden for params['golden_arch'] ('A5' or 'A6').
+
+    If omitted, QBSA_GOLDEN_ARCH selects the platform, defaulting to A5.
+    The resolved architecture is retained in the returned params for replay.
+    """
     case = _normalize_params(params)
     check_valid_param.check_valid_param(case)
 
