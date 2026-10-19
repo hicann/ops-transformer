@@ -179,7 +179,7 @@ aclnnStatus aclnnFusedFloydAttentionGrad(
         <tr>
           <td>attenMaskOptional（aclTensor）</td>
           <td>输入</td>
-          <td>公式中的atten_mask。</td>
+          <td>公式中的atten_mask。当前版本必须传入，不支持空指针。</td>
           <td>取值为1代表该位不参与计算，为0代表该位参与计算。</td>
           <td>BOOL、UINT8</td>
           <td>ND</td>
@@ -397,6 +397,7 @@ aclnnStatus aclnnFusedFloydAttentionGrad(
 - query与dy/attentionIn shape需相同。
 - softmaxMax与softmaxSum shape需相同。
 - D只支持32/64/128。
+- attenMaskOptional当前版本必须传入，不支持空指针；未传入时tiling返回失败。
 - 由于底层指令限制，当M\*D>=65536或者K\*D>=65536时，会出现明显性能下降，此时建议使用小算子拼接替换实现。
 
 ## 调用示例

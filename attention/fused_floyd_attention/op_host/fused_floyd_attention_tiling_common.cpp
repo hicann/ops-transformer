@@ -31,7 +31,8 @@ ge::graphStatus CheckAttentionMaskShape(gert::TilingContext* context, int64_t b,
 {
     auto attentionMaskShape = context->GetOptionalInputShape(ATTENTION_MASK_INPUT_INDEX);
     if (attentionMaskShape == nullptr) {
-        return ge::GRAPH_SUCCESS;
+        OP_LOGE(context, "FusedFloydAttention does not support a null atten_mask.");
+        return ge::GRAPH_FAILED;
     }
     auto attentionMaskDimNum = attentionMaskShape->GetStorageShape().GetDimNum();
     if (attentionMaskDimNum != SUPPORT_DIM_NUM) { // attentionMask only support 5 dimensions

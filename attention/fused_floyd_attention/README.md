@@ -69,7 +69,7 @@
     <tr>
       <td>attenMaskOptional</td>
       <td>可选输入</td>
-      <td>公式中的atten_mask，表示注意力掩码，取值为1代表该位不参与计算（不生效），为0代表该位参与计算。</td>
+      <td>公式中的atten_mask，当前版本必须传入，不支持空指针。表示注意力掩码，取值为1代表该位不参与计算（不生效），为0代表该位参与计算。</td>
       <td>BOOL、UINT8</td>
       <td>ND</td>
     </tr>
@@ -125,6 +125,7 @@
 - key2与value2 shape需相同。
 - softmaxMax与softmaxSum shape需相同。
 - D只支持32/64/128。
+- attenMaskOptional当前版本必须传入，不支持空指针；未传入时tiling返回失败。
 
 ## 调用说明
 
