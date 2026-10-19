@@ -168,6 +168,9 @@ protected:
     bool isCacheModeNorm_;
     bool isSeqLenCumSum_;
     bool hasSeqOffset_;
+    bool isAscend96_ = false;
+    bool isKeyFp4_ = false;
+    bool isValueFp4_ = false;
 
 private:
     ge::graphStatus GetAttrs();

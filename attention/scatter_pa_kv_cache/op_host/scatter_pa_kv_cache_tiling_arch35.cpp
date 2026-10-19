@@ -19,6 +19,7 @@
 
 #include "log/log.h"
 #include "util/math_util.h"
+#include "common/include/op_host/op_const_def_transformer.h"
 #include "op_host/tiling_util.h"
 #include "tiling/platform/platform_ascendc.h"
 #include "platform/platform_info_def.h"
@@ -196,7 +197,8 @@ ge::graphStatus ScatterPaKvCacheTiling::GetInputDtype()
             }
         }
         valueDtype_ = inputValueDtype;
-        if (inputValueDtype == ge::DT_FLOAT4_E2M1 || inputValueDtype == ge::DT_FLOAT4_E1M2) {
+        if (inputValueDtype == ge::DT_FLOAT4_E2M1 || inputValueDtype == ge::DT_FLOAT4_E1M2 ||
+            inputValueDtype == Ops::Transformer::DT_HIFLOAT4) {
             valueDtypeByteSize_ = DIM1;
         } else {
             valueDtypeByteSize_ = static_cast<int64_t>(GetSizeByDataType(inputValueDtype));
@@ -207,13 +209,13 @@ ge::graphStatus ScatterPaKvCacheTiling::GetInputDtype()
                                                   "get value input dtype bytes failed");
             return ge::GRAPH_FAILED;
         }
-        bool inputValueDtypeCheck = valueDtype_ == ge::DT_FLOAT || valueDtype_ == ge::DT_FLOAT16 ||
-                                    valueDtype_ == ge::DT_BF16 || valueDtype_ == ge::DT_INT8 ||
-                                    valueDtype_ == ge::DT_UINT8 || valueDtype_ == ge::DT_INT16 ||
-                                    valueDtype_ == ge::DT_UINT16 || valueDtype_ == ge::DT_INT32 ||
-                                    valueDtype_ == ge::DT_UINT32 || valueDtype_ == ge::DT_HIFLOAT8 ||
-                                    valueDtype_ == ge::DT_FLOAT8_E5M2 || valueDtype_ == ge::DT_FLOAT8_E4M3FN ||
-                                    valueDtype_ == ge::DT_FLOAT4_E2M1 || valueDtype_ == ge::DT_FLOAT4_E1M2;
+        bool inputValueDtypeCheck =
+            valueDtype_ == ge::DT_FLOAT || valueDtype_ == ge::DT_FLOAT16 || valueDtype_ == ge::DT_BF16 ||
+            valueDtype_ == ge::DT_INT8 || valueDtype_ == ge::DT_UINT8 || valueDtype_ == ge::DT_INT16 ||
+            valueDtype_ == ge::DT_UINT16 || valueDtype_ == ge::DT_INT32 || valueDtype_ == ge::DT_UINT32 ||
+            valueDtype_ == ge::DT_HIFLOAT8 || valueDtype_ == ge::DT_FLOAT8_E5M2 ||
+            valueDtype_ == ge::DT_FLOAT8_E4M3FN || valueDtype_ == ge::DT_FLOAT4_E2M1 ||
+            valueDtype_ == ge::DT_FLOAT4_E1M2 || (isAscend96_ && valueDtype_ == Ops::Transformer::DT_HIFLOAT4);
         if (!inputValueDtypeCheck) {
             OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "value",
                                                   ge::TypeUtils::DataTypeToSerialString(valueDtype_).c_str(),
@@ -232,7 +234,8 @@ ge::graphStatus ScatterPaKvCacheTiling::GetInputDtype()
     }
 
     inputDtype_ = inputKeyDtype;
-    if (inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2) {
+    if (inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2 ||
+        inputDtype_ == Ops::Transformer::DT_HIFLOAT4) {
         dtypeByteSize_ = DIM1;
     } else {
         dtypeByteSize_ = static_cast<int64_t>(GetSizeByDataType(inputDtype_));
@@ -247,7 +250,8 @@ ge::graphStatus ScatterPaKvCacheTiling::GetInputDtype()
                            inputDtype_ == ge::DT_UINT16 || inputDtype_ == ge::DT_INT32 ||
                            inputDtype_ == ge::DT_UINT32 || inputDtype_ == ge::DT_HIFLOAT8 ||
                            inputDtype_ == ge::DT_FLOAT8_E5M2 || inputDtype_ == ge::DT_FLOAT8_E4M3FN ||
-                           inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2;
+                           inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2 ||
+                           (isAscend96_ && inputDtype_ == Ops::Transformer::DT_HIFLOAT4);
     if (!inputDtypeCheck) {
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "key",
                                               ge::TypeUtils::DataTypeToSerialString(inputDtype_).c_str(),
@@ -310,7 +314,8 @@ void ScatterPaKvCacheTiling::GetNonContigousStrideInfo()
     keyCacheStride1_ = keyCacheStride_[DIM1];
     keyCacheStride2_ = keyCacheStride_[DIM2];
     keyCacheStride3_ = keyCacheStride_[DIM3];
-    if (inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2) {
+    if (inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2 ||
+        inputDtype_ == Ops::Transformer::DT_HIFLOAT4) {
         keyStride0_ /= DIM2;
         keyStride1_ /= DIM2;
         keyStride2_ /= DIM2;
@@ -332,7 +337,8 @@ void ScatterPaKvCacheTiling::GetNonContigousStrideInfo()
         valueCacheStride1_ = valueCacheStride_[DIM1];
         valueCacheStride2_ = valueCacheStride_[DIM2];
         valueCacheStride3_ = valueCacheStride_[DIM3];
-        if (valueDtype_ == ge::DT_FLOAT4_E2M1 || valueDtype_ == ge::DT_FLOAT4_E1M2) {
+        if (valueDtype_ == ge::DT_FLOAT4_E2M1 || valueDtype_ == ge::DT_FLOAT4_E1M2 ||
+            valueDtype_ == Ops::Transformer::DT_HIFLOAT4) {
             valueStride0_ /= DIM2;
             valueStride1_ /= DIM2;
             valueStride2_ /= DIM2;
@@ -363,7 +369,8 @@ ge::graphStatus ScatterPaKvCacheTiling::TemplateNormal()
     kHandleNumPerCore_ = inputKeyShape_.GetDim(DIM1) * inputKeyShape_.GetDim(DIM2);
     vHandleNumPerCore_ =
         (inOutMode_ == SINGLE_IN_OUT) ? DIM0 : inputValueShape_.GetDim(DIM1) * inputValueShape_.GetDim(DIM2);
-    if (inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2) {
+    if (inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2 ||
+        inputDtype_ == Ops::Transformer::DT_HIFLOAT4) {
         if (inputKeyShape_.GetDim(DIM2) % DIM2 != 0) {
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "key",
                                                   std::to_string(inputKeyShape_.GetDim(DIM2)).c_str(),
@@ -388,15 +395,21 @@ ge::graphStatus ScatterPaKvCacheTiling::TemplateNormal()
     if (templateType_ == TEMPLATE_NORMAL_NON_CONTIGUOUS) {
         return ge::GRAPH_SUCCESS;
     }
-    int64_t maxHandleNumPerLoop = ubSize_ / dtypeByteSize_;
+    int64_t maxOffsetSize = numBlocks_ * blockSize_ * std::max(kHandleNumPerCore_, vHandleNumPerCore_) * dtypeByteSize_;
+    int64_t availableUb_ = ubSize_ - RESERVED_UB_SIZE;
+    offsetTypeSize_ = INT32_DTYPE_SIZE;
+    if (maxOffsetSize > INT32_MAX || indexDtypeSize_ == INT64_DTYPE_SIZE) {
+        offsetTypeSize_ = INT64_DTYPE_SIZE;
+    }
     // check whether tail dim can fully load.
-    int64_t ubThreshold = std::max(blockFactor_, tailBlockFactor_) *
-                              (RoundUp(kHandleNumPerCore_, dtypeByteSize_) +
-                               RoundUp(vHandleNumPerCore_, dtypeByteSize_)) + // inputKey & inputValue
-                          RoundUp(std::max(blockFactor_, tailBlockFactor_), dtypeByteSize_) * DIM2 * indexDtypeSize_ /
-                              dtypeByteSize_; // slotMapping for key and value
-    if (ubThreshold <= maxHandleNumPerLoop) {
+    int64_t ubThreshold = RoundUp(kHandleNumPerCore_, dtypeByteSize_) * dtypeByteSize_ +
+                          RoundUp(vHandleNumPerCore_, dtypeByteSize_) * dtypeByteSize_ + offsetTypeSize_ * DIM2 +
+                          indexDtypeSize_ * DIM2;
+    if (ubThreshold < availableUb_) {
         // tail dim can fully load
+        ubBlockFactor_ = availableUb_ / (RoundUp(kHandleNumPerCore_, dtypeByteSize_) * dtypeByteSize_ +
+                                         RoundUp(vHandleNumPerCore_, dtypeByteSize_) * dtypeByteSize_ +
+                                         offsetTypeSize_ * DIM2 + indexDtypeSize_ * DIM2);
         isFullyLoad_ = FULLY_LOAD;
         OP_LOGD(context_, "tail dim can fully load.");
         return ge::GRAPH_SUCCESS;
@@ -443,7 +456,8 @@ ge::graphStatus ScatterPaKvCacheTiling::TemplateNZ()
     kHandleNumPerCore_ = inputKeyShape_.GetDim(DIM1) * inputKeyShape_.GetDim(DIM2);
     vHandleNumPerCore_ =
         (inOutMode_ == SINGLE_IN_OUT) ? DIM0 : inputValueShape_.GetDim(DIM1) * inputValueShape_.GetDim(DIM2);
-    if (inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2) {
+    if (inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2 ||
+        inputDtype_ == Ops::Transformer::DT_HIFLOAT4) {
         if (inputKeyShape_.GetDim(DIM2) % DIM2 != 0) {
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "key",
                                                   std::to_string(inputKeyShape_.GetDim(DIM2)).c_str(),
@@ -453,7 +467,8 @@ ge::graphStatus ScatterPaKvCacheTiling::TemplateNZ()
         kHandleNumPerCore_ /= DIM2;
         kHeadSize_ /= DIM2;
     }
-    if (inOutMode_ == DUAL_IN_OUT && (valueDtype_ == ge::DT_FLOAT4_E2M1 || valueDtype_ == ge::DT_FLOAT4_E1M2)) {
+    if (inOutMode_ == DUAL_IN_OUT && (valueDtype_ == ge::DT_FLOAT4_E2M1 || valueDtype_ == ge::DT_FLOAT4_E1M2 ||
+                                      valueDtype_ == Ops::Transformer::DT_HIFLOAT4)) {
         if (inputValueShape_.GetDim(DIM2) % DIM2 != 0) {
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "value",
                                                   std::to_string(inputValueShape_.GetDim(DIM2)).c_str(),
@@ -513,7 +528,8 @@ ge::graphStatus ScatterPaKvCacheTiling::TemplateRope()
 {
     if (inOutMode_ == SINGLE_IN_OUT &&
         (inputDtype_ == ge::DT_HIFLOAT8 || inputDtype_ == ge::DT_FLOAT8_E5M2 || inputDtype_ == ge::DT_FLOAT8_E4M3FN ||
-         inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2)) {
+         inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2 ||
+         inputDtype_ == Ops::Transformer::DT_HIFLOAT4)) {
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
             context_->GetNodeName(), "input", ge::TypeUtils::DataTypeToSerialString(inputDtype_).c_str(),
             "input dtype not support in rope compression when single input and output");
@@ -573,7 +589,8 @@ ge::graphStatus ScatterPaKvCacheTiling::TemplateOmni()
 {
     if (inOutMode_ == SINGLE_IN_OUT &&
         (inputDtype_ == ge::DT_HIFLOAT8 || inputDtype_ == ge::DT_FLOAT8_E5M2 || inputDtype_ == ge::DT_FLOAT8_E4M3FN ||
-         inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2)) {
+         inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2 ||
+         inputDtype_ == Ops::Transformer::DT_HIFLOAT4)) {
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
             context_->GetNodeName(), "input", ge::TypeUtils::DataTypeToSerialString(inputDtype_).c_str(),
             "TemplateOmni input dtype not support in rope compression when single input and output");
@@ -624,7 +641,8 @@ ge::graphStatus ScatterPaKvCacheTiling::TemplateAlibi()
 {
     if (inOutMode_ == SINGLE_IN_OUT &&
         (inputDtype_ == ge::DT_HIFLOAT8 || inputDtype_ == ge::DT_FLOAT8_E5M2 || inputDtype_ == ge::DT_FLOAT8_E4M3FN ||
-         inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2)) {
+         inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2 ||
+         inputDtype_ == Ops::Transformer::DT_HIFLOAT4)) {
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
             context_->GetNodeName(), "input", ge::TypeUtils::DataTypeToSerialString(inputDtype_).c_str(),
             "input dtype not support in alibi compression when single input and output");
@@ -734,8 +752,9 @@ ge::graphStatus ScatterPaKvCacheTiling::CheckNz()
     int64_t tokensK = numHead * kHeadSize;
     int64_t lastDimK = inputKeyCacheInShape_.GetDim(inputKeyCacheInShape_.GetDimNum() - DIM1);
     int64_t lastDimKSize = lastDimK * dtypeByteSize_;
-    if (inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2) {
-        lastDimKSize /= 2;
+    if (inputDtype_ == ge::DT_FLOAT4_E2M1 || inputDtype_ == ge::DT_FLOAT4_E1M2 ||
+        inputDtype_ == Ops::Transformer::DT_HIFLOAT4) {
+        lastDimKSize /= DIM2;
     }
     if (lastDimKSize != BLOCK_SIZE) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "keyCache.lastDimSize",
@@ -821,8 +840,9 @@ ge::graphStatus ScatterPaKvCacheTiling::CheckNz()
     int64_t tokensV = numHead * vHeadSize;
     int64_t lastDimV = inputValueCacheInShape_.GetDim(inputKeyCacheInShape_.GetDimNum() - DIM1);
     int64_t lastDimVSize = lastDimV * valueDtypeByteSize_;
-    if (valueDtype_ == ge::DT_FLOAT4_E2M1 || valueDtype_ == ge::DT_FLOAT4_E1M2) {
-        lastDimVSize /= 2;
+    if (valueDtype_ == ge::DT_FLOAT4_E2M1 || valueDtype_ == ge::DT_FLOAT4_E1M2 ||
+        valueDtype_ == Ops::Transformer::DT_HIFLOAT4) {
+        lastDimVSize /= DIM2;
     }
     if (lastDimVSize != BLOCK_SIZE) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "valueCache.lastDimSize",
@@ -1214,6 +1234,10 @@ bool ScatterPaKvCacheTiling::IsNonContiguous()
 ge::graphStatus ScatterPaKvCacheTiling::GetShapeAttrsInfo()
 {
     SetInputPos();
+    auto platformInfo = context_->GetPlatformInfo();
+    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context_, "platformInfo is nullptr."), return ge::GRAPH_FAILED);
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
+    isAscend96_ = ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201;
     if (GetTensorInfo(inputKeyShape_, keyStride_, inputKey_) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
@@ -1378,12 +1402,10 @@ ge::graphStatus ScatterPaKvCacheTiling::GetWorkspaceSize()
 
 void ScatterPaKvCacheTiling::GenTilingKey()
 {
-    tilingKey_ = static_cast<uint64_t>(templateType_) * HUNDRED + static_cast<uint64_t>(indexDtypeSize_) * TEN +
-                 static_cast<uint64_t>(isFullyLoad_);
-    if (templateType_ == TEMPLATE_NZ || templateType_ == TEMPLATE_OMNI || templateType_ == TEMPLATE_NCT ||
-        templateType_ == TEMPLATE_NORMAL_NON_CONTIGUOUS || templateType_ == TEMPLATE_NZ_NON_CONTIGUOUS ||
-        templateType_ == TEMPLATE_NZ_NON_CONTIGUOUS_FIVE_DIM) {
-        tilingKey_ = static_cast<uint64_t>(templateType_) * HUNDRED + static_cast<uint64_t>(isFullyLoad_);
+    tilingKey_ = static_cast<uint64_t>(templateType_) * HUNDRED + static_cast<uint64_t>(isFullyLoad_);
+    // nct normal support scatterdma
+    if ((templateType_ == TEMPLATE_NCT || templateType_ == TEMPLATE_NORMAL) && isFullyLoad_) {
+        tilingKey_ += static_cast<uint64_t>(offsetTypeSize_) * TEN;
     }
 }
 
@@ -1433,6 +1455,7 @@ ge::graphStatus ScatterPaKvCacheTiling::PostTiling()
         tilingData_.set_valueCacheStride2(valueCacheStride2_);
         tilingData_.set_valueCacheStride3(valueCacheStride3_);
     }
+    tilingData_.set_ubBlockFactor(ubBlockFactor_);
     GenTilingKey();
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
@@ -1441,8 +1464,7 @@ ge::graphStatus ScatterPaKvCacheTiling::PostTiling()
 
 void ScatterPaKvCacheTiling::DumpTilingInfo()
 {
-    std::string info;
-    info = " totalCoreNum: " + std::to_string(totalCoreNum_);
+    std::string info = " totalCoreNum: " + std::to_string(totalCoreNum_);
     info += " usedCoreNum: " + std::to_string(usedCoreNum_);
     info += " blockFactor: " + std::to_string(blockFactor_);
     info += " tailBlockFactor: " + std::to_string(tailBlockFactor_);
@@ -1493,6 +1515,7 @@ void ScatterPaKvCacheTiling::DumpTilingInfo()
         info += " valueCacheStride2: " + std::to_string(valueCacheStride2_);
         info += " valueCacheStride3: " + std::to_string(valueCacheStride3_);
     }
+    info += " ubBlockFactor: " + std::to_string(ubBlockFactor_);
     OP_LOGI(context_->GetNodeName(), "%s", info.c_str());
 }
 

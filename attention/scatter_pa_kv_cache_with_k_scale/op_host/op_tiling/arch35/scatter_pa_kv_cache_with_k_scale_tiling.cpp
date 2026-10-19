@@ -530,6 +530,21 @@ static void DumpTilingInfo(gert::TilingContext* context, const ScatterPaKvCacheW
     OP_LOGI(context, "===============================================================================");
 }
 
+// ==================== pcie through ====================
+
+// PCIe through场景判断(对齐ops-nn pcie_through_util.h写法): CANN>=9.2.0且flag为true
+static bool IsPcieThrough(gert::TilingContext* context)
+{
+#if defined(METADEF_VERSION_NUM) && METADEF_VERSION_NUM >= 90200000
+    bool result = context->GetPcieThroughFlag();
+    OP_LOGD(context->GetNodeName(), "IsPcieThrough:%s", (result ? "true" : "false"));
+    return result;
+#else
+    OP_LOGD(context->GetNodeName(), "IsPcieThrough:false");
+    return false;
+#endif
+}
+
 // ==================== template mode selection ====================
 
 // SIMD 模板 DataCopyPad 多行搬运要求 headSize 不小于 128B
@@ -555,11 +570,9 @@ static bool IsSimdCapable(gert::TilingContext* context, const TensorParams& para
     if (dtypeSize <= 0) {
         return false;
     }
-#if defined(METADEF_VERSION_NUM) && METADEF_VERSION_NUM >= 90200000
-    if (context->GetPcieThroughFlag()) {
+    if (IsPcieThrough(context)) {
         return true;
     }
-#endif
     bool headSizeValid = params.kHeadSize * dtypeSize >= SIMD_MIN_HEAD_SIZE_BYTES &&
                          params.vHeadSize * dtypeSize >= SIMD_MIN_HEAD_SIZE_BYTES;
     bool lastAxisContiguous = params.keyStride[DIM_HEAD_SIZE] == 1 && params.valueStride[DIM_HEAD_SIZE] == 1 &&

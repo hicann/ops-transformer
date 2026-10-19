@@ -69,6 +69,10 @@ function(gen_es_transformer_lib_builtin)
     PRIVATE
     ${ASCEND_DIR}/${SYSTEM_PREFIX}/lib64
   )
+  target_include_directories(proto_temp_transformer
+    PRIVATE
+    ${PROJECT_SOURCE_DIR}/common/include/op_host
+  )
   add_es_library_and_whl(
     ES_LINKABLE_AND_ALL_TARGET es_transformer
     OPP_PROTO_TARGET proto_temp_transformer
@@ -129,6 +133,10 @@ function(gen_opgraph_symbol)
     PRIVATE
     ${ASCEND_DIR}/${SYSTEM_PREFIX}/lib64
     ${CMAKE_BINARY_DIR}/es_packages/lib64
+  )
+  target_include_directories(${OPGRAPH_NAME}
+    PRIVATE
+    ${PROJECT_SOURCE_DIR}/common/include/op_host
   )
 
   if(TARGET ${GRAPH_PLUGIN_NAME}_obj)

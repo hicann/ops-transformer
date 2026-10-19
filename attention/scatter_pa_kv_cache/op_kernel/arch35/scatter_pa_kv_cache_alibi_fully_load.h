@@ -111,25 +111,26 @@ __aicore__ inline void ScatterPaKvCacheAlibiFullyLoad<T, IndexDtype, InOutMode>:
                                                                                            int64_t seqLenOffset)
 {
     LocalTensor<T> inputKeyLocal = inputKeyQueue_.AllocTensor<T>();
-    DataCopyExtParams params = {static_cast<uint16_t>(1), static_cast<uint32_t>(tilingData_->kHeadSize * sizeof(T)),
-                                static_cast<uint32_t>(0), static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
-    DataCopyPadExtParams<T> padParams;
-    padParams.isPad = 0;
-    padParams.leftPadding = 0;
-    padParams.rightPadding = 0;
-    padParams.paddingValue = 0;
-    int64_t offset = (kvBlockOffset_ + iter) / tilingData_->numHead * tilingData_->keyStride0 +
-                     (kvBlockOffset_ + iter) % tilingData_->numHead * tilingData_->keyStride2;
-    for (int64_t k = 0; k < offsetIndex; ++k) {
-        if (k >= tilingData_->seqLen) {
-            break;
-        }
-        if (seqLenOffset - offsetIndex + k < 0) {
-            continue;
-        }
-        DataCopyPad(inputKeyLocal[k * RoundUp(tilingData_->kHeadSize)],
-                    inputKeyGm_[offset + (seqLenOffset - offsetIndex + k) * tilingData_->keyStride1], params,
-                    padParams);
+    int64_t kHeadSize = tilingData_->kHeadSize;
+    int64_t roundUpKHeadSize = RoundUp(kHeadSize);
+    int64_t seqLen = tilingData_->seqLen;
+    int64_t keyStride1 = tilingData_->keyStride1;
+
+    // 原 for 循环约束: k < offsetIndex, k < seqLen, k >= offsetIndex - seqLenOffset
+    int64_t validStart = offsetIndex - seqLenOffset > 0 ? offsetIndex - seqLenOffset : 0;
+    int64_t validEnd = offsetIndex < seqLen ? offsetIndex : seqLen;
+    int64_t validCount = validEnd > validStart ? (validEnd - validStart) : 0;
+
+    if (validCount > 0) {
+        DataCopyExtParams params = {static_cast<uint16_t>(validCount), static_cast<uint32_t>(kHeadSize * sizeof(T)),
+                                    static_cast<uint32_t>((keyStride1 - kHeadSize) * sizeof(T)),
+                                    static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
+        DataCopyPadExtParams<T> padParams = {false, static_cast<uint8_t>(0), static_cast<uint8_t>(0),
+                                             static_cast<T>(0)};
+        int64_t offset = (kvBlockOffset_ + iter) / tilingData_->numHead * tilingData_->keyStride0 +
+                         (kvBlockOffset_ + iter) % tilingData_->numHead * tilingData_->keyStride2;
+        int64_t gmSrcOffset = offset + (seqLenOffset - offsetIndex + validStart) * keyStride1;
+        DataCopyPad(inputKeyLocal[validStart * roundUpKHeadSize], inputKeyGm_[gmSrcOffset], params, padParams);
     }
     inputKeyQueue_.EnQue(inputKeyLocal);
 }
@@ -140,25 +141,26 @@ __aicore__ inline void ScatterPaKvCacheAlibiFullyLoad<T, IndexDtype, InOutMode>:
                                                                                              int64_t seqLenOffset)
 {
     LocalTensor<T> inputValueLocal = inputValueQueue_.AllocTensor<T>();
-    DataCopyExtParams params = {static_cast<uint16_t>(1), static_cast<uint32_t>(tilingData_->vHeadSize * sizeof(T)),
-                                static_cast<uint32_t>(0), static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
-    DataCopyPadExtParams<T> padParams;
-    padParams.isPad = 0;
-    padParams.leftPadding = 0;
-    padParams.rightPadding = 0;
-    padParams.paddingValue = 0;
-    int64_t offset = (kvBlockOffset_ + iter) / tilingData_->numHead * tilingData_->valueStride0 +
-                     (kvBlockOffset_ + iter) % tilingData_->numHead * tilingData_->valueStride2;
-    for (int64_t k = 0; k < offsetIndex; ++k) {
-        if (k >= tilingData_->seqLen) {
-            break;
-        }
-        if (seqLenOffset - offsetIndex + k < 0) {
-            continue;
-        }
-        DataCopyPad(inputValueLocal[k * RoundUp(tilingData_->vHeadSize)],
-                    inputValueGm_[offset + (seqLenOffset - offsetIndex + k) * tilingData_->valueStride1], params,
-                    padParams);
+    int64_t vHeadSize = tilingData_->vHeadSize;
+    int64_t roundUpVHeadSize = RoundUp(vHeadSize);
+    int64_t seqLen = tilingData_->seqLen;
+    int64_t valueStride1 = tilingData_->valueStride1;
+
+    // 原 for 循环约束: k < offsetIndex, k < seqLen, k >= offsetIndex - seqLenOffset
+    int64_t validStart = offsetIndex - seqLenOffset > 0 ? offsetIndex - seqLenOffset : 0;
+    int64_t validEnd = offsetIndex < seqLen ? offsetIndex : seqLen;
+    int64_t validCount = validEnd > validStart ? (validEnd - validStart) : 0;
+
+    if (validCount > 0) {
+        DataCopyExtParams params = {static_cast<uint16_t>(validCount), static_cast<uint32_t>(vHeadSize * sizeof(T)),
+                                    static_cast<uint32_t>((valueStride1 - vHeadSize) * sizeof(T)),
+                                    static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
+        DataCopyPadExtParams<T> padParams = {false, static_cast<uint8_t>(0), static_cast<uint8_t>(0),
+                                             static_cast<T>(0)};
+        int64_t offset = (kvBlockOffset_ + iter) / tilingData_->numHead * tilingData_->valueStride0 +
+                         (kvBlockOffset_ + iter) % tilingData_->numHead * tilingData_->valueStride2;
+        int64_t gmSrcOffset = offset + (seqLenOffset - offsetIndex + validStart) * valueStride1;
+        DataCopyPad(inputValueLocal[validStart * roundUpVHeadSize], inputValueGm_[gmSrcOffset], params, padParams);
     }
     inputValueQueue_.EnQue(inputValueLocal);
 }
@@ -170,22 +172,24 @@ __aicore__ inline void ScatterPaKvCacheAlibiFullyLoad<T, IndexDtype, InOutMode>:
 {
     LocalTensor<T> inputKeyLocal = inputKeyQueue_.DeQue<T>();
     LocalTensor<IndexDtype> slotMappingLocal = slotMappingBuf_.Get<IndexDtype>();
+    int64_t kHeadSize = tilingData_->kHeadSize;
+    int64_t roundUpKHeadSize = RoundUp(kHeadSize);
+    int64_t seqLen = tilingData_->seqLen;
+    int64_t maxToken = tilingData_->numBlocks * tilingData_->blockSize;
+    int64_t kSlot = slotMappingLocal.GetValue(iter);
 
-    DataCopyExtParams outKeyCacheParams = {
-        static_cast<uint16_t>(1), static_cast<uint32_t>(tilingData_->kHeadSize * sizeof(T)), static_cast<uint32_t>(0),
-        static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
+    // 原 for 循环约束: k < offsetIndex, k < seqLen, k >= -kSlot, k >= offsetIndex-seqLenOffset, k < maxToken-kSlot
+    int64_t validStart = -kSlot > (offsetIndex - seqLenOffset) ? -kSlot : (offsetIndex - seqLenOffset);
+    validStart = validStart > 0 ? validStart : 0;
+    int64_t validEnd = offsetIndex < seqLen ? offsetIndex : seqLen;
+    validEnd = validEnd < (maxToken - kSlot) ? validEnd : (maxToken - kSlot);
+    int64_t validCount = validEnd > validStart ? (validEnd - validStart) : 0;
 
-    for (int64_t k = 0; k < offsetIndex; k++) {
-        if (k >= tilingData_->seqLen) {
-            break;
-        }
-        int64_t kStartIdx = slotMappingLocal.GetValue(iter) + k;
-        if (kStartIdx < 0 || kStartIdx >= tilingData_->numBlocks * tilingData_->blockSize ||
-            seqLenOffset - offsetIndex + k < 0) {
-            continue;
-        }
-        DataCopyPad(outputKeyCacheGm_[kStartIdx * tilingData_->kHeadSize],
-                    inputKeyLocal[k * RoundUp(tilingData_->kHeadSize)], outKeyCacheParams);
+    if (validCount > 0) {
+        DataCopyExtParams params = {static_cast<uint16_t>(validCount), static_cast<uint32_t>(kHeadSize * sizeof(T)),
+                                    static_cast<uint32_t>(0), static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
+        DataCopyPad(outputKeyCacheGm_[(kSlot + validStart) * kHeadSize], inputKeyLocal[validStart * roundUpKHeadSize],
+                    params);
     }
     inputKeyQueue_.FreeTensor(inputKeyLocal);
 }
@@ -197,22 +201,24 @@ __aicore__ inline void ScatterPaKvCacheAlibiFullyLoad<T, IndexDtype, InOutMode>:
 {
     LocalTensor<T> inputValueLocal = inputValueQueue_.DeQue<T>();
     LocalTensor<IndexDtype> slotMappingLocal = slotMappingBuf_.Get<IndexDtype>();
+    int64_t vHeadSize = tilingData_->vHeadSize;
+    int64_t roundUpVHeadSize = RoundUp(vHeadSize);
+    int64_t seqLen = tilingData_->seqLen;
+    int64_t maxToken = tilingData_->numBlocks * tilingData_->blockSize;
+    int64_t vSlot = slotMappingLocal.GetValue(iter);
 
-    DataCopyExtParams outValueCacheParams = {
-        static_cast<uint16_t>(1), static_cast<uint32_t>(tilingData_->vHeadSize * sizeof(T)), static_cast<uint32_t>(0),
-        static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
+    // 原 for 循环约束: k < offsetIndex, k < seqLen, k >= -vSlot, k >= offsetIndex-seqLenOffset, k < maxToken-vSlot
+    int64_t validStart = -vSlot > (offsetIndex - seqLenOffset) ? -vSlot : (offsetIndex - seqLenOffset);
+    validStart = validStart > 0 ? validStart : 0;
+    int64_t validEnd = offsetIndex < seqLen ? offsetIndex : seqLen;
+    validEnd = validEnd < (maxToken - vSlot) ? validEnd : (maxToken - vSlot);
+    int64_t validCount = validEnd > validStart ? (validEnd - validStart) : 0;
 
-    for (int64_t k = 0; k < offsetIndex; k++) {
-        if (k >= tilingData_->seqLen) {
-            break;
-        }
-        int64_t vStartIdx = slotMappingLocal.GetValue(iter) + k;
-        if (vStartIdx < 0 || vStartIdx >= tilingData_->numBlocks * tilingData_->blockSize ||
-            seqLenOffset - offsetIndex + k < 0) {
-            continue;
-        }
-        DataCopyPad(outputValueCacheGm_[vStartIdx * tilingData_->vHeadSize],
-                    inputValueLocal[k * RoundUp(tilingData_->vHeadSize)], outValueCacheParams);
+    if (validCount > 0) {
+        DataCopyExtParams params = {static_cast<uint16_t>(validCount), static_cast<uint32_t>(vHeadSize * sizeof(T)),
+                                    static_cast<uint32_t>(0), static_cast<uint32_t>(0), static_cast<uint32_t>(0)};
+        DataCopyPad(outputValueCacheGm_[(vSlot + validStart) * vHeadSize],
+                    inputValueLocal[validStart * roundUpVHeadSize], params);
     }
     inputValueQueue_.FreeTensor(inputValueLocal);
 }

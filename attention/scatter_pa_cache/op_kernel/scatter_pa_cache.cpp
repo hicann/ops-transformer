@@ -20,6 +20,7 @@
 #include "../scatter_pa_kv_cache/arch35/scatter_pa_kv_cache_rope_not_fully_load.h"
 #include "../scatter_pa_kv_cache/arch35/scatter_pa_kv_cache_alibi_fully_load.h"
 #include "../scatter_pa_kv_cache/arch35/scatter_pa_kv_cache_alibi_not_fully_load.h"
+#include "../scatter_pa_kv_cache/arch35/scatter_pa_kv_cache_arch35_common.h"
 #else
 #include "../../scatter_pa_kv_cache/op_kernel/arch35/scatter_pa_kv_cache_normal_fully_load.h"
 #include "../../scatter_pa_kv_cache/op_kernel/arch35/scatter_pa_kv_cache_normal_not_fully_load.h"
@@ -27,27 +28,36 @@
 #include "../../scatter_pa_kv_cache/op_kernel/arch35/scatter_pa_kv_cache_rope_not_fully_load.h"
 #include "../../scatter_pa_kv_cache/op_kernel/arch35/scatter_pa_kv_cache_alibi_fully_load.h"
 #include "../../scatter_pa_kv_cache/op_kernel/arch35/scatter_pa_kv_cache_alibi_not_fully_load.h"
+#include "../../scatter_pa_kv_cache/op_kernel/arch35/scatter_pa_kv_cache_arch35_common.h"
 #endif
 
 #define NORMAL_INT32_FULLY_LOAD 141
-#define NORMAL_INT32_NOT_FULLY_LOAD 140
-
 #define NORMAL_INT64_FULLY_LOAD 181
-#define NORMAL_INT64_NOT_FULLY_LOAD 180
 
-#define ROPE_INT32_FULLY_LOAD 241
-#define ROPE_INT32_NOT_FULLY_LOAD 240
+#define NORMAL_NOT_FULLY_LOAD 100
 
-#define ROPE_INT64_FULLY_LOAD 281
-#define ROPE_INT64_NOT_FULLY_LOAD 280
+#define ROPE_FULLY_LOAD 201
+#define ROPE_NOT_FULLY_LOAD 200
 
-#define ALIBI_INT32_FULLY_LOAD 341
-#define ALIBI_INT32_NOT_FULLY_LOAD 340
-
-#define ALIBI_INT64_FULLY_LOAD 381
-#define ALIBI_INT64_NOT_FULLY_LOAD 380
+#define ALIBI_FULLY_LOAD 301
+#define ALIBI_NOT_FULLY_LOAD 300
 
 constexpr int64_t SINGLE_IN_OUT = 1;
+
+template <typename T>
+struct GetInputType {
+    using type = typename std::conditional<
+        std::is_same<T, fp4x2_e1m2_t>::value, int8_t,
+        typename std::conditional<
+            std::is_same<T, fp4x2_e2m1_t>::value, int8_t,
+            typename std::conditional<
+                std::is_same<T, hifloat4x2_t>::value, int8_t,
+                typename std::conditional<
+                    sizeof(T) == ScatterPaKvCache::B8, int8_t,
+                    typename std::conditional<sizeof(T) == ScatterPaKvCache::B16, int16_t,
+                                              typename std::conditional<sizeof(T) == ScatterPaKvCache::B32, int32_t,
+                                                                        T>::type>::type>::type>::type>::type>::type;
+};
 
 extern "C" __global__ __aicore__ void scatter_pa_cache(GM_ADDR key, GM_ADDR key_cache_in, GM_ADDR slot_mapping,
                                                        GM_ADDR compress_lens, GM_ADDR compress_seq_offset,
@@ -58,184 +68,52 @@ extern "C" __global__ __aicore__ void scatter_pa_cache(GM_ADDR key, GM_ADDR key_
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
     GET_TILING_DATA(tilingData, tiling);
 
+    using keyType = GetInputType<DTYPE_KEY>::type;
     if TILING_KEY_IS (NORMAL_INT32_FULLY_LOAD) {
-        if constexpr (std::is_same<DTYPE_KEY, fp4x2_e2m1_t>::value || std::is_same<DTYPE_KEY, fp4x2_e1m2_t>::value ||
-                      sizeof(DTYPE_KEY) == sizeof(int8_t)) {
-            ScatterPaKvCache::ScatterPaKvCacheNormalFullyLoad<int8_t, int32_t, SINGLE_IN_OUT> op(&pipe, &tilingData);
-            op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                    key_cache_out, nullptr);
-            op.Process();
-        } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int16_t)) {
-            ScatterPaKvCache::ScatterPaKvCacheNormalFullyLoad<int16_t, int32_t, SINGLE_IN_OUT> op(&pipe, &tilingData);
-            op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                    key_cache_out, nullptr);
-            op.Process();
-        } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int32_t)) {
-            ScatterPaKvCache::ScatterPaKvCacheNormalFullyLoad<int32_t, int32_t, SINGLE_IN_OUT> op(&pipe, &tilingData);
-            op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                    key_cache_out, nullptr);
-            op.Process();
-        }
-    } else if TILING_KEY_IS (NORMAL_INT32_NOT_FULLY_LOAD) {
-        if constexpr (std::is_same<DTYPE_KEY, fp4x2_e2m1_t>::value || std::is_same<DTYPE_KEY, fp4x2_e1m2_t>::value ||
-                      sizeof(DTYPE_KEY) == sizeof(int8_t)) {
-            ScatterPaKvCache::ScatterPaKvCacheNormalNotFullyLoad<int8_t, int32_t, SINGLE_IN_OUT> op(&pipe, &tilingData);
-            op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                    key_cache_out, nullptr);
-            op.Process();
-        } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int16_t)) {
-            ScatterPaKvCache::ScatterPaKvCacheNormalNotFullyLoad<int16_t, int32_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                     &tilingData);
-            op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                    key_cache_out, nullptr);
-            op.Process();
-        } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int32_t)) {
-            ScatterPaKvCache::ScatterPaKvCacheNormalNotFullyLoad<int32_t, int32_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                     &tilingData);
-            op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                    key_cache_out, nullptr);
-            op.Process();
-        }
+        ScatterPaKvCache::ScatterPaKvCacheNormalFullyLoad<keyType, int32_t, int32_t, SINGLE_IN_OUT> op(&pipe,
+                                                                                                       &tilingData);
+        op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
+                key_cache_out, nullptr);
+        op.Process();
     } else if TILING_KEY_IS (NORMAL_INT64_FULLY_LOAD) {
-        if constexpr (std::is_same<DTYPE_KEY, fp4x2_e2m1_t>::value || std::is_same<DTYPE_KEY, fp4x2_e1m2_t>::value ||
-                      sizeof(DTYPE_KEY) == sizeof(int8_t)) {
-            ScatterPaKvCache::ScatterPaKvCacheNormalFullyLoad<int8_t, int64_t, SINGLE_IN_OUT> op(&pipe, &tilingData);
-            op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                    key_cache_out, nullptr);
-            op.Process();
-        } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int16_t)) {
-            ScatterPaKvCache::ScatterPaKvCacheNormalFullyLoad<int16_t, int64_t, SINGLE_IN_OUT> op(&pipe, &tilingData);
-            op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                    key_cache_out, nullptr);
-            op.Process();
-        } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int32_t)) {
-            ScatterPaKvCache::ScatterPaKvCacheNormalFullyLoad<int32_t, int64_t, SINGLE_IN_OUT> op(&pipe, &tilingData);
-            op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                    key_cache_out, nullptr);
-            op.Process();
-        }
-    } else if TILING_KEY_IS (NORMAL_INT64_NOT_FULLY_LOAD) {
-        if constexpr (std::is_same<DTYPE_KEY, fp4x2_e2m1_t>::value || std::is_same<DTYPE_KEY, fp4x2_e1m2_t>::value ||
-                      sizeof(DTYPE_KEY) == sizeof(int8_t)) {
-            ScatterPaKvCache::ScatterPaKvCacheNormalNotFullyLoad<int8_t, int64_t, SINGLE_IN_OUT> op(&pipe, &tilingData);
-            op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                    key_cache_out, nullptr);
-            op.Process();
-        } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int16_t)) {
-            ScatterPaKvCache::ScatterPaKvCacheNormalNotFullyLoad<int16_t, int64_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                     &tilingData);
-            op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                    key_cache_out, nullptr);
-            op.Process();
-        } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int32_t)) {
-            ScatterPaKvCache::ScatterPaKvCacheNormalNotFullyLoad<int32_t, int64_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                     &tilingData);
-            op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                    key_cache_out, nullptr);
-            op.Process();
-        }
+        ScatterPaKvCache::ScatterPaKvCacheNormalFullyLoad<keyType, DTYPE_SLOT_MAPPING, int64_t, SINGLE_IN_OUT> op(
+            &pipe, &tilingData);
+        op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
+                key_cache_out, nullptr);
+        op.Process();
+    } else if TILING_KEY_IS (NORMAL_NOT_FULLY_LOAD) {
+        ScatterPaKvCache::ScatterPaKvCacheNormalNotFullyLoad<keyType, DTYPE_SLOT_MAPPING, SINGLE_IN_OUT> op(
+            &pipe, &tilingData);
+        op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
+                key_cache_out, nullptr);
+        op.Process();
     } else if constexpr (!(std::is_same<DTYPE_KEY, fp4x2_e2m1_t>::value ||
-                           std::is_same<DTYPE_KEY, fp4x2_e1m2_t>::value)) {
-        if TILING_KEY_IS (ROPE_INT32_FULLY_LOAD) {
-            ScatterPaKvCache::ScatterPaKvCacheRopeFullyLoad<DTYPE_KEY, int32_t, SINGLE_IN_OUT> op(&pipe, &tilingData);
+                           std::is_same<DTYPE_KEY, fp4x2_e1m2_t>::value ||
+                           std::is_same<DTYPE_KEY, hifloat4x2_t>::value)) {
+        if TILING_KEY_IS (ROPE_FULLY_LOAD) {
+            ScatterPaKvCache::ScatterPaKvCacheRopeFullyLoad<DTYPE_KEY, DTYPE_SLOT_MAPPING, SINGLE_IN_OUT> op(
+                &pipe, &tilingData);
             op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
                     key_cache_out, nullptr);
             op.Process();
-        } else if TILING_KEY_IS (ROPE_INT32_NOT_FULLY_LOAD) {
-            ScatterPaKvCache::ScatterPaKvCacheRopeNotFullyLoad<DTYPE_KEY, int32_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                     &tilingData);
+        } else if TILING_KEY_IS (ROPE_NOT_FULLY_LOAD) {
+            ScatterPaKvCache::ScatterPaKvCacheRopeNotFullyLoad<DTYPE_KEY, DTYPE_SLOT_MAPPING, SINGLE_IN_OUT> op(
+                &pipe, &tilingData);
             op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
                     key_cache_out, nullptr);
             op.Process();
-        } else if TILING_KEY_IS (ROPE_INT64_FULLY_LOAD) {
-            ScatterPaKvCache::ScatterPaKvCacheRopeFullyLoad<DTYPE_KEY, int64_t, SINGLE_IN_OUT> op(&pipe, &tilingData);
+        } else if TILING_KEY_IS (ALIBI_FULLY_LOAD) {
+            ScatterPaKvCache::ScatterPaKvCacheAlibiFullyLoad<keyType, DTYPE_SLOT_MAPPING, SINGLE_IN_OUT> op(
+                &pipe, &tilingData);
             op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
                     key_cache_out, nullptr);
             op.Process();
-        } else if TILING_KEY_IS (ROPE_INT64_NOT_FULLY_LOAD) {
-            ScatterPaKvCache::ScatterPaKvCacheRopeNotFullyLoad<DTYPE_KEY, int64_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                     &tilingData);
+        } else if TILING_KEY_IS (ALIBI_NOT_FULLY_LOAD) {
+            ScatterPaKvCache::ScatterPaKvCacheAlibiNotFullyLoad<keyType, DTYPE_SLOT_MAPPING, SINGLE_IN_OUT> op(
+                &pipe, &tilingData);
             op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
                     key_cache_out, nullptr);
             op.Process();
-        } else if TILING_KEY_IS (ALIBI_INT32_FULLY_LOAD) {
-            if constexpr (sizeof(DTYPE_KEY) == sizeof(int8_t)) {
-                ScatterPaKvCache::ScatterPaKvCacheAlibiFullyLoad<int8_t, int32_t, SINGLE_IN_OUT> op(&pipe, &tilingData);
-                op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                        key_cache_out, nullptr);
-                op.Process();
-            } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int16_t)) {
-                ScatterPaKvCache::ScatterPaKvCacheAlibiFullyLoad<int16_t, int32_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                     &tilingData);
-                op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                        key_cache_out, nullptr);
-                op.Process();
-            } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int32_t)) {
-                ScatterPaKvCache::ScatterPaKvCacheAlibiFullyLoad<int32_t, int32_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                     &tilingData);
-                op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                        key_cache_out, nullptr);
-                op.Process();
-            }
-        } else if TILING_KEY_IS (ALIBI_INT32_NOT_FULLY_LOAD) {
-            if constexpr (sizeof(DTYPE_KEY) == sizeof(int8_t)) {
-                ScatterPaKvCache::ScatterPaKvCacheAlibiNotFullyLoad<int8_t, int32_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                       &tilingData);
-                op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                        key_cache_out, nullptr);
-                op.Process();
-            } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int16_t)) {
-                ScatterPaKvCache::ScatterPaKvCacheAlibiNotFullyLoad<int16_t, int32_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                        &tilingData);
-                op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                        key_cache_out, nullptr);
-                op.Process();
-            } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int32_t)) {
-                ScatterPaKvCache::ScatterPaKvCacheAlibiNotFullyLoad<int32_t, int32_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                        &tilingData);
-                op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                        key_cache_out, nullptr);
-                op.Process();
-            }
-        } else if TILING_KEY_IS (ALIBI_INT64_FULLY_LOAD) {
-            if constexpr (sizeof(DTYPE_KEY) == sizeof(int8_t)) {
-                ScatterPaKvCache::ScatterPaKvCacheAlibiFullyLoad<int8_t, int64_t, SINGLE_IN_OUT> op(&pipe, &tilingData);
-                op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                        key_cache_out, nullptr);
-                op.Process();
-            } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int16_t)) {
-                ScatterPaKvCache::ScatterPaKvCacheAlibiFullyLoad<int16_t, int64_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                     &tilingData);
-                op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                        key_cache_out, nullptr);
-                op.Process();
-            } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int32_t)) {
-                ScatterPaKvCache::ScatterPaKvCacheAlibiFullyLoad<int32_t, int64_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                     &tilingData);
-                op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                        key_cache_out, nullptr);
-                op.Process();
-            }
-        } else if TILING_KEY_IS (ALIBI_INT64_NOT_FULLY_LOAD) {
-            if constexpr (sizeof(DTYPE_KEY) == sizeof(int8_t)) {
-                ScatterPaKvCache::ScatterPaKvCacheAlibiNotFullyLoad<int8_t, int64_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                       &tilingData);
-                op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                        key_cache_out, nullptr);
-                op.Process();
-            } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int16_t)) {
-                ScatterPaKvCache::ScatterPaKvCacheAlibiNotFullyLoad<int16_t, int64_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                        &tilingData);
-                op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                        key_cache_out, nullptr);
-                op.Process();
-            } else if constexpr (sizeof(DTYPE_KEY) == sizeof(int32_t)) {
-                ScatterPaKvCache::ScatterPaKvCacheAlibiNotFullyLoad<int32_t, int64_t, SINGLE_IN_OUT> op(&pipe,
-                                                                                                        &tilingData);
-                op.Init(key, key_cache_in, slot_mapping, nullptr, nullptr, compress_lens, compress_seq_offset, seq_lens,
-                        key_cache_out, nullptr);
-                op.Process();
-            }
         }
     }
 }

@@ -41,6 +41,9 @@ if (BUILD_OPEN_PROJECT)
     target_compile_options(op_host_aclnn PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:-std=gnu++1z>
     )
+    target_include_directories(op_host_aclnn PRIVATE
+            ${PROJECT_SOURCE_DIR}
+    )
 
     add_library(op_host_aclnnInner SHARED EXCLUDE_FROM_ALL)
     target_link_libraries(op_host_aclnnInner PRIVATE
@@ -49,6 +52,9 @@ if (BUILD_OPEN_PROJECT)
     target_compile_options(op_host_aclnnInner PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:-std=gnu++1z>
     )
+    target_include_directories(op_host_aclnnInner PRIVATE
+            ${PROJECT_SOURCE_DIR}
+    )
 
     add_library(op_host_aclnnExc SHARED EXCLUDE_FROM_ALL)
     target_link_libraries(op_host_aclnnExc PRIVATE
@@ -56,6 +62,9 @@ if (BUILD_OPEN_PROJECT)
     )
     target_compile_options(op_host_aclnnExc PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:-std=gnu++1z>
+    )
+    target_include_directories(op_host_aclnnExc PRIVATE
+            ${PROJECT_SOURCE_DIR}
     )
 
     # op api
@@ -71,6 +80,7 @@ if (BUILD_OPEN_PROJECT)
             $<$<COMPILE_LANGUAGE:CXX>:-std=gnu++1z>
     )
     target_include_directories(cust_opapi PRIVATE
+            ${PROJECT_SOURCE_DIR}
             $<BUILD_INTERFACE:${ASCEND_CANN_PACKAGE_PATH}/include>
             $<BUILD_INTERFACE:${ASCEND_CANN_PACKAGE_PATH}/include/aclnn>
     )
@@ -572,6 +582,7 @@ if (BUILD_OPEN_PROJECT)
             ${ops_aclnn_src}
     )
     target_include_directories(ops_aclnn PRIVATE
+            ${PROJECT_SOURCE_DIR}
             ${PROJECT_SOURCE_DIR}/common/include/common
             ${PROJECT_SOURCE_DIR}/common/include/static
     )

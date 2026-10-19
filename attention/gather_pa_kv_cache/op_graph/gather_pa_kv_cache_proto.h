@@ -16,6 +16,7 @@
 #define OPS_OP_PROTO_INC_GatherPaKvCache_H_
 
 #include "graph/operator_reg.h"
+#include "common/include/op_host/op_const_def_transformer.h"
 #include "graph/types.h"
 
 namespace ge {
@@ -116,7 +117,8 @@ REG_OP(GatherPaKvCache)
     .ATTR(cache_mode, String, "Norm")
     .ATTR(is_seq_lens_cumsum, Bool, true)
     .DATATYPE(T, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT, DT_INT8, DT_UINT8, DT_INT16, DT_UINT16, DT_INT32, DT_UINT32,
-                             DT_HIFLOAT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN}))
+                             DT_HIFLOAT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_FLOAT4_E2M1, DT_FLOAT4_E1M2,
+                             Ops::Transformer::DT_HIFLOAT4}))
     .OP_END_FACTORY_REG(GatherPaKvCache)
 
 } // namespace ge

@@ -60,6 +60,7 @@ def merge_op_proto(protos_path, output_file):
 
 #include "graph/operator_reg.h"
 #include "register/op_impl_registry.h"
+#include "op_const_def_transformer.h"
 
 namespace ge{{
 

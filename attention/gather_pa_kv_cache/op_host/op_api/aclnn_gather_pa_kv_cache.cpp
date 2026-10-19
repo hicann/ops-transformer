@@ -11,6 +11,7 @@
 #include "aclnn_gather_pa_kv_cache.h"
 
 #include <new>
+#include "common/include/op_host/op_const_def_transformer.h"
 
 #include "gather_pa_kv_cache.h"
 
@@ -46,6 +47,13 @@ static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST_A5 = {
     DataType::DT_UINT8,   DataType::DT_INT16,    DataType::DT_UINT16,      DataType::DT_INT32,
     DataType::DT_UINT32,  DataType::DT_HIFLOAT8, DataType::DT_FLOAT8_E5M2, DataType::DT_FLOAT8_E4M3FN};
 
+static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST_A6 = {
+    DataType::DT_FLOAT16,     DataType::DT_FLOAT,       DataType::DT_BF16,
+    DataType::DT_INT8,        DataType::DT_UINT8,       DataType::DT_INT16,
+    DataType::DT_UINT16,      DataType::DT_INT32,       DataType::DT_UINT32,
+    DataType::DT_HIFLOAT8,    DataType::DT_FLOAT8_E5M2, DataType::DT_FLOAT8_E4M3FN,
+    DataType::DT_FLOAT4_E2M1, DataType::DT_FLOAT4_E1M2, Ops::Transformer::DT_HIFLOAT4};
+
 static const std::initializer_list<op::DataType> INDEX_DTYPE_SUPPORT_LIST = {DataType::DT_INT32, DataType::DT_INT64};
 
 static aclnnStatus CheckNullptr(const aclTensor* keyCache, const aclTensor* valueCache, const aclTensor* blockTables,
@@ -71,7 +79,9 @@ static aclnnStatus CheckDtypeValid(const aclTensor* keyCache, const aclTensor* v
     auto& platformInfo = op::GetCurrentPlatformInfo();
     auto socVersion = platformInfo.GetCurNpuArch();
     bool isArch35 = (socVersion == NpuArch::DAV_3510);
-    const auto& kvDtypeList = isArch35 ? DTYPE_SUPPORT_LIST_A5 : DTYPE_SUPPORT_LIST_910B;
+    bool isAscend96 = (socVersion == NpuArch::DAV_9201);
+    const auto& kvDtypeList =
+        isArch35 ? DTYPE_SUPPORT_LIST_A5 : (isAscend96 ? DTYPE_SUPPORT_LIST_A6 : DTYPE_SUPPORT_LIST_910B);
 
     OP_CHECK_DTYPE_NOT_SUPPORT(keyCache, kvDtypeList, return ACLNN_ERR_PARAM_INVALID);
     OP_CHECK_DTYPE_NOT_SUPPORT(valueCache, kvDtypeList, return ACLNN_ERR_PARAM_INVALID);

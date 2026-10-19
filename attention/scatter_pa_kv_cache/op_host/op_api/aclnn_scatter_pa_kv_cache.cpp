@@ -11,6 +11,7 @@
 #include "aclnn_scatter_pa_kv_cache.h"
 
 #include <new>
+#include "common/include/op_host/op_const_def_transformer.h"
 
 #include "scatter_pa_kv_cache.h"
 
@@ -49,6 +50,13 @@ static const std::initializer_list<op::DataType> KEY_VALUE_DTYPE_SUPPORT_LIST = 
 static const std::initializer_list<op::DataType> KEY_VALUE_DTYPE_SUPPORT_LIST_910 = {
     DataType::DT_FLOAT16, DataType::DT_BF16, DataType::DT_INT8};
 
+static const std::initializer_list<op::DataType> KEY_VALUE_DTYPE_SUPPORT_LIST_960 = {
+    DataType::DT_FLOAT16,     DataType::DT_FLOAT,       DataType::DT_BF16,
+    DataType::DT_INT8,        DataType::DT_UINT8,       DataType::DT_INT16,
+    DataType::DT_UINT16,      DataType::DT_INT32,       DataType::DT_UINT32,
+    DataType::DT_HIFLOAT8,    DataType::DT_FLOAT8_E5M2, DataType::DT_FLOAT8_E4M3FN,
+    DataType::DT_FLOAT4_E1M2, DataType::DT_FLOAT4_E2M1, Ops::Transformer::DT_HIFLOAT4};
+
 static const std::initializer_list<op::DataType> INDEX_DTYPE_SUPPORT_LIST = {DataType::DT_INT32, DataType::DT_INT64};
 
 static aclnnStatus CheckNullptr(const aclTensor* key, const aclTensor* keyCacheRef, const aclTensor* slotMapping,
@@ -76,7 +84,10 @@ static aclnnStatus CheckDtypeValid(const aclTensor* key, const aclTensor* keyCac
     auto& platformInfo = op::GetCurrentPlatformInfo();
     auto socVersion = platformInfo.GetCurNpuArch();
     bool isArch35 = (socVersion == NpuArch::DAV_3510);
-    auto dtypeSupportList = isArch35 ? KEY_VALUE_DTYPE_SUPPORT_LIST : KEY_VALUE_DTYPE_SUPPORT_LIST_910;
+    bool isAscend96 = (socVersion == NpuArch::DAV_9201);
+    auto dtypeSupportList = isArch35 ?
+                                KEY_VALUE_DTYPE_SUPPORT_LIST :
+                                (isAscend96 ? KEY_VALUE_DTYPE_SUPPORT_LIST_960 : KEY_VALUE_DTYPE_SUPPORT_LIST_910);
 
     if (!CheckType(key->GetDataType(), dtypeSupportList)) {
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
