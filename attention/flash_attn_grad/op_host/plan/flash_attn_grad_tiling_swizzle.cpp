@@ -62,6 +62,12 @@ void DecideSwizzle(const FagParsedInfo& info, const FagKernelPlan& kernel, FagSc
         trace.swizzleReject = "tnd-layout";
         return;
     }
+    if (info.hasSeqused) {
+        // Metadata uses a per-batch effective grid. The current swizzle mapping
+        // assumes the fixed physical S grid and cannot reinterpret its indices.
+        trace.swizzleReject = "seqused-variable-grid";
+        return;
+    }
     if (schedule.usedCube != info.aicNum) {
         trace.swizzleReject = "partial-chip";
         return;

@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <cmath>
 #include <climits>
+#include <numeric>
 #include <vector>
 
 using namespace optiling;
@@ -67,6 +68,16 @@ static inline void FagCalcleActualToken(uint32_t sparseMode, int64_t s1Token, in
 // Source: normal_regbase.cpp:478-509 DoSplit + common_regbase.cpp:1256-1281 ProcessTokensInfo
 void FlashAttnMetadataCpuKernel::InitFagParams()
 {
+    std::fill_n(fagBlockStarts_, FAG_CORE_LIST_NUM, int64_t{0});
+    std::fill_n(fagBlockEnds_, FAG_CORE_LIST_NUM, int64_t{0});
+    std::fill_n(fagTndStartBIdx_, FAG_CORE_LIST_NUM, int64_t{0});
+    fagBlockOuter_ = 0;
+    fagBlockFactor_ = 0;
+    fagIsAllSame_ = false;
+    fagIsSeqExistZero_ = false;
+    fagUseTndSplit_ = false;
+    fagIsInvalidCol_ = false;
+    fagIsInvalidRow_ = false;
     InitFagBaseDims();
     InitFagLayoutAndSparse();
     InitFagActualSeqlen();
@@ -79,8 +90,12 @@ void FlashAttnMetadataCpuKernel::InitFagBaseDims()
     fagS1Inner_ = 64;
     fagS2Inner_ = 128;
 
-    int64_t s1 = static_cast<int64_t>(maxSeqlenQ_);
-    int64_t s2 = static_cast<int64_t>(maxSeqlenKv_);
+    // Defensive clamp: max_seqlen is optional with seqused provided on both
+    // sides (non-TND) or derived from cu_seqlens (TND, see CheckActual*Seq).
+    // A negative value here would poison the grid arithmetic; zero collapses
+    // the dense grid, which the varlen split path (fagUseTndSplit_) ignores.
+    int64_t s1 = maxSeqlenQ_ < 0 ? 0 : static_cast<int64_t>(maxSeqlenQ_);
+    int64_t s2 = maxSeqlenKv_ < 0 ? 0 : static_cast<int64_t>(maxSeqlenKv_);
     fagS1CvInner_ =
         (s1 == 0) ? 1 : ((fagS1Inner_ * FAG_S1CV_RATIO_DEFAULT > s1) ? s1 : fagS1Inner_ * FAG_S1CV_RATIO_DEFAULT);
     fagCvS2Inner_ =
@@ -212,11 +227,21 @@ void FlashAttnMetadataCpuKernel::InitFagActualSeqlen()
 
 void FlashAttnMetadataCpuKernel::SupportTransBSND()
 {
+    // The host cannot prove runtime seqused values equal the physical lengths.
+    // Keep its GS route and the metadata grid consistent even if all used
+    // lengths happen to equal the maxima in this invocation.
+    if (fagHasSeqused_) {
+        fagIsAllSame_ = false;
+        return;
+    }
     bool isTND = (fagLayoutType_ == FAG_INPUT_FORMAT_TND);
     if (!actualSeqlenQ_.empty() && isTND) {
-        fagIsAllSame_ = true;
         int64_t s1First = actualSeqlenQ_[0];
         int64_t s2First = actualSeqlenKv_[0];
+        // Match host tndAllSame: both token totals must equal B * maxSeqlen.
+        // Equal lengths below the declared maxima still need the actual TND grid.
+        fagIsAllSame_ =
+            (s1First == static_cast<int64_t>(maxSeqlenQ_)) && (s2First == static_cast<int64_t>(maxSeqlenKv_));
         for (size_t i = 1; i < actualSeqlenQ_.size(); i++) {
             if (actualSeqlenQ_[i] != s1First || actualSeqlenKv_[i] != s2First) {
                 fagIsAllSame_ = false;
@@ -252,8 +277,8 @@ void FlashAttnMetadataCpuKernel::SetFagSplitAxis()
 
     // Match pypto host: single-block BN2 (S<=128) or MultiBlk (S in (128, 640]
     // and BN gate). Mask 3/4 is allowed on BN2 (kernel skip_invalid / packed).
-    // GQA / D>128 / TND stay on GS1S2.
-    fagIsBn2_ = (s1 <= 128 && s2 <= 128) && (n1 == n2) && (d <= 128) && !fagIsSeqExistZero_;
+    // GQA / D>128 / variable-length TND stay on GS1S2.
+    fagIsBn2_ = (s1 <= 128 && s2 <= 128) && (n1 == n2) && (d <= 128) && !fagUseTndSplit_ && !fagIsSeqExistZero_;
     constexpr int64_t BN2_MULTIBLK_SEQ = 640;
     constexpr int64_t BN2_MULTIBLK_BN_128 = 128;
     constexpr int64_t BN2_MULTIBLK_BN_256 = 256;
@@ -374,6 +399,13 @@ void FlashAttnMetadataCpuKernel::DoFagSparseBlockInfo()
     int64_t aicNum = static_cast<int64_t>(aicCoreNum_);
 
     int64_t fusedOuter = b * n2 * g * s1s2oCount;
+    if (fusedOuter == 0) {
+        // Equal-length TND can reach this path after SupportTransBSND, including
+        // max_seqlen_q == 0. It still needs the zero-task pre/post metadata.
+        fagBlockOuter_ = 0;
+        fagBlockFactor_ = 0;
+        return;
+    }
     int64_t blockFactor = (fusedOuter + aicNum - 1) / aicNum;
     int64_t blockOuter = (fusedOuter + blockFactor - 1) / blockFactor;
 
@@ -583,6 +615,13 @@ void FlashAttnMetadataCpuKernel::DoFagTndSplit()
     // Block split
     // Source: varlen_regbase.cpp:961-964
     int64_t fusedOuter = calculatedBlockInfo[b - 1][0][3]; // SUM_ALL
+    if (fusedOuter == 0) {
+        // No batch has a valid Q/KV tile pair. Leave all compute ranges empty;
+        // GenFagMetadata still assigns pre/post rows to clear physical outputs.
+        fagBlockOuter_ = 0;
+        fagBlockFactor_ = 0;
+        return;
+    }
     int64_t blockFactor = (fusedOuter + aicNum - 1) / aicNum;
     int64_t blockOuter = (fusedOuter + blockFactor - 1) / blockFactor;
 
@@ -1111,7 +1150,7 @@ void FlashAttnMetadataCpuKernel::GenFagMetadata(uint32_t sectionNum)
     fag[FAG_MAX_SEQLEN_Q_INDEX] = static_cast<FA_METADATA_T>(maxSeqlenQ_);
     fag[FAG_MAX_SEQLEN_KV_INDEX] = static_cast<FA_METADATA_T>(maxSeqlenKv_);
 
-    // pre/post 行区间。与 kernel 展平视图一致：dqRows=B*S1*N1，dkvRows=B*S2*N2。
+    // pre/post cover actual output rows, not padded public workspace capacity.
     int64_t s1 = (maxSeqlenQ_ > 0) ? static_cast<int64_t>(maxSeqlenQ_) : 0;
     int64_t s2 = (maxSeqlenKv_ > 0) ? static_cast<int64_t>(maxSeqlenKv_) : 0;
     int64_t b = (batchSize_ > 0) ? static_cast<int64_t>(batchSize_) : 0;
@@ -1119,7 +1158,18 @@ void FlashAttnMetadataCpuKernel::GenFagMetadata(uint32_t sectionNum)
     int64_t n2 = (numHeadsKv_ > 0) ? static_cast<int64_t>(numHeadsKv_) : 0;
     int64_t dqRows = b * s1 * n1;
     int64_t dkvRows = b * s2 * n2;
+    if (layoutQ_ == "TND") {
+        // Clear/cast every physical output row, including unused capacity inside
+        // packed batches. Effective seqused lengths only bound attention work.
+        dqRows = fagPhysicalTokensQ_ * n1;
+        dkvRows = fagPhysicalTokensKv_ * n2;
+    }
     uint32_t nAiv = fagBlockOuter_ * 2U;
+    if (nAiv == 0U) {
+        // TND/sparse launch all physical cores even when compute has no tiles.
+        // Keep at least one pre/post worker (also clears dsink on core zero).
+        nAiv = static_cast<uint32_t>(aivCoreNum_);
+    }
     if (nAiv > FAG_AIV_SLOT_NUM) {
         nAiv = FAG_AIV_SLOT_NUM;
     }

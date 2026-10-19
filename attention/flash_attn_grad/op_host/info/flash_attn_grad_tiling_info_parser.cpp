@@ -130,6 +130,10 @@ ge::graphStatus ParseShapes(gert::TilingContext* context, FagParsedInfo& info)
         } else {
             info.b = 1;
         }
+        // 两侧都填满各自的 maxSeqlen 时，TND 的 GM 排布才与 BSND 重合。
+        // 只检查 Q 会把 KV 变长的输入误派到 BN2 的非 atomic 写回路径。
+        info.tndAllSame = (qShape->GetStorageShape().GetDim(0) == info.b * info.s1) &&
+                          (kShape->GetStorageShape().GetDim(0) == info.b * info.s2);
     } else if (info.isBnsd) {
         // BNSD [B,N,S,D]
         info.b = qShape->GetStorageShape().GetDim(0);
@@ -149,6 +153,11 @@ ge::graphStatus ParseShapes(gert::TilingContext* context, FagParsedInfo& info)
         info.s2 = kShape->GetStorageShape().GetDim(1);
         info.n2 = kShape->GetStorageShape().GetDim(2);
     }
+
+    // TND 按实际 packed 存储分配，不按 B*maxSeqlen 预留；seqused 不改变物理跨度。
+    // kernel 的 constInfo.t1Size/t2Size 在合法 TND 输入下等于对应 cu_seqlens[B]。
+    info.t1 = info.isTnd ? qShape->GetStorageShape().GetDim(0) : info.b * info.s1;
+    info.t2 = info.isTnd ? kShape->GetStorageShape().GetDim(0) : info.b * info.s2;
 
     // GQA：Q/dout/attn_out/dq 带 N1 = N2*G 个 head，K/V/dk/dv 带 N2 个。
     // G 由整除得到，G == 1 即普通 MHA。
@@ -218,7 +227,9 @@ ge::graphStatus ParseFlashAttnGradInfo(gert::TilingContext* context, FagParsedIn
         return ret;
     }
 
-    info.hasSeqused = OptionalInputExists(context, SEQUSED_Q_INDEX) || OptionalInputExists(context, SEQUSED_KV_INDEX);
+    info.hasSequsedQ = OptionalInputExists(context, SEQUSED_Q_INDEX);
+    info.hasSequsedKv = OptionalInputExists(context, SEQUSED_KV_INDEX);
+    info.hasSeqused = info.hasSequsedQ || info.hasSequsedKv;
     FillAttenMaskInfo(context, info);
     info.hasSinks = OptionalInputExists(context, SINKS_INDEX);
 

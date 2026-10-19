@@ -83,8 +83,9 @@ class FlashAttnGradTilingData:
     totalPerBatchNum: int
     # 保留字段；核上闭式算轮次，当前不读该字段。
     deterMaxRound: int
-    # 1 = 带 sinks 输入，主循环额外算 dsink。运行期标量，不占 tilingkey。必须放最后。
-    sinkOptional: int
+    # Optional effective lengths; cu_seqlens continues to describe physical storage.
+    sequsedQOptional: int
+    sequsedKvOptional: int
 
 
 # 与 op_kernel/flash_attn_grad.py 的 FlashAttnGradTilingKey 一致
@@ -122,6 +123,9 @@ class FlashAttnGradTilingKey:
     bn2_need_zero = TilingKeyField(bits=1, values=[0, 1])
     # bit14：确定性分核（核上闭式）。非 swizzle 走跨轮流水+L0C；swizzle 仍轮间 barrier。
     deter = TilingKeyField(bits=1, values=[0, 1])
+    # bit15：1 = 本次带 sinks 输入，kernel 额外算 dsink。编译期常量：非 sink 变体
+    # 里 sink 代码被折叠掉，不再走运行期标量分支。两种 template 都放开。
+    sink = TilingKeyField(bits=1, values=[0, 1])
 
     def is_valid(self, key):
         """剪掉本实现未走到的组合，控制二进制数量。"""
@@ -135,6 +139,7 @@ class FlashAttnGradTilingKey:
             is_bn2_multiblk,
             bn2_need_zero,
             deter,
+            sink,
         ) = key
         # 2/3 保留。不剪会当 GS1S2 多编死二进制。
         if template != Tmpl.BN2GS1S2 and template != Tmpl.BN2:
@@ -146,16 +151,13 @@ class FlashAttnGradTilingKey:
                 return False
             if is_bn2_multiblk == 1 or bn2_need_zero == 1:
                 return False
-            if layout != 0:
-                return False
         if template == Tmpl.BN2:
-            if (
-                d_align == 192
-                or d_align == 256
-                or d_align == 768
-                or swizzle != 0
-                or layout != 0
-            ):
+            # BN2 + TND（layout=1）：host 仅对等长 TND 选 BN2（Bn2FamilyFeasible
+            # 的 tndAllSame 门，由 parser 用 shape 算术判定）——等长 TND 的
+            # GM 排布与 BSND 四维视图逐元素重合，lse 由 TND 2D 视图装载。
+            # 变长 TND 被 host 挡在 GS1S2；is_valid 无从区分等长/变长，契约由
+            # route 保证。0930 bisect-sink 定案移植。
+            if d_align == 192 or d_align == 256 or d_align == 768 or swizzle != 0:
                 return False
             if d_align != dv_align:
                 return False
@@ -167,8 +169,9 @@ class FlashAttnGradTilingKey:
         # 一般 d_align==dv_align；仅 D=192 且 Dv=128 允许 dv_align=128。
         if d_align != dv_align and not (d_align == 192 and dv_align == 128):
             return False
-        # D=192 / 256 / 768 只编非 TND。mask 3/4 与 dense 共用 GS1S2 D-split。
-        # 非 TND 的 swizzle=1 必须编出来：长序列 mask 过门走 HeadSliceSplit。
+        # 大 D 的 GS1S2 同时支持固定布局和原生 packed TND。
+        # TND 使用线性变长调度；host 不会选择 TND swizzle。
+        # 非 TND 保留 swizzle；deterministic TND 同样只编非 swizzle。
         if d_align == 192 or d_align == 256 or d_align == 768:
-            return layout == 0
+            return layout == 0 or swizzle == 0
         return True

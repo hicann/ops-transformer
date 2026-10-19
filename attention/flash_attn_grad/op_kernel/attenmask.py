@@ -82,24 +82,56 @@ def _load_compress_mask(tensor_mask, mask_ub, off, halfS1, s2Real):
 
 
 def copy_in_atten_mask(constInfo, runInfo, subIdx, tensor_mask, mask_ub, mask_pre_ub):
-    """按 mask_mode 把压缩 attenmask 搬进 UB。"""
+    """按 mask_mode 把压缩 attenmask 搬进 UB。TND 时用 batch 局部坐标。0930 移植。"""
     if runInfo.halfS1RealSize == 0:
         return
-    s1Offset = runInfo.queryOffset
-    s2Offset = runInfo.keyOffset
     vec_off = subIdx * VECTOR_BASEM
     halfS1 = runInfo.halfS1RealSize
     s2Real = runInfo.s2RealSize
-    if mask_mode == 3:
-        deltaN = constInfo.s1Size - constInfo.s2Size
-        delta = s1Offset - s2Offset - deltaN
-        off = compute_offset_for_causal(delta, vec_off)
-        _load_compress_mask(tensor_mask, mask_ub, off, halfS1, s2Real)
-        return
-    preT = constInfo.s1Token
-    nextT = constInfo.s2Token
-    deltaPre = s1Offset - s2Offset - preT - 1
-    deltaNext = s1Offset - s2Offset + nextT
+    if layout == 1:
+        # TND：对角线偏移必须用 batch 内局部坐标。全局 token 行
+        # （queryOffset/keyOffset）会混入 tokenBase 差——S1!=S2 或变长时
+        # 逐 batch 累积错位，mask 对角线整体漂移。对齐语义与 AICPU
+        # FagCalcleActualToken 一致：右下对齐，按本 batch 实际长度差平移
+        # （causal 即 c <= r + (sk - sq)）。0930 bisect-sink 定案移植。
+        s1Local = runInfo.queryOffset - runInfo.tokenBaseQ
+        s2Local = runInfo.keyOffset - runInfo.tokenBaseKV
+        sq = runInfo.batchS1Len
+        sk = runInfo.batchS2Len
+        if mask_mode == 3:
+            delta = s1Local - s2Local + sk - sq
+            off = compute_offset_for_causal(delta, vec_off)
+            _load_compress_mask(tensor_mask, mask_ub, off, halfS1, s2Real)
+            return
+        maxD = constInfo.s1Size - constInfo.s2Size
+        preT = constInfo.s1Token - maxD + sq - sk
+        nextT = constInfo.s2Token + maxD - sq + sk
+        deltaPre = s1Local - s2Local - preT - 1
+        deltaNext = s1Local - s2Local + nextT
+    else:
+        s1Offset = runInfo.queryOffset
+        s2Offset = runInfo.keyOffset
+        sq = constInfo.s1Size
+        sk = constInfo.s2Size
+        if constInfo.sequsedQOptional + constInfo.sequsedKvOptional > 0:
+            sq = runInfo.batchS1Len
+            sk = runInfo.batchS2Len
+        if mask_mode == 3:
+            deltaN = sq - sk
+            delta = s1Offset - s2Offset - deltaN
+            off = compute_offset_for_causal(delta, vec_off)
+            _load_compress_mask(tensor_mask, mask_ub, off, halfS1, s2Real)
+            return
+        preT = constInfo.s1Token
+        nextT = constInfo.s2Token
+        if constInfo.sequsedQOptional + constInfo.sequsedKvOptional > 0:
+            # Tokens were shifted using physical S by host; right-align with
+            # this batch's effective prefixes without changing GM addresses.
+            maxD = constInfo.s1Size - constInfo.s2Size
+            preT = preT - maxD + sq - sk
+            nextT = nextT + maxD - sq + sk
+        deltaPre = s1Offset - s2Offset - preT - 1
+        deltaNext = s1Offset - s2Offset + nextT
     off = compute_offset_for_causal(deltaNext, vec_off)
     _load_compress_mask(tensor_mask, mask_ub, off, halfS1, s2Real)
     preFactor = deltaPre + 1 + CUBE_BASEM

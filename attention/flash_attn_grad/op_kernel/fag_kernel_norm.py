@@ -67,6 +67,11 @@ def _run_preload3_cube_normal(
     blockStart = sched.blockStart
     blockEnd = sched.blockEnd
     numBlocks = sched.numBlocks
+    cuQ = sched.cuQ
+    cuKv = sched.cuKv
+    usedQ = sched.usedQ
+    usedKv = sched.usedKv
+    batchCursor = init_tnd_batch_cursor()
     tensor_q = gm.tensor_q
     tensor_k = gm.tensor_k
     tensor_k_nt = gm.tensor_k_nt
@@ -101,21 +106,34 @@ def _run_preload3_cube_normal(
     drainDone = 0
     nFetched = 0
     while True:
+        # 取块调用放在运行期条件外：swizzle 分支内部含运行期 if/return，嵌在
+        # ``if isLastLoop == 0`` 内会触发 loop-carried phi 断裂（de5ddd541
+        # 重构后 GS1S2+swizzle 上板卡死，见 0902 教训）；条件内只保留简单
+        # 变量拷贝——与重构前 fetch_work_gidx 模式同构的最小防护形态。
+        fetchedGIdx = next_work_gidx(
+            constInfo,
+            cBlockIdx,
+            coreNum,
+            blockStart,
+            blockEnd,
+            localIdx,
+            denseCursor,
+            numBlocks,
+            cuQ,
+            cuKv,
+            usedQ,
+            usedKv,
+            batchCursor,
+        )
         gIdx = pl.const(-1, pl.DT_INT64)
-        # Drain pending work without rescanning the trailing invalid tiles.
         if isLastLoop == 0:
-            gIdx = next_work_gidx(
-                constInfo,
-                cBlockIdx,
-                coreNum,
-                blockStart,
-                blockEnd,
-                localIdx,
-                denseCursor,
-                numBlocks,
-            )
+            gIdx = fetchedGIdx
             if gIdx < 0:
                 isLastLoop = 1
+                # Keep the unconditional fetch, but do not rescan sparse tails
+                # in the two remaining preload3 drain iterations.
+                if swizzle == 0:
+                    denseCursor = blockEnd
             else:
                 if swizzle == 0:
                     denseCursor = gIdx + 1
@@ -126,9 +144,21 @@ def _run_preload3_cube_normal(
         do_cur = do_l1.next()
         if gIdx >= 0:
             curInfo = runInfos[taskId % PRELOAD_TIMES]
-            set_run_info(constInfo, curInfo, taskId, gIdx, 0, localIdx)
+            set_run_info(
+                constInfo,
+                curInfo,
+                taskId,
+                gIdx,
+                0,
+                localIdx,
+                cuQ,
+                cuKv,
+                usedQ,
+                usedKv,
+                batchCursor,
+            )
             nFetched = nFetched + 1
-            apply_l0c_s2(runInfos, curInfo, taskId, PRELOAD_TIMES)
+            apply_l0c_s2(constInfo, runInfos, curInfo, taskId, PRELOAD_TIMES)
             if taskId > 1:
                 pl.system.wait_cross_core(
                     pipe=pl.PipeType.FIX,
@@ -260,12 +290,18 @@ def _run_preload3_vector_normal(
     gm,
     buf,
     runInfos,
+    sink,
 ):
     cBlockIdx = sched.cBlockIdx
     coreNum = sched.coreNum
     blockStart = sched.blockStart
     blockEnd = sched.blockEnd
     numBlocks = sched.numBlocks
+    cuQ = sched.cuQ
+    cuKv = sched.cuKv
+    usedQ = sched.usedQ
+    usedKv = sched.usedKv
+    batchCursor = init_tnd_batch_cursor()
     subIdx = sched.subIdx
     v1w = sched.v1w
     tensor_y = gm.tensor_y
@@ -310,20 +346,30 @@ def _run_preload3_vector_normal(
                 sfmg_ub.current(),
                 v1w,
             )
+        # 取块调用条件外化（与 cube 侧同因）：复杂调用嵌运行期条件触发
+        # loop-carried phi 断裂；条件内仅简单变量拷贝。
+        fetchedGIdx = next_work_gidx(
+            constInfo,
+            cBlockIdx,
+            coreNum,
+            blockStart,
+            blockEnd,
+            localIdx,
+            denseCursor,
+            numBlocks,
+            cuQ,
+            cuKv,
+            usedQ,
+            usedKv,
+            batchCursor,
+        )
         gIdx = pl.const(-1, pl.DT_INT64)
         if isLastLoop == 0:
-            gIdx = next_work_gidx(
-                constInfo,
-                cBlockIdx,
-                coreNum,
-                blockStart,
-                blockEnd,
-                localIdx,
-                denseCursor,
-                numBlocks,
-            )
+            gIdx = fetchedGIdx
             if gIdx < 0:
                 isLastLoop = 1
+                if swizzle == 0:
+                    denseCursor = blockEnd
             else:
                 if swizzle == 0:
                     denseCursor = gIdx + 1
@@ -331,9 +377,21 @@ def _run_preload3_vector_normal(
         if skipPipe == 0:
             if gIdx >= 0:
                 curInfo = runInfos[taskId % PRELOAD_TIMES]
-                set_run_info(constInfo, curInfo, taskId, gIdx, subIdx, localIdx)
+                set_run_info(
+                    constInfo,
+                    curInfo,
+                    taskId,
+                    gIdx,
+                    subIdx,
+                    localIdx,
+                    cuQ,
+                    cuKv,
+                    usedQ,
+                    usedKv,
+                    batchCursor,
+                )
                 nFetched = nFetched + 1
-                apply_l0c_s2(runInfos, curInfo, taskId, PRELOAD_TIMES)
+                apply_l0c_s2(constInfo, runInfos, curInfo, taskId, PRELOAD_TIMES)
                 lse_ub.next()
             vecInfo = runInfos[0]
             lse_t = lse_ub.current()
@@ -414,11 +472,8 @@ def _run_preload3_vector_normal(
                     nzp_ub.current(),
                 )
                 # GS1S2 C3/C4 read L1 and write GM/L0C, not mm1/mm2 UB.
-                # Let Cube overlap dsink; release UB only after its last read.
-                pl.system.set_cross_core(
-                    pipe=pl.PipeType.MTE3, event_id=SYNC_V3_TO_C3_FLAG
-                )
-                if constInfo.sinkOptional == 1:
+                # dsink is computed here before the set_cross_core, consistent with BN2.
+                if sink == 1:
                     headQ = vecInfo.n2oIdx * constInfo.gSize + vecInfo.goIdx
                     sink_val = pl.getval(tensor_sinks, headQ)
                     process_sink_partial(
@@ -432,6 +487,9 @@ def _run_preload3_vector_normal(
                         sink_part_ub.current(),
                         sink_val,
                     )
+                pl.system.set_cross_core(
+                    pipe=pl.PipeType.MTE3, event_id=SYNC_V3_TO_C3_FLAG
+                )
                 if setV2C == 1:
                     pl.system.set_cross_core(
                         pipe=pl.PipeType.V,
@@ -475,6 +533,11 @@ def _run_preload2_cube_bn2(
     blockStart = sched.blockStart
     blockEnd = sched.blockEnd
     numBlocks = sched.numBlocks
+    cuQ = sched.cuQ
+    cuKv = sched.cuKv
+    usedQ = sched.usedQ
+    usedKv = sched.usedKv
+    batchCursor = init_tnd_batch_cursor()
     tensor_q = gm.tensor_q
     tensor_k = gm.tensor_k
     tensor_k_nt = gm.tensor_k_nt
@@ -517,6 +580,11 @@ def _run_preload2_cube_bn2(
             denseCursor,
             numBlocks,
             roundId,
+            cuQ,
+            cuKv,
+            usedQ,
+            usedKv,
+            batchCursor,
         )
         if isLastLoop == 0:
             gIdx = fetchedGIdx
@@ -531,8 +599,20 @@ def _run_preload2_cube_bn2(
         curInfo = runInfos[0]
         if gIdx >= 0:
             curInfo = runInfos[taskId % 2]
-            set_run_info(constInfo, curInfo, taskId, gIdx, 0, localIdx)
-            apply_l0c_s2(runInfos, curInfo, taskId, 2)
+            set_run_info(
+                constInfo,
+                curInfo,
+                taskId,
+                gIdx,
+                0,
+                localIdx,
+                cuQ,
+                cuKv,
+                usedQ,
+                usedKv,
+                batchCursor,
+            )
+            apply_l0c_s2(constInfo, runInfos, curInfo, taskId, 2)
             if taskId > 1:
                 pl.system.wait_cross_core(
                     pipe=pl.PipeType.FIX, event_id=SYNC_DETER_FIX_FLAG
@@ -721,6 +801,11 @@ def _run_preload2_cube_gs_normal(
     blockStart = sched.blockStart
     blockEnd = sched.blockEnd
     numBlocks = sched.numBlocks
+    cuQ = sched.cuQ
+    cuKv = sched.cuKv
+    usedQ = sched.usedQ
+    usedKv = sched.usedKv
+    batchCursor = init_tnd_batch_cursor()
     tensor_q = gm.tensor_q
     tensor_k = gm.tensor_k
     tensor_k_nt = gm.tensor_k_nt
@@ -762,6 +847,11 @@ def _run_preload2_cube_gs_normal(
             denseCursor,
             numBlocks,
             roundId,
+            cuQ,
+            cuKv,
+            usedQ,
+            usedKv,
+            batchCursor,
         )
         if isLastLoop == 0:
             gIdx = fetchedGIdx
@@ -776,8 +866,20 @@ def _run_preload2_cube_gs_normal(
         curInfo = runInfos[0]
         if gIdx >= 0:
             curInfo = runInfos[taskId % 2]
-            set_run_info(constInfo, curInfo, taskId, gIdx, 0, localIdx)
-            apply_l0c_s2(runInfos, curInfo, taskId, 2)
+            set_run_info(
+                constInfo,
+                curInfo,
+                taskId,
+                gIdx,
+                0,
+                localIdx,
+                cuQ,
+                cuKv,
+                usedQ,
+                usedKv,
+                batchCursor,
+            )
+            apply_l0c_s2(constInfo, runInfos, curInfo, taskId, 2)
             iterate_mm_qk(
                 constInfo,
                 curInfo,
@@ -886,6 +988,7 @@ def _run_preload2_vector_bn2(
     gm,
     buf,
     runInfos,
+    sink,
 ):
     meta = sched.meta
     fagOff = sched.fagOff
@@ -894,6 +997,11 @@ def _run_preload2_vector_bn2(
     blockStart = sched.blockStart
     blockEnd = sched.blockEnd
     numBlocks = sched.numBlocks
+    cuQ = sched.cuQ
+    cuKv = sched.cuKv
+    usedQ = sched.usedQ
+    usedKv = sched.usedKv
+    batchCursor = init_tnd_batch_cursor()
     subIdx = sched.subIdx
     dv_align = sched.dv_align
     tensor_y = gm.tensor_y
@@ -959,6 +1067,11 @@ def _run_preload2_vector_bn2(
             denseCursor,
             numBlocks,
             roundId,
+            cuQ,
+            cuKv,
+            usedQ,
+            usedKv,
+            batchCursor,
         )
         if isLastLoop == 0:
             gIdx = fetchedGIdx
@@ -967,9 +1080,21 @@ def _run_preload2_vector_bn2(
                 isLastLoop = 1
         if gIdx >= 0:
             curInfo = runInfos[taskId % 2]
-            set_run_info(constInfo, curInfo, taskId, gIdx, subIdx, localIdx)
+            set_run_info(
+                constInfo,
+                curInfo,
+                taskId,
+                gIdx,
+                subIdx,
+                localIdx,
+                cuQ,
+                cuKv,
+                usedQ,
+                usedKv,
+                batchCursor,
+            )
             nFetched = nFetched + 1
-            apply_l0c_s2(runInfos, curInfo, taskId, 2)
+            apply_l0c_s2(constInfo, runInfos, curInfo, taskId, 2)
         vecInfo = runInfos[0]
         mm1_t = mm1_res.current()
         mm2_t = mm2_res.current()
@@ -1024,7 +1149,7 @@ def _run_preload2_vector_bn2(
                 )
             # C3/C4 reuse mm1/mm2 for dQ/dK in BN2. Finish reading the
             # original dP/P before V3's V->MTE3 copy and either ready event.
-            if constInfo.sinkOptional == 1:
+            if sink == 1:
                 headQ = vecInfo.n2oIdx * constInfo.gSize + vecInfo.goIdx
                 sink_val = pl.getval(tensor_sinks, headQ)
                 process_sink_partial(
@@ -1144,6 +1269,7 @@ def _run_preload2_vector_gs_normal(
     gm,
     buf,
     runInfos,
+    sink,
 ):
     meta = sched.meta
     fagOff = sched.fagOff
@@ -1152,6 +1278,11 @@ def _run_preload2_vector_gs_normal(
     blockStart = sched.blockStart
     blockEnd = sched.blockEnd
     numBlocks = sched.numBlocks
+    cuQ = sched.cuQ
+    cuKv = sched.cuKv
+    usedQ = sched.usedQ
+    usedKv = sched.usedKv
+    batchCursor = init_tnd_batch_cursor()
     subIdx = sched.subIdx
     v1w = sched.v1w
     tensor_y = gm.tensor_y
@@ -1194,6 +1325,11 @@ def _run_preload2_vector_gs_normal(
             denseCursor,
             numBlocks,
             roundId,
+            cuQ,
+            cuKv,
+            usedQ,
+            usedKv,
+            batchCursor,
         )
         if isLastLoop == 0:
             gIdx = fetchedGIdx
@@ -1204,9 +1340,21 @@ def _run_preload2_vector_gs_normal(
         mm1_res.next()
         if gIdx >= 0:
             curInfo = runInfos[taskId % 2]
-            set_run_info(constInfo, curInfo, taskId, gIdx, subIdx, localIdx)
+            set_run_info(
+                constInfo,
+                curInfo,
+                taskId,
+                gIdx,
+                subIdx,
+                localIdx,
+                cuQ,
+                cuKv,
+                usedQ,
+                usedKv,
+                batchCursor,
+            )
             nFetched = nFetched + 1
-            apply_l0c_s2(runInfos, curInfo, taskId, 2)
+            apply_l0c_s2(constInfo, runInfos, curInfo, taskId, 2)
             lse_ub.next()
         vecInfo = runInfos[0]
         mm1_t = mm1_res.current()
@@ -1294,7 +1442,9 @@ def _run_preload2_vector_gs_normal(
                 sfmg_ub.current(),
                 nzp_ub.current(),
             )
-            if constInfo.sinkOptional == 1:
+            # GS1S2 C3/C4 read L1 and write GM/L0C, not mm1/mm2 UB.
+            # dsink is computed here before the set_cross_core, consistent with BN2.
+            if sink == 1:
                 headQ = vecInfo.n2oIdx * constInfo.gSize + vecInfo.goIdx
                 sink_val = pl.getval(tensor_sinks, headQ)
                 process_sink_partial(

@@ -34,7 +34,7 @@ from fag_common import (
     VF_LANES,
     VF_LANES_F16,
 )
-from fag_mem import BN2_CAST_W, BN2_V1_ROWS, POST_ELEMS, PRE_ELEMS
+from fag_mem import BN2_CAST_W, POST_ELEMS, PRE_ELEMS
 from fag_vector_api import (
     broadcast_sub_mul_cast_vf,
     cast_p_vf,
@@ -84,6 +84,16 @@ def copy_ub2l1(l1_tile, nzp_ub, row_offset):
 # ==================================================================
 
 
+def _vector_load_rows(constInfo, runInfo):
+    """Bound y/dy/lse GM reads by the physical Q view, not the used length.
+
+    s1ViewSize is packed T for TND and physical S for BSND/BNSD. Keep the
+    tile's physical shape/stride unchanged; rowShift selects the valid rows
+    inside this load window, including windows borrowed across TND batches.
+    """
+    return pl.min(VECTOR_BASEM, pl.max(constInfo.s1ViewSize - runInfo.loadBase, 0))
+
+
 def process_vec1(
     constInfo, runInfo, subIdx, tensor_y, tensor_dy, y_ub, dy_ub, sfmg_ub, rowStride
 ):
@@ -93,8 +103,9 @@ def process_vec1(
             constInfo, runInfo, tensor_y, tensor_dy, y_ub, dy_ub, sfmg_ub, rowStride
         )
         return
-    pl.set_validshape(y_ub, [VECTOR_BASEM, constInfo.dvSize])
-    pl.set_validshape(dy_ub, [VECTOR_BASEM, constInfo.dvSize])
+    loadRows = _vector_load_rows(constInfo, runInfo)
+    pl.set_validshape(y_ub, [loadRows, constInfo.dvSize])
+    pl.set_validshape(dy_ub, [loadRows, constInfo.dvSize])
     pl.load(
         y_ub,
         tensor_y,
@@ -156,13 +167,14 @@ def _process_vec1_d768(
     constInfo, runInfo, tensor_y, tensor_dy, y_ub, dy_ub, sfmg_ub, rowStride
 ):
     """768 档 V1：3 趟 VF256，后两趟累加到同一 sfmg。工作列宽 256。"""
+    loadRows = _vector_load_rows(constInfo, runInfo)
     for k in pl.range(0, 3):
         colOff = k * 256
         rem = pl.max(constInfo.dvSize - colOff, 0)
         winW = pl.min(256, rem)
         if rem > 0:
-            pl.set_validshape(y_ub, [VECTOR_BASEM, winW])
-            pl.set_validshape(dy_ub, [VECTOR_BASEM, winW])
+            pl.set_validshape(y_ub, [loadRows, winW])
+            pl.set_validshape(dy_ub, [loadRows, winW])
             pl.load(
                 y_ub,
                 tensor_y,
@@ -226,7 +238,19 @@ def process_vec2(
     mask_pre_ub,
 ):
     headQ = runInfo.n2oIdx * constInfo.gSize + runInfo.goIdx
-    pl.load(lse_ub, tensor_lse, [runInfo.boIdx, headQ, runInfo.loadBase], order=[2, 0])
+    loadRows = _vector_load_rows(constInfo, runInfo)
+    pl.set_validshape(lse_ub, [loadRows, 1])
+    if layout == 1:
+        # TND：lse 是 (N1, T1) token 主序。变长 TND 的 loadBase 已是全局
+        # token 行（tokenBaseQ + 块内偏移，由 _set_run_info_tnd_varlen 计算）；
+        # 等长 TND 的 loadBase 也是全局坐标（tokenBase = boIdx*s1 已折叠）。
+        # 0930 bisect-sink 定案移植。
+        rowT = runInfo.loadBase
+        pl.load(lse_ub, tensor_lse, [headQ, rowT], order=[1, 0])
+    else:
+        pl.load(
+            lse_ub, tensor_lse, [runInfo.boIdx, headQ, runInfo.loadBase], order=[2, 0]
+        )
     if mask_mode != 0:
         copy_in_atten_mask(
             constInfo, runInfo, subIdx, tensor_mask, mask_ub, mask_pre_ub
@@ -440,8 +464,9 @@ def process_post(tensor_ws, tensor_out, f32_ub, f16_ub, scale, elemStart, nElems
 def process_vec1_bn2(
     constInfo, runInfo, subIdx, tensor_y, tensor_dy, y_ub, dy_ub, sfmg_ub, rowStride
 ):
-    pl.set_validshape(y_ub, [BN2_V1_ROWS, constInfo.dSize])
-    pl.set_validshape(dy_ub, [BN2_V1_ROWS, constInfo.dSize])
+    loadRows = _vector_load_rows(constInfo, runInfo)
+    pl.set_validshape(y_ub, [loadRows, constInfo.dSize])
+    pl.set_validshape(dy_ub, [loadRows, constInfo.dSize])
     pl.load(
         y_ub,
         tensor_y,

@@ -99,12 +99,22 @@ struct FagParsedInfo {
     std::string layoutQ = "BSND";
     int64_t layout = LAYOUT_NOT_TND;
     bool isTnd = false;
+    // 等长 TND（所有 batch 的 seq 长度相同，且与 maxSeqlen 一致）的 GM 排布
+    // 与 BSND 四维视图逐元素重合，host 仅对 tndAllSame 选择 BN2（layout=1
+    // 二进制，lse 走 TND 2D 视图），变长 TND 由 route 挡回 GS1S2 兜底。
+    // 由 ParseShapes 用 shape 算术判定（T1==b*s1 且 cu_seqlens 差分全等）。
+    bool tndAllSame = false;
     bool isBnsd = false;
 
     // 轴
     int64_t b = 0;
     int64_t s1 = 0;
     int64_t s2 = 0;
+    // 物理 token 总数：TND 取 Q/K 的 T 轴，BSND/BNSD 为 B*S。
+    // workspace 按物理存储分配；seqused 仅限制计算，不能缩小这两个值。
+    // 仅 host 内部使用，不新增 TilingData ABI 字段。
+    int64_t t1 = 0;
+    int64_t t2 = 0;
     int64_t n1 = 0;
     int64_t n2 = 0;
     int64_t g = 0;
@@ -126,7 +136,13 @@ struct FagParsedInfo {
     // 可选输入是否存在
     bool hasAttenMask = false;
     bool hasSeqused = false;
-    // 不占 tilingkey。kernel 用 sinkOptional 在主循环里多一个标量分支算 dsink。
+    bool hasSequsedQ = false;
+    bool hasSequsedKv = false;
+    // sinks 是否提供。占 tilingkey bit15（两种 template 都放开）：kernel 按该
+    // 编译期常量决定是否算 dsink，非 sink 变体里相关代码被折叠掉。命中时按
+    // head 在本 AIV 的 UB 累加器里精确累加，循环末尾写成槽位区本 AIV 行，
+    // post 阶段由 AIV0 固定次序归约后整行写 dsink
+    // （见 op_kernel/fag_block_vec.py 的 process_sink_partial/reduce）。
     bool hasSinks = false;
     // context->GetDeterministic()==1。BN2 单块仍走现网（tilingkey deter=0）。
     bool isDeterministic = false;
@@ -174,9 +190,9 @@ struct FagWorkspaceSegment {
 
 struct FagWorkspacePlan {
     size_t libapiSize = 0;
-    FagWorkspaceSegment dq; // B*S1*N1*D  fp32（N1 = N2*G）
-    FagWorkspaceSegment dk; // B*S2*N2*D  fp32
-    FagWorkspaceSegment dv; // B*S2*N2*Dv fp32
+    FagWorkspaceSegment dq; // T1*N1*D  fp32（N1 = N2*G，非 TND 的 T1=B*S1）
+    FagWorkspaceSegment dk; // T2*N2*D  fp32（非 TND 的 T2=B*S2）
+    FagWorkspaceSegment dv; // T2*N2*Dv fp32
     // dsink 槽位：[aivNum x N1] fp32。每 AIV 一行，post 由 AIV0 归约。
     FagWorkspaceSegment dsink;
     size_t totalSize = 0;

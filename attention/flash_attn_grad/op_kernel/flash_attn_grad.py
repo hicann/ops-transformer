@@ -21,7 +21,7 @@
 ``fag_mem``          L1/L0/UB 地址与 mutex id
 ``fag_tiling``       host 契约（TilingData / TilingKey）
 ``fag_schedule``     块有效性、swizzle、RunInfo
-``fag_deter_ondevice`` 确定性非 swizzle 闭式分核
+``fag_deter`` 确定性非 swizzle 闭式分核
 ``fag_buffers``      片上 tile 声明
 ``fag_block_cube``   C1..C5 五个 matmul
 ``fag_block_vec``    V1..V6 与 pre/post 编排
@@ -126,6 +126,7 @@ def flash_attn_grad(
             dv_align,
             swizzle,
             deter,
+            sink,
         )
     else:
         flash_attn_grad_preload2(
@@ -135,6 +136,10 @@ def flash_attn_grad(
             dout,
             attn_out,
             softmax_lse,
+            cu_seqlens_q,
+            cu_seqlens_kv,
+            seqused_q,
+            seqused_kv,
             attn_mask,
             metadata,
             sinks,
@@ -148,4 +153,5 @@ def flash_attn_grad(
             dv_align,
             swizzle,
             deter,
+            sink,
         )

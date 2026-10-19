@@ -103,7 +103,8 @@ ge::graphStatus CheckCuSeqlens(const char* opName, gert::TilingContext* context,
     };
 
     for (const auto& item : cuSeqlens) {
-        const bool exists = IsOptionalTensorExist(context, item.index);
+        const auto* inputShape = context->GetOptionalInputShape(item.index);
+        const bool exists = inputShape != nullptr;
         if (!isTnd) {
             OP_CHECK_IF(exists, OP_LOGE(opName, "%s must not be provided when layout is not TND.", item.name),
                         return ge::GRAPH_PARAM_INVALID);
@@ -111,9 +112,58 @@ ge::graphStatus CheckCuSeqlens(const char* opName, gert::TilingContext* context,
         }
         OP_CHECK_IF(!exists, OP_LOGE(opName, "%s must be provided when layout is TND.", item.name),
                     return ge::GRAPH_PARAM_INVALID);
-        auto& shape = context->GetOptionalInputShape(item.index)->GetStorageShape();
+        const auto& shape = inputShape->GetStorageShape();
         OP_CHECK_IF(shape.GetDimNum() != 1U,
                     OP_LOGE(opName, "%s must be 1D, but got %zu dims.", item.name, shape.GetDimNum()),
+                    return ge::GRAPH_PARAM_INVALID);
+        OP_CHECK_IF(shape.GetDim(0) < 2,
+                    OP_LOGE(opName, "%s must contain B+1 entries for at least one batch.", item.name),
+                    return ge::GRAPH_PARAM_INVALID);
+    }
+    if (isTnd) {
+        const auto& qShape = context->GetOptionalInputShape(CU_SEQLENS_Q_INDEX)->GetStorageShape();
+        const auto& kvShape = context->GetOptionalInputShape(CU_SEQLENS_KV_INDEX)->GetStorageShape();
+        OP_CHECK_IF(qShape.GetDim(0) != kvShape.GetDim(0),
+                    OP_LOGE(opName, "cu_seqlens_q and cu_seqlens_kv must describe the same number of batches."),
+                    return ge::GRAPH_PARAM_INVALID);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus CheckSeqused(FagCheckCtx& ctx, bool isTnd)
+{
+    const char* opName = ctx.opName;
+    auto* context = ctx.context;
+    const auto& qShape = context->GetInputShape(Q_INDEX)->GetStorageShape();
+    const int64_t batchSize =
+        isTnd ? context->GetOptionalInputShape(CU_SEQLENS_Q_INDEX)->GetStorageShape().GetDim(0) - 1 : qShape.GetDim(0);
+    bool hasSeqused = false;
+    const struct {
+        const char* name;
+        size_t index;
+    } seqused[] = {{"seqused_q", SEQUSED_Q_INDEX}, {"seqused_kv", SEQUSED_KV_INDEX}};
+    for (const auto& item : seqused) {
+        const auto* inputShape = context->GetOptionalInputShape(item.index);
+        if (inputShape == nullptr) {
+            continue;
+        }
+        hasSeqused = true;
+        const auto& shape = inputShape->GetStorageShape();
+        OP_CHECK_IF(shape.GetDimNum() != 1U,
+                    OP_LOGE(opName, "%s must be 1D [B], but got %zu dims.", item.name, shape.GetDimNum()),
+                    return ge::GRAPH_PARAM_INVALID);
+        OP_CHECK_IF(batchSize <= 0 || shape.GetDim(0) != batchSize,
+                    OP_LOGE(opName, "%s must contain exactly one effective length per batch.", item.name),
+                    return ge::GRAPH_PARAM_INVALID);
+    }
+    if (!isTnd && hasSeqused) {
+        const size_t seqAxis = ctx.layoutQ == "BNSD" ? 2U : 1U;
+        const auto& kShape = context->GetInputShape(K_INDEX)->GetStorageShape();
+        // A supplied maximum describes physical storage, not max(seqused).
+        // Keep -1/default behavior: fixed-layout strides still come from shape.
+        OP_CHECK_IF((ctx.maxSeqlenQ > 0 && ctx.maxSeqlenQ != qShape.GetDim(seqAxis)) ||
+                        (ctx.maxSeqlenKv > 0 && ctx.maxSeqlenKv != kShape.GetDim(seqAxis)),
+                    OP_LOGE(opName, "with seqused, positive max_seqlen_q/kv must equal the physical S dimensions."),
                     return ge::GRAPH_PARAM_INVALID);
     }
     return ge::GRAPH_SUCCESS;
@@ -187,12 +237,22 @@ ge::graphStatus FagShapeChecker::Check(FagCheckCtx& ctx)
         CheckDimEqual(opName, "N", "k", kN, axis.n, kvSide, sizeof(kvSide) / sizeof(kvSide[0])) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_PARAM_INVALID;
     }
-    OP_CHECK_IF(kN == 0 || qN % kN != 0,
+    OP_CHECK_IF(kN <= 0 || qN <= 0 || qN % kN != 0,
                 OP_LOGE(opName, "N dim of q(%ld) must be divisible by N dim of k(%ld).", qN, kN),
                 return ge::GRAPH_PARAM_INVALID);
 
-    // S 与 B 只在非 TND 下成轴；TND 把 B*S 压成 T，长度由 cu_seqlens 描述。
-    if (!isTnd) {
+    // Packed T is a physical storage extent, independent of seqused.
+    if (isTnd) {
+        if (CheckDimEqual(opName, "T", "q", q.shape->GetDim(0), 0U, qSide, sizeof(qSide) / sizeof(qSide[0])) !=
+                ge::GRAPH_SUCCESS ||
+            CheckDimEqual(opName, "T", "k", k.shape->GetDim(0), 0U, kvSide, sizeof(kvSide) / sizeof(kvSide[0])) !=
+                ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_PARAM_INVALID;
+        }
+        OP_CHECK_IF(softmaxLseSS.GetDim(0) != qN || softmaxLseSS.GetDim(1) != q.shape->GetDim(0),
+                    OP_LOGE(opName, "softmax_lse must have physical TND shape [N1, T1]."),
+                    return ge::GRAPH_PARAM_INVALID);
+    } else {
         const int64_t qS = q.shape->GetDim(axis.s);
         const int64_t kS = k.shape->GetDim(axis.s);
         if (CheckDimEqual(opName, "S", "q", qS, axis.s, qSide, sizeof(qSide) / sizeof(qSide[0])) != ge::GRAPH_SUCCESS ||
@@ -212,7 +272,10 @@ ge::graphStatus FagShapeChecker::Check(FagCheckCtx& ctx)
     if (CheckSinks(opName, context, qN) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_PARAM_INVALID;
     }
-    return CheckCuSeqlens(opName, context, isTnd);
+    if (CheckCuSeqlens(opName, context, isTnd) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_PARAM_INVALID;
+    }
+    return CheckSeqused(ctx, isTnd);
 }
 
 } // namespace optiling

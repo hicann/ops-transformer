@@ -123,8 +123,8 @@ def flash_attn_grad(
         softmax_lse: Softmax LSE from forward pass.
         cu_seqlens_q: Cumulative sequence lengths for Q (TND layout).
         cu_seqlens_kv: Cumulative sequence lengths for KV (TND layout).
-        seqused_q: Actual sequence lengths used for Q.
-        seqused_kv: Actual sequence lengths used for KV.
+        seqused_q: Optional int32 [B] used Q prefix lengths in any layout.
+        seqused_kv: Optional int32 [B] used KV prefix lengths in any layout.
         sinks: Sink tensor of shape (N1,), fp32.
         attn_mask: Attention mask tensor (for mask_mode 3 or 4).
         metadata: Precomputed metadata tensor from flash_attn_metadata.
@@ -141,7 +141,28 @@ def flash_attn_grad(
     Returns:
         A tuple of (dq, dk, dv, dsink) gradient tensors. dsink is fp32 of shape
         (N1,); it is meaningful only when sinks is provided.
+
+    Note:
+        TND uses the native packed-token path for both uniform and variable
+        sequence lengths. All layouts support 1 <= D <= 768, with Dv == D or
+        the special pair D=192, Dv=128.
+        seqused only changes effective computation lengths, never physical
+        tensor strides. Its values must be in [0, S] for BSND/BNSD, or in
+        [0, cu_seqlens[b + 1] - cu_seqlens[b]] for TND. Each omitted side uses
+        that side's complete physical length. Metadata max_seqlen_q/kv must
+        describe physical S in BSND/BNSD, not the maximum seqused value.
+        Metadata and forward inputs must use the same effective lengths.
+        Unused dq/dk/dv tails are zero; a zero-task batch contributes zero
+        gradients, including dsink when sinks is present.
     """
+    for name, lengths, expected_shape in (
+        ("cu_seqlens_q", cu_seqlens_q, "[B+1]"),
+        ("cu_seqlens_kv", cu_seqlens_kv, "[B+1]"),
+        ("seqused_q", seqused_q, "[B]"),
+        ("seqused_kv", seqused_kv, "[B]"),
+    ):
+        if lengths is not None and lengths.dim() != 1:
+            raise ValueError(f"{name} must be 1D {expected_shape} when provided.")
     op_module = flash_attn_grad_op_builder.load()
     return op_module.flash_attn_grad(
         q,

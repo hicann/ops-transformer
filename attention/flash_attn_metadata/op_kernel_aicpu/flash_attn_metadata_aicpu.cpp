@@ -31,6 +31,59 @@ constexpr uint32_t FA_KERNEL_STATUS_PARAM_INVALID = 1;
 using namespace optiling;
 
 namespace aicpu {
+namespace {
+// FAG uses cu_seqlens exclusively for physical packed offsets, and seqused
+// (when present) for the effective attention rectangle within each batch.
+bool CheckFagSequence(const std::vector<int64_t>& cu, const std::vector<int64_t>& used, int64_t batchSize,
+                      int64_t maxSeqlen, bool isTnd, const char* name)
+{
+    if (!isTnd) {
+        if (!cu.empty()) {
+            KERNEL_LOG_ERROR("FAG %s cu_seqlens is supported only for TND layout", name);
+            return false;
+        }
+        if (used.empty()) {
+            return true;
+        }
+        // Optional per the interface doc (seqused or max_seqlen, one of the
+        // two): when this side provides seqused, max_seqlen may be omitted.
+        // Skip the upper-bound check in that case; the missing-side
+        // requirement (max as the default fill source) is enforced in
+        // ParamsCheck.
+        if (batchSize <= 0 || used.size() != static_cast<size_t>(batchSize)) {
+            KERNEL_LOG_ERROR("FAG %s seqused requires B entries", name);
+            return false;
+        }
+        for (size_t i = 0; i < used.size(); ++i) {
+            if (used[i] < 0 || (maxSeqlen >= 0 && used[i] > maxSeqlen)) {
+                KERNEL_LOG_ERROR("FAG %s seqused at batch %zu must be in [0, physical S]", name, i);
+                return false;
+            }
+        }
+        return true;
+    }
+    if (batchSize <= 0 || maxSeqlen < 0 || cu.size() != static_cast<size_t>(batchSize) + 1 || cu[0] != 0) {
+        KERNEL_LOG_ERROR("FAG %s requires B+1 cumulative lengths starting at zero and non-negative max_seqlen", name);
+        return false;
+    }
+    if (!used.empty() && used.size() != static_cast<size_t>(batchSize)) {
+        KERNEL_LOG_ERROR("FAG %s seqused must have exactly B entries", name);
+        return false;
+    }
+    for (size_t i = 0; i < static_cast<size_t>(batchSize); ++i) {
+        if (cu[i + 1] < cu[i] || cu[i + 1] - cu[i] > maxSeqlen) {
+            KERNEL_LOG_ERROR("FAG %s physical length at batch %zu must be in [0, max_seqlen]", name, i);
+            return false;
+        }
+        if (!used.empty() && (used[i] < 0 || used[i] > cu[i + 1] - cu[i])) {
+            KERNEL_LOG_ERROR("FAG %s seqused at batch %zu must be in [0, physical length]", name, i);
+            return false;
+        }
+    }
+    return true;
+}
+} // namespace
+
 uint32_t FlashAttnMetadataCpuKernel::Compute(CpuKernelContext& ctx)
 {
     bool success = Prepare(ctx);
@@ -44,6 +97,61 @@ uint32_t FlashAttnMetadataCpuKernel::Compute(CpuKernelContext& ctx)
     KERNEL_CHECK_FALSE(success, FA_KERNEL_STATUS_PARAM_INVALID, "Generate balance result failed!");
 
     // ===== FAG metadata start =====
+    // Re-read seqused tensors right before FAG via direct int32 access.
+    // When an AicpuTaskSpace cache hit causes the reused task descriptor to
+    // carry a stale (undefined) dtype for an optional-input slot, the
+    // GetTensorDataAsInt64 switch falls through and returns a zero-filled
+    // vector. The zeros then masquerade as a legitimate all-zero seqused input
+    // in CheckActualQuerySeq/CheckActualKvSeq, polluting actualSeqlenQ_/Kv_.
+    // Direct pointer reads bypass the dtype dispatch and always see the real
+    // device data, so we use them to detect and recover from this condition.
+    // Only triggers when the early-read vector is all-zero AND the direct
+    // read yields non-zero values — legitimate all-zero seqused inputs are
+    // never touched.
+    if (fagIsGradEnabled_) {
+        auto isAllZero = [](const std::vector<int64_t>& v) {
+            if (v.empty()) {
+                return false;
+            }
+            for (size_t i = 0; i < v.size(); i++) {
+                if (v[i] != 0) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        auto directReadInt32 = [](Tensor* t) -> std::vector<int64_t> {
+            // NOTE: This assumes INT32 data (enforced by host-side
+            // FlashAttnMetadataCheck::CheckSeqLens in flash_attn_metadata_check.h).
+            // If the dtype restriction is relaxed, this reader must be updated.
+            if (t == nullptr || t->GetData() == nullptr) {
+                return {};
+            }
+            auto sh = t->GetTensorShape();
+            const int64_t n = (sh != nullptr && sh->GetDims() > 0) ? sh->GetDimSize(0) : 0;
+            if (n <= 0 || n > 65536) {
+                return {};
+            }
+            const int32_t* p = static_cast<const int32_t*>(t->GetData());
+            std::vector<int64_t> v;
+            v.reserve(static_cast<size_t>(n));
+            for (int64_t i = 0; i < n; i++) {
+                v.push_back(p[i]);
+            }
+            return v;
+        };
+        std::vector<int64_t> sqDirect = directReadInt32(sequsedQ_);
+        if (!sqDirect.empty() && isAllZero(actualSeqlenQ_) && !isAllZero(sqDirect)) {
+            actualSeqlenQ_ = sqDirect;
+            isActualSeqlenQAccum_ = false;
+        }
+        std::vector<int64_t> skvDirect = directReadInt32(sequsedKv_);
+        if (!skvDirect.empty() && isAllZero(actualSeqlenKv_) && !isAllZero(skvDirect)) {
+            actualSeqlenKv_ = skvDirect;
+            isActualSeqlenKvAccum_ = false;
+        }
+    }
+
     // FAG (Flash Attn Grad) metadata: only executed when is_grad_enabled=true.
     if (fagIsGradEnabled_) {
         InitFagParams();
@@ -106,6 +214,14 @@ bool FlashAttnMetadataCpuKernel::ParamsCheck()
 {
     KERNEL_CHECK_FALSE(CheckActualQuerySeq(), false, "Check query sequence failed");
     KERNEL_CHECK_FALSE(CheckActualKvSeq(), false, "Check kv sequence failed");
+    // Non-TND layouts: metadata has no q/k/v tensors, so a side without
+    // seqused can only derive its physical length (default fill in
+    // InitFagActualSeqlen and the split grid) from max_seqlen. When that side
+    // provides seqused, max_seqlen is optional per the interface doc.
+    // TND layouts derive max_seqlen from cu_seqlens (see CheckActual*Seq).
+    if (fagIsGradEnabled_ && (layoutQ_ != "TND" || layoutKv_ != "TND")) {
+        KERNEL_CHECK_FALSE(batchSize_ > 0, false, "FAG metadata requires B > 0");
+    }
     return true;
 }
 
@@ -118,6 +234,19 @@ bool FlashAttnMetadataCpuKernel::CheckActualQuerySeq()
 
     cuSeqlensQ = GetTensorDataAsInt64(cuSeqlensQ_);
     sequsedQ = GetTensorDataAsInt64(sequsedQ_);
+    // Optional per the interface doc: under TND layout, max_seqlen_q may be
+    // omitted (<0) and is derived from cu_seqlens_q. Use the packed token
+    // total (cu.back()) so host (q.shape T-dim fallback) and AICPU share the
+    // same derived value in grid/split formulas.
+    if (fagIsGradEnabled_ && layoutQ_ == "TND" && maxSeqlenQ_ < 0 && !cuSeqlensQ.empty()) {
+        maxSeqlenQ_ = static_cast<int32_t>(cuSeqlensQ.back());
+    }
+    if (fagIsGradEnabled_ &&
+        !CheckFagSequence(cuSeqlensQ, sequsedQ, batchSize_, maxSeqlenQ_, layoutQ_ == "TND", "query")) {
+        return false;
+    }
+    fagPhysicalTokensQ_ = cuSeqlensQ.empty() ? 0 : cuSeqlensQ.back();
+    fagHasSeqused_ = !sequsedQ.empty();
 
     for (size_t i = 0; i < sequsedQ.size(); ++i) {
         if (sequsedQ[i] < 0) {
@@ -162,6 +291,17 @@ bool FlashAttnMetadataCpuKernel::CheckActualKvSeq()
 
     cuSeqlensKv = GetTensorDataAsInt64(cuSeqlensKv_);
     sequsedKv = GetTensorDataAsInt64(sequsedKv_);
+    // Optional per the interface doc: under TND layout, max_seqlen_kv may be
+    // omitted (<0) and is derived from cu_seqlens_kv (packed token total).
+    if (fagIsGradEnabled_ && layoutKv_ == "TND" && maxSeqlenKv_ < 0 && !cuSeqlensKv.empty()) {
+        maxSeqlenKv_ = static_cast<int32_t>(cuSeqlensKv.back());
+    }
+    if (fagIsGradEnabled_ &&
+        !CheckFagSequence(cuSeqlensKv, sequsedKv, batchSize_, maxSeqlenKv_, layoutKv_ == "TND", "kv")) {
+        return false;
+    }
+    fagPhysicalTokensKv_ = cuSeqlensKv.empty() ? 0 : cuSeqlensKv.back();
+    fagHasSeqused_ = fagHasSeqused_ || !sequsedKv.empty();
 
     for (size_t i = 0; i < sequsedKv.size(); ++i) {
         if (sequsedKv[i] < 0) {

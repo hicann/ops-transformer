@@ -31,10 +31,20 @@ constexpr int64_t BN2_MULTIBLK_BN_256 = 256;
 constexpr int64_t BN2_ALIGN128 = 128;
 
 // ===== 能力谓词 =============================================================
-// 共同前提：BN2 系列模板本轮都不接 TND、不接 GQA、不接 D>128。
+// 共同前提：BN2 系列模板不接变长 TND、GQA 或 D>128。
 bool Bn2FamilyFeasible(const FagParsedInfo& p)
 {
-    return !p.isTnd && p.n1 == p.n2 && p.d <= BN2_MAX_D;
+    // 等长 TND（tndAllSame，parser 用 shape 算术判定）的 GM 排布与 BSND
+    // 四维视图逐元素重合，可走 BN2（layout=1 二进制，lse 走 TND 2D 视图）；
+    // 变长 TND 由本谓词挡回 GS1S2 兜底。0930 bisect-sink 定案移植。
+    // Effective lengths are runtime values. Even physically equal TND batches
+    // need the variable-length GS grid when either seqused input is supplied.
+    if (p.hasSeqused || (p.isTnd && !p.tndAllSame)) {
+        return false;
+    }
+    // Zero-task launches still need GS pre/post to clear a nonempty opposite
+    // output side. Single-token sequences remain eligible for BN2.
+    return p.s1 > 0 && p.s2 > 0 && p.n1 == p.n2 && p.d <= BN2_MAX_D;
 }
 
 bool Feasible_Bn2Single(const FagParsedInfo& p)

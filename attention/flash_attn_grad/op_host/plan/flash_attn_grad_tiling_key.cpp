@@ -21,6 +21,7 @@ constexpr uint64_t KEY_SHIFT_DV_ALIGN = 9;
 constexpr uint64_t KEY_SHIFT_BN2_MULTIBLK = 12;
 constexpr uint64_t KEY_SHIFT_BN2_NEED_ZERO = 13;
 constexpr uint64_t KEY_SHIFT_DETER = 14;
+constexpr uint64_t KEY_SHIFT_SINK = 15;
 
 uint64_t AlignBits(int64_t align)
 {
@@ -54,7 +55,8 @@ uint64_t EncodeTilingKey(const FagParsedInfo& info, const FagKernelPlan& kernel,
            (maskModeBits << KEY_SHIFT_MASK_MODE) | (static_cast<uint64_t>(schedule.swizzle) << KEY_SHIFT_SWIZZLE) |
            (AlignBits(kernel.dAlign) << KEY_SHIFT_D_ALIGN) | (AlignBits(kernel.dvAlign) << KEY_SHIFT_DV_ALIGN) |
            (static_cast<uint64_t>(kernel.isBn2MultiBlk) << KEY_SHIFT_BN2_MULTIBLK) |
-           (static_cast<uint64_t>(kernel.bn2NeedZero) << KEY_SHIFT_BN2_NEED_ZERO) | (deterBit << KEY_SHIFT_DETER);
+           (static_cast<uint64_t>(kernel.bn2NeedZero) << KEY_SHIFT_BN2_NEED_ZERO) | (deterBit << KEY_SHIFT_DETER) |
+           (static_cast<uint64_t>(info.hasSinks ? 1 : 0) << KEY_SHIFT_SINK);
 }
 
 } // namespace optiling

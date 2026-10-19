@@ -32,7 +32,7 @@ CV 通信全部使用手动 set/wait cross-core，且正反向成对：
 AIC 侧对每个 V->C flag 用 ``sync_mode=INTRA_BLOCK`` 等一次，覆盖两个
 vector 子核各自发来的信号。
 
-当前裁剪范围：非 TND（BSND/BNSD）、FP16/BF16。mask_mode 0=dense，3=causal，
+当前裁剪范围：BSND/BNSD/TND、FP16/BF16。mask_mode 0=dense，3=causal，
 4=band。tilingkey ``swizzle`` 区分线性 skip 无效块与 packed 有效块分核。
 ``deter`` 只做编译期分发。非 swizzle 核上闭式分核，与现网同套跨轮流水和
 L0C 累加，不每轮 ``sync_all``。BN2 支持 mask，禁止 BN2+swizzle，且与
@@ -47,7 +47,9 @@ import fag_block_cube
 import fag_block_vec
 import fag_buffers
 import fag_common
-import fag_deter_ondevice
+import fag_deter
+import fag_deter_tnd_dense
+import fag_deter_tnd_sparse
 import fag_schedule
 from fag_tiling import FlashAttnGradTilingData, Tmpl
 from fag_kernel_deter import (
@@ -85,7 +87,9 @@ def _bind_helpers():
         fag_block_vec,
         fag_buffers,
         fag_common,
-        fag_deter_ondevice,
+        fag_deter,
+        fag_deter_tnd_dense,
+        fag_deter_tnd_sparse,
         fag_schedule,
     ):
         for name, val in vars(mod).items():
@@ -107,8 +111,8 @@ def flash_attn_grad_preload3(
     dout: pl.Ptr[pl.DT_UINT8],
     attn_out: pl.Ptr[pl.DT_UINT8],
     softmax_lse: pl.Ptr[pl.DT_UINT8],
-    # 以下 6 个为可选输入。cu_seqlens/seqused(TND) 本轮不读。
-    # sinks：sinkOptional=1 时按 head 读标量，算 dsink。
+    # 以下为可选输入。TND 的 cu_seqlens 给物理偏移，seqused 给有效长度。
+    # sinks：tilingkey sink=1 时按 head 读标量，算 dsink。
     # attn_mask：mask_mode 3/4 时按 [2048,2048] uint8 压缩矩阵搬 UB。
     # metadata：FAG 区含分核 [start,end) 与 pre/post 行区间（412 int32）。
     cu_seqlens_q: pl.Ptr[pl.DT_UINT8],
@@ -130,6 +134,7 @@ def flash_attn_grad_preload3(
     dv_align,
     swizzle,
     deter,
+    sink,
 ):
     # 入口只建视图 / buffer / pre-post，cube/vector 主循环按 deter 编译期分发。
     # coreNum 从内建 API 取而非 tiling：TilingData 无此字段。
@@ -138,16 +143,22 @@ def flash_attn_grad_preload3(
     coreNum = pl.get_block_num()
     # swizzle 来自 tilingkey，是编译期常量 —— 每种分核各生成一份二进制，
     # `if swizzle` 的两路在编译期折叠，运行期没有判断开销。
-    constInfo = set_const_info(tiling, coreNum)
+    cu_q_tensor = pl.make_tensor(cu_seqlens_q, [tiling.b + 1], [1], dtype=pl.DT_INT32)
+    cu_kv_tensor = pl.make_tensor(cu_seqlens_kv, [tiling.b + 1], [1], dtype=pl.DT_INT32)
+    used_q_tensor = pl.make_tensor(seqused_q, [tiling.b], [1], dtype=pl.DT_INT32)
+    used_kv_tensor = pl.make_tensor(seqused_kv, [tiling.b], [1], dtype=pl.DT_INT32)
+    # constInfo 内统一计算实际 token 数，区分逻辑序列长度与 GM 视图长度。
+    constInfo = set_const_info(tiling, coreNum, cu_q_tensor, cu_kv_tensor)
 
     # ---- workspace 分区 ----
     # host(GetWorkspaceSizes) 给的是单块连续内存，这里按 fp32 元素切成
     # dq/dk/dv 三段累加区。三段大小必须与 host 的 CalcWorkSpace 逐一对齐。
     # dq 段按 n1(=n2*G) 个 head，dk/dv 段按 n2 —— 与 host 的 dqElems/dkvElems
     # 一致。GQA 下若这里误用 n2，dk/dv 的起始偏移就会算错。
-    # host 只在三段之后多留一行 128 对齐，不改这里的基地址。
-    wsRowsQ = tiling.b * tiling.s1 * tiling.n1
-    wsRowsKV = tiling.b * tiling.s2 * tiling.n2
+    # TND 按物理 packed token 分段，非 TND 的 T 仍为 B*S；seqused 不改变跨度。
+    # host 只在三段之后多留 128 行保护垫，不改这里的基地址。
+    wsRowsQ = constInfo.t1Size * constInfo.n1Size
+    wsRowsKV = constInfo.t2Size * constInfo.n2Size
     ws_ptr = pl.make_ptr(workspace, dtype=pl.DT_FP32)
     dq_workspace = ws_ptr
     # 段宽按各自的 head dim：dq/dk 是 D，dv 是 Dv(可以短于 D)。
@@ -174,25 +185,25 @@ def flash_attn_grad_preload3(
     dV = constInfo.dvSize
     viewD2Q = constInfo.viewD2Q
     d2dQ = viewD2Q * dQ
-    s1ndQ = constInfo.s1Size * d2dQ
+    s1ndQ = constInfo.s1ViewSize * d2dQ
     viewD2KV = constInfo.viewD2KV
     d2dKV = viewD2KV * dQ
-    s2ndKV = constInfo.s2Size * d2dKV
+    s2ndKV = constInfo.s2ViewSize * d2dKV
     # Dv 宽的那几个张量另有一套行距
     d2dQv = viewD2Q * dV
-    s1ndQv = constInfo.s1Size * d2dQv
+    s1ndQv = constInfo.s1ViewSize * d2dQv
     d2dKVv = viewD2KV * dV
-    s2ndKVv = constInfo.s2Size * d2dKVv
+    s2ndKVv = constInfo.s2ViewSize * d2dKVv
 
     tensor_q = pl.make_tensor(
         q,
-        [constInfo.viewD0Q, constInfo.s1Size, viewD2Q, dQ],
+        [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dQ],
         [s1ndQ, d2dQ, dQ, 1],
         dtype=input_dtype,
     )
     tensor_k = pl.make_tensor(
         k,
-        [constInfo.viewD0KV, constInfo.s2Size, viewD2KV, dQ],
+        [constInfo.viewD0KV, constInfo.s2ViewSize, viewD2KV, dQ],
         [s2ndKV, d2dKV, dQ, 1],
         dtype=input_dtype,
     )
@@ -203,26 +214,26 @@ def flash_attn_grad_preload3(
     # tensor 视图，让它独立推导 layout。
     tensor_k_nt = pl.make_tensor(
         k,
-        [constInfo.viewD0KV, constInfo.s2Size, viewD2KV, dQ],
+        [constInfo.viewD0KV, constInfo.s2ViewSize, viewD2KV, dQ],
         [s2ndKV, d2dKV, dQ, 1],
         dtype=input_dtype,
     )
     # V/dO/attn_out 是 Dv 宽
     tensor_v = pl.make_tensor(
         v,
-        [constInfo.viewD0KV, constInfo.s2Size, viewD2KV, dV],
+        [constInfo.viewD0KV, constInfo.s2ViewSize, viewD2KV, dV],
         [s2ndKVv, d2dKVv, dV, 1],
         dtype=input_dtype,
     )
     tensor_dy = pl.make_tensor(
         dout,
-        [constInfo.viewD0Q, constInfo.s1Size, viewD2Q, dV],
+        [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dV],
         [s1ndQv, d2dQv, dV, 1],
         dtype=input_dtype,
     )
     tensor_y = pl.make_tensor(
         attn_out,
-        [constInfo.viewD0Q, constInfo.s1Size, viewD2Q, dV],
+        [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dV],
         [s1ndQv, d2dQv, dV, 1],
         dtype=input_dtype,
     )
@@ -230,12 +241,22 @@ def flash_attn_grad_preload3(
     # 的 softmax 归一化因子不同，G 个 Q head 不能共享同一份 lse。
     # lse offset = ((b*n2 + n2o)*G + g)*S1。
     n1Size = constInfo.n2Size * constInfo.gSize
-    tensor_lse = pl.make_tensor(
-        softmax_lse,
-        [constInfo.bSize, n1Size, constInfo.s1Size],
-        [n1Size * constInfo.s1Size, constInfo.s1Size, 1],
-        dtype=pl.DT_FP32,
-    )
+    if layout == 1:
+        # TND LSE 为 [N1,T1]，loadBase 已是全局 token 行。
+        # head 间距必须取实际 T1，不能用 B*maxSeqlenQ。
+        tensor_lse = pl.make_tensor(
+            softmax_lse,
+            [n1Size, constInfo.t1Size],
+            [constInfo.t1Size, 1],
+            dtype=pl.DT_FP32,
+        )
+    else:
+        tensor_lse = pl.make_tensor(
+            softmax_lse,
+            [constInfo.bSize, n1Size, constInfo.s1Size],
+            [n1Size * constInfo.s1Size, constInfo.s1Size, 1],
+            dtype=pl.DT_FP32,
+        )
     if mask_mode != 0:
         tensor_mask = pl.make_tensor(
             attn_mask,
@@ -249,28 +270,28 @@ def flash_attn_grad_preload3(
     # dq/dk 是 D 宽，dv 是 Dv 宽 —— 与 workspace 的分段宽度一致
     tensor_dq_ws = pl.make_tensor(
         dq_workspace,
-        [constInfo.viewD0Q, constInfo.s1Size, viewD2Q, dQ],
+        [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dQ],
         [s1ndQ, d2dQ, dQ, 1],
         dtype=pl.DT_FP32,
     )
     tensor_dk_ws = pl.make_tensor(
         dk_workspace,
-        [constInfo.viewD0KV, constInfo.s2Size, viewD2KV, dQ],
+        [constInfo.viewD0KV, constInfo.s2ViewSize, viewD2KV, dQ],
         [s2ndKV, d2dKV, dQ, 1],
         dtype=pl.DT_FP32,
     )
     tensor_dv_ws = pl.make_tensor(
         dv_workspace,
-        [constInfo.viewD0KV, constInfo.s2Size, viewD2KV, dV],
+        [constInfo.viewD0KV, constInfo.s2ViewSize, viewD2KV, dV],
         [s2ndKVv, d2dKVv, dV, 1],
         dtype=pl.DT_FP32,
     )
 
     # ---- pre/post：一维视图 ----
-    # InitOutput / Muls+Cast 都按 B*S*N*D 个元素线性切，不看行宽。
+    # InitOutput / Muls+Cast 按实际 T*N*D 个元素线性切（非 TND 的 T=B*S）。
     # dq 侧 head 数是 n1(=n2*G)，dk/dv 侧是 n2。
-    dqRows = constInfo.bSize * constInfo.s1Size * n1Size
-    dkvRows = constInfo.bSize * constInfo.s2Size * constInfo.n2Size
+    dqRows = constInfo.t1Size * n1Size
+    dkvRows = constInfo.t2Size * constInfo.n2Size
     dqElems = dqRows * dQ
     dkElems = dkvRows * dQ
     dvElems = dkvRows * dV
@@ -337,7 +358,7 @@ def flash_attn_grad_preload3(
             dV,
             zero_ub.current(),
         )
-        if constInfo.sinkOptional == 1:
+        if sink == 1:
             process_sink_zero(
                 tensor_dsink_ws, constInfo, zero_ub.current(), pl.get_block_idx()
             )
@@ -364,6 +385,10 @@ def flash_attn_grad_preload3(
             fagOff=fagOff,
             cBlockIdx=cBlockIdx,
             coreNum=coreNum,
+            cuQ=cu_q_tensor,
+            cuKv=cu_kv_tensor,
+            usedQ=used_q_tensor,
+            usedKv=used_kv_tensor,
             blockStart=blockStart,
             blockEnd=blockEnd,
             numBlocks=numBlocks,
@@ -421,6 +446,10 @@ def flash_attn_grad_preload3(
             fagOff=fagOff,
             cBlockIdx=cBlockIdx,
             coreNum=coreNum,
+            cuQ=cu_q_tensor,
+            cuKv=cu_kv_tensor,
+            usedQ=used_q_tensor,
+            usedKv=used_kv_tensor,
             blockStart=blockStart,
             blockEnd=blockEnd,
             numBlocks=numBlocks,
@@ -450,9 +479,9 @@ def flash_attn_grad_preload3(
             p_l1=p_l1,
         )
         if deter == 1:
-            _run_preload3_vector_deter(constInfo, sched, gm, buf, runInfos)
+            _run_preload3_vector_deter(constInfo, sched, gm, buf, runInfos, sink)
         else:
-            _run_preload3_vector_normal(constInfo, sched, gm, buf, runInfos)
+            _run_preload3_vector_normal(constInfo, sched, gm, buf, runInfos, sink)
 
     # ==== Post 阶段：dQ/dK/dV 的 scale + cast fp32->16-bit ====
     # scale 在矩阵乘之后、fp32 结果上施加(而非提前乘进 dS)：先乘会让
@@ -502,7 +531,7 @@ def flash_attn_grad_preload3(
             dkvRowStartP * dV,
             (dkvRowEndP - dkvRowStartP) * dV,
         )
-        if constInfo.sinkOptional == 1:
+        if sink == 1:
             if pl.get_block_idx() == 0:
                 sink_red_ub = make_sink_red_post_ub(v1w)
                 sink_row_ub = make_sink_row_post_ub(v1w)
@@ -523,6 +552,11 @@ def flash_attn_grad_preload2(
     dout: pl.Ptr[pl.DT_UINT8],
     attn_out: pl.Ptr[pl.DT_UINT8],
     softmax_lse: pl.Ptr[pl.DT_UINT8],
+    # TND 变长：与 preload3 同款，循环外创建视图，非 TND 时为 null（不读）。
+    cu_seqlens_q: pl.Ptr[pl.DT_UINT8],
+    cu_seqlens_kv: pl.Ptr[pl.DT_UINT8],
+    seqused_q: pl.Ptr[pl.DT_UINT8],
+    seqused_kv: pl.Ptr[pl.DT_UINT8],
     attn_mask: pl.Ptr[pl.DT_UINT8],
     metadata: pl.Ptr[pl.DT_UINT8],
     sinks: pl.Ptr[pl.DT_UINT8],
@@ -536,6 +570,7 @@ def flash_attn_grad_preload2(
     dv_align,
     swizzle,
     deter,
+    sink,
 ):
     """1-ahead 入口：建视图、pre/post，并按 template/deter 分发主循环。
 
@@ -552,12 +587,17 @@ def flash_attn_grad_preload2(
     """
     coreNum = pl.get_block_num()
     # swizzle 来自 tilingkey。BN2 is_valid 保证为 0，与原先写死 0 等价。
-    constInfo = set_const_info(tiling, coreNum)
+    cu_q_tensor = pl.make_tensor(cu_seqlens_q, [tiling.b + 1], [1], dtype=pl.DT_INT32)
+    cu_kv_tensor = pl.make_tensor(cu_seqlens_kv, [tiling.b + 1], [1], dtype=pl.DT_INT32)
+    used_q_tensor = pl.make_tensor(seqused_q, [tiling.b], [1], dtype=pl.DT_INT32)
+    used_kv_tensor = pl.make_tensor(seqused_kv, [tiling.b], [1], dtype=pl.DT_INT32)
+    # 与 preload3 共用逻辑长度 / GM 视图长度的初始化约定。
+    constInfo = set_const_info(tiling, coreNum, cu_q_tensor, cu_kv_tensor)
 
     dQ = constInfo.dSize
     viewD2Q = constInfo.viewD2Q
     d2dQ = viewD2Q * dQ
-    s1ndQ = constInfo.s1Size * d2dQ
+    s1ndQ = constInfo.s1ViewSize * d2dQ
     if template == Tmpl.BN2:
         # BN2 无 GQA，KV 与 Q 同轴；V/dO 仍按 dSize 建，与现网 BN2 一致。
         dV = constInfo.dSize
@@ -568,76 +608,88 @@ def flash_attn_grad_preload2(
         viewD0KV = constInfo.viewD0KV
         viewD2KV = constInfo.viewD2KV
     d2dKV = viewD2KV * dQ
-    s2ndKV = constInfo.s2Size * d2dKV
+    s2ndKV = constInfo.s2ViewSize * d2dKV
     d2dQv = viewD2Q * dV
-    s1ndQv = constInfo.s1Size * d2dQv
+    s1ndQv = constInfo.s1ViewSize * d2dQv
     d2dKVv = viewD2KV * dV
-    s2ndKVv = constInfo.s2Size * d2dKVv
+    s2ndKVv = constInfo.s2ViewSize * d2dKVv
 
     tensor_q = pl.make_tensor(
         q,
-        [constInfo.viewD0Q, constInfo.s1Size, viewD2Q, dQ],
+        [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dQ],
         [s1ndQ, d2dQ, dQ, 1],
         dtype=input_dtype,
     )
     tensor_k = pl.make_tensor(
         k,
-        [viewD0KV, constInfo.s2Size, viewD2KV, dQ],
+        [viewD0KV, constInfo.s2ViewSize, viewD2KV, dQ],
         [s2ndKV, d2dKV, dQ, 1],
         dtype=input_dtype,
     )
     # MM3 需要未转置的 K，必须与 MM2 的 K^T 视图分开(layout 各自推导)
     tensor_k_nt = pl.make_tensor(
         k,
-        [viewD0KV, constInfo.s2Size, viewD2KV, dQ],
+        [viewD0KV, constInfo.s2ViewSize, viewD2KV, dQ],
         [s2ndKV, d2dKV, dQ, 1],
         dtype=input_dtype,
     )
     tensor_v = pl.make_tensor(
         v,
-        [viewD0KV, constInfo.s2Size, viewD2KV, dV],
+        [viewD0KV, constInfo.s2ViewSize, viewD2KV, dV],
         [s2ndKVv, d2dKVv, dV, 1],
         dtype=input_dtype,
     )
     tensor_dy = pl.make_tensor(
         dout,
-        [constInfo.viewD0Q, constInfo.s1Size, viewD2Q, dV],
+        [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dV],
         [s1ndQv, d2dQv, dV, 1],
         dtype=input_dtype,
     )
     tensor_y = pl.make_tensor(
         attn_out,
-        [constInfo.viewD0Q, constInfo.s1Size, viewD2Q, dV],
+        [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dV],
         [s1ndQv, d2dQv, dV, 1],
         dtype=input_dtype,
     )
     # BN2 无 GQA（g=1），n1==n2，与原先 [B,n2,S1] 等价。
     n1Size = constInfo.n2Size * constInfo.gSize
-    tensor_lse = pl.make_tensor(
-        softmax_lse,
-        [constInfo.bSize, n1Size, constInfo.s1Size],
-        [n1Size * constInfo.s1Size, constInfo.s1Size, 1],
-        dtype=pl.DT_FP32,
-    )
+    if layout == 1:
+        # TND：LSE 为 [N1,T1]，head stride 必须是实际 token 总数。
+        tensor_lse = pl.make_tensor(
+            softmax_lse,
+            [n1Size, constInfo.t1Size],
+            [constInfo.t1Size, 1],
+            dtype=pl.DT_FP32,
+        )
+    else:
+        tensor_lse = pl.make_tensor(
+            softmax_lse,
+            [constInfo.bSize, n1Size, constInfo.s1Size],
+            [n1Size * constInfo.s1Size, constInfo.s1Size, 1],
+            dtype=pl.DT_FP32,
+        )
 
     ws_ptr = pl.make_ptr(workspace, dtype=pl.DT_FP32)
+    # 与 preload3 / host 共用物理 token 口径；BN2 也用它定位 dsink 槽位。
+    wsRowsQ = constInfo.t1Size * constInfo.n1Size
+    wsRowsKV = constInfo.t2Size * constInfo.n2Size
     if template == Tmpl.BN2:
         # 单块直出 16-bit；dq workspace 是 per-core 条带，不是全量 4D。
         tensor_dq_out = pl.make_tensor(
             dq,
-            [constInfo.viewD0Q, constInfo.s1Size, viewD2Q, dQ],
+            [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dQ],
             [s1ndQ, d2dQ, dQ, 1],
             dtype=input_dtype,
         )
         tensor_dk_out = pl.make_tensor(
             dk,
-            [viewD0KV, constInfo.s2Size, viewD2KV, dQ],
+            [viewD0KV, constInfo.s2ViewSize, viewD2KV, dQ],
             [s2ndKV, d2dKV, dQ, 1],
             dtype=input_dtype,
         )
         tensor_dv_out = pl.make_tensor(
             dv,
-            [viewD0KV, constInfo.s2Size, viewD2KV, dV],
+            [viewD0KV, constInfo.s2ViewSize, viewD2KV, dV],
             [s2ndKVv, d2dKVv, dV, 1],
             dtype=input_dtype,
         )
@@ -649,32 +701,30 @@ def flash_attn_grad_preload2(
         )
     else:
         # GS1S2：三段 fp32 累加区，分段必须与 host CalcWorkSpace 对齐。
-        wsRowsQ = tiling.b * tiling.s1 * tiling.n1
-        wsRowsKV = tiling.b * tiling.s2 * tiling.n2
         dq_workspace = ws_ptr
         dk_workspace = pl.addptr(dq_workspace, wsRowsQ * tiling.d)
         dv_workspace = pl.addptr(dk_workspace, wsRowsKV * tiling.d)
         tensor_dq_ws = pl.make_tensor(
             dq_workspace,
-            [constInfo.viewD0Q, constInfo.s1Size, viewD2Q, dQ],
+            [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dQ],
             [s1ndQ, d2dQ, dQ, 1],
             dtype=pl.DT_FP32,
         )
         tensor_dk_ws = pl.make_tensor(
             dk_workspace,
-            [viewD0KV, constInfo.s2Size, viewD2KV, dQ],
+            [viewD0KV, constInfo.s2ViewSize, viewD2KV, dQ],
             [s2ndKV, d2dKV, dQ, 1],
             dtype=pl.DT_FP32,
         )
         tensor_dv_ws = pl.make_tensor(
             dv_workspace,
-            [viewD0KV, constInfo.s2Size, viewD2KV, dV],
+            [viewD0KV, constInfo.s2ViewSize, viewD2KV, dV],
             [s2ndKVv, d2dKVv, dV, 1],
             dtype=pl.DT_FP32,
         )
-        dqElems = constInfo.bSize * constInfo.s1Size * n1Size * dQ
-        dkElems = constInfo.bSize * constInfo.s2Size * constInfo.n2Size * dQ
-        dvElems = constInfo.bSize * constInfo.s2Size * constInfo.n2Size * dV
+        dqElems = constInfo.t1Size * n1Size * dQ
+        dkElems = constInfo.t2Size * constInfo.n2Size * dQ
+        dvElems = constInfo.t2Size * constInfo.n2Size * dV
         tensor_dq_ws_flat = pl.make_tensor(
             dq_workspace, [1, dqElems], [dqElems, 1], dtype=pl.DT_FP32
         )
@@ -708,9 +758,9 @@ def flash_attn_grad_preload2(
 
     dsink_workspace = pl.addptr(
         ws_ptr,
-        tiling.b * tiling.s1 * tiling.n1 * tiling.d
-        + tiling.b * tiling.s2 * tiling.n2 * tiling.d
-        + tiling.b * tiling.s2 * tiling.n2 * tiling.dv
+        wsRowsQ * tiling.d
+        + wsRowsKV * tiling.d
+        + wsRowsKV * tiling.dv
         + 128 * pl.max(tiling.d, tiling.dv),
     )
     tensor_sinks = pl.make_tensor(sinks, [constInfo.n1Size], [1], dtype=pl.DT_FP32)
@@ -749,24 +799,14 @@ def flash_attn_grad_preload2(
         if bn2_need_zero == 1:
             with pl.section_vector():
                 n1Size = constInfo.n2Size * constInfo.gSize
-                dqElems = constInfo.bSize * constInfo.s1Size * n1Size * constInfo.dSize
-                dkElems = (
-                    constInfo.bSize
-                    * constInfo.s2Size
-                    * constInfo.n2Size
-                    * constInfo.dSize
-                )
-                dvElems = (
-                    constInfo.bSize
-                    * constInfo.s2Size
-                    * constInfo.n2Size
-                    * constInfo.dvSize
-                )
+                dqElems = constInfo.t1Size * n1Size * constInfo.dSize
+                dkElems = constInfo.t2Size * constInfo.n2Size * constInfo.dSize
+                dvElems = constInfo.t2Size * constInfo.n2Size * constInfo.dvSize
                 tensor_dq_flat = pl.make_tensor(
                     dq, [1, dqElems], [dqElems, 1], dtype=input_dtype
                 )
                 tensor_dk_flat = pl.make_tensor(
-                    dk, [1, dkElems], [dqElems, 1], dtype=input_dtype
+                    dk, [1, dkElems], [dkElems, 1], dtype=input_dtype
                 )
                 tensor_dv_flat = pl.make_tensor(
                     dv, [1, dvElems], [dvElems, 1], dtype=input_dtype
@@ -782,7 +822,7 @@ def flash_attn_grad_preload2(
                     constInfo.dvSize,
                     zero_ub.current(),
                 )
-                if constInfo.sinkOptional == 1:
+                if sink == 1:
                     sink_zero_ub = make_pre_zero_buffer_f32()
                     process_sink_zero(
                         tensor_dsink_ws,
@@ -793,7 +833,7 @@ def flash_attn_grad_preload2(
             pl.system.sync_all()
         else:
             # No output pre-clear and no sink: BN2 needs no pre barrier.
-            if constInfo.sinkOptional == 1:
+            if sink == 1:
                 with pl.section_vector():
                     sink_zero_ub = make_pre_zero_buffer_f32()
                     process_sink_zero(
@@ -816,7 +856,7 @@ def flash_attn_grad_preload2(
                 dV,
                 zero_ub.current(),
             )
-            if constInfo.sinkOptional == 1:
+            if sink == 1:
                 process_sink_zero(
                     tensor_dsink_ws, constInfo, zero_ub.current(), pl.get_block_idx()
                 )
@@ -840,6 +880,10 @@ def flash_attn_grad_preload2(
                 fagOff=fagOff,
                 cBlockIdx=cBlockIdx,
                 coreNum=coreNum,
+                cuQ=cu_q_tensor,
+                cuKv=cu_kv_tensor,
+                usedQ=used_q_tensor,
+                usedKv=used_kv_tensor,
                 blockStart=blockStart,
                 blockEnd=blockEnd,
                 numBlocks=numBlocks,
@@ -878,6 +922,10 @@ def flash_attn_grad_preload2(
             sched = pl.make_tuple(
                 cBlockIdx=cBlockIdx,
                 coreNum=coreNum,
+                cuQ=cu_q_tensor,
+                cuKv=cu_kv_tensor,
+                usedQ=used_q_tensor,
+                usedKv=used_kv_tensor,
             )
             gm = pl.make_tuple(
                 tensor_q=tensor_q,
@@ -914,6 +962,10 @@ def flash_attn_grad_preload2(
                 fagOff=fagOff,
                 cBlockIdx=cBlockIdx,
                 coreNum=coreNum,
+                cuQ=cu_q_tensor,
+                cuKv=cu_kv_tensor,
+                usedQ=used_q_tensor,
+                usedKv=used_kv_tensor,
                 blockStart=blockStart,
                 blockEnd=blockEnd,
                 numBlocks=numBlocks,
@@ -963,6 +1015,10 @@ def flash_attn_grad_preload2(
                 fagOff=fagOff,
                 cBlockIdx=cBlockIdx,
                 coreNum=coreNum,
+                cuQ=cu_q_tensor,
+                cuKv=cu_kv_tensor,
+                usedQ=used_q_tensor,
+                usedKv=used_kv_tensor,
                 blockStart=blockStart,
                 blockEnd=blockEnd,
                 numBlocks=numBlocks,
@@ -995,7 +1051,7 @@ def flash_attn_grad_preload2(
                 ds_l1=ds_l1,
                 p_l1=p_l1,
             )
-            _run_preload2_vector_bn2(constInfo, sched, gm, buf, runInfos)
+            _run_preload2_vector_bn2(constInfo, sched, gm, buf, runInfos, sink)
         elif deter == 1:
             y_ub = make_y_ub(v1w)
             dy_ub = make_dy_ub(v1w)
@@ -1009,6 +1065,10 @@ def flash_attn_grad_preload2(
             sched = pl.make_tuple(
                 cBlockIdx=cBlockIdx,
                 coreNum=coreNum,
+                cuQ=cu_q_tensor,
+                cuKv=cu_kv_tensor,
+                usedQ=used_q_tensor,
+                usedKv=used_kv_tensor,
                 subIdx=subIdx,
                 v1w=v1w,
             )
@@ -1034,7 +1094,7 @@ def flash_attn_grad_preload2(
                 ds_l1=ds_l1,
                 p_l1=p_l1,
             )
-            _run_preload2_vector_gs_deter(constInfo, sched, gm, buf, runInfos)
+            _run_preload2_vector_gs_deter(constInfo, sched, gm, buf, runInfos, sink)
         else:
             y_ub = make_y_ub(v1w)
             dy_ub = make_dy_ub(v1w)
@@ -1050,6 +1110,10 @@ def flash_attn_grad_preload2(
                 fagOff=fagOff,
                 cBlockIdx=cBlockIdx,
                 coreNum=coreNum,
+                cuQ=cu_q_tensor,
+                cuKv=cu_kv_tensor,
+                usedQ=used_q_tensor,
+                usedKv=used_kv_tensor,
                 blockStart=blockStart,
                 blockEnd=blockEnd,
                 numBlocks=numBlocks,
@@ -1078,7 +1142,7 @@ def flash_attn_grad_preload2(
                 ds_l1=ds_l1,
                 p_l1=p_l1,
             )
-            _run_preload2_vector_gs_normal(constInfo, sched, gm, buf, runInfos)
+            _run_preload2_vector_gs_normal(constInfo, sched, gm, buf, runInfos, sink)
 
     if template != Tmpl.BN2:
         pl.system.sync_all()
@@ -1125,7 +1189,7 @@ def flash_attn_grad_preload2(
                 dkvRowStartP * dV,
                 (dkvRowEndP - dkvRowStartP) * dV,
             )
-            if constInfo.sinkOptional == 1:
+            if sink == 1:
                 if pl.get_block_idx() == 0:
                     sink_red_ub = make_sink_red_post_ub(v1w)
                     sink_row_ub = make_sink_row_post_ub(v1w)
@@ -1139,7 +1203,7 @@ def flash_attn_grad_preload2(
                     )
     if template == Tmpl.BN2:
         # BN2 writes dQ/dK/dV directly; only dsink needs a global reduction.
-        if constInfo.sinkOptional == 1:
+        if sink == 1:
             pl.system.sync_all()
             with pl.section_vector():
                 if pl.get_block_idx() == 0:

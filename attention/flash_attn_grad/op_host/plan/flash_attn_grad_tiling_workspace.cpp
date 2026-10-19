@@ -20,9 +20,11 @@ constexpr int64_t FAG_WS_ALIGN_ROWS = 128;
 
 // 分区必须与 kernel 的 make_ptr 切分完全一致：
 //   [0]        libapi 预留（系统占用）
-//   [+libapi]  dq 累加器  B*S1*N1*D  fp32（N1 = N2*G）
-//   [+...]     dk 累加器  B*S2*N2*D  fp32
-//   [+...]     dv 累加器  B*S2*N2*Dv fp32
+//   [+libapi]  dq 累加器  T1*N1*D  fp32（N1 = N2*G）
+//   [+...]     dk 累加器  T2*N2*D  fp32
+//   [+...]     dv 累加器  T2*N2*Dv fp32
+// TND 的 T1/T2 是 Q/K 的物理 token 数；非 TND 为 B*S1/B*S2。
+// seqused 只限制有效计算长度，不改变 workspace 的物理布局和 pre/post 覆盖。
 // dq 跟随 q 的 head 数（N1），dk/dv 跟随 k/v 的（N2）—— GQA 下同一个 KV head 的
 // G 个 Q head 会 atomicAdd 到同一块 dk/dv。kernel 用 fp32 atomicAdd 累加，之后
 // 由 post 阶段乘 scale 并 cast 回 fp16/bf16 输出；dv 不乘 scale。
@@ -32,9 +34,9 @@ FagWorkspacePlan BuildWorkspacePlan(const FagParsedInfo& info)
     FagWorkspacePlan plan;
     plan.libapiSize = info.libapiWorkspaceSize;
 
-    const size_t dqElems = static_cast<size_t>(info.b) * info.s1 * info.n1 * info.d;
-    const size_t dkElems = static_cast<size_t>(info.b) * info.s2 * info.n2 * info.d;
-    const size_t dvElems = static_cast<size_t>(info.b) * info.s2 * info.n2 * info.dv;
+    const size_t dqElems = static_cast<size_t>(info.t1) * info.n1 * info.d;
+    const size_t dkElems = static_cast<size_t>(info.t2) * info.n2 * info.d;
+    const size_t dvElems = static_cast<size_t>(info.t2) * info.n2 * info.dv;
 
     size_t cursor = plan.libapiSize;
     plan.dq.offset = cursor;
@@ -49,7 +51,7 @@ FagWorkspacePlan BuildWorkspacePlan(const FagParsedInfo& info)
     plan.dv.size = dvElems * FP32_SIZE;
     cursor += plan.dv.size;
 
-    // 一块 128 行对齐垫在 dv 后面；dq/dk/dv 基址仍是紧凑 B*S*N*D。
+    // 一块 128 行对齐垫在 dv 后面；dq/dk/dv 各段按物理 T*N*D 紧凑排列。
     const size_t alignRowElems =
         static_cast<size_t>(FAG_WS_ALIGN_ROWS) * static_cast<size_t>(std::max(info.d, info.dv));
     cursor += alignRowElems * FP32_SIZE;

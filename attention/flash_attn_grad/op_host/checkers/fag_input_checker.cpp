@@ -64,6 +64,22 @@ ge::graphStatus FagDtypeChecker::Check(FagCheckCtx& ctx)
                             static_cast<int32_t>(qDtype), static_cast<int32_t>(item.desc->GetDataType())),
                     return ge::GRAPH_PARAM_INVALID);
     }
+    const struct {
+        const char* name;
+        size_t index;
+    } sequenceInputs[] = {{"cu_seqlens_q", CU_SEQLENS_Q_INDEX},
+                          {"cu_seqlens_kv", CU_SEQLENS_KV_INDEX},
+                          {"seqused_q", SEQUSED_Q_INDEX},
+                          {"seqused_kv", SEQUSED_KV_INDEX}};
+    for (const auto& item : sequenceInputs) {
+        // A scalar is a provided (invalid) sequence input, not an omitted one.
+        if (context->GetOptionalInputShape(item.index) == nullptr) {
+            continue;
+        }
+        const auto desc = context->GetOptionalInputDesc(item.index);
+        OP_CHECK_IF(desc == nullptr || desc->GetDataType() != ge::DT_INT32,
+                    OP_LOGE(opName, "%s must have int32 dtype.", item.name), return ge::GRAPH_PARAM_INVALID);
+    }
     const auto sinksDesc = context->GetOptionalInputDesc(SINKS_INDEX);
     if (sinksDesc != nullptr) {
         OP_CHECK_IF(sinksDesc->GetDataType() != ge::DT_FLOAT,

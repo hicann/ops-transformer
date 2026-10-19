@@ -1283,9 +1283,12 @@ def deter_lin_max_round(constInfo, coreNum):
     n = constInfo.s2Outer
     bb = b * n2
     out = 0
+    dense_grid = constInfo.sequsedQOptional + constInfo.sequsedKvOptional
+    if mask_mode == 0:
+        dense_grid = 1
     if k > 0 and m > 0 and n > 0 and bb > 0:
         dense_r = _dense_lin_max_round(k, m, n, bb, g)
-        if mask_mode == 0:
+        if dense_grid > 0:
             out = dense_r
         else:
             band_r = _band_lin_max_round(
@@ -1325,6 +1328,7 @@ def deter_lin_round_bounds(constInfo, coreNum):
             and n < coreNum
             and constInfo.s1Size >= constInfo.s2Size
             and constInfo.s2Token == constInfo.s2Size - constInfo.s1Size
+            and constInfo.sequsedQOptional + constInfo.sequsedKvOptional == 0
         ):
             offset = (constInfo.s1Size - constInfo.s2Size) // CUBE_BASEM
             first = pl.astype(offset * g, pl.DT_INT64)
@@ -1401,7 +1405,7 @@ def _deter_lin_gidx_host(constInfo, cBlockIdx, coreNum, roundId):
     noff = 0
     if k <= 0 or j < 1 or j > k or r < 1 or s1o <= 0 or s2o <= 0 or b <= 0 or n2 <= 0:
         return -1
-    if mask_mode == 0:
+    if mask_mode == 0 or constInfo.sequsedQOptional + constInfo.sequsedKvOptional > 0:
         if g <= 1:
             w, x, y = cal_dense(k, s1o, s2o, bb, j, r)
         else:
@@ -1433,16 +1437,18 @@ def _deter_lin_gidx_host(constInfo, cBlockIdx, coreNum, roundId):
         return -1
     s1_idx = fused % s1o
     s2_idx = (fused % (s1o * s2o)) // s1o
-    if _fused_valid(constInfo, s1_idx, s2_idx) == 0:
-        return -1
+    if constInfo.sequsedQOptional + constInfo.sequsedKvOptional == 0:
+        if _fused_valid(constInfo, s1_idx, s2_idx) == 0:
+            return -1
     return fused
 
 
 def deter_lin_gidx(constInfo, cBlockIdx, coreNum, roundId):
     """(cBlockIdx, roundId) 0-based → fusedIdx，空槽 -1。
 
-    ``mask_mode`` 是 tiling key，dense/causal/band 分支会在编译时折叠。
-    设备路径必须直接使用对应的 AscendC 闭式，不能用 dense 后置过滤代替。
+    无 seqused 时保留对应的 AscendC dense/causal/band 闭式。
+    seqused 的 batch 几何在核上读取；先枚举完整物理 dense 网格，再由
+    skip_empty_deter 按有效长度和 mask 过滤，避免静态稀疏几何提前漏块。
     """
     k = coreNum
     j = cBlockIdx + 1
@@ -1455,7 +1461,10 @@ def deter_lin_gidx(constInfo, cBlockIdx, coreNum, roundId):
     bb = b * n2
     moff = 0
     noff = 0
+    dense_grid = constInfo.sequsedQOptional + constInfo.sequsedKvOptional
     if mask_mode == 0:
+        dense_grid = 1
+    if dense_grid > 0:
         w, x, y = cal_dense(k, s1o, s2o, bb, j, r)
         dense_round = select_gqa_dense_round(k, s1o, s2o, bb, g)
         wg, xg, yg = cal_gqa_dense(k, s1o, s2o, bb, j, r, g, dense_round)
@@ -1500,7 +1509,9 @@ def deter_lin_gidx(constInfo, cBlockIdx, coreNum, roundId):
     s2s = pl.max(s2o, 1)
     s1_idx = fused % s1s
     s2_idx = (fused % (s1s * s2s)) // s1s
-    hit = pl.min(pl.max(fused + 1, 0), 1) * _fused_valid(constInfo, s1_idx, s2_idx)
+    hit = pl.min(pl.max(fused + 1, 0), 1)
+    if constInfo.sequsedQOptional + constInfo.sequsedKvOptional == 0:
+        hit = hit * _fused_valid(constInfo, s1_idx, s2_idx)
     return pl.astype(fused, pl.DT_INT64) * hit + pl.astype(-1, pl.DT_INT64) * (1 - hit)
 
 

@@ -26,6 +26,12 @@ using namespace op;
 namespace l0op {
 OP_TYPE_REGISTER(FlashAttnMetadata);
 
+namespace {
+struct MetadataTaskSpace {
+    internal::AicpuTaskSpace value{"FlashAttnMetadata"};
+};
+} // namespace
+
 const aclTensor* FlashAttnMetadata(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional,
                                    const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional,
                                    int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,

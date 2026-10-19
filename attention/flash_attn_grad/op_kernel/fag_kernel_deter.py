@@ -20,7 +20,9 @@ import fag_block_cube
 import fag_block_vec
 import fag_buffers
 import fag_common
-import fag_deter_ondevice
+import fag_deter
+import fag_deter_tnd_dense
+import fag_deter_tnd_sparse
 import fag_schedule
 
 # codegen 内联时读的是本模块 globals() 里的裸名，不是 from-import 清单。
@@ -43,7 +45,9 @@ def _bind_helpers():
         fag_block_vec,
         fag_buffers,
         fag_common,
-        fag_deter_ondevice,
+        fag_deter,
+        fag_deter_tnd_dense,
+        fag_deter_tnd_sparse,
         fag_schedule,
     ):
         for name, val in vars(mod).items():
@@ -66,6 +70,10 @@ def _run_preload3_cube_deter(
 ):
     cBlockIdx = sched.cBlockIdx
     coreNum = sched.coreNum
+    cu_q_tensor = sched.cuQ
+    cu_kv_tensor = sched.cuKv
+    used_q_tensor = sched.usedQ
+    used_kv_tensor = sched.usedKv
     tensor_q = gm.tensor_q
     tensor_k = gm.tensor_k
     tensor_k_nt = gm.tensor_k_nt
@@ -97,13 +105,33 @@ def _run_preload3_cube_deter(
     fixTaskId = 0
     localIdx = 0
     denseCursor = pl.const(0, pl.DT_INT64)
-    prevPhysicalGIdx = pl.const(-1, pl.DT_INT64)
+    prevValidGIdx = pl.const(-1, pl.DT_INT64)
     physicalRound = pl.const(0, pl.DT_INT64)
     isLastLoop = 0
     drainDone = 0
     nFetched = 0
-    firstRound, maxRound = deter_round_bounds(constInfo, coreNum)
+    tndPlan = init_deter_schedule(
+        constInfo,
+        coreNum,
+        cu_q_tensor,
+        cu_kv_tensor,
+        used_q_tensor,
+        used_kv_tensor,
+    )
+    firstRound, maxRound = deter_round_bounds(constInfo, coreNum, tndPlan)
     denseCursor = firstRound
+    nextValidGIdx, nextValidRound = find_next_valid_deter(
+        constInfo,
+        cBlockIdx,
+        coreNum,
+        firstRound,
+        maxRound,
+        used_q_tensor,
+        used_kv_tensor,
+        cu_q_tensor,
+        cu_kv_tensor,
+        tndPlan,
+    )
     pl.system.set_cross_core(
         pipe=pl.PipeType.FIX,
         event_id=SYNC_DQ_DETER_FIX_FLAG,
@@ -122,14 +150,21 @@ def _run_preload3_cube_deter(
     while True:
         gIdx = pl.const(-1, pl.DT_INT64)
         physicalRound = denseCursor
-        prevRoundGIdx = prevPhysicalGIdx
-        nextPhysicalGIdx = pl.const(-1, pl.DT_INT64)
-        mappedGIdx, mappedDenseCursor = skip_empty_deter(
-            constInfo, cBlockIdx, coreNum, physicalRound, maxRound
-        )
-        gIdx = mappedGIdx
-        denseCursor = mappedDenseCursor
-        prevPhysicalGIdx = gIdx
+        denseCursor = physicalRound + 1
+        if physicalRound == nextValidRound:
+            gIdx = nextValidGIdx
+            nextValidGIdx, nextValidRound = find_next_valid_deter(
+                constInfo,
+                cBlockIdx,
+                coreNum,
+                physicalRound + 1,
+                maxRound,
+                used_q_tensor,
+                used_kv_tensor,
+                cu_q_tensor,
+                cu_kv_tensor,
+                tndPlan,
+            )
         if physicalRound >= maxRound:
             isLastLoop = 1
         doFix = 0
@@ -139,15 +174,24 @@ def _run_preload3_cube_deter(
             q_cur = q_l1.next()
             do_cur = do_l1.next()
             curInfo = runInfos[taskId % PRELOAD_TIMES]
-            set_run_info(constInfo, curInfo, taskId, gIdx, 0, localIdx)
+            set_run_info(
+                constInfo,
+                curInfo,
+                taskId,
+                gIdx,
+                0,
+                localIdx,
+                cu_q_tensor,
+                cu_kv_tensor,
+                used_q_tensor,
+                used_kv_tensor,
+            )
             nFetched = nFetched + 1
             curInfo.readyRound = physicalRound + 2
-            nextPhysicalGIdx, nextPhysicalRound = skip_empty_deter(
-                constInfo, cBlockIdx, coreNum, physicalRound + 1, maxRound
-            )
             set_deter_l0c_neighbors(
-                constInfo, curInfo, prevRoundGIdx, gIdx, nextPhysicalGIdx
+                constInfo, curInfo, prevValidGIdx, gIdx, nextValidGIdx
             )
+            prevValidGIdx = gIdx
             if taskId > 1:
                 pl.system.wait_cross_core(
                     pipe=pl.PipeType.FIX,
@@ -373,9 +417,14 @@ def _run_preload3_vector_deter(
     gm,
     buf,
     runInfos,
+    sink,
 ):
     cBlockIdx = sched.cBlockIdx
     coreNum = sched.coreNum
+    cu_q_tensor = sched.cuQ
+    cu_kv_tensor = sched.cuKv
+    used_q_tensor = sched.usedQ
+    used_kv_tensor = sched.usedKv
     subIdx = sched.subIdx
     v1w = sched.v1w
     tensor_y = gm.tensor_y
@@ -401,39 +450,75 @@ def _run_preload3_vector_deter(
     vecTaskId = 0
     localIdx = 0
     denseCursor = pl.const(0, pl.DT_INT64)
-    prevPhysicalGIdx = pl.const(-1, pl.DT_INT64)
+    prevValidGIdx = pl.const(-1, pl.DT_INT64)
     physicalRound = pl.const(0, pl.DT_INT64)
     isLastLoop = 0
     drainDone = 0
     nFetched = 0
-    firstRound, maxRound = deter_round_bounds(constInfo, coreNum)
+    tndPlan = init_deter_schedule(
+        constInfo,
+        coreNum,
+        cu_q_tensor,
+        cu_kv_tensor,
+        used_q_tensor,
+        used_kv_tensor,
+    )
+    firstRound, maxRound = deter_round_bounds(constInfo, coreNum, tndPlan)
     denseCursor = firstRound
+    nextValidGIdx, nextValidRound = find_next_valid_deter(
+        constInfo,
+        cBlockIdx,
+        coreNum,
+        firstRound,
+        maxRound,
+        used_q_tensor,
+        used_kv_tensor,
+        cu_q_tensor,
+        cu_kv_tensor,
+        tndPlan,
+    )
     while True:
         gIdx = pl.const(-1, pl.DT_INT64)
         physicalRound = denseCursor
-        prevRoundGIdx = prevPhysicalGIdx
-        nextPhysicalGIdx = pl.const(-1, pl.DT_INT64)
-        mappedGIdx, mappedDenseCursor = skip_empty_deter(
-            constInfo, cBlockIdx, coreNum, physicalRound, maxRound
-        )
-        gIdx = mappedGIdx
-        denseCursor = mappedDenseCursor
-        prevPhysicalGIdx = gIdx
+        denseCursor = physicalRound + 1
+        if physicalRound == nextValidRound:
+            gIdx = nextValidGIdx
+            nextValidGIdx, nextValidRound = find_next_valid_deter(
+                constInfo,
+                cBlockIdx,
+                coreNum,
+                physicalRound + 1,
+                maxRound,
+                used_q_tensor,
+                used_kv_tensor,
+                cu_q_tensor,
+                cu_kv_tensor,
+                tndPlan,
+            )
         if physicalRound >= maxRound:
             isLastLoop = 1
         skipPipe = 0
         if skipPipe == 0:
             if gIdx >= 0:
                 curInfo = runInfos[taskId % PRELOAD_TIMES]
-                set_run_info(constInfo, curInfo, taskId, gIdx, subIdx, localIdx)
+                set_run_info(
+                    constInfo,
+                    curInfo,
+                    taskId,
+                    gIdx,
+                    subIdx,
+                    localIdx,
+                    cu_q_tensor,
+                    cu_kv_tensor,
+                    used_q_tensor,
+                    used_kv_tensor,
+                )
                 nFetched = nFetched + 1
                 curInfo.readyRound = physicalRound + 2
-                nextPhysicalGIdx, nextPhysicalRound = skip_empty_deter(
-                    constInfo, cBlockIdx, coreNum, physicalRound + 1, maxRound
-                )
                 set_deter_l0c_neighbors(
-                    constInfo, curInfo, prevRoundGIdx, gIdx, nextPhysicalGIdx
+                    constInfo, curInfo, prevValidGIdx, gIdx, nextValidGIdx
                 )
+                prevValidGIdx = gIdx
                 taskId = taskId + 1
                 localIdx = localIdx + 1
             vecInfo = runInfos[0]
@@ -525,7 +610,9 @@ def _run_preload3_vector_deter(
                     sfmg_ub.current(),
                     nzp_ub.current(),
                 )
-                if constInfo.sinkOptional == 1:
+                # GS1S2 C3/C4 read L1 and write GM/L0C, not mm1/mm2 UB.
+                # dsink is computed here before the set_cross_core, consistent with BN2.
+                if sink == 1:
                     headQ = vecInfo.n2oIdx * constInfo.gSize + vecInfo.goIdx
                     sink_val = pl.getval(tensor_sinks, headQ)
                     process_sink_partial(
@@ -574,6 +661,10 @@ def _run_preload2_cube_gs_deter(
 ):
     cBlockIdx = sched.cBlockIdx
     coreNum = sched.coreNum
+    cu_q_tensor = sched.cuQ
+    cu_kv_tensor = sched.cuKv
+    used_q_tensor = sched.usedQ
+    used_kv_tensor = sched.usedKv
     tensor_q = gm.tensor_q
     tensor_k = gm.tensor_k
     tensor_k_nt = gm.tensor_k_nt
@@ -601,12 +692,32 @@ def _run_preload2_cube_gs_deter(
     fixTaskId = 0
     localIdx = 0
     denseCursor = pl.const(0, pl.DT_INT64)
-    prevPhysicalGIdx = pl.const(-1, pl.DT_INT64)
+    prevValidGIdx = pl.const(-1, pl.DT_INT64)
     physicalRound = pl.const(0, pl.DT_INT64)
     isLastLoop = 0
     drainDone = 0
-    firstRound, maxRound = deter_round_bounds(constInfo, coreNum)
+    tndPlan = init_deter_schedule(
+        constInfo,
+        coreNum,
+        cu_q_tensor,
+        cu_kv_tensor,
+        used_q_tensor,
+        used_kv_tensor,
+    )
+    firstRound, maxRound = deter_round_bounds(constInfo, coreNum, tndPlan)
     denseCursor = firstRound
+    nextValidGIdx, nextValidRound = find_next_valid_deter(
+        constInfo,
+        cBlockIdx,
+        coreNum,
+        firstRound,
+        maxRound,
+        used_q_tensor,
+        used_kv_tensor,
+        cu_q_tensor,
+        cu_kv_tensor,
+        tndPlan,
+    )
     pl.system.set_cross_core(
         pipe=pl.PipeType.FIX,
         event_id=SYNC_DQ_DETER_FIX_FLAG,
@@ -625,14 +736,21 @@ def _run_preload2_cube_gs_deter(
     while True:
         gIdx = pl.const(-1, pl.DT_INT64)
         physicalRound = denseCursor
-        prevRoundGIdx = prevPhysicalGIdx
-        nextPhysicalGIdx = pl.const(-1, pl.DT_INT64)
-        mappedGIdx, mappedDenseCursor = skip_empty_deter(
-            constInfo, cBlockIdx, coreNum, physicalRound, maxRound
-        )
-        gIdx = mappedGIdx
-        denseCursor = mappedDenseCursor
-        prevPhysicalGIdx = gIdx
+        denseCursor = physicalRound + 1
+        if physicalRound == nextValidRound:
+            gIdx = nextValidGIdx
+            nextValidGIdx, nextValidRound = find_next_valid_deter(
+                constInfo,
+                cBlockIdx,
+                coreNum,
+                physicalRound + 1,
+                maxRound,
+                used_q_tensor,
+                used_kv_tensor,
+                cu_q_tensor,
+                cu_kv_tensor,
+                tndPlan,
+            )
         if physicalRound >= maxRound:
             isLastLoop = 1
         doFix = 0
@@ -647,14 +765,23 @@ def _run_preload2_cube_gs_deter(
             do_cur = do_l1.next()
             curInfo = runInfos[0]
             curInfo = runInfos[taskId % 2]
-            set_run_info(constInfo, curInfo, taskId, gIdx, 0, localIdx)
+            set_run_info(
+                constInfo,
+                curInfo,
+                taskId,
+                gIdx,
+                0,
+                localIdx,
+                cu_q_tensor,
+                cu_kv_tensor,
+                used_q_tensor,
+                used_kv_tensor,
+            )
             curInfo.readyRound = physicalRound + 1
-            nextPhysicalGIdx, nextPhysicalRound = skip_empty_deter(
-                constInfo, cBlockIdx, coreNum, physicalRound + 1, maxRound
-            )
             set_deter_l0c_neighbors(
-                constInfo, curInfo, prevRoundGIdx, gIdx, nextPhysicalGIdx
+                constInfo, curInfo, prevValidGIdx, gIdx, nextValidGIdx
             )
+            prevValidGIdx = gIdx
             iterate_mm_qk(
                 constInfo,
                 curInfo,
@@ -837,9 +964,14 @@ def _run_preload2_vector_gs_deter(
     gm,
     buf,
     runInfos,
+    sink,
 ):
     cBlockIdx = sched.cBlockIdx
     coreNum = sched.coreNum
+    cu_q_tensor = sched.cuQ
+    cu_kv_tensor = sched.cuKv
+    used_q_tensor = sched.usedQ
+    used_kv_tensor = sched.usedKv
     subIdx = sched.subIdx
     v1w = sched.v1w
     tensor_y = gm.tensor_y
@@ -865,37 +997,73 @@ def _run_preload2_vector_gs_deter(
     vecTaskId = 0
     localIdx = 0
     denseCursor = pl.const(0, pl.DT_INT64)
-    prevPhysicalGIdx = pl.const(-1, pl.DT_INT64)
+    prevValidGIdx = pl.const(-1, pl.DT_INT64)
     physicalRound = pl.const(0, pl.DT_INT64)
     isLastLoop = 0
     drainDone = 0
     nFetched = 0
-    firstRound, maxRound = deter_round_bounds(constInfo, coreNum)
+    tndPlan = init_deter_schedule(
+        constInfo,
+        coreNum,
+        cu_q_tensor,
+        cu_kv_tensor,
+        used_q_tensor,
+        used_kv_tensor,
+    )
+    firstRound, maxRound = deter_round_bounds(constInfo, coreNum, tndPlan)
     denseCursor = firstRound
+    nextValidGIdx, nextValidRound = find_next_valid_deter(
+        constInfo,
+        cBlockIdx,
+        coreNum,
+        firstRound,
+        maxRound,
+        used_q_tensor,
+        used_kv_tensor,
+        cu_q_tensor,
+        cu_kv_tensor,
+        tndPlan,
+    )
     while True:
         gIdx = pl.const(-1, pl.DT_INT64)
         physicalRound = denseCursor
-        prevRoundGIdx = prevPhysicalGIdx
-        nextPhysicalGIdx = pl.const(-1, pl.DT_INT64)
-        mappedGIdx, mappedDenseCursor = skip_empty_deter(
-            constInfo, cBlockIdx, coreNum, physicalRound, maxRound
-        )
-        gIdx = mappedGIdx
-        denseCursor = mappedDenseCursor
-        prevPhysicalGIdx = gIdx
+        denseCursor = physicalRound + 1
+        if physicalRound == nextValidRound:
+            gIdx = nextValidGIdx
+            nextValidGIdx, nextValidRound = find_next_valid_deter(
+                constInfo,
+                cBlockIdx,
+                coreNum,
+                physicalRound + 1,
+                maxRound,
+                used_q_tensor,
+                used_kv_tensor,
+                cu_q_tensor,
+                cu_kv_tensor,
+                tndPlan,
+            )
         if physicalRound >= maxRound:
             isLastLoop = 1
         if gIdx >= 0:
             curInfo = runInfos[taskId % 2]
-            set_run_info(constInfo, curInfo, taskId, gIdx, subIdx, localIdx)
+            set_run_info(
+                constInfo,
+                curInfo,
+                taskId,
+                gIdx,
+                subIdx,
+                localIdx,
+                cu_q_tensor,
+                cu_kv_tensor,
+                used_q_tensor,
+                used_kv_tensor,
+            )
             nFetched = nFetched + 1
             curInfo.readyRound = physicalRound + 1
-            nextPhysicalGIdx, nextPhysicalRound = skip_empty_deter(
-                constInfo, cBlockIdx, coreNum, physicalRound + 1, maxRound
-            )
             set_deter_l0c_neighbors(
-                constInfo, curInfo, prevRoundGIdx, gIdx, nextPhysicalGIdx
+                constInfo, curInfo, prevValidGIdx, gIdx, nextValidGIdx
             )
+            prevValidGIdx = gIdx
             taskId = taskId + 1
             localIdx = localIdx + 1
         vecInfo = runInfos[0]
@@ -984,7 +1152,9 @@ def _run_preload2_vector_gs_deter(
                 sfmg_ub.current(),
                 nzp_ub.current(),
             )
-            if constInfo.sinkOptional == 1:
+            # GS1S2 C3/C4 read L1 and write GM/L0C, not mm1/mm2 UB.
+            # dsink is computed here before the set_cross_core, consistent with BN2.
+            if sink == 1:
                 headQ = vecInfo.n2oIdx * constInfo.gSize + vecInfo.goIdx
                 sink_val = pl.getval(tensor_sinks, headQ)
                 process_sink_partial(

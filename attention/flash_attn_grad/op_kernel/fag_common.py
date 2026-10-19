@@ -128,8 +128,8 @@ PRELOAD_TIMES = 3
 # ==================================================================
 #  SetConstInfo
 # ==================================================================
-def set_const_info(tiling, coreNum):
-    """由 tiling + 运行期核数推导常量。
+def set_const_info(tiling, coreNum, cu_q_tensor, cu_kv_tensor):
+    """由 tiling、运行期核数与 cu_seqlens 视图推导初始化信息。
 
     coreNum 不在 tiling 里(TilingData 没有该字段)，改由调用方从
     pl.get_block_num() 取：这是 host SetBlockDim 启动的 cube 数，dense 下
@@ -137,7 +137,25 @@ def set_const_info(tiling, coreNum):
 
     分核开关用 tilingkey 裸名 ``swizzle``，不要再写进本结构体：字段会
     被当成运行期值，``if constInfo.enableSwizzle`` 两路都编进同一份二进制。
+
+    t1Size/t2Size 在此统一计算：TND 读取 cu_seqlens[B]，固定布局为 B*S，
+    不读取可能为空的 cu_seqlens 输入。
+    逻辑 s1Size/s2Size 始终保留 tiling 的最大序列长度；GM 视图长度单列，
+    不影响分核、mask 坐标或 host 预留的 workspace 分段容量。
     """
+    t1Size = tiling.b * tiling.s1
+    t2Size = tiling.b * tiling.s2
+    viewD0Q = tiling.viewD0Q
+    viewD0KV = tiling.viewD0KV
+    s1ViewSize = tiling.s1
+    s2ViewSize = tiling.s2
+    if layout == 1:
+        t1Size = pl.astype(pl.getval(cu_q_tensor, tiling.b), pl.DT_INT64)
+        t2Size = pl.astype(pl.getval(cu_kv_tensor, tiling.b), pl.DT_INT64)
+        viewD0Q = 1
+        viewD0KV = 1
+        s1ViewSize = t1Size
+        s2ViewSize = t2Size
     s1Outer = (tiling.s1 + CUBE_BASEM - 1) // CUBE_BASEM
     s2Outer = (tiling.s2 + CUBE_BASEN - 1) // CUBE_BASEN
     # mask3 的 s1Token 可能是 INT32_MAX + s1 - s2，这里不读它。
@@ -196,12 +214,16 @@ def set_const_info(tiling, coreNum):
         totalBlockNum=tiling.b * tiling.n2 * tiling.gSize * s1Outer * s2Outer,
         gSize=tiling.gSize,
         coreNum=coreNum,
-        # 布局视图参数(BSND/BNSD 统一四维视图)，见 FlashAttnGradTilingData 注释。
+        # GM 四维视图：BSND/BNSD 沿用 tiling，TND 为 [1,T,N,D]。
         # Q 侧 n1=n2*G 个 head，KV 侧 n2 个，故两套。
-        viewD0Q=tiling.viewD0Q,
+        t1Size=t1Size,
+        t2Size=t2Size,
+        s1ViewSize=s1ViewSize,
+        s2ViewSize=s2ViewSize,
+        viewD0Q=viewD0Q,
         viewD2Q=tiling.viewD2Q,
         coefB0Q=tiling.coefB0Q,
-        viewD0KV=tiling.viewD0KV,
+        viewD0KV=viewD0KV,
         viewD2KV=tiling.viewD2KV,
         coefB0KV=tiling.coefB0KV,
         coefN0=tiling.coefN0,
@@ -219,7 +241,8 @@ def set_const_info(tiling, coreNum):
         bandP=(pl.max(tiling.s1Token, 0) + CUBE_BASEM - 1) // CUBE_BASEM,
         bandQ=(pl.max(tiling.s2Token, 0) + CUBE_BASEN - 1) // CUBE_BASEN,
         n1Size=tiling.n2 * tiling.gSize,
-        sinkOptional=tiling.sinkOptional,
+        sequsedQOptional=tiling.sequsedQOptional,
+        sequsedKvOptional=tiling.sequsedKvOptional,
         aivCount=coreNum * 2,
     )
 
@@ -251,6 +274,11 @@ def make_run_infos():
         idx0KV=0,
         idx2KV=0,
         loadBase=0,
+        loadBaseTnd=0,
+        tokenBaseQ=0,
+        tokenBaseKV=0,
+        batchS1Len=0,
+        batchS2Len=0,
         rowShift=0,
         loadKV=0,
         dkvAcc=0,
@@ -282,6 +310,11 @@ def make_run_infos_2():
         idx0KV=0,
         idx2KV=0,
         loadBase=0,
+        loadBaseTnd=0,
+        tokenBaseQ=0,
+        tokenBaseKV=0,
+        batchS1Len=0,
+        batchS2Len=0,
         rowShift=0,
         loadKV=0,
         dkvAcc=0,

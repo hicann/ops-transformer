@@ -127,6 +127,9 @@ private:
     bool fagIsInvalidCol_ = false;
     bool fagIsInvalidRow_ = false;
     bool fagIsGradEnabled_ = false;
+    bool fagHasSeqused_ = false;
+    int64_t fagPhysicalTokensQ_ = 0;
+    int64_t fagPhysicalTokensKv_ = 0;
     bool fagUseTndSplit_ = false;
     bool fagIsSeqExistZero_ = false;
 
