@@ -33,10 +33,33 @@ Switch between them by uncommenting exactly one SELECTED_GOLDEN line below.
 """
 
 import math
+import re
+from types import SimpleNamespace
+
 import numpy as np
 import ml_dtypes
-import tbetoolkits
-from .registry import register_golden
+
+try:
+    import tbetoolkits
+except ImportError:  # standalone self-check (`python3 golden.py`) has no tbetoolkits
+    tbetoolkits = None
+try:
+    from .registry import register_golden
+except ImportError:  # standalone self-check has no package context
+
+    def register_golden(names):
+        def decorator(func):
+            return func
+
+        return decorator
+
+
+# DYN_GOLD platform loading contracts (module level, same style as
+# causal_conv1d / mhc_pre_sinkhorn_backward). No aclnn golden is needed for
+# this operator.
+__golden__ = {"kernel": {"stem_oam_prep_varlen_q": "stem_oam_prep_varlen_q_golden"}}
+
+__input__ = {"kernel": {"stem_oam_prep_varlen_q": "StemOamPrepVarlenQ_input"}}
 
 
 # ============================================================
@@ -44,14 +67,36 @@ from .registry import register_golden
 # ============================================================
 
 
+def _extract_inputs(context: "tbetoolkits.UniversalTestcaseStructure"):
+    """
+    Extract (q, qScale, qSeqLens, cuSeqLensQ) from the test context.
+
+    Preferred 4-tensor contract, matching the op def input order
+    (q -> qSeqLens -> cuSeqLensQ -> qScale(OPTIONAL)):
+      input_arrays[0]=q, [1]=qSeqLens, [2]=cuSeqLensQ, [3]=qScale.
+    qScale stays optional: with len(input_arrays) == 3 it is None (unweighted
+    path). Falls back to the legacy 2-tensor flow (input_arrays[1]=qScale,
+    qSeqLens/cuSeqLensQ from other_runtime_params) when fewer than 3 tensor
+    inputs are provided.
+    """
+    arrays = context.input_arrays
+    q_np = arrays[0]
+    if len(arrays) >= 3:
+        q_seq_lens_np = arrays[1]
+        cu_seqlens_q_np = arrays[2]
+        qscale_np = arrays[3] if len(arrays) > 3 else None
+    else:
+        qscale_np = arrays[1] if len(arrays) > 1 else None
+        q_seq_lens_np = context.other_runtime_params["qSeqLens"]
+        cu_seqlens_q_np = context.other_runtime_params["cuSeqLensQ"]
+    return q_np, qscale_np, q_seq_lens_np, cu_seqlens_q_np
+
+
 def golden_seq(context: "tbetoolkits.UniversalTestcaseStructure"):
     """
     Sequential sum, numpy + for-loop (math baseline).
     """
-    q_np = context.input_arrays[0]
-    qscale_np = context.input_arrays[1] if len(context.input_arrays) > 1 else None
-    q_seq_lens_np = context.other_runtime_params["qSeqLens"]
-    cu_seqlens_q_np = context.other_runtime_params["cuSeqLensQ"]
+    q_np, qscale_np, q_seq_lens_np, cu_seqlens_q_np = _extract_inputs(context)
 
     B = context.other_compilation_params["stemBlockSize"]
     S = context.other_compilation_params["stemStride"]
@@ -128,10 +173,7 @@ def golden_torch_vectorized(context: "tbetoolkits.UniversalTestcaseStructure"):
     """
     import torch
 
-    q_np = context.input_arrays[0]
-    qscale_np = context.input_arrays[1] if len(context.input_arrays) > 1 else None
-    q_seq_lens_np = context.other_runtime_params["qSeqLens"]
-    cu_seqlens_q_np = context.other_runtime_params["cuSeqLensQ"]
+    q_np, qscale_np, q_seq_lens_np, cu_seqlens_q_np = _extract_inputs(context)
 
     B = context.other_compilation_params["stemBlockSize"]
     S = context.other_compilation_params["stemStride"]
@@ -217,12 +259,9 @@ def golden_binary_reduce(context: "tbetoolkits.UniversalTestcaseStructure"):
                stride from R_main down to 1 (halving each round):
                  ops = R_tail if stride==R_main else stride
                  for r in 0..ops-1: row[r] += row[r + stride]
-               After the loop, row[0, g, :] holds the full group sum.
+                After the loop, row[0, g, :] holds the full group sum.
     """
-    q_np = context.input_arrays[0]
-    qscale_np = context.input_arrays[1] if len(context.input_arrays) > 1 else None
-    q_seq_lens_np = context.other_runtime_params["qSeqLens"]
-    cu_seqlens_q_np = context.other_runtime_params["cuSeqLensQ"]
+    q_np, qscale_np, q_seq_lens_np, cu_seqlens_q_np = _extract_inputs(context)
 
     B = context.other_compilation_params["stemBlockSize"]
     S = context.other_compilation_params["stemStride"]
@@ -319,3 +358,408 @@ SELECTED_GOLDEN = golden_binary_reduce  # matches current kernel algorithm
 @register_golden(["stem_oam_prep_varlen_q"])
 def stem_oam_prep_varlen_q(context: "tbetoolkits.UniversalTestcaseStructure"):
     return SELECTED_GOLDEN(context)
+
+
+# ============================================================
+# DYN_GOLD platform entry points (referenced by __golden__/__input__)
+# ============================================================
+def stem_oam_prep_varlen_q_golden(*input_arrays, **kwargs):
+    """Platform golden entry: positional tensor array -> golden output.
+
+    Wraps the platform-provided inputs into a context-shaped object so the
+    existing golden variants keep their signature. With the 4-tensor contract
+    (q, qSeqLens, cuSeqLensQ, qScale) the tensor-input branch of
+    _extract_inputs is taken naturally; stemBlockSize/stemStride come from the
+    CSV attributes relayed via kwargs (code defaults as fallback).
+    """
+    context = SimpleNamespace(
+        input_arrays=list(input_arrays),
+        other_runtime_params=kwargs,
+        other_compilation_params={
+            "stemBlockSize": kwargs.get("stemBlockSize", 128),
+            "stemStride": kwargs.get("stemStride", 16),
+        },
+    )
+    return SELECTED_GOLDEN(context)
+
+
+def StemOamPrepVarlenQ_input(*input_arrays, **kwargs):
+    """Custom input generator: rebuild the varlen index inputs.
+
+    Input order: q(0) -> qSeqLens(1) -> cuSeqLensQ(2) -> qScale(3).
+
+    Platform-pregenerated int64 data cannot satisfy the varlen prefix-sum
+    contract, so both index inputs are rebuilt here:
+      - qSeqLens: authoritative values come from the CSV attributes relayed
+        via kwargs['qSeqLens']; otherwise parsed from the testcase name
+        suffix `_lens<val(_val)*>` (e.g. _lens0_128 -> [0, 128]), same
+        precedence as causal_conv1d's CausalConv1d_input; without either
+        source the tokens are split evenly across batches (remainder to the
+        last batch, sum strictly == total_tokens). Every source must pass
+        the shape validation (len == batch, sum == total_tokens, each >= 0),
+        otherwise the next source is tried.
+      - cuSeqLensQ: always rebuilt as [0, cumsum(qSeqLens)]; platform values
+        are never trusted.
+      - q(0) and qScale(3) carry no semantic constraint and stay untouched.
+    """
+    input_arrays = list(input_arrays)
+    if len(input_arrays) < 3 or input_arrays[1] is None:
+        return input_arrays
+
+    q = input_arrays[0]
+    qsl = input_arrays[1]
+    total_tokens = int(q.shape[0]) if q is not None and np.ndim(q) == 3 else 0
+    batch = int(qsl.shape[0]) if np.ndim(qsl) > 0 else 0
+    if batch <= 0:
+        return input_arrays
+
+    def _validated(values):
+        if (
+            len(values) == batch
+            and sum(values) == total_tokens
+            and all(v >= 0 for v in values)
+        ):
+            return values
+        return None
+
+    # a) CSV attributes relayed by the platform (most authoritative)
+    seq_lens = None
+    design = kwargs.get("qSeqLens")
+    if design is not None:
+        seq_lens = _validated([int(v) for v in design])
+    # b) design values encoded in the testcase name (_lens256_300_128)
+    if seq_lens is None:
+        match = re.search(r"_lens(\d+(?:_\d+)*)", kwargs.get("testcase_name", ""))
+        if match:
+            seq_lens = _validated([int(v) for v in match.group(1).split("_")])
+    # c) even-split fallback (remainder to the last batch)
+    if seq_lens is None:
+        base, remainder = divmod(total_tokens, batch)
+        seq_lens = [base] * batch
+        seq_lens[-1] += remainder
+
+    input_arrays[1] = np.array(seq_lens, dtype=np.int64)
+    cu_seqlens = [0]
+    for seq_len in seq_lens:
+        cu_seqlens.append(cu_seqlens[-1] + seq_len)
+    input_arrays[2] = np.array(cu_seqlens, dtype=np.int64)
+    return input_arrays
+
+
+# ============================================================
+# Standalone self-check: `python3 golden.py`
+# Verifies the golden variants stay consistent under both the
+# 4-tensor input contract and the legacy 2-tensor fallback flow.
+# ============================================================
+if __name__ == "__main__":
+    import sys
+
+    class _StubContext:
+        """Minimal duck-typed stand-in for UniversalTestcaseStructure."""
+
+        def __init__(self, input_arrays, runtime_params, compilation_params):
+            self.input_arrays = input_arrays
+            self.other_runtime_params = runtime_params
+            self.other_compilation_params = compilation_params
+
+    def _build_context(num_heads, q_seq_lens, four_tensor):
+        B = 128
+        S = 16
+        batch = len(q_seq_lens)
+        total_tokens = sum(q_seq_lens)
+        cu_seqlens = [0]
+        for seq_len in q_seq_lens:
+            cu_seqlens.append(cu_seqlens[-1] + seq_len)
+
+        # Exact-representable data (small integers, power-of-two scales) so
+        # every partial sum is exact in FP32 under any reduce order.
+        rng = np.random.default_rng(7)
+        q_np = rng.integers(-4, 5, size=(total_tokens, num_heads, 128))
+        q_np = q_np.astype(np.float32).astype(ml_dtypes.float8_e4m3fn)
+        qscale_np = rng.choice([0.5, 1.0, 2.0], size=(total_tokens, num_heads)).astype(
+            np.float32
+        )
+
+        runtime = {"qSeqLens": list(q_seq_lens), "cuSeqLensQ": cu_seqlens}
+        comp = {"stemBlockSize": B, "stemStride": S}
+        if four_tensor:
+            # op def order: q, qSeqLens, cuSeqLensQ, qScale(OPTIONAL)
+            arrays = [
+                q_np,
+                np.array(q_seq_lens, dtype=np.int64),
+                np.array(cu_seqlens, dtype=np.int64),
+                qscale_np,
+            ]
+        else:
+            # legacy flow: q, qScale + runtime params
+            arrays = [q_np, qscale_np]
+        return _StubContext(arrays, runtime, comp)
+
+    def _max_abs_err(a, b):
+        return float(np.max(np.abs(a.astype(np.float32) - b.astype(np.float32))))
+
+    cases = [
+        ("b1h2_len128_aligned", 2, [128]),
+        ("b3h2_multiblock_maxqb3", 2, [256, 300, 128]),
+        ("b2h8_zerolen_batch", 8, [0, 128]),
+        ("b1h4_len100_tail", 4, [100]),
+    ]
+    TOL = 1.137e-13
+    failed = False
+    for label, four_tensor in [("4-input", True), ("legacy-2-input-fallback", False)]:
+        for name, num_heads, q_seq_lens in cases:
+            ctx = _build_context(num_heads, q_seq_lens, four_tensor)
+            out_seq = golden_seq(ctx)
+            out_sel = SELECTED_GOLDEN(ctx)
+            err_sel = _max_abs_err(out_seq, out_sel)
+            print(
+                f"[{label}] {name}: out{out_sel.shape} "
+                f"seq-vs-selected logic_err={err_sel:.3e}"
+            )
+            failed = failed or err_sel > TOL
+            try:
+                out_torch = golden_torch_vectorized(ctx)
+            except ImportError:
+                print(f"[{label}] {name}: torch unavailable, skipped")
+                continue
+            err_torch = _max_abs_err(out_seq, out_torch)
+            print(
+                f"[{label}] {name}: out{out_torch.shape} "
+                f"seq-vs-torch logic_err={err_torch:.3e}"
+            )
+            failed = failed or err_torch > TOL
+
+    # ---- DYN_GOLD platform flow simulation ----
+    # CSV cases: (testcase_name, q_shape, qsl_shape, cu_shape, qs_shape,
+    #             out_shape, attributes). Per-case design values live both in
+    #             the attributes and in the `_lens<...>` name suffix.
+    csv_cases = [
+        (
+            "stem_oam_prep_varlen_q_st_01_b1h2_len128_aligned_1block_lens128",
+            (128, 2, 128),
+            (1,),
+            (2,),
+            (128, 2),
+            (1, 2, 1, 2048),
+            {
+                "stemBlockSize": 128,
+                "stemStride": 16,
+                "qSeqLens": [128],
+                "cuSeqLensQ": [0, 128],
+            },
+        ),
+        (
+            "stem_oam_prep_varlen_q_st_02_b2h2_len128_len128_multibatch_lens128_128",
+            (256, 2, 128),
+            (2,),
+            (3,),
+            (256, 2),
+            (2, 2, 1, 2048),
+            {
+                "stemBlockSize": 128,
+                "stemStride": 16,
+                "qSeqLens": [128, 128],
+                "cuSeqLensQ": [0, 128, 256],
+            },
+        ),
+        (
+            "stem_oam_prep_varlen_q_st_03_b1h4_len100_tail_in_block_lens100",
+            (100, 4, 128),
+            (1,),
+            (2,),
+            (100, 4),
+            (1, 4, 1, 2048),
+            {
+                "stemBlockSize": 128,
+                "stemStride": 16,
+                "qSeqLens": [100],
+                "cuSeqLensQ": [0, 100],
+            },
+        ),
+        (
+            "stem_oam_prep_varlen_q_st_04_b3h2_multiblock_maxqb3_lens256_300_128",
+            (684, 2, 128),
+            (3,),
+            (4,),
+            (684, 2),
+            (3, 2, 3, 2048),
+            {
+                "stemBlockSize": 128,
+                "stemStride": 16,
+                "qSeqLens": [256, 300, 128],
+                "cuSeqLensQ": [0, 256, 556, 684],
+            },
+        ),
+        (
+            "stem_oam_prep_varlen_q_st_05_b2h8_zerolen_batch_zerofill_lens0_128",
+            (128, 8, 128),
+            (2,),
+            (3,),
+            (128, 8),
+            (2, 8, 1, 2048),
+            {
+                "stemBlockSize": 128,
+                "stemStride": 16,
+                "qSeqLens": [0, 128],
+                "cuSeqLensQ": [0, 0, 128],
+            },
+        ),
+        (
+            "stem_oam_prep_varlen_q_st_06_b1h16_len200_multiblock_tail_lens200",
+            (200, 16, 128),
+            (1,),
+            (2,),
+            (200, 16),
+            (1, 16, 2, 2048),
+            {
+                "stemBlockSize": 128,
+                "stemStride": 16,
+                "qSeqLens": [200],
+                "cuSeqLensQ": [0, 200],
+            },
+        ),
+    ]
+
+    def _pregenerate(rng, q_shape, qsl_shape, cu_shape, qs_shape, total_tokens):
+        # Platform-pregenerated inputs: q as random fp8 bit patterns
+        # (NaN codes 0x7F/0xFF masked out), index inputs deliberately wrong.
+        raw = rng.integers(0, 256, size=q_shape, dtype=np.uint8)
+        raw[raw == 0x7F] = 0x7E
+        raw[raw == 0xFF] = 0xFE
+        q_pre = raw.view(ml_dtypes.float8_e4m3fn)
+        qsl_pre = rng.integers(0, 1024, size=qsl_shape, dtype=np.int64)
+        cu_pre = rng.integers(0, total_tokens + 1, size=cu_shape, dtype=np.int64)
+        qs_pre = rng.uniform(0.5, 2.0, size=qs_shape).astype(np.float32)
+        return q_pre, qsl_pre, cu_pre, qs_pre
+
+    def _assert_prefix_sum(tag, fixed, q_pre, qs_pre, batch, total_tokens):
+        q_fix, qsl_fix, cu_fix, qs_fix = fixed
+        # prefix-sum contract on the fixed index inputs
+        assert q_fix is q_pre and qs_fix is qs_pre, (
+            f"{tag}: q/qScale must stay untouched"
+        )
+        assert qsl_fix.dtype == np.int64 and cu_fix.dtype == np.int64, f"{tag}: dtype"
+        assert qsl_fix.shape[0] == batch, f"{tag}: len(qSeqLens) == batch"
+        assert int(qsl_fix.sum()) == total_tokens, (
+            f"{tag}: sum(qSeqLens) == total_tokens"
+        )
+        assert bool((qsl_fix >= 0).all()), f"{tag}: qSeqLens >= 0"
+        assert int(cu_fix[0]) == 0, f"{tag}: cu[0] == 0"
+        assert int(cu_fix[-1]) == total_tokens, f"{tag}: cu[-1] == total_tokens"
+        assert all(
+            int(cu_fix[i + 1]) - int(cu_fix[i]) == int(qsl_fix[i]) for i in range(batch)
+        ), f"{tag}: cu prefix sums"
+
+    def _design_context(q_pre, qs_pre, attrs):
+        design_ql = np.array(attrs["qSeqLens"], dtype=np.int64)
+        design_cu = np.array(attrs["cuSeqLensQ"], dtype=np.int64)
+        ctx = _StubContext(
+            [q_pre, design_ql, design_cu, qs_pre],
+            {"qSeqLens": list(design_ql), "cuSeqLensQ": list(design_cu)},
+            attrs,
+        )
+        return ctx
+
+    rng = np.random.default_rng(11)
+    for name, q_shape, qsl_shape, cu_shape, qs_shape, out_shape, attrs in csv_cases:
+        total_tokens = q_shape[0]
+        batch = qsl_shape[0]
+        design_maxqb = max(math.ceil(v / 128) for v in attrs["qSeqLens"])
+        assert out_shape[2] == design_maxqb, f"{name}: CSV maxQb vs design"
+        q_pre, qsl_pre, cu_pre, qs_pre = _pregenerate(
+            rng, q_shape, qsl_shape, cu_shape, qs_shape, total_tokens
+        )
+
+        # Scenario A (board-real): kwargs carries ONLY testcase_name, no
+        # attributes -> design values must come from the `_lens...` name suffix.
+        fixed_a = StemOamPrepVarlenQ_input(
+            q_pre, qsl_pre, cu_pre, qs_pre, testcase_name=name
+        )
+        _assert_prefix_sum(f"{name} A", fixed_a, q_pre, qs_pre, batch, total_tokens)
+        assert fixed_a[1].tolist() == attrs["qSeqLens"], (
+            f"{name} A: name-parsed qSeqLens != design {attrs['qSeqLens']}"
+        )
+        out_a = stem_oam_prep_varlen_q_golden(*fixed_a, testcase_name=name)
+        assert out_a.shape == out_shape, (
+            f"{name} A: golden shape {out_a.shape} != CSV {out_shape}"
+        )
+        assert out_a.shape[2] == design_maxqb, f"{name} A: maxQb != {design_maxqb}"
+        out_design = SELECTED_GOLDEN(_design_context(q_pre, qs_pre, attrs))
+        assert np.array_equal(
+            out_a.astype(np.float32), out_design.astype(np.float32)
+        ), f"{name} A: golden != design golden"
+        print(
+            f"[SCN-A name-only] {name}: lens={fixed_a[1].tolist()} "
+            f"maxQb={out_a.shape[2]} out{out_a.shape} == CSV {out_shape}"
+        )
+
+        # Scenario B: kwargs carries attributes (same values as the name
+        # suffix) -> identical result to scenario A.
+        fixed_b = StemOamPrepVarlenQ_input(
+            q_pre, qsl_pre, cu_pre, qs_pre, **dict(attrs, testcase_name=name)
+        )
+        _assert_prefix_sum(f"{name} B", fixed_b, q_pre, qs_pre, batch, total_tokens)
+        assert fixed_b[1].tolist() == fixed_a[1].tolist(), f"{name} B: qSeqLens differs"
+        assert fixed_b[2].tolist() == fixed_a[2].tolist(), f"{name} B: cu differs"
+        out_b = stem_oam_prep_varlen_q_golden(
+            *fixed_b, **dict(attrs, testcase_name=name)
+        )
+        assert np.array_equal(out_b.astype(np.float32), out_a.astype(np.float32)), (
+            f"{name} B: golden differs from A"
+        )
+        print(f"[SCN-B with-attrs] {name}: identical to scenario A")
+
+    # Scenario C: neither attributes nor a parseable testcase_name ->
+    # even-split fallback (remainder to the last batch). Case st_01:
+    # even split [128] keeps maxQb == design (1).
+    name, q_shape, qsl_shape, cu_shape, qs_shape, out_shape, attrs = csv_cases[0]
+    total_tokens = q_shape[0]
+    batch = qsl_shape[0]
+    q_pre, qsl_pre, cu_pre, qs_pre = _pregenerate(
+        rng, q_shape, qsl_shape, cu_shape, qs_shape, total_tokens
+    )
+    fixed = StemOamPrepVarlenQ_input(
+        q_pre,
+        qsl_pre,
+        cu_pre,
+        qs_pre,
+        stemBlockSize=attrs["stemBlockSize"],
+        stemStride=attrs["stemStride"],
+    )
+    even = [total_tokens // batch] * batch
+    even[-1] += total_tokens % batch
+    _assert_prefix_sum("SCN-C even-split", fixed, q_pre, qs_pre, batch, total_tokens)
+    assert fixed[1].tolist() == even, f"SCN-C: expected even split {even}"
+    cu_even = [0]
+    for v in even:
+        cu_even.append(cu_even[-1] + v)
+    design_ctx = _StubContext(
+        [
+            q_pre,
+            np.array(even, dtype=np.int64),
+            np.array(cu_even, dtype=np.int64),
+            qs_pre,
+        ],
+        {"qSeqLens": even, "cuSeqLensQ": cu_even},
+        attrs,
+    )
+    out_c = stem_oam_prep_varlen_q_golden(
+        *fixed, stemBlockSize=attrs["stemBlockSize"], stemStride=attrs["stemStride"]
+    )
+    out_design_c = SELECTED_GOLDEN(design_ctx)
+    assert out_c.shape == out_design_c.shape, "SCN-C: shape mismatch"
+    assert np.array_equal(out_c.astype(np.float32), out_design_c.astype(np.float32)), (
+        "SCN-C: golden mismatch"
+    )
+    even_maxqb = max(math.ceil(v / 128) for v in even)
+    assert out_c.shape[2] == even_maxqb, "SCN-C: maxQb vs even-split design"
+    print(
+        f"[SCN-C even-split] {name}: split={even} maxQb={out_c.shape[2]} "
+        f"out{out_c.shape}, prefix-sum OK, golden identical"
+    )
+
+    if failed:
+        print(f"SELF-CHECK FAILED (logic_err > {TOL})")
+        sys.exit(1)
+    print(f"SELF-CHECK PASSED (logic_err <= {TOL})")
+    sys.exit(0)
