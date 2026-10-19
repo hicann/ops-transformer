@@ -24,6 +24,7 @@ using namespace AscendC::Reg;
 using AscendC::MicroAPI::MaskDist;
 using AscendC::MicroAPI::PostLiteral;
 using AscendC::MicroAPI::StoreDist;
+constexpr int32_t DOUBLE_BUFFER = 2;
 constexpr int32_t CONST_TWO = 2;
 constexpr int32_t ALIGN_PARAM1 = 64;
 constexpr int32_t ALIGN_PARAM2 = 128;
@@ -149,7 +150,7 @@ __aicore__ inline void VFProcessSwigluHiF4InvScaleAndQuant(
             Pack(e6m2Res, (RegTensor<uint16_t>&)e6m2);
             DataCopyUnAlign<uint8_t, AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE>(eaLocalAddr, e6m2Res, uregEa, 8);
 
-            FusedReciprocalCast(vb16EaRecBf16, (RegTensor<fp8_e6m2_t>&)e6m2, maskAll);
+            ReciprocalCast(vb16EaRecBf16, (RegTensor<fp8_e6m2_t>&)e6m2, maskAll);
 
             Interleave(vb16EaRecBf16, tmp, vb16EaRecBf16, vb16EaRecBf16); // 8 -> 16
             Interleave(vb16EaRecBf16, tmp, vb16EaRecBf16, vb16EaRecBf16); // 16 -> 32
