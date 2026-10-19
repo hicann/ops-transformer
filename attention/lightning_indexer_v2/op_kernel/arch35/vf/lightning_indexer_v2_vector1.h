@@ -177,10 +177,13 @@ __simd_callee__ inline void ReduceSum2LoopBody(
         BroadcastLane(regwBrc[0], regW[0], i);
         BroadcastLane(regwBrc[1], brcWeight_, i);
 
+// 960: relu在cube随路做，vec1不做; 960: __NPU_ARCH__ 9201
+#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
         AscendC::Reg::Relu(regQK0[0], regQK0[0], maskAllB32);
         AscendC::Reg::Relu(regQK0[1], regQK0[1], maskAllB32);
         AscendC::Reg::Relu(regQK1[0], regQK1[0], maskAllB32);
         AscendC::Reg::Relu(regQK1[1], regQK1[1], maskAllB32);
+#endif
 
         AscendC::Reg::MulAddDst(regSum0[0], regQK0[0], regwBrc[0], maskAllB32);
         AscendC::Reg::MulAddDst(regSum0[1], regQK0[1], regwBrc[0], maskAllB32);
@@ -292,23 +295,31 @@ __aicore__ inline void BatchMulWeightAndReduceSum(const LocalTensor<SCORE_T>& ou
                                                   const int gSize, // G 64
                                                   const int row)
 {
-    // 暂只支持这两种情况, 后续改成循环
-    if (row != 2 && row != 1) {
+    // 暂只支持这四种情况, 后续改成循环
+    if (row != 1 && row != 2 && row != 3 && row != 4) {
         return;
     }
     auto weight = (__ubuf__ W_T*)weight_.GetPhyAddr();
     auto qk = (__ubuf__ QK_T*)qk_.GetPhyAddr();
     auto out = (__ubuf__ SCORE_T*)out_.GetPhyAddr();
 
-    if (row == 2) {
-        auto weight1 = weight + weightStride;
-        auto qk1 = qk + qkStride;
-        auto out1 = out + outStride;
+    int pairCount = row / 2;
+    for (int p = 0; p < pairCount; p++) {
+        auto curWeight = weight + p * 2 * weightStride;
+        auto curWeight1 = curWeight + weightStride;
+        auto curQk = qk + p * 2 * qkStride;
+        auto curQk1 = curQk + qkStride;
+        auto curOut = out + p * 2 * outStride;
+        auto curOut1 = curOut + outStride;
+        MulWeightAndReduceSum2(curOut, curOut1, outStride, curQk, curQk1, qkVLStride, qkStride, curWeight, curWeight1,
+                               weightStride, gSize);
+    }
 
-        MulWeightAndReduceSum2(out, out1, outStride, qk, qk1, qkVLStride, qkStride, weight, weight1, weightStride,
-                               gSize);
-    } else {
-        MulWeightAndReduceSum(out, qk, qkVLStride, weight, gSize);
+    if (row % 2 != 0) {
+        auto lastWeight = weight + (row - 1) * weightStride;
+        auto lastQk = qk + (row - 1) * qkStride;
+        auto lastOut = out + (row - 1) * outStride;
+        MulWeightAndReduceSum(lastOut, lastQk, qkVLStride, lastWeight, gSize);
     }
 }
 } // namespace liV2Vector1

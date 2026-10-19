@@ -56,7 +56,7 @@ TEST_F(LightningIndexerV2TilingCommon, LightningIndexerV2_mocked_950_tiling_bsnd
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices

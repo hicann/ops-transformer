@@ -221,8 +221,11 @@ int32_t LightningIndexerV2MetadataCpuKernel::GetQueryBatchSize()
 ValidSocVersion LightningIndexerV2MetadataCpuKernel::ProcessSocVersion()
 {
     const std::string ascend950 = "Ascend950";
+    const std::string ascend960 = "Ascend960DT";
     if (socVersion_.find(ascend950) != std::string::npos) {
         return ValidSocVersion::ASCEND950;
+    } else if (socVersion_.find(ascend960) != std::string::npos) {
+        return ValidSocVersion::ASCEND960;
     } else {
         return ValidSocVersion::ASCEND910B;
     }
@@ -245,7 +248,7 @@ bool LightningIndexerV2MetadataCpuKernel::ParamsInit()
     if (validSocVersion == ValidSocVersion::ASCEND910B) {
         mBaseSize_ = s1BaseSize_ * groupSize_;
         s2BaseSize_ = 2048U;
-    } else if (validSocVersion == ValidSocVersion::ASCEND950) {
+    } else if (validSocVersion == ValidSocVersion::ASCEND950 || validSocVersion == ValidSocVersion::ASCEND960) {
         if (groupSize_ > 32U || topk_ > 2048) {
             s1BaseSize_ = 2;
         }

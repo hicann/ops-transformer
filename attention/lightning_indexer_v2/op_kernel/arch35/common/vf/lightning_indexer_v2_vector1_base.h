@@ -222,7 +222,13 @@ __simd_callee__ inline void DuplicateZero(AscendC::Reg::RegTensor<T> (&regArray)
     }
 }
 
+// 960: relu在cube随路做(fixpipe reluEn)，vec1不做relu; 950: relu在vec1做
+// 960: __NPU_ARCH__ 9201
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+template <typename T, size_t N, bool ApplyRelu = false>
+#else
 template <typename T, size_t N, bool ApplyRelu = true>
+#endif
 __simd_callee__ inline void WeightedAccum(AscendC::Reg::RegTensor<T> (&accum)[N],
                                           AscendC::Reg::RegTensor<T> (&input)[N], AscendC::Reg::RegTensor<T>& weight,
                                           AscendC::Reg::MaskReg& mask)

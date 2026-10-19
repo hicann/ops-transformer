@@ -131,7 +131,7 @@ template <typename LIT>
 __aicore__ inline void LightningIndexerV2ServiceCube<LIT>::InitBuffers(TPipe* pipe)
 {
     // 大小：2(开dB) * 2 * 64 * 128 * 4 = 128KB
-    pipe->InitBuffer(bufUB_, 2 * CeilDiv(M_BASIC_BLOCK, 2) * liV2CubeConstInfo.s2BaseSize * sizeof(QK_T));
+    pipe->InitBuffer(bufUB_, 2 * CeilDiv(M_BASIC_BLOCK, CVRATIO) * liV2CubeConstInfo.s2BaseSize * sizeof(QK_T));
     mm1ResUB_ = bufUB_.Get<QK_T>();
     pipe->InitBuffer(bufQL1_, QUERY_BUF_NUM * M_BASIC_BLOCK * D_BASIC_BLOCK * sizeof(Q_T));
     queryL1_ = bufQL1_.Get<Q_T>();
@@ -162,8 +162,10 @@ __aicore__ inline void LightningIndexerV2ServiceCube<LIT>::ComputeMm1(const LIV2
 {
     CrossCoreWaitFlag<LIV2Common::ConstInfo::LI_SYNC_MODE4, PIPE_FIX>(LIV2Common::ConstInfo::CROSS_VC_EVENT +
                                                                       liV2CubeRunInfo.loop % 2);
+#if CVRATIO > 1
     CrossCoreWaitFlag<LIV2Common::ConstInfo::LI_SYNC_MODE4, PIPE_FIX>(
         LIV2Common::ConstInfo::CROSS_VC_EVENT + liV2CubeRunInfo.loop % 2 + LIV2Common::ConstInfo::AIV0_AIV1_OFFSET);
+#endif
     uint64_t s2GmBaseOffset = liV2CubeRunInfo.s2Idx * liV2CubeConstInfo.s2BaseSize;
     uint64_t s1gProcessSize = liV2CubeRunInfo.actMBaseSize;
     uint64_t s2ProcessSize = liV2CubeRunInfo.actualSingleProcessSInnerSize;
@@ -229,8 +231,10 @@ __aicore__ inline void LightningIndexerV2ServiceCube<LIT>::ComputeMm1(const LIV2
     }
     CrossCoreSetFlag<LIV2Common::ConstInfo::LI_SYNC_MODE4, PIPE_FIX>(LIV2Common::ConstInfo::CROSS_CV_EVENT +
                                                                      liV2CubeRunInfo.loop % 2);
+#if CVRATIO > 1
     CrossCoreSetFlag<LIV2Common::ConstInfo::LI_SYNC_MODE4, PIPE_FIX>(
         LIV2Common::ConstInfo::CROSS_CV_EVENT + liV2CubeRunInfo.loop % 2 + LIV2Common::ConstInfo::AIV0_AIV1_OFFSET);
+#endif
 }
 
 template <typename LIT>
@@ -379,8 +383,13 @@ __aicore__ inline void LightningIndexerV2ServiceCube<LIT>::Fixp(uint64_t liV2S1G
     fixpipeParams.srcStride = (s1gL0RealSize + 1) >> 1 << 1;
     // mmResUb上两行之间的间隔，单位：element。 // 128：根据比对dump文件得到，ND方案(S1 * S2)时脏数据用mask剔除
     fixpipeParams.dstStride = UB_BANK_DEPTH_STRIDE / sizeof(QK_T);
-    // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
+#if CVRATIO > 1
+    // 950(1:2): 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
     fixpipeParams.dualDstCtl = 1;
+#else
+    fixpipeParams.dualDstCtl = 0;
+    fixpipeParams.reluEn = true;
+#endif
     if (liV2NSize <= (256 / sizeof(float))) {
         // N方向小于一个bank(256B), 只需搬一个ND块, 且不用补齐
         fixpipeParams.nSize = liV2NSize;
@@ -392,7 +401,7 @@ __aicore__ inline void LightningIndexerV2ServiceCube<LIT>::Fixp(uint64_t liV2S1G
         fixpipeParams.nSize = S2_BASIC_BLOCK_L0 / 2;
         fixpipeParams.params.ndNum = 2;
         fixpipeParams.params.srcNdStride = ((fixpipeParams.mSize + 15) / 16) * fixpipeParams.nSize;
-        fixpipeParams.params.dstNdStride = liV2CubeConstInfo.s2BaseSize * M_BASIC_BLOCK / 2;
+        fixpipeParams.params.dstNdStride = liV2CubeConstInfo.s2BaseSize * M_BASIC_BLOCK / CVRATIO;
     }
 
     // 将matmul结果从L0C搬运到UB

@@ -26,7 +26,7 @@ const int DIM_1 = 1;
 const int DIM_2 = 2;
 const int DIM_3 = 3;
 
-constexpr int64_t LI_V2_METADATA_SIZE = 1024;
+constexpr int64_t LI_V2_METADATA_SIZE = 2048;
 
 at::Tensor LightningIndexerMetadata(int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk,
                                     const c10::optional<at::Tensor>& cuSeqlensQ,

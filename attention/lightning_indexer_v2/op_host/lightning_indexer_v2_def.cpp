@@ -97,6 +97,7 @@ public:
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true);
         this->AICore().AddConfig("ascend950", aicore_config);
+        this->AICore().AddConfig("ascend960dt", aicore_config);
 
         OpAICoreConfig aicore_config_910b;
         aicore_config_910b.Input("k")

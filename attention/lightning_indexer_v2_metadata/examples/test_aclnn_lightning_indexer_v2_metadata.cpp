@@ -30,8 +30,8 @@
     } while (0)
 
 // 参考 lightning_indexer_v2_metadata.h
-constexpr uint32_t AIC_CORE_MAX_NUM = 36;
-constexpr uint32_t AIV_CORE_MAX_NUM = 72;
+inline constexpr uint32_t AIC_CORE_MAX_NUM = 36;
+inline constexpr uint32_t AIV_CORE_MAX_NUM = 72;
 constexpr uint32_t LI_V2_METADATA_TOTAL_SIZE = 1024;
 constexpr uint32_t LI_V2_METADATA_SIZE = 8;
 constexpr uint32_t LD_V2_METADATA_SIZE = 8;

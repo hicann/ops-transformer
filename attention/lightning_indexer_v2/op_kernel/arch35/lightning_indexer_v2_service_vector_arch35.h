@@ -157,12 +157,12 @@ private:
 template <typename Liv2ServiceTraits>
 __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::InitBuffers(TPipe* pipe)
 {
-    pipe->InitBuffer(liv2ResMm1Buf_, 2 * CeilDiv(M_BASIC_BLOCK, 2) * liv2S2BaseSize_ * sizeof(float));
+    pipe->InitBuffer(liv2ResMm1Buf_, 2 * CeilDiv(M_BASIC_BLOCK, CVRATIO) * liv2S2BaseSize_ * sizeof(float));
     liv2ResMm1Ub_ = liv2ResMm1Buf_.Get<float>();
-    pipe->InitBuffer(liv2WeightBuf_, 2 * CeilDiv(liv2S1BaseSize_, 2) * UB_BANK_DEPTH_STRIDE);
+    pipe->InitBuffer(liv2WeightBuf_, 2 * CeilDiv(liv2S1BaseSize_, CVRATIO) * UB_BANK_DEPTH_STRIDE);
     liv2WeightUb_ = liv2WeightBuf_.Get<W_T>();
     // 大小：2(开dB) * 2 * 128 * 4 = 2KB
-    pipe->InitBuffer(liv2OutBuf_, 2 * CeilDiv(liv2S1BaseSize_, 2) * liv2S2BaseSize_ * sizeof(SCORE_T));
+    pipe->InitBuffer(liv2OutBuf_, 2 * CeilDiv(liv2S1BaseSize_, CVRATIO) * liv2S2BaseSize_ * sizeof(SCORE_T));
     // out
     // 大小：(topkCountAlign256_ + 每次排序长度) * sizeof(SCORE_T)
     liv2Vec1OutUb_ = liv2OutBuf_.Get<SCORE_T>();
@@ -319,8 +319,8 @@ __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::Proce
     int64_t curS2Idx = info.s2Idx * liv2S2BaseSize_;
     int64_t curS1ProcNum =
         curS1Idx + liv2S1BaseSize_ > info.actS1Size ? info.actS1Size % liv2S1BaseSize_ : liv2S1BaseSize_;
-    int64_t curAivS1Idx = curS1Idx + (liv2BlockId_ % 2) * CeilDiv(curS1ProcNum, 2);
-    int64_t curAivS1ProcNum = (liv2BlockId_ % 2 == 0) ? CeilDiv(curS1ProcNum, 2) : curS1ProcNum / 2;
+    int64_t curAivS1Idx = curS1Idx + (liv2BlockId_ % CVRATIO) * CeilDiv(curS1ProcNum, CVRATIO);
+    int64_t curAivS1ProcNum = (liv2BlockId_ % CVRATIO == 0) ? CeilDiv(curS1ProcNum, CVRATIO) : curS1ProcNum / CVRATIO;
 
     if (curAivS1ProcNum == 0) {
         // V核处理完，通知C核可以把mm1Res搬运到UB
@@ -343,8 +343,8 @@ __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::Proce
     SetFlag<HardEvent::MTE2_V>(LIV2_VEC1_MTE2_V_EVENT + pingpong);
     WaitFlag<HardEvent::MTE2_V>(LIV2_VEC1_MTE2_V_EVENT + pingpong);
     WaitFlag<HardEvent::MTE3_V>(LIV2_VEC1_MTE3_V_EVENT + pingpong);
-    auto qkVLStride = (UB_BANK_DEPTH_STRIDE / sizeof(QK_T)) / 2 * M_BASIC_BLOCK;
-    auto outBase = liv2Vec1OutUb_[(pingpong)*CeilDiv(liv2S1BaseSize_, 2) * liv2S2BaseSize_];
+    auto qkVLStride = (UB_BANK_DEPTH_STRIDE / sizeof(QK_T)) / CVRATIO * M_BASIC_BLOCK;
+    auto outBase = liv2Vec1OutUb_[(pingpong)*CeilDiv(liv2S1BaseSize_, CVRATIO) * liv2S2BaseSize_];
     auto qkBase = liv2ResMm1Ub_[(pingpong) * (UB_BANK_STRIDE / sizeof(QK_T))];
     auto weightBase = liv2WeightUb_[(pingpong) * (UB_BANK_STRIDE / sizeof(float))];
     liV2Vector1::BatchMulWeightAndReduceSum(outBase, UB_BANK_DEPTH_STRIDE / sizeof(SCORE_T), qkBase, qkVLStride,
@@ -355,11 +355,11 @@ __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::Proce
     SetFlag<HardEvent::V_MTE2>(LIV2_VEC1_V_MTE2_EVENT + pingpong);
     SetFlag<HardEvent::V_MTE3>(LIV2_VEC1_V_MTE3_EVENT + pingpong);
     WaitFlag<HardEvent::V_MTE3>(LIV2_VEC1_V_MTE3_EVENT + pingpong);
-    int64_t vec1OutGmOffset = liv2BlockId_ % 2 == 0 ?
-                                  curS2Idx :
-                                  CeilDiv(liv2S1BaseSize_, 2) * LIV2Common::Align((uint64_t)liv2ConstInfo_.kSeqSize,
-                                                                                  (uint64_t)liv2S2BaseSize_) +
-                                      curS2Idx;
+    int64_t vec1OutGmOffset = liv2BlockId_ % CVRATIO == 0 ? curS2Idx :
+                                                            CeilDiv(liv2S1BaseSize_, CVRATIO) *
+                                                                    LIV2Common::Align((uint64_t)liv2ConstInfo_.kSeqSize,
+                                                                                      (uint64_t)liv2S2BaseSize_) +
+                                                                curS2Idx;
     DataCopyExtParams copyOutParams;
     copyOutParams.blockCount = curAivS1ProcNum;
     copyOutParams.blockLen = liv2S2BaseSize_ * sizeof(SCORE_T);
@@ -368,8 +368,8 @@ __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::Proce
         (LIV2Common::Align((uint64_t)liv2ConstInfo_.kSeqSize, (uint64_t)liv2S2BaseSize_) - liv2S2BaseSize_) *
         sizeof(SCORE_T);
 
-    DataCopyPad(liv2ScoreGm[vec1OutGmOffset], liv2Vec1OutUb_[pingpong * CeilDiv(liv2S1BaseSize_, 2) * liv2S2BaseSize_],
-                copyOutParams);
+    DataCopyPad(liv2ScoreGm[vec1OutGmOffset],
+                liv2Vec1OutUb_[pingpong * CeilDiv(liv2S1BaseSize_, CVRATIO) * liv2S2BaseSize_], copyOutParams);
     SetFlag<HardEvent::MTE3_V>(LIV2_VEC1_MTE3_V_EVENT + pingpong);
     // V核处理完，通知C核可以把mm1Res搬运到UB
     CrossCoreSetFlag<LIV2Common::ConstInfo::LI_SYNC_MODE4, PIPE_V>(LIV2Common::ConstInfo::CROSS_VC_EVENT + pingpong);
@@ -386,8 +386,8 @@ __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::Proce
     int64_t curS2StartIdx = info.s2Start * liv2S2BaseSize_;
     int64_t curS1ProcNum =
         curS1Idx + liv2S1BaseSize_ > info.actS1Size ? info.actS1Size % liv2S1BaseSize_ : liv2S1BaseSize_;
-    int64_t curAivS1Idx = curS1Idx + (liv2BlockId_ % 2) * CeilDiv(curS1ProcNum, 2);
-    int64_t curAivS1ProcNum = (liv2BlockId_ % 2 == 0) ? CeilDiv(curS1ProcNum, 2) : curS1ProcNum / 2;
+    int64_t curAivS1Idx = curS1Idx + (liv2BlockId_ % CVRATIO) * CeilDiv(curS1ProcNum, CVRATIO);
+    int64_t curAivS1ProcNum = (liv2BlockId_ % CVRATIO == 0) ? CeilDiv(curS1ProcNum, CVRATIO) : curS1ProcNum / CVRATIO;
 
     // LD 需要搬运到的起始位置 32字节
     int64_t liV2LdDstOffset = (info.isNeedLD) ? curS2StartIdx : 0;
@@ -422,8 +422,8 @@ __aicore__ inline void LightningIndexerV2ServiceVector<Liv2ServiceTraits>::Proce
 
     int32_t validAllS2Len = cuRealAcSeq;
     for (uint32_t i = 0; i < curAivS1ProcNum; i++) {
-        uint32_t rowIdx = liv2BlockId_ % 2 * CeilDiv(curS1ProcNum, 2) + i;
-        uint32_t vecOffset = liv2BlockId_ % 2 * CeilDiv(liv2S1BaseSize_, 2) + i;
+        uint32_t rowIdx = liv2BlockId_ % CVRATIO * CeilDiv(curS1ProcNum, CVRATIO) + i;
+        uint32_t vecOffset = liv2BlockId_ % CVRATIO * CeilDiv(liv2S1BaseSize_, CVRATIO) + i;
         int64_t outputIdxOffset = 0;
         if (info.isOutputIdxOffsetValid) {
             outputIdxOffset = liv2OutputIdxOffsetGm.GetValue(info.outputIdxCoreOffset + rowIdx * liv2KHeadNum_);

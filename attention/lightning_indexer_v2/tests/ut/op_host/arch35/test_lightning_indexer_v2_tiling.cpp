@@ -54,7 +54,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_bsnd_bsnd_s
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -89,7 +89,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_bsnd_bsnd_w
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{2, 39, 1}, {2, 39, 1}}, ge::DT_INT32, ge::FORMAT_ND},               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -126,7 +126,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_tnd_tnd_suc
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
         },
         {
             {{{78, 1, 2048}, {78, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -165,7 +165,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_tnd_pa_succ
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                       // cmp_residual_k input7
             {{{2, 2}, {2, 2}}, ge::DT_INT32, ge::FORMAT_ND},               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                       // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                // metadata     input10
         },
         {
             {{{78, 1, 2048}, {78, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -217,7 +217,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_metadata_mi
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-// Ascend950: metadata size must be 1024, wrong size should fail
+// Ascend950: metadata size must be 2048, wrong size should fail
 TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_metadata_size_failed)
 {
     struct LIV2CompileInfo {
@@ -235,7 +235,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_metadata_si
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{512}, {512}}, ge::DT_INT32, ge::FORMAT_ND} // metadata     input10 (size != 1024)
+            {{{512}, {512}}, ge::DT_INT32, ge::FORMAT_ND} // metadata     input10 (size != 2048)
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -270,7 +270,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_cmp_residua
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},        // cmp_residual_k input7 (null, should fail)
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},        // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},        // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND} // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND} // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -305,7 +305,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_cmp_residua
             {{{5}, {5}}, ge::DT_INT32, ge::FORMAT_ND},      // cmp_residual_k input7 (size 5 != B=2)
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},        // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},        // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND} // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND} // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -340,7 +340,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_cmp_residua
             {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},      // cmp_residual_k input7 (wrong dtype)
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},        // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},        // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND} // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND} // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -375,7 +375,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_cmp_residua
             {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},      // cmp_residual_k input7 (should be null)
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},        // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},        // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND} // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND} // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -411,7 +411,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_tnd_cu_seql
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
         },
         {
             {{{78, 1, 2048}, {78, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -447,7 +447,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_bsnd_cu_seq
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -482,7 +482,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_return_valu
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -517,7 +517,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_max_seqlen_
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -552,7 +552,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_idx_offset_
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{2, 39, 1}, {2, 39, 1}}, ge::DT_INT64, ge::FORMAT_ND}, // output_idx_offset input9 (wrong dtype)
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}          // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}          // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -587,7 +587,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_seqused_q_d
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -622,7 +622,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_gsize_limit
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                 // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                 // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                 // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                          // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                          // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -661,7 +661,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_pa_block_si
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cmp_residual_k input7
             {{{2, 2}, {2, 2}}, ge::DT_INT32, ge::FORMAT_ND},                 // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
         },
         {
             {{{78, 1, 2048}, {78, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -696,7 +696,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_weights_sha
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -727,7 +727,7 @@ constexpr int64_t TEST_RETURN_INDICES = 0;
 constexpr int64_t TEST_BLOCK_COUNT = 2;
 constexpr int64_t TEST_BLOCK_SIZE = 16;
 constexpr int64_t TEST_BLOCKS_PER_BATCH = 1;
-constexpr int64_t TEST_METADATA_SIZE = 1024;
+constexpr int64_t TEST_METADATA_SIZE = 2048;
 constexpr int64_t TEST_SINGLETON_DIM = 1;
 constexpr int64_t TEST_Q_TOKENS = TEST_BATCH_SIZE * TEST_Q_SEQ_LEN;
 constexpr int64_t TEST_K_TOKENS = TEST_BATCH_SIZE * TEST_K_SEQ_LEN;
@@ -926,7 +926,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_pa_seqused_
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{2, 1}, {2, 1}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -962,7 +962,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_pa_block_nu
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{2, 1}, {2, 1}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -996,7 +996,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_pa_k_noncon
         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
         {{{2, 1}, {2, 1}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table  input8
         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-        {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
     };
     inputs[1].stride_ = gert::Stride({2048, 129, 128, 1});
     inputs[1].hasStride_ = true;
@@ -1034,7 +1034,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_pa_k_contig
         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
         {{{2, 1}, {2, 1}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table  input8
         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-        {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
     };
     inputs[1].stride_ = gert::Stride({2048, 128, 128, 1});
     inputs[1].hasStride_ = true;
@@ -1074,7 +1074,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_pa_block_ta
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{3, 4}, {3, 4}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table  input8 (B=3)
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1109,7 +1109,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_mask_mode_i
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1144,7 +1144,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_q_seq_negat
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1177,7 +1177,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_k_stride0_n
         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-        {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
     };
     inputs[1].stride_ = gert::Stride({-1, 128, 128, 1});
     inputs[1].hasStride_ = true;
@@ -1216,7 +1216,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_k_head_dim_
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1251,7 +1251,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_out_seq_mis
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 38, 1, 2048}, {2, 38, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices (S1=38)
@@ -1288,7 +1288,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_tnd_cu_seql
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
         },
         {
             {{{78, 1, 2048}, {78, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1325,7 +1325,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_tnd_tnd_cu_
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
         },
         {
             {{{78, 1, 2048}, {78, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1360,7 +1360,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_q_dtype_hif
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                         // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                         // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1395,7 +1395,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_q_k_dtype_m
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1430,7 +1430,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_required_q_
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                             // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                             // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                             // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                      // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                      // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1465,7 +1465,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_return_valu
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1500,7 +1500,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_required_w_
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1535,7 +1535,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_layout_k_in
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1570,7 +1570,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_layout_mism
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1605,7 +1605,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_topk_invali
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1640,7 +1640,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_cmp_ratio_i
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1675,7 +1675,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_max_seqlen_
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1710,7 +1710,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_k_heads_inv
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1745,7 +1745,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_bsnd_k_batc
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1782,7 +1782,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_tnd_values_
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
         },
         {
             {{{78, 1, 2048}, {78, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1817,7 +1817,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_idx_offset_
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{2, 39, 2}, {2, 39, 2}}, ge::DT_INT32, ge::FORMAT_ND},               // output_idx_offset input9 (N2=2)
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1852,7 +1852,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_bsnd_block_
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{2, 1}, {2, 1}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table  input8 (not PA)
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1888,7 +1888,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_tnd_cu_seql
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
         },
         {
             {{{78, 1, 2048}, {78, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1925,7 +1925,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_pa_cu_seqle
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{2, 1}, {2, 1}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -1960,7 +1960,7 @@ TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_layout_q_in
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
         },
         {
             {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices

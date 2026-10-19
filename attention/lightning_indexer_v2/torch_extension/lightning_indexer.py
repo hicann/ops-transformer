@@ -12,7 +12,7 @@ import torch
 from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
-LI_METADATA_SIZE = 1024
+LI_METADATA_SIZE = 2048
 LI_METADATA_OP_NAME = "lightning_indexer_metadata"
 
 
