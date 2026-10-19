@@ -65,7 +65,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadataGetWorkspaceSize(
     const char        *layoutKvOptional,
     bool               hasOriKv,
     bool               hasCmpKv,
-    const aclTensor   *metadata,
+    const aclTensor   *metaData,
     uint64_t          *workspaceSize,
     aclOpExecutor    **executor)
 ```
@@ -375,7 +375,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>metadata（aclTensor*）</td>
+      <td>metaData（aclTensor*）</td>
       <td>输出</td>
       <td>表示负载均衡结果输出。</td>
       <td>shape固定为(1024, )</td>

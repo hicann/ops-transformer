@@ -84,7 +84,7 @@ aclnnStatus aclnnNsaCompressAttentionGetWorkspaceSize(
   int64_t            selectBlockCount,
   const aclTensor   *softmaxMaxOut,
   const aclTensor   *softmaxSumOut,
-  const aclTensor   *attentionOut,
+  const aclTensor   *attentionOutOut,
   const aclTensor   *topkIndicesOut,
   uint64_t          *workspaceSize,
   aclOpExecutor    **executor)
@@ -318,7 +318,7 @@ aclnnStatus aclnnNsaCompressAttention(
         <td>√</td>
       </tr>
       <tr>
-        <td>attentionOut</td>
+        <td>attentionOutOut</td>
         <td>输出</td>
         <td>公式中的attentionOut。</td>
         <td>数据类型和shape前2维与query保持一致，最后1维和value的最后1维一致。</td>
