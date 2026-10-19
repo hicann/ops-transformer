@@ -5,6 +5,7 @@
 - [apply_rotary_pos_emb](../../posembedding/apply_rotary_pos_emb/docs/torchapi_apply_rotary_pos_emb.md)
 - [apply_rotary_pos_emb_grad](../../posembedding/apply_rotary_pos_emb_grad/docs/torchapi_apply_rotary_pos_emb_grad.md)
 - [attention_to_ffn](../../mc2/attention_to_ffn_v2/docs/torchapi_attention_to_ffn.md)
+- [attention_worker_combine](../../attention/attention_worker_combine/docs/torchapi_attention_worker_combine.md)
 - [block_attention_residuals](../../mhc/block_attention_residuals/docs/torchapi_block_attention_residuals.md)
 - [block_attn_res_prepare](../../attention/block_attn_res_prepare/docs/torchapi_block_attn_res_prepare.md)
 - [block_attn_res_update](../../attention/block_attn_res_update/docs/torchapi_block_attn_res_update.md)

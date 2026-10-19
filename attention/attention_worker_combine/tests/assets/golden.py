@@ -19,7 +19,7 @@ import ml_dtypes
 __spec__ = {
     "attention_worker_combine": "AttentionWorkerCombineKernelTestSpec",
     "aclnnAttentionWorkerCombine": "AclnnAttentionWorkerCombineTestSpec",
-    "torch_npu.npu_attention_worker_combine": "E2eAttentionWorkerCombineTestSpec",
+    "torch.ops.cann_ops_transformer.attention_worker_combine": "E2eAttentionWorkerCombineTestSpec",
 }
 
 # 按用例名保存同一份 CPU token/flags 及其 GM 地址，供各回调复用，比对结束后释放。
@@ -605,7 +605,7 @@ class AttentionWorkerCombineKernelTestSpec:
 
 
 class E2eAttentionWorkerCombineTestSpec:
-    """torch eager、静态图和动态图共用的输入准备与 CPU 标杆。"""
+    """torch_extension 的 eager、静态图和动态图共用的输入准备与 CPU 标杆。"""
 
     @staticmethod
     def customize_inputs(
