@@ -64,6 +64,7 @@ __aicore__ inline __gm__ GmmLoopCount* RegisterMegaMoeExceptionDump(ExceptionDum
                                                                     const MegaMoeImpl::PeermemInfo& peermemInfo,
                                                                     GM_ADDR epRankIdAddr)
 {
+#if MC2_ENABLE_EXCEPTION_DUMP
     engine.Init(dumpBase, tilingGM);
     engine.UpdateStage(Stage::INIT);
     engine.Dump(epRankIdAddr, sizeof(uint32_t));
@@ -82,10 +83,20 @@ __aicore__ inline __gm__ GmmLoopCount* RegisterMegaMoeExceptionDump(ExceptionDum
     loopCountGlobal.SetGlobalBuffer(reinterpret_cast<GM_ADDR>(loopCount));
     DataCacheCleanAndInvalid<uint8_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(loopCountGlobal);
     return loopCount;
+#else
+    (void)engine;
+    (void)dumpBase;
+    (void)tilingGM;
+    (void)tilingData;
+    (void)peermemInfo;
+    (void)epRankIdAddr;
+    return nullptr;
+#endif
 }
 
 __aicore__ inline void UpdateGmmLoopCount(__gm__ GmmLoopCount* loopCount, LoopCountIndex index, uint64_t count)
 {
+#if MC2_ENABLE_EXCEPTION_DUMP
     if ASCEND_IS_NOT_AIV {
         return;
     }
@@ -100,6 +111,11 @@ __aicore__ inline void UpdateGmmLoopCount(__gm__ GmmLoopCount* loopCount, LoopCo
     GlobalTensor<uint8_t> countGlobal;
     countGlobal.SetGlobalBuffer(reinterpret_cast<GM_ADDR>(countAddr));
     DataCacheCleanAndInvalid<uint8_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(countGlobal);
+#else
+    (void)loopCount;
+    (void)index;
+    (void)count;
+#endif
 }
 
 } // namespace MegaMoeImpl

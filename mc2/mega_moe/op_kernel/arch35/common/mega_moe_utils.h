@@ -17,6 +17,7 @@
 #define MEGA_MOE_UTILS_H
 
 #include <cstdint>
+#include "c_api/asc_simd.h"
 
 #include "kernel_operator.h"
 #include "op_kernel/math_util.h"
@@ -42,6 +43,8 @@ __aicore__ inline void IncrementSyncCount(GM_ADDR rankSyncBase, uint32_t aivCore
     auto* sequenceAddr = GetSyncCountAddress(rankSyncBase, aivCoreIdx);
     uint32_t nextSequence = static_cast<uint32_t>(ReadGmByPassDCache(sequenceAddr)) + 1U;
     WriteGmByPassDCache(sequenceAddr, static_cast<int32_t>(nextSequence));
+    // 等待旁路 GM 写完成后再读取 epoch。
+    asc_sync_data_barrier(mem_dsb_t::DSB_DDR);
 }
 
 __aicore__ inline uint32_t GetSyncRoundTag(int32_t syncCount)

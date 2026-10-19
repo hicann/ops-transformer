@@ -17,6 +17,10 @@
 #ifndef MC2_EXCEPTION_DUMP_H
 #define MC2_EXCEPTION_DUMP_H
 
+#ifndef MC2_ENABLE_EXCEPTION_DUMP
+#define MC2_ENABLE_EXCEPTION_DUMP 1
+#endif
+
 namespace MC2ExceptionDump {
 
 enum class OpType : int32_t {
@@ -68,6 +72,7 @@ struct alignas(8) DumpParams {
 
 using namespace AscendC;
 
+#if MC2_ENABLE_EXCEPTION_DUMP
 template <typename Policy>
 class ExceptionDump {
 public:
@@ -214,6 +219,18 @@ private:
     GlobalTensor<uint8_t> headerGlobal_;
     GlobalTensor<uint8_t> blockStageGlobal_;
 };
+#else
+template <typename Policy>
+class ExceptionDump {
+public:
+    __aicore__ inline ExceptionDump() = default;
+    __aicore__ inline ExceptionDump(GM_ADDR, GM_ADDR) {}
+    __aicore__ inline void Init(GM_ADDR, GM_ADDR) {}
+    __aicore__ inline void UpdateStage(typename Policy::StageEnumT) {}
+    __aicore__ inline void Dump(GM_ADDR, size_t) {}
+    __aicore__ inline void Dump(GM_ADDR, size_t, size_t, size_t) {}
+};
+#endif
 #endif
 } // namespace MC2ExceptionDump
 #endif // MC2_EXCEPTION_DUMP_H
