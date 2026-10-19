@@ -35,9 +35,34 @@ def remember_graph_state(tensor, before, after):
     _GRAPH_STATES[tensor.data_ptr()] = (before, after)
 
 
-def install_graph():
-    from ttk.core_modules.framework_api import graph_execution as graph
+def load_graph_execution():
+    """Resolve the aclgraph compile entry across TTK revisions.
 
+    TTK >= 2026-10 moved it to framework_api.torch.graph_runner (extra
+    fullgraph/super_kernel/online_compile parameters); older revisions expose
+    framework_api.graph_execution. Returns None when neither exists.
+    """
+    try:
+        from ttk.core_modules.framework_api.torch import graph_runner
+
+        return graph_runner
+    except ImportError:
+        pass
+    try:
+        from ttk.core_modules.framework_api import graph_execution
+
+        return graph_execution
+    except ImportError:
+        return None
+
+
+def install_graph():
+    graph = load_graph_execution()
+    if graph is None:
+        raise RuntimeError(
+            "FFN TTK compatibility: aclgraph module not found "
+            "(framework_api.torch.graph_runner / framework_api.graph_execution)"
+        )
     if getattr(graph, "SUPPORTS_NPU_GRAPH_BEFORE_RUN", False):
         return  # Newer frameworks own the hooks; never execute them twice.
     original = graph._compile_model_aclgraph
@@ -46,12 +71,15 @@ def install_graph():
     _require_parameters(original, ("model", "backend"))
 
     @functools.wraps(original)
-    def compile_ffn(model, backend):
+    def compile_ffn(model, backend, *args, **kwargs):
         import torch
 
         target = torch.ops.cann_ops_transformer.ffn_worker_batching
         api = getattr(model, "api_func", None)
-        compiled = original(model, backend)
+        if api is None:
+            # TTK may wrap the model (SuperKernel scope / core limit); unwrap once.
+            api = getattr(getattr(model, "_model", None), "api_func", None)
+        compiled = original(model, backend, *args, **kwargs)
         if api is not target and api is not target.default:
             return compiled
 
@@ -93,6 +121,9 @@ def adapt_geir_source(source):
     import hashlib
 
     digest = hashlib.sha256(Path(header).read_bytes()).hexdigest()
+    # TTK 2026-10-12 起 GEIR 模板 serve-mode 化：config 移入常驻 while 循环内
+    # 逐例解析（GEInitialize 之前不再有 config）。两代模板均在
+    # inputs_cfg 行处拥有 config/input_prefix/device_id 作用域，以它为锚。
     additions = (
         (
             "static int LoadInputFromFile(const string& path, DataType dt,\n",
@@ -105,7 +136,7 @@ def adapt_geir_source(source):
             "        delete[] buf;\n        return FAILED;\n    }\n",
         ),
         (
-            "    bool prof_init_done = false;\n",
+            '    const JsonValue& inputs_cfg  = config.at("inputs");\n',
             '    input_relocations = config.at("input_relocations");\n'
             '    relocation_input_prefix = input_prefix ? input_prefix : "";\n'
             "    if (input_relocations.size() && aclrtSetDevice(device_id) != ACL_SUCCESS) {\n"
@@ -123,6 +154,16 @@ def adapt_geir_source(source):
                 f"Unsupported TTK GEIR template; missing/ambiguous anchor: {anchor!r}"
             )
         source = source.replace(anchor, insertion + anchor, 1)
+    # serve-mode 模板：多个用例共享一个常驻进程，辅助 HBM 缓冲必须逐例释放，
+    # 否则跨用例累积设备内存。一次性模板没有该逐例收尾行，跳过即可。
+    per_round = "    if (ttk_serve_mode) prof_teardown();"
+    if source.count(per_round) == 1:
+        line_end = source.index("\n", source.index(per_round)) + 1
+        free_round = (
+            "    for (void* buffer : auxiliary_buffers) aclrtFree(buffer);\n"
+            "    auxiliary_buffers.clear();\n"
+        )
+        source = source[:line_end] + free_round + source[line_end:]
     return source
 
 

@@ -306,6 +306,16 @@ def restore_context_archive(path, expected_attributes=None):
 _ORIG_RUN_TIME = None
 
 
+def _ttk_global_storage():
+    """Ttk 2026-10 重构把 get_global_storage 升格到 ttk.switches；旧版位于
+    ttk.utilities.container_utils。两代 TTK 均需支持。"""
+    try:
+        from ttk.switches import get_global_storage
+    except ImportError:
+        from ttk.utilities.container_utils import get_global_storage
+    return get_global_storage()
+
+
 def _pin_run_time(need_schedule):
     """RECV 在设备侧消费描述符（清 flag / ids 置 sentinel），真实地址缓冲不会随
     TTK 的重复执行刷新：第二次执行面对空表会永久等待。TTK 默认 run_time=3，
@@ -313,9 +323,7 @@ def _pin_run_time(need_schedule):
     “输入生成先于执行器读取 run_time”的时序（aclnn / kernel 两模式均如此）。"""
     global _ORIG_RUN_TIME
     try:
-        from ttk.utilities.container_utils import get_global_storage
-
-        storage = get_global_storage()
+        storage = _ttk_global_storage()
         if _ORIG_RUN_TIME is None:
             _ORIG_RUN_TIME = storage.run_time
         storage.run_time = 1 if need_schedule == 1 else _ORIG_RUN_TIME
@@ -529,12 +537,26 @@ def _generate_test_data(
             rng, (A, M, BS, K), scale_range, np.float32, "scale"
         )
     else:
-        from ttk.utilities.dtypes import (
-            numpy_float8_e5m2,
-            numpy_float8_e4m3fn,
-            numpy_float4_e2m1,
-            numpy_float8_e8m0,
-        )
+        try:
+            from ttk.utilities.dtypes import (
+                numpy_float8_e5m2,
+                numpy_float8_e4m3fn,
+                numpy_float4_e2m1,
+                numpy_float8_e8m0,
+            )
+        except ImportError:
+            # Ttk 2026-10 重构删除了 float8 工厂，改为 resolve_numpy_dtype 直接
+            # 返回 dtype 对象；这里包回零参工厂以保持调用点不变。
+            from ttk.utilities.dtypes import numpy_float4_e2m1, resolve_numpy_dtype
+
+            def numpy_float8_e5m2():
+                return resolve_numpy_dtype("float8_e5m2")
+
+            def numpy_float8_e4m3fn():
+                return resolve_numpy_dtype("float8_e4m3fn")
+
+            def numpy_float8_e8m0():
+                return resolve_numpy_dtype("float8_e8m0")
 
         dtype = {3: numpy_float8_e5m2, 4: numpy_float8_e4m3fn, 5: numpy_float4_e2m1}[
             tokenDtype
@@ -1193,10 +1215,8 @@ def _ttk_assets_compat():
 
 def _configure_torch_execution(need_schedule):
     """Eager consumes once; ACL graph republishes descriptors before each call."""
-    from ttk.utilities.container_utils import get_global_storage
-
     global _TORCH_ORIG_WARMUP
-    storage = get_global_storage()
+    storage = _ttk_global_storage()
     if need_schedule == 1:
         ge_enabled = any(
             getattr(getattr(storage, name, None), "enabled", False)
@@ -1207,8 +1227,12 @@ def _configure_torch_execution(need_schedule):
                 "Torch RECV graph testing currently requires --aclgraph; GE is not adapted"
             )
         if getattr(storage, "aclgraph_enabled", False):
-            from ttk.core_modules.framework_api import graph_execution
-
+            graph_execution = _ttk_assets_compat().load_graph_execution()
+            if graph_execution is None:
+                raise ImportError(
+                    "TTK aclgraph compile entry not found (neither "
+                    "framework_api.torch.graph_runner nor framework_api.graph_execution)"
+                )
             if not getattr(graph_execution, "SUPPORTS_NPU_GRAPH_BEFORE_RUN", False):
                 _ttk_assets_compat().install_graph()
             if _TORCH_ORIG_WARMUP is not None:
@@ -1299,9 +1323,7 @@ class TorchFfnWorkerBatchingTestSpec:
                 descriptors.tobytes(),
             )
             _TORCH_GRAPH_REPLAY_CHECKS[kwargs.get("testcase_name", "default")] = 0
-            from ttk.utilities.container_utils import get_global_storage
-
-            if getattr(get_global_storage(), "aclgraph_enabled", False):
+            if getattr(_ttk_global_storage(), "aclgraph_enabled", False):
                 hook_args = {
                     **attributes,
                     "testcase_name": kwargs.get("testcase_name", "default"),
@@ -1483,9 +1505,7 @@ class FfnWorkerBatchingKernelTestSpec:
         sync_flag: bool = False,
         **kwargs,
     ):
-        from ttk.utilities.container_utils import get_global_storage
-
-        if getattr(get_global_storage(), "test_mode", None) == "geir":
+        if getattr(_ttk_global_storage(), "test_mode", None) == "geir":
             _ttk_assets_compat().install_geir(
                 FfnWorkerBatchingKernelTestSpec.geir_prepare_inputs
             )
