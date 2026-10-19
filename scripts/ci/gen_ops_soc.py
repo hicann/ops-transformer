@@ -60,6 +60,7 @@ group_op_dict = {
     },
     "ascend960dt": {
         "fused_infer_attention_score": 20,
+        "flash_attention_score_grad": 5,
     },
 }
 

@@ -18,8 +18,13 @@
 #include "log/log.h"
 #include "op_host/data_copy_transpose_tiling.h"
 #include "op_host/tiling_templates_registry.h"
+#if (defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)))
+#include "../op_kernel/arch92/flash_attention_score_grad_template_tiling_key_david.h"
+#include "../op_kernel/arch92/flash_attention_score_grad_tiling_data_david.h"
+#else
 #include "../op_kernel/arch35/flash_attention_score_grad_template_tiling_key.h"
 #include "../op_kernel/arch35/flash_attention_score_grad_tiling_data_regbase.h"
+#endif
 
 using namespace ge;
 using namespace AscendC;
@@ -153,7 +158,7 @@ public:
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus RunEmptyTilingRegbase(gert::TilingContext* context)
+    ge::graphStatus RunEmptyTilingRegbase(gert::TilingContext* context, NpuArch npuArch)
     {
         fag::FlashAttentionScoreGradEmptyTensorTilingDataRegbase* emptyTensorTilingDataRegbase =
             context->GetTilingData<fag::FlashAttentionScoreGradEmptyTensorTilingDataRegbase>();
@@ -254,8 +259,13 @@ public:
         }
         emptyTensorTilingDataRegbase->isRope = (dqRopeNum > 0 || dkRopeNum > 0);
 
-        context->SetTilingKey(
-            GET_TPL_TILING_KEY(TILING_KEY_1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, TILING_KEY_1));
+        if (npuArch == NpuArch::DAV_3510) {
+            context->SetTilingKey(
+                GET_TPL_TILING_KEY(TILING_KEY_1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, TILING_KEY_1));
+        } else {
+            context->SetTilingKey(
+                GET_TPL_TILING_KEY(TILING_KEY_1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, TILING_KEY_1));
+        }
         auto sliceNum =
             (dqNum < aivNum && dkNum < aivNum && dpseNum < aivNum) ? std::max(std::max(dqNum, dkNum), dpseNum) : aivNum;
         context->SetBlockDim(CalculateTschBlockDim(sliceNum, aicNum, aivNum));
@@ -551,11 +561,11 @@ ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionGradScore(gert::TilingConte
         OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
         return ge::GRAPH_FAILED);
     auto npuArch = compilePtr->npuArch;
-    if (npuArch == NpuArch::DAV_3510) {
-        OP_LOGW(context, "Current npu arch is dav-3510.");
+    if (npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_9201) {
+        OP_LOGW(context, "Current npu arch is dav-3510 or dav-9201.");
         if (IsEmptyOutput(context)) {
             FlashAttentionScoreGradTiling flashAttentionScoreGradTiling;
-            return flashAttentionScoreGradTiling.RunEmptyTilingRegbase(context);
+            return flashAttentionScoreGradTiling.RunEmptyTilingRegbase(context, npuArch);
         }
     } else {
         OP_LOGW(context, "Current npu arch is not dav-3510.");

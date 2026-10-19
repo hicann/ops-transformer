@@ -19,7 +19,7 @@ namespace ops {
 
 class FlashAttentionScoreGrad : public OpDef {
 public:
-    explicit FlashAttentionScoreGrad(const char *name)
+    explicit FlashAttentionScoreGrad(const char* name)
         : OpDef(name)
     {
         this->Input("query")
@@ -596,6 +596,30 @@ public:
             .ExtendCfgInfo("jitCompile.flag", "static_false,dynamic_false");
         this->AICore().AddConfig("ascend950", aicore_config_95);
         this->AICore().AddConfig("ascend350", aicore_config_95);
+        OpAICoreConfig aicore_config_96;
+        aicore_config_96.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
+            .ExtendCfgInfo("coreType.value", "AiCore")
+            .ExtendCfgInfo("opFile.value", "flash_attention_score_grad_apt")
+            .ExtendCfgInfo("jitCompile.flag", "static_false,dynamic_false");
+        this->AICore().AddConfig("ascend960dt", aicore_config_96);
+        OpAICoreConfig aicore_config_960PR;
+        aicore_config_96.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
+            .ExtendCfgInfo("coreType.value", "AiCore")
+            .ExtendCfgInfo("opFile.value", "flash_attention_score_grad_apt")
+            .ExtendCfgInfo("jitCompile.flag", "static_false,dynamic_false");
+        this->AICore().AddConfig("ascend960pr", aicore_config_960PR);
 
         OpAICoreConfig aicore_config;
         aicore_config.Input("query")

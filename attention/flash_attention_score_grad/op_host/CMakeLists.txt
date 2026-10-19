@@ -10,6 +10,7 @@
 add_op_to_compiled_list()
 
 if (BUILD_OPEN_PROJECT)
+    set(flash_attention_score_grad_depends attention/common PARENT_SCOPE)
     target_sources(op_host_aclnnInner PRIVATE
         flash_attention_score_grad_def.cpp
     )
@@ -28,6 +29,20 @@ elseif("${CONDITION_UNIT}" STREQUAL "ascend350")
     add_ops_compile_options(
         OP_NAME FlashAttentionScoreGrad
         COMPUTE_UNIT Ascend350_355e
+        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
+    )
+elseif("${CONDITION_UNIT}" STREQUAL "ascend960dt")
+    set(flash_attention_score_grad_apt_depends attention/common CACHE INTERNAL "Dependencies for flash_attention_score_grad")
+    add_ops_compile_options(
+        OP_NAME FlashAttentionScoreGrad
+        COMPUTE_UNIT ascend960dt_968B7
+        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
+    )
+elseif("${CONDITION_UNIT}" STREQUAL "ascend960pr")
+    set(flash_attention_score_grad_apt_depends attention/common CACHE INTERNAL "Dependencies for flash_attention_score_grad")
+    add_ops_compile_options(
+        OP_NAME FlashAttentionScoreGrad
+        COMPUTE_UNIT Ascend960PR_969A1
         OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
     )
 endif()
@@ -55,5 +70,13 @@ else()
         OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api
         OPTYPE flash_attention_score_grad
         ACLNNTYPE aclnn_inner
+    )
+endif()
+
+if (NOT BUILD_OPS_RTY_KERNEL)
+    add_tiling_modules()
+    target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
+        ./arch35/flash_attention_score_grad_tiling_common_regbase.cpp
+        ./arch92/flash_attention_score_grad_tiling_s1s2_bn2gs1s2_david.cpp
     )
 endif()
