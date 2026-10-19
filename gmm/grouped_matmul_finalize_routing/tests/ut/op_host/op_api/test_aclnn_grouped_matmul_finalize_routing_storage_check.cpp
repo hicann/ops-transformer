@@ -14,11 +14,11 @@
 
 #include "gtest/gtest.h"
 
-#include "../../../../op_api/aclnn_grouped_matmul_finalize_routing.h"
-#include "../../../../op_api/aclnn_grouped_matmul_finalize_routing_v2.h"
-#include "../../../../op_api/aclnn_grouped_matmul_finalize_routing_v3.h"
-#include "../../../../op_api/aclnn_grouped_matmul_finalize_routing_weight_nz.h"
-#include "../../../../op_api/aclnn_grouped_matmul_finalize_routing_weight_nz_v2.h"
+#include "gmm/grouped_matmul_finalize_routing/op_api/aclnn_grouped_matmul_finalize_routing.h"
+#include "gmm/grouped_matmul_finalize_routing/op_api/aclnn_grouped_matmul_finalize_routing_v2.h"
+#include "gmm/grouped_matmul_finalize_routing/op_api/aclnn_grouped_matmul_finalize_routing_v3.h"
+#include "gmm/grouped_matmul_finalize_routing/op_api/aclnn_grouped_matmul_finalize_routing_weight_nz.h"
+#include "gmm/grouped_matmul_finalize_routing/op_api/aclnn_grouped_matmul_finalize_routing_weight_nz_v2.h"
 #include "gmm_csv_acl_parse_utils.h"
 #include "op_api_ut_common/tensor_desc.h"
 #include "opdev/platform.h"

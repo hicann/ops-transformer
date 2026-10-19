@@ -27,8 +27,11 @@
 #undef private
 #include "register/register_custom_pass.h"
 
-#include "../../../op_graph/fusion_pass/grouped_matmul_transpose_fusion_pass.h"
+#include "gmm/grouped_matmul/op_graph/fusion_pass/grouped_matmul_transpose_fusion_pass.h"
 #include "gmm_csv_parse_utils.h"
+#include "gmm/grouped_matmul_finalize_routing/op_graph/fusion_pass/grouped_matmul_finalize_routing_transpose_fusion_pass.h"
+#include "gmm/grouped_matmul_swiglu_quant_v2/op_graph/fusion_pass/grouped_matmul_swiglu_quant_transpose_fusion_pass.h"
+#include "gmm/quant_grouped_matmul_inplace_add/op_graph/fusion_pass/quant_grouped_matmul_inplace_add_transpose_fusion_pass.h"
 
 using namespace ge;
 using namespace ge::fusion;
@@ -644,6 +647,31 @@ extern "C" aclError aclsysGetVersionNum(char* name, int32_t* version)
 }
 
 class GroupedMatmulTransposeFusionPassTest : public testing::TestWithParam<GroupedMatmulTransposeFusionPassParam> {};
+
+template <typename Pass>
+class RuntimeVersionTestPass : public Pass {
+public:
+    using Pass::Run;
+};
+
+TEST(GroupedMatmulTransposeFusionPassVersionTest, ThreeMigratedPassesSkipUnsupportedRuntime)
+{
+    GraphPtr graph = nullptr;
+    CustomPassContext context;
+    RuntimeVersionTestPass<ops::QuantGroupedMatmulInplaceAddTransposeFusionPass> inplaceAdd;
+    RuntimeVersionTestPass<ops::GroupedMatmulFinalizeRoutingTransposeFusionPass> finalizeRouting;
+    RuntimeVersionTestPass<ops::GroupedMatmulSwigluQuantTransposeFusionPass> swiglu;
+    gGeCompilerVersion = kGraphFusionSupportVersion - 1;
+    auto checkVersion = [&](auto& pass) {
+        gVersionKeyValid = false;
+        EXPECT_EQ(pass.Run(graph, context), GRAPH_NOT_CHANGED);
+        EXPECT_TRUE(gVersionKeyValid);
+    };
+    checkVersion(inplaceAdd);
+    checkVersion(finalizeRouting);
+    checkVersion(swiglu);
+    gGeCompilerVersion = kGraphFusionSupportVersion;
+}
 
 TEST(GroupedMatmulTransposeFusionPassVersionTest, SkipUnsupportedRuntime)
 {

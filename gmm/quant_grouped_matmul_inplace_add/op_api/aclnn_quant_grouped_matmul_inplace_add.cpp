@@ -7,7 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
-#include "../../common/op_api/gmm_tensor_storage_check.h"
+#include "gmm/common/op_api/gmm_tensor_storage_check.h"
 #include "aclnn_quant_grouped_matmul_inplace_add.h"
 
 #include <dlfcn.h>
@@ -31,8 +31,8 @@
 #include "opdev/make_op_executor.h"
 #include "log/log.h"
 
-#include "../../grouped_matmul/op_api/grouped_matmul_util.h"
-#include "../../grouped_matmul/op_api/grouped_matmul_950_checker.h"
+#include "gmm/grouped_matmul/op_api/grouped_matmul_util.h"
+#include "gmm/grouped_matmul/op_api/grouped_matmul_950_checker.h"
 #include "quant_grouped_matmul_inplace_add_util.h"
 #include "quant_grouped_matmul_inplace_add.h"
 #include "quant_grouped_matmul_inplace_add_950_checker.h"

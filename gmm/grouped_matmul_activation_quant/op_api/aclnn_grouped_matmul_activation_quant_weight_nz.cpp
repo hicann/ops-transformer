@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "../../common/op_api/gmm_tensor_storage_check.h"
+#include "gmm/common/op_api/gmm_tensor_storage_check.h"
 #include "aclnn_grouped_matmul_activation_quant_weight_nz.h"
 
 #include <cmath>

@@ -7,7 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
-#include "../../common/op_api/gmm_tensor_storage_check.h"
+#include "gmm/common/op_api/gmm_tensor_storage_check.h"
 #include "aclnn_grouped_matmul.h"
 #include "aclnn_grouped_matmul_v2.h"
 #include "aclnn_grouped_matmul_v3.h"

@@ -16,8 +16,8 @@
 
 #include "gtest/gtest.h"
 
-#include "../../../../common/op_api/gmm_tensor_storage_check.h"
-#include "../../../op_api/aclnn_grouped_matmul_v5.h"
+#include "gmm/common/op_api/gmm_tensor_storage_check.h"
+#include "gmm/grouped_matmul/op_api/aclnn_grouped_matmul_v5.h"
 #include "gmm_csv_acl_parse_utils.h"
 #include "op_api_ut_common/tensor_desc.h"
 #include "opdev/platform.h"

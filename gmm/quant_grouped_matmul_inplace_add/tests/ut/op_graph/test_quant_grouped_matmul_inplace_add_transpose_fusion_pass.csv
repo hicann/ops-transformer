@@ -1,0 +1,5 @@
+case_name,mx_mode,transpose_scale,reshape_x,valid_reshape,expected_status,expected_transpose_count,expected_reshape_count
+FuseNormalX1Transpose,0,0,0,0,SUCCESS,0,0
+FuseMxX1AndScale1Atomically,1,1,0,0,SUCCESS,0,0
+KeepMxGraphWhenScale1TransposeIsMissing,1,0,0,0,GRAPH_NOT_CHANGED,1,0
+RejectNonEquivalentReshape,0,0,1,0,GRAPH_NOT_CHANGED,0,1
