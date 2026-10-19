@@ -24,6 +24,7 @@ add_ops_compile_options(
             -Wno-deprecated-declarations
             -mllvm -cce-vf-remove-membar=false
             -Werror
+            -DFORCE_TILING_CONST_PROPAGATION
 )
 
 add_modules_sources_with_soc(
