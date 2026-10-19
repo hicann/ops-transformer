@@ -184,7 +184,9 @@ cann_ops_transformer.compressor(
 <!-- npu="950" id8 -->
 - <term>Ascend 950PR&950DT系列产品</term>：batch一致性：通过torch_npu.npu.set_deterministic_level()设置确定性级别为3开启batch一致性，开启后可以满足计算结果和所在批次大小和所在批次位置无关。
 <!-- end id8 -->
-
+<!-- npu="A3,910b" id9 -->
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：batch一致性：通过torch_npu.npu.set_deterministic_level()设置确定性级别为3开启batch一致性，开启后可以满足计算结果和所在批次大小和所在批次位置无关。
+<!-- end id9 -->
 ## 调用示例
 
 > **说明：**<br>

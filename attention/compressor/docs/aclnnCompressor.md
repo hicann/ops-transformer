@@ -446,6 +446,9 @@ aclnnStatus aclnnCompressor(
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT系列产品</term>：batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
   <!-- end id8 -->
+<!-- npu="A3,910b" id9 -->
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
+<!-- end id9 -->
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 - 输入shape限制：
   - stateCacheRef支持输入shape为[block_num, block_size, 2\*coff\*D]，要求block_num>0；cacheMode=2时，需满足block_size >= coff * cmp_ratio + S - 1。
