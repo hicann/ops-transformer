@@ -37,6 +37,8 @@ public:
 
     ge::graphStatus CheckMultiPara(const FaTilingInfo& faInfo) override;
 
+    ge::graphStatus CheckEmptyTensorPara(const FaTilingInfo& faInfo);
+
     void SetFaShapeCompare(const FaTilingInfo& faInfo);
     ge::graphStatus CheckQueryShape(const FaTilingInfo& faInfo) const;
     ge::graphStatus CheckKVShape(const FaTilingInfo& faInfo) const;

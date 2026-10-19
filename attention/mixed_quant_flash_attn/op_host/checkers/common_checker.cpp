@@ -178,6 +178,15 @@ ge::graphStatus CommonChecker::CheckDtypeConsistency(const FaTilingInfo& faInfo)
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus CommonChecker::CheckEmptyTensorPara(const FaTilingInfo& faInfo)
+{
+    if (CheckSinglePara(faInfo) != ge::GRAPH_SUCCESS || CheckMixedQuantDataType(faInfo) != ge::GRAPH_SUCCESS ||
+        CheckDtypeConsistency(faInfo) != ge::GRAPH_SUCCESS || CheckMultiParaLayout(faInfo) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 // ============================================================================
 // HeadNum
 // ============================================================================
@@ -421,7 +430,7 @@ ge::graphStatus CommonChecker::CheckShapeConsistency(const FaTilingInfo& faInfo)
 }
 
 // ============================================================================
-// MultiPara ¡ª combined
+// MultiPara â€” combined
 // ============================================================================
 
 ge::graphStatus CommonChecker::CheckMultiPara(const FaTilingInfo& faInfo)

@@ -10,7 +10,7 @@
 
 /*!
  * \file softmax_lse_checker.cpp
- * \brief Checker for softmax_lse parameter (Œƒµµ‘º ¯: SoftmaxLSE≤Œ ˝◊È)
+ * \brief Checker for softmax_lse parameter (ÊñáÊ°£Á∫¶Êùü: SoftmaxLSEÂèÇÊï∞ÁªÑ)
  */
 
 #include <map>
@@ -82,7 +82,7 @@ ge::graphStatus SoftmaxLSEChecker::CheckMultiPara(const FaTilingInfo& faInfo)
     uint32_t dimNum = lseShape.GetDimNum();
 
     if (faInfo.qLayout == FaLayout::TND) {
-        // (Q_T, Q_N) °™ 2D
+        // (Q_T, Q_N) ‚Äî 2D
         OP_CHECK_IF(dimNum != 2,
                     OP_LOGE_FOR_INVALID_SHAPEDIM(faInfo.opName, "softmax_lse", (std::to_string(dimNum) + "D").c_str(),
                                                  "2D (Q_T, Q_N) for TND layout"),
@@ -98,7 +98,7 @@ ge::graphStatus SoftmaxLSEChecker::CheckMultiPara(const FaTilingInfo& faInfo)
                                                   ("dim[1] must be Q_N=" + std::to_string(faInfo.n1Size)).c_str()),
             return ge::GRAPH_FAILED);
     } else {
-        // (B, Q_N, Q_S) °™ 3D for BNSD/BSND
+        // (B, Q_N, Q_S) ‚Äî 3D for BNSD/BSND
         OP_CHECK_IF(dimNum != 3,
                     OP_LOGE_FOR_INVALID_SHAPEDIM(faInfo.opName, "softmax_lse", (std::to_string(dimNum) + "D").c_str(),
                                                  "3D (B, Q_N, Q_S) for non-TND layout"),

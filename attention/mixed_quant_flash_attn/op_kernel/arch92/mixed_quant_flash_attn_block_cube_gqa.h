@@ -43,6 +43,7 @@ template <typename MQFA_T>
 class CubeBlockBase {
 public:
     using Q_T = typename MQFA_T::qType;
+    using SOFTMAX_OUT_T = half;
     using KV_T = typename MQFA_T::kvType;
     using KV_SCALE_T = typename MQFA_T::kvScaleType;
     using MM_T = float;
@@ -67,7 +68,7 @@ public:
     static constexpr uint32_t L0C_BUF_NUM = 2;
 
     static constexpr uint32_t L1_Q_SLOT_BYTES = mBaseSize * dBaseSize * sizeof(Q_T);
-    static constexpr uint32_t L1_P_SLOT_BYTES = mBaseSize * s2BaseSize * sizeof(Q_T);
+    static constexpr uint32_t L1_P_SLOT_BYTES = mBaseSize * s2BaseSize * sizeof(SOFTMAX_OUT_T);
     static constexpr uint32_t L1_KV_SLOT_BYTES =
         (std::is_same_v<KV_T, fp4x2_e2m1_t> || std::is_same_v<KV_T, hifloat4x2_t>) ?
             dBaseSize * s2BaseSize * sizeof(KV_T) / 2 :
@@ -113,6 +114,7 @@ template <typename MQFA_T>
 class FAAntiQuantGqaBlockCube {
 public:
     using Q_T = typename MQFA_T::qType;
+    using SOFTMAX_OUT_T = half;
     using KV_T = typename MQFA_T::kvType;
     using KV_SCALE_T = typename MQFA_T::kvScaleType;
     using MM_T = float;
@@ -129,7 +131,7 @@ public:
     using MM1_RES_BUF_T = LocalTensor<MM_T>;
     using MM2_RES_BUF_T = LocalTensor<MM_T>;
     using MM1_ABUF_T = LocalTensor<Q_T>;
-    using MM2_ABUF_T = LocalTensor<Q_T>;
+    using MM2_ABUF_T = LocalTensor<SOFTMAX_OUT_T>;
 
     using L0AType =
         BuffersPolicyDB<BufferType::L0A, SyncType::INNER_CORE_SYNC, SyncMode::LOCK_UNLOCK, IdSource::EXTERNAL>;
@@ -179,7 +181,7 @@ public:
     static constexpr uint32_t L0AB_BUF_SIZE = 32 * 1024;
     static constexpr uint32_t L0C_SLOT_BYTES = 128 * 1024;
     static constexpr uint32_t L1_Q_SLOT_BYTES = mBaseSize * dBaseSize * sizeof(Q_T);
-    static constexpr uint32_t L1_P_SLOT_BYTES = mBaseSize * s2BaseSize * sizeof(Q_T);
+    static constexpr uint32_t L1_P_SLOT_BYTES = mBaseSize * s2BaseSize * sizeof(SOFTMAX_OUT_T);
     static constexpr uint32_t L1_KV_SLOT_BYTES =
         (std::is_same_v<KV_T, fp4x2_e2m1_t> || std::is_same_v<KV_T, hifloat4x2_t>) ?
             dBaseSize * s2BaseSize * sizeof(KV_T) / 2 :
@@ -187,7 +189,9 @@ public:
     static constexpr uint32_t L1_KVSCALE_SLOT_BYTES = 512 * dBaseSize * sizeof(KV_SCALE_T) / GROUP_SIZE;
 
     /* ==================== GM变量 ==================== */
-    FaGmTensor<Q_T, Q_FORMAT, int32_t> queryGm;
+    static constexpr bool IS_Q_TND = (GmLayoutParams<Q_FORMAT>::CATEGORY == FormatCategory::GM_Q_OUT_TND);
+    using QGmTensorT = FaGmTensor<Q_T, Q_FORMAT, int32_t, IS_Q_TND>;
+    QGmTensorT queryGm;
     FaGmTensor<KV_T, KV_FORMAT, int32_t> keyGm;
     FaGmTensor<KV_T, KV_FORMAT, int32_t> valueGm;
     FaGmTensor<KV_SCALE_T, K_SCALE_FORMAT, int32_t> kScaleGm;
@@ -312,9 +316,12 @@ public:
         if constexpr (PAGE_ATTENTION) {
             blockTableGm.SetGlobalBuffer((__gm__ int32_t*)blockTable);
         }
+        if constexpr (IS_Q_TND) {
+            cuSeqLensGmQ.SetGlobalBuffer((__gm__ int32_t*)cuSeqLensQ, constInfo.cuSeqLensQSize + 1);
+        }
 
         InitQGmTensor(constInfo.bSize, constInfo.n2Size, constInfo.gSize, constInfo.s1Size, constInfo.dSize, seqUsedGmQ,
-                      constInfo.seqUsedQSize, queryGm, query);
+                      constInfo.seqUsedQSize, cuSeqLensGmQ, queryGm, query);
         InitKVGmTensor(constInfo.bSize, constInfo.s2Size, seqUsedGmKv, constInfo.seqUsedKvSize, constInfo.n2Size,
                        constInfo.blockSize, constInfo.dSize, keyGm, key);
         InitKVGmTensor(constInfo.bSize, constInfo.s2Size, seqUsedGmKv, constInfo.seqUsedKvSize, constInfo.n2Size,
@@ -333,11 +340,13 @@ public:
 
     __aicore__ inline void InitQGmTensor(uint32_t batchSize, uint32_t n2Size, uint32_t gSize, uint32_t qSeqSize,
                                          uint32_t headDim, GlobalTensor<int32_t> seqUsedGmQ, uint32_t actualLenQDims,
-                                         FaGmTensor<Q_T, Q_FORMAT, int32_t>& qGmTensor, __gm__ uint8_t* gm)
+                                         GlobalTensor<int32_t> cuSeqLensGmQ, QGmTensorT& qGmTensor, __gm__ uint8_t* gm)
     {
         qGmTensor.gmTensor.SetGlobalBuffer((__gm__ Q_T*)gm);
         if constexpr (GmLayoutParams<Q_FORMAT>::CATEGORY == FormatCategory::GM_Q_OUT_BNGSD) {
             qGmTensor.offsetCalculator.Init(batchSize, n2Size, gSize, qSeqSize, headDim, seqUsedGmQ, actualLenQDims);
+        } else if constexpr (GmLayoutParams<Q_FORMAT>::CATEGORY == FormatCategory::GM_Q_OUT_TND) {
+            qGmTensor.offsetCalculator.Init(n2Size, gSize, headDim, cuSeqLensGmQ, batchSize + 1);
         }
     }
 
@@ -380,7 +389,10 @@ public:
                 // for mxfp4
                 uint32_t bs0d0 = 32U;
                 uint32_t bs1 = kvScaleBlockSize / 16U;
-                kScaleGmTensor.offsetCalculator.Init(n2Size, bs1, headDim / 2, bs0d0, blockTableGm,
+                // headDim is D / GROUP_SIZE (D / 32 for MXFP4); PA_NZ K-scale
+                // stores one D1 entry per 64 logical dimensions.
+                uint32_t d1 = headDim / 2U;
+                kScaleGmTensor.offsetCalculator.Init(n2Size, bs1, d1, bs0d0, blockTableGm,
                                                      constInfo.maxBlockNumPerBatch);
             }
         } else if constexpr (GmLayoutParams<K_SCALE_FORMAT>::CATEGORY == FormatCategory::GM_KV_PA_BNBD) {
@@ -755,7 +767,7 @@ public:
                                           uint32_t outBufId, RunInfoX& runInfo)
     {
         // P V1已加载
-        LocalTensor<Q_T> mm2ATensor = inputBuf;
+        LocalTensor<SOFTMAX_OUT_T> mm2ATensor = inputBuf;
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(CC_L1P_0 + inBufId);
         // 搬运value
         LocalTensor<KV_T> mm2BTensor = l1KVBuffers[kvBufId].template ReinterpretCast<KV_T>();
@@ -778,10 +790,10 @@ public:
             LocalTensor<MM_T> mm2ResL0C = l0CBuffers[l0CBufOffset].template ReinterpretCast<MM_T>();
             Mutex::Lock<PIPE_M>(L0C_EVENT_0 + l0CBufId);
             if constexpr (dBaseSize <= 128 && mBaseSize <= 32) {
-                MatmulFull<Q_T, KV_T, MM_T, mBaseSize, dBaseSize, s2BaseSize, ABLayout::MK, ABLayout::KN>(
+                MatmulFull<SOFTMAX_OUT_T, KV_T, MM_T, mBaseSize, dBaseSize, s2BaseSize, ABLayout::MK, ABLayout::KN>(
                     mm2ATensor, mm2BTensor, l0ABuffers, l0BBuffers, mm2ResL0C, param, mm2BScaleTensor);
             } else {
-                MatmulK<Q_T, KV_T, MM_T, mBaseSize, dBaseSize, 256, ABLayout::MK, ABLayout::KN>(
+                MatmulK<SOFTMAX_OUT_T, KV_T, MM_T, mBaseSize, dBaseSize, 256, ABLayout::MK, ABLayout::KN>(
                     mm2ATensor, mm2BTensor, l0ABuffers, l0BBuffers, mm2ResL0C, param, mm2BScaleTensor);
             }
             CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(CC_L1P_0 + inBufId);
@@ -804,7 +816,7 @@ public:
                                          uint32_t outBufId, RunInfoX& runInfo)
     {
         // P V1已加载
-        LocalTensor<Q_T> mm2ATensor = inputBuf;
+        LocalTensor<SOFTMAX_OUT_T> mm2ATensor = inputBuf;
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(CC_L1P_0 + inBufId);
         // 搬运value
         LocalTensor<KV_T> mm2BTensor = l1KVBuffers[kvBufId].template ReinterpretCast<KV_T>();
@@ -829,7 +841,7 @@ public:
         uint32_t l0CBufOffset = l0CBufId * L0C_SLOT_BYTES;
         LocalTensor<MM_T> mm2ResL0C = l0CBuffers[l0CBufOffset].template ReinterpretCast<MM_T>();
         if constexpr (dBaseSize <= 128) {
-            MatmulK<Q_T, KV_T, MM_T, mBaseSize, dBaseSize, 256, ABLayout::MK, ABLayout::KN>(
+            MatmulK<SOFTMAX_OUT_T, KV_T, MM_T, mBaseSize, dBaseSize, 256, ABLayout::MK, ABLayout::KN>(
                 mm2ATensor, mm2BTensor, l0ABuffers, l0BBuffers, mm2ResL0C, param);
         }
 

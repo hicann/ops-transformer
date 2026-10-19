@@ -33,8 +33,8 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35FA;
 
-// RegisterCheckers - ×¢²áËùÓĞ checker
-// ĞÂÔö checker Ê±ÔÚ´Ë·½·¨ÖĞÌí¼Ó: checkers_.push_back(std::make_unique<XxxChecker>());
+// RegisterCheckers - æ³¨å†Œæ‰€æœ‰ checker
+// æ–°å¢ checker æ—¶åœ¨æ­¤æ–¹æ³•ä¸­æ·»åŠ : checkers_.push_back(std::make_unique<XxxChecker>());
 void FAChecker::RegisterCheckers()
 {
     checkers_.push_back(std::make_unique<CommonChecker>());

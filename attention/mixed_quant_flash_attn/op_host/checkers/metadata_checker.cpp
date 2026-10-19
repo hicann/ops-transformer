@@ -10,7 +10,7 @@
 
 /*!
  * \file metadata_checker.cpp
- * \brief Checker for metadata parameter (ÎÄµµ: INT32, shape=(max_schedule_size,))
+ * \brief Checker for metadata parameter (æ–‡æ¡£: INT32, shape=(max_schedule_size,))
  */
 
 #include <map>

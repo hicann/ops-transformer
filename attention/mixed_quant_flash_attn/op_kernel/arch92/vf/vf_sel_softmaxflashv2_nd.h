@@ -44,8 +44,8 @@ enum OriginNRange {
 
 template <typename T, typename T2, typename pseShiftType, uint32_t s1BaseSize = 128, uint32_t s2BaseSize = 128,
           OriginNRange oriNRange = GT_64_AND_LTE_128, bool hasAtten = 0,
-          PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0, bool isMlaSgd = false,
-          bool isMlaFullQuant = false, bool useNz = false, bool hasSink = false>
+          mqfaregbaseutil::PseTypeEnum pseMode = mqfaregbaseutil::PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0,
+          bool isMlaSgd = false, bool isMlaFullQuant = false, bool useNz = false, bool hasSink = false>
 __aicore__ inline void ProcessVec1NoUpdate(
     const LocalTensor<T2>& dstTensor, TBuf<>* vselrIndexesBuf, const LocalTensor<T>& expSumTensor,
     const LocalTensor<T>& maxTensor, const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor,
@@ -111,8 +111,8 @@ __aicore__ inline void ProcessVec1NoUpdate(
 
 template <typename T, typename T2, typename pseShiftType, uint32_t s1BaseSize = 128, uint32_t s2BaseSize = 128,
           OriginNRange oriNRange = GT_64_AND_LTE_128, bool hasAtten = 0,
-          PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0, bool isMlaSgd = false,
-          bool isMlaFullQuant = false, bool useNz = false, bool hasSink = false>
+          mqfaregbaseutil::PseTypeEnum pseMode = mqfaregbaseutil::PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0,
+          bool isMlaSgd = false, bool isMlaFullQuant = false, bool useNz = false, bool hasSink = false>
 __aicore__ inline void ProcessVec1Update(
     const LocalTensor<T2>& dstTensor, TBuf<>* vselrIndexesBuf, const LocalTensor<T>& expSumTensor,
     const LocalTensor<T>& maxTensor, const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor,
@@ -178,8 +178,8 @@ __aicore__ inline void ProcessVec1Update(
 
 template <typename T, typename T2, typename pseShiftType, bool isUpdate = false, uint32_t s1BaseSize = 128,
           uint32_t s2BaseSize = 128, OriginNRange oriNRange = GT_64_AND_LTE_128, bool hasAtten = 0,
-          PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0, bool isMlaSgd = false,
-          bool isMlaFullQuant = false, bool useNz = false, bool hasSink = false>
+          mqfaregbaseutil::PseTypeEnum pseMode = mqfaregbaseutil::PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0,
+          bool isMlaSgd = false, bool isMlaFullQuant = false, bool useNz = false, bool hasSink = false>
 __aicore__ inline void ProcessVec1Vf(
     const LocalTensor<T2>& dstTensor, TBuf<>* vselrIndexesBuf, const LocalTensor<T>& expSumTensor,
     const LocalTensor<T>& maxTensor, const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor,

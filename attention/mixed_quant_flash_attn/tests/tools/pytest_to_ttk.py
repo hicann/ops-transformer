@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------------------------------------
 # Copyright (c) 2026 Huawei Technologies Co., Ltd.
 # This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
@@ -5,8 +8,7 @@
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------------------------------------
 """
 pytest_to_ttk.py — 将 pytest TestCases 字典文件转换为 ttk CSV 用例文件
 
@@ -48,7 +50,7 @@ tensor 顺序（12 个，与算子签名一致）
   6  cu_seqlens_q  — None（非 TND）或 (B+1,)，int32
   7  seqused_q     — (B,) 或 None，int32
   8  seqused_kv    — (B,) 或 None，int32
-  9  sinks         — None 或 (8,)，int32（暂不支持，固定 None）
+  9  sinks         — None、空 tensor 或 (N1,)，float32
   10 attn_mask     — (2048, 2048) 或 None，int8
   11 metadata      — (16384,)，int32（固定）
 """
@@ -154,8 +156,10 @@ def gen_pa_shape(
     raise ValueError(f"不支持的 layout_kv: {layout_kv}")
 
 
-def calc_block_info(seqused_kv, s2, block_size):
+def calc_block_info(seqused_kv, s2, block_size, batch_size=1):
     """num_blocks = sum(ceil(seqused_kv[i]/block_size)), max_blocks_per_batch = ceil(max/blocks_size)。"""
+    if batch_size == 0 or block_size == 0:
+        return 0, 0
     if seqused_kv:
         num_blocks = sum(math.ceil(x / block_size) for x in seqused_kv)
         max_blocks_per_batch = math.ceil(max(seqused_kv) / block_size)
@@ -219,7 +223,7 @@ def parse_pytest_case(name, case):
         case, "quant_mode", 1
     )
     mask_mode = _val(case, "mask_mode", 0)
-    softmax_scale = _val(case, "softmax_scale", 1.0 / (D**0.5))
+    softmax_scale = _val(case, "softmax_scale", 1.0 / (D**0.5) if D != 0 else 1.0)
 
     seqused_q = _val(case, "seqused_q", None)
     seqused_kv = _val(case, "seqused_kv", None)
@@ -234,6 +238,12 @@ def parse_pytest_case(name, case):
 
     q_range = _val(case, "q_range", (-10.0, 10.0))
     kv_range = _val(case, "kv_range", (-10.0, 10.0))
+    sinks = _val(case, "sinks", None)
+    sinks_range = _val(case, "sinks_range", None)
+    if sinks_range is None:
+        sinks_range = _val(case, "sinks_datarange", None)
+    if sinks_range is None:
+        sinks_range = (-1.0, 1.0)
 
     # seqused_q/seqused_kv 可能是 [list]，_val 已取 [0]
     if isinstance(seqused_q, list) and seqused_q and isinstance(seqused_q[0], list):
@@ -273,6 +283,8 @@ def parse_pytest_case(name, case):
         "return_softmax_lse": return_softmax_lse,
         "q_range": q_range,
         "kv_range": kv_range,
+        "sinks": sinks,
+        "sinks_range": sinks_range,
     }
 
 
@@ -302,7 +314,7 @@ def build_csv_row(c, prefix):
     elif seqused_kv:
         B = len(seqused_kv)
 
-    num_blocks, max_blocks_per_batch = calc_block_info(seqused_kv, S2, bs)
+    num_blocks, max_blocks_per_batch = calc_block_info(seqused_kv, S2, bs, B)
 
     max_seqlen_q = resolve_max_seqlen(c["max_seqlen_q"], seqused_q, S1)
     max_seqlen_kv = resolve_max_seqlen(c["max_seqlen_kv"], seqused_kv, S2)
@@ -313,7 +325,13 @@ def build_csv_row(c, prefix):
     elif layout_q == "BSND":
         q_shape = (B, S1, N1, D)
     elif layout_q == "TND":
-        q_shape = (S1, N1, D)
+        if c["cu_seqlens_q"]:
+            total_q = c["cu_seqlens_q"][-1]
+        elif seqused_q:
+            total_q = sum(seqused_q)
+        else:
+            total_q = S1
+        q_shape = (total_q, N1, D)
     else:
         q_shape = (B, S1, N1, D)
 
@@ -357,7 +375,14 @@ def build_csv_row(c, prefix):
         seqused_q_shape = (len(seqused_q),) if seqused_q is not None else None
         seqused_kv_shape = (len(seqused_kv),) if seqused_kv is not None else None
 
-    sinks_shape = None  # 暂不支持
+    if c["sinks"] is True:
+        sinks_shape = (N1,)
+    elif isinstance(c["sinks"], str) and c["sinks"].lower() == "empty":
+        sinks_shape = (0,)
+    elif isinstance(c["sinks"], (list, tuple)):
+        sinks_shape = (len(c["sinks"]),)
+    else:
+        sinks_shape = None
 
     attn_mask_shape = DEFAULT_ATTN_MASK_SHAPE if c["mask_mode"] in (3, 4) else None
     metadata_shape = DEFAULT_METADATA_SHAPE
@@ -389,7 +414,7 @@ def build_csv_row(c, prefix):
         "int32",
         "int32",
         "int32",
-        "int32",
+        "float32",
         "int8",
         "int32",
     ]
@@ -425,7 +450,7 @@ def build_csv_row(c, prefix):
     cu_seqlens_q_range = (0, S1) if cu_seqlens_q_shape is not None else (-1, -1)
     seqused_q_range = (0, S1) if seqused_q_shape is not None else (-1, -1)
     seqused_kv_range = (0, S2) if seqused_kv_shape is not None else (-1, -1)
-    sinks_range = (0, 0)
+    sinks_range = c["sinks_range"] if sinks_shape is not None else (0, 0)
     attn_mask_range = (0, 1) if attn_mask_shape is not None else (0, 0)
     metadata_range = (0, 0)
 

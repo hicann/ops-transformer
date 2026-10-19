@@ -10,7 +10,7 @@
 
 /*!
  * \file mixed_quant_flash_attn_infershape.cpp
- * \brief MixedQuantFlashAttnËã×ÓInferShapeÊµÏÖ
+ * \brief MixedQuantFlashAttnç®—å­InferShapeå®ç°
  */
 
 #include <graph/utils/type_utils.h>

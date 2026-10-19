@@ -112,33 +112,33 @@ public:
     int32_t blockSize_ = 0;
     int32_t blockNum_ = 0;
 
-    // NPU–≈œ¢
+    // NPU‰ø°ÊÅØ
     NpuArch npuArch_ = NpuArch::DAV_3510;
 
-    // Dtype–≈œ¢
+    // Dtype‰ø°ÊÅØ
     ge::DataType inputQType_ = ge::DT_FLOAT16;
     ge::DataType inputKvType_ = ge::DT_FLOAT16;
     ge::DataType kDescaleType_ = ge::DT_FLOAT;
     ge::DataType vDescaleType_ = ge::DT_FLOAT;
     ge::DataType outputType_ = ge::DT_FLOAT16;
 
-    // Quant–≈œ¢
+    // Quant‰ø°ÊÅØ
     int64_t quantMode_ = 1;
     FaQuantMode faQuantMode_ = FaQuantMode::A16C4_KV_MXFP4_SOFTMAX_FP32;
 
-    // mask –≈œ¢
+    // mask ‰ø°ÊÅØ
     int64_t winLeft_ = 0;
     int64_t winRight_ = 0;
     int64_t maskMode_ = 0;
 
-    // Sinks –≈œ¢
+    // Sinks ‰ø°ÊÅØ
     bool sinksFlag_ = false;
 
-    // SoftmaxLSE –≈œ¢
+    // SoftmaxLSE ‰ø°ÊÅØ
     bool softmaxLseFlag_ = false;
     bool returnSoftmaxLse_ = false;
 
-    // ∆‰À˚ Ù–‘–≈œ¢
+    // ÂÖ∂‰ªñÂ±ûÊÄß‰ø°ÊÅØ
     float softmaxScale_ = 1.0;
 
     int64_t seqLenQDims_ = 0;
@@ -154,7 +154,7 @@ public:
     // Empty Tensor
     bool emptyTensorFlag_ = false;
 
-    // shape–≈œ¢
+    // shape‰ø°ÊÅØ
     std::shared_ptr<FaTilingShape> queryShape_ = nullptr;
     std::shared_ptr<FaTilingShape> keyShape_ = nullptr;
     std::shared_ptr<FaTilingShape> valueShape_ = nullptr;

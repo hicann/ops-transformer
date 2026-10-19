@@ -23,7 +23,7 @@ class MaskMode(IntEnum):
     SLIDING_WINDOW = 4
 
 
-class QuantComputeMode(IntEnum):
+class QuantMode(IntEnum):
     A16C4_KV_MXFP4_SOFTMAX_FP32 = 1
     A16C4_KV_HIF4_SOFTMAX_FP32 = 2
 
@@ -75,7 +75,7 @@ class MixedQuantFlashAttenOpBuilder(OpBuilder):
     def schema(self) -> list[str]:
         """PyTorch operator signature."""
         return [
-            "mixed_quant_flash_attn_metadata(int num_heads_q, int num_heads_kv, int head_dim, int quant_compute_mode, *, "
+            "mixed_quant_flash_attn_metadata(int num_heads_q, int num_heads_kv, int head_dim, int quant_mode, *, "
             "Tensor? cu_seqlens_q=None, Tensor? seqused_q=None, Tensor? seqused_kv=None,"
             "int? batch_size=None, int? max_seqlen_q=-1, int? max_seqlen_kv=-1, "
             "int? mask_mode=0, int? win_left=-1, int? win_right=-1, "
@@ -84,7 +84,7 @@ class MixedQuantFlashAttenOpBuilder(OpBuilder):
             "Tensor? block_table=None, Tensor? cu_seqlens_q=None,"
             "Tensor? seqused_q=None, Tensor? seqused_kv=None, Tensor? sinks=None, Tensor? attn_mask=None,"
             "Tensor? metadata=None,"
-            "int quant_compute_mode=1, float softmax_scale=1.0, int mask_mode=0, int win_left=-1, int win_right=-1,"
+            "int quant_mode=1, float softmax_scale=1.0, int mask_mode=0, int win_left=-1, int win_right=-1,"
             "int max_seqlen_q=-1, int max_seqlen_kv=-1,"
             'str layout_q="BSND", str layout_kv="PA_BBND", str layout_attn_out="BSND",'
             "bool return_softmax_lse=False) -> (Tensor, Tensor)",
@@ -101,7 +101,7 @@ class MixedQuantFlashAttenOpBuilder(OpBuilder):
             num_heads_q: int,
             num_heads_kv: int,
             head_dim: int,
-            quant_compute_mode: QuantComputeMode,
+            quant_mode: QuantMode,
             cu_seqlens_q: Optional[torch.Tensor] = None,
             seqused_q: Optional[torch.Tensor] = None,
             seqused_kv: Optional[torch.Tensor] = None,
@@ -137,9 +137,7 @@ class MixedQuantFlashAttenOpBuilder(OpBuilder):
             sinks: Optional[torch.Tensor] = None,
             attn_mask: Optional[torch.Tensor] = None,
             metadata: Optional[torch.Tensor] = None,
-            quant_compute_mode: Optional[
-                QuantComputeMode
-            ] = QuantComputeMode.A16C4_KV_MXFP4_SOFTMAX_FP32,
+            quant_mode: Optional[QuantMode] = QuantMode.A16C4_KV_MXFP4_SOFTMAX_FP32,
             softmax_scale: Optional[float] = 1.0,
             mask_mode: Optional[MaskMode] = MaskMode.NO_MASK,
             win_left: Optional[int] = -1,
@@ -155,7 +153,7 @@ class MixedQuantFlashAttenOpBuilder(OpBuilder):
                 t_size = q.size(0)
                 n_size = q.size(1)
                 d_size = v.size(2)
-                softmax_out_size = (n_size, t_size)
+                softmax_out_size = (t_size, n_size)
             elif layout_q == "BSND":
                 b_size = q.size(0)
                 s_size = q.size(1)
@@ -204,7 +202,7 @@ def mixed_quant_flash_attn_metadata(
     num_heads_q: int,
     num_heads_kv: int,
     head_dim: int,
-    quant_compute_mode: QuantComputeMode,
+    quant_mode: QuantMode,
     cu_seqlens_q: Optional[torch.Tensor] = None,
     seqused_q: Optional[torch.Tensor] = None,
     seqused_kv: Optional[torch.Tensor] = None,
@@ -228,11 +226,7 @@ def mixed_quant_flash_attn_metadata(
         if batch_size is None
         else batch_size
     )
-    quant_compute_mode = (
-        quant_compute_mode.value
-        if isinstance(quant_compute_mode, IntEnum)
-        else quant_compute_mode
-    )
+    quant_mode = quant_mode.value if isinstance(quant_mode, IntEnum) else quant_mode
     mask_mode = mask_mode.value if isinstance(mask_mode, IntEnum) else mask_mode
 
     metadata_size = _calculate_metadata_size(batch_size, num_heads_kv)
@@ -245,7 +239,7 @@ def mixed_quant_flash_attn_metadata(
         num_heads_q,
         num_heads_kv,
         head_dim,
-        quant_compute_mode,
+        quant_mode,
         batch_size,
         max_seqlen_q,
         max_seqlen_kv,
@@ -267,7 +261,7 @@ def mixed_quant_flash_attn_metadata_fallback(
     num_heads_q: int,
     num_heads_kv: int,
     head_dim: int,
-    quant_compute_mode: QuantComputeMode,
+    quant_mode: QuantMode,
     cu_seqlens_q: Optional[torch.Tensor] = None,
     seqused_q: Optional[torch.Tensor] = None,
     seqused_kv: Optional[torch.Tensor] = None,
@@ -285,7 +279,7 @@ def mixed_quant_flash_attn_metadata_fallback(
         num_heads_q=num_heads_q,
         num_heads_kv=num_heads_kv,
         head_dim=head_dim,
-        quant_compute_mode=quant_compute_mode,
+        quant_mode=quant_mode,
         cu_seqlens_q=cu_seqlens_q,
         seqused_q=seqused_q,
         seqused_kv=seqused_kv,
@@ -315,9 +309,7 @@ def mixed_quant_flash_attn(
     sinks: Optional[torch.Tensor] = None,
     attn_mask: Optional[torch.Tensor] = None,
     metadata: Optional[torch.Tensor] = None,
-    quant_compute_mode: Optional[
-        QuantComputeMode
-    ] = QuantComputeMode.A16C4_KV_MXFP4_SOFTMAX_FP32,
+    quant_mode: Optional[QuantMode] = QuantMode.A16C4_KV_MXFP4_SOFTMAX_FP32,
     softmax_scale: Optional[float] = 1.0,
     mask_mode: Optional[MaskMode] = MaskMode.NO_MASK,
     win_left: Optional[int] = -1,
@@ -334,11 +326,7 @@ def mixed_quant_flash_attn(
     'PrivateUse1' is the combine key for custom NPU backends.
     """
     op_module = mixed_quant_flash_attn_op_builder.load()
-    quant_compute_mode = (
-        quant_compute_mode.value
-        if isinstance(quant_compute_mode, IntEnum)
-        else quant_compute_mode
-    )
+    quant_mode = quant_mode.value if isinstance(quant_mode, IntEnum) else quant_mode
     mask_mode = mask_mode.value if isinstance(mask_mode, IntEnum) else mask_mode
 
     return op_module.mixed_quant_flash_attn(
@@ -354,7 +342,7 @@ def mixed_quant_flash_attn(
         sinks,
         attn_mask,
         metadata,
-        quant_compute_mode,
+        quant_mode,
         softmax_scale,
         mask_mode,
         win_left,
@@ -370,10 +358,10 @@ def mixed_quant_flash_attn(
 
 mixed_quant_flash_attn = torch.ops.cann_ops_transformer.mixed_quant_flash_attn
 mixed_quant_flash_attn.MaskMode = MaskMode
-mixed_quant_flash_attn.QuantComputeMode = QuantComputeMode
+mixed_quant_flash_attn.QuantMode = QuantMode
 
 mixed_quant_flash_attn_metadata = (
     torch.ops.cann_ops_transformer.mixed_quant_flash_attn_metadata
 )
 mixed_quant_flash_attn_metadata.MaskMode = MaskMode
-mixed_quant_flash_attn_metadata.QuantComputeMode = QuantComputeMode
+mixed_quant_flash_attn_metadata.QuantMode = QuantMode

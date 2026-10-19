@@ -24,6 +24,19 @@
 import sys
 import numpy as np
 
+try:
+    from ttk.utilities.container_utils import get_global_storage
+except Exception:
+    get_global_storage = None
+
+try:
+    from ttk.core_modules.comparison.cross_check import CrossCheckComparison
+    from ttk.core_modules.comparison.resolve import resolve_tolerance
+
+    _TTK_CROSS_CHECK_AVAILABLE = True
+except Exception:
+    _TTK_CROSS_CHECK_AVAILABLE = False
+
 DIFF_THD = 0.005
 MAX_DIFF_HD = 10.0
 _SEP = "─" * 64
@@ -162,27 +175,30 @@ def _check(
     # ===== 失败点位明细 =====
     if fail_cnt > 0:
         print(f"├{_SEP}┤", flush=True)
-        show_cnt = len(err_idx) if verbose_diff else min(max_err_show, len(err_idx))
         if verbose_diff:
             print(
                 f"│  全部 {len(err_idx)} 个超阈値元素 (rtol={rtol * 100:.2f}%):",
                 flush=True,
             )
+            positions = list(range(len(err_idx)))
         else:
-            print(f"│  前{show_cnt}个不通过元素:", flush=True)
+            positions = (
+                list(range(len(err_idx)))
+                if len(err_idx) <= 20
+                else [*range(10), *range(len(err_idx) - 10, len(err_idx))]
+            )
+            print(f"│  {len(err_idx)} 个不通过元素 (前10后10):", flush=True)
         print(
             f"│  {'idx':>10}  {except_label:>14}  {comp_label:>14}  {'absErr':>12}  {'relErr':>12}",
             flush=True,
         )
-        for i in err_idx[:show_cnt]:
+        for disp, pos in enumerate(positions, 1):
+            if not verbose_diff and len(err_idx) > 20 and disp == 11:
+                print("│  ...", flush=True)
+            i = int(err_idx[pos])
             print(
-                f"│  {int(i):>10}  {float(expect[i]):>+14.8f}  {float(real[i]):>+14.8f}"
+                f"│  {i:>10}  {float(expect[i]):>+14.8f}  {float(real[i]):>+14.8f}"
                 f"  {float(diff_abs[i]):>12.8f}  {float(rel_err[i]):>12.6f}",
-                flush=True,
-            )
-        if not verbose_diff and len(err_idx) > max_err_show:
-            print(
-                f"│  ... (共 {len(err_idx)} 个失败点，仅显示前 {max_err_show} 个)",
                 flush=True,
             )
 
@@ -297,3 +313,136 @@ def compare(*outputs, **kwargs):
             )
 
     return [attn_stats, lse_stats]
+
+
+# ---------------------------------------------------------------------------
+# ttk built-in cross_check (三方比对) entry points
+# ---------------------------------------------------------------------------
+
+
+def _get_compare_method():
+    if get_global_storage is not None:
+        try:
+            return getattr(get_global_storage(), "compare_method", None)
+        except Exception:
+            return None
+    return None
+
+
+def is_cross_check_available():
+    return _TTK_CROSS_CHECK_AVAILABLE
+
+
+def _resolve_raw_dtype(kwargs, default="bfloat16"):
+    raw = kwargs.get("data_type")
+    if raw is None:
+        raw = default
+    return str(raw).split(".")[-1].rstrip("'>\" ")
+
+
+def _resolve_cross_check_params(spec_tolerance, dtype_str):
+    standards = resolve_tolerance(
+        spec_tolerance, None, None, [dtype_str], "cross_check"
+    )
+    return standards[0].params
+
+
+_SEP2 = "─" * 64
+
+
+def _ttk_cross_check_single(
+    npu_out, golden_out, bench_out, idx, name, dtype_str, params
+):
+    c = CrossCheckComparison(
+        npu_out, bench_out, idx, dtype_str, params, third_party=golden_out
+    )
+    precision_str, log, is_pass, metrics = c.compare()
+
+    # 打印三方比对报告（通过/失败都打，便于日志查看 mare/mere/rmse）。
+    print(f"\n┌{_SEP2}┐", flush=True)
+    print(
+        f"│  三方比对(CrossCheck): {name}  三方=use_npu(高精度)  third_party=golden",
+        flush=True,
+    )
+    print(f"├{_SEP2}┤", flush=True)
+    result = metrics.get("result", {}) if isinstance(metrics, dict) else {}
+    config = metrics.get("config", {}) if isinstance(metrics, dict) else {}
+    print(
+        f"│  level    : {metrics.get('level', 'N/A') if isinstance(metrics, dict) else 'N/A'}",
+        flush=True,
+    )
+    print(
+        f"│  mare     : {result.get('mare', 'N/A')}   (thd {config.get('mare', 'N/A')})",
+        flush=True,
+    )
+    print(
+        f"│  mere     : {result.get('mere', 'N/A')}   (thd {config.get('mere', 'N/A')})",
+        flush=True,
+    )
+    print(
+        f"│  rmse     : {result.get('rmse', 'N/A')}   (thd {config.get('rmse', 'N/A')})",
+        flush=True,
+    )
+    print(
+        f"│  结论     : {'✓ PASS' if is_pass else '✗ FAIL'}   ({precision_str})",
+        flush=True,
+    )
+    print(f"└{_SEP2}┘", flush=True)
+    return {
+        "pass": is_pass,
+        "precision": precision_str,
+        "metrics": metrics,
+        "error_info": None if is_pass else log,
+    }
+
+
+def _run_cross_check_loop(npu_sub, golden_sub, bench_sub, names, params):
+    results = []
+    for idx in range(len(golden_sub)):
+        name = names[idx] if idx < len(names) else f"output_{idx}"
+        npu_out = npu_sub[idx]
+        golden_out = golden_sub[idx]
+        bench_out = bench_sub[idx] if idx < len(bench_sub) else None
+        if npu_out is None and golden_out is None:
+            results.append(
+                {"pass": True, "precision": "N/A", "error_info": f"{name} is None"}
+            )
+        else:
+            results.append(
+                _ttk_cross_check_single(
+                    npu_out, golden_out, bench_out, idx, name, "float32", params
+                )
+            )
+    return results
+
+
+def _split_e2e_outputs(outputs, bench_outputs):
+    GOLDEN_OUTPUT_COUNT = 2
+    golden_outputs = outputs[-GOLDEN_OUTPUT_COUNT:]
+    npu_outputs = outputs[:-GOLDEN_OUTPUT_COUNT]
+    names = ["attn_out", "softmax_lse"]
+
+    npu_attn = npu_outputs[0] if len(npu_outputs) > 0 else None
+    npu_lse = npu_outputs[1] if len(npu_outputs) > 1 else None
+    gold_attn = golden_outputs[0] if len(golden_outputs) > 0 else None
+    gold_lse = golden_outputs[1] if len(golden_outputs) > 1 else None
+    bench_attn = bench_outputs[0] if bench_outputs else None
+    bench_lse = bench_outputs[1] if bench_outputs and len(bench_outputs) > 1 else None
+
+    npu_sub = [npu_attn, npu_lse]
+    golden_sub = [gold_attn, gold_lse]
+    bench_sub = [bench_attn, bench_lse]
+
+    # return_softmax_lse=False 时 lse 为空 → 跳过（与默认 compare 行为一致）
+    gold_lse_empty = gold_lse is None or int(np.asarray(gold_lse).size) == 0
+    if gold_lse_empty:
+        npu_sub[1] = golden_sub[1] = bench_sub[1] = None
+
+    return npu_sub, golden_sub, bench_sub, names
+
+
+def _run_ttk_cross_check_e2e(outputs, kwargs, bench_outputs, spec_tolerance):
+    npu_sub, golden_sub, bench_sub, names = _split_e2e_outputs(outputs, bench_outputs)
+    raw_dtype_str = _resolve_raw_dtype(kwargs)
+    params = _resolve_cross_check_params(spec_tolerance, raw_dtype_str)
+    return _run_cross_check_loop(npu_sub, golden_sub, bench_sub, names, params)

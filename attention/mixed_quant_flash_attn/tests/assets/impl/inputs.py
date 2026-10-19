@@ -104,6 +104,16 @@ def _write_back(tensor, src):
     """
     if tensor is None or src is None:
         return
+    if int(np.prod(tensor.shape)) == 0:
+        return
+    if src.numel() == 0:
+        # A companion of an empty input can have a different physical shape.
+        # Its payload is unused by the empty kernel.
+        if torch.is_tensor(tensor):
+            tensor.zero_()
+        else:
+            tensor.fill(0)
+        return
     if isinstance(tensor, np.ndarray):
         # numpy: 按 raw bytes 拷贝（处理 float8_e8m0 等自定义 dtype）
         if tensor.dtype == src.dtype:
@@ -168,7 +178,7 @@ def generate_mixed_quant_inputs(
     sinks=None,
     attn_mask=None,
     metadata=None,
-    quant_compute_mode=1,
+    quant_mode=1,
     softmax_scale=1.0,
     mask_mode=0,
     win_left=-1,
@@ -185,7 +195,11 @@ def generate_mixed_quant_inputs(
     head_dim=128,
     **kwargs,
 ):
-    """In-place customize_inputs hook: 调用 pytest generate_inputs 生成全部输入并写回。"""
+    """In-place customize_inputs hook: 调用 pytest generate_inputs 生成全部输入并写回。
+    兼容 quant_mode / quant_compute_mode 两种表头（后者经 kwargs 传入）。
+    """
+    if kwargs.get("quant_compute_mode") is not None:
+        quant_mode = kwargs["quant_compute_mode"]
     b, n1, n2, s1, s2, d, block_num, block_size = _resolve_axis_layout(
         q, k, layout_q, layout_kv, cu_seqlens_q, seqused_q, seqused_kv
     )
@@ -198,6 +212,7 @@ def generate_mixed_quant_inputs(
     if input_ranges and len(input_ranges) >= 3:
         _q_range = tuple(input_ranges[0])
         _kv_range = tuple(input_ranges[1])
+        _sinks_range = tuple(input_ranges[9]) if len(input_ranges) > 9 else (-1.0, 1.0)
     else:
         _q_range = tuple(
             float(x) for x in os.environ.get("MQFA_Q_RANGE", "-1.0,1.0").split(",")
@@ -205,6 +220,12 @@ def generate_mixed_quant_inputs(
         _kv_range = tuple(
             float(x) for x in os.environ.get("MQFA_KV_RANGE", "-10.0,10.0").split(",")
         )
+        _sinks_range = tuple(
+            float(x) for x in os.environ.get("MQFA_SINKS_RANGE", "-1.0,1.0").split(",")
+        )
+
+    sink_numel = 0 if sinks is None else int(np.prod(sinks.shape))
+    sinks_mode = None if sinks is None else ("empty" if sink_numel == 0 else True)
 
     params = {
         "B": batch_size,
@@ -212,13 +233,13 @@ def generate_mixed_quant_inputs(
         "N2": n2,
         "S1": s1,
         "S2": s2,
-        "D": head_dim,
+        "D": d,
         "layout_q": layout_q,
         "layout_kv": layout_kv,
         "layout_attn_out": layout_attn_out,
         "block_size": block_size,
         "block_num": block_num,
-        "quant_compute_mode": int(quant_compute_mode),
+        "quant_mode": int(quant_mode),
         "mask_mode": int(mask_mode),
         "win_left": int(win_left),
         "win_right": int(win_right),
@@ -231,6 +252,8 @@ def generate_mixed_quant_inputs(
         "cu_seqlens_q": _to_int_list(cu_seqlens_q),
         "q_range": _q_range,
         "kv_range": _kv_range,
+        "sinks": sinks_mode,
+        "sinks_range": _sinks_range,
         "q_dtype": _to_q_dtype(q),
     }
 
@@ -317,43 +340,6 @@ def generate_mixed_quant_inputs(
     _write_back(sinks, tensors.get("sinks"))
     _write_back(attn_mask, tensors.get("attn_mask"))
 
-    # metadata: pytest gen_data 不生成（设为 None），由 npu.py 在 NPU 端生成。
-    # ttk 也需要 metadata，调 pytest 的 metadata op 生成。
-    if metadata is not None:
-        from core.meta_cpu.mixed_quant_flash_attn_metadata_op import (
-            MixedQuantFlashAttnMetadataOp,
-        )
-
-        meta_op = MixedQuantFlashAttnMetadataOp()
-        _meta_sq = _to_int_list(seqused_q) if seqused_q is not None else None
-        _meta_skv = _to_int_list(seqused_kv) if seqused_kv is not None else None
-        meta_list = meta_op.npu_mixed_quant_flash_attn_metadata(
-            num_heads_q=n1,
-            num_heads_kv=n2,
-            head_dim=d,
-            quant_compute_mode=int(quant_compute_mode),
-            batch_size=b if layout_q != "TND" else None,
-            cu_seqlens_q=_to_int_list(cu_seqlens_q)
-            if cu_seqlens_q is not None
-            else None,
-            seqused_q=_meta_sq,
-            seqused_kv=_meta_skv,
-            max_seqlen_q=int(max_seqlen_q),
-            max_seqlen_kv=int(max_seqlen_kv),
-            mask_mode=int(mask_mode),
-            win_left=int(win_left),
-            win_right=int(win_right),
-            layout_q=layout_q,
-            layout_kv=layout_kv,
-            layout_out=layout_attn_out,
-        )
-        _meta_src = torch.tensor(meta_list, dtype=torch.int32)
-        # metadata 实际生成 size 可能 != CSV view_shape，用截断填充（numpy/torch 两条路径都要 min 截断）
-        if torch.is_tensor(metadata):
-            _meta_dst = metadata.view(torch.int32).reshape(-1)
-            _n = min(_meta_dst.numel(), _meta_src.numel())
-            _meta_dst[:_n] = _meta_src[:_n]
-        else:
-            _meta_dst = np.asarray(metadata).view(np.int32).reshape(-1)
-            _n = min(_meta_dst.size, _meta_src.numel())
-            _meta_dst[:_n] = _meta_src.numpy().reshape(-1)[:_n]
+    # metadata: 由 npu.py 在 NPU 端经 mixed_quant_flash_attn_metadata 生成并覆盖，
+    # ttk 传入的 metadata slot 无需在这里填充。CSV metadata size 设为 -1（动态/空
+    # tensor），参考同类算子写法不写固定大小。

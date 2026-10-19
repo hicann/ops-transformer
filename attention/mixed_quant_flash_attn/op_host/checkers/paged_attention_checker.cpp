@@ -10,7 +10,7 @@
 
 /*!
  * \file paged_attention_checker.cpp
- * \brief Checker for PagedAttention parameters (ÎÄµµÔ¼Êø: Paged Attention²ÎÊı×é)
+ * \brief Checker for PagedAttention parameters (æ–‡æ¡£çº¦æŸ: Paged Attentionå‚æ•°ç»„)
  */
 
 #include <map>
@@ -50,7 +50,7 @@ ge::graphStatus PagedAttentionChecker::CheckSinglePara(const FaTilingInfo& faInf
         return ge::GRAPH_FAILED);
 
     auto& blockTableTensor = faInfo.opParamInfo.blockTable.tensor;
-    // ÕâÀïºÍ´æÔÚĞÔĞ£Ñé³åÍ»ÁË£¬µ«ÊÇÎªÁËÔÚµ¥²ÎÊıĞ£ÑéĞ£ÑédtypeĞèÒªÏÈÅĞ¿Õ
+    // è¿™é‡Œå’Œå­˜åœ¨æ€§æ ¡éªŒå†²çªäº†ï¼Œä½†æ˜¯ä¸ºäº†åœ¨å•å‚æ•°æ ¡éªŒæ ¡éªŒdtypeéœ€è¦å…ˆåˆ¤ç©º
     OP_CHECK_IF(blockTableTensor == nullptr, OP_LOGE_WITH_INVALID_INPUT(faInfo.opName, "block_table"),
                 return ge::GRAPH_FAILED);
 

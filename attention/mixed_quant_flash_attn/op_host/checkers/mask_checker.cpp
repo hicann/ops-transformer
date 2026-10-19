@@ -10,7 +10,7 @@
 
 /*!
  * \file mask_checker.cpp
- * \brief Checker for mask_mode, attn_mask, win_left, win_right parameters (ÎÄµµÔ¼Êø: Mask²ÎÊı×é)
+ * \brief Checker for mask_mode, attn_mask, win_left, win_right parameters (æ–‡æ¡£çº¦æŸ: Maskå‚æ•°ç»„)
  */
 
 #include <map>

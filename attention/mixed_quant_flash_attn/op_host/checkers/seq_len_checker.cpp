@@ -116,6 +116,56 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaCuSeqlensQ(const FaTilingInf
                         faInfo.cuSeqLensQSize, faInfo.bSize + 1),
                 return ge::GRAPH_FAILED);
 
+    const int32_t* cuSeqlensQData = gert::TensorPlacementUtils::IsOnHost(cuSeqlensQTensor->GetPlacement()) ?
+                                        cuSeqlensQTensor->GetData<int32_t>() :
+                                        nullptr;
+    if (cuSeqlensQData == nullptr) {
+        return ge::GRAPH_SUCCESS;
+    }
+
+    OP_CHECK_IF(cuSeqlensQData[0] != 0,
+                OP_LOGE(faInfo.opName, "cu_seqlens_q[0] must be 0, but got %d.", cuSeqlensQData[0]),
+                return ge::GRAPH_FAILED);
+
+    const gert::Tensor* sequsedQTensor = faInfo.opParamInfo.seqUsedQ.tensor;
+    const int32_t* sequsedQData =
+        (sequsedQTensor == nullptr || !gert::TensorPlacementUtils::IsOnHost(sequsedQTensor->GetPlacement())) ?
+            nullptr :
+            sequsedQTensor->GetData<int32_t>();
+
+    for (int64_t i = 0; i < faInfo.bSize; i++) {
+        int64_t physicalLen = static_cast<int64_t>(cuSeqlensQData[i + 1]) - cuSeqlensQData[i];
+        OP_CHECK_IF(physicalLen < 0,
+                    OP_LOGE(faInfo.opName,
+                            "cu_seqlens_q must be non-decreasing, but cu_seqlens_q[%ld]=%d is greater "
+                            "than cu_seqlens_q[%ld]=%d.",
+                            i, cuSeqlensQData[i], i + 1, cuSeqlensQData[i + 1]),
+                    return ge::GRAPH_FAILED);
+        if (faInfo.qLayout != FaLayout::TND) {
+            continue;
+        }
+        int64_t opSeqLen = (sequsedQData == nullptr) ? physicalLen : sequsedQData[i];
+        OP_CHECK_IF(sequsedQData != nullptr && opSeqLen > physicalLen,
+                    OP_LOGE(faInfo.opName,
+                            "The used seq len of batch %ld(%ld) must not be greater than the batch "
+                            "length(%ld) in cu_seqlens_q.",
+                            i, opSeqLen, physicalLen),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(faInfo.maxSeqQ != -1 && opSeqLen > faInfo.maxSeqQ,
+                    OP_LOGE(faInfo.opName,
+                            "The used seq len of batch %ld(%ld) must not be greater than "
+                            "max_seqlen_q(%ld).",
+                            i, opSeqLen, faInfo.maxSeqQ),
+                    return ge::GRAPH_FAILED);
+    }
+
+    if (faInfo.qLayout == FaLayout::TND) {
+        OP_CHECK_IF(static_cast<int64_t>(cuSeqlensQData[faInfo.bSize]) != faInfo.qTSize,
+                    OP_LOGE(faInfo.opName, "cu_seqlens_q[%ld](%d) must be equal to the T dim of query(%ld).",
+                            faInfo.bSize, cuSeqlensQData[faInfo.bSize], faInfo.qTSize),
+                    return ge::GRAPH_FAILED);
+    }
+
     return ge::GRAPH_SUCCESS;
 }
 

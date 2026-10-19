@@ -890,8 +890,9 @@ public:
     int64_t s1OuterSize;
     int64_t splitFactorSize;
     int64_t splitFactorTailSize;
-    uint32_t bnStartIdx[48];
-    int64_t sparseStartIdx[48];
+    static constexpr int maxCoreNum = 70;
+    uint32_t bnStartIdx[maxCoreNum];
+    int64_t sparseStartIdx[maxCoreNum];
     int64_t firstFullLoadS1OuterIdx;
     uint8_t splitCoreMode;
     uint8_t reserve[3];
@@ -942,7 +943,7 @@ public:
     }
     void set_bnStartIdx(const uint32_t* val)
     {
-        for (int i = 0; i < 48; ++i) { // 48: coreNum
+        for (int i = 0; i < maxCoreNum; ++i) {
             this->bnStartIdx[i] = val[i];
         }
     }
@@ -952,7 +953,7 @@ public:
     }
     void set_sparseStartIdx(const int64_t* val)
     {
-        for (int i = 0; i < 48; ++i) { // 48: coreNum
+        for (int i = 0; i < maxCoreNum; ++i) {
             this->sparseStartIdx[i] = val[i];
         }
     }

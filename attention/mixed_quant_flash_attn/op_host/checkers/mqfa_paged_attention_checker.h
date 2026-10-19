@@ -10,7 +10,7 @@
 
 /*!
  * \file mqfa_paged_attention_checker.h
- * \brief Checker for PagedAttention parameters (ÎÄµµÔ¼Êø: Paged Attention²ÎÊı×é)
+ * \brief Checker for PagedAttention parameters (æ–‡æ¡£çº¦æŸ: Paged Attentionå‚æ•°ç»„)
  */
 
 #ifndef MQFA_PAGED_ATTENTION_CHECKER_H

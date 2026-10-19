@@ -10,7 +10,7 @@
 
 /*!
  * \file sinks_checker.cpp
- * \brief Checker for sinks parameter (文档参数名: sinks, 文档约束: LearnableSink参数组)
+ * \brief Checker for the optional sinks parameter.
  */
 
 #include <map>
@@ -33,10 +33,27 @@ using namespace arch35FA;
 
 ge::graphStatus SinksChecker::CheckSinglePara(const FaTilingInfo& faInfo)
 {
-    if (faInfo.sinksFlag) {
-        OP_LOGE(faInfo.opName, "sinks is currently not supported.");
-        return ge::GRAPH_FAILED;
+    if (!faInfo.sinksFlag) {
+        return ge::GRAPH_SUCCESS;
     }
+
+    OP_CHECK_IF(faInfo.opParamInfo.sinks.tensor == nullptr || faInfo.opParamInfo.sinks.desc == nullptr,
+                OP_LOGE(faInfo.opName, "sinks tensor or desc is null."), return ge::GRAPH_FAILED);
+
+    auto dtype = faInfo.opParamInfo.sinks.desc->GetDataType();
+    OP_CHECK_IF(dtype != ge::DT_FLOAT,
+                OP_LOGE(faInfo.opName, "sinks dtype must be FLOAT32, but got %s.",
+                        ge::TypeUtils::DataTypeToSerialString(dtype).c_str()),
+                return ge::GRAPH_FAILED);
+
+    const auto& shape = faInfo.opParamInfo.sinks.tensor->GetStorageShape();
+    OP_CHECK_IF(shape.GetDimNum() != 1,
+                OP_LOGE(faInfo.opName, "sinks shape must be 1D (Q_N,), but got %lu dims.", shape.GetDimNum()),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        shape.GetDim(0) != faInfo.n1Size,
+        OP_LOGE(faInfo.opName, "sinks shape[0] must equal Q_N (%ld), but got %ld.", faInfo.n1Size, shape.GetDim(0)),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

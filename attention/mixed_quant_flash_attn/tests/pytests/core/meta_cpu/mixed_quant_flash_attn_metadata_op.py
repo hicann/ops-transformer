@@ -223,6 +223,13 @@ class MixedQuantFlashAttnMetadataOp:
         aic_core_num: int = 64,
         aiv_core_num: int = 64,
     ) -> List[int]:
+        # Empty KV has no FA/FD tasks and therefore no valid GQA ratio.  The
+        # runtime consumes a zeroed metadata header for this boundary case;
+        # returning it directly also avoids the ordinary num_heads_q /
+        # num_heads_kv calculation and the metadata helper binary.
+        if num_heads_kv <= 0:
+            return [0] * 16
+
         self.aic_core_num = aic_core_num
         self.aiv_core_num = aiv_core_num
 

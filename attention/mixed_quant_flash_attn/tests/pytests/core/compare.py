@@ -173,15 +173,22 @@ def check_result_(
                     f"  {float(diff_abs[i]):>12.8f}  {float(rel_err[i]):>12.6f}"
                 )
         else:
-            idxs = err_idx[:10]
-            print(f"│  前{len(idxs)}个不通过元素:")
+            idxs = (
+                err_idx
+                if len(err_idx) <= 20
+                else np.concatenate([err_idx[:10], err_idx[-10:]])
+            )
+            print(f"│  {len(err_idx)} 个不通过元素 (前10后10):")
             print(
                 f"│  {'idx':>8}  {except_label:>14}  {comp_label:>14}  {'absErr':>12}  {'relErr':>10}"
             )
-            for i in idxs:
+            for disp, i in enumerate(idxs, 1):
+                if len(err_idx) > 20 and disp == 11:
+                    print("│  ...")
+                _i = int(i)
                 print(
-                    f"│  {int(i):>8}  {float(data_compe[i]):>+14.8f}  {float(real_data[i]):>+14.8f}"
-                    f"  {float(diff_abs[i]):>12.8f}  {float(rel_err[i]):>10.6f}"
+                    f"│  {_i:>8}  {float(data_compe[_i]):>+14.8f}  {float(real_data[_i]):>+14.8f}"
+                    f"  {float(diff_abs[_i]):>12.8f}  {float(rel_err[_i]):>10.6f}"
                 )
     print(f"└{SEP}┘")
     stats = {
@@ -307,29 +314,29 @@ def display_error_output(real_data, expect_data, err_idx, relative_diff):
     print_log(
         "---------------------------------------------------------------------------------------"
     )
-    count = 0
     len_err = len(err_idx)
-    for i in err_idx:
-        count += 1
-        if count < 10 or (90 < count < 100):
-            print_log(
-                "%08d \t %.7f \t %.7f \t %.7f \t %.7f"
-                % (
-                    i + 1,
-                    expect_data[i],
-                    real_data[i],
-                    abs(np.float64(expect_data[i]) - np.float64(real_data[i])),
-                    relative_diff[count - 1],
-                )
-            )
-        elif count == 10 or (count == 100 and len_err > 100):
-            dot_3 = "..."
+    positions = (
+        list(range(len_err))
+        if len_err <= 20
+        else [*range(10), *range(len_err - 10, len_err)]
+    )
+    for disp, pos in enumerate(positions, 1):
+        if len_err > 20 and disp == 11:
             print_log(
                 "%08s \t %07s \t %07s \t %07s \t %07s"
-                % (dot_3, dot_3, dot_3, dot_3, dot_3)
+                % ("...", "...", "...", "...", "...")
             )
-        elif count > 100:
-            break
+        i = err_idx[pos]
+        print_log(
+            "%08d \t %.7f \t %.7f \t %.7f \t %.7f"
+            % (
+                i,
+                expect_data[i],
+                real_data[i],
+                abs(np.float64(expect_data[i]) - np.float64(real_data[i])),
+                relative_diff[pos],
+            )
+        )
 
     print_log(
         "Max-RE line:---------------------------------------------------------------------------"
@@ -343,7 +350,7 @@ def display_error_output(real_data, expect_data, err_idx, relative_diff):
             print_log(
                 "%08d \t %.7f \t %.7f \t %.7f \t %.7f"
                 % (
-                    m_idx + 1,
+                    m_idx,
                     expect_data[m_idx],
                     real_data[m_idx],
                     abs(np.float64(expect_data[m_idx]) - np.float64(real_data[m_idx])),

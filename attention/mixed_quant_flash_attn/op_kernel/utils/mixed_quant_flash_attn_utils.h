@@ -354,10 +354,10 @@ template <LayOutTypeEnum LAYOUT, uint8_t kvLayoutType = 0>
 __aicore__ inline constexpr GmFormat GetKDescaleGmFormat()
 {
     if constexpr (kvLayoutType == 0) {
-        if constexpr (LAYOUT == LayOutTypeEnum::LAYOUT_BSH) {
-            return GmFormat::BSND;
-        } else if constexpr (LAYOUT == LayOutTypeEnum::LAYOUT_BNSD) {
+        if constexpr (LAYOUT == LayOutTypeEnum::LAYOUT_BNSD) {
             return GmFormat::BNSD;
+        } else {
+            return GmFormat::BSND;
         }
     } else if constexpr (kvLayoutType == 1) {
         return GmFormat::PA_BnBsND;
@@ -372,9 +372,7 @@ template <LayOutTypeEnum LAYOUT, uint8_t kvLayoutType = 0>
 __aicore__ inline constexpr GmFormat GetVDescaleGmFormat()
 {
     if constexpr (kvLayoutType == 0) {
-        if constexpr (LAYOUT == LayOutTypeEnum::LAYOUT_BSH || LAYOUT == LayOutTypeEnum::LAYOUT_BNSD) {
-            return GmFormat::BNDS;
-        }
+        return GmFormat::BNDS;
     } else if constexpr (kvLayoutType == 1) {
         return GmFormat::PA_BnNDBs;
     } else if constexpr (kvLayoutType == 2) {

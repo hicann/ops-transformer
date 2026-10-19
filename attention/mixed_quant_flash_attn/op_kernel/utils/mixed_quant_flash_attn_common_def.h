@@ -266,6 +266,7 @@ struct RunInfoX {
     bool isChangeBatch = false;
     bool isFirstS2Loop = false;
     bool isLastS2Loop = false;
+    bool isFirstFdBlock = false;
 
     uint32_t bIdx = 0;
     uint32_t n2Idx = 0;

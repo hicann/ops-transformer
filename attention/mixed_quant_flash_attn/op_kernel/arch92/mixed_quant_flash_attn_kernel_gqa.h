@@ -48,6 +48,7 @@ public:
     static constexpr LayOutTypeEnum LAYOUT_Q = CubeBlockType::LAYOUT_Q;
     static constexpr LayOutTypeEnum LAYOUT_KV = CubeBlockType::LAYOUT_Q; // todo 整改
     using Q_T = typename CubeBlockType::Q_T;
+    using SOFTMAX_OUT_T = typename CubeBlockType::SOFTMAX_OUT_T;
     using MM_T = typename CubeBlockType::MM_T;
     using OUT_T = typename VecFaBlockType::OUT_T;
 
@@ -66,7 +67,7 @@ public:
     GlobalTensor<int32_t> seqUsedGmKv;
     GlobalTensor<uint32_t> faMetaDataGm;
     GlobalTensor<float> softmaxLseGm;
-    GlobalTensor<Q_T> sinkGm;
+    GlobalTensor<float> sinkGm;
 
     __gm__ uint8_t* keyPtr = nullptr;
     __gm__ uint8_t* valuePtr = nullptr;
@@ -97,8 +98,12 @@ public:
     bool headS2Split = false;
     bool tailS2Split = false;
     bool isFd = false;
+    uint32_t s2FirstToken = 0U;
 
-    ActualSeqLensParser<ActualSeqLensMode::BY_BATCH, int32_t> qSeqUsedParser;
+    using QSeqLensParserT = typename std::conditional<LAYOUT_Q == LayOutTypeEnum::LAYOUT_TND,
+                                                      ActualSeqLensParser<ActualSeqLensMode::ACCUM, int32_t, true>,
+                                                      ActualSeqLensParser<ActualSeqLensMode::BY_BATCH, int32_t>>::type;
+    QSeqLensParserT qSeqUsedParser;
     ActualSeqLensParser<ActualSeqLensMode::BY_BATCH, int32_t> kvSeqUsedParser;
     static constexpr uint32_t L1_Q_SLOT_BYTES = CubeBlockType::L1_Q_SLOT_BYTES;
     static constexpr uint32_t L1_P_SLOT_BYTES = CubeBlockType::L1_P_SLOT_BYTES;
@@ -141,12 +146,19 @@ public:
 
         if constexpr (LAYOUT_Q == LayOutTypeEnum::LAYOUT_TND) {
             cuSeqLensGmQ.SetGlobalBuffer((__gm__ int32_t*)cuSeqLensQ, constInfo.cuSeqLensQSize + 1);
+            if (constInfo.seqUsedQSize != 0U) {
+                seqUsedGmQ.SetGlobalBuffer((__gm__ int32_t*)seqUsedQ, constInfo.seqUsedQSize);
+            }
         } else {
             seqUsedGmQ.SetGlobalBuffer((__gm__ int32_t*)seqUsedQ, constInfo.seqUsedQSize);
-            seqUsedGmKv.SetGlobalBuffer((__gm__ int32_t*)seqUsedKv, constInfo.seqUsedKvSize);
         }
+        seqUsedGmKv.SetGlobalBuffer((__gm__ int32_t*)seqUsedKv, constInfo.seqUsedKvSize);
 
-        qSeqUsedParser.Init(seqUsedGmQ, constInfo.seqUsedQSize, constInfo.s1Size); // TODO parser需适配
+        if constexpr (LAYOUT_Q == LayOutTypeEnum::LAYOUT_TND) {
+            qSeqUsedParser.Init(cuSeqLensGmQ, seqUsedGmQ, constInfo.cuSeqLensQSize, constInfo.seqUsedQSize);
+        } else {
+            qSeqUsedParser.Init(seqUsedGmQ, constInfo.seqUsedQSize, constInfo.s1Size);
+        }
         kvSeqUsedParser.Init(seqUsedGmKv, constInfo.seqUsedKvSize, constInfo.s2Size);
 
         InitShareBuf();
@@ -159,11 +171,13 @@ public:
 
         if ASCEND_IS_AIV {
             vecFaBlock.InitVecBlock();
-            vecFaBlock.InitVecInput(query, seqUsedQ, seqUsedKv, attenMask, learnableSink, softmaxLse, attentionOut,
-                                    workspace);
+            vecFaBlock.InitVecInput(query, cuSeqLensQ, seqUsedQ, seqUsedKv, attenMask, learnableSink, softmaxLse,
+                                    attentionOut, workspace);
             if constexpr (QUANT_COMPUTE_MODE == AntiquantMode_FP8_PC) {
                 vecFaBlock.InitQuant(kDescale, vDescale);
             }
+            // Sink is seeded once in the first FA partition, as in flash_attn.
+            // FD combines ordinary partial max/sum/output; do not inject again.
             if (this->tilingData->mixedQuantFlashAttnBaseParams.needInitOutput) {
                 vecFaBlock.ClearOutput();
                 // if (constInfo.aicIdx == 0) {
@@ -176,12 +190,7 @@ public:
                 vecFdBlock.InitParams();
                 vecFdBlock.InitGlobalTensor(this->vecFaBlock.softmaxFDMaxGm, this->vecFaBlock.softmaxFDSumGm,
                                             this->vecFaBlock.accumOutGm, this->vecFaBlock.attentionOutGm,
-                                            this->seqUsedGmQ, this->seqUsedGmKv, keyPtr);
-                if (learnableSink != nullptr) {
-                    sinkGm.SetGlobalBuffer((__gm__ Q_T*)learnableSink);
-                    constInfo.learnableSinkFlag = true;
-                    vecFdBlock.InitLearnableSinkGm(sinkGm);
-                }
+                                            this->cuSeqLensGmQ, this->seqUsedGmQ, this->seqUsedGmKv, keyPtr);
                 if (constInfo.isSoftmaxLseEnable) {
                     softmaxLseGm.SetGlobalBuffer((__gm__ float*)softmaxLse);
                     vecFdBlock.InitSoftmaxLseGm(softmaxLseGm);
@@ -236,6 +245,7 @@ public:
         const auto& attenMaskParams = this->tilingData->mixedQuantFlashAttnAttenMaskParams;
         const auto& workspaceParams = this->tilingData->mixedQuantFlashAttnWorkspaceParams;
         const auto& pageAttentionParams = this->tilingData->mixedQuantFlashAttnPageAttentionParams;
+        constInfo.learnableSinkFlag = baseParams.hasSink;
         // 必须先设置核号，后续 GetFAMetaDataIndex(constInfo.aicIdx,...) 依赖它
         // spilit param
         if ASCEND_IS_AIC {
@@ -433,6 +443,7 @@ public:
 
     __aicore__ inline void CalcCurS2StartEndNoSparse(uint32_t bN2Cur, uint32_t gS1Cur)
     {
+        s2FirstToken = 0U;
         curS2Start = 0U;
         curS2End = (static_cast<uint32_t>(actSeqLensKv) + s2BaseSize - 1) / s2BaseSize;
 
@@ -449,6 +460,7 @@ public:
 
     __aicore__ inline void CalcCurS2StartEndWithSparse(uint32_t bN2Cur, uint32_t gS1Cur)
     {
+        s2FirstToken = 0U;
         // 1. Calc preTokenLeftUp, nextTokenLeftUp
         int64_t preTokenLeftUp = 0;
         int64_t nextTokenLeftUp = 0;
@@ -478,19 +490,20 @@ public:
         }
 
         // 3. trans index of token to index of block
-        int64_t s2FirstToken = s1FirstToken - preTokenLeftUp;
+        int64_t firstS2Token = s1FirstToken - preTokenLeftUp;
         int64_t s2LastToken = s1LastToken + nextTokenLeftUp;
         // no valid token
-        if (s2FirstToken >= static_cast<int64_t>(actSeqLensKv) || s2LastToken < 0 || s2LastToken < s2FirstToken) {
+        if (firstS2Token >= static_cast<int64_t>(actSeqLensKv) || s2LastToken < 0 || s2LastToken < firstS2Token) {
             curS2Start = 0U;
             curS2End = 0U;
             return;
         }
         // get valid range
-        s2FirstToken = ClipSInnerToken(s2FirstToken, 0, static_cast<int64_t>(actSeqLensKv - 1));
+        firstS2Token = ClipSInnerToken(firstS2Token, 0, static_cast<int64_t>(actSeqLensKv - 1));
         s2LastToken = ClipSInnerToken(s2LastToken, 0, static_cast<int64_t>(actSeqLensKv - 1));
+        this->s2FirstToken = static_cast<uint32_t>(firstS2Token);
 
-        uint32_t s2StartWithSparse = static_cast<uint32_t>(s2FirstToken) / s2BaseSize;
+        uint32_t s2StartWithSparse = static_cast<uint32_t>(firstS2Token) / s2BaseSize;
         uint32_t s2EndWithSparse = static_cast<uint32_t>(s2LastToken) / s2BaseSize + 1U;
 
         // 4. Calc curS2Start, curS2End
@@ -554,7 +567,7 @@ public:
     __aicore__ inline void ComputeMm2(RunInfoX& runInfo)
     {
         uint32_t l1PBufId = runInfo.loop % L1_P_BUF_NUM;
-        LocalTensor<Q_T> l1PBuf = l1PBuffers[l1PBufId].template ReinterpretCast<Q_T>();
+        LocalTensor<SOFTMAX_OUT_T> l1PBuf = l1PBuffers[l1PBufId].template ReinterpretCast<SOFTMAX_OUT_T>();
 
         uint32_t bmm2BufId = runInfo.loop % UB_MM2RES_BUF_NUM;
         uint32_t bmm2BufOffset = bmm2BufId * UB_MM2RES_BYTE;
@@ -578,7 +591,7 @@ public:
     __aicore__ inline void ComputeVec1(RunInfoX& runInfo)
     {
         uint32_t l1PBufId = runInfo.loop % L1_P_BUF_NUM;
-        LocalTensor<Q_T> l1PBuf = l1PBuffers[l1PBufId].template ReinterpretCast<Q_T>();
+        LocalTensor<SOFTMAX_OUT_T> l1PBuf = l1PBuffers[l1PBufId].template ReinterpretCast<SOFTMAX_OUT_T>();
 
         uint32_t bmm1BufId = runInfo.loop % UB_MM1RES_BUF_NUM;
         uint32_t bmm1BufOffset = bmm1BufId * UB_MM1RES_BYTE;
@@ -608,6 +621,7 @@ public:
     {
         info.loop = loop;
         info.mloop = mloop;
+        info.isFirstFdBlock = (s2Cur == s2FirstToken / s2BaseSize);
         info.bIdx = bN2Cur / constInfo.n2Size;
         info.n2Idx = bN2Cur % constInfo.n2Size;
         info.gS1Idx = gS1Cur * mBaseSize;

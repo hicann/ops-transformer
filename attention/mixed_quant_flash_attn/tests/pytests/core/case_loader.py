@@ -63,21 +63,24 @@ def normalize_params(raw):
     c.setdefault("win_left", -1)
     c.setdefault("win_right", -1)
     c.setdefault("mask_mode", 0)
-    c.setdefault("quant_compute_mode", c.get("quant_compute_mode"))
+    # 统一数据 key 为 quant_mode，兼容旧表头 quant_compute_mode；
+    # 归一化后只保留 quant_mode，避免 gen 阶段把 quant_compute_mode 残留 key 写进 .pt。
+    if "quant_mode" not in c and "quant_compute_mode" in c:
+        c["quant_mode"] = c["quant_compute_mode"]
+    c.setdefault("quant_mode", c.get("quant_compute_mode", 1))
+    c.pop("quant_compute_mode", None)
     c.setdefault("q_dtype", c.get("q_dtype", "bf16"))
-    c.setdefault(
-        "kv_dtype", "fp4_e2m1" if c.get("quant_compute_mode", 1) != 2 else "fp4_e1m2"
-    )
+    c.setdefault("kv_dtype", "fp4_e2m1" if c.get("quant_mode", 1) != 2 else "fp4_e1m2")
 
     from core.gen_data import resolve_kv_scale_dtype
 
     kv_dtype = c["kv_dtype"]
     q_dtype = c["q_dtype"]
-    quant_compute_mode = c["quant_compute_mode"]
-    c.setdefault("kv_scale_dtype", resolve_kv_scale_dtype(quant_compute_mode, q_dtype))
+    quant_mode = c["quant_mode"]
+    c.setdefault("kv_scale_dtype", resolve_kv_scale_dtype(quant_mode, q_dtype))
 
     d = c["D"]
-    c.setdefault("softmax_scale", 1.0 / (d**0.5))
+    c.setdefault("softmax_scale", 1.0 / (d**0.5) if d != 0 else 1.0)
 
     b = c.get("B")
     s1 = c.get("S1")
@@ -128,7 +131,11 @@ def normalize_params(raw):
         else:
             seqused_kv = torch.tensor(c["seqused_kv"], dtype=torch.int32)
             block_size = c["block_size"]
-            min_block_num = sum([math.ceil(x / block_size) for x in seqused_kv])
+            min_block_num = (
+                sum([math.ceil(x / block_size) for x in seqused_kv])
+                if block_size != 0
+                else 0
+            )
             c["block_num"] = max(min_block_num, c.get("block_num", 0))
 
     # Resolve max_seqlen_q / max_seqlen_kv defaults (-1 means auto from seqused/s2)
@@ -136,7 +143,7 @@ def normalize_params(raw):
         if "seqused_q" in c and c["seqused_q"] is not None:
             sq = c["seqused_q"]
             c["max_seqlen_q"] = int(
-                max(sq.tolist() if isinstance(sq, torch.Tensor) else sq)
+                max(sq.tolist() if isinstance(sq, torch.Tensor) else sq, default=0)
             )
         else:
             c["max_seqlen_q"] = s1
@@ -144,7 +151,7 @@ def normalize_params(raw):
         if "seqused_kv" in c and c["seqused_kv"] is not None:
             skv = c["seqused_kv"]
             c["max_seqlen_kv"] = int(
-                max(skv.tolist() if isinstance(skv, torch.Tensor) else skv)
+                max(skv.tolist() if isinstance(skv, torch.Tensor) else skv, default=0)
             )
         else:
             c["max_seqlen_kv"] = s2

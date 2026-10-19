@@ -10,7 +10,7 @@
 
 /*!
  * \file mqfa_softmax_lse_checker.h
- * \brief Checker for softmax_lse parameter (ÎÄµµÔ¼Êø: SoftmaxLSE²ÎÊı×é)
+ * \brief Checker for softmax_lse parameter (æ–‡æ¡£çº¦æŸ: SoftmaxLSEå‚æ•°ç»„)
  */
 
 #ifndef MQFA_SOFTMAX_LSE_CHECKER_H

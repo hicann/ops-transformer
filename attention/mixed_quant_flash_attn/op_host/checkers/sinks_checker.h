@@ -10,7 +10,7 @@
 
 /*!
  * \file sinks_checker.h
- * \brief Checker for sinks parameter (ÎÄµµ²ÎÊıÃû: sinks, ÎÄµµÔ¼Êø: LearnableSink²ÎÊı×é)
+ * \brief Checker for sinks parameter (æ–‡æ¡£å‚æ•°å: sinks, æ–‡æ¡£çº¦æŸ: LearnableSinkå‚æ•°ç»„)
  */
 
 #ifndef MIXED_QUANT_FLASH_ATTN_SINKS_CHECKER_H

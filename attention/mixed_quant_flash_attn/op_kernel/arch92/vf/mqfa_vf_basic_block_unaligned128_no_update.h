@@ -17,9 +17,9 @@
 
 #include "mqfa_vf_basic_block_utils.h"
 #include "mqfa_pse.h"
-using namespace regbaseutil;
 
 namespace FaVectorApi {
+using namespace mqfaregbaseutil;
 
 template <typename T, typename T2, typename pseShiftType, uint32_t s1BaseSize = 128, uint32_t s2BaseSize = 128,
           bool hasAtten = 0, PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0, bool isMlaSgd = false,

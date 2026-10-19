@@ -60,6 +60,10 @@ struct MixedQuantFlashAttnBaseParams {
     uint32_t coreNum;
     uint32_t outputLayout;
     bool needInitOutput;
+    bool emptyTensor;
+    bool hasSink;
+    uint64_t totalOutputSize;
+    uint64_t totalLseSize;
 };
 
 struct MixedQuantFlashAttnAttenMaskParams {

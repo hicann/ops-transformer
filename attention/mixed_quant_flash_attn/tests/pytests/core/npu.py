@@ -20,7 +20,7 @@ from .cpu import get_axis_from_tensor
 from .meta_cpu.mixed_quant_flash_attn_metadata_op import MixedQuantFlashAttnMetadataOp
 
 # 'esl' 'npu'
-RUN_METHOD = "esl"
+RUN_METHOD = "npu"
 
 
 def _to_npu_quant_dtype(
@@ -94,7 +94,7 @@ class MixedFlashAttnGraphNetwork(torch.nn.Module):
             sinks=sinks,
             attn_mask=attn_mask,
             metadata=metadata,
-            quant_compute_mode=quant_compute_mode,
+            quant_mode=quant_compute_mode,
             softmax_scale=softmax_scale,
             mask_mode=mask_mode,
             win_left=win_left,
@@ -121,7 +121,9 @@ def run_npu(input_data, device_id=0, mode="eager"):
     seqused_kv = input_data["seqused_kv"]
     sinks = input_data["sinks"]
     attn_mask = input_data["attn_mask"]
-    quant_compute_mode = input_data["quant_compute_mode"]
+    quant_compute_mode = input_data.get(
+        "quant_mode", input_data.get("quant_compute_mode", 1)
+    )
     softmax_scale = input_data["softmax_scale"]
     mask_mode = input_data["mask_mode"]
     win_left = input_data["win_left"]
@@ -138,7 +140,13 @@ def run_npu(input_data, device_id=0, mode="eager"):
     d = input_data["head_dim"]
 
     # quant_compute_mode = 1
-    if RUN_METHOD == "esl":
+    has_empty_input = any(
+        tensor.numel() == 0 for tensor in (q, k, v, k_descale, v_descale)
+    )
+    if has_empty_input:
+        # Empty execution does not consume FA/FD scheduling metadata.
+        metadata = torch.zeros(16, dtype=torch.int32, device="npu:%s" % device_id)
+    elif RUN_METHOD == "esl":
         meta_op = MixedQuantFlashAttnMetadataOp()
         metadata = meta_op.npu_mixed_quant_flash_attn_metadata(
             num_heads_q=n1,
@@ -170,7 +178,7 @@ def run_npu(input_data, device_id=0, mode="eager"):
             num_heads_q=n1,
             num_heads_kv=n2,
             head_dim=d,
-            quant_compute_mode=quant_compute_mode,
+            quant_mode=quant_compute_mode,
             cu_seqlens_q=cu_seqlens_q,
             seqused_q=seqused_q,
             seqused_kv=seqused_kv,
@@ -227,7 +235,7 @@ def run_npu(input_data, device_id=0, mode="eager"):
             sinks=sinks,
             attn_mask=attn_mask,
             metadata=metadata,
-            quant_compute_mode=quant_compute_mode,
+            quant_mode=quant_compute_mode,
             softmax_scale=softmax_scale,
             mask_mode=mask_mode,
             win_left=win_left,
@@ -266,7 +274,7 @@ def run_npu(input_data, device_id=0, mode="eager"):
             sinks=sinks,
             attn_mask=attn_mask,
             metadata=metadata,
-            quant_compute_mode=quant_compute_mode,
+            quant_mode=quant_compute_mode,
             softmax_scale=softmax_scale,
             mask_mode=mask_mode,
             win_left=win_left,

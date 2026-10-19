@@ -18,6 +18,7 @@
 #include "mixed_quant_flash_attn_template_tiling_key.h"
 #include "mixed_quant_flash_attn_tiling_data.h"
 #include "arch92/mixed_quant_flash_attn_kernel_gqa.h"
+#include "arch92/mixed_quant_flash_attn_empty_kernel.h"
 
 using namespace AscendC;
 
@@ -29,8 +30,28 @@ __global__ __aicore__ void mixed_quant_flash_attn(
     __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     REGISTER_TILING_DEFAULT(optiling::MixedQuantFlashAttnTilingData);
-    __gm__ uint8_t* user = GetUserWorkspace(workspace);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+
+    GET_TILING_DATA_PTR_WITH_STRUCT(optiling::MixedQuantFlashAttnTilingData, tilingData, tiling);
+    AscendC::InitSocState();
+
+#if (ORIG_DTYPE_Q == DT_BF16)
+    using Q_T = bfloat16_t;
+    using OUT_T = bfloat16_t;
+#elif (ORIG_DTYPE_Q == DT_FLOAT16)
+    using Q_T = half;
+    using OUT_T = half;
+#endif
+
+    if (tilingData->baseTiling.mixedQuantFlashAttnBaseParams.emptyTensor) {
+        using EmptyKernel = MixedQuantFlashAttnEmpty::MixedQuantFlashAttnEmptyKernel<OUT_T, inOutLayoutType>;
+        EmptyKernel op;
+        op.Init(attnOut, softmaxLse, cuSeqLensQ, seqUsedQ, seqUsedKv, sinks, &tilingData->baseTiling);
+        op.Process();
+        return;
+    }
+
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
 
     // dc_preload(reinterpret_cast<__gm__ uint64_t*>(seqUsedQ), 0);
     dc_preload(reinterpret_cast<__gm__ uint64_t*>(seqUsedKv), 0);
@@ -42,17 +63,6 @@ __global__ __aicore__ void mixed_quant_flash_attn(
 
     fa_base_matmul::idCounterNum = 0;
 
-    GET_TILING_DATA_PTR_WITH_STRUCT(optiling::MixedQuantFlashAttnTilingData, tilingData, tiling);
-
-    AscendC::InitSocState();
-
-#if (ORIG_DTYPE_Q == DT_BF16)
-    using Q_T = bfloat16_t;
-    using OUT_T = bfloat16_t;
-#elif (ORIG_DTYPE_Q == DT_FLOAT16)
-    using Q_T = half;
-    using OUT_T = half;
-#endif
     constexpr LayOutTypeEnum qLayout = static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][0]);
     constexpr LayOutTypeEnum outLayout = static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][1]);
 

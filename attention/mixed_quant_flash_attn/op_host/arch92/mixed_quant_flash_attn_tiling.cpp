@@ -173,7 +173,9 @@ void MixedQuantFlashAttnTilingImpl::UpdateTilingKeyConfig()
 
 void MixedQuantFlashAttnTilingImpl::UpdateTilingKeyLayout()
 {
-    if (faInfo_->outLayout == FaLayout::BSND && faInfo_->qLayout == FaLayout::BNSD) {
+    if (faInfo_->qLayout == FaLayout::TND) {
+        tilingKeyInfo_.inputLayout = InOutLayoutType_TND;
+    } else if (faInfo_->outLayout == FaLayout::BSND && faInfo_->qLayout == FaLayout::BNSD) {
         tilingKeyInfo_.inputLayout = InOutLayoutType_BNSD_BSND;
     } else if (faInfo_->outLayout == FaLayout::BNSD) {
         tilingKeyInfo_.inputLayout = InOutLayoutType_BNSD;
@@ -210,12 +212,6 @@ void MixedQuantFlashAttnTilingImpl::GenTilingKey()
         GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.hasAttenMask,
                            tilingKeyInfo_.config, tilingKeyInfo_.quantComputeMode);
     OP_LOGI(faInfo_->opName, "The tilingkey is %llu.", tilingKey_);
-    fprintf(stderr,
-            "[MQFA_HOST_TILING] tilingKey=%llu inOutLayout=%llu kvLayout=%llu hasMask=%llu config=%llu "
-            "quantComputeMode=%llu\\n",
-            tilingKey_, tilingKeyInfo_.inputLayout, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.hasAttenMask,
-            tilingKeyInfo_.config, tilingKeyInfo_.quantComputeMode);
-    fflush(stderr);
     OP_LOGI(faInfo_->opName,
             "The tilingkey param is inOutLayoutType: %llu, kvLayoutType: %llu, hasAttenMask: %llu, config: %llu, "
             "quantComputeMode: %llu.",
@@ -230,9 +226,6 @@ void MixedQuantFlashAttnTilingImpl::CalcNumBlocks(uint32_t aicNum)
 
     numBlocks_ = ascendcPlatform.CalcTschBlockDim(aivNum, aicNum, aivNum);
     OP_LOGI(faInfo_->opName, "MixedQuantFlashAttn block dim: %u aiv Num: %u aic Num: %u.", numBlocks_, aivNum, aicNum);
-    fprintf(stderr, "[MQFA_HOST_TILING] numBlocks=%u aivNum=%u aicNum=%u cvRatio=%u\\n", numBlocks_, aivNum, aicNum,
-            platformInfo_.cvRatio);
-    fflush(stderr);
 }
 
 void MixedQuantFlashAttnTilingImpl::CalcWorkspaceSize()
@@ -286,6 +279,7 @@ void MixedQuantFlashAttnTilingImpl::ComputeTilingData()
         }
         maskS2Size = faInfo_->opParamInfo.attnMask.tensor->GetStorageShape().GetDim(maskDimNum - 1);
         maskS1Size = faInfo_->opParamInfo.attnMask.tensor->GetStorageShape().GetDim(maskDimNum - 2);
+        tilingData_.baseTiling.mixedQuantFlashAttnAttenMaskParams.attenMaskBatch = maskBatch;
         tilingData_.baseTiling.mixedQuantFlashAttnAttenMaskParams.attenMaskS1Size = maskS1Size;
         tilingData_.baseTiling.mixedQuantFlashAttnAttenMaskParams.attenMaskS2Size = maskS2Size;
     }
@@ -306,15 +300,9 @@ void MixedQuantFlashAttnTilingImpl::ComputeTilingData()
 
 bool MixedQuantFlashAttnTilingImpl::CheckNeedInitOutput() const
 {
-    // varlen场景可能存在长度为0的batch, 对应行无计算, 必须清零
     if (seqUsedQFlag_ || seqUsedKvFlag_) {
         return true;
     }
-    // TND变长: 各batch的s1/s2比不同, NO_MASK时每行至少算到actSeqLensKv, 有mask时可能存在空行
-    if (faInfo_->qLayout == FaLayout::TND && faInfo_->kvLayout == FaLayout::TND) {
-        return faInfo_->maskMode != static_cast<int64_t>(MaskMode::NO_MASK);
-    }
-    // 非TND固定shape: 按mask模式判断是否存在整行被mask掉的query块
     if (faInfo_->maskMode == static_cast<int64_t>(MaskMode::NO_MASK)) {
         return false;
     }
@@ -345,8 +333,9 @@ void MixedQuantFlashAttnTilingImpl::SetFATilingData()
     tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.dSize = faInfo_->qkHeadDim;
     tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.dSizeV = faInfo_->vHeadDim;
     tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.scaleValue = faInfo_->softmaxScale;
+    // 统一约定: tilingData中cuSeqLensQSize/KVSize为batch数(bSize), kernel侧按size+1访问cu_seqlens
     tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.cuSeqLensQSize =
-        faInfo_->qLayout == FaLayout::TND ? faInfo_->cuSeqLensQSize : 0;
+        faInfo_->qLayout == FaLayout::TND ? static_cast<uint32_t>(faInfo_->cuSeqLensQSize - 1) : 0;
     tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.cuSeqLensKVSize =
         faInfo_->kvLayout == FaLayout::TND ? faInfo_->bSize : 0;
     tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.seqUsedQSize = seqUsedQFlag_ ? faInfo_->seqUsedQSize : 0;
@@ -356,6 +345,13 @@ void MixedQuantFlashAttnTilingImpl::SetFATilingData()
     tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.iscuSeqLengthsNull = !cuSeqLenQFlag_;
     tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.iscuSeqLengthsKVNull = !cuSeqLenKVFlag_;
     tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.coreNum = numBlocks_;
+    tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.outputLayout = faInfo_->outLayout == FaLayout::TND ?
+                                                                            static_cast<uint32_t>(FA_LAYOUT::TND) :
+                                                                            static_cast<uint32_t>(faInfo_->outLayout);
+    tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.emptyTensor = false;
+    tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.hasSink = faInfo_->sinksFlag;
+    tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.totalOutputSize = faInfo_->totalOutputSize;
+    tilingData_.baseTiling.mixedQuantFlashAttnBaseParams.totalLseSize = faInfo_->totalLseSize;
 
     tilingData_.baseTiling.mixedQuantFlashAttnAttenMaskParams.winLefts = faInfo_->winLeft;
     tilingData_.baseTiling.mixedQuantFlashAttnAttenMaskParams.winRights = faInfo_->winRight;

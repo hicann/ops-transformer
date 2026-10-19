@@ -65,17 +65,18 @@ ASCENDC_TPL_ARGS_DECL(MixedQuantFlashAttn,
 
 ASCENDC_TPL_SEL(
 #if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
-    ASCENDC_TPL_ARGS_SEL(
-        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND, InOutLayoutType_BNSD),
-        ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA, KvLayoutType_PA_NZ,
-                             KvLayoutType_PA_BBH, KvLayoutType_PA_BNBD),
-        ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
-        ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_S1Aligned32_S2Aligned512_DAligned128_DVAligned128,
-                             Config_S1Aligned48_S2Aligned512_DAligned128_DVAligned128,
-                             Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128),
-        ASCENDC_TPL_UINT_SEL(QuantComputeMode, ASCENDC_TPL_UI_LIST, A16C4_KV_MXFP4_SOFTMAX_FP32,
-                             A16C4_KV_HIF4_SOFTMAX_FP32),
-        ASCENDC_TPL_TILING_STRUCT_SEL(MixedQuantFlashAttnTilingData)),
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
+                                              InOutLayoutType_BNSD, InOutLayoutType_TND),
+                         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA, KvLayoutType_PA_NZ,
+                                              KvLayoutType_PA_BBH, KvLayoutType_PA_BNBD),
+                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
+                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
+                                              Config_S1Aligned32_S2Aligned512_DAligned128_DVAligned128,
+                                              Config_S1Aligned48_S2Aligned512_DAligned128_DVAligned128,
+                                              Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128),
+                         ASCENDC_TPL_UINT_SEL(QuantComputeMode, ASCENDC_TPL_UI_LIST, A16C4_KV_MXFP4_SOFTMAX_FP32,
+                                              A16C4_KV_HIF4_SOFTMAX_FP32),
+                         ASCENDC_TPL_TILING_STRUCT_SEL(MixedQuantFlashAttnTilingData)),
 #else
     ASCENDC_TPL_ARGS_SEL(
         ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND, InOutLayoutType_BNSD,

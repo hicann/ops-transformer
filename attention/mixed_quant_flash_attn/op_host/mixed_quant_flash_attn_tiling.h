@@ -23,7 +23,7 @@
 
 namespace optiling {
 
-// FlashAttn 使用common中的公共结构
+// FlashAttn 浣跨敤common涓殑鍏叡缁撴瀯
 // using FlashAttnTilingData = FlashAttnSimplifiedTilingData;
 
 ASCENDC_EXTERN_C ge::graphStatus TilingMixedQuantFlashAttn(gert::TilingContext* context);

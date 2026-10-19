@@ -20,7 +20,24 @@ __golden__ = {"e2e": {"mqfa_ttk_ops.call_npu": "cpu_mixed_quant_flash_attn"}}
 import numpy as np
 import torch
 
-from core.cpu import tforward
+from core.cpu import run_cpu_golden
+
+try:
+    from ttk.utilities.container_utils import get_global_storage
+except Exception:
+    get_global_storage = None
+
+
+_GOLDEN_CONTEXT = {}
+
+
+def _get_compare_method():
+    if get_global_storage is not None:
+        try:
+            return getattr(get_global_storage(), "compare_method", None)
+        except Exception:
+            return None
+    return None
 
 
 def _to_torch(val, dtype=None):
@@ -58,7 +75,7 @@ def cpu_mixed_quant_flash_attn(
     sinks=None,
     attn_mask=None,
     metadata=None,
-    quant_compute_mode=1,
+    quant_mode=1,
     softmax_scale=1.0,
     mask_mode=0,
     win_left=-1,
@@ -87,9 +104,9 @@ def cpu_mixed_quant_flash_attn(
         "cu_seqlens_q": _to_torch(cu_seqlens_q, torch.int32),
         "seqused_q": _to_torch(seqused_q, torch.int32),
         "seqused_kv": _to_torch(seqused_kv, torch.int32),
-        "sinks": _to_torch(sinks),
+        "sinks": _to_torch(sinks, torch.float32),
         "attn_mask": _to_torch(attn_mask, torch.int8),
-        "quant_compute_mode": int(quant_compute_mode),
+        "quant_mode": int(quant_mode),
         "softmax_scale": float(softmax_scale),
         "mask_mode": int(mask_mode),
         "win_left": int(win_left),
@@ -100,33 +117,78 @@ def cpu_mixed_quant_flash_attn(
         "layout_kv": layout_kv,
         "layout_attn_out": layout_attn_out,
         "return_softmax_lse": bool(return_softmax_lse),
+        "sinner": int(kwargs.get("sinner", 512)),
+        "souter": int(kwargs.get("souter", 32)),
     }
 
-    # tforward 内部会调 unpack_int4(k/v) 把 uint8 解包为逻辑 fp4
-    sinner = int(kwargs.get("sinner", 512))
-    souter = int(kwargs.get("souter", 32))
-    out_cpu, x_max, x_sum = tforward(sinner=sinner, souter=souter, **input_kwargs)
-    lse = torch.log(x_sum) + x_max
-    if seqused_q is not None or seqused_kv is not None:
-        batch = lse.shape[0]
-        for b in range(batch):
-            if (
-                seqused_kv is not None
-                and int(seqused_kv[b]) == 0
-                and layout_q in ("BNSD", "BSND")
-            ):
-                lse[b, :, :] = float("inf")
-                continue
-            if seqused_q is not None:
-                s_used = (
-                    seqused_q[b]
-                    if isinstance(seqused_q, torch.Tensor)
-                    else seqused_q[b]
-                )
-                lse[b, :, s_used:] = float("inf")
+    result = run_cpu_golden(dict(input_kwargs))
+    if _get_compare_method() == "cross_check":
+        # 第三方(高精度) golden：use_npu=True 走 aclnnBatchMatMul 的 fp32 路径。
+        _GOLDEN_CONTEXT["data_type"] = str(getattr(q, "dtype", "bfloat16"))
+        try:
+            bench = run_cpu_golden({**input_kwargs, "use_npu": True})
+            _GOLDEN_CONTEXT["bench_outputs"] = (bench["attn_out"], bench["softmax_lse"])
+        except Exception:
+            _GOLDEN_CONTEXT["bench_outputs"] = None
+    return result["attn_out"], result["softmax_lse"]
 
-    # 算子返回 (attn_out, softmax_lse)
-    # return_softmax_lse=False 时 NPU 输出 softmax_lse 为空，golden 也应返回空
-    if return_softmax_lse:
-        return out_cpu, lse
-    return out_cpu, torch.tensor([], dtype=torch.float32)
+
+def get_golden_context():
+    return _GOLDEN_CONTEXT
+
+
+def rebuild_golden_context_from_compare_context(compare_context):
+    """Re-run the high-precision benchmark (use_npu=True) from compare_context.
+
+    TTK 可能在独立进程里跑 golden 与 compare，cross_check 需要在 compare 进程里
+    重建 bench_outputs。仅计算第三方结果（golden 本体已由 TTK 传入）。
+    """
+    if compare_context is None:
+        return
+    try:
+        tensors = (
+            list(compare_context.input_tensors)
+            if compare_context.input_tensors is not None
+            else []
+        )
+        attrs = dict(compare_context.attributes or {})
+
+        def _t(idx):
+            return tensors[idx] if idx < len(tensors) else None
+
+        def _attr(*names, default=None):
+            for n in names:
+                if n in attrs:
+                    return attrs[n]
+            return default
+
+        input_kwargs = {
+            "q": _to_torch(_t(0), torch.bfloat16),
+            "k": _to_torch(_t(1), torch.uint8),
+            "v": _to_torch(_t(2), torch.uint8),
+            "k_descale": _to_torch(_t(3)),
+            "v_descale": _to_torch(_t(4)),
+            "block_table": _to_torch(_t(5), torch.int32),
+            "cu_seqlens_q": _to_torch(_t(6), torch.int32),
+            "seqused_q": _to_torch(_t(7), torch.int32),
+            "seqused_kv": _to_torch(_t(8), torch.int32),
+            "sinks": _to_torch(_t(9), torch.float32),
+            "attn_mask": _to_torch(_t(10), torch.int8),
+            "quant_mode": int(_attr("quant_mode", "quant_compute_mode", default=1)),
+            "softmax_scale": float(_attr("softmax_scale", default=1.0)),
+            "mask_mode": int(_attr("mask_mode", default=0)),
+            "win_left": int(_attr("win_left", default=-1)),
+            "win_right": int(_attr("win_right", default=-1)),
+            "max_seqlen_q": int(_attr("max_seqlen_q", default=-1)),
+            "max_seqlen_kv": int(_attr("max_seqlen_kv", default=-1)),
+            "layout_q": _attr("layout_q", default="BSND"),
+            "layout_kv": _attr("layout_kv", default="PA_BBND"),
+            "layout_attn_out": _attr("layout_attn_out", default="BSND"),
+            "return_softmax_lse": bool(_attr("return_softmax_lse", default=False)),
+            "sinner": int(_attr("sinner", default=512)),
+            "souter": int(_attr("souter", default=32)),
+        }
+        bench = run_cpu_golden({**input_kwargs, "use_npu": True})
+        _GOLDEN_CONTEXT["bench_outputs"] = (bench["attn_out"], bench["softmax_lse"])
+    except Exception:
+        _GOLDEN_CONTEXT["bench_outputs"] = None

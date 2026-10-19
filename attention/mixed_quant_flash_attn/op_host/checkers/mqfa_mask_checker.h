@@ -10,7 +10,7 @@
 
 /*!
  * \file mqfa_mask_checker.h
- * \brief Checker for mask_mode, attn_mask, win_left, win_right parameters (ÎÄµµÔ¼Êø: Mask²ÎÊı×é)
+ * \brief Checker for mask_mode, attn_mask, win_left, win_right parameters (æ–‡æ¡£çº¦æŸ: Maskå‚æ•°ç»„)
  */
 
 #ifndef MQFA_MASK_CHECKER_H

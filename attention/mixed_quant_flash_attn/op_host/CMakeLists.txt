@@ -52,9 +52,9 @@ if (NOT BUILD_OPS_RTY_KERNEL)
     arch92/mixed_quant_flash_attn_tiling.cpp
     )
     add_modules_sources_with_soc(
-        # 该变量用于判断op_api目录是否从op_host移出
+        # 璇ュ彉閲忕敤浜庡垽鏂璷p_api鐩綍鏄惁浠巓p_host绉诲嚭
         OP_API_INDEPENDENT ON
-        # op_api新的地址
+        # op_api鏂扮殑鍦板潃
         OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api
         OPTYPE mixed_quant_flash_attn
         ACLNNTYPE aclnn_inner
