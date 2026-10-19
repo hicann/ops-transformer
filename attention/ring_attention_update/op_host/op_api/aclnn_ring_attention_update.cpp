@@ -201,6 +201,7 @@ static aclnnStatus AnalysisAxis(const aclTensor* prevAttnOut, const aclTensor* p
     if (paShape.GetDimNum() != DIM_NUM_3 || caShape.GetDimNum() != DIM_NUM_3) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "the shape of prevAttnOut(%ld) or curAttnOut(%ld) is not supported.",
                 paShape.GetDimNum(), caShape.GetDimNum());
+        return ACLNN_ERR_PARAM_INVALID;
     }
 
     int headDimIndex = 0;
