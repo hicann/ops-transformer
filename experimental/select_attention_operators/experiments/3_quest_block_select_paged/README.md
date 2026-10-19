@@ -2,12 +2,12 @@
 
 This experiment checks the functional correctness and the performance of the paged version of the quest predictor.
 
-### Scenario parameters
+## Scenario parameters
 
  - `k` - number of the selected elements
  - `MMBPR` - maximum number of metadata blocks per request. Note that each metadata block (actually 2 metadata blocks: minblock and its corresponding maxblock) carries metadata of BLOCK_SIZE=128 KV-blocks, and since each of these KV-blocks carries BLOCK_SIZE=128 tokens --> one metadata block supports 128*128=16,384 tokens. Hence MBPR=10 supports sequence lengths of 160k tokens.
 
-### Test the operator first
+## Test the operator first
 
 To verify it was properly built
 
@@ -16,7 +16,7 @@ pytest -k basic -v  # run only basic sweep
 pytest .            # run all tests
 ```
 
-### Run a single scenario
+## Run a single scenario
 
 To run an in-depth comparison between a kernel and its reference implementation in python:
 
@@ -24,7 +24,7 @@ To run an in-depth comparison between a kernel and its reference implementation 
 python test_quest_block_select_paged.py
 ```
 
-### Run benchmarking
+## Run benchmarking
 
 To see latency and memory bandwidth
 
@@ -33,9 +33,9 @@ python ./benchmark_quest_block_select_paged.py | tee run_bench_quest_block_selec
 
 ```
 
-This benchmarks the two operator variants (with preallocated output and without) on float16 and bfloat16 data types on x86 host and 910B4 card. 
-Note that bfloat16 causes lower bandwidths due to the necessity to cast to bf16->float32 in the vector unit, and to use larger buffers compared 
-to ones used for float16 precision (which is natively supported in the vector unit). This could be mitigated by significantly complicating the 
+This benchmarks the two operator variants (with preallocated output and without) on float16 and bfloat16 data types on x86 host and 910B4 card.
+Note that bfloat16 causes lower bandwidths due to the necessity to cast to bf16->float32 in the vector unit, and to use larger buffers compared
+to ones used for float16 precision (which is natively supported in the vector unit). This could be mitigated by significantly complicating the
 kernel and introducing further tiling along the block_size dimension.
 
 ```bash

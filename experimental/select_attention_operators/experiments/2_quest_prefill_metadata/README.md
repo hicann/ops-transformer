@@ -2,7 +2,7 @@
 
 This experiment checks the functional correctness and the performance of quest prefill metadata kernel that should be launched to create the quest metadata blocks out of the KV cache that had already underwent prefill.
 
-### Scenario parameters
+## Scenario parameters
 
  - `BLOCK_SIZE` - fixed to 128 as commonly used in paged attention
  - `D` - fixed to 128 as commonly used in LLMs
@@ -11,7 +11,7 @@ This experiment checks the functional correctness and the performance of quest p
  - `MKBPR` - number of KV blocks per request (dictates the sequence length)
  - `MMBPR` - directly derived from _MKBPR_ as: _cdiv(MKBPR, BLOCK_SIZE)_
 
-### Test the operator first
+## Test the operator first
 
 To verify it was properly built
 
@@ -20,7 +20,7 @@ pytest -k basic -v  # run only basic sweep
 pytest .            # run all tests
 ```
 
-### Run a single scenario
+## Run a single scenario
 
 To run an in-depth comparison between a kernel and its reference implementation in python, dump all output tensors:
 
@@ -28,12 +28,12 @@ To run an in-depth comparison between a kernel and its reference implementation 
 python test_quest_prefill_metadata.py
 ```
 
-### Run benchmarking
+## Run benchmarking
 
 To see latency and memory bandwidth
 
 ```bash
- python benchmark_quest_prefill_metadata.py 
+ python benchmark_quest_prefill_metadata.py
 ```
 
 when setting the DTYPE to float16, benchmarking on x86 host and 910B4 card shows that the kernel reaches at least 0.55 TB/sec out of 0.80 TB/sec nominal Global memory BW of 910B4 - 69% bandwidth utilization.

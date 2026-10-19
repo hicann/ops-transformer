@@ -2,7 +2,7 @@
 
 the kernel adds between 0, 1, or 2 last blocks to the selected blocks (as the last selected blocks out of the k)
 
-### Run benchmarking
+## Run benchmarking
 
 To see latency and memory bandwidth
 
