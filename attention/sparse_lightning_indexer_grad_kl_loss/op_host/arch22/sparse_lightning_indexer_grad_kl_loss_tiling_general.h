@@ -98,6 +98,7 @@ protected:
 
     void GetActualSeqLenData(int64_t inputIdx, std::vector<int64_t> &res, int64_t &actualLen) const;
     ge::graphStatus CheckContext();
+    ge::graphStatus CheckOutPut();
     bool AnalyzeAttrs();
     bool CrossShapeVerify(const gert::Shape &queryRopeShape, const gert::Shape &keyRopeShap);
     bool AnalyzeDimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape,
