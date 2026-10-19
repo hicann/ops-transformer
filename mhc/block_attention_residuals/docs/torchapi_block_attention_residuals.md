@@ -79,7 +79,7 @@
     - $block\_res \in \mathbb{R}^{T \times N \times H}$ 表示输入 `block_res`，作为拼接后的前 $N$ 行 value。
     - $proj\_weight$ 表示输入 `proj_weight`，shape 为 $[1, H]$；$proj\_weight_{0,h}$ 表示其第 $h$ 个元素。
     - $norm\_weight \in \mathbb{R}^{H}$ 表示输入 `norm_weight`。
-    - $valid\_block\_num$ 表示输入 `valid_block_num`。为可选预留属性，默认值为 `-1`，当前仅支持传入 `-1`，不参与计算。
+    - $valid\_block\_num$ 表示输入 `valid_block_num`。为可选预留属性，默认值为 `-1`，当前仅支持传入 `-1`（表示使用 `N`）或 `N`（`block_res.shape[1]`），不参与计算。
     - $norm\_eps$ 表示输入 `norm_eps`，是计算 RMS 归一化因子时使用的数值稳定项。
     - $t \in [0, T)$、$i \in [0, N]$、$h \in [0, H)$ 分别表示 token、逻辑行和 hidden dimension 的索引。
     - $v_{t,i,h}$ 表示拼接后的 value；$inv\_rms_{t,i}$ 表示逐行 RMS 归一化系数；$score\_weight_{h}$ 表示 `norm_weight` 与 `proj_weight` 逐元素相乘结果。
@@ -107,7 +107,7 @@ cann_ops_transformer.block_attention_residuals(
 | block_res | Tensor | 必选 | 前 $N$ 行 value，对应公式中的 $block\_res$。数据格式为 ND；dtype 必须与 `partial_block` 一致。 | 同 partial_block | [T, N, H] |
 | proj_weight | Tensor | 必选 | 投影权重，与 `norm_weight` 共同构成 $score\_weight$。数据格式为 ND；dtype 必须与 `partial_block` 一致。 | 同 partial_block | [1, H] |
 | norm_weight | Tensor | 必选 | RMS 缩放权重。数据格式为 ND；dtype 必须与 `partial_block` 一致。 | 同 partial_block | [H] |
-| valid_block_num | int | 可选 | 预留属性，默认值为 `-1`，当前仅支持传入 `-1`，不参与计算。 | int | - |
+| valid_block_num | int | 可选 | 预留属性，默认值为 `-1`，当前仅支持传入 `-1`（表示使用 `N`）或 `N`（`block_res.shape[1]`），不参与计算。 | int | - |
 | norm_eps | float | 可选 | RMS 归一化的数值稳定项，必须为有限正数，默认值为 `1.0e-6`。 | float | - |
 
 ## 返回值说明
@@ -124,7 +124,7 @@ cann_ops_transformer.block_attention_residuals(
 - 主路径 dtype 必须一致，支持 float16 / bfloat16 / float32。
 - shape 要求：`T >= 0`，`H >= 0`，`1 <= N <= 100`。`T == 0` 或 `H == 0` 时返回对应 shape 的空输出。
 - `block_res.shape[0]`、`block_res.shape[2]` 必须分别等于 `partial_block` 的 $T$、$H$；`proj_weight` 最后一维与 `norm_weight` 长度必须等于 $H$。
-- `valid_block_num` 为可选预留属性，默认值为 `-1`，当前仅支持传入 `-1`，不参与计算。
+- `valid_block_num` 为可选预留属性，默认值为 `-1`，当前仅支持传入 `-1`（表示使用 `N`）或 `N`（`block_res.shape[1]`），不参与计算。
 - `norm_eps` 必须为有限正数。
 - `partial_block` 或 `block_res` 含 `NaN`、`Inf`，或平方、乘法及累加发生溢出时，结果可能包含 `NaN` 或 `Inf`。
 

@@ -116,10 +116,10 @@
 
         - 3.根据分组确定的入参进行如下计算：
 
-          - 3.1.将左矩阵$\mathbb{Z_8}$，转变为高低位两部分的$\mathbb{Z_4}$
+          - 3.1. 将左矩阵$\mathbb{Z}_8$，转变为高低位两部分的$\mathbb{Z}_4$
             $X\_high\_4bits_{i} = \lfloor \frac{X_{i}}{16} \rfloor$
-            $X\_low\_4bits_{i} = X_{i} \& 0x0f - 8$
-          - 3.2.做矩阵乘时，开启per-channel或per-group量化
+            $X\_low\_4bits_{i} = (X_{i} \& 0x0f) - 8$
+          - 3.2. 做矩阵乘时，采用per-channel或per-group量化
             per-channel：
 
             $C\_high_{i} = (X\_high\_4bits_{i} \cdot W_{i}) \odot w\_scale_{i}$
