@@ -27,7 +27,7 @@ public:
     __aicore__ inline MoeV2SortOneCore(){};
     __aicore__ inline void Init(GM_ADDR expertIdx, GM_ADDR expertTokensCountOrCumsum,
                                 GM_ADDR expertTokensBeforeCapacity, GM_ADDR workspace,
-                                const MoeInitRoutingV2TilingData* tilingData, TPipe* tPipe);
+                                const MoeInitRoutingV2Arch35TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -112,7 +112,7 @@ __aicore__ inline void MoeV2SortOneCore<T>::CopyOut()
 template <typename T>
 __aicore__ inline void MoeV2SortOneCore<T>::Init(GM_ADDR expertIdx, GM_ADDR expertTokensCountOrCumsum,
                                                  GM_ADDR expertTokensBeforeCapacity, GM_ADDR workspace,
-                                                 const MoeInitRoutingV2TilingData* tilingData, TPipe* tPipe)
+                                                 const MoeInitRoutingV2Arch35TilingData* tilingData, TPipe* tPipe)
 {
     this->blockIdx = GetBlockIdx();
     this->tileLength = Align(tilingData->vbsComputeParamsOp.lastCorePerLoopElements, sizeof(int32_t));

@@ -28,7 +28,7 @@ public:
     __aicore__ inline MoeV2SortMultiCore(){};
     __aicore__ inline void Init(GM_ADDR expertIdx, GM_ADDR expertTokensCountOrCumsum,
                                 GM_ADDR expertTokensBeforeCapacity, GM_ADDR workspace,
-                                const MoeInitRoutingV2TilingData* tilingData, TPipe* tPipe);
+                                const MoeInitRoutingV2Arch35TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -51,9 +51,9 @@ private:
     GlobalTensor<T> expertIdxGm;
     GlobalTensor<float> workspaceGms[2];
 
-    const MoeV2VBSComputeTilingData* vbsTilingData;
-    const MoeV2VMSMiddleComputeTilingData* vmsTilingData;
-    const MoeV2SortOutComputeTilingData* sortOutTilingData;
+    const MoeV2Arch35VBSComputeTilingData* vbsTilingData;
+    const MoeV2Arch35VMSMiddleComputeTilingData* vmsTilingData;
+    const MoeV2Arch35SortOutComputeTilingData* sortOutTilingData;
 
     // for MoeMrgsort
     MoeV2Mrgsort mrgsorter;
@@ -139,7 +139,8 @@ __aicore__ inline void MoeV2SortMultiCore<T>::InitBuffers(GM_ADDR expertIdx, GM_
     }
     pipe->InitBuffer(sortDataCopyOutQueue, bufferNum, bufferSize);
     pipe->InitBuffer(sortedBuffer, bufferSize);
-#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)) && !defined(__DAV_C220__)
+#if !(defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))) && \
+    !defined(__DAV_C220__)
     pipe->InitBuffer(tempBuffer, bufferSize);
 #endif
 }
@@ -182,7 +183,8 @@ __aicore__ inline void MoeV2SortMultiCore<T>::UBSortCompute(int64_t progress, in
     }
 
     LocalTensor<float> concatLocal;
-#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)) && !defined(__DAV_C220__)
+#if !(defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))) && \
+    !defined(__DAV_C220__)
     LocalTensor<float> tempTensor = tempBuffer.Get<float>(GetSortLen<float>(sortNum));
     Concat(concatLocal, expertForSourceRowLocalFp32, tempTensor, sortNum / ONE_REPEAT_SORT_NUM);
 #else
@@ -371,7 +373,7 @@ __aicore__ inline void MoeV2SortMultiCore<T>::SortOutProcess()
 template <typename T>
 __aicore__ inline void MoeV2SortMultiCore<T>::Init(GM_ADDR expertIdx, GM_ADDR expertTokensCountOrCumsum,
                                                    GM_ADDR expertTokensBeforeCapacity, GM_ADDR workspace,
-                                                   const MoeInitRoutingV2TilingData* tilingData, TPipe* tPipe)
+                                                   const MoeInitRoutingV2Arch35TilingData* tilingData, TPipe* tPipe)
 {
     this->totalLength = tilingData->n * tilingData->k;
     this->coreNum = tilingData->coreNum;

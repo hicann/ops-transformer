@@ -26,6 +26,7 @@ const static int64_t TILING_KEY_DROP_PAD_MODE_HIST_REGBASE_SORT_ONE_CORE = 11011
 const static int64_t TILING_KEY_DROP_PAD_MODE_HIST_REGBASE_SORT_MULTI_CORE = 11012;
 const static int64_t TILING_KEY_HIGH_PERFORMANCE = 20000;
 const static int64_t HIST_REGBASE_MAX_EXPERT_NUM = 256;
+const static int64_t SORT_API_MAX_ELEM = 32 * 255LL; // AscendC::Sort全排序模式最多支持一次排序(32*255rep)个元素
 const static int64_t NUM_TWO = 2;
 const static int64_t NUM_THREE = 3;
 const static int64_t NUM_FOUR = 4;
@@ -385,6 +386,8 @@ ge::graphStatus InnerMoeInitRoutingV2TilingBase::DoOpTiling()
     // SORT32_ALIGN_ELEMENT 32Bytes aligned
     sortLoopMaxElement =
         (aicoreParams_.ubSize) / (sizeof(int32_t) * NUM_TWO * NUM_FOUR) / SORT32_ALIGN_ELEMENT * SORT32_ALIGN_ELEMENT;
+    sortLoopMaxElement =
+        std::min(sortLoopMaxElement, SORT_API_MAX_ELEM); // 限制单核排序的元素个数在AscendC::Sort全排序的能力范围内
 
     if (!regBase) {
         isFullLoad = IsFullLoad();

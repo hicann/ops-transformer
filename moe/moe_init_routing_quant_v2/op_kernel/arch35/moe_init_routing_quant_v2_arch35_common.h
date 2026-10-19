@@ -16,8 +16,9 @@
 #define MOE_INIT_ROUTING_QUANT_V2_ARCH35_COMMON_H
 
 #include "kernel_operator.h"
+#include "moe_init_routing_quant_v2_arch35_tiling_def.h"
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
 #define THREAD_NUM 2048
 #endif
 

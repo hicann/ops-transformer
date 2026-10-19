@@ -50,9 +50,9 @@ private:
 private:
     GlobalTensor<float> workspaceGms[2];
 
-    const InnerMoeV2VBSComputeTilingData* vbsTilingData;
-    const InnerMoeV2VMSMiddleComputeTilingData* vmsTilingData;
-    const InnerMoeV2SortOutComputeTilingData* sortOutTilingData;
+    MoeV2Arch35VBSComputeTilingData vbsTilingData;
+    MoeV2Arch35VMSMiddleComputeTilingData vmsTilingData;
+    MoeV2Arch35SortOutComputeTilingData sortOutTilingData;
 
     // for MoeMrgsort
     MoeV2Mrgsort mrgsorter;
@@ -65,9 +65,9 @@ private:
     int64_t perListElements;
     int64_t lastListElements;
 
-    int64_t perCoreExpert;
-    int64_t needInitExpertCore;
-    int64_t currentCoreExpert;
+    int64_t perCoreExpert{0};
+    int64_t needInitExpertCore{0};
+    int64_t currentCoreExpert{0};
 
     int64_t sortTotalLength;
     int64_t sortCoreLoops;
@@ -98,7 +98,7 @@ __aicore__ inline void MoeV2SortMultiCore::VBSCopyIn(int64_t progress, int64_t s
     DataCopyPad(inLocal[0], expertIdxGm[inOffset], dataCopyParams, dataCopyPadParams);
 
     LocalTensor<int32_t> rowIdxLocal = inLocal[sortNum];
-    int64_t startValue = this->blockIdx * this->vbsTilingData->perCoreElements + inOffset;
+    int64_t startValue = this->blockIdx * this->vbsTilingData.perCoreElements + inOffset;
     SetWaitFlag<HardEvent::MTE3_S>(HardEvent::MTE3_S);
     ArithProgressionPerf(rowIdxLocal, startValue, 1, size);
     sortDataCopyInQueue.EnQue(inLocal);
@@ -136,7 +136,7 @@ __aicore__ inline void MoeV2SortMultiCore::UBSortCompute(int64_t progress, int64
 __aicore__ inline void MoeV2SortMultiCore::VBSCopyOut(int64_t progress, int64_t size, int64_t sortNum)
 {
     LocalTensor<float> outLocal = sortDataCopyOutQueue.DeQue<float>();
-    DataCopy(workspaceGms[0][this->blockIdx * GetSortLen<float>(this->vbsTilingData->perCoreElements) +
+    DataCopy(workspaceGms[0][this->blockIdx * GetSortLen<float>(this->vbsTilingData.perCoreElements) +
                              GetSortLen<float>(progress * sortCoreLoopElements)],
              outLocal, Align(GetSortLen<float>(size), sizeof(float)));
     sortDataCopyOutQueue.FreeTensor(outLocal);
@@ -148,7 +148,7 @@ __aicore__ inline void MoeV2SortMultiCore::InitMoeMrgSort(MoeV2Mrgsort* sorter, 
     GlobalTensor<float> srcWsGm = workspaceGms[srcWsIndex][blockIdx * coreOffset + loopOffset];
     LocalTensor<float> inLocal = sortDataCopyInQueue.AllocTensor<float>();
     for (int64_t i = 0; i < listNum; i++) {
-        LocalTensor<float> inLocalT = inLocal[GetSortLen<float>(this->sortOutTilingData->oneLoopMaxElements) * i];
+        LocalTensor<float> inLocalT = inLocal[GetSortLen<float>(this->sortOutTilingData.oneLoopMaxElements) * i];
         sorter->SetInput(srcWsGm, inLocalT);
     }
     LocalTensor<float> outLocal = sortDataCopyOutQueue.AllocTensor<float>();
@@ -166,15 +166,15 @@ __aicore__ inline void MoeV2SortMultiCore::InitMoeMrgSortOut(MoeV2MrgsortOut* so
     LocalTensor<float> outLocal = sortDataCopyOutQueue.AllocTensor<float>();
 
     for (int64_t i = 0; i < listNum; i++) {
-        LocalTensor<float> inLocalT = inLocal[GetSortLen<float>(this->sortOutTilingData->oneLoopMaxElements) * i];
+        LocalTensor<float> inLocalT = inLocal[GetSortLen<float>(this->sortOutTilingData.oneLoopMaxElements) * i];
         sorter->SetInput(srcWsGm, inLocalT);
     }
 
-    LocalTensor<float> outLocalV = outLocal[this->sortOutTilingData->oneLoopMaxElements * MAX_MRGSORT_LIST];
+    LocalTensor<float> outLocalV = outLocal[this->sortOutTilingData.oneLoopMaxElements * MAX_MRGSORT_LIST];
     sorter->SetOutput(this->sortedexpertIdxGm, this->expandDstToSrcRowGm, outLocal, outLocalV);
 
     LocalTensor<float> tempBuffer =
-        sortedBuffer.Get<float>(GetSortLen<float>(this->sortOutTilingData->oneLoopMaxElements) * MAX_MRGSORT_LIST);
+        sortedBuffer.Get<float>(GetSortLen<float>(this->sortOutTilingData.oneLoopMaxElements) * MAX_MRGSORT_LIST);
     sorter->SetBuffer(tempBuffer);
     sortDataCopyInQueue.FreeTensor(inLocal);
     sortDataCopyOutQueue.FreeTensor(outLocal);
@@ -183,8 +183,8 @@ __aicore__ inline void MoeV2SortMultiCore::InitMoeMrgSortOut(MoeV2MrgsortOut* so
 __aicore__ inline void MoeV2SortMultiCore::OneCoreVMSProcess(int64_t listNum, int64_t perListElements,
                                                              int64_t lastListElements)
 {
-    int64_t coreOffset = GetSortLen<float>(this->vbsTilingData->perCoreElements);
-    mrgsortParam.oneLoopMaxElements = this->sortOutTilingData->oneLoopMaxElements;
+    int64_t coreOffset = GetSortLen<float>(this->vbsTilingData.perCoreElements);
+    mrgsortParam.oneLoopMaxElements = this->sortOutTilingData.oneLoopMaxElements;
 
     for (int64_t i = 0; listNum >= 1; i++) {
         int64_t loops = (listNum + MAX_MRGSORT_LIST - 1) / MAX_MRGSORT_LIST;
@@ -226,7 +226,7 @@ __aicore__ inline void MoeV2SortMultiCore::UBSortProcess(int64_t progress, int64
 
 __aicore__ inline void MoeV2SortMultiCore::VBSProcess()
 {
-    if (this->blockIdx < this->vbsTilingData->needCoreNum) {
+    if (this->blockIdx < this->vbsTilingData.needCoreNum) {
         int64_t sortNum = Ceil(sortCoreLoopElements, ONE_REPEAT_SORT_NUM) * ONE_REPEAT_SORT_NUM;
         for (int64_t loop = 0; loop < sortCoreLoops - 1; loop++) {
             UBSortProcess(loop, sortCoreLoopElements, sortNum);
@@ -244,10 +244,10 @@ __aicore__ inline void MoeV2SortMultiCore::VBSProcess()
 
 __aicore__ inline void MoeV2SortMultiCore::VMSProcess()
 {
-    int64_t currentStageNeedCoreNum = this->vmsTilingData->needCoreNum;
-    perListElements = this->vbsTilingData->perCoreElements;
-    lastListElements = this->vbsTilingData->lastCoreElements;
-    listNum = this->vbsTilingData->needCoreNum;
+    int64_t currentStageNeedCoreNum = this->vmsTilingData.needCoreNum;
+    perListElements = this->vbsTilingData.perCoreElements;
+    lastListElements = this->vbsTilingData.lastCoreElements;
+    listNum = this->vbsTilingData.needCoreNum;
 
     for (; listNum > MAX_MRGSORT_LIST;) {
         currentStageNeedCoreNum = Ceil(listNum, MAX_MRGSORT_LIST);
@@ -257,14 +257,14 @@ __aicore__ inline void MoeV2SortMultiCore::VMSProcess()
         if (this->blockIdx == currentStageNeedCoreNum - 1) {
             mrgsortParam.perListElements = perListElements;
             mrgsortParam.lastListElements = lastListElements;
-            mrgsortParam.oneLoopMaxElements = this->sortOutTilingData->oneLoopMaxElements;
+            mrgsortParam.oneLoopMaxElements = this->sortOutTilingData.oneLoopMaxElements;
             InitMoeMrgSort(&mrgsorter, remainListNum, coreOffset, 0);
             mrgsorter.Init(&mrgsortParam);
             mrgsorter.Process();
         } else if (this->blockIdx < currentStageNeedCoreNum - 1) {
             mrgsortParam.perListElements = perListElements;
             mrgsortParam.lastListElements = perListElements;
-            mrgsortParam.oneLoopMaxElements = this->sortOutTilingData->oneLoopMaxElements;
+            mrgsortParam.oneLoopMaxElements = this->sortOutTilingData.oneLoopMaxElements;
             InitMoeMrgSort(&mrgsorter, MAX_MRGSORT_LIST, coreOffset, 0);
             mrgsorter.Init(&mrgsortParam);
             mrgsorter.Process();
@@ -284,7 +284,7 @@ __aicore__ inline void MoeV2SortMultiCore::SortOutProcess()
     if (this->blockIdx < 1) {
         mrgsortParam.perListElements = perListElements;
         mrgsortParam.lastListElements = lastListElements;
-        mrgsortParam.oneLoopMaxElements = this->sortOutTilingData->oneLoopMaxElements;
+        mrgsortParam.oneLoopMaxElements = this->sortOutTilingData.oneLoopMaxElements;
 
         MoeV2MrgsortOut sorter;
         InitMoeMrgSortOut(&sorter, listNum, GetSortLen<float>(perListElements));
@@ -299,17 +299,17 @@ __aicore__ inline void MoeV2SortMultiCore::InitTilingData(const TilingData* tili
 {
     this->totalLength = tilingData->n * tilingData->k;
     this->coreNum = tilingData->coreNum;
-    this->vbsTilingData = &(tilingData->vbsComputeParamsOp);
-    this->vmsTilingData = &(tilingData->vmsMiddleComputeParamsOp);
-    this->sortOutTilingData = &(tilingData->sortOutComputeParamsOp);
+    this->vbsTilingData = tilingData->vbsComputeParamsOp;
+    this->vmsTilingData = tilingData->vmsMiddleComputeParamsOp;
+    this->sortOutTilingData = tilingData->sortOutComputeParamsOp;
 
     this->blockIdx = GetBlockIdx();
     if (this->blockIdx == tilingData->vbsComputeParamsOp.needCoreNum - 1) {
-        this->tileLength = this->vbsTilingData->lastCorePerLoopElements;
-        this->sortTotalLength = this->vbsTilingData->lastCoreElements;
+        this->tileLength = this->vbsTilingData.lastCorePerLoopElements;
+        this->sortTotalLength = this->vbsTilingData.lastCoreElements;
     } else {
-        this->tileLength = this->vbsTilingData->perCorePerLoopElements;
-        this->sortTotalLength = this->vbsTilingData->perCoreElements;
+        this->tileLength = this->vbsTilingData.perCorePerLoopElements;
+        this->sortTotalLength = this->vbsTilingData.perCoreElements;
     }
     this->n = tilingData->n;
     this->k = tilingData->k;
@@ -318,14 +318,14 @@ __aicore__ inline void MoeV2SortMultiCore::InitTilingData(const TilingData* tili
     this->expertTokensBeforeCapacityFlag = tilingData->expertTokensBeforeCapacityFlag;
 
     // VBS param init
-    if (this->blockIdx == this->vbsTilingData->needCoreNum - 1) {
-        sortCoreLoops = this->vbsTilingData->lastCoreLoops;
-        sortCoreLoopElements = this->vbsTilingData->lastCorePerLoopElements;
-        sortCoreLastLoopElements = this->vbsTilingData->lastCoreLastLoopElements;
+    if (this->blockIdx == this->vbsTilingData.needCoreNum - 1) {
+        sortCoreLoops = this->vbsTilingData.lastCoreLoops;
+        sortCoreLoopElements = this->vbsTilingData.lastCorePerLoopElements;
+        sortCoreLastLoopElements = this->vbsTilingData.lastCoreLastLoopElements;
     } else {
-        sortCoreLoops = this->vbsTilingData->perCoreLoops;
-        sortCoreLoopElements = this->vbsTilingData->perCorePerLoopElements;
-        sortCoreLastLoopElements = this->vbsTilingData->perCoreLastLoopElements;
+        sortCoreLoops = this->vbsTilingData.perCoreLoops;
+        sortCoreLoopElements = this->vbsTilingData.perCorePerLoopElements;
+        sortCoreLastLoopElements = this->vbsTilingData.perCoreLastLoopElements;
     }
 }
 
@@ -371,7 +371,7 @@ __aicore__ inline void MoeV2SortMultiCore::Init(GM_ADDR expertIdx, GM_ADDR exper
         (__gm__ float*)workspace + Align(this->totalLength, sizeof(int32_t)) * (kvFactor + 2),
         Align(this->totalLength, sizeof(int32_t)) * kvFactor);
 
-    int64_t bufferSize = Ceil(Max(this->sortOutTilingData->oneLoopMaxElements * MAX_MRGSORT_LIST, sortCoreLoopElements),
+    int64_t bufferSize = Ceil(Max(this->sortOutTilingData.oneLoopMaxElements * MAX_MRGSORT_LIST, sortCoreLoopElements),
                               ONE_REPEAT_SORT_NUM) *
                          ONE_REPEAT_SORT_NUM * sizeof(int32_t) * kvFactor;
     pipe->InitBuffer(sortDataCopyInQueue, bufferNum, bufferSize);

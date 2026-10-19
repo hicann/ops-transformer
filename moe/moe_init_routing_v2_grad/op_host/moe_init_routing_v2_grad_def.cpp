@@ -53,6 +53,8 @@ public:
             .ExtendCfgInfo("opFile.value", "moe_init_routing_v2_grad_apt");
         this->AICore().AddConfig("ascend950", regbaseCfg);
         this->AICore().AddConfig("ascend350", regbaseCfg);
+        this->AICore().AddConfig("ascend960pr", regbaseCfg);
+        this->AICore().AddConfig("ascend960dt", regbaseCfg);
     }
 };
 

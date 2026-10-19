@@ -99,7 +99,8 @@ __aicore__ inline void MoeSortMultiCore::UBSortCompute(int64_t progress, int64_t
     }
 
     LocalTensor<float> concatLocal;
-#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)) && !defined(__DAV_C220__)
+#if !(defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))) && \
+    !defined(__DAV_C220__)
     LocalTensor<float> tempTensor = tempBuffer.Get<float>(GetSortLen<float>(sortNum));
     Concat(concatLocal, expertForSourceRowLocalFp32, tempTensor, sortNum / ONE_REPEAT_SORT_NUM);
 #else
@@ -329,7 +330,8 @@ __aicore__ inline void MoeSortMultiCore::Init(GM_ADDR expertForSourceRow, GM_ADD
     pipe->InitBuffer(sortDataCopyInQueue, bufferNum, bufferSize);
     pipe->InitBuffer(sortDataCopyOutQueue, bufferNum, bufferSize);
     pipe->InitBuffer(sortedBuffer, bufferSize);
-#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)) && !defined(__DAV_C220__)
+#if !(defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))) && \
+    !defined(__DAV_C220__)
     pipe->InitBuffer(tempBuffer, bufferSize);
 #endif
 }

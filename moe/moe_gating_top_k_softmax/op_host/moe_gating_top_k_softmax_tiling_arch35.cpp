@@ -37,6 +37,7 @@ static const int64_t MAX_EXPERT_NUM = 2048;
 static const int64_t BLOCK_BYTES = 32;
 static const int64_t B32_BLOCK_COUNT = 8;
 static const int64_t CONSTANT_TWO = 2;
+static const int64_t MAX_SORT32_ROW_COUNT = 255;
 
 class MoeGatingTopKSoftmaxRegbaseTiling : public MoeGatingTopKSoftmaxBaseTiling {
 public:
@@ -128,6 +129,9 @@ ge::graphStatus MoeGatingTopKSoftmaxRegbaseTiling::DoOpTiling()
     sortRepeatTimes_ = expertCountAlign_ / ONE_REPEAT_SORT_NUM;
 
     int64_t maxRowCountInUb = CalcMaxRowCountInUb();
+    if (expertCountAlign_ == ONE_REPEAT_SORT_NUM && maxRowCountInUb > MAX_SORT32_ROW_COUNT) {
+        maxRowCountInUb = MAX_SORT32_ROW_COUNT;
+    }
     SplitRowInUb(perCorePerLoopRowCount_, perCoreLastLoopRowCount_, perCoreLoopCount_, perCoreRowCount_,
                  maxRowCountInUb);
     SplitRowInUb(lastCorePerLoopRowCount_, lastCoreLastLoopRowCount_, lastCoreLoopCount_, lastCoreRowCount_,

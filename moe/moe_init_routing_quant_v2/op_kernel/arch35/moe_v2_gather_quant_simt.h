@@ -28,9 +28,9 @@ template <typename T>
 class MoeV2GatherQuant {
 public:
     __aicore__ inline MoeV2GatherQuant(){};
+    template <typename TilingData>
     __aicore__ inline void Init(GM_ADDR inputX, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedRowIdx,
-                                GM_ADDR expandedX, GM_ADDR workspace, const MoeInitRoutingQuantV2TilingData* tilingData,
-                                TPipe* tPipe);
+                                GM_ADDR expandedX, GM_ADDR workspace, const TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -56,7 +56,7 @@ private:
     GlobalTensor<float> offsetGm_;
     GlobalTensor<int32_t> expandedRowIdxIndexGm_;
 
-    const InnerMoeV2GatherOutComputeTilingData* gatherOutTilingData_;
+    MoeV2Arch35GatherOutComputeTilingData gatherOutTilingData_;
 
     int64_t needCoreNum_;
     int64_t blockIdx_;
@@ -124,7 +124,7 @@ __aicore__ inline void MoeV2GatherQuant<T>::CopyOutZero(int64_t progress)
             break;
         }
         int32_t nextIndex;
-        if (blockIdx_ == gatherOutTilingData_->needCoreNum - 1 && progress == rowLoops_ - 1 &&
+        if (blockIdx_ == gatherOutTilingData_.needCoreNum - 1 && progress == rowLoops_ - 1 &&
             i == currentLoopRows_ - 1) {
             nextIndex = activateRows_;
         } else {
@@ -181,7 +181,7 @@ __aicore__ inline void MoeV2GatherQuant<T>::CopyOut(int64_t progress)
     SetWaitFlag<HardEvent::MTE2_S>(HardEvent::MTE2_S);
     colsTileLength_ = perLoopCols_;
     for (int64_t colsLoop = 0; colsLoop < colLoops_; colsLoop++) {
-        int64_t initialRow = gatherOutTilingData_->perCoreRows * blockIdx_ + perLoopRows_ * progress;
+        int64_t initialRow = gatherOutTilingData_.perCoreRows * blockIdx_ + perLoopRows_ * progress;
         int64_t curLoopRow = 0;
         if (colsLoop == colLoops_ - 1) {
             colsTileLength_ = lastLoopCols_;
@@ -217,16 +217,17 @@ __aicore__ inline void MoeV2GatherQuant<T>::CopyOut(int64_t progress)
 }
 
 template <typename T>
+template <typename TilingData>
 __aicore__ inline void MoeV2GatherQuant<T>::Init(GM_ADDR inputX, GM_ADDR scale, GM_ADDR offset, GM_ADDR expandedRowIdx,
-                                                 GM_ADDR expandedX, GM_ADDR workspace,
-                                                 const MoeInitRoutingQuantV2TilingData* tilingData, TPipe* tPipe)
+                                                 GM_ADDR expandedX, GM_ADDR workspace, const TilingData* tilingData,
+                                                 TPipe* tPipe)
 {
     pipe_ = tPipe;
     blockIdx_ = GetBlockIdx();
-    gatherOutTilingData_ = &(tilingData->gatherOutComputeParamsOp);
+    gatherOutTilingData_ = tilingData->gatherOutComputeParamsOp;
 
-    needCoreNum_ = gatherOutTilingData_->needCoreNum;
-    activateRows_ = gatherOutTilingData_->activateRows;
+    needCoreNum_ = gatherOutTilingData_.needCoreNum;
+    activateRows_ = gatherOutTilingData_.activateRows;
     cols_ = tilingData->cols;
     n_ = tilingData->n;
     k_ = tilingData->k;
@@ -238,29 +239,29 @@ __aicore__ inline void MoeV2GatherQuant<T>::Init(GM_ADDR inputX, GM_ADDR scale, 
         activateRows_ = tilingData->expertCapacity * tilingData->expertNum;
     }
 
-    if (blockIdx_ == gatherOutTilingData_->needCoreNum - 1) {
-        coreRows_ = gatherOutTilingData_->lastCoreRows;
-        perLoopRows_ = gatherOutTilingData_->lastCorePerLoopRows;
-        lastLoopRows_ = gatherOutTilingData_->lastCoreLastLoopRows;
-        rowLoops_ = gatherOutTilingData_->lastCoreLoops;
+    if (blockIdx_ == gatherOutTilingData_.needCoreNum - 1) {
+        coreRows_ = gatherOutTilingData_.lastCoreRows;
+        perLoopRows_ = gatherOutTilingData_.lastCorePerLoopRows;
+        lastLoopRows_ = gatherOutTilingData_.lastCoreLastLoopRows;
+        rowLoops_ = gatherOutTilingData_.lastCoreLoops;
     } else {
-        coreRows_ = gatherOutTilingData_->perCoreRows;
-        perLoopRows_ = gatherOutTilingData_->perCorePerLoopRows;
-        lastLoopRows_ = gatherOutTilingData_->perCoreLastLoopRows;
-        rowLoops_ = gatherOutTilingData_->perCoreLoops;
+        coreRows_ = gatherOutTilingData_.perCoreRows;
+        perLoopRows_ = gatherOutTilingData_.perCorePerLoopRows;
+        lastLoopRows_ = gatherOutTilingData_.perCoreLastLoopRows;
+        rowLoops_ = gatherOutTilingData_.perCoreLoops;
     }
-    perLoopCols_ = gatherOutTilingData_->perLoopCols;
-    lastLoopCols_ = gatherOutTilingData_->lastLoopCols;
-    colLoops_ = gatherOutTilingData_->colLoops;
+    perLoopCols_ = gatherOutTilingData_.perLoopCols;
+    lastLoopCols_ = gatherOutTilingData_.lastLoopCols;
+    colLoops_ = gatherOutTilingData_.colLoops;
 
     inputXGm_.SetGlobalBuffer((__gm__ T*)inputX);
     expandedXGm_.SetGlobalBuffer((__gm__ int8_t*)expandedX);
-    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * gatherOutTilingData_->perCoreRows,
+    expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * gatherOutTilingData_.perCoreRows,
                                       Align(coreRows_, sizeof(int32_t)));
     scaleGm_.SetGlobalBuffer((__gm__ float*)scale, 1);
     offsetGm_.SetGlobalBuffer((__gm__ float*)offset, 1);
     expandedRowIdxIndexGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + Align(totalLength_, sizeof(int32_t)) * 2 +
-                                               expertNum_ + blockIdx_ * gatherOutTilingData_->perCoreRows,
+                                               expertNum_ + blockIdx_ * gatherOutTilingData_.perCoreRows,
                                            0);
     scale_ = scaleGm_.GetValue(0);
     offset_ = offsetGm_.GetValue(0);

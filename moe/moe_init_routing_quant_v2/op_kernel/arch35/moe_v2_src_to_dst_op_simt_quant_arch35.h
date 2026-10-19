@@ -34,7 +34,7 @@ private:
 private:
     __gm__ int32_t* expandDstToSrcRowGm_;
     __gm__ int32_t* expandedRowIdxGm_;
-    const InnerMoeV2GatherOutComputeTilingData* srcToDstTilingData_;
+    MoeV2Arch35GatherOutComputeTilingData srcToDstTilingData_;
 
     int64_t coreNum_;
     int64_t blockIdx_;
@@ -60,12 +60,12 @@ __aicore__ inline void MoeV2SrcToDstOpSimt::Init(GM_ADDR expandedRowIdx, GM_ADDR
     this->blockIdx_ = GetBlockIdx();
     this->coreNum_ = tilingData->coreNum;
     this->totalLength_ = tilingData->n * tilingData->k;
-    this->srcToDstTilingData_ = &(tilingData->srcToDstComputeParamsOp);
-    this->perCoreRows_ = this->srcToDstTilingData_->perCoreRows;
-    if (this->blockIdx_ == this->srcToDstTilingData_->needCoreNum - 1) {
-        this->coreRows_ = this->srcToDstTilingData_->lastCoreRows;
+    this->srcToDstTilingData_ = tilingData->srcToDstComputeParamsOp;
+    this->perCoreRows_ = this->srcToDstTilingData_.perCoreRows;
+    if (this->blockIdx_ == this->srcToDstTilingData_.needCoreNum - 1) {
+        this->coreRows_ = this->srcToDstTilingData_.lastCoreRows;
     } else {
-        this->coreRows_ = this->srcToDstTilingData_->perCoreRows;
+        this->coreRows_ = this->srcToDstTilingData_.perCoreRows;
     }
     startIndex_ = this->blockIdx_ * this->perCoreRows_;
     this->threadNum_ = THREAD_NUM < this->coreRows_ ? THREAD_NUM : this->coreRows_;
@@ -88,7 +88,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void ComputeSimt(int64_t 
 
 __aicore__ inline void MoeV2SrcToDstOpSimt::Process()
 {
-    if (this->blockIdx_ < this->srcToDstTilingData_->needCoreNum) {
+    if (this->blockIdx_ < this->srcToDstTilingData_.needCoreNum) {
         asc_vf_call<ComputeSimt>(dim3{static_cast<uint32_t>(this->threadNum_), 1, 1}, this->coreRows_,
                                  this->startIndex_, expandDstToSrcRowGm_, expandedRowIdxGm_);
     }

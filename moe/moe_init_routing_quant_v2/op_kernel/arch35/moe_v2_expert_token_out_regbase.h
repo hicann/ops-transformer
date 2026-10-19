@@ -86,7 +86,7 @@ private:
     LocalTensor<int32_t> expertTokenIdxLocal;
     LocalTensor<int32_t> expertTokenIdxOutLocal;
 
-    const InnerMoeV2GatherOutComputeTilingData* srcToDstTilingData;
+    MoeV2Arch35GatherOutComputeTilingData srcToDstTilingData;
 
     int64_t coreNum;
     int64_t blockIdx;
@@ -239,20 +239,20 @@ __aicore__ inline void MoeV2ExpertTokenOutRegBase::Init(GM_ADDR expertTokensCoun
 
     this->coreNum = tilingData->coreNum;
     this->totalLength = tilingData->n * tilingData->k;
-    this->srcToDstTilingData = &(tilingData->srcToDstComputeParamsOp);
+    this->srcToDstTilingData = tilingData->srcToDstComputeParamsOp;
     this->expertNum = tilingData->expertNum;
     this->dropPadMode = tilingData->dropPadMode;
     this->expertTokensCountOrCumsumFlag = tilingData->expertTokensCountOrCumsumFlag;
     this->expertTokensBeforeCapacityFlag = tilingData->expertTokensBeforeCapacityFlag;
 
-    if (this->blockIdx == this->srcToDstTilingData->needCoreNum - 1) {
-        this->coreRows = this->srcToDstTilingData->lastCoreRows;
-        this->perLoopRows = this->srcToDstTilingData->lastCorePerLoopRows;
-        this->lastLoopRows = this->srcToDstTilingData->lastCoreLastLoopRows;
+    if (this->blockIdx == this->srcToDstTilingData.needCoreNum - 1) {
+        this->coreRows = this->srcToDstTilingData.lastCoreRows;
+        this->perLoopRows = this->srcToDstTilingData.lastCorePerLoopRows;
+        this->lastLoopRows = this->srcToDstTilingData.lastCoreLastLoopRows;
     } else {
-        this->coreRows = this->srcToDstTilingData->perCoreRows;
-        this->perLoopRows = this->srcToDstTilingData->perCorePerLoopRows;
-        this->lastLoopRows = this->srcToDstTilingData->perCoreLastLoopRows;
+        this->coreRows = this->srcToDstTilingData.perCoreRows;
+        this->perLoopRows = this->srcToDstTilingData.perCorePerLoopRows;
+        this->lastLoopRows = this->srcToDstTilingData.perCoreLastLoopRows;
     }
 
     expandedRowIdxGm.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx, Align(this->totalLength, sizeof(int32_t)));
@@ -264,7 +264,7 @@ __aicore__ inline void MoeV2ExpertTokenOutRegBase::Init(GM_ADDR expertTokensCoun
     }
 
     expandedExpertIdxGm.SetGlobalBuffer(
-        (__gm__ int32_t*)workspace + this->blockIdx * this->srcToDstTilingData->perCoreRows,
+        (__gm__ int32_t*)workspace + this->blockIdx * this->srcToDstTilingData.perCoreRows,
         Align(this->coreRows, sizeof(int32_t)));
 
     this->expertNumUbAlign = EXPERT_NUM;
@@ -275,7 +275,7 @@ __aicore__ inline void MoeV2ExpertTokenOutRegBase::Init(GM_ADDR expertTokensCoun
 
 __aicore__ inline void MoeV2ExpertTokenOutRegBase::Process()
 {
-    if (this->blockIdx < this->srcToDstTilingData->needCoreNum) {
+    if (this->blockIdx < this->srcToDstTilingData.needCoreNum) {
         if ((this->dropPadMode == DROPLESS_MODE && this->expertTokensCountOrCumsumFlag > EXERPT_TOKENS_NONE) ||
             (this->dropPadMode == DROP_PAD_MODE &&
              this->expertTokensBeforeCapacityFlag == EXERPT_TOKENS_BEFORE_CAPACITY)) {

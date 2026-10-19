@@ -40,7 +40,7 @@ private:
     __gm__ int32_t* expandedRowIdxGm_;
     __gm__ int32_t* expandedRowIdxIndexGm_;
 
-    const MoeV2GatherOutComputeTilingData* srcToDstTilingData_;
+    const MoeV2Arch35GatherOutComputeTilingData* srcToDstTilingData_;
 
     int64_t coreNum_;
     int64_t blockIdx_;

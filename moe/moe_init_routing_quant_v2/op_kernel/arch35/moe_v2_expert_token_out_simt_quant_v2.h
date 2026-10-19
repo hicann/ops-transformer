@@ -45,7 +45,7 @@ private:
     GlobalTensor<int32_t> expertTokensCountOrCumsumGmOut;
     __gm__ int32_t* expertFirstIndexGm_;
 
-    const InnerMoeV2GatherOutComputeTilingData* srcToDstTilingData;
+    MoeV2Arch35GatherOutComputeTilingData srcToDstTilingData;
 
     int64_t coreNum_;
     int64_t blockIdx_;
@@ -94,23 +94,23 @@ __aicore__ inline void MoeV2ExpertTokenOutSimt::Init(GM_ADDR expertTokensCountOr
 
     this->coreNum_ = tilingData->coreNum;
     this->totalLength_ = tilingData->n * tilingData->k;
-    this->srcToDstTilingData = &(tilingData->srcToDstComputeParamsOp);
+    this->srcToDstTilingData = tilingData->srcToDstComputeParamsOp;
     this->expertNum_ = tilingData->expertNum;
     this->dropPadMode_ = tilingData->dropPadMode;
     this->expertTokensCountOrCumsumFlag_ = tilingData->expertTokensCountOrCumsumFlag;
     this->expertTokensBeforeCapacityFlag_ = tilingData->expertTokensBeforeCapacityFlag;
-    this->needCoreNum_ = this->srcToDstTilingData->needCoreNum;
+    this->needCoreNum_ = this->srcToDstTilingData.needCoreNum;
 
-    this->startIndex_ = this->blockIdx_ * this->srcToDstTilingData->perCoreRows;
+    this->startIndex_ = this->blockIdx_ * this->srcToDstTilingData.perCoreRows;
 
     if (this->blockIdx_ == this->needCoreNum_ - 1) {
-        this->coreRows_ = this->srcToDstTilingData->lastCoreRows;
-        this->perLoopRows_ = this->srcToDstTilingData->lastCorePerLoopRows;
-        this->lastLoopRows_ = this->srcToDstTilingData->lastCoreLastLoopRows;
+        this->coreRows_ = this->srcToDstTilingData.lastCoreRows;
+        this->perLoopRows_ = this->srcToDstTilingData.lastCorePerLoopRows;
+        this->lastLoopRows_ = this->srcToDstTilingData.lastCoreLastLoopRows;
     } else {
-        this->coreRows_ = this->srcToDstTilingData->perCoreRows;
-        this->perLoopRows_ = this->srcToDstTilingData->perCorePerLoopRows;
-        this->lastLoopRows_ = this->srcToDstTilingData->perCoreLastLoopRows;
+        this->coreRows_ = this->srcToDstTilingData.perCoreRows;
+        this->perLoopRows_ = this->srcToDstTilingData.perCorePerLoopRows;
+        this->lastLoopRows_ = this->srcToDstTilingData.perCoreLastLoopRows;
     }
     this->threadNum_ = this->coreRows_ > THREAD_NUM ? THREAD_NUM : this->coreRows_;
 

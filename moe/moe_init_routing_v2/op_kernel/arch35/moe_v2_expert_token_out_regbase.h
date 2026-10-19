@@ -85,7 +85,7 @@ private:
     LocalTensor<int32_t> expertTokenIdxLocal;
     LocalTensor<int32_t> expertTokenIdxOutLocal;
 
-    const MoeV2GatherOutComputeTilingData* srcToDstTilingData;
+    const MoeV2Arch35GatherOutComputeTilingData* srcToDstTilingData;
 
     int64_t coreNum;
     int64_t blockIdx;

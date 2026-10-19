@@ -40,7 +40,7 @@ private:
     __gm__ int32_t* expandedRowIdxIndexGm_;
     __gm__ int32_t* oriExpertIdGm_;
 
-    const InnerMoeV2GatherOutComputeTilingData* srcToDstTilingData_;
+    MoeV2Arch35GatherOutComputeTilingData srcToDstTilingData_;
 
     int64_t coreNum_;
     int64_t blockIdx_;
@@ -72,14 +72,14 @@ __aicore__ inline void MoeV2SrcToDstWithCapacitySimt<T, TilingData>::Init(GM_ADD
     blockIdx_ = GetBlockIdx();
     coreNum_ = tilingData->coreNum;
     totalLength_ = tilingData->n * tilingData->k;
-    srcToDstTilingData_ = &(tilingData->srcToDstCapacityComputeParamsOp);
+    srcToDstTilingData_ = tilingData->srcToDstCapacityComputeParamsOp;
     expertCapacity_ = tilingData->expertCapacity;
     expertNum_ = tilingData->expertNum;
-    startIndex_ = blockIdx_ * srcToDstTilingData_->perCoreRows;
-    if (blockIdx_ == srcToDstTilingData_->needCoreNum - 1) {
-        coreRows_ = srcToDstTilingData_->lastCoreRows;
+    startIndex_ = blockIdx_ * srcToDstTilingData_.perCoreRows;
+    if (blockIdx_ == srcToDstTilingData_.needCoreNum - 1) {
+        coreRows_ = srcToDstTilingData_.lastCoreRows;
     } else {
-        coreRows_ = srcToDstTilingData_->perCoreRows;
+        coreRows_ = srcToDstTilingData_.perCoreRows;
     }
     threadNum_ = coreRows_ > THREAD_NUM ? THREAD_NUM : coreRows_;
     int64_t length = MoeInitRoutingQuantV2::Align(totalLength_, sizeof(int32_t));
@@ -120,7 +120,7 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(THREAD_NUM) inline void ComputeCapacitySimt(
 template <typename T, typename TilingData>
 __aicore__ inline void MoeV2SrcToDstWithCapacitySimt<T, TilingData>::Process()
 {
-    if (blockIdx_ < srcToDstTilingData_->needCoreNum) {
+    if (blockIdx_ < srcToDstTilingData_.needCoreNum) {
         asc_vf_call<ComputeCapacitySimt<T, TilingData>>(dim3{static_cast<uint32_t>(this->threadNum_), 1, 1},
                                                         this->coreRows_, this->startIndex_, this->expertCapacity_,
                                                         sortedExpertIdGm_, sortedExpertIdIndexGm_, expertFirstIndexGm_,

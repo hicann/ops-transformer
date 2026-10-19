@@ -142,9 +142,11 @@ public:
         regbaseConfig.DynamicCompileStaticFlag(true)
             .DynamicRankSupportFlag(true)
             .DynamicShapeSupportFlag(true)
-            .ExtendCfgInfo("opFile.value", "moe_init_routing_v2");
+            .ExtendCfgInfo("opFile.value", "moe_init_routing_v2_apt");
         this->AICore().AddConfig("ascend950", regbaseConfig);
         this->AICore().AddConfig("ascend350", regbaseConfig);
+        this->AICore().AddConfig("ascend960pr", regbaseConfig);
+        this->AICore().AddConfig("ascend960dt", regbaseConfig);
     }
 };
 

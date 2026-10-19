@@ -1,0 +1,39 @@
+{
+  "op_type": "MoeComputeExpertTokens",
+  "op_list": [
+    {
+      "bin_filename": "MoeComputeExpertTokens_1980d2db1a80c523e7e59a032c95969880af8",
+      "inputs": [
+        {
+          "name": "sorted_experts",
+          "index": 0,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "total_rows_before_expert",
+          "index": 0,
+          "dtype": "int32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [
+            -2
+          ]
+        }
+      ],
+      "attrs": [
+        {
+          "name": "num_experts",
+          "dtype": "int",
+          "value": 0
+        }
+      ]
+    }
+  ]
+}

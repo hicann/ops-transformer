@@ -49,7 +49,7 @@ private:
     LocalTensor<int32_t> lastExpertIdCunsum_;
     __ubuf__ int32_t* lastExpertIdCunsumAddr_;
 
-    const MoeV2GatherOutComputeTilingData* srcToDstTilingData;
+    const MoeV2Arch35GatherOutComputeTilingData* srcToDstTilingData;
 
     int64_t coreNum_;
     int64_t blockIdx_;

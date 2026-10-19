@@ -25,6 +25,26 @@ if (BUILD_OPEN_PROJECT)
                     -mllvm
                     -cce-aicore-dcci-before-kernel-end=false
         )
+    elseif(CONDITION_UNIT STREQUAL "ascend960dt")
+        add_ops_compile_options(
+            OP_NAME MoeGatingTopK
+            COMPUTE_UNIT Ascend960DT_968B7
+            OPTIONS --cce-auto-sync=off
+                    -Wno-deprecated-declarations
+                    -Werror
+                    -mllvm
+                    -cce-aicore-dcci-before-kernel-end=false
+        )
+    elseif(CONDITION_UNIT STREQUAL "ascend960pr")
+        add_ops_compile_options(
+            OP_NAME MoeGatingTopK
+            COMPUTE_UNIT Ascend960PR_969A1
+            OPTIONS --cce-auto-sync=off
+                    -Wno-deprecated-declarations
+                    -Werror
+                    -mllvm
+                    -cce-aicore-dcci-before-kernel-end=false
+        )
     else()
         add_ops_compile_options(
             OP_NAME MoeGatingTopK

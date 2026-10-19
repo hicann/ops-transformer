@@ -29,7 +29,7 @@ class MoeV2ScatterOutBatchRow {
 public:
     __aicore__ inline MoeV2ScatterOutBatchRow(){};
     __aicore__ inline void Init(GM_ADDR inputX, GM_ADDR expandedRowIdx, GM_ADDR expandedX, GM_ADDR workspace,
-                                const MoeInitRoutingV2TilingData* tilingData, TPipe* tPipe);
+                                const MoeInitRoutingV2Arch35TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -47,7 +47,7 @@ private:
     GlobalTensor<T> expandedXGm;
     GlobalTensor<int32_t> dstToSrcIndexGm;
 
-    const MoeV2GatherOutComputeTilingData* gatherOutTilingData;
+    const MoeV2Arch35GatherOutComputeTilingData* gatherOutTilingData;
 
     int64_t needCoreNum;
     int64_t blockIdx;
@@ -160,7 +160,8 @@ __aicore__ inline void MoeV2ScatterOutBatchRow<T>::ScatterOutCompute(int64_t pro
 
 template <typename T>
 __aicore__ inline void MoeV2ScatterOutBatchRow<T>::Init(GM_ADDR inputX, GM_ADDR expandedRowIdx, GM_ADDR expandedX,
-                                                        GM_ADDR workspace, const MoeInitRoutingV2TilingData* tilingData,
+                                                        GM_ADDR workspace,
+                                                        const MoeInitRoutingV2Arch35TilingData* tilingData,
                                                         TPipe* tPipe)
 {
     this->pipe = tPipe;

@@ -24,6 +24,8 @@ const static int64_t NUM_FOUR = 4;
 const static int64_t MRG_LIST_NUM = 4;
 const static int64_t SORT32_ALIGN_ELEMENT = 32;
 const static int64_t ONE_BLOCK_BYTE = 32;
+const static int64_t MAX_SORT_REPEAT_TIMES = 255;
+const static int64_t MAX_SORT_LOOP_ELEMENT = SORT32_ALIGN_ELEMENT * MAX_SORT_REPEAT_TIMES;
 const static size_t DIM_ONE = 1;
 const static size_t DIM_TWO = 2;
 const static int32_t SIZE_16 = 16;
@@ -323,6 +325,7 @@ ge::graphStatus MoeInitRountingTilingBase::DoOpTiling()
 {
     sortLoopMaxElement = (aicoreParams_.ubSize - aivNum * ONE_BLOCK_BYTE) / (NUM_FOUR * NUM_TWO * NUM_FOUR) /
                          SORT32_ALIGN_ELEMENT * SORT32_ALIGN_ELEMENT;
+    sortLoopMaxElement = std::min(sortLoopMaxElement, MAX_SORT_LOOP_ELEMENT);
     Tiling4VBSCompute();
     Tiling4VMSMiddleCompute();
     Tiling4SortOutCompute();

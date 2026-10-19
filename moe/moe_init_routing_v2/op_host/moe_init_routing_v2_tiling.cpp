@@ -51,6 +51,7 @@ const static int64_t REGIONP_ROPOSA_BUFFER_NUM_310P = 2;
 const static int64_t SYNC_WORKSPACE = 8192;
 const static int64_t EXPERT_TOKENS_COUNT = 2;
 const static int64_t SIMT_UB_SIZE_BYTE = 40960;
+const static int64_t SORT_API_MAX_ELEM = 32 * 255LL; // AscendC::Sort全排序模式最多支持一次排序(32*255rep)个元素
 const static int64_t TILING_KEY_DROPLESS_SORT_ONE_CORE = 10001;
 const static int64_t TILING_KEY_DROPLESS_SORT_MULTI_CORE = 10002;
 const static int64_t TILING_KEY_DROPLESS_HIST_REGBASE_SORT_ONE_CORE = 11001;
@@ -561,6 +562,7 @@ ge::graphStatus MoeInitRoutingV2TilingBase::DoOpTiling()
         mrgSortListMaxElement = is310P ?
                                     sortLoopMaxElement / MRG_LIST_NUM / SORT32_ALIGN_ELEMENT * SORT32_ALIGN_ELEMENT :
                                     mrgSortListMaxElement;
+        sortLoopMaxElement = std::min(sortLoopMaxElement, SORT_API_MAX_ELEM);
         isFullLoad = IsFullLoad();
     } else {
         auto expertIdx = context_->GetInputDesc(INDEX_INPUT_EXPERT_IDX);
@@ -571,6 +573,7 @@ ge::graphStatus MoeInitRoutingV2TilingBase::DoOpTiling()
         bool isIdxLong = expertIdx->GetDataType() == ge::DataType::DT_INT64;
         sortLoopMaxElement = (aicoreParams_.ubSize) / (sizeof(int32_t) * NUM_TWO * NUM_FOUR + isIdxLong) /
                              SORT32_ALIGN_ELEMENT * SORT32_ALIGN_ELEMENT;
+        sortLoopMaxElement = std::min(sortLoopMaxElement, SORT_API_MAX_ELEM);
     }
     Tiling4VBSCompute();
     Tiling4VMSMiddleCompute();

@@ -1194,6 +1194,7 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKNotAlignEVFWithNor
         RegTensor<uint32_t> vregExpertIdxTmp;
 
         Reg::MaskReg preg0 = Reg::UpdateMask<float>(k);
+        Reg::MaskReg pregAll = Reg::CreateMask<float>();
         Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B32>(vreg0, vreg1, mrgSortAddr);
         Reg::Gather(vreg2, inputAddr, vreg1, preg0);
         Reg::Reduce<Reg::ReduceType::SUM>(vreg3, vreg2, preg0);
@@ -1201,7 +1202,7 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKNotAlignEVFWithNor
         Reg::Duplicate(vreg4, vreg3, preg0);
         Reg::Div(vreg4, vreg2, vreg4, preg0);
         Reg::Muls(vreg4, vreg4, routedScalingFactor, preg0);
-        Reg::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
+        Reg::Duplicate(vregAlign, perGroupExpertCountAlign, pregAll);
         Reg::Div(vregExpertIdxTmp, vreg1, vregAlign, preg0);
         Reg::Muls(vregExpertIdxTmp, vregExpertIdxTmp, expertIdxPad, preg0);
         Reg::Sub(vreg1, vreg1, vregExpertIdxTmp, preg0);

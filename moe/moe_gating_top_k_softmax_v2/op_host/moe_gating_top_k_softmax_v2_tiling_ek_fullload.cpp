@@ -12,6 +12,7 @@
  * \file moe_gating_top_k_softmax_v2_tiling_ek_fullload.cpp
  * \brief
  */
+#include <algorithm>
 #include "platform/platform_info.h"
 #include "register/op_def_registry.h"
 #include "op_host/tiling_templates_registry.h"
@@ -28,6 +29,7 @@ static const int32_t BOOL_SIZE = 1;
 static const bool IS_SOFTMAX_REUSE_SOURCE = true;
 static const bool IS_TOP_K_REUSE_SOURCE = true;
 static const int32_t MAX_COL_IN_UB = 8160; // ubSize/minTypeSize
+static const uint32_t MAX_UB_FORMER_ROW = 255;
 
 class MoeGatingTopKSoftmaxV2EKFullLoadTiling : public MoeGatingTopKSoftmaxV2BaseTiling {
 public:
@@ -67,6 +69,7 @@ bool MoeGatingTopKSoftmaxV2EKFullLoadTiling::IsCapable()
     if (maxRow == 0) {
         return false;
     }
+    maxRow = std::min(maxRow, MAX_UB_FORMER_ROW);
     return true;
 }
 
