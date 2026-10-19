@@ -45,7 +45,7 @@
     <tr>
     <td>microBatchIds</td>
     <td>输入</td>
-    <td>每个token的microBatch索引，1D Tensor，shape为 <code>(Y, )，microBatchIds取值区间为[0, MircoBatchNum-1]</code></td>
+    <td>每个token的microBatch索引，1D Tensor，shape为 <code>(Y, )，microBatchIds取值区间为[0, MicroBatchNum-1]</code></td>
     <td>INT32</td>
     <td>ND</td>
     </tr>
@@ -96,14 +96,14 @@
     <tr>
     <td>tokenInfoTableShape</td>
     <td>属性</td>
-    <td>Token信息列表大小，包含microBatch的大小（MircoBatchNum）、BatchSize大小（Bs）、以及每个Token对应的Expert数量（ExpertNumPerToken）。</td>
+    <td>Token信息列表大小，包含microBatch的大小（MicroBatchNum）、BatchSize大小（Bs）、以及每个Token对应的Expert数量（ExpertNumPerToken）。</td>
     <td>INT32</td>
     <td>-</td>
     </tr>
     <tr>
     <td>tokenDataShape</td>
     <td>属性</td>
-    <td>Token数据列表大小，包含microBatch的大小（MircoBatchNum）、BatchSize大小（Bs）、每个Token对应的Expert数量(ExpertNumPerToken)、以及token和scale长度(HS)。</td>
+    <td>Token数据列表大小，包含microBatch的大小（MicroBatchNum）、BatchSize大小（Bs）、每个Token对应的Expert数量(ExpertNumPerToken)、以及token和scale长度(HS)。</td>
     <td>INT32</td>
     <td>-</td>
     </tr>

@@ -38,28 +38,28 @@
     <tr>
     <td style="white-space: nowrap">x</td>
     <td style="white-space: nowrap">输入</td>
-    <td style="white-space: nowrap">本卡发送的token数据，3D Tensor，shape为 <code>(X, Bs, H)。</code></td>
+    <td style="white-space: nowrap">本卡发送的token数据，3D Tensor，shape为 <code>(X, Bs, H)</code>。</td>
     <td style="white-space: nowrap">FLOAT16、BFLOAT16</td>
     <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
     <td style="white-space: nowrap">sessionId</td>
     <td style="white-space: nowrap">输入</td>
-    <td style="white-space: nowrap">表示当前Attention Worker节点的Id，1D Tensor，shape为 <code>(X, )。</code></td>
+    <td style="white-space: nowrap">表示当前Attention Worker节点的Id，1D Tensor，shape为 <code>(X, )</code>。</td>
     <td style="white-space: nowrap">INT32</td>
     <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
     <td style="white-space: nowrap">microBatchId</td>
     <td style="white-space: nowrap">输入</td>
-    <td style="white-space: nowrap">表示当前microBatch的Id，1D Tensor，shape为 <code>(X, )。</code></td>
+    <td style="white-space: nowrap">表示当前microBatch的Id，1D Tensor，shape为 <code>(X, )</code>。</td>
     <td style="white-space: nowrap">INT32</td>
     <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
     <td style="white-space: nowrap">layerId</td>
     <td style="white-space: nowrap">输入</td>
-    <td style="white-space: nowrap">表示当前模型层数的Id，1D Tensor，shape为 <code>(X, )。</code></td>
+    <td style="white-space: nowrap">表示当前模型层数的Id，1D Tensor，shape为 <code>(X, )</code>。</td>
     <td style="white-space: nowrap">INT32</td>
     <td style="white-space: nowrap">ND</td>
     </tr>
@@ -73,21 +73,21 @@
     <tr>
     <td style="white-space: nowrap">expertRankTable</td>
     <td style="white-space: nowrap">输入</td>
-    <td style="white-space: nowrap">每个micro batch组中专家Id到FFN卡专家部署的映射表（外部需保证值正确），3D Tensor，shape为 <code>(L, moeExpertNum + sharedExpertNum, M)。</code></td>
+    <td style="white-space: nowrap">每个micro batch组中专家Id到FFN卡专家部署的映射表（外部需保证值正确），3D Tensor，shape为 <code>(L, moeExpertNum + sharedExpertNum, M)</code>。</td>
     <td style="white-space: nowrap">INT32</td>
     <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
     <td style="white-space: nowrap">scalesOptional</td>
     <td style="white-space: nowrap">输入</td>
-    <td style="white-space: nowrap">可选参数，表示每个专家的量化平滑参数，3D Tensor，shape为 <code>(L, moeExpertNum + sharedExpertNum, H)。</code></td>
+    <td style="white-space: nowrap">可选参数，表示每个专家的量化平滑参数，3D Tensor，shape为 <code>(L, moeExpertNum + sharedExpertNum, H)</code>。</td>
     <td style="white-space: nowrap">FLOAT32</td>
     <td style="white-space: nowrap">ND</td>
     </tr>
     <tr>
     <td style="white-space: nowrap">activeMaskOptional</td>
     <td style="white-space: nowrap">输入</td>
-    <td style="white-space: nowrap">可选参数，表示token是否参与通信，可传有效数据或空指针，2D Tensor，shape为 <code>(X, Bs)。</code></td>
+    <td style="white-space: nowrap">可选参数，表示token是否参与通信，可传有效数据或空指针，2D Tensor，shape为 <code>(X, Bs)</code>。</td>
     <td style="white-space: nowrap">BOOL</td>
     <td style="white-space: nowrap">ND</td>
     </tr>
