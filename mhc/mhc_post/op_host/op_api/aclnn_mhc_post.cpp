@@ -58,8 +58,9 @@ static aclnnStatus CheckNotNull(const aclTensor* x, const aclTensor* hRes, const
                                 const aclTensor* hPost, aclTensor* out)
 {
     CHECK_COND(x != nullptr, ACLNN_ERR_PARAM_NULLPTR, "x must not be nullptr.");
-    // hRes is optional on A5 (DAV_3510), required on A2/A3
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    // hRes is optional on A5 (DAV_3510) and A6 (DAV_9201/DAV_9202), required on A2/A3
+    auto curArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
+    if (curArch != NpuArch::DAV_3510 && curArch != NpuArch::DAV_9201 && curArch != NpuArch::DAV_9202) {
         CHECK_COND(hRes != nullptr, ACLNN_ERR_PARAM_NULLPTR, "hRes must not be nullptr.");
     }
     CHECK_COND(hOut != nullptr, ACLNN_ERR_PARAM_NULLPTR, "hOut must not be nullptr.");

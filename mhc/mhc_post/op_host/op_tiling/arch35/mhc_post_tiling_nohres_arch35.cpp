@@ -526,5 +526,9 @@ uint64_t MhcPostTilingNoHResArch35::GetTilingKey() const
     return GET_TPL_TILING_KEY(0, 1, 0);
 }
 
-REGISTER_TILING_TEMPLATE_WITH_ARCH(MhcPost, MhcPostTilingNoHResArch35, static_cast<int32_t>(NpuArch::DAV_3510), 5);
+REGISTER_TILING_TEMPLATE_WITH_ARCH(MhcPost, MhcPostTilingNoHResArch35,
+                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_3510),
+                                                         static_cast<int32_t>(NpuArch::DAV_9201),
+                                                         static_cast<int32_t>(NpuArch::DAV_9202)}),
+                                   5);
 } // namespace optiling
