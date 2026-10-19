@@ -100,7 +100,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B+1,)</td>
-      <td>x</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>cuSeqLensKOptional</td>
@@ -110,7 +110,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B+1,)</td>
-      <td>x</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>seqUsedQOptional</td>
@@ -120,7 +120,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
-      <td>x</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>seqUsedKOptional</td>
@@ -130,7 +130,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
-      <td>x</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>cmpResidualKOptional</td>
@@ -140,7 +140,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
-      <td>x</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>topkLengthOptional</td>
@@ -150,7 +150,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
       <td>INT32</td>
       <td>ND</td>
       <td>2维、3维，shape为(B,S1,N2)或(T1,N2)</td>
-      <td>x</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>batchSize</td>

@@ -382,7 +382,7 @@ aclnnStatus aclnnSparseFlashMlaGradMetadata(
       <td>INT32</td>
       <td>ND</td>
       <td>1维</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>workspaceSize（uint64_t*）</td>

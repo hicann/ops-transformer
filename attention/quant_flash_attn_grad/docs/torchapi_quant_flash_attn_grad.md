@@ -201,25 +201,25 @@ cann_ops_transformer.quant_flash_attn_grad(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 | 非连续Tensor |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| q | Tensor | 必选 | 公式中的Q，量化数据 | uint8 | ND | BSND: (B, Q_S, Q_N, D)<br>BNSD: (B, Q_N, Q_S, D)<br>TND: (Q_T, Q_N, D) | × |
-| k | Tensor | 必选 | 公式中的K，量化数据 | uint8 | ND | BSND: (B, KV_S, KV_N, D)<br>BNSD: (B, KV_N, KV_S, D)<br>TND: (KV_T, KV_N, D) | × |
-| v | Tensor | 必选 | 公式中的V，量化数据 | uint8 | ND | BSND: (B, KV_S, KV_N, D)<br>BNSD: (B, KV_N, KV_S, D)<br>TND: (KV_T, KV_N, D) | × |
-| dout | Tensor | 必选 | 正向输出attn_out对应的梯度，量化数据 | uint8 | ND | 与q的shape一致 | × |
-| attn_out | Tensor | 必选 | 正向计算输出的attn_out | bfloat16 | ND | 与q的shape一致 | × |
-| q_descale | Tensor | 必选 | q的反量化缩放因子 | float32 | ND | (1,) | × |
-| k_descale | Tensor | 必选 | k的反量化缩放因子 | float32 | ND | (1,) | × |
-| v_descale | Tensor | 必选 | v的反量化缩放因子 | float32 | ND | (1,) | × |
-| do_descale | Tensor | 必选 | dout的反量化缩放因子 | float32 | ND | (1,) | × |
-| p_scale | Tensor | 必选 | P矩阵的量化缩放因子 | float32 | ND | (1,) | × |
-| ds_scale | Tensor | 必选 | 反量化缩放因子 | float32 | ND | (1,) | × |
-| softmax_lse | Tensor | 必选 | 注意力正向计算的输出softmaxLse | float32 | ND | BSND/BNSD: (B, Q_N, Q_S)<br>TND: (Q_N, Q_T) | × |
-| cu_seqlens_q | Tensor | 可选 | Q的累积序列长度，用于处理变长序列，第一个元素必须为0。TND排布下必须传入，非TND排布不支持传入 | int32 | ND | (B+1,) | × |
-| cu_seqlens_kv | Tensor | 可选 | KV的累积序列长度，用于处理变长序列，第一个元素必须为0。TND排布下必须传入，非TND排布不支持传入 | int32 | ND | (B+1,) | × |
-| seqused_q | Tensor | 可选 | 指定每batch中q实际使用的序列长度，截断冗余运算。TND排布下其值需小于等于对应batch的cu_seqlens_q段长度 | int32 | ND | (B,) | × |
-| seqused_kv | Tensor | 可选 | 指定每batch中kv实际使用的序列长度，截断冗余运算。TND排布下其值需小于等于对应batch的cu_seqlens_kv段长度 | int32 | ND | (B,) | × |
-| sinks | Tensor | 可选 | sink场景下的输入tensor。当前版本不支持，传None即可 | float32 | ND | (Q_N,) | × |
-| attn_mask | Tensor | 可选 | 掩码矩阵，当mask_mode为3或4时必须传入，mask_mode为0时不允许传入 | int8 | ND | (2048, 2048) | × |
-| metadata | Tensor | 可选 | tiling下沉的aicpu算子输出结果，当前不支持不传入，必须由quant_flash_attn_metadata生成 | int32 | ND | (2, max_schedule_size) | × |
+| q | Tensor | 必选 | 公式中的Q，量化数据 | uint8 | ND | BSND: (B, Q_S, Q_N, D)<br>BNSD: (B, Q_N, Q_S, D)<br>TND: (Q_T, Q_N, D) | √ |
+| k | Tensor | 必选 | 公式中的K，量化数据 | uint8 | ND | BSND: (B, KV_S, KV_N, D)<br>BNSD: (B, KV_N, KV_S, D)<br>TND: (KV_T, KV_N, D) | √ |
+| v | Tensor | 必选 | 公式中的V，量化数据 | uint8 | ND | BSND: (B, KV_S, KV_N, D)<br>BNSD: (B, KV_N, KV_S, D)<br>TND: (KV_T, KV_N, D) | √ |
+| dout | Tensor | 必选 | 正向输出attn_out对应的梯度，量化数据 | uint8 | ND | 与q的shape一致 | √ |
+| attn_out | Tensor | 必选 | 正向计算输出的attn_out | bfloat16 | ND | 与q的shape一致 | √ |
+| q_descale | Tensor | 必选 | q的反量化缩放因子 | float32 | ND | (1,) | √ |
+| k_descale | Tensor | 必选 | k的反量化缩放因子 | float32 | ND | (1,) | √ |
+| v_descale | Tensor | 必选 | v的反量化缩放因子 | float32 | ND | (1,) | √ |
+| do_descale | Tensor | 必选 | dout的反量化缩放因子 | float32 | ND | (1,) | √ |
+| p_scale | Tensor | 必选 | P矩阵的量化缩放因子 | float32 | ND | (1,) | √ |
+| ds_scale | Tensor | 必选 | 反量化缩放因子 | float32 | ND | (1,) | √ |
+| softmax_lse | Tensor | 必选 | 注意力正向计算的输出softmaxLse | float32 | ND | BSND/BNSD: (B, Q_N, Q_S)<br>TND: (Q_N, Q_T) | √ |
+| cu_seqlens_q | Tensor | 可选 | Q的累积序列长度，用于处理变长序列，第一个元素必须为0。TND排布下必须传入，非TND排布不支持传入 | int32 | ND | (B+1,) | √ |
+| cu_seqlens_kv | Tensor | 可选 | KV的累积序列长度，用于处理变长序列，第一个元素必须为0。TND排布下必须传入，非TND排布不支持传入 | int32 | ND | (B+1,) | √ |
+| seqused_q | Tensor | 可选 | 指定每batch中q实际使用的序列长度，截断冗余运算。TND排布下其值需小于等于对应batch的cu_seqlens_q段长度 | int32 | ND | (B,) | √ |
+| seqused_kv | Tensor | 可选 | 指定每batch中kv实际使用的序列长度，截断冗余运算。TND排布下其值需小于等于对应batch的cu_seqlens_kv段长度 | int32 | ND | (B,) | √ |
+| sinks | Tensor | 可选 | sink场景下的输入tensor。当前版本不支持，传None即可 | float32 | ND | (Q_N,) | √ |
+| attn_mask | Tensor | 可选 | 掩码矩阵，当mask_mode为3或4时必须传入，mask_mode为0时不允许传入 | int8 | ND | (2048, 2048) | √ |
+| metadata | Tensor | 可选 | tiling下沉的aicpu算子输出结果，当前不支持不传入，必须由quant_flash_attn_metadata生成 | int32 | ND | (2, max_schedule_size) | √ |
 | quant_mode | int/QuantMode | 必选 | 量化模式，支持传入枚举或对应 int 值，枚举定义见「quant_mode 枚举」 | int32 | - | - | - |
 | softmax_scale | float | 可选 | 缩放系数，默认值为1.0。推荐值：sqrt(head_dim)的倒数 | float32 | - | - | - |
 | mask_mode | int/MaskMode | 可选 | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」。当前版本支持0/3/4 | int32 | - | - | - |
@@ -648,7 +648,7 @@ cann_ops_transformer.quant_flash_attn_grad(
                 <td>无</td>
                 <td rowspan="8">
                     <ul>
-                        <li>不支持非连续Tensor</li>
+                        <li>支持非连续Tensor输入</li>
                         <li>D固定为128</li>
                     </ul>
                 </td>

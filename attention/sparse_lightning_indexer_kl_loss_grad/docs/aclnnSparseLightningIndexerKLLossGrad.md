@@ -158,7 +158,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>FLOAT16、BFLOAT16</td>
                 <td>ND</td>
                 <td>(B,S1,N1,D)、(T1,N1,D)</td>
-                <td>x</td>
+                <td>√</td>
             </tr>
             <tr>
                 <td>k</td>
@@ -174,7 +174,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>FLOAT16、BFLOAT16</td>
                 <td>ND</td>
                 <td>(B,S2,N2,D)、(T2,N2,D)</td>
-                <td>x</td>
+                <td>√</td>
             </tr>
             <tr>
                 <td>w</td>
@@ -184,7 +184,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>FLOAT32</td>
                 <td>ND</td>
                 <td>(B,S1,N1)、(T1,N1)</td>
-                <td>x</td>
+                <td>√</td>
             </tr>
             <tr>
                 <td>sparseIndices</td>
@@ -200,7 +200,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>INT32</td>
                 <td>ND</td>
                 <td>(B,S1,N2,K)、(T1,N2,K)</td>
-                <td>x</td>
+                <td>√</td>
             </tr>
             <tr>
                 <td>attnSoftmaxL1Norm</td>
@@ -216,7 +216,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>FLOAT32</td>
                 <td>ND</td>
                 <td>(B,S1,N2,K)、(T1,N2,K)</td>
-                <td>x</td>
+                <td>√</td>
             </tr>
             <tr>
                 <td>cuSeqLensQOptional</td>
@@ -226,7 +226,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>INT32</td>
                 <td>ND</td>
                 <td>(B+1,)</td>
-                <td>x</td>
+                <td>√</td>
             </tr>
             <tr>
                 <td>cuSeqLensKOptional</td>
@@ -236,7 +236,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>INT32</td>
                 <td>ND</td>
                 <td>(B+1,)</td>
-                <td>x</td>
+                <td>√</td>
             </tr>
             <tr>
                 <td>seqUsedQOptional</td>
@@ -246,7 +246,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>INT32</td>
                 <td>ND</td>
                 <td>(B,)</td>
-                <td>x</td>
+                <td>√</td>
             </tr>
             <tr>
                 <td>seqUsedKOptional</td>
@@ -256,7 +256,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>INT32</td>
                 <td>ND</td>
                 <td>(B,)</td>
-                <td>x</td>
+                <td>√</td>
             </tr>
             <tr>
                 <td>cmpResidualKOptional</td>
@@ -266,7 +266,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>INT32</td>
                 <td>ND</td>
                 <td>(B,)</td>
-                <td>x</td>
+                <td>√</td>
             </tr>
             <tr>
                 <td>metadataOptional</td>
@@ -276,7 +276,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
                 <td>INT32</td>
                 <td>ND</td>
                 <td>(x,)</td>
-                <td>x</td>
+                <td>√</td>
             </tr>
             <tr>
                 <td>layoutQ</td>

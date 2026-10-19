@@ -98,7 +98,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B+1,)</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>cuSeqLensKOptional（const aclTensor*）</td>
@@ -108,7 +108,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B+1,)</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>seqUsedQOptional（const aclTensor*）</td>
@@ -118,7 +118,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>seqUsedKOptional（const aclTensor*）</td>
@@ -128,7 +128,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>cmpResidualKOptional（const aclTensor*）</td>
@@ -138,7 +138,7 @@ aclnnStatus aclnnDenseLightningIndexerKLLossGradMetadata(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape为(B,)</td>
-      <td>×</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>batchSize（int64_t）</td>

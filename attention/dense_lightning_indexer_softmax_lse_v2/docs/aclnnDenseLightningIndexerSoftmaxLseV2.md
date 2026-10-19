@@ -109,7 +109,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>(B,S1,N1,D);(T1,N1,D)</td>
-      <td>×</td>
+      <td>√</td>
      </tr>
      <tr>
       <td>keyIndex（aclTensor*）</td>
@@ -119,7 +119,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>(B,S2,N2,D);(T2,N2,D)</td>
-      <td>×</td>
+      <td>√</td>
      </tr>
      <tr>
       <td>weight（aclTensor*）</td>
@@ -129,7 +129,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>FLOAT32</td>
       <td>ND</td>
       <td>(B,S1,N1);(T1,N1)</td>
-      <td>×</td>
+      <td>√</td>
      </tr>
      <tr>
       <td>cuSeqLensQOptional（aclTensor*）</td>
@@ -139,7 +139,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape 为 (B+1,)</td>
-      <td>×</td>
+      <td>√</td>
      </tr>
      <tr>
       <td>cuSeqLensKOptional（aclTensor*）</td>
@@ -149,7 +149,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape 为 (B+1,)</td>
-      <td>×</td>
+      <td>√</td>
      </tr>
      <tr>
       <td>seqUsedQOptional（aclTensor*）</td>
@@ -159,7 +159,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape 为 (B,)</td>
-      <td>×</td>
+      <td>√</td>
      </tr>
      <tr>
       <td>seqUsedKOptional（aclTensor*）</td>
@@ -169,7 +169,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape 为 (B,)</td>
-      <td>×</td>
+      <td>√</td>
      </tr>
      <tr>
       <td>cmpResidualKOptional（aclTensor*）</td>
@@ -179,7 +179,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape 为 (B,)</td>
-      <td>×</td>
+      <td>√</td>
      </tr>
      <tr>
       <td>metadataOptional（aclTensor*）</td>
@@ -189,7 +189,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape 为 (64,)</td>
-      <td>×</td>
+      <td>√</td>
      </tr>
      <tr>
       <td>layoutQ（char*）</td>
