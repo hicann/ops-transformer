@@ -260,10 +260,10 @@ __aicore__ inline void LightningIndexerV2ServiceCube<LIT>::KeyNd2NzForPA(uint64_
     while (s2L1Offset < s2L1RealSize) {
         uint64_t s2BlkId = (s2L1Offset + liV2S2GmOffset) / liV2CubeConstInfo.kCacheBlockSize;
         uint64_t s2BlkOffset = (s2L1Offset + liV2S2GmOffset) % liV2CubeConstInfo.kCacheBlockSize;
-        uint64_t keyGmOffset =
-            blkTableGm_.GetValue(liV2CubeRunInfo.bIdx * liV2CubeConstInfo.maxBlockNumPerBatch + s2BlkId) *
-                liV2CubeConstInfo.keyStride0 +
-            s2BlkOffset * liV2CubeConstInfo.headDim;
+        uint64_t keyGmOffset = static_cast<uint64_t>(blkTableGm_.GetValue(
+                                   liV2CubeRunInfo.bIdx * liV2CubeConstInfo.maxBlockNumPerBatch + s2BlkId)) *
+                                   liV2CubeConstInfo.keyStride0 +
+                               s2BlkOffset * liV2CubeConstInfo.headDim;
 
         uint64_t s2Mte2Size = s2L1RealSize - s2L1Offset;
         s2Mte2Size = s2BlkOffset + s2Mte2Size >= liV2CubeConstInfo.kCacheBlockSize ?
