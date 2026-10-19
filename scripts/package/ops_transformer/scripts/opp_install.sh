@@ -332,8 +332,6 @@ install_es_whl_package() {
  	  else
  	    logandprint "[INFO]: ${_package_name} installed successfully!"
  	  fi
- 	  chmod -R "${CUSTOM_PERM}" "${_pythonlocalpath}"/es_transformer 2> /dev/null
- 	  chmod -R "${CUSTOM_PERM}" "${_pythonlocalpath}"/es_transformer-*.dist-info 2> /dev/null
  	else
  	  logandprint "[WARNING]: install ${_package_name} skipped, whl package not found for this platform."
  	fi
@@ -344,9 +342,6 @@ install_es_whl() {
  	local python_es_whl_name="es_transformer"
  	local whl_install_dir_path="${TARGET_VERSION_DIR}/python/site-packages"
  	install_es_whl_package "${es_whl_path}" "${python_es_whl_name}" "${whl_install_dir_path}"
-  if [ -d "${TARGET_VERSION_DIR}/ops_transformer" ]; then
- 	  rm -rf "${TARGET_VERSION_DIR}/ops_transformer"
- 	fi
 }
 
 add_init_py() {
@@ -362,6 +357,10 @@ add_init_py() {
   if [ -n "${opp_builtin_mod}" ]; then
     chmod ${opp_builtin_mod} -R "${built_in_impl_path}" 2>/dev/null
   fi
+
+  if [ -d "${TARGET_VERSION_DIR}/ops_transformer" ]; then
+ 	  rm -rf "${TARGET_VERSION_DIR}/ops_transformer"
+ 	fi
 }
 
 install_whl_package() {
@@ -419,6 +418,8 @@ install_opp() {
   # 先安装 whl 包，再通过 install_common_parser.sh 统一安装权限
   install_whl_package
 
+  install_es_whl
+
   bash "${COMMON_PARSER_FILE}" --copy_all --package="${OPP_PLATFORM_DIR}" --install --username="${TARGET_USERNAME}" \
     --usergroup="${TARGET_USERGROUP}" --set-cann-uninstall --version=$RUN_PKG_VERSION \
     --use-share-info --version-dir=$PKG_VERSION_DIR $INSTALL_OPTION ${INSTALL_FOR_ALL} "--feature=all" "--chip=all" \
@@ -428,8 +429,6 @@ install_opp() {
   logandprint "[INFO]: upgradePercentage:30%"
 
   add_init_py
-
-  install_es_whl
 
   logandprint "[INFO]: upgradePercentage:50%"
 }
