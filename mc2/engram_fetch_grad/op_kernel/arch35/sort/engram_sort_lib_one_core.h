@@ -64,10 +64,9 @@ __aicore__ inline void SortRadixOneCore<ValT, IdxT, isDescend>::Init(GM_ADDR x, 
     pipe_ = pipe;
     numTileData_ = params.numTileData;
     tmpUbSize_ = params.tmpUbSize;
-    // int64 index 时，AscendC::Sort 先把 uint32 索引写到 buffer 后半段（32 字节对齐），再 AscendC::Cast 为 int64。
-    // uint32 排序结果缓冲 CeilAlign(N*4, 32)，int64 时再翻倍以容纳 AscendC::Cast 结果。
-    uint32_t idxUbSize32 = RoundUpAlign(static_cast<uint32_t>(numTileData_ * sizeof(uint32_t)));
+    uint32_t idxUbSize32 = RoundUpAlign(static_cast<uint32_t>(numTileData_ * sizeof(uint32_t))); // ub 32对齐
     halfIndex_ = idxUbSize32 / static_cast<uint32_t>(sizeof(uint32_t));
+    // sort api只支持uint32，但是调用方可能需要这个排序伴随下表为int64，需扩展最后uint32->int64，需要更大空间
     uint32_t idxBufferBytes = (sizeof(IdxT) == sizeof(int64_t)) ? (2U * idxUbSize32) : idxUbSize32;
 
     inputXGm_.SetGlobalBuffer((__gm__ ValT*)x);
@@ -76,7 +75,7 @@ __aicore__ inline void SortRadixOneCore<ValT, IdxT, isDescend>::Init(GM_ADDR x, 
 
     pipe_->InitBuffer(inQueueX_, 1, RoundUpAlign(static_cast<uint32_t>(numTileData_ * sizeof(ValT))));
     pipe_->InitBuffer(outValueQueue_, 1, RoundUpAlign(static_cast<uint32_t>(numTileData_ * sizeof(ValT))));
-    pipe_->InitBuffer(outIdxQueue_, 1, idxBufferBytes);
+    pipe_->InitBuffer(outIdxQueue_, 1, idxBufferBytes); // 存排序idx用
     pipe_->InitBuffer(tmpUb_, tmpUbSize_);
 }
 

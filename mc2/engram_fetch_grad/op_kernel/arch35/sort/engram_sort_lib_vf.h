@@ -472,11 +472,14 @@ __simd_vf__ __aicore__ inline void EncodeHistVF(__ubuf__ uint16_t* blockHistPtr,
     AscendC::Reg::RegTensor<uint16_t> blockHistZero, blockHistOne;
     AscendC::Reg::RegTensor<uint16_t> lookaheadOutZero, lookaheadOutOne, lookaheadOutTwo, lookaheadOutThree;
     AscendC::Reg::RegTensor<uint16_t> zeroVector;
-    AscendC::Reg::Duplicate(zeroVector, 0, predicateDefaultB16);
-    AscendC::Reg::LoadAlign<uint16_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(blockHistZero, blockHistPtr,
-                                                                                   VF_LEN_B16);
-    AscendC::Reg::LoadAlign<uint16_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(blockHistOne, blockHistPtr,
-                                                                                   VF_LEN_B16);
+    AscendC::Reg::Duplicate(zeroVector, 0, predicateDefaultB16); // 填充全零向量
+    AscendC::Reg::LoadAlign<uint16_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(
+        blockHistZero, blockHistPtr,
+        VF_LEN_B16); // 读128个u16（即256B为向量引擎一次宽度）进寄存器
+    AscendC::Reg::LoadAlign<uint16_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(
+        blockHistOne, blockHistPtr,
+        VF_LEN_B16); // 读128~255，两次合计256桶
+    // Interleave数据重排指令，(out前半, out后半, a, b);
     AscendC::Reg::Interleave(lookaheadOutZero, lookaheadOutOne, blockHistZero, zeroVector);
     AscendC::Reg::Interleave(lookaheadOutTwo, lookaheadOutThree, blockHistOne, zeroVector);
     if constexpr (AscendC::IsSameType<CountT, uint32_t>::value) {

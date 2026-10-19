@@ -502,6 +502,11 @@ static ge::graphStatus SetPlatformInfo(gert::TilingContext* context, EngramFetch
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
     uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
+    // 平台信息异常时拦在 tiling 源头: a2a 死锁硬约束要求至少 2 个 v 核
+    // (1 send + 1 recv 并发, credit 背压依赖对端 receiver 在场)
+    OP_TILING_CHECK(aivNum < 2U,
+                    OP_LOGE(nodeName, "EngramFetchGrad requires at least 2 AIV cores, got aivNum=%u", aivNum),
+                    return ge::GRAPH_FAILED);
     uint32_t numBlocks = ascendcPlatform.CalcTschNumBlocks(aivNum, 0, aivNum);
     context->SetBlockDim(numBlocks);
     tilingData.aivNum = aivNum;
@@ -575,8 +580,6 @@ static ge::graphStatus SetTilingData(const gert::TilingContext* context, EngramF
     auto commBufferSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_COMM_BUFFER_SIZE);
     tilingData.commBufferSize = *commBufferSizePtr;
 
-    // 动态计算 gradSubBatch：常驻区与 Kernel 侧 InitBuffer 布局一一对应（精确推导而非固定 9KB），
-    // accum 预留双缓冲 2 行与 Kernel AccumBufBytes 对齐（TIL-2/SIMT-UB-01 修复）
     uint32_t statusBytes =
         static_cast<uint32_t>(AlignTo(static_cast<int64_t>(rankSize) * Mc2Kernel::STATE_OFFSET, Mc2Kernel::UB_ALIGN));
     uint32_t tempBytes = statusBytes;
@@ -651,8 +654,8 @@ static ge::graphStatus SetTilingData(const gert::TilingContext* context, EngramF
         uint32_t chunkFp32Stride =
             static_cast<uint32_t>(AlignTo(static_cast<int64_t>(Mc2Kernel::HIDDEN_CHUNK_ELEMS) * sizeof(float),
                                           static_cast<int64_t>(Mc2Kernel::UB_ALIGN)));
-        uint32_t chunkOutStride = chunkFp32Stride;
-        uint32_t chunkEntryBytes = Mc2Kernel::FLUSH_CAST_HEAD_BYTES + DOUBLE_BUFFER_NUM * chunkOutStride;
+        // flush cast staging 按 fp32 stride 上界预留(保守; 与 kernel 侧 LoadTilingData 同口径)
+        uint32_t chunkEntryBytes = Mc2Kernel::FLUSH_CAST_HEAD_BYTES + DOUBLE_BUFFER_NUM * chunkFp32Stride;
         uint32_t chunkMinNeed =
             Mc2Kernel::GRAD_BUF_BYTES + chunkEntryBytes + chunkFp32Stride + DOUBLE_BUFFER_NUM * chunkFp32Stride;
         OP_TILING_CHECK(chunkMinNeed > availableForPool,
@@ -666,8 +669,18 @@ static ge::graphStatus SetTilingData(const gert::TilingContext* context, EngramF
         tilingData.gradSubBatch = chunkRows;
     }
 
-    uint64_t hookReserve = Mc2Kernel::A2aHookUbReserve(tilingData.rankSize);
-    uint64_t budget = static_cast<uint64_t>(tilingData.ubSize) - hookReserve;
+    uint32_t sortCoreCnt = tilingData.aivNum / 2U;
+    if (sortCoreCnt < 1U) {
+        sortCoreCnt = 1U;
+    }
+    tilingData.sortCoreCnt = sortCoreCnt;
+
+    uint64_t sortTileCalibReserve =
+        512U +
+        ((static_cast<uint64_t>(tilingData.rankSize) * Mc2Kernel::STATE_OFFSET + Mc2Kernel::UB_ALIGN - 1U) /
+         Mc2Kernel::UB_ALIGN * Mc2Kernel::UB_ALIGN) +
+        2U * Mc2Kernel::A2A_COPY_HALF_BYTES;
+    uint64_t budget = static_cast<uint64_t>(tilingData.ubSize) - sortTileCalibReserve;
     constexpr uint64_t kSortLibFixedBytes = 5120U;
     constexpr uint64_t kMinTileElems = 64U;
     constexpr uint64_t kBytesPerElem = 21U;
@@ -676,12 +689,15 @@ static ge::graphStatus SetTilingData(const gert::TilingContext* context, EngramF
     constexpr uint32_t kSortTmpBytesPerGroup = 7U;
     constexpr uint32_t kSortTmpGroupTiles = 32U;
     if (budget < kSortLibFixedBytes + kMinTileElems * kBytesPerElem) {
-        OP_LOGE(nodeName, "SortLib UB budget too small: ubSize=%llu, hookReserve=%llu, need>=%llu",
-                static_cast<uint64_t>(tilingData.ubSize), static_cast<uint64_t>(hookReserve),
+        OP_LOGE(nodeName, "SortLib UB budget too small: ubSize=%llu, calibReserve=%llu, need>=%llu",
+                static_cast<uint64_t>(tilingData.ubSize), sortTileCalibReserve,
                 static_cast<uint64_t>(kSortLibFixedBytes + kMinTileElems * kBytesPerElem));
         return ge::GRAPH_FAILED;
     }
-    uint32_t numTile = static_cast<uint32_t>((totalRecv + tilingData.aivNum - 1) / tilingData.aivNum);
+
+    uint32_t tilesPerSortCore = 2U;
+    uint32_t numTile =
+        static_cast<uint32_t>((totalRecv + sortCoreCnt * tilesPerSortCore - 1) / (sortCoreCnt * tilesPerSortCore));
     uint32_t ubCap = static_cast<uint32_t>((budget - kSortLibFixedBytes) / kBytesPerElem);
     if (numTile < kMinTileElems) {
         numTile = kMinTileElems;
@@ -773,7 +789,13 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext* context, const EngramFe
     int64_t slSeg4 =
         AlignTo(static_cast<int64_t>(tilingData.sortTileCount) * tilingData.sortNumTileData, Mc2Kernel::UB_ALIGN);
     int64_t slSeg5 = AlignTo(totalRecv * static_cast<int64_t>(sizeof(int32_t)), Mc2Kernel::UB_ALIGN);
-    int64_t wsSortTotal = wsSortCompanion + slSeg0 + slSeg1 + slSeg2 + slSeg3 + slSeg4 + slSeg5;
+
+    constexpr int64_t SOFT_BARRIER_MAX_GENS = 16;
+    int64_t wsSortBarrier = SOFT_BARRIER_MAX_GENS *
+                            ((static_cast<int64_t>(tilingData.aivNum) * static_cast<int64_t>(Mc2Kernel::STATE_OFFSET) +
+                              Mc2Kernel::UB_ALIGN - 1) /
+                             Mc2Kernel::UB_ALIGN * Mc2Kernel::UB_ALIGN);
+    int64_t wsSortTotal = wsSortCompanion + slSeg0 + slSeg1 + slSeg2 + slSeg3 + slSeg4 + slSeg5 + wsSortBarrier;
 
     int64_t wsTotal = wsGradSorted + wsRecvGrad + wsSdispls + wsRdispls + wsCounterScratch + wsFlagScratch +
                       wsSegCount + wsCoreStart + wsSortTotal;

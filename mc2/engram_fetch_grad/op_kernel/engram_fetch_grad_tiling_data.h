@@ -18,9 +18,6 @@
 
 #include <cstdint>
 
-// Host/Kernel 共享布局常量（单一权威定义）。
-// Host 侧 op_tiling 与 Kernel 侧 utils/arch35/unique 均从此处引用，禁止在其它文件重复定义；
-// 修改任一常量必须同步评估两侧 UB/GM 预算（TIL-2/SIMT-UB-01/CG-4.3 根治措施）。
 namespace Mc2Kernel {
 constexpr uint32_t MAX_QP_SIZE = 1024U;           // 通信域 rank 上界（EngramCommContext.commBuffer 容量）
 constexpr uint32_t UB_ALIGN = 32U;                // UB 32B 对齐
@@ -39,10 +36,6 @@ constexpr uint32_t FLUSH_CAST_HEAD_BYTES =
     static_cast<uint32_t>(ENTRY_BUF_INT32_SLOTS * ENTRY_BATCH_CAP * sizeof(int32_t));
 constexpr uint32_t HIDDEN_CHUNK_ELEMS = 2048U;
 constexpr uint32_t A2A_COPY_HALF_BYTES = 32U * 1024U;
-constexpr uint64_t A2aHookUbReserve(uint32_t numRanks)
-{
-    return HCOMM_INIT_SIZE + (numRanks * STATE_OFFSET + UB_ALIGN - 1U) / UB_ALIGN * UB_ALIGN + 2U * A2A_COPY_HALF_BYTES;
-}
 } // namespace Mc2Kernel
 
 struct EngramFetchGradTilingData {
@@ -61,6 +54,7 @@ struct EngramFetchGradTilingData {
     uint32_t sortNumTileData;  // SortLib: 每 tile 元素数
     uint32_t sortTileCount;    // SortLib: tile 数
     uint32_t sortTmpUbSize;    // SortLib: AscendC::Sort 临时 UB 字节
+    uint32_t sortCoreCnt;      // sort 参与核数
     uint32_t chunkElems;
 };
 #endif

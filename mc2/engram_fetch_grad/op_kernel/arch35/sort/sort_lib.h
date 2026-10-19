@@ -18,11 +18,17 @@
 #define SORT_LIB_H
 
 #include "kernel_operator.h"
-struct NoOpHook {
-    __aicore__ inline void operator()() const {}
+
+// 核子集屏障接口: 调用方通过模板参数注入"排序内部的同步原语"(默认硬件全核 SyncAll;
+// 核分区模式下注入软屏障, 仅同步参与排序的核子集), 编译期绑定零开销
+struct HardwareBarrier {
+    __aicore__ inline void operator()() const
+    {
+        AscendC::SyncAll<true>();
+    }
 };
-#include "sort_lib/sort_lib_core.h"
-#include "sort_lib/engram_sort_lib_one_core.h"
+#include "sort_lib_core.h"
+#include "engram_sort_lib_one_core.h"
 
 namespace SortLib {
 
@@ -68,10 +74,10 @@ namespace SortLib {
  *            SortLib::SortInvoke<ValT, IdxT, CountT, false>(&pipe, x, outVal, outIdx, ws, p);
  *            pipe.Reset();   // 调用后释放本接口占用的 UB，保证后续接口可用
  */
-template <typename ValT, typename IdxT, typename CountT, bool isDescending, typename HookT = NoOpHook>
+template <typename ValT, typename IdxT, typename CountT, bool isDescending, typename BarrierT = HardwareBarrier>
 __aicore__ inline void SortInvoke(AscendC::TPipe* pipe, __gm__ ValT* x, __gm__ ValT* sortedValues,
                                   __gm__ IdxT* sortedIndices, __gm__ char* workspace, const SortParams& p,
-                                  HookT hook = HookT())
+                                  BarrierT barrier = BarrierT())
 {
     if (p.totalElements == 0) {
         return; // 空输入：无元素可排序，跳过排序与 workspace 清零（避免写 0 字节 workspace 越界）
@@ -87,7 +93,7 @@ __aicore__ inline void SortInvoke(AscendC::TPipe* pipe, __gm__ ValT* x, __gm__ V
     detail::SortRadixMoreCore<ValT, IdxT, CountT, isDescending> op;
     op.Init(reinterpret_cast<GM_ADDR>(x), reinterpret_cast<GM_ADDR>(sortedValues),
             reinterpret_cast<GM_ADDR>(sortedIndices), reinterpret_cast<GM_ADDR>(workspace), p, pipe);
-    op.Process(hook);
+    op.Process(barrier);
 }
 
 } // namespace SortLib

@@ -44,6 +44,287 @@ static __aicore__ inline uint32_t GetDtypeSize(int32_t dtype)
     return sizeof(float);
 }
 
+constexpr uint32_t VF_CHUNK_INT32 = 64U;
+
+struct EngramVfTables {
+    static constexpr uint32_t GUARD = 0U;
+    static constexpr uint32_t ISNEWN = 32U;
+    static constexpr uint32_t ISNEW = 1056U;
+    static constexpr uint32_t SCAN_PAD = 2080U;
+    static constexpr uint32_t SCAN_DAT = 2112U;
+    static constexpr uint32_t PREFIX = 2176U;
+    static constexpr uint32_t DRF = 3200U;
+    static constexpr uint32_t RUNSF = 4224U;
+    static constexpr uint32_t RID = 5248U;
+    static constexpr uint32_t DUPSF = 6272U;
+    static constexpr uint32_t GID = 7296U;
+    static constexpr uint32_t RUNEF = 8320U;
+    static constexpr uint32_t DUPEF = 9344U;
+    static constexpr uint32_t E2 = 10368U;
+    static constexpr uint32_t TOTAL_INT32 = 11392U;
+};
+static_assert(EngramVfTables::TOTAL_INT32 * sizeof(int32_t) <= Mc2Kernel::GRAD_BUF_BYTES,
+              "vf scratch tables must fit inside gradBuf (walk reuses it after judging)");
+
+__simd_callee__ __aicore__ inline void EngramVfScanTable(__ubuf__ int32_t* src, __ubuf__ int32_t* dst,
+                                                         __ubuf__ int32_t* scanDat, uint32_t b)
+{
+    const uint32_t chunks = (b + VF_CHUNK_INT32 - 1U) / VF_CHUNK_INT32;
+    AscendC::Reg::MaskReg allMask = AscendC::Reg::CreateMask<int32_t>();
+    AscendC::Reg::RegTensor<int32_t> zeroReg;
+    AscendC::Reg::Duplicate(zeroReg, (int32_t)0, allMask);
+    for (uint32_t c = 0U; c < chunks; c++) {
+        const uint32_t base = c * VF_CHUNK_INT32;
+        const uint32_t n = (b - base > VF_CHUNK_INT32) ? VF_CHUNK_INT32 : (b - base);
+        AscendC::Reg::RegTensor<int32_t> xReg;
+        AscendC::Reg::LoadAlign(xReg, src + base);
+        for (uint32_t s = 1U; s < VF_CHUNK_INT32; s <<= 1U) {
+            AscendC::Reg::StoreAlign(scanDat, xReg, allMask);
+            AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
+            AscendC::Reg::RegTensor<int32_t> shReg;
+            AscendC::Reg::Load<int32_t>(shReg, scanDat - s);
+            AscendC::Reg::Add<int32_t>(xReg, xReg, shReg, allMask);
+        }
+        if (c > 0U) {
+            AscendC::Reg::RegTensor<int32_t> carryIdx;
+            AscendC::Reg::Duplicate(carryIdx, static_cast<int32_t>(base) - 1, allMask);
+            AscendC::Reg::RegTensor<int32_t> carryReg;
+            AscendC::Reg::Gather<int32_t>(carryReg, dst, (AscendC::Reg::RegTensor<uint32_t>&)carryIdx, allMask);
+            AscendC::Reg::Add<int32_t>(xReg, xReg, carryReg, allMask);
+        }
+        uint32_t nVal = n;
+        AscendC::Reg::MaskReg nMask = AscendC::Reg::UpdateMask<int32_t>(nVal);
+        AscendC::Reg::RegTensor<int32_t> xClean;
+        AscendC::Reg::Select(xClean, xReg, zeroReg, nMask);
+        AscendC::Reg::StoreAlign(dst + base, xClean, allMask);
+    }
+}
+
+__simd_vf__ __aicore__ inline void EngramVfBatchUniqueVF(__ubuf__ int32_t* vfBase, __ubuf__ int32_t* entry,
+                                                         __ubuf__ int32_t* uniqueT, __ubuf__ int32_t* runStartT,
+                                                         __ubuf__ int32_t* runEndT, __ubuf__ int32_t* runCompactT,
+                                                         __ubuf__ int32_t* dupStartT, __ubuf__ int32_t* dupEndT,
+                                                         __ubuf__ int32_t* dupCompactT, uint32_t b, int32_t prevEntry,
+                                                         uint32_t firstElem, int32_t rankBase, int32_t runningOffset)
+{
+    __ubuf__ int32_t* isnewNP = vfBase + EngramVfTables::ISNEWN;
+    __ubuf__ int32_t* isnewP = vfBase + EngramVfTables::ISNEW;
+    __ubuf__ int32_t* scanPad = vfBase + EngramVfTables::SCAN_PAD;
+    __ubuf__ int32_t* scanDat = vfBase + EngramVfTables::SCAN_DAT;
+    __ubuf__ int32_t* prefixP = vfBase + EngramVfTables::PREFIX;
+    __ubuf__ int32_t* drfP = vfBase + EngramVfTables::DRF;
+    __ubuf__ int32_t* runSFP = vfBase + EngramVfTables::RUNSF;
+    __ubuf__ int32_t* ridP = vfBase + EngramVfTables::RID;
+    __ubuf__ int32_t* dupSFP = vfBase + EngramVfTables::DUPSF;
+    __ubuf__ int32_t* gidP = vfBase + EngramVfTables::GID;
+    __ubuf__ int32_t* runEFP = vfBase + EngramVfTables::RUNEF;
+    __ubuf__ int32_t* dupEFP = vfBase + EngramVfTables::DUPEF;
+    __ubuf__ int32_t* e2P = vfBase + EngramVfTables::E2;
+
+    const uint32_t chunks = (b + VF_CHUNK_INT32 - 1U) / VF_CHUNK_INT32;
+    AscendC::Reg::MaskReg allMask = AscendC::Reg::CreateMask<int32_t>();
+    AscendC::Reg::RegTensor<int32_t> zeroReg;
+    AscendC::Reg::RegTensor<int32_t> onesReg;
+    AscendC::Reg::Duplicate(zeroReg, (int32_t)0, allMask);
+    AscendC::Reg::Duplicate(onesReg, (int32_t)1, allMask);
+
+    for (uint32_t c = 0U; c < chunks; c++) {
+        const uint32_t base = c * VF_CHUNK_INT32;
+        AscendC::Reg::RegTensor<int32_t> e2Reg;
+        AscendC::Reg::RegTensor<int32_t> enReg;
+        AscendC::Reg::LoadAlign(e2Reg, e2P + base);
+        AscendC::Reg::LoadAlign(enReg, entry + base);
+        AscendC::Reg::MaskReg neMask;
+        AscendC::Reg::Compare<int32_t, AscendC::CMPMODE::NE>(neMask, e2Reg, enReg, allMask);
+        AscendC::Reg::RegTensor<int32_t> nnReg;
+        AscendC::Reg::Select(nnReg, onesReg, zeroReg, neMask);
+        const int32_t keep = static_cast<int32_t>(b) - 1 - static_cast<int32_t>(base);
+        if (keep > 0) {
+            uint32_t keepN =
+                (static_cast<uint32_t>(keep) > VF_CHUNK_INT32) ? VF_CHUNK_INT32 : static_cast<uint32_t>(keep);
+            AscendC::Reg::MaskReg keepMask = AscendC::Reg::UpdateMask<int32_t>(keepN);
+            AscendC::Reg::RegTensor<int32_t> nnClean;
+            AscendC::Reg::Select(nnClean, nnReg, zeroReg, keepMask);
+            AscendC::Reg::StoreAlign(isnewNP + base, nnClean, allMask);
+        } else {
+            AscendC::Reg::StoreAlign(isnewNP + base, zeroReg, allMask);
+        }
+    }
+
+    AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
+    {
+        AscendC::Reg::RegTensor<int32_t> shReg;
+        AscendC::Reg::Load<int32_t>(shReg, isnewNP - 1);
+        AscendC::Reg::RegTensor<int32_t> arReg;
+        AscendC::Reg::Arange<int32_t>(arReg, (int32_t)0);
+        AscendC::Reg::MaskReg laneZero;
+        AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::EQ>(laneZero, arReg, (int32_t)0, allMask);
+        AscendC::Reg::RegTensor<int32_t> isReg;
+        if (firstElem != 0U) {
+            AscendC::Reg::Select(isReg, onesReg, shReg, laneZero);
+        } else {
+            AscendC::Reg::RegTensor<int32_t> enReg;
+            AscendC::Reg::RegTensor<int32_t> prevReg;
+            AscendC::Reg::LoadAlign(enReg, entry);
+            AscendC::Reg::Duplicate(prevReg, prevEntry, allMask);
+            AscendC::Reg::MaskReg neMask;
+            AscendC::Reg::Compare<int32_t, AscendC::CMPMODE::NE>(neMask, enReg, prevReg, allMask);
+            AscendC::Reg::RegTensor<int32_t> cmpOnes;
+            AscendC::Reg::Select(cmpOnes, onesReg, zeroReg, neMask);
+            AscendC::Reg::Select(isReg, cmpOnes, shReg, laneZero);
+        }
+        AscendC::Reg::StoreAlign(isnewP, isReg, allMask);
+    }
+    for (uint32_t c = 1U; c < chunks; c++) {
+        const uint32_t base = c * VF_CHUNK_INT32;
+        AscendC::Reg::RegTensor<int32_t> shReg;
+        AscendC::Reg::Load<int32_t>(shReg, isnewNP + base - 1U);
+        AscendC::Reg::StoreAlign(isnewP + base, shReg, allMask);
+    }
+
+    AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
+    {
+        uint32_t padLen = 32U;
+        AscendC::Reg::MaskReg padMask = AscendC::Reg::UpdateMask<int32_t>(padLen);
+        AscendC::Reg::StoreAlign(scanPad, zeroReg, padMask);
+    }
+    EngramVfScanTable(isnewP, prefixP, scanDat, b);
+
+    AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
+    for (uint32_t c = 0U; c < chunks; c++) {
+        const uint32_t base = c * VF_CHUNK_INT32;
+        AscendC::Reg::RegTensor<int32_t> isReg;
+        AscendC::Reg::LoadAlign(isReg, isnewP + base);
+        AscendC::Reg::MaskReg newMask;
+        AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::NE>(newMask, isReg, (int32_t)0, allMask);
+        AscendC::Reg::RegTensor<int32_t> preReg;
+        AscendC::Reg::LoadAlign(preReg, prefixP + base);
+        AscendC::Reg::RegTensor<int32_t> idxReg;
+        AscendC::Reg::Adds(idxReg, preReg, (int32_t)-1, allMask);
+        AscendC::Reg::MaskReg posMask;
+        AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::NE>(posMask, preReg, (int32_t)0, allMask);
+        AscendC::Reg::RegTensor<int32_t> idxClamped;
+        AscendC::Reg::Select(idxClamped, idxReg, zeroReg, posMask);
+        AscendC::Reg::RegTensor<int32_t> enReg;
+        AscendC::Reg::LoadAlign(enReg, entry + base);
+        AscendC::Reg::RegTensor<int32_t> valReg;
+        AscendC::Reg::Adds(valReg, enReg, -rankBase, allMask);
+        AscendC::Reg::Scatter<int32_t>(uniqueT, valReg, (AscendC::Reg::RegTensor<uint32_t>&)idxClamped, newMask);
+    }
+
+    AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
+    for (uint32_t c = 0U; c < chunks; c++) {
+        const uint32_t base = c * VF_CHUNK_INT32;
+        AscendC::Reg::RegTensor<int32_t> isReg, nnReg, isPrevReg, nnNextReg;
+        AscendC::Reg::LoadAlign(isReg, isnewP + base);
+        AscendC::Reg::LoadAlign(nnReg, isnewNP + base);
+        AscendC::Reg::Load<int32_t>(isPrevReg, isnewP + base - 1U);
+        AscendC::Reg::Load<int32_t>(nnNextReg, isnewNP + base + 1U);
+        AscendC::Reg::RegTensor<int32_t> drfReg, drfPrevReg, drfNextReg;
+        AscendC::Reg::And<int32_t>(drfReg, isReg, nnReg, allMask);
+        AscendC::Reg::And<int32_t>(drfPrevReg, isPrevReg, isReg, allMask);
+        AscendC::Reg::And<int32_t>(drfNextReg, nnReg, nnNextReg, allMask);
+        AscendC::Reg::StoreAlign(drfP + base, drfReg, allMask);
+
+        AscendC::Reg::RegTensor<int32_t> notPrev;
+        AscendC::Reg::Not(notPrev, drfPrevReg, allMask);
+        AscendC::Reg::RegTensor<int32_t> runSFReg;
+        AscendC::Reg::And<int32_t>(runSFReg, drfReg, notPrev, allMask);
+        if (c == 0U) {
+            AscendC::Reg::RegTensor<int32_t> arReg;
+            AscendC::Reg::Arange<int32_t>(arReg, (int32_t)0);
+            AscendC::Reg::MaskReg laneZero;
+            AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::EQ>(laneZero, arReg, (int32_t)0, allMask);
+            AscendC::Reg::RegTensor<int32_t> fixed;
+            AscendC::Reg::Select(fixed, drfReg, runSFReg, laneZero);
+            runSFReg = fixed;
+        }
+        AscendC::Reg::StoreAlign(runSFP + base, runSFReg, allMask);
+
+        AscendC::Reg::RegTensor<int32_t> notNext;
+        AscendC::Reg::Not(notNext, drfNextReg, allMask);
+        AscendC::Reg::RegTensor<int32_t> runEFReg;
+        AscendC::Reg::And<int32_t>(runEFReg, drfReg, notNext, allMask);
+        AscendC::Reg::StoreAlign(runEFP + base, runEFReg, allMask);
+
+        AscendC::Reg::RegTensor<int32_t> notDrf;
+        AscendC::Reg::Not(notDrf, drfReg, allMask);
+        AscendC::Reg::RegTensor<int32_t> dupSFReg;
+        if (c == 0U) {
+            AscendC::Reg::RegTensor<int32_t> arReg, laneZeroVec, orReg;
+            AscendC::Reg::Arange<int32_t>(arReg, (int32_t)0);
+            AscendC::Reg::MaskReg laneZero;
+            AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::EQ>(laneZero, arReg, (int32_t)0, allMask);
+            AscendC::Reg::Select(laneZeroVec, onesReg, zeroReg, laneZero);
+            AscendC::Reg::Or<int32_t>(orReg, isReg, laneZeroVec, allMask);
+            AscendC::Reg::And<int32_t>(dupSFReg, notDrf, orReg, allMask);
+        } else {
+            AscendC::Reg::And<int32_t>(dupSFReg, notDrf, isReg, allMask);
+        }
+        AscendC::Reg::StoreAlign(dupSFP + base, dupSFReg, allMask);
+
+        AscendC::Reg::RegTensor<int32_t> dupEFReg;
+        if (c + 1U == chunks) {
+            AscendC::Reg::RegTensor<int32_t> arReg, isLastVec, orReg;
+            AscendC::Reg::Arange<int32_t>(arReg, (int32_t)0);
+            AscendC::Reg::MaskReg lastMask;
+            AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::EQ>(lastMask, arReg, static_cast<int32_t>(b - 1U - base),
+                                                                  allMask);
+            AscendC::Reg::Select(isLastVec, onesReg, zeroReg, lastMask);
+            AscendC::Reg::Or<int32_t>(orReg, nnReg, isLastVec, allMask);
+            AscendC::Reg::And<int32_t>(dupEFReg, notDrf, orReg, allMask);
+        } else {
+            AscendC::Reg::And<int32_t>(dupEFReg, notDrf, nnReg, allMask);
+        }
+        AscendC::Reg::StoreAlign(dupEFP + base, dupEFReg, allMask);
+    }
+
+    AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
+    EngramVfScanTable(runSFP, ridP, scanDat, b);
+    EngramVfScanTable(dupSFP, gidP, scanDat, b);
+
+    AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
+    for (uint32_t c = 0U; c < chunks; c++) {
+        const uint32_t base = c * VF_CHUNK_INT32;
+        AscendC::Reg::RegTensor<int32_t> posReg;
+        AscendC::Reg::Arange<int32_t>(posReg, (int32_t)0);
+        if (base != 0U) {
+            AscendC::Reg::Adds(posReg, posReg, static_cast<int32_t>(base), allMask);
+        }
+        AscendC::Reg::RegTensor<int32_t> pos1Reg;
+        AscendC::Reg::Adds(pos1Reg, posReg, (int32_t)1, allMask);
+        AscendC::Reg::RegTensor<int32_t> ridReg, gidReg, preReg;
+        AscendC::Reg::LoadAlign(ridReg, ridP + base);
+        AscendC::Reg::LoadAlign(gidReg, gidP + base);
+        AscendC::Reg::LoadAlign(preReg, prefixP + base);
+        AscendC::Reg::RegTensor<int32_t> ridIdx, gidIdx, cmpVal, ridIdxC, gidIdxC;
+        AscendC::Reg::Adds(ridIdx, ridReg, (int32_t)-1, allMask);
+        AscendC::Reg::Adds(gidIdx, gidReg, (int32_t)-1, allMask);
+        AscendC::Reg::Adds(cmpVal, preReg, runningOffset - 1, allMask);
+        AscendC::Reg::MaskReg ridPosMask, gidPosMask;
+        AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::NE>(ridPosMask, ridReg, (int32_t)0, allMask);
+        AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::NE>(gidPosMask, gidReg, (int32_t)0, allMask);
+        AscendC::Reg::Select(ridIdxC, ridIdx, zeroReg, ridPosMask);
+        AscendC::Reg::Select(gidIdxC, gidIdx, zeroReg, gidPosMask);
+        AscendC::Reg::RegTensor<int32_t> runSFReg, runEFReg, dupSFReg, dupEFReg;
+        AscendC::Reg::LoadAlign(runSFReg, runSFP + base);
+        AscendC::Reg::LoadAlign(runEFReg, runEFP + base);
+        AscendC::Reg::LoadAlign(dupSFReg, dupSFP + base);
+        AscendC::Reg::LoadAlign(dupEFReg, dupEFP + base);
+        AscendC::Reg::MaskReg runSFMask, runEFMask, dupSFMask, dupEFMask;
+        AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::NE>(runSFMask, runSFReg, (int32_t)0, allMask);
+        AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::NE>(runEFMask, runEFReg, (int32_t)0, allMask);
+        AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::NE>(dupSFMask, dupSFReg, (int32_t)0, allMask);
+        AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::NE>(dupEFMask, dupEFReg, (int32_t)0, allMask);
+        AscendC::Reg::Scatter<int32_t>(runStartT, posReg, (AscendC::Reg::RegTensor<uint32_t>&)ridIdxC, runSFMask);
+        AscendC::Reg::Scatter<int32_t>(runEndT, pos1Reg, (AscendC::Reg::RegTensor<uint32_t>&)ridIdxC, runEFMask);
+        AscendC::Reg::Scatter<int32_t>(runCompactT, cmpVal, (AscendC::Reg::RegTensor<uint32_t>&)ridIdxC, runSFMask);
+        AscendC::Reg::Scatter<int32_t>(dupStartT, posReg, (AscendC::Reg::RegTensor<uint32_t>&)gidIdxC, dupSFMask);
+        AscendC::Reg::Scatter<int32_t>(dupEndT, pos1Reg, (AscendC::Reg::RegTensor<uint32_t>&)gidIdxC, dupEFMask);
+        AscendC::Reg::Scatter<int32_t>(dupCompactT, cmpVal, (AscendC::Reg::RegTensor<uint32_t>&)gidIdxC, dupSFMask);
+    }
+}
+
 class EngramFetchGradUnique {
 public:
     __aicore__ inline EngramFetchGradUnique() = default;
@@ -176,6 +457,9 @@ private:
                                                   int32_t& prevEntry, bool& isFirstElement, int32_t& inclusiveSum,
                                                   GM_ADDR recvLocalEntryOutGM, GM_ADDR sortCompanionGM, bool emitLists,
                                                   bool sparseCompact);
+    __aicore__ inline uint32_t ProcessBatchUniqueVF(uint32_t cur, uint32_t batchLen, int32_t runningOffset,
+                                                    int32_t& prevEntry, bool& isFirstElement, int32_t& inclusiveSum,
+                                                    GM_ADDR recvLocalEntryOutGM, GM_ADDR sortCompanionGM);
     __aicore__ inline void WriteBatchUnique(uint32_t tileUniqueCnt, int32_t& runningUniqueOffset,
                                             GM_ADDR uniqueLocalEntryOutGM);
 
@@ -1020,18 +1304,23 @@ __aicore__ inline uint32_t EngramFetchGradUnique::ProcessBatchUnique(
     uint32_t cur, uint32_t batchLen, int32_t runningOffset, int32_t& prevEntry, bool& isFirstElement,
     int32_t& inclusiveSum, GM_ADDR recvLocalEntryOutGM, GM_ADDR sortCompanionGM, bool emitLists, bool sparseCompact)
 {
-    AscendC::LocalTensor<int32_t> entryUb = indicesBuf_->Get<int32_t>();
-
-    AscendC::GlobalTensor<int32_t> sortedEntryGM;
-    AscendC::GlobalTensor<int32_t> compGM;
-    sortedEntryGM.SetGlobalBuffer((__gm__ int32_t*)recvLocalEntryOutGM);
-    compGM.SetGlobalBuffer((__gm__ int32_t*)sortCompanionGM);
     if (cur >= numRecv_) {
         return 0;
     }
     if (cur + batchLen > numRecv_) {
         batchLen = numRecv_ - cur;
     }
+    if (emitLists && sparseCompact) {
+        return ProcessBatchUniqueVF(cur, batchLen, runningOffset, prevEntry, isFirstElement, inclusiveSum,
+                                    recvLocalEntryOutGM, sortCompanionGM);
+    }
+
+    AscendC::LocalTensor<int32_t> entryUb = indicesBuf_->Get<int32_t>();
+
+    AscendC::GlobalTensor<int32_t> sortedEntryGM;
+    AscendC::GlobalTensor<int32_t> compGM;
+    sortedEntryGM.SetGlobalBuffer((__gm__ int32_t*)recvLocalEntryOutGM);
+    compGM.SetGlobalBuffer((__gm__ int32_t*)sortCompanionGM);
     AscendC::DataCopyExtParams cpParams{1U, static_cast<uint32_t>(batchLen * sizeof(int32_t)), 0U, 0U, 0U};
     AscendC::DataCopyPadExtParams<int32_t> cpPad{false, 0, 0, 0};
     AscendC::DataCopyPad(entryUb, sortedEntryGM[cur], cpParams, cpPad);
@@ -1040,97 +1329,6 @@ __aicore__ inline uint32_t EngramFetchGradUnique::ProcessBatchUnique(
 
     inclusiveSum = 0;
     uint32_t tileUniqueCnt = 0;
-    if (emitLists && sparseCompact) {
-        AscendC::LocalTensor<int32_t> uniqueT = UniqueUb();
-        AscendC::LocalTensor<int32_t> runStartT = RunStartUb();
-        AscendC::LocalTensor<int32_t> runLenT = RunLenUb();
-        AscendC::LocalTensor<int32_t> runCompactT = RunCompactUb();
-        AscendC::LocalTensor<int32_t> dupStartT = DupStartUb();
-        AscendC::LocalTensor<int32_t> dupCompactT = DupCompactUb();
-        AscendC::LocalTensor<int32_t> dupEndT = DupEndUb();
-        int32_t rankBase = static_cast<int32_t>(static_cast<int64_t>(rankId_) * numEntriesPerRank_);
-        bool prevIsNewUnique = false;
-        int32_t prevCompact = 0;
-        uint32_t runCnt = 0;
-        uint32_t dupCnt = 0;
-        bool inRun = false;
-        uint32_t runStartPos = 0;
-        int32_t runStartCompact = 0;
-        int32_t pendingDupStart = -1;
-        int32_t pendingDupCompact = 0;
-        for (uint32_t i = 0; i < batchLen; i++) {
-            int32_t entry = entryUb.GetValue(i);
-            bool isNewUnique = isFirstElement || (entry != prevEntry);
-            isFirstElement = false;
-            prevEntry = entry;
-            if (isNewUnique) {
-                inclusiveSum++;
-                if (pendingDupStart >= 0) {
-                    dupStartT.SetValue(dupCnt, pendingDupStart);
-                    dupEndT.SetValue(dupCnt, static_cast<int32_t>(i));
-                    dupCompactT.SetValue(dupCnt, pendingDupCompact);
-                    dupCnt++;
-                    pendingDupStart = -1;
-                }
-                uniqueT.SetValue(tileUniqueCnt, entry - rankBase);
-                tileUniqueCnt++;
-            }
-            int32_t compactIdx = runningOffset + inclusiveSum - 1;
-            if (i == 0U && !isNewUnique) {
-                pendingDupStart = 0;
-                pendingDupCompact = compactIdx;
-            }
-            if (i > 0U) {
-                bool dPrev = prevIsNewUnique && isNewUnique;
-                if (dPrev) {
-                    if (!inRun) {
-                        inRun = true;
-                        runStartPos = i - 1U;
-                        runStartCompact = prevCompact;
-                    }
-                } else {
-                    if (inRun) {
-                        runStartT.SetValue(runCnt, static_cast<int32_t>(runStartPos));
-                        runLenT.SetValue(runCnt, static_cast<int32_t>(i - 1U - runStartPos));
-                        runCompactT.SetValue(runCnt, runStartCompact);
-                        runCnt++;
-                        inRun = false;
-                    }
-                    if (prevIsNewUnique) {
-                        pendingDupStart = static_cast<int32_t>(i - 1U);
-                        pendingDupCompact = prevCompact;
-                    }
-                }
-            }
-            prevIsNewUnique = isNewUnique;
-            prevCompact = compactIdx;
-        }
-        if (batchLen > 0U) {
-            if (inRun) {
-                runStartT.SetValue(runCnt, static_cast<int32_t>(runStartPos));
-                runLenT.SetValue(runCnt, static_cast<int32_t>(batchLen - 1U - runStartPos));
-                runCompactT.SetValue(runCnt, runStartCompact);
-                runCnt++;
-                inRun = false;
-            }
-            if (pendingDupStart >= 0) {
-                dupStartT.SetValue(dupCnt, pendingDupStart);
-                dupEndT.SetValue(dupCnt, static_cast<int32_t>(batchLen));
-                dupCompactT.SetValue(dupCnt, pendingDupCompact);
-                dupCnt++;
-                pendingDupStart = -1;
-            } else {
-                dupStartT.SetValue(dupCnt, static_cast<int32_t>(batchLen - 1U));
-                dupEndT.SetValue(dupCnt, static_cast<int32_t>(batchLen));
-                dupCompactT.SetValue(dupCnt, runningOffset + inclusiveSum - 1);
-                dupCnt++;
-            }
-        }
-        runCnt_ = runCnt;
-        dupCnt_ = dupCnt;
-        accumCnt_ = 0;
-        return tileUniqueCnt;
-    }
     if (emitLists) {
         AscendC::LocalTensor<int32_t> uniqueT = UniqueUb();
         AscendC::LocalTensor<int32_t> compactT = CompactIdxUb();
@@ -1222,6 +1420,66 @@ __aicore__ inline uint32_t EngramFetchGradUnique::ProcessBatchUnique(
         DirectFlagUb().SetValue(batchLen - 1, 0);
     }
     return tileUniqueCnt;
+}
+
+__aicore__ inline uint32_t EngramFetchGradUnique::ProcessBatchUniqueVF(uint32_t cur, uint32_t batchLen,
+                                                                       int32_t runningOffset, int32_t& prevEntry,
+                                                                       bool& isFirstElement, int32_t& inclusiveSum,
+                                                                       GM_ADDR recvLocalEntryOutGM,
+                                                                       GM_ADDR sortCompanionGM)
+{
+    AscendC::LocalTensor<int32_t> entryUb = indicesBuf_->Get<int32_t>();
+    AscendC::GlobalTensor<int32_t> sortedEntryGM;
+    AscendC::GlobalTensor<int32_t> compGM;
+    sortedEntryGM.SetGlobalBuffer((__gm__ int32_t*)recvLocalEntryOutGM);
+    compGM.SetGlobalBuffer((__gm__ int32_t*)sortCompanionGM);
+    if (cur >= numRecv_) {
+        return 0;
+    }
+    if (cur + batchLen > numRecv_) {
+        batchLen = numRecv_ - cur;
+    }
+    if (batchLen == 0U) {
+        return 0;
+    }
+    const uint32_t b = batchLen;
+    int32_t rankBase = static_cast<int32_t>(static_cast<int64_t>(rankId_) * numEntriesPerRank_);
+
+    AscendC::PipeBarrier<PIPE_ALL>();
+
+    AscendC::LocalTensor<int32_t> vfBase = gradBuf_->Get<int32_t>();
+    AscendC::DataCopyExtParams cpParams{1U, static_cast<uint32_t>(b * sizeof(int32_t)), 0U, 0U, 0U};
+    AscendC::DataCopyPadExtParams<int32_t> cpPad{false, 0, 0, 0};
+    AscendC::DataCopyPad(entryUb, sortedEntryGM[cur], cpParams, cpPad);
+    AscendC::DataCopyPad(CompUb(), compGM[cur], cpParams, cpPad);
+    if (b > 1U) {
+        AscendC::DataCopyExtParams e2Params{1U, static_cast<uint32_t>((b - 1U) * sizeof(int32_t)), 0U, 0U, 0U};
+        AscendC::DataCopyPad(vfBase[EngramVfTables::E2], sortedEntryGM[cur + 1U], e2Params, cpPad);
+    }
+    SyncFunc<AscendC::HardEvent::MTE2_V>(*pipe_);
+    SyncFunc<AscendC::HardEvent::MTE2_S>(*pipe_);
+
+    asc_vf_call<EngramVfBatchUniqueVF>(
+        (__ubuf__ int32_t*)vfBase.GetPhyAddr(), (__ubuf__ int32_t*)entryUb.GetPhyAddr(),
+        (__ubuf__ int32_t*)UniqueUb().GetPhyAddr(), (__ubuf__ int32_t*)RunStartUb().GetPhyAddr(),
+        (__ubuf__ int32_t*)RunLenUb().GetPhyAddr(), (__ubuf__ int32_t*)RunCompactUb().GetPhyAddr(),
+        (__ubuf__ int32_t*)DupStartUb().GetPhyAddr(), (__ubuf__ int32_t*)DupEndUb().GetPhyAddr(),
+        (__ubuf__ int32_t*)DupCompactUb().GetPhyAddr(), b, prevEntry, isFirstElement ? 1U : 0U, rankBase,
+        runningOffset);
+
+    SyncFunc<AscendC::HardEvent::V_S>(*pipe_);
+    SyncFunc<AscendC::HardEvent::V_MTE3>(*pipe_);
+
+    const int32_t total = vfBase[EngramVfTables::PREFIX].GetValue(b - 1U);
+    const int32_t runTotal = vfBase[EngramVfTables::RID].GetValue(b - 1U);
+    const int32_t dupTotal = vfBase[EngramVfTables::GID].GetValue(b - 1U);
+    inclusiveSum = total;
+    runCnt_ = static_cast<uint32_t>(runTotal);
+    dupCnt_ = static_cast<uint32_t>(dupTotal);
+    accumCnt_ = 0;
+    prevEntry = entryUb.GetValue(b - 1U);
+    isFirstElement = false;
+    return static_cast<uint32_t>(total);
 }
 
 __aicore__ inline void EngramFetchGradUnique::WriteBatchUnique(uint32_t tileUniqueCnt, int32_t& runningUniqueOffset,
@@ -1323,19 +1581,19 @@ __aicore__ inline void EngramFetchGradUnique::EmitRunsFromDupList(uint32_t subSt
     uint32_t subEnd = subStart + subLen;
     while (cursor < runCnt_) {
         int32_t a = RunStartUb().GetValue(cursor);
-        int32_t l = RunLenUb().GetValue(cursor);
-        if (a < 0 || l <= 0) {
+        int32_t e = RunLenUb().GetValue(cursor);
+        if (a < 0 || e <= a) {
             cursor++;
             continue;
         }
-        if (static_cast<uint32_t>(a) + static_cast<uint32_t>(l) <= subStart) {
+        if (static_cast<uint32_t>(e) <= subStart) {
             cursor++;
             continue;
         }
         if (static_cast<uint32_t>(a) >= subEnd) {
             break;
         }
-        uint32_t b = static_cast<uint32_t>(a) + static_cast<uint32_t>(l);
+        uint32_t b = static_cast<uint32_t>(e);
         uint32_t lo = (static_cast<uint32_t>(a) > subStart) ? static_cast<uint32_t>(a) : subStart;
         uint32_t hi = (b < subEnd) ? b : subEnd;
         if (lo >= hi) {

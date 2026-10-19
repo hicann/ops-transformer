@@ -35,7 +35,7 @@
 #include "adv_api/hcomm/hcomm.h"
 #endif
 
-#include "../../../engram_fetch_grad/op_kernel/arch35/sortlib/sort_lib.h"
+#include "../../../engram_fetch_grad/op_kernel/arch35/sort/sort_lib.h"
 
 namespace Mc2Kernel {
 
@@ -1575,6 +1575,8 @@ __aicore__ inline void EngramFetchTrainArch35::SortInputIndices()
     p.tmpUbSize = sortTmpUbSize_;
     p.totalElements = static_cast<int64_t>(numTokens_);
     p.isSingleCore = 0;
+    p.jobIndex = static_cast<uint32_t>(AscendC::GetBlockIdx()); // 全核模式: 物理核号即 job
+    p.totalJobs = static_cast<uint32_t>(AscendC::GetBlockNum());
     SortLib::SortInvoke<int32_t, int32_t, uint32_t, false>(
         tpipe_, (__gm__ int32_t*)indicesGM_, (__gm__ int32_t*)sortedIndicesGM_, (__gm__ int32_t*)permOutGM_,
         (__gm__ char*)sortWorkspaceGm_, p);

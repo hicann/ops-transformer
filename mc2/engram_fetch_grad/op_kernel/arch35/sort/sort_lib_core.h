@@ -110,8 +110,9 @@ private:
                                            AscendC::LocalTensor<uint32_t>& xLocal, uint64_t tileOffset,
                                            uint32_t currTileSize);
     __aicore__ inline void ComputeOnePass(uint32_t round, AscendC::GlobalTensor<ValT> inputXGm);
-    template <typename HookT>
-    __aicore__ inline void ProcessRadix(AscendC::GlobalTensor<ValT> inputXGm, HookT hook);
+    // BarrierT 为同步原语回调(编译期绑定, 默认硬件全核 SyncAll; 核分区模式注入软屏障)
+    template <typename BarrierT>
+    __aicore__ inline void ProcessRadix(AscendC::GlobalTensor<ValT> inputXGm, BarrierT barrier);
     __aicore__ inline void ScatterSortedTile(
         AscendC::LocalTensor<ValT> xInputValueLocal, AscendC::LocalTensor<uint32_t> sortedIndexLocal,
         AscendC::LocalTensor<uint32_t> xInputIndexLocal, AscendC::LocalTensor<uint8_t> sortedValueLocal,
@@ -135,17 +136,19 @@ public:
     __aicore__ inline SortRadixMoreCore(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR value, GM_ADDR sortIndex, GM_ADDR workspace,
                                 const SortLib::SortParams& params, AscendC::TPipe* pipe);
-    template <typename HookT>
-    __aicore__ inline void Process(HookT hook);
+    template <typename BarrierT>
+    __aicore__ inline void Process(BarrierT barrier);
 };
 
 template <typename ValT, typename IdxT, typename CountT, bool isDescend>
 __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::ClearWorkSpace()
 
 {
-    FillZeros(exclusiveBinsGmWkAsCount_, static_cast<uint64_t>(RADIX_SORT_NUM) * sizeof(ValT), realCoreNum_);
-
-    FillZeros(globalHistGmWk_, static_cast<uint64_t>(tileCount_) * RADIX_SORT_NUM * sizeof(ValT), realCoreNum_);
+    // exclusiveBins会被原子累加，需提前清理
+    FillZeros(exclusiveBinsGmWkAsCount_, static_cast<uint64_t>(RADIX_SORT_NUM) * sizeof(ValT), blockIdx_, realCoreNum_);
+    // 存状态，需要提前清理
+    FillZeros(globalHistGmWk_, static_cast<uint64_t>(tileCount_) * RADIX_SORT_NUM * sizeof(ValT), blockIdx_,
+              realCoreNum_);
 }
 
 template <typename ValT, typename IdxT, typename CountT, bool isDescend>
@@ -178,7 +181,11 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::PreGlob
     AscendC::LocalTensor<uint16_t>& histUb, AscendC::LocalTensor<uint16_t>& histCumsumUb,
     AscendC::LocalTensor<uint8_t>& inputB8Ub, uint32_t currTileSize, uint32_t round)
 {
-    // Extract the current radix byte, build the tile histogram, and update this core's per-bin exclusive totals.
+    // 抽取当前radix字节，建立tile内的直方图， 建立tile内的排他前缀和
+    // inputB8Ub：后续用于sort
+    // histUb用于计算tile偏移
+    // histCumsumUb用于后续算桶内序：桶内序 = tile内Sort后位置 − histCumsum[桶]
+    // blockExclusiveUb用于算全局桶前缀
     if constexpr (sizeof(ValT) == sizeof(int32_t)) {
         GetGlobalExclusiveSumB32<KeyT, CountT>(inputXCopy, blockExclusiveUb, histUb, histCumsumUb, inputB8Ub,
                                                currTileSize, round);
@@ -199,6 +206,7 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::GetGlob
     uint32_t round, AscendC::GlobalTensor<ValT> inputX)
 
 {
+    // 获取排他前缀和
     if (blockIdx_ >= activeCores_) {
         return;
     }
@@ -207,23 +215,22 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::GetGlob
     AscendC::LocalTensor<uint32_t> blockExclusiveUb = blockUbFlagQue_.template AllocTensor<uint32_t>();
 
     uint64_t exclusiveBinOffset = round * RADIX_SORT_NUM;
+    // 跨tile累计直方图清零
+    // todo: CountT的拦截？
     if constexpr (sizeof(CountT) == sizeof(uint32_t)) {
         AscendC::Duplicate(blockExclusiveUb, static_cast<uint32_t>(0), RADIX_SORT_NUM);
     } else {
         AscendC::Duplicate(blockExclusiveUb, static_cast<uint32_t>(0), RADIX_SORT_NUM * 2);
     }
+    // 一核可能处理多tile，需要进行该循环
     for (uint32_t tileId = startTileId; tileId < tileCount_; tileId += activeCores_) {
-        // tileOffset may exceed int32 range for large rows, so keep the address arithmetic in uint64.
         uint64_t tileOffset = static_cast<uint64_t>(tileId) * numTileData_;
-        uint64_t remainTileDataNum = totalDataNum_ - tileOffset;
-        if (totalDataNum_ < tileOffset) {
-            break;
-        }
-        uint32_t currTileSize = static_cast<uint32_t>(
-            remainTileDataNum < static_cast<uint64_t>(numTileData_) ? remainTileDataNum : numTileData_);
+        uint32_t currTileSize = static_cast<uint32_t>(totalDataNum_ - tileOffset < static_cast<uint64_t>(numTileData_) ?
+                                                          totalDataNum_ - tileOffset :
+                                                          numTileData_);
         AscendC::LocalTensor<ValT> xLocal = inQueueX_.template AllocTensor<ValT>();
 
-        // Round 0 reads original input. Later rounds read the double-buffered output from the previous pass.
+        // 如果是round 0 则读原始数据，否则需要根据后续的数据实际转移位置读取
         if (round == 0) {
             CopyGmToUb(inputX, xLocal, tileOffset, currTileSize);
         } else {
@@ -236,24 +243,25 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::GetGlob
         AscendC::LocalTensor<uint8_t> inputB8Ub = inputB8Que_.template AllocTensor<uint8_t>();
         AscendC::LocalTensor<uint16_t> histUb = outIdxQueue_.template AllocTensor<uint16_t>();
         AscendC::LocalTensor<uint16_t> histCumsumUb = outValueQueue_.template AllocTensor<uint16_t>();
-        AscendC::LocalTensor<CountT> blockExclusiveUbTmp = blockExclusiveUb.template ReinterpretCast<CountT>();
+        AscendC::LocalTensor<CountT> blockExclusiveUbTmp =
+            blockExclusiveUb.template ReinterpretCast<CountT>(); // 会在preGlobalExclusiveSum里面进行累加
         PreGlobalExclusiveSum(xUbCopy, blockExclusiveUbTmp, histUb, histCumsumUb, inputB8Ub, currTileSize, round);
         inQueueX_.FreeTensor(xLocal);
         inputB8Que_.template EnQue<AscendC::QuePosition::VECCALC, AscendC::QuePosition::VECOUT>(inputB8Ub);
         inputB8Ub = inputB8Que_.template DeQue<AscendC::QuePosition::VECCALC, AscendC::QuePosition::VECOUT, uint8_t>();
-        // Save the extracted radix byte for the scatter phase to avoid recomputing it.
+        // 保存提取的radix byte避免后续重新计算
         CopyUbToGm(xB8GmWk_, inputB8Ub, tileOffset, currTileSize);
         inputB8Que_.FreeTensor(inputB8Ub);
 
         outIdxQueue_.EnQue(histUb);
         histUb = outIdxQueue_.template DeQue<uint16_t>();
-        // Save each tile's 256-bin histogram. Lookback uses these counts for inter-tile prefix offsets.
+        // 保存每个 tile的 256-bin histogr直方图. 计算前缀offset时候方便lookback.
         CopyUbToGm(histTileGmWk_, histUb, static_cast<uint64_t>(tileId) * RADIX_SORT_NUM, RADIX_SORT_NUM);
         outIdxQueue_.FreeTensor(histUb);
 
         outValueQueue_.EnQue(histCumsumUb);
         histCumsumUb = outValueQueue_.template DeQue<uint16_t>();
-        // Save each tile's intra-tile exclusive cumsum for the final scatter address calculation.
+        // 保存tile的前缀和为后续最终scatter adrress计算
         CopyUbToGm(histCumsumTileGmWk_, histCumsumUb, static_cast<uint64_t>(tileId) * RADIX_SORT_NUM, RADIX_SORT_NUM);
         outValueQueue_.FreeTensor(histCumsumUb);
     }
@@ -264,7 +272,7 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::GetGlob
         CopyUbToGm(exclusiveBinsGmWkAsU32_, blockExclusiveUb, exclusiveBinOffset, RADIX_SORT_NUM);
         AscendC::SetAtomicNone();
     } else {
-        // int64 counters can exceed the int32 atomic path, so use the SIMT int64 atomic-add helper.
+        // atomicadd不支持64位宽，使用smit atomicadd
         asc_vf_call<SimtGlobalOffset<CountT>>(dim3(RADIX_SORT_NUM), exclusiveBinOffset,
                                               (__gm__ CountT*)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
                                               (__ubuf__ CountT*)(blockExclusiveUb.GetPhyAddr()));
@@ -406,19 +414,15 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Compute
     uint32_t startId = blockIdx_ % activeCores_;
 
     for (uint32_t tileId = startId; tileId < tileCount_; tileId += activeCores_) {
-        uint64_t tileOffset = static_cast<uint64_t>(tileId) * numTileData_;
         uint64_t tileDataStart = static_cast<uint64_t>(tileId) * numTileData_;
-        uint64_t remainTileDataNum = totalDataNum_ - tileDataStart;
-        if (totalDataNum_ < tileDataStart) {
-            break;
-        }
         uint32_t currTileSize = static_cast<uint32_t>(
-            remainTileDataNum < static_cast<uint64_t>(numTileData_) ? remainTileDataNum : numTileData_);
+            totalDataNum_ - tileDataStart < static_cast<uint64_t>(numTileData_) ? totalDataNum_ - tileDataStart :
+                                                                                  numTileData_);
         AscendC::LocalTensor<ValT> xLocal = inQueueX_.template AllocTensor<ValT>();
         if (round == 0) {
-            CopyGmToUb(inputXGm, xLocal, tileOffset, currTileSize);
+            CopyGmToUb(inputXGm, xLocal, tileDataStart, currTileSize);
         } else {
-            CopyGmToUb(inputXDbGm_.Current(), xLocal, tileOffset, currTileSize);
+            CopyGmToUb(inputXDbGm_.Current(), xLocal, tileDataStart, currTileSize);
         }
         inQueueX_.EnQue(xLocal);
         xLocal = inQueueX_.template DeQue<ValT>();
@@ -438,6 +442,7 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Compute
         AscendC::LocalTensor<uint8_t> shareTmpBuffer = tmpUb_.template Get<uint8_t>();
         AscendC::LocalTensor<uint32_t> sortedValueIndexLocal = outIdxQueue_.template AllocTensor<uint32_t>();
         AscendC::LocalTensor<uint8_t> sortedValueLocal = outValueQueue_.template AllocTensor<uint8_t>();
+        // sortedValueLocal：排好序的字节，sortedValueIndexLocal：排好后每位置原来是第几个
         AscendC::Sort<uint8_t, false, sortConfigMulti>(sortedValueLocal, sortedValueIndexLocal, inputX8Ub,
                                                        shareTmpBuffer, static_cast<uint32_t>(currTileSize));
         outValueQueue_.template EnQue<uint8_t>(sortedValueLocal);
@@ -455,10 +460,10 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Compute
         if (round != 0) {
             xIndexLocal = inQueueIndex_.template AllocTensor<uint32_t>();
             if constexpr (sizeof(CountT) > sizeof(IdxT)) {
-                CopyIndexDataIn(idxDbGm_.Current(), xIndexLocal, tileOffset * sizeof(IdxT) / sizeof(uint32_t),
+                CopyIndexDataIn(idxDbGm_.Current(), xIndexLocal, tileDataStart * sizeof(IdxT) / sizeof(uint32_t),
                                 currTileSize);
             } else {
-                CopyIndexDataIn(idxDbGm_.Current(), xIndexLocal, tileOffset * sizeof(CountT) / sizeof(uint32_t),
+                CopyIndexDataIn(idxDbGm_.Current(), xIndexLocal, tileDataStart * sizeof(CountT) / sizeof(uint32_t),
                                 currTileSize);
             }
             inQueueIndex_.EnQue(xIndexLocal);
@@ -489,38 +494,37 @@ template <typename ValT, typename IdxT, typename CountT, bool isDescend>
 __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::SetupDoubleBuffer()
 {
     if constexpr (sizeof(ValT) == sizeof(int8_t)) {
+        // int8只有一轮，最后散写Alternate区时必须时gmout，而非workspace
         inputXDbGm_.SetDoubleBuffer(outValueDbWK_, outValueGm_[0]);
         idxDbGm_.SetDoubleBuffer(outIdxDbWK_, outIdxGm_[0]);
     } else {
+        // 否则2/4这些则需要一开始Alternate为workspace交换到最后才是gmout
         inputXDbGm_.SetDoubleBuffer(outValueGm_[0], outValueDbWK_);
         idxDbGm_.SetDoubleBuffer(outIdxGm_[0], outIdxDbWK_);
     }
 }
 
 template <typename ValT, typename IdxT, typename CountT, bool isDescend>
-template <typename HookT>
+template <typename BarrierT>
 __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::ProcessRadix(
-    AscendC::GlobalTensor<ValT> inputXGm, HookT hook)
+    AscendC::GlobalTensor<ValT> inputXGm, BarrierT barrier)
 {
-    AscendC::SyncAll();
+    barrier();
     SetupDoubleBuffer();
-    hook();
     for (uint32_t round = 0; round < static_cast<uint32_t>(sizeof(ValT)); round++) {
         GetGlobalExclusiveSum(round, inputXGm);
-        AscendC::SyncAll();
-        hook();
+        barrier();
+        // 散写阶段
         ComputeOnePass(round, inputXGm);
-        AscendC::SyncAll();
-        hook();
+        barrier();
     }
 }
 
 template <typename ValT, typename IdxT, typename CountT, bool isDescend>
-template <typename HookT>
-__aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Process(HookT hook)
+template <typename BarrierT>
+__aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Process(BarrierT barrier)
 {
-    hook();
-    ProcessRadix(inputXGm_[0], hook);
+    ProcessRadix(inputXGm_[0], barrier);
 }
 
 template <typename ValT, typename IdxT, typename CountT, bool isDescend>
@@ -529,42 +533,44 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Init(GM
                                                                               const SortLib::SortParams& params,
                                                                               AscendC::TPipe* pipe)
 {
-    blockIdx_ = AscendC::GetBlockIdx();
+    blockIdx_ = params.jobIndex;
     pipe_ = pipe;
     params_ = params;
     ParserTilingData();
-    realCoreNum_ = AscendC::GetBlockNum();
+    realCoreNum_ = params.totalJobs;
 
     inputXGm_.SetGlobalBuffer((__gm__ ValT*)x);
     outValueGm_.SetGlobalBuffer((__gm__ ValT*)value);
     outIdxGm_.SetGlobalBuffer((__gm__ uint32_t*)sortIndex);
 
-    // ⚠️ Workspace 布局契约：本六段 [0]~[5] 的 offset 计算，
-    //    必须与 op_host/arch35/sort_lib_tiling.h 中 SortTilingCompute 的六段总大小计算逐段一致。
-    //    变量对应：RADIX_SORT_NUM==BIN_NUM；sizeof(CountT)==counterSize；
-    //    UB_ALIGN_BYTES==blockUbSize；totalDataNum_==totalElements；
-    //    [3] 段两次 wkOffset += tileHistBytes 对应 host 侧 [3] 段的 ×2。
-    // [0] exclusiveBinsGmWk_ — 256 × radixRounds × sizeof(CountT) 字节, 对齐 UB_ALIGN_BYTES
-    constexpr uint32_t radixRounds = sizeof(ValT); // radix sort passes
-    uint64_t exclBinBytes = static_cast<uint64_t>(RADIX_SORT_NUM) * radixRounds * sizeof(CountT);
+    constexpr uint32_t radixRounds = sizeof(ValT);
+    uint64_t exclBinBytes =
+        static_cast<uint64_t>(RADIX_SORT_NUM) * radixRounds *
+        sizeof(
+            CountT); // 一个字节最大256，也就是最大256桶，countT是所有计数类（如全局落点，索引偏移等）的数据宽度，独立于输入输出
     exclBinBytes = RoundUpAlign(exclBinBytes, UB_ALIGN_BYTES);
+    // 布局[轮r][桶b]
     exclusiveBinsGmWkAsU32_.SetGlobalBuffer((__gm__ uint32_t*)workspace);
     uint64_t wkOffset = exclBinBytes;
 
     // [1] globalHistGmWk_ — radixRounds 轮 × 256 bin × tileCount × sizeof(CountT) 字节
     uint64_t globalHistBytes = static_cast<uint64_t>(tileCount_) * RADIX_SORT_NUM * radixRounds * sizeof(CountT);
     globalHistBytes = RoundUpAlign(globalHistBytes, UB_ALIGN_BYTES);
+    // 布局[轮r][tile t][桶b]
     globalHistGmWk_.SetGlobalBuffer((__gm__ CountT*)(workspace + wkOffset));
     wkOffset += globalHistBytes;
 
     // [2] outIdxDbWK_ — totalElements × sizeof(CountT) 字节
+    // 存放索引的双缓冲区之一，另一区是输出区outIdxGm_
     uint64_t idxDbBytes = static_cast<uint64_t>(totalDataNum_) * sizeof(CountT);
     idxDbBytes = RoundUpAlign(idxDbBytes, UB_ALIGN_BYTES);
     outIdxDbWK_.SetGlobalBuffer((__gm__ uint32_t*)(workspace + wkOffset));
     wkOffset += idxDbBytes;
 
     // [3] histTileGmWk_ + histCumsumTileGmWk_ — 各 tileCount × 256 × sizeof(uint16_t)
-    uint64_t tileHistBytes = static_cast<uint64_t>(tileCount_) * RADIX_SORT_NUM * sizeof(uint16_t);
+    // 每个tile两张256格小表，记录桶内元素数/排他前缀和
+    uint64_t tileHistBytes =
+        static_cast<uint64_t>(tileCount_) * RADIX_SORT_NUM * sizeof(uint16_t); // ub大小限制了数据的大小，uint16足够
     tileHistBytes = RoundUpAlign(tileHistBytes, UB_ALIGN_BYTES);
     histTileGmWk_.SetGlobalBuffer((__gm__ uint16_t*)(workspace + wkOffset));
     wkOffset += tileHistBytes;
@@ -572,18 +578,20 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Init(GM
     wkOffset += tileHistBytes;
 
     // [4] xB8GmWk_ — tileCount × numTileData 字节, 对齐 UB_ALIGN_BYTES
+    // 存储当前轮要排的那个字节共8bit
     uint64_t xB8Bytes = static_cast<uint64_t>(tileCount_) * numTileData_;
     xB8Bytes = RoundUpAlign(xB8Bytes, UB_ALIGN_BYTES);
     xB8GmWk_.SetGlobalBuffer((__gm__ uint8_t*)(workspace + wkOffset));
     wkOffset += xB8Bytes;
 
     // [5] outValueDbWK_ — ValT 结尾段
+    // output双缓冲的一面，另一面是outValueGm_
     outValueDbWK_.SetGlobalBuffer((__gm__ ValT*)(workspace + wkOffset));
 
-    pipe_->InitBuffer(inQueueX_, 1, numTileData_ * sizeof(ValT));
-    pipe_->InitBuffer(inQueueIndex_, 1, numTileData_ * sizeof(CountT));
+    pipe_->InitBuffer(inQueueX_, 1, numTileData_ * sizeof(ValT));       // 装完整tile数据
+    pipe_->InitBuffer(inQueueIndex_, 1, numTileData_ * sizeof(CountT)); // 装索引数据
     pipe_->InitBuffer(inQueueGlobalHist_, 1, RADIX_SORT_NUM * sizeof(CountT));
-    pipe_->InitBuffer(outValueQueue_, 1, numTileData_);
+    pipe_->InitBuffer(outValueQueue_, 1, numTileData_); // 装sort排好的字节
     pipe_->InitBuffer(blockExclusiveInQue_, 1, RADIX_SORT_NUM * sizeof(uint16_t));
     pipe_->InitBuffer(blockHistInQue_, 1, RADIX_SORT_NUM * sizeof(uint16_t));
     pipe_->InitBuffer(blockUbFlagQue_, 1, RADIX_SORT_NUM * sizeof(CountT));
@@ -594,17 +602,17 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Init(GM
 
     exclusiveBinsGmWkAsCount_ = exclusiveBinsGmWkAsU32_.template ReinterpretCast<CountT>();
 
-    ClearWorkSpace(); // MUST be before InitBuffer
+    ClearWorkSpace();
 }
 
 template <typename ValT, typename IdxT, typename CountT, bool isDescend>
 __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::ParserTilingData()
 {
-    totalDataNum_ = params_.totalElements; // total number of elements to sort
-    numTileData_ = params_.numTileData;    // max elements per tile (UB capacity limited)
-    tileCount_ = params_.tileCount;        // total tiles: ceil(totalElements / numTileData)
-    activeCores_ = params_.activeCores;    // cores actually used: min(coreCount, tileCount)
-    tmpUbSize_ = params_.tmpUbSize;        // UB size reserved for AscendC::Sort<uint8_t>
+    totalDataNum_ = params_.totalElements;
+    numTileData_ = params_.numTileData;
+    tileCount_ = params_.tileCount;
+    activeCores_ = params_.activeCores;
+    tmpUbSize_ = params_.tmpUbSize;
 }
 
 template <typename ValT, typename IdxT, typename CountT, bool isDescend>

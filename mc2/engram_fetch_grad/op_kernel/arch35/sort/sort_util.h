@@ -102,19 +102,22 @@ __aicore__ inline void SyncEvent()
 }
 
 template <typename T>
-__aicore__ inline void FillZeros(AscendC::GlobalTensor<T>& gm, uint64_t totalCount, uint32_t realCoreNum)
+__aicore__ inline void FillZeros(AscendC::GlobalTensor<T>& gm, uint64_t totalCount, uint32_t blockIdx, uint32_t coreNum)
 {
+    if (coreNum == 0U) {
+        coreNum = 1U;
+    }
     uint64_t minElem = FILL_MIN_BYTES / sizeof(T);
 
-    uint64_t perCore = (totalCount + realCoreNum - 1) / realCoreNum;
+    uint64_t perCore = (totalCount + coreNum - 1) / coreNum;
     perCore = (perCore + minElem - 1) / minElem * minElem;
 
     uint64_t coresNeed = (totalCount + perCore - 1) / perCore;
     uint64_t lastCount = totalCount - (coresNeed - 1) * perCore;
 
-    if (static_cast<uint32_t>(AscendC::GetBlockIdx()) < coresNeed) {
-        uint64_t myCount = (static_cast<uint32_t>(AscendC::GetBlockIdx()) == coresNeed - 1) ? lastCount : perCore;
-        AscendC::GlobalTensor<T> sub = gm[static_cast<uint64_t>(AscendC::GetBlockIdx()) * perCore];
+    if (blockIdx < coresNeed) {
+        uint64_t myCount = (blockIdx == coresNeed - 1) ? lastCount : perCore;
+        AscendC::GlobalTensor<T> sub = gm[static_cast<uint64_t>(blockIdx) * perCore];
         AscendC::Fill(sub, myCount, static_cast<T>(0));
     }
 }

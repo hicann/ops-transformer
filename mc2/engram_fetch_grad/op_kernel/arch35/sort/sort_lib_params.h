@@ -21,10 +21,12 @@ namespace SortLib {
 struct SortParams {
     uint32_t numTileData = 0;  // 每 tile 最大元素数（受 UB 容量限制，由 ComputeTileData 求得）
     uint32_t tileCount = 0;    // 总 tile 数 = ceil(totalElements / numTileData)
-    uint32_t activeCores = 0;  // 实际使用的 AI Core 数 = min(coreCount, tileCount)
+    uint32_t activeCores = 0;  // 实际使用的 AI Core 数 = min(totalJobs, tileCount)
     uint32_t tmpUbSize = 0;    // AscendC::Sort 临时 UB 空间大小（字节）
     int64_t totalElements = 0; // 待排序元素总数
     uint32_t isSingleCore = 0; // 单核/多核标志：1=单核快路径，0=多核 LSD radix sort
+    uint32_t jobIndex = 0;     // 本核的排序 job 编号([0, totalJobs) 的连续分片编号;
+    uint32_t totalJobs = 0;    // 参与排序的 job 总数
 };
 
 } // namespace SortLib
