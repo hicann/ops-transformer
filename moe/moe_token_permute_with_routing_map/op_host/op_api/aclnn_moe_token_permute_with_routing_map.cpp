@@ -86,7 +86,9 @@ static inline bool CheckDtypeValid(const aclTensor* tokens, const aclTensor* rou
     if (permuteProbsOutOptional != nullptr) {
         // 检查groupIdxOptional的数据类型是否在支持列表内
         OP_CHECK_DTYPE_NOT_SUPPORT(permuteProbsOutOptional, dtype_list, return false);
-        OP_CHECK_DTYPE_NOT_MATCH(probsOptional, permuteProbsOutOptional->GetDataType(), return false);
+        if (probsOptional != nullptr) {
+            OP_CHECK_DTYPE_NOT_MATCH(probsOptional, permuteProbsOutOptional->GetDataType(), return false);
+        }
     }
     return true;
 }
