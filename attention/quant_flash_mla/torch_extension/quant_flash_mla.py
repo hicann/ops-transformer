@@ -16,6 +16,7 @@ from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 from torch.library import impl
 
 QFMLA_METADATA_OP_NAME = "quant_flash_mla_metadata"
+METADATA_STRIDE = 16
 
 # MLA固定维度: head_dim_qk = nope(512) + rope(64) = 576, head_dim_v = 512
 MLA_HEAD_DIM_QK = 576
@@ -26,7 +27,6 @@ class QuantMode(IntEnum):
     """quant_mode 枚举：对外字符串/int 经由本枚举映射为传给算子侧的 int。"""
 
     MLA_FP8_E4M3_FULLQUANT = 1
-    MLA_HIF8_FULLQUANT = 2
 
 
 class MaskMode(IntEnum):
@@ -46,7 +46,7 @@ def _resolve_quant_mode(quant_mode: Union[str, int, "QuantMode"]) -> int:
             raise ValueError(
                 f"quant_mode should be one of [{valid}], but got {quant_mode!r}"
             ) from exc
-    return int(QuantMode(quant_mode))
+    return int(quant_mode)
 
 
 def _resolve_mask_mode(mask_mode: Union[str, int, "MaskMode", None]) -> int:
@@ -61,24 +61,113 @@ def _resolve_mask_mode(mask_mode: Union[str, int, "MaskMode", None]) -> int:
             raise ValueError(
                 f"mask_mode should be one of [{valid}], but got {mask_mode!r}"
             ) from exc
-    return int(MaskMode(mask_mode))
+    return int(mask_mode)
 
 
-def _calculate_max_schedule_size():
-    return 4096
+def _get_core_nums():
+    """Return the core counts used by the metadata AICPU scheduler."""
+    npu = getattr(torch, "npu", None)
+    if npu is None or not npu.is_available():
+        return 36, 72
+    props = npu.get_device_properties()
+    return props.cube_core_num, props.vector_core_num
+
+
+def _calculate_max_schedule_size(batch_size, num_heads_kv):
+    """Allocate one row for the worst-case MLA metadata section count."""
+    align_size = 4096
+    batch_size = batch_size if batch_size and batch_size > 0 else 1
+    num_heads_kv = num_heads_kv if num_heads_kv and num_heads_kv > 0 else 1
+    aic_num, aiv_num = _get_core_nums()
+    schedule_size = METADATA_STRIDE + (
+        (aic_num + aiv_num) * METADATA_STRIDE * batch_size * num_heads_kv
+    )
+    return ((schedule_size + align_size - 1) // align_size) * align_size
 
 
 # 各 layout 期望的 tensor 维度数
-_LAYOUT_Q_EXPECTED_NDIM = {
-    "TND": 3,
-    "BSND": 4,
-    "BNSD": 4,
-}
-_LAYOUT_KV_EXPECTED_NDIM = {
-    "PA_NZ": 5,
-    "PA_BNBD": 4,
-    "PA_BBND": 4,
-}
+
+_SUPPORTED_NUM_HEADS_Q = (1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128)
+
+
+def _check_int32_1d(name: str, tensor: torch.Tensor) -> None:
+    torch._check(tensor is not None, lambda: f"{name} must be provided")
+    torch._check(
+        tensor.dtype == torch.int32,
+        lambda: f"{name} must be int32, but got {tensor.dtype}",
+    )
+    torch._check(
+        tensor.dim() == 1, lambda: f"{name} must be 1D, but got {tensor.dim()}D"
+    )
+    torch._check(tensor.numel() > 0, lambda: f"{name} must be non-empty")
+
+
+def _check_metadata_parameters(
+    cache_seqlens,
+    num_heads_q,
+    num_heads_kv,
+    quant_mode,
+    cu_seqlens_q,
+    seqused_q,
+    max_seqlen_q,
+    max_seqlen_kv,
+    head_dim_qk,
+    head_dim_v,
+    mask_mode,
+    layout_q,
+) -> None:
+    torch._check(
+        quant_mode == int(QuantMode.MLA_FP8_E4M3_FULLQUANT),
+        lambda: f"quant_mode only supports 1 (MLA_FP8_E4M3_FULLQUANT), but got {quant_mode}",
+    )
+    torch._check(
+        layout_q == "TND", lambda: f"layout_q only supports 'TND', but got {layout_q!r}"
+    )
+    torch._check(
+        num_heads_q in _SUPPORTED_NUM_HEADS_Q,
+        lambda: f"num_heads_q must be one of {_SUPPORTED_NUM_HEADS_Q}, but got {num_heads_q}",
+    )
+    torch._check(
+        num_heads_kv == 1,
+        lambda: f"num_heads_kv only supports 1, but got {num_heads_kv}",
+    )
+    torch._check(
+        head_dim_qk == MLA_HEAD_DIM_QK,
+        lambda: f"head_dim_qk only supports 576, but got {head_dim_qk}",
+    )
+    torch._check(
+        head_dim_v == MLA_HEAD_DIM_V,
+        lambda: f"head_dim_v only supports 512, but got {head_dim_v}",
+    )
+    torch._check(
+        mask_mode in (0, 3),
+        lambda: f"mask_mode only supports 0 or 3, but got {mask_mode}",
+    )
+    torch._check(
+        max_seqlen_q == -1 or 1 <= max_seqlen_q <= 16,
+        lambda: f"max_seqlen_q must be -1 or in [1, 16], but got {max_seqlen_q}",
+    )
+    torch._check(
+        max_seqlen_kv == -1 or max_seqlen_kv >= 1,
+        lambda: f"max_seqlen_kv must be -1 or greater than 0, but got {max_seqlen_kv}",
+    )
+    _check_int32_1d("cache_seqlens", cache_seqlens)
+    _check_int32_1d("cu_seqlens_q", cu_seqlens_q)
+    batch_size = cache_seqlens.numel()
+    torch._check(
+        cu_seqlens_q.numel() == batch_size + 1,
+        lambda: f"cu_seqlens_q shape must be (B+1,), but got {tuple(cu_seqlens_q.shape)} for B={batch_size}",
+    )
+    if seqused_q is not None:
+        _check_int32_1d("seqused_q", seqused_q)
+        torch._check(
+            seqused_q.numel() == batch_size,
+            lambda: f"seqused_q shape must be (B,), but got {tuple(seqused_q.shape)} for B={batch_size}",
+        )
+    torch._check(
+        seqused_q is not None or max_seqlen_q > 0,
+        lambda: "When layout_q is TND, at least one of seqused_q or max_seqlen_q must be provided",
+    )
 
 
 class QuantFlashMlaOpBuilder(OpBuilder):
@@ -99,14 +188,14 @@ class QuantFlashMlaOpBuilder(OpBuilder):
             "Tensor? cu_seqlens_q=None, Tensor? seqused_q=None, "
             "int? max_seqlen_q=-1, int? max_seqlen_kv=-1, "
             "int? head_dim_qk=576, int? head_dim_v=512, int? mask_mode=0, "
-            'str? layout_q="BSND") -> Tensor',
+            'str? layout_q="TND") -> Tensor',
             "quant_flash_mla(Tensor q, Tensor k_cache, Tensor q_descale, Tensor k_descale, "
             "Tensor block_table, Tensor cache_seqlens, int quant_mode, *, "
             "Tensor? cu_seqlens_q=None, Tensor? seqused_q=None, "
             "Tensor? attn_mask=None, Tensor? metadata=None, "
             "int head_dim_v=512, float softmax_scale=1.0, int mask_mode=0, "
             "int max_seqlen_q=-1, int max_seqlen_kv=-1, "
-            'str layout_q="BSND", str layout_kv="PA_BNBD", str layout_out="BSND", '
+            'str layout_q="TND", str layout_kv="PA_BNBD", str layout_out="TND", '
             "bool return_softmax_lse=False) -> (Tensor, Tensor)",
         ]
 
@@ -129,9 +218,10 @@ class QuantFlashMlaOpBuilder(OpBuilder):
             head_dim_qk: Optional[int] = MLA_HEAD_DIM_QK,
             head_dim_v: Optional[int] = MLA_HEAD_DIM_V,
             mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
-            layout_q: Optional[str] = "BSND",
+            layout_q: Optional[str] = "TND",
         ):
-            max_schedule_size = _calculate_max_schedule_size()
+            batch_size = cache_seqlens.size(0) if cache_seqlens.dim() > 0 else 0
+            max_schedule_size = _calculate_max_schedule_size(batch_size, num_heads_kv)
             return torch.empty((2, max_schedule_size), dtype=torch.int32, device="meta")
 
         @torch.library.register_fake("cann_ops_transformer::quant_flash_mla")
@@ -153,61 +243,22 @@ class QuantFlashMlaOpBuilder(OpBuilder):
             mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
             max_seqlen_q: Optional[int] = -1,
             max_seqlen_kv: Optional[int] = -1,
-            layout_q: Optional[str] = "BSND",
+            layout_q: Optional[str] = "TND",
             layout_kv: Optional[str] = "PA_BNBD",
-            layout_out: Optional[str] = "BSND",
+            layout_out: Optional[str] = "TND",
             return_softmax_lse: Optional[bool] = False,
         ):
-            if q is None:
-                raise ValueError("q must not be None")
-            q_expected = _LAYOUT_Q_EXPECTED_NDIM.get(layout_q)
-            if q_expected is None:
-                raise ValueError(
-                    f"Unsupported layout_q: {layout_q!r}, expected one of TND/BSND/BNSD"
-                )
-            if q.dim() != q_expected:
-                raise ValueError(
-                    f"q with layout {layout_q} expects {q_expected} dims, but got {q.dim()} dims"
-                )
-            kv_expected = _LAYOUT_KV_EXPECTED_NDIM.get(layout_kv)
-            if kv_expected is None:
-                raise ValueError(
-                    f"Unsupported layout_kv: {layout_kv!r}, expected one of PA_BBND/PA_BNBD/PA_NZ"
-                )
-            if k_cache.dim() != kv_expected:
-                raise ValueError(
-                    f"k_cache with layout {layout_kv} expects {kv_expected} dims, but got {k_cache.dim()} dims"
-                )
-            if layout_q == "TND":
-                t_size = q.size(0)
-                n_size = q.size(1)
-                b_size = 1
-                s_size = 0
-                softmax_out_size = (n_size, t_size)
-            else:
-                if layout_q == "BSND":
-                    b_size = q.size(0)
-                    s_size = q.size(1)
-                    n_size = q.size(2)
-                else:
-                    b_size = q.size(0)
-                    n_size = q.size(1)
-                    s_size = q.size(2)
-                t_size = 0
-                softmax_out_size = (b_size, n_size, s_size)
-
-            if layout_out not in ("BSND", "BNSD", "TND", "NTD"):
-                raise ValueError(
-                    f"Unsupported layout_out: {layout_out!r}, expected one of BSND/BNSD/TND/NTD"
-                )
-            if layout_out == "BSND":
-                attention_out_size = (b_size, s_size, n_size, head_dim_v)
-            elif layout_out == "BNSD":
-                attention_out_size = (b_size, n_size, s_size, head_dim_v)
-            elif layout_out == "TND":
-                attention_out_size = (t_size, n_size, head_dim_v)
-            else:
-                attention_out_size = (n_size, t_size, head_dim_v)
+            # FakeTensor only needs enough structure to infer output shapes.
+            # Contract validation belongs to the C++ host checker.
+            torch._check(q is not None, lambda: "q must be provided")
+            torch._check(
+                q.dim() >= 2,
+                lambda: f"q must have at least 2 dimensions, but got {q.dim()}D",
+            )
+            torch._check(head_dim_v is not None, lambda: "head_dim_v must be provided")
+            t_size, n_size = q.size(0), q.size(1)
+            softmax_out_size = (n_size, t_size) if return_softmax_lse else (0,)
+            attention_out_size = (t_size, n_size, head_dim_v)
 
             return (
                 torch.empty(attention_out_size, dtype=torch.bfloat16, device=q.device),
@@ -235,31 +286,38 @@ def quant_flash_mla_metadata(
     head_dim_qk: Optional[int] = MLA_HEAD_DIM_QK,
     head_dim_v: Optional[int] = MLA_HEAD_DIM_V,
     mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
-    layout_q: Optional[str] = "BSND",
+    layout_q: Optional[str] = "TND",
 ):
     """
     Dispatcher implementation: NPU.
     'PrivateUse1' is dispatch key for custom NPU backends.
     """
-    if quant_mode not in (1, 2):
-        raise ValueError(
-            f"The quant_mode of quant_flash_mla_metadata only supports "
-            f"1 (MLA_FP8_E4M3_FULLQUANT) or 2 (MLA_HIF8_FULLQUANT), but got {quant_mode}"
-        )
-    if num_heads_kv != 1:
-        raise ValueError(
-            f"The num_heads_kv of quant_flash_mla only supports 1 (MLA KV shared), "
-            f"but got {num_heads_kv}"
-        )
     max_seqlen_q = -1 if max_seqlen_q is None else max_seqlen_q
     max_seqlen_kv = -1 if max_seqlen_kv is None else max_seqlen_kv
     quant_mode = _resolve_quant_mode(quant_mode)
     mask_mode = _resolve_mask_mode(mask_mode)
-    layout_q = "BSND" if layout_q is None else layout_q
+    layout_q = "TND" if layout_q is None else layout_q
     head_dim_qk = MLA_HEAD_DIM_QK if head_dim_qk is None else head_dim_qk
     head_dim_v = MLA_HEAD_DIM_V if head_dim_v is None else head_dim_v
 
-    max_schedule_size = _calculate_max_schedule_size()
+    _check_metadata_parameters(
+        cache_seqlens,
+        num_heads_q,
+        num_heads_kv,
+        quant_mode,
+        cu_seqlens_q,
+        seqused_q,
+        max_seqlen_q,
+        max_seqlen_kv,
+        head_dim_qk,
+        head_dim_v,
+        mask_mode,
+        layout_q,
+    )
+
+    max_schedule_size = _calculate_max_schedule_size(
+        cache_seqlens.size(0), num_heads_kv
+    )
     output = torch.empty((2, max_schedule_size), dtype=torch.int32, device="npu")
 
     op_module = quant_flash_mla_op_builder.load()
@@ -293,7 +351,7 @@ def quant_flash_mla_metadata_fallback(
     head_dim_qk: Optional[int] = MLA_HEAD_DIM_QK,
     head_dim_v: Optional[int] = MLA_HEAD_DIM_V,
     mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
-    layout_q: Optional[str] = "BSND",
+    layout_q: Optional[str] = "TND",
 ):
     # 处理所有 tensor 都为 None 的情况
     return quant_flash_mla_metadata(
@@ -331,59 +389,31 @@ def quant_flash_mla(
     mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
     max_seqlen_q: Optional[int] = -1,
     max_seqlen_kv: Optional[int] = -1,
-    layout_q: Optional[str] = "BSND",
+    layout_q: Optional[str] = "TND",
     layout_kv: Optional[str] = "PA_BNBD",
-    layout_out: Optional[str] = "BSND",
+    layout_out: Optional[str] = "TND",
     return_softmax_lse: Optional[bool] = False,
 ):
     """
     dispatcher implementation for NPU.
     'PrivateUse1' is the combine key for custom NPU backends.
     """
-    if quant_mode not in (1, 2):
-        raise ValueError(
-            f"The quant_mode of quant_flash_mla only supports "
-            f"1 (MLA_FP8_E4M3_FULLQUANT) or 2 (MLA_HIF8_FULLQUANT), but got {quant_mode}"
-        )
     quant_mode = _resolve_quant_mode(quant_mode)
     mask_mode = _resolve_mask_mode(mask_mode)
     if head_dim_v is None:
         head_dim_v = MLA_HEAD_DIM_V
 
-    # 取 shape 前校验 q/k_cache 非空及维度
-    if q is None:
-        raise ValueError("q must not be None")
-    if k_cache is None:
-        raise ValueError("k_cache must not be None")
-    q_expected = _LAYOUT_Q_EXPECTED_NDIM.get(layout_q)
-    if q_expected is None:
-        raise ValueError(
-            f"Unsupported layout_q: {layout_q!r}, expected one of TND/BSND/BNSD"
+    # Prevent empty outputs from being short-circuited by the framework before
+    # host tiling validation. QFA applies the same guard to output-related dims.
+    # Rank errors remain the responsibility of the C++ checker.
+    if q.dim() >= 2:
+        torch._check(
+            all(size > 0 for size in (q.size(0), q.size(1), head_dim_v)),
+            lambda: (
+                "The output-related dims T/N of q and head_dim_v must be greater than 0, "
+                f"but got q.shape={tuple(q.shape)}, head_dim_v={head_dim_v}"
+            ),
         )
-    if q.dim() != q_expected:
-        raise ValueError(
-            f"q with layout {layout_q} expects {q_expected} dims, but got {q.dim()} dims"
-        )
-    kv_expected = _LAYOUT_KV_EXPECTED_NDIM.get(layout_kv)
-    if kv_expected is None:
-        raise ValueError(
-            f"Unsupported layout_kv: {layout_kv!r}, expected one of PA_BBND/PA_BNBD/PA_NZ"
-        )
-    if k_cache.dim() != kv_expected:
-        raise ValueError(
-            f"k_cache with layout {layout_kv} expects {kv_expected} dims, but got {k_cache.dim()} dims"
-        )
-    if metadata is None:
-        raise ValueError("metadata should be provided by quant_flash_mla_metadata")
-    if quant_mode == int(QuantMode.MLA_FP8_E4M3_FULLQUANT):
-        if q.dtype != torch.float8_e4m3fn:
-            raise ValueError(
-                f"In FP8_E4M3 mode (quant_mode=1), q must be float8_e4m3fn, but got {q.dtype}"
-            )
-        if k_cache.dtype != torch.float8_e4m3fn:
-            raise ValueError(
-                f"In FP8_E4M3 mode (quant_mode=1), k_cache must be float8_e4m3fn, but got {k_cache.dtype}"
-            )
 
     # MLA 不支持 k_cache 的 stride 中含 0（仅 k_cache 支持 PA 非连续）
     for name, tensor in (("k_cache", k_cache),):

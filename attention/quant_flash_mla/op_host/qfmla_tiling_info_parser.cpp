@@ -29,16 +29,11 @@ namespace optiling {
 namespace quant_flash_mla {
 
 static const std::map<std::string, QfmlaLayout> QFMLA_LAYOUT_Q_MAP = {
-    {"BSND", QfmlaLayout::BSND},
-    {"BNSD", QfmlaLayout::BNSD},
     {"TND", QfmlaLayout::TND},
 };
 
 static const std::map<std::string, QfmlaOutLayout> QFMLA_LAYOUT_OUT_MAP = {
-    {"BSND", QfmlaOutLayout::BSND},
-    {"BNSD", QfmlaOutLayout::BNSD},
     {"TND", QfmlaOutLayout::TND},
-    {"NTD", QfmlaOutLayout::NTD},
 };
 
 static const std::map<std::string, QfmlaKvLayout> QFMLA_LAYOUT_KV_MAP = {
@@ -61,6 +56,15 @@ ge::graphStatus QfmlaInfoParser::GetNpuInfo()
 {
     auto platformInfoPtr = context_->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(opName_, "GetPlatformInfo is nullptr."), return ge::GRAPH_FAILED);
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
+    aicNum_ = ascendcPlatform.GetCoreNumAic();
+    aivNum_ = ascendcPlatform.GetCoreNumAiv();
+    OP_CHECK_IF(aicNum_ == 0 || aivNum_ == 0, OP_LOGE(opName_, "num of core obtained is 0."), return ge::GRAPH_FAILED);
+    npuArch_ = ascendcPlatform.GetCurNpuArch();
+    if (npuArch_ != NpuArch::DAV_3510 && npuArch_ != NpuArch::DAV_9201) {
+        OP_LOGE(opName_, "NpuArch[%d] is not support.", static_cast<int32_t>(npuArch_));
+        return GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -238,8 +242,8 @@ ge::graphStatus QfmlaInfoParser::GetQShapeInfo()
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, CU_SEQLENS_Q_NAME, "provided",
                                                           "When layout_q is TND, cu_seqlens_q must be provided"),
                     return ge::GRAPH_FAILED);
-        int64_t cuSeqLenQSize = opParamInfo_.cuSeqlensQ.tensor->GetShapeSize();
-        bSize_ = cuSeqLenQSize - 1;
+        // Use required cache_seqlens as B so an invalid cu_seqlens_q shape reaches its own checker.
+        bSize_ = opParamInfo_.cacheSeqlens.tensor->GetShapeSize();
         s1Size_ = (opParamInfo_.maxSeqlenQ != nullptr && *opParamInfo_.maxSeqlenQ > 0) ? *opParamInfo_.maxSeqlenQ : -1;
     } else {
         if (qShape.GetDimNum() != 4) {
@@ -330,7 +334,8 @@ ge::graphStatus QfmlaInfoParser::ParseAxisInfo()
         GetS2Size() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    headDimV_ = (opParamInfo_.headDimV != nullptr && *opParamInfo_.headDimV > 0) ? *opParamInfo_.headDimV : 512;
+    // 仅在属性真正缺失时使用默认值。显式传入 0/负数必须保留给 checker 抦截。
+    headDimV_ = (opParamInfo_.headDimV != nullptr) ? *opParamInfo_.headDimV : 512;
 
     // q_descale shape: BSND->(B,Q_S,Q_N), BNSD->(B,Q_N,Q_S), TND->(Q_T,Q_N)
     size_t qDescaleDimNum = opParamInfo_.qDescale.shape->GetStorageShape().GetDimNum();
@@ -383,6 +388,8 @@ void QfmlaInfoParser::GenerateInfo(QfmlaTilingInfo& qfmlaInfo)
 {
     qfmlaInfo.opName = opName_;
     qfmlaInfo.opParamInfo = opParamInfo_;
+    qfmlaInfo.aicNum = aicNum_;
+    qfmlaInfo.aivNum = aivNum_;
 
     qfmlaInfo.bSize = bSize_;
     qfmlaInfo.n1Size = n1Size_;

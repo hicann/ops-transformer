@@ -95,6 +95,11 @@ private:
     const char* opName_ = nullptr;
     QfmlaParaInfo opParamInfo_;
 
+    uint32_t aicNum_ = 0;
+    uint32_t aivNum_ = 0;
+    // NPU
+    NpuArch npuArch_ = NpuArch::DAV_3510;
+
     // 轴
     int64_t bSize_ = 0;
     int64_t n1Size_ = 0;

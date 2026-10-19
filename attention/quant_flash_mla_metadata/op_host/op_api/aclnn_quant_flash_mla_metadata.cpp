@@ -51,14 +51,9 @@ aclnnStatus aclnnQuantFlashMlaMetadataGetWorkspaceSize(const aclTensor* cacheSeq
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    // 文档默认值: head_dim_qk默认576, head_dim_v默认512, mask_mode默认NO_MASK(0), layout_q默认BSND
-    constexpr int64_t MLA_HEAD_DIM_QK_DEFAULT = 576;
-    constexpr int64_t MLA_HEAD_DIM_V_DEFAULT = 512;
-    constexpr int64_t NO_MASK = 0;
-    headDimQk = (headDimQk > 0) ? headDimQk : MLA_HEAD_DIM_QK_DEFAULT;
-    headDimV = (headDimV > 0) ? headDimV : MLA_HEAD_DIM_V_DEFAULT;
-    maskMode = (maskMode >= 0) ? maskMode : NO_MASK;
-    layoutQ = (layoutQ != nullptr && strlen(layoutQ) > 0) ? layoutQ : "BSND";
+    // Torch/schema 层已经对可选属性应用默认值。这里不能把 0/负数静默改成合法值，
+    // 否则异常 case 会绕过 checker。仅为空 layout 按当前唯一支持布局 TND 应用默认值。
+    layoutQ = (layoutQ != nullptr && strlen(layoutQ) > 0) ? layoutQ : "TND";
 
     auto ret = QuantFlashMlaMetadataCheck::ParamsCheck(cacheSeqlens, cuSeqlensQOptional, sequsedQOptional, maxSeqlenQ,
                                                        maxSeqlenKv, numHeadsQ, numHeadsKv, headDimQk, headDimV,
@@ -101,10 +96,22 @@ aclnnStatus aclnnQuantFlashMlaMetadataGetWorkspaceSize(const aclTensor* cacheSeq
     }
     const char* socVersion = npuInfo.GetSocLongVersion().c_str();
 
-    auto output = l0op::QuantFlashMlaMetadata(cacheSeqlensContiguous, cuSeqlensQOptionalContiguous,
-                                              sequsedQOptionalContiguous, maxSeqlenQ, maxSeqlenKv, numHeadsQ,
-                                              numHeadsKv, headDimQk, headDimV, quantMode, maskMode, layoutQ, socVersion,
-                                              aicCoreNum, aivCoreNum, metaData, uniqueExecutor.get());
+    constexpr int64_t DIM_ONE = 1;
+    constexpr int64_t DIM_TWO = 2;
+    constexpr int64_t DIM_IDX_0 = 0;
+    constexpr int64_t DIM_IDX_1 = 1;
+    const int64_t metadataDimNum = metaData->GetViewShape().GetDimNum();
+    int64_t metadataRowSize = 0;
+    if (metadataDimNum >= DIM_TWO) {
+        metadataRowSize = metaData->GetViewShape().GetDim(DIM_IDX_1);
+    } else if (metadataDimNum == DIM_ONE) {
+        metadataRowSize = metaData->GetViewShape().GetDim(DIM_IDX_0);
+    }
+
+    auto output = l0op::QuantFlashMlaMetadata(
+        cacheSeqlensContiguous, cuSeqlensQOptionalContiguous, sequsedQOptionalContiguous, maxSeqlenQ, maxSeqlenKv,
+        numHeadsQ, numHeadsKv, headDimQk, headDimV, quantMode, maskMode, layoutQ, socVersion, aicCoreNum, aivCoreNum,
+        metadataDimNum, metadataRowSize, metaData, uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();

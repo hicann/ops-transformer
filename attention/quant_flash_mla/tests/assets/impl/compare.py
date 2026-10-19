@@ -18,13 +18,66 @@ precision with bf16 tolerance defaults.
 """
 
 import logging
+import os
+import sys
 
 import numpy as np
 import torch
 
+_ASSETS_DIR = os.path.dirname(os.path.abspath(__file__))
+_GOLDEN_DIR = os.path.join(_ASSETS_DIR, "..")  # assets/
+if _GOLDEN_DIR not in sys.path:
+    sys.path.insert(0, _GOLDEN_DIR)
+import qfmla_golden as golden_mod
+
 logger = logging.getLogger(__name__)
 
 _EPS = 1e-10
+
+
+def _resolve_csv_tolerance(idx):
+    """从 golden 模块读 csv 注入的 precision_tolerances / absolute_precision。
+
+    (对齐 QFA compare.py 风格) ttk 框架不把 testcase 对象直接传给 custom compare,
+    golden 插件在调用前把 csv 的 precision_tolerances / absolute_precision 暂存到
+    golden_mod 上。本函数返回 (rtol, atol, diff_thd, pct_thd, max_diff_hd);
+    csv 省略时返回 (None,)*5 由 check_result 用默认值 (rtol/atol 按 dtype 分支,
+    diff_thd=0.005, pct_thd=0.005, max_diff_hd=10)。
+
+    precision_tolerances 格式: tuple of per-output tuple, 每条目可为 2-tuple 或 5-tuple
+      2-tuple (向后兼容): (rtol, atol)                       如 ((0.0078125, 0.0001),)
+      5-tuple (新):        (rtol, atol, diff_thd, pct_thd, max_diff_hd)
+                          如 ((0.0078125, 0.0001, 0.005, 0.005, 10),)
+    """
+    pt = getattr(golden_mod, "_csv_precision_tolerances", None)
+    ap = getattr(golden_mod, "_csv_absolute_precision", None)
+    rtol = None
+    atol = None
+    diff_thd = None
+    pct_thd = None
+    max_diff_hd = None
+    if pt:
+        pair = pt[idx] if idx < len(pt) else pt[-1]
+        if pair is not None and len(pair) >= 2:
+            rtol = float(pair[0])
+            atol = float(pair[1])
+            if len(pair) >= 3 and pair[2] is not None:
+                diff_thd = float(pair[2])
+            if len(pair) >= 4 and pair[3] is not None:
+                pct_thd = float(pair[3])
+            if len(pair) >= 5 and pair[4] is not None:
+                max_diff_hd = float(pair[4])
+    if atol is None and ap is not None:
+        if isinstance(ap, (tuple, list)):
+            val = ap[idx] if idx < len(ap) else ap[-1]
+            if val is not None:
+                atol = float(val)
+        else:
+            atol = float(ap)
+    # replay 模式: pt 为 None (golden 未注入) → 用 bf16 默认, 与 CSV atten 容差一致
+    if rtol is None and atol is None:
+        rtol, atol = 0.0078125, 0.0001
+    return rtol, atol, diff_thd, pct_thd, max_diff_hd
 
 
 def _to_torch(x):
@@ -117,13 +170,6 @@ def check_result(
         max_error,
     )
 
-    logger.info("First 100 values comparison (expect vs actual vs diff):")
-    for i in range(min(100, real_data.numel())):
-        e = float(expect_float[i].item())
-        a = float(real_float[i].item())
-        d = float(diff_abs[i].item())
-        logger.info("  [%d] expect=%.6f actual=%.6f diff=%.6f", i, e, a, d)
-
     return result, fulfill_percent, max_error
 
 
@@ -168,13 +214,24 @@ def compare(*outputs, **kwargs):
         npu_torch = _to_torch(npu_out)
         golden_torch = _to_torch(golden_out)
 
-        # bf16 defaults
-        rtol, atol = 0.0078125, 0.0001
-        if npu_torch.dtype != torch.bfloat16:
-            rtol, atol = 0.005, 0.000025
-
+        rtol, atol, diff_thd, pct_thd, max_diff_hd = _resolve_csv_tolerance(idx)
+        logger.info(
+            "[COMPARE] %s: csv rtol=%s atol=%s diff_thd=%s pct_thd=%s max_diff_hd=%s",
+            label,
+            rtol,
+            atol,
+            diff_thd,
+            pct_thd,
+            max_diff_hd,
+        )
         result, pct, max_err = check_result(
-            golden_torch, npu_torch, rtol=rtol, atol=atol
+            golden_torch,
+            npu_torch,
+            rtol=rtol,
+            atol=atol,
+            diff_thd=diff_thd,
+            pct_thd=pct_thd,
+            max_diff_hd=max_diff_hd,
         )
         results.append(
             {

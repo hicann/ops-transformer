@@ -561,7 +561,7 @@ def _build_tensor_lists(row, cols, sq_values, cu_values):
             if excel_meta_shape is not None and excel_meta_shape != (0, 0):
                 shape = excel_meta_shape
             else:
-                shape = (2, 4096)
+                shape = _metadata_slot_shape(row, cols)
             dtype = "int32"
 
         # k_descale is per-tensor scalar (1,)
@@ -608,7 +608,7 @@ def _build_attributes(row, cols, sq_values, cu_values):
     layout_kv = _strip_or_none(row.get(cols.get("layout_kv"))) or "PA_BNBD"
     layout_out = _strip_or_none(row.get(cols.get("layout_out"))) or "TND"
     return_lse = _bool_to_int(row.get(cols.get("return_softmax_lse"))) or 0
-    graph_path = _str_to_int(row.get(cols.get("graph_path"))) or 0
+    # graph_path = _str_to_int(row.get(cols.get("graph_path"))) or 0
 
     # Force TND layout
     layout_q = "TND"
@@ -649,7 +649,7 @@ def _build_attributes(row, cols, sq_values, cu_values):
     _set("layout_kv", layout_kv)
     _set("layout_out", layout_out)
     _set("return_softmax_lse", return_lse)
-    _set("graph_path", graph_path)
+    # _set("graph_path", graph_path)
     _set("q_data_range", list(q_range))
     _set("k_data_range", list(k_range))
     _set("v_data_range", list(v_range))

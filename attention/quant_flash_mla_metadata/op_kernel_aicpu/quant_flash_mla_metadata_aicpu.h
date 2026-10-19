@@ -46,6 +46,7 @@ private:
     bool Prepare(CpuKernelContext& ctx);
     bool BalanceSchedule(SectionStreamKResult& splitRes);
     bool GenMetaData(SectionStreamKResult& splitRes);
+    void GetMetadataRowInfo(int32_t& dimNum, int64_t& rowSize);
     bool ParamsInit();
     bool CheckNeedInitOutput();
     std::vector<int64_t> GetTensorDataAsInt64(Tensor* tensor, size_t size);
@@ -65,10 +66,12 @@ private:
     int32_t headDimV_ = 512;
     int32_t quantMode_ = 1;
     int32_t maskMode_ = 0;
-    std::string layoutQ_ = "BSND";
+    std::string layoutQ_ = "TND";
     std::string socVersion_ = "";
     int32_t aicCoreNum_ = 36;
     int32_t aivCoreNum_ = 72;
+    int64_t metadataDimNum_ = 0;
+    int64_t metadataRowSize_ = 0;
 
     uint32_t mBaseSize_ = 0;
     uint32_t s2BaseSize_ = 0;

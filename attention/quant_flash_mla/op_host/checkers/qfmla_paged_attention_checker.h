@@ -33,6 +33,7 @@ private:
     ge::graphStatus CheckSingleParaBlockTable(const QfmlaTilingInfo& qfmlaInfo);
     ge::graphStatus CheckSingleParaCacheSeqlens(const QfmlaTilingInfo& qfmlaInfo);
     ge::graphStatus CheckBlockSize(const QfmlaTilingInfo& qfmlaInfo);
+    ge::graphStatus CheckMaxSeqlenKvCapacity(const QfmlaTilingInfo& qfmlaInfo);
     // --- Feature: k_cache 非连续 Tensor 支持校验 ---
     ge::graphStatus CheckNonContiguousSupport(const QfmlaTilingInfo& qfmlaInfo);
 };

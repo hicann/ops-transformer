@@ -119,6 +119,10 @@ struct QfmlaTilingInfo : public TilingInfo {
     int64_t maxBlockNumPerBatch = 0;
     int64_t totalBlockNum = 0;
 
+    // Device core counts used to validate the metadata row capacity.
+    uint32_t aicNum = 0;
+    uint32_t aivNum = 0;
+
     // Mask
     int64_t maskMode = 0;
     bool attnMaskFlag = false;

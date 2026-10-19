@@ -638,6 +638,28 @@ def _build_qfmla_section_info(seqused_q, cache_seqlens):
     if quant_flash_mla_metadata is None:
         logger.warning("[Section] metadata 算子不可用, golden 使用全局量化语义")
         return None
+    # This NPU metadata call is only a golden optimization.  Deliberately
+    # invalid sequence values must not reach AICPU here: even when its error is
+    # caught below, the failed task poisons the stream and masks the real
+    # operator/preprocess validation with a later EE9999 synchronization error.
+    cache_values = [int(value) for value in cache_seqlens]
+    query_values = [int(value) for value in seqused_q]
+    invalid_cache = (
+        not cache_values
+        or any(value < 0 for value in cache_values)
+        or (MAX_SEQLEN_KV > 0 and any(value > MAX_SEQLEN_KV for value in cache_values))
+    )
+    invalid_query = (
+        not query_values
+        or any(value < 0 or value > 16 for value in query_values)
+        or (MAX_SEQLEN_Q > 0 and any(value > MAX_SEQLEN_Q for value in query_values))
+    )
+    if invalid_cache or invalid_query:
+        logger.warning(
+            "[Section] skip NPU metadata for invalid golden sequence values; "
+            "use full CPU attention instead"
+        )
+        return None
     try:
         cache_seqlens_t = torch.tensor(
             cache_seqlens, dtype=torch.int32, device="npu"

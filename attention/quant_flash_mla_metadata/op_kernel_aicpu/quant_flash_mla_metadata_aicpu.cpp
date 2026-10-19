@@ -55,6 +55,8 @@ bool QuantFlashMlaMetadataCpuKernel::Prepare(CpuKernelContext& ctx)
     GetAttrValueOpt(ctx, "head_dim_v", headDimV_);
     GetAttrValueOpt(ctx, "mask_mode", maskMode_);
     GetAttrValueOpt(ctx, "layout_q", layoutQ_);
+    GetAttrValueOpt(ctx, "metadata_dim_num", metadataDimNum_);
+    GetAttrValueOpt(ctx, "metadata_row_size", metadataRowSize_);
     return ParamsInit();
 }
 
@@ -137,6 +139,11 @@ bool QuantFlashMlaMetadataCpuKernel::ParamsInit()
         batchSize_ = static_cast<int32_t>(cacheSeqlens.size());
         baseInfo.actualKvSeqSize.resize(batchSize_, baseInfo.kvSeqSize);
         for (int64_t i = 0; i < batchSize_; ++i) {
+            if (cacheSeqlens[i] < 0 || (maxSeqlenKv_ > 0 && cacheSeqlens[i] > maxSeqlenKv_)) {
+                KERNEL_LOG_ERROR("cache_seqlens[%ld]=%ld must be non-negative and not exceed max_seqlen_kv=%d", i,
+                                 cacheSeqlens[i], maxSeqlenKv_);
+                return false;
+            }
             // PA场景: cache_seqlens为每batch实际长度, 直接存入actualKvSeqSize和kvSeqSize
             baseInfo.actualKvSeqSize[i] = cacheSeqlens[i];
             baseInfo.kvSeqSize = std::max(static_cast<int64_t>(baseInfo.kvSeqSize), cacheSeqlens[i]);
@@ -163,9 +170,22 @@ bool QuantFlashMlaMetadataCpuKernel::ParamsInit()
     }
     if (baseInfo.isCumulativeQuerySeq && cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
         auto cuSeqlensQ = GetTensorDataAsInt64(cuSeqlensQ_, cuSeqlensQ_->NumElements());
-        batchSize_ = static_cast<int32_t>(cuSeqlensQ.size()) - 1;
+        const int32_t cuBatchSize = static_cast<int32_t>(cuSeqlensQ.size()) - 1;
+        if (cuBatchSize != batchSize_ || cuSeqlensQ.empty() || cuSeqlensQ[0] != 0) {
+            KERNEL_LOG_ERROR("cu_seqlens_q must start with 0 and contain B+1 elements, got %zu for B=%d",
+                             cuSeqlensQ.size(), batchSize_);
+            return false;
+        }
+        batchSize_ = cuBatchSize;
         baseInfo.actualQuerySeqSize.resize(batchSize_, baseInfo.querySeqSize);
         for (int64_t i = 0; i < batchSize_; ++i) {
+            const int64_t seqLen = cuSeqlensQ[i + 1] - cuSeqlensQ[i];
+            if (seqLen < 0 || seqLen > 16 || (maxSeqlenQ_ > 0 && seqLen > maxSeqlenQ_)) {
+                KERNEL_LOG_ERROR("cu_seqlens_q must be non-decreasing and each Q length must be in [0, 16], "
+                                 "but batch %ld has length %ld",
+                                 i, seqLen);
+                return false;
+            }
             baseInfo.actualQuerySeqSize[i] = cuSeqlensQ[i + 1];
             baseInfo.querySeqSize =
                 std::max(static_cast<int64_t>(baseInfo.querySeqSize), cuSeqlensQ[i + 1] - cuSeqlensQ[i]);
@@ -173,9 +193,26 @@ bool QuantFlashMlaMetadataCpuKernel::ParamsInit()
     }
     if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
         auto sequsedQ = GetTensorDataAsInt64(sequsedQ_, sequsedQ_->NumElements());
-        batchSize_ = static_cast<int32_t>(sequsedQ.size());
+        if (static_cast<int32_t>(sequsedQ.size()) != batchSize_) {
+            KERNEL_LOG_ERROR("seqused_q must contain B elements, got %zu for B=%d", sequsedQ.size(), batchSize_);
+            return false;
+        }
         baseInfo.actualQuerySeqSize.resize(batchSize_, baseInfo.querySeqSize);
         for (int64_t i = 0; i < batchSize_; ++i) {
+            if (sequsedQ[i] < 0 || sequsedQ[i] > 16 || (maxSeqlenQ_ > 0 && sequsedQ[i] > maxSeqlenQ_)) {
+                KERNEL_LOG_ERROR("seqused_q[%ld]=%ld must be in [0, 16] and not exceed max_seqlen_q=%d", i, sequsedQ[i],
+                                 maxSeqlenQ_);
+                return false;
+            }
+            if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
+                auto cuSeqlensQ = GetTensorDataAsInt64(cuSeqlensQ_, cuSeqlensQ_->NumElements());
+                const int64_t allocatedLen = cuSeqlensQ[i + 1] - cuSeqlensQ[i];
+                if (sequsedQ[i] > allocatedLen) {
+                    KERNEL_LOG_ERROR("seqused_q[%ld]=%ld must not exceed allocated Q length %ld", i, sequsedQ[i],
+                                     allocatedLen);
+                    return false;
+                }
+            }
             baseInfo.actualQuerySeqSize[i] = sequsedQ[i];
             if (baseInfo.isCumulativeQuerySeq && (i > 0)) {
                 baseInfo.actualQuerySeqSize[i] += baseInfo.actualQuerySeqSize[i - 1];
@@ -285,6 +322,19 @@ bool QuantFlashMlaMetadataCpuKernel::CheckNeedInitOutput()
     return false;
 }
 
+void QuantFlashMlaMetadataCpuKernel::GetMetadataRowInfo(int32_t& dimNum, int64_t& rowSize)
+{
+    dimNum = static_cast<int32_t>(metadataDimNum_);
+    rowSize = metadataRowSize_;
+    if (dimNum <= 0 || rowSize <= 0) {
+        auto metadataShape = metaData_ == nullptr ? nullptr : metaData_->GetTensorShape();
+        if (metadataShape != nullptr && metadataShape->GetDims() >= 1) {
+            dimNum = metadataShape->GetDims();
+            rowSize = dimNum >= 2 ? metadataShape->GetDimSize(1) : metadataShape->GetDimSize(0);
+        }
+    }
+}
+
 bool QuantFlashMlaMetadataCpuKernel::GenMetaData(SectionStreamKResult& splitRes)
 {
     if (metaData_ == nullptr || metaData_->GetData() == nullptr) {
@@ -292,6 +342,24 @@ bool QuantFlashMlaMetadataCpuKernel::GenMetaData(SectionStreamKResult& splitRes)
         return false;
     }
     uint32_t sectionNum = splitRes.sectionNum;
+    int32_t dimNum = 0;
+    int64_t rowSize = 0;
+    GetMetadataRowInfo(dimNum, rowSize);
+    if (dimNum > 0 && dimNum != 2) {
+        KERNEL_LOG_ERROR("metadata must be 2D, but got %dD", dimNum);
+        return false;
+    }
+    const int64_t requiredSize = static_cast<int64_t>(optiling::HEAD_METADATA_SIZE) +
+                                 static_cast<int64_t>(sectionNum) *
+                                     (static_cast<int64_t>(aicCoreNum_) + static_cast<int64_t>(aivCoreNum_)) *
+                                     static_cast<int64_t>(optiling::METADATA_STRIDE);
+    if (rowSize > 0 && rowSize < requiredSize) {
+        KERNEL_LOG_ERROR("metadata row size %ld is smaller than required %ld "
+                         "(sectionNum %u, aic %d, aiv %d)",
+                         rowSize, requiredSize, sectionNum, aicCoreNum_, aivCoreNum_);
+        return false;
+    }
+
     detail::FaMetaData faMetadata(static_cast<uint32_t>(aicCoreNum_), static_cast<uint32_t>(aivCoreNum_), sectionNum,
                                   metaData_->GetData());
     faMetadata.Clear();

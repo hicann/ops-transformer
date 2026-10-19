@@ -18,6 +18,7 @@ calls the CPU golden reference, converts output to target layout, and returns
 (attention_out, lse_out) for comparison.
 """
 
+import importlib.util
 import logging
 import math
 import os
@@ -35,7 +36,17 @@ _COMMON_DIR = os.path.join(_ASSETS_DIR, "..", "..", "pytest", "common")
 if _COMMON_DIR not in sys.path:
     sys.path.insert(0, _COMMON_DIR)
 
-import qfmla_golden as golden_mod
+_GOLDEN_MODULE_NAME = "qfmla_assets_golden_reference"
+if _GOLDEN_MODULE_NAME in sys.modules:
+    golden_mod = sys.modules[_GOLDEN_MODULE_NAME]
+else:
+    _GOLDEN_PATH = os.path.join(_GOLDEN_DIR, "qfmla_golden.py")
+    _GOLDEN_SPEC = importlib.util.spec_from_file_location(
+        _GOLDEN_MODULE_NAME, _GOLDEN_PATH
+    )
+    golden_mod = importlib.util.module_from_spec(_GOLDEN_SPEC)
+    sys.modules[_GOLDEN_MODULE_NAME] = golden_mod
+    _GOLDEN_SPEC.loader.exec_module(golden_mod)
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +112,12 @@ def _set_golden_globals(
     golden_mod.MAX_SEQLEN_Q = max_seqlen_q
     golden_mod.MAX_SEQLEN_KV = max_seqlen_kv
 
+    # csv precision_tolerances / absolute_precision 暂存到 golden_mod 供 compare
+    # 读取 (对齐 QFA golden.py 风格: ttk 框架不把 testcase 对象直接传给 custom
+    # compare, golden 插件在调用前把 csv 容差暂存到 golden 模块上)。
+    golden_mod._csv_precision_tolerances = kwargs.get("precision_tolerances")
+    golden_mod._csv_absolute_precision = kwargs.get("absolute_precision")
+
     if kwargs.get("q_data_range"):
         golden_mod.Q_DATA_RANGE = tuple(kwargs["q_data_range"])
     if kwargs.get("k_data_range"):
@@ -147,9 +164,9 @@ def cpu_qfmla_mxfp8(
     max_seqlen_q=-1,
     max_seqlen_kv=-1,
     head_dim_v=512,
-    layout_q="BSND",
+    layout_q="TND",
     layout_kv="PA_BNBD",
-    layout_out="BSND",
+    layout_out="TND",
     return_softmax_lse=False,
     **kwargs,
 ):
@@ -166,6 +183,29 @@ def cpu_qfmla_mxfp8(
         layout_q,
         layout_out,
     )
+
+    # CSV 'D' 字段语义不统一 (有些 case D=D_nope=512, 有些 case D=D_total=576);
+    # 与 inputs.py 一致, 以 q slot 末维为准反推 D_nope, 防止 golden generate_data
+    # 用 D + D_rope = 640 生成数据导致与算子期望的 576 维不一致。
+    _csv_D = int(kwargs.get("D", 512))
+    _csv_D_rope = int(kwargs.get("D_rope", 64))
+    _q_last_dim = int(q.shape[-1]) if (hasattr(q, "shape") and q.dim() > 0) else 0
+    if (
+        _q_last_dim > 0
+        and _csv_D + _csv_D_rope != _q_last_dim
+        and _csv_D == _q_last_dim
+    ):
+        # CSV 'D' 是 D_total (新约定): D_nope = D - D_rope
+        kwargs = dict(kwargs)
+        kwargs["D"] = _csv_D - _csv_D_rope
+        logger.warning(
+            "[%s] golden: CSV D=%d == q slot last dim=%d (D_total convention); "
+            "use D_nope = D - D_rope = %d for data synthesis",
+            testcase_name,
+            _csv_D,
+            _q_last_dim,
+            _csv_D - _csv_D_rope,
+        )
 
     # ---- 1. Set golden globals ----
     cfg = _set_golden_globals(

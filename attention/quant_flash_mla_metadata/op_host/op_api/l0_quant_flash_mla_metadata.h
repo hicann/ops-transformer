@@ -18,8 +18,8 @@ const aclTensor* QuantFlashMlaMetadata(const aclTensor* cacheSeqlens, const aclT
                                        const aclTensor* sequsedQOptional, int64_t maxSeqlenQ, int64_t maxSeqlenKv,
                                        int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDimQk, int64_t headDimV,
                                        int64_t quantMode, int64_t maskMode, const char* layoutQ, const char* socVersion,
-                                       int64_t aicCoreNum, int64_t aivCoreNum, const aclTensor* metaData,
-                                       aclOpExecutor* executor);
+                                       int64_t aicCoreNum, int64_t aivCoreNum, int64_t metadataDimNum,
+                                       int64_t metadataRowSize, const aclTensor* metaData, aclOpExecutor* executor);
 } // namespace l0op
 
 #endif

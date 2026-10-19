@@ -71,6 +71,22 @@ ge::graphStatus MetadataChecker::CheckSinglePara(const QfmlaTilingInfo& qfmlaInf
                         opName, METADATA_NAME, ("[..., " + std::to_string(metaShape.GetDim(1)) + "]").c_str(),
                         "The dim1 (max_schedule_size) of metadata must be greater than 0"),
                     return ge::GRAPH_FAILED);
+
+        constexpr int64_t metadataStride = 16;
+        const int64_t sectionUpperBound = qfmlaInfo.bSize * qfmlaInfo.n2Size;
+        const int64_t requiredRowSize =
+            metadataStride + sectionUpperBound *
+                                 (static_cast<int64_t>(qfmlaInfo.aicNum) + static_cast<int64_t>(qfmlaInfo.aivNum)) *
+                                 metadataStride;
+        OP_CHECK_IF(
+            metaShape.GetDim(1) < requiredRowSize,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName, METADATA_NAME, ("[..., " + std::to_string(metaShape.GetDim(1)) + "]").c_str(),
+                ("The metadata row is too small: expected at least " + std::to_string(requiredRowSize) +
+                 " elements for B=" + std::to_string(qfmlaInfo.bSize) + ", KV_N=" + std::to_string(qfmlaInfo.n2Size) +
+                 ", AIC=" + std::to_string(qfmlaInfo.aicNum) + ", AIV=" + std::to_string(qfmlaInfo.aivNum))
+                    .c_str()),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }

@@ -66,6 +66,20 @@ ge::graphStatus SoftmaxLSEChecker::CheckMultiPara(const QfmlaTilingInfo& qfmlaIn
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, SOFTMAX_LSE_NAME, "not empty",
                                                   "When return_softmax_lse is True, softmax_lse must not be empty"),
             return ge::GRAPH_FAILED);
+        const auto& lseShape = qfmlaInfo.opParamInfo.softmaxLse.shape->GetStorageShape();
+        OP_CHECK_IF(lseShape.GetDimNum() != 2 || static_cast<int64_t>(lseShape.GetDim(0)) != qfmlaInfo.n1Size ||
+                        static_cast<int64_t>(lseShape.GetDim(1)) != qfmlaInfo.qTSize,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName, SOFTMAX_LSE_NAME, ToString(lseShape).c_str(),
+                        "When return_softmax_lse is True and layout_q is TND, softmax_lse shape must be (Q_N, Q_T)"),
+                    return ge::GRAPH_FAILED);
+    } else if (qfmlaInfo.opParamInfo.softmaxLse.shape != nullptr) {
+        const auto& lseShape = qfmlaInfo.opParamInfo.softmaxLse.shape->GetStorageShape();
+        OP_CHECK_IF(
+            lseShape.GetShapeSize() != 0,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, SOFTMAX_LSE_NAME, ToString(lseShape).c_str(),
+                                                  "When return_softmax_lse is False, softmax_lse must be empty"),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }

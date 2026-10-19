@@ -52,12 +52,12 @@ ge::graphStatus CommonChecker::CheckSingleParaLayout(const QfmlaTilingInfo& qfml
                                                       "layout_kv must be PA_BBND/PA_BNBD/PA_NZ"),
                 return ge::GRAPH_FAILED);
 
-    // layout_out: 支持 BSND/BNSD/TND/NTD
-    OP_CHECK_IF(
-        qfmlaInfo.layoutOut != QfmlaOutLayout::BSND && qfmlaInfo.layoutOut != QfmlaOutLayout::BNSD &&
-            qfmlaInfo.layoutOut != QfmlaOutLayout::TND && qfmlaInfo.layoutOut != QfmlaOutLayout::NTD,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "layout_out", "invalid", "layout_out must be BSND/BNSD/TND/NTD"),
-        return ge::GRAPH_FAILED);
+    // 当前 MLA 只支持 TND 输入和 TND 输出。枚举解析与能力校验分层，避免非法字符串与
+    // “枚举合法但当前不支持”混成同一类报错。
+    OP_CHECK_IF(qfmlaInfo.layoutOut != QfmlaOutLayout::TND,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "layout_out", "BSND/BNSD/NTD",
+                                                      "Currently only layout_out=TND is supported"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -238,6 +238,10 @@ ge::graphStatus CommonChecker::CheckAxis(const QfmlaTilingInfo& qfmlaInfo)
     if (qfmlaInfo.layoutKv == QfmlaKvLayout::PA_BBND || qfmlaInfo.layoutKv == QfmlaKvLayout::PA_BNBD) {
         kCacheD = static_cast<int64_t>(kCacheShape.GetDim(3));
     } else {
+        OP_CHECK_IF(static_cast<int64_t>(kCacheShape.GetDim(4)) != 32,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, K_CACHE_NAME, ToString(kCacheShape).c_str(),
+                                                          "When layout_kv is PA_NZ, the innermost axis must be 32"),
+                    return ge::GRAPH_FAILED);
         kCacheD = static_cast<int64_t>(kCacheShape.GetDim(2)) * 32;
     }
     OP_CHECK_IF(kCacheD != QFMLA_HEAD_DIM_QK,
@@ -279,25 +283,12 @@ ge::graphStatus CommonChecker::CheckAttnOutShape(const QfmlaTilingInfo& qfmlaInf
 {
     const char* opName = qfmlaInfo.opName;
     const auto& attnOutShape = qfmlaInfo.opParamInfo.attnOut.shape->GetStorageShape();
-    // layout_out=TND: (Q_T, Q_N, head_dim_v=512)
-    // layout_out=NTD: (Q_N, Q_T, head_dim_v=512)
-    if (qfmlaInfo.layoutOut == QfmlaOutLayout::TND) {
-        OP_CHECK_IF(
-            static_cast<int64_t>(attnOutShape.GetDim(0)) != qfmlaInfo.qTSize ||
-                static_cast<int64_t>(attnOutShape.GetDim(1)) != qfmlaInfo.n1Size ||
-                static_cast<int64_t>(attnOutShape.GetDim(2)) != QFMLA_HEAD_DIM_V,
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, ATTN_OUT_NAME, ToString(attnOutShape).c_str(),
-                                                  "When layout_out is TND, attn_out shape must be (Q_T, Q_N, 512)"),
-            return ge::GRAPH_FAILED);
-    } else if (qfmlaInfo.layoutOut == QfmlaOutLayout::NTD) {
-        OP_CHECK_IF(
-            static_cast<int64_t>(attnOutShape.GetDim(0)) != qfmlaInfo.n1Size ||
-                static_cast<int64_t>(attnOutShape.GetDim(1)) != qfmlaInfo.qTSize ||
-                static_cast<int64_t>(attnOutShape.GetDim(2)) != QFMLA_HEAD_DIM_V,
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, ATTN_OUT_NAME, ToString(attnOutShape).c_str(),
-                                                  "When layout_out is NTD, attn_out shape must be (Q_N, Q_T, 512)"),
-            return ge::GRAPH_FAILED);
-    }
+    OP_CHECK_IF(static_cast<int64_t>(attnOutShape.GetDim(0)) != qfmlaInfo.qTSize ||
+                    static_cast<int64_t>(attnOutShape.GetDim(1)) != qfmlaInfo.n1Size ||
+                    static_cast<int64_t>(attnOutShape.GetDim(2)) != QFMLA_HEAD_DIM_V,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, ATTN_OUT_NAME, ToString(attnOutShape).c_str(),
+                                                      "When layout_out is TND, attn_out shape must be (Q_T, Q_N, 512)"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

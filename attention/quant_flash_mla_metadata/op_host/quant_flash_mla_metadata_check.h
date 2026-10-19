@@ -39,7 +39,7 @@ private:
 
     // 校验基础属性: maxSeqlen / numHeads / headDim / quantMode / layout
     // 文档约束: num_heads_kv仅支持1(MLA KV_N=1); head_dim_qk仅支持576; head_dim_v仅支持512;
-    // quantMode当前仅支持1(FP8_E4M3)/0(HIFLOAT8)
+    // quantMode当前仅支持1(FP8_E4M3), layout_q仅支持TND
     static inline aclnnStatus CheckBaseAttr(int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
                                             int64_t numHeadsKv, int64_t headDimQk, int64_t headDimV, int64_t quantMode,
                                             const char* layoutQ);
@@ -85,21 +85,19 @@ inline aclnnStatus QuantFlashMlaMetadataCheck::CheckBaseAttr(int64_t maxSeqlenQ,
                                                              int64_t quantMode, const char* layoutQ)
 {
     constexpr int64_t MLA_FP8_E4M3_FULLQUANT = 1;
-    constexpr int64_t MLA_HIF8_FULLQUANT = 0;
-    static const std::unordered_set<int64_t> quantModeSet = {MLA_FP8_E4M3_FULLQUANT, MLA_HIF8_FULLQUANT};
-    CHECK_COND(quantModeSet.count(quantMode) > 0, ACLNN_ERR_RUNTIME_ERROR,
-               "quantMode only supports 1 (MLA_FP8_E4M3_FULLQUANT: Q/K/V FP8_E4M3, Q per-token-head, K per-tensor) "
-               "and 0 (MLA_HIF8_FULLQUANT) but got %ld",
-               quantMode);
+    CHECK_COND(quantMode == MLA_FP8_E4M3_FULLQUANT, ACLNN_ERR_RUNTIME_ERROR,
+               "quantMode only supports 1 (MLA_FP8_E4M3_FULLQUANT), but got %ld", quantMode);
 
-    // 文档约束(单参数校验): max_seqlen_q / max_seqlen_kv 值域为 -1(默认,表示未传) 或 >=0(有效值)
+    // -1表示未传; 显式传入时序列长度必须大于0。Q侧当前最大支持16。
     // 场景相关的存在性约束由 CheckExistency(特性交叉校验)负责: TND时与seqused_q至少传1个
-    CHECK_COND((maxSeqlenQ == -1 || maxSeqlenQ >= 0), ACLNN_ERR_RUNTIME_ERROR,
-               "maxSeqlenQ must be -1 or greater than 0, but got %ld", maxSeqlenQ);
-    CHECK_COND((maxSeqlenKv == -1 || maxSeqlenKv >= 0), ACLNN_ERR_RUNTIME_ERROR,
+    CHECK_COND((maxSeqlenQ == -1 || (maxSeqlenQ >= 1 && maxSeqlenQ <= 16)), ACLNN_ERR_RUNTIME_ERROR,
+               "maxSeqlenQ must be -1 or in [1, 16], but got %ld", maxSeqlenQ);
+    CHECK_COND((maxSeqlenKv == -1 || maxSeqlenKv >= 1), ACLNN_ERR_RUNTIME_ERROR,
                "maxSeqlenKv must be -1 or greater than 0, but got %ld", maxSeqlenKv);
 
-    CHECK_COND(numHeadsQ > 0, ACLNN_ERR_RUNTIME_ERROR, "numHeadsQ must be greater than 0, but got %ld", numHeadsQ);
+    static const std::unordered_set<int64_t> numHeadsQSet = {1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128};
+    CHECK_COND(numHeadsQSet.count(numHeadsQ) > 0, ACLNN_ERR_RUNTIME_ERROR,
+               "numHeadsQ must be one of {1,2,4,6,8,12,16,24,32,48,64,96,128}, but got %ld", numHeadsQ);
     // 文档约束: MLA场景KV共享单一latent头, num_heads_kv仅支持1
     CHECK_COND(numHeadsKv == 1, ACLNN_ERR_RUNTIME_ERROR, "numHeadsKv only supports 1 in MLA scenario, but got %ld",
                numHeadsKv);
@@ -108,9 +106,8 @@ inline aclnnStatus QuantFlashMlaMetadataCheck::CheckBaseAttr(int64_t maxSeqlenQ,
     CHECK_COND(headDimQk == 576, ACLNN_ERR_RUNTIME_ERROR, "headDimQk only supports 576, but got %ld", headDimQk);
     CHECK_COND(headDimV == 512, ACLNN_ERR_RUNTIME_ERROR, "headDimV only supports 512, but got %ld", headDimV);
 
-    static const std::unordered_set<std::string> layoutQSet = {"BSND", "TND", "BNSD"};
-    CHECK_COND(layoutQSet.count(layoutQ) > 0, ACLNN_ERR_RUNTIME_ERROR,
-               "layoutQ only supports BSND, TND, BNSD, but got %s", layoutQ);
+    CHECK_COND(layoutQ != nullptr, ACLNN_ERR_RUNTIME_ERROR, "layoutQ must not be null");
+    CHECK_COND(strcmp(layoutQ, "TND") == 0, ACLNN_ERR_RUNTIME_ERROR, "layoutQ only supports TND, but got %s", layoutQ);
 
     return ACLNN_SUCCESS;
 }
@@ -133,6 +130,12 @@ inline aclnnStatus QuantFlashMlaMetadataCheck::CheckExistency(int64_t maxSeqlenQ
                                                               const aclTensor* metadata)
 {
     CHECK_COND(metadata != nullptr, ACLNN_ERR_RUNTIME_ERROR, "metadata should be provided, but got null");
+    CHECK_COND(metadata->GetDataType() == ge::DT_INT32, ACLNN_ERR_RUNTIME_ERROR,
+               "metadata only supports int32, but got %s", op::ToString(metadata->GetDataType()).GetString());
+    CHECK_COND(metadata->GetViewShape().GetDimNum() == 2 && metadata->GetViewShape().GetDim(0) == 2 &&
+                   metadata->GetViewShape().GetDim(1) > 0,
+               ACLNN_ERR_RUNTIME_ERROR, "metadata shape must be (2, maxScheduleSize), but got dimNum=%ld",
+               metadata->GetViewShape().GetDimNum());
 
     // 文档约束: cache_seqlens为必选输入
     CHECK_COND(IsTensorExist(cacheSeqlens), ACLNN_ERR_RUNTIME_ERROR,
@@ -143,7 +146,7 @@ inline aclnnStatus QuantFlashMlaMetadataCheck::CheckExistency(int64_t maxSeqlenQ
         CHECK_COND(IsTensorExist(cuSeqlensQOptional), ACLNN_ERR_RUNTIME_ERROR,
                    "When layoutQ is TND, cuSeqlensQOptional should be provided, but got null");
         // 文档约束: layout_q为TND时, seqused_q与max_seqlen_q至少传入其中一个 (-1表示max_seqlen_q未传)
-        CHECK_COND(((maxSeqlenQ >= 0) || IsTensorExist(sequsedQOptional)), ACLNN_ERR_RUNTIME_ERROR,
+        CHECK_COND(((maxSeqlenQ > 0) || IsTensorExist(sequsedQOptional)), ACLNN_ERR_RUNTIME_ERROR,
                    "When layoutQ is TND, at least one of maxSeqlenQ or sequsedQOptional must be provided");
     } else {
         // 文档约束: layout_q不为TND时, cu_seqlens_q不支持传入
