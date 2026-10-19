@@ -51,7 +51,7 @@ static bool QfaMxfp8SoftmaxFp16IsEmptyInput(gert::TilingContext* context)
 static ge::graphStatus TilingQuantFlashAttnMxfp8SoftmaxFp16(gert::TilingContext* context)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
-    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201) {
         if (QfaMxfp8SoftmaxFp16IsEmptyInput(context)) {
             return ge::GRAPH_SUCCESS;
         }

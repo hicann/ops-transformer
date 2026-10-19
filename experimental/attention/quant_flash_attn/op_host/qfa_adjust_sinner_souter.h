@@ -25,7 +25,9 @@ constexpr uint32_t LAYOUT_BNSD = 1;
 constexpr uint32_t LAYOUT_TND = 2;
 
 constexpr uint32_t SOUTER_64 = 64;
+constexpr uint32_t SOUTER_128 = 128;
 constexpr uint32_t SOUTER_256 = 256;
+constexpr uint32_t SINNER_128 = 128;
 constexpr uint32_t SINNER_256 = 256;
 constexpr uint32_t SINNER_512 = 512;
 constexpr uint32_t DSIZE_256 = 256;
@@ -72,6 +74,49 @@ inline void AdjustSinnerAndSouter(uint32_t vHeadDim, int64_t maxSeqQ, int64_t ma
     } else {
         sOuterFactor = SOUTER_64;
         sInnerFactor = SINNER_512;
+    }
+}
+
+/**
+ * @brief arch92 (v121 porting) 版本的 sOuter / sInner 切块大小决策。
+ *        相比 AdjustSinnerAndSouter，新增 isDecode 参数和 quantMode==3(SOFTMAX_FP16) 支持。
+ *
+ * @param vHeadDim   V 的 head dim
+ * @param maxSeqQ    Q 的 max sequence length，-1 表示未知（按极大值处理）
+ * @param maxSeqKv   KV 的 max sequence length，-1 表示未知（按极大值处理）
+ * @param maskMode   mask 模式（0/2/4 等）
+ * @param winLeft    左侧窗口，调用方直接传入接口值，-1 表示无限制，函数内部会转为正无穷
+ * @param winRight   右侧窗口，调用方直接传入接口值，-1 表示无限制，函数内部会转为正无穷
+ * @param qLayout    Q 的 layout（使用 LAYOUT_BSH / LAYOUT_BSND / LAYOUT_TND 等）
+ * @param quantMode  量化模式（1=MXFP8 FP32, 3=MXFP8 SOFTMAX_FP16）
+ * @param isDecode   是否 decode（true=decode，false=prefill）
+ * @param sOuterFactor [out] sOuter 切块大小
+ * @param sInnerFactor [out] sInner 切块大小
+ */
+inline void AdjustSinnerAndSouterArch92(uint32_t vHeadDim, int64_t maxSeqQ, int64_t maxSeqKv, int32_t maskMode,
+                                        int64_t winLeft, int64_t winRight, uint32_t qLayout, uint32_t quantMode,
+                                        bool isDecode, uint32_t& sOuterFactor, uint32_t& sInnerFactor)
+{
+    if (maxSeqQ == -1) {
+        maxSeqQ = MAX_SEQ_LEN_DEFAULT;
+    }
+    if (maxSeqKv == -1) {
+        maxSeqKv = MAX_SEQ_LEN_DEFAULT;
+    }
+    if (winLeft == -1) {
+        winLeft = MAX_SEQ_LEN_DEFAULT;
+    }
+    if (winRight == -1) {
+        winRight = MAX_SEQ_LEN_DEFAULT;
+    }
+    if (quantMode == 3) {
+        // SOFTMAX_FP16 (quantMode=3): 仅 BNSD/无 mask/无 PA, 基本块固定 128*512, D=128
+        sOuterFactor = SOUTER_128;
+        sInnerFactor = SINNER_512;
+    } else {
+        // prefill，其余 dim：128x256
+        sOuterFactor = SOUTER_128;
+        sInnerFactor = SINNER_256;
     }
 }
 

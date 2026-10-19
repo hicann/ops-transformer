@@ -51,7 +51,7 @@ ge::graphStatus QuantFlashAttnTilingInfoParser::GetNpuInfo()
     OP_CHECK_IF(aicNum == 0 || aivNum == 0,
                 OPS_REPORT_VECTOR_INNER_ERR(tilingInfo_.opName, "num of core obtained is 0."), return GRAPH_FAILED);
     npuArch_ = ascendcPlatform.GetCurNpuArch();
-    if (npuArch_ != NpuArch::DAV_3510) {
+    if (npuArch_ != NpuArch::DAV_3510 && npuArch_ != NpuArch::DAV_9201) {
         OPS_REPORT_VECTOR_INNER_ERR(tilingInfo_.opName, "NpuArch[%d] is not support.", static_cast<int32_t>(npuArch_));
         return GRAPH_FAILED;
     }
@@ -633,7 +633,7 @@ void QuantFlashAttnTilingInfoParser::GetSoftmaxScale()
 
 ge::graphStatus QuantFlashAttnTilingInfoParser::GetEmptyTensorFlag()
 {
-    auto checkEmptyTensor = [this](const gert::StorageShape *shape, const std::string &name) -> bool {
+    auto checkEmptyTensor = [this](const gert::StorageShape* shape, const std::string& name) -> bool {
         if (shape == nullptr) {
             return false;
         }

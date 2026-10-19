@@ -125,6 +125,15 @@ public:
         this->seqUsedDims = seqUsedDims;
     }
 
+    __aicore__ inline void Init(GlobalTensor<ACTLEN_T> cuSeqLensGm, GlobalTensor<ACTLEN_T> seqUsedGm,
+                                uint32_t cuSeqLensSize, uint32_t seqUsedSize, uint64_t defaultVal = 0)
+    {
+        this->cuSeqLensGm = cuSeqLensGm;
+        this->seqUsedGm = seqUsedGm;
+        this->actualLenDims = cuSeqLensSize + 1;
+        this->seqUsedDims = seqUsedSize;
+    }
+
     __aicore__ inline uint64_t GetTBase(uint32_t bIdx) const
     {
         return cuSeqLensGm.GetValue(bIdx);
@@ -144,21 +153,21 @@ public:
         return cuSeqLensGm.GetValue(actualLenDims - 1);
     }
 
-    __aicore__ inline uint32_t GetActualLenDims() const
-    {
-        return actualLenDims;
-    }
-
     __aicore__ inline uint64_t GetMxVscaleTBase(uint32_t bIdx) const
     {
+        uint64_t vScaleTBaseOffset = 0;
         if (bIdx == 0) {
             return 0;
         }
-        uint64_t vScaleTBaseOffset = 0;
         for (uint32_t idx = 0; idx < bIdx; idx++) {
             vScaleTBaseOffset += ((GetActualSeqLength(idx) + 63) >> 6);
         }
         return vScaleTBaseOffset;
+    }
+
+    __aicore__ inline uint32_t GetActualLenDims() const
+    {
+        return actualLenDims;
     }
 
 private:

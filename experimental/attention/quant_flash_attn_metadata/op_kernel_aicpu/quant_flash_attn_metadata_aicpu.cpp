@@ -322,10 +322,23 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInitMxfp8SoftmaxFp16()
         baseInfo.queryType = load_balance::DataType::INT8;
         baseInfo.kvType = load_balance::DataType::INT8;
     }
-    // Mode 3 kernels advance S1 by 256 rows per Cube task (128 per Vector).
-    // Do not multiply this full-task size by the Cube/Vector ratio again.
-    mBaseSize_ = 256U;
-    s2BaseSize_ = 256U;
+    uint32_t sOuterFactor = 0;
+    uint32_t sInnerFactor = 0;
+    if (socVersion_.find("Ascend960") != std::string::npos) {
+        // arch92 基本块随 quantMode/decode/prefill 分级
+        optiling::quant_flash_attn::qfa_tiling_util::AdjustSinnerAndSouterArch92(
+            static_cast<uint32_t>(headDimV_), static_cast<int64_t>(maxSeqlenQ_), static_cast<int64_t>(maxSeqlenKv_),
+            maskMode_, static_cast<int64_t>(winLeft_), static_cast<int64_t>(winRight_),
+            optiling::quant_flash_attn::qfa_tiling_util::LAYOUT_BSND, static_cast<uint32_t>(quantMode_), isDecode,
+            sOuterFactor, sInnerFactor);
+        // Mode 3 kernels advance S1 by sOuterFactor rows per Cube task.
+        // Do not multiply this full-task size by the Cube/Vector ratio again.
+        mBaseSize_ = sOuterFactor;
+        s2BaseSize_ = sInnerFactor;
+    } else {
+        mBaseSize_ = 256U;
+        s2BaseSize_ = 256U;
+    }
     param.mBaseSize = mBaseSize_;
     param.s2BaseSize = s2BaseSize_;
     param.l2Byte = 0;
