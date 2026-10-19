@@ -413,6 +413,8 @@ private:
     ge::graphStatus FillMatmul3Tiling();
     ge::graphStatus FillMatmul4Tiling();
     uint32_t CalcSingleCoreN(uint32_t n, uint32_t coreNum, uint32_t alignNum = 16) const;
+
+    bool IsSplitKnSupported() const;
     bool GetMatmulType(ge::DataType getype, matmul_tiling::DataType* mmType);
     ge::graphStatus CalcWorkSpace();
     ge::graphStatus GenTilingKey() const;
@@ -437,6 +439,13 @@ private:
     uint32_t singlecoreHeadSizeQcQr_ = 0;
     uint32_t singlecoreHeadSizeCkvKr_ = 0;
     uint32_t singlecoreNumHeadSize_ = 0;
+
+    uint16_t mm1NGroup_ = 1;      // N 分组数(1=未切KN, 走原切N)
+    uint16_t mm1KGroup_ = 1;      // K 分组数
+    uint32_t mm1SingleCoreK_ = 0; // 每核 K 切片(0=未切KN)
+    uint16_t mm2NGroup_ = 1;
+    uint16_t mm2KGroup_ = 1;
+    uint32_t mm2SingleCoreK_ = 0;
 
     float reciprocalCq_ = 0.00001f;
     float epsilonCq_ = 1.0f;

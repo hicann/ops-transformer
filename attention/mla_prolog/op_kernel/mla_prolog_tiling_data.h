@@ -65,8 +65,15 @@ struct MlaPrologBaseParams {
     float kcScale;              // kv 的尺度矫正因子
     uint16_t isQcQrScaleEnable; // query 的尺度矫正因子是否生效（默认是1.0的时候不生效）
     uint16_t isKcScaleEnable;   // kv 的尺度矫正因子是否生效（默认是1.0的时候不生效）
-    uint64_t kvCacheStride0;    // kv cache first-axis stride in elements
-    uint64_t krCacheStride0;    // kr cache first-axis stride in elements
+
+    uint16_t mm1NGroup;      // MM1切KN: N分组数(=1 未切KN, 走原切N路径)
+    uint16_t mm1KGroup;      // MM1切KN: K分组数(=1 未切KN, 走原路径)
+    uint32_t mm1SingleCoreK; // MM1切KN: 每K组的K深 = CeilDiv(headSizeX, mm1KGroup)
+    uint16_t mm2NGroup;      // MM2切KN: N分组数(=1 未切KN, 走原路径)
+    uint16_t mm2KGroup;      // MM2切KN: K分组数(=1 未切KN, 走原路径)
+    uint32_t mm2SingleCoreK; // MM2切KN: 每K组的K深 = CeilDiv(headSizeX, mm2KGroup)
+    uint64_t kvCacheStride0; // kv cache first-axis stride in elements
+    uint64_t krCacheStride0; // kr cache first-axis stride in elements
 };
 
 // 2. 完整分块数据结构体（对应 MlaPrologTilingData 宏定义，嵌套基础参数）

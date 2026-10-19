@@ -3915,3 +3915,564 @@ TEST_F(MlaPrologV3, MlaPrologV3_tiling_test_do_rope_false_combine_kr_empty)
     int64_t expectTilingKey = 3671457;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
 }
+
+static std::string MlaPrologV3_tiling_960DtSocInfo = "{\n"
+                                                     "  \"hardware_info\": {\n"
+                                                     "    \"BT_SIZE\": 0,\n"
+                                                     "    \"load3d_constraints\": \"1\",\n"
+                                                     "    \"Intrinsic_fix_pipe_l0c2out\": false,\n"
+                                                     "    \"Intrinsic_data_move_l12ub\": true,\n"
+                                                     "    \"Intrinsic_data_move_l0c2ub\": true,\n"
+                                                     "    \"Intrinsic_data_move_out2l1_nd2nz\": false,\n"
+                                                     "    \"UB_SIZE\": 196608,\n"
+                                                     "    \"L2_SIZE\": 201326592,\n"
+                                                     "    \"L1_SIZE\": 524288,\n"
+                                                     "    \"L0A_SIZE\": 65536,\n"
+                                                     "    \"L0B_SIZE\": 65536,\n"
+                                                     "    \"L0C_SIZE\": 131072,\n"
+                                                     "    \"vector_core_cnt\": 64,\n"
+                                                     "    \"cube_core_cnt\": 64,\n"
+                                                     "    \"socVersion\": \"Ascend960DT\"\n"
+                                                     "  }\n"
+                                                     "}";
+
+// 960DT：NO_QUANT + PA_BSND，BS合轴 T = 2（对应 950 test64）
+// 覆盖 Ascend960DT 非量化(bf16) 切KN 放行门、FillMatmul3 的非量化对齐分支、
+// 以及 CalcWorkSpace 里 mm1KGroup/mm2KGroup > 1 的 float 部分和 workspace 分支
+TEST_F(MlaPrologV3, MlaPrologV3_tiling_960dt_test3)
+{
+    optiling::MlaPrologCompileInfo compileInfo = {48};
+    gert::TilingContextPara tilingContextPara(
+        "MlaPrologV3",
+        {
+            {{{2, 7168}, {2, 7168}}, ge::DT_BF16, ge::FORMAT_ND},                       // token_x 0
+            {{{7168, 1536}, {7168, 1536}}, ge::DT_BF16, ge::FORMAT_FRACTAL_NZ},         // weight_dq 1
+            {{{1536, 1536}, {1536, 1536}}, ge::DT_BF16, ge::FORMAT_FRACTAL_NZ},         // weight_uq_qr 2
+            {{{8, 128, 512}, {8, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},               // weight_uk 3
+            {{{7168, 512 + 64}, {7168, 512 + 64}}, ge::DT_BF16, ge::FORMAT_FRACTAL_NZ}, // weight_dkv_kr 4
+            {{{1536}, {1536}}, ge::DT_BF16, ge::FORMAT_ND},                             // rmsnorm_gamma_cq 5
+            {{{512}, {512}}, ge::DT_BF16, ge::FORMAT_ND},                               // rmsnorm_gamma_ckv 6
+            {{{2, 64}, {2, 64}}, ge::DT_BF16, ge::FORMAT_ND},                           // rope_sin 7
+            {{{2, 64}, {2, 64}}, ge::DT_BF16, ge::FORMAT_ND},                           // rope_cos 8
+            {{{2, 128, 1, 512}, {2, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},         // kv_cache 9
+            {{{2, 128, 1, 64}, {2, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},           // kr_cache 10
+            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},                                  // cache_index 11
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // dequant_scale_x 12
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // dequant_scale_w_dq 13
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // dequant_scale_w_uq_qr 14
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // dequant_scale_w_dkv_kr 15
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // quant_scale_ckv 16
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // quant_scale_ckr 17
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // smooth_scales_cq 18
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                    // actual_seq_len 19
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // k_nope_clip_alpha 20
+        },
+        {
+            {{{2, 8, 512}, {2, 8, 512}}, ge::DT_BF16, ge::FORMAT_ND},           // query
+            {{{2, 8, 64}, {2, 8, 64}}, ge::DT_BF16, ge::FORMAT_ND},             // query_rope
+            {{{2, 128, 1, 512}, {2, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND}, // kv_cache
+            {{{2, 128, 1, 64}, {2, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},   // kr_cache
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},                          // dequant_scale_q_nope
+            {{{0}, {0}}, ge::DT_BF16, ge::FORMAT_ND},                           // query_norm
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},                          // dequant_scale_q_norm
+        },
+        {
+            {"rmsnorm_epsilon_cq", Ops::Transformer::AnyValue::CreateFrom<float>(0.36856476641669955)},
+            {"rmsnorm_epsilon_ckv", Ops::Transformer::AnyValue::CreateFrom<float>(0.4911813887143225)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+            {"query_norm_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+            {"weight_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"kv_cache_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"query_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"ckvkr_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)}, // 128 : set value of tile size
+            {"qc_qr_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+        },
+        &compileInfo, "9201", MlaPrologV3_tiling_960DtSocInfo, 4096);
+    int64_t expectTilingKey = 3407889; // 3932177(950 的 test64) - 524288
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}
+
+// =====================================================================================
+// 以下 960DT(Ascend960DT / DAV_9201) 用例与 test3 同源，两条前置条件缺一不可：
+//   1) 框架 tests/ut/framework_normal/common/tiling_case_executor.cpp 的 archToSoc 需含
+//      {"9201", "Ascend960DT"}：框架对纯数字 arch 串会同时写 version/NpuArch 与
+//      version/Short_SoC_version，两键都写全 GetCurNpuArch() 才返回 DAV_9201。
+//      只写 NpuArch(平台串 "9201" 但不改框架) 或只写 SoC 名(平台串 "Ascend960DT") 都拿不到 9201，
+//      会退化成 DAV_RESV，量化档会被 GenTilingKey 的 "CV1:1 只允许 NO_QUANT+PA_*" 拒掉。
+//   2) 用例的平台串写纯数字 "9201"（写 "Ascend960DT" 时 socToArch 查不到，NpuArch 会被写成空串）。
+// 9201 只支持 CV1:1（kernel 固定 KERNEL_TYPE_MIX_AIC_1_1），故 SocInfo 取 64:64；
+// 因此期望 tilingKey = 对应 950/A2 用例的 tilingKey - 524288（2^19，CV_MODE 1:2(7)→1:1(6)）。
+// =====================================================================================
+
+// 960DT：FULL_QUANT_KV_QUANT_PER_TENSOR(INT8) + PA_BSND（对应 950/A2 的 test0）
+// 覆盖 9201 切KN 的 INT8 放行门(IsSplitKnSupported) 与 MM1/MM2 的切KN 分支
+TEST_F(MlaPrologV3, MlaPrologV3_tiling_960dt_test0)
+{
+    optiling::MlaPrologCompileInfo compileInfo = {48};
+    gert::TilingContextPara tilingContextPara(
+        "MlaPrologV3",
+        {
+            {{{8, 1, 7168}, {8, 1, 7168}}, ge::DT_INT8, ge::FORMAT_ND},                               // token_x
+            {{{7168, 1536}, {7168, 1536}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ},                       // weight_dq
+            {{{1536, 32 * (128 + 64)}, {1536, 32 * (128 + 64)}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ}, // weight_uq_qr
+            {{{32, 128, 512}, {32, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},                           // weight_uk
+            {{{7168, 512 + 64}, {7168, 512 + 64}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ},               // weight_dkv_kr
+            {{{1536}, {1536}}, ge::DT_BF16, ge::FORMAT_ND},                              // rmsnorm_gamma_cq
+            {{{512}, {512}}, ge::DT_BF16, ge::FORMAT_ND},                                // rmsnorm_gamma_ckv
+            {{{8, 1, 64}, {8, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                      // rope_sin
+            {{{8, 1, 64}, {8, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                      // rope_cos
+            {{{16, 128, 1, 512}, {16, 128, 1, 512}}, ge::DT_INT8, ge::FORMAT_ND},        // kv_cache
+            {{{16, 128, 1, 64}, {16, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},          // kr_cache
+            {{{8, 1}, {8, 1}}, ge::DT_INT64, ge::FORMAT_ND},                             // cache_index
+            {{{8 * 1, 1}, {8 * 1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},                     // dequant_scale_x
+            {{{1, 1536}, {1, 1536}}, ge::DT_FLOAT, ge::FORMAT_ND},                       // dequant_scale_w_dq
+            {{{1, 32 * (128 + 64)}, {1, 32 * (128 + 64)}}, ge::DT_FLOAT, ge::FORMAT_ND}, // dequant_scale_w_uq_qr
+            {{{1, 512 + 64}, {1, 512 + 64}}, ge::DT_FLOAT, ge::FORMAT_ND},               // dequant_scale_w_dkv_kr
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},                                   // quant_scale_ckv
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                     // quant_scale_ckr
+            {{{1, 1536}, {1, 1536}}, ge::DT_FLOAT, ge::FORMAT_ND},                       // smooth_scales_cq
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                     // actual_seq_len
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                     // k_nope_clip_alpha
+        },
+        {
+            {{{8, 1, 32, 512}, {8, 1, 32, 512}}, ge::DT_INT8, ge::FORMAT_ND},     // query
+            {{{8, 1, 32, 64}, {8, 1, 32, 64}}, ge::DT_BF16, ge::FORMAT_ND},       // query_rope
+            {{{16, 128, 1, 512}, {16, 128, 1, 512}}, ge::DT_INT8, ge::FORMAT_ND}, // kv_cache
+            {{{16, 128, 1, 64}, {16, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},   // kr_cache
+            {{{8 * 1, 32, 1}, {8 * 1, 32, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},      // dequant_scale_q_nope
+            {{{0}, {0}}, ge::DT_INT8, ge::FORMAT_ND},                             // query_norm
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                             // dequant_scale_q_norm
+        },
+        {
+            {"rmsnorm_epsilon_cq", Ops::Transformer::AnyValue::CreateFrom<float>(1e-05f)},
+            {"rmsnorm_epsilon_ckv", Ops::Transformer::AnyValue::CreateFrom<float>(1e-05f)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+            {"query_norm_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+            {"weight_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"kv_cache_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"query_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"ckvkr_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)}, // 128 : set value of tile size
+            {"qc_qr_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+        },
+        &compileInfo, "9201", MlaPrologV3_tiling_960DtSocInfo, 4096);
+    int64_t expectTilingKey = 3409185; // 3933473(950/A2 的 test0) - 524288
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}
+
+// 960DT：MXFP8_FULL_QUANT_KV_QUANT_PER_TENSOR + PA_BSND（对应 950 的 test49）
+// 覆盖 9201 切KN 的 MXFP8 放行门(isMxfp8Scale=true 的 MM1/MM2 切KN 分支)
+TEST_F(MlaPrologV3, MlaPrologV3_tiling_960dt_test1)
+{
+    optiling::MlaPrologCompileInfo compileInfo = {48};
+    gert::TilingContextPara tilingContextPara(
+        "MlaPrologV3",
+        {
+            {{{8, 1, 7168}, {8, 1, 7168}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},                 // token_x 0
+            {{{7168, 1536}, {7168, 1536}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_FRACTAL_NZ},         // weight_dq 1
+            {{{1536, 24576}, {1536, 24576}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_FRACTAL_NZ},       // weight_uq_qr 2
+            {{{128, 128, 512}, {128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},                    // weight_uk 3
+            {{{7168, 512 + 64}, {7168, 512 + 64}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_FRACTAL_NZ}, // weight_dkv_kr 4
+            {{{1536}, {1536}}, ge::DT_BF16, ge::FORMAT_ND},                                      // rmsnorm_gamma_cq 5
+            {{{512}, {512}}, ge::DT_BF16, ge::FORMAT_ND},                                        // rmsnorm_gamma_ckv 6
+            {{{8, 1, 64}, {8, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                              // rope_sin 7
+            {{{8, 1, 64}, {8, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                              // rope_cos 8
+            {{{1, 16, 1, 512}, {1, 16, 1, 512}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},           // kv_cache 9
+            {{{1, 16, 1, 64}, {1, 16, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                      // kr_cache 10
+            {{{8, 1}, {8, 1}}, ge::DT_INT64, ge::FORMAT_ND},                                     // cache_index 11
+            {{{8, 224}, {8, 224}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND},                           // dequant_scale_x 12
+            {{{1536, 224}, {1536, 224}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND}, // dequant_scale_w_dq 13
+            {{{24576, 48}, {24576, 48}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND}, // dequant_scale_w_uq_qr 14
+            {{{576, 224}, {576, 224}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND},   // dequant_scale_w_dkv_kr 15
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},                       // quant_scale_ckv 16
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // quant_scale_ckr 17
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // smooth_scales_cq 18
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // actual_seq_len 19
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // k_nope_clip_alpha 20
+        },
+        {
+            {{{8, 1, 128, 512}, {8, 1, 128, 512}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND}, // query
+            {{{8, 1, 128, 64}, {8, 1, 128, 64}}, ge::DT_BF16, ge::FORMAT_ND},            // query_rope
+            {{{1, 16, 1, 512}, {1, 16, 1, 512}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},   // kv_cache
+            {{{1, 16, 1, 64}, {1, 16, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},              // kr_cache
+            {{{8, 128, 1}, {8, 128, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},                   // dequant_scale_q_nope
+            {{{0}, {0}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},                           // query_norm
+            {{{0}, {0}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND},                             // dequant_scale_q_norm
+        },
+        {
+            {"rmsnorm_epsilon_cq", Ops::Transformer::AnyValue::CreateFrom<float>(0.0022971812167027)},
+            {"rmsnorm_epsilon_ckv", Ops::Transformer::AnyValue::CreateFrom<float>(0.00235037235057241)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+            {"query_norm_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+            {"weight_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+            {"kv_cache_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"query_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"ckvkr_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)}, // 128 : set value of tile size
+            {"qc_qr_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+        },
+        &compileInfo, "9201", MlaPrologV3_tiling_960DtSocInfo, 4096);
+    int64_t expectTilingKey = 3409441; // 3933729(950 的 test49) - 524288
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}
+
+// 960DT：MXFP8 + PA_NZ，BS合轴 T = 128（对应 950 的 test69）
+// T=128 时 stepBatchSize_ = min(128, T) = 128，与主用例的切KN 选点条件一致
+TEST_F(MlaPrologV3, MlaPrologV3_tiling_960dt_test2)
+{
+    optiling::MlaPrologCompileInfo compileInfo = {48};
+    gert::TilingContextPara tilingContextPara(
+        "MlaPrologV3",
+        {
+            {{{128, 7168}, {128, 7168}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},                   // token_x 0
+            {{{7168, 1536}, {7168, 1536}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_FRACTAL_NZ},         // weight_dq 1
+            {{{1536, 768}, {1536, 768}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_FRACTAL_NZ},           // weight_uq_qr 2
+            {{{4, 128, 512}, {4, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},                        // weight_uk 3
+            {{{7168, 512 + 64}, {7168, 512 + 64}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_FRACTAL_NZ}, // weight_dkv_kr 4
+            {{{1536}, {1536}}, ge::DT_BF16, ge::FORMAT_ND},                                      // rmsnorm_gamma_cq 5
+            {{{512}, {512}}, ge::DT_BF16, ge::FORMAT_ND},                                        // rmsnorm_gamma_ckv 6
+            {{{128, 64}, {128, 64}}, ge::DT_BF16, ge::FORMAT_ND},                                // rope_sin 7
+            {{{128, 64}, {128, 64}}, ge::DT_BF16, ge::FORMAT_ND},                                // rope_cos 8
+            {{{440, 128, 1, 512}, {440, 128, 1, 512}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},     // kv_cache 9
+            {{{440, 128, 1, 64}, {440, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                // kr_cache 10
+            {{{128}, {128}}, ge::DT_INT64, ge::FORMAT_ND},                                       // cache_index 11
+            {{{128, 224}, {128, 224}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND},                       // dequant_scale_x 12
+            {{{1536, 224}, {1536, 224}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND}, // dequant_scale_w_dq 13
+            {{{768, 48}, {768, 48}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND},     // dequant_scale_w_uq_qr 14
+            {{{576, 224}, {576, 224}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND},   // dequant_scale_w_dkv_kr 15
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},                       // quant_scale_ckv 16
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // quant_scale_ckr 17
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // smooth_scales_cq 18
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // actual_seq_len 19
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // k_nope_clip_alpha 20
+        },
+        {
+            {{{128, 4, 512}, {128, 4, 512}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},           // query
+            {{{128, 4, 64}, {128, 4, 64}}, ge::DT_BF16, ge::FORMAT_ND},                      // query_rope
+            {{{440, 128, 1, 512}, {440, 128, 1, 512}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND}, // kv_cache
+            {{{440, 128, 1, 64}, {440, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},            // kr_cache
+            {{{128, 4, 1}, {128, 4, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},                       // dequant_scale_q_nope
+            {{{0}, {0}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},                               // query_norm
+            {{{0}, {0}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND},                                 // dequant_scale_q_norm
+        },
+        {
+            {"rmsnorm_epsilon_cq", Ops::Transformer::AnyValue::CreateFrom<float>(0.2867307068127365)},
+            {"rmsnorm_epsilon_ckv", Ops::Transformer::AnyValue::CreateFrom<float>(0.4978298916484819)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_NZ")},
+            {"query_norm_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+            {"weight_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+            {"kv_cache_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"query_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"ckvkr_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)}, // 128 : set value of tile size
+            {"qc_qr_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+        },
+        &compileInfo, "9201", MlaPrologV3_tiling_960DtSocInfo, 4096);
+    int64_t expectTilingKey = 3409442; // 3933730(950 的 test69) - 524288
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}
+
+// 960DT：PARTIAL_QUANT_KV_QUANT_PER_CHANNEL + PA_BSND（对应 950 的 test115）
+// 半量化不在 9201 切KN 的放行集合内（IsSplitKnSupported 走到末尾 return false），
+// 用于看护"非放行档仍走原切N"
+TEST_F(MlaPrologV3, MlaPrologV3_tiling_960dt_test4)
+{
+    optiling::MlaPrologCompileInfo compileInfo = {48};
+    gert::TilingContextPara tilingContextPara(
+        "MlaPrologV3",
+        {
+            {{{8, 1, 7168}, {8, 1, 7168}}, ge::DT_BF16, ge::FORMAT_ND},                               // token_x
+            {{{7168, 1536}, {7168, 1536}}, ge::DT_BF16, ge::FORMAT_FRACTAL_NZ},                       // weight_dq
+            {{{1536, 32 * (128 + 64)}, {1536, 32 * (128 + 64)}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ}, // weight_uq_qr
+            {{{32, 128, 512}, {32, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},                           // weight_uk
+            {{{7168, 512 + 64}, {7168, 512 + 64}}, ge::DT_BF16, ge::FORMAT_FRACTAL_NZ},               // weight_dkv_kr
+            {{{1536}, {1536}}, ge::DT_BF16, ge::FORMAT_ND},                              // rmsnorm_gamma_cq
+            {{{512}, {512}}, ge::DT_BF16, ge::FORMAT_ND},                                // rmsnorm_gamma_ckv
+            {{{8, 1, 64}, {8, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                      // rope_sin
+            {{{8, 1, 64}, {8, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                      // rope_cos
+            {{{16, 128, 1, 512}, {16, 128, 1, 512}}, ge::DT_INT8, ge::FORMAT_ND},        // kv_cache
+            {{{16, 128, 1, 64}, {16, 128, 1, 64}}, ge::DT_INT8, ge::FORMAT_ND},          // kr_cache
+            {{{8, 1}, {8, 1}}, ge::DT_INT64, ge::FORMAT_ND},                             // cache_index
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                     // dequant_scale_x
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                     // dequant_scale_w_dq
+            {{{1, 32 * (128 + 64)}, {1, 32 * (128 + 64)}}, ge::DT_FLOAT, ge::FORMAT_ND}, // dequant_scale_w_uq_qr
+            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},                                      // dequant_scale_w_dkv_kr
+            {{{1, 512}, {1, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // quant_scale_ckv
+            {{{1, 64}, {1, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},                           // quant_scale_ckr
+            {{{1, 1536}, {1, 1536}}, ge::DT_FLOAT, ge::FORMAT_ND},                       // smooth_scales_cq
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                     // actual_seq_len
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                     // k_nope_clip_alpha
+        },
+        {
+            {{{8, 1, 32, 512}, {8, 1, 32, 512}}, ge::DT_BF16, ge::FORMAT_ND},     // query
+            {{{8, 1, 32, 64}, {8, 1, 32, 64}}, ge::DT_BF16, ge::FORMAT_ND},       // query_rope
+            {{{16, 128, 1, 512}, {16, 128, 1, 512}}, ge::DT_INT8, ge::FORMAT_ND}, // kv_cache
+            {{{16, 128, 1, 64}, {16, 128, 1, 64}}, ge::DT_INT8, ge::FORMAT_ND},   // kr_cache
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},                            // dequant_scale_q_nope
+            {{{0}, {0}}, ge::DT_INT8, ge::FORMAT_ND},                             // query_norm
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                             // dequant_scale_q_norm
+        },
+        {
+            {"rmsnorm_epsilon_cq", Ops::Transformer::AnyValue::CreateFrom<float>(1e-05f)},
+            {"rmsnorm_epsilon_ckv", Ops::Transformer::AnyValue::CreateFrom<float>(1e-05f)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+            {"query_norm_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+            {"weight_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"kv_cache_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"query_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"ckvkr_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
+            {"qc_qr_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+        },
+        &compileInfo, "9201", MlaPrologV3_tiling_960DtSocInfo, 4096);
+    int64_t expectTilingKey = 3409057; // 3933345(950 的 test115) - 524288
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}
+
+// 960DT：FP8_FULL_QUANT_KV_QUANT_PER_TENSOR + PA_BSND（主用例 fp8 档，FP8 无现成 950 用例）
+// 由 950 的 test49(MXFP8) 改造：dequant scale 由 (N,K/32) E8M0 改为 (1,N) FLOAT，
+// 覆盖 9201 切KN 的 FP8/HIF8 放行门与 FP8 全量化档
+TEST_F(MlaPrologV3, MlaPrologV3_tiling_960dt_test5)
+{
+    optiling::MlaPrologCompileInfo compileInfo = {48};
+    gert::TilingContextPara tilingContextPara(
+        "MlaPrologV3",
+        {
+            {{{8, 1, 7168}, {8, 1, 7168}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},                 // token_x 0
+            {{{7168, 1536}, {7168, 1536}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_FRACTAL_NZ},         // weight_dq 1
+            {{{1536, 24576}, {1536, 24576}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_FRACTAL_NZ},       // weight_uq_qr 2
+            {{{128, 128, 512}, {128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},                    // weight_uk 3
+            {{{7168, 512 + 64}, {7168, 512 + 64}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_FRACTAL_NZ}, // weight_dkv_kr 4
+            {{{1536}, {1536}}, ge::DT_BF16, ge::FORMAT_ND},                                      // rmsnorm_gamma_cq 5
+            {{{512}, {512}}, ge::DT_BF16, ge::FORMAT_ND},                                        // rmsnorm_gamma_ckv 6
+            {{{8, 1, 64}, {8, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                              // rope_sin 7
+            {{{8, 1, 64}, {8, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                              // rope_cos 8
+            {{{1, 16, 1, 512}, {1, 16, 1, 512}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},           // kv_cache 9
+            {{{1, 16, 1, 64}, {1, 16, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                      // kr_cache 10
+            {{{8, 1}, {8, 1}}, ge::DT_INT64, ge::FORMAT_ND},                                     // cache_index 11
+            {{{8, 1}, {8, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},                                     // dequant_scale_x 12
+            {{{1, 1536}, {1, 1536}}, ge::DT_FLOAT, ge::FORMAT_ND},   // dequant_scale_w_dq 13
+            {{{1, 24576}, {1, 24576}}, ge::DT_FLOAT, ge::FORMAT_ND}, // dequant_scale_w_uq_qr 14
+            {{{1, 576}, {1, 576}}, ge::DT_FLOAT, ge::FORMAT_ND},     // dequant_scale_w_dkv_kr 15
+            {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND},               // quant_scale_ckv 16
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                 // quant_scale_ckr 17
+            {{{1, 1536}, {1, 1536}}, ge::DT_FLOAT, ge::FORMAT_ND},   // smooth_scales_cq 18
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                 // actual_seq_len 19
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                 // k_nope_clip_alpha 20
+        },
+        {
+            {{{8, 1, 128, 512}, {8, 1, 128, 512}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND}, // query
+            {{{8, 1, 128, 64}, {8, 1, 128, 64}}, ge::DT_BF16, ge::FORMAT_ND},            // query_rope
+            {{{1, 16, 1, 512}, {1, 16, 1, 512}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},   // kv_cache
+            {{{1, 16, 1, 64}, {1, 16, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},              // kr_cache
+            {{{8, 128, 1}, {8, 128, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},                   // dequant_scale_q_nope
+            {{{0}, {0}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},                           // query_norm
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},                                   // dequant_scale_q_norm
+        },
+        {
+            {"rmsnorm_epsilon_cq", Ops::Transformer::AnyValue::CreateFrom<float>(0.0022971812167027)},
+            {"rmsnorm_epsilon_ckv", Ops::Transformer::AnyValue::CreateFrom<float>(0.00235037235057241)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+            {"query_norm_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+            {"weight_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"kv_cache_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"query_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"ckvkr_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)}, // 128 : set value of tile size
+            {"qc_qr_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+        },
+        &compileInfo, "9201", MlaPrologV3_tiling_960DtSocInfo, 4096);
+    // CACHE_MODE=1(PA_BSND) | SCENARIO=2 | QUANT_MODE=11(FP8+KV PER_TENSOR)<<6
+    // | ENABLE_DEQUANT=1<<10 | ENABLE_ROPE=1<<18 | CV_MODE=1:1(6)<<19
+    int64_t expectTilingKey = 3409633;
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}
+
+// 960DT：NO_QUANT + PA_NZ，BS合轴 T = 128（对应 950 的 test65）
+// 与 test3 同为非量化放行档，补 PA_NZ/T=128/N=1 这一组切KN 选点
+TEST_F(MlaPrologV3, MlaPrologV3_tiling_960dt_test6)
+{
+    optiling::MlaPrologCompileInfo compileInfo = {48};
+    gert::TilingContextPara tilingContextPara(
+        "MlaPrologV3",
+        {
+            {{{128, 7168}, {128, 7168}}, ge::DT_BF16, ge::FORMAT_ND},                   // token_x 0
+            {{{7168, 1536}, {7168, 1536}}, ge::DT_BF16, ge::FORMAT_FRACTAL_NZ},         // weight_dq 1
+            {{{1536, 192}, {1536, 192}}, ge::DT_BF16, ge::FORMAT_FRACTAL_NZ},           // weight_uq_qr 2
+            {{{1, 128, 512}, {1, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},               // weight_uk 3
+            {{{7168, 512 + 64}, {7168, 512 + 64}}, ge::DT_BF16, ge::FORMAT_FRACTAL_NZ}, // weight_dkv_kr 4
+            {{{1536}, {1536}}, ge::DT_BF16, ge::FORMAT_ND},                             // rmsnorm_gamma_cq 5
+            {{{512}, {512}}, ge::DT_BF16, ge::FORMAT_ND},                               // rmsnorm_gamma_ckv 6
+            {{{128, 64}, {128, 64}}, ge::DT_BF16, ge::FORMAT_ND},                       // rope_sin 7
+            {{{128, 64}, {128, 64}}, ge::DT_BF16, ge::FORMAT_ND},                       // rope_cos 8
+            {{{62, 128, 1, 512}, {62, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},       // kv_cache 9
+            {{{62, 128, 1, 64}, {62, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},         // kr_cache 10
+            {{{128}, {128}}, ge::DT_INT64, ge::FORMAT_ND},                              // cache_index 11
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // dequant_scale_x 12
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // dequant_scale_w_dq 13
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // dequant_scale_w_uq_qr 14
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // dequant_scale_w_dkv_kr 15
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // quant_scale_ckv 16
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // quant_scale_ckr 17
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // smooth_scales_cq 18
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                    // actual_seq_len 19
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // k_nope_clip_alpha 20
+        },
+        {
+            {{{128, 1, 512}, {128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},         // query
+            {{{128, 1, 64}, {128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},           // query_rope
+            {{{62, 128, 1, 512}, {62, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND}, // kv_cache
+            {{{62, 128, 1, 64}, {62, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},   // kr_cache
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},                            // dequant_scale_q_nope
+            {{{0}, {0}}, ge::DT_BF16, ge::FORMAT_ND},                             // query_norm
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},                            // dequant_scale_q_norm
+        },
+        {
+            {"rmsnorm_epsilon_cq", Ops::Transformer::AnyValue::CreateFrom<float>(0.9623901933410451)},
+            {"rmsnorm_epsilon_ckv", Ops::Transformer::AnyValue::CreateFrom<float>(0.9581271563003967)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_NZ")},
+            {"query_norm_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+            {"weight_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"kv_cache_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"query_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"ckvkr_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)}, // 128 : set value of tile size
+            {"qc_qr_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+        },
+        &compileInfo, "9201", MlaPrologV3_tiling_960DtSocInfo, 4096);
+    int64_t expectTilingKey = 3407890; // 3932178(950 的 test65) - 524288
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}
+
+// 960DT：MXFP8_FULL_QUANT_KV_NO_QUANT + PA_BSND，He = 7680（对应 950 的 test104）
+// 补 He=7680（HEAD_SIZE2）+ kv 非量化的切KN 选点，并走 CalcWorkSpace 里 isMxfp8FullQuant 的
+// hcqSize/MXFP8_BLOCK_SIZE 那支 scale slot
+TEST_F(MlaPrologV3, MlaPrologV3_tiling_960dt_test7)
+{
+    optiling::MlaPrologCompileInfo compileInfo = {48};
+    gert::TilingContextPara tilingContextPara(
+        "MlaPrologV3",
+        {
+            {{{8, 1, 7680}, {8, 1, 7680}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},                 // token_x 0
+            {{{7680, 1536}, {7680, 1536}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_FRACTAL_NZ},         // weight_dq 1
+            {{{1536, 24576}, {1536, 24576}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_FRACTAL_NZ},       // weight_uq_qr 2
+            {{{128, 128, 512}, {128, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND},                    // weight_uk 3
+            {{{7680, 512 + 64}, {7680, 512 + 64}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_FRACTAL_NZ}, // weight_dkv_kr 4
+            {{{1536}, {1536}}, ge::DT_BF16, ge::FORMAT_ND},                                      // rmsnorm_gamma_cq 5
+            {{{512}, {512}}, ge::DT_BF16, ge::FORMAT_ND},                                        // rmsnorm_gamma_ckv 6
+            {{{8, 1, 64}, {8, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                              // rope_sin 7
+            {{{8, 1, 64}, {8, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                              // rope_cos 8
+            {{{1, 112, 1, 512}, {1, 112, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},                  // kv_cache 9
+            {{{1, 112, 1, 64}, {1, 112, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},                    // kr_cache 10
+            {{{8, 1}, {8, 1}}, ge::DT_INT64, ge::FORMAT_ND},                                     // cache_index 11
+            {{{8, 240}, {8, 240}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND},                           // dequant_scale_x 12
+            {{{1536, 240}, {1536, 240}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND}, // dequant_scale_w_dq 13
+            {{{24576, 48}, {24576, 48}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND}, // dequant_scale_w_uq_qr 14
+            {{{576, 240}, {576, 240}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND},   // dequant_scale_w_dkv_kr 15
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // quant_scale_ckv 16
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // quant_scale_ckr 17
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // smooth_scales_cq 18
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // actual_seq_len 19
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // k_nope_clip_alpha 20
+        },
+        {
+            {{{8, 1, 128, 512}, {8, 1, 128, 512}}, ge::DT_BF16, ge::FORMAT_ND}, // query
+            {{{8, 1, 128, 64}, {8, 1, 128, 64}}, ge::DT_BF16, ge::FORMAT_ND},   // query_rope
+            {{{1, 112, 1, 512}, {1, 112, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND}, // kv_cache
+            {{{1, 112, 1, 64}, {1, 112, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},   // kr_cache
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},                          // dequant_scale_q_nope
+            {{{0}, {0}}, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},                  // query_norm
+            {{{0}, {0}}, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND},                    // dequant_scale_q_norm
+        },
+        {
+            {"rmsnorm_epsilon_cq", Ops::Transformer::AnyValue::CreateFrom<float>(0.0022971812167027)},
+            {"rmsnorm_epsilon_ckv", Ops::Transformer::AnyValue::CreateFrom<float>(0.00235037235057241)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+            {"query_norm_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+            {"weight_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+            {"kv_cache_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"query_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"ckvkr_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)}, // 128 : set value of tile size
+            {"qc_qr_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+        },
+        &compileInfo, "9201", MlaPrologV3_tiling_960DtSocInfo, 4096);
+    int64_t expectTilingKey = 3409377; // 3933665(950 的 test104) - 524288
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}
+
+// 960DT：NO_QUANT + PA_BSND，D = 192（由 test3 改造）
+// D != 128 覆盖 ProcessBaseInputs 里 dSize != HIGH_THROUGHPUT__D_SIZE 的 maxStepBatch=64 分支，
+// 以及 stepNumHeadDequant_ 的非 128 分支（D=192 路径在现有 950/A2 用例里没有覆盖）
+TEST_F(MlaPrologV3, MlaPrologV3_tiling_960dt_test8)
+{
+    optiling::MlaPrologCompileInfo compileInfo = {48};
+    gert::TilingContextPara tilingContextPara(
+        "MlaPrologV3",
+        {
+            {{{2, 7168}, {2, 7168}}, ge::DT_BF16, ge::FORMAT_ND},                       // token_x 0
+            {{{7168, 1536}, {7168, 1536}}, ge::DT_BF16, ge::FORMAT_FRACTAL_NZ},         // weight_dq 1
+            {{{1536, 2048}, {1536, 2048}}, ge::DT_BF16, ge::FORMAT_FRACTAL_NZ},         // weight_uq_qr 2 (8*(192+64))
+            {{{8, 192, 512}, {8, 192, 512}}, ge::DT_BF16, ge::FORMAT_ND},               // weight_uk 3 (D=192)
+            {{{7168, 512 + 64}, {7168, 512 + 64}}, ge::DT_BF16, ge::FORMAT_FRACTAL_NZ}, // weight_dkv_kr 4
+            {{{1536}, {1536}}, ge::DT_BF16, ge::FORMAT_ND},                             // rmsnorm_gamma_cq 5
+            {{{512}, {512}}, ge::DT_BF16, ge::FORMAT_ND},                               // rmsnorm_gamma_ckv 6
+            {{{2, 64}, {2, 64}}, ge::DT_BF16, ge::FORMAT_ND},                           // rope_sin 7
+            {{{2, 64}, {2, 64}}, ge::DT_BF16, ge::FORMAT_ND},                           // rope_cos 8
+            {{{2, 128, 1, 512}, {2, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},         // kv_cache 9
+            {{{2, 128, 1, 64}, {2, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},           // kr_cache 10
+            {{{2}, {2}}, ge::DT_INT64, ge::FORMAT_ND},                                  // cache_index 11
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // dequant_scale_x 12
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // dequant_scale_w_dq 13
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // dequant_scale_w_uq_qr 14
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // dequant_scale_w_dkv_kr 15
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // quant_scale_ckv 16
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // quant_scale_ckr 17
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // smooth_scales_cq 18
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                    // actual_seq_len 19
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                    // k_nope_clip_alpha 20
+        },
+        {
+            {{{2, 8, 512}, {2, 8, 512}}, ge::DT_BF16, ge::FORMAT_ND},           // query
+            {{{2, 8, 64}, {2, 8, 64}}, ge::DT_BF16, ge::FORMAT_ND},             // query_rope
+            {{{2, 128, 1, 512}, {2, 128, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND}, // kv_cache
+            {{{2, 128, 1, 64}, {2, 128, 1, 64}}, ge::DT_BF16, ge::FORMAT_ND},   // kr_cache
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},                          // dequant_scale_q_nope
+            {{{0}, {0}}, ge::DT_BF16, ge::FORMAT_ND},                           // query_norm
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},                          // dequant_scale_q_norm
+        },
+        {
+            {"rmsnorm_epsilon_cq", Ops::Transformer::AnyValue::CreateFrom<float>(0.36856476641669955)},
+            {"rmsnorm_epsilon_ckv", Ops::Transformer::AnyValue::CreateFrom<float>(0.4911813887143225)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+            {"query_norm_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+            {"weight_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"kv_cache_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"query_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"ckvkr_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"quant_scale_repo_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"tile_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)}, // 128 : set value of tile size
+            {"qc_qr_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"kc_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+        },
+        &compileInfo, "9201", MlaPrologV3_tiling_960DtSocInfo, 4096);
+    int64_t expectTilingKey = 3407889; // 与 test3 同 key（D 不参与 tilingKey）
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey);
+}

@@ -16,7 +16,10 @@
 #define MLA_PROLOG_VERSION 3
 #define GLOBAL_OVERFLOW_MODE_CTRL 60
 
-#if (__CCE_AICORE__ == 310) || (__NPU_ARCH__ == 9201)
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+#include "../../mla_prolog/op_kernel/arch92/kernel_mla_prolog_split_n_arch92.h"
+#include "../../mla_prolog/op_kernel/arch92/kernel_mla_prolog_split_m.h"
+#elif __CCE_AICORE__ == 310
 #include "../../mla_prolog/op_kernel/arch35/kernel_mla_prolog_split_n_arch35.h"
 #include "../../mla_prolog/op_kernel/arch35/kernel_mla_prolog_split_m.h"
 #else
