@@ -26,6 +26,7 @@
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
 #include "platform/platform_info.h"
+#include "op_host/util/op_const_def.h"
 
 namespace optiling {
 // ----------公共定义----------
@@ -68,6 +69,7 @@ REGISTER_TILING_DATA_CLASS(IndexerQuantCache, IndexerQuantCacheTilingData)
 struct IndexerQuantCacheCompileInfo {
     uint64_t coreNum = 0;
     uint64_t ubSize = 0;
+    NpuArch npuArch = Ops::Base::DAV_3510;
 };
 
 // ----------算子Tiling入参信息解析及check类----------
@@ -117,7 +119,7 @@ private:
     int64_t cacheBlockStride_ = 0;
     int64_t scaleRowStride_ = 0;
     int64_t scaleBlockStride_ = 0;
-    platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND950;
+    NpuArch npuArch_ = Ops::Base::DAV_3510;
     int64_t tilingKey_ = 0;
 };
 

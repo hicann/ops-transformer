@@ -19,6 +19,7 @@ constexpr int64_t MXFP8_QUANT_MODE = 0;
 constexpr int64_t NORMAL_QUANT_MODE = 1;
 constexpr int64_t HIFLOAT_QUANT_MODE = 2;
 constexpr int64_t MXFP4_QUANT_MODE = 3;
+constexpr int64_t HIFP4_QUANT_MODE = 4;
 
 inline bool IsValidQuantTypes(int64_t mode, ge::DataType cache, ge::DataType scale, ge::DataType x, ge::DataType slots)
 {
@@ -36,6 +37,8 @@ inline bool IsValidQuantTypes(int64_t mode, ge::DataType cache, ge::DataType sca
             return (fp8 || cache == ge::DT_UINT8) && scale == ge::DT_FLOAT;
         case MXFP4_QUANT_MODE:
             return (cache == ge::DT_FLOAT4_E2M1 || cache == ge::DT_FLOAT4_E1M2) && scale == ge::DT_FLOAT8_E8M0;
+        case HIFP4_QUANT_MODE:
+            return cache == ge::DT_HIFLOAT4 && scale == ge::DT_HIFLOAT4_SCALE;
         default:
             return false;
     }

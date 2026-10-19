@@ -580,3 +580,67 @@ TEST_F(IndexerQuantCacheTiling, InvalidCacheBlockDimensionsRejected)
         ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
     }
 }
+
+TEST(IndexerQuantCacheContract, HiFloat4Pairs)
+{
+    using indexer_quant_cache::IsValidQuantTypes;
+    for (auto x : {ge::DT_FLOAT16, ge::DT_BF16}) {
+        EXPECT_TRUE(IsValidQuantTypes(4, ge::DT_HIFLOAT4, ge::DT_HIFLOAT4_SCALE, x, ge::DT_INT32));
+        EXPECT_FALSE(IsValidQuantTypes(4, ge::DT_FLOAT4_E1M2, ge::DT_HIFLOAT4_SCALE, x, ge::DT_INT32));
+        EXPECT_FALSE(IsValidQuantTypes(4, ge::DT_HIFLOAT4, ge::DT_FLOAT8_E8M0, x, ge::DT_INT32));
+        for (int mode = 0; mode < 4; ++mode) {
+            EXPECT_FALSE(IsValidQuantTypes(mode, ge::DT_HIFLOAT4, ge::DT_HIFLOAT4_SCALE, x, ge::DT_INT32));
+        }
+    }
+}
+
+TEST_F(IndexerQuantCacheTiling, HiFloat4PlatformAndShape)
+{
+    struct Case {
+        NpuArch npuArch;
+        int64_t d;
+        int64_t cacheDim;
+        int64_t scaleDim;
+        int64_t bs;
+        uint64_t ub;
+        ge::graphStatus result;
+        uint64_t key;
+    };
+    const auto dt = Ops::Base::DAV_9201;
+    const auto oldArch = Ops::Base::DAV_3510;
+    const uint64_t unusedKey = std::numeric_limits<uint64_t>::max();
+    const Case cases[] = {
+        {dt, 64, 64, 1, 1, 196608, ge::GRAPH_SUCCESS, 10003},
+        {dt, 128, 128, 2, 1024, 196608, ge::GRAPH_SUCCESS, 10013},
+        {dt, 576, 578, 9, 1024, 196608, ge::GRAPH_SUCCESS, 10013},
+        {dt, 8192, 8192, 128, 1, 196608, ge::GRAPH_SUCCESS, 10003},
+        {oldArch, 128, 128, 2, 1, 196608, ge::GRAPH_FAILED, unusedKey},
+        {dt, 96, 96, 2, 1, 196608, ge::GRAPH_FAILED, unusedKey},
+        {dt, 128, 129, 2, 1, 196608, ge::GRAPH_FAILED, unusedKey},
+        {dt, 128, 128, 1, 1, 196608, ge::GRAPH_FAILED, unusedKey},
+        {dt, 128, 128, 2, 1, 1024, ge::GRAPH_FAILED, unusedKey},
+    };
+    for (const auto& c : cases) {
+        optiling::IndexerQuantCacheCompileInfo info{48, c.ub, c.npuArch};
+        gert::TilingContextPara para(
+            "IndexerQuantCache",
+            {
+                {{{2048, 1, 1, c.cacheDim}, {2048, 1, 1, c.cacheDim}}, ge::DT_HIFLOAT4, ge::FORMAT_ND},
+                {{{2048, 1, 1, c.scaleDim}, {2048, 1, 1, c.scaleDim}}, ge::DT_HIFLOAT4_SCALE, ge::FORMAT_ND},
+                {{{c.bs, c.d}, {c.bs, c.d}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                {{{c.bs}, {c.bs}}, ge::DT_INT32, ge::FORMAT_ND},
+            },
+            {
+                {{{2048, 1, 1, c.cacheDim}, {2048, 1, 1, c.cacheDim}}, ge::DT_HIFLOAT4, ge::FORMAT_ND},
+                {{{2048, 1, 1, c.scaleDim}, {2048, 1, 1, c.scaleDim}}, ge::DT_HIFLOAT4_SCALE, ge::FORMAT_ND},
+            },
+            {
+                {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+                {"round_scale", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+                {"x_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            },
+            &info, c.npuArch == dt ? "Ascend960DT" : "Ascend950");
+        para.ubSize_ = c.ub;
+        ExecuteTestCase(para, c.result, c.key);
+    }
+}

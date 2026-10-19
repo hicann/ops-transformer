@@ -13,6 +13,9 @@
 
 #include "aclnn_kernels/common/op_error_check.h"
 #include "opdev/make_op_executor.h"
+#include "opdev/platform.h"
+#include "op_host/util/op_const_def.h"
+#include "../indexer_quant_cache_contract.h"
 #include "opdev/op_dfx.h"
 #include "opdev/op_executor.h"
 #include "opdev/op_log.h"
@@ -39,6 +42,15 @@ aclnnStatus aclnnIndexerQuantCacheGetWorkspaceSize(aclTensor* cacheRef, aclTenso
     OP_CHECK_NULL(cacheScaleRef, return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK_NULL(x, return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK_NULL(slotMapping, return ACLNN_ERR_PARAM_NULLPTR);
+
+    if (quantMode == indexer_quant_cache::HIFP4_QUANT_MODE) {
+        if (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_9201 ||
+            cacheRef->GetDataType() != op::DataType::DT_HIFLOAT4 ||
+            cacheScaleRef->GetDataType() != op::DataType::DT_HIFLOAT4_SCALE) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "HiFloat4 requires ASCEND960DT and HIFLOAT4/HIFLOAT4_SCALE.");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
 
     if (cacheRef->IsEmpty() || x->IsEmpty() || slotMapping->IsEmpty()) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "aclnnIndexerQuantCache does not support empty tensor!");

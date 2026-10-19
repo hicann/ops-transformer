@@ -68,6 +68,10 @@ constexpr int64_t MXFP8_QUANT_MODE = 0;
 constexpr int64_t NORMAL_QUANT_MODE = 1;
 constexpr int64_t HIFLOAT_QUANT_MODE = 2;
 constexpr int64_t MXFP4_QUANT_MODE = 3;
+constexpr int64_t HIFP4_QUANT_MODE = 4;
+constexpr int64_t HIFP4_GROUP_SIZE = 64;
+constexpr int64_t HIFP4_ROW_ALIGN = 512;
+constexpr int64_t HIFP4_SCALE_VECTOR = 256;
 constexpr int64_t SINGLE_ROW = 1;
 } // namespace
 
@@ -80,13 +84,14 @@ ge::graphStatus IndexerQuantCacheTiling::GetPlatformInfo()
                     return ge::GRAPH_FAILED);
         coreNum_ = compileInfoPtr->coreNum;
         ubSize_ = compileInfoPtr->ubSize;
+        npuArch_ = compileInfoPtr->npuArch;
     } else {
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
         coreNum_ = ascendcPlatform.GetCoreNumAiv();
         uint64_t ubSizePlatForm;
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
         ubSize_ = ubSizePlatForm;
-        socVersion_ = ascendcPlatform.GetSocVersion();
+        npuArch_ = ascendcPlatform.GetCurNpuArch();
     }
     OP_CHECK_IF(coreNum_ == 0 || ubSize_ == 0,
                 OP_LOGE(context_->GetNodeName(), "core count and UB size must be positive"), return ge::GRAPH_FAILED);
@@ -213,8 +218,12 @@ ge::graphStatus IndexerQuantCacheTiling::GetShapeAttrsInfoInner()
 
     OP_CHECK_IF(GetAttr() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "get attr failed."),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(quantMode_ < 0 || quantMode_ > MXFP4_QUANT_MODE,
-                OP_LOGE(context_->GetNodeName(), "quant_mode should be in [0,3], got %ld", quantMode_),
+    OP_CHECK_IF(quantMode_ < 0 || quantMode_ > HIFP4_QUANT_MODE,
+                OP_LOGE(context_->GetNodeName(), "quant_mode should be in [0,4], got %ld", quantMode_),
+                return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(quantMode_ == HIFP4_QUANT_MODE && (npuArch_ != Ops::Base::DAV_9201 || d_ % HIFP4_GROUP_SIZE != 0),
+                OP_LOGE(context_->GetNodeName(), "HiFloat4 requires ASCEND960DT and d aligned to 64."),
                 return ge::GRAPH_FAILED);
 
     for (size_t idx = 0; idx < INPUT_COUNT; ++idx) {
@@ -232,6 +241,9 @@ ge::graphStatus IndexerQuantCacheTiling::GetShapeAttrsInfoInner()
         scaleCol_ = CeilDiv(d_, PER_BLOCK_MXFP4);
     } else {
         scaleCol_ = 1;
+    }
+    if (quantMode_ == HIFP4_QUANT_MODE) {
+        scaleCol_ = d_ / HIFP4_GROUP_SIZE;
     }
 
     return ge::GRAPH_SUCCESS;
@@ -273,6 +285,17 @@ ge::graphStatus IndexerQuantCacheTiling::CalcOpTiling()
             // Two uint16 scratch buffers, each rounded to a 32-byte block.
             mxScratchSize = 2 * RoundUp(scaleCol_, 16) * sizeof(uint16_t);
         }
+        if (quantMode_ == HIFP4_QUANT_MODE) {
+            // Match the HiFloat4 kernels' padded row strides and full-vector scale packing.
+            const int64_t dAligned = RoundUp(d_, HIFP4_ROW_ALIGN);
+            const int64_t groups = dAligned / HIFP4_GROUP_SIZE;
+            xSize = mid * dAligned * sizeof(uint16_t) * DOUBLE_BUFFER;
+            ySize = mid * RoundUp(dAligned / FP4_PACK_NUM, 128) * DOUBLE_BUFFER;
+            scaleSize = mid * RoundUp(groups, HIFP4_SCALE_VECTOR) * sizeof(uint32_t) * DOUBLE_BUFFER;
+            const int64_t eaBytes = RoundUp(groups, HIFP4_SCALE_VECTOR);
+            const int64_t ecBytes = RoundUp(groups * 2, HIFP4_SCALE_VECTOR) * sizeof(uint16_t);
+            mxScratchSize = 2 * eaBytes + ecBytes;
+        }
         int64_t totalSize = xSize + ySize + scaleSize + tmpBufferSize + mxScratchSize;
         if (totalSize <= static_cast<int64_t>(ubSize_)) {
             rowFactor_ = mid;
@@ -297,7 +320,7 @@ ge::graphStatus IndexerQuantCacheTiling::CalcOpTiling()
     // 每行写出长度(kernel 寻址单位): cache 写 cacheCol; scale 写 scaleCol。
     //   - cacheCol: MX-FP4 为打包字节 (d/2), 其余模式为 d (fp8/uint8 元素==字节)。
     //   - scaleCol: MX-FP8/MX-FP4 为 ⌈d/32⌉ 个 e8m0; Normal/HiFloat8 为 1 个 float。
-    int64_t cacheCol = (quantMode_ == MXFP4_QUANT_MODE) ? (d_ + 1) / 2 : d_;
+    int64_t cacheCol = (quantMode_ == MXFP4_QUANT_MODE || quantMode_ == HIFP4_QUANT_MODE) ? (d_ + 1) / 2 : d_;
 
     // === Reading B + 4D-only 契约: cache 行宽(headDim)由 cache 自身决定 ===
     // cache 始终校验。末维 lastDim 为 cache 自身元素单位 (MX-FP4: fp4 元素; 其余: 字节)。
@@ -313,7 +336,9 @@ ge::graphStatus IndexerQuantCacheTiling::CalcOpTiling()
     }
 
     // 转为 kernel 寻址单位: MX-FP4 字节寻址打包 cache (÷2); 其余模式元素==字节, 直接取末维。
-    cacheRowStride_ = (quantMode_ == MXFP4_QUANT_MODE) ? (cacheLastDim / FP4_PACK_NUM) : cacheLastDim;
+    cacheRowStride_ = (quantMode_ == MXFP4_QUANT_MODE || quantMode_ == HIFP4_QUANT_MODE) ?
+                          (cacheLastDim / FP4_PACK_NUM) :
+                          cacheLastDim;
 
     // Validate both in-place tensors in every mode. HiFloat8 preserves cache_scale.
     // Its descriptor must still satisfy the shared 4D contract.
@@ -347,7 +372,7 @@ ge::graphStatus IndexerQuantCacheTiling::CalcOpTiling()
         // returns the cache view strides in fp4 ELEMENTS, but the kernel byte-addresses the packed
         // cache (int8 GM), so convert the cache strides to BYTES (÷2). scale (e8m0, 1 byte) is
         // already byte-equal so it is left unchanged.
-        if (quantMode_ == MXFP4_QUANT_MODE) {
+        if (quantMode_ == MXFP4_QUANT_MODE || quantMode_ == HIFP4_QUANT_MODE) {
             // 分页 view 下同样以整字节寻址, row/block stride(fp4 元素)必须为偶数, 否则半字节偏移
             // 无法表达(与上面连续场景 cacheLastDim 的校验同理)。
             if (CheckMxfp4EvenStride(cacheRowStride_, "paged-view row stride") != ge::GRAPH_SUCCESS ||
@@ -408,6 +433,8 @@ ge::graphStatus IndexerQuantCacheTiling::CalcOpTiling()
         tilingKey_ += 1;
     } else if (quantMode_ == MXFP4_QUANT_MODE) {
         tilingKey_ += 2;
+    } else if (quantMode_ == HIFP4_QUANT_MODE) {
+        tilingKey_ += 3;
     }
 
     return ge::GRAPH_SUCCESS;
@@ -457,10 +484,10 @@ ge::graphStatus IndexerQuantCacheTiling::PostTiling()
 
 ge::graphStatus IndexerQuantCacheTiling::CheckMxfp4EvenStride(int64_t stride, const char* name)
 {
-    if (quantMode_ == MXFP4_QUANT_MODE && stride % FP4_PACK_NUM != 0) {
+    if ((quantMode_ == MXFP4_QUANT_MODE || quantMode_ == HIFP4_QUANT_MODE) && stride % FP4_PACK_NUM != 0) {
         const std::string strideStr = std::to_string(stride);
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), name, strideStr.c_str(),
-                                                 "MX-FP4 cache stride in fp4 elements must be an even number.");
+                                                 "Packed FP4 cache stride in fp4 elements must be an even number.");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -468,7 +495,14 @@ ge::graphStatus IndexerQuantCacheTiling::CheckMxfp4EvenStride(int64_t stride, co
 
 ge::graphStatus TilingPrepareForIndexerQuantCache(gert::TilingParseContext* context)
 {
-    (void)context;
+    auto* compileInfo = context->GetCompiledInfo<IndexerQuantCacheCompileInfo>();
+    auto* platformInfo = context->GetPlatformInfo();
+    if (compileInfo != nullptr && platformInfo != nullptr) {
+        platform_ascendc::PlatformAscendC platform(platformInfo);
+        compileInfo->npuArch = platform.GetCurNpuArch();
+        compileInfo->coreNum = platform.GetCoreNumAiv();
+        platform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfo->ubSize);
+    }
     return ge::GRAPH_SUCCESS;
 }
 

@@ -19,6 +19,12 @@ if (BUILD_OPEN_PROJECT)
             COMPUTE_UNIT Ascend950PR_9599
             OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
         )
+    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend960dt")
+        add_ops_compile_options(
+            OP_NAME IndexerQuantCache
+            COMPUTE_UNIT ascend960dt_968B7
+            OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
+        )
     else()
         add_ops_compile_options(
             OP_NAME IndexerQuantCache
