@@ -17,6 +17,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/pybind11.h>
 #include <chrono>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -264,6 +265,63 @@ struct EngramSharedBufferEntry : EngramCtxResBase {
 };
 static std::mutex gEngramSharedBufferMutex;
 static std::unordered_map<std::string, EngramSharedBufferEntry> gEngramSharedBuffers;
+
+struct LocalEngramMapping {
+    int64_t bytes = 0;
+    void* devicePtr = nullptr;
+    uint64_t refcount = 0;
+};
+static std::mutex gLocalEngramMappingsMutex;
+static std::unordered_map<void*, LocalEngramMapping> gLocalEngramMappings;
+
+static void* AcquireLocalHostMapping(void* hostPtr, int64_t bytes)
+{
+    TORCH_CHECK(hostPtr != nullptr, "local zero-copy storage pointer is null");
+    TORCH_CHECK(bytes > 0, "local zero-copy storage size must be positive, got ", bytes);
+
+    std::lock_guard<std::mutex> lock(gLocalEngramMappingsMutex);
+    auto iter = gLocalEngramMappings.find(hostPtr);
+    if (iter != gLocalEngramMappings.end()) {
+        TORCH_CHECK(iter->second.bytes == bytes,
+                    "local zero-copy storage address is already registered with a different size, registered ",
+                    iter->second.bytes, " bytes, got ", bytes, " bytes");
+        ++iter->second.refcount;
+        return iter->second.devicePtr;
+    }
+
+    aclError ret = aclrtHostRegisterV2(hostPtr, static_cast<uint64_t>(bytes), ACL_HOST_REG_MAPPED);
+    TORCH_CHECK(ret == ACL_SUCCESS, "aclrtHostRegisterV2(", bytes, " B) failed, ret=", ret);
+    void* devicePtr = nullptr;
+    ret = aclrtHostGetDevicePointer(hostPtr, &devicePtr, 0);
+    if (ret != ACL_SUCCESS) {
+        (void)aclrtHostUnregister(hostPtr);
+        TORCH_CHECK(false, "aclrtHostGetDevicePointer failed, ret=", ret, ", host memory cannot be mapped to device");
+    }
+    auto [insertedIter, inserted] = gLocalEngramMappings.emplace(hostPtr, LocalEngramMapping{bytes, devicePtr, 1});
+    TORCH_CHECK(inserted, "local host mapping insert unexpectedly found an existing entry");
+    return insertedIter->second.devicePtr;
+}
+
+static void ReleaseLocalHostMapping(void* hostPtr, int64_t bytes)
+{
+    if (hostPtr == nullptr) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(gLocalEngramMappingsMutex);
+    auto iter = gLocalEngramMappings.find(hostPtr);
+    TORCH_CHECK(iter != gLocalEngramMappings.end(), "local host mapping is missing during destroy");
+    TORCH_CHECK(iter->second.bytes == bytes, "local host mapping size changed during destroy, registered ",
+                iter->second.bytes, " bytes, got ", bytes, " bytes");
+    TORCH_CHECK(iter->second.refcount > 0, "local host mapping refcount underflow");
+    if (iter->second.refcount > 1) {
+        --iter->second.refcount;
+        return;
+    }
+
+    aclError ret = aclrtHostUnregister(hostPtr);
+    TORCH_CHECK(ret == ACL_SUCCESS, "aclrtHostUnregister failed, ret: ", ret);
+    gLocalEngramMappings.erase(iter);
+}
 
 static void RollbackExternalHostRegistration(EngramContextResources& resources, void* externalHostPtr, void* sfHostPtr)
 {
@@ -534,6 +592,48 @@ protected:
 
 class EngramContextBuilder : public HcclContextBuilderBase {
 public:
+    static EngramContextResources BuildLocal(int64_t numCpuBytes, void* externalHostPtr, int64_t externalBytes)
+    {
+        TORCH_CHECK(externalHostPtr == nullptr || externalBytes > 0,
+                    "local zero-copy storage size must be positive, got ", externalBytes);
+
+        EngramContextResources resources;
+        if (externalHostPtr != nullptr) {
+            resources.hostBufPtr = externalHostPtr;
+            resources.deviceBufPtr = AcquireLocalHostMapping(externalHostPtr, externalBytes);
+            resources.externalRegistered = true;
+        } else {
+            TORCH_CHECK(numCpuBytes > 0, "local copy window size must be positive, got ", numCpuBytes);
+            aclError ret = aclrtMallocHost(&resources.hostBufPtr, static_cast<uint64_t>(numCpuBytes));
+            TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMallocHost(", numCpuBytes, " B) failed, ret=", ret);
+            try {
+                resources.deviceBufPtr = AcquireLocalHostMapping(resources.hostBufPtr, numCpuBytes);
+            } catch (...) {
+                (void)aclrtFreeHost(resources.hostBufPtr);
+                resources.hostBufPtr = nullptr;
+                throw;
+            }
+        }
+
+        try {
+            resources.context.rankId = 0;
+            resources.context.rankSize = 1;
+            resources.context.channelsPerRank = 1;
+            resources.context.virtualAddrList[0] = reinterpret_cast<uint64_t>(resources.deviceBufPtr);
+            resources.contextTensor = CreateCommContextTensor(resources.context);
+        } catch (...) {
+            ReleaseLocalHostMapping(resources.hostBufPtr, externalHostPtr != nullptr ? externalBytes : numCpuBytes);
+            if (externalHostPtr == nullptr) {
+                (void)aclrtFreeHost(resources.hostBufPtr);
+            }
+            resources.hostBufPtr = nullptr;
+            resources.deviceBufPtr = nullptr;
+            resources.externalRegistered = false;
+            throw;
+        }
+        return resources;
+    }
+
     EngramContextResources Build(const std::string& groupName, int64_t numCpuBytes, bool withGrad,
                                  void* externalHostPtr = nullptr, int64_t externalBytes = 0, void* sfHostPtr = nullptr,
                                  int64_t sfBytes = 0)
@@ -667,13 +767,10 @@ private:
             TORCH_CHECK(ar == ACL_SUCCESS, "aclrtHostRegisterV2(", numCpuBytes, " B) failed, ret=", ar);
             guard.registered = true;
         } else {
-            // Map caller-owned storage memory directly (zero-copy): plain memory is supported
+            // Explicit zero-copy (or training direct mapping): registration failure is a hard error.
             aclError ar =
                 aclrtHostRegisterV2(externalHostPtr, static_cast<uint64_t>(externalBytes), ACL_HOST_REG_MAPPED);
-            if (ar != ACL_SUCCESS) {
-                ASCEND_LOGW("aclrtHostRegisterV2(%lld B) failed, ret=%d, fallback to existing registration",
-                            externalBytes, static_cast<int>(ar));
-            }
+            TORCH_CHECK(ar == ACL_SUCCESS, "aclrtHostRegisterV2(", externalBytes, " B) failed, ret=", ar);
             resources.externalRegistered = (ar == ACL_SUCCESS);
         }
 
@@ -1596,11 +1693,11 @@ private:
 // ElasticBuffer class - unified interface for Engram storage and MoE EP kernels
 class ElasticBuffer {
 public:
-    ElasticBuffer(const std::string& groupName, int64_t numCpuBytes, int64_t numMaxTokensPerRank = 0,
+    ElasticBuffer(const std::optional<std::string>& groupName, int64_t numCpuBytes, int64_t numMaxTokensPerRank = 0,
                   bool withGrad = false, bool explicitlyDestroy = false);
     ~ElasticBuffer();
 
-    void EngramWrite(const at::Tensor& storage, const c10::optional<at::Tensor>& sf);
+    void EngramWrite(const at::Tensor& storage, const c10::optional<at::Tensor>& sf, bool zeroCopy);
     void EngramBarrier(bool useCommStream = true, bool withCpuSync = false);
     void Destroy();
 
@@ -1684,8 +1781,10 @@ private:
     void EnsureMoeContext(int64_t cclBufferSize);
     int64_t ResolveRankNumPerServer(int64_t epWorldSize) const;
     int64_t ResolveTopoType(int64_t epWorldSize, int64_t rankNumPerServer) const;
+    void CheckExternalStorageUnchanged(const at::Tensor& storage, bool zeroCopy, bool localMode) const;
 
-    std::string groupName_;
+    std::optional<std::string> groupName_;
+    bool localFullVocab_ = false;
     int64_t engramNumCpuBytes_;
     int64_t numMaxTokensPerRank_ = 0;
     bool explicitlyDestroy_ = false;
@@ -1707,6 +1806,8 @@ private:
     bool engramExternalRegisteredByUs_ = false;
     int64_t engramExternalBytes_ = 0;
     bool engramBufferPooled_ = false; // host buffer 归进程级共享池所有，Destroy 不反注册/释放
+    // local 模式下，本实例是否已经释放 mapping 引用；free host 失败后的重试只需继续释放内存。
+    bool localMappingReleased_ = false;
 
     at::Tensor moeContextTensor_;
     int64_t moeCclBufferSize_ = 0; // MoE 通信 buffer 大小（首次调用时按算子参数计算并内部申请注册）
@@ -1728,9 +1829,10 @@ private:
 
 // Constructor
 
-ElasticBuffer::ElasticBuffer(const std::string& groupName, int64_t numCpuBytes, int64_t numMaxTokensPerRank,
-                             bool withGrad, bool explicitlyDestroy)
+ElasticBuffer::ElasticBuffer(const std::optional<std::string>& groupName, int64_t numCpuBytes,
+                             int64_t numMaxTokensPerRank, bool withGrad, bool explicitlyDestroy)
     : groupName_(groupName),
+      localFullVocab_(!groupName.has_value()),
       engramNumCpuBytes_(numCpuBytes),
       destroyed_(false),
       engramWriteCalled_(false),
@@ -1738,8 +1840,10 @@ ElasticBuffer::ElasticBuffer(const std::string& groupName, int64_t numCpuBytes, 
       explicitlyDestroy_(explicitlyDestroy),
       withGrad_(withGrad)
 {
-    InitHcclEngineCtxFunctions();
-    InitHcclFunctions();
+    if (!localFullVocab_) {
+        InitHcclEngineCtxFunctions();
+        InitHcclFunctions();
+    }
 }
 
 // Destructor - automatic resource cleanup only when explicitlyDestroy is false
@@ -1765,11 +1869,16 @@ void ElasticBuffer::EnsureEngramContext(void* externalHostPtr, int64_t externalB
     if (engramContextInitialized_) {
         return;
     }
-    commStream_ = c10_npu::getNPUStreamFromPool().stream(false);
-    TORCH_CHECK(commStream_ != nullptr, "Failed to get NPU stream from pool for comm stream");
-    EngramContextBuilder builder;
-    EngramContextResources resources = builder.Build(groupName_, withGrad_ ? 0 : engramNumCpuBytes_, withGrad_,
-                                                     externalHostPtr, externalBytes, sfHostPtr, sfBytes);
+    EngramContextResources resources;
+    if (localFullVocab_) {
+        resources = EngramContextBuilder::BuildLocal(engramNumCpuBytes_, externalHostPtr, externalBytes);
+    } else {
+        commStream_ = c10_npu::getNPUStreamFromPool().stream(false);
+        TORCH_CHECK(commStream_ != nullptr, "Failed to get NPU stream from pool for comm stream");
+        EngramContextBuilder builder;
+        resources = builder.Build(*groupName_, withGrad_ ? 0 : engramNumCpuBytes_, withGrad_, externalHostPtr,
+                                  externalBytes, sfHostPtr, sfBytes);
+    }
     engramHcclComm_ = resources.hcclComm;
     engramMemHandle_ = resources.memHandle;
     engramHostBufPtr_ = resources.hostBufPtr;
@@ -1787,7 +1896,7 @@ void ElasticBuffer::EnsureEngramContext(void* externalHostPtr, int64_t externalB
         localSfTableTensor_ = hostSfAddrTensor.to(c10::DeviceType::PrivateUse1);
     }
     engramExternalBytes_ = externalBytes;
-    engramBufferPooled_ = (engramHostBufPtr_ != nullptr);
+    engramBufferPooled_ = (!localFullVocab_ && engramHostBufPtr_ != nullptr);
     int64_t addrValue = reinterpret_cast<int64_t>(engramDeviceBufPtr_);
     auto hostAddrTensor = at::full({1}, addrValue, at::TensorOptions().dtype(at::kLong));
     localStorageAddrTensor_ = hostAddrTensor.to(c10::DeviceType::PrivateUse1);
@@ -1801,11 +1910,12 @@ void ElasticBuffer::EnsureEngramContext(void* externalHostPtr, int64_t externalB
 void ElasticBuffer::EnsureMoeContext(int64_t cclBufferSize)
 {
     TORCH_CHECK(!destroyed_, "ElasticBuffer cannot be used after destroy, please create a new ElasticBuffer instance");
+    TORCH_CHECK(!localFullVocab_, "MoE operations are not supported when group is None");
     if (moeContextInitialized_) {
         return;
     }
     MoeContextBuilder builder;
-    MoeContextResources resources = builder.Build(groupName_, cclBufferSize);
+    MoeContextResources resources = builder.Build(*groupName_, cclBufferSize);
     moeContextTensor_ = resources.contextTensor;
     moeCclBufferSize_ = resources.cclBufferSize;
     moeRankSizePerServer_ = resources.rankSizePerServer;
@@ -1830,8 +1940,36 @@ int64_t ElasticBuffer::ResolveTopoType(int64_t epWorldSize, int64_t rankNumPerSe
     return (epWorldSize / rankNumPerServer > 1) ? NETWORK_HYBRID : NETWORK_DIRECT;
 }
 
+void ElasticBuffer::CheckExternalStorageUnchanged(const at::Tensor& storage, bool zeroCopy, bool localMode) const
+{
+    if (withGrad_) {
+        TORCH_CHECK(engramHostBufPtr_ == storage.data_ptr(),
+                    "engram_write: engram storage is already initialized from a different address, expected ptr=",
+                    engramHostBufPtr_, ", got ptr=", storage.data_ptr(),
+                    "; note: in with_grad mode the first engram API call initializes the context, an earlier "
+                    "engram_barrier without storage would initialize it with no storage");
+        TORCH_CHECK(engramExternalBytes_ == static_cast<int64_t>(storage.nbytes()),
+                    "engram_write: storage size changed after the engram storage was registered from this address, "
+                    "registered ",
+                    engramExternalBytes_, " bytes, got ", storage.nbytes(), " bytes");
+        return;
+    }
+
+    TORCH_CHECK(zeroCopy == engramStorageExternal_,
+                "engram_write zero_copy mode cannot change after the storage window is initialized");
+    if (!zeroCopy) {
+        return;
+    }
+
+    const char* mode = localMode ? "local zero-copy" : "zero-copy";
+    TORCH_CHECK(engramHostBufPtr_ == storage.data_ptr(), "engram_write: ", mode, " storage address changed, expected ",
+                engramHostBufPtr_, ", got ", storage.data_ptr());
+    TORCH_CHECK(engramExternalBytes_ == static_cast<int64_t>(storage.nbytes()), "engram_write: ", mode,
+                " storage size changed, registered ", engramExternalBytes_, " bytes, got ", storage.nbytes(), " bytes");
+}
+
 // EngramWrite - write data with automatic barrier.
-void ElasticBuffer::EngramWrite(const at::Tensor& storage, const c10::optional<at::Tensor>& sf)
+void ElasticBuffer::EngramWrite(const at::Tensor& storage, const c10::optional<at::Tensor>& sf, bool zeroCopy)
 {
     TORCH_CHECK(!destroyed_, "engram_write cannot be called after destroy, "
                              "please create a new ElasticBuffer instance");
@@ -1839,20 +1977,23 @@ void ElasticBuffer::EngramWrite(const at::Tensor& storage, const c10::optional<a
     int64_t externalBytes = 0;
     void* sfHostPtr = nullptr;
     int64_t sfBytes = 0;
-    if (withGrad_) {
+    if (localFullVocab_) {
+        TORCH_CHECK(!withGrad_, "local full-vocab mode supports inference only");
+        if (engramContextInitialized_) {
+            CheckExternalStorageUnchanged(storage, zeroCopy, true);
+        } else {
+            if (zeroCopy) {
+                externalHostPtr = storage.data_ptr();
+                externalBytes = static_cast<int64_t>(storage.nbytes());
+            } else if (engramNumCpuBytes_ == 0) {
+                engramNumCpuBytes_ = AlignTo(static_cast<int64_t>(storage.nbytes()), BUFFER_ALIGNMENT);
+            }
+        }
+    } else if (withGrad_) {
         TORCH_CHECK(storage.nbytes() > 0, "engram_write in with_grad mode requires non-empty storage, got ",
                     storage.nbytes(), " bytes");
         if (engramContextInitialized_) {
-            TORCH_CHECK(engramHostBufPtr_ == storage.data_ptr(),
-                        "engram_write: engram storage is already initialized from a different address, expected "
-                        "ptr=",
-                        engramHostBufPtr_, ", got ptr=", storage.data_ptr(),
-                        "; note: in with_grad mode the first engram API call initializes the context, an earlier "
-                        "engram_barrier without storage would initialize it with no storage");
-            TORCH_CHECK(engramExternalBytes_ == static_cast<int64_t>(storage.nbytes()),
-                        "engram_write: storage size changed after the engram storage was registered from this "
-                        "address, registered ",
-                        engramExternalBytes_, " bytes, got ", storage.nbytes(), " bytes");
+            CheckExternalStorageUnchanged(storage, true, false);
         } else {
             externalHostPtr = storage.data_ptr();
             externalBytes = static_cast<int64_t>(storage.nbytes());
@@ -1862,27 +2003,41 @@ void ElasticBuffer::EngramWrite(const at::Tensor& storage, const c10::optional<a
                 sfBytes = static_cast<int64_t>(sf.value().nbytes());
             }
         }
+    } else {
+        if (engramContextInitialized_) {
+            CheckExternalStorageUnchanged(storage, zeroCopy, false);
+        } else if (zeroCopy) {
+            externalHostPtr = storage.data_ptr();
+            externalBytes = static_cast<int64_t>(storage.nbytes());
+        }
     }
     EnsureEngramContext(externalHostPtr, externalBytes, sfHostPtr, sfBytes);
 
-    if (!withGrad_) {
+    if (!withGrad_ && !engramStorageExternal_) {
         TORCH_CHECK(storage.nbytes() <= static_cast<size_t>(engramNumCpuBytes_), "storage size ", storage.nbytes(),
                     " exceeds buffer capacity ", engramNumCpuBytes_);
     }
 
     constexpr int64_t int32Max = static_cast<int64_t>(INT32_MAX);
-    TORCH_CHECK(storage.size(0) * static_cast<int64_t>(engramCommContext_.rankSize) <= int32Max,
-                "num_entries * rank_size must not exceed INT32_MAX, got num_entries=", storage.size(0),
-                ", rank_size=", engramCommContext_.rankSize,
-                ", product=", storage.size(0) * static_cast<int64_t>(engramCommContext_.rankSize));
+    if (localFullVocab_) {
+        TORCH_CHECK(storage.size(0) <= int32Max,
+                    "num_entries must not exceed INT32_MAX in full-vocab mode, got num_entries=", storage.size(0));
+    } else {
+        TORCH_CHECK(storage.size(0) * static_cast<int64_t>(engramCommContext_.rankSize) <= int32Max,
+                    "num_entries * rank_size must not exceed INT32_MAX, got num_entries=", storage.size(0),
+                    ", rank_size=", engramCommContext_.rankSize,
+                    ", product=", storage.size(0) * static_cast<int64_t>(engramCommContext_.rankSize));
+    }
 
-    EngramBarrier(false, true);
+    if (!localFullVocab_) {
+        EngramBarrier(false, true);
+    }
 
     engramHiddenSize_ = storage.size(1);
     engramNumEntries_ = storage.size(0);
     engramDtype_ = storage.scalar_type();
 
-    if (!withGrad_ && engramNumEntries_ > 0) {
+    if (!withGrad_ && !engramStorageExternal_ && engramNumEntries_ > 0) {
         constexpr size_t MEMCPY_MAX_BYTES = 0x7fffffff;
         size_t totalBytes = storage.nbytes();
         size_t remaining = totalBytes;
@@ -1899,7 +2054,9 @@ void ElasticBuffer::EngramWrite(const at::Tensor& storage, const c10::optional<a
         }
     }
 
-    EngramBarrier(false, true);
+    if (!localFullVocab_) {
+        EngramBarrier(false, true);
+    }
     engramWriteCalled_ = true;
 }
 
@@ -1990,6 +2147,7 @@ void ElasticBuffer::EngramBarrier(bool useCommStream, bool withCpuSync)
 {
     TORCH_CHECK(!destroyed_,
                 "engram_barrier cannot be called after destroy, please create a new ElasticBuffer instance");
+    TORCH_CHECK(!localFullVocab_, "engram_barrier is not supported in local full-vocab mode");
     EnsureEngramContext();
     TORCH_CHECK(engramHcclComm_ != nullptr, "HCCL comm not initialized");
 
@@ -2025,10 +2183,15 @@ void ElasticBuffer::Destroy()
         return;
     }
 
-    try {
-        EngramBarrier(true, true);
-    } catch (const std::exception& e) {
-        ASCEND_LOGE("EngramBarrier in Destroy failed: %s", e.what());
+    if (localFullVocab_) {
+        aclError syncRet = aclrtSynchronizeDevice();
+        TORCH_CHECK(syncRet == ACL_SUCCESS, "aclrtSynchronizeDevice failed during local destroy, ret: ", syncRet);
+    } else {
+        try {
+            EngramBarrier(true, true);
+        } catch (const std::exception& e) {
+            ASCEND_LOGE("EngramBarrier in Destroy failed: %s", e.what());
+        }
     }
 
     // HCCL 默认 buffer 由框架管理，无需手动释放
@@ -2045,7 +2208,19 @@ void ElasticBuffer::Destroy()
 
     // 注册内存与 host buffer 已按 tag 入进程级共享池(引擎 ctx 的 virtualAddrList[] 引用且无法
     // 反注册)：Destroy 仅解除本实例引用、不释放内存，同 group 重建 ElasticBuffer 时复用。
-    if (engramHostBufPtr_ != nullptr) {
+    if (localFullVocab_ && engramHostBufPtr_ != nullptr) {
+        if (!localMappingReleased_) {
+            ReleaseLocalHostMapping(engramHostBufPtr_,
+                                    engramStorageExternal_ ? engramExternalBytes_ : engramNumCpuBytes_);
+            localMappingReleased_ = true;
+        }
+        if (!engramStorageExternal_) {
+            aclError ret = aclrtFreeHost(engramHostBufPtr_);
+            TORCH_CHECK(ret == ACL_SUCCESS, "aclrtFreeHost failed, ret: ", ret);
+        }
+        engramHostBufPtr_ = nullptr;
+        engramDeviceBufPtr_ = nullptr;
+    } else if (engramHostBufPtr_ != nullptr) {
         if (!engramBufferPooled_) {
             if (!engramStorageExternal_ || engramExternalRegisteredByUs_) {
                 aclError ret = aclrtHostUnregister(engramHostBufPtr_);
@@ -2333,11 +2508,11 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         .def("host_ptr", &OpApi::HostPinnedCounter::HostPtr);
 
     pybind11::class_<Mc2Api::ElasticBuffer>(m, "ElasticBuffer")
-        .def(pybind11::init<const std::string&, int64_t, int64_t, bool, bool>(), pybind11::arg("groupName"),
-             pybind11::arg("numCpuBytes"), pybind11::arg("numMaxTokensPerRank") = 0, pybind11::arg("withGrad") = false,
-             pybind11::arg("explicitlyDestroy") = false)
+        .def(pybind11::init<const std::optional<std::string>&, int64_t, int64_t, bool, bool>(),
+             pybind11::arg("groupName"), pybind11::arg("numCpuBytes"), pybind11::arg("numMaxTokensPerRank") = 0,
+             pybind11::arg("withGrad") = false, pybind11::arg("explicitlyDestroy") = false)
         .def("engram_write", &Mc2Api::ElasticBuffer::EngramWrite, pybind11::arg("storage").noconvert(),
-             pybind11::arg("sf") = pybind11::none())
+             pybind11::arg("sf") = pybind11::none(), pybind11::arg("zeroCopy"))
         .def_static("engram_fetch",
                     static_cast<at::Tensor (*)(const at::Tensor&, const at::Tensor&, int64_t, int64_t, int64_t,
                                                const at::Tensor&, at::Tensor&)>(&Mc2Api::ElasticBuffer::EngramFetch),

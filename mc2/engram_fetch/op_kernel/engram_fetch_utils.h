@@ -58,6 +58,24 @@ struct CoreAssignment {
     uint32_t rankGroupSize;  // 远端核=该卡通道数；本地核=本地核总数
 };
 
+struct TokenRangeAssignment {
+    uint32_t start;
+    uint32_t count;
+};
+
+__aicore__ inline TokenRangeAssignment GetTokenRangeAssignment(uint32_t totalBlocks, uint32_t aivId, uint32_t numTokens)
+{
+    TokenRangeAssignment assignment{0U, 0U};
+    if (totalBlocks == 0U) {
+        return assignment;
+    }
+    uint32_t base = numTokens / totalBlocks;
+    uint32_t remainder = numTokens % totalBlocks;
+    assignment.start = aivId * base + ((aivId < remainder) ? aivId : remainder);
+    assignment.count = base + ((aivId < remainder) ? 1U : 0U);
+    return assignment;
+}
+
 __aicore__ inline CoreAssignment GetCoreAssignment(uint32_t totalBlocks, uint32_t aivId, uint32_t numRanks,
                                                    uint32_t rankId, uint32_t channelsPerRank)
 {

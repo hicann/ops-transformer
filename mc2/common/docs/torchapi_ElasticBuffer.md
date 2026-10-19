@@ -25,7 +25,7 @@
 
 ElasticBuffer类提供统一的分布式通信buffer管理能力：
 
-- Engram存储接口用于分布式Engram存储管理，支持将本rank的表注册为通信可达的存储（推理模式写入host pinned共享段，训练模式直接映射上层锁页表内存，零拷贝），以及通过RDMA从远端rank抓取Engram数据。需与 [get_engram_storage_size_hint](#get_engram_storage_size_hint静态方法) 配套使用。
+- Engram存储接口用于分布式Engram存储管理，支持将本rank的表注册为通信可达的存储（推理模式可写入host pinned共享段或显式零拷贝注册调用方内存，训练模式直接映射上层锁页表内存），以及通过RDMA从远端rank抓取Engram数据。`group=None` 表示full-vocab local推理，不初始化HCCL。
 - Engram训练接口在推理接口的基础上，通过 `with_grad=True` 开启训练模式。前向 [engram_fetch](#engram_fetch) 在抓取数据的同时保存反向所需的通信元数据（封装为 [EngramFetchCtx](#engramfetchctx)），反向 [engram_fetch_grad](#engram_fetch_grad) 根据这些元数据将梯度沿前向路径反向交换并按local entry稀疏累加，产出稀疏梯度用于优化器更新。
 - Dispatch/Combine接口用于MoE的Expert Parallelism（EP）并行部署，支持通过[dispatch](#dispatch)将token数据分发到对应专家卡，再通过[combine](#combine)将专家输出按原路由聚合回原始序列。所需的CCL通信buffer由ElasticBuffer内部按算子参数自动计算并申请，无需手动配置。
 
@@ -35,7 +35,7 @@ ElasticBuffer类提供统一的分布式通信buffer管理能力：
 class ElasticBuffer:
     def __init__(
         self,
-        group: torch.distributed.ProcessGroup,
+        group: Optional[torch.distributed.ProcessGroup],
         *,
         num_cpu_bytes: int = 0,
         num_max_tokens_per_rank: Optional[int] = None,
@@ -45,7 +45,13 @@ class ElasticBuffer:
         explicitly_destroy: bool = False,
     )
 
-    def engram_write(self, storage: torch.Tensor) -> None
+    def engram_write(
+        self,
+        storage: torch.Tensor,
+        sf: Optional[torch.Tensor] = None,
+        *,
+        zero_copy: Optional[bool] = None,
+    ) -> None
 
     def engram_fetch(self, indices: torch.Tensor) -> Callable
 
@@ -122,7 +128,7 @@ class ElasticBuffer:
 
 **输入参数**：
 
-- **group** (`torch.distributed.ProcessGroup`)：必选参数，分布式进程组，用于跨rank通信和同步。
+- **group** (`Optional[torch.distributed.ProcessGroup]`)：必选参数。非 `None` 时为HCCL分布式进程组；`None` 表示full-vocab local推理，固定 `rank_size=1`，不初始化HCCL、不支持训练。
 - <strong>*</strong>：其之前的变量是位置相关的；之后的变量是可选参数，需要使用键值对赋值，不赋值会使用默认值。
 - **num_cpu_bytes** (`int`)：可选参数，CPU buffer大小（字节），用于host pinned存储区分配（仅推理模式生效；训练模式不分配内部存储区，该参数不生效）。默认值为0，且必须2MB对齐。
 - **num_max_tokens_per_rank** (`int`)：可选参数，表示每张卡上的最大token数量上限。使用 [dispatch](#dispatch) 和 [combine](#combine) 时必须与 `hidden`、`num_topk` 一起指定；使用 `with_grad=True` 训练模式时必须指定且大于0。
@@ -135,12 +141,13 @@ class ElasticBuffer:
 
 ### engram_write
 
-**功能**：将本rank的Engram表注册为通信可达的Engram storage，使其他rank可读取该数据。按构造时的 `with_grad` 区分两种行为：
+**功能**：将本rank的Engram表注册为通信可达的Engram storage，使其他rank可读取该数据。按构造时的 `with_grad` 与 `zero_copy` 区分行为：
 
-- **推理**（`with_grad=False`）：将 `storage` 数据拷贝到内部host pinned共享内存段。
+- **推理**（`with_grad=False`，`zero_copy=False`）：将 `storage` 数据拷贝到内部host pinned共享内存段；`group=None` 且未显式指定容量时，内部按 `storage.nbytes()` 向上2MB对齐。
+- **推理**（`with_grad=False`，`zero_copy=True`）：原地注册 `storage` 主机内存，注册或映射失败直接报错，不隐式回退到拷贝。
 - **训练**（`with_grad=True`）：将 `storage` 的锁页内存直接映射为Engram storage（零拷贝，无数据搬运），`storage` 的原地更新对后续 [engram_fetch](#engram_fetch) 可见。
 
-两种模式写入完成后，内部都会自动获取通信上下文tensor、本地storage地址、通信buffer大小和rank数等信息，供后续 [engram_fetch](#engram_fetch) 使用。
+写入完成后，内部都会获取通信上下文tensor、本地storage地址和rank数等信息，供后续 [engram_fetch](#engram_fetch) 使用。
 
 > **host pinned共享内存段**（推理模式）：指通过 `aclrtMallocHost` 分配的页锁定（pinned）主机内存，并经 `aclrtHostRegisterV2` 映射后获得设备可访问地址。该内存段既可被本卡NPU直接访问，也可被远端rank的NPU通过RDMA读取，从而实现跨rank的零拷贝数据共享。其大小由构造函数的 `num_cpu_bytes` 参数指定。
 
@@ -156,7 +163,7 @@ $$HostPinnedBuf[0 : storage.nbytes()] \leftarrow storage.data()$$
 
 $$EngramTable[rank\_id] \equiv storage$$
 
-两种模式写入前后均有两次 `Barrier`，保证所有rank写入完成且对彼此可见：
+分布式模式写入前后均有两次 `Barrier`；`group=None` local模式没有通信域，不执行 `Barrier`：
 
 $$Barrier \rightarrow write(storage) \rightarrow Barrier$$
 
@@ -165,12 +172,14 @@ $$Barrier \rightarrow write(storage) \rightarrow Barrier$$
 **函数原型**：
 
 ```python
-ElasticBuffer.engram_write(storage) -> None
+ElasticBuffer.engram_write(storage, sf=None, *, zero_copy=None) -> None
 ```
 
 **输入参数**：
 
 - **storage** (`Tensor`)：必选参数，待写入的CPU tensor，shape为 `(num_entries, hidden)`，表示有 `num_entries` 个条目，每个条目维度为 `hidden`。要求2维、连续、`hidden`必须大于0，数据类型支持 `bfloat16`、`float16`、`float32`。
+- **sf** (`Optional[Tensor]`)：可选参数，FP8 scaling factor表。推理时为NPU tensor，shape为 `(num_entries * world_size, num_sf_packs)`，local模式 `world_size=1`；训练时为pinned CPU tensor，shape为 `(num_entries, num_sf_packs)`。
+- **zero_copy** (`Optional[bool]`)：keyword-only参数。未传时按模式取默认值：推理为 `False`，训练为 `True`。推理时 `False` 表示拷贝到内部host pinned window，`True` 表示原地注册调用方内存，失败直接抛错；训练时始终原地注册pinned storage，显式传 `False` 会直接报错。
 
 **输出说明**：无返回值。推理模式数据写入host pinned内存；训练模式 `storage` 内存被注册为Engram storage。
 
@@ -498,6 +507,14 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
   - 同一ElasticBuffer实例上不允许并发 [engram_fetch](#engram_fetch)（需等待上次fetch的callable执行完成）。
   - 训练模式下，必须先调用 [engram_fetch](#engram_fetch)（训练模式）获取 `fetch_ctx`，才能调用 [engram_fetch_grad](#engram_fetch_grad)。
 
+- **full-vocab local约束**：
+  - `group=None` 仅支持推理，`with_grad=True`、MoE参数和 [barrier](#barrier) 均会被拒绝。
+  - 调用方应在创建实例前调用 `torch.npu.set_device(local_rank)`，并在首次 [engram_write](#engram_write)、后续 [engram_fetch](#engram_fetch) 与 [destroy](#destroy) 期间保持当前NPU device不变；local运行时资源绑定首次 `engram_write` 时的当前NPU device。
+  - `storage` 为完整全局词表，`indices` 为全局行号，`num_entries_per_rank` 等于 `storage.size(0)`。
+  - `zero_copy=True` 时Python实例保存 `storage` 引用；mmap/SharedMemory视图的底层owner仍必须由调用方保留到所有fetch完成且 `destroy()` 成功。
+  - 多进程共享同一词表推荐 `/dev/shm`、`mmap` 或 `SharedMemory`；不要把 `pin_memory()` 的私有副本当作跨进程共享方案。
+  - `indices` 必须全部落在有效全局索引范围内；越界或负数索引属于调用方错误，输出行为未定义。
+
 - **Engram训练模式约束**：
   - `with_grad=True` 时，`num_max_tokens_per_rank` 必须为正整数。
   - `with_grad=True` 时，[engram_fetch](#engram_fetch) 返回的 `fetch_ctx` 为局部变量，多次fetch不会覆盖（每次调用返回独立的ctx）。
@@ -511,6 +528,7 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
   - `storage.nbytes()` 必须小于等于 `num_cpu_bytes`。`storage.nbytes()` 表示tensor实际占用的字节数，即 `num_entries × hidden × dtype_size`（其中
   `dtype_size` 为单个元素的字节大小，如 `bfloat16` 为2 字节、`float32` 为4 字节）。
   - 全局条目总数 `world_size × num_entries` 必须小于2^31（int32 最大值），保证indices索引不溢出。
+  - `group=None` 时 `num_entries` 必须小于2^31。
 
 - **Dispatch/Combine配套约束**：
   - [dispatch](#dispatch) 和 [combine](#combine) 必须配套使用。

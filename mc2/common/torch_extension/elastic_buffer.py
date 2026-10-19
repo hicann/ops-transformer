@@ -173,7 +173,13 @@ class ElasticBufferOpBuilder(OpBuilder):
 
         @impl(get_as_library(), "engram_fetch", "Meta")
         def engram_fetch_meta(
-            context, indices, hidden_size, num_entries, dtype, sf_table, fetched_sf
+            context,
+            indices,
+            hidden_size,
+            num_entries,
+            dtype,
+            sf_table,
+            fetched_sf,
         ):
             return torch.empty(
                 (indices.size(0), hidden_size),
@@ -276,11 +282,23 @@ _elastic_buffer_op_builder._ensure_initialized()
 
 @impl(get_as_library(), "engram_fetch", "PrivateUse1")
 def engram_fetch(
-    context, indices, hidden_size, num_entries, dtype, sf_table, fetched_sf
+    context,
+    indices,
+    hidden_size,
+    num_entries,
+    dtype,
+    sf_table,
+    fetched_sf,
 ):
     op_module = _elastic_buffer_op_builder.load()
     return op_module.ElasticBuffer.engram_fetch(
-        context, indices, hidden_size, num_entries, dtype, sf_table, fetched_sf
+        context,
+        indices,
+        hidden_size,
+        num_entries,
+        dtype,
+        sf_table,
+        fetched_sf,
     )
 
 
@@ -610,7 +628,7 @@ class ElasticBuffer:
 
     def __init__(
         self,
-        group: torch.distributed.ProcessGroup,
+        group: Optional[torch.distributed.ProcessGroup],
         *,
         num_cpu_bytes: int = 0,
         num_max_tokens_per_rank: Optional[int] = None,
@@ -623,7 +641,8 @@ class ElasticBuffer:
         Initialize the ElasticBuffer.
 
         Arguments:
-            group: the distributed process group.
+            group: the distributed process group. ``None`` selects full-vocab
+                local inference without HCCL.
             num_cpu_bytes: the CPU buffer size in bytes (must be 2MB-aligned).
             num_max_tokens_per_rank: maximum MoE dispatch tokens per rank.
             hidden: hidden dimension for MoE dispatch/combine.
@@ -643,17 +662,25 @@ class ElasticBuffer:
         self._num_cpu_bytes = num_cpu_bytes
         self._with_grad = with_grad
         self._explicitly_destroy = explicitly_destroy
-        self._rank_id = dist.get_rank(self._group)
-        self._ep_world_size = dist.get_world_size(self._group)
-
-        backend = self._group._get_backend(torch.device("npu"))
-        self._group_name = backend.get_hccl_comm_name(self._rank_id, init_comm=False)
-        if not self._group_name:
-            self._group_name = backend.get_hccl_comm_name(self._rank_id, init_comm=True)
-        torch._check(
-            self._group_name is not None and len(self._group_name) > 0,
-            lambda: "HCCL comm name is empty, please check HCCL group initialization.",
-        )
+        if group is None:
+            self._rank_id = 0
+            self._ep_world_size = 1
+            self._group_name = None
+        else:
+            self._rank_id = dist.get_rank(self._group)
+            self._ep_world_size = dist.get_world_size(self._group)
+            backend = self._group._get_backend(torch.device("npu"))
+            self._group_name = backend.get_hccl_comm_name(
+                self._rank_id, init_comm=False
+            )
+            if not self._group_name:
+                self._group_name = backend.get_hccl_comm_name(
+                    self._rank_id, init_comm=True
+                )
+            torch._check(
+                self._group_name is not None and len(self._group_name) > 0,
+                lambda: "HCCL comm name is empty, please check HCCL group initialization.",
+            )
         _elastic_buffer_ops = _elastic_buffer_op_builder.load()
         self._runtime = _elastic_buffer_ops.ElasticBuffer(
             self._group_name,
@@ -738,7 +765,6 @@ class ElasticBuffer:
     @staticmethod
     def _validate_init_args(group, num_cpu_bytes, moe_args, with_grad):
         buffer_alignment = 2 * 1024 * 1024
-        _torch_check((group is not None), lambda: ("group must not be None."))
         _torch_check(
             isinstance(num_cpu_bytes, int) and not isinstance(num_cpu_bytes, bool),
             lambda: (
@@ -752,6 +778,19 @@ class ElasticBuffer:
                 f"which is not divisible by {buffer_alignment=}."
             ),
         )
+        if group is None:
+            _torch_check(
+                not with_grad,
+                lambda: "group=None supports full-vocab local inference only; with_grad=True is rejected.",
+            )
+            _torch_check(
+                all(value is None for value in moe_args),
+                lambda: (
+                    "group=None does not support MoE dispatch/combine; "
+                    "num_max_tokens_per_rank, hidden and num_topk must be None."
+                ),
+            )
+            return
         if with_grad:
             num_max_tokens_per_rank = moe_args[0]
             _torch_check(
@@ -778,7 +817,11 @@ class ElasticBuffer:
             )
 
     def engram_write(
-        self, storage: torch.Tensor, sf: Optional[torch.Tensor] = None
+        self,
+        storage: torch.Tensor,
+        sf: Optional[torch.Tensor] = None,
+        *,
+        zero_copy: Optional[bool] = None,
     ) -> None:
         """
         Write data to the Engram storage of ElasticBuffer.
@@ -789,6 +832,9 @@ class ElasticBuffer:
             sf: optional scaling factor table for FP8 quantization (GPU tensor,
                 shape [num_entries, num_sf_packs]). When provided, engram_fetch
                 will return a fetched_sf tensor alongside fetched data.
+            zero_copy: whether to map storage host memory in place. The parameter
+                is keyword-only. Inference defaults to False; training defaults to
+                True and rejects False. Mapping failure is a hard error.
 
         Returns:
             None
@@ -802,6 +848,19 @@ class ElasticBuffer:
             `torch.empty(..., pin_memory=True)`); plain (non-pinned) CPU memory is not
             supported by the driver's host-register path.
         """
+        _torch_check(
+            zero_copy is None or isinstance(zero_copy, bool),
+            lambda: (
+                f"zero_copy must be a boolean or None, got {type(zero_copy).__name__}: "
+                f"{zero_copy!r}."
+            ),
+        )
+        effective_zero_copy = zero_copy if zero_copy is not None else self._with_grad
+        if self._with_grad:
+            _torch_check(
+                effective_zero_copy,
+                lambda: "with_grad=True always maps storage directly; zero_copy=False is rejected.",
+            )
         torch._check(
             storage.is_cpu,
             lambda: f"storage must be on CPU, got device: {storage.device}",
@@ -841,6 +900,18 @@ class ElasticBuffer:
                 lambda: "engram_write in with_grad mode requires a non-empty storage",
             )
         if sf is not None:
+            torch._check(
+                sf.dim() == 2,
+                lambda: f"sf must be 2D, got dimensions: {sf.dim()}",
+            )
+            torch._check(
+                sf.is_contiguous(),
+                lambda: "sf must be contiguous",
+            )
+            torch._check(
+                sf.size(1) > 0,
+                lambda: f"sf second dimension must be positive, got: {sf.size(1)}",
+            )
             if self._with_grad:
                 torch._check(
                     sf.is_cpu,
@@ -859,14 +930,33 @@ class ElasticBuffer:
                     lambda: f"sf dim0 ({sf.size(0)}) must match storage dim0 "
                     f"({storage.size(0)}) in with_grad mode, sf must be the per-rank table",
                 )
+            else:
+                expected_sf_rows = (
+                    storage.size(0)
+                    if self._group is None
+                    else storage.size(0) * self._ep_world_size
+                )
+                torch._check(
+                    sf.size(0) == expected_sf_rows,
+                    lambda: (
+                        f"inference sf dim0 ({sf.size(0)}) must match the full-vocab rows "
+                        f"({expected_sf_rows}); sliced mode uses storage dim0 "
+                        f"({storage.size(0)}) * world_size ({self._ep_world_size}), and local mode uses "
+                        f"storage dim0 ({storage.size(0)})"
+                    ),
+                )
+                torch._check(
+                    sf.device.type == torch.device("npu").type,
+                    lambda: f"inference sf must be on NPU, got device: {sf.device}",
+                )
             torch._check(
                 sf.dtype in _ENGRAM_SF_DTYPES,
                 lambda: f"sf dtype must be one of {_ENGRAM_SF_DTYPES}, got: {sf.dtype}",
             )
-        self._runtime.engram_write(storage, sf)
-        if self._with_grad:
+        self._runtime.engram_write(storage, sf, effective_zero_copy)
+        if effective_zero_copy:
             self._engram_storage_ref = storage
-            if sf is not None:
+            if self._with_grad and sf is not None:
                 self._engram_sf_ref = sf
         self._engram_context_tensor = self._runtime.get_context_tensor()
         self._engram_hidden_size = storage.size(1)
@@ -982,6 +1072,10 @@ class ElasticBuffer:
             with_cpu_sync: whether to call `aclrtSynchronizeDevice` before and after the barrier
                 to fully drain the device.
         """
+        torch._check(
+            self._group is not None,
+            lambda: "barrier() is not supported when group=None; local mode has no communication domain.",
+        )
         self._runtime.engram_barrier(use_comm_stream, with_cpu_sync)
 
     def engram_fetch_grad(
@@ -1452,6 +1546,8 @@ class ElasticBuffer:
             raise RuntimeError(f"indices must be 1D, got dimensions: {indices.dim()}")
         if indices.dtype != torch.int32:
             raise RuntimeError(f"indices dtype must be int32, got: {indices.dtype}")
+        if not indices.is_contiguous():
+            raise RuntimeError("indices must be contiguous")
         if self._runtime is None:
             raise RuntimeError(
                 "engram_fetch cannot be called after destroy, please create a new ElasticBuffer instance"

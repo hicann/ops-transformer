@@ -83,6 +83,11 @@ public:
 private:
     __aicore__ inline void LocalCopySlice(GM_ADDR dst, GM_ADDR src, uint64_t len);
     __aicore__ inline void GatherSf(int32_t globalIdx, uint64_t globalTokenIdx);
+    template <bool HasSf>
+    __aicore__ inline void GatherWave(const AscendC::LocalTensor<int32_t>& indicesLocal, uint32_t batchOffset,
+                                      uint32_t waveLen, uint32_t tokenBase);
+    template <bool HasSf>
+    __aicore__ inline void LocalFetchRange(uint32_t indicesBatchStart, uint32_t tokenStart, uint32_t tokenEnd);
     __aicore__ inline void CopyContextToUb();
     __aicore__ inline void CopyIndicesToUb(uint32_t indicesBatchStart, uint32_t indicesBatchLen);
     __aicore__ inline void ScatterByRank(uint32_t batchLen);
@@ -108,6 +113,8 @@ private:
     uint64_t ubSize_{0};
     uint32_t indicesBatchSize_{0};
     uint32_t tileBytes_{TILE_BYTES_INFER_MAX};
+    bool localWaveEnabled_{false};
+    uint32_t localRowsPerWave_{1U};
     int64_t numTokens_{0};
     int64_t hiddenBytes_{0};
 
@@ -170,7 +177,30 @@ __aicore__ inline void EngramFetchArch35::Init(GM_ADDR commContext, GM_ADDR indi
     numSfPacks_ = tilingData->numSfPacks;
     sfElemSize_ = tilingData->sfElemSize;
 
-    tileBytes_ = AscendC::Ceil(static_cast<uint32_t>(hiddenBytes_), UB_ALIGN) * UB_ALIGN;
+    const uint64_t alignedHiddenBytes = (static_cast<uint64_t>(hiddenBytes_) + UB_ALIGN - 1U) / UB_ALIGN * UB_ALIGN;
+    tileBytes_ =
+        alignedHiddenBytes > TILE_BYTES_INFER_MAX ? TILE_BYTES_INFER_MAX : static_cast<uint32_t>(alignedHiddenBytes);
+    uint64_t sfBytes = 0U;
+    if (numSfPacks_ > 0 && sfElemSize_ > 0) {
+        sfBytes = static_cast<uint64_t>(numSfPacks_) * static_cast<uint64_t>(sfElemSize_);
+    }
+    const uint64_t sfSlot = (sfBytes + UB_ALIGN - 1U) / UB_ALIGN * UB_ALIGN;
+    uint64_t rowBytes = static_cast<uint64_t>(hiddenBytes_) + sfSlot;
+    localWaveEnabled_ = false;
+    localRowsPerWave_ = 1U;
+    // wave 打包要求行宽按 32B 对齐；不满足时保留逐行 fallback。
+    if (numRanks_ == 1U && hiddenBytes_ > 0 && static_cast<uint64_t>(hiddenBytes_) % UB_ALIGN == 0U &&
+        rowBytes <= TILE_BYTES_INFER_MAX) {
+        uint32_t rows = static_cast<uint32_t>(static_cast<uint64_t>(TILE_BYTES_INFER_MAX) / rowBytes);
+        constexpr uint32_t minRowsPerWave = 8U;
+        uint64_t waveFixedUb = HCOMM_INIT_SIZE + ENGRAM_BATCH_BUFFER_BYTES + UB_RESERVED_SIZE + UB_ALIGN * 5U;
+        uint64_t waveRelayUb = static_cast<uint64_t>(TILE_BYTES_INFER_MAX) * RELAY_BUFFER_NUM_INFER;
+        if (rows >= minRowsPerWave && waveFixedUb + waveRelayUb <= ubSize_) {
+            localWaveEnabled_ = true;
+            localRowsPerWave_ = rows;
+            tileBytes_ = TILE_BYTES_INFER_MAX;
+        }
+    }
     if (tileBytes_ > TILE_BYTES_INFER_MAX) {
         tileBytes_ = TILE_BYTES_INFER_MAX;
     }
@@ -326,8 +356,20 @@ __aicore__ inline void EngramFetchArch35::Process()
             }
             CopyIndicesToUb(indicesBatchStart, indicesBatchLen);
             SyncFunc<AscendC::HardEvent::MTE2_S>();
-            ScatterByRank(indicesBatchLen);
-            FetchByRank<HasSf>(indicesBatchStart);
+            if (numRanks_ == 1U) {
+                uint32_t totalBlocks = AscendC::GetBlockNum();
+                auto range = GetTokenRangeAssignment(totalBlocks, aivId_, numTokens);
+                uint32_t batchEnd = indicesBatchStart + indicesBatchLen;
+                uint32_t tokenStart = (range.start > indicesBatchStart) ? range.start : indicesBatchStart;
+                uint32_t tokenStop = range.start + range.count;
+                tokenStop = (tokenStop > batchEnd) ? batchEnd : tokenStop;
+                if (tokenStart < tokenStop) {
+                    LocalFetchRange<HasSf>(indicesBatchStart, tokenStart, tokenStop);
+                }
+            } else {
+                ScatterByRank(indicesBatchLen);
+                FetchByRank<HasSf>(indicesBatchStart);
+            }
             indicesBatchStart += indicesBatchLen;
         }
     }
@@ -351,6 +393,10 @@ __aicore__ inline void EngramFetchArch35::LocalFetchTokens(uint32_t indicesBatch
     for (uint32_t tokenPos = tokenOffset; tokenPos < cnt; tokenPos += tokenStride) {
         uint32_t i = tokenIdxInRank(rankStart + tokenPos);
         int32_t globalIdx = indicesLocal(i);
+        const int64_t totalEntries = static_cast<int64_t>(numEntriesPerRank_) * numRanks_;
+        if (globalIdx < 0 || static_cast<int64_t>(globalIdx) >= totalEntries) {
+            continue;
+        }
         uint32_t localEntryIdx = static_cast<uint32_t>(globalIdx) - localIdxStart;
         uint64_t globalTokenIdx = indicesBatchStart + i;
         GM_ADDR dst = fetchedGM_ + globalTokenIdx * hiddenBytes;
@@ -359,6 +405,110 @@ __aicore__ inline void EngramFetchArch35::LocalFetchTokens(uint32_t indicesBatch
         if constexpr (HasSf) {
             GatherSf(globalIdx, globalTokenIdx);
         }
+    }
+    SyncFunc<AscendC::HardEvent::MTE3_S>();
+}
+
+template <bool HasSf>
+__aicore__ inline void EngramFetchArch35::GatherWave(const AscendC::LocalTensor<int32_t>& indicesLocal,
+                                                     uint32_t batchOffset, uint32_t waveLen, uint32_t tokenBase)
+{
+    // 将同一 wave 的 data 与 SF 打包到 relay buffer，减少搬运次数。
+    const uint64_t hiddenBytes = static_cast<uint64_t>(hiddenBytes_);
+    uint64_t sfBytes = 0U;
+    if constexpr (HasSf) {
+        sfBytes = static_cast<uint64_t>(numSfPacks_) * static_cast<uint64_t>(sfElemSize_);
+    }
+    const uint32_t sfSlot = static_cast<uint32_t>((sfBytes + UB_ALIGN - 1U) / UB_ALIGN * UB_ALIGN);
+    const uint32_t dataBytes = static_cast<uint32_t>(waveLen) * static_cast<uint32_t>(hiddenBytes_);
+
+    AscendC::LocalTensor<uint64_t> commBufferLocal = commBufferBuf_.Get<uint64_t>();
+    GM_ADDR tableBase = (GM_ADDR)commBufferLocal(rankId_);
+    AscendC::GlobalTensor<uint8_t> srcGm;
+    srcGm.SetGlobalBuffer((__gm__ uint8_t*)tableBase);
+    AscendC::LocalTensor<uint8_t> relayBuffer = relayQue_.AllocTensor<uint8_t>();
+    AscendC::DataCopyExtParams dataLoadParams{1U, static_cast<uint32_t>(hiddenBytes), 0U, 0U, 0U};
+    AscendC::DataCopyPadExtParams<uint8_t> loadPad{false, 0, 0, 0};
+    for (uint32_t row = 0; row < waveLen; ++row) {
+        int32_t entry = indicesLocal.GetValue(batchOffset + row);
+        AscendC::DataCopyPad(relayBuffer[row * hiddenBytes], srcGm[static_cast<uint64_t>(entry) * hiddenBytes],
+                             dataLoadParams, loadPad);
+    }
+    if constexpr (HasSf) {
+        AscendC::GlobalTensor<uint8_t> sfSrcGm;
+        sfSrcGm.SetGlobalBuffer(sfTableGM_);
+        AscendC::DataCopyExtParams sfLoadParams{1U, static_cast<uint32_t>(sfBytes), 0U, 0U, 0U};
+        for (uint32_t row = 0; row < waveLen; ++row) {
+            int32_t entry = indicesLocal.GetValue(batchOffset + row);
+            AscendC::DataCopyPad(relayBuffer[dataBytes + row * sfSlot], sfSrcGm[static_cast<uint64_t>(entry) * sfBytes],
+                                 sfLoadParams, loadPad);
+        }
+    }
+    relayQue_.EnQue<uint8_t>(relayBuffer);
+    relayBuffer = relayQue_.DeQue<uint8_t>();
+
+    AscendC::GlobalTensor<uint8_t> dstGm;
+    dstGm.SetGlobalBuffer((__gm__ uint8_t*)fetchedGM_);
+    AscendC::DataCopyParams dataStoreParams{1U, static_cast<uint16_t>(dataBytes), 0U, 0U};
+    AscendC::DataCopyPad(dstGm[static_cast<uint64_t>(tokenBase) * hiddenBytes], relayBuffer, dataStoreParams);
+    if constexpr (HasSf) {
+        AscendC::GlobalTensor<uint8_t> sfDstGm;
+        sfDstGm.SetGlobalBuffer((__gm__ uint8_t*)fetchedSfGM_);
+        AscendC::DataCopyParams sfStoreParams{1U, static_cast<uint16_t>(sfBytes), 0U, 0U};
+        for (uint32_t row = 0; row < waveLen; ++row) {
+            AscendC::DataCopyPad(sfDstGm[static_cast<uint64_t>(tokenBase + row) * sfBytes],
+                                 relayBuffer[dataBytes + row * sfSlot], sfStoreParams);
+        }
+    }
+    relayQue_.FreeTensor<uint8_t>(relayBuffer);
+}
+
+template <bool HasSf>
+__aicore__ inline void EngramFetchArch35::LocalFetchRange(uint32_t indicesBatchStart, uint32_t tokenStart,
+                                                          uint32_t tokenEnd)
+{
+    AscendC::LocalTensor<uint64_t> commBufferLocal = commBufferBuf_.Get<uint64_t>();
+    AscendC::LocalTensor<int32_t> indicesLocal = indicesBuf_.Get<int32_t>();
+    GM_ADDR tableBase = (GM_ADDR)commBufferLocal(rankId_);
+    const uint64_t hiddenBytes = static_cast<uint64_t>(hiddenBytes_);
+    const int64_t totalEntries = static_cast<int64_t>(numEntriesPerRank_) * static_cast<int64_t>(numRanks_);
+    uint32_t current = tokenStart;
+    while (current < tokenEnd) {
+        uint32_t waveLen = tokenEnd - current;
+        if (!localWaveEnabled_) {
+            waveLen = tokenEnd - current;
+        } else if (waveLen > localRowsPerWave_) {
+            waveLen = localRowsPerWave_;
+        }
+        bool hasInvalid = false;
+        if (localWaveEnabled_) {
+            for (uint32_t offset = 0; offset < waveLen; ++offset) {
+                int32_t entry = indicesLocal.GetValue(current - indicesBatchStart + offset);
+                if (entry < 0 || static_cast<int64_t>(entry) >= totalEntries) {
+                    hasInvalid = true;
+                    break;
+                }
+            }
+        }
+        if (localWaveEnabled_ && !hasInvalid) {
+            GatherWave<HasSf>(indicesLocal, current - indicesBatchStart, waveLen, current);
+            current += waveLen;
+            continue;
+        }
+        for (uint32_t offset = 0; offset < waveLen; ++offset) {
+            uint32_t token = current + offset;
+            int32_t entry = indicesLocal.GetValue(token - indicesBatchStart);
+            if (entry < 0 || static_cast<int64_t>(entry) >= totalEntries) {
+                continue;
+            }
+            GM_ADDR dst = fetchedGM_ + static_cast<uint64_t>(token) * hiddenBytes;
+            GM_ADDR src = tableBase + static_cast<uint64_t>(entry) * hiddenBytes;
+            LocalCopySlice(dst, src, hiddenBytes);
+            if constexpr (HasSf) {
+                GatherSf(entry, token);
+            }
+        }
+        current += waveLen;
     }
     SyncFunc<AscendC::HardEvent::MTE3_S>();
 }
@@ -468,20 +618,23 @@ __aicore__ inline void EngramFetchArch35::FetchByRank(uint32_t indicesBatchStart
 
 __aicore__ inline void EngramFetchArch35::GatherSf(int32_t globalIdx, uint64_t globalTokenIdx)
 {
-    uint32_t sfBytes = static_cast<uint32_t>(numSfPacks_) * static_cast<uint32_t>(sfElemSize_);
+    // tiling 已保证单行 SF 不超过 relay tile，因此这里可一次拷贝完整 SF 行。
+    const uint64_t sfBytes = static_cast<uint64_t>(numSfPacks_) * static_cast<uint64_t>(sfElemSize_);
     GM_ADDR sfSrc = sfTableGM_ + static_cast<uint64_t>(globalIdx) * sfBytes;
     GM_ADDR sfDst = fetchedSfGM_ + globalTokenIdx * sfBytes;
     AscendC::GlobalTensor<uint8_t> sfSrcGm;
     AscendC::GlobalTensor<uint8_t> sfDstGm;
     sfSrcGm.SetGlobalBuffer((__gm__ uint8_t*)sfSrc);
     sfDstGm.SetGlobalBuffer((__gm__ uint8_t*)sfDst);
+
+    const uint32_t sfCopyBytes = static_cast<uint32_t>(sfBytes);
     AscendC::LocalTensor<uint8_t> sfTmp = relayQue_.AllocTensor<uint8_t>();
-    AscendC::DataCopyExtParams sfCopyIn{1U, sfBytes, 0U, 0U, 0U};
+    AscendC::DataCopyExtParams sfCopyIn{1U, sfCopyBytes, 0U, 0U, 0U};
     AscendC::DataCopyPadExtParams<uint8_t> sfPadIn{false, 0, 0, 0};
     AscendC::DataCopyPad(sfTmp, sfSrcGm, sfCopyIn, sfPadIn);
     relayQue_.EnQue<uint8_t>(sfTmp);
     sfTmp = relayQue_.DeQue<uint8_t>();
-    AscendC::DataCopyExtParams sfCopyOut{1U, sfBytes, 0U, 0U, 0U};
+    AscendC::DataCopyExtParams sfCopyOut{1U, sfCopyBytes, 0U, 0U, 0U};
     AscendC::DataCopyPad(sfDstGm, sfTmp, sfCopyOut);
     relayQue_.FreeTensor<uint8_t>(sfTmp);
 }
