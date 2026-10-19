@@ -19,8 +19,8 @@
 namespace optiling {
 
 // 数组长度
-constexpr uint32_t NPU_AIC_CORE_NUM = 36;
-constexpr uint32_t NPU_AIV_CORE_NUM = 72;
+constexpr uint32_t NPU_AIC_CORE_NUM = 80;
+constexpr uint32_t NPU_AIV_CORE_NUM = 80;
 
 constexpr uint32_t FA_METADATA_SIZE = 8;
 constexpr uint32_t FD_METADATA_SIZE = 8;
