@@ -324,7 +324,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::Init(
     params_.expertTokenNumsOutGmAddr = expertTokenNumsOut;
     params_.probsGmAddr = topkWeights;
     (void)workspaceGM;
-    params_.peermemInfo = PeermemInfo(g_winRankAddr_[rankId_], tilingData, A_ELEMS_PER_BYTE);
+    params_.peermemInfo = PeermemInfo(tilingData, A_ELEMS_PER_BYTE, g_winRankAddr_[rankId_]);
     {
         WorkspaceLayout workspaceLayout(tilingData);
         params_.workspaceInfo.Bind(params_.peermemInfo.cclDataPtr, workspaceLayout);
@@ -441,7 +441,7 @@ __aicore__ inline uint32_t MegaMoe<TemplateMegaMoeTypeFunc>::InitQuantScratchTen
     uint32_t xInAlignSize = Ops::Base::CeilAlign(k_, static_cast<uint32_t>(ALIGN_128)) * sizeof(bfloat16_t);
 
     quantScratch_.inputGm.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(params_.aGmAddr));
-    quantScratch_.outputGm.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t*>(params_.peermemInfo.quantTokenScalePtr));
+    quantScratch_.outputGm.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t*>(params_.peermemInfo.quantTokenScale.ptr));
     quantScratch_.mxTempTensor =
         LocalTensor<uint16_t>(TPosition::VECCALC, mxTempTensorAddr, mxTempTensorSize / sizeof(uint16_t));
     uint32_t xOutTensorAddr1 = mxTempTensorAddr + mxTempTensorSize;
@@ -571,7 +571,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ConfigureSharedGmm1Inpu
         gmmAddrInfo.aGlobal = params_.aGmAddr;
         gmmAddrInfo.aScaleGlobal = params_.xScaleGmAddr;
     } else {
-        GM_ADDR sharedInputBase = SHARED_INPUT_REUSES_MOE_QUANT ? params_.peermemInfo.quantTokenScalePtr :
+        GM_ADDR sharedInputBase = SHARED_INPUT_REUSES_MOE_QUANT ? params_.peermemInfo.quantTokenScale.ptr :
                                                                   params_.workspaceInfo.sharedExpertInputPtr;
         gmmAddrInfo.aGlobal = sharedInputBase;
         gmmAddrInfo.aScaleGlobal = sharedInputBase + sharedQuantProcessConfig_.quantTokenAlignBytes;
@@ -921,7 +921,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ExportAndResetExpertCou
         SyncFuncStatic<HardEvent::MTE3_V, SYNC_EVENT_ID2>();
         Duplicate<int32_t>(resetTensor_, 0, resetTensor_.GetSize());
         SyncFuncStatic<HardEvent::V_MTE3, SYNC_EVENT_ID2>();
-        ResetWorkspaceRegionWithStride(resetRange, params_.peermemInfo.expertCountRecvPtr, MTE_COUNT_SLOT_BYTES,
+        ResetWorkspaceRegionWithStride(resetRange, params_.peermemInfo.expertCountRecv.ptr, MTE_COUNT_SLOT_BYTES,
                                        resetTensor_);
     }
     // 输出和本轮有效 count 槽清零均完成后，才进入共享 GMM2 及出口跨卡握手。
@@ -944,14 +944,14 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::PrepareLocalInput()
             QuantizeInputTokens(tokenRange);
         } else {
             PackPreQuantizedLocalTokens<XType, TopkWeightsType, TopkWeightsPrefetch>(
-                tokenRange, commonConfig_, params_, quantProcessConfig_, params_.peermemInfo.quantTokenScalePtr,
+                tokenRange, commonConfig_, params_, quantProcessConfig_, params_.peermemInfo.quantTokenScale.ptr,
                 preQuantScratch_);
             // 预量化共享专家与 MoE 类型一致；64 对齐时直接读取原始输入，
             // 否则复用这里的 MoE 拼接结果，无需独立打包共享输入。
         }
     }
     // 每个物理 AIV 推进入口轮次一次，空 token 核也参与。
-    IncrementSyncCount(params_.peermemInfo.rankSyncInWorldPtr, aivCoreIdx_);
+    IncrementSyncCount(params_.peermemInfo.rankSync.ptr, aivCoreIdx_);
     // MoE 及可选共享 token 数据和 scale 写回后，发布 token 数据就绪通知。
     // 空 token 核也必须报告，保证全 AIV 事件配对。
     CrossCoreSetFlag<ALL_AICORE_SYNC_MODE, PIPE_MTE3>(TOKEN_DATA_READY_FLAG);
@@ -978,7 +978,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessInputPreparation
         }
         if (ownedExpertRange.count > 0U) {
             PipeBarrier<PIPE_MTE3>();
-            auto* syncCountAddr = GetSyncCountAddress(params_.peermemInfo.rankSyncInWorldPtr, aivCoreIdx_);
+            auto* syncCountAddr = GetSyncCountAddress(params_.peermemInfo.rankSync.ptr, aivCoreIdx_);
             const int32_t syncCount = ReadGmByPassDCache(syncCountAddr);
             SendTopkIdsCountForExperts(ownedExpertRange, commonConfig_, syncCount, g_winRankAddr_, sendMaskConfig_,
                                        sendMaskScratch_);
@@ -1052,7 +1052,7 @@ template <TemplateMegaMoeTypeClass>
 __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessTokenUnpermuteStage()
 {
     exceptionDump_.UpdateStage(MegaMoeImpl::Stage::CROSS_RANK_SYNC_OUTPUT);
-    CrossRankSyncInWorldSize(params_.peermemInfo.rankSyncInWorldPtr, rankId_, worldSize_, aivJob_);
+    CrossRankSyncInWorldSize(params_.peermemInfo.rankSync.ptr, rankId_, worldSize_, aivJob_);
     exceptionDump_.UpdateStage(MegaMoeImpl::Stage::UNPERMUTE);
     MegaMoeUnpermuteBufferConfig unpermuteBufferConfig = InitTokenUnpermuteBuffers();
     UnpermuteTokens<CombineQuantMode, TopkWeightsType, TopkWeightsPrefetch, GMM1_TILE_M>(

@@ -48,35 +48,21 @@ constexpr int64_t PEERMEM_SYNC_SLOT_SIZE = static_cast<int64_t>(INT_CACHELINE) *
 constexpr int64_t TOPO_TYPE_MTE = 0U;
 constexpr int64_t TOPO_TYPE_URMA = 1U;
 
-HOST_DEVICE int64_t CalcUrmaSyncCountOffset(int64_t epWorldSize)
+HOST_DEVICE int64_t CalcUrmaRankSyncSize(int64_t epWorldSize)
 {
     int64_t rankSyncSize = epWorldSize * PEERMEM_SYNC_SLOT_SIZE;
     return rankSyncSize > PEERMEM_MIN_RANK_SYNC_SIZE ? rankSyncSize : PEERMEM_MIN_RANK_SYNC_SIZE;
 }
 
-HOST_DEVICE int64_t CalcPeermemDataOffset(int64_t topoType, int64_t epWorldSize)
-{
-    if (topoType == TOPO_TYPE_URMA) {
-        return Ops::Base::CeilAlign(CalcUrmaSyncCountOffset(epWorldSize) + PEERMEM_SYNC_COUNT_REGION_SIZE, ALIGN_512);
-    }
-    return PEERMEM_DATA_OFFSET;
-}
-
 // ============================ 各区尺寸（host / device 共用） ============================
 
 // URMA layered 路径仍使用 mask 槽；MTE WAVE 不再经过该布局。
-HOST_DEVICE int64_t CalcDispatchMaskAlignSizeBy(int64_t numMaxTokensPerRank, int64_t topK)
+HOST_DEVICE int64_t CalcDispatchMaskAlignSize(int64_t numMaxTokensPerRank, int64_t topK)
 {
     int64_t sendTotalNum = numMaxTokensPerRank * topK;
     int64_t alignedRouteCount = Ops::Base::CeilAlign(sendTotalNum * static_cast<int64_t>(sizeof(int32_t)), ALIGN_256) /
                                 static_cast<int64_t>(sizeof(int32_t));
     return Ops::Base::CeilAlign(alignedRouteCount / static_cast<int64_t>(BITS_PER_BYTE), ALIGN_32);
-}
-
-HOST_DEVICE int64_t CalcDispatchMaskAlignSize(const MegaMoeTilingData* tilingData)
-{
-    return CalcDispatchMaskAlignSizeBy(static_cast<int64_t>(tilingData->numMaxTokensPerRank),
-                                       static_cast<int64_t>(tilingData->topK));
 }
 
 // 所有 Rank 使用一致的 numMaxTokensPerRank，因此可据此统一选择 int16 或 int32 编码。
@@ -100,24 +86,6 @@ HOST_DEVICE int64_t CalcDispatchRouteIndexAlignSize(const MegaMoeTilingData* til
                                 ALIGN_32);
 }
 
-// route index 接收区不携带槽尾 count；MTE count 使用独立的 512B 间隔表。
-HOST_DEVICE int64_t CalcRouteIndexRecvSize(int64_t routeIndexAlignSize, int64_t moeExpertPerRank, int64_t epWorldSize)
-{
-    return Ops::Base::CeilAlign(moeExpertPerRank * epWorldSize * routeIndexAlignSize, ALIGN_512);
-}
-
-HOST_DEVICE int64_t CalcMaskRecvSize(int64_t maskAlignSize, int64_t moeExpertPerRank, int64_t epWorldSize)
-{
-    int64_t maskSlotSize = maskAlignSize + ALIGN_32;
-    return Ops::Base::CeilAlign(moeExpertPerRank * epWorldSize * maskSlotSize, ALIGN_512);
-}
-
-// URMA 的独立 raw count 表仍按 [localExpert][sourceRank] 连续排列；不使用 MTE slot 布局。
-HOST_DEVICE int64_t CalcExpertCountRecvSize(int64_t moeExpertPerRank, int64_t epWorldSize)
-{
-    return Ops::Base::CeilAlign(moeExpertPerRank * epWorldSize * static_cast<int64_t>(sizeof(int32_t)), ALIGN_512);
-}
-
 // dedupMode 的值就是门控后实际开启的去重模式：
 // 0 = dispatch 关、combine 关；1 = dispatch 关、combine 开；
 // 2 = dispatch 开、combine 关；3 = dispatch 开、combine 开。
@@ -132,7 +100,8 @@ HOST_DEVICE constexpr bool IsCombineDedupOn(int32_t dedupMode)
     return dedupMode == 1 || dedupMode == 3;
 }
 
-// 单 token 的量化记录字节数 = 量化数据 + mx scale（prefetch 场景再拼 topk 权重），按 32B 对齐。
+// 单 token 的量化记录包含数据和 mx scale，按 32B 对齐。
+// topkWeightsPrefetch 控制是否追加 topK 权重；调用方也可因 Combine 去重开启该记录段。
 HOST_DEVICE int64_t CalcQuantTokenScaleBytes(int64_t h, uint32_t elemsPerByte, int64_t topK, bool topkWeightsPrefetch)
 {
     uint32_t mxScaleNum = Ops::Base::CeilDiv(static_cast<uint32_t>(h), static_cast<uint32_t>(ALIGN_32));
@@ -169,141 +138,124 @@ HOST_DEVICE int64_t CalcCombineTokenBytes(int64_t h, int64_t yDtypeSize, bool is
     return Ops::Base::CeilAlign(tokenStorageBytes + storedScaleBytes, ALIGN_32);
 }
 
-// 计算窗口总大小的入参（供 host 侧 tiling 校验 cclBufferSize 使用）。
-struct PeermemSizeParams {
-    int64_t numMaxTokensPerRank;
-    int64_t topK;
-    int64_t h;
-    int64_t moeExpertPerRank;
-    int64_t epWorldSize;
-    int64_t yDtypeSize;
-    uint32_t elemsPerByte;
-    bool topkWeightsPrefetch;
-    bool isQuantCombine;
-    int64_t topoType;
-    int64_t serverNum;
+// GM 区域保存相对基址的偏移、字节数和初始化时计算的地址。
+struct GmMemoryRegion {
+    int64_t offset{-1};
+    int64_t size{0};
+    GM_ADDR ptr{nullptr};
 };
 
-// peermem 各分段尺寸。Host 打印、窗口下限校验共用该结果，避免重复维护布局公式。
-struct PeermemLayoutSizes {
-    int64_t dataOffset;
-    int64_t maskAlignSize;
-    int64_t maskRecvSize;
-    int64_t expertCountRecvSize;
-    int64_t tokenScaleBytes;
-    int64_t relayDataSize;
-    int64_t relayFlagSize;
-    int64_t dispatchRecordAreaSize;
-    int64_t combineTokenBytes;
-    int64_t combineSendSize;
-};
-
-HOST_DEVICE PeermemLayoutSizes CalcPeermemLayoutSizes(const PeermemSizeParams& params)
-{
-    PeermemLayoutSizes sizes{};
-    sizes.dataOffset = CalcPeermemDataOffset(params.topoType, params.epWorldSize);
-    sizes.maskAlignSize = CalcDispatchMaskAlignSizeBy(params.numMaxTokensPerRank, params.topK);
-    if (params.topoType == TOPO_TYPE_MTE) {
-        int64_t routeIndexAlignSize = Ops::Base::CeilAlign(
-            params.numMaxTokensPerRank * CalcTopkIndexTypeBytes(params.numMaxTokensPerRank, params.topK), ALIGN_32);
-        sizes.maskRecvSize = CalcRouteIndexRecvSize(routeIndexAlignSize, params.moeExpertPerRank, params.epWorldSize);
-    } else {
-        sizes.maskRecvSize = CalcMaskRecvSize(sizes.maskAlignSize, params.moeExpertPerRank, params.epWorldSize);
-    }
-    sizes.expertCountRecvSize = params.topoType == TOPO_TYPE_MTE ?
-                                    PEERMEM_MTE_COUNT_REGION_SIZE :
-                                    CalcExpertCountRecvSize(params.moeExpertPerRank, params.epWorldSize);
-    sizes.tokenScaleBytes =
-        CalcQuantTokenScaleBytes(params.h, params.elemsPerByte, params.topK, params.topkWeightsPrefetch);
-    sizes.dispatchRecordAreaSize = Ops::Base::CeilAlign(params.numMaxTokensPerRank * sizes.tokenScaleBytes, ALIGN_512);
-    if (params.topoType == TOPO_TYPE_URMA) {
-        int64_t relayRecordBytes = Ops::Base::CeilAlign(sizes.tokenScaleBytes, ALIGN_512);
-        sizes.relayDataSize =
-            Ops::Base::CeilAlign(params.numMaxTokensPerRank * relayRecordBytes * params.serverNum, ALIGN_512);
-        sizes.relayFlagSize = Ops::Base::CeilAlign(
-            params.serverNum * params.numMaxTokensPerRank * static_cast<int64_t>(sizeof(uint64_t)), ALIGN_512);
-        sizes.dispatchRecordAreaSize = sizes.relayDataSize + sizes.relayFlagSize;
-    }
-    sizes.combineTokenBytes = CalcCombineTokenBytes(params.h, params.yDtypeSize, params.isQuantCombine);
-    sizes.combineSendSize =
-        Ops::Base::CeilAlign(params.numMaxTokensPerRank * params.topK * sizes.combineTokenBytes, ALIGN_512);
-    return sizes;
-}
-
-/*
- * peermem 窗口所需的最小字节数，逐段与下方 PeermemInfo 构造函数的偏移推进同源：
- *   MTE：同步区 + 固定 count 接收区 + route 接收区 + dispatch 接收区 + combine 接收区。
- *   URMA：同步区 + mask 接收区 + count 接收区 + dispatch 接收区 + combine 接收区。
- * host 侧 tiling 用它校验用户传入的 cclBufferSize，不再各自手写一份布局公式。
- */
-HOST_DEVICE int64_t CalcPeermemLeastSize(const PeermemSizeParams& params)
-{
-    PeermemLayoutSizes sizes = CalcPeermemLayoutSizes(params);
-    return sizes.dataOffset + sizes.maskRecvSize + sizes.expertCountRecvSize + sizes.dispatchRecordAreaSize +
-           sizes.combineSendSize;
-}
-
-#if defined(__DAV_C310_CUBE__) || defined(__DAV_C310_VEC__)
-// device 侧窗口各区基址；偏移推进顺序即上方 CalcPeermemLeastSize 的分段顺序。
+// Host 和 kernel 使用同一布局；base 不包含 MTE 调用方预留的异常 dump 区。
 struct PeermemInfo {
-    GM_ADDR rankSyncInWorldPtr{nullptr};
-    GM_ADDR maskRecvPtr{nullptr};
-    GM_ADDR expertCountRecvPtr{nullptr};
-    GM_ADDR quantTokenScalePtr{nullptr};
-    GM_ADDR dispatchReceivePtr{nullptr};
-    GM_ADDR dispatchFlagPtr{nullptr};
-    GM_ADDR combineSendPtr{nullptr};
-    GM_ADDR cclDataPtr{nullptr}; // CCL 数据区起始地址，相对 peermem 基址按 512B 对齐。
+    GmMemoryRegion rankSync;
+    GmMemoryRegion syncCount;
+    GmMemoryRegion maskRecv;
+    GmMemoryRegion expertCountRecv;
+    GmMemoryRegion quantTokenScale;
+    GmMemoryRegion dispatchReceive;
+    GmMemoryRegion dispatchFlag;
+    GmMemoryRegion combineSend;
+    GM_ADDR cclDataPtr{nullptr}; // 通信区之后按 512B 对齐的 Workspace 基址。
+    int64_t totalSize{0};
 
-    __aicore__ inline PeermemInfo() = default;
-    __aicore__ inline PeermemInfo(GM_ADDR base, const MegaMoeTilingData* tilingData, uint32_t elemsPerByte = 1,
-                                  uint32_t serverNum = 1)
+    HOST_DEVICE PeermemInfo() = default;
+
+    HOST_DEVICE explicit PeermemInfo(const MegaMoeTilingData* tilingData, uint32_t elemsPerByte = 1,
+                                     GM_ADDR windowBase = nullptr)
+        : base_(windowBase)
     {
-        PeermemSizeParams params{};
-        params.numMaxTokensPerRank = static_cast<int64_t>(tilingData->numMaxTokensPerRank);
-        params.topK = static_cast<int64_t>(tilingData->topK);
-        params.h = static_cast<int64_t>(tilingData->h);
-        params.moeExpertPerRank = static_cast<int64_t>(tilingData->moeExpertPerRank);
-        params.epWorldSize = static_cast<int64_t>(tilingData->epWorldSize);
-        params.yDtypeSize = static_cast<int64_t>(sizeof(bfloat16_t));
-        params.elemsPerByte = elemsPerByte;
-        params.topkWeightsPrefetch = (tilingData->topkWeightsPrefetch == 1 || IsCombineDedupOn(tilingData->dedupMode));
-        params.isQuantCombine = tilingData->combineQuantMode != COMBINE_NO_QUANT;
-        params.topoType = tilingData->topoType;
-        params.serverNum = static_cast<int64_t>(serverNum);
-        PeermemLayoutSizes sizes = CalcPeermemLayoutSizes(params);
-
-        rankSyncInWorldPtr = base;
-        int64_t offset = sizes.dataOffset;
         if (tilingData->topoType == TOPO_TYPE_MTE) {
-            // count 固定在同步区之后的 1 MiB，避免可变路由区覆盖历史 count 槽。
-            expertCountRecvPtr = base + offset;
-            offset += sizes.expertCountRecvSize;
-            maskRecvPtr = base + offset;
-            offset += sizes.maskRecvSize;
+            InitializeMteLayout(*tilingData, elemsPerByte);
         } else {
-            maskRecvPtr = base + offset;
-            offset += sizes.maskRecvSize;
-            expertCountRecvPtr = base + offset;
-            offset += sizes.expertCountRecvSize;
+            InitializeUrmaLayout(*tilingData, elemsPerByte);
         }
+        cclDataPtr =
+            base_ == nullptr ? nullptr : base_ + Ops::Base::CeilAlign(totalSize, static_cast<int64_t>(ALIGN_512));
+    }
 
-        if (tilingData->topoType == TOPO_TYPE_MTE) {
-            quantTokenScalePtr = base + offset;
-            offset += sizes.dispatchRecordAreaSize;
+private:
+    GM_ADDR base_{nullptr};
+
+    HOST_DEVICE GmMemoryRegion Reserve(int64_t bytes)
+    {
+        GmMemoryRegion region{totalSize, bytes, base_ == nullptr ? nullptr : base_ + totalSize};
+        totalSize += bytes;
+        return region;
+    }
+
+    HOST_DEVICE void InitializeMteLayout(const MegaMoeTilingData& tilingData, uint32_t elemsPerByte)
+    {
+        const int64_t capacity = tilingData.numMaxTokensPerRank;
+
+        // 同步区：固定预留跨卡同步槽和各核计数。
+        rankSync = Reserve(PEERMEM_MIN_RANK_SYNC_SIZE);
+        syncCount = Reserve(PEERMEM_SYNC_COUNT_REGION_SIZE);
+
+        // Dispatch 计数与路由索引：计数独立存放，索引槽不再携带尾部 count。
+        expertCountRecv = Reserve(PEERMEM_MTE_COUNT_REGION_SIZE);
+        maskRecv =
+            Reserve(Ops::Base::CeilAlign(static_cast<int64_t>(tilingData.moeExpertPerRank) * tilingData.epWorldSize *
+                                             CalcDispatchRouteIndexAlignSize(&tilingData),
+                                         ALIGN_512));
+
+        // Dispatch 量化记录：保存本卡 token 数据、scale 和可选的 topK 权重。
+        const bool recordHasWeights = tilingData.topkWeightsPrefetch == 1 || IsCombineDedupOn(tilingData.dedupMode);
+        const int64_t tokenScaleBytes =
+            CalcQuantTokenScaleBytes(tilingData.h, elemsPerByte, tilingData.topK, recordHasWeights);
+        quantTokenScale = Reserve(Ops::Base::CeilAlign(capacity * tokenScaleBytes, ALIGN_512));
+
+        // Combine 接收区：保存回传结果，供 Unpermute 读取。
+        // 输出 dtype 在容量检查前已限定为 BF16。
+        constexpr int64_t outputElementBytes = 2;
+        const int64_t tokenBytes =
+            CalcCombineTokenBytes(tilingData.h, outputElementBytes, tilingData.combineQuantMode != COMBINE_NO_QUANT);
+        combineSend = Reserve(Ops::Base::CeilAlign(
+            static_cast<int64_t>(tilingData.numMaxTokensPerRank) * tilingData.topK * tokenBytes, ALIGN_512));
+    }
+
+    HOST_DEVICE void InitializeUrmaLayout(const MegaMoeTilingData& tilingData, uint32_t elemsPerByte)
+    {
+        const int64_t capacity = tilingData.numMaxTokensPerRank;
+        uint32_t rankNumPerServer = tilingData.rankNumPerServer;
+        if (rankNumPerServer == 0U || rankNumPerServer > tilingData.epWorldSize) {
+            rankNumPerServer = tilingData.epWorldSize;
         }
-        if (tilingData->topoType == TOPO_TYPE_URMA) {
-            dispatchReceivePtr = base + offset;
-            offset += sizes.relayDataSize;
-            dispatchFlagPtr = base + offset;
-            offset += sizes.relayFlagSize;
-        }
-        combineSendPtr = base + offset;
-        offset += sizes.combineSendSize;
-        cclDataPtr = base + Ops::Base::CeilAlign(offset, static_cast<int64_t>(ALIGN_512));
+        const int64_t serverNum = Ops::Base::CeilDiv(tilingData.epWorldSize, rankNumPerServer);
+
+        // 同步区：按 Rank 数扩展同步槽，计数区之后补齐到 512 字节。
+        rankSync = Reserve(CalcUrmaRankSyncSize(tilingData.epWorldSize));
+        syncCount = Reserve(PEERMEM_SYNC_COUNT_REGION_SIZE);
+        totalSize = Ops::Base::CeilAlign(totalSize, ALIGN_512);
+
+        // Dispatch mask 与专家计数：分别记录路由集合和各源 Rank 的 token 数。
+        const int64_t maskAlignSize = CalcDispatchMaskAlignSize(capacity, tilingData.topK);
+        const int64_t maskSlotSize = maskAlignSize + ALIGN_32;
+        maskRecv = Reserve(Ops::Base::CeilAlign(
+            static_cast<int64_t>(tilingData.moeExpertPerRank) * tilingData.epWorldSize * maskSlotSize, ALIGN_512));
+        // URMA raw count 按 [localExpert][sourceRank] 连续排列。
+        expertCountRecv =
+            Reserve(Ops::Base::CeilAlign(static_cast<int64_t>(tilingData.moeExpertPerRank) * tilingData.epWorldSize *
+                                             static_cast<int64_t>(sizeof(int32_t)),
+                                         ALIGN_512));
+
+        // Dispatch 中继：按源 Server 保存量化记录及 ready 标志。
+        const bool recordHasWeights = tilingData.topkWeightsPrefetch == 1 || IsCombineDedupOn(tilingData.dedupMode);
+        const int64_t tokenScaleBytes =
+            CalcQuantTokenScaleBytes(tilingData.h, elemsPerByte, tilingData.topK, recordHasWeights);
+        const int64_t relayRecordBytes = Ops::Base::CeilAlign(tokenScaleBytes, ALIGN_512);
+        dispatchReceive = Reserve(Ops::Base::CeilAlign(capacity * relayRecordBytes * serverNum, ALIGN_512));
+        dispatchFlag =
+            Reserve(Ops::Base::CeilAlign(serverNum * capacity * static_cast<int64_t>(sizeof(uint64_t)), ALIGN_512));
+
+        // Combine 接收区：保存回传结果，供 Unpermute 读取。
+        // 输出 dtype 在容量检查前已限定为 BF16。
+        constexpr int64_t outputElementBytes = 2;
+        const int64_t tokenBytes =
+            CalcCombineTokenBytes(tilingData.h, outputElementBytes, tilingData.combineQuantMode != COMBINE_NO_QUANT);
+        combineSend = Reserve(Ops::Base::CeilAlign(
+            static_cast<int64_t>(tilingData.numMaxTokensPerRank) * tilingData.topK * tokenBytes, ALIGN_512));
     }
 };
-#endif
 
 } // namespace MegaMoeImpl
 

@@ -346,7 +346,7 @@ __aicore__ inline void UnpermuteTokens(const TokenUnpermuteConfig& context, cons
     int32_t jobLen = static_cast<int32_t>(tokenRange.count);
     int32_t jobOffset = static_cast<int32_t>(tokenRange.start);
     GlobalTensor<bfloat16_t> expandedX;
-    expandedX.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(params.peermemInfo.combineSendPtr));
+    expandedX.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(params.peermemInfo.combineSend.ptr));
     GlobalTensor<bfloat16_t> output;
     output.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(params.y2GmAddr));
 

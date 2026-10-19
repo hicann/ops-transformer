@@ -285,8 +285,7 @@ __aicore__ inline WaveCombineDedupGmViews CreateWaveCombineDedupGmViews(const Mo
     views.gmm2OutGm.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(
         params.workspaceInfo.gmm2MmadResPtr +
         static_cast<uint64_t>(state.globalTokenStartIndex) * common.tokenHiddenDim * sizeof(bfloat16_t)));
-    views.gmRemoteBaseOffset =
-        static_cast<uint64_t>(params.peermemInfo.combineSendPtr - params.peermemInfo.rankSyncInWorldPtr);
+    views.gmRemoteBaseOffset = static_cast<uint64_t>(params.peermemInfo.combineSend.offset);
     return views;
 }
 

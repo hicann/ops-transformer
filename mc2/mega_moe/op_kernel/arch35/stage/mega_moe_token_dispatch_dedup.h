@@ -224,7 +224,7 @@ __aicore__ inline void LoadDedupRouteAndDescBatch(
     // route 槽元素类型随 numMaxTokensPerRank*topK 在 int16/int32 间切换（UseInt16TopkIndex），与基线同式读取。
     GlobalTensor<TopkIndexType> remoteRouteIndexGlobal;
     remoteRouteIndexGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ TopkIndexType*>(
-        params.peermemInfo.maskRecvPtr + slotOffset + static_cast<uint64_t>(routeOrdinal) * sizeof(TopkIndexType)));
+        params.peermemInfo.maskRecv.ptr + slotOffset + static_cast<uint64_t>(routeOrdinal) * sizeof(TopkIndexType)));
     DataCopyExtParams routeCopyParams{1U, static_cast<uint32_t>(batchCount * sizeof(TopkIndexType)), 0U, 0U, 0U};
     DataCopyPadExtParams<TopkIndexType> routeCopyPad{false, 0U, 0U, 0U};
     DataCopyPad(scratch.validTopkIndexTensor, remoteRouteIndexGlobal, routeCopyParams, routeCopyPad);

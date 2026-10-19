@@ -39,7 +39,7 @@ __aicore__ inline void CombineSendTokenToRemote(uint32_t batchStart, uint32_t cu
     uint32_t topkIdx = metaInfoTensor.GetValue(batchStart * META_INFO_SIZE + TOPK_INDEX);
 
     AscendC::GlobalTensor<DataType> gmLocalD;
-    uint64_t gmRemoteOffset = params.peermemInfo.combineSendPtr - params.peermemInfo.rankSyncInWorldPtr;
+    uint64_t gmRemoteOffset = params.peermemInfo.combineSend.offset;
     GM_ADDR srcAddr = localSrcPtr;
 
     if (toRankId == rankId) {

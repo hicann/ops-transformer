@@ -284,9 +284,6 @@ private:
     uint32_t dispatchRoundSendTotalNum_ = 0;  // dispatch分轮次：每轮处理的 token*topK 数量（256 对齐）
     uint32_t dispatchTotalRounds_ = 0;        // dispatch分轮次：容量上界总轮数
     uint32_t dispatchRoundMaskAlignSize_ = 0; // dispatch分轮次：每轮mask的字节大小（32B对齐）
-    uint64_t maskWinOffset_ = 0;              // maskRecvPtr 相对 win 基址(rankSyncInWorldPtr)的偏移
-    uint64_t dispatchWinOffset_ = 0;          // peermemInfo dispatchReceivePtr 相对 URMA win 基址的偏移
-    uint64_t dispatchFlagWinOffset_ = 0;      // peermemInfo dispatchFlagPtr 相对 URMA win 基址的偏移
     uint32_t relayRecordBytes_ = 0;
     uint64_t dispatchRelayQueueBytesPerServer_ = 0;
     uint64_t dispatchRelayFlagSnapshotBytesPerBlock_ = 0;
@@ -500,14 +497,9 @@ template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitDispatchLayout(
     const MegaMoeTilingData* tilingData)
 {
-    // 各 win 区相对 win 基址(rankSyncInWorldPtr)的偏移; 所有卡 win 布局一致, 跨卡读写用同一偏移。
-    maskWinOffset_ = static_cast<uint64_t>(params_.peermemInfo.maskRecvPtr - params_.peermemInfo.rankSyncInWorldPtr);
-    dispatchWinOffset_ =
-        static_cast<uint64_t>(params_.peermemInfo.dispatchReceivePtr - params_.peermemInfo.rankSyncInWorldPtr);
-    dispatchFlagWinOffset_ =
-        static_cast<uint64_t>(params_.peermemInfo.dispatchFlagPtr - params_.peermemInfo.rankSyncInWorldPtr);
     // mask 是跨 Rank 共享的槽布局，几何必须与 PeermemInfo 一样按全卡容量计算。
-    maskAlignSize_ = static_cast<uint32_t>(CalcDispatchMaskAlignSize(tilingData));
+    maskAlignSize_ =
+        static_cast<uint32_t>(CalcDispatchMaskAlignSize(tilingData->numMaxTokensPerRank, tilingData->topK));
     // 每个 win 槽位再追加 32B 存 count(源卡 SendMaskCal 同步算好), 须与 PeermemInfo 的 maskSlotSize 一致。
     maskSlotSize_ = maskAlignSize_ + static_cast<uint32_t>(ALIGN_32);
     mxQuantScaleNumAlignPerToken_ = Ops::Base::CeilDiv(k_, static_cast<uint32_t>(ALIGN_32));
@@ -536,7 +528,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitWorks
     GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData)
 {
     (void)workspaceGM;
-    params_.peermemInfo = PeermemInfo(g_winRankAddr_[rankId_], tilingData, A_ELEMS_PER_BYTE, serverNum_);
+    params_.peermemInfo = PeermemInfo(tilingData, A_ELEMS_PER_BYTE, g_winRankAddr_[rankId_]);
     {
         WorkspaceLayout workspaceLayout(tilingData, serverNum_);
         params_.workspaceInfo.Bind(params_.peermemInfo.cclDataPtr, workspaceLayout);
@@ -841,10 +833,9 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CrossRank
     if constexpr (g_coreType == AIC) {
         return;
     }
-    __gm__ int32_t* syncRank = (__gm__ int32_t*)params_.peermemInfo.rankSyncInWorldPtr;
-    int64_t syncCountOffset = CalcUrmaSyncCountOffset(static_cast<int64_t>(worldSize_));
-    __gm__ int32_t* syncCount = (__gm__ int32_t*)(params_.peermemInfo.rankSyncInWorldPtr + syncCountOffset +
-                                                  aivCoreIdx_ * PEERMEM_SYNC_SLOT_SIZE);
+    __gm__ int32_t* syncRank = (__gm__ int32_t*)params_.peermemInfo.rankSync.ptr;
+    __gm__ int32_t* syncCount =
+        (__gm__ int32_t*)(params_.peermemInfo.syncCount.ptr + aivCoreIdx_ * PEERMEM_SYNC_SLOT_SIZE);
     int count = ReadGmByPassDCache(syncCount) + 1;
     WriteGmByPassDCache(syncCount, count);
     // 先向本 AIV 负责的所有 peer 发出通知，再进入等待。256P 场景下可同时维持多个

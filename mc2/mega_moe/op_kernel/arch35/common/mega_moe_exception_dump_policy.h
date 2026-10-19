@@ -67,11 +67,8 @@ __aicore__ inline __gm__ GmmLoopCount* RegisterMegaMoeExceptionDump(ExceptionDum
     engine.Init(dumpBase, tilingGM);
     engine.UpdateStage(Stage::INIT);
     engine.Dump(epRankIdAddr, sizeof(uint32_t));
-    size_t routeRecvSize = static_cast<size_t>(CalcRouteIndexRecvSize(
-        CalcDispatchRouteIndexAlignSize(tilingData), static_cast<int64_t>(tilingData->moeExpertPerRank),
-        static_cast<int64_t>(tilingData->epWorldSize)));
-    engine.Dump(peermemInfo.rankSyncInWorldPtr, static_cast<size_t>(MegaMoeImpl::PEERMEM_DATA_OFFSET));
-    engine.Dump(peermemInfo.maskRecvPtr, routeRecvSize);
+    engine.Dump(peermemInfo.rankSync.ptr, static_cast<size_t>(MegaMoeImpl::PEERMEM_DATA_OFFSET));
+    engine.Dump(peermemInfo.maskRecv.ptr, static_cast<size_t>(peermemInfo.maskRecv.size));
     GM_ADDR loopCountBase = dumpBase + GMM_LOOP_COUNT_REGION_OFFSET;
     engine.Dump(loopCountBase, tilingData->blockAivNum, GMM_LOOP_COUNT_DATA_SIZE, sizeof(GmmLoopCount));
 

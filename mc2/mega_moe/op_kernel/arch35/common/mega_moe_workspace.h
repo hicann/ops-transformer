@@ -371,7 +371,7 @@ private:
     {
         maskSlotOffset = workspaceSize;
         // 远端 mask 槽的 count 位于全卡共用的容量尾部，本地发送暂存必须使用相同槽宽。
-        const int64_t maskAlignSize = CalcDispatchMaskAlignSize(tilingData);
+        const int64_t maskAlignSize = CalcDispatchMaskAlignSize(tilingData->numMaxTokensPerRank, tilingData->topK);
         int64_t maskSlotSize = maskAlignSize + static_cast<int64_t>(ALIGN_32); // mask + 32B count
 
         workspaceSize += Ops::Base::CeilAlign(

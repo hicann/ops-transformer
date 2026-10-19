@@ -295,7 +295,7 @@ __aicore__ inline void DedupScanRouteSlots(DedupPrepassWorker<TopkIndexType>& wo
         const int32_t expertRowBegin =
             expertIdx == 0U ? 0 : scratch.cumsumInfoTensor.GetValue(expertIdx * common.worldSize - 1U);
         __gm__ TopkIndexType* slotPtr = reinterpret_cast<__gm__ TopkIndexType*>(
-            params.peermemInfo.maskRecvPtr + static_cast<uint64_t>(prefixIdx) * routeIndexAlignSize);
+            params.peermemInfo.maskRecv.ptr + static_cast<uint64_t>(prefixIdx) * routeIndexAlignSize);
         if (slotCount > worker.ROUTE_HALF_ITEMS) {
             DedupFlushPendingSlot(worker, pending, window); // 大槽独占半区前先清空在途
             DedupScanLargeSlot(worker, slotPtr, slotCount, loadHalf, window, rowBase, expertIdx, expertRowBegin);

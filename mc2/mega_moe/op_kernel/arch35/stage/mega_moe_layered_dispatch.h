@@ -458,8 +458,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendMaskC
             uint64_t srcOffset = static_cast<uint64_t>(expertIdIndex * static_cast<int32_t>(worldSize_) +
                                                        static_cast<int32_t>(curRankId)) *
                                  static_cast<uint64_t>(maskSlotSize_);
-            uint64_t dstOffset =
-                maskWinOffset_ + static_cast<uint64_t>(expertIdIndex * static_cast<int32_t>(worldSize_) +
+            uint64_t dstOffset = params_.peermemInfo.maskRecv.offset +
+                                 static_cast<uint64_t>(expertIdIndex * static_cast<int32_t>(worldSize_) +
                                                        static_cast<int32_t>(rankId_)) *
                                      static_cast<uint64_t>(maskSlotSize_);
             uint64_t totalSendCnt = BuildExpertMask(curRankId, curExpertId, srcOffset, dstOffset);
@@ -584,7 +584,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ResetDisp
         WriteGmByPassDCache(countPtr, int32_t(0));
     }
     // 远端 ready flag 仍是一级数据到达 relay 后供二级 Dispatch 使用的完成协议。
-    ResetContiguousGm(params_.peermemInfo.dispatchFlagPtr,
+    ResetContiguousGm(params_.peermemInfo.dispatchFlag.ptr,
                       static_cast<uint64_t>(serverNum_) *
                           static_cast<uint64_t>(params_.tilingData->numMaxTokensPerRank) * sizeof(uint64_t));
 }
@@ -646,7 +646,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::QuantizeL
         SetFlag<AscendC::HardEvent::V_MTE3>(event);
         WaitFlag<AscendC::HardEvent::V_MTE3>(event);
         uint64_t relayOffset = RelayTokenOffset(serverId_, tokenIdx);
-        GM_ADDR recordAddr = GetRankWinAddrWithOffset(rankId_, dispatchWinOffset_) + relayOffset;
+        GM_ADDR recordAddr =
+            GetRankWinAddrWithOffset(rankId_, params_.peermemInfo.dispatchReceive.offset) + relayOffset;
         workspaceDstGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t*>(recordAddr));
         LocalTensor<uint8_t> xOutBytesTensor = xOutTensor.template ReinterpretCast<uint8_t>();
         DataCopyPad(workspaceDstGlobal, xOutBytesTensor, {1U, mxQuantTokenScaleAlignBytes_, 0U, 0U, 0U});
@@ -670,7 +671,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SetLocalR
     Duplicate<uint64_t>(relayReadyFillTensor_, uint64_t(1), DISPATCH_READY_FLAG_BATCH_TOKENS);
     SyncFuncStatic<AscendC::HardEvent::V_MTE3, SYNC_EVENT_ID2>();
     GlobalTensor<uint64_t> readyFlagGlobal;
-    readyFlagGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t*>(params_.peermemInfo.dispatchFlagPtr) +
+    readyFlagGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t*>(params_.peermemInfo.dispatchFlag.ptr) +
                                     static_cast<uint64_t>(serverId_) * params_.tilingData->numMaxTokensPerRank +
                                     tokenStart);
     for (uint32_t offset = 0U; offset < tokenNumInCore; offset += DISPATCH_READY_FLAG_BATCH_TOKENS) {
@@ -753,8 +754,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::AppendDis
         reinterpret_cast<__gm__ int32_t*>(params_.workspaceInfo.dispatchRelaySendQueuePtr + metaOffset);
     int32_t tokenIdx = ReadGmByPassDCache(srcMetaPtr);
     uint64_t relayOffset = RelayTokenOffset(serverId_, static_cast<uint32_t>(tokenIdx));
-    GM_ADDR srcAddr = GetRankWinAddrWithOffset(rankId_, dispatchWinOffset_) + relayOffset;
-    GM_ADDR dstAddr = GetRankWinAddrWithOffset(relayRank, dispatchWinOffset_) + relayOffset;
+    GM_ADDR srcAddr = GetRankWinAddrWithOffset(rankId_, params_.peermemInfo.dispatchReceive.offset) + relayOffset;
+    GM_ADDR dstAddr = GetRankWinAddrWithOffset(relayRank, params_.peermemInfo.dispatchReceive.offset) + relayOffset;
     comm_.WriteRelaxedNbi(batchHandle, dstAddr, srcAddr, mxQuantTokenScaleAlignBytes_);
 }
 
@@ -768,8 +769,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::AppendDis
         reinterpret_cast<__gm__ int32_t*>(params_.workspaceInfo.dispatchRelaySendQueuePtr + metaOffset);
     int32_t tokenIdx = ReadGmByPassDCache(srcMetaPtr);
     uint64_t flagOffset = RelayFlagOffset(serverId_, static_cast<uint32_t>(tokenIdx));
-    GM_ADDR localFlagAddr = GetRankWinAddrWithOffset(rankId_, dispatchFlagWinOffset_) + flagOffset;
-    GM_ADDR remoteFlagAddr = GetRankWinAddrWithOffset(relayRank, dispatchFlagWinOffset_) + flagOffset;
+    GM_ADDR localFlagAddr = GetRankWinAddrWithOffset(rankId_, params_.peermemInfo.dispatchFlag.offset) + flagOffset;
+    GM_ADDR remoteFlagAddr = GetRankWinAddrWithOffset(relayRank, params_.peermemInfo.dispatchFlag.offset) + flagOffset;
     if (firstFlag) {
         comm_.WriteStrongNbi(batchHandle, remoteFlagAddr, localFlagAddr, sizeof(uint64_t));
     } else {
@@ -833,13 +834,14 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::LoadToken
                                                                                                int32_t bufferIdx,
                                                                                                uint32_t copyInNum)
 {
-    __gm__ uint64_t* readyFlag = reinterpret_cast<__gm__ uint64_t*>(params_.peermemInfo.dispatchFlagPtr +
+    __gm__ uint64_t* readyFlag = reinterpret_cast<__gm__ uint64_t*>(params_.peermemInfo.dispatchFlag.ptr +
                                                                     RelayFlagOffset(srcServer, tokenIndex));
     while (ReadGmByPassDCache(readyFlag) != uint64_t(1)) {
     }
 
     uint64_t remoteCopyOffset = RelayTokenOffset(srcServer, tokenIndex);
-    GM_ADDR localRecordAddr = GetRankWinAddrWithOffset(rankId_, dispatchWinOffset_) + remoteCopyOffset;
+    GM_ADDR localRecordAddr =
+        GetRankWinAddrWithOffset(rankId_, params_.peermemInfo.dispatchReceive.offset) + remoteCopyOffset;
     GlobalTensor<ActivationType> relayGlobalTensor;
     relayGlobalTensor.SetGlobalBuffer(reinterpret_cast<__gm__ ActivationType*>(localRecordAddr));
     DataCopy(copyTmpTensors_[bufferIdx], relayGlobalTensor, copyInNum);
@@ -860,7 +862,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::PublishEx
     // 逐 rank 直接从 GM 读取 count 并累计全局 cumsum。
     for (uint32_t srcRank = 0U; srcRank < worldSize_; ++srcRank) {
         __gm__ int32_t* rankCountPtr = reinterpret_cast<__gm__ int32_t*>(
-            params_.peermemInfo.maskRecvPtr + static_cast<uint64_t>(expertIdx) * worldSize_ * maskSlotSize_ +
+            params_.peermemInfo.maskRecv.ptr + static_cast<uint64_t>(expertIdx) * worldSize_ * maskSlotSize_ +
             static_cast<uint64_t>(srcRank) * maskSlotSize_ + maskAlignSize_);
         int32_t rankTokenCount = ReadGmByPassDCache(rankCountPtr);
         tokenCount += static_cast<uint64_t>(rankTokenCount);
@@ -1079,8 +1081,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveRe
 
             uint64_t flagSnapshotBytes = static_cast<uint64_t>(windowEnd - windowStart) * sizeof(uint64_t);
             DataCopyExtParams flagCopyParams{1U, static_cast<uint32_t>(flagSnapshotBytes), 0U, 0U, 0U};
-            GM_ADDR remoteFlagAddr =
-                GetRankWinAddrWithOffset(relayRank, dispatchFlagWinOffset_) + RelayFlagOffset(srcServer, windowStart);
+            GM_ADDR remoteFlagAddr = GetRankWinAddrWithOffset(relayRank, params_.peermemInfo.dispatchFlag.offset) +
+                                     RelayFlagOffset(srcServer, windowStart);
             bool windowTokensReady = false;
             while (!windowTokensReady) {
                 comm_.ReadNbi(channel, scratchAddr, remoteFlagAddr, flagSnapshotBytes);
@@ -1116,8 +1118,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveRe
         uint32_t srcServer = static_cast<uint32_t>(record.GetValue(DISPATCH_BATCH_SRC_SERVER));
         uint32_t tokenIndex = static_cast<uint32_t>(record.GetValue(TOKEN_ID));
         uint32_t dstRow = static_cast<uint32_t>(record.GetValue(DISPATCH_BATCH_DST_ROW));
-        GM_ADDR remoteRecordAddr =
-            GetRankWinAddrWithOffset(relayRank, dispatchWinOffset_) + RelayTokenOffset(srcServer, tokenIndex);
+        GM_ADDR remoteRecordAddr = GetRankWinAddrWithOffset(relayRank, params_.peermemInfo.dispatchReceive.offset) +
+                                   RelayTokenOffset(srcServer, tokenIndex);
         GM_ADDR tokenDstAddr =
             params_.workspaceInfo.dispatchRevDataPtr + static_cast<uint64_t>(dstRow) * widthA * sizeof(ActivationType);
         GM_ADDR scaleDstAddr = params_.workspaceInfo.dispatchRevScalePtr +
@@ -1235,7 +1237,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveDi
                     continue;
                 }
                 __gm__ uint8_t* rankMaskBasePtr = reinterpret_cast<__gm__ uint8_t*>(
-                    params_.peermemInfo.maskRecvPtr + static_cast<uint64_t>(expertIdx) * worldSize_ * maskSlotSize_ +
+                    params_.peermemInfo.maskRecv.ptr + static_cast<uint64_t>(expertIdx) * worldSize_ * maskSlotSize_ +
                     static_cast<uint64_t>(srcRank) * maskSlotSize_);
                 __gm__ int32_t* rankCountPtr = reinterpret_cast<__gm__ int32_t*>(rankMaskBasePtr + maskAlignSize_);
                 const int32_t rankTokenCount = ReadGmByPassDCache(rankCountPtr);
@@ -1366,7 +1368,7 @@ __aicore__ inline auto MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitShare
 
 // ===============================================================
 // SharedExpertCopyInput：从原始 bf16 输入量化后写入共享专家专用缓冲区
-//   源: aGmAddr [bs × h] bf16（layered URMA 模式下 quantTokenScalePtr 未填充，需直接从原始输入量化）
+//   源: aGmAddr [bs × h] bf16（layered URMA 模式下 quantTokenScale 区域未分配，需直接从原始输入量化）
 //   目标: sharedExpertInputDataPtr [bs × h] fp8 连续, sharedExpertInputScalePtr [bs × scaleN] 连续
 //   AIV 执行，在 AIC GMM1 开始前调用
 // ===============================================================

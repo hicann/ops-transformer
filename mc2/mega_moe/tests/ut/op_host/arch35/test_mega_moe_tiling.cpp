@@ -36,32 +36,91 @@ protected:
     }
 };
 
-static MegaMoeImpl::PeermemSizeParams MakePeermemSizeParams(const MegaMoeTilingData& tilingData)
+TEST_F(MegaMoeArch35TilingTest, GmMemoryRegionsPreserveTopologyOrder)
 {
-    MegaMoeImpl::PeermemSizeParams peermemParams{};
-    peermemParams.numMaxTokensPerRank = tilingData.numMaxTokensPerRank;
-    peermemParams.topK = tilingData.topK;
-    peermemParams.h = tilingData.h;
-    peermemParams.moeExpertPerRank = tilingData.moeExpertPerRank;
-    peermemParams.epWorldSize = tilingData.epWorldSize;
-    peermemParams.yDtypeSize = sizeof(uint16_t); // 这些用例的输出类型为 BF16。
-    peermemParams.elemsPerByte = MegaMoeImpl::IsA4W4GmmMode(tilingData.moeGmmMode) ? 2U : 1U;
-    peermemParams.topkWeightsPrefetch =
-        tilingData.topkWeightsPrefetch == 1 || MegaMoeImpl::IsCombineDedupOn(tilingData.dedupMode);
-    peermemParams.isQuantCombine = tilingData.combineQuantMode != MegaMoeImpl::COMBINE_NO_QUANT;
-    peermemParams.topoType = tilingData.topoType;
-    peermemParams.serverNum = 1;
-    if (tilingData.topoType == MegaMoeImpl::TOPO_TYPE_URMA) {
-        peermemParams.serverNum = tilingData.epWorldSize / tilingData.rankNumPerServer;
-    }
-    return peermemParams;
+    using namespace MegaMoeImpl;
+    MegaMoeTilingData params{};
+    params.numMaxTokensPerRank = 128;
+    params.topK = 8;
+    params.h = 4096;
+    params.moeExpertPerRank = 4;
+    params.epWorldSize = 4;
+    params.topoType = TOPO_TYPE_MTE;
+    params.rankNumPerServer = 2;
+    const PeermemInfo mte(&params);
+    EXPECT_EQ(mte.rankSync.offset, 0);
+    EXPECT_EQ(mte.syncCount.offset + mte.syncCount.size, PEERMEM_DATA_OFFSET);
+    EXPECT_EQ(mte.expertCountRecv.offset, PEERMEM_DATA_OFFSET);
+    EXPECT_EQ(mte.expertCountRecv.size, PEERMEM_MTE_COUNT_REGION_SIZE);
+    EXPECT_EQ(mte.maskRecv.offset, mte.expertCountRecv.offset + mte.expertCountRecv.size);
+    EXPECT_EQ(mte.combineSend.offset, mte.quantTokenScale.offset + mte.quantTokenScale.size);
+    EXPECT_EQ(mte.totalSize, mte.combineSend.offset + mte.combineSend.size);
+    EXPECT_EQ(mte.dispatchReceive.ptr, nullptr);
+    EXPECT_EQ(mte.dispatchFlag.ptr, nullptr);
+    EXPECT_EQ(mte.combineSend.ptr, nullptr);
+    std::vector<uint8_t> window(static_cast<size_t>(mte.totalSize));
+    const PeermemInfo bound(&params, 1, window.data());
+    EXPECT_EQ(bound.rankSync.ptr, window.data());
+    EXPECT_EQ(bound.maskRecv.ptr, window.data() + bound.maskRecv.offset);
+    EXPECT_EQ(bound.combineSend.ptr, window.data() + bound.combineSend.offset);
+    EXPECT_EQ(bound.cclDataPtr, window.data() + Ops::Base::CeilAlign(bound.totalSize, ALIGN_512));
+    EXPECT_EQ(bound.dispatchReceive.ptr, nullptr);
+    EXPECT_EQ(bound.dispatchFlag.ptr, nullptr);
+    const PeermemInfo copy = bound;
+    EXPECT_EQ(copy.maskRecv.ptr, bound.maskRecv.ptr);
+    EXPECT_EQ(copy.combineSend.ptr, bound.combineSend.ptr);
+    EXPECT_EQ(copy.totalSize, bound.totalSize);
+    auto emptyParams = params;
+    emptyParams.numMaxTokensPerRank = 0;
+    const PeermemInfo empty(&emptyParams, 1, window.data());
+    EXPECT_EQ(empty.combineSend.size, 0);
+    EXPECT_EQ(empty.combineSend.ptr, window.data() + empty.combineSend.offset);
+
+    params.topoType = TOPO_TYPE_URMA;
+    params.epWorldSize = 1024;
+    params.rankNumPerServer = 8;
+    const PeermemInfo urma(&params);
+    EXPECT_EQ(urma.syncCount.offset, 1024 * PEERMEM_SYNC_SLOT_SIZE);
+    EXPECT_EQ(urma.maskRecv.offset, urma.syncCount.offset + urma.syncCount.size);
+    EXPECT_EQ(urma.expertCountRecv.offset, urma.maskRecv.offset + urma.maskRecv.size);
+    EXPECT_EQ(urma.dispatchReceive.offset, urma.expertCountRecv.offset + urma.expertCountRecv.size);
+    EXPECT_EQ(urma.dispatchFlag.offset, urma.dispatchReceive.offset + urma.dispatchReceive.size);
+    EXPECT_EQ(urma.combineSend.offset, urma.dispatchFlag.offset + urma.dispatchFlag.size);
+    EXPECT_EQ(urma.totalSize, urma.combineSend.offset + urma.combineSend.size);
+    EXPECT_EQ(urma.quantTokenScale.ptr, nullptr);
+}
+
+TEST_F(MegaMoeArch35TilingTest, GmMemoryRegionsKeepCapacityOptionsIndependent)
+{
+    using namespace MegaMoeImpl;
+    MegaMoeTilingData params{};
+    params.numMaxTokensPerRank = 128;
+    params.topK = 8;
+    params.h = 4096;
+    params.moeExpertPerRank = 4;
+    params.epWorldSize = 770;
+    params.topoType = TOPO_TYPE_URMA;
+    params.rankNumPerServer = 770;
+    const PeermemInfo a8(&params);
+    EXPECT_EQ(a8.maskRecv.offset % ALIGN_512, 0);
+    EXPECT_GT(a8.maskRecv.offset, a8.syncCount.offset + a8.syncCount.size);
+    const PeermemInfo a4(&params, 2);
+    EXPECT_LT(a4.dispatchReceive.size, a8.dispatchReceive.size);
+    EXPECT_LE(a4.totalSize, a8.totalSize); // Host 的 1 byte 容量上界覆盖 A4。
+    params.topkWeightsPrefetch = true;
+    const PeermemInfo weights(&params, 2);
+    EXPECT_GE(weights.dispatchReceive.size, a4.dispatchReceive.size);
+    EXPECT_EQ(weights.combineSend.size, a4.combineSend.size);
+    params.combineQuantMode = 1;
+    const PeermemInfo quant(&params, 2);
+    EXPECT_EQ(quant.dispatchReceive.size, weights.dispatchReceive.size);
+    EXPECT_LT(quant.combineSend.size, weights.combineSend.size);
+    EXPECT_EQ(quant.totalSize, quant.combineSend.offset + quant.combineSend.size);
 }
 
 static int64_t CalcCclCommunicationCapacity(const MegaMoeTilingData& tilingData)
 {
-    auto peermemParams = MakePeermemSizeParams(tilingData);
-    peermemParams.elemsPerByte = 1U;
-    int64_t communicationSize = MegaMoeImpl::CalcPeermemLeastSize(peermemParams);
+    int64_t communicationSize = MegaMoeImpl::PeermemInfo(&tilingData).totalSize;
     if (tilingData.topoType == MegaMoeImpl::TOPO_TYPE_MTE) {
         communicationSize += MegaMoeImpl::EXCEPTION_DUMP_REGION_SIZE;
     }
@@ -192,26 +251,24 @@ TEST_F(MegaMoeArch35TilingTest, CclDataOffsetFitsFp4CapacityBudget)
                     SCOPED_TRACE(testing::Message()
                                  << "topoType=" << topoType << ", prefetch=" << prefetch
                                  << ", combineQuantMode=" << combineQuantMode << ", combineDedup=" << combineDedup);
-                    MegaMoeImpl::PeermemSizeParams params{};
+                    MegaMoeTilingData params{};
                     params.numMaxTokensPerRank = 257;
                     params.topK = 8;
                     params.h = 4096;
                     params.moeExpertPerRank = 2;
                     params.epWorldSize = 8;
-                    params.yDtypeSize = sizeof(uint16_t);
-                    params.elemsPerByte = 2U;
-                    params.topkWeightsPrefetch = prefetch == 1 || combineDedup;
-                    params.isQuantCombine = combineQuantMode != MegaMoeImpl::COMBINE_NO_QUANT;
+                    params.topkWeightsPrefetch = prefetch;
+                    params.dedupMode = combineDedup ? 3 : 0;
+                    params.combineQuantMode = combineQuantMode;
                     params.topoType = topoType;
-                    params.serverNum = topoType == MegaMoeImpl::TOPO_TYPE_URMA ? 2 : 1;
+                    params.rankNumPerServer = topoType == MegaMoeImpl::TOPO_TYPE_URMA ? 4 : 8;
 
                     auto budgetParams = params;
-                    budgetParams.elemsPerByte = 1U;
                     const int64_t dumpBytes =
                         topoType == MegaMoeImpl::TOPO_TYPE_MTE ? MegaMoeImpl::EXCEPTION_DUMP_REGION_SIZE : 0;
                     const int64_t communicationCapacity = Ops::Base::CeilAlign(
-                        dumpBytes + MegaMoeImpl::CalcPeermemLeastSize(budgetParams), MegaMoeImpl::ALIGN_512);
-                    const int64_t communicationSize = MegaMoeImpl::CalcPeermemLeastSize(params);
+                        dumpBytes + MegaMoeImpl::PeermemInfo(&budgetParams).totalSize, MegaMoeImpl::ALIGN_512);
+                    const int64_t communicationSize = MegaMoeImpl::PeermemInfo(&params, 2).totalSize;
                     const int64_t cclDataOffset = Ops::Base::CeilAlign(communicationSize, MegaMoeImpl::ALIGN_512);
 
                     // 实际布局按 FP4 压缩记录推进，业务起点位于通信末尾并保持 512B 对齐。
@@ -220,7 +277,7 @@ TEST_F(MegaMoeArch35TilingTest, CclDataOffsetFitsFp4CapacityBudget)
                     EXPECT_EQ(cclDataOffset % MegaMoeImpl::ALIGN_512, 0);
                     // MTE 的异常信息区在传入基址之前，保守申请容量仍覆盖实际业务起点。
                     EXPECT_LT(dumpBytes + cclDataOffset, communicationCapacity);
-                    EXPECT_EQ(params.elemsPerByte, 2U);
+                    EXPECT_LE(communicationSize, MegaMoeImpl::PeermemInfo(&budgetParams).totalSize);
                 }
             }
         }
@@ -663,7 +720,8 @@ TEST_F(MegaMoeArch35TilingTest, BS128_NumMaxTokens256_URMA_WorkspaceUsesCapacity
     MegaMoeImpl::WorkspaceLayout workspaceLayout(&tilingData);
     const int64_t actualMaskWorkspaceBytes =
         workspaceLayout.dispatchRelaySendQueueOffset - workspaceLayout.maskSlotOffset;
-    const int64_t capacityMaskSlotBytes = MegaMoeImpl::CalcDispatchMaskAlignSize(&tilingData) + MegaMoeImpl::ALIGN_32;
+    const int64_t capacityMaskSlotBytes =
+        MegaMoeImpl::CalcDispatchMaskAlignSize(tilingData.numMaxTokensPerRank, tilingData.topK) + MegaMoeImpl::ALIGN_32;
     const int64_t expectedMaskWorkspaceBytes = Ops::Base::CeilAlign(
         static_cast<int64_t>(tilingData.moeExpertPerRank) * tilingData.epWorldSize * capacityMaskSlotBytes,
         static_cast<int64_t>(MegaMoeImpl::ALIGN_512));
@@ -674,7 +732,7 @@ TEST_F(MegaMoeArch35TilingTest, BS128_NumMaxTokens256_URMA_WorkspaceUsesCapacity
         serverNum * (MegaMoeImpl::ALIGN_32 + static_cast<int64_t>(tilingData.bs) * MegaMoeImpl::ALIGN_32),
         static_cast<int64_t>(MegaMoeImpl::ALIGN_512));
     const int64_t localBsMaskSlotBytes =
-        MegaMoeImpl::CalcDispatchMaskAlignSizeBy(tilingData.bs, tilingData.topK) + MegaMoeImpl::ALIGN_32;
+        MegaMoeImpl::CalcDispatchMaskAlignSize(tilingData.bs, tilingData.topK) + MegaMoeImpl::ALIGN_32;
     const int64_t localBsMaskWorkspaceBytes = Ops::Base::CeilAlign(
         static_cast<int64_t>(tilingData.moeExpertPerRank) * tilingData.epWorldSize * localBsMaskSlotBytes,
         static_cast<int64_t>(MegaMoeImpl::ALIGN_512));

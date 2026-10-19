@@ -304,26 +304,16 @@ void PrintPeermemInfo(const MegaMoeTilingData* tilingData, const char* nodeName)
     OP_LOGD(nodeName, "========== PeermemInfo ==========");
     int64_t exceptionDumpRegionSize = tilingData->topoType == TOPO_TYPE_MTE ? EXCEPTION_DUMP_REGION_SIZE : 0;
     OP_LOGD(nodeName, "exceptionDumpRegionSize: {%ld}\n", exceptionDumpRegionSize);
-    PeermemSizeParams params{};
-    params.numMaxTokensPerRank = static_cast<int64_t>(tilingData->numMaxTokensPerRank);
-    params.topK = static_cast<int64_t>(tilingData->topK);
-    params.h = static_cast<int64_t>(tilingData->h);
-    params.moeExpertPerRank = static_cast<int64_t>(tilingData->moeExpertPerRank);
-    params.epWorldSize = static_cast<int64_t>(tilingData->epWorldSize);
-    params.yDtypeSize = SIZE_BF_16;
-    params.elemsPerByte = IsA4W4GmmMode(tilingData->moeGmmMode) ? 2U : 1U;
-    params.topkWeightsPrefetch = (tilingData->topkWeightsPrefetch == 1 || IsCombineDedupOn(tilingData->dedupMode));
-    params.isQuantCombine = tilingData->combineQuantMode != COMBINE_NO_QUANT;
-    params.topoType = tilingData->topoType;
-    params.serverNum =
-        tilingData->topoType == TOPO_TYPE_URMA ? tilingData->epWorldSize / tilingData->rankNumPerServer : 1;
-    PeermemLayoutSizes sizes = CalcPeermemLayoutSizes(params);
-    OP_LOGD(nodeName, "peermemDataOffset: {%ld}\n", sizes.dataOffset);
-    OP_LOGD(nodeName, "maskRecvSize: {%ld}\n", sizes.maskRecvSize);
-    OP_LOGD(nodeName, "expertCountRecvSize: {%ld}\n", sizes.expertCountRecvSize);
-    OP_LOGD(nodeName, "dispatchRecordAreaSize: {%ld}\n", sizes.dispatchRecordAreaSize);
-    OP_LOGD(nodeName, "combineSendSize: {%ld}\n", sizes.combineSendSize);
-    OP_LOGD(nodeName, "total PeermemInfo Size: {%ld}\n", exceptionDumpRegionSize + CalcPeermemLeastSize(params));
+    const PeermemInfo info(tilingData, IsA4W4GmmMode(tilingData->moeGmmMode) ? 2U : 1U);
+    const int64_t dataOffset =
+        tilingData->topoType == TOPO_TYPE_MTE ? info.expertCountRecv.offset : info.maskRecv.offset;
+    OP_LOGD(nodeName, "peermemDataOffset: {%ld}\n", dataOffset);
+    OP_LOGD(nodeName, "maskRecvSize: {%ld}\n", info.maskRecv.size);
+    OP_LOGD(nodeName, "expertCountRecvSize: {%ld}\n", info.expertCountRecv.size);
+    OP_LOGD(nodeName, "dispatchRecordAreaSize: {%ld}\n",
+            info.quantTokenScale.size + info.dispatchReceive.size + info.dispatchFlag.size);
+    OP_LOGD(nodeName, "combineSendSize: {%ld}\n", info.combineSend.size);
+    OP_LOGD(nodeName, "total PeermemInfo Size: {%ld}\n", exceptionDumpRegionSize + info.totalSize);
 }
 
 /*
@@ -917,33 +907,6 @@ static ge::graphStatus CheckAndSetExpertGmmModes(const gert::TilingContext* cont
 }
 
 /*
- * 按主机与设备共用的 peermem 布局公式计算 CCL 容量下界。
- * 参数来自已校验的 tiling 配置，容量口径统一按每字节一个元素预留。
- */
-static int64_t CalcLeastCclBufferSize(int64_t numMaxTokensPerRank, int64_t yDtypeSize,
-                                      const MegaMoeTilingData* tilingData, bool topkWeightsPrefetch)
-{
-    PeermemSizeParams peermemSizeParams{};
-    peermemSizeParams.numMaxTokensPerRank = numMaxTokensPerRank;
-    peermemSizeParams.topK = tilingData->topK;
-    peermemSizeParams.h = tilingData->h;
-    peermemSizeParams.moeExpertPerRank = tilingData->moeExpertPerRank;
-    peermemSizeParams.epWorldSize = tilingData->epWorldSize;
-    peermemSizeParams.yDtypeSize = yDtypeSize;
-    peermemSizeParams.elemsPerByte = 1U;
-    peermemSizeParams.topkWeightsPrefetch = topkWeightsPrefetch;
-    peermemSizeParams.isQuantCombine = tilingData->combineQuantMode != COMBINE_NO_QUANT;
-    peermemSizeParams.topoType = tilingData->topoType;
-    peermemSizeParams.serverNum =
-        tilingData->topoType == TOPO_TYPE_URMA ? tilingData->epWorldSize / tilingData->rankNumPerServer : 1;
-    int64_t leastCclBufferSize = CalcPeermemLeastSize(peermemSizeParams);
-    if (tilingData->topoType == TOPO_TYPE_MTE) {
-        leastCclBufferSize += EXCEPTION_DUMP_REGION_SIZE;
-    }
-    return leastCclBufferSize;
-}
-
-/*
  * 校验并默认化单 rank 最大 token 数，将结果写入 tiling data。
  */
 static ge::graphStatus CheckAndSetMaxTokensPerRankAttr(const gert::TilingContext* context, const MegaMoeConfig& config,
@@ -1007,11 +970,12 @@ static ge::graphStatus CheckCclBufferCapacity(const gert::TilingContext* context
                                               const WorkspaceLayout& workspaceLayout, const char* nodeName)
 {
     auto attrs = context->GetAttrs();
-    int64_t yDtypeSize = ge::GetSizeByDataType(context->GetOutputDesc(config.yIndex)->GetDataType());
-    const bool recordHasWeights = tilingData->topkWeightsPrefetch == 1 || IsCombineDedupOn(tilingData->dedupMode);
-    int64_t cclDataOffset = ops::CeilAlign(CalcLeastCclBufferSize(static_cast<int64_t>(tilingData->numMaxTokensPerRank),
-                                                                  yDtypeSize, tilingData, recordHasWeights),
-                                           static_cast<int64_t>(ALIGN_512));
+    // 按请求去重模式规划容量；elemsPerByte=1 保留 A4 的保守上界。
+    int64_t leastCclBufferSize = PeermemInfo(tilingData).totalSize;
+    if (tilingData->topoType == TOPO_TYPE_MTE) {
+        leastCclBufferSize += EXCEPTION_DUMP_REGION_SIZE;
+    }
+    int64_t cclDataOffset = ops::CeilAlign(leastCclBufferSize, static_cast<int64_t>(ALIGN_512));
     int64_t cclBufferSize = static_cast<int64_t>(*attrs->GetAttrPointer<int64_t>((config.attrCclBufferSizeIndex)));
     OP_TILING_CHECK(workspaceLayout.workspaceSize <= 0,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "cclDataSize",

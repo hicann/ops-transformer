@@ -49,10 +49,8 @@ struct ExpertRouteInfo {
 template <typename TopkIndexType>
 __aicore__ inline SendMaskConfig CreateSendMaskConfig(const Params& params, uint32_t aivCoreIdx)
 {
-    uint64_t routeIndexWinOffset =
-        static_cast<uint64_t>(params.peermemInfo.maskRecvPtr - params.peermemInfo.rankSyncInWorldPtr);
-    uint64_t expertCountWinOffset =
-        static_cast<uint64_t>(params.peermemInfo.expertCountRecvPtr - params.peermemInfo.rankSyncInWorldPtr);
+    uint64_t routeIndexWinOffset = static_cast<uint64_t>(params.peermemInfo.maskRecv.offset);
+    uint64_t expertCountWinOffset = static_cast<uint64_t>(params.peermemInfo.expertCountRecv.offset);
     const MegaMoeSendMaskBufferConfig& bufferConfig = aivCoreIdx < params.tilingData->sendMaskCoreCountWithExtraExpert ?
                                                           params.tilingData->sendMaskConfigForCoreWithExtraExpert :
                                                           params.tilingData->sendMaskConfigForCoreWithoutExtraExpert;
