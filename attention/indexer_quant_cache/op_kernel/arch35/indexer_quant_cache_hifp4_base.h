@@ -29,6 +29,12 @@ constexpr int32_t CONST_TWO = 2;
 constexpr int32_t ALIGN_PARAM1 = 64;
 constexpr int32_t ALIGN_PARAM2 = 128;
 constexpr int32_t ALIGN_PARAM3 = 512;
+constexpr AscendC::MicroAPI::CastTrait castTraitReciprocal = {
+    AscendC::MicroAPI::RegLayout::ZERO,
+    AscendC::MicroAPI::SatMode::SAT,
+    AscendC::MicroAPI::MaskMergeMode::ZEROING,
+    AscendC::RoundMode::CAST_RINT,
+};
 
 template <typename TX>
 __aicore__ inline void VFProcessSwigluHiF4InvScaleAndQuant(
@@ -150,7 +156,8 @@ __aicore__ inline void VFProcessSwigluHiF4InvScaleAndQuant(
             Pack(e6m2Res, (RegTensor<uint16_t>&)e6m2);
             DataCopyUnAlign<uint8_t, AscendC::MicroAPI::PostLiteral::POST_MODE_UPDATE>(eaLocalAddr, e6m2Res, uregEa, 8);
 
-            ReciprocalCast(vb16EaRecBf16, (RegTensor<fp8_e6m2_t>&)e6m2, maskAll);
+            ReciprocalCast<bfloat16_t, fp8_e6m2_t, castTraitReciprocal>(vb16EaRecBf16, (RegTensor<fp8_e6m2_t>&)e6m2,
+                                                                        maskAll);
 
             Interleave(vb16EaRecBf16, tmp, vb16EaRecBf16, vb16EaRecBf16); // 8 -> 16
             Interleave(vb16EaRecBf16, tmp, vb16EaRecBf16, vb16EaRecBf16); // 16 -> 32
