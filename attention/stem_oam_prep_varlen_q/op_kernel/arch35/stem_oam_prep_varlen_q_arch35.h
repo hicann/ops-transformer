@@ -63,8 +63,8 @@ constexpr uint32_t DIM_QK = 128;
 constexpr uint32_t DOUBLE_BUFFER_DEPTH = 2;
 constexpr uint32_t SCALE_PAD_SIZE = 8;
 
-__simd_callee__ inline void MulsOnAllRows(__ubuf__ float* qFP32Ptr, __ubuf__ float* scalePtr, uint16_t R, uint16_t S,
-                                          uint16_t D, uint16_t scaleStride)
+__simd_vf__ inline void MulsOnAllRows(__ubuf__ float* qFP32Ptr, __ubuf__ float* scalePtr, uint16_t R, uint16_t S,
+                                      uint16_t D, uint16_t scaleStride)
 {
     using namespace AscendC::Reg;
 
@@ -90,11 +90,8 @@ __simd_callee__ inline void MulsOnAllRows(__ubuf__ float* qFP32Ptr, __ubuf__ flo
     }
 }
 
-__simd_vf__ inline void WeightedBinaryReduceFull(__ubuf__ float* qFP32Ptr, __ubuf__ float* scalePtr, uint16_t R,
-                                                 uint16_t S, uint16_t D, uint16_t scaleStride)
+__simd_vf__ inline void ReduceOneStride(__ubuf__ float* qFP32Ptr, uint16_t stride, uint16_t ops, uint16_t S, uint16_t D)
 {
-    MulsOnAllRows(qFP32Ptr, scalePtr, R, S, D, scaleStride);
-
     using namespace AscendC::Reg;
 
     constexpr uint16_t VL_F = VECTOR_REG_WIDTH / sizeof(float);
@@ -104,25 +101,16 @@ __simd_vf__ inline void WeightedBinaryReduceFull(__ubuf__ float* qFP32Ptr, __ubu
     RegTensor<float> regA;
     RegTensor<float> regB;
 
-    uint16_t rMain = 1;
-    while ((rMain << 1) <= R) {
-        rMain <<= 1;
-    }
-    uint16_t rTail = R - rMain;
-
-    for (uint16_t stride = rMain; stride >= 1; stride >>= 1) {
-        uint16_t ops = (stride == rMain) ? rTail : stride;
-        for (uint16_t g = 0; g < S; g++) {
-            for (uint16_t r = 0; r < ops; r++) {
-                uint32_t offDst = static_cast<uint32_t>(r * S + g) * D;
-                uint32_t offSrc = static_cast<uint32_t>((r + stride) * S + g) * D;
-                for (uint16_t vi = 0; vi < vlIter; vi++) {
-                    uint32_t d = static_cast<uint32_t>(vi) * VL_F;
-                    DataCopy(regA, qFP32Ptr + offDst + d);
-                    DataCopy(regB, qFP32Ptr + offSrc + d);
-                    Add(regA, regA, regB, maskAll);
-                    DataCopy(qFP32Ptr + offDst + d, regA, maskAll);
-                }
+    for (uint16_t g = 0; g < S; g++) {
+        for (uint16_t r = 0; r < ops; r++) {
+            uint32_t offDst = static_cast<uint32_t>(r * S + g) * D;
+            uint32_t offSrc = static_cast<uint32_t>((r + stride) * S + g) * D;
+            for (uint16_t vi = 0; vi < vlIter; vi++) {
+                uint32_t d = static_cast<uint32_t>(vi) * VL_F;
+                DataCopy(regA, qFP32Ptr + offDst + d);
+                DataCopy(regB, qFP32Ptr + offSrc + d);
+                Add(regA, regA, regB, maskAll);
+                DataCopy(qFP32Ptr + offDst + d, regA, maskAll);
             }
         }
     }
@@ -290,8 +278,24 @@ public:
         __ubuf__ float* qFP32Ptr = (__ubuf__ float*)fp32Buf.GetPhyAddr();
         __ubuf__ float* scalePtr = (__ubuf__ float*)scaleBuf.GetPhyAddr();
 
-        VF_CALL<WeightedBinaryReduceFull>(qFP32Ptr, scalePtr, static_cast<uint16_t>(R), static_cast<uint16_t>(S),
-                                          static_cast<uint16_t>(dimQk), static_cast<uint16_t>(SCALE_PAD_SIZE));
+        uint16_t R16 = static_cast<uint16_t>(R);
+        uint16_t S16 = static_cast<uint16_t>(S);
+        uint16_t D16 = static_cast<uint16_t>(dimQk);
+
+        VF_CALL<MulsOnAllRows>(qFP32Ptr, scalePtr, R16, S16, D16, static_cast<uint16_t>(SCALE_PAD_SIZE));
+        PipeBarrier<PIPE_V>();
+
+        uint16_t rMain = 1;
+        while ((rMain << 1) <= R16) {
+            rMain <<= 1;
+        }
+        uint16_t rTail = R16 - rMain;
+
+        for (uint16_t stride = rMain; stride >= 1; stride >>= 1) {
+            uint16_t ops = (stride == rMain) ? rTail : stride;
+            VF_CALL<ReduceOneStride>(qFP32Ptr, stride, ops, S16, D16);
+            PipeBarrier<PIPE_V>();
+        }
 
         qBlockFP32Que.EnQue(fp32Buf);
     }
