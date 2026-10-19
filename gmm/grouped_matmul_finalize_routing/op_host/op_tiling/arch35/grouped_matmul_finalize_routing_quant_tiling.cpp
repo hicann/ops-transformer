@@ -761,9 +761,11 @@ ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::CalWeightNzScaleFactors
 ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::DoLibApiTiling()
 {
     CalBasicBlock();
-    const bool isWeightNzMx = inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE &&
-                              inputParams_.bFormat == ge::FORMAT_FRACTAL_NZ;
-    if (isWeightNzMx) {
+    // TensorAPI MX FP32 uses the same L1 and scale-window constraints for ND and NZ weights.
+    const bool useTensorApiMxL1Tiling =
+        inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE &&
+        (inputParams_.bFormat == ge::FORMAT_FRACTAL_NZ || inputParams_.cDtype == ge::DT_FLOAT);
+    if (useTensorApiMxL1Tiling) {
         OP_CHECK_IF(CalWeightNzL1Tiling() != ge::GRAPH_SUCCESS,
                     OP_LOGE(context_->GetNodeName(), "CalWeightNzL1Tiling failed"), return ge::GRAPH_FAILED);
     } else {
