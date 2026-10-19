@@ -83,6 +83,8 @@ struct MsaTask {
     uint32_t sStileEnd;
     uint32_t numSTiles;        // 含不可见尾，必须写 -inf 的 S-tile 数
     uint32_t numComputeSTiles; // AIC 真正做 QKᵀ 的 S-tile 数（<= numSTiles）
+    uint32_t sChunkIdx;        // 本 M-tile 的 S 切分序号
+    uint32_t sChunks;          // 本 M-tile 的 S 切分数
     bool writeTailFill;        // 本 M-tile 的最后 chunk 负责 [visible, stride) 填 -inf
 };
 
@@ -253,6 +255,8 @@ private:
         task.localBlocks = localBlocks_;
         task.mStart = mStart;
         task.mActual = mActual;
+        task.sChunkIdx = sChunkIdx;
+        task.sChunks = (sChunks < 1U) ? 1U : sChunks;
         task.globalRowBase = cuQStart_ * numQHeads_ + task.mStart;
 
         const uint32_t tLo = (mActual == 0U) ? 0U : (task.mStart / numQHeads_);

@@ -131,11 +131,93 @@ inline uint32_t EstMaxVisibleBlocks(gert::TilingContext* context, const MsaIndex
     return vis;
 }
 
+inline uint32_t GcdU32(uint32_t a, uint32_t b)
+{
+    while (b != 0U) {
+        const uint32_t t = a % b;
+        a = b;
+        b = t;
+    }
+    return (a == 0U) ? 1U : a;
+}
+
+// A2/A3：M-task 少于 AIC 时，kvChunks 取 aic/gcd(mTasks, aic)，让总 task 能铺满核。
+// 仅当估算 makespan（每核 stile 数）下降才切开，避免短 KV 被握手开销拖慢。
+inline uint32_t EstKvChunksA2(uint32_t aicNum, uint32_t packedM, uint32_t visBlocks)
+{
+    if (packedM == 0U || aicNum == 0U || packedM >= aicNum) {
+        return 1U;
+    }
+    const uint32_t nStiles = (visBlocks + MSA_BLOCKS_PER_STILE - 1U) / MSA_BLOCKS_PER_STILE;
+    if (nStiles <= 1U) {
+        return 1U;
+    }
+    uint32_t chunks = aicNum / GcdU32(packedM, aicNum);
+    if (chunks > nStiles) {
+        chunks = nStiles;
+    }
+    if (chunks <= 1U) {
+        return 1U;
+    }
+    const uint32_t oldSpan = ((packedM + aicNum - 1U) / aicNum) * nStiles;
+    const uint32_t newTasks = packedM * chunks;
+    const uint32_t tasksPerCore = (newTasks + aicNum - 1U) / aicNum;
+    const uint32_t stilePerChunk = (nStiles + chunks - 1U) / chunks;
+    if (tasksPerCore * stilePerChunk >= oldSpan) {
+        return 1U;
+    }
+    return chunks;
+}
+
+// A2/A3：batch 已超过 AIC、但每个请求仍是一个 M-tile（短 decode）时，按最长 KV 的 stile
+// 再切 S。否则 32 个长短不一的请求会按任务号跨步，最慢核拿到约 2 倍平均页数。
+// 仅当估算 makespan 下降才切。prefill（单请求行数 > M-tile）和 950 不走这里。
+inline uint32_t EstKvChunksA2BatchBalance(const MsaIndexScoreInfo& info, uint32_t aicNum, uint32_t visBlocks)
+{
+    if (info.batch <= aicNum || aicNum == 0U) {
+        return 1U;
+    }
+    const uint64_t rows = static_cast<uint64_t>(info.totalQ) * static_cast<uint64_t>(info.numQHeads);
+    if (rows > static_cast<uint64_t>(info.batch) * MSA_ROW_TILE_M) {
+        return 1U;
+    }
+    const uint32_t nStiles = (visBlocks + MSA_BLOCKS_PER_STILE - 1U) / MSA_BLOCKS_PER_STILE;
+    if (nStiles <= 1U) {
+        return 1U;
+    }
+    const uint32_t oldSpan = ((info.batch + aicNum - 1U) / aicNum) * nStiles;
+    uint32_t bestChunks = 1U;
+    uint32_t bestSpan = oldSpan;
+    for (uint32_t chunks = 2U; chunks <= nStiles && chunks <= 16U; chunks *= 2U) {
+        const uint32_t newTasks = info.batch * chunks;
+        const uint32_t tasksPerCore = (newTasks + aicNum - 1U) / aicNum;
+        const uint32_t stilePerChunk = (nStiles + chunks - 1U) / chunks;
+        const uint32_t span = tasksPerCore * stilePerChunk;
+        // 与当前最优 span 相同时取更大 chunks：stile 估算打平，但请求长短不一时
+        // 更细的 S 切分能把长请求拆开。span 不小于初始 makespan 时不切，避免空切。
+        if (span < bestSpan || (span == bestSpan && bestChunks > 1U)) {
+            bestSpan = span;
+            bestChunks = chunks;
+        }
+    }
+    return bestChunks;
+}
+
 // 950：M-task 填不满 AIC 且可见 KV stile 足够时，沿 S 切开打满核。A1 类 packedM≈aicNum 时 kvChunks=1。
+// A2/A3 走 EstKvChunksA2，不改变 950 的 chunks=aic/packedM。
 inline uint32_t EstKvChunks(const MsaIndexScoreInfo& info, uint32_t aicNum, uint32_t packedM, uint32_t visBlocks)
 {
-    if (!info.isAscend950 || packedM == 0U || aicNum == 0U || packedM >= aicNum) {
+    if (packedM == 0U || aicNum == 0U) {
         return 1U;
+    }
+    if (packedM >= aicNum) {
+        if (!info.isAscend950) {
+            return EstKvChunksA2BatchBalance(info, aicNum, visBlocks);
+        }
+        return 1U;
+    }
+    if (!info.isAscend950) {
+        return EstKvChunksA2(aicNum, packedM, visBlocks);
     }
     const uint32_t nStiles = (visBlocks + MSA_BLOCKS_PER_STILE - 1U) / MSA_BLOCKS_PER_STILE;
     if (nStiles <= 1U) {

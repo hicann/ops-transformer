@@ -242,6 +242,79 @@ public:
         FinishSTile(blkBase);
     }
 
+    __aicore__ inline bool ScoreStaged() const
+    {
+        return stageOn_;
+    }
+
+    /// 宽 score（stride > 一窗，stage 关闭）的不可见尾。
+    /// 旧路径对每个 S-tile 走一整遍 ProcessSTile（Duplicate / barrier / 8 列 DataCopy）。
+    /// kv 只有约 520 block、stride 为 2064 时，尾部约 193 个 tile，且 kvChunks 整除 AIC
+    /// 会让每个请求的最后一块落在同一核上，墙钟被这段空写拉到计算量的数倍。
+    /// 这里按 chunk 把 [numComputeSTiles, stride) 切成 32B 对齐的连续 -inf 写回。
+    __aicore__ inline void FillInvalidTail(const MsaTask& task)
+    {
+        if (stageOn_ || mSub_ == 0U) {
+            return;
+        }
+        const uint32_t begin = task.numComputeSTiles * MSA_BLOCKS_PER_STILE;
+        if (begin >= strideOutToken_) {
+            return;
+        }
+        const uint32_t tailBlks = strideOutToken_ - begin;
+        const uint32_t tailStiles = tailBlks / MSA_BLOCKS_PER_STILE;
+        const uint32_t sChunks = (task.sChunks < 1U) ? 1U : task.sChunks;
+        const uint32_t sChunkIdx = task.sChunkIdx;
+        if (sChunkIdx >= sChunks || tailStiles == 0U) {
+            return;
+        }
+        const uint32_t base = tailStiles / sChunks;
+        const uint32_t extra = tailStiles % sChunks;
+        uint32_t st0 = 0U;
+        uint32_t nst = 0U;
+        if (sChunkIdx < extra) {
+            st0 = sChunkIdx * (base + 1U);
+            nst = base + 1U;
+        } else {
+            st0 = extra * (base + 1U) + (sChunkIdx - extra) * base;
+            nst = base;
+        }
+        if (nst == 0U) {
+            return;
+        }
+        const uint32_t col0 = begin + st0 * MSA_BLOCKS_PER_STILE;
+        const uint32_t col1 = begin + (st0 + nst) * MSA_BLOCKS_PER_STILE;
+        // 一次最多写 1024 个 fp32（4KB）。Duplicate 长度补到 64 的倍数，DataCopy 只写真实列。
+        constexpr uint32_t kChunk = 1024U;
+        static_assert(kChunk % 64U == 0U, "tail chunk must cover whole fp32 repeats");
+        static_assert(kChunk <= MSA_STAGE_ROWS * MSA_STAGE_BLOCKS, "tail chunk exceeds stage UB");
+
+        for (uint32_t col = col0; col < col1;) {
+            uint32_t n = col1 - col;
+            if (n > kChunk) {
+                n = kChunk;
+            }
+            const uint32_t dupN = (n + 63U) & ~63U;
+            AscendC::Duplicate(ubStage_, MSA_FILL_VALUE, dupN);
+            AscendC::PipeBarrier<PIPE_V>();
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID2);
+            AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID2);
+            uint32_t tOff = rowInReqBase_ / numQHeads_;
+            uint32_t h = rowInReqBase_ - tOff * numQHeads_;
+            uint64_t tokenBase = static_cast<uint64_t>(tokenBase0_ + tOff) * strideOutToken_ + col;
+            for (uint32_t r = 0; r < mSub_; ++r) {
+                AscendC::DataCopy(gScore_[tokenBase + static_cast<uint64_t>(h) * strideOutHead_], ubStage_, n);
+                if (++h == numQHeads_) {
+                    h = 0U;
+                    tokenBase += strideOutToken_;
+                }
+            }
+            AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID2);
+            AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID2);
+            col += n;
+        }
+    }
+
 private:
     /// 非量化乒乓：把本 pass 的 S 搬进 ubS16Ping_[stage]，不阻塞 Vector。
     __aicore__ inline void IssueS16(const AscendC::GlobalTensor<ElementS>& gS, uint32_t rowOff, uint32_t rows,

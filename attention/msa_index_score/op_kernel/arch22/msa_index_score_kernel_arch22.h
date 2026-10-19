@@ -139,6 +139,8 @@ private:
         MsaTask task;
         for (uint32_t taskIdx = coreIdx; taskIdx < totalTasks; taskIdx += coreNum) {
             scheduler_.Decode(taskIdx, task);
+            // block_table 按 256B 预取，盖住后续逐页 GetValue 的 HBM 延迟。
+            PreloadBlockTable(task);
             // 只对可见 S-tile 做 QKᵀ + 握手；因果不可见尾由 AIV 直接写 -inf，避免空转同步。
             bool needLoadQ = true;
             for (uint32_t st = task.sStileBegin; st < task.sStileEnd; ++st) {
@@ -230,6 +232,22 @@ private:
         }
         const uint32_t seqRemain = static_cast<uint32_t>(task.kvLen) - seqTok;
         return seqRemain < MSA_BLOCK_SIZE ? seqRemain : MSA_BLOCK_SIZE;
+    }
+
+    /// PA block_table 一行可能有数百个 int32。dc_preload 每次 256B，在 QK 开始前发出。
+    __aicore__ inline void PreloadBlockTable(const MsaTask& task)
+    {
+        if (tiling_->keyLayout == MSA_KEY_LAYOUT_TND || task.sBlkEnd <= task.sBlkBegin) {
+            return;
+        }
+        const uint32_t nBlk = task.sBlkEnd - task.sBlkBegin;
+        const __gm__ int32_t* row = gBlockTable_.GetPhyAddr() +
+                                    static_cast<uint64_t>(task.batchIdx) * tiling_->maxBlocksPerBatch + task.sBlkBegin;
+        const uint32_t bytes = nBlk * static_cast<uint32_t>(sizeof(int32_t));
+        auto* base = reinterpret_cast<__gm__ uint64_t*>(const_cast<__gm__ int32_t*>(row));
+        for (uint32_t off = 0; off < bytes; off += 256U) {
+            dc_preload(base, static_cast<int64_t>(off));
+        }
     }
 
     __aicore__ inline uint64_t KeyBlockGmOffset(const MsaTask& task, uint32_t blk) const
@@ -515,11 +533,16 @@ private:
                     ++tileSeq;
                 }
             }
-            // 因果不可见尾：不握手，直接写 -inf（与 AIC 跳过这些 tile 对齐）。
-            if (task.writeTailFill) {
-                for (uint32_t st = task.numComputeSTiles; st < task.numSTiles; ++st) {
-                    epilogue.ProcessSTile(gWorkspace_[0], task, st * MSA_BLOCKS_PER_STILE);
+            // 因果不可见尾不握手。窄 score 仍逐 tile 写进暂存窗；宽 score 的 -inf 尾
+            // 按 chunk 连续写回，避免 8 列循环把墙钟拉到可见 KV 计算量的数倍。
+            if (epilogue.ScoreStaged()) {
+                if (task.writeTailFill) {
+                    for (uint32_t st = task.numComputeSTiles; st < task.numSTiles; ++st) {
+                        epilogue.ProcessSTile(gWorkspace_[0], task, st * MSA_BLOCKS_PER_STILE);
+                    }
                 }
+            } else {
+                epilogue.FillInvalidTail(task);
             }
             epilogue.EndTask();
         }
