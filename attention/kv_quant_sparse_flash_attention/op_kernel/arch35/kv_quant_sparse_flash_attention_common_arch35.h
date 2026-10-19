@@ -36,6 +36,15 @@ constexpr uint64_t SYNC_MODE = 4;
 
 static constexpr uint32_t QSFA_SYNC_MODE0 = 0;
 
+// ===== GetKVPhyAddr 独立相位, FREE/READY 同号配对 =====
+// 同一块 UB 两个方向绑定同一事件号; V_MTE2 与 MTE2_V 是独立硬件标志组, 同号互不影响
+#define INNERCORE_PHYADDR_BLKTABLE_FREE (3)   // V_MTE2, blkTable 空闲
+#define INNERCORE_PHYADDR_BLKTABLE_READY (3)  // MTE2_V, blkTable 就绪
+#define INNERCORE_PHYADDR_SPARSEIDX_FREE (4)  // V_MTE2, sparseIdx 空闲
+#define INNERCORE_PHYADDR_SPARSEIDX_READY (4) // MTE2_V, sparseIdx 就绪
+#define INNERCORE_PHYADDR_KVADDR_READY (7)    // V_MTE3, kvPhyAddr 就绪
+#define INNERCORE_PHYADDR_KVADDR_FREE (7)     // MTE3_V, kvPhyAddr 空闲
+
 enum class QSFA_LAYOUT {
     BSND = 0,
     TND = 1,

@@ -27,12 +27,12 @@
 #define INNERCORE_STAGE2 (6)              // 6:   stage2, MTE3_V / V_MTE3
 #define INNERCORE_SINKS_SYNC (7)          // 7:   sinks,  MTE2_V / V_MTE2
 
-// ===== GetKVPhyAddr 独立阶段, 保留原 flag 值 =====
+// ===== GetKVPhyAddr 独立阶段, FREE/READY 同号配对 =====
 #define INNERCORE_PHYADDR_BLKTABLE_FREE (3)   // V_MTE2, blkTable 空闲
-#define INNERCORE_PHYADDR_BLKTABLE_READY (8)  // MTE2_V, blkTable 就绪
+#define INNERCORE_PHYADDR_BLKTABLE_READY (3)  // MTE2_V, blkTable 就绪
 #define INNERCORE_PHYADDR_SPARSEIDX_FREE (4)  // V_MTE2, sparseIdx 空闲
-#define INNERCORE_PHYADDR_SPARSEIDX_READY (6) // MTE2_V, sparseIdx 就绪
-#define INNERCORE_PHYADDR_KVADDR_READY (5)    // V_MTE3, kvPhyAddr 就绪
+#define INNERCORE_PHYADDR_SPARSEIDX_READY (4) // MTE2_V, sparseIdx 就绪
+#define INNERCORE_PHYADDR_KVADDR_READY (7)    // V_MTE3, kvPhyAddr 就绪
 #define INNERCORE_PHYADDR_KVADDR_FREE (7)     // MTE3_V, kvPhyAddr 空闲
 
 // ===== V 侧其余核内 flag id (FD / batch-consistency / LSE / init) =====

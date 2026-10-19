@@ -1683,9 +1683,9 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
     qsmlaTmpGS1Start = gS1StartIdx;
     bool qsmlaDone = false;
 
-    SetFlag<AscendC::HardEvent::V_MTE2>(3); // 3: 同步标志位值
-    SetFlag<AscendC::HardEvent::V_MTE2>(4); // 4: 同步标志位值
-    SetFlag<AscendC::HardEvent::MTE3_V>(7); // 7: 同步标志位值
+    SetFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_BLKTABLE_FREE);
+    SetFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_SPARSEIDX_FREE);
+    SetFlag<AscendC::HardEvent::MTE3_V>(INNERCORE_PHYADDR_KVADDR_FREE);
 
     for (uint32_t bIdx = bN2StartIdx; bIdx < bN2EndIdx && !qsmlaDone; ++bIdx) {
         bool qsmlaLastBN = (bIdx == bN2EndIdx - 1);
@@ -1725,10 +1725,10 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
         Qs35PhyAddrValidInfo qs35ValidWindow =
             CalcPhyAddrValidInfo(isOriKv, qsmlaActualS1Size, actualOriS2Size, restoredSize, qs35VecConstInfo);
 
-        WaitFlag<AscendC::HardEvent::V_MTE2>(3); // 3: 同步标志位值
+        WaitFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_BLKTABLE_FREE);
         AttentionCommon::CopyPaTableToUb(blkTableUb, bIdx, qsActiveBlockTableGm, qsActiveMaxBlocksPerBatch);
-        SetFlag<AscendC::HardEvent::MTE2_V>(8);  // 8: 同步标志位值
-        WaitFlag<AscendC::HardEvent::MTE2_V>(8); // 8: 同步标志位值
+        SetFlag<AscendC::HardEvent::MTE2_V>(INNERCORE_PHYADDR_BLKTABLE_READY);
+        WaitFlag<AscendC::HardEvent::MTE2_V>(INNERCORE_PHYADDR_BLKTABLE_READY);
 
         for (int32_t s1Idx = qsmlaTmpGS1Start; s1Idx < qsmlaS1End; ++s1Idx) {
             int32_t qsmlaCurValidS2 =
@@ -1746,22 +1746,22 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
 
             uint16_t qsmlaS2Loop = (qsmlaCurValidS2 + s2NumPerLoop - 1) / s2NumPerLoop;
             int32_t qsmlaS2Tail = qsmlaCurValidS2 - (qsmlaS2Loop - 1) * s2NumPerLoop;
-            WaitFlag<AscendC::HardEvent::V_MTE2>(4); // 4: 同步标志位值
+            WaitFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_SPARSEIDX_FREE);
             AttentionCommon::CopySparseIdxToUb(sparseIdxUb, bS1Idx, s1Idx, qsmlaCurValidS2, qsActiveSparseIndicesGm,
                                                sparseBlockCount);
-            SetFlag<AscendC::HardEvent::MTE2_V>(6); // 6: 同步标志位值
+            SetFlag<AscendC::HardEvent::MTE2_V>(INNERCORE_PHYADDR_SPARSEIDX_READY);
 
-            WaitFlag<AscendC::HardEvent::MTE2_V>(6); // 6: 同步标志位值
-            WaitFlag<AscendC::HardEvent::MTE3_V>(7); // 7: 同步标志位值
+            WaitFlag<AscendC::HardEvent::MTE2_V>(INNERCORE_PHYADDR_SPARSEIDX_READY);
+            WaitFlag<AscendC::HardEvent::MTE3_V>(INNERCORE_PHYADDR_KVADDR_FREE);
             AttentionCommon::GetKVPhyAddrVFPa<uint32_t>(
                 kvPhyAddrUb, sparseIdxUb, blkTableUb, qsmlaS2Loop, qsmlaS2Tail, qsActiveBlockSize, shiftRightNum,
                 qs35VecConstInfo.sparseBlockSize, dVTemplateTypeInput, kvStride);
-            SetFlag<AscendC::HardEvent::V_MTE2>(4);  // 4: 同步标志位值
-            SetFlag<AscendC::HardEvent::V_MTE3>(5);  // 5: 同步标志位值
-            WaitFlag<AscendC::HardEvent::V_MTE3>(5); // 5: 同步标志位值
+            SetFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_SPARSEIDX_FREE);
+            SetFlag<AscendC::HardEvent::V_MTE3>(INNERCORE_PHYADDR_KVADDR_READY);
+            WaitFlag<AscendC::HardEvent::V_MTE3>(INNERCORE_PHYADDR_KVADDR_READY);
             AttentionCommon::CopyPhyAddrToGm(kvPhyAddrUb, bS1Idx, s1Idx, qsmlaCurValidS2, s2NumPerLoop, phyAddrGm,
                                              alignedSparseBlockCount);
-            SetFlag<AscendC::HardEvent::MTE3_V>(7); // 7: 同步标志位值
+            SetFlag<AscendC::HardEvent::MTE3_V>(INNERCORE_PHYADDR_KVADDR_FREE);
 
             qsmlaProcessedCount++;
             if (qsmlaProcessedCount >= qsmlaCurCount) {
@@ -1769,13 +1769,13 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
                 break;
             }
         }
-        SetFlag<AscendC::HardEvent::V_MTE2>(3); // 3: 同步标志位值
+        SetFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_BLKTABLE_FREE);
         qsmlaTmpGS1Start = 0;
     }
 
-    WaitFlag<AscendC::HardEvent::V_MTE2>(3); // 3: 同步标志位值
-    WaitFlag<AscendC::HardEvent::V_MTE2>(4); // 4: 同步标志位值
-    WaitFlag<AscendC::HardEvent::MTE3_V>(7); // 7: 同步标志位值
+    WaitFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_BLKTABLE_FREE);
+    WaitFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_SPARSEIDX_FREE);
+    WaitFlag<AscendC::HardEvent::MTE3_V>(INNERCORE_PHYADDR_KVADDR_FREE);
 }
 
 TEMPLATES_DEF_NO_DEFAULT

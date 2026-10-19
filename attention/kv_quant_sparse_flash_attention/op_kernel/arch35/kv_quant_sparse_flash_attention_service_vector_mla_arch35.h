@@ -1492,9 +1492,9 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::GetKVPhyAddr(uint32_t h
     tmpGS1Start = gS1StartIdx;
     bool done = false;
 
-    SetFlag<AscendC::HardEvent::V_MTE2>(3);
-    SetFlag<AscendC::HardEvent::V_MTE2>(4);
-    SetFlag<AscendC::HardEvent::MTE3_V>(7);
+    SetFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_BLKTABLE_FREE);
+    SetFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_SPARSEIDX_FREE);
+    SetFlag<AscendC::HardEvent::MTE3_V>(INNERCORE_PHYADDR_KVADDR_FREE);
 
     for (uint32_t bIdx = bN2StartIdx; bIdx < bN2EndIdx && !done; ++bIdx) {
         bool lastBN = (bIdx == bN2EndIdx - 1);
@@ -1514,10 +1514,10 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::GetKVPhyAddr(uint32_t h
 
         int32_t actualS2Size = GetActualS2Size(bIdx, qsfaConstInfo);
 
-        WaitFlag<AscendC::HardEvent::V_MTE2>(3);
+        WaitFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_BLKTABLE_FREE);
         CopyPaTableToUb(blkTableUb, bIdx, qsfaConstInfo);
-        SetFlag<AscendC::HardEvent::MTE2_V>(8);
-        WaitFlag<AscendC::HardEvent::MTE2_V>(8);
+        SetFlag<AscendC::HardEvent::MTE2_V>(INNERCORE_PHYADDR_BLKTABLE_READY);
+        WaitFlag<AscendC::HardEvent::MTE2_V>(INNERCORE_PHYADDR_BLKTABLE_READY);
 
         for (int32_t s1Idx = tmpGS1Start; s1Idx < s1End; ++s1Idx) {
             int32_t numerator = actualS2Size - actualS1Size + 1 + s1Idx;
@@ -1534,12 +1534,12 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::GetKVPhyAddr(uint32_t h
 
             uint16_t s2Loop = (curValidS2 + s2NumPerLoop - 1) / s2NumPerLoop;
             int32_t s2Tail = curValidS2 - (s2Loop - 1) * s2NumPerLoop;
-            WaitFlag<AscendC::HardEvent::V_MTE2>(4);
+            WaitFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_SPARSEIDX_FREE);
             CopySparseIdxToUb(sparseIdxUb, bS1Idx, s1Idx, curValidS2, qsfaConstInfo);
-            SetFlag<AscendC::HardEvent::MTE2_V>(6);
+            SetFlag<AscendC::HardEvent::MTE2_V>(INNERCORE_PHYADDR_SPARSEIDX_READY);
 
-            WaitFlag<AscendC::HardEvent::MTE2_V>(6);
-            WaitFlag<AscendC::HardEvent::MTE3_V>(7);
+            WaitFlag<AscendC::HardEvent::MTE2_V>(INNERCORE_PHYADDR_SPARSEIDX_READY);
+            WaitFlag<AscendC::HardEvent::MTE3_V>(INNERCORE_PHYADDR_KVADDR_FREE);
             GetKVPhyAddrVF<uint32_t>(kvPhyAddrUb, sparseIdxUb, blkTableUb, s2Loop, s2Tail, qsfaConstInfo.blockSize,
                                      shiftRightNum, qsfaConstInfo.sparseBlockSize, qsfaConstInfo.dSizeVInput, kvStride);
             static constexpr int32_t phyAddrPerBlock = 4;
@@ -1548,11 +1548,11 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::GetKVPhyAddr(uint32_t h
                 // A full VF tail has no invalid lanes. Append one 32-B block of -1 as the CopyIn stop sentinel.
                 Duplicate(kvPhyAddrUb[curValidS2 * 2], UINT32_MAX, phyAddrPerBlock * 2);
             }
-            SetFlag<AscendC::HardEvent::V_MTE2>(4);
-            SetFlag<AscendC::HardEvent::V_MTE3>(5);
-            WaitFlag<AscendC::HardEvent::V_MTE3>(5);
+            SetFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_SPARSEIDX_FREE);
+            SetFlag<AscendC::HardEvent::V_MTE3>(INNERCORE_PHYADDR_KVADDR_READY);
+            WaitFlag<AscendC::HardEvent::V_MTE3>(INNERCORE_PHYADDR_KVADDR_READY);
             CopyPhyAddrToGm(kvPhyAddrUb, bS1Idx, s1Idx, curValidS2, s2NumPerLoop, qsfaConstInfo);
-            SetFlag<AscendC::HardEvent::MTE3_V>(7);
+            SetFlag<AscendC::HardEvent::MTE3_V>(INNERCORE_PHYADDR_KVADDR_FREE);
 
             processedCount++;
             if (processedCount >= curCount) {
@@ -1560,13 +1560,13 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::GetKVPhyAddr(uint32_t h
                 break;
             }
         }
-        SetFlag<AscendC::HardEvent::V_MTE2>(3);
+        SetFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_BLKTABLE_FREE);
         tmpGS1Start = 0;
     }
 
-    WaitFlag<AscendC::HardEvent::V_MTE2>(3);
-    WaitFlag<AscendC::HardEvent::V_MTE2>(4);
-    WaitFlag<AscendC::HardEvent::MTE3_V>(7);
+    WaitFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_BLKTABLE_FREE);
+    WaitFlag<AscendC::HardEvent::V_MTE2>(INNERCORE_PHYADDR_SPARSEIDX_FREE);
+    WaitFlag<AscendC::HardEvent::MTE3_V>(INNERCORE_PHYADDR_KVADDR_FREE);
     SyncAll();
     tPipe->Reset();
 }

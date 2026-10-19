@@ -27,12 +27,12 @@
 #define INNERCORE_STAGE0OUT_MTE2_MTE3(s) (s) // 0,1  Vec0 stage0OutBuf (原 mte2ToMte3)
 #define INNERCORE_SINKS_SYNC (7)             // 7    MTE2_V / V_MTE2
 
-// ===== GetKVPhyAddr 独立相位 (保留原值; 与主流程相位分离, 可复用) =====
+// ===== GetKVPhyAddr 独立相位 (与主流程相位分离, 可复用; FREE/READY 同号配对) =====
 #define INNERCORE_PHYADDR_BLKTABLE_FREE (3)   // V_MTE2
-#define INNERCORE_PHYADDR_BLKTABLE_READY (8)  // MTE2_V
+#define INNERCORE_PHYADDR_BLKTABLE_READY (3)  // MTE2_V
 #define INNERCORE_PHYADDR_SPARSEIDX_FREE (4)  // V_MTE2
-#define INNERCORE_PHYADDR_SPARSEIDX_READY (6) // MTE2_V
-#define INNERCORE_PHYADDR_KVADDR_READY (5)    // V_MTE3
+#define INNERCORE_PHYADDR_SPARSEIDX_READY (4) // MTE2_V
+#define INNERCORE_PHYADDR_KVADDR_READY (7)    // V_MTE3
 #define INNERCORE_PHYADDR_KVADDR_FREE (7)     // MTE3_V
 
 // ===== batch-consistency / LSE / FD / init =====

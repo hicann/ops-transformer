@@ -31,6 +31,15 @@ __aicore__ constexpr uint64_t Align32Func(uint64_t data)
 }
 } // namespace BaseApi
 
+// ===== GetKVPhyAddr 独立相位, FREE/READY 同号配对 =====
+// 同一块 UB 两个方向绑定同一事件号; V_MTE2 与 MTE2_V 是独立硬件标志组, 同号互不影响
+#define INNERCORE_PHYADDR_BLKTABLE_FREE (3)   // V_MTE2, blkTable 空闲
+#define INNERCORE_PHYADDR_BLKTABLE_READY (3)  // MTE2_V, blkTable 就绪
+#define INNERCORE_PHYADDR_SPARSEIDX_FREE (4)  // V_MTE2, sparseIdx 空闲
+#define INNERCORE_PHYADDR_SPARSEIDX_READY (4) // MTE2_V, sparseIdx 就绪
+#define INNERCORE_PHYADDR_KVADDR_READY (7)    // V_MTE3, kvPhyAddr 就绪
+#define INNERCORE_PHYADDR_KVADDR_FREE (7)     // MTE3_V, kvPhyAddr 空闲
+
 #define TEMPLATE_INTF \
     template <typename Q_T, typename KV_T, typename T, typename OUTPUT_T, bool isFd, bool isPa, QSMLA_LAYOUT LAYOUT_T, \
               QSMLA_LAYOUT KV_LAYOUT_T, QSMLATemplateMode TEMPLATE_MODE, bool IS_SPLIT_G, bool IS_VEC_S2PHYADDR, \
