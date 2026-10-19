@@ -88,11 +88,17 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLseV2MetadataGetWorkspaceSize(
         CHECK_RET(cmpResidualKContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
+    const aclTensor* metadataContiguous = l0op::Contiguous(metadata, uniqueExecutor.get());
+    CHECK_RET(metadataContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     auto output = l0op::DenseLightningIndexerSoftmaxLseV2Metadata(
         cuSeqLensQContiguous, cuSeqLensKContiguous, seqUsedQContiguous, seqUsedKContiguous, cmpResidualKContiguous,
         batchSize, maxSeqLenQ, maxSeqLenK, numHeadsQ, numHeadsK, headDim, layoutQ, layoutK, maskMode, cmpRatio,
-        socVersion, aicCoreNum, metadata, uniqueExecutor.get());
+        socVersion, aicCoreNum, metadataContiguous, uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    if (metadataContiguous != metadata) {
+        auto viewCopyResult = l0op::ViewCopy(output, metadata, uniqueExecutor.get());
+        CHECK_RET(viewCopyResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    }
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
     uniqueExecutor.ReleaseTo(executor);

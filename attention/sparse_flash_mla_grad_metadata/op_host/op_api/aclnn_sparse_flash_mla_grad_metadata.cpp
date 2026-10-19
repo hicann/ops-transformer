@@ -150,14 +150,20 @@ aclnnStatus aclnnSparseFlashMlaGradMetadataGetWorkspaceSize(
         }
     }
 
+    const aclTensor* metaDataContiguous = l0op::Contiguous(metaData, uniqueExecutor.get());
+    CHECK_RET(metaDataContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
     auto output = l0op::SparseFlashMlaGradMetadata(
         cuSeqlensQOptionalContiguous, cuSeqlensOriKvOptionalContiguous, cuSeqlensCmpKvOptionalContiguous,
         sequsedQOptionalContiguous, sequsedOriKvOptionalContiguous, sequsedCmpKvOptionalContiguous,
         cmpResidualKvOptionalContiguous, oriTopkLengthOptionalContiguous, cmpTopkLengthOptionalContiguous, numHeadsQ,
         numHeadsKv, headDim, batchSize, maxSeqlenQ, maxSeqlenOriKv, maxSeqlenCmpKv, oriTopk, cmpTopk, cmpRatio,
         oriMaskMode, cmpMaskMode, oriWinLeft, oriWinRight, layoutQOptional, layoutKvOptional, hasOriKv, hasCmpKv,
-        socVersion, aicCoreNum, aivCoreNum, metaData, uniqueExecutor.get());
+        socVersion, aicCoreNum, aivCoreNum, metaDataContiguous, uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    if (metaDataContiguous != metaData) {
+        auto viewCopyResult = l0op::ViewCopy(output, metaData, uniqueExecutor.get());
+        CHECK_RET(viewCopyResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    }
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
     uniqueExecutor.ReleaseTo(executor);

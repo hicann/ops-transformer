@@ -295,6 +295,27 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
                         static_cast<int32_t>(outputDesc->GetDataType())),
                 return ge::GRAPH_PARAM_INVALID);
 
+    // The aclnn adapter of this op is auto-generated and performs no Contiguous/ViewCopy for the
+    // output: a strided output view would be written as if contiguous (misaligned data + OOB
+    // writes). Reject non-contiguous output here. Size-1 dims do not participate in addressing
+    // and are skipped, same as torch contiguity semantics.
+    auto* outStrides = context->GetOutputStride(0);
+    const gert::Shape& outShape = outputShape->GetStorageShape();
+    if (outStrides != nullptr && outStrides->GetDimNum() == outShape.GetDimNum()) {
+        int64_t expectedStride = 1;
+        for (size_t i = outShape.GetDimNum(); i > 0; --i) {
+            const size_t dim = i - 1;
+            const int64_t actualStride = outStrides->GetStride(dim);
+            if (outShape.GetDim(dim) != 1 && actualStride != expectedStride) {
+                OP_LOGE(context->GetNodeName(),
+                        "output softmax_lse must be contiguous, but got stride[%zu]=%ld, expected=%ld.", dim,
+                        actualStride, expectedStride);
+                return ge::GRAPH_PARAM_INVALID;
+            }
+            expectedStride *= outShape.GetDim(dim);
+        }
+    }
+
     auto queryDesc = context->GetInputDesc(0);
     auto keyDesc = context->GetInputDesc(1);
     auto weightDesc = context->GetInputDesc(2);
