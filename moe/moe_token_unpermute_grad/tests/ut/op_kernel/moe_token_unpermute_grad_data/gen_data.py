@@ -1,110 +1,121 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-# -----------------------------------------------------------------------------------------------------------
-# Copyright (c) 2025 Huawei Technologies Co., Ltd.
+#!/usr/bin/env python3
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
 # This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
 # THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
-# -----------------------------------------------------------------------------------------------------------
 
-import sys
-import numpy as np
+"""CPU golden and binary inputs for MoeTokenUnpermuteGrad kernel UTs."""
+
+import argparse
+from pathlib import Path
+
 import torch
+
+
+DTYPES = {
+    "float32": torch.float32,
+    "float16": torch.float16,
+    "bfloat16": torch.bfloat16,
+    "bfloat16_t": torch.bfloat16,
+}
+
+
+def parse_bool(value):
+    if value not in ("True", "False"):
+        raise argparse.ArgumentTypeError("expected True or False")
+    return value == "True"
+
+
+def write_tensor(path, tensor):
+    tensor = tensor.detach().cpu().contiguous()
+    # Preserve BF16 storage without requiring a NumPy BF16 extension.
+    if tensor.dtype == torch.bfloat16:
+        tensor = tensor.view(torch.int16)
+    tensor.numpy().tofile(path)
 
 
 def get_cpu_data(
     token_num,
     topk,
-    hiddensize,
+    hidden_size,
     permuted_tokens,
-    sorted_indices1,
-    unpermuted_output_d,
+    sorted_indices,
+    output_grad,
     probs,
     flag,
 ):
-    ori_type = permuted_tokens.dtype
-    prob_type = probs.dtype
+    """sorted_indices maps original token/top-k slots to permuted rows."""
+    indices = sorted_indices.to(torch.int64)
+    if not flag and topk != 1:
+        raise ValueError("topk must be 1 when probs is absent")
+    expanded_grad = (
+        output_grad.float().unsqueeze(1).expand(token_num, topk, hidden_size)
+    )
+    probs_grad = None
     if flag:
-        unpermuted_tokens = torch.zeros(
-            token_num * topk, hiddensize, dtype=torch.float32
+        original_tokens = (
+            permuted_tokens.float()
+            .index_select(0, indices)
+            .reshape(token_num, topk, hidden_size)
         )
-        unpermuted_tokens = permuted_tokens.index_select(0, sorted_indices1)
-        unpermuted_tokens = unpermuted_tokens.reshape(
-            -1, topk, permuted_tokens.size(-1)
-        )
-        probs_grad = torch.sum(
-            unpermuted_output_d.unsqueeze(1) * unpermuted_tokens, -1, keepdim=False
-        )
-
-        permuted_tokens_grad = (
-            unpermuted_output_d.unsqueeze(1) * probs.unsqueeze(-1)
-        ).reshape(-1, hiddensize)
-        permuted_tokens_grad1 = torch.zeros(
-            token_num * topk, hiddensize, dtype=torch.float32
-        )
-        permuted_tokens_grad1.index_add_(0, sorted_indices1, permuted_tokens_grad)
-
-        return permuted_tokens_grad1.detach().numpy().astype(
-            ori_type
-        ), probs_grad.detach().numpy().astype(prob_type)
-    else:
-        permuted_tokens_grad1 = torch.zeros(
-            token_num * topk, hiddensize, dtype=torch.float32
-        )
-        permuted_tokens_grad1.index_add_(0, sorted_indices1, permuted_tokens_grad)
-        return permuted_tokens_grad1.detach().numpy().astype(ori_type), None
+        probs_grad = (expanded_grad * original_tokens).sum(-1).to(probs.dtype)
+        expanded_grad = expanded_grad * probs.float().unsqueeze(-1)
+    token_grad = torch.zeros(token_num * topk, hidden_size, dtype=torch.float32)
+    token_grad.index_copy_(0, indices, expanded_grad.reshape(-1, hidden_size))
+    return token_grad.to(permuted_tokens.dtype), probs_grad
 
 
 def gen_data_and_golden(
-    token_num, topk, hiddensize, tokendtype, probdtype, flag
-):  # flag=True传probs, False不传probs
-    permuted_tokens = np.random.uniform(
-        -2, 2, [int(token_num * topk), int(hiddensize)]
-    ).astype(tokendtype)
-    indices = np.random.randint(0, token_num * topk, size=(token_num * topk,)).astype(
-        "int32"
-    )
-    sorted_indices1 = torch.argsort(indices, stable=True).to(torch.int64)  # 传给标杆
-    sorted_indices = (
-        torch.argsort(sorted_indices1, stable=True).to(torch.int64).numpy()
-    )  # 传给算子
-    unpermuted_output_d = np.random.uniform(
-        -2, 2, [int(token_num), int(hiddensize)]
-    ).astype(tokendtype)
-    probs = np.random.uniform(-2, 2, [int(token_num), int(topk)]).astype(probdtype)
-    permuted_tokens_grad, probs_grad = get_cpu_data(
-        token_num,
-        topk,
-        hiddensize,
-        permuted_tokens,
-        sorted_indices1,
-        unpermuted_output_d,
-        probs,
-        flag,
-    )
-
-    permuted_tokens.tofile("./input_permuted_tokens.bin")
-    sorted_indices.tofile("./input_sorted_indices.bin")
-    unpermuted_output_d.tofile("./input_unpermuted_output_d.bin")
+    token_num, topk, hiddensize, tokendtype, probdtype, flag, output_dir="."
+):
+    if min(token_num, topk, hiddensize) <= 0:
+        raise ValueError("token_num, topk and hiddensize must be positive")
+    if not flag and topk != 1:
+        raise ValueError("topk must be 1 when probs is absent")
+    generator = torch.Generator().manual_seed(0)
+    tokens = (
+        torch.randint(
+            -8, 9, (token_num * topk, hiddensize), generator=generator
+        ).float()
+        / 8
+    ).to(DTYPES[tokendtype])
+    indices = torch.randperm(token_num * topk, generator=generator).to(torch.int32)
+    output_grad = (
+        torch.randint(-8, 9, (token_num, hiddensize), generator=generator).float() / 8
+    ).to(DTYPES[tokendtype])
+    probs = None
     if flag:
-        probs.tofile("./input_probs.bin")
-
-    permuted_tokens_grad.tofile("./output_permuted_tokens_grad.bin")
+        probs = (
+            torch.randint(-8, 9, (token_num, topk), generator=generator).float() / 8
+        ).to(DTYPES[probdtype])
+    token_grad, probs_grad = get_cpu_data(
+        token_num, topk, hiddensize, tokens, indices, output_grad, probs, flag
+    )
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    write_tensor(output_dir / "input_permuted_tokens.bin", tokens)
+    write_tensor(output_dir / "input_sorted_indices.bin", indices)
+    write_tensor(output_dir / "input_unpermuted_output_d.bin", output_grad)
+    write_tensor(output_dir / "output_permuted_tokens_grad.bin", token_grad)
     if flag:
-        probs_grad.tofile("./output_probs_grad.bin")
+        write_tensor(output_dir / "input_probs.bin", probs)
+        write_tensor(output_dir / "output_probs_grad.bin", probs_grad)
+    else:
+        for name in ("input_probs.bin", "output_probs_grad.bin"):
+            (output_dir / name).unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
-    # 清理bin文件
-    os.system("rm -rf *.bin")
-    gen_data_and_golden(
-        int(sys.argv[1]),
-        int(sys.argv[2]),
-        int(sys.argv[3]),
-        sys.argv[4],
-        sys.argv[5],
-        sys.argv[6],
-    )
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("token_num", type=int)
+    parser.add_argument("topk", type=int)
+    parser.add_argument("hiddensize", type=int)
+    parser.add_argument("tokendtype", choices=DTYPES)
+    parser.add_argument("probdtype", choices=DTYPES)
+    parser.add_argument("flag", type=parse_bool)
+    parser.add_argument("--output-dir", default=".")
+    args = parser.parse_args()
+    gen_data_and_golden(**vars(args))
