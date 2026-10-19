@@ -279,6 +279,8 @@ struct Config {
         uint32_t k = 0;
         uint32_t outputN = 0;
         uint32_t schedulerN = 0;
+        // GMM1 用于推导激活输出宽度，GMM2 用于恢复生产侧完整列宽及 ready 计数。
+        uint32_t activationOutputDivisor = ACTIVATION_N_HALF;
         uint32_t blockNum = 0;
         uint32_t blockIdx = 0;
         uint32_t scaleK = 0;
@@ -307,13 +309,15 @@ struct Config {
     }
 
     __aicore__ static inline ProblemConfig BuildGmm1ProblemConfig(const ProblemShape& problemShape,
-                                                                  const BlockJobContext& blockJob, uint32_t gmm1TileM)
+                                                                  const BlockJobContext& blockJob, uint32_t gmm1TileM,
+                                                                  uint32_t activationOutputDivisor = ACTIVATION_N_HALF)
     {
-        ProblemConfig config;
+        ProblemConfig config{};
         config.m = Get<M_VALUE>(problemShape);
         config.n = Get<N_VALUE>(problemShape);
         config.k = Get<K_VALUE>(problemShape);
-        config.outputN = config.n / ACTIVATION_N_HALF;
+        config.activationOutputDivisor = activationOutputDivisor;
+        config.outputN = config.n / config.activationOutputDivisor;
         config.schedulerN = config.n;
         config.tileM = gmm1TileM;
         FinalizeProblemConfig(config, blockJob, gmm1TileM);
@@ -321,12 +325,14 @@ struct Config {
     }
 
     __aicore__ static inline ProblemConfig BuildGmm2ProblemConfig(const ProblemShape& problemShape,
-                                                                  const BlockJobContext& blockJob, uint32_t gmm1TileM)
+                                                                  const BlockJobContext& blockJob, uint32_t gmm1TileM,
+                                                                  uint32_t activationOutputDivisor = ACTIVATION_N_HALF)
     {
-        ProblemConfig config;
+        ProblemConfig config{};
         config.m = Get<M_VALUE>(problemShape);
         config.n = Get<K_VALUE>(problemShape);
-        config.k = Get<N_VALUE>(problemShape) / ACTIVATION_N_HALF;
+        config.activationOutputDivisor = activationOutputDivisor;
+        config.k = Get<N_VALUE>(problemShape) / config.activationOutputDivisor;
         config.outputN = config.n;
         config.schedulerN = config.outputN;
         config.tileM = L1_TILE_M_256;
@@ -397,9 +403,8 @@ struct BlockMmadContext<BlockMmad, Blaze::Gemm::GroupedMatmulWithScaleMx<>> {
     __aicore__ inline void Init(const ProblemConfig& config)
     {
         const auto& tiling = config.blockMmadTiling;
-        // tiling.tileN is the full MMAD output width (gate + up, currently 256).
-        // QGMM concat takes one half (128) and doubles it internally; GMM2 uses the full width.
-        const uint32_t tileN = Stage == GmmStage::GMM1 ? tiling.tileN / ACTIVATION_N_HALF : tiling.tileN;
+        // GMM1 门控激活按半宽初始化拼接入口；GELU 和 GMM2 使用普通 MMAD 的完整列宽。
+        const uint32_t tileN = Stage == GmmStage::GMM1 ? tiling.tileN / config.activationOutputDivisor : tiling.tileN;
         const BlockMmadInitConfig requestedConfig{config.k, tiling.tileM, tileN, tiling.l1Params.kAL1,
                                                   tiling.l1Params.scaleKL1};
         if (!initialized_ || initConfig_ != requestedConfig) {

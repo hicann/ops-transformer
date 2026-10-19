@@ -223,10 +223,13 @@ struct MoeStageCommonConfig {
     uint32_t tokenNum;
     uint32_t topK;
     uint32_t tokenHiddenDim;
+    // GMM1 MMAD 的完整输出列数，也是 W1 的逻辑列数。
     uint32_t gmm1OutputDim;
+    // 本次 kernel 按 actMode 确定一次，激活输出宽度由 gmm1OutputDim / activationOutputDivisor 推导。
+    uint32_t activationOutputDivisor;
 };
 
-// GMM1/GMM2 共用的执行方式：当前 block 的任务分工、矩阵模板模式和专家权重布局。
+// GMM1/GMM2 共用的执行方式：当前 block 的任务分工、专家权重布局与输入步长。
 struct GmmExecutionConfig {
     BlockJobContext blockJob;
     bool isPerExpertWeightTensor;

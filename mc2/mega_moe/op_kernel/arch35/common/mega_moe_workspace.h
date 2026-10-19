@@ -44,6 +44,16 @@ HOST_DEVICE bool IsA4W4GmmMode(uint8_t gmmMode)
     return gmmMode == GMM_MODE_A4W4_ND || gmmMode == GMM_MODE_A4W4_NZ;
 }
 
+HOST_DEVICE uint32_t GetActivationOutputDivisor(uint8_t actMode)
+{
+    return actMode == static_cast<uint8_t>(MegaMoeActMode::GELU) ? 1U : ACTIVATION_N_HALF;
+}
+
+HOST_DEVICE int64_t GetActivationOutputWidth(const MegaMoeTilingData* tilingData)
+{
+    return static_cast<int64_t>(tilingData->hiddenDim) / GetActivationOutputDivisor(tilingData->actMode);
+}
+
 // 仅描述各 workspace 分区相对基址的字节偏移，不持有或构造任何地址。
 struct WorkspaceLayout {
     int64_t dispatchRevDataOffset{INVALID_WORKSPACE_OFFSET};
@@ -199,17 +209,15 @@ private:
 
     HOST_DEVICE void InitializeActivationBuffers(const MegaMoeTilingData* tilingData)
     {
+        const int64_t activationOutputWidth = GetActivationOutputWidth(tilingData);
+        const int64_t activationScaleWidth =
+            Ops::Base::CeilDiv(activationOutputWidth, static_cast<int64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
         activationQuantDataOffset = workspaceSize;
-        workspaceSize += Ops::Base::CeilAlign(
-            SIZE_INT_8 * tilingData->maxOutputSize * tilingData->hiddenDim / ACTIVATION_N_HALF, ALIGN_512);
+        workspaceSize +=
+            Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->maxOutputSize * activationOutputWidth, ALIGN_512);
 
         activationQuantScaleOffset = workspaceSize;
-        workspaceSize +=
-            Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->maxOutputSize *
-                                     Ops::Base::CeilDiv(static_cast<int64_t>(tilingData->hiddenDim / ACTIVATION_N_HALF),
-                                                        static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
-                                     MXFP_MULTI_BASE_SIZE,
-                                 ALIGN_512);
+        workspaceSize += Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->maxOutputSize * activationScaleWidth, ALIGN_512);
     }
 
     HOST_DEVICE void InitializeRoutingMetadata(const MegaMoeTilingData* tilingData, int64_t expertRecvTokenCountBytes)
@@ -421,19 +429,17 @@ private:
 
     HOST_DEVICE void InitializeSharedExpertActivationBuffers(const MegaMoeTilingData* tilingData)
     {
-        // sharedExpertActivationData：SwiGLU 量化输出 [sharedExpertNum × bs × hiddenDim / 2] FP8。
+        const int64_t activationOutputWidth = GetActivationOutputWidth(tilingData);
+        const int64_t activationScaleWidth =
+            Ops::Base::CeilDiv(activationOutputWidth, static_cast<int64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
+        // sharedExpertActivationData：量化输出 [sharedExpertNum × bs × activationOutputWidth] FP8。
         sharedExpertActivationDataOffset = workspaceSize;
         workspaceSize += Ops::Base::CeilAlign(
-            SIZE_INT_8 * tilingData->bs * tilingData->sharedExpertNum * tilingData->hiddenDim / ACTIVATION_N_HALF,
-            ALIGN_512);
+            SIZE_INT_8 * tilingData->bs * tilingData->sharedExpertNum * activationOutputWidth, ALIGN_512);
         // sharedExpertActivationScale：每个 MXFP scale group 保存两个 multi-base 分量。
         sharedExpertActivationScaleOffset = workspaceSize;
-        workspaceSize +=
-            Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->bs * tilingData->sharedExpertNum *
-                                     Ops::Base::CeilDiv(static_cast<int64_t>(tilingData->hiddenDim / ACTIVATION_N_HALF),
-                                                        static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
-                                     MXFP_MULTI_BASE_SIZE,
-                                 ALIGN_512);
+        workspaceSize += Ops::Base::CeilAlign(
+            SIZE_INT_8 * tilingData->bs * tilingData->sharedExpertNum * activationScaleWidth, ALIGN_512);
     }
 };
 

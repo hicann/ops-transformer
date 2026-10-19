@@ -43,6 +43,7 @@ enum class MegaMoeActMode : uint8_t {
     SITU = 1U,
     SWIGLU_STEP = 2U,
     SWIGLU_OAI = 3U,
+    GELU = 4U,
 };
 
 enum class MegaMoeActSubMode : uint8_t {

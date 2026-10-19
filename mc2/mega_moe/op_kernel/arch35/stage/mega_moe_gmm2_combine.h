@@ -367,7 +367,7 @@ __aicore__ inline void WaitForGmm2InputReady(const GMMAddrInfo& gmmAddrInfo, con
     if (gmmAddrInfo.activationToGmm2Flag == nullptr) {
         return;
     }
-    constexpr uint32_t sourceNFactor = ACTIVATION_N_HALF;
+    const uint32_t sourceNFactor = config.activationOutputDivisor;
     if constexpr (Config::IS_WAVE_FLAG_GRAINED) {
         uint32_t waveIdx = mLoc / L1_TILE_M_256;
         uint32_t waveStart = waveIdx * L1_TILE_M_256;
@@ -750,14 +750,15 @@ __aicore__ inline void RunGmm2Generic(const AscendC::Shape<int64_t, int64_t, int
                                       const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
                                       const BlockJobContext& blockJob, void* blockMmadContext = nullptr,
                                       bool allowWeightL2Bypass = false, uint32_t rowOffsetInExpert = 0U,
-                                      const Params* params = nullptr)
+                                      const Params* params = nullptr,
+                                      uint32_t activationOutputDivisor = ACTIVATION_N_HALF)
 {
     static_assert(!IsShared || !NotifyCombineTileReady, "Shared expert GMM2 has its own completion counter");
     static_assert(!IsLayered || !NotifyCombineTileReady, "Layered GMM2 selects its synchronization through IsLayered");
     using GmmConfig =
         GmmKernel::Config<false, CombineQuantMode, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB,
                           IsWeightNZ, TopkWeightsPrefetch, IsShared, IsLayered, IsWaveFlagGrained>;
-    auto config = GmmConfig::BuildGmm2ProblemConfig(problemShape, blockJob, Gmm1TileM);
+    auto config = GmmConfig::BuildGmm2ProblemConfig(problemShape, blockJob, Gmm1TileM, activationOutputDivisor);
 
     GmmKernel::BlockScheduler scheduler({config.m, config.schedulerN, config.k},
                                         GmmKernel::BlockScheduler::Params{asc::te::make_coord(
@@ -788,14 +789,15 @@ template <uint8_t CombineQuantMode, typename ElementA, typename ElementB, typena
 __aicore__ inline void RunGmm2Generic(const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
                                       const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
                                       void* blockMmadContext = nullptr, bool allowWeightL2Bypass = false,
-                                      uint32_t rowOffsetInExpert = 0U, const Params* params = nullptr)
+                                      uint32_t rowOffsetInExpert = 0U, const Params* params = nullptr,
+                                      uint32_t activationOutputDivisor = ACTIVATION_N_HALF)
 {
     BlockJobContext blockJob{static_cast<uint32_t>(GetBlockIdx() / GetTaskRation()),
                              static_cast<uint32_t>(GetBlockNum())};
     RunGmm2Generic<CombineQuantMode, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, IsWeightNZ,
                    IsLayered, Gmm1TileM, TopkWeightsPrefetch, IsShared, IsWaveFlagGrained, NotifyCombineTileReady>(
         problemShape, gmmAddrInfo, startBlockIdx, blockJob, blockMmadContext, allowWeightL2Bypass, rowOffsetInExpert,
-        params);
+        params, activationOutputDivisor);
 }
 
 // RunGmm2A8W4：AIV0执行W4→W8 prologue，AIC执行GMM2；可选由配对AIV1逐tile Combine。
@@ -807,7 +809,8 @@ __aicore__ inline void RunGmm2A8W4(const BlockContext& pipeline,
                                    const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
                                    const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
                                    const BlockJobContext& blockJob, uint32_t expertTokenCount,
-                                   uint32_t rowOffsetInExpert, const Params* params = nullptr)
+                                   uint32_t rowOffsetInExpert, const Params* params = nullptr,
+                                   uint32_t activationOutputDivisor = ACTIVATION_N_HALF)
 {
     static_assert(!IsShared || !NotifyCombineTileReady, "Shared expert GMM2 has its own completion counter");
     static_assert(!IsLayered || !NotifyCombineTileReady, "Layered GMM2 selects its synchronization through IsLayered");
@@ -816,7 +819,7 @@ __aicore__ inline void RunGmm2A8W4(const BlockContext& pipeline,
 
     using GmmConfig = GmmKernel::Config<true, 0, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, false,
                                         TopkWeightsPrefetch, IsShared, IsLayered, IsWaveFlagGrained>;
-    auto config = GmmConfig::BuildGmm2ProblemConfig(problemShape, blockJob, Gmm1TileM);
+    auto config = GmmConfig::BuildGmm2ProblemConfig(problemShape, blockJob, Gmm1TileM, activationOutputDivisor);
 
     using BlockMmad = typename GmmConfig::BlockMmad;
     using BlockPrologue = typename GmmConfig::BlockPrologue;
@@ -845,14 +848,14 @@ template <typename ElementA, typename ElementB, typename ElementC, typename Elem
 __aicore__ inline void RunGmm2A8W4(const BlockContext& pipeline,
                                    const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
                                    const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
-                                   const Params* params = nullptr)
+                                   const Params* params = nullptr, uint32_t activationOutputDivisor = ACTIVATION_N_HALF)
 {
     BlockJobContext blockJob{static_cast<uint32_t>(GetBlockIdx() / GetTaskRation()),
                              static_cast<uint32_t>(GetBlockNum())};
     RunGmm2A8W4<ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, Gmm1TileM, TopkWeightsPrefetch,
                 IsShared, IsLayered, IsWaveFlagGrained, NotifyCombineTileReady>(
         pipeline, problemShape, gmmAddrInfo, startBlockIdx, blockJob, static_cast<uint32_t>(Get<M_VALUE>(problemShape)),
-        0U, params);
+        0U, params, activationOutputDivisor);
 }
 
 // 紧凑 token 资源按累计行偏移寻址，专家固定资源按 expertIdx 寻址。
@@ -862,17 +865,16 @@ __aicore__ inline void UpdateMoeExpertGmm2GlobalBuffer(const GmmExecutionConfig&
                                                        const WorkspaceInfo& workspace,
                                                        const ExpertWeightTensorListAddrs& weights,
                                                        GMMAddrInfo& gmmAddrInfo, const ExpertLoopState& state,
-                                                       uint32_t rowOffsetInExpert = 0U)
+                                                       uint32_t activationOutputWidth, uint32_t rowOffsetInExpert = 0U)
 {
     constexpr uint32_t weightElementsPerByte = PackedElementTraits<WeightType>::ELEMENTS_PER_BYTE;
     constexpr uint32_t activationOutputElementsPerByte = PackedElementTraits<ActivationOutType>::ELEMENTS_PER_BYTE;
-    uint64_t gmm1OutputDim = static_cast<uint64_t>(Get<N_VALUE>(state.problemShape));
     uint64_t tokenHiddenDim = static_cast<uint64_t>(Get<K_VALUE>(state.problemShape));
     uint64_t globalTokenStartIndex = static_cast<uint64_t>(state.globalTokenStartIndex) + rowOffsetInExpert;
     uint32_t expertMGroupOffset = rowOffsetInExpert / L1_TILE_M_256;
-    uint64_t activationOutputWidth = gmm1OutputDim / ACTIVATION_N_HALF;
     uint64_t activationScaleWidth =
-        Ops::Base::CeilDiv(activationOutputWidth, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
+        Ops::Base::CeilDiv(static_cast<uint64_t>(activationOutputWidth), static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) *
+        MXFP_MULTI_BASE_SIZE;
 
     gmmAddrInfo.gmm2OutGlobal = workspace.gmm2MmadResPtr + globalTokenStartIndex * tokenHiddenDim * sizeof(bfloat16_t);
     gmmAddrInfo.metaInfoGlobal = workspace.metaInfoPtr + globalTokenStartIndex * META_INFO_SIZE * sizeof(int32_t);
@@ -917,7 +919,7 @@ __aicore__ inline void UpdateSharedExpertGmm2GlobalBuffer(const MoeStageCommonCo
     constexpr uint32_t weightElementsPerByte = PackedElementTraits<WeightType>::ELEMENTS_PER_BYTE;
     uint64_t tokenNum = commonConfig.tokenNum;
     uint64_t tokenHiddenDim = commonConfig.tokenHiddenDim;
-    uint64_t activationOutputWidth = commonConfig.gmm1OutputDim / ACTIVATION_N_HALF;
+    uint64_t activationOutputWidth = commonConfig.gmm1OutputDim / commonConfig.activationOutputDivisor;
     uint64_t activationScaleWidth =
         Ops::Base::CeilDiv(activationOutputWidth, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
     uint64_t sharedExpertTokenStartIndex = static_cast<uint64_t>(sharedExpertIdx) * tokenNum;

@@ -43,8 +43,6 @@ using namespace MegaMoeImpl;
 
 namespace optiling {
 namespace {
-// SwiGLU 将 GMM1 输出划分为 gate 和 up 两部分，因此 weight1 行数为 weight2 列数的两倍。
-const static int64_t SWIGLU_GATE_UP_SPLIT_FACTOR = 2LL;
 // MX 量化的 weight scale 每个专家末尾固定带 2 个 base 分量。
 const static int64_t WEIGHT_SCALE_MULTI_BASE_DIM_SIZE = 2LL;
 // 当前实现支持的共享专家数量上限。
@@ -66,8 +64,8 @@ const static int64_t MX_SCALE_GROUP = 32LL;
 const static int64_t MTE_H_ALIGN = 64LL;
 const static int64_t URMA_H_ALIGN = 1024LL;
 const static int64_t MAX_HIDDEN_DIM = 8LL * 1024LL; // 8K
-// hiddenDim 是 GMM1 含 gate/up 两路的完整输出宽度；MTE 与 URMA 共用支持尾 tile 的激活 epilogue。
-// 256 对齐保证 gate/up 半宽按 128 对齐，下限 512 保证半宽至少覆盖一个完整 tile。
+// hiddenDim 是 GMM1 的完整输出宽度；门控激活按 gate/up 划分，GELU 保留全宽。
+// 256 对齐保证门控激活半宽按 128 对齐，下限 512 保证半宽至少覆盖一个完整 tile。
 const static int64_t MIN_HIDDEN_DIM = 512LL;
 const static int64_t HIDDEN_DIM_ALIGN = 256LL;
 const static int64_t MIN_EP_WORLD_SIZE = 2LL;
@@ -145,8 +143,9 @@ uint32_t CalcMGroupsPerWave(const MegaMoeTilingData* tilingData, uint32_t aicNum
     }
 
     /*
-     * hiddenDim 包含 gate/up 两部分。交织模式每核至少调度 4 个独立 N tile；非交织模式
-     * 每个物理任务成对处理 gate/up，原先每核 2 个物理任务同样等价于 4 个逻辑 N tile。
+     * hiddenDim 是 GMM1 的完整 N。交织模式每核至少调度 4 个独立 N tile；非交织门控
+     * 调度每个物理任务成对处理 gate/up，每核 2 个物理任务同样等价于 4 个逻辑 N tile。
+     * GELU 保留完整 N，沿用按完整宽度计算的逻辑 tile 数。
      * hiddenDim 已校验为 GMM_TILE_N(256) 的倍数（MTE；URMA 仍为 1024），CeilDiv 对
      * 非交织半宽产生的尾 tile 只影响 wave 粒度估算，不影响正确性，两种编译模式共用本公式。
      */
@@ -510,6 +509,23 @@ static ge::graphStatus CheckSituGluActivationParams(const float* activationParam
 }
 
 /*
+ * GELU 仅接受一个 float 最大值作为占位参数，不用于截断计算。
+ */
+static ge::graphStatus CheckGeluActivationParams(const float* activationParams, size_t paramCount, const char* nodeName)
+{
+    OP_TILING_CHECK(
+        paramCount != 1U,
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationParamsSize", std::to_string(paramCount).c_str(), "1 for gelu"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        activationParams[0] != DEFAULT_ACTIVATION_CLAMP,
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "activationParams[0]", std::to_string(activationParams[0]).c_str(),
+                                  "float maximum placeholder for gelu"),
+        return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+/*
  * 校验激活类型、参数个数与取值，并检查激活类型和通信拓扑的兼容性。
  */
 static ge::graphStatus CheckActivationParams(const gert::TilingContext* context, const MegaMoeConfig& config,
@@ -525,23 +541,26 @@ static ge::graphStatus CheckActivationParams(const gert::TilingContext* context,
     const bool isSwiGluStep = std::strcmp(activationPtr, "swiglustep") == 0;
     const bool isSwiGluOai = std::strcmp(activationPtr, "swigluoai") == 0;
     const bool isSituGlu = std::strcmp(activationPtr, "situglu") == 0;
-    OP_TILING_CHECK(!isSwiGlu && !isSwiGluStep && !isSwiGluOai && !isSituGlu,
+    const bool isGelu = std::strcmp(activationPtr, "gelu") == 0;
+    OP_TILING_CHECK(!isSwiGlu && !isSwiGluStep && !isSwiGluOai && !isSituGlu && !isGelu,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "activation", activationPtr,
-                                              "one of 'swiglu', 'swiglustep', 'swigluoai' or 'situglu'"),
+                                              "one of 'swiglu', 'swiglustep', 'swigluoai', 'situglu' or 'gelu'"),
                     return ge::GRAPH_FAILED);
 
-    // URMA Layered 已接入 swiglu/situglu，其余扩展激活仍保持拦截。
+    // URMA Layered 仅支持 swiglu/situglu；GELU 仅支持 MTE。
     OP_TILING_CHECK(
         topoType == TOPO_TYPE_URMA && !isSwiGlu && !isSituGlu,
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "activation", activationPtr, "'swiglu' or 'situglu' for URMA topology"),
         return ge::GRAPH_FAILED);
 
-    // 前置类型校验已将其余分支收敛为 situglu。
     if (isSwiGlu || isSwiGluStep) {
         return CheckSwiGluActivationParams(activationParams, paramCount, nodeName);
     }
     if (isSwiGluOai) {
         return CheckSwiGluOaiActivationParams(activationParams, paramCount, nodeName);
+    }
+    if (isGelu) {
+        return CheckGeluActivationParams(activationParams, paramCount, nodeName);
     }
     return CheckSituGluActivationParams(activationParams, paramCount, nodeName);
 }
@@ -1040,7 +1059,7 @@ static ge::graphStatus CheckAndSetMaxRecvTokenNumAttr(const gert::TilingContext*
 
 /*
  * 将激活属性规范化后写入 tiling data。默认值必须先于条件分支设置：
- * swiglu 直接使用这些默认值，其他激活类型在对应分支中覆盖所需字段。
+ * swiglu 直接使用这些默认值；其他模式按分支覆盖，GELU 的占位参数不用于截断。
  */
 static void SetActivationAttrParams(const gert::TilingContext* context, const MegaMoeConfig& config,
                                     MegaMoeTilingData* tilingData)
@@ -1052,14 +1071,20 @@ static void SetActivationAttrParams(const gert::TilingContext* context, const Me
 
     const size_t paramCount = activationParamsPtr->GetSize();
     const float* activationParams = paramCount == 0U ? nullptr : activationParamsPtr->GetData();
-    tilingData->clampLimit = paramCount == 0U ? DEFAULT_ACTIVATION_CLAMP : activationParams[0];
+    const bool isGelu = std::strcmp(activationPtr, "gelu") == 0;
+    const bool isSituGlu = std::strcmp(activationPtr, "situglu") == 0;
+    tilingData->clampLimit = DEFAULT_ACTIVATION_CLAMP;
+    if (!isGelu && !isSituGlu && paramCount != 0U) {
+        tilingData->clampLimit = activationParams[0];
+    }
     tilingData->actMode = static_cast<uint8_t>(MegaMoeImpl::MegaMoeActMode::SWIGLU);
     tilingData->actSubMode = static_cast<uint8_t>(MegaMoeImpl::MegaMoeActSubMode::DEFAULT);
     tilingData->activationAlpha = 1.0f;
     tilingData->activationBeta = 1.0f;
 
-    if (std::strcmp(activationPtr, "situglu") == 0) {
-        tilingData->clampLimit = std::numeric_limits<float>::max();
+    if (isGelu) {
+        tilingData->actMode = static_cast<uint8_t>(MegaMoeImpl::MegaMoeActMode::GELU);
+    } else if (isSituGlu) {
         tilingData->actMode = static_cast<uint8_t>(MegaMoeImpl::MegaMoeActMode::SITU);
         tilingData->activationBeta = activationParams[0];
         if (activationParamsPtr->GetSize() == 2U) {
@@ -1086,7 +1111,7 @@ static void SetActivationAttrParams(const gert::TilingContext* context, const Me
 static void SetPrefetchAndWaveParams(MegaMoeTilingData* tilingData, const uint32_t aicNum)
 {
     // GMM1 tile 状态位区每 expert 的 tile 上限（仅 prefetch 软同步路径使用）。
-    // 非交织调度只遍历 hiddenDim / 2，交织调度会遍历完整 hiddenDim；host 无法感知 kernel
+    // 非交织门控调度只遍历 hiddenDim / 2，交织调度及 GELU 会遍历完整 hiddenDim；host 无法感知 kernel
     // 编译期开关，因此按完整 hiddenDim 预留，避免交织模式覆盖下一 expert 的状态槽。
     tilingData->maxTilesPerExpert = 0;
     if (tilingData->topkWeightsPrefetch == 1) {
@@ -2065,7 +2090,8 @@ static ge::graphStatus CheckAndSetWeightAndScaleLayout(const gert::TilingContext
  */
 static ge::graphStatus CheckWeightPairShapeRelations(const gert::TilingContext* context,
                                                      const ExpertParams& expertParams, uint32_t xIndex,
-                                                     bool isPerExpertWeightTensor, const char* nodeName)
+                                                     bool isPerExpertWeightTensor, uint8_t actMode,
+                                                     const char* nodeName)
 {
     auto weightOneStorageShape = context->GetDynamicInputShape(expertParams.inputs.weightOne, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, weightOneStorageShape);
@@ -2073,33 +2099,36 @@ static ge::graphStatus CheckWeightPairShapeRelations(const gert::TilingContext* 
     OP_CHECK_NULL_WITH_CONTEXT(context, weightTwoStorageShape);
 
     // 去掉可选的专家维后，weight1 和 weight2 均按单专家二维矩阵读取行数和列数。
-    const int64_t weightOneRowCount =
+    const int64_t weight1RowCount =
         GetSingleExpertTensorDimSize(weightOneStorageShape, WEIGHT_MATRIX_ROW_DIM_INDEX, isPerExpertWeightTensor);
-    const int64_t weightOneColumnCount =
+    const int64_t weight1ColumnCount =
         GetSingleExpertTensorDimSize(weightOneStorageShape, WEIGHT_MATRIX_COLUMN_DIM_INDEX, isPerExpertWeightTensor);
-    const int64_t weightTwoRowCount =
+    const int64_t weight2RowCount =
         GetSingleExpertTensorDimSize(weightTwoStorageShape, WEIGHT_MATRIX_ROW_DIM_INDEX, isPerExpertWeightTensor);
-    const int64_t weightTwoColumnCount =
+    const int64_t weight2ColumnCount =
         GetSingleExpertTensorDimSize(weightTwoStorageShape, WEIGHT_MATRIX_COLUMN_DIM_INDEX, isPerExpertWeightTensor);
 
-    // 单专家 GMM 形状：weight1=[N, H]，weight2=[H, N/2]，x=[BS, H]。
+    // 单专家 GMM 形状：weight1=[N, H]，weight2=[H, N / divisor]，x=[BS, H]。
     const gert::StorageShape* xStorageShape = context->GetInputShape(xIndex);
     const int64_t xColumnCount = xStorageShape->GetOriginShape().GetDim(1);
-    const std::string commonMatrixDimensionsString = "[" + std::to_string(weightOneColumnCount) + ", " +
-                                                     std::to_string(weightTwoRowCount) + ", " +
+    const std::string commonMatrixDimensionsString = "[" + std::to_string(weight1ColumnCount) + ", " +
+                                                     std::to_string(weight2RowCount) + ", " +
                                                      std::to_string(xColumnCount) + "]";
-    OP_TILING_CHECK(weightOneColumnCount != weightTwoRowCount || weightOneColumnCount != xColumnCount,
+    OP_TILING_CHECK(weight1ColumnCount != weight2RowCount || weight1ColumnCount != xColumnCount,
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                         nodeName, expertParams.expertTypeName, commonMatrixDimensionsString.c_str(),
                         "weight1 column count and weight2 row count must equal x column count"),
                     return ge::GRAPH_FAILED);
 
     const std::string weightRowColumnDimensionsString =
-        "[" + std::to_string(weightOneRowCount) + ", " + std::to_string(weightTwoColumnCount) + "]";
-    OP_TILING_CHECK(weightOneRowCount != weightTwoColumnCount * SWIGLU_GATE_UP_SPLIT_FACTOR,
+        "[" + std::to_string(weight1RowCount) + ", " + std::to_string(weight2ColumnCount) + "]";
+    const int64_t outputDivisor = static_cast<int64_t>(GetActivationOutputDivisor(actMode));
+    OP_TILING_CHECK(weight1RowCount % outputDivisor != 0 || weight2ColumnCount != weight1RowCount / outputDivisor,
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                         nodeName, expertParams.expertTypeName, weightRowColumnDimensionsString.c_str(),
-                        "weight1 row count must equal weight2 column count multiplied by 2"),
+                        (std::string("weight2 column count must equal weight1 row count divided by ") +
+                         std::to_string(outputDivisor))
+                            .c_str()),
                     return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -2110,9 +2139,9 @@ static ge::graphStatus CheckWeightPairShapeRelations(const gert::TilingContext* 
  */
 static ge::graphStatus CheckWeightShapeRelations(const gert::TilingContext* context,
                                                  const MegaMoeExpertParams& expertParams, uint32_t xIndex,
-                                                 const char* nodeName)
+                                                 uint8_t actMode, const char* nodeName)
 {
-    if (CheckWeightPairShapeRelations(context, expertParams.moe, xIndex, expertParams.isPerExpertWeightTensor,
+    if (CheckWeightPairShapeRelations(context, expertParams.moe, xIndex, expertParams.isPerExpertWeightTensor, actMode,
                                       nodeName) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
@@ -2120,7 +2149,7 @@ static ge::graphStatus CheckWeightShapeRelations(const gert::TilingContext* cont
         return ge::GRAPH_SUCCESS;
     }
     return CheckWeightPairShapeRelations(context, expertParams.shared, xIndex, expertParams.isPerExpertWeightTensor,
-                                         nodeName);
+                                         actMode, nodeName);
 }
 
 /*
@@ -2346,13 +2375,15 @@ static ge::graphStatus CheckDispatchInputShapes(const gert::TilingContext* conte
  */
 static ge::graphStatus CheckWeightAndScaleShapeRelations(const gert::TilingContext* context,
                                                          const MegaMoeConfig& config,
-                                                         const MegaMoeExpertParams& expertParams, const char* nodeName)
+                                                         const MegaMoeExpertParams& expertParams, uint8_t actMode,
+                                                         const char* nodeName)
 {
-    OP_TILING_CHECK(CheckWeightShapeRelations(context, expertParams, config.xIndex, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "weight shape relation is invalid."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        CheckWeightShapeRelations(context, expertParams, config.xIndex, actMode, nodeName) != ge::GRAPH_SUCCESS,
+        OP_LOGE(nodeName, "weight shape relation is invalid."), return ge::GRAPH_FAILED);
 
     if (expertParams.shared.expertCount > 0) {
-        // 两侧 W1 column 和 W2 row 已分别校验为 x.H，且各自满足 W1 row = 2 * W2 column。
+        // 两侧 W1 column 和 W2 row 已分别校验为 x.H，且各自满足相同的激活输出宽度关系。
         // 因此跨侧只需保证 W1 row（GMM1 输出维 hiddenDim）一致。
         auto moeWeightOneShape = context->GetDynamicInputShape(expertParams.moe.inputs.weightOne, 0);
         auto sharedWeightOneShape = context->GetDynamicInputShape(expertParams.shared.inputs.weightOne, 0);
@@ -2551,7 +2582,8 @@ static ge::graphStatus CheckAndSetTensorMetadata(const gert::TilingContext* cont
                     OP_LOGE(nodeName, "weight scale dtypes or formats are invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckDispatchInputShapes(context, config, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "dispatch input shapes are invalid."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckWeightAndScaleShapeRelations(context, config, expertParams, nodeName) != ge::GRAPH_SUCCESS,
+    OP_TILING_CHECK(CheckWeightAndScaleShapeRelations(context, config, expertParams, tilingData->actMode, nodeName) !=
+                        ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "weight or scale shape relation is invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckYShape(context, config, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "y tensor shape is invalid."), return ge::GRAPH_FAILED);
@@ -2935,9 +2967,9 @@ static ge::graphStatus CommitTilingResult(gert::TilingContext* context, const Me
                                           const MegaMoeExpertParams& expertParams, MegaMoeTilingData* tilingData,
                                           const char* nodeName)
 {
-    // Shared and routed experts have the same validated H/hiddenDim dimensions.
-    tilingData->a8w4L1Layout =
-        CalcMegaMoeL1Layout(std::max(uint64_t{tilingData->h}, uint64_t{tilingData->hiddenDim / 2U}));
+    // 共享专家与路由专家的 H、hiddenDim 已校验一致。
+    tilingData->a8w4L1Layout = CalcMegaMoeL1Layout(
+        std::max(uint64_t{tilingData->h}, static_cast<uint64_t>(GetActivationOutputWidth(tilingData))));
 
     WorkspaceLayout workspaceLayout(tilingData);
     OP_TILING_CHECK(CheckCclBufferCapacity(context, config, tilingData, workspaceLayout, nodeName) != ge::GRAPH_SUCCESS,

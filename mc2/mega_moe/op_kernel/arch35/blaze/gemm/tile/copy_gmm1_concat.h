@@ -36,6 +36,8 @@ struct Gmm1NzWeightView : Tensor {
 // QGMM owns accumulation; MegaMoe owns the destination and valid output extent.
 template <typename Tensor>
 struct Gmm1OutputView {
+    // 普通 MMAD 通过该类型识别 GM/UB，实际写回仍使用本文件的重载。
+    using iterator = typename Tensor::iterator;
     Tensor tensor;
 };
 

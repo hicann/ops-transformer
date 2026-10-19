@@ -79,16 +79,26 @@ __aicore__ inline void Gmm1AicMmadTileToGmGeneric(BlockMmad& blockMmad, const Co
     typename BlockMmad::BlockShape singleShape{Get<M_VALUE>(actualShape), Get<N_VALUE>(actualShape),
                                                Get<K_VALUE>(actualShape), 0};
 
-    Get<N_VALUE>(singleShape) /= ACTIVATION_N_HALF;
-    auto gmBlockB = gmB.slice(asc::te::make_coord(kLoc, nLoc / ACTIVATION_N_HALF),
+    Get<N_VALUE>(singleShape) /= config.activationOutputDivisor;
+    auto gmBlockB = gmB.slice(asc::te::make_coord(kLoc, nLoc / config.activationOutputDivisor),
                               asc::te::make_shape(Get<K_VALUE>(actualShape), Get<N_VALUE>(singleShape)));
-    auto gmBlockScaleB = gmScaleB.slice(asc::te::make_coord(0, nLoc / ACTIVATION_N_HALF),
+    auto gmBlockScaleB = gmScaleB.slice(asc::te::make_coord(0, nLoc / config.activationOutputDivisor),
                                         asc::te::make_shape(config.scaleK, Get<N_VALUE>(singleShape)));
     auto tensorBlockGm = gmC.slice(asc::te::make_coord(mLoc, nLoc),
                                    asc::te::make_shape(Get<M_VALUE>(actualShape), Get<N_VALUE>(actualShape)));
-    auto weightView = MakeGmm1WeightView(gmBlockB);
     Gmm1OutputView<decltype(tensorBlockGm)> outputView{tensorBlockGm};
-    blockMmad(gmBlockA, weightView, gmBlockScaleA, gmBlockScaleB, outputView, singleShape);
+    if (config.activationOutputDivisor == 1U) {
+        using KernelConfig = typename Config::KernelConfig;
+        using BiasType = typename KernelConfig::BiasType;
+        // 普通 MMAD 入口要求传入 bias 张量；Init 已关闭 bias，因此不会读取该空地址。
+        auto gmBias =
+            asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ BiasType*>(0UL)),
+                                 typename KernelConfig::MakeLayoutBias{}(1U, config.n));
+        blockMmad(gmBlockA, gmBlockB, gmBlockScaleA, gmBlockScaleB, gmBias, outputView, singleShape);
+    } else {
+        auto weightView = MakeGmm1WeightView(gmBlockB);
+        blockMmad(gmBlockA, weightView, gmBlockScaleA, gmBlockScaleB, outputView, singleShape);
+    }
 }
 
 // 计算一个非 Prefetch GMM1 tile 并写入固定 tile layout 的 UB。
@@ -102,17 +112,27 @@ __aicore__ inline void Gmm1AicMmadTileToUbGeneric(BlockMmad& blockMmad, const Co
     typename BlockMmad::BlockShape singleShape{Get<M_VALUE>(actualShape), Get<N_VALUE>(actualShape),
                                                Get<K_VALUE>(actualShape), 0};
 
-    Get<N_VALUE>(singleShape) /= ACTIVATION_N_HALF;
-    auto gmBlockB = gmB.slice(asc::te::make_coord(kLoc, nLoc / ACTIVATION_N_HALF),
+    Get<N_VALUE>(singleShape) /= config.activationOutputDivisor;
+    auto gmBlockB = gmB.slice(asc::te::make_coord(kLoc, nLoc / config.activationOutputDivisor),
                               asc::te::make_shape(Get<K_VALUE>(actualShape), Get<N_VALUE>(singleShape)));
-    auto gmBlockScaleB = gmScaleB.slice(asc::te::make_coord(0, nLoc / ACTIVATION_N_HALF),
+    auto gmBlockScaleB = gmScaleB.slice(asc::te::make_coord(0, nLoc / config.activationOutputDivisor),
                                         asc::te::make_shape(config.scaleK, Get<N_VALUE>(singleShape)));
     auto tensorUb = pingpongIdx == 0U ? l0cOutUbFirst : l0cOutUbSecond;
     auto tensorBlockUb = tensorUb.slice(asc::te::make_coord(0, 0),
                                         asc::te::make_shape(Get<M_VALUE>(actualShape), Get<N_VALUE>(actualShape)));
-    auto weightView = MakeGmm1WeightView(gmBlockB);
     Gmm1OutputView<decltype(tensorBlockUb)> outputView{tensorBlockUb};
-    blockMmad(gmBlockA, weightView, gmBlockScaleA, gmBlockScaleB, outputView, singleShape);
+    if (config.activationOutputDivisor == 1U) {
+        using KernelConfig = typename Config::KernelConfig;
+        using BiasType = typename KernelConfig::BiasType;
+        // 普通 MMAD 入口要求传入 bias 张量；Init 已关闭 bias，因此不会读取该空地址。
+        auto gmBias =
+            asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ BiasType*>(0UL)),
+                                 typename KernelConfig::MakeLayoutBias{}(1U, config.n));
+        blockMmad(gmBlockA, gmBlockB, gmBlockScaleA, gmBlockScaleB, gmBias, outputView, singleShape);
+    } else {
+        auto weightView = MakeGmm1WeightView(gmBlockB);
+        blockMmad(gmBlockA, weightView, gmBlockScaleA, gmBlockScaleB, outputView, singleShape);
+    }
 }
 
 // AIC 执行一个 A8W4 GMM1 MMAD tile；不管理 Dispatch/GMM1 或 GMM1/Activation 同步，
@@ -127,7 +147,7 @@ __aicore__ inline void Gmm1AicMmadTileA8W4(BlockMmad& blockMmad, TensorA& gmA, T
     auto gmBlockScaleA =
         gmScaleA.slice(asc::te::make_coord(mLoc, 0), asc::te::make_shape(Get<M_VALUE>(actualShape), config.scaleK));
 
-    uint32_t nOffset = nLoc / ACTIVATION_N_HALF;
+    uint32_t nOffset = nLoc / config.activationOutputDivisor;
     auto gmBlockScaleB =
         gmScaleB.slice(asc::te::make_coord(0, nOffset), asc::te::make_shape(config.scaleK, Get<N_VALUE>(actualShape)));
     auto tensorBlockGm = l0cOutGm.slice(asc::te::make_coord(mLoc, nLoc),
@@ -232,7 +252,9 @@ __aicore__ inline void Gmm1AicMmadA8W4(BlockMmad& blockMmad, WorkSet& workSet, c
     typename BlockMmad::BlockShape l0TileShape{config.blockMmadTiling.tileM, config.blockMmadTiling.tileN, L0_TILE_K,
                                                0};
     typename BlockMmad::ProblemShape matmulShape{config.m, config.schedulerN, config.k, 0};
-    blockMmad.template Init<false>(matmulShape, l0TileShape, true);
+    // GELU 连续搬运 W1 和 ScaleB，门控激活沿用两个物理半区的交织搬运。
+    const bool interleave = config.activationOutputDivisor != 1U;
+    blockMmad.template Init<false>(matmulShape, l0TileShape, interleave);
 
     uint32_t lastWaveWaited = static_cast<uint32_t>(-1);
     for (uint32_t loopIdx = startLoopIdx; loopIdx < tileNum; loopIdx += config.blockNum) {
@@ -286,8 +308,8 @@ __aicore__ inline void Gmm1Aiv0PrefetchEpilogueTileGeneric(const Config& config,
         AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(0);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(0);
 
-        uint32_t epilogueN = Get<N_VALUE>(actualShape) / ACTIVATION_N_HALF;
-        uint32_t epilogueNLoc = nLoc / ACTIVATION_N_HALF;
+        uint32_t epilogueN = Get<N_VALUE>(actualShape) / config.activationOutputDivisor;
+        uint32_t epilogueNLoc = nLoc / config.activationOutputDivisor;
         Std::tuple<int64_t, int64_t, int64_t, int64_t> epilogueShape{subM, epilogueN, 0, 0};
         Std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> epilogueOffset{
             subMLoc * config.outputN + epilogueNLoc,
@@ -314,8 +336,8 @@ __aicore__ inline void Gmm1Aiv0EpilogueTileGeneric(const Config& config, Activat
     if (Get<M_VALUE>(actualShape) == 0U) {
         return;
     }
-    uint32_t epilogueN = Get<N_VALUE>(actualShape) / ACTIVATION_N_HALF;
-    uint32_t epilogueNLoc = nLoc / ACTIVATION_N_HALF;
+    uint32_t epilogueN = Get<N_VALUE>(actualShape) / config.activationOutputDivisor;
+    uint32_t epilogueNLoc = nLoc / config.activationOutputDivisor;
     Std::tuple<int64_t, int64_t, int64_t, int64_t> epilogueShape{Get<M_VALUE>(actualShape), epilogueN, 0, 0};
     Std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> epilogueOffset{
         mLoc * config.outputN + epilogueNLoc,
@@ -367,7 +389,7 @@ __aicore__ inline void Gmm1Aiv1EpilogueTileA8W4(ActivationQuantOp& activationQua
     AscendC::WaitFlag<AscendC::HardEvent::S_MTE2>(0);
 }
 
-// AIV0 在 UB 拼接 gate/up 并展开 A8W4 权重，每个配对 tile 只提交一次 prologue。
+// AIV0 在 UB 拼接两段 W1 权重并展开 A8W4，每个配对 tile 只提交一次 prologue。
 template <typename BlockPrologue, typename Scheduler, typename TensorB, typename Config>
 __aicore__ inline void Gmm1Aiv0PrologueA8W4(BlockPrologue& blockPrologue, Scheduler& scheduler, TensorB& gmB,
                                             const Config& config, uint32_t startLoopIdx, uint32_t tileNum)
@@ -378,8 +400,11 @@ __aicore__ inline void Gmm1Aiv0PrologueA8W4(BlockPrologue& blockPrologue, Schedu
         uint32_t nLoc = Get<N_VALUE>(blockCoord);
         auto nL1Size = Get<N_VALUE>(actualShape);
 
-        auto nOffset = nLoc / ACTIVATION_N_HALF;
-        blockPrologue(gmB, config.k, nL1Size, nOffset, config.n, config.outputN);
+        const bool isGelu = config.activationOutputDivisor == 1U;
+        auto nOffset = nLoc / config.activationOutputDivisor;
+        const uint64_t secondHalfColumnOffset = isGelu ? 0U : config.n / ACTIVATION_N_HALF;
+        // W1 两段物理拼接各占一半，与激活输出列宽无关。
+        blockPrologue(gmB, config.k, nL1Size, nOffset, config.n, secondHalfColumnOffset);
     }
 }
 
@@ -617,13 +642,14 @@ __aicore__ inline void RunGmm1Generic(BlockEpilogueActivationMxQuant<EpilogueEle
                                       const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
                                       const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx, int32_t& vecSetSyncCom,
                                       const BlockJobContext& blockJob, uint32_t expertBeforeCnt, uint32_t expertIdx,
-                                      uint16_t& pingpongIdx, void* blockMmadContext = nullptr,
-                                      bool allowWeightL2Bypass = false, const LayoutArgs&... layoutArgs)
+                                      uint16_t& pingpongIdx, uint32_t activationOutputDivisor = ACTIVATION_N_HALF,
+                                      void* blockMmadContext = nullptr, bool allowWeightL2Bypass = false,
+                                      const LayoutArgs&... layoutArgs)
 {
     using GmmConfig =
         GmmKernel::Config<false, COMBINE_NO_QUANT, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB,
                           IsWeightNZ, TopkWeightsPrefetch, IsShared, false, IsWaveFlagGrained>;
-    auto config = GmmConfig::BuildGmm1ProblemConfig(problemShape, blockJob, Gmm1TileM);
+    auto config = GmmConfig::BuildGmm1ProblemConfig(problemShape, blockJob, Gmm1TileM, activationOutputDivisor);
 
     GmmKernel::BlockScheduler scheduler({config.m, config.schedulerN, config.k},
                                         GmmKernel::BlockScheduler::Params{asc::te::make_coord(
@@ -662,6 +688,7 @@ __aicore__ inline void RunGmm1Generic(BlockEpilogueActivationMxQuant<EpilogueEle
                                       const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
                                       const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx, int32_t& vecSetSyncCom,
                                       uint32_t expertBeforeCnt, uint32_t expertIdx, uint16_t& pingpongIdx,
+                                      uint32_t activationOutputDivisor = ACTIVATION_N_HALF,
                                       void* blockMmadContext = nullptr, bool allowWeightL2Bypass = false)
 {
     BlockJobContext blockJob{static_cast<uint32_t>(GetBlockIdx() / GetTaskRation()),
@@ -669,28 +696,28 @@ __aicore__ inline void RunGmm1Generic(BlockEpilogueActivationMxQuant<EpilogueEle
     RunGmm1Generic<ElementA, EpilogueElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, IsWeightNZ,
                    Gmm1TileM, EpilogueTileM, TopkWeightsPrefetch, IsShared, IsWaveFlagGrained>(
         epilogueOp, params, problemShape, gmmAddrInfo, startBlockIdx, vecSetSyncCom, blockJob, expertBeforeCnt,
-        expertIdx, pingpongIdx, blockMmadContext, allowWeightL2Bypass);
+        expertIdx, pingpongIdx, activationOutputDivisor, blockMmadContext, allowWeightL2Bypass);
 }
 
 // RunGmm1A8W4：执行 A8W4 prologue（W4→W8）、GMM1、Activation 和量化。
 template <typename ElementA, typename ElementB, typename ElementC, typename ElementMxScaleA, typename ElementMxScaleB,
           uint32_t Gmm1TileM = L1_TILE_M_256, uint32_t EpilogueTileM = Gmm1TileM, bool TopkWeightsPrefetch = false,
           bool IsShared = false, bool IsWaveFlagGrained = false, typename BlockContext, typename... LayoutArgs>
-__aicore__ inline void RunGmm1A8W4(const BlockContext& pipeline,
-                                   BlockEpilogueActivationMxQuant<ElementA, ElementC, EpilogueTileM, L1_TILE_N,
-                                                                  TopkWeightsPrefetch>& activationQuantOp,
-                                   const Params& params,
-                                   const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
-                                   const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
-                                   int32_t& gmm1TileReadySequence, const BlockJobContext& blockJob,
-                                   uint32_t expertBeforeCnt, uint32_t expertIdx, const LayoutArgs&... layoutArgs)
+__aicore__ inline void RunGmm1A8W4(
+    const BlockContext& pipeline,
+    BlockEpilogueActivationMxQuant<ElementA, ElementC, EpilogueTileM, L1_TILE_N, TopkWeightsPrefetch>&
+        activationQuantOp,
+    const Params& params, const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
+    const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx, int32_t& gmm1TileReadySequence,
+    const BlockJobContext& blockJob, uint32_t expertBeforeCnt, uint32_t expertIdx,
+    uint32_t activationOutputDivisor = ACTIVATION_N_HALF, const LayoutArgs&... layoutArgs)
 {
     static_assert(std::is_same_v<ElementA, __fp8e4m3>, "Activation must be __fp8e4m3");
     static_assert(std::is_same_v<ElementB, __fp4e2m1x2>, "Weight must be __fp4e2m1x2");
 
     using GmmConfig = GmmKernel::Config<true, 0, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, false,
                                         TopkWeightsPrefetch, IsShared, false, IsWaveFlagGrained>;
-    auto config = GmmConfig::BuildGmm1ProblemConfig(problemShape, blockJob, Gmm1TileM);
+    auto config = GmmConfig::BuildGmm1ProblemConfig(problemShape, blockJob, Gmm1TileM, activationOutputDivisor);
 
     if constexpr (g_coreType == AIV) {
         activationQuantOp.UpdateNextProblem({config.m, config.outputN, config.k, 0});
@@ -729,14 +756,15 @@ __aicore__ inline void RunGmm1A8W4(const BlockContext& pipeline,
                                    const Params& params,
                                    const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
                                    const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
-                                   int32_t& gmm1TileReadySequence, uint32_t expertBeforeCnt, uint32_t expertIdx = 0)
+                                   int32_t& gmm1TileReadySequence, uint32_t expertBeforeCnt, uint32_t expertIdx = 0,
+                                   uint32_t activationOutputDivisor = ACTIVATION_N_HALF)
 {
     BlockJobContext blockJob{static_cast<uint32_t>(GetBlockIdx() / GetTaskRation()),
                              static_cast<uint32_t>(GetBlockNum())};
     RunGmm1A8W4<ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, Gmm1TileM, EpilogueTileM,
-                TopkWeightsPrefetch, IsShared, IsWaveFlagGrained>(pipeline, activationQuantOp, params, problemShape,
-                                                                  gmmAddrInfo, startBlockIdx, gmm1TileReadySequence,
-                                                                  blockJob, expertBeforeCnt, expertIdx);
+                TopkWeightsPrefetch, IsShared, IsWaveFlagGrained>(
+        pipeline, activationQuantOp, params, problemShape, gmmAddrInfo, startBlockIdx, gmm1TileReadySequence, blockJob,
+        expertBeforeCnt, expertIdx, activationOutputDivisor);
 }
 
 template <typename ActivationType, typename WeightType, typename ActivationOutType, typename QuantScaleType,
@@ -744,7 +772,8 @@ template <typename ActivationType, typename WeightType, typename ActivationOutTy
 __aicore__ inline void UpdateMoeExpertGmm1GlobalBuffer(
     const GmmExecutionConfig& gmmConfig, const MoeSyncWorkspaceLayout& syncLayout, const WorkspaceInfo& workspace,
     const ExpertWeightTensorListAddrs& weights, BlockEpilogue& epilogueOp, GMMAddrInfo& gmmAddrInfo,
-    const ExpertLoopState& state, uint32_t rowOffsetInExpert = 0U, uint32_t gmm1TilesPerMGroup = 0U)
+    const ExpertLoopState& state, uint32_t activationOutputCols, uint32_t rowOffsetInExpert = 0U,
+    uint32_t gmm1TilesPerMGroup = 0U)
 {
     if constexpr (g_coreType == AIV && !UseA8W4Gmm1) {
         if (GetSubBlockIdx() != 0) {
@@ -789,10 +818,11 @@ __aicore__ inline void UpdateMoeExpertGmm1GlobalBuffer(
             runsActivation = GetSubBlockIdx() == 1;
         }
         if (runsActivation) {
-            int64_t scaleN = Ops::Base::CeilDiv(n / ACTIVATION_N_HALF, static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
+            int64_t scaleN = Ops::Base::CeilDiv(static_cast<int64_t>(activationOutputCols),
+                                                static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
                              MXFP_MULTI_BASE_SIZE;
             AscendC::Coord<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> vecBaseOffset{
-                globalTokenStartIndex * n / ACTIVATION_N_HALF / outputElementsPerByte,
+                globalTokenStartIndex * activationOutputCols / outputElementsPerByte,
                 globalTokenStartIndex * scaleN,
                 expertOffset * syncLayout.activationFlagSlotCountPerExpert / INT_CACHELINE + expertMGroupOffset,
                 0L,
@@ -831,7 +861,7 @@ __aicore__ inline void UpdateSharedExpertGmm1GlobalBuffer(const MoeStageCommonCo
     uint64_t n = commonConfig.gmm1OutputDim;
     uint64_t k = commonConfig.tokenHiddenDim;
     uint64_t scaleK = Ops::Base::CeilDiv(k, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
-    uint64_t activationN = n / ACTIVATION_N_HALF;
+    uint64_t activationN = n / commonConfig.activationOutputDivisor;
     uint64_t scaleN = Ops::Base::CeilDiv(activationN, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
     uint64_t expertIdx = sharedExpertIdx;
 

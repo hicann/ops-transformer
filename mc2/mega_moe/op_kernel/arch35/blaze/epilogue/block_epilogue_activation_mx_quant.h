@@ -26,10 +26,12 @@
 #include "../../common/mega_moe_constants.h"
 #include "../../common/mega_moe_utils.h"
 #include "activation/activation_common.h"
+#include "activation/gelu_activation.h"
 #include "activation/situglu_activation.h"
 #include "activation/swiglu_activation.h"
 #include "activation/swigluoai_activation.h"
 #include "block_epilogue_ub_layout.h"
+#include "rowwise_mx_quant.h"
 
 #define BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS \
     template <typename DataTypeOut, typename DataTypeIn, uint32_t TileM, uint32_t TileN, bool TopkWeightsPrefetch>
@@ -97,12 +99,7 @@ private:
         UbPointers buffers;
         uint64_t outputOffset;
         uint64_t scaleOffset;
-        uint16_t pingpongIndex;
     };
-
-    static constexpr auto ubLayout = BuildActivationMxQuantUbOffsets<DataTypeIn, TileM, TileN>();
-    static constexpr uint32_t ubFirstOffset = ubLayout.firstInputOffsetBytes;
-    static constexpr uint32_t ubInputElementCapacity = ubLayout.firstInputElementCapacity;
 
     __aicore__ inline TileExecutionContext PrepareTileExecutionContext(const BlockShape& blockShape,
                                                                        const BlockCoord& blockCoord,
@@ -116,9 +113,15 @@ private:
 
     __aicore__ inline void RunGatedActivationTile(const TileExecutionContext& tileContext);
 
-    __aicore__ inline void RunMxQuantTile(const TileExecutionContext& tileContext);
+    __aicore__ inline void RunGeluActivationTile(const TileExecutionContext& tileContext);
+
+    __aicore__ inline void RunGatedMxQuantTile(const TileExecutionContext& tileContext);
+
+    __aicore__ inline void RunGeluMxQuantTile(const TileExecutionContext& tileContext);
 
     __aicore__ inline void StoreQuantTile(const TileExecutionContext& tileContext);
+
+    __aicore__ inline void StoreGeluQuantTile(const TileExecutionContext& tileContext);
 
     __aicore__ inline void StoreQuantOutput(AscendC::GlobalTensor<int8_t>& dst, AscendC::LocalTensor<int8_t>& src,
                                             uint64_t blockCount, uint64_t offset, uint64_t n, uint64_t singleN);
@@ -127,14 +130,14 @@ private:
                                                   uint64_t blockCount, uint64_t offset, uint64_t scaleN,
                                                   uint64_t singleN);
 
-    // GM base addresses and bound tensor views
+    // GM 基地址及绑定的张量视图。
     GM_ADDR yGmAddr_{nullptr};
     GM_ADDR yScaleGmAddr_{nullptr};
     GlobalTensor<int8_t> quantOutputGlobal_;
     GlobalTensor<int8_t> quantScaleGlobal_;
 
-    // UB tensor views ordered by physical layout
-    LocalTensor<DataTypeIn> activationInputUb_{TPosition::VECIN, ubFirstOffset, ubInputElementCapacity};
+    // 按物理布局绑定 UB 张量视图。
+    LocalTensor<DataTypeIn> activationInputUb_;
     LocalTensor<bfloat16_t> gluRes_;
     LocalTensor<int8_t> quantOutput_;
     LocalTensor<int8_t> quantScaleOutput_;
@@ -142,11 +145,11 @@ private:
     LocalTensor<uint16_t> inverseMxScale_;
     LocalTensor<float> weightUb_;
 
-    // Problem state
+    // 当前计算形状。
     int64_t intermediateHiddenSize_;
     int64_t intermediateHiddenScaleElements_;
 
-    // Activation state
+    // 激活配置。
     float clampLimit_{0.0f};
     uint8_t actMode_{static_cast<uint8_t>(ActMode::SWIGLU)};
     uint8_t actSubMode_{static_cast<uint8_t>(ActSubMode::DEFAULT)};
@@ -169,17 +172,23 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::Init(P
     activationAlpha_ = params.activationAlpha;
     activationBeta_ = params.activationBeta;
 
+    const bool isGelu = actMode_ == static_cast<uint8_t>(ActMode::GELU);
+    const auto ubLayout = BuildActivationMxQuantUbOffsets<DataTypeIn, TileM, TileN, TopkWeightsPrefetch>(isGelu);
+    activationInputUb_ =
+        LocalTensor<DataTypeIn>(TPosition::VECIN, ubLayout.firstInputOffsetBytes, ubLayout.firstInputElementCapacity);
     gluRes_ = LocalTensor<bfloat16_t>(TPosition::VECCALC, ubLayout.activationOutputOffsetBytes,
-                                      ubLayout.activationQuantElementCapacity);
-    quantOutput_ = LocalTensor<int8_t>(TPosition::VECOUT, ubLayout.quantOutputOffsetBytes,
-                                       ubLayout.activationQuantElementCapacity);
+                                      ubLayout.activationOutputElementCapacity);
+    quantOutput_ =
+        LocalTensor<int8_t>(TPosition::VECOUT, ubLayout.quantOutputOffsetBytes, ubLayout.quantOutputElementCapacity);
     quantScaleOutput_ =
-        LocalTensor<int8_t>(TPosition::VECOUT, ubLayout.quantScaleOffsetBytes, ubLayout.scaleElementCapacity);
-    maxExp_ = LocalTensor<uint16_t>(TPosition::VECCALC, ubLayout.maxExpOffsetBytes, ubLayout.scaleElementCapacity);
-    inverseMxScale_ =
-        LocalTensor<uint16_t>(TPosition::VECCALC, ubLayout.inverseMxScaleOffsetBytes, ubLayout.scaleElementCapacity);
+        LocalTensor<int8_t>(TPosition::VECOUT, ubLayout.quantScaleOffsetBytes, ubLayout.quantScaleElementCapacity);
+    if (!isGelu) {
+        maxExp_ = LocalTensor<uint16_t>(TPosition::VECCALC, ubLayout.maxExpOffsetBytes, ubLayout.scaleElementCapacity);
+        inverseMxScale_ = LocalTensor<uint16_t>(TPosition::VECCALC, ubLayout.inverseMxScaleOffsetBytes,
+                                                ubLayout.scaleElementCapacity);
+    }
 
-    // weight UB: 放在 VECIN 区之后的安全区域，仅 mode=1 分配
+    // 预取权重放在公共工作区之后，仅预取路径绑定。
     if constexpr (TopkWeightsPrefetch) {
         weightUb_ =
             LocalTensor<float>(TPosition::VECCALC, ubLayout.topkWeightOffsetBytes, ubLayout.topkWeightElementCapacity);
@@ -220,20 +229,23 @@ BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::PrepareTileExecutionContext(c
     TileExecutionContext tileContext{};
     tileContext.geometry.rowCount = Get<M_VALUE>(blockShape);
     tileContext.geometry.columnCount = Get<N_VALUE>(blockShape);
-    tileContext.pingpongIndex = pingpongIdx;
 
-    tileContext.geometry.outputRowStrideElements =
-        Ops::Base::CeilAlign(tileContext.geometry.columnCount, static_cast<uint32_t>(ONE_BLK_SIZE));
     tileContext.outputOffset = Get<Y_IDX>(blockCoord);
     tileContext.scaleOffset = Get<Y_SCALE_IDX>(blockCoord);
 
-    // Ping/pong bases use TileM * TileN capacity; gate/up separation uses this
-    // activation tile's columnCount, so it follows the scheduler's compute width.
+    const bool isGelu = actMode_ == static_cast<uint8_t>(ActMode::GELU);
     tileContext.buffers = ResolveActivationMxQuantUbPointers<DataTypeIn, MAX_SINGLE_MN>(
         (__ubuf__ DataTypeIn*)activationInputUb_.GetPhyAddr(), (__ubuf__ bfloat16_t*)gluRes_.GetPhyAddr(),
         (__ubuf__ int8_t*)quantOutput_.GetPhyAddr(), (__ubuf__ uint16_t*)quantScaleOutput_.GetPhyAddr(),
-        (__ubuf__ uint16_t*)maxExp_.GetPhyAddr(), (__ubuf__ uint16_t*)inverseMxScale_.GetPhyAddr(),
-        tileContext.geometry.columnCount, tileContext.pingpongIndex);
+        isGelu ? nullptr : (__ubuf__ uint16_t*)maxExp_.GetPhyAddr(),
+        isGelu ? nullptr : (__ubuf__ uint16_t*)inverseMxScale_.GetPhyAddr(), tileContext.geometry.columnCount,
+        pingpongIdx, isGelu);
+    if (isGelu) {
+        tileContext.geometry.outputRowStrideElements = TileN;
+    } else {
+        tileContext.geometry.outputRowStrideElements =
+            Ops::Base::CeilAlign(tileContext.geometry.columnCount, static_cast<uint32_t>(ONE_BLK_SIZE));
+    }
     return tileContext;
 }
 
@@ -287,8 +299,8 @@ BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::BuildGatedActivationContext(c
     gatedActivationContext.gate = ubPointers.firstInput;
     gatedActivationContext.up = ubPointers.secondInput;
     gatedActivationContext.output = ubPointers.activationOutput;
-    // Each input row is [gate, up]; validColumnCount is the width of either half.
-    // Current tiling requires complete N tiles (hiddenDim % 256 == 0).
+    // 每行输入由 gate、up 两段组成，validColumnCount 为其中一段的宽度。
+    // 当前 tiling 要求完整的 N tile，hiddenDim 按 256 对齐。
     gatedActivationContext.inputRowStrideElements = static_cast<uint32_t>(validColumnCount) * ACTIVATION_N_HALF;
     gatedActivationContext.outputRowStrideElements = tileContext.geometry.outputRowStrideElements;
     gatedActivationContext.rowLoopCount = static_cast<uint16_t>(tileContext.geometry.rowCount);
@@ -334,7 +346,39 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGat
 }
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
-__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunMxQuantTile(
+__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGeluActivationTile(
+    const TileExecutionContext& tileContext)
+{
+    Activation::GeluActivationTileContext<DataTypeIn> context{};
+    context.input = tileContext.buffers.firstInput;
+    context.output = tileContext.buffers.activationOutput;
+    context.topkWeights = TopkWeightsPrefetch ? (__ubuf__ float*)weightUb_.GetPhyAddr() : nullptr;
+    context.rowStrideElements = TileN;
+    context.rowCount = static_cast<uint16_t>(tileContext.geometry.rowCount);
+    context.validColumnCount = static_cast<uint16_t>(tileContext.geometry.columnCount);
+    asc_vf_call<Activation::RunGeluActivation<DataTypeIn, TopkWeightsPrefetch>>(context);
+}
+
+BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
+__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGeluMxQuantTile(
+    const TileExecutionContext& tileContext)
+{
+    constexpr bool isFp4 = IsSameType<DataTypeOut, fp4x2_e2m1_t>::value || IsSameType<DataTypeOut, fp4x2_e1m2_t>::value;
+    const UbPointers& ubPointers = tileContext.buffers;
+    GeluQuant::TileContext context{};
+    context.activation = ubPointers.activationOutput;
+    context.quantOutput = ubPointers.quantOutput;
+    context.scaleOutput = (__ubuf__ uint8_t*)ubPointers.quantScale;
+    context.rowCount = static_cast<uint16_t>(tileContext.geometry.rowCount);
+    context.activationRowStrideElements = TileN;
+    context.quantRowStrideBytes = TopkWeightsPrefetch ? (isFp4 ? TileN / 2U : TileN) : TileN * sizeof(DataTypeIn);
+    context.scaleRowStrideBytes =
+        TopkWeightsPrefetch ? (TileN / MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE : TileN * sizeof(DataTypeIn);
+    asc_vf_call<GeluQuant::RunGeluMxQuant<DataTypeOut, TileN>>(context);
+}
+
+BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
+__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGatedMxQuantTile(
     const TileExecutionContext& tileContext)
 {
     const UbPointers& ubPointers = tileContext.buffers;
@@ -360,7 +404,7 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::StoreQ
     const TileExecutionContext& tileContext)
 {
     const TileGeometry& tileGeometry = tileContext.geometry;
-    const uint32_t bufferOffset = tileContext.buffers.selectedInt8BufferOffsetElements;
+    const uint32_t bufferOffset = tileContext.buffers.selectedSlotOffsetBytes;
     LocalTensor<int8_t> quantOutputTile = quantOutput_[bufferOffset];
     LocalTensor<int8_t> quantScaleTile = quantScaleOutput_[bufferOffset];
 
@@ -369,6 +413,38 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::StoreQ
     // scale已按compact布局生成，直接copy到GM，省掉原先TransMxScaleLayout重排scale。
     StoreQuantScaleCompact(quantScaleGlobal_, quantScaleTile, tileGeometry.rowCount, tileContext.scaleOffset,
                            intermediateHiddenScaleElements_, tileGeometry.columnCount);
+}
+
+BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
+__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::StoreGeluQuantTile(
+    const TileExecutionContext& tileContext)
+{
+    constexpr bool isFp4 = IsSameType<DataTypeOut, fp4x2_e2m1_t>::value || IsSameType<DataTypeOut, fp4x2_e1m2_t>::value;
+    const uint32_t validColumns = tileContext.geometry.columnCount;
+    const uint32_t inputRowBytes = TileN * sizeof(DataTypeIn);
+    const uint32_t quantRowBytes = isFp4 ? validColumns / 2U : validColumns;
+    const uint32_t alignedQuantRowBytes = Ops::Base::CeilAlign(quantRowBytes, static_cast<uint32_t>(ONE_BLK_SIZE));
+    const uint32_t scaleRowBytes =
+        Ops::Base::CeilDiv(validColumns, static_cast<uint32_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
+    const uint32_t bufferOffset = tileContext.buffers.selectedSlotOffsetBytes;
+    LocalTensor<int8_t> quantOutputTile = quantOutput_[bufferOffset];
+    LocalTensor<int8_t> quantScaleTile = quantScaleOutput_[bufferOffset];
+
+    DataCopyExtParams quantCopy{1, 0, 0, 0, 0};
+    quantCopy.blockCount = tileContext.geometry.rowCount;
+    quantCopy.blockLen = quantRowBytes;
+    quantCopy.srcStride = (inputRowBytes - alignedQuantRowBytes) / ONE_BLK_SIZE;
+    quantCopy.dstStride =
+        isFp4 ? (intermediateHiddenSize_ - validColumns) / 2U : intermediateHiddenSize_ - validColumns;
+    const uint64_t quantOffset = isFp4 ? tileContext.outputOffset / 2U : tileContext.outputOffset;
+    DataCopyPad(quantOutputGlobal_[quantOffset], quantOutputTile, quantCopy);
+
+    DataCopyExtParams scaleCopy{1, 0, 0, 0, 0};
+    scaleCopy.blockCount = tileContext.geometry.rowCount;
+    scaleCopy.blockLen = scaleRowBytes;
+    scaleCopy.srcStride = (inputRowBytes - ONE_BLK_SIZE) / ONE_BLK_SIZE;
+    scaleCopy.dstStride = intermediateHiddenScaleElements_ - scaleRowBytes;
+    DataCopyPad(quantScaleGlobal_[tileContext.scaleOffset], quantScaleTile, scaleCopy);
 }
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
@@ -401,7 +477,7 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::StoreQ
     AscendC::DataCopyExtParams ub2GmParams{0, 0, 0, 0, 0};
     auto blockScaleN = Ops::Base::CeilDiv(static_cast<uint64_t>(singleN), static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) *
                        MXFP_MULTI_BASE_SIZE;
-    // scale layout in UB is already compact: (mSize, blockScaleN). Compact copy avoids (mSize*8)->(mSize,32).
+    // UB 中的 scale 已按行紧凑存放，直接使用紧凑拷贝写回。
     ub2GmParams.blockCount = blockCount; // 128
     ub2GmParams.blockLen = blockScaleN;  // 8
     ub2GmParams.srcStride = 0;
@@ -419,11 +495,25 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::operat
     }
 
     TileExecutionContext tileContext = PrepareTileExecutionContext(blockShape, blockCoord, pingpongIdx);
-    RunGatedActivationTile(tileContext);
-    RunMxQuantTile(tileContext);
+    const bool isGelu = actMode_ == static_cast<uint8_t>(ActMode::GELU);
+    if (isGelu) {
+        RunGeluActivationTile(tileContext);
+        RunGeluMxQuantTile(tileContext);
+    } else {
+        RunGatedActivationTile(tileContext);
+        RunGatedMxQuantTile(tileContext);
+    }
     SetFlag<HardEvent::V_MTE3>(0);
     WaitFlag<HardEvent::V_MTE3>(0);
-    StoreQuantTile(tileContext);
+    if constexpr (TopkWeightsPrefetch) {
+        StoreQuantTile(tileContext);
+    } else {
+        if (isGelu) {
+            StoreGeluQuantTile(tileContext);
+        } else {
+            StoreQuantTile(tileContext);
+        }
+    }
     SetFlag<HardEvent::MTE3_V>(0);
     WaitFlag<HardEvent::MTE3_V>(0);
     SetFlag<HardEvent::MTE3_S>(0);
