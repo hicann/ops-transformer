@@ -9,6 +9,7 @@
  */
 
 #include "gmm/common/op_api/gmm_tensor_storage_check.h"
+#include "common/include/op_host/op_const_def_transformer.h"
 #include <dlfcn.h>
 #include <vector>
 #include "aclnn_grouped_matmul_finalize_routing_weight_nz.h"
@@ -245,7 +246,7 @@ static inline bool CheckDimRange(const GroupedMatmulParams& params)
     OP_CHECK_MIN_DIM(params.x1, MIN_DIM_NUM_ND, return false);
     OP_CHECK_MIN_DIM(params.out, MIN_DIM_NUM_ND, return false);
 
-    if (gmm::CheckDTypeInVector(params.x2->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX)) {
+    if (IsMxDataTypeSupported(params.x2->GetDataType())) {
         OP_CHECK_WRONG_DIMENSION(params.scale, MX_SCALE_DIM, return false);
         if (params.bias != nullptr) {
             OP_CHECK_WRONG_DIMENSION(params.bias, TWO_DIM_NUM, return false);
@@ -262,7 +263,7 @@ static inline bool CheckDimRange(const GroupedMatmulParams& params)
         OP_CHECK_WRONG_DIMENSION(params.scale, SCALE_DIM, return false);
     }
 
-    if (gmm::CheckDTypeInVector(params.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX)) {
+    if (IsMxDataTypeSupported(params.x1->GetDataType())) {
         OP_CHECK_WRONG_DIMENSION(params.pertokenScaleOptional, MX_PERTOKEN_SCALE_DIM, return false);
     } else if (params.pertokenScaleOptional != nullptr) {
         OP_CHECK_WRONG_DIMENSION(params.pertokenScaleOptional, 1, return false);
@@ -587,11 +588,24 @@ static int64_t GetL0OutputDtype(const GroupedMatmulParams& params)
     return params.dtype;
 }
 
+static bool IsMxA8Hif4(const GroupedMatmulParams& params)
+{
+    return params.x1->GetDataType() == DataType::DT_FLOAT8_E4M3FN &&
+           params.x2->GetDataType() == Ops::Transformer::DT_HIFLOAT4;
+}
+
+static bool IsHif4Quant(const GroupedMatmulParams& params)
+{
+    return params.x1->GetDataType() == Ops::Transformer::DT_HIFLOAT4 &&
+           params.x2->GetDataType() == Ops::Transformer::DT_HIFLOAT4;
+}
+
 static aclnnStatus CheckParams(GroupedMatmulParams& params)
 {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
         aclnnStatus status;
-        if (IsMxA8W4(params)) {
+        if (IsMxA8W4(params) || IsMxA8Hif4(params)) {
             // 使用MxA8W4场景专用Checker，与原有Checker解耦
             GmmFinalizeRouting::GroupedMatmulFinalizeRoutingWeightQuant950Checker checker;
             status = checker.CheckParams(params);
@@ -846,7 +860,8 @@ static void SetNZC0FormatToNZFormat(aclTensor& input)
 static aclnnStatus WeightNZCaseProcess(const aclTensor*& x2, bool& transposeX2, aclOpExecutor* executor)
 {
     // if weight is already in nz format, no need to set contiguous
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
         if (!transposeX2) {
             CHECK_RET(TransposeTensorContiguousProcessForMx(x2, transposeX2, executor), ACLNN_ERR_INNER_NULLPTR);
         }
@@ -917,19 +932,19 @@ static aclnnStatus PreMatmulCalcProcess(GroupedMatmulParams& params, aclOpExecut
     auto ret = WeightNZCaseProcess(x2, transposeX2, executor);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
-    if (scale != nullptr && gmm::CheckDTypeInVector(x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX) &&
-        gmm::CheckDTypeInVector(scale->GetDataType(), SCALE_TYPE_SUPPORT_LIST_MX)) {
+    if (scale != nullptr && IsMxDataTypeSupported(x1->GetDataType()) && IsMxScaleTypeSupported(scale->GetDataType())) {
         bool transposeScale = false;
         ret = WeightNZCaseProcessForMXScale(scale, transposeScale, executor);
         CHECK_RET(ret == ACLNN_SUCCESS, ret);
         // MxA8W4场景：scale按transposeX2对应的shape传入，跳过transpose一致性检查
-        if (!IsMxA8W4(params)) {
+        if (!IsMxA8W4(params) && !IsMxA8Hif4(params) && !IsHif4Quant(params)) {
             CHECK_RET(transposeX2 == transposeScale, ret);
         }
     }
 
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510 &&
+        op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_9201) {
         CHECK_RET(CheckDimRange(params), ACLNN_ERR_PARAM_INVALID);
     }
     return ACLNN_SUCCESS;
@@ -940,7 +955,8 @@ static aclnnStatus aclnnGroupedMatmulFinalizeRoutingGetWorkspaceSizeCommonProces
 {
     auto ret = PreMatmulCalcProcess(params, executor);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
         auto x1MDim = params.x1->GetViewShape().GetDim(0);
         auto x2NIndex = params.x2->GetViewShape().GetDimNum() - (params.transposeX2 ? PENULTIMATE_DIM : 1);
         auto x2NDim = params.x2->GetViewShape().GetDim(x2NIndex);
@@ -1250,6 +1266,11 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize(
                                   std::to_string(dtype), "0 or 2");
         return ACLNN_ERR_PARAM_INVALID;
     }
+    if ((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) && dtype != 0) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "GroupedMatmulFinalizeRoutingWeightNzV2 dtype must be 0 (FLOAT32), but is %lld.", dtype);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     auto viewShape = x2->GetViewShape();
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -1260,7 +1281,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2GetWorkspaceSize(
     // unpack int32 to int4
     auto tmpWeight = uniqueExecutor.get()->CreateView(x2, viewShape, x2->GetViewOffset());
     CHECK_RET(tmpWeight != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510 &&
+        op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_9201) {
         auto storageShape = x2->GetStorageShape();
         if (tmpWeight->GetDataType() == DataType::DT_INT32) {
             tmpWeight->SetStorageFormat(op::Format::FORMAT_FRACTAL_NZ);
@@ -1579,7 +1601,8 @@ static inline aclnnStatus CheckSupportSceneforV3(const aclTensor* x1, const aclT
                                                  const aclTensor* antiquantOffsetOptional)
 {
     // 支持sharedInput输入为空, 不支持logit为空
-    const bool biasRequired = op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510;
+    const bool biasRequired = op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510 &&
+                              op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_9201;
     auto scene = x1 != nullptr && x2 != nullptr && scaleOptional != nullptr && groupListOptional != nullptr &&
                  pertokenScaleOptional != nullptr && logitOptional != nullptr && rowIndexOptional != nullptr &&
                  (!biasRequired || biasOptional != nullptr) && antiquantScaleOptional == nullptr &&
@@ -1680,17 +1703,19 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize(
         return ACLNN_ERR_PARAM_INVALID;
     } else if (!((transposeX1 == false && transposeX2 == false) ||
                  (transposeX1 == false && transposeX2 == true &&
-                  op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510))) {
+                  (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+                   op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201)))) {
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
             "aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize", "transposeX1 and transposeX2",
             "transposeX1=" + std::string(transposeX1 ? "true" : "false") +
                 ", transposeX2=" + std::string(transposeX2 ? "true" : "false"),
-            "the value of transposeX1 and transposeX2 must be false/false or false/true on DAV_3510");
+            "the value of transposeX1 and transposeX2 must be false/false or false/true on DAV_3510/DAV_9201");
         return ACLNN_ERR_PARAM_INVALID;
     }
     // unpack int32 to int4
     auto tmpWeightV3 = x2;
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510 &&
+        op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_9201) {
         if (tmpWeightV3->GetDataType() == DataType::DT_INT32) {
             op::Shape weightShapeV3 = tmpWeightV3->GetViewShape();
             auto viewShapeDimV2 = weightShapeV3.GetDimNum();
@@ -1705,14 +1730,16 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize(
             return ACLNN_ERR_PARAM_INVALID;
         }
     }
-    bool isMXValid = gmm::CheckDTypeInVector(x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX) &&
-                     gmm::CheckDTypeInVector(tmpWeightV3->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX);
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 && !isMXValid) {
+    bool isMXValid = IsMxDataTypeSupported(x1->GetDataType()) && IsMxDataTypeSupported(tmpWeightV3->GetDataType());
+    if ((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+         op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) &&
+        !isMXValid) {
         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
             "aclnnGroupedMatmulFinalizeRoutingV3GetWorkspaceSize", "x and weight",
             "x=" + std::string(op::ToString(x1->GetDataType()).GetString()) +
                 ", weight=" + op::ToString(tmpWeightV3->GetDataType()).GetString(),
-            "for mx, the dtypes of x and weight must be within the range {FLOAT8_E5M2, FLOAT8_E4M3FN, FLOAT4_E2M1}");
+            "for mx, x and weight must be FLOAT8_E5M2, FLOAT8_E4M3FN or FLOAT4_E2M1; "
+            "HIFLOAT4 is only supported on DAV_9201");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (dtype != ACLNN_OUT_DTYPE_FLOAT32) {

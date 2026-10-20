@@ -11,6 +11,8 @@
 #ifndef OP_API_INC_GROUPED_MATMUL_FINALIZE_ROUTING_950_CHECKER_H
 #define OP_API_INC_GROUPED_MATMUL_FINALIZE_ROUTING_950_CHECKER_H
 #include "opdev/format_utils.h"
+#include "common/include/op_host/op_const_def_transformer.h"
+#include "opdev/platform.h"
 #include <vector>
 #include "aclnn_kernels/common/op_error_check.h"
 #include "quant_grouped_matmul_finalize_routing_util.h"
@@ -89,6 +91,7 @@ static const std::vector<op::DataType> ROW_INDEX_TYPE_SUPPORT_LIST_MX = {op::Dat
 static const std::vector<op::DataType> ROW_INDEX_TYPE_SUPPORT_LIST_MX_BF16_OUTPUT = {op::DataType::DT_INT32};
 static const std::vector<op::DataType> BIAS_TYPE_SUPPORT_LIST_MX = {op::DataType::DT_BF16};
 static const std::vector<op::DataType> PERTOKEN_SCALE_TYPE_SUPPORT_LIST_MX = {op::DataType::DT_FLOAT8_E8M0};
+static const std::vector<op::DataType> SCALE_TYPE_SUPPORT_LIST_HIF4 = {Ops::Transformer::DT_HIFLOAT4_SCALE};
 static const std::vector<op::DataType> GROUP_LIST_TYPE_SUPPORT_LIST = {op::DataType::DT_INT64};
 static const std::vector<op::DataType> SHARED_INPUT_TYPE_SUPPORT_LIST = {op::DataType::DT_BF16};
 static const std::vector<op::DataType> LOGIT_TYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
@@ -108,6 +111,37 @@ static const std::vector<op::DataType> SCALE_TYPE_SUPPORT_LIST_PERTOKEN = {op::D
 static const std::vector<op::DataType> ROW_INDEX_TYPE_SUPPORT_LIST_PERTOKEN_INT8 = {op::DataType::DT_INT64,
                                                                                     op::DataType::DT_INT32};
 static const std::vector<op::DataType> ROW_INDEX_TYPE_SUPPORT_LIST_PERTOKEN_FP8HIFLOAT8 = {op::DataType::DT_INT64};
+// Select platform capabilities first; input validation and API entry checks share these lists.
+inline const std::vector<DataType>& GetMxDataTypeSupportList()
+{
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
+        static const std::vector<DataType> supportedTypes = {DataType::DT_FLOAT8_E4M3FN, DataType::DT_FLOAT8_E5M2,
+                                                             DataType::DT_FLOAT4_E2M1, Ops::Transformer::DT_HIFLOAT4};
+        return supportedTypes;
+    }
+    return X_WEIGHT_TYPE_SUPPORT_LIST_MX;
+}
+
+inline const std::vector<DataType>& GetMxScaleTypeSupportList()
+{
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
+        static const std::vector<DataType> supportedTypes = {DataType::DT_FLOAT8_E8M0,
+                                                             Ops::Transformer::DT_HIFLOAT4_SCALE};
+        return supportedTypes;
+    }
+    return SCALE_TYPE_SUPPORT_LIST_MX;
+}
+
+inline bool IsMxDataTypeSupported(DataType dtype)
+{
+    return gmm::CheckDTypeInVector(dtype, GetMxDataTypeSupportList());
+}
+
+inline bool IsMxScaleTypeSupported(DataType dtype)
+{
+    return gmm::CheckDTypeInVector(dtype, GetMxScaleTypeSupportList());
+}
+
 enum class QuantMode {
     PERTOKEN = 0, // pertoken 量化
     MX = 2        // MX量化
@@ -125,14 +159,14 @@ public:
                            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GMMFR_ACLNN_OP_NAME, "scale", "nullptr",
                                                                  "the value of scale cannot be nullptr"));
         DataType scaleDtype = gmmParams_.scale->GetDataType();
-        if (gmm::CheckDTypeInVector(scaleDtype, SCALE_TYPE_SUPPORT_LIST_MX)) {
+        if (IsMxScaleTypeSupported(scaleDtype)) {
             quantMode_ = QuantMode::MX;
         } else if (gmm::CheckDTypeInVector(scaleDtype, SCALE_TYPE_SUPPORT_LIST_PERTOKEN)) {
             quantMode_ = QuantMode::PERTOKEN;
         } else {
             OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
                 GMMFR_ACLNN_OP_NAME, "scale", op::ToString(scaleDtype).GetString(),
-                "the dtype of scale must be within the range {FLOAT8_E8M0, FLOAT32, BFLOAT16}");
+                "scale must be FLOAT8_E8M0, FLOAT32 or BFLOAT16; HIFLOAT4_SCALE is only supported on DAV_9201");
             return ACLNN_ERR_PARAM_INVALID;
         }
         // 1. 检查参数是否为空指针
@@ -297,12 +331,14 @@ public:
     {
         op::Shape xExpectShape = {m, k};
         op::Shape weightExpectShape = {e, k, n};
+        int64_t mxScaleLastDim =
+            gmmParams_.scale->GetDataType() == Ops::Transformer::DT_HIFLOAT4_SCALE ? 1 : GMMFR_SPLIT_FACTOR;
         op::Shape weightScaleExpectShape =
-            quantMode_ == QuantMode::MX ? op::Shape{e, Ops::Base::CeilDiv(k, GMMFR_SPLIT_SIZE), n, GMMFR_SPLIT_FACTOR} :
+            quantMode_ == QuantMode::MX ? op::Shape{e, Ops::Base::CeilDiv(k, GMMFR_SPLIT_SIZE), n, mxScaleLastDim} :
                                           op::Shape{e, 1, n};
         op::Shape weightTransExpectShape = {e, n, k};
         op::Shape weightScaleTransExpectShape =
-            quantMode_ == QuantMode::MX ? op::Shape{e, n, Ops::Base::CeilDiv(k, GMMFR_SPLIT_SIZE), GMMFR_SPLIT_FACTOR} :
+            quantMode_ == QuantMode::MX ? op::Shape{e, n, Ops::Base::CeilDiv(k, GMMFR_SPLIT_SIZE), mxScaleLastDim} :
                                           op::Shape{e, 1, n};
         op::Shape grouplistExpectShape = {e};
         op::Shape logitExpectShape = {m};
@@ -326,10 +362,11 @@ public:
     bool CheckOptionalShapes(int64_t m, int64_t k, int64_t e, int64_t n)
     {
         if (gmmParams_.pertokenScaleOptional != nullptr) {
-            op::Shape xScaleExpectShape =
-                quantMode_ == QuantMode::MX ?
-                    op::Shape{m, Ops::Base::CeilDiv(k, GMMFR_SPLIT_SIZE), GMMFR_SPLIT_FACTOR} :
-                    op::Shape{m};
+            int64_t mxScaleLastDim =
+                gmmParams_.scale->GetDataType() == Ops::Transformer::DT_HIFLOAT4_SCALE ? 1 : GMMFR_SPLIT_FACTOR;
+            op::Shape xScaleExpectShape = quantMode_ == QuantMode::MX ?
+                                              op::Shape{m, Ops::Base::CeilDiv(k, GMMFR_SPLIT_SIZE), mxScaleLastDim} :
+                                              op::Shape{m};
             GMMFR_CHECK_SHAPE(gmmParams_.pertokenScaleOptional, "perTokenScale", xScaleExpectShape, return false);
         }
         if (gmmParams_.bias != nullptr) {
@@ -447,11 +484,15 @@ public:
 
     bool CheckDtypeValidForMX()
     {
-        GMMFR_CHECK_DTYPE(gmmParams_.x1, "x", X_WEIGHT_TYPE_SUPPORT_LIST_MX, return false);
-        GMMFR_CHECK_DTYPE(gmmParams_.x2, "weight", X_WEIGHT_TYPE_SUPPORT_LIST_MX, return false);
-        GMMFR_CHECK_DTYPE(gmmParams_.scale, "scale", SCALE_TYPE_SUPPORT_LIST_MX, return false);
-        GMMFR_CHECK_DTYPE(gmmParams_.pertokenScaleOptional, "perTokenScale", PERTOKEN_SCALE_TYPE_SUPPORT_LIST_MX,
-                          return false);
+        const auto& supportedTypes = GetMxDataTypeSupportList();
+        GMMFR_CHECK_DTYPE(gmmParams_.x1, "x", supportedTypes, return false);
+        GMMFR_CHECK_DTYPE(gmmParams_.x2, "weight", supportedTypes, return false);
+        // Platform membership does not imply that arbitrary data/scale combinations are valid.
+        const bool isHif4 = gmmParams_.x1->GetDataType() == Ops::Transformer::DT_HIFLOAT4;
+        const auto& scaleTypes = isHif4 ? SCALE_TYPE_SUPPORT_LIST_HIF4 : SCALE_TYPE_SUPPORT_LIST_MX;
+        const auto& perTokenTypes = isHif4 ? SCALE_TYPE_SUPPORT_LIST_HIF4 : PERTOKEN_SCALE_TYPE_SUPPORT_LIST_MX;
+        GMMFR_CHECK_DTYPE(gmmParams_.scale, "scale", scaleTypes, return false);
+        GMMFR_CHECK_DTYPE(gmmParams_.pertokenScaleOptional, "perTokenScale", perTokenTypes, return false);
         if (gmmParams_.bias != nullptr) {
             GMMFR_CHECK_DTYPE(gmmParams_.bias, "bias", BIAS_TYPE_SUPPORT_LIST_MX, return false);
         }
@@ -486,20 +527,21 @@ public:
                                    GMMFR_ACLNN_OP_NAME, "y", op::ToString(gmmParams_.out->GetDataType()).GetString(),
                                    "when dtype is 0, y must be DT_FLOAT"));
         }
-        if ((gmm::CheckDTypeInVector(gmmParams_.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP4) !=
-             gmm::CheckDTypeInVector(gmmParams_.x2->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_FP4)) ||
-            (gmm::CheckDTypeInVector(gmmParams_.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX_FP8) !=
-             gmm::CheckDTypeInVector(gmmParams_.x2->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX_FP8))) {
+        const bool isMxA4W4 = gmmParams_.x1->GetDataType() == DataType::DT_FLOAT4_E2M1 &&
+                              gmmParams_.x2->GetDataType() == DataType::DT_FLOAT4_E2M1;
+        const bool isMxA8W8 =
+            gmm::CheckDTypeInVector(gmmParams_.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX_FP8) &&
+            gmm::CheckDTypeInVector(gmmParams_.x2->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX_FP8);
+        const bool isHif4Pair = isHif4 && gmmParams_.x2->GetDataType() == Ops::Transformer::DT_HIFLOAT4;
+        if (!isMxA4W4 && !isMxA8W8 && !isHif4Pair) {
             OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
                 GMMFR_ACLNN_OP_NAME, "x and weight",
                 "x=" + std::string(op::ToString(gmmParams_.x1->GetDataType()).GetString()) +
                     ", weight=" + op::ToString(gmmParams_.x2->GetDataType()).GetString(),
-                "the dtypes of x and weight must be within the range {both MXFP4 or both MXFP8}");
+                "x and weight must both be MXFP4, both be MXFP8, or both be HIFLOAT4 (DAV_9201 only)");
             return false;
         }
         bool isWeightNz = gmmParams_.x2->GetStorageFormat() == Format::FORMAT_FRACTAL_NZ;
-        bool isMxA8W8 = gmm::CheckDTypeInVector(gmmParams_.x1->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX_FP8) &&
-                        gmm::CheckDTypeInVector(gmmParams_.x2->GetDataType(), X_WEIGHT_TYPE_SUPPORT_LIST_MX_FP8);
         if (isWeightNz && isMxA8W8 &&
             (gmmParams_.x1->GetDataType() != DataType::DT_FLOAT8_E4M3FN ||
              gmmParams_.x2->GetDataType() != DataType::DT_FLOAT8_E4M3FN)) {

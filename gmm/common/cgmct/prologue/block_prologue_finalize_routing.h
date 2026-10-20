@@ -156,7 +156,7 @@ __aicore__ inline void BlockPrologueFinalizeRouting<
     singleCount = CeilDiv(singleCount, static_cast<uint64_t>(ONE_CORE_ALIGN_LEN)) * ONE_CORE_ALIGN_LEN;
 
     uint64_t baseOffset = GetBlockIdx() * singleCount;
-    if (baseOffset > totalLen) {
+    if (baseOffset >= totalLen) {
         return;
     }
 
@@ -167,7 +167,8 @@ __aicore__ inline void BlockPrologueFinalizeRouting<
     if (!isDataBlockInitialized_) {
         Duplicate<DataTypeOut>(initWithZero_, 0, UB_INIT_REZO_LEN);
         isDataBlockInitialized_ = true;
-        AscendC::PipeBarrier<PIPE_ALL>();
+        AscendC::PipeBarrier<PIPE_MTE2>();
+        AscendC::PipeBarrier<PIPE_MTE3>();
     }
     // the baseOffset addr of cur vector core, copy out to GM
     baseOffset += outOffset;
@@ -219,8 +220,8 @@ __aicore__ inline void BlockPrologueFinalizeRouting<BLOCK_PROLOGUE_BLOCK_FINALIZ
     uint32_t pingPongID = 0;
     AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(0);
     AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(1);
-    AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(0);
-    AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(1);
+    AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(MTE_SYNC_DB_FLAG_IDS_PAIR_1[0]);
+    AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(MTE_SYNC_DB_FLAG_IDS_PAIR_1[1]);
     for (uint32_t offset = 0; offset < singleCount; offset += curCount) {
         if (unlikely(offset + curCount > singleCount)) {
             curCount = singleCount - offset;
@@ -234,20 +235,19 @@ __aicore__ inline void BlockPrologueFinalizeRouting<BLOCK_PROLOGUE_BLOCK_FINALIZ
         __ubuf__ DataTypeIn* residualLocalUbAddr = (__ubuf__ DataTypeIn*)residualLocal->GetPhyAddr();
         __ubuf__ DataTypeOut* outUbAddr = (__ubuf__ DataTypeOut*)yLocal->GetPhyAddr();
         // before vector compute,need wait MTE3 copyout finished
-        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(pingPongID);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(MTE_SYNC_DB_FLAG_IDS_PAIR_1[pingPongID]);
         VFDoSharedCastAndMuls(outUbAddr, residualLocalUbAddr, params_->residualScale, curCount);
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(pingPongID);
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(pingPongID);
         CopyOutShareInput(*yLocal, outOffset + offset, curCount);
-        AscendC::PipeBarrier<PIPE_ALL>();
-        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(pingPongID);
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(MTE_SYNC_DB_FLAG_IDS_PAIR_1[pingPongID]);
         AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(pingPongID);
         pingPongID = (pingPongID + 1) & 1;
     }
     AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(0);
     AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(1);
-    AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(0);
-    AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(1);
+    AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(MTE_SYNC_DB_FLAG_IDS_PAIR_1[0]);
+    AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(MTE_SYNC_DB_FLAG_IDS_PAIR_1[1]);
 }
 
 BLOCK_PROLOGUE_BLOCK_FINALIZE_ROUTING_CLASS_LOCAL_PARAMS

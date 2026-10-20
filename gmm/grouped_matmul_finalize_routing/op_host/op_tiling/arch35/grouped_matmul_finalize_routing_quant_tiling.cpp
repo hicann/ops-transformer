@@ -14,6 +14,7 @@
  */
 
 #include "grouped_matmul_finalize_routing_quant_tiling.h"
+#include "common/include/op_host/op_const_def_transformer.h"
 #include <alog_pub.h>
 #include <climits>
 #include "log/log.h"
@@ -259,6 +260,11 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::IsFp4Dtype(ge::DataType dtype) con
     return dtype == ge::DT_FLOAT4_E2M1;
 }
 
+bool GroupedMatmulFinalizeRoutingQuantTiling::IsHif4Scale() const
+{
+    return inputParams_.aDtype == Ops::Transformer::DT_HIFLOAT4 && inputParams_.bDtype == Ops::Transformer::DT_HIFLOAT4;
+}
+
 bool GroupedMatmulFinalizeRoutingQuantTiling::IsFp8Dtype(ge::DataType dtype) const
 {
     return (dtype == ge::DT_FLOAT8_E4M3FN || dtype == ge::DT_FLOAT8_E5M2);
@@ -290,6 +296,16 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckDtype() const
                                      ge::TypeUtils::DataTypeToSerialString(inputParams_.bDtype)),
                         "in MX A8W8 weight NZ mode, x and weight must both be DT_FLOAT8_E4M3FN"),
                     return false);
+    } else if (IsHif4Scale()) {
+        OP_CHECK_IF(
+            inputParams_.scaleDtype != Ops::Transformer::DT_HIFLOAT4_SCALE ||
+                inputParams_.perTokenScaleDtype != Ops::Transformer::DT_HIFLOAT4_SCALE,
+            OP_LOGE(context_->GetNodeName(),
+                    "In hif4 quant mode, the expected dtype of scale and pertokenScale should be DT_HIFLOAT4_SCALE, \
+                    but actual dtype is %s, %s.",
+                    ge::TypeUtils::DataTypeToSerialString(inputParams_.scaleDtype).c_str(),
+                    ge::TypeUtils::DataTypeToSerialString(inputParams_.perTokenScaleDtype).c_str()),
+            return false);
     } else {
         OP_CHECK_IF(!(inputParams_.aDtype == ge::DT_FLOAT8_E4M3FN || inputParams_.aDtype == ge::DT_INT8 ||
                       inputParams_.aDtype == ge::DT_HIFLOAT8),
@@ -349,7 +365,7 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckScaleAndPerTokenDims(
     const gert::StorageShape* pertokenScaleStorageShape, const gert::Shape& scaleShape) const
 {
     auto scaleDimNum = scaleShape.GetDimNum();
-    if (IsMicroScaling()) {
+    if (IsMicroScaling() || IsHif4Scale()) {
         OP_CHECK_IF(scaleDimNum != DIM_NUM_MX_SCALE,
                     OP_LOGE_FOR_INVALID_SHAPEDIM(inputParams_.opType, "scale", std::to_string(scaleDimNum),
                                                  std::to_string(DIM_NUM_MX_SCALE)),
@@ -385,7 +401,7 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckScaleAndPerTokenDims(
 
 bool GroupedMatmulFinalizeRoutingQuantTiling::CheckFp4Shape(const gert::Shape& xShape, const gert::Shape& wShape) const
 {
-    bool a4w4 = IsFp4Dtype(inputParams_.aDtype) && IsFp4Dtype(inputParams_.bDtype);
+    bool a4w4 = (IsFp4Dtype(inputParams_.aDtype) && IsFp4Dtype(inputParams_.bDtype)) || IsHif4Scale();
     if (!a4w4) {
         return true;
     }
@@ -467,7 +483,7 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckInputsShape(const gert::Shape
     const gert::Shape& wShape = wStorageShape->GetOriginShape();
     OP_CHECK_IF(!CheckDim(xShape, wShape, pertokenScaleStorageShape, scaleShape, yShape),
                 OP_LOGE(context_->GetNodeName(), "CheckDim failed."), return false);
-    if (IsMicroScaling()) {
+    if (IsMicroScaling() || IsHif4Scale()) {
         OP_CHECK_IF(!CheckFp4Shape(xShape, wShape), OP_LOGE(context_->GetNodeName(), "CheckFp4Shape failed."),
                     return false);
     }
@@ -506,6 +522,11 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::AnalyzeInputs()
                 return false);
     const gert::Shape& yShape = yStorageShape->GetOriginShape();
 
+    auto compileInfo = context_->GetCompileInfo<GroupedMatmulFinalizeRoutingCompileInfo>();
+    OP_CHECK_IF(compileInfo == nullptr,
+                OP_LOGE(inputParams_.opName, "GroupedMatmulFinalizeRouting compileInfo is nullptr."), return false);
+    supportMmadF16S8_ = compileInfo->supportMmadF16S8;
+
     if (IsMicroScaling()) {
         bool isFullMx = (IsFp8Dtype(inputParams_.aDtype) && IsFp8Dtype(inputParams_.bDtype)) ||
                         (IsFp4Dtype(inputParams_.aDtype) && IsFp4Dtype(inputParams_.bDtype));
@@ -516,7 +537,7 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::AnalyzeInputs()
                         inputParams_.opType, "weight", ge::TypeUtils::FormatToSerialString(inputParams_.bFormat),
                         "when output is DT_BF16 in mx quant mode, the format of weight must be FRACTAL_NZ"),
                     return false);
-    } else {
+    } else if (!IsHif4Scale()) {
         OP_CHECK_IF(inputParams_.bFormat != ge::FORMAT_FRACTAL_NZ,
                     OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
                         inputParams_.opType, "weight", ge::TypeUtils::FormatToSerialString(inputParams_.bFormat),
@@ -542,12 +563,15 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckCoreNum() const
                 OP_LOGE(inputParams_.opName, "GroupedMatmulFinalizeRouting compileInfo is nullptr."), return false);
     auto aicNum = compileInfo->aicNum;
     auto aivNum = compileInfo->aivNum;
-    OP_CHECK_IF(aicNum == 0, OP_LOGE(inputParams_.opName, "aicNum should be positive integer, actual is %u.", aicNum),
+    OP_CHECK_IF(aicNum == 0,
+                OP_LOGE(inputParams_.opName, "aicNum should be positive integer, actual is %lu.",
+                        static_cast<unsigned long>(aicNum)),
                 return false);
-    OP_CHECK_IF(
-        aivNum != GmmConstant::CORE_RATIO * aicNum,
-        OP_LOGE(inputParams_.opName, "aicNum:aivNum should be 1:2, actual aicNum: %u, aivNum: %u.", aicNum, aivNum),
-        return false);
+    uint32_t coreRatio = supportMmadF16S8_ ? GmmConstant::CORE_RATIO_9201 : GmmConstant::CORE_RATIO;
+    OP_CHECK_IF(aivNum != coreRatio * aicNum,
+                OP_LOGE(inputParams_.opName, "aicNum:aivNum should be 1:%u, actual aicNum: %lu, aivNum: %lu.",
+                        coreRatio, static_cast<unsigned long>(aicNum), static_cast<unsigned long>(aivNum)),
+                return false);
     return true;
 }
 
@@ -556,6 +580,12 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::SetQuantModeForGMMFinalizeRouting(
     if (IsMicroScaling()) {
         inputParams_.bQuantMode = optiling::QuantMode::MX_PERGROUP_MODE;
         inputParams_.aQuantMode = optiling::QuantMode::MX_PERGROUP_MODE;
+        return true;
+    }
+
+    if (IsHif4Scale()) {
+        inputParams_.bQuantMode = optiling::QuantMode::HIF4_PERGROUP_MODE;
+        inputParams_.aQuantMode = optiling::QuantMode::HIF4_PERGROUP_MODE;
         return true;
     }
 
@@ -611,7 +641,7 @@ uint64_t GroupedMatmulFinalizeRoutingQuantTiling::GetTilingKey() const
                               static_cast<uint64_t>(logitType_));
 }
 
-ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::CalWeightNzL1Tiling()
+ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::CalL1Tiling()
 {
     InitCommonL1TilingFields();
     if (inputParams_.kSize == 0) {
@@ -620,16 +650,20 @@ ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::CalWeightNzL1Tiling()
     uint64_t leftL1Size = 0;
     OP_CHECK_IF(CalcLeftL1Size(leftL1Size) != ge::GRAPH_SUCCESS,
                 OP_LOGE(context_->GetNodeName(), "CalcLeftL1Size failed"), return ge::GRAPH_FAILED);
-    return CalWeightNzL1Depth(leftL1Size);
+    return CalL1Depth(leftL1Size);
 }
 
-ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::CalWeightNzL1Depth(uint64_t leftL1Size)
+ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::CalL1Depth(uint64_t leftL1Size)
 {
     const uint64_t baseASize = GetSizeWithDataType(basicTiling_.baseM * basicTiling_.baseK, inputParams_.aDtype);
     const uint64_t baseBSize = GetSizeWithDataType(basicTiling_.baseN * basicTiling_.baseK, inputParams_.bDtype);
     uint64_t baseScaleASize = 0;
     uint64_t baseScaleBSize = 0;
-    CalcAlignedMxBaseScaleSize(baseScaleASize, baseScaleBSize);
+    const bool isMicroScaling = inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE ||
+                                inputParams_.bQuantMode == optiling::QuantMode::HIF4_PERGROUP_MODE;
+    if (isMicroScaling) {
+        CalcAlignedMxBaseScaleSize(baseScaleASize, baseScaleBSize);
+    }
     const uint64_t baseL1Size = baseASize + baseBSize + baseScaleASize + baseScaleBSize;
     OP_CHECK_IF(leftL1Size < baseL1Size,
                 OP_LOGE(context_->GetNodeName(), "L1 space overflow. Free L1Size: %lu, used space: %lu", leftL1Size,
@@ -637,8 +671,8 @@ ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::CalWeightNzL1Depth(uint
                 return ge::GRAPH_FAILED);
 
     const uint64_t depthInit = GetDepthA1B1(leftL1Size, baseL1Size, 1UL);
-    basicTiling_.depthA1 = GetWeightNzDepthWithHighBW(std::min(inputParams_.mSize, basicTiling_.baseM));
-    basicTiling_.depthB1 = GetWeightNzDepthWithHighBW(std::min(inputParams_.nSize, basicTiling_.baseN));
+    basicTiling_.depthA1 = GetDepthWithHighBW(std::min(inputParams_.mSize, basicTiling_.baseM));
+    basicTiling_.depthB1 = GetDepthWithHighBW(std::min(inputParams_.nSize, basicTiling_.baseN));
     if (basicTiling_.depthA1 * baseASize + basicTiling_.depthB1 * baseBSize +
             std::max(basicTiling_.depthA1, basicTiling_.depthB1) * (baseScaleASize + baseScaleBSize) >
         leftL1Size) {
@@ -646,12 +680,15 @@ ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::CalWeightNzL1Depth(uint
         basicTiling_.depthB1 = depthInit;
     }
 
-    ModifyWeightNzDepthForUnalign(leftL1Size, baseASize, baseBSize, baseScaleASize + baseScaleBSize);
+    ModifyDepthForUnalign(leftL1Size, baseASize, baseBSize, baseScaleASize + baseScaleBSize);
     CalStepKs();
-    return CalWeightNzScaleFactors();
+    if (isMicroScaling) {
+        return CalScaleFactors();
+    }
+    return ge::GRAPH_SUCCESS;
 }
 
-uint64_t GroupedMatmulFinalizeRoutingQuantTiling::GetWeightNzDepthWithHighBW(uint64_t mnL1) const
+uint64_t GroupedMatmulFinalizeRoutingQuantTiling::GetDepthWithHighBW(uint64_t mnL1) const
 {
     const uint64_t baseKSize = GetSizeWithDataType(basicTiling_.baseK, inputParams_.aDtype);
     const uint64_t depth = GroupedMatmul::CeilAlign(GroupedMatmul::CeilDiv(MTE2_MIN_LOAD_SIZE_V120, mnL1),
@@ -664,9 +701,8 @@ uint64_t GroupedMatmulFinalizeRoutingQuantTiling::GetWeightNzDepthWithHighBW(uin
     return std::min(pow2Depth, GroupedMatmul::CeilDiv(inputParams_.kSize, basicTiling_.baseK) * DB_SIZE);
 }
 
-void GroupedMatmulFinalizeRoutingQuantTiling::ModifyWeightNzDepthForUnalign(uint64_t leftL1Size, uint64_t baseASize,
-                                                                            uint64_t baseBSize,
-                                                                            uint64_t baseScaleABSize)
+void GroupedMatmulFinalizeRoutingQuantTiling::ModifyDepthForUnalign(uint64_t leftL1Size, uint64_t baseASize,
+                                                                    uint64_t baseBSize, uint64_t baseScaleABSize)
 {
     if (inputParams_.kSize % GmmConstant::BASIC_BLOCK_SIZE_128 == 0) {
         return;
@@ -704,16 +740,17 @@ void GroupedMatmulFinalizeRoutingQuantTiling::ModifyWeightNzDepthForUnalign(uint
     }
 }
 
-ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::CalWeightNzScaleFactors()
+ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::CalScaleFactors()
 {
-    const uint64_t baseScaleASize = GetSizeWithDataType(
-        GroupedMatmul::CeilAlign(GroupedMatmul::CeilDiv(basicTiling_.baseK, MX_GROUP_SIZE), MXFP_MULTI_BASE_SIZE) *
-            basicTiling_.baseM,
-        inputParams_.perTokenScaleDtype);
-    const uint64_t baseScaleBSize = GetSizeWithDataType(
-        GroupedMatmul::CeilAlign(GroupedMatmul::CeilDiv(basicTiling_.baseK, MX_GROUP_SIZE), MXFP_MULTI_BASE_SIZE) *
-            basicTiling_.baseN,
-        inputParams_.scaleDtype);
+    const uint64_t scaleGroupSize =
+        inputParams_.bQuantMode == optiling::QuantMode::HIF4_PERGROUP_MODE ? HIF4_BASEK_FACTOR : MX_GROUP_SIZE;
+    uint64_t baseScaleK = GroupedMatmul::CeilDiv(basicTiling_.baseK, scaleGroupSize);
+    if (!supportMmadF16S8_) {
+        baseScaleK = GroupedMatmul::CeilAlign(baseScaleK, MXFP_MULTI_BASE_SIZE);
+    }
+    const uint64_t baseScaleASize =
+        GetSizeWithDataType(baseScaleK * basicTiling_.baseM, inputParams_.perTokenScaleDtype);
+    const uint64_t baseScaleBSize = GetSizeWithDataType(baseScaleK * basicTiling_.baseN, inputParams_.scaleDtype);
     const uint64_t biasDtypeSize = ge::GetSizeByDataType(inputParams_.biasDtype);
     const uint64_t baseBiasSize = inputParams_.hasBias ? basicTiling_.baseN * biasDtypeSize : 0;
     const uint64_t baseASize = GetSizeWithDataType(basicTiling_.baseM * basicTiling_.baseK, inputParams_.aDtype);
@@ -765,13 +802,17 @@ ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::DoLibApiTiling()
     const bool useTensorApiMxL1Tiling =
         inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE &&
         (inputParams_.bFormat == ge::FORMAT_FRACTAL_NZ || inputParams_.cDtype == ge::DT_FLOAT);
-    if (useTensorApiMxL1Tiling) {
-        OP_CHECK_IF(CalWeightNzL1Tiling() != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_->GetNodeName(), "CalWeightNzL1Tiling failed"), return ge::GRAPH_FAILED);
-    } else {
+    if (supportMmadF16S8_ || useTensorApiMxL1Tiling) {
+        if (supportMmadF16S8_) {
+            basicTiling_.baseM = std::min(basicTiling_.baseM, static_cast<uint64_t>(GmmConstant::BASIC_BLOCK_SIZE_128));
+        }
         OP_CHECK_IF(CalL1Tiling() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CalL1Tiling failed"),
                     return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(GroupedQmmTiling::CalL1Tiling() != ge::GRAPH_SUCCESS,
+                    OP_LOGE(context_->GetNodeName(), "CalL1Tiling failed"), return ge::GRAPH_FAILED);
     }
+
     tilingData_.matmulTiling.M = inputParams_.mSize;
     tilingData_.matmulTiling.N = inputParams_.nSize;
     tilingData_.matmulTiling.Ka = inputParams_.kSize;
@@ -794,7 +835,8 @@ ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::DoLibApiTiling()
     tilingData_.matmulTiling.dbL0A = 2; // db switch, 1: off, 2: on
     tilingData_.matmulTiling.dbL0B = 2; // db switch, 1: off, 2: on
     tilingData_.matmulTiling.dbL0C = basicTiling_.dbL0c;
-    if (inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE) {
+    if (inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE ||
+        inputParams_.bQuantMode == optiling::QuantMode::HIF4_PERGROUP_MODE) {
         if (basicTiling_.scaleFactorA >= SCALER_FACTOR_MIN && basicTiling_.scaleFactorA <= SCALER_FACTOR_MAX &&
             basicTiling_.scaleFactorB >= SCALER_FACTOR_MIN && basicTiling_.scaleFactorB <= SCALER_FACTOR_MAX) {
             tilingData_.matmulTiling.mxTypePara =

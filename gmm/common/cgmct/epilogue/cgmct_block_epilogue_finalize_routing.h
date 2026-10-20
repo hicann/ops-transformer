@@ -15,7 +15,7 @@
 
 #ifndef CGMCT_BLOCK_EPILOGUE_FINALIZE_ROUTING_H
 #define CGMCT_BLOCK_EPILOGUE_FINALIZE_ROUTING_H
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"
 #else
@@ -34,7 +34,11 @@ namespace {
 constexpr int64_t OUT_ELE_NUM_ONE_BLK = 64;
 constexpr uint32_t Y_IDX = 0;
 constexpr uint32_t LOGIT_INDEX = 4;
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+constexpr uint32_t MAX_SINGLE_MN = 256 * 256;
+#else
 constexpr uint32_t MAX_SINGLE_MN = 128 * 256;
+#endif
 constexpr uint32_t HALF_DB_MAX_SINGLE_MN = 32 * 256;
 constexpr uint32_t BLOCK_BYTES = 256;
 constexpr uint64_t MAX_OUTPUT_M_UB = 32;
@@ -60,6 +64,7 @@ public:
         GM_ADDR rowIndexGmAddr{nullptr};
         int32_t baseM = 256;
         int32_t baseN = 256;
+        uint32_t l0cOutUbSize = MAX_SINGLE_MN;
         Arguments() = default;
     };
 
@@ -120,8 +125,7 @@ __aicore__ inline void BlockEpilogueFinalizeRouting<GMM_BLOCK_EPILOGUE_FINALIZE_
     }
     params_ = &params;
     yGlobal_.SetGlobalBuffer((__gm__ DataTypeOut*)params_->yGMAddr);
-    // input
-    uint32_t afterFirstIn = MAX_SINGLE_MN * sizeof(DataTypeOut);
+    uint32_t afterFirstIn = params_->l0cOutUbSize * sizeof(DataTypeOut);
     logitUbPing_ = AscendC::LocalTensor<float>(AscendC::TPosition::VECIN, afterFirstIn, BLOCK_BYTES);
     uint32_t afterSecondIn = afterFirstIn + BLOCK_BYTES * sizeof(DataTypeOut);
     logitUbPong_ = AscendC::LocalTensor<float>(AscendC::TPosition::VECIN, afterSecondIn, BLOCK_BYTES);

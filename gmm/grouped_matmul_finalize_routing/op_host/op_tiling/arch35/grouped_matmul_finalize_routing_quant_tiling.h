@@ -105,12 +105,11 @@ private:
     bool AnalyzeAttrs() override;
     bool AnalyzeDtype() override;
     bool AnalyzeInputs() override;
-    ge::graphStatus CalWeightNzL1Tiling();
-    ge::graphStatus CalWeightNzL1Depth(uint64_t leftL1Size);
-    ge::graphStatus CalWeightNzScaleFactors();
-    uint64_t GetWeightNzDepthWithHighBW(uint64_t mnL1) const;
-    void ModifyWeightNzDepthForUnalign(uint64_t leftL1Size, uint64_t baseASize, uint64_t baseBSize,
-                                       uint64_t baseScaleABSize);
+    ge::graphStatus CalL1Tiling();
+    ge::graphStatus CalL1Depth(uint64_t leftL1Size);
+    ge::graphStatus CalScaleFactors();
+    uint64_t GetDepthWithHighBW(uint64_t mnL1) const;
+    void ModifyDepthForUnalign(uint64_t leftL1Size, uint64_t baseASize, uint64_t baseBSize, uint64_t baseScaleABSize);
     int64_t LogQuantParams() const;
     int64_t LogMatmulParams() const;
     bool SetQuantModeForGMMFinalizeRouting();
@@ -119,6 +118,7 @@ private:
     bool CheckDtype() const;
     bool CheckOptional(uint32_t index, const char* paramName, ge::DataType targetDtype) const;
     bool IsFp4Dtype(ge::DataType dtype) const;
+    bool IsHif4Scale() const;
     bool IsFp8Dtype(ge::DataType dtype) const;
     bool CheckInputsShape(const gert::Shape& xShape, const gert::StorageShape* wStorageShape,
                           const gert::StorageShape* pertokenScaleStorageShape, const gert::Shape& scaleShape,
@@ -145,6 +145,7 @@ private:
     int8_t rowIndexType_ = 0;
     int8_t logitType_ = 0;
     uint32_t deterWorkspaceSize_ = 0;
+    bool supportMmadF16S8_ = false;
 };
 } // namespace optiling
 

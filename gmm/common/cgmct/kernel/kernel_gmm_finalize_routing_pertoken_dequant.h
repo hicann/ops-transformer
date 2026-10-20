@@ -176,12 +176,16 @@ public:
     __aicore__ inline void WaitForVector()
     {
         AscendC::CrossCoreWaitFlag<SYNC_AIC_AIV_MODES, PIPE_FIX>(AIV_SYNC_AIC_FLAGS);
-        AscendC::CrossCoreWaitFlag<SYNC_AIC_AIV_MODES, PIPE_FIX>(AIV_SYNC_AIC_FLAGS + FLAG_ID_MAXS);
+        if (GetAicAivTaskRation() != 1) {
+            AscendC::CrossCoreWaitFlag<SYNC_AIC_AIV_MODES, PIPE_FIX>(AIV_SYNC_AIC_FLAGS + FLAG_ID_MAXS);
+        }
     }
     __aicore__ inline void NotifyVector()
     {
         AscendC::CrossCoreSetFlag<SYNC_AIC_AIV_MODES, PIPE_FIX>(AIC_SYNC_AIV_FLAGS);
-        AscendC::CrossCoreSetFlag<SYNC_AIC_AIV_MODES, PIPE_FIX>(AIC_SYNC_AIV_FLAGS + FLAG_ID_MAXS);
+        if (GetAicAivTaskRation() != 1) {
+            AscendC::CrossCoreSetFlag<SYNC_AIC_AIV_MODES, PIPE_FIX>(AIC_SYNC_AIV_FLAGS + FLAG_ID_MAXS);
+        }
     }
     __aicore__ inline void WaitForCube()
     {

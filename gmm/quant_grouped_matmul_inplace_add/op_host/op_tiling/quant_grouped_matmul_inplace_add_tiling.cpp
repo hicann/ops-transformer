@@ -8,10 +8,12 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 #include <alog_pub.h>
+#include "common/include/op_host/op_const_def_transformer.h"
 #include <climits>
 #include "log/log.h"
 #include "op_host/tiling_templates_registry.h"
 #include "op_host/tiling_type.h"
+#include "platform/platform_infos_def.h"
 #include "register/op_impl_registry.h"
 #include "quant_grouped_matmul_inplace_add_tiling.h"
 #include "quant_grouped_matmul_inplace_add_basic_api_tiling.h"
@@ -44,11 +46,21 @@ bool QuantGroupedInplaceAddTiling::AnalyzeDtype()
     return AnalyzeDtypeForInplaceAdd(context_, inputParams_) && CheckDtypeForInplaceAdd(inputParams_);
 }
 
+bool QuantGroupedInplaceAddTiling::IsHif4Scale() const
+{
+    return inputParams_.aDtype == Ops::Transformer::DT_HIFLOAT4 && inputParams_.bDtype == Ops::Transformer::DT_HIFLOAT4;
+}
+
 bool QuantGroupedInplaceAddTiling::SetQuantModeForQGmmInplaceAdd()
 {
     if (IsMicroScaling()) {
         inputParams_.bQuantMode = optiling::QuantMode::MX_PERGROUP_MODE;
         inputParams_.aQuantMode = optiling::QuantMode::MX_PERGROUP_MODE;
+        return true;
+    }
+    if (IsHif4Scale()) {
+        inputParams_.bQuantMode = optiling::QuantMode::HIF4_PERGROUP_MODE;
+        inputParams_.aQuantMode = optiling::QuantMode::HIF4_PERGROUP_MODE;
         return true;
     }
     inputParams_.bQuantMode = optiling::QuantMode::PERCHANNEL_MODE;
@@ -91,17 +103,23 @@ bool QuantGroupedInplaceAddTiling::AnalyzeInputs()
     const gert::Shape& x1ScaleShape = x1ScaleStorageShape->GetOriginShape();
     OP_CHECK_IF(!SetGroupNum(GROUPLIST_INDEX), OP_LOGE(inputParams_.opName, "SetGroupNum failed."), return false);
     OP_CHECK_IF(!SetMKN(xShape, wShape), OP_LOGE(inputParams_.opName, "SetMKN failed."), return false);
-    if (IsMicroScaling()) {
+    OP_CHECK_IF(!SetQuantModeForQGmmInplaceAdd(), OP_LOGE(inputParams_.opName, "SetQuantModeForQGmmInplaceAdd failed."),
+                return false);
+    if (inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE) {
         OP_CHECK_IF(!CheckShapeForMxQuant(x1ScaleShape, wScaleShape, inputParams_),
                     OP_LOGE(inputParams_.opName, "CheckShapeForMxQuant failed."), return false);
+    } else if (inputParams_.bQuantMode == optiling::QuantMode::HIF4_PERGROUP_MODE) {
+        OP_CHECK_IF(!CheckShapeForHif4Quant(x1ScaleShape, wScaleShape, inputParams_),
+                    OP_LOGE(inputParams_.opName, "CheckShapeForHif4Quant failed."), return false);
     } else {
         OP_CHECK_IF(!CheckShapeForHif8Quant(x1ScaleShape, wScaleShape, inputParams_),
                     OP_LOGE(inputParams_.opName, "CheckShapeForHif8Quant failed."), return false);
     }
-    OP_CHECK_IF(!SetQuantModeForQGmmInplaceAdd(), OP_LOGE(inputParams_.opName, "SetQuantModeForQGmmInplaceAdd failed."),
-                return false);
     SetKernelType();
-    OP_CHECK_IF(!CheckCoreNum(), OP_LOGE(inputParams_.opName, "CheckCoreNum failed."), return false);
+    auto compileInfoPtr = context_->GetCompileInfo<GMMCompileInfo>();
+    OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(inputParams_.opName, "compile info is null."), return false);
+    supportMmadF16S8_ = compileInfoPtr->supportMmadF16S8;
+    OP_CHECK_IF(!CheckCoreNum(), OP_LOGE(inputParams_.opName, "CheckCoreNumForInplaceAdd failed."), return false);
     return true;
 }
 
@@ -131,6 +149,10 @@ int64_t QuantGroupedInplaceAddTiling::LogQuantParams() const
 ge::graphStatus QuantGroupedInplaceAddTiling::DoLibApiTiling()
 {
     CalBasicBlock();
+    if (supportMmadF16S8_ && inputParams_.aQuantMode == optiling::QuantMode::PERTENSOR_MODE) {
+        basicTiling_.baseM = std::min(basicTiling_.baseM, static_cast<uint64_t>(GmmConstant::BASIC_BLOCK_SIZE_128));
+        basicTiling_.baseN = std::min(basicTiling_.baseN, static_cast<uint64_t>(GmmConstant::BASIC_BLOCK_SIZE_128));
+    }
     OP_CHECK_IF(CalL1Tiling() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CalL1Tiling failed"),
                 return ge::GRAPH_FAILED);
     tilingData_.mmTilingData.M = inputParams_.mSize;
@@ -155,7 +177,8 @@ ge::graphStatus QuantGroupedInplaceAddTiling::DoLibApiTiling()
     tilingData_.mmTilingData.dbL0A = 2; // db switch, 1: off, 2: on
     tilingData_.mmTilingData.dbL0B = 2; // db switch, 1: off, 2: on
     tilingData_.mmTilingData.dbL0C = basicTiling_.dbL0c;
-    if (inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE) {
+    if (inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE ||
+        inputParams_.bQuantMode == optiling::QuantMode::HIF4_PERGROUP_MODE) {
         tilingData_.mmTilingData.mxTypePara =
             (SCALER_FACTOR_MIN << SCALER_FACTOR_N_BIT) + (SCALER_FACTOR_MIN << SCALER_FACTOR_M_BIT);
         if (basicTiling_.scaleFactorA >= SCALER_FACTOR_MIN && basicTiling_.scaleFactorA <= SCALER_FACTOR_MAX &&
@@ -201,10 +224,14 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForGMMInplaceAdd(gert::TilingParse
     auto compileInfoPtr = context->GetCompiledInfo<GMMCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfoPtr);
 
+    std::string intrinsicMmad;
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     compileInfoPtr->aicNum = ascendcPlatform.GetCoreNumAic();
     compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();
     compileInfoPtr->socVersion = ascendcPlatform.GetSocVersion();
+    compileInfoPtr->npuArch = ascendcPlatform.GetCurNpuArch();
+    platformInfoPtr->GetPlatformRes("AICoreintrinsicDtypeMap", "Intrinsic_mmad", intrinsicMmad);
+    compileInfoPtr->supportMmadF16S8 = (intrinsicMmad.find("f16s8") != std::string::npos);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfoPtr->ubSize);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, compileInfoPtr->l1Size);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_A, compileInfoPtr->l0ASize);

@@ -15,7 +15,9 @@
 #include "arch35/qgmm_inplace_add_utils.h"
 #include "arch35/quant_grouped_matmul_inplace_add_tiling_data.h"
 #include "arch35/qgmm_inplace_add_tiling_key.h"
-#if defined(V310_QGMM_QUANT_MX)
+#if defined(V310_QGMM_QUANT_MX_HIF4)
+#include "arch35/qgmm_inplace_add_mx_basic_api.h"
+#elif defined(V310_QGMM_QUANT_MX)
 #include "arch35/qgmm_inplace_add_cube_on_the_fly.h"
 #else
 #include "arch35/qgmm_inplace_add_mix_online_dynamic.h"
@@ -25,21 +27,31 @@
 using namespace AscendC;
 using namespace matmul;
 
-#if defined(__CCE_AICORE__) && __CCE_AICORE__ == 310
+#if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 310) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
 template <int8_t QUANT_B_TRANS, int8_t QUANT_A_TRANS, int8_t KERNEL_TYPE>
 #endif
 __global__ __aicore__ void quant_grouped_matmul_inplace_add(GM_ADDR x1, GM_ADDR x2, GM_ADDR scale2, GM_ADDR groupList,
                                                             GM_ADDR yIn, GM_ADDR scale1, GM_ADDR y, GM_ADDR workspace,
                                                             GM_ADDR tiling)
 {
+#if defined(V310_QGMM_QUANT_MX_HIF4)
+    REGISTER_TILING_DEFAULT(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddTilingDataParams);
+#else
     REGISTER_NONE_TILING;
+#endif
     TPipe tPipe;
     AscendCUtils::SetOverflow(1);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIC_ONLY);
     GM_ADDR user1 = GetUserWorkspace(workspace);
 
 #ifndef __CCE_KT_TEST__
-#if defined(V310_QGMM_QUANT_MX) // mxfpx
+#if defined(V310_QGMM_QUANT_MX_HIF4)
+    if constexpr (QUANT_B_TRANS == QGMM_INPLACE_ADD_NO_TRANS && QUANT_A_TRANS == QGMM_INPLACE_ADD_TRANS &&
+                  KERNEL_TYPE == QGMM_INPLACE_ADD_DEQUANT_FIXP) {
+        QGmmInplaceAddAswtMxBasicApi<Cgmct::Gemm::layout::ColumnMajor, Cgmct::Gemm::layout::RowMajor>(
+            x1, x2, scale2, groupList, scale1, y, tiling);
+    }
+#elif defined(V310_QGMM_QUANT_MX) // mxfpx
     if constexpr (QUANT_B_TRANS == QGMM_INPLACE_ADD_NO_TRANS && QUANT_A_TRANS == QGMM_INPLACE_ADD_TRANS &&
                   KERNEL_TYPE == QGMM_INPLACE_ADD_DEQUANT_FIXP) { // transX = true, transW = false
         GET_TILING_DATA_WITH_STRUCT(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddTilingDataParams, tilingData, tiling);

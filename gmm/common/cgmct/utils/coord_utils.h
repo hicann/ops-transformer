@@ -264,11 +264,64 @@ public:
             } else {
                 Get<3>(offset) = nOffset * MXFP_MULTI_BASE_SIZE; // 3: idx of x2Scale
             }
+        } else if constexpr (aQuantMode == GroupedMatmul::QuantMode::HIF4_PEGROUP_MODE) {
+            if constexpr (isTransA) {
+                Get<2>(offset) = mOffset >> 1; // 2: idx of x1Scale
+            } else {
+                Get<2>(offset) = mOffset * CeilDiv(k, MXFP_DIVISOR_SIZE); // 2: idx of x1Scale
+            }
+            if constexpr (isTransB) {
+                Get<3>(offset) = nOffset * CeilDiv(k, MXFP_DIVISOR_SIZE); // 3: idx of x2Scale
+            } else {
+                Get<3>(offset) = nOffset >> 1; // 3: idx of x2Scale
+            }
         } else {
             Get<2>(offset) = mOffset; // 2: idx of x1Scale
             Get<3>(offset) = nOffset; // 3: idx of x2Scale
         }
         Get<4>(offset) = nOffset; // 4: idx of bias
+        return offset;
+    }
+
+    template <typename AScaleType, typename BScaleType, int64_t bC0Align = MATMUL_MNK_ALIGN_INT8>
+    __aicore__ inline AscendC::Std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> GetMxQuantOffset(
+        int64_t mTileIdx, int64_t nTileIdx, int64_t mSplitOffset = 0, int64_t nSplitOffset = 0)
+    {
+        int64_t mOffset = mTileIdx * l1M + mSplitOffset;
+        int64_t nOffset = nTileIdx * l1N + nSplitOffset;
+        AscendC::Std::tuple<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> offset{0, 0, 0, 0, 0, 0};
+        if constexpr (isTransA) {
+            Get<0>(offset) = mOffset;
+        } else {
+            Get<0>(offset) = mOffset * k;
+        }
+
+        CalBOffset4LowerBits<bC0Align>(nOffset, Get<1>(offset));
+        Get<5>(offset) = mOffset * n + nOffset;
+
+        constexpr uint64_t scaleABaseSize =
+            IsHif4ScaleType<AScaleType>() ? MX_HIF4_SCALE_BASE_SIZE : MXFP_MULTI_BASE_SIZE;
+        if constexpr (isTransA) {
+            if constexpr (IsHif4ScaleType<AScaleType>()) {
+                Get<2>(offset) = mOffset >> 1;
+            } else {
+                Get<2>(offset) = mOffset * scaleABaseSize;
+            }
+        } else {
+            Get<2>(offset) = mOffset * CeilDiv(k, MXFP_DIVISOR_SIZE) * scaleABaseSize;
+        }
+
+        constexpr uint64_t scaleBBaseSize =
+            IsHif4ScaleType<BScaleType>() ? MX_HIF4_SCALE_BASE_SIZE : MXFP_MULTI_BASE_SIZE;
+        if constexpr (isTransB) {
+            Get<3>(offset) = nOffset * CeilDiv(k, MXFP_DIVISOR_SIZE) * scaleBBaseSize;
+        } else if constexpr (IsHif4ScaleType<BScaleType>()) {
+            Get<3>(offset) = nOffset >> 1;
+        } else {
+            Get<3>(offset) = nOffset * scaleBBaseSize;
+        }
+
+        Get<4>(offset) = nOffset;
         return offset;
     }
 
@@ -315,6 +368,16 @@ public:
             auto scaleN = CeilDiv(n / 2, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE;
             // 6: idx of yScale
             Get<6>(offset) = mOffset * scaleN + CeilDiv(nOffset, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE;
+        } else if constexpr (aQuantMode == GroupedMatmul::QuantMode::HIF4_PEGROUP_MODE) {
+            Get<2>(offset) = mOffset * CeilDiv(k, MXFP_DIVISOR_SIZE); // 2: idx of x1Scale
+            if constexpr (!isTransB) {
+                Get<3>(offset) = nOffset; // 3: idx of x2Scale
+            } else {
+                Get<3>(offset) = nOffset * CeilDiv(k, MXFP_DIVISOR_SIZE); // 3: idx of x2Scale
+            }
+            auto scaleN = CeilDiv(n / 2, MXFP_DIVISOR_SIZE);
+            // 6: idx of yScale
+            Get<6>(offset) = mOffset * scaleN + CeilDiv(nOffset, MXFP_DIVISOR_SIZE);
         } else {
             Get<2>(offset) = mOffset; // 2: idx of x1Scale
             Get<3>(offset) = nOffset; // 3: idx of x2Scale

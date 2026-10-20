@@ -69,7 +69,7 @@ __aicore__ inline void InitGlobalTensorA(AGlobalTensor_& aGlobal, GM_ADDR aGmAdd
         aLayout = AscendC::MakeLayout(AscendC::MakeShape(k, m), AscendC::MakeStride(m, static_cast<int64_t>(1)));
     }
     aGlobal.SetTensorTrait(ATensorTrait_(aLayout));
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     AscendC::GlobalTensor<AType_> aTmp;
     aTmp.SetGlobalBuffer(reinterpret_cast<__gm__ AType_*>(aGmAddr), m * k);
     aGlobal.address_ = aTmp.address_;
@@ -88,7 +88,7 @@ __aicore__ inline void InitGlobalTensorB(BGlobalTensor_& bGlobal, GM_ADDR bGmAdd
         bLayout = AscendC::MakeLayout(AscendC::MakeShape(n, k), AscendC::MakeStride(k, static_cast<int64_t>(1)));
     }
     bGlobal.SetTensorTrait(BTensorTrait_(bLayout));
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     AscendC::GlobalTensor<BType_> bTmp;
     bTmp.SetGlobalBuffer(reinterpret_cast<__gm__ BType_*>(bGmAddr), k * n);
     bGlobal.address_ = bTmp.address_;
@@ -102,7 +102,7 @@ __aicore__ inline void InitGlobalTensorC(CGlobalTensor_& cGlobal, GM_ADDR cGmAdd
 {
     Layout_ cLayout = AscendC::MakeLayout(AscendC::MakeShape(m, n), AscendC::MakeStride(n, static_cast<int64_t>(1)));
     cGlobal.SetTensorTrait(CTensorTrait_(cLayout));
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     AscendC::GlobalTensor<CType_> cTmp;
     cTmp.SetGlobalBuffer(reinterpret_cast<__gm__ CType_*>(cGmAddr), m * n);
     cGlobal.address_ = cTmp.address_;
@@ -121,7 +121,7 @@ __aicore__ inline AscendC::GlobalTensor<CTensorTrait_> GetWorkSpaceGlobal(BlockS
     CTensorTrait_ cTensorTrait = AscendC::MakeTensorTrait<CType_, AscendC::TPosition::GM>(cLayout);
     AscendC::GlobalTensor<CTensorTrait_> workspaceGlobal;
     workspaceGlobal.SetTensorTrait(cTensorTrait);
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     AscendC::GlobalTensor<CType_> cTmp;
     cTmp.SetGlobalBuffer(reinterpret_cast<__gm__ CType_*>(cGmAddr));
     workspaceGlobal.address_ = cTmp.address_;
@@ -148,7 +148,8 @@ __aicore__ inline constexpr auto GetTile(AscendC::GlobalTensor<AscendC::TensorTr
     auto layout = tensor.GetTensorTrait().GetLayout();
     auto offset = layout(coord);
     typename AscendC::Std::remove_cvref_t<decltype(tensor)> newTensor;
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 3102)
+#if defined(__NPU_ARCH__) && \
+    (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 3102 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     if constexpr (AscendC::IsSameTypeV<T, fp4x2_e2m1_t> || AscendC::IsSameTypeV<T, fp4x2_e1m2_t>) {
         newTensor.address_ = (__gm__ T*)((__gm__ uint8_t*)tensor.address_ + (offset >> 1));
     } else {

@@ -105,7 +105,18 @@ public:
     using BType = typename BlockMmadBuilder::BType;
     using CType = typename BlockMmadBuilder::CType;
     using BiasType = typename BlockMmadBuilder::BiasType;
-    using TupleShape = AscendC::Shape<int64_t, int64_t, int64_t>;
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+    using ScaleAType =
+        typename AscendC::Conditional<IsHif4Type<AType>(), AscendC::hif4_scale, AscendC::fp8_e8m0_t>::type;
+    using ScaleBType =
+        typename AscendC::Conditional<IsHif4Type<BType>(), AscendC::hif4_scale, AscendC::fp8_e8m0_t>::type;
+#else
+    using ScaleAType = AscendC::fp8_e8m0_t;
+    using ScaleBType = AscendC::fp8_e8m0_t;
+#endif
+    using TupleShape = typename BlockSchedulerOp::TupleShape; // m, n, k
+    static_assert(AscendC::Std::is_same_v<TupleShape, typename BlockEpilogue::ProblemShape>,
+                  "Scheduler and epilogue must use the same problem shape");
     using BlockShape = AscendC::Shape<int64_t, int64_t, int64_t, int64_t>;
     using BlockCoord = AscendC::Coord<int64_t, int64_t, int64_t, int64_t>;
     // a, b, x1scale, x2scale, bias, y, logit
@@ -118,8 +129,8 @@ public:
 
     AscendC::GlobalTensor<AType> aGlobal_;
     AscendC::GlobalTensor<BType> bGlobal_;
-    AscendC::GlobalTensor<AscendC::fp8_e8m0_t> x1ScaleGlobal_;
-    AscendC::GlobalTensor<AscendC::fp8_e8m0_t> x2ScaleGlobal_;
+    AscendC::GlobalTensor<ScaleAType> x1ScaleGlobal_;
+    AscendC::GlobalTensor<ScaleBType> x2ScaleGlobal_;
     AscendC::GlobalTensor<bfloat16_t> biasGlobal_;
     AscendC::GlobalTensor<int64_t> groupListGm_;
     // shape
@@ -179,12 +190,16 @@ public:
     __aicore__ inline void WaitForVector()
     {
         AscendC::CrossCoreWaitFlag<SYNC_AIC_AIV_MODE, PIPE_FIX>(AIV_SYNC_AIC_FLAG);
-        AscendC::CrossCoreWaitFlag<SYNC_AIC_AIV_MODE, PIPE_FIX>(AIV_SYNC_AIC_FLAG + FLAG_ID_MAX);
+        if (GetAicAivTaskRation() != 1) {
+            AscendC::CrossCoreWaitFlag<SYNC_AIC_AIV_MODE, PIPE_FIX>(AIV_SYNC_AIC_FLAG + FLAG_ID_MAX);
+        }
     }
     __aicore__ inline void NotifyVector()
     {
         AscendC::CrossCoreSetFlag<SYNC_AIC_AIV_MODE, PIPE_FIX>(AIC_SYNC_AIV_FLAG);
-        AscendC::CrossCoreSetFlag<SYNC_AIC_AIV_MODE, PIPE_FIX>(AIC_SYNC_AIV_FLAG + FLAG_ID_MAX);
+        if (GetAicAivTaskRation() != 1) {
+            AscendC::CrossCoreSetFlag<SYNC_AIC_AIV_MODE, PIPE_FIX>(AIC_SYNC_AIV_FLAG + FLAG_ID_MAX);
+        }
     }
     __aicore__ inline void WaitForCube()
     {
@@ -218,9 +233,9 @@ public:
         if ASCEND_IS_AIC {
             aGlobal_.SetGlobalBuffer((__gm__ AType*)params.mmadParams.aGmAddr + Get<IDX_A_OFFSET>(baseOffset_));
             bGlobal_.SetGlobalBuffer((__gm__ BType*)params.mmadParams.bGmAddr + Get<IDX_B_OFFSET>(baseOffset_));
-            x1ScaleGlobal_.SetGlobalBuffer((__gm__ AscendC::fp8_e8m0_t*)params.mmadParams.x1ScaleGmAddr +
+            x1ScaleGlobal_.SetGlobalBuffer((__gm__ ScaleAType*)params.mmadParams.x1ScaleGmAddr +
                                            Get<IDX_X1SCALE_OFFSET>(baseOffset_));
-            x2ScaleGlobal_.SetGlobalBuffer((__gm__ AscendC::fp8_e8m0_t*)params.mmadParams.x2ScaleGmAddr +
+            x2ScaleGlobal_.SetGlobalBuffer((__gm__ ScaleBType*)params.mmadParams.x2ScaleGmAddr +
                                            Get<IDX_X2SCALE_OFFSET>(baseOffset_));
             if (params.gmmParams.hasBias == 1) {
                 biasGlobal_.SetGlobalBuffer((__gm__ bfloat16_t*)params.mmadParams.biasGmAddr +
@@ -243,19 +258,37 @@ public:
         uint64_t m = Get<MNK_M>(problemShape_);
         uint64_t n = Get<MNK_N>(problemShape_);
         uint64_t k = Get<MNK_K>(problemShape_);
-        if (AscendC::IsSameTypeV<AType, fp4x2_e2m1_t> || AscendC::IsSameTypeV<AType, fp4x2_e1m2_t>) {
+        if constexpr (IsFp4Hif4Type<AType>()) {
             Get<IDX_A_OFFSET>(baseOffset_) += (m * k) >> 1;
-            Get<IDX_B_OFFSET>(baseOffset_) += (n * k) >> 1;
         } else {
             Get<IDX_A_OFFSET>(baseOffset_) += m * k;
-            Get<IDX_B_OFFSET>(baseOffset_) += n * k;
         }
+
+        uint64_t bGroupOffset = 0;
+        if constexpr (BlockMmadBuilder::formatB == CubeFormat::NZ) {
+            uint64_t c0 = AscendC::AuxGetC0Size<BType>();
+            if constexpr (transB) {
+                bGroupOffset = Cgmct::Gemm::CeilDiv(k, c0) *
+                               Cgmct::Gemm::CeilDiv(n, static_cast<uint64_t>(BLOCK_CUBE)) * BLOCK_CUBE * c0;
+            } else {
+                bGroupOffset = Cgmct::Gemm::CeilDiv(n, c0) *
+                               Cgmct::Gemm::CeilDiv(k, static_cast<uint64_t>(BLOCK_CUBE)) * BLOCK_CUBE * c0;
+            }
+        } else {
+            bGroupOffset = n * k;
+        }
+        if constexpr (IsFp4Hif4Type<BType>()) {
+            bGroupOffset >>= 1;
+        }
+        Get<IDX_B_OFFSET>(baseOffset_) += bGroupOffset;
+
         Get<IDX_BIAS_OFFSET>(baseOffset_) += n;
-        auto scaleK = CeilDiv(k, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE;
-        // scaleAAxisBaseOffset (m, ceil(k,64), 2)
-        Get<IDX_X1SCALE_OFFSET>(baseOffset_) += m * scaleK;
-        // scaleBAxisBaseOffset (g, n, ceil(k,64), 2) or (g, ceil(k,64), n, 2)
-        Get<IDX_X2SCALE_OFFSET>(baseOffset_) += n * scaleK;
+        constexpr uint64_t scaleABaseSize =
+            IsHif4ScaleType<ScaleAType>() ? MX_HIF4_SCALE_BASE_SIZE : MXFP_MULTI_BASE_SIZE;
+        constexpr uint64_t scaleBBaseSize =
+            IsHif4ScaleType<ScaleBType>() ? MX_HIF4_SCALE_BASE_SIZE : MXFP_MULTI_BASE_SIZE;
+        Get<IDX_X1SCALE_OFFSET>(baseOffset_) += m * CeilDiv(k, MXFP_DIVISOR_SIZE) * scaleABaseSize;
+        Get<IDX_X2SCALE_OFFSET>(baseOffset_) += n * CeilDiv(k, MXFP_DIVISOR_SIZE) * scaleBBaseSize;
         Get<IDX_C_OFFSET>(baseOffset_) += m * n;
         Get<IDX_LOGIT_OFFSET>(baseOffset_) += m;
     }
@@ -291,7 +324,7 @@ public:
         BlockCoord tileIdx;
         while (bs.GetTileIdx(tileIdx)) {
             BlockShape singleShape = bs.GetBlockShape(tileIdx);
-            blockOffset_ = coord.template GetQuantOffset<GroupedMatmul::QuantMode::MX_PERGROUP_MODE>(
+            blockOffset_ = coord.template GetMxQuantOffset<ScaleAType, ScaleBType, AscendC::AuxGetC0Size<BType>()>(
                 Get<IDX_M_TILEIDX>(tileIdx), Get<IDX_N_TILEIDX>(tileIdx), Get<IDX_M_TAIL_SPLIT_TILEIDX>(singleShape),
                 Get<IDX_N_TAIL_SPLIT_TILEIDX>(singleShape));
             if ASCEND_IS_AIC {

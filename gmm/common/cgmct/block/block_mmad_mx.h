@@ -23,7 +23,6 @@
 namespace Cgmct {
 namespace Gemm {
 namespace Block {
-using AscendC::fp8_e8m0_t;
 namespace {
 constexpr static uint64_t HALF_L0C_SIZE = AscendC::TOTAL_L0C_SIZE / DOUBLE_BUFFER_COUNT / sizeof(float);
 constexpr static uint64_t BLOCK_REDUCE_CUBE = 32UL;
@@ -42,6 +41,9 @@ constexpr static uint16_t INPUT_BUFFER_FLAG_2 = 2;
 constexpr static uint16_t INPUT_BUFFER_FLAG_3 = 3;
 constexpr static uint16_t SCALE_BUFFER_FLAG_0 = 4;
 constexpr static uint16_t SCALE_BUFFER_FLAG_1 = 5;
+constexpr static uint64_t HIF4_SCALE_NUM_HALF_RATIO = 1UL;
+constexpr static uint64_t HIF4_GROUP_SIZE = 64UL;
+constexpr static uint64_t PREALLOC_BL1_THRESHOLD = 131072UL;
 
 struct TileL1L0Param {
     uint64_t curM = 0;
@@ -78,6 +80,7 @@ public:
     using CType = CType_;
     using LayoutA = LayoutA_;
     using LayoutB = LayoutB_;
+    using LayoutC = LayoutC_;
     using L1TileShape = L1TileShape_;
     using L0TileShape = L0TileShape_;
     using MxL0AType = typename AscendC::GetL0DataType<AType, true>::Type;
@@ -86,15 +89,36 @@ public:
     using DispatchPolicy = DispatchPolicy_;
     using TupleShape = AscendC::Shape<int64_t, int64_t, int64_t>;
     using BlockShape = AscendC::Shape<int64_t, int64_t, int64_t>;
+    static constexpr CubeFormat formatA = TagToFormat<LayoutA>::format;
+    static constexpr CubeFormat formatB = TagToFormat<LayoutB>::format;
+    static constexpr CubeFormat formatC = TagToFormat<LayoutC>::format;
     static constexpr bool transA = TagToTrans<LayoutA>::value;
     static constexpr bool transB = TagToTrans<LayoutB>::value;
-    static constexpr CubeFormat formatB = TagToFormat<LayoutB>::format;
-    static constexpr bool IS_FP4 =
-        AscendC::IsSameType<AType, fp4x2_e2m1_t>::value || AscendC::IsSameType<AType, fp4x2_e1m2_t>::value;
-    static constexpr uint64_t MIN_STEP = IS_FP4 ? B4_MIN_STEP : B8_MIN_STEP;
+    static constexpr bool IS_FP4_HIF4_A = IsFp4Hif4Type<AType>();
+    static constexpr bool IS_FP4_HIF4_B = IsFp4Hif4Type<BType>();
+    static constexpr bool IS_HIF4_A = IsHif4Type<AType>();
+    static constexpr bool IS_HIF4_B = IsHif4Type<BType>();
+    static constexpr uint64_t MIN_STEP_A = IS_FP4_HIF4_A ? B4_MIN_STEP : B8_MIN_STEP;
+    static constexpr uint64_t MIN_STEP_B = IS_FP4_HIF4_B ? B4_MIN_STEP : B8_MIN_STEP;
     constexpr static uint64_t HALF_L0_SIZE = L0A_SIZE / DOUBLE_BUFFER_COUNT;
-    constexpr static int32_t C0_SIZE = AscendC::AuxGetC0Size<AType>();
+
+    constexpr static int32_t C0_SIZE_A = AscendC::AuxGetC0Size<AType>();
+    constexpr static int32_t C0_SIZE_B = AscendC::AuxGetC0Size<BType>();
     constexpr static int32_t BIAS_C0 = AscendC::AuxGetC0Size<BiasType>();
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+    using ScaleAType = typename AscendC::Conditional<IS_HIF4_A, AscendC::hif4_scale, AscendC::fp8_e8m0_t>::type;
+    using ScaleBType = typename AscendC::Conditional<IS_HIF4_B, AscendC::hif4_scale, AscendC::fp8_e8m0_t>::type;
+#else
+    using ScaleAType = AscendC::fp8_e8m0_t;
+    using ScaleBType = AscendC::fp8_e8m0_t;
+#endif
+
+    bool enablePreAllocate_ = false;
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+    static constexpr bool SUPPORT_PREALLOCATE = true;
+#else
+    static constexpr bool SUPPORT_PREALLOCATE = false;
+#endif
 
     struct Params {
         GM_ADDR aGmAddr{nullptr};
@@ -140,6 +164,37 @@ public:
     }
 
 public:
+    __aicore__ inline void InitL1Buffer()
+    {
+        for (int32_t bufferId = 0; bufferId < l1BufNum_; bufferId++) {
+            // 2 buffer: L1 space is : A0|B0|AScale0|BScale0|bias0|...|A1|B1|AScale1|BScale1|bias1|...
+            // split L1 into two halves according to bank, represented in bytes
+            uint64_t l1ByteOffset = (AscendC::TOTAL_L1_SIZE >> 1) * (bufferId & 1);
+            uint64_t l1AOffset; // in elements
+            uint64_t l1BByteOffsetAfterA;
+            if constexpr (IS_FP4_HIF4_A) {
+                l1AOffset = l1ByteOffset << 1;
+                l1BByteOffsetAfterA = (aL1OneBuffer_ * (l1BufNum_ >> 1)) >> 1;
+            } else {
+                l1AOffset = l1ByteOffset / sizeof(AType);
+                l1BByteOffsetAfterA = aL1OneBuffer_ * (l1BufNum_ >> 1) * sizeof(AType);
+            }
+            uint64_t l1BByteOffset = l1ByteOffset + l1BByteOffsetAfterA;
+            uint64_t l1BOffset = IS_FP4_HIF4_B ? l1BByteOffset << 1 : l1BByteOffset / sizeof(BType);
+
+            l1BufferAOffset_[bufferId] = (l1AOffset + aL1OneBuffer_ * (bufferId >> 1));
+            l1BufferBOffset_[bufferId] = (l1BOffset + bL1OneBuffer_ * (bufferId >> 1));
+        }
+
+        for (int32_t bufferId = 0; bufferId < SCALE_BUFFER_NUM; bufferId++) {
+            uint64_t totalScaleOffset = l1BufferBOffset_[bufferId] + bL1OneBuffer_ * (l1BufNum_ >> 1);
+            uint64_t scaleByteOffset = IS_FP4_HIF4_B ? (totalScaleOffset >> 1) : totalScaleOffset;
+            l1BufferScaleAOffset_[bufferId] = scaleByteOffset / sizeof(ScaleAType);
+            l1BufferScaleBOffset_[bufferId] =
+                (l1BufferScaleAOffset_[bufferId] * sizeof(ScaleAType) + scaleAL1OneBuffer_) / sizeof(ScaleBType);
+            l1BufferBiasOffset_[bufferId] = (l1BufferScaleBOffset_[bufferId] * sizeof(ScaleBType) + scaleBL1OneBuffer_);
+        }
+    }
     __aicore__ inline void Init(const TupleShape& problemShape, const BlockShape& l0TileShape, const L1Params& l1Params,
                                 bool isBias, bool dbL0C)
     {
@@ -157,31 +212,28 @@ public:
         isBias_ = isBias;
         l1BufNum_ = l1Params.l1BufNum;
         enableL0cPingPong_ = dbL0C;
-        bL1OneBuffer_ = baseN_ * Cgmct::Gemm::Align(kBL1_, MXFP_DIVISOR_SIZE);
-        mxScaleKL1B16_ = Cgmct::Gemm::CeilDiv(scaleKL1_, MXFP_DIVISOR_SIZE);
-        auto mxScaleKL1 = mxScaleKL1B16_ * MXFP_MULTI_BASE_SIZE;
-        scaleBL1OneBuffer_ = baseN_ * mxScaleKL1;
+        bL1OneBuffer_ = (baseN_ * Cgmct::Gemm::Align(kBL1_, MXFP_DIVISOR_SIZE));
+        aL1OneBuffer_ = baseM_ * Cgmct::Gemm::Align(kAL1_, MXFP_DIVISOR_SIZE);
+        if constexpr (IS_HIF4_A) {
+            mxScaleKL1B16A_ = Cgmct::Gemm::CeilDiv(scaleKL1_, HIF4_GROUP_SIZE) << HIF4_SCALE_NUM_HALF_RATIO;
+            scaleAL1OneBuffer_ = baseM_ * Cgmct::Gemm::CeilDiv(scaleKL1_, HIF4_GROUP_SIZE) * sizeof(ScaleAType);
+        } else {
+            mxScaleKL1B16A_ = Cgmct::Gemm::CeilDiv(scaleKL1_, MXFP_DIVISOR_SIZE);
+            scaleAL1OneBuffer_ =
+                baseM_ * Cgmct::Gemm::CeilDiv(scaleKL1_, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE * sizeof(ScaleAType);
+        }
+        if constexpr (IS_HIF4_B) {
+            mxScaleKL1B16B_ = Cgmct::Gemm::CeilDiv(scaleKL1_, HIF4_GROUP_SIZE) << HIF4_SCALE_NUM_HALF_RATIO;
+            scaleBL1OneBuffer_ = baseN_ * Cgmct::Gemm::CeilDiv(scaleKL1_, HIF4_GROUP_SIZE) * sizeof(ScaleBType);
+        } else {
+            mxScaleKL1B16B_ = Cgmct::Gemm::CeilDiv(scaleKL1_, MXFP_DIVISOR_SIZE);
+            scaleBL1OneBuffer_ =
+                baseN_ * Cgmct::Gemm::CeilDiv(scaleKL1_, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE * sizeof(ScaleBType);
+        }
         if (isBias_) {
             biasL1OneBuffer_ = baseN_ * sizeof(BiasType);
         }
-        aL1OneBuffer_ = baseM_ * Cgmct::Gemm::Align(kAL1_, MXFP_DIVISOR_SIZE);
-        scaleAL1OneBuffer_ = baseM_ * mxScaleKL1;
-        for (int32_t bufferId = 0; bufferId < l1BufNum_; bufferId++) {
-            // 2 buffer: L1 space is : A0|B0|AScale0|BScale0|bias0|...|A1|B1|AScale1|BScale1|bias1|...
-            // l1Offset represents element count
-            uint64_t l1Offset =
-                IS_FP4 ? AscendC::TOTAL_L1_SIZE * (bufferId & 1) : (AscendC::TOTAL_L1_SIZE >> 1) * (bufferId & 1);
-            l1BufferAOffset_[bufferId] = l1Offset + aL1OneBuffer_ * (bufferId >> 1);
-            l1BufferBOffset_[bufferId] = l1Offset + aL1OneBuffer_ * (l1BufNum_ >> 1) + bL1OneBuffer_ * (bufferId >> 1);
-        }
-        for (int32_t bufferId = 0; bufferId < SCALE_BUFFER_NUM; bufferId++) {
-            // l1BufferScaleAOffset_[bufferId]: byte count when B8, element count when B4
-            l1BufferScaleAOffset_[bufferId] =
-                IS_FP4 ? ((l1BufferBOffset_[bufferId] + bL1OneBuffer_ * (l1BufNum_ >> 1)) >> 1) :
-                         (l1BufferBOffset_[bufferId] + bL1OneBuffer_ * (l1BufNum_ >> 1));
-            l1BufferScaleBOffset_[bufferId] = l1BufferScaleAOffset_[bufferId] + scaleAL1OneBuffer_;
-            l1BufferBiasOffset_[bufferId] = l1BufferScaleBOffset_[bufferId] + scaleBL1OneBuffer_;
-        }
+        InitL1Buffer();
     }
 
     __aicore__ inline void UpdateParamsForNextProblem(const TupleShape& problemShape)
@@ -191,25 +243,48 @@ public:
         k_ = Get<IDX_K_IDX>(problemShape);
     }
 
+    __aicore__ inline void SetPreAllocFlag(const TileL1L0Param& tileL1L0Param)
+    {
+        if constexpr (SUPPORT_PREALLOCATE) {
+            uint64_t aL1Elems = tileL1L0Param.curM * kAL1_;
+            uint64_t bL1Elems = tileL1L0Param.curN * kBL1_;
+            if constexpr (IS_FP4_HIF4_A) {
+                aL1Elems >>= 1;
+            }
+            if constexpr (IS_FP4_HIF4_B) {
+                bL1Elems >>= 1;
+            }
+            uint64_t abL1Size = aL1Elems * sizeof(AType) + bL1Elems * sizeof(BType);
+            enablePreAllocate_ = (abL1Size <= PREALLOC_BL1_THRESHOLD);
+        }
+    }
+
     __aicore__ inline void CopyInA1(const AscendC::GlobalTensor<AType>& aGlobal,
                                     const AscendC::LocalTensor<AType>& al1Local, const TileL1L0Param& tileL1L0Param)
     {
         AscendC::Nd2NzParams nd2nzParams;
         nd2nzParams.ndNum = 1;
-        nd2nzParams.nValue = transA ? tileL1L0Param.curGmAKL1 : tileL1L0Param.curM;
-        nd2nzParams.dValue = transA ? tileL1L0Param.curM : tileL1L0Param.curGmAKL1;
-        if constexpr (IS_FP4) {
-            nd2nzParams.dValue >>= 1;
+        uint64_t nDim = transA ? tileL1L0Param.curGmAKL1 : tileL1L0Param.curM;
+        uint64_t dDim = transA ? tileL1L0Param.curM : tileL1L0Param.curGmAKL1;
+
+        nd2nzParams.nValue = nDim;
+        nd2nzParams.dValue = dDim;
+        if constexpr (IS_FP4_HIF4_A) {
+            nd2nzParams.dValue = dDim >> 1;
         }
         nd2nzParams.srcNdMatrixStride = 1;
         nd2nzParams.srcDValue = transA ? m_ : k_;
-        if constexpr (IS_FP4) {
-            nd2nzParams.srcDValue >>= 1;
+        if constexpr (IS_FP4_HIF4_A) {
+            nd2nzParams.srcDValue = nd2nzParams.srcDValue >> 1;
         }
         nd2nzParams.dstNzC0Stride = transA ? tileL1L0Param.curPadAKL1 : tileL1L0Param.curAlignM;
         nd2nzParams.dstNzNStride = 1;
         nd2nzParams.dstNzMatrixStride = 1;
-        AscendC::DataCopy(al1Local, aGlobal, nd2nzParams);
+        if constexpr (SUPPORT_PREALLOCATE) {
+            AscendC::DataCopy(al1Local, aGlobal, nd2nzParams, enablePreAllocate_);
+        } else {
+            AscendC::DataCopy(al1Local, aGlobal, nd2nzParams);
+        }
     }
 
     __aicore__ inline void CopyInB1(const AscendC::GlobalTensor<BType>& bGlobal,
@@ -217,20 +292,27 @@ public:
     {
         AscendC::Nd2NzParams nd2nzParams;
         nd2nzParams.ndNum = 1;
-        nd2nzParams.nValue = transB ? tileL1L0Param.curN : tileL1L0Param.curGmBKL1;
-        nd2nzParams.dValue = transB ? tileL1L0Param.curGmBKL1 : tileL1L0Param.curN;
-        if constexpr (IS_FP4) {
-            nd2nzParams.dValue >>= 1;
+        uint64_t nDim = transB ? tileL1L0Param.curN : tileL1L0Param.curGmBKL1;
+        uint64_t dDim = transB ? tileL1L0Param.curGmBKL1 : tileL1L0Param.curN;
+
+        nd2nzParams.nValue = nDim;
+        nd2nzParams.dValue = dDim;
+        if constexpr (IS_FP4_HIF4_B) {
+            nd2nzParams.dValue = dDim >> 1;
         }
         nd2nzParams.srcNdMatrixStride = 1;
         nd2nzParams.srcDValue = transB ? k_ : n_;
-        if constexpr (IS_FP4) {
-            nd2nzParams.srcDValue >>= 1;
+        if constexpr (IS_FP4_HIF4_B) {
+            nd2nzParams.srcDValue = nd2nzParams.srcDValue >> 1;
         }
         nd2nzParams.dstNzC0Stride = transB ? tileL1L0Param.curAlignN : tileL1L0Param.curPadBKL1;
         nd2nzParams.dstNzNStride = 1;
         nd2nzParams.dstNzMatrixStride = 1;
-        AscendC::DataCopy(bl1Local, bGlobal, nd2nzParams);
+        if constexpr (SUPPORT_PREALLOCATE) {
+            AscendC::DataCopy(bl1Local, bGlobal, nd2nzParams, enablePreAllocate_);
+        } else {
+            AscendC::DataCopy(bl1Local, bGlobal, nd2nzParams);
+        }
     }
 
     __aicore__ inline void CopyInB1WeightNz(const AscendC::GlobalTensor<BType>& bGlobal,
@@ -240,25 +322,25 @@ public:
         AscendC::DataCopyExtParams dataCopyParams;
         AscendC::DataCopyPadExtParams<uint8_t> padParams;
         if constexpr (transB) {
-            dataCopyParams.blockCount = Cgmct::Gemm::CeilDiv(tileL1L0Param.curGmBKL1, C0_SIZE);
-            dataCopyParams.blockLen = tileL1L0Param.curAlignN * C0_SIZE;
-            if constexpr (IS_FP4) {
+            dataCopyParams.blockCount = Cgmct::Gemm::CeilDiv(tileL1L0Param.curGmBKL1, C0_SIZE_B);
+            dataCopyParams.blockLen = tileL1L0Param.curAlignN * C0_SIZE_B;
+            if constexpr (IS_FP4_HIF4_B) {
                 dataCopyParams.blockLen >>= 1;
             }
-            dataCopyParams.srcStride = (Align16(n_) - tileL1L0Param.curAlignN) * C0_SIZE;
-            if constexpr (IS_FP4) {
+            dataCopyParams.srcStride = (Align16(n_) - tileL1L0Param.curAlignN) * C0_SIZE_B;
+            if constexpr (IS_FP4_HIF4_B) {
                 dataCopyParams.srcStride >>= 1;
             }
             dataCopyParams.dstStride = 0;
         } else {
             int64_t curGmBKL1NZ = Align16(tileL1L0Param.curGmBKL1);
-            dataCopyParams.blockCount = tileL1L0Param.curAlignN / C0_SIZE;
-            dataCopyParams.blockLen = curGmBKL1NZ * C0_SIZE;
-            if constexpr (IS_FP4) {
+            dataCopyParams.blockCount = tileL1L0Param.curAlignN / C0_SIZE_B;
+            dataCopyParams.blockLen = curGmBKL1NZ * C0_SIZE_B;
+            if constexpr (IS_FP4_HIF4_B) {
                 dataCopyParams.blockLen >>= 1;
             }
-            dataCopyParams.srcStride = (Align16(k_) - curGmBKL1NZ) * C0_SIZE;
-            if constexpr (IS_FP4) {
+            dataCopyParams.srcStride = (Align16(k_) - curGmBKL1NZ) * C0_SIZE_B;
+            if constexpr (IS_FP4_HIF4_B) {
                 dataCopyParams.srcStride >>= 1;
             }
             dataCopyParams.dstStride = tileL1L0Param.curPadBKL1 - curGmBKL1NZ;
@@ -269,6 +351,7 @@ public:
 
     __aicore__ inline void InitA1(const AscendC::LocalTensor<AType>& al1Local, const TileL1L0Param& tileL1L0Param)
     {
+        AscendC::LocalTensor<half> al1LocalHalf = al1Local.template ReinterpretCast<half>();
         AscendC::InitConstValueParams<half> initConstValueParams;
         uint64_t offset = 0;
         if constexpr (!transA) {
@@ -281,23 +364,25 @@ public:
             initConstValueParams.blockNum = tileL1L0Param.curAlignM;
             initConstValueParams.dstGap = 0;
             initConstValueParams.initValue = 0;
-            uint64_t kAlign = Cgmct::Gemm::CeilDiv(tileL1L0Param.curGmAKL1, C0_SIZE) * AscendC::BLOCK_CUBE;
+            uint64_t kAlign = Cgmct::Gemm::CeilDiv(tileL1L0Param.curGmAKL1, C0_SIZE_A) * AscendC::BLOCK_CUBE;
             offset = tileL1L0Param.curAlignM * kAlign;
         } else { // nd2nz pading to k 64 align, (k,m)->(m1,k1,k0,m0)
             if (tileL1L0Param.curPadAKL1 == tileL1L0Param.curGmAKL1) {
                 return;
             }
             offset = tileL1L0Param.curGmAKL1 * AscendC::BLOCK_CUBE;
-            initConstValueParams.repeatTimes = Cgmct::Gemm::CeilDiv(tileL1L0Param.curAlignM, C0_SIZE);
+            initConstValueParams.repeatTimes = Cgmct::Gemm::CeilDiv(tileL1L0Param.curAlignM, C0_SIZE_A);
             initConstValueParams.blockNum = tileL1L0Param.curPadAKL1 - tileL1L0Param.curGmAKL1;
             initConstValueParams.dstGap = tileL1L0Param.curGmAKL1;
             initConstValueParams.initValue = 0;
         }
-        AscendC::InitConstValue(al1Local.template ReinterpretCast<half>()[offset], initConstValueParams);
+        AscendC::InitConstValue(al1LocalHalf[offset], initConstValueParams);
     }
 
     __aicore__ inline void InitB1(const AscendC::LocalTensor<BType>& bl1Local, const TileL1L0Param& tileL1L0Param)
     {
+        // Equivalent to curKL1 % MXFP_DIVISOR_SIZE
+        AscendC::LocalTensor<half> bl1LocalHalf = bl1Local.template ReinterpretCast<half>();
         AscendC::InitConstValueParams<half> initConstValueParams;
         uint64_t offset = 0;
         if constexpr (transB) {
@@ -310,23 +395,23 @@ public:
             initConstValueParams.blockNum = tileL1L0Param.curAlignN;
             initConstValueParams.dstGap = 0;
             initConstValueParams.initValue = 0;
-            uint64_t kAlign = Cgmct::Gemm::CeilDiv(tileL1L0Param.curGmBKL1, C0_SIZE) * AscendC::BLOCK_CUBE;
+            uint64_t kAlign = Cgmct::Gemm::CeilDiv(tileL1L0Param.curGmBKL1, C0_SIZE_B) * AscendC::BLOCK_CUBE;
             offset = tileL1L0Param.curAlignN * kAlign;
         } else { // nd2nz pading to k 64 align, (k,n)->(n1,k1,k0,n0)
             uint64_t movK = tileL1L0Param.curGmBKL1;
             if constexpr (formatB == CubeFormat::NZ) {
-                movK = Align16(tileL1L0Param.curGmBKL1);
+                movK = Cgmct::Gemm::CeilAlign(tileL1L0Param.curGmBKL1, AscendC::BLOCK_CUBE);
             }
             if (tileL1L0Param.curPadBKL1 == movK) {
                 return;
             }
             offset = movK * AscendC::BLOCK_CUBE;
-            initConstValueParams.repeatTimes = Cgmct::Gemm::CeilDiv(tileL1L0Param.curAlignN, C0_SIZE);
+            initConstValueParams.repeatTimes = Cgmct::Gemm::CeilDiv(tileL1L0Param.curAlignN, C0_SIZE_B);
             initConstValueParams.blockNum = tileL1L0Param.curPadBKL1 - movK;
             initConstValueParams.dstGap = movK;
             initConstValueParams.initValue = 0;
         }
-        AscendC::InitConstValue(bl1Local.template ReinterpretCast<half>()[offset], initConstValueParams);
+        AscendC::InitConstValue(bl1LocalHalf[offset], initConstValueParams);
     }
 
     __aicore__ inline void CopyInBias(const AscendC::GlobalTensor<BiasType>& biasGlobal,
@@ -338,14 +423,18 @@ public:
         AscendC::DataCopyPad(cl1Local, biasGlobal, biasParam, padParams);
     }
 
-    __aicore__ inline void CopyInScaleA(const AscendC::GlobalTensor<fp8_e8m0_t>& aScaleGlobal,
-                                        const AscendC::LocalTensor<fp8_e8m0_t>& aScaleL1Local, uint64_t curML1,
+    __aicore__ inline void CopyInScaleA(const AscendC::GlobalTensor<ScaleAType>& aScaleGlobal,
+                                        const AscendC::LocalTensor<ScaleAType>& aScaleL1Local, uint64_t curML1,
                                         uint64_t kL1Offset)
     {
         uint64_t curScaleKL1 = scaleKL1_;
         if (kL1Offset + curScaleKL1 > k_) {
             curScaleKL1 = k_ - kL1Offset;
         }
+        uint64_t nDim = transA ? Cgmct::Gemm::CeilDiv(curScaleKL1, MXFP_DIVISOR_SIZE) : curML1;
+        uint64_t dDim = transA ? curML1 : Cgmct::Gemm::CeilDiv(curScaleKL1, MXFP_DIVISOR_SIZE);
+
+        uint64_t offsetScaleAGM = !transA ? kL1Offset / MXFP_DIVISOR_SIZE : (kL1Offset / MXFP_DIVISOR_SIZE) * m_;
 
         AscendC::GlobalTensor<half> aScaleGlobalB16;
         aScaleGlobalB16.SetGlobalBuffer(((__gm__ half*)(aScaleGlobal.GetPhyAddr())));
@@ -354,63 +443,123 @@ public:
         if constexpr (!transA) {
             AscendC::Dn2NzParams dn2nzParams;
             dn2nzParams.dnNum = 1;
-            dn2nzParams.dValue = curML1;
-            dn2nzParams.nValue = Cgmct::Gemm::CeilDiv(curScaleKL1, MXFP_DIVISOR_SIZE);
-            dn2nzParams.srcDnMatrixStride = 0;
-            dn2nzParams.srcDValue = Cgmct::Gemm::CeilDiv(k_, MXFP_DIVISOR_SIZE);
-            dn2nzParams.dstNzC0Stride = mxScaleKL1B16_;
+            if constexpr (IS_HIF4_A) {
+                offsetScaleAGM = offsetScaleAGM << HIF4_SCALE_NUM_HALF_RATIO;
+                dn2nzParams.dValue = nDim;
+                dn2nzParams.nValue = dDim << HIF4_SCALE_NUM_HALF_RATIO;
+                dn2nzParams.srcDnMatrixStride = 0;
+                dn2nzParams.srcDValue = Cgmct::Gemm::CeilDiv(k_, HIF4_GROUP_SIZE) << HIF4_SCALE_NUM_HALF_RATIO;
+                dn2nzParams.dstNzC0Stride = Cgmct::Gemm::CeilDiv(scaleKL1_, HIF4_GROUP_SIZE)
+                                            << HIF4_SCALE_NUM_HALF_RATIO;
+            } else {
+                dn2nzParams.dValue = nDim;
+                dn2nzParams.nValue = dDim;
+                dn2nzParams.srcDnMatrixStride = 0;
+                dn2nzParams.srcDValue = Cgmct::Gemm::CeilDiv(k_, MXFP_DIVISOR_SIZE);
+                dn2nzParams.dstNzC0Stride = mxScaleKL1B16A_;
+            }
             dn2nzParams.dstNzNStride = 1;
             dn2nzParams.dstNzMatrixStride = 0;
-            AscendC::DataCopy(aScaleL1LocalImpl, aScaleGlobalB16[kL1Offset / MXFP_DIVISOR_SIZE], dn2nzParams);
+            if constexpr (SUPPORT_PREALLOCATE) {
+                AscendC::DataCopy(aScaleL1LocalImpl, aScaleGlobalB16[offsetScaleAGM], dn2nzParams, enablePreAllocate_);
+            } else {
+                AscendC::DataCopy(aScaleL1LocalImpl, aScaleGlobalB16[offsetScaleAGM], dn2nzParams);
+            }
         } else {
             AscendC::Nd2NzParams nd2nzParams;
             nd2nzParams.ndNum = 1;
-            nd2nzParams.nValue = Cgmct::Gemm::CeilDiv(curScaleKL1, MXFP_DIVISOR_SIZE);
-            nd2nzParams.dValue = curML1;
-            nd2nzParams.srcNdMatrixStride = 0;
-            nd2nzParams.srcDValue = m_;
-            nd2nzParams.dstNzC0Stride = mxScaleKL1B16_;
+            if constexpr (IS_HIF4_A) {
+                offsetScaleAGM = offsetScaleAGM << HIF4_SCALE_NUM_HALF_RATIO;
+                nd2nzParams.dValue = dDim;
+                nd2nzParams.nValue = nDim << HIF4_SCALE_NUM_HALF_RATIO;
+                nd2nzParams.srcNdMatrixStride = 0;
+                nd2nzParams.srcDValue = m_;
+                nd2nzParams.dstNzC0Stride = Cgmct::Gemm::CeilDiv(scaleKL1_, HIF4_GROUP_SIZE)
+                                            << HIF4_SCALE_NUM_HALF_RATIO;
+            } else {
+                nd2nzParams.dValue = dDim;
+                nd2nzParams.nValue = nDim;
+                nd2nzParams.srcNdMatrixStride = 0;
+                nd2nzParams.srcDValue = m_;
+                nd2nzParams.dstNzC0Stride = mxScaleKL1B16A_;
+            }
             nd2nzParams.dstNzNStride = 1;
             nd2nzParams.dstNzMatrixStride = 0;
-            AscendC::DataCopy(aScaleL1LocalImpl, aScaleGlobalB16[(kL1Offset / MXFP_DIVISOR_SIZE) * m_], nd2nzParams);
+            if constexpr (SUPPORT_PREALLOCATE) {
+                AscendC::DataCopy(aScaleL1LocalImpl, aScaleGlobalB16[offsetScaleAGM], nd2nzParams, enablePreAllocate_);
+            } else {
+                AscendC::DataCopy(aScaleL1LocalImpl, aScaleGlobalB16[offsetScaleAGM], nd2nzParams);
+            }
         }
     }
 
-    __aicore__ inline void CopyInScaleB(const AscendC::GlobalTensor<fp8_e8m0_t>& bScaleGlobal,
-                                        const AscendC::LocalTensor<fp8_e8m0_t>& bScaleL1Local, uint64_t curNL1,
+    __aicore__ inline void CopyInScaleB(const AscendC::GlobalTensor<ScaleBType>& bScaleGlobal,
+                                        const AscendC::LocalTensor<ScaleBType>& bScaleL1Local, uint64_t curNL1,
                                         uint64_t kL1Offset)
     {
         uint64_t curScaleKL1 = scaleKL1_;
         if (kL1Offset + curScaleKL1 > k_) {
             curScaleKL1 = k_ - kL1Offset;
         }
+        uint64_t nDim = transB ? curNL1 : Cgmct::Gemm::CeilDiv(curScaleKL1, MXFP_DIVISOR_SIZE);
+        uint64_t dDim = transB ? Cgmct::Gemm::CeilDiv(curScaleKL1, MXFP_DIVISOR_SIZE) : curNL1;
 
         AscendC::GlobalTensor<half> bScaleGlobalB16;
         bScaleGlobalB16.SetGlobalBuffer(((__gm__ half*)(bScaleGlobal.GetPhyAddr())));
         auto bScaleL1LocalImpl = bScaleL1Local.template ReinterpretCast<half>();
 
+        uint64_t offsetScaleBGM = transB ? kL1Offset / MXFP_DIVISOR_SIZE : (kL1Offset / MXFP_DIVISOR_SIZE) * n_;
+
         if constexpr (transB) {
             AscendC::Dn2NzParams dn2nzParams;
             dn2nzParams.dnNum = 1;
-            dn2nzParams.dValue = curNL1;
-            dn2nzParams.nValue = Cgmct::Gemm::CeilDiv(curScaleKL1, MXFP_DIVISOR_SIZE);
-            dn2nzParams.srcDnMatrixStride = 0;
-            dn2nzParams.srcDValue = Cgmct::Gemm::CeilDiv(k_, MXFP_DIVISOR_SIZE);
-            dn2nzParams.dstNzC0Stride = mxScaleKL1B16_;
+            if constexpr (IS_HIF4_B) {
+                offsetScaleBGM = offsetScaleBGM << HIF4_SCALE_NUM_HALF_RATIO;
+                dn2nzParams.dValue = nDim;
+                dn2nzParams.nValue = dDim << HIF4_SCALE_NUM_HALF_RATIO;
+                dn2nzParams.srcDnMatrixStride = 0;
+                dn2nzParams.srcDValue = Cgmct::Gemm::CeilDiv(k_, HIF4_GROUP_SIZE) << HIF4_SCALE_NUM_HALF_RATIO;
+                dn2nzParams.dstNzC0Stride = Cgmct::Gemm::CeilDiv(scaleKL1_, HIF4_GROUP_SIZE)
+                                            << HIF4_SCALE_NUM_HALF_RATIO;
+            } else {
+                dn2nzParams.dValue = nDim;
+                dn2nzParams.nValue = dDim;
+                dn2nzParams.srcDnMatrixStride = 0;
+                dn2nzParams.srcDValue = Cgmct::Gemm::CeilDiv(k_, MXFP_DIVISOR_SIZE);
+                dn2nzParams.dstNzC0Stride = mxScaleKL1B16B_;
+            }
             dn2nzParams.dstNzNStride = 1;
             dn2nzParams.dstNzMatrixStride = 0;
-            AscendC::DataCopy(bScaleL1LocalImpl, bScaleGlobalB16[kL1Offset / MXFP_DIVISOR_SIZE], dn2nzParams);
+            if constexpr (SUPPORT_PREALLOCATE) {
+                AscendC::DataCopy(bScaleL1LocalImpl, bScaleGlobalB16[offsetScaleBGM], dn2nzParams, enablePreAllocate_);
+            } else {
+                AscendC::DataCopy(bScaleL1LocalImpl, bScaleGlobalB16[offsetScaleBGM], dn2nzParams);
+            }
         } else {
             AscendC::Nd2NzParams nd2nzParams;
             nd2nzParams.ndNum = 1;
-            nd2nzParams.nValue = Cgmct::Gemm::CeilDiv(curScaleKL1, MXFP_DIVISOR_SIZE);
-            nd2nzParams.dValue = curNL1;
-            nd2nzParams.srcNdMatrixStride = 0;
-            nd2nzParams.srcDValue = n_;
-            nd2nzParams.dstNzC0Stride = mxScaleKL1B16_;
+            if constexpr (IS_HIF4_B) {
+                offsetScaleBGM = offsetScaleBGM << HIF4_SCALE_NUM_HALF_RATIO;
+                nd2nzParams.dValue = dDim;
+                nd2nzParams.nValue = nDim << HIF4_SCALE_NUM_HALF_RATIO;
+                nd2nzParams.srcNdMatrixStride = 0;
+                nd2nzParams.srcDValue = n_;
+                nd2nzParams.dstNzC0Stride = Cgmct::Gemm::CeilDiv(scaleKL1_, HIF4_GROUP_SIZE)
+                                            << HIF4_SCALE_NUM_HALF_RATIO;
+            } else {
+                nd2nzParams.dValue = dDim;
+                nd2nzParams.nValue = nDim;
+                nd2nzParams.srcNdMatrixStride = 0;
+                nd2nzParams.srcDValue = n_;
+                nd2nzParams.dstNzC0Stride = mxScaleKL1B16B_;
+            }
             nd2nzParams.dstNzNStride = 1;
             nd2nzParams.dstNzMatrixStride = 0;
-            AscendC::DataCopy(bScaleL1LocalImpl, bScaleGlobalB16[(kL1Offset / MXFP_DIVISOR_SIZE) * n_], nd2nzParams);
+            if constexpr (SUPPORT_PREALLOCATE) {
+                AscendC::DataCopy(bScaleL1LocalImpl, bScaleGlobalB16[offsetScaleBGM], nd2nzParams, enablePreAllocate_);
+            } else {
+                AscendC::DataCopy(bScaleL1LocalImpl, bScaleGlobalB16[offsetScaleBGM], nd2nzParams);
+            }
         }
     }
 
@@ -430,7 +579,7 @@ public:
 
     __aicore__ inline void CopyInL0A(const AscendC::LocalTensor<MxL0AType>& l0aLocal,
                                      const AscendC::LocalTensor<AType>& al1Local,
-                                     const AscendC::LocalTensor<fp8_e8m0_t>& scaleAl1Local,
+                                     const AscendC::LocalTensor<ScaleAType>& scaleAl1Local,
                                      const TileL1L0Param& tileL1L0Param, uint64_t kL0L1Off)
     {
         AscendC::LoadData2DParamsV2 loadDataParams;
@@ -438,42 +587,52 @@ public:
         uint64_t m1 = Cgmct::Gemm::CeilDiv(tileL1L0Param.curM, AscendC::BLOCK_CUBE);
         if constexpr (!transA) {
             loadDataParams.mStartPosition = 0;
-            loadDataParams.kStartPosition = Cgmct::Gemm::CeilDiv(kL0L1Off, C0_SIZE);
+            loadDataParams.kStartPosition = Cgmct::Gemm::CeilDiv(kL0L1Off, C0_SIZE_A);
             loadDataParams.mStep = m1;
-            loadDataParams.kStep = Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, C0_SIZE);
+            loadDataParams.kStep = Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, C0_SIZE_A);
             loadDataParams.srcStride = loadDataParams.mStep;
             loadDataParams.dstStride = loadDataParams.mStep;
             loadDataParams.ifTranspose = false;
         } else {
             loadDataParams.mStartPosition = Cgmct::Gemm::CeilDiv(kL0L1Off, AscendC::BLOCK_CUBE);
             loadDataParams.kStartPosition = 0;
-            if (((m1 & 1) == 0 && !(IS_FP4)) ||
-                (IS_FP4 && (Cgmct::Gemm::CeilDiv(tileL1L0Param.curM, AscendC::BLOCK_CUBE) & (B4_MIN_STEP - 1)) == 0)) {
+            if (((m1 & 1) == 0 && !(IS_FP4_HIF4_A)) ||
+                (IS_FP4_HIF4_A &&
+                 (Cgmct::Gemm::CeilDiv(tileL1L0Param.curM, AscendC::BLOCK_CUBE) & (B4_MIN_STEP - 1)) == 0)) {
                 loadDataParams.mStep = Cgmct::Gemm::CeilAlign(
                     Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, AscendC::BLOCK_CUBE), MXFP_MULTI_BASE_SIZE);
             } else {
-                loadDataParams.mStep = MIN_STEP;
+                loadDataParams.mStep = MIN_STEP_A;
             }
-            loadDataParams.kStep = Cgmct::Gemm::CeilDiv(tileL1L0Param.curM, C0_SIZE);
+            loadDataParams.kStep = Cgmct::Gemm::CeilDiv(tileL1L0Param.curM, C0_SIZE_A);
             loadDataParams.srcStride = Cgmct::Gemm::CeilDiv(tileL1L0Param.curPadAKL1, AscendC::BLOCK_CUBE);
             loadDataParams.dstStride = m1;
             loadDataParams.ifTranspose = true;
         }
         loadData2DMxParams.xStartPosition = 0;
-        loadData2DMxParams.yStartPosition = 0;
         loadData2DMxParams.xStep = m1;
-        loadData2DMxParams.yStep = Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, MXFP_DIVISOR_SIZE);
-        loadData2DMxParams.srcStride = mxScaleKL1B16_;
-        loadData2DMxParams.dstStride = loadData2DMxParams.yStep;
+        if constexpr (IS_HIF4_A) {
+            loadData2DMxParams.yStartPosition = 0;
+            loadData2DMxParams.yStep = Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, MXFP_DIVISOR_SIZE)
+                                       << HIF4_SCALE_NUM_HALF_RATIO;
+            loadData2DMxParams.srcStride = mxScaleKL1B16A_;
+            loadData2DMxParams.dstStride = loadData2DMxParams.yStep;
+        } else {
+            loadData2DMxParams.yStartPosition = 0;
+            loadData2DMxParams.yStep = Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, MXFP_DIVISOR_SIZE);
+            loadData2DMxParams.srcStride = mxScaleKL1B16A_;
+            loadData2DMxParams.dstStride = loadData2DMxParams.yStep;
+        }
         AscendC::LoadData(l0aLocal, al1Local, scaleAl1Local, loadDataParams, loadData2DMxParams);
         if constexpr (transA) {
-            if (((m1 & 1) != 0 && !(IS_FP4)) ||
-                (IS_FP4 && (Cgmct::Gemm::CeilDiv(tileL1L0Param.curM, AscendC::BLOCK_CUBE) & (B4_MIN_STEP - 1)) != 0)) {
+            if (((m1 & 1) != 0 && !(IS_FP4_HIF4_A)) ||
+                (IS_FP4_HIF4_A &&
+                 (Cgmct::Gemm::CeilDiv(tileL1L0Param.curM, AscendC::BLOCK_CUBE) & (B4_MIN_STEP - 1)) != 0)) {
                 AscendC::PipeBarrier<PIPE_MTE1>();
                 AscendC::LocalTensor<AType> l0a = l0aLocal.template ReinterpretCast<AType>();
                 uint64_t loadTimes =
-                    Cgmct::Gemm::CeilDiv(Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, AscendC::BLOCK_CUBE), MIN_STEP);
-                if constexpr (IS_FP4) {
+                    Cgmct::Gemm::CeilDiv(Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, AscendC::BLOCK_CUBE), MIN_STEP_A);
+                if constexpr (IsFp4Type<AType>()) {
                     loadData2DMxParams.xStartPosition = 0;
                     loadData2DMxParams.yStartPosition = 0;
                     loadData2DMxParams.xStep = 0;
@@ -482,16 +641,16 @@ public:
                     loadData2DMxParams.dstStride = 0;
                     for (uint64_t i = 1; i < loadTimes; i++) {
                         loadDataParams.mStartPosition =
-                            MIN_STEP * i + Cgmct::Gemm::CeilDiv(kL0L1Off, AscendC::BLOCK_CUBE);
-                        AscendC::LoadData(l0a[i * m1 * AscendC::BLOCK_CUBE * C0_SIZE], al1Local, scaleAl1Local,
+                            MIN_STEP_A * i + Cgmct::Gemm::CeilDiv(kL0L1Off, AscendC::BLOCK_CUBE);
+                        AscendC::LoadData(l0a[i * m1 * AscendC::BLOCK_CUBE * C0_SIZE_A], al1Local, scaleAl1Local,
                                           loadDataParams, loadData2DMxParams);
                         AscendC::PipeBarrier<PIPE_MTE1>();
                     }
                 } else {
                     for (uint64_t i = 1; i < loadTimes; i++) {
                         loadDataParams.mStartPosition =
-                            MIN_STEP * i + Cgmct::Gemm::CeilDiv(kL0L1Off, AscendC::BLOCK_CUBE);
-                        AscendC::LoadData(l0a[i * m1 * AscendC::BLOCK_CUBE * C0_SIZE], al1Local, loadDataParams);
+                            MIN_STEP_A * i + Cgmct::Gemm::CeilDiv(kL0L1Off, AscendC::BLOCK_CUBE);
+                        AscendC::LoadData(l0a[i * m1 * AscendC::BLOCK_CUBE * C0_SIZE_A], al1Local, loadDataParams);
                         AscendC::PipeBarrier<PIPE_MTE1>();
                     }
                 }
@@ -501,7 +660,7 @@ public:
 
     __aicore__ inline void CopyInL0B(const AscendC::LocalTensor<MxL0BType>& l0bLocal,
                                      const AscendC::LocalTensor<BType>& bl1Local,
-                                     const AscendC::LocalTensor<fp8_e8m0_t>& scaleBl1Local,
+                                     const AscendC::LocalTensor<ScaleBType>& scaleBl1Local,
                                      const TileL1L0Param& tileL1L0Param, uint64_t kL0L1Off)
     {
         AscendC::LoadData2DParamsV2 loadDataParams;
@@ -509,42 +668,52 @@ public:
         uint64_t n1 = Cgmct::Gemm::CeilDiv(tileL1L0Param.curN, AscendC::BLOCK_CUBE);
         if constexpr (transB) {
             loadDataParams.mStartPosition = 0;
-            loadDataParams.kStartPosition = Cgmct::Gemm::CeilDiv(kL0L1Off, C0_SIZE);
+            loadDataParams.kStartPosition = Cgmct::Gemm::CeilDiv(kL0L1Off, C0_SIZE_B);
             loadDataParams.mStep = n1;
-            loadDataParams.kStep = Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, C0_SIZE);
+            loadDataParams.kStep = Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, C0_SIZE_B);
             loadDataParams.srcStride = loadDataParams.mStep;
             loadDataParams.dstStride = loadDataParams.mStep;
             loadDataParams.ifTranspose = false;
         } else {
             loadDataParams.mStartPosition = Cgmct::Gemm::CeilDiv(kL0L1Off, AscendC::BLOCK_CUBE);
             loadDataParams.kStartPosition = 0;
-            if (((n1 & 1) == 0 && !(IS_FP4)) ||
-                (IS_FP4 && (Cgmct::Gemm::CeilDiv(tileL1L0Param.curN, AscendC::BLOCK_CUBE) & (B4_MIN_STEP - 1)) == 0)) {
+            if (((n1 & 1) == 0 && !(IS_FP4_HIF4_B)) ||
+                (IS_FP4_HIF4_B &&
+                 (Cgmct::Gemm::CeilDiv(tileL1L0Param.curN, AscendC::BLOCK_CUBE) & (B4_MIN_STEP - 1)) == 0)) {
                 loadDataParams.mStep = Cgmct::Gemm::CeilAlign(
                     Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, AscendC::BLOCK_CUBE), EVEN_FACTOR);
             } else {
-                loadDataParams.mStep = MIN_STEP;
+                loadDataParams.mStep = MIN_STEP_B;
             }
-            loadDataParams.kStep = Cgmct::Gemm::CeilDiv(tileL1L0Param.curN, C0_SIZE);
+            loadDataParams.kStep = Cgmct::Gemm::CeilDiv(tileL1L0Param.curN, C0_SIZE_B);
             loadDataParams.srcStride = Cgmct::Gemm::CeilDiv(tileL1L0Param.curPadBKL1, AscendC::BLOCK_CUBE);
             loadDataParams.dstStride = n1;
             loadDataParams.ifTranspose = true;
         }
         loadData2DMxParams.xStartPosition = 0;
-        loadData2DMxParams.yStartPosition = 0;
         loadData2DMxParams.xStep = n1;
-        loadData2DMxParams.yStep = Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, MXFP_DIVISOR_SIZE);
-        loadData2DMxParams.srcStride = mxScaleKL1B16_;
-        loadData2DMxParams.dstStride = loadData2DMxParams.yStep;
+        if constexpr (IS_HIF4_B) {
+            loadData2DMxParams.yStartPosition = 0;
+            loadData2DMxParams.yStep = Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, MXFP_DIVISOR_SIZE)
+                                       << HIF4_SCALE_NUM_HALF_RATIO;
+            loadData2DMxParams.srcStride = mxScaleKL1B16B_;
+            loadData2DMxParams.dstStride = loadData2DMxParams.yStep;
+        } else {
+            loadData2DMxParams.yStartPosition = 0;
+            loadData2DMxParams.yStep = Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, MXFP_DIVISOR_SIZE);
+            loadData2DMxParams.srcStride = mxScaleKL1B16B_;
+            loadData2DMxParams.dstStride = loadData2DMxParams.yStep;
+        }
         AscendC::LoadData(l0bLocal, bl1Local, scaleBl1Local, loadDataParams, loadData2DMxParams);
         if constexpr (!transB) {
-            if (((n1 & 1) != 0 && !(IS_FP4)) ||
-                (IS_FP4 && (Cgmct::Gemm::CeilDiv(tileL1L0Param.curN, AscendC::BLOCK_CUBE) & (B4_MIN_STEP - 1)) != 0)) {
+            if (((n1 & 1) != 0 && !(IS_FP4_HIF4_B)) ||
+                (IS_FP4_HIF4_B &&
+                 (Cgmct::Gemm::CeilDiv(tileL1L0Param.curN, AscendC::BLOCK_CUBE) & (B4_MIN_STEP - 1)) != 0)) {
                 AscendC::PipeBarrier<PIPE_MTE1>();
                 AscendC::LocalTensor<BType> l0b = l0bLocal.template ReinterpretCast<BType>();
                 uint64_t loadTimes =
-                    Cgmct::Gemm::CeilDiv(Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, AscendC::BLOCK_CUBE), MIN_STEP);
-                if constexpr (IS_FP4) {
+                    Cgmct::Gemm::CeilDiv(Cgmct::Gemm::CeilDiv(tileL1L0Param.curKL0, AscendC::BLOCK_CUBE), MIN_STEP_B);
+                if constexpr (IsFp4Type<BType>()) {
                     loadData2DMxParams.xStartPosition = 0;
                     loadData2DMxParams.yStartPosition = 0;
                     loadData2DMxParams.xStep = 0;
@@ -553,16 +722,16 @@ public:
                     loadData2DMxParams.dstStride = 0;
                     for (uint64_t i = 1; i < loadTimes; i++) {
                         loadDataParams.mStartPosition =
-                            MIN_STEP * i + Cgmct::Gemm::CeilDiv(kL0L1Off, AscendC::BLOCK_CUBE);
-                        AscendC::LoadData(l0b[i * n1 * AscendC::BLOCK_CUBE * C0_SIZE], bl1Local, scaleBl1Local,
+                            MIN_STEP_B * i + Cgmct::Gemm::CeilDiv(kL0L1Off, AscendC::BLOCK_CUBE);
+                        AscendC::LoadData(l0b[i * n1 * AscendC::BLOCK_CUBE * C0_SIZE_B], bl1Local, scaleBl1Local,
                                           loadDataParams, loadData2DMxParams);
                         AscendC::PipeBarrier<PIPE_MTE1>();
                     }
                 } else {
                     for (uint64_t i = 1; i < loadTimes; i++) {
                         loadDataParams.mStartPosition =
-                            MIN_STEP * i + Cgmct::Gemm::CeilDiv(kL0L1Off, AscendC::BLOCK_CUBE);
-                        AscendC::LoadData(l0b[i * n1 * AscendC::BLOCK_CUBE * C0_SIZE], bl1Local, loadDataParams);
+                            MIN_STEP_B * i + Cgmct::Gemm::CeilDiv(kL0L1Off, AscendC::BLOCK_CUBE);
+                        AscendC::LoadData(l0b[i * n1 * AscendC::BLOCK_CUBE * C0_SIZE_B], bl1Local, loadDataParams);
                         AscendC::PipeBarrier<PIPE_MTE1>();
                     }
                 }
@@ -577,7 +746,7 @@ public:
         intriParams.nSize = baseN;
         intriParams.mSize = baseM;
         intriParams.dstStride = n_;
-        intriParams.srcStride = Align16(baseM);
+        intriParams.srcStride = Cgmct::Gemm::Align(baseM, AscendC::BLOCK_CUBE);
         // set mode according to dtype
         if constexpr (AscendC::IsSameType<CType, bfloat16_t>::value) {
             intriParams.quantPre = QuantMode_t::F322BF16;
@@ -597,10 +766,15 @@ public:
     {
         AscendC::FixpipeParamsC310<AscendC::CO2Layout::ROW_MAJOR> fixpipeParams;
         fixpipeParams.mSize = static_cast<uint16_t>(Cgmct::Gemm::Align(baseM, EVEN_FACTOR));
-        fixpipeParams.nSize = static_cast<uint16_t>(baseN);
         fixpipeParams.srcStride = static_cast<uint16_t>(Cgmct::Gemm::Align(baseM, AscendC::BLOCK_CUBE));
-        fixpipeParams.dstStride = baseN;
-        fixpipeParams.dualDstCtl = static_cast<uint8_t>(AscendC::McgShfMode::DUAL_DST_SPLIT_M);
+        if (GetAicAivTaskRation() == 1) {
+            fixpipeParams.nSize = static_cast<uint16_t>(Cgmct::Gemm::Align(baseN, AscendC::AuxGetC0Size<CType>()));
+            fixpipeParams.dstStride = Cgmct::Gemm::Align(baseN, AscendC::AuxGetC0Size<CType>());
+        } else {
+            fixpipeParams.nSize = static_cast<uint16_t>(baseN);
+            fixpipeParams.dstStride = baseN;
+            fixpipeParams.dualDstCtl = static_cast<uint8_t>(AscendC::McgShfMode::DUAL_DST_SPLIT_M);
+        }
         fixpipeParams.subBlockId = 0;
         fixpipeParams.unitFlag = FINAL_ACCUMULATION;
         AscendC::Fixpipe<CType, CType, AscendC::Impl::CFG_ROW_MAJOR_UB>(cLocal, c1Local, fixpipeParams);
@@ -608,32 +782,41 @@ public:
 
     __aicore__ inline void UpdateKAL1(TileL1L0Param& tileL1L0Param, uint64_t offsetKAL1)
     {
-        tileL1L0Param.curGmAKL1 = Min(kAL1_, k_ - offsetKAL1);
-        tileL1L0Param.curPadAKL1 = Align64(tileL1L0Param.curGmAKL1);
+        tileL1L0Param.curGmAKL1 = (offsetKAL1 + kAL1_ > k_) ? (k_ - offsetKAL1) : kAL1_;
+        tileL1L0Param.curPadAKL1 = Cgmct::Gemm::CeilAlign(tileL1L0Param.curGmAKL1, MXFP_DIVISOR_SIZE);
     }
 
     __aicore__ inline void UpdateKBL1(TileL1L0Param& tileL1L0Param, uint64_t offsetKBL1)
     {
-        tileL1L0Param.curGmBKL1 = Min(kBL1_, k_ - offsetKBL1);
-        tileL1L0Param.curPadBKL1 = Align64(tileL1L0Param.curGmBKL1);
+        tileL1L0Param.curGmBKL1 = (offsetKBL1 + kBL1_ > k_) ? (k_ - offsetKBL1) : kBL1_;
+        tileL1L0Param.curPadBKL1 = Cgmct::Gemm::CeilAlign(tileL1L0Param.curGmBKL1, MXFP_DIVISOR_SIZE);
+    }
+
+    __aicore__ inline void UpdateKL0(TileL1L0Param& tileL1L0Param, uint64_t kL0Offset, uint64_t minPadKL1)
+    {
+        if (kL0Offset + baseK_ > minPadKL1) {
+            tileL1L0Param.curKL0 = minPadKL1 - kL0Offset;
+        } else {
+            tileL1L0Param.curKL0 = baseK_;
+        }
     }
 
     __aicore__ inline void GetAlignMN(TileL1L0Param& tileL1L0Param)
     {
         if constexpr (transA) {
-            tileL1L0Param.curAlignM = IS_FP4 ? Align64(tileL1L0Param.curM) : Align32(tileL1L0Param.curM);
+            tileL1L0Param.curAlignM = Cgmct::Gemm::CeilAlign(tileL1L0Param.curM, C0_SIZE_A);
         } else {
-            tileL1L0Param.curAlignM = Align16(tileL1L0Param.curM);
+            tileL1L0Param.curAlignM = Cgmct::Gemm::CeilAlign(tileL1L0Param.curM, AscendC::BLOCK_CUBE);
         }
         if constexpr (!transB) {
-            tileL1L0Param.curAlignN = IS_FP4 ? Align64(tileL1L0Param.curN) : Align32(tileL1L0Param.curN);
+            tileL1L0Param.curAlignN = Cgmct::Gemm::CeilAlign(tileL1L0Param.curN, C0_SIZE_B);
         } else {
-            tileL1L0Param.curAlignN = Align16(tileL1L0Param.curN);
+            tileL1L0Param.curAlignN = Cgmct::Gemm::CeilAlign(tileL1L0Param.curN, AscendC::BLOCK_CUBE);
         }
     }
 
-    __aicore__ inline void CopyScalesInL1(const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
-                                          const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+    __aicore__ inline void CopyScalesInL1(const AscendC::GlobalTensor<ScaleAType>& scaleAGlobal,
+                                          const AscendC::GlobalTensor<ScaleBType>& scaleBGlobal,
                                           const TileL1L0Param& tileL1L0Param, uint64_t kL1Offset, uint64_t scaleL1BufId)
     {
         if (kL1Offset % scaleKL1_ == 0) {
@@ -648,7 +831,7 @@ public:
     __aicore__ inline void CopyAInL1(const AscendC::GlobalTensor<AType>& aGlobal, const TileL1L0Param& tileL1L0Param,
                                      uint64_t l1BufId, uint64_t kL1Offset)
     {
-        if constexpr (!(IS_FP4 && !transA)) {
+        if constexpr (!(IS_FP4_HIF4_A && !transA)) {
             InitA1(aL1Local_[l1BufferAOffset_[l1BufId]], tileL1L0Param);
         }
         uint64_t offsetA = transA ? kL1Offset * m_ : kL1Offset;
@@ -658,11 +841,12 @@ public:
     __aicore__ inline void CopyBInL1(const AscendC::GlobalTensor<BType>& bGlobal, const TileL1L0Param& tileL1L0Param,
                                      uint64_t l1BufId, uint64_t kL1Offset)
     {
-        if constexpr (!(IS_FP4 && transB)) {
+        if constexpr (!(IS_FP4_HIF4_B && transB)) {
             InitB1(bL1Local_[l1BufferBOffset_[l1BufId]], tileL1L0Param);
         }
         if constexpr (formatB == CubeFormat::NZ) {
-            uint64_t offsetB = transB ? kL1Offset * Align16(n_) : kL1Offset * C0_SIZE;
+            uint64_t offsetB =
+                transB ? kL1Offset * Cgmct::Gemm::CeilAlign(n_, AscendC::BLOCK_CUBE) : kL1Offset * C0_SIZE_B;
             CopyInB1WeightNz(bGlobal[offsetB], bL1Local_[l1BufferBOffset_[l1BufId]], tileL1L0Param);
         } else {
             uint64_t offsetB = transB ? kL1Offset : kL1Offset * n_;
@@ -676,28 +860,33 @@ public:
     {
         uint64_t minPadKL1 = Cgmct::Gemm::Min(tileL1L0Param.curPadBKL1, tileL1L0Param.curPadAKL1);
         for (uint64_t kL0Offset = kL1Offset; kL0Offset < Min(kL1Offset + minKL1_, k_); kL0Offset += baseK_) {
-            tileL1L0Param.curKL0 = Min(baseK_, minPadKL1 + kL1Offset - kL0Offset);
+            UpdateKL0(tileL1L0Param, kL0Offset - kL1Offset, minPadKL1);
             uint64_t kL0L1Off = kL0Offset - kL1Offset;
             // Load data to L0 and open DB
-            // l0Offset represents element count
-            uint64_t l0Offset = IS_FP4 ? (HALF_L0_SIZE << 1) * (l0PingPong_ & 0x1) : HALF_L0_SIZE * (l0PingPong_ & 0x1);
+            uint64_t l0OffsetA =
+                IS_FP4_HIF4_A ? (HALF_L0_SIZE << 1) * (l0PingPong_ & 0x1) : HALF_L0_SIZE * (l0PingPong_ & 0x1);
+            uint64_t l0OffsetB =
+                IS_FP4_HIF4_B ? (HALF_L0_SIZE << 1) * (l0PingPong_ & 0x1) : HALF_L0_SIZE * (l0PingPong_ & 0x1);
             AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0PingPong_ & 0x1);
-            uint64_t offsetScaleL1 = AscendC::BLOCK_CUBE * ((kL0Offset % scaleKL1_) / MXFP_GROUP_SIZE);
-            CopyInL0A(l0aLocal_[l0Offset], aL1Local_[l1BufferAOffset_[al1BufId]],
-                      scaleAL1Local_[l1BufferScaleAOffset_[scaleL1BufId] + offsetScaleL1], tileL1L0Param,
+            uint64_t offsetScaleL1A = IS_HIF4_A ? AscendC::BLOCK_CUBE * ((kL0Offset % scaleKL1_) / MXFP_DIVISOR_SIZE) :
+                                                  AscendC::BLOCK_CUBE * ((kL0Offset % scaleKL1_) / MXFP_GROUP_SIZE);
+            uint64_t offsetScaleL1B = IS_HIF4_B ? AscendC::BLOCK_CUBE * ((kL0Offset % scaleKL1_) / MXFP_DIVISOR_SIZE) :
+                                                  AscendC::BLOCK_CUBE * ((kL0Offset % scaleKL1_) / MXFP_GROUP_SIZE);
+            CopyInL0A(l0aLocal_[l0OffsetA], aL1Local_[l1BufferAOffset_[al1BufId]],
+                      scaleAL1Local_[l1BufferScaleAOffset_[scaleL1BufId] + offsetScaleL1A], tileL1L0Param,
                       kL0L1Off + kaL1Offset);
             // copy bias to bt
             CopyInC2(biasL1Local_[l1BufferBiasOffset_[biasBufId_] / sizeof(BiasType)], biasBt_[baseN_ * biasBufId_],
-                     Align16(mmadParams.n), NeedBias(kL0Offset));
-            CopyInL0B(l0bLocal_[l0Offset], bL1Local_[l1BufferBOffset_[bl1BufId]],
-                      scaleBL1Local_[l1BufferScaleBOffset_[scaleL1BufId] + offsetScaleL1], tileL1L0Param,
+                     Cgmct::Gemm::Align(mmadParams.n, AscendC::BLOCK_CUBE), NeedBias(kL0Offset));
+            CopyInL0B(l0bLocal_[l0OffsetB], bL1Local_[l1BufferBOffset_[bl1BufId]],
+                      scaleBL1Local_[l1BufferScaleBOffset_[scaleL1BufId] + offsetScaleL1B], tileL1L0Param,
                       kL0L1Off + kbL1Offset);
             AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(l0PingPong_ & 0x1);
             AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(l0PingPong_ & 0x1);
-            mmadParams.k = Align64(tileL1L0Param.curKL0);
+            mmadParams.k = Cgmct::Gemm::CeilAlign(tileL1L0Param.curKL0, MXFP_DIVISOR_SIZE);
             mmadParams.unitFlag = (kL0Offset + baseK_ >= k_) ? FINAL_ACCUMULATION : NON_FINAL_ACCUMULATION;
             mmadParams.cmatrixInitVal = (kL0Offset == 0 && !isBias_);
-            Mmad(mmadParams, l0cOffset, l0Offset, baseN_ * biasBufId_, NeedBias(kL0Offset));
+            Mmad(mmadParams, l0cOffset, l0OffsetA, l0OffsetB, baseN_ * biasBufId_, NeedBias(kL0Offset));
             AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0PingPong_ & 0x1);
             l0PingPong_++;
         }
@@ -705,8 +894,8 @@ public:
     __aicore__ inline void IterBL1AL1(TileL1L0Param& tileL1L0Param, AscendC::MmadParams& mmadParams, uint64_t l0cOffset,
                                       const AscendC::GlobalTensor<AType>& aGlobal,
                                       const AscendC::GlobalTensor<BType>& bGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                      const AscendC::GlobalTensor<ScaleAType>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<ScaleBType>& scaleBGlobal,
                                       const AscendC::GlobalTensor<BiasType>& biasGlobal)
     {
         for (uint64_t kOuter = 0; kOuter < k_; kOuter += kBL1_) {
@@ -745,8 +934,8 @@ public:
     __aicore__ inline void IterAL1BL1(TileL1L0Param& tileL1L0Param, AscendC::MmadParams& mmadParams, uint64_t l0cOffset,
                                       const AscendC::GlobalTensor<AType>& aGlobal,
                                       const AscendC::GlobalTensor<BType>& bGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                      const AscendC::GlobalTensor<ScaleAType>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<ScaleBType>& scaleBGlobal,
                                       const AscendC::GlobalTensor<BiasType>& biasGlobal)
     {
         for (uint64_t kOuter = 0; kOuter < k_; kOuter += kAL1_) {
@@ -783,8 +972,8 @@ public:
     }
 
     __aicore__ inline void run(const AscendC::GlobalTensor<AType>& aGlobal, const AscendC::GlobalTensor<BType>& bGlobal,
-                               const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
-                               const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                               const AscendC::GlobalTensor<ScaleAType>& scaleAGlobal,
+                               const AscendC::GlobalTensor<ScaleBType>& scaleBGlobal,
                                const AscendC::GlobalTensor<BiasType>& biasGlobal,
                                const AscendC::GlobalTensor<CType>& cGlobal, const BlockShape& singleShape)
     {
@@ -797,8 +986,8 @@ public:
     }
 
     __aicore__ inline void run(const AscendC::GlobalTensor<AType>& aGlobal, const AscendC::GlobalTensor<BType>& bGlobal,
-                               const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
-                               const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                               const AscendC::GlobalTensor<ScaleAType>& scaleAGlobal,
+                               const AscendC::GlobalTensor<ScaleBType>& scaleBGlobal,
                                const AscendC::GlobalTensor<BiasType>& biasGlobal,
                                const AscendC::LocalTensor<CType>& cLocal, const BlockShape& singleShape)
     {
@@ -812,8 +1001,8 @@ public:
 
     __aicore__ inline void operator()(const AscendC::GlobalTensor<AType>& aGlobal,
                                       const AscendC::GlobalTensor<BType>& bGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                      const AscendC::GlobalTensor<ScaleAType>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<ScaleBType>& scaleBGlobal,
                                       const AscendC::GlobalTensor<CType>& cGlobal, const BlockShape& singleShape)
     {
         AscendC::GlobalTensor<BiasType> biasGlobal;
@@ -822,8 +1011,8 @@ public:
 
     __aicore__ inline void operator()(const AscendC::GlobalTensor<AType>& aGlobal,
                                       const AscendC::GlobalTensor<BType>& bGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                      const AscendC::GlobalTensor<ScaleAType>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<ScaleBType>& scaleBGlobal,
                                       const AscendC::GlobalTensor<BiasType>& biasGlobal,
                                       const AscendC::GlobalTensor<CType>& cGlobal, const BlockShape& singleShape)
     {
@@ -832,8 +1021,8 @@ public:
 
     __aicore__ inline void operator()(const AscendC::GlobalTensor<AType>& aGlobal,
                                       const AscendC::GlobalTensor<BType>& bGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                      const AscendC::GlobalTensor<ScaleAType>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<ScaleBType>& scaleBGlobal,
                                       const AscendC::LocalTensor<CType>& cLocal, const BlockShape& singleShape)
     {
         AscendC::GlobalTensor<BiasType> biasGlobal;
@@ -842,8 +1031,8 @@ public:
 
     __aicore__ inline void operator()(const AscendC::GlobalTensor<AType>& aGlobal,
                                       const AscendC::GlobalTensor<BType>& bGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
-                                      const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                      const AscendC::GlobalTensor<ScaleAType>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<ScaleBType>& scaleBGlobal,
                                       const AscendC::GlobalTensor<BiasType>& biasGlobal,
                                       const AscendC::LocalTensor<CType>& cLocal, const BlockShape& singleShape)
     {
@@ -858,8 +1047,8 @@ private:
 
     __aicore__ inline void RunMmadLoop(const AscendC::GlobalTensor<AType>& aGlobal,
                                        const AscendC::GlobalTensor<BType>& bGlobal,
-                                       const AscendC::GlobalTensor<fp8_e8m0_t>& scaleAGlobal,
-                                       const AscendC::GlobalTensor<fp8_e8m0_t>& scaleBGlobal,
+                                       const AscendC::GlobalTensor<ScaleAType>& scaleAGlobal,
+                                       const AscendC::GlobalTensor<ScaleBType>& scaleBGlobal,
                                        const AscendC::GlobalTensor<BiasType>& biasGlobal, const BlockShape& singleShape,
                                        AscendC::MmadParams& mmParams, uint64_t& l0cOffset)
     {
@@ -871,6 +1060,7 @@ private:
         mmParams.n = tileL1L0Param.curN;
         mmParams.disableGemv = true;
         l0cOffset = (l0cPingPong_ & 1) * HALF_L0C_SIZE;
+        SetPreAllocFlag(tileL1L0Param);
         if (orderAL1BL1_) {
             IterAL1BL1(tileL1L0Param, mmParams, l0cOffset, aGlobal, bGlobal, scaleAGlobal, scaleBGlobal, biasGlobal);
         } else {
@@ -885,16 +1075,16 @@ private:
         }
     }
 
-    __aicore__ inline void Mmad(AscendC::MmadParams& mmadParams, uint64_t l0cOffset, uint64_t l0abOffset,
-                                uint64_t biasOffset, bool needBias)
+    __aicore__ inline void Mmad(AscendC::MmadParams& mmadParams, uint64_t l0cOffset, uint64_t l0aOffset,
+                                uint64_t l0bOffset, uint64_t biasOffset, bool needBias)
     {
         mmadParams.cmatrixSource = needBias;
         if (needBias) {
-            AscendC::Mmad(c1Local_[l0cOffset], l0aLocal_[l0abOffset], l0bLocal_[l0abOffset], biasBt_[biasOffset],
+            AscendC::Mmad(c1Local_[l0cOffset], l0aLocal_[l0aOffset], l0bLocal_[l0bOffset], biasBt_[biasOffset],
                           mmadParams);
         } else {
             mmadParams.cmatrixSource = false;
-            AscendC::Mmad(c1Local_[l0cOffset], l0aLocal_[l0abOffset], l0bLocal_[l0abOffset], mmadParams);
+            AscendC::Mmad(c1Local_[l0cOffset], l0aLocal_[l0aOffset], l0bLocal_[l0bOffset], mmadParams);
         }
     }
 
@@ -918,7 +1108,8 @@ private:
     uint64_t kBL1_{1};
     uint64_t minKL1_{1};
     uint64_t scaleKL1_{1};
-    uint64_t mxScaleKL1B16_{1};
+    uint64_t mxScaleKL1B16A_{1};
+    uint64_t mxScaleKL1B16B_{1};
     uint64_t baseM_{16};
     uint64_t baseN_{16};
     uint64_t baseK_{16};
@@ -937,8 +1128,8 @@ private:
     AscendC::LocalTensor<AType> aL1Local_{AscendC::TPosition::A1, 0, AscendC::TOTAL_L1_SIZE};
     AscendC::LocalTensor<BType> bL1Local_{AscendC::TPosition::A1, 0, AscendC::TOTAL_L1_SIZE};
     AscendC::LocalTensor<BiasType> biasL1Local_{AscendC::TPosition::A1, 0, AscendC::TOTAL_L1_SIZE / sizeof(BiasType)};
-    AscendC::LocalTensor<fp8_e8m0_t> scaleAL1Local_{AscendC::TPosition::A1, 0, AscendC::TOTAL_L1_SIZE};
-    AscendC::LocalTensor<fp8_e8m0_t> scaleBL1Local_{AscendC::TPosition::A1, 0, AscendC::TOTAL_L1_SIZE};
+    AscendC::LocalTensor<ScaleAType> scaleAL1Local_{AscendC::TPosition::A1, 0, AscendC::TOTAL_L1_SIZE};
+    AscendC::LocalTensor<ScaleBType> scaleBL1Local_{AscendC::TPosition::A1, 0, AscendC::TOTAL_L1_SIZE};
 };
 } // namespace Block
 } // namespace Gemm

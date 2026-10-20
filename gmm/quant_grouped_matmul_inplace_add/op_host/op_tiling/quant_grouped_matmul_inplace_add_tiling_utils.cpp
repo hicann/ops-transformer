@@ -13,6 +13,7 @@
  * \brief
  */
 #include "quant_grouped_matmul_inplace_add_tiling_utils.h"
+#include "common/include/op_host/op_const_def_transformer.h"
 
 #include <graph/utils/type_utils.h>
 
@@ -87,6 +88,22 @@ bool CheckDtypeForInplaceAdd(const GQmmInputInfo& inputParams)
     bool isHif8 = inputParams.aDtype == ge::DT_HIFLOAT8 && inputParams.bDtype == ge::DT_HIFLOAT8;
     bool isFp8 = (inputParams.aDtype == ge::DT_FLOAT8_E4M3FN || inputParams.aDtype == ge::DT_FLOAT8_E5M2) &&
                  (inputParams.bDtype == ge::DT_FLOAT8_E4M3FN || inputParams.bDtype == ge::DT_FLOAT8_E5M2);
+    bool isHif4 =
+        inputParams.aDtype == Ops::Transformer::DT_HIFLOAT4 && inputParams.bDtype == Ops::Transformer::DT_HIFLOAT4;
+
+    if (isHif4) {
+        OP_CHECK_IF(inputParams.scaleDtype != Ops::Transformer::DT_HIFLOAT4_SCALE,
+                    OP_LOGE_FOR_INVALID_DTYPE(inputParams.opType, "scale2",
+                                              ge::TypeUtils::DataTypeToSerialString(inputParams.scaleDtype),
+                                              "DT_HIFLOAT4_SCALE"),
+                    return false);
+        OP_CHECK_IF(inputParams.perTokenScaleDtype != Ops::Transformer::DT_HIFLOAT4_SCALE,
+                    OP_LOGE_FOR_INVALID_DTYPE(inputParams.opType, "scale1",
+                                              ge::TypeUtils::DataTypeToSerialString(inputParams.perTokenScaleDtype),
+                                              "DT_HIFLOAT4_SCALE"),
+                    return false);
+        return true;
+    }
 
     if (isHif8) {
         OP_CHECK_IF(
@@ -120,7 +137,8 @@ bool CheckDtypeForInplaceAdd(const GQmmInputInfo& inputParams)
         inputParams.opType, "x1, x2",
         ListToString(ge::TypeUtils::DataTypeToSerialString(inputParams.aDtype),
                      ge::TypeUtils::DataTypeToSerialString(inputParams.bDtype)),
-        "in quant case, the dtypes of x1 and x2 must be both DT_HIFLOAT8 or both DT_FLOAT8_E4M3FN/DT_FLOAT8_E5M2");
+        "in quant case, the dtypes of x1 and x2 must be both DT_HIFLOAT4, both DT_HIFLOAT8, or both "
+        "DT_FLOAT8_E4M3FN/DT_FLOAT8_E5M2");
     return false;
 }
 
@@ -132,10 +150,11 @@ bool CheckCoreNumForInplaceAdd(const gert::TilingContext* context, const GQmmInp
     auto aivNum = compileInfo->aivNum;
     OP_CHECK_IF(aicNum == 0, OP_LOGE(inputParams.opName, "aicNum should be positive integer, actual is %u.", aicNum),
                 return false);
-    OP_CHECK_IF(
-        aivNum != GmmConstant::CORE_RATIO * aicNum,
-        OP_LOGE(inputParams.opName, "aicNum:aivNum should be 1:2, actual aicNum: %u, aivNum: %u.", aicNum, aivNum),
-        return false);
+    const uint32_t expectedAivRatio = compileInfo->npuArch == NpuArch::DAV_9201 ? 1U : GmmConstant::CORE_RATIO;
+    OP_CHECK_IF(aivNum != expectedAivRatio * aicNum,
+                OP_LOGE(inputParams.opName, "aicNum:aivNum should be 1:%u, actual aicNum: %u, aivNum: %u.",
+                        expectedAivRatio, aicNum, aivNum),
+                return false);
     return true;
 }
 
@@ -206,7 +225,7 @@ bool CheckShapeForMxQuant(const gert::Shape& x1ScaleShape, const gert::Shape& x2
     auto xScaleMDim = static_cast<uint64_t>(x1ScaleShape.GetDim(x1ScaleDimNum - LAST_SECOND_DIM_INDEX));
     auto wScaleLastDim = static_cast<uint64_t>(x2ScaleShape.GetDim(x2ScaleDimNum - 1));
     auto wScaleNDim = static_cast<uint64_t>(x2ScaleShape.GetDim(x2ScaleDimNum - LAST_SECOND_DIM_INDEX));
-    auto wScaleKDim = static_cast<uint64_t>(x1ScaleShape.GetDim(0));
+    auto wScaleKDim = static_cast<uint64_t>(x2ScaleShape.GetDim(0));
     auto expectedKDimValue = inputParams.kSize / MXFP_BASEK_FACTOR + inputParams.groupNum;
     OP_CHECK_IF(
         xScaleLastDim != MXFP_MULTI_BASE_SIZE || xScaleKDim != expectedKDimValue || xScaleMDim != inputParams.mSize,
@@ -218,6 +237,35 @@ bool CheckShapeForMxQuant(const gert::Shape& x1ScaleShape, const gert::Shape& x2
         OP_LOGE_FOR_INVALID_SHAPE(inputParams.opType, "scale2", ShapeToString(x2ScaleShape),
                                   ShapeDimsToString(expectedKDimValue, inputParams.nSize, MXFP_MULTI_BASE_SIZE)),
         return false);
+    return true;
+}
+
+bool CheckShapeForHif4Quant(const gert::Shape& x1ScaleShape, const gert::Shape& x2ScaleShape,
+                            const GQmmInputInfo& inputParams)
+{
+    auto x1ScaleDimNum = x1ScaleShape.GetDimNum();
+    auto x2ScaleDimNum = x2ScaleShape.GetDimNum();
+    OP_CHECK_IF(x1ScaleDimNum != HIF4_TYPE_M_SCALE_DIM_NUM - 1,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(inputParams.opType, "scale1", std::to_string(x1ScaleDimNum), "3"),
+                return false);
+    OP_CHECK_IF(x2ScaleDimNum != HIF4_TYPE_K_SCALE_DIM_NUM,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(inputParams.opType, "scale2", std::to_string(x2ScaleDimNum), "3"),
+                return false);
+    auto xScaleKDim = static_cast<uint64_t>(x1ScaleShape.GetDim(0));
+    auto xScaleMDim = static_cast<uint64_t>(x1ScaleShape.GetDim(1));
+    auto xScaleLastDim = static_cast<uint64_t>(x1ScaleShape.GetDim(2));
+    auto wScaleKDim = static_cast<uint64_t>(x2ScaleShape.GetDim(0));
+    auto wScaleNDim = static_cast<uint64_t>(x2ScaleShape.GetDim(1));
+    auto wScaleLastDim = static_cast<uint64_t>(x2ScaleShape.GetDim(2));
+    auto expectedKDim = inputParams.kSize / HIF4_BASEK_FACTOR + inputParams.groupNum;
+    OP_CHECK_IF(xScaleKDim != expectedKDim || xScaleMDim != inputParams.mSize || xScaleLastDim != HIF4_MULTI_BASE_SIZE,
+                OP_LOGE_FOR_INVALID_SHAPE(inputParams.opType, "scale1", ShapeToString(x1ScaleShape),
+                                          ShapeDimsToString(expectedKDim, inputParams.mSize, HIF4_MULTI_BASE_SIZE)),
+                return false);
+    OP_CHECK_IF(wScaleKDim != expectedKDim || wScaleNDim != inputParams.nSize || wScaleLastDim != HIF4_MULTI_BASE_SIZE,
+                OP_LOGE_FOR_INVALID_SHAPE(inputParams.opType, "scale2", ShapeToString(x2ScaleShape),
+                                          ShapeDimsToString(expectedKDim, inputParams.nSize, HIF4_MULTI_BASE_SIZE)),
+                return false);
     return true;
 }
 

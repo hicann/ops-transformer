@@ -74,6 +74,8 @@ DTYPE_LIST = [
     "bfloat16",
     "uint1",
     "hifloat8",
+    "hifloat4",
+    "hifloat4_scale",
     "float8_e4m3fn",
     "float8_e5m2",
     "float8_e8m0",

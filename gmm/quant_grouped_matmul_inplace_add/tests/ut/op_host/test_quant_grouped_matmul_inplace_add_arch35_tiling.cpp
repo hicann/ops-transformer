@@ -67,18 +67,35 @@ struct QGmmInplaceAddArch35Param {
 
     void Test() const
     {
-        optiling::GMMCompileInfo compileInfo = {
-            32,
-            64,
-            262144,
-            524288,
-            134217728,
-            262144,
-            65536,
-            65536,
-            platform_ascendc::SocVersion::ASCEND950,
-            NpuArch::DAV_3510,
-        };
+        optiling::GMMCompileInfo compileInfo;
+        string archStr;
+        if (socVersion == "Ascend960DT") {
+            compileInfo = {32,
+                           32,
+                           262144,
+                           524288,
+                           134217728,
+                           262144,
+                           65536,
+                           65536,
+                           platform_ascendc::SocVersion::ASCEND950,
+                           NpuArch::DAV_9201,
+                           true};
+            archStr = "9201";
+        } else {
+            compileInfo = {32,
+                           64,
+                           262144,
+                           524288,
+                           134217728,
+                           262144,
+                           65536,
+                           65536,
+                           platform_ascendc::SocVersion::ASCEND950,
+                           NpuArch::DAV_3510,
+                           false};
+            archStr = "3510";
+        }
 
         gert::StorageShape xShape = MakeShape({k, m});
         gert::StorageShape weightShape = MakeShape({k, n});
@@ -100,7 +117,7 @@ struct QGmmInplaceAddArch35Param {
             {{yShape, yDtype, ge::FORMAT_ND}},
             {{"group_list_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(groupListType)},
              {"group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
-            &compileInfo, "3510", compileInfo.aicNum, compileInfo.ubSize, actualTilingDataSize);
+            &compileInfo, archStr.c_str(), compileInfo.aicNum, compileInfo.ubSize, actualTilingDataSize);
 
         TilingInfo tilingInfo;
         bool tilingResult = ExecuteTiling(tilingContextPara, tilingInfo);
@@ -195,6 +212,12 @@ const vector<QGmmInplaceAddArch35Param>& GetAscend950Params()
     return params;
 }
 
+const vector<QGmmInplaceAddArch35Param>& GetAscend960DTParams()
+{
+    static const vector<QGmmInplaceAddArch35Param> params = GetParams("Ascend960DT");
+    return params;
+}
+
 class TestQuantGroupedMatmulInplaceAddArch35Tiling : public testing::TestWithParam<QGmmInplaceAddArch35Param> {};
 
 TEST_P(TestQuantGroupedMatmulInplaceAddArch35Tiling, csvDrivenCase)
@@ -204,4 +227,7 @@ TEST_P(TestQuantGroupedMatmulInplaceAddArch35Tiling, csvDrivenCase)
 
 INSTANTIATE_TEST_SUITE_P(QUANT_GROUPED_MATMUL_INPLACE_ADD_950, TestQuantGroupedMatmulInplaceAddArch35Tiling,
                          testing::ValuesIn(GetAscend950Params()), MakeParamName);
+
+INSTANTIATE_TEST_SUITE_P(QUANT_GROUPED_MATMUL_INPLACE_ADD_960DT, TestQuantGroupedMatmulInplaceAddArch35Tiling,
+                         testing::ValuesIn(GetAscend960DTParams()), MakeParamName);
 } // namespace QuantGroupedMatmulInplaceAddArch35TilingUT

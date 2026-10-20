@@ -129,7 +129,7 @@ __aicore__ inline constexpr bool IsI8I8I32()
 template <class MatmulType>
 __aicore__ inline constexpr bool IsF4()
 {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     return AscendC::IsSameTypeV<typename MatmulType::T, fp4x2_e2m1_t> ||
            AscendC::IsSameTypeV<typename MatmulType::T, fp4x2_e1m2_t>;
 #else
@@ -147,7 +147,7 @@ __aicore__ inline constexpr bool IsF4()
 template <class AType, class BType, class CType>
 __aicore__ inline constexpr bool IsFp4Fp4F32()
 {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     return IsF4<AType>() && IsF4<BType>() && AscendC::IsSameTypeV<typename CType::T, float>;
 #else
     return false;
@@ -162,7 +162,7 @@ __aicore__ inline constexpr bool IsFp4Fp4F32()
 template <class MatmulType>
 __aicore__ inline constexpr bool IsF8()
 {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     return AscendC::IsSameTypeV<typename MatmulType::T, fp8_e5m2_t> ||
            AscendC::IsSameTypeV<typename MatmulType::T, fp8_e4m3fn_t>;
 #else
@@ -180,7 +180,7 @@ __aicore__ inline constexpr bool IsF8()
 template <class AType, class BType, class CType>
 __aicore__ inline constexpr bool IsFp8Fp8F32()
 {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     return IsF8<AType>() && IsF8<BType>() && AscendC::IsSameTypeV<typename CType::T, float>;
 #else
     return false;
@@ -197,7 +197,7 @@ __aicore__ inline constexpr bool IsFp8Fp8F32()
 template <class AType, class BType, class CType>
 __aicore__ inline constexpr bool IsHIF8HIF8F32()
 {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     return AscendC::IsSameTypeV<typename AType::T, hifloat8_t> && AscendC::IsSameTypeV<typename BType::T, hifloat8_t> &&
            AscendC::IsSameTypeV<typename CType::T, float>;
 #else

@@ -20,6 +20,7 @@
 #include <graph/types.h>
 
 #include "gmm_csv_parse_utils.h"
+#include "../../../../common/include/op_host/op_const_def_transformer.h"
 
 namespace ops::ut {
 
@@ -41,6 +42,8 @@ inline ge::DataType ParseGeDtype(const std::string& dtype)
         {"FLOAT8_E8M0", ge::DT_FLOAT8_E8M0},
         {"FLOAT8-E8M0", ge::DT_FLOAT8_E8M0},
         {"HIFLOAT8", ge::DT_HIFLOAT8},
+        {"HIFLOAT4", Ops::Transformer::DT_HIFLOAT4},
+        {"HIFLOAT4_SCALE", Ops::Transformer::DT_HIFLOAT4_SCALE},
         {"FLOAT4_E2M1", ge::DT_FLOAT4_E2M1},
         {"FLOAT4_E1M2", ge::DT_FLOAT4_E1M2},
         {"UNDEFINED", ge::DT_UNDEFINED},

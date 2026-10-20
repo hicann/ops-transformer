@@ -18,3 +18,9 @@ Ascend950,hif8_scale2_firstdim_mismatch,true,hif8_scale2_firstdim_mismatch,4,96,
 Ascend950,mxfp8_e4m3_dtype_invalid,true,mxfp8_e4m3_dtype_invalid,4,96,512,128,FLOAT8-E4M3FN,FLOAT8-E4M3FN,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,0,false,NONE,12:128:2,12:96:2,0
 Ascend950,mxfp8_memcpy_fail_buffer_too_small,true,mxfp8_memcpy_fail_buffer_too_small,4,96,512,128,FLOAT8-E5M2,FLOAT8-E5M2,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,0,false,NONE,12:128:2,12:96:2,8
 Ascend950,hif8_tt_memcpy_fail_buffer_too_small,true,hif8_tt_memcpy_fail_buffer_too_small,4,96,512,128,HIFLOAT8,HIFLOAT8,FLOAT,FLOAT,FLOAT,0,false,NONE,4,4,8
+Ascend960DT,mxfp8_basic_valid,true,a6_mxfp8_basic_valid,4,96,512,128,FLOAT8-E5M2,FLOAT8-E5M2,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,0,true,NONE,12:128:2,12:96:2,0
+Ascend960DT,mxfp8_scale2_shape_invalid,true,a6_mxfp8_scale2_shape_invalid,4,96,512,128,FLOAT8-E5M2,FLOAT8-E5M2,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,0,false,NONE,12:52:2,12:96:2,0
+Ascend960DT,hif8_tc_valid,true,a6_hif8_tc_valid,4,96,512,128,HIFLOAT8,HIFLOAT8,FLOAT,FLOAT,FLOAT,0,true,NONE,4:128,4,0
+Ascend960DT,hif4_basic_valid,true,a6_hif4_basic_valid,4,96,512,128,HIFLOAT4,HIFLOAT4,HIFLOAT4_SCALE,HIFLOAT4_SCALE,FLOAT,0,true,NONE,12:128:1,12:96:1,0
+Ascend960DT,hif4_scale2_last_dim_invalid,true,a6_hif4_scale2_last_dim_invalid,4,96,512,128,HIFLOAT4,HIFLOAT4,HIFLOAT4_SCALE,HIFLOAT4_SCALE,FLOAT,0,false,NONE,12:128:2,12:96:1,0
+Ascend960DT,hif4_mixed_input_invalid,true,a6_hif4_mixed_input_invalid,4,96,512,128,HIFLOAT4,HIFLOAT8,HIFLOAT4_SCALE,HIFLOAT4_SCALE,FLOAT,0,false,NONE,12:128:1,12:96:1,0

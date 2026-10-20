@@ -98,24 +98,32 @@ public:
     using AType = typename BlockMmadBuilder::AType;
     using BType = typename BlockMmadBuilder::BType;
     using CType = typename BlockMmadBuilder::CType;
-    using TupleShape = AscendC::Shape<int64_t, int64_t, int64_t>;
+    using TupleShape = typename BlockSchedulerOp::TupleShape; // m, n, k
     using BlockShape = AscendC::Shape<int64_t, int64_t, int64_t, int64_t>;
     using BlockCoord = AscendC::Coord<int64_t, int64_t, int64_t, int64_t>;
+    using BlockTupleShape = TupleShape;
     // order by {x1, x2, scale1, scale2, bias, y}
     using BlockOffset = AscendC::Shape<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t>;
     // coordinate
     using CoordClass =
         Coordinate<transA, transB, BlockMmadBuilder::formatA, BlockMmadBuilder::formatB, BlockMmadBuilder::formatC>;
+    static constexpr bool isHiF4 = IsHif4Type<AType>();
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+    using ScaleType = typename AscendC::Conditional<isHiF4, AscendC::hif4_scale, AscendC::fp8_e8m0_t>::type;
+#else
+    using ScaleType = AscendC::fp8_e8m0_t;
+#endif
 
     // attribute
     AscendC::GlobalTensor<AType> aGlobal_;
     AscendC::GlobalTensor<BType> bGlobal_;
-    AscendC::GlobalTensor<AscendC::fp8_e8m0_t> x1ScaleGlobal_;
-    AscendC::GlobalTensor<AscendC::fp8_e8m0_t> x2ScaleGlobal_;
+    AscendC::GlobalTensor<ScaleType> x1ScaleGlobal_;
+    AscendC::GlobalTensor<ScaleType> x2ScaleGlobal_;
     AscendC::GlobalTensor<CType> cGlobal_;
     AscendC::GlobalTensor<int64_t> groupListGm_;
     // shape
     TupleShape problemShape_{};
+    BlockTupleShape blockTupleShape_{};
     BlockOffset baseOffset_{0, 0, 0, 0, 0, 0};
     BlockOffset blockOffset_{0, 0, 0, 0, 0, 0};
     uint64_t preOffset_ = 0;
@@ -170,9 +178,9 @@ public:
     {
         aGlobal_.SetGlobalBuffer((__gm__ AType*)params.mmadParams.aGmAddr + Get<IDX_A_OFFSET>(baseOffset_));
         bGlobal_.SetGlobalBuffer((__gm__ BType*)params.mmadParams.bGmAddr + Get<IDX_B_OFFSET>(baseOffset_));
-        x1ScaleGlobal_.SetGlobalBuffer((__gm__ AscendC::fp8_e8m0_t*)params.mmadParams.x1ScaleGmAddr +
+        x1ScaleGlobal_.SetGlobalBuffer((__gm__ ScaleType*)params.mmadParams.x1ScaleGmAddr +
                                        Get<IDX_X1SCALE_OFFSET>(baseOffset_));
-        x2ScaleGlobal_.SetGlobalBuffer((__gm__ AscendC::fp8_e8m0_t*)params.mmadParams.x2ScaleGmAddr +
+        x2ScaleGlobal_.SetGlobalBuffer((__gm__ ScaleType*)params.mmadParams.x2ScaleGmAddr +
                                        Get<IDX_X2SCALE_OFFSET>(baseOffset_));
         cGlobal_.SetGlobalBuffer((__gm__ CType*)params.mmadParams.cGmAddr + Get<IDX_C_OFFSET>(baseOffset_));
     }
@@ -187,10 +195,23 @@ public:
         uint64_t n = Get<N_VALUE>(problemShape_);
         uint64_t k = Get<K_VALUE>(problemShape_);
         // aBaseOffset += m * k
-        Get<IDX_A_OFFSET>(baseOffset_) = Get<IDX_A_OFFSET>(baseOffset_) + m * k;
+        if constexpr (isHiF4) {
+            Get<IDX_A_OFFSET>(baseOffset_) += (m * k) >> 1;
+        } else {
+            Get<IDX_A_OFFSET>(baseOffset_) += m * k;
+        }
         // bBaseOffset += n * k
-        Get<IDX_B_OFFSET>(baseOffset_) = Get<IDX_B_OFFSET>(baseOffset_) + n * k;
-        uint64_t scaleK = (Get<IDX_B_OFFSET>(baseOffset_) / n / MXFP_DIVISOR_SIZE + groupIdx) * MXFP_MULTI_BASE_SIZE;
+        if constexpr (isHiF4) {
+            Get<IDX_B_OFFSET>(baseOffset_) += (n * k) >> 1;
+        } else {
+            Get<IDX_B_OFFSET>(baseOffset_) += n * k;
+        }
+        constexpr uint64_t scaleBaseSize =
+            IsHif4ScaleType<ScaleType>() ? MX_HIF4_SCALE_BASE_SIZE : MXFP_MULTI_BASE_SIZE;
+        constexpr uint64_t packedCompensation =
+            IsHif4ScaleType<ScaleType>() ? MXFP_MULTI_BASE_SIZE : MX_HIF4_SCALE_BASE_SIZE;
+        uint64_t scaleK =
+            (Get<IDX_B_OFFSET>(baseOffset_) * packedCompensation / n / MXFP_DIVISOR_SIZE + groupIdx) * scaleBaseSize;
         // scaleAAxisBaseOffset = (k / 64 + g) * m * 2
         Get<IDX_X1SCALE_OFFSET>(baseOffset_) = scaleK * m;
         // scaleBAxisBaseOffset = (k / 64 + g) * n * 2
@@ -216,6 +237,8 @@ public:
     {
         Get<M_VALUE>(problemShape_) = params.gmmParams.matmulTiling->M;
         Get<N_VALUE>(problemShape_) = params.gmmParams.matmulTiling->N;
+        Get<M_VALUE>(blockTupleShape_) = params.gmmParams.matmulTiling->M;
+        Get<N_VALUE>(blockTupleShape_) = params.gmmParams.matmulTiling->N;
         cGlobal_.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_DISABLE);
         groupListGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(params.mmadParams.groupListGmAddr));
     }
@@ -228,14 +251,22 @@ public:
         // Keep the logical group shape separate from the aligned tile shape.
         // The matmul implementation uses it to clip tail loads in GM/L1 for
         // small groups whose dimensions are not block aligned.
-        blockMmadOp.SetOrgShape(m, n, k);
+        if constexpr (!isHiF4) {
+            blockMmadOp.SetOrgShape(m, n, k);
+        }
         CoordClass coord(m, n, k, params.gmmParams.baseM, params.gmmParams.baseN, params.gmmParams.baseK);
         BlockCoord tileIdx;
         while (bs.GetTileIdx(tileIdx)) {
             BlockShape singleShape = bs.GetBlockShape(tileIdx);
-            blockOffset_ = coord.template GetQuantOffset<GroupedMatmul::QuantMode::MX_PERGROUP_MODE>(
-                Get<IDX_M_TILEIDX>(tileIdx), Get<IDX_N_TILEIDX>(tileIdx), Get<IDX_M_TAIL_SPLIT_TILEIDX>(singleShape),
-                Get<IDX_N_TAIL_SPLIT_TILEIDX>(singleShape));
+            if constexpr (isHiF4) {
+                blockOffset_ = coord.template GetQuantOffset<GroupedMatmul::QuantMode::HIF4_PEGROUP_MODE>(
+                    Get<IDX_M_TILEIDX>(tileIdx), Get<IDX_N_TILEIDX>(tileIdx),
+                    Get<IDX_M_TAIL_SPLIT_TILEIDX>(singleShape), Get<IDX_N_TAIL_SPLIT_TILEIDX>(singleShape));
+            } else {
+                blockOffset_ = coord.template GetQuantOffset<GroupedMatmul::QuantMode::MX_PERGROUP_MODE>(
+                    Get<IDX_M_TILEIDX>(tileIdx), Get<IDX_N_TILEIDX>(tileIdx),
+                    Get<IDX_M_TAIL_SPLIT_TILEIDX>(singleShape), Get<IDX_N_TAIL_SPLIT_TILEIDX>(singleShape));
+            }
             AscendC::Std::tuple<int32_t, int32_t, int32_t> mmSingleShape{Get<M_VALUE>(singleShape),
                                                                          Get<N_VALUE>(singleShape), k};
             blockMmadOp(aGlobal_[Get<IDX_A_OFFSET>(blockOffset_)], bGlobal_[Get<IDX_B_OFFSET>(blockOffset_)],
@@ -263,6 +294,10 @@ public:
         for (uint32_t groupIdx = 0; groupIdx < groupNum; groupIdx++) {
             if (!UpdateGroupParams(params, groupIdx)) {
                 continue;
+            }
+            if constexpr (isHiF4) {
+                Get<K_VALUE>(blockTupleShape_) = Get<K_VALUE>(problemShape_);
+                blockMmadOp.UpdateParamsForNextProblem(blockTupleShape_);
             }
             bs.UpdateNextProblem(problemShape_);
             ProcessSingleGroup(params, bs, blockMmadOp);

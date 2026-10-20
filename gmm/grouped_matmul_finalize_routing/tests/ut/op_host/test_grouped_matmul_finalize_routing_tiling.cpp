@@ -80,7 +80,7 @@ platform_ascendc::SocVersion ParseSocVersion(const string& socVersion)
     if (trimmed == "Ascend910B") {
         return platform_ascendc::SocVersion::ASCEND910B;
     }
-    if (trimmed == "Ascend950") {
+    if (trimmed == "Ascend950" || trimmed == "Ascend960DT") {
         return platform_ascendc::SocVersion::ASCEND950;
     }
     return static_cast<platform_ascendc::SocVersion>(0);
@@ -88,7 +88,14 @@ platform_ascendc::SocVersion ParseSocVersion(const string& socVersion)
 
 NpuArch ParseNpuArch(const string& npuArch)
 {
-    return Trim(npuArch) == "DAV_3510" ? NpuArch::DAV_3510 : static_cast<NpuArch>(0);
+    const string trimmed = Trim(npuArch);
+    if (trimmed == "DAV_3510") {
+        return NpuArch::DAV_3510;
+    }
+    if (trimmed == "DAV_9201") {
+        return NpuArch::DAV_9201;
+    }
+    return static_cast<NpuArch>(0);
 }
 
 struct GroupedMatmulFinalizeRoutingTilingCase {
@@ -117,6 +124,7 @@ struct GroupedMatmulFinalizeRoutingTilingCase {
         compileInfo.supportL0c2out = ParseBool(supportL0c2out);
         compileInfo.supportL12BtBf16 = ParseBool(supportL12BtBf16);
         compileInfo.npuArch = ParseNpuArch(npuArch);
+        compileInfo.supportMmadF16S8 = compileInfo.npuArch == NpuArch::DAV_9201;
 
         vector<int64_t> tuningConfigVec = ops::ut::ParseDims(tuningConfig, {});
         if (tuningConfigVec.empty()) {
@@ -144,8 +152,7 @@ struct GroupedMatmulFinalizeRoutingTilingCase {
                                     ge::FORMAT_ND);
         }
 
-        string socVersionStr =
-            ParseSocVersion(socVersion) == platform_ascendc::SocVersion::ASCEND950 ? "Ascend950" : "Ascend910B";
+        const string socVersionStr = Trim(socVersion);
         gert::TilingContextPara tilingContextPara(
             "GroupedMatmulFinalizeRouting", inputDescs,
             {

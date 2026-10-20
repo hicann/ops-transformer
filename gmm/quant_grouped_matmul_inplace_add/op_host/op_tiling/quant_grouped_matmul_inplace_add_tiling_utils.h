@@ -48,6 +48,8 @@ bool CheckShapeForHif8Quant(const gert::Shape& x1ScaleShape, const gert::Shape& 
 // MX 量化：scale1/scale2 均为 3D，末轴 = MXFP_MULTI_BASE_SIZE
 bool CheckShapeForMxQuant(const gert::Shape& x1ScaleShape, const gert::Shape& x2ScaleShape,
                           const optiling::GQmmInputInfo& inputParams);
+bool CheckShapeForHif4Quant(const gert::Shape& x1ScaleShape, const gert::Shape& x2ScaleShape,
+                            const optiling::GQmmInputInfo& inputParams);
 
 // 由 (transB, transA, kernelType) 三元组生成 tiling key，BasicApi 与 普通路径共用
 uint64_t GetTilingKeyForInplaceAdd(const optiling::GQmmInputInfo& inputParams);

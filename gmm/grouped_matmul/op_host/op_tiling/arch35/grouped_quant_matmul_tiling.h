@@ -56,9 +56,13 @@ constexpr uint64_t X_DIMS = 2UL;
 constexpr uint64_t BIAS_DIMS = 2UL;
 constexpr uint64_t GROUP_LIST_SPARSE_DIMS = 2UL;
 constexpr uint64_t MXFP_MULTI_BASE_SIZE = 2UL;
+constexpr uint64_t HIF4_MULTI_BASE_SIZE = 1UL;
 constexpr uint64_t MXFP_BASEK_FACTOR = 64UL;
+constexpr uint64_t HIF4_BASEK_FACTOR = 64UL;
 constexpr size_t MXFP_TYPE_K_SCALE_DIM_NUM = 3;
 constexpr size_t MXFP_TYPE_M_SCALE_DIM_NUM = 4;
+constexpr size_t HIF4_TYPE_K_SCALE_DIM_NUM = 3;
+constexpr size_t HIF4_TYPE_M_SCALE_DIM_NUM = 4;
 // Scale FRACTAL_NZ single-tensor storage shape is (group, n1, kScale, n0, c0).
 constexpr size_t MXFP_SCALE_NZ_DIM_NUM = 5;
 // Scale origin shape ends with (kScale, n, 2); this offset points to the trailing scale-pair dim.
@@ -88,6 +92,7 @@ constexpr uint32_t FP32_WORKSIZE = 4;
 constexpr uint64_t DB_REQUIRED_BYTES_SIZE = 14UL;
 constexpr uint32_t SYS_WORKSPACE_SIZES = 16 * 1024 * 1024U;
 constexpr uint32_t CORE_RATIO = 2U;
+constexpr uint32_t CORE_RATIO_9201 = 1U;
 } // namespace GmmConstant
 
 template <typename ShapeT>
@@ -150,6 +155,7 @@ enum class QuantMode : uint32_t {
     MX_PERGROUP_MODE = 0x1U << 3,
     PERGROUP_MODE = 0x1U << 4,
     PERBLOCK_MODE = 0x1U << 5,
+    HIF4_PERGROUP_MODE = 0x1U << 6,
 };
 
 enum class GMMActType {

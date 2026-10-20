@@ -16,7 +16,7 @@
 
 #ifndef BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_DETER_H
 #define BLOCK_EPILOGUE_DEQUANT_FINALIZE_ROUTING_DETER_H
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
 #include "kernel_basic_intf.h"
 #include "../utils/cgmct_common_utils.h"
 #include "../utils/device_utils.h"

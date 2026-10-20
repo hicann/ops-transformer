@@ -60,7 +60,7 @@ public:
                                       int32_t baseM, int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc,
                                       uint8_t subBlockId = 0)
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         uint32_t dimN = orgKc != 0 ? orgKc : orgN;
         constexpr uint32_t blockCount = AscendC::ONE_BLK_SIZE / sizeof(DstT);
         if constexpr (OutputType::format == CubeFormat::ND_ALIGN) {
@@ -130,7 +130,7 @@ public:
                                       int32_t baseM, int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc,
                                       uint8_t id = 0)
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         int64_t dstOffset =
             static_cast<int64_t>(curCol * baseN) * orgM + static_cast<int64_t>(curRow * baseM) * AscendC::BLOCK_CUBE;
         uint32_t stride =
@@ -197,7 +197,7 @@ public:
                                       int32_t baseM, int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc,
                                       const AscendC::LocalTensor<uint64_t>& quantTens)
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         CopyOutNZ2ND(dst, src, curRow, curCol, l0CTileHeight, l0CTileWidth, baseM, baseN, orgKc != 0 ? orgKc : orgN,
                      quantTens);
 #else
@@ -225,7 +225,7 @@ public:
                                       int32_t baseM, int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc,
                                       uint64_t quantScalar)
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         CopyOutNZ2ND(dst, src, curRow, curCol, l0CTileHeight, l0CTileWidth, baseM, baseN, orgKc != 0 ? orgKc : orgN,
                      quantScalar);
 #else
@@ -234,7 +234,7 @@ public:
     }
 
 private:
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     /**
      * @brief Copy data from a local tensor to a global tensor, supporting multiple data types and quantization modes
      * @param [in] T: quantization object type
@@ -358,7 +358,7 @@ public:
                                       int32_t baseM, int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc,
                                       const AscendC::LocalTensor<uint64_t>& quantTensor)
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         CopyOutNZ2NZ(dst, src, curRow, curCol, l0CTileHeight, l0CTileWidth, baseM, baseN, orgM, quantTensor);
 #else
         ASCENDC_ASSERT(false, { KERNEL_LOG(KERNEL_ERROR, "Only support DAV3510"); });
@@ -385,7 +385,7 @@ public:
                                       int32_t baseM, int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc,
                                       uint64_t quantScalar)
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         CopyOutNZ2NZ(dst, src, curRow, curCol, l0CTileHeight, l0CTileWidth, baseM, baseN, orgM, quantScalar);
 #else
         ASCENDC_ASSERT(false, { KERNEL_LOG(KERNEL_ERROR, "Only support DAV3510"); });
@@ -393,7 +393,7 @@ public:
     }
 
 private:
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     /**
      * @brief Copy data from a local tensor to a global tensor, supporting both quantized and non-quantized modes
      * @param [in] T: quantization object type

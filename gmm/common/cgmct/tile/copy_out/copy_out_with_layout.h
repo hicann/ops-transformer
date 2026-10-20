@@ -166,7 +166,7 @@ struct Copy<
     __aicore__ inline void operator()(AscendC::GlobalTensor<DstTrait>& dst, AscendC::LocalTensor<SrcTrait>& src,
                                       const Coord& coord)
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         using SrcT = typename SrcTrait::LiteType;
         using DstT = typename DstTrait::LiteType;
 
@@ -233,7 +233,7 @@ struct Copy<Arch::DAV3510, CopyWithLayout, OutputType, DstTrait, SrcTrait,
     __aicore__ inline void operator()(AscendC::GlobalTensor<DstTrait>& dst, AscendC::LocalTensor<SrcTrait>& src,
                                       const Coord& coord)
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         using SrcT = typename SrcTrait::LiteType;
         using DstT = typename DstTrait::LiteType;
 
@@ -297,7 +297,7 @@ struct Copy<
     template <class Coord>
     __aicore__ inline void operator()(DstTensor& dst, SrcTensor& src, const Coord& coord, uint8_t subIdx = 0)
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         using SrcT = typename SrcTrait::LiteType;
         using DstT = typename DstTrait::LiteType;
         static constexpr AscendC::FixpipeConfig cfgUb = {AscendC::CO2Layout::ROW_MAJOR, true}; // isToUB is true
@@ -364,7 +364,7 @@ struct Copy<Arch::DAV3510, CopyWithLayout, OutputType, DstTrait, SrcTrait,
     template <class Coord>
     __aicore__ inline void operator()(DstTensor& dst, SrcTensor& src, const Coord& coord, uint8_t subIdx = 0)
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         using SrcT = typename SrcTrait::LiteType;
         using DstT = typename DstTrait::LiteType;
         static constexpr AscendC::FixpipeConfig cfgUb = {AscendC::CO2Layout::NZ, true}; // isToUB is true

@@ -49,6 +49,7 @@ constexpr static int64_t PER_BLOCK_SIZE = 128LL;
 constexpr static uint64_t MXFP_GROUP_SIZE = 32UL;
 constexpr int32_t MXFP_DIVISOR_SIZE = 64;
 constexpr int32_t MXFP_MULTI_BASE_SIZE = 2;
+constexpr int32_t MX_HIF4_SCALE_BASE_SIZE = 1;
 
 // Bitwise alignment utilities for power-of-2 alignments
 // Align to 64: ((x + 63) & ~63)
@@ -61,6 +62,10 @@ constexpr uint64_t ALIGN_MASK_16 = 15UL;
 // Set unitflag state: 3 = final accumulation, 2 = non-final accumulation
 constexpr static uint32_t FINAL_ACCUMULATION = 3U;
 constexpr static uint32_t NON_FINAL_ACCUMULATION = 2U;
+
+static constexpr uint8_t SYNC_FLAG_ID_6 = 6;
+static constexpr uint8_t SYNC_FLAG_ID_7 = 7;
+static constexpr uint8_t MTE_SYNC_DB_FLAG_IDS_PAIR_1[DOUBLE_BUFFER_COUNT] = {SYNC_FLAG_ID_6, SYNC_FLAG_ID_7};
 
 struct MatmulShape {
     int64_t m;
@@ -144,7 +149,7 @@ template <typename CType, typename AType>
 __aicore__ inline constexpr static bool IsQuantSenario()
 {
     using L0cT = typename AscendC::GetMmDstType<AType>::Type;
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
     if constexpr (!AscendC::IsTypeOneOfV<AType, int8_t, hifloat8_t, fp8_e4m3fn_t, fp8_e5m2_t, fp4x2_e2m1_t,
                                          fp4x2_e1m2_t> &&
                   AscendC::IsTypeOneOfV<CType, half, bfloat16_t>) {
@@ -185,6 +190,42 @@ struct is_2d_nz_c0_32_impl<AscendC::Std::tuple<AscendC::Std::tuple<T0, T1>, Asce
 
 template <class Stride>
 struct is_2d_nz_c0_32 : is_2d_nz_c0_32_impl<typename AscendC::Std::remove_cvref_t<Stride>> {};
+
+template <typename T>
+__host_aicore__ inline constexpr bool IsHif4Type()
+{
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+    return AscendC::IsSameTypeV<T, hifloat4x2_t>;
+#else
+    return false;
+#endif
+}
+
+template <typename T>
+__host_aicore__ inline constexpr bool IsFp4Type()
+{
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+    return AscendC::IsSameTypeV<T, fp4x2_e2m1_t> || AscendC::IsSameTypeV<T, fp4x2_e1m2_t>;
+#else
+    return false;
+#endif
+}
+
+template <typename T>
+__host_aicore__ inline constexpr bool IsFp4Hif4Type()
+{
+    return IsHif4Type<T>() || IsFp4Type<T>();
+}
+
+template <typename T>
+__host_aicore__ inline constexpr bool IsHif4ScaleType()
+{
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+    return AscendC::IsSameTypeV<T, AscendC::hif4_scale>;
+#else
+    return false;
+#endif
+}
 } // namespace Gemm
 } // namespace Cgmct
 #endif

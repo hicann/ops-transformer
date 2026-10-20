@@ -35,6 +35,7 @@ struct GroupedMatmulFinalizeRoutingCompileInfo {
     bool supportL0c2out = false;
     bool supportL12BtBf16 = false;
     NpuArch npuArch;
+    bool supportMmadF16S8 = false;
 };
 
 BEGIN_TILING_DATA_DEF(GroupMatmulFRTilingData)

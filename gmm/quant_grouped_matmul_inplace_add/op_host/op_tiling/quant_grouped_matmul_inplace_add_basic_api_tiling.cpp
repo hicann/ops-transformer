@@ -49,6 +49,19 @@ bool QGMMInplaceAddBasicApiTiling::IsCapable()
                                  static_cast<uint64_t>(wScaleShape.GetDim(1)) == 1));
 }
 
+ge::graphStatus QGMMInplaceAddBasicApiTiling::GetShapeAttrsInfo()
+{
+    const auto* compileInfo = context_->GetCompileInfo<GMMCompileInfo>();
+    OP_CHECK_IF(compileInfo == nullptr, OP_LOGE(context_->GetNodeName(), "compileInfo is nullptr."),
+                return ge::GRAPH_FAILED);
+
+    if (compileInfo->supportMmadF16S8) {
+        return ge::GRAPH_PARAM_INVALID;
+    }
+
+    return GroupedQmmBasicApiTiling::GetShapeAttrsInfo();
+}
+
 bool QGMMInplaceAddBasicApiTiling::AnalyzeAttrs()
 {
     return AnalyzeAttrsForInplaceAdd(context_, inputParams_);

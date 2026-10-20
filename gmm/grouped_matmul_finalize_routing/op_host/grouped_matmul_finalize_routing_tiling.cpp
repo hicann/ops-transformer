@@ -15,6 +15,7 @@
 #include "grouped_matmul_finalize_routing_tiling.h"
 #include "op_tiling/arch35/grouped_matmul_finalize_routing_quant_tiling.h"
 #include "op_tiling/arch35/grouped_matmul_finalize_routing_weight_quant_tiling.h"
+#include "op_tiling/arch35/grouped_matmul_finalize_routing_weight_quant_asw_tiling.h"
 #include "grouped_matmul_finalize_routing_base_tiling.h"
 #include "op_host/tiling_templates_registry.h"
 #include "register/op_def_registry.h"
@@ -65,6 +66,20 @@ static ge::graphStatus GroupedMatmulFinalizeRoutingTilingFunc(gert::TilingContex
         std::vector<int32_t> tilingRegisterList = {1};
         OP_LOGD("GroupedMatmulFinalizeRoutingTilingFunc", "Using the tiling strategy of A5");
         return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context, tilingRegisterList);
+    } else if (compileInfoPtr->npuArch == NpuArch::DAV_9201) {
+        OP_CHECK_NULL_WITH_CONTEXT(context, context);
+        auto xDesc = context->GetDynamicInputDesc(X_INDEX, 0);
+        OP_CHECK_NULL_WITH_CONTEXT(context, xDesc);
+        auto w0Desc = context->GetDynamicInputDesc(W_INDEX, 0);
+        OP_CHECK_NULL_WITH_CONTEXT(context, w0Desc);
+        std::vector<int32_t> tilingRegisterList = {1};
+        if (GetSizeByDataType(xDesc->GetDataType()) != GetSizeByDataType(w0Desc->GetDataType())) {
+            tilingRegisterList[0] = GMMFR_WEIGHT_QUANT_ASW_TILING;
+            OP_LOGD("GroupedMatmulFinalizeRoutingTilingFunc", "Using the weight-quant tiling strategy of DAV_9201");
+        } else {
+            OP_LOGD("GroupedMatmulFinalizeRoutingTilingFunc", "Using the full-quant tiling strategy of DAV_9201");
+        }
+        return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context, tilingRegisterList);
     } else {
         std::vector<int32_t> tilingRegisterList = {0};
         OP_LOGD("GroupedMatmulFinalizeRoutingTilingFunc", "Using the tiling strategy of A2/A3");
@@ -86,16 +101,20 @@ static ge::graphStatus TilingPrepareForGroupedMatmulFinalizeRouting(gert::Tiling
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     std::string val;
     std::string dataMoveL12Bt;
+    std::string intrinsicMmad;
     platformInfo->GetPlatformRes("AICoreintrinsicDtypeMap", "Intrinsic_fix_pipe_l0c2out", val);
     platformInfo->GetPlatformRes("AICoreintrinsicDtypeMap", "Intrinsic_data_move_l12bt", dataMoveL12Bt);
+    platformInfo->GetPlatformRes("AICoreintrinsicDtypeMap", "Intrinsic_mmad", intrinsicMmad);
     compileInfoPtr->supportL0c2out = !val.empty();
     compileInfoPtr->supportL12BtBf16 = (dataMoveL12Bt.find("bf16") != std::string::npos);
+    compileInfoPtr->supportMmadF16S8 = (intrinsicMmad.find("f16s8") != std::string::npos);
     compileInfoPtr->aicNum = ascendcPlatform.GetCoreNumAic();
     compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();
     compileInfoPtr->socVersion = ascendcPlatform.GetSocVersion();
     compileInfoPtr->npuArch = ascendcPlatform.GetCurNpuArch();
     compileInfoPtr->btSize = compileInfoPtr->supportL0c2out ? 1024UL : 0UL;                      // 1024 is btSize
     compileInfoPtr->btSize = compileInfoPtr->supportL12BtBf16 ? 4096UL : compileInfoPtr->btSize; // 4096 is btSize
+    compileInfoPtr->btSize = compileInfoPtr->supportMmadF16S8 ? 4096UL : compileInfoPtr->btSize; // 4096 is btSize
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfoPtr->ubSize);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, compileInfoPtr->l1Size);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_A, compileInfoPtr->l0ASize);
@@ -105,9 +124,10 @@ static ge::graphStatus TilingPrepareForGroupedMatmulFinalizeRouting(gert::Tiling
 
     OP_LOGI(context->GetNodeName(),
             "parse compile info success soc:%d, l1Size(bytes):%lu, l2Size(bytes):%lu, coreNum:%lu, supportL0c2out:%d, "
-            "supportL12BtBf16:%d",
+            "supportL12BtBf16:%d, supportMmadF16S8:%d",
             static_cast<int>(compileInfoPtr->socVersion), compileInfoPtr->l1Size, compileInfoPtr->l2Size,
-            compileInfoPtr->aicNum, compileInfoPtr->supportL0c2out, compileInfoPtr->supportL12BtBf16);
+            compileInfoPtr->aicNum, compileInfoPtr->supportL0c2out, compileInfoPtr->supportL12BtBf16,
+            compileInfoPtr->supportMmadF16S8);
     return ge::GRAPH_SUCCESS;
 }
 

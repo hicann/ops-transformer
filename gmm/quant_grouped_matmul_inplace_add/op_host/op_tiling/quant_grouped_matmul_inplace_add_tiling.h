@@ -65,6 +65,8 @@ private:
     int64_t LogQuantParams() const;
     bool SetQuantModeForQGmmInplaceAdd();
     bool CheckCoreNum() const override;
+    bool IsHif4Scale() const;
+    bool supportMmadF16S8_{false};
     QuantGroupedMatmulInplaceAdd::QGmmInplaceAddTilingDataParams tilingData_;
 };
 } // namespace optiling

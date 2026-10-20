@@ -8,11 +8,13 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 #include "gmm/common/op_api/gmm_tensor_storage_check.h"
+#include "common/include/op_host/op_const_def_transformer.h"
 #include "aclnn_quant_grouped_matmul_inplace_add.h"
 
 #include <dlfcn.h>
 #include <new>
 #include <sstream>
+#include <vector>
 
 #include "aclnn_kernels/transdata.h"
 #include "aclnn_kernels/contiguous.h"
@@ -165,6 +167,32 @@ static aclnnStatus IsMxQuantDim(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddPara
     return ACLNN_SUCCESS;
 }
 
+static aclnnStatus CheckHiF4QuantDim(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams params)
+{
+    auto x1ScaleDimNum = params.scale1Optional->GetViewShape().GetDimNum();
+    auto x2ScaleDimNum = params.scale2->GetViewShape().GetDimNum();
+    QGMM_INPLACE_ADD_CHECK_REPORT(
+        x2ScaleDimNum == gmm::MX_SPLIT_K_SCALE_DIM, return ACLNN_ERR_PARAM_INVALID,
+        OP_LOGE_FOR_INVALID_SHAPEDIM(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale2", std::to_string(x2ScaleDimNum),
+                                     std::to_string(gmm::MX_SPLIT_K_SCALE_DIM)));
+    QGMM_INPLACE_ADD_CHECK_REPORT(
+        x1ScaleDimNum == gmm::MX_SPLIT_K_PER_TOKEN_SCALE_DIM, return ACLNN_ERR_PARAM_INVALID,
+        OP_LOGE_FOR_INVALID_SHAPEDIM(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale1", std::to_string(x1ScaleDimNum),
+                                     std::to_string(gmm::MX_SPLIT_K_PER_TOKEN_SCALE_DIM)));
+    auto scale1LastDimValue = params.scale1Optional->GetViewShape().GetDim(gmm::MX_SPLIT_K_PER_TOKEN_SCALE_DIM - 1);
+    auto scale2LastDimValue = params.scale2->GetViewShape().GetDim(gmm::MX_SPLIT_K_SCALE_DIM - 1);
+    QGMM_INPLACE_ADD_CHECK_REPORT(
+        scale1LastDimValue == 1, return ACLNN_ERR_PARAM_INVALID,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale1",
+                                              ViewShapeToString(params.scale1Optional),
+                                              "in HIFLOAT4 quant mode, last dim of scale1 must be equal to 1"));
+    QGMM_INPLACE_ADD_CHECK_REPORT(scale2LastDimValue == 1, return ACLNN_ERR_PARAM_INVALID,
+                                  OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                                      QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale2", ViewShapeToString(params.scale2),
+                                      "in HIFLOAT4 quant mode, last dim of scale2 must be equal to 1"));
+    return ACLNN_SUCCESS;
+}
+
 static aclnnStatus CheckShape(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams params)
 {
     auto x2DimNum = params.x2->GetViewShape().GetDimNum();
@@ -214,8 +242,21 @@ static aclnnStatus CheckShape(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams
 
 static aclnnStatus CheckDtype(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams params)
 {
+    static const std::vector<DataType> commonInputTypes = {DataType::DT_FLOAT8_E4M3FN, DataType::DT_FLOAT8_E5M2,
+                                                           DataType::DT_HIFLOAT8};
+    static const std::vector<DataType> inputTypesDav92 = {DataType::DT_FLOAT8_E4M3FN, DataType::DT_FLOAT8_E5M2,
+                                                          DataType::DT_HIFLOAT8, Ops::Transformer::DT_HIFLOAT4};
+    const auto& supportedInputTypes =
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ? inputTypesDav92 : commonInputTypes;
     auto x1Dtype = params.x1->GetDataType();
     auto x2Dtype = params.x2->GetDataType();
+    QGMM_INPLACE_ADD_CHECK_REPORT(
+        gmm::CheckDTypeInVector(x1Dtype, supportedInputTypes) && gmm::CheckDTypeInVector(x2Dtype, supportedInputTypes),
+        return ACLNN_ERR_PARAM_INVALID,
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+            QGMM_INPLACE_ADD_ACLNN_OP_NAME, "x1 and x2",
+            "x1=" + std::string(op::ToString(x1Dtype).GetString()) + ", x2=" + op::ToString(x2Dtype).GetString(),
+            "supported input types on the current platform: " + gmm::DTypeVectorToString(supportedInputTypes)));
     QGMM_INPLACE_ADD_CHECK_REPORT(
         params.yRef->GetDataType() == DataType::DT_FLOAT, return ACLNN_ERR_PARAM_INVALID,
         OP_LOGE_FOR_INVALID_DTYPE(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "yRef",
@@ -235,12 +276,24 @@ static aclnnStatus CheckDtype(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams
             params.scale1Optional->GetDataType() == DataType::DT_FLOAT8_E8M0, return ACLNN_ERR_PARAM_INVALID,
             OP_LOGE_FOR_INVALID_DTYPE(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale1",
                                       op::ToString(params.scale1Optional->GetDataType()).GetString(), "FLOAT8_E8M0"));
+    } else if (x1Dtype == Ops::Transformer::DT_HIFLOAT4 && x2Dtype == Ops::Transformer::DT_HIFLOAT4) {
+        CHECK_COND(CheckHiF4QuantDim(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID,
+                   "Check CheckHiF4QuantDim failed.");
+        QGMM_INPLACE_ADD_CHECK_REPORT(
+            params.scale2->GetDataType() == Ops::Transformer::DT_HIFLOAT4_SCALE, return ACLNN_ERR_PARAM_INVALID,
+            OP_LOGE_FOR_INVALID_DTYPE(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale2",
+                                      op::ToString(params.scale2->GetDataType()).GetString(), "HIFLOAT4_SCALE"));
+        QGMM_INPLACE_ADD_CHECK_REPORT(
+            params.scale1Optional->GetDataType() == Ops::Transformer::DT_HIFLOAT4_SCALE, return ACLNN_ERR_PARAM_INVALID,
+            OP_LOGE_FOR_INVALID_DTYPE(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale1",
+                                      op::ToString(params.scale1Optional->GetDataType()).GetString(),
+                                      "HIFLOAT4_SCALE"));
     } else if (!(x1Dtype == DataType::DT_HIFLOAT8 && x2Dtype == DataType::DT_HIFLOAT8)) {
         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
             QGMM_INPLACE_ADD_ACLNN_OP_NAME, "x1 and x2",
             "x1=" + std::string(op::ToString(x1Dtype).GetString()) + ", x2=" + op::ToString(x2Dtype).GetString(),
             "in quant case, the dtypes of x1 and x2 must be within the range both FLOAT8_E4M3FN/FLOAT8_E5M2 "
-            "or both HIFLOAT8");
+            "or both HIFLOAT8 or both HIFLOAT4");
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
@@ -277,7 +330,8 @@ static aclnnStatus CheckParams(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParam
         auto checker = QGmmInPlaceAdd::AclnnQuantGroupedMatmulInplaceAddDAV3510Checker<aclTensor>(gmmParams);
         checker.SetInputName("x1", "x2", "scale1Optional", "scale2", "groupList");
         CHECK_RET(checker.CheckQuantGroupedMatmulInplaceAddDAV3510() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
-    } else {
+    } else if (!(params.x1->GetDataType() == Ops::Transformer::DT_HIFLOAT4 &&
+                 params.x2->GetDataType() == Ops::Transformer::DT_HIFLOAT4)) {
         auto checker = gmm::AclnnGroupedMatmulDAV3510Checker<aclTensor>(gmmParams);
         checker.SetInputName("x1", "x2", "scale1Optional", "scale2", "groupList");
         checker.SetAclnnOpName(QGMM_INPLACE_ADD_ACLNN_OP_NAME);

@@ -14,6 +14,7 @@
 namespace op {
 
 SocVersion g_socVersion = SocVersion::ASCEND910B;
+NpuArch g_npuArchOverride = NpuArch::DAV_RESV;
 PlatformInfo* g_platformInfo = new PlatformInfo();
 
 bool PlatformInfo::CheckSupport(SocSpec socSpec, SocSpecAbility ability) const
@@ -86,6 +87,9 @@ const PlatformInfo& GetCurrentPlatformInfo()
 
 NpuArch PlatformInfo::GetCurNpuArch() const
 {
+    if (g_npuArchOverride != NpuArch::DAV_RESV) {
+        return g_npuArchOverride;
+    }
     static const std::map<SocVersion, NpuArch> soc2ArchMap = {
         {SocVersion::ASCEND910, NpuArch::DAV_1001},    {SocVersion::ASCEND910B, NpuArch::DAV_2201},
         {SocVersion::ASCEND910_93, NpuArch::DAV_2201}, {SocVersion::ASCEND950, NpuArch::DAV_3510},
@@ -121,11 +125,13 @@ ge::AscendString ToString(SocVersion socVersion)
 
 void SetPlatformSocVersion(SocVersion socVersion)
 {
+    g_npuArchOverride = NpuArch::DAV_RESV;
     g_socVersion = socVersion;
 }
 
 void SetPlatformNpuArch(NpuArch npuArch)
 {
+    g_npuArchOverride = npuArch;
     static const std::map<NpuArch, SocVersion> NpuArchSocVersionMap = {
         {NpuArch::DAV_3510, SocVersion::ASCEND950},
         {NpuArch::DAV_RESV, SocVersion::RESERVED_VERSION},

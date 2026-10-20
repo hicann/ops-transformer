@@ -196,7 +196,7 @@ public:
                                       int32_t curRow, int32_t curCol, int32_t l0CTileH, int32_t l0CTileW, int32_t baseM,
                                       int32_t baseN, int32_t orgM, int32_t orgN, int32_t orgKc, uint8_t id = 0)
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
         l0CTileH = AscendC::Align(l0CTileH, 2); // 2 means SplitM scenario aligned to 2
         uint32_t stride = l0CTileW;
         int64_t dstOffset = 0;
@@ -216,7 +216,11 @@ public:
         } else if constexpr (AscendC::IsSameType<DstT, bfloat16_t>::value && AscendC::IsSameType<SrcT, float>::value) {
             params.quantPre = QuantMode_t::F322BF16;
         }
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+        params.dualDstCtl = static_cast<uint8_t>(AscendC::McgShfMode::SINGLE_DST_MODE);
+#else
         params.dualDstCtl = static_cast<uint8_t>(AscendC::McgShfMode::DUAL_DST_SPLIT_M);
+#endif
         params.subBlockId = id;
         AscendC::Fixpipe<DstT, SrcT, AscendC::Impl::CFG_ROW_MAJOR_UB>(dst[dstOffset], src, params);
 #else

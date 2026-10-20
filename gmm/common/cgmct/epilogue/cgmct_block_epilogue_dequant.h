@@ -15,7 +15,7 @@
 
 #ifndef EPILOGUE_BLOCK_EPILOGUE_DEQUANT_H
 #define EPILOGUE_BLOCK_EPILOGUE_DEQUANT_H
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"
 #else

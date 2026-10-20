@@ -11,6 +11,8 @@
 #ifndef OP_API_INC_GROUPED_MATMUL_FINALIZE_ROUTING_WEIGHT_QUANT_950_CHECKER_H
 #define OP_API_INC_GROUPED_MATMUL_FINALIZE_ROUTING_WEIGHT_QUANT_950_CHECKER_H
 #include "opdev/format_utils.h"
+#include "opdev/platform.h"
+#include "common/include/op_host/op_const_def_transformer.h"
 #include <vector>
 #include "aclnn_kernels/common/op_error_check.h"
 #include "quant_grouped_matmul_finalize_routing_util.h"
@@ -42,13 +44,17 @@ constexpr size_t WQ_DIM_FOUR = 4UL;
 constexpr size_t WQ_DIM_FIVE = 5UL;
 constexpr int64_t WQ_GMMFR_SPLIT_SIZE = 64L;
 constexpr int64_t WQ_GMMFR_SPLIT_FACTOR = 2L;
+constexpr int64_t WQ_GMMFR_HIF4_SPLIT_FACTOR = 1L;
 constexpr int64_t WQ_MAX_NUM_EXPERTS = 1024L;
 constexpr int64_t K_ALIGN_SIZE = 32L;
 constexpr int64_t N_ALIGN_SIZE = 32L;
 
 static const std::vector<op::DataType> A8W4_X_TYPE_LIST = {op::DataType::DT_FLOAT8_E4M3FN};
 static const std::vector<op::DataType> A8W4_W_TYPE_LIST = {op::DataType::DT_FLOAT4_E2M1};
+static const std::vector<op::DataType> A8W4_HIF4_W_TYPE_LIST = {op::DataType::DT_FLOAT4_E2M1,
+                                                                Ops::Transformer::DT_HIFLOAT4};
 static const std::vector<op::DataType> A8W4_SCALE_TYPE_LIST = {op::DataType::DT_FLOAT8_E8M0};
+static const std::vector<op::DataType> A8HIF4_SCALE_TYPE_LIST = {Ops::Transformer::DT_HIFLOAT4_SCALE};
 static const std::vector<op::DataType> A8W4_PERTOKEN_SCALE_TYPE_LIST = {op::DataType::DT_FLOAT8_E8M0};
 static const std::vector<op::DataType> A8W4_BIAS_TYPE_LIST = {op::DataType::DT_BF16};
 static const std::vector<op::DataType> A8W4_GROUP_LIST_TYPE_LIST = {op::DataType::DT_INT64};
@@ -64,6 +70,7 @@ public:
     aclnnStatus CheckParams(GroupedMatmulParams& gmmParams)
     {
         gmmParams_ = gmmParams;
+        npuArch_ = op::GetCurrentPlatformInfo().GetCurNpuArch();
         // 1. 检查参数是否为空指针
         CHECK_RET(CheckNotNull() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR);
         // 2. 检查输入的数据类型是否在支持的数据类型范围之内
@@ -78,6 +85,12 @@ public:
         // 6. 检查数据形状是否支持
         CHECK_RET(CheckFormat(), ACLNN_ERR_PARAM_INVALID);
         return ACLNN_SUCCESS;
+    }
+
+    bool IsMxA8Hif4() const
+    {
+        return gmmParams_.x1->GetDataType() == op::DataType::DT_FLOAT8_E4M3FN &&
+               gmmParams_.x2->GetDataType() == Ops::Transformer::DT_HIFLOAT4;
     }
 
     aclnnStatus CheckAttrs()
@@ -254,8 +267,9 @@ public:
         // MxA8W4 only supports transposed weight: viewShape=(e, n, k)
         op::Shape weightExpectShape = {e, n, k};
         // MxA8W4 scale shape: (e, n, ceil(k/64), 2)
+        int64_t weightScaleLastDim = IsMxA8Hif4() ? WQ_GMMFR_HIF4_SPLIT_FACTOR : WQ_GMMFR_SPLIT_FACTOR;
         op::Shape weightScaleExpectShape =
-            op::Shape{e, n, Ops::Base::CeilDiv(k, WQ_GMMFR_SPLIT_SIZE), WQ_GMMFR_SPLIT_FACTOR};
+            op::Shape{e, n, Ops::Base::CeilDiv(k, WQ_GMMFR_SPLIT_SIZE), weightScaleLastDim};
         op::Shape xScaleExpectShape = op::Shape{m, Ops::Base::CeilDiv(k, WQ_GMMFR_SPLIT_SIZE), WQ_GMMFR_SPLIT_FACTOR};
         op::Shape grouplistExpectShape = {e};
         op::Shape logitExpectShape = {m};
@@ -331,8 +345,10 @@ public:
     bool CheckDtypeValid()
     {
         OP_CHECK_DTYPE_NOT_SUPPORT_WITH_REASON(ACLNN_NAME, gmmParams_.x1, A8W4_X_TYPE_LIST, return false);
-        OP_CHECK_DTYPE_NOT_SUPPORT_WITH_REASON(ACLNN_NAME, gmmParams_.x2, A8W4_W_TYPE_LIST, return false);
-        OP_CHECK_DTYPE_NOT_SUPPORT_WITH_REASON(ACLNN_NAME, gmmParams_.scale, A8W4_SCALE_TYPE_LIST, return false);
+        const auto& weightTypes = npuArch_ == NpuArch::DAV_9201 ? A8W4_HIF4_W_TYPE_LIST : A8W4_W_TYPE_LIST;
+        const auto& scaleTypes = IsMxA8Hif4() ? A8HIF4_SCALE_TYPE_LIST : A8W4_SCALE_TYPE_LIST;
+        OP_CHECK_DTYPE_NOT_SUPPORT_WITH_REASON(ACLNN_NAME, gmmParams_.x2, weightTypes, return false);
+        OP_CHECK_DTYPE_NOT_SUPPORT_WITH_REASON(ACLNN_NAME, gmmParams_.scale, scaleTypes, return false);
         OP_CHECK_DTYPE_NOT_SUPPORT_WITH_REASON(ACLNN_NAME, gmmParams_.rowIndex, A8W4_ROW_INDEX_TYPE_LIST, return false);
         OP_CHECK_DTYPE_NOT_SUPPORT_WITH_REASON(ACLNN_NAME, gmmParams_.pertokenScaleOptional,
                                                A8W4_PERTOKEN_SCALE_TYPE_LIST, return false);
@@ -427,6 +443,7 @@ public:
 
 private:
     GroupedMatmulParams gmmParams_;
+    NpuArch npuArch_ = NpuArch::DAV_RESV;
 };
 } // namespace GmmFinalizeRouting
 #endif
