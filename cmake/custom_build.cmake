@@ -42,7 +42,7 @@ if (BUILD_OPEN_PROJECT)
             $<$<COMPILE_LANGUAGE:CXX>:-std=gnu++1z>
     )
     target_include_directories(op_host_aclnn PRIVATE
-            ${PROJECT_SOURCE_DIR}
+            ${OPS_TRANSFORMER_DIR}
     )
 
     add_library(op_host_aclnnInner SHARED EXCLUDE_FROM_ALL)
@@ -53,7 +53,7 @@ if (BUILD_OPEN_PROJECT)
             $<$<COMPILE_LANGUAGE:CXX>:-std=gnu++1z>
     )
     target_include_directories(op_host_aclnnInner PRIVATE
-            ${PROJECT_SOURCE_DIR}
+            ${OPS_TRANSFORMER_DIR}
     )
 
     add_library(op_host_aclnnExc SHARED EXCLUDE_FROM_ALL)
@@ -64,7 +64,7 @@ if (BUILD_OPEN_PROJECT)
             $<$<COMPILE_LANGUAGE:CXX>:-std=gnu++1z>
     )
     target_include_directories(op_host_aclnnExc PRIVATE
-            ${PROJECT_SOURCE_DIR}
+            ${OPS_TRANSFORMER_DIR}
     )
 
     # op api
@@ -80,7 +80,7 @@ if (BUILD_OPEN_PROJECT)
             $<$<COMPILE_LANGUAGE:CXX>:-std=gnu++1z>
     )
     target_include_directories(cust_opapi PRIVATE
-            ${PROJECT_SOURCE_DIR}
+            ${OPS_TRANSFORMER_DIR}
             $<BUILD_INTERFACE:${ASCEND_CANN_PACKAGE_PATH}/include>
             $<BUILD_INTERFACE:${ASCEND_CANN_PACKAGE_PATH}/include/aclnn>
     )
@@ -116,6 +116,7 @@ if (BUILD_OPEN_PROJECT)
 
     # op proto
     add_library(cust_proto SHARED)
+    target_include_directories(cust_proto PRIVATE ${OPS_TRANSFORMER_DIR})
     target_compile_options(cust_proto PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:-std=c++11>
             -fvisibility=hidden
@@ -582,7 +583,7 @@ if (BUILD_OPEN_PROJECT)
             ${ops_aclnn_src}
     )
     target_include_directories(ops_aclnn PRIVATE
-            ${PROJECT_SOURCE_DIR}
+            ${OPS_TRANSFORMER_DIR}
             ${PROJECT_SOURCE_DIR}/common/include/common
             ${PROJECT_SOURCE_DIR}/common/include/static
     )
@@ -956,6 +957,7 @@ if(generate_proto_srcs AND TARGET cust_proto AND NOT ENABLE_BUILT_IN AND NOT ENA
         -Wl,--as-needed
     )
     target_link_directories(proto_transformer_cust PRIVATE ${ASCEND_DIR}/${SYSTEM_PREFIX}/lib64)
+    target_include_directories(proto_transformer_cust PRIVATE ${OPS_TRANSFORMER_DIR})
 
     add_es_library(
         ES_LINKABLE_AND_ALL_TARGET es_transformer_cust

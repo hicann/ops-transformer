@@ -71,7 +71,7 @@ function(gen_es_transformer_lib_builtin)
   )
   target_include_directories(proto_temp_transformer
     PRIVATE
-    ${PROJECT_SOURCE_DIR}/common/include/op_host
+    ${OPS_TRANSFORMER_DIR}/common/include/op_host
   )
   add_es_library_and_whl(
     ES_LINKABLE_AND_ALL_TARGET es_transformer
@@ -136,7 +136,7 @@ function(gen_opgraph_symbol)
   )
   target_include_directories(${OPGRAPH_NAME}
     PRIVATE
-    ${PROJECT_SOURCE_DIR}/common/include/op_host
+    ${OPS_TRANSFORMER_DIR}/common/include/op_host
   )
 
   if(TARGET ${GRAPH_PLUGIN_NAME}_obj)
@@ -169,7 +169,7 @@ function(gen_opgraph_symbol)
   install(FILES ${ASCEND_GRAPH_CONF_DST}/ops_proto_transformer.h
     DESTINATION ${OPGRAPH_INC_INSTALL_DIR} OPTIONAL
   )
-  install(FILES ${PROJECT_SOURCE_DIR}/common/include/op_host/op_const_def_transformer.h
+  install(FILES ${OPS_TRANSFORMER_DIR}/common/include/op_host/op_const_def_transformer.h
     DESTINATION ${OPGRAPH_INC_INSTALL_DIR} OPTIONAL
   )
 endfunction()
