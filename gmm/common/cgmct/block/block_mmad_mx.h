@@ -114,11 +114,6 @@ public:
 #endif
 
     bool enablePreAllocate_ = false;
-#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
-    static constexpr bool SUPPORT_PREALLOCATE = true;
-#else
-    static constexpr bool SUPPORT_PREALLOCATE = false;
-#endif
 
     struct Params {
         GM_ADDR aGmAddr{nullptr};
@@ -245,18 +240,18 @@ public:
 
     __aicore__ inline void SetPreAllocFlag(const TileL1L0Param& tileL1L0Param)
     {
-        if constexpr (SUPPORT_PREALLOCATE) {
-            uint64_t aL1Elems = tileL1L0Param.curM * kAL1_;
-            uint64_t bL1Elems = tileL1L0Param.curN * kBL1_;
-            if constexpr (IS_FP4_HIF4_A) {
-                aL1Elems >>= 1;
-            }
-            if constexpr (IS_FP4_HIF4_B) {
-                bL1Elems >>= 1;
-            }
-            uint64_t abL1Size = aL1Elems * sizeof(AType) + bL1Elems * sizeof(BType);
-            enablePreAllocate_ = (abL1Size <= PREALLOC_BL1_THRESHOLD);
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+        uint64_t aL1Elems = tileL1L0Param.curM * kAL1_;
+        uint64_t bL1Elems = tileL1L0Param.curN * kBL1_;
+        if constexpr (IS_FP4_HIF4_A) {
+            aL1Elems >>= 1;
         }
+        if constexpr (IS_FP4_HIF4_B) {
+            bL1Elems >>= 1;
+        }
+        uint64_t abL1Size = aL1Elems * sizeof(AType) + bL1Elems * sizeof(BType);
+        enablePreAllocate_ = (abL1Size <= PREALLOC_BL1_THRESHOLD);
+#endif
     }
 
     __aicore__ inline void CopyInA1(const AscendC::GlobalTensor<AType>& aGlobal,
@@ -280,11 +275,11 @@ public:
         nd2nzParams.dstNzC0Stride = transA ? tileL1L0Param.curPadAKL1 : tileL1L0Param.curAlignM;
         nd2nzParams.dstNzNStride = 1;
         nd2nzParams.dstNzMatrixStride = 1;
-        if constexpr (SUPPORT_PREALLOCATE) {
-            AscendC::DataCopy(al1Local, aGlobal, nd2nzParams, enablePreAllocate_);
-        } else {
-            AscendC::DataCopy(al1Local, aGlobal, nd2nzParams);
-        }
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+        AscendC::DataCopy(al1Local, aGlobal, nd2nzParams, enablePreAllocate_);
+#else
+        AscendC::DataCopy(al1Local, aGlobal, nd2nzParams);
+#endif
     }
 
     __aicore__ inline void CopyInB1(const AscendC::GlobalTensor<BType>& bGlobal,
@@ -308,11 +303,11 @@ public:
         nd2nzParams.dstNzC0Stride = transB ? tileL1L0Param.curAlignN : tileL1L0Param.curPadBKL1;
         nd2nzParams.dstNzNStride = 1;
         nd2nzParams.dstNzMatrixStride = 1;
-        if constexpr (SUPPORT_PREALLOCATE) {
-            AscendC::DataCopy(bl1Local, bGlobal, nd2nzParams, enablePreAllocate_);
-        } else {
-            AscendC::DataCopy(bl1Local, bGlobal, nd2nzParams);
-        }
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+        AscendC::DataCopy(bl1Local, bGlobal, nd2nzParams, enablePreAllocate_);
+#else
+        AscendC::DataCopy(bl1Local, bGlobal, nd2nzParams);
+#endif
     }
 
     __aicore__ inline void CopyInB1WeightNz(const AscendC::GlobalTensor<BType>& bGlobal,
@@ -460,11 +455,11 @@ public:
             }
             dn2nzParams.dstNzNStride = 1;
             dn2nzParams.dstNzMatrixStride = 0;
-            if constexpr (SUPPORT_PREALLOCATE) {
-                AscendC::DataCopy(aScaleL1LocalImpl, aScaleGlobalB16[offsetScaleAGM], dn2nzParams, enablePreAllocate_);
-            } else {
-                AscendC::DataCopy(aScaleL1LocalImpl, aScaleGlobalB16[offsetScaleAGM], dn2nzParams);
-            }
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+            AscendC::DataCopy(aScaleL1LocalImpl, aScaleGlobalB16[offsetScaleAGM], dn2nzParams, enablePreAllocate_);
+#else
+            AscendC::DataCopy(aScaleL1LocalImpl, aScaleGlobalB16[offsetScaleAGM], dn2nzParams);
+#endif
         } else {
             AscendC::Nd2NzParams nd2nzParams;
             nd2nzParams.ndNum = 1;
@@ -485,11 +480,11 @@ public:
             }
             nd2nzParams.dstNzNStride = 1;
             nd2nzParams.dstNzMatrixStride = 0;
-            if constexpr (SUPPORT_PREALLOCATE) {
-                AscendC::DataCopy(aScaleL1LocalImpl, aScaleGlobalB16[offsetScaleAGM], nd2nzParams, enablePreAllocate_);
-            } else {
-                AscendC::DataCopy(aScaleL1LocalImpl, aScaleGlobalB16[offsetScaleAGM], nd2nzParams);
-            }
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+            AscendC::DataCopy(aScaleL1LocalImpl, aScaleGlobalB16[offsetScaleAGM], nd2nzParams, enablePreAllocate_);
+#else
+            AscendC::DataCopy(aScaleL1LocalImpl, aScaleGlobalB16[offsetScaleAGM], nd2nzParams);
+#endif
         }
     }
 
@@ -530,11 +525,11 @@ public:
             }
             dn2nzParams.dstNzNStride = 1;
             dn2nzParams.dstNzMatrixStride = 0;
-            if constexpr (SUPPORT_PREALLOCATE) {
-                AscendC::DataCopy(bScaleL1LocalImpl, bScaleGlobalB16[offsetScaleBGM], dn2nzParams, enablePreAllocate_);
-            } else {
-                AscendC::DataCopy(bScaleL1LocalImpl, bScaleGlobalB16[offsetScaleBGM], dn2nzParams);
-            }
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+            AscendC::DataCopy(bScaleL1LocalImpl, bScaleGlobalB16[offsetScaleBGM], dn2nzParams, enablePreAllocate_);
+#else
+            AscendC::DataCopy(bScaleL1LocalImpl, bScaleGlobalB16[offsetScaleBGM], dn2nzParams);
+#endif
         } else {
             AscendC::Nd2NzParams nd2nzParams;
             nd2nzParams.ndNum = 1;
@@ -555,11 +550,11 @@ public:
             }
             nd2nzParams.dstNzNStride = 1;
             nd2nzParams.dstNzMatrixStride = 0;
-            if constexpr (SUPPORT_PREALLOCATE) {
-                AscendC::DataCopy(bScaleL1LocalImpl, bScaleGlobalB16[offsetScaleBGM], nd2nzParams, enablePreAllocate_);
-            } else {
-                AscendC::DataCopy(bScaleL1LocalImpl, bScaleGlobalB16[offsetScaleBGM], nd2nzParams);
-            }
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+            AscendC::DataCopy(bScaleL1LocalImpl, bScaleGlobalB16[offsetScaleBGM], nd2nzParams, enablePreAllocate_);
+#else
+            AscendC::DataCopy(bScaleL1LocalImpl, bScaleGlobalB16[offsetScaleBGM], nd2nzParams);
+#endif
         }
     }
 

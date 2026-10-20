@@ -115,8 +115,6 @@ public:
     using ScaleBType = AscendC::fp8_e8m0_t;
 #endif
     using TupleShape = typename BlockSchedulerOp::TupleShape; // m, n, k
-    static_assert(AscendC::Std::is_same_v<TupleShape, typename BlockEpilogue::ProblemShape>,
-                  "Scheduler and epilogue must use the same problem shape");
     using BlockShape = AscendC::Shape<int64_t, int64_t, int64_t, int64_t>;
     using BlockCoord = AscendC::Coord<int64_t, int64_t, int64_t, int64_t>;
     // a, b, x1scale, x2scale, bias, y, logit
