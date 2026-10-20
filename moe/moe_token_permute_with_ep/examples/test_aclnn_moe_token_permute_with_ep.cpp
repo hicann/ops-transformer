@@ -45,7 +45,7 @@ int Init(int32_t deviceId, aclrtStream* stream)
 template <typename T>
 int CreateAclIntArray(const std::vector<T>& hostData, void** deviceAddr, aclIntArray** intArray)
 {
-    auto size = GetShapeSize(hostData) * sizeof(T);
+    auto size = hostData.size() * sizeof(T);
     // Call aclrtMalloc to allocate memory on the device.
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
