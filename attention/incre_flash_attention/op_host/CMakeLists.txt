@@ -18,13 +18,20 @@ endif()
 
 set(incre_flash_attention_mc62_arch_directory arch38 CACHE INTERNAL "incre_flash_attention mc62 arch")
 
+set(incre_flash_attention_compile_options
+    --cce-auto-sync=off
+    -Wno-deprecated-declarations
+    -mllvm -cce-vf-remove-membar=false
+    -Werror
+)
+
+if(NOT "${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend310p")
+    list(APPEND incre_flash_attention_compile_options -DFORCE_TILING_CONST_PROPAGATION)
+endif()
+
 add_ops_compile_options(
     OP_NAME IncreFlashAttention
-    OPTIONS --cce-auto-sync=off
-            -Wno-deprecated-declarations
-            -mllvm -cce-vf-remove-membar=false
-            -Werror
-            -DFORCE_TILING_CONST_PROPAGATION
+    OPTIONS ${incre_flash_attention_compile_options}
 )
 
 add_modules_sources_with_soc(
