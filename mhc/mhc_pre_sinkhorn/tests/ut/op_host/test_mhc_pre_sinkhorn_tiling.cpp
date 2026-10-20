@@ -21,6 +21,7 @@ using namespace std;
 
 namespace {
 constexpr char ASCEND950_SOC_VERSION[] = "Ascend950";
+constexpr char ASCEND910B_SOC_VERSION[] = "Ascend910B";
 constexpr int64_t HC_MULT = 4;
 constexpr int64_t HC_MIX = 24;
 constexpr int64_t NUM_ITERS = 20;
@@ -345,7 +346,7 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_B1_S1024_N4_C512)
     int64_t phiDim0 = hcMix;
     int64_t phiDim1 = N * C;
 
-    optiling::MhcPreSinkhornCompileInfo compileInfo = {};
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {64, 0, 262144, SYS_WORKSPACE_SIZE, 2};
 
     gert::TilingContextPara tilingContextPara(
         "MhcPreSinkhorn",
@@ -372,16 +373,16 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_B1_S1024_N4_C512)
             {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(normEps)},
             {"need_backward", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
         },
-        &compileInfo);
+        &compileInfo, ASCEND910B_SOC_VERSION, 64, 262144);
 
     int64_t expectTilingKey = 0;
     string expectTilingData =
-        "1024 24 4 512 8 26 10 26 10 0 1 1 1 512 512 20 3856831416675743677 0 0 0 0 1 2048 0 0 0 0 128 256 4 1 0 "
-        "1024 512 256 0 0 0 0 0 0 0 0 40 0 20 21 0 0 0 1 128 8 128 128 26 10 26 10 40 1 1 1 256 128 256 4 40 20 "
-        "26 10 1 32 8 256 256 20971520 274877906945 8796093022232 274877908992 8796093022232 137438953536 "
+        "1024 24 4 512 8 16 16 16 16 0 1 1 1 512 512 20 3856831416675743677 0 0 0 0 1 2048 0 0 0 0 128 256 4 1 0 "
+        "1024 256 256 0 0 0 0 0 0 0 0 64 0 64 21 0 0 0 1 128 8 128 128 16 16 16 16 64 1 1 1 256 128 256 4 64 64 "
+        "16 16 1 32 8 256 256 33554432 274877906945 8796093022232 274877908992 8796093022232 137438953536 "
         "8589934720 4294967298 1 0 422212465065984 8192 4294967297 4294967297 4294967297 0 8589934594 1 0 0 0 0 0 "
         "0 0 0 ";
-    std::vector<size_t> expectWorkspaces = {171966464};
+    std::vector<size_t> expectWorkspaces = {184549376};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
@@ -398,7 +399,7 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_3d_S1024_N4_C512)
     int64_t phiDim0 = hcMix;
     int64_t phiDim1 = N * C;
 
-    optiling::MhcPreSinkhornCompileInfo compileInfo = {};
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {64, 0, 262144, SYS_WORKSPACE_SIZE, 2};
 
     gert::TilingContextPara tilingContextPara(
         "MhcPreSinkhorn",
@@ -425,16 +426,16 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_3d_S1024_N4_C512)
             {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(normEps)},
             {"need_backward", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
         },
-        &compileInfo);
+        &compileInfo, ASCEND910B_SOC_VERSION, 64, 262144);
 
     int64_t expectTilingKey = 0;
     string expectTilingData =
-        "1024 24 4 512 8 26 10 26 10 0 1 1 1 512 512 20 3856831416675743677 0 0 0 0 1 2048 0 0 0 0 128 256 4 1 0 "
-        "1024 512 256 0 0 0 0 0 0 0 0 40 0 20 21 0 0 0 1 128 8 128 128 26 10 26 10 40 1 1 1 256 128 256 4 40 20 "
-        "26 10 1 32 8 256 256 20971520 274877906945 8796093022232 274877908992 8796093022232 137438953536 "
+        "1024 24 4 512 8 16 16 16 16 0 1 1 1 512 512 20 3856831416675743677 0 0 0 0 1 2048 0 0 0 0 128 256 4 1 0 "
+        "1024 256 256 0 0 0 0 0 0 0 0 64 0 64 21 0 0 0 1 128 8 128 128 16 16 16 16 64 1 1 1 256 128 256 4 64 64 "
+        "16 16 1 32 8 256 256 33554432 274877906945 8796093022232 274877908992 8796093022232 137438953536 "
         "8589934720 4294967298 1 0 422212465065984 8192 4294967297 4294967297 4294967297 0 8589934594 1 0 0 0 0 0 "
         "0 0 0 ";
-    std::vector<size_t> expectWorkspaces = {171966464};
+    std::vector<size_t> expectWorkspaces = {184549376};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
@@ -452,7 +453,7 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_B2_S128_N4_C256)
     int64_t phiDim0 = hcMix;
     int64_t phiDim1 = N * C;
 
-    optiling::MhcPreSinkhornCompileInfo compileInfo = {};
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {64, 0, 262144, SYS_WORKSPACE_SIZE, 2};
 
     gert::TilingContextPara tilingContextPara(
         "MhcPreSinkhorn",
@@ -479,15 +480,15 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_B2_S128_N4_C256)
             {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(normEps)},
             {"need_backward", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
         },
-        &compileInfo);
+        &compileInfo, ASCEND910B_SOC_VERSION, 64, 262144);
 
     int64_t expectTilingKey = 0;
     string expectTilingData =
-        "256 24 4 256 8 7 4 7 4 0 1 1 1 256 256 20 3856831416675743677 0 0 0 0 1 1024 0 0 0 0 128 256 1 1 0 "
-        "1024 256 256 0 0 0 0 0 0 0 0 37 0 20 21 0 0 0 1 128 2 128 128 7 4 7 4 37 1 1 1 256 128 256 1 40 20 7 7 "
-        "1 32 4 256 256 10485760 274877906945 4398046511128 274877907968 4398046511128 137438953536 8589934720 "
+        "256 24 4 256 8 4 4 4 4 0 1 1 1 256 256 20 3856831416675743677 0 0 0 0 1 1024 0 0 0 0 128 256 1 1 0 "
+        "1024 256 256 0 0 0 0 0 0 0 0 64 0 64 21 0 0 0 1 128 2 128 128 4 4 4 4 64 1 1 1 256 128 256 1 64 64 4 4 "
+        "1 32 4 256 256 16777216 274877906945 4398046511128 274877907968 4398046511128 137438953536 8589934720 "
         "4294967304 1 0 844424930131968 8192 4294967297 4294967297 34359738369 0 8589934594 1 0 0 0 0 0 0 0 0 ";
-    std::vector<size_t> expectWorkspaces = {161480704};
+    std::vector<size_t> expectWorkspaces = {167772160};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
@@ -505,7 +506,7 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_no_backward_B1_S256_N4_C512)
     int64_t phiDim0 = hcMix;
     int64_t phiDim1 = N * C;
 
-    optiling::MhcPreSinkhornCompileInfo compileInfo = {};
+    optiling::MhcPreSinkhornCompileInfo compileInfo = {64, 0, 262144, SYS_WORKSPACE_SIZE, 2};
 
     gert::TilingContextPara tilingContextPara(
         "MhcPreSinkhorn",
@@ -527,14 +528,14 @@ TEST_F(MhcPreSinkhornTiling, test_tiling_no_backward_B1_S256_N4_C512)
             {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(normEps)},
             {"need_backward", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
         },
-        &compileInfo);
+        &compileInfo, ASCEND910B_SOC_VERSION, 64, 262144);
 
     int64_t expectTilingKey = 0;
     string expectTilingData =
-        "256 24 4 512 8 7 4 7 4 0 1 1 1 512 512 20 3856831416675743677 0 0 0 0 1 2048 0 0 0 0 128 256 1 1 0 "
-        "1024 256 256 0 0 0 0 0 0 0 0 37 0 20 21 0 0 0 0 128 2 128 128 7 4 7 4 37 1 1 1 256 128 256 1 40 20 7 7 "
-        "1 32 8 256 256 20971520 274877906945 8796093022232 274877908992 8796093022232 137438953536 8589934720 "
+        "256 24 4 512 8 4 4 4 4 0 1 1 1 512 512 20 3856831416675743677 0 0 0 0 1 2048 0 0 0 0 128 256 1 1 0 "
+        "1024 256 256 0 0 0 0 0 0 0 0 64 0 64 21 0 0 0 0 128 2 128 128 4 4 4 4 64 1 1 1 256 128 256 1 64 64 4 4 "
+        "1 32 8 256 256 33554432 274877906945 8796093022232 274877908992 8796093022232 137438953536 8589934720 "
         "4294967298 1 0 422212465065984 8192 4294967297 4294967297 4294967297 0 8589934594 1 0 0 0 0 0 0 0 0 ";
-    std::vector<size_t> expectWorkspaces = {171992064};
+    std::vector<size_t> expectWorkspaces = {184574976};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
