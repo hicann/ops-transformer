@@ -36,6 +36,7 @@ enum QuantMode : int64_t {
     FP8_QUANT = 1,
     MXFP4_OCP_QUANT = 2,
     MXFP4_CX_QUANT = 3,
+    MXFP8_OCP_QUANT = 4,
 };
 
 std::tuple<at::Tensor, at::Tensor> npu_block_sparse_attention(
@@ -104,7 +105,25 @@ std::tuple<at::Tensor, at::Tensor> npu_block_sparse_attention(
 
     // block_shape_ref / actual_seq_lengths_ref / actual_seq_lengths_kv_ref 为指向
     // 本作用域存活数据的 IntArrayRef，ACLNN_CMD 内部 ConvertType 会转成 aclIntArray。
-    if (quant_mode == MXFP4_OCP_QUANT || quant_mode == MXFP4_CX_QUANT) {
+    // mxfp4 / mxfp8 都会解引用三个 descale optional，缺任一 scale 须在此拦截。
+    if (quant_mode == MXFP4_OCP_QUANT || quant_mode == MXFP4_CX_QUANT || quant_mode == MXFP8_OCP_QUANT) {
+        TORCH_CHECK(q_dequant_scale.has_value() && q_dequant_scale->defined(), "quant_mode=", quant_mode,
+                    " requires q_dequant_scale");
+        TORCH_CHECK(k_dequant_scale.has_value() && k_dequant_scale->defined(), "quant_mode=", quant_mode,
+                    " requires k_dequant_scale");
+        TORCH_CHECK(v_dequant_scale.has_value() && v_dequant_scale->defined(), "quant_mode=", quant_mode,
+                    " requires v_dequant_scale");
+    }
+    if (quant_mode == MXFP8_OCP_QUANT) {
+        TensorWrapper q_descale_wrapper = make_wrapper(*q_dequant_scale, FLOAT8_E8M0);
+        TensorWrapper k_descale_wrapper = make_wrapper(*k_dequant_scale, FLOAT8_E8M0);
+        TensorWrapper v_descale_wrapper = make_wrapper(*v_dequant_scale, FLOAT8_E8M0);
+        ACLNN_CMD(aclnnBlockSparseAttentionV3, query, key, value, block_sparse_mask, atten_mask, block_shape_ref,
+                  actual_seq_lengths_ref, actual_seq_lengths_kv_ref, block_table, q_descale_wrapper, k_descale_wrapper,
+                  v_descale_wrapper, p_quant_scale, q_layout_ptr, kv_layout_ptr, num_key_value_heads, mask_type,
+                  scale_value, inner_precise, block_size, pre_tokens, next_tokens, softmax_lse_flag, quant_mode,
+                  dst_type_max, attention_out, softmax_lse);
+    } else if (quant_mode == MXFP4_OCP_QUANT || quant_mode == MXFP4_CX_QUANT) {
         TensorWrapper q_wrapper = make_wrapper(query, FLOAT4_E2M1);
         TensorWrapper k_wrapper = make_wrapper(key, FLOAT4_E2M1);
         TensorWrapper v_wrapper = make_wrapper(value, FLOAT4_E2M1);

@@ -8,7 +8,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 from enum import IntEnum
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import torch
 import torch_npu  # noqa: F401
@@ -17,10 +17,26 @@ from torch.library import impl
 
 
 class QuantMode(IntEnum):
+    """quant_mode 枚举：对外字符串/int 经由本枚举映射为传给算子侧的 int。"""
+
     NO_QUANT = 0
     FP8_QUANT = 1
     MXFP4_OCP_QUANT = 2
     MXFP4_CX_QUANT = 3
+    MXFP8_OCP_QUANT = 4
+
+
+def _resolve_quant_mode(quant_mode: Union[str, int, "QuantMode"]) -> int:
+    """对外 str/int/IntEnum quant_mode 统一为传给算子侧的 int；校验取值合法性。"""
+    if isinstance(quant_mode, str):
+        try:
+            return int(QuantMode[quant_mode.strip().upper()])
+        except KeyError as exc:
+            valid = ", ".join(m.name.lower() for m in QuantMode)
+            raise ValueError(
+                f"quant_mode should be one of [{valid}], but got {quant_mode!r}"
+            ) from exc
+    return int(QuantMode(quant_mode))
 
 
 class BlockSparseAttentionOpBuilder(OpBuilder):
@@ -78,7 +94,7 @@ class BlockSparseAttentionOpBuilder(OpBuilder):
             actual_seq_lengths_kv: Optional[List[int]] = None,
             return_softmax_lse: bool = False,
             mask_type: int = 0,
-            quant_mode: int = 0,
+            quant_mode: Union[QuantMode, int] = QuantMode.NO_QUANT,
             block_size: int = 0,
             pre_tokens: int = 2147483647,
             next_tokens: int = 2147483647,
@@ -91,7 +107,8 @@ class BlockSparseAttentionOpBuilder(OpBuilder):
             p_quant_scale: Optional[torch.Tensor] = None,
             attention_out_dtype: Optional[torch.dtype] = None,
         ):
-            # 与 C++ 实现保持一致：quant_mode != 0 时 attention_out_dtype 必填，
+            quant_mode = _resolve_quant_mode(quant_mode)
+            # 与 C++ 实现保持一致：quant_mode != NO_QUANT 时 attention_out_dtype 必填，
             # 否则 meta 推断的 dtype 会与实际输出不一致（错误迟到运行时才抛出）
             if attention_out_dtype is not None:
                 out_dtype = attention_out_dtype
@@ -99,7 +116,7 @@ class BlockSparseAttentionOpBuilder(OpBuilder):
                 out_dtype = query.dtype
             else:
                 raise ValueError(
-                    "attention_out_dtype must be specified when quant_mode != 0"
+                    "attention_out_dtype must be specified when quant_mode != NO_QUANT"
                 )
             # FP4: two values pack into one uint8 byte, so last dim is 2*D
             if query.dtype == torch.uint8 and quant_mode in (
@@ -143,7 +160,7 @@ def block_sparse_attention(
     actual_seq_lengths_kv: Optional[List[int]] = None,
     return_softmax_lse: bool = False,
     mask_type: int = 0,
-    quant_mode: int = 0,
+    quant_mode: Union[QuantMode, int] = QuantMode.NO_QUANT,
     block_size: int = 0,
     pre_tokens: int = 2147483647,
     next_tokens: int = 2147483647,
@@ -156,6 +173,7 @@ def block_sparse_attention(
     p_quant_scale: Optional[torch.Tensor] = None,
     attention_out_dtype: Optional[torch.dtype] = None,
 ):
+    quant_mode = _resolve_quant_mode(quant_mode)
     op_module = _op_builder.load()
     return op_module.npu_block_sparse_attention(
         query,
@@ -185,3 +203,6 @@ def block_sparse_attention(
         p_quant_scale,
         attention_out_dtype,
     )
+
+
+block_sparse_attention.QuantMode = QuantMode
