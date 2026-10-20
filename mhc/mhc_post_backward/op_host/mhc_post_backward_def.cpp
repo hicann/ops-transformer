@@ -105,6 +105,7 @@ public:
             .ExtendCfgInfo("opFile.value", "mhc_post_backward_apt");
         this->AICore().AddConfig("ascend950", aicore_Config_950);
         this->AICore().AddConfig("ascend350", aicore_Config_950);
+        this->AICore().AddConfig("ascend960dt", aicore_Config_950);
     }
 };
 

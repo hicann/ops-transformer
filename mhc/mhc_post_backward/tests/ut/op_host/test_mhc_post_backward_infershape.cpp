@@ -196,6 +196,8 @@ TEST_F(MhcPostBackward, MhcPostBackward_unknowshape3)
          {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
          {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
         {});
+    // x 为空 shape（DimNum=0）时既非未知 rank（{-2}）也非未知 shape（含 -1），
+    // 而 x 为必填且 rank 必须为 3/4，故 infershape 正确返回 GRAPH_FAILED
     std::vector<std::vector<int64_t>> expectOutputShape = {};
-    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
 }

@@ -67,9 +67,9 @@ static aclnnStatus CheckNotNull(const aclTensor* gradOutput, const aclTensor* x,
 {
     CHECK_COND(gradOutput != nullptr, ACLNN_ERR_PARAM_NULLPTR, "gradOutput must not be nullptr.");
     CHECK_COND(x != nullptr, ACLNN_ERR_PARAM_NULLPTR, "x must not be nullptr.");
-    // hRes is optional on A5 (DAV_3510), required on A2/A3
+    // hRes is optional on DAV_3510 / DAV_9201, required on A2/A3
     auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
-    if (npuArch != NpuArch::DAV_3510) {
+    if (npuArch != NpuArch::DAV_3510 && npuArch != NpuArch::DAV_9201) {
         CHECK_COND(hRes != nullptr, ACLNN_ERR_PARAM_NULLPTR, "hRes must not be nullptr.");
     }
     CHECK_COND(hOut != nullptr, ACLNN_ERR_PARAM_NULLPTR, "hOut must not be nullptr.");
@@ -382,7 +382,7 @@ static aclnnStatus CheckShape(const MhcPostBackwardParams& params)
 
     if (IsTNDFormat(xDimNum)) {
         auto xDim1 = params.x->GetViewShape().GetDim(DIM_IDX_1);
-        if (npuArch == NpuArch::DAV_3510) {
+        if (npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_9201) {
             CHECK_COND((xDim1 == 4) || (xDim1 == 6) || (xDim1 == 8), ACLNN_ERR_PARAM_INVALID,
                        "the dim n should be 4 / 6 / 8 for 3D format");
         } else {
@@ -412,7 +412,7 @@ static aclnnStatus CheckShape(const MhcPostBackwardParams& params)
         CHECK_COND(CheckShape3D(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "invalid shape for 3D format");
     } else {
         auto xDim2 = params.x->GetViewShape().GetDim(DIM_IDX_2);
-        if (npuArch == NpuArch::DAV_3510) {
+        if (npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_9201) {
             CHECK_COND((xDim2 == 4) || (xDim2 == 6) || (xDim2 == 8), ACLNN_ERR_PARAM_INVALID,
                        "the dim n should be 4 / 6 / 8 for 4D format");
         } else {

@@ -302,7 +302,8 @@ protected:
             ApplyErrorModifications(tilingContextPara, errorType, true, n, D, T, 0, 0);
         }
 
-        int64_t expectTilingKey = 0;
+        // arch35 tiling key 将 IS_HRES 编码到 bit1，h_res 生效时 GET_TPL_TILING_KEY(1,1)=2
+        int64_t expectTilingKey = 2;
         string expectTilingDataStr = "";
         ge::graphStatus expectStatus = (errorType == ErrorType::NONE) ? ge::GRAPH_SUCCESS : ge::GRAPH_FAILED;
         std::vector<size_t> expectWorkspaces =
@@ -326,7 +327,8 @@ protected:
             ApplyErrorModifications(tilingContextPara, errorType, false, n, D, 0, B, S);
         }
 
-        int64_t expectTilingKey = 0;
+        // arch35 tiling key 将 IS_HRES 编码到 bit1，h_res 生效时 GET_TPL_TILING_KEY(1,1)=2
+        int64_t expectTilingKey = 2;
         string expectTilingDataStr = "";
         ge::graphStatus expectStatus = (errorType == ErrorType::NONE) ? ge::GRAPH_SUCCESS : ge::GRAPH_FAILED;
         std::vector<size_t> expectWorkspaces =

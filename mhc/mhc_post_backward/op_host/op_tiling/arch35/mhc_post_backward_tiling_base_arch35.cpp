@@ -875,5 +875,7 @@ void MhcPostBackwardTilingBaseArch35::Reset()
 }
 
 REGISTER_TILING_TEMPLATE_WITH_ARCH(MhcPostBackward, MhcPostBackwardTilingBaseArch35,
-                                   static_cast<int32_t>(NpuArch::DAV_3510), 0);
+                                   std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_3510),
+                                                         static_cast<int32_t>(NpuArch::DAV_9201)}),
+                                   0);
 } // namespace optiling
