@@ -21,27 +21,22 @@ Only the slice [start, end) on the last dim is rotated; outside the slice dx == 
 cos/sin have length == sliceLength (end - start) on the last dim and broadcast over
 the leading (B, S, N) dims of dy.
 
-Three test paths share this reference:
-  * kernel (numpy inputs)  — "InplacePartialRotaryMulGrad"
-  * aclnn  (torch inputs)  — "AclnnInplacePartialRotaryMulGrad"
-  * e2e torch path via cann_ops_transformer.ops.inplace_partial_rotary_mul_backward
-    (torch inputs, str rotary_mode) — "CannOpsInplacePartialRotaryMulBackward"
+实现为纯 torch 切片，兼容 Kernel/GEIR（numpy 入参）与 ACLNN/E2E（任意设备上的
+torch tensor 入参，含 NPU/CUDA 三方执行）。
 """
 
-__golden__ = {
-    "kernel": {"inplace_partial_rotary_mul_grad": "InplacePartialRotaryMulGrad"},
-    "aclnn": {"aclnnInplacePartialRotaryMulGrad": "AclnnInplacePartialRotaryMulGrad"},
-    "e2e": {
-        "cann_ops_transformer.ops.inplace_partial_rotary_mul_backward": "CannOpsInplacePartialRotaryMulBackward",
-    },
+__spec__ = {
+    "inplace_partial_rotary_mul_grad": "InplacePartialRotaryMulGradTestSpec",
+    "aclnnInplacePartialRotaryMulGrad": "AclnnInplacePartialRotaryMulGradTestSpec",
+    "cann_ops_transformer.ops.inplace_partial_rotary_mul_backward": "CannOpsInplacePartialRotaryMulBackwardTestSpec",
 }
 
+import sys
+
 import numpy as np
+import torch
 
-# torch 前端的字符串 rotary_mode -> 算子整数 mode（见 torch_extension/
-# inplace_partial_rotary_mul_backward.cpp 的 mode_map；当前仅实现 interleave）
 _TORCH_MODE_INT = {"half": 0, "interleave": 1, "quarter": 2, "interleave-half": 3}
-
 _BF16_NP = None
 
 
@@ -55,122 +50,258 @@ def _bf16_np():
     return _BF16_NP
 
 
-def InplacePartialRotaryMulGrad(
-    dy, cos, sin, *, rotary_mode=0, partial_slice=(0, 0), **extra
-):
-    out_dtype = dy.dtype
-    dx = np.asarray(dy, dtype=np.float32).copy()
+def _rotary_grad_compute(dy_f32, cos_f32, sin_f32, rotary_mode, start, end):
+    """共享 torch 计算（所有入参为 float32 torch tensor），返回 float32 torch tensor。
 
-    start, end = int(partial_slice[0]), int(partial_slice[1])
-    # Empty slice -> no rope, dx == dy
-    if start == end:
-        return dx.astype(out_dtype)
+    dy_f32/out 的 shape 为 (..., D)，cos_f32/sin_f32 的 shape 为 (..., L)，
+    其中 L = end - start，广播到 dy 的 shape。
+    """
+    dx = dy_f32.clone()
 
-    if int(rotary_mode) != 1:
+    if (
+        start == end
+        or dy_f32.numel() == 0
+        or cos_f32.numel() == 0
+        or sin_f32.numel() == 0
+    ):
+        return dx
+
+    if rotary_mode != 1:
         raise NotImplementedError(
             f"golden only supports interleave mode (rotary_mode=1), got {rotary_mode}"
         )
 
     slice_len = end - start
-    # Empty dy / cos / sin -> device treats as no-op (TILING_KEY_EMPTY, dx == dy).
-    if dy.size == 0 or cos.size == 0 or sin.size == 0:
-        return dx.astype(out_dtype)
-    d = dx[..., start:end]  # (..., L)
-    c = np.asarray(cos, dtype=np.float32)[..., :slice_len]  # (..., L)
-    s = np.asarray(sin, dtype=np.float32)[..., :slice_len]
-    c = np.broadcast_to(c, d.shape)
-    s = np.broadcast_to(s, d.shape)
+    # aten.slice 纯算子切片（不经过 numpy，兼容 CPU/NPU/CUDA 任意设备上的 tensor）
+    d = torch.ops.aten.slice(dy_f32, -1, start, end)
+    c = torch.ops.aten.slice(cos_f32, -1, 0, slice_len).broadcast_to(d.shape)
+    s = torch.ops.aten.slice(sin_f32, -1, 0, slice_len).broadcast_to(d.shape)
 
-    even = np.arange(0, slice_len, 2)  # 2k
-    odd = np.arange(1, slice_len, 2)  # 2k+1
+    even = torch.arange(0, slice_len, 2, device=d.device)
+    odd = torch.arange(1, slice_len, 2, device=d.device)
 
-    out = np.empty_like(d)
-    out[..., even] = c[..., even] * d[..., even] + s[..., odd] * d[..., odd]
-    out[..., odd] = c[..., odd] * d[..., odd] - s[..., even] * d[..., even]
+    out_even = c[..., even] * d[..., even] + s[..., odd] * d[..., odd]
+    out_odd = c[..., odd] * d[..., odd] - s[..., even] * d[..., even]
+    out = torch.cat([out_even.unsqueeze(-1), out_odd.unsqueeze(-1)], dim=-1).flatten(-2)
+    dx = torch.cat(
+        [
+            torch.ops.aten.slice(dx, -1, 0, start),
+            out,
+            torch.ops.aten.slice(dx, -1, end, sys.maxsize),
+        ],
+        dim=-1,
+    )
+    return dx
 
-    dx[..., start:end] = out
-    return dx.astype(out_dtype)
+
+class InplacePartialRotaryMulGradTestSpec:
+    """InplacePartialRotaryMulGrad 测试规范（kernel/geir 流程，numpy 入参）
+
+    Parameters follow inplace_partial_rotary_mul_grad_def.cpp:
+    dy, cos, sin, rotary_mode, partial_slice.
+    """
+
+    def golden(dy, cos, sin, rotary_mode=0, partial_slice=(0, 0), **kwargs):
+        def _from_numpy(t):
+            if t.dtype == _bf16_np():
+                return torch.from_numpy(t.view(np.float32))
+            return torch.from_numpy(t).float()
+
+        result_f32 = _rotary_grad_compute(
+            _from_numpy(dy),
+            _from_numpy(cos),
+            _from_numpy(sin),
+            int(rotary_mode),
+            int(partial_slice[0]),
+            int(partial_slice[1]),
+        )
+        result_np = result_f32.numpy()
+        if dy.dtype == np.float16:
+            result_np = result_np.astype(np.float16)
+        elif dy.dtype == _bf16_np():
+            result_np = result_np.astype(_bf16_np())
+        return [result_np]
+
+    class ThirdPartyImpl:
+        def __init__(self, dy, **kwargs):
+            self.out_dtype = dy.dtype
+
+        def __call__(self, dy, cos, sin, rotary_mode=0, partial_slice=(0, 0), **kwargs):
+            result_f32 = _rotary_grad_compute(
+                dy.float(),
+                cos.float(),
+                sin.float(),
+                int(rotary_mode),
+                int(partial_slice[0]),
+                int(partial_slice[1]),
+            )
+            if self.out_dtype == torch.bfloat16:
+                result_f32 = result_f32.to(torch.bfloat16)
+            elif self.out_dtype == torch.float16:
+                result_f32 = result_f32.half()
+            return [result_f32]
+
+    third_party = {"torch": ThirdPartyImpl}
+    tolerance = {
+        "float16": {"standard": "cross_check", "level": "L1"},
+        "bfloat16": {"standard": "cross_check", "level": "L1"},
+    }
 
 
-def AclnnInplacePartialRotaryMulGrad(
-    dyRef, cos, sin, rotaryMode=0, partialSlice=None, *args, **kwargs
-):
-    """aclnn 流程 golden（torch 入参，dyRef 原地输入/输出）。
+class AclnnInplacePartialRotaryMulGradTestSpec:
+    """InplacePartialRotaryMulGrad 测试规范（aclnn 流程，torch 入参，已在设备上）
 
     Parameters follow aclnnInplacePartialRotaryMulGradGetWorkspaceSize
-    (without workspaceSize & executor): dyRef, cos, sin, rotaryMode, partialSlice.
+    (without workspaceSize & executor): dyRef, cos, sin, rotaryMode,
+    partialSliceOptional.
     """
-    import torch
 
-    def _np(t):
-        if t is None:
-            return None
-        if t.dtype == torch.bfloat16:
-            t = t.float()
-        return t.detach().cpu().numpy()
+    def golden(
+        dyRef,
+        cos,
+        sin,
+        rotaryMode=0,
+        partialSlice=None,
+        partialSliceOptional=None,
+        **kwargs,
+    ):
+        ps = partialSliceOptional if partialSliceOptional is not None else partialSlice
+        start, end = (0, 0) if ps is None else (int(ps[0]), int(ps[1]))
 
-    sl = (
-        (0, 0) if partialSlice is None else (int(partialSlice[0]), int(partialSlice[1]))
-    )
-    return [
-        InplacePartialRotaryMulGrad(
-            _np(dyRef),
-            _np(cos),
-            _np(sin),
-            rotary_mode=int(rotaryMode),
-            partial_slice=sl,
+        result_f32 = _rotary_grad_compute(
+            dyRef.float(),
+            cos.float(),
+            sin.float(),
+            int(rotaryMode),
+            start,
+            end,
         )
-    ]
+        if dyRef.dtype == torch.bfloat16:
+            result_f32 = result_f32.to(torch.bfloat16)
+        elif dyRef.dtype == torch.float16:
+            result_f32 = result_f32.half()
+        return [result_f32]
 
+    class ThirdPartyImpl:
+        def __init__(self, dyRef, **kwargs):
+            self.out_dtype = dyRef.dtype
 
-def CannOpsInplacePartialRotaryMulBackward(
-    grad_output, r1, r2, *, rotary_mode="interleave", partial_slice=None, **kwargs
-):
-    """e2e 通路 cann_ops_transformer.ops.inplace_partial_rotary_mul_backward golden
-    （torch 入参，grad_output 原地输入/输出）。
-
-    torch 前端语义（torch_extension/inplace_partial_rotary_mul_backward.py）：
-    rotary_mode 为字符串（当前仅 'interleave'），partial_slice 为二元组，结果原地
-    写回 grad_output —— 输入位即输出位，golden 返回写回后的期望值。
-
-    与 aclnn 分支不同，本分支把 fp32 参考值回 cast 到设备输出 dtype（bf16 经
-    ml_dtypes.bfloat16），使半精度舍入被正确建模。
-
-    返回值首位补 None 对齐框架的输出结构：该 torch API 无返回值（schema -> ()），
-    ttk e2e 侧 result 为 [None, 原地回读的 grad_output]，zip 比对要求 golden 同构；
-    None 位在比对器里按 golden-suppressed 处理（SUPPRESSED/pass），真正的精度比对
-    发生在第二位。
-    """
-    import torch
-
-    def _np(t):
-        if t is None:
-            return None
-        if t.dtype == torch.bfloat16:
-            t = t.float()
-        return t.detach().cpu().numpy()
-
-    if isinstance(rotary_mode, str):
-        mode = _TORCH_MODE_INT.get(rotary_mode.lower())
-        if mode is None:
-            raise NotImplementedError(
-                f"golden only supports rotary_mode in {sorted(_TORCH_MODE_INT)}, got {rotary_mode!r}"
+        def __call__(
+            self,
+            dyRef,
+            cos,
+            sin,
+            rotaryMode=0,
+            partialSlice=None,
+            partialSliceOptional=None,
+            **kwargs,
+        ):
+            ps = (
+                partialSliceOptional
+                if partialSliceOptional is not None
+                else partialSlice
             )
-    else:
-        mode = int(rotary_mode)
+            start, end = (0, 0) if ps is None else (int(ps[0]), int(ps[1]))
+            result_f32 = _rotary_grad_compute(
+                dyRef.float(),
+                cos.float(),
+                sin.float(),
+                int(rotaryMode),
+                start,
+                end,
+            )
+            if self.out_dtype == torch.bfloat16:
+                result_f32 = result_f32.to(torch.bfloat16)
+            elif self.out_dtype == torch.float16:
+                result_f32 = result_f32.half()
+            return [result_f32]
 
-    sl = (
-        (0, 0)
-        if partial_slice is None
-        else (int(partial_slice[0]), int(partial_slice[1]))
-    )
-    out = InplacePartialRotaryMulGrad(
-        _np(grad_output), _np(r1), _np(r2), rotary_mode=mode, partial_slice=sl
-    )
+    third_party = {"torch": ThirdPartyImpl}
+    tolerance = {
+        "float16": {"standard": "cross_check", "level": "L1"},
+        "bfloat16": {"standard": "cross_check", "level": "L1"},
+    }
 
-    out_dtype = grad_output.dtype
-    if out_dtype == torch.bfloat16:
-        return [None, out.astype(_bf16_np())]
-    if out_dtype == torch.float16:
-        return [None, out.astype(np.float16)]
-    return [None, out]
+
+class CannOpsInplacePartialRotaryMulBackwardTestSpec:
+    """InplacePartialRotaryMulBackward 测试规范（e2e 流程，torch 入参，已在设备上）
+
+    Parameters follow the torch dispatcher schema
+    inplace_partial_rotary_mul_backward(Tensor grad_output, Tensor r1,
+    Tensor r2, *, str rotary_mode, (int, int) partial_slice) -> ().
+
+    torch 前端语义：grad_output 原地修改，API 无返回值，TTK 回读 grad_output 与 golden 比对。
+    返回值首位补 None 对齐 TTK e2e 侧的 [None, grad_output] 输出结构。
+    """
+
+    def golden(
+        grad_output, r1, r2, *, rotary_mode="interleave", partial_slice=None, **kwargs
+    ):
+        mode = (
+            _TORCH_MODE_INT.get(rotary_mode.lower(), 1)
+            if isinstance(rotary_mode, str)
+            else int(rotary_mode)
+        )
+        start, end = (
+            (0, 0)
+            if partial_slice is None
+            else (int(partial_slice[0]), int(partial_slice[1]))
+        )
+
+        result_f32 = _rotary_grad_compute(
+            grad_output.float(),
+            r1.float(),
+            r2.float(),
+            mode,
+            start,
+            end,
+        )
+        if grad_output.dtype == torch.bfloat16:
+            result_f32 = result_f32.to(torch.bfloat16)
+        elif grad_output.dtype == torch.float16:
+            result_f32 = result_f32.half()
+        return [None, result_f32]
+
+    class ThirdPartyImpl:
+        def __init__(self, grad_output, **kwargs):
+            self.out_dtype = grad_output.dtype
+
+        def __call__(
+            self,
+            grad_output,
+            r1,
+            r2,
+            *,
+            rotary_mode="interleave",
+            partial_slice=None,
+            **kwargs,
+        ):
+            mode = (
+                _TORCH_MODE_INT.get(rotary_mode.lower(), 1)
+                if isinstance(rotary_mode, str)
+                else int(rotary_mode)
+            )
+            start, end = (
+                (0, 0)
+                if partial_slice is None
+                else (int(partial_slice[0]), int(partial_slice[1]))
+            )
+            result_f32 = _rotary_grad_compute(
+                grad_output.float(),
+                r1.float(),
+                r2.float(),
+                mode,
+                start,
+                end,
+            )
+            if self.out_dtype == torch.bfloat16:
+                result_f32 = result_f32.to(torch.bfloat16)
+            elif self.out_dtype == torch.float16:
+                result_f32 = result_f32.half()
+            return [None, result_f32]
+
+    third_party = {"torch": ThirdPartyImpl}
+    tolerance = {
+        "float16": {"standard": "cross_check", "level": "L1"},
+        "bfloat16": {"standard": "cross_check", "level": "L1"},
+    }

@@ -13,6 +13,7 @@
 #include <vector>
 #include "infer_shape_context_faker.h"
 #include "infer_shape_case_executor.h"
+#include "infer_datatype_context_faker.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 
 using namespace std;
@@ -232,4 +233,37 @@ TEST_F(InplacePartialRotaryMulGradInferShape, empty_slice)
         });
     std::vector<std::vector<int64_t>> expectOutputShape = {{2, 32, 4, 128}};
     ExecuteTestCase(ctx, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
+// ==================== InferDataType: output dtype follows input dy ====================
+TEST_F(InplacePartialRotaryMulGradInferShape, infer_dtype_follows_dy)
+{
+    ASSERT_NE(
+        gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry()->GetOpImpl("InplacePartialRotaryMulGrad"),
+        nullptr);
+    auto data_type_func = gert::DefaultOpImplSpaceRegistryV2::GetInstance()
+                              .GetSpaceRegistry()
+                              ->GetOpImpl("InplacePartialRotaryMulGrad")
+                              ->infer_datatype;
+    ASSERT_NE(data_type_func, nullptr);
+
+    ge::DataType input_0 = ge::DT_FLOAT16;
+    ge::DataType output_0 = ge::DT_FLOAT16;
+    auto context_holder = gert::InferDataTypeContextFaker()
+                              .IrInputNum(3)
+                              .NodeIoNum(3, 1)
+                              .IrInstanceNum({1, 1, 1})
+                              .NodeInputTd(0, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(1, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeInputTd(2, ge::DT_FLOAT16, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
+                              .InputDataTypes({&input_0, &input_0, &input_0})
+                              .OutputDataTypes({&output_0})
+                              .Build();
+
+    auto context = context_holder.GetContext<gert::InferDataTypeContext>();
+    EXPECT_EQ(data_type_func(context), ge::GRAPH_SUCCESS);
+    ASSERT_NE(context, nullptr);
+
+    EXPECT_EQ(context->GetOutputDataType(0), ge::DT_FLOAT16);
 }
