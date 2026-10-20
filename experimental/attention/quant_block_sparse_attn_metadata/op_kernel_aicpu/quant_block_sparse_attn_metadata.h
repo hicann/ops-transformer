@@ -36,6 +36,11 @@ using QBSA_METADATA_T = uint32_t;
 
 constexpr uint32_t QBSA_HEAD_METADATA_SIZE = 8U;
 constexpr uint32_t QBSA_HEAD_SECTION_NUM_INDEX = 0U;
+// A6 MX readers use the producer's table stride, independently of launched cores.
+constexpr uint32_t QBSA_HEAD_AIC_CORE_NUM_INDEX = 1U;
+constexpr uint32_t QBSA_HEAD_AIV_CORE_NUM_INDEX = 2U;
+constexpr uint32_t QBSA_HEAD_LAYOUT_TAG_INDEX = 3U;
+constexpr uint32_t QBSA_METADATA_LAYOUT_V1 = 0x51425301U;
 
 constexpr uint32_t QBSA_METADATA_SIZE = 8U;
 constexpr uint32_t FD_METADATA_SIZE = 8U;

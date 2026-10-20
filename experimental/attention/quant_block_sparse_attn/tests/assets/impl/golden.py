@@ -336,9 +336,12 @@ def _mxfp8_cpu_golden(
             "query": module.unpack_padded_query(to_cpu(query), q_lengths, layout_q),
             "key": to_cpu(key),
             "value": to_cpu(value),
+            # Public Q scales are packed as [T,N,D/64,2]; the CPU
+            # reference consumes one flat D/32 group axis, including replay
+            # calls that do not have the input generator's cached tensors.
             "q_descale": module.unpack_padded_query(
                 to_cpu(q_descale), q_lengths, layout_q
-            ),
+            ).flatten(-2),
             "k_descale": to_cpu(k_descale),
             "v_descale": to_cpu(v_descale),
             "p_scale": None if p_scale is None else to_cpu(p_scale),

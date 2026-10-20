@@ -23,7 +23,7 @@
 #endif
 #include "lib/matmul_intf.h"
 #include "stdarg.h"
-#include "common/util_regbase.h"
+#include "../common/util_regbase.h"
 #include "quant_block_sparse_attn_metadata.h"
 
 using matmul::MatmulType;

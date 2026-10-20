@@ -17,6 +17,7 @@
 #define QUANT_BLOCK_SPARSE_ATTN_TEMPLATE_TILING_KEY_H
 
 #include "ascendc/host_api/tiling/template_argument.h"
+#include "quant_block_sparse_attn_arch_select.h"
 
 // Template tiling key macros: values match QBSALayout enum (in quant_block_sparse_attn_const.h)
 // for ASCENDC_TPL_ARGS compile-time dispatch.
@@ -65,7 +66,7 @@ ASCENDC_TPL_ARGS_DECL(
     ASCENDC_TPL_UINT_DECL(QUANT_MODE, QBSA_TPL_4_BW, ASCENDC_TPL_UI_LIST, FP8QuantMode, MXFullQuantMode), );
 
 ASCENDC_TPL_SEL(
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+#if QBSA_ARCH92_FP8
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(QKV_DTYPE, ASCENDC_TPL_UI_LIST, QBSA_DTYPE_FP8_E4M3FN),
                          ASCENDC_TPL_UINT_SEL(LAYOUT_T, ASCENDC_TPL_UI_LIST, QBSA_LAYOUT_TND, QBSA_LAYOUT_NTD),
                          ASCENDC_TPL_UINT_SEL(KV_LAYOUT_T, ASCENDC_TPL_UI_LIST, QBSA_KV_LAYOUT_PA_BNSD),
@@ -74,6 +75,15 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
                                               Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128),
                          ASCENDC_TPL_UINT_SEL(QUANT_MODE, ASCENDC_TPL_UI_LIST, FP8QuantMode)),
+#elif QBSA_ARCH_9102R1
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(QKV_DTYPE, ASCENDC_TPL_UI_LIST, QBSA_DTYPE_FP8_E4M3FN),
+                         ASCENDC_TPL_UINT_SEL(LAYOUT_T, ASCENDC_TPL_UI_LIST, QBSA_LAYOUT_TND),
+                         ASCENDC_TPL_UINT_SEL(KV_LAYOUT_T, ASCENDC_TPL_UI_LIST, QBSA_KV_LAYOUT_PA_BNSD),
+                         ASCENDC_TPL_UINT_SEL(MASK_MODE, ASCENDC_TPL_UI_LIST, QBSA_MASK_NONE, QBSA_MASK_CAUSAL),
+                         ASCENDC_TPL_BOOL_SEL(RETURN_SOFTMAX_LSE, 0, 1),
+                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
+                                              Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128),
+                         ASCENDC_TPL_UINT_SEL(QUANT_MODE, ASCENDC_TPL_UI_LIST, MXFullQuantMode)),
 #else
     ASCENDC_TPL_ARGS_SEL(
         ASCENDC_TPL_UINT_SEL(QKV_DTYPE, ASCENDC_TPL_UI_LIST, QBSA_DTYPE_FP8_E4M3FN),

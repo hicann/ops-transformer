@@ -72,8 +72,8 @@ bool QuantBlockSparseAttnMetadataCpuKernel::Prepare(CpuKernelContext& ctx)
 bool QuantBlockSparseAttnMetadataCpuKernel::ParamsCheck()
 {
     metadataSlotConfig_ = optiling::GetMetadataSlotConfig(isA5_);
-    if (!isA5_ && quantMode_ != 1) {
-        KERNEL_LOG_ERROR("unsupported metadata architecture/quant_mode combination");
+    if (!isA5_ && quantMode_ == 2 && (headDim_ != 128 || layoutQ_ != "TND")) {
+        KERNEL_LOG_ERROR("A6 MXFP8 metadata requires TND query layout with head_dim=128");
         return false;
     }
     if (!optiling::detail::IsSupportedQueryLayout(layoutQ_.c_str(), quantMode_) || layoutKv_ != "PA_BNBD" ||
@@ -494,6 +494,11 @@ bool QuantBlockSparseAttnMetadataCpuKernel::GenMetadata(const std::vector<Sectio
     optiling::detail::qbsaMetaData qbsaMetadata(metadata_->GetData(), sectionNum, metadataSlotConfig_);
     qbsaMetadata.Clear();
     qbsaMetadata.SetHeadMetadata(optiling::QBSA_HEAD_SECTION_NUM_INDEX, sectionNum);
+    if (!isA5_ && quantMode_ == 2) {
+        qbsaMetadata.SetHeadMetadata(optiling::QBSA_HEAD_AIC_CORE_NUM_INDEX, metadataSlotConfig_.aicSlots);
+        qbsaMetadata.SetHeadMetadata(optiling::QBSA_HEAD_AIV_CORE_NUM_INDEX, metadataSlotConfig_.aivSlots);
+        qbsaMetadata.SetHeadMetadata(optiling::QBSA_HEAD_LAYOUT_TAG_INDEX, optiling::QBSA_METADATA_LAYOUT_V1);
+    }
 
     for (uint32_t secIdx = 0; secIdx < sectionNum; ++secIdx) {
         const auto& section = sectionResults[secIdx];

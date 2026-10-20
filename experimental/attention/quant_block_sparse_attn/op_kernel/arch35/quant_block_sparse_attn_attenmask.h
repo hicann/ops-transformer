@@ -16,7 +16,7 @@
 #ifndef QUANT_BLOCK_SPARSE_ATTN_ATTENMASK_H_
 #define QUANT_BLOCK_SPARSE_ATTN_ATTENMASK_H_
 
-#include "common/util_regbase.h"
+#include "../common/util_regbase.h"
 #include "quant_block_sparse_attn_common_arch35.h"
 
 using namespace AscendC;
@@ -54,9 +54,9 @@ struct AttenMaskInfo {
     int64_t attenMaskS1Offset;
 };
 
-__aicore__ inline void BoolCopyInRegbase(const LocalTensor<uint8_t> &dstTensor, GlobalTensor<uint8_t> &srcTensor,
+__aicore__ inline void BoolCopyInRegbase(const LocalTensor<uint8_t>& dstTensor, GlobalTensor<uint8_t>& srcTensor,
                                          int64_t srcOffset, uint32_t s1Size, uint32_t s2Size, int64_t totalS2Size,
-                                         int64_t s2BaseSize, ConstInfo &constInfo)
+                                         int64_t s2BaseSize, ConstInfo& constInfo)
 {
     if (s1Size == 0 || s2Size == 0) {
         return;
@@ -82,8 +82,8 @@ __aicore__ inline void BoolCopyInRegbase(const LocalTensor<uint8_t> &dstTensor, 
 
 template <bool hasAtten>
 __aicore__ inline void GetAttenMaskComputeMode(int64_t deltaCausalOrNext, int64_t deltaPre, int64_t s1Offset,
-                                               const RunInfo &runInfo, ConstInfo &constInfo,
-                                               AttenMaskInfo &attenMaskInfo)
+                                               const RunInfo& runInfo, ConstInfo& constInfo,
+                                               AttenMaskInfo& attenMaskInfo)
 {
     if constexpr (hasAtten) {
         uint32_t s2BaseSize = constInfo.s2BaseSize;
@@ -122,7 +122,7 @@ __aicore__ inline void GetAttenMaskComputeMode(int64_t deltaCausalOrNext, int64_
                 attenMaskInfo.computeMode = AttenMaskComputeMode::NO_NEED_COMPUTE_MODE;
             } else {
                 int64_t intersectionX = runInfo.actualS1Size - runInfo.actualS2Size +
-                                        ((__gm__ int64_t *)attenMaskInfo.prefixNAddr)[runInfo.boIdx];
+                                        ((__gm__ int64_t*)attenMaskInfo.prefixNAddr)[runInfo.boIdx];
                 if (s1Offset >= intersectionX) {
                     attenMaskInfo.computeMode = AttenMaskComputeMode::CAUSAL_OR_NEXT_ONLY_MODE;
                 } else if (s1Offset + constInfo.s1BaseSize <= intersectionX) {
@@ -136,9 +136,9 @@ __aicore__ inline void GetAttenMaskComputeMode(int64_t deltaCausalOrNext, int64_
     }
 }
 
-__aicore__ inline int64_t ComputeOffsetForCausal(const int64_t &delta, const uint32_t &s1BaseSize,
-                                                 const uint32_t &s2BaseSize, const uint32_t &attenMaskS2Size,
-                                                 const int64_t &vecCoreOffset, const bool useDn = false)
+__aicore__ inline int64_t ComputeOffsetForCausal(const int64_t& delta, const uint32_t& s1BaseSize,
+                                                 const uint32_t& s2BaseSize, const uint32_t& attenMaskS2Size,
+                                                 const int64_t& vecCoreOffset, const bool useDn = false)
 {
     if (useDn) {
         if (delta >= 0) {
@@ -173,17 +173,17 @@ __simd_vf__ inline void MergeBandVF(const uint64_t maskPreUb, const uint64_t mas
     Duplicate(vreg_xor, XOR_MASK);
 
     for (uint16_t i = 0; i < loopCount; ++i) {
-        LoadAlign(vreg_pre, (__ubuf__ uint32_t *&)maskPreUb + i * VREG_STRIDE_BYTES);
-        LoadAlign(vreg_next, (__ubuf__ uint32_t *&)maskNextUb + i * VREG_STRIDE_BYTES);
+        LoadAlign(vreg_pre, (__ubuf__ uint32_t*&)maskPreUb + i * VREG_STRIDE_BYTES);
+        LoadAlign(vreg_next, (__ubuf__ uint32_t*&)maskNextUb + i * VREG_STRIDE_BYTES);
         Xor(vreg_not, vreg_pre, vreg_xor, preg_all);
         Or(vreg_or, vreg_not, vreg_next, preg_all);
-        StoreAlign((__ubuf__ uint32_t *&)maskNextUb + i * VREG_STRIDE_BYTES, vreg_or, preg_all);
+        StoreAlign((__ubuf__ uint32_t*&)maskNextUb + i * VREG_STRIDE_BYTES, vreg_or, preg_all);
     }
 }
 
 template <bool hasAtten>
-__aicore__ inline void MergeBandModeMask(LocalTensor<uint8_t> &maskPre, LocalTensor<uint8_t> &maskNext,
-                                         int32_t &halfS1RealSize, int64_t s2BaseSize)
+__aicore__ inline void MergeBandModeMask(LocalTensor<uint8_t>& maskPre, LocalTensor<uint8_t>& maskNext,
+                                         int32_t& halfS1RealSize, int64_t s2BaseSize)
 {
     uint64_t maskPreUb = maskPre.GetPhyAddr();
     uint64_t maskNextUb = maskNext.GetPhyAddr();
@@ -210,16 +210,16 @@ __simd_vf__ inline void MergePrefixVF(const uint64_t maskPreUb, const uint64_t m
     MaskReg preg_all = CreateMask<uint32_t, MaskPattern::ALL>();
 
     for (uint16_t i = 0; i < loopCount; ++i) {
-        LoadAlign(vreg_pre, (__ubuf__ uint32_t *&)maskPreUb + i * VREG_STRIDE_BYTES);
-        LoadAlign(vreg_next, (__ubuf__ uint32_t *&)maskNextUb + i * VREG_STRIDE_BYTES);
+        LoadAlign(vreg_pre, (__ubuf__ uint32_t*&)maskPreUb + i * VREG_STRIDE_BYTES);
+        LoadAlign(vreg_next, (__ubuf__ uint32_t*&)maskNextUb + i * VREG_STRIDE_BYTES);
         And(vreg_and, vreg_pre, vreg_next, preg_all);
-        StoreAlign((__ubuf__ uint32_t *&)maskNextUb + i * VREG_STRIDE_BYTES, vreg_and, preg_all);
+        StoreAlign((__ubuf__ uint32_t*&)maskNextUb + i * VREG_STRIDE_BYTES, vreg_and, preg_all);
     }
 }
 
 template <bool hasAtten>
-__aicore__ inline void MergePrefixModeMask(LocalTensor<uint8_t> &maskPre, LocalTensor<uint8_t> &maskNext,
-                                           int32_t &halfS1RealSize, int64_t s2BaseSize)
+__aicore__ inline void MergePrefixModeMask(LocalTensor<uint8_t>& maskPre, LocalTensor<uint8_t>& maskNext,
+                                           int32_t& halfS1RealSize, int64_t s2BaseSize)
 {
     uint64_t maskPreUb = maskPre.GetPhyAddr();
     uint64_t maskNextUb = maskNext.GetPhyAddr();
@@ -239,19 +239,19 @@ __aicore__ inline void MergePrefixModeMask(LocalTensor<uint8_t> &maskPre, LocalT
 }
 #else
 template <bool hasAtten>
-__aicore__ inline void MergeBandModeMask(LocalTensor<uint8_t> &maskPre, LocalTensor<uint8_t> &maskNext,
-                                         int32_t &halfS1RealSize, int64_t s2BaseSize)
+__aicore__ inline void MergeBandModeMask(LocalTensor<uint8_t>& maskPre, LocalTensor<uint8_t>& maskNext,
+                                         int32_t& halfS1RealSize, int64_t s2BaseSize)
 {}
 
 template <bool hasAtten>
-__aicore__ inline void MergePrefixModeMask(LocalTensor<uint8_t> &maskPre, LocalTensor<uint8_t> &maskNext,
-                                           int32_t &halfS1RealSize, int64_t s2BaseSize)
+__aicore__ inline void MergePrefixModeMask(LocalTensor<uint8_t>& maskPre, LocalTensor<uint8_t>& maskNext,
+                                           int32_t& halfS1RealSize, int64_t s2BaseSize)
 {}
 #endif
 
 template <bool hasAtten, DTemplateType dTemplateType = DTemplateType::Aligned128>
-__aicore__ inline int64_t ComputeAttenMaskInnerOffset(const RunInfo &runInfo, ConstInfo &constInfo,
-                                                      AttenMaskInfo &attenMaskInfo, bool first_block = true,
+__aicore__ inline int64_t ComputeAttenMaskInnerOffset(const RunInfo& runInfo, ConstInfo& constInfo,
+                                                      AttenMaskInfo& attenMaskInfo, bool first_block = true,
                                                       const bool useDn = false, const int32_t subLoop = 0)
 {
     if constexpr (hasAtten) {
@@ -281,8 +281,8 @@ __aicore__ inline int64_t ComputeAttenMaskInnerOffset(const RunInfo &runInfo, Co
 }
 
 template <bool hasAtten, DTemplateType dTemplateType = DTemplateType::Aligned128>
-__aicore__ inline int64_t ComputeAttenMaskOffset(const RunInfo &runInfo, ConstInfo &constInfo,
-                                                 AttenMaskInfo &attenMaskInfo, const bool first_block = false,
+__aicore__ inline int64_t ComputeAttenMaskOffset(const RunInfo& runInfo, ConstInfo& constInfo,
+                                                 AttenMaskInfo& attenMaskInfo, const bool first_block = false,
                                                  const bool useDn = true, const int32_t subLoop = 0)
 {
     auto result = ComputeAttenMaskInnerOffset<hasAtten, dTemplateType>(runInfo, constInfo, attenMaskInfo, first_block,
@@ -290,8 +290,8 @@ __aicore__ inline int64_t ComputeAttenMaskOffset(const RunInfo &runInfo, ConstIn
     return result;
 }
 
-__aicore__ inline void GenerateRightDownCausalMaskDn(LocalTensor<uint8_t> &dstTensor, RunInfo &runInfo,
-                                                     ConstInfo &constInfo, int64_t sparseBlkIdx,
+__aicore__ inline void GenerateRightDownCausalMaskDn(LocalTensor<uint8_t>& dstTensor, RunInfo& runInfo,
+                                                     ConstInfo& constInfo, int64_t sparseBlkIdx,
                                                      uint32_t sparseBlkRealSize)
 {
     uint32_t halfS1BaseSize = constInfo.s1BaseSize >> 1;
@@ -308,8 +308,8 @@ __aicore__ inline void GenerateRightDownCausalMaskDn(LocalTensor<uint8_t> &dstTe
 }
 
 template <bool hasAtten>
-__aicore__ inline void AttenMaskCopyIn(TQue<QuePosition::VECIN, 1> &attenMaskInQue, GlobalTensor<uint8_t> &srcTensor,
-                                       RunInfo &runInfo, ConstInfo &constInfo, AttenMaskInfo &attenMaskInfo,
+__aicore__ inline void AttenMaskCopyIn(TQue<QuePosition::VECIN, 1>& attenMaskInQue, GlobalTensor<uint8_t>& srcTensor,
+                                       RunInfo& runInfo, ConstInfo& constInfo, AttenMaskInfo& attenMaskInfo,
                                        bool isPre = false)
 {
     if constexpr (hasAtten) {
@@ -323,8 +323,8 @@ __aicore__ inline void AttenMaskCopyIn(TQue<QuePosition::VECIN, 1> &attenMaskInQ
 }
 
 template <bool hasAtten>
-__aicore__ inline void AttenMaskCopyInDnFun(LocalTensor<uint8_t> attenMaskUb, GlobalTensor<uint8_t> &srcTensor,
-                                            RunInfo &runInfo, ConstInfo &constInfo, AttenMaskInfo &attenMaskInfo,
+__aicore__ inline void AttenMaskCopyInDnFun(LocalTensor<uint8_t> attenMaskUb, GlobalTensor<uint8_t>& srcTensor,
+                                            RunInfo& runInfo, ConstInfo& constInfo, AttenMaskInfo& attenMaskInfo,
                                             bool needAtten, uint64_t offset, int32_t sparseBlkIdx, uint32_t s2Len)
 {
     if constexpr (hasAtten) {
@@ -347,8 +347,8 @@ __aicore__ inline void AttenMaskCopyInDnFun(LocalTensor<uint8_t> attenMaskUb, Gl
 }
 
 template <bool hasAtten>
-__aicore__ inline void AttenMaskCopyInDn(TQue<QuePosition::VECIN, 1> &attenMaskInQue, GlobalTensor<uint8_t> &srcTensor,
-                                         RunInfo &runInfo, ConstInfo &constInfo, AttenMaskInfo &attenMaskInfo,
+__aicore__ inline void AttenMaskCopyInDn(TQue<QuePosition::VECIN, 1>& attenMaskInQue, GlobalTensor<uint8_t>& srcTensor,
+                                         RunInfo& runInfo, ConstInfo& constInfo, AttenMaskInfo& attenMaskInfo,
                                          bool needAtten1, bool needAtten2)
 {
     LocalTensor<uint8_t> attenMaskUb = attenMaskInQue.template AllocTensor<uint8_t>();

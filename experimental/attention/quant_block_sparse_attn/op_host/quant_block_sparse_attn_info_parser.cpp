@@ -406,11 +406,6 @@ ge::graphStatus QuantBlockSparseAttnInfoParser::Parse(QuantBlockSparseAttnTiling
         return ge::GRAPH_FAILED;
     }
 
-    if (!tilingInfo.isA5 && tilingInfo.quantModeVal != QBSA_QUANT_MODE_FP8) {
-        OP_LOGE(kOpName, "arch92 only supports FP8 quant_mode=1");
-        return ge::GRAPH_FAILED;
-    }
-
     if (tilingInfo.quantModeVal == QBSA_QUANT_MODE_FP8) {
         const QBSARequiredParaInfo* requiredInputs[] = {
             &opParamInfo.query,    &opParamInfo.key,      &opParamInfo.value,         &opParamInfo.qDescale,

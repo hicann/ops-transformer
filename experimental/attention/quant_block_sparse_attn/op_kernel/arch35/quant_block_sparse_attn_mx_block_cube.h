@@ -17,12 +17,12 @@
 
 #include "kernel_operator.h"
 #include "quant_block_sparse_attn_common_arch35.h"
-#include "common/CopyInL1.h"
-#include "common/FixpipeOut.h"
-#include "common/buffer_manager.h"
-#include "common/buffers_policy.h"
-#include "common/matmul.h"
-#include "common/util_regbase_mx.h"
+#include "../common/CopyInL1.h"
+#include "../common/FixpipeOut.h"
+#include "../common/buffer_manager.h"
+#include "../common/buffers_policy.h"
+#include "../common/matmul.h"
+#include "../common/util_regbase_mx.h"
 
 using namespace AscendC;
 using namespace AscendC::Impl::Detail;

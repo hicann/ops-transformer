@@ -16,7 +16,7 @@
 #define UTIL_REGBASE_MX_H
 
 #include <cstdint>
-#include "../../quant_block_sparse_attn_const.h"
+#include "../quant_block_sparse_attn_common.h"
 
 namespace regbasemx {
 // Metadata partitions sparse table capacity, which may exceed the physical Q
@@ -49,7 +49,6 @@ __aicore__ inline constexpr uint64_t MxLseSlot(uint64_t tokenBase, uint32_t s, u
         return (tokenBase + s) * heads + n;
     }
 }
-
 constexpr uint32_t QBSA_MX_SCALE_LAST_DIM = 2U;
 constexpr uint32_t QBSA_MX_S2_BASE_SIZE = 512U;
 constexpr uint32_t QBSA_MX_MIN_KV_BLOCK_SIZE = 64U;
@@ -63,7 +62,7 @@ struct MxRunInfo {
     bool isValid = false;
     bool isFirstS2Loop = false;
     bool isLastS2Loop = false;
-    // bit0/bit1分别表示256-token subLoop 0/1是否需要真实causal mask。
+    // arch35 的两个 256-token subLoop 是否需要真实 causal mask。
     uint8_t attenMaskSubLoopBits = 0U;
 
     // Batch/head/query 坐标。
@@ -77,11 +76,13 @@ struct MxRunInfo {
     uint64_t actS1Size = 1U;
     uint64_t actS2Size = 1U;
     uint32_t actMSize = 0U;
+    uint32_t actMSizeAlign32 = 0U;
     uint32_t actVecMSize = 0U;
     uint32_t vecMbaseIdx = 0U;
 
-    // 拼接后 logical S2 tile 的有效长度。
+    // 拼接后 logical S2 tile 的有效长度及 64 对齐长度。
     uint32_t actSingleLoopS2Size = 0U;
+    uint32_t actSingleLoopS2SizeAlign = 0U;
 
     // Sparse block 索引与拼接信息，单 task 最多 8 个 block。
     uint32_t sparseBlockCount = 0U;
@@ -110,6 +111,7 @@ struct MxBaseConstInfo {
     uint32_t realN2Size = 0U;
     uint32_t coreNum = 0U;
     uint32_t aicIdx = 0U;
+    uint32_t aivIdx = 0U;
     uint8_t subBlockIdx = 0U;
     uint32_t qSeqSize = 0U;
     uint32_t queryRowStride = 0U;

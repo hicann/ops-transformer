@@ -23,18 +23,18 @@
 template <typename T, QBSALayout GM_FORMAT>
 class CopyAntiquantGmToUb {
 public:
-    __aicore__ inline void operator()(LocalTensor<T> &dstTensor, const GlobalTensor<T> &srcTensor,
-                                      const GlobalTensor<int32_t> &blockTableTensor, const RunInfo &runInfo,
-                                      const ConstInfo &constInfo)
+    __aicore__ inline void operator()(LocalTensor<T>& dstTensor, const GlobalTensor<T>& srcTensor,
+                                      const GlobalTensor<int32_t>& blockTableTensor, const RunInfo& runInfo,
+                                      const ConstInfo& constInfo)
     {
         // per per_head + per_token + PA
         ProcessPA(dstTensor, srcTensor, blockTableTensor, runInfo, constInfo);
     }
 
 private:
-    __aicore__ inline void ProcessPA(LocalTensor<T> &dstTensor, const GlobalTensor<T> &srcTensor,
-                                     const GlobalTensor<int32_t> &blockTableTensor, const RunInfo &runInfo,
-                                     const ConstInfo &constInfo)
+    __aicore__ inline void ProcessPA(LocalTensor<T>& dstTensor, const GlobalTensor<T>& srcTensor,
+                                     const GlobalTensor<int32_t>& blockTableTensor, const RunInfo& runInfo,
+                                     const ConstInfo& constInfo)
     {
         int64_t byteOffset1 = 0;
         int64_t byteOffset2 = 0;
@@ -70,14 +70,14 @@ private:
             DataCopyPad(dstTensor[128], srcTensor[byteOffset2], dataCopyParams, dataCopyPadParams);
         }
     }
-    __aicore__ inline void GetPaKScaleOffset(int64_t &byteOffset, const int64_t sparseBlkIdx,
-                                             const GlobalTensor<int32_t> &blockTableTensor, const RunInfo &runInfo,
-                                             const ConstInfo &constInfo)
+    __aicore__ inline void GetPaKScaleOffset(int64_t& byteOffset, const int64_t sparseBlkIdx,
+                                             const GlobalTensor<int32_t>& blockTableTensor, const RunInfo& runInfo,
+                                             const ConstInfo& constInfo)
     {
         int64_t blockTableOffset = runInfo.boIdx * constInfo.blockTableDim2 + sparseBlkIdx;
         int64_t physicalBlock = blockTableTensor.GetValue(blockTableOffset);
-        byteOffset = physicalBlock * (constInfo.paBlockStride / sizeof(float)) +
-                     runInfo.n2oIdx * constInfo.kvSparseBlockSize;
+        byteOffset =
+            physicalBlock * (constInfo.paBlockStride / sizeof(float)) + runInfo.n2oIdx * constInfo.kvSparseBlockSize;
     }
 };
 
@@ -85,15 +85,15 @@ private:
 template <typename T, QBSALayout GM_FORMAT>
 class CopyQueryScaleGmToUb {
 public:
-    __aicore__ inline void operator()(LocalTensor<T> &dstTensor, const GlobalTensor<T> &srcTensor,
-                                      const RunInfo &runInfo, const ConstInfo &constInfo)
+    __aicore__ inline void operator()(LocalTensor<T>& dstTensor, const GlobalTensor<T>& srcTensor,
+                                      const RunInfo& runInfo, const ConstInfo& constInfo)
     {
         ProcessGS1(dstTensor, srcTensor, runInfo, constInfo);
     }
 
 private:
-    __aicore__ inline void ProcessGS1(LocalTensor<T> &dstTensor, const GlobalTensor<T> &srcTensor,
-                                      const RunInfo &runInfo, const ConstInfo &constInfo)
+    __aicore__ inline void ProcessGS1(LocalTensor<T>& dstTensor, const GlobalTensor<T>& srcTensor,
+                                      const RunInfo& runInfo, const ConstInfo& constInfo)
     {
         if constexpr (GM_FORMAT == QBSALayout::TND) {
             DataCopyExtParams dataCopyParams;

@@ -12,6 +12,7 @@
 
 """TTK metadata-first adapter for the installed quant_block_sparse_attn API."""
 
+import importlib.util
 import math
 import random
 import sys
@@ -21,6 +22,7 @@ from typing import List, Optional
 import torch
 
 _CUSTOM_OPS_LOADED = False
+_CPU_GOLDEN = None
 _FP32_BYTES = 4
 
 
@@ -38,6 +40,20 @@ def _ensure_cann_ops():
         import custom_ops  # noqa: F401 - loads .so + registers torch.ops.custom namespace
 
         _CUSTOM_OPS_LOADED = True
+
+
+def _cpu_golden(*args, **kwargs):
+    global _CPU_GOLDEN
+    if _CPU_GOLDEN is None:
+        # Load by file path: TTK and other operators can also own an "impl" module.
+        path = Path(__file__).with_name("impl") / "golden.py"
+        spec = importlib.util.spec_from_file_location("_qbsa_ttk_cpu_reference", path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"cannot load QBSA CPU reference from {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _CPU_GOLDEN = module.cpu_quant_block_sparse_attn
+    return _CPU_GOLDEN(*args, **kwargs)
 
 
 def _synchronize_npu(tensor):
@@ -374,7 +390,45 @@ def quant_block_sparse_attn(
     num_heads_kv: int = 0,
     head_dim: int = 0,
 ):
-    """Adapt the shared CSV inputs and call the installed QBSA operator."""
+    """Route CPU golden calls to the reference and NPU calls to the installed op."""
+    if query.device.type == "cpu":
+        # Some TTK versions fall back to the same API on CPU when the golden
+        # plugin is unavailable. Metadata is an NPU scheduling input; the CPU
+        # reference does not need it and must not invoke the custom metadata op.
+        return _cpu_golden(
+            query,
+            key,
+            value,
+            q_descale,
+            k_descale,
+            v_descale,
+            sparse_indices,
+            sparse_seq_len,
+            p_scale,
+            cu_seqlens_q,
+            cu_seqlens_kv,
+            seqused_q,
+            seqused_kv,
+            block_table,
+            atten_mask,
+            metadata,
+            quant_mode=quant_mode,
+            softmax_scale=softmax_scale,
+            mask_mode=mask_mode,
+            blocksize=blocksize,
+            sparse_block_size_q=sparse_block_size_q,
+            sparse_block_size_kv=sparse_block_size_kv,
+            layout_q=layout_q,
+            layout_kv=layout_kv,
+            layout_out=layout_out,
+            layout_sparse_indices=layout_sparse_indices,
+            return_softmax_lse=return_softmax_lse,
+            quant_matmul=quant_matmul,
+            batch_size=batch_size,
+            num_heads_q=num_heads_q,
+            num_heads_kv=num_heads_kv,
+            head_dim=head_dim,
+        )
     del quant_matmul  # MXFP8 golden-only switch; never forward it to the operator.
     _ensure_cann_ops()
     key, value, k_descale, p_scale, metadata = _prepare_operator_inputs(

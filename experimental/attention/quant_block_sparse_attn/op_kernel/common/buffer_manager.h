@@ -15,6 +15,8 @@
 #ifndef BUFFER_MANAGER_H
 #define BUFFER_MANAGER_H
 
+#include "../quant_block_sparse_attn_arch_select.h"
+
 #if (__NPU_ARCH__ == 5102)
 #include "buffer_mix_core.h"
 #else
@@ -27,36 +29,49 @@
 // L0C TPosition::CO1
 // UB  TPosition::VECIN
 namespace fa_base_matmul {
-template<BufferType bufferType>
+template <BufferType bufferType>
 class BufferManager {
     using TensorType = std::conditional_t<bufferType == BufferType::GM, GlobalTensor<uint8_t>, LocalTensor<uint8_t>>;
     using OffsetType = std::conditional_t<bufferType == BufferType::GM, uint64_t, uint32_t>;
+
 public:
-    __aicore__ inline void Init(TPipe *pipe, uint32_t size) {
+    __aicore__ inline void Init(TPipe* pipe, uint32_t size)
+    {
         static_assert(bufferType != BufferType::GM, "GM should use workspace.");
+#if QBSA_ARCH_9102R1
+        // DAV_9201/9202 may reuse the block-local kernel object storage across consecutive launches.
+        // Every newly bound arena must allocate again from its beginning.
+        offset_ = 0;
+#endif
         TBuf<BufferInfo<bufferType>::Position> tbuf;
         pipe->InitBuffer(tbuf, size);
         mem_ = tbuf.template Get<uint8_t>();
     }
 
-    __aicore__ inline void Init(__gm__ uint8_t* workspace) {
+    __aicore__ inline void Init(__gm__ uint8_t* workspace)
+    {
         static_assert(bufferType == BufferType::GM, "BufferType should be GM.");
+#if QBSA_ARCH_9102R1
+        offset_ = 0;
+#endif
         mem_.SetGlobalBuffer((__gm__ uint8_t*)workspace);
     }
 
-    template<SyncType syncType = SyncType::INNER_CORE_SYNC>
-    __aicore__ inline Buffer<bufferType, syncType> AllocBuffer(uint32_t size) {
+    template <SyncType syncType = SyncType::INNER_CORE_SYNC, uint32_t cvRatio = 2U>
+    __aicore__ inline Buffer<bufferType, syncType, cvRatio> AllocBuffer(uint32_t size)
+    {
         TensorType temp = mem_[offset_];
         offset_ += size;
-        return Buffer<bufferType, syncType>(temp, size);
+        return Buffer<bufferType, syncType, cvRatio>(temp, size);
     }
 
-    template<SyncType syncType = SyncType::INNER_CORE_SYNC>
-    __aicore__ inline void FreeBuffer(Buffer<bufferType, syncType> &buffer){
-    }
+    template <SyncType syncType = SyncType::INNER_CORE_SYNC, uint32_t cvRatio = 2U>
+    __aicore__ inline void FreeBuffer(Buffer<bufferType, syncType, cvRatio>& buffer)
+    {}
+
 private:
     OffsetType offset_ = 0;
     TensorType mem_;
 };
-}
+} // namespace fa_base_matmul
 #endif

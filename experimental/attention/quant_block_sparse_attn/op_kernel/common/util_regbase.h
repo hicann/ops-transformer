@@ -17,7 +17,7 @@
 #define FLASH_ATTENTION_UTIL_REGBASE_H
 
 #include "util.h"
-#include "../../quant_block_sparse_attn_common.h"
+#include "../quant_block_sparse_attn_common.h"
 
 using AscendC::QuePosition;
 using AscendC::TQue;
@@ -151,8 +151,8 @@ struct RunParamStr { // 分核与切块需要使用到参数
     int64_t actualS2Size;       /* 当前batch的s2 */ \
     int64_t preTokensPerBatch;  /* vec2左上顶点pretoken */ \
     int64_t nextTokensPerBatch; /* vec2左上顶点nexttoken */ \
-    int64_t b1SSOffsetAlign; /* TND s2对齐16后前面batch的s1*s2之和 */ \
-    int64_t deScaleKvOffset; /* KV反量化scale在Gm偏移, shape[B,N2,1,Ceil(S2,128),1] */ \
+    int64_t b1SSOffsetAlign;    /* TND s2对齐16后前面batch的s1*s2之和 */ \
+    int64_t deScaleKvOffset;    /* KV反量化scale在Gm偏移, shape[B,N2,1,Ceil(S2,128),1] */ \
     uint8_t taskIdMod2; \
     uint8_t taskIdMod3; \
     uint8_t multiCoreIdxMod2 = 0; \
@@ -239,7 +239,7 @@ struct RunInfo {
     uint32_t maxQb; \
     uint32_t maxKb; \
     /* 推理新增 */ \
-    bool isRowInvalid;       /* 是否使能行无效 */ \
+    bool isRowInvalid; /* 是否使能行无效 */ \
     bool isGqa; \
 \
     uint32_t seqUsedQlenSize;  /* 去掉前导0后的cuSeqQlen长度 */ \

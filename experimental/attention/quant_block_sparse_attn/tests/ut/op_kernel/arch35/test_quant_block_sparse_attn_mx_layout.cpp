@@ -12,7 +12,7 @@
 #include <vector>
 #include <gtest/gtest.h>
 
-#include "../../../../op_kernel/arch35/common/util_regbase_mx.h"
+#include "../../../../op_kernel/common/util_regbase_mx.h"
 
 namespace QuantBlockSparseAttnUT {
 namespace {

@@ -190,8 +190,9 @@ static aclnnStatus ParamsCheck(const aclTensor* sparseSeqLen, const aclTensor* c
                                const char* layoutKvOptional, const char* layoutSparseIndicesOptional,
                                uint32_t aicCoreNum, uint32_t aivCoreNum, bool isA5, const aclTensor* metadata)
 {
-    if (!isA5 && quantMode != QBSA_QUANT_MODE_FP8) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Unsupported architecture/quant_mode: arch92 requires FP8 quant_mode=1");
+    if (!isA5 && quantMode == QBSA_QUANT_MODE_MXFP8 &&
+        (headDim != 128 || layoutQOptional == nullptr || strcmp(layoutQOptional, "TND") != 0)) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "A6 MXFP8 metadata requires TND query layout with headDim=128");
         return ACLNN_ERR_PARAM_INVALID;
     }
     aclnnStatus ret = CheckSingleParamQbsa(batchSize, numHeadsQ, numHeadsKv, headDim, sparseBlockSizeQ,

@@ -39,15 +39,31 @@ constexpr uint32_t QBSA_ATTEN_MASK_DEFAULT_S1_SIZE = 2048U;
 constexpr uint32_t QBSA_ATTEN_MASK_DEFAULT_S2_SIZE = 2048U;
 constexpr uint32_t QBSA_MXFP8_VALUE_SCALE_LAST_DIM = 2U;
 
+uint32_t GetPlatformAicCoreNum(gert::TilingContext* context)
+{
+    if (context == nullptr || context->GetPlatformInfo() == nullptr) {
+        return 0U;
+    }
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
+    return ascendcPlatform.GetCoreNumAic();
+}
+
+bool Is9102R1Platform(gert::TilingContext* context)
+{
+    if (context == nullptr || context->GetPlatformInfo() == nullptr) {
+        return false;
+    }
+    const auto arch = platform_ascendc::PlatformAscendC(context->GetPlatformInfo()).GetCurNpuArch();
+    return arch == NpuArch::DAV_9201 || arch == NpuArch::DAV_9202;
+}
+
 uint32_t GetAicCoreNum(gert::TilingContext* context, bool isA5)
 {
     const uint32_t maxCoreNum = isA5 ? QBSA_MAX_CORE_NUM : QBSA_MAX_CORE_NUM_ARCH92;
-    auto platformInfo = context->GetPlatformInfo();
-    if (platformInfo == nullptr) {
+    if (context == nullptr || context->GetPlatformInfo() == nullptr) {
         return maxCoreNum;
     }
-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-    const uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
+    const uint32_t aicNum = GetPlatformAicCoreNum(context);
     return aicNum == 0U ? maxCoreNum : std::min<uint32_t>(aicNum, maxCoreNum);
 }
 
@@ -277,10 +293,12 @@ void QuantBlockSparseAttnTiling::CalcTilingKey()
     if (info.quantModeVal == QBSA_QUANT_MODE_MXFP8_FULL_QUANT) {
         // D64 对齐 FIA 使用 S2=512/S2_SPLIT=256，保留 C1 UB/L0C 双缓冲。
         const uint32_t config =
-            info.dSize == QBSA_MXFP8_D_SIZE_64 ?
-                Config_S1Aligned128_S2Aligned512_DAligned64_DVAligned64 :
-                (info.dSize == QBSA_MXFP8_D_SIZE_256 ? Config_S1Aligned128_S2Aligned256_DAligned256_DVAligned256 :
-                                                       Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128);
+            Is9102R1Platform(context_) ?
+                Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128 :
+                (info.dSize == QBSA_MXFP8_D_SIZE_64 ?
+                     Config_S1Aligned128_S2Aligned512_DAligned64_DVAligned64 :
+                     (info.dSize == QBSA_MXFP8_D_SIZE_256 ? Config_S1Aligned128_S2Aligned256_DAligned256_DVAligned256 :
+                                                            Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128));
         tilingKey_ = GET_TPL_TILING_KEY(QBSA_DTYPE_FP8_E4M3FN, info.layoutQValue, QBSA_KV_LAYOUT_PA_BNSD,
                                         info.maskModeVal, info.returnSoftmaxLseVal ? 1U : 0U, config, MXFullQuantMode);
     } else {
@@ -478,6 +496,12 @@ ge::graphStatus QuantBlockSparseAttnTiling::DoOpTiling(QuantBlockSparseAttnTilin
         return ge::GRAPH_FAILED;
     }
     tilingInfo_ = tilingInfo;
+
+    if (Is9102R1Platform(context_) && tilingInfo_->quantModeVal == QBSA_QUANT_MODE_MXFP8_FULL_QUANT &&
+        (tilingInfo_->dSize != QBSA_D_SIZE || tilingInfo_->layoutQValue != static_cast<uint32_t>(QBSALayout::TND))) {
+        OP_LOGE(kOpName, "960 MXFullQuantMode currently supports only TND query layout with D=128");
+        return ge::GRAPH_FAILED;
+    }
 
     const uint64_t bnCount = tilingInfo_->bSize * tilingInfo_->n1Size;
     totalTaskNum_ = bnCount * tilingInfo_->gS1OuterSize;
