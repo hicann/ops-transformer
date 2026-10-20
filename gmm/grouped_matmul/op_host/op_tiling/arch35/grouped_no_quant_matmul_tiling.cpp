@@ -29,6 +29,10 @@ bool GroupedNoQuantMatmulTiling::SetTiling(gert::TilingContext* context)
     OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "compileInfoPtr is nullptr."), return false);
     usedCoreNum_ = compileInfoPtr->aicNum;
     OP_CHECK_IF(!Init(context), OP_LOGE(context->GetNodeName(), "Init failed"), return false);
+    OP_CHECK_IF(
+        compileInfoPtr->npuArch == NpuArch::DAV_9201 && activeType_ != ACT_TYPE_NONE,
+        OP_LOGE(context->GetNodeName(), "In no quant groupedMatmul, activation is not supported on ASCEND960DT."),
+        return false);
     OP_CHECK_IF(activeType_ == ACT_TYPE_GELU_TANH &&
                     (compileInfoPtr->aicNum == 0U || compileInfoPtr->aivNum < compileInfoPtr->aicNum),
                 OP_LOGE(context->GetNodeName(), "GMM GELU requires at least one AIV per AIC."), return false);

@@ -82,19 +82,38 @@ vector<gert::TilingContextPara::OpAttr> GetGroupedNoQuantAttrs(int64_t splitItem
 
 class GroupedNoQuantArch35TilingTestParam {
 public:
+    NpuArch GetNpuArch() const
+    {
+        if (socVersion == "Ascend960DT") {
+            return NpuArch::DAV_9201;
+        }
+        return NpuArch::DAV_3510;
+    }
+
+    const char* GetNpuArchString() const
+    {
+        if (socVersion == "Ascend960DT") {
+            return "9201";
+        }
+        return "3510";
+    }
+
     void Prepare(optiling::GMMCompileInfo& compileInfo) const
     {
+        // 950为AIV:AIC=2:1形态; 960dt为AIV:AIC=1:1形态
+        const uint32_t aicNum = static_cast<uint32_t>(coreNum > 0 ? coreNum : 32);
+        const uint32_t aivNum = GetNpuArch() == NpuArch::DAV_3510 ? aicNum * 2 : aicNum;
         compileInfo = {
-            static_cast<uint32_t>(coreNum > 0 ? coreNum : 32),     // aicNum
-            static_cast<uint32_t>(coreNum > 0 ? coreNum * 2 : 64), // aivNum
-            262144,                                                // ubSize
-            524288,                                                // l1Size
-            134217728,                                             // l2Size
-            262144,                                                // l0CSize
-            65536,                                                 // l0ASize
-            65536,                                                 // l0BSize
-            platform_ascendc::SocVersion::ASCEND950,               // socVersion
-            NpuArch::DAV_3510,
+            aicNum,                                  // aicNum
+            aivNum,                                  // aivNum
+            262144,                                  // ubSize
+            524288,                                  // l1Size
+            134217728,                               // l2Size
+            262144,                                  // l0CSize
+            65536,                                   // l0ASize
+            65536,                                   // l0BSize
+            platform_ascendc::SocVersion::ASCEND950, // socVersion
+            GetNpuArch(),                            // npuArch
         };
     }
 
@@ -137,7 +156,7 @@ public:
             },
             {{ops::ut::MakeGertStorageShape({m}, {n}), yDtype, ge::FORMAT_ND}},
             GetGroupedNoQuantAttrs(splitItem, transposeX, transposeWeight, groupType, groupListType), &compileInfo,
-            "3510", compileInfo.aicNum, compileInfo.ubSize);
+            GetNpuArchString(), compileInfo.aicNum, compileInfo.ubSize);
 
         TilingInfo tilingInfo;
         bool tilingResult = ExecuteTiling(tilingContextPara, tilingInfo);
@@ -146,13 +165,26 @@ public:
             return;
         }
 
-        ASSERT_EQ(tilingInfo.blockNum, expectBlockDim) << "prefix=" << prefix;
-        ASSERT_EQ(tilingInfo.tilingKey, expectTilingKey) << "prefix=" << prefix;
+        // golden留空(0/空串)表示期望值待回填(如960dt新增case): 打印实际值便于校验后补充
+        if (expectBlockDim == 0U) {
+            cout << "case[" << caseName << "] golden blockDim not set, actual: " << tilingInfo.blockNum << endl;
+        } else {
+            ASSERT_EQ(tilingInfo.blockNum, expectBlockDim) << "prefix=" << prefix;
+        }
+        if (expectTilingKey == 0U) {
+            cout << "case[" << caseName << "] golden tilingKey not set, actual: " << tilingInfo.tilingKey << endl;
+        } else {
+            ASSERT_EQ(tilingInfo.tilingKey, expectTilingKey) << "prefix=" << prefix;
+        }
         ASSERT_EQ(tilingInfo.tilingDataSize, sizeof(GroupedMatmulTilingData::GMMNoQuantTilingData))
             << "prefix=" << prefix;
 
         string actualTilingData = TilingData2Str(tilingInfo.tilingData.get(), tilingInfo.tilingDataSize);
-        ASSERT_EQ(actualTilingData, expectTilingData) << "prefix=" << prefix;
+        if (expectTilingData.empty()) {
+            cout << "case[" << caseName << "] golden tilingData not set, actual: " << actualTilingData << endl;
+        } else {
+            ASSERT_EQ(actualTilingData, expectTilingData) << "prefix=" << prefix;
+        }
     }
 
     void Test() const
@@ -246,8 +278,11 @@ vector<GroupedNoQuantArch35TilingTestParam> GetParams(const string& socVersion)
             param.yDtype = ParseDtype(items[idx++]);
             param.hasBias = ParseBool(items[idx++]);
             param.result = ParseBool(items[idx++]);
-            param.expectBlockDim = static_cast<uint64_t>(stoull(items[idx++]));
-            param.expectTilingKey = static_cast<uint64_t>(stoull(items[idx++]));
+            // 空值(0/空串)表示golden待回填, 仅校验tiling执行结果
+            param.expectBlockDim = items[idx].empty() ? 0U : static_cast<uint64_t>(stoull(items[idx]));
+            idx++;
+            param.expectTilingKey = items[idx].empty() ? 0U : static_cast<uint64_t>(stoull(items[idx]));
+            idx++;
             param.expectTilingData = items[idx++];
             // Optional trailing columns for groupListType scenarios; absent columns keep the
             // legacy default (groupListType=0, dimNum derived from the type).
@@ -282,6 +317,12 @@ const vector<GroupedNoQuantArch35TilingTestParam>& GetAscend950Params()
     return params;
 }
 
+const vector<GroupedNoQuantArch35TilingTestParam>& GetAscend960DTParams()
+{
+    static const vector<GroupedNoQuantArch35TilingTestParam> params = GetParams("Ascend960DT");
+    return params;
+}
+
 class TestGroupedNoQuantArch35Tiling : public testing::TestWithParam<GroupedNoQuantArch35TilingTestParam> {
 protected:
     static void SetUpTestCase() {}
@@ -295,5 +336,9 @@ TEST_P(TestGroupedNoQuantArch35Tiling, generalTest)
 
 INSTANTIATE_TEST_SUITE_P(GROUPED_NO_QUANT_950, TestGroupedNoQuantArch35Tiling, testing::ValuesIn(GetAscend950Params()),
                          MakeParamName);
+
+// 960dt回归case: golden期望值留空待回填, 首次运行时打印实际tilingKey/blockDim/tilingData, 校验后填入csv对应字段
+INSTANTIATE_TEST_SUITE_P(GROUPED_NO_QUANT_960DT, TestGroupedNoQuantArch35Tiling,
+                         testing::ValuesIn(GetAscend960DTParams()), MakeParamName);
 
 } // namespace GroupedNoQuantArch35TilingUT

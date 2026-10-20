@@ -23,7 +23,8 @@
 #include "err/ops_err.h"
 #include "platform/soc_spec.h"
 namespace optiling {
-const std::vector<NpuArch> AdvancedNpuArch = {NpuArch::DAV_3510};
+// DAV_3510系列(含V121/DAV_9201)走arch35高级tiling实现
+const std::vector<NpuArch> AdvancedNpuArch = {NpuArch::DAV_3510, NpuArch::DAV_9201};
 
 template <typename T>
 inline typename std::enable_if<

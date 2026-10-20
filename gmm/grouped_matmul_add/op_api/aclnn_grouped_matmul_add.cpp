@@ -124,7 +124,8 @@ static aclnnStatus CheckShape(gmm_add_advanced::GroupedMatmulAddParams params, c
                "Constraint:[shape size should be %ld].",
                opName, "yRef", actualYSize, expectedYSize);
 
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
         auto groupNum = params.groupList->GetViewShape().GetDim(0);
         auto yDimNum = params.yRef->GetViewShape().GetDimNum();
         if (yDimNum != Dim3) {

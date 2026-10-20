@@ -18,7 +18,7 @@
 #include "stub_fun.h"
 #endif
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201)
 #include "arch35/grouped_matmul_add_kernel_arch35.h"
 #else
 #include "grouped_matmul_add_kernel.h"
@@ -34,7 +34,7 @@ using namespace AscendC;
 /* pour changement co */
 
 namespace AscendC {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201)
 #else
 using namespace matmul;
 constexpr uint32_t thresholdBlockNum = 8;
@@ -396,7 +396,7 @@ extern "C" __global__ __aicore__ void grouped_matmul_add(GM_ADDR x, GM_ADDR weig
     TPipe tPipe;
     AscendCUtils::SetOverflow(1);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201)
     REGISTER_TILING_DEFAULT(GroupedMatmulAdd::GmmAddTilingDataParams);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIC_ONLY);
     if (TILING_KEY_IS(10000900009000090001UL)) { // split_k

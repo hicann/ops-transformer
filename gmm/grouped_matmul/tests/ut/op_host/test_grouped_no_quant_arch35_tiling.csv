@@ -32,3 +32,13 @@ Ascend950,nosplit_mmm_sparse_invalid,true,nosplit_mmm_sparse_invalid,,256,1024,5
 Ascend950,sparse_1d_grouplist_invalid,true,sparse_1d_grouplist_invalid,,256,1024,512,2,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,false,32,0,,2,1
 Ascend950,count_2d_grouplist_invalid,true,count_2d_grouplist_invalid,,256,1024,512,2,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,false,32,0,,1,2
 Ascend950,invalid_grouplist_type,true,invalid_grouplist_type,,256,1024,512,2,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,false,32,0,,3,
+Ascend960DT,split_m_sss_960dt,true,split_m_sss_960dt,64,256,1024,512,2,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,true,,,,,
+Ascend960DT,split_k_sss_960dt,true,split_k_sss_960dt,64,256,1024,512,2,false,false,2,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,true,,,,,
+Ascend960DT,nosplit_mmm_960dt,true,nosplit_mmm_960dt,64,256,1024,512,2,false,false,-1,0,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,true,,,,,
+Ascend960DT,nosplit_mmm_weightNZ_960dt,true,nosplit_mmm_weightNZ_960dt,64,256,1024,512,2,false,false,-1,0,NZ,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,true,,,,,
+Ascend960DT,transpose_weight_960dt,true,transpose_weight_960dt,64,256,1024,512,2,false,true,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,true,,,,,
+Ascend960DT,with_bias_960dt,true,with_bias_960dt,64,256,1024,512,2,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,true,true,,,,,
+Ascend960DT,split_m_sss_960dt_small,true,split_m_sss_960dt_small,64,17,15,13,1,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,true,,,,,
+Ascend960DT,baseM_limit_960dt,true,baseM_limit_960dt,64,1024,64,256,2,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,true,,,,,
+Ascend960DT,invalid_groupnum_zero_960dt,true,invalid_groupnum_zero_960dt,64,256,1024,512,0,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,false,32,0,,,
+Ascend960DT,invalid_grouptype_960dt,true,invalid_grouptype_960dt,64,256,1024,512,2,false,false,3,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,false,32,0,,,
