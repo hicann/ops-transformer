@@ -12,7 +12,7 @@ import torch
 from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
-QLI_METADATA_SIZE = 1024
+QLI_METADATA_SIZE = 2048
 QLI_METADATA_OP_NAME = "quant_lightning_indexer_metadata"
 
 

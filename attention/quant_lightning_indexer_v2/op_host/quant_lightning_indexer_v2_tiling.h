@@ -89,16 +89,19 @@ constexpr uint32_t G_SIZE_LIMIT_32_950 = 32;
 constexpr uint32_t BLOCK_SIZE_LIMIT = 1024;
 constexpr uint32_t BLOCK_SIZE_FACTOR = 16;
 constexpr uint32_t SPARSE_MODE_LOWER = 3;
-constexpr uint32_t METADATA_LIMIT = 1024;
+constexpr uint32_t METADATA_LIMIT = 2048;
 using lightning_indexer_v2_checker::QUANT_MODE_FP8;
 using lightning_indexer_v2_checker::QUANT_MODE_INT8;
 using lightning_indexer_v2_checker::QUANT_MODE_MXFP8;
 using lightning_indexer_v2_checker::QUANT_MODE_HIFLOAT8;
 using lightning_indexer_v2_checker::QUANT_MODE_MXFP4;
+using lightning_indexer_v2_checker::QUANT_MODE_HIFLOAT4;
 using lightning_indexer_v2_checker::MX_SCALE_SHAPE_ALIGN;
 using lightning_indexer_v2_checker::MX_E8M0_SCALE_PACK_NUM;
 using lightning_indexer_v2_checker::MXFP4_PACK_NUM;
+using lightning_indexer_v2_checker::HIFLOAT4_PACK_NUM;
 constexpr uint32_t MX_SCALE_GROUP_SIZE = 32; // MX量化每32个D维元素对应1个E8M0 scale
+constexpr uint32_t HIFLOAT4_BLOCK_SIZE = 64; // HIFLOAT4每64个D维元素对应1个scale
 
 // -----------算子TilingData定义---------------
 BEGIN_TILING_DATA_DEF(QLIV2TilingData)

@@ -21,9 +21,10 @@
 namespace optiling {
 
 // Constants
-inline constexpr uint32_t AIC_CORE_MAX_NUM = 36;
-inline constexpr uint32_t AIV_CORE_MAX_NUM = 72;
-constexpr uint32_t QLI_V2_METADATA_TOTAL_SIZE = 1024;
+inline constexpr uint32_t AIC_CORE_MAX_NUM = 80;
+inline constexpr uint32_t AIV_CORE_MAX_NUM = 80;
+constexpr uint32_t QLI_V2_METADATA_TOTAL_SIZE = 2048;
+
 using QLI_V2_METADATA_T = int32_t;
 
 inline constexpr uint32_t QLI_V2_METADATA_SIZE = 8;

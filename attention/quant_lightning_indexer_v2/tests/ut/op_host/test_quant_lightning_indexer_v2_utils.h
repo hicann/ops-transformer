@@ -41,7 +41,7 @@ struct CaseParam {
     std::vector<int64_t> cmpResidual;
     std::vector<int64_t> blockTable = {2, 2};
     std::vector<int64_t> idxOffset;
-    std::vector<int64_t> metadata = {1024};
+    std::vector<int64_t> metadata = {2048};
     ge::DataType qType = ge::DT_INT8;
     ge::DataType kType = ge::DT_INT8;
     ge::DataType wType = ge::DT_FLOAT16;

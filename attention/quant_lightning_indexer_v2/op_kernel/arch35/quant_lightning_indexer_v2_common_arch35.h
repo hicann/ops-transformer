@@ -18,6 +18,12 @@
 #include "../../../lightning_indexer_v2/op_kernel/arch35/common/lightning_indexer_v2_base_arch35.h"
 #include "../../../lightning_indexer_v2/op_kernel/arch35/common/lightning_indexer_v2_const_info_common.h"
 
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+#define CVRATIO 1
+#else
+#define CVRATIO 2
+#endif
+
 using namespace AscendC;
 namespace QLIV2Common {
 using FP8E4M3 = fp8_e4m3fn_t;
@@ -27,6 +33,8 @@ using FP8E8M0 = fp8_e8m0_t;
 constexpr uint32_t MX_SCALE_GROUP_SIZE = 32; // 每32个D维度元素一个scale
 constexpr uint32_t FP8_TWO = 2;              // 2个FP8E8M0打包成1个BF16
 constexpr uint32_t FP4_PACK_NUM = 2;         // 2个FP4E2M1打包成1个字节存储
+constexpr uint32_t HIFLOAT4_BLOCK_SIZE = 64; // HIFLOAT每64个D维度元素一个scale
+constexpr uint32_t HIFLOAT4_TWO = 2;         // 2个HIFLOAT4打包成1个UINT8
 
 // 与tiling的layout保持一致
 enum class LI_LAYOUT : uint32_t {
@@ -53,6 +61,8 @@ struct QLIV2Type {
     static constexpr bool isMxFp4 = std::is_same_v<rawQueryType, FP4E2M1> && std::is_same_v<rawKeyType, FP4E2M1> &&
                                     std::is_same_v<SCALE_T, FP8E8M0>;
     static constexpr bool isMx = isMxFp8 || isMxFp4;
+    static constexpr bool isHiFloat4 =
+        std::is_same_v<rawQueryType, hifloat4x2_t> && std::is_same_v<rawKeyType, hifloat4x2_t>;
 
     using queryType = std::conditional_t<isMxFp4, uint8_t, rawQueryType>;
     using keyType = std::conditional_t<isMxFp4, uint8_t, rawKeyType>;
@@ -115,11 +125,31 @@ struct ConstInfo : LIV2Common::ConstInfoCommon<LI_LAYOUT> {
     static constexpr uint32_t QLIV2_SYNC_MODE4 = 4;
     static constexpr uint16_t NEG_INF_BFLOAT = 0xFF80;
 
-    // 8字节字段
-    uint64_t sparseCount; // topK选取大小
+    // CUBE和VEC的核间同步EventID
+    uint32_t syncC1V1 = 0U;
+    uint32_t syncC1V0 = 2U;
+    uint32_t syncV1C1 = 0U;
+    uint32_t syncV0C1 = 1U;
 
-    // 4字节字段
-    uint32_t mBaseSizeMax = 1U;
+    // 基本块大小
+    uint32_t mBaseSize = 1ULL;
+    uint32_t mBaseSizeMax = 1ULL;
+    uint32_t s1BaseSize = 1ULL;
+    uint32_t s2BaseSize = 1ULL;
+    uint64_t mAlignSize = 128U;
+
+    uint64_t batchSize = 0ULL;
+    uint64_t gSize = 0ULL;
+    uint64_t qHeadNum = 0ULL;
+    uint64_t kHeadNum;
+    uint64_t headDim;
+    uint64_t sparseCount;             // topK选取大小
+    uint64_t kSeqSize = 0ULL;         // kv最大S长度
+    uint64_t qSeqSize = 1ULL;         // q最大S长度
+    uint32_t kCacheBlockSize = 0;     // PA场景的block size
+    uint32_t maxBlockNumPerBatch = 0; // PA场景的最大单batch block number
+    LI_LAYOUT outputLayout;           // 输出的格式
+    bool attenMaskFlag = false;
     uint32_t cmpRatio = 1;
     uint32_t keyDequantScaleStride0 = 0;
     int32_t maxSeqlenQ = -1;

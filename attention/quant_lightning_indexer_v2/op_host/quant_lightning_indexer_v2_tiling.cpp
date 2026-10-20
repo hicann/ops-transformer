@@ -61,8 +61,27 @@ static const std::map<ge::DataType, std::string> DATATYPE_TO_STRING_MAP = {
     {ge::DT_DUAL_SUB_INT8, "DT_DUAL_SUB_INT8"},   // dual output int8 type
     {ge::DT_DUAL_SUB_UINT8, "DT_DUAL_SUB_UINT8"}, // dual output uint8 type
     {ge::DT_COMPLEX32, "DT_COMPLEX32"},           // complex32 type
-    {ge::DT_COMPLEX64, "DT_COMPLEX64"}            // complex64 type
-};
+    {ge::DT_COMPLEX64, "DT_COMPLEX64"},           // complex64 type
+    {ge::DT_COMPLEX128, "DT_COMPLEX128"},         // complex128 type
+    {ge::DT_QINT8, "DT_QINT8"},                   // qint8 type
+    {ge::DT_QINT16, "DT_QINT16"},                 // qint16 type
+    {ge::DT_QINT32, "DT_QINT32"},                 // qint32 type
+    {ge::DT_QUINT8, "DT_QUINT8"},                 // quint8 type
+    {ge::DT_QUINT16, "DT_QUINT16"},               // quint16 type
+    {ge::DT_RESOURCE, "DT_RESOURCE"},             // resource type
+    {ge::DT_STRING_REF, "DT_STRING_REF"},         // string ref type
+    {ge::DT_STRING, "DT_STRING"},                 // string type
+    {ge::DT_VARIANT, "DT_VARIANT"},               // dt_variant type
+    {ge::DT_BF16, "DT_BFLOAT16"},                 // dt_bfloat16 type
+    {ge::DT_INT4, "DT_INT4"},                     // dt_variant type
+    {ge::DT_UINT1, "DT_UINT1"},                   // dt_variant type
+    {ge::DT_INT2, "DT_INT2"},                     // dt_variant type
+    {ge::DT_UINT2, "DT_UINT2"},                   // dt_variant type
+    {ge::DT_HIFLOAT8, "DT_HIFLOAT8"},
+    {ge::DT_FLOAT8_E4M3FN, "DT_FLOAT8_E4M3FN"},
+    {ge::DT_FLOAT8_E8M0, "DT_FLOAT8_E8M0"},
+    {ge::DT_FLOAT4_E2M1, "DT_FLOAT4_E2M1"},
+    {ge::DT_HIFLOAT4, "DT_HIFLOAT4"}};
 
 std::string QLIV2DataTypeToSerialString(ge::DataType type)
 {
@@ -192,7 +211,9 @@ ge::graphStatus QLIV2InfoParser::GetNpuInfo()
 
     socVersion_ = ascendcPlatform.GetSocVersion();
     npuArch_ = ascendcPlatform.GetCurNpuArch();
-    if ((npuArch_ != NpuArch::DAV_2201) && (npuArch_ != NpuArch::DAV_3510)) {
+    // DAV_9201：Ascend960DT；DAV_9202：Ascend960PR
+    if ((npuArch_ != NpuArch::DAV_2201) && (npuArch_ != NpuArch::DAV_3510) && (npuArch_ != NpuArch::DAV_9201) &&
+        (npuArch_ != NpuArch::DAV_9202)) {
         OP_LOGE(opName_, "NpuArch[%d] is not support.", static_cast<int32_t>(npuArch_));
         return GRAPH_FAILED;
     }
@@ -318,7 +339,7 @@ ge::graphStatus QLIV2InfoParser::CheckAttrParaInfo()
                             "but now layout_key is %s.",
                             layout_key.c_str()),
                     return ge::GRAPH_FAILED);
-    } else if (npuArch_ == NpuArch::DAV_3510) {
+    } else if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         OP_CHECK_IF(
             ((std::string(qliV2Params_.layOutKey) != "PA_BBND") && (std::string(qliV2Params_.layOutKey) != "BSND") &&
              (std::string(qliV2Params_.layOutKey) != "TND")),
@@ -339,7 +360,7 @@ ge::graphStatus QLIV2InfoParser::CheckAttrParaInfo()
                             " but now cmpRatio is %lld.",
                             *qliV2Params_.cmpRatio),
                     return ge::GRAPH_FAILED);
-    } else if (npuArch_ == NpuArch::DAV_3510) {
+    } else if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         OP_CHECK_IF(
             !((*qliV2Params_.sparseCount > 0) && (*qliV2Params_.sparseCount <= SPARSE_LIMIT_8K)),
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "topk", std::to_string(*qliV2Params_.sparseCount),
@@ -375,16 +396,24 @@ ge::graphStatus QLIV2InfoParser::CheckAttrParaInfo()
                         (*qliV2Params_.quantMode != QUANT_MODE_MXFP8) &&
                         (*qliV2Params_.quantMode != QUANT_MODE_HIFLOAT8) &&
                         (*qliV2Params_.quantMode != QUANT_MODE_MXFP4),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "sparse_mode",
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "quant_mode",
                                                           std::to_string(*qliV2Params_.quantMode).c_str(),
                                                           "Quant_mode only supports 1, 2, 3, 4 and 5"),
+                    return ge::GRAPH_FAILED);
+    } else if (npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
+        OP_CHECK_IF((*qliV2Params_.quantMode != QUANT_MODE_FP8) && (*qliV2Params_.quantMode != QUANT_MODE_MXFP8) &&
+                        (*qliV2Params_.quantMode != QUANT_MODE_MXFP4) &&
+                        (*qliV2Params_.quantMode != QUANT_MODE_HIFLOAT4),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "quant_mode",
+                                                          std::to_string(*qliV2Params_.quantMode).c_str(),
+                                                          "Quant_mode only supports 1, 3, 5 and 6"),
                     return ge::GRAPH_FAILED);
     }
 
     if (npuArch_ == NpuArch::DAV_2201) {
         OP_CHECK_IF(*qliV2Params_.returnValue, OP_LOGE(opName_, "input attr returnValue only supported False."),
                     return ge::GRAPH_FAILED);
-    } else if (npuArch_ == NpuArch::DAV_3510) {
+    } else if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         OP_CHECK_IF((*qliV2Params_.returnValue != 0) && (*qliV2Params_.returnValue != 1),
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "return_value",
                                                           std::to_string(*qliV2Params_.returnValue).c_str(),
@@ -457,6 +486,8 @@ ge::graphStatus QLIV2InfoParser::GetAndCheckInOutDataType()
         } else if (*qliV2Params_.quantMode == QUANT_MODE_INT8) {
             expectQType = ge::DT_INT8;
             expectScaleType = ge::DT_FLOAT16;
+        } else if (*qliV2Params_.quantMode == QUANT_MODE_HIFLOAT4) {
+            expectQType = ge::DT_HIFLOAT4;
         }
         OP_CHECK_IF(inputQType_ != expectQType,
                     OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
@@ -476,7 +507,7 @@ ge::graphStatus QLIV2InfoParser::GetAndCheckInOutDataType()
     if (npuArch_ == NpuArch::DAV_2201) {
         OP_CHECK_IF(weightsType_ != ge::DT_FLOAT16,
                     OP_LOGE(opName_, "The data types of the input weights must be float16."), return ge::GRAPH_FAILED);
-    } else if (npuArch_ == NpuArch::DAV_3510) {
+    } else if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         if (inputQType_ == ge::DT_INT8) {
             OP_CHECK_IF(weightsType_ != ge::DT_FLOAT16,
                         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
@@ -707,7 +738,7 @@ ge::graphStatus QLIV2InfoParser::GetAndCheckOptionalInput()
                         return ge::GRAPH_FAILED);
         }
     }
-    if (npuArch_ == NpuArch::DAV_3510) {
+    if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         if (qliV2Params_.outputIdxOffset.tensor != nullptr) {
             OP_CHECK_IF(qliV2Params_.outputIdxOffset.desc->GetDataType() != ge::DT_INT32,
                         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
@@ -767,7 +798,8 @@ ge::graphStatus QLIV2InfoParser::CheckShapeDim()
                                          std::to_string(expectShapeDim - 1).c_str()),
             return ge::GRAPH_FAILED);
     }
-    if (npuArch_ == NpuArch::DAV_3510 && *qliV2Params_.returnValue == 1) {
+    if ((npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) &&
+        *qliV2Params_.returnValue == 1) {
         uint32_t sparseValuesShapeDim = qliV2Params_.sparseValues.shape->GetStorageShape().GetDimNum();
         OP_CHECK_IF(sparseValuesShapeDim != expectShapeDim,
                     OP_LOGE_FOR_INVALID_SHAPEDIM(opName_, "sparse_values", std::to_string(sparseValuesShapeDim).c_str(),
@@ -833,7 +865,7 @@ ge::graphStatus QLIV2InfoParser::GetGSize()
     }
     gSize_ = n1Size_ / n2Size_;
 
-    if (npuArch_ == NpuArch::DAV_3510) {
+    if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         OP_CHECK_IF(gSize_ > G_SIZE_LIMIT,
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                         opName_, "q and k",
@@ -1051,6 +1083,30 @@ ge::graphStatus QLIV2InfoParser::ValidateInputShapesMatch()
                             std::to_string(qliV2Params_.attenOut.shape->GetStorageShape().GetDim(0)) +
                             " respectively, they must be same"),
                     return ge::GRAPH_FAILED);
+        if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
+            if (*qliV2Params_.returnValue == 1 && qliV2Params_.sparseValues.shape != nullptr) {
+                OP_CHECK_IF((qliV2Params_.sparseValues.shape->GetStorageShape().GetDim(0) != qTsize),
+                            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                                opName_, "q and sparse_values",
+                                Ops::Base::ToString(qliV2Params_.query.shape->GetStorageShape()) + " and " +
+                                    Ops::Base::ToString(qliV2Params_.sparseValues.shape->GetStorageShape()),
+                                "TND case q and sparse_values dim 0 are " + std::to_string(qTsize) + ", " +
+                                    std::to_string(qliV2Params_.sparseValues.shape->GetStorageShape().GetDim(0)) +
+                                    " respectively, they must be same"),
+                            return ge::GRAPH_FAILED);
+            }
+            if (qliV2Params_.outputIdxOffset.tensor != nullptr) {
+                OP_CHECK_IF((qliV2Params_.outputIdxOffset.tensor->GetStorageShape().GetDim(0) != qTsize),
+                            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                                opName_, "q and output_idx_offset",
+                                Ops::Base::ToString(qliV2Params_.query.shape->GetStorageShape()) + " and " +
+                                    Ops::Base::ToString(qliV2Params_.outputIdxOffset.tensor->GetStorageShape()),
+                                "TND case q and output_idx_offset dim 0 are " + std::to_string(qTsize) + " and " +
+                                    std::to_string(qliV2Params_.outputIdxOffset.tensor->GetStorageShape().GetDim(0)) +
+                                    " respectively, they must be same"),
+                            return ge::GRAPH_FAILED);
+            }
+        }
     } else {
         // -----------------------check BatchSize-------------------
         // bSize_ 来源于query
@@ -1171,7 +1227,7 @@ ge::graphStatus QLIV2InfoParser::ValidateInputShapesMatch()
             return ge::GRAPH_FAILED);
     }
     // -----------------------check sparse_values------------------
-    if (npuArch_ == NpuArch::DAV_3510) {
+    if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         if (*qliV2Params_.returnValue == 1) {
             OP_CHECK_IF((qliV2Params_.sparseValues.shape->GetStorageShape().GetDim(qliV2OutN2Dim) != n2Size_),
                         OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
@@ -1206,6 +1262,7 @@ ge::graphStatus QLIV2InfoParser::CheckScaleShape()
     uint32_t qDequantScaleShapeDim = qliV2Params_.query_dequant_scale.shape->GetStorageShape().GetDimNum();
     uint32_t kDequantScaleShapeDim = qliV2Params_.key_dequant_scale.shape->GetStorageShape().GetDimNum();
     bool isMxQuantMode = (*qliV2Params_.quantMode == QUANT_MODE_MXFP8) || (*qliV2Params_.quantMode == QUANT_MODE_MXFP4);
+    bool isHiFloat4QuantMode = (*qliV2Params_.quantMode == QUANT_MODE_HIFLOAT4);
 
     if (*qliV2Params_.quantMode == QUANT_MODE_HIFLOAT8) {
         OP_CHECK_IF(qDequantScaleShapeDim != 1,
@@ -1297,6 +1354,64 @@ ge::graphStatus QLIV2InfoParser::CheckScaleShape()
                     ", k_descale's last dims should be [" + std::to_string(expectScaleD) + ", " +
                     std::to_string(MX_E8M0_SCALE_PACK_NUM) + "]"),
             return ge::GRAPH_FAILED);
+    } else if (isHiFloat4QuantMode) {
+        OP_CHECK_IF(headDim_ % HIFLOAT4_BLOCK_SIZE != 0,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName_, "q", ToStringRaw(qliV2Params_.query.shape->GetStorageShape()).c_str(),
+                        "When quant_mode is 6, head_dim should be a multiple of " +
+                            std::to_string(HIFLOAT4_BLOCK_SIZE) + ", but now is " + std::to_string(headDim_)),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            qDequantScaleShapeDim != qShapeDim,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName_, "q_descale", ToStringRaw(qliV2Params_.query_dequant_scale.shape->GetStorageShape()).c_str(),
+                "When quant_mode is 6, the dim num of q_descale should be " + std::to_string(qShapeDim)),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            kDequantScaleShapeDim != kShapeDim,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName_, "k_descale", ToStringRaw(qliV2Params_.key_dequant_scale.shape->GetStorageShape()).c_str(),
+                "When quant_mode is 6, the dim num of k_descale should be " + std::to_string(kShapeDim)),
+            return ge::GRAPH_FAILED);
+        for (uint32_t i = 0; i < (qShapeDim - 1); i++) {
+            uint32_t dimValueQueryScale = qliV2Params_.query_dequant_scale.shape->GetStorageShape().GetDim(i);
+            uint32_t dimValueQuery = qliV2Params_.query.shape->GetStorageShape().GetDim(i);
+            OP_CHECK_IF(
+                dimValueQueryScale != dimValueQuery,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "q and q_descale",
+                    Ops::Base::ToString(qliV2Params_.query.shape->GetStorageShape()) + " and " +
+                        Ops::Base::ToString(qliV2Params_.query_dequant_scale.shape->GetStorageShape()),
+                    "Q_descale's shape[" + std::to_string(i) + "]" + std::to_string(dimValueQueryScale) +
+                        " and q's shape[" + std::to_string(i) + "]" + std::to_string(dimValueQuery) + " are not same"),
+                return ge::GRAPH_FAILED);
+        }
+        for (uint32_t i = 0; i < (kShapeDim - 1); i++) {
+            uint32_t dimValueKeyScale = qliV2Params_.key_dequant_scale.shape->GetStorageShape().GetDim(i);
+            uint32_t dimValueKey = qliV2Params_.key.shape->GetStorageShape().GetDim(i);
+            OP_CHECK_IF(
+                dimValueKeyScale != dimValueKey,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "k and k_descale",
+                    Ops::Base::ToString(qliV2Params_.key.shape->GetStorageShape()) + " and " +
+                        Ops::Base::ToString(qliV2Params_.key_dequant_scale.shape->GetStorageShape()),
+                    "K_descale's shape[" + std::to_string(i) + "]" + std::to_string(dimValueKeyScale) +
+                        " and k's shape[" + std::to_string(i) + "]" + std::to_string(dimValueKey) + " are not same"),
+                return ge::GRAPH_FAILED);
+        }
+        uint32_t expectHif4ScaleD = headDim_ / HIFLOAT4_BLOCK_SIZE;
+        OP_CHECK_IF(
+            qliV2Params_.query_dequant_scale.shape->GetStorageShape().GetDim(qShapeDim - 1) != expectHif4ScaleD,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName_, "q_descale", Ops::Base::ToString(qliV2Params_.query_dequant_scale.shape->GetStorageShape()),
+                "When quant_mode is 6, q_descale's last dim should be " + std::to_string(expectHif4ScaleD)),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            qliV2Params_.key_dequant_scale.shape->GetStorageShape().GetDim(kShapeDim - 1) != expectHif4ScaleD,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName_, "k_descale", Ops::Base::ToString(qliV2Params_.key_dequant_scale.shape->GetStorageShape()),
+                "When quant_mode is 6, k_descale's last dim should be " + std::to_string(expectHif4ScaleD)),
+            return ge::GRAPH_FAILED);
     } else {
         OP_CHECK_IF(qDequantScaleShapeDim != (qShapeDim - 1),
                     OP_LOGE_FOR_INVALID_SHAPEDIM(opName_, "q_descale", std::to_string(qDequantScaleShapeDim).c_str(),
@@ -1344,10 +1459,14 @@ ge::graphStatus QLIV2InfoParser::CheckKeyContiguous() const
 {
     bool keyNonContiguous = false;
     bool scaleNonContiguous = false;
-    // PA_BBND: 0轴允许非连续（分页缓存 stride0，各arch一致），从1轴开始检查
-    // PA_BBND: axis 0 allows non-contiguous (paged cache stride0), check starts from axis 1
-    // 非PA_BBND: 所有轴都必须连续 Non-PA_BBND: check starts from axis 0
-    size_t checkStartIdx = (kLayout_ == DataLayout::PA_BBND) ? 1 : 0;
+    // A5 PA_BBND: 0轴允许非连续，从1轴开始检查；非PA_BBND或A3: 从0轴开始检查
+    // PA_BBND: axis 0 allows non-contiguous, check starts from axis 1
+    // Non-PA_BBND: check starts from axis 0
+    size_t checkStartIdx =
+        ((npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) &&
+         kLayout_ == DataLayout::PA_BBND) ?
+            1 :
+            0;
     if (!keyStridesVec_.empty() && qliV2Params_.key.shape != nullptr) {
         auto& shape = qliV2Params_.key.shape->GetStorageShape();
         std::vector<uint32_t> expectedStrides;
@@ -1365,6 +1484,7 @@ ge::graphStatus QLIV2InfoParser::CheckKeyContiguous() const
         }
     }
     bool isMxQuantMode = (*qliV2Params_.quantMode == QUANT_MODE_MXFP8) || (*qliV2Params_.quantMode == QUANT_MODE_MXFP4);
+    bool isHiFloat4QuantMode = (*qliV2Params_.quantMode == QUANT_MODE_HIFLOAT4);
     if ((*qliV2Params_.quantMode != QUANT_MODE_HIFLOAT8) && !keyDequantScaleStridesVec_.empty() &&
         qliV2Params_.key_dequant_scale.shape != nullptr) {
         auto& shape = qliV2Params_.key_dequant_scale.shape->GetStorageShape();
@@ -1377,6 +1497,13 @@ ge::graphStatus QLIV2InfoParser::CheckKeyContiguous() const
             } else if (kLayout_ == DataLayout::TND) {
                 expectedStrides = {shape.GetDim(1) * shape.GetDim(2) * shape.GetDim(3),
                                    shape.GetDim(2) * shape.GetDim(3), shape.GetDim(3), 1};
+            }
+        } else if (isHiFloat4QuantMode) {
+            if (kLayout_ == DataLayout::BSND || kLayout_ == DataLayout::PA_BBND) {
+                expectedStrides = {shape.GetDim(1) * shape.GetDim(2) * shape.GetDim(3),
+                                   shape.GetDim(2) * shape.GetDim(3), shape.GetDim(3), 1};
+            } else if (kLayout_ == DataLayout::TND) {
+                expectedStrides = {shape.GetDim(1) * shape.GetDim(2), shape.GetDim(2), 1};
             }
         } else {
             if (kLayout_ == DataLayout::BSND || kLayout_ == DataLayout::PA_BBND) {
@@ -1401,6 +1528,15 @@ ge::graphStatus QLIV2InfoParser::CheckKeyContiguous() const
                         opName_, "k",
                         "When quant_mode is 5 and layout_k is PA_BBND, key stride0 must be positive and satisfy "
                         "2-element FP4 packing alignment, but got " +
+                            std::to_string(keyStridesVec_[0])),
+                    return ge::GRAPH_FAILED);
+            } else if (*qliV2Params_.quantMode == QUANT_MODE_HIFLOAT4) {
+                OP_CHECK_IF(
+                    keyStridesVec_[0] <= 0 || keyStridesVec_[0] % HIFLOAT4_PACK_NUM != 0,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "k",
+                        "When quant_mode is 6 and layout_k is PA_BBND, key stride0 must be positive and satisfy "
+                        "2-element HiFloat4 packing alignment, but got " +
                             std::to_string(keyStridesVec_[0])),
                     return ge::GRAPH_FAILED);
             } else {
@@ -1467,8 +1603,12 @@ void QLIV2InfoParser::GenerateInfo(QLIV2TilingInfo& QLIV2Info)
         if (*qliV2Params_.quantMode == QUANT_MODE_MXFP4) {
             // FP4 shape stride以逻辑元素计数，kernel侧以打包后的uint8为寻址单位。
             keyStride0 /= MXFP4_PACK_NUM;
+        } else if (*qliV2Params_.quantMode == QUANT_MODE_HIFLOAT4) {
+            keyStride0 /= HIFLOAT4_PACK_NUM;
         }
         QLIV2Info.keyStride0 = keyStride0;
+    } else if (kLayout_ == DataLayout::PA_BBND && *qliV2Params_.quantMode == QUANT_MODE_HIFLOAT4) {
+        QLIV2Info.keyStride0 = static_cast<uint32_t>(blockSize_) * n2Size_ * (headDim_ / HIFLOAT4_PACK_NUM);
     } else {
         QLIV2Info.keyStride0 = 0; // 非PA无需使用stride
     }
@@ -1476,6 +1616,8 @@ void QLIV2InfoParser::GenerateInfo(QLIV2TilingInfo& QLIV2Info)
         QLIV2Info.keyDequantScaleStride0 = static_cast<uint32_t>(keyDequantScaleStridesVec_[0]);
     } else if ((*qliV2Params_.quantMode == QUANT_MODE_MXFP8) || (*qliV2Params_.quantMode == QUANT_MODE_MXFP4)) {
         QLIV2Info.keyDequantScaleStride0 = static_cast<uint32_t>(blockSize_) * (headDim_ / MX_SCALE_GROUP_SIZE);
+    } else if (*qliV2Params_.quantMode == QUANT_MODE_HIFLOAT4) {
+        QLIV2Info.keyDequantScaleStride0 = static_cast<uint32_t>(blockSize_) * (headDim_ / HIFLOAT4_BLOCK_SIZE);
     } else {
         QLIV2Info.keyDequantScaleStride0 = 0;
     }
@@ -1544,17 +1686,18 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingI
     constexpr uint32_t V1_DECODE_DATA_NUM = 2;        // Decode每个核需要存储头和尾部两块数据
     constexpr uint32_t S1_BASE_SIZE = 4;              // S1轴基本块的大小
     constexpr uint32_t TOPK_MAX_SIZE = 2048;          // TopK选取个数
-    constexpr uint32_t TOPK_MAX_SIZE_950 = 8192;      // A5 TopK最大选取个数
+    constexpr uint32_t TOPK_MAX_SIZE1 = 8192;         // A5/A6 TopK最大选取个数
     uint64_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
     // 主流程需Workspace大小
-    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
-        constexpr uint32_t S1_BASE_SIZE_950 = 4;
-        constexpr uint32_t S2_BASE_SIZE_950 = 128;
-        workspaceSize += S1_BASE_SIZE_950 * ((tilingInfo->s2Size + S2_BASE_SIZE_950 - 1) / S2_BASE_SIZE_950) *
-                         S2_BASE_SIZE_950 * sizeof(uint16_t) * aicNum;
+    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201 ||
+        ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9202) {
+        constexpr uint32_t S1_BASE_SIZE1 = 4;
+        constexpr uint32_t S2_BASE_SIZE1 = 128;
+        workspaceSize += S1_BASE_SIZE1 * ((tilingInfo->s2Size + S2_BASE_SIZE1 - 1) / S2_BASE_SIZE1) * S2_BASE_SIZE1 *
+                         sizeof(uint16_t) * aicNum;
         // 临时存储Decode中间结果大小: 2(头/尾)*8(s1Base)*2(idx/value)*2048(K)*sizeof(int32)*24=6M
         workspaceSize +=
-            V1_DECODE_DATA_NUM * S1_BASE_SIZE * V1_RES_ELEM_TYPE * TOPK_MAX_SIZE_950 * V1_RES_ELEM_SIZE * aicNum;
+            V1_DECODE_DATA_NUM * S1_BASE_SIZE * V1_RES_ELEM_TYPE * TOPK_MAX_SIZE1 * V1_RES_ELEM_SIZE * aicNum;
         // 临时存储Decode中间参数信息大小: 2(头/尾)*8(s1Base)*16(paramNum)*sizeof(int64_t)*24=48k
         workspaceSize += V1_DECODE_DATA_NUM * S1_BASE_SIZE * V1_DECODE_PARAM_NUM * V1_DECODE_PARAM_ELEM_SIZE * aicNum;
     } else {

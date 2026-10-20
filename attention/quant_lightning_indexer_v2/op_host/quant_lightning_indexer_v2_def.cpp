@@ -175,6 +175,89 @@ public:
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true);
         this->AICore().AddConfig("ascend950", aicore_config_95);
+
+        OpAICoreConfig aicore_config_96;
+        // fp8/mxfp8/hif8/mxfp4/hif4
+        aicore_config_96.Input("q")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8, ge::DT_FLOAT4_E2M1, ge::DT_INT8, ge::DT_HIFLOAT4})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_96.Input("k")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8, ge::DT_FLOAT4_E2M1, ge::DT_INT8, ge::DT_HIFLOAT4})
+            .FormatList({ge::FORMAT_ND})
+            .IgnoreContiguous();
+        aicore_config_96.Input("w")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_96.Input("q_descale")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT16, ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_96.Input("k_descale")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT16, ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
+            .IgnoreContiguous();
+        aicore_config_96.Input("cu_seqlens_q")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_96.Input("cu_seqlens_k")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_96.Input("seqused_q")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_96.Input("seqused_k")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_96.Input("cmp_residual_k")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_96.Input("block_table")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_96.Input("output_idx_offset")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_96.Input("metadata")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_96.Output("sparse_indices")
+            .ParamType(REQUIRED)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND});
+        aicore_config_96.Output("sparse_values")
+            .ParamType(REQUIRED)
+            .DataTypeList({ge::DT_BF16})
+            .FormatList({ge::FORMAT_ND});
+        aicore_config_96.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true);
+        this->AICore().AddConfig("ascend960dt", aicore_config_96);
     }
 };
 OP_ADD(QuantLightningIndexerV2);

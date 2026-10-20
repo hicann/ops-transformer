@@ -51,6 +51,7 @@ enum class SparseMode : uint8_t {
 enum class ValidSocVersion {
     ASCEND910B = 0,
     ASCEND950,
+    ASCEND960,
     RESERVED_VERSION = 99999
 };
 

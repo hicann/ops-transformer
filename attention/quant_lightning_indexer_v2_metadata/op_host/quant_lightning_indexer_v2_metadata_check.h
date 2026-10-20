@@ -33,6 +33,7 @@ inline constexpr int64_t QLI_V2_QUANT_MODE_2 = 2;
 inline constexpr int64_t QLI_V2_QUANT_MODE_3 = 3;
 inline constexpr int64_t QLI_V2_QUANT_MODE_4 = 4;
 inline constexpr int64_t QLI_V2_QUANT_MODE_5 = 5;
+inline constexpr int64_t QLI_V2_QUANT_MODE_6 = 6;
 inline constexpr int64_t QLI_V2_NO_MASK_MODE = 0;
 inline constexpr int64_t QLI_V2_CAUSAL_MASK_MODE = 3;
 inline constexpr int64_t QLI_V2_CMP_RATIO_LOWER_BOUND = 1;
@@ -186,66 +187,79 @@ aclnnStatus CheckSingleParamQliV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t 
                                                "For layout_k != PA_BBND, layout_q and layout_k must be the same");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    // 校验 A2/A3 参数
-    if (socVersion.find("Ascend950") == std::string::npos) {
+    // 校验 A6 参数
+    if (socVersion.find("Ascend960DT") != std::string::npos) {
+        // num_heads_q 校验
+        CHECK_COND(numHeadsQ >= QLI_V2_NUM_HEADS_Q_LOWER_BOUND && numHeadsQ <= QLI_V2_NUM_HEADS_Q_UPPER_BOUND,
+                   ACLNN_ERR_PARAM_INVALID, "For Ascend 960DT, num_heads_q should be [%lld, %lld], but got %lld",
+                   QLI_V2_NUM_HEADS_Q_LOWER_BOUND, QLI_V2_NUM_HEADS_Q_UPPER_BOUND, numHeadsQ);
+        // topk 校验
+        CHECK_COND(topk >= QLI_V2_TOPK_LOWER_BOUND && topk <= QLI_V2_A5_TOPK_UPPER_BOUND, ACLNN_ERR_PARAM_INVALID,
+                   "For Ascend 960DT, topk should be [%lld, %lld], but got %lld", QLI_V2_TOPK_LOWER_BOUND,
+                   QLI_V2_A5_TOPK_UPPER_BOUND, topk);
+        // quant_mode 校验
+        CHECK_COND((quantMode == QLI_V2_QUANT_MODE_1) || (quantMode == QLI_V2_QUANT_MODE_3) ||
+                       (quantMode == QLI_V2_QUANT_MODE_5) || (quantMode == QLI_V2_QUANT_MODE_6),
+                   ACLNN_ERR_PARAM_INVALID,
+                   "For Ascend 950PR/Ascend 950DT, quant_mode should be %lld/%lld/%lld, but got %lld",
+                   QLI_V2_QUANT_MODE_1, QLI_V2_QUANT_MODE_3, QLI_V2_QUANT_MODE_5, QLI_V2_QUANT_MODE_6, quantMode);
+        // cmp_ratio 校验
+        CHECK_COND((cmpRatio >= QLI_V2_CMP_RATIO_LOWER_BOUND) && (cmpRatio <= QLI_V2_CMP_RATIO_UPPER_BOUND),
+                   ACLNN_ERR_PARAM_INVALID,
+                   "For Ascend 960DT, cmp_ratio should be between [%lld, %lld], "
+                   "but got %lld",
+                   QLI_V2_CMP_RATIO_LOWER_BOUND, QLI_V2_CMP_RATIO_UPPER_BOUND, cmpRatio);
+        CHECK_COND((strcmp(layoutKOptional, "TND") == 0) || (strcmp(layoutKOptional, "BSND") == 0) ||
+                       (strcmp(layoutKOptional, "PA_BBND") == 0),
+                   ACLNN_ERR_PARAM_INVALID, "For Ascend 960DT, layout_k must be TND/BSND/PA_BBND, but got %s",
+                   layoutKOptional);
+    } else if (socVersion.find("Ascend950") != std::string::npos) { // 校验 A5 参数
+        // num_heads_q 校验
+        CHECK_COND(numHeadsQ >= QLI_V2_NUM_HEADS_Q_LOWER_BOUND && numHeadsQ <= QLI_V2_NUM_HEADS_Q_UPPER_BOUND,
+                   ACLNN_ERR_PARAM_INVALID,
+                   "For Ascend 950PR/Ascend 950DT, num_heads_q should be [%lld, %lld], but got %lld",
+                   QLI_V2_NUM_HEADS_Q_LOWER_BOUND, QLI_V2_NUM_HEADS_Q_UPPER_BOUND, numHeadsQ);
+        // topk 校验
+        CHECK_COND(topk >= QLI_V2_TOPK_LOWER_BOUND && topk <= QLI_V2_A5_TOPK_UPPER_BOUND, ACLNN_ERR_PARAM_INVALID,
+                   "For Ascend 950PR/Ascend 950DT, topk should be [%lld, %lld], but got %lld", QLI_V2_TOPK_LOWER_BOUND,
+                   QLI_V2_A5_TOPK_UPPER_BOUND, topk);
+        // quant_mode 校验
+        CHECK_COND((quantMode == QLI_V2_QUANT_MODE_1) || (quantMode == QLI_V2_QUANT_MODE_2) ||
+                       (quantMode == QLI_V2_QUANT_MODE_3) || (quantMode == QLI_V2_QUANT_MODE_4) ||
+                       (quantMode == QLI_V2_QUANT_MODE_5),
+                   ACLNN_ERR_PARAM_INVALID,
+                   "For Ascend 950PR/Ascend 950DT, quant_mode should be %lld/%lld/%lld, but got %lld",
+                   QLI_V2_QUANT_MODE_1, QLI_V2_QUANT_MODE_2, QLI_V2_QUANT_MODE_3, QLI_V2_QUANT_MODE_4,
+                   QLI_V2_QUANT_MODE_5, quantMode);
+        // cmp_ratio 校验
+        CHECK_COND((cmpRatio >= QLI_V2_CMP_RATIO_LOWER_BOUND) && (cmpRatio <= QLI_V2_CMP_RATIO_UPPER_BOUND),
+                   ACLNN_ERR_PARAM_INVALID,
+                   "For Ascend 950PR/Ascend 950DT, cmp_ratio should be between [%lld, %lld], "
+                   "but got %lld",
+                   QLI_V2_CMP_RATIO_LOWER_BOUND, QLI_V2_CMP_RATIO_UPPER_BOUND, cmpRatio);
+        CHECK_COND((strcmp(layoutKOptional, "TND") == 0) || (strcmp(layoutKOptional, "BSND") == 0) ||
+                       (strcmp(layoutKOptional, "PA_BBND") == 0),
+                   ACLNN_ERR_PARAM_INVALID,
+                   "For Ascend 950PR/Ascend 950DT, layout_k must be TND/BSND/PA_BBND, but got %s", layoutKOptional);
+    } else { // 校验 A2/A3 参数
         // num_heads_q 校验
         CHECK_COND(numHeadsQ == QLI_V2_NUM_HEADS_Q_UPPER_BOUND, ACLNN_ERR_PARAM_INVALID,
-                   "num_heads_q should be %lld, but got %lld", QLI_V2_NUM_HEADS_Q_UPPER_BOUND, numHeadsQ);
+                   "For Atlas A2/A3, num_heads_q should be %lld, but got %lld", QLI_V2_NUM_HEADS_Q_UPPER_BOUND,
+                   numHeadsQ);
         // topk 校验
         CHECK_COND(topk >= QLI_V2_TOPK_LOWER_BOUND && topk <= QLI_V2_A3_TOPK_UPPER_BOUND, ACLNN_ERR_PARAM_INVALID,
-                   "topk should be [%lld, %lld], but got %lld", QLI_V2_TOPK_LOWER_BOUND, QLI_V2_A3_TOPK_UPPER_BOUND,
-                   topk);
+                   "For Atlas A2/A3, topk should be [%lld, %lld], but got %lld", QLI_V2_TOPK_LOWER_BOUND,
+                   QLI_V2_A3_TOPK_UPPER_BOUND, topk);
         // quant_mode 校验
-        CHECK_COND(quantMode == QLI_V2_QUANT_MODE_2, ACLNN_ERR_PARAM_INVALID, "quant_mode should be 2, but got %lld",
-                   quantMode);
+        CHECK_COND(quantMode == QLI_V2_QUANT_MODE_2, ACLNN_ERR_PARAM_INVALID,
+                   "For Atlas A2/A3, quant_mode should be 2, but got %lld", quantMode);
         // cmp_ratio 校验
         CHECK_COND((cmpRatio >= QLI_V2_CMP_RATIO_LOWER_BOUND) && (cmpRatio <= QLI_V2_CMP_RATIO_UPPER_BOUND) &&
                        ((cmpRatio & (cmpRatio - 1)) == 0),
-                   ACLNN_ERR_PARAM_INVALID, "cmp_ratio should be 1/2/4/8/16/32/64/128, but got %lld", cmpRatio);
+                   ACLNN_ERR_PARAM_INVALID, "For Atlas A2/A3, cmp_ratio should be 1/2/4/8/16/32/64/128, but got %lld",
+                   cmpRatio);
         CHECK_COND(strcmp(layoutKOptional, "PA_BBND") == 0, ACLNN_ERR_PARAM_INVALID,
-                   "layout_k must be PA_BBND, but got %s", layoutKOptional);
-    } else { // 校验 A5参数
-        // num_heads_q 校验
-        if (numHeadsQ < QLI_V2_NUM_HEADS_Q_LOWER_BOUND || numHeadsQ > QLI_V2_NUM_HEADS_Q_UPPER_BOUND) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "num_heads_q", std::to_string(numHeadsQ),
-                                                  "The value of num_heads_q should be in range [" +
-                                                      std::to_string(QLI_V2_NUM_HEADS_Q_LOWER_BOUND) + ", " +
-                                                      std::to_string(QLI_V2_NUM_HEADS_Q_UPPER_BOUND) + "]");
-            return ACLNN_ERR_PARAM_INVALID;
-        }
-        // topk 校验
-        if (topk < QLI_V2_TOPK_LOWER_BOUND || topk > QLI_V2_A5_TOPK_UPPER_BOUND) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "topk", std::to_string(topk),
-                                                  "The value of topk should be in range [" +
-                                                      std::to_string(QLI_V2_TOPK_LOWER_BOUND) + ", " +
-                                                      std::to_string(QLI_V2_A5_TOPK_UPPER_BOUND) + "]");
-            return ACLNN_ERR_PARAM_INVALID;
-        }
-        // quant_mode 校验
-        if ((quantMode != QLI_V2_QUANT_MODE_1) && (quantMode != QLI_V2_QUANT_MODE_2) &&
-            (quantMode != QLI_V2_QUANT_MODE_3) && (quantMode != QLI_V2_QUANT_MODE_4) &&
-            (quantMode != QLI_V2_QUANT_MODE_5)) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                QLI_V2_ACLNN_OP_NAME, "quant_mode", std::to_string(quantMode),
-                "The value of quant_mode should be in [" + std::to_string(QLI_V2_QUANT_MODE_1) + ", " +
-                    std::to_string(QLI_V2_QUANT_MODE_2) + ", " + std::to_string(QLI_V2_QUANT_MODE_3) + ", " +
-                    std::to_string(QLI_V2_QUANT_MODE_4) + ", " + std::to_string(QLI_V2_QUANT_MODE_5) + "]");
-            return ACLNN_ERR_PARAM_INVALID;
-        }
-        // cmp_ratio 校验
-        if ((cmpRatio < QLI_V2_CMP_RATIO_LOWER_BOUND) || (cmpRatio > QLI_V2_CMP_RATIO_UPPER_BOUND)) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "cmp_ratio", std::to_string(cmpRatio),
-                                                  "The value of cmp_ratio should be in range [" +
-                                                      std::to_string(QLI_V2_CMP_RATIO_LOWER_BOUND) + ", " +
-                                                      std::to_string(QLI_V2_CMP_RATIO_UPPER_BOUND) + "]");
-            return ACLNN_ERR_PARAM_INVALID;
-        }
-        if ((strcmp(layoutKOptional, "TND") != 0) && (strcmp(layoutKOptional, "BSND") != 0) &&
-            (strcmp(layoutKOptional, "PA_BBND") != 0)) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "layout_k", layoutKOptional,
-                                                  "The value of layout_k must be in [TND, BSND, PA_BBND]");
-            return ACLNN_ERR_PARAM_INVALID;
-        }
+                   "For Atlas A2/A3, layout_k must be PA_BBND, but got %s", layoutKOptional);
     }
     // 校验 layout_q 为 BSND 时，max_seqlen_q 必须大于 0
     if ((strcmp(layoutQOptional, "BSND") == 0) && (maxSeqlenQ <= 0)) {
@@ -328,7 +342,8 @@ aclnnStatus CheckExistenceQliV2(int64_t maskMode, int64_t cmpRatio, const aclTen
 aclnnStatus CheckConsistencyQliV2(int64_t batchSize, const aclTensor* cuSeqlensQOptional,
                                   const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
                                   const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional,
-                                  const char* layoutQOptional, const char* layoutKOptional, const aclTensor* metadata)
+                                  const char* layoutQOptional, const char* layoutKOptional, const aclTensor* metadata,
+                                  const std::string& socVersion)
 {
     int64_t dimNum = -1;
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
@@ -525,7 +540,7 @@ aclnnStatus ParamsCheckQliV2(const aclTensor* cuSeqlensQOptional, const aclTenso
     CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     ret = CheckConsistencyQliV2(batchSize, cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional,
-                                cmpResidualKOptional, layoutQOptional, layoutKOptional, metadata);
+                                cmpResidualKOptional, layoutQOptional, layoutKOptional, metadata, socVersion);
     CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     return ACLNN_SUCCESS;

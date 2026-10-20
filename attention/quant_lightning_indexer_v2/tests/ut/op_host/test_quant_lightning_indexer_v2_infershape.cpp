@@ -47,7 +47,7 @@ TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_infershape_bsnd)
             {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // cmp_residual_k input9 (optional)
             {{{1, 4}, {1, 4}}, ge::DT_INT32, ge::FORMAT_ND},                  // block_table  input10
             {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // output_idx_offset input11 (optional)
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                   // metadata     input12
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                   // metadata     input12
         },
         // 输出Tensor
         {
@@ -86,7 +86,7 @@ TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_infershape_tnd)
             {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                       // cmp_residual_k input9 (optional)
             {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                       // block_table  input10 (optional)
             {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true}, // output_idx_offset input11 (optional)
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}  // metadata     input12
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}  // metadata     input12
         },
         {
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -123,7 +123,7 @@ TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_infershape_tnd_pa)
             {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true}, // cmp_residual_k input9 (optional)
             {{{1, 2}, {1, 2}}, ge::DT_INT32, ge::FORMAT_ND}, // block_table  input10
             {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true}, // output_idx_offset input11 (optional)
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}  // metadata     input12
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}  // metadata     input12
         },
         {
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
@@ -160,7 +160,7 @@ TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_infershape_layout_f
             {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // cmp_residual_k input9 (optional)
             {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // block_table  input10 (optional)
             {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // output_idx_offset input11 (optional)
-            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                   // metadata     input12
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                   // metadata     input12
         },
         {
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices

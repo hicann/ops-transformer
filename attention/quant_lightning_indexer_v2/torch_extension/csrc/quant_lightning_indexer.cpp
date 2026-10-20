@@ -40,11 +40,14 @@ inline bool IsFp4CompatibleTensor(const at::Tensor& tensor)
 }
 
 constexpr int64_t E8M0_SCALE_PACK_NUM = 2;
+constexpr uint32_t QUANT_MODE_HIFLOAT8 = 4;
+constexpr uint32_t QUANT_MODE_MXFP4 = 5;
+constexpr uint32_t QUANT_MODE_HIFLOAT4 = 6;
 
 inline void FixQLIV2AclDtypes(int64_t quantMode, TensorWrapper& queryWrapper, TensorWrapper& keyWrapper,
                               TensorWrapper& queryScaleWrapper, TensorWrapper& keyScaleWrapper)
 {
-    if (quantMode == 4) {
+    if (quantMode == QUANT_MODE_HIFLOAT8) {
         TORCH_CHECK(queryWrapper.tensor_.scalar_type() == at::kByte, "When quant_mode is 4, query must be hifp8 type");
         TORCH_CHECK(keyWrapper.tensor_.scalar_type() == at::kByte, "When quant_mode is 4, key must be hifp8 type");
         queryWrapper.dtype = ACL_HIFLOAT8;
@@ -52,13 +55,25 @@ inline void FixQLIV2AclDtypes(int64_t quantMode, TensorWrapper& queryWrapper, Te
         return;
     }
 
-    if (quantMode == 5) {
+    if (quantMode == QUANT_MODE_MXFP4) {
         TORCH_CHECK(IsFp4CompatibleTensor(queryWrapper.tensor_),
                     "When quant_mode is 5, query must be torch.float4_e2m1fn_x2 or packed torch.uint8");
         TORCH_CHECK(IsFp4CompatibleTensor(keyWrapper.tensor_),
                     "When quant_mode is 5, key must be torch.float4_e2m1fn_x2 or packed torch.uint8");
         queryWrapper.dtype = ACL_FLOAT4_E2M1;
         keyWrapper.dtype = ACL_FLOAT4_E2M1;
+    }
+
+    if (quantMode == QUANT_MODE_HIFLOAT4) {
+        TORCH_CHECK(queryWrapper.tensor_.scalar_type() == at::kByte,
+                    "When quant_mode is 6, query must be packed torch.uint8");
+        TORCH_CHECK(keyWrapper.tensor_.scalar_type() == at::kByte,
+                    "When quant_mode is 6, key must be packed torch.uint8");
+        TORCH_CHECK(queryScaleWrapper.tensor_.scalar_type() == at::kFloat &&
+                        keyScaleWrapper.tensor_.scalar_type() == at::kFloat,
+                    "When quant_mode is 6, query_dequant_scale and key_dequant_scale must be torch.float32");
+        queryWrapper.dtype = ACL_HIFLOAT4;
+        keyWrapper.dtype = ACL_HIFLOAT4;
     }
 
     if (IsMxQuantMode(quantMode)) {
@@ -87,7 +102,7 @@ const int DIM_1 = 1;
 const int DIM_2 = 2;
 const int DIM_3 = 3;
 
-constexpr int64_t QLI_V2_METADATA_SIZE = 1024;
+constexpr int64_t QLI_V2_METADATA_SIZE = 2048;
 
 at::Tensor QuantLightningIndexerMetadata(int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk,
                                          int64_t quantMode, const c10::optional<at::Tensor>& cuSeqlensQ,

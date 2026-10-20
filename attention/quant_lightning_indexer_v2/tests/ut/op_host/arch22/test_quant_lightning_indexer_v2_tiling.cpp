@@ -310,7 +310,7 @@ TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_
         qliv2_ut::Desc({}, ge::DT_INT32),              // cmp_residual_k input9
         qliv2_ut::Desc({2, 2}, ge::DT_INT32),          // block_table    input10
         qliv2_ut::Desc({}, ge::DT_INT32),              // output_idx_offset input11
-        qliv2_ut::Desc({1024}, ge::DT_INT32)           // metadata       input12
+        qliv2_ut::Desc({2048}, ge::DT_INT32)           // metadata       input12
     };
     inputs[1].stride_ = gert::Stride({0, 128, 128, 1});
     inputs[1].hasStride_ = true;
@@ -346,7 +346,7 @@ TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_
         qliv2_ut::Desc({}, ge::DT_INT32),              // cmp_residual_k input9
         qliv2_ut::Desc({2, 2}, ge::DT_INT32),          // block_table    input10
         qliv2_ut::Desc({}, ge::DT_INT32),              // output_idx_offset input11
-        qliv2_ut::Desc({1024}, ge::DT_INT32)           // metadata       input12
+        qliv2_ut::Desc({2048}, ge::DT_INT32)           // metadata       input12
     };
     inputs[1].stride_ = gert::Stride({2048, 128, 128, 1});
     inputs[1].hasStride_ = true;
@@ -384,7 +384,7 @@ TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_
         qliv2_ut::Desc({}, ge::DT_INT32),              // cmp_residual_k input9
         qliv2_ut::Desc({2, 2}, ge::DT_INT32),          // block_table    input10
         qliv2_ut::Desc({}, ge::DT_INT32),              // output_idx_offset input11
-        qliv2_ut::Desc({1024}, ge::DT_INT32)           // metadata       input12
+        qliv2_ut::Desc({2048}, ge::DT_INT32)           // metadata       input12
     };
     inputs[1].stride_ = gert::Stride({2048, 256, 128, 1});
     inputs[1].hasStride_ = true;

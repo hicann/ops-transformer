@@ -83,6 +83,7 @@ public:
     using SCALE_T = typename QLIV2T::scaleType;
     using WEIGHT_T = typename QLIV2T::weightType;
     static constexpr bool IS_MX = QLIV2T::isMx;
+    static constexpr bool IS_HIFLOAT4 = QLIV2T::isHiFloat4;
 
     QLIV2Matmul<QLIV2T> matmulService;
     QLIV2Vector<QLIV2T> qliV2VectorService;
@@ -224,6 +225,7 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::InitTilingData(const QLIV2TilingDat
         qliV2KernelConstInfo.mBaseSizeMax = M_BASE_SIZE;
     }
     qliV2KernelConstInfo.mBaseSize = qliV2KernelConstInfo.s1BaseSize * qliV2KernelConstInfo.gSize;
+    qliV2KernelConstInfo.mAlignSize = 2 * qliV2KernelConstInfo.gSize;
     qliV2KernelConstInfo.s2BaseSize = S2_BASE_SIZE;
     qliV2KernelConstInfo.returnValue = tilingData->returnValue;
 }
@@ -344,7 +346,7 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::SplitCoreByAICPU(uint32_t cubeCoreI
         // 此时只需要s2End往前退一格，bN2End和gS1End都不变
         qliV2SplitInfo.s2End = qliV2SplitInfo.s2End - 1;
     } else {
-        // splitCoreInfo.gS1End != 0 splitCoreInfo.s2End == 0 时，gS1End需要往前退一格, bN2End不变
+        // qliV2SplitInfo.gS1End != 0 qliV2SplitInfo.s2End == 0 时，gS1End需要往前退一格, bN2End不变
         if (qliV2SplitInfo.gS1End != 0) {
             // 此时需要使用bIdx获取实际Actal S2来计算出 s2End
             qliV2SplitInfo.gS1End = qliV2SplitInfo.gS1End - 1;
@@ -361,7 +363,7 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::SplitCoreByAICPU(uint32_t cubeCoreI
             }
             qliV2SplitInfo.s2End = qliV2S2BaseNum - 1;
         } else {
-            // splitCoreInfo.gS1End == 0 splitCoreInfo.s2End == 0 时，bN2End需要往前退一格
+            // qliV2SplitInfo.gS1End == 0 qliV2SplitInfo.s2End == 0 时，bN2End需要往前退一格
             // 此时需要使用bIdx获取实际Actal S1和S2来计算出 gS1End 和 s2End
             qliV2SplitInfo.bN2End = qliV2SplitInfo.bN2End - 1;
 
@@ -451,7 +453,7 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::Init(
 {
     if ASCEND_IS_AIV {
         qliV2BlockIndex = GetBlockIdx(); // vec:0-47
-        qliV2AiCoreIndex = qliV2BlockIndex / 2;
+        qliV2AiCoreIndex = qliV2BlockIndex / CVRATIO;
     } else {
         qliV2BlockIndex = GetBlockIdx(); // cube:0-23
         qliV2AiCoreIndex = qliV2BlockIndex;
@@ -497,7 +499,7 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::Init(
             isOutputIdxOffsetValid = true;
             outputIdxOffsetGm.SetGlobalBuffer((__gm__ int32_t*)outputIdxOffset);
         }
-        if constexpr (IS_MX) {
+        if constexpr (IS_MX || IS_HIFLOAT4) {
             qliV2VectorService.InitVecInputTensor(weightsGm, indiceOutGm, blockTableGm, valueOutGm, outputIdxOffsetGm);
         } else {
             GlobalTensor<SCALE_T> qScaleGmForVec;
@@ -516,7 +518,7 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::Init(
             blockTableGm.SetGlobalBuffer((__gm__ int32_t*)blockTable);
         }
         keyGm.SetGlobalBuffer((__gm__ K_T*)key);
-        if constexpr (IS_MX) {
+        if constexpr (IS_MX || IS_HIFLOAT4) {
             mxQueryScaleGmBf16.SetGlobalBuffer((__gm__ bfloat16_t*)queryScale);
             mxKeyScaleGmBf16.SetGlobalBuffer((__gm__ bfloat16_t*)keyScale);
             matmulService.InitMm1GlobalTensor(blockTableGm, keyGm, queryGm, mxKeyScaleGmBf16, mxQueryScaleGmBf16);
@@ -569,6 +571,9 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::CalcRunInfo(uint32_t loop, uint32_t
     if constexpr (QLIV2T::isMxFp4) {
         qkHeadDim = qliV2KernelConstInfo.headDim / FP4_PACK_NUM;
     }
+    if constexpr (IS_HIFLOAT4) {
+        qkHeadDim = qliV2KernelConstInfo.headDim / HIFLOAT4_TWO;
+    }
     if (qliV2KernelRunInfo.isFirstS2InnerLoop) {
         uint64_t actualSeqQPrefixSum;
         if constexpr (Q_LAYOUT_T == LI_LAYOUT::TND) {
@@ -610,6 +615,13 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::CalcRunInfo(uint32_t loop, uint32_t
                                       qliV2KernelConstInfo.mBaseSize *
                                       (qliV2KernelConstInfo.headDim / MX_SCALE_GROUP_SIZE);
             qScaleCoreOffset = qScalePrefixSum + qScaleS1Offset;
+        } else if constexpr (IS_HIFLOAT4) {
+            uint64_t qScalePrefixSum = actualSeqQPrefixSum * qliV2KernelConstInfo.qHeadNum *
+                                       (qliV2KernelConstInfo.headDim / HIFLOAT4_BLOCK_SIZE);
+            uint64_t qScaleS1Offset = static_cast<uint64_t>(qliV2KernelRunInfo.gS1Idx) *
+                                      qliV2KernelConstInfo.mBaseSize *
+                                      (qliV2KernelConstInfo.headDim / HIFLOAT4_BLOCK_SIZE);
+            qScaleCoreOffset = qScalePrefixSum + qScaleS1Offset;
         }
     }
     uint64_t actualSeqKPrefixSum;
@@ -628,6 +640,9 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::CalcRunInfo(uint32_t loop, uint32_t
         // MX: kScale offset, shape [B, S2, N2, D/64, 2]
         keyScaleCoreOffset =
             keyScaleS2Offset * qliV2KernelConstInfo.kHeadNum * (qliV2KernelConstInfo.headDim / MX_SCALE_GROUP_SIZE);
+    } else if constexpr (IS_HIFLOAT4) {
+        keyScaleCoreOffset =
+            keyScaleS2Offset * qliV2KernelConstInfo.kHeadNum * (qliV2KernelConstInfo.headDim / HIFLOAT4_BLOCK_SIZE);
     } else {
         keyScaleCoreOffset = keyScaleS2Offset * qliV2KernelConstInfo.kHeadNum;
     }
@@ -659,7 +674,7 @@ template <typename QLIV2T>
 __aicore__ inline void QLIV2Preload<QLIV2T>::ProcessInvalid()
 {
     if ASCEND_IS_AIV {
-        uint32_t aivCoreNum = GetBlockNum() * 2; // 2 means c:v = 1:2
+        uint32_t aivCoreNum = GetBlockNum() * CVRATIO; // A5:CVRATIO=2(1:2), A6:CVRATIO=1(1:1)
         uint64_t totalOutputSize = static_cast<uint64_t>(qliV2KernelConstInfo.batchSize) *
                                    qliV2KernelConstInfo.qSeqSize * qliV2KernelConstInfo.kHeadNum *
                                    qliV2KernelConstInfo.sparseCount;
@@ -739,10 +754,12 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::ProcessMain()
                                                                               0);
         CrossCoreWaitFlag<QLIV2Common::ConstInfo::QLIV2_SYNC_MODE4, PIPE_FIX>(QLIV2Common::ConstInfo::CROSS_VC_EVENT +
                                                                               1);
+#if CVRATIO > 1
         CrossCoreWaitFlag<QLIV2Common::ConstInfo::QLIV2_SYNC_MODE4, PIPE_FIX>(
             QLIV2Common::ConstInfo::CROSS_VC_EVENT + 0 + QLIV2Common::ConstInfo::AIV0_AIV1_OFFSET);
         CrossCoreWaitFlag<QLIV2Common::ConstInfo::QLIV2_SYNC_MODE4, PIPE_FIX>(
             QLIV2Common::ConstInfo::CROSS_VC_EVENT + 1 + QLIV2Common::ConstInfo::AIV0_AIV1_OFFSET);
+#endif
     }
 }
 

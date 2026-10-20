@@ -222,8 +222,11 @@ int32_t QuantLightningIndexerV2MetadataCpuKernel::GetQueryBatchSize()
 ValidSocVersion QuantLightningIndexerV2MetadataCpuKernel::ProcessSocVersion()
 {
     const std::string ascend950 = "Ascend950";
+    const std::string ascend960 = "Ascend960";
     if (socVersion_.find(ascend950) != std::string::npos) {
         return ValidSocVersion::ASCEND950;
+    } else if (socVersion_.find(ascend960) != std::string::npos) {
+        return ValidSocVersion::ASCEND960;
     } else {
         return ValidSocVersion::ASCEND910B;
     }
@@ -326,7 +329,7 @@ void QuantLightningIndexerV2MetadataCpuKernel::CalcSplitInfo(SplitContext& split
         }
     }
     ValidSocVersion validSocVersion = ProcessSocVersion();
-    if (validSocVersion == ValidSocVersion::ASCEND950) {
+    if (validSocVersion == ValidSocVersion::ASCEND950 || validSocVersion == ValidSocVersion::ASCEND960) {
         if (maxS2Size_ < static_cast<uint32_t>(topk_)) {
             supportFd_ = false;
             return;

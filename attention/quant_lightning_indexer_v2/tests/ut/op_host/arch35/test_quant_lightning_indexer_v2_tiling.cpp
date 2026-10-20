@@ -413,7 +413,7 @@ TEST_F(QuantLightningIndexerV2TilingArch35, QuantLightningIndexerV2_950_tiling_m
     qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
 }
 
-// metadata shape size must be 1024
+// metadata shape size must be 2048
 TEST_F(QuantLightningIndexerV2TilingArch35, QuantLightningIndexerV2_950_tiling_metadata_size_failed)
 {
     qliv2_ut::CaseParam p = Make950TndPaFp8();
@@ -910,7 +910,7 @@ TEST_F(QuantLightningIndexerV2TilingArch35, QuantLightningIndexerV2_950_tiling_f
         qliv2_ut::Desc({}, ge::DT_INT32),                      // cmp_residual_k input9
         qliv2_ut::Desc({2, 2}, ge::DT_INT32),                  // block_table    input10
         qliv2_ut::Desc({}, ge::DT_INT32),                      // output_idx_offset input11
-        qliv2_ut::Desc({1024}, ge::DT_INT32)                   // metadata       input12
+        qliv2_ut::Desc({2048}, ge::DT_INT32)                   // metadata       input12
     };
     inputs[1].stride_ = gert::Stride({0, 128, 128, 1});
     inputs[1].hasStride_ = true;
@@ -946,7 +946,7 @@ TEST_F(QuantLightningIndexerV2TilingArch35, QuantLightningIndexerV2_950_tiling_m
         qliv2_ut::Desc({}, ge::DT_INT32),                      // cmp_residual_k input9
         qliv2_ut::Desc({2, 2}, ge::DT_INT32),                  // block_table    input10
         qliv2_ut::Desc({}, ge::DT_INT32),                      // output_idx_offset input11
-        qliv2_ut::Desc({1024}, ge::DT_INT32)                   // metadata       input12
+        qliv2_ut::Desc({2048}, ge::DT_INT32)                   // metadata       input12
     };
     inputs[4].stride_ = gert::Stride({0, 4, 4, 2, 1});
     inputs[4].hasStride_ = true;
@@ -982,7 +982,7 @@ TEST_F(QuantLightningIndexerV2TilingArch35, QuantLightningIndexerV2_950_tiling_m
         qliv2_ut::Desc({}, ge::DT_INT32),                     // cmp_residual_k input9
         qliv2_ut::Desc({2, 2}, ge::DT_INT32),                 // block_table    input10
         qliv2_ut::Desc({}, ge::DT_INT32),                     // output_idx_offset input11
-        qliv2_ut::Desc({1024}, ge::DT_INT32)                  // metadata       input12
+        qliv2_ut::Desc({2048}, ge::DT_INT32)                  // metadata       input12
     };
     inputs[1].stride_ = gert::Stride({2048, 128, 128, 1});
     inputs[1].hasStride_ = true;
