@@ -177,6 +177,20 @@ static constexpr ConfigParams ConfigValue[] = {
      inferDTemplateType::Aligned64}, // 29
     {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned512, inferDTemplateType::Aligned128,
      inferDTemplateType::Aligned128}, // 30
+    {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned128,
+     inferDTemplateType::Aligned128}, // 31
+    {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned512,
+     inferDTemplateType::Aligned512}, // 32
+    {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned64,
+     inferDTemplateType::Aligned64}, // 33
+    {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned256,
+     inferDTemplateType::Aligned256}, // 34
+    {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned128,
+     inferDTemplateType::Aligned64}, // 35
+    {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned64,
+     inferDTemplateType::Aligned128}, // 36
+    {inferS1TemplateType::Aligned32, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned576,
+     inferDTemplateType::Aligned512}, // 37
 };
 
 #define Config_S1Aligned64_S2Aligned256_DAligned64_DVAligned64 0
@@ -210,6 +224,13 @@ static constexpr ConfigParams ConfigValue[] = {
 #define Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128 28
 #define Config_S1Aligned64_S2Aligned512_DAligned64_DVAligned64 29
 #define Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128 30
+#define Config_S1Aligned64_S2Aligned128_DAligned128_DVAligned128 31
+#define Config_S1Aligned64_S2Aligned128_DAligned512_DVAligned512 32
+#define Config_S1Aligned64_S2Aligned128_DAligned64_DVAligned64 33
+#define Config_S1Aligned64_S2Aligned128_DAligned256_DVAligned256 34
+#define Config_S1Aligned64_S2Aligned128_DAligned128_DVAligned64 35
+#define Config_S1Aligned64_S2Aligned128_DAligned64_DVAligned128 36
+#define Config_S1Aligned32_S2Aligned128_DAligned576_DVAligned512 37
 
 #define PSE_MODE_PSE_OUTER_MUL_ADD_TYPE 0
 #define PSE_MODE_PSE_OUTER_ADD_MUL_TYPE 1

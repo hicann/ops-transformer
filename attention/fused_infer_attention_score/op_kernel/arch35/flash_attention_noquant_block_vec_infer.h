@@ -384,7 +384,7 @@ __aicore__ inline void FANoQuantBlockVecInfer<TEMPLATE_ARGS>::InitUniqueLocalBuf
 {
     if (constInfo.isSoftmaxLseEnable) {
         // 8: 适配TND，每行的结果存为8个重复lse元素（32B对齐）
-        this->tPipe->InitBuffer(softmaxLseQueue, 1, (BaseClass::s1BaseSize >> 1U) * sizeof(float) * 8);
+        this->tPipe->InitBuffer(softmaxLseQueue, 1, (BaseClass::s1BaseSize / ArchInfo::CV_RATIO) * sizeof(float) * 8);
     }
     if constexpr (POST_QUANT) {
         this->tPipe->InitBuffer(postQuantScaleQue, 1, 2048); // 2K
@@ -424,7 +424,7 @@ __aicore__ inline void FANoQuantBlockVecInfer<TEMPLATE_ARGS>::InitFDBuffers(Cons
     }
     if (constInfo.isSoftmaxLseEnable) {
         // 8: 适配TND, 每行结果存为8个重复lse元素(32B对齐)
-        this->tPipe->InitBuffer(softmaxLseQueue, 1, (BaseClass::s1BaseSize >> 1U) * sizeof(float) * 8);
+        this->tPipe->InitBuffer(softmaxLseQueue, 1, (BaseClass::s1BaseSize / ArchInfo::CV_RATIO) * sizeof(float) * 8);
     }
 }
 

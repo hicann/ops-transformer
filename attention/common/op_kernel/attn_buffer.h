@@ -25,7 +25,11 @@
 using namespace AscendC;
 namespace fa_base_matmul {
 __BLOCK_LOCAL__ __inline__ uint32_t idCounterNum;
+#if __NPU_ARCH__ == 9201
+#define MAKE_ID ((++idCounterNum) % 16)
+#else
 #define MAKE_ID ((++idCounterNum) % 11)
+#endif
 
 __aicore__ inline void ResetIdCounter()
 {
