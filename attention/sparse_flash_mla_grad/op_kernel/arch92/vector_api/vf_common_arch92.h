@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file vf_common_utils_arch92.h
+ * \file vf_common_arch92.h
  * \brief
  */
-#ifndef VF_COMMON_UTILS_ARCH92_H
-#define VF_COMMON_UTILS_ARCH92_H
+#ifndef VF_COMMON_ARCH92_H
+#define VF_COMMON_ARCH92_H
 
 #include "kernel_operator.h"
 
@@ -34,4 +34,4 @@ constexpr static AscendC::Reg::CastTrait castTraitB162B32Even = {
 };
 } // namespace AscendC
 
-#endif // VF_COMMON_UTILS_ARCH92_H
+#endif // VF_COMMON_ARCH92_H

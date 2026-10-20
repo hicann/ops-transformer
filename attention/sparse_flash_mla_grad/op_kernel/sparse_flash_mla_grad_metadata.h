@@ -43,7 +43,7 @@ constexpr uint32_t MAX_CMP_KV_SIZE = 6;
  * @param metaIdx 元数据索引
  * @return 返回属性的绝对索引
  */
-#ifdef __CCE_AICORE__
+#ifdef __CCE_AICORE__ || (defined(__NPU_ARCH__))
 __aicore__ inline uint32_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx)
 {
     return GRAD_METADATA_SIZE * coreIdx + metaIdx;
