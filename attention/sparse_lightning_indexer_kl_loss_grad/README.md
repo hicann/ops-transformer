@@ -113,7 +113,7 @@
     <tr>
         <td>sparseIndices</td>
         <td>输入</td>
-        <td>top-k key下标，有效部分填充key下标，无效部分填充-1。</td>
+        <td>top-k key下标，每行有效值排列在前，无效值排列在后；有效key下标从最后一维第0列开始连续存放，无效位置仅在尾部填充-1。</td>
         <td>INT32</td>
         <td>ND</td>
     </tr>
@@ -239,7 +239,7 @@
     - 参数sparseIndices、cuSeqLensQOptional、cuSeqLensKOptional、seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional、metadataOptional的数据类型应为INT32。
     - layoutQ和layoutK当前支持BSND和TND。
     - 当layoutQ为TND时，需要传入cuSeqLensQOptional；当layoutK为TND时，需要传入cuSeqLensKOptional。
-    - sparseIndices中有效位置必须位于当前batch的key序列范围内；无效位置使用-1填充。
+    - sparseIndices中有效位置必须位于当前batch的key序列范围内；每行有效key下标从最后一维第0列开始连续存放，无效位置仅在尾部使用-1填充，不支持在有效位置之前或之间填充-1。
     - attnSoftmaxL1Norm的无效top-k位置建议置零，并与sparseIndices的有效位置保持一致。
     <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
         <col style="width: 100px">

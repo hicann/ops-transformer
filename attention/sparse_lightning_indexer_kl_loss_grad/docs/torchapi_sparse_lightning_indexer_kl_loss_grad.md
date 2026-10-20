@@ -130,7 +130,7 @@ cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
 | q | 必选输入 | Lightning Indexer分支的query输入。D：固定为128。 | `float16`、`bfloat16` | `layout_q="BSND"` 时为 `[B, S1, N1, D]`；`layout_q="TND"` 时为 `[T1, N1, D]`。 |
 | k | 必选输入 | Lightning Indexer分支的key输入。N2 仅支持1。D：固定为128。 | 与 `q` 一致 | `layout_k="BSND"` 时为 `[B, S2, N2, D]`；`layout_k="TND"` 时为 `[T2, N2, D]`。 |
 | w | 必选输入 | Indexer logits的head权重。 | `float32` | `layout_q="BSND"` 时为 `[B, S1, N1]`；`layout_q="TND"` 时为 `[T1, N1]`。 |
-| sparse_indices | 必选输入 | 每个query对应的top-k key下标。有效位置填key下标，无效位置填 `-1`。 | `int32` | `layout_q="BSND"` 时为 `[B, S1, N2, K]`；`layout_q="TND"` 时为 `[T1, N2, K]`。 |
+| sparse_indices | 必选输入 | 每个query对应的top-k key下标。每行有效值排列在前，无效值排列在后；有效key下标从最后一维第0列开始连续存放，无效位置仅在尾部填充 `-1`。 | `int32` | `layout_q="BSND"` 时为 `[B, S1, N2, K]`；`layout_q="TND"` 时为 `[T1, N2, K]`。 |
 | attn_softmax_l1_norm | 必选输入 | 主Attention分支预先计算得到的目标分布 `p`，无效top-k位置建议置0。 | `float32` | 与 `sparse_indices` 一致。 |
 | cu_seqlens_q | 可选输入 | TND场景中query的前缀和序列长度，首元素为0。 | `int32` | `[B + 1]`。 |
 | cu_seqlens_k | 可选输入 | TND场景中key的前缀和序列长度，首元素为0。 | `int32` | `[B + 1]`。 |
@@ -204,7 +204,7 @@ cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
 - `layout_q` 和 `layout_k` 支持 `BSND` 和 `TND`。
 - `layout_q="TND"` 时需要传入 `cu_seqlens_q`；`layout_k="TND"` 时需要传入 `cu_seqlens_k`。
 - 当前 `num_heads_k` 仅支持1。
-- `sparse_indices` 中有效位置必须位于当前batch的key序列范围内，无效位置使用 `-1` 填充。
+- `sparse_indices` 中有效位置必须位于当前batch的key序列范围内；每行有效key下标从最后一维第0列开始连续存放，无效位置仅在尾部使用 `-1` 填充，不支持在有效位置之前或之间填充 `-1`。
 - `attn_softmax_l1_norm` 的无效top-k位置建议置0，并与 `sparse_indices` 的有效位置保持一致。
 - `mask_mode` 当前支持 `0` 和 `3`。
 - `cmp_ratio` 取值范围为 `[1, 128]`。
