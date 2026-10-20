@@ -238,6 +238,52 @@ public:
         }
     }
 
+    template <class TensorV, class TensorL1A, class TensorVScale, class TensorL1AScale, class TileInfoT>
+    __aicore__ inline void CopyVFromQKPlan(TensorV& gVTensor, TensorL1A& l1ATensorTla, TensorVScale& gVScaleTensor,
+                                           TensorL1AScale& l1AScaleTensorTla, const TileInfoT& tileInfo, uint32_t embed)
+    {
+        using CopyData = Tile::TileCopyTla<ArchTag, TensorV, TensorL1A>;
+        using CopyScale = Tile::TileCopyTla<ArchTag, TensorVScale, TensorL1AScale>;
+        CopyData copyData;
+        CopyScale copyScale;
+        uint32_t dstStart = 0;
+        for (uint32_t i = 0; i < tileInfo.kvGatherCount; ++i) {
+            CopyVSegment(copyData, copyScale, gVTensor, l1ATensorTla, gVScaleTensor, l1AScaleTensorTla,
+                         tileInfo.kvGatherStarts[i], tileInfo.kvGatherLengths[i], dstStart, embed);
+            dstStart += tileInfo.kvGatherLengths[i];
+        }
+    }
+
+    template <class CopyData, class CopyScale, class TensorV, class TensorL1A, class TensorVScale, class TensorL1AScale>
+    __aicore__ inline void CopyVSegment(CopyData& copyData, CopyScale& copyScale, TensorV& gVTensor,
+                                        TensorL1A& l1ATensorTla, TensorVScale& gVScaleTensor,
+                                        TensorL1AScale& l1AScaleTensorTla, uint32_t srcStart, uint32_t length,
+                                        uint32_t dstStart, uint32_t embed)
+    {
+        const uint32_t scaleLength = CeilDiv(length, MX_SCALE_GROUP_NUM);
+        auto src = GetTile(gVTensor, tla::MakeCoord(0, srcStart), tla::MakeShape(embed, length));
+        auto dst = GetTile(l1ATensorTla, tla::MakeCoord(0, dstStart), tla::MakeShape(embed, length));
+        copyData(dst, src);
+        auto srcScale = GetTile(gVScaleTensor, tla::MakeCoord(0, srcStart / MX_SCALE_GROUP_NUM),
+                                tla::MakeShape(embed, scaleLength));
+        auto dstScale = GetTile(l1AScaleTensorTla, tla::MakeCoord(0, dstStart / MX_SCALE_GROUP_NUM),
+                                tla::MakeShape(embed, scaleLength));
+        copyScale(dstScale, srcScale);
+    }
+
+    template <class TensorV, class TensorL1A, class TensorVScale, class TensorL1AScale>
+    __aicore__ inline void CopyVDenseSegment(TensorV& gVTensor, TensorL1A& l1ATensorTla, TensorVScale& gVScaleTensor,
+                                             TensorL1AScale& l1AScaleTensorTla, uint32_t srcStart, uint32_t length,
+                                             uint32_t embed)
+    {
+        using CopyData = Tile::TileCopyTla<ArchTag, TensorV, TensorL1A>;
+        using CopyScale = Tile::TileCopyTla<ArchTag, TensorVScale, TensorL1AScale>;
+        CopyData copyData;
+        CopyScale copyScale;
+        CopyVSegment(copyData, copyScale, gVTensor, l1ATensorTla, gVScaleTensor, l1AScaleTensorTla, srcStart, length, 0,
+                     embed);
+    }
+
     // L0C → UB fixpipe（SPLIT_N 模式）
     template <class TensorUB>
     __aicore__ inline void FixpipeMm2(uint32_t s1Align64, TensorUB& ubOTmpTensor)
@@ -358,11 +404,17 @@ public:
         uint32_t yBlockNumRsvd = delay20TaskInfo.yBlockNumRsvd;
         uint32_t gatheredKvSTileIdx = delay20TileInfo.pvGatheredKvSTileIdx;
         uint32_t pSlot = delay20TileInfo.loop % MXFP4::L1_P_BUF_CNT;
+        // 与 QK 同一条件。dense 不再写 gather 计划，不能再看槽里的 kvGatherCount。
+        const bool denseRow = delay20TaskInfo.isDenseRow != 0 && blockShapeY == 128 && kvSBaseTile == 256;
 
         // [预取] 首个 sparse index 是阻塞式 GM 标量读，且 gather 的第一条 Nd2Nz 地址依赖它。
         //   在此提前发起，把访存延迟藏进后面的 WaitFlag，并让标量单元能继续往前排 MTE2 指令。
-        uint32_t firstYBlockIdx = (gatheredKvSTileIdx * kvSBaseTile) / blockShapeY;
-        uint32_t firstOriYBlockIdx = static_cast<uint32_t>(gSparseBlockIdx.GetValue(firstYBlockIdx));
+        uint32_t firstYBlockIdx = 0;
+        uint32_t firstOriYBlockIdx = 0;
+        if (!denseRow && delay20TileInfo.kvGatherCount == 0) {
+            firstYBlockIdx = (gatheredKvSTileIdx * kvSBaseTile) / blockShapeY;
+            firstOriYBlockIdx = static_cast<uint32_t>(gSparseBlockIdx.GetValue(firstYBlockIdx));
+        }
 
         uint32_t mMmad = MXFP4::PV_MMAD_M_DIM;
 
@@ -395,9 +447,17 @@ public:
                                 embedReal, delay20TileInfo.kvsActBaseTileAlign64 / MX_SCALE_GROUP_NUM),
                             Arch::PositionL1{});
 
-        SparseVFusedBaseTileL1FullLoad(gV, l1ATensorTla, gVScaleTensorTla, l1AScaleTensorTla, gSparseBlockIdx,
-                                       gatheredKvSTileIdx, kvSeqlen, kvSBaseTile, blockShapeY, yBlockNumAval,
-                                       yBlockNumRsvd, curBaseTileSize, embedReal, firstYBlockIdx, firstOriYBlockIdx);
+        if (denseRow) {
+            CopyVDenseSegment(gV, l1ATensorTla, gVScaleTensorTla, l1AScaleTensorTla, gatheredKvSTileIdx * kvSBaseTile,
+                              curBaseTileSize, embedReal);
+        } else if (delay20TileInfo.kvGatherCount != 0) {
+            CopyVFromQKPlan(gV, l1ATensorTla, gVScaleTensorTla, l1AScaleTensorTla, delay20TileInfo, embedReal);
+        } else {
+            SparseVFusedBaseTileL1FullLoad(gV, l1ATensorTla, gVScaleTensorTla, l1AScaleTensorTla, gSparseBlockIdx,
+                                           gatheredKvSTileIdx, kvSeqlen, kvSBaseTile, blockShapeY, yBlockNumAval,
+                                           yBlockNumRsvd, curBaseTileSize, embedReal, firstYBlockIdx,
+                                           firstOriYBlockIdx);
+        }
 
         AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(KV_EVENT0 + l1ABufId);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(KV_EVENT0 + l1ABufId);

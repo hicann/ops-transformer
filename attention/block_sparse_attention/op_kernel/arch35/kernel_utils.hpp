@@ -45,6 +45,7 @@ struct TaskInfo {
     int64_t kvSeqlen = 0;           // 当前 batch 实际 KV 长度
     uint32_t yBlockNumAval = 0;     // CeilDiv(kvSeqlen, blockShapeY)，实际 Y-block 总数
     uint32_t yBlockNumRsvd = 0;     // 本 task 选中 Y-block 数（来自 gSparseCount）
+    uint32_t isDenseRow = 0;        // 选中块恰好是 0..yBlockNumAval-1，KV 与原始地址重合
     // ===== QK(Mm1) 所需（mxfp4）=====
     int64_t gmOffsetQ = 0;      // Q 数据偏移（含本 task 的 Q seq 起点，fp4 元素单位）
     int64_t gmOffsetK = 0;      // K 数据 batch+head 基址（seq 由后续稀疏 gather 处理）
@@ -104,6 +105,11 @@ struct TileInfo {
     uint32_t pvGatheredKvSTileIdx = 0; // 当前 tile 在 task 内 gather 后的 KV base tile 序号，供 PV
     uint16_t pscaleNum = 0;
     uint16_t pSlot = 0; //  L1 P 环 0..L1_P_BUF_CNT-1，CreateTileInfo 滚动写入，热路径不再 % 20
+    // A 256-token tile with 128-token sparse blocks spans at most two blocks.
+    // QK records its merged copy segments; PV reuses them on the same Cube core.
+    uint32_t kvGatherCount = 0;
+    uint32_t kvGatherStarts[2] = {};
+    uint32_t kvGatherLengths[2] = {};
 };
 } // namespace MXFP4Kernel
 

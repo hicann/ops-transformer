@@ -55,20 +55,9 @@ public:
     template <class TensorGMaxUb, class TileInfoT>
     __aicore__ inline void operator()(TensorGMaxUb& gMaxUbTensor, TileInfoT& delay3TileInfo)
     {
-        // AscendC::PRINTF("CopyGMaxL1ToUb \n");
         uint32_t blockCount = static_cast<uint32_t>(tla::get<0>(gMaxUbTensor.shape()));
         uint32_t blockLenPerSubVec = static_cast<uint32_t>(tla::get<1>(gMaxUbTensor.shape())) / SUB_VEC_NUM /
                                      BLOCK_SIZE * sizeof(ElementLocalGlobalMax);
-
-        // // [TODO] 此处也是假数据
-        // AscendC::InitConstValueParams<ElementLocalGlobalMax> localGlobalMaxL1FillParams(1,
-        // static_cast<uint16_t>(MXFP4::L1_LOCAL_GLOBAL_MAX_BUF_SIZE * MXFP4::L1_LOCAL_GLOBAL_MAX_BUF_CNT  *
-        // sizeof(ElementLocalGlobalMax) / BLOCK_SIZE ), 0, static_cast<half>(1.865));
-        // AscendC::Fill(localGlobalMaxL1[0], localGlobalMaxL1FillParams);          // localGlobalMaxL1 数据
-        // AscendC::PipeBarrier<PIPE_MTE2>();
-
-        // AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(7);
-        // AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(7);
 
         AscendC::LocalTensor<ElementLocalGlobalMax> localGlobalMax0 = localGlobalMaxL1[delay3TileInfo.tileMaxIdx];
         AscendC::LocalTensor<ElementLocalGlobalMax> localGlobalMax1 =

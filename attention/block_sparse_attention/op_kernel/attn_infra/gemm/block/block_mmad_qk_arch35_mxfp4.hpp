@@ -166,19 +166,82 @@ public:
         copyGmToL1MxScaleDn2Nz(l1BScaleTensor[qBufId], gQDequantScale, qsActBaseTile, scaleK, 0, 0, qHeadMul);
     }
 
+    // D=128 的 128/256 行满块：Nd2Nz/Dn2Nz 的 D、C0、fractal 都是编译期常量。
+    // parentRows 是这块 L1 的行数，两个 128 行半块落在 256 行 L1 上时仍是 256。
+    // 只在调用点算 GM/L1 偏移。尾块和其它 D 继续走 TileCopyTla。
+    template <class TensorK, class TensorL1K>
+    __aicore__ inline void CopyFixedD128K(TensorK const& gKTensorTla, TensorL1K const& l1KTensorTla,
+                                          AscendC::GlobalTensor<uint8_t> const& gKScale, uint32_t srcStart,
+                                          uint32_t dstStart, uint32_t rows, uint32_t parentRows, uint32_t kBufId,
+                                          uint32_t kvHeadMul)
+    {
+        constexpr uint32_t kEmbed = 128;
+        constexpr uint32_t kFractal = 1024;
+        constexpr uint32_t kScaleHalf = 2;
+        AscendC::Nd2NzParams nd2nz;
+        nd2nz.ndNum = 1;
+        nd2nz.nValue = rows;
+        nd2nz.dValue = kEmbed / 2;
+        nd2nz.srcNdMatrixStride = 0;
+        nd2nz.srcDValue = kvHeadMul * (kEmbed / 2);
+        nd2nz.dstNzC0Stride = parentRows;
+        nd2nz.dstNzNStride = 1;
+        nd2nz.dstNzMatrixStride = 0;
+        const uint32_t srcOff = srcStart * kvHeadMul * kEmbed;
+        const uint32_t dstOff = (dstStart >> 4) * kFractal;
+        AscendC::DataCopy(l1KTensorTla.data()[dstOff], gKTensorTla.data()[srcOff], nd2nz);
+
+        AscendC::GlobalTensor<half> gScaleB16;
+        gScaleB16.SetGlobalBuffer((__gm__ half*)(gKScale.GetPhyAddr()), MXFP4::GM_MAX_BUFFER_LEN);
+        auto l1ScaleB16 = l1AScaleTensor[kBufId].template ReinterpretCast<half>();
+        AscendC::Dn2NzParams dn2nz;
+        dn2nz.dnNum = 1;
+        dn2nz.dValue = rows;
+        dn2nz.nValue = kScaleHalf;
+        dn2nz.srcDnMatrixStride = 0;
+        dn2nz.srcDValue = kvHeadMul * kScaleHalf;
+        dn2nz.dstNzC0Stride = kScaleHalf;
+        dn2nz.dstNzNStride = 1;
+        dn2nz.dstNzMatrixStride = 0;
+        AscendC::DataCopy(l1ScaleB16[dstStart * kScaleHalf], gScaleB16[srcStart * kvHeadMul * kScaleHalf], dn2nz);
+    }
+
+    template <class TensorK, class TensorL1K>
+    __aicore__ inline void CopyFullKSegment(TensorK gKTensorTla, TensorL1K l1KTensorTla,
+                                            AscendC::GlobalTensor<uint8_t> gKScale, uint32_t srcStart,
+                                            uint32_t dstStart, uint32_t rows, uint32_t embed, uint32_t scaleK,
+                                            uint32_t kBufId, uint32_t kvHeadMul, uint32_t parentRows)
+    {
+        if (embed == 128 && (rows == 128 || rows == 256) && (dstStart & 15u) == 0 &&
+            (parentRows == 128 || parentRows == 256)) {
+            CopyFixedD128K(gKTensorTla, l1KTensorTla, gKScale, srcStart, dstStart, rows, parentRows, kBufId, kvHeadMul);
+            return;
+        }
+        using Copy = Tile::TileCopyTla<ArchTag, decltype(gKTensorTla), decltype(l1KTensorTla)>;
+        Copy copy;
+        auto src = GetTile(gKTensorTla, tla::MakeCoord(srcStart, 0), tla::MakeShape(rows, embed));
+        auto dst = GetTile(l1KTensorTla, tla::MakeCoord(dstStart, 0), tla::MakeShape(rows, embed));
+        copy(dst, src);
+        const uint32_t half = scaleK / 2;
+        copyGmToL1MxScaleDn2Nz(l1AScaleTensor[kBufId], gKScale, rows, scaleK, srcStart * kvHeadMul * half,
+                               dstStart * half, kvHeadMul);
+    }
+
     // K 数据 + K-scale 融合稀疏 gather：按 gSparseBlockIdx 逐段搬 GM → L1。
     // 两者的分段边界必然一致，故只遍历一遍 index，每段发 K(Nd2Nz) / K-scale(Dn2Nz) 两条 copy。
     // ori 连续递增即代表 GM 上物理相邻，向前偷看合并成单条 copy。
     // 段推进天然落在 y-block 边界上（仅首段 innerStart 可能非 0），故循环内无除法/取模。
     // firstYBlockIdx / firstOriYBlockIdx 由调用方提前预取，避免首个 index 的阻塞访存落在此处。
-    template <class TensorK, class TensorL1K>
+    template <class TensorK, class TensorL1K, class TileInfoT>
     __aicore__ inline void SparseKFusedBaseTileL1FullLoad(
         TensorK gKTensorTla, TensorL1K l1KTensorTla, AscendC::GlobalTensor<uint8_t> gKScale,
         AscendC::GlobalTensor<int32_t> gSparseBlockIdx, uint32_t gatheredKvSTileIdx, int64_t kvSeqlen,
         uint32_t kvSBaseTile, uint32_t blockShapeY, uint32_t yBlockNumAval, uint32_t yBlockNumRsvd,
         uint32_t kvsActBaseTile, uint32_t embed, uint32_t kBufId, uint32_t kvHeadMul, uint32_t firstYBlockIdx,
-        uint32_t firstOriYBlockIdx)
+        uint32_t firstOriYBlockIdx, TileInfoT& tileInfo)
     {
+        const bool savePlan = blockShapeY == 128 && kvSBaseTile == 256;
+        tileInfo.kvGatherCount = 0;
         using CopyGmToL1K = Tile::TileCopyTla<ArchTag, decltype(gKTensorTla), decltype(l1KTensorTla)>;
         CopyGmToL1K copyGmToL1K;
 
@@ -190,6 +253,34 @@ public:
         uint32_t yBlockInnerStart = gatheredKvSTileIdx * kvSBaseTile - firstYBlockIdx * blockShapeY;
         uint32_t oriYBlockIdx = firstOriYBlockIdx;
         uint32_t dealtLenAccum = 0;
+
+        // Full 128+128 tiles need only one additional index read and no gather scan.
+        // Tail/other block shapes retain the original generic path.
+        if (savePlan && kvsActBaseTile == 256 && firstYBlockIdx + 1 < yBlockNumRsvd &&
+            firstOriYBlockIdx < (kvSeqlenU >> 7)) {
+            const uint32_t second = static_cast<uint32_t>(gSparseBlockIdx.GetValue(firstYBlockIdx + 1));
+            if (second < (kvSeqlenU >> 7)) {
+                const uint32_t src0 = firstOriYBlockIdx << 7;
+                tileInfo.kvGatherStarts[0] = src0;
+                if (second == firstOriYBlockIdx + 1) {
+                    tileInfo.kvGatherCount = 1;
+                    tileInfo.kvGatherLengths[0] = 256;
+                    CopyFullKSegment(gKTensorTla, l1KTensorTla, gKScale, src0, 0, 256, embed, scaleK, kBufId, kvHeadMul,
+                                     kvSBaseTile);
+                } else {
+                    const uint32_t src1 = second << 7;
+                    tileInfo.kvGatherCount = 2;
+                    tileInfo.kvGatherStarts[1] = src1;
+                    tileInfo.kvGatherLengths[0] = 128;
+                    tileInfo.kvGatherLengths[1] = 128;
+                    CopyFullKSegment(gKTensorTla, l1KTensorTla, gKScale, src0, 0, 128, embed, scaleK, kBufId, kvHeadMul,
+                                     kvSBaseTile);
+                    CopyFullKSegment(gKTensorTla, l1KTensorTla, gKScale, src1, 128, 128, embed, scaleK, kBufId,
+                                     kvHeadMul, kvSBaseTile);
+                }
+                return;
+            }
+        }
 
         while (dealtLenAccum < kvsActBaseTile && gatheredYBlockIdx < yBlockNumRsvd && oriYBlockIdx < yBlockNumAval) {
             uint32_t oriStartOffset = oriYBlockIdx * blockShapeY + yBlockInnerStart;
@@ -221,6 +312,11 @@ public:
             }
 
             uint32_t curDealtLen = MinU32(availLen, kvsActBaseTile - dealtLenAccum);
+            if (savePlan) {
+                const uint32_t segment = tileInfo.kvGatherCount++;
+                tileInfo.kvGatherStarts[segment] = oriStartOffset;
+                tileInfo.kvGatherLengths[segment] = curDealtLen;
+            }
 
             auto gKTile = GetTile(gKTensorTla, tla::MakeCoord(oriStartOffset, 0), tla::MakeShape(curDealtLen, embed));
             auto l1KTile = GetTile(l1KTensorTla, tla::MakeCoord(dealtLenAccum, 0), tla::MakeShape(curDealtLen, embed));
@@ -335,11 +431,15 @@ public:
         uint32_t l1KEventId = MXFP4::KV_EVENT0 + kBufId;
         uint32_t l1QEventId = Q_EVENT0 + qBufId;
 
-        // [预取] 首个 sparse index 是阻塞式 GM 标量读，且 gather 的第一条 copy 地址依赖它。
-        //   在此提前发起，把访存延迟藏进后面的 Q 搬运 / WaitFlag，
-        //   并让标量单元能继续往前排 MTE2 指令。
-        uint32_t firstYBlockIdx = (gatheredKvSTileIdx * kvSBaseTile) / blockShapeY;
-        uint32_t firstOriYBlockIdx = static_cast<uint32_t>(gSparseBlockIdx.GetValue(firstYBlockIdx));
+        // 完整保留行的 gather 序号等于原始序号，不必再读 sparse index。
+        // 稀疏行仍提前读首个 index，把阻塞访存藏进后面的 Q 搬运。
+        const bool denseRow = curTaskInfo.isDenseRow != 0 && blockShapeY == 128 && kvSBaseTile == 256;
+        uint32_t firstYBlockIdx = 0;
+        uint32_t firstOriYBlockIdx = 0;
+        if (!denseRow) {
+            firstYBlockIdx = (gatheredKvSTileIdx * kvSBaseTile) / blockShapeY;
+            firstOriYBlockIdx = static_cast<uint32_t>(gSparseBlockIdx.GetValue(firstYBlockIdx));
+        }
 
         // Q/QScale 仅在 task 首 KV tile 搬 GM → L1，后续 tile 复用
         if (isFirstKvsTile) {
@@ -368,9 +468,16 @@ public:
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1KEventId);
         auto l1KLayout = tla::MakeLayout<ElementA, layout::zN>(kvsActBaseTile, embed);
         auto l1KTensorTla = tla::MakeTensor(l1ATensor[kBufId], l1KLayout, Arch::PositionL1{});
-        SparseKFusedBaseTileL1FullLoad(gKTensorTla, l1KTensorTla, gKDequantScale, gSparseBlockIdx, gatheredKvSTileIdx,
-                                       kvSeqlen, kvSBaseTile, blockShapeY, yBlockNumAval, yBlockNumRsvd, kvsActBaseTile,
-                                       embed, kBufId, kvHeadMul, firstYBlockIdx, firstOriYBlockIdx);
+        if (denseRow) {
+            const uint32_t srcStart = gatheredKvSTileIdx * kvSBaseTile;
+            CopyFullKSegment(gKTensorTla, l1KTensorTla, gKDequantScale, srcStart, 0, kvsActBaseTile, embed, scaleK,
+                             kBufId, kvHeadMul, kvsActBaseTile);
+        } else {
+            SparseKFusedBaseTileL1FullLoad(gKTensorTla, l1KTensorTla, gKDequantScale, gSparseBlockIdx,
+                                           gatheredKvSTileIdx, kvSeqlen, kvSBaseTile, blockShapeY, yBlockNumAval,
+                                           yBlockNumRsvd, kvsActBaseTile, embed, kBufId, kvHeadMul, firstYBlockIdx,
+                                           firstOriYBlockIdx, curTileInfo);
+        }
         AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1KEventId);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1KEventId);
 

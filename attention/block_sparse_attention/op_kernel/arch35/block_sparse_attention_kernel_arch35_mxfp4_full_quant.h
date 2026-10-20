@@ -194,6 +194,15 @@ public:
         BatchOffsetInfo batchOffsetInfo;
         batchOffsetInfo.curTotalTaskNum = firstBatchTaskNum_;
 
+        // 21 不是 2 的幂，循环内对 task/tile 序号做 % 21 会生成魔数除法。
+        // task 序号从 0 起每次加一，槽下标同样加一回绕。
+        // tile 延迟槽只在 coreTileLoop >= delay 时被读取，此时
+        // (loop - delay) % 21 = (loop % 21 + (21 - delay)) % 21，用加法得到，不再取模。
+        uint32_t curTaskSlot = 0;
+        uint32_t delay20TaskSlot = 0;
+        uint32_t delay3TaskSlot = 0;
+        uint32_t curTileSlot = 0;
+
         const uint32_t kvHeadMul = (kvFormat == Format::BNSD) ? 1u : kvHeads_;
         const uint32_t qHeadMul = (qFormat == Format::BNSD) ? 1u : qHeads_;
 
@@ -202,13 +211,21 @@ public:
             delay20TaskTileIdx = coreTileLoop - PV_RE_DELAY_N - delay20preTaskTileSum;
             delay3TaskTileIdx = coreTileLoop - DELAY_PSCALE_N - delay3preTaskTileSum;
 
-            TaskInfo& curTaskInfo = taskInfos[coreTaskId % PRELOAD_TASK_CACHE_SIZE];
-            TaskInfo& delay20TaskInfo = taskInfos[delay20CoreTaskId % PRELOAD_TASK_CACHE_SIZE];
-            TaskInfo& delay3TaskInfo = taskInfos[delay3CoreTaskId % PRELOAD_TASK_CACHE_SIZE];
+            TaskInfo& curTaskInfo = taskInfos[curTaskSlot];
+            TaskInfo& delay20TaskInfo = taskInfos[delay20TaskSlot];
+            TaskInfo& delay3TaskInfo = taskInfos[delay3TaskSlot];
 
-            TileInfo& curTileInfo = tileInfos[coreTileLoop % PRELOAD_TASK_CACHE_SIZE];
-            TileInfo& delay20TileInfo = tileInfos[(coreTileLoop - PV_RE_DELAY_N) % PRELOAD_TASK_CACHE_SIZE];
-            TileInfo& delay3TileInfo = tileInfos[(coreTileLoop - DELAY_PSCALE_N) % PRELOAD_TASK_CACHE_SIZE];
+            uint32_t delay20TileSlot = curTileSlot + (PRELOAD_TASK_CACHE_SIZE - PV_RE_DELAY_N);
+            if (delay20TileSlot >= PRELOAD_TASK_CACHE_SIZE) {
+                delay20TileSlot -= PRELOAD_TASK_CACHE_SIZE;
+            }
+            uint32_t delay3TileSlot = curTileSlot + (PRELOAD_TASK_CACHE_SIZE - DELAY_PSCALE_N);
+            if (delay3TileSlot >= PRELOAD_TASK_CACHE_SIZE) {
+                delay3TileSlot -= PRELOAD_TASK_CACHE_SIZE;
+            }
+            TileInfo& curTileInfo = tileInfos[curTileSlot];
+            TileInfo& delay20TileInfo = tileInfos[delay20TileSlot];
+            TileInfo& delay3TileInfo = tileInfos[delay3TileSlot];
 
             // 创建qs任务
             if (curTaskTileIdx == 0 && coreTaskId < coreTaskNum) {
@@ -355,17 +372,21 @@ public:
             if (curTaskTileIdx == curTaskInfo.taskTileNum - 1 && coreTaskId < coreTaskNum) {
                 preTaskTileSum += curTaskInfo.taskTileNum;
                 coreTaskId++;
+                curTaskSlot = (curTaskSlot + 1u == PRELOAD_TASK_CACHE_SIZE) ? 0u : (curTaskSlot + 1u);
             }
             if (coreTileLoop >= PV_RE_DELAY_N && delay20TaskTileIdx == delay20TaskInfo.taskTileNum - 1) {
                 delay20preTaskTileSum += delay20TaskInfo.taskTileNum;
                 delay20CoreTaskId++;
+                delay20TaskSlot = (delay20TaskSlot + 1u == PRELOAD_TASK_CACHE_SIZE) ? 0u : (delay20TaskSlot + 1u);
             }
             if (coreTileLoop >= DELAY_PSCALE_N && delay3TaskTileIdx == delay3TaskInfo.taskTileNum - 1 &&
                 delay3CoreTaskId < coreTaskNum) {
                 delay3preTaskTileSum += delay3TaskInfo.taskTileNum;
                 delay3CoreTaskId++;
+                delay3TaskSlot = (delay3TaskSlot + 1u == PRELOAD_TASK_CACHE_SIZE) ? 0u : (delay3TaskSlot + 1u);
             }
             coreTileLoop++;
+            curTileSlot = (curTileSlot + 1u == PRELOAD_TASK_CACHE_SIZE) ? 0u : (curTileSlot + 1u);
         }
 
         // release reverse sync flags
@@ -606,6 +627,10 @@ public:
         info.kvSeqlen = kvSeqlen;
         info.yBlockNumAval = yBlockNumAval;
         info.yBlockNumRsvd = yBlockNumRsvd;
+        // mask2idx 写出的索引严格递增。选中数等于实际块数，且最后一项就是最后一块时，
+        // 选中集合只能是 0..yBlockNumAval-1。这时 gather 后的 KV 与原始 KV 重合。
+        info.isDenseRow =
+            (yBlockNumRsvd != 0 && yBlockNumRsvd == yBlockNumAval && lastSparseIdx + 1u == yBlockNumAval) ? 1u : 0u;
         // V 数据 batch+head 基址（seq 由 gather 的 oriStartOffset 处理，基址只含 batch+head）
         // V-scale batch+head 基址（字节单位，布局 [B,N2,S2//64,D,2]）
         if constexpr (kvFormat == Format::TND) {
