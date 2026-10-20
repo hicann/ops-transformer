@@ -48,9 +48,8 @@ constexpr uint64_t M_L1_MAX_SIZE = 256;
 constexpr uint64_t K_MULIT_CORE_SPLIT_BASE_SIZE = 256;
 constexpr uint64_t A_L1_SIZE = 128 * 256;
 constexpr uint64_t K_L1_MAX_SIZE = 1024;
-// Ascend950(regbase, A5) only supports these three tail-axis(c) sizes, which differs from A2/A3(membase).
+// Ascend950(regbase, A5) only supports these two tail-axis(c) sizes, which differs from A2/A3(membase).
 constexpr int64_t C_VALID_VALUE_4096 = 4096;
-constexpr int64_t C_VALID_VALUE_5120 = 5120;
 constexpr int64_t C_VALID_VALUE_7168 = 7168;
 constexpr int64_t HCMULT_VALUE = 4;
 constexpr int64_t NUM_ITERS_VALUE = 20;
@@ -93,7 +92,7 @@ struct UbBufferConfig {
     bool hasPremix = false;
 };
 
-bool CalcCoreRowTiling(int64_t bs, int64_t coreNum, CoreRowTiling &rowTiling)
+bool CalcCoreRowTiling(int64_t bs, int64_t coreNum, CoreRowTiling& rowTiling)
 {
     if (bs <= 0 || coreNum <= 0) {
         return false;
@@ -104,7 +103,7 @@ bool CalcCoreRowTiling(int64_t bs, int64_t coreNum, CoreRowTiling &rowTiling)
     return true;
 }
 
-void CompleteCoreRowTiling(CoreRowTiling &rowTiling, int64_t rowFactor)
+void CompleteCoreRowTiling(CoreRowTiling& rowTiling, int64_t rowFactor)
 {
     rowTiling.rowLoopOfFormerBlock = CeilDiv(rowTiling.rowOfFormerBlock, rowFactor);
     rowTiling.rowLoopOfTailBlock = CeilDiv(rowTiling.rowOfTailBlock, rowFactor);
@@ -114,7 +113,7 @@ void CompleteCoreRowTiling(CoreRowTiling &rowTiling, int64_t rowFactor)
         rowTiling.rowOfTailBlock % rowFactor == 0 ? rowFactor : rowTiling.rowOfTailBlock % rowFactor;
 }
 
-int64_t CalcUbBufferSize(const UbBufferConfig &config, int64_t rowFactor, int64_t dFactor)
+int64_t CalcUbBufferSize(const UbBufferConfig& config, int64_t rowFactor, int64_t dFactor)
 {
     const int64_t floatAlign = BLOCK_SIZE / sizeof(float);
     const int64_t hcMixAlign = RoundUp(config.hcMix, floatAlign);
@@ -162,7 +161,7 @@ int64_t CalcMOnlyBufferPool1Size(uint64_t ubSize, int64_t mUbSize, int64_t hcMix
 }
 
 template <typename FitsInUb>
-int64_t FindMaxRowFactor(int64_t maxRowFactor, const FitsInUb &fitsInUb)
+int64_t FindMaxRowFactor(int64_t maxRowFactor, const FitsInUb& fitsInUb)
 {
     int64_t left = 1;
     int64_t right = maxRowFactor;
@@ -180,7 +179,7 @@ int64_t FindMaxRowFactor(int64_t maxRowFactor, const FitsInUb &fitsInUb)
 }
 
 template <typename FitsInUb>
-int64_t FindFirstDFactorDivisor(int64_t d, const FitsInUb &fitsInUb)
+int64_t FindFirstDFactorDivisor(int64_t d, const FitsInUb& fitsInUb)
 {
     int64_t left = 2;
     int64_t right = d;
@@ -196,7 +195,7 @@ int64_t FindFirstDFactorDivisor(int64_t d, const FitsInUb &fitsInUb)
 }
 
 template <typename FitsInUb>
-bool CalcRowAndDTiling(int64_t d, int64_t maxRowFactor, const FitsInUb &fitsInUb, RowAndDTiling &result)
+bool CalcRowAndDTiling(int64_t d, int64_t maxRowFactor, const FitsInUb& fitsInUb, RowAndDTiling& result)
 {
     if (d <= 0 || maxRowFactor <= 0 || !fitsInUb(1, 1)) {
         return false;
@@ -220,7 +219,7 @@ bool CalcRowAndDTiling(int64_t d, int64_t maxRowFactor, const FitsInUb &fitsInUb
     return result.rowFactor > 0 && result.dFactor > 0;
 }
 
-void PrintFinalTilingData(gert::TilingContext *context, MhcPreSinkhornPremixRegbaseTilingData &tilingData,
+void PrintFinalTilingData(gert::TilingContext* context, MhcPreSinkhornPremixRegbaseTilingData& tilingData,
                           uint64_t tilingKey, uint64_t blockDim, size_t workspaceSize)
 {
     OP_LOGD(context->GetNodeName(),
@@ -255,7 +254,7 @@ void PrintFinalTilingData(gert::TilingContext *context, MhcPreSinkhornPremixRegb
 }
 } // namespace
 
-MhcPreSinkhornPremixTilingRegbase::MhcPreSinkhornPremixTilingRegbase(gert::TilingContext *tilingContext)
+MhcPreSinkhornPremixTilingRegbase::MhcPreSinkhornPremixTilingRegbase(gert::TilingContext* tilingContext)
     : context_(tilingContext)
 {}
 
@@ -287,7 +286,7 @@ ge::graphStatus MhcPreSinkhornPremixTilingRegbase::GetPlatformInfo()
 
 ge::graphStatus MhcPreSinkhornPremixTilingRegbase::GetAttr()
 {
-    auto *attrs = context_->GetAttrs();
+    auto* attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
 
     auto hcMultAttr = attrs->GetAttrPointer<int64_t>(0);
@@ -329,11 +328,11 @@ ge::graphStatus MhcPreSinkhornPremixTilingRegbase::GetShapeAttrsInfoInner()
         return ge::GRAPH_FAILED;
     }
 
-    OP_CHECK_IF(d_ != C_VALID_VALUE_4096 && d_ != C_VALID_VALUE_5120 && d_ != C_VALID_VALUE_7168,
+    OP_CHECK_IF(d_ != C_VALID_VALUE_4096 && d_ != C_VALID_VALUE_7168,
                 OP_LOGE(context_->GetNodeName(),
-                        "On Ascend950, x last dim c only supports %ld, %ld or %ld, but is %ld. "
-                        "Please set x last dim c to 4096, 5120 or 7168.",
-                        C_VALID_VALUE_4096, C_VALID_VALUE_5120, C_VALID_VALUE_7168, d_),
+                        "On Ascend950, x last dim c only supports %ld or %ld, but is %ld. "
+                        "Please set x last dim c to 4096 or 7168.",
+                        C_VALID_VALUE_4096, C_VALID_VALUE_7168, d_),
                 return ge::GRAPH_FAILED);
 
     auto shapeHcFn = context_->GetInputShape(1);
@@ -362,7 +361,7 @@ ge::graphStatus MhcPreSinkhornPremixTilingRegbase::GetShapeAttrsInfoInner()
     auto shapePremix = context_->GetOptionalInputShape(4);
     hasPremix_ = (shapePremix != nullptr);
     if (hasPremix_) {
-        auto &premixStorageShape = shapePremix->GetStorageShape();
+        auto& premixStorageShape = shapePremix->GetStorageShape();
         size_t premixDimNum = premixStorageShape.GetDimNum();
         OP_CHECK_IF(
             premixDimNum != xDimNum - 1,
@@ -619,7 +618,7 @@ ge::graphStatus MhcPreSinkhornPremixTilingRegbase::PostTiling()
     }
     context_->SetBlockDim(blockDim);
     context_->SetScheduleMode(BATCH_MODE);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = workspaceSize_;
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());

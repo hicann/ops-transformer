@@ -63,7 +63,7 @@ struct RegbaseTilingExpected {
 };
 
 struct RegbaseTilingBaseline {
-    const char *name;
+    const char* name;
     int64_t sequenceLength;
     int64_t d;
     bool needBackward;
@@ -76,8 +76,8 @@ struct RegbaseTilingBaseline {
     bool hasPremix = false;
 };
 
-std::unique_ptr<gert::TilingContextPara> BuildRegbaseTilingContext(const RegbaseTilingBaseline &baseline,
-                                                                   void *compileInfo)
+std::unique_ptr<gert::TilingContextPara> BuildRegbaseTilingContext(const RegbaseTilingBaseline& baseline,
+                                                                   void* compileInfo)
 {
     const int64_t b = 1;
     const int64_t s = baseline.sequenceLength;
@@ -117,7 +117,7 @@ std::unique_ptr<gert::TilingContextPara> BuildRegbaseTilingContext(const Regbase
 }
 
 template <typename T>
-T ReadTilingField(const uint8_t *buffer, size_t &offset)
+T ReadTilingField(const uint8_t* buffer, size_t& offset)
 {
     T value = 0;
     std::memcpy(&value, buffer + offset, sizeof(value));
@@ -125,8 +125,8 @@ T ReadTilingField(const uint8_t *buffer, size_t &offset)
     return value;
 }
 
-void DeserializeRegbaseTilingData(const TilingInfo &tilingInfo,
-                                  optiling::MhcPreSinkhornPremixRegbaseTilingData &tilingData)
+void DeserializeRegbaseTilingData(const TilingInfo& tilingInfo,
+                                  optiling::MhcPreSinkhornPremixRegbaseTilingData& tilingData)
 {
     size_t offset = 0;
 #define READ_TILING_FIELD(type, field) \
@@ -168,7 +168,7 @@ void DeserializeRegbaseTilingData(const TilingInfo &tilingInfo,
     EXPECT_EQ(offset, tilingInfo.tilingDataSize) << "Regbase tiling data schema changed; update the deserializer";
 }
 
-void ExpectRegbaseTilingData(const RegbaseTilingBaseline &baseline)
+void ExpectRegbaseTilingData(const RegbaseTilingBaseline& baseline)
 {
     TilingInfo tilingInfo;
     optiling::MhcPreSinkhornPremixCompileInfo compileInfo = {baseline.coreNum, baseline.ubSize, SYS_WORKSPACE_SIZE};
@@ -217,7 +217,7 @@ void ExpectRegbaseTilingData(const RegbaseTilingBaseline &baseline)
 }
 
 // premix 用例的不变量校验：tiling 成功、tilingKey 正确、hasPremix 字段为 1
-void ExpectRegbasePremixTiling(const char *name, int64_t sequenceLength, int64_t d, bool needBackward,
+void ExpectRegbasePremixTiling(const char* name, int64_t sequenceLength, int64_t d, bool needBackward,
                                uint64_t expectedTilingKey)
 {
     RegbaseTilingBaseline baseline{name, sequenceLength, d, needBackward, 262144, 0, 0, {}};
@@ -234,7 +234,7 @@ void ExpectRegbasePremixTiling(const char *name, int64_t sequenceLength, int64_t
     EXPECT_EQ(actual.get_hasPremix(), 1) << name;
 }
 
-void ExpectRegbaseTilingFailure(const RegbaseTilingBaseline &baseline)
+void ExpectRegbaseTilingFailure(const RegbaseTilingBaseline& baseline)
 {
     TilingInfo tilingInfo;
     optiling::MhcPreSinkhornPremixCompileInfo compileInfo = {baseline.coreNum, baseline.ubSize, SYS_WORKSPACE_SIZE};
@@ -302,7 +302,7 @@ TEST_F(MhcPreSinkhornPremixTiling, ascend950_regbase_tilingdata_matches_pre_refa
          {{4, 4, 4, 1, 1}, {4, 1344, 64}, {64, 1, 128, 256, 1, 64, 64, 256, 64, 0, 0, 0, 128}}},
     }};
 
-    for (const auto &baseline : baselines) {
+    for (const auto& baseline : baselines) {
         SCOPED_TRACE(baseline.name);
         ExpectRegbaseTilingData(baseline);
     }
@@ -315,15 +315,6 @@ TEST_F(MhcPreSinkhornPremixTiling, ascend950_regbase_premix_optional_input)
     ExpectRegbasePremixTiling("k_split_premix_grad", 256, 7168, true, 2000);
     ExpectRegbasePremixTiling("m_split_premix_no_grad", 16384, 4096, false, 1001);
     ExpectRegbasePremixTiling("m_split_premix_grad", 16384, 4096, true, 2001);
-}
-
-TEST_F(MhcPreSinkhornPremixTiling, ascend950_regbase_d5120_supported)
-{
-    // 尾轴 c=5120 放行：K/M 分核、grad/no-grad 各覆盖
-    ExpectRegbasePremixTiling("k_split_d5120_no_grad", 256, 5120, false, 1000);
-    ExpectRegbasePremixTiling("k_split_d5120_grad", 256, 5120, true, 2000);
-    ExpectRegbasePremixTiling("m_split_d5120_no_grad", 16384, 5120, false, 1001);
-    ExpectRegbasePremixTiling("m_split_d5120_grad", 16384, 5120, true, 2001);
 }
 
 TEST_F(MhcPreSinkhornPremixTiling, membase_rejects_premix)
@@ -399,7 +390,7 @@ TEST_F(MhcPreSinkhornPremixTiling, ascend950_regbase_core_tiling_boundary_branch
          {{256, 256, 256, 1, 1}, {256, 16, 16}, {1, 0, 128, 256, 64, 1, 64, 16384, 0, 1, 51232, 38240, 128}}},
     }};
 
-    for (const auto &baseline : baselines) {
+    for (const auto& baseline : baselines) {
         SCOPED_TRACE(baseline.name);
         ExpectRegbaseTilingData(baseline);
     }

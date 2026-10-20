@@ -56,6 +56,8 @@ constexpr int64_t C_V_RATIO = 2;
 constexpr int64_t DEFAULT_KEY = 0;
 constexpr int64_t DETERMINISTIC_KEY = 1;
 constexpr int64_t ELEMENTS_SIZE_PER_BLOCK = 8;
+constexpr int64_t TILE_FULL = 32; // 默认 tile 行数(每 AIV 核每轮 1 tile, mm1M=mm2K=2*tile)
+constexpr int64_t TILE_HALF = 16; // 小 BS 自适应 tile(见 TilingCompute 内自适应判据)
 } // namespace
 
 using namespace ge;
@@ -64,7 +66,7 @@ using namespace AscendC;
 
 namespace optiling {
 
-ge::graphStatus ShapeVerify(gert::TilingContext *context, int64_t batchSize, int64_t seqLength, int64_t n, int64_t c)
+ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int64_t seqLength, int64_t n, int64_t c)
 {
     auto opName = context->GetNodeName();
 
@@ -354,7 +356,7 @@ ge::graphStatus ShapeVerify(gert::TilingContext *context, int64_t batchSize, int
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingMhcPreSinkhornPremixBackwardArch22(gert::TilingContext *context)
+ge::graphStatus TilingMhcPreSinkhornPremixBackwardArch22(gert::TilingContext* context)
 {
     if (context == nullptr) {
         OP_LOGE(context, "context is nullptr");
@@ -409,7 +411,15 @@ ge::graphStatus TilingMhcPreSinkhornPremixBackwardArch22(gert::TilingContext *co
     int64_t cTail = c % c0;
     int64_t cTailunaglin = cTail % 64 + 64 * cTail / (64 + 128);
 
-    int64_t tile = 32;
+    // [round_004 优化3] tile 自适应: tile32 切分后 AIV 不满核的单轮小 BS shape 改用 tile16,
+    // 使 AIV 活跃核翻倍(如 BS=512: 16→32/40) 且总 tile 数仍 <= aivNum 保持单轮; 大 BS 保持
+    // tile32, 避免 mm1M/mm2K 减半(mm M 64→32 cube 效率降)与轮数翻倍的回归. 判据
+    // CeilDiv(BS,32)*2 <= aivNum 即 tile16 后仍单轮. 实测(msprof op 锁频, 见 docs/perf/round_004):
+    // BS=512 416→317us(-23.8%), 其余 shape 零回归(±2.5% 噪声带); 全局 tile16 则 BS>=1280
+    // 回归 1.5%~17% 故不可全局启用.
+    int64_t totalTasks = batchSize * seqLength;
+    int64_t tilesIfHalf = ((totalTasks + TILE_FULL - 1) / TILE_FULL) * 2;
+    int64_t tile = (tilesIfHalf <= static_cast<int64_t>(aivNum)) ? TILE_HALF : TILE_FULL;
     const auto sumOutPtr = context->GetInputShape(10);
     CHECK_NULLPTR(sumOutPtr);
     auto sumOutShape = sumOutPtr->GetStorageShape();
@@ -433,7 +443,7 @@ ge::graphStatus TilingMhcPreSinkhornPremixBackwardArch22(gert::TilingContext *co
     int64_t mm2M = n * n + 2 * n;
     int64_t mm2N = n * c;
 
-    MhcPreSinkhornPremixBackwardArch22TilingData *tilingData =
+    MhcPreSinkhornPremixBackwardArch22TilingData* tilingData =
         context->GetTilingData<MhcPreSinkhornPremixBackwardArch22TilingData>();
     auto featureDataType = matmul_tiling::DataType::DT_FLOAT;
     matmul_tiling::MatmulApiTiling mm1Tiling(ascendPlatformInfo);
@@ -483,7 +493,7 @@ ge::graphStatus TilingMhcPreSinkhornPremixBackwardArch22(gert::TilingContext *co
 
     size_t systemWorkspaceSize = ascendPlatformInfo.GetLibApiWorkSpaceSize();
     size_t usrWorkSpaceSize = xCastWorkspace + gradHat2Workspace;
-    size_t *currentWorkspace = context->GetWorkspaceSizes(1);
+    size_t* currentWorkspace = context->GetWorkspaceSizes(1);
     if (currentWorkspace == nullptr) {
         OP_LOGE(context, "GetWorkspaceSizes() returned nullptr");
         return ge::GRAPH_FAILED;

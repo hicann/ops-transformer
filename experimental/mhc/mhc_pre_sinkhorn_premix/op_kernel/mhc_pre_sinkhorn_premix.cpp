@@ -4,7 +4,7 @@
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
@@ -18,7 +18,6 @@
 #include "lib/matmul_intf.h"
 #include "mhc_pre_sinkhorn_premix_m_k_split_core.h"
 #include "mhc_pre_sinkhorn_premix_m_split_core.h"
-#include "mhc_pre_sinkhorn_premix_base.h"
 using namespace MhcPreSinkhornPremix;
 
 using namespace AscendC;
@@ -40,10 +39,38 @@ extern "C" __global__ __aicore__ void mhc_pre_sinkhorn_premix(GM_ADDR x, GM_ADDR
     }
 
     GET_TILING_DATA_WITH_STRUCT(MhcPreSinkhornPremixTilingData, tiling_data_in, tiling);
-    const MhcPreSinkhornPremixTilingData *__restrict tilingData = &tiling_data_in;
+    const MhcPreSinkhornPremixTilingData* __restrict tilingData = &tiling_data_in;
 
     if (TILING_KEY_IS(0)) {
-        // -----------split m--------------
+        // -----------split m k (MPMD: pre/post 与 sinkhorn 分核)------------
+        TPipe pipe;
+        MhcPreSinkhornPremix::MhcPreSinkhornPremixMembaseKSplitCorePart1<DTYPE_X> op;
+        op.Init(x, phi, userWs, tilingData, &pipe);
+        op.Process();
+        pipe.Destroy();
+
+        TPipe pipeStage2;
+        MhcPreSinkhornPremix::MhcPreSinkhornPremixMembaseKSplitCorePart2<DTYPE_X, false> op2;
+        op2.Init(x, alpha, bias, hin, hPost, hRes, premix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
+                 tilingData, &pipeStage2);
+        op2.Process();
+        pipeStage2.Destroy();
+    } else if (TILING_KEY_IS(1)) {
+        // -----------split m k (original: 单核全流程, bs<=32 或 needGrad)------------
+        TPipe pipe;
+        MhcPreSinkhornPremix::MhcPreSinkhornPremixMembaseKSplitCorePart1<DTYPE_X> op;
+        op.Init(x, phi, userWs, tilingData, &pipe);
+        op.Process();
+        pipe.Destroy();
+
+        TPipe pipeStage2;
+        MhcPreSinkhornPremix::MhcPreSinkhornPremixMembaseKSplitCorePart2<DTYPE_X, true> op2;
+        op2.Init(x, alpha, bias, hin, hPost, hRes, premix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
+                 tilingData, &pipeStage2);
+        op2.Process();
+        pipeStage2.Destroy();
+    } else if (TILING_KEY_IS(2)) {
+        // -----------split m (K=hcMult*d 超出 nd2nz srcDValue 上限, B矩阵走 MatmulImpl)------------
         TPipe pipe;
         MhcPreSinkhornPremix::MhcPreSinkhornPremixStage1<DTYPE_X> op1;
         op1.cubeCompute_.mm1_.Init(&tilingData->mm1TilingData, &pipe);
@@ -58,26 +85,5 @@ extern "C" __global__ __aicore__ void mhc_pre_sinkhorn_premix(GM_ADDR x, GM_ADDR
                  tilingData, &pipeStage2);
         op2.Process(false);
         pipeStage2.Destroy();
-    } else if (TILING_KEY_IS(1)) {
-        // -----------split m k------------
-        for (int64_t bsLoopIdx = 0; bsLoopIdx < tilingData->bsLoop; bsLoopIdx++) {
-            int64_t curBsOffset = bsLoopIdx * tilingData->curBsSplit;
-            int64_t curBs = (bsLoopIdx == tilingData->bsLoop - 1) ? tilingData->tailBs : tilingData->curBsSplit;
-            bool isTailBsLoop = (bsLoopIdx == tilingData->bsLoop - 1) && (tilingData->tailBs != tilingData->curBsSplit);
-            TPipe pipe;
-            MhcPreSinkhornPremix::MhcPreSinkhornPremixMembaseKSplitCorePart1<DTYPE_X> op;
-            op.Init(x, phi, userWs, tilingData, &pipe, curBsOffset, curBs, isTailBsLoop);
-            op.Process(curBsOffset, curBs, isTailBsLoop);
-            pipe.Destroy();
-
-            TPipe pipeStage2;
-            MhcPreSinkhornPremix::MhcPreSinkhornPremixMembaseKSplitCorePart2<DTYPE_X> op2;
-            op2.Init(x, alpha, bias, hin, hPost, hRes, premix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
-                     tilingData, &pipeStage2, curBsOffset, isTailBsLoop);
-            op2.Process(curBsOffset, curBs, isTailBsLoop);
-            pipeStage2.Destroy();
-            SyncAll<false>(); // cv全部同步
-        }
     }
-    // #endif
 }
