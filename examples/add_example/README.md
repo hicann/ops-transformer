@@ -81,7 +81,7 @@ $$
 
 ```bash
 ## 快速启动
-cd example/add_example
+# 请在 ops-transformer 仓库根目录执行以下命令
 # 假设已准备好环境变量
 bash build.sh --soc=${soc_version} --ops=add_example
 bash build.sh --run_example add_example eager cus
