@@ -209,8 +209,8 @@ ge::graphStatus MoeFinalizeRoutingV2Membase::DoGetShapeAttrsInfo()
     params.expandedRowIdxShape = expandedRowIdxShapePtr;
 
     OP_CHECK_IF(dropPadMode_ < DROP_MODE_VALUE_0 || dropPadMode_ > DROP_MODE_VALUE_3,
-                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "drop_pad_mode",
-                                          std::to_string(dropPadMode_).c_str(), "[0,3]"),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "drop_pad_mode",
+                                                      std::to_string(dropPadMode_).c_str(), "must be in [0, 3]"),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(expandedRowIdxShape.GetDimNum() != 1,
@@ -1019,7 +1019,7 @@ ge::graphStatus MoeFinalizeRoutingV2Membase::Check310pParams()
     int64_t dropPadMode = *(attrsPtr->GetAttrPointer<int64_t>(0));
     OP_CHECK_IF(
         dropPadMode != DROP_MODE_VALUE_2,
-        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "drop_pad_mode", std::to_string(dropPadMode).c_str(), "2"),
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "drop_pad_mode", std::to_string(dropPadMode).c_str(), "2"),
         return ge::GRAPH_FAILED);
 
     // check hidden size

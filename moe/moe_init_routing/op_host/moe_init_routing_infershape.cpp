@@ -124,7 +124,8 @@ static ge::graphStatus CheckInputDimsAndAttr(const gert::InferShapeContext* cont
 
     if (activeNum < 0) {
         std::string activeNumStr = std::to_string(activeNum);
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "active_num", activeNumStr.c_str(), "a non-negative number");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "active_num", activeNumStr.c_str(),
+                                              "must be a non-negative number");
         return ge::GRAPH_FAILED;
     }
 

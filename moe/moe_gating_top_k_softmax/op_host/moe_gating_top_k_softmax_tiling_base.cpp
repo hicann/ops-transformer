@@ -144,13 +144,15 @@ ge::graphStatus MoeGatingTopKSoftmaxBaseTiling::GetShapeAttrsInfo()
     OP_CHECK_NULL_WITH_CONTEXT(context_, kPtr);
     k = *kPtr;
     OP_CHECK_IF((k <= 0 || k > col),
-                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "k", std::to_string(k).c_str(),
-                                          ("greater than 0 and less than or equal to " + std::to_string(col)).c_str()),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context_->GetNodeName(), "k", std::to_string(k).c_str(),
+                    ("must be greater than 0 and less than or equal to " + std::to_string(col)).c_str()),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF((k > MAX_K),
-                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "k", std::to_string(k).c_str(),
-                                          ("less than or equal to " + std::to_string(MAX_K)).c_str()),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (k > MAX_K),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "k", std::to_string(k).c_str(),
+                                              ("must be less than or equal to " + std::to_string(MAX_K)).c_str()),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 } // namespace optiling

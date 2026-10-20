@@ -66,22 +66,24 @@ static ge::graphStatus CheckParm(gert::InferShapeContext* context, const gert::S
     // attr drop_pad_mode
     if (dropPadMode != DROPLESS && dropPadMode != POSITION_DROP_AND_PAD_0) {
         std::string dropPadModeStr = std::to_string(dropPadMode);
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "drop_pad_mode", dropPadModeStr.c_str(), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "drop_pad_mode", dropPadModeStr.c_str(),
+                                              "must be 0 or 1");
         return ge::GRAPH_FAILED;
     }
 
     // attr top_k
     if (topK <= 0) {
         std::string topKStr = std::to_string(topK);
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "top_k", topKStr.c_str(), "greater than 0");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "top_k", topKStr.c_str(),
+                                              "must be greater than 0");
         return ge::GRAPH_FAILED;
     }
 
     // attr active_num
     if (activeNum < 0) {
         std::string activeNumStr = std::to_string(activeNum);
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "active_num", activeNumStr.c_str(),
-                                  "greater than or equal to 0");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "active_num", activeNumStr.c_str(),
+                                              "must be greater than or equal to 0");
         return ge::GRAPH_FAILED;
     }
 

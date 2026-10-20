@@ -131,22 +131,24 @@ static ge::graphStatus CheckParm(const gert::InferShapeContext* context,
         return ge::GRAPH_FAILED;
     }
     if (activeNum < 0) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "activeNum", std::to_string(activeNum).c_str(),
-                                  "greater than or equal to 0");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "activeNum", std::to_string(activeNum).c_str(),
+                                              "must be greater than or equal to 0");
         return ge::GRAPH_FAILED;
     }
     if (expertCapacity < 0) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "expertCapacity", std::to_string(expertCapacity).c_str(),
-                                  "greater than or equal to 0");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "expertCapacity",
+                                              std::to_string(expertCapacity).c_str(),
+                                              "must be greater than or equal to 0");
         return ge::GRAPH_FAILED;
     }
     if (expertNum < 0) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(),
-                                  "greater than or equal to 0");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(),
+                                              "must be greater than or equal to 0");
         return ge::GRAPH_FAILED;
     }
     if (dropPadMode < 0 || dropPadMode > 1) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "dropPadMode", std::to_string(dropPadMode).c_str(), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "dropPadMode",
+                                              std::to_string(dropPadMode).c_str(), "must be 0 or 1");
         return ge::GRAPH_FAILED;
     }
     bool dropLessCheck = (dropPadMode > 0 && (expertCapacity < 1 || expertNum < 1));
@@ -161,8 +163,9 @@ static ge::graphStatus CheckParm(const gert::InferShapeContext* context,
     bool expertTokensCountOrCumsumFlagCheck =
         (expertTokensCountOrCumsumFlag < 0 || expertTokensCountOrCumsumFlag > EXPERT_TOKENS_COUNT);
     if (expertTokensCountOrCumsumFlagCheck) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "expertTokensCountOrCumsumFlag",
-                                  std::to_string(expertTokensCountOrCumsumFlag).c_str(), "0, 1 or 2");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "expertTokensCountOrCumsumFlag",
+                                              std::to_string(expertTokensCountOrCumsumFlag).c_str(),
+                                              "must be 0, 1 or 2");
         return ge::GRAPH_FAILED;
     }
     bool expertNumCheck = (expertTokensCountOrCumsumFlag > 0 && expertNum <= 0);
@@ -182,7 +185,8 @@ static ge::graphStatus CheckParm(const gert::InferShapeContext* context,
     }
     bool quantModeCheck = (quantMode < 0 || quantMode > 1);
     if (quantModeCheck) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "quantMode", std::to_string(quantMode).c_str(), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "quantMode", std::to_string(quantMode).c_str(),
+                                              "must be 0 or 1");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;

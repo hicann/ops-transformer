@@ -316,8 +316,9 @@ ge::graphStatus MoeInitRountingV3TilingBase::CheckAttr()
     dropPadMode_ = *dropPadModePtr_;
     moeInitRoutingV3TilingData.set_dropPadMode(dropPadMode_);
     OP_CHECK_IF((dropPadMode_ != DROP_LESS) && (dropPadMode_ != DROP_PAD),
-                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "drop_pad_mode", std::to_string(dropPadMode_),
-                                          (std::to_string(DROP_LESS) + " or " + std::to_string(DROP_PAD))),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context_->GetNodeName(), "drop_pad_mode", std::to_string(dropPadMode_),
+                    (std::string("must be ") + std::to_string(DROP_LESS) + " or " + std::to_string(DROP_PAD))),
                 return ge::GRAPH_FAILED);
 
     rowIdxTytpe_ = *rowIdxTypePtr_;
@@ -327,22 +328,22 @@ ge::graphStatus MoeInitRountingV3TilingBase::CheckAttr()
     activeNum_ = *activeNumPtr_;
     if (dropPadMode_ == DROP_LESS) {
         OP_CHECK_IF(activeNum_ < ACTIVE_NUM_MIN_VALUE,
-                    OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "active_num", std::to_string(activeNum_),
-                                              ("greater than or equal to " + std::to_string(ACTIVE_NUM_MIN_VALUE))),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        context_->GetNodeName(), "active_num", std::to_string(activeNum_),
+                        ("must be greater than or equal to " + std::to_string(ACTIVE_NUM_MIN_VALUE))),
                     return ge::GRAPH_FAILED);
     }
 
     expertNum_ = *expertNumPtr_;
     moeInitRoutingV3TilingData.set_expertNum(expertNum_);
-    OP_CHECK_IF(
-        expertNum_ <= 0,
-        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expert_num", std::to_string(expertNum_), "greater than 0"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(expertNum_ <= 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expert_num", std::to_string(expertNum_),
+                                                      "must be greater than 0"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         activeExpertRangeListPtr_->GetSize() != ATTR_EXPERT_RANGE_DIM && activeExpertRangeListPtr_->GetSize() != 0,
-        OP_LOGE_WITH_INVALID_ATTR_SIZE(context_->GetNodeName(), "expert_range",
-                                       std::to_string(activeExpertRangeListPtr_->GetSize()),
-                                       (std::to_string(ATTR_EXPERT_RANGE_DIM) + " or 0(no input)")),
+        OP_LOGE_FOR_INVALID_LISTSIZE(context_->GetNodeName(), "expert_range",
+                                     std::to_string(activeExpertRangeListPtr_->GetSize()), "0 or 2 (0 means no input)"),
         return ge::GRAPH_FAILED);
     if (activeExpertRangeListPtr_->GetSize() == 0) {
         expertStart_ = 0;
@@ -362,38 +363,41 @@ ge::graphStatus MoeInitRountingV3TilingBase::CheckAttr()
     expertCapacity_ = *expertCapacityPtr_;
     moeInitRoutingV3TilingData.set_expertCapacity(expertCapacity_);
     if (dropPadMode_ == DROP_PAD) {
-        OP_CHECK_IF(
-            expertCapacity_ <= EXPERT_CAPACITY_MIN_VALUE || expertCapacity_ > n_,
-            OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expert_Capacity", std::to_string(expertCapacity_),
-                                      ("greater than 0 and less than " + std::to_string(n_))),
-            return ge::GRAPH_FAILED);
-        OP_CHECK_IF(rowIdxTytpe_ == SCATTER,
-                    OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "row_idx_type", std::to_string(rowIdxTytpe_),
-                                              "0 when drop_pad_mode is 1"),
+        OP_CHECK_IF(expertCapacity_ <= EXPERT_CAPACITY_MIN_VALUE || expertCapacity_ > n_,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        context_->GetNodeName(), "expert_Capacity", std::to_string(expertCapacity_),
+                        ("must be greater than 0 and less than or equal to " + std::to_string(n_))),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(
-            expertStart_ != 0 || expertEnd_ != expertNum_,
-            OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expert_range",
-                                      ("[" + std::to_string(expertStart_) + ", " + std::to_string(expertEnd_) + "]"),
-                                      ("[0, " + std::to_string(expertNum_) + "] when drop_pad_mode is 1")),
+            rowIdxTytpe_ == SCATTER,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "row_idx_type", std::to_string(rowIdxTytpe_),
+                                                  "must be 0 when dropPadMode is 1"),
             return ge::GRAPH_FAILED);
+        OP_CHECK_IF(expertStart_ != 0 || expertEnd_ != expertNum_,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        context_->GetNodeName(), "expert_range",
+                        ("[" + std::to_string(expertStart_) + ", " + std::to_string(expertEnd_) + "]"),
+                        ("must be [0, " + std::to_string(expertNum_) + "] when dropPadMode is 1")),
+                    return ge::GRAPH_FAILED);
     }
 
     expertTokensNumType_ = *expertTokensNumTypePtr_;
     moeInitRoutingV3TilingData.set_expertTokensNumType(expertTokensNumType_);
     OP_CHECK_IF(
         (expertTokensNumType_ != COUNT) && (expertTokensNumType_ != KEY_VALUE) && (expertTokensNumType_ != CUMSUM),
-        OP_LOGE_WITH_INVALID_ATTR(
-            context_->GetNodeName(), "expert_tokens_num_type", std::to_string(expertTokensNumType_),
-            (std::to_string(COUNT) + ", " + std::to_string(KEY_VALUE) + " or " + std::to_string(CUMSUM))),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expert_tokens_num_type",
+                                              std::to_string(expertTokensNumType_),
+                                              (std::string("must be ") + std::to_string(COUNT) + ", " +
+                                               std::to_string(KEY_VALUE) + " or " + std::to_string(CUMSUM))),
         return ge::GRAPH_FAILED);
 
     expertTokensNumFlag_ = *expertTokensNumFlagPtr_;
     if (dropPadMode_ == DROP_PAD && expertTokensNumFlag_) {
         OP_CHECK_IF(expertTokensNumType_ != COUNT,
-                    OP_LOGE_WITH_INVALID_ATTR(
-                        context_->GetNodeName(), "expert_tokens_num_type", std::to_string(expertTokensNumType_),
-                        (std::to_string(COUNT) + "when DROP_MODE and expert_tokens_num_flag is true")),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expert_tokens_num_type",
+                                                          std::to_string(expertTokensNumType_),
+                                                          (std::string("must be ") + std::to_string(COUNT) +
+                                                           " when dropPadMode is 1 and expertTokensNumFlag is true")),
                     return ge::GRAPH_FAILED);
     }
     if (expertTokensNumFlag_) {
@@ -402,38 +406,45 @@ ge::graphStatus MoeInitRountingV3TilingBase::CheckAttr()
         moeInitRoutingV3TilingData.set_expertTokensNumFlag(0);
     }
 
-    OP_CHECK_IF(expertStart_ < 0,
-                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expert_start", std::to_string(expertStart_),
-                                          "greater than or equal to 0"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(expertStart_ >= expertEnd_,
-                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expert_start", std::to_string(expertStart_),
-                                          ("less than " + std::to_string(expertEnd_))),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        expertStart_ < 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expert_start", std::to_string(expertStart_),
+                                              "must be greater than or equal to 0"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        expertStart_ >= expertEnd_,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expert_start", std::to_string(expertStart_),
+                                              ("must be less than expertEnd (" + std::to_string(expertEnd_) + ")")),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(expertEnd_ > expertNum_,
-                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expert_end", std::to_string(expertEnd_),
-                                          ("less than or equal to " + std::to_string(expertNum_))),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context_->GetNodeName(), "expert_end", std::to_string(expertEnd_),
+                    ("must be less than or equal to expertNum (" + std::to_string(expertNum_) + ")")),
                 return ge::GRAPH_FAILED);
     if (expertTokensNumType_ == KEY_VALUE) {
-        OP_CHECK_IF(expertEnd_ > KV_MODE_EXPERT_IDX_MAX,
-                    OP_LOGE_WITH_INVALID_ATTR(
-                        context_->GetNodeName(), "expert_end", std::to_string(expertEnd_),
-                        ("less than or equal to " + std::to_string(KV_MODE_EXPERT_IDX_MAX) + " in KEY_VALUE mode")),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            expertEnd_ > KV_MODE_EXPERT_IDX_MAX,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                context_->GetNodeName(), "expert_end", std::to_string(expertEnd_),
+                ("must be less than or equal to " + std::to_string(KV_MODE_EXPERT_IDX_MAX) + " in KEY_VALUE mode")),
+            return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(expertEnd_ > EXPERT_IDX_MAX,
-                    OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expert_end", std::to_string(expertEnd_),
-                                              ("less than or equal to " + std::to_string(EXPERT_IDX_MAX))),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            expertEnd_ > EXPERT_IDX_MAX,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expert_end", std::to_string(expertEnd_),
+                                                  ("must be less than or equal to " + std::to_string(EXPERT_IDX_MAX))),
+            return ge::GRAPH_FAILED);
     }
-    OP_CHECK_IF(quantMode_ != UN_QUANT && quantMode_ != DYNAMIC_QUANT && quantMode_ != STATIC_QUANT,
-                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "quant_mode", std::to_string(quantMode_),
-                                          (std::to_string(UN_QUANT) + ", " + std::to_string(DYNAMIC_QUANT) + " or " +
-                                           std::to_string(STATIC_QUANT))),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        quantMode_ != UN_QUANT && quantMode_ != DYNAMIC_QUANT && quantMode_ != STATIC_QUANT,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "quant_mode", std::to_string(quantMode_),
+                                              (std::string("must be ") + std::to_string(UN_QUANT) + ", " +
+                                               std::to_string(DYNAMIC_QUANT) + " or " + std::to_string(STATIC_QUANT))),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(rowIdxTytpe_ != SCATTER && rowIdxTytpe_ != GATHER,
-                OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "row_idx_type", std::to_string(rowIdxTytpe_),
-                                          (std::to_string(SCATTER) + " or " + std::to_string(GATHER))),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context_->GetNodeName(), "row_idx_type", std::to_string(rowIdxTytpe_),
+                    (std::string("must be ") + std::to_string(SCATTER) + " or " + std::to_string(GATHER))),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

@@ -306,8 +306,8 @@ static ge::graphStatus Infershape4MoeFinalizeRoutingV2(gert::InferShapeContext* 
 
     auto outShape = context->GetOutputShape(INDEX_OUT);
     OP_CHECK_IF(dropPadMode < VALUE_MODE_0 || dropPadMode > VALUE_MODE_3,
-                OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "drop_pad_mode", std::to_string(dropPadMode).c_str(),
-                                          "[0,3]"),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "drop_pad_mode",
+                                                      std::to_string(dropPadMode).c_str(), "must be in [0, 3]"),
                 return ge::GRAPH_FAILED);
 
     bool earlyReturn = false;

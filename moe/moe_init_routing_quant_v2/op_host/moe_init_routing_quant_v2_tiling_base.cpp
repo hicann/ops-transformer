@@ -265,26 +265,30 @@ ge::graphStatus InnerMoeInitRoutingV2TilingBase::GetShapeAttrsInfo()
                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expertIdx",
                                                      Ops::Base::ToString(expertIdxShape).c_str(),
                                                      "The second dim of expertIdx cannot be less than 0"));
-    CHECK_FAIL(context_, activateNum < 0,
-               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "activeNum", std::to_string(activateNum).c_str(),
-                                         "greater than or equal to 0"));
+    CHECK_FAIL(
+        context_, activateNum < 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "activeNum", std::to_string(activateNum).c_str(),
+                                              "must be greater than or equal to 0"));
     CHECK_FAIL(context_, expertCapacity < 0,
-               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expertCapacity",
-                                         std::to_string(expertCapacity).c_str(), "greater than or equal to 0"));
-    CHECK_FAIL(context_, expertNum < 0,
-               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(),
-                                         "greater than or equal to 0"));
+               OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expertCapacity",
+                                                     std::to_string(expertCapacity).c_str(),
+                                                     "must be greater than or equal to 0"));
+    CHECK_FAIL(
+        context_, expertNum < 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(),
+                                              "must be greater than or equal to 0"));
     CHECK_FAIL(context_, dropPadMode < 0 || dropPadMode > 1,
-               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "dropPadMode", std::to_string(dropPadMode).c_str(),
-                                         "0 or 1"));
+               OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "dropPadMode",
+                                                     std::to_string(dropPadMode).c_str(), "must be 0 or 1"));
     CHECK_FAIL(context_, dropPadMode > 0 && (expertCapacity < 1 || expertNum < 1),
                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                    context_->GetNodeName(), "expertCapacity and expertNum",
                    (std::to_string(expertCapacity) + " and " + std::to_string(expertNum)).c_str(),
                    "The expertCapacity and expertNum should be greater than 0 when dropPadMode is 1"));
     CHECK_FAIL(context_, expertTokensCountOrCumsumFlag < 0 || expertTokensCountOrCumsumFlag > EXPERT_TOKENS_COUNT,
-               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expertTokensCountOrCumsumFlag",
-                                         std::to_string(expertTokensCountOrCumsumFlag).c_str(), "0, 1 or 2"));
+               OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expertTokensCountOrCumsumFlag",
+                                                     std::to_string(expertTokensCountOrCumsumFlag).c_str(),
+                                                     "must be 0, 1 or 2"));
     CHECK_FAIL(context_, expertTokensCountOrCumsumFlag > 0 && expertNum <= 0,
                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                    context_->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(),

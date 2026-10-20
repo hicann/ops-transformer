@@ -128,17 +128,19 @@ static ge::graphStatus GetAndCheckAttrActiveExpertRange(const gert::RuntimeAttrs
         expertStart = activeExpertRangePtr->GetData()[0];
         expertEnd = activeExpertRangePtr->GetData()[1];
         if (expertStart >= expertEnd || expertStart < 0 || expertEnd > MOE_INIT_ROUTING_V3_EXPERT_END_BOUND) {
-            OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "active_expert_range",
-                                      ("[" + std::to_string(expertStart) + ", " + std::to_string(expertEnd) + ")"),
-                                      ("[0, " + std::to_string(MOE_INIT_ROUTING_V3_EXPERT_END_BOUND) + ")"));
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                context->GetNodeName(), "active_expert_range",
+                ("[" + std::to_string(expertStart) + ", " + std::to_string(expertEnd) + ")"),
+                ("must satisfy 0 <= expertStart < expertEnd <= " +
+                 std::to_string(MOE_INIT_ROUTING_V3_EXPERT_END_BOUND)));
             return ge::GRAPH_FAILED;
         }
     } else if (activeExpertRangePtr->GetSize() == 0) {
         expertStart = 0;
         expertEnd = experNum;
     } else {
-        OP_LOGE_WITH_INVALID_ATTR_SIZE(context->GetNodeName(), "active_expert_range",
-                                       std::to_string(activeExpertRangeSize), "2");
+        OP_LOGE_FOR_INVALID_LISTSIZE(context->GetNodeName(), "active_expert_range",
+                                     std::to_string(activeExpertRangeSize), "0 or 2 (0 means no input)");
         return ge::GRAPH_FAILED;
     }
 
@@ -157,8 +159,8 @@ static ge::graphStatus GetAndCheckAttrActiveNum(const gert::RuntimeAttrs* attrs,
     }
     activeNum = *activeNumPtr;
     if (dropPadMode == DropPadMode::NO_DROP_PAD && activeNum < -1) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "active_num", std::to_string(activeNum),
-                                  "greater than or equal to -1");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "active_num", std::to_string(activeNum),
+                                              "must be greater than or equal to -1");
         return ge::GRAPH_FAILED;
     }
 
@@ -178,8 +180,8 @@ static ge::graphStatus GetAndCheckAttrExpertCapacity(const gert::RuntimeAttrs* a
     }
     expertCapacity = *expertCapacityPtr;
     if (dropPadMode == DropPadMode::DROP_PAD && xShape->GetDim(0) > 0 && expertCapacity > xShape->GetDim(0)) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "expert_capacity", std::to_string(expertCapacity),
-                                  ("between 0 and " + std::to_string(xShape->GetDim(0))));
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "expert_capacity", std::to_string(expertCapacity),
+                                              ("must be less than or equal to " + std::to_string(xShape->GetDim(0))));
         return ge::GRAPH_FAILED;
     }
     OP_LOGD(context, "End to do GetAndCheckAttrExpertCapacity.");
@@ -197,8 +199,9 @@ static ge::graphStatus GetAndCheckAttrExpertNum(const gert::RuntimeAttrs* attrs,
     }
     experNum = *experNumPtr;
     if (experNum <= 0 || experNum > MOE_INIT_ROUTING_V3_EXPERT_END_BOUND) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "expert_num", std::to_string(experNum),
-                                  ("in range [1, " + std::to_string(MOE_INIT_ROUTING_V3_EXPERT_END_BOUND) + "]"));
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context->GetNodeName(), "expert_num", std::to_string(experNum),
+            ("must be in range [1, " + std::to_string(MOE_INIT_ROUTING_V3_EXPERT_END_BOUND) + "]"));
         return ge::GRAPH_FAILED;
     }
 
@@ -218,7 +221,8 @@ static ge::graphStatus GetAndCheckAttrDropPadMode(const gert::RuntimeAttrs* attr
 
     dropPadMode = *dropPadModePtr;
     if (dropPadMode < DropPadMode::NO_DROP_PAD || dropPadMode > DropPadMode::DROP_PAD) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "drop_pad_mode", std::to_string(dropPadMode), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "drop_pad_mode", std::to_string(dropPadMode),
+                                              "must be 0 or 1");
         return ge::GRAPH_FAILED;
     }
 
@@ -239,8 +243,8 @@ static ge::graphStatus GetAndCheckAttrExpertTokenNumType(const gert::RuntimeAttr
     }
     experTokenNumType = *experTokenNumTypePtr;
     if (experTokenNumType < ExpertTokenNumType::CUMSUM || experTokenNumType > ExpertTokenNumType::KEY_VALUE) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "expert_token_num_type", std::to_string(experTokenNumType),
-                                  "0, 1 or 2");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "expert_token_num_type",
+                                              std::to_string(experTokenNumType), "must be 0, 1 or 2");
         return ge::GRAPH_FAILED;
     }
 
@@ -278,8 +282,8 @@ static ge::graphStatus GetAndCheckAttrQuantMode(const gert::RuntimeAttrs* attrs,
     }
     quantMode = *quantModePtr;
     if (validQuantModes.count(quantMode) == 0) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "quant_mode", std::to_string(quantMode),
-                                  "-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16 or 17");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "quant_mode", std::to_string(quantMode),
+                                              "must be -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16 or 17");
         return ge::GRAPH_FAILED;
     }
     OP_LOGD(context, "End to do GetAndCheckQuantMode.");
@@ -305,13 +309,14 @@ static ge::graphStatus GetAndCheckAttrRowIdxType(const gert::RuntimeAttrs* attrs
     }
     rowIdxType = *rowIdxTypePtr;
     if (dropPadMode == DropPadMode::DROP_PAD && rowIdxType != 0) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "row_Idx_type", std::to_string(rowIdxType),
-                                  "0 when dropPadMode is 1");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "row_Idx_type", std::to_string(rowIdxType),
+                                              "must be 0 when dropPadMode is 1");
         return ge::GRAPH_FAILED;
     }
 
     if (rowIdxType < 0 || rowIdxType > 1) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "row_Idx_type", std::to_string(rowIdxType), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "row_Idx_type", std::to_string(rowIdxType),
+                                              "must be 0 or 1");
         return ge::GRAPH_FAILED;
     }
 

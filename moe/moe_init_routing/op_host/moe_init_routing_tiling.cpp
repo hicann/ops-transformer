@@ -242,8 +242,8 @@ ge::graphStatus MoeInitRountingTilingBase::GetShapeAttrsInfo()
 
     if (activateNum < 0) {
         std::string activateNumStr = std::to_string(activateNum);
-        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "active_num", activateNumStr.c_str(),
-                                  "a non-negative number");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "active_num", activateNumStr.c_str(),
+                                              "must be a non-negative number");
         return ge::GRAPH_FAILED;
     }
 

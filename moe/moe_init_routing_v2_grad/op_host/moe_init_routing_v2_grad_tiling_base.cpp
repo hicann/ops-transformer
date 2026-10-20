@@ -126,20 +126,22 @@ ge::graphStatus MoeInitRoutingV2GradTilingBaseClass::CheckParamsValidity(const g
     // attr属性校验
     if (dropPadMode != 0 && dropPadMode != 1) {
         std::string dropPadModeStr = std::to_string(dropPadMode);
-        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "drop_pad_mode", dropPadModeStr.c_str(), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "drop_pad_mode", dropPadModeStr.c_str(),
+                                              "must be 0 or 1");
         return ge::GRAPH_FAILED;
     }
 
     if (topK <= 0) {
         std::string topKStr = std::to_string(topK);
-        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "top_k", topKStr.c_str(), "greater than 0");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "top_k", topKStr.c_str(),
+                                              "must be greater than 0");
         return ge::GRAPH_FAILED;
     }
 
     if (activeNum < 0) {
         std::string activeNumStr = std::to_string(activeNum);
-        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "active_num", activeNumStr.c_str(),
-                                  "greater than or equal to 0");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "active_num", activeNumStr.c_str(),
+                                              "must be greater than or equal to 0");
         return ge::GRAPH_FAILED;
     }
 

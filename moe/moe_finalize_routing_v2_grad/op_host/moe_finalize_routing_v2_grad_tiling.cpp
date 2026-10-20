@@ -195,7 +195,8 @@ ge::graphStatus MoeFinalizeRoutingV2GradTiling::GetShapeAttrsInfo()
 ge::graphStatus MoeFinalizeRoutingV2GradTiling::CheckAttr()
 {
     OP_CHECK_IF(((dropPadMode_ != 0) && (dropPadMode_ != 1)),
-                OP_LOGE_WITH_INVALID_ATTR(nodeName_, "drop_pad_mode", std::to_string(dropPadMode_).c_str(), "0 or 1"),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName_, "drop_pad_mode", std::to_string(dropPadMode_).c_str(),
+                                                      "must be 0 or 1"),
                 return ge::GRAPH_FAILED);
 
     if (dropPadMode_ == 1) {

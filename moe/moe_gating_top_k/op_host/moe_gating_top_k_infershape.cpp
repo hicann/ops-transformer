@@ -55,7 +55,7 @@ static ge::graphStatus CheckInputDimsAndAttr(gert::InferShapeContext* context, c
     }
 
     if (k < 0) {
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "k", std::to_string(k), "non-negative");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "k", std::to_string(k), "must be non-negative");
         return ge::GRAPH_FAILED;
     }
 

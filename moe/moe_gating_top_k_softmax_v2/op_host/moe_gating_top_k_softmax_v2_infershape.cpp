@@ -100,7 +100,7 @@ static ge::graphStatus InferShapeMoeGatingTopKSoftmaxV2(gert::InferShapeContext*
     int64_t renorm = renormPtr == nullptr ? 0 : *renormPtr;
     if (renorm < 0 || renorm > 1) {
         std::string renormStr = std::to_string(renorm);
-        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "renorm", renormStr.c_str(), "0 or 1");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "renorm", renormStr.c_str(), "must be 0 or 1");
         return ge::GRAPH_FAILED;
     }
 

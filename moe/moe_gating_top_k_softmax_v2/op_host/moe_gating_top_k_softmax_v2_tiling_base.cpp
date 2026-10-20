@@ -138,10 +138,10 @@ ge::graphStatus MoeGatingTopKSoftmaxV2BaseTiling::CheckOptionalAttr(gert::Shape&
     renorm = 0;
     if (renormPtr) {
         renorm = *renormPtr;
-        OP_CHECK_IF(
-            (renorm < 0 || renorm > 1),
-            OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "renorm", std::to_string(renorm).c_str(), "0 or 1"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF((renorm < 0 || renorm > 1),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "renorm",
+                                                          std::to_string(renorm).c_str(), "must be 0 or 1"),
+                    return ge::GRAPH_FAILED);
     }
 
     const bool* softmaxFlagPtr = attrs->GetAttrPointer<bool>(2);

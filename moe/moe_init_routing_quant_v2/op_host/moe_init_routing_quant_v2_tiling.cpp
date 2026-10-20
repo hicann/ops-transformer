@@ -177,11 +177,13 @@ ge::graphStatus MoeInitRoutingQuantV2TilingBase::CheckInt4Info()
                        context_->GetNodeName(), "x", std::to_string(cols).c_str(),
                        "The second dim of x should be a multiple of 2 when expandedX is int4"));
         CHECK_FAIL(context_, quantMode != 1,
-                   OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "quantMode", std::to_string(quantMode).c_str(),
-                                             "1 when expandedX is int4"));
+                   OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "quantMode",
+                                                         std::to_string(quantMode).c_str(),
+                                                         "must be 1 when expanded_x has INT4 dtype"));
         CHECK_FAIL(context_, dropPadMode != 0,
-                   OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "dropPadMode",
-                                             std::to_string(dropPadMode).c_str(), "0 when expandedX is int4"));
+                   OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "dropPadMode",
+                                                         std::to_string(dropPadMode).c_str(),
+                                                         "must be 0 when expanded_x has INT4 dtype"));
         auto scaleShapePtr = context_->GetOptionalInputShape(INDEX_SCALE);
         if (scaleShapePtr != nullptr) {
             auto scaleDesc = context_->GetOptionalInputDesc(INDEX_SCALE);
@@ -207,9 +209,9 @@ ge::graphStatus MoeInitRoutingQuantV2TilingBase::GetShapeAttrsInfo()
     if (quantModePtr != nullptr) {
         quantMode = *quantModePtr;
     }
-    CHECK_FAIL(
-        context_, quantMode < 0 || quantMode > 1,
-        OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "quantMode", std::to_string(quantMode).c_str(), "0 or 1"));
+    CHECK_FAIL(context_, quantMode < 0 || quantMode > 1,
+               OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "quantMode",
+                                                     std::to_string(quantMode).c_str(), "must be 0 or 1"));
     if (InnerMoeInitRoutingV2TilingBase::GetShapeAttrsInfo() == ge::GRAPH_FAILED ||
         CheckInt4Info() == ge::GRAPH_FAILED) {
         return ge::GRAPH_FAILED;

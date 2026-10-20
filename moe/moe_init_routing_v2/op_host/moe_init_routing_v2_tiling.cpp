@@ -112,8 +112,8 @@ ge::graphStatus MoeInitRoutingV2TilingBase::GetPlatformInfo()
     regBase = Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_);
     is310P = (ascendcPlatform.GetSocVersion() == platform_ascendc::SocVersion::ASCEND310P);
     CHECK_FAIL(context_, (is310P && dropPadMode != 0),
-               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "dropPadMode", std::to_string(dropPadMode).c_str(),
-                                         "0 on 310p"));
+               OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "dropPadMode",
+                                                     std::to_string(dropPadMode).c_str(), "must be 0 on Ascend310P"));
     if (!regBase) {
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
         mrgSortListMaxElement = 2040; // 单词搬运最大元素个数2040
@@ -333,16 +333,18 @@ ge::graphStatus MoeInitRoutingV2TilingBase::ValidateInputShapes(const gert::Shap
 ge::graphStatus MoeInitRoutingV2TilingBase::ValidateAttrsParams(const gert::Shape& xShape) const
 {
     CHECK_FAIL(context_, expertCapacity < 0,
-               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expertCapacity",
-                                         std::to_string(expertCapacity).c_str(), "greater than or equal to 0"));
+               OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expertCapacity",
+                                                     std::to_string(expertCapacity).c_str(),
+                                                     "must be greater than or equal to 0"));
 
-    CHECK_FAIL(context_, expertNum < 0,
-               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(),
-                                         "greater than or equal to 0"));
+    CHECK_FAIL(
+        context_, expertNum < 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expertNum", std::to_string(expertNum).c_str(),
+                                              "must be greater than or equal to 0"));
 
     CHECK_FAIL(context_, dropPadMode < 0 || dropPadMode > 1,
-               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "dropPadMode", std::to_string(dropPadMode).c_str(),
-                                         "0 or 1"));
+               OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "dropPadMode",
+                                                     std::to_string(dropPadMode).c_str(), "must be 0 or 1"));
 
     CHECK_FAIL(
         context_, dropPadMode > 0 && (expertCapacity < 1 || expertNum < 1),
@@ -352,8 +354,9 @@ ge::graphStatus MoeInitRoutingV2TilingBase::ValidateAttrsParams(const gert::Shap
             "expertCapacity and expertNum should be greater than 0 when dropPadMode is 1"));
 
     CHECK_FAIL(context_, expertTokensCountOrCumsumFlag < 0 || expertTokensCountOrCumsumFlag > EXPERT_TOKENS_COUNT,
-               OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "expertTokensCountOrCumsumFlag",
-                                         std::to_string(expertTokensCountOrCumsumFlag).c_str(), "0, 1 or 2"));
+               OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expertTokensCountOrCumsumFlag",
+                                                     std::to_string(expertTokensCountOrCumsumFlag).c_str(),
+                                                     "must be 0, 1 or 2"));
 
     CHECK_FAIL(
         context_, expertTokensCountOrCumsumFlag > 0 && expertNum <= 0,
@@ -398,8 +401,9 @@ ge::graphStatus MoeInitRoutingV2TilingBase::ProcessParamsAndSetTilingData(const 
         moeInitRoutingTilingData.set_k(expertIdxDimNum == DIM_TWO ? expertIdxShape.GetDim(1) : 1);
     } else {
         CHECK_FAIL(context_, activateNum < 0,
-                   OP_LOGE_WITH_INVALID_ATTR(context_->GetNodeName(), "activeNum", std::to_string(activateNum).c_str(),
-                                             "greater than or equal to 0"));
+                   OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "activeNum",
+                                                         std::to_string(activateNum).c_str(),
+                                                         "must be greater than or equal to 0"));
         CHECK_FAIL(context_, expertIdxDimNum != DIM_TWO,
                    OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "expertIdx",
                                                 std::to_string(expertIdxDimNum).c_str(), "2D"));
