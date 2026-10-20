@@ -41,7 +41,7 @@
     x1，x2为INT8，commQuantScale1Optional, commQuantScale2Optional不为空时:
 
     $$
-    matmulAddOutput = (x2ScaleOptional * x1ScaleOptional * (x1_{int8}@x2_{int8} + biasOptional_{int32}) + x3Optional);
+    matmulAddOutput = (x2Scale * x1ScaleOptional * (x1_{int8}@x2_{int8} + biasOptional_{int32}) + x3Optional);
     $$
 
     $$
@@ -58,10 +58,10 @@
 
   - 公式2，perchannel量化 && pertensor量化：
 
-    x1，x2为INT8，无x1ScaleOptional，x2ScaleOptional为INT64/UINT64，可选biasOptional为INT32，out为BFLOAT16/FLOAT16：
+    x1，x2为INT8，无x1ScaleOptional，x2Scale为INT64/UINT64，可选biasOptional为INT32，out为BFLOAT16/FLOAT16：
 
     $$
-    output = AllReduce((x1@x2 + biasOptional) * x2ScaleOptional + x3Optional)
+    output = AllReduce((x1@x2 + biasOptional) * x2Scale + x3Optional)
     $$
 
   - 公式3，pertoken-perchannel量化 && pertoken-pertensor量化：
@@ -69,31 +69,31 @@
     x1，x2为INT8，x1ScaleOptional为FLOAT32，x2Scale为FLOAT32/BFLOAT16，可选biasOptional为INT32, out为FLOAT16/BFLOAT16：
 
     $$
-    output = AllReduce((x1@x2 + biasOptional) * x2ScaleOptional * x1ScaleOptional + x3Optional)
+    output = AllReduce((x1@x2 + biasOptional) * x2Scale * x1ScaleOptional + x3Optional)
     $$
 
   - 公式4，MXFP量化：
 
-    x1，x2为`FLOAT4_E2M1`/`FLOAT8_E4M3FN`/`FLOAT8_E5M2`，x1ScaleOptional为`FLOAT8_E8M0`，x2ScaleOptional为`FLOAT8_E8M0`，可选biasOptional为FLOAT32, out为FLOAT16/BFLOAT16/FLOAT32：
+    x1，x2为`FLOAT4_E2M1`/`FLOAT8_E4M3FN`/`FLOAT8_E5M2`，x1ScaleOptional为`FLOAT8_E8M0`，x2Scale为`FLOAT8_E8M0`，可选biasOptional为FLOAT32, out为FLOAT16/BFLOAT16/FLOAT32：
 
     $$
-    output = AllReduce((x1* x1ScaleOptional)@(x2* x2ScaleOptional) + biasOptional + x3Optional)
+    output = AllReduce((x1* x1ScaleOptional)@(x2* x2Scale) + biasOptional + x3Optional)
     $$
 
   - 公式5，perchannel量化 && pertensor量化：
 
-    x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x2ScaleOptional为UINT/INT64，可选bias为FLOAT32, out为FLOAT16/BFLOAT16/FLOAT32：
+    x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x2Scale为UINT/INT64，可选bias为FLOAT32, out为FLOAT16/BFLOAT16/FLOAT32：
 
   $$
-  output = AllReduce((x1@x2 + biasOptional) * x2ScaleOptional  + x3Optional)
+  output = AllReduce((x1@x2 + biasOptional) * x2Scale  + x3Optional)
   $$
 
   - 公式6，pertoken-perchannel量化 && pertoken-pertensor量化：
 
-    x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x1ScaleOptional为FLOAT32，x2ScaleOptional为FLOAT32，可选bias为FLOAT32, out为FLOAT16/BFLOAT16/FLOAT32：
+    x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x1ScaleOptional为FLOAT32，x2Scale为FLOAT32，可选bias为FLOAT32, out为FLOAT16/BFLOAT16/FLOAT32：
 
     $$
-    output = AllReduce((x1@x2 + biasOptional) * x2ScaleOptional * x1ScaleOptional + x3Optional)
+    output = AllReduce((x1@x2 + biasOptional) * x2Scale * x1ScaleOptional + x3Optional)
     $$
 
   - 公式7，perblock-perblock量化：
@@ -109,7 +109,7 @@
     x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`，x1ScaleOptional为FLOAT32，x2Scale为FLOAT32，可选biasOptional为FLOAT32，commQuantMode为1，out为FLOAT16/BFLOAT16/FLOAT32:
 
     $$
-    matmulAddOutput_{fp32} = (x2ScaleOptional * x1ScaleOptional * (x1_{fp8}@x2_{fp8} + biasOptional_{fp32}) + x3Optional);
+    matmulAddOutput_{fp32} = (x2Scale * x1ScaleOptional * (x1_{fp8}@x2_{fp8} + biasOptional_{fp32}) + x3Optional);
     $$
 
     $$
@@ -159,7 +159,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4GetWorkspaceSize(
     const aclTensor *biasOptional,
     const aclTensor *x3Optional,
     const aclTensor *x1ScaleOptional,
-    const aclTensor *x2ScaleOptional,
+    const aclTensor *x2Scale,
     const aclTensor *commQuantScale1Optional,
     const aclTensor *commQuantScale2Optional,
     const char      *group,
@@ -257,10 +257,10 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
           <td>√</td>
         </tr>
         <tr>
-          <td>x2ScaleOptional</td>
+          <td>x2Scale</td>
           <td>输入</td>
           <td>MatMul计算后的去量化系数，即计算公式中的x2Scale。</td>
-          <td><ul><li>shape在pertensor场景为(1)，perchannel场景为(n)/(1, n)。</li><li>输入为int8且输出为BFLOAT16时，直接将BFLOAT16类型的x2ScaleOptional传入本接口。</li><li>输出为FLOAT16且输入为INT8时，x1ScaleOptional不为空，可直接将FLOAT32类型的x2ScaleOptional传入本接口，如果x1ScaleOptional为空，则需提前调用TransQuantParamV2算子的aclnn接口来将x2ScaleOptional转成INT64/UINT64数据类型。</li><li>数据类型为FLOAT8_E8M0时，仅支持转置，shape为[n, ceilDiv(k, 64), 2]。</li> <li>x2为FLOAT4_E2M1时，必须保证ceilDiv(k, 32)为偶数.</li><li>perblock场景下，x2的shape为[ceilDiv(k, 128), ceilDiv(n, 128)]，x2转置时，x2ScaleOptional的shape为[ceilDiv(n, 128), ceilDiv(k, 128)]。</li></ul></td>
+          <td><ul><li>shape在pertensor场景为(1)，perchannel场景为(n)/(1, n)。</li><li>输入为int8且输出为BFLOAT16时，直接将BFLOAT16类型的x2Scale传入本接口。</li><li>输出为FLOAT16且输入为INT8时，x1ScaleOptional不为空，可直接将FLOAT32类型的x2Scale传入本接口，如果x1ScaleOptional为空，则需提前调用TransQuantParamV2算子的aclnn接口来将x2Scale转成INT64/UINT64数据类型。</li><li>数据类型为FLOAT8_E8M0时，仅支持转置，shape为[n, ceilDiv(k, 64), 2]。</li> <li>x2为FLOAT4_E2M1时，必须保证ceilDiv(k, 32)为偶数.</li><li>perblock场景下，x2的shape为[ceilDiv(k, 128), ceilDiv(n, 128)]，x2转置时，x2Scale的shape为[ceilDiv(n, 128), ceilDiv(k, 128)]。</li></ul></td>
           <td>INT64、UINT64、FLOAT32、BFLOAT16、FLOAT8_E8M0</td>
           <td>ND</td>
           <td>1-3</td>
@@ -473,7 +473,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
 - 输入x1可为2维或者3维，其shape为(b, s, k)或者(m, k)。x2必须是2维。其shape为(k, n)，k轴满足mm算子入参要求，k轴相等。
 - m大小不超过2147483647，x1与x2的最后一维大小不超过65535，x1的最后一维指k，x2的最后一维指转置时的k或非转置时的n。
 - 传入的x1、x2、x2Scale或者output不为空指针。
-- x1和x2、dequantScale、output、bias（非空场景）、x3（非空场景）的数据类型和数据格式需要在支持的范围之内。
+- x1和x2、x1ScaleOptional、x2Scale、output、biasOptional（非空场景）、x3Optional（非空场景）的数据类型和数据格式需要在支持的范围之内。
 - 传入的commQuantScale1与commQuantScale2需要同时为空指针或同时不为空指针，若传入的commQuantScale1与commQuantScale2同时不为空指针，两个量化参数shape需保持一致，类型需与算子输出类型保持一致，且每张卡输入保持一致。
 - 仅支持hccs链路all mesh组网。
 
@@ -507,7 +507,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
         <th>biasOptional</th>
         <th>x3Optional</th>
         <th>x1ScaleOptional</th>
-        <th>x2ScaleOptional</th>
+        <th>x2Scale</th>
         <th>commQuantScale1Optional</th>
         <th>commQuantScale2Optional</th>
         <th>output</th>
@@ -567,7 +567,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
         <th>biasOptional</th>
         <th>x3Optional</th>
         <th>x1ScaleOptional</th>
-        <th>x2ScaleOptional</th>
+        <th>x2Scale</th>
         <th>commQuantScale1Optional</th>
         <th>commQuantScale2Optional</th>
         <th>output</th>
@@ -623,7 +623,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
         <th>biasOptional</th>
         <th>x3Optional</th>
         <th>x1ScaleOptional</th>
-        <th>x2ScaleOptional</th>
+        <th>x2Scale</th>
         <th>output</th>
         <th>限制</th>
         </tr>
@@ -671,7 +671,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
         <th>biasOptional</th>
         <th>x3Optional</th>
         <th>x1ScaleOptional</th>
-        <th>x2ScaleOptional</th>
+        <th>x2Scale</th>
         <th>output</th>
         <th>限制</th>
         </tr>
@@ -719,7 +719,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
         <th>biasOptional</th>
         <th>x3Optional</th>
         <th>x1ScaleOptional</th>
-        <th>x2ScaleOptional</th>
+        <th>x2Scale</th>
         <th>output</th>
         <th>限制</th>
         </tr>
@@ -891,7 +891,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
       std::vector<int64_t> x1Shape = {32, 64};
       std::vector<int64_t> x2Shape = {64, 128};
       std::vector<int64_t> biasShape = {128};
-      std::vector<int64_t> dequantScaleShape = {128};
+      std::vector<int64_t> x2ScaleShape = {128};
       std::vector<int64_t> x1ScaleShape = {32};
       std::vector<int64_t> commQuantScale1Shape = {128};
       std::vector<int64_t> commQuantScale2Shape = {128};
@@ -900,7 +900,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
       void *x1DeviceAddr = nullptr;
       void *x2DeviceAddr = nullptr;
       void *biasDeviceAddr = nullptr;
-      void *dequantScaleDeviceAddr = nullptr;
+      void *x2ScaleDeviceAddr = nullptr;
       void *x1ScaleDeviceAddr = nullptr;
       void *commQuantScale1DeviceAddr = nullptr;
       void *commQuantScale2DeviceAddr = nullptr;
@@ -909,7 +909,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
       aclTensor *x1 = nullptr;
       aclTensor *x2 = nullptr;
       aclTensor *bias = nullptr;
-      aclTensor *x2ScaleOptional = nullptr;
+      aclTensor *x2Scale = nullptr;
       aclTensor *x1Scale = nullptr;
       aclTensor *commQuantScale1 = nullptr;
       aclTensor *commQuantScale2 = nullptr;
@@ -925,7 +925,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
       long long x1ShapeSize = GetShapeSize(x1Shape);
       long long x2ShapeSize = GetShapeSize(x2Shape);
       long long biasShapeSize = GetShapeSize(biasShape);
-      long long dequantScaleShapeSize = GetShapeSize(dequantScaleShape);
+      long long x2ScaleShapeSize = GetShapeSize(x2ScaleShape);
       long long x1ScaleShapeSize = GetShapeSize(x1ScaleShape);
       long long commQuantScale1ShapeSize = GetShapeSize(commQuantScale1Shape);
       long long commQuantScale2ShapeSize = GetShapeSize(commQuantScale2Shape);
@@ -935,7 +935,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
       std::vector<int8_t> x1HostData(x1ShapeSize, 1);
       std::vector<int8_t> x2HostData(x2ShapeSize, 1);
       std::vector<int32_t> biasHostData(biasShapeSize, 1);
-      std::vector<float> dequantScaleHostData(dequantScaleShapeSize, 1);
+      std::vector<float> x2ScaleHostData(x2ScaleShapeSize, 1);
       std::vector<float> x1ScaleHostData(x1ScaleShapeSize, 1);
       std::vector<op::fp16_t> commQuantScale1HostData(commQuantScale1ShapeSize, 1);
       std::vector<op::fp16_t> commQuantScale2HostData(commQuantScale2ShapeSize, 1);
@@ -952,8 +952,8 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
       CHECK_RET(ret == ACL_SUCCESS, return ret);
       ret = CreateAclTensor(biasHostData, biasShape, &biasDeviceAddr, aclDataType::ACL_INT32, &bias);
       CHECK_RET(ret == ACL_SUCCESS, return ret);
-      ret = CreateAclTensor(dequantScaleHostData, dequantScaleShape, &dequantScaleDeviceAddr,
-                            aclDataType::ACL_FLOAT, &x2ScaleOptional);
+      ret = CreateAclTensor(x2ScaleHostData, x2ScaleShape, &x2ScaleDeviceAddr,
+                            aclDataType::ACL_FLOAT, &x2Scale);
       CHECK_RET(ret == ACL_SUCCESS, return ret);
       ret = CreateAclTensor(x1ScaleHostData, x1ScaleShape, &x1ScaleDeviceAddr,
                             aclDataType::ACL_FLOAT, &x1Scale);
@@ -969,7 +969,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
       ret = CreateAclTensor(outHostData, outShape, &outDeviceAddr, aclDataType::ACL_FLOAT16, &out);
       CHECK_RET(ret == ACL_SUCCESS, return ret);
       // 调用第一段接口
-      ret = aclnnQuantMatmulAllReduceV4GetWorkspaceSize(x1, x2, bias, x3, x1Scale, x2ScaleOptional,
+      ret = aclnnQuantMatmulAllReduceV4GetWorkspaceSize(x1, x2, bias, x3, x1Scale, x2Scale,
                                                         commQuantScale1, commQuantScale2, hcom_name,
                                                         "sum", commTurn, streamMode, 0, 0, out,
                                                         &workspaceSize, &executor);
@@ -997,8 +997,8 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
       if (bias != nullptr) {
           aclDestroyTensor(bias);
       }
-      if (x2ScaleOptional != nullptr) {
-          aclDestroyTensor(x2ScaleOptional);
+      if (x2Scale != nullptr) {
+          aclDestroyTensor(x2Scale);
       }
       if (x1Scale != nullptr) {
           aclDestroyTensor(x1Scale);
@@ -1024,8 +1024,8 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
       if (biasDeviceAddr != nullptr) {
           aclrtFree(biasDeviceAddr);
       }
-      if (dequantScaleDeviceAddr != nullptr) {
-          aclrtFree(dequantScaleDeviceAddr);
+      if (x2ScaleDeviceAddr != nullptr) {
+          aclrtFree(x2ScaleDeviceAddr);
       }
       if (x1ScaleDeviceAddr != nullptr) {
           aclrtFree(x1ScaleDeviceAddr);

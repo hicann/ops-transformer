@@ -25,7 +25,7 @@ extern "C" {
  * @domain aclnn_ops_infer
  * 算子功能：实现mm+AllReduce融合计算
  * @param [in] x1: matmul左矩阵，数据类型支持：float16, bf16。
- * @param [in] x2: matmul右矩阵，数据类型支持：int8。
+ * @param [in] x2: matmul右矩阵，数据类型支持：float16, bf16。
  * @param [in] bias: 偏置，数据类型支持：float16, bf16。
  * @param [in] x3: add计算参数，数据类型支持：float16, bf16。
  * @param [in] group: 标识列组的字符串。

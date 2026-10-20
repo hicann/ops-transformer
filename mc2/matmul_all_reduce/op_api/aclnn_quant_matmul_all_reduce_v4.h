@@ -30,12 +30,12 @@ extern "C" {
  * @brief aclnnQuantMatmulAllReduceV4的第一段接口，根据具体的计算流程，计算workspace大小。
  * @domain aclnn_ops_infer
  * 算子功能：实现mm+AllReduce融合计算
- * @param [in] x1: matmul左矩阵，数据类型支持：float4_e2m1, float4_e1m2, int8, float8_e4m3fn, float8_e5m2, hifloat8。
- * @param [in] x2: matmul右矩阵，数据类型支持：float4_e2m1, float4_e1m2, int8, float8_e4m3fn, float8_e5m2, hifloat8。
+ * @param [in] x1: matmul左矩阵，数据类型支持：float4_e2m1, int8, float8_e4m3fn, float8_e5m2, hifloat8。
+ * @param [in] x2: matmul右矩阵，数据类型支持：float4_e2m1, int8, float8_e4m3fn, float8_e5m2, hifloat8。
  * @param [in] biasOptional: 偏置，数据类型支持：int32, float32。
  * @param [in] x3Optional: add操作参数，数据类型支持：float16, bfloat16, float32。
  * @param [in] x1ScaleOptional: x1去量化系数，数据类型支持：float32, float8_e8m0。
- * @param [in] x2Scale: x2去量化系数，数据类型支持：int64, uint64, bfloat16, float32。
+ * @param [in] x2Scale: x2去量化系数，数据类型支持：int64, uint64, bfloat16, float32, float8_e8m0。
  * @param [in] commQuantScale1Optional: 通信量化计算参数，数据类型支持：float16, bfloat16。
  * @param [in] commQuantScale2Optional: 通信量化计算参数，数据类型支持：float16, bfloat16。
  * @param [in] group: 标识列组的字符串。
