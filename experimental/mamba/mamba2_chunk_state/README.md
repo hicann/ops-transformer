@@ -1,6 +1,6 @@
 # mamba2_chunk_state算子说明
 
-### 功能和实现说明
+## 功能和实现说明
 
 mamba2_chunk_state用于在MambaV2 Prefill阶段进行chunk内的离散时间状态更新，根据chunk_cumsum得到的累积量dacs/dacs_chunk和状态更新因子dtout进行状态递推，输出chunk内每一步的状态序列，并生成用于下一chunk的最终隐藏状态。本算子实现为Vector+cube融合算子，支持FP16/FP32。
 
@@ -8,7 +8,7 @@ mamba2_chunk_state用于在MambaV2 Prefill阶段进行chunk内的离散时间状
 
 <img src="https://raw.atomgit.com/user-images/assets/7673863/88ab3b4c-4940-4b88-9aca-e6a44fd4fc04/image.png" height="300">
 
-### Kernel输入输出（I/O）
+## Kernel输入输出（I/O）
 
 **输入**
 

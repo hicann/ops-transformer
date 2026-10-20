@@ -1,6 +1,6 @@
 # mamba2_chunk_scan算子说明
 
-### 功能和实现说明
+## 功能和实现说明
 
 mamba2_chunk_scan用于在MambaV2 Prefill阶段对chunk内状态执行selective scan运算：对来自前序chunk的传播状态、chunk内delta信息以及gating/bias进行结合，根据时间步顺序进行递推累计，生成当前chunk的有效输出。
 该算子包含两个matmul和两部分vector计算，因此实现为CVCV融合算子，通过VC并行提升计算性能。
@@ -9,7 +9,7 @@ mamba2_chunk_scan用于在MambaV2 Prefill阶段对chunk内状态执行selective 
 
 <img src="https://raw.atomgit.com/user-images/assets/7673863/246d0aa8-1ed9-45ff-97db-7ee759ca8334/image.png" height="300">
 
-### Kernel输入输出（I/O）
+## Kernel输入输出（I/O）
 
 **输入**
 
