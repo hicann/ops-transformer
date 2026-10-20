@@ -53,8 +53,9 @@ public:
 
     __aicore__ inline void operator()(GbsaKernelParamsArch35 const& params)
     {
-        __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData =
-            reinterpret_cast<__gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData*>(params.tiling);
+        GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData, tilingDataLocal,
+                                    params.tiling);
+        const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData = &tilingDataLocal;
         FetchBaseShapeInfo(tilingData, params.metaData);
         CalcOnChipBufTileInfo(tilingData);
         __gm__ const GbsaMetadata::Metadata* meta =
@@ -415,7 +416,7 @@ public:
 
 private:
     __aicore__ inline void FetchBaseShapeInfo(
-        __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData, GM_ADDR metaData)
+        const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData, GM_ADDR metaData)
     {
         batch_ = tilingData->batch;
         qHeads_ = tilingData->numHeads;
@@ -441,7 +442,7 @@ private:
     }
 
     __aicore__ inline void CalcOnChipBufTileInfo(
-        __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData)
+        const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData)
     {
         mm1L1TileM_ = tilingData->mm1L1TileM;
         mm1L1TileN_ = tilingData->mm1L1TileN;

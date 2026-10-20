@@ -55,8 +55,9 @@ public:
 
     __aicore__ inline void operator()(GbsaKernelParamsArch22 const& params)
     {
-        __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData =
-            reinterpret_cast<__gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData*>(params.tiling);
+        GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData, tilingDataLocal,
+                                    params.tiling);
+        const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData = &tilingDataLocal;
         FetchTilingData(tilingData, params.metaData);
         __gm__ const GbsaMetadata::Metadata* meta =
             reinterpret_cast<__gm__ const GbsaMetadata::Metadata*>(params.metaData);
@@ -498,7 +499,7 @@ public:
 
 private:
     __aicore__ inline void FetchTilingData(
-        __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData, GM_ADDR metaData)
+        const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData, GM_ADDR metaData)
     {
         batch_ = tilingData->batch;
         qHeads_ = tilingData->numHeads;

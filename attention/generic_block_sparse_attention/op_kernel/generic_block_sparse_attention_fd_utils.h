@@ -27,7 +27,7 @@ __aicore__ inline uint32_t HashConfigValue(uint32_t hash, uint32_t value)
 }
 
 __aicore__ inline uint32_t CalculateConfigSignature(
-    __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData)
+    const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData)
 {
     uint32_t hash = 2166136261U;
     hash = HashConfigValue(hash, tilingData->batch);
@@ -45,9 +45,9 @@ __aicore__ inline uint32_t CalculateConfigSignature(
     return hash;
 }
 
-__aicore__ inline bool ValidateMetadata(
-    __gm__ const GbsaMetadata::Metadata* meta,
-    __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData, uint32_t physicalAicNum)
+__aicore__ inline bool ValidateMetadata(__gm__ const GbsaMetadata::Metadata* meta,
+                                        const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData,
+                                        uint32_t physicalAicNum)
 {
     if (meta == nullptr || meta->magic != GbsaMetadata::METADATA_MAGIC ||
         meta->version != GbsaMetadata::METADATA_VERSION ||

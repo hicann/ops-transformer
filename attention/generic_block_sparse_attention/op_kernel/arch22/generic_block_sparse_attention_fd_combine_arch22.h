@@ -55,7 +55,7 @@ public:
 
     template <class CuSeqTensor, class SeqUsedTensor>
     __aicore__ inline void operator()(__gm__ const GbsaMetadata::Metadata* meta,
-                                      __gm__ GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData,
+                                      const GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData* tilingData,
                                       AscendC::GlobalTensor<float>& gPartialLse,
                                       AscendC::GlobalTensor<float>& gPartialO, AscendC::GlobalTensor<ElementO>& gO,
                                       AscendC::GlobalTensor<float>& gLse, CuSeqTensor& gCuSeqLengths,
