@@ -27,10 +27,10 @@
 
 |      类型      |                                           开源代码地址                                           |                            文件名                             |             公网IP地址/公网URL地址/域名/邮箱地址/压缩文件地址             |                   用途说明                    |
 | :------------: |:------------------------------------------------------------------------------------------:|:----------------------------------------------------------| :---------------------------------------------------------- |:-----------------------------------------|
-|  依赖  | 不涉及  | cmake/third_party/makeself-fetch.cmake | https://atomgit.com/cann-src-third-party/makeself/releases/download/release-2.5.0-patch1.0/makeself-release-2.5.0-patch1.tar.gz | 从gitcode下载makeself源码，作用编译依赖 |
-|  依赖  | 不涉及  | cmake/third_party/protobuf.cmake | https://github.com/protocolbuffers/protobuf/archive/v25.1.tar.gz | 从github下载protobuf源码，作用编译依赖 |
-|  依赖  | 不涉及  | cmake/third_party/json.cmake | https://atomgit.com/cann-src-third-party/json/releases/download/v3.11.3/include.zip | 从gitcode下载JSON源码，作用编译依赖 |
-|  依赖  | 不涉及  | cmake/third_party/gtest.cmake | https://github.com/google/googletest/archive/release-1.8.0.tar.gz | 从github下载googletest源码，作用编译依赖 |
+|  依赖  | 不涉及  | cmake/third_party/makeself-fetch.cmake | https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/makeself/makeself-release-2.5.0.tar.gz | 从obs下载makeself源码，作用编译依赖 |
+|  依赖  | 不涉及  | cmake/third_party/protobuf.cmake | https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/protobuf/protobuf-25.1.tar.gz | 从obs下载protobuf源码，作用编译依赖 |
+|  依赖  | 不涉及  | cmake/third_party/json.cmake | https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/json/json-3.12.0.tar.gz | 从obs下载JSON源码，作用编译依赖 |
+|  依赖  | 不涉及  | cmake/third_party/gtest.cmake | https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/googletest/googletest-1.14.0.tar.gz | 从obs下载googletest源码，作用编译依赖 |
 |  依赖  | 不涉及  | cmake/third_party/secure_c.cmake | https://gitee.com/openeuler/libboundscheck/repository/archive/v1.1.10.tar.gz | 从gitee下载libboundscheck源码，作用编译依赖 |
 
 ---

@@ -10,15 +10,15 @@
 
 | 开源软件 | 版本 | 下载地址 |
 |---|---|---|
-| googletest | 1.14.0 | [googletest-1.14.0.tar.gz](https://atomgit.com/cann-src-third-party/googletest/releases/download/v1.14.0/googletest-1.14.0.tar.gz) |
-| json | 3.11.3 | [include.zip](https://atomgit.com/cann-src-third-party/json/releases/download/v3.11.3/include.zip) |
-| makeself | 2.5.0 | [makeself-release-2.5.0-patch1.tar.gz](https://atomgit.com/cann-src-third-party/makeself/releases/download/release-2.5.0-patch1.0/makeself-release-2.5.0-patch1.tar.gz) |
-| pybind11 | 2.13.6 | [pybind11-2.13.6.tar.gz](https://atomgit.com/cann-src-third-party/pybind11/releases/download/v2.13.6/pybind11-2.13.6.tar.gz) |
-| eigen | 5.0.0 | [eigen-5.0.0.tar.gz](https://atomgit.com/cann-src-third-party/eigen/releases/download/5.0.0/eigen-5.0.0.tar.gz) |
-| protobuf | 25.1.0 | [protobuf-25.1.tar.gz](https://atomgit.com/cann-src-third-party/protobuf/releases/download/v25.1/protobuf-25.1.tar.gz) |
-| abseil-cpp | 20230802.1 | [abseil-cpp-20230802.1.tar.gz](https://atomgit.com/cann-src-third-party/abseil-cpp/releases/download/20230802.1/abseil-cpp-20230802.1.tar.gz) |
+| googletest | 1.14.0 | [googletest-1.14.0.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/googletest/googletest-1.14.0.tar.gz) |
+| json | 3.12.0 | [json-3.12.0.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/json/json-3.12.0.tar.gz) |
+| makeself | 2.5.0 | [makeself-release-2.5.0.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/makeself/makeself-release-2.5.0.tar.gz)，[makeself-2.5.0.patch](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/makeself/fix/makeself-2.5.0.patch) |
+| pybind11 | 2.13.6 | [pybind11-2.13.6.tar.gz](https://gitcode.com/cann-src-third-party/pybind11/releases/download/v2.13.6/pybind11-2.13.6.tar.gz) |
+| eigen | 5.0.0 | [eigen-5.0.0.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/eigen/eigen-5.0.0.tar.gz) |
+| protobuf | 25.1.0 | [protobuf-25.1.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/protobuf/protobuf-25.1.tar.gz) |
+| abseil-cpp | 20230802.1 | [abseil-cpp-20230802.1.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/abseil-cpp/abseil-cpp-20230802.1.tar.gz)，[backport-CVE-2025-0838.patch](https://gitcode.com/cann-src-third-party/abseil-cpp/releases/download/20230802.1-h0/backport-CVE-2025-0838.patch) |
 | opbase(自CANN 9.0.0及以后版本需要下载) | master | [opbase](https://atomgit.com/cann/opbase) |
-| cann-cmake | master-046 | [cmake-master-046.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/cmake/cmake-master-046.tar.gz) |
+| cann-cmake | master-059 | [cmake-master-059.tar.gz](https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/cmake/cmake-master-059.tar.gz) |
 | ops-tensor(自CANN 9.1.0及以后版本需要下载) | master | [ops-tensor](https://atomgit.com/cann/ops-tensor) |
 
 若您的编译环境可以访问网络，请参考[联网编译](#联网编译)，编译脚本会自动联网下载第三方软件。否则，请参考[未联网编译](#未联网编译)手动下载第三方软件。
@@ -200,13 +200,20 @@
 
     - 方式1：根据[第三方软件依赖](#安装第三方依赖)提供的表格手动下载，若从其他地址下载，请确保版本号一致。
 
-    - 方式2：通过[third_lib_download.py](../../../scripts/tools/third_lib_download.py)脚本一键下载，该脚本在本项目`scripts/tools/`目录，下载该脚本并执行如下命令：
+    - 方式2：通过[download_3rd_party.sh](../../../scripts/download_3rd_party.sh)脚本一键下载，该脚本在本项目`scripts/`目录，可一键下载本项目涉及的全部三方件（含cann-cmake、各三方件源码包、所需patch及opbase/ops-tensor/catlass等git仓库），默认存放于本项目根目录`third_party`目录，执行如下命令：
 
         ```bash
-        python ${scripts_dir}/third_lib_download.py
+        bash scripts/download_3rd_party.sh
+        # 也可指定三方件存放目录，之后编译时通过 --cann_3rd_lib_path=<目录> 传入
+        # bash scripts/download_3rd_party.sh --cann_3rd_lib_path=${cann_3rd_lib_path}
         ```
 
-    \$\{scripts\_dir\}表示脚本存放路径，下载的第三方软件包默认存放在当前脚本所在目录。
+    > **说明**：
+    >
+    > - 脚本会对每个文件做 SHA256 完整性校验，二次调用时已下载且校验通过的文件会自动跳过，无需重复下载。
+    > - 本仓库部分三方件（如abseil-cpp、makeself）编译构建时需要应用patch，patch 统一存放于三方件目录下`patch`子目录（即`${cann_3rd_lib_path}/patch`），脚本会自动下载所需patch，无需手工处理。
+    > - opbase/ops-tensor/catlass 为 git 仓库，脚本会自动 clone 到 `${cann_3rd_lib_path}` 下（需本机已安装 git）。若目录已存在，脚本会校验其当前 HEAD 是否为目标提交，不一致时自动 fetch 并 checkout 到目标提交。
+    > - 若上述目录已存在但不是 git 仓库（例如手工解压的源码目录），脚本会报错退出，不会删除目录内容；请手动删除该目录、更换存放目录，或自行准备正确版本的仓库。
 
 3. **编译算子包**
 
