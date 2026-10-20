@@ -275,9 +275,19 @@ def collect_compile_ops(changed_file, soc_text, experimental):
     whitelist = load_whitelist()
     target_socs = split_socs(soc_text)
 
+    # impact 为空的条目视为暂缓编译：自身不编，闭包也不附带
+    suppressed_keys = {
+        key for key, entry in whitelist.items() if entry.get("impact") == []
+    }
+
     chosen_names = set()
     fallback_starts = set()
     for key in sorted(starts):
+        if key in suppressed_keys:
+            continue
+        # common/3rd 暂不触发下游编译（当前仅测试算子间互相触发）
+        if key.rsplit("/", 1)[-1] in ("common", "3rd"):
+            continue
         entry = whitelist.get(key)
         if entry is None:
             fallback_starts.add(key)
@@ -286,7 +296,7 @@ def collect_compile_ops(changed_file, soc_text, experimental):
 
     if fallback_starts:
         edges = build_edges(ops)
-        selected = reverse_closure(edges, fallback_starts)
+        selected = reverse_closure(edges, fallback_starts) - suppressed_keys
         chosen = [by_key[key] for key in selected if key in by_key]
         chosen = filter_by_soc(chosen, target_socs)
         chosen_names.update(name for _, name, _ in chosen)

@@ -35,6 +35,15 @@ ops:
       - flash_mla
       soc:
       - ascend950
+    fused_infer_attention_score:
+      # owner 要求暂缓编译，恢复时删除本条目
+      impact: []
+      soc:
+      - ascend910b
+      - ascend910_93
+      - mc62
+      - ascend950
+      - ascend960dt
     generic_block_sparse_attention_grad_metadata:
       impact:
       - generic_block_sparse_attention_grad_metadata
@@ -128,6 +137,21 @@ ops:
       impact:
       - ffn_worker_scheduler
       soc:
+      - ascend910b
+  mc2:
+    matmul_all_reduce:
+      # owner 要求暂缓编译，恢复时删除本条目
+      impact: []
+      soc:
+      - ascend950
+      - ascend910b
+      - ascend310p
+    mega_moe:
+      # owner 要求暂缓编译，恢复时删除本条目
+      impact: []
+      soc:
+      - ascend950
+      - ascend910_93
       - ascend910b
   mhc:
     mhc_sinkhorn_common:
