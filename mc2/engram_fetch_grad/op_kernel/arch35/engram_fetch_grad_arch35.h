@@ -173,10 +173,13 @@ private:
     uint32_t sortCoreBase_{0};
     uint32_t numSortCores_{0};
     static constexpr uint32_t SOFT_BARRIER_MAX_GENS = 16U;
+    static constexpr uint32_t SOFT_BARRIER_SPIN_PAUSE_ITERS = 64U; // 软屏障自旋等待的单轮空转拍数(降低GM轮询总线压力)
+    static constexpr uint32_t RADIX_TRIM_MIN_ACTIVE_CORES = 12U; // 活跃核数低于此值不裁radix轮(小场景裁轮无收益)
+    static constexpr uint32_t RADIX_BITS_PER_ROUND = 8U;        // 每轮LSD排序按1字节=8bit
+    static constexpr uint32_t CROSS_KERNEL_RESERVED_SLOTS = 2U; // 窗口头跨kernel保留槽区数(fwd/bwd各占1槽)
     uint32_t softBarrierGen_{0};
     uint32_t softBarrierPageInts_{0};
     GM_ADDR sortBarrierGM_{nullptr};
-    TBuf<> softBarrierScratchBuf_;
 
     friend struct EngramSortSoftBarrier;
 };
@@ -432,8 +435,17 @@ __aicore__ inline void EngramFetchGradArch35::InitBuffers()
     if (chunkElems_ == 0U) {
         if (inputDtype_ != Mc2Kernel::ENGRAM_DT_FLOAT) {
             if (inputDtype_ == outputDtype_) {
-                castBufBytes_ = (static_cast<uint32_t>(hiddenDim_) * sizeof(float) + Mc2Kernel::UB_ALIGN - 1U) /
-                                Mc2Kernel::UB_ALIGN * Mc2Kernel::UB_ALIGN;
+                // list路径(ProcessDirectSubBatchLoopV2)整tile一次性cast的fp32暂存:
+                // tile行数与gradBuf 4份半缓冲一致(kBufBytes=GRAD_PING_BYTES/2, bufRows=kBufBytes/inRowStride),
+                // 行内无padding时dup累加可省掉逐行cast(实测scatterCast为最大分段)
+                uint32_t listTileRows =
+                    Mc2Kernel::GRAD_PING_BYTES / 2U / AlignRowStride(static_cast<uint32_t>(hiddenBytes_));
+                if (listTileRows < 1U) {
+                    listTileRows = 1U;
+                }
+                castBufBytes_ =
+                    Ceil(static_cast<uint64_t>(hiddenDim_) * sizeof(float) * listTileRows, Mc2Kernel::UB_ALIGN) *
+                    Mc2Kernel::UB_ALIGN;
             } else {
                 castBufBytes_ = CastBufBytes(hiddenDim_, maxByPong);
             }
@@ -469,6 +481,11 @@ __aicore__ inline void EngramFetchGradArch35::SetAllToAllvConfig()
     config.winSize = winSize_;
     config.numSlots = NUM_SLOTS;
     config.rowBytes = static_cast<uint64_t>(hiddenBytes_);
+    // 窗口头 [0, 2*nr*32B) 为跨kernel协议保留区: [0, nr*32) = 本算子跨rank屏障槽(本算子专用),
+    // [nr*32, 2*nr*32) = forward 的 count-flag 区 —— 两者原本都挤在偏移0, 组合跑下
+    // rank 间偏斜使 fwd/bwd 在别的 rank 窗口上并发写同一片字节, 互擦导致 forward
+    // GatherRecvCounts 60s 超时(ne7239680_h256 偶发卡死根因), 分区后互不再踩。
+    config.headReserveBytes = static_cast<uint64_t>(CROSS_KERNEL_RESERVED_SLOTS) * numRanks_ * STATE_OFFSET;
     config.srcGM = gradSortedGM_;
     config.dstGM = recvGradGM_;
     config.sendCountsGM = sendCountsGM_;
@@ -881,35 +898,15 @@ __aicore__ inline void EngramFetchGradArch35::SoftBarrier()
     if (softBarrierGen_ >= SOFT_BARRIER_MAX_GENS) {
         ascendc_assert(false, "soft barrier page overflow: gen=%u, max=%u", softBarrierGen_, SOFT_BARRIER_MAX_GENS);
     }
-    uint32_t statusCnt = numSortCores_ * STATE_OFFSET / sizeof(float); // 槽区 float 数(含 32B 对齐尾)
-    GM_ADDR pageBase = sortBarrierGM_ + static_cast<uint64_t>(softBarrierGen_) * softBarrierPageInts_ * sizeof(int32_t);
-    float minTarget = static_cast<float>(numSortCores_) - 0.5f;
-    float maxTarget = static_cast<float>(numSortCores_) + 0.5f;
+    // arrive：PipeBarrier<PIPE_ALL> 等待本核各管线（含 MTE3 数据写）完成后，GM AtomicAdd 原子自增；
+    // 等待：ReadGmBypassDCache 旁路 Dcache 读自旋 + 固定 64 拍空转，完全去掉 MTE2/V/S 流水往返。
+    __gm__ int32_t* counterPtr = (__gm__ int32_t*)(sortBarrierGM_ + static_cast<uint64_t>(softBarrierGen_) *
+                                                                        softBarrierPageInts_ * sizeof(int32_t));
     AscendC::PipeBarrier<PIPE_ALL>();
-    LocalTensor<float> softBarrierLocal = softBarrierScratchBuf_.Get<float>();
-    for (uint32_t i = 1U; i < STATE_OFFSET / sizeof(float); i++) {
-        softBarrierLocal.SetValue(i, 0.0f);
-    }
-    softBarrierLocal.SetValue(0, 1.0f);
-    EngramFetchGradSyncFunc<HardEvent::S_MTE3>();
-    GlobalTensor<float> mySlotGM;
-    mySlotGM.SetGlobalBuffer((__gm__ float*)(pageBase + static_cast<uint64_t>(sortCoreIdx_) * STATE_OFFSET));
-    DataCopyParams arriveParams = {1U, static_cast<uint16_t>(UB_ALIGN), 0U, 0U};
-    DataCopyPad(mySlotGM, softBarrierLocal, arriveParams);
-    EngramFetchGradSyncFunc<HardEvent::MTE3_S>();
-
-    GlobalTensor<float> softBarrierGM;
-    softBarrierGM.SetGlobalBuffer((__gm__ float*)pageBase);
-    SumParams sumParams{1U, statusCnt, statusCnt};
-    float flag = 0.0f;
-    while ((flag < minTarget) || (flag > maxTarget)) {
-        DataCopyExtParams cpParams{1U, static_cast<uint32_t>(statusCnt * sizeof(float)), 0U, 0U, 0U};
-        DataCopyPadExtParams<float> cpPad{false, 0, 0, 0};
-        DataCopyPad(softBarrierLocal, softBarrierGM, cpParams, cpPad);
-        EngramFetchGradSyncFunc<HardEvent::MTE2_V>();
-        AscendC::Sum<float>(softBarrierLocal, softBarrierLocal, sumParams); // 原地: 归约结果落 softBarrierLocal[0]
-        EngramFetchGradSyncFunc<HardEvent::V_S>();
-        flag = softBarrierLocal.GetValue(0);
+    AscendC::AtomicAdd(counterPtr, static_cast<int32_t>(1));
+    while (AscendC::ReadGmBypassDCache(counterPtr) < static_cast<int32_t>(numSortCores_)) {
+        for (volatile int32_t d = 0; d < static_cast<int32_t>(SOFT_BARRIER_SPIN_PAUSE_ITERS); d++) {
+        }
     }
     softBarrierGen_++;
 }
@@ -918,7 +915,6 @@ __aicore__ inline void EngramFetchGradArch35::RunSortPhase(uint32_t numRecv)
 {
     AscendC::PipeBarrier<PIPE_ALL>();
     tpipe_->Reset();
-    tpipe_->InitBuffer(softBarrierScratchBuf_, numSortCores_ * STATE_OFFSET);
     softBarrierGen_ = 0; // 起始软同步次数为0
     SortLib::SortParams sortParams;
     sortParams.numTileData = sortNumTileData_;
@@ -929,6 +925,22 @@ __aicore__ inline void EngramFetchGradArch35::RunSortPhase(uint32_t numRecv)
     sortParams.isSingleCore = 0;
     sortParams.jobIndex = aivId_ - sortCoreBase_; // sort 子集内的连续编号
     sortParams.totalJobs = numSortCores_;
+    // radix 轮数按 key 值域裁剪: 排序 key 为本 rank 局部 entry id ∈ [0, numEntriesPerRank), 非负。
+    // 值域位宽不足 32 位时最高字节为常量, 跳过无效轮(每轮省 1 次散写后大屏障+1 次小屏障+一轮扫描)。
+    // 例: numEntriesPerRank=282800 → 19 位 → 3 轮; 7239680 → 23 位 → 3 轮。
+    // actCores < 12 的小场景保守回退全 4 轮: 小场景 sort 本身极短, 裁轮无收益, 且与跨 kernel
+    // 时序敏感(参见 InitWinLayout 的跨kernel保留区说明)。
+    uint32_t maxEntryId = (numEntriesPerRank_ > 0) ? static_cast<uint32_t>(numEntriesPerRank_ - 1) : 0U;
+    uint32_t keyBits = 0;
+    while (maxEntryId != 0U) {
+        keyBits++;
+        maxEntryId >>= 1;
+    }
+    uint32_t radixRounds = (keyBits + RADIX_BITS_PER_ROUND - 1U) / RADIX_BITS_PER_ROUND;
+    if (radixRounds == 0U || sortParams.activeCores < RADIX_TRIM_MIN_ACTIVE_CORES) {
+        radixRounds = 0U; // 0 = SortLib 回退全 sizeof(ValT) 轮
+    }
+    sortParams.radixRounds = radixRounds;
     EngramSortSoftBarrier softBarrier{this};
     SortLib::SortInvoke<int32_t, int32_t, uint32_t, false, EngramSortSoftBarrier>(
         tpipe_, (__gm__ int32_t*)recvLocalEntryGM_, (__gm__ int32_t*)recvLocalEntryGM_,
@@ -942,17 +954,21 @@ __aicore__ inline void EngramFetchGradArch35::Process()
         numRecvGM.SetGlobalBuffer((__gm__ int32_t*)numRecvGM_);
         DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(numRecvGM);
         uint32_t numRecv = static_cast<uint32_t>(numRecvGM.GetValue(0));
+
         // 初始化核预算/核角色/pipelinesPerRank（每rank分核数）/窗口布局
         InitCorePartition(numRecv);
 
         InitFlagsAndDispls();
         // write/read计数器清零
         allToAllv_.ClearCounters(entryBuf_.Get<int32_t>());
-        // 清零sort软同步需要使用的状态区
-        InitSortBarrierArea();
         SyncAll<true>();
         // 发送跨rank barrier标志写入
         CrossRankBarrierIssue();
+        // sort软同步状态区清零仅core0执行: 挪出init段、藏进unsort窗口与其余核的UnsortGrad重叠,
+        // 不再串行拖慢init段末尾的SyncAll; 完成仍早于RunSortPhase(barrierWait内SyncAll兜底可见性)
+        if (numRecv > 0) {
+            InitSortBarrierArea();
+        }
         UnsortGrad();
         // 等待全部rank的barrier标志到齐并清零
         CrossRankBarrierWait();

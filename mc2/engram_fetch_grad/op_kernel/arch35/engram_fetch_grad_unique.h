@@ -704,6 +704,7 @@ __aicore__ inline void EngramFetchGradUnique::CountUniquesParallel(uint32_t numR
 
     uint32_t localUniqueCount = 0;
     if (start < rawEnd) {
+        // 注意: V算子(Sub/ReduceSum)的UB操作数必须32B对齐(底层LoadAlign), 槽位偏移勿做逐元素错位视图
         AscendC::LocalTensor<int32_t> xUb = gradBuf_->Get<int32_t>();
         AscendC::LocalTensor<int32_t> yUb = xUb[Mc2Kernel::ENTRY_BATCH_CAP];
         AscendC::LocalTensor<int32_t> fUb = xUb[UNIQUE_DIFF_UB_OFFSET * Mc2Kernel::ENTRY_BATCH_CAP];
@@ -1916,8 +1917,13 @@ __aicore__ inline void EngramFetchGradUnique::ScatterAccumulateParallel(uint32_t
 
 __aicore__ inline void EngramFetchGradUnique::WriteNumUnique(GM_ADDR segCountGM, GM_ADDR numUniqueOutGM)
 {
-    // Sum per-core segCount on core 0 and plain-write (do NOT atomic-add: numUniqueOutGM is
-    // at::empty/uninitialized, so SetAtomicAdd would accumulate onto garbage -> wrong numUnique).
+    // 仅core0汇总各核segCount并普通回写numUnique(numUniqueOutGM未初始化, 不能原子加)。
+    // 其余核直接返回, 省掉全核的GM加载+标量求和+尾部SyncAll(稳态约2K cyc/核);
+    // 各核segCount早已由CountUniquesParallel后的SyncAll保证可见, numUnique由kernel
+    // 结束顺序(host在kernel完成后读取)保证可见, 无需额外同步。
+    if (aivId_ != 0) {
+        return;
+    }
     AscendC::GlobalTensor<int32_t> segCountGMT;
     segCountGMT.SetGlobalBuffer((__gm__ int32_t*)segCountGM);
     AscendC::LocalTensor<int32_t> segCountUb = tempBuf_->Get<int32_t>();
@@ -1931,17 +1937,14 @@ __aicore__ inline void EngramFetchGradUnique::WriteNumUnique(GM_ADDR segCountGM,
         numUnique += segCountUb.GetValue(core);
     }
 
-    if (aivId_ == 0) {
-        AscendC::LocalTensor<int32_t> tmp = statusBuf_->Get<int32_t>();
-        tmp.SetValue(0, numUnique);
-        SyncFunc<AscendC::HardEvent::S_MTE3>(*pipe_);
-        AscendC::GlobalTensor<int32_t> numUniqueGM;
-        numUniqueGM.SetGlobalBuffer((__gm__ int32_t*)numUniqueOutGM);
-        AscendC::DataCopyParams p{1U, static_cast<uint16_t>(sizeof(int32_t)), 0U, 0U};
-        AscendC::DataCopyPad(numUniqueGM, tmp, p);
-        SyncFunc<AscendC::HardEvent::MTE3_S>(*pipe_);
-    }
-    AscendC::SyncAll<true>();
+    AscendC::LocalTensor<int32_t> tmp = statusBuf_->Get<int32_t>();
+    tmp.SetValue(0, numUnique);
+    SyncFunc<AscendC::HardEvent::S_MTE3>(*pipe_);
+    AscendC::GlobalTensor<int32_t> numUniqueGM;
+    numUniqueGM.SetGlobalBuffer((__gm__ int32_t*)numUniqueOutGM);
+    AscendC::DataCopyParams p{1U, static_cast<uint16_t>(sizeof(int32_t)), 0U, 0U};
+    AscendC::DataCopyPad(numUniqueGM, tmp, p);
+    SyncFunc<AscendC::HardEvent::MTE3_S>(*pipe_);
 }
 
 } // namespace EngramFetchGradUnique

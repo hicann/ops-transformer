@@ -39,10 +39,16 @@ struct AllToAllvConfig {
     GM_ADDR rdisplsGM{0};    // [rankSize] int64: 接收目的内各 peer 段起始行号
 
     GM_ADDR creditScratchGM{0}; // credit 异步读暂存区
+
+    // 窗口头保留字节数: [0, headReserveBytes) 为调用方的专用区(如跨kernel屏障槽),
+    // a2a 的计数区/数据区从该偏移起布局。默认 0 = 占满全窗(与旧版布局一致)。
+    // 同一窗口若被多个 kernel 复用, 各 kernel 的 headReserveBytes 必须一致。
+    uint64_t headReserveBytes{0};
 };
 
 static constexpr uint32_t ALLTOALLV_COUNTER_SLOT_BYTES = 32U; // 计数器槽步长
-static constexpr uint32_t ALLTOALLV_UB_ALIGN = 32U;           // UB/窗口 32B 对齐单位
+static constexpr uint32_t ALLTOALLV_EQUAL_REGION_COUNT = 3U; // 窗口等宽计数区数(barrier标志/write计数/read credit)
+static constexpr uint32_t ALLTOALLV_UB_ALIGN = 32U;          // UB/窗口 32B 对齐单位
 static constexpr int32_t ALLTOALLV_CREDIT_SENTINEL = -1;
 static constexpr uint32_t ALLTOALLV_MAX_PENDING = 8U; // 每 job 暂存未排空句柄的上限(攒满一批再统一 Drain)
 static constexpr uint32_t ALLTOALLV_MAX_COPY_BYTES = 65504U; // 单次 DataCopy 块上限
@@ -373,9 +379,10 @@ private:
         uint64_t totalRanksOffset =
             totalCounterEntries * ALLTOALLV_COUNTER_SLOT_BYTES; // 每 rank 32B  rankSize×pipelines×32B
         // 设置了3个区域等宽，barrier 标志区，write 计数器区，read credit 区
-        tokenWriteOffset_ = totalRanksOffset;
+        // 头部保留区(headReserveBytes, 如调用方的跨kernel屏障槽)不计入本模块布局
+        tokenWriteOffset_ = config_.headReserveBytes + totalRanksOffset;
         tokenReadOffset_ = tokenWriteOffset_ + totalRanksOffset;
-        tokenDataOffset_ = 3U * totalRanksOffset;
+        tokenDataOffset_ = config_.headReserveBytes + ALLTOALLV_EQUAL_REGION_COUNT * totalRanksOffset;
 
         uint64_t tokenAreaRaw = (config_.winSize > tokenDataOffset_) ? (config_.winSize - tokenDataOffset_) : 0U;
         uint64_t tokenArea = tokenAreaRaw / config_.rowBytes * config_.rowBytes;

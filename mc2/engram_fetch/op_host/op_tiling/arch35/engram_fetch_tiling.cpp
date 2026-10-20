@@ -728,6 +728,17 @@ static ge::graphStatus SetTilingData(const gert::TilingContext* context, EngramF
             tilingData.commBufferSize = *commBufferSizePtr;
         }
 
+        // 与 kernel InitWinLayout 的 fixedSize 公式同源：跨kernel保留区 2*nr*32 + indices 计数区
+        // 4*nr*32 + token 计数区 2*nr*32*groupSize（groupSize >= 1），下限取 groupSize=1 时的
+        // nr*32*8。commBufferSize 低于该下限时 kernel 侧 remaining=0、槽容量派生为 0，直接拒绝。
+        uint64_t winFixedSizeLower = static_cast<uint64_t>(tilingData.rankSize) * 32ULL * 8ULL;
+        OP_TILING_CHECK(tilingData.commBufferSize < static_cast<int64_t>(winFixedSizeLower),
+                        OP_LOGE(nodeName,
+                                "commBufferSize(%ld) is smaller than window fixedSize lower bound(%llu), "
+                                "kernel would derive zero slot capacity",
+                                tilingData.commBufferSize, static_cast<unsigned long long>(winFixedSizeLower)),
+                        return ge::GRAPH_FAILED);
+
         // SortLib 参数：请求方对输入 indices 全局排序（key = entry id，规模 numTokens）
         constexpr uint64_t kSortLibFixedBytes = 5120U;
         // sortlib 内部 histUb/histCumsumUb 队列按 256 bin × uint16 = 512B 使用

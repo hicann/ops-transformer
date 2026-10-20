@@ -72,6 +72,7 @@ private:
     uint32_t blockIdx_ = 0;
     uint32_t realCoreNum_ = 0;
     SortLib::SortParams params_;
+    uint32_t radixRounds_ = 0; // 实际 radix 轮数(≤sizeof(ValT)); workspace 布局仍按 sizeof(ValT)
 
     // === tiling parameters ===
     int64_t totalDataNum_ = 0;
@@ -113,6 +114,8 @@ private:
     // BarrierT 为同步原语回调(编译期绑定, 默认硬件全核 SyncAll; 核分区模式注入软屏障)
     template <typename BarrierT>
     __aicore__ inline void ProcessRadix(AscendC::GlobalTensor<ValT> inputXGm, BarrierT barrier);
+    // 奇数轮收尾: 输入预拷到 workspace 段作为 round0 读源, 仅 4B 索引组合启用
+    __aicore__ inline void PreCopyInputToWk(AscendC::GlobalTensor<ValT> inputXGm);
     __aicore__ inline void ScatterSortedTile(
         AscendC::LocalTensor<ValT> xInputValueLocal, AscendC::LocalTensor<uint32_t> sortedIndexLocal,
         AscendC::LocalTensor<uint32_t> xInputIndexLocal, AscendC::LocalTensor<uint8_t> sortedValueLocal,
@@ -224,10 +227,14 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::GetGlob
     }
     // 一核可能处理多tile，需要进行该循环
     for (uint32_t tileId = startTileId; tileId < tileCount_; tileId += activeCores_) {
+        // tileOffset may exceed int32 range for large rows, so keep the address arithmetic in uint64.
         uint64_t tileOffset = static_cast<uint64_t>(tileId) * numTileData_;
-        uint32_t currTileSize = static_cast<uint32_t>(totalDataNum_ - tileOffset < static_cast<uint64_t>(numTileData_) ?
-                                                          totalDataNum_ - tileOffset :
-                                                          numTileData_);
+        uint64_t remainTileDataNum = totalDataNum_ - tileOffset;
+        if (totalDataNum_ < tileOffset) {
+            break;
+        }
+        uint32_t currTileSize = static_cast<uint32_t>(
+            remainTileDataNum < static_cast<uint64_t>(numTileData_) ? remainTileDataNum : numTileData_);
         AscendC::LocalTensor<ValT> xLocal = inQueueX_.template AllocTensor<ValT>();
 
         // 如果是round 0 则读原始数据，否则需要根据后续的数据实际转移位置读取
@@ -415,9 +422,12 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Compute
 
     for (uint32_t tileId = startId; tileId < tileCount_; tileId += activeCores_) {
         uint64_t tileDataStart = static_cast<uint64_t>(tileId) * numTileData_;
+        uint64_t remainTileDataNum = totalDataNum_ - tileDataStart;
+        if (totalDataNum_ < tileDataStart) {
+            break;
+        }
         uint32_t currTileSize = static_cast<uint32_t>(
-            totalDataNum_ - tileDataStart < static_cast<uint64_t>(numTileData_) ? totalDataNum_ - tileDataStart :
-                                                                                  numTileData_);
+            remainTileDataNum < static_cast<uint64_t>(numTileData_) ? remainTileDataNum : numTileData_);
         AscendC::LocalTensor<ValT> xLocal = inQueueX_.template AllocTensor<ValT>();
         if (round == 0) {
             CopyGmToUb(inputXGm, xLocal, tileDataStart, currTileSize);
@@ -493,8 +503,11 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Compute
 template <typename ValT, typename IdxT, typename CountT, bool isDescend>
 __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::SetupDoubleBuffer()
 {
-    if constexpr (sizeof(ValT) == sizeof(int8_t)) {
-        // int8只有一轮，最后散写Alternate区时必须时gmout，而非workspace
+    // 奇数轮交换方向: round0 读 workspace 预拷副本(PreCopyInputToWk), 写真实输出; 末轮恰好
+    // 写回真实输出, 无需收尾拷贝。偶数轮恒正常方向, 末轮亦写真实输出。
+    // 旧版(5dd)就地写真实输出虽有同样的写局部性, 但 round0 散写会踩其他核未读的输入
+    // tile(静默损坏); 预拷出后读写源/目标不相交, 竞态根除且局部性不丢。
+    if (radixRounds_ % 2U == 1U) {
         inputXDbGm_.SetDoubleBuffer(outValueDbWK_, outValueGm_[0]);
         idxDbGm_.SetDoubleBuffer(outIdxDbWK_, outIdxGm_[0]);
     } else {
@@ -511,13 +524,51 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Process
 {
     barrier();
     SetupDoubleBuffer();
-    for (uint32_t round = 0; round < static_cast<uint32_t>(sizeof(ValT)); round++) {
+    // 奇数轮(仅 4B 索引组合, 8B 走旧语义不预拷): 先把输入预拷到 workspace 段, round0 改读副本。
+    // round0 的散写目标(真实输出)与读源(副本)不相交, 根除就地排序下散写踩输入的竞态;
+    // 预拷同时预热输入/输出缓冲的 L2 行。末轮恰好写回真实输出, 无需收尾拷贝。
+    AscendC::GlobalTensor<ValT> round0InGm = inputXGm;
+    if (radixRounds_ % 2U == 1U && sizeof(IdxT) == sizeof(uint32_t)) {
+        PreCopyInputToWk(inputXGm);
+        round0InGm = outValueDbWK_;
+    }
+    GetGlobalExclusiveSum(0, round0InGm);
+    barrier();
+    ComputeOnePass(0, round0InGm);
+    barrier();
+    for (uint32_t round = 1U; round < radixRounds_; round++) {
         GetGlobalExclusiveSum(round, inputXGm);
         barrier();
         // 散写阶段
         ComputeOnePass(round, inputXGm);
         barrier();
     }
+}
+
+// 奇数轮前置: 输入按 tile 分片预拷到 workspace 段(round0 的读源)。
+// 每核只读自己拷的片, 程序序自足, 无需屏障; UB 以 MTE2_MTE3/MTE3_MTE2 事件对保序复用。
+template <typename ValT, typename IdxT, typename CountT, bool isDescend>
+__aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::PreCopyInputToWk(
+    AscendC::GlobalTensor<ValT> inputXGm)
+{
+    if (blockIdx_ >= activeCores_) {
+        return;
+    }
+    AscendC::LocalTensor<ValT> vUb = inQueueX_.template AllocTensor<ValT>();
+    for (uint32_t tileId = blockIdx_; tileId < tileCount_; tileId += activeCores_) {
+        uint64_t tileOffset = static_cast<uint64_t>(tileId) * numTileData_;
+        uint64_t remainTileDataNum = totalDataNum_ - tileOffset;
+        if (totalDataNum_ < tileOffset) {
+            break;
+        }
+        uint32_t currTileSize = static_cast<uint32_t>(
+            remainTileDataNum < static_cast<uint64_t>(numTileData_) ? remainTileDataNum : numTileData_);
+        CopyGmToUb(inputXGm, vUb, tileOffset, currTileSize);
+        SyncEvent<AscendC::HardEvent::MTE2_MTE3>();
+        CopyUbToGm(outValueDbWK_, vUb, tileOffset, currTileSize);
+        SyncEvent<AscendC::HardEvent::MTE3_MTE2>();
+    }
+    inQueueX_.FreeTensor(vUb);
 }
 
 template <typename ValT, typename IdxT, typename CountT, bool isDescend>
@@ -537,6 +588,13 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Init(GM
     pipe_ = pipe;
     params_ = params;
     ParserTilingData();
+    // radix 轮数: 0 或越界时回退 sizeof(ValT) 全轮; 调用方按 key 值域传入更小轮数可省尾部无效轮
+    // (要求 key 的 [radixRounds_×8, keyBits) 位段为常量, 见 SortParams::radixRounds 注释)
+    radixRounds_ = (params.radixRounds == 0U || params.radixRounds > static_cast<uint32_t>(sizeof(ValT))) ?
+                       static_cast<uint32_t>(sizeof(ValT)) :
+                       params.radixRounds;
+    // 参与排序的 job 总数: ClearWorkSpace 的 FillZeros 分片依赖此值,
+    // 传全核数会因未到场核漏清 workspace(核分区教训)
     realCoreNum_ = params.totalJobs;
 
     inputXGm_.SetGlobalBuffer((__gm__ ValT*)x);
@@ -634,7 +692,7 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Scatter
             (__ubuf__ ValT*)(xInputValueLocal.GetPhyAddr()), (__ubuf__ CountT*)(blockHistFlag.GetPhyAddr()),
             (__ubuf__ uint16_t*)(blockHist.GetPhyAddr()), (__gm__ uint32_t*)(idxDbGm_.Alternate().GetPhyAddr()),
             (__gm__ ValT*)(inputXDbGm_.Alternate().GetPhyAddr()));
-    } else if (round < static_cast<uint32_t>(sizeof(ValT) - 1)) {
+    } else if (round + 1U < radixRounds_) {
         asc_vf_call<CopyOutGm<ValT, CountT, uint32_t, true>>(
             dim3(THREAD_DIM_NUM), tileDataStart, cureTileSize, 0, exclRoundOffset,
             (__ubuf__ uint16_t*)(blockExclusiveSum.GetPhyAddr()),

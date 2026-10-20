@@ -55,6 +55,7 @@ constexpr uint32_t ENGRAM_TIMEOUT_US = 60U * 1000U * 1000U;
 constexpr uint32_t ENGRAM_CYCLES_PER_US = 1000U;
 constexpr uint32_t ENGRAM_LOCAL_PIPE_DEPTH = 16U;
 constexpr uint32_t ENGRAM_SEND_CHUNK_ROWS = 128U;
+constexpr uint32_t ENGRAM_CROSS_KERNEL_RESERVED_SLOTS = 2U; // 窗口头跨kernel保留槽区数(fwd/bwd各占1槽, 见InitWinLayout)
 constexpr int STATUS_FLAGS_TIME_CHECK = 1;
 constexpr int SEND_INDICES_REMOTE_TIME_CHECK = 2;
 constexpr int RECV_INDICES_FROM_PEER_TIME_CHECK = 3;
@@ -374,13 +375,19 @@ __aicore__ inline void EngramFetchTrainArch35::InitWinLayout()
 {
     uint64_t indicesCounterSize = static_cast<uint64_t>(numRanks_) * STATE_OFFSET;
     uint64_t tokenCounterSize = static_cast<uint64_t>(numRanks_) * STATE_OFFSET * groupSize_;
-    uint64_t fixedSize = static_cast<uint64_t>(WIN_REGION_COUNT - 2) * indicesCounterSize +
+    // 窗口头 [0, 2*nr*32B) 为跨kernel协议保留区(与 engram_fetch_grad 的 a2a headReserveBytes
+    // 约定一致): [0, nr*32) = backward 的跨rank屏障槽(本算子永不写), [nr*32, 2nr*32) = 本算子
+    // count-flag 专用区 —— 两者原本都挤在偏移0, 组合跑下 fwd/bwd 在别的 rank 窗口上并发写
+    // 同一片字节互擦, 造成 GatherRecvCounts 60s 超时(偶发卡死根因), 分区后互不再踩。
+    uint64_t crossKernelSlotBytes = static_cast<uint64_t>(numRanks_) * STATE_OFFSET;
+    uint64_t crossKernelReserve = static_cast<uint64_t>(ENGRAM_CROSS_KERNEL_RESERVED_SLOTS) * crossKernelSlotBytes;
+    uint64_t fixedSize = crossKernelReserve + static_cast<uint64_t>(WIN_REGION_COUNT - 2) * indicesCounterSize +
                          static_cast<uint64_t>(WIN_REGION_COUNT - 4) * tokenCounterSize;
     uint64_t remaining = (winSize_ > fixedSize) ? (winSize_ - fixedSize) : 0U;
 
-    uint64_t offset = 0;
-    countFlagOffset_ = offset;
-    offset += indicesCounterSize;
+    uint64_t offset = crossKernelReserve;
+    countFlagOffset_ = crossKernelSlotBytes; // count-flag区从第2个保留槽起(第1槽为backward屏障槽)
+    offset = countFlagOffset_ + indicesCounterSize;
     indicesWriteOffset_ = offset;
     offset += indicesCounterSize;
     indicesReadOffset_ = offset;
@@ -411,6 +418,14 @@ __aicore__ inline void EngramFetchTrainArch35::InitWinLayout()
     maxIndicesPerSlot_ = static_cast<uint32_t>(indicesSlotSize_ / sizeof(int32_t));
     maxTokensPerSlot_ =
         (rowStride_ > 0U && tokenSlotSize_ >= rowStride_) ? static_cast<uint32_t>(tokenSlotSize_ / rowStride_) : 0U;
+
+    // 窗口过小（winSize <= fixedSize）时槽容量派生为 0，下游按其做除/模运算且收发循环
+    // 无法推进；钳位为 1 保证运算可终止（与 bwd 侧 DeriveLayout 的 0→1 钳位对齐），
+    // 小窗口配置由 Host 侧 commBufferSize 下限校验拒绝。
+    maxIndicesPerSlot_ = (maxIndicesPerSlot_ == 0U) ? 1U : maxIndicesPerSlot_;
+    if (maxTokensPerSlot_ == 0U) {
+        maxTokensPerSlot_ = 1U;
+    }
 }
 
 __aicore__ inline void EngramFetchTrainArch35::InitCoreRoles()
@@ -940,8 +955,9 @@ __aicore__ inline void EngramFetchTrainArch35::RecvIndicesFromPeers()
     LoadInt64ArrayToUb(rdisplsGM_);
     LocalTensor<int64_t> rdisplsUb = tempBuf_.Get<int64_t>();
     for (uint32_t srcRank = recvIdx; srcRank < numRanks_; srcRank += numRecvCores_) {
-        if (srcRank == rankId_)
+        if (srcRank == rankId_) {
             continue;
+        }
         int32_t recvCount = recvCountsUb.GetValue(srcRank);
         int64_t rdispl = rdisplsUb.GetValue(srcRank);
         if (recvCount <= 0) {
