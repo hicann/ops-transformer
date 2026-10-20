@@ -2713,10 +2713,12 @@ ge::graphStatus DequantChecker::CheckFeatureD032ForAntiquant(const FiaTilingInfo
                                               "key and value must be INT8 when PA_NZ D0=32 antiquant is enabled"),
         return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(fiaInfo.blockSize != 128 && fiaInfo.blockSize != 512,
-                OP_LOGE_WITH_INVALID_ATTR(fiaInfo.opName, "block_size", std::to_string(fiaInfo.blockSize).c_str(),
-                                          "128 or 512"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        fiaInfo.blockSize != 128 && fiaInfo.blockSize != 512,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(fiaInfo.opName, "block_size", std::to_string(fiaInfo.blockSize).c_str(),
+                                              "block_size only supports 128 or 512 "
+                                              "when PA_NZ D0=32 antiquant is enabled"),
+        return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(fiaInfo.inputQType != ge::DT_BF16,
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(fiaInfo.opName, "query", ToString(fiaInfo.inputQType).c_str(),
@@ -2747,16 +2749,18 @@ ge::graphStatus DequantChecker::CheckFeatureD032ForAntiquant(const FiaTilingInfo
                     "query S axis must be in range [1, 16] when PA_NZ D0=32 antiquant is enabled"),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(
-        fiaInfo.innerPrecise != 1,
-        OP_LOGE_WITH_INVALID_ATTR(fiaInfo.opName, "inner_precise", std::to_string(fiaInfo.innerPrecise).c_str(), "1"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(fiaInfo.innerPrecise != 1,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(fiaInfo.opName, "inner_precise",
+                                                      std::to_string(fiaInfo.innerPrecise).c_str(),
+                                                      "inner_precise must be 1 when PA_NZ D0=32 antiquant is enabled"),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(
-        fiaInfo.ropeMode != RopeMode::NO_ROPE,
-        OP_LOGE_WITH_INVALID_ATTR(fiaInfo.opName, "rope_mode",
-                                  std::to_string(static_cast<int32_t>(fiaInfo.ropeMode)).c_str(), "0 (NO_ROPE)"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(fiaInfo.ropeMode != RopeMode::NO_ROPE,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(fiaInfo.opName, "rope_mode",
+                                                      std::to_string(static_cast<int32_t>(fiaInfo.ropeMode)).c_str(),
+                                                      "rope_mode must be 0 (NO_ROPE) "
+                                                      "when PA_NZ D0=32 antiquant is enabled"),
+                return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(
         fiaInfo.opParamInfo.keyAntiquantOffset.tensor != nullptr ||
@@ -2790,8 +2794,10 @@ ge::graphStatus DequantChecker::CheckFeatureD032ForAntiquant(const FiaTilingInfo
 
     if (fiaInfo.s1Size == 1) {
         OP_CHECK_IF(fiaInfo.sparseMode != SPARSE_MODE_NO_MASK,
-                    OP_LOGE_WITH_INVALID_ATTR(fiaInfo.opName, "sparse_mode", std::to_string(fiaInfo.sparseMode).c_str(),
-                                              "0 (SPARSE_MODE_NO_MASK)"),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(fiaInfo.opName, "sparse_mode",
+                                                          std::to_string(fiaInfo.sparseMode).c_str(),
+                                                          "sparse_mode must be 0 (SPARSE_MODE_NO_MASK) "
+                                                          "when PA_NZ D0=32 antiquant is enabled and Q_S=1"),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(fiaInfo.opParamInfo.attenMask.tensor != nullptr,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
@@ -2800,8 +2806,10 @@ ge::graphStatus DequantChecker::CheckFeatureD032ForAntiquant(const FiaTilingInfo
                     return ge::GRAPH_FAILED);
     } else {
         OP_CHECK_IF(fiaInfo.sparseMode != SPARSE_MODE_RIGHT_DOWN,
-                    OP_LOGE_WITH_INVALID_ATTR(fiaInfo.opName, "sparse_mode", std::to_string(fiaInfo.sparseMode).c_str(),
-                                              "3 (SPARSE_MODE_RIGHT_DOWN)"),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(fiaInfo.opName, "sparse_mode",
+                                                          std::to_string(fiaInfo.sparseMode).c_str(),
+                                                          "sparse_mode must be 3 (SPARSE_MODE_RIGHT_DOWN) "
+                                                          "when PA_NZ D0=32 antiquant is enabled and Q_S>1"),
                     return ge::GRAPH_FAILED);
     }
 
