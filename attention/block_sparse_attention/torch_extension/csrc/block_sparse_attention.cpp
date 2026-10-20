@@ -15,6 +15,9 @@ namespace op_api {
 
 const int64_t FLOAT4_E2M1 = static_cast<int64_t>(296);
 const int64_t FLOAT8_E8M0 = static_cast<int64_t>(293);
+// Match quant_flash_attn: this is the ACL dtype value, not the Python-side
+// torch_npu.hifloat8 enum value (290).
+const int64_t HIFLOAT8 = static_cast<int64_t>(34);
 
 TensorWrapper make_wrapper(const at::Tensor& tensor, const int64_t real_dtype)
 {
@@ -24,6 +27,8 @@ TensorWrapper make_wrapper(const at::Tensor& tensor, const int64_t real_dtype)
             wrapper.dtype = ACL_FLOAT4_E2M1;
         } else if (real_dtype == FLOAT8_E8M0) {
             wrapper.dtype = ACL_FLOAT8_E8M0;
+        } else if (real_dtype == HIFLOAT8) {
+            wrapper.dtype = ACL_HIFLOAT8;
         }
     } else {
         wrapper.dtype = kATenScalarTypeToAclDataTypeTable[static_cast<int64_t>(tensor.scalar_type())];
@@ -37,6 +42,7 @@ enum QuantMode : int64_t {
     MXFP4_OCP_QUANT = 2,
     MXFP4_CX_QUANT = 3,
     MXFP8_OCP_QUANT = 4,
+    HIF8_QKVP_PERTENSOR_QUANT = 5,
 };
 
 std::tuple<at::Tensor, at::Tensor> npu_block_sparse_attention(
@@ -133,6 +139,15 @@ std::tuple<at::Tensor, at::Tensor> npu_block_sparse_attention(
         ACLNN_CMD(aclnnBlockSparseAttentionV3, q_wrapper, k_wrapper, v_wrapper, block_sparse_mask, atten_mask,
                   block_shape_ref, actual_seq_lengths_ref, actual_seq_lengths_kv_ref, block_table, q_descale_wrapper,
                   k_descale_wrapper, v_descale_wrapper, p_quant_scale, q_layout_ptr, kv_layout_ptr, num_key_value_heads,
+                  mask_type, scale_value, inner_precise, block_size, pre_tokens, next_tokens, softmax_lse_flag,
+                  quant_mode, dst_type_max, attention_out, softmax_lse);
+    } else if (quant_mode == HIF8_QKVP_PERTENSOR_QUANT) {
+        TensorWrapper q_wrapper = make_wrapper(query, HIFLOAT8);
+        TensorWrapper k_wrapper = make_wrapper(key, HIFLOAT8);
+        TensorWrapper v_wrapper = make_wrapper(value, HIFLOAT8);
+        ACLNN_CMD(aclnnBlockSparseAttentionV3, q_wrapper, k_wrapper, v_wrapper, block_sparse_mask, atten_mask,
+                  block_shape_ref, actual_seq_lengths_ref, actual_seq_lengths_kv_ref, block_table, q_dequant_scale,
+                  k_dequant_scale, v_dequant_scale, p_quant_scale, q_layout_ptr, kv_layout_ptr, num_key_value_heads,
                   mask_type, scale_value, inner_precise, block_size, pre_tokens, next_tokens, softmax_lse_flag,
                   quant_mode, dst_type_max, attention_out, softmax_lse);
     } else {

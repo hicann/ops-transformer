@@ -24,6 +24,7 @@ class QuantMode(IntEnum):
     MXFP4_OCP_QUANT = 2
     MXFP4_CX_QUANT = 3
     MXFP8_OCP_QUANT = 4
+    HIF8_QKVP_PERTENSOR_QUANT = 5
 
 
 def _resolve_quant_mode(quant_mode: Union[str, int, "QuantMode"]) -> int:
