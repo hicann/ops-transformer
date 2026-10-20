@@ -92,6 +92,7 @@ constexpr uint64_t URMA_BATCH_BUFFER_SIZE = 256U * 64U;
 constexpr uint64_t METADATA_CHUNK_BUFFER_SIZE = 256U * 4U * sizeof(int32_t);
 constexpr uint64_t ADDRESS_TABLE_BUFFER_SIZE = 40U * 1024U;
 constexpr uint64_t RANK_INFO_SEGMENT_NUM = 3U;
+constexpr uint64_t HCOMM_CQE_SCRATCH_BYTES = 64U;
 
 ge::graphStatus FFNToAttentionV2TilingFunc(gert::TilingContext* context)
 {
@@ -163,9 +164,10 @@ ge::graphStatus FFNToAttentionV2TilingFunc(gert::TilingContext* context)
         info.isInputRankTable ?
             (static_cast<uint64_t>(info.A) * sizeof(int32_t) + URMA_UB_ALIGN - 1U) / URMA_UB_ALIGN * URMA_UB_ALIGN :
             0U;
-    const uint64_t requiredUbBytes =
-        URMA_BUFFER_NUM * alignedPayloadBytes + URMA_UB_ALIGN + METADATA_CHUNK_BUFFER_SIZE + ADDRESS_TABLE_BUFFER_SIZE +
-        RANK_INFO_SEGMENT_NUM * ubCountRowBytes + URMA_HCOMM_INIT_SIZE + URMA_BATCH_BUFFER_SIZE + rankTableUbBytes;
+    const uint64_t requiredUbBytes = URMA_BUFFER_NUM * alignedPayloadBytes + URMA_UB_ALIGN +
+                                     METADATA_CHUNK_BUFFER_SIZE + ADDRESS_TABLE_BUFFER_SIZE +
+                                     RANK_INFO_SEGMENT_NUM * ubCountRowBytes + URMA_HCOMM_INIT_SIZE +
+                                     URMA_BATCH_BUFFER_SIZE + rankTableUbBytes + HCOMM_CQE_SCRATCH_BYTES;
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint64_t availableUbBytes = 0U;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, availableUbBytes);

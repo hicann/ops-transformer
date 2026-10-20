@@ -57,7 +57,7 @@ constexpr uint32_t OP_TYPE_ALL_TO_ALL = 8;
 constexpr int64_t BS_UPPER_BOUND = 512;
 constexpr int64_t MICRO_BATCH_NUM_UPPER_BOUND = static_cast<int64_t>(std::numeric_limits<uint32_t>::max());
 // Per-token expert count upper bound: keeps MB * BS * K * HS products inside uint64 in CalWinSize.
-constexpr int64_t EXPERT_NUM_PER_TOKEN_UPPER_BOUND = 256;
+constexpr int64_t EXPERT_NUM_PER_TOKEN_UPPER_BOUND = 20;
 constexpr int64_t H_MIN = 1024;
 constexpr int64_t H_MAX = 8192;
 constexpr int64_t SCALE_SIZE = 128;

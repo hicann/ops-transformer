@@ -53,10 +53,12 @@ constexpr size_t TOKEN_BYTES = 2U; // x dtype is FP16/BF16 (validated by the bas
 // Mirrors of the kernel UB buffer constants in op_kernel/attention_to_ffn_urma.h; keep both sides in sync.
 constexpr size_t URMA_BUFFER_NUM = 2U;                 // kernel: BUFFER_NUM
 constexpr size_t URMA_HCOMM_INIT_SIZE = 512U;          // kernel: URMA_HCOMM_INIT_SIZE
-constexpr size_t URMA_BATCH_BUFFER_SIZE = 16U * 1024U; // kernel: ATTN_FFN_HCOMM_BATCH_UB_BYTES
+constexpr size_t URMA_BATCH_BUFFER_SIZE = 16U * 1024U; // kernel: WQE region of ATTN_FFN_HCOMM_BATCH_UB_BYTES
+constexpr size_t HCOMM_CQE_SCRATCH_BYTES = 64U;        // kernel: HCOMM_CQE_SCRATCH_BYTES
 constexpr size_t BUCKET_BUFFER_SIZE = 32U * 1024U;     // kernel: BUCKET_BUFFER_SIZE
 constexpr size_t RANK_INFO_SEGMENT_NUM = 4U;           // kernel: RANK_INFO_SEGMENT_NUM
 constexpr size_t MX_PERGROUP_BLOCK_SIZE = 128U;        // kernel: PERGROUP_BLOCK_SIZE
+constexpr size_t RANK_RESOLVE_STRIDE = 2U;             // kernel: RANK_RESOLVE_STRIDE
 
 inline size_t CeilAlignSize(size_t val, size_t align)
 {
@@ -285,11 +287,11 @@ ge::graphStatus CheckUrmaUbCapacity(gert::TilingContext* context, const Attentio
     const size_t maxTotalSendNum = static_cast<size_t>(info.X) * info.BS * expertNumPerToken;
     const size_t maxTokensPerAiv = (maxTotalSendNum + aivNum - 1U) / aivNum;
 
-    // Init(): expertIds + status + per-AIV flag staging + rank scratch + bucket + rankInfo.
     const size_t expertIdsBytes = CeilAlignSize(maxTotalSendNum * sizeof(int32_t), ubAlign);
     const size_t statusBytes = ubAlign;
     const size_t flagValueBytes = CeilAlignSize(maxTokensPerAiv * URMA_FLAG_SLOT_SIZE, ubAlign);
-    const size_t flagOffsetBytes = CeilAlignSize(maxTokensPerAiv * sizeof(uint32_t), ubAlign);
+    const size_t expertRankResolveBytes =
+        CeilAlignSize(RANK_RESOLVE_STRIDE * static_cast<size_t>(info.expertNum) * sizeof(int32_t), ubAlign);
     const size_t tokenRankStashBytes = CeilAlignSize(maxTokensPerAiv * sizeof(int32_t), ubAlign);
     const size_t rankCountRowBytes = CeilAlignSize(static_cast<size_t>(info.worldSize) * sizeof(int32_t), ubAlign);
     const size_t rankInfoBytes = RANK_INFO_SEGMENT_NUM * rankCountRowBytes;
@@ -332,8 +334,9 @@ ge::graphStatus CheckUrmaUbCapacity(gert::TilingContext* context, const Attentio
     }
 
     const uint64_t requiredUbBytes = static_cast<uint64_t>(
-        expertIdsBytes + statusBytes + flagValueBytes + flagOffsetBytes + tokenRankStashBytes + BUCKET_BUFFER_SIZE +
-        rankInfoBytes + queueBytes + syncBytes + activeMaskBytes + URMA_HCOMM_INIT_SIZE + URMA_BATCH_BUFFER_SIZE);
+        expertIdsBytes + statusBytes + flagValueBytes + expertRankResolveBytes + tokenRankStashBytes +
+        BUCKET_BUFFER_SIZE + rankInfoBytes + queueBytes + syncBytes + activeMaskBytes + URMA_HCOMM_INIT_SIZE +
+        URMA_BATCH_BUFFER_SIZE + HCOMM_CQE_SCRATCH_BYTES);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint64_t availableUbBytes = 0U;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, availableUbBytes);
@@ -421,9 +424,8 @@ ge::graphStatus TilingNewQuantMode(gert::TilingContext* context, uint32_t quantM
 ge::graphStatus AttentionToFfnV2TilingFunc(gert::TilingContext* context)
 {
     // Deployment marker: grep plog for this tag to verify the rebuilt package is actually
-    // loaded (v10: per-rank counting in Phase 1 + compact bucket tables; the relay reads only
-    // the served ranks' tables instead of rescanning the full token list per slot).
-    OP_LOGI(context->GetNodeName(), "[AT2FFN_V2_URMA_FIX] v10 (rankBucketTables) active");
+
+    OP_LOGI(context->GetNodeName(), "[AT2FFN_V2_URMA_FIX] v11 (ubExpertRankResolve+batchedFlagCopy) active");
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "attrs"),
                     return ge::GRAPH_FAILED);
