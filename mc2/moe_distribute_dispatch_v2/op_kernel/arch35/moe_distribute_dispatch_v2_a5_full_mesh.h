@@ -87,6 +87,8 @@ public:
 
 private:
     __aicore__ inline uint32_t GetSendGroupOffset(uint32_t roundId, uint32_t sendRoundNum);
+    __aicore__ inline uint32_t GetSendTargetGroup(uint32_t sourceGroup, uint32_t groupOffset, uint32_t groupNum);
+    __aicore__ inline uint32_t BuildSendGroupIndices(uint32_t routeCount, uint32_t targetGroup);
     __aicore__ inline void ExpIdsCopyAndMaskCal();
     __aicore__ inline void TokenActiveMaskCal();
     __aicore__ inline void InitElasticInfo();
@@ -197,6 +199,7 @@ private:
     LocalTensor<float> workLocalTensor_;
     LocalTensor<int32_t> validExpertIdsTensor_;
     LocalTensor<uint16_t> expertFreqTensor_;
+    LocalTensor<int16_t> sendGroupIndices_;
     LocalTensor<int32_t> elasticInfoTensor_;
     LocalTensor<int32_t> performanceInfoTensor_;
     LocalTensor<int32_t> performanceFlagTensor_;
@@ -304,6 +307,7 @@ private:
     bool isScalingDownFlag_ = false;
     bool useSerialMode_ = false;
     bool enableGroupSend_ = false;
+    bool useSendGroupIndices_ = false;
     uint64_t totalWinSize_{0};
     uint32_t expertTokenNumsType_{1};
     int32_t expertIdsCnt_{0};
@@ -416,7 +420,11 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
     } else {
         statusCntAlign_ = Ceil(totalExpertNum_, UB_ALIGN_DATA_COUNT) * UB_ALIGN_DATA_COUNT;
     }
-    if (aivNum_ - aivUsedCumSum_ >= ALL_TO_ALL_MAX_CORE_NUM) {
+    if (enableGroupSend_) {
+        // 分组保持原来的发送核和计数核划分
+        aivAllToAllDispatch_ = aivNum_ - aivUsedCumSum_;
+        aivTokenCnt_ = aivUsedCumSum_;
+    } else if (aivNum_ - aivUsedCumSum_ >= ALL_TO_ALL_MAX_CORE_NUM) {
         aivAllToAllDispatch_ = ALL_TO_ALL_MAX_CORE_NUM;
         aivTokenCnt_ = aivNum_ - aivAllToAllDispatch_;
     } else {
@@ -711,15 +719,33 @@ template <TemplateMC2A5FullMeshTypeClass>
 __aicore__ inline uint32_t MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::GetSendGroupOffset(
     uint32_t roundId, uint32_t sendRoundNum)
 {
-    // 本组发送放在中间轮次
-    const uint32_t localRound = sendRoundNum / 2U;
-    if (roundId < localRound) {
-        return roundId + 1U;
-    }
-    if (roundId == localRound) {
+    // 未分组时偏移为0，分组后奇数阶段发本组，偶数阶段依次发远端组
+    if (sendRoundNum == 1U || (roundId & 1U) != 0U) {
         return 0U;
     }
-    return roundId;
+    return roundId / 2U + 1U;
+}
+
+template <TemplateMC2A5FullMeshTypeClass>
+__aicore__ inline uint32_t MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::GetSendTargetGroup(
+    uint32_t sourceGroup, uint32_t groupOffset, uint32_t groupNum)
+{
+    if (groupOffset == 0U) {
+        return sourceGroup;
+    }
+    if ((groupNum & 1U) != 0U) {
+        return (sourceGroup + groupOffset) % groupNum;
+    }
+    // 偶数组固定一组，其余组轮换配对
+    const uint32_t fixedGroup = groupNum - 1U;
+    const uint32_t pairedGroup = fixedGroup - groupOffset;
+    if (sourceGroup == fixedGroup) {
+        return pairedGroup;
+    }
+    if (sourceGroup == pairedGroup) {
+        return fixedGroup;
+    }
+    return (2U * pairedGroup + fixedGroup - sourceGroup) % fixedGroup;
 }
 
 template <TemplateMC2A5FullMeshTypeClass>
@@ -746,25 +772,37 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(i % sendTokenBufNum_);
     }
     // 按原始通信域 rank 分组，缩容后保持组号不变
-    const bool hasMultipleSendGroups = enableGroupSend_ && (epWorldSizeOriginal_ > SEND_GROUP_RANK_NUM) &&
-                                       (epWorldSizeOriginal_ % SEND_GROUP_RANK_NUM == 0U);
-    const uint32_t sendRoundNum = hasMultipleSendGroups ? epWorldSizeOriginal_ / SEND_GROUP_RANK_NUM : 1U;
-    const bool isPowerOfTwo = (sendRoundNum & (sendRoundNum - 1U)) == 0U;
+    const uint32_t sendRoundNum = enableGroupSend_ ? epWorldSizeOriginal_ / SEND_GROUP_RANK_NUM : 1U;
     const uint32_t sourceGroup = epRankIdOriginal_ / SEND_GROUP_RANK_NUM;
     int32_t lastTokenId = -1;
-    for (uint32_t roundId = 0U; roundId < sendRoundNum; ++roundId) {
+    const bool splitLocalGroup = sendRoundNum > 2U;
+    // 本组数据分摊到远端组之间的间隙，共组数减2份
+    const uint32_t localPartNum = splitLocalGroup ? sendRoundNum - 2U : 1U;
+    // 总阶段数为远端组数加本组分片数，单组或两组保持原阶段数
+    const uint32_t sendPhaseNum = splitLocalGroup ? sendRoundNum * 2U - 3U : sendRoundNum;
+    for (uint32_t roundId = 0U; roundId < sendPhaseNum; ++roundId) {
         const uint32_t groupOffset = GetSendGroupOffset(roundId, sendRoundNum);
-        const uint32_t targetGroup =
-            isPowerOfTwo ? (sourceGroup ^ groupOffset) : (sourceGroup + groupOffset) % sendRoundNum;
+        const uint32_t targetGroup = GetSendTargetGroup(sourceGroup, groupOffset, sendRoundNum);
+        uint32_t localRouteCount = 0U;
         for (uint32_t virtualTokenIndex = startTokenId; virtualTokenIndex < endTokenId; ++virtualTokenIndex) {
             uint32_t sendTokenIndex = virtualTokenIndex / sharedExpertNum_;
             uint32_t dstSharedExpertIndex = virtualTokenIndex % sharedExpertNum_;
+            if (enableGroupSend_) {
+                // 分组保持原路由顺序和分核归属
+                sendTokenIndex = virtualTokenIndex % activeMaskBsCnt_;
+                dstSharedExpertIndex = virtualTokenIndex / activeMaskBsCnt_;
+            }
             int32_t toRankId = idInSharedGroup + dstSharedExpertIndex * rankNumPerSharedExpert_;
             if (isScalingDownFlag_) {
                 toRankId = elasticInfoTensor_.GetValue(ELASTIC_INFO_OFFSET + epWorldSizeOriginal_ + toRankId);
             }
             const uint32_t destinationGroup = static_cast<uint32_t>(toRankId) / SEND_GROUP_RANK_NUM;
             if ((sendRoundNum > 1U) && (destinationGroup != targetGroup)) {
+                continue;
+            }
+            // 本组路由按序号取模分片，奇数阶段的roundId / 2为分片号
+            if (splitLocalGroup && destinationGroup == sourceGroup &&
+                localRouteCount++ % localPartNum != roundId / 2U) {
                 continue;
             }
             dstWinGMTensor.SetGlobalBuffer((__gm__ XOutType*)(uint64_t(GetWindAddrByRankId(toRankId)) +
@@ -795,10 +833,12 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
             lastTokenId = tokenId;
         }
     }
-    if constexpr (Std::IsSame<ExpandXOutType, XType>::value) {
-        inQueue.FreeTensor<XOutType>(tempTensor_);
-    } else {
-        inQueue.FreeTensor<XInType>(quantInTensor_);
+    if (lastTokenId != -1) {
+        if constexpr (Std::IsSame<ExpandXOutType, XType>::value) {
+            inQueue.FreeTensor<XOutType>(tempTensor_);
+        } else {
+            inQueue.FreeTensor<XInType>(quantInTensor_);
+        }
     }
     for (int i = 0; i < sendTokenBufNum_; i++) {
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(i % sendTokenBufNum_);
@@ -829,6 +869,39 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
     for (int i = 0; i < sendTokenBufNum_; i++) {
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(i % sendTokenBufNum_);
     }
+}
+
+template <TemplateMC2A5FullMeshTypeClass>
+__aicore__ inline uint32_t MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::BuildSendGroupIndices(
+    uint32_t routeCount, uint32_t targetGroup)
+{
+    // 普通专家卡位于共享专家卡之后
+    int32_t beginRank =
+        static_cast<int32_t>(targetGroup * SEND_GROUP_RANK_NUM) - static_cast<int32_t>(sharedExpertRankNum_);
+    int32_t endRank = beginRank + SEND_GROUP_RANK_NUM;
+    beginRank = beginRank < 0 ? 0 : beginRank;
+    if ((endRank <= beginRank) || (routeCount == 0U)) {
+        return 0U;
+    }
+
+    LocalTensor<uint8_t> lowerMask = dstExpBuf_.Get<uint8_t>();
+    LocalTensor<uint8_t> upperMask = subExpBuf_.Get<uint8_t>();
+    LocalTensor<int16_t> routeIndices = dstExpBuf_.Get<int16_t>();
+    const uint32_t compareCount = Ceil(routeCount * sizeof(int32_t), SIZE_ALIGN_256) * SIZE_ALIGN_256 / sizeof(int32_t);
+    // 复用计数临时区，发送前只保留压紧后的原始路由索引
+    SyncFunc<AscendC::HardEvent::S_V>();
+    CompareScalar(lowerMask, validExpertIdsTensor_, static_cast<int32_t>(beginRank * moeExpertNumPerRank_),
+                  AscendC::CMPMODE::GE, compareCount);
+    CompareScalar(upperMask, validExpertIdsTensor_, static_cast<int32_t>(endRank * moeExpertNumPerRank_),
+                  AscendC::CMPMODE::LT, compareCount);
+    LocalTensor<uint16_t> lowerMask16 = lowerMask.ReinterpretCast<uint16_t>();
+    LocalTensor<uint16_t> upperMask16 = upperMask.ReinterpretCast<uint16_t>();
+    And(upperMask16, upperMask16, lowerMask16, Ceil(compareCount, 16U));
+    CreateVecIndex(routeIndices, static_cast<int16_t>(0), routeCount);
+    uint64_t groupRouteCount = 0U;
+    GatherMask(sendGroupIndices_, routeIndices, upperMask16, true, routeCount, {1, 1, 0, 0}, groupRouteCount);
+    SyncFunc<AscendC::HardEvent::V_S>();
+    return static_cast<uint32_t>(groupRouteCount);
 }
 
 template <TemplateMC2A5FullMeshTypeClass>
@@ -943,24 +1016,42 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
     if (aivId_ >= moeUsedAivNum_) {
         return;
     }
-    const bool hasMultipleSendGroups = enableGroupSend_ && (epWorldSizeOriginal_ > SEND_GROUP_RANK_NUM) &&
-                                       (epWorldSizeOriginal_ % SEND_GROUP_RANK_NUM == 0U);
-    if (hasMultipleSendGroups) {
+    if (enableGroupSend_) {
         uint32_t startIndex = aivId_;
         uint32_t endIndex = validTokenNum;
         uint32_t routeStep = moeUsedAivNum_;
-        // 分组时连续分核，避免核步长与目的卡周期重合
-        uint32_t routeCount;
-        SplitToCore(validTokenNum, moeUsedAivNum_, startIndex, endIndex, routeCount, true);
-        routeStep = 1U;
+        if (!useSendGroupIndices_) {
+            // 无索引时沿用连续分核
+            uint32_t routeCount;
+            SplitToCore(validTokenNum, moeUsedAivNum_, startIndex, endIndex, routeCount, true);
+            routeStep = 1U;
+        }
         const uint32_t sendRoundNum = epWorldSizeOriginal_ / SEND_GROUP_RANK_NUM;
-        const bool isPowerOfTwo = (sendRoundNum & (sendRoundNum - 1U)) == 0U;
         const uint32_t sourceGroup = epRankIdOriginal_ / SEND_GROUP_RANK_NUM;
-        for (uint32_t roundId = 0U; roundId < sendRoundNum; ++roundId) {
+        const bool splitLocalGroup = sendRoundNum > 2U;
+        // 本组数据分摊到远端组之间的间隙，共组数减2份
+        const uint32_t localPartNum = splitLocalGroup ? sendRoundNum - 2U : 1U;
+        // 总阶段数为远端组数加本组分片数，单组或两组保持原阶段数
+        const uint32_t sendPhaseNum = splitLocalGroup ? sendRoundNum * 2U - 3U : sendRoundNum;
+        for (uint32_t roundId = 0U; roundId < sendPhaseNum; ++roundId) {
             const uint32_t groupOffset = GetSendGroupOffset(roundId, sendRoundNum);
-            const uint32_t targetGroup =
-                isPowerOfTwo ? (sourceGroup ^ groupOffset) : (sourceGroup + groupOffset) % sendRoundNum;
-            for (uint32_t index = startIndex; index < endIndex; index += routeStep) {
+            const uint32_t targetGroup = GetSendTargetGroup(sourceGroup, groupOffset, sendRoundNum);
+            uint32_t localRouteIndex = 0U;
+            if (useSendGroupIndices_) {
+                endIndex = BuildSendGroupIndices(validTokenNum, targetGroup);
+                startIndex = aivId_;
+                routeStep = moeUsedAivNum_;
+                if (splitLocalGroup && targetGroup == sourceGroup) {
+                    // 按发送核数分块，各份交替取块，块内仍轮转分核
+                    startIndex += (roundId / 2U) * moeUsedAivNum_;
+                    routeStep *= localPartNum;
+                }
+            }
+            for (uint32_t routeIndex = startIndex; routeIndex < endIndex; routeIndex += routeStep) {
+                uint32_t index = routeIndex;
+                if (useSendGroupIndices_) {
+                    index = static_cast<uint32_t>(sendGroupIndices_.GetValue(routeIndex));
+                }
                 int32_t tokenId = index / axisK_;
                 int32_t topKId = index % axisK_;
                 int32_t expertId = validExpertIdsTensor_(index);
@@ -972,6 +1063,11 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
                 }
                 const uint32_t destinationGroup = static_cast<uint32_t>(toRankId) / SEND_GROUP_RANK_NUM;
                 if ((sendRoundNum > 1U) && (destinationGroup != targetGroup)) {
+                    continue;
+                }
+                // 无索引时按本核本组路由的序号取模分片
+                if (!useSendGroupIndices_ && splitLocalGroup && destinationGroup == sourceGroup &&
+                    localRouteIndex++ % localPartNum != roundId / 2U) {
                     continue;
                 }
                 bool isNeedCopyIn = (tokenId != lastTokenId);
@@ -1113,9 +1209,10 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
 template <TemplateMC2A5FullMeshTypeClass>
 __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::AllToAllDispatch()
 {
+    useSendGroupIndices_ = enableGroupSend_ && !isScalingDownFlag_;
     // 使用的全局参数
     TQue<QuePosition::VECIN, 1> inQueue;
-    TBuf<> tempBuf, outBuf, inQueueCleanBuf, calTempBuf;
+    TBuf<> tempBuf, outBuf, inQueueCleanBuf, calTempBuf, sendGroupIndexBuf;
     TBuf<> smoothScalesBuf, receiveDataCastFloatBuf;
     expertIdsBufSize_ = Ceil(expertIdsCnt_ * sizeof(int32_t), SIZE_ALIGN_256) * SIZE_ALIGN_256; // 支持compareScalar
     AscendC::TBufPool<AscendC::TPosition::VECIN> tbufPool0, tbufPool1;
@@ -1156,8 +1253,17 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
         tpipe_->InitBuffer(dstExpBuf_, calTokenIdxBuffSize);
         tpipe_->InitBuffer(subExpBuf_, calTokenIdxBuffSize);
     }
-    tpipe_->InitBuffer(calTempBuf, calTokenIdxBuffSize);
+    const uint32_t routeCount = axisBS_ * axisK_;
+    // A5规约只需保存每64个float的中间结果
+    const uint32_t reduceBytes =
+        routeCount <= 256U ? UB_ALIGN : Ceil(Ceil(routeCount, 64U) * sizeof(float), SIZE_ALIGN_256) * SIZE_ALIGN_256;
+    tpipe_->InitBuffer(calTempBuf, reduceBytes);
     workLocalTensor_ = calTempBuf.Get<float>();
+    if (useSendGroupIndices_) {
+        const uint32_t indexBytes = Ceil(routeCount * sizeof(int16_t), UB_ALIGN) * UB_ALIGN;
+        tpipe_->InitBuffer(sendGroupIndexBuf, indexBytes);
+        sendGroupIndices_ = sendGroupIndexBuf.Get<int16_t>();
+    }
     quantInst_.SetQuantInitParams(floatLocalTemp_, smoothScalesTensor_, smoothScalesBuf, dynamicScalesOutGMTensor_);
     ExpIdsCopyAndMaskCal();
     if (useSerialMode_) {

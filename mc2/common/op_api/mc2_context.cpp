@@ -473,7 +473,7 @@ aclnnStatus Mc2Context::CheckGroupInstances(const HcclComm& hcclHandle, uint32_t
 aclnnStatus Mc2Context::CheckGroupSendEnabled(const HcclComm& hcclHandle, uint32_t rankSize, uint32_t rank,
                                               bool& enableGroupSend) const
 {
-    if (rankSize < GROUP_RANK_NUM || rankSize % GROUP_RANK_NUM != 0U || rank >= rankSize) {
+    if (rankSize <= GROUP_RANK_NUM || rankSize % GROUP_RANK_NUM != 0U || rank >= rankSize) {
         OP_LOGI("Group send disabled: unsupported rank layout, rank=%u, rankSize=%u, groupSize=%u", rank, rankSize,
                 GROUP_RANK_NUM);
         return ACLNN_ERR_INNER;

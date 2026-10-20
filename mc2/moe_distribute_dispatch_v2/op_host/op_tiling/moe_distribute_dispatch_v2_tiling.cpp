@@ -1804,6 +1804,16 @@ static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistri
     }
 
     ubSize = ubSize + SendToMoeExpertUsedBuffer(context, tilingData, expertIdsBufSize, kSize, nodeName);
+    if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) {
+        uint32_t reduceBytes = expertIdsCnt <= 256U ? UB_ALIGN :
+                                                      Ceil(Ceil(expertIdsCnt, 64U, nodeName) / 64U * sizeof(float),
+                                                           SIZE_ALIGN_256, nodeName);
+        ubSize += reduceBytes + 2U * UB_ALIGN; // calTempBuf及首尾计量buffer
+        if (config.isMc2Context) {
+            // V3分组开关在device context中，预留组内索引空间
+            ubSize += Ceil(expertIdsCnt * sizeof(int16_t), UB_ALIGN, nodeName);
+        }
+    }
     if (mc2tiling::GetSocVersion(context) == "Ascend910_93") {
         ubSize = A3FullMeshUsedBuffer(context, tilingData, expertIdsBufSize, hOutSizeAlign, config, nodeName);
     }
