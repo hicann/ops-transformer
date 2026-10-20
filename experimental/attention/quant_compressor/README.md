@@ -58,7 +58,7 @@
 | cmp\_ratio | 属性 | 用于稀疏计算，表示数据压缩率。 | INT32          | -         |
 | state\_block\_table | 可选输入 | 表示state\_cache存储使用的block映射表。 | INT32 | ND         |
 | cu\_seqlens | 可选输入 | 表示不同Batch中的有效token数。TH布局下为必选输入，BSH布局下必须为空。 | INT32          | ND         |
-| seqused | 可选输入 | 表示不同Batch中实际参与压缩的token数，如果指定为None时，表示和每个Batch上的Sequence Length长度相同。 | INT32          | ND         |
+| seqused | 可选输入 | 表示不同Batch中实际参与压缩的token数，如果指定为None时，表示和每个Batch上的Sequence Length相同。 | INT32          | ND         |
 | start\_pos | 可选输入 | 表示计算起始位置。 | INT32          | ND         |
 | coff | 可选属性 | 默认值1，支持1/2。当coff=1时，无需进行overlap数据重排。当coff=2时，需要进行overlap数据重排。 | INT32          | -         |
 | cache\_mode | 可选属性 | 表示state\_cache的存储模式，1表示连续buffer，2表示循环buffer。默认值1。**目前A3暂不支持输入2**。 | INT32          | -         |
@@ -78,13 +78,13 @@
     - wgate\_descale支持输入shape[coff\* D]
     - start\_pos支持输入shape[B,]
     - 若x的维度采用BS合轴，即x的输入shape为[T,H]
-        - cu\_seqlens输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须位0。**TH布局下为必选输入**。
-        - seqused，支持输入shape[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即seqused[n] <= cu\_seqlens[n+1] - cu\_seqlens[n]，且不小于0。
+        - cu\_seqlens输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须为0。**TH布局下为必选输入**。
+        - seqused，支持输入shape[B,]，要求每个Batch的有效token数小于等于对应Sequence Length，即seqused[n] <= cu\_seqlens[n+1] - cu\_seqlens[n]，且不小于0。
         - state\_block\_table支持输入shape[B,ceil(Smax/block\_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(start\_pos)+max(cu\_seqlens[n+1] - cu\_seqlens[n])。
         - cmp\_kv，输出shape为[min(T,T//cmp\_ratio+B),D]：<batch0>compressed\_tokens + <batch1>compressed\_tokens + ... + <batchN>compressed\_tokens + pad。
     - 若x的维度不采用BS合轴，即x的输入shape为[B,S,H]
         - cu\_seqlens，**参数必须为空**。
-        - seqused，支持输入shape[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即要求seqused[n] <= S，且不小于0。
+        - seqused，支持输入shape[B,]，要求每个Batch的有效token数小于等于对应Sequence Length，即要求seqused[n] <= S，且不小于0。
         - state\_block\_table支持输入shape[B,ceil(Smax/block\_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(start\_pos)+S。
         - cmp\_kv，输出shape为[B,ceil(S/cmp\_ratio),D]：(<batch0>compressed\_tokens+pad0) + (<batch1>compressed\_tokens+pad1) + ...  + (<batchN>compressed\_tokens+padN)。
 - 输入值域限制：

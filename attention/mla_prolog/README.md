@@ -37,7 +37,7 @@
     q^N = q^C \cdot W^{UK}
     $$
 
-    对Query的进行ROPE旋转位置编码
+    对Query进行ROPE旋转位置编码
 
     $$
     q^R = ROPE(c^Q \cdot W^{QR})
@@ -360,7 +360,7 @@
   </tr>
   <tr>
     <td class="tg-0pky">
-    <a href="./examples/test_aclnn_mla_prolog_nq_bsh.cpp">MlaProlog半量化KV量化（BSH）接口测试用例代码
+    <a href="./examples/test_aclnn_mla_prolog_pq.cpp">MlaProlog 部分量化（BSH）接口测试用例代码
     </a>
   </td>
   </tr>
