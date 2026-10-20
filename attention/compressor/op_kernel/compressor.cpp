@@ -54,14 +54,15 @@ __global__ __aicore__ void compressor(__gm__ uint8_t* x, __gm__ uint8_t* wKv, __
     REGISTER_TILING_DEFAULT(optiling::CompressorTilingData);
 #if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+    GET_TILING_DATA_PTR_WITH_STRUCT(optiling::CompressorTilingData, tilingData, tiling);
 #else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
-#endif
     GET_TILING_DATA_WITH_STRUCT(optiling::CompressorTilingData, tilingDataIn, tiling);
+    const optiling::CompressorTilingData* __restrict tilingData = &tilingDataIn;
+#endif
     if constexpr (static_cast<TEMPLATE_ID>(TemplateId) == TEMPLATE_ID::EMPTY_X) {
         return;
     }
-    const optiling::CompressorTilingData* __restrict tilingData = &tilingDataIn;
     TPipe pipe;
     constexpr auto xLayout = static_cast<X_LAYOUT>(XLayout);
     constexpr auto xDtype = static_cast<X_DTYPE>(XDType);

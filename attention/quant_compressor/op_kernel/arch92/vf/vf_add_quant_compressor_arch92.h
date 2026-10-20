@@ -49,7 +49,7 @@ __simd_callee__ void MultiAddVFImpl(__ubuf__ T* outputAddr, __ubuf__ T* inputAdd
     __ubuf__ T* initialAddr = IS_FIRST ? inputAddr : outputAddr;
     Reg::MaskReg mask = Reg::UpdateMask<T>(maskValue);
     Reg::LoadAlign(regList.vreg, initialAddr + offset);
-    for (uint32_t repeatIdx = initialRepeatIdx; repeatIdx < repeatNum; repeatIdx++) {
+    for (uint16_t repeatIdx = initialRepeatIdx; repeatIdx < static_cast<uint16_t>(repeatNum); repeatIdx++) {
         uint64_t addOffset = offset + repeatIdx * repeatOffset;
         Reg::LoadAlign(regList.vregape, inputAddr + addOffset);
         Reg::Add(regList.vreg, regList.vreg, regList.vregape, mask);
@@ -174,7 +174,7 @@ __simd_vf__ void MultiAdd64VFImpl(__ubuf__ T* outputAddr, __ubuf__ T* inputAddr,
         Reg::LoadAlign(regList[1].vreg, initialAddr + offset + actualCol);
         Reg::LoadAlign(regList[2].vreg, initialAddr + offset + 2 * actualCol);
         Reg::LoadAlign(regList[3].vreg, initialAddr + offset + 3 * actualCol);
-        for (uint32_t repeatIdx = initialRepeatIdx; repeatIdx < repeatNum; repeatIdx++) {
+        for (uint16_t repeatIdx = initialRepeatIdx; repeatIdx < static_cast<uint16_t>(repeatNum); repeatIdx++) {
             uint64_t addOffset = offset + repeatIdx * repeatOffset;
             Reg::LoadAlign(regList[0].vregape, inputAddr + addOffset);
             Reg::LoadAlign(regList[1].vregape, inputAddr + addOffset + actualCol);
@@ -262,7 +262,7 @@ __simd_vf__ void MultiAdd256VFImpl(__ubuf__ T* outputAddr, __ubuf__ T* inputAddr
         Reg::LoadAlign(regList[1].vreg, initialAddr + offset + VF_FLOAT_REP_SIZE);
         Reg::LoadAlign(regList[2].vreg, initialAddr + offset + 2 * VF_FLOAT_REP_SIZE);
         Reg::LoadAlign(regList[3].vreg, initialAddr + offset + 3 * VF_FLOAT_REP_SIZE);
-        for (uint32_t repeatIdx = initialRepeatIdx; repeatIdx < repeatNum; repeatIdx++) {
+        for (uint16_t repeatIdx = initialRepeatIdx; repeatIdx < static_cast<uint16_t>(repeatNum); repeatIdx++) {
             uint64_t addOffset = offset + repeatIdx * repeatOffset;
             Reg::LoadAlign(regList[0].vregape, inputAddr + addOffset);
             Reg::LoadAlign(regList[1].vregape, inputAddr + addOffset + VF_FLOAT_REP_SIZE);
@@ -300,7 +300,7 @@ __simd_vf__ void MultiAdd512VFImpl(__ubuf__ T* outputAddr, __ubuf__ T* inputAddr
         Reg::LoadAlign(regList[6].vreg, initialAddr + offset + 6 * VF_FLOAT_REP_SIZE);
         Reg::LoadAlign(regList[7].vreg, initialAddr + offset + 7 * VF_FLOAT_REP_SIZE);
         for (uint16_t repeatIdx = initialRepeatIdx; repeatIdx < static_cast<uint16_t>(repeatNum); repeatIdx++) {
-            uint64_t addOffset = offset + repeatIdx * row * actualCol;
+            uint64_t addOffset = offset + repeatIdx * repeatOffset;
             Reg::LoadAlign(regList[0].vregape, inputAddr + addOffset);
             Reg::LoadAlign(regList[1].vregape, inputAddr + addOffset + VF_FLOAT_REP_SIZE);
             Reg::LoadAlign(regList[2].vregape, inputAddr + addOffset + 2 * VF_FLOAT_REP_SIZE);

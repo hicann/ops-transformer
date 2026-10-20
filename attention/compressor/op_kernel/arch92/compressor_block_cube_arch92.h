@@ -40,7 +40,6 @@ public:
     __aicore__ inline void AllocEventID(TPipe* pipe);
     __aicore__ inline void FreeEventID(TPipe* pipe);
     __aicore__ inline void ComputeMm1(const RunInfo& info);
-    __aicore__ inline void UpdateMRange(uint32_t mStart, uint32_t mEnd);
 
 private:
     using T = float;
@@ -210,13 +209,6 @@ __aicore__ inline void CompressorBlockCube<COMP, IS_FULL_LOAD>::FreeEventID(TPip
 }
 
 template <typename COMP, bool IS_FULL_LOAD>
-__aicore__ inline void CompressorBlockCube<COMP, IS_FULL_LOAD>::UpdateMRange(uint32_t mStart, uint32_t mEnd)
-{
-    constInfo_.mStart = mStart;
-    constInfo_.mEnd = mEnd;
-}
-
-template <typename COMP, bool IS_FULL_LOAD>
 __aicore__ inline void CompressorBlockCube<COMP, IS_FULL_LOAD>::CopyXGmToL1(const RunInfo& info,
                                                                             LocalTensor<X_T> xL1Tensor, uint32_t hIdx,
                                                                             uint32_t kBase)
@@ -353,7 +345,8 @@ __aicore__ inline void CompressorBlockCube<COMP, IS_FULL_LOAD>::CopyOutMm1Res(co
     } else {
         nOffset = constInfo_.dIdx * constInfo_.dBaseSize;
     }
-    uint64_t gmOffset = nOffset + coffId * constInfo_.headDim + mStart * fixParams.dstStride + dbOffset;
+    uint64_t globalRow = (uint64_t)constInfo_.mRowBase + mStart;
+    uint64_t gmOffset = nOffset + coffId * constInfo_.headDim + globalRow * fixParams.dstStride + dbOffset;
     uint32_t kvOffset = Align(mDealSize, NZ_FRACTAL_DIM) * nStart;
     uint32_t scoreOffset = Align(mDealSize, NZ_FRACTAL_DIM) *
                            ((nStart + constInfo_.dBaseSize) % (WEIGHT_MATRIX_NUM * constInfo_.dBaseSize));

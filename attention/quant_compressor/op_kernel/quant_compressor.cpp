@@ -40,14 +40,15 @@ __global__ __aicore__ void quant_compressor(__gm__ uint8_t* x, __gm__ uint8_t* w
     REGISTER_TILING_DEFAULT(optiling::QuantCompressorTilingData);
 #if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+    GET_TILING_DATA_PTR_WITH_STRUCT(optiling::QuantCompressorTilingData, tilingData, tiling);
 #else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
-#endif
     GET_TILING_DATA_WITH_STRUCT(optiling::QuantCompressorTilingData, tilingDataIn, tiling);
+    const optiling::QuantCompressorTilingData* __restrict tilingData = &tilingDataIn;
+#endif
     if constexpr (static_cast<TEMPLATE_ID>(TemplateId) == TEMPLATE_ID::EMPTY_X) {
         return;
     }
-    const optiling::QuantCompressorTilingData* __restrict tilingData = &tilingDataIn;
     TPipe pipe;
     constexpr auto xLayout = static_cast<X_LAYOUT>(XLayout);
     constexpr auto xDtype = static_cast<X_DTYPE>(XDType);

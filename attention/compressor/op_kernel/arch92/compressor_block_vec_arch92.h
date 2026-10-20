@@ -170,6 +170,7 @@ protected:
     // in queue
     TQue<QuePosition::VECIN, 1> inputQue1;
     TQue<QuePosition::VECIN, 1> inputQue2;
+    TQue<QuePosition::VECIN, 1> inputQue3;
     // out queue
     TQue<QuePosition::VECOUT, 1> outputQue1;
     TQue<QuePosition::VECOUT, 1> outputQue2;
@@ -376,7 +377,7 @@ __aicore__ inline void CompressorBlockVector<COMP>::DataCopyWithInputQue(const L
     if (copyRowCount == 0) {
         return;
     }
-    uint32_t singleCopyRowCount = BUFFER_SIZE_BYTE_64K / (copyColCount * sizeof(O));
+    uint32_t singleCopyRowCount = BUFFER_SIZE_BYTE_32K / (copyColCount * sizeof(O));
     for (uint32_t rowCount = 0; rowCount < copyRowCount; rowCount += singleCopyRowCount) {
         LocalTensor<O> inputUb = inputQue2.AllocTensor<O>();
 
@@ -406,38 +407,48 @@ __aicore__ inline void CompressorBlockVector<COMP>::AddMultiDataToUb(
     if (cnt == 0) {
         return;
     }
-    uint32_t groupSize = BUFFER_SIZE_BYTE_64K / (cnt * sizeof(O));
-    uint32_t loopTimes = CeilDivT(repeatTimes, groupSize);
-    uint64_t srcGmOffset = 0;
-    for (uint32_t idx = 0; idx < loopTimes; idx++) {
-        auto& inputQue = inputQue2;
-        uint32_t curGroupSize = min(groupSize, (repeatTimes - groupSize * idx));
-        LocalTensor<O> splitLocal = inputQue.AllocTensor<O>();
-        if (srcSingleRowCount == dstSingleRowCount && dstSingleRowCount == dealRowCount) {
-            for (uint32_t groupIdx = 0; groupIdx < curGroupSize; groupIdx++) {
-                DataCopy(splitLocal[groupIdx * cnt], srcGm[srcGmOffset], cnt);
-                srcGmOffset += offset;
+    constexpr uint32_t bufElem = BUFFER_SIZE_BYTE_32K / sizeof(O);
+    uint32_t rowsPerSplit = bufElem / dstSingleRowCount;
+    uint32_t splitNum = CeilDivT(dealRowCount, rowsPerSplit);
+    for (uint32_t splitIdx = 0; splitIdx < splitNum; splitIdx++) {
+        uint32_t rowStart = splitIdx * rowsPerSplit;
+        uint32_t rowCnt = min(rowsPerSplit, dealRowCount - rowStart);
+        uint32_t splitCnt = rowCnt * dstSingleRowCount;
+        uint32_t groupSize = bufElem / splitCnt;
+        uint32_t loopTimes = CeilDivT(repeatTimes, groupSize);
+        uint64_t srcGmOffset = static_cast<uint64_t>(rowStart) * srcSingleRowCount;
+        for (uint32_t idx = 0; idx < loopTimes; idx++) {
+            auto& inputQue = (splitIdx * loopTimes + idx) % 2 == 0 ? inputQue2 : inputQue3;
+            uint32_t curGroupSize = min(groupSize, (repeatTimes - groupSize * idx));
+            LocalTensor<O> splitLocal = inputQue.AllocTensor<O>();
+            if (srcSingleRowCount == dstSingleRowCount && dstSingleRowCount == dealRowCount) {
+                for (uint32_t groupIdx = 0; groupIdx < curGroupSize; groupIdx++) {
+                    DataCopy(splitLocal[groupIdx * splitCnt], srcGm[srcGmOffset], splitCnt);
+                    srcGmOffset += offset;
+                }
+            } else {
+                for (uint32_t groupIdx = 0; groupIdx < curGroupSize; groupIdx++) {
+                    DataCopyAlignGmToUb(splitLocal[groupIdx * splitCnt], srcGm[srcGmOffset], rowCnt, dealColCount,
+                                        srcSingleRowCount, dstSingleRowCount);
+                    srcGmOffset += offset;
+                }
             }
-        } else {
-            for (uint32_t groupIdx = 0; groupIdx < curGroupSize; groupIdx++) {
-                DataCopyAlignGmToUb(splitLocal[groupIdx * cnt], srcGm[srcGmOffset], dealRowCount, dealColCount,
-                                    srcSingleRowCount, dstSingleRowCount);
-                srcGmOffset += offset;
+
+            inputQue.EnQue(splitLocal);
+            inputQue.DeQue<O>();
+
+            PipeBarrier<PIPE_V>();
+            if (idx == 0) {
+                MultiAddVF<true>(dstLocal[rowStart * dstSingleRowCount], splitLocal, rowCnt, dealColCount,
+                                 dstSingleRowCount, curGroupSize, splitCnt);
+            } else {
+                MultiAddVF<false>(dstLocal[rowStart * dstSingleRowCount], splitLocal, rowCnt, dealColCount,
+                                  dstSingleRowCount, curGroupSize, splitCnt);
             }
+            inputQue.FreeTensor(splitLocal);
         }
-
-        inputQue.EnQue(splitLocal);
-        inputQue.DeQue<O>();
-
         PipeBarrier<PIPE_V>();
-        if (idx == 0) {
-            MultiAddVF<true>(dstLocal, splitLocal, dealRowCount, dealColCount, dstSingleRowCount, curGroupSize, cnt);
-        } else {
-            MultiAddVF<false>(dstLocal, splitLocal, dealRowCount, dealColCount, dstSingleRowCount, curGroupSize, cnt);
-        }
-        inputQue.FreeTensor(splitLocal);
     }
-    PipeBarrier<PIPE_V>();
 }
 
 template <typename COMP>

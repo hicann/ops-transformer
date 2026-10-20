@@ -73,7 +73,8 @@ template <typename COMP>
 __aicore__ inline void CompressorBlockVectorNormal<COMP>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(this->inputQue1, 1, BUFFER_SIZE_BYTE_64K);
-    pipe->InitBuffer(this->inputQue2, 1, BUFFER_SIZE_BYTE_64K);
+    pipe->InitBuffer(this->inputQue2, 1, BUFFER_SIZE_BYTE_32K);
+    pipe->InitBuffer(this->inputQue3, 1, BUFFER_SIZE_BYTE_32K);
     pipe->InitBuffer(this->tmpBuff1, BUFFER_SIZE_BYTE_64K);
     pipe->InitBuffer(this->tmpBuff2, BUFFER_SIZE_BYTE_64K);
     pipe->InitBuffer(this->outputQue1, 1, BUFFER_SIZE_BYTE_32K);

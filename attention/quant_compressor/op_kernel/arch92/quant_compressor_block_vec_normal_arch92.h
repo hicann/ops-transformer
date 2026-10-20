@@ -80,16 +80,15 @@ private:
 template <typename COMP>
 __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::InitBuffers(TPipe* pipe)
 {
-    pipe->InitBuffer(this->inputQue1, 1, BUFFER_SIZE_BYTE_32K);
+    pipe->InitBuffer(this->inputQue1, 1, BUFFER_SIZE_BYTE_64K);
     pipe->InitBuffer(this->inputQue2, 1, BUFFER_SIZE_BYTE_32K);
     pipe->InitBuffer(this->inputQue3, 1, BUFFER_SIZE_BYTE_32K);
-    pipe->InitBuffer(this->tmpBuff1, BUFFER_SIZE_BYTE_32K);
-    pipe->InitBuffer(this->tmpBuff2, BUFFER_SIZE_BYTE_32K);
+    pipe->InitBuffer(this->tmpBuff1, BUFFER_SIZE_BYTE_64K);
+    pipe->InitBuffer(this->tmpBuff2, BUFFER_SIZE_BYTE_64K);
     pipe->InitBuffer(this->outputQue1, 1, BUFFER_SIZE_BYTE_32K);
     pipe->InitBuffer(this->wKvDescaleBuf, BUFFER_SIZE_BYTE_8K);
     pipe->InitBuffer(this->wGateDescaleBuf, BUFFER_SIZE_BYTE_8K);
-    pipe->InitBuffer(this->apeBuf, BUFFER_SIZE_BYTE_32K);
-    pipe->InitBuffer(this->outputQue2, 1, BUFFER_SIZE_BYTE_16K);
+    pipe->InitBuffer(this->apeBuf, BUFFER_SIZE_BYTE_64K);
     this->apeUb = this->apeBuf.template Get<T>();
     this->xWKvDescaleUb = this->wKvDescaleBuf.template Get<T>();
     this->xWGateDescaleUb = this->wGateDescaleBuf.template Get<T>();
@@ -289,14 +288,11 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::DealVec1BaseBlock
     if (statisticInfo.compressorScCnt > 0) {
         this->SoftmaxDN(scoreLocal, statisticInfo.compressorScCnt, dDealSize);
         PipeBarrier<PIPE_V>();
-        LocalTensor<T> comperssoredUb = this->outputQue2.template AllocTensor<T>();
+        LocalTensor<T> comperssoredUb = scoreLocal;
         this->KvMulReduceScore(kvLocal, scoreLocal, comperssoredUb, statisticInfo.compressorScCnt, dDealSize);
-        this->outputQue2.EnQue(comperssoredUb);
-        this->outputQue2.template DeQue<T>();
         PipeBarrier<PIPE_V>();
         this->CopyOutVec1ResToOutput(comperssoredUb, originSliceInfo, statisticInfo.compressorScCnt, dStartIdx,
                                      dDealSize);
-        this->outputQue2.FreeTensor(comperssoredUb);
     }
     this->compressedCnt_ += statisticInfo.compressorScCnt;
 }
@@ -313,7 +309,7 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::CalcGroupInfo(con
     // （DataCopy 的 blockLen/srcGap 整数除法错位 → 行间源偏移错误 → 数据错乱）。
     // clamp 到"不超过 maxDealColNum 的最大2的幂"后，dSplitSize 恒等于 dBaseSize
     // （2的幂，天然8元素对齐），不再进入拆分分支。
-    uint32_t maxDealColNum = BUFFER_SIZE_BYTE_32K / (this->cmpRatio_ * this->coff_ * sizeof(T));
+    uint32_t maxDealColNum = BUFFER_SIZE_BYTE_64K / (this->cmpRatio_ * this->coff_ * sizeof(T));
     splitInfo.dBaseSize = min(splitInfo.dBaseSize, FloorPow2(Trunc(maxDealColNum, BlockElementNum<T>())));
     if (this->constInfo_.kBaseNum > 1) {
         splitInfo.dBaseSize = max(splitInfo.dBaseSize, FP32_REPEAT_ELEMENT_NUM);

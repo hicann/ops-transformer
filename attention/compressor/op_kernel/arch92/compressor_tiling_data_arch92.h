@@ -46,6 +46,7 @@ struct CompressorBaseParams {
     uint32_t kBaseNum = 0;
     uint32_t kBaseSize = 0;
     uint32_t coreGroupNum = 0;
+    uint32_t mGroupNum = 0;
     uint32_t mLoopNum = 0;
     uint32_t batchConsistency = 0;
     CompressorSplitCoreParams splitCoreParam[CMP_MAX_AIC_CORE_NUM];

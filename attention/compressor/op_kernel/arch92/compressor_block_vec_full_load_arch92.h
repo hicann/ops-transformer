@@ -36,8 +36,8 @@ public:
 
     __aicore__ inline CompressorBlockVectorFullLoad(){};
     __aicore__ inline void InitBuffers(TPipe* pipe);
-    __aicore__ inline void UpdateMRange(uint32_t mStart, uint32_t mEnd);
     __aicore__ inline void ComputeVec1(uint32_t c1v1DbIdx);
+    __aicore__ inline void Warmup();
 
 private:
     __aicore__ inline void CopyInApe(uint32_t dStartIdx, uint32_t dDealSize);
@@ -68,34 +68,28 @@ private:
     __aicore__ inline Vec1SplitInfo SplitCoreV1();
 
     uint32_t c1v1DbIdx_ = 0;
-    uint64_t mm1ResMOffset_ = 0;
     uint32_t totalCompressedCnt_ = 0;
     uint32_t kvStateIdx_ = 0;
     uint32_t scoreStateIdx_ = 1;
     LocalTensor<T> scoreUb;
     LocalTensor<T> kvUb;
     TQue<QuePosition::VECIN, 1> inputQueApe;
+    Vec1SplitInfo splitInfo_;
 };
 
 template <typename COMP>
 __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(this->inputQue1, 1, BUFFER_SIZE_BYTE_64K);
-    pipe->InitBuffer(this->inputQue2, 1, BUFFER_SIZE_BYTE_64K);
+    pipe->InitBuffer(this->inputQue2, 1, BUFFER_SIZE_BYTE_32K);
+    pipe->InitBuffer(this->inputQue3, 1, BUFFER_SIZE_BYTE_32K);
     pipe->InitBuffer(this->outputQue1, 1, BUFFER_SIZE_BYTE_32K);
     pipe->InitBuffer(inputQueApe, 1, BUFFER_SIZE_BYTE_32K);
     pipe->InitBuffer(this->outputQue2, 1, BUFFER_SIZE_BYTE_16K);
-    pipe->InitBuffer(this->tmpBuff1, BUFFER_SIZE_BYTE_32K);
-    pipe->InitBuffer(this->tmpBuff2, BUFFER_SIZE_BYTE_32K);
+    pipe->InitBuffer(this->tmpBuff1, BUFFER_SIZE_BYTE_64K);
+    pipe->InitBuffer(this->tmpBuff2, BUFFER_SIZE_BYTE_64K);
     pipe->InitBuffer(this->apeBuf, BUFFER_SIZE_BYTE_32K);
     PipeBarrier<PIPE_V>();
-}
-
-template <typename COMP>
-__aicore__ inline void CompressorBlockVectorFullLoad<COMP>::UpdateMRange(uint32_t mStart, uint32_t mEnd)
-{
-    this->constInfo_.mStart = mStart;
-    this->constInfo_.mEnd = mEnd;
 }
 
 template <typename COMP>
@@ -224,7 +218,7 @@ __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::OverLapScoreKv(
     overLapSliceIterator.SetMaxBatchSize(this->constInfo_.batchSize);
     Vec1SliceInfo& overLapSliceInfo = overLapSliceIterator.GetSlice();
 
-    GlobalTensor<T> scoreDBMm1ResGm = this->scoreMm1ResGm_[c1v1DbIdx_ * this->constInfo_.dbSize + mm1ResMOffset_];
+    GlobalTensor<T> scoreDBMm1ResGm = this->scoreMm1ResGm_[c1v1DbIdx_ * this->constInfo_.dbSize];
     overLapSliceIterator.Reset(originSliceInfo.bIdx, originSliceInfo.sIdx, originSliceInfo.dealedSeqCnt, 0U);
     overLapSliceIterator.SetNeedDealTcSize(needDealTcSize);
 
@@ -248,7 +242,7 @@ __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::OverLapScoreKv(
                   dDealSize);
         }
     }
-    GlobalTensor<T> kvDBMm1ResGm = this->kvMm1ResGm_[c1v1DbIdx_ * this->constInfo_.dbSize + mm1ResMOffset_];
+    GlobalTensor<T> kvDBMm1ResGm = this->kvMm1ResGm_[c1v1DbIdx_ * this->constInfo_.dbSize];
     overLapSliceIterator.Reset(originSliceInfo.bIdx, originSliceInfo.sIdx, originSliceInfo.dealedSeqCnt, 0U);
     overLapSliceIterator.SetNeedDealTcSize(needDealTcSize);
 
@@ -299,14 +293,8 @@ template <typename COMP>
 __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::CalcGroupInfo(Vec1SplitInfo& splitInfo)
 {
     uint32_t aiCoreNum = this->constInfo_.usedCoreNum * this->cvRatio_;
-    uint32_t mStartBatch = this->constInfo_.mStart / this->constInfo_.sSize;
-    uint32_t mEndBatch = (this->constInfo_.mEnd + this->constInfo_.sSize - 1) / this->constInfo_.sSize;
-    uint32_t effectiveBatchSize =
-        min(mEndBatch, this->constInfo_.batchSize) - min(mStartBatch, this->constInfo_.batchSize);
-    effectiveBatchSize = max(effectiveBatchSize, 1U);
-    uint32_t vecCoresPerMBlock = this->constInfo_.kBaseNum * this->constInfo_.dBasicBlockNum;
-    splitInfo.dBaseSize = this->constInfo_.headDim /
-                          min(FloorPow2(vecCoresPerMBlock), CeilPow2(CeilDivT(vecCoresPerMBlock, effectiveBatchSize)));
+    splitInfo.dBaseSize =
+        this->constInfo_.headDim / min(FloorPow2(aiCoreNum), CeilPow2(CeilDivT(aiCoreNum, this->constInfo_.batchSize)));
     uint32_t maxDealColNum = BUFFER_SIZE_BYTE_64K / (this->cmpRatio_ * this->coff_ * sizeof(T));
     splitInfo.dBaseSize = min(splitInfo.dBaseSize, FloorPow2(Trunc(maxDealColNum, BlockElementNum<T>())));
     if (this->constInfo_.kBaseNum > 1) {
@@ -315,7 +303,7 @@ __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::CalcGroupInfo(Vec1Sp
     splitInfo.dBaseSize = max(splitInfo.dBaseSize, BlockElementNum<X_T>());
     splitInfo.vec1GroupSize = this->constInfo_.headDim / splitInfo.dBaseSize;
     splitInfo.vec1GroupNum =
-        min(static_cast<uint32_t>(vecCoresPerMBlock / splitInfo.vec1GroupSize), effectiveBatchSize);
+        min(static_cast<uint32_t>(aiCoreNum / splitInfo.vec1GroupSize), this->constInfo_.batchSize);
 }
 template <typename COMP>
 __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::CalcTaskDistribution(Vec1SplitInfo& splitInfo)
@@ -323,34 +311,24 @@ __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::CalcTaskDistribution
     uint32_t blockIdx = GetBlockIdx();
     uint32_t groupSize = splitInfo.vec1GroupSize;
     uint32_t groupNum = splitInfo.vec1GroupNum;
-    uint32_t mStartBatch = this->constInfo_.mStart / this->constInfo_.sSize;
-    uint32_t mEndBatch = (this->constInfo_.mEnd + this->constInfo_.sSize - 1) / this->constInfo_.sSize;
-    uint32_t totalDealBatchNum =
-        min(mEndBatch, this->constInfo_.batchSize) - min(mStartBatch, this->constInfo_.batchSize);
+    uint32_t totalDealBatchNum = this->constInfo_.batchSize;
 
-    uint32_t effectiveMIdx = (this->constInfo_.mLoopNum == 1 && this->constInfo_.mBaseSize != 0) ?
-                                 this->constInfo_.mStart / this->constInfo_.mBaseSize :
-                                 0;
-    uint32_t localBlockIdx = blockIdx - effectiveMIdx * this->constInfo_.kBaseNum * this->constInfo_.dBasicBlockNum;
-
-    if (localBlockIdx < groupSize * (totalDealBatchNum % groupNum)) {
+    if (blockIdx < groupSize * (totalDealBatchNum % groupNum)) {
         splitInfo.dealBatchNum = totalDealBatchNum / groupNum + 1;
-        splitInfo.preDealBatchNum = splitInfo.dealBatchNum * (localBlockIdx / groupSize);
-    } else if (localBlockIdx < groupSize * groupNum) {
+        splitInfo.preDealBatchNum = splitInfo.dealBatchNum * (blockIdx / groupSize);
+    } else if (blockIdx < groupSize * groupNum) {
         splitInfo.dealBatchNum = totalDealBatchNum / groupNum;
-        splitInfo.preDealBatchNum = splitInfo.dealBatchNum * (localBlockIdx / groupSize) + totalDealBatchNum % groupNum;
+        splitInfo.preDealBatchNum = splitInfo.dealBatchNum * (blockIdx / groupSize) + totalDealBatchNum % groupNum;
     } else {
         splitInfo.dealBatchNum = 0;
         splitInfo.preDealBatchNum = totalDealBatchNum;
     }
-    splitInfo.preDealBatchNum += min(mStartBatch, this->constInfo_.batchSize);
 }
 template <typename COMP>
 __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::UpdateIteratorState(Vec1SplitInfo& splitInfo)
 {
     splitInfo.preCompressedCnt = 0;
-    uint32_t mStartBatch = this->constInfo_.mStart / this->constInfo_.sSize;
-    splitInfo.dealSeqStartIdx = (splitInfo.preDealBatchNum - mStartBatch) * this->constInfo_.sSize;
+    splitInfo.dealSeqStartIdx = splitInfo.preDealBatchNum * this->constInfo_.sSize;
     splitInfo.curBStart = splitInfo.preDealBatchNum;
     splitInfo.dealSeqCnt = splitInfo.dealBatchNum * this->constInfo_.sSize;
     splitInfo.curSStart = 0;
@@ -385,17 +363,42 @@ __aicore__ inline Vec1SplitInfo CompressorBlockVectorFullLoad<COMP>::SplitCoreV1
 
     return splitInfo;
 }
+
+template <typename COMP>
+__aicore__ inline void CompressorBlockVectorFullLoad<COMP>::Warmup()
+{
+    splitInfo_ = SplitCoreV1();
+    if (splitInfo_.dealBatchNum == 0) {
+        return;
+    }
+
+    __gm__ uint64_t* blockTableAddr = reinterpret_cast<__gm__ uint64_t*>(this->stateBlockTableGm_.GetPhyAddr(0));
+    if constexpr (COMP::cacheMode == CACHE_MODE::RING_BUFFER) {
+        int64_t blockTableOffset = splitInfo_.curBStart * sizeof(int32_t);
+        dc_preload(blockTableAddr, blockTableOffset);
+    } else {
+        uint32_t batchStart = splitInfo_.curBStart;
+        uint32_t batchEnd = batchStart + splitInfo_.dealBatchNum;
+        for (uint32_t curB = batchStart; curB < batchEnd; ++curB) {
+            if (this->GetSeqUsed(curB) == 0) {
+                continue;
+            }
+            uint32_t startPos = this->GetStartPos(curB);
+            uint64_t rowOffset = curB * this->constInfo_.maxBlockNumPerBatch;
+            uint32_t firstBlock = startPos / this->constInfo_.blockSize;
+            int64_t blockTableOffset = (rowOffset + firstBlock) * sizeof(int32_t);
+            dc_preload(blockTableAddr, blockTableOffset);
+        }
+    }
+}
+
 template <typename COMP>
 __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::ComputeVec1(uint32_t c1v1DbIdx)
 {
     c1v1DbIdx_ = c1v1DbIdx;
-    mm1ResMOffset_ = (this->constInfo_.mLoopNum == 1 && this->constInfo_.mBaseSize != 0) ?
-                         (uint64_t)(this->constInfo_.mStart / this->constInfo_.mBaseSize) * this->constInfo_.kBaseNum *
-                             this->constInfo_.mm1KvResSize :
-                         0;
-    GlobalTensor<T> scoreDbGm = this->scoreMm1ResGm_[(uint64_t)c1v1DbIdx * this->constInfo_.dbSize + mm1ResMOffset_];
-    GlobalTensor<T> kvDbGm = this->kvMm1ResGm_[(uint64_t)c1v1DbIdx * this->constInfo_.dbSize + mm1ResMOffset_];
-    Vec1SplitInfo splitInfo = SplitCoreV1();
+    GlobalTensor<T> scoreDbGm = this->scoreMm1ResGm_[(uint64_t)c1v1DbIdx * this->constInfo_.dbSize];
+    GlobalTensor<T> kvDbGm = this->kvMm1ResGm_[(uint64_t)c1v1DbIdx * this->constInfo_.dbSize];
+    Vec1SplitInfo& splitInfo = splitInfo_;
     // 计算当前VecCore的任务量
     if (splitInfo.dealBatchNum == 0) {
         return;
@@ -404,13 +407,8 @@ __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::ComputeVec1(uint32_t
     LoopInfo loopInfo;
     loopInfo.groupSize = splitInfo.vec1GroupSize;
     loopInfo.groupNum = splitInfo.vec1GroupNum;
-    uint32_t effectiveMIdxL = (this->constInfo_.mLoopNum == 1 && this->constInfo_.mBaseSize != 0) ?
-                                  this->constInfo_.mStart / this->constInfo_.mBaseSize :
-                                  0;
-    uint32_t localBlockIdxL =
-        GetBlockIdx() - effectiveMIdxL * this->constInfo_.kBaseNum * this->constInfo_.dBasicBlockNum;
-    loopInfo.coreRowIdx = localBlockIdxL / splitInfo.vec1GroupSize;
-    loopInfo.coreColIdx = localBlockIdxL % splitInfo.vec1GroupSize;
+    loopInfo.coreRowIdx = GetBlockIdx() / splitInfo.vec1GroupSize;
+    loopInfo.coreColIdx = GetBlockIdx() % splitInfo.vec1GroupSize;
     loopInfo.isCoreRowLast = loopInfo.coreRowIdx == splitInfo.vec1GroupNum - 1;
     loopInfo.isCoreRowFirst = loopInfo.coreRowIdx == 0;
 
@@ -430,10 +428,11 @@ __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::ComputeVec1(uint32_t
         uint32_t curLoopBatchNum = min(singleLoopBatchNum, splitInfo.dealBatchNum - singleLoopBatchNum * idx);
         scoreUb = this->inputQue1.template AllocTensor<T>();
         kvUb = scoreUb[BUFFER_SIZE_BYTE_32K / sizeof(T)];
-        this->FromWokrSpaceToUb(scoreUb, scoreDbGm, splitInfo.dealSeqStartIdx, curLoopBatchNum * this->constInfo_.sSize,
+        uint32_t globalRowOffset = splitInfo.dealSeqStartIdx;
+        this->FromWokrSpaceToUb(scoreUb, scoreDbGm, globalRowOffset, curLoopBatchNum * this->constInfo_.sSize,
                                 baseOffset, splitInfo.dBaseSize);
-        this->FromWokrSpaceToUb(kvUb, kvDbGm, splitInfo.dealSeqStartIdx, curLoopBatchNum * this->constInfo_.sSize,
-                                baseOffset, splitInfo.dBaseSize);
+        this->FromWokrSpaceToUb(kvUb, kvDbGm, globalRowOffset, curLoopBatchNum * this->constInfo_.sSize, baseOffset,
+                                splitInfo.dBaseSize);
         this->inputQue1.template EnQue(scoreUb);
         this->inputQue1.template DeQue<T>();
         splitInfo.dealTcNum = 0;

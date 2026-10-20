@@ -58,9 +58,9 @@ __simd_vf__ void MulReduceSumbase8VFImpl(__ubuf__ T* kvAddr, __ubuf__ T* scoreAd
     Reg::MaskReg maskL8 = Reg::CreateMask<T, Reg::MaskPattern::VL8>();
     uint32_t offset = 0;
     uint32_t rCnt = coff * cmpRatio;
-    for (uint32_t scLoop = 0; scLoop < scLoopCnt; scLoop++) {
+    for (uint16_t scLoop = 0; scLoop < static_cast<uint16_t>(scLoopCnt); scLoop++) {
         Reg::Duplicate(regList.vregSum, 0, mask);
-        for (uint32_t rLoop = 0; rLoop < rCnt; rLoop++) {
+        for (uint16_t rLoop = 0; rLoop < static_cast<uint16_t>(rCnt); rLoop++) {
             LoadMulAddVFImpl(kvAddr, scoreAddr, regList, offset, baseD);
             offset += baseD;
         }
@@ -78,9 +78,9 @@ __simd_vf__ void MulReduceSumbase16VFImpl(__ubuf__ T* kvAddr, __ubuf__ T* scoreA
     Reg::MaskReg maskL16 = Reg::CreateMask<T, Reg::MaskPattern::VL16>();
     uint32_t offset = 0;
     uint32_t rCnt = coff * cmpRatio;
-    for (uint32_t scLoop = 0; scLoop < scLoopCnt; scLoop++) {
+    for (uint16_t scLoop = 0; scLoop < static_cast<uint16_t>(scLoopCnt); scLoop++) {
         Reg::Duplicate(regList.vregSum, 0, mask);
-        for (uint32_t rLoop = 0; rLoop < rCnt; rLoop++) {
+        for (uint16_t rLoop = 0; rLoop < static_cast<uint16_t>(rCnt); rLoop++) {
             LoadMulAddVFImpl(kvAddr, scoreAddr, regList, offset, baseD);
             offset += baseD;
         }
@@ -98,9 +98,9 @@ __simd_vf__ void MulReduceSumbase32VFImpl(__ubuf__ T* kvAddr, __ubuf__ T* scoreA
     Reg::MaskReg maskL32 = Reg::CreateMask<T, Reg::MaskPattern::VL32>();
     uint32_t offset = 0;
     uint32_t rCnt = coff * cmpRatio;
-    for (uint32_t scLoop = 0; scLoop < scLoopCnt; scLoop++) {
+    for (uint16_t scLoop = 0; scLoop < static_cast<uint16_t>(scLoopCnt); scLoop++) {
         Reg::Duplicate(regList.vregSum, 0, mask);
-        for (uint32_t rLoop = 0; rLoop < rCnt; rLoop++) {
+        for (uint16_t rLoop = 0; rLoop < static_cast<uint16_t>(rCnt); rLoop++) {
             LoadMulAddVFImpl(kvAddr, scoreAddr, regList, offset, baseD);
             offset += baseD;
         }

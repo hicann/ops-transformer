@@ -51,7 +51,7 @@ __simd_callee__ void MultiAddVFImpl(__ubuf__ T* outputAddr, __ubuf__ T* inputAdd
     __ubuf__ T* initialAddr = IS_FIRST ? inputAddr : outputAddr;
     Reg::MaskReg mask = Reg::UpdateMask<T>(maskValue);
     Reg::LoadAlign(regList.vreg, initialAddr + offset);
-    for (uint32_t repeatIdx = initialRepeatIdx; repeatIdx < repeatNum; repeatIdx++) {
+    for (uint16_t repeatIdx = initialRepeatIdx; repeatIdx < static_cast<uint16_t>(repeatNum); repeatIdx++) {
         uint64_t addOffset = offset + repeatIdx * repeatOffset;
         Reg::LoadAlign(regList.vregape, inputAddr + addOffset);
         Reg::Add(regList.vreg, regList.vreg, regList.vregape, mask);
@@ -65,7 +65,7 @@ __simd_vf__ void Add64VFImpl(__ubuf__ T* inputAddr, __ubuf__ T* apeAddr, uint32_
 {
     AddRegList<T> regList[4];
     uint32_t loopTimes = row / 4;
-    for (uint32_t idx = 0; idx < loopTimes; idx++) {
+    for (uint16_t idx = 0; idx < static_cast<uint16_t>(loopTimes); idx++) {
         uint64_t offset0 = idx * 4 * actualCol0;
         uint64_t offset1 = idx * 4 * actualCol1;
         AddVFImpl(inputAddr, apeAddr, regList[0], row, col, offset0, offset1);
@@ -95,7 +95,7 @@ __simd_vf__ void Add128VFImpl(__ubuf__ T* inputAddr, __ubuf__ T* apeAddr, uint32
 {
     AddRegList<T> regList[4];
     uint32_t loopTimes = row / 2;
-    for (uint32_t idx = 0; idx < loopTimes; idx++) {
+    for (uint16_t idx = 0; idx < static_cast<uint16_t>(loopTimes); idx++) {
         uint64_t offset0 = idx * 2 * actualCol0;
         uint64_t offset1 = idx * 2 * actualCol1;
         AddVFImpl(inputAddr, apeAddr, regList[0], row, FLOAT_REP_SIZE, offset0, offset1);
@@ -120,7 +120,7 @@ __simd_vf__ void Add256VFImpl(__ubuf__ T* inputAddr, __ubuf__ T* apeAddr, uint32
 {
     AddRegList<T> regList[4];
     Reg::MaskReg mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
-    for (uint32_t idx = 0; idx < row; idx++) {
+    for (uint16_t idx = 0; idx < static_cast<uint16_t>(row); idx++) {
         uint64_t offset0 = idx * actualCol0;
         uint64_t offset1 = idx * actualCol1;
         AddVFImpl(inputAddr, apeAddr, regList[0], row, FLOAT_REP_SIZE, offset0, offset1);
@@ -170,13 +170,13 @@ __simd_vf__ void MultiAdd64VFImpl(__ubuf__ T* outputAddr, __ubuf__ T* inputAddr,
     uint32_t initialRepeatIdx = IS_FIRST ? 1 : 0;
     __ubuf__ T* initialAddr = IS_FIRST ? inputAddr : outputAddr;
     Reg::MaskReg mask = Reg::UpdateMask<T>(maskValue);
-    for (uint32_t idx = 0; idx < loopTimes; idx++) {
+    for (uint16_t idx = 0; idx < static_cast<uint16_t>(loopTimes); idx++) {
         uint64_t offset = idx * 4 * actualCol;
         Reg::LoadAlign(regList[0].vreg, initialAddr + offset);
         Reg::LoadAlign(regList[1].vreg, initialAddr + offset + actualCol);
         Reg::LoadAlign(regList[2].vreg, initialAddr + offset + 2 * actualCol);
         Reg::LoadAlign(regList[3].vreg, initialAddr + offset + 3 * actualCol);
-        for (uint32_t repeatIdx = initialRepeatIdx; repeatIdx < repeatNum; repeatIdx++) {
+        for (uint16_t repeatIdx = initialRepeatIdx; repeatIdx < static_cast<uint16_t>(repeatNum); repeatIdx++) {
             uint64_t addOffset = offset + repeatIdx * repeatOffset;
             Reg::LoadAlign(regList[0].vregape, inputAddr + addOffset);
             Reg::LoadAlign(regList[1].vregape, inputAddr + addOffset + actualCol);
@@ -218,13 +218,13 @@ __simd_vf__ void MultiAdd128VFImpl(__ubuf__ T* outputAddr, __ubuf__ T* inputAddr
     uint32_t initialRepeatIdx = IS_FIRST ? 1 : 0;
     __ubuf__ T* initialAddr = IS_FIRST ? inputAddr : outputAddr;
     Reg::MaskReg mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
-    for (uint32_t idx = 0; idx < loopTimes; idx++) {
+    for (uint16_t idx = 0; idx < static_cast<uint16_t>(loopTimes); idx++) {
         uint64_t offset = idx * actualCol * 2;
         Reg::LoadAlign(regList[0].vreg, initialAddr + offset);
         Reg::LoadAlign(regList[1].vreg, initialAddr + offset + FLOAT_REP_SIZE);
         Reg::LoadAlign(regList[2].vreg, initialAddr + offset + actualCol);
         Reg::LoadAlign(regList[3].vreg, initialAddr + offset + actualCol + FLOAT_REP_SIZE);
-        for (uint32_t repeatIdx = initialRepeatIdx; repeatIdx < repeatNum; repeatIdx++) {
+        for (uint16_t repeatIdx = initialRepeatIdx; repeatIdx < static_cast<uint16_t>(repeatNum); repeatIdx++) {
             uint64_t addOffset = offset + repeatIdx * repeatOffset;
             Reg::LoadAlign(regList[0].vregape, inputAddr + addOffset);
             Reg::LoadAlign(regList[1].vregape, inputAddr + addOffset + FLOAT_REP_SIZE);
@@ -258,13 +258,13 @@ __simd_vf__ void MultiAdd256VFImpl(__ubuf__ T* outputAddr, __ubuf__ T* inputAddr
     uint32_t initialRepeatIdx = IS_FIRST ? 1 : 0;
     __ubuf__ T* initialAddr = IS_FIRST ? inputAddr : outputAddr;
     Reg::MaskReg mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
-    for (uint32_t idx = 0; idx < loopTimes; idx++) {
+    for (uint16_t idx = 0; idx < static_cast<uint16_t>(loopTimes); idx++) {
         uint64_t offset = idx * actualCol;
         Reg::LoadAlign(regList[0].vreg, initialAddr + offset);
         Reg::LoadAlign(regList[1].vreg, initialAddr + offset + FLOAT_REP_SIZE);
         Reg::LoadAlign(regList[2].vreg, initialAddr + offset + 2 * FLOAT_REP_SIZE);
         Reg::LoadAlign(regList[3].vreg, initialAddr + offset + 3 * FLOAT_REP_SIZE);
-        for (uint32_t repeatIdx = initialRepeatIdx; repeatIdx < repeatNum; repeatIdx++) {
+        for (uint16_t repeatIdx = initialRepeatIdx; repeatIdx < static_cast<uint16_t>(repeatNum); repeatIdx++) {
             uint64_t addOffset = offset + repeatIdx * repeatOffset;
             Reg::LoadAlign(regList[0].vregape, inputAddr + addOffset);
             Reg::LoadAlign(regList[1].vregape, inputAddr + addOffset + FLOAT_REP_SIZE);
@@ -302,7 +302,7 @@ __simd_vf__ void MultiAdd512VFImpl(__ubuf__ T* outputAddr, __ubuf__ T* inputAddr
         Reg::LoadAlign(regList[6].vreg, initialAddr + offset + 6 * FLOAT_REP_SIZE);
         Reg::LoadAlign(regList[7].vreg, initialAddr + offset + 7 * FLOAT_REP_SIZE);
         for (uint16_t repeatIdx = initialRepeatIdx; repeatIdx < static_cast<uint16_t>(repeatNum); repeatIdx++) {
-            uint64_t addOffset = offset + repeatIdx * static_cast<uint16_t>(actualCol);
+            uint64_t addOffset = offset + repeatIdx * repeatOffset;
             Reg::LoadAlign(regList[0].vregape, inputAddr + addOffset);
             Reg::LoadAlign(regList[1].vregape, inputAddr + addOffset + FLOAT_REP_SIZE);
             Reg::LoadAlign(regList[2].vregape, inputAddr + addOffset + 2 * FLOAT_REP_SIZE);

@@ -344,7 +344,8 @@ __aicore__ inline void QuantCompressorBlockCube<COMP, IS_FULL_LOAD>::CopyOutMm1R
         nOffset = constInfo_.dIdx * constInfo_.dBaseSize;
     }
     uint64_t dbOffset = info.cubeDbIdx * constInfo_.dbSize;
-    uint64_t gmOffset = nOffset + coffId * constInfo_.headDim + mStart * fixParams.dstStride + dbOffset;
+    uint64_t globalRow = (uint64_t)constInfo_.mRowBase + mStart;
+    uint64_t gmOffset = nOffset + coffId * constInfo_.headDim + globalRow * fixParams.dstStride + dbOffset;
     uint32_t kvOffset = (mDealSize + NZ_FRACTAL_DIM - 1) / NZ_FRACTAL_DIM * NZ_FRACTAL_DIM * nStart;
     uint32_t scoreOffset = (mDealSize + NZ_FRACTAL_DIM - 1) / NZ_FRACTAL_DIM * NZ_FRACTAL_DIM *
                            ((nStart + constInfo_.dBaseSize) % (WEIGHT_MATRIX_NUM * constInfo_.dBaseSize));

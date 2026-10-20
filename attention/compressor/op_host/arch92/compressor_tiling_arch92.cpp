@@ -224,10 +224,13 @@ ge::graphStatus CompressorTiling::SetTemplateId()
 
 ge::graphStatus CompressorTiling::SetFullLoadSplitInfo()
 {
-    innerSplitParams_->mBaseSize = 256;              // 256:核间切分，M轴基本块大小
+    constexpr uint32_t M_BASE_TARGET = 256;
+    uint32_t seqSize = baseParams_->seqSize != 0 ? baseParams_->seqSize : 1U;
+    innerSplitParams_->mBaseSize = M_BASE_TARGET - (M_BASE_TARGET % seqSize);
     innerSplitParams_->dBaseSize = 256 / (coff * 2); // nBase = dBase * coff * 2
     uint32_t dBaseNum = baseParams_->headDim / innerSplitParams_->dBaseSize;
     uint32_t mBaseNum = (baseParams_->tokenSize + innerSplitParams_->mBaseSize - 1) / innerSplitParams_->mBaseSize;
+    baseParams_->mGroupNum = mBaseNum;
     baseParams_->coreGroupNum = baseParams_->usedCoreNum / dBaseNum;
     baseParams_->kBaseNum = 1;
     baseParams_->kBaseSize = baseParams_->hiddenSize;
@@ -305,6 +308,18 @@ ge::graphStatus CompressorTiling::SetNormalSplitInfo()
 {
     innerSplitParams_->mBaseSize = 256;        // 256:核间切分，M轴基本块大小
     innerSplitParams_->dBaseSize = 128 / coff; // 128：核间切分，D轴基本块大小
+    uint32_t dBaseNum = baseParams_->headDim / innerSplitParams_->dBaseSize;
+    baseParams_->coreGroupNum = baseParams_->usedCoreNum / dBaseNum;
+    uint32_t mBaseNum = (baseParams_->tokenSize + innerSplitParams_->mBaseSize - 1) / innerSplitParams_->mBaseSize;
+    baseParams_->mGroupNum = baseParams_->coreGroupNum;
+    baseParams_->kBaseNum = 1;
+    baseParams_->kBaseSize = baseParams_->hiddenSize;
+    if (dBaseNum * mBaseNum < baseParams_->usedCoreNum && baseParams_->batchConsistency != BATCH_CONSISTENCY) {
+        baseParams_->kBaseNum = baseParams_->coreGroupNum / mBaseNum;
+        uint32_t kAlignSize = (baseParams_->hiddenSize + baseParams_->kBaseNum - 1) / baseParams_->kBaseNum;
+        baseParams_->kBaseSize = kAlignSize / 16 * 16; // 切k的size需要16对齐
+        baseParams_->mGroupNum = mBaseNum;
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -313,27 +328,7 @@ ge::graphStatus CompressorTiling::SetInnerSplitInfo()
     if (context_->templateId == TemplateId::FULL_LOAD) {
         return SetFullLoadSplitInfo();
     }
-    ge::graphStatus ret = SetNormalSplitInfo();
-    if (ret != ge::GRAPH_SUCCESS) {
-        return ret;
-    }
-    // 核数(usedCoreNum/aicNum_)可能不是 dBasicBlockNum 的整数倍（如 54 核、headdim=512
-    // 时 dBasicBlockNum=8 → 54%8=6）。若放任 54 个核全部下发，会多出第 7 个"残组"
-    // （curGroupIdx=6 >= coreGroupNum=6），该组 cube 无 K 片可算(dealKSize==0)但
-    // vector 仍会运行，用非法组几何推导 workspace 偏移 → aicore "UB access overflow"(341)。
-    // 将 usedCoreNum 向下取整到 dBasicBlockNum 的整数倍，让残组核(48~53)不再下发。
-    uint32_t dBasicBlockNum = baseParams_->headDim / innerSplitParams_->dBaseSize;
-    if (dBasicBlockNum != 0) {
-        uint32_t alignedCoreNum = (baseParams_->usedCoreNum / dBasicBlockNum) * dBasicBlockNum;
-        if (alignedCoreNum == 0) {
-            alignedCoreNum = dBasicBlockNum;
-        }
-        if (alignedCoreNum > aivNum_) {
-            alignedCoreNum = (aivNum_ / dBasicBlockNum) * dBasicBlockNum;
-        }
-        baseParams_->usedCoreNum = alignedCoreNum;
-    }
-    return ge::GRAPH_SUCCESS;
+    return SetNormalSplitInfo();
 }
 
 ge::graphStatus CompressorTiling::CalcWorkSpace()
@@ -412,9 +407,9 @@ ge::graphStatus CompressorTiling::RunBigKernelTiling(CompressorTilingData* tilin
                                                     std::bind(&CompressorTiling::SetPageAttentionInfo, this),
                                                     std::bind(&CompressorTiling::CheckFeature, this),
                                                     std::bind(&CompressorTiling::CheckMultiParaConsistency, this),
-                                                    std::bind(&CompressorTiling::CheckBlockDimConstrain, this),
                                                     std::bind(&CompressorTiling::SetTemplateId, this),
                                                     std::bind(&CompressorTiling::SetInnerSplitInfo, this),
+                                                    std::bind(&CompressorTiling::CheckBlockDimConstrain, this),
                                                     std::bind(&CompressorTiling::SetWorkSpaceInfo, this),
                                                     std::bind(&CompressorTiling::SetScenarioInfo, this)};
     for (const auto& func : requiredTilingFuncs) {
@@ -1051,6 +1046,10 @@ ge::graphStatus CompressorTiling::CheckDimNumConsistency() const
 ge::graphStatus CompressorTiling::CheckBlockDimConstrain() const
 {
     uint32_t minBlockNum = baseParams_->headDim / 64; // 64 is the largest dBaseSize
+    if (context_->templateId == TemplateId::FULL_LOAD) {
+        uint32_t dBaseNum = baseParams_->headDim / innerSplitParams_->dBaseSize;
+        minBlockNum = std::max(minBlockNum, dBaseNum * baseParams_->mGroupNum);
+    }
     OP_CHECK_IF(aicNum_ < minBlockNum,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->opName, "aicNum", std::to_string(aicNum_),
                                                       "aicNum should not be less than " + std::to_string(minBlockNum)),

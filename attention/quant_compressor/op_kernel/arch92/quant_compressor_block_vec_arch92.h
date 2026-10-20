@@ -188,7 +188,6 @@ protected:
     TQue<QuePosition::VECIN, 1> inputQue3;
     // out queue
     TQue<QuePosition::VECOUT, 1> outputQue1;
-    TQue<QuePosition::VECOUT, 1> outputQue2;
 };
 
 // =================================Init=================================
@@ -304,14 +303,14 @@ __aicore__ inline LoopInfo QuantCompressorBlockVector<COMP>::GetLoopInfo(const V
 template <typename COMP>
 __aicore__ inline void QuantCompressorBlockVector<COMP>::LoadDescale()
 {
-    LocalTensor<T> wDescale = this->inputQue3.template AllocTensor<T>();
+    LocalTensor<T> wDescale = this->inputQue2.template AllocTensor<T>();
     DataCopy(wDescale, this->wKvDescaleGm_, this->coff_ * this->constInfo_.headDim);
     DataCopy(wDescale[BUFFER_SIZE_BYTE_8K / sizeof(T)], this->wGateDescaleGm_, this->coff_ * this->constInfo_.headDim);
-    this->inputQue3.template EnQue(wDescale);
-    this->inputQue3.template DeQue<T>();
+    this->inputQue2.template EnQue(wDescale);
+    this->inputQue2.template DeQue<T>();
     DataCopy(this->xWKvDescaleUb, wDescale, this->coff_ * this->constInfo_.headDim);
     DataCopy(this->xWGateDescaleUb, wDescale[BUFFER_SIZE_BYTE_8K / sizeof(T)], this->coff_ * this->constInfo_.headDim);
-    this->inputQue3.template FreeTensor(wDescale);
+    this->inputQue2.template FreeTensor(wDescale);
     MulsVF(this->xWKvDescaleUb, this->xWKvDescaleUb, this->xDescale_, this->coff_, this->constInfo_.headDim);
     MulsVF(this->xWGateDescaleUb, this->xWGateDescaleUb, this->xDescale_, this->coff_, this->constInfo_.headDim);
 }
@@ -429,38 +428,51 @@ __aicore__ inline void QuantCompressorBlockVector<COMP>::AddMultiDataToUb(
     uint32_t srcSingleRowCount, uint32_t dstSingleRowCount, uint32_t repeatTimes, uint64_t offset)
 {
     uint32_t cnt = dealRowCount * dstSingleRowCount;
-    uint32_t groupSize = BUFFER_SIZE_BYTE_32K / (cnt * sizeof(O));
-    uint32_t loopTimes = CeilDivT(repeatTimes, groupSize);
-    uint64_t srcGmOffset = 0;
-    for (uint32_t idx = 0; idx < loopTimes; idx++) {
-        auto& inputQue = idx % 2 == 0 ? inputQue2 : inputQue3;
-        uint32_t curGroupSize = min(groupSize, (repeatTimes - groupSize * idx));
-        LocalTensor<O> splitLocal = inputQue.AllocTensor<O>();
-        if (srcSingleRowCount == dstSingleRowCount && dstSingleRowCount == dealRowCount) {
-            for (uint32_t groupIdx = 0; groupIdx < curGroupSize; groupIdx++) {
-                DataCopy(splitLocal[groupIdx * cnt], srcGm[srcGmOffset], cnt);
-                srcGmOffset += offset;
-            }
-        } else {
-            for (uint32_t groupIdx = 0; groupIdx < curGroupSize; groupIdx++) {
-                DataCopyAlignGmToUb(splitLocal[groupIdx * cnt], srcGm[srcGmOffset], dealRowCount, dealColCount,
-                                    srcSingleRowCount, dstSingleRowCount);
-                srcGmOffset += offset;
-            }
-        }
-
-        inputQue.EnQue(splitLocal);
-        inputQue.DeQue<O>();
-
-        PipeBarrier<PIPE_V>();
-        if (idx == 0) {
-            MultiAddVF<true>(dstLocal, splitLocal, dealRowCount, dealColCount, dstSingleRowCount, curGroupSize, cnt);
-        } else {
-            MultiAddVF<false>(dstLocal, splitLocal, dealRowCount, dealColCount, dstSingleRowCount, curGroupSize, cnt);
-        }
-        inputQue.FreeTensor(splitLocal);
+    if (cnt == 0) {
+        return;
     }
-    PipeBarrier<PIPE_V>();
+    constexpr uint32_t bufElem = BUFFER_SIZE_BYTE_32K / sizeof(O);
+    uint32_t rowsPerSplit = bufElem / dstSingleRowCount;
+    uint32_t splitNum = CeilDivT(dealRowCount, rowsPerSplit);
+    for (uint32_t splitIdx = 0; splitIdx < splitNum; splitIdx++) {
+        uint32_t rowStart = splitIdx * rowsPerSplit;
+        uint32_t rowCnt = min(rowsPerSplit, dealRowCount - rowStart);
+        uint32_t splitCnt = rowCnt * dstSingleRowCount;
+        uint32_t groupSize = bufElem / splitCnt;
+        uint32_t loopTimes = CeilDivT(repeatTimes, groupSize);
+        uint64_t srcGmOffset = static_cast<uint64_t>(rowStart) * srcSingleRowCount;
+        for (uint32_t idx = 0; idx < loopTimes; idx++) {
+            auto& inputQue = (splitIdx * loopTimes + idx) % 2 == 0 ? inputQue2 : inputQue3;
+            uint32_t curGroupSize = min(groupSize, (repeatTimes - groupSize * idx));
+            LocalTensor<O> splitLocal = inputQue.AllocTensor<O>();
+            if (srcSingleRowCount == dstSingleRowCount && dstSingleRowCount == dealRowCount) {
+                for (uint32_t groupIdx = 0; groupIdx < curGroupSize; groupIdx++) {
+                    DataCopy(splitLocal[groupIdx * splitCnt], srcGm[srcGmOffset], splitCnt);
+                    srcGmOffset += offset;
+                }
+            } else {
+                for (uint32_t groupIdx = 0; groupIdx < curGroupSize; groupIdx++) {
+                    DataCopyAlignGmToUb(splitLocal[groupIdx * splitCnt], srcGm[srcGmOffset], rowCnt, dealColCount,
+                                        srcSingleRowCount, dstSingleRowCount);
+                    srcGmOffset += offset;
+                }
+            }
+
+            inputQue.EnQue(splitLocal);
+            inputQue.DeQue<O>();
+
+            PipeBarrier<PIPE_V>();
+            if (idx == 0) {
+                MultiAddVF<true>(dstLocal[rowStart * dstSingleRowCount], splitLocal, rowCnt, dealColCount,
+                                 dstSingleRowCount, curGroupSize, splitCnt);
+            } else {
+                MultiAddVF<false>(dstLocal[rowStart * dstSingleRowCount], splitLocal, rowCnt, dealColCount,
+                                  dstSingleRowCount, curGroupSize, splitCnt);
+            }
+            inputQue.FreeTensor(splitLocal);
+        }
+        PipeBarrier<PIPE_V>();
+    }
 }
 
 // =================================Dequant=================================
@@ -864,7 +876,7 @@ template <typename COMP>
 __aicore__ inline void QuantCompressorBlockVector<COMP>::CalcTilingStrategy(Vec1SplitInfo& splitInfo)
 {
     // 计算headDim和Tc方向切分大小
-    uint32_t maxDealColNum = BUFFER_SIZE_BYTE_32K / (cmpRatio_ * coff_ * sizeof(T));
+    uint32_t maxDealColNum = BUFFER_SIZE_BYTE_64K / (cmpRatio_ * coff_ * sizeof(T));
 
     // 切块逻辑
     if (maxDealColNum < splitInfo.dBaseSize) {
