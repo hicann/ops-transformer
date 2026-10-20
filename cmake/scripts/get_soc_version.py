@@ -21,99 +21,13 @@ from parse_changed_files import Module
 from parse_changed_files import Parser
 
 
-class GetSocModules(Module):
-    def __init__(self, name):
-        super().__init__(name=name)
-
-    def get_test_options(self, f: Path) -> List[str]:
-        def check_option_arch(path_obj: Path, option: List[str]):
-            if not option:
-                return True
-            if option[0] == "ascend310p":
-                ascend310p_exclude_folders = [
-                    "arch22",
-                    "arch35",
-                    "ascend910b",
-                    "ascend910_93",
-                    "ascend950",
-                    "ascend350",
-                ]
-                return any(
-                    folder in path_obj.parts for folder in ascend310p_exclued_folders
-                )
-            if option[0] == "ascend910b":
-                ascend910b_exclude_folders = [
-                    "arch20",
-                    "arch31",
-                    "arch35",
-                    "ascend310p",
-                    "ascend310p",
-                    "ascend350",
-                ]
-                return any(
-                    folder in path_obj.parts for folder in ascend910b_exclued_folders
-                )
-            if option[0] == "ascend950":
-                ascend950_exclude_folders = [
-                    "arch22",
-                    "arch20",
-                    "arch31",
-                    "ascend910b",
-                    "ascend910_93",
-                    "ascend310p",
-                    "ascend350",
-                ]
-                return any(
-                    folder in path_obj.parts for folder in ascend950_exclued_folders
-                )
-            if option[0] == "ascend350":
-                ascend350_exclude_folders = [
-                    "arch22",
-                    "arch20",
-                    "arch31",
-                    "ascend910b",
-                    "ascend910_93",
-                    "ascend310p",
-                    "ascend950",
-                ]
-                return any(
-                    folder in path_obj.parts for folder in ascend350_exclude_folders
-                )
-            return False
-
-        def is_excluded(e_f: Path, option: str):
-            if check_option_arch(e_f, option):
-                return True
-            for e in self.src_exclude_files:
-                try:
-                    e_f.relative_to(e)
-                    return True
-                except ValueError:
-                    continue
-            return False
-
-        related_socs: List[str] = []
-        for s in self.src_files:
-            if is_excluded(e_f=f, option=self.options):
-                continue
-            try:
-                if f.relative_to(s):
-                    # 当同一个修改文件需要触发多个 soc 时, 需要把这些 soc 全部添加
-                    related_socs.extend(self.options)
-            except ValueError:
-                continue
-        # 关联 socs 去重
-        related_socs = list(set(related_socs))
-        return related_socs
-
-
 class ParserSoc(Parser):
     """
     规则文件、修改文件列表文件解析.
     """
 
     _Modules: List[
-        GetSocModules
+        Module
     ] = []  # 保存规则文件(tests/test_soc_config.yaml)内设置的模块列表
 
     @staticmethod
