@@ -9,14 +9,14 @@
  */
 
 /*!
- * \file vf_dequant.h
+ * \file vf_dequant_arch92.h
  * \brief
  */
 
-#ifndef VF_DEQUANT_H
-#define VF_DEQUANT_H
+#ifndef VF_DEQUANT_ARCH92_H
+#define VF_DEQUANT_ARCH92_H
 #include "kernel_tensor.h"
-#include "vf_comm.h"
+#include "vf_comm_arch92.h"
 
 namespace MlaProlog {
 

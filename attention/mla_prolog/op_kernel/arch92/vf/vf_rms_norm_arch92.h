@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file vf_rms_norm.h
+ * \file vf_rms_norm_arch92.h
  * \brief
  */
 
-#ifndef VF_RMS_NORM_H
-#define VF_RMS_NORM_H
+#ifndef VF_RMS_NORM_ARCH92_H
+#define VF_RMS_NORM_ARCH92_H
 #include "kernel_tensor.h"
 #include "../mla_prolog_comm_arch92.h"
 

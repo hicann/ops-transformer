@@ -800,7 +800,7 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::VectorBufferInit()
         uint64_t stepActualSeqSize = baseParams_->stepBatchSize * sizeof(int64_t);
         pipe_->InitBuffer(stepActualSeqBuffer_, stepActualSeqSize); // [1, stepBatchSize]
         stepActualSeqLocal_ = stepActualSeqBuffer_.Get<int64_t>();
-        usedBytes += stepActualSeqSize;
+        usedBytes += Align(stepActualSeqSize, static_cast<uint64_t>(ALIGN_BLOCK_SIZE));
     }
     pipe_->InitBuffer(shareBuffer_, MAX_UB_SIZE - usedBytes);
     ubShareBytes_ = static_cast<uint32_t>(MAX_UB_SIZE - usedBytes);
@@ -1185,7 +1185,7 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::AivProcess(AivOffset& aivOffs
         CrossCoreSetFlag<SYNC_MODE_CUBE_VEC, PIPE_MTE3>(FINISH_VEC_RMSNORM_CQ);
         SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
         WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
-        if (aivOffset.curVecToken > 0) {
+        if (blockIdx_ < curVectorBlockNum_ && aivOffset.curVecToken > 0) {
             DataCopy(dequantTool_.deQuantScaleCqGm_[aivOffset.curBlockTokenOffset * FP32_BLOCK_ELEMENT_NUM],
                      dequantTool_.deQuantScaleCqLocal_[aivOffset.curBlockTokenOffset * FP32_BLOCK_ELEMENT_NUM],
                      FP32_BLOCK_ELEMENT_NUM * aivOffset.curVecToken);
@@ -2895,9 +2895,14 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::RopeQrSplitN(const RopeQrSpli
                                                                   ropeQrSplitNParams.deqScaleOffset];
                 Dequant(kFp32Local, waveUbQr, scaleChLocal, dequantTool_.deQuantScaleCqLocal_[deQuantScaleCqOffset],
                         Rectangle{ropeCnt, colQr, wavePitch}, colQr);
-                RotaryPosEmb<ropeComputType>(kOutFp32Local, kFp32Local, cosLocal_[ropeQrSplitNParams.sinCosOffset],
-                                             sinLocal_[ropeQrSplitNParams.sinCosOffset], ropeCnt, colQr, colQr);
-                Cast(outputLocalRope, kOutFp32Local, RoundMode::CAST_RINT, cnt);
+                if constexpr (MLAPT::enableRope) {
+                    RotaryPosEmb<ropeComputType>(kOutFp32Local, kFp32Local, cosLocal_[ropeQrSplitNParams.sinCosOffset],
+                                                 sinLocal_[ropeQrSplitNParams.sinCosOffset], ropeCnt, colQr, colQr);
+                    Cast(outputLocalRope, kOutFp32Local, RoundMode::CAST_RINT, cnt);
+                } else {
+                    DataSyncBarrier<MemDsbT::UB>();
+                    Cast(outputLocalRope, kFp32Local, RoundMode::CAST_RINT, cnt);
+                }
             } else if constexpr (std::is_same<mmQcQrInputType, bfloat16_t>::value) {
                 const uint32_t colQcSingleR2 = baseParams_->dimHeadSizeQc / cvRatio_;
                 const uint32_t sOut = cnt * static_cast<uint32_t>(sizeof(ropeOutputType));
@@ -2914,9 +2919,14 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::RopeQrSplitN(const RopeQrSpli
                 LocalTensor<float> kOutFp32Local = kFp32Local[cnt];  // rope计算输出
                 CopyStridedVf<mmQcQrOutputType>(kLocalUb, waveUbQr, ropeCnt, colQr, wavePitch, colQr);
                 Cast(kFp32Local, kLocalUb, RoundMode::CAST_NONE, cnt);
-                RotaryPosEmb<ropeComputType>(kOutFp32Local, kFp32Local, cosLocal_[ropeQrSplitNParams.sinCosOffset],
-                                             sinLocal_[ropeQrSplitNParams.sinCosOffset], ropeCnt, colQr, colQr);
-                Cast(outputLocalRope, kOutFp32Local, RoundMode::CAST_RINT, cnt);
+                if constexpr (MLAPT::enableRope) {
+                    RotaryPosEmb<ropeComputType>(kOutFp32Local, kFp32Local, cosLocal_[ropeQrSplitNParams.sinCosOffset],
+                                                 sinLocal_[ropeQrSplitNParams.sinCosOffset], ropeCnt, colQr, colQr);
+                    Cast(outputLocalRope, kOutFp32Local, RoundMode::CAST_RINT, cnt);
+                } else {
+                    DataSyncBarrier<MemDsbT::UB>();
+                    Cast(outputLocalRope, kFp32Local, RoundMode::CAST_RINT, cnt);
+                }
             } else {
                 LocalTensor<float> kFp32Local = ropeShareTmpUb.ReinterpretCast<float>(); // 紧凑输入[ropeCnt,colQr]
                 LocalTensor<float> kOutFp32Local = kFp32Local[cnt];                      // rope计算输出
@@ -2932,9 +2942,14 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::RopeQrSplitN(const RopeQrSpli
                 WaitFlag<HardEvent::MTE2_V>(EVENT_ID1);
                 Dequant(kFp32Local, waveUbQr, scaleChLocal, dequantTool_.deQuantScaleCqLocal_[deQuantScaleCqOffset],
                         Rectangle{ropeCnt, colQr, wavePitch}, colQr);
-                RotaryPosEmb<ropeComputType>(kOutFp32Local, kFp32Local, cosLocal_[ropeQrSplitNParams.sinCosOffset],
-                                             sinLocal_[ropeQrSplitNParams.sinCosOffset], ropeCnt, colQr, colQr);
-                Cast(outputLocalRope, kOutFp32Local, RoundMode::CAST_RINT, cnt);
+                if constexpr (MLAPT::enableRope) {
+                    RotaryPosEmb<ropeComputType>(kOutFp32Local, kFp32Local, cosLocal_[ropeQrSplitNParams.sinCosOffset],
+                                                 sinLocal_[ropeQrSplitNParams.sinCosOffset], ropeCnt, colQr, colQr);
+                    Cast(outputLocalRope, kOutFp32Local, RoundMode::CAST_RINT, cnt);
+                } else {
+                    DataSyncBarrier<MemDsbT::UB>();
+                    Cast(outputLocalRope, kFp32Local, RoundMode::CAST_RINT, cnt);
+                }
             }
         } else {
             // ===== 原 GM 路径 =====
@@ -2967,9 +2982,14 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::RopeQrSplitN(const RopeQrSpli
             LocalTensor<float> kFp32Local = shareTmpUb[ropeBase].template ReinterpretCast<float>(); // 紧凑输入
             LocalTensor<float> kOutFp32Local = kFp32Local[cnt];                                     // rope计算输出
             CopyStridedVf<mmQcQrOutputType>(kFp32Local, waveUbQr, ropeCnt, colQr, wavePitch, colQr);
-            RotaryPosEmb<ropeComputType>(kOutFp32Local, kFp32Local, cosLocal_[ropeQrSplitNParams.sinCosOffset],
-                                         sinLocal_[ropeQrSplitNParams.sinCosOffset], ropeCnt, colQr, colQr);
-            Cast(outputLocalRope, kOutFp32Local, RoundMode::CAST_RINT, cnt);
+            if constexpr (MLAPT::enableRope) {
+                RotaryPosEmb<ropeComputType>(kOutFp32Local, kFp32Local, cosLocal_[ropeQrSplitNParams.sinCosOffset],
+                                             sinLocal_[ropeQrSplitNParams.sinCosOffset], ropeCnt, colQr, colQr);
+                Cast(outputLocalRope, kOutFp32Local, RoundMode::CAST_RINT, cnt);
+            } else {
+                DataSyncBarrier<MemDsbT::UB>();
+                Cast(outputLocalRope, kFp32Local, RoundMode::CAST_RINT, cnt);
+            }
         } else {
             if constexpr (IsFullQuantMode<mmQcQrInputType, dequantScaleType, true>()) {
                 GlobalTensor<dequantScaleType> deqScaleRope = deqScaleQcQrW_[ropeQrSplitNParams.ropeQrOffset];
@@ -3614,6 +3634,7 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::DynamicQuantQnAndMulQrSyncMMQ
         const uint32_t col = baseParams_->headSizeCkv;     // 512
         const uint32_t colRope = baseParams_->dimHeadRope; // 64
         const uint32_t subRowRope = (row < 64) ? row : 64;
+        const uint32_t scaleRowStride = Align(row, static_cast<uint32_t>(FP32_BLOCK_ELEMENT_NUM));
         const uint32_t cvPingElems =
             baseParams_->stepBatchSize * mmQcQrParam_.baseN * sizeof(mmQcQrOutputType) / sizeof(mmQnOutputType);
         constexpr uint32_t MUL_QR = EVENT_ID1;
@@ -3640,9 +3661,16 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::DynamicQuantQnAndMulQrSyncMMQ
                                              static_cast<uint32_t>(ALIGN_BLOCK_SIZE)));
         LocalTensor<float> reciprocalLocal = qrFp32Local;
         LocalTensor<float> scaleAcc = shareTmpUb[ubOff].ReinterpretCast<float>();
-        ubOff += static_cast<uint32_t>(
-            Align(static_cast<uint32_t>(mmQnLoops * row * sizeof(float)), static_cast<uint32_t>(ALIGN_BLOCK_SIZE)));
+        ubOff += static_cast<uint32_t>(Align(static_cast<uint32_t>(mmQnLoops * scaleRowStride * sizeof(float)),
+                                             static_cast<uint32_t>(ALIGN_BLOCK_SIZE)));
         LocalTensor<float> scaleBrcb = shareTmpUb[ubOff].ReinterpretCast<float>();
+        if (scaleRowStride != row) {
+            // Brcb reads full groups of eight; initialize padding only when present.
+            SetFlag<HardEvent::MTE3_V>(EVENT_ID0);
+            WaitFlag<HardEvent::MTE3_V>(EVENT_ID0);
+            Duplicate(scaleAcc, 0.0f, static_cast<uint32_t>(mmQnLoops) * scaleRowStride);
+            PipeBarrier<PIPE_V>();
+        }
 
         // 令牌预置
         SetFlag<HardEvent::MTE3_V>(DYNAMIC_QUANT_OUTPUT_READY);
@@ -3667,11 +3695,13 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::DynamicQuantQnAndMulQrSyncMMQ
                 WaitFlag<HardEvent::MTE3_V>(curReady);
                 if constexpr (MLA_USE_DQ_V2) {
                     DynamicQuantPerTokenVf2(
-                        curStaging, scaleAcc[loopIdx * static_cast<int64_t>(row) + static_cast<int64_t>(h) * rows0],
+                        curStaging,
+                        scaleAcc[loopIdx * static_cast<int64_t>(scaleRowStride) + static_cast<int64_t>(h) * rows0],
                         waveHalf, rows, col);
                 } else {
                     DynamicQuantPerTokenVf(
-                        curStaging, scaleAcc[loopIdx * static_cast<int64_t>(row) + static_cast<int64_t>(h) * rows0],
+                        curStaging,
+                        scaleAcc[loopIdx * static_cast<int64_t>(scaleRowStride) + static_cast<int64_t>(h) * rows0],
                         waveHalf, rows, col);
                 }
                 SetFlag<HardEvent::V_MTE3>(curReady);
@@ -3690,8 +3720,8 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::DynamicQuantQnAndMulQrSyncMMQ
             dynamicQuantQueryResOffset += static_cast<int64_t>(baseParams_->headSizeCkv);
         }
         for (int64_t loopIdx = 0; loopIdx < mmQnLoops; loopIdx++) {
-            Brcb(scaleBrcb, scaleAcc[loopIdx * static_cast<int64_t>(row)], CeilDivT(row, FP32_BLOCK_ELEMENT_NUM),
-                 {1, FP32_BLOCK_ELEMENT_NUM});
+            Brcb(scaleBrcb, scaleAcc[loopIdx * static_cast<int64_t>(scaleRowStride)],
+                 CeilDivT(row, FP32_BLOCK_ELEMENT_NUM), {1, FP32_BLOCK_ELEMENT_NUM});
             DataCopyParams scaleOutCopyParams{static_cast<uint16_t>(row), static_cast<uint16_t>(sizeof(float)), 0,
                                               static_cast<uint16_t>((baseParams_->numHeadSize - 1) * sizeof(float))};
             SetFlag<HardEvent::V_MTE3>(EVENT_ID0);

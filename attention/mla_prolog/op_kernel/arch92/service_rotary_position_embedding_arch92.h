@@ -19,7 +19,7 @@
 #include "mla_prolog_comm_arch92.h"
 #include "mla_prolog_vector_comm_arch92.h"
 #include "service_rope_arch92.h"
-#include "vf/vf_comm.h"
+#include "vf/vf_comm_arch92.h"
 
 namespace MlaProlog {
 

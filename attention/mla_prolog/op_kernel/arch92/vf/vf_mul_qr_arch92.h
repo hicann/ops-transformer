@@ -9,13 +9,13 @@
  */
 
 /*!
- * \file vf_mul_qr.h
+ * \file vf_mul_qr_arch92.h
  * \brief
  */
 
-#ifndef VF_MUL_QR_H
-#define VF_MUL_QR_H
-#include "vf_comm.h"
+#ifndef VF_MUL_QR_ARCH92_H
+#define VF_MUL_QR_ARCH92_H
+#include "vf_comm_arch92.h"
 
 namespace MlaProlog {
 template <typename T>

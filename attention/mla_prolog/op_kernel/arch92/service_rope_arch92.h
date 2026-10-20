@@ -18,7 +18,7 @@
 
 #include "mla_prolog_comm_arch92.h"
 
-#include "vf/vf_rope.h"
+#include "vf/vf_rope_arch92.h"
 
 namespace MlaProlog {
 /**

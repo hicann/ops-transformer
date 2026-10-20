@@ -9,15 +9,15 @@
  */
 
 /*!
- * \file vf_dynamic_quant.h
+ * \file vf_dynamic_quant_arch92.h
  * \brief
  */
 
-#ifndef VF_DYNAMIC_QUANT_H
-#define VF_DYNAMIC_QUANT_H
+#ifndef VF_DYNAMIC_QUANT_ARCH92_H
+#define VF_DYNAMIC_QUANT_ARCH92_H
 
 #include "kernel_tensor.h"
-#include "vf_comm.h"
+#include "vf_comm_arch92.h"
 
 namespace MlaProlog {
 constexpr float INT8_MAX_VALUE = 127.0f;

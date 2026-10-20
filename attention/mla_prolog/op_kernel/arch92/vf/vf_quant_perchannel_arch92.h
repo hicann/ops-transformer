@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file vf_quant_perchannel.h
+ * \file vf_quant_perchannel_arch92.h
  * \brief
  */
 
-#ifndef VF_QUANT_PERCHANNEL_H
-#define VF_QUANT_PERCHANNEL_H
+#ifndef VF_QUANT_PERCHANNEL_ARCH92_H
+#define VF_QUANT_PERCHANNEL_ARCH92_H
 #include "kernel_tensor.h"
 
 namespace MlaProlog {

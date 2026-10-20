@@ -16,10 +16,10 @@
 #ifndef MLA_PROLOG_VECTOR_COMM_arch92_H
 #define MLA_PROLOG_VECTOR_COMM_arch92_H
 
-#include "vf/vf_quant_pertensor.h"
-#include "vf/vf_quant_perchannel.h"
-#include "vf/vf_dynamic_quant.h"
-#include "vf/vf_dequant.h"
+#include "vf/vf_quant_pertensor_arch92.h"
+#include "vf/vf_quant_perchannel_arch92.h"
+#include "vf/vf_dynamic_quant_arch92.h"
+#include "vf/vf_dequant_arch92.h"
 
 #include "mla_prolog_comm_arch92.h"
 namespace MlaProlog {

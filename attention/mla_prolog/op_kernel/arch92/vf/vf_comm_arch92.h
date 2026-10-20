@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file vf_comm.h
+ * \file vf_comm_arch92.h
  * \brief VF comm
  */
 
-#ifndef VF_COMM_H
-#define VF_COMM_H
+#ifndef VF_COMM_ARCH92_H
+#define VF_COMM_ARCH92_H
 
 #include "kernel_tensor.h"
 
@@ -65,4 +65,4 @@ __aicore__ inline void CastF32ToB16NoSat(const LocalTensor<B16T>& dstLocal, cons
 
 } // namespace MlaProlog
 
-#endif // VF_COMM_H
+#endif // VF_COMM_ARCH92_H

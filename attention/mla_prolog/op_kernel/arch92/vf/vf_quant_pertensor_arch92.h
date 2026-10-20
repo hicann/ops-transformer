@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file vf_quant_pertensor.h
+ * \file vf_quant_pertensor_arch92.h
  * \brief
  */
 
-#ifndef VF_QUANT_PERTENSOR_H
-#define VF_QUANT_PERTENSOR_H
+#ifndef VF_QUANT_PERTENSOR_ARCH92_H
+#define VF_QUANT_PERTENSOR_ARCH92_H
 #include "kernel_tensor.h"
 
 namespace MlaProlog {

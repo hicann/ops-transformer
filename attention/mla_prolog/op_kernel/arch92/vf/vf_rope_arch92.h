@@ -9,15 +9,15 @@
  */
 
 /*!
- * \file vf_rope.h
+ * \file vf_rope_arch92.h
  * \brief VF implementation for mla_prolog rope path (interleave-half mode).
  */
 
-#ifndef VF_ROPE_H
-#define VF_ROPE_H
+#ifndef VF_ROPE_ARCH92_H
+#define VF_ROPE_ARCH92_H
 
 #include "kernel_tensor.h"
-#include "vf_comm.h"
+#include "vf_comm_arch92.h"
 
 namespace MlaProlog {
 
@@ -88,4 +88,4 @@ __aicore__ inline void RotaryPosEmbVF(const LocalTensor<C>& outputLocal, const L
 }
 } // namespace MlaProlog
 
-#endif // VF_ROPE_H
+#endif // VF_ROPE_ARCH92_H

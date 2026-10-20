@@ -19,9 +19,9 @@
 #include "mla_prolog_comm_arch92.h"
 #include "mla_prolog_vector_comm_arch92.h"
 
-#include "vf/vf_comm.h"
-#include "vf/vf_rms_norm.h"
-#include "vf/vf_dynamic_quant.h"
+#include "vf/vf_comm_arch92.h"
+#include "vf/vf_rms_norm_arch92.h"
+#include "vf/vf_dynamic_quant_arch92.h"
 
 namespace MlaProlog {
 

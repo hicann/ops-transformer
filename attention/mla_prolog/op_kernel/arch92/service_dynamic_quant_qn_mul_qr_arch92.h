@@ -18,8 +18,8 @@
 
 #include "mla_prolog_comm_arch92.h"
 #include "mla_prolog_vector_comm_arch92.h"
-#include "vf/vf_mul_qr.h"
-#include "vf/vf_dynamic_quant.h"
+#include "vf/vf_mul_qr_arch92.h"
+#include "vf/vf_dynamic_quant_arch92.h"
 
 namespace MlaProlog {
 
