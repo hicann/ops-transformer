@@ -629,7 +629,7 @@ private:
         fixpipeParams.mSize = (s2RealSize + 7U) >> 3 << 3;
         fixpipeParams.srcStride = ((fixpipeParams.mSize + 15U) >> 4) << 4U;
         fixpipeParams.dstStride = 64U;
-        // arch920 的唯一 AIV 消费完整 N=64 结果，不做双目标拆分。
+        // arch92 的唯一 AIV 消费完整 N=64 结果，不做双目标拆分。
         fixpipeParams.dualDstCtl = 0U;
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
@@ -646,7 +646,7 @@ private:
         fixpipeParams.mSize = M_BASE;
         fixpipeParams.srcStride = ((M_BASE + 15U) >> 4) << 4U;
         fixpipeParams.dstStride = (DV_BASE + 15U) >> 4 << 4;
-        // arch920 的唯一 AIV 消费完整 M=64 结果，不做双目标拆分。
+        // arch92 的唯一 AIV 消费完整 M=64 结果，不做双目标拆分。
         fixpipeParams.dualDstCtl = 0U;
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;

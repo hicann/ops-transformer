@@ -23,10 +23,10 @@
 #include "quant_block_sparse_attn_mx_tiling_data.h"
 #include "quant_block_sparse_attn_arch_select.h"
 #if QBSA_ARCH_9102R1
-#include "arch920/quant_block_sparse_attn_mx_kernel.h"
-#include "arch920/quant_block_sparse_attn_mx_m128_v64_layout.h"
+#include "arch92/quant_block_sparse_attn_mx_kernel.h"
+#include "arch92/quant_block_sparse_attn_mx_m128_v64_layout.h"
 #if QBSA_9102_MX_M128_V64
-#include "arch920/quant_block_sparse_attn_mx_m128_v64_kernel.h"
+#include "arch92/quant_block_sparse_attn_mx_m128_v64_kernel.h"
 #endif
 #else
 #include "arch35/quant_block_sparse_attn_kernel.h"
