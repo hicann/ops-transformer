@@ -91,7 +91,8 @@ aclnnStatus aclnnDistributeBarrierGetWorkspaceSizeBase(const aclTensor* xRef, co
         (void)strncpy_s(groupBuf, HCCL_GROUP_NAME_MAX, group, HCCL_GROUP_NAME_MAX - 1);
     }
     aclTensor* xRefBuf = const_cast<aclTensor*>(xRef);
-    if (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
+    auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
+    if (npuArch != Ops::Base::DAV_3510 && npuArch != Ops::Base::DAV_9201 && npuArch != Ops::Base::DAV_9202) {
         getWorkspaceSizesRes = aclnnInnerDistributeBarrierGetWorkspaceSize(xRefBuf, timeOut, elasticInfo, groupBuf,
                                                                            worldSize, workspaceSize, executor);
     } else {
@@ -114,7 +115,8 @@ aclnnStatus aclnnDistributeBarrierBase(void* workspace, uint64_t workspaceSize, 
         NnopbaseSetHcclServerType(executor, NNOPBASE_HCCL_SERVER_TYPE_MTE);
     }
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
-    if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+    auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
+    if (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) {
         OP_LOGD("aclnn_distribute_barrier_extend inner start");
         return aclnnInnerDistributeBarrierExtend(workspace, workspaceSize, executor, stream);
     }

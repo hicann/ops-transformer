@@ -254,7 +254,8 @@ inline ge::graphStatus GetEpWinSize(const gert::TilingContext* context, const ch
                                     bool isLayered)
 {
     auto attrs = context->GetAttrs();
-    if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) {
+    NpuArch npuArch = mc2tiling::GetNpuArch(context);
+    if (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) {
         // A5 暂不支持 Hccl CommGetBufSizeCfg 接口，此处暂作规避
         // A5 实际物理分配为 HCCL_BUFFSIZE 的 2 倍
         hcclBufferSizeEp = mc2tiling::Mc2TilingUtils::GetMaxWindowSize() * 2UL;

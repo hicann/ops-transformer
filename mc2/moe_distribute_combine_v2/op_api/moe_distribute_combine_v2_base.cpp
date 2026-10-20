@@ -121,10 +121,10 @@ static inline void SafeCopyGroupBuf(char* dst, size_t dstSize, const char* src, 
     }
 }
 
-static void SetCommArgs(aclOpExecutor** executor, const bool is910B, const bool isA5, const char* commAlg)
+static void SetCommArgs(aclOpExecutor** executor, const bool is910B, const bool isA5OrA6, const char* commAlg)
 {
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
-    if (isA5) {
+    if (isA5OrA6) {
         CommType type = CommType::AIV;
         if (commAlg != nullptr && std::strcmp(commAlg, "ccu") == 0) {
             type = CommType::CCU;
@@ -137,7 +137,7 @@ static void SetCommArgs(aclOpExecutor** executor, const bool is910B, const bool 
     if (NnopbaseSetHcclServerType) {
         if (is910B) {
             NnopbaseSetHcclServerType(*executor, NNOPBASE_HCCL_SERVER_TYPE_AICPU);
-        } else if (isA5 && commAlg != nullptr && std::strcmp(commAlg, "ccu") == 0) {
+        } else if (isA5OrA6 && commAlg != nullptr && std::strcmp(commAlg, "ccu") == 0) {
             NnopbaseSetHcclServerType(*executor, NNOPBASE_HCCL_SERVER_TYPE_CCU);
         } else {
             NnopbaseSetHcclServerType(*executor, NNOPBASE_HCCL_SERVER_TYPE_MTE);
@@ -181,12 +181,12 @@ static aclnnStatus ResolveInnerWorkspaceSize(
     char* groupEpBuf, char* groupTpBuf, const char* commAlg, char* commAlgBuf, int64_t epWorldSize, int64_t epRankId,
     int64_t moeExpertNum, int64_t tpWorldSize, int64_t tpRankId, int64_t expertShardType, int64_t sharedExpertNum,
     int64_t sharedExpertRankNum, int64_t globalBs, int64_t outDtype, int64_t commQuantMode, int64_t groupListType,
-    int64_t zeroExpertNum, int64_t copyExpertNum, int64_t constExpertNum, bool is910B, bool isA5, aclTensor* xOut,
+    int64_t zeroExpertNum, int64_t copyExpertNum, int64_t constExpertNum, bool is910B, bool isA5OrA6, aclTensor* xOut,
     uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     aclnnStatus getWorkspaceSizesRes = ACLNN_ERR_INNER;
     // ccu暂时不支持mc2Context，回退到V2接口
-    if (!isA5 || (commAlg != nullptr && std::strcmp(commAlg, "ccu") == 0)) {
+    if (!isA5OrA6 || (commAlg != nullptr && std::strcmp(commAlg, "ccu") == 0)) {
         getWorkspaceSizesRes = aclnnInnerMoeDistributeCombineV2GetWorkspaceSize(
             expandX, expertIds, assistInfoForCombine, epSendCounts, expertScales, tpSendCountsOptional,
             xActiveMaskOptional, activationScaleOptional, weightScaleOptional, groupListOptional, expandScalesOptional,
@@ -212,7 +212,7 @@ static aclnnStatus ResolveInnerWorkspaceSize(
             xOut, workspaceSize, executor);
 #endif
     }
-    SetCommArgs(executor, is910B, isA5, commAlg);
+    SetCommArgs(executor, is910B, isA5OrA6, commAlg);
     return getWorkspaceSizesRes;
 }
 
@@ -230,8 +230,10 @@ aclnnStatus aclnnMoeDistributeCombineBaseGetWorkspaceSize(
     int64_t copyExpertNum, int64_t constExpertNum, aclTensor* xOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("enter to the  aclnnMoeDistributeCombineBaseGetWorkspaceSize\n");
+    auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
     const static bool is910B = GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B;
-    const static bool isA5 = GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510;
+    const static bool isA5OrA6 =
+        (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202);
     auto retParam = CombineCheckParams(expandX, expertIds, assistInfoForCombine, epSendCounts, expertScales, groupEp,
                                        groupTp, xOut);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
@@ -247,8 +249,8 @@ aclnnStatus aclnnMoeDistributeCombineBaseGetWorkspaceSize(
         elasticInfoOptional, oriXOptional, constExpertAlpha1Optional, constExpertAlpha2Optional, constExpertVOptional,
         performanceInfoOptional, groupEp, groupEpBuf, groupTpBuf, commAlg, commAlgBuf, epWorldSize, epRankId,
         moeExpertNum, tpWorldSize, tpRankId, expertShardType, sharedExpertNum, sharedExpertRankNum, globalBs, outDtype,
-        commQuantMode, groupListType, zeroExpertNum, copyExpertNum, constExpertNum, is910B, isA5, xOut, workspaceSize,
-        executor);
+        commQuantMode, groupListType, zeroExpertNum, copyExpertNum, constExpertNum, is910B, isA5OrA6, xOut,
+        workspaceSize, executor);
 }
 
 // aclnn二段式接口
@@ -256,8 +258,10 @@ aclnnStatus aclnnMoeDistributeCombineBase(void* workspace, uint64_t workspaceSiz
                                           aclrtStream stream)
 {
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
-    const static bool isA5 = GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510;
-    if (isA5) {
+    auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
+    const static bool isA5OrA6 =
+        (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202);
+    if (isA5OrA6) {
         void* arg = NnopbaseGetUserHandle(executor);
         uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
         CommType commType = static_cast<CommType>(handleVal);

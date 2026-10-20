@@ -120,7 +120,7 @@ static bool CheckAndSetAttrs(const gert::TilingContext* context, DistributeBarri
     OP_TILING_CHECK(attrs == nullptr, OPS_LOG_E(A_INNER_DEBUG_BARRIER, "GetAttrs returned nullptr!"), return false);
     NpuArch npuArch = mc2tiling::GetNpuArch(context);
     int64_t MAX_WORLD_SIZE = 0;
-    if (npuArch == Ops::Base::DAV_3510) {
+    if (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) {
         MAX_WORLD_SIZE = MAX_WORLD_SIZE_A5;
     } else {
         MAX_WORLD_SIZE = MAX_WORLD_SIZE_A3;

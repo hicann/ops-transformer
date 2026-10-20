@@ -18,7 +18,7 @@
 
 #include "../../moe_distribute_dispatch_v2/op_kernel/moe_distribute_v2_constant.h"
 #include "../../moe_distribute_dispatch_v2/op_kernel/moe_distribute_v2_base.h"
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
 #include "../../moe_distribute_dispatch_v2/op_kernel/moe_distribute_dispatch_v2_common.h"
 #include "../../common/op_kernel/quantize_functions.h"
 #endif
@@ -82,7 +82,7 @@ public:
             uint32_t scaleGranu =
                 static_cast<uint32_t>(UB_ALIGN / sizeof(float)); // 计算每个block得到的reducemax结果数量
             quantScaleNum_ = (hExpandXAlign32Size_ / sizeof(ExpandXType)) / scaleGranu; // 得到有效scale的个数
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
             // A5 INT8融合反量化按512B覆盖尾段，scale数量需与Brcb的repeat覆盖范围一致
             quantScaleNum_ = (hFloatAlign256Size_ / sizeof(float)) / scaleGranu;
 #endif
@@ -93,7 +93,7 @@ public:
             mask_ = static_cast<uint32_t>(ALIGNED_LEN / sizeof(float));
             tokenScaleCnt_ = hAlign32Size_ / sizeof(ExpandXType) + quantScaleNum_; // int8_align + scale有效个数
         }
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
         else if constexpr (QuantMode == MXFP8_E5M2_COMM_QUANT || QuantMode == MXFP8_E4M3_COMM_QUANT) {
             hExpandXAlignSize_ = Align128(axisH) * sizeof(ExpandXType);
             quantScaleNum_ = Align2(Ceil32(axisH));
@@ -147,7 +147,7 @@ public:
         PipeBarrier<PIPE_V>();
     }
 
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
     template <bool ApplyExpertScale = true>
     __aicore__ inline void Int8DequantProcessA5(LocalTensor<XType>& inLocal, LocalTensor<float>& sumFinalTensor,
                                                 float scaleVal)
@@ -361,7 +361,7 @@ public:
         if constexpr (QuantMode == INT8_COMM_QUANT) {
             Int8QuantProcess(outLocal, inLocal);
         }
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
         else if constexpr (QuantMode == MXFP8_E5M2_COMM_QUANT || QuantMode == MXFP8_E4M3_COMM_QUANT) {
             QuantMxFp8(outLocal, inLocal);
         }
@@ -372,14 +372,14 @@ public:
                                           float scaleVal)
     {
         if constexpr (QuantMode == INT8_COMM_QUANT) {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
             // A5 走反量化及加权求和融合
             Int8DequantProcessA5(inLocal, sumFinalTensor, scaleVal);
 #else
             Int8DequantProcess(inLocal, outLocal);
 #endif
         }
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
         else if constexpr (QuantMode == MXFP8_E5M2_COMM_QUANT) {
             DeQuantMxFp8<fp8_e5m2_t>(inLocal, sumTensor, sumFinalTensor, scaleVal);
         } else if constexpr (QuantMode == MXFP8_E4M3_COMM_QUANT) {
@@ -392,7 +392,7 @@ public:
                                                             LocalTensor<float>& sumTensor,
                                                             LocalTensor<float>& sumFinalTensor)
     {
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
         if constexpr (QuantMode == INT8_COMM_QUANT) {
             Int8DequantProcessA5<false>(inLocal, sumFinalTensor, 0.0f);
         } else if constexpr (QuantMode == MXFP8_E5M2_COMM_QUANT) {

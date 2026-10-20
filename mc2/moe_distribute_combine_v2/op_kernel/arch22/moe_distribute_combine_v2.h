@@ -489,7 +489,7 @@ __aicore__ inline void MoeDistributeCombineV2<CombineMC2TypeFunc>::InitAttrs(
     uint32_t hFloatSize = axisH_ * static_cast<uint32_t>(sizeof(float));
     hFloatAlign32Size_ = Ceil(hFloatSize, UB_ALIGN) * UB_ALIGN;
     hFloatAlign256Size_ = Ceil(hFloatSize, ALIGNED_LEN) * ALIGNED_LEN;
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
     // A5 INT8/MXFP8 融合反量化每轮固定访问 128 floats，工作区按 512B 对齐避免尾段越界
     if constexpr ((QuantMode == INT8_COMM_QUANT) || (QuantMode == MXFP8_E5M2_COMM_QUANT) ||
                   (QuantMode == MXFP8_E4M3_COMM_QUANT)) {
@@ -575,7 +575,8 @@ template <CombineMC2TypeClass>
 __aicore__ inline void MoeDistributeCombineV2<CombineMC2TypeFunc>::BuffInit()
 {
     tpipe_->Reset();
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510) // reset后 ctrl寄存器会复位为默认值
+#if defined(__NPU_ARCH__) && \
+    ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)) // reset后 ctrl寄存器会复位为默认值
     // 单指令饱和模式
     AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(0);
 #endif
@@ -981,7 +982,7 @@ __aicore__ inline void MoeDistributeCombineV2<CombineMC2TypeFunc>::PrefetchDispa
         uint32_t slot = sendInputCount_ % BUFFER_NUM;
         WaitFlag<HardEvent::V_MTE2>(slot);
         expandXInTensor_ = sendInputBuf_.Get<ExpandXType>()[slot * hExpandXAlignSize_ / sizeof(ExpandXType)];
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
         LocalTensor<uint8_t> singleByteTok = expandXInTensor_.template ReinterpretCast<uint8_t>();
         // 由于MX量化在计算scales时每次搬入256字节数据，所以在token搬入前需要对空间填0，避免引入脏数据
         if constexpr ((QuantMode == MXFP8_E5M2_COMM_QUANT) || (QuantMode == MXFP8_E4M3_COMM_QUANT)) {
@@ -1329,7 +1330,7 @@ __aicore__ inline void MoeDistributeCombineV2<CombineMC2TypeFunc>::ProcessMoeExp
         } else {
             quantInst_.DeQuantProcessWithoutExpertScale(tmpUb, outLocalTensor, rowTmpFloatLocal_, sumFloatBufLocal_);
         }
-#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510))
+#if !(defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)))
         // 非 A5 在外层完成 INT8 加权求和
         if constexpr (QuantMode == INT8_COMM_QUANT) {
             Cast(rowTmpFloatLocal_, outLocalTensor, AscendC::RoundMode::CAST_NONE, processLen);
@@ -1460,7 +1461,7 @@ __aicore__ inline void MoeDistributeCombineV2<CombineMC2TypeFunc>::ProcessShared
         LocalTensor<XType> outLocalTensor = fp16CastTensor_.template ReinterpretCast<XType>();
         if constexpr (QuantMode > UNQUANT) {
             quantInst_.DeQuantProcess(tmpUb, outLocalTensor, rowTmpFloatLocal_, sumFloatBufLocal_, 1.0f);
-#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510))
+#if !(defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)))
             // 非 A5 在外层完成 INT8 求和累加
             if constexpr (QuantMode == INT8_COMM_QUANT) {
                 Cast(rowTmpFloatLocal_, outLocalTensor, AscendC::RoundMode::CAST_NONE, processLen);

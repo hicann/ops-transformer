@@ -107,7 +107,11 @@ ge::graphStatus MoeDistributeCombineTilingA5::MoeDistributeCombineA5TilingFuncIm
     if (commQuantMode == INT8_COMM_QUANT) {
         quantMode = TILINGKEY_INT8_QUANT;
     }
-    uint32_t archTag = (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) ? TILINGKEY_TPL_A5 : TILINGKEY_TPL_A3;
+    NpuArch npuArch = mc2tiling::GetNpuArch(context);
+    uint32_t archTag =
+        (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) ?
+            TILINGKEY_TPL_A5 :
+            TILINGKEY_TPL_A3;
     const uint64_t tilingKey = GET_TPL_TILING_KEY(quantMode, layeredMode, archTag);
     OP_LOGD(nodeName, "tilingKey is %lu", tilingKey);
     context->SetTilingKey(tilingKey);
