@@ -90,8 +90,9 @@ ge::graphStatus FlashAttentionScoreGraTilingMla::SetAttrsInfo()
     fBaseParams.sparseMode = *context_->GetAttrs()->GetAttrPointer<int>(SPARSE_MODE);
 
     OP_CHECK_IF((fBaseParams.keepProb <= 0 || fBaseParams.keepProb > 1),
-                OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "keepProb",
-                                          std::to_string(fBaseParams.keepProb).c_str(), "a value in the range (0, 1]"),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    "FlashAttentionScoreGrad", "keepProb", std::to_string(fBaseParams.keepProb).c_str(),
+                    "keepProb must be a float in the range (0, 1]; set it to 1.0 to disable dropout"),
                 return ge::GRAPH_FAILED);
 
     fBaseParams.dropMskEnable = (dropMask != nullptr || fBaseParams.keepProb < 1.0f);

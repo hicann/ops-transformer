@@ -496,8 +496,10 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessPseInfo(
     if (context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(PSETYPE)) {
         fBaseParams.pseType = *(context_->GetAttrs()->GetAttrPointer<int64_t>(PSETYPE)); // 8
         if (fBaseParams.pseType < 0 || fBaseParams.pseType >= PSE_INVALID_TYPE) {
-            OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "pseType", std::to_string(fBaseParams.pseType).c_str(),
-                                      "a value in the supported enumeration range");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                "FlashAttentionScoreGrad", "pseType", std::to_string(fBaseParams.pseType).c_str(),
+                "pseType must be a valid PseType enum value in the range [0, 3] "
+                "(0: OUTER_MUL_ADD, 1: OUTER_ADD_MUL, 2: INNER_MUL_ADD, 3: INNER_MUL_ADD_SQRT)");
             return ge::GRAPH_FAILED;
         }
     }
@@ -682,8 +684,10 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ProcessSparseMo
     if (attrs->GetAttrNum() > static_cast<size_t>(SPARSE_MODE)) {
         fBaseParams.sparseMode = *(attrs->GetAttrPointer<int>(SPARSE_MODE)); // 7
         if (fBaseParams.sparseMode > BAND_LEFT_UP_CASUAL) {
-            OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "sparseMode",
-                                      std::to_string(fBaseParams.sparseMode).c_str(), "a value from 0 to 8");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "sparseMode",
+                                                  std::to_string(fBaseParams.sparseMode).c_str(),
+                                                  "sparseMode must be an integer in the range [0, 8]; "
+                                                  "see the sparse_mode description in the operator documentation");
             return ge::GRAPH_FAILED;
         }
     }
@@ -761,10 +765,12 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetBaseShapeInf
     int64_t headNum = *context_->GetAttrs()->GetAttrPointer<int>(HEAD_NUM);
     const char* inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
 
-    OP_CHECK_IF(headNum == 0,
-                OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "headNum", std::to_string(headNum).c_str(),
-                                          "a value greater than 0"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        headNum == 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "headNum", std::to_string(headNum).c_str(),
+                                              "headNum must be greater than 0 and match the N1 (head number) "
+                                              "dimension of query"),
+        return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(queryShape == nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "query"),
                 return ge::GRAPH_FAILED);
@@ -1166,8 +1172,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetShapeAttrsIn
     fBaseParams.scaleValue = *(context_->GetAttrs()->GetAttrPointer<float>(SCALE_VALUE));
     fBaseParams.keepProb = *(context_->GetAttrs()->GetAttrPointer<float>(KEEP_PROB));
     OP_CHECK_IF((fBaseParams.keepProb <= 0 || fBaseParams.keepProb > 1),
-                OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "keepProb",
-                                          std::to_string(fBaseParams.keepProb).c_str(), "a value in the range (0, 1]"),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    "FlashAttentionScoreGrad", "keepProb", std::to_string(fBaseParams.keepProb).c_str(),
+                    "keepProb must be a float in the range (0, 1]; set it to 1.0 to disable dropout"),
                 return ge::GRAPH_FAILED);
 
     fBaseParams.dropoutIsDivisibleBy8 = 1;

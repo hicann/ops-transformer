@@ -869,11 +869,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetShapeAttrsInfo()
     // setTilingData
     td_->opInfo.set_scaleValue(*context_->GetAttrs()->GetAttrPointer<float>(SCALE_VALUE));
     td_->opInfo.set_keepProb(*context_->GetAttrs()->GetAttrPointer<float>(KEEP_PROB));
-    OP_CHECK_IF(
-        (td_->opInfo.get_keepProb() <= 0 || td_->opInfo.get_keepProb() > 1),
-        OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "keepProb",
-                                  std::to_string(td_->opInfo.get_keepProb()).c_str(), "a value in the range (0, 1]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((td_->opInfo.get_keepProb() <= 0 || td_->opInfo.get_keepProb() > 1),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    "FlashAttentionScoreGrad", "keepProb", std::to_string(td_->opInfo.get_keepProb()).c_str(),
+                    "keepProb must be a float in the range (0, 1]; set it to 1.0 to disable dropout"),
+                return ge::GRAPH_FAILED);
 
     if (td_->opInfo.get_keepProb() < 1) {
         tmpData_.drop_out_cfg = DropOutConfig::EXIST_DROP_OUT;
@@ -890,8 +890,10 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetShapeAttrsInfo()
         sparseMode = SparseMode(*(attrs->GetAttrPointer<int>(SPARSE_MODE))); // 7
         uint32_t sparse = *(attrs->GetAttrPointer<int>(SPARSE_MODE));
         if (sparse > BAND_LEFT_UP_CASUAL) {
-            OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "sparseMode", std::to_string(sparse).c_str(),
-                                      "a value from 0 to 8");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "sparseMode",
+                                                  std::to_string(sparse).c_str(),
+                                                  "sparseMode must be an integer in the range [0, 8]; "
+                                                  "see the sparse_mode description in the operator documentation");
             return ge::GRAPH_FAILED;
         }
     }
@@ -922,11 +924,12 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetShapeAttrsInfo()
     td_->opInfo.set_nextTokens(*context_->GetAttrs()->GetAttrPointer<int>(NEXT_TOKENS));
     if (attrs->GetAttrNum() > static_cast<size_t>(PSETYPE)) {
         tmpData_.pseType = *(context_->GetAttrs()->GetAttrPointer<int64_t>(PSETYPE)); // 8
-        OP_CHECK_IF(
-            (tmpData_.pseType < 0 || tmpData_.pseType >= PSE_INVALID_TYPE),
-            OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "pseType", std::to_string(tmpData_.pseType).c_str(),
-                                      "a value in the supported enumeration range"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF((tmpData_.pseType < 0 || tmpData_.pseType >= PSE_INVALID_TYPE),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        "FlashAttentionScoreGrad", "pseType", std::to_string(tmpData_.pseType).c_str(),
+                        "pseType must be a valid PseType enum value in the range [0, 3] "
+                        "(0: OUTER_MUL_ADD, 1: OUTER_ADD_MUL, 2: INNER_MUL_ADD, 3: INNER_MUL_ADD_SQRT)"),
+                    return ge::GRAPH_FAILED);
     }
     td_->opInfo.set_pseType(tmpData_.pseType);
 

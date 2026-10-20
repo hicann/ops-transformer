@@ -79,8 +79,9 @@ ge::graphStatus FlashAttentionScoreGraTilingBasicDet::SetAttrsInfo()
     fBaseParams.dqPostAbsorb = 0;
 
     OP_CHECK_IF((fBaseParams.keepProb <= 0.0 || fBaseParams.keepProb > 1.0),
-                OP_LOGE_WITH_INVALID_ATTR("FlashAttentionScoreGrad", "keepProb",
-                                          std::to_string(fBaseParams.keepProb).c_str(), "a value in the range (0, 1]"),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    "FlashAttentionScoreGrad", "keepProb", std::to_string(fBaseParams.keepProb).c_str(),
+                    "keepProb must be a float in the range (0, 1]; set it to 1.0 to disable dropout"),
                 return ge::GRAPH_FAILED);
 
     if (context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(PSETYPE)) {
