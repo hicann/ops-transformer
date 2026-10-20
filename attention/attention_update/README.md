@@ -66,7 +66,7 @@ $$
   </tr>
   <tr>
     <td class="tg-0pky">O</td>
-    <td class="tg-0pky">输入</td>
+    <td class="tg-0pky">输出</td>
     <td class="tg-0pky">更新后的全局attentionout。</td>
     <td class="tg-0pky">FLOAT32，FLOAT16，BFLOAT16</td>
     <td class="tg-0pky">ND</td>
