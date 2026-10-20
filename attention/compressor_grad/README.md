@@ -87,10 +87,10 @@
     - start\_pos支持输入shape[B,]
     - 若x的维度采用BS合轴，即x的输入shape为[T,H]
         - cu\_seqlens输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须为0。
-        - seqused，支持输入shape[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即seqused[n] <= cu\_seqlens[n+1] - cu\_seqlens[n]，且不小于0。
+        - seqused，支持输入shape[B,]，要求每个Batch的有效token数小于等于对应Sequence Length长度，即seqused[n] <= cu\_seqlens[n+1] - cu\_seqlens[n]，且不小于0。
     - 若x的维度不采用BS合轴，即x的输入shape为[B,S,H]
         - cu\_seqlens，参数必须为空。
-        - seqused，支持输入shape[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即要求seqused[n] <= S，且不小于0。
+        - seqused，支持输入shape[B,]，要求每个Batch的有效token数小于等于对应Sequence Length长度，即要求seqused[n] <= S，且不小于0。
 - 输入值域限制：
   - 该接口支持B、S泛化，且存在如下场景限制：
       - **不支持B、S、T为0的空Tensor**：与正向Compressor不同，CompressorGrad所有输入/输出均不支持空Tensor，shapeSize必须大于0。

@@ -37,7 +37,7 @@
     q^N = q^C \cdot W^{UK}
     $$
 
-    对Query的进行ROPE旋转位置编码
+    对Query进行ROPE旋转位置编码
 
     $$
     q^R = ROPE(c^Q \cdot W^{QR})

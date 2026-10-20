@@ -222,12 +222,12 @@
     - state_cache支持输入shape为[block_num, block_size, 2\*coff\*D]，要求block_num>0，cache_mode=2时，需要满足block_size >= coff * cmp_ratio + S - 1。
     - 若x的维度采用BS合轴，即x的输入shape为[T,H]：
         - cu_seqlens输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须为0，最后一位必须为T。
-        - seqused，支持输入shape为[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即seqused[n] <= cu_seqlens[n+1] - cu_seqlens[n]，且不小于0。
+        - seqused，支持输入shape为[B,]，要求每个Batch的有效token数小于等于对应Sequence Length长度，即seqused[n] <= cu_seqlens[n+1] - cu_seqlens[n]，且不小于0。
         - cache_mode=1时，state_block_table支持输入shape为[B, ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，state_block_table支持输入shape为[B]。
         - cmp_kv，输出shape为[min(T, T/cmp_ratio+B), D]：compressed_tokens + compressed_tokens + ... + compressed_tokens + pad。
     - 若x的维度不采用BS合轴，即x的输入shape为[B,S,H]：
         - cu_seqlens，参数必须为空。
-        - seqused，支持输入shape为[B,]，要求每个Batch的有效token数要求小于等于对应Sequence Length长度，即要求seqused[n] <= S，且不小于0。
+        - seqused，支持输入shape为[B,]，要求每个Batch的有效token数小于等于对应Sequence Length长度，即要求seqused[n] <= S，且不小于0。
         - cache_mode=1时，state_block_table支持输入shape为[B, ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(start_pos)+S。cache_mode=2时，state_block_table支持输入shape为[B]。
         - cmp_kv，输出shape为[B, ceil(S/cmp_ratio), D]：(compressed_tokens+pad0) + (compressed_tokens+pad1) + ... + (compressed_tokens+padN)。
 - 输入值域限制：

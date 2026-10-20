@@ -5,7 +5,7 @@
 基于pytest测试框架，实现Compressor算子的功能验证：
 
 - **CPU侧**：复现算子功能用以生成golden数据
-- **NPU侧**：通过TorchNPU进行算子直调获取实际数据
+- **NPU侧**：通过torch_npu进行算子直调获取实际数据
 - **精度对比**：进行CPU与NPU结果的精度对比验证算子功能
 - **双模式执行隔离**：支持直接pytest多进程执行和shell层进程隔离两种批量模式
 - **性能采集**：支持挂载msprof采集算子性能数据并汇总输出
@@ -26,7 +26,7 @@
 
 #### 前置要求
 
-1、 确认TorchNPU为最新版本  
+1、 确认torch_npu为最新版本
 
 #### custom包调用
 
@@ -34,7 +34,7 @@
 
 ## 文件结构
 
-#### pytest文件结构说明
+### pytest文件结构说明
 
 - test_run.sh                                  # 执行脚本，支持single/batch两种命令
 - batch_isolated_run.sh                        # 批量隔离执行脚本（shell层进程隔离+msprof性能采集）
