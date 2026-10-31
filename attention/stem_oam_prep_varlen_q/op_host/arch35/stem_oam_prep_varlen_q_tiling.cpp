@@ -277,8 +277,9 @@ ge::graphStatus StemOamPrepVarlenQTiling::ValidateInputShapes()
     numQHeads_ = qShape->GetStorageShape().GetDim(1);
     int64_t D = qShape->GetStorageShape().GetDim(2);
     if (D != DIM_QK_HOST) {
-        OP_LOGE_WITH_INVALID_INPUT_SHAPESIZE(opName_, INPUT_Q, std::to_string(D).c_str(),
-                                             std::to_string(DIM_QK_HOST).c_str());
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            opName_, "q", std::to_string(D).c_str(),
+            ("The D dim of input q must be " + std::to_string(DIM_QK_HOST)).c_str());
         return ge::GRAPH_FAILED;
     }
     if (batch_ < 0 || batch_ > MAX_BATCH_SIZE) {
@@ -309,18 +310,20 @@ ge::graphStatus StemOamPrepVarlenQTiling::ValidateDtypes()
 
     qDtype_ = qDesc->GetDataType();
     if (qDtype_ != ge::DT_FLOAT8_E4M3FN) {
-        OP_LOGE_WITH_INVALID_INPUT_DTYPE(opName_, "q", std::to_string(static_cast<int>(qDtype_)).c_str(),
-                                         "DT_FLOAT8_E4M3FN");
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "q", std::to_string(static_cast<int>(qDtype_)).c_str(),
+                                              "The dtype of input q must be DT_FLOAT8_E4M3FN");
         return ge::GRAPH_FAILED;
     }
     if (qSeqLensDesc->GetDataType() != ge::DT_INT64) {
-        OP_LOGE_WITH_INVALID_INPUT_DTYPE(
-            opName_, "qSeqLens", std::to_string(static_cast<int>(qSeqLensDesc->GetDataType())).c_str(), "DT_INT64");
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "qSeqLens",
+                                              std::to_string(static_cast<int>(qSeqLensDesc->GetDataType())).c_str(),
+                                              "The dtype of input qSeqLens must be DT_INT64");
         return ge::GRAPH_FAILED;
     }
     if (cuSeqLensQDesc->GetDataType() != ge::DT_INT64) {
-        OP_LOGE_WITH_INVALID_INPUT_DTYPE(
-            opName_, "cuSeqLensQ", std::to_string(static_cast<int>(cuSeqLensQDesc->GetDataType())).c_str(), "DT_INT64");
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "cuSeqLensQ",
+                                              std::to_string(static_cast<int>(cuSeqLensQDesc->GetDataType())).c_str(),
+                                              "The dtype of input cuSeqLensQ must be DT_INT64");
         return ge::GRAPH_FAILED;
     }
 
@@ -332,8 +335,9 @@ ge::graphStatus StemOamPrepVarlenQTiling::ValidateDtypes()
             return ge::GRAPH_FAILED;
         }
         if (qScaleDesc->GetDataType() != ge::DT_FLOAT) {
-            OP_LOGE_WITH_INVALID_INPUT_DTYPE(
-                opName_, "qScale", std::to_string(static_cast<int>(qScaleDesc->GetDataType())).c_str(), "DT_FLOAT");
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "qScale",
+                                                  std::to_string(static_cast<int>(qScaleDesc->GetDataType())).c_str(),
+                                                  "The dtype of input qScale must be DT_FLOAT");
             return ge::GRAPH_FAILED;
         }
         auto qScaleShape = context_->GetInputShape(INPUT_QSCALE);
