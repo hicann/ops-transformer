@@ -122,7 +122,7 @@ aclnnStatus aclnnMoeGatingTopKBackward(
       <td>xNorm（aclTensor*）</td>
       <td>输入</td>
       <td>计算的输入，对应公式中的xNorm。</td>
-      <td><ul><li>不支持空Tensor。</li><li>要求是一个2D的Tensor，维度为[M,N]。</li><li>最后一维（专家数N）要求大于等于2，并小于等于2048。</li></ul></td>
+      <td><ul><li>不支持空Tensor。</li><li>要求是一个2D的Tensor，维度为[M,N]。</li><li>最后一维（专家数N）要求大于等于1，并小于等于2048。</li></ul></td>
       <td>FLOAT32</td>
       <td>ND</td>
       <td>2</td>
@@ -242,18 +242,20 @@ aclnnStatus aclnnMoeGatingTopKBackward(
     <tr>
       <td> ACLNN_ERR_PARAM_NULLPTR </td>
       <td> 161001 </td>
-      <td>xNorm、gradY、expertIdx、out存在空指针。</td>
+      <td>传入的必选输入、必选输出或者必选属性，存在空指针。</td>
     </tr>
     <tr>
-      <td rowspan="5"> ACLNN_ERR_PARAM_INVALID </td>
-      <td rowspan="5"> 161002 </td>
-      <td>xNorm、gradY或expertIdx的数据类型不在支持的范围之内。</td>
+      <td> ACLNN_ERR_PARAM_INVALID </td>
+      <td> 161002 </td>
+      <td>输入和输出的数据类型和数据格式不在支持的范围之内。</td>
     </tr>
     <tr>
-      <td>out的数据类型与xNorm不一致。</td>
-    </tr>
-    <tr>
+      <td rowspan="4"> ACLNN_ERR_INNER_TILING_ERROR </td>
+      <td rowspan="4"> 561002 </td>
       <td>xNorm、gradY或expertIdx的shape维度不在支持的范围之内。</td>
+    </tr>
+    <tr>
+      <td>out的数据类型与gradY不一致。</td>
     </tr>
     <tr>
       <td>gradY与expertIdx的shape不一致。</td>
@@ -313,7 +315,7 @@ aclnnStatus aclnnMoeGatingTopKBackward(
 
 <!-- npu="950" id7 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
-  - xNorm最后一维的大小（即专家数N）取值范围为[2, 2048]。
+  - xNorm最后一维的大小（即专家数N）取值范围为[1, 2048]。
   - gradY最后一维的大小（即K）取值范围为[1, N]。
 
 <!-- end id7 -->

@@ -191,10 +191,10 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckXNorm()
                                               "x_norm cannot be an empty tensor");
         return ge::GRAPH_FAILED;
     }
-    if (expertCount_ < 2 || expertCount_ > MAX_EXPERT_COUNT) {
+    if (expertCount_ < 1 || expertCount_ > MAX_EXPERT_COUNT) {
         std::string incorrectShape = "[" + std::to_string(tokenCount_) + ", " + std::to_string(expertCount_) + "]";
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x_norm", incorrectShape.c_str(),
-                                              "Shape [1] of this parameter must be within the range [2, 2048]");
+                                              "Shape [1] of this parameter must be within the range [1, 2048]");
         return ge::GRAPH_FAILED;
     }
 
