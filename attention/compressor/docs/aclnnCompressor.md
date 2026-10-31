@@ -367,15 +367,12 @@ aclnnStatus aclnnCompressor(
       <td>x、wkv、wgate、stateCacheRef、ape、cmpKvOut等必选参数中存在空指针。</td>
     </tr>
     <tr>
-      <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="4">161002</td>
+      <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="3">161002</td>
       <td>x、wkv、wgate、stateCacheRef、ape、cmpKvOut的数据类型不在支持的范围之内。</td>
     </tr>
     <tr>
       <td>x、wkv、wgate、stateCacheRef、ape的shape维度不在支持的范围之内。</td>
-    </tr>
-    <tr>
-      <td>cmpRatio、coff、cacheMode的取值不在支持的范围之内。</td>
     </tr>
     <tr>
       <td>cuSeqlensOptional、sequsedOptional、startPosOptional与x的shape组合不满足约束。</td>
@@ -383,7 +380,7 @@ aclnnStatus aclnnCompressor(
     <tr>
       <td>ACLNN_ERR_INNER_TILING_ERROR</td>
       <td>561002</td>
-      <td>tiling发生异常，入参的dtype类型或者shape错误。</td>
+      <td>tiling发生异常，入参的dtype类型或者shape错误，或cmpRatio、coff、cacheMode的取值不在支持的范围之内。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
