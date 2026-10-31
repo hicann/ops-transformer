@@ -125,6 +125,20 @@ if("ascend960dt" IN_LIST ASCEND_COMPUTE_UNIT OR "ascend960pr" IN_LIST ASCEND_COM
     endif()
 endif()
 
+# PyPTO DSL sources are isolated by hardware generation.
+set(PYPTO_SUPPORT_LIST ascend950 ascend960dt)
+set(PYPTO_ARCH_DIRECTORY_LIST arch35 arch92)
+set(PYPTO_ARCH_DIR arch35)
+list(FIND PYPTO_SUPPORT_LIST "${ASCEND_COMPUTE_UNIT}" _idx)
+if(NOT _idx EQUAL -1)
+    list(GET PYPTO_ARCH_DIRECTORY_LIST ${_idx} PYPTO_ARCH_DIR)
+else()
+    message(STATUS "unsupported chip type")
+endif()
+if(NOT PROJECT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    set(PYPTO_ARCH_DIR "${PYPTO_ARCH_DIR}" PARENT_SCOPE)
+endif()
+
 if(PROJECT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   message(STATUS "compile project with library")
   option(BUILD_WITH_INSTALLED_DEPENDENCY_CANN_PKG "Build ops-transformer with cann pkg" ON)
