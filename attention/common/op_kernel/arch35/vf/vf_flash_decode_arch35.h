@@ -253,7 +253,7 @@ __simd_vf__ void ComputeScaleValue_8_VF_FD(__ubuf__ T* lseSink, __ubuf__ T* lseM
                                            __ubuf__ T* lseUb, __ubuf__ T* lseMaxReduce, uint32_t dealCount, uint16_t i,
                                            uint32_t dealRowCount, uint32_t actualCombineLoopSize,
                                            uint16_t softmaxLseFlag, uint16_t learnableSinkFlag,
-                                           float minCheckValue = FLT_MAX_NEW)
+                                           float minCheckValue = -FLT_MAX_NEW)
 {
     Reg::RegTensor<T> vregLseMax;
     Reg::RegTensor<T> vregLseMaxTmp;
@@ -405,7 +405,7 @@ __aicore__ inline void ComputeScaleValue_8_FD(const LocalTensor<SINK_T>& tmpSink
                                               const LocalTensor<T>& lseOutputUb, const LocalTensor<T>& lseMaxReduceUb,
                                               uint32_t dealRowCount, uint32_t actualCombineLoopSize,
                                               bool softmaxLseFlag, bool learnableSinkFlag,
-                                              float minCheckValue = FLT_MAX_NEW)
+                                              float minCheckValue = -FLT_MAX_NEW)
 {
     uint32_t dealCount = dealRowCount * 8;
     uint16_t i = 0;
@@ -598,7 +598,7 @@ __aicore__ inline void ComputeScaleValue_VF_FD(const LocalTensor<SINK_T>& tmpSin
                                                const LocalTensor<T>& lseOutputUb, const LocalTensor<T>& lseMaxUbTmp,
                                                uint32_t dealRowCount, uint32_t actualCombineLoopSize,
                                                bool softmaxLseFlag, bool learnableSinkFlag,
-                                               float minCheckValue = FLT_MAX_NEW)
+                                               float minCheckValue = -FLT_MAX_NEW)
 {
     ComputeScaleValue_8_FD<T, SINK_T, SINK_INJECT_STAGE>(tmpSinkUb, lseMaxUb, lseSumUb, lseResUb, lseOutputUb,
                                                          lseMaxUbTmp, dealRowCount, actualCombineLoopSize,
