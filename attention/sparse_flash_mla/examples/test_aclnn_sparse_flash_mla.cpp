@@ -185,7 +185,7 @@ int main()
     std::vector<int64_t> seqUsedCmpKvShape = {B};
     std::vector<int64_t> cmpResidualKvShape = {B};
     std::vector<int64_t> sinksShape = {N1};
-    std::vector<int64_t> metadataShape = {1024};
+    std::vector<int64_t> metadataShape = {2048};
     std::vector<int64_t> attnOutShape = {T1, N1, D};
     std::vector<int64_t> softmaxLseShape = {T1, N1, 1};
     // 对全部 5 个输入调用 Contiguous，optional 输入传 shape 为 {0} 的空 tensor。
@@ -253,7 +253,7 @@ int main()
     std::vector<int32_t> seqUsedCmpKvHostData(B, static_cast<int32_t>(cmpKvLen));
     std::vector<int32_t> cmpResidualKvHostData(B, static_cast<int32_t>(s2Act % cmpRatio));
     std::vector<float> sinksHostData(N1, 1.0f);
-    std::vector<int32_t> metadataHostData(1024, 0);
+    std::vector<int32_t> metadataHostData(GetShapeSize(metadataShape), 0);
     std::vector<uint16_t> attnOutHostData = MakeFp16Data(attnOutSize, 0.0f);
     std::vector<float> softmaxLseHostData(softmaxLseSize, 0.0f);
 

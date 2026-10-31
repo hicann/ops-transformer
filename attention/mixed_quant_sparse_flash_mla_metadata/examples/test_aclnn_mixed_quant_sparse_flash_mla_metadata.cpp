@@ -30,9 +30,9 @@
     } while (0)
 
 // 参考 mixed_quant_sparse_flash_mla_metadata.h
-constexpr uint32_t AIC_CORE_MAX_NUM = 36;
-constexpr uint32_t AIV_CORE_MAX_NUM = 72;
-constexpr uint32_t MQSMLA_METADATA_TOTAL_SIZE = 1024;
+constexpr uint32_t AIC_CORE_MAX_NUM = 80;
+constexpr uint32_t AIV_CORE_MAX_NUM = 80;
+constexpr uint32_t MQSMLA_METADATA_TOTAL_SIZE = 2048;
 constexpr uint32_t FA_METADATA_SIZE = 9;
 constexpr uint32_t FD_METADATA_SIZE = 8;
 
@@ -229,7 +229,7 @@ aclnnStatus CreateArgs(const ArgScenario& scenario, ArgContext& context)
     context.numHeadsKv = 1;
     context.headDim = 512; // 512：注意力头的维度
     context.quantMode = 1;
-    ret = CreateTensor(aclDataType::ACL_INT32, {MQSMLA_METADATA_TOTAL_SIZE}, context.metadata); // 1024: Fix size
+    ret = CreateTensor(aclDataType::ACL_INT32, {MQSMLA_METADATA_TOTAL_SIZE}, context.metadata); // 2048: Fix size
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create metadata failed. Error: %d", ret);
     context.oriTopk = 0;
     context.cmpTopk = 0;
@@ -248,10 +248,10 @@ aclnnStatus CreateArgs(const ArgScenario& scenario, ArgContext& context)
     context.hasOriKv = true;
     context.hasCmpKv = true;
 
-    context.batchSize = 4;         // 4：Batch数量
-    context.maxSeqlenOriKv = 1024; // 1024：ori_kv的最长Sequence Length
-    context.maxSeqlenCmpKv = 1024; // 1024：cmp_kv的最长Sequence Length
-    context.maxSeqlenQ = 1024;     // 1024：q的最长Sequence Length
+    context.batchSize = 4;                                              // 4：Batch数量
+    context.maxSeqlenOriKv = 1024;                                      // 1024：ori_kv的最长Sequence Length
+    context.maxSeqlenCmpKv = context.maxSeqlenOriKv / context.cmpRatio; // cmp_kv的最长Sequence Length
+    context.maxSeqlenQ = 1024;                                          // 1024：q的最长Sequence Length
 
     if (scenario.hasCuSeq) {
         // (B+1,), first element is always 0
