@@ -389,7 +389,7 @@
     <tr>
       <td>padSlotId</td>
       <td>可选输入</td>
-      <td>用于跳过不需要参与计算的变长序列。</td>
+      <td>用于指定不参与计算的变长序列（cacheIndices[i]==padSlotId的batch不参与计算）；不参与计算的batch对应的输出区域为未定义值，不应读取或依赖其内容。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -485,7 +485,7 @@
     - maxQueryLen范围[1, maxDraftTokens + 1]，可为-1。
 
 - 输入值域限制：
-  - queryStartLoc是累计偏移量，取值范围[0, cuSeqLen]，长度为batch+1，queryStartLoc[i]表示第i个序列的起始偏移，queryStartLoc[batch+1]表示最后一个序列的结束位置。
+  - queryStartLoc是累计偏移量，取值范围[0, cuSeqLen]，长度为batch+1，queryStartLoc[i]表示第i个序列的起始偏移，queryStartLoc[batch]表示最后一个序列的结束位置。
   - blockSize 为0或者大于等于2，apc开启时不为0。
   - blockIdxFirstScheduledToken、blockIdxLastScheduledToken、initialStateIdx、numComputedTokens和cacheIndices均存在时表示APC开启，且满足以下条件（i为batch的索引）：
     - cacheIndices为2维

@@ -464,16 +464,16 @@ aclnnStatus aclnnInplaceFusedCausalConv1dV2(
       <td>activationMode（int64_t）</td>
       <td>输入</td>
       <td>激活函数类型。</td>
+      <td>当前版本暂不支持，传参时请置为nullptr或忽略。</td>
       <td>INT64</td>
-      <td>-</td>
       <td>-</td>
       <td>-</td>
     </tr>
     <tr>
       <td>padSlotId（int64_t）</td>
       <td>输入</td>
-      <td>用于跳过不需要参与计算的batch。</td>
-      <td><ul><li>仅支持不参与计算的变长序列在x的开头或结尾。</li><li>当cacheIndices[i]==padSlotId时跳过该batch。</li></ul></td>
+      <td>用于指定不参与计算的变长序列（cacheIndices[i]==padSlotId的batch不参与计算）；不参与计算的batch对应的输出区域为未定义值，不应读取或依赖其内容。</td>
+      <td>仅支持不参与计算的变长序列在x的开头或结尾。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -685,7 +685,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1dV2(
     - maxQueryLen范围[1, maxDraftTokens + 1]，可为-1。
 
 - 输入值域限制：
-  - queryStartLocOptional是累计偏移量，取值范围[0, cuSeqLen]，长度为batch+1，queryStartLocOptional[i]表示第i个序列的起始偏移，queryStartLocOptional[batch+1]表示最后一个序列的结束位置。
+  - queryStartLocOptional是累计偏移量，取值范围[0, cuSeqLen]，长度为batch+1，queryStartLocOptional[i]表示第i个序列的起始偏移，queryStartLocOptional[batch]表示最后一个序列的结束位置。
   - blockSize 为0或者大于等于2，apc开启时不为0。
   - blockIdxFirstScheduledTokenOptional、blockIdxLastScheduledTokenOptional、initialStateIdxOptional、numComputedTokensOptional和cacheIndicesOptional均存在时表示APC开启，且满足以下条件（i为batch的索引）：
     - cacheIndices为2维

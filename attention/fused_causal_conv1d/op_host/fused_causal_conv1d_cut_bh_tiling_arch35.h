@@ -39,22 +39,21 @@ struct FusedCausalConv1dCutBHCompileInfo {
 constexpr uint64_t TILING_KEY_BH_BF16 = 20000; // BF16 数据类型对应的 kernel 分支
 constexpr uint64_t TILING_KEY_BH_FP16 = 20001; // FP16 数据类型对应的 kernel 分支
 
-constexpr int32_t X_INDEX = 0;                  // 输入特征 x：[batch, seq_len, dim] 或 [cu_seq_len, dim]
-constexpr int32_t WEIGHT_INDEX = 1;             // 卷积权重：[kernel_size, dim]
-constexpr int32_t CONV_STATES_INDEX = 2;        // KV 缓存状态：[batch, state_len, dim]
-constexpr int32_t QUERY_START_LOC_INDEX = 3;    // 2D 输入时各 batch 的起始位置：[batch+1]（可选）
-constexpr int32_t CACHE_INDICES_INDEX = 4;      // cache 索引（可选），非APC为 1D，APC 为 2D
-constexpr int32_t INITIAL_STATE_MODE_INDEX = 5; // 初始状态模式（可选）
-constexpr int32_t BIAS_INDEX = 6;               // 偏置（可选）
-constexpr int32_t NUM_ACCEPTED_TOKEN_INDEX = 7; // 每个 batch 接受的 token 数（可选）
-// APC（Attention Page Cache）相关辅助输入
-constexpr int32_t NUM_COMPUTED_TOKENS_INDEX = 8;             // 已计算 token 数（可选）
+constexpr int32_t X_INDEX = 0;                   // 输入特征 x：[batch, seq_len, dim] 或 [cu_seq_len, dim]
+constexpr int32_t WEIGHT_INDEX = 1;              // 卷积权重：[kernel_size, dim]
+constexpr int32_t CONV_STATES_INDEX = 2;         // KV 缓存状态：[batch, state_len, dim]
+constexpr int32_t QUERY_START_LOC_INDEX = 3;     // 2D 输入时各 batch 的起始位置：[batch+1]（可选）
+constexpr int32_t CACHE_INDICES_INDEX = 4;       // cache 索引（可选），非APC为 1D，APC 为 2D
+constexpr int32_t INITIAL_STATE_MODE_INDEX = 5;  // 初始状态模式（可选）
+constexpr int32_t BIAS_INDEX = 6;                // 偏置（可选）
+constexpr int32_t NUM_ACCEPTED_TOKEN_INDEX = 7;  // 每个 batch 接受的 token 数（可选）
+constexpr int32_t NUM_COMPUTED_TOKENS_INDEX = 8; // 已计算 token 数（可选）
 constexpr int32_t BLOCK_IDX_FIRST_SCHEDULED_TOKEN_INDEX = 9; // APC: 首个调度 token 所在 block 索引（可选）
 constexpr int32_t BLOCK_IDX_LAST_SCHEDULED_TOKEN_INDEX = 10; // APC: 最后调度 token 所在 block 索引（可选）
 constexpr int32_t INITIAL_STATE_IDX_INDEX = 11;              // 初始状态索引（可选）
 
-constexpr int32_t Y_INDEX = 0;                    // 输出特征 y（与 x 形状相同）
-constexpr int32_t OUTPUT_CONV_STATES_INDEX = 1;   // 更新后的 conv_states（与输入 conv_states 形状相同）
+constexpr int32_t OUTPUT_CONV_STATES_INDEX = 0;   // 更新后的 conv_states（与输入 conv_states 形状相同）
+constexpr int32_t Y_INDEX = 1;                    // 输出特征 y（与 x 形状相同）
 constexpr int32_t ATTR_ACTIVATION_MODE_INDEX = 0; // 激活函数模式：0=无，1=silu 等
 constexpr int32_t ATTR_PAD_SLOT_ID_INDEX = 1;     // padding slot id，用于标识 padding 样本
 constexpr int32_t ATTR_RUN_MODE_INDEX = 2;        // 运行模式（预留）
@@ -110,6 +109,7 @@ protected:
 
     // ---- 各张量形状合法性校验 ----
     ge::graphStatus ValidateXShape();
+    ge::graphStatus ValidateYShape();
     ge::graphStatus ValidateWeightShape();
     ge::graphStatus ValidateConvStatesShape();
     ge::graphStatus ValidateQueryStartLocShape();

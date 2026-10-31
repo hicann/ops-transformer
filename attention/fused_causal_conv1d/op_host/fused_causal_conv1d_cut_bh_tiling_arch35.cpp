@@ -466,6 +466,23 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::ValidateXShape()
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus FusedCausalConv1dCutBHTiling::ValidateYShape()
+{
+    auto xShape = context_->GetInputShape(X_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, xShape);
+    auto yShape = context_->GetOutputShape(Y_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, yShape);
+    const gert::Shape xOriginShape = xShape->GetOriginShape();
+    const gert::Shape yOriginShape = yShape->GetOriginShape();
+    if (xOriginShape != yOriginShape) {
+        std::string shapeMsg = Ops::Base::ToString(xOriginShape) + " and " + Ops::Base::ToString(yOriginShape);
+        std::string reasonMsg = "Input x shape should be equal to output y shape";
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "x and y", shapeMsg.c_str(), reasonMsg.c_str());
+        return ge::GRAPH_FAILED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus FusedCausalConv1dCutBHTiling::ValidateWeightShape()
 {
     auto weightShape = context_->GetInputShape(WEIGHT_INDEX);
@@ -776,6 +793,8 @@ ge::graphStatus FusedCausalConv1dCutBHTiling::CheckInputParams()
 {
     // 形状校验
     if (ValidateXShape() != ge::GRAPH_SUCCESS)
+        return ge::GRAPH_FAILED;
+    if (ValidateYShape() != ge::GRAPH_SUCCESS)
         return ge::GRAPH_FAILED;
     if (ValidateWeightShape() != ge::GRAPH_SUCCESS)
         return ge::GRAPH_FAILED;

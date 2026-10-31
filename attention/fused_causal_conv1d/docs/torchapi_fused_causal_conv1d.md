@@ -193,7 +193,7 @@ cann_ops_transformer.fused_causal_conv1d(
 | block_idx_last_scheduled_token | Tensor | 可选 | 当前batch的seq_len - 1处对应的block索引。 | int32 | [batch] |
 | initial_state_idx | Tensor | 可选 | 初始索引块的索引。 | int32 | [batch] |
 | activation | str | 可选 | 激活函数类型，目前不支持此字段，默认值为"None"。 | - | - |
-| pad_slot_id | int | 可选 | padding slot id。默认值为-1。 | - | - |
+| pad_slot_id | int | 可选 | 用于指定不参与计算的变长序列（cache_indices[i]==pad_slot_id的batch不参与计算）；不参与计算的batch对应的输出区域为未定义值，不应读取或依赖其内容。默认值为-1。 | - | - |
 | max_query_len | int | 可选 | 所有batch中最大的seq_len，仅decode场景（固定batch）支持为-1。 | - | - |
 | residual_connection | int | 可选 | 是否做残差连接，1=做残差连接，0=不做残差连接。 | - | - |
 | block_size | int | 可选 | block块的大小。取值范围大于等于2，典型值128、256。 | - | - |
@@ -243,7 +243,7 @@ cann_ops_transformer.fused_causal_conv1d(
     - max_query_len范围[1, max_draft_tokens + 1]，可为-1。
 
 - 输入值域限制：
-  - query_start_loc是累计偏移量，取值范围[0, cu_seq_len]，长度为batch+1，query_start_loc[i]表示第i个序列的起始偏移，query_start_loc[batch+1]表示最后一个序列的结束位置。
+  - query_start_loc是累计偏移量，取值范围[0, cu_seq_len]，长度为batch+1，query_start_loc[i]表示第i个序列的起始偏移，query_start_loc[batch]表示最后一个序列的结束位置。
   - block_size 为0或者大于等于2，apc开启时不为0。
   - block_idx_first_scheduled_token、block_idx_last_scheduled_token、initial_state_idx、num_computed_tokens和cache_indices均存在时表示APC开启，且满足以下条件（i为batch的索引）：
     - cache_indices为2维

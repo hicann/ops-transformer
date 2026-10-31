@@ -116,7 +116,6 @@ private:
     uint64_t bsBlockFactor_ = 0;     // BS方向大核处理的长度（含overlap，前bsRemainderCores个核）
     uint64_t bsBlockTailFactor_ = 0; // BS方向小核处理的长度（后面的核）
 
-    // ===== 核数信息 =====
     uint64_t realCoreNum_ = 0; // 实际使用核数（dimCoreNum × bsCoreNum）
 
     // 核内切分信息 - 整核

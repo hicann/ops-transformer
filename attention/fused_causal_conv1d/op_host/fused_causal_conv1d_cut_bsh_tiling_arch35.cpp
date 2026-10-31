@@ -443,6 +443,16 @@ ge::graphStatus FusedCausalConv1dCutBSHTiling::CheckInputParams()
 
 ge::graphStatus FusedCausalConv1dCutBSHTiling::CheckOutputParams()
 {
+    auto outputYShape = context_->GetOutputShape(OUTPUT_Y_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, outputYShape);
+    const gert::Shape yOriginShape = outputYShape->GetOriginShape();
+    if (xShape_ != yOriginShape) {
+        std::string shapeMsg = Ops::Base::ToString(xShape_) + " and " + Ops::Base::ToString(yOriginShape);
+        std::string reasonMsg = "Input x shape should be equal to output y shape";
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "x and y", shapeMsg.c_str(), reasonMsg.c_str());
+        return ge::GRAPH_FAILED;
+    }
+
     auto outputYDesc = context_->GetOutputDesc(OUTPUT_Y_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, outputYDesc);
     auto outputYType = outputYDesc->GetDataType();
