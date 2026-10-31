@@ -29,7 +29,6 @@ constexpr int32_t CONSTANT_TWO = 2;
 constexpr int32_t CONSTANT_THREE = 3;
 constexpr int32_t CONSTANT_FOUR = 4;
 constexpr int32_t CONSTANT_EIGHT = 8;
-constexpr Reg::DivSpecificMode mode = {Reg::MaskMergeMode::ZEROING, true};
 
 template <typename T, typename U1 = int32_t, typename U2 = int32_t>
 class MoeGatingTopKRegbase {
@@ -401,7 +400,7 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SigmoidWithBias(LocalTen
             Reg::Muls(vreg1, vregInFp32, static_cast<float>(-1), preg0);
             Reg::Exp(vreg2, vreg1, preg0);
             Reg::Adds(vreg3, vreg2, static_cast<float>(1), preg0);
-            Reg::Div<float, &mode>(vregSigmoidResult, vregOne, vreg3, preg0);
+            Reg::Div(vregSigmoidResult, vregOne, vreg3, preg0);
             Reg::Add(vregBiasResult, vregSigmoidResult, vregBiasFp32, preg0);
             Reg::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
             Reg::StoreAlign(sigmoidOutAddr + i * VL_FLOAT_SIZE, vregSigmoidResult, preg0);
@@ -446,7 +445,7 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SigmoidWithoutBias(Local
             Reg::Muls(vreg1, vregInFp32, static_cast<float>(-1), preg0);
             Reg::Exp(vreg2, vreg1, preg0);
             Reg::Adds(vreg3, vreg2, static_cast<float>(1), preg0);
-            Reg::Div<float, &mode>(vregSigmoidResult, vregOne, vreg3, preg0);
+            Reg::Div(vregSigmoidResult, vregOne, vreg3, preg0);
             Reg::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
             Reg::StoreAlign(sigmoidOutAddr + i * VL_FLOAT_SIZE, vregSigmoidResult, preg0);
             Reg::StoreAlign(addBiasOutAddr + i * VL_FLOAT_SIZE, vregSigmoidResult, preg0);

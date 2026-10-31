@@ -25,8 +25,6 @@ namespace MoeGatingTopK {
 using namespace AscendC;
 using Reg::RegTensor;
 
-constexpr Reg::DivSpecificMode EK_DIV_MODE = {Reg::MaskMergeMode::ZEROING, true};
-
 template <typename T>
 class MoeGatingTopKEKFullloadRegbase {
 public:
@@ -163,7 +161,7 @@ __aicore__ inline void MoeGatingTopKEKFullloadRegbase<T>::ComputeX()
             Reg::Muls(vreg1, vregInFp32, static_cast<float>(-1), preg0);
             Reg::Exp(vreg2, vreg1, preg0);
             Reg::Adds(vreg3, vreg2, static_cast<float>(1), preg0);
-            Reg::Div<float, &EK_DIV_MODE>(vregSigmoidResult, vregOne, vreg3, preg0);
+            Reg::Div(vregSigmoidResult, vregOne, vreg3, preg0);
             Reg::Add(vregBiasResult, vregSigmoidResult, vregBiasFp32, preg0);
             Reg::Arange(vregIndex, static_cast<int32_t>(i * VL_FLOAT_SIZE));
             Reg::StoreAlign(sigmoidOutAddr + i * VL_FLOAT_SIZE, vregSigmoidResult, preg0);

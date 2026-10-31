@@ -31,7 +31,6 @@ constexpr int32_t WG_CONSTANT_TWO = 2;
 constexpr int32_t WG_CONSTANT_TEN = 10;
 constexpr int64_t DEFAULT_BATCH_ROWS = 4;
 constexpr int64_t SINGLE_EXPERT_FALLBACK_BATCH = 512;
-constexpr Reg::DivSpecificMode WG_DIV_MODE = {Reg::MaskMergeMode::ZEROING, true};
 
 template <typename T>
 class MoeGatingTopKWithoutGroupRegbase {
@@ -191,7 +190,7 @@ __aicore__ inline void MoeGatingTopKWithoutGroupRegbase<T>::ComputeNormSigmoid(_
             Reg::Muls(vregNegInput, vregIn, static_cast<float>(-1), preg0);
             Reg::Exp(vregExpNeg, vregNegInput, preg0);
             Reg::Adds(vregExpPlusOne, vregExpNeg, static_cast<float>(1), preg0);
-            Reg::Div<float, &WG_DIV_MODE>(vregNorm, vregOne, vregExpPlusOne, preg0);
+            Reg::Div(vregNorm, vregOne, vregExpPlusOne, preg0);
             Reg::StoreAlign(xNormAddr + i * VL_FLOAT_SIZE, vregNorm, preg0);
         }
     }
@@ -708,7 +707,7 @@ __aicore__ inline void MoeGatingTopKWithoutGroupRegbase<T>::ProcessSingleExpertS
                 Reg::Muls(vregTmp1, vregIn, static_cast<float>(-1), preg0);
                 Reg::Exp(vregTmp2, vregTmp1, preg0);
                 Reg::Adds(vregTmp3, vregTmp2, static_cast<float>(1), preg0);
-                Reg::Div<float, &WG_DIV_MODE>(vregNorm, vregOne, vregTmp3, preg0);
+                Reg::Div(vregNorm, vregOne, vregTmp3, preg0);
                 if constexpr (NEED_RENORM) {
                     Reg::Adds(vregSumBcast, vregNorm, eps_, preg0);
                     Reg::Div(vregOut, vregNorm, vregSumBcast, preg0);
