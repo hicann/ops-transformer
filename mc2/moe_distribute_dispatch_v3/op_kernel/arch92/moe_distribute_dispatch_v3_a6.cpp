@@ -9,8 +9,8 @@
  */
 
 /*!
- * \file moe_distribute_dispatch_v2_a6.cpp
- * \brief A6 (arch92) kernel entry for MoeDistributeDispatchV2.
+ * \file moe_distribute_dispatch_v3_a6.cpp
+ * \brief A6 (arch92) kernel entry for MoeDistributeDispatchV3.
  */
 #if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"

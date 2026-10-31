@@ -17,15 +17,6 @@
 #include "../../common/op_host/mc2_moe_input_registration.h"
 #include "common/include/op_host/op_const_def_transformer.h"
 
-// 旧版 CANN(如 9.2.0)的 op_build 生成器不支持 DT_HIFLOAT4/Ascend960,
-// 通过 devkit 版本宏守卫整段 960 配置: CANN >= 9.3 才注册(参照 moe_re_routing 同型守卫)
-#if __has_include("version/asc_devkit_version.h")
-#include "version/asc_devkit_version.h"
-#if ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR >= 3)
-#define ENABLE_DISPATCHV2_DT_HIFLOAT4
-#endif
-#endif
-
 namespace ops {
 class MoeDistributeDispatchV2 : public OpDef {
 public:
@@ -40,13 +31,13 @@ public:
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,       ge::DT_FLOAT,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
-                       ge::DT_FLOAT, Ops::Transformer::DT_HIFLOAT4_SCALE, Ops::Transformer::DT_HIFLOAT4_SCALE,
-                       Ops::Transformer::DT_HIFLOAT4_SCALE})
+                       ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         Mc2OpDef::DefineDispatchOptionalInputs(*this);
         DefineOutputs();
         DefineAttributes();
+        this->MC2().HcclGroup({"group_ep", "group_tp"});
 
         // A2 (arch22): _a2 entry (opFile -> arch22/..._a2.cpp).
         OpAICoreConfig aicore_config_a2;
@@ -62,6 +53,8 @@ public:
             .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
             .ExtendCfgInfo("opFile.value", "moe_distribute_dispatch_v2_a2");
 
+        this->AICore().AddConfig("ascend910b", aicore_config_a2);
+
         // A3 (arch22): _a3 entry (opFile -> arch22/..._a3.cpp).
         OpAICoreConfig aicore_config_a3;
         aicore_config_a3.DynamicCompileStaticFlag(true)
@@ -75,6 +68,8 @@ public:
             .ExtendCfgInfo("jitCompile.flag", "static_true")
             .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
             .ExtendCfgInfo("opFile.value", "moe_distribute_dispatch_v2_a3");
+
+        this->AICore().AddConfig("ascend910_93", aicore_config_a3);
 
         // A5 (arch35): dedicated kernel entry (opFile -> arch35/..._apt.cpp).
         OpAICoreConfig aicore_config_apt;
@@ -90,8 +85,55 @@ public:
             .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
             .ExtendCfgInfo("opFile.value", "moe_distribute_dispatch_v2_apt");
 
+        this->AICore().AddConfig("ascend950", aicore_config_apt);
+
         // A6 (arch92): dedicated kernel entry (opFile -> arch92/..._a6.cpp).
         OpAICoreConfig aicore_config_a6;
+        aicore_config_a6.Input("x")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_BF16,        ge::DT_BF16,        ge::DT_FLOAT16,       ge::DT_FLOAT16,
+                       ge::DT_BF16,        ge::DT_BF16,        ge::DT_BF16,          ge::DT_FLOAT16,
+                       ge::DT_FLOAT16,     ge::DT_FLOAT16,     ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN,
+                       ge::DT_HIFLOAT8,    ge::DT_FLOAT8_E5M2, ge::DT_FLOAT8_E4M3FN, ge::DT_BF16,
+                       ge::DT_BF16,        ge::DT_FLOAT16,     ge::DT_FLOAT16,       ge::DT_BF16,
+                       ge::DT_BF16,        ge::DT_FLOAT16,     ge::DT_FLOAT16,       ge::DT_FLOAT4_E2M1,
+                       ge::DT_FLOAT4_E1M2, ge::DT_INT32,       ge::DT_BF16,          ge::DT_FLOAT16,
+                       Ops::Transformer::DT_HIFLOAT4})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_a6.Input("scales")
+            .ParamType(OPTIONAL)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,       ge::DT_FLOAT,
+                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,       ge::DT_FLOAT,
+                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
+                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,       ge::DT_FLOAT,
+                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
+                       ge::DT_FLOAT, Ops::Transformer::DT_HIFLOAT4_SCALE, Ops::Transformer::DT_HIFLOAT4_SCALE,
+                       Ops::Transformer::DT_HIFLOAT4_SCALE})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        aicore_config_a6.Output("expand_x")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_BF16,          ge::DT_INT8,          ge::DT_FLOAT16,       ge::DT_INT8,
+                       ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8,      ge::DT_FLOAT8_E5M2,
+                       ge::DT_FLOAT8_E4M3FN, ge::DT_HIFLOAT8,      ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN,
+                       ge::DT_HIFLOAT8,      ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,
+                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1,
+                       ge::DT_FLOAT4_E1M2,   ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E1M2,   ge::DT_FLOAT4_E2M1,
+                       ge::DT_FLOAT4_E1M2,   ge::DT_INT32,         Ops::Transformer::DT_HIFLOAT4, Ops::Transformer::DT_HIFLOAT4,
+                       Ops::Transformer::DT_HIFLOAT4})
+            .FormatList({ge::FORMAT_ND});
+        aicore_config_a6.Output("dynamic_scales")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
+                       ge::DT_FLOAT,       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
+                       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
+                       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
+                       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT, Ops::Transformer::DT_HIFLOAT4_SCALE, Ops::Transformer::DT_HIFLOAT4_SCALE,
+                       Ops::Transformer::DT_HIFLOAT4_SCALE})
+            .FormatList({ge::FORMAT_ND});
         aicore_config_a6.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(true)
             .DynamicRankSupportFlag(true)
@@ -102,16 +144,10 @@ public:
             .ExtendCfgInfo("prebuildPattern.value", "Opaque")
             .ExtendCfgInfo("jitCompile.flag", "static_true")
             .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
-            .ExtendCfgInfo("opFile.value", "moe_distribute_dispatch_v2");
+            .ExtendCfgInfo("opFile.value", "moe_distribute_dispatch_v2_a6");
 
-        this->AICore().AddConfig("ascend910b", aicore_config_a2);
-        this->AICore().AddConfig("ascend910_93", aicore_config_a3);
-        this->AICore().AddConfig("ascend950", aicore_config_apt);
-#ifdef ENABLE_DISPATCHV2_DT_HIFLOAT4
         this->AICore().AddConfig("ascend960dt", aicore_config_a6);
         this->AICore().AddConfig("ascend960pr", aicore_config_a6);
-#endif // ENABLE_DISPATCHV2_DT_HIFLOAT4
-        this->MC2().HcclGroup({"group_ep", "group_tp"});
     }
 
 private:
@@ -125,8 +161,7 @@ private:
                        ge::DT_HIFLOAT8,    ge::DT_FLOAT8_E5M2, ge::DT_FLOAT8_E4M3FN, ge::DT_BF16,
                        ge::DT_BF16,        ge::DT_FLOAT16,     ge::DT_FLOAT16,       ge::DT_BF16,
                        ge::DT_BF16,        ge::DT_FLOAT16,     ge::DT_FLOAT16,       ge::DT_FLOAT4_E2M1,
-                       ge::DT_FLOAT4_E1M2, ge::DT_INT32,       ge::DT_BF16,          ge::DT_FLOAT16,
-                       Ops::Transformer::DT_HIFLOAT4})
+                       ge::DT_FLOAT4_E1M2, ge::DT_INT32})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("expert_ids")
@@ -146,8 +181,7 @@ private:
                        ge::DT_HIFLOAT8,      ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,
                        ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2,   ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT4_E2M1,
                        ge::DT_FLOAT4_E1M2,   ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E1M2,   ge::DT_FLOAT4_E2M1,
-                       ge::DT_FLOAT4_E1M2,   ge::DT_INT32,         Ops::Transformer::DT_HIFLOAT4, Ops::Transformer::DT_HIFLOAT4,
-                       Ops::Transformer::DT_HIFLOAT4})
+                       ge::DT_FLOAT4_E1M2,   ge::DT_INT32})
             .FormatList({ge::FORMAT_ND});
 
         this->Output("dynamic_scales")
@@ -158,8 +192,7 @@ private:
                        ge::DT_FLOAT,       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
                        ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
                        ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
-                       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT, Ops::Transformer::DT_HIFLOAT4_SCALE, Ops::Transformer::DT_HIFLOAT4_SCALE,
-                       Ops::Transformer::DT_HIFLOAT4_SCALE})
+                       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND});
 
         this->Output("assist_info_for_combine")

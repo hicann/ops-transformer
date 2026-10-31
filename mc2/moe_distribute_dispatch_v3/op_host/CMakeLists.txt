@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------------------------------------
-# Copyright (c) 2025 Huawei Technologies Co., Ltd.
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
 # This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -22,6 +22,9 @@ if (BUILD_OPEN_PROJECT)  # custom
     set(moe_distribute_dispatch_v3_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch_v2 PARENT_SCOPE)
     set(moe_distribute_dispatch_v3_a3_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch_v2 PARENT_SCOPE)
     set(moe_distribute_dispatch_v3_apt_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch_v2 PARENT_SCOPE)
+    set(moe_distribute_dispatch_v3_a6_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch_v2 PARENT_SCOPE)
+    get_filename_component(_dispatch_v3_a6_dir "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+    set(moe_distribute_dispatch_v3_a6_dir "${_dispatch_v3_a6_dir}" PARENT_SCOPE)
 
     # --cce-auto-sync=off：指定CCE编译器是否自动执行线程间或模块间的同步操作
     add_ops_compile_options(
