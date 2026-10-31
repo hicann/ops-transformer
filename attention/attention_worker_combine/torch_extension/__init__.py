@@ -11,6 +11,13 @@
 """Attention worker combine frontend and optional GE converter."""
 
 from .attention_worker_combine import attention_worker_combine
-from .graph_convert_attention_worker_combine import convert_attention_worker_combine
+from .graph_convert_attention_worker_combine import (
+    convert_attention_worker_combine,
+    register_attention_worker_combine_converter,
+)
 
-__all__ = ["attention_worker_combine", "convert_attention_worker_combine"]
+__all__ = [
+    "attention_worker_combine",
+    "convert_attention_worker_combine",
+    "register_attention_worker_combine_converter",
+]

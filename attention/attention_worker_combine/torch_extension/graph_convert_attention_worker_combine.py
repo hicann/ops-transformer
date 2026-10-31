@@ -78,9 +78,6 @@ if _TORCHAIR_AVAILABLE:
             .output("next_layer_id", "DT_INT32"),
         )
 
-    @register_fx_node_ge_converter(
-        torch.ops.cann_ops_transformer.attention_worker_combine.default
-    )
     def convert_attention_worker_combine(
         schedule_context: Tensor,
         expert_scales: Tensor,
@@ -108,3 +105,16 @@ else:
     def convert_attention_worker_combine(*args, **kwargs):
         """Report the optional GE dependency without blocking eager imports."""
         raise RuntimeError("AttentionWorkerCombine GE converter requires torchair")
+
+
+def register_attention_worker_combine_converter():
+    """Bind the GE converter to the currently resolved PyTorch overload."""
+    if _TORCHAIR_AVAILABLE:
+        # Interface discovery may recreate the overload packet after import.
+        # Register again before compilation so the new overload uses our converter.
+        register_fx_node_ge_converter(
+            torch.ops.cann_ops_transformer.attention_worker_combine.default
+        )(convert_attention_worker_combine)
+
+
+register_attention_worker_combine_converter()

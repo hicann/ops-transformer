@@ -637,6 +637,10 @@ class E2eAttentionWorkerCombineTestSpec:
         need_schedule=0,
         **kwargs,
     ):
+        from cann_ops_transformer.ops import register_attention_worker_combine_converter
+
+        # 接口解析可能重建 torch.ops 对象，图编译前将 converter 注册到当前对象。
+        register_attention_worker_combine_converter()
         name = kwargs["testcase_name"]
         data = case_data(name)
         try:
