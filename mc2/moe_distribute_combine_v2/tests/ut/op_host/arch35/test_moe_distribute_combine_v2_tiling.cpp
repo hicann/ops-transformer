@@ -9,6 +9,7 @@
  */
 
 #include <iostream>
+#include <cstdlib>
 #include <gtest/gtest.h>
 #include "mc2_tiling_case_executor.h"
 #include "../test_moe_distribute_combine_v2_host_ut_param.h"
@@ -17,6 +18,32 @@ namespace MoeDistributeCombineV2UT {
 
 class MoeDistributeCombineV2Arch35TilingTest : public testing::TestWithParam<MoeDistributeCombineV2TilingUtParam> {
 protected:
+    void SetUp() override
+    {
+        useLargeWindow_ = GetParam().case_name.find("arch35_combine_boundary_") == 0;
+        if (useLargeWindow_) {
+            const char* value = getenv("HCCL_BUFFSIZE");
+            hadOriginalEnv_ = value != nullptr;
+            originalEnv_ = hadOriginalEnv_ ? value : "";
+            ASSERT_EQ(setenv("HCCL_BUFFSIZE", "65536", 1), 0);
+        }
+    }
+
+    void TearDown() override
+    {
+        if (useLargeWindow_) {
+            if (hadOriginalEnv_) {
+                setenv("HCCL_BUFFSIZE", originalEnv_.c_str(), 1);
+            } else {
+                unsetenv("HCCL_BUFFSIZE");
+            }
+        }
+    }
+
+    bool useLargeWindow_ = false;
+    bool hadOriginalEnv_ = false;
+    std::string originalEnv_;
+
     static void SetUpTestCase()
     {
         std::cout << "MoeDistributeCombineV2Arch35TilingTest SetUp" << std::endl;

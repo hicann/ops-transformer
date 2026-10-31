@@ -1037,7 +1037,7 @@ __aicore__ inline void MoeDistributeCombineV2A5Mte<A5MteCombineTypeFunc>::Expert
     LocalTensor<ExpandXType> expandXInLocal = expandXInBuf_.Get<ExpandXType>()[inputOffset];
     DataCopyExtParams copyParams{1U, hExpandXTypeSize_, 0U, 0U, 0U};
     DataCopyPadExtParams<ExpandXType> padParams{true, 0U, 0U, 0U};
-    DataCopyPad(expandXInLocal, expandXGM_[tkIndex * axisH_], copyParams, padParams);
+    DataCopyPad(expandXInLocal, expandXGM_[static_cast<uint64_t>(tkIndex) * axisH_], copyParams, padParams);
     SetFlag<HardEvent::MTE2_V>(bufferIndex);
 }
 

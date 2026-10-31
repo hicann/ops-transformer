@@ -362,7 +362,12 @@ public:
             }
 #endif
 #endif
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+            DataCopyPad(dynamicScalesOutGMTensor_[static_cast<uint64_t>(currentTokenIndex) * scaleOutBytes], scaleLT,
+                        scaleOutParams);
+#else
             DataCopyPad(dynamicScalesOutGMTensor_[currentTokenIndex * scaleOutBytes], scaleLT, scaleOutParams);
+#endif
         }
     }
 

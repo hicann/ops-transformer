@@ -72,6 +72,9 @@ constexpr uint32_t STATUS_BLOCK_COUNT_SEL_PATTERN = 2U;
 // status block中的count字段偏移
 constexpr uint32_t STATUS_BLOCK_COUNT_FIELD_OFFSET = 1U;
 constexpr uint32_t MAX_UB_SIZE = 170U * 1024U;
+constexpr uint32_t A5_CUMSUM_UB_RESERVE = 2U * UB_ALIGN;
+constexpr uint32_t EXPERT_HISTO_BIN_NUM = 256U;
+constexpr uint32_t EXPERT_PER_HISTO_GROUP = 254U;
 constexpr float FP8_E5M2_MAX_VALUE = 57344.0f;
 constexpr float FP8_E4M3_MAX_VALUE = 448.0f;
 constexpr float HIFP8_MAX_VALUE = 32768.0f;

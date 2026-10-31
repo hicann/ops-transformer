@@ -99,8 +99,10 @@ constexpr uint32_t RANK_LIST_NUM = 2;
 // 分层方案中每个 token 需要存储 cnt 与 offset 两个 int32 信息
 constexpr uint32_t LAYERED_CNT_OFFSET_PER_TOKEN = 2;
 constexpr int64_t MOE_EXPERT_MAX_NUM = 1024;
+constexpr int64_t MOE_EXPERT_MAX_NUM_A5 = 2048;
 constexpr int64_t MOE_EXPERT_MAX_NUM_LAYERED = 512;
 constexpr int64_t LOCAL_EXPERT_MAX_SIZE = 2048;
+constexpr int64_t LOCAL_EXPERT_MAX_SIZE_A5 = 4096;
 constexpr int64_t K_MAX = 16;
 constexpr int64_t H_MIN = 1024;
 constexpr int64_t H_MAX = 8192;
@@ -159,14 +161,16 @@ static void PrintTilingDataInfo(const char* nodeName, MoeDistributeCombineV2Tili
     OP_LOGD(nodeName, "hasExpertScales is %d.", tilingData.moeDistributeCombineV2Info.hasExpertScales);
 }
 
-static ge::graphStatus CheckExpertAttributeValues(const char* nodeName, int64_t moeExpertNum, int64_t zeroExpertNum,
-                                                  int64_t copyExpertNum, int64_t constExpertNum,
-                                                  const int64_t* expertShardPtr, bool isLayered)
+static ge::graphStatus CheckExpertAttributeValues(const gert::TilingContext* context, const char* nodeName,
+                                                  int64_t moeExpertNum, int64_t zeroExpertNum, int64_t copyExpertNum,
+                                                  int64_t constExpertNum, const int64_t* expertShardPtr, bool isLayered)
 {
     OP_TILING_CHECK((moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum) > INT32_MAX,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "totalExpertNum", "too large", "should not exceed MAX_INT32"),
                     return ge::GRAPH_FAILED);
-    int64_t moeExpertMaxNum = isLayered ? MOE_EXPERT_MAX_NUM_LAYERED : MOE_EXPERT_MAX_NUM;
+    bool isA5 = mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510;
+    int64_t moeExpertMaxNum =
+        isLayered ? MOE_EXPERT_MAX_NUM_LAYERED : (isA5 ? MOE_EXPERT_MAX_NUM_A5 : MOE_EXPERT_MAX_NUM);
     OP_TILING_CHECK(
         (moeExpertNum <= 0) || (moeExpertNum > moeExpertMaxNum),
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "moeExpertNum", std::to_string(moeExpertNum).c_str(), "in supported range"),
@@ -215,8 +219,8 @@ static ge::graphStatus GetExpertsAttrAndSetTilingData(const gert::TilingContext*
     int64_t zeroExpertNum = *zeroExpertNumPtr;
     int64_t copyExpertNum = *copyExpertNumPtr;
     int64_t constExpertNum = *constExpertNumPtr;
-    if (CheckExpertAttributeValues(nodeName, moeExpertNum, zeroExpertNum, copyExpertNum, constExpertNum, expertShardPtr,
-                                   isLayered) != ge::GRAPH_SUCCESS) {
+    if (CheckExpertAttributeValues(context, nodeName, moeExpertNum, zeroExpertNum, copyExpertNum, constExpertNum,
+                                   expertShardPtr, isLayered) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     tilingData.moeDistributeCombineV2Info.moeExpertNum = static_cast<uint32_t>(moeExpertNum);
@@ -1723,6 +1727,13 @@ static bool CheckAndSetGlobalBs(const gert::TilingContext* context, MoeDistribut
                                               "should be 0 or configured maxBs per rank * epWorldSize"),
                     return false);
 
+    OP_TILING_CHECK(mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 &&
+                        *globalBsPtr > static_cast<int64_t>(epWorldSize) * BS_UPPER_BOUND,
+                    OP_LOGE(nodeName,
+                            "Configured maxBs per rank must not exceed %ld on A5, but got "
+                            "globalBs=%ld, epWorldSize=%u.",
+                            BS_UPPER_BOUND, *globalBsPtr, epWorldSize),
+                    return false);
     tilingData.moeDistributeCombineV2Info.globalBs = static_cast<uint32_t>(*globalBsPtr);
     if (*globalBsPtr == 0) {
         tilingData.moeDistributeCombineV2Info.globalBs = static_cast<uint32_t>(expertIdsDim0) * epWorldSize;
@@ -1748,10 +1759,14 @@ static bool CheckAttrs(const gert::TilingContext* context, MoeDistributeCombineV
                                               "should be divisible by (epWorldSize - sharedExpertRankNum)"),
                     return false);
     localMoeExpertNum = moeExpertNum / (epWorldSize - sharedExpertRankNum);
-    OP_TILING_CHECK((localMoeExpertNum <= 0) || (localMoeExpertNum * epWorldSize > LOCAL_EXPERT_MAX_SIZE),
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "localMoeExpertNum", std::to_string(localMoeExpertNum).c_str(),
-                                              "must be > 0 and localMoeExpertNum * epWorldSize <= 2048"),
-                    return false);
+    int64_t localExpertMaxSize =
+        (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) ? LOCAL_EXPERT_MAX_SIZE_A5 : LOCAL_EXPERT_MAX_SIZE;
+    OP_TILING_CHECK(
+        (localMoeExpertNum <= 0) || (localMoeExpertNum * epWorldSize > localExpertMaxSize),
+        OP_LOGE_FOR_INVALID_VALUE(
+            nodeName, "localMoeExpertNum", std::to_string(localMoeExpertNum).c_str(),
+            ("must be > 0 and localMoeExpertNum * epWorldSize <= " + std::to_string(localExpertMaxSize)).c_str()),
+        return false);
     tilingData.moeDistributeCombineV2Info.moeExpertPerRankNum = localMoeExpertNum;
 
     // 校验输入expertIds的维度0并设bs

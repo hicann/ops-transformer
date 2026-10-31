@@ -16,6 +16,7 @@
 #ifndef MOE_DISTRIBUTE_CHECK_WIN_SIZE
 #define MOE_DISTRIBUTE_CHECK_WIN_SIZE
 
+#include <algorithm>
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "mc2_log_compat.h"
 
@@ -104,7 +105,8 @@ struct CheckWinSizeData {
 };
 
 inline uint64_t CalcMinWinSize(const CheckWinSizeData& winSizeData, uint64_t& tokenNeedSizeDispatch,
-                               uint64_t& tokenNeedSizeCombine, uint64_t combineDataAlign = WIN_ADDR_ALIGN)
+                               uint64_t& tokenNeedSizeCombine, uint64_t combineDataAlign = WIN_ADDR_ALIGN,
+                               uint64_t dispatchTokenBytes = 0UL)
 {
     // A3 Combine uses raw 512-byte-aligned data for both fullmesh variants.
     // A5 callers explicitly request the packed-data alignment.
@@ -113,8 +115,9 @@ inline uint64_t CalcMinWinSize(const CheckWinSizeData& winSizeData, uint64_t& to
     const uint64_t maxBs = winSizeData.globalBs / winSizeData.epWorldSize;
     tokenNeedSizeCombine = ((h * MAX_OUT_DTYPE_SIZE + combineDataAlign - 1UL) / combineDataAlign) * WIN_ADDR_ALIGN;
     // expertScale 复用三元组后的对齐空间，不增加窗口占用。
-    const uint64_t tokenActualLen =
+    const uint64_t defaultTokenLen =
         ((h * MAX_OUT_DTYPE_SIZE + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN + SCALE_EXPAND_IDX_BUFFER;
+    const uint64_t tokenActualLen = std::max(defaultTokenLen, dispatchTokenBytes);
     const uint64_t tokenDataAlign = winSizeData.isSetFullMeshV2 ? FULL_MESH_DATA_ALIGN : WIN_ADDR_ALIGN;
     tokenNeedSizeDispatch = ((tokenActualLen + tokenDataAlign - 1UL) / tokenDataAlign) * WIN_ADDR_ALIGN;
     // 跨超win区计算，3代表token里拼的topK、expert_scale、实际有效token数量，32B对齐，64代表scale和flag， 404是400MB
@@ -163,7 +166,7 @@ inline ge::graphStatus CalcMinWinSizeA3(const gert::TilingContext* context, cons
 
 inline ge::graphStatus CheckActualWinSize(const gert::TilingContext* context, const char* nodeName,
                                           const CheckWinSizeData& winSizeData, const uint64_t maxWindowSizeEp,
-                                          const uint64_t hcclBufferSizeEp)
+                                          const uint64_t hcclBufferSizeEp, uint64_t dispatchTokenBytes = 0UL)
 {
     uint64_t h = winSizeData.h;
     uint64_t k = winSizeData.k;
@@ -174,7 +177,8 @@ inline ge::graphStatus CheckActualWinSize(const gert::TilingContext* context, co
     uint64_t tokenNeedSizeCombine = 0;
     const uint64_t combineDataAlign =
         (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_2201) ? WIN_ADDR_ALIGN : FULL_MESH_DATA_ALIGN;
-    uint64_t actualSize = CalcMinWinSize(winSizeData, tokenNeedSizeDispatch, tokenNeedSizeCombine, combineDataAlign);
+    uint64_t actualSize =
+        CalcMinWinSize(winSizeData, tokenNeedSizeDispatch, tokenNeedSizeCombine, combineDataAlign, dispatchTokenBytes);
     OP_TILING_CHECK(CheckLayeredWinSizeParams(context, nodeName, winSizeData) != ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(nodeName, "Invalid hierarchy window parameters."), return ge::GRAPH_FAILED);
     if (winSizeData.isLayered) {
@@ -228,7 +232,7 @@ inline ge::graphStatus CheckActualWinSize(const gert::TilingContext* context, co
 }
 
 inline ge::graphStatus CheckWinSize(const gert::TilingContext* context, const char* nodeName,
-                                    CheckWinSizeData& winSizeData)
+                                    CheckWinSizeData& winSizeData, uint64_t dispatchTokenBytes = 0UL)
 {
     auto attrs = context->GetAttrs();
     uint64_t hcclBufferSizeEp = 0;
@@ -252,9 +256,10 @@ inline ge::graphStatus CheckWinSize(const gert::TilingContext* context, const ch
         hcclBufferSizeEp = *cclBuffSizePtr;
     }
     OP_LOGD(nodeName, "windowSize = %lu", maxWindowSizeEp);
-    OP_TILING_CHECK(
-        CheckActualWinSize(context, nodeName, winSizeData, maxWindowSizeEp, hcclBufferSizeEp) != ge::GRAPH_SUCCESS,
-        OP_LOGE_WITHOUT_REPORT(nodeName, "Tiling check actual window size failed."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckActualWinSize(context, nodeName, winSizeData, maxWindowSizeEp, hcclBufferSizeEp,
+                                       dispatchTokenBytes) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "Tiling check actual window size failed."),
+                    return ge::GRAPH_FAILED);
 
     winSizeData.totalWinSizeEp = maxWindowSizeEp;
     if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) {

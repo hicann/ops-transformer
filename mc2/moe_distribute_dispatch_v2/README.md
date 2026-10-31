@@ -419,7 +419,7 @@ $$
     - 参数约束：
         - `elasticInfoOptional`：当前版本不支持，传空指针即可。
         - `epWorldSize`：取值范围[2, 1024]。
-        - `moeExpertNum`：取值范围(0, 1024]。
+        - `moeExpertNum`：取值范围(0, 2048]。
         - `sharedExpertNum`：取值支持[0, 4]。
         - `commAlg`：当前版本仅支持""，"fullmesh_v1"，"fullmesh_v2"三种输入方式。
             - ""：默认值，开启fullmesh_v1模板。

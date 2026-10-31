@@ -590,7 +590,7 @@ aclnnStatus aclnnMoeDistributeCombineV3(
     - expandScalesOptional预留参数，当前版本不支持，传空指针即可。
     - sharedExpertXOptional要求为2D或3D Tensor（2D时shape为(BS, H)；3D时前两位乘积等于BS、第三维等于H）；可传或不传，传入时sharedExpertRankNum需为0。
     - epWorldSize取值支持[2, 1024]。
-    - moeExpertNum取值范围(0, 1024]。
+    - moeExpertNum取值范围(0, 2048]。
     - groupTp当前版本不支持，传空字符即可。
     - tpWorldSize当前版本不支持，传0即可。
     - tpRankId当前版本不支持，传0即可。
@@ -722,7 +722,7 @@ aclnnStatus aclnnMoeDistributeCombineV3(
   | BS           | 本卡最终输出token数:<ul><li> <term>Atlas A2系列产品</term>：依commAlg取值，"fullmesh"支持(0, 256]；"hierarchy"并且驱动版本≥25.0.RC1.1时支持(0, 512]；</li><li><term>Atlas A3系列产品</term>、Ascend 950DT系列产品：0 < BS ≤512。</li></ul> |
   | K            |表示选取topK个专家:<br> 0 < K ≤16，且0 < K ≤ <code>moeExpertNum+zeroExpertNum+copyExpertNum+constExpertNum</code>。 |
   | serverNum    | 服务器节点数:<br><term>Atlas A2系列产品</term>：仅该场景的shape使用了该变量，仅支持2、4、8。
-  | localExpertNum | 本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，localExpertNum > 1时不支持TP通信。 </li><li><term>Atlas A3系列产品</term>  、<term>Ascend 950DT系列产品</term>：应满足0 < localExpertNum * epWorldSize ≤ 2048。</li></ul>|
+  | localExpertNum | 本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，localExpertNum > 1时不支持TP通信。 </li><li><term>Atlas A3系列产品</term>：应满足0 < localExpertNum * epWorldSize ≤ 2048。</li><li><term>Ascend 950DT系列产品</term>：应满足0 < localExpertNum * epWorldSize ≤ 4096。</li></ul>|
 
 - **环境变量约束**：
   - **HCCL_BUFFSIZE**：调用本接口前需检查HCCL_BUFFSIZE环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。

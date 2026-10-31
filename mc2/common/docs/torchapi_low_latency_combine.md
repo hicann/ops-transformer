@@ -122,7 +122,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
         <td>num_experts</td>
         <td>int</td>
         <td>可选</td>
-        <td>MoE专家数量，取值范围[1, 1024]，并且满足以下条件：num_experts%(ep_world_size - shared_expert_rank_num)=0。默认值为0。</td>
+        <td>MoE专家数量，取值范围[1, 1024]，并且满足以下条件：num_experts%(ep_world_size - shared_expert_rank_num)=0。对于<term>Ascend 950PR&950DT系列产品</term>，取值范围为[1, 2048]。默认值为0。</td>
         <td>int</td>
         <td>-</td>
     </tr>
@@ -419,7 +419,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
   - local_expert_num：表示本卡专家数量。
     - 对于共享专家卡，local_expert_num=1。
     - 对于MoE专家卡，local_expert_num=num_experts/(ep_world_size-shared_expert_rank_num)。
-    - 应满足0 < local_expert_num \* ep_world_size ≤ 2048。
+    - 应满足0 < local_expert_num \* ep_world_size ≤ 2048；对于<term>Ascend 950PR&950DT系列产品</term>，应满足0 < local_expert_num \* ep_world_size ≤ 4096。
 
 - `low_latency_dispatch`和`low_latency_combine`必须配套使用。
 - 在不同产品型号、不同通信算法或不同版本中，`low_latency_dispatch`的Tensor输出`assist_info_for_combine`、`ep_recv_counts`、`expand_scales`中的元素值可能不同，使用时直接将上述Tensor传给`low_latency_combine`对应参数即可，模型其他业务逻辑不应对其存在依赖。

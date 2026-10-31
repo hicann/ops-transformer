@@ -20,12 +20,43 @@
 #include "exe_graph/runtime/storage_shape.h"
 
 #include "mc2_tiling_case_executor.h"
+#include "mc2/moe_distribute_dispatch_v2/op_host/op_tiling/moe_distribute_check_win_size.h"
 #include "../test_moe_distribute_dispatch_v2_host_ut_param.h"
 
 namespace MoeDistributeDispatchV2UT {
 
 class MoeDistributeDispatchV2Arch35TilingTest : public testing::TestWithParam<MoeDistributeDispatchV2TilingUtParam> {
 protected:
+    void SetUp() override
+    {
+        const auto* testInfo = ::testing::UnitTest::GetInstance()->current_test_info();
+        if (testInfo == nullptr || testInfo->value_param() == nullptr) {
+            return;
+        }
+        const auto& param = GetParam();
+        if (param.comm_alg != "fullmesh_v1" && param.comm_alg != "fullmesh_v2") {
+            return;
+        }
+        const char* value = getenv("HCCL_BUFFSIZE");
+        hadOriginalEnv_ = value != nullptr;
+        originalEnv_ = hadOriginalEnv_ ? value : "";
+        const bool smallScaledWindow = param.case_name == "arch35_boundary_nonquant_scales8192_v1_small_win";
+        ASSERT_EQ(setenv("HCCL_BUFFSIZE", smallScaledWindow ? "32768" : "65536", 1), 0);
+        windowEnvSet_ = true;
+    }
+
+    void TearDown() override
+    {
+        if (!windowEnvSet_) {
+            return;
+        }
+        if (hadOriginalEnv_) {
+            setenv("HCCL_BUFFSIZE", originalEnv_.c_str(), 1);
+        } else {
+            unsetenv("HCCL_BUFFSIZE");
+        }
+    }
+
     static void SetUpTestCase()
     {
         std::cout << "MoeDistributeDispatchV2Arch35TilingTest SetUp" << std::endl;
@@ -35,6 +66,11 @@ protected:
     {
         std::cout << "MoeDistributeDispatchV2Arch35TilingTest TearDown" << std::endl;
     }
+
+private:
+    bool windowEnvSet_ = false;
+    bool hadOriginalEnv_ = false;
+    std::string originalEnv_;
 };
 
 TEST_P(MoeDistributeDispatchV2Arch35TilingTest, param)
@@ -291,6 +327,49 @@ TEST_F(MoeDistributeDispatchV2Arch35TilingTest, A5MteStaticNoSharedTwoDimScales)
         &compileInfo, "3510", 20, 196608);
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, UINT64_MAX);
+}
+
+Mc2Tiling::CheckWinSizeData MakeWindowData()
+{
+    Mc2Tiling::CheckWinSizeData data{};
+    data.epWorldSize = 64;
+    data.bs = 512;
+    data.globalBs = 64 * 512;
+    data.h = 8192;
+    data.k = 12;
+    data.moeExpertNum = 1024;
+    data.localMoeExpertNum = 16;
+    data.tpWorldSize = 1;
+    return data;
+}
+
+TEST(MoeDistributeWindowSize, A5Expert2048WithSixteenSharedRanks)
+{
+    auto data = MakeWindowData();
+    data.epWorldSize = 32;
+    data.globalBs = 32 * 512;
+    data.moeExpertNum = 2048;
+    data.localMoeExpertNum = 128;
+    data.sharedExpertNum = 4;
+    data.k = 12;
+    uint64_t dispatchStride = 0;
+    uint64_t combineStride = 0;
+    EXPECT_EQ(Mc2Tiling::CalcMinWinSize(data, dispatchStride, combineStride, 480), 71160561664ULL);
+    data.isSetFullMeshV2 = true;
+    EXPECT_EQ(Mc2Tiling::CalcMinWinSize(data, dispatchStride, combineStride, 480), 75455528960ULL);
+}
+
+TEST(MoeDistributeWindowSize, NonQuantizedScalesAreReservedWithEachToken)
+{
+    auto data = MakeWindowData();
+    const uint64_t dispatchTokenBytes = 8192 * sizeof(uint16_t) + 8192 * sizeof(float) + 3 * sizeof(int32_t);
+    uint64_t dispatchStride = 0;
+    uint64_t combineStride = 0;
+    Mc2Tiling::CalcMinWinSize(data, dispatchStride, combineStride, 480, dispatchTokenBytes);
+    EXPECT_EQ(dispatchStride, 49664UL);
+    data.isSetFullMeshV2 = true;
+    Mc2Tiling::CalcMinWinSize(data, dispatchStride, combineStride, 480, dispatchTokenBytes);
+    EXPECT_EQ(dispatchStride, 52736UL);
 }
 
 } // namespace MoeDistributeDispatchV2UT

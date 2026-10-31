@@ -526,7 +526,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
     - xActiveMaskOptional要求为1D或2D Tensor（1D时shape为(BS, )，2D时shape为(BS, K)）；1D时true需排在false前，2D时token对应K个值全为false则不参与通信。
     - expertScalesOptional可传有效Tensor或空指针。传有效Tensor时使能expertScales专家权重功能，有效Tensor为2D Tensor，shape为(BS, K)；传空指针时不使能expertScales专家权重功能。不支持空Tensor。
     - epWorldSize取值范围[2, 1024]。
-    - moeExpertNum取值范围(0, 1024]。
+    - moeExpertNum取值范围(0, 2048]。
     - groupTp当前版本不支持，传空字符即可。
     - tpWorldSize当前版本不支持，传0即可。
     - tpRankId当前版本不支持，传0即可。
@@ -660,7 +660,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
   | BS           | 表示本卡最终输出token数。<ul><li><term>Atlas A2系列产品</term>：依commAlg取值，"fullmesh"取值范围为(0 < BS ≤ 256)；"hierarchy"并且驱动版本≥25.0.RC1.1时取值范围为(0 < BS ≤ 512)；</li><li><term>Atlas A3训练系列产品/Atlas A3推理系列产品</term>：依commAlg取值，"fullmesh_v2"取值范围为(0 < BS ≤ 256)，"fullmesh_v1"和""取值范围为(0 < BS ≤ 512)。</li><li><term>Ascend 950DT系列产品</term>：0 < BS ≤512。</li></ul> |
   | K    | 表示选取topK个专家，取值范围为0 < K ≤16，且<code>0 < K ≤ moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>。<br> <term>Atlas A3系列产品</term>：当commAlg为"fullmesh_v2"时，取值范围为0 < K ≤ 12。|
   | serverNum    | 表示服务器节点数，仅支持2、4、8。<br>Atlas A2训练系列产品/Atlas A2推理系列产品：仅该场景的shape使用了该变量。                                                  |
-  | localExpertNum |  本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，当前版本不支持TP域通信。 </li><li><term>Atlas A3系列产品</term>、Ascend 950DT系列产品：应满足0 < <code>localExpertNum * epWorldSize</code> ≤ 2048。</li></ul>|
+  | localExpertNum |  本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，当前版本不支持TP域通信。 </li><li><term>Atlas A3系列产品</term>：应满足0 < <code>localExpertNum * epWorldSize</code> ≤ 2048。</li><li><term>Ascend 950DT系列产品</term>：应满足0 < <code>localExpertNum * epWorldSize</code> ≤ 4096。</li></ul>|
 
 - **quantMode相关约束**：
 
