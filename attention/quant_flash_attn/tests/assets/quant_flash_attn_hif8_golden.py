@@ -354,6 +354,202 @@ def cpu_hif8_golden(
     return out, lse
 
 
+# ==============================================================================
+# 三方比对支撑 (cross_check): fp64 bench
+# 仅 --compare cross_check 时由 impl/golden.py 调用, 两方回归路径不受影响。
+# HIF8 为 per-tensor 量化且 golden 无分核分段语义, 因此不额外提供分段参考
+# (compare 侧 third_party 缺省回退 golden)。
+# ==============================================================================
+
+
+def _scalar(value):
+    if isinstance(value, torch.Tensor):
+        return float(value.reshape(-1)[0])
+    return float(value)
+
+
+def cpu_hif8_bench(
+    q_fp8,
+    k_fp8,
+    v_fp8,
+    dequant_scale_q,
+    dequant_scale_k,
+    v_descale,
+    p_scale,
+    actual_seq_q,
+    actual_seq_kv,
+    softmax_scale=None,
+    sectioned=False,
+):
+    """三方比对的 bench(标杆): 同语义、更高算术精度的参考实现。
+
+    与 golden 的差异:
+      - bench(sectioned=False) 全程 float64 累加/softmax, 排除归约顺序与 fp32
+        舍入噪声; 分段参考(sectioned=True)用 float32 累加, 与 kernel 同量级
+      - 输入只做反量化(乘 per-tensor scale), 不重新量化; P 的 HIF8 量化是
+        算子语义, 必须保留
+      - sectioned=False: running max 跨整个 KV 单调累积(全局 max)
+      - sectioned=True: 每个 KV 基本块独立取 running max 后按 FD 语义合并,
+        复刻 kernel 分段量化行为, 作为三方 third_party 参考。
+        KV 不超过一个基本块(256)时, 256 分段与 bench 完全等价(仅剩 bf16 舍入),
+        参考退化为"零噪声", 三方比值分母失去意义; 此时细分到 32, 使参考具有
+        独立的 P 量化舍入边界翻转, 噪声水平与 target 可比。
+    """
+    EPSILON = 1e-20
+    Q_BLOCK_SIZE = 128
+    K_BLOCK_SIZE = 256
+
+    dq_scale = _scalar(dequant_scale_q)
+    dk_scale = _scalar(dequant_scale_k)
+    dv_scale = _scalar(v_descale)
+    p_scale_value = _scalar(p_scale)
+
+    # 三方口径对齐 quant_flash_mla: bench 用 float64 保证真值精度;
+    # 分段参考(third_party)跟随 kernel 用 float32 累加, 使其绝对误差底噪与
+    # target 同量级, 避免参考过干净导致 max/max 比值判据虚高。
+    acc_dtype = torch.float32 if sectioned else torch.float64
+
+    q_tensor = hif8_per_tensor_dequant(q_fp8).to(acc_dtype) * dq_scale
+    k_tensor = hif8_per_tensor_dequant(k_fp8).to(acc_dtype) * dk_scale
+    v_tensor = hif8_per_tensor_dequant(v_fp8).to(acc_dtype) * dv_scale
+
+    if N_q != N_kv:
+        logger.info("[INFO] GQA 广播 (bench)")
+        k_tensor = broadcast_kv(N_q, N_kv, k_tensor)
+        v_tensor = broadcast_kv(N_q, N_kv, v_tensor)
+
+    b, n, _s, d = q_tensor.shape
+    if softmax_scale is None:
+        softmax_scale = 1.0 / math.sqrt(d)
+    dv = v_tensor.shape[-1]
+    Sq, Skv = q_tensor.shape[2], k_tensor.shape[2]
+    if sectioned:
+        max_kv = max(int(x) for x in actual_seq_kv)
+        if max_kv <= K_BLOCK_SIZE:
+            # KV 只有一段时 256 分段与 bench 等价(仅剩 bf16 舍入), 分母退化;
+            # 先细分到 32, 极短 KV 再按 KV//4 切, 保证至少 4 段独立的量化边界。
+            K_BLOCK_SIZE = 32 if max_kv > 32 else max(1, max_kv // 4)
+
+    out = torch.zeros([b, n, Sq, dv], dtype=acc_dtype)
+    o_sum = torch.zeros(q_tensor.shape[:-1], dtype=acc_dtype)[..., None]
+    o_max = torch.full(q_tensor.shape[:-1], float("-inf"), dtype=acc_dtype)[..., None]
+
+    mask_global = _build_attention_mask(
+        b, Sq, Skv, actual_seq_q, actual_seq_kv, SPARSE_MODE
+    )
+
+    TILES_Q = (Sq + Q_BLOCK_SIZE - 1) // Q_BLOCK_SIZE
+    TILES_KV = (Skv + K_BLOCK_SIZE - 1) // K_BLOCK_SIZE
+    ln_p_scale = math.log(p_scale_value)
+
+    logger.info(
+        "[CPU Bench FP64] TILES_Q=%d, TILES_KV=%d, Sq=%d, Skv=%d",
+        TILES_Q,
+        TILES_KV,
+        Sq,
+        Skv,
+    )
+
+    for i in range(TILES_Q):
+        Sq_start = i * Q_BLOCK_SIZE
+        Sq_end = min(Sq_start + Q_BLOCK_SIZE, Sq)
+        qi = q_tensor[:, :, Sq_start:Sq_end, :]
+        oi = out[:, :, Sq_start:Sq_end, :]
+        si = o_sum[:, :, Sq_start:Sq_end, :]
+        mi = o_max[:, :, Sq_start:Sq_end, :]
+
+        for j in range(TILES_KV):
+            Sk_start = j * K_BLOCK_SIZE
+            Sk_end = min(Sk_start + K_BLOCK_SIZE, Skv)
+            kj = k_tensor[:, :, Sk_start:Sk_end, :]
+
+            sij = torch.matmul(qi, kj.transpose(-1, -2)) * softmax_scale
+            mask_j = mask_global[:, :, Sq_start:Sq_end, Sk_start:Sk_end]
+            sij = sij.masked_fill(mask_j, float("-inf"))
+
+            m_seg, _ = torch.max(sij, dim=-1, keepdims=True)
+            m_seg = m_seg - ln_p_scale
+            if sectioned:
+                # 段内独立 running max: P 量化只对齐本段, 复刻 kernel 分段行为
+                m_block_j = m_seg
+            else:
+                m_block_j = torch.max(mi, m_seg)
+
+            p_raw = torch.exp(sij - m_block_j)
+            # 整行/整块被 mask 时 -inf - -inf = nan, 该元素贡献置 0
+            p_raw = torch.where(torch.isneginf(sij), torch.zeros_like(p_raw), p_raw)
+            s_block_j = torch.sum(p_raw, dim=-1, keepdims=True)
+            # P 的 HIF8 量化是算子语义, 保留
+            p_drop = hif8_cast_p(p_raw.float()).to(acc_dtype)
+
+            vj = v_tensor[:, :, Sk_start:Sk_end, :]
+            o_seg = torch.matmul(p_drop, vj)
+            if sectioned:
+                # 段间按 FD 语义合并: 以段 max 为基准把段内结果折算到新 max
+                m_new = torch.maximum(mi, m_seg)
+                alpha = torch.exp(mi - m_new)
+                beta = torch.exp(m_seg - m_new)
+                alpha = torch.where(torch.isnan(alpha), torch.zeros_like(alpha), alpha)
+                beta = torch.where(torch.isnan(beta), torch.zeros_like(beta), beta)
+                out[:, :, Sq_start:Sq_end, :] = alpha * oi + beta * o_seg
+                o_sum[:, :, Sq_start:Sq_end, :] = alpha * si + beta * s_block_j
+                o_max[:, :, Sq_start:Sq_end, :] = m_new
+            else:
+                update_mul_si = torch.exp(mi - m_block_j)
+                update_mul_si = torch.where(
+                    torch.isnan(update_mul_si),
+                    torch.zeros_like(update_mul_si),
+                    update_mul_si,
+                )
+                out[:, :, Sq_start:Sq_end, :] = update_mul_si * oi + o_seg
+                o_sum[:, :, Sq_start:Sq_end, :] = update_mul_si * si + s_block_j
+                o_max[:, :, Sq_start:Sq_end, :] = m_block_j
+
+    result = out / (o_sum + EPSILON)
+    all_masked = o_max <= float("-inf")
+    lse = torch.where(
+        all_masked,
+        torch.full_like(o_max, float("inf")),
+        o_max + torch.log(o_sum + EPSILON),
+    )
+    result = torch.where(all_masked, torch.zeros_like(result), result)
+    logger.info("[CPU Bench FP64] output=%s", result.shape)
+    return result.float().contiguous(), lse.float().contiguous()
+
+
+def cpu_hif8_sectioned_golden(
+    q_fp8,
+    k_fp8,
+    v_fp8,
+    dequant_scale_q,
+    dequant_scale_k,
+    v_descale,
+    p_scale,
+    actual_seq_q,
+    actual_seq_kv,
+    softmax_scale=None,
+):
+    """分段量化参考, 仅供三方 cross_check 作为 third_party 使用。
+
+    bench 走全局 running max; 本函数按 KV 基本块(256)独立取 running max 后
+    再合并, 使参考的 P 量化噪声水平与 kernel 可比, 不会因参考"过干净"导致
+    三方比值虚高。
+    """
+    return cpu_hif8_bench(
+        q_fp8,
+        k_fp8,
+        v_fp8,
+        dequant_scale_q,
+        dequant_scale_k,
+        v_descale,
+        p_scale,
+        actual_seq_q,
+        actual_seq_kv,
+        softmax_scale=softmax_scale,
+        sectioned=True,
+    )
+
+
 def _build_causal_mask():
     # sparse_mode=0 不需要 mask，其他模式需要上三角 causal mask
     if SPARSE_MODE == 0:

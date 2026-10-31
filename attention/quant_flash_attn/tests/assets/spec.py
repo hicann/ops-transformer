@@ -106,8 +106,19 @@ class QuantFlashAttnSpec:
     customize_inputs = staticmethod(_inputs_dispatch)
 
     @staticmethod
-    def compare(*outputs, **kwargs):
-        return load_impl_module("compare").compare(*outputs, **kwargs)
+    def compare(*outputs, compare_context=None, **kwargs):
+        impl = load_impl_module("compare")
+        if impl.cross_check_enabled():
+            testcase_name = getattr(compare_context, "testcase_name", None)
+            golden_impl = load_impl_module("golden")
+            return impl.compare(
+                *outputs,
+                bench_outputs=golden_impl.peek_bench(testcase_name),
+                third_party_outputs=golden_impl.peek_sectioned_ref(testcase_name),
+                spec_tolerance=impl.CROSS_CHECK_TOLERANCE,
+                **kwargs,
+            )
+        return impl.compare(*outputs, **kwargs)
 
     @staticmethod
     def npu_preprocess(*args, **kwargs):
@@ -115,6 +126,8 @@ class QuantFlashAttnSpec:
 
     torch_graph = load_impl_module("graph").QuantFlashAttnAclGraph
 
+    # 默认两方比较; 三方 cross_check 需显式 --compare cross_check 开启,
+    # 判据参数见 impl/compare.py 的 CROSS_CHECK_TOLERANCE。
     tolerance = {
         "float16": {
             "rtol": 0.005,

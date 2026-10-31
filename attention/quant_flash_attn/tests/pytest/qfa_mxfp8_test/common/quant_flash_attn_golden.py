@@ -57,13 +57,13 @@ except ImportError:
     import result_compare_method
 
 try:
-    from .precision_compare_v2 import check_result, compute_cv_report, display_cv_report
+    from .precision_compare_v2 import cross_check_compare
 except ImportError:
     import sys
     import os
 
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from precision_compare_v2 import check_result, compute_cv_report, display_cv_report
+    from precision_compare_v2 import cross_check_compare
 
 logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
 logger = logging.getLogger(__name__)
@@ -177,13 +177,12 @@ ENABLE_LSE = False
 ENABLE_V_TAIL = False
 _VTAIL_BUNDLE = None  # generate_data产出: {v_tail_bnsd, v_tail_pa, block_table_tail, seqused_v_tail}
 
-# 三方比对 (method=12 CV 双标杆): golden=FP64(最高精度参考) | benchmark=FP32 | actual=NPU
-USE_FP64_GOLDEN = (
-    False  # True: FP64 golden + CV 三方比对, False: 仅 FP32 golden 简单比对
-)
-USE_FP64_COMPARE = (
-    True  # FP64 golden 时, 用 FP64 做 golden(最高精度)还是用 FP32 做 golden(CV 分母)
-)
+# 三方 cross_check (与 TTK 判据一致):
+#   golden      = cpu_mxfp8_bench             (FP64 算术, 保留 P 的 FP8 量化)
+#   third_party = cpu_mxfp8_sectioned_golden  (分段量化参考, 作为噪声上界)
+#   actual      = NPU
+# False 时走原有两方 FP32 golden 简单比对。
+USE_FP64_GOLDEN = False
 
 # e8m0fnu 最小正数: 2^(-127)，用于替换 scale 中的 0 和非有限值
 # e8m0fnu 没有 0 值语义，0 的 biased exponent 会被 NPU 解释为 NaN
@@ -1709,6 +1708,77 @@ def _cpu_mxfp8_golden_sectioned(
     return out.contiguous(), lse.contiguous()
 
 
+# ==============================================================================
+# 三方比对支撑: 固定分段量化参考 (third_party)
+# 与 kernel 分核分段解耦, 按 s2 基本块(256 列)固定切段, 使参考的 P 量化噪声
+# 水平与 target 可比; 仅在 USE_FP64_GOLDEN(三方 cross_check) 开启时使用。
+# ==============================================================================
+_SECTION_M_BASE = 64
+_SECTION_S2_BASE = 256
+
+
+def _fixed_block_section_info(actual_seq_q, actual_seq_kv):
+    is_decode = resolve_q_scale_layout()[0] in ("N2TGD", "BN2SGD")
+    head_num = N_kv if is_decode else N_q
+    sched_group = N_q // head_num
+    segments = []
+    for bi in range(len(actual_seq_kv)):
+        q_len = int(actual_seq_q[bi])
+        kv_len = int(actual_seq_kv[bi])
+        m_blocks = (q_len * sched_group + _SECTION_M_BASE - 1) // _SECTION_M_BASE
+        row_segments = []
+        for mi in range(m_blocks):
+            s2_start, s2_end = _qfa_calc_s2_block_range(
+                mi,
+                _SECTION_M_BASE,
+                _SECTION_S2_BASE,
+                q_len,
+                kv_len,
+                sched_group,
+            )
+            row_segments.append([(j, j + 1) for j in range(s2_start, s2_end)])
+        for _ in range(head_num):
+            segments.append([list(segs) for segs in row_segments])
+    return _SECTION_M_BASE, _SECTION_S2_BASE, segments, head_num, is_decode
+
+
+def cpu_mxfp8_sectioned_golden(
+    q_fp8,
+    k_fp8,
+    v_fp8,
+    dequant_scale_q,
+    dequant_scale_k,
+    v_descale,
+    p_scale,
+    actual_seq_q,
+    actual_seq_kv,
+    softmax_scale=None,
+    v_tail_bnsd=None,
+    tail_lens=None,
+    qr_bf16=None,
+    kr_bf16=None,
+):
+    """分段量化参考, 仅供三方比对作为 third_party 使用。"""
+    section_info = _fixed_block_section_info(actual_seq_q, actual_seq_kv)
+    return _cpu_mxfp8_golden_sectioned(
+        q_fp8,
+        k_fp8,
+        v_fp8,
+        dequant_scale_q,
+        dequant_scale_k,
+        v_descale,
+        p_scale,
+        actual_seq_q,
+        actual_seq_kv,
+        section_info,
+        softmax_scale=softmax_scale,
+        v_tail_bnsd=v_tail_bnsd,
+        tail_lens=tail_lens,
+        qr_bf16=qr_bf16,
+        kr_bf16=kr_bf16,
+    )
+
+
 def cpu_mxfp8_golden(
     q_fp8,
     k_fp8,
@@ -2066,7 +2136,7 @@ def cpu_mxfp8_golden(
     return out, lse
 
 
-def cpu_mxfp8_golden_fp64(
+def cpu_mxfp8_bench(
     q_fp8,
     k_fp8,
     v_fp8,
@@ -2080,11 +2150,12 @@ def cpu_mxfp8_golden_fp64(
     qr_bf16=None,
     kr_bf16=None,
 ):
-    """CPU Flash Attention golden with MXFP8 — FP64 最高精度参考 (三方比对 golden)
+    """三方 cross_check 的 golden(bench): 同语义、更高算术精度的参考实现。
 
-    与 FP32 golden 的区别:
-      - 全程 float64 计算, 不模拟 P 的 FP8 量化损失 (P 直接参与矩阵乘)
-      - 作为 CV 三方比对的 golden (最高精度标杆), FP32 golden 作为 benchmark
+    与两方门禁用的 cpu_mxfp8_golden 相比: 全程 float64 累加, 但同样保留
+    P 的 FP8 量化(算子语义), 因此只作三方比对的误差分母, 不做 pass/fail 基准
+    (v_tail 等场景 bench 与算子语义仍有偏差)。
+    与 TTK 侧 cpu_mxfp8_bench 语义一致(golden=bench, third_party=分段参考)。
     """
     EPSILON = 1e-20
     LN2 = math.log(2.0)
@@ -2112,7 +2183,7 @@ def cpu_mxfp8_golden_fp64(
 
     # GQA: 广播 K/V 到与 Q 相同的 head 数
     if N_q != N_kv:
-        logger.info("[INFO] GQA 广播 (fp64)")
+        logger.info("[INFO] GQA 广播 (bench)")
         k_tensor = broadcast_kv(N_q, N_kv, k_tensor)
         v_tensor = broadcast_kv(N_q, N_kv, v_tensor)
         dequant_scale_k = broadcast_kv(N_q, N_kv, dequant_scale_k)
@@ -2180,7 +2251,7 @@ def cpu_mxfp8_golden_fp64(
             v_descale_expanded[bi, :, kv_len - tail_len : kv_len, :] = 1.0
 
     logger.info(
-        "[CPU Golden FP64] TILES_Q=%d, TILES_KV=%d, Sq=%d, Skv=%d",
+        "[CPU Bench FP64] TILES_Q=%d, TILES_KV=%d, Sq=%d, Skv=%d",
         TILES_Q,
         TILES_KV,
         Sq,
@@ -2222,6 +2293,8 @@ def cpu_mxfp8_golden_fp64(
 
             P_ij_raw = torch.exp(S_ij - m_block_j)
             s_block_j = torch.sum(P_ij_raw, dim=-1, keepdims=True)
+            # P 量化是算子语义(固定 scale), 其余算术保持 float64
+            P_ij = P_ij_raw.to(FP8_DTYPE).double()
 
             if j + 1 < TILES_KV:
                 # --- 第二个 K block (j+1) ---
@@ -2248,6 +2321,7 @@ def cpu_mxfp8_golden_fp64(
 
                 P_ij1_raw = torch.exp(S_ij1 - m_block_j1)
                 s_block_j1 = torch.sum(P_ij1_raw, dim=-1, keepdims=True)
+                P_ij1 = P_ij1_raw.to(FP8_DTYPE).double()
 
                 # V block: 一个 V_BLOCK_SIZE 对应两个 K_BLOCK_SIZE
                 Vj = V_BLOCKS[j // 2]
@@ -2259,8 +2333,8 @@ def cpu_mxfp8_golden_fp64(
                 V_part1 = Vj_dequant[:, :, : Kj.shape[2], :]
                 V_part2 = Vj_dequant[:, :, Kj.shape[2] : Kj.shape[2] + Kj1.shape[2], :]
                 P_ij_Vj = torch.matmul(
-                    P_ij_raw * torch.exp(m_block_j - m_block_j1), V_part1
-                ) + torch.matmul(P_ij1_raw, V_part2)
+                    P_ij * torch.exp(m_block_j - m_block_j1), V_part1
+                ) + torch.matmul(P_ij1, V_part2)
 
                 update_mul_si = torch.exp(mi - m_block_j1)
                 si_new = (
@@ -2279,7 +2353,7 @@ def cpu_mxfp8_golden_fp64(
                 Vj_expanded = Vj[:, :, : Kj.shape[2], :]
                 Vj_dequant = Vj_expanded * deq_scale_v_j[:, :, : Kj.shape[2], :]
 
-                P_ij_Vj = torch.matmul(P_ij_raw, Vj_dequant)
+                P_ij_Vj = torch.matmul(P_ij, Vj_dequant)
                 update_mul_si = torch.exp(mi - m_block_j)
                 si_new = update_mul_si * si + s_block_j
                 o_BLOCKS[i] = update_mul_si * oi + P_ij_Vj
@@ -2298,8 +2372,8 @@ def cpu_mxfp8_golden_fp64(
         o_max + torch.log(out_sum + EPSILON),
     )
     out = torch.where(all_masked, torch.zeros_like(out), out)
-    logger.info("[CPU Golden FP64] output=%s", out.shape)
-    return out, lse
+    logger.info("[CPU Bench FP64] output=%s", out.shape)
+    return out.float().contiguous(), lse.float().contiguous()
 
 
 # ==============================================================================
@@ -3252,69 +3326,23 @@ if __name__ == "__main__":
 
     if "cpu" in mode:
         logger.info("\n[Step 2] CPU Golden")
-        if USE_FP64_GOLDEN:
-            logger.info("模式: FP64 CV 三方比对 (golden_fp64 | benchmark_fp32 | NPU)")
-            cpu_out_fp64, cpu_lse_fp64 = cpu_mxfp8_golden_fp64(
-                q_fp8,
-                k_fp8,
-                v_fp8,
-                dequant_scale_q,
-                dequant_scale_k,
-                v_descale,
-                p_scale,
-                _get_seqused_q(),
-                _get_seqused_kv(),
-                softmax_scale=SOFTMAX_SCALE,
-                qr_bf16=qr_bf16,
-                kr_bf16=kr_bf16,
-            )
-            cpu_out, cpu_lse = cpu_mxfp8_golden(
-                q_fp8,
-                k_fp8,
-                v_fp8,
-                dequant_scale_q,
-                dequant_scale_k,
-                v_descale,
-                p_scale,
-                _get_seqused_q(),
-                _get_seqused_kv(),
-                softmax_scale=SOFTMAX_SCALE,
-                qr_bf16=qr_bf16,
-                kr_bf16=kr_bf16,
-            )
-            # cpu_output 缓存保存 FP64 golden (最高精度参考), FP32 golden 单独缓存作 benchmark
-            cpu_out_fp32, cpu_lse_fp32 = cpu_out, cpu_lse
-            golden_cache.save_cpu_output(
-                case_name, cpu_out_fp64, cpu_lse_fp64, cache_dir=cdir
-            )
-            golden_cache.save_cpu_output_fp32(
-                case_name, cpu_out, cpu_lse, cache_dir=cdir
-            )
-            # 统一语义: cpu_out/lse 恒为 FP64 golden (与缓存加载路径一致)
-            cpu_out, cpu_lse = cpu_out_fp64, cpu_lse_fp64
-        else:
-            cpu_out, cpu_lse = cpu_mxfp8_golden(
-                q_fp8,
-                k_fp8,
-                v_fp8,
-                dequant_scale_q,
-                dequant_scale_k,
-                v_descale,
-                p_scale,
-                _get_seqused_q(),
-                _get_seqused_kv(),
-                softmax_scale=SOFTMAX_SCALE,
-                qr_bf16=qr_bf16,
-                kr_bf16=kr_bf16,
-            )
-            golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)
+        cpu_out, cpu_lse = cpu_mxfp8_golden(
+            q_fp8,
+            k_fp8,
+            v_fp8,
+            dequant_scale_q,
+            dequant_scale_k,
+            v_descale,
+            p_scale,
+            _get_seqused_q(),
+            _get_seqused_kv(),
+            softmax_scale=SOFTMAX_SCALE,
+            qr_bf16=qr_bf16,
+            kr_bf16=kr_bf16,
+        )
+        golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)
     else:
         cpu_out, cpu_lse = golden_cache.load_cpu_output(case_name, cache_dir=cdir)
-        if USE_FP64_GOLDEN:
-            # FP64 模式: cpu_output 缓存中是 FP64 golden, 另加载 FP32 benchmark
-            cpu_out_fp32, cpu_lse_fp32 = golden_cache.load_cpu_output_fp32(
-                case_name, cache_dir=cdir
-            )
 
     if "cpu" in mode and not (mode & {"npu", "compare"}):
         logger.info("\n[Done] CPU 输出已保存，退出")
@@ -3350,27 +3378,49 @@ if __name__ == "__main__":
 
     if USE_FP64_GOLDEN:
         logger.info(
-            "\n[Step 4] Atten OUT CV 三方比对 (FP64 golden | FP32 benchmark | NPU)"
+            "\n[Step 4] Atten OUT 三方 cross_check (FP64 bench | 分段参考 | NPU)"
         )
-        golden_tnd = convert_q_bnsd_to_layout(
-            cpu_out if USE_FP64_COMPARE else cpu_out_fp32,
+        bench_out, bench_lse = cpu_mxfp8_bench(
+            q_fp8,
+            k_fp8,
+            v_fp8,
+            dequant_scale_q,
+            dequant_scale_k,
+            v_descale,
+            p_scale,
             _get_seqused_q(),
-            "TND",
-            cu_seqlens=CU_SEQLENS_Q,
+            _get_seqused_kv(),
+            softmax_scale=SOFTMAX_SCALE,
+            qr_bf16=qr_bf16,
+            kr_bf16=kr_bf16,
         )
-        benchmark_tnd = convert_q_bnsd_to_layout(
-            cpu_out_fp32, _get_seqused_q(), "TND", cu_seqlens=CU_SEQLENS_Q
+        ref_out, ref_lse = cpu_mxfp8_sectioned_golden(
+            q_fp8,
+            k_fp8,
+            v_fp8,
+            dequant_scale_q,
+            dequant_scale_k,
+            v_descale,
+            p_scale,
+            _get_seqused_q(),
+            _get_seqused_kv(),
+            softmax_scale=SOFTMAX_SCALE,
+            qr_bf16=qr_bf16,
+            kr_bf16=kr_bf16,
         )
-        cv_report = compute_cv_report(
-            golden=golden_tnd,
-            benchmark=benchmark_tnd,
-            actual=atten_out,
-            test_name="qfa_mxfp8_attention_out",
+        bench_tnd = convert_q_bnsd_to_layout(
+            bench_out, _get_seqused_q(), "TND", cu_seqlens=CU_SEQLENS_Q
         )
-        display_cv_report(cv_report)
+        ref_tnd = convert_q_bnsd_to_layout(
+            ref_out, _get_seqused_q(), "TND", cu_seqlens=CU_SEQLENS_Q
+        ).to(torch.bfloat16)  # 与 TTK 一致: 分段参考 cast bf16 作为噪声上界
+        status, info = cross_check_compare(
+            atten_out, bench_tnd, ref_tnd, test_name="qfa_mxfp8_attention_out"
+        )
+        logger.info("  [Compare] Atten OUT: %s %s", status, info)
 
         if ENABLE_LSE:
-            logger.info("\n[Step 5] LSE CV 三方比对")
+            logger.info("\n[Step 5] LSE 三方 cross_check")
 
             def _lse_bnsd_to_nt(lse_bnsd):
                 lse_tnd = convert_q_bnsd_to_layout(
@@ -3383,23 +3433,13 @@ if __name__ == "__main__":
                 # NPU LSE 输出为 N-major 排布 (N, T): golden 经 convert 后是 [T, N, 1] (T-major)
                 return lse_tnd.squeeze(-1).permute(1, 0).contiguous()
 
-            golden_lse_nt = _lse_bnsd_to_nt(
-                cpu_lse if USE_FP64_COMPARE else cpu_lse_fp32
-            )
-            bench_lse_nt = _lse_bnsd_to_nt(cpu_lse_fp32)
-            cv_lse_report = compute_cv_report(
-                golden=golden_lse_nt,
-                benchmark=bench_lse_nt,
-                actual=lse_out,
+            status, info = cross_check_compare(
+                lse_out,
+                _lse_bnsd_to_nt(bench_lse),
+                _lse_bnsd_to_nt(ref_lse),
                 test_name="qfa_mxfp8_lse",
             )
-            display_cv_report(cv_lse_report)
-
-        logger.info("\n[Compare] FP64 golden vs NPU 简单模式结果:")
-        result, pass_pct, max_err = check_result(golden_tnd, atten_out)
-        logger.info(
-            "  Simple: %s (Pass%%=%.2f, MaxRelErr=%.6e)", result, pass_pct, max_err
-        )
+            logger.info("  [Compare] LSE: %s %s", status, info)
     else:
         logger.info("\n[Step 4] Atten OUT 精度对比")
         cpu_tnd_torch = convert_q_bnsd_to_layout(

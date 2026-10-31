@@ -195,6 +195,73 @@ python quant_flash_attn_golden.py --mode gen --case-name my_case
 python quant_flash_attn_golden.py --mode npu,compare --case-name my_case
 ```
 
+### 6.1 三方精度比对（bench golden | 分段参考 third_party | NPU）
+
+当 case 精度不过（尤其是 QKV 输入范围不是 [-1,1]（`DATA_RANGE_Q/K/V > 1.0`）的场景）时，
+可用三方比对判定 NPU 输出偏差是否在合理范围。三方角色与 TTK `--compare cross_check` 完全一致：
+
+- golden（真值/误差分母）：`cpu_hif8_bench`，FP64 算术且保留 P 的 HIF8 量化；
+- third_party（竞品噪声上界）：`cpu_hif8_sectioned_golden`，分段量化参考；
+- actual：NPU 输出。
+
+判定沿用 TTK `CrossCheckComparison` 判据（`precision_compare_v2.cross_check_compare`，复用
+`qfa_mxfp8_test/common` 下的同一套实现）：large 域 `mare/mere/rmse <= 10/2/2`，small 域
+`err(actual)/err(third_party) <= 2`，NaN/Inf 需与 golden 或 third_party 之一一致。
+
+使用方法：编辑 `common/quant_flash_attn_golden.py` 配置区，将 case 参数（B/N_q/N_kv/D、
+`CU_SEQLENS_*`/`SEQUSED_*`、`SPARSE_MODE`、`Q_SCALE_LAYOUT`、`P_SCALE`、`ENABLE_ROPE`/`D_rope`、
+`DATA_RANGE_Q/K/V`、`ENABLE_LSE` 等）与失败 case 对齐，并设置：
+
+```python
+USE_FP64_GOLDEN = True   # 开启三方 cross_check
+DATA_RANGE_Q = 8.0       # 示例：非 [-1,1] 输入范围
+DATA_RANGE_K = 4.0
+DATA_RANGE_V = 2.0
+```
+
+然后运行：
+
+```bash
+cd common/
+# 全流程：数据生成 → FP32 golden 缓存 → NPU → 三方 cross_check
+python quant_flash_attn_golden.py --mode all --case-name my_case
+# 分步运行（NPU 输出与 golden 均缓存为 .pt，可单独重跑比对）
+python quant_flash_attn_golden.py --mode gen,cpu --case-name my_case
+python quant_flash_attn_golden.py --mode npu,compare --case-name my_case
+```
+
+输出说明：
+- `[Compare] Atten OUT / LSE`：三方 cross_check 结果（status + 比值指标）
+- LSE（`ENABLE_LSE=True` 时）：同样三方比对，N-major 排布对齐
+- `USE_FP64_GOLDEN=False` 时走原有两方简单比对（`check_result`，FP32 golden vs NPU）
+
+缓存文件：`{case_name}_input.pt`、`{case_name}_cpu_output.pt`（FP32 两方基准）、
+`{case_name}_npu_output.pt`。三方所用的 bench 与分段参考在 compare 阶段现算，不落盘。
+
+### 6.2 通过 pytest debug 跑三方比对
+
+pytest 路径同样支持三方比对：在 `quant_flash_attn_paramset_debug.py` 的 case 参数里直接加
+`use_fp64_golden: [True]`，compare 阶段会以 bench 作 golden、分段参考作 third_party 执行
+`cross_check_compare`（含 attention 与 LSE）。
+
+```bash
+cd attention/quant_flash_attn/tests/pytest/qfa_hif8_test/
+# 只跑三方比对 case（-k 后替换为实际 case 名）
+pytest test_quant_flash_attn_debug.py -k <case_name> -v
+# 失败后分步复跑（缓存 .pt，免重跑 golden/NPU）
+pytest test_quant_flash_attn_debug.py -k <case_name> -v --golden-mode=npu,compare
+```
+
+`use_fp64_golden=True` 时 pass/fail 直接由 `cross_check_compare` 判定，与 TTK 口径一致；
+默认 `False` 时仍走原有两方 `check_result` 路径。
+
+容差档按 TTK 侧 golden 的输出 dtype 选取（TTK `CrossCheckComparison` 用 golden 输出 dtype 查表）：
+TTK 侧 hif8 golden 返回 FP32，故取 FP32 档（`small_value=2^-14`）。
+
+分段参考的 K 分段块会按 KV 长度自适应细分（KV 不足一个分段块时按 32 / `KV//4` 切），避免参考与
+bench 数值等价后比值分母退化；同时 bench 用 float64、分段参考用 float32 累加（与
+`quant_flash_mla` 三方口径一致），使参考的绝对误差底噪与 target 同量级。
+
 ## 7. 用例命名规则
 
 格式：`{LAYOUT}_B{batch}_QS{Q长度}_KVS{KV长度}_Nq{Q头数}_Nkv{KV头数}_D{维度}_SP{稀疏模式}`

@@ -1660,6 +1660,245 @@ def cpu_mxfp8_golden(
 
 
 # ==============================================================================
+# 三方比对支撑 (cross_check): fp64 bench 与固定分段量化参考
+# 仅 --compare cross_check 时由 impl/golden.py 调用, 两方回归路径不受影响。
+# ==============================================================================
+_SECTION_M_BASE = 64
+_SECTION_S2_BASE = 256
+
+
+def _fixed_block_section_info(actual_seq_q, actual_seq_kv):
+    """按 s2 基本块(256 列)固定切段, 与 kernel 分核分段解耦
+
+    kernel 的一个段是若干连续基本块在分核后的并集, 所以按单块切段的分段粒度
+    最细、段数最多; 作为三方 third_party 时其量化噪声只会不小于 target, 判据
+    不会因参考过干净而虚高。返回 (m_base, s2_base, segments, head_num, is_decode),
+    segments[bn][mi] 为该 (bn, m-block) 的 [(s2块起, s2块止), ...] 分段列表。
+    """
+    is_decode = resolve_q_scale_layout()[0] in ("N2TGD", "BN2SGD")
+    head_num = N_kv if is_decode else N_q
+    sched_group = N_q // head_num
+    segments = []
+    for bi in range(len(actual_seq_kv)):
+        q_len = int(actual_seq_q[bi])
+        kv_len = int(actual_seq_kv[bi])
+        m_blocks = (q_len * sched_group + _SECTION_M_BASE - 1) // _SECTION_M_BASE
+        row_segments = []
+        for mi in range(m_blocks):
+            s2_start, s2_end = _qfa_calc_s2_block_range(
+                mi,
+                _SECTION_M_BASE,
+                _SECTION_S2_BASE,
+                q_len,
+                kv_len,
+                sched_group,
+            )
+            row_segments.append([(j, j + 1) for j in range(s2_start, s2_end)])
+        for _ in range(head_num):
+            segments.append([list(segs) for segs in row_segments])
+    return _SECTION_M_BASE, _SECTION_S2_BASE, segments, head_num, is_decode
+
+
+def cpu_mxfp8_sectioned_golden(
+    q_fp8,
+    k_fp8,
+    v_fp8,
+    dequant_scale_q,
+    dequant_scale_k,
+    dequant_scale_v,
+    p_scale,
+    actual_seq_q,
+    actual_seq_kv,
+    softmax_scale=None,
+    v_tail_bnsd=None,
+    tail_lens=None,
+):
+    """分段量化参考, 仅供三方 cross_check 作为 third_party 使用。
+
+    两方 golden 走全局 / metadata 分段语义(cpu_mxfp8_golden); 本函数固定按
+    s2 基本块切段, 不依赖 metadata 分核规划, 使参考的 P 量化噪声水平与 target
+    可比。
+    """
+    section_info = _fixed_block_section_info(actual_seq_q, actual_seq_kv)
+    return _cpu_mxfp8_golden_sectioned(
+        q_fp8,
+        k_fp8,
+        v_fp8,
+        dequant_scale_q,
+        dequant_scale_k,
+        dequant_scale_v,
+        p_scale,
+        actual_seq_q,
+        actual_seq_kv,
+        section_info,
+        softmax_scale=softmax_scale,
+        v_tail_bnsd=v_tail_bnsd,
+        tail_lens=tail_lens,
+    )
+
+
+def cpu_mxfp8_bench(
+    q_fp8,
+    k_fp8,
+    v_fp8,
+    dequant_scale_q,
+    dequant_scale_k,
+    dequant_scale_v,
+    p_scale,
+    actual_seq_q,
+    actual_seq_kv,
+    softmax_scale=None,
+    v_tail_bnsd=None,
+    tail_lens=None,
+):
+    """三方比对的 bench(标杆): 同语义、更高算术精度的参考实现。
+
+    与 golden 的差异:
+      - 全程 float64 累加/softmax, 排除归约顺序与 fp32 舍入噪声
+      - running max 跨整个 KV 单调累积, 不复现 metadata 分核分段
+        (分段只影响 running max 的取法, 属舍入级差异)
+      - 输入只做反量化(乘 deq), 不重新量化; P 的 fp8 量化是算子语义, 必须保留
+    """
+    EPSILON = 1e-20
+    Q_BLOCK_SIZE = 128
+    # 与 kernel 常量一致 (vf_basic_block_utils.h), 同 _online_softmax_update
+    LN2 = 0.6931471824645996
+    INV_LN2 = 1.4426950216293335
+    if D == 256:
+        K_BLOCK_SIZE = 128
+        V_BLOCK_SIZE = 256
+    else:
+        K_BLOCK_SIZE = 256
+        V_BLOCK_SIZE = 512
+
+    q_tensor = q_fp8.to(torch.float32).double()
+    k_tensor = k_fp8.to(torch.float32).double()
+    v_tensor = v_fp8.to(torch.float32).double()
+
+    if softmax_scale is None:
+        softmax_scale = 1.0 / math.sqrt(q_tensor.shape[-1])
+
+    # GQA: 广播 K/V 与 dequant scale 到与 Q 相同的 head 数
+    if N_q != N_kv:
+        logger.info("[INFO] GQA 广播 (bench)")
+        k_tensor = broadcast_kv(N_q, N_kv, k_tensor)
+        v_tensor = broadcast_kv(N_q, N_kv, v_tensor)
+        dequant_scale_k = broadcast_kv(N_q, N_kv, dequant_scale_k)
+        dequant_scale_v = broadcast_kv(N_q, N_kv, dequant_scale_v)
+
+    b, n, _s, d = q_tensor.shape
+    dv = v_tensor.shape[-1]
+    Sq, Skv = q_tensor.shape[2], k_tensor.shape[2]
+
+    out = torch.zeros([b, n, Sq, dv], dtype=torch.float64)
+    o_sum = torch.zeros(q_tensor.shape[:-1], dtype=torch.float64)[..., None]
+    o_max = torch.full(q_tensor.shape[:-1], float("-inf"), dtype=torch.float64)[
+        ..., None
+    ]
+
+    mask_global = _build_attention_mask(
+        b, Sq, Skv, actual_seq_q, actual_seq_kv, SPARSE_MODE
+    )
+
+    deq_q_exp = dequant_scale_q.double().repeat_interleave(QUANT_GROUP_SIZE, dim=-1)[
+        ..., :d
+    ]
+    deq_k_exp = dequant_scale_k.double().repeat_interleave(QUANT_GROUP_SIZE, dim=-1)[
+        ..., :d
+    ]
+    deq_v_exp = dequant_scale_v.double().repeat_interleave(QUANT_GROUP_SIZE, dim=2)
+
+    # v_tail 尾块高精窗口: 尾段 V 用 bf16 原值替换反量化值(尾段 scale 恒 1)
+    if (
+        v_tail_bnsd is not None
+        and tail_lens is not None
+        and any(int(t) > 0 for t in tail_lens)
+    ):
+        v_tensor = v_tensor.clone()
+        for bi, tail_len in enumerate(tail_lens):
+            tail_len = int(tail_len)
+            if tail_len == 0:
+                continue
+            kv_len = int(actual_seq_kv[bi])
+            tail = v_tail_bnsd[bi][:, :tail_len, :].to(torch.bfloat16).double()
+            if tail.shape[0] != v_tensor.shape[1]:
+                tail = tail.repeat_interleave(v_tensor.shape[1] // tail.shape[0], dim=0)
+            v_tensor[bi, :, kv_len - tail_len : kv_len, :] = tail
+            deq_v_exp[bi, :, kv_len - tail_len : kv_len, :] = 1.0
+
+    TILES_Q = (Sq + Q_BLOCK_SIZE - 1) // Q_BLOCK_SIZE
+    TILES_KV = (Skv + K_BLOCK_SIZE - 1) // K_BLOCK_SIZE
+    ln_p_scale = math.log(p_scale)
+
+    logger.info(
+        "[CPU Bench FP64] TILES_Q=%d, TILES_KV=%d, Sq=%d, Skv=%d",
+        TILES_Q,
+        TILES_KV,
+        Sq,
+        Skv,
+    )
+
+    for i in range(TILES_Q):
+        Sq_start = i * Q_BLOCK_SIZE
+        Sq_end = min(Sq_start + Q_BLOCK_SIZE, Sq)
+        q_deq = q_tensor[:, :, Sq_start:Sq_end, :] * deq_q_exp[:, :, Sq_start:Sq_end, :]
+        oi = out[:, :, Sq_start:Sq_end, :]
+        si = o_sum[:, :, Sq_start:Sq_end, :]
+        mi = o_max[:, :, Sq_start:Sq_end, :]
+
+        for j in range(TILES_KV):
+            Sk_start = j * K_BLOCK_SIZE
+            Sk_end = min(Sk_start + K_BLOCK_SIZE, Skv)
+            kj = (
+                k_tensor[:, :, Sk_start:Sk_end, :] * deq_k_exp[:, :, Sk_start:Sk_end, :]
+            )
+
+            sij = torch.matmul(q_deq, kj.transpose(-1, -2)) * softmax_scale
+            mask_j = mask_global[:, :, Sq_start:Sq_end, Sk_start:Sk_end]
+            sij = sij.masked_fill(mask_j, float("-inf"))
+
+            m_block_j, _ = torch.max(sij, dim=-1, keepdims=True)
+            m_block_j = torch.ceil(m_block_j * INV_LN2) * LN2 - ln_p_scale
+            m_block_j = torch.max(mi, m_block_j)
+
+            p_raw = torch.exp(sij - m_block_j)
+            # 整行/整块被 mask 时 -inf - -inf = nan, 该元素贡献置 0
+            p_raw = torch.where(torch.isneginf(sij), torch.zeros_like(p_raw), p_raw)
+            s_block_j = torch.sum(p_raw, dim=-1, keepdims=True)
+            # P 量化是算子语义(固定 scale), 保留; 其余算术保持 float64
+            p_drop = p_raw.to(FP8_DTYPE).double()
+
+            vj = (
+                v_tensor[:, :, Sk_start:Sk_end, :] * deq_v_exp[:, :, Sk_start:Sk_end, :]
+            )
+            update_mul_si = torch.exp(mi - m_block_j)
+            update_mul_si = torch.where(
+                torch.isnan(update_mul_si),
+                torch.zeros_like(update_mul_si),
+                update_mul_si,
+            )
+            out[:, :, Sq_start:Sq_end, :] = update_mul_si * oi + torch.matmul(
+                p_drop, vj
+            )
+            o_sum[:, :, Sq_start:Sq_end, :] = update_mul_si * si + s_block_j
+            o_max[:, :, Sq_start:Sq_end, :] = m_block_j
+            oi = out[:, :, Sq_start:Sq_end, :]
+            si = o_sum[:, :, Sq_start:Sq_end, :]
+            mi = o_max[:, :, Sq_start:Sq_end, :]
+
+    result = out / (o_sum + EPSILON)
+    all_masked = o_max <= float("-inf")
+    lse = torch.where(
+        all_masked,
+        torch.full_like(o_max, float("inf")),
+        o_max + torch.log(o_sum + EPSILON),
+    )
+    result = torch.where(all_masked, torch.zeros_like(result), result)
+    logger.info("[CPU Bench FP64] output=%s", result.shape)
+    return result.float().contiguous(), lse.float().contiguous()
+
+
+# ==============================================================================
 # NPU 调用
 # GRAPH_PATH: 0=单算子, 3=静态图, 5=动态图, 6=tiling下沉, 7=aclgraph
 # PA 模式: Q 用 TND layout, K/V 走 PA 预处理 (block_table + block_size)

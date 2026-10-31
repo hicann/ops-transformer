@@ -71,7 +71,6 @@ def prepare_case(spec, cache_dir):
         enable_v_tail=True,
         is_contiguous=True,
         use_fp64_golden=False,
-        use_fp64_compare=False,
     )
     cache = Path(cache_dir or Path(__file__).parent / "common/noncontiguous_cache")
     cache.mkdir(parents=True, exist_ok=True)

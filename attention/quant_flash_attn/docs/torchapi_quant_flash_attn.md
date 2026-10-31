@@ -1251,7 +1251,7 @@ mask_mode参数解释：
             </td>
             <td rowspan="3">
                 <ul>
-                    <li><code>seqused_kv</code>、metadata生成所用的KV长度以及causal mask位置均使用包含尾块在内的总长度<code>L</code>，不能改成主体长度。metadata接口没有新增尾块参数。</li>
+                    <li><code>seqused_kv</code>、metadata生成所用的KV长度以及causal mask位置均使用包含尾块在内的总长度<code>L</code>，不能改成不含尾块的长度。metadata接口没有新增尾块参数。</li>
                     <li>Q、K及其descale仍使用原量化路径；K cache必须覆盖全部有效token。V主体从原量化cache读取，最后<code>T</code>个token的V从<code>v_tail</code>读取，不使用<code>v_descale</code>反量化。<code>v</code>、<code>v_descale</code>仍为必选输入，保持主cache的形状要求。</li>
                     <li><code>v_tail</code>使用独立物理块池和<code>block_table_tail</code>，每个batch的尾块从其尾块逻辑位置0开始存放。不要把尾块在整条KV序列中的绝对位置作为尾块池内偏移；主<code>block_table</code>仍用于原KV cache。</li>
                     <li>三个Tensor应与Q/K/V位于同一NPU设备。</li>
@@ -1289,7 +1289,7 @@ mask_mode参数解释：
     </tbody>
 </table>
 
-设第b个batch的总KV长度为`L = seqused_kv[b]`，尾块长度必须为`T = seqused_v_tail[b] = L % 64`，满足`0 <= T < 64`，主体长度为`L - T`。例如`L=1555`时，主体为1536，尾块为19；`L`为64的倍数时，尾块长度为0。当前不支持任意长度或任意位置的高精窗口。
+设第b个batch的总KV长度为`L = seqused_kv[b]`，尾块长度必须为`T = seqused_v_tail[b] = L % 64`，满足`0 <= T < 64`。主`block_table`、`v`、`v_descale`仍按覆盖全长`L`的主KV cache准备（K需要使用尾段的token）；其中前`L - T`个token的V走主cache的量化路径并按`v_descale`反量化，最后`T`个token的V改由`v_tail`以BF16提供、不使用`v_descale`，主cache尾段的V不参与计算。例如`L=1555`时，`L - T`为1536，尾块为19；`L`为64的倍数时尾块长度为0。当前不支持任意长度或任意位置的高精窗口。
 
 `v_tail`的块大小`Bs`、KV头数`KV_N`、head dimension `D`与主V cache一致。设尾块池物理块数为`Bn_tail`，其shape如下；BF16的NZ内维为16，不能直接使用量化V的D/32、32布局。
 

@@ -452,6 +452,161 @@ def _tolist_t(t):
     return t.detach().cpu().tolist() if t.numel() > 0 else None
 
 
+# ==============================================================================
+# 三方 cross_check 支撑: fp64 bench / 分段参考缓存
+# 仅 CLI 显式 --compare cross_check 时生成, 默认两方回归不额外计算。
+# ==============================================================================
+
+
+def _bench_enabled():
+    """是否生成三方 bench: 仅 CLI 显式 --compare cross_check 时生成。"""
+    try:
+        from ttk.switches import get_global_storage
+    except Exception:
+        try:
+            from ttk.utilities.container_utils import get_global_storage
+        except Exception:
+            return False
+    try:
+        method = getattr(get_global_storage(), "compare_method", None)
+    except Exception:  # pylint: disable=broad-except
+        return False
+    return method is not None and str(method).lower() == "cross_check"
+
+
+_BENCH_CACHE = {}
+_REF_CACHE = {}
+_LAST_BENCH = None
+
+
+def peek_bench(testcase_name=None):
+    """取当前用例的 bench 输出; 未生成时返回 None。"""
+    if testcase_name is not None:
+        return _BENCH_CACHE.get(str(testcase_name))
+    return _LAST_BENCH
+
+
+def peek_sectioned_ref(testcase_name=None):
+    """取当前用例的分段量化参考; 未生成时返回 None。"""
+    return _REF_CACHE.get(str(testcase_name))
+
+
+def _convert_cross_check_output(
+    convert_mod,
+    out_bnsd,
+    lse_bnsd,
+    actual_seq_q,
+    compare_layout,
+    cu_out,
+    enable_lse,
+    to_bf16,
+    lse_non_tnd_layout=None,
+):
+    """把 BNSD 结果转换到算子输出布局(与 golden 转换语义保持一致)。
+
+    to_bf16=True 用于分段参考(对齐算子 bf16 输出); bench 保持 float32。
+    """
+    out = convert_mod.convert_q_bnsd_to_layout(
+        out_bnsd, actual_seq_q, compare_layout, cu_seqlens=cu_out
+    )
+    if to_bf16:
+        out = out.to(torch.bfloat16)
+
+    lse = None
+    if enable_lse and lse_bnsd is not None:
+        if str(compare_layout).upper() == "TND":
+            lse = convert_mod.convert_q_bnsd_to_layout(
+                lse_bnsd, actual_seq_q, "TND", cu_seqlens=cu_out
+            )
+            if cu_out is not None:
+                lse = convert_mod.fill_tnd_padding(
+                    lse, actual_seq_q, cu_out, fill_value=float("inf")
+                )
+            if lse.ndim == 3 and lse.shape[-1] == 1:
+                lse = lse.squeeze(-1).contiguous()
+            if lse.ndim == 2:
+                lse = lse.permute(1, 0).contiguous()
+        elif lse_non_tnd_layout is None:
+            lse = lse_bnsd
+            if lse.ndim == 3 and lse.shape[-1] == 1:
+                lse = lse.squeeze(-1).contiguous()
+        else:
+            lse = convert_mod.convert_q_bnsd_to_layout(
+                lse_bnsd, actual_seq_q, lse_non_tnd_layout
+            )
+            if lse.ndim > 1 and lse.shape[-1] == 1:
+                lse = lse.squeeze(-1).contiguous()
+    return out, lse
+
+
+def _cache_cross_check(
+    testcase_name,
+    convert_mod,
+    bench_fn,
+    ref_fn,
+    golden_args,
+    golden_kwargs,
+    actual_seq_q,
+    compare_layout,
+    cu_out,
+    enable_lse,
+    lse_non_tnd_layout=None,
+):
+    """生成并缓存当前用例的 fp64 bench 与分段参考, 供 compare 侧三方比对读取。"""
+    global _LAST_BENCH
+    name = str(testcase_name)
+    _BENCH_CACHE.pop(name, None)
+    _REF_CACHE.pop(name, None)
+    _LAST_BENCH = None
+    if not _bench_enabled():
+        return
+    try:
+        bench_out, bench_lse = bench_fn(*golden_args, **golden_kwargs)
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.warning("[%s] cross_check bench failed: %s", name, exc)
+        return
+    bench_res, bench_lse_c = _convert_cross_check_output(
+        convert_mod,
+        bench_out,
+        bench_lse,
+        actual_seq_q,
+        compare_layout,
+        cu_out,
+        enable_lse,
+        to_bf16=False,
+        lse_non_tnd_layout=lse_non_tnd_layout,
+    )
+    _LAST_BENCH = [bench_res, bench_lse_c]
+    _BENCH_CACHE[name] = _LAST_BENCH
+    logger.info(
+        "[%s] bench(fp64): result=%s lse=%s",
+        name,
+        tuple(bench_res.shape),
+        None if bench_lse_c is None else tuple(bench_lse_c.shape),
+    )
+
+    if ref_fn is None:
+        return
+    try:
+        ref_out, ref_lse = ref_fn(*golden_args, **golden_kwargs)
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.warning("[%s] sectioned reference failed: %s", name, exc)
+        return
+    ref_res, ref_lse_c = _convert_cross_check_output(
+        convert_mod,
+        ref_out,
+        ref_lse,
+        actual_seq_q,
+        compare_layout,
+        cu_out,
+        enable_lse,
+        to_bf16=True,
+        lse_non_tnd_layout=lse_non_tnd_layout,
+    )
+    _REF_CACHE[name] = [ref_res, ref_lse_c]
+    logger.info("[%s] sectioned ref: result=%s", name, tuple(ref_res.shape))
+
+
 def cpu_qfa_mxfp8(
     q: torch.Tensor,
     k: torch.Tensor,
@@ -856,7 +1011,38 @@ def cpu_qfa_mxfp8(
         result = [cpu_out_aligned, cpu_lse_aligned]
 
     else:
-        result = [cpu_out_aligned, None]
+        # 未开 lse 时不返回 None 占位: TTK 的 compare_with_hooks 要求
+        # validate_outputs 全为 VALID 才会调用插件自定义 compare, 而 None golden
+        # 会被判为 SUPPRESSED 从而跳过钩子(回落 TTK 原生 cross_check, 无 XPU 即 FAIL)。
+        result = [cpu_out_aligned]
+
+    # ----- 三方 cross_check: 缓存 fp64 bench 与固定分段参考 -----
+    _cache_cross_check(
+        kwargs.get("testcase_name", "unknown"),
+        mxfp8_golden_mod,
+        mxfp8_golden_mod.cpu_mxfp8_bench,
+        mxfp8_golden_mod.cpu_mxfp8_sectioned_golden,
+        (
+            q_fp8_bnsd,
+            k_fp8_bnsd,
+            v_fp8_bnsd,
+            dq_bnsd_grouped,
+            dk_bnsd_grouped,
+            dv_bnsd_grouped,
+            p_scale_value,
+            actual_seq_q,
+            actual_seq_kv,
+        ),
+        {
+            "softmax_scale": softmax_scale,
+            "v_tail_bnsd": vtail_bnsd,
+            "tail_lens": vtail_tail_lens,
+        },
+        actual_seq_q,
+        compare_layout,
+        cu_seqlens_q_list if enable_pa else None,
+        enable_lse,
+    )
 
     return result
 
@@ -927,7 +1113,7 @@ def cpu_qfa_gqa_fp8(
       dequant_scale_q: NT [N,T] FP32
       dequant_scale_k: BNSD [B,N_kv,max_skv,1] FP32 (供本函数直接用, 无需从 K cache 提取)
       dequant_scale_v: [N_kv] FP32
-    返回: [cpu_out_aligned, cpu_lse_aligned 或 None]
+    返回: [cpu_out_aligned] 或 [cpu_out_aligned, cpu_lse_aligned] (仅启用 lse 时含第二项)
     """
     if not enable_pa:
         raise NotImplementedError("GQA FP8 (quant_mode=6) 仅支持 PA 模式")
@@ -1069,7 +1255,8 @@ def cpu_qfa_gqa_fp8(
             cpu_lse_aligned = cpu_lse_aligned.permute(1, 0).contiguous()
         result = [cpu_out_aligned, cpu_lse_aligned]
     else:
-        result = [cpu_out_aligned, None]
+        # 未开 lse 时省略该输出(不返回 None), 保证 TTK 插件 compare 钩子可被调用
+        result = [cpu_out_aligned]
 
     return result
 
@@ -1378,7 +1565,33 @@ def cpu_qfa_hif8(
                 cpu_lse_aligned = cpu_lse_aligned.squeeze(-1).contiguous()
         result = [cpu_out_aligned, cpu_lse_aligned]
     else:
-        result = [cpu_out_aligned, None]
+        # 未开 lse 时省略该输出(不返回 None), 保证 TTK 插件 compare 钩子可被调用
+        result = [cpu_out_aligned]
+
+    # ----- 三方 cross_check: 缓存 fp64 bench + 分段量化参考 -----
+    _cache_cross_check(
+        kwargs.get("testcase_name", "unknown"),
+        hif8_golden_mod,
+        hif8_golden_mod.cpu_hif8_bench,
+        hif8_golden_mod.cpu_hif8_sectioned_golden,
+        (
+            q_bnsd,
+            k_bnsd,
+            v_bnsd,
+            deq_q,
+            deq_k,
+            deq_v,
+            p_scale_t,
+            actual_seq_q,
+            actual_seq_kv,
+        ),
+        {"softmax_scale": softmax_scale},
+        actual_seq_q,
+        compare_layout,
+        cu_q_for_convert,
+        enable_lse,
+        lse_non_tnd_layout="BNSD",
+    )
 
     return result
 
@@ -1605,7 +1818,7 @@ def cpu_qfa_hifp4(
 
     compare_layout = "TND" if enable_pa else input_layout
     if compare_layout == "BNSD":
-        result = [cpu_out, None]
+        result = [cpu_out]
         if enable_lse and cpu_lse is not None:
             result = [cpu_out, cpu_lse]
     else:
@@ -1628,6 +1841,7 @@ def cpu_qfa_hifp4(
                 cpu_lse_aligned = cpu_lse_aligned.permute(1, 0).contiguous()
             result = [cpu_out_aligned, cpu_lse_aligned]
         else:
-            result = [cpu_out_aligned, None]
+            # 未开 lse 时省略该输出(不返回 None), 保证 TTK 插件 compare 钩子可被调用
+            result = [cpu_out_aligned]
 
     return result

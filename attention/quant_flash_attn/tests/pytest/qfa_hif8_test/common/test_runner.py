@@ -8,11 +8,15 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+import logging
+
 import pytest
 import torch
 
-from common import golden_cache, result_compare_method
+from common import golden_cache, precision_compare_v2 as _CV, result_compare_method
 from common import quant_flash_attn_golden as golden
+
+logger = logging.getLogger(__name__)
 
 PARAM_MAP = {
     "B": "B",
@@ -25,6 +29,7 @@ PARAM_MAP = {
     "seqused_kv": "SEQUSED_KV",
     "max_seqlen_q": "MAX_SEQLEN_Q",
     "max_seqlen_kv": "MAX_SEQLEN_KV",
+    "batch_size": "BATCH_SIZE",
     "enable_pa": None,
     "kv_cache_layout": None,
     "block_size": None,
@@ -40,6 +45,7 @@ PARAM_MAP = {
     "quant_mode": None,
     "device_id": "DEVICE_ID",
     "is_contiguous": "IS_CONTIGUOUS",
+    "use_fp64_golden": "USE_FP64_GOLDEN",
 }
 
 
@@ -164,38 +170,99 @@ def execute_test(params, mode, cdir=None):
 
     compare_layout = golden.INPUT_LAYOUT
     act_seqused_q = golden._get_seqused_q()
-    if compare_layout == "TND":
-        cpu_cmp = golden.convert_q_bnsd_to_layout(
-            cpu_out, act_seqused_q, compare_layout, cu_seqlens=golden.CU_SEQLENS_Q
-        )
-    else:
-        cpu_cmp = golden.convert_q_bnsd_to_layout(
-            cpu_out, act_seqused_q, compare_layout
-        )
 
-    atten_result = result_compare_method.check_result(cpu_cmp, npu_out)
-
-    lse_result = None
-    if golden.ENABLE_LSE:
+    def _to_cmp(tensor):
         if compare_layout == "TND":
-            lse_cmp = golden.convert_q_bnsd_to_layout(
-                cpu_lse, act_seqused_q, compare_layout, cu_seqlens=golden.CU_SEQLENS_Q
+            return golden.convert_q_bnsd_to_layout(
+                tensor, act_seqused_q, compare_layout, cu_seqlens=golden.CU_SEQLENS_Q
             )
+        return golden.convert_q_bnsd_to_layout(tensor, act_seqused_q, compare_layout)
+
+    def _lse_to_cmp(lse_bnsd):
+        if compare_layout == "TND":
+            lse_cmp = _to_cmp(lse_bnsd)
             golden.fill_tnd_padding(
                 lse_cmp, act_seqused_q, golden.CU_SEQLENS_Q, fill_value=float("inf")
             )
             # NPU LSE 输出为 N-major 排布 (N, T): N 在外, T 在内
             # CPU golden 经 convert 后是 [T, N, 1] (T-major), 需转成 [N, T] 对齐
-            lse_cmp = lse_cmp.squeeze(-1).permute(1, 0).contiguous()
+            return lse_cmp.squeeze(-1).permute(1, 0).contiguous()
+        # NPU LSE 非 TND 时固定为 (B,N,S) 3D (与 layout_out 无关),
+        # BSND 也按 BNSD 对齐, 不随 compare_layout 转置
+        lse_cmp = golden.convert_q_bnsd_to_layout(lse_bnsd, act_seqused_q, "BNSD")
+        # golden LSE 带附加尾维 1 ((B,N,S,1)), 剥掉附加维;
+        # S=1 时保留 (B,N,1) 与 NPU infershape 一致
+        if lse_cmp.ndim > 1 and lse_cmp.shape[-1] == 1:
+            lse_cmp = lse_cmp.squeeze(-1)
+        return lse_cmp.contiguous()
+
+    if golden.USE_FP64_GOLDEN:
+        # 三方 cross_check(与 TTK 判据一致):
+        #   golden      = FP64 bench(保留 P 的量化, 作为误差分母)
+        #   third_party = 分段量化参考(竞品噪声上界)
+        #   actual      = NPU
+        # 序列长度统一走 _get_act_seq_*: BNSD/BSND 仅给 batch_size 的用例
+        # SEQUSED_* 为 None, 直接用会触发 len(None)。
+        act_seq_q = golden._get_act_seq_q()
+        act_seq_kv = golden._get_act_seq_kv()
+        bench_out, bench_lse = golden.cpu_hif8_bench(
+            q_fp8,
+            k_fp8,
+            v_fp8,
+            deq_q,
+            deq_k,
+            deq_v,
+            p_scale,
+            act_seq_q,
+            act_seq_kv,
+            softmax_scale=golden.SOFTMAX_SCALE,
+            qr_bf16=qr_bf16,
+            kr_bf16=kr_bf16,
+        )
+        # 分段参考复刻 kernel 的 P 量化分段行为, 作为分母基准
+        ref_out, ref_lse = golden.cpu_hif8_sectioned_golden(
+            q_fp8,
+            k_fp8,
+            v_fp8,
+            deq_q,
+            deq_k,
+            deq_v,
+            p_scale,
+            act_seq_q,
+            act_seq_kv,
+            softmax_scale=golden.SOFTMAX_SCALE,
+            qr_bf16=qr_bf16,
+            kr_bf16=kr_bf16,
+        )
+        golden_cmp = _to_cmp(bench_out)
+        # 与 TTK 一致: 分段参考 cast bf16, 使其量化噪声水平与 target 可比
+        benchmark_cmp = _to_cmp(ref_out).to(torch.bfloat16)
+        atten_result = _CV.cross_check_compare(
+            npu_out,
+            golden_cmp,
+            benchmark_cmp,
+            # 容差档按 NPU 输出 dtype 取(与 quant_flash_mla / flash_attn 口径一致):
+            # bf16 输出 → small_value=2^-8/atol=2^-16; 不能按 fp64 bench 取档
+            output_dtype=npu_out.dtype,
+            test_name=f"qfa_hif8_attention_out::{case_name}",
+        )
+    else:
+        cpu_cmp = _to_cmp(cpu_out)
+        atten_result = result_compare_method.check_result(cpu_cmp, npu_out)
+
+    lse_result = None
+    if golden.ENABLE_LSE:
+        if golden.USE_FP64_GOLDEN:
+            lse_result = _CV.cross_check_compare(
+                lse_out,
+                _lse_to_cmp(bench_lse),
+                _lse_to_cmp(ref_lse),
+                output_dtype=lse_out.dtype,
+                test_name=f"qfa_hif8_lse::{case_name}",
+            )
         else:
-            # NPU LSE 非 TND 时固定为 (B,N,S) 3D (与 layout_out 无关),
-            # BSND 也按 BNSD 对齐, 不随 compare_layout 转置
-            lse_cmp = golden.convert_q_bnsd_to_layout(cpu_lse, act_seqused_q, "BNSD")
-            # golden LSE 带附加尾维 1 ((B,N,S,1)), 剥掉附加维;
-            # S=1 时保留 (B,N,1) 与 NPU infershape 一致
-            if lse_cmp.ndim > 1 and lse_cmp.shape[-1] == 1:
-                lse_cmp = lse_cmp.squeeze(-1).contiguous()
-        lse_result = result_compare_method.check_result(lse_cmp, lse_out)
+            lse_cmp = _lse_to_cmp(cpu_lse)
+            lse_result = result_compare_method.check_result(lse_cmp, lse_out)
 
     return atten_result, lse_result
 

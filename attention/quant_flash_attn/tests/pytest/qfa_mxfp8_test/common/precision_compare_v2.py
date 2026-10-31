@@ -37,6 +37,7 @@ API:
 
 import logging
 import math
+import numpy as np
 import torch
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Tuple, List
@@ -1049,6 +1050,202 @@ def check_result_cv(
         "status": cv.status,
         "reasons": list(cv.failure_reasons),
     }
+
+
+# ------------------------------------------------------------
+# 三方交叉校验 (cross_check)
+#   golden 为真值/分母, third_party 为独立参考, actual 为 NPU
+#   判定: 与两方门禁同一把尺 —— 超差元素占比 <= 0.5%,
+#         且不劣于独立参考的两倍(参考更干净时由 0.5% 地板兜底)
+#   归因: mare/mere/rmse、小值域超差计数只打印, 不参与判定
+#   special 域: NaN/Inf 位需与 golden 或 third_party 之一一致
+# 仅在 USE_FP64_GOLDEN(三方) 场景使用, 不影响两方比对路径。
+# ------------------------------------------------------------
+CROSS_CHECK_TOLERANCE_PER_DTYPE: Dict[str, Dict[str, float]] = {
+    # 与 quant_flash_mla / flash_attn 的三方口径一致(按 NPU 输出 dtype 取档):
+    # bf16 输出的相对误差分辨率约 2^-8, 低于该量级的元素由绝对值 atol 判定
+    "float16": {"small_value": 2**-10, "small_value_atol": 2**-16},
+    "bfloat16": {"small_value": 2**-8, "small_value_atol": 2**-16},
+    "float32": {"small_value": 2**-10, "small_value_atol": 2**-16},
+}
+CROSS_CHECK_RATIO = {"mare": 10.0, "mere": 2.0, "rmse": 2.0}
+_CROSS_LARGE_DENOM_EPS = 1e-7
+# 判定用容差: 与两方 result_compare_method.check_result 完全一致
+# (bf16 输出 rtol=2^-7=0.0078125, atol=1e-4, 允许 0.5% 元素超差)
+_CROSS_RTOL = 0.0078125
+_CROSS_ATOL = 1e-4
+_CROSS_PCT = 0.005
+
+
+def _cross_safe_div(num: float, den: float, err: float) -> float:
+    """三比值除法: 分母夹 small_value 下界(与 TTK safe_div 一致)。"""
+    if math.isnan(num) or math.isnan(den):
+        return float("inf")
+    if math.isinf(num) and math.isinf(den):
+        return 1.0
+    if math.isinf(num):
+        return float("inf")
+    if num == 0 and den == 0:
+        return 1.0
+    return float(num / max(den, err))
+
+
+def _cross_dtype_key(output_dtype) -> str:
+    s = str(output_dtype).lower()
+    if "bfloat16" in s or s.endswith("bf16"):
+        return "bfloat16"
+    if "float16" in s or s.endswith("fp16") or s.endswith("half"):
+        return "float16"
+    return "float32"
+
+
+def cross_check_compare(
+    actual: torch.Tensor,
+    golden: torch.Tensor,
+    third_party: torch.Tensor,
+    output_dtype=None,
+    test_name: str = "",
+    tolerance: Optional[Dict[str, float]] = None,
+) -> Tuple[str, Dict]:
+    """三方交叉校验, 判据与 TTK CrossCheckComparison 一致。
+
+    actual      : NPU 输出
+    golden      : 高精度标杆(FP64 bench, 保留 P 量化), 同时作为误差分母
+    third_party : 分段量化参考, 作为竞品噪声上界
+    返回 (status, info), status ∈ {"Pass", "Failed"}
+    """
+    name = test_name or "cross_check"
+    if actual is None or golden is None or third_party is None:
+        return "Failed", {"reason": f"{name}: missing output"}
+    if tolerance is None:
+        tolerance = CROSS_CHECK_TOLERANCE_PER_DTYPE[
+            _cross_dtype_key(golden.dtype if output_dtype is None else output_dtype)
+        ]
+    small_value = tolerance["small_value"]
+    small_value_atol = tolerance["small_value_atol"]
+
+    t = _to_numpy_1d(actual).astype(np.float64)
+    g = _to_numpy_1d(golden).astype(np.float64)
+    b = _to_numpy_1d(third_party).astype(np.float64)
+    if t.size != g.size or t.size != b.size:
+        return "Failed", {
+            "reason": (
+                f"{name}: shape mismatch actual={t.size} golden={g.size} "
+                f"third_party={b.size}"
+            )
+        }
+    if t.size == 0:
+        return "Pass", {}
+
+    with np.errstate(invalid="ignore", divide="ignore"):
+        # special 域: NaN/Inf 位需与 golden 或 third_party 之一一致
+        special = (
+            np.isnan(t)
+            | np.isinf(t)
+            | np.isnan(g)
+            | np.isinf(g)
+            | np.isnan(b)
+            | np.isinf(b)
+        )
+        t_fin, g_fin, b_fin = np.isfinite(t), np.isfinite(g), np.isfinite(b)
+        tb_match = (
+            (np.isnan(t) & np.isnan(b))
+            | (np.isposinf(t) & np.isposinf(b))
+            | (np.isneginf(t) & np.isneginf(b))
+            | (t_fin & b_fin & (t == b))
+        )
+        tg_match = (
+            (np.isnan(t) & np.isnan(g))
+            | (np.isposinf(t) & np.isposinf(g))
+            | (np.isneginf(t) & np.isneginf(g))
+            | (t_fin & g_fin & (t == g))
+        )
+        special_ok = not bool(np.any(special & ~(tb_match | tg_match)))
+
+        finite = ~special
+        large = finite & (np.abs(g) >= small_value)
+        small = finite & (np.abs(g) < small_value)
+
+        # 归因指标(只打印, 不参与判定)
+        mare = mere = rmse = None
+        n_large = int(np.count_nonzero(large))
+        if n_large > 0:
+            tl, gl, bl = t[large], g[large], b[large]
+            denom = np.abs(gl) + _CROSS_LARGE_DENOM_EPS
+            rel_n = np.abs(tl - gl) / denom
+            rel_p = np.abs(bl - gl) / denom
+            if not bool(np.all(np.isinf(rel_p) | np.isnan(rel_p))):
+                mare = _cross_safe_div(
+                    float(rel_n.max()), float(rel_p.max()), small_value
+                )
+                mere = _cross_safe_div(
+                    float(rel_n.mean()), float(rel_p.mean()), small_value
+                )
+                rmse = _cross_safe_div(
+                    float(np.sqrt(np.mean((tl - gl) ** 2))),
+                    float(np.sqrt(np.mean((bl - gl) ** 2))),
+                    small_value,
+                )
+
+        err_target = int(
+            np.count_nonzero(np.abs(t[small] - g[small]) > small_value_atol)
+        )
+        err_third = int(
+            np.count_nonzero(np.abs(b[small] - g[small]) > small_value_atol)
+        )
+
+        # 判定口径: 与两方门禁同一把尺 —— |x-golden| > atol + rtol*|golden| 的元素
+        # 占比不超过 0.5%, 且不劣于独立参考的两倍(参考更干净时由 0.5% 地板兜底)。
+        # 不用"最差单元素比值 + 零容忍": 参考侧超差数常为 0, 分母被抬到 1, 少量
+        # 近零离群元素即判红, 与两方门禁自相矛盾。
+        ft = np.isfinite(t) & np.isfinite(g) & np.isfinite(b)
+        tt, gg, bb = t[ft], g[ft], b[ft]
+        n_all = int(tt.size)
+        if n_all == 0:
+            rate_target = rate_third = 0.0
+            rate_ok = True
+        else:
+            tol = _CROSS_ATOL + _CROSS_RTOL * np.abs(gg)
+            rate_target = float(np.count_nonzero(np.abs(tt - gg) > tol)) / n_all
+            rate_third = float(np.count_nonzero(np.abs(bb - gg) > tol)) / n_all
+            rate_ok = rate_target <= max(2.0 * rate_third, _CROSS_PCT)
+
+    passed = rate_ok and special_ok
+    info = {
+        "mare": mare,
+        "mere": mere,
+        "rmse": rmse,
+        "special_ok": special_ok,
+        "small_err_target": err_target,
+        "small_err_third": err_third,
+        "small_value": small_value,
+        "small_value_atol": small_value_atol,
+        "over_rate_target": rate_target,
+        "over_rate_third": rate_third,
+    }
+    logger.info(
+        "[CROSS_CHECK] %s: %s mare=%s mere=%s rmse=%s small_err=%d/%d "
+        "over=%.4f%%/%.4f%% special_ok=%s",
+        name,
+        "PASS" if passed else "FAIL",
+        f"{mare:.4f}" if mare is not None else "N/A",
+        f"{mere:.4f}" if mere is not None else "N/A",
+        f"{rmse:.4f}" if rmse is not None else "N/A",
+        err_target,
+        err_third,
+        100.0 * rate_target,
+        100.0 * rate_third,
+        special_ok,
+    )
+    if not passed:
+        if not special_ok:
+            info["reason"] = "nan/inf mismatch"
+        else:
+            info["reason"] = (
+                f"over_rate_exceeded({rate_target:.4%}>"
+                f"{max(2.0 * rate_third, _CROSS_PCT):.4%})"
+            )
+    return ("Pass" if passed else "Failed"), info
 
 
 def check_result(

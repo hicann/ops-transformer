@@ -21,6 +21,7 @@ HIF8: Q/K/V 各只有一个 per-tensor FP32 scale (shape=(1,))
 import argparse
 import logging
 import math
+import os
 
 import torch
 from torch import nn
@@ -54,11 +55,22 @@ except ImportError as e:
 try:
     from . import result_compare_method
 except ImportError:
-    import os
     import sys
 
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import result_compare_method
+
+
+def _load_cross_check_compare():
+    """hif8 目录自带 precision_compare_v2, 直接取同一套三方判据实现。"""
+    try:
+        from .precision_compare_v2 import cross_check_compare
+    except ImportError:
+        from precision_compare_v2 import cross_check_compare
+    return cross_check_compare
+
+
+cross_check_compare = _load_cross_check_compare()
 
 # ==============================================================================
 # 配置区
@@ -96,6 +108,31 @@ def _get_seqused_kv():
     return SEQUSED_KV if SEQUSED_KV is not None else _derive_seqused(CU_SEQLENS_KV)
 
 
+# BNSD/BSND decode 只给 batch_size 属性 (cu_seqlens/seqused 全空) 时的显式 batch 数;
+# None 表示走 cu_seqlens/seqused 推导。仅透传给算子 metadata, 不合成 seqused tensor。
+BATCH_SIZE = None
+
+
+def _fallback_seq_lens(max_seqlen):
+    """无 cu_seqlens/seqused 时的每 batch 长度兜底: 非 varlen 场景各 batch 同长。"""
+    if BATCH_SIZE is None or int(BATCH_SIZE) <= 0:
+        return None
+    if max_seqlen is None or int(max_seqlen) <= 0:
+        return None
+    return [int(max_seqlen)] * int(BATCH_SIZE)
+
+
+def _get_act_seq_q():
+    """golden/layout 计算用的 Q 每 batch 长度 (比 _get_seqused_q 多一层 batch_size 兜底)。"""
+    seq_lens = _get_seqused_q()
+    return seq_lens if seq_lens is not None else _fallback_seq_lens(MAX_SEQLEN_Q)
+
+
+def _get_act_seq_kv():
+    seq_lens = _get_seqused_kv()
+    return seq_lens if seq_lens is not None else _fallback_seq_lens(MAX_SEQLEN_KV)
+
+
 SPARSE_MODE = 3
 HIF8_MAX = 32768.0
 
@@ -108,6 +145,14 @@ SOFTMAX_SCALE = None
 IS_CONTIGUOUS = True
 
 ENABLE_LSE = False
+
+# 三方比对开关(默认关闭, 保持既有两方判定语义):
+#   USE_FP64_GOLDEN=True 时 compare 阶段以 cross_check 判定, 角色与 TTK
+#   --compare cross_check 一致:
+#     golden      = cpu_hif8_bench             (FP64 算术, 保留 P 的 HIF8 量化)
+#     third_party = cpu_hif8_sectioned_golden  (分段量化参考, 作为噪声上界)
+#     actual      = NPU 输出
+USE_FP64_GOLDEN = False
 
 SEED_Q = 54
 SEED_K = 3
@@ -415,9 +460,9 @@ def cpu_hif8_golden(
     V_BLOCK_SIZE = 256
 
     if actual_seq_q is None:
-        actual_seq_q = _get_seqused_q()
+        actual_seq_q = _get_act_seq_q()
     if actual_seq_kv is None:
-        actual_seq_kv = _get_seqused_kv()
+        actual_seq_kv = _get_act_seq_kv()
 
     q_tensor = hif8_per_tensor_dequant(q_fp8)
     k_tensor = hif8_per_tensor_dequant(k_fp8)
@@ -520,6 +565,214 @@ def cpu_hif8_golden(
     out = torch.where(all_masked, torch.zeros_like(out), out)
     logger.info("[CPU Golden] output=%s", out.shape)
     return out, lse
+
+
+def _scalar(value):
+    if isinstance(value, torch.Tensor):
+        return float(value.reshape(-1)[0])
+    return float(value)
+
+
+def cpu_hif8_bench(
+    q_fp8,
+    k_fp8,
+    v_fp8,
+    dequant_scale_q,
+    dequant_scale_k,
+    v_descale,
+    p_scale,
+    actual_seq_q,
+    actual_seq_kv,
+    softmax_scale=None,
+    qr_bf16=None,
+    kr_bf16=None,
+    sectioned=False,
+):
+    """三方比对的 bench(标杆): 同语义、更高算术精度的参考实现。
+
+    与 golden 的差异:
+      - 全程 float64 累加/softmax, 排除归约顺序与 fp32 舍入噪声
+      - 输入只做反量化(乘 per-tensor scale), 不重新量化; P 的 HIF8 量化是
+        算子语义, 必须保留
+      - sectioned=False: running max 跨整个 KV 单调累积(全局 max)
+      - sectioned=True: 每个 KV 基本块独立取 running max 后按 FD 语义合并,
+        复刻 kernel 分段量化行为, 作为三方 third_party 参考。
+        KV 不超过一个基本块(256)时, 256 分段与 bench 完全等价(仅剩 bf16 舍入),
+        参考退化为"零噪声", 三方比值分母失去意义; 此时细分到 32, 使参考具有
+        独立的 P 量化舍入边界翻转, 噪声水平与 target 可比。
+    """
+    EPSILON = 1e-20
+    Q_BLOCK_SIZE = 128
+    K_BLOCK_SIZE = 256
+
+    if actual_seq_q is None:
+        actual_seq_q = _get_act_seq_q()
+    if actual_seq_kv is None:
+        actual_seq_kv = _get_act_seq_kv()
+
+    dq_scale = _scalar(dequant_scale_q)
+    dk_scale = _scalar(dequant_scale_k)
+    dv_scale = _scalar(v_descale)
+    p_scale_value = _scalar(p_scale)
+
+    # 三方口径对齐 quant_flash_mla: bench 用 float64 保证真值精度;
+    # 分段参考(third_party)跟随 kernel 用 float32 累加, 使其绝对误差底噪与
+    # target 同量级, 避免参考过干净导致 max/max 比值判据虚高。
+    acc_dtype = torch.float32 if sectioned else torch.float64
+
+    q_tensor = hif8_per_tensor_dequant(q_fp8).to(acc_dtype) * dq_scale
+    k_tensor = hif8_per_tensor_dequant(k_fp8).to(acc_dtype) * dk_scale
+    v_tensor = hif8_per_tensor_dequant(v_fp8).to(acc_dtype) * dv_scale
+
+    if N_q != N_kv:
+        logger.info("[INFO] GQA 广播 (bench)")
+        k_tensor = broadcast_kv(N_q, N_kv, k_tensor)
+        v_tensor = broadcast_kv(N_q, N_kv, v_tensor)
+        if kr_bf16 is not None:
+            kr_bf16 = broadcast_kv(N_q, N_kv, kr_bf16)
+
+    b, n, _s, d = q_tensor.shape
+    d_total = d + (D_rope if ENABLE_ROPE else 0)
+    if softmax_scale is None:
+        softmax_scale = 1.0 / math.sqrt(d_total)
+    dv = v_tensor.shape[-1]
+    Sq, Skv = q_tensor.shape[2], k_tensor.shape[2]
+    if sectioned:
+        max_kv = max(int(x) for x in actual_seq_kv)
+        if max_kv <= K_BLOCK_SIZE:
+            # KV 只有一段时 256 分段与 bench 等价(仅剩 bf16 舍入), 分母退化;
+            # 先细分到 32, 极短 KV 再按 KV//4 切, 保证至少 4 段独立的量化边界。
+            K_BLOCK_SIZE = 32 if max_kv > 32 else max(1, max_kv // 4)
+
+    out = torch.zeros([b, n, Sq, dv], dtype=acc_dtype)
+    o_sum = torch.zeros(q_tensor.shape[:-1], dtype=acc_dtype)[..., None]
+    o_max = torch.full(q_tensor.shape[:-1], float("-inf"), dtype=acc_dtype)[..., None]
+
+    mask_global = _build_attention_mask(
+        b, Sq, Skv, actual_seq_q, actual_seq_kv, SPARSE_MODE
+    )
+
+    TILES_Q = (Sq + Q_BLOCK_SIZE - 1) // Q_BLOCK_SIZE
+    TILES_KV = (Skv + K_BLOCK_SIZE - 1) // K_BLOCK_SIZE
+    ln_p_scale = math.log(p_scale_value)
+
+    use_rope = ENABLE_ROPE and qr_bf16 is not None
+    logger.info(
+        "[CPU Bench FP64] TILES_Q=%d, TILES_KV=%d, Sq=%d, Skv=%d",
+        TILES_Q,
+        TILES_KV,
+        Sq,
+        Skv,
+    )
+
+    for i in range(TILES_Q):
+        Sq_start = i * Q_BLOCK_SIZE
+        Sq_end = min(Sq_start + Q_BLOCK_SIZE, Sq)
+        qi = q_tensor[:, :, Sq_start:Sq_end, :]
+        oi = out[:, :, Sq_start:Sq_end, :]
+        si = o_sum[:, :, Sq_start:Sq_end, :]
+        mi = o_max[:, :, Sq_start:Sq_end, :]
+
+        for j in range(TILES_KV):
+            Sk_start = j * K_BLOCK_SIZE
+            Sk_end = min(Sk_start + K_BLOCK_SIZE, Skv)
+            kj = k_tensor[:, :, Sk_start:Sk_end, :]
+
+            sij = torch.matmul(qi, kj.transpose(-1, -2))
+            if use_rope:
+                qri = qr_bf16[:, :, Sq_start:Sq_end, :].double()
+                krj = kr_bf16[:, :, Sk_start:Sk_end, :].double()
+                sij += torch.matmul(qri, krj.transpose(-1, -2))
+            sij = sij * softmax_scale
+
+            mask_j = mask_global[:, :, Sq_start:Sq_end, Sk_start:Sk_end]
+            sij = sij.masked_fill(mask_j, float("-inf"))
+
+            m_seg, _ = torch.max(sij, dim=-1, keepdims=True)
+            m_seg = m_seg - ln_p_scale
+            if sectioned:
+                # 段内独立 running max: P 量化只对齐本段, 复刻 kernel 分段行为
+                m_block_j = m_seg
+            else:
+                m_block_j = torch.max(mi, m_seg)
+
+            p_raw = torch.exp(sij - m_block_j)
+            # 整行/整块被 mask 时 -inf - -inf = nan, 该元素贡献置 0
+            p_raw = torch.where(torch.isneginf(sij), torch.zeros_like(p_raw), p_raw)
+            s_block_j = torch.sum(p_raw, dim=-1, keepdims=True)
+            # P 的 HIF8 量化是算子语义, 保留
+            p_drop = hif8_cast_p(p_raw.float()).to(acc_dtype)
+
+            vj = v_tensor[:, :, Sk_start:Sk_end, :]
+            o_seg = torch.matmul(p_drop, vj)
+            if sectioned:
+                # 段间按 FD 语义合并: 以段 max 为基准把段内结果折算到新 max
+                m_new = torch.maximum(mi, m_seg)
+                alpha = torch.exp(mi - m_new)
+                beta = torch.exp(m_seg - m_new)
+                alpha = torch.where(torch.isnan(alpha), torch.zeros_like(alpha), alpha)
+                beta = torch.where(torch.isnan(beta), torch.zeros_like(beta), beta)
+                out[:, :, Sq_start:Sq_end, :] = alpha * oi + beta * o_seg
+                o_sum[:, :, Sq_start:Sq_end, :] = alpha * si + beta * s_block_j
+                o_max[:, :, Sq_start:Sq_end, :] = m_new
+            else:
+                update_mul_si = torch.exp(mi - m_block_j)
+                update_mul_si = torch.where(
+                    torch.isnan(update_mul_si),
+                    torch.zeros_like(update_mul_si),
+                    update_mul_si,
+                )
+                out[:, :, Sq_start:Sq_end, :] = update_mul_si * oi + o_seg
+                o_sum[:, :, Sq_start:Sq_end, :] = update_mul_si * si + s_block_j
+                o_max[:, :, Sq_start:Sq_end, :] = m_block_j
+
+    result = out / (o_sum + EPSILON)
+    all_masked = o_max <= float("-inf")
+    lse = torch.where(
+        all_masked,
+        torch.full_like(o_max, float("inf")),
+        o_max + torch.log(o_sum + EPSILON),
+    )
+    result = torch.where(all_masked, torch.zeros_like(result), result)
+    logger.info("[CPU Bench FP64] output=%s", result.shape)
+    return result.float().contiguous(), lse.float().contiguous()
+
+
+def cpu_hif8_sectioned_golden(
+    q_fp8,
+    k_fp8,
+    v_fp8,
+    dequant_scale_q,
+    dequant_scale_k,
+    v_descale,
+    p_scale,
+    actual_seq_q,
+    actual_seq_kv,
+    softmax_scale=None,
+    qr_bf16=None,
+    kr_bf16=None,
+):
+    """分段量化参考, 仅供三方 cross_check 作为 benchmark 使用。
+
+    bench 走全局 running max; 本函数按 KV 基本块(256)独立取 running max 后
+    再合并, 使参考的 P 量化噪声水平与 kernel 可比, 不会因参考"过干净"导致
+    三方比值虚高。
+    """
+    return cpu_hif8_bench(
+        q_fp8,
+        k_fp8,
+        v_fp8,
+        dequant_scale_q,
+        dequant_scale_k,
+        v_descale,
+        p_scale,
+        actual_seq_q,
+        actual_seq_kv,
+        softmax_scale=softmax_scale,
+        qr_bf16=qr_bf16,
+        kr_bf16=kr_bf16,
+        sectioned=True,
+    )
 
 
 # ==============================================================================
@@ -1229,21 +1482,92 @@ if __name__ == "__main__":
         logger.info("\n[Done] NPU 输出已保存，退出")
         sys.exit(0)
 
-    logger.info("\n[Step 4] Atten OUT 精度对比")
-    cpu_tnd_torch = convert_q_bnsd_to_layout(
-        cpu_out, _get_seqused_q(), "TND", cu_seqlens=CU_SEQLENS_Q
-    )
-    result_compare_method.check_result(cpu_tnd_torch, atten_out)
+    if USE_FP64_GOLDEN:
+        if cross_check_compare is None:
+            raise RuntimeError("USE_FP64_GOLDEN 三方比对需要 precision_compare_v2")
 
-    if ENABLE_LSE:
-        logger.info("\n[Step 5] LSE 精度对比")
-        cpu_lse_tnd_torch = convert_q_bnsd_to_layout(
-            cpu_lse, _get_seqused_q(), "TND", cu_seqlens=CU_SEQLENS_Q
+        logger.info(
+            "\n[Step 4] Atten OUT 三方 cross_check (FP64 bench | 分段参考 | NPU)"
         )
-        fill_tnd_padding(
-            cpu_lse_tnd_torch, _get_seqused_q(), CU_SEQLENS_Q, fill_value=float("inf")
+        bench_out, bench_lse = cpu_hif8_bench(
+            q_fp8,
+            k_fp8,
+            v_fp8,
+            dequant_scale_q,
+            dequant_scale_k,
+            v_descale,
+            p_scale,
+            _get_seqused_q(),
+            _get_seqused_kv(),
+            softmax_scale=SOFTMAX_SCALE,
+            qr_bf16=qr_bf16,
+            kr_bf16=kr_bf16,
         )
-        # NPU LSE 输出为 N-major 排布 (N, T): N 在外, T 在内
-        # CPU golden 经 convert 后是 [T, N, 1] (T-major), 需转成 [N, T] 对齐
-        cpu_lse_nt_torch = cpu_lse_tnd_torch.squeeze(-1).permute(1, 0).contiguous()
-        result_compare_method.check_result(cpu_lse_nt_torch, lse_out)
+        ref_out, ref_lse = cpu_hif8_sectioned_golden(
+            q_fp8,
+            k_fp8,
+            v_fp8,
+            dequant_scale_q,
+            dequant_scale_k,
+            v_descale,
+            p_scale,
+            _get_seqused_q(),
+            _get_seqused_kv(),
+            softmax_scale=SOFTMAX_SCALE,
+            qr_bf16=qr_bf16,
+            kr_bf16=kr_bf16,
+        )
+        bench_tnd = convert_q_bnsd_to_layout(
+            bench_out, _get_seqused_q(), "TND", cu_seqlens=CU_SEQLENS_Q
+        )
+        ref_tnd = convert_q_bnsd_to_layout(
+            ref_out, _get_seqused_q(), "TND", cu_seqlens=CU_SEQLENS_Q
+        ).to(torch.bfloat16)  # 与 TTK 一致: 分段参考 cast bf16 作为噪声上界
+        status, info = cross_check_compare(
+            atten_out, bench_tnd, ref_tnd, test_name="qfa_hif8_attention_out"
+        )
+        logger.info("  [Compare] Atten OUT: %s %s", status, info)
+
+        if ENABLE_LSE:
+            logger.info("\n[Step 5] LSE 三方 cross_check")
+
+            def _lse_bnsd_to_nt(lse_bnsd):
+                lse_tnd = convert_q_bnsd_to_layout(
+                    lse_bnsd, _get_seqused_q(), "TND", cu_seqlens=CU_SEQLENS_Q
+                )
+                # TND padding 位置填 inf 以匹配 NPU 行为：NPU 对超出实际序列长度的 Q 位置输出 inf LSE
+                lse_tnd = fill_tnd_padding(
+                    lse_tnd, _get_seqused_q(), CU_SEQLENS_Q, fill_value=float("inf")
+                )
+                # NPU LSE 输出为 N-major 排布 (N, T): golden 经 convert 后是 [T, N, 1]
+                return lse_tnd.squeeze(-1).permute(1, 0).contiguous()
+
+            status, info = cross_check_compare(
+                lse_out,
+                _lse_bnsd_to_nt(bench_lse),
+                _lse_bnsd_to_nt(ref_lse),
+                test_name="qfa_hif8_lse",
+            )
+            logger.info("  [Compare] LSE: %s %s", status, info)
+    else:
+        logger.info("\n[Step 4] Atten OUT 精度对比")
+        cpu_tnd_torch = convert_q_bnsd_to_layout(
+            cpu_out, _get_seqused_q(), "TND", cu_seqlens=CU_SEQLENS_Q
+        )
+        result_compare_method.check_result(cpu_tnd_torch, atten_out)
+
+        if ENABLE_LSE:
+            logger.info("\n[Step 5] LSE 精度对比")
+            cpu_lse_tnd_torch = convert_q_bnsd_to_layout(
+                cpu_lse, _get_seqused_q(), "TND", cu_seqlens=CU_SEQLENS_Q
+            )
+            fill_tnd_padding(
+                cpu_lse_tnd_torch,
+                _get_seqused_q(),
+                CU_SEQLENS_Q,
+                fill_value=float("inf"),
+            )
+            # NPU LSE 输出为 N-major 排布 (N, T): N 在外, T 在内
+            # CPU golden 经 convert 后是 [T, N, 1] (T-major), 需转成 [N, T] 对齐
+            cpu_lse_nt_torch = cpu_lse_tnd_torch.squeeze(-1).permute(1, 0).contiguous()
+            result_compare_method.check_result(cpu_lse_nt_torch, lse_out)
