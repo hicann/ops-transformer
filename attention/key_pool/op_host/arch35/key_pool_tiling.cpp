@@ -90,8 +90,17 @@ ge::graphStatus KeyPoolTiling::ConvertContext(gert::TilingContext& context, KeyP
                 return ge::GRAPH_FAILED);
     key_poolContext.cmpRatio = attrs->GetAttrPointer<int>(CMP_RATIO_ATTR_INDEX);
     key_poolContext.normEps = attrs->GetAttrPointer<float>(NORM_EPS_ATTR_INDEX);
-    key_poolContext.rotaryMode = attrs->GetAttrPointer<int>(ROTARY_MODE_ATTR_INDEX);
+    key_poolContext.rotaryMode = attrs->GetAttrPointer<int64_t>(ROTARY_MODE_ATTR_INDEX);
     key_poolContext.stateCacheStrideDim0 = attrs->GetAttrPointer<int>(STATE_CACHE_STRIDE_DIM0_ATTR_INDEX);
+
+    OP_CHECK_IF(key_poolContext.rotaryMode == nullptr, OP_LOGE(context.GetNodeName(), "attr rotaryMode is nullptr"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(*key_poolContext.rotaryMode != 0 && *key_poolContext.rotaryMode != 1,
+                OP_LOGE(context.GetNodeName(), "rotaryMode must be 0 or 1, but got %ld", *key_poolContext.rotaryMode),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(key_poolContext.cos.desc != nullptr || key_poolContext.sin.desc != nullptr,
+                OP_LOGE(context.GetNodeName(), "cos and sin must be nullptr; RoPE is not supported"),
+                return ge::GRAPH_FAILED);
     key_poolContext.batchConsistency = context.GetDeterministicLevel();
     OP_LOGD(context.GetNodeName(), "deterministic_level=%d", context.GetDeterministicLevel());
     OP_CHECK_IF(context.GetWorkspaceSizes(1) == nullptr,

@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -56,7 +57,8 @@ TensorDesc Empty(ge::DataType dtype)
 
 gert::TilingContextPara MakePara(const std::string& layout, ge::DataType dtype, int64_t batch, int64_t sequence,
                                  int64_t hidden, int64_t headDim, int64_t cmpRatio, int64_t blockSize,
-                                 int64_t maxBlocks, bool withNorm = false)
+                                 int64_t maxBlocks, bool withNorm = false, int64_t rotaryMode = 1, bool withCos = false,
+                                 bool withSin = false, bool emptyRope = false)
 {
     const int64_t tokenCount = layout == "BSH" ? batch * sequence : sequence;
     const int64_t blockNum = std::max<int64_t>(1, batch * maxBlocks);
@@ -70,8 +72,9 @@ gert::TilingContextPara MakePara(const std::string& layout, ge::DataType dtype, 
     inputs.emplace_back(Desc({batch}, ge::DT_INT32));
     inputs.emplace_back(withNorm ? Desc({headDim}, ge::DT_FLOAT) : Empty(ge::DT_FLOAT));
     inputs.emplace_back(withNorm ? Desc({headDim}, ge::DT_FLOAT) : Empty(ge::DT_FLOAT));
-    inputs.emplace_back(Empty(ge::DT_BF16));
-    inputs.emplace_back(Empty(ge::DT_BF16));
+    const auto rope = emptyRope ? Desc({0}, ge::DT_BF16) : Desc({batch, sequence, headDim}, ge::DT_BF16);
+    inputs.emplace_back(withCos ? rope : Empty(ge::DT_BF16));
+    inputs.emplace_back(withSin ? rope : Empty(ge::DT_BF16));
     inputs.emplace_back(layout == "TH" ? Desc({batch + 1}, ge::DT_INT32) : Empty(ge::DT_INT32));
     inputs.emplace_back(Empty(ge::DT_INT32));
 
@@ -82,7 +85,7 @@ gert::TilingContextPara MakePara(const std::string& layout, ge::DataType dtype, 
     std::vector<OpAttr> attrs{
         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(cmpRatio)},
         {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6F)},
-        {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+        {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(rotaryMode)},
         {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(blockSize * 2 * headDim)},
     };
     static optiling::KeyPoolCompileInfo compileInfo{};
@@ -124,4 +127,47 @@ TEST(KeyPoolTilingArch35, RejectsUnsupportedHeadDim)
 {
     auto para = MakePara("BSH", ge::DT_BF16, 2, 8, 2048, 256, 4, 4, 2);
     ExecuteTestCase(para, ge::GRAPH_FAILED, 32);
+}
+
+TEST(KeyPoolTilingArch35, ValidRotaryModes)
+{
+    for (int64_t mode : {0, 1}) {
+        auto para = MakePara("BSH", ge::DT_BF16, 2, 8, 4096, 512, 4, 4, 2, false, mode);
+        ExecuteTestCase(para, ge::GRAPH_SUCCESS, 0);
+    }
+}
+
+TEST(KeyPoolTilingArch35, RejectsInvalidRotaryModes)
+{
+    const std::vector<int64_t> modes{-1,
+                                     2,
+                                     7,
+                                     int64_t{1} << 32,
+                                     (int64_t{1} << 32) + 1,
+                                     std::numeric_limits<int64_t>::min(),
+                                     std::numeric_limits<int64_t>::max()};
+    for (int64_t batch : {0, 2}) {
+        for (int64_t mode : modes) {
+            SCOPED_TRACE(::testing::Message() << "batch=" << batch << ", mode=" << mode);
+            auto para = MakePara("BSH", ge::DT_BF16, batch, 8, 4096, 512, 4, 4, 2, false, mode);
+            ExecuteTestCase(para, ge::GRAPH_FAILED, 0);
+        }
+    }
+}
+
+TEST(KeyPoolTilingArch35, RejectsRopeInputs)
+{
+    for (int64_t batch : {0, 2}) {
+        for (int64_t mode : {0, 1}) {
+            for (bool emptyRope : {false, true}) {
+                for (int mask : {1, 2, 3}) {
+                    SCOPED_TRACE(::testing::Message() << "batch=" << batch << ", mode=" << mode
+                                                      << ", emptyRope=" << emptyRope << ", mask=" << mask);
+                    auto para = MakePara("BSH", ge::DT_BF16, batch, 8, 4096, 512, 4, 4, 2, false, mode, mask & 1,
+                                         mask & 2, emptyRope);
+                    ExecuteTestCase(para, ge::GRAPH_FAILED, 0);
+                }
+            }
+        }
+    }
 }

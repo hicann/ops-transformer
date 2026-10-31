@@ -223,7 +223,7 @@ struct KeyPoolContext {
 
     const int* cmpRatio;
     const float* normEps;
-    const int* rotaryMode;
+    const int64_t* rotaryMode;
     const int* stateCacheStrideDim0;
     TemplateId templateId;
 

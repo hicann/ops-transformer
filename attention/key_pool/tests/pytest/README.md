@@ -33,6 +33,21 @@ non-empty RoPE rejection through the public interface contract
 RoPE remains an interface placeholder. Non-empty `cos`/`sin` inputs must be
 rejected explicitly and must not be silently ignored.
 
+The ctypes regression checks the installed two-stage ACLNN interface directly,
+without a wheel. After sourcing CANN and the custom package environment, run:
+
+```bash
+export KEYPOOL_OPAPI_LIBRARY=/path/to/vendors/custom_transformer/op_api/lib/libcust_opapi.so
+ACL_DEVICE_ID=0 python3 test_key_pool_rope_validation.py
+```
+
+Invalid inputs must fail tiling with ACLNN error 561002.
+It checks invalid 64-bit `rotaryMode` values, either or both RoPE inputs, and
+non-null empty RoPE tensors for FP16 and BF16. The two supported modes with null
+RoPE inputs must execute successfully and produce the expected pooled values.
+Use `--observe` only to collect before-fix evidence; the default run fails if an
+invalid input is accepted.
+
 The NPU scripts are intended to run after the CANN, custom OPP, and wheel
 environments have been loaded. They do not require `torchair`.
 

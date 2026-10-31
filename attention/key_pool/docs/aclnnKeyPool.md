@@ -376,18 +376,18 @@ aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/co
     <td>输入输出Tensor的数据类型、shape或数据格式不在支持范围内。</td>
   </tr>
   <tr>
-    <td>cmpRatio、normEps或rotaryMode的取值不在支持范围内。</td>
+    <td>cmpRatio或normEps的取值不在支持范围内。</td>
   </tr>
   <tr>
     <td>BSH/TH场景与cuSeqlensOptional、sequsedOptional的组合不满足约束。</td>
   </tr>
   <tr>
-    <td>normWeightOptional与normBiasOptional未同时提供，或cosOptional与sinOptional未按当前版本要求传空。</td>
+    <td>normWeightOptional与normBiasOptional未同时提供。</td>
   </tr>
   <tr>
     <td>ACLNN_ERR_INNER_TILING_ERROR</td>
     <td>561002</td>
-    <td>tiling发生异常，入参dtype、shape或属性组合错误。</td>
+    <td>tiling发生异常，入参dtype、shape或属性组合错误；包括rotaryMode不为0/1，或cosOptional、sinOptional任一非空。</td>
   </tr>
   <tr>
     <td>ACLNN_ERR_RUNTIME_ERROR</td>
@@ -437,6 +437,7 @@ aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/co
 
 ## 约束说明
 
+- `D`仅支持`128/512`；`H`必须在`[1024,10240]`范围内且为`512`的整数倍。
 - 支持BSH和TH两种场景：
   - BSH场景`cuSeqlensOptional`必须为空；
   - TH场景必须提供合法的`cuSeqlensOptional`前缀和数组，首元素为0，
