@@ -388,3 +388,41 @@ TEST_F(LightningIndexerKLLossOpapiUt, E11_batch_513_failed)
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
     EXPECT_EQ(executor, nullptr);
 }
+
+TEST_F(LightningIndexerKLLossOpapiUt, E12_eps_zero_failed)
+{
+    auto targetScore = MakeTensor({2, 8, 64}, ACL_FLOAT);
+    auto indexProbs = MakeTensor({2, 8, 64}, ACL_FLOAT);
+    auto loss = MakeTensor({1}, ACL_FLOAT);
+
+    double eps = 0.0;
+    char weightType[] = "logits";
+
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+
+    aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
+                                                                     weightType, loss.get(), &workspaceSize, &executor);
+
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
+    EXPECT_EQ(executor, nullptr);
+}
+
+TEST_F(LightningIndexerKLLossOpapiUt, E13_eps_negative_failed)
+{
+    auto targetScore = MakeTensor({2, 8, 64}, ACL_FLOAT);
+    auto indexProbs = MakeTensor({2, 8, 64}, ACL_FLOAT);
+    auto loss = MakeTensor({1}, ACL_FLOAT);
+
+    double eps = -1.0;
+    char weightType[] = "logits";
+
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+
+    aclnnStatus aclRet = aclnnLightningIndexerKLLossGetWorkspaceSize(targetScore.get(), indexProbs.get(), eps,
+                                                                     weightType, loss.get(), &workspaceSize, &executor);
+
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
+    EXPECT_EQ(executor, nullptr);
+}

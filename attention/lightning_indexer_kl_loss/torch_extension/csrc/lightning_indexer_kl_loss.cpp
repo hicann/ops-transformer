@@ -13,7 +13,7 @@
 
 namespace op_api {
 
-at::Tensor lightning_indexer_kl_loss(const at::Tensor& targetScore, const at::Tensor& indexProbs, float eps,
+at::Tensor lightning_indexer_kl_loss(const at::Tensor& targetScore, const at::Tensor& indexProbs, double eps,
                                      const std::string& weightType)
 {
     TORCH_CHECK((eps > 0), "eps should be greater than 0, current is: ", eps);

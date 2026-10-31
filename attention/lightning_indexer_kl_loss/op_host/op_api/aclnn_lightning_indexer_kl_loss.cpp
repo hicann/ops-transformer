@@ -73,6 +73,7 @@ static aclnnStatus CheckParams(const LightningIndexerKLLossParams& params)
     CHECK_COND(params.indexProbs != nullptr, ACLNN_ERR_PARAM_NULLPTR, "indexProbs must not be nullptr.");
     CHECK_COND(params.weightType != nullptr, ACLNN_ERR_PARAM_NULLPTR, "weightType must not be nullptr.");
     CHECK_COND(params.loss != nullptr, ACLNN_ERR_PARAM_NULLPTR, "loss must not be nullptr.");
+    CHECK_COND(params.eps > 0.0, ACLNN_ERR_PARAM_INVALID, "eps must be positive.");
 
     if (!CheckShape(params.targetScore)) {
         return ACLNN_ERR_PARAM_INVALID;

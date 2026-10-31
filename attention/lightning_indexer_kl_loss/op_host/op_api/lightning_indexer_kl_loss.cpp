@@ -26,18 +26,22 @@ const aclTensor* LightningIndexerKLLoss(const aclTensor* targetScore, const aclT
                                         const char* weightType, aclOpExecutor* executor)
 {
     L0_DFX(LightningIndexerKLLoss, targetScore, indexProbs, eps, weightType);
+    // The op attr is FLOAT while the aclnn API passes eps as double. Cast before
+    // OP_ATTR so RuntimeAttrs::GetFloat reads the intended value instead of the
+    // low 32 bits of the double representation.
+    float epsFloat = static_cast<float>(eps);
     DataType outputDtype = targetScore->GetDataType();
     auto loss = executor->AllocTensor(outputDtype, op::Format::FORMAT_ND, op::Format::FORMAT_ND);
 
     auto ret = INFER_SHAPE(LightningIndexerKLLoss, OP_INPUT(targetScore, indexProbs), OP_OUTPUT(loss),
-                           OP_ATTR(eps, weightType));
+                           OP_ATTR(epsFloat, weightType));
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "LightningIndexerKLLoss InferShape failed.");
         return nullptr;
     }
 
     ret = ADD_TO_LAUNCHER_LIST_AICORE(LightningIndexerKLLoss, OP_INPUT(targetScore, indexProbs), OP_OUTPUT(loss),
-                                      OP_ATTR(eps, weightType));
+                                      OP_ATTR(epsFloat, weightType));
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "LightningIndexerKLLoss launch kernel failed.");
         return nullptr;
