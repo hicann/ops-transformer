@@ -32,7 +32,7 @@
     <!-- npu="950" id7 -->
     - <term>Ascend 950PR&950DT products</term>:
 
-        Adds support for low-precision data types FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8. Supports the pertensor, perblock, and mx [quantization modes](../../../docs/en/context/quant_mode_introduction.md).
+        Adds support for low-precision data types FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8/FLOAT4_E2M1. Supports the pertensor, perblock, and mx [quantization modes](../../../docs/en/context/quant_mode_introduction.md).
 
     <!-- end id7 -->
     <!-- npu="A3,910b" id8 -->

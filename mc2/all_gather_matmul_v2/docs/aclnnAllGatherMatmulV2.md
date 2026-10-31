@@ -30,7 +30,7 @@
     <!-- npu="950" id7 -->
     - <term>Ascend 950PR&950DT系列产品</term>：
 
-        新增了对低精度数据类型FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8的支持。支持pertensor、perblock、mx[量化方式](../../../docs/zh/context/quant_mode_introduction.md)。
+        新增了对低精度数据类型FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8/FLOAT4_E2M1的支持。支持pertensor、perblock、mx[量化方式](../../../docs/zh/context/quant_mode_introduction.md)。
 
     <!-- end id7 -->
     <!-- npu="A3,910b" id8 -->
