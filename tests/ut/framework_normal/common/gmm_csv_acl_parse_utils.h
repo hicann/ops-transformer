@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "aclnn/aclnn_base.h"
+#include "common/include/op_host/op_const_def_transformer.h"
 #include "op_api_ut_common/tensor_desc.h"
 #include "opdev/common_types.h"
 #include "gmm_csv_parse_utils.h"
@@ -39,6 +40,8 @@ inline aclDataType ParseAclDtype(const std::string& dtype)
         {"FLOAT8_E5M2", ACL_FLOAT8_E5M2},
         {"FLOAT8_E8M0", ACL_FLOAT8_E8M0},
         {"HIFLOAT8", ACL_HIFLOAT8},
+        {"HIFLOAT4", static_cast<aclDataType>(Ops::Transformer::DT_HIFLOAT4)},
+        {"HIFLOAT4_SCALE", static_cast<aclDataType>(Ops::Transformer::DT_HIFLOAT4_SCALE)},
         {"FLOAT4_E2M1", ACL_FLOAT4_E2M1},
         {"FLOAT4_E1M2", ACL_FLOAT4_E1M2},
         {"UNDEFINED", ACL_DT_UNDEFINED},

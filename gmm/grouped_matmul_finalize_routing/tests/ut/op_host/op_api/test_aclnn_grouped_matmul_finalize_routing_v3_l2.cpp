@@ -68,15 +68,16 @@ void SetupPlatformForCase(const string& socVersion)
     static const map<string, SocVersion> socMap = {
         {"Ascend910B", SocVersion::ASCEND910B},
         {"Ascend950", SocVersion::ASCEND950},
+        {"Ascend960DT", SocVersion::ASCEND960DT},
     };
     auto it = socMap.find(Trim(socVersion));
     SetPlatformSocVersion(it == socMap.end() ? SocVersion::ASCEND910B : it->second);
 }
 
 TensorDesc MakeTensorDesc(const vector<int64_t>& shape, aclDataType dtype, aclFormat format,
-                          const vector<int64_t>& storageShape)
+                          const vector<int64_t>& storageShape, const vector<int64_t>& stride = {})
 {
-    return ops::ut::MakeAclTensorDesc(shape, dtype, format, storageShape).ValueRange(-1, 1);
+    return ops::ut::MakeAclTensorDesc(shape, dtype, format, storageShape, stride).ValueRange(-1, 1);
 }
 
 struct GroupedMatmulFinalizeRoutingV3RunParam {
@@ -193,9 +194,11 @@ struct GroupedMatmulFinalizeRoutingV3Case {
         SetupPlatformForCase(socVersion);
 
         const vector<int64_t> x1Dims = ParseDims(x1Shape);
-        const vector<int64_t> x2Dims = ParseDims(x2Shape);
-        const vector<int64_t> x2StorageDims = ParseDims(x2StorageShape);
-        const vector<int64_t> scaleDims = ParseDims(scaleShape);
+        // Accept shape#stride#storageShape for transposed weight and scale views.
+        const auto x2Spec = ops::ut::ParseAclTensorSpec(x2Shape);
+        const vector<int64_t> explicitX2StorageDims = ParseDims(x2StorageShape);
+        const auto& x2StorageDims = explicitX2StorageDims.empty() ? x2Spec.storageDims : explicitX2StorageDims;
+        const auto scaleSpec = ops::ut::ParseAclTensorSpec(scaleShape);
         const vector<int64_t> biasDims = ParseDims(biasShape);
         const vector<int64_t> offsetDims = ParseDims(offsetShape);
         const vector<int64_t> antiQuantScaleDims = ParseDims(antiQuantScaleShape);
@@ -207,8 +210,11 @@ struct GroupedMatmulFinalizeRoutingV3Case {
         const vector<int64_t> outDims = ParseDims(outShape);
 
         TensorDesc x1 = MakeTensorDesc(x1Dims, ParseDtype(x1Dtype), ACL_FORMAT_ND, {});
-        TensorDesc x2 = MakeTensorDesc(x2Dims, ParseDtype(x2Dtype), ParseFormat(x2Format), x2StorageDims);
-        TensorDesc scale = MakeTensorDesc(scaleDims, ParseDtype(scaleDtype), ACL_FORMAT_ND, {}).ValueRange(0, 3);
+        TensorDesc x2 =
+            MakeTensorDesc(x2Spec.viewDims, ParseDtype(x2Dtype), ParseFormat(x2Format), x2StorageDims, x2Spec.stride);
+        TensorDesc scale = MakeTensorDesc(scaleSpec.viewDims, ParseDtype(scaleDtype), ACL_FORMAT_ND,
+                                          scaleSpec.storageDims, scaleSpec.stride)
+                               .ValueRange(0, 3);
         TensorDesc offset = MakeTensorDesc(offsetDims, ParseDtype(offsetDtype), ParseFormat(offsetFormat), {});
         TensorDesc antiQuantScale =
             MakeTensorDesc(antiQuantScaleDims, ParseDtype(antiQuantScaleDtype), ACL_FORMAT_ND, {});
