@@ -356,8 +356,8 @@
     - `copyExpertNum`：取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的copy专家的ID的值是[`moeExpertNum` + `zeroExpertNum`, `moeExpertNum` + `zeroExpertNum` + `copyExpertNum`)。
     - `constExpertNum`：取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的常量专家的ID的值是[`moeExpertNum` + `zeroExpertNum` + `copyExpertNum`, `moeExpertNum` + `zeroExpertNum` + `copyExpertNum` + `constExpertNum`)。
     - `oriXOptional`：可选择传入有效数据或空指针，当`copyExpertNum`不为0或`constExpertNum`不为0时必须传入有效输入；当传入有效数据时，要求shape为(`BS`, `H`)，数据类型需与`expandX`保持一致。
-    - `constExpertAlpha1Optional`：可选择传入有效数据或空指针，当`constExpertNum`不为0时必须传入有效输入；当传入有效数据时，要求shape为(`constExpertNum`,)，数据类型需与`expandX`保持一致。
-    - `constExpertAlpha2Optional`：可选择传入有效数据或空指针，当`constExpertNum`不为0时必须传入有效输入；当传入有效数据时，要求shape为(`constExpertNum`,)，数据类型需与`expandX`保持一致。
+    - `constExpertAlpha1Optional`：可选择传入有效数据或空指针，当`constExpertNum`不为0时必须传入有效输入；当传入有效数据时，要求shape为(`constExpertNum`, `H`)，数据类型需与`expandX`保持一致。
+    - `constExpertAlpha2Optional`：可选择传入有效数据或空指针，当`constExpertNum`不为0时必须传入有效输入；当传入有效数据时，要求shape为(`constExpertNum`, `H`)，数据类型需与`expandX`保持一致。
     - `constExpertVOptional`：可选择传入有效数据或空指针，当`constExpertNum`不为0时必须传入有效输入；当传入有效数据时，要求shape为(`constExpertNum`, `H`)，数据类型需与`expandX`保持一致。
 
 - 本文公式中的"/"表示整除。
