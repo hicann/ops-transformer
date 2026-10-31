@@ -862,6 +862,17 @@ static aclnnStatus InnerFusedInferAttentionScoreGetWorkspaceSizeImpl(
         return ACLNN_ERR_PARAM_NULLPTR;
     }
 
+    if (std::string(inputLayout) == "TND" && actualSeqLengthsOptional != nullptr &&
+        actualSeqLengthsKvOptional != nullptr) {
+        const uint64_t actualSeqLengthsDims = actualSeqLengthsOptional->Size();
+        const uint64_t actualSeqLengthsKvDims = actualSeqLengthsKvOptional->Size();
+        if (actualSeqLengthsKvDims < actualSeqLengthsDims) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "When inputLayout is TND, actualSeqLengthsKv should not be less than actualSeqLengths.");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+
     const bool isFAIRoutingCandidate = IsFAIRoutingCandidate(
         query, key, value, attenMaskOptional, blockTableOptional, queryRopeOptional, keyRopeOptional,
         learnableSinkOptional, inputLayout, numHeads, numKeyValueHeads, sparseMode, innerPrecise);

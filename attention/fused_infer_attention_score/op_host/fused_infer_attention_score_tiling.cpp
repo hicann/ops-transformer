@@ -1167,6 +1167,11 @@ ge::graphStatus CheckFAIIsTND(gert::TilingContext* context, bool isPageAttention
                     context->GetNodeName(),
                     "When layout is TND, actualSequenceLengthKV is required, but the number of element in it is 0!"),
                 return ge::GRAPH_FAILED);
+    OP_CHECK_IF((actSeqLenKVDims < actSeqLenDims),
+                OPS_REPORT_VECTOR_INNER_ERR(
+                    context->GetNodeName(),
+                    "When layout is TND, actualSequenceLengthKV should not be less than actualSequenceLengthQ!"),
+                return ge::GRAPH_FAILED);
     if (CheckFAISeqlenDataInTND(context, isPageAttention, actSeqLenDims, actSeqLenKVDims) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
