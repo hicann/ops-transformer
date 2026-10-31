@@ -51,7 +51,7 @@ static bool IsPlatformSupportTnd()
 static bool CheckNotNull(const aclTensor* x, const aclTensor* phi, const aclTensor* alpha, const aclTensor* bias,
                          const aclTensor* hin, const aclTensor* hPost, const aclTensor* hRes, const aclTensor* hPre,
                          const aclTensor* hcBeforeNorm, const aclTensor* invRms, const aclTensor* sumOut,
-                         const aclTensor* normOut, bool needBackward)
+                         const aclTensor* normOut)
 {
     OP_CHECK_NULL(x, return false);
     OP_CHECK_NULL(phi, return false);
@@ -60,13 +60,11 @@ static bool CheckNotNull(const aclTensor* x, const aclTensor* phi, const aclTens
     OP_CHECK_NULL(hin, return false);
     OP_CHECK_NULL(hPost, return false);
     OP_CHECK_NULL(hRes, return false);
-    if (needBackward) {
-        OP_CHECK_NULL(hPre, return false);
-        OP_CHECK_NULL(hcBeforeNorm, return false);
-        OP_CHECK_NULL(invRms, return false);
-        OP_CHECK_NULL(sumOut, return false);
-        OP_CHECK_NULL(normOut, return false);
-    }
+    OP_CHECK_NULL(hPre, return false);
+    OP_CHECK_NULL(hcBeforeNorm, return false);
+    OP_CHECK_NULL(invRms, return false);
+    OP_CHECK_NULL(sumOut, return false);
+    OP_CHECK_NULL(normOut, return false);
     return true;
 }
 
@@ -131,6 +129,12 @@ static bool CheckShape(const aclTensor* x, const aclTensor* phi, const aclTensor
         c = xShape.GetDim(3);
     }
     int64_t hcMix = n * n + 2 * n;
+
+    // Atlas A2/A3系列产品规格约束：尾轴c需为128的倍数，非对齐c不保证kernel计算正确性
+    if (!IsPlatformSupportTnd() && c % 128 != 0) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "tail axis c must be a multiple of 128, but got c = %ld.", c);
+        return false;
+    }
 
     if (hcMult != HCMULT_DEFAULT_VALUE) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "hcMult must be in range [%ld], but got hcMult = %ld.", HCMULT_DEFAULT_VALUE,
@@ -362,9 +366,8 @@ static inline aclnnStatus CheckParams(const aclTensor* x, const aclTensor* phi, 
                                       const aclTensor* invRms, const aclTensor* sumOut, const aclTensor* normOut,
                                       int64_t hcMult, int64_t numIters, bool needBackward)
 {
-    CHECK_RET(
-        CheckNotNull(x, phi, alpha, bias, hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut, needBackward),
-        ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(CheckNotNull(x, phi, alpha, bias, hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut),
+              ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValid(x, phi, alpha, bias, hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut,
                               needBackward),
               ACLNN_ERR_PARAM_INVALID);

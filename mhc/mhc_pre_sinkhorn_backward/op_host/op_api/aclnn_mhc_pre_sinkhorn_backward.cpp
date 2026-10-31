@@ -25,6 +25,7 @@
 #include "aclnn_kernels/contiguous.h"
 #include "aclnn_kernels/reshape.h"
 #include "aclnn_kernels/aclnn_platform.h"
+#include "level0/fill.h"
 
 using namespace op;
 
@@ -617,6 +618,23 @@ static bool CopyOutput(const aclTensor* out, const aclTensor* dst, aclOpExecutor
     return ret != nullptr;
 }
 
+static aclnnStatus FillOutputZero(const aclTensor* out, aclOpExecutor* executor)
+{
+    op::FVector<int64_t, op::MAX_DIM_NUM> fillDims = op::ToShapeVector(out->GetViewShape());
+    auto shapes = executor->AllocIntArray(fillDims.data(), out->GetViewShape().GetDimNum());
+    CHECK_RET(shapes != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    const aclTensor* dimTensor = executor->ConvertToTensor(shapes, op::DataType::DT_INT32);
+    CHECK_RET(dimTensor != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    const aclScalar* valueScalar = executor->AllocScalar(0);
+    CHECK_RET(valueScalar != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    const aclTensor* valueTensor = executor->ConvertToTensor(valueScalar, out->GetDataType());
+    CHECK_RET(valueTensor != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    auto filled = l0op::Fill(dimTensor, valueTensor, shapes, executor);
+    CHECK_RET(filled != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(l0op::ViewCopy(filled, const_cast<aclTensor*>(out), executor) != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    return ACLNN_SUCCESS;
+}
+
 static aclnnStatus mhcPreSinkhornBackwardCommonProcess(AclnnMhcPreSinkhornBackwardParams& params,
                                                        aclOpExecutor* executor)
 {
@@ -665,7 +683,13 @@ aclnnStatus aclnnMhcPreSinkhornBackwardGetWorkspaceSize(
     if (gradHin->IsEmpty() || gradHPost->IsEmpty() || gradHRes->IsEmpty() || x->IsEmpty() || hPre->IsEmpty() ||
         hcBeforeNorm->IsEmpty() || invRms->IsEmpty() || sumOut->IsEmpty() || normOut->IsEmpty()) {
         OP_LOGW("[aclnnMhcPreSinkhornBackward] Input tensor is empty, skip computation and return success.");
-        *workspaceSize = 0;
+        // 空输入（如 B=0）时梯度数学上为全 0：非空输出必须写出 0，避免未初始化内存透出给调用方
+        for (const aclTensor* out : {gradX, gradPhi, gradAlpha, gradBias}) {
+            if (!out->IsEmpty()) {
+                CHECK_RET(FillOutputZero(out, uniqueExecutor.get()) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR);
+            }
+        }
+        *workspaceSize = uniqueExecutor->GetWorkspaceSize();
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_SUCCESS;
     }
