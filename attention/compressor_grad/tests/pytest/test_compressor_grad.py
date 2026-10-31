@@ -254,10 +254,7 @@ def run_small_ops_case(case, device, compare_mode=3):
 
 # PyPTO kernel 直跑（通路 2）：不经 aclnn/custom 包，运行时 JIT 编译
 sys.path.insert(
-    0,
-    os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "op_kernel", "arch35"
-    ),
+    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "op_kernel")
 )
 # pypto_pro 仅 ascend950 环境提供；本机（910_93）无法导入 A5 PyPTO kernel，
 # 通路 2（PyPTO 直跑）不可用 -> 跳过。其余通路（1/3/4/5）与 checker 逻辑不变。

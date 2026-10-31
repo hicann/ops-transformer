@@ -88,7 +88,7 @@ class FlashAttnGradTilingData:
     sequsedKvOptional: int
 
 
-# 与 op_kernel/arch35/flash_attn_grad.py 的 FlashAttnGradTilingKey 一致
+# 与 op_kernel/flash_attn_grad.py 的 FlashAttnGradTilingKey 一致
 class FlashAttnGradTilingKey:
     # bit[1:0]：见 :class:`Tmpl`。2/3 保留，本轮不编、不进入口。
     template = TilingKeyField(

@@ -29,12 +29,6 @@ COMPUTE_UNIT = None
 ENABLE_EXPERIMENTAL = "OFF"
 PYPTO_ARCH_MAP = {
     "ascend950": "a5",
-    "ascend960dt": "a6",
-}
-
-PYPTO_KERNEL_ARCH_DIR_MAP = {
-    "ascend950": "arch35",
-    "ascend960dt": "arch92",
 }
 
 if const_var.CHECK_ASC_DEVKIT_VERSION:
@@ -333,7 +327,7 @@ COMPILE_OP_API_BUILT_IN = """
 """
 
 # pypto-pro variant of COMPILE_OP_API: same OpInfo construction, but the kernel source is the pypto DSL
-# .py co-located with this wrapper (op_kernel/<arch_dir>/<op_file>.py, copied there by the src-copy step), no
+# .py co-located with this wrapper (op_kernel/<op_file>.py, copied there by the src-copy step), no
 # get_code_channel precompile (that expects a .cpp), and the leaf call is pypto_compile_op instead of
 # compile_op. Deriving src from __file__ keeps the wrapper self-contained: the standard asc_opc flow
 # (op-store, SingleOpCompile build_config/op_context, SingleOpPostCompile) drives it unchanged; only this
@@ -342,7 +336,7 @@ PYPTO_COMPILE_OP_API = """
     msg = "start compile pypto Operator {}, kernel name is " + kernel_name
     CommonUtility.print_compile_log("", msg, AscendCLogLevel.LOG_INFO)
     op_type = "{}"
-    src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "op_kernel", "{pypto_kernel_arch_dir}", "{}.py")
+    src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "op_kernel", "{}.py")
     if not os.path.exists(src):
         raise RuntimeError("pypto DSL kernel not found next to wrapper: " + src)
     code_channel = -1
@@ -440,11 +434,10 @@ class AdpBuilder(opdesc_parser.OpDesc):
         self.argsdefv = []
         self.op_compile_option: str = "{}"
         # pypto-pro binary-delivery op: emit a wrapper that calls pypto_compile_op (src = the DSL .py
-        # co-located at op_kernel/<arch_dir>/<op_file>.py) instead of the template compile_op. Set from --pypto-ops
+        # co-located at op_kernel/<op_file>.py) instead of the template compile_op. Set from --pypto-ops
         # and the per-SOC ops-info generated for the compute units originating from build.sh --soc.
         self.is_pypto = False
         self.pypto_arch = None
-        self.pypto_kernel_arch_dir = None
         super().__init__(op_type)
 
     def write_adapt(
@@ -460,7 +453,7 @@ class AdpBuilder(opdesc_parser.OpDesc):
             if ini_soc not in compute_unit:
                 return
         self._build_paradefault()
-        # pypto ops have a DSL .py kernel (op_kernel/<arch_dir>/<op_file>.py), not a <op_file>.cpp — skip the
+        # pypto ops have a DSL .py kernel (op_kernel/<op_file>.py), not a <op_file>.cpp — skip the
         # template .cpp existence check; the wrapper locates that DSL .py relative to itself.
         if (
             os.environ.get("BUILD_BUILTIN_OPP") != "1"
@@ -852,7 +845,6 @@ class AdpBuilder(opdesc_parser.OpDesc):
                     self.op_compile_option,
                     repr(extend_opt),
                     pypto_arch=self.pypto_arch,
-                    pypto_kernel_arch_dir=self.pypto_kernel_arch_dir,
                 )
             )
         else:
@@ -990,11 +982,6 @@ def write_scripts(
             if op_desc.pypto_arch is None:
                 raise RuntimeError(
                     f"PyPTO binary compilation does not support compute unit '{ini_soc}'"
-                )
-            op_desc.pypto_kernel_arch_dir = PYPTO_KERNEL_ARCH_DIR_MAP.get(ini_soc)
-            if op_desc.pypto_kernel_arch_dir is None:
-                raise RuntimeError(
-                    f"PyPTO kernel source directory is not configured for '{ini_soc}'"
                 )
         op_desc.write_adapt(
             dirs.get(const_var.CFG_IMPL_DIR),
