@@ -111,7 +111,7 @@ aclnnStatus aclnnMoeTokenPermuteGrad(
       <td>numTopk</td>
       <td>输入</td>
       <td>被选中的专家个数。</td>
-      <td>numTopk <= 512。</td>
+      <td>-</td>
       <td>INT64</td>
       <td>ND</td>
       <td>-</td>
@@ -241,7 +241,7 @@ aclnnStatus aclnnMoeTokenPermuteGrad(
   - aclnnMoeTokenPermuteGrad默认确定性实现。
 
 <!-- npu="A3,910b" id7 -->
-- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：numTopk <= 512。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：numTopk取值为[1, 512]或-1。
 <!-- end id7 -->
 <!-- npu="950" id8 -->
 - <term>Ascend 950PR&950DT系列产品</term>：

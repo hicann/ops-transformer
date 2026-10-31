@@ -77,6 +77,10 @@ aclnnStatus aclnnMoeTokenPermuteGradGetWorkspaceSize(const aclTensor* permutedOu
     L2_DFX_PHASE_1(aclnnMoeTokenPermuteGrad, DFX_IN(permutedOutputGrad, sortedIndices, numTopk, paddedMode),
                    DFX_OUT(out));
 
+    if (numTopk == 0 || numTopk < -1) {
+        OP_LOGW("Invalid numTopk [%ld]: 0 and values less than -1 are not supported.", numTopk);
+    }
+
     bool useMoeInitRoutingV2Grad = Ops::Transformer::AclnnUtil::IsRegbase();
     if (!useMoeInitRoutingV2Grad) {
         return aclnnInnerMoeTokenPermuteGradGetWorkspaceSize(permutedOutputGrad, sortedIndices, numTopk, paddedMode,
