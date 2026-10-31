@@ -264,10 +264,16 @@ static void PrintInfo(gert::TilingContext* context, BlockAttentionResidualsGradT
 
 static ge::graphStatus GetPlatformInfo(gert::TilingContext* context, uint64_t& ub, uint32_t& coreNum)
 {
-    const BlockAttentionResidualsGradCompileInfo* compileInfo =
-        context->GetCompileInfo<BlockAttentionResidualsGradCompileInfo>();
-    coreNum = compileInfo->coreNum;
-    ub = compileInfo->ubSize;
+    OP_CHECK_NULL_WITH_CONTEXT(context, context);
+    auto platformInfo = context->GetPlatformInfo();
+    OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);
+    platform_ascendc::PlatformAscendC platform(platformInfo);
+    coreNum = platform.GetCoreNumAiv();
+    platform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ub);
+    OP_CHECK_IF(coreNum == 0 || ub == 0,
+                OP_LOGE(context, "Invalid platform resources in Tiling: aivCoreNum=%u, ubSize=%lu.", coreNum, ub),
+                return ge::GRAPH_FAILED);
+    OP_LOGD(context, "tiling: ub=%luB coreNum=%u", ub, coreNum);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -450,19 +456,17 @@ static ge::graphStatus DoTiling(gert::TilingContext* context, int64_t B, int64_t
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CalcWorkspaceSize(gert::TilingContext* context, bool splitH)
+static ge::graphStatus CalcWorkspaceSize(gert::TilingContext* context, bool splitH, uint32_t coreNum)
 {
     int64_t H = EnsureNotScalar(context->GetInputShape(0)->GetStorageShape()).GetDim(1);
     int64_t B = EnsureNotScalar(context->GetInputShape(0)->GetStorageShape()).GetDim(0);
     int64_t N = EnsureNotScalar(context->GetInputShape(1)->GetStorageShape()).GetDim(1);
-    const BlockAttentionResidualsGradCompileInfo* compileInfo =
-        context->GetCompileInfo<BlockAttentionResidualsGradCompileInfo>();
     uint64_t perCoreWkspBytes = AlignUp(static_cast<uint64_t>(H) * sizeof(float), ALIGN_512B);
     platform_ascendc::PlatformAscendC ascendcPlatform(context->GetPlatformInfo());
     uint64_t sysWorkspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
     size_t* ws = context->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, ws);
-    uint64_t userWorkspaceSize = perCoreWkspBytes * static_cast<uint64_t>(compileInfo->coreNum);
+    uint64_t userWorkspaceSize = perCoreWkspBytes * static_cast<uint64_t>(coreNum);
     if (splitH) {
         const uint64_t metaWkspBytes =
             AlignUp(static_cast<uint64_t>(B) * static_cast<uint64_t>(N + 1) * sizeof(float), ALIGN_512B);
@@ -505,25 +509,19 @@ static ge::graphStatus TilingBlockAttentionResidualsGrad(gert::TilingContext* co
     OP_CHECK_IF(DoTiling(context, partialBlockShape.GetDim(0), blockResShape.GetDim(1), H, coreNum,
                          hiddenTiling.hiddenTileSize, hiddenTiling.splitH) != ge::GRAPH_SUCCESS,
                 OP_LOGE(context, "tiling failed"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CalcWorkspaceSize(context, hiddenTiling.splitH) != ge::GRAPH_SUCCESS,
+    OP_CHECK_IF(CalcWorkspaceSize(context, hiddenTiling.splitH, coreNum) != ge::GRAPH_SUCCESS,
                 OP_LOGE(context, "workspace failed"), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
 static ge::graphStatus TilingPrepareForBlockAttentionResidualsGrad(gert::TilingParseContext* context)
 {
+    OP_CHECK_NULL_WITH_CONTEXT(context, context);
     BlockAttentionResidualsGradCompileInfo* compileInfo =
         context->GetCompiledInfo<BlockAttentionResidualsGradCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfo);
-
-    platform_ascendc::PlatformAscendC plat(context->GetPlatformInfo());
-    uint32_t aivNum = plat.GetCoreNumAiv();
-    compileInfo->coreNum = aivNum;
-    OP_CHECK_IF(compileInfo->coreNum == 0, OP_LOGE(context, "coreNum is 0"), return ge::GRAPH_FAILED);
-    plat.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfo->ubSize);
-    OP_CHECK_IF(compileInfo->ubSize == 0, OP_LOGE(context, "ubSize is 0"), return ge::GRAPH_FAILED);
-
-    OP_LOGD(context, "parse: ub=%luB coreNum=%u", compileInfo->ubSize, compileInfo->coreNum);
+    auto platformInfo = context->GetPlatformInfo();
+    OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);
     return ge::GRAPH_SUCCESS;
 }
 
