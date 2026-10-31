@@ -59,6 +59,48 @@ stages:
   stage2:
     name: compile
     jobs:
+      JOB_check_examples_ut:
+        name: Check_examples_ut
+        steps:
+          -
+            name: Checkout
+            identifier: process_checkout
+            uses: checkout
+            with:
+              ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+              allow-unsafe-pr-checkout: true
+          -
+            name: download_pr_filelist
+            uses: obs-download
+            with:
+              endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
+              bucket: "ascend-ci"
+              access-key: ${{ secrets.AK }}
+              secret-key: ${{ secrets.SK }}
+              key: |
+                ${{ env.obs_path }}/pr_filelist.txt
+              path: ${{ steps.process_checkout.outputs.path }}
+          -
+            name: check_examples_ut
+            run: |
+              set -e
+              cd ${{ steps.process_checkout.outputs.path }}
+              python3 scripts/ci/check_examples_ut.py pr_filelist.txt
+          -
+            name: upload_check_report
+            if: ${{ always() }}
+            uses: obs-upload
+            with:
+              endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
+              bucket: "ascend-ci"
+              access-key: ${{ secrets.AK }}
+              secret-key: ${{ secrets.SK }}
+              artifact-path: |
+                ${{ steps.process_checkout.outputs.path }}/build/check_examples_ut.csv
+              object-prefix: ${{ env.obs_path }}/
+        runs-on: ["self-hosted", "arch=x64", "spec=small"]
+        container:
+          image: swr.cn-north-4.myhuaweicloud.com/ci_cann/${{ jobs.JOB_image.outputs.Compile_Ascend_X86 }}
       JOB_x86_compile:
         name: Compile_x86
         uses: .gitcode/workflows/compile_action.yml
