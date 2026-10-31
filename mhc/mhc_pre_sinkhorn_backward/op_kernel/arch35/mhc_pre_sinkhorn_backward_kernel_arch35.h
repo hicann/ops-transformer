@@ -35,7 +35,7 @@ constexpr uint32_t ROOT_POOL_BUFFER_COUNT = STAGE_POOL_BUFFER_COUNT;
 template <typename T, SplitMode MODE, bool DETERMINISTIC>
 class MhcPreSinkhornBackwardKernel {
     MhcBwdShape shape_;
-    // 由运行时N推导的分块参数。
+    // Tiling parameters derived from N at runtime.
     uint32_t gqTileElements_ = 0;
     uint32_t l1GqWaveElems_ = 0;
     uint32_t workspaceRowsGrOffset_ = 0;
@@ -70,7 +70,7 @@ public:
         shape_.Init(tiling->n);
         InitDerivedShape();
         phiGm_.SetGlobalBuffer((__gm__ float*)phi);
-        // phi重复读取，驻留L2以减少GM访问。
+        // Keep phi in L2 to reduce GM accesses during repeated reads.
         phiGm_.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_PERSISTENT);
         gradPhiGm_.SetGlobalBuffer((__gm__ float*)gradPhi);
         gradAlphaGm_.SetGlobalBuffer((__gm__ float*)gradAlpha);
@@ -82,7 +82,7 @@ public:
         pipe_->InitBuffer(l1Buf_, L1_BYTES);
         l1_ = l1Buf_.Get<float>();
 
-        // GQ缓存波数受phi B1乒乓区挤压，容量由Tiling下发的phi区偏移推导。
+        // The phi B1 ping-pong region limits GQ cache waves; derive capacity from the phi region offset in tiling data.
         l1GqWaves_ = tiling_->l1BOffsetElems / l1GqWaveElems_;
         cacheWaves_ = tiling_->maxMWave < l1GqWaves_ ? tiling_->maxMWave : l1GqWaves_;
         uint32_t grElements = ROWS_PER_AIV * (MODE == SplitMode::MK_SPLIT ? cacheWaves_ : 1);
@@ -96,7 +96,8 @@ public:
         if constexpr (MODE == SplitMode::M_SPLIT) {
             rootPoolBytes += shape_.mm2RowsPerAiv * K_TILE_VALUE * sizeof(float);
         }
-        // TBufPool按32B块向上取整每个buffer：容量需按同规则取整，避免末尾分配越过池边界。
+        // TBufPool rounds each buffer up to 32 bytes; round the pool size the same way to keep allocations within
+        // bounds.
         rootPoolBytes =
             (rootPoolBytes + FLOAT_C0 * sizeof(float) - 1) / (FLOAT_C0 * sizeof(float)) * (FLOAT_C0 * sizeof(float));
         pipe_->InitBufPool(rootPool_, rootPoolBytes);
@@ -138,7 +139,7 @@ public:
         SyncAll<false>();
         if ASCEND_IS_AIC {
             if (GetBlockIdx() >= static_cast<uint32_t>(tiling_->usedAic)) {
-                // 未参与计算的AIC也需回收Init设置的缓冲区令牌。
+                // AIC cores that do not compute must also reclaim the buffer tokens set by Init.
                 mm_.End();
                 return;
             }
@@ -192,7 +193,8 @@ private:
     __aicore__ inline void InitMkScalarReduceStage()
     {
         ResetStagePool();
-        // 输入侧按段分离排布：[alpha行(8对齐)][bias行(AlignU32(hcMix,8)对齐)]，规避寄存器内跨段Gather。
+        // Separate input segments as [alpha rows aligned to 8][bias rows aligned to AlignU32(hcMix,8)] to avoid
+        // cross-segment Gather.
         stagePool_.InitBuffer(scalarInQue_, 1,
                               tiling_->usedPrepAiv * (FLOAT_C0 + AlignU32(shape_.hValue, FLOAT_C0)) * sizeof(float) +
                                   SMALL_BUFFER_SLACK * sizeof(float));
@@ -230,12 +232,12 @@ private:
         clearOutQue_.FreeTensor(zero);
     }
 
-    // alpha/bias的小粒度GM写之间需等待MTE3完成。
+    // Wait for MTE3 completion between small GM writes of alpha and bias.
     __aicore__ inline void WriteScalarOutputs(const LocalTensor<float>& output, uint32_t alphaCount, uint32_t biasCount)
     {
         CopyUbToGm(gradAlphaGm_, output, alphaCount);
         if (shape_.hValue < 16) {
-            // bias不足60B时需与前一条写同步隔离。
+            // Synchronize with the previous write when bias occupies fewer than 60 bytes.
             SyncMte3Writes();
         }
         CopyUbToGm(gradBiasGm_, output[FLOAT_C0], biasCount);
@@ -249,7 +251,7 @@ private:
         return tiling_->bs - rowBase < ROWS_PER_AIV ? tiling_->bs - rowBase : ROWS_PER_AIV;
     }
 
-    // 有效GQ行数按CUBE_M向上取整，用于跳过MM2的补零行计算。
+    // Round valid GQ rows up to CUBE_M to skip MM2 computation on padded rows.
     __aicore__ inline uint32_t AicWaveKRows(int64_t waveRowBegin) const
     {
         int64_t remain = tiling_->bs - waveRowBegin;
@@ -278,7 +280,7 @@ private:
         uint64_t gqOffset = tiling_->offGQ / sizeof(float);
         uint64_t grOffset = tiling_->offGR / sizeof(float);
         if (validRows != 0) {
-            // rightPadding上限32B，仅补零到8元素对齐；其余不读取的列由dstStride留空。
+            // rightPadding is limited to 32 bytes; pad to 8 elements and use dstStride to skip other unread columns.
             uint32_t hValueAligned = AlignU32(shape_.hValue, FLOAT_C0);
             uint32_t zeroPad = hValueAligned - shape_.hValue;
             uint32_t gapBlocks = (shape_.hAlign - hValueAligned) / FLOAT_C0;
@@ -370,7 +372,8 @@ private:
         for (uint32_t owner = 0; owner < tiling_->reduceOwnerCount; ++owner) {
             if (logicalBlock == owner) {
                 for (uint32_t hLocal = 0; hLocal < shape_.mm2RowsPerAiv; ++hLocal) {
-                    // 奇数hcMix补零的末行仅用于dualDst均分，不回写gradPhi。
+                    // The final zero-padded row for odd hcMix only balances dualDst output and is not written to
+                    // gradPhi.
                     if (hBegin + hLocal >= static_cast<uint32_t>(tiling_->hcMix)) {
                         continue;
                     }
@@ -485,7 +488,7 @@ private:
                 uint64_t base = tiling_->offRowPart / sizeof(float);
                 LocalTensor<float> partial = scalarInQue_.AllocTensor<float>();
                 uint32_t biasStride = AlignU32(shape_.hValue, FLOAT_C0);
-                // rowPart按[alpha(3)][bias(hcMix)]紧凑存储，分段搬运到8对齐行后归约。
+                // rowPart packs [alpha(3)][bias(hcMix)]; copy each segment into 8-aligned rows before reduction.
                 DataCopyPadExtParams<float> alphaPad = {true, 0, FLOAT_C0 - 3, 0};
                 DataCopyExtParams alphaCopy = {static_cast<uint16_t>(tiling_->usedPrepAiv), 3 * sizeof(float),
                                                static_cast<uint32_t>(shape_.hValue * sizeof(float)), 0, 0};
@@ -610,7 +613,7 @@ private:
         if (cachedM) {
             LoadMkCache(blockRowBegin, subBlock, 0, cacheWaves_);
         }
-        // 当前kTile的phi：由上一kTile尾部的B1乒乓预取提供，或在此首次载入。
+        // Use phi prefetched into the B1 ping-pong buffer at the end of the previous kTile, or load it here initially.
         LocalTensor<float> phiL1;
         bool phiPrefetched = false;
         for (uint32_t kTile = 0; kTile < tiling_->gradPhiLoopK; ++kTile) {
@@ -639,7 +642,8 @@ private:
                     ComputeMkWaves(blockRowBegin, subBlock, kBegin, kValid, firstWave, waveCount, phiL1);
                 }
                 if ASCEND_IS_AIC {
-                    // 预取下一kTile的phi到B1乒乓另一槽，与当前尾波MM2计算及搬出重叠。
+                    // Prefetch phi for the next kTile into the other B1 slot, overlapping the final MM2 wave and output
+                    // transfer.
                     uint32_t nextKBegin = kBegin + K_TILE_VALUE;
                     if (kTile + 1 < tiling_->gradPhiLoopK && nextKBegin < tiling_->k) {
                         uint32_t nextKValid =
@@ -648,7 +652,8 @@ private:
                             mm_.PreloadPhi(phiGm_, l1_[tiling_->l1BOffsetElems], tiling_->k, nextKBegin, nextKValid);
                         phiPrefetched = true;
                     }
-                    // 单mBlock直写GM；多mBlock分区写workspace，尾部按固定顺序归约。
+                    // Write a single mBlock directly to GM; otherwise write per-mBlock workspace partitions and reduce
+                    // in a fixed order.
                     if (tiling_->mBlockCount == 1) {
                         mm_.CopyMm2ToGm(gradPhiGm_[kBegin], kValid, tiling_->k);
                     } else {

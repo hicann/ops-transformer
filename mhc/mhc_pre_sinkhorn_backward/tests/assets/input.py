@@ -168,7 +168,7 @@ def mhc_pre_sinkhorn_backward_input(
 
     gzp4 = _sigmoid_grad(zp4, g_hpre)
     gzpost4 = 2 * _sigmoid_grad(zpost4, gp4)
-    # ghres4可能为(B,S,N*N)或(B,S,N,N), 统一reshape为(B,S,N,N)供_sinkhorn_grad处理
+    # ghres4 may be (B,S,N*N) or (B,S,N,N); reshape to (B,S,N,N) for _sinkhorn_grad.
     ghres4_4d = ghres4.reshape(B4, S4, n4, n4) if ghres4.dim() == 3 else ghres4
     skg4 = _sinkhorn_grad(ghres4_4d, suma, norm4, hc_eps_val)
     gzres4 = _exp_grad(zres4, skg4).flatten(2)
@@ -234,7 +234,7 @@ def mhc_pre_sinkhorn_backward_input_kernel(
     hc_eps=1e-6,
     **kwargs,
 ):
-    """生成 numpy 测试输入；中间量由前向计算得到，避免 Sinkhorn 反向发散。"""
+    """Generate NumPy test inputs using forward-computed intermediates to avoid divergence in Sinkhorn backward."""
     del kwargs
     rng = np.random.default_rng(0)
     eps = float(hc_eps)
@@ -243,7 +243,7 @@ def mhc_pre_sinkhorn_backward_input_kernel(
     iters = sum_out.shape[0] // 2
     hm = n * n + 2 * n
 
-    # 先按输入 dtype 取值，再据此计算前向中间量。
+    # Cast values to the input dtype before computing forward intermediates.
     x[...] = rng.standard_normal(x.shape).astype(x.dtype)
     phi[...] = rng.standard_normal(phi.shape).astype(phi.dtype)
     alpha[...] = (rng.standard_normal(3) * 0.1).astype(alpha.dtype)

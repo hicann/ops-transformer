@@ -40,8 +40,15 @@ private:
     bool CheckOutputShape(uint32_t index, const char* name, const int64_t* dims, size_t rank,
                           bool logError = true) const;
     ge::graphStatus CheckDataTypes() const;
-    void SetMmConfig();
-    ge::graphStatus ValidateMmConfig();
+    ge::graphStatus SetMmConfig();
+    struct MkSplitResult {
+        int64_t mBlockCount = 0;
+        int64_t kCoreCount = 0;
+        int64_t mBlockRows = 0;
+        int64_t kBlockSize = 0;
+        int64_t kBlockCount = 0;
+    };
+    void ComputeMkSplit(int64_t bs, int64_t k, bool empty, bool deterministic, MkSplitResult& result) const;
 
     MhcPreSinkhornBackwardArch35TilingData* tilingData_ = nullptr;
     uint64_t aicNum_ = 0;

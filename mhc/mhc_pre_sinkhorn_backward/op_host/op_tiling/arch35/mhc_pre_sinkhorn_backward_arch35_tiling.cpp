@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <utility>
 #include "register/op_def_registry.h"
 #include "tiling/platform/platform_ascendc.h"
 #include "err/ops_err.h"
@@ -43,17 +44,17 @@ constexpr uint32_t OUTPUT_GRAD_PHI = 1;
 constexpr uint32_t OUTPUT_GRAD_ALPHA = 2;
 constexpr uint32_t OUTPUT_GRAD_BIAS = 3;
 
-// MM1/MM2 Cube配置。
+// MM1/MM2 Cube configuration.
 constexpr int64_t MM_ROWS_PER_AIV = 16;
 constexpr int64_t MM_TILE_ROWS = 2 * MM_ROWS_PER_AIV;
 constexpr int64_t X_L1_SLOTS = 2;
 constexpr int64_t L1_TOTAL_BYTES = 512 * 1024;
-constexpr int64_t MM_BASE_N_MAX = 128;
-constexpr int64_t MM_BASE_N_MID = 64;
-constexpr int64_t MM_BASE_N_MIN = 32;
-constexpr int64_t MM_DEPTH_B1 = 2; // phi B1乒乓深度
-constexpr int64_t MM_DB_L0A = 2;   // L0A/B乒乓深度
-constexpr int64_t MM_DB_L0C = 2;   // L0C乒乓深度
+constexpr int64_t MM_BASE_N = 128;
+constexpr int64_t MM_DEPTH_B1 = 2; // phi B1 ping-pong depth
+constexpr int64_t MM_DB_L0A = 2;   // L0A/B ping-pong depth
+constexpr int64_t MM_DB_L0C = 2;   // L0C ping-pong depth
+static_assert(K_TILE % MM_BASE_N == 0);
+static_assert(MM_TILE_ROWS % CUBE_ALIGN == 0);
 
 int64_t CeilDiv(int64_t value, int64_t divisor)
 {
@@ -313,40 +314,11 @@ uint64_t MhcPreSinkhornBackwardArch35Tiling::AlignWorkspace(uint64_t value) cons
     return (value + WORKSPACE_ALIGN - 1) / WORKSPACE_ALIGN * WORKSPACE_ALIGN;
 }
 
-void MhcPreSinkhornBackwardArch35Tiling::SetMmConfig()
-{
-    const int64_t hcMixAlignRows = RoundUp(tilingData_->hcMix, CUBE_ALIGN);
-    // 在L0B容量内优先使用较大的baseN，并保留双缓冲。
-    int64_t baseN = MM_BASE_N_MAX;
-    int64_t dbL0A = MM_DB_L0A;
-    if (hcMixAlignRows * MM_BASE_N_MAX * sizeof(float) * MM_DB_L0A * 2 > static_cast<int64_t>(l0BSize_)) {
-        if (hcMixAlignRows * MM_BASE_N_MID * sizeof(float) * MM_DB_L0A * 2 <= static_cast<int64_t>(l0BSize_)) {
-            baseN = MM_BASE_N_MID;
-        } else if (hcMixAlignRows * MM_BASE_N_MID * sizeof(float) * 1 * 2 <= static_cast<int64_t>(l0BSize_)) {
-            baseN = MM_BASE_N_MID;
-            dbL0A = 1;
-        } else {
-            baseN = MM_BASE_N_MIN;
-        }
-    }
-    tilingData_->mmConfigMm1.baseN = static_cast<uint32_t>(baseN);
-    tilingData_->mmConfigMm1.l1K = K_TILE;
-    tilingData_->mmConfigMm1.depthB1 = MM_DEPTH_B1;
-    tilingData_->mmConfigMm1.dbL0A = static_cast<uint32_t>(dbL0A);
-    tilingData_->mmConfigMm1.dbL0C = MM_DB_L0C;
-    tilingData_->mmConfigMm2 = tilingData_->mmConfigMm1;
-}
-
-ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::ValidateMmConfig()
+ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::SetMmConfig()
 {
     constexpr int64_t elementSize = sizeof(float);
     const int64_t hcMixAlignRows = RoundUp(tilingData_->hcMix, CUBE_ALIGN);
-    const int64_t mmBaseN = tilingData_->mmConfigMm1.baseN;
-    OP_CHECK_IF(K_TILE % mmBaseN != 0,
-                OP_LOGE(context_->GetNodeName(), "invalid MM config: K_TILE=%ld, baseN=%ld", K_TILE, mmBaseN),
-                return ge::GRAPH_FAILED);
 
-    // L1布局：[GQ缓存波][phi B1乒乓槽][X双缓冲槽]。
     const int64_t phiSlotBytes = hcMixAlignRows * K_TILE * elementSize;
     const int64_t phiRegionBytes = MM_DEPTH_B1 * phiSlotBytes;
     const int64_t xRegionBytes = X_L1_SLOTS * MM_TILE_ROWS * K_TILE * elementSize;
@@ -356,35 +328,103 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::ValidateMmConfig()
                 OP_LOGE(context_->GetNodeName(), "MM config exceeds L1: need=%ld, budget=%ld, platform=%lu",
                         l1NeededBytes, L1_TOTAL_BYTES, l1Size_),
                 return ge::GRAPH_FAILED);
+
+    // MM1 K-axis tiling.
+    const int64_t reduceK =
+        std::max(CUBE_ALIGN, RoundUp(tilingData_->hcMix, C0_ALIGN)); // HC reduction length for MMAD.
+    const uint64_t l0ABSlotBytes = std::min(l0ASize_, l0BSize_) / (2 * MM_DB_L0A);
+    const int64_t maxBaseK =
+        l0ABSlotBytes / (std::max(MM_TILE_ROWS, MM_BASE_N) * elementSize * CUBE_ALIGN) * CUBE_ALIGN;
+    const int64_t baseK = std::min(reduceK, maxBaseK);
+
+    // MM1 LoadB loads phi in multiples of 16 rows, including padding when reduceK is only 8-aligned.
+    const int64_t mm1SlotElems = std::max(MM_TILE_ROWS * baseK, RoundUp(baseK, CUBE_ALIGN) * MM_BASE_N);
+    const int64_t mm2SlotElems = MM_TILE_ROWS * std::max(hcMixAlignRows, MM_BASE_N);
+    const int64_t l0ABSingleBufferElems = std::max(mm1SlotElems, mm2SlotElems);
+    const int64_t l0ABUsedBytes = 2 * MM_DB_L0A * l0ABSingleBufferElems * elementSize;
+
+    // L0C: MM1 ping-pong slots plus one MM2 accumulation slot per N chunk.
+    const int64_t l0CSingleBufferElems = std::max(MM_TILE_ROWS, hcMixAlignRows) * MM_BASE_N;
+    const int64_t l0CUsedBytes = (MM_DB_L0C + K_TILE / MM_BASE_N) * l0CSingleBufferElems * elementSize;
+
+    OP_CHECK_IF(
+        baseK < CUBE_ALIGN || l0ABUsedBytes > static_cast<int64_t>(l0ASize_) ||
+            l0ABUsedBytes > static_cast<int64_t>(l0BSize_) || l0CUsedBytes > static_cast<int64_t>(l0CSize_),
+        OP_LOGE(context_->GetNodeName(), "MM config exceeds platform memory: baseK=%ld, L0A/B=%ld/%lu/%lu, L0C=%ld/%lu",
+                baseK, l0ABUsedBytes, l0ASize_, l0BSize_, l0CUsedBytes, l0CSize_),
+        return ge::GRAPH_FAILED);
+
+    auto& mmConfig = tilingData_->mmConfigMm1;
+    mmConfig.baseN = MM_BASE_N;
+    mmConfig.baseK = static_cast<uint32_t>(baseK);
+    mmConfig.l1K = K_TILE;
+    mmConfig.depthB1 = MM_DEPTH_B1;
+    mmConfig.dbL0A = MM_DB_L0A;
+    mmConfig.dbL0C = MM_DB_L0C;
+    tilingData_->mmConfigMm2 = mmConfig;
     tilingData_->l1SingleBufferElems = static_cast<uint32_t>(phiSlotBytes / elementSize);
     tilingData_->l1BOffsetElems = static_cast<uint32_t>((L1_TOTAL_BYTES - xRegionBytes - phiRegionBytes) / elementSize);
-
-    // L0A/L0B：MM1与MM2各自独立乒乓池，单槽取两侧最大需求。
-    const int64_t mm1ASlotBytes = MM_TILE_ROWS * hcMixAlignRows * elementSize;               // GQ
-    const int64_t mm1BSlotBytes = hcMixAlignRows * mmBaseN * elementSize;                    // phi分块
-    const int64_t mm2ASlotBytes = hcMixAlignRows * MM_TILE_ROWS * elementSize;               // GQ^T
-    const int64_t mm2BSlotBytes = RoundUp(MM_TILE_ROWS, CUBE_ALIGN) * mmBaseN * elementSize; // X分块
-    const int64_t l0ABSingleBufferBytes =
-        std::max(std::max(mm1ASlotBytes, mm1BSlotBytes), std::max(mm2ASlotBytes, mm2BSlotBytes));
-    const int64_t l0ABUsedBytes = 2 * static_cast<int64_t>(tilingData_->mmConfigMm1.dbL0A) * l0ABSingleBufferBytes;
-
-    // L0C：MM1乒乓槽 + MM2按N分块累加槽。
-    const int64_t mm2L0cChunks = K_TILE / mmBaseN;
-    const int64_t mm1CSlotBytes = RoundUp(MM_TILE_ROWS, CUBE_ALIGN) * mmBaseN * elementSize;
-    const int64_t mm2CSlotBytes = hcMixAlignRows * mmBaseN * elementSize;
-    const int64_t l0CSingleBufferBytes = std::max(mm1CSlotBytes, mm2CSlotBytes);
-    const int64_t l0CUsedBytes = (MM_DB_L0C + mm2L0cChunks) * l0CSingleBufferBytes;
-
-    OP_CHECK_IF(l0ABUsedBytes > static_cast<int64_t>(l0ASize_) || l0ABUsedBytes > static_cast<int64_t>(l0BSize_) ||
-                    l0CUsedBytes > static_cast<int64_t>(l0CSize_),
-                OP_LOGE(context_->GetNodeName(), "MM config exceeds platform memory: L0A/B=%ld/%lu/%lu, L0C=%ld/%lu",
-                        l0ABUsedBytes, l0ASize_, l0BSize_, l0CUsedBytes, l0CSize_),
-                return ge::GRAPH_FAILED);
     tilingData_->l0ABUsedBytes = static_cast<uint32_t>(l0ABUsedBytes);
-    tilingData_->l0ABSingleBufferElems = static_cast<uint32_t>(l0ABSingleBufferBytes / elementSize);
+    tilingData_->l0ABSingleBufferElems = static_cast<uint32_t>(l0ABSingleBufferElems);
     tilingData_->l0CUsedBytes = static_cast<uint32_t>(l0CUsedBytes);
-    tilingData_->l0CSingleBufferElems = static_cast<uint32_t>(l0CSingleBufferBytes / elementSize);
+    tilingData_->l0CSingleBufferElems = static_cast<uint32_t>(l0CSingleBufferElems);
     return ge::GRAPH_SUCCESS;
+}
+
+void MhcPreSinkhornBackwardArch35Tiling::ComputeMkSplit(int64_t bs, int64_t k, bool empty, bool deterministic,
+                                                        MkSplitResult& result) const
+{
+    const int64_t aicNum = static_cast<int64_t>(aicNum_);
+    int64_t mBlockCount = empty ? 1 : std::min<int64_t>(aicNum, CeilDiv(bs, M_TILE));
+    if (!empty && !deterministic) {
+        constexpr int64_t FINE_NEAR_FULL_MARGIN = 4;
+        constexpr int64_t N4_MIN_FINE_GAIN = 2;
+        // Keep K parallelism when M exceeds the cache size; the kernel streams M in bounded chunks.
+        const int64_t maxMBlocks = std::max<int64_t>(1, aicNum / 2);
+        const int64_t mTarget = std::min(maxMBlocks, std::max<int64_t>(1, CeilDiv(bs, MK_BLOCK_ROWS)));
+        // Maximize core usage; scan M block counts in descending order to keep the larger count on ties.
+        auto findBestSplit = [&](int64_t minM, int64_t maxM) {
+            int64_t bestM = 1;
+            int64_t bestUsed = 0;
+            for (int64_t m = maxM; m >= minM; --m) {
+                const int64_t rows = RoundUp(CeilDiv(bs, m), ROW_TILE);
+                // Require every aligned M block to contain data to avoid overestimating core usage.
+                if (CeilDiv(bs, rows) != m) {
+                    continue;
+                }
+                const int64_t kSize = RoundUp(CeilDiv(k, aicNum / m), K_TILE);
+                const int64_t used = m * CeilDiv(k, kSize);
+                if (used > bestUsed) {
+                    bestUsed = used;
+                    bestM = m;
+                }
+                if (bestUsed >= aicNum) {
+                    break;
+                }
+            }
+            return std::make_pair(bestM, bestUsed);
+        };
+
+        const auto [coarseM, coarseUsed] = findBestSplit(1, mTarget);
+        mBlockCount = coarseM;
+        // Preserve K parallelism near full core usage; otherwise split M at ROW_TILE granularity
+        // to improve AIC/AIV utilization.
+        if (coarseUsed < aicNum - FINE_NEAR_FULL_MARGIN) {
+            const int64_t mFineMax = std::min(maxMBlocks, std::max<int64_t>(1, CeilDiv(bs, ROW_TILE)));
+            const auto [fineM, fineUsed] = findBestSplit(mTarget + 1, mFineMax);
+            // For N=4, require at least twice the core usage to offset cross-M reduction and repeated phi reads.
+            const int64_t minFineUsed = tilingData_->n == 4 ? coarseUsed * N4_MIN_FINE_GAIN : coarseUsed + 1;
+            if (fineUsed >= minFineUsed) {
+                mBlockCount = fineM;
+            }
+        }
+    }
+    const int64_t kCoreCount = empty || deterministic ? 1 : aicNum / mBlockCount;
+    result.mBlockCount = mBlockCount;
+    result.kCoreCount = kCoreCount;
+    result.mBlockRows = empty ? 0 : RoundUp(CeilDiv(bs, mBlockCount), ROW_TILE);
+    result.kBlockSize = RoundUp(CeilDiv(k, kCoreCount), K_TILE);
+    result.kBlockCount = CeilDiv(k, result.kBlockSize);
 }
 
 ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::DoOpTiling()
@@ -392,35 +432,15 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::DoOpTiling()
     const int64_t bs = tilingData_->bs;
     const int64_t k = tilingData_->k;
     const bool empty = bs == 0;
-    int64_t mBlockCount = empty ? 1 : std::min<int64_t>(aicNum_, CeilDiv(bs, M_TILE));
-    OP_CHECK_IF(mBlockCount <= 0, OP_LOGE(context_->GetNodeName(), "mBlockCount is zero"), return ge::GRAPH_FAILED);
-    int64_t kCoreCount = empty ? 1 : static_cast<int64_t>(aicNum_) / mBlockCount;
     const bool deterministic = context_->GetDeterministicLevel() == DETERMINISTIC_LEVEL;
-    if (deterministic) {
-        kCoreCount = 1;
-    } else if (!empty) {
-        // Keep K parallelism when M exceeds the cache size; the kernel streams M in bounded chunks.
-        const int64_t maxMBlocks = std::max<int64_t>(1, static_cast<int64_t>(aicNum_) / 2);
-        const int64_t mTarget = std::min(maxMBlocks, std::max<int64_t>(1, CeilDiv(bs, MK_BLOCK_ROWS)));
-        // 选择用核数最多的M分块数；用核数相同时优先较大的M块。
-        int64_t bestUsed = -1;
-        for (int64_t m = mTarget; m >= 1; --m) {
-            const int64_t cores = aicNum_ / m;
-            const int64_t kSize = RoundUp(CeilDiv(k, cores), K_TILE);
-            const int64_t used = m * CeilDiv(k, kSize);
-            if (used > bestUsed) {
-                bestUsed = used;
-                mBlockCount = m;
-                kCoreCount = cores;
-            }
-            if (bestUsed >= static_cast<int64_t>(aicNum_)) {
-                break;
-            }
-        }
-    }
-    const int64_t mBlockRows = empty ? 0 : RoundUp(CeilDiv(bs, mBlockCount), ROW_TILE);
-    const int64_t kBlockSize = RoundUp(CeilDiv(k, kCoreCount), K_TILE);
-    const int64_t kBlockCount = CeilDiv(k, kBlockSize);
+    MkSplitResult mkSplitResult;
+    ComputeMkSplit(bs, k, empty, deterministic, mkSplitResult);
+    OP_CHECK_IF(mkSplitResult.mBlockCount <= 0, OP_LOGE(context_->GetNodeName(), "mBlockCount is zero"),
+                return ge::GRAPH_FAILED);
+    const int64_t mBlockCount = mkSplitResult.mBlockCount;
+    const int64_t mBlockRows = mkSplitResult.mBlockRows;
+    const int64_t kBlockSize = mkSplitResult.kBlockSize;
+    const int64_t kBlockCount = mkSplitResult.kBlockCount;
     const bool mkSplit = !empty && !deterministic;
 
     tilingKey_ = deterministic ? MhcPreSinkhornBackwardNs::TILING_KEY_M_SPLIT_DETERMINISTIC :
@@ -453,11 +473,7 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::DoOpTiling()
     tilingData_->reduceOwnerCount = mBlockCount;
     tilingData_->maxMWave = CeilDiv(mBlockRows, ROW_TILE);
 
-    SetMmConfig();
-    if (ValidateMmConfig() != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
-    return ge::GRAPH_SUCCESS;
+    return SetMmConfig();
 }
 
 ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::DoLibApiTiling()

@@ -9,38 +9,38 @@
 # -----------------------------------------------------------------------------------------------------------
 
 """
-MhcPreSinkhornBackward golden 与 TestSpec。
+MhcPreSinkhornBackward golden reference and TestSpec.
 
-算子原型：MhcPreSinkhornBackward
-功能：MhcPreSinkhorn反向传播梯度计算
-平台：Ascend NPU (arch35)
+Operator: MhcPreSinkhornBackward
+Function: gradient computation for MhcPreSinkhorn backward
+Platform: Ascend NPU
 
 ================================================================================
-算子维度约束（官方定义）
+Operator dimension constraints (official definition)
 ================================================================================
 
-【输入维度约束】
-    grad_hin:       [B, S, D] 或 [T, D]       (T = B*S, D = feature_dim)
-    grad_h_post:    [B, S, N] 或 [T, N]       (N = hidden_dim)
-    grad_h_res:     [B, S, N, N] 或 [T, N, N] (Sinkhorn矩阵梯度)
-    x:              [B, S, N, D] 或 [T, N, D] (输入特征矩阵)
-    phi:            [N²+2N, N*D]              (全局投影矩阵) ★关键
-    alpha:          [3]                        (三路缩放系数)
-    bias:           [N²+2N]                    (全局偏置)
-    h_pre:          [B, S, N] 或 [T, N]       (sigmoid门控输出)
-    hc_before_norm: [B, S, N²+2N] 或 [T, N²+2N] (投影后输出)
-    inv_rms:        [B, S, 1] 或 [T, 1]       (RMS倒数)
-    sum_out:        [2*iter, B, S, N]         (Sinkhorn迭代sum记录)
-    norm_out:       [2*iter, B, S, N, N]      (Sinkhorn迭代norm记录)
+Input dimension constraints
+    grad_hin:       [B, S, D] or [T, D]       (T = B*S, D = feature_dim)
+    grad_h_post:    [B, S, N] or [T, N]       (N = hidden_dim)
+    grad_h_res:     [B, S, N, N] or [T, N, N] (Sinkhorn matrix gradient)
+    x:              [B, S, N, D] or [T, N, D] (Input feature matrix)
+    phi:            [N²+2N, N*D]              (Global projection matrix; key tensor)
+    alpha:          [3]                        (Three scaling coefficients)
+    bias:           [N²+2N]                    (Global bias)
+    h_pre:          [B, S, N] or [T, N]       (Sigmoid gate output)
+    hc_before_norm: [B, S, N²+2N] or [T, N²+2N] (Projection output)
+    inv_rms:        [B, S, 1] or [T, 1]       (Reciprocal RMS)
+    sum_out:        [2*iter, B, S, N]         (Sum values saved during Sinkhorn iterations)
+    norm_out:       [2*iter, B, S, N, N]      (Norm values saved during Sinkhorn iterations)
 
-【输出维度约束】
-    grad_x:         [B, S, N, D]              (对x的梯度)
-    grad_phi:       [N²+2N, N*D]              (对phi的梯度) ★关键
-    grad_alpha:     [3]                        (对alpha的梯度)
-    grad_bias:      [N²+2N]                    (对bias的梯度)
+Output dimension constraints
+    grad_x:         [B, S, N, D]              (Gradient with respect to x)
+    grad_phi:       [N²+2N, N*D]              (Gradient with respect to phi; key tensor)
+    grad_alpha:     [3]                        (Gradient with respect to alpha)
+    grad_bias:      [N²+2N]                    (Gradient with respect to bias)
 
-Kernel 与 ACLNN 通过 __spec__ 注册，共用 _compute。
-ml_dtypes 仅在 numpy bf16 转换时导入，供未安装该依赖的远端运行 third_party。
+Kernel and ACLNN register through __spec__ and share _compute.
+Import ml_dtypes only for NumPy bf16 conversions, allowing third_party to run remotely without the dependency installed.
 """
 
 import numpy as np
@@ -59,7 +59,7 @@ def _np_bfloat16():
 
 
 def _torch_to_numpy(t):
-    """torch.Tensor -> numpy.ndarray，支持 bf16（通过 view(int16) 桥接）"""
+    """torch.Tensor -> numpy.ndarray, supporting bf16 through a view(int16) bridge."""
     if t is None:
         return None
     if t.dtype == torch.bfloat16:
@@ -74,7 +74,7 @@ def _is_fp64(a):
 
 
 def _torch_dtype_of(a):
-    """输入对应的 torch dtype（numpy bf16 走 int16 桥接，其余按名映射）。"""
+    """Return the input's torch dtype; bridge NumPy bf16 through int16 and map other dtypes by name."""
     if isinstance(a, torch.Tensor):
         return a.dtype
     d = np.dtype(a.dtype)
@@ -82,7 +82,7 @@ def _torch_dtype_of(a):
 
 
 def _as_torch(a, dtype):
-    """转为指定 dtype 的 torch.Tensor，numpy bf16 通过 int16 桥接。"""
+    """Convert to a torch.Tensor of the specified dtype, bridging NumPy bf16 through int16."""
     if a is None:
         return None
     if isinstance(a, torch.Tensor):
@@ -93,7 +93,7 @@ def _as_torch(a, dtype):
 
 
 def _to_output(value, template):
-    """按输出槽的 dtype/device 转换结果；无模板时原样返回。"""
+    """Convert the result to the output slot's dtype/device; return it unchanged if no template is provided."""
     if value is None:
         return None
     if isinstance(template, torch.Tensor):
@@ -104,7 +104,7 @@ def _to_output(value, template):
 
 
 def _numel(t):
-    """元素总数；兼容 numpy.ndarray 与 torch.Tensor。"""
+    """Return the total element count for a numpy.ndarray or torch.Tensor."""
     return t.numel() if isinstance(t, torch.Tensor) else np.size(t)
 
 
@@ -119,7 +119,7 @@ def _backward_inputs_empty(
     sum_out,
     norm_out,
 ):
-    """检查数据输入是否为空；phi/alpha/bias 不参与判空。"""
+    """Check whether data inputs are empty; exclude phi/alpha/bias from the check."""
     return (
         _numel(grad_hin) == 0
         or _numel(grad_h_post) == 0
@@ -151,7 +151,7 @@ def _exp_grad(x, y_grad):
     y = (x - x_max).exp()
     weighted = y * y_grad
     sum_all = weighted.sum(dim=-1, keepdim=True)
-    # Match arch35 Select: non-max lanes must not evaluate 0 * Inf/NaN.
+    # Match Select: non-max lanes must not evaluate 0 * Inf/NaN.
     correction = torch.where(is_max, sum_all, torch.zeros_like(sum_all))
     return weighted - correction
 
@@ -238,7 +238,7 @@ def _torch_backward(
 
     grad_z_pre = _sigmoid_grad(z_pre, grad_h_pre)
     grad_z_post = 2 * _sigmoid_grad(z_post, grad_h_post_t)
-    # grad_h_res可能为(B,S,N*N)或(B,S,N,N), 统一reshape为(B,S,N,N)供_sinkhorn_grad处理
+    # grad_h_res may be (B,S,N*N) or (B,S,N,N); reshape to (B,S,N,N) for _sinkhorn_grad.
     grad_h_res_4d = (
         grad_h_res_t.reshape(B, S, n, n) if grad_h_res_t.dim() == 3 else grad_h_res_t
     )
@@ -296,10 +296,10 @@ def _compute(
     norm_out,
     hc_eps=1e-6,
 ):
-    """Kernel 与 ACLNN 共用的解析反向。
+    """Analytic backward shared by Kernel and ACLNN.
 
-    存在 fp64 输入时以 fp64 计算，否则使用 fp32。
-    grad_x 跟随 x 的 dtype，其余输出保留计算精度。
+    Compute in fp64 when any input is fp64; otherwise use fp32.
+    grad_x follows x's dtype; other outputs retain the computation precision.
     """
     arrays = (
         grad_hin,
@@ -315,7 +315,7 @@ def _compute(
         sum_out,
         norm_out,
     )
-    # 统一混合精度输入，满足 matmul 的 dtype 要求。
+    # Normalize mixed-precision inputs to satisfy matmul dtype requirements.
     compute = torch.float64 if any(_is_fp64(a) for a in arrays) else torch.float32
     grad_x, grad_phi, grad_alpha, grad_bias = _torch_backward(
         *(_as_torch(a, compute) for a in arrays),
@@ -341,7 +341,7 @@ def mhc_pre_sinkhorn_backward_golden(
     hc_eps=1e-6,
     **kwargs,
 ):
-    """Kernel golden（numpy 输入输出）。"""
+    """Kernel golden reference with NumPy inputs and outputs."""
     del kwargs
     grad_x, grad_phi, grad_alpha, grad_bias = _compute(
         grad_hin,
@@ -395,7 +395,7 @@ def aclnn_mhc_pre_sinkhorn_backward_golden(
     the Tensors in the parameters are all torch.Tensor.
     Conversely, when not, the Tensors in the parameters are all numpy.ndarray.
 
-    计算结果按各输出槽的 dtype/device 转换。
+    Convert results to each output slot's dtype/device.
 
     Args:
         kwargs: tensor_{dtypes, formats}, scalar_dtypes, short_soc_version, testcase_name
@@ -405,7 +405,7 @@ def aclnn_mhc_pre_sinkhorn_backward_golden(
     """
     del kwargs
 
-    # 数据输入为空时保留输出槽原值。
+    # Preserve existing output slot values when data inputs are empty.
     if _backward_inputs_empty(
         gradHin,
         gradHPost,
@@ -448,7 +448,6 @@ def aclnn_mhc_pre_sinkhorn_backward_golden(
 
 
 def _ref_sigmoid_grad(z, dy):
-    """arch35 VFPrepareGates: Exp/Add/Div, then (sigma * gate) * dy."""
     exp_neg = torch.exp(-z)
     denom = exp_neg + 1.0
     sigma = torch.ones_like(denom) / denom
@@ -458,7 +457,6 @@ def _ref_sigmoid_grad(z, dy):
 
 
 def _ref_exp_grad(x, y_grad):
-    """arch35 residual gate: first argmax and Select, not mask multiplication."""
     x_max, idx = x.max(dim=-1, keepdim=True)
     is_max = idx == torch.arange(x.size(-1), device=x.device)
     exp_shifted = torch.exp(x - x_max)
@@ -501,7 +499,6 @@ def _ref_sinkhorn_grad(grad_h_res, sum_out, norm_out, hc_eps=1e-6):
 
 
 def _ref_rms_norm_grad(x, inv_rms, grad_inv_rms):
-    """arch35 computes the row coefficient before multiplying each x element."""
     coefficient = inv_rms * inv_rms
     coefficient = coefficient * inv_rms
     coefficient = coefficient * grad_inv_rms
@@ -524,7 +521,7 @@ def _ref_torch_backward(
     norm_out,
     hc_eps=1e-6,
 ):
-    """Independent fp32 reference following arch35's arithmetic order.
+    """Independent fp32 reference.
 
     Arithmetic uses the Torch backend without bitwise emulation of Ascend.
     """
@@ -543,7 +540,7 @@ def _ref_torch_backward(
             norm_out,
         )
     ):
-        # 数据输入为空时返回未初始化的输出占位。
+        # Return uninitialized output placeholders when data inputs are empty.
         def _unwritten(t):
             return torch.empty_like(t, dtype=torch.float32)
 
@@ -609,7 +606,7 @@ def _ref_torch_backward(
         [grad_z_pre * alpha[0], grad_z_post * alpha[1], grad_z_res * alpha[2]], dim=-1
     )
     grad_hc_before_norm = grad_norm_out * inv_rms
-    # arch35 reduces pre/post/res separately, adding each partial to a zero scalar.
+    # reduces pre/post/res separately, adding each partial to a zero scalar.
     products = hc_before_norm * grad_norm_out
     grad_inv_rms = torch.zeros_like(inv_rms)
     for begin, end in ((0, n), (n, 2 * n), (2 * n, n * n + 2 * n)):

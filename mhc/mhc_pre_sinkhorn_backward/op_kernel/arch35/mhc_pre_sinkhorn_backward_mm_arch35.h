@@ -20,7 +20,7 @@ using namespace AscendC;
 constexpr uint32_t CUBE_M = 16;
 constexpr uint32_t MM_TILE_M = ROWS_PER_AIV * 2;
 constexpr uint32_t MM_K0 = 8;
-// 16×8 float分形的元素数。
+// Number of elements in a 16x8 float fractal.
 constexpr uint32_t FRACTAL_ELEMENTS = 128;
 constexpr uint32_t MM1_L0_EVENT_BASE = 3;
 constexpr uint32_t MM2_L0_EVENT_BASE = 5;
@@ -41,18 +41,18 @@ public:
         l1SingleBufferElems_ = tiling->l1SingleBufferElems;
         l0ABSingleBufferElems_ = tiling->l0ABSingleBufferElems;
         l0CSingleBufferElems_ = tiling->l0CSingleBufferElems;
-        // L0A/L0B按MM1、MM2划分为两个独立乒乓池，槽位大小与偏移由Tiling下发。
+        // Partition L0A/L0B into separate MM1/MM2 ping-pong pools, using slot sizes and offsets from tiling data.
         aMm1L0_ = LocalTensor<float>(TPosition::A2, 0, l0ABSingleBufferElems_ * configMm1_.dbL0A);
         bMm1L0_ = LocalTensor<float>(TPosition::B2, 0, l0ABSingleBufferElems_ * configMm1_.dbL0A);
         uint32_t mm1L0Bytes = l0ABSingleBufferElems_ * configMm1_.dbL0A * sizeof(float);
         aMm2L0_ = LocalTensor<float>(TPosition::A2, mm1L0Bytes, l0ABSingleBufferElems_ * configMm2_.dbL0A);
         bMm2L0_ = LocalTensor<float>(TPosition::B2, mm1L0Bytes, l0ABSingleBufferElems_ * configMm2_.dbL0A);
-        // L0C划分为MM1乒乓槽与MM2按N分块累加槽。
+        // Partition L0C into MM1 ping-pong slots and MM2 accumulation slots for N chunks.
         cMm1L0_ = LocalTensor<float>(TPosition::CO1, 0, l0CSingleBufferElems_ * configMm1_.dbL0C);
         cMm2L0_ = LocalTensor<float>(TPosition::CO1, l0CSingleBufferElems_ * configMm1_.dbL0C * sizeof(float),
                                      l0CSingleBufferElems_ * MM2CSlots());
 
-        // 各组初始令牌：phi B1槽可写、L0A/B槽可载、L0C槽可写。
+        // Initial tokens mark phi B1 slots as writable, L0A/B slots as loadable, and L0C slots as writable.
         for (uint32_t slot = 0; slot < configMm1_.depthB1; ++slot) {
             SetFlag<HardEvent::MTE1_MTE2>(slot);
         }
@@ -72,18 +72,18 @@ public:
         SetHF32TransMode(0);
     }
 
-    // phi按B1乒乓槽预载，与当前尾波计算重叠。
+    // Preload phi into B1 ping-pong slots, overlapping computation of the current final wave.
     __aicore__ inline LocalTensor<float> PreloadPhi(const GlobalTensor<float>& phi, const LocalTensor<float>& b1Region,
                                                     uint32_t fullK, uint32_t kBegin, uint32_t kValid)
     {
         phiSlot_ = phiPingPong_ % configMm1_.depthB1;
         LocalTensor<float> dst = b1Region[phiSlot_ * l1SingleBufferElems_];
-        // MTE1读完该槽上一次驻留的phi后，MTE2方可复写。
+        // MTE2 may overwrite the slot only after MTE1 finishes reading the previous phi data.
         WaitFlag<HardEvent::MTE1_MTE2>(phiSlot_);
-        // phi补零行用于NZ装载，MM1仅计算kMM1个K元素。
+        // Zero-pad phi rows for NZ loading; MM1 computes only kMM1 elements along K.
         InitConstValueParams<float> zero(1, l1SingleBufferElems_ / FLOAT_C0, 0, 0.0f);
         Fill(dst, zero);
-        PipeBarrier<PIPE_MTE2>(); // 等待补零完成后再写入同一phi槽。
+        PipeBarrier<PIPE_MTE2>(); // Wait for zero-padding to finish before writing to the same phi slot.
         Nd2NzParams params;
         params.ndNum = 1;
         params.srcNdMatrixStride = 1;
@@ -103,48 +103,57 @@ public:
                                       const LocalTensor<float>& dst, uint32_t kValid, bool lastPhiUse = true,
                                       bool firstPhiUse = true)
     {
+        const uint32_t redK = shape_.kMM1;
+        const uint32_t baseK = (configMm1_.baseK == 0 || configMm1_.baseK >= redK) ? redK : configMm1_.baseK;
+        const bool kChunked = baseK < redK;
+        const uint32_t chunkCount = CeilDivU32(kValid, configMm1_.baseN);
+        uint32_t l0Iter = 0;
         for (uint32_t offsetN = 0; offsetN < kValid; offsetN += configMm1_.baseN) {
             uint32_t currentN = kValid - offsetN < configMm1_.baseN ? kValid - offsetN : configMm1_.baseN;
-            uint32_t chunk = offsetN / configMm1_.baseN;
-            uint32_t l0Slot = chunk % configMm1_.dbL0A;
-            LocalTensor<float> a2 = aMm1L0_[l0Slot * l0ABSingleBufferElems_];
-            LocalTensor<float> b2 = bMm1L0_[l0Slot * l0ABSingleBufferElems_];
-            WaitFlag<HardEvent::M_MTE1>(MM1_L0_EVENT_BASE + l0Slot);
-            LoadA(a2, gqL1, MM_TILE_M, shape_.kMM1, false);
-            // 分块数超过乒乓深度时槽位会被覆盖，phi需每波重载。
-            if (firstPhiUse && chunk == 0) {
-                // phi B1槽数据就绪后MTE1才可读取；LoadA先行以重叠预载搬运。
-                WaitFlag<HardEvent::MTE2_MTE1>(phiSlot_);
-            }
-            const uint32_t chunkCount = CeilDivU32(kValid, configMm1_.baseN);
-            if (firstPhiUse || configMm1_.dbL0A < chunkCount) {
-                LoadB(b2, phiL1[NChunkOffset(shape_.hAlign, offsetN)], shape_.kMM1Load, currentN);
-            }
-            SetFlag<HardEvent::MTE1_M>(MM1_MTE1_M_EVENT_BASE + l0Slot);
-            WaitFlag<HardEvent::MTE1_M>(MM1_MTE1_M_EVENT_BASE + l0Slot);
-            uint32_t cSlot = chunk % configMm1_.dbL0C;
+            uint32_t chunkN = offsetN / configMm1_.baseN;
+            uint32_t cSlot = chunkN % configMm1_.dbL0C;
             LocalTensor<float> cCur = cMm1L0_[cSlot * l0CSingleBufferElems_];
-            // 每个列块计算后立即搬出并释放L0C槽，避免循环等待槽位。
+            const uint32_t nOff = NChunkOffset(shape_.hAlign, offsetN);
+            // Accumulate all K chunks of a column chunk into one L0C slot; ensure the slot is free before use.
             WaitFlag<HardEvent::FIX_M>(cSlot);
-            Compute(cCur, a2, b2, MM_TILE_M, currentN, shape_.kMM1, true);
-            SetFlag<HardEvent::M_MTE1>(MM1_L0_EVENT_BASE + l0Slot);
+            for (uint32_t offsetK = 0; offsetK < redK; offsetK += baseK) {
+                uint32_t currentK = redK - offsetK < baseK ? redK - offsetK : baseK;
+                uint32_t l0Slot = l0Iter % configMm1_.dbL0A;
+                ++l0Iter;
+                LocalTensor<float> a2 = aMm1L0_[l0Slot * l0ABSingleBufferElems_];
+                LocalTensor<float> b2 = bMm1L0_[l0Slot * l0ABSingleBufferElems_];
+                WaitFlag<HardEvent::M_MTE1>(MM1_L0_EVENT_BASE + l0Slot);
+                LoadA(a2, gqL1[KOffA(offsetK)], MM_TILE_M, currentK, false);
+                if (firstPhiUse && chunkN == 0 && offsetK == 0) {
+                    // MTE1 must wait for phi B1 data; issue LoadA first to overlap the preload transfer.
+                    WaitFlag<HardEvent::MTE2_MTE1>(phiSlot_);
+                }
+                // With K tiling, L0B holds one K slice and cannot reuse it across GQ waves; reload each slice from L1.
+                if (kChunked || firstPhiUse || configMm1_.dbL0A < chunkCount) {
+                    LoadB(b2, phiL1[nOff + KOffB(offsetK)], currentK, currentN, shape_.hAlign);
+                }
+                SetFlag<HardEvent::MTE1_M>(MM1_MTE1_M_EVENT_BASE + l0Slot);
+                WaitFlag<HardEvent::MTE1_M>(MM1_MTE1_M_EVENT_BASE + l0Slot);
+                Compute(cCur, a2, b2, MM_TILE_M, currentN, currentK, offsetK == 0);
+                SetFlag<HardEvent::M_MTE1>(MM1_L0_EVENT_BASE + l0Slot);
+            }
             SetFlag<HardEvent::M_FIX>(cSlot);
             WaitFlag<HardEvent::M_FIX>(cSlot);
             FixpipeMm1(dst, cCur, offsetN, currentN);
             SetFlag<HardEvent::FIX_M>(cSlot);
         }
         if (lastPhiUse) {
-            // MTE1完成该phi B1槽读取后释放给下一次预载（乒乓预取下一kTile）。
+            // Release the phi B1 slot after MTE1 finishes reading it, allowing ping-pong prefetch of the next kTile.
             SetFlag<HardEvent::MTE1_MTE2>(phiSlot_);
         }
     }
 
-    // kRows为16对齐的有效GQ行数，MM2仅对这些行累加。
+    // kRows is the valid GQ row count aligned to 16; MM2 accumulates only these rows.
     __aicore__ inline void ComputeMm2(const LocalTensor<float>& gqL1, const LocalTensor<float>& xL1, uint32_t kValid,
                                       bool firstM = true, bool lastM = true, uint32_t kRows = MM_TILE_M)
     {
         if (firstM) {
-            // 上一kTile的MM2结果完成搬出后才能重新初始化各N分块累加槽。
+            // Reinitialize N-chunk accumulation slots only after transferring the previous kTile's MM2 results.
             WaitFlag<HardEvent::FIX_M>(MM2_C_EVENT);
         }
         for (uint32_t offsetN = 0; offsetN < kValid; offsetN += configMm2_.baseN) {
@@ -155,11 +164,12 @@ public:
             LocalTensor<float> b2 = bMm2L0_[l0Slot * l0ABSingleBufferElems_];
             WaitFlag<HardEvent::M_MTE1>(MM2_L0_EVENT_BASE + l0Slot);
             LoadA(a2, gqL1, MM_TILE_M, shape_.hValue, true);
-            LoadB(b2, xL1[NChunkOffset(MM_TILE_M, offsetN)], MM_TILE_M, currentN);
+            LoadB(b2, xL1[NChunkOffset(MM_TILE_M, offsetN)], MM_TILE_M, currentN, MM_TILE_M);
             SetFlag<HardEvent::MTE1_M>(MM2_MTE1_M_EVENT_BASE + l0Slot);
             WaitFlag<HardEvent::MTE1_M>(MM2_MTE1_M_EVENT_BASE + l0Slot);
             LocalTensor<float> cCur = cMm2L0_[chunk * l0CSingleBufferElems_];
-            // M=MM2_M（奇数hcMix补1零值行）：保证dualDstCtl=1时两个AIV子核均分整行数。
+            // M=MM2_M pads odd hcMix with one zero row so the two AIV subcores receive equal whole rows with
+            // dualDstCtl=1.
             Compute(cCur, a2, b2, shape_.mm2M, currentN, kRows, firstM);
             SetFlag<HardEvent::M_MTE1>(MM2_L0_EVENT_BASE + l0Slot);
         }
@@ -214,7 +224,7 @@ public:
         for (uint32_t offsetN = 0; offsetN < kValid; offsetN += configMm2_.baseN) {
             uint32_t currentN = kValid - offsetN < configMm2_.baseN ? kValid - offsetN : configMm2_.baseN;
             uint32_t chunk = offsetN / configMm2_.baseN;
-            // GM侧仅回写hcMix个有效行；奇数N补零的末行保留在L0C，不落GM。
+            // Write only hcMix valid rows to GM; keep the final padded row for odd N in L0C.
             CopyToGm(dst[offsetN], cMm2L0_[chunk * l0CSingleBufferElems_], shape_.hValue, currentN, dstStride);
         }
         SetFlag<HardEvent::FIX_M>(MM2_C_EVENT);
@@ -222,7 +232,7 @@ public:
 
     __aicore__ inline void End()
     {
-        // 回收Init下发的全部缓冲区令牌。
+        // Reclaim all buffer tokens issued by Init.
         for (uint32_t slot = 0; slot < configMm1_.depthB1; ++slot) {
             WaitFlag<HardEvent::MTE1_MTE2>(slot);
         }
@@ -246,10 +256,23 @@ private:
         return CeilDivU32(K_TILE_VALUE, configMm2_.baseN);
     }
 
-    // L1 NZ按“N方向8列分形×K方向16行分形”排布，N方向块偏移 = 分形列序号×mStep×分形元素数。
+    // L1 NZ uses 8-column N fractals and 16-row K fractals; the N-chunk offset is column-fractal index * mStep *
+    // fractal size.
     __aicore__ inline uint32_t NChunkOffset(uint32_t kRows, uint32_t offsetN) const
     {
         return offsetN / MM_K0 * CeilDivU32(kRows, CUBE_M) * FRACTAL_ELEMENTS;
+    }
+
+    // gq L1 NZ layout is [k/8][M/16][16][8]; advance the reduction axis in 8-row fractals.
+    __aicore__ inline uint32_t KOffA(uint32_t offsetK) const
+    {
+        return offsetK / MM_K0 * CeilDivU32(MM_TILE_M, CUBE_M) * FRACTAL_ELEMENTS;
+    }
+
+    // phi L1 NZ layout is [n/8][k/16][16][8]; the reduction axis is contiguous in 16-row chunks within each N fractal.
+    __aicore__ inline uint32_t KOffB(uint32_t offsetK) const
+    {
+        return offsetK / CUBE_M * FRACTAL_ELEMENTS;
     }
 
     __aicore__ inline void LoadA(const LocalTensor<float>& dst, const LocalTensor<float>& src, uint32_t originalM,
@@ -274,14 +297,16 @@ private:
         LoadData(dst, src, params);
     }
 
-    __aicore__ inline void LoadB(const LocalTensor<float>& dst, const LocalTensor<float>& src, uint32_t k, uint32_t n)
+    __aicore__ inline void LoadB(const LocalTensor<float>& dst, const LocalTensor<float>& src, uint32_t k, uint32_t n,
+                                 uint32_t kL1)
     {
         LoadData2DParamsV2 params;
         params.mStartPosition = 0;
         params.kStartPosition = 0;
         params.mStep = CeilDivU32(k, CUBE_M);
         params.kStep = AlignU32(CeilDivU32(n, MM_K0), 2);
-        params.srcStride = params.mStep;
+        // srcStride spans adjacent N fractals; use the full L1 K length (kL1), not the current K slice length.
+        params.srcStride = CeilDivU32(kL1, CUBE_M);
         params.dstStride = CeilDivU32(n, CUBE_M);
         params.ifTranspose = true;
         LoadData(dst, src, params);
@@ -297,7 +322,7 @@ private:
         params.disableGemv = true;
         params.cmatrixInitVal = initC;
         params.cmatrixSource = false;
-        // unitFlag=0：L0C的生产/消费完全由M_FIX与FIX_M事件管理。
+        // unitFlag=0: M_FIX and FIX_M events fully control L0C production and consumption.
         params.unitFlag = 0;
         Mmad(c, a, b, params);
     }

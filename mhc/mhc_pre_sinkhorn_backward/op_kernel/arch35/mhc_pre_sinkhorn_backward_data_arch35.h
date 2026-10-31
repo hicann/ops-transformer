@@ -13,13 +13,14 @@
 
 #include <cstdint>
 
-// MM1/MM2分块与缓冲配置。
+// MM1/MM2 tiling and buffer configuration.
 struct MhcPreSinkhornBackwardMMConfig {
-    uint32_t baseN = 0;   // N方向分块大小
-    uint32_t l1K = 0;     // phi B1驻留宽度
-    uint32_t depthB1 = 0; // phi B1 L1乒乓深度（跨kTile预取）
-    uint32_t dbL0A = 0;   // L0A/B乒乓深度
-    uint32_t dbL0C = 0;   // L0C乒乓深度
+    uint32_t baseN = 0;
+    uint32_t baseK = 0;
+    uint32_t l1K = 0;
+    uint32_t depthB1 = 0;
+    uint32_t dbL0A = 0;
+    uint32_t dbL0C = 0;
 };
 
 // This is a private ABI shared only by the new Ascend950 host tiling and kernel.
@@ -66,15 +67,15 @@ struct MhcPreSinkhornBackwardArch35TilingData {
     uint64_t offGradPhiPart = 0;
     uint64_t userWorkspaceBytes = 0;
 
-    // MM1(GQ@phi)与MM2(GQ^T@X)的Cube配置及缓存布局。
+    // Cube configuration and buffer layout for MM1 (GQ@phi) and MM2 (GQ^T@X).
     MhcPreSinkhornBackwardMMConfig mmConfigMm1;
     MhcPreSinkhornBackwardMMConfig mmConfigMm2;
-    uint32_t l1BOffsetElems = 0;        // L1 phi B1乒乓区起始偏移（元素），其下方为GQ缓存波
-    uint32_t l1SingleBufferElems = 0;   // phi B1单槽元素数
-    uint32_t l0ABUsedBytes = 0;         // L0A/L0B乒乓池总用量（每侧MM1/MM2各一池）
-    uint32_t l0ABSingleBufferElems = 0; // L0A/B单槽元素数
-    uint32_t l0CUsedBytes = 0;          // L0C总用量（MM1乒乓槽+MM2累加槽）
-    uint32_t l0CSingleBufferElems = 0;  // L0C单槽元素数
+    uint32_t l1BOffsetElems = 0;
+    uint32_t l1SingleBufferElems = 0;
+    uint32_t l0ABUsedBytes = 0;
+    uint32_t l0ABSingleBufferElems = 0;
+    uint32_t l0CUsedBytes = 0;
+    uint32_t l0CSingleBufferElems = 0;
 
     float hcEps = 0.0f;
     float normEps = 0.0f;

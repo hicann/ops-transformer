@@ -20,6 +20,13 @@ using namespace std;
 // Ascend 950 走 arch35 tiling 模板，模板会 SetTilingKey（DETERMINISTIC 位），SUCCESS 用例跳过 tilingKey 校验
 constexpr uint64_t SKIP_TILING_KEY_VALIDATION = UINT64_MAX;
 constexpr char kSocVersion950[] = "Ascend950";
+// Match Ascend950's 256 KiB L0C while preserving the other generic UT platform settings.
+constexpr char kAscend950SocInfo[] = R"({"hardware_info":{
+    "BT_SIZE":0,"load3d_constraints":"1","Intrinsic_fix_pipe_l0c2out":false,
+    "Intrinsic_data_move_l12ub":true,"Intrinsic_data_move_l0c2ub":true,
+    "Intrinsic_data_move_out2l1_nd2nz":false,"UB_SIZE":262144,"L2_SIZE":33554432,
+    "L1_SIZE":524288,"L0A_SIZE":65536,"L0B_SIZE":65536,"L0C_SIZE":262144,
+    "CORE_NUM":64,"socVersion":"Ascend950"}})";
 
 class MhcPreSinkhornBackwardTiling : public testing::Test {
 protected:
@@ -76,6 +83,7 @@ TEST_F(MhcPreSinkhornBackwardTiling, test_tiling_B2_S128_N4_C256)
         },
         &compileInfo, kSocVersion950);
 
+    tilingContextPara.socInfoString_ = kAscend950SocInfo;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, SKIP_TILING_KEY_VALIDATION);
 }
 
@@ -121,6 +129,7 @@ TEST_F(MhcPreSinkhornBackwardTiling, test_tiling_B1_S512_N4_C128)
         },
         &compileInfo, kSocVersion950);
 
+    tilingContextPara.socInfoString_ = kAscend950SocInfo;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, SKIP_TILING_KEY_VALIDATION);
 }
 
@@ -166,6 +175,7 @@ TEST_F(MhcPreSinkhornBackwardTiling, test_tiling_B4_S64_N4_C512)
         },
         &compileInfo, kSocVersion950);
 
+    tilingContextPara.socInfoString_ = kAscend950SocInfo;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, SKIP_TILING_KEY_VALIDATION);
 }
 
@@ -211,6 +221,7 @@ TEST_F(MhcPreSinkhornBackwardTiling, test_tiling_B1_S64_N9_C128_fail)
         },
         &compileInfo, kSocVersion950);
 
+    tilingContextPara.socInfoString_ = kAscend950SocInfo;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -256,6 +267,7 @@ TEST_F(MhcPreSinkhornBackwardTiling, test_tiling_B1_S35_N1_C512)
         },
         &compileInfo, kSocVersion950);
 
+    tilingContextPara.socInfoString_ = kAscend950SocInfo;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, SKIP_TILING_KEY_VALIDATION);
 }
 
@@ -301,6 +313,7 @@ TEST_F(MhcPreSinkhornBackwardTiling, test_tiling_B2_S64_N2_C256)
         },
         &compileInfo, kSocVersion950);
 
+    tilingContextPara.socInfoString_ = kAscend950SocInfo;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, SKIP_TILING_KEY_VALIDATION);
 }
 
@@ -346,6 +359,7 @@ TEST_F(MhcPreSinkhornBackwardTiling, test_tiling_B1_S64_N8_C128)
         },
         &compileInfo, kSocVersion950);
 
+    tilingContextPara.socInfoString_ = kAscend950SocInfo;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, SKIP_TILING_KEY_VALIDATION);
 }
 
@@ -392,6 +406,7 @@ TEST_F(MhcPreSinkhornBackwardTiling, test_tiling_T256_N4_C256_3d)
         },
         &compileInfo, kSocVersion950);
 
+    tilingContextPara.socInfoString_ = kAscend950SocInfo;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, SKIP_TILING_KEY_VALIDATION);
 }
 
@@ -438,6 +453,7 @@ TEST_F(MhcPreSinkhornBackwardTiling, test_tiling_T64_N8_C128_3d)
         },
         &compileInfo, kSocVersion950);
 
+    tilingContextPara.socInfoString_ = kAscend950SocInfo;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, SKIP_TILING_KEY_VALIDATION);
 }
 
@@ -484,6 +500,7 @@ TEST_F(MhcPreSinkhornBackwardTiling, test_tiling_T64_N9_C128_3d_fail)
         },
         &compileInfo, kSocVersion950);
 
+    tilingContextPara.socInfoString_ = kAscend950SocInfo;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
@@ -530,6 +547,9 @@ void CheckPlatformRouting(const char* soc, int32_t deterministic, uint64_t expec
         },
         &compileInfo, soc);
 
+    if (tilingContextPara.socVersion_ == kSocVersion950) {
+        tilingContextPara.socInfoString_ = kAscend950SocInfo;
+    }
     tilingContextPara.deterministicInfo_ = deterministic;
     TilingInfo info;
     ASSERT_TRUE(ExecuteTiling(tilingContextPara, info));

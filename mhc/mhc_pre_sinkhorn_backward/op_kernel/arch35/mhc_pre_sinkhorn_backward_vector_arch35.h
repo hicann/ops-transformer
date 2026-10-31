@@ -23,7 +23,7 @@ constexpr uint32_t K_TILE_VALUE = 256;
 constexpr uint32_t FLOAT_C0 = 8;
 constexpr uint32_t ND_GAP = 8;
 constexpr uint32_t VECTOR_LENGTH = 64;
-// 行扫描（gradHin·x逐行约简）缓冲预算外的UB预留，防止64 lane对齐读越过小缓冲区尾部。
+// Reserve UB beyond the row-scan buffer budget (per-row gradHin dot x) so aligned 64-lane reads stay within bounds.
 constexpr uint32_t SMALL_BUFFER_SLACK = VECTOR_LENGTH;
 constexpr uint32_t PARAM_ALPHA = 0;
 constexpr uint32_t ROW_INPUT_Q = 0;
@@ -41,11 +41,11 @@ constexpr uint32_t X_STAGE_ND_ELEMENTS = ROWS_PER_AIV * (K_TILE_VALUE + ND_GAP);
 constexpr uint32_t X_STAGE_NZ_OFFSET = X_STAGE_ND_ELEMENTS;
 constexpr uint32_t X_STAGE_ELEMENTS = X_STAGE_ND_ELEMENTS + ROWS_PER_AIV * K_TILE_VALUE;
 constexpr uint32_t STAGE_POOL_BUFFER_COUNT = 16;
-// Prepare阶段共享缓冲池大小（行扫描双缓冲+迭代缓存等从该池分配）。
+// Shared buffer pool size for Prepare, including row-scan double buffers and iteration caches.
 constexpr uint32_t STAGE_POOL_BYTES = 160 * 1024;
-// Prepare阶段共享缓冲池中，行扫描双缓冲以外的固定开销预留（池对齐、小块余量）。
+// Reserve fixed Prepare pool overhead beyond row-scan double buffers for alignment and small-buffer slack.
 constexpr uint32_t SCAN_BUDGET_MARGIN_BYTES = 1024;
-// 行扫描的最小分块：C恒为128的倍数，按128对齐可保证尾块仍为128的倍数。
+// Minimum row-scan chunk: C is a multiple of 128, so 128-aligned chunks keep the tail a multiple of 128.
 constexpr uint32_t SCAN_CHUNK_ALIGN = 128;
 
 using BackwardStagePool = TBufPool<QuePosition::VECCALC, STAGE_POOL_BUFFER_COUNT>;
@@ -107,21 +107,21 @@ constexpr uint32_t RoundUpPow2U32(uint32_t value)
     return pow2;
 }
 
-// 由运行时N（1~8）推导的布局。
+// Layout derived from runtime N (1 to 8).
 struct MhcBwdShape {
     uint32_t n = 0;
     uint32_t hValue = 0; // hcMix = 2N + N^2
-    // MM2转置LoadA要求kStep为偶数个8列分形。
+    // MM2 transposed LoadA requires kStep to be an even number of 8-column fractals.
     uint32_t hAlign = 0;
-    // MM1收缩K：补零到8对齐并下限16（Mmad最小K粒度）。
+    // MM1 reduction K: zero-pad to a multiple of 8 with a minimum of 16, the minimum Mmad K granularity.
     uint32_t kMM1 = 0;
-    // phi装载行数至少为16，避免LoadB的mStep为0。
+    // Load at least 16 phi rows to keep LoadB mStep nonzero.
     uint32_t kMM1Load = 0;
-    // MM2输出行数：奇数hcMix补1行零值（dualDstCtl=1均分），下限16。
+    // MM2 output rows: pad odd hcMix with one zero row for equal dualDstCtl=1 splits, with a minimum of 16.
     uint32_t mm2M = 0;
     uint32_t mm2RowsPerAiv = 0;
 
-    // 单行状态区布局：[g_h_pre(N)][grad_post(N)][sk(N^2)][gz(hcMix)][inv_rms(1)]，段间8对齐。
+    // Per-row state layout: [g_h_pre(N)][grad_post(N)][sk(N^2)][gz(hcMix)][inv_rms(1)], with segments aligned to 8.
     uint32_t stateGhPre = 0;
     uint32_t stateGradPost = 0;
     uint32_t stateSk = 0;
@@ -132,7 +132,7 @@ struct MhcBwdShape {
     uint32_t paramBias = 0;
     uint32_t paramElements = 0;
 
-    // 单行输入暂存区布局（均为8对齐段）。
+    // Per-row input staging layout, with all segments aligned to 8.
     uint32_t rowInputInvRms = 0;
     uint32_t rowInputGradPost = 0;
     uint32_t rowInputSk = 0;
@@ -201,7 +201,7 @@ __aicore__ inline void CopyUbToGm(const GlobalTensor<T>& dst, const LocalTensor<
     DataCopyPad(dst, src, copy);
 }
 
-// 小N路径需等待MTE2完成，避免连续的小粒度GM读触发设备异常。
+// For small N, wait for MTE2 completion to avoid device exceptions from consecutive small GM reads.
 __aicore__ inline void SyncMte2Reads()
 {
     TEventID evtId = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();
@@ -210,7 +210,7 @@ __aicore__ inline void SyncMte2Reads()
     GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_V>(evtId);
 }
 
-// 等待MTE3完成，避免连续的小粒度GM写触发设备异常。
+// Wait for MTE3 completion to avoid device exceptions from consecutive small GM writes.
 __aicore__ inline void SyncMte3Writes()
 {
     TEventID evtId = GetTPipePtr()->AllocEventID<HardEvent::MTE3_MTE2>();
@@ -219,7 +219,7 @@ __aicore__ inline void SyncMte3Writes()
     GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(evtId);
 }
 
-// 按寄存器宽度搬运任意count个元素，src/dst均需8元素对齐。
+// Copy count elements using register-width transfers; src and dst must be aligned to 8 elements.
 __aicore__ inline void VFCopySmall(const LocalTensor<float>& dst, const LocalTensor<float>& src, uint32_t count)
 {
     __ubuf__ float* dstAddr = (__ubuf__ float*)dst.GetPhyAddr();
@@ -308,7 +308,8 @@ __aicore__ inline void VFAdd(const LocalTensor<float>& dst, const LocalTensor<fl
 }
 
 // x is ND with one extra 32-byte gap per row. y is NZ with M aligned to eight FP32 values.
-// validCols为有效列数（PAD_GQ时仅搬运有效列分形，尾分形内的补零列由调用方清零）。
+// validCols counts valid columns; PAD_GQ copies only valid column fractals, and the caller clears padding in the tail
+// fractal.
 template <bool PAD_ROWS = false, bool PAD_GQ = false>
 __aicore__ inline void TransNdToNz(const LocalTensor<float>& y, const LocalTensor<float>& x, uint16_t rows,
                                    uint16_t cols, uint16_t srcRowStride, uint16_t validRows = ROWS_PER_AIV,
@@ -350,7 +351,8 @@ __aicore__ inline void TransNdToNz(const LocalTensor<float>& y, const LocalTenso
             }
         }
         if constexpr (PAD_GQ) {
-            // MM2转置装载读取整个H_ALIGN宽度；有效列分形之外的补零分形在此清零。
+            // MM2 transposed loads read the full H_ALIGN width; clear padded fractals beyond the valid column fractals
+            // here.
             for (uint16_t padBlock = 0; padBlock < padBlocks; ++padBlock) {
                 uint16_t colBlock = colBlocks + padBlock;
                 for (uint16_t rowBlock = 0; rowBlock < rowBlocks; ++rowBlock) {
@@ -361,7 +363,8 @@ __aicore__ inline void TransNdToNz(const LocalTensor<float>& y, const LocalTenso
     }
 }
 
-// 行扫描约简：dst[n] += Σ_i lhs[i] * rhs[n*count + i]。分块累加（RMW），首块前调用方清零dst。
+// Row-scan reduction: dst[n] += sum_i lhs[i] * rhs[n*count + i]. Accumulate chunks with RMW; the caller clears dst
+// first.
 template <typename T>
 __aicore__ inline void VFReducePreGrad(const LocalTensor<float>& dst, const LocalTensor<T>& lhs,
                                        const LocalTensor<T>& rhs, uint32_t count, uint32_t nValue)
@@ -404,7 +407,7 @@ __aicore__ inline void VFReducePreGrad(const LocalTensor<float>& dst, const Loca
     }
 }
 
-// GLOBAL=true时寄存器承载整批B*N^2元素，否则逐矩阵处理。
+// With GLOBAL=true, registers hold the entire batch of B*N^2 elements; otherwise process one matrix at a time.
 template <uint32_t BATCH, bool GLOBAL>
 __aicore__ inline void VFSinkhornBackwardPass(__ubuf__ float* skAddr, __ubuf__ float* sumAddr, __ubuf__ float* normAddr,
                                               uint32_t iterElements, uint32_t colSumOffset, uint16_t iterations,
@@ -428,7 +431,7 @@ __aicore__ inline void VFSinkhornBackwardPass(__ubuf__ float* skAddr, __ubuf__ f
         RegTensor<uint32_t> index;
         Arange((RegTensor<int32_t>&)order, static_cast<int32_t>(0));
         if constexpr (GLOBAL) {
-            // pow2Index/logN在标量侧预计算，避免向量域生成不支持的ctpop指令。
+            // Precompute pow2Index/logN on the scalar side to avoid unsupported ctpop instructions in vector code.
             if (pow2Index) {
                 Duplicate(bits, n - 1);
                 And(colIndex, order, bits, fullMask);
@@ -459,8 +462,8 @@ __aicore__ inline void VFSinkhornBackwardPass(__ubuf__ float* skAddr, __ubuf__ f
                 }
             }
         } else {
-            // 单矩阵趟：lane l对应矩阵内元素l，矩阵分量以立即数叠加。
-            // mask外的lane也会执行Gather，索引需钳制在寄存器宽度内。
+            // Single-matrix pass: lane l maps to matrix element l, with matrix-component offsets added as immediates.
+            // Lanes outside the mask also execute Gather, so clamp indices to the register width.
             Duplicate(divisor, n);
             Div(rowIndex, order, divisor, fullMask);
             Mul(rowBase, rowIndex, divisor, fullMask);
@@ -502,7 +505,7 @@ __aicore__ inline void VFSinkhornBackwardPass(__ubuf__ float* skAddr, __ubuf__ f
             Div(grad, grad, denom, mask);
             Sub(grad, grad, correction, mask);
 
-            // 最后一次行反传需从normOut[0]和sumOut[0]中减去正向加入的hcEps。
+            // In the final row backward pass, subtract the forward hcEps from normOut[0] and sumOut[0].
             if (iterOffset == 0U) {
                 Adds(norm, norm, -hcEps, mask);
             }
@@ -525,7 +528,7 @@ __aicore__ inline void VFSinkhornBackwardPass(__ubuf__ float* skAddr, __ubuf__ f
     }
 }
 
-// sk整批紧凑存储时批量反传，否则逐矩阵处理。
+// Run batched backward when sk is packed contiguously for the batch; otherwise process one matrix at a time.
 template <uint32_t BATCH = 1>
 __aicore__ inline void VFSinkhornBackward(const MhcBwdShape& shape, const LocalTensor<float>& sk,
                                           const LocalTensor<float>& iterInput, uint16_t iterations, float hcEps,
@@ -576,7 +579,7 @@ __aicore__ inline void VFPrepareGqAndPartials(const MhcBwdShape& shape, const Lo
     uint32_t stateGhPre = shape.stateGhPre;
     uint32_t stateGradPost = shape.stateGradPost;
     uint32_t smallState = shape.smallStateElements;
-    // sk读入步长：整批紧凑驻留batchSk时为N*N；否则sk直接驻留state行内sk槽。
+    // The sk read stride is N*N when packed in batchSk; otherwise sk resides in each state row's sk slot.
     uint32_t skReadStride = (BATCHED && shape.skContiguousBatch) ? n * n : smallState;
     __ubuf__ float* qBase = (__ubuf__ float*)q.GetPhyAddr();
     __ubuf__ float* paramAddr = (__ubuf__ float*)params.GetPhyAddr();
@@ -585,7 +588,7 @@ __aicore__ inline void VFPrepareGqAndPartials(const MhcBwdShape& shape, const Lo
     __ubuf__ float* gqBase = (__ubuf__ float*)gq.GetPhyAddr() + localRow * hAlign;
     __ubuf__ float* grBase = (__ubuf__ float*)gr.GetPhyAddr() + localRow;
     __ubuf__ float* partAddr = (__ubuf__ float*)rowPart.GetPhyAddr();
-    // h_pre = σ(z) + hcEps，门控导数由z重算σ(z)，不受hcEps影响。
+    // h_pre = sigmoid(z) + hcEps; recompute sigmoid(z) from z for the gate derivative, independent of hcEps.
     (void)hcEps;
     __VEC_SCOPE__
     {
@@ -638,7 +641,7 @@ __aicore__ inline void VFPrepareGqAndPartials(const MhcBwdShape& shape, const Lo
         RegTensor<float> biasPre;
         RegTensor<float> biasPost;
         RegTensor<float> biasRes;
-        // 仅计算本次调用的partials，跨调用累加由kernel完成。
+        // Compute partials only for this call; the kernel accumulates across calls.
         Duplicate(alphaPre, 0.0f);
         Duplicate(alphaPost, 0.0f);
         Duplicate(alphaRes, 0.0f);
@@ -736,7 +739,7 @@ __aicore__ inline void VFPrepareGqAndPartials(const MhcBwdShape& shape, const Lo
                 }
             }
 
-            // 2N非8的倍数时使用非对齐加载。
+            // Use unaligned loads when 2N is not a multiple of 8.
             if (2 * n % 8 == 0) {
                 LoadAlign(gzReg, stateBase + batchRow * smallState + stateGz + 2 * n);
                 LoadAlign(qReg, qBase + batchRow * hAlign + 2 * n);
@@ -747,7 +750,7 @@ __aicore__ inline void VFPrepareGqAndPartials(const MhcBwdShape& shape, const Lo
             LoadAlign<float, LoadDist::DIST_BRC_B32>(alphaReg, paramAddr + PARAM_ALPHA + 2);
             Mul(gradNorm, gzReg, alphaReg, residualGroupMask);
             Mul(product, gradNorm, invReg, residualGroupMask);
-            // 2N非8的倍数时使用非对齐存储。
+            // Use unaligned stores when 2N is not a multiple of 8.
             if (2 * n % 8 == 0) {
                 StoreAlign(gqBase + batchRow * hAlign + 2 * n, product, residualGroupMask);
             } else {
@@ -811,8 +814,9 @@ __aicore__ inline void VFComputeGradX(const LocalTensor<OUT_T>& gxOut, const Loc
             uint32_t sreg = count;
             for (uint16_t i = 0; i < loopCount; ++i) {
                 uint32_t col = static_cast<uint32_t>(i) * VECTOR_LENGTH;
-                // 源（x/gh）按段紧凑打包（行距=count）；目的（xNd/gx/mm1）写入tile内全局列偏移处，
-                // 以支持K_TILE跨通道分段（每段各自读取本通道的grad_hin与h_pre）。
+                // Pack source segments (x/gh) contiguously with row stride count; write destinations (xNd/gx/mm1) at
+                // tile-global column offsets to support K_TILE segments across channels, each reading its channel's
+                // grad_hin and h_pre.
                 uint32_t srcOffset = row * count + col;
                 uint32_t dstOffset = row * K_TILE_VALUE + colOffset + col;
                 MaskReg mask = UpdateMask<float>(sreg);
@@ -882,7 +886,7 @@ public:
         gradHPostGm_.SetGlobalBuffer((__gm__ float*)gradHPost);
         gradHResGm_.SetGlobalBuffer((__gm__ float*)gradHRes);
         xGm_.SetGlobalBuffer((__gm__ T*)x);
-        // x/grad_x单遍访问，关闭L2缓存以保留phi。
+        // Disable L2 caching for single-pass x/grad_x accesses to keep phi cached.
         xGm_.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_DISABLE);
         phiGm_.SetGlobalBuffer((__gm__ float*)phi);
         alphaGm_.SetGlobalBuffer((__gm__ float*)alpha);
@@ -930,7 +934,7 @@ public:
                               (batchRows * shape_.hAlign + SMALL_BUFFER_SLACK) * sizeof(float) +
                               (batchRows * shape_.smallStateElements + SMALL_BUFFER_SLACK) * sizeof(float) +
                               (shape_.batchSkElements + SMALL_BUFFER_SLACK) * sizeof(float) + SCAN_BUDGET_MARGIN_BYTES;
-        // 按stage池剩余容量确定行扫描分块大小。
+        // Choose the row-scan chunk size from the remaining stage pool capacity.
         uint32_t budget = STAGE_POOL_BYTES > fixedBytes ? STAGE_POOL_BYTES - fixedBytes : SCAN_CHUNK_ALIGN;
         uint32_t chunkCap = budget / (inputBuffers * (shape_.n + 1) * sizeof(T));
         chunkCap = chunkCap / SCAN_CHUNK_ALIGN * SCAN_CHUNK_ALIGN;
@@ -956,7 +960,7 @@ public:
     {
         pool.InitBuffer(tileInputQue_, 2, ROWS_PER_AIV * K_TILE_VALUE * sizeof(T));
         pool.InitBuffer(tileScalarQue_, 1, TILE_SCALAR_ELEMENTS * sizeof(float));
-        // grad_x双缓冲，使向量写出与MTE3回写重叠。
+        // Double-buffer grad_x to overlap vector output with MTE3 writeback.
         pool.InitBuffer(gxOutQue_, 2, ROWS_PER_AIV * K_TILE_VALUE * sizeof(T));
         pool.InitBuffer(xStageQue_, deferMm1 ? 2 : 1,
                         (X_STAGE_ELEMENTS + (deferMm1 ? ROWS_PER_AIV * K_TILE_VALUE : 0)) * sizeof(float));
@@ -1006,7 +1010,7 @@ public:
         for (uint32_t row = 0; row < rows; ++row) {
             Duplicate(state_[row * shape_.smallStateElements + shape_.stateGhPre], 0.0f, shape_.n);
         }
-        // 行扫描双缓冲，使下一块搬运与当前块约简重叠。
+        // Double-buffer the row scan to overlap the next chunk's transfer with the current chunk's reduction.
         uint32_t totalChunks = rows * scanChunks_;
         PrefetchScanChunk(rowBase, 0);
         PrefetchRowInput(rowBase);
@@ -1070,7 +1074,8 @@ public:
             if constexpr (!DEFER_MM1) {
                 gxOut = gxOutQue_.AllocTensor<T>();
             }
-            // 跨通道的K_TILE按通道边界分段读取，结果按kOff写回同一缓冲。
+            // Read cross-channel K_TILE data in segments at channel boundaries and write each result into the same
+            // buffer at kOff.
             uint32_t kOff = 0;
             while (kOff < kValid) {
                 uint32_t nIdx = (kBegin + kOff) / static_cast<uint32_t>(tiling_->c);
@@ -1079,7 +1084,8 @@ public:
                 if (segLen > kValid - kOff) {
                     segLen = kValid - kOff;
                 }
-                // 源按段紧凑搬运（行距=segLen），目的缓冲按tile全局列索引（行距=K_TILE）。
+                // Copy source segments contiguously with row stride segLen; use tile-global column indices and row
+                // stride K_TILE in the destination.
                 DataCopyPadExtParams<T> inputPad = {false, 0, 0, 0};
                 DataCopyExtParams inputCopy = {static_cast<uint16_t>(validRows),
                                                static_cast<uint32_t>(segLen * sizeof(T)),
@@ -1194,7 +1200,8 @@ private:
         DataCopyPad(scanGh, gradHinGm_[row * tiling_->c + chunk * scanChunk_], ghCopy, pad);
         scanGhQue_.EnQue(scanGh);
         LocalTensor<T> scanX = scanXQue_.AllocTensor<T>();
-        // x行按[shape_.n][C]排布：以N个分形块搬运当前C分块，块间距为C-分块长。
+        // x rows use [shape_.n][C] layout; copy the current C chunk as N fractal blocks with gap C minus the chunk
+        // length.
         DataCopyExtParams xCopy = {static_cast<uint16_t>(shape_.n), lenBytes, gapBytes, 0, 0};
         DataCopyPad(scanX, xGm_[row * tiling_->k + chunk * scanChunk_], xCopy, pad);
         scanXQue_.EnQue(scanX);
@@ -1215,7 +1222,8 @@ private:
     {
         LocalTensor<float> input = rowInputQue_.AllocTensor<float>();
         if (shape_.hValue < 16) {
-            // 小N（hcMix<16）：四段小粒度GM读之间插入MTE2完成同步，隔离连续小描述符。
+            // For small N (hcMix<16), wait for MTE2 completion between four small GM reads to separate consecutive
+            // small descriptors.
             CopyGmToUb(qGm_[row * shape_.hValue], input[ROW_INPUT_Q], shape_.hValue);
             SyncMte2Reads();
             CopyGmToUb(invRmsGm_[row], input[shape_.rowInputInvRms], 1);
@@ -1244,7 +1252,7 @@ private:
 
     __aicore__ inline void CopySkToBatch(uint32_t rows)
     {
-        // 整批紧凑布局需将sk集中到batchSk。
+        // Gather sk into batchSk for the packed batch layout.
         if (shape_.skContiguousBatch) {
             for (uint32_t row = 0; row < rows; ++row) {
                 DataCopy(batchSk_[shape_.stateSk + row * shape_.n * shape_.n],
@@ -1286,7 +1294,7 @@ private:
             SyncMte2Reads();
         }
         DataCopyPad(iterInput[shape_.batchIterColSum], sumGm_[(tiling_->bs + rowBase) * shape_.n], copy, pad);
-        // norm按矩阵8对齐，供LoadAlign读取。
+        // Align each norm matrix to 8 for LoadAlign reads.
         for (uint32_t matrix = 0; matrix < rows; ++matrix) {
             if (shape_.hValue < 16) {
                 SyncMte2Reads();
@@ -1305,8 +1313,8 @@ private:
     {
         gxOutQue_.EnQue(output);
         output = gxOutQue_.DeQue<T>();
-        // 源缓冲行距固定为K_TILE（跨通道分段按全局列偏移落址），UB侧行间空隙按32B块下发；
-        // 仅回写kValid个有效列到GM（GM侧行距为k）。
+        // The source row stride is K_TILE, with cross-channel segments at global column offsets; specify UB row gaps in
+        // 32-byte blocks. Write only kValid valid columns to GM, whose row stride is k.
         DataCopyExtParams copy = {static_cast<uint16_t>(validRows), static_cast<uint32_t>(kValid * sizeof(T)),
                                   static_cast<uint32_t>((K_TILE_VALUE - kValid) * sizeof(T) / 32),
                                   static_cast<uint32_t>((tiling_->k - kValid) * sizeof(T)), 0};

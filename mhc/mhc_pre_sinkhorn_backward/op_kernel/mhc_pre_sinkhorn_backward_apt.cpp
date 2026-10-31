@@ -22,7 +22,7 @@
 using namespace AscendC;
 using namespace MhcPreSinkhornBackwardNs;
 
-// N由运行时tiling确定，多个N共用kernel实例。
+// N is determined by runtime tiling data; different N values share the same kernel instance.
 template <typename T, SplitMode MODE, bool DETERMINISTIC>
 __aicore__ inline void MhcPreSinkhornBackwardRun(GM_ADDR grad_hin, GM_ADDR grad_h_post, GM_ADDR grad_h_res, GM_ADDR x,
                                                  GM_ADDR phi, GM_ADDR alpha, GM_ADDR bias, GM_ADDR h_pre,
@@ -64,7 +64,7 @@ extern "C" __global__ __aicore__ void mhc_pre_sinkhorn_backward(
             grad_hin, grad_h_post, grad_h_res, x, phi, alpha, bias, h_pre, hc_before_norm, inv_rms, sum_out, norm_out,
             grad_x, grad_phi, grad_alpha, grad_bias, nullptr, tilingData, &pipe);
     } else if (TILING_KEY_IS(3003)) {
-        // 确定性分支共用M_SPLIT实例。
+        // The deterministic branch shares the M_SPLIT instance.
         MhcPreSinkhornBackwardRun<DTYPE_X, SplitMode::M_SPLIT, false>(
             grad_hin, grad_h_post, grad_h_res, x, phi, alpha, bias, h_pre, hc_before_norm, inv_rms, sum_out, norm_out,
             grad_x, grad_phi, grad_alpha, grad_bias, nullptr, tilingData, &pipe);
