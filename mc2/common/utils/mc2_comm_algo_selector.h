@@ -21,12 +21,14 @@ constexpr uint32_t MAX_COMM_ALGO_CANDIDATES = 32;
 
 // 组网标志字(uint64)分区布局，由Mc2TopoInfo一次性装配的事实按位拼接，表项按位与匹配：
 // 机器当前标志包含表项要求的全部标志位才命中。
-// 分区：bit0-2 层数/实例数 | bit8-15 实例类型存在(按CommTopo枚举值) | bit16-23 覆盖类型(按CommTopo枚举值)
+// 分区：bit0-3 层数/实例形态 | bit8-15 实例类型存在(按CommTopo枚举值) | bit16-23 覆盖类型(按CommTopo枚举值)
 //      | bit32-47 链路协议(按CommProtocol枚举值)
 constexpr uint64_t TOPO_FLAG_NONE = 0ULL;
 constexpr uint64_t TOPO_FLAG_SINGLE_LEVEL = 1ULL << 0;  ///< 单层网络(topoLevelNums==1)
 constexpr uint64_t TOPO_FLAG_MULTI_LEVEL = 1ULL << 1;   ///< 多层网络(topoLevelNums>1)
 constexpr uint64_t TOPO_FLAG_L0_MULTI_INST = 1ULL << 2; ///< L0实例数>1(全层视角，来自GetInstSizeListByLayer)
+constexpr uint64_t TOPO_FLAG_L0_NONCOVER_INST =
+    1ULL << 3; ///< L0存在未覆盖实例(存在rank数小于level0RankSize的实例类型，die内子网实例特征)
 
 // 类型/覆盖/协议区的起始位与掩码(区宽度与Mc2TopoInfo位图宽度一致，新枚举值超出宽度时需同步扩区)
 constexpr uint32_t TOPO_FLAG_TOPO_TYPE_SHIFT = 8;
@@ -57,9 +59,11 @@ constexpr uint64_t TOPO_FLAG_L0_CLOS = TopoTypeFlag(COMM_TOPO_CLOS);
 constexpr uint64_t TOPO_FLAG_L0_1DMESH_COVER = TopoCoverFlag(COMM_TOPO_1DMESH);
 constexpr uint64_t TOPO_FLAG_L0_CLOS_COVER = TopoCoverFlag(COMM_TOPO_CLOS);
 constexpr uint64_t TOPO_FLAG_L0_PCIE_LINK = LinkProtoFlag(COMM_PROTOCOL_PCIE);
-// Mesh+CLOS混联形态(MESH_1D_CLOS)组合常量：1DMESH实例与CLOS实例并存且CLOS实例覆盖L0
-// (die内mesh不覆盖L0全部rank)，与Mc2Level0Topo::MESH_1D_CLOS的结构判定条件一致
-constexpr uint64_t TOPO_FLAG_L0_MESH_1D_CLOS = TOPO_FLAG_L0_1DMESH | TOPO_FLAG_L0_CLOS | TOPO_FLAG_L0_CLOS_COVER;
+// Mesh+CLOS混联形态(MESH_1D_CLOS)组合常量：1DMESH实例与CLOS实例并存、CLOS实例覆盖L0，
+// 且存在未覆盖实例(die内子网实例不覆盖L0全部rank)——混联的定义特征；
+// fullmesh等全覆盖形态(1DMESH实例亦覆盖L0)不存在未覆盖实例，不满足该组合
+constexpr uint64_t TOPO_FLAG_L0_MESH_1D_CLOS =
+    TOPO_FLAG_L0_1DMESH | TOPO_FLAG_L0_CLOS | TOPO_FLAG_L0_CLOS_COVER | TOPO_FLAG_L0_NONCOVER_INST;
 
 struct CommAlgoEntry {
     uint8_t commEngine;

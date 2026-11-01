@@ -56,6 +56,12 @@ uint64_t Mc2CommAlgoSelector::CalcTopoFlags(const Mc2TopoInfo& topoInfo)
     if (topoInfo.l0InstNum > 1) {
         flags |= TOPO_FLAG_L0_MULTI_INST;
     }
+    // L0存在未覆盖实例(存在未覆盖的类型，die内子网实例特征，混联形态判别位)：
+    // 由类型位图与覆盖位图按位推导；同一类型既存在覆盖实例又存在未覆盖实例时按覆盖论
+    // (位图粒度限制，该位不置位则混联表项不命中，方向安全)
+    if (((topoInfo.l0InstTypeSet & TOPO_TYPE_REGION_MASK) & ~(topoInfo.l0CoverTypeSet & TOPO_COVER_REGION_MASK)) != 0) {
+        flags |= TOPO_FLAG_L0_NONCOVER_INST;
+    }
     if ((topoInfo.l0InstTypeSet & ~TOPO_TYPE_REGION_MASK) != 0 ||
         (topoInfo.l0CoverTypeSet & ~TOPO_COVER_REGION_MASK) != 0) {
         OP_LOGW("", "[CommAlgoSelector] L0 topo type bitmap 0x%x/0x%x exceeds region width, truncated.",
