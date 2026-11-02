@@ -181,15 +181,16 @@ __aicore__ inline uint32_t MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitR
 }
 
 template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitSendMaskRounds(uint32_t resetTensorSize)
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitSendMaskRounds(uint32_t resetTensorSize,
+                                                                                          uint32_t countTensorSize)
 {
     // 分轮次参数计算：UB 预算扣除固定开销后，求解最大 roundSendTotalNum_
-    // round 张量: topkIds(R*4) + 2*maskSlot(CeilAlign(R/8,32)+32) + gatherOut(R*4)
-    //            = 8R + R/4 + 64  (R 为 256 对齐时 CeilAlign(R/8,32)=R/8)
-    // 解: R <= (available - 64) * 4 / 33，再 floor-align 到 256（保证 GM 写 32B 对齐）
-    uint32_t fixedUbCosts = ALIGN_512 + resetTensorSize;
+    // round 张量: topkIds(R*4) + 2*mask(CeilAlign(R/8,32))
+    //            = 4R + R/4  (R 为 256 对齐时 CeilAlign(R/8,32)=R/8)
+    // 解: R <= available * 4 / 17，再 floor-align 到 256（保证 GM 写 32B 对齐）
+    uint32_t fixedUbCosts = ALIGN_512 + resetTensorSize + countTensorSize;
     uint32_t availableUb = COMM_WORK_UB_LIMIT - fixedUbCosts;
-    uint32_t maxRoundSize = (availableUb - 64U) * 4U / 33U;
+    uint32_t maxRoundSize = availableUb * 4U / 17U;
     if (maxRoundSize == 0) {
         maxRoundSize = 256U;
     }
@@ -208,35 +209,36 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitSendM
     if (roundSendTotalNum_ == 0) {
         roundSendTotalNum_ = 256U;
     }
-    roundCompareCount_ = roundSendTotalNum_; // 16K
+    roundCompareCount_ = roundSendTotalNum_;
     roundMaskAlignSize_ = static_cast<uint32_t>(
         Ops::Base::CeilAlign(static_cast<int64_t>(roundCompareCount_) / 8, static_cast<int64_t>(ALIGN_32)));
-    roundMaskSlotSize_ = roundMaskAlignSize_ + static_cast<uint32_t>(ALIGN_32);
+    roundMaskSlotSize_ = roundMaskAlignSize_;
     totalRounds_ = static_cast<uint32_t>(
         Ops::Base::CeilDiv(static_cast<int64_t>(sendTotalNum_), static_cast<int64_t>(roundSendTotalNum_)));
 }
 
 // ======================================================================================
-// SendAndQuantBuffInit：SendMaskCal & ResetFlagList localTensor申请
+// SendAndQuantBuffInit：ComputeExpertMasks 与 ResetState 的 UB 地址及容量准备
 // --------------------------------------------------------------------------------------
 //   大 bs 场景下 sendTotalNum 可能超出 UB 256KB 限制，因此按 roundSendTotalNum_ 分轮次
-//   分配 UB 张量（topkIds / sendMask / sendGatherOut），每轮仅加载一部分 topkIds，
+//   分配 UB 张量（topkIds / sendMask / count），每轮仅加载一部分 topkIds，
 //   在 UB 中计算部分 mask 后拼写到 workspace 对应偏移，最终合并为完整 mask slot。
 // ======================================================================================
 template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendAndQuantBuffInit()
 {
-    if constexpr (g_coreType == AIC) {
-        return;
-    }
     // 输入准备与 DispatchBuffInit 生命期不重叠，可复用同一 UB 地址。
-    // 减去 Hcomm 和分批清零区后，按 8R + R/4 + 64 字节计算单轮容量，避免清零区随 GM 总量增长。
+    // 减去通信 scratch、清零和专家 count 区后，按 4R + R/4 字节计算单轮容量。
     LocalTensor<uint8_t> hcommTensor(TPosition::VECCALC, 0, ALIGN_512);
     comm_.Init(hcommTensor, ALIGN_512);
 
     uint32_t resetTensorSize = InitResetBatch();
-    InitSendMaskRounds(resetTensorSize);
-    // Tensor用处：SendMaskCal 每轮搬运本卡 topkIds 的一个子段；
+    // 每核负责的专家 count 独立保存在 32B 槽中，供 VF 累加、MTE3 搬出。
+    const uint32_t countSlots = Ops::Base::CeilDiv(worldSize_ * moeExpertPerRank_, blockAivNum_);
+    const uint32_t countTensorSize =
+        Ops::Base::CeilAlign(countSlots * static_cast<uint32_t>(ALIGN_32), static_cast<uint32_t>(ALIGN_256));
+    InitSendMaskRounds(resetTensorSize, countTensorSize);
+    // Tensor用处：ComputeExpertMasks 每轮搬运本卡 topkIds 的一个子段；
     // Tensor大小：roundCompareCount_ 个 int32（256B 对齐）；
     uint32_t topkIdsTensorAddr = ALIGN_512;
     uint32_t topkIdsTensorSize = roundCompareCount_ * sizeof(int32_t);
@@ -244,38 +246,33 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendAndQu
 
     uint32_t resetTensorAddr = topkIdsTensorAddr + topkIdsTensorSize;
     resetTensor_ = reinterpret_cast<__ubuf__ int32_t*>(resetTensorAddr);
-    {
-        LocalTensor<int32_t> values(TPosition::VECCALC, reinterpret_cast<uint64_t>(resetTensor_),
-                                    (resetTensorSize / sizeof(int32_t)));
-        Duplicate<int32_t>(values, 0, (resetTensorSize / sizeof(int32_t)));
-    }
-    // Tensor用处：SendMaskCal 每轮存储部分 mask 位；DOUBLE_BUFFER 双缓冲；
-    // Tensor大小：roundMaskSlotSize_（每轮部分 [mask|count] 槽位大小）；
+    // Tensor用处：ComputeExpertMasks 每轮存储部分 mask 位；DOUBLE_BUFFER 双缓冲；
+    // Tensor大小：roundMaskSlotSize_（仅本轮 mask 位图，不包含 count）；
     uint32_t sendMaskAddr = resetTensorAddr + resetTensorSize;
     for (int32_t index = 0; index < DOUBLE_BUFFER; ++index) {
         sendMaskTensor_[index] =
             reinterpret_cast<__ubuf__ uint8_t*>(sendMaskAddr + static_cast<uint32_t>(index) * roundMaskSlotSize_);
     }
 
-    // Tensor用处：SendMaskCal 每轮 GatherMask 计 count 的废弃输出 scratch；
-    // Tensor大小：roundCompareCount_ 个 int32（256B 对齐）；
-    uint32_t sendGatherOutAddr = sendMaskAddr + static_cast<uint32_t>(DOUBLE_BUFFER) * roundMaskSlotSize_;
-    uint32_t sendGatherOutSize = roundCompareCount_ * sizeof(int32_t);
-    sendGatherOutTensor_ = reinterpret_cast<__ubuf__ int32_t*>(sendGatherOutAddr);
+    sendMaskCounts_ =
+        reinterpret_cast<__ubuf__ int32_t*>(sendMaskAddr + static_cast<uint32_t>(DOUBLE_BUFFER) * roundMaskSlotSize_);
 }
 
 // ===============================================================================================
-// ResetFlagList：清理本卡 workspace 中连续排布的 GMM/dispatch flag 和 AIC-AIV1 ready sequence。
+// ResetState：准备零缓冲，清理本卡计算同步标志、通信队列及 ready 状态。
 // ===============================================================================================
 template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ResetFlagList()
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ResetState()
 {
     const auto& workspace = params_.workspace.layout;
     const auto& buffer = params_.workspace.base;
-    if constexpr (g_coreType == AIC) {
-        return;
-    }
-    AivJobContext job{aivCoreIdx_, blockAivNum_};
+    const auto& peermem = params_.communication.layout;
+    const auto& commBuffer = params_.communication.base;
+    const AivJobContext job{aivCoreIdx_, blockAivNum_};
+
+    LocalTensor<int32_t> resetTensor(TPosition::VECCALC, reinterpret_cast<uint64_t>(resetTensor_),
+                                     resetBatchElementCount_);
+    Duplicate<int32_t>(resetTensor, 0, resetBatchElementCount_);
     PipeFence<PIPE_V, PIPE_MTE3, SYNC_EVENT_ID2>();
     ResetWorkspaceRegion<1>(job, workspace.sync.activationReady.get_ptr(buffer),
                             (workspace.reset.flags.sizeBytes / SIZE_INT_32), resetBatchElementCount_, resetTensor_);
@@ -286,6 +283,32 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ResetFlag
                                      INT_CACHELINE;
         ResetWorkspaceRegion(GetBalancedWorkRange(static_cast<uint32_t>(statusElementCount), job),
                              workspace.sync.gmm1Tiles.get_ptr(buffer), resetBatchElementCount_, resetTensor_);
+    }
+
+    // 同一 AIV owner 清零目标 Server 的队列 count 和 Combine 列表行头。
+    const int64_t tokenListStride =
+        CalcServerCombineTokenListStrideBytes(params_.tilingData->compute.numMaxTokensPerRank);
+    for (uint32_t targetServer = aivCoreIdx_; targetServer < serverNum_; targetServer += blockAivNum_) {
+        auto countPtr = reinterpret_cast<__gm__ int32_t*>(workspace.urma.relaySendQueue.get_ptr(buffer) +
+                                                          DispatchRelayQueueServerOffset(targetServer));
+        GmWrite(countPtr, int32_t(0));
+        if (IsCombineServerDedupEnabled()) {
+            auto listCount = reinterpret_cast<__gm__ int32_t*>(workspace.urma.serverCombine.tokenIds.get_ptr(buffer) +
+                                                               targetServer * tokenListStride);
+            GmWrite(listCount, int32_t(0));
+        }
+    }
+    // CCL ready 区连续清零；普通模式的两个 Combine ready 区大小为 0。
+    const auto readyBytes =
+        peermem.dispatchFlag.sizeBytes + peermem.sourceReady.sizeBytes + peermem.contributionReady.sizeBytes;
+    const auto readyRange = GetBalancedWorkRange(static_cast<int32_t>(readyBytes / sizeof(int32_t)), job);
+    ResetWorkspaceRegion(readyRange, peermem.dispatchFlag.get_ptr(commBuffer), resetBatchElementCount_, resetTensor_);
+    // Server Combine 的连续 token 状态区。
+    if (IsCombineServerDedupEnabled()) {
+        const auto completedCountRange =
+            GetBalancedWorkRange(static_cast<int32_t>(workspace.reset.serverCombine.sizeBytes / sizeof(int32_t)), job);
+        ResetWorkspaceRegion(completedCountRange, workspace.urma.serverCombine.completedCounts.get_ptr(buffer),
+                             resetBatchElementCount_, resetTensor_);
     }
 }
 
@@ -315,149 +338,112 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ExpertTok
     PipeWait<PIPE_MTE3, PIPE_MTE2>(0);
 }
 
+// 发送区按 [目标卡][专家] 排列，本卡专家直接写入接收区的 [本源卡][专家]。
 template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::BuildExpertMaskRound(
-    int32_t curExpertId, uint32_t roundIdx, uint64_t roundStart, uint32_t roundLen, uint32_t curRoundCompareCount,
-    uint64_t& totalSendCnt)
+__aicore__ inline GM_ADDR MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::GetSendMaskSlot(uint32_t expertId) const
 {
-    // Phase 1: 加载本轮 topkIds 子段；用非法 expert id 填充对齐尾部。
-    {
-        LocalTensor<int32_t> values(TPosition::VECCALC, reinterpret_cast<uint64_t>(topkIdsTensor_), roundCompareCount_);
-        Duplicate<int32_t>(values, -1, roundCompareCount_);
-    }
-    PipeFence<PIPE_V, PIPE_MTE2, SYNC_EVENT_ID1>();
-    __gm__ int32_t* roundSrcGlobal =
-        (__gm__ int32_t*)(params_.expertIdxGmAddr + static_cast<uint64_t>(roundStart) * sizeof(int32_t));
-
-    CopyGmToUb(topkIdsTensor_, roundSrcGlobal, static_cast<uint32_t>(roundLen * sizeof(int32_t)));
-    PipeFence<PIPE_MTE2, PIPE_V, SYNC_EVENT_ID1>();
-
-    // Phase 2: CompareScalar → 本轮部分 mask + GatherMask 累加 count
-    __ubuf__ uint8_t* maskBuf = sendMaskTensor_[roundIdx % DOUBLE_BUFFER];
-    LocalTensor<uint8_t> mask(TPosition::VECCALC, reinterpret_cast<uint64_t>(maskBuf), roundMaskSlotSize_);
-    LocalTensor<int32_t> ids(TPosition::VECCALC, reinterpret_cast<uint64_t>(topkIdsTensor_), roundCompareCount_);
-    LocalTensor<int32_t> selected(TPosition::VECCALC, reinterpret_cast<uint64_t>(sendGatherOutTensor_),
-                                  roundCompareCount_);
-    auto maskPattern = mask.template ReinterpretCast<uint32_t>();
-    CompareScalar(mask, ids, curExpertId, AscendC::CMPMODE::EQ, curRoundCompareCount);
-    uint64_t roundSendCnt = 0;
-    GatherMask(selected, ids, maskPattern, true, static_cast<uint32_t>(roundLen), {1, 1, 0, 0}, roundSendCnt);
-    PipeFence<PIPE_V, PIPE_S, SYNC_EVENT_ID2>();
-    totalSendCnt += roundSendCnt;
-    PipeFence<PIPE_S, PIPE_MTE3, SYNC_EVENT_ID3>();
+    const uint32_t targetRank = expertId / moeExpertPerRank_;
+    GM_ADDR maskBase = targetRank == rankId_ ?
+                           params_.communication.layout.maskRecv.get_ptr(params_.communication.base) :
+                           params_.workspace.layout.urma.mask.get_ptr(params_.workspace.base);
+    return maskBase + static_cast<uint64_t>(expertId) * maskSlotSize_;
 }
 
 template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline uint64_t MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::BuildExpertMask(uint32_t curRankId,
-                                                                                           int32_t curExpertId,
-                                                                                           uint64_t srcOffset,
-                                                                                           uint64_t dstOffset)
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CopyExpertMaskCounts(
+    const WorkRange& expertRange)
 {
-    const auto& workspace = params_.workspace.layout;
-    const auto& buffer = params_.workspace.base;
-    uint64_t totalSendCnt = 0;
-    for (uint32_t roundIdx = 0; roundIdx < totalRounds_; ++roundIdx) {
-        uint64_t roundStart = static_cast<uint64_t>(roundIdx) * static_cast<uint64_t>(roundSendTotalNum_);
-        uint64_t roundLen64 =
-            (roundIdx + 1 < totalRounds_) ? static_cast<uint64_t>(roundSendTotalNum_) : sendTotalNum_ - roundStart;
-        uint32_t roundLen = static_cast<uint32_t>(roundLen64);
-        uint32_t curRoundCompareCount =
-            (roundLen == roundSendTotalNum_) ?
-                roundCompareCount_ :
-                static_cast<uint32_t>(
-                    Ops::Base::CeilAlign(static_cast<int64_t>(roundLen) * static_cast<int64_t>(sizeof(int32_t)),
-                                         static_cast<int64_t>(ALIGN_256)) /
-                    static_cast<int64_t>(sizeof(int32_t)));
-        uint32_t curRoundMaskAlignSize =
-            (roundLen == roundSendTotalNum_) ?
-                roundMaskAlignSize_ :
-                static_cast<uint32_t>(Ops::Base::CeilAlign(static_cast<int64_t>(curRoundCompareCount) / 8,
-                                                           static_cast<int64_t>(ALIGN_32)));
-
-        BuildExpertMaskRound(curExpertId, roundIdx, roundStart, roundLen, curRoundCompareCount, totalSendCnt);
-        __ubuf__ uint8_t* maskBuf = sendMaskTensor_[roundIdx % DOUBLE_BUFFER];
-        // Phase 2b: 将本轮部分 mask 写入 workspace 或 local win 对应字节偏移
-        // roundByteOffset = roundStart/8，因 roundSendTotalNum_ 为 256 对齐，该偏移 32B 对齐
-        uint64_t roundByteOffset = static_cast<uint64_t>(roundStart) / 8U;
-        uint32_t writeBytes =
-            (static_cast<uint64_t>(curRoundMaskAlignSize) <= static_cast<uint64_t>(maskAlignSize_) - roundByteOffset) ?
-                curRoundMaskAlignSize :
-                static_cast<uint32_t>(static_cast<uint64_t>(maskAlignSize_) - roundByteOffset);
-
-        if (curRankId == rankId_) {
-            __gm__ uint8_t* winDstGlobal =
-                (__gm__ uint8_t*)(GetRankWinAddrWithOffset(rankId_, dstOffset + roundByteOffset));
-            CopyUbToGm(winDstGlobal, maskBuf, writeBytes);
-        } else {
-            __gm__ uint8_t* wsDstGlobal =
-                (__gm__ uint8_t*)(workspace.urma.mask.get_ptr(buffer) + srcOffset + roundByteOffset);
-            CopyUbToGm(wsDstGlobal, maskBuf, writeBytes);
+    const uint32_t expertEnd = expertRange.start + expertRange.count;
+    const uint32_t localExpertBegin = rankId_ * moeExpertPerRank_;
+    const uint32_t localExpertEnd = localExpertBegin + moeExpertPerRank_;
+    uint32_t expertBegin = expertRange.start;
+    // 发送暂存区按全局专家连续排列，仅进入、离开本卡专家范围时切换 GM 区域。
+    while (expertBegin < expertEnd) {
+        uint32_t copyEnd = expertEnd; // 默认搬完本核剩余 count。
+        if (expertBegin < localExpertBegin && localExpertBegin < copyEnd) {
+            copyEnd = localExpertBegin; // 搬到本卡专家区起点，下一段切换到接收区。
+        } else if (expertBegin < localExpertEnd && localExpertEnd < copyEnd) {
+            copyEnd = localExpertEnd; // 搬到本卡专家区终点，下一段切回发送暂存区。
         }
-        PipeBarrier<PIPE_ALL>();
+        const WorkRange copyRange{expertBegin, copyEnd - expertBegin};
+        const uint64_t ubOffset = static_cast<uint64_t>(copyRange.start - expertRange.start) * ALIGN_32;
+        auto* source = reinterpret_cast<__ubuf__ uint8_t*>(sendMaskCounts_) + ubOffset;
+        auto* destination = reinterpret_cast<__gm__ uint8_t*>(GetSendMaskSlot(copyRange.start) + maskAlignSize_);
+        const CopyRows copyParams{static_cast<uint16_t>(copyRange.count), sizeof(int32_t), maskSlotSize_, ALIGN_32};
+        CopyUbToGm(destination, source, copyParams);
+        expertBegin = copyEnd;
     }
-    return totalSendCnt;
 }
 
-// ======================================================================================================
-// SendMaskCal：对本卡 topk 按通信域内所有专家id计算mask位，并发送至目标专家卡
-// ------------------------------------------------------------------------------------------------------
-//   大 bs 场景下 sendTotalNum 可能超出 UB 限制，因此按 roundSendTotalNum_ 分轮次计算：
-//   Phase 1: 对每个全局专家，逐轮加载 topkIds 子段 → CompareScalar → 部分 mask；
-//   Phase 2: 每轮部分 mask 拼写到 workspace/win 对应字节偏移，GatherMask 累加本轮 count；
-//   Phase 3: 所有轮次完成后，写入 total count，URMA 发送完整 mask slot。
-// ======================================================================================================
+/*
+ * 全部 AIV 均分 [目标 rank × 本地专家]，各核写互不重叠的完整 mask 槽。
+ * 每轮 topk 只搬入一次，复用于本核全部专家；跨轮 count 保存在独立 UB 槽中。
+ * UB = 512B 通信 scratch + topk + reset 零缓冲 + 双 mask 缓冲 + count 槽。
+ * InitSendMaskRounds 将 count 槽一并计入预算，所有缓冲均位于 COMM_WORK_UB_LIMIT 以下。
+ */
 template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendMaskCal()
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ComputeExpertMasks(const WorkRange& expertRange)
+{
+    constexpr uint32_t COUNT_STRIDE = ALIGN_32 / sizeof(int32_t);
+    LocalTensor<int32_t> counts(TPosition::VECCALC, reinterpret_cast<uint64_t>(sendMaskCounts_),
+                                expertRange.count * COUNT_STRIDE);
+    Duplicate<int32_t>(counts, 0, expertRange.count * COUNT_STRIDE);
+
+    for (uint32_t roundIdx = 0U; roundIdx < totalRounds_; ++roundIdx) {
+        const uint64_t roundStart = static_cast<uint64_t>(roundIdx) * roundSendTotalNum_;
+        const uint32_t roundLen = static_cast<uint32_t>(
+            sendTotalNum_ - roundStart < roundSendTotalNum_ ? sendTotalNum_ - roundStart : roundSendTotalNum_);
+        const uint64_t byteOffset = roundStart / 8U;
+        const uint32_t alignedMaskBytes =
+            Ops::Base::CeilAlign(Ops::Base::CeilDiv(roundLen, 8U), static_cast<uint32_t>(ALIGN_32));
+        const uint32_t writeBytes = static_cast<uint32_t>(
+            maskAlignSize_ - byteOffset < alignedMaskBytes ? maskAlignSize_ - byteOffset : alignedMaskBytes);
+
+        // 下一轮覆盖 topk 前，等待前轮 VF 读取完成；VF 自身屏蔽无效尾部，无需填充输入。
+        PipeFence<PIPE_V, PIPE_MTE2, SYNC_EVENT_ID1>();
+        CopyGmToUb(topkIdsTensor_, reinterpret_cast<__gm__ int32_t*>(params_.expertIdxGmAddr) + roundStart,
+                   roundLen * sizeof(int32_t));
+        PipeFence<PIPE_MTE2, PIPE_V, SYNC_EVENT_ID1>();
+
+        for (uint32_t expertOffset = 0U; expertOffset < expertRange.count; ++expertOffset) {
+            const uint32_t expertId = expertRange.start + expertOffset;
+            const uint32_t bufferIdx = expertOffset % DOUBLE_BUFFER;
+            // mutex 0/1 分别保护两块 mask 缓冲，首次可直接获取，复用时由硬件等待前次搬出。
+            asc_lock(PIPE_V, bufferIdx);
+            CallVf<ComputeExpertMaskVF>(topkIdsTensor_, sendMaskTensor_[bufferIdx],
+                                        sendMaskCounts_ + expertOffset * COUNT_STRIDE, expertId, roundLen);
+            asc_unlock(PIPE_V, bufferIdx);
+            asc_lock(PIPE_MTE3, bufferIdx);
+            CopyUbToGm(reinterpret_cast<__gm__ uint8_t*>(GetSendMaskSlot(expertId) + byteOffset),
+                       sendMaskTensor_[bufferIdx], writeBytes);
+            asc_unlock(PIPE_MTE3, bufferIdx);
+        }
+    }
+    // count 由 VF 写入 UB，等待 V 完成后搬出；源槽保持到本卡交接同步结束。
+    PipeFence<PIPE_V, PIPE_MTE3, SYNC_EVENT_ID3>();
+    CopyExpertMaskCounts(expertRange);
+}
+
+// 固定 channel owner 发送其他计算核准备的完整 [mask | count] 槽，锁继续由 Sync1 释放。
+template <TemplateMegaMoeLayeredTypeClass>
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendExpertMasks()
 {
     const auto& workspace = params_.workspace.layout;
     const auto& buffer = params_.workspace.base;
     const auto& peermem = params_.communication.layout;
-    if constexpr (g_coreType == AIC) {
-        return;
-    }
-    int32_t totalExperts = static_cast<int32_t>(worldSize_);
-    // 按卡处理，只使用前 worldSize 个核。
-    for (uint32_t curRankId = aivCoreIdx_; curRankId < static_cast<uint32_t>(totalExperts); curRankId += blockAivNum_) {
-        Channel maskChannel{};
-        if (curRankId != rankId_) {
-            maskChannel = comm_.GetChannel(curRankId);
-            // SendMask 与紧随其后的第一次全卡同步由同一物理 AIV 负责，锁跨两个阶段复用，
-            // 避免在中间没有换核时提前 Unlock 刷新通道 counter。
-            comm_.Lock(maskChannel);
+    const uint64_t rankMaskBytes = static_cast<uint64_t>(moeExpertPerRank_) * maskSlotSize_;
+    for (uint32_t targetRank = aivCoreIdx_; targetRank < worldSize_; targetRank += blockAivNum_) {
+        if (targetRank == rankId_) {
+            continue;
         }
-        for (uint32_t expertIdIndex = 0; expertIdIndex < moeExpertPerRank_; ++expertIdIndex) { // 按专家处理
-            int32_t curExpertId = static_cast<int32_t>(curRankId * moeExpertPerRank_ + expertIdIndex);
-            uint64_t srcOffset = static_cast<uint64_t>(expertIdIndex * static_cast<int32_t>(worldSize_) +
-                                                       static_cast<int32_t>(curRankId)) *
-                                 static_cast<uint64_t>(maskSlotSize_);
-            uint64_t dstOffset =
-                peermem.maskRecv.offsetBytes + static_cast<uint64_t>(expertIdIndex * static_cast<int32_t>(worldSize_) +
-                                                                     static_cast<int32_t>(rankId_)) *
-                                                   static_cast<uint64_t>(maskSlotSize_);
-            uint64_t totalSendCnt = BuildExpertMask(curRankId, curExpertId, srcOffset, dstOffset);
-            // Phase 3: 写入 total count 并发送完整 mask slot
-            if (curRankId == rankId_) {
-                __gm__ int32_t* winCountPtr =
-                    reinterpret_cast<__gm__ int32_t*>(GetRankWinAddrWithOffset(rankId_, dstOffset + maskAlignSize_));
-                GmWrite(winCountPtr, static_cast<int32_t>(totalSendCnt));
-                PipeBarrier<PIPE_ALL>();
-            } else {
-                __gm__ int32_t* wsCountPtr =
-                    reinterpret_cast<__gm__ int32_t*>(workspace.urma.mask.get_ptr(buffer) + srcOffset + maskAlignSize_);
-                GmWrite(wsCountPtr, static_cast<int32_t>(totalSendCnt));
-                PipeBarrier<PIPE_ALL>();
-                // E_dsburma2: WriteNbi 的 DMA 引擎从 maskSlot 直读（含尾部 count），旁路写必须先 DSB 排空，
-                // 否则远端专家计数表可能收到旧 count，等待目标与实际 token 数错位即挂死/丢数。
-                GmDataBarrier();
-                GM_ADDR remoteDataAddr = GetRankWinAddrWithOffset(curRankId, dstOffset);
-                GM_ADDR localGmAddr = workspace.urma.mask.get_ptr(buffer) + srcOffset;
-                comm_.WriteNbi(maskChannel, remoteDataAddr, localGmAddr, maskSlotSize_);
-            }
-        }
+        Channel channel = comm_.GetChannel(targetRank);
+        comm_.Lock(channel);
+        const uint64_t srcOffset = static_cast<uint64_t>(targetRank) * rankMaskBytes;
+        const uint64_t dstOffset = peermem.maskRecv.offsetBytes + static_cast<uint64_t>(rankId_) * rankMaskBytes;
+        comm_.WriteNbiChunked(channel, GetRankWinAddrWithOffset(targetRank, dstOffset),
+                              workspace.urma.mask.get_ptr(buffer) + srcOffset, rankMaskBytes);
     }
-    // SendMask 使用 direct WriteNbi，不创建批量 handle；完成等待放在首次 CrossRankSync 的
-    // 通知发送之前（同一 AIV、同一通道集合），mask 传输与随后的本卡准备重叠，通道锁由紧随
-    // 其后的 CrossRankSync 复用。
+    // mask 发送完成的等待统一放在首次跨卡同步前，与中间的本卡准备工作重叠。
 }
 
 // ======================================================================
@@ -512,45 +498,6 @@ __aicore__ inline uint64_t MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Relay
                 static_cast<uint64_t>(params_.tilingData->compute.numMaxTokensPerRank) +
             tokenId) *
            sizeof(uint64_t);
-}
-
-template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ResetCommunicationState()
-{
-    const auto& workspace = params_.workspace.layout;
-    const auto& buffer = params_.workspace.base;
-    const auto& peermem = params_.communication.layout;
-    const auto& commBuffer = params_.communication.base;
-    if constexpr (g_coreType == AIC) {
-        return;
-    }
-
-    // 同一 AIV owner 清零目标 Server 的队列 count 和 Combine 列表行头。
-    const int64_t tokenListStride =
-        CalcServerCombineTokenListStrideBytes(params_.tilingData->compute.numMaxTokensPerRank);
-    for (uint32_t targetServer = aivCoreIdx_; targetServer < serverNum_; targetServer += blockAivNum_) {
-        auto countPtr = reinterpret_cast<__gm__ int32_t*>(workspace.urma.relaySendQueue.get_ptr(buffer) +
-                                                          DispatchRelayQueueServerOffset(targetServer));
-        GmWrite(countPtr, int32_t(0));
-        if (IsCombineServerDedupEnabled()) {
-            auto listCount = reinterpret_cast<__gm__ int32_t*>(workspace.urma.serverCombine.tokenIds.get_ptr(buffer) +
-                                                               targetServer * tokenListStride);
-            GmWrite(listCount, int32_t(0));
-        }
-    }
-    const AivJobContext job{aivCoreIdx_, blockAivNum_};
-    // CCL ready 区连续清零；普通模式的两个 Combine ready 区大小为 0。
-    const auto readyBytes =
-        peermem.dispatchFlag.sizeBytes + peermem.sourceReady.sizeBytes + peermem.contributionReady.sizeBytes;
-    const auto readyRange = GetBalancedWorkRange(static_cast<int32_t>(readyBytes / sizeof(int32_t)), job);
-    ResetWorkspaceRegion(readyRange, peermem.dispatchFlag.get_ptr(commBuffer), resetBatchElementCount_, resetTensor_);
-    // Server Combine 的连续 token 状态区。
-    if (IsCombineServerDedupEnabled()) {
-        const auto completedCountRange =
-            GetBalancedWorkRange(static_cast<int32_t>(workspace.reset.serverCombine.sizeBytes / sizeof(int32_t)), job);
-        ResetWorkspaceRegion(completedCountRange, workspace.urma.serverCombine.completedCounts.get_ptr(buffer),
-                             resetBatchElementCount_, resetTensor_);
-    }
 }
 
 template <TemplateMegaMoeLayeredTypeClass>
@@ -865,39 +812,6 @@ __aicore__ inline GM_ADDR MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Prepar
 }
 
 /*
- * 将连续字节范围分成单条写请求，再按 WQE 剩余槽位组批；满批立即提交。
- * 返回尾批的请求数，使数据和 Combine 位图能够接续使用同一批次。
- */
-template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline uint32_t MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::AppendDispatchWriteRange(
-    BatchHandle& batchHandle, GM_ADDR target, GM_ADDR source, uint64_t bytes, uint32_t maxWriteBytes,
-    uint32_t pendingWqes)
-{
-    // WQE 描述符区为 64KiB，每条普通写占 64B，一批最多容纳 1024 条。
-    constexpr uint32_t maxWqesPerBatch = LAYERED_HCOMM_BATCH_WQE_CAPACITY;
-    const uint64_t writeCount = Ops::Base::CeilDiv(bytes, static_cast<uint64_t>(maxWriteBytes));
-    uint32_t batchWriteCount = 0U;
-    for (uint64_t firstWrite = 0U; firstWrite < writeCount; firstWrite += batchWriteCount) {
-        const uint64_t remainingWrites = writeCount - firstWrite;
-        const uint32_t availableWqes = maxWqesPerBatch - pendingWqes;
-        batchWriteCount = static_cast<uint32_t>(remainingWrites < availableWqes ? remainingWrites : availableWqes);
-        for (uint32_t index = 0U; index < batchWriteCount; ++index) {
-            const uint64_t offset = (firstWrite + index) * static_cast<uint64_t>(maxWriteBytes);
-            const uint64_t remainingBytes = bytes - offset;
-            const uint32_t chunkBytes =
-                static_cast<uint32_t>(remainingBytes < maxWriteBytes ? remainingBytes : maxWriteBytes);
-            comm_.WriteRelaxedNbi(batchHandle, target + offset, source + offset, chunkBytes);
-        }
-        pendingWqes += batchWriteCount;
-        if (pendingWqes == maxWqesPerBatch) {
-            comm_.BatchCommit(batchHandle);
-            pendingWqes = 0U;
-        }
-    }
-    return pendingWqes;
-}
-
-/*
  * 一级 Dispatch：向单个远端 Server 的同卡号中继发送全量记录和可选 Combine 位图。
  * 最后提交来源就绪通知，整批完成等待留给后续依赖或出口。
  */
@@ -910,14 +824,11 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendDispa
     GM_ADDR readySource = PrepareDispatchReadySource(targetServer);
     Channel channel = comm_.GetChannel(relayRank);
     BatchHandle batchHandle = comm_.MakeBatchHandle(channel, GetRankWinAddrWithOffset(relayRank, 0));
-    // 通信策略选择按 512B 对齐且小于协议长度上限的分块：
-    // URMA 小于 256 MiB，RoCE 小于 2 GiB；全部分块使用当前通道的同一 WQ。
-    const uint32_t maxWriteBytes = comm_.GetBulkWriteChunkBytes(channel);
     const uint64_t relayOffset = RelayTokenOffset(serverId_, 0U);
     GM_ADDR dataSource = GetRankWinAddrWithOffset(rankId_, peermem.dispatchReceive.offsetBytes) + relayOffset;
     GM_ADDR dataTarget = GetRankWinAddrWithOffset(relayRank, peermem.dispatchReceive.offsetBytes) + relayOffset;
     const uint64_t dataBytes = static_cast<uint64_t>(m_) * static_cast<uint64_t>(relayRecordBytes_);
-    uint32_t pendingWqes = AppendDispatchWriteRange(batchHandle, dataTarget, dataSource, dataBytes, maxWriteBytes, 0U);
+    uint32_t pendingWqes = comm_.WriteRelaxedNbiChunked(batchHandle, dataTarget, dataSource, dataBytes);
     if (IsCombineServerDedupEnabled()) {
         // 未命中和实际 m_ 以外的位图槽由入口 reset 保证为零；只发位图，不混入尾部 count。
         const uint64_t capacity = static_cast<uint64_t>(params_.tilingData->compute.numMaxTokensPerRank);
@@ -925,8 +836,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendDispa
         GM_ADDR bitmapTarget =
             GetRankWinAddrWithOffset(relayRank, peermem.dispatchFlag.offsetBytes) + RelayFlagOffset(serverId_, 0U);
         const uint64_t bitmapBytes = capacity * sizeof(uint64_t);
-        pendingWqes =
-            AppendDispatchWriteRange(batchHandle, bitmapTarget, bitmapSource, bitmapBytes, maxWriteBytes, pendingWqes);
+        pendingWqes = comm_.WriteRelaxedNbiChunked(batchHandle, bitmapTarget, bitmapSource, bitmapBytes, pendingWqes);
     }
     if (pendingWqes != 0U) {
         comm_.BatchCommit(batchHandle);
@@ -1027,15 +937,29 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::PrepareEx
         return;
     }
 
-    // count 位于 mask slot 尾部，按 slot stride 压缩搬入连续 UB 表。
+    // GM 按 [源卡][专家] 保存 count，先紧凑搬入，再重排成前缀和使用的 [专家][源卡]。
+    // 复用接收 metadata 区（256 * 32B）；最多 2048 个 int32 count，不增加 UB 预算。
+    auto* rankCounts = reinterpret_cast<__ubuf__ int32_t*>(ubBufferUsedAddr_);
     // maskRecv 基址 512B 对齐、maskAlignSize_ 32B 对齐；blockCount <= 2048，满足 Compact Copy。
     auto* countGm = reinterpret_cast<__gm__ int32_t*>(peermem.maskRecv.get_ptr(commBuffer) + maskAlignSize_);
     PipeFence<PIPE_V, PIPE_MTE2, SYNC_EVENT_ID2>();
-    CopyGmToUb(cumsumInfoTensor_, countGm,
+    CopyGmToUb(rankCounts, countGm,
                CopyRows{static_cast<uint16_t>(worldSize_ * moeExpertPerRank_), sizeof(int32_t), maskSlotSize_,
                         sizeof(int32_t)},
                GmLoadCacheMode::NORMAL_FIRST_VICTIM, true);
     PipeFence<PIPE_MTE2, PIPE_V, SYNC_EVENT_ID2>();
+
+    const uint32_t countElements = worldSize_ * moeExpertPerRank_;
+    LocalTensor<int32_t> rankCountsTensor(TPosition::VECCALC, reinterpret_cast<uint64_t>(rankCounts), countElements);
+    LocalTensor<int32_t> expertCountsTensor(TPosition::VECCALC, reinterpret_cast<uint64_t>(cumsumInfoTensor_),
+                                            countElements);
+    ConfusionTransposeTiling tiling{};
+    tiling.param0 = 1U;
+    tiling.param1 = worldSize_;
+    tiling.param2 = moeExpertPerRank_;
+    // 950 的 021 路径无需额外 scratch，源和目标使用两块独立 UB。
+    Transpose<int32_t>(expertCountsTensor, rankCountsTensor, expertCountsTensor.template ReinterpretCast<uint8_t>(),
+                       TransposeType::TRANSPOSE_ND2ND_021, tiling);
 
     // 复用 MTE 的 count 表计算：前缀和 + 专家差分 + maxOutputSize clamp。
     // URMA mask count 高 8 位为 0，0x00FFFFFF 的 epoch mask 在当前场景下是无操作。
@@ -1480,7 +1404,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveDi
     if (rowStart >= static_cast<int32_t>(maxOutputSize_)) {
         return;
     }
-    auto* rankMaskBasePtr = expertMaskBase + static_cast<uint64_t>(srcRank) * maskSlotSize_;
+    auto* rankMaskBasePtr = expertMaskBase + static_cast<uint64_t>(srcRank) * moeExpertPerRank_ * maskSlotSize_;
     auto* rankCountPtr = reinterpret_cast<__gm__ int32_t*>(rankMaskBasePtr + maskAlignSize_);
     const int32_t rankTokenCount = GmRead(rankCountPtr);
     if (rankTokenCount <= 0) {
@@ -1532,8 +1456,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveDi
     }
     const auto& peermem = params_.communication.layout;
     const auto& commBuffer = params_.communication.base;
-    auto* expertMaskBase = reinterpret_cast<__gm__ uint8_t*>(
-        peermem.maskRecv.get_ptr(commBuffer) + static_cast<uint64_t>(expertIdx) * worldSize_ * maskSlotSize_);
+    auto* expertMaskBase = reinterpret_cast<__gm__ uint8_t*>(peermem.maskRecv.get_ptr(commBuffer) +
+                                                             static_cast<uint64_t>(expertIdx) * maskSlotSize_);
     const uint32_t srcServerBegin = IsLocalServer ? serverId_ : 0U;
     const uint32_t srcServerEnd = IsLocalServer ? serverId_ + 1U : serverNum_;
     for (uint32_t srcServer = srcServerBegin; srcServer < srcServerEnd; ++srcServer) {
@@ -1627,9 +1551,6 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SharedExp
 {
     const auto& workspace = params_.workspace.layout;
     const auto& buffer = params_.workspace.base;
-    if constexpr (g_coreType == AIC) {
-        return;
-    }
     int32_t currentNum;
     int32_t currentOffset;
     TilingByCore(m_, currentNum, currentOffset, 1);

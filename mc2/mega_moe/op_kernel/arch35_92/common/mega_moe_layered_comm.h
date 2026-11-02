@@ -13,11 +13,18 @@
 
 #if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL)
 #include "adv_api/hcomm/hcomm.h"
+#include "mega_moe_constants.h"
 #include "../../../../common/op_kernel/mc2_moe_context.h"
 
 namespace MegaMoeImpl {
 
 using namespace AscendC;
+
+// 本实现的分块长度小于协议上限；中间分块预留 512B，使后续地址保持原有对齐。
+constexpr uint32_t LAYERED_URMA_WRITE_BYTES_LIMIT = 256U * 1024U * 1024U;
+constexpr uint32_t LAYERED_ROCE_WRITE_BYTES_LIMIT = uint32_t(1) << 31U;
+constexpr uint32_t LAYERED_URMA_WRITE_CHUNK_BYTES = LAYERED_URMA_WRITE_BYTES_LIMIT - 512U;
+constexpr uint32_t LAYERED_ROCE_WRITE_CHUNK_BYTES = LAYERED_ROCE_WRITE_BYTES_LIMIT - 512U;
 
 // 两种 Layered 通信策略共用的 URMA 写配置。
 static constexpr UrmaWqeEntry LAYERED_RELAXED_WRITE_WQE_CONFIG = {
@@ -42,11 +49,6 @@ public:
         return context_->hcommHandle_[index];
     }
 
-    __aicore__ inline uint32_t GetBulkWriteChunkBytes(ChannelHandle) const
-    {
-        // URMA WriteNbi 要求长度严格小于 256 MiB，分块时保持记录对齐。
-        return 256U * 1024U * 1024U - 512U;
-    }
     __aicore__ inline int32_t Init(const LocalTensor<uint8_t>& scratch, uint32_t bytes)
     {
         return hcomm_.Init(scratch, bytes);
@@ -82,6 +84,44 @@ public:
     __aicore__ inline int32_t WriteNbi(ChannelHandle channel, GM_ADDR dst, GM_ADDR src, uint64_t bytes)
     {
         return hcomm_.WriteNbi(channel, dst, src, bytes);
+    }
+
+    // 自动拆分超长连续写，不等待完成；完成依赖仍由调用方通过 Drain 建立。
+    __aicore__ inline void WriteNbiChunked(Channel channel, GM_ADDR dst, GM_ADDR src, uint64_t bytes)
+    {
+        constexpr uint64_t bytesLimit = LAYERED_URMA_WRITE_BYTES_LIMIT;
+        constexpr uint32_t maxChunkBytes = LAYERED_URMA_WRITE_CHUNK_BYTES;
+        while (bytes != 0U) {
+            const uint64_t chunkBytes = bytes < bytesLimit ? bytes : maxChunkBytes;
+            WriteNbi(channel, dst, src, chunkBytes);
+            dst += chunkBytes;
+            src += chunkBytes;
+            bytes -= chunkBytes;
+        }
+    }
+
+    /*
+     * 与普通 channel 使用相同分段规则，弱保序追加请求并在满批时 Commit；不等待通信完成。
+     * 返回未提交尾批的请求数，可继续追加下一段；调用方负责尾批提交及最终 ready 通知。
+     */
+    __aicore__ inline uint32_t WriteRelaxedNbiChunked(BatchHandle& batch, GM_ADDR dst, GM_ADDR src, uint64_t bytes,
+                                                      uint32_t pendingWqes = 0U)
+    {
+        constexpr uint64_t bytesLimit = LAYERED_URMA_WRITE_BYTES_LIMIT;
+        constexpr uint32_t maxChunkBytes = LAYERED_URMA_WRITE_CHUNK_BYTES;
+        const uint32_t maxWqes = batchBufferBytes_ / HCOMM_BATCH_WQE_BYTES;
+        while (bytes != 0U) {
+            const uint32_t chunkBytes = static_cast<uint32_t>(bytes < bytesLimit ? bytes : maxChunkBytes);
+            WriteRelaxedNbi(batch, dst, src, chunkBytes);
+            if (++pendingWqes == maxWqes) {
+                BatchCommit(batch);
+                pendingWqes = 0U;
+            }
+            dst += chunkBytes;
+            src += chunkBytes;
+            bytes -= chunkBytes;
+        }
+        return pendingWqes;
     }
 
     __aicore__ inline int32_t WriteNbi(BatchHandle& batch, GM_ADDR dst, GM_ADDR src, uint32_t bytes)
@@ -172,11 +212,6 @@ public:
         // Retain peer routing with the native handle; later calls need no reverse lookup.
         return {ctx_->hcommHandle_[peer > rank_ ? peer - 1 : peer], peer / rankNumPerServer_ != serverId_};
     }
-    __aicore__ inline uint32_t GetBulkWriteChunkBytes(Channel channel) const
-    {
-        // RoCE 单次写入长度须严格小于 2 GiB，URMA 须严格小于 256 MiB。
-        return channel.roce ? (uint32_t(1) << 31U) - 512U : 256U * 1024U * 1024U - 512U;
-    }
     __aicore__ inline int32_t Lock(Channel ch)
     {
         return ch.roce ? roce_.Lock(ch.native) : urma_.Lock(ch.native);
@@ -210,6 +245,44 @@ public:
     {
         return ch.roce ? roce_.WriteNbi(ch.native, dst, src, bytes) : urma_.WriteNbi(ch.native, dst, src, bytes);
     }
+    // 自动拆分超长连续写，不等待完成；完成依赖仍由调用方通过 Drain 建立。
+    __aicore__ inline void WriteNbiChunked(Channel channel, GM_ADDR dst, GM_ADDR src, uint64_t bytes)
+    {
+        const uint64_t bytesLimit = channel.roce ? LAYERED_ROCE_WRITE_BYTES_LIMIT : LAYERED_URMA_WRITE_BYTES_LIMIT;
+        const uint32_t maxChunkBytes = channel.roce ? LAYERED_ROCE_WRITE_CHUNK_BYTES : LAYERED_URMA_WRITE_CHUNK_BYTES;
+        while (bytes != 0U) {
+            const uint64_t chunkBytes = bytes < bytesLimit ? bytes : maxChunkBytes;
+            WriteNbi(channel, dst, src, chunkBytes);
+            dst += chunkBytes;
+            src += chunkBytes;
+            bytes -= chunkBytes;
+        }
+    }
+
+    /*
+     * 与普通 channel 使用相同分段规则，弱保序追加请求并在满批时 Commit；不等待通信完成。
+     * 返回未提交尾批的请求数，可继续追加下一段；调用方负责尾批提交及最终 ready 通知。
+     */
+    __aicore__ inline uint32_t WriteRelaxedNbiChunked(BatchHandle& batch, GM_ADDR dst, GM_ADDR src, uint64_t bytes,
+                                                      uint32_t pendingWqes = 0U)
+    {
+        const uint64_t bytesLimit = batch.roce ? LAYERED_ROCE_WRITE_BYTES_LIMIT : LAYERED_URMA_WRITE_BYTES_LIMIT;
+        const uint32_t maxChunkBytes = batch.roce ? LAYERED_ROCE_WRITE_CHUNK_BYTES : LAYERED_URMA_WRITE_CHUNK_BYTES;
+        const uint32_t maxWqes = batchBufferBytes_ / HCOMM_BATCH_WQE_BYTES;
+        while (bytes != 0U) {
+            const uint32_t chunkBytes = static_cast<uint32_t>(bytes < bytesLimit ? bytes : maxChunkBytes);
+            WriteRelaxedNbi(batch, dst, src, chunkBytes);
+            if (++pendingWqes == maxWqes) {
+                BatchCommit(batch);
+                pendingWqes = 0U;
+            }
+            dst += chunkBytes;
+            src += chunkBytes;
+            bytes -= chunkBytes;
+        }
+        return pendingWqes;
+    }
+
     __aicore__ inline int32_t WriteNbi(BatchHandle& b, GM_ADDR dst, GM_ADDR src, uint32_t bytes)
     {
         return b.roce ? roce_.WriteNbi(b.native, dst, src, bytes) : urma_.WriteNbi(b.native, dst, src, bytes);

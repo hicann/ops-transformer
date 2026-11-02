@@ -23,6 +23,47 @@ namespace MegaMoeImpl {
 
 using namespace AscendC;
 
+/*
+ * 复用同一个比较 mask：打包输出位图，并通过 0/1 向量累加统计命中数量。
+ * 全程在 V 流水内更新 UB count，不使用 AR、Scalar 取数或废弃压缩输出。
+ * topkIds 容量按 256 个 int32 对齐；mask 输出按 32B 补齐，尾部无效位置写零。
+ * count 指向一个 32B 对齐槽，仅首个 int32 有效，首轮前由调用方初始化为零。
+ */
+__simd_vf__ inline void ComputeExpertMaskVF(__ubuf__ int32_t* topkIds, __ubuf__ uint8_t* mask, __ubuf__ int32_t* count,
+                                            int32_t expertId, uint32_t validCount)
+{
+    constexpr uint32_t ELEMENTS_PER_VECTOR = AscendC::GetVecLen() / sizeof(int32_t);
+    constexpr uint32_t BITS_PER_BLOCK = ALIGN_32 * 8U;
+    const uint32_t paddedCount = (validCount + BITS_PER_BLOCK - 1U) / BITS_PER_BLOCK * BITS_PER_BLOCK;
+    AscendC::Reg::RegTensor<int32_t> expertReg, oneReg, zeroReg, hitReg, sumReg, previousCountReg;
+    AscendC::Reg::MaskReg fullMask = AscendC::Reg::CreateMask<int32_t, AscendC::Reg::MaskPattern::ALL>();
+    AscendC::Reg::MaskReg firstLaneMask = AscendC::Reg::CreateMask<int32_t, AscendC::Reg::MaskPattern::VL1>();
+    AscendC::Reg::MaskReg activeMask, matchedMask;
+    AscendC::Reg::UnalignReg outputState;
+    __ubuf__ int32_t* output = reinterpret_cast<__ubuf__ int32_t*>(mask);
+    AscendC::Reg::Duplicate(oneReg, 1, fullMask);
+    AscendC::Reg::Duplicate(zeroReg, 0, fullMask);
+    AscendC::Reg::Duplicate(sumReg, 0, fullMask);
+
+    uint32_t remaining = validCount;
+    for (uint32_t offset = 0U; offset < paddedCount; offset += ELEMENTS_PER_VECTOR) {
+        activeMask = AscendC::Reg::UpdateMask<int32_t>(remaining);
+        AscendC::Reg::LoadAlign(expertReg, topkIds + offset);
+        AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::EQ>(matchedMask, expertReg, expertId, activeMask);
+        AscendC::Reg::And(matchedMask, matchedMask, activeMask, fullMask);
+        // 与 CompareScalar 的 packed-bit 输出保持一致，每个有效 topk 位置占 1 bit。
+        AscendC::Reg::StoreUnAlign(output, matchedMask, outputState);
+        AscendC::Reg::Select(hitReg, oneReg, zeroReg, matchedMask);
+        AscendC::Reg::Add(sumReg, sumReg, hitReg, fullMask);
+    }
+    AscendC::Reg::StoreUnAlignPost<int32_t, AscendC::Reg::PostLiteral::POST_MODE_NORMAL>(output, outputState, 0);
+    AscendC::Reg::Reduce<AscendC::Reg::ReduceType::SUM>(sumReg, sumReg, fullMask);
+
+    AscendC::Reg::LoadAlign<int32_t, AscendC::Reg::LoadDist::DIST_BRC_B32>(previousCountReg, count);
+    AscendC::Reg::Add(sumReg, previousCountReg, sumReg, firstLaneMask);
+    AscendC::Reg::StoreAlign(count, sumReg, firstLaneMask);
+}
+
 // 计算 layered 规划所需的专家计数元数据：
 //   result[0] = Σ ceil(expertCount[i] / L1_TILE_M_256)
 //   result[8] = 最后一个 expertCount[i] != 0 的下标；全部为空时为 -1

@@ -165,16 +165,12 @@ private:
     __aicore__ inline void InitDispatchLayout(const MegaMoeTilingData* tilingData);
     __aicore__ inline void InitWorkspace(GM_ADDR workspaceGM, const MegaMoeTilingData* tilingData);
     __aicore__ inline uint32_t InitResetBatch();
-    __aicore__ inline void InitSendMaskRounds(uint32_t resetTensorSize);
+    __aicore__ inline void InitSendMaskRounds(uint32_t resetTensorSize, uint32_t countTensorSize);
     __aicore__ inline void InitDispatchRounds(uint32_t fixedBefore, uint32_t dispatchFixedCost);
     __aicore__ inline uint32_t InitDispatchIndexBuffers(uint32_t fixedBefore);
     __aicore__ inline void InitDispatchReceiveScratch(uint32_t copyBufferUbOffset, uint32_t copyBufferTotalBytes,
                                                       uint32_t expertCountBufferBytes);
-    __aicore__ inline void BuildExpertMaskRound(int32_t curExpertId, uint32_t roundIdx, uint64_t roundStart,
-                                                uint32_t roundLen, uint32_t curRoundCompareCount,
-                                                uint64_t& totalSendCnt);
-    __aicore__ inline uint64_t BuildExpertMask(uint32_t curRankId, int32_t curExpertId, uint64_t srcOffset,
-                                               uint64_t dstOffset);
+    __aicore__ inline GM_ADDR GetSendMaskSlot(uint32_t expertId) const;
     __aicore__ inline void UpdateLocalRelayWeight(int32_t copyIdx, int32_t outIdx, TEventID eventId);
     __aicore__ inline QuantProcessScratch<ActivationType> InitSharedExpertInputBuffers();
     __aicore__ inline void InitUnpermuteWeightChunk(uint32_t dataResBufAlign, uint32_t dataResFp32BufAlign);
@@ -205,8 +201,10 @@ private:
     __aicore__ inline void DispatchPrepareBuffInit();
     __aicore__ inline void SendAndQuantBuffInit();
     __aicore__ inline void UnpermuteBuffInit();
-    __aicore__ inline void ResetFlagList();
-    __aicore__ inline void SendMaskCal();
+    __aicore__ inline void ResetState();
+    __aicore__ inline void CopyExpertMaskCounts(const WorkRange& expertRange);
+    __aicore__ inline void ComputeExpertMasks(const WorkRange& expertRange);
+    __aicore__ inline void SendExpertMasks();
     __aicore__ inline void PrepareDispatchReceive();
     __aicore__ inline DispatchRowRange CalcDispatchExpertSlice(uint32_t expertIdx, uint32_t expertBegin,
                                                                const ExpertTokenRange& range);
@@ -247,11 +245,8 @@ private:
     __aicore__ inline void ExpertTokenNumCopyOut();
     __aicore__ inline void CopyLocalDispatchTokens(int32_t dstRow, int32_t srcRank, int32_t tokenOffset,
                                                    int32_t tokenCount);
-    __aicore__ inline void ResetCommunicationState();
     __aicore__ inline void PublishLocalDispatchRelayCount();
     __aicore__ inline GM_ADDR PrepareDispatchReadySource(uint32_t targetServer);
-    __aicore__ inline uint32_t AppendDispatchWriteRange(BatchHandle& batchHandle, GM_ADDR target, GM_ADDR source,
-                                                        uint64_t bytes, uint32_t maxWriteBytes, uint32_t pendingWqes);
     __aicore__ inline void SendDispatchToRemoteServer(uint32_t targetServer, uint32_t relayRank);
     __aicore__ inline void StartInterServerDispatch();
     __aicore__ inline uint64_t DispatchBulkReadyFlagOffset(uint32_t sourceServer) const;
@@ -433,8 +428,8 @@ private:
     __ubuf__ int32_t* resetTensor_ = nullptr;
     int32_t resetBatchElementCount_ = 0;
     __ubuf__ int32_t* topkIdsTensor_ = nullptr;
-    __ubuf__ uint8_t* sendMaskTensor_[DOUBLE_BUFFER]{}; // SendMaskCal 源卡算 [mask|count] 的 ping-pong 缓冲
-    __ubuf__ int32_t* sendGatherOutTensor_ = nullptr;   // SendMaskCal GatherMask 计 count 的废弃输出 scratch
+    __ubuf__ uint8_t* sendMaskTensor_[DOUBLE_BUFFER]{}; // ComputeExpertMasks 位图搬出的 ping-pong 缓冲
+    __ubuf__ int32_t* sendMaskCounts_ = nullptr;        // 每个任务一个 32B count 槽
     __ubuf__ int32_t* expertTokenNumsOutTensor_ = nullptr;
     __ubuf__ bfloat16_t* dataResTensor_ = nullptr;
     __ubuf__ float* dataResFp32Tensor_ = nullptr;
@@ -592,7 +587,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitDispa
     // mask 是跨 Rank 共享的槽布局，几何必须与 PeermemInfo 一样按全卡容量计算。
     maskAlignSize_ = static_cast<uint32_t>(
         CalcDispatchMaskAlignSize(tilingData->compute.numMaxTokensPerRank, tilingData->compute.topK));
-    // 每个 win 槽位再追加 32B 存 count(源卡 SendMaskCal 同步算好), 须与 PeermemInfo 的 maskSlotSize 一致。
+    // 每个 win 槽位再追加 32B 存 count（源卡 ComputeExpertMasks 同时算好）, 须与 PeermemInfo 的 maskSlotSize 一致。
     maskSlotSize_ = maskAlignSize_ + static_cast<uint32_t>(ALIGN_32);
     mxQuantScaleNumAlignPerToken_ = Ops::Base::CeilDiv(k_, static_cast<uint32_t>(ALIGN_32));
     mxQuantTokenAlignBytes_ =
@@ -1351,14 +1346,21 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Process()
     // 1.本卡数据处理
     int64_t oriOverflowMode = GetCtrlSpr<OVERFLOW_MODE_CTRL, OVERFLOW_MODE_CTRL>();
     SetCtrlSpr<OVERFLOW_MODE_CTRL, OVERFLOW_MODE_CTRL>(0);
-    SendAndQuantBuffInit();
-    SendMaskCal();             // 源卡按全局专家计算掩码，并推送到目标专家卡
-    ResetFlagList();           // 清零工作空间中的同步标志
-    ResetCommunicationState(); // 清零通信队列、CCL ready 及 Combine 工作空间状态
-    if (sharedExpertNum_ > 0) {
-        SharedExpertCopyInput();
-    }
     if constexpr (g_coreType == AIV) {
+        SendAndQuantBuffInit();
+        ResetState();
+        const auto expertRange =
+            GetBalancedWorkRange(worldSize_ * moeExpertPerRank_, {.jobIndex = aivCoreIdx_, .totalJobs = blockAivNum_});
+        if (expertRange.count != 0U) {
+            ComputeExpertMasks(expertRange);
+        }
+        // 同一 MTE3 队列上的清零、mask 和 count 写回完成后，再允许 owner 提交通信。
+        SyncInterArrive<PIPE_MTE3>(ALL_AIV_BARRIER_EVENT);
+        SyncInterWait<PIPE_S>(ALL_AIV_BARRIER_EVENT);
+        SendExpertMasks();
+        if (sharedExpertNum_ > 0) {
+            SharedExpertCopyInput();
+        }
         PipeBarrier<PIPE_ALL>();
     }
     AllCoreBarrier(); // AIC 等待同步标志清零完成
