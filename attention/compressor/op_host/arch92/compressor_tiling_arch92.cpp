@@ -447,7 +447,7 @@ ge::graphStatus CompressorTiling::GenTilingKey() const
     uint8_t layout = 0;
     uint8_t templateId = static_cast<uint8_t>(context_->templateId);
     uint8_t cacheMode = static_cast<uint8_t>(*context_->cacheMode);
-    uint8_t gradEnabled = static_cast<uint8_t>(context_->gradEnabled ? 1 : 0);
+    uint8_t gradEnabled = static_cast<uint8_t>(context_->gradEnabled != nullptr && *context_->gradEnabled ? 1 : 0);
 
     auto xDtype = context_->x.desc->GetDataType();
     if (xDtype == ge::DT_BF16) {

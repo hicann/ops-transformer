@@ -365,7 +365,7 @@ class _CompressorFunction(torch.autograd.Function):
         coff,
         cache_mode,
     ):
-        grad_enabled = torch.is_grad_enabled() and any(
+        grad_enabled = any(
             t is not None and t.requires_grad for t in (x, wkv, wgate, ape)
         )
         cmp_kv, softmax_score, kv = _compressor_forward_graph(
