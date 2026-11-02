@@ -161,7 +161,7 @@ public:
                 mSub_ = (task.mActual > m0) ? (task.mActual - m0) : 0U;
             }
         }
-        // blocksize=16 的 stage 一行是一个 token（写回时复制到全部 head）；其余路径一行就是一行。
+        // blocksize=16 的 stage 一行是一个 token，写回 score 的唯一 head；其余路径一行就是一行。
         tokensSub_ = IS_BLOCK16 ? (mSub_ / numQHeads_) : mSub_;
         stageRows_ = IS_BLOCK16 ? tokensSub_ : mSub_;
         // 容量按 stage 行数判断。blocksize=16 时 N1=128 会让某个 AIV 拿到 128 个 head 行，
@@ -552,19 +552,15 @@ private:
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
         uint32_t tOff = rowInReqBase_ / numQHeads_;
-        uint32_t h = rowInReqBase_ - tOff * numQHeads_;
         uint64_t tokenBase = static_cast<uint64_t>(tokenBase0_ + tOff) * strideOutToken_ + lo;
         if constexpr (IS_BLOCK16) {
-            // head 间 maxpool 后一个 token 只有一个分数，复制到该 token 的全部 head。
-            // mOff_ 与 task.mStart 都是 numQHeads 的整数倍，故 h 恒为 0。
+            // head 间 maxpool 后一个 token 只有一个分数。score 的 head 维是 1，只写这一份。
             for (uint32_t r = 0; r < stageRows_; ++r) {
-                for (uint32_t hh = 0; hh < numQHeads_; ++hh) {
-                    AscendC::DataCopy(gScore_[tokenBase + static_cast<uint64_t>(hh) * strideOutHead_],
-                                      ubStage_[r * MSA_STAGE_BLOCKS + ubOff], count);
-                }
+                AscendC::DataCopy(gScore_[tokenBase], ubStage_[r * MSA_STAGE_BLOCKS + ubOff], count);
                 tokenBase += strideOutToken_;
             }
         } else {
+            uint32_t h = rowInReqBase_ - tOff * numQHeads_;
             for (uint32_t r = 0; r < mSub_; ++r) {
                 AscendC::DataCopy(gScore_[tokenBase + static_cast<uint64_t>(h) * strideOutHead_],
                                   ubStage_[r * MSA_STAGE_BLOCKS + ubOff], count);

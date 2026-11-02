@@ -205,8 +205,8 @@ def msa_index_score_golden_v2(inputs):
                 s = q[t] @ k_page.T
                 if pool_block_size == 16:
                     # 先在每个 head 内做 block maxpool，再对该 block 取 head 间 max。
-                    # 输出是三维的，head 维上复制同一个值。块长 16 的 BBND/BNBD 与此相同。
-                    out[:, t, blk] = s.max(axis=1).max()
+                    # 归约结果只留在 head 0，返回前丢掉其余 head。
+                    out[0, t, blk] = s.max(axis=1).max()
                 else:
                     out[:, t, blk] = s.max(axis=1)
 
@@ -230,9 +230,12 @@ def msa_index_score_golden_v2(inputs):
                         boost = LOCAL_SCORE_INIT
                     if local_start <= blk <= q_block:
                         boost = LOCAL_SCORE_LOCAL
-                    if boost is not None:
-                        out[h, t, blk] = boost
+                    if boost is not None and (pool_block_size != 16 or h == 0):
+                        dst_h = 0 if pool_block_size == 16 else h
+                        out[dst_h, t, blk] = boost
 
+    if pool_block_size == 16:
+        return out[:1].copy()
     return out
 
 

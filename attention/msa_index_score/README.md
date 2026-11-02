@@ -149,7 +149,7 @@
   <tr>
     <td>score</td>
     <td>输出</td>
-    <td>公式中的 $score$，逐 block 重要性分数；shape 为 $[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]$</td>
+    <td>公式中的 $score$，逐 block 重要性分数。块长 128 的 shape 为 $[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]$；块长 16 做完 head 间 max 后 head 维为 1，shape 为 $[1, T1, RoundUp(maxBlockNumPerSeq, 16)]$</td>
     <td>FLOAT</td>
     <td>ND</td>
   </tr>

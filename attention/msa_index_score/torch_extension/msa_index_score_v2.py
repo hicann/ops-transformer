@@ -183,8 +183,10 @@ class MsaIndexScoreV2OpBuilder(OpBuilder):
                 if max_blocks <= 0:
                     max_blocks = 1
             score_stride = _round_up(int(max_blocks), SCORE_STRIDE_ALIGN)
+            blk = _resolve_pool_block_size(layout, key, pool_block_size)
+            score_heads = 1 if blk == BLOCK16_SIZE else num_q_heads
             return torch.empty(
-                (num_q_heads, total_q, score_stride),
+                (score_heads, total_q, score_stride),
                 dtype=torch.float32,
                 device="meta",
             )
@@ -273,7 +275,7 @@ def msa_index_score_v2(
     与 BBND / BNBD 的存储页长不是同一个量；分页时不能超过页长。
     128 走原单次块内 maxpool（TND 默认）；16 仅 Ascend 950、fp16 / bf16，
     先在每个 head 内对 block 取 max，再对每个 block 取 head 间 max，
-    输出在 ``N1`` 维上是同一个值的复制，且 ``N1`` 必须整除 128。
+    score 的 head 维为 1。query 的 head 数必须整除 128。
     允许 ``q_len`` / ``kv_len`` 为 0（含整 batch）：跳过该请求的 QK；空 KV 的 score 为 ``-inf``。
 
     Args:
@@ -292,7 +294,7 @@ def msa_index_score_v2(
             BBND / BNBD 不能超过存储页长。
 
     Returns:
-        ``[N1, T1, RoundUp(MB, 16)]`` float32
+        ``pool_block_size=16`` 时 ``[1, T1, RoundUp(MB, 16)]``，否则 ``[N1, T1, RoundUp(MB, 16)]``，float32
     """
     layout_query = _normalize_layout_query(layout_query)
     layout_key = _normalize_layout_key(layout_key)

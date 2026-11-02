@@ -535,19 +535,19 @@ void ComputeGolden(const TestCase& tc, const std::vector<int32_t>& actualSeqQlen
                 }
             }
             if (headMax) {
-                // 每个 block 再取 head 间 max，并把结果复制回全部 head（输出仍是三维）。
-                // local_mask 对所有 head 相同，放在其后不改变结果。
+                // head 间 max 之后每个块一个分数，只留在 head 0。函数返回前丢掉其余 head。
                 for (int64_t blk = 0; blk < numBlocks; ++blk) {
                     float m = golden[static_cast<size_t>(t * scoreStride + blk)];
                     for (int64_t h = 1; h < tc.numQHeads; ++h) {
                         m = std::max(m, golden[static_cast<size_t>((h * totalQ + t) * scoreStride + blk)]);
                     }
-                    for (int64_t h = 0; h < tc.numQHeads; ++h) {
-                        golden[static_cast<size_t>((h * totalQ + t) * scoreStride + blk)] = m;
-                    }
+                    golden[static_cast<size_t>(t * scoreStride + blk)] = m;
                 }
             }
         }
+    }
+    if (headMax) {
+        golden.resize(static_cast<size_t>(totalQ * scoreStride));
     }
 }
 
@@ -815,7 +815,8 @@ bool RunCase(const TestCase& tc, aclrtStream stream, bool isAscend950)
     } else {
         keyShape = {tc.numPages, blockLen, NUM_KV_HEADS, tc.headDim};
     }
-    const std::vector<int64_t> scoreShape = {tc.numQHeads, totalQ, scoreStride};
+    const int64_t scoreHeads = (blockLen == kBlock16Size) ? 1 : tc.numQHeads;
+    const std::vector<int64_t> scoreShape = {scoreHeads, totalQ, scoreStride};
 
     aclTensor* queryT = nullptr;
     if (isFp8) {
@@ -898,7 +899,7 @@ bool RunCase(const TestCase& tc, aclrtStream stream, bool isAscend950)
         attenMaskT = buf.Create(attenMaskHost, {kAttenMaskSize, kAttenMaskSize}, ACL_INT8);
     }
 
-    std::vector<float> scoreInit(static_cast<size_t>(tc.numQHeads * totalQ * scoreStride), 0.0F);
+    std::vector<float> scoreInit(static_cast<size_t>(scoreHeads * totalQ * scoreStride), 0.0F);
     void* scoreDev = nullptr;
     aclTensor* scoreT = buf.Create(scoreInit, scoreShape, ACL_FLOAT, &scoreDev);
 

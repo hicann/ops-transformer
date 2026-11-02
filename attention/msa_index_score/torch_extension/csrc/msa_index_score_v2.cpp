@@ -315,7 +315,8 @@ at::Tensor msa_index_score_v2(const at::Tensor& query, const at::Tensor& key,
                     "pool_block_size 16 requires num_q_heads to divide 128, got ", num_q_heads);
     }
     const int64_t score_stride = ((meta.maxBlocks + SCORE_STRIDE_ALIGN - 1) / SCORE_STRIDE_ALIGN) * SCORE_STRIDE_ALIGN;
-    at::Tensor score = at::empty({num_q_heads, total_q, score_stride}, query.options().dtype(at::kFloat));
+    const int64_t score_heads = (poolBlockSize == BLOCK16_SIZE) ? 1 : num_q_heads;
+    at::Tensor score = at::empty({score_heads, total_q, score_stride}, query.options().dtype(at::kFloat));
     ACLNN_CMD(aclnnMsaIndexScoreV2, query, key, block_table, scale, atten_mask, actual_seq_qlen, actual_seq_klen,
               start_loc, layoutKeyStr, sparse_mode, init_blocks, local_blocks, layoutQueryStr, poolBlockSize, score);
     return score;

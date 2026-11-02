@@ -607,10 +607,11 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
         const gert::Shape& scoreEarly = scoreShapeEarly->GetStorageShape();
         OP_CHECK_IF(scoreEarly.GetDimNum() != MSA_QUERY_DIM_NUM, OP_LOGE(context, "score must be 3D [N1,T1,stride]."),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF(
-            static_cast<uint32_t>(scoreEarly.GetDim(MSA_DIM_0)) != info.numQHeads,
-            OP_LOGE(context, "score N1(%ld) must equal query heads(%u).", scoreEarly.GetDim(MSA_DIM_0), info.numQHeads),
-            return ge::GRAPH_FAILED);
+        // pool_block_size=16 的 head 间 max 把 score 收到 1 个 head；块长 128 仍是每个 query head 一份。
+        const uint32_t expectScoreHeads = (poolBlockSizeAttr == MSA_BLOCK16_SIZE) ? 1U : info.numQHeads;
+        OP_CHECK_IF(static_cast<uint32_t>(scoreEarly.GetDim(MSA_DIM_0)) != expectScoreHeads,
+                    OP_LOGE(context, "score head dim(%ld) must be %u.", scoreEarly.GetDim(MSA_DIM_0), expectScoreHeads),
+                    return ge::GRAPH_FAILED);
         const int64_t scoreTokens = scoreEarly.GetDim(MSA_DIM_1);
         OP_CHECK_IF(scoreTokens < 0, OP_LOGE(context, "score T1 must be concrete, got %ld.", scoreTokens),
                     return ge::GRAPH_FAILED);

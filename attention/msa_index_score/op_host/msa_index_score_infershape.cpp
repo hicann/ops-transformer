@@ -221,9 +221,11 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
 
     // maxpool 已经把一个 block 内的 poolBlockSize 个 token 归约成 1 个分数，
     // 因此输出末维是 block 数（16 对齐）而不是 kv token 数。
+    // pool_block_size=16 再做 head 间 max，每个块只剩一个分数，head 维为 1。
+    const int64_t scoreHeads = (poolBlockSizeAttr == MSA_BLOCK16_SIZE) ? 1 : numQHeads;
     scoreShape->SetDimNum(MSA_QUERY_DIM_NUM);
-    scoreShape->SetDim(0, numQHeads); // 0: numQHeads
-    scoreShape->SetDim(1, totalQ);    // 1: totalQ
+    scoreShape->SetDim(0, scoreHeads);
+    scoreShape->SetDim(1, totalQ); // 1: totalQ
     scoreShape->SetDim(MSA_SCORE_DIM_BLOCK, RoundUpTo(maxBlocks, MSA_SCORE_STRIDE_ALIGN));
 
     OP_LOGI(context->GetNodeName(), "MsaIndexScore InferShape end.");

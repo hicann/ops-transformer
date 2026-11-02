@@ -174,7 +174,7 @@ cann_ops_transformer.msa_index_score_v2(
 
 ## 输出
 
-`[N1, T1, RoundUp(MB,16)]` float32。`T1`是`actual_seq_qlen`的有效token总数。逻辑块长16（BSND/BNSD，或BBND/BNBD页长16）时，先在每个head内对block取max，再对每个block取head间max，`N1`维上是同一个值的复制；`N1`必须整除128。块长128时每个head只做一次块内max，不做head间max。
+块长16时`[1, T1, RoundUp(MB,16)]`，块长128时`[N1, T1, RoundUp(MB,16)]`，float32。`T1`是`actual_seq_qlen`的有效token总数。逻辑块长16时，先在每个head内对block取max，再对每个block取head间max，结果放在这一个head上；query的head数必须整除128。块长128时每个head只做一次块内max，不做head间max。
 
 ## 调用示例
 
