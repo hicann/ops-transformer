@@ -65,8 +65,14 @@ public:
                                      uint32_t axisH)
     {
         axisH_ = axisH;
-        hOutSizeAlign_ = Ceil(hOutSize_, UB_ALIGN) * UB_ALIGN;             // scale起始放置偏移
-        hAlignSize_ = Ceil(axisH_ * sizeof(XInType), UB_ALIGN) * UB_ALIGN; // 用于搬入token数据xInQueue_大小申请
+        hOutSizeAlign_ = Ceil(hOutSize_, UB_ALIGN) * UB_ALIGN; // scale起始放置偏移
+        // 用于搬入token数据xInQueue_大小申请
+        if constexpr (Std::IsSame<XInType, uint8_t>::value) {
+            // 当且仅当输入类型为b4时，XInType为uint8_t
+            hAlignSize_ = Ceil(Ceil(axisH_, FP4_ELEMS_PER_BYTE), UB_ALIGN) * UB_ALIGN;
+        } else {
+            hAlignSize_ = Ceil(axisH_ * sizeof(XInType), UB_ALIGN) * UB_ALIGN;
+        }
         if constexpr ((QuantMode == UNQUANT) && IsSmoothScaleExist) {
             hOutSizeAlign_ += scaleInBytes_;
             hAlignSize_ += scaleInBytes_;

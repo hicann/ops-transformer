@@ -69,7 +69,6 @@ constexpr int64_t FULLMESH_BS_UPPER_BOUND_A5 = BS_UPPER_BOUND;
 constexpr uint32_t H_BASIC_BLOCK_LAYERED = 32;
 constexpr uint32_t RANK_NUM_PER_NODE = 16U;
 
-constexpr uint32_t SIZE_OF_UNQUANT = 2;
 constexpr uint32_t SIZE_OF_HALF = 2;
 constexpr uint32_t SIZE_ALIGN_256 = 256;
 constexpr uint32_t SPLIT_BLOCK_DATA_SIZE = 480U;
@@ -111,10 +110,6 @@ constexpr uint64_t MX_BLOCK_SIZE = 32U;
 constexpr uint64_t PERGROUP_BLOCK_SIZE = 128U;
 constexpr uint64_t HIF4_GROUP_SIZE = 64U;
 } // namespace
-
-// Supported x datatype in nonquant mode, the same as expandX
-static const std::set<ge::DataType> NON_QUANT_DTYPE = {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_HIFLOAT8,
-                                                       ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2};
 
 namespace optiling {
 static void PrintTilingDataInfo(const char* nodeName, MoeDistributeDispatchV2TilingData& tilingData)
@@ -669,7 +664,7 @@ ge::graphStatus MoeDistributeDispatchV2TilingFuncBase::CheckOtherAttrParams(cons
                     OP_LOGE(nodeName, "expertTokenNumsType should be 0 or 1, but got %s.",
                             std::to_string(*expertTokenNumsTypePtr).c_str()),
                     return ge::GRAPH_FAILED);
-    // A5 已作校验，这里只校验 A3
+    // 这里只校验 A3
     if (CheckCommAlgPtr(commAlgPtr, nodeName) == ge::GRAPH_FAILED) {
         return ge::GRAPH_FAILED;
     }
@@ -763,25 +758,25 @@ static ge::graphStatus CheckExpertAttrParams(const gert::TilingContext* context,
                     epWorldSize, sharedExpertRankNum),
             return ge::GRAPH_FAILED);
     }
-    bool isA5 = mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510;
+    bool isArch22 = mc2tiling::GetNpuArch(context) == Ops::Base::DAV_2201;
     int64_t moeExpertMaxNum =
-        isLayered ? MOE_EXPERT_MAX_NUM_LAYERED : (isA5 ? MOE_EXPERT_MAX_NUM_A5 : MOE_EXPERT_MAX_NUM);
+        isLayered ? MOE_EXPERT_MAX_NUM_LAYERED : (isArch22 ? MOE_EXPERT_MAX_NUM : MOE_EXPERT_MAX_NUM_A5);
     OP_TILING_CHECK(
         (moeExpertNum <= 0) || (moeExpertNum > moeExpertMaxNum),
         OP_LOGE(nodeName, "moeExpertNum should be in (0, %ld], but got %ld.", moeExpertMaxNum, moeExpertNum),
         return ge::GRAPH_FAILED);
 
-    if (isA5) {
+    if (!isArch22) {
         int64_t moeExpertRankNum = epWorldSize - sharedExpertRankNum;
         OP_TILING_CHECK(moeExpertRankNum <= 0,
                         OP_LOGE(nodeName, "moeExpertRankNum must be positive, but got %ld.", moeExpertRankNum),
                         return ge::GRAPH_FAILED);
         uint64_t localMoeExpertNum = static_cast<uint64_t>(moeExpertNum / moeExpertRankNum);
-        OP_TILING_CHECK(localMoeExpertNum * Mc2Kernel::STATE_OFFSET > Mc2Kernel::WIN_STATE_OFFSET,
+        OP_TILING_CHECK(localMoeExpertNum * epWorldSize * Mc2Kernel::STATE_OFFSET > Mc2Kernel::WIN_STATE_OFFSET,
                         OP_LOGE(nodeName,
-                                "A5 local expert status slots exceed one state region: localMoeExpertNum=%lu, "
+                                "local status slots exceed one state region: localMoeExpertNum=%lu, epWorldSize=%ld, "
                                 "STATE_OFFSET=%u, WIN_STATE_OFFSET=%lu.",
-                                localMoeExpertNum, Mc2Kernel::STATE_OFFSET, Mc2Kernel::WIN_STATE_OFFSET),
+                                localMoeExpertNum, epWorldSize, Mc2Kernel::STATE_OFFSET, Mc2Kernel::WIN_STATE_OFFSET),
                         return ge::GRAPH_FAILED);
     }
 
@@ -909,7 +904,7 @@ static bool CheckCommAlgAttrs(const gert::TilingContext* context, const char* no
                             fullMeshBsUpperBound, bs),
                     return false);
     int64_t fullMeshKUpperBound =
-        mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 ? FULLMESH_K_MAX_A5 : FULLMESH_K_MAX_A3;
+        mc2tiling::GetNpuArch(context) == Ops::Base::DAV_2201 ? FULLMESH_K_MAX_A3 : FULLMESH_K_MAX_A5;
     // 检查comm_alg和topK是否冲突
     OP_TILING_CHECK(isSetFullMeshV2 && (k > fullMeshKUpperBound),
                     OP_LOGE(nodeName, "When comm_alg is fullmesh_v2, topK should be between [1, %lld], but got %u.",
@@ -949,12 +944,17 @@ static ge::graphStatus CheckGlobalBsAttr(const gert::TilingContext* context, con
                             "rank) * epWorldSize, but got globalBS=%ld, bs=%ld, epWorldSize=%u.",
                             *globalBsPtr, xDim0, epWorldSize),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 &&
-                        *globalBsPtr > static_cast<int64_t>(epWorldSize) * BS_UPPER_BOUND,
+    int64_t bsUpperBound = BS_UPPER_BOUND;
+    if ((mc2tiling::GetNpuArch(context) == Ops::Base::DAV_9201) ||
+        (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_9202)) {
+        bsUpperBound = BS_UPPER_BOUND_A6;
+    }
+    OP_TILING_CHECK(mc2tiling::GetNpuArch(context) != Ops::Base::DAV_2201 &&
+                        *globalBsPtr > static_cast<int64_t>(epWorldSize) * bsUpperBound,
                     OP_LOGE(nodeName,
-                            "Configured maxBs per rank must not exceed %ld on A5, but got "
+                            "Configured maxBs per rank must not exceed %ld, but got "
                             "globalBs=%ld, epWorldSize=%u.",
-                            BS_UPPER_BOUND, *globalBsPtr, epWorldSize),
+                            bsUpperBound, *globalBsPtr, epWorldSize),
                     return ge::GRAPH_FAILED);
     tilingData.moeDistributeDispatchV2Info.globalBs =
         (*globalBsPtr == 0) ? static_cast<uint32_t>(xDim0) * epWorldSize : static_cast<uint32_t>(*globalBsPtr);
@@ -982,7 +982,7 @@ static ge::graphStatus CheckAttrs(const gert::TilingContext* context, const char
                             moeExpertNum, epWorldSize, sharedExpertRankNum),
                     return ge::GRAPH_FAILED);
     int64_t localExpertMaxSize =
-        (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) ? LOCAL_EXPERT_MAX_SIZE_A5 : LOCAL_EXPERT_MAX_SIZE;
+        (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_2201) ? LOCAL_EXPERT_MAX_SIZE : LOCAL_EXPERT_MAX_SIZE_A5;
     OP_TILING_CHECK((localMoeExpertNum <= 0) || (localMoeExpertNum * epWorldSize > localExpertMaxSize),
                     OP_LOGE(nodeName,
                             "localMoeExpertNum is invalid, "
@@ -1403,7 +1403,7 @@ static ge::graphStatus CheckRecvCountTensorShape(const gert::TilingContext* cont
 
     if (isLayered) {
         // 如果是分层方案，则需要校验全新的shape，额外的globalBs * 2 * k * epWorldSize / 8
-        // 用来存储token的cnt信息与offset信息，为了兼容A2&A5 这里取/8。
+        // 用来存储token的cnt信息与offset信息，为了兼容A3以外的芯片架构 这里取/8。
         epRecvCount = epWorldSize * localMoeExpertNum +
                       globalBs * LAYERED_METAINFO_LIST_NUM * expertIdsDim1 * epWorldSize / RANK_NUM_PER_NODE_A2;
         OP_TILING_CHECK(
@@ -1639,7 +1639,7 @@ static ge::graphStatus CheckAndCalWinSize(const gert::TilingContext* context,
     winSizeData.isMc2Context = config.isMc2Context;
     const auto& info = tilingData.moeDistributeDispatchV2Info;
     uint64_t dispatchTokenBytes = 0UL;
-    if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 &&
+    if (mc2tiling::GetNpuArch(context) != Ops::Base::DAV_2201 &&
         info.quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT) && info.scalesCol != 0U) {
         dispatchTokenBytes = CalcA5DispatchTokenBytes(info);
     }
@@ -1695,7 +1695,7 @@ static uint32_t SendToMoeExpertUsedBuffer(const gert::TilingContext* context,
     uint32_t moeUsedAivNum = aivUsedAllToAll - sharedUsedAivNum;
     uint32_t maskSizePerExpert = Ceil((expertIdsBufSize / sizeof(int32_t)) / 8, UB_ALIGN, nodeName); // 8 is 1byte->8bit
     uint32_t expertMaskBufSize = maskSizePerExpert * Ceil(moeExpertNum, moeUsedAivNum, nodeName) / moeUsedAivNum;
-    if (mc2tiling::GetNpuArch(context) != Ops::Base::DAV_3510) {
+    if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_2201) {
         UbForMoe = UbForMoe + expertMaskBufSize;                                        // expertMaskBuf
         UbForMoe = UbForMoe + Ceil(moeExpertNum * sizeof(int32_t), UB_ALIGN, nodeName); // tokenNumToExpertBuf
     }
@@ -1726,15 +1726,27 @@ static uint32_t AllToAllBasicUsedBuffer(const gert::TilingContext* context,
         UbForBasic = UbForBasic + elasticInfoSizeAlign; // elasticInfoBuf_
     }
 
-    bool isA5 = mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510;
-    bool isMxQuant = isA5 && (quantMode == static_cast<uint32_t>(QuantModeA5::MX_QUANT) ||
-                              quantMode == static_cast<uint32_t>(QuantModeA5::MX_QUANT_CLIP));
-    bool isPerGroupQuant = isA5 && quantMode == static_cast<uint32_t>(QuantModeA5::PERGROUP_DYNAMIC_QUANT);
-    uint32_t sizeofX = 2U;
-    uint32_t hAlignSize = (isMxQuant || isPerGroupQuant) ? Ceil(hSize, PERGROUP_BLOCK_SIZE, nodeName) * sizeofX :
-                                                           Ceil(hSize * sizeofX, UB_ALIGN, nodeName);
+    bool isArch22 = mc2tiling::GetNpuArch(context) == Ops::Base::DAV_2201;
+    bool isArch35 = mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510;
+    bool isMxQuant = !isArch22 && (quantMode == static_cast<uint32_t>(QuantModeA5::MX_QUANT) ||
+                                   quantMode == static_cast<uint32_t>(QuantModeA5::MX_QUANT_CLIP));
+    bool isPerGroupQuant = !isArch22 && quantMode == static_cast<uint32_t>(QuantModeA5::PERGROUP_DYNAMIC_QUANT);
+    bool isHif4Quant = !(isArch22 || isArch35) && quantMode == static_cast<uint32_t>(QuantModeA5::HIF4_QUANT);
     auto xDesc = context->GetInputDesc(config.xIndex);
     auto expandXDesc = context->GetOutputDesc(OUTPUT_EXPAND_X_INDEX);
+    const auto inputType = xDesc->GetDataType();
+    const bool isB4 = (inputType == ge::DT_FLOAT4_E2M1) || (inputType == ge::DT_FLOAT4_E1M2) ||
+                      (inputType == Ops::Transformer::DT_HIFLOAT4);
+    uint32_t hAlignSize = 0;
+    if (isB4) {
+        // 4bit 输入按 2 元素/字节打包
+        const uint32_t hInBytes = static_cast<uint32_t>((hSize + EVEN_ALIGN - 1) / EVEN_ALIGN);
+        hAlignSize = Ceil(hInBytes, UB_ALIGN, nodeName);
+    } else {
+        const uint32_t inputTypeSize = ge::GetSizeByDataType(inputType);
+        hAlignSize = (isMxQuant || isPerGroupQuant) ? Ceil(hSize, PERGROUP_BLOCK_SIZE, nodeName) * inputTypeSize :
+                                                      Ceil(hSize * inputTypeSize, UB_ALIGN, nodeName);
+    }
     // xDesc与expandXDesc在之前的函数中已校验非空，此处不做校验
     if (xDesc->GetDataType() == expandXDesc->GetDataType()) {
         hAlignSize += UB_ALIGN;
@@ -1743,7 +1755,17 @@ static uint32_t AllToAllBasicUsedBuffer(const gert::TilingContext* context,
 
     const gert::StorageShape* scalesStorageShape = context->GetOptionalInputShape(config.scalesIndex);
     bool isScales = (scalesStorageShape != nullptr);
-    uint32_t hOutSize = (quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) ? hSize * SIZE_OF_UNQUANT : hSize;
+    const auto outputType = expandXDesc->GetDataType();
+    const bool isB4Out = (outputType == ge::DT_FLOAT4_E2M1) || (outputType == ge::DT_FLOAT4_E1M2) ||
+                         (outputType == Ops::Transformer::DT_HIFLOAT4);
+    uint32_t hOutSize = 0;
+    if (isB4Out) {
+        // 4bit 输出按 2 元素/字节打包
+        hOutSize = static_cast<uint32_t>((hSize + EVEN_ALIGN - 1) / EVEN_ALIGN);
+    } else {
+        const uint32_t outputTypeSize = ge::GetSizeByDataType(outputType);
+        hOutSize = hSize * outputTypeSize;
+    }
     hOutSizeAlign = Ceil(hOutSize, UB_ALIGN, nodeName);
     if ((quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) && isScales) {
         uint32_t scaleInBytes =
@@ -1752,7 +1774,6 @@ static uint32_t AllToAllBasicUsedBuffer(const gert::TilingContext* context,
     } else if (quantMode == static_cast<uint32_t>(QuantModeA5::PERTOKEN_DYNAMIC_QUANT)) {
         hOutSizeAlign += sizeof(float);
     } else if (isMxQuant) {
-        auto outputType = context->GetOutputDesc(OUTPUT_EXPAND_X_INDEX)->GetDataType();
         bool isFp4 = outputType == ge::DT_FLOAT4_E2M1 || outputType == ge::DT_FLOAT4_E1M2;
         uint32_t outputBytes = isFp4 ? (hSize + 1U) / 2U : hSize;
         uint32_t scaleCount = Ceil(hSize, MX_BLOCK_SIZE, nodeName) / MX_BLOCK_SIZE;
@@ -1760,6 +1781,11 @@ static uint32_t AllToAllBasicUsedBuffer(const gert::TilingContext* context,
     } else if (isPerGroupQuant) {
         uint32_t paddedH = Ceil(hSize, PERGROUP_BLOCK_SIZE, nodeName);
         hOutSizeAlign = paddedH + paddedH / PERGROUP_BLOCK_SIZE * sizeof(float);
+    } else if (isHif4Quant) {
+        uint32_t scaleCount = Ceil(hSize, HIF4_GROUP_SIZE, nodeName) / HIF4_GROUP_SIZE;
+        hOutSizeAlign +=
+            scaleCount *
+            sizeof(uint32_t); // hifloat4_scale为b32，此处使用uint32_t确保不含hifloat4_scale的低版本包可以正常编译
     }
     uint32_t hScaleSizeAlign = Ceil(hOutSizeAlign, UB_ALIGN, nodeName);
     uint32_t tokenQuantAlign = hScaleSizeAlign / sizeof(int32_t);
@@ -1862,7 +1888,7 @@ static ge::graphStatus CheckUsedUbSize(const gert::TilingContext* context,
 static ge::graphStatus CalcA5CumsumUbBudget(uint64_t ubRealSize, const char* nodeName, uint32_t& ubBudget)
 {
     OP_TILING_CHECK(ubRealSize <= Mc2Kernel::A5_CUMSUM_UB_RESERVE,
-                    OP_LOGE(nodeName, "A5 UB size %luB must be greater than reserved size %uB.", ubRealSize,
+                    OP_LOGE(nodeName, "UB size %luB must be greater than reserved size %uB.", ubRealSize,
                             Mc2Kernel::A5_CUMSUM_UB_RESERVE),
                     return ge::GRAPH_FAILED);
     ubBudget = static_cast<uint32_t>(ubRealSize - Mc2Kernel::A5_CUMSUM_UB_RESERVE);
@@ -1877,10 +1903,19 @@ static uint32_t CalcA5TokenInAlignSize(const gert::TilingContext* context, const
                            quantMode == static_cast<uint32_t>(QuantModeA5::MX_QUANT_CLIP);
     const bool isPerGroupQuant = quantMode == static_cast<uint32_t>(QuantModeA5::PERGROUP_DYNAMIC_QUANT);
     auto inputType = context->GetInputDesc(config.xIndex)->GetDataType();
-    bool isInputFp4 = inputType == ge::DT_FLOAT4_E2M1 || inputType == ge::DT_FLOAT4_E1M2;
-    uint32_t inputTypeSize = isInputFp4 ? 1U : ge::GetSizeByDataType(inputType);
-    uint32_t hAlignSize = (isMxQuant || isPerGroupQuant) ? Ceil(info.h, PERGROUP_BLOCK_SIZE, nodeName) * inputTypeSize :
-                                                           Ceil(info.h * inputTypeSize, UB_ALIGN, nodeName);
+    const bool isB4 = (inputType == ge::DT_FLOAT4_E2M1) || (inputType == ge::DT_FLOAT4_E1M2) ||
+                      (inputType == Ops::Transformer::DT_HIFLOAT4);
+    uint32_t hAlignSize = 0;
+    if (isB4) {
+        // 同 AllToAllBasicUsedBuffer：4bit 输入按打包字节数记账，与 quant.h 的 hAlignSize_ 对齐
+        const uint32_t hInBytes = static_cast<uint32_t>((info.h + EVEN_ALIGN - 1) / EVEN_ALIGN);
+        hAlignSize = Ceil(hInBytes, UB_ALIGN, nodeName);
+    } else {
+        const uint32_t inputTypeSize = ge::GetSizeByDataType(inputType);
+        hAlignSize = (isMxQuant || isPerGroupQuant) ? Ceil(info.h, PERGROUP_BLOCK_SIZE, nodeName) * inputTypeSize :
+                                                      Ceil(info.h * inputTypeSize, UB_ALIGN, nodeName);
+    }
+
     if (quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) {
         hAlignSize += info.scalesCol * info.scalesTypeSize;
     }
@@ -1895,7 +1930,8 @@ static uint32_t CalcA5TokenOutAlignSize(const gert::TilingContext* context, cons
                            quantMode == static_cast<uint32_t>(QuantModeA5::MX_QUANT_CLIP);
     const bool isPerGroupQuant = quantMode == static_cast<uint32_t>(QuantModeA5::PERGROUP_DYNAMIC_QUANT);
     auto outputType = context->GetOutputDesc(OUTPUT_EXPAND_X_INDEX)->GetDataType();
-    bool isOutputFp4 = outputType == ge::DT_FLOAT4_E2M1 || outputType == ge::DT_FLOAT4_E1M2;
+    bool isOutputFp4 = outputType == ge::DT_FLOAT4_E2M1 || outputType == ge::DT_FLOAT4_E1M2 ||
+                       outputType == Ops::Transformer::DT_HIFLOAT4;
     uint32_t outputTypeSize = isOutputFp4 ? 1U : ge::GetSizeByDataType(outputType);
     uint32_t scaleInBytes = info.scalesCol * info.scalesTypeSize;
     uint32_t outputBytes = isOutputFp4 ? (info.h + 1U) / 2U : info.h * outputTypeSize;
@@ -1935,7 +1971,7 @@ static ge::graphStatus CheckSerialReceiveUbSizeA5(const gert::TilingContext* con
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubRealSize);
     uint32_t cumsumUbBudget = 0;
     OP_TILING_CHECK(CalcA5CumsumUbBudget(ubRealSize, nodeName, cumsumUbBudget) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Calc A5 cumsum UB budget failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(nodeName, "Calc cumsum UB budget failed."), return ge::GRAPH_FAILED);
     uint32_t moeExpertNumPerRank = info.moeExpertNum / (info.epWorldSize - info.sharedExpertRankNum);
     uint32_t recvStatusNum = info.epWorldSize * moeExpertNumPerRank;
     uint32_t recvStatusPerCore = Ceil(recvStatusNum, aivNum, nodeName) / aivNum;
@@ -1965,7 +2001,7 @@ static ge::graphStatus CheckSerialReceiveUbSizeA5(const gert::TilingContext* con
     OP_TILING_CHECK(
         requiredUbSize > cumsumUbBudget,
         OP_LOGE(nodeName,
-                "A5 serial receive UB exceeds budget: fixed=%luB, minimum copy=%luB, reserved=%luB, budget=%uB, "
+                "Serial receive UB exceeds budget: fixed=%luB, minimum copy=%luB, reserved=%luB, budget=%uB, "
                 "epRankId=%u, receive states per core=%u.",
                 fixedUbSize, minCopyUbSize, static_cast<uint64_t>(2U * UB_ALIGN), cumsumUbBudget, info.epRankId,
                 recvStatusPerCore),
@@ -2061,12 +2097,12 @@ static ge::graphStatus CheckCumSumUbSizeA5(const gert::TilingContext* context, c
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubRealSize);
     uint32_t cumsumUbBudget = 0;
     OP_TILING_CHECK(CalcA5CumsumUbBudget(ubRealSize, nodeName, cumsumUbBudget) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Calc A5 cumsum UB budget failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE(nodeName, "Calc cumsum UB budget failed."), return ge::GRAPH_FAILED);
     const auto& info = tilingData.moeDistributeDispatchV2Info;
     uint32_t maxBs = info.globalBs / info.epWorldSize;
     if (maxBs < A5_SERIAL_MODE_BS_THRESHOLD && info.epWorldSize < A5_SERIAL_MODE_EP_WORLD_SIZE_THRESHOLD) {
         OP_TILING_CHECK(CheckSerialReceiveUbSizeA5(context, nodeName, tilingData, config) != ge::GRAPH_SUCCESS,
-                        OP_LOGE(nodeName, "Check A5 serial receive UB size failed."), return ge::GRAPH_FAILED);
+                        OP_LOGE(nodeName, "Check serial receive UB size failed."), return ge::GRAPH_FAILED);
         if (!info.hasElasticInfo) {
             return ge::GRAPH_SUCCESS;
         }
@@ -2078,7 +2114,7 @@ static ge::graphStatus CheckCumSumUbSizeA5(const gert::TilingContext* context, c
     OP_TILING_CHECK(
         cumSumUbSize > cumsumUbBudget,
         OP_LOGE(nodeName,
-                "A5 cumsum-core UB exceeds budget: used=%uB, budget=%uB, moeExpertNum=%u, sharedExpertRankNum=%u, "
+                "Cumsum-core UB exceeds budget: used=%uB, budget=%uB, moeExpertNum=%u, sharedExpertRankNum=%u, "
                 "epWorldSize=%u, BS=%u, topK=%u, aivNum=%u.",
                 cumSumUbSize, cumsumUbBudget, info.moeExpertNum, info.sharedExpertRankNum, info.epWorldSize, info.bs,
                 info.k, aivNum),
@@ -2175,7 +2211,7 @@ static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistri
 {
     uint32_t ubSize = UB_ALIGN; // dataStateBuf
     std::string ubDetail = "dataStateBuf:" + std::to_string(UB_ALIGN);
-    const bool isA5Arch = (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510);
+    const bool isArch22 = (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_2201);
 
     uint32_t quantMode = tilingData.moeDistributeDispatchV2Info.quantMode;
     uint32_t hSize = tilingData.moeDistributeDispatchV2Info.h;
@@ -2196,7 +2232,7 @@ static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistri
     bool needMaskCalFlag = (isActiveMask || tilingData.moeDistributeDispatchV2Info.zeroComputeExpertNum != 0);
     bool hasExpertMaskOrZeroCompute = (tilingData.moeDistributeDispatchV2Info.isExpertMask ||
                                        (tilingData.moeDistributeDispatchV2Info.zeroComputeExpertNum != 0));
-    bool reuseValidExpertIndexForTemp = isA5Arch && hasExpertMaskOrZeroCompute;
+    bool reuseValidExpertIndexForTemp = !isArch22 && hasExpertMaskOrZeroCompute;
 
     uint32_t expertIdsSize = Ceil(expertIdsCnt * sizeof(int32_t), UB_ALIGN, nodeName);
     uint32_t xActivateMaskSize = bsSize * Ceil(kSize * sizeof(bool), UB_ALIGN, nodeName) * SIZE_OF_HALF;
@@ -2205,20 +2241,20 @@ static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistri
 
     uint32_t calTokenIdxBuffSize = Ceil(expertIdsCnt * sizeof(int32_t), UB_ALIGN, nodeName);
     uint32_t calTempBufSize = calTokenIdxBuffSize; // A3 维持原公式
-    if (isA5Arch) {
-        // A5规约只需保存每64个float的中间结果（与 kernel 侧 reduceBytes 公式对齐）
+    if (!isArch22) {
+        // 规约只需保存每64个float的中间结果（与 kernel 侧 reduceBytes 公式对齐）
         calTempBufSize = expertIdsCnt <= 256U ?
                              UB_ALIGN :
                              Ceil(Ceil(expertIdsCnt, 64U, nodeName) / 64U * sizeof(float), SIZE_ALIGN_256, nodeName);
     }
     uint32_t gatherMaskBufSize = needMaskCalFlag ? expertIdsBufSize : 0;
     uint32_t maskAndWorkBufSize =
-        isA5Arch ? (needMaskCalFlag ? expertIdsBufSize : calTempBufSize) : (gatherMaskBufSize + calTokenIdxBuffSize);
+        isArch22 ? (gatherMaskBufSize + calTokenIdxBuffSize) : (needMaskCalFlag ? expertIdsBufSize : calTempBufSize);
     ubSize = ubSize + maskAndWorkBufSize; // gatherMaskTBuf_ / calTempBuf
     ubDetail += "; gatherMask+calTemp:" + std::to_string(maskAndWorkBufSize);
 
     uint32_t expertScalesBufSize =
-        (tilingData.moeDistributeDispatchV2Info.hasExpertScales && !isA5Arch) ? expertIdsBufSize : 0;
+        (tilingData.moeDistributeDispatchV2Info.hasExpertScales && isArch22) ? expertIdsBufSize : 0;
     ubSize = ubSize + expertScalesBufSize; // expertScalesBuf_
     ubDetail += "; expertScalesBuf:" + std::to_string(expertScalesBufSize);
 
@@ -2229,7 +2265,7 @@ static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistri
     bool isDirectCast = (quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) && (xDesc != nullptr) &&
                         (expandXDesc != nullptr) && (xDesc->GetDataType() != expandXDesc->GetDataType());
     if (quantMode > static_cast<uint32_t>(QuantModeA5::NON_QUANT) || isDirectCast) {
-        hOutAlignUbSize = Ceil(hOutSizeAlign, isA5Arch ? SPLIT_BLOCK_DATA_SIZE : UB_ALIGN, nodeName);
+        hOutAlignUbSize = Ceil(hOutSizeAlign, isArch22 ? UB_ALIGN : SPLIT_BLOCK_DATA_SIZE, nodeName);
         uint32_t tempBufSize = reuseValidExpertIndexForTemp ? 0 : hOutAlignUbSize;
         ubSize = ubSize + tempBufSize;
         ubSize = ubSize + BUFFER_NUM * maxSizeForUbBuffer; // receiveDataCastFloatBuf smoothScalesBuf
@@ -2260,7 +2296,7 @@ static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistri
     ubSize = ubSize + sendToMoeUsedBuffer;
     ubDetail += "; sendToMoeExpertBufs:" + std::to_string(sendToMoeUsedBuffer);
 
-    if (isA5Arch) {
+    if (!isArch22) {
         ubSize += 2U * UB_ALIGN; // 首尾计量buffer（calBeginBuf_/calEndBuf_）
         uint32_t groupIndexSize = 0;
         if (config.isMc2Context) {
@@ -2274,10 +2310,10 @@ static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistri
         ubSize = A3FullMeshUsedBuffer(context, tilingData, expertIdsBufSize, hOutSizeAlign, config, nodeName);
     }
     ubDetail += "; total:" + std::to_string(ubSize);
-    if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) {
+    if (mc2tiling::GetNpuArch(context) != Ops::Base::DAV_2201) {
         OP_TILING_CHECK(CheckCumSumUbSizeA5(context, nodeName, tilingData, expertIdsBufSize, maxSizeForUbBuffer,
                                             config) != ge::GRAPH_SUCCESS,
-                        OP_LOGE(nodeName, "Check A5 cumsum core UB size failed."), return ge::GRAPH_FAILED);
+                        OP_LOGE(nodeName, "Check cumsum core UB size failed."), return ge::GRAPH_FAILED);
     }
     return CheckUsedUbSize(context, tilingData, nodeName, ubSize, bsSize, hSize, kSize, ubDetail);
 }
@@ -2767,7 +2803,7 @@ static ge::graphStatus FinalizeDispatchTiling(gert::TilingContext* context,
     context->SetTilingKey(tilingKey);
     OP_TILING_CHECK(CheckAndSetPlatformInfo(context, &tilingData, isLayered, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Tiling set platformInfo Failed"), return ge::GRAPH_FAILED);
-    // A5 CumSum 最小 tmp 大小
+    // CumSum 最小 tmp 大小
     SetCumsumTmpMinSize(tilingData, localMoeExpertNum, nodeName);
     PrintTilingDataInfo(nodeName, tilingData);
     return ge::GRAPH_SUCCESS;
