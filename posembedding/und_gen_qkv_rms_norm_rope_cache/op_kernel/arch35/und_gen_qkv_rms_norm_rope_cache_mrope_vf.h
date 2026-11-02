@@ -39,10 +39,71 @@
 #define UND_GEN_QKV_RMS_NORM_ROPE_CACHE_MROPE_VF_H_
 
 #include "kernel_operator.h"
-#include "op_kernel/platform_util.h"
 
 namespace UndGenQkvRmsNormRopeCache {
 namespace Reg = AscendC::Reg;
+
+// DMA offset 与 RMSNorm/RoPE 解耦。UB 索引滑窗按轴排列，Gather 读取任意 tile 起点，
+// 不要求 tile 起点对齐；Scatter 将三轴 offset 交错写成 [token, 3]，供一次 GatherDataCopy 使用。
+__aicore__ inline void ComputeCosSinOffsetVF(__ubuf__ int64_t* offsets, __ubuf__ int64_t* positions, uint32_t tokenNum,
+                                             uint32_t windowOffset, uint32_t axisStride, int64_t maxPos,
+                                             int64_t rowBytes)
+{
+    __VEC_SCOPE__
+    {
+        Reg::RegTensor<uint32_t> srcIndex;
+        Reg::RegTensor<uint32_t> dstIndex;
+        Reg::RegTensor<uint32_t> axisIndex;
+        Reg::RegTensor<int64_t, Reg::RegTraitNumTwo> pos;
+        Reg::RegTensor<int64_t, Reg::RegTraitNumTwo> zero;
+        Reg::MaskReg mask = Reg::UpdateMask<int64_t, Reg::RegTraitNumTwo>(tokenNum);
+        Reg::MaskReg indexMask = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+        Reg::MaskReg valid;
+        Reg::Arange((Reg::RegTensor<int32_t>&)srcIndex, static_cast<int32_t>(windowOffset));
+        Reg::Arange((Reg::RegTensor<int32_t>&)dstIndex, 0);
+        Reg::Muls(dstIndex, dstIndex, static_cast<uint32_t>(3), indexMask);
+        Reg::Duplicate(zero, static_cast<int64_t>(0), mask);
+        for (uint16_t axis = 0; axis < 3; ++axis) {
+            Reg::Gather(pos, positions + axis * axisStride, srcIndex, mask);
+            Reg::Compares<int64_t, AscendC::CMPMODE::GE>(valid, pos, static_cast<int64_t>(0), mask);
+            Reg::Select(pos, pos, zero, valid);
+            Reg::Compares<int64_t, AscendC::CMPMODE::LT>(valid, pos, maxPos, mask);
+            Reg::Select(pos, pos, zero, valid);
+            Reg::Muls(pos, pos, rowBytes, mask);
+            Reg::Adds(axisIndex, dstIndex, static_cast<uint32_t>(axis), indexMask);
+            Reg::Scatter(offsets, pos, axisIndex, mask);
+        }
+    }
+}
+
+__aicore__ inline void ComputeCacheOffsetVF(__ubuf__ int64_t* offsets, __ubuf__ int64_t* slots, uint32_t tokenNum,
+                                            uint32_t windowOffset, int64_t maxSlot, int64_t rowBytes)
+{
+    __VEC_SCOPE__
+    {
+        Reg::RegTensor<uint32_t> index;
+        Reg::RegTensor<int64_t, Reg::RegTraitNumTwo> slot;
+        Reg::RegTensor<int64_t, Reg::RegTraitNumTwo> value;
+        Reg::RegTensor<int64_t, Reg::RegTraitNumTwo> zero;
+        Reg::RegTensor<int64_t, Reg::RegTraitNumTwo> invalid;
+        Reg::MaskReg mask = Reg::UpdateMask<int64_t, Reg::RegTraitNumTwo>(tokenNum);
+        Reg::MaskReg nonNegative;
+        Reg::MaskReg belowCapacity;
+        Reg::Arange((Reg::RegTensor<int32_t>&)index, static_cast<int32_t>(windowOffset));
+        Reg::Gather(slot, slots, index, mask);
+        Reg::Duplicate(zero, static_cast<int64_t>(0), mask);
+        Reg::Duplicate(invalid, static_cast<int64_t>(-1), mask);
+        Reg::Compares<int64_t, AscendC::CMPMODE::GE>(nonNegative, slot, static_cast<int64_t>(0), mask);
+        Reg::Compares<int64_t, AscendC::CMPMODE::LT>(belowCapacity, slot, maxSlot, mask);
+        // 先把非法 slot 清零再乘，避免非法极大索引参与偏移运算；负 offset 由 Scatter DMA 跳过。
+        Reg::Select(value, slot, zero, nonNegative);
+        Reg::Select(value, value, zero, belowCapacity);
+        Reg::Muls(value, value, rowBytes, mask);
+        Reg::Select(value, value, invalid, nonNegative);
+        Reg::Select(value, value, invalid, belowCapacity);
+        Reg::StoreAlign(offsets, value, mask);
+    }
+}
 
 constexpr static Reg::CastTrait CAST_B16_TO_B32 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
                                                    Reg::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN};

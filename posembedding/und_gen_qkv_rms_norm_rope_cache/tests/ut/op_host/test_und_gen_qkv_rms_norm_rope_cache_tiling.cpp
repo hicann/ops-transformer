@@ -323,6 +323,45 @@ TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_success_plain_rope_empty_mrope_se
     CheckBlockTiling(td, 128);
 }
 
+// 在 tile 边界附近压低 UB 容量，验证 960 为异步 DMA offset 预留空间，950 不受影响。
+TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_dma_offsets_reduce_tile_only_on_960)
+{
+    constexpr int64_t residentBytes = 4 * HEAD_DIM * 2 + 4 * HEAD_DIM * 4 + HEAD_DIM / 2 * 4 + 5 * 256 * 8;
+    for (const auto& heads : std::vector<std::vector<int64_t>>{{8, 1, 1}, {16, 2, 2}}) {
+        const int64_t n = heads[0] + heads[1] + heads[2];
+        const int64_t perTokenBytes = 2 * n * HEAD_DIM * 2 + 2 * 3 * HEAD_DIM * 4 + 2 * n * HEAD_DIM * 2;
+        auto para = BuildTilingContext(30000, 30000, heads[0], heads[1], heads[2]);
+        para.ubSize_ = residentBytes + optiling::DMA_OFFSET_BYTES + 3 * perTokenBytes - 1;
+        TilingInfo info950;
+        ASSERT_TRUE(ExecuteTiling(para, info950));
+        EXPECT_EQ(AsTilingData(info950)->ubFactor, 3);
+
+        for (const auto& arch : {"9201", "9202"}) {
+            para.socVersion_ = arch;
+            TilingInfo info960;
+            ASSERT_TRUE(ExecuteTiling(para, info960)) << arch;
+            EXPECT_EQ(AsTilingData(info960)->ubFactor, 2) << arch;
+            EXPECT_LE(residentBytes + optiling::DMA_OFFSET_BYTES + AsTilingData(info960)->ubFactor * perTokenBytes,
+                      para.ubSize_);
+        }
+    }
+}
+
+TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_rejects_960_when_dma_offsets_leave_no_room_for_one_token)
+{
+    constexpr int64_t residentBytes = 4 * HEAD_DIM * 2 + 4 * HEAD_DIM * 4 + HEAD_DIM / 2 * 4 + 5 * 256 * 8;
+    constexpr int64_t perTokenBytes = 2 * 10 * HEAD_DIM * 2 + 2 * 3 * HEAD_DIM * 4 + 2 * 10 * HEAD_DIM * 2;
+    auto para = BuildTilingContext(5, 3, 8, 1, 1);
+    para.ubSize_ = residentBytes + optiling::DMA_OFFSET_BYTES + perTokenBytes - 1;
+    TilingInfo info950;
+    ASSERT_TRUE(ExecuteTiling(para, info950));
+    for (const auto& arch : {"9201", "9202"}) {
+        para.socVersion_ = arch;
+        TilingInfo info960;
+        EXPECT_FALSE(ExecuteTiling(para, info960)) << arch;
+    }
+}
+
 // ==================== 失败路径 ====================
 
 TEST_F(UndGenQkvRmsNormRopeCacheTiling, tiling_fail_when_head_dim_unsupported)

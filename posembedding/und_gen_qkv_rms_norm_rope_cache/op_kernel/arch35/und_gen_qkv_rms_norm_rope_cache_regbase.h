@@ -138,14 +138,27 @@ public:
         Tile pend; // 已算完、待写出的那个 tile；pend.Valid() 为假表示还没有
 
         EnsureIndexWindow(cur.start, cur.start + cur.num);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+        PrepareCosSinOffsets(cur);
+#endif
         CopyIn(cur);
 
         while (cur.Valid()) {
             const Tile next = NextTile(cur);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            if (next.Valid()) {
+                EnsureIndexWindow(pend.Valid() ? pend.start : cur.start, next.start + next.num);
+                // 先发下一 tile 的 offset VF 和 V->MTE2 事件，再发当前 tile 的计算 VF。
+                // CopyIn(next) 只等 offset，不把 Compute(cur) 的整个向量流水串行到 DMA 前。
+                PrepareCosSinOffsets(next);
+            }
+#endif
             Compute(cur);
             if (next.Valid()) {
+#if !defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201 && __NPU_ARCH__ != 9202)
                 // anchor 取最早一个还要读索引的 tile：CopyOut 还要读 pend 的 slot_mapping
                 EnsureIndexWindow(pend.Valid() ? pend.start : cur.start, next.start + next.num);
+#endif
                 CopyIn(next);
             }
             if (pend.Valid()) {
@@ -159,6 +172,22 @@ public:
             CopyOut(pend);
         }
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+        // offset 位于 TBuf，不由输入/输出队列管理；退出前消费仍挂起的 DMA 完成事件。
+        for (int64_t slot = 0; slot < BUFFER_NUM_DB; ++slot) {
+            if (gatherOffsetPending_[slot]) {
+                WaitFlag<HardEvent::MTE2_V>(gatherOffsetDone_[slot]);
+            }
+            if (scatterOffsetPending_[slot]) {
+                WaitFlag<HardEvent::MTE3_V>(scatterOffsetDone_[slot]);
+            }
+            pipe_->ReleaseEventID<HardEvent::MTE2_V>(gatherOffsetDone_[slot]);
+            pipe_->ReleaseEventID<HardEvent::MTE3_V>(scatterOffsetDone_[slot]);
+        }
+        pipe_->ReleaseEventID<HardEvent::V_MTE2>(gatherOffsetReady_);
+        pipe_->ReleaseEventID<HardEvent::MTE2_V>(dmaIndexReady_);
+        pipe_->ReleaseEventID<HardEvent::V_MTE2>(dmaIndexReuse_);
+#endif
         wInQue_.FreeTensor(wBf16Local_);
     }
 
@@ -275,6 +304,18 @@ private:
         pipe_->InitBuffer(wFp32Buf_, WEIGHT_NUM * headDim_ * sizeof(float));
         pipe_->InitBuffer(gatherIdxBuf_, AlignUp(halfDim_ * sizeof(uint32_t), BLOCK_ALIGN_BYTES));
         pipe_->InitBuffer(idxBuf_, IDX_REGION_NUM * IDX_WINDOW_TOKENS * sizeof(int64_t));
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+        // 与 host 的 DMA_OFFSET_BYTES 对齐，槽间距为 32B 的整数倍，尾 tile 也无需额外补齐。
+        pipe_->InitBuffer(dmaGatherOffsetBuf_, BUFFER_NUM_DB * MROPE_AXIS_NUM * UND_MASK_BITS * sizeof(int64_t));
+        pipe_->InitBuffer(dmaScatterOffsetBuf_, BUFFER_NUM_DB * UND_MASK_BITS * sizeof(int64_t));
+        for (int64_t slot = 0; slot < BUFFER_NUM_DB; ++slot) {
+            gatherOffsetDone_[slot] = static_cast<event_t>(pipe_->AllocEventID<HardEvent::MTE2_V>());
+            scatterOffsetDone_[slot] = static_cast<event_t>(pipe_->AllocEventID<HardEvent::MTE3_V>());
+        }
+        gatherOffsetReady_ = static_cast<event_t>(pipe_->AllocEventID<HardEvent::V_MTE2>());
+        dmaIndexReady_ = static_cast<event_t>(pipe_->AllocEventID<HardEvent::MTE2_V>());
+        dmaIndexReuse_ = static_cast<event_t>(pipe_->AllocEventID<HardEvent::V_MTE2>());
+#endif
 
         wFp32Local_ = wFp32Buf_.Get<float>();
         gatherIdxLocal_ = gatherIdxBuf_.Get<uint32_t>();
@@ -399,6 +440,11 @@ private:
     {
         // 旧窗口的内容还可能刚被标量读过，覆盖前先等标量走到这里
         if (winBegin_ >= 0) {
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+            // offset VF 也读取原始索引，换窗前同时保护向量读与原有的标量读。
+            SetFlag<HardEvent::V_MTE2>(dmaIndexReuse_);
+            WaitFlag<HardEvent::V_MTE2>(dmaIndexReuse_);
+#endif
             SetFlag<HardEvent::S_MTE2>(EVT_S_TO_MTE2_WINDOW_REUSE);
             WaitFlag<HardEvent::S_MTE2>(EVT_S_TO_MTE2_WINDOW_REUSE);
         }
@@ -416,6 +462,10 @@ private:
         }
         SetFlag<HardEvent::MTE2_S>(EVT_MTE2_TO_S_INDEX_READY);
         WaitFlag<HardEvent::MTE2_S>(EVT_MTE2_TO_S_INDEX_READY);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+        SetFlag<HardEvent::MTE2_V>(dmaIndexReady_);
+        WaitFlag<HardEvent::MTE2_V>(dmaIndexReady_);
+#endif
     }
 
     /*
@@ -482,6 +532,9 @@ private:
 
         // 三轴 cos_sin：每 token 按 positions[axis, out_t] 各取一行 [D]
         LocalTensor<float> cosSinLocal = cosSinInQue_.AllocTensor<float>();
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+        CopyCosSinDma(tile, cosSinLocal);
+#else
         for (int64_t i = 0; i < tokenNum; ++i) {
             for (int64_t axis = 0; axis < MROPE_AXIS_NUM; ++axis) {
                 int64_t pos = idxLocal_.GetValue(IdxAt(IDX_REGION_POS + axis, tileStart + i));
@@ -491,6 +544,7 @@ private:
                 DataCopy(cosSinLocal[(i * MROPE_AXIS_NUM + axis) * headDim_], cosSinCacheGm_[pos * headDim_], headDim_);
             }
         }
+#endif
         cosSinInQue_.EnQue(cosSinLocal);
         undMask_[tile.maskSlot] = mask;
     }
@@ -510,6 +564,9 @@ private:
         LocalTensor<float> cosSinLocal = cosSinInQue_.DeQue<float>();
         LocalTensor<T_QKV> outLocal = outQue_.AllocTensor<T_QKV>();
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+        PrepareCacheOffsets(tile);
+#endif
         const int64_t kSegBase = ubFactor_ * numHeadQ_ * headDim_;
         const int64_t vSegBase = ubFactor_ * headNumQK_ * headDim_;
 
@@ -551,6 +608,9 @@ private:
 
         DataCopy(qGm_[tileStart * qSegElems], outLocal[0], tokenNum * qSegElems);
 
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+        CopyKvCacheDma(tile, outLocal[kSegBase], outLocal[vSegBase]);
+#else
         for (int64_t i = 0; i < tokenNum; ++i) {
             int64_t slot = idxLocal_.GetValue(IdxAt(IDX_REGION_SLOT, tileStart + i));
             if (slot < 0 || slot >= maxSlot_) { // 运行期数据，越界则跳过写入而不是踩内存
@@ -559,9 +619,71 @@ private:
             DataCopy(kCacheGm_[slot * kSegElems], outLocal[kSegBase + i * kSegElems], kSegElems);
             DataCopy(vCacheGm_[slot * vSegElems], outLocal[vSegBase + i * vSegElems], vSegElems);
         }
+#endif
 
         outQue_.FreeTensor(outLocal);
     }
+
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+    __aicore__ inline void PrepareCosSinOffsets(const Tile& tile)
+    {
+        const int64_t slot = tile.maskSlot;
+        if (gatherOffsetPending_[slot]) {
+            WaitFlag<HardEvent::MTE2_V>(gatherOffsetDone_[slot]);
+            gatherOffsetPending_[slot] = false;
+        }
+        LocalTensor<int64_t> offsets = dmaGatherOffsetBuf_.Get<int64_t>()[slot * MROPE_AXIS_NUM * UND_MASK_BITS];
+        ComputeCosSinOffsetVF((__ubuf__ int64_t*)offsets.GetPhyAddr(),
+                              (__ubuf__ int64_t*)idxLocal_[IDX_REGION_POS * IDX_WINDOW_TOKENS].GetPhyAddr(),
+                              static_cast<uint32_t>(tile.num), static_cast<uint32_t>(tile.start - winBegin_),
+                              static_cast<uint32_t>(IDX_WINDOW_TOKENS), maxPos_, headDim_ * sizeof(float));
+        SetFlag<HardEvent::V_MTE2>(gatherOffsetReady_);
+    }
+
+    __aicore__ inline void CopyCosSinDma(const Tile& tile, LocalTensor<float>& cosSinLocal)
+    {
+        const int64_t slot = tile.maskSlot;
+        LocalTensor<int64_t> offsets = dmaGatherOffsetBuf_.Get<int64_t>()[slot * MROPE_AXIS_NUM * UND_MASK_BITS];
+        WaitFlag<HardEvent::V_MTE2>(gatherOffsetReady_);
+        GatherParams params{static_cast<uint16_t>(tile.num * MROPE_AXIS_NUM),
+                            static_cast<uint32_t>(headDim_ * sizeof(float)),
+                            static_cast<uint32_t>(headDim_ * sizeof(float))};
+        GatherPadParams<float> padParams{GatherPaddingMode::CONSTANT_PADDING_MODE, 0.0f};
+        GatherDataCopy(cosSinLocal, cosSinCacheGm_, offsets, params, padParams);
+        SetFlag<HardEvent::MTE2_V>(gatherOffsetDone_[slot]);
+        gatherOffsetPending_[slot] = true;
+    }
+
+    __aicore__ inline void PrepareCacheOffsets(const Tile& tile)
+    {
+        const int64_t slot = tile.maskSlot;
+        if (scatterOffsetPending_[slot]) {
+            WaitFlag<HardEvent::MTE3_V>(scatterOffsetDone_[slot]);
+            scatterOffsetPending_[slot] = false;
+        }
+        LocalTensor<int64_t> offsets = dmaScatterOffsetBuf_.Get<int64_t>()[slot * UND_MASK_BITS];
+        ComputeCacheOffsetVF((__ubuf__ int64_t*)offsets.GetPhyAddr(),
+                             (__ubuf__ int64_t*)idxLocal_[IDX_REGION_SLOT * IDX_WINDOW_TOKENS].GetPhyAddr(),
+                             static_cast<uint32_t>(tile.num), static_cast<uint32_t>(tile.start - winBegin_), maxSlot_,
+                             numHeadK_ * headDim_ * sizeof(T_CACHE));
+        // 随后的 outQue_.EnQue/DeQue 同时保护 offset VF 和 QKV VF 到 MTE3 的依赖。
+    }
+
+    __aicore__ inline void CopyKvCacheDma(const Tile& tile, LocalTensor<T_QKV> kLocal, LocalTensor<T_QKV> vLocal)
+    {
+        const int64_t slot = tile.maskSlot;
+        LocalTensor<int64_t> offsets = dmaScatterOffsetBuf_.Get<int64_t>()[slot * UND_MASK_BITS];
+        // 两组支持的头数均 Hk == Hv，因此 K/V 共用一份 int64 字节 offset。
+        const int64_t rowBytes = numHeadK_ * headDim_ * sizeof(T_CACHE);
+        ScatterParams params{static_cast<uint16_t>(tile.num), static_cast<uint32_t>(rowBytes),
+                             static_cast<uint32_t>(rowBytes)};
+        ScatterDataCopy(kCacheGm_, kLocal, offsets, params);
+        ScatterDataCopy(vCacheGm_, vLocal, offsets, params);
+        SetFlag<HardEvent::MTE3_V>(scatterOffsetDone_[slot]);
+        scatterOffsetPending_[slot] = true;
+    }
+
+#endif
 
     /*
     向上对齐
@@ -590,6 +712,17 @@ private:
     TBuf<TPosition::VECCALC> wFp32Buf_;
     TBuf<TPosition::VECCALC> gatherIdxBuf_;
     TBuf<TPosition::VECCALC> idxBuf_;
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+    TBuf<TPosition::VECCALC> dmaGatherOffsetBuf_;
+    TBuf<TPosition::VECCALC> dmaScatterOffsetBuf_;
+    bool gatherOffsetPending_[BUFFER_NUM_DB] = {false, false};
+    bool scatterOffsetPending_[BUFFER_NUM_DB] = {false, false};
+    event_t gatherOffsetDone_[BUFFER_NUM_DB];
+    event_t scatterOffsetDone_[BUFFER_NUM_DB];
+    event_t gatherOffsetReady_;
+    event_t dmaIndexReady_;
+    event_t dmaIndexReuse_;
+#endif
 
     // 常驻 LocalTensor：权重来自 wInQue_（Process 开头 DeQue、结束时 Free），
     // 其余是 TBuf 的视图，Init 时取一次，整个 Process 复用

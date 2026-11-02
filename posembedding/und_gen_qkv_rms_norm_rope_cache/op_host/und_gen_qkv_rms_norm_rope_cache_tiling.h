@@ -56,6 +56,7 @@ REGISTER_TILING_DATA_CLASS(UndGenQkvRmsNormRopeCache, UndGenQkvRmsNormRopeCacheT
 struct UndGenQkvRmsNormRopeCacheCompileInfo {
     int64_t coreNum = 0;
     int64_t ubSize = 0;
+    bool useGatherScatterDma = false;
 };
 
 // 输入索引
@@ -129,6 +130,8 @@ constexpr int64_t IDX_WINDOW_TOKENS = 256;
 // 当前 UB 预算下两档 head 组合分别只有 18 和 10，离上限很远；CalUbTiling 里既夹取也复核。
 constexpr int64_t UND_MASK_BITS = 64;
 constexpr int64_t MAX_UB_FACTOR = UND_MASK_BITS;
+// 960 DMA 的字节 offset，按最大 tile 预留两份，避免异步搬运读到下一 tile 改写的索引。
+constexpr int64_t DMA_OFFSET_BYTES = DOUBLE_BUFFER * (MROPE_AXIS_NUM + 1) * MAX_UB_FACTOR * INT64_BYTES;
 // 把「常量 <= 位图宽度」钉在编译期：放宽 MAX_UB_FACTOR 而不同步换掉 kernel 侧
 // undMask_ 的类型会直接编译失败，而不是等到板上出随机结果
 static_assert(MAX_UB_FACTOR <= UND_MASK_BITS,
@@ -164,6 +167,7 @@ static_assert(IDX_WINDOW_TOKENS >= DIM_NUM_THREE * MAX_UB_FACTOR,
  *                                                  后标量在 UB 上读，替掉逐 token 的 GM GetValue。
  *                                                  定长而不随 u：区间距是编译期常量，
  *                                                  ubFactor 的式子保持线性
+ *   仅 960: dmaGatherOffsetBuf = 2 * 3 * MAX_UB_FACTOR * 8，dmaScatterOffsetBuf = 2 * MAX_UB_FACTOR * 8。
  *
  * 随 u 的部分:
  *   qkvInQue     VECIN   2 * u * N * D * 2
@@ -193,6 +197,7 @@ public:
     int64_t blockSize_ = 0;
     bool hasGen_ = false;
     bool hasCatIndices_ = false;
+    bool useGatherScatterDma_ = false;
     int64_t mropeSection_[MROPE_AXIS_NUM] = {0, 0, 0};
     float epsilon_ = 0.0f;
     float reciprocal_ = 0.0f;

@@ -66,21 +66,23 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheRegbaseTiling::CalUbTiling()
                                   WEIGHT_NUM * headDim_ * FLOAT32_BYTES + // wFp32Buf
                                   Ops::Base::CeilAlign(halfDim * UINT32_BYTES, BLOCK_ALIGN_BYTES) + // gatherIdxBuf
                                   IDX_REGION_NUM * IDX_WINDOW_TOKENS * INT64_BYTES; // idxBuf（索引滑窗）
+    const int64_t dmaOffsetBytes = useGatherScatterDma_ ? DMA_OFFSET_BYTES : 0;
+    const int64_t totalResidentBytes = residentBytes + dmaOffsetBytes;
 
     const int64_t perTokenBytes = DOUBLE_BUFFER * numHead_ * headDim_ * BF16_BYTES +          // qkvInQue
                                   DOUBLE_BUFFER * MROPE_AXIS_NUM * headDim_ * FLOAT32_BYTES + // cosSinInQue
                                   DOUBLE_BUFFER * numHead_ * headDim_ * BF16_BYTES;           // outQue
 
-    OP_CHECK_IF(residentBytes + perTokenBytes > ubSize_,
+    OP_CHECK_IF(totalResidentBytes + perTokenBytes > ubSize_,
                 OP_LOGE(context_->GetNodeName(),
                         "UB is not enough for even one token: resident(%ld) + perToken(%ld) > ubSize(%ld).",
-                        residentBytes, perTokenBytes, ubSize_),
+                        totalResidentBytes, perTokenBytes, ubSize_),
                 return ge::GRAPH_FAILED);
 
     // 每核最多也只处理 blockFactor 个 token，ubFactor 再大也用不上
     // 上限 MAX_UB_FACTOR 来自 kernel 侧 und/gen 位图的宽度，见 tiling.h
     const int64_t ubFactor =
-        std::min({(ubSize_ - residentBytes) / perTokenBytes, tilingData_.get_blockFactor(), MAX_UB_FACTOR});
+        std::min({(ubSize_ - totalResidentBytes) / perTokenBytes, tilingData_.get_blockFactor(), MAX_UB_FACTOR});
     OP_CHECK_IF(ubFactor <= 0, OP_LOGE(context_->GetNodeName(), "ubFactor must be positive, got %ld.", ubFactor),
                 return ge::GRAPH_FAILED);
     // 上面的 min 已经保证不会超，这里再复核一次：kernel 侧 undMask_ 是 uint64_t，

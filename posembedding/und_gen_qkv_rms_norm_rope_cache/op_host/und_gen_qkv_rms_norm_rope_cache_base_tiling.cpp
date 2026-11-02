@@ -33,8 +33,11 @@ ge::graphStatus UndGenQkvRmsNormRopeCacheTilingBase::GetPlatformInfo()
                     return ge::GRAPH_FAILED);
         coreNum_ = compileInfoPtr->coreNum;
         ubSize_ = compileInfoPtr->ubSize;
+        useGatherScatterDma_ = compileInfoPtr->useGatherScatterDma;
     } else {
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
+        const auto npuArch = ascendcPlatform.GetCurNpuArch();
+        useGatherScatterDma_ = npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202;
         coreNum_ = ascendcPlatform.GetCoreNumAiv();
         uint64_t ubSize = 0;
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
@@ -549,6 +552,8 @@ ge::graphStatus TilingPrepare4UndGenQkvRmsNormRopeCache(gert::TilingParseContext
     auto platformInfo = context->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
+    const auto npuArch = ascendcPlatform.GetCurNpuArch();
+    compileInfo->useGatherScatterDma = npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202;
     compileInfo->coreNum = ascendcPlatform.GetCoreNumAiv();
     OP_CHECK_IF(compileInfo->coreNum <= 0, OP_LOGE(context, "coreNum must be greater than 0."),
                 return ge::GRAPH_FAILED);
