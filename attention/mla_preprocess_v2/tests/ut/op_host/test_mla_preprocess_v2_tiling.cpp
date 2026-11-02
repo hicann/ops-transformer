@@ -107,7 +107,7 @@ TEST_P(MlaPreprocessTilingV2, mla_preprocess_v2_test_tiling_case0)
             {MakeStorageShape(cosShape), ge::DT_FLOAT16, ge::FORMAT_ND},                          // cos
             {MakeStorageShape(sinShape), ge::DT_FLOAT16, ge::FORMAT_ND},                          // sin
             {{{headNum, 128, 512}, {headNum, 128, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},          // wuk
-            {{{blockNum, blockSize, 1, 576}, {blockNum, blockSize, 1, 576}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // kvCache
+            {{{blockNum, blockSize, 1, 512}, {blockNum, blockSize, 1, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // kvCache
             {{{blockNum, blockSize, 1, 64}, {blockNum, blockSize, 1, 64}},
              ge::DT_FLOAT16,
              ge::FORMAT_ND},                                         // kvCacheRope
@@ -126,8 +126,8 @@ TEST_P(MlaPreprocessTilingV2, mla_preprocess_v2_test_tiling_case0)
         {
             // 特别注意，attr是根据顺序匹配的，不是根据字段匹配的！！！不确定attr顺序的话，可以在算子的ophost/xxxx_def.h中看
             {"wdqDim", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
-            {"qRopeDim", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"kRopeDim", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"qRopeDim", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)},
+            {"kRopeDim", Ops::Transformer::AnyValue::CreateFrom<int64_t>(64)},
             {"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-05f)},
             {"qRotaryCoeff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
             {"kRotaryCoeff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},

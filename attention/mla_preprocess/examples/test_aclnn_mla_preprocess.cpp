@@ -246,14 +246,14 @@ int main()
     std::vector<int64_t> cosShape = {tokenNum, 64};
     std::vector<int64_t> sinShape = {tokenNum, 64};
     std::vector<int64_t> wukShape = {headNum, 128, 512};
-    std::vector<int64_t> kvCacheShape = {blockNum, blockSize, 1, 576};
+    std::vector<int64_t> kvCacheShape = {blockNum, blockSize, 1, 512};
     std::vector<int64_t> kvCacheRopeShape = {blockNum, blockSize, 1, 64};
     std::vector<int64_t> slotmappingShape = {tokenNum};
     std::vector<int64_t> ctkvScaleShape = {1};
     std::vector<int64_t> qNopeScaleShape = {1};
 
-    std::vector<int64_t> qOutShape = {tokenNum, headNum, 576};
-    std::vector<int64_t> kvCacheOutShape = {blockNum, blockSize, 1, 576};
+    std::vector<int64_t> qOutShape = {tokenNum, headNum, 512};
+    std::vector<int64_t> kvCacheOutShape = {blockNum, blockSize, 1, 512};
     std::vector<int64_t> qRopeOutShape = {tokenNum, headNum, 64};
     std::vector<int64_t> krCacheOutShape = {blockNum, blockSize, 1, 64};
 

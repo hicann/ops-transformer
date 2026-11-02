@@ -20,7 +20,9 @@
 #include "op_host/tiling_base.h"
 #include <cmath>
 #include <cstdio>
+#include <initializer_list>
 #include <string>
+#include <vector>
 
 constexpr uint64_t AXES_ALIGN_SIZE = 512;
 constexpr uint64_t BASE_BLOCK_STEP = 2;
@@ -48,6 +50,8 @@ const int32_t NUM3 = 3;
 const int32_t NUM4 = 4;
 
 constexpr uint64_t INDEX_INPUT = 0;
+constexpr uint64_t INDEX_GAMMA0 = 1;
+constexpr uint64_t INDEX_BETA0 = 2;
 constexpr uint64_t INDEX_WDQKV = 5;
 constexpr uint64_t INDEX_WUQ = 12;
 constexpr uint64_t INDEX_COS = 16;
@@ -55,16 +59,54 @@ constexpr uint64_t INDEX_SIN = 17;
 constexpr uint64_t INDEX_WUK = 18;
 constexpr uint64_t INDEX_KV_CACHE = 19;
 constexpr uint64_t INDEX_KV_CACHE_ROPE = 20;
+constexpr uint64_t INDEX_SLOT_MAPPING = 21;
 constexpr uint64_t INDEX_DEQSCALE = 6;
+
+constexpr uint64_t INDEX_Q_OUT = 0;
+constexpr uint64_t INDEX_KV_CACHE_OUT = 1;
+constexpr uint64_t INDEX_Q_ROPE_OUT = 2;
+constexpr uint64_t INDEX_KR_CACHE_OUT = 3;
 
 constexpr uint64_t DIM_0 = 0;
 constexpr uint64_t DIM_1 = 1;
 constexpr uint64_t DIM_2 = 2;
+constexpr uint64_t DIM_3 = 3;
 
+constexpr uint64_t ATTR_Q_ROPE_DIM_IDX = 1;
+constexpr uint64_t ATTR_K_ROPE_DIM_IDX = 2;
 constexpr uint64_t ATTR_EPSILON_IDX = 3;
+constexpr uint64_t ATTR_Q_ROTARY_COEFF_IDX = 4;
+constexpr uint64_t ATTR_K_ROTARY_COEFF_IDX = 5;
+constexpr uint64_t ATTR_TRANSPOSE_WDQ_IDX = 6;
+constexpr uint64_t ATTR_TRANSPOSE_WUQ_IDX = 7;
+constexpr uint64_t ATTR_TRANSPOSE_WUK_IDX = 8;
 constexpr uint64_t ATTR_CACHE_MODE_IDX = 9;
 constexpr uint64_t ATTR_QUANT_MODE_IDX = 10;
 constexpr uint64_t ATTR_DO_RMS_NORM_IDX = 11;
+constexpr uint64_t ATTR_WDKV_SPLIT_COUNT_IDX = 12;
+
+constexpr int64_t TOKEN_NUM_MAX = 256;
+constexpr int64_t HIDDEN_SIZE_MIN = 2048;
+constexpr int64_t HIDDEN_SIZE_MAX = 10240;
+constexpr int64_t HIDDEN_SIZE_ALIGN = 256;
+constexpr int64_t Q_ROPE_DIM_SUPPORTED = 64;
+constexpr int64_t K_ROPE_DIM_SUPPORTED = 64;
+constexpr int64_t ROTARY_COEFF_SUPPORTED = 2;
+constexpr int64_t WDKV_SPLIT_COUNT_SUPPORTED = 1;
+constexpr int64_t CACHE_MODE_MAX = 3;
+constexpr int64_t Q_OUT_LAST_MERGED = 576;
+constexpr int64_t Q_OUT_LAST_SPLIT = 512;
+constexpr int64_t Q_ROPE_OUT_LAST = 64;
+constexpr int64_t KV_LAST_MERGED = 576;
+constexpr int64_t KV_LAST_SPLIT = 512;
+constexpr int64_t KV_ROPE_LAST = 64;
+constexpr uint64_t HEAD_NUM_MAX = 128;
+constexpr uint64_t QLORA_RANK_MIN = 32;
+constexpr uint64_t QLORA_RANK_MAX = 4096;
+constexpr uint64_t QLORA_RANK_ALIGN = 32;
+constexpr uint64_t NOPE_DIM_MIN = 16;
+constexpr uint64_t NOPE_DIM_MAX = 256;
+constexpr uint64_t NOPE_DIM_ALIGN = 16;
 
 inline uint64_t CeilDiv(const uint64_t dividend, const uint64_t divisor)
 {
@@ -250,6 +292,19 @@ void PpMatmulTilingApi::GetTilingData(optiling::MlaPpMatmulTilingData* tiling)
 
 void PpMatmulTilingApi::GetTileSize()
 {
+    if (m_ == 0 || n_ == 0 || k_ == 0) {
+        m0_ = 0;
+        n0_ = 0;
+        k0_ = 0;
+        mLoop_ = 0;
+        nLoop_ = 0;
+        kLoop_ = 0;
+        coreLoop_ = 0;
+        blockDim_ = 1;
+        swizzleCount_ = 1;
+        swizzleDirect_ = 0;
+        return;
+    }
     bool priFlag = !(m_ < n_);
     uint64_t roundBase = static_cast<uint64_t>(pow(2, ceil(log(CeilDiv(priFlag ? n_ : m_, CONST_16)))) * CONST_16);
     uint64_t priAxes = RoundUp(priFlag ? m_ : n_, CONST_16);
@@ -427,6 +482,23 @@ void MlaPreprocessTiling::RopeConcatTiling(const OpParam::MlaPreprocessParam& pa
 {
     uint64_t ntokens = param.N;
     uint64_t hiddenSizeQ = HEADDIM * param.headNum;
+    if (ntokens == 0) {
+        mlaTilingData.set_hiddenSizeQ(hiddenSizeQ);
+        mlaTilingData.set_headNumQ(param.headNum);
+        mlaTilingData.set_headDim(HEADDIM);
+        mlaTilingData.set_concatSize(CONCAT_SIZE);
+        mlaTilingData.set_rotaryCoeff(NUM2);
+        mlaTilingData.set_ntokens(0);
+        mlaTilingData.set_realCore(0);
+        mlaTilingData.set_nlCoreRun(0);
+        mlaTilingData.set_lCoreRun(0);
+        mlaTilingData.set_maxNPerLoopForUb(0);
+        mlaTilingData.set_preCoreLoopTime(0);
+        mlaTilingData.set_preCoreLoopNLast(0);
+        mlaTilingData.set_lastCoreLoopTime(0);
+        mlaTilingData.set_lastCoreLoopNLast(0);
+        return;
+    }
     uint64_t headDim = HEADDIM;
     uint64_t headNumQ = hiddenSizeQ / headDim;
     uint64_t concatSize = CONCAT_SIZE;
@@ -691,8 +763,203 @@ void MlaPreprocessTiling::PrintLastTilingData(gert::TilingContext* context)
             mlaTilingData.get_kvCacheRopeStride0());
 }
 
+static ge::graphStatus ReportInvalidParam(gert::TilingContext* context, const char* message)
+{
+    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "%s", message);
+    const std::vector<const char*> msgKey = {"message"};
+    const std::vector<const char*> msgValue = {message};
+    REPORT_PREDEFINED_ERR_MSG("EZ1001", msgKey, msgValue);
+    return ge::GRAPH_FAILED;
+}
+
+static bool ShapeEquals(const gert::Shape& shape, const std::initializer_list<int64_t>& expect)
+{
+    if (shape.GetDimNum() != expect.size()) {
+        return false;
+    }
+    size_t index = 0;
+    for (const int64_t dim : expect) {
+        if (shape.GetDim(index) != dim) {
+            return false;
+        }
+        ++index;
+    }
+    return true;
+}
+
+static const gert::Shape* InputOriginShape(gert::TilingContext* context, uint64_t index)
+{
+    const auto* storage = context->GetRequiredInputShape(index);
+    return storage == nullptr ? nullptr : &storage->GetOriginShape();
+}
+
+static const gert::Shape* OutputOriginShape(gert::TilingContext* context, uint64_t index)
+{
+    const auto* storage = context->GetOutputShape(index);
+    return storage == nullptr ? nullptr : &storage->GetOriginShape();
+}
+
+static ge::graphStatus CheckMlaPreprocessParams(gert::TilingContext* context)
+{
+    const auto* attrs = context->GetAttrs();
+    if (attrs == nullptr) {
+        return ReportInvalidParam(context, "attrs is null.");
+    }
+    const auto* qRopeDim = attrs->GetAttrPointer<int64_t>(ATTR_Q_ROPE_DIM_IDX);
+    const auto* kRopeDim = attrs->GetAttrPointer<int64_t>(ATTR_K_ROPE_DIM_IDX);
+    const auto* qRotaryCoeff = attrs->GetAttrPointer<int64_t>(ATTR_Q_ROTARY_COEFF_IDX);
+    const auto* kRotaryCoeff = attrs->GetAttrPointer<int64_t>(ATTR_K_ROTARY_COEFF_IDX);
+    const auto* transposeWdq = attrs->GetAttrPointer<bool>(ATTR_TRANSPOSE_WDQ_IDX);
+    const auto* transposeWuq = attrs->GetAttrPointer<bool>(ATTR_TRANSPOSE_WUQ_IDX);
+    const auto* transposeWuk = attrs->GetAttrPointer<bool>(ATTR_TRANSPOSE_WUK_IDX);
+    const auto* wdkvSplitCount = attrs->GetAttrPointer<int64_t>(ATTR_WDKV_SPLIT_COUNT_IDX);
+    const auto* cacheModePtr = attrs->GetAttrPointer<int64_t>(ATTR_CACHE_MODE_IDX);
+    const auto* quantModePtr = attrs->GetAttrPointer<int64_t>(ATTR_QUANT_MODE_IDX);
+    if (qRopeDim == nullptr || kRopeDim == nullptr || qRotaryCoeff == nullptr || kRotaryCoeff == nullptr ||
+        transposeWdq == nullptr || transposeWuq == nullptr || transposeWuk == nullptr || wdkvSplitCount == nullptr ||
+        cacheModePtr == nullptr || quantModePtr == nullptr) {
+        return ReportInvalidParam(context, "required attributes are missing.");
+    }
+    if (*qRopeDim != Q_ROPE_DIM_SUPPORTED || *kRopeDim != K_ROPE_DIM_SUPPORTED) {
+        return ReportInvalidParam(context, "qRopeDim and kRopeDim only support 64.");
+    }
+    if (*qRotaryCoeff != ROTARY_COEFF_SUPPORTED || *kRotaryCoeff != ROTARY_COEFF_SUPPORTED) {
+        return ReportInvalidParam(context, "qRotaryCoeff and kRotaryCoeff only support 2.");
+    }
+    if (!(*transposeWdq) || !(*transposeWuq) || !(*transposeWuk)) {
+        return ReportInvalidParam(context, "transposeWdq, transposeWuq and transposeWuk only support true.");
+    }
+    if (*wdkvSplitCount != WDKV_SPLIT_COUNT_SUPPORTED) {
+        return ReportInvalidParam(context, "wdkvSplitCount only supports 1.");
+    }
+    const int64_t cacheMode = *cacheModePtr;
+    if (cacheMode < 0 || cacheMode > CACHE_MODE_MAX) {
+        return ReportInvalidParam(context, "cacheMode only supports 0, 1, 2 and 3.");
+    }
+    if (*quantModePtr != 0) {
+        return ReportInvalidParam(context, "quantMode only supports 0.");
+    }
+
+    const auto* inputStorage = context->GetRequiredInputShape(INDEX_INPUT);
+    const auto* wukStorage = context->GetRequiredInputShape(INDEX_WUK);
+    const auto* deScaleStorage = context->GetRequiredInputShape(INDEX_DEQSCALE);
+    const auto* kvCacheStorage = context->GetRequiredInputShape(INDEX_KV_CACHE);
+    const auto* kvCacheRopeStorage = context->GetRequiredInputShape(INDEX_KV_CACHE_ROPE);
+    if (inputStorage == nullptr || wukStorage == nullptr || deScaleStorage == nullptr || kvCacheStorage == nullptr ||
+        kvCacheRopeStorage == nullptr) {
+        return ReportInvalidParam(context, "input, deScale0, wuk, kvCache and kvCacheRope must be provided.");
+    }
+    const int64_t tokenNumStorage = inputStorage->GetStorageShape().GetDim(DIM_0);
+    if (tokenNumStorage < 0 || tokenNumStorage > TOKEN_NUM_MAX) {
+        return ReportInvalidParam(context, "tokenNum must be in range [0, 256].");
+    }
+    const auto& wukStorageShape = wukStorage->GetStorageShape();
+    if (wukStorageShape.GetDimNum() < 2) {
+        return ReportInvalidParam(context, "wuk shape must be [headNum, nopeDim, ...].");
+    }
+    const int64_t headNum = wukStorageShape.GetDim(DIM_0);
+    const int64_t nopeDim = wukStorageShape.GetDim(DIM_1);
+    if (headNum <= 0 || static_cast<uint64_t>(headNum) > HEAD_NUM_MAX) {
+        return ReportInvalidParam(context, "headNum must be in range [1, 128].");
+    }
+    if (deScaleStorage->GetStorageShape().GetDimNum() < 1) {
+        return ReportInvalidParam(context, "deScale0 shape must contain qLoraRank.");
+    }
+    const int64_t qLoraRank = deScaleStorage->GetStorageShape().GetDim(DIM_0) - KV_LAST_MERGED;
+    if (qLoraRank < static_cast<int64_t>(QLORA_RANK_MIN) || qLoraRank > static_cast<int64_t>(QLORA_RANK_MAX) ||
+        (static_cast<uint64_t>(qLoraRank) % QLORA_RANK_ALIGN) != 0) {
+        return ReportInvalidParam(context, "qLoraRank must be in range [32, 4096] and aligned to 32.");
+    }
+    if (nopeDim < static_cast<int64_t>(NOPE_DIM_MIN) || nopeDim > static_cast<int64_t>(NOPE_DIM_MAX) ||
+        (static_cast<uint64_t>(nopeDim) % NOPE_DIM_ALIGN) != 0) {
+        return ReportInvalidParam(context, "nopeDim must be in range [16, 256] and aligned to 16.");
+    }
+
+    const gert::Shape* inputShape = InputOriginShape(context, INDEX_INPUT);
+    const gert::Shape* gamma0Shape = InputOriginShape(context, INDEX_GAMMA0);
+    const gert::Shape* beta0Shape = InputOriginShape(context, INDEX_BETA0);
+    const gert::Shape* slotMappingShape = InputOriginShape(context, INDEX_SLOT_MAPPING);
+    const gert::Shape* qOutShape = OutputOriginShape(context, INDEX_Q_OUT);
+    if (inputShape == nullptr || gamma0Shape == nullptr || beta0Shape == nullptr || slotMappingShape == nullptr ||
+        qOutShape == nullptr) {
+        return ReportInvalidParam(context, "input, gamma0, beta0, slotMapping and qOut must be provided.");
+    }
+    if (inputShape->GetDimNum() != 2) {
+        return ReportInvalidParam(context, "input shape must be [tokenNum, hiddenSize].");
+    }
+    const int64_t tokenNum = inputShape->GetDim(DIM_0);
+    const int64_t hiddenSize = inputShape->GetDim(DIM_1);
+    if (hiddenSize < HIDDEN_SIZE_MIN || hiddenSize > HIDDEN_SIZE_MAX || (hiddenSize % HIDDEN_SIZE_ALIGN) != 0) {
+        return ReportInvalidParam(context, "hiddenSize must be in range [2048, 10240] and a multiple of 256.");
+    }
+    if (!ShapeEquals(*gamma0Shape, {hiddenSize}) || !ShapeEquals(*beta0Shape, {hiddenSize})) {
+        return ReportInvalidParam(context, "gamma0 and beta0 shape must be [hiddenSize].");
+    }
+    if (!ShapeEquals(*slotMappingShape, {tokenNum})) {
+        return ReportInvalidParam(context, "slotMapping shape must be [tokenNum].");
+    }
+
+    const int64_t qOutLast = cacheMode == 0 ? Q_OUT_LAST_MERGED : Q_OUT_LAST_SPLIT;
+    if (!ShapeEquals(*qOutShape, {tokenNum, headNum, qOutLast})) {
+        char message[160];
+        snprintf(message, sizeof(message), "qOut shape must be [tokenNum, headNum, %ld] for cacheMode %ld.", qOutLast,
+                 cacheMode);
+        return ReportInvalidParam(context, message);
+    }
+    if (cacheMode != 0) {
+        const gert::Shape* qRopeOutShape = OutputOriginShape(context, INDEX_Q_ROPE_OUT);
+        if (qRopeOutShape == nullptr || !ShapeEquals(*qRopeOutShape, {tokenNum, headNum, Q_ROPE_OUT_LAST})) {
+            return ReportInvalidParam(context,
+                                      "qRopeOut shape must be [tokenNum, headNum, 64] when cacheMode is not 0.");
+        }
+    }
+    if (cacheMode == 0 || cacheMode == 1) {
+        const int64_t kvLast = cacheMode == 0 ? KV_LAST_MERGED : KV_LAST_SPLIT;
+        const gert::Shape* kvCacheShape = InputOriginShape(context, INDEX_KV_CACHE);
+        const gert::Shape* kvCacheOutShape = OutputOriginShape(context, INDEX_KV_CACHE_OUT);
+        if (kvCacheShape == nullptr || kvCacheOutShape == nullptr || kvCacheShape->GetDimNum() != 4) {
+            return ReportInvalidParam(context, "kvCache shape must be [blockNum, blockSize, 1, kvDim] for ND cache.");
+        }
+        const int64_t blockNum = kvCacheShape->GetDim(DIM_0);
+        const int64_t blockSize = kvCacheShape->GetDim(DIM_1);
+        if (blockNum <= 0 || blockSize <= 0 || !ShapeEquals(*kvCacheShape, {blockNum, blockSize, 1, kvLast}) ||
+            !ShapeEquals(*kvCacheOutShape, {blockNum, blockSize, 1, kvLast})) {
+            char message[192];
+            snprintf(message, sizeof(message),
+                     "kvCache and kvCacheOut shape must be [blockNum, blockSize, 1, %ld] for cacheMode %ld.", kvLast,
+                     cacheMode);
+            return ReportInvalidParam(context, message);
+        }
+        if (cacheMode == 1) {
+            const gert::Shape* kvCacheRopeShape = InputOriginShape(context, INDEX_KV_CACHE_ROPE);
+            const gert::Shape* krCacheOutShape = OutputOriginShape(context, INDEX_KR_CACHE_OUT);
+            if (kvCacheRopeShape == nullptr || krCacheOutShape == nullptr ||
+                !ShapeEquals(*kvCacheRopeShape, {blockNum, blockSize, 1, KV_ROPE_LAST}) ||
+                !ShapeEquals(*krCacheOutShape, {blockNum, blockSize, 1, KV_ROPE_LAST})) {
+                return ReportInvalidParam(context,
+                                          "kvCacheRope and krCacheOut shape must be [blockNum, blockSize, 1, 64] "
+                                          "when cacheMode is 1.");
+            }
+        }
+    } else {
+        const auto& kvStorageShape = kvCacheStorage->GetStorageShape();
+        const auto& kvOriginShape = kvCacheStorage->GetOriginShape();
+        const bool blockSizeFromStorageDim2 = kvStorageShape.GetDimNum() > DIM_2 && kvStorageShape.GetDim(DIM_2) != 1;
+        const int64_t blockSize = blockSizeFromStorageDim2 ?
+                                      kvStorageShape.GetDim(DIM_2) :
+                                      (kvOriginShape.GetDimNum() > DIM_1 ? kvOriginShape.GetDim(DIM_1) : 0);
+        if (blockSize <= 0) {
+            return ReportInvalidParam(context, "blockSize must be greater than 0.");
+        }
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus MlaPreprocessTiling::Init(gert::TilingContext* context)
 {
+    if (CheckMlaPreprocessParams(context) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     OpParam::MlaPreprocessParam param = MlaPreprocessTiling::GetParam(context);
     const auto* cosShape = context->GetRequiredInputShape(INDEX_COS);
     const auto* sinShape = context->GetRequiredInputShape(INDEX_SIN);
@@ -724,18 +991,6 @@ ge::graphStatus MlaPreprocessTiling::Init(gert::TilingContext* context)
     OP_CHECK_IF(!ValidateCacheNonFirstAxisContiguous(context, INDEX_KV_CACHE_ROPE, kvCacheRopeShape, "kvCacheRope"),
                 OP_LOGE(context, "kvCacheRope has non-contiguous axis beyond dim0, which is not supported."),
                 return ge::GRAPH_FAILED);
-
-    // headNum 限制：范围 1~128
-    OP_CHECK_IF(param.headNum <= 0 || param.headNum > 128, OP_LOGE(context, "headNum must be in range [1, 128]"),
-                return ge::GRAPH_FAILED);
-
-    // qLoraRank (qlora) 限制：范围 32~4096，必须 32 对齐
-    OP_CHECK_IF(param.qLoraRank < 32 || param.qLoraRank > 4096 || (param.qLoraRank % 32) != 0,
-                OP_LOGE(context, "qLoraRank must be in range [32, 4096] and aligned to 32"), return ge::GRAPH_FAILED);
-
-    // nopeDim (nope) 限制：范围 16~256，必须 16 对齐
-    OP_CHECK_IF(param.nopeDim < 16 || param.nopeDim > 256 || (param.nopeDim % 16) != 0,
-                OP_LOGE(context, "nopeDim must be in range [16, 256] and aligned to 16"), return ge::GRAPH_FAILED);
 
     bool doRmsNorm = *(context->GetAttrs()->GetAttrPointer<bool>(ATTR_DO_RMS_NORM_IDX));
     mlaTilingData.set_doRmsNorm(doRmsNorm);

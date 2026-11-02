@@ -11,6 +11,7 @@
 #include "aclnn_mla_preprocess.h"
 
 #include "empty_tensor_holder.h"
+#include "mla_preprocess_param_check.h"
 #include "opdev/op_log.h"
 
 namespace {
@@ -49,6 +50,14 @@ extern "C" aclnnStatus aclnnMlaPreprocessGetWorkspaceSize(
     if (cosIsNull != sinIsNull) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "cos and sin must both be nullptr or both be non-null.");
         return ACLNN_ERR_PARAM_NULLPTR;
+    }
+    const aclnnStatus paramStatus = MlaPreprocessApi::CheckMlaPreprocessApiParams(
+        input, gamma0, beta0, quantScale0, quantOffset0, wdqkv, deScale0, bias0, gamma1, beta1, quantScale1,
+        quantOffset1, wuq, deScale1, bias1, gamma2, cos, sin, wuk, kvCache, kvCacheRope, slotMapping, ctkvScale,
+        qNopeScale, qRopeDim, kRopeDim, qRotaryCoeff, kRotaryCoeff, transposeWdq, transposeWuq, transposeWuk, cacheMode,
+        quantMode, wdkvSplitCount, qOut, kvCacheOut, qRopeOut, krCacheOut, nullptr, false);
+    if (paramStatus != ACLNN_SUCCESS) {
+        return paramStatus;
     }
 
     aclDataType ropeDataType = ACL_DT_UNDEFINED;
