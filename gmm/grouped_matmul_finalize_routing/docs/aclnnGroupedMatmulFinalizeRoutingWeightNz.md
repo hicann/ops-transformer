@@ -129,7 +129,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
       <td>pertokenScaleOptional</td>
       <td>输入</td>
       <td>矩阵计算的反量化参数。</td>
-      <td></td>
+      <td>可选参数，支持空指针。</td>
       <td>FLOAT32</td>
       <td>ND</td>
       <td>shape支持一维，维度为(m)，m和x1的m一致</td>
@@ -139,7 +139,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
       <td>groupList</td>
       <td>输入</td>
       <td>输入和输出分组轴方向的matmul大小分布。</td>
-      <td></td>
+      <td>必选参数，不支持空指针。</td>
       <td>INT64</td>
       <td>ND</td>
       <td>shape支持一维，维度为(e)，e和x2的e一致</td>
@@ -149,7 +149,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
       <td>sharedInput</td>
       <td>输入</td>
       <td>moe计算中共享专家的输出，需要与moe专家的输出进行combine操作。</td>
-      <td></td>
+      <td>可选参数，支持空指针；为空时不融合共享专家输出。</td>
       <td>BF16</td>
       <td>ND</td>
       <td>支持二维，维度为(bsdp,n)，bsdp必须小于等于batchSize/e，n和x2的n一致。</td>
@@ -159,7 +159,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
       <td>logit</td>
       <td>输入</td>
       <td>moe专家对各个token的logit大小。</td>
-      <td></td>
+      <td>必选参数，不支持空指针；sharedInput为空时仍须提供。</td>
       <td>FLOAT32</td>
       <td>ND</td>
       <td>shape支持一维，维度为(m)，m和x1的m一致</td>
@@ -169,7 +169,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
       <td>rowIndex</td>
       <td>输入</td>
       <td>moe专家输出按照该rowIndex进行combine，其中的值即为combine做scatter add的索引。</td>
-      <td></td>
+      <td>必选参数，不支持空指针。</td>
       <td>INT32、INT64</td>
       <td>ND</td>
       <td>shape支持一维，维度为(m)，m和x1的m一致</td>
@@ -290,7 +290,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>传入的x1、x2、scale、bias或out是空指针。</td>
+      <td>必选输入或输出参数为空指针。各参数的必选条件请参见参数说明和约束说明。</td>
     </tr>
     <tr>
       <td rowspan="8">ACLNN_ERR_PARAM_INVALID</td>
@@ -353,6 +353,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
 
 ## 约束说明
 
+- x1、x2、scale、groupList、logit、rowIndex、out为必选参数，pertokenScaleOptional、sharedInput为可选参数。bias为预留参数，传入空指针即可。sharedInput为空时，logit和rowIndex仍须提供。
+
 - 确定性计算：
 
   - aclnnGroupedMatmulFinalizeRoutingWeightNz默认非确定性实现，支持通过aclrtSetSysParamOpt开启确定性。
@@ -360,8 +362,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
 
   | x1   | x2   | scale   | bias | pertokenScaleOptional | groupList | sharedInput | logit   | rowIndex | out   |
   | ---- | ---- | ------- | ---- | --------------------- | --------- | ----------- | ------- | -------- | ----- |
-  | INT8 | INT8 | FLOAT32 | null | FLOAT32               | INT64     | BFLOAT16    | FLOAT32 | INT64    | FLOAT |
-  | INT8 | INT8 | FLOAT32 | null | FLOAT32               | INT64     | null        | null    | INT64    | FLOAT |
+  | INT8 | INT8 | FLOAT32 | null | FLOAT32 / null        | INT64     | BFLOAT16    | FLOAT32 | INT64    | FLOAT |
+  | INT8 | INT8 | FLOAT32 | null | FLOAT32 / null        | INT64     | null        | FLOAT32 | INT64    | FLOAT |
 
 ## 调用示例
 

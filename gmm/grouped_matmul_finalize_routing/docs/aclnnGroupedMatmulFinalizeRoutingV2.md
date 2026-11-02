@@ -112,7 +112,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2(
       <td>scaleOptional</td>
       <td>输入</td>
       <td>量化参数中的缩放因子，per-channel量化参数。</td>
-      <td>-</td>
+      <td>必选参数，不支持空指针。</td>
       <td>INT64</td>
       <td>ND</td>
       <td>shape支持三维，维度为(e, 1, n)，e、n和x2的e、n一致</td>
@@ -122,7 +122,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2(
       <td>biasOptional</td>
       <td>输入</td>
       <td>矩阵的偏移。</td>
-      <td>-</td>
+      <td>必选参数，不支持空指针。</td>
       <td>FLOAT32</td>
       <td>ND</td>
       <td>shape支持二维，维度为(e, n)，e、n和x2的e、n一致</td>
@@ -162,7 +162,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2(
       <td>pertokenScaleOptional</td>
       <td>输入</td>
       <td>矩阵计算的反量化参数。</td>
-      <td></td>
+      <td>必选参数，不支持空指针。</td>
       <td>FLOAT32</td>
       <td>ND</td>
       <td>shape支持一维，维度为(m)，m和x1的m一致</td>
@@ -172,7 +172,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2(
       <td>groupListOptional</td>
       <td>输入</td>
       <td>输入和输出分组轴方向的matmul大小分布。</td>
-      <td></td>
+      <td>必选参数，不支持空指针。</td>
       <td>INT64</td>
       <td>ND</td>
       <td>shape支持一维，维度为(e)，e和x2的e一致</td>
@@ -182,7 +182,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2(
       <td>sharedInputOptional</td>
       <td>输入</td>
       <td>moe计算中共享专家的输出，需要与moe专家的输出进行combine操作。</td>
-      <td></td>
+      <td>可选参数，支持空指针；为空时不融合共享专家输出。</td>
       <td>BF16</td>
       <td>ND</td>
       <td>shape支持二维，维度为(bsdp,n)，bsdp必须小于等于batchSize/e，n和x2的n一致。</td>
@@ -192,7 +192,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2(
       <td>logitOptional</td>
       <td>输入</td>
       <td>moe专家对各个token的logit大小。</td>
-      <td></td>
+      <td>必选参数，不支持空指针；sharedInputOptional为空时仍须提供。</td>
       <td>FLOAT32</td>
       <td>ND</td>
       <td>shape支持一维，维度为(m)，m和x1的m一致</td>
@@ -202,7 +202,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2(
       <td>rowIndexOptional</td>
       <td>输入</td>
       <td>moe专家输出按照该rowIndex进行combine，其中的值即为combine做scatter add的索引。</td>
-      <td></td>
+      <td>必选参数，不支持空指针。</td>
       <td>INT64</td>
       <td>ND</td>
       <td>shape支持一维，维度为(m)，m和x1的m一致</td>
@@ -322,7 +322,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>传入的x1、x2、scaleOptional、biasOptional或out是空指针。</td>
+      <td>必选输入或输出参数为空指针。各参数的必选条件请参见参数说明和约束说明。</td>
     </tr>
     <tr>
       <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
@@ -381,6 +381,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2(
 
 ## 约束说明
 
+- scaleOptional、biasOptional、pertokenScaleOptional、groupListOptional、logitOptional、rowIndexOptional为必选参数，sharedInputOptional为可选参数。参数名中的Optional不表示在本接口支持的场景中均可为空。
+
 - 确定性计算：
   - aclnnGroupedMatmulFinalizeRoutingV2默认非确定性实现，支持通过aclrtSetSysParamOpt开启确定性。
 
@@ -389,8 +391,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2(
 
   | x1    | x2    | scaleOptional | biasOptional    | offsetOptional  | antiquantScaleOptional | antiquantOffsetOptional | pertokenScaleOptional | groupListOptional |  sharedInputOptional | logitOptional   | rowIndexOptional | out       |
   |------|------|-------|---------|---------|----------------|-----------------|---------------|-----------|-------------|---------|----------|---------|
-  | INT8 | INT4 | INT64 | FLOAT32 | FLOAT32 | null           | null            | FLOAT32       | INT64     | BFLOAT16    | FLOAT32 | INT64    | FLOAT32 |
-  | INT8 | INT4 | INT64 | FLOAT32 | null    | null           | null            | FLOAT32       | INT64     | BFLOAT16    | FLOAT32 | INT64    | FLOAT32 |
+  | INT8 | INT4 | INT64 | FLOAT32 | FLOAT32 | null           | null            | FLOAT32       | INT64     | BFLOAT16 / null | FLOAT32 | INT64    | FLOAT32 |
+  | INT8 | INT4 | INT64 | FLOAT32 | null    | null           | null            | FLOAT32       | INT64     | BFLOAT16 / null | FLOAT32 | INT64    | FLOAT32 |
 
     - 在该场景中，scaleOptional代表per-channel和per-group离线融合的结果。
     - 在该场景中，biasOptional代表离线计算的辅助结果，值要求为$8 \times w \times scaleOptional$，并在第一维累加。

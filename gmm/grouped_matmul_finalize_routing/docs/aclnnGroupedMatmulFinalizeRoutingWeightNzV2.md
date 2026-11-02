@@ -175,7 +175,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>pertokenScaleOptional（aclTensor *）</td>
       <td>输入</td>
       <td>矩阵计算的反量化参数。</td>
-      <td>-</td>
+      <td>可选性取决于产品和量化场景，具体请参见约束说明。</td>
       <td>FLOAT、FLOAT8_E8M0<sup>1</sup></td>
       <td>ND</td>
       <td>shape支持1维和3维，维度为(m)，m和x1的m一致；MxA8W4场景为三维(m, ceil(k/64), 2)</td>
@@ -185,7 +185,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>groupList（aclTensor *）</td>
       <td>输入</td>
       <td>输入和输出分组轴方向的matmul大小分布。</td>
-      <td>根据groupListType输入不同格式数据。综合约束请参见<a href="#约束说明">约束说明</a>。</td>
+      <td>必选参数，不支持空指针。根据groupListType输入不同格式数据。综合约束请参见<a href="#约束说明">约束说明</a>。</td>
       <td>INT64</td>
       <td>ND</td>
       <td>shape支持一维，维度为(e)，e和x2的e一致</td>
@@ -195,7 +195,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>sharedInput（aclTensor *）</td>
       <td>输入</td>
       <td>moe计算中共享专家的输出，需要与moe专家的输出进行combine操作。</td>
-      <td>-</td>
+      <td>可选参数，支持空指针；为空时不融合共享专家输出。</td>
       <td>BF16</td>
       <td>ND</td>
       <td>支持二维，维度为(bsdp, n)，bsdp必须小于等于batchSize/e，n和x2的n一致。</td>
@@ -205,7 +205,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>logit（aclTensor *）</td>
       <td>输入</td>
       <td>moe专家对各个token的logit大小。</td>
-      <td>-</td>
+      <td>必选参数，不支持空指针；sharedInput为空时仍须提供。</td>
       <td>FLOAT、BFLOAT16<sup>1</sup></td>
       <td>ND</td>
       <td>shape支持一维，维度为(m)，m和x1的m一致</td>
@@ -215,7 +215,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>rowIndex（aclTensor *）</td>
       <td>输入</td>
       <td>moe专家输出按照该rowIndex进行combine，其中的值即为combine做scatter add的索引。</td>
-      <td>-</td>
+      <td>必选参数，不支持空指针。</td>
       <td>INT64、INT32</td>
       <td>ND</td>
       <td>shape支持一维，维度为(m)，m和x1的m一致</td>
@@ -370,7 +370,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>传入参数是必选输入、输出或者必须属性，且是空指针。</td>
+      <td>必选输入或输出参数为空指针。各参数的必选条件请参见参数说明和约束说明。</td>
     </tr>
     <tr>
       <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
