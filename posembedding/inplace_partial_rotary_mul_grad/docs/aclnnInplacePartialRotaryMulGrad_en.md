@@ -213,7 +213,7 @@ aclnnStatus aclnnInplacePartialRotaryMulGrad(
     <tr>
       <td>partialSlice</td>
       <td>Input</td>
-      <td>Slice range on the last dimension (D dimension) of dyRef, in the format [start, end), indicating that the gradient computation of the rotary position embedding is performed on dyRef[..., start:end].</td>
+      <td>Slice range on the last dimension (D dimension) of dyRef, in the format [start, end), indicating that the gradient computation of the rotary position embedding is performed on dyRef[..., start:end]. Must contain exactly 2 elements.</td>
       <td>-</td>
       <td>IntArray</td>
       <td>-</td>
@@ -273,12 +273,20 @@ aclnnStatus aclnnInplacePartialRotaryMulGrad(
       <td>The data types and formats of inputs dyRef, cos, and sin are not in the supported range.</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_INNER_TILING_ERROR</td>
-      <td rowspan="2">561002</td>
+      <td rowspan="3">ACLNN_ERR_INNER_TILING_ERROR</td>
+      <td rowspan="3">561002</td>
       <td>The shape of the input parameter does not meet the conditions in the Constraints section.</td>
     </tr>
     <tr>
       <td>The input rotaryMode parameter is not 0, 1, 2, or 3. </td>
+    </tr>
+    <tr>
+      <td>The number of elements in partialSlice is not 2 (it must be two elements, [start, end)).</td>
+    </tr>
+    <tr>
+      <td>ACLNN_ERR_INNER_NULLPTR</td>
+      <td>561103</td>
+      <td>The input partialSlice is an empty array (0 elements); the framework rejects empty array attributes.</td>
     </tr>
   </tbody>
   </table>

@@ -34,6 +34,7 @@ constexpr int64_t DIM_3 = 3;
 constexpr int64_t HALF_INTERLEAVE_MODE_COEF = 2;
 constexpr int64_t QUARTER_MODE_COEF = 4;
 constexpr int64_t D_LIMIT = 1024;
+constexpr size_t PARTIAL_SLICE_ELEMENT_NUM = 2; // partial_slice is a [start, end) pair
 
 const std::vector<ge::DataType> SUPPORT_DTYPE = {ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT16};
 static const std::vector<std::string> inputNames = {"dy", "cos", "sin"};
@@ -370,6 +371,16 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckAttr()
 
     auto partialSlicePtr = attrs->GetListInt(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, partialSlicePtr);
+    // The element count must be validated before indexing: with fewer than 2 elements the
+    // reads below are out of bounds (a 1-element slice reads heap garbage for 'end', making
+    // the kernel silently no-op or slice a wrong range; a 0-element slice reads data[0]).
+    if (partialSlicePtr->GetSize() != PARTIAL_SLICE_ELEMENT_NUM) {
+        std::string sliceStr = "element count " + std::to_string(partialSlicePtr->GetSize());
+        std::string reasonMsg = "partial_slice must contain exactly 2 elements [start, end), but got " +
+                                std::to_string(partialSlicePtr->GetSize()) + " element(s)";
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "partial_slice", sliceStr.c_str(), reasonMsg.c_str());
+        return ge::GRAPH_FAILED;
+    }
     sliceStart_ = partialSlicePtr->GetData()[0];
     sliceEnd_ = partialSlicePtr->GetData()[1];
     sliceLength_ = sliceEnd_ - sliceStart_;

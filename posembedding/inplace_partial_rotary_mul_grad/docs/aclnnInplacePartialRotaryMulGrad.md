@@ -211,7 +211,7 @@ aclnnStatus aclnnInplacePartialRotaryMulGrad(
     <tr>
       <td>partialSlice</td>
       <td>输入</td>
-      <td>dyRef最后一维(D维)上的切片范围，为[start, end)，表示对dyRef[..., start:end]执行旋转位置编码梯度计算。</td>
+      <td>dyRef最后一维(D维)上的切片范围，为[start, end)，表示对dyRef[..., start:end]执行旋转位置编码梯度计算。必须为2个元素。</td>
       <td>-</td>
       <td>IntArray</td>
       <td>-</td>
@@ -271,12 +271,20 @@ aclnnStatus aclnnInplacePartialRotaryMulGrad(
       <td>传入的输入dyRef、cos、sin的数据类型和格式不在支持的范围内。</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_INNER_TILING_ERROR</td>
-      <td rowspan="2">561002</td>
+      <td rowspan="3">ACLNN_ERR_INNER_TILING_ERROR</td>
+      <td rowspan="3">561002</td>
       <td>传入的参数shape不满足约束说明章节中的条件。</td>
     </tr>
     <tr>
       <td>传入的rotaryMode参数不在0、1、2、3范围内。 </td>
+    </tr>
+    <tr>
+      <td>传入的partialSlice元素个数不为2（必须为[start, end)两个元素）。</td>
+    </tr>
+    <tr>
+      <td>ACLNN_ERR_INNER_NULLPTR</td>
+      <td>561103</td>
+      <td>传入的partialSlice是空数组（0个元素），框架层拒绝空数组属性。</td>
     </tr>
   </tbody>
   </table>

@@ -538,6 +538,71 @@ TEST_F(InplacePartialRotaryMulGradTilingTest, rejects_mode_half)
     ExecuteTestCase(tilingPara, ge::GRAPH_FAILED);
 }
 
+// partial_slice must contain exactly 2 elements [start, end); 0/1/3 elements are rejected
+// before any out-of-bounds read of the attr array (issue #6857).
+TEST_F(InplacePartialRotaryMulGradTilingTest, rejects_partial_slice_zero_element)
+{
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMulGrad",
+        {
+            {{{2, 2, 2, 8}, {2, 2, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 1, 4}, {1, 1, 1, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 1, 4}, {1, 1, 1, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 2, 8}, {2, 2, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"partial_slice", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>({})},
+        },
+        &compileInfo_, kSocVersion, k950CoreNum, k950UbSize);
+
+    ExecuteTestCase(tilingPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(InplacePartialRotaryMulGradTilingTest, rejects_partial_slice_one_element)
+{
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMulGrad",
+        {
+            {{{2, 2, 2, 8}, {2, 2, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 1, 4}, {1, 1, 1, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 1, 4}, {1, 1, 1, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 2, 8}, {2, 2, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"partial_slice", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>({0})},
+        },
+        &compileInfo_, kSocVersion, k950CoreNum, k950UbSize);
+
+    ExecuteTestCase(tilingPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(InplacePartialRotaryMulGradTilingTest, rejects_partial_slice_three_elements)
+{
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMulGrad",
+        {
+            {{{2, 2, 2, 8}, {2, 2, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 1, 4}, {1, 1, 1, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 1, 4}, {1, 1, 1, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 2, 8}, {2, 2, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"partial_slice", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>({0, 4, 6})},
+        },
+        &compileInfo_, kSocVersion, k950CoreNum, k950UbSize);
+
+    ExecuteTestCase(tilingPara, ge::GRAPH_FAILED);
+}
+
 TEST_F(InplacePartialRotaryMulGradTilingTest, rejects_mode_quarter)
 {
     gert::TilingContextPara tilingPara(
