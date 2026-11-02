@@ -81,6 +81,19 @@ TEST_F(NsaCompressApiTest, invalid_input_and_weight_ranks)
     }
 }
 
+TEST_F(NsaCompressApiTest, null_layout)
+{
+    auto input = TensorDesc({48, 32, 16}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(0, 1);
+    auto weight = TensorDesc({16, 32}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(0, 1);
+    IntArrayDesc actSeqLen(std::vector<int64_t>{16, 32, 48});
+    auto output = TensorDesc({3, 32, 16}, ACL_FLOAT16, ACL_FORMAT_ND);
+
+    auto ut = OP_API_UT(aclnnNsaCompress, INPUT(input, weight, actSeqLen, static_cast<char*>(nullptr), 16, 16, 0),
+                        OUTPUT(output));
+    uint64_t workspaceSize = 0;
+    EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_ERR_PARAM_INVALID);
+}
+
 TEST_F(NsaCompressApiTest, null_actual_sequence_lengths)
 {
     auto input = TensorDesc({64, 4, 32}, ACL_FLOAT16, ACL_FORMAT_ND);

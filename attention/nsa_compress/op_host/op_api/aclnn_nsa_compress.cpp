@@ -188,6 +188,7 @@ aclnnStatus aclnnNsaCompressGetWorkspaceSize(const aclTensor* input, const aclTe
     // 检查入参
     CHECK_RET(CheckNsaCompressParam(input, weight, actSeqLenOptional, output, workspaceSize, executor) == ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_RET(layoutOptional != nullptr, ACLNN_ERR_PARAM_INVALID);
     // L2接口阶段1
     L2_DFX_PHASE_1(
         aclnnNsaCompress,
