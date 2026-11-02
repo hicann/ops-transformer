@@ -337,6 +337,26 @@ attention:
     options:
       - generic_block_sparse_attention
 
+  quant_flash_attn:
+    module: True
+    src:
+      - attention/quant_flash_attn
+      - attention/common/op_host
+    exclude:
+      - attention/quant_flash_attn/docs
+      - attention/quant_flash_attn/README.md
+    ut_cov_exclude:
+      - attention/quant_flash_attn/op_kernel
+      - attention/quant_flash_attn/tests
+      - attention/quant_flash_attn/torch_extension
+      - attention/quant_flash_attn/docs
+      - attention/quant_flash_attn/op_host/arch92
+    test:
+      examples: False
+      ut: True
+    options:
+      - quant_flash_attn
+
   flash_attention_score:
     module: True
     src:
