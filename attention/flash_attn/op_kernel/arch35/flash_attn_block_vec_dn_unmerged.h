@@ -100,8 +100,11 @@ public:
     LocalTensor<T> ubVec2Res_; // 存放vec2阶段VEC的中间处理结果, 并且作为attn_out的输出buffer, 需配对的MTE3和V的同步ID
 
     static constexpr uint32_t UB_VEC1_RES_BUFCNT = 2U;
-    // DN VF 按 64 lanes 打包 P, 逻辑 Vector M 为 32(mBase=64) 时也按实际打包宽度定容
-    static constexpr uint32_t UB_VEC1_RES_BUF_BYTES = (64U + 1U) * s2BaseSize * sizeof(INPUT_T);
+    // P 的容量: 32 列一组, 组内 8 个 544B 槽(每槽 = 16x16 fractal 512B + 32B pad),
+    // 组 = 8 x 544B = 4352B, 故容量 = ceil(s2BaseSize/32) * 4352B (= 4.25 x s2BaseSize)。
+    // 依据: StoreAlign<DATA_BLOCK_COPY> 一条指令写 8 个 32B DataBlock, 块间距离 17 个 DataBlock(544B)
+    //       恰好覆盖 (列 c 的 4 个行块 | 列 c+16 的 4 个行块); 每 fractal 一个 pad 换来均匀步长与 bank 相位错开。
+    static constexpr uint32_t UB_VEC1_RES_BUF_BYTES = ((s2BaseSize + 31U) / 32U) * 4352U;
     LocalTensor<uint8_t> ubVec1ResBuffers_;
     uint32_t vec1ResUbBufId_ = 0;
 
@@ -395,11 +398,14 @@ public:
             return;
         }
 
-        static constexpr uint32_t vec1S2CopyLenDn = s2BaseSize / CV_RATIO;
         static constexpr uint32_t vec1HalfS1BaseSize = mBaseSize >> 1;
-        static constexpr uint32_t vec1S2CopyCountDn = (mBaseSize >> 4) / CV_RATIO;
-        static constexpr uint32_t vec1S2strideDn = s2BaseSize * 8;
-        static constexpr uint32_t vec1ResOffsetDn = s2BaseSize * 32 + 64;
+        // P(UB) 新布局: 32 列一组, 组内 8 个 544B 槽(k0.m0..m3 | k1.m0..m3), 每槽 = 一个 16x16 fractal。
+        // L1 目的仍是 NZ [m_fractal 4][k_fractal actS2Align/16], m_fractal 步长 16*actS2Align 个元素。
+        // 对固定 m_fractal, 第 j 个 fractal(j = 2*组号 + k) 在 UB 的偏移 = j*4*544B + m*544B,
+        // 在 L1 连续排列(j*512B), 于是每条 DataCopy 一次搬完整个 m_fractal:
+        //   blockCount = actS2Align/16, blockLen = 16 DataBlock, srcGap = 52 DataBlock, dstGap = 0
+        static constexpr uint32_t vec1PFractalBytes = 544U;
+        static constexpr uint32_t vec1PFractalSrcGap = (4U * 544U - 512U) / 32U;
 
         LocalTensor<T> sumUb =
             softmaxSumBuf_[(runInfo.mloop % UB_SOFTMAX_SUM_BUFCNT) * (UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T))];
@@ -428,32 +434,22 @@ public:
                     runInfo.actSingleLoopS2Size, static_cast<T>(constInfo_.scaleValue), negativeFloatScalar_, maskLine);
             }
         } else {
-            LocalTensor<uint8_t> unusedMaskTensor;
-            constexpr float descaleQK = 1.0F;
-            FaVectorApi::ProcessVec1VfDn<T, INPUT_T, true, false, s2BaseSize>(
-                stage1CastTensor, sumUb, maxUb, mm1ResUbTensor, expUb, nullptr, unusedMaskTensor,
-                runInfo.actMSizeAlign32 >> 1, runInfo.actSingleLoopS2SizeAlign, runInfo.actSingleLoopS2Size,
-                static_cast<T>(constInfo_.scaleValue), descaleQK, negativeFloatScalar_, 0.0F, false);
+            // mask_mode=0: 没有遮挡, 但仍要用本模板的 P 布局(common 的 ProcessVec1VfDn 走的是旧 P 布局)
+            ProcessVec1VfDnLine<T, INPUT_T, false, s2BaseSize>(
+                stage1CastTensor, sumUb, maxUb, mm1ResUbTensor, expUb, runInfo.actMSizeAlign32 >> 1,
+                runInfo.actSingleLoopS2Size, static_cast<T>(constInfo_.scaleValue), negativeFloatScalar_, 0);
         }
         Mutex::Unlock<PIPE_V>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
         Mutex::Lock<PIPE_MTE3>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
         LocalTensor<INPUT_T> mm2AL1Tensor = pL1Tensor;
 
-        if (runInfo.actSingleLoopS2Size > vec1S2CopyLenDn) {
-            DataCopy(mm2AL1Tensor[constInfo_.subBlockIdx * vec1HalfS1BaseSize * runInfo.actSingleLoopS2SizeAlign],
-                     stage1CastTensor,
-                     {vec1S2CopyCountDn, vec1S2CopyLenDn, 1,
-                      static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign - vec1S2CopyLenDn)});
-            DataCopy(mm2AL1Tensor[constInfo_.subBlockIdx * vec1HalfS1BaseSize * runInfo.actSingleLoopS2SizeAlign +
-                                  vec1S2strideDn],
-                     stage1CastTensor[vec1ResOffsetDn],
-                     {vec1S2CopyCountDn, static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign - vec1S2CopyLenDn),
-                      static_cast<uint16_t>(s2BaseSize - runInfo.actSingleLoopS2SizeAlign + 1), vec1S2CopyLenDn});
-        } else {
-            DataCopy(mm2AL1Tensor[constInfo_.subBlockIdx * vec1HalfS1BaseSize * runInfo.actSingleLoopS2SizeAlign],
-                     stage1CastTensor,
-                     {vec1S2CopyCountDn, static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign),
-                      static_cast<uint16_t>(vec1S2CopyLenDn - runInfo.actSingleLoopS2SizeAlign + 1), 0});
+        // 尾块 L1 按 actS2Align 紧凑排列(与旧实现一致), k_fractal 数 = actS2Align/16
+        uint16_t vec1PFractalCountDn = static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign >> 4);
+        uint32_t vec1PDstBaseDn = constInfo_.subBlockIdx * vec1HalfS1BaseSize * runInfo.actSingleLoopS2SizeAlign;
+        for (uint16_t mFrac = 0; mFrac < 4U; ++mFrac) {
+            DataCopy(mm2AL1Tensor[vec1PDstBaseDn + mFrac * 16U * runInfo.actSingleLoopS2SizeAlign],
+                     stage1CastTensor[mFrac * (vec1PFractalBytes / sizeof(INPUT_T))],
+                     {vec1PFractalCountDn, 16, static_cast<uint16_t>(vec1PFractalSrcGap), 0});
         }
 
         Mutex::Unlock<PIPE_MTE3>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);

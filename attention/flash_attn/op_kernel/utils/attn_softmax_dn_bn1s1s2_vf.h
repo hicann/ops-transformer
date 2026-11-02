@@ -42,22 +42,31 @@ using namespace FaVectorApi;
  * 缩放系数: NEED_MASK=true 时先乘 scale 再做遮挡(被挡的格子就是极小值本身, 不会再乘 scale);
  *           NEED_MASK=false 时和原实现一样, 先拿原始分数求 max, 算 exp 前再乘 scale。
  *
- * P 在 UB 里的摆法(本 AIV 负责的 64 行拆成两个 32 行半区):
- *   偏移 0                    : 第 0~31 行, 每行 tileCols 个元素, 共 tileCols*32 个;
- *   偏移 tileCols*32 + 64     : 第 32~63 行, 同样 tileCols*32 个;
- *   末尾再留 64 个元素, 总长 (64+1)*tileCols。
- *   vec block 搬去 L1 时, 第一段从偏移 0 取, 第二段从 tileCols*32+64 取。
+ * P 在 UB 里的摆法(32 列一组, 组内 8 个 544B 槽, 列粒度因此降到 2 列):
+ *   组基址 = 组号 g * 4352B; 槽序 = k0.m0 k0.m1 k0.m2 k0.m3 | k1.m0 k1.m1 k1.m2 k1.m3;
+ *   每个槽 = 512B 的 16x16 fractal + 32B pad(= 17 个 DataBlock = 544B), 列主序:
+ *   槽(k_sub, m) 里第 i 列占 [i*32, i*32+32), 即一个 32B 块 = 某列的 16 行。
+ *   于是一列 64 行 = 4 个 32B 块, 落在 m0..m3 四个槽里; 一条 StoreAlign<DATA_BLOCK_COPY>
+ *   写 8 个块、块距 17 个 DataBlock, 恰好是 (列 c 的 4 个行块 | 列 c+16 的 4 个行块)。
+ *   地址: off(g, c', m) = g*4352 + ((c'/16)*4 + m)*544 + (c'%16)*32, 容量 ceil(s2/32)*4352B。
+ *   每 fractal 一个 pad 是必须的: 纯 NZ(512B 步长)8 块同 bank 相位会撞 bank, 组内单个 pad
+ *   又让 8 块步长不均匀, 只有 544B(17 个 DataBlock, 奇数)同时满足均匀步长与相位错开。
+ *   vec block 搬去 L1 时按 fractal 取数(源 544B / 目的 512B 递增)。
  */
 template <typename T, typename T2, bool NEED_MASK, uint16_t tileCols = 128>
 __simd_vf__ inline void ProcessVec1DnLineVF(__ubuf__ T2* pOutBuf, __ubuf__ float* scoreBuf,
                                             __ubuf__ float* maxRescaleBuf, __ubuf__ float* runningSumBuf,
                                             __ubuf__ float* runningMaxBuf, const uint32_t rowStride,
                                             const uint32_t validColCount, const T scale, const T minValue,
-                                            const int64_t maskLine, const uint32_t blockStride,
-                                            const uint32_t repeatStride)
+                                            const int64_t maskLine)
 {
     (void)maskLine; // NEED_MASK=false 的那份实例化用不到
     const float inputScale = static_cast<float>(scale);
+    // 32 列一组: 组内 8 个槽 = 4352B; 每次迭代 c 推进 1 列 = 32B
+    constexpr uint16_t P_COLS_PER_GROUP = 32U;
+    constexpr uint32_t P_GROUP_ELEMS = 4352U / sizeof(T2); // 2176 (T2 为 16bit)
+    constexpr uint32_t P_COL_ELEMS = 32U / sizeof(T2);     // 16
+    constexpr uint32_t P_DATA_BLOCK_STRIDE = 17U;          // 544B
 
     RegTensor<float> expSum0;
     RegTensor<float> expSum1;
@@ -105,12 +114,6 @@ __simd_vf__ inline void ProcessVec1DnLineVF(__ubuf__ T2* pOutBuf, __ubuf__ float
     RegTensor<float> tileMax0, tileMax1, tileMax2, tileMax3;
     RegTensor<float> maskedFillValue;
 
-    __ubuf__ T2* pOutBufSecond = pOutBuf + (tileCols * 4);
-    __ubuf__ float* scoreColPtr0 = scoreBuf;
-    __ubuf__ float* scoreColPtr1 = scoreColPtr0 + rowStride;
-    __ubuf__ float* scoreColPtr2 = scoreColPtr0 + rowStride * 2;
-    __ubuf__ float* scoreColPtr3 = scoreColPtr0 + rowStride * 3;
-
     Duplicate(tileMax0, minValue);
     Duplicate(tileMax1, minValue);
     Duplicate(tileMax2, minValue);
@@ -118,7 +121,19 @@ __simd_vf__ inline void ProcessVec1DnLineVF(__ubuf__ T2* pOutBuf, __ubuf__ float
     Duplicate(maskedFillValue, minValue);
     uint32_t validRowCount = rowStride;
     MaskReg validRowMask = UpdateMask<T>(validRowCount);
-    for (uint16_t colIdx = validColCount; colIdx < tileCols; ++colIdx) {
+    // 列粒度: 每次迭代处理 4 列 {c, c+8, c+16, c+24}(c 为本组内的列号), 一组 8 次迭代覆盖 32 列。
+    // 末组只需覆盖到有效列: 有效列 <= 8 时迭代数就是列数, 否则 8 次全用(0..31 都会被取列碰到)。
+    uint16_t fullGroupCount = static_cast<uint16_t>(validColCount / P_COLS_PER_GROUP);
+    uint16_t tailColCount = static_cast<uint16_t>(validColCount - P_COLS_PER_GROUP * fullGroupCount);
+    uint16_t tailIterCount = (tailColCount > 8U) ? 8U : tailColCount;
+    uint16_t groupCount = static_cast<uint16_t>(fullGroupCount + ((tailColCount != 0U) ? 1U : 0U));
+    // 掩码/max 循环仍按"4 个相邻列"推进, 收界到末组里被取列碰到的最远一列((k-1)+24), 再向上取整到 4 列。
+    // 补 minValue 的范围也就是这一段(至多 24+3 列), 于是 max/exp/sum 都只看得到有效列与填好的极小值。
+    uint16_t fillEndCol =
+        static_cast<uint16_t>(P_COLS_PER_GROUP * fullGroupCount + ((tailColCount != 0U) ? (tailIterCount + 24U) : 0U));
+    uint16_t maskIterCount = static_cast<uint16_t>((fillEndCol + 3U) >> 2);
+    fillEndCol = static_cast<uint16_t>(maskIterCount << 2);
+    for (uint16_t colIdx = static_cast<uint16_t>(validColCount); colIdx < fillEndCol; ++colIdx) {
         // 每个 S2 列在 UB 里只占 rowStride 个 float; 这里只写这 rowStride 个, 不要写到下一列去
         StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)scoreBuf + colIdx * rowStride, maskedFillValue,
                                                      validRowMask);
@@ -139,11 +154,11 @@ __simd_vf__ inline void ProcessVec1DnLineVF(__ubuf__ T2* pOutBuf, __ubuf__ float
         // 串行依赖, 让 4 列的比较/选择能并行发射。
         Arange(rowLimitValue, (float)maskLine);
         Duplicate(colBaseValue, 0.0f);
-        for (uint16_t colGroup = 0; colGroup < uint16_t(tileCols / 4); ++colGroup) {
-            LoadAlign(score0, scoreColPtr0 + colGroup * rowStride * 4);
-            LoadAlign(score1, scoreColPtr1 + colGroup * rowStride * 4);
-            LoadAlign(score2, scoreColPtr2 + colGroup * rowStride * 4);
-            LoadAlign(score3, scoreColPtr3 + colGroup * rowStride * 4);
+        for (uint16_t colGroup = 0; colGroup < maskIterCount; ++colGroup) {
+            LoadAlign(score0, scoreBuf + colGroup * rowStride * 4);
+            LoadAlign(score1, scoreBuf + colGroup * rowStride * 4 + rowStride);
+            LoadAlign(score2, scoreBuf + colGroup * rowStride * 4 + rowStride * 2);
+            LoadAlign(score3, scoreBuf + colGroup * rowStride * 4 + rowStride * 3);
             Muls(score0, score0, inputScale, allLanesF32);
             Muls(score1, score1, inputScale, allLanesF32);
             Muls(score2, score2, inputScale, allLanesF32);
@@ -161,10 +176,13 @@ __simd_vf__ inline void ProcessVec1DnLineVF(__ubuf__ T2* pOutBuf, __ubuf__ float
             Select(score2, score2, maskedFillValue, visibleMask2);
             Select(score3, score3, maskedFillValue, visibleMask3);
             // 只能写回本列的 rowStride 个元素; 如果写满 64 个, M 不满 64 行的尾块会把下一列的数据盖掉
-            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(scoreColPtr0 + colGroup * rowStride * 4, score0, validRowMask);
-            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(scoreColPtr1 + colGroup * rowStride * 4, score1, validRowMask);
-            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(scoreColPtr2 + colGroup * rowStride * 4, score2, validRowMask);
-            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(scoreColPtr3 + colGroup * rowStride * 4, score3, validRowMask);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(scoreBuf + colGroup * rowStride * 4, score0, validRowMask);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(scoreBuf + colGroup * rowStride * 4 + rowStride, score1,
+                                                         validRowMask);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(scoreBuf + colGroup * rowStride * 4 + rowStride * 2, score2,
+                                                         validRowMask);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(scoreBuf + colGroup * rowStride * 4 + rowStride * 3, score3,
+                                                         validRowMask);
             Max(tileMax0, tileMax0, score0, allLanesF32);
             Max(tileMax1, tileMax1, score1, allLanesF32);
             Max(tileMax2, tileMax2, score2, allLanesF32);
@@ -172,11 +190,11 @@ __simd_vf__ inline void ProcessVec1DnLineVF(__ubuf__ T2* pOutBuf, __ubuf__ float
         }
         LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
     } else {
-        for (uint16_t colGroup = 0; colGroup < uint16_t(tileCols / 4); ++colGroup) {
-            LoadAlign(score0, scoreColPtr0 + colGroup * rowStride * 4);
-            LoadAlign(score1, scoreColPtr1 + colGroup * rowStride * 4);
-            LoadAlign(score2, scoreColPtr2 + colGroup * rowStride * 4);
-            LoadAlign(score3, scoreColPtr3 + colGroup * rowStride * 4);
+        for (uint16_t colGroup = 0; colGroup < maskIterCount; ++colGroup) {
+            LoadAlign(score0, scoreBuf + colGroup * rowStride * 4);
+            LoadAlign(score1, scoreBuf + colGroup * rowStride * 4 + rowStride);
+            LoadAlign(score2, scoreBuf + colGroup * rowStride * 4 + rowStride * 2);
+            LoadAlign(score3, scoreBuf + colGroup * rowStride * 4 + rowStride * 3);
             Max(tileMax0, tileMax0, score0, allLanesF32);
             Max(tileMax1, tileMax1, score1, allLanesF32);
             Max(tileMax2, tileMax2, score2, allLanesF32);
@@ -201,64 +219,74 @@ __simd_vf__ inline void ProcessVec1DnLineVF(__ubuf__ T2* pOutBuf, __ubuf__ float
     Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(expSum1, 0, allLanesF32);
     Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(expSum2, 0, allLanesF32);
     Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(expSum3, 0, allLanesF32);
-    uint16_t colGroupCount = tileCols / 4;
 
-    for (uint16_t colGroup = 0; colGroup < colGroupCount; ++colGroup) {
-        LoadAlign(loadedScore0, scoreBuf + colGroup * rowStride);
-        LoadAlign(loadedScore1, scoreBuf + tileCols * rowStride / 4 + colGroup * rowStride);
-        LoadAlign(loadedScore2, scoreBuf + tileCols * rowStride / 2 + colGroup * rowStride);
-        LoadAlign(loadedScore3, scoreBuf + tileCols * rowStride / 2 + tileCols * rowStride / 4 + colGroup * rowStride);
+    // 组循环 + 组内 8 次迭代: 两层都是 uint16 从 0 步长 1, 组内层的内层边界先拷成局部量;
+    // 组内层每层的指针/列偏移都是"基址 + 迭代号 * 常量", 便于 Compiler 生成 Hardware Loop。
+    for (uint16_t groupIdx = 0; groupIdx < groupCount; ++groupIdx) {
+        uint16_t iterCount = ((groupIdx + 1U) == groupCount && tailColCount != 0U) ? tailIterCount : 8U;
+        __ubuf__ float* scoreGroup = scoreBuf + groupIdx * P_COLS_PER_GROUP * rowStride;
+        __ubuf__ T2* pOutGroupBase = pOutBuf + groupIdx * P_GROUP_ELEMS;
+        for (uint16_t colInGroup = 0; colInGroup < iterCount; ++colInGroup) {
+            // 4 路取列: 本组内 {c, c+8, c+16, c+24}; 打包时按 (c, c+16) / (c+8, c+24) 配对,
+            // 恰好一组落 k0 槽、一组落 k1 槽, 一条 store 的 8 个块正好填满两列
+            LoadAlign(loadedScore0, scoreGroup + colInGroup * rowStride);
+            LoadAlign(loadedScore1, scoreGroup + (colInGroup + 8U) * rowStride);
+            LoadAlign(loadedScore2, scoreGroup + (colInGroup + 16U) * rowStride);
+            LoadAlign(loadedScore3, scoreGroup + (colInGroup + 24U) * rowStride);
 
-        if constexpr (!NEED_MASK) {
-            // 不遮挡的那份分数还没乘过 scale, 这里补乘; 遮挡那份在求 max 前已经乘过, 不再乘
-            Muls(loadedScore0, loadedScore0, inputScale, allLanesF32);
-            Muls(loadedScore1, loadedScore1, inputScale, allLanesF32);
-            Muls(loadedScore2, loadedScore2, inputScale, allLanesF32);
-            Muls(loadedScore3, loadedScore3, inputScale, allLanesF32);
-        }
+            if constexpr (!NEED_MASK) {
+                // 不遮挡的那份分数还没乘过 scale, 这里补乘; 遮挡那份在求 max 前已经乘过, 不再乘
+                Muls(loadedScore0, loadedScore0, inputScale, allLanesF32);
+                Muls(loadedScore1, loadedScore1, inputScale, allLanesF32);
+                Muls(loadedScore2, loadedScore2, inputScale, allLanesF32);
+                Muls(loadedScore3, loadedScore3, inputScale, allLanesF32);
+            }
 
-        FusedExpSub(expValue0, loadedScore0, tileMax0, allLanesF32);
-        FusedExpSub(expValue1, loadedScore1, tileMax0, allLanesF32);
-        FusedExpSub(expValue2, loadedScore2, tileMax0, allLanesF32);
-        FusedExpSub(expValue3, loadedScore3, tileMax0, allLanesF32);
+            FusedExpSub(expValue0, loadedScore0, tileMax0, allLanesF32);
+            FusedExpSub(expValue1, loadedScore1, tileMax0, allLanesF32);
+            FusedExpSub(expValue2, loadedScore2, tileMax0, allLanesF32);
+            FusedExpSub(expValue3, loadedScore3, tileMax0, allLanesF32);
 
-        if constexpr (AscendC::IsSameType<T2, bfloat16_t>::value) {
-            Cast<T2, T, castTraitZero>(expEvenBf16Half0, expValue0, allLanesF32);
-            Cast<T2, T, castTraitZero>(expOddBf16Half0, expValue2, allLanesF32);
-            DeInterleave(packedBf16Half0, packedBf16Half0Alt, expEvenBf16Half0, expOddBf16Half0);
+            __ubuf__ T2* pOutGroup = pOutGroupBase + colInGroup * P_COL_ELEMS;
+            __ubuf__ T2* pOutGroupK1 = pOutGroup + 8U * P_COL_ELEMS; // 组内 k1 的 8 列
+            if constexpr (AscendC::IsSameType<T2, bfloat16_t>::value) {
+                Cast<T2, T, castTraitZero>(expEvenBf16Half0, expValue0, allLanesF32);
+                Cast<T2, T, castTraitZero>(expOddBf16Half0, expValue2, allLanesF32);
+                DeInterleave(packedBf16Half0, packedBf16Half0Alt, expEvenBf16Half0, expOddBf16Half0);
 
-            Cast<T2, T, castTraitZero>(expEvenBf16Half1, expValue1, allLanesF32);
-            Cast<T2, T, castTraitZero>(expOddBf16Half1, expValue3, allLanesF32);
-            DeInterleave(packedBf16Half1, packedBf16Half1Alt, expEvenBf16Half1, expOddBf16Half1);
-            /* 按文件头写的 P 布局存回: 两个 32 行半区, 中间空 64 个元素 */
-            StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                ((__ubuf__ T2*&)pOutBuf), packedBf16Half0, blockStride, repeatStride, packLanesB16);
-            Add(expSum0, expValue0, expSum0, allLanesF32);
-            Add(expSum2, expValue2, expSum2, allLanesF32);
-            StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                ((__ubuf__ T2*&)pOutBufSecond), packedBf16Half1, blockStride, repeatStride, packLanesB16);
-            Add(expSum1, expValue1, expSum1, allLanesF32);
-            Add(expSum3, expValue3, expSum3, allLanesF32);
-        } else {
-            Cast<T2, T, castTraitZero>(expEvenHalf0, expValue0, allLanesF32);
-            Cast<T2, T, castTraitZero>(expOddHalf0, expValue2, allLanesF32);
-            DeInterleave(packedHalf0, packedHalf0Alt, expEvenHalf0, expOddHalf0);
+                Cast<T2, T, castTraitZero>(expEvenBf16Half1, expValue1, allLanesF32);
+                Cast<T2, T, castTraitZero>(expOddBf16Half1, expValue3, allLanesF32);
+                DeInterleave(packedBf16Half1, packedBf16Half1Alt, expEvenBf16Half1, expOddBf16Half1);
+                /* 8 个 32B 块 = 列 c 的 4 个行块 + 列 c+16 的 4 个行块, 块距 17 个 DataBlock */
+                StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pOutGroup, packedBf16Half0, P_DATA_BLOCK_STRIDE,
+                                                                   packLanesB16);
+                Add(expSum0, expValue0, expSum0, allLanesF32);
+                Add(expSum2, expValue2, expSum2, allLanesF32);
+                StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pOutGroupK1, packedBf16Half1, P_DATA_BLOCK_STRIDE,
+                                                                   packLanesB16);
+                Add(expSum1, expValue1, expSum1, allLanesF32);
+                Add(expSum3, expValue3, expSum3, allLanesF32);
+            } else {
+                Cast<T2, T, castTraitZero>(expEvenHalf0, expValue0, allLanesF32);
+                Cast<T2, T, castTraitZero>(expOddHalf0, expValue2, allLanesF32);
+                DeInterleave(packedHalf0, packedHalf0Alt, expEvenHalf0, expOddHalf0);
 
-            Cast<T2, T, castTraitZero>(expEvenHalf1, expValue1, allLanesF32);
-            Cast<T2, T, castTraitZero>(expOddHalf1, expValue3, allLanesF32);
+                Cast<T2, T, castTraitZero>(expEvenHalf1, expValue1, allLanesF32);
+                Cast<T2, T, castTraitZero>(expOddHalf1, expValue3, allLanesF32);
 
-            DeInterleave(packedHalf1, packedHalf1Alt, expEvenHalf1, expOddHalf1);
+                DeInterleave(packedHalf1, packedHalf1Alt, expEvenHalf1, expOddHalf1);
 
-            /* 按文件头写的 P 布局存回: 两个 32 行半区, 中间空 64 个元素 */
-            StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                ((__ubuf__ T2*&)pOutBuf), packedHalf0, blockStride, repeatStride, packLanesB16);
-            Add(expSum0, expValue0, expSum0, allLanesF32);
-            Add(expSum2, expValue2, expSum2, allLanesF32);
+                /* 8 个 32B 块 = 列 c 的 4 个行块 + 列 c+16 的 4 个行块, 块距 17 个 DataBlock */
+                StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pOutGroup, packedHalf0, P_DATA_BLOCK_STRIDE,
+                                                                   packLanesB16);
+                Add(expSum0, expValue0, expSum0, allLanesF32);
+                Add(expSum2, expValue2, expSum2, allLanesF32);
 
-            StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                ((__ubuf__ T2*&)pOutBufSecond), packedHalf1, blockStride, repeatStride, packLanesB16);
-            Add(expSum1, expValue1, expSum1, allLanesF32);
-            Add(expSum3, expValue3, expSum3, allLanesF32);
+                StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pOutGroupK1, packedHalf1, P_DATA_BLOCK_STRIDE,
+                                                                   packLanesB16);
+                Add(expSum1, expValue1, expSum1, allLanesF32);
+                Add(expSum3, expValue3, expSum3, allLanesF32);
+            }
         }
     }
 
@@ -284,12 +312,9 @@ __aicore__ inline void ProcessVec1VfDnLine(const LocalTensor<T2>& dstTensor, con
     __ubuf__ float* maxRescaleBuf = (__ubuf__ T*)expMaxTensor.GetPhyAddr();
     __ubuf__ float* runningSumBuf = (__ubuf__ T*)expSumTensor.GetPhyAddr();
     __ubuf__ float* runningMaxBuf = (__ubuf__ T*)maxTensor.GetPhyAddr();
-    constexpr uint32_t blockStride = tileCols >> 1 | 0x1;
-    constexpr uint32_t repeatStride = 1;
 
     ProcessVec1DnLineVF<T, T2, NEED_MASK, tileCols>(pOutBuf, scoreBuf, maxRescaleBuf, runningSumBuf, runningMaxBuf,
-                                                    rowStride, validColCount, scale, minValue, maskLine, blockStride,
-                                                    repeatStride);
+                                                    rowStride, validColCount, scale, minValue, maskLine);
 }
 
 } // namespace FlashAttnKernel
