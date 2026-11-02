@@ -66,15 +66,15 @@
 | token_x                     | 输入      | 公式中计算Query和Key的输入tensor | INT8, BF16 | ND         |
 | weight_dq                   | 输入      | 公式中计算Query的下采样权重矩阵$W^{DQ}$ | INT8, BF16 | FRACTAL_NZ |
 | weight_uq_qr                 | 输入      | 公式中计算Query的上采样权重矩阵$W^{UQ}$和位置编码权重矩阵$W^{QR}$。| INT8, BF16 | FRACTAL_NZ |
-| weight_uk                   | 输入      | 公式中计算Key的上采样权重$W^{UK}$ | FLOAT16, BF16       | ND         |
+| weight_uk                   | 输入      | 公式中计算Key的上采样权重$W^{UK}$ | BF16       | ND         |
 | weight_dkv_kr                | 输入      | 公式中计算Key的下采样权重矩阵$W^{DKV}$和位置编码权重矩阵$W^{KR}$ | INT8, BF16| FRACTAL_NZ |
-| rmsnorm_gamma_cq             | 输入      | 计算$c^Q$的RmsNorm公式中$\gamma$参数 | FLOAT16, BF16       | ND         |
-| rmsnorm_gamma_ckv            | 输入      | 计算$c^{KV}$的RmsNorm公式中$\gamma$参数 | FLOAT16, BF16       | ND         |
-| rope_sin                    | 输入      | 旋转位置编码的正弦参数矩阵 | FLOAT16, BF16       | ND         |
-| rope_cos                    | 输入      | 旋转位置编码的余弦参数矩阵 | FLOAT16, BF16       | ND         |
+| rmsnorm_gamma_cq             | 输入      | 计算$c^Q$的RmsNorm公式中$\gamma$参数 | BF16       | ND         |
+| rmsnorm_gamma_ckv            | 输入      | 计算$c^{KV}$的RmsNorm公式中$\gamma$参数 | BF16       | ND         |
+| rope_sin                    | 输入      | 旋转位置编码的正弦参数矩阵 | BF16       | ND         |
+| rope_cos                    | 输入      | 旋转位置编码的余弦参数矩阵 | BF16       | ND         |
 | cache_index                 | 输入      | 存储kvCache和krCache的索引 | INT64          | ND         |
-| kv_cache                 | 输入/ 输出| cache索引的aclTensor，计算结果原地更新（对应$k^C$）| FLOAT16, BF16, INT8 | ND         |
-| kr_cache                 | 输入/ 输出| key位置编码的cache，计算结果原地更新（对应$k^R$） | FLOAT16, BF16, INT8 | ND         |
+| kv_cache                 | 输入/ 输出| cache索引的aclTensor，计算结果原地更新（对应$k^C$）| BF16, INT8 | ND         |
+| kr_cache                 | 输入/ 输出| key位置编码的cache，计算结果原地更新（对应$k^R$） | BF16, INT8 | ND         |
 | dequant_scale_x      | 输入      | 预留参数，当前版本暂未使用，必须传入空指针  | FLOAT          | ND         |
 | dequant_scale_w_dq    | 输入      | 预留参数，当前版本暂未使用，必须传入空指针 | FLOAT          | ND         |
 | dequant_scale_w_uq_qr  | 输入      | MatmulQcQr矩阵乘后反量化的per-channel参数| FLOAT          | ND         |
@@ -85,8 +85,8 @@
 | rmsnorm_epsilon_cq           | 输入      | 计算$c^Q$的RmsNorm公式中$\epsilon$参数 | DOUBLE         | -          |
 | rmsnorm_epsilon_ckv          | 输入      | 计算$c^{KV}$的RmsNorm公式中$\epsilon$参数 | DOUBLE         | -          |
 | cache_mode          | 输入      | kvCache模式 | CHAR*          | -          |
-| query                   | 输出      | 公式中Query的输出tensor（对应$q^N$） | FLOAT16, BF16, INT8 | ND         |
-| query_rope               | 输出      | 公式中Query位置编码的输出tensor（对应$q^R$） | FLOAT16, BF16, INT8       | ND |
+| query                   | 输出      | 公式中Query的输出tensor（对应$q^N$） | BF16, INT8 | ND         |
+| query_rope               | 输出      | 公式中Query位置编码的输出tensor（对应$q^R$） | BF16, INT8       | ND |
 | dequant_scale_q_nope | 输出     | 表示Query的输出tensor的量化参数   | FLOAT             | ND         |
 
 ## 约束说明
