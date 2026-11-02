@@ -77,15 +77,16 @@ results/<时间戳>/          （或 --output 指定目录）
 多 batch 逐条累加）：
 
 ```
-sp0:            compute_num = 2*kvs*qs*qkd*2*qn
-sp3 (qs<kvs):   compute_num = 2*(kvs-qs+1+kvs)*qs/2*qkd*2*qn
-sp3 (qs>=kvs):  compute_num = 2*kvs*kvs/2*qkd*2*qn
+sp0:            compute_num = 2*kvs*qs*(qkd+vd)*qn
+sp3 (qs<kvs):   compute_num = 2*(kvs-qs+1+kvs)*qs/2*(qkd+vd)*qn
+sp3 (qs>=kvs):  compute_num = 2*kvs*kvs/2*(qkd+vd)*qn
 fp8_peak_tflops = 2*16*16*32*1.6*core_num*0.001
 mfu = (compute_num / (duration*1e-6)) * 1e-12 / fp8_peak_tflops
 ```
 
 - `qs` = `seqused_q[b]`，`kvs` = `cache_seqlens[b]`，`qn` = `N_q`
-- `qkd` = 576（nope 512 + rope 64，常量 `QK_HEAD_DIM`）
+- `qkd` = 576（nope 512 + rope 64，常量 `QK_HEAD_DIM`），`vd` = 512（V head dim，
+  常量 `V_HEAD_DIM`，取自 `perf_codegen.D_V`）；QK 与 PV 的 head dim 不同，需分开计入
 - `core_num` 运行时取设备 `cube_core_num`（纯 CPU 环境回退 32），
   32 核对应 `fp8_peak_tflops = 838.86`
 - 结果以**百分比**写入 `perf.csv` 的 `mfu` 列，终端同时打印 `MFU=xx.xx%`

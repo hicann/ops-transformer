@@ -296,13 +296,15 @@ bool QuantFlashMlaMetadataCpuKernel::CheckNeedInitOutput()
         cacheSeqlens = GetTensorDataAsInt64(cacheSeqlens_, bSize);
     }
     for (uint32_t bIdx = 0; bIdx < bSize; ++bIdx) {
-        // Q侧: cu_seqlens_q差分为0 → 零长batch
-        int64_t qAllocLen = hasCuQ ? cuSeqlensQ[bIdx + 1] - cuSeqlensQ[bIdx] : -1;
+        // Q侧: TND按cu_seqlens_q差分，BNSD/BSND无cu_seqlens_q,
+        // 每个batch按padded S1(querySeqSize)整块分配，分配长度即querySeqSize
+        int64_t qAllocLen =
+            hasCuQ ? cuSeqlensQ[bIdx + 1] - cuSeqlensQ[bIdx] : static_cast<int64_t>(baseInfo.querySeqSize);
         if (qAllocLen == 0) {
             return true;
         }
         // Q侧: seqused_q为0, 或小于分配长度 → 输出存在padding行, 需要清零
-        int64_t qUsedLen = hasSeqQ ? seqUsedQ[bIdx] : (qAllocLen > 0 ? qAllocLen : baseInfo.querySeqSize);
+        int64_t qUsedLen = hasSeqQ ? seqUsedQ[bIdx] : qAllocLen;
         if (qUsedLen == 0) {
             return true;
         }

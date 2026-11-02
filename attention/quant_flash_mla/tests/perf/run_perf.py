@@ -43,12 +43,13 @@ HERE = Path(__file__).resolve().parent
 os.environ.setdefault("TORCH_EXTENSIONS_DIR", str(HERE / ".torch_ext"))
 
 from perf_cases import load_cases
-from perf_codegen import build_script
+from perf_codegen import D_V, build_script
 from perf_profiler import run_msprof, run_msopprof_pipe
 from perf_parser import parse_op_summary, compute_hot_avg
 
 # MFU 相关常量
 QK_HEAD_DIM = 576  # MLA: nope 512 + rope 64
+V_HEAD_DIM = D_V  # MLA: 512, 与 perf_codegen 保持同一来源
 FP8_CUBE_FLOPS_PER_CYCLE = 2 * 16 * 16 * 32
 FP8_FREQ_GHZ = 1.6
 DEFAULT_CORE_NUM = 32
@@ -70,21 +71,22 @@ def fp8_peak_tflops(core_num):
 
 
 def calc_compute_num(case):
-    """按 batch 逐条累加计算量。
+    """按 batch 逐条累加计算量, QK 与 PV 的 head dim 分开计。
 
-    sp0:            2*kvs*qs*qkd*2*qn
-    sp3 (qs<kvs):   2*(kvs-qs+1+kvs)*qs/2*qkd*2*qn
-    sp3 (qs>=kvs):  2*kvs*kvs/2*qkd*2*qn
+    sp0:            2*kvs*qs*(qkd+vd)*qn
+    sp3 (qs<kvs):   2*(kvs-qs+1+kvs)*qs/2*(qkd+vd)*qn
+    sp3 (qs>=kvs):  2*kvs*kvs/2*(qkd+vd)*qn
     """
     qn = case["N_q"]
     is_causal = case["sparse_mode"] == 3
+    head_dim_sum = QK_HEAD_DIM + V_HEAD_DIM
     total = 0.0
     for qs, kvs in zip(case["seqused_q"], case["cache_seqlens"]):
         if is_causal:
             valid = (kvs - qs + 1 + kvs) * qs / 2 if qs < kvs else kvs * kvs / 2
         else:
             valid = kvs * qs
-        total += 2 * valid * QK_HEAD_DIM * 2 * qn
+        total += 2 * valid * head_dim_sum * qn
     return total
 
 

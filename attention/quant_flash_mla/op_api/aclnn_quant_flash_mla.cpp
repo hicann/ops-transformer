@@ -18,7 +18,6 @@
 #include "opdev/op_def.h"
 #include "opdev/op_log.h"
 #include "opdev/tensor_view_utils.h"
-#include "aclnn_quant_flash_mla_inner.h"
 
 using namespace op;
 
@@ -26,8 +25,39 @@ using namespace op;
 extern "C" {
 #endif
 
+// inner 接口（由框架根据 L0 op 注册自动生成）
+extern aclnnStatus aclnnInnerQuantFlashMlaGetWorkspaceSize(
+    const aclTensor* q, const aclTensor* kCache, const aclTensor* qDescale, const aclTensor* kDescale,
+    const aclTensor* blockTable, const aclTensor* cacheSeqlens, const aclTensor* cuSeqlensQOptional,
+    const aclTensor* sequsedQOptional, const aclTensor* attnMaskOptional, const aclTensor* metadataOptional,
+    int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t headDimV,
+    char* layoutQOptional, char* layoutKvOptional, char* layoutOutOptional, bool returnSoftmaxLse,
+    const aclTensor* attnOutOut, const aclTensor* softmaxLseOutOptional, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
+
+extern aclnnStatus aclnnInnerQuantFlashMla(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+                                           const aclrtStream stream);
+
 // 新版本opbase存在TensorV2的新接口，用弱符号判断当前opbase是新版本还是旧版本，旧版本不支持传入非连续tensor
 bool NnopbaseSupportTensorV2() __attribute__((weak));
+
+namespace {
+
+void QuantFlashMlaProcessSoftmaxLse(bool returnSoftmaxLse, const aclTensor* softmaxLse, const aclTensor*& tempTensor,
+                                    const aclTensor*& placeHolder)
+{
+    if (!returnSoftmaxLse) {
+        std::vector<int64_t> shape = {0};
+        int64_t addr = 0xff;
+        tempTensor = aclCreateTensor(shape.data(), shape.size(), aclDataType::ACL_FLOAT, shape.data(), 0, ACL_FORMAT_ND,
+                                     shape.data(), shape.size(), static_cast<void*>(&addr));
+        placeHolder = tempTensor;
+    } else {
+        placeHolder = softmaxLse;
+    }
+}
+
+} // namespace
 
 static aclnnStatus CheckTensorContiguous(const aclTensor* kCache)
 {

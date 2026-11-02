@@ -315,7 +315,7 @@ cann_ops_transformer.quant_flash_mla(
                             <li>KV_N = 1</li>
                             <li>q/k的head_dim_qk仅支持576（nope+rope）</li>
                             <li>v的head_dim_v仅支持512</li>
-                            <li>Q_T ≥ 0</li>
+                            <li>Q_T > 0</li>
                         </ul>
                     </li>
                 </ul>
