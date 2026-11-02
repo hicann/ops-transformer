@@ -30,7 +30,7 @@ struct StoragePrefix {
         return capacity != 0U ? static_cast<int64_t>(batch) * capacity : tensor.GetValue(batch);
     }
 };
-__aicore__ inline uint64_t TensorOffset(uint32_t layout, uint32_t batch, uint32_t token, uint32_t storageToken,
+__aicore__ inline uint64_t TensorOffset(uint32_t layout, uint32_t batch, uint32_t token, uint64_t storageToken,
                                         uint32_t head, uint32_t heads, uint32_t dim, uint32_t capacity)
 {
     if (layout == 2U) {

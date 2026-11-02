@@ -163,7 +163,8 @@ public:
             blockPages = gBlockTable.GetPhyAddr();
         }
         uint32_t fastBlockCount = 0U;
-        if ((L1TileShape::N == 128U || L1TileShape::N == 256U) && strideKV < 65536U && PAGED_CACHE_FLAG_ && yFitsPage &&
+        const bool copyGeometryOk = PAGED_CACHE_FLAG_ ? yFitsPage : (y != 0U && y <= 128U);
+        if ((L1TileShape::N == 128U || L1TileShape::N == 256U) && strideKV < 65536U && copyGeometryOk &&
             (nBlockOffset % y) == 0U && firstSlot < localExplicitBlockCount) {
             const uint32_t explicitAvail = localExplicitBlockCount - firstSlot;
             const uint32_t byTokens = nActual / y;
@@ -189,9 +190,16 @@ public:
                 const uint32_t subBlocks = min(copyTokens / y, blocksLeft);
                 const uint32_t copyIndex = nL1Idx * (L1TileShape::N / copyTokens) + sub;
                 auto* plan = kvCopyInfo == nullptr ? nullptr : kvCopyInfo + copyIndex;
-                GbsaSparsePairCopy::Load<true>(l1BTensor[stage], gB, layoutBInL1, gSelectIdx, gBlockTable,
-                                               firstSlot + tokenOffset / y, subBlocks, tokenOffset, kActual, strideKV,
-                                               pageStride, peerPageStride, y, kvYBlockNum, kvSeqlen, plan, tokenOffset);
+                if constexpr (PAGED_CACHE_FLAG_) {
+                    GbsaSparsePairCopy::Load<true>(l1BTensor[stage], gB, layoutBInL1, gSelectIdx, gBlockTable,
+                                                   firstSlot + tokenOffset / y, subBlocks, tokenOffset, kActual,
+                                                   strideKV, pageStride, peerPageStride, y, kvYBlockNum, kvSeqlen, plan,
+                                                   tokenOffset);
+                } else {
+                    GbsaSparsePairCopy::LoadDense<true>(l1BTensor[stage], gB, layoutBInL1, gSelectIdx,
+                                                        firstSlot + tokenOffset / y, subBlocks, tokenOffset, kActual,
+                                                        strideKV, y);
+                }
             }
             processSize = fastBlockCount * y;
             currentSelectYIdx = firstSlot + fastBlockCount;

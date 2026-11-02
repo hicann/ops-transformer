@@ -106,6 +106,42 @@ __aicore__ inline void EmitAndRecord(AscendC::LocalTensor<Element> dst, AscendC:
 }
 
 template <bool IS_QK, class Element, class Layout>
+__aicore__ inline void LoadDense(AscendC::LocalTensor<Element> dst, AscendC::GlobalTensor<Element> src,
+                                 const Layout& layout, AscendC::GlobalTensor<int32_t> indices, uint32_t firstSlot,
+                                 uint32_t blocks, uint32_t dstBegin, uint32_t embed, uint32_t tokenStride,
+                                 uint32_t blockY)
+{
+    const __gm__ int32_t* idx = indices.GetPhyAddr(firstSlot);
+    const uint64_t blockStride = static_cast<uint64_t>(blockY) * tokenStride;
+    uint32_t dealt = 0U;
+    for (uint32_t i = 0U; i < blocks;) {
+        const uint32_t first = static_cast<uint32_t>(idx[i]);
+        const uint64_t source = static_cast<uint64_t>(first) * blockStride;
+        uint32_t run = 1U;
+        while (i + run < blocks && static_cast<uint32_t>(idx[i + run]) == first + run) {
+            ++run;
+        }
+        if (run > 1U) {
+            Emit<IS_QK>(dst, src, layout, dstBegin + dealt, source, run * blockY, 1U, 0U, embed, tokenStride);
+        } else if (i + 1U < blocks) {
+            const uint32_t next = static_cast<uint32_t>(idx[i + 1U]);
+            const uint64_t gap = static_cast<uint64_t>(next - first) * blockStride;
+            if (next > first && gap < 65536U && (gap & 15U) == 0U) {
+                Emit<IS_QK>(dst, src, layout, dstBegin + dealt, source, blockY, 2U, static_cast<uint32_t>(gap), embed,
+                            tokenStride);
+                run = 2U;
+            } else {
+                Emit<IS_QK>(dst, src, layout, dstBegin + dealt, source, blockY, 1U, 0U, embed, tokenStride);
+            }
+        } else {
+            Emit<IS_QK>(dst, src, layout, dstBegin + dealt, source, blockY, 1U, 0U, embed, tokenStride);
+        }
+        i += run;
+        dealt += run * blockY;
+    }
+}
+
+template <bool IS_QK, class Element, class Layout>
 __aicore__ inline bool TryEmitDenseRun(AscendC::LocalTensor<Element> dst, AscendC::GlobalTensor<Element> src,
                                        const Layout& layout, AscendC::GlobalTensor<int32_t> indices,
                                        AscendC::GlobalTensor<int32_t> table, uint32_t firstSlot, uint32_t blocks,

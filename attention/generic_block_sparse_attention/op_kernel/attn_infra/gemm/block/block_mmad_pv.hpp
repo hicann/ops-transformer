@@ -151,8 +151,9 @@ public:
                 blockPages = gBlockTable.GetPhyAddr();
             }
             uint32_t fastBlockCount = 0U;
-            if (L1TileShape::N == 128U && strideKV < 65536U && PAGED_CACHE_FLAG_ && yFitsPage &&
-                (nBlockOffset % y) == 0U && firstSlot < localExplicitBlockCount) {
+            const bool copyGeometryOk = PAGED_CACHE_FLAG_ ? yFitsPage : (y != 0U && y <= 128U);
+            if (L1TileShape::N == 128U && strideKV < 65536U && copyGeometryOk && (nBlockOffset % y) == 0U &&
+                firstSlot < localExplicitBlockCount) {
                 const uint32_t explicitAvail = localExplicitBlockCount - firstSlot;
                 const uint32_t byTokens = kActual / y;
                 fastBlockCount = byTokens < explicitAvail ? byTokens : explicitAvail;
@@ -178,9 +179,15 @@ public:
                 currentSelectYIdx = firstSlot + fastBlockCount;
                 currentYoffset = 0U;
             } else if (fastBlockCount != 0U) {
-                GbsaSparsePairCopy::Load<false>(l1BTensor, gB, layoutBInL1, gSelectIdx, gBlockTable, firstSlot,
-                                                fastBlockCount, blockStackIdx * L1TileShape::N, nActual, strideKV,
-                                                pageStride, peerPageStride, y, kvYBlockNum, kvSeqlen);
+                if constexpr (PAGED_CACHE_FLAG_) {
+                    GbsaSparsePairCopy::Load<false>(l1BTensor, gB, layoutBInL1, gSelectIdx, gBlockTable, firstSlot,
+                                                    fastBlockCount, blockStackIdx * L1TileShape::N, nActual, strideKV,
+                                                    pageStride, peerPageStride, y, kvYBlockNum, kvSeqlen);
+                } else {
+                    GbsaSparsePairCopy::LoadDense<false>(l1BTensor, gB, layoutBInL1, gSelectIdx, firstSlot,
+                                                         fastBlockCount, blockStackIdx * L1TileShape::N, nActual,
+                                                         strideKV, y);
+                }
                 processSize = fastBlockCount * y;
                 currentSelectYIdx = firstSlot + fastBlockCount;
                 currentYoffset = 0U;
