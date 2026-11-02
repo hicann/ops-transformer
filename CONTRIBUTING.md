@@ -27,7 +27,7 @@
 
 ![算子开发贡献流程](./docs/zh/figures/op_dev_and_contribute_flow.png "算子开发贡献流程图")
 
-如果您有全新的算子希望基于 NPU 设计与实现，欢迎在 Issue 中提出您的想法与设计方案。完整的贡献过程如下：
+本仓生态算子面向特定网络与场景定制开发，支持定制算法快速验证使用。如果您有全新的算子希望基于 NPU 设计与实现，欢迎在 Issue 中提出您的想法与设计方案，并将算子贡献至 `experimental` 对应算子分类目录。完整的贡献过程如下：
 
 ### 1. 创建 Issue 需求
 
@@ -62,13 +62,14 @@
 #### 生态最简算子交付件
 
 ```text
-${op_class}                    # 算子分类
-├── ${op_name}                 # 算子名
-│   ├── ${op_name}.cpp         # 算子 Kernel 实现文件
-│   ├── tests                  # 测试目录
-│   │   └── test_${op_name}.py # 算子测试文件
-│   ├── CMakeLists.txt         # 算子编译配置文件
-│   └── README.md              # 算子 README 文档
+experimental/${op_class}          # 算子分类（experimental 目录下）
+├── ${op_name}                    # 算子名
+│   ├── ${op_name}.cpp            # 算子 Kernel 实现文件
+│   ├── examples                  # 算子示例目录（看护基础场景，须可编译执行）
+│   ├── tests                     # 测试目录（含定制场景用例）
+│   │   └── test_${op_name}.py    # 算子测试文件
+│   ├── CMakeLists.txt            # 算子编译配置文件
+│   └── README.md                 # 算子 README 文档
 ```
 
 #### PR 提交须知
@@ -85,6 +86,9 @@ ${op_class}                    # 算子分类
 | 代码交付件 | 需提供算子 Kernel 实现、算子测试文件 | [fast_kernel_launch_example](examples/fast_kernel_launch_example/README.md) |
 | 文档交付件 | 算子 README 文档为必选，其余文档可视情况提供 | [文档贡献指南](docs/CONTRIBUTING_DOCS.md) |
 | 精度要求 | 新贡献算子需满足精度标准 | [生态算子开源精度标准](https://atomgit.com/cann/opbase/blob/master/docs/zh/ops_precision_standard/mixed_tolerance_standard.md) |
+| 覆盖率要求 | 算子测试文件需覆盖算子核心功能与主要分支，满足 UT 覆盖率要求；本地可通过 `bash build.sh --experimental -u --cov` 生成 lcov 覆盖率报告自查，CI 侧将按 [tests/test_config.yaml](tests/test_config.yaml) 配置统计覆盖率 | [构建与测试说明](docs/zh/install/build.md) |
+| example 看护要求 | 需提供算子 example 看护算子基础场景，example 须可编译执行（本地可通过 `bash build.sh --experimental --run_example ${op_name} eager` 编译并执行验证，运行模式及可选参数详见 `bash build.sh --help`），CI 会按 [tests/test_config.yaml](tests/test_config.yaml) 配置触发 examples 验证 | [fast_kernel_launch_example](examples/fast_kernel_launch_example/README.md) |
+| 用例上库要求 | 面向特定网络与场景定制的生态算子，其定制场景用例（典型网络 shape、典型配置下的功能与精度验证用例）须随代码一并上库至算子 `tests` 目录，确保算子可持续回归验证，用例生成规则参考生态算子开源精度标准 | [生态算子开源精度标准](https://atomgit.com/cann/opbase/blob/master/docs/zh/ops_precision_standard/mixed_tolerance_standard.md) |
 
 **合规检查：**
 
@@ -98,7 +102,7 @@ ${op_class}                    # 算子分类
 - **贡献目录**：按 SIG 成员意见提交至指定目录 `experimental/${op_class}`，可参考已有算子文件放置规则。
 - **PR 提交**：通过 `git` 命令提交目标分支 PR，检查 PR 标题是否清晰、PR 描述是否规范（指明更改内容和原因、是否关联对应 Issue）、是否签署 CLA。
 
-> **注意**：如果您希望贡献项目标准算子，其交付件比生态算子更丰富，包括 Kernel、Tiling 实现等，贡献指导可参考 [附录](#附录)。
+> **说明**：若希望直接贡献项目标准算子，其交付件与提交规范参见[项目标准算子 PR 上库要求](#项目标准算子-pr-上库要求)；生态算子转换为项目标准算子的流程，参见[生态算子转换为项目标准算子](#生态算子转换为项目标准算子)。
 
 ### 4. CI 门禁
 
@@ -106,7 +110,7 @@ ${op_class}                    # 算子分类
 
 - 代码编译
 - 静态检查（如涉及 codecheck 误报，请提交给 SIG 成员屏蔽）
-- UT 测试
+- UT 测试（含覆盖率统计）
 - 冒烟测试
 
 门禁通过后，请在关联的 Issue 中 @ Committer。
@@ -155,6 +159,18 @@ Committer 检视通过后，将标注 `/lgtm` 标签。Maintainer 最终审核�
 
 ## 附录
 
+### 项目标准算子介绍
+
+本仓算子分为两类：正文所述的生态算子，以及项目标准算子（即非 experimental 算子），二者对比如下：
+
+| 对比维度 | 项目标准算子 | 生态算子 |
+|---------|--------------|---------------------|
+| 目标场景 | 主流模型场景，追求高性能、高精度、高泛化 | 特定网络与场景定制开发 |
+| 使用方式 | 随正式版本发布，支持作为项目标准算子使用 | 支持定制算法快速验证使用 |
+| 贡献目录 | `${op_class}/${op_name}` | `experimental/${op_class}/${op_name}` |
+| 交付件要求 | 完整交付件（op_host、op_kernel、UT、README 等） | 最简交付件（Kernel 实现、example、测试文件、README），并满足覆盖率、example 看护与定制场景用例上库要求 |
+| 评审重点 | 性能、精度、泛化性全面评审 | 功能正确性、定制场景适配、用例与覆盖率完备性 |
+
 ### 项目标准算子交付件
 
 ```text
@@ -181,7 +197,7 @@ ${op_class}                           # 算子分类
 
 > **说明**：op_host 目录下参与编译的 Tiling 实现文件，文件名须包含 `_tiling` 标识（如 `${op_name}_tiling.cpp`、`${op_name}_tiling_${sub_case}.cpp`），否则不会被编译系统识别。针对子场景（如特定架构 arch35）拆分 Tiling 实现时，请遵循此命名规则。
 
-### PR 上库要求
+### 项目标准算子 PR 上库要求
 
 **交付件要求：**
 
@@ -199,5 +215,18 @@ ${op_class}                           # 算子分类
 
 **提交规范：**
 
-- **贡献目录**：按 SIG 成员意见提交至指定目录 `experimental/${op_class}`，可参考已有算子文件放置规则。
+- **贡献目录**：按 SIG 成员意见提交至指定算子分类目录（如 `attention/${op_name}`），可参考已有算子文件放置规则。
 - **PR 提交**：通过 `git` 命令提交目标分支 PR，检查 PR 标题是否清晰、PR 描述是否规范（指明更改内容和原因、是否关联对应 Issue）、是否签署 CLA。
+
+### 生态算子转换为项目标准算子
+
+生态算子面向特定网络与场景定制开发，当算子稳定成熟后，可申请转换为项目标准算子。转换需满足以下条件：
+
+- **项目标准算子要求**：算子已在目标网络与场景中稳定验证，性能与精度满足项目标准算子的使用要求。
+- **泛化性要求**：算子具备良好的泛化能力，能够支撑主流模型场景的通用使用诉求。
+
+转换流程如下：
+
+1. 发起 `Requirement|需求建议` 类 Issue，说明算子的实际场景验证情况与泛化性表现，申请将算子从 `experimental/${op_class}/${op_name}` 迁移至对应算子模块目录 `${op_class}/${op_name}`。
+2. 申报 SIG 议题并参加评审：在[议题申请页](https://etherpad-cann.meeting.osinfra.cn/p/sig-ops-transformer)填写转换议题完成申报，并按议题安排参加 Ops-transformer SIG 例会评审（[会议链接](https://meeting.osinfra.cn/cann/)）；经 SIG 评审接纳后，按"项目标准算子交付件"标准补齐交付件（如 op_host Tiling 实现等）。
+3. 通过 CI 门禁与 Committer 检视、Maintainer 合入后完成转换；转换后的算子后续随正式版本发布，支持作为项目标准算子使用。
