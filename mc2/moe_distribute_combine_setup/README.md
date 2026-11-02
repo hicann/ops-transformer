@@ -1,3 +1,3 @@
 # MoeDistributeCombineSetup
 
-本目录仅包含MoeDistributeCombineSetup算子对应的aclnn接口；如您想要贡献该算子的Ascend C实现，请参考[贡献流程](../../CONTRIBUTING.md)。
+本目录包含MoeDistributeCombineSetup算子的实现，不提供公开的aclnn接口；如您想要为该算子贡献代码，请参考[贡献流程](../../CONTRIBUTING.md)。

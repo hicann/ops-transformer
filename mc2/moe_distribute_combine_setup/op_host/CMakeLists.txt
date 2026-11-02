@@ -13,14 +13,12 @@ if (BUILD_OPEN_PROJECT)  # custom
         moe_distribute_combine_setup_def.cpp
     )
     add_modules_sources_with_soc(
-        OP_API_INDEPENDENT ON
-        OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api
         OP_MC2_ENABLE ON
-        OPTYPE moe_distribute_combine_setup moe_distribute_combine_setup ACLNNTYPE aclnn aclnn_inner)
+        OPTYPE moe_distribute_combine_setup ACLNNTYPE aclnn_inner)
     set(SUB_MC2_COMPILE TRUE PARENT_SCOPE)
     set(MC2_OPT ON PARENT_SCOPE)
     set(moe_distribute_combine_setup_depends mc2/common mc2/3rd PARENT_SCOPE)
 else() # 回黄host
-    add_mc2_modules_sources(OPTYPE moe_distribute_combine_setup moe_distribute_combine_setup ACLNNTYPE aclnn aclnn_inner)
+    add_mc2_modules_sources(OPTYPE moe_distribute_combine_setup ACLNNTYPE aclnn_inner)
     set(SUB_MC2_COMPILE TRUE PARENT_SCOPE)
 endif()

@@ -36,10 +36,6 @@ const std::string DISTRIBUTE_BARRIER_OP_TYPE = "DistributeBarrier";
 const std::string MOE_DISTRIBUTE_DISPATCH_V2_OP_TYPE = "MoeDistributeDispatchV2";
 const std::string MOE_DISTRIBUTE_COMBINE_V2_OP_TYPE = "MoeDistributeCombineV2";
 const std::string MOE_DISTRIBUTE_COMBINE_ADD_RMS_NORM_OP_TYPE = "MoeDistributeCombineAddRmsNorm";
-const std::string MOE_DISTRIBUTE_COMBINE_SETUP_OP_TYPE = "MoeDistributeCombineSetup";
-const std::string MOE_DISTRIBUTE_COMBINE_TEARDOWN_OP_TYPE = "MoeDistributeCombineTeardown";
-const std::string MOE_DISTRIBUTE_DISPATCH_SETUP_OP_TYPE = "MoeDistributeDispatchSetup";
-const std::string MOE_DISTRIBUTE_DISPATCH_TEARDOWN_OP_TYPE = "MoeDistributeDispatchTeardown";
 const std::string ALLTO_ALLV_GROUPED_MAT_MUL_OP_TYPE = "AlltoAllvGroupedMatMul";
 const std::string GROUPED_MAT_MUL_ALLTO_ALLV_OP_TYPE = "GroupedMatMulAlltoAllv";
 const std::string ALL_TO_ALLV_QUANT_GROUPED_MM_OP_TYPE = "AlltoAllvQuantGroupedMatMul";
@@ -48,7 +44,6 @@ const std::string ATTENTION_TO_FFN_OP_TYPE = "AttentionToFFN";
 const std::string FFN_TO_ATTENTION_OP_TYPE = "FFNToAttention";
 const int32_t GROUP_CNT_OF_DS_TRAINING = 1;
 const int32_t GROUP_CNT_OF_MOE_DISTRIBUTE = 2;
-const int32_t ONE_GROUP_CNT_OF_MOE_DISTRIBUTE = 1;
 const int32_t GROUP_CNT_OF_DISTRIBUTE_BARRIER = 1;
 const int32_t GROUP_CNT_OF_ATTENTION_FFN = 1;
 const int32_t GROUP_CNT = 2;
@@ -69,10 +64,6 @@ static const std::map<const std::string, int32_t> GROUP_CNT_MAP{
     {MOE_DISTRIBUTE_DISPATCH_V2_OP_TYPE, GROUP_CNT_OF_MOE_DISTRIBUTE},
     {MOE_DISTRIBUTE_COMBINE_V2_OP_TYPE, GROUP_CNT_OF_MOE_DISTRIBUTE},
     {MOE_DISTRIBUTE_COMBINE_ADD_RMS_NORM_OP_TYPE, GROUP_CNT_OF_MOE_DISTRIBUTE},
-    {MOE_DISTRIBUTE_COMBINE_SETUP_OP_TYPE, ONE_GROUP_CNT_OF_MOE_DISTRIBUTE},
-    {MOE_DISTRIBUTE_COMBINE_TEARDOWN_OP_TYPE, ONE_GROUP_CNT_OF_MOE_DISTRIBUTE},
-    {MOE_DISTRIBUTE_DISPATCH_SETUP_OP_TYPE, ONE_GROUP_CNT_OF_MOE_DISTRIBUTE},
-    {MOE_DISTRIBUTE_DISPATCH_TEARDOWN_OP_TYPE, ONE_GROUP_CNT_OF_MOE_DISTRIBUTE},
     {ALLTO_ALLV_GROUPED_MAT_MUL_OP_TYPE, GROUP_CNT_OF_DS_TRAINING},
     {GROUPED_MAT_MUL_ALLTO_ALLV_OP_TYPE, GROUP_CNT_OF_DS_TRAINING},
     {ALL_TO_ALLV_QUANT_GROUPED_MM_OP_TYPE, GROUP_CNT_OF_DS_TRAINING},
@@ -84,8 +75,6 @@ static const std::unordered_set<std::string> NO_AI_CPU_SET{MOE_DISTRIBUTE_DISPAT
                                                            MOE_DISTRIBUTE_COMBINE_OP_TYPE,
                                                            MOE_DISTRIBUTE_DISPATCH_V2_OP_TYPE,
                                                            MOE_DISTRIBUTE_COMBINE_V2_OP_TYPE,
-                                                           MOE_DISTRIBUTE_DISPATCH_TEARDOWN_OP_TYPE,
-                                                           MOE_DISTRIBUTE_COMBINE_TEARDOWN_OP_TYPE,
                                                            MOE_DISTRIBUTE_COMBINE_ADD_RMS_NORM_OP_TYPE,
                                                            DISTRIBUTE_BARRIER_OP_TYPE,
                                                            ATTENTION_TO_FFN_OP_TYPE,
@@ -299,10 +288,6 @@ ge::Status Mc2MoeGenTaskOpsUtils::Mc2MoeGenTaskCallback(const gert::ExeResGenera
         return ge::GRAPH_SUCCESS;
     }
 
-    const std::string opTypeStr = opType; // 和V2的差异点，待确认，应该可以整合为一，用V2的if逻辑即可
-    if (opTypeStr == MOE_DISTRIBUTE_COMBINE_TEARDOWN_OP_TYPE || opTypeStr == MOE_DISTRIBUTE_DISPATCH_TEARDOWN_OP_TYPE) {
-        return ge::GRAPH_SUCCESS;
-    }
     return Mc2MoeInsertTask(context, tasks, groupCnt);
 }
 
