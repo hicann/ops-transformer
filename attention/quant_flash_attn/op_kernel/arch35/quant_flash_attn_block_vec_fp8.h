@@ -137,8 +137,8 @@ public:
 
     TBuf<> lseTmpBuff_;
     TQue<QuePosition::VECOUT, 1> softmaxLseQueue_;
-    TBuf<> queryAntiqScaleInputQue_;
-    TBuf<> keyAntiqScaleInputQue_[2]; // 2:DB
+    TBuf<> queryAntiqScaleInputQue_[2]; // 2:DB
+    TBuf<> keyAntiqScaleInputQue_[2];   // 2:DB
     const ConstInfoX& constInfo_;
     T negativeFloatScalar_;
     float pScaleValue_{1.0f};
@@ -407,7 +407,7 @@ public:
 
         auto expUb = this->softmaxExpBuf_[runInfo.loop % (PRELOAD_N + 1)].template Get<T>()[0];
         int64_t stage1Offset = runInfo.loop % DB;
-        int64_t kscaleOffset = (runInfo.s2Idx >> 8) & 1;
+        int64_t qscaleOffset = runInfo.mloop % DB;
 
         float descaleQK = 1.0;
 
@@ -415,12 +415,13 @@ public:
         LocalTensor<float> qScaleUbTensor;
         LocalTensor<float> kScaleUbTensor;
         if (unlikely(runInfo.isFirstS2Loop)) {
-            qScaleUbTensor = queryAntiqScaleInputQue_.template Get<float>();
+            qScaleUbTensor = queryAntiqScaleInputQue_[qscaleOffset].template Get<float>();
             CopyQueryScaleTile(qScaleUbTensor, runInfo);
-            kScaleUbTensor = keyAntiqScaleInputQue_[kscaleOffset].template Get<float>();
+            kScaleUbTensor = keyAntiqScaleInputQue_[stage1Offset].template Get<float>();
             CopyKeyScaleTile(kScaleUbTensor, runInfo, false);
         } else {
-            kScaleUbTensor = keyAntiqScaleInputQue_[kscaleOffset].template Get<float>();
+            qScaleUbTensor = queryAntiqScaleInputQue_[qscaleOffset].template Get<float>();
+            kScaleUbTensor = keyAntiqScaleInputQue_[stage1Offset].template Get<float>();
         }
 
         event_t mte2VEvtID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
@@ -474,7 +475,7 @@ public:
         }
 
         if (likely(!runInfo.isLastS2Loop)) {
-            LocalTensor<float> kScaleUbNextTensor = keyAntiqScaleInputQue_[1 - kscaleOffset].template Get<float>();
+            LocalTensor<float> kScaleUbNextTensor = keyAntiqScaleInputQue_[1 - stage1Offset].template Get<float>();
             CopyKeyScaleTile(kScaleUbNextTensor, runInfo, true);
         }
 
@@ -864,7 +865,8 @@ public:
     __aicore__ inline void InitBuffers()
     {
         SoftmaxInitBuffer();
-        tPipe_->InitBuffer(queryAntiqScaleInputQue_, (mBaseSize >> 1U) * sizeof(float));
+        tPipe_->InitBuffer(queryAntiqScaleInputQue_[0], (mBaseSize >> 1U) * sizeof(float));
+        tPipe_->InitBuffer(queryAntiqScaleInputQue_[1], (mBaseSize >> 1U) * sizeof(float));
         // 4: 4份解bank冲突
         tPipe_->InitBuffer(keyAntiqScaleInputQue_[0], (s2BaseSize + (FA_BYTE_BLOCK / sizeof(T))) * sizeof(float) * 4);
         tPipe_->InitBuffer(keyAntiqScaleInputQue_[1], (s2BaseSize + (FA_BYTE_BLOCK / sizeof(T))) * sizeof(float) * 4);
