@@ -12,9 +12,9 @@
 
 """检测算子的 examples 与 ut 是否缺失或为空。
 
-算子判定：目录下存在 op_host 或 op_kernel 子目录，op_host 下存在def文件，
+算子判定：非 experimental 目录下存在 op_host 或 op_kernel 子目录，op_host 下存在def文件，
 且目录名不属于公共库（common、*_common 等）；无def文件为接口类算子，不参与统计。
-example 判定：examples 目录不存在，目录内（含子目录）无任何源码文件，
+examples 判定仅针对具有公开 aclnn_*.h 头文件的算子：examples 目录不存在，目录内（含子目录）无任何源码文件，
 或仅有 arch35 一个子目录且def文件声明支持ascend910b/ascend910_93（纯950等非910芯片算子不统计）。
 ut 判定：tests/ut 目录不存在，或目录内除 CMakeLists.txt 外无任何文件。
 检测结果按类别汇总写入 build/check_examples_ut.csv，
@@ -41,6 +41,7 @@ NON_CATEGORY_DIRS = {
     "common",
     "docs",
     "examples",
+    "experimental",
     "oat_reports",
     "scripts",
     "st",
@@ -121,7 +122,7 @@ def is_arch35_only_examples(examples_dir: str) -> bool:
 
 
 def iter_category_dirs(repo_root: str) -> Iterator[str]:
-    """遍历所有算子类目目录（含 experimental 下的二级类目）。"""
+    """遍历所有参与检查的算子类目目录，跳过 experimental。"""
     for entry in sorted(os.listdir(repo_root)):
         path = os.path.join(repo_root, entry)
         if (
@@ -130,13 +131,7 @@ def iter_category_dirs(repo_root: str) -> Iterator[str]:
             or not os.path.isdir(path)
         ):
             continue
-        if entry == "experimental":
-            for sub in sorted(os.listdir(path)):
-                sub_path = os.path.join(path, sub)
-                if os.path.isdir(sub_path):
-                    yield sub_path
-        else:
-            yield path
+        yield path
 
 
 def has_def_file(op_path: str) -> bool:
@@ -147,6 +142,19 @@ def has_def_file(op_path: str) -> bool:
     return bool(
         glob.glob(os.path.join(op_host_dir, f"{os.path.basename(op_path)}_def*.cpp"))
         or glob.glob(os.path.join(op_host_dir, "*_def*.cpp"))
+    )
+
+
+def has_aclnn_public_header(op_path: str) -> bool:
+    """判断算子是否有公开 aclnn_*.h 头文件。"""
+    api_dirs = (
+        os.path.join(op_path, "op_api"),
+        os.path.join(op_path, "op_host", "op_api"),
+    )
+    return any(
+        os.path.isfile(header)
+        for api_dir in api_dirs
+        for header in glob.glob(os.path.join(api_dir, "aclnn_*.h"))
     )
 
 
@@ -167,10 +175,11 @@ def iter_op_dirs(repo_root: str) -> Iterator[str]:
 
 def check_op(op_path: str) -> Optional[OpIssue]:
     """检查单个算子，无问题返回 None。"""
-    missing_examples = True
+    # 只有有公开 aclnn 头文件的算子才要求 examples。
+    missing_examples = has_aclnn_public_header(op_path)
     arch35_only_examples = False
     examples_dir = os.path.join(op_path, "examples")
-    if os.path.isdir(examples_dir):
+    if missing_examples and os.path.isdir(examples_dir):
         missing_examples = not has_file_with_ext(examples_dir, EXAMPLE_EXTS)
         # def文件仅声明950等非910芯片的算子，仅有arch35 examples属正常，不视为缺失
         arch35_only_examples = (
@@ -224,7 +233,7 @@ def parse_ops_from_filelist(
     """解析pr_filelist，返回(涉及的算子目录, 涉及的算子名)。
 
     算子名取二级目录名，类目公共目录记为'<类目>.common'（与ops_config.txt中的键一致），
-    其他公共库（*_common、*_utils等）不在依赖图中，跳过。
+    其他公共库（*_common、*_utils等）以及 experimental 目录不在检查范围内，跳过。
     """
     categories = set(get_op_categories(repo_root))
     involved_dirs: Set[str] = set()
@@ -240,19 +249,11 @@ def parse_ops_from_filelist(
             if len(parts) < 2:
                 continue
             category, second = parts[0], parts[1]
+            if category == "experimental":
+                continue
             prefix = ""
             if category in categories:
                 prefix = category
-            elif (
-                category == "experimental"
-                and len(parts) >= 3
-                and parts[1] in categories
-            ):
-                category, second, prefix = (
-                    parts[1],
-                    parts[2],
-                    f"experimental/{parts[1]}",
-                )
             if not prefix:
                 continue
             op_dir = os.path.join(repo_root, prefix, second)
@@ -447,6 +448,13 @@ def main() -> int:
         involved_dirs, involved_names = parse_ops_from_filelist(repo_root, pr_filelist)
         if not involved_dirs and not involved_names:
             print(f"pr_filelist未解析到算子: {pr_filelist}")
+            # CI 后续步骤会无条件上传报告；即使 PR 只改脚本、文档或
+            # experimental 目录，也要生成带表头的空 CSV，避免上传步骤失败。
+            build_dir = os.path.join(repo_root, "build")
+            os.makedirs(build_dir, exist_ok=True)
+            csv_path = os.path.join(build_dir, "check_examples_ut.csv")
+            write_csv([], csv_path, repo_root)
+            print(f"检测结果已写入: {csv_path} (0条)")
             return 0
         op_dirs = expand_involved_ops(repo_root, involved_dirs, involved_names)
         print(f"pr_filelist涉及算子(依赖展开可用时包含依赖): {len(op_dirs)}个")
