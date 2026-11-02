@@ -448,7 +448,7 @@ aclnnStatus aclnnMhcPreSinkhornBackward(
         <td>hcEps(double)</td>
         <td>输入</td>
         <td>数值稳定性参数。</td>
-        <td>建议值1e-6。转换为FLOAT32后须有限且大于0。</td>
+        <td>建议值1e-6。</td>
         <td>-</td>
         <td>-</td>
         <td>-</td>
@@ -634,6 +634,9 @@ aclnnStatus aclnnMhcPreSinkhornBackward(
 
   - C：大于0、小于100000且可以被128整除。
   - sk_iter_count：Sinkhorn迭代次数当前仅支持20。
+  <!-- npu="950" id15 -->
+  - hcEps（针对Ascend 950PR&950DT系列产品）：转换为FLOAT32后须有限且大于0。
+  <!-- end id15 -->
   - 输入phi的数据范围建议在$\pm \frac{1}{\sqrt{nc}}$范围内，hcEps建议在1e-6，此范围内具有较好的数值稳定性。
   - hPre、hcBeforeNorm、invRms、sumOut、normOut须与前向参数x、phi、alpha、bias、hcEps保持正确的前向推导关系，以获得正确反向结果和稳定数值输出。
 
