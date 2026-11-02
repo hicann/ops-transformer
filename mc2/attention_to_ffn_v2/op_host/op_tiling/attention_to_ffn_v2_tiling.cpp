@@ -56,7 +56,7 @@ constexpr size_t URMA_HCOMM_INIT_SIZE = 512U;          // kernel: URMA_HCOMM_INI
 constexpr size_t URMA_BATCH_BUFFER_SIZE = 16U * 1024U; // kernel: ATTN_FFN_HCOMM_BATCH_UB_BYTES
 constexpr size_t BUCKET_BUFFER_SIZE = 32U * 1024U;     // kernel: BUCKET_BUFFER_SIZE
 constexpr size_t RANK_INFO_SEGMENT_NUM = 4U;           // kernel: RANK_INFO_SEGMENT_NUM
-constexpr size_t MX_PERGROUP_BLOCK_SIZE = 128U;        // kernel: PERGROUP_BLOCK_SIZE
+constexpr size_t MX_INPUT_READ_BYTES = 512U;           // kernel: MX_INPUT_READ_BYTES
 constexpr size_t RANK_RESOLVE_STRIDE = 2U;             // kernel: RANK_RESOLVE_STRIDE
 
 inline size_t CeilAlignSize(size_t val, size_t align)
@@ -303,11 +303,10 @@ ge::graphStatus CheckUrmaUbCapacity(gert::TilingContext* context, const Attentio
         if (tilingKeyQuantMode == ATTN_FFN_TILINGKEY_PERTOKEN_INT8) {
             xInBytes = CeilAlignSize(axisH * TOKEN_BYTES, ubAlign);
         } else {
-            // MX/MX_CLIP stage the input per 128-element groups; the group count is a ceiling
-            // division (kernel: Ceil(axisH, PERGROUP_BLOCK_SIZE)), NOT an align-up of axisH.
+            // MX/MX_CLIP quant reads two full vector registers per loop with mask=ALL; the kernel
+            // stages each token zero-filled to this 512B boundary (kernel: MX_INPUT_READ_BYTES).
             xInBytes = CeilAlignSize(
-                (axisH + MX_PERGROUP_BLOCK_SIZE - 1U) / MX_PERGROUP_BLOCK_SIZE * MX_PERGROUP_BLOCK_SIZE * TOKEN_BYTES,
-                ubAlign);
+                (axisH * TOKEN_BYTES + MX_INPUT_READ_BYTES - 1U) / MX_INPUT_READ_BYTES * MX_INPUT_READ_BYTES, ubAlign);
         }
         const size_t xOutBytes = CeilAlignSize(GetUrmaCommuBytes(tilingKeyQuantMode, outDtype, axisH), ubAlign);
         queueBytes = URMA_BUFFER_NUM * (xInBytes + xOutBytes) +

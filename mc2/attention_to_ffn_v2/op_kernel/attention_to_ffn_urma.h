@@ -72,7 +72,7 @@ constexpr uint32_t TOKEN_INFO_TABLE_COPY_BLOCK_CNT = 2;
 constexpr float INT8_MAX_VALUE = 127.0f;
 constexpr uint32_t FP4_ELEMS_PER_BYTE = 2;
 constexpr uint32_t MX_BLOCK_SIZE = 32;
-constexpr uint32_t PERGROUP_BLOCK_SIZE = 128;
+constexpr uint32_t MX_INPUT_READ_BYTES = 512U;
 
 __aicore__ constexpr bool IsMxQuant(uint32_t qm)
 {
@@ -507,7 +507,7 @@ __aicore__ inline void AttentionToFfnUrma<TemplateAttentionToFfnUrmaTypeFunc>::Q
         uint32_t mxScaleNum = Ceil(Ceil(axisH_, MX_BLOCK_SIZE), 2U) * 2U;
         scaleParamPad = mxScaleNum;
         hCommuSize_ = hOutSizeAlign_ + scaleParamPad;
-        uint32_t hInSize = Ceil(axisH_, PERGROUP_BLOCK_SIZE) * PERGROUP_BLOCK_SIZE * sizeof(XType);
+        uint32_t hInSize = Ceil(axisH_ * sizeof(XType), MX_INPUT_READ_BYTES) * MX_INPUT_READ_BYTES;
         tpipe_->InitBuffer(xInQueue_, BUFFER_NUM, hInSize);
         tpipe_->InitBuffer(xOutQueue_, BUFFER_NUM, hCommuSize_);
     } else {
@@ -606,12 +606,7 @@ __aicore__ inline void AttentionToFfnUrma<TemplateAttentionToFfnUrmaTypeFunc>::Q
         __ubuf__ uint16_t* halfScaleLocalAddr =
             (__ubuf__ uint16_t*)receiveDataCastFloat[Ceil(mxScaleNum, 32U) * 32U].GetPhyAddr();
         __ubuf__ int8_t* outLocalAddr = (__ubuf__ int8_t*)xOutTensor_.GetPhyAddr();
-        __ubuf__ uint16_t* mxScaleLocalAddr;
-        if constexpr (Std::IsSame<XOutType, fp4x2_e2m1_t>::value) {
-            mxScaleLocalAddr = (__ubuf__ uint16_t*)xOutTensor_[Ceil(axisH_, FP4_ELEMS_PER_BYTE) * 1U].GetPhyAddr();
-        } else {
-            mxScaleLocalAddr = (__ubuf__ uint16_t*)xOutTensor_[axisH_ * 1U].GetPhyAddr();
-        }
+        __ubuf__ uint16_t* mxScaleLocalAddr = (__ubuf__ uint16_t*)xOutTensor_[hOutSizeAlign_].GetPhyAddr();
         Quant::ComputeMaxExp(srcAddr, maxExpAddr, axisH_);
         Quant::ComputeScale<XOutType>(maxExpAddr, mxScaleLocalAddr, halfScaleLocalAddr, mxScaleNum);
         if constexpr (Std::IsSame<XOutType, fp8_e4m3fn_t>::value || Std::IsSame<XOutType, fp8_e5m2_t>::value) {
@@ -630,7 +625,7 @@ __aicore__ inline void AttentionToFfnUrma<TemplateAttentionToFfnUrmaTypeFunc>::Q
         __ubuf__ uint16_t* halfScaleLocalAddr =
             (__ubuf__ uint16_t*)receiveDataCastFloat[Ceil(mxScaleNum, 32U) * 32U].GetPhyAddr();
         __ubuf__ int8_t* outLocalAddr = (__ubuf__ int8_t*)xOutTensor_.GetPhyAddr();
-        __ubuf__ uint16_t* mxScaleLocalAddr = (__ubuf__ uint16_t*)xOutTensor_[axisH_ * 1U].GetPhyAddr();
+        __ubuf__ uint16_t* mxScaleLocalAddr = (__ubuf__ uint16_t*)xOutTensor_[hOutSizeAlign_].GetPhyAddr();
         Quant::ComputeMaxExpClip(srcAddr, maxExpAddr, axisH_);
         Quant::ComputeScaleClip<XOutType, StorageXInType>(maxExpAddr, mxScaleLocalAddr, halfScaleLocalAddr, mxScaleNum);
         Quant::ComputeFp8Data<StorageXInType, XOutType, AscendC::RoundMode::CAST_TRUNC, AscendC::RoundMode::CAST_RINT>(
@@ -808,6 +803,15 @@ __aicore__ inline void AttentionToFfnUrma<TemplateAttentionToFfnUrmaTypeFunc>::L
         xTmpTensor_ = xQueue_.DeQue<XType>();
     } else {
         xInTensor_ = xInQueue_.AllocTensor<XType>();
+        if constexpr (IsMxOrMxClipQuant(QuantMode)) {
+            LocalTensor<uint8_t> singleByteTok = xInTensor_.template ReinterpretCast<uint8_t>();
+            Duplicate(singleByteTok, static_cast<uint8_t>(0),
+                      Ceil(axisH_ * sizeof(XType), MX_INPUT_READ_BYTES) * MX_INPUT_READ_BYTES);
+            SyncFunc<HardEvent::V_MTE2>();
+            const uint32_t tailPadElems = (UB_ALIGN - axisH_ * sizeof(XType) % UB_ALIGN) % UB_ALIGN / sizeof(XType);
+            copyPadExtParams =
+                DataCopyPadExtParams<XType>{true, 0U, static_cast<uint8_t>(tailPadElems), static_cast<XType>(0)};
+        }
         DataCopyPad(xInTensor_, xGMTensor_[static_cast<uint64_t>(tokenId) * axisH_], xCopyParams, copyPadExtParams);
         xInQueue_.EnQue(xInTensor_);
         xInTensor_ = xInQueue_.DeQue<XType>();
