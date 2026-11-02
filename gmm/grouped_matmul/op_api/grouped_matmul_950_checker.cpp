@@ -1249,43 +1249,31 @@ template <typename T>
 aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckGroupedMatmulHif4DimValue() const
 {
     for (size_t i = 0; i < GetInputTensorSize(gmmParams_.x); i++) {
-        auto xKDimValue = GetInputTensor(gmmParams_.x, i)->GetViewShape().GetDim(1);
+        auto weightNIndex = GetInputTensor(gmmParams_.weight, i)->GetViewShape().GetDimNum() - 1;
+        auto weightNDimValue = GetInputTensor(gmmParams_.weight, i)->GetViewShape().GetDim(weightNIndex);
         auto weightKIndex = GetInputTensor(gmmParams_.weight, i)->GetViewShape().GetDimNum() - LAST_TWO_DIM_INDEX;
         auto weightKDimValue = GetInputTensor(gmmParams_.weight, i)->GetViewShape().GetDim(weightKIndex);
-        auto weightLastIndex = GetInputTensor(gmmParams_.weight, i)->GetViewShape().GetDimNum() - 1;
-        auto weightLastDimValue = GetInputTensor(gmmParams_.weight, i)->GetViewShape().GetDim(weightLastIndex);
-        // 2：检查N是否为偶数
-        auto weightLastDimModValue = weightLastDimValue % 2;
+        auto xKDimValue = GetInputTensor(gmmParams_.x, i)->GetViewShape().GetDim(1);
+        auto xLastDimValue = GetInputTensor(gmmParams_.x, i)->GetViewShape().GetDim(1);
+        // 2：检查N是否为偶数（weight未转置时；N在最后一维）
+        auto weightNDimModValue = weightNDimValue % 2;
+        // 2：检查x最后一维是否为偶数（未转置时为K，转置时为M）
+        auto xLastDimModValue = xLastDimValue % 2;
         if (!gmmParams_.transposeWeight) {
-            CHECK_COND(weightLastDimModValue == 0, ACLNN_ERR_PARAM_INVALID,
-                       "When the dtypes of x and weight inputs are hifloat4 and weight is not transposed, the dim N \
-value of %s should be even, but actual dim N mod value is %lu",
-                       weightName_.c_str(), weightLastDimModValue);
+            CHECK_COND(weightNDimModValue == 0, ACLNN_ERR_PARAM_INVALID,
+                       "When the weight is not transposed, the dim N value of %s should be even, but actual dim \
+value is %lu",
+                       weightName_.c_str(), weightNDimValue);
         }
-        // 2：检查K是否为偶数, 不支持k轴为2
-        auto xKDimModValue = xKDimValue % 2;
-        if (!gmmParams_.transposeX) {
-            CHECK_COND(
-                xKDimModValue == 0, ACLNN_ERR_PARAM_INVALID,
-                "When the dtypes of x and weight inputs are hifloat4, the last dim value of %s should be even, but \
+        CHECK_COND(xLastDimModValue == 0, ACLNN_ERR_PARAM_INVALID,
+                   "When the dtypes of x and weight inputs are hifloat4, the last dim value of %s should be even, but \
 actual dim value is %lu",
-                xName_.c_str(), xKDimValue);
-            // 2：不支持k轴为2
-            CHECK_COND(
-                xKDimModValue != 2, ACLNN_ERR_PARAM_INVALID,
-                "When the dtypes of x and weight inputs are hifloat4, the dim K value should not be 2, but actual \
-dim K value of %s is %lu",
-                xName_.c_str(), xKDimValue);
-        }
-        if (gmmParams_.transposeX) {
-            auto kDimValue = GetInputTensor(gmmParams_.x, i)->GetViewShape().GetDim(0);
-            // 2：不支持k轴为2
-            CHECK_COND(
-                kDimValue != 2, ACLNN_ERR_PARAM_INVALID,
-                "When the dtypes of x and weight inputs are hifloat4, the dim K value should not be 2, but actual \
-dim K value of %s is %lu",
-                xName_.c_str(), kDimValue);
-        }
+                   xName_.c_str(), xLastDimValue);
+        // 不支持k轴为2
+        CHECK_COND(xKDimValue != 2 && weightKDimValue != 2, ACLNN_ERR_PARAM_INVALID,
+                   "When the dtypes of x and weight inputs are hifloat4, the dim K value should not be 2, but actual \
+dim K value of %s is %lu and dim K value of %s is %lu",
+                   xName_.c_str(), xKDimValue, weightName_.c_str(), weightKDimValue);
     }
     return ACLNN_SUCCESS;
 }
