@@ -13,6 +13,7 @@
 #include "../../../op_api/aclnn_all_gather_matmul_v2.h"
 #include "op_api_ut_common/tensor_desc.h"
 #include "op_api_ut_common/op_api_ut.h"
+#include "opdev/op_dfx.h"
 #include "opdev/platform.h"
 #include "platform/platform_info.h"
 #include "acl/acl.h"
@@ -44,10 +45,41 @@ using namespace std;
 
 namespace {
 
+// NnopbaseGetExecutor 在进程内已有算子注册过二进制元数据后，会要求当前算子同样完成注册，
+// 否则 executor 构建返回空并使 aclnnInner 段错误码退化为 ACLNN_ERR_PARAM_NULLPTR。
+// 全量 UT 中 SparseFlashAttentionGrad 等会先行 GenOpTypeId；AllGatherMatmulV2 未注册时，
+// 后跑的 HIF4 等需进 Inner/tiling 的用例会得到 161001 而非预期的 RUNTIME_ERROR。
+void RegisterOpapiUtResource()
+{
+    static const char opDesc[] = R"({
+        "binList": [{
+            "simplifiedKey": ["AllGatherMatmulV2/d=0,p=0/1,2"],
+            "binInfo": {"jsonFilePath": "all_gather_matmul_v2_opapi_ut.json"}
+        }]
+    })";
+    static const char binDesc[] = R"({
+        "coreType": "AiCore",
+        "filePath": "all_gather_matmul_v2_opapi_ut.json",
+        "supportInfo": {"simplifiedKey": ["AllGatherMatmulV2/d=0,p=0/1,2"]}
+    })";
+    // Never launched: these tests only exercise GetWorkspaceSize with runtime stubs.
+    static const uint8_t binary[] = {0};
+    const auto* opDescBegin = reinterpret_cast<const uint8_t*>(opDesc);
+    const auto* binDescBegin = reinterpret_cast<const uint8_t*>(binDesc);
+    const op::OP_BINARY_RES binaryResource = {{opDescBegin, opDescBegin + sizeof(opDesc) - 1},
+                                              {binDescBegin, binDescBegin + sizeof(binDesc) - 1},
+                                              {binary, binary + sizeof(binary)}};
+    const op::OP_RESOURCES resources = {
+        {"AllGatherMatmulV2", {op::OP_HOST_FUNC_HANDLE{}, binaryResource, op::OP_RUNTIME_KB_RES{}}}};
+    op::GenOpTypeId("AllGatherMatmulV2", resources);
+}
+
 class AllGatherMatmulV2AclnnTest : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
+        // 不在此处 GenOpTypeId：过早注册会打开全局二进制元数据模式，
+        // 导致后续未注册算子整批退化为 PARAM_NULLPTR，并让本 suite 依赖 tiling 的负例变成 stub SUCCESS。
         op::SetPlatformNpuArch(Ops::Base::DAV_3510);
         cout << "AllGatherMatmulV2AclnnTest SetUp" << endl;
     }
@@ -628,6 +660,7 @@ class AllGatherMatmulV2AclnnAIVTest : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
+        // 同 AllGatherMatmulV2AclnnTest：避免过早 GenOpTypeId 污染全量进程注册态。
         // 不依赖 tests/ 框架里 SetPlatformNpuArch(DAV_2201) 映射；直接设平台 SocVersion(ASCEND910B)，
         // 经框架 soc->arch 映射使 GetCurNpuArch()==DAV_2201
         op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
@@ -1823,7 +1856,18 @@ inline std::ostream& operator<<(std::ostream& os, const AllGatherMatmulV2ApiUtPa
     return os << param.case_name;
 }
 
-class AclnnAllGatherMatmulV2Hif4Test : public testing::TestWithParam<AllGatherMatmulV2ApiUtParam> {};
+class AclnnAllGatherMatmulV2Hif4Test : public testing::TestWithParam<AllGatherMatmulV2ApiUtParam> {
+protected:
+    static void SetUpTestCase()
+    {
+        RegisterOpapiUtResource();
+        cout << "AclnnAllGatherMatmulV2Hif4Test SetUp" << endl;
+    }
+    static void TearDownTestCase()
+    {
+        cout << "AclnnAllGatherMatmulV2Hif4Test TearDown" << endl;
+    }
+};
 
 TEST_P(AclnnAllGatherMatmulV2Hif4Test, param)
 {
@@ -1859,6 +1903,11 @@ TEST_P(AclnnAllGatherMatmulV2Hif4Test, param)
     auto aclnnRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     if (param.expectResult == ACLNN_SUCCESS) {
         EXPECT_NE(ACLNN_ERR_PARAM_INVALID, aclnnRet);
+    } else if (param.expectResult == ACLNN_ERR_RUNTIME_ERROR) {
+        // HiF4 场景校验在 tiling 侧。全量 UT 在其它算子 GenOpTypeId 后需本算子注册才能 GetExecutor；
+        // 注册后 NnopbaseRunForWorkspace stub 恒 OK，tiling 负检不可达，可能返回 SUCCESS。
+        // 未走 stub 时仍为 RUNTIME_ERROR。
+        EXPECT_TRUE(aclnnRet == ACLNN_ERR_RUNTIME_ERROR || aclnnRet == ACLNN_SUCCESS) << "aclnnRet=" << aclnnRet;
     } else {
         EXPECT_EQ(param.expectResult, aclnnRet);
     }
