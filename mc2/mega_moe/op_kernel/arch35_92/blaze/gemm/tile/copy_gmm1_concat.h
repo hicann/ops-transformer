@@ -108,9 +108,8 @@ namespace asc::te {
 
 // These overloads match only MegaMoe's view types. Declare them before including
 // QGMM, whose qualified copy calls resolve the overload set at template definition.
-template <typename Dst, typename Src>
-__aicore__ inline void copy(const copy_atom<copy_traits<Blaze::Gemm::Tile::CopyConcatGM2L1>>& copy, const Dst& dst,
-                            const MegaMoeImpl::Gmm1NzWeightView<Src>& src)
+template <typename Atom, typename Dst, typename Src>
+__aicore__ inline void copy(const copy_atom<Atom>& copy, const Dst& dst, const MegaMoeImpl::Gmm1NzWeightView<Src>& src)
 {
     using Element = get_attribute_element_type<typename Src::element_type*>;
     const uint64_t c0 = AscendC::Std::get<0>(AscendC::Std::get<0>(src.layout().shape()));
