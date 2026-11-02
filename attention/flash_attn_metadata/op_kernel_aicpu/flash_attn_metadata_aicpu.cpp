@@ -386,15 +386,11 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
         optiling::flash_attn::fa_tiling_util::AdjustSinnerAndSouter(headDimV_, gSize, maxSeqlenQ_, maxSeqlenKv_,
                                                                     maskMode_, baseInfo.preToken, baseInfo.nextToken,
                                                                     qlayout, mBaseSize_, s2BaseSize_);
-        // 不合轴 DN: 路由开关打开时按条件路由(V_D<=128, maskMode=0/3, maxActualQ>=256), 命中时按
-        // BN1_S1 分核(B轴*N1轴, M轴=纯S1); 判定逻辑与 host 侧 UpdateTilingKeyTemplateId 共享
-        // fa_tiling_util::GetFlashAttnTemplateId, 保证 metadata 分核模式与 kernel 模板选择严格一致;
-        // Nonmatching cases retain mainline BN2_S1G splitting for ND / merged-DN templates.
-        dnUnmergedRouted =
-            optiling::flash_attn::fa_tiling_util::DN_UNMERGED_ROUTE_ENABLED &&
-            optiling::flash_attn::fa_tiling_util::GetFlashAttnTemplateId(
-                static_cast<uint32_t>(headDim_), static_cast<uint32_t>(headDimV_), static_cast<int64_t>(maskMode_),
-                static_cast<int64_t>(maxSeqlenQ_)) == optiling::flash_attn::fa_tiling_util::FA_TEMPLATE_DN_UNMERGED;
+        // Share the final template selection with host tiling before applying the CV ratio.
+        dnUnmergedRouted = optiling::flash_attn::fa_tiling_util::GetFlashAttnTemplateId(
+                               static_cast<uint32_t>(headDim_), static_cast<uint32_t>(headDimV_),
+                               static_cast<int64_t>(maskMode_), static_cast<int64_t>(maxSeqlenQ_),
+                               mBaseSize_) == optiling::flash_attn::fa_tiling_util::FA_TEMPLATE_DN_UNMERGED;
         param.costFunc = FlashAttnMetadataCpuKernel::CostFunc;
     }
     mBaseSize_ *= (aivCoreNum_ / aicCoreNum_);

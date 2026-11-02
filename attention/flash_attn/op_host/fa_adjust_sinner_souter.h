@@ -122,25 +122,23 @@ constexpr uint32_t FA_TEMPLATE_DN_UNMERGED = 2; // 不合轴 DN(templateId=2)
 // 路由开关: 打开后由 GetFlashAttnTemplateId 按条件路由到不合轴 DN 模板
 // (kernel/block *_dn_unmerged.h 文件, templateId=2), host tiling 与 flash_attn_metadata(AICPU)
 // 共享该开关, 保证两侧分核选择严格一致; 关闭时模板路由维持原逻辑(ND/合轴DN)。
-constexpr bool DN_UNMERGED_ROUTE_ENABLED = false;
+constexpr bool DN_UNMERGED_ROUTE_ENABLED = true;
 
-// 路由条件: V_D<=128 + mask_mode 0/3 + max_seqlen_q>=256; 其余回退 ND 模板。
-//   - V_D>128(D=256 档) 不在当前 DN 不合轴模板范围内;
-//   - mask_mode=4(BAND) 不支持;
-//   - maxSeqlenQ<256(含 -1: host 读不到 cu_seqlens, 无法与 AICPU 严格对齐) 任务量不足。
-inline uint32_t GetFlashAttnTemplateId(uint32_t qkHeadDim, uint32_t vHeadDim, int64_t maskMode, int64_t maxSeqlenQ)
+// Select the final arch35 template: unmerged DN first, then merged DN, otherwise ND.
+// Host tiling and metadata pass the same per-AIV sOuterFactor before applying the CV ratio.
+inline uint32_t GetFlashAttnTemplateId(uint32_t qkHeadDim, uint32_t vHeadDim, int64_t maskMode, int64_t maxSeqlenQ,
+                                       uint32_t sOuterFactor)
 {
-    (void)qkHeadDim;
-    if (vHeadDim > 128U) {
-        return FA_TEMPLATE_ND;
+    if (DN_UNMERGED_ROUTE_ENABLED && vHeadDim <= DSIZE_128 && (maskMode == 0 || maskMode == 3) && maxSeqlenQ >= 256) {
+        return FA_TEMPLATE_DN_UNMERGED;
     }
-    if (maskMode != 0 && maskMode != 3) {
-        return FA_TEMPLATE_ND;
+    // Equivalent to the existing no-mask config=0/2/6 selection (D=72 uses config=2).
+    bool mergedDnDims = (qkHeadDim == vHeadDim && (qkHeadDim == 64 || qkHeadDim == 72 || qkHeadDim == 128)) ||
+                        (qkHeadDim == 192 && vHeadDim == 128);
+    if (maskMode == 0 && sOuterFactor == SOUTER_64 && mergedDnDims) {
+        return FA_TEMPLATE_DN;
     }
-    if (maxSeqlenQ < 256) {
-        return FA_TEMPLATE_ND;
-    }
-    return FA_TEMPLATE_DN_UNMERGED;
+    return FA_TEMPLATE_ND;
 }
 
 } // namespace fa_tiling_util
