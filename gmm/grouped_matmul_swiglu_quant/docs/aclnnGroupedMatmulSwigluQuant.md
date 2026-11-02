@@ -437,6 +437,9 @@ aclnnStatus aclnnGroupedMatmulSwigluQuant(
   - 1.x的尾轴长度不能大于等于65536。
   - 2.weight的数据格式仅支持FRACTAL_NZ。
   - 3.N轴长度不能超过10240。
+  <!-- npu="A3,910b" id7 -->
+  - 4.<term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：bias不参与计算。传入非空指针时接口返回成功，输出与传空指针相同。
+  <!-- end id7 -->
 
 - A8W4场景
 

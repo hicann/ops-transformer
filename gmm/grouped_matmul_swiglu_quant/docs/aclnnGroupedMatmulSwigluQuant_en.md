@@ -436,6 +436,9 @@ aclnnStatus aclnnGroupedMatmulSwigluQuant(
   - The last axis length of x must not be greater than or equal to 65536.
   - The data format of weight only supports FRACTAL_NZ.
   - The length of the N axis cannot exceed 10240.
+  <!-- npu="A3,910b" id7 -->
+  - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>: bias does not participate in the computation. A non-null pointer is accepted, and the output matches a null pointer.
+  <!-- end id7 -->
 
 - A8W4 scenario
 
