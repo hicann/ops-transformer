@@ -2568,7 +2568,10 @@ static aclnnStatus TransWeightToNz(gmm::GroupedMatmulParams& gmmParams, aclOpExe
             }
             if (!((op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
                    op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) &&
-                  (IsQuant(xDtype, weight->GetDataType()) || IsS8S4PseudoQuantDataFlow(gmmParams)) &&
+                  (IsQuant(xDtype, weight->GetDataType()) || IsS8S4PseudoQuantDataFlow(gmmParams) ||
+                   (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 &&
+                    gmmParams.apiVersion == gmm::GMMApiVersion::WeightNz &&
+                    IsWeightQuant(xDtype, weight->GetDataType()))) &&
                   weight->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ)) {
                 aclnnStatus ret = TransWeightToNzCheckAlign(gmmParams, weight, xDtype);
                 CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -2776,10 +2779,15 @@ static aclnnStatus SetTransposedScaleTensorListContiguous(gmm::GroupedMatmulPara
          op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) &&
         params.apiVersion == gmm::GMMApiVersion::WeightNz) {
         std::vector<aclTensor*> antiSTensorList;
-        if (((*params.antiquantScaleOptional)[0]->GetDataType() == DataType::DT_FLOAT8_E8M0) ||
-            ((*params.antiquantScaleOptional)[0]->GetDataType() == Ops::Transformer::DT_HIFLOAT4_SCALE &&
-             (*params.antiquantScaleOptional)[0]->GetViewShape().GetDimNum() ==
-                 ANTIQUANT_SCALE_4D_DIMS)) { // Mx场景处理
+        const auto* antiScale = (*params.antiquantScaleOptional)[0];
+        const auto antiScaleDtype = antiScale->GetDataType();
+        const bool isFourDimMxScale =
+            antiScale->GetViewShape().GetDimNum() == ANTIQUANT_SCALE_4D_DIMS &&
+            (antiScaleDtype == DataType::DT_FLOAT8_E8M0 || antiScaleDtype == Ops::Transformer::DT_HIFLOAT4_SCALE);
+        // Preserve the existing A5 view handling. DAV_9201 A16 scales are 3D.
+        const bool keepA5MxScaleView = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 &&
+                                       antiScaleDtype == DataType::DT_FLOAT8_E8M0;
+        if (isFourDimMxScale || keepA5MxScaleView) {
             CHECK_RET(gmm::CreateContiguousTensorListForMXTypeMScale(params.antiquantScaleOptional, antiSTensorList,
                                                                      executorPtr),
                       ACLNN_ERR_INNER_NULLPTR);

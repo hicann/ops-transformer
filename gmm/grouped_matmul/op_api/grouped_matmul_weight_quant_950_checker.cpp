@@ -1127,9 +1127,17 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckGroupSize(size_t i
 
     // 2含义: (g,k,n)的k轴索引
     int64_t kSize = weightShape.GetDim(weightShape.GetDimNum() - 2);
-    // 2含义: (g,k/groupSize,n)的k轴索引
-    int64_t groupNum = IsMxA8W4NZ() ? antiquantScaleShape.GetDim(antiquantScaleDimNum - 3) * 2 :
-                                      antiquantScaleShape.GetDim(antiquantScaleDimNum - 2);
+    int64_t groupNum = 0;
+    if (IsMxA8W4NZ()) {
+        // 3 selects the K-group axis in (G, K/64, N, 2); 2 scales encode two K/32 groups per K/64 block.
+        groupNum = antiquantScaleShape.GetDim(antiquantScaleDimNum - 3) * 2;
+    } else if (IsMxA8HiF4()) {
+        // 3 selects the K-group axis in the API view (G, K/64, N, 1), rather than the N axis.
+        groupNum = antiquantScaleShape.GetDim(antiquantScaleDimNum - 3);
+    } else {
+        // 2 selects the penultimate K-group axis in the API scale view (..., K/groupSize, N).
+        groupNum = antiquantScaleShape.GetDim(antiquantScaleDimNum - 2);
+    }
     if (unlikely(groupNum <= 0)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnName(), "groupNum", std::to_string(groupNum),
                                               "The value of groupNum must be greater than 0");
