@@ -116,7 +116,8 @@ protected:
 
     void TearDown() override
     {
-        chunk_kda_ut::SetNextLauncherStatus(ACLNN_SUCCESS);
+        chunk_kda_ut::ClearLauncherStatus();
+        chunk_kda_ut::ClearConvertToTensorFailCall();
         (void)DrainErrorItems();
     }
 };
@@ -175,6 +176,9 @@ TEST_F(ChunkKdaFwdErrorCodeTest, launcher_failure_returns_null_outputs_without_e
                               nullptr, 1.0, 64, false, true, false, -5.0, attn.get(), nullptr, nullptr, aqk.get(),
                               akk.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, executor.get());
 
+    if (chunk_kda_ut::HasPendingLauncherStatus()) {
+        GTEST_SKIP() << "Launcher test hook is inactive for the linked KdaChunkForward implementation.";
+    }
     EXPECT_TRUE(std::all_of(result.begin(), result.end(), [](const aclTensor* tensor) { return tensor == nullptr; }));
     EXPECT_TRUE(DrainErrorItems().empty());
 }

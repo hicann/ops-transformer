@@ -37,6 +37,16 @@ inline aclnnStatus ConsumeLauncherStatus()
     return status;
 }
 
+inline bool HasPendingLauncherStatus()
+{
+    return std::getenv(LAUNCHER_STATUS_ENV) != nullptr;
+}
+
+inline void ClearLauncherStatus()
+{
+    (void)unsetenv(LAUNCHER_STATUS_ENV);
+}
+
 inline void SetConvertToTensorFailCall(int32_t failCall)
 {
     const std::string value = std::to_string(failCall);
@@ -57,6 +67,11 @@ inline bool ShouldFailConvertToTensor()
     const std::string nextValue = std::to_string(failCall - 1);
     (void)setenv(CONVERT_FAIL_CALL_ENV, nextValue.c_str(), 1);
     return false;
+}
+
+inline void ClearConvertToTensorFailCall()
+{
+    (void)unsetenv(CONVERT_FAIL_CALL_ENV);
 }
 } // namespace chunk_kda_ut
 
