@@ -133,7 +133,7 @@ ffn_to_attention(buffer, x, session_ids, micro_batch_ids, token_ids, expert_offs
 </tbody>
 </table>
 
-该接口返回<code>FFNToAttentionBuffer</code>对象，内部自动计算FFN侧CCL通信缓冲区大小（覆盖<code>attention_to_ffn</code>的下发接收区，作为算子<code>ccl_buffer_size</code>属性，等于实际注册的窗口大小；本算子flag source区与地址表区由算子workspace申请，不占用窗口），并创建通信上下文，供<code>ffn_to_attention</code>使用；传入<code>window_addr</code>/<code>window_size</code>时，本卡通信窗口以该地址和大小注册。本接口与<code>attention_to_ffn</code>共用注册tag以便对端rank查询本卡窗口。
+该接口返回<code>FFNToAttentionBuffer</code>对象，内部自动计算FFN侧CCL通信缓冲区大小（覆盖<code>attention_to_ffn</code>的下发接收区，作为算子<code>ccl_buffer_size</code>属性，等于实际注册的窗口大小；本算子flag source区与地址表区由算子workspace申请，不占用窗口），并创建通信上下文，供<code>ffn_to_attention</code>使用；传入<code>window_addr</code>和<code>window_size</code>时，本卡通信窗口以该地址和大小注册。本接口与<code>attention_to_ffn</code>共用注册tag以便对端rank查询本卡窗口。
 
 ### ffn_to_attention
 
@@ -251,18 +251,13 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{flagSi
   - `flagSize = microBatchNum × BS × expertNumPerToken × 4B`（本算子写入attention侧窗口的per-token flag区）
   - `returnDataSize = microBatchNum × BS × expertNumPerToken × HS × 2B`（本算子写入attention侧窗口的单会话紧凑FP16/BF16回写数据区，写入偏移与attention worker数量无关）
 
-原窗口尾部的本算子flag source区与地址表/count行区已改为从算子workspace申请（大小由tiling自动计算；下一轮kernel启动时先回收上一轮在途WQE再复用workspace）。
+原窗口尾部的本算子flag source区与地址表和 count 行区已改为从算子workspace申请（大小由tiling自动计算；下一轮kernel启动时先回收上一轮在途WQE再复用workspace）。
 
 对端attention卡通信窗口大小由attention侧`get_buffer_for_attention_to_ffn`计算；量化模式下其结果（按1B/元素）即为本算子可接受的下限之上，tiling只校验上述落地区，因此两侧可共用同一窗口大小。
 
-- 异步发送的Tensor保活与延迟释放：
-    - 发送是异步的：kernel返回后通信引擎可能仍在读取`x`（数据WQE直接读`x`的GM行）。`ffn_to_attention`接口内部按轮次持有`x`的引用（仅引用，不拷贝），并在每次调用时非阻塞轮询设备写回的完成状态表，释放已完成轮次的引用，不在每轮通信上引入CPU同步等待。
-    - 同一buffer上的发送必须全部经由`ffn_to_attention`接口发起（保证轮次编号与kernel启动序号一一对应），且使用同一条NPU stream。
-    - 最后若干轮的在途发送在`buffer.destroy()`中通过device级同步统一等待并释放；直接丢弃buffer对象同样安全（内部状态表析构会执行相同的device同步）。
-
-- 自定义通信窗口约束（`window_addr`/`window_size`）：
+- 自定义通信窗口约束（`window_addr`和`window_size`）：
     - 两个参数必须成对传入，`window_size`为本卡窗口内存的实际大小（Bytes），同时作为算子`ccl_buffer_size`。
-    - FFN卡上传入的为ffn侧内存大小，需不小于FFN侧窗口所需大小（承接`attention_to_ffn`的下发接收区，按对侧实际quant_mode：量化按1B、非量化按2B；无法感知量化时可按保守容量`world_size - 1`个会话、非量化宽度估算，即`get_ffn_to_attention_ccl_buffer_size`的计算结果）。
+    - FFN卡上传入的为ffn侧内存大小，需不小于FFN侧窗口所需大小（承接`attention_to_ffn`的下发接收区，按对侧实际quant_mode：量化按1B、非量化按2B。
     - 窗口内存由调用方管理，需在`buffer.destroy()`之前保持有效；框架仅负责清零一次，不负责分配与释放。
     - 仅channel后端（Ascend950）支持；同一进程同一group下只应创建一个通信buffer（attn卡创建`attention_to_ffn`的buffer，FFN卡创建`ffn_to_attention`的buffer）。
 
@@ -271,7 +266,7 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{flagSi
     - `BS`：表示各Attention节点上的token数，取值范围为0 < `BS` ≤ 512。
     - `H`：表示hidden size（隐藏层大小），取值范围为1024 ≤ `H` ≤ 8192。
     - `HS`：表示hidden与scale隐藏层大小，取值范围为1152 ≤ `HS` ≤ 8320，满足`HS` ≥ `H`。
-    - `microBatchNum`：表示micro batch数量。
+    - `microBatchNum`：表示micro batch数量，取值范围为1 ≤ `H` ≤ 3。
     - `expertNumPerToken`：表示每个token对应的专家总数（含共享专家）。
     - `attnRankNum`：表示Attention Worker数量，取值范围为0 < `attnRankNum` < `worldSize`。
     - `ffnRankNum`：表示FFN Worker数量，取值范围为0 < `ffnRankNum` < `worldSize`。
@@ -307,6 +302,7 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{flagSi
   WORLD_SIZE = 8
   ATTENTION_WORKER_NUM = 3
   FFN_WORKER_NUM = WORLD_SIZE - ATTENTION_WORKER_NUM
+  SERVER_NUM = 1
   BS = 8
   H = 7168
   HS = 7168
@@ -317,7 +313,7 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{flagSi
 
 
   def set_device(rank):
-      torch_npu.npu.set_device(rank % (WORLD_SIZE // 2))
+      torch_npu.npu.set_device(rank % (WORLD_SIZE // SERVER_NUM))
 
 
   def init_hccl_comm(rank):
@@ -328,38 +324,41 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{flagSi
           init_method="tcp://127.0.0.1:50001",
       )
       ep_group = dist.new_group(backend="hccl", ranks=list(range(WORLD_SIZE)))
-      return ep_group
+      ep_hcomm_info = ep_group._get_backend(torch.device("npu")).get_hccl_comm_name(rank)
+      return ep_hcomm_info, ep_group
 
 
   def run_ffn_to_attention(rank):
       set_device(rank)
-      ep_group = init_hccl_comm(rank)
+      _, ep_group = init_hccl_comm(rank)
 
       token_info_table_shape = [microBatchNum, BS, expertNumPerToken]
       token_data_shape = [microBatchNum, BS, expertNumPerToken, HS]
 
       # 步骤1：准备本卡通信窗口内存并创建通信buffer。
-      # attention卡窗口需覆盖attention_to_ffn自身的token信息表/token数据区（其staging/flag区
+      # attention卡窗口需覆盖attention_to_ffn自身的token信息表和token数据区（其staging和flag区
       # 已迁至算子workspace；本示例中该窗口同时接收ffn_to_attention的回传数据：单会话紧凑
       # FP16/BF16数据区+flag区，写入偏移与attention worker数量无关）；
       # FFN卡窗口需覆盖attention_to_ffn的下发接收区（每会话一个info表区+数据区，宽度按对侧
-      # quant_mode：量化1B、非量化2B；本算子flag source/地址表区已迁至算子workspace，不占用
-      # 窗口）。算子tiling仅校验attention侧落地区；此处为演示window_addr/window_size用法，
+      # quant_mode：量化1B、非量化2B；本算子flag source和地址表区已迁至算子workspace，不占用
+      # 窗口）。算子tiling仅校验attention侧落地区；此处为演示window_addr和window_size用法，
       # FFN卡按保守容量（world_size - 1个会话、非量化宽度）手工计算。
       if rank < ATTENTION_WORKER_NUM:
           window_size = microBatchNum * BS * expertNumPerToken * (4 + HS * 2)
       else:
           # 保守容量：最大会话数 = world_size - 1；infoTableLastDim与attention_to_ffn的
           # ffn_token_info_table_shape最后一维一致；数据区按HS（2B元素）取保守上界，最终
-          # 按2MB向上对齐（flag source/地址表区由算子workspace申请，无需计入窗口大小）。
+          # 按2MB向上对齐（flag source和地址表区由算子workspace申请，无需计入窗口大小）。
           max_sessions = WORLD_SIZE - 1
           info_table_last_dim = 2 + BS * expertNumPerToken
-          window_size = max_sessions * microBatchNum * (
-              info_table_last_dim * 4 + BS * expertNumPerToken * HS * 2
+          window_size = (
+              max_sessions
+              * microBatchNum
+              * (info_table_last_dim * 4 + BS * expertNumPerToken * HS * 2)
           )
       window_size = (
-          window_size + 2 * 1024 * 1024 - 1
-      ) // (2 * 1024 * 1024) * (2 * 1024 * 1024)
+          (window_size + 2 * 1024 * 1024 - 1) // (2 * 1024 * 1024) * (2 * 1024 * 1024)
+      )
       # 本卡窗口内存由调用方管理，需在buffer销毁前保持有效
       window = torch.empty(window_size, dtype=torch.uint8, device="npu")
       window_addr = window.data_ptr()
@@ -376,19 +375,29 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{flagSi
       if rank >= ATTENTION_WORKER_NUM:
           # 步骤2：构造输入数据
           tokens_per_rank = (
-              BS * microBatchNum * ATTENTION_WORKER_NUM * expertNumPerToken // FFN_WORKER_NUM
+              BS
+              * microBatchNum
+              * ATTENTION_WORKER_NUM
+              * expertNumPerToken
+              // FFN_WORKER_NUM
           )
           x = torch.randn((tokens_per_rank, H), dtype=torch.bfloat16, device="npu")
           session_ids = torch.randint(
               0, ATTENTION_WORKER_NUM, (tokens_per_rank,), dtype=torch.int32, device="npu"
           )
           micro_batch_ids = torch.zeros(tokens_per_rank, dtype=torch.int32, device="npu")
-          token_ids = torch.randint(0, BS, (tokens_per_rank,), dtype=torch.int32, device="npu")
+          token_ids = torch.randint(
+              0, BS, (tokens_per_rank,), dtype=torch.int32, device="npu"
+          )
           expert_offsets = torch.randint(
               0, expertNumPerToken, (tokens_per_rank,), dtype=torch.int32, device="npu"
           )
-          actual_token_num = torch.tensor([tokens_per_rank], dtype=torch.int64, device="npu")
-          attn_rank_table = torch.arange(ATTENTION_WORKER_NUM, dtype=torch.int32, device="npu")
+          actual_token_num = torch.tensor(
+              [tokens_per_rank], dtype=torch.int64, device="npu"
+          )
+          attn_rank_table = torch.arange(
+              ATTENTION_WORKER_NUM, dtype=torch.int32, device="npu"
+          )
 
           # 步骤3：调用ffn_to_attention发送token数据
           ffn_to_attention(
@@ -419,4 +428,5 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{flagSi
           proc_list.append(proc)
       for proc in proc_list:
           proc.join()
+
   ```

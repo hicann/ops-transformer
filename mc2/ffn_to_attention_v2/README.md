@@ -139,6 +139,7 @@
     - `BS`取值范围为`[1, 512]`。
     - `H`表示hidden size，取值范围为`[1024, 8192]`。
     - `HS`表示通信window中每个token槽位的长度，需满足`H <= HS <= 8320`。
+    - `MicroBatchNum`取值范围为`[1, 3]`。
     - `worldSize`取值范围为`[2, 1024]`。
 - 可选输入`attnRankTableOptional`必须是一维Tensor，其长度小于`worldSize`；表中每个目标rank的取值范围为`[0, worldSize)`。
 - 同一目标rank内，多个有效token不得映射到相同的`(microBatchId, tokenId, expertOffset)`槽位，否则写入结果存在覆盖风险。
@@ -152,15 +153,10 @@ $$cclBufferSize \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{flagSize},
   - `flagSize = microBatchNum × BS × expertNumPerToken × 4B`（本算子写入attention侧窗口的per-token flag区）
   - `returnDataSize = microBatchNum × BS × expertNumPerToken × HS × 2B`（本算子写入attention侧窗口的单会话紧凑FP16/BF16回写数据区，写入偏移与attention worker数量无关）
 
-原窗口尾部的本算子 flag source 区与地址表/count 行区已改为从算子 workspace 申请，大小由 tiling 自动计算，用户无需感知。
+原窗口尾部的本算子 flag source 区与地址表和 count 行区已改为从算子 workspace 申请，大小由 tiling 自动计算，用户无需感知。
 
-`attention_to_ffn`下发的N会话接收区布局在FFN侧窗口，其大小依赖对侧`quant_mode`（量化按1B、非量化按2B下发），由`attention_to_ffn_v2`的tiling按实际元素宽度校验，本算子不按非量化宽度保守镜像。`get_ffn_to_attention_ccl_buffer_size`接口返回按`worldSize - 1`个会话、非量化宽度计算的保守容量，作为FFN侧窗口（承接对侧下发数据）的推荐分配值仍然适用。
+`attention_to_ffn`下发的N会话接收区布局在FFN侧窗口，其大小依赖对侧`quant_mode`（量化按1B、非量化按2B下发），由`attention_to_ffn_v2`的tiling按实际元素宽度校验，本算子不按非量化宽度保守镜像。
 
-- 异步发送与Tensor保活延迟释放：
-  - kernel退出时在途WQE可能尚未完成（通信引擎可能仍在读取`x`的GM行；有序flag WQE读取的本rank workspace flag槽位每轮重写值恒为同一常量，其生命周期由下一轮kernel开头的在途WQE回收与destroy的device级同步保证）。算子通过"设备完成通知驱动CPU延迟释放"机制保证源内存生命周期：torch_extension侧按轮次持有输入`x`的引用（仅引用，不拷贝）；下一轮kernel开头先回收前几轮的在途WQE（空闲channel立即返回，不引入每轮同步等待），随后由AIV0把已完成轮次写入注册的Host状态表；CPU侧在下一次调用时非阻塞轮询该状态表并释放已完成轮次的引用。
-  - 因此同一buffer上的调用需满足：全部经由torch_extension的`ffn_to_attention`接口发起（保证轮次编号与kernel启动序号一致），且使用同一条stream。
-  - 最后若干轮的引用在`FFNToAttentionBuffer.destroy()`中通过device级同步统一等待并释放；直接丢弃buffer对象同样安全（状态表析构会执行相同的device同步）。
-  - 该机制依赖通信域内无其他算子共享channel（见下述通信域使用约束），drain只回收本算子发出的WQE。
 
 - 通信域使用约束：
     - FFNToAttentionV2算子的通信域中不允许有其他算子。

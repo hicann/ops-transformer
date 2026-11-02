@@ -191,18 +191,11 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}(\mathrm{CeilAlign}(\mathrm{tokenInfoS
 其中：
 
   - `tokenInfoSize = attentionWorkerNum × microBatchNum × infoTableLastDim × 4B`
-  - 非量化模式：`tokenDataSize = attentionWorkerNum × microBatchNum × BS × (K+shared) × HS × 2B`
-  - INT8/FP8量化模式：`tokenDataSize = attentionWorkerNum × microBatchNum × BS × (K+shared) × HS × 1B`
-  - FP4量化模式：`HS`已按打包字节计算，`tokenDataSize = attentionWorkerNum × microBatchNum × BS × (K+shared) × HS × 1B`
+  - `tokenDataSize = attentionWorkerNum × microBatchNum × BS × (K+shared) × HS × bytesPerElem`
+  - `infoTableLastDim`：FFN侧token信息表最后一维长度，即`ffnTokenInfoTableShape`的最后一维，等于`2 + BS × expertNumPerToken`（`expertNumPerToken = K + sharedExpertNum`；前2个int32为保留表项，其余为每个token按专家存放的信息表项，每项4B）。
+  - `bytesPerElem`：token数据每个元素的传输字节数，由quantMode决定：非量化模式（quantMode=0）为2B（FP16/BF16按原始精度传输）；量化模式（quantMode=2~7，含INT8/FP8/FP4）为1B，其中FP4模式下2个元素打包为1B，`HS`为按打包折算后的字节数。
 
 > 窗口内仅保留token信息表与token数据区。原窗口尾部的staging区（每token一个staging槽，槽步长按32B向上对齐）与URMA flag常驻区（每token一个4B紧凑flag槽 + 1个32B layer flag槽）已改为从算子workspace申请，大小由tiling自动计算，用户无需感知。非量化模式（quantMode=0）与量化模式一致：输入`x`的行先经UB中转（GM→UB→GM）写入staging区，relay WQE从staging区读取数据发往目标卡，连续的tokenOffset可合并为单个WQE连续发送。
-
-- 异步发送与Tensor保活延迟释放：
-
-  - kernel退出时在途WQE可能尚未完成（通信引擎可能仍在读取workspace中的staging/flag区）。算子通过"设备完成通知驱动CPU延迟释放"机制保证源内存生命周期：torch_extension侧按轮次持有输入`x`的引用（仅引用，不拷贝）；下一轮kernel开头先回收前几轮的在途WQE（空闲channel立即返回，不引入每轮同步等待），随后由AIV0把已完成轮次写入注册的Host状态表；CPU侧在下一次调用时非阻塞轮询该状态表并释放已完成轮次的引用。
-  - 因此同一buffer上的调用需满足：全部经由torch_extension的`attention_to_ffn`接口发起（保证轮次编号与kernel启动序号一致），且使用同一条stream。
-  - 最后若干轮的引用在`AttentionToFfnBuffer.destroy()`中通过device级同步统一等待并释放；直接丢弃buffer对象同样安全（状态表析构会执行相同的device同步）。
-  - 该机制依赖通信域内无其他算子共享channel（前述通信域约束），drain只回收本算子发出的WQE。
 
 该大小由 `get_buffer_for_attention_to_ffn` 接口内部自动计算，用户无需自行计算或设置`ccl_buffer_size`。
 
@@ -213,10 +206,11 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}(\mathrm{CeilAlign}(\mathrm{tokenInfoS
 
 - 参数说明里shape格式说明：
     - `X`：表示micro batch sequence size（token组数），当前版本只支持`X` = 1。
+    - `microBatchNum`：表示通信窗口布局中的micro batch数量，即`ffnTokenDataShape`第1维（与`ffnTokenInfoTableShape`第1维、`attnTokenInfoTableShape`第0维相等），取值范围为[1, 3]；运行时`microBatchId`取值需位于`[0, microBatchNum)`内。
     - `BS`：表示batch sequence size（本卡最终输出的token数量）取值范围为0 < `BS` ≤ 512。
     - `K`：表示选取topK个专家，取值范围为0 < `K` ≤ 16且满足0 < `K` ≤ moeExpertNum。
     - `H`：表示hidden size（隐藏层大小），取值范围为1024 ≤ `H` ≤ 8192。
-    - `L`：表示模型层数，取值范围为`L` ≥ 1，且运行时`LayerId`取值需小于`L`。
+    - `L`：表示模型层数，取值范围为[1, 43]，且运行时`LayerId`取值需小于`L`。
     - `M`：表示expertRankTable最后一维的长度，具体体现为部署在FFN节点上数量最多的专家部署信息列表的长度，取值范围为0 < `M` ≤ 2049（每行布局为`[rankCnt, (toRankId, localExpId) × rankCnt]`，rankCnt不超过worldSize）。
     - `moeExpertNum`：表示MoE专家数量，取值范围为0 < `moeExpertNum` ≤ 1024。
 
