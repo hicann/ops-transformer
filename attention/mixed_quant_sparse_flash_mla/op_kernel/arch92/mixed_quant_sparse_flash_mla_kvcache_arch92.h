@@ -15,10 +15,15 @@
 #ifndef MIXED_QUANT_SPARSE_FLASH_MLA_KVCACHE_H
 #define MIXED_QUANT_SPARSE_FLASH_MLA_KVCACHE_H
 
+#if ASC_DEVKIT_MAJOR >= 9
+#include "kernel_vec_intf.h"
+#include "kernel_cube_intf.h"
+#else
 #include "kernel_operator.h"
+#endif
 #include "kernel_operator_list_tensor_intf.h"
 #include "mixed_quant_sparse_flash_mla_common_arch92.h"
-#include "util_regbase.h"
+#include "util_regbase_arch92.h"
 
 using namespace matmul;
 using namespace regbaseutil;
@@ -118,8 +123,8 @@ __aicore__ inline void ComputeS1LoopInfo(RunParamStr& runParam, const ConstInfo&
 
     int32_t gs1LoopEndIdx = 0;
     if constexpr (TEMPLATE_MODE == MQSMLATemplateMode::CSA_TEMPLATE_MODE) {
-        gs1LoopEndIdx = runParam.actualS1Size; // 对于SCFA, 不切G轴, 每次拷贝一行的topk，只算一行的qs
-    } else {                                   // SWA/CFA
+        gs1LoopEndIdx = runParam.actualS1Size;
+    } else {
         // 不需要取topk, 每次计算gSize行, 循环qs次
         gs1LoopEndIdx = (runParam.actualS1Size + runParam.qSNumInOneBlock - 1) / runParam.qSNumInOneBlock;
     }
@@ -255,7 +260,7 @@ __aicore__ inline bool ComputeS2LoopInfo(RunParamStr& runParam, const ConstInfo&
         if constexpr (TEMPLATE_MODE == MQSMLATemplateMode::HCA_TEMPLATE_MODE) {
             runParam.s2CmpLineEndIdx = Min(runParam.s2LineCmpEndIdx, runParam.actualS2CmpSize);
             runParam.cmpKvLoopEndIdx = (runParam.s2CmpLineEndIdx + s2BaseSize - 1) / s2BaseSize;
-        } else { // SCFA_TEMPLATE_MODE
+        } else {
             runParam.s2CmpLineEndIdx = Min(runParam.s2LineCmpEndIdx, constInfo.sparseBlockCount);
             runParam.s2CmpLineEndIdx = Min(runParam.s2CmpLineEndIdx, runParam.actualS2CmpSize);
             runParam.cmpKvLoopEndIdx = (runParam.s2CmpLineEndIdx + s2BaseSize - 1) / s2BaseSize;

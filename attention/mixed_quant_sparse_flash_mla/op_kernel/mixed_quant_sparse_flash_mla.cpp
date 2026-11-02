@@ -12,14 +12,6 @@
  * \file mixed_quant_sparse_flash_mla.cpp
  * \brief
  */
-#if (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-#include "kernel_operator.h"
-#include "lib/matmul_intf.h"
-#include "arch92/mixed_quant_sparse_flash_mla_template_tiling_key_arch92.h"
-#include "arch92/mixed_quant_sparse_flash_mla_scfa_kernel.h"
-#include "arch92/mixed_quant_sparse_flash_mla_common_arch92.h"
-#else
-#if (__CCE_AICORE__ == 310)
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_vec_intf.h"
 #include "kernel_cube_intf.h"
@@ -27,13 +19,16 @@
 #include "kernel_operator.h"
 #endif
 #include "lib/matmul_intf.h"
+#if (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+#include "arch92/mixed_quant_sparse_flash_mla_template_tiling_key_arch92.h"
+#include "arch92/mixed_quant_sparse_flash_mla_csa_kernel_arch92.h"
+#include "arch92/mixed_quant_sparse_flash_mla_common_arch92.h"
+#else
+#if (__CCE_AICORE__ == 310)
 #include "arch35/mixed_quant_sparse_flash_mla_template_tiling_key_arch35.h"
 #include "arch35/mixed_quant_sparse_flash_mla_csa_kernel.h"
 #include "arch35/mixed_quant_sparse_flash_mla_common.h"
 #else
-#include "kernel_vec_intf.h"
-#include "kernel_cube_intf.h"
-#include "lib/matmul_intf.h"
 #include "arch22/mixed_quant_sparse_flash_mla_template_tiling_key_arch22.h"
 #include "arch22/mixed_quant_sparse_flash_mla_tq_csa_kernel.h"
 #include "mixed_quant_sparse_flash_mla_metadata.h"

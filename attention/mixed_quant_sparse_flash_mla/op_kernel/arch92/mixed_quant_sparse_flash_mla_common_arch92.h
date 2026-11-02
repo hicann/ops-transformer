@@ -16,7 +16,6 @@
 #define MIXED_QUANT_SPARSE_FLASH_MLA_COMMON_ARCH92_H
 #include <type_traits>
 #include "kernel_tiling/kernel_tiling.h"
-#include "kernel_operator.h"
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
 #include "../mixed_quant_sparse_flash_mla_metadata.h"

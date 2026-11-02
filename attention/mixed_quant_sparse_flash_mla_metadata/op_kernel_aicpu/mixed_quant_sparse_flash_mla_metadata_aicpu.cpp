@@ -404,9 +404,8 @@ void MixedQuantSparseFlashMlaMetadataCpuKernel::CalcCmpMaskMode()
 ValidSocVersion MixedQuantSparseFlashMlaMetadataCpuKernel::ProcessSocVersion()
 {
     const std::string ascend960Dt = "Ascend960DT";
-    const std::string ascend960Pr = "Ascend960PR";
     const std::string ascend950 = "Ascend950";
-    if (socVersion_.find(ascend960Dt) != std::string::npos || socVersion_.find(ascend960Pr) != std::string::npos) {
+    if (socVersion_.find(ascend960Dt) != std::string::npos) {
         return ValidSocVersion::ASCEND960;
     } else if (socVersion_.find(ascend950) != std::string::npos) {
         return ValidSocVersion::ASCEND950;

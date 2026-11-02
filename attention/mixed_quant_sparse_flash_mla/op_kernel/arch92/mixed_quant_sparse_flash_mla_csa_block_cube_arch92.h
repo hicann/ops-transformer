@@ -9,18 +9,18 @@
  */
 
 /*!
- * \file mixed_quant_sparse_flash_mla_scfa_block_cube.h
+ * \file mixed_quant_sparse_flash_mla_csa_block_cube_arch92.h
  * \brief
  */
-#ifndef MIXED_QUANT_SPARSE_FLASH_MLA_SCFA_BLOCK_CUBE_H
-#define MIXED_QUANT_SPARSE_FLASH_MLA_SCFA_BLOCK_CUBE_H
-#include "common/offset_calculator.h"
+#ifndef MIXED_QUANT_SPARSE_FLASH_MLA_CSA_BLOCK_CUBE_ARCH92_H
+#define MIXED_QUANT_SPARSE_FLASH_MLA_CSA_BLOCK_CUBE_ARCH92_H
+#include "../../common/op_kernel/offset_calculator.h"
 #include "../../common/op_kernel/matmul.h"
 #include "../../common/op_kernel/FixpipeOut.h"
 #include "../../common/op_kernel/CopyInL1.h"
 #include "kernel_operator_list_tensor_intf.h"
 
-#include "util_regbase.h"
+#include "util_regbase_arch92.h"
 #include "mixed_quant_sparse_flash_mla_common_arch92.h"
 
 using namespace AscendC;
@@ -76,16 +76,17 @@ public:
 
 private:
     __aicore__ inline void InitLocalBuffer(BufferManager<BufferType::L1>& l1BufferManager);
-    __aicore__ inline void InitGmTensor(__gm__ uint8_t* cuSeqlensQ, const ConstInfo& constInfo);
+    __aicore__ inline void InitGmTensor(__gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* sequsedQ,
+                                        const ConstInfo& constInfo);
     __aicore__ inline void CalcS1Coord(RunInfo& runInfo, ConstInfo& constInfo);
 
-    __aicore__ inline void IterateBmm1SCFA(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf,
-                                           Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& inputRightBuf,
-                                           Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD>& v0ResGm,
-                                           RunInfo& runInfo, ConstInfo& constInfo);
+    __aicore__ inline void IterateBmm1CSA(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf,
+                                          Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& inputRightBuf,
+                                          Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD>& v0ResGm,
+                                          RunInfo& runInfo, ConstInfo& constInfo);
 
     // --------------------Bmm2--------------------------
-    __aicore__ inline void IterateBmm2SCFA(
+    __aicore__ inline void IterateBmm2CSA(
         Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf,
         Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf1,
         BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& inputLeftBuffers,
@@ -94,7 +95,8 @@ private:
     TPipe* tPipe;
     /* =====================GM变量==================== */
     static constexpr GmFormat Q_FORMAT = GetQueryGmFormat<LAYOUT_T>();
-    FaGmTensor<Q_T, Q_FORMAT> queryGm;
+    static constexpr bool Q_WITH_ZERO_HEAD = (LAYOUT_T == MQSMLA_LAYOUT::TND);
+    FaGmTensor<Q_T, Q_FORMAT, int32_t, Q_WITH_ZERO_HEAD> queryGm;
 
     /* =====================运行时变量==================== */
     CubeCoordInfo coordInfo[3];
@@ -136,7 +138,7 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::InitCubeInput(__gm__ u
                                                                         const ConstInfo& constInfo)
 {
     if ASCEND_IS_AIC {
-        InitGmTensor(cuSeqlensQ, constInfo);
+        InitGmTensor(cuSeqlensQ, sequsedQ, constInfo);
         if constexpr (IS_SPLIT_G) {
             mte1ToMte2Id[NUM_0] = GetTPipePtr()->AllocEventID<HardEvent::MTE2_MTE1>();
             mte1ToMte2Id[NUM_1] = GetTPipePtr()->AllocEventID<HardEvent::MTE2_MTE1>();
@@ -184,16 +186,23 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::InitLocalBuffer(
 /* 初始化GmTensor,设置shape信息并计算strides */
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::InitGmTensor(__gm__ uint8_t* cuSeqlensQ,
+                                                                       __gm__ uint8_t* sequsedQ,
                                                                        const ConstInfo& constInfo)
 {
     if constexpr (LAYOUT_T == MQSMLA_LAYOUT::BSND) {
         this->queryGm.offsetCalculator.Init(constInfo.bSize, constInfo.n2Size, constInfo.gSize, constInfo.s1Size,
                                             constInfo.dSize);
     } else { // MQSMLA_LAYOUT::TND
-        GlobalTensor<int32_t> actualSeqQLen;
-        actualSeqQLen.SetGlobalBuffer((__gm__ int32_t*)cuSeqlensQ);
-        this->queryGm.offsetCalculator.Init(constInfo.n2Size, constInfo.gSize, constInfo.dSize, actualSeqQLen,
-                                            constInfo.actualSeqLenSize);
+        GlobalTensor<int32_t> cuSeqlensQGm;
+        cuSeqlensQGm.SetGlobalBuffer((__gm__ int32_t*)cuSeqlensQ);
+        GlobalTensor<int32_t> sequsedQGm;
+        if (sequsedQ != nullptr) {
+            sequsedQGm.SetGlobalBuffer((__gm__ int32_t*)sequsedQ);
+        }
+        uint32_t sequsedQSize = (sequsedQ == nullptr) ? 0 : constInfo.bSize;
+        ActualSeqLensParser<ActualSeqLensMode::ACCUM, int32_t, true> parser;
+        parser.Init(cuSeqlensQGm, sequsedQGm, constInfo.bSize, sequsedQSize);
+        this->queryGm.offsetCalculator.Init(constInfo.n2Size, constInfo.gSize, constInfo.dSize, parser);
     }
 }
 
@@ -211,7 +220,7 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm1(
     Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD>& v0ResGm, RunInfo& runInfo, ConstInfo& constInfo)
 {
     CalcS1Coord(runInfo, constInfo);
-    IterateBmm1SCFA(outputBuf, inputRightBuf, v0ResGm, runInfo, constInfo);
+    IterateBmm1CSA(outputBuf, inputRightBuf, v0ResGm, runInfo, constInfo);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -221,11 +230,11 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm2(
     BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& inputLeftBuffers,
     Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& inputRightBuf, RunInfo& runInfo, ConstInfo& constInfo)
 {
-    IterateBmm2SCFA(outputBuf, outputBuf1, inputLeftBuffers, inputRightBuf, runInfo, constInfo);
+    IterateBmm2CSA(outputBuf, outputBuf1, inputLeftBuffers, inputRightBuf, runInfo, constInfo);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm1SCFA(
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
     Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf,
     Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& inputRightBuf,
     Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD>& v0ResGm, RunInfo& runInfo, ConstInfo& constInfo)
@@ -305,7 +314,7 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm1SCFA(
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm2SCFA(
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm2CSA(
     Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf,
     Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf1,
     BuffersPolicyDB<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& inputLeftBuffers,
@@ -404,4 +413,4 @@ DEFINE_CUBE_BLOCK_TRAITS(MqsmlaCsaBlockCubeDummy);
     CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_ARGS_TYPE) \
     CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_ARGS_CONST)
 } // namespace BaseApi
-#endif // MIXED_QUANT_SPARSE_FLASH_MLA_SCFA_BLOCK_CUBE_H
+#endif // MIXED_QUANT_SPARSE_FLASH_MLA_CSA_BLOCK_CUBE_H

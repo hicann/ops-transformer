@@ -9,14 +9,14 @@
  */
 
 /*!
- * \file mixed_quant_sparse_flash_mla_scfa_block_vector.h
+ * \file mixed_quant_sparse_flash_mla_csa_block_vector_arch92.h
  * \brief
  */
 
-#ifndef MIXED_QUANT_SPARSE_FLASH_MLA_SCFA_BLOCK_VECTOR_H
-#define MIXED_QUANT_SPARSE_FLASH_MLA_SCFA_BLOCK_VECTOR_H
+#ifndef MIXED_QUANT_SPARSE_FLASH_MLA_CSA_BLOCK_VECTOR_ARCH92_H
+#define MIXED_QUANT_SPARSE_FLASH_MLA_CSA_BLOCK_VECTOR_ARCH92_H
 
-#include "util_regbase.h"
+#include "util_regbase_arch92.h"
 #include "mixed_quant_sparse_flash_mla_common_arch92.h"
 #include "../../common/op_kernel/buffers_policy.h"
 #include "../../common/op_kernel/attn_buffer_manager.h"
@@ -26,7 +26,7 @@
 #include "lib/matrix/matmul/tiling.h"
 
 #include "../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_sfa.h"
-#include "vf/vf_flashupdate_new_scfa.h"
+#include "../../common/op_kernel/arch92/vf/vf_flashupdate_new_sfa.h"
 
 using namespace AscendC;
 using namespace FaVectorApi;
@@ -1489,4 +1489,4 @@ public:
     {}
 };
 } // namespace BaseApi
-#endif // MIXED_QUANT_SPARSE_FLASH_MLA_SCFA_BLOCK_VECTOR_H
+#endif // MIXED_QUANT_SPARSE_FLASH_MLA_CSA_BLOCK_VECTOR_ARCH92_H

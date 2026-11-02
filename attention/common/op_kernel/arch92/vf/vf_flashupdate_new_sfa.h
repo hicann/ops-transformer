@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file vf_flashupdate_new_scfa.h
@@ -15,9 +15,7 @@
 #ifndef FLASH_UPDATE_NEW_INTERFACE_SCFA_H
 #define FLASH_UPDATE_NEW_INTERFACE_SCFA_H
 
-#include "vf_basic_block_utils.h"
-#include "../util_regbase.h"
-#include "../mixed_quant_sparse_flash_mla_common_arch92.h"
+#include "kernel_tensor.h"
 
 namespace FaVectorApi {
 constexpr uint16_t REDUCE_SIZE = 1;
@@ -97,12 +95,12 @@ __simd_vf__ inline void FlashUpdateLastBasicVF(__ubuf__ float* dstUb, __ubuf__ f
         AscendC::MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_BRC_B32>(vreg_exp_sum, expSumUb + i * reduceSize);
 
         for (uint16_t j = 0; j < dLoops; ++j) {
-            AscendC::MicroAPI::LoadAlign(vreg_input_pre, preUb + i * srcD + (j + dstart) * floatRepSize); // stage2 之前
-            AscendC::MicroAPI::LoadAlign(vreg_input_cur, curUb + i * srcD / 4 + j * floatRepSize);        // mm2res
+            AscendC::MicroAPI::LoadAlign(vreg_input_pre, preUb + i * srcD + (j + dstart) * floatRepSize);
+            AscendC::MicroAPI::LoadAlign(vreg_input_cur, curUb + i * srcD / 4 + j * floatRepSize); // mm2res
             AscendC::MicroAPI::MulDstAdd(vreg_input_pre, vreg_exp_max, vreg_input_cur, preg_all);
             AscendC::MicroAPI::Div(vreg_div, vreg_input_pre, vreg_exp_sum, preg_all);
             AscendC::MicroAPI::StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B32>(
-                (__ubuf__ T*&)dstUb + i * srcD + (j + dstart) * floatRepSize, vreg_div, preg_all); // stage2 更新
+                (__ubuf__ T*&)dstUb + i * srcD + (j + dstart) * floatRepSize, vreg_div, preg_all);
         }
     }
 }

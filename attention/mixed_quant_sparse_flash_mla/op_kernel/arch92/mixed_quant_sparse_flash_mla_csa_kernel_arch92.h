@@ -9,18 +9,19 @@
  */
 
 /*!
- * \file mixed_quant_sparse_flash_mla_scfa_kernel.h
+ * \file mixed_quant_sparse_flash_mla_csa_kernel_arch92.h
  * \brief
  */
 
-#ifndef MIXED_QUANT_SPARSE_FLASH_MLA_SCFA_KERNEL_H
-#define MIXED_QUANT_SPARSE_FLASH_MLA_SCFA_KERNEL_H
+#ifndef MIXED_QUANT_SPARSE_FLASH_MLA_CSA_KERNEL_ARCH92_H
+#define MIXED_QUANT_SPARSE_FLASH_MLA_CSA_KERNEL_ARCH92_H
 
 #include "mixed_quant_sparse_flash_mla_common_arch92.h"
-#include "mixed_quant_sparse_flash_mla_kvcache.h"
-#include "mixed_quant_sparse_flash_mla_scfa_block_cube.h"
-#include "mixed_quant_sparse_flash_mla_scfa_block_vector.h"
-#include "kernel_operator.h"
+#include "mixed_quant_sparse_flash_mla_kvcache_arch92.h"
+#include "mixed_quant_sparse_flash_mla_csa_block_cube_arch92.h"
+#include "mixed_quant_sparse_flash_mla_csa_block_vector_arch92.h"
+#include "kernel_vec_intf.h"
+#include "kernel_cube_intf.h"
 #include "../mixed_quant_sparse_flash_mla_metadata.h"
 #include "../../../common/op_kernel/matmul.h"
 #include "../../../common/op_kernel/FixpipeOut.h"
@@ -260,7 +261,6 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     constInfo.cmpRatio = mixedQuantSparseFlashMlaBaseParams.cmpRatio;
     constInfo.oriWinLeft = mixedQuantSparseFlashMlaBaseParams.oriWinLeft;
     constInfo.oriWinRight = mixedQuantSparseFlashMlaBaseParams.oriWinRight;
-    constInfo.tileSize = mixedQuantSparseFlashMlaBaseParams.tileSize;
     constInfo.dSizeRope = mixedQuantSparseFlashMlaBaseParams.ropeHeadDim;
     constInfo.softmaxScale = mixedQuantSparseFlashMlaBaseParams.softmaxScale;
     constInfo.oriKvStride = mixedQuantSparseFlashMlaBaseParams.oriKvStride;
@@ -271,7 +271,6 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     constInfo.dSizeNope = constInfo.dSize - constInfo.dSizeRope;
     constInfo.sparseBlockSize = 1;
     constInfo.actualSeqLenSize = constInfo.bSize + 1;
-    constInfo.actualSeqLenKVSize = constInfo.bSize;
 
     // pageAttention
     if constexpr (isPa) {
@@ -732,8 +731,8 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     int32_t qSNumInOneBlock = 0;
     qSNumInOneBlock = 1;
     if constexpr (TEMPLATE_MODE == MQSMLATemplateMode::CSA_TEMPLATE_MODE) {
-        gs1LoopEndIdx = actualS1Size; // 对于SCFA, 不切G轴, 每次拷贝一行的topk，只算一行的qs
-    } else {                          // SWA/CFA
+        gs1LoopEndIdx = actualS1Size; //
+    } else {
         // 不需要取topk, 每次计算gSize行, 循环qs次
         gs1LoopEndIdx = (actualS1Size + qSNumInOneBlock - 1) / qSNumInOneBlock;
     }
@@ -854,4 +853,4 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     }
 }
 } // namespace BaseApi
-#endif // MIXED_QUANT_SPARSE_FLASH_MLA_SCFA_KERNEL_H
+#endif // MIXED_QUANT_SPARSE_FLASH_MLA_CSA_KERNEL_ARCH92_H
