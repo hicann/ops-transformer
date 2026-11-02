@@ -1358,10 +1358,12 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::AdjustCvInner()
 void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ChooseL1Custom()
 {
     // enable L1 custom + constant propagation
-    // disable: pse, drop, dtm, fp32, tnd
-    // support: long sequence, s1/s2CvInner=512, special d
-
-    bool inputCond = fBaseParams.layoutType != INPUT_FORMAT_TND && fBaseParams.queryType == ge::DT_BF16 &&
+    // disable: pse, dropout, deterministic mode, fp32, and TND shapes other than merged-MLA
+    // support: long sequence, s1/s2CvInner=512, special d, and TND merged-MLA (d=192 / value_d=128, no rope)
+    bool tndNope192Cond = fBaseParams.layoutType == INPUT_FORMAT_TND && fBaseParams.rope_d == 0 &&
+                          fBaseParams.d == 192 && fBaseParams.value_d == SPECIAL_HEADDIM_128;
+    bool inputCond = (fBaseParams.layoutType != INPUT_FORMAT_TND || tndNope192Cond) &&
+                     fBaseParams.queryType == ge::DT_BF16 &&
                      (fBaseParams.s1 >= 512 && fBaseParams.s2 >= 512);                              // long sequence
     bool optionalInputCond = fBaseParams.pseOptional != NORMAL_TENSOR && fBaseParams.keepProb >= 1; // no pse, no drop
     bool dtmCond = context_->GetDeterministic() != 1;
@@ -1373,7 +1375,7 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ChooseL1Custom()
             fBaseParams.mm1IsNZOut = true;
             fBaseParams.mm2IsNZOut = true;
         } else if (fBaseParams.d > SPECIAL_HEADDIM_128 && fBaseParams.d <= SPECIAL_HEADDIM_256) {
-            if (ShapeCond && fBaseParams.attenMaskOptional != EMPTY_TENSOR) {
+            if ((ShapeCond || tndNope192Cond) && fBaseParams.attenMaskOptional != EMPTY_TENSOR) {
                 fBaseParams.enableL1Custom = true;
                 fBaseParams.mm1IsNZOut = true;
                 fBaseParams.mm2IsNZOut = false;

@@ -2597,7 +2597,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeL
                 commonFixpipeParamsV220.mSize = subMSizeAct;
                 commonFixpipeParamsV220.nSize = d;
                 commonFixpipeParamsV220.srcStride = subMSizeActAlign;
-                commonFixpipeParamsV220.dstStride = s1 * 2;
+                commonFixpipeParamsV220.dstStride = dbParam.actualS1Len * 2;
                 commonFixpipeParamsV220.quantPre = QuantMode_t::NoQuant;
                 commonFixpipeParamsV220.unitFlag = 3;
                 AscendC::SetAtomicType<float>();
@@ -2684,7 +2684,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<FAGT>::ComputeL
                 commonFixpipeParamsV220.mSize = subNSizeAct;
                 commonFixpipeParamsV220.nSize = d;
                 commonFixpipeParamsV220.srcStride = subNSizeActAlign;
-                commonFixpipeParamsV220.dstStride = s2 * 2;
+                commonFixpipeParamsV220.dstStride = dbParam.actualS2Len * 2;
                 commonFixpipeParamsV220.quantPre = QuantMode_t::NoQuant;
                 commonFixpipeParamsV220.unitFlag = 3;
                 AscendC::SetAtomicType<float>();
