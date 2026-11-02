@@ -87,15 +87,17 @@ public:
     __aicore__ inline MsaSegRowMaxEpilogue() {}
 
     __aicore__ inline void Init(Catlass::Arch::Resource<ArchTag>& resource, uint32_t numQHeads, uint32_t strideOutHead,
-                                uint32_t strideOutToken, uint32_t maxBlocksPerBatch, uint32_t strideScalePage,
-                                uint32_t strideScaleHead, bool isQuant, uint32_t keyLayout, uint32_t totalK,
-                                const AscendC::GlobalTensor<float>& gScore, const AscendC::GlobalTensor<float>& gScale,
+                                uint32_t strideOutToken, uint32_t maxBlocksPerBatch, uint32_t tableWidth,
+                                uint32_t strideScalePage, uint32_t strideScaleHead, bool isQuant, uint32_t keyLayout,
+                                uint32_t totalK, const AscendC::GlobalTensor<float>& gScore,
+                                const AscendC::GlobalTensor<float>& gScale,
                                 const AscendC::GlobalTensor<int32_t>& gBlockTable)
     {
         numQHeads_ = numQHeads;
         strideOutHead_ = strideOutHead;
         strideOutToken_ = strideOutToken;
         maxBlocksPerBatch_ = maxBlocksPerBatch;
+        tableWidth_ = tableWidth;
         strideScalePage_ = strideScalePage;
         strideScaleHead_ = strideScaleHead;
         isQuant_ = isQuant;
@@ -647,7 +649,8 @@ private:
                     }
                 }
             } else {
-                const int32_t page = gBlockTable_.GetValue(task.batchIdx * maxBlocksPerBatch_ + blk);
+                const uint32_t rowStride = tableWidth_ > 0U ? tableWidth_ : maxBlocksPerBatch_;
+                const int32_t page = gBlockTable_.GetValue(task.batchIdx * rowStride + blk);
                 scaleOff = static_cast<uint64_t>(page) * strideScalePage_;
             }
             // 上一轮 Mul 占用 ubDeqScale_，必须等 V 完成后再 MTE2 覆盖。
@@ -805,6 +808,7 @@ private:
     uint32_t strideOutHead_ = 0;
     uint32_t strideOutToken_ = 0;
     uint32_t maxBlocksPerBatch_ = 0;
+    uint32_t tableWidth_ = 0;
     uint32_t strideScalePage_ = 0;
     uint32_t strideScaleHead_ = 1;
     uint32_t keyLayout_ = MSA_KEY_LAYOUT_BBND;

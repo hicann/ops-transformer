@@ -235,6 +235,12 @@ private:
         return seqRemain < MSA_BLOCK_SIZE ? seqRemain : MSA_BLOCK_SIZE;
     }
 
+    /// score 末维是 16 对齐后的输出宽度。分页页表的行距是 tableWidth，不能用 score 末维。
+    __aicore__ inline uint32_t BlockTableRowStride() const
+    {
+        return tiling_->tableWidth > 0U ? tiling_->tableWidth : tiling_->maxBlocksPerBatch;
+    }
+
     /// PA block_table 一行可能有数百个 int32。dc_preload 每次 256B，在 QK 开始前发出。
     __aicore__ inline void PreloadBlockTable(const MsaTask& task)
     {
@@ -242,8 +248,8 @@ private:
             return;
         }
         const uint32_t nBlk = task.sBlkEnd - task.sBlkBegin;
-        const __gm__ int32_t* row = gBlockTable_.GetPhyAddr() +
-                                    static_cast<uint64_t>(task.batchIdx) * tiling_->maxBlocksPerBatch + task.sBlkBegin;
+        const __gm__ int32_t* row =
+            gBlockTable_.GetPhyAddr() + static_cast<uint64_t>(task.batchIdx) * BlockTableRowStride() + task.sBlkBegin;
         const uint32_t bytes = nBlk * static_cast<uint32_t>(sizeof(int32_t));
         auto* base = reinterpret_cast<__gm__ uint64_t*>(const_cast<__gm__ int32_t*>(row));
         for (uint32_t off = 0; off < bytes; off += 256U) {
@@ -257,7 +263,7 @@ private:
             return MsaSeqKeyBlockElem(tiling_->keyLayout, task.batchIdx, task.cuKStart, blk * tiling_->poolBlockSize,
                                       tiling_->numKvHeads, tiling_->headDim, tiling_->kMaxSeq);
         }
-        const int32_t page = gBlockTable_.GetValue(task.batchIdx * tiling_->maxBlocksPerBatch + blk);
+        const int32_t page = gBlockTable_.GetValue(task.batchIdx * BlockTableRowStride() + blk);
         return static_cast<uint64_t>(page) * tiling_->strideKvBlock;
     }
 
@@ -531,8 +537,9 @@ private:
         Catlass::Arch::Resource<ArchTag> resource;
         MsaSegRowMaxEpilogue<IS_QUANT_V> epilogue;
         epilogue.Init(resource, tiling_->numQHeads, tiling_->strideOutHead, tiling_->strideOutToken,
-                      tiling_->maxBlocksPerBatch, tiling_->strideScalePage, tiling_->strideScaleHead, IS_QUANT_V,
-                      tiling_->keyLayout, tiling_->totalK, gScore_, gScale_, gBlockTable_);
+                      tiling_->maxBlocksPerBatch, tiling_->tableWidth, tiling_->strideScalePage,
+                      tiling_->strideScaleHead, IS_QUANT_V, tiling_->keyLayout, tiling_->totalK, gScore_, gScale_,
+                      gBlockTable_);
         Catlass::Arch::CrossCoreFlagWithReverse<REVERSE_DEPTH> flagSReady{MSA_FLAG_S_READY, MSA_FLAG_S_READY_REVERSE};
         Catlass::Arch::CrossCoreFlag flagK0{MSA_FLAG_K_READY};
         Catlass::Arch::CrossCoreFlag flagK1{MSA_FLAG_K_READY_REVERSE};
