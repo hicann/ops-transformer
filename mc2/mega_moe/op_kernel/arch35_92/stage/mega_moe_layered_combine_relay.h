@@ -447,11 +447,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendRelay
     const uint64_t capacity = static_cast<uint64_t>(params_.tilingData->compute.numMaxTokensPerRank);
     const uint64_t tokenBytes = static_cast<uint64_t>(k_) * sizeof(bfloat16_t);
     const auto channel = comm_.GetChannel(targetRank);
-    auto batch =
-        comm_.MakeBatchHandle(channel,
-                              LocalTensor<uint8_t>(TPosition::VECCALC, reinterpret_cast<uint64_t>(hcommBatchWqeTensor_),
-                                                   LAYERED_HCOMM_BATCH_UB_BYTES),
-                              LAYERED_HCOMM_BATCH_UB_BYTES, GetRankWinAddrWithOffset(targetRank, 0));
+    auto batch = comm_.MakeBatchHandle(channel, GetRankWinAddrWithOffset(targetRank, 0));
     for (uint32_t entry = 0; entry < count; entry += batchTokens) {
         const uint32_t remaining = count - entry;
         const uint32_t batchCount = remaining < batchTokens ? remaining : batchTokens;

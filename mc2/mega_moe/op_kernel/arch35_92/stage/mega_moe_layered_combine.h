@@ -197,11 +197,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessCo
     batchState.dstRankId = targetRank;
     if (targetRank != rankId_) {
         Channel channel = comm_.GetChannel(targetRank);
-        batchState.batchHandle = comm_.MakeBatchHandle(
-            channel,
-            LocalTensor<uint8_t>(TPosition::VECCALC, reinterpret_cast<uint64_t>(hcommBatchWqeTensor_),
-                                 LAYERED_HCOMM_BATCH_UB_BYTES),
-            LAYERED_HCOMM_BATCH_UB_BYTES, GetRankWinAddrWithOffset(targetRank, 0));
+        batchState.batchHandle = comm_.MakeBatchHandle(channel, GetRankWinAddrWithOffset(targetRank, 0));
     }
     ExpertLoopState combineState = waveBeginState;
     GMMAddrInfo combineAddrInfo{};

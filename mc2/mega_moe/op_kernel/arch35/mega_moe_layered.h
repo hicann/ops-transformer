@@ -60,6 +60,18 @@ constexpr int64_t HALF_TO_FP32 = 2U;
 #if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL)
 using TupleShape = Shape<int64_t, int64_t, int64_t, int64_t>;
 
+struct DispatchRowRange {
+    int32_t beginRow = 0;
+    int32_t endRow = 0;
+};
+
+struct DispatchRoundSlice {
+    int32_t validRowCount = 0;
+    int32_t sourceRowBegin = 0;
+    int32_t copyRowCount = 0;
+    int32_t gatheredOffset = 0;
+};
+
 // 预留：XType OutputType TopkWeightsType Weight1Type
 #define TemplateMegaMoeLayeredTypeClass \
     typename XType, typename OutputType, typename TopkWeightsType, typename Weight1Type, int32_t QuantMode, \
@@ -156,9 +168,8 @@ private:
     __aicore__ inline void InitSendMaskRounds(uint32_t resetTensorSize);
     __aicore__ inline void InitDispatchRounds(uint32_t fixedBefore, uint32_t dispatchFixedCost);
     __aicore__ inline uint32_t InitDispatchIndexBuffers(uint32_t fixedBefore);
-    __aicore__ inline void InitDispatchCopyBuffers(uint32_t copyTmpBaseAddr, uint32_t relayFlagTensorSize,
-                                                   uint32_t dispatchWorkTensorSize,
-                                                   uint32_t expertTokenNumsOutTensorSize);
+    __aicore__ inline void InitDispatchReceiveScratch(uint32_t copyBufferUbOffset, uint32_t copyBufferTotalBytes,
+                                                      uint32_t expertCountBufferBytes);
     __aicore__ inline void BuildExpertMaskRound(int32_t curExpertId, uint32_t roundIdx, uint64_t roundStart,
                                                 uint32_t roundLen, uint32_t curRoundCompareCount,
                                                 uint64_t& totalSendCnt);
@@ -177,6 +188,8 @@ private:
     __aicore__ inline uint32_t GetChannelOwnerBlock(uint32_t rank) const;
     __aicore__ inline bool IsChannelOwner(uint32_t rank) const;
     __aicore__ inline void PrepareExpertTokenCountTable();
+    __aicore__ inline void InitDispatchSourceReadyCache();
+    __aicore__ inline void EnsureDispatchSourceReady(uint32_t relayRank, uint32_t srcServer);
     __aicore__ inline ExpertTokenRange PlanTokenWave(const ExpertTokenPosition& begin, uint32_t groupTarget);
     __aicore__ inline void AdjustStartBlockIdxForNextWave(const ExpertTokenRange& wave, uint32_t waveStartBlockIdx,
                                                           uint32_t gmm1EndBlockIdx);
@@ -195,9 +208,8 @@ private:
     __aicore__ inline void ResetFlagList();
     __aicore__ inline void SendMaskCal();
     __aicore__ inline void PrepareDispatchReceive();
-    __aicore__ inline void CalcDispatchExpertSlice(uint32_t expertIdx, uint32_t expertBegin,
-                                                   const ExpertTokenRange& range, int32_t& sliceStart,
-                                                   int32_t& sliceEnd);
+    __aicore__ inline DispatchRowRange CalcDispatchExpertSlice(uint32_t expertIdx, uint32_t expertBegin,
+                                                               const ExpertTokenRange& range);
     __aicore__ inline uint64_t LoadAndGatherDispatchRound(__gm__ uint8_t* rankMaskBasePtr, uint32_t roundIdx);
     __aicore__ inline void CopyLocalDispatchRound(uint32_t expertIdx, uint32_t srcRank, int32_t rowStart,
                                                   int32_t copyBegin, int32_t roundCopyCount, int32_t gatheredOffset);
@@ -206,6 +218,17 @@ private:
                                                      int32_t roundCopyCount, int32_t gatheredOffset,
                                                      uint32_t& remoteBatchTokenCount);
     __aicore__ inline void ReceiveDispatchTokenRange(const ExpertTokenRange& range);
+    template <bool IsLocalServer>
+    __aicore__ inline void ReceiveDispatchServerPhase(const ExpertTokenRange& range);
+    template <bool IsLocalServer>
+    __aicore__ inline void ReceiveDispatchExpertFromServers(uint32_t relayRank, uint32_t expertIdx,
+                                                            const ExpertTokenRange& range,
+                                                            uint32_t& remoteBatchTokenCount);
+    template <bool IsLocalServer>
+    __aicore__ inline void ReceiveDispatchFromSourceRank(uint32_t relayRank, uint32_t expertIdx, uint32_t srcServer,
+                                                         __gm__ uint8_t* expertMaskBase,
+                                                         const DispatchRowRange& expertRows,
+                                                         uint32_t& remoteBatchTokenCount);
     __aicore__ inline uint32_t FindDispatchSegmentEnd(uint32_t segmentStart, uint32_t batchTokenCount);
     __aicore__ inline void ReceiveRemoteDispatchBatch(uint32_t relayRank, uint32_t batchTokenCount);
     __aicore__ inline void PublishDispatchRows(uint32_t expertIdx, int32_t globalRowStart, int32_t rowCount);
@@ -226,9 +249,12 @@ private:
                                                    int32_t tokenCount);
     __aicore__ inline void ResetCommunicationState();
     __aicore__ inline void PublishLocalDispatchRelayCount();
-    __aicore__ inline void SendDispatchRelayQueue(uint32_t targetServer, uint32_t relayRank,
-                                                  const LocalTensor<int32_t>& tokenIds);
-    __aicore__ inline void SendDispatchRelayQueues();
+    __aicore__ inline GM_ADDR PrepareDispatchReadySource(uint32_t targetServer);
+    __aicore__ inline uint32_t AppendDispatchWriteRange(BatchHandle& batchHandle, GM_ADDR target, GM_ADDR source,
+                                                        uint64_t bytes, uint32_t maxWriteBytes, uint32_t pendingWqes);
+    __aicore__ inline void SendDispatchToRemoteServer(uint32_t targetServer, uint32_t relayRank);
+    __aicore__ inline void StartInterServerDispatch();
+    __aicore__ inline uint64_t DispatchBulkReadyFlagOffset(uint32_t sourceServer) const;
     template <bool CombineServerDedup>
     __aicore__ inline void BuildDispatchRelayCandidates(const LocalTensor<int32_t>& topkIds,
                                                         const LocalTensor<uint32_t>& masks, uint32_t tokenCount,
@@ -247,12 +273,6 @@ private:
                                                     const LocalTensor<uint32_t>& transposedMasks,
                                                     const WorkRange& tokenRange, uint32_t batchTokens);
     __aicore__ inline void EnqueueDispatchRelayToken(uint32_t targetServer, uint32_t tokenIdx);
-    __aicore__ inline void AppendDispatchRelayData(uint32_t relayRank, BatchHandle& batchHandle, int32_t tokenIdx);
-    __aicore__ inline void AppendDispatchRelayFlag(uint32_t targetServer, uint32_t relayRank, BatchHandle& batchHandle,
-                                                   int32_t tokenIdx, bool firstFlag);
-    __aicore__ inline void CommitDispatchRelayBatch(uint32_t targetServer, uint32_t relayRank, BatchHandle& batchHandle,
-                                                    int32_t batchStart, uint32_t batchTokenCount,
-                                                    const LocalTensor<int32_t>& tokenIds);
     __aicore__ inline void LoadTokenFromLocalRelay(uint32_t srcServer, uint32_t tokenIndex, int32_t bufferIdx,
                                                    uint32_t copyInNum);
     __aicore__ inline void CopyTokensFromLocalRelay(int32_t rowDstOffsetInCore, uint32_t srcServer, int32_t copyNum,
@@ -260,7 +280,6 @@ private:
     __aicore__ inline void QuantizeTokenInUb(__ubuf__ bfloat16_t* input, __ubuf__ ActivationType* output,
                                              __ubuf__ uint16_t* scratch);
     __aicore__ inline void QuantizeLocalTokensToRelay();
-    __aicore__ inline void SetLocalRelayReadyFlags();
     __aicore__ inline uint64_t DispatchRelayQueueServerOffset(uint32_t targetServer) const;
     __aicore__ inline uint64_t RelayTokenOffset(uint32_t sourceServer, uint32_t tokenId) const;
     __aicore__ inline uint64_t RelayFlagOffset(uint32_t sourceServer, uint32_t tokenId) const;
@@ -306,7 +325,6 @@ private:
     __gm__ Mc2MoeContext* mc2Context_{nullptr};
     __gm__ int32_t* gmmToEpilogueFlag_{nullptr};
     CommPolicy comm_;
-    __ubuf__ uint8_t* hcommBatchWqeTensor_ = nullptr;
     Params params_{};
 
     __gm__ int32_t* expertTokenNumsOut_ = nullptr;
@@ -380,22 +398,22 @@ private:
     // A4W4 场景下 GMM1 走通用 A4W4、GMM2 走 A8W4，避免两段都使用 A4W4 导致精度损失过大。
     static constexpr bool ENABLE_A4W4 =
         Std::IsSame<Weight1Type, fp4x2_e2m1_t>::value && Std::IsSame<QuantOutType, fp4x2_e2m1_t>::value;
+    // 来源就绪位图每个 rank 占一个 bit；按 512B 预留，使下移后的 WQE 区继续保持对齐。
+    static constexpr uint32_t DISPATCH_READY_CACHE_RESERVE_BYTES = 512U;
     static constexpr int32_t DISPATCH_COPY_BUFFER_COUNT = 5;
     static constexpr uint32_t MX_QUANT_TEMP_UB_BYTES = 2U * 1024U;
-    static constexpr uint32_t DISPATCH_READY_FLAG_BATCH_TOKENS = 256U;
     static constexpr uint32_t DISPATCH_MAX_TOPK = 32U;
-    static constexpr uint32_t SEND_MASK_UB_LIMIT = LAYERED_USABLE_UB_BYTES;
+    static constexpr uint32_t SEND_MASK_UB_LIMIT = LAYERED_USABLE_UB_BYTES - DISPATCH_READY_CACHE_RESERVE_BYTES;
     // 二级读取在 TopkWeightsPrefetch 路径下每 token 需要 data/scale/weight 三条 WQE。
     // 64 KiB 可容纳 1024 条 WQE，足够一次提交完整的 256-token 批次（最多 768 条 WQE）。
     static_assert(LAYERED_HCOMM_BATCH_WQE_CAPACITY >= L1_TILE_M_256 * 3U,
                   "Layered Hcomm UB must hold 256 three-WQE token records");
     // Wave 通信需要同时保留批量描述符和其他搬运张量，因此动态 UB 预算止于批量区起点。
-    static constexpr uint32_t COMM_WORK_UB_LIMIT = LAYERED_HCOMM_BATCH_UB_OFFSET;
-    // 计算 Wave 按专家内 256-row M group 规划；通信 Wave 合并多个计算 Wave。
-    // 一级发送批次独立于通信/计算 Wave，尽量用满 WQE 区。
-    // 一级发送尽量吃满 64 KiB WQE 区；二级接收仍以 256 token 作为完整就绪边界。
+    static constexpr uint32_t COMM_WORK_UB_LIMIT = LAYERED_HCOMM_BATCH_UB_OFFSET - DISPATCH_READY_CACHE_RESERVE_BYTES;
+    // AIV1 私有持久存储；Dispatch/Combine 临时缓冲的上界不得进入该区域。
+    __ubuf__ uint32_t* dispatchSourceReadyBitsUb_ = nullptr;
+    // 一级按协议长度限制连续分块；二级按最多 256 条 metadata 组织批次。
     static constexpr uint32_t DISPATCH_RELAY_QUEUE_ENTRY_BYTES = ALIGN_32;
-    static constexpr uint32_t DISPATCH_SEND_BATCH_TOKEN_CAPACITY = LAYERED_HCOMM_BATCH_WQE_CAPACITY;
     static constexpr uint32_t DISPATCH_RECEIVE_BATCH_TOKEN_CAPACITY = L1_TILE_M_256;
     static constexpr uint32_t DISPATCH_BATCH_DST_ROW = 4U;
     static constexpr uint32_t DISPATCH_BATCH_EXPERT_ID = 5U;
@@ -406,15 +424,12 @@ private:
     __ubuf__ int32_t* validTopkIndexTensor_ = nullptr;
     __ubuf__ int32_t* cumsumInfoTensor_ = nullptr;
     __ubuf__ ActivationType* copyTmpTensors_[DISPATCH_COPY_BUFFER_COUNT]{}; // 5 路软流水：占用 EVENT_ID1..EVENT_ID5。
-    // 当前 256-token 中继就绪标志窗口，复用本地搬运缓冲起始地址。
-    __ubuf__ uint64_t* relayFlagTensor_ = nullptr;
     __ubuf__ int32_t* metaInfoTensor_ = nullptr;
     __ubuf__ bfloat16_t* xInTensor1_ = nullptr;
     __ubuf__ bfloat16_t* xInTensor2_ = nullptr;
     __ubuf__ ActivationType* xOutTensor1_ = nullptr;
     __ubuf__ ActivationType* xOutTensor2_ = nullptr;
     __ubuf__ uint16_t* mxTempTensor_ = nullptr;
-    __ubuf__ uint64_t* relayReadyFillTensor_ = nullptr;
     __ubuf__ int32_t* resetTensor_ = nullptr;
     int32_t resetBatchElementCount_ = 0;
     __ubuf__ int32_t* topkIdsTensor_ = nullptr;
@@ -467,6 +482,27 @@ __aicore__ inline bool MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::IsChannel
         return false;
     }
     return subBlockIdx_ == 1U && blockIdx_ == GetChannelOwnerBlock(rank);
+}
+
+template <TemplateMegaMoeLayeredTypeClass>
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitDispatchSourceReadyCache()
+{
+    if constexpr (g_coreType == AIV) {
+        if (subBlockIdx_ != 1U) {
+            return;
+        }
+        const uint32_t readyCacheBytes =
+            Ops::Base::CeilAlign(Ops::Base::CeilDiv(worldSize_, uint32_t(32)) * static_cast<uint32_t>(sizeof(uint32_t)),
+                                 static_cast<uint32_t>(ALIGN_32));
+        dispatchSourceReadyBitsUb_ =
+            reinterpret_cast<__ubuf__ uint32_t*>(LAYERED_USABLE_UB_BYTES - DISPATCH_READY_CACHE_RESERVE_BYTES);
+        // 每次调用初始化一次；计数表准备阶段的 V→S 同步保证首次标量访问前清零完成。
+        // 后续仅由当前 AIV1 以标量方式读写。
+        const uint32_t cacheWordCount = readyCacheBytes / sizeof(uint32_t);
+        LocalTensor<uint32_t> readyCache(TPosition::VECCALC, reinterpret_cast<uint64_t>(dispatchSourceReadyBitsUb_),
+                                         cacheWordCount);
+        Duplicate<uint32_t>(readyCache, 0U, cacheWordCount);
+    }
 }
 
 // 完整计数表在入口就绪后，按调用方给定的 M-group 预算规划 wave。
@@ -576,7 +612,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitDispa
         Ops::Base::CeilAlign(static_cast<uint64_t>(mxQuantTokenScaleAlignBytes_), static_cast<uint64_t>(ALIGN_512));
     dispatchRelayQueueBytesPerServer_ =
         static_cast<uint64_t>(ALIGN_32) + static_cast<uint64_t>(m_) * DISPATCH_RELAY_QUEUE_ENTRY_BYTES;
-    // 远端 flag 按 256-token 连续窗口读取，UB 占用不随 BS 增长。
+    // 保留 GM 快照原有行宽，来源级 ready 轮询只使用行首一个 uint64_t。
     uint64_t flagSnapshotBytes = static_cast<uint64_t>(DISPATCH_RECEIVE_BATCH_TOKEN_CAPACITY) * sizeof(uint64_t);
     dispatchRelayFlagSnapshotBytesPerBlock_ = Ops::Base::CeilAlign(flagSnapshotBytes, static_cast<uint64_t>(ALIGN_512));
 }
@@ -853,11 +889,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::DrainAndU
             continue;
         }
         Channel channel = comm_.GetChannel(rank);
-        BatchHandle batchHandle = comm_.MakeBatchHandle(
-            channel,
-            LocalTensor<uint8_t>(TPosition::VECCALC, reinterpret_cast<uint64_t>(hcommBatchWqeTensor_),
-                                 LAYERED_HCOMM_BATCH_UB_BYTES),
-            LAYERED_HCOMM_BATCH_UB_BYTES, GetRankWinAddrWithOffset(rank, 0));
+        BatchHandle batchHandle = comm_.MakeBatchHandle(channel, GetRankWinAddrWithOffset(rank, 0));
         // 同一通道可能同时残留 Dispatch 一级和 Combine 的已提交批次，统一按批量句柄等待完成。
         comm_.Drain(batchHandle);
         comm_.Unlock(channel);
@@ -1250,6 +1282,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessMo
     const auto& buffer = params_.workspace.base;
     DispatchBuffInit();
     InitCombineBuffers();
+    InitDispatchSourceReadyCache();
     LockOwnedRemoteChannels();
     ExpertLoopState gmm1State = CreateExpertLoopState(commonConfig_);
     ExpertLoopState gmm2State = CreateExpertLoopState(commonConfig_);
@@ -1258,8 +1291,9 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessMo
     int32_t vecSetSyncCom = 0;
     if constexpr (g_coreType == AIV) {
         if (subBlockIdx_ == 1U) {
-            // 全量量化和目标 Server 队列已由全部 AIV 完成，先提交一级发送，再并行准备完整计数表。
-            SendDispatchRelayQueues();
+            // 量化和 Combine 元数据已准备完成，一级通信异步提交，
+            // 使本 Server 的二级接收能够与其重叠。
+            StartInterServerDispatch();
             PrepareExpertTokenCountTable();
         }
     }
@@ -1338,21 +1372,23 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Process()
     }
 
     if constexpr (g_coreType == AIV) {
-        // 全部物理 AIV 量化各自 token 分片，再构造一级队列；CrossRankSync 同步全部 AIV。
+        // 所有物理 AIV 在 CrossRankSync 前完成各自 token 分片的量化。
         DispatchPrepareBuffInit();
         QuantizeLocalTokensToRelay();
-        if (!IsCombineServerDedupEnabled()) {
-            SetLocalRelayReadyFlags();
-            // 等待普通模式的本地 ready 搬出读完 UB，再交给建表阶段复用。
-            PipeFence<PIPE_MTE3, PIPE_MTE2, SYNC_EVENT_ID2>();
+        // Server Combine 仍需位图和有效 token 数量；
+        // 普通整批发送路径不再构造或读取 token 队列。
+        if (IsCombineServerDedupEnabled()) {
+            PrepareDispatchRelayQueues();
         }
-        PrepareDispatchRelayQueues();
         // 首次跨卡同步前收口 SendMask 的发送完成，使同步通知代表本 AIV 的 mask 已发送。
         for (int rankIndex = aivCoreIdx_; rankIndex < worldSize_; rankIndex += blockAivNum_) {
             if (rankIndex != rankId_) {
                 comm_.Drain(comm_.GetChannel(rankIndex));
             }
         }
+        // 每个对端的跨卡同步通知由一个 AIV 发送，发送前须确保本卡所有 AIV 均已完成量化，
+        // 使本 Server 的二级接收可以直接读取原始记录。
+        AllVectorBarrier();
     }
 
     CrossRankSyncInWorldSize<true>(); // 同一物理 AIV 继续使用 SendMask 已取得的锁，并在同步结束后释放。

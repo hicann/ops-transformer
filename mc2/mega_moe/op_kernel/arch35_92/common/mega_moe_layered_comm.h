@@ -19,6 +19,12 @@ namespace MegaMoeImpl {
 
 using namespace AscendC;
 
+// 两种 Layered 通信策略共用的 URMA 写配置。
+static constexpr UrmaWqeEntry LAYERED_RELAXED_WRITE_WQE_CONFIG = {
+    .odr = 5, .fence = 1, .se = 0, .cqe = 0, .inlineEn = 0};
+static constexpr UrmaWqeEntry LAYERED_STRONG_COMPLETION_WRITE_WQE_CONFIG = {
+    .odr = 6, .fence = 1, .se = 0, .cqe = 1, .inlineEn = 0};
+
 // 封装 Layered 路径使用的 URMA 通信接口。
 class LayeredUrmaComm {
 public:
@@ -36,6 +42,11 @@ public:
         return context_->hcommHandle_[index];
     }
 
+    __aicore__ inline uint32_t GetBulkWriteChunkBytes(ChannelHandle) const
+    {
+        // URMA WriteNbi 要求长度严格小于 256 MiB，分块时保持记录对齐。
+        return 256U * 1024U * 1024U - 512U;
+    }
     __aicore__ inline int32_t Init(const LocalTensor<uint8_t>& scratch, uint32_t bytes)
     {
         return hcomm_.Init(scratch, bytes);
@@ -50,10 +61,21 @@ public:
         return hcomm_.Unlock(channel);
     }
 
-    __aicore__ inline BatchHandle MakeBatchHandle(ChannelHandle channel, const LocalTensor<uint8_t>& buffer,
-                                                  uint32_t bytes, GM_ADDR remoteAddr)
+    /*
+     * 绑定本核固定的批量描述符工作区；与 Init 使用的通信临时区相互独立。
+     */
+    __aicore__ inline void BindBatchBuffer(const LocalTensor<uint8_t>& buffer, uint32_t bytes)
     {
-        return hcomm_.MakeBatchHandle(channel, buffer, bytes, remoteAddr);
+        batchBuffer_ = buffer;
+        batchBufferBytes_ = bytes;
+    }
+
+    /*
+     * 复用已绑定的 UB 工作区，为目标通道及远端注册内存新建批量句柄。
+     */
+    __aicore__ inline BatchHandle MakeBatchHandle(ChannelHandle channel, GM_ADDR remoteAddr)
+    {
+        return hcomm_.MakeBatchHandle(channel, batchBuffer_, batchBufferBytes_, remoteAddr);
     }
 
     // 使用 Hcomm 默认写配置，生成 CQE。
@@ -86,13 +108,16 @@ public:
     // 弱执行保序写（ODR=5），配置完成保序，不生成 CQE。
     __aicore__ inline int32_t WriteRelaxedNbi(BatchHandle& batch, GM_ADDR dst, GM_ADDR src, uint32_t bytes)
     {
-        return hcomm_.WriteNbi<RELAXED_WRITE_WQE_CONFIG>(batch, dst, src, bytes);
+        return hcomm_.WriteNbi<LAYERED_RELAXED_WRITE_WQE_CONFIG>(batch, dst, src, bytes);
     }
 
-    // 强执行保序写（ODR=6），配置完成保序，不生成 CQE。
-    __aicore__ inline int32_t WriteStrongNbi(BatchHandle& batch, GM_ADDR dst, GM_ADDR src, uint32_t bytes)
+    /*
+     * 整批发送的尾通知同时生成 CQE；若全部写入均为 cqe=0，
+     * Drain 无法确认这些写入已全部完成。
+     */
+    __aicore__ inline int32_t WriteStrongNbiWithCqe(BatchHandle& batch, GM_ADDR dst, GM_ADDR src, uint32_t bytes)
     {
-        return hcomm_.WriteNbi<STRONG_WRITE_WQE_CONFIG>(batch, dst, src, bytes);
+        return hcomm_.WriteNbi<LAYERED_STRONG_COMPLETION_WRITE_WQE_CONFIG>(batch, dst, src, bytes);
     }
 
     __aicore__ inline int32_t BatchCommit(BatchHandle& batch)
@@ -109,12 +134,10 @@ public:
     }
 
 private:
-    static constexpr struct UrmaWqeEntry RELAXED_WRITE_WQE_CONFIG = {
-        .odr = 5, .fence = 1, .se = 0, .cqe = 0, .inlineEn = 0};
-    static constexpr struct UrmaWqeEntry STRONG_WRITE_WQE_CONFIG = {
-        .odr = 6, .fence = 1, .se = 0, .cqe = 0, .inlineEn = 0};
     __gm__ Mc2Aclnn::Mc2MoeContext* const context_;
     const uint32_t rankId_;
+    LocalTensor<uint8_t> batchBuffer_;
+    uint32_t batchBufferBytes_ = 0U;
     Hcomm<COMM_PROTOCOL_UB_CTP> hcomm_;
 };
 
@@ -149,6 +172,11 @@ public:
         // Retain peer routing with the native handle; later calls need no reverse lookup.
         return {ctx_->hcommHandle_[peer > rank_ ? peer - 1 : peer], peer / rankNumPerServer_ != serverId_};
     }
+    __aicore__ inline uint32_t GetBulkWriteChunkBytes(Channel channel) const
+    {
+        // RoCE 单次写入长度须严格小于 2 GiB，URMA 须严格小于 256 MiB。
+        return channel.roce ? (uint32_t(1) << 31U) - 512U : 256U * 1024U * 1024U - 512U;
+    }
     __aicore__ inline int32_t Lock(Channel ch)
     {
         return ch.roce ? roce_.Lock(ch.native) : urma_.Lock(ch.native);
@@ -157,14 +185,25 @@ public:
     {
         return ch.roce ? roce_.Unlock(ch.native) : urma_.Unlock(ch.native);
     }
-    __aicore__ inline BatchHandle MakeBatchHandle(Channel ch, const LocalTensor<uint8_t>& buffer, uint32_t bytes,
-                                                  GM_ADDR remote)
+    /*
+     * 两种协议共用本核固定的批量描述符工作区，不改变各自的 Init 临时区。
+     */
+    __aicore__ inline void BindBatchBuffer(const LocalTensor<uint8_t>& buffer, uint32_t bytes)
+    {
+        batchBuffer_ = buffer;
+        batchBufferBytes_ = bytes;
+    }
+
+    /*
+     * 为目标通道新建批量句柄，并保持 RoCE 所需的本端注册内存选择。
+     */
+    __aicore__ inline BatchHandle MakeBatchHandle(Channel ch, GM_ADDR remote)
     {
         BatchHandle b{};
         b.roce = ch.roce;
         GM_ADDR local = reinterpret_cast<GM_ADDR>(ctx_->epHcclBuffer_[rank_]);
-        b.native = b.roce ? roce_.MakeBatchHandle(ch.native, buffer, bytes, remote, local) :
-                            urma_.MakeBatchHandle(ch.native, buffer, bytes, remote);
+        b.native = b.roce ? roce_.MakeBatchHandle(ch.native, batchBuffer_, batchBufferBytes_, remote, local) :
+                            urma_.MakeBatchHandle(ch.native, batchBuffer_, batchBufferBytes_, remote);
         return b;
     }
     __aicore__ inline int32_t WriteNbi(Channel ch, GM_ADDR dst, GM_ADDR src, uint64_t bytes)
@@ -183,11 +222,15 @@ public:
     }
     __aicore__ inline int32_t WriteRelaxedNbi(BatchHandle& b, GM_ADDR dst, GM_ADDR src, uint32_t bytes)
     {
-        return WriteNbi(b, dst, src, bytes);
+        return b.roce ? roce_.WriteNbi(b.native, dst, src, bytes) :
+                        urma_.WriteNbi<LAYERED_RELAXED_WRITE_WQE_CONFIG>(b.native, dst, src, bytes);
     }
-    __aicore__ inline int32_t WriteStrongNbi(BatchHandle& b, GM_ADDR dst, GM_ADDR src, uint32_t bytes)
+    __aicore__ inline int32_t WriteStrongNbiWithCqe(BatchHandle& b, GM_ADDR dst, GM_ADDR src, uint32_t bytes)
     {
-        return WriteNbi(b, dst, src, bytes);
+        // RoCE 提交使用同一 QP/SQ，写入按 FIFO 排序；尾通知设置 fence 并生成 CQE，
+        // 发布就绪状态，同时使最终 Drain 能够回收全部写入。
+        return b.roce ? roce_.WriteNbi(b.native, dst, src, bytes) :
+                        urma_.WriteNbi<LAYERED_STRONG_COMPLETION_WRITE_WQE_CONFIG>(b.native, dst, src, bytes);
     }
     __aicore__ inline int32_t ReadNbi(Channel ch, GM_ADDR dst, GM_ADDR src, uint64_t bytes)
     {
@@ -216,6 +259,8 @@ private:
     uint32_t rank_;
     const uint32_t rankNumPerServer_;
     const uint32_t serverId_;
+    LocalTensor<uint8_t> batchBuffer_;
+    uint32_t batchBufferBytes_ = 0U;
     Hcomm<COMM_PROTOCOL_UB_CTP> urma_;
     Hcomm<COMM_PROTOCOL_ROCE> roce_;
 };
