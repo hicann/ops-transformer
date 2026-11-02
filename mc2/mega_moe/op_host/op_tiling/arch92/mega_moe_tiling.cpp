@@ -384,7 +384,8 @@ static ge::graphStatus SetAdaptiveBufferConfigs(const gert::TilingContext* conte
                                    tilingData->compute.sharedInputIndependent == 1U, availableUbBytes);
 
     ge::DataType topKWeightsDataType = topKWeightsDesc->GetDataType();
-    SetUnpermuteBufferConfigs(tilingData, topKWeightsDataType, availableUbBytes);
+    SetUnpermuteBufferConfigs(tilingData, topKWeightsDataType, availableUbBytes,
+                              UnpermuteBufferPolicy::SEPARATE_DEQUANTIZATION);
     return ge::GRAPH_SUCCESS;
 }
 

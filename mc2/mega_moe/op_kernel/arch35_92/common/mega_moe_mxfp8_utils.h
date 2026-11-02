@@ -19,9 +19,6 @@
 #include "mega_moe_constants.h"
 #include "mega_moe_utils.h"
 #include "../../../../common/op_kernel/quantize_functions.h"
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
-#include "c_api/asc_simd.h"
-#endif
 
 namespace MegaMoeImpl {
 
@@ -135,87 +132,6 @@ __simd_vf__ inline void DeQuantMxFp8Vf(__ubuf__ XType* inAddr, __ubuf__ float* s
     DequantizeMxFp8Token(tokenPtr0, dyScaleFp32Ptr, sumDstPtr, tokenLen, fp32RepeatSize, tokenFp32RepeatTimes);
 }
 
-#else
-__simd_callee__ inline void ConvertMxScaleToBf16(__ubuf__ fp8_e8m0_t* srcPtr, __ubuf__ bfloat16_t* dyScaleBf16Ptr,
-                                                 uint32_t scaleLen, uint32_t bf16RepeatSize, uint16_t repeatTimes)
-{
-    auto* scalePtr = reinterpret_cast<__ubuf__ uint8_t*>(srcPtr);
-    auto* dstPtr = reinterpret_cast<__ubuf__ uint16_t*>(dyScaleBf16Ptr);
-    vector_uint8_t scaleReg;
-    vector_uint16_t bf16Bits;
-    vector_bool nanMask;
-    for (uint16_t i = 0; i < repeatTimes; ++i) {
-        vector_bool mask = asc_update_mask_b16(scaleLen);
-        asc_loadalign_unpack_postupdate(scaleReg, scalePtr, bf16RepeatSize);
-        // UNPACK_B8 already zero-extends each scale byte to a uint16_t lane.
-        asc_shiftleft_scalar(bf16Bits, reinterpret_cast<vector_uint16_t&>(scaleReg), int16_t{7}, mask);
-        asc_eq_scalar(nanMask, bf16Bits, uint16_t{0x7f80}, mask);
-        vdup(bf16Bits, uint16_t{0x7fc0}, nanMask, MODE_MERGING);
-        asc_storealign_intlv(dstPtr, bf16Bits, bf16Bits);
-        dstPtr += bf16RepeatSize * 2U;
-    }
-    asc_mem_bar(VST_VLD);
-}
-
-__simd_callee__ inline void ConvertMxScaleToFp32(__ubuf__ bfloat16_t* dyScaleBf16Ptr, __ubuf__ float* dyScaleFp32Ptr,
-                                                 uint32_t quantCount, uint32_t fp32RepeatSize, uint16_t repeatTimes)
-{
-    vector_bfloat16_t bf16Reg;
-    vector_float fp32Reg;
-    for (uint16_t i = 0; i < repeatTimes; ++i) {
-        vector_bool mask = asc_update_mask_b32(quantCount);
-        asc_loadalign_unpack_postupdate(bf16Reg, dyScaleBf16Ptr, fp32RepeatSize);
-        asc_bfloat162float(fp32Reg, bf16Reg, mask, ASC_POSITION_EVEN);
-        asc_storealign_intlv(reinterpret_cast<__ubuf__ uint32_t*>(dyScaleFp32Ptr),
-                             reinterpret_cast<vector_uint32_t&>(fp32Reg), reinterpret_cast<vector_uint32_t&>(fp32Reg));
-        dyScaleFp32Ptr += fp32RepeatSize * 2U;
-    }
-    asc_mem_bar(VST_VLD);
-}
-
-template <typename T>
-__simd_callee__ inline void DequantizeMxFp8Token(__ubuf__ T* tokenPtr, __ubuf__ float* dyScaleFp32Ptr,
-                                                 __ubuf__ float* sumDstPtr, uint32_t tokenLen, uint32_t fp32RepeatSize,
-                                                 uint16_t repeatTimes)
-{
-    static_assert(IsSameType<T, fp8_e4m3fn_t>::value || IsSameType<T, fp8_e5m2_t>::value);
-    using TokenReg =
-        typename std::conditional<IsSameType<T, fp8_e4m3fn_t>::value, vector_fp8_e4m3fn_t, vector_fp8_e5m2_t>::type;
-    TokenReg tokenReg;
-    vector_float valueReg;
-    vector_float scaleReg;
-    for (uint16_t i = 0; i < repeatTimes; ++i) {
-        vector_bool mask = asc_update_mask_b32(tokenLen);
-        asc_loadalign_brc_elem2datablock_postupdate(scaleReg, dyScaleFp32Ptr, 8);
-        asc_loadalign_unpack4_postupdate(tokenReg, tokenPtr, fp32RepeatSize);
-        if constexpr (IsSameType<T, fp8_e4m3fn_t>::value) {
-            asc_e4m32float(valueReg, tokenReg, mask, ASC_DISPERSE_FIRST_QUARTER);
-        } else {
-            asc_e5m22float(valueReg, tokenReg, mask, ASC_DISPERSE_FIRST_QUARTER);
-        }
-        asc_mul(valueReg, scaleReg, valueReg, mask);
-        asc_storealign_postupdate(sumDstPtr, valueReg, fp32RepeatSize, mask);
-    }
-}
-
-template <typename T, typename XType>
-__simd_vf__ inline void DeQuantMxFp8Vf(__ubuf__ XType* inAddr, __ubuf__ float* sumDstPtr,
-                                       __ubuf__ bfloat16_t* dyScaleBf16Ptr, __ubuf__ float* dyScaleFp32Ptr,
-                                       uint32_t scaleLen, uint32_t tokenLen)
-{
-    auto* tokenPtr = reinterpret_cast<__ubuf__ T*>(inAddr);
-    uint32_t tokenStorageElementCount = ((tokenLen + ALIGN_256 - 1U) / ALIGN_256 * ALIGN_256) / 2U;
-    auto* scalePtr = reinterpret_cast<__ubuf__ fp8_e8m0_t*>(inAddr + tokenStorageElementCount);
-    constexpr uint32_t bf16RepeatSize = AscendC::VECTOR_REG_WIDTH / sizeof(bfloat16_t);
-    constexpr uint32_t fp32RepeatSize = AscendC::VECTOR_REG_WIDTH / sizeof(float);
-    uint16_t bf16RepeatTimes = (scaleLen + bf16RepeatSize - 1U) / bf16RepeatSize;
-    uint32_t quantCount = scaleLen * 2U;
-    uint16_t scaleFp32RepeatTimes = (quantCount + fp32RepeatSize - 1U) / fp32RepeatSize;
-    uint16_t tokenFp32RepeatTimes = (tokenLen + fp32RepeatSize - 1U) / fp32RepeatSize;
-    ConvertMxScaleToBf16(scalePtr, dyScaleBf16Ptr, scaleLen, bf16RepeatSize, bf16RepeatTimes);
-    ConvertMxScaleToFp32(dyScaleBf16Ptr, dyScaleFp32Ptr, quantCount, fp32RepeatSize, scaleFp32RepeatTimes);
-    DequantizeMxFp8Token(tokenPtr, dyScaleFp32Ptr, sumDstPtr, tokenLen, fp32RepeatSize, tokenFp32RepeatTimes);
-}
 #endif
 
 template <typename T, typename XType>

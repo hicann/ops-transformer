@@ -117,7 +117,7 @@ __simd_vf__ inline void SelectExpertIndicesVF(__ubuf__ int32_t* idsUb, __ubuf__ 
             asc_deintlv_b16(selectedMask, discardedMask, selectedMask, upperMask);
         }
         asc_loadalign(indicesReg, indicesUb + offset);
-        asc_squeeze_with_status(packedReg, indicesReg, selectedMask);
+        asc_squeeze_v2(packedReg, indicesReg, selectedMask);
         asc_storeunalign_postupdate(selectedUb, storeState, packedReg);
     }
     // 输出偏移由 AR 管理，所有迭代及收尾均使用同一基址和同一个非对齐存储状态。
@@ -171,7 +171,7 @@ __aicore__ inline uint64_t SelectTopkIdsIndexByExpert(const SendMaskConfig& conf
     PipeFence<PIPE_V, PIPE_S, SYNC_EVENT_ID2>();
     // AR 累计压缩输出的字节数；零长度不发射 VF，也不读取上次调用遗留的 AR。
     if (validLen > 0) {
-        return static_cast<uint64_t>(asc_get_squeeze_status()) / sizeof(TopkIndexType);
+        return static_cast<uint64_t>(asc_get_ar_spr()) / sizeof(TopkIndexType);
     }
     return 0U;
 #endif

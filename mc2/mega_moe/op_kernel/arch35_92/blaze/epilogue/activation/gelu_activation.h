@@ -126,7 +126,7 @@ __simd_vf__ inline void RunGeluActivation(GeluActivationTileContext<InputType> c
 
     for (uint16_t row = 0; row < context.rowCount; ++row) {
         if constexpr (TopkWeightsPrefetch) {
-            asc_loadalign_brc_elem(weight, context.topkWeights + row * INT32_PER_256B + WEIGHT_INDEX);
+            asc_loadalign_brc(weight, context.topkWeights + row * INT32_PER_256B + WEIGHT_INDEX);
         }
         __ubuf__ InputType* input = context.input + row * context.rowStrideElements;
         __ubuf__ uint32_t* output =

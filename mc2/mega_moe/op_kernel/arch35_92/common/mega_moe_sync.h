@@ -181,7 +181,9 @@ __aicore__ inline void SyncInterArrive(uint16_t eventId)
 #if defined(MEGA_MOE_ARCH92_DEVICE)
     AscendC::CrossCoreSetFlag<0, Pipe>(eventId);
 #else
-    asc_sync_inter_arrive(Pipe, eventId);
+    // 9.1.0 的 asc_sync_block_arrive 使用 mode 2，不能替代这里的 mode 0。
+    const uint64_t config = 1U | (static_cast<uint64_t>(eventId & 0xFU) << 8U);
+    ffts_cross_core_sync(Pipe, config);
 #endif
 }
 
@@ -228,7 +230,7 @@ __aicore__ inline void AllCoreBarrier()
     if constexpr (g_coreType == AscendC::AIC) {
         asc_sync_intra_wait(PIPE_S, AIV_ARRIVE_EVENT);
         asc_sync_intra_wait(PIPE_S, AIV_ARRIVE_EVENT + AIV1_EVENT_OFFSET);
-        asc_sync_inter_arrive(PIPE_FIX, ALL_AIC_BARRIER_EVENT);
+        SyncInterArrive<PIPE_FIX>(ALL_AIC_BARRIER_EVENT);
         asc_sync_inter_wait(PIPE_S, ALL_AIC_BARRIER_EVENT);
         asc_sync_intra_arrive(PIPE_S, AIV_RELEASE_EVENT);
         asc_sync_intra_arrive(PIPE_S, AIV_RELEASE_EVENT + AIV1_EVENT_OFFSET);

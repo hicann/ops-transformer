@@ -23,6 +23,7 @@
 #include "kernel_operator_list_tensor_intf.h"
 #include "../arch35_92/common/mega_moe_types.h"
 #include "../arch35_92/common/mega_moe_gm_layout.h"
+#include "mega_moe_vf/mega_moe_vf.h"
 #include "../arch35_92/common/mega_moe_utils.h"
 #include "../arch35_92/common/mega_moe_arch35_92_exception_dump_policy.h"
 #include "../arch35_92/blaze/epilogue/mega_moe_block_epilogue_activation_mx_quant.h"

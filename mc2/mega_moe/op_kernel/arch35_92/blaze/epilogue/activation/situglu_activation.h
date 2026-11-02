@@ -329,7 +329,7 @@ __simd_vf__ inline void RunSiTUGLU(GatedActivationTileContext<InputType> context
     for (uint16_t rowIndex = 0U; rowIndex < context.rowLoopCount; ++rowIndex) {
         vector_float weightReg;
         if constexpr (TopkWeightsPrefetch) {
-            asc_loadalign_brc_elem_postupdate(weightReg, topkWeights, INT32_PER_256B);
+            asc_loadalign_brc_postupdate(weightReg, topkWeights, INT32_PER_256B);
         }
         const uint32_t inputRowOffset = static_cast<uint32_t>(rowIndex) * context.inputRowStrideElements;
         const uint32_t outputRowOffset = static_cast<uint32_t>(rowIndex) * context.outputRowStrideElements;

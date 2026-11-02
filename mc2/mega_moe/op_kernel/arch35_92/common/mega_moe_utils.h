@@ -40,9 +40,6 @@ HOST_DEVICE uint64_t CalcMtePaddedRowCount(uint64_t validRows)
 #if defined(__DAV_C310_CUBE__) || defined(__DAV_C310_VEC__) || defined(__DAV_310R6_CUBE__) || \
     defined(__DAV_310R6_VEC__) || defined(__DAV_920R1_CUBE__) || defined(__DAV_920R1_VEC__) || \
     defined(__NPU_ARCH__) || defined(__CCE_AICORE__)
-#if !defined(__NPU_ARCH__) || ((__NPU_ARCH__ != 9201) && (__NPU_ARCH__ != 9202))
-#include "c_api/asc_simd.h"
-#endif
 #include "kernel_operator.h"
 #include "mega_moe_sync.h"
 #include "mega_moe_copy.h"
@@ -61,144 +58,6 @@ __aicore__ inline void CallVf(Args&&... args)
 {
     asc_vf_call<Function>(static_cast<Args&&>(args)...);
 }
-
-#if !defined(MEGA_MOE_ARCH92_DEVICE)
-template <typename T>
-__simd_vf__ inline void FillUbVF(__ubuf__ T* destination, T value, uint32_t elementCount)
-{
-    static_assert(std::is_same_v<T, int16_t> || std::is_same_v<T, int32_t>);
-    using ValueVector = std::conditional_t<std::is_same_v<T, int16_t>, vector_int16_t, vector_int32_t>;
-    constexpr uint32_t ELEMENTS_PER_VECTOR = static_cast<uint32_t>(asc_get_vf_len()) / sizeof(T);
-    ValueVector valueReg;
-    vector_bool fullMask = sizeof(T) == sizeof(int16_t) ? asc_create_mask_b16(PAT_ALL) : asc_create_mask_b32(PAT_ALL);
-    asc_duplicate_scalar(valueReg, value, fullMask);
-    const uint32_t fullElementCount = elementCount / ELEMENTS_PER_VECTOR * ELEMENTS_PER_VECTOR;
-    for (uint32_t offset = 0U; offset < fullElementCount; offset += ELEMENTS_PER_VECTOR) {
-        asc_storealign(destination + offset, valueReg, fullMask);
-    }
-    if (fullElementCount < elementCount) {
-        uint32_t remaining = elementCount - fullElementCount;
-        vector_bool active =
-            sizeof(T) == sizeof(int16_t) ? asc_update_mask_b16(remaining) : asc_update_mask_b32(remaining);
-        asc_storealign(destination + fullElementCount, valueReg, active);
-    }
-}
-
-template <typename T>
-__simd_vf__ inline void CreateRouteIndicesVF(__ubuf__ T* destination, int32_t firstIndex, uint32_t elementCount)
-{
-    static_assert(std::is_same_v<T, int16_t> || std::is_same_v<T, int32_t>);
-    using IndexVector = std::conditional_t<std::is_same_v<T, int16_t>, vector_int16_t, vector_int32_t>;
-    constexpr uint32_t ELEMENTS_PER_VECTOR = static_cast<uint32_t>(asc_get_vf_len()) / sizeof(T);
-    IndexVector indicesReg;
-    for (uint32_t offset = 0U; offset < elementCount; offset += ELEMENTS_PER_VECTOR) {
-        uint32_t remaining = elementCount - offset;
-        vector_bool active =
-            sizeof(T) == sizeof(int16_t) ? asc_update_mask_b16(remaining) : asc_update_mask_b32(remaining);
-        asc_arange(indicesReg, static_cast<T>(firstIndex + static_cast<int32_t>(offset)));
-        asc_storealign(destination + offset, indicesReg, active);
-    }
-}
-
-// 源和目的均32B对齐且不重叠；尾段只读取有效BF16，支持只有32B/64B的TopK权重槽。
-__simd_callee__ inline void ConvertBf16ToFp32(__ubuf__ float* destination, __ubuf__ bfloat16_t* source,
-                                              uint32_t elementCount)
-{
-    constexpr uint32_t ELEMENTS_PER_VECTOR = static_cast<uint32_t>(asc_get_vf_len()) / sizeof(float);
-    vector_bfloat16_t inputReg;
-    vector_float outputReg;
-    vector_bool fullMask = asc_create_mask_b32(PAT_ALL);
-    uint32_t offset = 0U;
-    for (; elementCount - offset >= ELEMENTS_PER_VECTOR; offset += ELEMENTS_PER_VECTOR) {
-        asc_loadalign_unpack(inputReg, source + offset);
-        asc_bfloat162float(outputReg, inputReg, fullMask, ASC_POSITION_EVEN);
-        asc_storealign(destination + offset, outputReg, fullMask);
-    }
-    if (offset < elementCount) {
-        uint32_t remaining = elementCount - offset;
-        vector_bool active = asc_update_mask_b32(remaining);
-        vector_int32_t indexReg;
-        asc_arange(indexReg, 0);
-        // b32索引将BF16放入偶数b16 lane，未激活项不访问UB。
-        asc_gather(inputReg, source + offset, reinterpret_cast<vector_uint32_t&>(indexReg), active);
-        asc_bfloat162float(outputReg, inputReg, active, ASC_POSITION_EVEN);
-        asc_storealign(destination + offset, outputReg, active);
-    }
-}
-
-__simd_vf__ inline void CastBf16ToFp32VF(__ubuf__ float* destination, __ubuf__ bfloat16_t* source,
-                                         uint32_t elementCount)
-{
-    ConvertBf16ToFp32(destination, source, elementCount);
-}
-
-// 调用方保证长度按64项对齐；Unpermute整行和去重成员分段均覆盖完整向量加载范围。
-template <bool InitAccum, bool ApplyWeight>
-__simd_vf__ inline void AccumulateBf16ExpertSlotVF(__ubuf__ float* accumUb, __ubuf__ bfloat16_t* inputUb,
-                                                   float expertScale, uint32_t elementCount)
-{
-    constexpr uint32_t ELEMENTS_PER_VECTOR = static_cast<uint32_t>(asc_get_vf_len()) / sizeof(float);
-    const uint16_t repeatCount = static_cast<uint16_t>((elementCount + ELEMENTS_PER_VECTOR - 1U) / ELEMENTS_PER_VECTOR);
-    vector_bfloat16_t inputReg;
-    vector_float valueReg;
-    for (uint16_t i = 0U; i < repeatCount; ++i) {
-        const uint32_t offset = static_cast<uint32_t>(i) * ELEMENTS_PER_VECTOR;
-        vector_bool active = asc_update_mask_b32(elementCount);
-        // 64 个连续 BF16 放在偶数 b16 lane，转换后与 64 个 FP32 累加值逐项对应。
-        asc_loadalign_unpack(inputReg, inputUb + offset);
-        asc_bfloat162float(valueReg, inputReg, active, ASC_POSITION_EVEN);
-        if constexpr (ApplyWeight) {
-            // 保持独立 FP32 乘法和加法，不使用 FMA 或乘加后转半精度的接口。
-            asc_mul_scalar(valueReg, valueReg, expertScale, active);
-        }
-        if constexpr (!InitAccum) {
-            vector_float accumReg;
-            asc_loadalign(accumReg, accumUb + offset);
-            asc_add(valueReg, accumReg, valueReg, active);
-        }
-        asc_storealign(accumUb + offset, valueReg, active);
-    }
-}
-
-// FP32输入来自独立槽，乘权中间结果无需写回输入UB；长度由Host保证为64的倍数。
-template <bool InitAccum, bool ApplyWeight>
-__simd_vf__ inline void AccumulateFp32ExpertSlotVF(__ubuf__ float* accumUb, __ubuf__ float* inputUb, float expertScale,
-                                                   uint32_t elementCount)
-{
-    constexpr uint32_t ELEMENTS_PER_VECTOR = static_cast<uint32_t>(asc_get_vf_len()) / sizeof(float);
-    vector_bool fullMask = asc_create_mask_b32(PAT_ALL);
-    vector_float valueReg;
-    for (uint32_t offset = 0U; offset < elementCount; offset += ELEMENTS_PER_VECTOR) {
-        asc_loadalign(valueReg, inputUb + offset);
-        if constexpr (ApplyWeight) {
-            asc_mul_scalar(valueReg, valueReg, expertScale, fullMask);
-        }
-        if constexpr (!InitAccum) {
-            vector_float accumReg;
-            asc_loadalign(accumReg, accumUb + offset);
-            asc_add(valueReg, accumReg, valueReg, fullMask);
-        }
-        asc_storealign(accumUb + offset, valueReg, fullMask);
-    }
-}
-
-// 与原CAST_RINT保持相同的RINT、SAT和ZEROING模式；调用方保证长度按64项对齐。
-__simd_vf__ inline void CastFp32ToBf16VF(__ubuf__ bfloat16_t* destination, __ubuf__ float* source,
-                                         uint32_t elementCount)
-{
-    constexpr uint32_t ELEMENTS_PER_VECTOR = static_cast<uint32_t>(asc_get_vf_len()) / sizeof(float);
-    vector_bool fullMask = asc_create_mask_b32(PAT_ALL);
-    vector_float inputReg;
-    vector_bfloat16_t outputReg;
-    for (uint32_t offset = 0U; offset < elementCount; offset += ELEMENTS_PER_VECTOR) {
-        asc_loadalign(inputReg, source + offset);
-        asc_float2bfloat16_rn_sat(outputReg, inputReg, fullMask, ASC_POSITION_EVEN);
-        // 每个32bit槽取低16bit连续存储，避免误用BF16重载的PK_B16。
-        asc_storealign_pack(reinterpret_cast<__ubuf__ uint32_t*>(destination + offset),
-                            reinterpret_cast<vector_uint32_t&>(outputReg), fullMask);
-    }
-}
-#endif
 
 constexpr uint32_t UINT64_BYTE_OFFSET_SHIFT = 3U;
 
@@ -236,10 +95,10 @@ __aicore__ inline uint32_t GetSyncRoundTag(int32_t syncCount)
  * 本函数是 VF 内部的可复用计算单元，其他 VF 可直接调用，不会产生额外的 VF 启动。
  */
 // InputMask 可在加载时去除输入中的标记位，默认保留完整 int32 数值。
+#if defined(MEGA_MOE_ARCH92_DEVICE)
 template <int32_t InputMask = -1>
 __simd_callee__ inline void InclusivePrefixSumInt32(__ubuf__ int32_t* values, uint32_t elementCount)
 {
-#if defined(MEGA_MOE_ARCH92_DEVICE)
     constexpr uint32_t ELEMENTS_PER_VECTOR = GetVecLen() / sizeof(int32_t);
     AscendC::Reg::RegTensor<int32_t> prefixReg;
     AscendC::Reg::RegTensor<int32_t> shiftedReg;
@@ -283,51 +142,8 @@ __simd_callee__ inline void InclusivePrefixSumInt32(__ubuf__ int32_t* values, ui
         AscendC::Reg::Gather(carryReg, prefixReg,
                              reinterpret_cast<AscendC::Reg::RegTensor<uint32_t>&>(shiftedIndexReg));
     }
-#else
-    constexpr uint32_t ELEMENTS_PER_VECTOR = static_cast<uint32_t>(asc_get_vf_len()) / sizeof(int32_t);
-    vector_int32_t prefixReg;
-    vector_int32_t shiftedReg;
-    vector_int32_t carryReg;
-    vector_int32_t laneIndexReg;
-    vector_int32_t shiftedIndexReg;
-    vector_int32_t inputMaskReg;
-    vector_bool fullMask = asc_create_mask_b32(PAT_ALL);
-
-    asc_arange(laneIndexReg, 0);
-    asc_duplicate_scalar(carryReg, 0, fullMask);
-    if constexpr (InputMask != -1) {
-        asc_duplicate_scalar(inputMaskReg, InputMask, fullMask);
-    }
-    for (uint32_t vectorOffset = 0U; vectorOffset < elementCount; vectorOffset += ELEMENTS_PER_VECTOR) {
-        uint32_t validCount = elementCount - vectorOffset;
-        validCount = validCount < ELEMENTS_PER_VECTOR ? validCount : ELEMENTS_PER_VECTOR;
-        uint32_t maskCount = validCount;
-        vector_bool activeMask = asc_update_mask_b32(maskCount);
-        asc_loadalign(prefixReg, values + vectorOffset);
-        if constexpr (InputMask != -1) {
-            asc_and(prefixReg, prefixReg, inputMaskReg, activeMask);
-        }
-
-        for (uint32_t shift = 1U; shift < validCount; shift <<= 1U) {
-            asc_add_scalar(shiftedIndexReg, laneIndexReg, -static_cast<int32_t>(shift), fullMask);
-            asc_max_scalar(shiftedIndexReg, shiftedIndexReg, 0, fullMask);
-            asc_gather(shiftedReg, prefixReg, reinterpret_cast<vector_uint32_t&>(shiftedIndexReg));
-            vector_bool shiftedLaneMask;
-            asc_ge_scalar(shiftedLaneMask, laneIndexReg, static_cast<int32_t>(shift), activeMask);
-            // asc_add 将未激活 lane 清零；复用 shiftedReg 暂存，再选择以保留原 MERGING 语义。
-            asc_add(shiftedReg, prefixReg, shiftedReg, shiftedLaneMask);
-            asc_select(prefixReg, shiftedReg, prefixReg, shiftedLaneMask);
-        }
-
-        asc_add(shiftedReg, prefixReg, carryReg, activeMask);
-        asc_select(prefixReg, shiftedReg, prefixReg, activeMask);
-        asc_storealign(values + vectorOffset, prefixReg, activeMask);
-
-        asc_duplicate_scalar(shiftedIndexReg, static_cast<int32_t>(validCount - 1U), fullMask);
-        asc_gather(carryReg, prefixReg, reinterpret_cast<vector_uint32_t&>(shiftedIndexReg));
-    }
-#endif
 }
+#endif
 
 __aicore__ inline WorkRange TilingByJobContext(uint32_t totalLen, uint32_t jobIndex, uint32_t totalJobs,
                                                uint32_t align = ALIGN_32)

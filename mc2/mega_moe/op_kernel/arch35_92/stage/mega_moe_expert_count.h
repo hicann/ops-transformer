@@ -58,7 +58,6 @@ __simd_vf__ inline void CheckCountRoundTagsVF(__ubuf__ uint32_t* counts, __ubuf_
     vector_uint32_t oneReg;
     vector_uint32_t resultReg;
     vector_bool fullMask = asc_create_mask_b32(PAT_ALL);
-    vector_bool firstLaneMask = asc_create_mask_b32(PAT_VL1);
     asc_duplicate_scalar(pendingReg, 0U, fullMask);
     asc_duplicate_scalar(oneReg, 1U, fullMask);
     for (uint32_t offset = 0U; offset < elementCount; offset += ELEMENTS_PER_VECTOR) {
@@ -71,7 +70,7 @@ __simd_vf__ inline void CheckCountRoundTagsVF(__ubuf__ uint32_t* counts, __ubuf_
         asc_select(pendingReg, oneReg, pendingReg, mismatchMask);
     }
     asc_reduce_max(resultReg, pendingReg, fullMask);
-    asc_storealign(pending, resultReg, firstLaneMask);
+    asc_storealign_1st(pending, resultReg);
 #endif
 }
 
@@ -174,7 +173,6 @@ __simd_vf__ inline void ComputeExpertCountTablesVF(__ubuf__ int32_t* count, __ub
     vector_int32_t previousEndPrefixReg;
     vector_int32_t expertCountReg;
     vector_int32_t previousVectorEndReg;
-    vector_int32_t maxOutputSizeReg;
     vector_int32_t laneIndexReg;
     vector_int32_t gatherIndexReg;
     vector_int32_t previousLaneIndexReg;
@@ -184,12 +182,13 @@ __simd_vf__ inline void ComputeExpertCountTablesVF(__ubuf__ int32_t* count, __ub
     int32_t maxOutputSizeInt32 = static_cast<int32_t>(maxOutputSize);
     asc_arange(laneIndexReg, 0);
     asc_duplicate_scalar(previousVectorEndReg, 0, fullMask);
-    asc_duplicate_scalar(maxOutputSizeReg, maxOutputSizeInt32, fullMask);
-    for (uint32_t expertOffset = 0U; expertOffset < expertCount; expertOffset += ELEMENTS_PER_VECTOR) {
+    const uint16_t repeatCount = static_cast<uint16_t>((expertCount + ELEMENTS_PER_VECTOR - 1U) / ELEMENTS_PER_VECTOR);
+    for (uint16_t i = 0U; i < repeatCount; ++i) {
+        const uint32_t expertOffset = static_cast<uint32_t>(i) * ELEMENTS_PER_VECTOR;
         uint32_t validCount = expertCount - expertOffset;
-        validCount = validCount < ELEMENTS_PER_VECTOR ? validCount : ELEMENTS_PER_VECTOR;
         uint32_t maskCount = validCount;
         vector_bool activeMask = asc_update_mask_b32(maskCount);
+        validCount -= maskCount;
 
         asc_add_scalar(gatherIndexReg, laneIndexReg, static_cast<int32_t>(expertOffset), fullMask);
         asc_mul_scalar(gatherIndexReg, gatherIndexReg, static_cast<int32_t>(worldSize), fullMask);
@@ -200,11 +199,8 @@ __simd_vf__ inline void ComputeExpertCountTablesVF(__ubuf__ int32_t* count, __ub
         asc_max_scalar(previousLaneIndexReg, previousLaneIndexReg, 0, fullMask);
         asc_gather(previousEndPrefixReg, expertEndPrefixReg, reinterpret_cast<vector_uint32_t&>(previousLaneIndexReg));
         asc_select(previousEndPrefixReg, previousVectorEndReg, previousEndPrefixReg, firstLaneMask);
-        vector_bool overflowMask;
-        asc_ge_scalar(overflowMask, expertEndPrefixReg, maxOutputSizeInt32, activeMask);
-        asc_select(expertCountReg, maxOutputSizeReg, expertEndPrefixReg, overflowMask);
-        asc_ge_scalar(overflowMask, previousEndPrefixReg, maxOutputSizeInt32, activeMask);
-        asc_select(previousEndPrefixReg, maxOutputSizeReg, previousEndPrefixReg, overflowMask);
+        asc_min_scalar(expertCountReg, expertEndPrefixReg, maxOutputSizeInt32, activeMask);
+        asc_min_scalar(previousEndPrefixReg, previousEndPrefixReg, maxOutputSizeInt32, activeMask);
         asc_sub(expertCountReg, expertCountReg, previousEndPrefixReg, activeMask);
         asc_storealign(expertCounts + expertOffset, expertCountReg, activeMask);
 

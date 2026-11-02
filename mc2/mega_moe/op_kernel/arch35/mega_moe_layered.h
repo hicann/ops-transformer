@@ -31,6 +31,7 @@
 
 #include "kernel_tiling/kernel_tiling.h"
 #include "kernel_operator_list_tensor_intf.h"
+#include "mega_moe_vf/mega_moe_vf.h"
 
 #include "../../../common/op_kernel/mc2_kernel_utils.h"
 #include "../../../common/op_kernel/quantize_functions.h"

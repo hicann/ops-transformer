@@ -437,13 +437,18 @@ static MegaMoeSendMaskBufferConfig CalcTopkValidIndexBufferConfig(const MegaMoeT
     return bufferConfig;
 }
 
+enum class UnpermuteBufferPolicy : uint8_t {
+    FUSED_ACCUMULATION,
+    SEPARATE_DEQUANTIZATION
+};
+
 /*
  * 计算 unpermute 的 slot 与 scale 尺寸：单 token 的 BF16 搬入区 + FP32 计算区，以及 combine quant 的 scale 展开区。
  * dataSlotBytes 与 scaleBytes 经出参带出，供后续两个阶段共用。
  */
 static void CalcUnpermuteSlotAndScaleBytes(const MegaMoeTilingData* tilingData,
                                            MegaMoeUnpermuteBufferConfig& bufferConfig, uint32_t& dataSlotBytes,
-                                           uint32_t& scaleBytes)
+                                           uint32_t& scaleBytes, UnpermuteBufferPolicy bufferPolicy)
 {
     uint32_t bf16SlotBytes = static_cast<uint32_t>(ops::CeilAlign(
         static_cast<uint64_t>(tilingData->compute.h) * sizeof(uint16_t), static_cast<uint64_t>(ALIGN_32)));
@@ -456,7 +461,8 @@ static void CalcUnpermuteSlotAndScaleBytes(const MegaMoeTilingData* tilingData,
 
     // scaleBytes 是 combine quant 使用的 BF16/FP32 scale 展开区大小。
     scaleBytes = 0U;
-    if (tilingData->combineQuantMode != COMBINE_NO_QUANT) {
+    if (bufferPolicy == UnpermuteBufferPolicy::SEPARATE_DEQUANTIZATION &&
+        tilingData->combineQuantMode != COMBINE_NO_QUANT) {
         uint32_t scaleElementCount = (tilingData->compute.h + ALIGN_32 - 1U) / ALIGN_32;
         scaleBytes = static_cast<uint32_t>(ops::CeilAlign(
                          static_cast<uint64_t>(scaleElementCount) * sizeof(uint16_t) * DEQUANT_BF16_SCALE_EXPANSION,
@@ -489,7 +495,8 @@ static void SetUnpermuteWeightBufferBytes(MegaMoeUnpermuteBufferConfig& bufferCo
 static MegaMoeUnpermuteBufferConfig CalcUnpermuteBufferConfig(const MegaMoeTilingData* tilingData,
                                                               uint32_t coreTokenCount,
                                                               uint32_t topKWeightsConversionElementBytes,
-                                                              uint32_t availableUbBytes)
+                                                              uint32_t availableUbBytes,
+                                                              UnpermuteBufferPolicy bufferPolicy)
 {
     MegaMoeUnpermuteBufferConfig bufferConfig{};
     if (coreTokenCount == 0U) {
@@ -498,7 +505,11 @@ static MegaMoeUnpermuteBufferConfig CalcUnpermuteBufferConfig(const MegaMoeTilin
 
     uint32_t dataSlotBytes = 0U;
     uint32_t scaleBytes = 0U;
-    CalcUnpermuteSlotAndScaleBytes(tilingData, bufferConfig, dataSlotBytes, scaleBytes);
+    CalcUnpermuteSlotAndScaleBytes(tilingData, bufferConfig, dataSlotBytes, scaleBytes, bufferPolicy);
+    // 累加/输出区固定为 BF16 + FP32；Arch35 输入槽只需保留搬入区。
+    const uint32_t inputSlotBytes = bufferPolicy == UnpermuteBufferPolicy::FUSED_ACCUMULATION ?
+                                        bufferConfig.bf16SlotElementCount * sizeof(uint16_t) :
+                                        dataSlotBytes;
 
     // 第一阶段：按基准 weight batch 确定每批 token 数和 weight 区，再以剩余 UB 分配输入 ring。
     uint32_t baseTokensPerBatch = UNPERMUTE_WEIGHT_ITEMS_PER_BATCH / tilingData->compute.topK;
@@ -511,7 +522,7 @@ static MegaMoeUnpermuteBufferConfig CalcUnpermuteBufferConfig(const MegaMoeTilin
                                        bufferConfig.topKWeightsConversionBufferBytes + scaleBytes + dataSlotBytes;
     uint32_t inputBufferBudgetBytes =
         availableUbBytes > bytesBeforeInputBuffers ? availableUbBytes - bytesBeforeInputBuffers : 0U;
-    bufferConfig.inputBufferCount = static_cast<int32_t>(inputBufferBudgetBytes / dataSlotBytes);
+    bufferConfig.inputBufferCount = static_cast<int32_t>(inputBufferBudgetBytes / inputSlotBytes);
     bufferConfig.inputBufferCount = std::min(bufferConfig.inputBufferCount, MAX_UNPERMUTE_INPUT_BUFFER_COUNT);
     int32_t accumulationItemCount =
         bufferConfig.tokensPerBatch *
@@ -522,7 +533,8 @@ static MegaMoeUnpermuteBufferConfig CalcUnpermuteBufferConfig(const MegaMoeTilin
     // 第二阶段：ring 深度固定后，使用剩余 UB 扩大 weight batch。
     if (baseTokensPerBatch < coreTokenCount) {
         // fixedBytes 包含 scale、一个累加/输出 slot 和已经选中的所有输入 slot。
-        uint32_t fixedBytes = scaleBytes + (static_cast<uint32_t>(bufferConfig.inputBufferCount) + 1U) * dataSlotBytes;
+        uint32_t fixedBytes =
+            scaleBytes + dataSlotBytes + static_cast<uint32_t>(bufferConfig.inputBufferCount) * inputSlotBytes;
         // weightBudgetBytes 是 FP32 weight 及可选转换中转区可使用的 UB。
         uint32_t weightBudgetBytes = availableUbBytes - fixedBytes - UNPERMUTE_WEIGHT_ALIGNMENT_RESERVE_BYTES;
         uint32_t weightBytesPerToken =
@@ -591,7 +603,7 @@ static void SetPreQuantTileConfig(MegaMoeTilingData* tilingData, bool isPreQuant
  * 设置 Unpermute 的完整 chunk 与 tail chunk 两套 UB 配置，并记录完整 chunk 对应的 core 数。
  */
 static void SetUnpermuteBufferConfigs(MegaMoeTilingData* tilingData, ge::DataType topKWeightsDataType,
-                                      uint32_t availableUbBytes)
+                                      uint32_t availableUbBytes, UnpermuteBufferPolicy bufferPolicy)
 {
     /*
      * 与 kernel Unpermute 开头的 TilingByCore(m_, ..., align=1) 一一对应。TilingByCore 使用：
@@ -610,12 +622,13 @@ static void SetUnpermuteBufferConfigs(MegaMoeTilingData* tilingData, ge::DataTyp
     uint32_t tailTokenChunkSize = tilingData->compute.bs - (activeCoreCount - 1U) * fullTokenChunkSize;
     bool tailIsFullTokenChunk = tailTokenChunkSize == fullTokenChunkSize;
     tilingData->unpermuteFullTokenChunkCoreCount = tailIsFullTokenChunk ? activeCoreCount : activeCoreCount - 1U;
-    tilingData->unpermuteConfigForFullTokenChunk =
-        CalcUnpermuteBufferConfig(tilingData, fullTokenChunkSize, topKWeightsConversionElementBytes, availableUbBytes);
+    tilingData->unpermuteConfigForFullTokenChunk = CalcUnpermuteBufferConfig(
+        tilingData, fullTokenChunkSize, topKWeightsConversionElementBytes, availableUbBytes, bufferPolicy);
     tilingData->unpermuteConfigForTailTokenChunk =
-        tailIsFullTokenChunk ? MegaMoeUnpermuteBufferConfig{} :
-                               CalcUnpermuteBufferConfig(tilingData, tailTokenChunkSize,
-                                                         topKWeightsConversionElementBytes, availableUbBytes);
+        tailIsFullTokenChunk ?
+            MegaMoeUnpermuteBufferConfig{} :
+            CalcUnpermuteBufferConfig(tilingData, tailTokenChunkSize, topKWeightsConversionElementBytes,
+                                      availableUbBytes, bufferPolicy);
 }
 
 /*

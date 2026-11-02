@@ -88,9 +88,9 @@ __simd_callee__ inline void LoadActivationInput(vector_float& output, __ubuf__ I
     InputVector inputReg;
     asc_loadalign_unpack_postupdate(inputReg, input, VECTOR_LENGTH_FP32);
     if constexpr (std::is_same_v<InputType, bfloat16_t>) {
-        asc_bfloat162float(output, inputReg, computeMask, ASC_POSITION_EVEN);
+        asc_bfloat162float(output, inputReg, computeMask);
     } else {
-        asc_half2float(output, inputReg, computeMask, ASC_POSITION_EVEN);
+        asc_half2float(output, inputReg, computeMask);
     }
 }
 
@@ -98,7 +98,7 @@ __simd_callee__ inline void StoreActivationOutput(__ubuf__ uint32_t*& output, ve
                                                   vector_bool computeMask, vector_bool storeMask)
 {
     vector_bfloat16_t outputReg;
-    asc_float2bfloat16_rn(outputReg, input, computeMask, ASC_POSITION_EVEN);
+    asc_float2bfloat16_rn(outputReg, input, computeMask);
     constexpr uint32_t OUTPUT_STEP = VECTOR_LENGTH_FP32 * sizeof(bfloat16_t) / sizeof(uint32_t);
     asc_storealign_pack_postupdate(output, reinterpret_cast<vector_uint32_t&>(outputReg), OUTPUT_STEP, storeMask);
 }

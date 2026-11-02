@@ -20,7 +20,6 @@
 
 namespace MegaMoeImpl {
 
-#if defined(MEGA_MOE_ARCH92_DEVICE)
 enum class GmLoadCacheMode : uint8_t {
     NORMAL_FIRST_VICTIM = 0,
     NORMAL_LAST_VICTIM = 1,
@@ -36,10 +35,6 @@ enum class GmStoreCacheMode : uint8_t {
     NORMAL_PERSISTENT = 2,
     NOTALLOC_CLEAN = 4
 };
-#else
-using GmLoadCacheMode = asc_load_l2_cache_mode;
-using GmStoreCacheMode = asc_store_l2_cache_mode;
-#endif
 
 // All lengths/pitches are bytes. Pitches are row-start to row-start distances.
 // UB pitch == rowBytes selects compact packing; otherwise UB pitch must be 32B aligned.
@@ -131,8 +126,8 @@ __aicore__ inline void CopyGmToUb(__ubuf__ D* dst, __gm__ S* src, CopyRows copy,
     }
 #else
     asc_copy_gm2ub_align(reinterpret_cast<__ubuf__ CopyWord<S>*>(dst), reinterpret_cast<__gm__ CopyWord<S>*>(src),
-                         copy.rows, copy.rowBytes, 0, 0, enableConstantPad, cacheMode, copy.gmPitchBytes,
-                         copy.ubPitchBytes);
+                         copy.rows, copy.rowBytes, 0, 0, enableConstantPad, static_cast<uint8_t>(cacheMode),
+                         copy.gmPitchBytes, copy.ubPitchBytes);
 #endif
 }
 
@@ -164,7 +159,7 @@ __aicore__ inline void CopyUbToGm(__gm__ D* dst, __ubuf__ S* src, CopyRows copy,
     }
 #else
     asc_copy_ub2gm_align(reinterpret_cast<__gm__ uint8_t*>(dst), reinterpret_cast<__ubuf__ uint8_t*>(src), copy.rows,
-                         copy.rowBytes, cacheMode, copy.gmPitchBytes, copy.ubPitchBytes);
+                         copy.rowBytes, static_cast<uint8_t>(cacheMode), copy.gmPitchBytes, copy.ubPitchBytes);
 #endif
 }
 
