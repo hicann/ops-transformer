@@ -437,6 +437,8 @@ int main() {
         kHostData[i] = FloatToBf16(dist(gen) * 0.05f);
         vHostData[i] = FloatToBf16(dist(gen) * 0.05f);
         gHostData[i] = dist(gen) * 0.02f - 0.5f;
+    }
+    for (size_t i = 0; i < betaHostData.size(); i++) {
         betaHostData[i] = Sigmoid(dist(gen));
     }
     std::vector<float> aLogHostData = {-0.5f, 0.5f};

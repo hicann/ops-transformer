@@ -149,27 +149,6 @@
 | use_gate_in_kernel | 必选属性 | 是否在kernel内由raw gate计算激活。默认值为false。 | BOOL | - |
 | state_v_first | 可选属性 | 是否将状态张量末两维排列为(V, K)。默认值为false。 | BOOL | - |
 
-## Python返回策略
-
-`cann_ops_transformer.ops.chunk_kda_fwd`固定返回12项。每一项的返回条件如下：
-
-| 返回项 | 返回条件 |
-| :--- | :--- |
-| attn_out | 始终返回。 |
-| final_state | `output_final_state=true`时返回，否则为`None`。 |
-| gk | `use_gate_in_kernel=false`或`disable_recompute=true`时返回，否则为`None`。 |
-| Aqk | 始终返回。 |
-| Akk | 始终返回。 |
-| w | `disable_recompute=true`时返回，否则为`None`。 |
-| u | `disable_recompute=true`时返回，否则为`None`。 |
-| qg | `disable_recompute=true`时返回，否则为`None`。 |
-| kg | `disable_recompute=true`时返回，否则为`None`。 |
-| v_new | `disable_recompute=true`时返回，否则为`None`。 |
-| h | `disable_recompute=true`或`return_intermediate_states=true`时返回，否则为`None`。 |
-| initial_state | 原样返回Python输入`initial_state`，不是aclnn输出。 |
-
-aclnn接口不接收`output_final_state`、`disable_recompute`或`return_intermediate_states`。L2只根据每个可选输出指针是否为空决定是否导出该输出。
-
 ## 约束说明
 
 - H和HV必须为正整数，且满足HV≥H、HV≤128、HV % H=0。
@@ -187,7 +166,7 @@ aclnn接口不接收`output_final_state`、`disable_recompute`或`return_interme
 
 | 调用方式 | 样例代码 | 说明 |
 | :--- | :--- | :--- |
-| aclnn接口 | [aclnnChunkKdaFwd](./docs/aclnnChunkKdaFwd.md) | 通过`aclnnChunkKdaFwdGetWorkspaceSize`和`aclnnChunkKdaFwd`调用。 |
-| pytest | [ChunkKdaFwd测试框架](./tests/pytest/README.md) | 覆盖功能、跨布局一致性、确定性和性能验证。 |
+| aclnn API | [test_aclnn_chunk_kda_fwd.cpp](./examples/test_aclnn_chunk_kda_fwd.cpp) | 通过[aclnnChunkKdaFwd](./docs/aclnnChunkKdaFwd.md)调用ChunkKdaFwd算子。编译与运行步骤见[调用示例说明](./examples/README.md)。 |
+| PyTorch API | [torchapi_chunk_kda_fwd](./docs/torchapi_chunk_kda_fwd.md) | 通过`cann_ops_transformer.ops.chunk_kda_fwd`调用ChunkKdaFwd算子。 |
 
 阶段划分、平台模板和流水设计见[ChunkKdaFwd算子设计介绍](./docs/ChunkKdaFwd算子设计介绍.md)。

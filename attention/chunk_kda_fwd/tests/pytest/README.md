@@ -4,7 +4,7 @@
 
 基于pytest和msopprof实现ChunkKdaFwd算子的功能、确定性和性能验证：
 
-- **功能验证**：通过`cann_ops_transformer.ops.chunk_kda_fwd`调用算子，验证四种输入布局、可选输出矩阵、BF16 gate参数提升、变长序列尾块和`state_v_first`。
+- **功能验证**：通过`cann_ops_transformer.ops.chunk_kda_fwd`调用算子，验证四种输入布局、可选输出矩阵、BFLOAT16 gate参数提升、变长序列尾块和`state_v_first`。
 - **一致性验证**：将BNSD、TND、NTD输入的结果与BSND输入结果进行交叉布局对比。
 - **确定性验证**：对同一输入重复执行，验证指定输出二进制一致。
 - **性能验证**：使用msopprof采集关键场景的device侧耗时，不使用Python wall time作为性能结论。
@@ -16,18 +16,18 @@
 | 测试项 | 覆盖内容 |
 | --- | --- |
 | 输入布局 | BSND、BNSD、TND、NTD |
-| 数据类型 | BF16主输入，FP32 gate，BF16/FP32 `A_log`和`dt_bias` |
+| 数据类型 | BFLOAT16主输入，FLOAT32 gate，BFLOAT16、FLOAT32 `A_log`和`dt_bias` |
 | 可选输出 | 默认返回、`return_intermediate_states=True`、`disable_recompute=True` |
 | 变长序列 | NTD，`cu_seqlens=[0,64,65]`，序列尾块长度为1 |
 | 状态布局 | `state_v_first=False`和`state_v_first=True` |
-| 性能场景 | BF16、BSND、B=1、S=16384、H=HV=96、K=V=128、`chunk_size=64`、`safe_gate=True`、`use_gate_in_kernel=True` |
+| 性能场景 | BFLOAT16、BSND、B=1、S=16384、H=HV=96、K=V=128、`chunk_size=64`、`safe_gate=True`、`use_gate_in_kernel=True` |
 
 ### 环境配置
 
 #### 前置要求
 
-1. 完成CANN、Ascend for PyTorch和ops-transformer安装及环境变量配置，具体操作请参考[ops-transformer](../../../../README.md)。
-2. 安装包中已包含`ChunkKdaFwd`算子及`cann_ops_transformer.ops.chunk_kda_fwd` Python接口。
+1. 完成CANN、`torch_npu`和ops-transformer安装及环境变量配置，具体操作请参考[ops-transformer](../../../../README.md)。
+2. 已安装包含`ChunkKdaFwd`算子的custom算子包，以及提供`cann_ops_transformer.ops.chunk_kda_fwd`的`torch_extension` wheel。
 3. 性能验证前确认`msopprof`命令可用。
 
 ## 文件结构
@@ -37,7 +37,7 @@ pytest/
 ├── README.md                    # 测试框架说明
 ├── common.py                    # 输入构造、layout转换和通用断言
 ├── test_chunk_kda_fwd.py        # 功能、一致性和确定性用例
-├── profile_a5_h96_t16k.py       # A5关键场景性能与50次确定性入口
+├── profile_a5_h96_t16k.py       # Ascend 950关键场景性能与50次确定性入口
 └── check_msopprof.py             # msopprof结果解析和性能门禁
 ```
 
@@ -63,7 +63,7 @@ python3 attention/chunk_kda_fwd/tests/pytest/profile_a5_h96_t16k.py \
 
 确定性验证对`attn_out`、`final_state`、`Aqk`和`Akk`执行二进制一致性比较。
 
-### 运行A5关键场景性能验证
+### 运行Ascend 950关键场景性能验证
 
 创建性能数据目录：
 

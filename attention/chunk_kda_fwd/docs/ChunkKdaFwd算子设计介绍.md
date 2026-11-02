@@ -23,7 +23,7 @@ raw g -> ChunkKdaFwd[
 
 ```text
 cann_ops_transformer.ops.chunk_kda_fwd
-  -> PyTorch C++ extension wrapper
+  -> PyTorch custom op registration and wrapper
   -> aclnnChunkKdaFwd
   -> ChunkKdaFwd L0 注册与 launcher
   -> chunk_kda_fwd device kernel launch 入口
