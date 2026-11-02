@@ -433,7 +433,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
     - In the mx quantization scenario, x2/x2Scale supports transposed/non-transposed input.
     - In the mx quantization scenario, when x1 and x2 are FLOAT4_E2M1 (MXFP4 quantization) inputs, k must be an even number. When x2 is a non-transpose input, n must also be an even number.
     - Supports 2, 4, 8, 16, 32, and 64 devices; supports CCU communication and AICPU communication. CCU only supports interconnection within the UB domain of a single machine, and AICPU supports interconnection across machines within the UB domain.
-    - The total data volume of ReduceScatter collective communication must not exceed 16 * 256MB. The total data volume is calculated as follows: m * n * sizeof(output_dtype). The internal implementation of the operator may vary due to shape differences. The actual supported total communication volume may be slightly less than this value.
+    - In case of CCU communication, the total data volume of ReduceScatter collective communication must not exceed 63 * 256MB. The total data volume is calculated as follows: m * n * sizeof(output_dtype). The internal implementation of the operator may vary due to shape differences. The actual supported total communication volume may be slightly less than this value.
 
 <!-- end id14 -->
 <!-- npu="A3,910b" id15 -->
