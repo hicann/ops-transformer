@@ -220,7 +220,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
     <td>输入</td>
     <td>块状稀疏掩码，表示实际的稀疏pattern。决定哪些block实际参与注意力计算。</td>
     <td>不支持空Tensor。<br>可选输入（当前版本为必选）：<ul><li>shape为[batch, headNum, ceilDiv(maxQSeqLength, blockShapeX), ceilDiv(maxKvSeqLength, blockShapeY)]。</li><li>表示按block划分后哪些block需要参与计算（为1），哪些block不参与计算（为0）。</li><li>如传入nullptr，则视为不开启块稀疏计算，即所有token之间的注意力分数都会被计算。</li></ul></td>
-    <td>BOOL</td>
+    <td>UINT8</td>
     <td>ND</td>
     <td>4</td>
     <td>×</td>

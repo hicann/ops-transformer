@@ -238,7 +238,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
     <td>Input</td>
     <td>Block sparse mask that indicates the actual sparse pattern. Determines which blocks actually participate in the attention computation.</td>
     <td>Does not support empty tensors.<br>Optional input (required in the current version):<ul><li>The shape is [batch, headNum, ceilDiv(maxQSeqLength, blockShapeX), ceilDiv(maxKvSeqLength, blockShapeY)]. The 3rd dimension is calculated independently based on the blockShapeX granularity in the Q direction, and the 4th dimension is calculated independently based on the blockShapeY granularity in the KV direction. The two values can be different.</li><li>Indicates, after block division, which blocks need to participate in the computation (value 1) and which blocks do not (value 0).</li><li>When the sequence length is not an integer multiple of the blockShape in the corresponding direction, the last logical block covers the remaining valid tokens in that direction.</li><li>If nullptr is passed in, block sparse computation is disabled, which means the attention scores between all tokens are computed.</li></ul></td>
-    <td>BOOL</td>
+    <td>UINT8</td>
     <td>ND</td>
     <td>4</td>
     <td>×</td>
@@ -247,10 +247,10 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
     <td>attenMaskOptional (aclTensor*)</td>
     <td>Input</td>
     <td>Attention mask, that is, atten_mask in the formula. Used to mask the specific tokens that should not participate in the computation.</td>
-    <td>Empty tensors are supported.<br>Currently not supported. Pass in nullptr.</td>
-    <td>BOOL</td>
+    <td>For maskType=0, pass nullptr. For maskType=1 (A2/A3 only), this input is required and must be an INT32 tensor with shape [batch, headNum, maxBlockNum, 2], where maxBlockNum = max(ceilDiv(maxQSeqLength, blockShapeX), ceilDiv(maxKvSeqLength, blockShapeY)). The last dimension stores the actual Q and KV lengths in each block; each length must be between 0 and the corresponding blockShape value.</td>
+    <td>INT32</td>
     <td>ND</td>
-    <td>2</td>
+    <td>4</td>
     <td>×</td>
     </tr>
     <tr>
@@ -323,7 +323,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
     <td>maskType (int64_t)</td>
     <td>Input</td>
     <td>Mask type in the attention computation. Specifies the preset masking rule to use.</td>
-    <td>Currently only 0 is supported: it indicates the use case without a mask.</td>
+    <td>Supports 0 and 1:<ul><li>0: no attention mask; attenMaskOptional must be nullptr.</li><li>1: PerBlockSizeMask on A2/A3; attenMaskOptional is required.</li></ul></td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
