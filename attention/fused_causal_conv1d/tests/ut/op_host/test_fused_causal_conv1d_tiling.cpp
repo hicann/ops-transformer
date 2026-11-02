@@ -80,8 +80,8 @@ TEST_F(FusedCausalConv1dCutBHTiling, bh_3d_bf16_b4_s1_d512)
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                  // initialStateIdx
                               },
                               {
-                                  {{{4, 1, 512}, {4, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND}, // y
                                   {{{4, 2, 512}, {4, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND}, // convStates
+                                  {{{4, 1, 512}, {4, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND}, // y
                               },
                               a, &c);
     ExecuteTestCase(p, ge::GRAPH_SUCCESS, 20000,
@@ -110,8 +110,8 @@ TEST_F(FusedCausalConv1dCutBHTiling, bh_3d_bf16_b1_s4_d1024)
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                    // initialStateIdx
                               },
                               {
-                                  {{{1, 4, 1024}, {1, 4, 1024}}, ge::DT_BF16, ge::FORMAT_ND}, // y
                                   {{{1, 5, 1024}, {1, 5, 1024}}, ge::DT_BF16, ge::FORMAT_ND}, // convStates
+                                  {{{1, 4, 1024}, {1, 4, 1024}}, ge::DT_BF16, ge::FORMAT_ND}, // y
                               },
                               a, &c);
     ExecuteTestCase(p, ge::GRAPH_SUCCESS, 20000,
@@ -142,8 +142,9 @@ TEST_F(FusedCausalConv1dCutBHTiling, bh_2d_fp16_b1_s4_d512)
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // initialStateIdx
                               },
                               {
-                                  {{{4, 512}, {4, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},       // y
                                   {{{2, 5, 512}, {2, 5, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // convStates
+                                  {{{4, 512}, {4, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},       // y
+
                               },
                               a, &c);
     ExecuteTestCase(p, ge::GRAPH_SUCCESS, 20001,
@@ -172,8 +173,8 @@ TEST_F(FusedCausalConv1dCutBHTiling, bh_2d_fp16_b32_s128_d512)
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                       // initialStateIdx
                               },
                               {
-                                  {{{128, 512}, {128, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},     // y
                                   {{{64, 5, 512}, {64, 5, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // convStates
+                                  {{{128, 512}, {128, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},     // y
                               },
                               a, &c);
     ExecuteTestCase(p, ge::GRAPH_SUCCESS, 20001,
@@ -205,8 +206,8 @@ TEST_F(FusedCausalConv1dCutBHTiling, bh_2d_hasNAT_fp16_b4_s16_d512)
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                     // initialStateIdx
         },
         {
-            {{{16, 512}, {16, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},     // y
             {{{8, 7, 512}, {8, 7, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // convStates
+            {{{16, 512}, {16, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},     // y
         },
         a, &c);
     ExecuteTestCase(p, ge::GRAPH_SUCCESS, 20001,
@@ -237,8 +238,8 @@ TEST_F(FusedCausalConv1dCutBHTiling, bh_2d_apc_fp16_b8_s32_d512)
                                   {{{8}, {8}}, ge::DT_INT32, ge::FORMAT_ND}, // initialStateIdx (APC)
                               },
                               {
-                                  {{{32, 512}, {32, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},         // y
                                   {{{100, 5, 512}, {100, 5, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // convStates
+                                  {{{32, 512}, {32, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},         // y
                               },
                               a, &c);
     ExecuteTestCase(p, ge::GRAPH_SUCCESS, 20001,
