@@ -52,7 +52,8 @@ __global__ __aicore__ void allto_allv_grouped_mat_mul(GM_ADDR gmmxGM, GM_ADDR gm
         return;
     }
 
-    REGISTER_TILING_DEFAULT(AlltoAllvGmmKernelTilingData);
+    REGISTER_TILING_DEFAULT(AlltoAllvGmmTilingData);
+    REGISTER_TILING_FOR_TILINGKEY("TILINGKEY_COMM_MODE == TILINGKEY_TPL_AIV", AlltoAllvGmmAivTilingData);
 
     if constexpr (TILINGKEY_COMM_MODE == TILINGKEY_TPL_AIV) {
 #if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 220) || defined(__CCE_KT_TEST__)

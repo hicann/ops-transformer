@@ -80,7 +80,6 @@ __global__ __aicore__ void allto_allv_quant_grouped_mat_mul(
 #else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
 #endif
-    GET_TILING_DATA_WITH_STRUCT(QuantAlltoAllvGroupedMatmulTilingData, tilingData, tilingGM);
     using ComputeOpType =
         QuantGroupedMatmul<QuantAlltoAllvGroupedMatmulTilingData, GMMQuantTilingData, DTYPE_GMM_X, DTYPE_GMM_WEIGHT,
                            DTYPE_GMM_X_SCALE, DTYPE_GMM_Y, CubeFormat::ND, false, TILINGKEY_GMM_WEIGHT_TRANSPOSE, false,

@@ -27,12 +27,12 @@ struct A2avGmmWorkspaceInfo {
 #pragma pack(push, 8)
 struct QuantAlltoAllvGroupedMatmulTilingData {
     MC2KernelTemplate::HcclA2avTilingInfo hcclA2avTilingInfo;
-    A2avGmmWorkspaceInfo workspaceInfo;
     MC2KernelTemplate::TaskTilingInfo taskTilingInfo;
-    Mc2GroupedMatmulTilingData::GMMQuantTilingData gmmQuantTilingData;
-    Mc2GroupedMatmulTilingData::GMMQuantTilingData mmQuantTilingData;
     bool isPermuteOut = false;
     bool isNeedMM = false;
+    Mc2GroupedMatmulTilingData::GMMQuantTilingData gmmQuantTilingData;
+    Mc2GroupedMatmulTilingData::GMMQuantTilingData mmQuantTilingData;
+    A2avGmmWorkspaceInfo workspaceInfo;
 };
 #pragma pack(pop)
 
