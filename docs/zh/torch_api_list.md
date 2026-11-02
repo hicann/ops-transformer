@@ -85,7 +85,7 @@
 |[moe_token_permute](../../moe/moe_token_permute/docs/torchapi_moe_token_permute.md)|根据专家索引扩展并排序token。|-|默认支持确定性计算。|
 |[msa_index_score](../../attention/msa_index_score/docs/torchapi_msa_index_score.md)|计算 MSA Index Branch 的 block score，对每个 query token 与 KV sparse block 做 matmul+maxpool 得到重要性分数。|默认确定性实现|默认确定性实现|
 |[msa_index_score_v2](../../attention/msa_index_score/docs/torchapi_msa_index_score_v2.md)|兼容 msa_index_score，支持指定 layout_query 与 pool_block_size。|默认确定性实现|默认确定性实现|
-|[pool_key_indexer](../../attention/pool_key_indexer/docs/pool_key_indexer.md)|将多个连续token打包成一个pool（池），以pool为单位计算注意力相关性分数并选取top-k位置，从而在保持稀疏注意力优势的同时减少索引开销。|默认确定性实现|默认确定性实现|
+|[pool_key_indexer](../../attention/pool_key_indexer/docs/torchapi_pool_key_indexer.md)|将多个连续token打包成一个pool（池），以pool为单位计算注意力相关性分数并选取top-k位置，从而在保持稀疏注意力优势的同时减少索引开销。|默认确定性实现|默认确定性实现|
 |[qkv_rms_norm_rope_cache_with_k_scale](../../posembedding/qkv_rms_norm_rope_cache_with_k_scale/docs/torchapi_qkv_rms_norm_rope_cache_with_k_scale.md)|融合Q/K/V拆分、Q/K RMSNorm、RoPE/M-RoPE、量化和KV Cache更新，支持原地与函数式接口及M-RoPE MX场景。|-|默认支持确定性计算。|
 |[quant_all_reduce](../../mc2/quant_all_reduce/docs/torchapi_quant_all_reduce.md)|实现低比特数据的AllReduce通信，在通信的过程中对数据进行反量化，并输出通信结果。|-|-|
 |[quant_compressor](../../attention/quant_compressor/docs/torchapi_quant_compressor.md)|Compressor的量化版本，将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。|-|默认支持确定性计算|

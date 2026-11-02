@@ -164,3 +164,25 @@ TEST_F(LightningIndexerGradOpapiUt, E3_null_dq_output_failed)
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
     EXPECT_EQ(executor, nullptr);
 }
+
+TEST_F(LightningIndexerGradOpapiUt, E4_null_layout_failed)
+{
+    auto query = MakeTensor({2, 8, 64, 128}, ACL_FLOAT16);
+    auto key = MakeTensor({2, 16, 1, 128}, ACL_FLOAT16);
+    auto dy = MakeTensor({2, 8, 64, 128}, ACL_FLOAT16);
+    auto sparseIndices = MakeTensor({2, 8, 2048}, ACL_INT32);
+    auto weights = MakeTensor({2, 8, 64}, ACL_FLOAT16);
+    auto dqOut = MakeTensor({2, 8, 64, 128}, ACL_FLOAT16);
+    auto dkOut = MakeTensor({2, 16, 1, 128}, ACL_FLOAT16);
+    auto dweightsOut = MakeTensor({2, 8, 64}, ACL_FLOAT16);
+
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+
+    aclnnStatus aclRet = aclnnLightningIndexerGradGetWorkspaceSize(
+        query.get(), key.get(), dy.get(), sparseIndices.get(), weights.get(), nullptr, nullptr, 64, nullptr, 3, 65536,
+        65536, false, dqOut.get(), dkOut.get(), dweightsOut.get(), &workspaceSize, &executor);
+
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
+    EXPECT_EQ(executor, nullptr);
+}

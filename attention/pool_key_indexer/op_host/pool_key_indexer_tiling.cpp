@@ -971,7 +971,10 @@ ge::graphStatus PoolKeyIndexerTiling::ParseAndCheckParams(PoolKeyIndexerTilingIn
         const gert::Tensor* ptkTensor = context_->GetInputTensor(PKI_POOL_TAIL_K_INDEX);
         OP_CHECK_NULL_WITH_CONTEXT(context_, ptkTensor);
         OP_CHECK_IF(static_cast<uint32_t>(ptkTensor->GetShapeSize()) != info.bSize,
-                    OP_LOGE(context_, "pool_tail_k count(%ld) must equal B(%u)", ptkTensor->GetShapeSize(), info.bSize),
+                    OP_LOGE(context_,
+                            "pool_tail_k count(%ld) must equal B(%u) (B = query batch count in BSND, = element count "
+                            "of actual_seq_q in TND)",
+                            ptkTensor->GetShapeSize(), info.bSize),
                     return ge::GRAPH_FAILED);
         const int64_t* ptkData = IsHostVisibleValue(ptkTensor) ? ptkTensor->GetData<int64_t>() : nullptr;
         if (ptkData != nullptr) {

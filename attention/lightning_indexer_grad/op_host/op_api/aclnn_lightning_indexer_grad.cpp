@@ -68,6 +68,8 @@ static aclnnStatus CheckParams(const LightningIndexerGradParams& params)
     CHECK_COND(params.dqOut != nullptr, ACLNN_ERR_PARAM_NULLPTR, "dqOut must not be nullptr.");
     CHECK_COND(params.dkOut != nullptr, ACLNN_ERR_PARAM_NULLPTR, "dkOut must not be nullptr.");
     CHECK_COND(params.dweightsOut != nullptr, ACLNN_ERR_PARAM_NULLPTR, "dweightsOut must not be nullptr.");
+    // layout 以 nullptr 构造 std::string 会抛未捕获异常致进程 abort, 必须在使用前拦截
+    CHECK_COND(params.layout != nullptr, ACLNN_ERR_PARAM_NULLPTR, "inputLayout must not be nullptr.");
     return ACLNN_SUCCESS;
 }
 

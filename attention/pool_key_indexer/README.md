@@ -1,4 +1,4 @@
-# PoolKeyIndexer
+# pool\_key\_indexer
 
 ## 产品支持情况
 
@@ -21,7 +21,7 @@
     Top\text{-}k \leftarrow Expand\left(Top\text{-}\frac{k}{p}\left\{[1]_{1\times g}@\left[\left(W@[1]_{1\times S_{k}^{pool}}\right)\odot ReLU\left(\left(Q_{index}@{K_{index}^{Pool}}^T\right)\odot\frac{1}{\sqrt{d}}\right)\right]\right\}\right) + AppendTail
     $$
 
-    其中$p = pool\_size$，$S_{k}^{pool} = \lfloor S_{k} / pool\_size \rfloor$，$d$为注意力头维度（headDim），缩放系数$\frac{1}{\sqrt{d}}$防止点积过大；$Expand$将每个pool索引展开为$p$个连续token索引，$AppendTail$追加尾部pool中`pool_tail_k`个有效token。
+    其中$p = pool\_size$，$S_{k}^{pool} = \lfloor S_{k} / pool\_size \rfloor$，$d$为注意力头维度（headDim），缩放系数$\frac{1}{\sqrt{d}}$防止点积过大；$Expand$将每个pool索引展开为$p$个连续token索引，$AppendTail$追加尾部pool中`pool_tail_k`个有效token。不完整尾池不包含在$pool\_key$中，$pool\_key$仅包含完整pool，尾token的索引为完整pool数$\times pool\_size$起的连续$pool\_tail\_k$个原始token索引。
 
     主要计算过程为：
 
@@ -89,3 +89,4 @@
 | 调用方式 | 样例代码 | 说明 |
 |----------|----------|------|
 | aclnn接口 | [test_aclnn_pool_key_indexer](./examples/test_aclnn_pool_key_indexer.cpp) | 通过[aclnnPoolKeyIndexer](./docs/aclnnPoolKeyIndexer.md)接口方式调用算子。|
+| PyTorch API | - | 通过[torchapi_pool_key_indexer](./docs/torchapi_pool_key_indexer.md)接口调用pool_key_indexer算子。|

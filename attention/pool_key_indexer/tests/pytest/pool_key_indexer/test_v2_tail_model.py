@@ -144,3 +144,26 @@ class TestTailSemantics:
                 f"gpos={gpos}: 尾可见违约 期望{expect_tail} 实际{got_tail}"
             )
             assert not np.any(row > L - 1), f"gpos={gpos}: 出现未来 token"
+
+    def test_tail_index_domain_bsnd(self, npu_backend):
+        """poolTailK>0 索引域回归(#6636): poolKey 仅含完整池, 尾 token 起点=完整池数×ps。
+
+        npool=8 完整池 + ptk=2 → 合法域 [0, 34), 尾区槽为 32,33(尾池 token 的
+        原始 KV 索引, 非越界); ptk=0 对照组同位置为 -1, 展开区两态逐比特一致。
+        """
+        common = dict(layout_q="BSND", layout_k="BSND", q_shape=(1, 2, 1, D), k_shape=(1, 8, 1, D), w_shape=(1, 2, 1), kd_shape=(1, 8, 1, D), topk=16, ps=4, mask=0, rv=True, quant_mode=-1, q_dtype=torch.float16,)
+        sp_t2 = spec("TD_6636_t2", 20260223, ptk=[2], version=None, **common)
+        sp_t0 = spec("TD_6636_t0", 20260223, ptk=[0], version=None, **common)
+        idx_t2, _, _ = run_golden_compare(npu_backend, sp_t2, index_version=1)
+        idx_t0, _, _ = run_golden_compare(npu_backend, sp_t0, index_version=1)
+        row_t2, row_t0 = rows_of(idx_t2, sp_t2)[0], rows_of(idx_t0, sp_t0)[0]
+        pool_tokens = 8 * 4  # poolKey 完整池覆盖的 token 数
+        assert np.array_equal(row_t2[:16], row_t0[:16]), "展开区不应随 poolTailK 变化"
+        assert row_t2[16:].tolist() == [pool_tokens, pool_tokens + 1, -1], (
+            f"尾区槽应为 [{pool_tokens}, {pool_tokens + 1}, -1], 实际 {row_t2[16:].tolist()}"
+        )
+        assert row_t0[16:].tolist() == [-1, -1, -1], "ptk=0 尾区槽应全 -1"
+        valid_t2 = row_t2[row_t2 >= 0]
+        assert int(valid_t2.max()) < pool_tokens + 2, "ptk=2 索引应 < npool*ps+ptk"
+        valid_t0 = row_t0[row_t0 >= 0]
+        assert int(valid_t0.max()) < pool_tokens, "ptk=0 索引应 < npool*ps"

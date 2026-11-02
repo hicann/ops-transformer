@@ -85,7 +85,7 @@
   SparseIndices = \text{Append}(\text{Expand}(TopK\_pool, PoolIndices))
   $$
 
-  其中$\text{Expand}$将选中的pool索引通过$PoolIndices$展开为原始token索引，$\text{Append}$追加不完整pool的尾部有效token，确保短序列尾部不遗漏（先展开后追加）。尾部有效token数由poolTailK指定。
+  其中$\text{Expand}$将选中的pool索引通过$PoolIndices$展开为原始token索引，$\text{Append}$追加不完整pool的尾部有效token，确保短序列尾部不遗漏（先展开后追加）。尾部有效token数由poolTailK指定。不完整尾池不包含在$poolKey$中，$poolKey$仅包含完整pool，尾token的索引为完整pool数$\times pool\_size$起的连续$poolTailK$个原始token索引。
 
   **输出：**
 
@@ -246,6 +246,8 @@ aclnnStatus aclnnPoolKeyIndexer(
           <ul>
                 <li>不支持空tensor。</li>
                 <li>取值范围为[0, pool_size-1]，0表示无尾部有效token。</li>
+                <li>不完整尾池不包含在poolKey中，poolKey仅包含完整pool；每个Batch的有效token总数=完整pool数×pool_size+poolTailK，调用方需保证下游原始KV的有效token数与该值一致。</li>
+                <li>元素数必须等于B。</li>
                 <li>shape为(B,)。</li>
           </ul>
       </td>
@@ -260,7 +262,7 @@ aclnnStatus aclnnPoolKeyIndexer(
       <td>每个Batch中，Query的有效token数。</td>
       <td>
           <ul>
-                <li>可选输入，不指定seqlen时可传入空指针，表示与query的shape的S长度相同。</li>
+                <li>可选输入，不指定seqlen时可传入空指针，表示与query的shape的S长度相同；layoutQueryOptional为BSND时（含PageAttention场景layoutKeyOptional为PA_BBND且query按BSND组织），该入参必须传入空指针。</li>
                 <li>不支持空Tensor。</li>
                 <li>该入参中每个Batch的有效token数不超过query中的维度S大小且不小于0，支持长度为B的一维tensor。</li>
                 <li>当layoutQueryOptional为TND时，该入参必须传入，且以该入参元素的数量作为B值，该入参中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
@@ -278,7 +280,7 @@ aclnnStatus aclnnPoolKeyIndexer(
       <td>每个Batch中，Key的有效token数。</td>
       <td>
           <ul>
-                <li>可选输入，不指定seqlen时可传入空指针，表示与poolKey的shape的S长度相同。</li>
+                <li>可选输入，不指定seqlen时可传入空指针，表示与poolKey的shape的S长度相同；layoutKeyOptional为BSND时，该入参必须传入空指针。</li>
                 <li>不支持空Tensor。</li>
                 <li>该参数中每个Batch的有效pool数不超过poolKey的维度S（BSND/TND）或blockSize总池数（PA_BBND）大小且不小于0，支持长度为B的一维tensor。</li>
                 <li>当layoutKeyOptional为TND或PA_BBND时，该入参必须传入。layoutKeyOptional为TND时，该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值；layoutKeyOptional为PA_BBND时，该参数中每个元素的值表示当前batch的pool数（即该batch有效token数除以pool_size后向下取整的池数，非前缀和形式）。</li>
@@ -489,6 +491,8 @@ aclnnStatus aclnnPoolKeyIndexer(
       <td>
           <ul>
                 <li>不支持空tensor。</li>
+                <li>元素为原始KV token索引（batch内局部口径），合法域为[0, 完整pool数×pool_size+poolTailK)，其中完整pool数为poolKey的S2（BSND）/T2（TND）维大小或actualSeqLengthsKeyOptional对应元素（PA_BBND）；索引不指向poolKey内部，尾部poolTailK个token由下游从原始KV中按索引回取。</li>
+                <li>无尾token（poolTailK为0）或因因果可见性不可见的尾token位置填充-1。</li>
                 <li>layoutQueryOptional为BSND时，输出shape为(B, S1, topk + pool_size - 1)。</li>
                 <li>layoutQueryOptional为TND时，输出shape为(T1, topk + pool_size - 1)。</li>
           </ul>
@@ -631,7 +635,9 @@ aclnnStatus aclnnPoolKeyIndexer(
   - 不支持query、poolKey中对S1、S2 pad无效数据。
   - 输出sparseIndicesOut最后一维为topk + pool_size - 1，输出sparseValuesOut最后一维为topk // pool_size。
   - 维度一致性约束：weights、qDescaleOptional的各维度（BSND时为B、S1、N1，TND时为T1、N1）必须与query对应维度一致；kDescaleOptional的各维度必须与poolKey对应维度一致（PA_BBND时blockNum、blockSize、N2需与poolKey一致）；poolTailK的元素数必须等于B；actualSeqLengthsKeyOptional的元素数必须等于B。
+  - actualSeqLengths空指针约束：layoutQueryOptional与layoutKeyOptional均为BSND时（非PageAttention场景），actualSeqLengthsQueryOptional与actualSeqLengthsKeyOptional必须传入空指针；PageAttention场景layoutKeyOptional为PA_BBND且query为BSND时，actualSeqLengthsQueryOptional必须传入空指针。
   - 前缀和约束：当layoutQueryOptional为TND时，actualSeqLengthsQueryOptional的前缀和最后一个元素的值必须等于query的T1；当layoutKeyOptional为TND时，actualSeqLengthsKeyOptional的前缀和最后一个元素的值必须等于poolKey的T2。
+  - 索引合法域约束：sparseIndicesOut中有效索引为原始KV token索引（batch内局部口径），取值范围为[0, 完整pool数×pool_size+poolTailK)；poolKey仅包含完整pool，尾部不完整pool的poolTailK个token不在poolKey中，由下游按索引从原始KV回取，调用方需保证原始KV每Batch有效token数与该上界一致；无效位置填充-1。
   - 输出维度约束：sparseIndicesOut和sparseValuesOut的B、S1（或T1）维度必须与query对应维度一致。
 - 输入属性限制：
   - topk需满足topk % pool_size == 0，pool_size支持[1, 128]，topk支持[1, 2048]以及3072、4096、5120、6144、7168、8192。
