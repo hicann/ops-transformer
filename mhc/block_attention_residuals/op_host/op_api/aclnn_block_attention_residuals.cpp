@@ -197,7 +197,7 @@ aclnnStatus aclnnBlockAttentionResidualsGetWorkspaceSize(const aclTensor* partia
 
     BlockAttentionResidualsParams params{partialBlock, blockRes,     projWeight,   normWeight, validBlockNum,
                                          normEps,      needBackward, hiddenStates, invNorm,    probs};
-    CHECK_RET(CheckNotNull(params), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckNotNull(params), ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckParams(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     auto ret = PreProcess(params);
