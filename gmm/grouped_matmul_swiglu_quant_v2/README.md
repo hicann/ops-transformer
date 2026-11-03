@@ -184,6 +184,44 @@
           - $blocksize$：指每次量化的元素个数，仅支持32。
     </details>
 
+
+    <details>
+    <summary>Pertoken量化场景：</summary>
+
+      - **定义**：
+
+        * **⋅** 表示矩阵乘法。
+        * **⊙** 表示逐元素乘法。
+      - **输入**：
+
+        * $X∈\mathbb{Z_8}^{M \times K}$：激活矩阵（左矩阵），M是总token数，K是特征维度。
+        * $W∈\mathbb{Z_8}^{E \times K \times N}$：分组权重矩阵（右矩阵），E是专家个数，K是特征维度，N是输出维度。
+        * $w\_scale∈\mathbb{R}^{E \times N}$：分组权重矩阵（右矩阵）的逐通道缩放因子，E是专家个数，K是特征维度， N是输出维度。
+        * $x\_scale∈\mathbb{R}^{M}$：激活矩阵（左矩阵）的逐token缩放因子，M是总token数，K是特征维度。
+        * $grouplist∈\mathbb{N}^{E}$：cumsum或count的分组索引列表。
+      - **输出**：
+
+        * $Q∈\mathbb{Z_8}^{M \times N / 2}$：量化后的输出矩阵。
+        * $Q\_scale∈\mathbb{R}^{M}$：量化缩放因子。
+      - **计算过程**
+        - 1.根据groupList[i]确定当前分组的token ，$i \in [0,Len(groupList)]$
+
+           - 2.根据分组确定的入参进行如下计算：
+
+             $C_{i} = (X_{i}\cdot W_{i} )\odot xScale_{i} \odot wScale_{i}$
+
+             $C_{i,act}, gate_{i} = split(C_{i})$
+
+             $S_{i}=Swish(C_{i,act})\odot gate_{i}$，其中$Swish(x)=\frac{x}{1+e^{-x}}$
+
+             其中，$xScale_{i}$代表的是对应token对的量化因子
+           - 3.量化输出结果
+
+             $Q\_scale_{i} = \frac{max(|S_{i}|)}{max(type)}$
+
+             $Q_{i} = \lfloor \frac{S_{i}}{Q\_scale_{i}} \rceil$
+    </details>
+
 ## 参数说明
 
 <table style="undefined;table-layout: fixed;width: 1567px"><colgroup>
@@ -199,7 +237,7 @@
 <thead>
   <tr>
     <th>参数名</th>
-    <th style="white-space: nowrap">输入/输出</th>
+    <th style="white-space: nowrap">输入/输出/属性</th>
     <th>描述</th>
     <th>数据类型</th>
     <th>数据格式</th>
@@ -210,21 +248,21 @@
     <td>x</td>
     <td rowspan="1">输入</td>
     <td>表示左矩阵，对应公式中的X。</td>
-    <td>FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1、INT8</td>
+    <td>FLOAT8_E4M3FN<sup>1</sup>、FLOAT8_E5M2<sup>1</sup>、FLOAT4_E2M1<sup>1</sup>、FLOAT4_E1M2<sup>1</sup>、INT8、INT4<sup>2</sup>、INT32<sup>2</sup>、HIFLOAT8<sup>1</sup></td>
     <td>ND</td>
   </tr>
   <tr>
     <td>weight</td>
     <td rowspan="1">输入</td>
     <td>表示权重矩阵，对应公式中的W。</td>
-    <td>FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1、INT8、INT4、INT32</td>
+    <td>FLOAT8_E4M3FN<sup>1</sup>、FLOAT8_E5M2<sup>1</sup>、FLOAT4_E2M1<sup>1</sup>、FLOAT4_E1M2<sup>1</sup>、INT8、INT4<sup>2</sup>、INT32<sup>2</sup>、HIFLOAT8<sup>1</sup></td>
     <td>ND、FRACTAL_NZ</td>
   </tr>
   <tr>
     <td>weightScale</td>
     <td rowspan="1">输入</td>
     <td>表示右矩阵的量化因子，公式中的wScale。</td>
-    <td>FLOAT8_E8M0、UINT64、FLOAT、FLOAT16、BFLOAT16</td>
+    <td>FLOAT8_E8M0<sup>1</sup>、UINT64<sup>2</sup>、FLOAT、FLOAT16、BFLOAT16</td>
     <td>ND</td>
   </tr>
   <tr>
@@ -245,14 +283,14 @@
     <td>xScale</td>
     <td rowspan="1">输入</td>
     <td>表示左矩阵的量化因子，公式中的xScale。</td>
-    <td>FLOAT8_E8M0、FLOAT</td>
+    <td>FLOAT8_E8M0<sup>1</sup>、FLOAT</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>smoothScale</td>
     <td rowspan="1">可选输入</td>
     <td>表示左矩阵的量化因子。</td>
-    <td>-</td>
+    <td>FLOAT</td>
     <td>-</td>
   </tr>
   <tr>
@@ -264,51 +302,51 @@
   </tr>
   <tr>
     <td>dequantMode</td>
-    <td rowspan="1">输入</td>
-    <td>表示反量化计算类型，用于确定激活矩阵与权重矩阵的反量化方式。</td>
+    <td rowspan="1">可选属性</td>
+    <td>反量化模式，默认值为0，表示pertoken perchannel量化模式。</td>
     <td>INT64</td>
     <td>-</td>
   </tr>
   <tr>
     <td>dequantDtype</td>
-    <td rowspan="1">输入</td>
-    <td>表示中间GroupedMatmul的结果数据类型。</td>
+    <td rowspan="1">可选属性</td>
+    <td>GroupedMatmul中间结果类型，默认值为0，表示FLOAT。</td>
     <td>INT64</td>
     <td>-</td>
   </tr>
   <tr>
     <td>quantMode</td>
-    <td rowspan="1">输入</td>
-    <td>表示量化计算类型，用于确定swiglu结果的量化模式。</td>
+    <td rowspan="1">可选属性</td>
+    <td>SwiGLU结果的量化模式，默认值为0，表示pertoken量化。</td>
     <td>INT64</td>
     <td>-</td>
   </tr>
   <tr>
     <td>groupListType</td>
-    <td rowspan="1">输入</td>
-    <td>表示分组的解释方式，用于确定groupList的语义。</td>
+    <td rowspan="1">可选属性</td>
+    <td>groupList的解释方式，默认值为0，表示累计token数（cumsum）。</td>
     <td>INT64</td>
     <td>-</td>
   </tr>
   <tr>
     <td>tuningConfig</td>
-    <td rowspan="1">输入</td>
-    <td>用于算子预估M/E的大小，走不同的算子模板，以适配不不同场景性能要求。</td>
-    <td>-</td>
+    <td rowspan="1">可选属性</td>
+    <td>tiling调优配置，默认值为[0]，表示不指定各专家的预期token数。</td>
+    <td>INT64</td>
     <td>-</td>
   </tr>
   <tr>
     <td>output</td>
     <td rowspan="1">输出</td>
     <td>表示输出的量化结果，公式中的Q。</td>
-    <td>FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1、INT8</td>
+    <td>FLOAT8_E4M3FN<sup>1</sup>、FLOAT8_E5M2<sup>1</sup>、FLOAT4_E2M1<sup>1</sup>、FLOAT4_E1M2<sup>1</sup>、INT8、HIFLOAT8<sup>1</sup></td>
     <td>ND</td>
   </tr>
   <tr>
     <td>outputScale</td>
     <td rowspan="1">输出</td>
     <td>表示输出的量化因子，公式中的QScale。</td>
-    <td>FLOAT8_E8M0、FLOAT</td>
+    <td>FLOAT8_E8M0<sup>1</sup>、FLOAT</td>
     <td>ND</td>
   </tr>
   <tr>
@@ -329,8 +367,9 @@
 </table>
 
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-    - x仅支持INT8量化数据类型、不支持其他数据类型。
-    - weight仅支持非转置，支持INT8、INT4、INT32数据类型，ND格式shape形如{(E, K, N)}，NZ格式下，当weight数据类型是INT8时shape形如{(E, N / 32, K / 16, 16, 32)}，INT4时shape形如{(E, N / 64, K / 16, 16， 64)}，INT32时shape形如{(E, N / 64, K / 16, 16， 8)}。
+    - 上表数据类型列中的角标 <sup>1</sup> 代表该系列不支持的数据类型。
+    - x支持INT8、INT4、INT32数据类型。
+    - weight支持INT8、INT4、INT32数据类型，ND格式shape形如{(E, K, N)}，NZ格式下，当weight数据类型是INT8时shape形如{(E, N / 32, K / 16, 16, 32)}，INT4时shape形如{(E, N / 64, K / 16, 16， 64)}，INT32时shape形如{(E, N / 64, K / 16, 16， 8)}。
     - weightScale，A8W8场景支持FLOAT、FLOAT16、BFLOAT16数据类型，shape只支持2维，形如{(E, N)}；A8W4场景支持UINT64数据类型，shape支持2维和3维，其中per-channel的shape形如{(E, N)}，per-group的shape形如{(E, KGroupCount, N)}。
     - 支持dequantMode参数：0表示激活矩阵per-token，权重矩阵per-channel；1表示激活矩阵per-token，权重矩阵per-group。
     - 不支持dequantDtype参数。
@@ -341,16 +380,15 @@
     - output仅支持数据类型INT8，shape支持2维，形如(M, N / 2)。
     - outputScale仅支持数据类型FLOAT，shape支持1维，形如(M,)。
 - <term>Ascend 950PR&950DT系列产品</term>：
-    - 仅支持FLOAT8、FLOAT4量化数据类型，不支持其他数据类型，支持weight转置。
-    - x支持FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1数据类型。
-    - weight支持FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1数据类型，非转置shape形如{(E, K, N)}，weight转置shape形如{(E, N, K)}。
-    - weightScale支持FLOAT8_E8M0数据类型，shape支持4维：weightScale非转置shape形如{(E, ceil(K / 64), N, 2)}，weightScale转置shape形如{(E, N, ceil(K / 64), 2)}。
-    - xScale: FLOAT8_E8M0数据类型：shape支持3维，形如(M, ceil(K / 64), 2)。
-    - 支持dequantMode参数：当前仅支持取值2，2表示MX量化。
-    - 支持dequantDtype参数：当前仅支持取值0，0表示DT_FLOAT。
-    - 支持quantMode参数：当前仅支持取值2，2表示MX量化。
-    - output支持数据类型FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1，shape支持2维，形如(M, N / 2)。
-    - outputScale支持数据类型FLOAT8_E8M0，shape支持3维，形如(M, ceil((N / 2) / 64), 2)。
+    - 上表数据类型列中的角标 <sup>2</sup> 代表该系列不支持的数据类型。
+    - x、weight不支持INT4、INT32数据类型，支持weight转置。
+    - weightScale不支持UINT64数据类型；MX单Tensor场景下，非转置shape为(E, ceil(K / 64), N, 2)，转置时为(E, N, ceil(K / 64), 2)；per-token及WeightNzV2多Tensor场景的shape见对应接口文档。
+    - xScale支持FLOAT8_E8M0、FLOAT数据类型；MX量化场景下shape为(M, ceil(K / 64), 2)，per-token量化场景下为(M,)。
+    - 支持dequantMode参数：MX量化场景取值为2，per-token量化场景取值为0。
+    - 支持dequantDtype参数：MX量化场景仅支持0（FLOAT），per-token量化场景支持0（FLOAT）、1（FLOAT16）、27（BFLOAT16）。
+    - 支持quantMode参数：MX量化场景取值为2，per-token量化场景取值为0。
+    - output支持数据类型FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1、FLOAT4_E1M2、HIFLOAT8、INT8，shape支持2维，形如(M, N / 2)。
+    - outputScale支持FLOAT8_E8M0、FLOAT数据类型；MX量化场景下shape为(M, ceil((N / 2) / 64), 2)，per-token量化场景下为(M,)。
 
 ## 约束说明
 
@@ -400,7 +438,7 @@
 
   - <term>Ascend 950PR&950DT系列产品</term>：
     - MX量化场景下需满足以下约束条件：
-        - 数据类型需要满足下表：
+        - aclnnGroupedMatmulSwigluQuantV2的数据类型需要满足下表：
         <table style="undefined;table-layout: fixed; width: 1134px"><colgroup>
         <col style="width: 319px">
         <col style="width: 144px">
@@ -438,6 +476,8 @@
         </tbody>
         </table>
 
+      - aclnnGroupedMatmulSwigluQuantWeightNzV2的MXFP8场景中，x、weight和output仅支持FLOAT8_E4M3FN；MXFP4场景中，x、weight支持FLOAT4_E2M1、FLOAT4_E1M2及两者交叉组合，output支持FLOAT8_E4M3FN、FLOAT4_E1M2、FLOAT4_E2M1。各场景的scale均为FLOAT8_E8M0。MXA8W4等其他场景见[WeightNzV2约束说明](docs/aclnnGroupedMatmulSwigluQuantWeightNzV2.md#约束说明)。
+
       - MX量化、weightND场景下，当输入为fp8数据类型时，需满足N为2对齐；当输入为fp4数据类型时，需满足N为4对齐。
       - MX量化、weightNZ场景下，当输入为fp8数据类型时，需满足N为64对齐；当输入为fp4数据类型时，需满足N为128对齐。
       - MXFP4场景不支持K=2。
@@ -445,13 +485,10 @@
 
     - `aclnnGroupedMatmulSwigluQuantWeightNzV3`增量场景仅支持MXFP8、单Tensor和weight FRACTAL_NZ；`x`、`weight`和`output`仅支持FLOAT8_E4M3FN，`swigluMode`仅支持2，`scaleAlg`支持0（OCP）或1（cuBLAS）。完整约束见[ACLNN接口资料](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md)。
 
-  - 确定性计算：
-      - aclnnGroupedMatmulSwigluQuantV2默认为确定性实现。
-
 ## 调用说明
 
 | 调用方式      | 调用样例                 | 说明                                                         |
 |--------------|-------------------------|--------------------------------------------------------------|
 | aclnn API | [test_aclnn_quant_grouped_matmul_swiglu_quant_V2](examples/test_aclnn_grouped_matmul_swiglu_quant_v2_a8w8.cpp) | 通过接口方式调用[GroupedMatmulSwigluQuantV2](docs/aclnnGroupedMatmulSwigluQuantV2.md)算子。 |
 | aclnn API | [test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3](examples/arch35/test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3.cpp) | 通过[aclnnGroupedMatmulSwigluQuantWeightNzV3](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md)调用Ascend 950PR&950DT系列产品的MXFP8 weight FRACTAL_NZ增量场景。 |
-| PyTorch API | [grouped_matmul_swiglu_quant](docs/torchapi_grouped_matmul_swiglu_quant.md) | 通过`cann_ops_transformer.grouped_matmul_swiglu_quant`调用上述增量场景。 |
+| PyTorch API | [grouped_matmul_swiglu_quant](docs/torchapi_grouped_matmul_swiglu_quant.md#调用说明) | 通过[grouped_matmul_swiglu_quant](docs/torchapi_grouped_matmul_swiglu_quant.md)调用上述增量场景。 |
