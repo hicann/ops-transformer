@@ -100,7 +100,7 @@ public:
                                        RunInfo& runInfo, ConstInfo& constInfo);
     __aicore__ inline void ProcessVec2(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm2ResBuf,
                                        RunInfo& runInfo, ConstInfo& constInfo);
-    __aicore__ inline void FreeEvent(ConstInfo& constInfo);
+    __aicore__ inline void FreeEvent();
 
 private:
     __aicore__ inline void ProcessSparseKv(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& outputL1,
@@ -941,6 +941,9 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CleanOutput(__gm__ uint8_t* a
             WaitFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
         }
     }
+    if ASCEND_IS_AIV {
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(initOutputEventId);
+    }
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -1001,6 +1004,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitSinksBuffer(ConstInfo& co
     TEventID mte2ToV = GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>();
     SetFlag<AscendC::HardEvent::MTE2_V>(mte2ToV);
     WaitFlag<AscendC::HardEvent::MTE2_V>(mte2ToV);
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_V>(mte2ToV);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -1065,7 +1069,26 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(TPipe* pipe, 
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::FreeEvent(ConstInfo& constInfo) {}
+__aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::FreeEvent()
+{
+    WaitFlag<HardEvent::MTE3_V>(mte3ToVId);
+    WaitFlag<HardEvent::MTE3_V>(mte3ToVLseOutId);
+    WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[0]);
+    WaitFlag<HardEvent::MTE3_V>(mte3ToVV0Id[1]);
+    WaitFlag<HardEvent::MTE3_MTE2>(Mte3ToMte2V0Id);
+
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVId);
+    GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3Id);
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVLseOutId);
+    GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3LseOutId);
+    for (uint32_t i = 0; i < NUM_2; ++i) {
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_V>(mte2ToVV0Id[i]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(vToMte2V0Id[i]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3V0Id[i]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVV0Id[i]);
+    }
+    GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(Mte3ToMte2V0Id);
+}
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetExtremeValue(T& negativeScalar)

@@ -284,11 +284,11 @@ __aicore__ inline void SparseFlashMlaCsaKernel<CubeBlockType, VecBlockType>::Par
         constInfo.cmpMLow = sparseFlashMLACmpParams.cmpMLow;
         constInfo.cmpMHigh = sparseFlashMLACmpParams.cmpMHigh;
         if constexpr (TEMPLATE_MODE != SMLATemplateMode::SWA_TEMPLATE_MODE) {
-            constInfo.cmpKeyStride0 = constInfo.cmpBlockSize * constInfo.dSize;
-            constInfo.cmpKvStride = constInfo.cmpBlockSize * constInfo.dSize;
+            constInfo.cmpKeyStride0 = sparseFlashMLACmpParams.cmpKeyStride0;
+            constInfo.cmpKvStride = constInfo.cmpKeyStride0;
         }
-        constInfo.oriKeyStride0 = constInfo.oriBlockSize * constInfo.dSize;
-        constInfo.oriKvStride = constInfo.oriBlockSize * constInfo.dSize;
+        constInfo.oriKeyStride0 = sparseFlashMLABaseParams.oriKeyStride0;
+        constInfo.oriKvStride = constInfo.oriKeyStride0;
     }
 
     if (cuSeqlensQ != nullptr) {
@@ -511,6 +511,7 @@ __aicore__ inline TaskDealMode SparseFlashMlaCsaKernel<CubeBlockType, VecBlockTy
             this->hasActualSeqQlen, this->hasActualSeqOriKvlen, this->hasActualSeqCmpKvlen, this->hasCuSeqlensCmpKv);
         ComputeS1LoopInfo<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, lastBN, nextGs1Idx, gS1StartIdx);
         prevBN2Cur = bN2Cur;
+        prevGS1Cur = static_cast<uint32_t>(-1);
         gS1LoopEndForBN = runParam.gs1LoopEndIdx;
 
         runParam.s1oIdx = gS1Cur * runParam.qSNumInOneBlock;
@@ -911,9 +912,9 @@ __aicore__ inline void SparseFlashMlaCsaKernel<CubeBlockType, VecBlockType>::Fre
         bmm1Buffers.Get().WaitCrossCore();
         bmm1Buffers.Get().WaitCrossCore();
         bmm2Buffers.Get().WaitCrossCore();
-        this->cubeBlock.FreeEvent();
+        this->cubeBlock.FreeEvent(l1BufferManager);
     } else {
-        this->vecBlock.FreeEvent(constInfo);
+        this->vecBlock.FreeEvent();
     }
 }
 

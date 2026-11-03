@@ -97,7 +97,7 @@ public:
         Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& inputRightBuf, const RunInfo& runInfo,
         const ConstInfo& constInfo);
 
-    __aicore__ inline void FreeEvent();
+    __aicore__ inline void FreeEvent(BufferManager<BufferType::L1>& l1BufferManager);
 
 private:
     __aicore__ inline void InitLocalBuffer(BufferManager<BufferType::L1>& l1BufferManager);
@@ -237,7 +237,22 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::InitLocalBuffer(BufferManage
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::FreeEvent() {}
+__aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::FreeEvent(BufferManager<BufferType::L1>& l1BufferManager)
+{
+    if constexpr (TEMPLATE_MODE == SMLATemplateMode::CSA_TEMPLATE_MODE ||
+                  TEMPLATE_MODE == SMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+                  TEMPLATE_MODE == SMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE || IS_SPLIT_G) {
+        for (uint32_t i = 0; i < NUM_3; ++i) {
+            WaitFlag<HardEvent::MTE1_MTE2>(mte2ToMte1Id[i]);
+            GetTPipePtr()->ReleaseEventID<HardEvent::MTE1_MTE2>(mte2ToMte1Id[i]);
+            GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_MTE1>(mte1ToMte2Id[i]);
+        }
+    }
+    l1QBuffers.Uninit(l1BufferManager);
+    mmL0ABuffers.Uninit(l0aBufferManager);
+    mmL0BBuffers.Uninit(l0bBufferManager);
+    mmL0CBuffers.Uninit(l0cBufferManager);
+}
 
 /* 初始化GmTensor,设置shape信息并计算strides */
 TEMPLATES_DEF_NO_DEFAULT
