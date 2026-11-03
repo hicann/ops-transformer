@@ -9,6 +9,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <filesystem>
 #include "../flash_attn_param.h"
 #include "tiling_case_executor.h"
 
@@ -70,5 +71,11 @@ TEST_P(FlashAttnArch35TilingTest, tiling)
 INSTANTIATE_TEST_SUITE_P(FlashAttn, FlashAttnArch35TilingTest,
                          testing::ValuesIn(GetCasesFromCsv<FlashAttnTilingUtParam>(ReplaceFileExtension2Csv(__FILE__))),
                          PrintCaseInfoString<FlashAttnTilingUtParam>);
+
+INSTANTIATE_TEST_SUITE_P(
+    FlashAttnStride, FlashAttnArch35TilingTest,
+    testing::ValuesIn(GetCasesFromCsv<FlashAttnTilingUtParam>(
+        std::filesystem::path(__FILE__).replace_filename("test_flash_attn_tiling_stride.csv").string())),
+    PrintCaseInfoString<FlashAttnTilingUtParam>);
 
 } // namespace FlashAttnUT

@@ -81,7 +81,9 @@ struct FlashAttnTilingUtParam : public FlashAttnHostUtParamBase {
     {
         inputInstance.emplace_back(GetTensorGE(csvMap, "q_shape", "q_dtype", "q_format", this->q));
         inputInstance.emplace_back(GetTensorGE(csvMap, "k_shape", "k_dtype", "k_format", this->k));
+        ApplyStrideFromCsv(csvMap, "k_stride", this->k);
         inputInstance.emplace_back(GetTensorGE(csvMap, "v_shape", "v_dtype", "v_format", this->v));
+        ApplyStrideFromCsv(csvMap, "v_stride", this->v);
         inputInstance.emplace_back(
             GetTensorGE(csvMap, "block_table_shape", "block_table_dtype", "block_table_format", this->block_table));
         inputInstance.emplace_back(

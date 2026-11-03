@@ -21,26 +21,25 @@
 namespace optiling {
 namespace flash_attn {
 
-// 逐维比对strides与连续场景的期望stride, index返回首个非连续维, 全连续返回GRAPH_SUCCESS
+// 逐维比对strides与连续场景的期望stride, 跳过size为1的维度(该维索引恒为0, stride不参与地址计算,
+// 语义同 PyTorch is_contiguous), stride维数小于shape维数时按非连续处理,
+// index返回首个非连续维, 全连续返回GRAPH_SUCCESS
 inline ge::graphStatus CheckTensorContiguous(const uint32_t& tensorDimNum, const gert::Shape& inputShape,
                                              const gert::Stride* strides, int32_t& index)
 {
     if (strides == nullptr || strides->GetDimNum() == 0) {
         return ge::GRAPH_SUCCESS;
     }
-    uint64_t preStride = 1;
+    if (strides->GetDimNum() < tensorDimNum) {
+        index = static_cast<int32_t>(tensorDimNum);
+        return ge::GRAPH_FAILED;
+    }
+    uint64_t expectedStride = 1;
     for (index = static_cast<int32_t>(tensorDimNum) - 1; index >= 0; index--) {
-        if (index == static_cast<int32_t>(tensorDimNum) - 1) {
-            if (strides->GetStride(index) != preStride) {
-                return ge::GRAPH_FAILED;
-            }
-            continue;
-        }
-        uint64_t expected = inputShape.GetDim(index + 1) * preStride;
-        if (strides->GetStride(index) != expected) {
+        if (inputShape.GetDim(index) != 1 && strides->GetStride(index) != expectedStride) {
             return ge::GRAPH_FAILED;
         }
-        preStride = expected;
+        expectedStride *= static_cast<uint64_t>(inputShape.GetDim(index));
     }
     return ge::GRAPH_SUCCESS;
 }
