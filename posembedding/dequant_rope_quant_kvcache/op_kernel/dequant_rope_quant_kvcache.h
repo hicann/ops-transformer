@@ -84,7 +84,8 @@ public:
         this->frontCoreNum = tilingData->frontCoreNum;
         this->blockFactor = tilingData->blockFactor;
         this->tailCoreBlockFactor = tilingData->tailCoreBlockFactor;
-        this->hasQuantOffset = tilingData->hasQuantOffset;
+        this->hasOffsetK = tilingData->hasOffsetK;
+        this->hasOffsetV = tilingData->hasOffsetV;
         this->hiddenSizeFp32Align = tilingData->hiddenSizeFp32Align;
         this->hiddenSizeFp16Align = tilingData->hiddenSizeFp16Align;
         this->hiddenSizeInt8Align = tilingData->hiddenSizeInt8Align;
@@ -136,12 +137,15 @@ public:
         quantScaleVGm.SetGlobalBuffer((__gm__ float*)quant_scale_v, this->kHiddenSize);
         quantScaleVGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
 
-        if (this->hasQuantOffset == true) {
+        if (this->hasOffsetK == true) {
             quantOffsetKGm.SetGlobalBuffer((__gm__ float*)quant_offset_k, this->kHiddenSize);
             quantOffsetKGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
+            pipe.InitBuffer(offsetKQueue, this->kHiddenSize * sizeof(float));
+        }
+
+        if (this->hasOffsetV == true) {
             quantOffsetVGm.SetGlobalBuffer((__gm__ float*)quant_offset_v, this->kHiddenSize);
             quantOffsetVGm.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
-            pipe.InitBuffer(offsetKQueue, this->kHiddenSize * sizeof(float));
             pipe.InitBuffer(offsetVQueue, this->kHiddenSize * sizeof(float));
         }
 
@@ -234,10 +238,12 @@ public:
         DataCopy(quantScaleKUb, quantScaleKGm, this->kHiddenSize);
         DataCopy(quantScaleVUb, quantScaleVGm, this->kHiddenSize);
 
-        if (this->hasQuantOffset == true) {
+        if (this->hasOffsetK == true) {
             offsetKUb = offsetKQueue.Get<float>();
-            offsetVUb = offsetVQueue.Get<float>();
             DataCopy(offsetKUb, quantOffsetKGm, this->kHiddenSize);
+        }
+        if (this->hasOffsetV == true) {
+            offsetVUb = offsetVQueue.Get<float>();
             DataCopy(offsetVUb, quantOffsetVGm, this->kHiddenSize);
         }
 
@@ -289,13 +295,6 @@ public:
                             static_cast<uint32_t>((this->kHiddenSize + this->vHiddenSize) * sizeof(XTYPE)), 0, 0};
         dataCopyParamsV_ = {(uint16_t)OnceUBMaxS, static_cast<uint32_t>(this->vHiddenSize * sizeof(XTYPE)),
                             static_cast<uint32_t>((this->qHiddenSize + this->kHiddenSize) * sizeof(XTYPE)), 0, 0};
-        if (!this->isPA) {
-            dataCopyParamsIndice_ = {
-                1, static_cast<uint32_t>(AscendC::Std::min(OnceUBMaxS, this->batch - this->bOffset) * sizeof(int32_t)),
-                0, 0, 0};
-        } else {
-            dataCopyParamsIndice_ = {1, static_cast<uint32_t>(OnceUBMaxS * sizeof(int32_t)), 0, 0, 0};
-        }
 
         for (uint32_t ubLoopIndex = 0; ubLoopIndex < coreCalcSLoop - 1; ubLoopIndex++) {
             computeQKV(OnceUBMaxS);
@@ -307,15 +306,6 @@ public:
                             static_cast<uint32_t>((this->kHiddenSize + this->vHiddenSize) * sizeof(XTYPE)), 0, 0};
         dataCopyParamsV_ = {(uint16_t)coreCalcSLastNum, static_cast<uint32_t>(this->vHiddenSize * sizeof(XTYPE)),
                             static_cast<uint32_t>((this->qHiddenSize + this->kHiddenSize) * sizeof(XTYPE)), 0, 0};
-        if (!this->isPA) {
-            dataCopyParamsIndice_ = {
-                1,
-                static_cast<uint32_t>(AscendC::Std::min(coreCalcSLastNum, this->batch - this->bOffset) *
-                                      sizeof(int32_t)),
-                0, 0, 0};
-        } else {
-            dataCopyParamsIndice_ = {1, static_cast<uint32_t>(coreCalcSLastNum * sizeof(int32_t)), 0, 0, 0};
-        }
         computeQKV(coreCalcSLastNum);
         if (this->ifKVout == true) {
             WaitFlag<HardEvent::MTE3_MTE2>(eventIdMTE3ToMTE2K);
@@ -336,12 +326,22 @@ private:
         int64_t index = indiceUb.GetValue(bIndex);
         if (this->isPA == true) {
             if (index >= 0) {
-                DataCopy(vCacheGm[index * this->kvHeadNum * this->hiddenSize],
-                         vOut[sIndexUb * this->kvHeadNum * this->hiddenSize],
-                         sNum * this->kvHeadNum * this->hiddenSize);
-                DataCopy(kCacheGm[index * this->kvHeadNum * this->hiddenSize],
-                         kOut[sIndexUb * this->kvHeadNum * this->hiddenSize],
-                         sNum * this->kvHeadNum * this->hiddenSize);
+                bool hasLaterSameBlock = false;
+                int64_t curToken = this->sCoreOffset + sIndexUb;
+                for (int64_t j = curToken + sNum; j < this->batch; j++) {
+                    if (indiceGm.GetValue(j) == index) {
+                        hasLaterSameBlock = true;
+                        break;
+                    }
+                }
+                if (!hasLaterSameBlock) {
+                    DataCopy(vCacheGm[index * this->kvHeadNum * this->hiddenSize],
+                             vOut[sIndexUb * this->kvHeadNum * this->hiddenSize],
+                             sNum * this->kvHeadNum * this->hiddenSize);
+                    DataCopy(kCacheGm[index * this->kvHeadNum * this->hiddenSize],
+                             kOut[sIndexUb * this->kvHeadNum * this->hiddenSize],
+                             sNum * this->kvHeadNum * this->hiddenSize);
+                }
             }
         } else {
             DataCopy(vCacheGm[((bOffset + bIndex) * this->cacheSeqlen + index + sIndex) * this->kvHeadNum *
@@ -370,6 +370,8 @@ private:
 
         indiceUb = indiceQueue.AllocTensor<int32_t>();
         bOffset = GetDiv(sCoreOffset, seqlen);
+        dataCopyParamsIndice_ = {
+            1, static_cast<uint32_t>(AscendC::Std::min(onceS, this->batch - this->bOffset) * sizeof(int32_t)), 0, 0, 0};
 
         DataCopyPad(indiceUb, indiceGm[bOffset], dataCopyParamsIndice_, padParamsIndice_);
         SetFlag<HardEvent::MTE2_S>(eventIdMTE2ToS);
@@ -532,7 +534,7 @@ private:
                                   {1, 1, 1, repeatStrideF, repeatStrideF, 0});
             }
             PipeBarrier<PIPE_V>();
-            if (this->hasQuantOffset == true) {
+            if (this->hasOffsetK == true) {
                 for (uint32_t r = 0; r < hRepeatTime; r++) {
                     Add<float, false>(tmpBufFP32[r * FP32_ONE_REPEAT_NUM], tmpBufFP32[r * FP32_ONE_REPEAT_NUM],
                                       offsetKUb[r * FP32_ONE_REPEAT_NUM], FP32_ONE_REPEAT_NUM, onceS,
@@ -546,7 +548,7 @@ private:
                     this->hiddenSize * this->kvHeadNum);
             }
             PipeBarrier<PIPE_V>();
-            if (this->hasQuantOffset == true) {
+            if (this->hasOffsetK == true) {
                 for (uint32_t r = 0; r < onceS; r++) {
                     Add(tmpBufFP32[r * this->hiddenSize * this->kvHeadNum],
                         tmpBufFP32[r * this->hiddenSize * this->kvHeadNum], offsetKUb,
@@ -691,7 +693,7 @@ private:
                                   {1, 1, 1, repeatStrideF, repeatStrideF, 0});
             }
             PipeBarrier<PIPE_V>();
-            if (this->hasQuantOffset == true) {
+            if (this->hasOffsetV == true) {
                 for (uint32_t r = 0; r < hRepeatTime; r++) {
                     Add<float, false>(tmpBufFP32[r * FP32_ONE_REPEAT_NUM], tmpBufFP32[r * FP32_ONE_REPEAT_NUM],
                                       offsetVUb[r * FP32_ONE_REPEAT_NUM], FP32_ONE_REPEAT_NUM, onceS,
@@ -705,7 +707,7 @@ private:
                     this->hiddenSize * this->kvHeadNum);
             }
             PipeBarrier<PIPE_V>();
-            if (this->hasQuantOffset == true) {
+            if (this->hasOffsetV == true) {
                 for (uint32_t r = 0; r < onceS; r++) {
                     Add(tmpBufFP32[r * this->hiddenSize * this->kvHeadNum],
                         tmpBufFP32[r * this->hiddenSize * this->kvHeadNum], offsetVUb,
@@ -886,7 +888,8 @@ private:
     int64_t realCoreNum;
     int64_t blockFactor;
     int64_t tailCoreBlockFactor;
-    int64_t hasQuantOffset;
+    int64_t hasOffsetK;
+    int64_t hasOffsetV;
     int64_t indiceUbNum;
     int64_t hiddenSizeFp32Align;
     int64_t hiddenSizeFp16Align;

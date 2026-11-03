@@ -98,7 +98,8 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_0)
     tilingData->frontCoreNum = 64;
     tilingData->blockFactor = 5;
     tilingData->tailCoreBlockFactor = 5;
-    tilingData->hasQuantOffset = 0;
+    tilingData->hasOffsetK = 0;
+    tilingData->hasOffsetV = 0;
     tilingData->ifKVout = 0;
     tilingData->isPA = 0;
     tilingData->hasBias = 0;
@@ -193,7 +194,8 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_1)
     tilingData->frontCoreNum = 64;
     tilingData->blockFactor = 5;
     tilingData->tailCoreBlockFactor = 5;
-    tilingData->hasQuantOffset = 0;
+    tilingData->hasOffsetK = 0;
+    tilingData->hasOffsetV = 0;
     tilingData->ifKVout = 0;
     tilingData->isPA = 0;
     tilingData->hasBias = 0;
@@ -288,7 +290,8 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_2)
     tilingData->frontCoreNum = 64;
     tilingData->blockFactor = 5;
     tilingData->tailCoreBlockFactor = 5;
-    tilingData->hasQuantOffset = 0;
+    tilingData->hasOffsetK = 0;
+    tilingData->hasOffsetV = 0;
     tilingData->ifKVout = 0;
     tilingData->isPA = 0;
     tilingData->hasBias = 0;
@@ -383,7 +386,8 @@ TEST_F(dequant_rope_quant_kvcache_test, test_dequant_rope_quant_kvcache_3)
     tilingData->frontCoreNum = 64;
     tilingData->blockFactor = 5;
     tilingData->tailCoreBlockFactor = 5;
-    tilingData->hasQuantOffset = 0;
+    tilingData->hasOffsetK = 0;
+    tilingData->hasOffsetV = 0;
     tilingData->ifKVout = 0;
     tilingData->isPA = 0;
     tilingData->hasBias = 0;

@@ -154,7 +154,8 @@ struct TilingInfoDRQK {
     int64_t ubSize = 0;
     int64_t ifKVout = 0;
     int64_t onceS = 0;
-    int64_t hasQuantOffset = 0;
+    int64_t hasOffsetK = 0;
+    int64_t hasOffsetV = 0;
     int64_t isPA = 0;
     int64_t hasBias = 0;
     int64_t hasAS = 0;
@@ -187,7 +188,8 @@ static void DQRKPrintParam(gert::TilingContext* context, DequantRopeQuantKvcache
     OP_LOGD(nodeName, ">>> frontCoreNum:          %ld", tiling.get_frontCoreNum());
     OP_LOGD(nodeName, ">>> blockFactor:        %ld", tiling.get_blockFactor());
     OP_LOGD(nodeName, ">>> tailCoreBlockFactor:   %ld", tiling.get_tailCoreBlockFactor());
-    OP_LOGD(nodeName, ">>> hasQuantOffset:              %ld", tiling.get_hasQuantOffset());
+    OP_LOGD(nodeName, ">>> hasOffsetK:              %ld", tiling.get_hasOffsetK());
+    OP_LOGD(nodeName, ">>> hasOffsetV:              %ld", tiling.get_hasOffsetV());
     OP_LOGD(nodeName, ">>> ifKVout:              %ld", tiling.get_ifKVout());
     OP_LOGD(nodeName, ">>> isPA:              %ld", tiling.get_isPA());
     OP_LOGD(nodeName, ">>> hasBias:              %ld", tiling.get_hasBias());
@@ -300,9 +302,9 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& t
     tilingInfoDRQK.ifKVout = *ifKVoutPtr ? 1 : 0;
 
     auto quantKOffsetDesc = context->GetOptionalInputDesc(QUANT_K_OFFSET_INPUT_INDEX);
-    tilingInfoDRQK.hasQuantOffset = (quantKOffsetDesc == nullptr) ? 0 : 1;
+    tilingInfoDRQK.hasOffsetK = (quantKOffsetDesc == nullptr) ? 0 : 1;
     auto quantVOffsetDesc = context->GetOptionalInputDesc(QUANT_V_OFFSET_INPUT_INDEX);
-    tilingInfoDRQK.hasQuantOffset = (quantVOffsetDesc == nullptr) ? 0 : tilingInfoDRQK.hasQuantOffset;
+    tilingInfoDRQK.hasOffsetV = (quantVOffsetDesc == nullptr) ? 0 : 1;
     for (uint64_t indexOpt = QUANT_K_OFFSET_INPUT_INDEX; indexOpt < BIAS_INPUT_INDEX; indexOpt++) {
         const char* inputName = OPTIONAL_INPUT_NAMES[indexOpt - QUANT_K_OFFSET_INPUT_INDEX];
         if (checkOptDtype(indexOpt, context, nodeName, inputName) == ge::GRAPH_FAILED) {
@@ -510,23 +512,33 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& t
                     "EZ1008", (std::vector<const char*>{"opName", "reason"}),
                     (std::vector<const char*>{nodeName, "scale_k input descriptor is unavailable during Tiling"})),
                 return ge::GRAPH_FAILED);
-    if (tilingInfoDRQK.hasQuantOffset == 1) {
+    if (tilingInfoDRQK.hasOffsetK == 1) {
         const gert::StorageShape* kOffsetShape = context->GetOptionalInputShape(QUANT_K_OFFSET_INPUT_INDEX);
-        const gert::StorageShape* vOffsetShape = context->GetOptionalInputShape(QUANT_V_OFFSET_INPUT_INDEX);
-        OP_CHECK_IF(kOffsetShape == nullptr || vOffsetShape == nullptr,
+        OP_CHECK_IF(kOffsetShape == nullptr,
                     REPORT_PREDEFINED_ERR_MSG(
                         "EZ1008", (std::vector<const char*>{"opName", "reason"}),
-                        (std::vector<const char*>{nodeName,
-                                                  "offset_k or offset_v shape metadata is unavailable during Tiling"})),
+                        (std::vector<const char*>{nodeName, "offset_k shape metadata is unavailable during Tiling"})),
                     return ge::GRAPH_FAILED);
         const int64_t kOffsetSize = kOffsetShape->GetStorageShape().GetShapeSize();
-        const int64_t vOffsetSize = vOffsetShape->GetStorageShape().GetShapeSize();
-        OP_CHECK_IF((kOffsetShape->GetStorageShape().GetShapeSize() != quantShapeSize ||
-                     vOffsetShape->GetStorageShape().GetShapeSize() != quantShapeSize),
+        OP_CHECK_IF(kOffsetSize != quantShapeSize,
                     OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
-                        nodeName, "offset_k, offset_v",
-                        (std::to_string(kOffsetSize) + ", " + std::to_string(vOffsetSize)).c_str(),
-                        "both sizes must equal k_cache.shape[2] * k_cache.shape[3] " + std::to_string(quantShapeSize)),
+                        nodeName, "offset_k", std::to_string(kOffsetSize).c_str(),
+                        "size must equal k_cache.shape[2] * k_cache.shape[3] " + std::to_string(quantShapeSize)),
+                    return ge::GRAPH_FAILED);
+        tilingInfoDRQK.scalesBtyeSize = ge::GetSizeByDataType(scaleDesc->GetDataType());
+    }
+    if (tilingInfoDRQK.hasOffsetV == 1) {
+        const gert::StorageShape* vOffsetShape = context->GetOptionalInputShape(QUANT_V_OFFSET_INPUT_INDEX);
+        OP_CHECK_IF(vOffsetShape == nullptr,
+                    REPORT_PREDEFINED_ERR_MSG(
+                        "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                        (std::vector<const char*>{nodeName, "offset_v shape metadata is unavailable during Tiling"})),
+                    return ge::GRAPH_FAILED);
+        const int64_t vOffsetSize = vOffsetShape->GetStorageShape().GetShapeSize();
+        OP_CHECK_IF(vOffsetSize != quantShapeSize,
+                    OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                        nodeName, "offset_v", std::to_string(vOffsetSize).c_str(),
+                        "size must equal k_cache.shape[2] * k_cache.shape[3] " + std::to_string(quantShapeSize)),
                     return ge::GRAPH_FAILED);
         tilingInfoDRQK.scalesBtyeSize = ge::GetSizeByDataType(scaleDesc->GetDataType());
     }
@@ -548,11 +560,12 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& t
                         tilingInfoDRQK.kvHeadNum * tilingInfoDRQK.hiddenSizeUpOutBtyeAlign +
                         tilingInfoDRQK.hasAS * FP32_BYTE;
 
-    int64_t remainSize =
-        BLOCK_SIZE * DOUBLE_BUFFER + ONCE_INDICE_BYTE_SIZE +
-        KV_NUM * tilingInfoDRQK.kvHeadNum * tilingInfoDRQK.hiddenSizeUpOutBtyeAlign +
-        KV_NUM * tilingInfoDRQK.kvHeadNum * tilingInfoDRQK.hiddenSizeUpOutBtyeAlign * tilingInfoDRQK.hasQuantOffset +
-        tilingInfoDRQK.hasBias * qkvHiddensize * FP32_BYTE + tilingInfoDRQK.isDequant * qkvHiddensize * FP32_BYTE;
+    int64_t remainSize = BLOCK_SIZE * DOUBLE_BUFFER + ONCE_INDICE_BYTE_SIZE +
+                         KV_NUM * tilingInfoDRQK.kvHeadNum * tilingInfoDRQK.hiddenSizeUpOutBtyeAlign +
+                         (tilingInfoDRQK.hasOffsetK + tilingInfoDRQK.hasOffsetV) * tilingInfoDRQK.kvHeadNum *
+                             tilingInfoDRQK.hiddenSizeUpOutBtyeAlign +
+                         tilingInfoDRQK.hasBias * qkvHiddensize * FP32_BYTE +
+                         tilingInfoDRQK.isDequant * qkvHiddensize * FP32_BYTE;
 
     int64_t unUsedSize = tilingInfoDRQK.ubSize - remainSize;
 
@@ -636,7 +649,8 @@ static ge::graphStatus TilingDequantRopeQuantKvcache(gert::TilingContext* contex
     tiling.set_realCoreNum(numBlocks);
     tiling.set_blockFactor(blockFactor);
     tiling.set_tailCoreBlockFactor(lastCoreNum);
-    tiling.set_hasQuantOffset(tilingInfoDRQK.hasQuantOffset);
+    tiling.set_hasOffsetK(tilingInfoDRQK.hasOffsetK);
+    tiling.set_hasOffsetV(tilingInfoDRQK.hasOffsetV);
     tiling.set_ifKVout(tilingInfoDRQK.ifKVout);
     tiling.set_isPA(tilingInfoDRQK.isPA);
     tiling.set_hasBias(tilingInfoDRQK.hasBias);

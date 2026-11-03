@@ -38,7 +38,8 @@ struct DequantRopeQuantKvcacheTilingData {
     int64_t frontCoreNum = 30;
     int64_t blockFactor = 3;
     int64_t tailCoreBlockFactor = 10;
-    int64_t hasQuantOffset = 1;
+    int64_t hasOffsetK = 1;
+    int64_t hasOffsetV = 1;
     int64_t ifKVout = 1;
     int64_t isPA = 1;
     int64_t hasBias = 1;
