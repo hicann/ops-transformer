@@ -291,14 +291,12 @@ protected:
 
     void AnalyzeOptionalDn() override
     {
-        if (hasRope ||
+        if (hasRope || hasPse || hasDropOut ||
             (hasAttenMask &&
              attenMaskCompressMode != static_cast<uint8_t>(AttenMaskCompressMode::LEFT_UP_CAUSAL_MODE) &&
              attenMaskCompressMode != static_cast<uint8_t>(AttenMaskCompressMode::RIGHT_DOWN_CAUSAL_MODE)) ||
-            (hasPse && pseType != static_cast<int64_t>(PseType::PSE_INNER_MUL_ADD_TYPE) &&
-             pseType != static_cast<int64_t>(PseType::PSE_INNER_MUL_ADD_SQRT_TYPE)) ||
-            (hasDropOut && dropMaskOuter) || inputDtypeBytes == DATA_TYPE_FP32 ||
-            dTemplateType > DTemplateType::ALIGNED_256 || dTemplateType != dVTemplateType) {
+            inputDtypeBytes == DATA_TYPE_FP32 || dTemplateType > DTemplateType::ALIGNED_256 ||
+            dTemplateType != dVTemplateType) {
             return;
         }
         optionalDn = true;
