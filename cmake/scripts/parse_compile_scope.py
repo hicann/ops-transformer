@@ -51,7 +51,7 @@ LONG_SOC = {
     "kirinx90": "KirinX90",
     "kirin9030": "Kirin9030",
     "mc62": "",
-    "ascend5162a": "Ascend5162A",
+    "ascend5162": "Ascend5162A",
     "ascend610lite": "Ascend610Lite",
 }
 _WHITELIST_CACHE = None

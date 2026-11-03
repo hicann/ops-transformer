@@ -276,7 +276,7 @@ function(op_add_subdirectory OP_LIST OP_DIR_LIST)
             if(NOT (ASCEND_COMPUTE_UNIT STREQUAL "kirinx90" OR
                 ASCEND_COMPUTE_UNIT STREQUAL "kirin9030" OR
                 ASCEND_COMPUTE_UNIT STREQUAL "mc62" OR
-                ASCEND_COMPUTE_UNIT STREQUAL "ascend5162a"))
+                ASCEND_COMPUTE_UNIT STREQUAL "ascend5162"))
                 file(GLOB MC2_CANNDEV_OPS_HOST_CMAKE_FILES
                 "${CMAKE_CURRENT_SOURCE_DIR}/mc2/**/op_host/CMakeLists.txt"
                 "${CMAKE_CURRENT_SOURCE_DIR}/mc2/**/framework/CMakeLists.txt"
