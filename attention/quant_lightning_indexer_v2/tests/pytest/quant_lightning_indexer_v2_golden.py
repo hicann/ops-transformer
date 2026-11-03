@@ -2081,7 +2081,7 @@ def qliv2_output_single(
                 q_head_num,
                 math.ceil(head_dim / HIF4_GROUP_SIZE),
             ]
-            q_scale_u32 = gen_hifp4_scale_tensor(q_scale_shape_hif4)
+            q_scale_u32 = gen_hifp4_scale_tensor(q_scale_shape_hif4, q_scale_datarange)
             query_dequant_scale = q_scale_u32.view(HIF4_SCALE_FAKE_DTYPE)
             query_dequant_scale_cpu = query_dequant_scale
         else:
@@ -2152,7 +2152,7 @@ def qliv2_output_single(
                 q_head_num,
                 math.ceil(head_dim / HIF4_GROUP_SIZE),
             ]
-            q_scale_u32 = gen_hifp4_scale_tensor(q_scale_shape_hif4)
+            q_scale_u32 = gen_hifp4_scale_tensor(q_scale_shape_hif4, q_scale_datarange)
             query_dequant_scale = q_scale_u32.view(HIF4_SCALE_FAKE_DTYPE)
             query_dequant_scale_cpu = query_dequant_scale
         else:
@@ -2218,7 +2218,7 @@ def qliv2_output_single(
                 k_head_num,
                 math.ceil(head_dim / HIF4_GROUP_SIZE),
             ]
-            k_scale_u32 = gen_hifp4_scale_tensor(k_scale_shape_hif4)
+            k_scale_u32 = gen_hifp4_scale_tensor(k_scale_shape_hif4, k_scale_datarange)
             key_dequant_scale = k_scale_u32.view(HIF4_SCALE_FAKE_DTYPE)
             key_dequant_scale_cpu = key_dequant_scale
         else:
@@ -2291,7 +2291,7 @@ def qliv2_output_single(
                 k_head_num,
                 math.ceil(head_dim / HIF4_GROUP_SIZE),
             ]
-            k_scale_u32 = gen_hifp4_scale_tensor(k_scale_shape_hif4)
+            k_scale_u32 = gen_hifp4_scale_tensor(k_scale_shape_hif4, k_scale_datarange)
             key_dequant_scale = k_scale_u32.view(HIF4_SCALE_FAKE_DTYPE)
             key_dequant_scale_cpu = key_dequant_scale
         else:
@@ -2364,7 +2364,7 @@ def qliv2_output_single(
                 k_max_s2,
                 math.ceil(head_dim / HIF4_GROUP_SIZE),
             ]
-            k_scale_u32 = gen_hifp4_scale_tensor(k_scale_shape_hif4)
+            k_scale_u32 = gen_hifp4_scale_tensor(k_scale_shape_hif4, k_scale_datarange)
             key_dequant_scale_bns = k_scale_u32.view(HIF4_SCALE_FAKE_DTYPE)
         else:
             key_dequant_scale_bns = torch.tensor(
@@ -3756,14 +3756,62 @@ def split_hifp4_scale(scale_u32):
     return e6m2, e1_8, e1_16
 
 
-def gen_hifp4_scale_tensor(shape):
-    """随机生成合法 HIF4 scale uint32 tensor
-    简单场景: E6M2 随机, E1_8/E1_16 全 0 (一阶量化, 对齐 FIA To_HiFP4_reverse_order_new)
-    返回 torch.uint32 tensor, 调用方可 .view(torch.float32) 伪装传 NPU
+def gen_hifp4_scale_tensor(shape, scale_range):
+    """生成 packed uint32 scale，使每个 4 元素子组的实际 scale 落在闭区间内。
+
+    scale_range 约束 E6M2 * 2**(E1_8 + E1_16)，不约束乘上 FP4 数据后的值。
+    保留三阶量化：每 8 个元素共享 E1_8，每 4 个元素共享 E1_16。
+    返回 torch.uint32，调用方可 view(torch.float32) 后传给 NPU。
     """
-    e6m2 = torch.randint(0, 254, shape, dtype=torch.int32)
-    e1_8 = torch.randint(0, 255, shape, dtype=torch.int32)
-    e1_16 = torch.randint(0, 65536, shape, dtype=torch.int32)
+    if len(scale_range) != 2:
+        raise ValueError(f"HIF4 scale range must contain two bounds, got {scale_range}")
+    range_min, range_max = map(float, scale_range)
+    if not math.isfinite(range_min) or not math.isfinite(range_max):
+        raise ValueError(f"HIF4 scale range must be finite, got {scale_range}")
+    if range_min <= 0 or range_min > range_max:
+        raise ValueError(
+            f"HIF4 scale range must satisfy 0 < min <= max, got {scale_range}"
+        )
+
+    # 0xFF 为 NaN；其余 255 个 E6M2 编码均参与筛选。
+    # 基础 E6M2 可以低于下界，只要叠加 E1 后的实际 scale 满足范围。
+    candidates = []
+    for code in range(255):
+        base_scale = e6m2_bits_to_float(code)
+        shifts = [
+            shift
+            for shift in range(3)
+            if range_min <= math.ldexp(base_scale, shift) <= range_max
+        ]
+        if shifts:
+            candidates.append((code, shifts[0], shifts[-1]))
+    if not candidates:
+        raise ValueError(
+            f"HIF4 scale range contains no representable value: {scale_range}"
+        )
+
+    choices = torch.tensor(candidates, dtype=torch.int32)
+    selected = choices[torch.randint(len(candidates), tuple(shape))]
+    e6m2 = selected[..., 0]
+    min_shift, max_shift = selected[..., 1], selected[..., 2]
+    e1_8 = torch.zeros(shape, dtype=torch.int32)
+    e1_16 = torch.zeros(shape, dtype=torch.int32)
+
+    # 先选择两个 4 元素子组共享的 E1_8，确保两个子组都有合法的 E1_16。
+    e1_8_min = torch.clamp(min_shift - 1, min=0)
+    e1_8_max = torch.clamp(max_shift, max=1)
+    for group in range(8):
+        bit8 = e1_8_min + torch.randint(0, 2, shape, dtype=torch.int32) * (
+            e1_8_max - e1_8_min
+        )
+        e1_8 |= bit8 << group
+        bit16_min = torch.clamp(min_shift - bit8, min=0)
+        bit16_max = torch.clamp(max_shift - bit8, max=1)
+        for subgroup in range(2):
+            bit16 = bit16_min + torch.randint(0, 2, shape, dtype=torch.int32) * (
+                bit16_max - bit16_min
+            )
+            e1_16 |= bit16 << (2 * group + subgroup)
     scale_u32 = combine_hifp4_scale(e6m2, e1_8, e1_16)
     return scale_u32.to(torch.uint32)
 
