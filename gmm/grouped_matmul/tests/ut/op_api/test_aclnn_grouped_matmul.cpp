@@ -572,10 +572,17 @@ string BuildCaseName(const testing::TestParamInfo<GroupedMatmulOpApiCase>& info)
 class grouped_matmul_opapi_csv_test : public testing::TestWithParam<GroupedMatmulOpApiCase> {};
 
 aclnnStatus CheckS8S4Inputs(int64_t groupListType, bool hasOffset, bool nullBiasElement = false,
-                            aclFormat weightFormat = ACL_FORMAT_ND, int64_t scaleGroupNum = 4)
+                            aclFormat weightFormat = ACL_FORMAT_ND, int64_t scaleGroupNum = 4,
+                            gmm::GMMApiVersion apiVersion = gmm::GMMApiVersion::V5,
+                            std::vector<int64_t> tuningConfig = {})
 {
     auto x = BuildAclTensorListDesc("64:1024", "INT8", "ND").ToAclType();
-    auto weight = BuildAclTensorListDesc({{2, 1024, 256}}, ACL_INT4, weightFormat).ToAclType();
+    const bool specialWeight = tuningConfig.size() > 1 && tuningConfig[1] == 1;
+    auto weight = BuildAclTensorListDesc(specialWeight ? std::vector<std::vector<int64_t>>{{2, 256, 1024}} :
+                                                         std::vector<std::vector<int64_t>>{{2, 1024, 256}},
+                                         ACL_INT4, weightFormat)
+                      .ToAclType();
+    auto tuning = IntArrayDesc(tuningConfig).ToAclType();
     auto bias = BuildAclTensorListDesc("2:256", "FLOAT", "ND").ToAclType();
     const std::string scaleShape = hasOffset ? "2:1:256" : "2:" + std::to_string(scaleGroupNum) + ":256";
     auto scale = BuildAclTensorListDesc(scaleShape, "UINT64", "ND").ToAclType();
@@ -598,7 +605,8 @@ aclnnStatus CheckS8S4Inputs(int64_t groupListType, bool hasOffset, bool nullBias
     params.splitItem = 3;
     params.groupListType = groupListType;
     params.activeType = 0;
-    params.apiVersion = gmm::GMMApiVersion::V5;
+    params.apiVersion = apiVersion;
+    params.tuningConfigOptional = tuningConfig.empty() ? nullptr : tuning.get();
     params.groupType = 0;
     params.y = out.get();
     params.xDtype = op::DataType::DT_INT8;
@@ -635,6 +643,233 @@ TEST(GroupedMatmulS8S4OpApiChecker, UsesA3WeightFormatWhitelist)
     }
     EXPECT_EQ(CheckS8S4Inputs(1, false, false, ACL_FORMAT_NHWC), ACLNN_ERR_PARAM_INVALID);
 }
+
+TEST(GroupedMatmulS8S4OpApiChecker, SeparatesV5AndWeightNzFormats)
+{
+    for (bool hasOffset : {false, true}) {
+        for (const std::vector<int64_t>& tuning : {std::vector<int64_t>{}, {0, 0}, {0, 1}}) {
+            EXPECT_EQ(CheckS8S4Inputs(1, hasOffset, false, ACL_FORMAT_FRACTAL_NZ, 4, gmm::GMMApiVersion::V5, tuning),
+                      ACLNN_ERR_PARAM_INVALID);
+            EXPECT_EQ(CheckS8S4Inputs(1, hasOffset, false, ACL_FORMAT_ND, 4, gmm::GMMApiVersion::WeightNz, tuning),
+                      ACLNN_ERR_PARAM_INVALID);
+            const aclnnStatus expected =
+                tuning.size() > 1 && tuning[1] == 1 && !hasOffset ? ACLNN_ERR_PARAM_INVALID : ACLNN_SUCCESS;
+            EXPECT_EQ(
+                CheckS8S4Inputs(1, hasOffset, false, ACL_FORMAT_FRACTAL_NZ, 4, gmm::GMMApiVersion::WeightNz, tuning),
+                expected);
+        }
+    }
+}
+
+TEST(GroupedMatmulS8S4OpApiChecker, V5RejectsSpecialFormatWithNdWeight)
+{
+    EXPECT_EQ(CheckS8S4Inputs(1, true, false, ACL_FORMAT_ND, 4, gmm::GMMApiVersion::V5, {0, 1}),
+              ACLNN_ERR_PARAM_INVALID);
+    EXPECT_EQ(CheckS8S4Inputs(1, true, false, ACL_FORMAT_ND, 4, gmm::GMMApiVersion::V5, {0, 0}), ACLNN_SUCCESS);
+}
+
+TEST(GroupedMatmulS8S4OpApiChecker, RejectsInvalidSpecialFormatFlag)
+{
+    for (int64_t flag : {-1L, 2L}) {
+        EXPECT_EQ(CheckS8S4Inputs(1, true, false, ACL_FORMAT_ND, 4, gmm::GMMApiVersion::V5, {0, flag}),
+                  ACLNN_ERR_PARAM_INVALID);
+        EXPECT_EQ(CheckS8S4Inputs(1, true, false, ACL_FORMAT_FRACTAL_NZ, 4, gmm::GMMApiVersion::WeightNz, {0, flag}),
+                  ACLNN_ERR_PARAM_INVALID);
+    }
+}
+
+struct S8S4PublicApiCase {
+    std::string name;
+    gmm::GMMApiVersion api = gmm::GMMApiVersion::V5;
+    aclFormat format = ACL_FORMAT_ND;
+    bool hasOffset = false;
+    bool packed = false;
+    std::vector<int64_t> tuning;
+    int64_t quantGroupSize = 256;
+    bool invertLayout = false;
+    size_t weightCount = 1;
+    aclnnStatus expected = ACLNN_SUCCESS;
+};
+
+aclnnStatus RunS8S4PublicApiCase(const S8S4PublicApiCase& testCase)
+{
+    auto x = BuildAclTensorListDesc("64:1024", "INT8", "ND").ToAclType();
+    const bool special = testCase.tuning.size() > 1 && testCase.tuning[1] == 1;
+    const bool specialLayout = special != testCase.invertLayout;
+    const int64_t packing = testCase.packed ? 8 : 1;
+    const std::vector<int64_t> weightShape =
+        specialLayout ? std::vector<int64_t>{2, 256, 1024 / packing} : std::vector<int64_t>{2, 1024, 256 / packing};
+    const std::vector<int64_t> storageShape = testCase.format == ACL_FORMAT_FRACTAL_NZ ?
+                                                  (specialLayout ? std::vector<int64_t>{2, 32, 16, 16, 32 / packing} :
+                                                                   std::vector<int64_t>{2, 8, 64, 16, 32 / packing}) :
+                                                  weightShape;
+    auto weight = BuildAclTensorListDesc(std::vector<std::vector<int64_t>>(testCase.weightCount, weightShape),
+                                         testCase.packed ? ACL_INT32 : ACL_INT4, testCase.format,
+                                         std::vector<std::vector<int64_t>>(testCase.weightCount, storageShape))
+                      .ToAclType();
+    auto bias = BuildAclTensorListDesc("2:256", "FLOAT", "ND").ToAclType();
+    auto scale = BuildAclTensorListDesc(testCase.hasOffset ? "2:1:256" : "2:4:256", "UINT64", "ND").ToAclType();
+    auto offset = BuildAclTensorListDesc("2:1:256", "FLOAT", "ND").ToAclType();
+    auto perToken = BuildAclTensorListDesc("64", "FLOAT", "ND").ToAclType();
+    auto out = BuildAclTensorListDesc("64:256", testCase.hasOffset ? "FLOAT16" : "BF16", "ND").ToAclType();
+    auto groupList = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).ToAclType();
+    auto tuning = IntArrayDesc(testCase.tuning).ToAclType();
+    auto* tuningOptional = testCase.tuning.empty() ? nullptr : tuning.get();
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+    aclnnStatus status;
+    if (testCase.api == gmm::GMMApiVersion::WeightNz) {
+        status = aclnnGroupedMatmulWeightNzGetWorkspaceSize(
+            x.get(), weight.get(), bias.get(), scale.get(), testCase.hasOffset ? offset.get() : nullptr, nullptr,
+            nullptr, perToken.get(), groupList.get(), nullptr, nullptr, nullptr, 3, 0, 1, 0, tuningOptional,
+            testCase.quantGroupSize, out.get(), nullptr, nullptr, &workspaceSize, &executor);
+    } else {
+        status = aclnnGroupedMatmulV5GetWorkspaceSize(
+            x.get(), weight.get(), bias.get(), scale.get(), testCase.hasOffset ? offset.get() : nullptr, nullptr,
+            nullptr, perToken.get(), groupList.get(), nullptr, nullptr, nullptr, 3, 0, 1, 0, tuningOptional, out.get(),
+            nullptr, nullptr, &workspaceSize, &executor);
+    }
+    if (status == ACLNN_SUCCESS) {
+        EXPECT_NE(executor, nullptr);
+        EXPECT_EQ((*weight)[0]->GetDataType(), op::DataType::DT_INT4);
+        EXPECT_EQ((*weight)[0]->GetViewShape().GetDim(2), specialLayout ? 1024 : 256);
+        if (testCase.format == ACL_FORMAT_FRACTAL_NZ) {
+            EXPECT_EQ((*weight)[0]->GetStorageShape().GetDim(4), 32);
+        }
+    }
+    if (executor != nullptr) {
+        aclDestroyAclOpExecutor(executor);
+    }
+    return status;
+}
+
+std::vector<S8S4PublicApiCase> BuildS8S4PublicApiCases()
+{
+    std::vector<S8S4PublicApiCase> cases;
+    const std::vector<std::vector<int64_t>> tuningValues = {{}, {0}, {0, 0}, {0, 1}, {32, 0}, {32, 1}, {0, -1}, {0, 2}};
+    const std::vector<std::string> tuningNames = {"Null",         "Token0",       "Flag0",      "Flag1",
+                                                  "Token32Flag0", "Token32Flag1", "FlagMinus1", "Flag2"};
+    for (const auto api : {gmm::GMMApiVersion::V5, gmm::GMMApiVersion::WeightNz}) {
+        for (const auto format : {ACL_FORMAT_ND, ACL_FORMAT_FRACTAL_NZ}) {
+            for (bool hasOffset : {false, true}) {
+                for (bool packed : {false, true}) {
+                    for (size_t tuningIndex = 0; tuningIndex < tuningValues.size(); ++tuningIndex) {
+                        S8S4PublicApiCase testCase;
+                        testCase.api = api;
+                        testCase.format = format;
+                        testCase.hasOffset = hasOffset;
+                        testCase.packed = packed;
+                        testCase.tuning = tuningValues[tuningIndex];
+                        testCase.quantGroupSize = hasOffset ? 0 : 256;
+                        testCase.name = std::string(api == gmm::GMMApiVersion::V5 ? "V5" : "WeightNz") +
+                                        (format == ACL_FORMAT_ND ? "_ND" : "_NZ") +
+                                        (hasOffset ? "_Perchannel" : "_Pergroup") + (packed ? "_Int32" : "_Int4") +
+                                        "_" + tuningNames[tuningIndex];
+                        const bool special = tuningIndex == 3 || tuningIndex == 5;
+                        const bool supportedFormat =
+                            api == gmm::GMMApiVersion::V5 ? format == ACL_FORMAT_ND : format == ACL_FORMAT_FRACTAL_NZ;
+                        const bool supportedSpecial = !special || (api == gmm::GMMApiVersion::WeightNz && hasOffset);
+                        testCase.expected = supportedFormat && supportedSpecial && tuningIndex < 6 ?
+                                                ACLNN_SUCCESS :
+                                                ACLNN_ERR_PARAM_INVALID;
+                        cases.push_back(testCase);
+                    }
+                }
+            }
+        }
+    }
+    for (bool packed : {false, true}) {
+        for (bool hasOffset : {false, true}) {
+            for (int64_t groupSize :
+                 (hasOffset ? std::vector<int64_t>{64, 256, -1} : std::vector<int64_t>{0, 64, 512})) {
+                S8S4PublicApiCase testCase;
+                testCase.api = gmm::GMMApiVersion::WeightNz;
+                testCase.format = ACL_FORMAT_FRACTAL_NZ;
+                testCase.hasOffset = hasOffset;
+                testCase.packed = packed;
+                testCase.quantGroupSize = groupSize;
+                testCase.expected = ACLNN_ERR_PARAM_INVALID;
+                testCase.name = std::string("BadQuantGroupSize_") + (hasOffset ? "Perchannel" : "Pergroup") +
+                                (packed ? "_Int32_" : "_Int4_") +
+                                (groupSize < 0 ? "Minus1" : std::to_string(groupSize));
+                cases.push_back(testCase);
+            }
+        }
+    }
+    for (const auto api : {gmm::GMMApiVersion::V5, gmm::GMMApiVersion::WeightNz}) {
+        for (bool hasOffset : {false, true}) {
+            for (int64_t token : {-1L, 64L, 65L}) {
+                S8S4PublicApiCase testCase;
+                testCase.api = api;
+                testCase.format = api == gmm::GMMApiVersion::V5 ? ACL_FORMAT_ND : ACL_FORMAT_FRACTAL_NZ;
+                testCase.hasOffset = hasOffset;
+                testCase.quantGroupSize = hasOffset ? 0 : 256;
+                testCase.tuning = {token, 0};
+                testCase.expected = token == 64 ? ACLNN_SUCCESS : ACLNN_ERR_PARAM_INVALID;
+                testCase.name = std::string(api == gmm::GMMApiVersion::V5 ? "V5" : "WeightNz") +
+                                (hasOffset ? "_Perchannel_Token" : "_Pergroup_Token") +
+                                (token < 0 ? "Minus1" : std::to_string(token));
+                cases.push_back(testCase);
+            }
+        }
+    }
+    for (bool packed : {false, true}) {
+        for (int64_t flag : {0L, 1L}) {
+            S8S4PublicApiCase testCase;
+            testCase.api = gmm::GMMApiVersion::WeightNz;
+            testCase.format = ACL_FORMAT_FRACTAL_NZ;
+            testCase.hasOffset = true;
+            testCase.packed = packed;
+            testCase.quantGroupSize = 0;
+            testCase.tuning = {0, flag};
+            testCase.invertLayout = true;
+            testCase.expected = ACLNN_ERR_PARAM_INVALID;
+            testCase.name = std::string("WrongLayout_") + (packed ? "Int32_Flag" : "Int4_Flag") + std::to_string(flag);
+            cases.push_back(testCase);
+        }
+        S8S4PublicApiCase testCase;
+        testCase.api = gmm::GMMApiVersion::WeightNz;
+        testCase.format = ACL_FORMAT_FRACTAL_NZ;
+        testCase.hasOffset = true;
+        testCase.packed = packed;
+        testCase.quantGroupSize = 0;
+        testCase.tuning = {0, 1};
+        testCase.weightCount = 2;
+        testCase.expected = ACLNN_ERR_PARAM_INVALID;
+        testCase.name = packed ? "SpecialMultiWeight_Int32" : "SpecialMultiWeight_Int4";
+        cases.push_back(testCase);
+    }
+    return cases;
+}
+
+class GroupedMatmulS8S4PublicApiMatrix : public testing::TestWithParam<S8S4PublicApiCase> {
+protected:
+    void SetUp() override
+    {
+        previousSoc_ = op::GetCurrentPlatformInfo().GetSocVersion();
+        previousStub_ = GroupedMatmulInferShapeStubEnabled();
+        op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
+        GroupedMatmulInferShapeStubEnabled() = true;
+    }
+
+    void TearDown() override
+    {
+        GroupedMatmulInferShapeStubEnabled() = previousStub_;
+        op::SetPlatformSocVersion(previousSoc_);
+    }
+
+private:
+    op::SocVersion previousSoc_ = op::SocVersion::ASCEND910B;
+    bool previousStub_ = false;
+};
+
+TEST_P(GroupedMatmulS8S4PublicApiMatrix, ChecksFormatAndTuningAtPublicEntry)
+{
+    EXPECT_EQ(RunS8S4PublicApiCase(GetParam()), GetParam().expected);
+}
+
+INSTANTIATE_TEST_SUITE_P(S8S4Formats, GroupedMatmulS8S4PublicApiMatrix, testing::ValuesIn(BuildS8S4PublicApiCases()),
+                         [](const testing::TestParamInfo<S8S4PublicApiCase>& info) { return info.param.name; });
 
 using OptionalTensorLists = std::array<const aclTensorList*, 6>;
 using OwnedTensorList = std::unique_ptr<aclTensorList, decltype(&aclDestroyTensorList)>;
@@ -673,11 +908,12 @@ protected:
         op::SetPlatformSocVersion(previousSoc_);
     }
 
-    aclnnStatus GetWorkspaceSize(gmm::GMMApiVersion api, const OptionalTensorLists& optional)
+    aclnnStatus GetWorkspaceSize(gmm::GMMApiVersion api, const OptionalTensorLists& optional,
+                                 aclFormat weightFormat = ACL_FORMAT_ND)
     {
         // A valid no-split FP16 case with zero M avoids kernel execution for compatibility checks.
         auto x = BuildAclTensorListDesc("0:32", "FLOAT16", "ND").ToAclType();
-        auto weight = BuildAclTensorListDesc("32:32", "FLOAT16", "ND").ToAclType();
+        auto weight = BuildAclTensorListDesc({{32, 32}}, ACL_FLOAT16, weightFormat).ToAclType();
         auto out = BuildAclTensorListDesc("0:32", "FLOAT16", "ND").ToAclType();
         uint64_t workspaceSize = 0;
         aclOpExecutor* executor = nullptr;
@@ -732,6 +968,26 @@ protected:
 private:
     op::SocVersion previousSoc_ = op::SocVersion::ASCEND910B;
 };
+
+TEST_F(GroupedMatmulOptionalTensorListTest, NdApisRejectNzBeforeEmptyTensorShortcut)
+{
+    for (const auto api : kGroupedMatmulPublicApis) {
+        if (api == gmm::GMMApiVersion::WeightNz) {
+            continue;
+        }
+        SCOPED_TRACE(testing::Message() << "API=" << static_cast<int>(api));
+        EXPECT_EQ(GetWorkspaceSize(api, {}, ACL_FORMAT_ND), ACLNN_SUCCESS);
+        EXPECT_EQ(GetWorkspaceSize(api, {}, ACL_FORMAT_FRACTAL_NZ), ACLNN_ERR_PARAM_INVALID);
+    }
+}
+
+TEST_F(GroupedMatmulOptionalTensorListTest, LegacyV5NzFormatRemainsSupported)
+{
+    for (const auto soc : {op::SocVersion::ASCEND910B, op::SocVersion::ASCEND910_93}) {
+        op::SetPlatformSocVersion(soc);
+        EXPECT_EQ(GetWorkspaceSize(gmm::GMMApiVersion::V5, {}, ACL_FORMAT_FRACTAL_NZ), ACLNN_SUCCESS);
+    }
+}
 
 TEST_F(GroupedMatmulOptionalTensorListTest, A5RejectsNullElementsAcrossPublicApis)
 {

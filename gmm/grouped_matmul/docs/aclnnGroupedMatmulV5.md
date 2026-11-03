@@ -316,14 +316,12 @@ aclnnGroupedMatmulV5默认确定性实现。
 #### 平台约束
 
 - groupType：支持M轴分组（0）和不分组（-1）。非量化/全量化额外支持K轴分组（2）。
+- Ascend 950PR&950DT系列产品通过本接口传入的weight仅支持ND格式；NZ格式请使用[aclnnGroupedMatmulWeightNz](aclnnGroupedMatmulWeightNz.md)。
 - groupListType：支持0、1、2。
   - groupListType=0：groupList须为非负单调非递减数列（累积和），最后一个值不大于x中tensor的第一维。以M=256、E=4（各组大小依次为64、0、128、64）为例：`[64, 64, 192, 256]`
   - groupListType=1：groupList须为非负数列（各组大小），数值总和不大于x中tensor的第一维。例如：`[64, 0, 128, 64]`
   - groupListType=2：仅全量化和非量化，且groupType=0场景下支持，groupList须为非负数列，shape为`[E, 2]`，E表示Group大小，数据排布为`[[groupIdx0, groupSize0], [groupIdx1, groupSize1], ...]`，其中groupSize为分组轴上每组大小，必须为非负数。所有groupSize非0的分组按groupIdx有序排列在前，所有groupSize为0的分组按groupIdx有序排列在后，确保非零组前置、零值组后置，且组内有序。第二列的数值总和不大于x中tensor的第一维。例如：`[[0, 64], [2, 128], [3, 64], [1, 0]]`
-- tuningConfigOptional：可选调优参数，当前仅S8S4场景支持。如不使用，传入nullptr即可。
-  - 第一个元素（下标0）：支持0和正整数，取值范围为`[0, min(M, UINT32_MAX)]`，其中M为输入x的行数。0表示不指定预期值，正整数表示各个专家处理的token数的预期值，例如128表示预期每个专家处理128个token（要求M不小于128）。当前S8S4实现仅校验并保存该值，暂不参与实际调优计算。
-  - 第二个元素（下标1）：仅支持0或1，其他值不支持。设为0或不提供该元素时，不开启weight特殊格式，weight按常规`[E,K,N]`逻辑布局解析；设为1时，开启weight特殊格式，仅支持offsetOptional不为空的perchannel场景，weight须按`[E,N,K]`排布后转换为NZ，且weight TensorList长度为1。
-  - 例如，传入`[0, 1]`表示不指定预期token数，并开启weight特殊格式。详见[S8S4场景约束](#ascend950-s8s4场景约束)。
+- tuningConfigOptional：可选参数，数组中的第一个值表示各个专家处理的token数的预期值，当前无场景使用。
 - actType（0~5）：
   - 伪量化仅支持 0。
   - 非量化在x、weight、out数据类型为BFLOAT16/FLOAT16，不分组/M轴分组场景下支持0/2；其余场景仅支持0。
@@ -571,7 +569,7 @@ aclnnGroupedMatmulV5默认确定性实现。
   | 输入输出 | 子场景 | shape限制 |
   |:---:|:---|:---|
   | x | 单Tensor | 2维，shape为`[M,K]`，不支持转置 |
-  | weight | 单Tensor | 3维，默认逻辑shape为`[E,K,N]`，不支持转置；特殊格式见tuningConfigOptional说明 |
+  | weight | 单Tensor | 3维，shape为`[E,K,N]`，不支持转置 |
   | biasOptional | 必选输入 | 2维，shape为`[E,N]` |
   | perTokenScaleOptional | 单Tensor | 1维，shape为`[M]` |
   | out | 单Tensor | - |
@@ -579,7 +577,6 @@ aclnnGroupedMatmulV5默认确定性实现。
   - biasOptional为必选输入，是INT4权重离线转换的校正量，按`8 × weight × scale`沿K轴规约得到。
   - 当weight传入数据类型为INT32时，会将每个INT32视为8个INT4。
   - offsetOptional为空时，K不大于18432且必须是256的整数倍。
-  - S8S4 offsetOptional不为空的perchannel场景下，tuningConfigOptional数组第二个元素可置1。此时weight需按`[E,N,K]`排布并转换为NZ，仅支持长度为1的weight TensorList。
 
 **其他伪量化场景：**
 

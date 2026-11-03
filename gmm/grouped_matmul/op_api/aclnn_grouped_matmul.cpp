@@ -370,13 +370,19 @@ static aclnnStatus CheckShapeDiffLengthTensorList(const aclTensorList* longTenso
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckFormat(const aclTensor* tensor, const std::string& tensorType, size_t idx)
+static aclnnStatus CheckFormat(const gmm::GroupedMatmulParams& gmmParams, const aclTensor* tensor,
+                               const std::string& tensorType, size_t idx)
 {
     bool isWeightTensor = tensorType == "weight";
     op::Format tensorFormat = tensor->GetStorageFormat();
     CHECK_COND(tensorFormat < Format::FORMAT_END, ACLNN_ERR_PARAM_INVALID, "Format of %s[%lu] %s is invalid.",
                tensorType.c_str(), idx, op::ToString(tensorFormat).GetString());
     if (isWeightTensor) { // 310P weight need to be NZ
+        CHECK_COND(!IsNpuArch3510Series() || !op::IsPrivateFormat(tensorFormat) ||
+                       gmmParams.apiVersion == gmm::GMMApiVersion::WeightNz,
+                   ACLNN_ERR_PARAM_INVALID,
+                   "The format of weight must be ND for this interface. "
+                   "For NZ weight, use aclnnGroupedMatmulWeightNz.");
         CHECK_COND(!op::IsPrivateFormat(tensorFormat) || tensorFormat == Format::FORMAT_FRACTAL_NZ ||
                        tensorFormat == Format::FORMAT_FRACTAL_NZ_C0_16 ||
                        tensorFormat == Format::FORMAT_FRACTAL_NZ_C0_32,
@@ -437,7 +443,7 @@ static aclnnStatus CheckDimNumAndFormat(const gmm::GroupedMatmulParams& gmmParam
     for (size_t i = 0; i < tensorListLength; ++i) {
         CHECK_COND((*tensorList)[i] != nullptr, ACLNN_ERR_PARAM_NULLPTR, "%s[%lu] is null, which is not supported.",
                    tensorType.c_str(), i);
-        CHECK_COND(CheckFormat((*tensorList)[i], tensorType, i) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID,
+        CHECK_COND(CheckFormat(gmmParams, (*tensorList)[i], tensorType, i) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID,
                    "Invalid format.");
         size_t dimNum = (*tensorList)[i]->GetViewShape().GetDimNum();
         CHECK_COND(dimNum == expectedDimNum, ACLNN_ERR_PARAM_INVALID,
@@ -482,10 +488,12 @@ static aclnnStatus CheckDimNumAndGroupListNoSplitAndFormat(const gmm::GroupedMat
         CHECK_COND(gmm::IsTransposeLastTwoDims((*gmmParams.weight)[i]) == gmmParams.transposeWeight,
                    ACLNN_ERR_PARAM_INVALID, "The transpose state must be the same for each tensor in weight.");
         CHECK_COND((*gmmParams.y)[i] != nullptr, ACLNN_ERR_PARAM_NULLPTR, "Y[%lu] is null, which is not supported.", i);
-        CHECK_COND(CheckFormat((*gmmParams.x)[i], "x", i) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "Invalid format.");
-        CHECK_COND(CheckFormat((*gmmParams.weight)[i], "weight", i) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID,
+        CHECK_COND(CheckFormat(gmmParams, (*gmmParams.x)[i], "x", i) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID,
                    "Invalid format.");
-        CHECK_COND(CheckFormat((*gmmParams.y)[i], "y", i) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "Invalid format.");
+        CHECK_COND(CheckFormat(gmmParams, (*gmmParams.weight)[i], "weight", i) == ACLNN_SUCCESS,
+                   ACLNN_ERR_PARAM_INVALID, "Invalid format.");
+        CHECK_COND(CheckFormat(gmmParams, (*gmmParams.y)[i], "y", i) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID,
+                   "Invalid format.");
         size_t xDimNum = (*gmmParams.x)[i]->GetViewShape().GetDimNum();
         size_t weightDimNum = (*gmmParams.weight)[i]->GetViewShape().GetDimNum();
         size_t yDimNum = (*gmmParams.y)[i]->GetViewShape().GetDimNum();

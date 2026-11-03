@@ -316,12 +316,12 @@ aclnnStatus aclnnGroupedMatmulV5(
 #### Platform Constraints
 
 - groupType: M-axis grouping (0) and non-grouping (-1) are supported. K-axis grouping is additionally supported for non-quantization and full quantization (2).
+- On Ascend 950PR&950DT products, `weight` supports only the ND format through this interface. For NZ weights, use [aclnnGroupedMatmulWeightNz](aclnnGroupedMatmulWeightNz_en.md).
 - groupListType: The value can be 0, 1, or 2.
   - groupListType=0: The groupList must be a non-negative monotonically non-decreasing number sequence (cumulative sum). The last value cannot be greater than the first dimension of the tensor in x. For example, M = 256 and E = 4 (the sizes of each group are 64, 0, 128, and 64 in sequence): [64, 64, 192, 256]
   - groupListType=1: The groupList must be a non-negative number sequence (size of each group). The total value cannot be greater than the first dimension of the tensor in x. Example: [64, 0, 128, 64]
   - groupListType=2: supported only in full quantization and groupType=0 scenarios. groupList must be a non-negative number sequence, shape is [E, 2], E indicates the group size, and data layout is [[groupIdx0, groupSize0], [groupIdx1, groupSize1]...]. Non-zero groups are placed in front. The sum of values in the second column must be less than or equal to the first dimension of the tensor in x. Example: [[0, 64], [2, 128], [3, 64], [1, 0]]
-- tuningConfigOptional: optional parameter. The first value in the array indicates the expected number of tokens processed by each expert. Currently, this function is supported only in the S8S4 scenario. For details, see [S8S4 Scenario Constraints](#ascend950-s8s4-scenario-constraints). This parameter can be omitted if it is not used.
-  - [1]: whether to enable the weight affinity format (transpose before NZ). Application scenario: [S8S4](#ascend950-s8s4-scenario-constraints).
+- tuningConfigOptional: optional parameter. The first value in the array indicates the expected number of tokens processed by each expert. This value is currently unused. This parameter can be omitted if it is not used.
 - actType (0-5) :
   - Only 0 is supported for non-quantization and fake-quantization.
   - In full quantization, the data type of x and weight is INT8, and the data type of out is BFLOAT16/FLOAT16. The value can be 0, 1, 2, 4, or 5 when the static T-C, dynamic K-C, or scale data type is FLOAT32/BFLOAT16. (Note that 3 is not supported.) In other scenarios, only 0 is supported.
@@ -575,7 +575,6 @@ S8/S4 scenario:
   - biasOptional is mandatory. It is the correction amount for offline conversion of the INT4 weight and is obtained based on the 8 × weight × scale along the K axis.
   - When the data type of `weight` is INT32, each INT32 value is treated as eight INT4 values.
   - If offsetOptional is empty, K cannot be greater than 18432 and must be an integer multiple of 256.
-  - In the per-channel scenario where S8S4 offsetOptional is not empty, the second element in the tuningConfigOptional array can be set to 1. In this case, the weight needs to be arranged based on [E,N,K] and converted into an NZ. Only the weight TensorList whose length is 1 is supported.
 
 Other fake-quantization scenarios:
 

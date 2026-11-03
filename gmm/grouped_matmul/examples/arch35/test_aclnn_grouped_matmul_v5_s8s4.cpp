@@ -37,10 +37,21 @@ namespace {
 struct TensorResource {
     void* deviceAddr = nullptr;
     aclTensor* tensor = nullptr;
+    aclTensorList* tensorList = nullptr;
+
+    aclTensorList* CreateList()
+    {
+        const aclTensor* items[] = {tensor};
+        tensorList = aclCreateTensorList(items, 1);
+        return tensorList;
+    }
 
     ~TensorResource()
     {
-        if (tensor != nullptr) {
+        // Destroying a TensorList also destroys its member tensors.
+        if (tensorList != nullptr) {
+            aclDestroyTensorList(tensorList);
+        } else if (tensor != nullptr) {
             aclDestroyTensor(tensor);
         }
         if (deviceAddr != nullptr) {
@@ -200,20 +211,18 @@ int RunS8S4Example(aclrtStream stream)
     CHECK_ACL(CreateTensor(groupList.data(), groupList.size() * sizeof(int64_t), {E}, ACL_INT64, groupListTensor));
     CHECK_ACL(CreateTensor(output.data(), output.size() * sizeof(uint16_t), {M, N}, ACL_FLOAT16, outputTensor));
 
-    const aclTensor* xItems[] = {xTensor.tensor};
-    const aclTensor* weightItems[] = {weightTensor.tensor};
-    const aclTensor* biasItems[] = {biasTensor.tensor};
-    const aclTensor* scaleItems[] = {scaleTensor.tensor};
-    const aclTensor* offsetItems[] = {offsetTensor.tensor};
-    const aclTensor* perTokenItems[] = {perTokenTensor.tensor};
-    const aclTensor* outputItems[] = {outputTensor.tensor};
-    aclTensorList* xList = aclCreateTensorList(xItems, 1);
-    aclTensorList* weightList = aclCreateTensorList(weightItems, 1);
-    aclTensorList* biasList = aclCreateTensorList(biasItems, 1);
-    aclTensorList* scaleList = aclCreateTensorList(scaleItems, 1);
-    aclTensorList* offsetList = aclCreateTensorList(offsetItems, 1);
-    aclTensorList* perTokenList = aclCreateTensorList(perTokenItems, 1);
-    aclTensorList* outputList = aclCreateTensorList(outputItems, 1);
+    aclTensorList* xList = xTensor.CreateList();
+    aclTensorList* weightList = weightTensor.CreateList();
+    aclTensorList* biasList = biasTensor.CreateList();
+    aclTensorList* scaleList = scaleTensor.CreateList();
+    aclTensorList* offsetList = offsetTensor.CreateList();
+    aclTensorList* perTokenList = perTokenTensor.CreateList();
+    aclTensorList* outputList = outputTensor.CreateList();
+    if (xList == nullptr || weightList == nullptr || biasList == nullptr || scaleList == nullptr ||
+        offsetList == nullptr || perTokenList == nullptr || outputList == nullptr) {
+        std::cerr << "aclCreateTensorList failed" << std::endl;
+        return ACL_ERROR_FAILURE;
+    }
 
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;
@@ -237,14 +246,6 @@ int RunS8S4Example(aclrtStream stream)
     }
     CHECK_ACL(aclrtMemcpy(output.data(), output.size() * sizeof(uint16_t), outputTensor.deviceAddr,
                           output.size() * sizeof(uint16_t), ACL_MEMCPY_DEVICE_TO_HOST));
-
-    aclDestroyTensorList(xList);
-    aclDestroyTensorList(weightList);
-    aclDestroyTensorList(biasList);
-    aclDestroyTensorList(scaleList);
-    aclDestroyTensorList(offsetList);
-    aclDestroyTensorList(perTokenList);
-    aclDestroyTensorList(outputList);
 
     float maxError = 0.0F;
     int64_t rowStart = 0;

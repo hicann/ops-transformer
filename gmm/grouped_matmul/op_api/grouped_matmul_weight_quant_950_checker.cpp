@@ -135,7 +135,8 @@ bool AclnnGroupedMatmulWeightQuantDAV3510Checker::IsS8S4PseudoQuant() const
 
 bool AclnnGroupedMatmulWeightQuantDAV3510Checker::IsS8S4SpecialWeightFormat() const
 {
-    return IsS8S4PseudoQuant() && gmmParams_.tuningConfigOptional != nullptr &&
+    return gmmParams_.apiVersion == GMMApiVersion::WeightNz && IsS8S4PseudoQuant() &&
+           gmmParams_.tuningConfigOptional != nullptr &&
            gmmParams_.tuningConfigOptional->Size() > TUNING_CONFIG_WEIGHT_FORMAT_INDEX &&
            (*gmmParams_.tuningConfigOptional)[TUNING_CONFIG_WEIGHT_FORMAT_INDEX] == TUNING_CONFIG_SPECIAL_WEIGHT_FORMAT;
 }
@@ -508,6 +509,9 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckWeightFormat(size_
                                           weightFormat == op::Format::FORMAT_NCHW;
         CHECK_COND(weightIsNdCompatible || weightIsNz, ACLNN_ERR_PARAM_INVALID,
                    "In S8S4, weight format must be ND, NCL, NCHW or FRACTAL_NZ.");
+        CHECK_COND(!weightIsNz || gmmParams_.apiVersion == GMMApiVersion::WeightNz, ACLNN_ERR_PARAM_INVALID,
+                   "The format of weight must be ND for this interface. "
+                   "For NZ weight, use aclnnGroupedMatmulWeightNz.");
         CHECK_COND(gmmParams_.apiVersion != GMMApiVersion::WeightNz || weightIsNz, ACLNN_ERR_PARAM_INVALID,
                    "In S8S4 through WeightNz, weight must be in FRACTAL_NZ format.");
         CHECK_COND(!IsS8S4SpecialWeightFormat() || weightIsNz, ACLNN_ERR_PARAM_INVALID,
@@ -1081,6 +1085,16 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckUnsupportedApi() c
                    ACLNN_ERR_PARAM_INVALID,
                    "Only aclnnGroupedMatmulV5 and aclnnGroupedMatmulWeightNz support this S8S4 "
                    "data flow.");
+        if (gmmParams_.tuningConfigOptional != nullptr &&
+            gmmParams_.tuningConfigOptional->Size() > TUNING_CONFIG_WEIGHT_FORMAT_INDEX) {
+            const int64_t weightFormatFlag = (*gmmParams_.tuningConfigOptional)[TUNING_CONFIG_WEIGHT_FORMAT_INDEX];
+            CHECK_COND(weightFormatFlag == 0 || weightFormatFlag == TUNING_CONFIG_SPECIAL_WEIGHT_FORMAT,
+                       ACLNN_ERR_PARAM_INVALID, "In S8S4, tuningConfig[1] must be 0 or 1.");
+            CHECK_COND(weightFormatFlag == 0 || gmmParams_.apiVersion == GMMApiVersion::WeightNz,
+                       ACLNN_ERR_PARAM_INVALID,
+                       "For this interface, tuningConfig[1] must be 0 when provided. "
+                       "For NZ weight, use aclnnGroupedMatmulWeightNz.");
+        }
     } else if (IsA16MxFp4NZ() || IsA16MxHiF4() || IsMxA8W4NZ() || IsMxA8HiF4() || IsS8S4NZ()) {
         CHECK_COND(gmmParams_.apiVersion == GMMApiVersion::WeightNz, ACLNN_ERR_PARAM_INVALID,
                    "Only AclnnGroupedMatmulNz supports fp16/bf16-fp4_e2m1, "
@@ -1353,6 +1367,13 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckGroupedMatmulWeigh
     CHECK_COND(CheckAntiQuantParams() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "CheckAntiQuantParams failed.");
     CHECK_COND(CheckQuantParams() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "CheckQuantParams failed!");
     CHECK_COND(CheckTensorListSize() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "CheckTensorListSize failed.");
+    if (IsS8S4PseudoQuant()) {
+        for (size_t weightIdx = 0; weightIdx < gmmParams_.weight->Size(); ++weightIdx) {
+            CHECK_RET(CheckTensorNotNullPtr(gmmParams_.weight, weightIdx, "weight") == ACLNN_SUCCESS,
+                      ACLNN_ERR_PARAM_NULLPTR);
+            CHECK_RET(CheckWeightFormat(weightIdx) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+        }
+    }
     CHECK_RET(CheckYDtype() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckQuantDtype() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckBiasDtype() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
