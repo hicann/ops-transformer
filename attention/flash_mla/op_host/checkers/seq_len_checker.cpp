@@ -28,7 +28,7 @@ namespace flash_mla {
 ge::graphStatus ActualSeqLenChecker::CheckSingleParaSequsedQ(const FlashMlaTilingInfo& faInfo)
 {
     auto& sequsedQTensor = faInfo.opParamInfo.sequsedQ.tensor;
-    if (sequsedQTensor == nullptr) {
+    if (sequsedQTensor == nullptr || sequsedQTensor->GetShapeSize() == 0) {
         return ge::GRAPH_SUCCESS;
     }
 
@@ -97,7 +97,7 @@ ge::graphStatus ActualSeqLenChecker::CheckSingleParaCacheSeqlens(const FlashMlaT
 ge::graphStatus ActualSeqLenChecker::CheckSingleParaCuSeqlensQ(const FlashMlaTilingInfo& faInfo)
 {
     auto& cuSeqlensQTensor = faInfo.opParamInfo.cuSeqlensQ.tensor;
-    if (cuSeqlensQTensor == nullptr) {
+    if (cuSeqlensQTensor == nullptr || cuSeqlensQTensor->GetShapeSize() == 0) {
         return ge::GRAPH_SUCCESS;
     }
 
@@ -162,19 +162,20 @@ ge::graphStatus ActualSeqLenChecker::CheckSinglePara(const FlashMlaTilingInfo& f
 ge::graphStatus ActualSeqLenChecker::CheckParaExistence(const FlashMlaTilingInfo& faInfo)
 {
     auto& cacheSeqlensTensor = faInfo.opParamInfo.cacheSeqlens.tensor;
-    OP_CHECK_IF(cacheSeqlensTensor == nullptr,
+    OP_CHECK_IF(cacheSeqlensTensor == nullptr || cacheSeqlensTensor->GetShapeSize() == 0,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                     faInfo.opName, "cache_seqlens", "cache_seqlens cannot be empty when paged attention is enabled"),
                 return ge::GRAPH_FAILED);
 
     auto& cuSeqlensQTensor = faInfo.opParamInfo.cuSeqlensQ.tensor;
+    const bool hasCuSeqlensQ = cuSeqlensQTensor != nullptr && cuSeqlensQTensor->GetShapeSize() > 0;
     if (faInfo.qLayout == FlashMlaLayout::TND) {
-        OP_CHECK_IF(cuSeqlensQTensor == nullptr,
+        OP_CHECK_IF(!hasCuSeqlensQ,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(faInfo.opName, "cu_seqlens_q",
                                                              "cu_seqlens_q cannot be empty when layout_q is TND"),
                     return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(cuSeqlensQTensor != nullptr,
+        OP_CHECK_IF(hasCuSeqlensQ,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                         faInfo.opName, "cu_seqlens_q",
                         "cu_seqlens_q must be empty when layout_q is not TND, only supported in TND layout"),
@@ -192,7 +193,14 @@ ge::graphStatus ActualSeqLenChecker::CheckFeature(const FlashMlaTilingInfo& faIn
 
 ge::graphStatus ActualSeqLenChecker::CheckMultiPara(const FlashMlaTilingInfo& faInfo)
 {
-    // GetData 返回设备地址，Host 不能解引用序列长度。
+    OP_CHECK_IF(faInfo.cuSeqlensQSize == 0 && faInfo.seqUsedQSize == 0 && faInfo.maxSeqQ != faInfo.s1Size,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    faInfo.opName, "max_seqlen_q", std::to_string(faInfo.maxSeqQ).c_str(),
+                    ("When cu_seqlens_q and seqused_q are absent, max_seqlen_q must equal the query sequence "
+                     "dimension " +
+                     std::to_string(faInfo.s1Size))
+                        .c_str()),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

@@ -119,10 +119,10 @@ cann_ops_transformer.flash_mla(
 | cache_seqlens | Tensor | 必选 | 各batch有效KV长度，与主算子一致 | int32 | ND | (B,) |
 | num_heads_q | int | 必选 | Query头数，支持1～128 | int32 | - | - |
 | num_heads_kv | int | 必选 | KV头数，配套当前主算子时为1 | int32 | - | - |
-| cu_seqlens_q | Tensor | 条件必选 | layout_q=TND时必传，非TND时不能传；累积Query长度，首项为0 | int32 | ND | (B+1,) |
+| cu_seqlens_q | Tensor | 可选 | layout_q=TND时必传，非TND时不能传；累积Query长度，首项为0 | int32 | ND | (B+1,) |
 | seqused_q | Tensor | 可选 | 各batch实际使用的Query长度 | int32 | ND | (B,) |
-| max_seqlen_q | int | 可选 | 允许-1或非负值；默认None归一化为-1 | int32 | - | - |
-| max_seqlen_kv | int | 可选 | 允许-1或非负值；默认None归一化为-1 | int32 | - | - |
+| max_seqlen_q | int | 可选 | 默认None归一化为-1；cu_seqlens_q和seqused_q均未提供有效tensor时，必须传非负值；空tensor视为未提供 | int32 | - | - |
+| max_seqlen_kv | int | 可选 | 允许-1或非负值；默认None归一化为-1；cache_seqlens为必选参数 | int32 | - | - |
 | head_dim_qk | int | 可选 | Query/Key逻辑头维，固定576，不能传nope部分的512 | int32 | - | - |
 | head_dim_v | int | 可选 | Value头维，固定512 | int32 | - | - |
 | mask_mode | int | 可选 | 0、3或4；默认None归一化为0，与主算子一致 | int32 | - | - |
@@ -139,7 +139,7 @@ cann_ops_transformer.flash_mla(
 | k_cache | Tensor | 必选 | 同时提供Key和Value的分页缓存 | bfloat16/float16 | ND | PA_BBND：(num_blocks, block_size, KV_N, D)；PA_BNBD：(num_blocks, KV_N, block_size, D)；PA_NZ：(num_blocks, KV_N, D / D0, block_size, D0) |
 | block_table | Tensor | 必选 | 各batch逻辑页到物理页的索引映射 | int32 | ND | (B, max_num_blocks_per_seq) |
 | cache_seqlens | Tensor | 必选 | 各batch有效KV长度 | int32 | ND | (B,) |
-| cu_seqlens_q | Tensor | 条件必选 | TND时必传、非TND时不能传；累积Query长度，首项0，末项Q_T | int32 | ND | (B+1,) |
+| cu_seqlens_q | Tensor | 可选 | TND时必传、非TND时不能传；累积Query长度，首项0，末项Q_T | int32 | ND | (B+1,) |
 | seqused_q | Tensor | 可选 | 各batch实际使用的Query长度 | int32 | ND | (B,) |
 | sinks | Tensor | 可选 | 每个 Q head 的 softmax sink logit；None 或形状(0,)表示关闭 | float32 | ND | (num_heads_q,) |
 | attn_mask | Tensor | 可选 | mask_mode=3或4时必传；mask_mode=0时不传 | int8 | ND | (2048, 2048) |
@@ -149,8 +149,8 @@ cann_ops_transformer.flash_mla(
 | mask_mode | int | 可选 | 0无掩码、3右对齐因果、4右对齐滑动窗口，默认0 | int32 | - | - |
 | win_left | int | 可选 | 左窗口，同metadata接口，默认-1 | int32 | - | - |
 | win_right | int | 可选 | 右窗口，同metadata接口，默认-1 | int32 | - | - |
-| max_seqlen_q | int | 可选 | 允许-1或非负值，默认-1 | int32 | - | - |
-| max_seqlen_kv | int | 可选 | 允许-1或非负值，默认-1 | int32 | - | - |
+| max_seqlen_q | int | 可选 | 默认-1；cu_seqlens_q和seqused_q均为null或空tensor时，必须等于q的S维长度 | int32 | - | - |
+| max_seqlen_kv | int | 可选 | 允许-1或非负值，默认-1；cache_seqlens为必选参数 | int32 | - | - |
 | layout_q | string | 可选 | 支持BSND、BNSD、TND，默认BSND | string | - | - |
 | layout_kv | string | 可选 | 支持PA_BBND、PA_BNBD、PA_NZ，默认PA_BBND | string | - | - |
 | layout_out | string | 可选 | 支持BSND、BNSD、TND、NTD，默认BSND；BSND/BNSD输入的输出必须同布局，TND输入可输出TND或NTD | string | - | - |
@@ -199,11 +199,14 @@ metadata的shape根据batch数和设备核数动态计算。
 | | attn_mask | INPUT(OPTIONAL) | Tensor |
 | Paged Attention参数组 | block_table | INPUT | Tensor |
 | SeqLens参数组 | cache_seqlens | INPUT | Tensor |
-| | cu_seqlens_q | INPUT(条件必选) | Tensor |
+| | cu_seqlens_q | INPUT(OPTIONAL) | Tensor |
 | | seqused_q | INPUT(OPTIONAL) | Tensor |
-| | max_seqlen_q、max_seqlen_kv | ATTR(OPTIONAL) | int |
+| | max_seqlen_q | ATTR(OPTIONAL) | int |
+| | max_seqlen_kv | ATTR(OPTIONAL) | int |
 | SoftmaxLSE参数组 | return_softmax_lse | ATTR(OPTIONAL) | bool |
 | | softmax_lse | OUTPUT | Tensor |
+
+上述 `OPTIONAL` 表示接口允许省略，但仍需满足输入约束：`cu_seqlens_q` 在 TND 布局下必传；`max_seqlen_q` 在 `cu_seqlens_q` 和 `seqused_q` 均未提供有效 tensor 时必传，具体取值要求见参数说明。
 
 ### 基准信息说明
 
@@ -290,8 +293,8 @@ C++ 调用方和 Torch 扩展须重新编译，使用配套的主算子及 metad
 | cache_seqlens | int32、ND、(B,)，元素非负 | 必须传入 | 与metadata生成时一致 | 与block_table的batch数一致 |
 | cu_seqlens_q | int32、ND、(B+1,)，非递减，首项0、末项Q_T | TND场景必须传入，非TND场景禁止传入 | B与cache_seqlens一致 | 相邻差值表示各batch物理Query长度 |
 | seqused_q | int32、ND、(B,)，元素非负 | 可选 | 与metadata生成时一致 | TND场景每项不超过对应cu_seqlens_q相邻差值，省略时使用相邻差值；非TND场景每项不超过物理Q_S |
-| max_seqlen_q | int | 可省略 | 允许-1或非负值 | -1表示未指定；非TND的metadata生成需提供seqused_q或非负max_seqlen_q以确定Query长度 |
-| max_seqlen_kv | int | 可省略 | 允许-1或非负值 | -1表示未指定；有效KV长度由cache_seqlens提供 |
+| max_seqlen_q | int，允许-1或非负值 | cu_seqlens_q和seqused_q均为null或空tensor时必须传入 | 未提供Query长度tensor时，metadata生成须传非负值，主算子须等于q的S维长度 | 提供Query长度tensor时，-1表示未指定 |
+| max_seqlen_kv | int，允许-1或非负值 | 可省略 | 允许-1或非负值 | 当前分页模式要求提供cache_seqlens；-1表示未指定 |
 
 #### SoftmaxLSE参数组
 

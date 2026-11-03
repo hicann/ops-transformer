@@ -143,6 +143,9 @@ inline aclnnStatus FlashMlaMetadataCheck::CheckExistency(int64_t maxSeqlenQ, con
     CHECK_COND(metadata->GetViewShape().GetDim(0) > 0, ACLNN_ERR_RUNTIME_ERROR,
                "metadata shape (max_schedule_size,) must be positive, but got %ld", metadata->GetViewShape().GetDim(0));
 
+    CHECK_COND(IsTensorExist(cuSeqlensQOptional) || IsTensorExist(sequsedQOptional) || maxSeqlenQ != NONE_VALUE,
+               ACLNN_ERR_RUNTIME_ERROR,
+               "maxSeqlenQ must not be -1 when cuSeqlensQOptional and sequsedQOptional are null or empty tensors");
     CHECK_COND(IsTensorExist(cacheSeqlensOptional), ACLNN_ERR_RUNTIME_ERROR,
                "cacheSeqlens should be provided, but got null or empty tensor");
     CHECK_COND(cacheSeqlensOptional->GetViewShape().GetDimNum() == 1, ACLNN_ERR_RUNTIME_ERROR,
