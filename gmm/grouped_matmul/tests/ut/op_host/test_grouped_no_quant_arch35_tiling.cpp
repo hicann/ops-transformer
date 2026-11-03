@@ -126,16 +126,28 @@ public:
         // groupListType 0(cumsum)/1(count): 1D [E]; groupListType 2(sparse): 2D [E, 2].
         const int64_t groupListDimNum =
             groupListDimNumOverride > 0 ? groupListDimNumOverride : (groupListType == 2 ? 2 : 1);
-        gert::StorageShape groupListShape = groupListDimNum == 2 ?
-                                                ops::ut::MakeGertStorageShape({groupNum, 2}, {groupNum, 2}) :
-                                                ops::ut::MakeGertStorageShape({groupNum}, {groupNum});
+        // 桩只构造单个 x tensor，因此非 split 场景（groupType=-1）下 tiling 由 x tensor 数推导 groupNum(=1)，
+        // groupList 长度必须与之自洽，否则会触发 groupList 长度一致性校验误报。
+        const int64_t effectiveGroupListLen = groupListLen > 0 ? groupListLen : (groupType == -1 ? 1 : groupNum);
+        gert::StorageShape groupListShape =
+            groupListDimNum == 2 ?
+                ops::ut::MakeGertStorageShape({effectiveGroupListLen, 2}, {effectiveGroupListLen, 2}) :
+                ops::ut::MakeGertStorageShape({effectiveGroupListLen}, {effectiveGroupListLen});
 
-        vector<int64_t> weightOriginDims =
-            transposeWeight ? vector<int64_t>{groupNum, n, k} : vector<int64_t>{groupNum, k, n};
+        // weightDimNum==2: WeightNz 单 x-单 y 的 E=1 特殊场景（weight 列表仅 1 个二维 tensor）
+        vector<int64_t> weightOriginDims;
+        if (weightDimNum == 2) {
+            weightOriginDims = transposeWeight ? vector<int64_t>{n, k} : vector<int64_t>{k, n};
+        } else {
+            weightOriginDims = transposeWeight ? vector<int64_t>{groupNum, n, k} : vector<int64_t>{groupNum, k, n};
+        }
         vector<int64_t> weightStorageDims;
         if (weightFormat == "NZ") {
-            weightStorageDims = transposeWeight ? vector<int64_t>{groupNum, (k + 31) / 32, (n + 15) / 16, 16, 32} :
-                                                  vector<int64_t>{groupNum, (n + 31) / 32, (k + 15) / 16, 16, 32};
+            weightStorageDims = transposeWeight ? vector<int64_t>{(k + 31) / 32, (n + 15) / 16, 16, 32} :
+                                                  vector<int64_t>{(n + 31) / 32, (k + 15) / 16, 16, 32};
+            if (weightDimNum != 2) {
+                weightStorageDims.insert(weightStorageDims.begin(), groupNum);
+            }
         } else {
             weightStorageDims = weightOriginDims;
         }
@@ -208,6 +220,8 @@ public:
     int64_t groupType = 0;
     int64_t groupListType = 0;
     int64_t groupListDimNumOverride = 0; // 0: derive from groupListType; 1/2: force 1D/2D negative cases
+    int64_t weightDimNum = 3; // 3: weight 为 (E, K, N)；2: weight 为 (K, N)（WeightNz 单 x-单 y 特殊场景）
+    int64_t groupListLen = 0; // 0: 与 groupNum 一致；>0: 显式指定 groupList 长度（负向用例）
     int64_t splitItem = 0;
     string weightFormat;
     ge::DataType xDtype = ge::DT_UNDEFINED;
@@ -292,6 +306,14 @@ vector<GroupedNoQuantArch35TilingTestParam> GetParams(const string& socVersion)
             idx++;
             if (items.size() > idx && !Trim(items[idx]).empty()) {
                 param.groupListDimNumOverride = stoll(items[idx]);
+            }
+            idx++;
+            if (items.size() > idx && !Trim(items[idx]).empty()) {
+                param.weightDimNum = stoll(items[idx]);
+            }
+            idx++;
+            if (items.size() > idx && !Trim(items[idx]).empty()) {
+                param.groupListLen = stoll(items[idx]);
             }
             idx++;
             params.push_back(param);

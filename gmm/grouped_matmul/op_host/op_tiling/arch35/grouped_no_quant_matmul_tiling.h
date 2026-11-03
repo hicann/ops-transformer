@@ -94,6 +94,8 @@ public:
 protected:
     bool Init(const gert::TilingContext* context);
     bool CheckNoQuantGroupList(const gert::TilingContext* context) const;
+    // groupList 长度与 groupNum_ 一致性校验（所有切分场景通用）
+    bool CheckGroupListLen(const gert::TilingContext* context) const;
     bool CalBaseMMTiling(const gert::TilingContext* context, const GMMCompileInfo* compileInfoPtr);
     void FormulateBasicBlock(const GMMCompileInfo* compileInfoPtr, uint32_t remainCoreNum);
     void CalAswtL1Tiling(const GMMCompileInfo* compileInfoPtr);

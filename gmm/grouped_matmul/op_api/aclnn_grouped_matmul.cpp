@@ -724,12 +724,24 @@ static bool IsMultiTensorWeight(const gmm::GroupedMatmulParams& gmmParams);
 
 static bool IsWeightNzMultiTensorCase(const gmm::GroupedMatmulParams& gmmParams)
 {
-    // The 950 checker restricts this layout to MX A8W8/A4W4 before the common shape check.
-    return op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 && gmmParams.x != nullptr &&
-           gmmParams.y != nullptr && gmmParams.weight != nullptr &&
-           gmmParams.apiVersion == gmm::GMMApiVersion::WeightNz && gmmParams.groupType == gmm::SPLIT_M &&
-           gmmParams.x->Size() == 1 && gmmParams.y->Size() == 1 && gmmParams.biasOptional == nullptr &&
-           IsMultiTensorWeight(gmmParams) && IsQuant(gmmParams.xDtype, (*gmmParams.weight)[0]->GetDataType());
+    // DAV_3510 + WeightNz + 单 x / 单 y + weight 首 tensor 为 2 维时，按「多 tensor」路径校验。
+    // 量化 / 伪量化 dtype 组合已由 quant / weight-quant checker 提前分流；bias 仅在非量化场景放开
+    // （量化 kernel 在该布局下不消费 bias）。
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510 || gmmParams.x == nullptr ||
+        gmmParams.y == nullptr || gmmParams.weight == nullptr || gmmParams.weight->Size() == 0UL ||
+        (*gmmParams.weight)[0] == nullptr || gmmParams.apiVersion != gmm::GMMApiVersion::WeightNz ||
+        gmmParams.groupType != gmm::SPLIT_M || gmmParams.x->Size() != 1UL || gmmParams.y->Size() != 1UL ||
+        !IsMultiTensorWeight(gmmParams)) {
+        return false;
+    }
+    const bool isQuantDtype = IsQuant(gmmParams.xDtype, (*gmmParams.weight)[0]->GetDataType());
+    return !isQuantDtype || gmmParams.biasOptional == nullptr;
+}
+
+// 特殊场景：A5 非量化、单 x / 单 y、weight 列表仅 1 个二维 tensor（E=1 的多 tensor 等价形态）
+static bool IsWeightNzMultiTensorSingleCase(const gmm::GroupedMatmulParams& gmmParams)
+{
+    return IsWeightNzMultiTensorCase(gmmParams) && gmmParams.weight->Size() == 1UL;
 }
 
 static uint64_t GetGroupSize(const gmm::GroupedMatmulParams& gmmParams)
@@ -1884,6 +1896,14 @@ static aclnnStatus SplitMSingleXSeparatedWeightSingleY(const gmm::GroupedMatmulP
                                          "with single x, separated weight and single y") == ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckSplitMShape(gmmParams, opName, errorMessage, weightSize) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    // 单 weight（列表长度 1、二维）等价于 E=1 的多 tensor 场景：groupList 长度必须为 1，
+    // 否则 tiling 侧 groupNum 取自 weight 列表长度(=1)，groupList 其余 group 会被静默忽略。
+    if (weightSize == 1UL && gmmParams.groupTensorOptional != nullptr) {
+        CHECK_COND(gmmParams.groupTensorOptional->GetViewShape().GetDim(0) == 1, ACLNN_ERR_PARAM_INVALID,
+                   "In op [%s], when %s with single x, single 2d weight and single y, size of groupList must be 1, "
+                   "but got %ld.",
+                   opName, errorMessage.c_str(), gmmParams.groupTensorOptional->GetViewShape().GetDim(0));
+    }
     // check groupList
     CHECK_RET_CODE(CheckGroupListSplitM(gmmParams, true, false, false, weightSize, opName),
                    "In op [%s], when %s with single x, separated weight and single y, [%s] check failed.", opName,
@@ -2284,6 +2304,33 @@ static aclnnStatus CheckParamsByGroupType(const gmm::GroupedMatmulParams& gmmPar
     return ACLNN_SUCCESS;
 }
 
+// A5 非量化「单 weight（列表长度 1、二维）+ 单 x / 单 y」特殊多 tensor 场景的 bias 校验：
+// 与真多 tensor 口径一致——bias 列表长度与 weight 列表长度相同（=1），每个 bias 为 1 维 (N)。
+static aclnnStatus CheckBiasSingleWeight2DMultiTensor(const gmm::GroupedMatmulParams& gmmParams, const char* opName)
+{
+    size_t biasSize = gmmParams.biasOptional->Size();
+    size_t weightSize = gmmParams.weight->Size();
+    CHECK_COND(biasSize == weightSize, ACLNN_ERR_PARAM_INVALID,
+               "In op [%s], when WeightNz single-multi-single with a single 2d weight, size of bias(%zu) must be equal "
+               "to weight size(%zu).",
+               opName, biasSize, weightSize);
+    const aclTensor* bias0 = (*gmmParams.biasOptional)[0];
+    CHECK_COND(bias0 != nullptr, ACLNN_ERR_PARAM_NULLPTR,
+               "In op [%s], when WeightNz single-multi-single with a single 2d weight, bias[0] must not be nullptr.",
+               opName);
+    const op::Shape& biasShape = bias0->GetViewShape();
+    CHECK_COND(biasShape.GetDimNum() == 1UL, ACLNN_ERR_PARAM_INVALID,
+               "In op [%s], when WeightNz single-multi-single with a single 2d weight, dim num of bias must be 1, "
+               "but got %zu.",
+               opName, biasShape.GetDimNum());
+    const op::Shape& w0Shape = (*gmmParams.weight)[0]->GetViewShape();
+    const int64_t weightN = gmmParams.transposeWeight ? w0Shape.GetDim(0) : w0Shape.GetDim(1);
+    CHECK_COND(biasShape.GetDim(0) == weightN, ACLNN_ERR_PARAM_INVALID,
+               "In op [%s], N axis of bias(%ld) must be equal to weight N axis(%ld).", opName, biasShape.GetDim(0),
+               weightN);
+    return ACLNN_SUCCESS;
+}
+
 static aclnnStatus CheckParamDifferentGroupType(const gmm::GroupedMatmulParams& gmmParams, const char* opName)
 {
     CHECK_COND(!(gmmParams.transposeX && gmmParams.transposeWeight), ACLNN_ERR_PARAM_INVALID,
@@ -2325,8 +2372,14 @@ static aclnnStatus CheckParamDifferentGroupType(const gmm::GroupedMatmulParams& 
     CHECK_RET_CODE(CheckParamsByGroupType(gmmParams, opName), "In op [%s], groupType specific parameter check failed.",
                    opName);
     if (gmmParams.biasOptional != nullptr) {
-        CHECK_RET_CODE(CheckOptionalTensorList(gmmParams, gmmParams.biasOptional, "bias"),
-                       "In op [%s], [%s] check failed.", opName, "bias");
+        if (IsWeightNzMultiTensorSingleCase(gmmParams)) {
+            // 特殊多 tensor 场景：bias 为 1 维 (N)，与真多 tensor 口径一致
+            CHECK_RET_CODE(CheckBiasSingleWeight2DMultiTensor(gmmParams, opName), "In op [%s], [%s] check failed.",
+                           opName, "bias");
+        } else {
+            CHECK_RET_CODE(CheckOptionalTensorList(gmmParams, gmmParams.biasOptional, "bias"),
+                           "In op [%s], [%s] check failed.", opName, "bias");
+        }
     }
     return ACLNN_SUCCESS;
 }

@@ -228,6 +228,11 @@ bool GroupedNoQuantMatmulTiling::Init(const gert::TilingContext* context)
     isSingleWeight_ = (context->GetDynamicInputTensor(INDEX_WEIGHT, 1) == nullptr);
     isSingleX_ = (context->GetDynamicInputTensor(INDEX_X, 1) == nullptr);
     isSingleY_ = (splitItem_ == 2 || splitItem_ == 3); // 2&3: output tensor is single
+    // SPLIT_M 下只有「weight 列表长度 1 且 weight 为 3 维」才算单 weight；weight 为 2 维时按多 tensor 处理
+    // （WeightNz 单 x-单 y 的 E=1 特殊场景）。SPLIT_K 的单 weight 合法为 2 维，不受此约束。
+    if (groupType_ == SPLIT_M) {
+        isSingleWeight_ = (isSingleWeight_ && wDimNum == DIM_THREE);
+    }
 
     if (weightNzFlag_) {
         uint64_t c0 = BLOCK_SIZE / std::max(1, GetSizeByDataType(weightDtype_));
@@ -239,7 +244,34 @@ bool GroupedNoQuantMatmulTiling::Init(const gert::TilingContext* context)
                     OP_LOGE(context->GetNodeName(), "The shape of nz weight is invalid."), return false);
     }
 
-    return HandleGroupTypeDispatch(context, xShape, wShape, wDimNum);
+    if (!HandleGroupTypeDispatch(context, xShape, wShape, wDimNum)) {
+        return false;
+    }
+    return CheckGroupListLen(context);
+}
+
+/**
+ * @brief groupList 长度一致性校验（所有切分场景通用）
+ * groupNum_ 已在各切分路径的 shape 解析中确定（单 3D weight 取 E；多 weight 取 tensor 数；
+ * 单 2D weight 取 1），因此只要 groupList 存在，其长度必须等于 groupNum_。
+ * 否则 kernel 会按 groupNum_ 计算，groupList 中多出的 group 被静默忽略。
+ */
+bool GroupedNoQuantMatmulTiling::CheckGroupListLen(const gert::TilingContext* context) const
+{
+    auto groupListTensor = context->GetDynamicInputTensor(INDEX_GROUPLIST, 0);
+    if (groupListTensor == nullptr) {
+        return true; // groupList 是否必须传入由各切分路径决定，这里只校验长度一致性
+    }
+    int64_t groupListLen = groupListTensor->GetStorageShape().GetDim(0);
+    OP_CHECK_IF(
+        groupListLen != static_cast<int64_t>(groupNum_),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context->GetNodeName(), "groupList length",
+            Ops::Transformer::Gmm::FormatString("%ld", groupListLen).c_str(),
+            Ops::Transformer::Gmm::FormatString("The value of groupList length must be equal to groupNum %u", groupNum_)
+                .c_str()),
+        return false);
+    return true;
 }
 
 bool GroupedNoQuantMatmulTiling::HandleGroupTypeDispatch(const gert::TilingContext* context, const gert::Shape& xShape,

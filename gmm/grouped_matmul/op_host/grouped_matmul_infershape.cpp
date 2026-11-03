@@ -1590,12 +1590,38 @@ static ge::graphStatus SplitMSeparatedXSeparatedWeightSingleY(gert::InferShapeCo
     return GRAPH_SUCCESS;
 }
 
+// weight 列表仅 1 个二维 tensor 时，语义等价于「多 tensor」场景（E=1），
+static bool IsGmmWeightNzMultiTensorSingleCase(const gert::InferShapeContext* context, const GMMParamsInfo& paramsInfo)
+{
+    const auto& platformInfo = GetGmmPlatformCache();
+    if (platformInfo.ret != GRAPH_SUCCESS || !IsGmmDavidSupportSoc(platformInfo.shortSocVersion)) {
+        return false;
+    }
+    if (paramsInfo.numX != 1UL || paramsInfo.numWeight != 1UL || paramsInfo.numY != 1UL) {
+        return false;
+    }
+    auto weightShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
+    if (weightShape == nullptr) {
+        return false;
+    }
+    return weightShape->GetDimNum() == GMM_SEPARATED_WEIGHT_DIM;
+}
+
 static ge::graphStatus CheckCaseSplitM(gert::InferShapeContext* context, bool transposeWeight,
                                        const GMMParamsInfo& paramsInfo)
 {
     const size_t& xSize = paramsInfo.numX;
     const size_t& weightSize = paramsInfo.numWeight;
     const size_t& ySize = paramsInfo.numY;
+    // 单 x / 单 y + weight 列表仅 1 个二维 tensor：按「多 tensor」路径校验，
+    // 否则会落到单单单分支被 weight 3 维校验拒绝。bias 由 CheckParamDifferentGroupType 单独校验。
+    if (IsGmmWeightNzMultiTensorSingleCase(context, paramsInfo)) {
+        OP_CHECK_IF(SplitMSingleXSeparatedWeightSingleY(context, transposeWeight, paramsInfo) != GRAPH_SUCCESS,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        context->GetNodeName(), "weight", "Split m, single x, single 2d weight, single y case failed"),
+                    return GRAPH_FAILED);
+        return GRAPH_SUCCESS;
+    }
     if ((xSize == 1UL) && (weightSize == 1UL) && (ySize == 1UL)) {
         OP_CHECK_IF(SplitMSingleXSingleWeightSingleY(context, transposeWeight, paramsInfo) != GRAPH_SUCCESS,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "weight",
@@ -1712,6 +1738,41 @@ static ge::graphStatus CheckCaseSplitK(gert::InferShapeContext* context, bool tr
     return GRAPH_FAILED;
 }
 
+// A5 非量化「单 weight（列表长度 1、二维）+ 单 x / 单 y」特殊多 tensor 场景的 bias 校验：
+// 与真多 tensor 口径一致——bias 列表长度与 weight 列表长度相同（=1），每个 bias 为 1 维 (N)。
+static ge::graphStatus CheckBiasSingleWeight2DMultiTensor(gert::InferShapeContext* context,
+                                                          const GMMParamsInfo& paramsInfo, bool transposeWeight)
+{
+    size_t biasSize = 0;
+    while (context->GetDynamicInputShape(GMM_INDEX_IN_BIAS, biasSize) != nullptr) {
+        ++biasSize;
+    }
+    OP_CHECK_IF(biasSize != paramsInfo.numWeight,
+                OP_LOGE_FOR_INVALID_TENSORNUMS_WITH_REASON(
+                    context->GetNodeName(), "bias, weight",
+                    Ops::Transformer::Gmm::FormatString("%zu, %zu", biasSize, paramsInfo.numWeight).c_str(),
+                    "bias tensor count must equal weight tensor count"),
+                return GRAPH_FAILED);
+    auto biasShape = context->GetDynamicInputShape(GMM_INDEX_IN_BIAS, 0);
+    OP_CHECK_NULL_WITH_CONTEXT(context, biasShape);
+    OP_CHECK_IF(biasShape->GetDimNum() != 1UL,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    context->GetNodeName(), "bias",
+                    Ops::Transformer::Gmm::FormatString("%zu", biasShape->GetDimNum()).c_str(), "1"),
+                return GRAPH_FAILED);
+    auto weightShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
+    OP_CHECK_NULL_WITH_CONTEXT(context, weightShape);
+    const int64_t weightN =
+        transposeWeight ? weightShape->GetDim(0) : weightShape->GetDim(weightShape->GetDimNum() - 1);
+    OP_CHECK_IF(
+        biasShape->GetDim(0) != weightN,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context->GetNodeName(), "bias", Ops::Transformer::Gmm::FormatString("%ld", biasShape->GetDim(0)).c_str(),
+            Ops::Transformer::Gmm::FormatString("N axis of bias must be equal to weight N axis %ld", weightN).c_str()),
+        return GRAPH_FAILED);
+    return GRAPH_SUCCESS;
+}
+
 static ge::graphStatus CheckParamDifferentGroupType(gert::InferShapeContext* context, const GMMAttrs& gmmAttrs,
                                                     const GMMParamsInfo& paramsInfo)
 {
@@ -1783,9 +1844,17 @@ static ge::graphStatus CheckParamDifferentGroupType(gert::InferShapeContext* con
                     return GRAPH_FAILED);
     }
     if (!IsTensorListNullOrEmpty(context, GMM_INDEX_IN_BIAS)) {
-        OP_CHECK_IF(CheckOptionalTensorList(context, "bias", paramsInfo, gmmAttrs, GMM_INDEX_IN_BIAS) != GRAPH_SUCCESS,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "bias", "Invalid bias"),
-                    return GRAPH_FAILED);
+        if (IsGmmWeightNzMultiTensorSingleCase(context, paramsInfo)) {
+            // 特殊多 tensor 场景：bias 为 1 维 (N)，与真多 tensor 口径一致
+            OP_CHECK_IF(CheckBiasSingleWeight2DMultiTensor(context, paramsInfo, transposeWeight) != GRAPH_SUCCESS,
+                        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "bias", "Invalid bias"),
+                        return GRAPH_FAILED);
+        } else {
+            OP_CHECK_IF(
+                CheckOptionalTensorList(context, "bias", paramsInfo, gmmAttrs, GMM_INDEX_IN_BIAS) != GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "bias", "Invalid bias"),
+                return GRAPH_FAILED);
+        }
     }
     return GRAPH_SUCCESS;
 }

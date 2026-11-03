@@ -42,3 +42,5 @@ Ascend960DT,split_m_sss_960dt_small,true,split_m_sss_960dt_small,64,17,15,13,1,f
 Ascend960DT,baseM_limit_960dt,true,baseM_limit_960dt,64,1024,64,256,2,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,true,,,,,
 Ascend960DT,invalid_groupnum_zero_960dt,true,invalid_groupnum_zero_960dt,64,256,1024,512,0,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,false,32,0,,,
 Ascend960DT,invalid_grouptype_960dt,true,invalid_grouptype_960dt,64,256,1024,512,2,false,false,3,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,false,32,0,,,
+Ascend950,split_m_sms_2d_single_weight,true,split_m_sms_2d_single_weight,,256,1024,512,1,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,true,,,,,,2,1
+Ascend950,split_m_sms_2d_single_weight_grouplist2_neg,true,split_m_sms_2d_single_weight_grouplist2_neg,,256,1024,512,1,false,false,0,3,ND,FLOAT16,FLOAT16,FLOAT,FLOAT16,false,false,,,,,,2,2
