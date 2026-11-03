@@ -117,7 +117,7 @@ static bool CheckShapeValid(const aclTensor* routingMap, const aclTensor* probsO
             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                 "MoeTokenPermuteWithRoutingMap", "routing_map, probs",
                 "The dim 1 of probs " + std::to_string(static_cast<int64_t>(probsOptional->GetViewShape().GetDim(1))) +
-                    " should be same with routingMap's dim 0 " +
+                    " should be same with routingMap's dim 1 " +
                     std::to_string(static_cast<int64_t>(routingMap->GetViewShape().GetDim(1))) + "."),
             return false);
         OP_CHECK(
@@ -168,7 +168,7 @@ static aclnnStatus CheckParams(const aclTensor* tokens, const aclTensor* routing
     OP_CHECK(
         numOutTokens >= 0,
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("MoeTokenPermuteWithRoutingMap", "num_out_tokens",
-                                                 "numOutTokens should be greater than " + std::to_string(int64_t(0)) +
+                                                 "numOutTokens should not be less than " + std::to_string(int64_t(0)) +
                                                      ", but got " + std::to_string(numOutTokens) + "."),
         return ACLNN_ERR_PARAM_INVALID);
     OP_CHECK(numOutTokens <= tokenNum * expertNum,
@@ -243,8 +243,8 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGetWorkspaceSize(const aclTensor* 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    // 空Tensor处理
-    if (routingMap->IsEmpty()) {
+    // 空Tensor处理：所有必选输出均为空Tensor时，无需下发kernel，直接返回
+    if (routingMap->IsEmpty() || (permuteTokensOut->IsEmpty() && sortedIndicesOut->IsEmpty())) {
         *workspaceSize = uniqueExecutor->GetWorkspaceSize();
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_SUCCESS;

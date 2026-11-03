@@ -225,7 +225,8 @@ public:
         pipe->InitBuffer(outQueueY, BUFFER_NUM, this->tileLengthAlign * sizeof(T));
 
         pipe->InitBuffer(moveQue, BUFFER_NUM, this->tileLengthAlign * sizeof(T));
-        pipe->InitBuffer(offsetBuf, BLOCK_SIZE);
+        const uint64_t offsetBufferBytes = (numBlocks * sizeof(int32_t) + BLOCK_SIZE - 1) / BLOCK_SIZE * BLOCK_SIZE;
+        pipe->InitBuffer(offsetBuf, offsetBufferBytes);
 
         pipe->InitBuffer(sumBuf, BLOCK_SIZE);
 

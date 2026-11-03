@@ -342,7 +342,9 @@ private:
         }
         pipe->InitBuffer(inQueueMask, BUFFER_NUM, this->tileLengthAlign * sizeof(uint8_t));
         pipe->InitBuffer(outQueueIndex, BUFFER_NUM, this->tileLengthAlign * sizeof(int32_t));
-        pipe->InitBuffer(offsetBuf, MASK_LEN);
+        const uint64_t offsetBufferBytes =
+            (numBlocks + ONE_BLOCK_NUM - 1) / ONE_BLOCK_NUM * ONE_BLOCK_NUM * sizeof(int32_t);
+        pipe->InitBuffer(offsetBuf, offsetBufferBytes);
 
         pipe->InitBuffer(sumBuf, BLOCK_SIZE);
 

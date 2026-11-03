@@ -27,6 +27,7 @@ const static int64_t NUM_THREE = 3;
 const static int64_t NUM_FOUR = 4;
 const static int64_t MRG_LIST_NUM = 4;
 const static int64_t SORT32_ALIGN_ELEMENT = 32;
+const static int64_t MAX_SORT_REPEAT_TIMES = 255;
 const static int64_t ONE_BLOCK_BYTE = 32;
 const static size_t DIM_ONE = 1;
 const static size_t DIM_TWO = 2;
@@ -256,7 +257,7 @@ private:
     ge::graphStatus InitShapeAttrsInfo();
     ge::graphStatus CheckOutShape();
     void Tiling4IndexCopyCompute();
-    uint64_t CalcMaskedSelectUb();
+    uint64_t CalcMaskedSelectUb(uint64_t numBlocks);
     void Tiling4MaskedSelect();
     void Tiling4SortOutCompute();
     void Tiling4VMSMiddleCompute();
@@ -425,8 +426,8 @@ ge::graphStatus MoeTokenPermuteWithRoutingMapTilingBase::InitShapeAttrsInfo()
     numExperts = IndicesShape.GetDim(0);
     if (numExperts < 0) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-            context_->GetNodeName(), "num_out_tokens",
-            "Input attr's num_out_tokens [" + std::to_string(numTokens) + "] should be larger than 0.");
+            context_->GetNodeName(), "routing_map",
+            "The number of experts [" + std::to_string(numExperts) + "] should be greater than or equal to 0.");
         return ge::GRAPH_FAILED;
     }
 
@@ -474,8 +475,8 @@ ge::graphStatus MoeTokenPermuteWithRoutingMapTilingBase::GetShapeAttrsInfo()
     }
     if (numTokens <= 0) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-            context_->GetNodeName(), "num_out_tokens",
-            "Input attr's num_out_tokens [" + std::to_string(numTokens) + "] should be larger than max 0.");
+            context_->GetNodeName(), "tokens",
+            "The number of input tokens [" + std::to_string(numTokens) + "] should be greater than 0.");
         return ge::GRAPH_FAILED;
     }
 
@@ -691,6 +692,8 @@ ge::graphStatus MoeTokenPermuteWithRoutingMapTilingBase::DoOpTiling()
     }
     sortLoopMaxElement = (aicoreParams_.ubSize - aivNum * ONE_BLOCK_BYTE) / (NUM_FOUR * NUM_TWO * NUM_FOUR) /
                          SORT32_ALIGN_ELEMENT * SORT32_ALIGN_ELEMENT;
+    // 每个排序分块最多执行 255 次 repeat，每次处理 32 个元素。
+    sortLoopMaxElement = std::min(sortLoopMaxElement, MAX_SORT_REPEAT_TIMES * SORT32_ALIGN_ELEMENT);
     if (paddedMode == false) {
         Tiling4MaskedSelect();
         Tiling4VBSCompute();
@@ -896,7 +899,7 @@ void MoeTokenPermuteWithRoutingMapTilingBase::Tiling4SortOutCompute()
     tilingData->set_oneLoopMaxElements(mrgSortListMaxElement);
 }
 
-uint64_t MoeTokenPermuteWithRoutingMapTilingBase::CalcMaskedSelectUb()
+uint64_t MoeTokenPermuteWithRoutingMapTilingBase::CalcMaskedSelectUb(uint64_t numBlocks)
 {
     // 求单个元素大小
     uint64_t sizeOfDataType = 2;
@@ -935,7 +938,9 @@ uint64_t MoeTokenPermuteWithRoutingMapTilingBase::CalcMaskedSelectUb()
     // ub对齐后长度
     uint64_t oneDataSize = IO_QUE * DOUBLE_BUFFER * sizeOfDataType + MASK_ONE_DATA_SIZE + INDEX_ONE_DATA_SIZE;
     uint64_t ubSize = aicoreParams_.ubSize;
-    uint64_t ubLength = ((ubSize - ONE_BLOCK_BYTE * DOUBLE_BUFFER * DOUBLE_BUFFER) / oneDataSize) / alignNum * alignNum;
+    // offsetBuf 为每个参与核保存一个 int32，按 32 字节对齐；sumBuf 占 32 字节。
+    const uint64_t fixedReserve = UpAlign(numBlocks * sizeof(int32_t), ONE_BLOCK_BYTE) + ONE_BLOCK_BYTE;
+    uint64_t ubLength = ((ubSize - fixedReserve) / oneDataSize) / alignNum * alignNum;
     ubLength = static_cast<int64_t>(ubLength) > numTokens ? numTokens : ubLength; // 一次ub能放多少数
     return ubLength;
 }
@@ -959,8 +964,8 @@ void MoeTokenPermuteWithRoutingMapTilingBase::Tiling4MaskedSelect()
     uint64_t tailTileLength = 0;
     uint64_t tailLastTileLength = 0;
 
-    uint64_t numBlocks = 0;
-    uint64_t ubLength = CalcMaskedSelectUb();
+    uint64_t numBlocks = (numExperts > static_cast<int64_t>(aivUseNum)) ? aivUseNum : numExperts;
+    uint64_t ubLength = CalcMaskedSelectUb(numBlocks);
     if (ubLength == 0) {
         OP_LOGE_LIBOPAPI_REPORT(Ops::Base::GetOpInfo(opName), "%s", "Ub length is zero.");
         REPORT_PREDEFINED_ERR_MSG("EZ1008", std::vector<const char*>({"opName", "reason"}),
@@ -969,7 +974,6 @@ void MoeTokenPermuteWithRoutingMapTilingBase::Tiling4MaskedSelect()
     }
 
     // 运行核数
-    numBlocks = (numExperts > static_cast<int64_t>(aivUseNum)) ? aivUseNum : numExperts;
     tilingData->set_needCoreNum(numBlocks);
 
     // 切分流程

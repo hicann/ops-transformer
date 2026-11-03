@@ -389,7 +389,8 @@ static inline void Tiling4MaskedSelect(MoeTokenUnpermuteWithRoutingMapTilingData
     uint64_t tailTileLength = 0;
     uint64_t tailLastTileLength = 0;
 
-    uint64_t numBlocks = 0;
+    const uint64_t numBlocks =
+        (static_cast<uint64_t>(param.input.numExperts) > aivUseNum) ? aivUseNum : param.input.numExperts;
 
     // 求单个元素大小
     uint64_t sizeOfDataType = 1;
@@ -399,11 +400,12 @@ static inline void Tiling4MaskedSelect(MoeTokenUnpermuteWithRoutingMapTilingData
     uint32_t alignNum = BLOCK_SIZE / NUM_TWO; // 256/<8>=32
     // ub对齐后长度
     uint64_t oneDataSize = IO_QUE * DOUBLE_BUFFER * sizeOfDataType + MASK_ONE_DATA_SIZE + INDEX_ONE_DATA_SIZE;
-    uint64_t ubLength = ((ubSize - ONE_BLOCK_BYTE * DOUBLE_BUFFER * DOUBLE_BUFFER) / oneDataSize) / alignNum * alignNum;
+    // offsetBuf 按参与核数分配并按 32 字节对齐，sumBuf 占 32 字节。
+    const uint64_t fixedReserve = GetCeilAlign(numBlocks * sizeof(int32_t), ONE_BLOCK_BYTE) + ONE_BLOCK_BYTE;
+    uint64_t ubLength = ((ubSize - fixedReserve) / oneDataSize) / alignNum * alignNum;
     ubLength = ubLength > static_cast<uint64_t>(param.input.tokensNum) ? param.input.tokensNum : ubLength;
     // ub能放的元素个数
     // 运行核数
-    numBlocks = (static_cast<uint64_t>(param.input.numExperts) > aivUseNum) ? aivUseNum : param.input.numExperts;
     mstilingData->set_needCoreNum(numBlocks);
     // 切分流程
     formerNum = param.input.numExperts % numBlocks;

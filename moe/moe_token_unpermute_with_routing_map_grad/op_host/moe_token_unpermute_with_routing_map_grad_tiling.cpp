@@ -204,8 +204,8 @@ static ge::graphStatus TilingForProbNotNonePadTrue(const gert::TilingContext* co
     OP_CHECK_IF(capacity > tokensNum,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                     context->GetNodeName(), "permuted_tokens, unpermuted_tokens_grad",
-                    "Capacity should be smaller than tokens_num, but now capacity is " + std::to_string(capacity) +
-                        ", tokens_num is " + std::to_string(tokensNum) + "."),
+                    "Capacity should be less than or equal to tokens_num, but now capacity is " +
+                        std::to_string(capacity) + ", tokens_num is " + std::to_string(tokensNum) + "."),
                 return ge::GRAPH_FAILED);
     tiling.set_formerCoreNum(formerCoreNum);
     tiling.set_tailCoreNum(tailCoreNum);
@@ -264,14 +264,14 @@ static ge::graphStatus TilingForProbNotNonePadFalse(const gert::TilingContext* c
     OP_CHECK_IF(topK > MAX_TOP_K,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                     context->GetNodeName(), "routing_map",
-                    "The topK_num needs to be smaller than 512, but now is " + std::to_string(topK) + "."),
+                    "The topK_num needs to be less than or equal to 512, but now is " + std::to_string(topK) + "."),
                 return ge::GRAPH_FAILED);
     int64_t numExpert = tiling.get_numExpert();
     OP_CHECK_IF(topK > numExpert,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                     context->GetNodeName(), "routing_map",
-                    "The topK_num needs to be smaller than experts_num, but now topK_num is " + std::to_string(topK) +
-                        ", experts_num is " + std::to_string(numExpert) + "."),
+                    "The topK_num needs to be less than or equal to experts_num, but now topK_num is " +
+                        std::to_string(topK) + ", experts_num is " + std::to_string(numExpert) + "."),
                 return ge::GRAPH_FAILED);
     int64_t totalCoreNum = static_cast<int64_t>(context->GetBlockDim());
     int64_t tokenNumTailCore = GetDiv(tokensNum, totalCoreNum);
@@ -305,8 +305,9 @@ static ge::graphStatus TilingForProbNotNonePadFalse(const gert::TilingContext* c
     int64_t indicesReserveNumAlign = AlignUp<int64_t>(indicesReserveNum, inputBlockAlignEleNum);
     int64_t numExpertAlign = AlignUp<int64_t>(numExpert, BLOCK_SIZE_32);
     int64_t probTypeLength = GetLengthByType(context->GetInputDesc(INPUT_PROB_IDX)->GetDataType());
-    int64_t remainSize = tiling.get_totalUbSize() - inputTypeLength * INDICES_RESERVE_MAX_NUM -
-                         INDICES_RESERVE_MAX_NUM * SIZE_OF_FLOAT * INDICES_FP32_BUFFER_NUM;
+    const int64_t indexBufferBytes =
+        indicesReserveNumAlign * (probTypeLength + SIZE_OF_FLOAT * INDICES_FP32_BUFFER_NUM);
+    int64_t remainSize = tiling.get_totalUbSize() - indexBufferBytes;
     int64_t numExpertSize = (1 + probTypeLength) * numExpertAlign;
     int64_t hiddenNum =
         H_BUFFER_NUM_PAD_FALSE * BUFFER_NUM * inputTypeLength + H_FP32_BUFFER_NUM_PAD_FALSE * SIZE_OF_FLOAT;
