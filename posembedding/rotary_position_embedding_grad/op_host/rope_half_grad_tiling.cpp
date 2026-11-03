@@ -195,6 +195,13 @@ static ge::graphStatus RopeHalfGradShapeDimCheck(const gert::TilingContext* cont
     auto xOptionalInput = context->GetOptionalInputDesc(INDEX_X);
     auto xOptionalShape = context->GetOptionalInputShape(INDEX_X);
     if (xOptionalInput != nullptr && xOptionalShape != nullptr) {
+        auto dyDesc = context->GetInputDesc(INDEX_GRAD);
+        OP_CHECK_NULL_WITH_CONTEXT(context, dyDesc);
+        if (xOptionalInput->GetDataType() != dyDesc->GetDataType()) {
+            OP_LOGW(context->GetNodeName(),
+                    "The dtypes of input x and input dy should be the same, but got x: %s, dy: %s.",
+                    ToString(xOptionalInput->GetDataType()).c_str(), ToString(dyDesc->GetDataType()).c_str());
+        }
         auto xOptionalStorageShape = xOptionalShape->GetStorageShape();
         if (xOptionalStorageShape != xShape) {
             std::string shapeMsg = ToString(xOptionalStorageShape) + " and " + ToString(xShape);

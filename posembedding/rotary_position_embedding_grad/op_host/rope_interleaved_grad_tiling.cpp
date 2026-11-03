@@ -288,6 +288,13 @@ ge::graphStatus RopeCheckOptInputShape(gert::TilingContext* context)
     auto xOptionalInput = context->GetOptionalInputDesc(INPUT_X_IDX);
     auto xOptionalShape = context->GetOptionalInputShape(INPUT_X_IDX);
     if (xOptionalInput != nullptr && xOptionalShape != nullptr) {
+        auto dyDesc = context->GetInputDesc(INPUT_GRAD_IDX);
+        OP_CHECK_NULL_WITH_CONTEXT(context, dyDesc);
+        if (xOptionalInput->GetDataType() != dyDesc->GetDataType()) {
+            OP_LOGW(context->GetNodeName(),
+                    "The dtypes of input x and input dy should be the same, but got x: %s, dy: %s.",
+                    ToString(xOptionalInput->GetDataType()).c_str(), ToString(dyDesc->GetDataType()).c_str());
+        }
         auto dyShape = context->GetInputShape(INPUT_GRAD_IDX);
         auto dyStorageShape = dyShape->GetStorageShape();
         auto xOptionalStorageShape = xOptionalShape->GetStorageShape();
