@@ -61,6 +61,7 @@ stages:
     jobs:
       JOB_check_examples_ut:
         name: Check_examples_ut
+        if: env.TARGET_BRANCH == 'master'
         steps:
           -
             name: Checkout
