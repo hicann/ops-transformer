@@ -63,7 +63,12 @@ group_op_dict = {
     },
     "ascend960dt": {
         "fused_infer_attention_score": 20,
-        "flash_attention_score_grad": 5,
+        "flash_attention_score": 5,
+        "flash_attention_score_grad": 10,
+        "mega_moe": 40,
+        "matmul_all_reduce": 40,
+        "allto_all_matmul": 20,
+        "matmul_reduce_scatter_v2": 20,
     },
     "ascend960pr": {
         "fused_infer_attention_score": 20,
