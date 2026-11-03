@@ -1,0 +1,281 @@
+{
+  "op_type": "RopeWithSinCosCache",
+  "op_list": [
+    {
+      "bin_filename": "RopeWithSinCosCache_0",
+      "inputs": [
+        {
+          "name": "positions",
+          "index": 0,
+          "dtype": "int64",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        },
+        {
+          "name": "queryIn",
+          "index": 1,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        },
+        {
+          "name": "keyIn",
+          "index": 2,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        },
+        {
+          "name": "cosSinCache",
+          "index": 3,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "queryOut",
+          "index": 0,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        },
+        {
+          "name": "keyOut",
+          "index": 1,
+          "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        }
+      ],
+      "attrs": [
+        {
+          "name": "numQHeads",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "numKHeads",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "headSize",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "mropeSection",
+          "dtype": "list_int",
+          "value": []
+        },
+        {
+          "name": "qStride",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "kStride",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "isNeoxStyle",
+          "dtype": "bool",
+          "value": null
+        }
+      ]
+    },
+    {
+      "bin_filename": "RopeWithSinCosCache_1",
+      "inputs": [
+        {
+          "name": "positions",
+          "index": 0,
+          "dtype": "int64",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        },
+        {
+          "name": "queryIn",
+          "index": 1,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        },
+        {
+          "name": "keyIn",
+          "index": 2,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        },
+        {
+          "name": "cosSinCache",
+          "index": 3,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "queryOut",
+          "index": 0,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        },
+        {
+          "name": "keyOut",
+          "index": 1,
+          "dtype": "float16",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        }
+      ],
+      "attrs": [
+        {
+          "name": "numQHeads",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "numKHeads",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "headSize",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "mropeSection",
+          "dtype": "list_int",
+          "value": []
+        },
+        {
+          "name": "qStride",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "kStride",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "isNeoxStyle",
+          "dtype": "bool",
+          "value": null
+        }
+      ]
+    },
+    {
+      "bin_filename": "RopeWithSinCosCache_2",
+      "inputs": [
+        {
+          "name": "positions",
+          "index": 0,
+          "dtype": "int64",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        },
+        {
+          "name": "queryIn",
+          "index": 1,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        },
+        {
+          "name": "keyIn",
+          "index": 2,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        },
+        {
+          "name": "cosSinCache",
+          "index": 3,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "queryOut",
+          "index": 0,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        },
+        {
+          "name": "keyOut",
+          "index": 1,
+          "dtype": "float32",
+          "format": "ND",
+          "paramType": "required",
+          "shape": [-2]
+        }
+      ],
+      "attrs": [
+        {
+          "name": "numQHeads",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "numKHeads",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "headSize",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "mropeSection",
+          "dtype": "list_int",
+          "value": []
+        },
+        {
+          "name": "qStride",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "kStride",
+          "dtype": "int",
+          "value": null
+        },
+        {
+          "name": "isNeoxStyle",
+          "dtype": "bool",
+          "value": null
+        }
+      ]
+    }
+  ]
+}
