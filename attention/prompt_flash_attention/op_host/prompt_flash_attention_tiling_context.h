@@ -132,6 +132,7 @@ struct ContextParamsForPFATiling {
     const int64_t* queryQuantMode = nullptr;
     bool hasKeyAntiquantOffset = 0;
     bool hasLearnableSink = 0;
+    bool isBaseApiTilingKey = false;
 };
 
 } // namespace optiling

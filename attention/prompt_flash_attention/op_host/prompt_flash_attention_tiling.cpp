@@ -114,7 +114,7 @@ constexpr uint32_t DSPLIT_THRESHOLDS_512 = 512;
 constexpr uint64_t DSPLIT_S2_D_TILING_KEY = 400;
 constexpr uint64_t DSPLIT_S2_TILING_KEY = 300;
 constexpr uint32_t UB_ALIGN = 32;
-uint64_t BENCHMARK_TILING_KEY = 1000000000000000000;
+constexpr uint64_t BENCHMARK_TILING_KEY = 1000000000000000000;
 constexpr uint64_t BENCHMARK_TILING_KEY_0 = 3000000000000000000;
 constexpr uint64_t BENCHMARK_TILING_KEY_1 = 3000000000000000001;
 constexpr uint64_t BENCHMARK_TILING_KEY_2 = 3000000000000000002;
@@ -618,7 +618,7 @@ ge::graphStatus PromptFlashAttentionTiling::TilingGetBaseApiTilingKeyAttentionAs
         return ge::GRAPH_SUCCESS;
     } else {
         tilingKey = 12U;
-        BENCHMARK_TILING_KEY = BENCHMARK_TILING_KEY_4;
+        contextKeyParams.isBaseApiTilingKey = true;
         tilingKey += (inputDataType == ge::DT_BF16) ? 100U : 0U;
         tilingKey += (inputDataType == ge::DT_INT8) ? 200U : 0U;
         if (innerPrecise == static_cast<decltype(innerPrecise)>(HIGH_PERFORMANCE)) {
@@ -6519,7 +6519,8 @@ PFA_EXTERN_C ge::graphStatus PromptFlashAttentionTiling::DoOpTiling() {
     OP_CHECK_IF(ret == ge::GRAPH_FAILED, OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "fail to convert to PFAParams"),
         return ge::GRAPH_FAILED);
         ret = RunBigKernelTilingWithParams(contextParamsForPFATiling, tilingKey, numBlocksToBeSet, tilingData);
-        tilingKey += BENCHMARK_TILING_KEY;
+        tilingKey += contextParamsForPFATiling.isBaseApiTilingKey ?
+            BENCHMARK_TILING_KEY_4 : BENCHMARK_TILING_KEY;
         context_->SetTilingKey(tilingKey);
         context_->SetBlockDim(numBlocksToBeSet);
         PromptFlashAttentionSetTilingData(context_, tilingData);
