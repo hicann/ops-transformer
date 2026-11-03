@@ -693,6 +693,16 @@ static ge::graphStatus SetTilingData(const gert::TilingContext* context, EngramF
                         "sfElemSize=%ld, hiddenBytes=%ld",
                         sfBytes, relayTileBytes, tilingData.numSfPacks, tilingData.sfElemSize, tilingData.hiddenBytes),
                 return ge::GRAPH_FAILED);
+        } else {
+            // 训练分支: kernel侧行宽按uint32参与对齐与容量守卫, 对齐后之和超UINT32_MAX将在kernel内回绕
+            const int64_t sfBytes = tilingData.numSfPacks * tilingData.sfElemSize;
+            OP_TILING_CHECK(AlignTo(tilingData.hiddenBytes, UB_ALIGN) + AlignTo(sfBytes, UB_ALIGN) >
+                                static_cast<int64_t>(UINT32_MAX),
+                            OP_LOGE(nodeName,
+                                    "training row size hiddenBytes=%ld + sfBytes=%ld exceeds UINT32_MAX after align; "
+                                    "numSfPacks=%ld, sfElemSize=%ld",
+                                    tilingData.hiddenBytes, sfBytes, tilingData.numSfPacks, tilingData.sfElemSize),
+                            return ge::GRAPH_FAILED);
         }
     }
 
