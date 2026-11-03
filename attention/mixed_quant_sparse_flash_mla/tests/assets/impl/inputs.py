@@ -526,7 +526,7 @@ def generate_mixed_quant_sparse_flash_mla_inputs(
     INPUT_ADAPTER.load_metadata_protocol().save_metadata_inputs(
         "mixed_quant_sparse_flash_mla", testcase_name, data.get("metadata_input")
     )
-    return data
+    return None
 
 
 def generate_aclnn_mixed_quant_sparse_flash_mla_inputs(

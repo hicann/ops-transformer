@@ -560,7 +560,7 @@ def generate_sparse_flash_mla_inputs(
     INPUT_ADAPTER.load_metadata_protocol().save_metadata_inputs(
         "sparse_flash_mla", testcase_name, metadata_input
     )
-    return data
+    return None
 
 
 def generate_aclnn_sparse_flash_mla_inputs(
