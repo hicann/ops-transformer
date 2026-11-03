@@ -113,7 +113,9 @@ private:
     __aicore__ inline void ExpertActiveMaskCal();
     __aicore__ inline void CalcSendTokenBufNum(TBuf<>& outBuf);
     __aicore__ inline void AllToAllDispatchA5(TQue<QuePosition::VECIN, 1> inQueue, TBuf<> outBuf);
+    __aicore__ inline void PrepareTokenSend(TQue<QuePosition::VECIN, 1>& inQueue);
     __aicore__ inline void AllToAllDispatch();
+    __aicore__ inline void AllToAllDispatchSerial();
     __aicore__ inline void CalCumSum();
     __aicore__ inline void WaitCumSumFlag();
     __aicore__ inline int32_t CalExpertCnt(uint32_t expertId);
@@ -313,6 +315,7 @@ private:
     bool useSerialMode_ = false;
     bool enableGroupSend_ = false;
     bool useSendGroupIndices_ = false;
+    bool useTailTokenSeg_ = false;
     uint64_t totalWinSize_{0};
     uint32_t expertTokenNumsType_{1};
     int32_t expertIdsCnt_{0};
@@ -448,6 +451,8 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
     if (useSerialMode_) {
         aivUsedAllToAll_ = aivNum_;
         moeUsedAivNum_ = aivNum_ - sharedUsedAivNum_;
+        // 串行：token 段从尾部核起填，少路由时与 count/flag 核零重叠
+        useTailTokenSeg_ = true;
     }
 }
 
@@ -1233,8 +1238,10 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
         uint32_t segmentNum = moeUsedAivNum_ * 2;
         uint32_t segmentSize = validTokenNum / segmentNum;
         uint32_t remainder = validTokenNum % segmentNum;
+        // SerialMode时token 从尾部核起填，与 count 核职责分离
+        const uint32_t segAivId = useTailTokenSeg_ ? (moeUsedAivNum_ - 1U - aivId_) : aivId_;
         for (uint32_t part = 0; part < 2; ++part) {
-            uint32_t segmentId = (part == 0) ? aivId_ : (segmentNum - 1 - aivId_);
+            uint32_t segmentId = (part == 0) ? segAivId : (segmentNum - 1 - aivId_);
             uint32_t startTokenId = segmentId * segmentSize + (segmentId < remainder ? segmentId : remainder);
             uint32_t endTokenId = startTokenId + segmentSize + (segmentId < remainder ? 1 : 0);
             SendIndexRange(dstWinGMTensor, inQueue, static_cast<int32_t>(startTokenId),
@@ -1276,12 +1283,11 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
 }
 
 template <TemplateMC2A5FullMeshTypeClass>
-__aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::AllToAllDispatch()
+__aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::PrepareTokenSend(
+    TQue<QuePosition::VECIN, 1>& inQueue)
 {
     useSendGroupIndices_ = enableGroupSend_ && !isScalingDownFlag_;
-    // 使用的全局参数
-    TQue<QuePosition::VECIN, 1> inQueue;
-    TBuf<> tempBuf, outBuf, inQueueCleanBuf, calTempBuf, sendGroupIndexBuf;
+    TBuf<> tempBuf, inQueueCleanBuf, calTempBuf, sendGroupIndexBuf;
     TBuf<> smoothScalesBuf, receiveDataCastFloatBuf;
     expertIdsBufSize_ = Ceil(expertIdsCnt_ * sizeof(int32_t), SIZE_ALIGN_256) * SIZE_ALIGN_256; // 支持compareScalar
     AscendC::TBufPool<AscendC::TPosition::VECIN> tbufPool0, tbufPool1;
@@ -1347,10 +1353,29 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
     }
     quantInst_.SetQuantInitParams(floatLocalTemp_, smoothScalesTensor_, smoothScalesBuf, dynamicScalesOutGMTensor_);
     ExpIdsCopyAndMaskCal();
-    if (useSerialMode_) {
-        tpipe_->InitBuffer(statusBuf_, statusCntAlign_ * UB_ALIGN);
-        statusTensor_ = statusBuf_.Get<int32_t>();
+}
+
+template <TemplateMC2A5FullMeshTypeClass>
+__aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::AllToAllDispatch()
+{
+    TQue<QuePosition::VECIN, 1> inQueue;
+    TBuf<> outBuf;
+    PrepareTokenSend(inQueue);
+    if (activeMaskBsCnt_ > 0) {
+        AllToAllDispatchA5(inQueue, outBuf);
     }
+}
+
+template <TemplateMC2A5FullMeshTypeClass>
+__aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::AllToAllDispatchSerial()
+{
+    TQue<QuePosition::VECIN, 1> inQueue;
+    TBuf<> outBuf;
+    PrepareTokenSend(inQueue);
+    tpipe_->InitBuffer(statusBuf_, statusCntAlign_ * UB_ALIGN);
+    statusTensor_ = statusBuf_.Get<int32_t>();
+    // count 提前发出，token 段随即起排
+    CalAndSendCntSerial();
     if (activeMaskBsCnt_ > 0) {
         AllToAllDispatchA5(inQueue, outBuf);
     }
@@ -1781,6 +1806,8 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
 template <TemplateMC2A5FullMeshTypeClass>
 __aicore__ inline bool MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::WaitDispatchSerialInit()
 {
+    // Reset 前清空全流水：count 与 token 在途 MTE2/MTE3/V 排空
+    PipeBarrier<PIPE_ALL>();
     tpipe_->Reset();
     SplitToCore(rscvStatusNum_, aivNum_, startStatusIndex_, endStatusIndex_, recStatusNumPerCore_, true);
     startId_ = startStatusIndex_;
@@ -2374,13 +2401,11 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
         uint32_t maskCnt = isTokenMaskFlag_ ? (activeMaskBsCnt_ * axisK_) : expertIdsCnt_;
         CalAndSendCntSerialByExpert(startExpertId, endExpertId, maskCnt);
     }
-    PipeBarrier<PIPE_ALL>();
     if (sendExpertNum == 0) {
         return;
     }
     SyncFunc<AscendC::HardEvent::S_MTE3>();
     SendExpertCntRange(startExpertId, endExpertId, startExpertId);
-    SyncFunc<AscendC::HardEvent::MTE3_S>();
 }
 
 template <TemplateMC2A5FullMeshTypeClass>
@@ -2795,8 +2820,7 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
 {
     if ASCEND_IS_AIV { // 全aiv处理
         if (useSerialMode_) {
-            AllToAllDispatch();
-            CalAndSendCntSerial();
+            AllToAllDispatchSerial();
             WaitDispatch();
             LocalWindowCopySerial();
         } else {
