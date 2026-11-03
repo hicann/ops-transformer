@@ -162,8 +162,6 @@ protected:
     uint32_t blockIdx_ = MegaMoeHardwarePolicy::GetAicBlockIdx();
     uint32_t aivCoreIdx_ = MegaMoeHardwarePolicy::GetAivBlockIdx();
     uint16_t gmm1PingPongIdx_ = 0;
-    // 同一 AIC/AIV 对复用 gmmToEpilogueFlag；序号在单次 launch 的相关 GMM 阶段间保持单调递增。
-    int32_t gmmTileSequence_ = 0;
     // MoE GMM1/GMM2 共用分核游标；A8W8 的共享专家 GMM2 继续沿用该游标。
     uint32_t startBlockIdx_ = 0;
     // 主线 shared-expert 特性成员
@@ -226,10 +224,8 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitSyncWorkspaceConfig
                                                                                   int32_t activationFlagSlotsPerExpert)
 {
     countWorkspace_ = {.blockIdx = blockIdx_, .blockNum = static_cast<uint32_t>(params_.tilingData->compute.aicNum)};
-    syncWorkspaceLayout_ = {
-        .dispatchFlagSlotCountPerExpert = dispatchFlagSlotsPerExpert,
-        .activationFlagSlotCountPerExpert = activationFlagSlotsPerExpert,
-        .gmm1TileStatusCountPerExpert = static_cast<uint32_t>(params_.tilingData->compute.maxTilesPerExpert)};
+    syncWorkspaceLayout_ = {.dispatchFlagSlotCountPerExpert = dispatchFlagSlotsPerExpert,
+                            .activationFlagSlotCountPerExpert = activationFlagSlotsPerExpert};
 }
 
 template <TemplateMegaMoeTypeClass>
@@ -313,7 +309,6 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::Init(
     sharedExpertNum_ = static_cast<uint32_t>(tilingData->compute.sharedExpertNum);
     mGroupsPerWave_ = static_cast<uint32_t>(tilingData->compute.mGroupsPerWave);
     gmm1PingPongIdx_ = 0;
-    gmmTileSequence_ = 0;
     startBlockIdx_ = 0;
     mc2Context_ = reinterpret_cast<__gm__ Mc2MoeContext*>(context);
     rankId_ = mc2Context_->epRankId;
@@ -609,10 +604,6 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::SendAndQuantBuffInit()
 
     // 与 route batch 无关的固定占用
     uint64_t totalFlagInt32 = static_cast<uint64_t>(workspace.reset.flags.sizeBytes / SIZE_INT_32);
-    if constexpr (TopkWeightsPrefetch) {
-        uint64_t statusElementCount = static_cast<uint64_t>(workspace.reset.gmm1Tiles.sizeBytes / SIZE_INT_32);
-        totalFlagInt32 = totalFlagInt32 > statusElementCount ? totalFlagInt32 : statusElementCount;
-    }
     uint32_t resetElementCountPerCore = Ops::Base::CeilDiv(totalFlagInt32, static_cast<uint64_t>(blockAivNum_));
     int32_t resetBatchElementCount = resetElementCountPerCore < static_cast<uint32_t>(DISPATCH_RESET_BATCH) ?
                                          static_cast<int32_t>(resetElementCountPerCore) :
@@ -716,8 +707,8 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::RunSharedExpertGmm1Acti
             RunGmm1A8W4<typename SharedQuantConfig::QuantOutType, SharedWeightType, bfloat16_t, SharedQuantScaleType,
                         SharedQuantScaleType, GMM1_TILE_M, L1_TILE_M_256, false, true, true>(
                 sharedBlockContext_, sharedEpilogueOp_, params_, problemShape, gmmAddrInfo, runtimeState.startBlockIdx,
-                gmmTileSequence_, gmmConfig.blockJob, expertBeforeCnt, sharedExpertIdx,
-                commonConfig_.activationOutputDivisor, layoutArgs...);
+                gmmConfig.blockJob, expertBeforeCnt, sharedExpertIdx, commonConfig_.activationOutputDivisor,
+                layoutArgs...);
         } else {
             RunGmm1Generic<typename SharedQuantConfig::QuantOutType, SharedActivationOutType,
                            typename SharedQuantConfig::QuantOutType, bfloat16_t, SharedQuantScaleType,
@@ -1071,7 +1062,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::PrepareLocalInput()
     // 全部 AIV 均分 reset 和 quant/pack。
     const WorkRange tokenRange = GetBalancedWorkRange(commonConfig_.tokenNum, aivJob_);
     SendAndQuantBuffInit();
-    ResetSyncStatus<TopkWeightsPrefetch>(aivJob_, params_, resetBatchElementCount_, resetTensor_);
+    ResetSyncStatus(aivJob_, params_, resetBatchElementCount_, resetTensor_);
     // 本核 reset 任务完成后发布通知；空任务核同样参与全 AIV 事件。
     SyncInterArrive<PIPE_MTE3>(INPUT_RESET_DONE_FLAG);
     if (tokenRange.count > 0U) {

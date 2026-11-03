@@ -292,7 +292,7 @@ __aicore__ inline ExpertTokenPosition MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTyp
                                         TopkWeightsPrefetch>(
             gmmExecutionConfig_, syncWorkspaceLayout_, workspace, buffer, moeWeightTensorListAddrs_, epilogueOp_,
             gmm1AddrInfo, gmm1ExpertState, commonConfig_.gmm1OutputDim / commonConfig_.activationOutputDivisor,
-            gmm1Position.tokenIndexInExpert, gmm1TilesPerMGroup_);
+            gmm1Position.tokenIndexInExpert);
         /*
          * 只有该 problem 从第 0 行覆盖到专家尾，后续 Wave 才不会再次读取同一份 GMM1 权重。
          * 热点专家的任一 Wave problem 都为 false，即使本次不足 256 行也保留正常 L2 cache。

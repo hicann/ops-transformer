@@ -60,7 +60,6 @@ private:
     using MegaMoeBase::countWorkspace_;
     using MegaMoeBase::epilogueOp_;
     using MegaMoeBase::gmmExecutionConfig_;
-    using MegaMoeBase::gmmTileSequence_;
     using MegaMoeBase::mGroupsPerWave_;
     using MegaMoeBase::moeWeightTensorListAddrs_;
     using MegaMoeBase::params_;
@@ -116,7 +115,7 @@ __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::RunGmm1
         typename MoeQuantConfig::QuantScaleType, MoeQuantConfig::A_ELEMS_PER_BYTE, false, TopkWeightsPrefetch>(
         gmmExecutionConfig_, syncWorkspaceLayout_, workspace, buffer, moeWeightTensorListAddrs_, epilogueOp_,
         gmmAddrInfo, state, commonConfig_.gmm1OutputDim / commonConfig_.activationOutputDivisor,
-        tokenStartIndexInExpert, gmm1TilesPerMGroup);
+        tokenStartIndexInExpert);
     ProblemShape sliceProblemShape = state.problemShape;
     Get<M_VALUE>(sliceProblemShape) = sliceTokenCount;
     RunGmm1Generic<typename MoeQuantConfig::QuantOutType, typename MoeQuantConfig::ActivationQuantOutType,

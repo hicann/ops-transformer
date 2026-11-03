@@ -61,7 +61,6 @@ private:
     using MegaMoeBase::commonConfig_;
     using MegaMoeBase::countWorkspace_;
     using MegaMoeBase::gmmExecutionConfig_;
-    using MegaMoeBase::gmmTileSequence_;
     using MegaMoeBase::mGroupsPerWave_;
     using MegaMoeBase::syncWorkspaceLayout_;
     using MegaMoeBase::moeWeightTensorListAddrs_;
@@ -115,15 +114,15 @@ __aicore__ inline void MegaMoeA8W4Wave<TemplateMegaMoeA8W4WaveTypeFunc>::RunGmm1
         typename MoeQuantConfig::QuantScaleType, MoeQuantConfig::A_ELEMS_PER_BYTE, true, TopkWeightsPrefetch>(
         gmmExecutionConfig_, syncWorkspaceLayout_, workspace, buffer, moeWeightTensorListAddrs_, epilogueOp_,
         gmmAddrInfo, state, commonConfig_.gmm1OutputDim / commonConfig_.activationOutputDivisor,
-        tokenStartIndexInExpert, gmm1TilesPerMGroup);
+        tokenStartIndexInExpert);
     ProblemShape sliceProblemShape = state.problemShape;
     Get<M_VALUE>(sliceProblemShape) = sliceTokenCount;
     RunGmm1A8W4<typename MoeQuantConfig::QuantOutType, MoeWeightType, bfloat16_t,
                 typename MoeQuantConfig::QuantScaleType, typename MoeQuantConfig::QuantScaleType, GMM1_TILE_M,
                 EPILOGUE_TILE_M, TopkWeightsPrefetch, false, true>(
-        pipeline, epilogueOp_, params_, sliceProblemShape, gmmAddrInfo, startBlockIdx, gmmTileSequence_,
-        gmmExecutionConfig_.blockJob, static_cast<uint32_t>(state.globalTokenStartIndex) + tokenStartIndexInExpert,
-        state.expertIdx, commonConfig_.activationOutputDivisor);
+        pipeline, epilogueOp_, params_, sliceProblemShape, gmmAddrInfo, startBlockIdx, gmmExecutionConfig_.blockJob,
+        static_cast<uint32_t>(state.globalTokenStartIndex) + tokenStartIndexInExpert, state.expertIdx,
+        commonConfig_.activationOutputDivisor);
 }
 
 template <TemplateMegaMoeA8W4WaveTypeClass>

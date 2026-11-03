@@ -24,6 +24,10 @@
 
 namespace optiling {
 
+constexpr int64_t COMBINE_COMM_MODE_NO_DEDUP = 0;
+constexpr int64_t COMBINE_COMM_MODE_RANK_DEDUP = 1;
+constexpr int64_t COMBINE_COMM_MODE_SERVER_DEDUP = 2;
+
 struct MegaMoeConfig {
     uint32_t contextIndex = 0U;
     uint32_t xIndex = 1U;

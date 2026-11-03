@@ -671,7 +671,6 @@ void AccumulateSyncSize(int64_t& cclDataSize, const CclDataBudget& budget)
         AccumulateFlagSize(cclDataSize, budget.expertPerRank * budget.wavesPerExpert); // 激活到 GMM2 的通知。
         AccumulateFlagSize(cclDataSize, budget.expertPerRank * budget.wavesPerExpert); // 分发到 GMM1 的通知。
         AccumulateFlagSize(cclDataSize, budget.expertPerRank * budget.aicNum); // 接收数量元数据就绪通知。
-        AccumulateFlagSize(cclDataSize, budget.aicNum);                        // GMM 到后处理的通知。
         int64_t maxTokenGroups = CeilDiv(budget.numMaxTokensPerRank * budget.epWorldSize, ARCH35_TILE_M);
         int64_t combineSyncSlots = std::max(maxTokenGroups, budget.aicNum);
         AccumulateFlagSize(cclDataSize, combineSyncSlots * budget.expertPerRank); // GMM2 到分层合并的通知。
@@ -685,7 +684,6 @@ void AccumulateSyncSize(int64_t& cclDataSize, const CclDataBudget& budget)
         if (budget.reserveDedup) {
             AccumulateFlagSize(cclDataSize, 1LL + budget.epWorldSize * ARCH35_DEDUP_PREPASS_MAX_CHUNKS);
         }
-        AccumulateFlagSize(cclDataSize, budget.aicNum); // GMM 到后处理的通知。
         if (budget.needsGmm2Ready) {
             AccumulateFlagSize(cclDataSize, budget.expertPerRank * budget.aicNum);
         }
@@ -708,13 +706,6 @@ void AccumulateGmmSize(int64_t& cclDataSize, const CclDataBudget& budget)
         cclDataSize += CeilAlign(static_cast<int64_t>(sizeof(int16_t)) * budget.maxOutput * budget.hidden, ALIGN_512);
     } else {
         cclDataSize += static_cast<int64_t>(sizeof(int16_t)) * budget.maxOutput * budget.hidden;
-    }
-
-    if (budget.topkWeightsType == 1) {
-        int64_t maxTilesPerExpert =
-            CeilAlign(budget.wavesPerExpert * CeilDiv(budget.hiddenDim, ARCH35_TILE_N), ARCH35_INT_CACHELINE);
-        int64_t statusSlots = budget.expertPerRank * maxTilesPerExpert + 1LL;
-        cclDataSize += CeilAlign(static_cast<int64_t>(sizeof(int32_t)) * statusSlots * ARCH35_INT_CACHELINE, ALIGN_512);
     }
 }
 
@@ -817,7 +808,6 @@ MemoryBudgetParams BuildMemoryBudgetParams(int64_t epWorldSize, int64_t moeExper
     // 创建窗口时尚未知激活类型，按 GELU 的较窄 GMM1 输出取较大的 wave 行预算。
     // GMM1 结果宽度仍按门控激活的两倍 intermediateHidden 预留。
     params.mGroupsPerWave = MegaMoeImpl::CalcMemoryMGroupsPerWave(intermediateHidden, params.h, params.aicNum);
-    params.maxTilesPerExpert = MegaMoeImpl::CalcMemoryMaxTilesPerExpert(params.maxOutputSize, params.hiddenDim);
     const int64_t maxTokenGroups = MegaMoeImpl::MemoryLayoutDetail::CeilDiv(
         numMaxTokensPerRank * epWorldSize, MegaMoeImpl::MemoryLayoutDetail::L1_TILE_M_256);
     params.combineSyncSlotCountPerExpert = maxTokenGroups > params.aicNum ? maxTokenGroups : params.aicNum;
@@ -836,7 +826,6 @@ MemoryBudgetParams BuildMemoryBudgetParams(int64_t epWorldSize, int64_t moeExper
     params.reserveGmm1Output = params.topkWeightsPrefetch || (!isFp4 && !isE5M2);
     params.reserveCumsum = !isE5M2;
     // 共享专家的量化配置独立于 MoE，仍按 W4 与独立量化的上界预留。
-    params.needsGmmEpilogue = true;
     params.sharedInputIndependent = true;
 
     auto& comm = budget.comm;

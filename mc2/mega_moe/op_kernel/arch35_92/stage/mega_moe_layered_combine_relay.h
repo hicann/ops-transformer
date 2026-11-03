@@ -201,7 +201,7 @@ template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessCombineRelay()
 {
     if (subBlockIdx_ == 0U) {
-        if constexpr (ENABLE_A8W4 || ENABLE_A4W4) {
+        if constexpr (MoeQuantConfig::AXW_MODE != AxWMode::A8W8) {
             // 无建表任务或空列表也会直接由 Scalar 缓存 count，先完成 Prologue 的旧 UB 访问。
             PipeFence<PIPE_V, PIPE_S, SYNC_EVENT_ID2>();
         }

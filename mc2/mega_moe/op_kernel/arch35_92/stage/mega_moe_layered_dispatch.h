@@ -276,14 +276,6 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ResetStat
     PipeFence<PIPE_V, PIPE_MTE3, SYNC_EVENT_ID2>();
     ResetWorkspaceRegion<1>(job, workspace.sync.activationReady.get_ptr(buffer),
                             (workspace.reset.flags.sizeBytes / SIZE_INT_32), resetBatchElementCount_, resetTensor_);
-    if constexpr (TopkWeightsPrefetch) {
-        int32_t statusElementCount = (static_cast<int32_t>(moeExpertPerRank_) *
-                                          static_cast<int32_t>(params_.tilingData->compute.maxTilesPerExpert) +
-                                      1) *
-                                     INT_CACHELINE;
-        ResetWorkspaceRegion(GetBalancedWorkRange(static_cast<uint32_t>(statusElementCount), job),
-                             workspace.sync.gmm1Tiles.get_ptr(buffer), resetBatchElementCount_, resetTensor_);
-    }
 
     // 同一 AIV owner 清零目标 Server 的队列 count 和 Combine 列表行头。
     const int64_t tokenListStride =

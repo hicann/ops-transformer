@@ -46,15 +46,17 @@ static ge::graphStatus CheckAndSetTensorMetadata(const gert::TilingContext* cont
 static ge::graphStatus CheckAndSetUrmaDedupMode(int64_t combineCommMode, MegaMoeTilingData* tilingData,
                                                 const char* nodeName)
 {
-    OP_TILING_CHECK(combineCommMode != 0 && combineCommMode != 2,
+    OP_TILING_CHECK(combineCommMode != COMBINE_COMM_MODE_NO_DEDUP && combineCommMode != COMBINE_COMM_MODE_SERVER_DEDUP,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_comm_mode", std::to_string(combineCommMode).c_str(),
                                               "URMA only supports combine_comm_mode=0 or 2"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(combineCommMode == 2 && tilingData->combineQuantMode != COMBINE_QUANT_OUT_TYPE_NO_QUANT,
+    OP_TILING_CHECK(combineCommMode == COMBINE_COMM_MODE_SERVER_DEDUP &&
+                        tilingData->combineQuantMode != COMBINE_QUANT_OUT_TYPE_NO_QUANT,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_comm_mode", "2",
                                               "server combine reduction requires combineQuantMode=0"),
                     return ge::GRAPH_FAILED);
-    tilingData->compute.dedupMode = combineCommMode == 2 ? DEDUP_MODE_SERVER_COMBINE : DEDUP_MODE_OFF;
+    tilingData->compute.dedupMode =
+        combineCommMode == COMBINE_COMM_MODE_SERVER_DEDUP ? DEDUP_MODE_SERVER_COMBINE : DEDUP_MODE_OFF;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -63,21 +65,23 @@ static ge::graphStatus CheckAndSetMteDedupMode(const gert::TilingContext* contex
                                                int64_t combineCommMode, MegaMoeTilingData* tilingData,
                                                const char* nodeName)
 {
-    OP_TILING_CHECK(combineCommMode != 0 && combineCommMode != 1,
+    OP_TILING_CHECK(combineCommMode != COMBINE_COMM_MODE_NO_DEDUP && combineCommMode != COMBINE_COMM_MODE_RANK_DEDUP,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_comm_mode", std::to_string(combineCommMode).c_str(),
                                               "MTE only supports combine_comm_mode=0 or 1"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(combineCommMode == 1 && tilingData->combineQuantMode != COMBINE_QUANT_OUT_TYPE_NO_QUANT,
+    OP_TILING_CHECK(combineCommMode == COMBINE_COMM_MODE_RANK_DEDUP &&
+                        tilingData->combineQuantMode != COMBINE_QUANT_OUT_TYPE_NO_QUANT,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_comm_mode", "1",
                                               "combine dedup requires combineQuantMode=0 (no-quant) for now"),
                     return ge::GRAPH_FAILED);
     const bool isPreQuantizedX = IsPreQuantizedXType(context->GetInputDesc(config.xIndex)->GetDataType());
     OP_TILING_CHECK(
-        combineCommMode == 1 && tilingData->topkWeightsPrefetch == 0 && isPreQuantizedX,
+        combineCommMode == COMBINE_COMM_MODE_RANK_DEDUP && tilingData->topkWeightsPrefetch == 0 && isPreQuantizedX,
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_comm_mode", "1",
                                   "combine dedup with topk_weights_type=0 does not support pre-quantized x"),
         return ge::GRAPH_FAILED);
-    tilingData->compute.dedupMode = combineCommMode == 1 ? DEDUP_MODE_BOTH : DEDUP_MODE_DISPATCH_ONLY;
+    tilingData->compute.dedupMode =
+        combineCommMode == COMBINE_COMM_MODE_RANK_DEDUP ? DEDUP_MODE_BOTH : DEDUP_MODE_DISPATCH_ONLY;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -90,8 +94,9 @@ static ge::graphStatus CheckAndSetDedupMode(const gert::TilingContext* context, 
 {
     auto attrs = context->GetAttrs();
     auto ccmPtr = attrs->GetAttrPointer<int64_t>(static_cast<int>(config.attrCombineCommModeIndex));
-    const int64_t combineCommMode = ccmPtr == nullptr ? 0 : *ccmPtr;
-    OP_TILING_CHECK(combineCommMode != 0 && combineCommMode != 1 && combineCommMode != 2,
+    const int64_t combineCommMode = ccmPtr == nullptr ? COMBINE_COMM_MODE_NO_DEDUP : *ccmPtr;
+    OP_TILING_CHECK(combineCommMode != COMBINE_COMM_MODE_NO_DEDUP && combineCommMode != COMBINE_COMM_MODE_RANK_DEDUP &&
+                        combineCommMode != COMBINE_COMM_MODE_SERVER_DEDUP,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "combineCommMode", std::to_string(combineCommMode).c_str(),
                                               "only support 0, 1 or 2"),
                     return ge::GRAPH_FAILED);
@@ -270,17 +275,6 @@ static uint32_t CalcTopkValidIndexFixedBufferBytes(const MegaMoeTilingData* tili
 {
     const WorkspaceLayout workspaceLayout(tilingData->compute);
     uint64_t totalFlagElementCount = static_cast<uint64_t>((workspaceLayout.reset.flags.sizeBytes / SIZE_INT_32));
-    /*
-     * SendAndQuantBuffInit 会清零普通 flag 区域和预取 GMM1 tile 状态区域中较大的一块。
-     * Host 侧的 UB reset 预算必须与 device 侧的最大值保持一致，否则 route ring 可能与 reset UB 重叠。
-     */
-    if (tilingData->topkWeightsPrefetch == 1U) {
-        uint64_t statusSlots = static_cast<uint64_t>(tilingData->compute.moeExpertPerRank) *
-                                   static_cast<uint64_t>(tilingData->compute.maxTilesPerExpert) +
-                               1U;
-        uint64_t statusElementCount = statusSlots * static_cast<uint64_t>(INT_CACHELINE);
-        totalFlagElementCount = std::max(totalFlagElementCount, statusElementCount);
-    }
     uint32_t resetElementCountPerCore =
         static_cast<uint32_t>(ops::CeilDiv(totalFlagElementCount, static_cast<uint64_t>(tilingData->blockAivNum)));
     uint32_t resetBatchElementCount = std::min(resetElementCountPerCore, static_cast<uint32_t>(DISPATCH_RESET_BATCH));
@@ -359,8 +353,6 @@ static void SetCclLayoutParams(MegaMoeTilingData* tilingData)
     compute.dispatchFp4 = IsA4W4GmmMode(tilingData->moeGmmMode);
     compute.reserveGmm1Output = tilingData->moeGmmMode == GMM_MODE_A8W4_NZ || compute.topkWeightsPrefetch;
     compute.reserveCumsum = IsW4GmmMode(tilingData->moeGmmMode);
-    compute.needsGmmEpilogue =
-        compute.reserveCumsum || (compute.sharedExpertNum > 0 && IsW4GmmMode(tilingData->sharedGmmMode));
     compute.sharedInputElementsPerByte = IsA4W4GmmMode(tilingData->sharedGmmMode) ? 2U : 1U;
     compute.ring = CalcCclStageRingConfig(compute);
 
@@ -574,8 +566,8 @@ ge::graphStatus MegaMoeTilingFuncImplArch35(gert::TilingContext* context, MegaMo
                         OP_LOGE(nodeName, "MTE dedup capacity or benefit check failed."), return ge::GRAPH_FAILED);
     }
 
-    // 按最终模式规划预取、Wave 和 buffer。
-    SetPrefetchAndWaveParams(tilingData, aicNum);
+    // 按最终模式规划 Wave 和 buffer。
+    SetWaveParams(tilingData, aicNum);
     SetAdaptiveBufferConfigs(context, config, expertParams, tilingData, static_cast<uint32_t>(ubSize));
 
     return CommitTilingResult(context, config, expertParams, tilingData, nodeName);

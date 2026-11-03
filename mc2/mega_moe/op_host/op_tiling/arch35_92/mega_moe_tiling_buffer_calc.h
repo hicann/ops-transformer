@@ -193,11 +193,12 @@ static int64_t GetDedupMode(const gert::TilingContext* context, const MegaMoeCon
         return 0;
     }
     auto ccmPtr = attrs->GetAttrPointer<int64_t>(static_cast<int>(config.attrCombineCommModeIndex));
-    int64_t combineCommMode = ccmPtr == nullptr ? 0 : *ccmPtr; // 旧序列化图无该属性时按默认 0
-    if (combineCommMode != 0 && combineCommMode != 1) {
+    int64_t combineCommMode = ccmPtr == nullptr ? COMBINE_COMM_MODE_NO_DEDUP : *ccmPtr; // 旧序列化图无该属性时按默认 0
+    if (combineCommMode != COMBINE_COMM_MODE_NO_DEDUP && combineCommMode != COMBINE_COMM_MODE_RANK_DEDUP) {
         return -1;
     }
-    return combineCommMode == 1 ? 3 : 2; // dispatch 恒请求：ccm=1 双开(3)，否则仅 dispatch(2)
+    return combineCommMode == COMBINE_COMM_MODE_RANK_DEDUP ? 3 :
+                                                             2; // dispatch 恒请求：ccm=1 双开(3)，否则仅 dispatch(2)
 }
 
 /*
@@ -268,22 +269,9 @@ static void RegisterMegaMoeException()
 }
 #endif
 
-/*
- * 设置 prefetch 状态位区上限与 wave 粒度。maxTilesPerExpert 先无条件置零、再由 prefetch 分支覆盖，
- * 非 prefetch 路径依赖这次置零，不可改成只在分支内赋值。
- * 本步读 maxOutputSize，必须排在 CheckAndSetMaxRecvTokenNumAttr 之后。
- */
-static void SetPrefetchAndWaveParams(MegaMoeTilingData* tilingData, const uint32_t aicNum)
+/* 按两段 GMM 的 N 维分核计算每个 wave 的 M 分组数。 */
+static void SetWaveParams(MegaMoeTilingData* tilingData, const uint32_t aicNum)
 {
-    // GMM1 tile 状态位区每 expert 的 tile 上限（仅 prefetch 软同步路径使用）。
-    // 非交织门控调度只遍历 hiddenDim / 2，交织调度及 GELU 会遍历完整 hiddenDim；host 无法感知 kernel
-    // 编译期开关，因此按完整 hiddenDim 预留，避免交织模式覆盖下一 expert 的状态槽。
-    tilingData->compute.maxTilesPerExpert = 0;
-    if (tilingData->topkWeightsPrefetch == 1) {
-        tilingData->compute.maxTilesPerExpert = static_cast<uint32_t>(
-            CalcMemoryMaxTilesPerExpert(tilingData->compute.maxOutputSize, tilingData->compute.hiddenDim));
-    }
-
     tilingData->compute.mGroupsPerWave =
         static_cast<uint32_t>(CalcMemoryMGroupsPerWave(tilingData->compute.hiddenDim, tilingData->compute.h, aicNum));
 }

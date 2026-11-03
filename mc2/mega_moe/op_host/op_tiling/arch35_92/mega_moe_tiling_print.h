@@ -129,11 +129,9 @@ void PrintWorkspaceLayout(const WorkspaceLayout* layout, const char* nodeName)
     printBuffer("mte.sync.sharedActivationReady", layout->mte.sync.sharedActivationReady);
     printBuffer("sync.dispatchReady", layout->sync.dispatchReady);
     printBuffer("sync.countsReady", layout->sync.countsReady);
-    printBuffer("sync.epilogueReady", layout->sync.epilogueReady);
     printBuffer("mte.sync.aiv1TopkReady", layout->mte.sync.aiv1TopkReady);
     printBuffer("mte.sync.gmm2Ready", layout->mte.sync.gmm2Ready);
     printBuffer("urma.sync.combineCounters", layout->urma.sync.combineCounters);
-    printBuffer("sync.gmm1Tiles", layout->sync.gmm1Tiles);
     printBuffer("mte.sync.sharedGmm2Tiles", layout->mte.sync.sharedGmm2Tiles);
     printBuffer("mte.sync.dedupReady", layout->mte.sync.dedupReady);
     printBuffer("mte.dedupRowDescriptors", layout->mte.dedupRowDescriptors);
@@ -145,7 +143,6 @@ void PrintWorkspaceLayout(const WorkspaceLayout* layout, const char* nodeName)
     printBuffer("urma.serverCombine.completedCounts", layout->urma.serverCombine.completedCounts);
     printBuffer("reset.serverCombine", layout->reset.serverCombine);
     printBuffer("reset.flags", layout->reset.flags);
-    printBuffer("reset.gmm1Tiles", layout->reset.gmm1Tiles);
     OP_LOGD(nodeName, "workspaceSize=%ld bytes", layout->workspaceSize);
 }
 

@@ -315,8 +315,6 @@ struct SyncBuffers {
     GmBuffer activationReady{};
     GmBuffer dispatchReady{};
     GmBuffer countsReady{};
-    GmBuffer epilogueReady{};
-    GmBuffer gmm1Tiles{};
 };
 
 struct MteSyncBuffers {
@@ -351,11 +349,9 @@ struct UrmaBuffers {
 };
 
 // These ranges reference existing sync storage; they do not allocate extra buffers.
-// gmm1Tiles excludes allocation-tail padding, matching the existing reset contract.
 struct WorkspaceResetRanges {
     GmBuffer serverCombine;
     GmBuffer flags;
-    GmBuffer gmm1Tiles;
 };
 
 // CCL 通信布局的尺寸与偏移，容量申请、主机校验和核内地址绑定共用。
@@ -485,9 +481,8 @@ struct CclComputeLayoutParams {
     int64_t moeExpertPerRank{0}; // 本卡参与 topK 路由的专家数，与 weight1 的专家数一致。
     int64_t epWorldSize{0};
     int64_t aicNum{0};
-    int64_t sharedExpertNum{0};   // 独立 dense 路径的共享专家数，不进入路由 expert id 空间。
-    int64_t mGroupsPerWave{0};    // 每个 Wave 消费的 256 行 M 分组预算。
-    int64_t maxTilesPerExpert{0}; // GMM1 状态区每专家容量，覆盖完整 N 方向调度。
+    int64_t sharedExpertNum{0}; // 独立 dense 路径的共享专家数，不进入路由 expert id 空间。
+    int64_t mGroupsPerWave{0};  // 每个 Wave 消费的 256 行 M 分组预算。
     int64_t combineSyncSlotCountPerExpert{0}; // 每专家预留的 GMM2 到 Combine 同步槽数。
     int64_t serverNum{1};
     int64_t numMaxTokensPerRank{0}; // 全卡一致的单卡 token 数上界，用于通信槽和 mask 的几何。
@@ -498,7 +493,6 @@ struct CclComputeLayoutParams {
     bool dispatchFp4{false};
     bool reserveGmm1Output{false};
     bool reserveCumsum{false};
-    bool needsGmmEpilogue{false};
     bool sharedInputIndependent{false};
     uint32_t sharedInputElementsPerByte{1};
 };
@@ -521,13 +515,6 @@ HOST_DEVICE constexpr int64_t CalcMemoryMGroupsPerWave(int64_t hiddenDim, int64_
     const int64_t gmm2Groups =
         MemoryLayoutDetail::CeilDiv(aicNum, MemoryLayoutDetail::CeilDiv(h, MemoryLayoutDetail::L1_TILE_M_256));
     return gmm1Groups > gmm2Groups ? gmm1Groups : gmm2Groups;
-}
-
-HOST_DEVICE constexpr int64_t CalcMemoryMaxTilesPerExpert(int64_t maxOutputSize, int64_t hiddenDim)
-{
-    return MemoryLayoutDetail::CeilAlign(MemoryLayoutDetail::CeilDiv(maxOutputSize, MemoryLayoutDetail::L1_TILE_M_256) *
-                                             MemoryLayoutDetail::CeilDiv(hiddenDim, MemoryLayoutDetail::L1_TILE_M_256),
-                                         MemoryLayoutDetail::INT_CACHELINE);
 }
 
 // CCL 本地计算区从通信布局尾部开始，MTE 另保留头部异常记录区域。
@@ -596,8 +583,6 @@ struct WorkspaceLayout {
         archParams.reserveGmm1Output =
             params.topoType == TOPO_TYPE_MTE || modes.moeGmmMode == GMM_MODE_A8W4_NZ || params.topkWeightsPrefetch;
         archParams.reserveCumsum = false;
-        archParams.needsGmmEpilogue = params.topoType == TOPO_TYPE_MTE || IsW4GmmMode(modes.moeGmmMode) ||
-                                      (params.sharedExpertNum > 0 && IsW4GmmMode(modes.sharedGmmMode));
         archParams.sharedInputElementsPerByte = IsA4W4GmmMode(modes.sharedGmmMode) ? 2U : 1U;
         Initialize(archParams, Architecture::Arch92);
     }
@@ -646,7 +631,6 @@ private:
         InitializeMteSyncFlags(params);
         const bool needsReloadCumsum = params.reserveCumsum;
         InitializeGmmIntermediateBuffers(params, needsReloadCumsum, true);
-        InitializeGmm1TileStatus(params);
         InitializeDedupRowDesc(params);
         if (params.sharedExpertNum > 0) {
             InitializeSharedExpertGmmOutputs(params);
@@ -671,7 +655,6 @@ private:
         InitializeUrmaSyncFlags(params);
         // URMA 所有 GMM 模式均保留 dispatch 累积计数。
         InitializeGmmIntermediateBuffers(params, true, false);
-        InitializeGmm1TileStatus(params);
         InitializeDedupRowDesc(params);
         InitializeUrmaDispatchBuffers(params, serverNum);
         if (arch == Architecture::Arch35 && IsServerCombineDedupOn(params.dedupMode)) {
@@ -789,10 +772,6 @@ private:
                      SIZE_INT_32 * MemoryLayoutDetail::INT_CACHELINE *
                          (1 + static_cast<int64_t>(params.epWorldSize) * MemoryLayoutDetail::DEDUP_PREPASS_MAX_CHUNKS));
         }
-        if (params.needsGmmEpilogue || !params.combineQuant) {
-            Allocate(sync.epilogueReady,
-                     static_cast<int64_t>(params.aicNum) * MemoryLayoutDetail::INT_CACHELINE * SIZE_INT_32);
-        }
         // 量化 Combine 在完整专家结束后等待每个 AIC 的完成标记；combine 去重下非量化路径的
         // 合并驱动行也要等组内成员所在专家的 GMM2 全部落地，同样需要该 per-expert 标记区。
         if (params.combineQuant || IsCombineDedupOn(params.dedupMode)) {
@@ -824,10 +803,6 @@ private:
         Allocate(sync.activationReady,
                  SIZE_INT_32 * moeExpertCount * maxGroupsPerExpert * MemoryLayoutDetail::INT_CACHELINE);
         InitializeRoutingFlags(params);
-        if (params.needsGmmEpilogue) {
-            Allocate(sync.epilogueReady,
-                     static_cast<int64_t>(params.aicNum) * MemoryLayoutDetail::INT_CACHELINE * SIZE_INT_32);
-        }
         Allocate(urma.sync.combineCounters, static_cast<int64_t>(params.combineSyncSlotCountPerExpert) *
                                                 moeExpertCount * MemoryLayoutDetail::INT_CACHELINE * SIZE_INT_32);
         reset.flags = GmBuffer{sync.activationReady.offsetBytes,
@@ -884,20 +859,6 @@ private:
                      MemoryLayoutDetail::CeilAlign(
                          SIZE_INT_32 * rowDescStrideInt32 * static_cast<int64_t>(params.maxOutputSize),
                          MemoryLayoutDetail::ALIGN_512));
-        }
-    }
-
-    HOST_DEVICE constexpr void InitializeGmm1TileStatus(const CclComputeLayoutParams& params)
-    {
-        // GMM1 tile 状态位区（仅 prefetch 路径分配，用于 AIC→AIV 软同步）。
-        // 每个 tile 状态和末尾 allDone 状态都独占一条 64B cache line。
-        sync.gmm1Tiles.offsetBytes = INVALID_WORKSPACE_OFFSET;
-        if (params.topkWeightsPrefetch == 1) {
-            int64_t statusSlots = static_cast<int64_t>(params.moeExpertPerRank) * params.maxTilesPerExpert + 1;
-            int64_t statusBytes = SIZE_INT_32 * statusSlots * MemoryLayoutDetail::INT_CACHELINE;
-            Allocate(sync.gmm1Tiles, MemoryLayoutDetail::CeilAlign(statusBytes, MemoryLayoutDetail::ALIGN_512));
-            reset.gmm1Tiles =
-                GmBuffer{sync.gmm1Tiles.offsetBytes, (statusSlots * MemoryLayoutDetail::INT_CACHELINE) * SIZE_INT_32};
         }
     }
 

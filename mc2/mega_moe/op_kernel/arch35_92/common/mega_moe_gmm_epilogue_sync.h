@@ -172,7 +172,7 @@ public:
         SyncIntraArrive<PIPE_MTE3>(activationFinishedFlag_);
     }
 
-    // MTE 主流程末尾统一排空；独立事件允许 ACK 跨过后续共享计算保留。
+    // 主流程末尾统一排空；独立事件允许 ACK 跨过后续共享计算保留。
     __aicore__ inline void EndSync()
     {
         if constexpr (g_coreType == AscendC::AIC) {
@@ -189,111 +189,6 @@ private:
     const uint16_t gmm1FinishedFlag_;
     const uint16_t activationFinishedFlag_;
     uint32_t pendingTiles_ = 0; // 已提交的 tile 数减去 AIC 已消费的 Activation 完成通知数。
-};
-
-// GM path facade: hardware ACKs and Layered GM flags keep their original
-// protocols. AddressInfo is referenced because each problem updates its GM bases.
-// 非 Prefetch 的 GM flag 软同步需要序号；硬件通知路径可不传。
-// 已有传序号的调用仍保持原有计数。
-template <bool TopkWeightsPrefetch, typename AddressInfo>
-class Gmm1GmActivationSync {
-public:
-    __aicore__ explicit inline Gmm1GmActivationSync(const AddressInfo& addresses, int32_t* sequence = nullptr)
-        : addresses_(addresses),
-          sequence_(sequence)
-    {}
-
-    __aicore__ inline void WaitForActivation()
-    {
-        if (addresses_.gmm1ActivationSync != nullptr) {
-            addresses_.gmm1ActivationSync->WaitForActivation();
-        }
-    }
-
-    __aicore__ inline void NotifyActivation(uint32_t expertIdx, uint32_t loopIdx)
-    {
-        if (addresses_.gmm1ActivationSync != nullptr) {
-            addresses_.gmm1ActivationSync->NotifyActivation();
-            if constexpr (!TopkWeightsPrefetch) {
-                if (sequence_ != nullptr) {
-                    ++(*sequence_);
-                }
-            }
-        } else {
-            PipeNotify<PIPE_FIX, PIPE_S>(0);
-            PipeWait<PIPE_FIX, PIPE_S>(0);
-            if constexpr (TopkWeightsPrefetch) {
-                __gm__ int32_t* status = addresses_.gmm1TileStatus + static_cast<uint64_t>(loopIdx) * INT_CACHELINE;
-                GmWrite(status, static_cast<int32_t>(expertIdx + 1));
-            } else {
-                GmWrite(addresses_.gmmToEpilogueFlag, ++(*sequence_));
-            }
-        }
-    }
-
-    __aicore__ inline void WaitForGmm1(uint32_t expertIdx = 0U, uint32_t loopIdx = 0U)
-    {
-        if constexpr (!TopkWeightsPrefetch) {
-            if (sequence_ != nullptr) {
-                expectedSequence_ = *sequence_ + 1;
-            }
-        }
-        if (addresses_.gmm1ActivationSync != nullptr) {
-            addresses_.gmm1ActivationSync->WaitForGmm1();
-        } else if constexpr (TopkWeightsPrefetch) {
-            __gm__ int32_t* status = addresses_.gmm1TileStatus + static_cast<uint64_t>(loopIdx) * INT_CACHELINE;
-            int32_t roundTag = static_cast<int32_t>(expertIdx + 1);
-            WaitUntilGmFlagEquals(status, roundTag);
-        } else {
-            WaitUntilGmFlagAtLeast(addresses_.gmmToEpilogueFlag, expectedSequence_);
-        }
-    }
-
-    __aicore__ inline void NotifyGmm1()
-    {
-        if constexpr (!TopkWeightsPrefetch) {
-            if (sequence_ != nullptr) {
-                *sequence_ = expectedSequence_;
-            }
-        }
-        if (addresses_.gmm1ActivationSync != nullptr) {
-            addresses_.gmm1ActivationSync->NotifyGmm1();
-        }
-    }
-
-private:
-    const AddressInfo& addresses_;
-    int32_t* sequence_;
-    int32_t expectedSequence_ = 0;
-};
-
-// Layered prefetch's existing final GM handshake, separate from per-tile ACKs.
-class Gmm1GmCompletionSync {
-public:
-    __aicore__ inline Gmm1GmCompletionSync(__gm__ int32_t* flag, int32_t tag, uint32_t subBlockIdx,
-                                           uint32_t activationSubBlockIdx)
-        : flag_(flag),
-          tag_(tag),
-          subBlockIdx_(subBlockIdx),
-          activationSubBlockIdx_(activationSubBlockIdx)
-    {}
-
-    __aicore__ inline void EndSync()
-    {
-        if constexpr (g_coreType == AscendC::AIV) {
-            if (subBlockIdx_ == activationSubBlockIdx_) {
-                GmWrite(flag_, tag_);
-            }
-        } else {
-            WaitUntilGmFlagEquals(flag_, tag_);
-        }
-    }
-
-private:
-    __gm__ int32_t* flag_ = nullptr;
-    int32_t tag_;
-    uint32_t subBlockIdx_;
-    uint32_t activationSubBlockIdx_;
 };
 
 // GMM2 -> 非量化 Combine：arch35 使用 AIV1，arch92 使用唯一 AIV，事件和计数独立于 GMM1/Activation。

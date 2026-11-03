@@ -157,13 +157,13 @@ __aicore__ inline void Gmm1AicMmadTileA8W4(BlockMmad& blockMmad, TensorA& gmA, T
     blockMmad(gmBlockA, gmBlockScaleA, gmBlockScaleB, tensorBlockGm);
 }
 
-// GM 交接路径的 AIC 将 GMM1 tile 写入 GM，并按 prefetch 或顺序协议通知 AIV 后处理。
+// GM 交接路径的 AIC 将 GMM1 tile 写入 GM，再通过硬同步通知 AIV 后处理。
 template <typename MmadContext, bool IsShared, bool TopkWeightsPrefetch, typename WorkSet, typename Config>
 __aicore__ inline void Gmm1AicMmadToGmGeneric(WorkSet& workSet, const Params& params, const GMMAddrInfo& gmmAddrInfo,
                                               const Config& config, uint32_t startLoopIdx, uint32_t tileNum,
                                               uint32_t expertIdx, MmadContext* blockMmadContext)
 {
-    Gmm1GmActivationSync<TopkWeightsPrefetch, GMMAddrInfo> sync(gmmAddrInfo);
+    auto& sync = *gmmAddrInfo.gmm1ActivationSync;
     using BlockMmad = decltype(blockMmadContext->blockMmad);
     blockMmadContext->template Init<GmmStage::GMM1>(config);
     auto& blockMmad = blockMmadContext->blockMmad;
@@ -191,7 +191,7 @@ __aicore__ inline void Gmm1AicMmadToGmGeneric(WorkSet& workSet, const Params& pa
         sync.WaitForActivation();
         Gmm1AicMmadTileToGmGeneric<BlockMmad>(blockMmad, config, workSet.gmB, workSet.gmScaleB, workSet.gmC,
                                               actualShape, mLoc, nLoc, kLoc, gmBlockA, gmBlockScaleA);
-        sync.NotifyActivation(expertIdx, loopIdx);
+        sync.NotifyActivation();
     }
 }
 
@@ -247,9 +247,9 @@ __aicore__ inline void Gmm1AicMmadGeneric(WorkSet& workSet, const GMMAddrInfo& g
 template <typename BlockMmad, bool IsShared, bool TopkWeightsPrefetch, typename WorkSet, typename Config>
 __aicore__ inline void Gmm1AicMmadA8W4(BlockMmad& blockMmad, WorkSet& workSet, const Params& params,
                                        const GMMAddrInfo& gmmAddrInfo, const Config& config, uint32_t startLoopIdx,
-                                       uint32_t tileNum, int32_t& gmm1TileReadySequence, uint32_t expertIdx)
+                                       uint32_t tileNum, uint32_t expertIdx)
 {
-    Gmm1GmActivationSync<TopkWeightsPrefetch, GMMAddrInfo> sync(gmmAddrInfo, &gmm1TileReadySequence);
+    auto& sync = *gmmAddrInfo.gmm1ActivationSync;
     typename BlockMmad::BlockShape l0TileShape{config.blockMmadTiling.tileM, config.blockMmadTiling.tileN, L0_TILE_K,
                                                0};
     typename BlockMmad::ProblemShape matmulShape{config.m, config.schedulerN, config.k, 0};
@@ -273,7 +273,7 @@ __aicore__ inline void Gmm1AicMmadA8W4(BlockMmad& blockMmad, WorkSet& workSet, c
         Gmm1AicMmadTileA8W4(blockMmad, workSet.gmA, workSet.gmScaleA, workSet.gmScaleB, workSet.gmC, config,
                             actualShape, mLoc, nLoc);
 
-        sync.NotifyActivation(expertIdx, loopIdx);
+        sync.NotifyActivation();
     }
 }
 
@@ -410,7 +410,7 @@ __aicore__ inline void Gmm1Aiv0PrologueA8W4(BlockPrologue& blockPrologue, Schedu
     }
 }
 
-// Prefetch 路径的 AIV0 通过硬件通知或 GM 状态等待 tile 就绪，再执行 Activation/量化。
+// Prefetch 路径的 AIV0 通过硬同步等待 tile 就绪，再执行 Activation/量化。
 template <typename MakeLayoutC, typename ElementC, bool IsWaveFlagGrained, typename WorkSet, typename Config,
           typename ActivationQuantOp>
 __aicore__ inline void Gmm1Aiv0PrefetchEpilogueGeneric(WorkSet& workSet, const Params& params,
@@ -419,13 +419,13 @@ __aicore__ inline void Gmm1Aiv0PrefetchEpilogueGeneric(WorkSet& workSet, const P
                                                        ActivationQuantOp& activationQuantOp, uint32_t expertBeforeCnt,
                                                        uint32_t expertIdx)
 {
-    Gmm1GmActivationSync<true, GMMAddrInfo> sync(gmmAddrInfo);
+    auto& sync = *gmmAddrInfo.gmm1ActivationSync;
     for (uint32_t loopIdx = startLoopIdx; loopIdx < tileNum; loopIdx += config.blockNum) {
         auto blockCoord = workSet.scheduler.GetBlockCoord(loopIdx);
         auto actualShape = workSet.scheduler.GetBlockShape(blockCoord);
         uint32_t mLoc = Get<M_VALUE>(blockCoord);
         uint32_t nLoc = Get<N_VALUE>(blockCoord);
-        sync.WaitForGmm1(expertIdx, loopIdx);
+        sync.WaitForGmm1();
         Gmm1Aiv0PrefetchEpilogueTileGeneric<MakeLayoutC, ElementC, IsWaveFlagGrained>(
             config, workSet.gmC, workSet.metaInfoGm, activationQuantOp, gmmAddrInfo, expertBeforeCnt, actualShape, mLoc,
             nLoc);
@@ -531,7 +531,7 @@ __aicore__ inline void Gmm1ExecGeneric(Scheduler& scheduler, const Params& param
     }
 }
 
-// Prefetch 路径的 AIV1 通过硬件通知或 GM 状态等待 tile 就绪，再执行 A8W4 Activation/量化。
+// Prefetch 路径的 AIV1 通过硬同步等待 tile 就绪，再执行 A8W4 Activation/量化。
 template <typename ElementC, typename MakeLayoutC, bool IsWaveFlagGrained, typename WorkSet, typename Config,
           typename ActivationQuantOp>
 __aicore__ inline void Gmm1Aiv1PrefetchEpilogueA8W4(WorkSet& workSet, const Params& params,
@@ -540,13 +540,13 @@ __aicore__ inline void Gmm1Aiv1PrefetchEpilogueA8W4(WorkSet& workSet, const Para
                                                     ActivationQuantOp& activationQuantOp, uint32_t expertBeforeCnt,
                                                     uint32_t expertIdx)
 {
-    Gmm1GmActivationSync<true, GMMAddrInfo> sync(gmmAddrInfo);
+    auto& sync = *gmmAddrInfo.gmm1ActivationSync;
     for (uint32_t loopIdx = startLoopIdx; loopIdx < tileNum; loopIdx += config.blockNum) {
         auto blockCoord = workSet.scheduler.GetBlockCoord(loopIdx);
         auto actualShape = workSet.scheduler.GetBlockShape(blockCoord);
         uint32_t mLoc = Get<M_VALUE>(blockCoord);
         uint32_t nLoc = Get<N_VALUE>(blockCoord);
-        sync.WaitForGmm1(expertIdx, loopIdx);
+        sync.WaitForGmm1();
         Gmm1Aiv1PrefetchEpilogueTileA8W4<ElementC, MakeLayoutC, IsWaveFlagGrained>(
             activationQuantOp, workSet.gmC, workSet.metaInfoGm, gmmAddrInfo, config, actualShape, mLoc, nLoc,
             expertBeforeCnt);
@@ -558,10 +558,10 @@ __aicore__ inline void Gmm1Aiv1PrefetchEpilogueA8W4(WorkSet& workSet, const Para
 template <typename ElementC, typename MakeLayoutC, bool IsWaveFlagGrained, typename WorkSet, typename Config,
           typename ActivationQuantOp>
 __aicore__ inline void Gmm1Aiv1EpilogueA8W4(WorkSet& workSet, const GMMAddrInfo& gmmAddrInfo, const Config& config,
-                                            uint32_t startLoopIdx, uint32_t tileNum, int32_t& gmm1TileReadySequence,
+                                            uint32_t startLoopIdx, uint32_t tileNum,
                                             ActivationQuantOp& activationQuantOp)
 {
-    Gmm1GmActivationSync<false, GMMAddrInfo> sync(gmmAddrInfo, &gmm1TileReadySequence);
+    auto& sync = *gmmAddrInfo.gmm1ActivationSync;
     for (uint32_t loopIdx = startLoopIdx; loopIdx < tileNum; loopIdx += config.blockNum) {
         auto blockCoord = workSet.scheduler.GetBlockCoord(loopIdx);
         auto actualShape = workSet.scheduler.GetBlockShape(blockCoord);
@@ -580,8 +580,8 @@ template <typename BlockMmad, typename BlockPrologue, typename ElementC, typenam
           typename ActivationQuantOp, typename LayoutBundle>
 __aicore__ inline void Gmm1ExecA8W4(Scheduler& scheduler, const Params& params, const GMMAddrInfo& gmmAddrInfo,
                                     const Config& config, uint32_t startLoopIdx, uint32_t tileNum,
-                                    int32_t& gmm1TileReadySequence, ActivationQuantOp& activationQuantOp,
-                                    uint32_t expertBeforeCnt, uint32_t expertIdx, const LayoutBundle& layouts,
+                                    ActivationQuantOp& activationQuantOp, uint32_t expertBeforeCnt, uint32_t expertIdx,
+                                    const LayoutBundle& layouts,
                                     const A8W4BlockContext<BlockMmad, BlockPrologue>& pipeline)
 {
     using KernelConfig = typename Config::KernelConfig;
@@ -614,8 +614,7 @@ __aicore__ inline void Gmm1ExecA8W4(Scheduler& scheduler, const Params& params, 
     WorkSetType workSet{scheduler, gmA, gmB, gmScaleA, gmScaleB, gmC, metaInfoGm};
     if constexpr (g_coreType == AscendC::AIC) {
         Gmm1AicMmadA8W4<BlockMmad, IsShared, TopkWeightsPrefetch>(*pipeline.block, workSet, params, gmmAddrInfo, config,
-                                                                  startLoopIdx, tileNum, gmm1TileReadySequence,
-                                                                  expertIdx);
+                                                                  startLoopIdx, tileNum, expertIdx);
     } else if (IsSubBlockIdx<0U>()) {
         Gmm1Aiv0PrologueA8W4<BlockPrologue>(*pipeline.block, workSet.scheduler, workSet.gmB, config, startLoopIdx,
                                             tileNum);
@@ -625,8 +624,8 @@ __aicore__ inline void Gmm1ExecA8W4(Scheduler& scheduler, const Params& params, 
                 workSet, params, gmmAddrInfo, config, startLoopIdx, tileNum, activationQuantOp, expertBeforeCnt,
                 expertIdx);
         } else {
-            Gmm1Aiv1EpilogueA8W4<ElementC, MakeLayoutC, IsWaveFlagGrained>(
-                workSet, gmmAddrInfo, config, startLoopIdx, tileNum, gmm1TileReadySequence, activationQuantOp);
+            Gmm1Aiv1EpilogueA8W4<ElementC, MakeLayoutC, IsWaveFlagGrained>(workSet, gmmAddrInfo, config, startLoopIdx,
+                                                                           tileNum, activationQuantOp);
         }
     }
 }
@@ -704,8 +703,7 @@ template <typename ElementA, typename ElementB, typename ElementC, typename Elem
 __aicore__ inline void RunGmm1A8W4(const BlockContext& pipeline, BlockEpilogue& activationQuantOp, const Params& params,
                                    const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
                                    const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
-                                   int32_t& gmm1TileReadySequence, const BlockJobContext& blockJob,
-                                   uint32_t expertBeforeCnt, uint32_t expertIdx,
+                                   const BlockJobContext& blockJob, uint32_t expertBeforeCnt, uint32_t expertIdx,
                                    uint32_t activationOutputDivisor = ACTIVATION_N_HALF,
                                    const LayoutArgs&... layoutArgs)
 {
@@ -738,36 +736,38 @@ __aicore__ inline void RunGmm1A8W4(const BlockContext& pipeline, BlockEpilogue& 
     auto layouts = GmmConfig::BuildLayouts(config, layoutArgs...);
     GmmKernel::Gmm1ExecA8W4<BlockMmad, BlockPrologue, ElementC, MakeLayoutC, IsShared, GmmKernel::BlockScheduler,
                             decltype(config), TopkWeightsPrefetch, IsWaveFlagGrained>(
-        scheduler, params, gmmAddrInfo, config, startLoopIdx, tileNum, gmm1TileReadySequence, activationQuantOp,
-        expertBeforeCnt, expertIdx, layouts, pipeline);
+        scheduler, params, gmmAddrInfo, config, startLoopIdx, tileNum, activationQuantOp, expertBeforeCnt, expertIdx,
+        layouts, pipeline);
 
     startBlockIdx = (startBlockIdx + tileNum) % config.blockNum;
 }
 
+// 使用当前核的任务配置执行 A8W4 GMM1。
 template <typename ElementA, typename ElementB, typename ElementC, typename ElementMxScaleA, typename ElementMxScaleB,
           uint32_t Gmm1TileM = L1_TILE_M_256, uint32_t EpilogueTileM = Gmm1TileM, bool TopkWeightsPrefetch = false,
           bool IsShared = false, bool IsWaveFlagGrained = false, typename BlockContext, typename BlockEpilogue>
 __aicore__ inline void RunGmm1A8W4(const BlockContext& pipeline, BlockEpilogue& activationQuantOp, const Params& params,
                                    const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
-                                   const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
-                                   int32_t& gmm1TileReadySequence, uint32_t expertBeforeCnt, uint32_t expertIdx = 0,
-                                   uint32_t activationOutputDivisor = ACTIVATION_N_HALF)
+                                   const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx, uint32_t expertBeforeCnt,
+                                   uint32_t expertIdx = 0, uint32_t activationOutputDivisor = ACTIVATION_N_HALF)
 {
     BlockJobContext blockJob{MegaMoeHardwarePolicy::GetAicBlockIdx(),
                              static_cast<uint32_t>(MegaMoeHardwarePolicy::GetBlockNum())};
     RunGmm1A8W4<ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, Gmm1TileM, EpilogueTileM,
-                TopkWeightsPrefetch, IsShared, IsWaveFlagGrained>(
-        pipeline, activationQuantOp, params, problemShape, gmmAddrInfo, startBlockIdx, gmm1TileReadySequence, blockJob,
-        expertBeforeCnt, expertIdx, activationOutputDivisor);
+                TopkWeightsPrefetch, IsShared, IsWaveFlagGrained>(pipeline, activationQuantOp, params, problemShape,
+                                                                  gmmAddrInfo, startBlockIdx, blockJob, expertBeforeCnt,
+                                                                  expertIdx, activationOutputDivisor);
 }
 
 template <typename ActivationType, typename WeightType, typename ActivationOutType, typename QuantScaleType,
           uint32_t ActivationElementsPerByte, bool UseA8W4Gmm1, bool TopkWeightsPrefetch, typename BlockEpilogue>
-__aicore__ inline void UpdateMoeExpertGmm1GlobalBuffer(
-    const GmmExecutionConfig& gmmConfig, const MoeSyncWorkspaceLayout& syncLayout, const WorkspaceLayout& workspace,
-    GM_ADDR workspaceBase, const ExpertWeightTensorListAddrs& weights, BlockEpilogue& epilogueOp,
-    GMMAddrInfo& gmmAddrInfo, const ExpertLoopState& state, uint32_t activationOutputWidth,
-    uint32_t rowOffsetInExpert = 0U, uint32_t gmm1TilesPerMGroup = 0U)
+__aicore__ inline void UpdateMoeExpertGmm1GlobalBuffer(const GmmExecutionConfig& gmmConfig,
+                                                       const MoeSyncWorkspaceLayout& syncLayout,
+                                                       const WorkspaceLayout& workspace, GM_ADDR workspaceBase,
+                                                       const ExpertWeightTensorListAddrs& weights,
+                                                       BlockEpilogue& epilogueOp, GMMAddrInfo& gmmAddrInfo,
+                                                       const ExpertLoopState& state, uint32_t activationOutputWidth,
+                                                       uint32_t rowOffsetInExpert = 0U)
 {
     if constexpr (g_coreType == AIV && !UseA8W4Gmm1) {
         if (!IsSubBlockIdx<0U>()) {
@@ -794,13 +794,6 @@ __aicore__ inline void UpdateMoeExpertGmm1GlobalBuffer(
     if constexpr (UseA8W4Gmm1 || TopkWeightsPrefetch) {
         gmmAddrInfo.gmm1OutGlobal =
             workspace.routed.gmm1Output.get_ptr(workspaceBase) + physicalTokenStartIndex * n * sizeof(bfloat16_t);
-    }
-    if constexpr (TopkWeightsPrefetch) {
-        gmmAddrInfo.gmm1TileStatus =
-            reinterpret_cast<__gm__ int32_t*>(workspace.sync.gmm1Tiles.get_ptr(workspaceBase)) +
-            (static_cast<uint64_t>(state.expertIdx) * syncLayout.gmm1TileStatusCountPerExpert +
-             static_cast<uint64_t>(expertMGroupOffset) * gmm1TilesPerMGroup) *
-                INT_CACHELINE;
     }
     gmmAddrInfo.metaInfoGlobal = workspace.routing.receivedTokenMetadata.get_ptr(workspaceBase);
     gmmAddrInfo.activationToGmm2Flag =
@@ -842,14 +835,6 @@ __aicore__ inline void UpdateMoeExpertGmm1GlobalBuffer(
             expertOffset * syncLayout.dispatchFlagSlotCountPerExpert +
             static_cast<uint64_t>(expertMGroupOffset) * INT_CACHELINE;
     }
-    if constexpr (UseA8W4Gmm1) {
-        gmmAddrInfo.gmmToEpilogueFlag = nullptr;
-        if (workspace.sync.epilogueReady.get_ptr(workspaceBase) != nullptr) {
-            gmmAddrInfo.gmmToEpilogueFlag =
-                reinterpret_cast<__gm__ int32_t*>(workspace.sync.epilogueReady.get_ptr(workspaceBase)) +
-                static_cast<uint64_t>(gmmConfig.blockJob.jobIndex) * INT_CACHELINE;
-        }
-    }
 }
 
 // 构造一个共享专家的 GMM1 输入、权重、输出与 Activation 量化输出 GM 视图。
@@ -890,14 +875,6 @@ __aicore__ inline void UpdateSharedExpertGmm1GlobalBuffer(const MoeStageCommonCo
     }
     gmmAddrInfo.metaInfoGlobal = nullptr;
     gmmAddrInfo.dispatchToGmm1Flag = nullptr;
-    if constexpr (UseGmOutput) {
-        gmmAddrInfo.gmmToEpilogueFlag = nullptr;
-        if (workspace.sync.epilogueReady.get_ptr(workspaceBase) != nullptr) {
-            gmmAddrInfo.gmmToEpilogueFlag =
-                reinterpret_cast<__gm__ int32_t*>(workspace.sync.epilogueReady.get_ptr(workspaceBase)) +
-                static_cast<uint64_t>(gmmConfig.blockJob.jobIndex) * INT_CACHELINE;
-        }
-    }
 
     if constexpr (g_coreType == AIV) {
         AscendC::Coord<int64_t, int64_t, int64_t, int64_t, int64_t, int64_t> vecBaseOffset{

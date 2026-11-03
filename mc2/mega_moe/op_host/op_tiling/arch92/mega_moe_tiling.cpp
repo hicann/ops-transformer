@@ -201,7 +201,6 @@ static uint64_t CalcHostFlagElementCount(const MegaMoeTilingData* tilingData)
 
     uint64_t flagElementCount = moeExpertCount * (activationFlagSlotsPerExpert + waveFlagSlotsPerExpert +
                                                   static_cast<uint64_t>(INT_CACHELINE) * tilingData->compute.aicNum);
-    flagElementCount += static_cast<uint64_t>(tilingData->compute.aicNum) * INT_CACHELINE;
     // 去重附加计数与 A6 的 Workspace 分配、Kernel 清零范围保持一致。
     if (tilingData->compute.topoType == TOPO_TYPE_MTE &&
         (tilingData->combineQuantMode != COMBINE_NO_QUANT || IsCombineDedupOn(tilingData->compute.dedupMode))) {
@@ -236,17 +235,6 @@ static uint32_t CalcTopkValidIndexFixedBufferBytes(const MegaMoeTilingData* tili
                                                    bool isSharedQuantIndependent, uint32_t topkValidIndexCoreNum)
 {
     uint64_t totalFlagElementCount = CalcHostFlagElementCount(tilingData);
-    /*
-     * SendAndQuantBuffInit 会清零普通 flag 区域和预取 GMM1 tile 状态区域中较大的一块。
-     * Host 侧的 UB reset 预算必须与 device 侧的最大值保持一致，否则 route ring 可能与 reset UB 重叠。
-     */
-    if (tilingData->topkWeightsPrefetch == 1U) {
-        uint64_t statusSlots = static_cast<uint64_t>(tilingData->compute.moeExpertPerRank) *
-                                   static_cast<uint64_t>(tilingData->compute.maxTilesPerExpert) +
-                               1U;
-        uint64_t statusElementCount = statusSlots * static_cast<uint64_t>(INT_CACHELINE);
-        totalFlagElementCount = std::max(totalFlagElementCount, statusElementCount);
-    }
     uint32_t resetElementCountPerCore =
         static_cast<uint32_t>(ops::CeilDiv(totalFlagElementCount, static_cast<uint64_t>(tilingData->blockAivNum)));
     uint32_t resetBatchElementCount = std::min(resetElementCountPerCore, static_cast<uint32_t>(DISPATCH_RESET_BATCH));
@@ -325,7 +313,6 @@ static void SetCclLayoutParams(MegaMoeTilingData* tilingData)
     compute.dispatchFp4 = IsA4W4GmmMode(tilingData->moeGmmMode);
     compute.reserveGmm1Output = true;
     compute.reserveCumsum = false;
-    compute.needsGmmEpilogue = true;
     compute.sharedInputElementsPerByte = IsA4W4GmmMode(tilingData->sharedGmmMode) ? 2U : 1U;
     // Arch92 keeps its existing full-row workspace and execution policy.
     compute.ring = {};
@@ -567,7 +554,7 @@ ge::graphStatus MegaMoeTilingFuncImplArch92(gert::TilingContext* context, MegaMo
     OP_TILING_CHECK(CheckArchitectureCapability(context, tilingData, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "architecture capability is invalid."), return ge::GRAPH_FAILED);
 
-    SetPrefetchAndWaveParams(tilingData, aicNum);
+    SetWaveParams(tilingData, aicNum);
     OP_TILING_CHECK(SetAdaptiveBufferConfigs(context, config, expertParams, tilingData, static_cast<uint32_t>(ubSize),
                                              nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "adaptive UB buffer configuration failed."), return ge::GRAPH_FAILED);

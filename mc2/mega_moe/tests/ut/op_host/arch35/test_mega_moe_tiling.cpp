@@ -49,8 +49,6 @@ static void FinalizeTestLayoutParams(MegaMoeTilingData& tilingData)
     params.dispatchFp4 = IsA4W4GmmMode(tilingData.moeGmmMode);
     params.reserveGmm1Output = tilingData.moeGmmMode == GMM_MODE_A8W4_NZ || params.topkWeightsPrefetch;
     params.reserveCumsum = IsW4GmmMode(tilingData.moeGmmMode);
-    params.needsGmmEpilogue =
-        IsW4GmmMode(tilingData.moeGmmMode) || (params.sharedExpertNum > 0 && IsW4GmmMode(tilingData.sharedGmmMode));
     params.sharedInputElementsPerByte = IsA4W4GmmMode(tilingData.sharedGmmMode) ? 2U : 1U;
     const int64_t rankNumPerServer =
         tilingData.rankNumPerServer == 0 || tilingData.rankNumPerServer > params.epWorldSize ?
@@ -1599,9 +1597,8 @@ static void ExpectRoutedBufferRows(MegaMoeTilingData tilingData, int64_t rows)
             layout.routed.gmm1Output.offsetBytes + static_cast<int64_t>(2) * rows * tilingData.compute.hiddenDim;
         EXPECT_EQ(layout.routed.gmm2Output.offsetBytes, Ops::Base::CeilAlign(afterGmm1, storageAlign));
     }
-    const int64_t afterGmm2 = layout.sync.gmm1Tiles.offsetBytes >= 0 ? layout.sync.gmm1Tiles.offsetBytes :
-                              layout.mte.dedupRowDescriptors.offsetBytes >= 0 ?
-                                                                       layout.mte.dedupRowDescriptors.offsetBytes :
+    const int64_t afterGmm2 = layout.mte.dedupRowDescriptors.offsetBytes >= 0 ?
+                                  layout.mte.dedupRowDescriptors.offsetBytes :
                               layout.urma.mask.offsetBytes >= 0         ? layout.urma.mask.offsetBytes :
                               layout.shared.gmm2Output.offsetBytes >= 0 ? layout.shared.gmm2Output.offsetBytes :
                                                                           layout.workspaceSize;
@@ -1657,11 +1654,9 @@ TEST_F(MegaMoeArch35TilingTest, MteRingsOnlyAllocateActualGmm1GmResults)
         EXPECT_EQ(noPrefetch.routed.gmm1Output.offsetBytes, MegaMoeImpl::INVALID_WORKSPACE_OFFSET);
         ExpectRoutedBufferRows(tilingData, 3LL * 14LL * 256LL);
         tilingData.topkWeightsPrefetch = 1;
-        tilingData.compute.maxTilesPerExpert = 1024;
         FinalizeTestLayoutParams(tilingData);
         MegaMoeImpl::WorkspaceLayout prefetch(tilingData.compute);
         EXPECT_GE(prefetch.routed.gmm1Output.offsetBytes, 0);
-        EXPECT_EQ((prefetch.reset.gmm1Tiles.sizeBytes / MegaMoeImpl::SIZE_INT_32), (4LL * 1024LL + 1LL) * 16LL);
         ExpectRoutedBufferRows(tilingData, 3LL * 14LL * 256LL);
     }
 }
@@ -1933,9 +1928,6 @@ static MegaMoeTilingData MakeMemoryPlannerCase(uint32_t aicNum, uint8_t gmmMode,
     const int64_t gmm1Groups = Ops::Base::CeilDiv<int64_t>(4LL * aicNum, tilingData.compute.hiddenDim / 256LL);
     const int64_t gmm2Groups = Ops::Base::CeilDiv<int64_t>(aicNum, tilingData.compute.h / 256LL);
     tilingData.compute.mGroupsPerWave = gmm1Groups > gmm2Groups ? gmm1Groups : gmm2Groups;
-    const int64_t maxMGroups = Ops::Base::CeilDiv<int64_t>(tilingData.compute.maxOutputSize, 256LL);
-    tilingData.compute.maxTilesPerExpert =
-        prefetch ? Ops::Base::CeilAlign<int64_t>(maxMGroups * (tilingData.compute.hiddenDim / 256LL), 16LL) : 0U;
     const int64_t combineGroups =
         Ops::Base::CeilDiv<int64_t>(tilingData.compute.numMaxTokensPerRank * tilingData.compute.epWorldSize, 256LL);
     tilingData.compute.combineSyncSlotCountPerExpert = combineGroups > aicNum ? combineGroups : aicNum;
@@ -1951,9 +1943,6 @@ static void ExpectPreparedLayoutParams(MegaMoeTilingData tilingData)
     EXPECT_EQ(params.reserveGmm1Output,
               tilingData.moeGmmMode == MegaMoeImpl::GMM_MODE_A8W4_NZ || tilingData.topkWeightsPrefetch == 1);
     EXPECT_EQ(params.reserveCumsum, MegaMoeImpl::IsW4GmmMode(tilingData.moeGmmMode));
-    EXPECT_EQ(params.needsGmmEpilogue,
-              MegaMoeImpl::IsW4GmmMode(tilingData.moeGmmMode) ||
-                  (tilingData.compute.sharedExpertNum > 0 && MegaMoeImpl::IsW4GmmMode(tilingData.sharedGmmMode)));
     EXPECT_EQ(params.combineQuant, tilingData.combineQuantMode != MegaMoeImpl::COMBINE_NO_QUANT);
     EXPECT_EQ(params.topkWeightsPrefetch, tilingData.topkWeightsPrefetch == 1);
     EXPECT_EQ(params.sharedInputElementsPerByte, MegaMoeImpl::IsA4W4GmmMode(tilingData.sharedGmmMode) ? 2U : 1U);
@@ -1994,8 +1983,6 @@ static void ExpectSharedMemoryBudgetCoversExact(MegaMoeTilingData tilingData)
     budgetParams.activationOutputDivisor = 2;
     budgetParams.mGroupsPerWave =
         MegaMoeImpl::CalcMemoryMGroupsPerWave(budgetParams.hiddenDim / 2LL, budgetParams.h, budgetParams.aicNum);
-    budgetParams.maxTilesPerExpert =
-        MegaMoeImpl::CalcMemoryMaxTilesPerExpert(budgetParams.maxOutputSize, budgetParams.hiddenDim);
     const int64_t maxTokenGroups =
         Ops::Base::CeilDiv<int64_t>(budgetParams.numMaxTokensPerRank * budgetParams.epWorldSize, 256LL);
     budgetParams.combineSyncSlotCountPerExpert = maxTokenGroups > 36 ? maxTokenGroups : 36;
@@ -2005,7 +1992,6 @@ static void ExpectSharedMemoryBudgetCoversExact(MegaMoeTilingData tilingData)
     budgetParams.dispatchFp4 = false;
     budgetParams.reserveGmm1Output = true;
     budgetParams.reserveCumsum = true;
-    budgetParams.needsGmmEpilogue = true;
     budgetParams.sharedInputIndependent = true;
     budgetParams.sharedInputElementsPerByte = 1;
     budgetParams.ring = MegaMoeImpl::CalcCclStageRingConfig(budgetParams);
@@ -2037,9 +2023,8 @@ static void ExpectSharedMemoryBudgetCoversExact(MegaMoeTilingData tilingData)
     const int64_t budgetResultRows = budgetRingEnabled && !MegaMoeImpl::IsCombineDedupOn(budgetParams.dedupMode) ?
                                          threeWaveRows :
                                          budgetParams.maxOutputSize;
-    const int64_t afterGmm2 = budget.sync.gmm1Tiles.offsetBytes >= 0 ? budget.sync.gmm1Tiles.offsetBytes :
-                              budget.mte.dedupRowDescriptors.offsetBytes >= 0 ?
-                                                                       budget.mte.dedupRowDescriptors.offsetBytes :
+    const int64_t afterGmm2 = budget.mte.dedupRowDescriptors.offsetBytes >= 0 ?
+                                  budget.mte.dedupRowDescriptors.offsetBytes :
                               budget.urma.mask.offsetBytes >= 0         ? budget.urma.mask.offsetBytes :
                               budget.shared.gmm2Output.offsetBytes >= 0 ? budget.shared.gmm2Output.offsetBytes :
                                                                           budget.workspaceSize;
@@ -2120,8 +2105,6 @@ TEST_F(MegaMoeArch35TilingTest, SharedMemoryBudgetUsesDefaultCapacityAndClippedP
         for (const uint32_t maxOutput : {1U, 255U, 256U, 257U, 3840U, 3841U, 6912U, 6913U}) {
             SCOPED_TRACE(testing::Message() << "dedup=" << dedupMode << ", maxOutput=" << maxOutput);
             tilingData.compute.maxOutputSize = maxOutput;
-            tilingData.compute.maxTilesPerExpert = Ops::Base::CeilAlign<int64_t>(
-                Ops::Base::CeilDiv(maxOutput, 256U) * (tilingData.compute.hiddenDim / 256LL), 16LL);
             ExpectPreparedLayoutParams(tilingData);
             ExpectSharedMemoryBudgetCoversExact(tilingData);
         }
@@ -2143,10 +2126,6 @@ TEST_F(MegaMoeArch35TilingTest, SharedMemoryBudgetCoversGeluAndGatedActivation)
                             4096U * MegaMoeImpl::GetActivationOutputDivisor(tilingData.actMode);
                         tilingData.compute.mGroupsPerWave = static_cast<uint32_t>(MegaMoeImpl::CalcMemoryMGroupsPerWave(
                             tilingData.compute.hiddenDim, tilingData.compute.h, aicNum));
-                        tilingData.compute.maxTilesPerExpert =
-                            prefetch ? static_cast<uint32_t>(MegaMoeImpl::CalcMemoryMaxTilesPerExpert(
-                                           tilingData.compute.maxOutputSize, tilingData.compute.hiddenDim)) :
-                                       0U;
                         ExpectPreparedLayoutParams(tilingData);
                         ExpectSharedMemoryBudgetCoversExact(tilingData);
                         tilingData.compute.topoType = MegaMoeImpl::TOPO_TYPE_URMA;

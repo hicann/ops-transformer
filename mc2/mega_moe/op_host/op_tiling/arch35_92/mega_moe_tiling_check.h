@@ -244,8 +244,8 @@ static ge::graphStatus CheckDedupRequestAttrs(const gert::TilingContext* context
 {
     auto attrs = context->GetAttrs();
     auto ccmPtr = attrs->GetAttrPointer<int64_t>(static_cast<int>(config.attrCombineCommModeIndex));
-    int64_t combineCommMode = ccmPtr == nullptr ? 0 : *ccmPtr;
-    OP_TILING_CHECK(combineCommMode != 0 && combineCommMode != 1,
+    int64_t combineCommMode = ccmPtr == nullptr ? COMBINE_COMM_MODE_NO_DEDUP : *ccmPtr;
+    OP_TILING_CHECK(combineCommMode != COMBINE_COMM_MODE_NO_DEDUP && combineCommMode != COMBINE_COMM_MODE_RANK_DEDUP,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "combineCommMode", std::to_string(combineCommMode).c_str(),
                                               "only support 0 or 1"),
                     return ge::GRAPH_FAILED);
@@ -256,7 +256,7 @@ static ge::graphStatus CheckDedupRequestAttrs(const gert::TilingContext* context
                     return ge::GRAPH_FAILED);
     int64_t topoType = *attrs->GetAttrPointer<int64_t>(config.attrTopoTypeIndex);
     // ccm=1 显式请求 + 非 MTE = 报错（自动请求的 dispatch 位已由 GetDedupMode 关位回落）。
-    OP_TILING_CHECK(combineCommMode == 1 && topoType != TOPO_TYPE_MTE,
+    OP_TILING_CHECK(combineCommMode == COMBINE_COMM_MODE_RANK_DEDUP && topoType != TOPO_TYPE_MTE,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_comm_mode", "1",
                                               "combine dedup only supported with topoType MTE(0)"),
                     return ge::GRAPH_FAILED);

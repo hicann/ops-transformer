@@ -88,8 +88,6 @@ struct GMMAddrInfo {
     __gm__ int32_t* activationToGmm2Flag = nullptr;
     __gm__ int32_t* dispatchToGmm1Flag = nullptr;
     __gm__ int32_t* gmm2CombineSyncCounter = nullptr;
-    __gm__ int32_t* gmmToEpilogueFlag = nullptr;
-    __gm__ int32_t* gmm1TileStatus = nullptr;
     __gm__ int32_t* sharedExpertGmm2TileCounter = nullptr;
     uint32_t gmm2CombineLogicalCoreCount = 0U;
     Gmm1ActivationSync* gmm1ActivationSync = nullptr;
@@ -283,7 +281,6 @@ struct GmmExecutionConfig {
 struct MoeSyncWorkspaceLayout {
     int32_t dispatchFlagSlotCountPerExpert;
     int32_t activationFlagSlotCountPerExpert;
-    uint32_t gmm1TileStatusCountPerExpert;
 };
 
 struct GroupSyncSlotLayout {
