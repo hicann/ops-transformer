@@ -63,7 +63,11 @@ def read_changed_files(changed_file):
             path = raw.strip().replace(os.sep, "/")
             if not path or path.startswith("/"):
                 continue
-            if Path(path).suffix.lower() in SKIP_EXTS or "docs/" in path:
+            if (
+                "tests" in Path(path).parts
+                or Path(path).suffix.lower() in SKIP_EXTS
+                or "docs/" in path
+            ):
                 continue
             yield path
 

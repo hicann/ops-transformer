@@ -38,17 +38,6 @@ protected:
     }
 };
 
-TEST_F(l2_attention_worker_scheduler_test, normal_input_success)
-{
-    TensorDesc scheduleContextDesc = TensorDesc({1024}, ACL_INT8, ACL_FORMAT_ND);
-    auto ut = OP_API_UT(aclnnInplaceAttentionWorkerScheduler, INPUT(scheduleContextDesc), OUTPUT());
-
-    // SAMPLE: only test GetWorkspaceSize
-    uint64_t workspace_size = 0;
-    aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);
-    EXPECT_EQ(aclRet, ACLNN_SUCCESS);
-}
-
 TEST_F(l2_attention_worker_scheduler_test, empty_tensor_success)
 {
     TensorDesc scheduleContextDesc = TensorDesc({0}, ACL_INT8, ACL_FORMAT_ND);

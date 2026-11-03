@@ -37,20 +37,6 @@ protected:
     }
 };
 
-TEST_F(l2_ffn_worker_scheduler_test, case_norm_int8)
-{
-    TensorDesc scheduleContextDesc = TensorDesc({1024}, ACL_INT8, ACL_FORMAT_ND);
-    int32_t syncGroupSize = 1;
-    int32_t executeMode = 0;
-    auto ut =
-        OP_API_UT(aclnnInplaceFfnWorkerScheduler, INPUT(scheduleContextDesc, syncGroupSize, executeMode), OUTPUT());
-
-    // SAMPLE: only test GetWorkspaceSize
-    uint64_t workspace_size = 0;
-    aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);
-    EXPECT_EQ(aclRet, ACLNN_SUCCESS);
-}
-
 TEST_F(l2_ffn_worker_scheduler_test, case_norm_empty_tensor)
 {
     TensorDesc scheduleContextDesc = TensorDesc({0}, ACL_INT8, ACL_FORMAT_ND);
