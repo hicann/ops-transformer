@@ -256,6 +256,7 @@ aclnnStatus aclnnRotaryPositionEmbedding(
     - <term>Atlas inference products</term>: 0=half.
 
     <!-- end id11 -->
+    - On <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, if these values are passed in, the API does **not** return an error code. A **warning** is logged to indicate that the mode is supported only on <term>Ascend 950PR&950DT products</term>. The computation runs with `0=half` semantics, so the output does not match quarter / interleave-half.
 
 - **Return value**
 

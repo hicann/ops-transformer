@@ -79,6 +79,27 @@ static inline bool TensorContiguousProcess(const aclTensor*& contiguousTensor, a
     return true;
 }
 
+// mode=2(quarter)、mode=3(interleave-half) 仅 Ascend 950 支持。
+// Atlas A2/A3 等非 950 平台若传入这两个值，内核侧无对应实现，结果会按 half(mode=0) 计算。
+// 为避免静默语义偏差，在此打 warning；不返回错误码，以保持既有调用兼容。
+static void CheckModeSupportAndWarn(int64_t mode)
+{
+    constexpr int64_t MODE_QUARTER = 2;
+    constexpr int64_t MODE_INTERLEAVE_HALF = 3;
+    if (mode != MODE_QUARTER && mode != MODE_INTERLEAVE_HALF) {
+        return;
+    }
+    // 与文档一致：2/3 仅 Ascend 950PR&950DT（DAV_3510 / regbase）支持
+    if (Ops::Transformer::AclnnUtil::IsRegbase()) {
+        return;
+    }
+    OP_LOGW("RotaryPositionEmbedding: mode=%ld is not supported on the current platform "
+            "(2=quarter, 3=interleave-half are only supported on Ascend 950PR&950DT). "
+            "The call still returns success, but the result is computed with half (mode=0) "
+            "semantics and does not match the requested mode.",
+            mode);
+}
+
 static aclnnStatus PreProcess(const aclTensor*& x, const aclTensor*& cos, const aclTensor*& sin,
                               const aclTensor*& rotate, aclOpExecutor* executor)
 {
@@ -98,6 +119,7 @@ static aclnnStatus RotaryPositionEmbeddingCommonProcess(const aclTensor* x, cons
         ret = CheckDtype(x, cos, sin, rotate, out);
         CHECK_RET(ret == ACLNN_SUCCESS, ret);
     }
+    CheckModeSupportAndWarn(mode);
 
     const aclTensor* xProcessed = x;
     const aclTensor* cosProcessed = cos;

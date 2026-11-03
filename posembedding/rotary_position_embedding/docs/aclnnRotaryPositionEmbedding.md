@@ -254,6 +254,7 @@ aclnnStatus aclnnRotaryPositionEmbedding(
     - <term>Atlas推理系列产品</term>：0=half。
 
     <!-- end id11 -->
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>却传入这两个值时，接口**不返回错误码**，而是打印 **warning** 日志，提示该 mode 仅 <term>Ascend 950PR&950DT系列产品</term> 支持；实际计算按 `0=half` 语义执行，输出与 quarter / interleave-half 不一致。
 
 - **返回值：**
 

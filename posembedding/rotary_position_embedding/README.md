@@ -181,6 +181,7 @@
       - 当x为BSND时，cos、sin支持1S1D
       - 当x为SBND时，cos、sin支持S11D
       - 当x为TND时，cos、sin支持T1D
+    - mode：仅支持 0=half、1=interleave。若传入 2=quarter 或 3=interleave-half（仅 Ascend 950 支持），接口打印 warning，不返回错误码，实际按照half 语义计算；未传 rotate 时按 0=half 语义计算。
 
 ## 调用说明
 

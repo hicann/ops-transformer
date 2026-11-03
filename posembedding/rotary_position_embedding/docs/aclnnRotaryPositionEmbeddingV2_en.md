@@ -234,6 +234,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
     - <term>Ascend 950PR&950DT products</term>: 0=half, 1=interleave, 2=quarter, and 3=interleave-half.
 
     <!-- end id9 -->
+    - Compatibility note: On <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, if `2=quarter` or `3=interleave-half` is passed in, the API does **not** return an error code. A **warning** is logged to indicate that the mode is supported only on <term>Ascend 950PR&950DT products</term>, and the computation follows half semantics.
 
   - Constraints on rotate:
 

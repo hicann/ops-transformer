@@ -232,6 +232,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
     - <term>Ascend 950PR&950DT系列产品</term>：0=half，1=interleave，2=quarter，3=interleave-half。
 
     <!-- end id9 -->
+    - 兼容性说明：在 <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term> 上传入 `2=quarter` 或 `3=interleave-half` 时，接口**不返回错误码**，而是打印 **warning** 日志，提示该 mode 仅 <term>Ascend 950PR&950DT系列产品</term> 支持，并按照half 语义计算。
 
   - 参数rotate约束：
 
