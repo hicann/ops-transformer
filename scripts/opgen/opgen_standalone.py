@@ -63,6 +63,10 @@ class OpGenerator:
                 f"算子名称 '{self.op_name}' 包含无效字符。只允许字母、数字和下划线。"
             )
 
+        cpp_name = "".join(word.capitalize() for word in self.op_name.split("_"))
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", cpp_name):
+            raise ValueError(f"算子名称 '{self.op_name}' 不能生成有效的 C++ 类型名。")
+
         if os.path.exists(self.dest_dir):
             raise FileExistsError(f"目标目录 '{self.dest_dir}' 已存在。")
 
