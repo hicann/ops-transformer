@@ -305,31 +305,43 @@ __aicore__ inline void FlashAttentionNoQuantKernelBase<ChildClass, CubeBlockType
                 this->GetSeqQlenKvlenByBoidx(i, actualS1Len, actualS2Len);
                 if (actualS2Len <= 0 && actualS1Len != 0) {
                     int64_t accumSize = (i == 0) ? 0 : ((__gm__ int64_t*)this->actualSeqQlenAddr)[i - 1];
-                    if (actualS1Len < 0 && accumSize > 0) {
+                    if (actualS1Len < 0) {
+                        // 负数表示最后一个batch占用T轴剩余长度
                         actualS1Len = constInfo.s1Size - accumSize;
-                        int64_t frontCoreNum = actualS1Len % (this->sharedParams.coreNum * 2);
-                        int64_t splitFactor = frontCoreNum > 0 ? 1 : 0;
-                        int64_t s1SizeInner = actualS1Len / this->sharedParams.coreNum / 2;
-                        int64_t innerOffset1 = (s1SizeInner + splitFactor) *
-                                               (constInfo.aivIdx >= frontCoreNum ? frontCoreNum : constInfo.aivIdx);
-                        int64_t innerOffset2 =
-                            s1SizeInner * (constInfo.aivIdx >= frontCoreNum ? constInfo.aivIdx - frontCoreNum : 0);
-                        accumSize = accumSize + innerOffset1 + innerOffset2;
-                        actualS1Len = s1SizeInner + (constInfo.aivIdx >= frontCoreNum ? 0 : splitFactor);
                     }
-                    GlobalTensor<OUTPUT_T> attentionOutEodGm =
-                        this->vecBlock.attentionOutGm[accumSize * this->constInfo.n2GDv];
-                    GlobalTensor<float> softmaxMaxEodGm =
-                        this->vecBlock.softmaxMaxGm[accumSize * this->constInfo.n2G * 8];
-                    GlobalTensor<float> softmaxSumEodGm =
-                        this->vecBlock.softmaxSumGm[accumSize * this->constInfo.n2G * 8];
-                    AscendC::Fill<OUTPUT_T>(attentionOutEodGm, actualS1Len * this->constInfo.n2GDv,
-                                            static_cast<OUTPUT_T>(0.0));
-                    AscendC::Fill<float>(softmaxMaxEodGm, actualS1Len * this->constInfo.n2G * 8,
-                                         static_cast<float>(0.0));
-                    AscendC::Fill<float>(softmaxSumEodGm, actualS1Len * this->constInfo.n2G * 8,
-                                         static_cast<float>(0.0));
-                    SyncAll();
+                    if (actualS1Len > 0) {
+                        // 被跳过的空kv batch输出需清零, 按实际参与计算的vec核数(coreNum * CV_RATIO)切分, 每个vec核
+                        // 只清零属于自己的那一段; dropMask场景会启动全部AIV, aivIdx超出vecCoreNum的核不清零只做同步
+                        int64_t vecCoreNum = this->sharedParams.coreNum * CV_RATIO;
+                        int64_t eodOffset = accumSize;
+                        int64_t eodSize = 0;
+                        if (constInfo.aivIdx < vecCoreNum) {
+                            int64_t frontCoreNum = actualS1Len % vecCoreNum;
+                            int64_t splitFactor = frontCoreNum > 0 ? 1 : 0;
+                            int64_t s1SizeInner = actualS1Len / vecCoreNum;
+                            int64_t innerOffset1 = (s1SizeInner + splitFactor) *
+                                                   (constInfo.aivIdx >= frontCoreNum ? frontCoreNum : constInfo.aivIdx);
+                            int64_t innerOffset2 =
+                                s1SizeInner * (constInfo.aivIdx >= frontCoreNum ? constInfo.aivIdx - frontCoreNum : 0);
+                            eodOffset = accumSize + innerOffset1 + innerOffset2;
+                            eodSize = s1SizeInner + (constInfo.aivIdx >= frontCoreNum ? 0 : splitFactor);
+                        }
+                        if (eodSize > 0) {
+                            GlobalTensor<OUTPUT_T> attentionOutEodGm =
+                                this->vecBlock.attentionOutGm[eodOffset * this->constInfo.n2GDv];
+                            GlobalTensor<float> softmaxMaxEodGm =
+                                this->vecBlock.softmaxMaxGm[eodOffset * this->constInfo.n2G * 8];
+                            GlobalTensor<float> softmaxSumEodGm =
+                                this->vecBlock.softmaxSumGm[eodOffset * this->constInfo.n2G * 8];
+                            AscendC::Fill<OUTPUT_T>(attentionOutEodGm, eodSize * this->constInfo.n2GDv,
+                                                    static_cast<OUTPUT_T>(0.0));
+                            AscendC::Fill<float>(softmaxMaxEodGm, eodSize * this->constInfo.n2G * 8,
+                                                 static_cast<float>(0.0));
+                            AscendC::Fill<float>(softmaxSumEodGm, eodSize * this->constInfo.n2G * 8,
+                                                 static_cast<float>(0.0));
+                        }
+                        SyncAll();
+                    }
                 }
             }
         }
