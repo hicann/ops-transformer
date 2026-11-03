@@ -27,6 +27,15 @@ constexpr uint64_t FIA_PERF_MODE_TILINGKEYOFFSET = uint64_t(1000000000000000UL);
 
 constexpr uint64_t EMPTY_KV_TILING_KEY = 20;
 
+// 合法输入下 Tiling 失败时，按 EZ1008 正式错误码首报（Arglist: op_name, reason），并输出 PLOG 上下文
+inline void ReportTilingFailure(const gert::TilingContext* context, const char* reason)
+{
+    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "%s\n", reason);
+    const std::vector<const char*> msgKey = {"op_name", "reason"};
+    const std::vector<const char*> msgvalue = {context->GetNodeName(), reason};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgvalue);
+}
+
 void FiaTilingEmptyTensor::InitTilingInfo(TilingInfo* tilingInfo)
 {
     fiaInfo_ = static_cast<FiaTilingInfo*>(tilingInfo);
@@ -34,15 +43,15 @@ void FiaTilingEmptyTensor::InitTilingInfo(TilingInfo* tilingInfo)
 
 ge::graphStatus FiaTilingEmptyTensor::GetPlatformInfo()
 {
-    OP_CHECK_IF(fiaInfo_->platformInfo == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(fiaInfo_->opName, "GetPlatformInfo is nullptr."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(fiaInfo_->platformInfo == nullptr, ReportTilingFailure(context_, "GetPlatformInfo is nullptr."),
+                return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(fiaInfo_->platformInfo);
     aivNum_ = ascendcPlatform.GetCoreNumAiv();
     aicNum_ = ascendcPlatform.GetCoreNumAic();
 
-    OP_CHECK_IF(aicNum_ == 0 || aivNum_ == 0,
-                OPS_REPORT_VECTOR_INNER_ERR(fiaInfo_->opName, "num of core obtained is 0."), return GRAPH_FAILED);
+    OP_CHECK_IF(aicNum_ == 0 || aivNum_ == 0, ReportTilingFailure(context_, "num of core obtained is 0."),
+                return GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }

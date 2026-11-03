@@ -100,7 +100,8 @@ ge::graphStatus PagedAttentionChecker::CheckBlockTableDtype(const FiaTilingInfo&
     }
     const gert::CompileTimeTensorDesc* blockTableDesc = fiaInfo.opParamInfo.blockTable.desc;
     OP_CHECK_IF(blockTableDesc->GetDataType() != ge::DT_INT32,
-                OP_LOGE(fiaInfo.opName, "When page attention enable, blockTable dtype only support INT32."),
+                OP_LOGE_FOR_INVALID_DTYPE(fiaInfo.opName, "blockTable",
+                                          DataTypeToSerialString(blockTableDesc->GetDataType()).c_str(), "INT32"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -876,11 +877,12 @@ ge::graphStatus PagedAttentionChecker::CheckKVLayout(const FiaTilingInfo& fiaInf
                 (fiaInfo.qLayout != FiaLayout::BSH && fiaInfo.qLayout != FiaLayout::BSND &&
                  fiaInfo.qLayout != FiaLayout::BNSD && fiaInfo.qLayout != FiaLayout::TND &&
                  fiaInfo.qLayout != FiaLayout::NTD),
-            OP_LOGE(fiaInfo.opName,
-                    "In %s %s situation, the key/value's layout is BnBsH, query layout must be BSH, BSND, BNSD "
-                    "TND and TND in page attention scene, but got %s",
-                    QuantModeToSerialString(fiaInfo.quantMode).c_str(),
-                    SituationToSerialString(fiaInfo.ropeMode).c_str(), LayoutToSerialString(fiaInfo.qLayout).c_str()),
+            OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
+                fiaInfo.opName, "query", LayoutToSerialString(fiaInfo.qLayout).c_str(),
+                ("In " + QuantModeToSerialString(fiaInfo.quantMode) + " " + SituationToSerialString(fiaInfo.ropeMode) +
+                 " situation, the key/value's layout is BnBsH, query layout must be BSH, BSND, BNSD, "
+                 "TND and NTD in page attention scene")
+                    .c_str()),
             return ge::GRAPH_FAILED);
 
         OP_CHECK_IF(
@@ -888,11 +890,12 @@ ge::graphStatus PagedAttentionChecker::CheckKVLayout(const FiaTilingInfo& fiaInf
                 (fiaInfo.qLayout != FiaLayout::BSH && fiaInfo.qLayout != FiaLayout::BSND &&
                  fiaInfo.qLayout != FiaLayout::BNSD && fiaInfo.qLayout != FiaLayout::TND &&
                  fiaInfo.qLayout != FiaLayout::NTD),
-            OP_LOGE(fiaInfo.opName,
-                    "In %s %s situation, the key/value's layout is BnNBsD, "
-                    "query layout must be BSH, BSND, BNSD TND and NTD in page attention scene, but got %s",
-                    QuantModeToSerialString(fiaInfo.quantMode).c_str(),
-                    SituationToSerialString(fiaInfo.ropeMode).c_str(), LayoutToSerialString(fiaInfo.qLayout).c_str()),
+            OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
+                fiaInfo.opName, "query", LayoutToSerialString(fiaInfo.qLayout).c_str(),
+                ("In " + QuantModeToSerialString(fiaInfo.quantMode) + " " + SituationToSerialString(fiaInfo.ropeMode) +
+                 " situation, the key/value's layout is BnNBsD, query layout must be BSH, BSND, BNSD, "
+                 "TND and NTD in page attention scene")
+                    .c_str()),
             return ge::GRAPH_FAILED);
 
         OP_CHECK_IF(
@@ -900,11 +903,12 @@ ge::graphStatus PagedAttentionChecker::CheckKVLayout(const FiaTilingInfo& fiaInf
                 (fiaInfo.qLayout != FiaLayout::BSH && fiaInfo.qLayout != FiaLayout::BSND &&
                  fiaInfo.qLayout != FiaLayout::BNSD && fiaInfo.qLayout != FiaLayout::TND &&
                  fiaInfo.qLayout != FiaLayout::NTD),
-            OP_LOGE(fiaInfo.opName,
-                    "In %s %s situation, the key/value's layout is PA_NZ, "
-                    "query layout must be BSH, BSND, BNSD TND and NTD in page attention scene, but got %s",
-                    QuantModeToSerialString(fiaInfo.quantMode).c_str(),
-                    SituationToSerialString(fiaInfo.ropeMode).c_str(), LayoutToSerialString(fiaInfo.qLayout).c_str()),
+            OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
+                fiaInfo.opName, "query", LayoutToSerialString(fiaInfo.qLayout).c_str(),
+                ("In " + QuantModeToSerialString(fiaInfo.quantMode) + " " + SituationToSerialString(fiaInfo.ropeMode) +
+                 " situation, the key/value's layout is PA_NZ, query layout must be BSH, BSND, BNSD, "
+                 "TND and NTD in page attention scene")
+                    .c_str()),
             return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -921,9 +925,10 @@ ge::graphStatus PagedAttentionChecker::CheckFeatureQueryS(const FiaTilingInfo& f
         }
         OP_CHECK_IF((keyAntiquantMode == PER_CHANNEL_MODE || keyAntiquantMode == PER_TOKEN_MODE) &&
                         fiaInfo.inputKvType == ge::DT_INT8,
-                    OP_LOGE(fiaInfo.opName,
-                            "In keyAntiquant/valueAntiquant split mode and data type of key/value is INT8 scenario, if "
-                            "keyAntiquantMode/valueAntiquantMode is 0 or 1, page attention is not supported!"),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        fiaInfo.opName, "keyAntiquantMode/valueAntiquantMode",
+                        "In keyAntiquant/valueAntiquant split mode and data type of key/value is INT8 scenario, if "
+                        "keyAntiquantMode/valueAntiquantMode is 0 or 1, page attention is not supported!"),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;

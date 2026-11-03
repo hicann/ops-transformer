@@ -37,31 +37,39 @@ ge::graphStatus FiaTilingCheck::CheckFeatureNoQuantDtype() const
     }
     OP_CHECK_IF(
         inputQType_ != ge::DT_BF16 && inputQType_ != ge::DT_FLOAT16,
-        OP_LOGE(opName_, "In %s situation, query dtype only support %s and %s, but got %s",
-                QuantModeToSerialString(quantMode_).c_str(), FusedDataTypeToSerialString(ge::DT_BF16).c_str(),
-                FusedDataTypeToSerialString(ge::DT_FLOAT16).c_str(), FusedDataTypeToSerialString(inputQType_).c_str()),
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            opName_, "query", FusedDataTypeToSerialString(inputQType_).c_str(),
+            ("In " + QuantModeToSerialString(quantMode_) + " situation, query dtype only supports BF16 and FLOAT16")
+                .c_str()),
         return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(inputQType_ != inputKvType_,
-                OP_LOGE(opName_, "In %s situation, key and value dtype(%s) must equal to query dtype(%s)",
-                        QuantModeToSerialString(quantMode_).c_str(), FusedDataTypeToSerialString(inputQType_).c_str(),
-                        FusedDataTypeToSerialString(inputKvType_).c_str()),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        inputQType_ != inputKvType_,
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+            opName_, "key,value", FusedDataTypeToSerialString(inputKvType_).c_str(),
+            ("In " + QuantModeToSerialString(quantMode_) +
+             " situation, key and value dtype must equal to query dtype " + FusedDataTypeToSerialString(inputQType_))
+                .c_str()),
+        return ge::GRAPH_FAILED);
 
     if (ropeMode_ == RopeMode::ROPE_SPLIT) {
-        OP_CHECK_IF(
-            (opParamInfo_.queryRope.desc->GetDataType() != opParamInfo_.query.desc->GetDataType()),
-            OP_LOGE(opName_, "%s(%s) and %s(%s) must have same dType", QUERY_ROPE_NAME.c_str(),
-                    FusedDataTypeToSerialString(opParamInfo_.queryRope.desc->GetDataType()).c_str(), QUERY_NAME.c_str(),
-                    FusedDataTypeToSerialString(opParamInfo_.query.desc->GetDataType()).c_str()),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF((opParamInfo_.queryRope.desc->GetDataType() != opParamInfo_.query.desc->GetDataType()),
+                    OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                        opName_, "query_rope,query",
+                        ("query_rope=" + FusedDataTypeToSerialString(opParamInfo_.queryRope.desc->GetDataType()) +
+                         ",query=" + FusedDataTypeToSerialString(opParamInfo_.query.desc->GetDataType()))
+                            .c_str(),
+                        "query_rope and query must have same dtype"),
+                    return ge::GRAPH_FAILED);
 
-        OP_CHECK_IF(
-            (opParamInfo_.keyRope.desc->GetDataType() != opParamInfo_.key.desc->GetDataType()),
-            OP_LOGE(opName_, "%s(%s) and %s(%s) must have same dType", KEY_ROPE_NAME.c_str(),
-                    FusedDataTypeToSerialString(opParamInfo_.keyRope.desc->GetDataType()).c_str(), KEY_NAME.c_str(),
-                    FusedDataTypeToSerialString(opParamInfo_.key.desc->GetDataType()).c_str()),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF((opParamInfo_.keyRope.desc->GetDataType() != opParamInfo_.key.desc->GetDataType()),
+                    OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                        opName_, "key_rope,key",
+                        ("key_rope=" + FusedDataTypeToSerialString(opParamInfo_.keyRope.desc->GetDataType()) +
+                         ",key=" + FusedDataTypeToSerialString(opParamInfo_.key.desc->GetDataType()))
+                            .c_str(),
+                        "key_rope and key must have same dtype"),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -71,20 +79,25 @@ ge::graphStatus FiaTilingCheck::CheckFeatureBlockSize() const
     constexpr int32_t BLOCK_SIZE_ALIGN_SIZE = 16;
     constexpr int32_t BLOCK_SIZE_MAX_SIZE = 1024;
     if (blockSize_ % BLOCK_SIZE_ALIGN_SIZE != 0) {
-        OP_LOGE(opName_, "In %s situation, %s should be aligned to 16, but got %d.",
-                QuantModeToSerialString(quantMode_).c_str(), BLOCK_SIZE_NAME.c_str(), blockSize_);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            opName_, "block_size", std::to_string(blockSize_).c_str(),
+            ("In " + QuantModeToSerialString(quantMode_) + " situation, block_size should be aligned to 16").c_str());
         return ge::GRAPH_FAILED;
     }
 
     if (blockSize_ > BLOCK_SIZE_MAX_SIZE) {
-        OP_LOGE(opName_, "In %s situation, %s should be less than or equal to 1024, but got %d.",
-                QuantModeToSerialString(quantMode_).c_str(), BLOCK_SIZE_NAME.c_str(), blockSize_);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "block_size", std::to_string(blockSize_).c_str(),
+                                              ("In " + QuantModeToSerialString(quantMode_) +
+                                               " situation, block_size should be less than or equal to 1024")
+                                                  .c_str());
         return ge::GRAPH_FAILED;
     }
 
     if (kvStorageMode_ == KvStorageMode::PAGE_ATTENTION && blockSize_ == 0) {
-        OP_LOGE(opName_, "In %s and storage mode is page attention, %s should not be 0",
-                QuantModeToSerialString(quantMode_).c_str(), BLOCK_SIZE_NAME.c_str());
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "block_size", std::to_string(blockSize_).c_str(),
+                                              ("In " + QuantModeToSerialString(quantMode_) +
+                                               " and storage mode is page attention, block_size should not be 0")
+                                                  .c_str());
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -110,17 +123,17 @@ ge::graphStatus FiaTilingCheck::CheckFeatureTensorList() const
         };
         std::string layout = opParamInfo_.layOut;
         if (std::find(layoutSupportList.begin(), layoutSupportList.end(), layout) == layoutSupportList.end()) {
-            OP_LOGE(opName_,
-                    "when the tensor number of key/value is greater than 1 (this scenario is called tensor list), "
-                    "input_layout only supports BSH, BSND, BNSD, and BNSD_BSND, but got %s",
-                    layout.c_str());
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                opName_, "input_layout", layout.c_str(),
+                "when the tensor number of key/value is greater than 1 (this scenario is called tensor list), "
+                "input_layout only supports BSH, BSND, BNSD, and BNSD_BSND");
             return ge::GRAPH_FAILED;
         }
 
         OP_CHECK_IF(
             ropeMode_ != RopeMode::NO_ROPE,
-            OP_LOGE(
-                opName_,
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                opName_, "query_rope,key_rope",
                 "when the tensor number of key/value is greater than 1 (this scenario is called tensor list), "
                 "query_rope and key_rope should be not exist and the head_dim(D) dimension of query and key should be "
                 "equal to the head_dim(D) dimension of value."),
@@ -131,10 +144,11 @@ ge::graphStatus FiaTilingCheck::CheckFeatureTensorList() const
 
 ge::graphStatus FiaTilingCheck::CheckFeatureMlaNoquant()
 {
-    OP_CHECK_IF(socVersion_ == platform_ascendc::SocVersion::ASCEND310P,
-                OP_LOGE(opName_, "In %s %s situation, Ascend310P is not supported",
-                        RopeModeToSerialString(ropeMode_).c_str(), QuantModeToSerialString(quantMode_).c_str()),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        socVersion_ == platform_ascendc::SocVersion::ASCEND310P,
+        OP_LOGE_WITHOUT_REPORT(opName_, "In %s %s situation, Ascend310P is not supported",
+                               RopeModeToSerialString(ropeMode_).c_str(), QuantModeToSerialString(quantMode_).c_str()),
+        return ge::GRAPH_FAILED);
     if (ge::GRAPH_SUCCESS != CheckFeatureTensorList() || ge::GRAPH_SUCCESS != CheckFeatureBlockSize() ||
         ge::GRAPH_SUCCESS != CheckFeatureInOutDtype() || ge::GRAPH_SUCCESS != CheckFeatureActualSeqLens() ||
         ge::GRAPH_SUCCESS != CheckFeatureMask() || ge::GRAPH_SUCCESS != CheckFeatureNoQuantDtype() ||
@@ -176,34 +190,45 @@ ge::graphStatus FiaTilingCheck::CheckFeatureSparseMode() const
     // sparse9 仅在rope分离场景下存在，不支持左padding、PSE、公共前缀、后量化等特性 拦截s2 >= s1
     if (sparseMode == SPARSE_MODE_TREE) {
         // 特性校验
-        OP_CHECK_IF(
-            ropeMode_ != RopeMode::ROPE_SPLIT,
-            OP_LOGE(opName_, "In %s situation, when query_rope and key_rope not exist, %s does not support sparse(%d).",
-                    QuantModeToSerialString(quantMode_).c_str(), SPARSE_MODE_NAME.c_str(), sparseMode),
-            return ge::GRAPH_FAILED);
-
-        OP_CHECK_IF(
-            fiaInfo_.qPaddingSizeFlag || fiaInfo_.kvPaddingSizeFlag,
-            OP_LOGE(opName_,
-                    "In %s situation, when sparse is %d, query_padding_size or kv_padding_size should be not exist.",
-                    QuantModeToSerialString(quantMode_).c_str(), sparseMode),
-            return ge::GRAPH_FAILED);
-
-        OP_CHECK_IF(fiaInfo_.pseShiftFlag,
-                    OP_LOGE(opName_, "In %s situation, when sparse is %d, pse_shift should be not exist.",
-                            QuantModeToSerialString(quantMode_).c_str(), sparseMode),
+        OP_CHECK_IF(ropeMode_ != RopeMode::ROPE_SPLIT,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "sparse_mode", std::to_string(sparseMode).c_str(),
+                        ("In " + QuantModeToSerialString(quantMode_) +
+                         " situation, when query_rope and key_rope not exist, sparse_mode does not support sparse(" +
+                         std::to_string(sparseMode) + ")")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
 
-        OP_CHECK_IF(
-            fiaInfo_.sysPrefixFlag,
-            OP_LOGE(opName_,
-                    "In %s situation, when sparse is %d, key_shared_prefix and value_shared_prefix should not exist.",
-                    QuantModeToSerialString(quantMode_).c_str(), sparseMode),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(fiaInfo_.qPaddingSizeFlag || fiaInfo_.kvPaddingSizeFlag,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "query_padding_size,kv_padding_size",
+                        ("In " + QuantModeToSerialString(quantMode_) + " situation, when sparse is " +
+                         std::to_string(sparseMode) + ", query_padding_size or kv_padding_size should be not exist")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
+
+        OP_CHECK_IF(fiaInfo_.pseShiftFlag,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "pse_shift",
+                        ("In " + QuantModeToSerialString(quantMode_) + " situation, when sparse is " +
+                         std::to_string(sparseMode) + ", pse_shift should be not exist")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
+
+        OP_CHECK_IF(fiaInfo_.sysPrefixFlag,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "key_shared_prefix,value_shared_prefix",
+                        ("In " + QuantModeToSerialString(quantMode_) + " situation, when sparse is " +
+                         std::to_string(sparseMode) + ", key_shared_prefix and value_shared_prefix should not exist")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
 
         OP_CHECK_IF(outputType_ == ge::DT_INT8,
-                    OP_LOGE(opName_, "In %s situation, when sparse is %d, output dtype %d is not currently supported.",
-                            QuantModeToSerialString(quantMode_).c_str(), sparseMode, static_cast<int32_t>(outputType_)),
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        opName_, "attention_out", FusedDataTypeToSerialString(outputType_).c_str(),
+                        ("In " + QuantModeToSerialString(quantMode_) + " situation, when sparse is " +
+                         std::to_string(sparseMode) + ", output dtype INT8 is not currently supported")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
 
         // s2 >= s1拦截
@@ -218,10 +243,14 @@ ge::graphStatus FiaTilingCheck::CheckFeatureSparseMode() const
                 continue;
             }
             OP_CHECK_IF(qSize[i] > kvSize[i],
-                        OP_LOGE(opName_,
-                                "In %s situation, when sparse is %d, qSize[%d] should less than or equal to kvSize[%d],"
-                                "but got qSize %d and kvSize %d.",
-                                QuantModeToSerialString(quantMode_).c_str(), sparseMode, i, i, qSize[i], kvSize[i]),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            opName_, ("actual_seq_lengths[" + std::to_string(i) + "]").c_str(),
+                            std::to_string(qSize[i]).c_str(),
+                            ("In " + QuantModeToSerialString(quantMode_) + " situation, when sparse is " +
+                             std::to_string(sparseMode) + ", qSize[" + std::to_string(i) +
+                             "] should less than or equal to kvSize[" + std::to_string(i) + "], but got qSize " +
+                             std::to_string(qSize[i]) + " and kvSize " + std::to_string(kvSize[i]))
+                                .c_str()),
                         return ge::GRAPH_FAILED);
         }
     }
@@ -235,8 +264,7 @@ ge::graphStatus FiaTilingCheck::CheckFeatureMask() const
     }
 
     if ((!attenMaskFlag_) && (fiaInfo_.sparseMode != SPARSE_MODE_NO_MASK)) {
-        OP_LOGE(opName_, "when %s is %d (not 0), %s should not be null.", SPARSE_MODE_NAME.c_str(), fiaInfo_.sparseMode,
-                ATTEN_MASK_NAME.c_str());
+        OP_LOGE_WITH_INVALID_INPUT(opName_, "atten_mask");
         return ge::GRAPH_FAILED;
     }
 
@@ -254,16 +282,20 @@ ge::graphStatus FiaTilingCheck::CheckFeatureMask() const
                 std::string layout = opParamInfo_.layOut;
                 OP_CHECK_IF(
                     std::find(layoutSupportList.begin(), layoutSupportList.end(), layout) == layoutSupportList.end(),
-                    OP_LOGE(opName_,
-                            "In %s situation, rope does not exist and qkHeadDim = vHeadDim, when sparseMode = 0 or 1, "
-                            "two dim mask only support for layout BSH,BSND,BNSD,BNSD_BSND, but got %s",
-                            QuantModeToSerialString(quantMode_).c_str(), layout.c_str()),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "input_layout", layout.c_str(),
+                        ("In " + QuantModeToSerialString(quantMode_) +
+                         " situation, rope does not exist and qkHeadDim = vHeadDim, when sparseMode = 0 or 1, "
+                         "two dim mask only support for layout BSH,BSND,BNSD,BNSD_BSND")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
             } else {
-                OP_LOGE(opName_,
-                        "In %s situation, rope exists or qkHeadDim != vHeadDim, when sparseMode = 0 or 1, two dim mask "
-                        "is not supported.",
-                        QuantModeToSerialString(quantMode_).c_str());
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    opName_, "query_rope,key_rope",
+                    ("In " + QuantModeToSerialString(quantMode_) +
+                     " situation, rope exists or qkHeadDim != vHeadDim, when sparseMode = 0 or 1, two dim mask "
+                     "is not supported")
+                        .c_str());
                 return ge::GRAPH_FAILED;
             }
         }
@@ -273,10 +305,13 @@ ge::graphStatus FiaTilingCheck::CheckFeatureMask() const
         int32_t sparseMode = fiaInfo_.sparseMode;
         if (sparseMode != SPARSE_MODE_NO_MASK && sparseMode != SPARSE_MODE_RIGHT_DOWN &&
             sparseMode != SPARSE_MODE_BAND && sparseMode != SPARSE_MODE_TREE) {
-            OP_LOGE(opName_,
-                    "In %s situation, when query_rope and key_rope exists and the head dim of value is %u, %s only "
-                    "support 0/3/4/9, but got %d.",
-                    QuantModeToSerialString(quantMode_).c_str(), vHeadDim_, SPARSE_MODE_NAME.c_str(), sparseMode);
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                opName_, "sparse_mode", std::to_string(sparseMode).c_str(),
+                ("In " + QuantModeToSerialString(quantMode_) +
+                 " situation, when query_rope and key_rope exists and the head dim of value is " +
+                 std::to_string(vHeadDim_) + ", sparse_mode only support 0/3/4/9, but got " +
+                 std::to_string(sparseMode))
+                    .c_str());
             return ge::GRAPH_FAILED;
         }
     }
@@ -340,11 +375,13 @@ void FiaTilingCheck::CalcPostQuantTokensPerBatch(int64_t& preTokensPerbatch, int
 ge::graphStatus FiaTilingCheck::CheckFeaturePostQuantLayout() const
 {
     if (fiaInfo_.ropeMode == RopeMode::ROPE_SPLIT) {
-        OP_LOGE(opName_, "postquant do not support qkHeadDim = vHeadDim and rope exist");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query_rope,key_rope",
+                                                 "postquant do not support qkHeadDim = vHeadDim and rope exist");
         return ge::GRAPH_FAILED;
     }
     if (fiaInfo_.ropeMode == RopeMode::ROPE_COMBINE) {
-        OP_LOGE(opName_, "postquant do not support qkHeadDim != vHeadDim");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query_rope",
+                                                 "postquant do not support qkHeadDim != vHeadDim");
         return ge::GRAPH_FAILED;
     }
     const std::vector<std::string> layoutSupportList = {
@@ -355,10 +392,9 @@ ge::graphStatus FiaTilingCheck::CheckFeaturePostQuantLayout() const
     };
     std::string layout = opParamInfo_.layOut;
     if (std::find(layoutSupportList.begin(), layoutSupportList.end(), layout) == layoutSupportList.end()) {
-        OP_LOGE(opName_,
-                "when enable postquant, input_layout only supports BSH, BSND, BNSD, "
-                "and BNSD_BSND, but got %s",
-                layout.c_str());
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            opName_, "input_layout", layout.c_str(),
+            "when enable postquant, input_layout only supports BSH, BSND, BNSD, and BNSD_BSND");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -374,14 +410,14 @@ ge::graphStatus FiaTilingCheck::CheckFeaturePostQuantOffsetPerBatch(bool checkPo
         (checkPostQuantOffset &&
          ((preTokensPerbatch + actualSeqLenKV + static_cast<int64_t>(fiaInfo_.systemPrefixLen) - actualSeqLenQ < 0) ||
           (nextTokensPerbatch < 0))),
-        OP_LOGE(opName_,
-                "When sparse mode = %d, output dtype is INT8, the output's dequant offset "
-                "is not null or empty tensor, "
-                "preTokens = %ld and nextTokens = %ld, some rows of the matrix do not "
-                "participate in the calculation, "
-                "the accuracy of the final result will be incorrect. Please see the "
-                "documentation for more details.",
-                fiaInfo_.sparseMode, preTokens, nextTokens),
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            opName_, "quantOffset2",
+            ("When sparse mode = " + std::to_string(fiaInfo_.sparseMode) +
+             ", output dtype is INT8, the output's dequant offset is not null or empty tensor, preTokens = " +
+             std::to_string(preTokens) + " and nextTokens = " + std::to_string(nextTokens) +
+             ", some rows of the matrix do not participate in the calculation, the accuracy of the final result "
+             "will be incorrect. Please see the documentation for more details")
+                .c_str()),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -399,9 +435,11 @@ ge::graphStatus FiaTilingCheck::CheckFeaturePostQuant() const
     }
     OP_CHECK_IF(
         (fiaInfo_.sparseMode == SPARSE_MODE_BAND && (fiaInfo_.preToken < 0 || fiaInfo_.nextToken < 0)),
-        OP_LOGE(opName_,
-                "When output type is INT8, sparse mode = 4, preTokens (%ld) or nextTokens (%ld) cannot be negative.",
-                fiaInfo_.preToken, fiaInfo_.nextToken),
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            opName_, "pre_tokens,next_tokens",
+            ("pre_tokens=" + std::to_string(fiaInfo_.preToken) + ",next_tokens=" + std::to_string(fiaInfo_.nextToken))
+                .c_str(),
+            "When output type is INT8, sparse mode = 4, preTokens or nextTokens cannot be negative"),
         return ge::GRAPH_FAILED);
     bool checkPostQuantOffset =
         (fiaInfo_.outputType == ge::DT_INT8) &&
@@ -441,54 +479,53 @@ ge::graphStatus FiaTilingCheck::CheckFeatureLeftPadding() const
         };
         std::string layout = opParamInfo_.layOut;
         if (std::find(layoutSupportList.begin(), layoutSupportList.end(), layout) == layoutSupportList.end()) {
-            OP_LOGE(opName_,
-                    "when query_padding_size or kv_padding_size exists, input_layout only supports BSH, BSND, BNSD, "
-                    "and BNSD_BSND, but got %s",
-                    layout.c_str());
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                opName_, "input_layout", layout.c_str(),
+                "when query_padding_size or kv_padding_size exists, input_layout only supports BSH, BSND, BNSD, "
+                "and BNSD_BSND");
             return ge::GRAPH_FAILED;
         }
 
         OP_CHECK_IF(
             ropeMode_ != RopeMode::NO_ROPE,
-            OP_LOGE(opName_,
-                    "when query_padding_size or kv_padding_size exists, query_rope and key_rope should be not exist "
-                    "and the "
-                    "head_dim(D) dimension of query and key should be equal to the head_dim(D) dimension of value."),
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                opName_, "query_rope,key_rope",
+                "when query_padding_size or kv_padding_size exists, query_rope and key_rope should be not exist "
+                "and the "
+                "head_dim(D) dimension of query and key should be equal to the head_dim(D) dimension of value."),
             return ge::GRAPH_FAILED);
 
         OP_CHECK_IF(
             kvStorageMode_ == KvStorageMode::TENSOR_LIST,
-            OP_LOGE(opName_,
-                    "when query_padding_size or kv_padding_size exists, key/value tensorlist is not supported; in this "
-                    "case, the tensor number of key/value should be 1"),
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                opName_, "key,value",
+                "when query_padding_size or kv_padding_size exists, key/value tensorlist is not supported; in this "
+                "case, the tensor number of key/value should be 1"),
             return ge::GRAPH_FAILED);
 
         OP_CHECK_IF(
             kvStorageMode_ == KvStorageMode::PAGE_ATTENTION,
-            OP_LOGE(opName_,
-                    "when query_padding_size or kv_padding_size exists, page attention is not supported; in this case, "
-                    "block_table should exist and block_size is not 0"),
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                opName_, "block_table",
+                "when query_padding_size or kv_padding_size exists, page attention is not supported; in this case, "
+                "block_table should exist and block_size is not 0"),
             return ge::GRAPH_FAILED);
 
-        OP_CHECK_IF(
-            fiaInfo_.sysPrefixFlag,
-            OP_LOGE(opName_,
-                    "when query_padding_size exists, key_shared_prefix and key_shared_prefix should be not exist."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(fiaInfo_.sysPrefixFlag,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "key_shared_prefix,value_shared_prefix",
+                        "when query_padding_size exists, key_shared_prefix and key_shared_prefix should be not exist."),
+                    return ge::GRAPH_FAILED);
     }
 
     if (fiaInfo_.qPaddingSizeFlag) {
-        OP_CHECK_IF(
-            !(fiaInfo_.actualLenQDims != 0U),
-            OP_LOGE(opName_, "when query_padding_size exists, the query's actual sequence lengths are required."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(!(fiaInfo_.actualLenQDims != 0U), OP_LOGE_WITH_INVALID_INPUT(opName_, "actual_seq_lengths"),
+                    return ge::GRAPH_FAILED);
     }
 
     if (fiaInfo_.kvPaddingSizeFlag) {
-        OP_CHECK_IF(
-            !(fiaInfo_.actualLenKvDims != 0U),
-            OP_LOGE(opName_, "when kv_padding_size exists, the key/value's actual sequence lengths are required."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(!(fiaInfo_.actualLenKvDims != 0U), OP_LOGE_WITH_INVALID_INPUT(opName_, "actual_seq_lengths_kv"),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -504,17 +541,18 @@ ge::graphStatus FiaTilingCheck::CheckFeaturePSE() const
         };
         std::string layout = opParamInfo_.layOut;
         if (std::find(layoutSupportList.begin(), layoutSupportList.end(), layout) == layoutSupportList.end()) {
-            OP_LOGE(opName_,
-                    "when pse_shift exists, input_layout only supports BSH, BSND, BNSD, and BNSD_BSND, but got %s",
-                    layout.c_str());
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                opName_, "input_layout", layout.c_str(),
+                "when pse_shift exists, input_layout only supports BSH, BSND, BNSD, and BNSD_BSND");
             return ge::GRAPH_FAILED;
         }
 
-        OP_CHECK_IF(
-            ropeMode_ != RopeMode::NO_ROPE,
-            OP_LOGE(opName_, "when pse_shift exists, query_rope and key_rope should be not exist and the head_dim(D) "
-                             "dimension of query and key should be equal to the head_dim(D) dimension of value."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(ropeMode_ != RopeMode::NO_ROPE,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "query_rope,key_rope",
+                        "when pse_shift exists, query_rope and key_rope should be not exist and the head_dim(D) "
+                        "dimension of query and key should be equal to the head_dim(D) dimension of value."),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -532,13 +570,20 @@ ge::graphStatus FiaTilingCheck::CheckFeatureLearnableSink() const
     }
 
     uint32_t sinkDim = opParamInfo_.learnableSink.tensor->GetStorageShape().GetDim(0);
-    OP_CHECK_IF(sinkDim != fiaInfo_.n1Size,
-                OP_LOGE(opName_, "learnable_sink enable, sink shape(%u) must be equal to queryN(%u)!", sinkDim,
-                        fiaInfo_.n1Size),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        sinkDim != fiaInfo_.n1Size,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "learnable_sink", std::to_string(sinkDim).c_str(),
+                                              ("learnable_sink enable, sink shape(" + std::to_string(sinkDim) +
+                                               ") must be equal to queryN(" + std::to_string(fiaInfo_.n1Size) + ")")
+                                                  .c_str()),
+        return ge::GRAPH_FAILED);
 
     OP_CHECK_IF((opParamInfo_.learnableSink.desc->GetDataType() != ge::DT_BF16),
-                OP_LOGE(opName_, "When learnable_sink enable, sink dtype must be BFLOAT16!"), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                    opName_, "learnable_sink",
+                    FusedDataTypeToSerialString(opParamInfo_.learnableSink.desc->GetDataType()).c_str(),
+                    "When learnable_sink enable, sink dtype must be BFLOAT16"),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -550,74 +595,80 @@ ge::graphStatus FiaTilingCheck::CheckFeatureLayout() const
                                                         "BSH_BNSD", "BSND_BNSD", "BNSD_BSND"};
     std::string layout = opParamInfo_.layOut;
     OP_CHECK_IF(std::find(layoutSupportList.begin(), layoutSupportList.end(), layout) == layoutSupportList.end(),
-                OP_LOGE(opName_,
-                        "In %s %s situation, layout only supports BSH, BSND, BNSD, TND, NTD, BSH_NBSD, BSND_NBSD, "
-                        "BNSD_NBSD, TND_NTD, NTD_TND, BSH_BNSD, BSND_BNSD, BNSD_BSND, but got %s",
-                        QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                        layout.c_str()),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    opName_, "input_layout", layout.c_str(),
+                    ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                     " situation, layout only supports BSH, BSND, BNSD, TND, NTD, BSH_NBSD, BSND_NBSD, "
+                     "BNSD_NBSD, TND_NTD, NTD_TND, BSH_BNSD, BSND_BNSD, BNSD_BSND")
+                        .c_str()),
                 return ge::GRAPH_FAILED);
 
     if (kvStorageMode_ == KvStorageMode::BATCH_CONTINUOUS) {
         OP_CHECK_IF(kvLayout_ != FiaLayout::BSH && kvLayout_ != FiaLayout::BSND && kvLayout_ != FiaLayout::BNSD &&
                         kvLayout_ != FiaLayout::TND && kvLayout_ != FiaLayout::NTD,
-                    OP_LOGE(opName_,
-                            "In %s %s situation, key/value's layout only support BSH, BSND, BNSD, TND and NTD in batch "
-                            "continuous scene, but got %s",
-                            QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                            LayoutToSerialString(kvLayout_).c_str()),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "input_layout", LayoutToSerialString(kvLayout_).c_str(),
+                        ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                         " situation, key/value's layout only support BSH, BSND, BNSD, TND and NTD in batch "
+                         "continuous scene")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
 
-        OP_CHECK_IF(
-            kvLayout_ != qLayout_,
-            OP_LOGE(
-                opName_,
-                "In %s %s situation, key/value's layout and query's layout should be same in batch continuous scene.",
-                QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str()),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(kvLayout_ != qLayout_,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "key,value",
+                        ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                         " situation, key/value's layout and query's layout should be same in batch continuous scene.")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
     } else if (kvStorageMode_ == KvStorageMode::TENSOR_LIST) {
         OP_CHECK_IF(kvLayout_ != FiaLayout::BSH && kvLayout_ != FiaLayout::BSND && kvLayout_ != FiaLayout::BNSD,
-                    OP_LOGE(opName_,
-                            "In %s %s situation, key/value's layout only support BSH, BSND and BNSD in tensor list "
-                            "scene, but got %s",
-                            QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                            LayoutToSerialString(kvLayout_).c_str()),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "input_layout", LayoutToSerialString(kvLayout_).c_str(),
+                        ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                         " situation, key/value's layout only support BSH, BSND and BNSD in tensor list scene")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
 
-        OP_CHECK_IF(
-            kvLayout_ != qLayout_,
-            OP_LOGE(opName_,
-                    "In %s %s situation, key/value's layout and query's layout should be same in tensor list scene.",
-                    QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str()),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(kvLayout_ != qLayout_,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "key,value",
+                        ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                         " situation, key/value's layout and query's layout should be same in tensor list scene.")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
     } else if (kvStorageMode_ == KvStorageMode::PAGE_ATTENTION) {
         OP_CHECK_IF(kvLayout_ == FiaLayout::BnBsH &&
                         (qLayout_ != FiaLayout::BSH && qLayout_ != FiaLayout::BSND && qLayout_ != FiaLayout::BNSD &&
                          qLayout_ != FiaLayout::TND && qLayout_ != FiaLayout::NTD),
-                    OP_LOGE(opName_,
-                            "In %s %s situation, the key/value's layout is BnBsH, %s layout must be BSH, BSND, BNSD, "
-                            "TND and NTD in page attention scene, but got %s",
-                            QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                            QUERY_NAME.c_str(), LayoutToSerialString(qLayout_).c_str()),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "input_layout", LayoutToSerialString(qLayout_).c_str(),
+                        ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                         " situation, the key/value's layout is BnBsH, query layout must be BSH, BSND, BNSD, "
+                         "TND and NTD in page attention scene")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
 
         OP_CHECK_IF(kvLayout_ == FiaLayout::BnNBsD &&
                         (qLayout_ != FiaLayout::BSH && qLayout_ != FiaLayout::BSND && qLayout_ != FiaLayout::BNSD &&
                          qLayout_ != FiaLayout::TND && qLayout_ != FiaLayout::NTD),
-                    OP_LOGE(opName_,
-                            "In %s %s situation, the key/value's layout is BnNBsD, %s layout must be BSH, BSND, BNSD, "
-                            "TND and NTD in page attention scene, but got %s",
-                            QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                            QUERY_NAME.c_str(), LayoutToSerialString(qLayout_).c_str()),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "input_layout", LayoutToSerialString(qLayout_).c_str(),
+                        ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                         " situation, the key/value's layout is BnNBsD, query layout must be BSH, BSND, BNSD, "
+                         "TND and NTD in page attention scene")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
 
         OP_CHECK_IF(kvLayout_ == FiaLayout::NZ &&
                         (qLayout_ != FiaLayout::BSH && qLayout_ != FiaLayout::BSND && qLayout_ != FiaLayout::BNSD &&
                          qLayout_ != FiaLayout::TND && qLayout_ != FiaLayout::NTD),
-                    OP_LOGE(opName_,
-                            "In %s %s situation, the key/value's layout is NZ, %s layout must be BSH, BSND, BNSD, TND "
-                            "and NTD in page attention scene, but got %s",
-                            QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                            QUERY_NAME.c_str(), LayoutToSerialString(qLayout_).c_str()),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "input_layout", LayoutToSerialString(qLayout_).c_str(),
+                        ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                         " situation, the key/value's layout is NZ, query layout must be BSH, BSND, BNSD, TND "
+                         "and NTD in page attention scene")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
     }
 
@@ -640,100 +691,112 @@ ge::graphStatus FiaTilingCheck::CheckFeatureLayout() const
         if (vHeadDim_ == HEAD_DIM_512) {
             OP_CHECK_IF(std::find(splitRopeLayoutSupportList.begin(), splitRopeLayoutSupportList.end(), layout) ==
                             splitRopeLayoutSupportList.end(),
-                        OP_LOGE(opName_,
-                                "In %s %s situation, when value headDim = 512, layout only supports BSH, BSND, BNSD, "
-                                "TND, BNSD_NBSD, BSND_NBSD, BSH_NBSD, TND_NTD, but got %s",
-                                QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                                layout.c_str()),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            opName_, "input_layout", layout.c_str(),
+                            ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                             " situation, when value headDim = 512, layout only supports BSH, BSND, BNSD, "
+                             "TND, BNSD_NBSD, BSND_NBSD, BSH_NBSD, TND_NTD")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
         }
         if (vHeadDim_ == HEAD_DIM_128) {
             OP_CHECK_IF(std::find(restrictedLayoutSupportList.begin(), restrictedLayoutSupportList.end(), layout) ==
                             restrictedLayoutSupportList.end(),
-                        OP_LOGE(opName_,
-                                "In %s %s situation, when value headDim = 128, layout only supports BSH, BSND, BNSD, "
-                                "BNSD_BSND, TND, NTD, BSH_BNSD, BSND_BNSD, NTD_TND, but got %s",
-                                QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                                layout.c_str()),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            opName_, "input_layout", layout.c_str(),
+                            ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                             " situation, when value headDim = 128, layout only supports BSH, BSND, BNSD, "
+                             "BNSD_BSND, TND, NTD, BSH_BNSD, BSND_BNSD, NTD_TND")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
         }
     } else if (fiaInfo_.ropeMode == RopeMode::NO_ROPE) {
         OP_CHECK_IF(std::find(restrictedLayoutSupportList.begin(), restrictedLayoutSupportList.end(), layout) ==
                         restrictedLayoutSupportList.end(),
-                    OP_LOGE(opName_,
-                            "In %s %s situation, layout only supports BSH, BSND, BNSD, BNSD_BSND, TND, NTD, BSH_BNSD, "
-                            "BSND_BNSD, NTD_TND, but got %s.",
-                            QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                            layout.c_str()),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "input_layout", layout.c_str(),
+                        ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                         " situation, layout only supports BSH, BSND, BNSD, BNSD_BSND, TND, NTD, BSH_BNSD, "
+                         "BSND_BNSD, NTD_TND")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
 
         if (!fiaInfo_.isLegacyIfa && (vHeadDim_ % ALIGN_SIZE_16 != 0)) {
             OP_CHECK_IF(std::find(noRopeLayoutSupportListA.begin(), noRopeLayoutSupportListA.end(), layout) !=
                             noRopeLayoutSupportListA.end(),
-                        OP_LOGE(opName_,
-                                "In %s %s situation, when Qs>1 and input_layout is %s, headDim of query|key|value "
-                                "should be align to 16.",
-                                QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                                layout.c_str()),
+                        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                            opName_, "query,key,value",
+                            ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                             " situation, when Qs>1 and input_layout is " + layout +
+                             ", headDim of query|key|value should be align to 16.")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
 
             OP_CHECK_IF(std::find(noRopeLayoutSupportListB.begin(), noRopeLayoutSupportListB.end(), layout) !=
                             noRopeLayoutSupportListB.end(),
-                        OP_LOGE(opName_,
-                                "In %s %s situation, when Qs>1 and input_layout is %s, headDim of query|key|value "
-                                "should be align to 16.",
-                                QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                                layout.c_str()),
+                        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                            opName_, "query,key,value",
+                            ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                             " situation, when Qs>1 and input_layout is " + layout +
+                             ", headDim of query|key|value should be align to 16.")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
         }
         if (fiaInfo_.isLegacyIfa && (vHeadDim_ != HEAD_DIM_64 && vHeadDim_ != HEAD_DIM_128)) {
             OP_CHECK_IF(std::find(noRopeLayoutSupportListB.begin(), noRopeLayoutSupportListB.end(), layout) !=
                             noRopeLayoutSupportListB.end(),
-                        OP_LOGE(opName_,
-                                "In %s %s situation, when Qs=1 and input_layout is BNSD_BSND, only query|key|value "
-                                "headDim = 64/128 are supported, but got %u",
-                                QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                                vHeadDim_),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            opName_, "query,key,value", std::to_string(vHeadDim_).c_str(),
+                            ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                             " situation, when Qs=1 and input_layout is BNSD_BSND, only query|key|value "
+                             "headDim = 64/128 are supported")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
         }
         if (std::find(noRopeLayoutSupportListC.begin(), noRopeLayoutSupportListC.end(), layout) !=
             noRopeLayoutSupportListC.end()) {
             OP_CHECK_IF(vHeadDim_ != HEAD_DIM_64 && vHeadDim_ != HEAD_DIM_128,
-                        OP_LOGE(opName_,
-                                "In %s %s situation, when input_layout is NTD, BSH_BNSD, BSND_BNSD, NTD_TND, only "
-                                "query|key|value headDim = 64/128 are supported, but got %u",
-                                QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                                vHeadDim_),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            opName_, "query,key,value", std::to_string(vHeadDim_).c_str(),
+                            ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                             " situation, when input_layout is NTD, BSH_BNSD, BSND_BNSD, NTD_TND, only "
+                             "query|key|value headDim = 64/128 are supported")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
         }
         if (std::find(noRopeLayoutSupportListD.begin(), noRopeLayoutSupportListD.end(), layout) !=
             noRopeLayoutSupportListD.end()) {
             OP_CHECK_IF(vHeadDim_ != HEAD_DIM_64 && vHeadDim_ != HEAD_DIM_128 && vHeadDim_ != HEAD_DIM_192,
-                        OP_LOGE(opName_,
-                                "In %s %s situation, when input_layout is TND, only query|key|value headDim = "
-                                "64/128/192 are supported, but got %u",
-                                QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                                vHeadDim_),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            opName_, "query,key,value", std::to_string(vHeadDim_).c_str(),
+                            ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                             " situation, when input_layout is TND, only query|key|value headDim = "
+                             "64/128/192 are supported")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
         }
     } else if (fiaInfo_.ropeMode == RopeMode::ROPE_COMBINE) {
         if (std::find(restrictedLayoutSupportList.begin(), restrictedLayoutSupportList.end(), layout) !=
             restrictedLayoutSupportList.end()) {
-            OP_CHECK_IF(qkHeadDim_ != HEAD_DIM_192 || vHeadDim_ != HEAD_DIM_128,
-                        OP_LOGE(opName_,
-                                "In %s %s situation, when input_layout is BSH, BSND, BNSD, BNSD_BSND, TND, NTD, "
-                                "BSH_BNSD, BSND_BNSD, NTD_TND, and the headDim shared by query and key is not equal to "
-                                "that of value, only query|key headDim = 192, value headDim = 128 are supported, but "
-                                "got query|key headDim: %u, value headDim: %u",
-                                QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                                qkHeadDim_, vHeadDim_),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                qkHeadDim_ != HEAD_DIM_192 || vHeadDim_ != HEAD_DIM_128,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName_, "key,value",
+                    ("query|key headDim:" + std::to_string(qkHeadDim_) + ",value headDim:" + std::to_string(vHeadDim_))
+                        .c_str(),
+                    ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                     " situation, when input_layout is BSH, BSND, BNSD, BNSD_BSND, TND, NTD, "
+                     "BSH_BNSD, BSND_BNSD, NTD_TND, and the headDim shared by query and key is not equal to "
+                     "that of value, only query|key headDim = 192, value headDim = 128 are supported")
+                        .c_str()),
+                return ge::GRAPH_FAILED);
         } else {
-            OP_LOGE(opName_,
-                    "In %s %s situation, layout only supports BSH, BSND, BNSD, BNSD_BSND, TND, NTD, BSH_BNSD, "
-                    "BSND_BNSD, NTD_TND, but got %s.",
-                    QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                    layout.c_str());
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                opName_, "input_layout", layout.c_str(),
+                ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                 " situation, layout only supports BSH, BSND, BNSD, BNSD_BSND, TND, NTD, BSH_BNSD, "
+                 "BSND_BNSD, NTD_TND")
+                    .c_str());
             return ge::GRAPH_FAILED;
         }
     }
@@ -745,31 +808,40 @@ ge::graphStatus FiaTilingCheck::CheckFeatureAxisInfo() const
     constexpr uint32_t MAX_ACTUAL_SEQ_LEN_BYTE = 64U * 1024U;
     constexpr uint32_t MAX_B_SIZE = 256U;
 
-    OP_CHECK_IF(
-        actualSeqLengthsQSize_ > MAX_ACTUAL_SEQ_LEN_BYTE,
-        OP_LOGE(opName_, "In %s situation, actual sequence length q should be smaller or equal to 64K, but got %u",
-                QuantModeToSerialString(quantMode_).c_str(), actualSeqLengthsQSize_),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(actualSeqLengthsQSize_ > MAX_ACTUAL_SEQ_LEN_BYTE,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    opName_, "actual_seq_lengths", std::to_string(actualSeqLengthsQSize_).c_str(),
+                    ("In " + QuantModeToSerialString(quantMode_) +
+                     " situation, actual sequence length q should be smaller or equal to 64K")
+                        .c_str()),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(
-        actualSeqLengthsKvSize_ > MAX_ACTUAL_SEQ_LEN_BYTE,
-        OP_LOGE(opName_, "In %s situation, actual sequence length kv should be smaller or equal to 64K, but got %u",
-                QuantModeToSerialString(quantMode_).c_str(), actualSeqLengthsKvSize_),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(actualSeqLengthsKvSize_ > MAX_ACTUAL_SEQ_LEN_BYTE,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    opName_, "actual_seq_lengths_kv", std::to_string(actualSeqLengthsKvSize_).c_str(),
+                    ("In " + QuantModeToSerialString(quantMode_) +
+                     " situation, actual sequence length kv should be smaller or equal to 64K")
+                        .c_str()),
+                return ge::GRAPH_FAILED);
 
     if (kvStorageMode_ == KvStorageMode::TENSOR_LIST) {
         OP_CHECK_IF(bSize_ > MAX_B_SIZE,
-                    OP_LOGE(opName_, "In %s situation, batch size(%u) cannot be greater than %u in tensor list scene.",
-                            QuantModeToSerialString(quantMode_).c_str(), bSize_, MAX_B_SIZE),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "batch_size", std::to_string(bSize_).c_str(),
+                                                          ("In " + QuantModeToSerialString(quantMode_) +
+                                                           " situation, batch size cannot be greater than " +
+                                                           std::to_string(MAX_B_SIZE) + " in tensor list scene")
+                                                              .c_str()),
                     return ge::GRAPH_FAILED);
     }
 
     if (fiaInfo_.ropeMode == RopeMode::ROPE_SPLIT && vHeadDim_ == HEAD_DIM_512) {
-        OP_CHECK_IF(
-            n2Size_ != HEAD_NUM_ONE,
-            OP_LOGE(opName_, "In %s %s situation, when query|key|value headDim = 512, kvN should be equals to 1.",
-                    QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str()),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(n2Size_ != HEAD_NUM_ONE,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "num_key_value_heads",
+                        ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                         " situation, when query|key|value headDim = 512, kvN should be equals to 1.")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -787,9 +859,9 @@ ge::graphStatus FiaTilingCheck::CheckFeatureGqaPrefix() const
     };
     std::string layout = opParamInfo_.layOut;
     if (std::find(layoutSupportList.begin(), layoutSupportList.end(), layout) == layoutSupportList.end()) {
-        OP_LOGE(opName_,
-                "when system prefix exists, input_layout only supports BSH, BSND, BNSD, and BNSD_BSND, but got %s",
-                layout.c_str());
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            opName_, "input_layout", layout.c_str(),
+            "when system prefix exists, input_layout only supports BSH, BSND, BNSD, and BNSD_BSND");
         return ge::GRAPH_FAILED;
     }
     int32_t sparseMode = *opParamInfo_.sparseMode;
@@ -798,27 +870,33 @@ ge::graphStatus FiaTilingCheck::CheckFeatureGqaPrefix() const
         uint32_t maskS2 = maskTensor->GetStorageShape().GetDim(maskTensor->GetStorageShape().GetDimNum() - 1);
         uint32_t totalLen = fiaInfo_.systemPrefixLen + fiaInfo_.maxActualseq;
         if (totalLen > maskS2) {
-            OP_LOGE(opName_, "s2Size + systemPrefix (%u) is greater than mask s2 size (%u)", totalLen, maskS2);
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "atten_mask",
+                                                     ("s2Size + systemPrefix (" + std::to_string(totalLen) +
+                                                      ") is greater than mask s2 size (" + std::to_string(maskS2) + ")")
+                                                         .c_str());
             return ge::GRAPH_FAILED;
         }
     }
     if (fiaInfo_.ropeMode != RopeMode::NO_ROPE) {
-        OP_LOGE(opName_, "system prefix do not support rope");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "query_rope,key_rope", "system prefix do not support rope");
         return ge::GRAPH_FAILED;
     }
 
     if (fiaInfo_.kvStorageMode == KvStorageMode::PAGE_ATTENTION) {
-        OP_LOGE(opName_, "system prefix do not support PAGE_ATTENTION");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "block_table", "system prefix do not support PAGE_ATTENTION");
         return ge::GRAPH_FAILED;
     }
     if (fiaInfo_.kvStorageMode == KvStorageMode::TENSOR_LIST && fiaInfo_.s1Size > 1) {
-        OP_LOGE(opName_, "system prefix do not support qs > 1 and enable TENSORLIST");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "key,value",
+                                                 "system prefix do not support qs > 1 and enable TENSORLIST");
         return ge::GRAPH_FAILED;
     }
 
     if (fiaInfo_.pseShiftFlag) {
         if (fiaInfo_.s2Size + fiaInfo_.systemPrefixLen > fiaInfo_.pseShiftS2) {
-            OP_LOGE(opName_, "when enable pse and system prefix, pse s2 Size greater than kv s2size + systemPrefixLen");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                opName_, "pse_shift",
+                "when enable pse and system prefix, pse s2 Size greater than kv s2size + systemPrefixLen");
             return ge::GRAPH_FAILED;
         }
     }
@@ -831,61 +909,81 @@ ge::graphStatus FiaTilingCheck::CheckFeatureHeadDim() const
     constexpr uint32_t MAX_ROPE_DIM = 64;
 
     OP_CHECK_IF(vHeadDim_ > MAX_HEAD_DIM,
-                OP_LOGE(opName_, "In %s situation, headDim of value should be smaller or equal to 512, but got %u",
-                        QuantModeToSerialString(quantMode_).c_str(), vHeadDim_),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "value", std::to_string(vHeadDim_).c_str(),
+                                                      ("In " + QuantModeToSerialString(quantMode_) +
+                                                       " situation, headDim of value should be smaller or equal to 512")
+                                                          .c_str()),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF((fiaInfo_.ropeMode == RopeMode::ROPE_SPLIT || fiaInfo_.ropeMode == RopeMode::ROPE_COMBINE) &&
                     ropeHeadDim_ != MAX_ROPE_DIM,
-                OP_LOGE(opName_, "In %s situation, headDim of Rope should be equal to 64, but got %u",
-                        QuantModeToSerialString(quantMode_).c_str(), ropeHeadDim_),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    opName_, "query_rope,key_rope", std::to_string(ropeHeadDim_).c_str(),
+                    ("In " + QuantModeToSerialString(quantMode_) + " situation, headDim of Rope should be equal to 64")
+                        .c_str()),
                 return ge::GRAPH_FAILED);
 
     constexpr int32_t D_ALIGN_SIZE = 16;
     if (kvStorageMode_ == KvStorageMode::PAGE_ATTENTION && kvLayout_ == FiaLayout::NZ) {
         OP_CHECK_IF((vHeadDim_ % D_ALIGN_SIZE != 0) || (qkHeadDim_ % D_ALIGN_SIZE != 0),
-                    OP_LOGE(opName_,
-                            "In %s situation, when the dim of key&value is 5, headDim of query|key|value should be "
-                            "align to 16, but got keyHeadDim:%u, queryHeadDim and keyHeadDim:%u",
-                            QuantModeToSerialString(quantMode_).c_str(), vHeadDim_, qkHeadDim_),
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        opName_, "query,key,value",
+                        ("keyHeadDim:" + std::to_string(vHeadDim_) + ",query|key headDim:" + std::to_string(qkHeadDim_))
+                            .c_str(),
+                        ("In " + QuantModeToSerialString(quantMode_) +
+                         " situation, when the dim of key&value is 5, headDim of query|key|value should be align to 16")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
     }
 
     if (fiaInfo_.ropeMode == RopeMode::NO_ROPE) {
         if (!fiaInfo_.isLegacyIfa) {
-            OP_CHECK_IF((!fiaInfo_.isOutQuantEnable && (vHeadDim_ % ALIGN_SIZE_16 != 0)),
-                        OP_LOGE(opName_,
-                                "In %s %s situation, when Qs>1, headDim of query|key|value should be align to 16, but "
-                                "got value headDim:%u, query|key headDim:%u",
-                                QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                                vHeadDim_, qkHeadDim_),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                (!fiaInfo_.isOutQuantEnable && (vHeadDim_ % ALIGN_SIZE_16 != 0)),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName_, "query,key,value",
+                    ("value headDim:" + std::to_string(vHeadDim_) + ",query|key headDim:" + std::to_string(qkHeadDim_))
+                        .c_str(),
+                    ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                     " situation, when Qs>1, headDim of query|key|value should be align to 16")
+                        .c_str()),
+                return ge::GRAPH_FAILED);
 
-            OP_CHECK_IF((fiaInfo_.isOutQuantEnable && (vHeadDim_ % ALIGN_SIZE_32 != 0)),
-                        OP_LOGE(opName_,
-                                "In %s %s situation, when Qs>1 and enable postquant, headDim of query|key|value should "
-                                "be align to 32, but got value headDim:%u, query|key headDim:%u",
-                                QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                                vHeadDim_, qkHeadDim_),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                (fiaInfo_.isOutQuantEnable && (vHeadDim_ % ALIGN_SIZE_32 != 0)),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName_, "query,key,value",
+                    ("value headDim:" + std::to_string(vHeadDim_) + ",query|key headDim:" + std::to_string(qkHeadDim_))
+                        .c_str(),
+                    ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                     " situation, when Qs>1 and enable postquant, headDim of query|key|value should "
+                     "be align to 32")
+                        .c_str()),
+                return ge::GRAPH_FAILED);
         }
     } else if (fiaInfo_.ropeMode == RopeMode::ROPE_SPLIT) {
-        OP_CHECK_IF(!(vHeadDim_ == HEAD_DIM_512 && ropeHeadDim_ == HEAD_DIM_64) &&
-                        !(vHeadDim_ == HEAD_DIM_128 && ropeHeadDim_ == HEAD_DIM_64),
-                    OP_LOGE(opName_,
-                            "In %s %s situation, only value matrix headDim = 128/512 and rope headDim = 64 are "
-                            "supported, but got value matrix headDim:%u, rope headDim:%u.",
-                            QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                            vHeadDim_, ropeHeadDim_),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            !(vHeadDim_ == HEAD_DIM_512 && ropeHeadDim_ == HEAD_DIM_64) &&
+                !(vHeadDim_ == HEAD_DIM_128 && ropeHeadDim_ == HEAD_DIM_64),
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                opName_, "value,query_rope,key_rope",
+                ("value matrix headDim:" + std::to_string(vHeadDim_) + ",rope headDim:" + std::to_string(ropeHeadDim_))
+                    .c_str(),
+                ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                 " situation, only value matrix headDim = 128/512 and rope headDim = 64 are supported")
+                    .c_str()),
+            return ge::GRAPH_FAILED);
     } else if (fiaInfo_.ropeMode == RopeMode::ROPE_COMBINE) {
-        OP_CHECK_IF(!(vHeadDim_ == HEAD_DIM_128 && ropeHeadDim_ == HEAD_DIM_64),
-                    OP_LOGE(opName_,
-                            "In %s %s situation, only value matrix headDim = 128 and rope headDim = 64 are supported, "
-                            "but got value matrix headDim:%u, rope headDim:%u.",
-                            QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(),
-                            vHeadDim_, ropeHeadDim_),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            !(vHeadDim_ == HEAD_DIM_128 && ropeHeadDim_ == HEAD_DIM_64),
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                opName_, "value,query_rope,key_rope",
+                ("value matrix headDim:" + std::to_string(vHeadDim_) + ",rope headDim:" + std::to_string(ropeHeadDim_))
+                    .c_str(),
+                ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                 " situation, only value matrix headDim = 128 and rope headDim = 64 are supported")
+                    .c_str()),
+            return ge::GRAPH_FAILED);
     }
     if (kvStorageMode_ == KvStorageMode::PAGE_ATTENTION && kvLayout_ == FiaLayout::NZ &&
         ropeMode_ == RopeMode::NO_ROPE) {
@@ -894,12 +992,14 @@ ge::graphStatus FiaTilingCheck::CheckFeatureHeadDim() const
                 nzNoRopeDSupportList.end() ||
             std::find(nzNoRopeDSupportList.begin(), nzNoRopeDSupportList.end(), vHeadDim_) ==
                 nzNoRopeDSupportList.end()) {
-            OP_LOGE(opName_,
-                    "In %s %s situation, when the dim of key&value is 5, and the headDim shared by query and key is "
-                    "equal to that of value. The headDim of query|key|value should be 64 | "
-                    "128, but got valueHeadDim:%u, queryHeadDim and keyHeadDim:%u",
-                    QuantModeToSerialString(quantMode_).c_str(), SituationToSerialString(ropeMode_).c_str(), vHeadDim_,
-                    qkHeadDim_);
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                opName_, "query,key,value",
+                ("valueHeadDim:" + std::to_string(vHeadDim_) + ",query|key headDim:" + std::to_string(qkHeadDim_))
+                    .c_str(),
+                ("In " + QuantModeToSerialString(quantMode_) + " " + SituationToSerialString(ropeMode_) +
+                 " situation, when the dim of key&value is 5, and the headDim shared by query and key is "
+                 "equal to that of value. The headDim of query|key|value should be 64 | 128")
+                    .c_str());
             return ge::GRAPH_FAILED;
         }
     }
@@ -908,10 +1008,11 @@ ge::graphStatus FiaTilingCheck::CheckFeatureHeadDim() const
 
 ge::graphStatus FiaTilingCheck::CheckFeatureGqaNoquant()
 {
-    OP_CHECK_IF(socVersion_ == platform_ascendc::SocVersion::ASCEND310P,
-                OP_LOGE(opName_, "In %s %s situation, Ascend310P is not supported",
-                        RopeModeToSerialString(ropeMode_).c_str(), QuantModeToSerialString(quantMode_).c_str()),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        socVersion_ == platform_ascendc::SocVersion::ASCEND310P,
+        OP_LOGE_WITHOUT_REPORT(opName_, "In %s %s situation, Ascend310P is not supported",
+                               RopeModeToSerialString(ropeMode_).c_str(), QuantModeToSerialString(quantMode_).c_str()),
+        return ge::GRAPH_FAILED);
     if (ge::GRAPH_SUCCESS != CheckFeatureTensorList() || ge::GRAPH_SUCCESS != CheckFeatureBlockSize() ||
         ge::GRAPH_SUCCESS != CheckFeatureInOutDtype() || ge::GRAPH_SUCCESS != CheckFeatureActualSeqLens() ||
         ge::GRAPH_SUCCESS != CheckFeatureMask() || ge::GRAPH_SUCCESS != CheckFeatureNoQuantDtype() ||
@@ -951,35 +1052,23 @@ ge::graphStatus FiaTilingCheck::CheckFeatureActualSeqLensExistence() const
 {
     if ((qLayout_ == FiaLayout::TND || qLayout_ == FiaLayout::NTD)) {
         OP_CHECK_IF(opParamInfo_.actualSeqLengthsQ.tensor == nullptr,
-                    OP_LOGE(opName_, "when %s's layout is %s, %s should not be null.", QUERY_NAME.c_str(),
-                            LayoutToSerialString(qLayout_).c_str(), ACTUAL_SEQ_Q_LEN_NAME.c_str()),
-                    return ge::GRAPH_FAILED);
+                    OP_LOGE_WITH_INVALID_INPUT(opName_, "actual_seq_lengths"), return ge::GRAPH_FAILED);
         OP_CHECK_IF(opParamInfo_.actualSeqLengths.tensor == nullptr,
-                    OP_LOGE(opName_, "when %s's layout is %s, %s should not be null.", KEY_NAME.c_str(),
-                            LayoutToSerialString(kvLayout_).c_str(), ACTUAL_SEQ_KV_LEN_NAME.c_str()),
-                    return ge::GRAPH_FAILED);
+                    OP_LOGE_WITH_INVALID_INPUT(opName_, "actual_seq_lengths_kv"), return ge::GRAPH_FAILED);
 
         if (!fiaInfo_.isMaxWorkspace) {
             OP_CHECK_IF(opParamInfo_.actualSeqLengthsQ.tensor->GetData<int64_t>() == nullptr,
-                        OP_LOGE(opName_, "when %s's layout is %s, %s data should not be null.", QUERY_NAME.c_str(),
-                                LayoutToSerialString(qLayout_).c_str(), ACTUAL_SEQ_Q_LEN_NAME.c_str()),
-                        return ge::GRAPH_FAILED);
+                        OP_LOGE_WITH_INVALID_INPUT(opName_, "actual_seq_lengths"), return ge::GRAPH_FAILED);
             OP_CHECK_IF(opParamInfo_.actualSeqLengths.tensor->GetData<int64_t>() == nullptr,
-                        OP_LOGE(opName_, "when %s's layout is %s, %s data should not be null.", KEY_NAME.c_str(),
-                                LayoutToSerialString(kvLayout_).c_str(), ACTUAL_SEQ_KV_LEN_NAME.c_str()),
-                        return ge::GRAPH_FAILED);
+                        OP_LOGE_WITH_INVALID_INPUT(opName_, "actual_seq_lengths_kv"), return ge::GRAPH_FAILED);
         }
     } else {
         if (kvStorageMode_ == KvStorageMode::PAGE_ATTENTION) {
-            OP_CHECK_IF(
-                opParamInfo_.actualSeqLengths.tensor == nullptr,
-                OP_LOGE(opName_, "In page attention scene, %s should not be null.", ACTUAL_SEQ_KV_LEN_NAME.c_str()),
-                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(opParamInfo_.actualSeqLengths.tensor == nullptr,
+                        OP_LOGE_WITH_INVALID_INPUT(opName_, "actual_seq_lengths_kv"), return ge::GRAPH_FAILED);
             if (!fiaInfo_.isMaxWorkspace) {
                 OP_CHECK_IF(opParamInfo_.actualSeqLengths.tensor->GetData<int64_t>() == nullptr,
-                            OP_LOGE(opName_, "In page attention scene, %s data should not be null.",
-                                    ACTUAL_SEQ_KV_LEN_NAME.c_str()),
-                            return ge::GRAPH_FAILED);
+                            OP_LOGE_WITH_INVALID_INPUT(opName_, "actual_seq_lengths_kv"), return ge::GRAPH_FAILED);
             }
         }
     }
@@ -991,13 +1080,15 @@ ge::graphStatus FiaTilingCheck::GetActualSeqLenSize(uint32_t& size, const gert::
                                                     const std::string& actualSeqLenName, const std::string& attrName)
 {
     if (tensor == nullptr) {
-        OP_LOGE(opName_, "when layout of %s is %s, %s must be provided.", attrName.c_str(),
-                LayoutToSerialString(layout).c_str(), actualSeqLenName.c_str());
+        OP_LOGE_WITHOUT_REPORT(opName_, "when layout of %s is %s, %s must be provided.", attrName.c_str(),
+                               LayoutToSerialString(layout).c_str(), actualSeqLenName.c_str());
+        OP_LOGE_WITH_INVALID_INPUT(opName_, actualSeqLenName.c_str());
         return ge::GRAPH_FAILED;
     }
     int64_t shapeSize = tensor->GetShapeSize();
     if (shapeSize <= 0) {
-        OP_LOGE(opName_, "%s shape size is %ld, it should be greater than 0.", actualSeqLenName.c_str(), shapeSize);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, actualSeqLenName.c_str(), std::to_string(shapeSize).c_str(),
+                                              (actualSeqLenName + " shape size should be greater than 0").c_str());
         return ge::GRAPH_FAILED;
     }
     size = static_cast<uint32_t>(shapeSize);
@@ -1027,16 +1118,24 @@ ge::graphStatus FiaTilingCheck::CheckFeatureActualSeqLensQData()
         int64_t tmpS1 = 0;
         if (qLayout_ == FiaLayout::TND || qLayout_ == FiaLayout::NTD) {
             OP_CHECK_IF(actualSeq[i] < 0,
-                        OP_LOGE(opName_, "when %s's layout is %s, %s[%u] should not be a negative number, but got %ld.",
-                                QUERY_NAME.c_str(), LayoutToSerialString(qLayout_).c_str(),
-                                ACTUAL_SEQ_Q_LEN_NAME.c_str(), i, actualSeq[i]),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            opName_, ("actual_seq_lengths[" + std::to_string(i) + "]").c_str(),
+                            std::to_string(actualSeq[i]).c_str(),
+                            ("when query's layout is " + LayoutToSerialString(qLayout_) + ", actual_seq_lengths[" +
+                             std::to_string(i) + "] should not be a negative number")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
 
             OP_CHECK_IF(
                 i > 0U && (actualSeq[i] < actualSeq[i - 1U]),
-                OP_LOGE(opName_, "when %s's layout is %s, %s[%u](%ld) should not be less than %s[%u](%ld).",
-                        QUERY_NAME.c_str(), LayoutToSerialString(qLayout_).c_str(), ACTUAL_SEQ_Q_LEN_NAME.c_str(), i,
-                        actualSeq[i], ACTUAL_SEQ_Q_LEN_NAME.c_str(), (i - 1U), actualSeq[i - 1U]),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName_, "actual_seq_lengths",
+                    ("actual_seq_lengths[" + std::to_string(i) + "]=" + std::to_string(actualSeq[i]) +
+                     ",actual_seq_lengths[" + std::to_string(i - 1U) + "]=" + std::to_string(actualSeq[i - 1U]))
+                        .c_str(),
+                    ("when query's layout is " + LayoutToSerialString(qLayout_) + ", actual_seq_lengths[" +
+                     std::to_string(i) + "] should not be less than actual_seq_lengths[" + std::to_string(i - 1U) + "]")
+                        .c_str()),
                 return ge::GRAPH_FAILED);
 
             tmpS1 = (i == 0U) ? actualSeq[0] : (actualSeq[i] - actualSeq[i - 1U]);
@@ -1044,18 +1143,24 @@ ge::graphStatus FiaTilingCheck::CheckFeatureActualSeqLensQData()
             tmpS1 = actualSeq[i];
         }
         if (tmpS1 > static_cast<int64_t>(s1Size_) || tmpS1 < 0) {
-            OP_LOGE(opName_, "%s[%u] computed is %ld, it should be in range [0, Q_S(%u)].",
-                    ACTUAL_SEQ_Q_LEN_NAME.c_str(), i, tmpS1, s1Size_);
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                opName_, ("actual_seq_lengths[" + std::to_string(i) + "]").c_str(), std::to_string(tmpS1).c_str(),
+                ("actual_seq_lengths[" + std::to_string(i) + "] computed should be in range [0, Q_S(" +
+                 std::to_string(s1Size_) + ")]")
+                    .c_str());
             return ge::GRAPH_FAILED;
         }
         qSize.push_back(tmpS1);
     }
 
-    OP_CHECK_IF((qLayout_ == FiaLayout::TND) && (qTSize_ != actualSeq[actualSeqLengthsQSize_ - 1]),
-                OP_LOGE(opName_, "when %s's layout is %s, T(%u) should be equal to the last element of %s(%ld).",
-                        QUERY_NAME.c_str(), LayoutToSerialString(qLayout_).c_str(), qTSize_,
-                        ACTUAL_SEQ_Q_LEN_NAME.c_str(), actualSeq[actualSeqLengthsQSize_ - 1]),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (qLayout_ == FiaLayout::TND) && (qTSize_ != actualSeq[actualSeqLengthsQSize_ - 1]),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "actual_seq_lengths", std::to_string(qTSize_).c_str(),
+                                              ("when query's layout is " + LayoutToSerialString(qLayout_) +
+                                               ", T should be equal to the last element of actual_seq_lengths(" +
+                                               std::to_string(actualSeq[actualSeqLengthsQSize_ - 1]) + ")")
+                                                  .c_str()),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1082,35 +1187,52 @@ ge::graphStatus FiaTilingCheck::CheckFeatureActualSeqLensKvData()
     for (uint32_t i = 0; i < loop; i++) {
         int64_t tmpS2 = 0;
         if (kvLayout_ == FiaLayout::TND || kvLayout_ == FiaLayout::NTD) {
-            OP_CHECK_IF(
-                actualSeq[i] < 0,
-                OP_LOGE(opName_, "when kv's layout is %s, %s[%u] should not be a negative number, but got %ld.",
-                        LayoutToSerialString(kvLayout_).c_str(), ACTUAL_SEQ_KV_LEN_NAME.c_str(), i, actualSeq[i]),
-                return ge::GRAPH_FAILED);
-
-            OP_CHECK_IF(i > 0U && (actualSeq[i] < actualSeq[i - 1U]),
-                        OP_LOGE(opName_, "when kv's layout is %s, %s[%u](%ld) should not be less than %s[%u](%ld).",
-                                LayoutToSerialString(kvLayout_).c_str(), ACTUAL_SEQ_KV_LEN_NAME.c_str(), i,
-                                actualSeq[i], ACTUAL_SEQ_KV_LEN_NAME.c_str(), (i - 1U), actualSeq[i - 1U]),
+            OP_CHECK_IF(actualSeq[i] < 0,
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            opName_, ("actual_seq_lengths_kv[" + std::to_string(i) + "]").c_str(),
+                            std::to_string(actualSeq[i]).c_str(),
+                            ("when key/value's layout is " + LayoutToSerialString(kvLayout_) +
+                             ", actual_seq_lengths_kv[" + std::to_string(i) + "] should not be a negative number")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
+
+            OP_CHECK_IF(
+                i > 0U && (actualSeq[i] < actualSeq[i - 1U]),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName_, "actual_seq_lengths_kv",
+                    ("actual_seq_lengths_kv[" + std::to_string(i) + "]=" + std::to_string(actualSeq[i]) +
+                     ",actual_seq_lengths_kv[" + std::to_string(i - 1U) + "]=" + std::to_string(actualSeq[i - 1U]))
+                        .c_str(),
+                    ("when key/value's layout is " + LayoutToSerialString(kvLayout_) + ", actual_seq_lengths_kv[" +
+                     std::to_string(i) + "] should not be less than actual_seq_lengths_kv[" + std::to_string(i - 1U) +
+                     "]")
+                        .c_str()),
+                return ge::GRAPH_FAILED);
 
             tmpS2 = (i == 0U) ? actualSeq[0] : (actualSeq[i] - actualSeq[i - 1U]);
         } else {
             tmpS2 = actualSeq[i];
         }
 
-        OP_CHECK_IF(tmpS2 < 0 || tmpS2 > s2Size_,
-                    OP_LOGE(opName_, "%s(%u) is %ld, it should be in range [0, KV_S(%ld)].",
-                            ACTUAL_SEQ_KV_LEN_NAME.c_str(), i, tmpS2, s2Size_),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            tmpS2 < 0 || tmpS2 > s2Size_,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, ("actual_seq_lengths_kv[" + std::to_string(i) + "]").c_str(),
+                                                  std::to_string(tmpS2).c_str(),
+                                                  ("actual_seq_lengths_kv[" + std::to_string(i) +
+                                                   "] should be in range [0, KV_S(" + std::to_string(s2Size_) + ")]")
+                                                      .c_str()),
+            return ge::GRAPH_FAILED);
         kvSize.push_back(tmpS2);
     }
 
-    OP_CHECK_IF((kvLayout_ == FiaLayout::TND) && (kTSize_ != actualSeq[actualSeqLengthsKvSize_ - 1]),
-                OP_LOGE(opName_, "when kv's layout is %s, T(%u) should be equal to the last element of %s(%ld).",
-                        LayoutToSerialString(kvLayout_).c_str(), kTSize_, ACTUAL_SEQ_KV_LEN_NAME.c_str(),
-                        actualSeq[actualSeqLengthsKvSize_ - 1]),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (kvLayout_ == FiaLayout::TND) && (kTSize_ != actualSeq[actualSeqLengthsKvSize_ - 1]),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "actual_seq_lengths_kv", std::to_string(kTSize_).c_str(),
+                                              ("when key/value's layout is " + LayoutToSerialString(kvLayout_) +
+                                               ", T should be equal to the last element of actual_seq_lengths_kv(" +
+                                               std::to_string(actualSeq[actualSeqLengthsKvSize_ - 1]) + ")")
+                                                  .c_str()),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1125,8 +1247,11 @@ ge::graphStatus FiaTilingCheck::CheckFeatureInOutDtype() const
 
     std::pair<ge::DataType, ge::DataType> inOutDtypePair = {inputQType_, outputType_};
     if (!VecContains(inOutDtypePairSupported, inOutDtypePair)) {
-        OP_LOGE(opName_, "input dtype %d with output dtype %d is not currently supported.",
-                static_cast<int32_t>(inputQType_), static_cast<int32_t>(outputType_));
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(opName_, "query,attention_out",
+                                               ("query=" + FusedDataTypeToSerialString(inputQType_) +
+                                                ",attention_out=" + FusedDataTypeToSerialString(outputType_))
+                                                   .c_str(),
+                                               "input dtype with output dtype is not currently supported");
         return ge::GRAPH_FAILED;
     }
 

@@ -127,7 +127,8 @@ void TilingGetTempCompileInfo(platform_ascendc::PlatformAscendC& ascendcPlatform
 ge::graphStatus IFATilingArch38::ConvertContext(gert::TilingContext& context, IncreFlashAttentionContext& ifaContext)
 {
     OP_CHECK_IF(context.GetNodeName() == nullptr,
-                OP_LOGE("IncreFlashAttention", "OpName got from TilingContext is null."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT("IncreFlashAttention", "OpName got from TilingContext is null."),
+                return ge::GRAPH_FAILED);
     ifaContext.opName = context.GetNodeName();
     ifaContext.platformInfo = context.GetPlatformInfo();
     ifaContext.query.desc = context.GetInputDesc(QUERY_INPUT_INDEX);
@@ -135,7 +136,8 @@ ge::graphStatus IFATilingArch38::ConvertContext(gert::TilingContext& context, In
     ifaContext.key.desc = context.GetInputDesc(KEY_INPUT_INDEX);
     ifaContext.key.shape = context.GetInputShape(KEY_INPUT_INDEX);
     OP_CHECK_IF((ifaContext.query.shape == nullptr) || (ifaContext.key.shape == nullptr),
-                OP_LOGE(context.GetNodeName(), "Shape of query or shape of key is null."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context.GetNodeName(), "Shape of query or shape of key is null."),
+                return ge::GRAPH_FAILED);
     auto batchOfQuery = ifaContext.query.shape->GetStorageShape().GetDim(NUM0);
     auto batchOfKey = ifaContext.key.shape->GetStorageShape().GetDim(NUM0);
     if (batchOfQuery != batchOfKey) {
@@ -182,7 +184,7 @@ ge::graphStatus IFATilingArch38::ConvertContext(gert::TilingContext& context, In
     ifaContext.kvPaddingSize.tensor = context.GetOptionalInputTensor(KV_PADDING_SIZE_INPUT_INDEX);
 
     auto attrs = context.GetAttrs();
-    OP_CHECK_IF(attrs == nullptr, OP_LOGE(context.GetNodeName(), "Attrs got from ge is null."),
+    OP_CHECK_IF(attrs == nullptr, OP_LOGE_WITHOUT_REPORT(context.GetNodeName(), "Attrs got from ge is null."),
                 return ge::GRAPH_FAILED);
 
     ifaContext.numHeads = attrs->GetAttrPointer<uint32_t>(NUM_HEADS_ATTR_INDEX);
@@ -193,7 +195,7 @@ ge::graphStatus IFATilingArch38::ConvertContext(gert::TilingContext& context, In
     ifaContext.innerPrecise = attrs->GetAttrPointer<uint32_t>(INNER_PRECISE_ATTR_INDEX);
 
     OP_CHECK_IF(context.GetWorkspaceSizes(1) == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(context.GetNodeName(), "WorkSpaceSize got from ge is null."),
+                OP_LOGE_WITHOUT_REPORT(context.GetNodeName(), "WorkSpaceSize got from ge is null."),
                 return ge::GRAPH_FAILED);
     ifaContext.workSpaces = context.GetWorkspaceSizes(1);
     return ge::GRAPH_SUCCESS;
@@ -204,7 +206,7 @@ ge::graphStatus IFATilingArch38::DoOpTiling()
     IncreFlashAttentionContext ifaContext;
     auto ret = ConvertContext(*context_, ifaContext);
     OP_CHECK_IF(ret == ge::GRAPH_FAILED,
-                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "fail to convert to IFAParams"),
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "fail to convert to IFAParams"),
                 return ge::GRAPH_FAILED);
     ret = DoSubOpTiling(ifaContext);
     return ret;
@@ -215,36 +217,48 @@ bool IFATilingArch38::CheckArch38ScenarioSupported(const IncreFlashAttentionCont
     const char* opName = context_->GetNodeName();
     // PagedAttention lays key out by block, its shape carries no real kv seq length for the check below
     OP_CHECK_IF((ifaContext.blockTable.tensor != nullptr),
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "PagedAttention is not supported on this platform."), return false);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "blockTable", "not null",
+                                                      "PagedAttention is not supported on this platform."),
+                return false);
 
     // BNSD_BSND shares the BNSD input layout, it only transposes the output, same as PFA's SetInputLayout
     const std::string layoutStr = (ifaContext.layOut == nullptr) ? "" : std::string(ifaContext.layOut);
     OP_CHECK_IF((layoutStr != "BNSD"),
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "only BNSD layout is supported on this platform."), return false);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "inputLayout", layoutStr.c_str(),
+                                                      "only BNSD layout is supported on this platform."),
+                return false);
 
     OP_CHECK_IF(((ifaContext.query.shape == nullptr) || (ifaContext.key.shape == nullptr) ||
                  (ifaContext.value.shape == nullptr)),
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "shape of query, key or value is null."), return false);
+                OP_LOGE_WITHOUT_REPORT(opName, "shape of query, key or value is null."), return false);
 
     const auto& queryShape = ifaContext.query.shape->GetStorageShape();
     const auto& keyShape = ifaContext.key.shape->GetStorageShape();
     const auto& valueShape = ifaContext.value.shape->GetStorageShape();
     OP_CHECK_IF(((queryShape.GetDimNum() != BNSD_DIM_NUM) || (keyShape.GetDimNum() != BNSD_DIM_NUM) ||
                  (valueShape.GetDimNum() != BNSD_DIM_NUM)),
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "BNSD layout requires 4-dim query, key and value shapes."),
+                OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                    opName, "query, key and value",
+                    (std::to_string(queryShape.GetDimNum()) + ", " + std::to_string(keyShape.GetDimNum()) + ", " +
+                     std::to_string(valueShape.GetDimNum()))
+                        .c_str(),
+                    "BNSD layout requires 4-dim query, key and value shapes."),
                 return false);
 
     const int64_t sQ = queryShape.GetDim(BNSD_DIM_S);
-    OP_CHECK_IF((sQ != 1), OPS_REPORT_VECTOR_INNER_ERR(opName, "query seq length must be 1, but qs = %ld.", sQ),
+    OP_CHECK_IF((sQ != 1),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "query", std::to_string(sQ).c_str(),
+                                                      "query seq length (S dimension) must be 1."),
                 return false);
 
     const int64_t sKV = keyShape.GetDim(BNSD_DIM_S);
     OP_CHECK_IF(((sKV <= 1) || (sKV > ARCH38_IFA_SUPPORTED_MAX_SKV)),
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "kv seq length must be in (1, %ld], but kvs = %ld.",
-                                            ARCH38_IFA_SUPPORTED_MAX_SKV, sKV),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    opName, "key", std::to_string(sKV).c_str(),
+                    ("kv seq length must be in (1, " + std::to_string(ARCH38_IFA_SUPPORTED_MAX_SKV) + "].").c_str()),
                 return false);
 
-    OP_CHECK_IF((ifaContext.numHeads == nullptr), OPS_REPORT_VECTOR_INNER_ERR(opName, "numHeads got from ge is null."),
+    OP_CHECK_IF((ifaContext.numHeads == nullptr), OP_LOGE_WITHOUT_REPORT(opName, "numHeads got from ge is null."),
                 return false);
     const int64_t nQ = static_cast<int64_t>(*ifaContext.numHeads);
     // numKeyValueHeads defaults to numHeads when it is absent or left as 0
@@ -252,19 +266,17 @@ bool IFATilingArch38::CheckArch38ScenarioSupported(const IncreFlashAttentionCont
                             static_cast<int64_t>(*ifaContext.kvHeadNums) :
                             nQ;
     OP_CHECK_IF(((nQ <= 0) || (nQ > ARCH38_IFA_SUPPORTED_MAX_N) || (nKV <= 0) || (nKV > ARCH38_IFA_SUPPORTED_MAX_N)),
-                OPS_REPORT_VECTOR_INNER_ERR(opName,
-                                            "head num must be in (0, %ld], but numHeads = %ld, "
-                                            "numKeyValueHeads = %ld.",
-                                            ARCH38_IFA_SUPPORTED_MAX_N, nQ, nKV),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName, "numHeads, numKeyValueHeads", (std::to_string(nQ) + ", " + std::to_string(nKV)).c_str(),
+                    ("head num must be in (0, " + std::to_string(ARCH38_IFA_SUPPORTED_MAX_N) + "].").c_str()),
                 return false);
 
     const int64_t dQ = queryShape.GetDim(BNSD_DIM_D);
     const int64_t dV = valueShape.GetDim(BNSD_DIM_D);
     OP_CHECK_IF((!IsArch38SupportedHeadSize(dQ) || !IsArch38SupportedHeadSize(dV)),
-                OPS_REPORT_VECTOR_INNER_ERR(opName,
-                                            "head size only supports 64/80/128, but query d = %ld, "
-                                            "value d = %ld.",
-                                            dQ, dV),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(opName, "query, value",
+                                                       (std::to_string(dQ) + ", " + std::to_string(dV)).c_str(),
+                                                       "head size only supports 64/80/128."),
                 return false);
 
     return true;
@@ -273,11 +285,11 @@ bool IFATilingArch38::CheckArch38ScenarioSupported(const IncreFlashAttentionCont
 ge::graphStatus IFATilingArch38::DoSubOpTiling(IncreFlashAttentionContext& ifaContext)
 {
     OP_CHECK_IF(!CheckArch38ScenarioSupported(ifaContext),
-                OP_LOGE(context_->GetNodeName(), "unsupported scenario on this platform."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "unsupported scenario on this platform."),
+                return ge::GRAPH_FAILED);
 
     auto platformInfoPtr = context_->GetPlatformInfo();
-    OP_CHECK_IF(platformInfoPtr == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "platformInfoPtr is null!"),
+    OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "platformInfoPtr is null!"),
                 return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     PromptFlashAttentionCompileInfo compileInfo = {0, 0, 0, 0, 0, 0, 0, 0, ascendcPlatform.GetSocVersion()};
@@ -287,7 +299,7 @@ ge::graphStatus IFATilingArch38::DoSubOpTiling(IncreFlashAttentionContext& ifaCo
     auto ret = PFAConvertContext(contextParamsForPFATiling, context_);
     contextParamsForPFATiling.compileInfoPtr = &compileInfo;
     OP_CHECK_IF(ret == ge::GRAPH_FAILED,
-                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "fail to convert to PFAParams"),
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "fail to convert to PFAParams"),
                 return ge::GRAPH_FAILED);
     PromptFlashAttentionTilingData tilingData;
     ret = flashTilingArch38.DoSubOpTiling(tilingData, contextParamsForPFATiling);

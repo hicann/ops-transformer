@@ -68,7 +68,7 @@ inline std::string ToString(ge::DataType type)
     if (it != arch35FIA::DATATYPE_TO_STRING_MAP.end()) {
         return it->second;
     } else {
-        OP_LOGE("FusedInferAttentionScore", "dtype %d is not supported", type);
+        OP_LOGE_WITHOUT_REPORT("FusedInferAttentionScore", "dtype %d is not supported", type);
         return "UNDEFINED";
     }
 }

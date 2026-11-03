@@ -32,6 +32,14 @@ using namespace ge;
 using namespace AscendC;
 namespace optiling {
 using namespace arch35FIA;
+// 合法输入下 Tiling 失败时，按 EZ1008 正式错误码首报（Arglist: op_name, reason），并输出 PLOG 上下文
+inline void ReportTilingFailure(const gert::TilingContext* context, const char* reason)
+{
+    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "%s\n", reason);
+    const std::vector<const char*> msgKey = {"op_name", "reason"};
+    const std::vector<const char*> msgvalue = {context->GetNodeName(), reason};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgvalue);
+}
 constexpr uint64_t PRE_LOAD_NUM_MLA_ARCH35 = 2;
 
 void FiaTilingNonQuantMlaArch35::InitTilingInfo(TilingInfo* tilingInfo)
@@ -140,8 +148,8 @@ void FiaTilingNonQuantMlaArch35::CalcScheduleMode()
 
 ge::graphStatus FiaTilingNonQuantMlaArch35::DoOpTiling()
 {
-    OP_CHECK_IF(SetPlatMemoryInfo() != ge::GRAPH_SUCCESS, OP_LOGE(fiaInfo_->opName, "Set plat memory info fail."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(SetPlatMemoryInfo() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(fiaInfo_->opName, "Set plat memory info fail."), return ge::GRAPH_FAILED);
 
     if (fiaInfo_->isMaxWorkspace) {
         // tiling下沉场景，无法获取到actual_seq，分核结果未知，workspace设置成最大
@@ -178,7 +186,7 @@ ge::graphStatus FiaTilingNonQuantMlaArch35::DoOpTiling()
 ge::graphStatus FiaTilingNonQuantMlaArch35::SetPlatMemoryInfo()
 {
     auto platformInfoPtr = context_->GetPlatformInfo();
-    OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(fiaInfo_->opName, "The platformInfoPtr is null!"),
+    OP_CHECK_IF(platformInfoPtr == nullptr, ReportTilingFailure(context_, "The platformInfoPtr is null!"),
                 return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     platformInfo_.aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -688,7 +696,8 @@ void FiaTilingNonQuantMlaArch35::SetFATilingData()
 ge::graphStatus FiaTilingNonQuantMlaArch35::SetTilingData(FusedInferAttentionScoreTilingData& tilingData)
 {
     FusedInferAttentionScoreTilingData* tiling = context_->GetTilingData<FusedInferAttentionScoreTilingData>();
-    OP_CHECK_IF(tiling == nullptr, OP_LOGE(fiaInfo_->opName, "The tiling data is nullptr"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(tiling == nullptr, ReportTilingFailure(context_, "The tiling data is nullptr"),
+                return ge::GRAPH_FAILED);
     *tiling = tilingData;
     return ge::GRAPH_SUCCESS;
 }

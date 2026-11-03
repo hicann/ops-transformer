@@ -29,11 +29,19 @@ using namespace ge;
 using namespace AscendC;
 namespace optiling {
 using namespace arch35FIA;
+// 合法输入下 Tiling 失败时，按 EZ1008 正式错误码首报（Arglist: op_name, reason），并输出 PLOG 上下文
+inline void ReportTilingFailure(const gert::TilingContext* context, const char* reason)
+{
+    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "%s\n", reason);
+    const std::vector<const char*> msgKey = {"op_name", "reason"};
+    const std::vector<const char*> msgvalue = {context->GetNodeName(), reason};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgvalue);
+}
 ge::graphStatus FusedInferAttentionScoreTilingImpl::SetPlatMemoryInfo(const gert::TilingContext* context,
                                                                       const FiaTilingInfo& fiaInfo)
 {
     auto platformInfoPtr = context->GetPlatformInfo();
-    OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(fiaInfo.opName, "The platformInfoPtr is null!"),
+    OP_CHECK_IF(platformInfoPtr == nullptr, ReportTilingFailure(context, "The platformInfoPtr is null!"),
                 return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     platformInfo_.aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -72,14 +80,14 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::SetEmptyTensor(gert::TilingC
     initOutputParams.set_totalSoftMaxLseOutputSize(lseSize);
     initOutputParams.set_needInit(1);
 
-    OP_CHECK_IF(GenTilingKey(context, fiaInfo) != ge::GRAPH_SUCCESS, OP_LOGE(fiaInfo.opName, "GenTilingKey fail."),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(SetBlockDim(context, fiaInfo) != ge::GRAPH_SUCCESS, OP_LOGE(fiaInfo.opName, "SetBlockDim fail."),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(GetWorkspace(context, fiaInfo) != ge::GRAPH_SUCCESS, OP_LOGE(fiaInfo.opName, "GetWorkspace fail."),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(SetTilingData(context, fiaInfo) != ge::GRAPH_SUCCESS, OP_LOGE(fiaInfo.opName, "SetTilingData fail."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GenTilingKey(context, fiaInfo) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "GenTilingKey fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(SetBlockDim(context, fiaInfo) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "SetBlockDim fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GetWorkspace(context, fiaInfo) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "GetWorkspace fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(SetTilingData(context, fiaInfo) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "SetTilingData fail."), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1233,7 +1241,7 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::SplitPolicy(gert::TilingCont
     }
 
     OP_CHECK_IF(AdjustSinnerAndSouter(context, fiaInfo) != ge::GRAPH_SUCCESS,
-                OP_LOGE(fiaInfo.opName, "Get sinner and souter fail!"), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "Get sinner and souter fail!"), return ge::GRAPH_FAILED);
 
     ApplySinnerSouterOverrides(fiaInfo);
     ApplySplitStrategy(fiaInfo);
@@ -1621,10 +1629,10 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::GetWorkspace(gert::TilingCon
         workspace = platformInfo_.defaultSysWorkspaceSize;
     } else if (fiaInfo.quantMode == FiaQuantMode::ANTI_QUANT) {
         OP_CHECK_IF(SetWorkspaceAntiQuant(fiaInfo, workspace) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(fiaInfo.opName, "Get workspace failed ."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "Get workspace failed ."), return ge::GRAPH_FAILED);
     } else {
         OP_CHECK_IF(SetWorkspaceNormal(fiaInfo, workspace) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(fiaInfo.opName, "Get workspace failed ."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "Get workspace failed ."), return ge::GRAPH_FAILED);
     }
 
     OP_LOGI(fiaInfo.opName, "Workspaces: %ld Byte", workspace);
@@ -1700,7 +1708,7 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::SetMaskTilingData(const FiaT
 
     auto attenMaskTensor = fiaInfo.opParamInfo.attenMask.tensor;
     if (attenMaskTensor == nullptr) {
-        OP_LOGE(fiaInfo.opName, "attenMaskFlag is true but attenMask tensor is null.");
+        OP_LOGE_WITH_INVALID_INPUT(fiaInfo.opName, "attenMask");
         return ge::GRAPH_FAILED;
     }
     const auto& shape = attenMaskTensor->GetStorageShape();
@@ -1986,7 +1994,7 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::SetTilingData(gert::TilingCo
 
     PrintAllTilingData(fiaInfo);
     FlashAttentionScoreSimplifiedTilingData* tiling = context->GetTilingData<FlashAttentionScoreSimplifiedTilingData>();
-    OP_CHECK_IF(tiling == nullptr, OP_LOGE(fiaInfo.opName, "The tiling data is nullptr"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(tiling == nullptr, ReportTilingFailure(context, "The tiling data is nullptr"), return ge::GRAPH_FAILED);
     *tiling = faRunTilingAdapter_;
     return ge::GRAPH_SUCCESS;
 }
@@ -2111,18 +2119,18 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::DoOpTiling(gert::TilingConte
                                                                const FiaTilingInfo& fiaInfo)
 {
     OP_CHECK_IF(SetPlatMemoryInfo(context, fiaInfo) != ge::GRAPH_SUCCESS,
-                OP_LOGE(fiaInfo.opName, "Set plat memory info fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "Set plat memory info fail."), return ge::GRAPH_FAILED);
 
     if (fiaInfo.emptyTensorFlag) {
         OP_CHECK_IF(SetEmptyTensor(context, fiaInfo) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(fiaInfo.opName, "Set empty tensor fail."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "Set empty tensor fail."), return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }
 
     InitImplParam(fiaInfo);
 
     OP_CHECK_IF(SplitPolicy(context, fiaInfo) != ge::GRAPH_SUCCESS,
-                OP_LOGE(fiaInfo.opName, "Execute split policy fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "Execute split policy fail."), return ge::GRAPH_FAILED);
 
     if (fiaInfo.quantMode == FiaQuantMode::NO_QUANT && fiaInfo.mlaMode != MlaMode::ROPE_SPLIT_D512 && gsMergeFlag_ &&
         !dnFlag_ &&
@@ -2133,22 +2141,22 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::DoOpTiling(gert::TilingConte
         gsMergeFlag_ = false;
     }
 
-    OP_CHECK_IF(ComputeTilingData(fiaInfo) != ge::GRAPH_SUCCESS, OP_LOGE(fiaInfo.opName, "Compute tilingData fail."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(ComputeTilingData(fiaInfo) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "Compute tilingData fail."), return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(GenTilingKey(context, fiaInfo) != ge::GRAPH_SUCCESS,
-                OP_LOGE(fiaInfo.opName, "Generate tilingKey fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "Generate tilingKey fail."), return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(SetBlockDim(context, fiaInfo) != ge::GRAPH_SUCCESS, OP_LOGE(fiaInfo.opName, "Set blockDim fail."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(SetBlockDim(context, fiaInfo) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "Set blockDim fail."), return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(GetWorkspace(context, fiaInfo) != ge::GRAPH_SUCCESS, OP_LOGE(fiaInfo.opName, "Get workspace fail."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GetWorkspace(context, fiaInfo) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "Get workspace fail."), return ge::GRAPH_FAILED);
     // 使用SyncAll，需要设置为batchmode模式，所有核同时启动，否则多流方式下执行可能会卡死
     constexpr uint32_t BATCH_MODE_SCHEDULE = 1;
     context->SetScheduleMode(BATCH_MODE_SCHEDULE);
-    OP_CHECK_IF(SetTilingData(context, fiaInfo) != ge::GRAPH_SUCCESS, OP_LOGE(fiaInfo.opName, "Set tiling data fail."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(SetTilingData(context, fiaInfo) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "Set tiling data fail."), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }

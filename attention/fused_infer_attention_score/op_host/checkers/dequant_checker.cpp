@@ -606,7 +606,8 @@ ge::graphStatus DequantChecker::CheckFeaturePertensorFullquant(const FiaTilingIn
 
     // 不支持 rope
     OP_CHECK_IF(fiaInfo.mlaMode != MlaMode::NO_MLA,
-                OP_LOGE(fiaInfo.opName, "In per-tensor quant scenario, rope is not supported."),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "mlaMode",
+                                                         "In per-tensor quant scenario, rope is not supported."),
                 return ge::GRAPH_FAILED);
 
     // 不支持alibipse
@@ -1429,19 +1430,21 @@ ge::graphStatus DequantChecker::CheckDequantScaleShapeFP8GQA(const FiaTilingInfo
     OP_CHECK_IF(((ge::GRAPH_SUCCESS != CheckTensorContiguous(keyAntiquantScaleDimNum, keyAntiquantScaleShape,
                                                              fiaInfo.kScaleStrides, dimIndex)) &&
                  (dimIndex != 0 && dimIndex != 1)),
-                OP_LOGE(fiaInfo.opName,
-                        "In FP8 GQA fullquant BnNBsD scenarios, "
-                        "kscale only supports non-contiguous tensors in dimensions 0 or 1, "
-                        "but currently the non-contiguous dimension is dimension %d",
-                        dimIndex),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    fiaInfo.opName, "key_antiquant_scale",
+                    ("In FP8 GQA fullquant BnNBsD scenarios, kscale only supports non-contiguous tensors in "
+                     "dimensions 0 or 1, but currently the non-contiguous dimension is dimension " +
+                     std::to_string(dimIndex))
+                        .c_str()),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(((ge::GRAPH_SUCCESS != CheckTensorContiguous(keyDimNum, keyInputShape, fiaInfo.keyStrides, dimIndex)) &&
                  (dimIndex != 0 && dimIndex != 1)),
-                OP_LOGE(fiaInfo.opName,
-                        "In FP8 GQA fullquant BnNBsD scenarios, "
-                        "key only supports non-contiguous tensors in dimensions 0 or 1, "
-                        "but currently the non-contiguous dimension is dimension %d",
-                        dimIndex),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    fiaInfo.opName, "key",
+                    ("In FP8 GQA fullquant BnNBsD scenarios, key only supports non-contiguous tensors in "
+                     "dimensions 0 or 1, but currently the non-contiguous dimension is dimension " +
+                     std::to_string(dimIndex))
+                        .c_str()),
                 return ge::GRAPH_FAILED);
 
     // value scale: N layout [n2Size]
@@ -1469,11 +1472,12 @@ ge::graphStatus DequantChecker::CheckDequantScaleShapeFP8GQA(const FiaTilingInfo
     OP_CHECK_IF(
         ((ge::GRAPH_SUCCESS != CheckTensorContiguous(valueDimNum, valueInputShape, fiaInfo.valueStrides, dimIndex)) &&
          (dimIndex != 0 && dimIndex != 1)),
-        OP_LOGE(fiaInfo.opName,
-                "In FP8 GQA fullquant BnNBsD scenarios, "
-                "value only supports non-contiguous tensors in dimensions 0 or 1, "
-                "but currently the non-contiguous dimension is dimension %d",
-                dimIndex),
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            fiaInfo.opName, "value",
+            ("In FP8 GQA fullquant BnNBsD scenarios, value only supports non-contiguous tensors in dimensions "
+             "0 or 1, but currently the non-contiguous dimension is dimension " +
+             std::to_string(dimIndex))
+                .c_str()),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -1490,7 +1494,9 @@ ge::graphStatus DequantChecker::CheckStrideFP8GQAFullquant(const FiaTilingInfo& 
 
     // key_antiquant_scale BnNBs: 只校验BS轴 stride[2]==1
     OP_CHECK_IF(fiaInfo.kScaleStrides == nullptr,
-                OP_LOGE(fiaInfo.opName, "In FP8 GQA fullquant scenario, dequant_scale_key stride is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "dequant_scale_key",
+                                                         "In FP8 GQA fullquant scenario, dequant_scale_key stride "
+                                                         "is nullptr"),
                 return ge::GRAPH_FAILED);
     if (fiaInfo.kScaleStrides->GetDimNum() >= 2) {
         if (fiaInfo.kScaleStrides->GetStride(2) != 1) {
@@ -1505,7 +1511,8 @@ ge::graphStatus DequantChecker::CheckStrideFP8GQAFullquant(const FiaTilingInfo& 
 
     // key BnNBsD: 只校验BS轴 stride[2]==qkHeadDim 和 D轴 stride[3]==1
     OP_CHECK_IF(fiaInfo.keyStrides == nullptr,
-                OP_LOGE(fiaInfo.opName, "In FP8 GQA fullquant scenario, key stride is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "key",
+                                                         "In FP8 GQA fullquant scenario, key stride is nullptr"),
                 return ge::GRAPH_FAILED);
     if (fiaInfo.keyStrides->GetDimNum() >= 4) {
         const uint64_t expectedBs = static_cast<uint64_t>(fiaInfo.qkHeadDim);
@@ -1521,7 +1528,8 @@ ge::graphStatus DequantChecker::CheckStrideFP8GQAFullquant(const FiaTilingInfo& 
 
     // value BnNBsD: 只校验BS轴 stride[2]==vHeadDim 和 D轴 stride[3]==1
     OP_CHECK_IF(fiaInfo.valueStrides == nullptr,
-                OP_LOGE(fiaInfo.opName, "In FP8 GQA fullquant scenario, value stride is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "value",
+                                                         "In FP8 GQA fullquant scenario, value stride is nullptr"),
                 return ge::GRAPH_FAILED);
     if (fiaInfo.valueStrides->GetDimNum() >= 4) {
         const uint64_t expectedBs = static_cast<uint64_t>(fiaInfo.vHeadDim);
@@ -2214,7 +2222,9 @@ ge::graphStatus DequantChecker::CheckDescExistenceForAntiquant(const FiaTilingIn
     // keyantiquantScale
     OP_CHECK_IF((fiaInfo.opParamInfo.keyAntiquantScale.tensor != nullptr &&
                  fiaInfo.opParamInfo.keyAntiquantScale.desc == nullptr),
-                OP_LOGE(fiaInfo.opName, "keyAntiquantScaleTensor exists, but keyAntiquantScaleDesc does not exist."),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    fiaInfo.opName, "key_antiquant_scale",
+                    "When keyAntiquantScaleTensor exists, keyAntiquantScaleDesc cannot be empty"),
                 return ge::GRAPH_FAILED);
     // valueAntiquantScale
     OP_CHECK_IF((fiaInfo.opParamInfo.valueAntiquantScale.tensor != nullptr &&
@@ -2226,7 +2236,9 @@ ge::graphStatus DequantChecker::CheckDescExistenceForAntiquant(const FiaTilingIn
     // keyAntiquantOffset
     OP_CHECK_IF((fiaInfo.opParamInfo.keyAntiquantOffset.tensor != nullptr &&
                  fiaInfo.opParamInfo.keyAntiquantOffset.desc == nullptr),
-                OP_LOGE(fiaInfo.opName, "keyAntiquantOffsetTensor exists, but keyAntiquantOffsetDesc does not exist."),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    fiaInfo.opName, "key_antiquant_offset",
+                    "When keyAntiquantOffsetTensor exists, keyAntiquantOffsetDesc cannot be empty"),
                 return ge::GRAPH_FAILED);
     // valueAntiquantOffset
     OP_CHECK_IF((fiaInfo.opParamInfo.valueAntiquantOffset.tensor != nullptr &&

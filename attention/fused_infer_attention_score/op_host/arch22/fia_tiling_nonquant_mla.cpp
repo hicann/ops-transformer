@@ -39,6 +39,15 @@ constexpr uint64_t PRE_LOAD_NUM_MLA = 2;
 constexpr uint64_t FIA_TILINGKEYOFFSET = uint64_t(100000000000000000UL);         // 10^17
 constexpr uint64_t FIA_PERF_MODE_TILINGKEYOFFSET = uint64_t(1000000000000000UL); // 10^15
 
+// 合法输入下 Tiling 失败时，按 EZ1008 正式错误码首报（Arglist: op_name, reason），并输出 PLOG 上下文
+inline void ReportTilingFailure(const gert::TilingContext* context, const char* reason)
+{
+    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "%s\n", reason);
+    const std::vector<const char*> msgKey = {"op_name", "reason"};
+    const std::vector<const char*> msgvalue = {context->GetNodeName(), reason};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgvalue);
+}
+
 template <typename T>
 inline auto Align(T num, T rnd) -> T
 {
@@ -68,16 +77,16 @@ void FiaTilingNonQuantMla::InitTilingInfo(TilingInfo* tilingInfo)
 
 ge::graphStatus FiaTilingNonQuantMla::GetPlatformInfo()
 {
-    OP_CHECK_IF(fiaInfo_->platformInfo == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(fiaInfo_->opName, "GetPlatformInfo is nullptr."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(fiaInfo_->platformInfo == nullptr, ReportTilingFailure(context_, "GetPlatformInfo is nullptr."),
+                return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(fiaInfo_->platformInfo);
     libapiSize_ = ascendcPlatform.GetLibApiWorkSpaceSize();
     aivNum_ = ascendcPlatform.GetCoreNumAiv();
     aicNum_ = ascendcPlatform.GetCoreNumAic();
 
-    OP_CHECK_IF(aicNum_ == 0 || aivNum_ == 0,
-                OPS_REPORT_VECTOR_INNER_ERR(fiaInfo_->opName, "num of core obtained is 0."), return GRAPH_FAILED);
+    OP_CHECK_IF(aicNum_ == 0 || aivNum_ == 0, ReportTilingFailure(context_, "num of core obtained is 0."),
+                return GRAPH_FAILED);
 
     // 设置CV1:1模式
     cvRatio_ = aivNum_ / aicNum_;
@@ -407,8 +416,9 @@ void FiaTilingNonQuantMla::Split()
     SplitResult res{aicNum_, cvRatio_};
     SplitCore(aicNum_, baseInfo, splitParam, res);
     if (res.numOfFdHead > aicNum_ || res.usedCoreNum > aicNum_ || res.maxS2SplitNum > aicNum_ + 1U) {
-        OP_LOGE(fiaInfo_->opName, "used_core_num: %u, num_of_fd_head: %u, max_s2_split_num: %u, aic_num: %u",
-                res.usedCoreNum, res.numOfFdHead, res.maxS2SplitNum, aicNum_);
+        OP_LOGE_WITHOUT_REPORT(fiaInfo_->opName,
+                               "used_core_num: %u, num_of_fd_head: %u, max_s2_split_num: %u, aic_num: %u",
+                               res.usedCoreNum, res.numOfFdHead, res.maxS2SplitNum, aicNum_);
     }
     SetSplitOutput(res);
     tilingData_.innerSplitParams.set_mBaseSize(mBaseSize_);

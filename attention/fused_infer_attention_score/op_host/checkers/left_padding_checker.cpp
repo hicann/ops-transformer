@@ -56,8 +56,12 @@ ge::graphStatus LeftPaddingChecker::CheckShapeAndDim(const FiaTilingInfo& fiaInf
                 std::to_string(fiaInfo.opParamInfo.queryPaddingSize.tensor->GetShapeSize()).c_str(), "1");
             return ge::GRAPH_FAILED;
         }
-        OP_CHECK_IF(fiaInfo.opParamInfo.queryPaddingSize.tensor->GetStorageShape().GetDimNum() != DIM_NUM_1,
-                    OP_LOGE(fiaInfo.opName, "The dim number of query paddingsize is not 1!"), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            fiaInfo.opParamInfo.queryPaddingSize.tensor->GetStorageShape().GetDimNum() != DIM_NUM_1,
+            OP_LOGE_FOR_INVALID_SHAPEDIM(
+                fiaInfo.opName, "query_padding_size",
+                std::to_string(fiaInfo.opParamInfo.queryPaddingSize.tensor->GetStorageShape().GetDimNum()) + "D", "1D"),
+            return ge::GRAPH_FAILED);
     }
 
     if (fiaInfo.kvPaddingSizeFlag) {
@@ -69,9 +73,12 @@ ge::graphStatus LeftPaddingChecker::CheckShapeAndDim(const FiaTilingInfo& fiaInf
                 std::to_string(fiaInfo.opParamInfo.kvPaddingSize.tensor->GetShapeSize()).c_str(), "1");
             return ge::GRAPH_FAILED;
         }
-        OP_CHECK_IF(fiaInfo.opParamInfo.kvPaddingSize.tensor->GetStorageShape().GetDimNum() != DIM_NUM_1,
-                    OP_LOGE(fiaInfo.opName, "The dim number of key/value paddingsize is not 1!"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            fiaInfo.opParamInfo.kvPaddingSize.tensor->GetStorageShape().GetDimNum() != DIM_NUM_1,
+            OP_LOGE_FOR_INVALID_SHAPEDIM(
+                fiaInfo.opName, "kv_padding_size",
+                std::to_string(fiaInfo.opParamInfo.kvPaddingSize.tensor->GetStorageShape().GetDimNum()) + "D", "1D"),
+            return ge::GRAPH_FAILED);
     }
 
     return ge::GRAPH_SUCCESS;

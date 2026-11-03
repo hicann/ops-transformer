@@ -90,7 +90,7 @@ ge::graphStatus CommonChecker::CheckDtypeCommon(const gert::CompileTimeTensorDes
     if (desc != nullptr) {
         const auto& it = dataMap.find(name);
         OP_CHECK_IF(it == dataMap.end(),
-                    OP_LOGE("FIA", "%s dtype support list should be specified in map", name.c_str()),
+                    OP_LOGE_WITHOUT_REPORT("FIA", "%s dtype support list should be specified in map", name.c_str()),
                     return ge::GRAPH_FAILED);
         auto& expectDtypeList = it->second;
         OP_CHECK_IF(
@@ -174,12 +174,12 @@ ge::graphStatus CommonChecker::CheckPAKeyValue(const FiaTilingInfo& fiaInfo)
                 nzNoRopeDSupportList.end() ||
             std::find(nzNoRopeDSupportList.begin(), nzNoRopeDSupportList.end(), valueHeadDim) ==
                 nzNoRopeDSupportList.end()) {
-            OP_LOGE(fiaInfo.opName,
-                    "In %s %s situation, when the dim of key&value is 5, and the headDim shared by query and key is "
-                    "equal to that of value. The headDim of query|key|value should be 64 | "
-                    "128, but got valueHeadDim:%u, queryHeadDim and keyHeadDim:%u",
-                    QuantModeToSerialString(fiaInfo.quantMode).c_str(),
-                    SituationToSerialString(fiaInfo.ropeMode).c_str(), valueHeadDim, keyHeadDim);
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                fiaInfo.opName, "qkHeadDim and vHeadDim",
+                std::to_string(keyHeadDim) + " and " + std::to_string(valueHeadDim),
+                "In " + QuantModeToSerialString(fiaInfo.quantMode) + " " + SituationToSerialString(fiaInfo.ropeMode) +
+                    " situation, when the dim of key&value is 5 and the headDim shared by query and key equals "
+                    "that of value, the headDim of query|key|value should be 64 or 128");
             return ge::GRAPH_FAILED;
         }
     }
@@ -1010,7 +1010,8 @@ ge::graphStatus CommonChecker::CheckKeyShape(const FiaTilingInfo& fiaInfo)
         for (uint32_t i = 0; i < fiaInfo.kCache.size(); i++) {
             auto keyShape = fiaInfo.kCache[i]->GetStorageShape();
             if (CheckKeyNHVaild(fiaInfo, keyShape) != ge::GRAPH_SUCCESS) {
-                OP_LOGE(fiaInfo.opName, "When kv storage mode is tensorlist, the input %d of key shape is invalid", i);
+                OP_LOGE_WITHOUT_REPORT(fiaInfo.opName,
+                                       "When kv storage mode is tensorlist, the input %d of key shape is invalid", i);
                 return ge::GRAPH_FAILED;
             }
         }
@@ -1030,7 +1031,8 @@ ge::graphStatus CommonChecker::CheckQueryKeyTensorlistConsistency(const FiaTilin
     for (uint32_t i = 0; i < fiaInfo.kCache.size(); i++) {
         auto keyShape = fiaInfo.kCache[i]->GetStorageShape();
         if (CheckKeyDVaild(fiaInfo, keyShape) != ge::GRAPH_SUCCESS) {
-            OP_LOGE(fiaInfo.opName, "When kv storage mode is tensorlist, the input %d of key shape is invalid", i);
+            OP_LOGE_WITHOUT_REPORT(fiaInfo.opName,
+                                   "When kv storage mode is tensorlist, the input %d of key shape is invalid", i);
             return ge::GRAPH_FAILED;
         }
     }
@@ -1230,56 +1232,58 @@ ge::graphStatus CommonChecker::ValidateNoRopeLayoutDim(const FiaTilingInfo& fiaI
         fiaInfo.vHeadDim % 16 != 0) { // 16: qkvD need 16 align when qs>1, in specific input layout
         OP_CHECK_IF(std::find(noRopeLayoutSupportListA.begin(), noRopeLayoutSupportListA.end(), inputLayout) !=
                         noRopeLayoutSupportListA.end(),
-                    OP_LOGE(fiaInfo.opName,
-                            "In %s %s situation, when Qs>1 and input_layout is %s, headDim of query|key|value "
-                            "should be aligned to 16.",
-                            QuantModeToSerialString(fiaInfo.quantMode).c_str(),
-                            SituationToSerialString(fiaInfo.ropeMode).c_str(), inputLayout.c_str()),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        fiaInfo.opName, "vHeadDim", std::to_string(fiaInfo.vHeadDim),
+                        "In " + QuantModeToSerialString(fiaInfo.quantMode) + " " +
+                            SituationToSerialString(fiaInfo.ropeMode) + " situation, when Qs>1 and input_layout is " +
+                            inputLayout + ", headDim of query|key|value should be aligned to 16"),
                     return ge::GRAPH_FAILED);
 
         OP_CHECK_IF(std::find(noRopeLayoutSupportListB.begin(), noRopeLayoutSupportListB.end(), inputLayout) !=
                         noRopeLayoutSupportListB.end(),
-                    OP_LOGE(fiaInfo.opName,
-                            "In %s %s situation, when Qs>1 and input_layout is %s, headDim of query|key|value "
-                            "should be aligned to 16.",
-                            QuantModeToSerialString(fiaInfo.quantMode).c_str(),
-                            SituationToSerialString(fiaInfo.ropeMode).c_str(), inputLayout.c_str()),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        fiaInfo.opName, "vHeadDim", std::to_string(fiaInfo.vHeadDim),
+                        "In " + QuantModeToSerialString(fiaInfo.quantMode) + " " +
+                            SituationToSerialString(fiaInfo.ropeMode) + " situation, when Qs>1 and input_layout is " +
+                            inputLayout + ", headDim of query|key|value should be aligned to 16"),
                     return ge::GRAPH_FAILED);
     }
 
     if (fiaInfo.isLegacyIfa &&
         (fiaInfo.vHeadDim != 64 &&
          fiaInfo.vHeadDim != 128)) { // 64: qkvD need 64 128: qkvD need 128 in specific input layout
-        OP_CHECK_IF(std::find(noRopeLayoutSupportListB.begin(), noRopeLayoutSupportListB.end(), inputLayout) !=
-                        noRopeLayoutSupportListB.end(),
-                    OP_LOGE(fiaInfo.opName,
-                            "In %s %s situation, when Qs=1 and input_layout is BNSD_BSND, only query|key|value "
-                            "headDim = 64/128 are supported, but got %u",
-                            QuantModeToSerialString(fiaInfo.quantMode).c_str(),
-                            SituationToSerialString(fiaInfo.ropeMode).c_str(), fiaInfo.vHeadDim),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            std::find(noRopeLayoutSupportListB.begin(), noRopeLayoutSupportListB.end(), inputLayout) !=
+                noRopeLayoutSupportListB.end(),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                fiaInfo.opName, "vHeadDim", std::to_string(fiaInfo.vHeadDim),
+                "In " + QuantModeToSerialString(fiaInfo.quantMode) + " " + SituationToSerialString(fiaInfo.ropeMode) +
+                    " situation, when Qs=1 and input_layout is BNSD_BSND, only query|key|value headDim = "
+                    "64/128 are supported"),
+            return ge::GRAPH_FAILED);
     }
 
     if (std::find(noRopeLayoutSupportListC.begin(), noRopeLayoutSupportListC.end(), inputLayout) !=
         noRopeLayoutSupportListC.end()) {
-        OP_CHECK_IF(fiaInfo.vHeadDim != 64 && fiaInfo.vHeadDim != 128,
-                    OP_LOGE(fiaInfo.opName,
-                            "In %s %s situation, when input_layout is NTD, BSH_BNSD, BSND_BNSD, NTD_TND, only "
-                            "query|key|value headDim = 64/128 are supported, but got %u",
-                            QuantModeToSerialString(fiaInfo.quantMode).c_str(),
-                            SituationToSerialString(fiaInfo.ropeMode).c_str(), fiaInfo.vHeadDim),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            fiaInfo.vHeadDim != 64 && fiaInfo.vHeadDim != 128,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                fiaInfo.opName, "vHeadDim", std::to_string(fiaInfo.vHeadDim),
+                "In " + QuantModeToSerialString(fiaInfo.quantMode) + " " + SituationToSerialString(fiaInfo.ropeMode) +
+                    " situation, when input_layout is NTD, BSH_BNSD, BSND_BNSD, NTD_TND, only "
+                    "query|key|value headDim = 64/128 are supported"),
+            return ge::GRAPH_FAILED);
     }
 
     if (std::find(noRopeLayoutSupportListD.begin(), noRopeLayoutSupportListD.end(), inputLayout) !=
         noRopeLayoutSupportListD.end()) {
         OP_CHECK_IF(
             fiaInfo.vHeadDim != 64 && fiaInfo.vHeadDim != 128 && fiaInfo.vHeadDim != 192 && fiaInfo.vHeadDim != 256,
-            OP_LOGE(fiaInfo.opName,
-                    "In %s %s situation, when input_layout is TND, only query|key|value headDim = "
-                    "64/128/192/256 are supported, but got %u",
-                    QuantModeToSerialString(fiaInfo.quantMode).c_str(),
-                    SituationToSerialString(fiaInfo.ropeMode).c_str(), fiaInfo.vHeadDim),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(fiaInfo.opName, "vHeadDim", std::to_string(fiaInfo.vHeadDim),
+                                                  "In " + QuantModeToSerialString(fiaInfo.quantMode) + " " +
+                                                      SituationToSerialString(fiaInfo.ropeMode) +
+                                                      " situation, when input_layout is TND, only query|key|value "
+                                                      "headDim = 64/128/192/256 are supported"),
             return ge::GRAPH_FAILED);
     }
 
@@ -1308,10 +1312,10 @@ ge::graphStatus CommonChecker::CheckInputLayout(const FiaTilingInfo& fiaInfo)
                                                                 "NTD_TND", "BSH_BNSD", "BSND_BNSD", "BNSD_BSND"};
             OP_CHECK_IF(
                 std::find(INPUT_LAYOUT_LIST.begin(), INPUT_LAYOUT_LIST.end(), inputLayout) == INPUT_LAYOUT_LIST.end(),
-                OP_LOGE(fiaInfo.opName,
-                        "When gqa noquant scenario is applied, layout only supports BSH, BSND, BNSD, TND, "
-                        "NTD, NTD_TND, BSH_BNSD, BSND_BNSD, BNSD_BSND, but got %s",
-                        inputLayout.c_str()),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    fiaInfo.opName, "input_layout", inputLayout,
+                    "When gqa noquant scenario is applied, input_layout only supports BSH, BSND, BNSD, TND, "
+                    "NTD, NTD_TND, BSH_BNSD, BSND_BNSD, BNSD_BSND"),
                 return ge::GRAPH_FAILED);
             return ValidateNoRopeLayoutDim(fiaInfo, inputLayout);
         }
@@ -1336,14 +1340,14 @@ ge::graphStatus CommonChecker::CheckInputLayout(const FiaTilingInfo& fiaInfo)
         } else {
             OP_CHECK_IF(fiaInfo.ropeMode == RopeMode::ROPE_COMBINE &&
                             (fiaInfo.qkHeadDim != NUM_192 || fiaInfo.vHeadDim != NUM_128),
-                        OP_LOGE(fiaInfo.opName,
-                                "In %s %s situation, when input_layout is BSH, BSND, BNSD, BNSD_BSND, TND, NTD, "
-                                "BSH_BNSD, BSND_BNSD, NTD_TND, "
-                                "and the headDim shared by query and key is not equal to that of value, "
-                                "only query|key headDim = 192, value headDim = 128 are supported, "
-                                "but got query|key headDim: %u, value headDim: %u",
-                                QuantModeToSerialString(fiaInfo.quantMode).c_str(),
-                                SituationToSerialString(fiaInfo.ropeMode).c_str(), fiaInfo.qkHeadDim, fiaInfo.vHeadDim),
+                        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                            fiaInfo.opName, "qkHeadDim and vHeadDim",
+                            std::to_string(fiaInfo.qkHeadDim) + " and " + std::to_string(fiaInfo.vHeadDim),
+                            "In " + QuantModeToSerialString(fiaInfo.quantMode) + " " +
+                                SituationToSerialString(fiaInfo.ropeMode) +
+                                " situation, when input_layout is BSH, BSND, BNSD, BNSD_BSND, TND, NTD, BSH_BNSD, "
+                                "BSND_BNSD, NTD_TND, and the headDim shared by query and key is not equal to that "
+                                "of value, only query|key headDim = 192, value headDim = 128 are supported"),
                         return ge::GRAPH_FAILED);
         }
     }
@@ -1528,7 +1532,7 @@ ge::graphStatus CommonChecker::CheckKVStorageConsistency(const FiaTilingInfo& fi
         }
     } else if (fiaInfo.kvStorageMode == KvStorageMode::TENSOR_LIST) {
         OP_CHECK_IF((CheckTensorList(fiaInfo)) != ge::GRAPH_SUCCESS,
-                    OPS_REPORT_VECTOR_INNER_ERR(fiaInfo.opName, "Check Tensorlist failed!"), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "Check Tensorlist failed!"), return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }

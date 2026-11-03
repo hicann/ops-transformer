@@ -267,15 +267,13 @@ ge::graphStatus PostQuantChecker::CheckFeatureRowValid(const FiaTilingInfo& fiaI
                                                    static_cast<int64_t>(fiaInfo.systemPrefixLen) - actualSeqLengths[i] <
                                                0) ||
                                               (nextTokensPerbatch < 0))),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        fiaInfo.opName,
-                        "When sparse mode = %d, output dtype is INT8, the output's dequant offset "
-                        "is not null or empty tensor, "
-                        "preTokens = %ld and nextTokens = %ld, some rows of the matrix do not "
-                        "participate in the calculation, "
-                        "the accuracy of the final result will be incorrect. Please see the "
-                        "documentation for more details.",
-                        fiaInfo.sparseMode, preTokens, nextTokens),
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        fiaInfo.opName, "pre_tokens and next_tokens",
+                        (std::to_string(preTokens) + " and " + std::to_string(nextTokens)).c_str(),
+                        "When sparse mode is set and output dtype is INT8, the output's dequant offset is not null "
+                        "or empty tensor, some rows of the matrix do not participate in the calculation, the "
+                        "accuracy of the final result will be incorrect. Please see the documentation for more "
+                        "details."),
                     return ge::GRAPH_FAILED);
             }
         }

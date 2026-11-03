@@ -31,6 +31,15 @@ using namespace ge;
 using namespace AscendC;
 namespace optiling {
 
+// 合法输入下 Tiling 失败时，按 EZ1008 正式错误码首报（Arglist: op_name, reason），并输出 PLOG 上下文
+inline void ReportTilingFailure(const gert::TilingContext* context, const char* reason)
+{
+    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "%s\n", reason);
+    const std::vector<const char*> msgKey = {"op_name", "reason"};
+    const std::vector<const char*> msgvalue = {context->GetNodeName(), reason};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgvalue);
+}
+
 namespace {
 // 判断tensor是否连续，逻辑与 BaseChecker::CheckTensorContiguous 一致
 ge::graphStatus CheckTensorContiguousLocal(const uint32_t& tensorDimNum, const gert::Shape& inputShape,
@@ -62,21 +71,23 @@ ge::graphStatus CheckTensorContiguousLocal(const uint32_t& tensorDimNum, const g
 ge::graphStatus ValidateStrideLocal(const char* opName, const char* tensorName, const gert::Shape& inputShape,
                                     const gert::Stride* strides)
 {
-    OP_CHECK_IF(strides == nullptr, OP_LOGE(opName, "Failed to get stride metadata for view input %s.", tensorName),
+    OP_CHECK_IF(strides == nullptr,
+                OP_LOGE_WITHOUT_REPORT(opName, "Failed to get stride metadata for view input %s.", tensorName),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(strides->GetDimNum() < inputShape.GetDimNum(),
-                OP_LOGE(opName, "The stride rank of %s is %zu, which is smaller than its input rank %zu.", tensorName,
-                        static_cast<size_t>(strides->GetDimNum()), static_cast<size_t>(inputShape.GetDimNum())),
+                OP_LOGE_FOR_INVALID_STRIDE(opName, tensorName, std::to_string(strides->GetDimNum()),
+                                           std::to_string(inputShape.GetDimNum())),
                 return ge::GRAPH_FAILED);
     // Empty tensors may carry zero strides on non-singleton dimensions.
     if (inputShape.GetShapeSize() == 0) {
         return ge::GRAPH_SUCCESS;
     }
     for (uint32_t dim = 0; dim < inputShape.GetDimNum(); ++dim) {
-        OP_CHECK_IF(
-            inputShape.GetDim(dim) > 1 && strides->GetStride(dim) <= 0,
-            OP_LOGE(opName, "The stride of %s at non-singleton dimension %u must be greater than 0.", tensorName, dim),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(inputShape.GetDim(dim) > 1 && strides->GetStride(dim) <= 0,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName, tensorName, std::to_string(strides->GetStride(dim)),
+                        "The stride at non-singleton dimension " + std::to_string(dim) + " must be greater than 0"),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -94,10 +105,12 @@ void BuildContiguousStride(const gert::Shape& shape, gert::Stride& strides)
 ge::graphStatus ValidateForwardedStrideRankLocal(const char* opName, const char* tensorName,
                                                  const gert::Stride* strides, uint32_t requiredRank)
 {
-    OP_CHECK_IF(strides == nullptr || strides->GetDimNum() < requiredRank,
-                OP_LOGE(opName, "The stride rank of %s must be at least %u for the selected PA layout.", tensorName,
-                        requiredRank),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        strides == nullptr || strides->GetDimNum() < requiredRank,
+        OP_LOGE_FOR_INVALID_STRIDE(opName, tensorName,
+                                   strides == nullptr ? std::string("nullptr") : std::to_string(strides->GetDimNum()),
+                                   std::to_string(requiredRank) + " or more for the selected PA layout"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -303,7 +316,7 @@ ge::graphStatus FiaInfoParser::GetActualSeqLenQSize(uint32_t& size)
 ge::graphStatus FiaInfoParser::GetOpName()
 {
     if (context_->GetNodeName() == nullptr) {
-        OP_LOGE("FusedInferAttentionScore", "opName got from TilingContext is nullptr");
+        OP_LOGE_WITHOUT_REPORT("FusedInferAttentionScore", "opName got from TilingContext is nullptr");
         return ge::GRAPH_FAILED;
     }
     opName_ = context_->GetNodeName();
@@ -376,22 +389,25 @@ ge::graphStatus FiaInfoParser::GetStrides()
     }
 
     OP_CHECK_IF(keyIsView && !HasStrideMetadata(kStrideCache_),
-                OP_LOGE(opName_, "Failed to get stride metadata for view input key."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(opName_, "Failed to get stride metadata for view input key."),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(valueIsView && !HasStrideMetadata(vStrideCache_),
-                OP_LOGE(opName_, "Failed to get stride metadata for view input value."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(opName_, "Failed to get stride metadata for view input value."),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(keyRopeIsView && kRopeStrides_ == nullptr,
-                OP_LOGE(opName_, "Failed to get stride metadata for view input keyRope."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(opName_, "Failed to get stride metadata for view input keyRope."),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(keyScaleIsView && kScaleStrides_ == nullptr,
-                OP_LOGE(opName_, "Failed to get stride metadata for view input keyAntiquantScale."),
+                OP_LOGE_WITHOUT_REPORT(opName_, "Failed to get stride metadata for view input keyAntiquantScale."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(valueScaleIsView && vScaleStrides_ == nullptr,
-                OP_LOGE(opName_, "Failed to get stride metadata for view input valueAntiquantScale."),
+                OP_LOGE_WITHOUT_REPORT(opName_, "Failed to get stride metadata for view input valueAntiquantScale."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(keyOffsetIsView && kOffsetStrides_ == nullptr,
-                OP_LOGE(opName_, "Failed to get stride metadata for view input keyAntiquantOffset."),
+                OP_LOGE_WITHOUT_REPORT(opName_, "Failed to get stride metadata for view input keyAntiquantOffset."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(valueOffsetIsView && vOffsetStrides_ == nullptr,
-                OP_LOGE(opName_, "Failed to get stride metadata for view input valueAntiquantOffset."),
+                OP_LOGE_WITHOUT_REPORT(opName_, "Failed to get stride metadata for view input valueAntiquantOffset."),
                 return ge::GRAPH_FAILED);
 
     if (HasUsableStride(kStrideCache_[0])) {
@@ -592,13 +608,13 @@ ge::graphStatus FiaInfoParser::GetKvStrideValues()
 ge::graphStatus FiaInfoParser::GetNpuInfo()
 {
     platformInfo_ = context_->GetPlatformInfo();
-    OP_CHECK_IF(platformInfo_ == nullptr, OPS_REPORT_VECTOR_INNER_ERR(opName_, "GetPlatformInfo is nullptr."),
+    OP_CHECK_IF(platformInfo_ == nullptr, ReportTilingFailure(context_, "GetPlatformInfo is nullptr."),
                 return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo_);
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
     uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
-    OP_CHECK_IF(aicNum == 0 || aivNum == 0, OPS_REPORT_VECTOR_INNER_ERR(opName_, "num of core obtained is 0."),
+    OP_CHECK_IF(aicNum == 0 || aivNum == 0, ReportTilingFailure(context_, "num of core obtained is 0."),
                 return GRAPH_FAILED);
 
     socVersion_ = ascendcPlatform.GetSocVersion();
@@ -606,8 +622,10 @@ ge::graphStatus FiaInfoParser::GetNpuInfo()
     if ((socVersion_ != platform_ascendc::SocVersion::ASCEND310P) &&
         (socVersion_ != platform_ascendc::SocVersion::ASCEND910B) && (npuArch_ != Ops::Base::DAV_3510) &&
         (npuArch_ != Ops::Base::DAV_9201) && (npuArch_ != Ops::Base::DAV_9202)) {
-        OPS_REPORT_VECTOR_INNER_ERR(opName_, "SOC Version[%d]/NpuArch[%d] is not support.",
-                                    static_cast<int32_t>(socVersion_), static_cast<int32_t>(npuArch_));
+        ReportTilingFailure(
+            context_, (std::string("SOC Version[") + std::to_string(static_cast<int32_t>(socVersion_)) + "]/NpuArch[" +
+                       std::to_string(static_cast<int32_t>(npuArch_)) + "] is not support.")
+                          .c_str());
         return GRAPH_FAILED;
     }
 
@@ -744,7 +762,7 @@ void FiaInfoParser::GetOutputParaInfo()
 ge::graphStatus FiaInfoParser::GetAttrParaInfo()
 {
     auto attrs = context_->GetAttrs();
-    OP_CHECK_IF(attrs == nullptr, OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "attrs got from ge is nullptr"),
+    OP_CHECK_IF(attrs == nullptr, ReportTilingFailure(context_, "attrs got from ge is nullptr"),
                 return ge::GRAPH_FAILED);
 
     // sparseMode,preToken,nextToken在GetUpdateInfo()中获取
@@ -1487,12 +1505,14 @@ ge::graphStatus FiaInfoParser::GetAttenMaskInfo()
     // only bss & b1ss & bs need to calc attenMaskSize_ , attenMaskSize_ is uesed to calc batch offset
     if (attenMaskFlag_) {
         if (opParamInfo_.sparseMode == nullptr) {
-            OP_LOGE(opName_, "sparse_mode attr is nullptr");
+            OP_LOGE_WITH_INVALID_INPUT(opName_, "sparse_mode");
             return ge::GRAPH_FAILED;
         }
         int32_t sparseMode = *opParamInfo_.sparseMode;
         if (sparseMode == 9U && npuArch_ == Ops::Base::DAV_3510) {
-            OP_LOGE(opName_, "NpuArch[%d] currently does not support sparse9.", static_cast<int32_t>(npuArch_));
+            ReportTilingFailure(context_, (std::string("NpuArch[") + std::to_string(static_cast<int32_t>(npuArch_)) +
+                                           "] currently does not support sparse9.")
+                                              .c_str());
             return ge::GRAPH_FAILED;
         }
         if (sparseMode == 9U) {
@@ -1949,7 +1969,7 @@ void FiaInfoParser::GenerateDtypeInfo(FiaTilingInfo& fiaInfo)
 ge::graphStatus FiaInfoParser::Parse(FiaTilingInfo& fiaInfo)
 {
     if (context_ == nullptr) {
-        OP_LOGE(fiaInfo.opName, "tiling context is nullptr!");
+        OP_LOGE_WITHOUT_REPORT(fiaInfo.opName, "tiling context is nullptr!");
         return ge::GRAPH_FAILED;
     }
 

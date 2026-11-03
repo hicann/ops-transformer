@@ -300,14 +300,13 @@ ge::graphStatus MaskChecker::CheckFeatureSparseMode(const FiaTilingInfo& fiaInfo
             if (fiaInfo.kvSize[i] == 0) {
                 continue;
             }
-            OP_CHECK_IF(
-                fiaInfo.qSize[i] > fiaInfo.kvSize[i],
-                OP_LOGE(fiaInfo.opName,
-                        "In %s situation, when sparse is %d, qSize[%d] should less than or equal to kvSize[%d], "
-                        "but got qSize %d and kvSize %d.",
-                        QuantModeToSerialString(fiaInfo.quantMode).c_str(), sparseMode, i, i, fiaInfo.qSize[i],
-                        fiaInfo.kvSize[i]),
-                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(fiaInfo.qSize[i] > fiaInfo.kvSize[i],
+                        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                            fiaInfo.opName, "qSize and kvSize",
+                            (std::to_string(fiaInfo.qSize[i]) + " and " + std::to_string(fiaInfo.kvSize[i])).c_str(),
+                            "In " + QuantModeToSerialString(fiaInfo.quantMode) + " situation, when sparse is " +
+                                std::to_string(sparseMode) + ", qSize should be less than or equal to kvSize"),
+                        return ge::GRAPH_FAILED);
         }
     }
     return ge::GRAPH_SUCCESS;
@@ -358,8 +357,10 @@ ge::graphStatus MaskChecker::CheckIFAMask2DShape(const FiaTilingInfo& fiaInfo, c
                 return ge::GRAPH_FAILED;
             }
         } else {
-            OP_LOGE(fiaInfo.opName, "In gqa noquant situation, rope exits or qkHeadDim != vHeadDim, "
-                                    "when sparseMode = 0 or 1, two dim mask is not supported.");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                fiaInfo.opName, "atten_mask",
+                "In gqa noquant situation, rope exits or qkHeadDim != vHeadDim, when sparseMode = 0 or 1, two dim "
+                "mask is not supported.");
             return ge::GRAPH_FAILED;
         }
     } else {
@@ -494,8 +495,10 @@ ge::graphStatus MaskChecker::CheckAndProcess2DMask(const FiaTilingInfo& fiaInfo,
                     return ge::GRAPH_FAILED;
                 }
             } else {
-                OP_LOGE(fiaInfo.opName, "In gqa no quant situation, rope exits or qkHeadDim != vHeadDim, "
-                                        "when sparseMode = 0 or 1, two dim mask is not supported.");
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    fiaInfo.opName, "atten_mask",
+                    "In gqa no quant situation, rope exits or qkHeadDim != vHeadDim, when sparseMode = 0 or 1, "
+                    "two dim mask is not supported.");
                 return ge::GRAPH_FAILED;
             }
         }

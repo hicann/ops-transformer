@@ -44,16 +44,16 @@ void FiaTilingCheck::SetFiaShapeCompare()
 ge::graphStatus FiaTilingCheck::CheckQAndQRopeDType() const
 {
     if (opParamInfo_.query.desc->GetDataType() != inputQType_) {
-        OP_LOGE(opName_, "%s's dtype is %s, it should be %s.", QUERY_NAME.c_str(),
-                FusedDataTypeToSerialString(opParamInfo_.query.desc->GetDataType()).c_str(),
-                FusedDataTypeToSerialString(inputQType_).c_str());
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "query",
+                                  FusedDataTypeToSerialString(opParamInfo_.query.desc->GetDataType()).c_str(),
+                                  FusedDataTypeToSerialString(inputQType_).c_str());
         return ge::GRAPH_FAILED;
     }
     if (ropeMode_ == RopeMode::ROPE_SPLIT) {
         if (opParamInfo_.queryRope.desc->GetDataType() != inputQRopeType_) {
-            OP_LOGE(opName_, "%s's dtype is %s, it should be %s.", QUERY_NAME.c_str(),
-                    FusedDataTypeToSerialString(opParamInfo_.queryRope.desc->GetDataType()).c_str(),
-                    FusedDataTypeToSerialString(inputQRopeType_).c_str());
+            OP_LOGE_FOR_INVALID_DTYPE(opName_, "queryRope",
+                                      FusedDataTypeToSerialString(opParamInfo_.queryRope.desc->GetDataType()).c_str(),
+                                      FusedDataTypeToSerialString(inputQRopeType_).c_str());
             return ge::GRAPH_FAILED;
         }
     }
@@ -106,22 +106,22 @@ ge::graphStatus FiaTilingCheck::CheckQAndQRope() const
 ge::graphStatus FiaTilingCheck::CheckKVDType() const
 {
     if (opParamInfo_.key.desc->GetDataType() != inputKvType_) {
-        OP_LOGE(opName_, "%s's dtype is %s, it should be %s.", KEY_NAME.c_str(),
-                FusedDataTypeToSerialString(opParamInfo_.key.desc->GetDataType()).c_str(),
-                FusedDataTypeToSerialString(inputKvType_).c_str());
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "key",
+                                  FusedDataTypeToSerialString(opParamInfo_.key.desc->GetDataType()).c_str(),
+                                  FusedDataTypeToSerialString(inputKvType_).c_str());
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo_.value.desc->GetDataType() != inputKvType_) {
-        OP_LOGE(opName_, "%s's dtype is %s, it should be %s.", VALUE_NAME.c_str(),
-                FusedDataTypeToSerialString(opParamInfo_.value.desc->GetDataType()).c_str(),
-                FusedDataTypeToSerialString(inputKvType_).c_str());
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "value",
+                                  FusedDataTypeToSerialString(opParamInfo_.value.desc->GetDataType()).c_str(),
+                                  FusedDataTypeToSerialString(inputKvType_).c_str());
         return ge::GRAPH_FAILED;
     }
     if (ropeMode_ == RopeMode::ROPE_SPLIT) {
         if (opParamInfo_.keyRope.desc->GetDataType() != inputKRopeType_) {
-            OP_LOGE(opName_, "%s's dtype is %s, it should be %s.", KEY_ROPE_NAME.c_str(),
-                    FusedDataTypeToSerialString(opParamInfo_.keyRope.desc->GetDataType()).c_str(),
-                    FusedDataTypeToSerialString(inputKRopeType_).c_str());
+            OP_LOGE_FOR_INVALID_DTYPE(opName_, "keyRope",
+                                      FusedDataTypeToSerialString(opParamInfo_.keyRope.desc->GetDataType()).c_str(),
+                                      FusedDataTypeToSerialString(inputKRopeType_).c_str());
             return ge::GRAPH_FAILED;
         }
     }
@@ -225,12 +225,18 @@ ge::graphStatus FiaTilingCheck::CheckBlockTable() const
     }
 
     OP_CHECK_IF(opParamInfo_.blockTable.tensor->GetStorageShape().GetShapeSize() == 0,
-                OP_LOGE(opName_, "%s shape size is zero.", BLOCK_TABLE_NAME.c_str()), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                    opName_, "blockTable",
+                    std::to_string(opParamInfo_.blockTable.tensor->GetStorageShape().GetShapeSize()).c_str(),
+                    "The shape size of blockTable should be greater than 0"),
+                return ge::GRAPH_FAILED);
 
     uint32_t blockTableBatch = opParamInfo_.blockTable.tensor->GetStorageShape().GetDim(0);
     OP_CHECK_IF(qLayout_ == FiaLayout::TND && blockTableBatch != bSize_,
-                OP_LOGE(opName_, "when %s's layout is TND, %s's first dimension(%u) should be equal to batch size(%u)",
-                        QUERY_NAME.c_str(), BLOCK_TABLE_NAME.c_str(), blockTableBatch, bSize_),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "blockTable", ("[" + std::to_string(blockTableBatch) + "]").c_str(),
+                    "When query's layout is TND, the first dimension of blockTable should be equal to batch size(" +
+                        std::to_string(bSize_) + ")"),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -240,9 +246,11 @@ ge::graphStatus FiaTilingCheck::CheckKVShapeForPageAttention() const
 {
     uint32_t kvBlockElemNum = 32 / GetTypeSize(inputKvType_);
     if (blockSize_ % static_cast<int32_t>(kvBlockElemNum) != 0) {
-        OP_LOGE(opName_,
-                "when kv_dtype is %s, 32 / sizeof(kv_dtype) is %u, block_size %% (32 / sizeof(kv_dtype)) should be 0.",
-                FusedDataTypeToSerialString(inputKvType_).c_str(), kvBlockElemNum);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            opName_, "block_size", std::to_string(blockSize_).c_str(),
+            ("when kv_dtype is " + FusedDataTypeToSerialString(inputKvType_) + ", 32 / sizeof(kv_dtype) is " +
+             std::to_string(kvBlockElemNum) + ", block_size % (32 / sizeof(kv_dtype)) should be 0")
+                .c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -268,10 +276,12 @@ ge::graphStatus FiaTilingCheck::CheckKVShapeForPageAttention() const
     if (ropeMode_ == RopeMode::ROPE_SPLIT) {
         uint32_t kRopeBlockElemNum = 32 / GetTypeSize(inputKRopeType_);
         if (blockSize_ % static_cast<int32_t>(kRopeBlockElemNum) != 0) {
-            OP_LOGE(opName_,
-                    "when key_rope_dtype is %s, 32 / sizeof(key_rope_dtype) is %u, block_size %% (32 / "
-                    "sizeof(key_rope_dtype)) should be 0.",
-                    FusedDataTypeToSerialString(inputKRopeType_).c_str(), kRopeBlockElemNum);
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                opName_, "block_size", std::to_string(blockSize_).c_str(),
+                ("when key_rope_dtype is " + FusedDataTypeToSerialString(inputKRopeType_) +
+                 ", 32 / sizeof(key_rope_dtype) is " + std::to_string(kRopeBlockElemNum) +
+                 ", block_size % (32 / sizeof(key_rope_dtype)) should be 0")
+                    .c_str());
             return ge::GRAPH_FAILED;
         }
         shapeParams.D = static_cast<int64_t>(ropeHeadDim_);
@@ -298,7 +308,8 @@ ge::graphStatus FiaTilingCheck::CheckKVShape() const
         return CheckKVShapeForPageAttention();
     }
 
-    OP_LOGE(opName_, "storage mode of key and value is %u, it is incorrect.", static_cast<uint32_t>(kvStorageMode_));
+    OP_LOGE_WITHOUT_REPORT(opName_, "storage mode of key and value is %u, it is incorrect.",
+                           static_cast<uint32_t>(kvStorageMode_));
     return ge::GRAPH_FAILED;
 }
 
@@ -333,14 +344,18 @@ ge::graphStatus FiaTilingCheck::CheckActualSeqLensQ() const
 
     if (qLayout_ == FiaLayout::TND) {
         if (actualSeqLengthsQSize_ != bSize_ && actualSeqLengthsQSize_ != 1U) {
-            OP_LOGE(opName_, "%s shape size is %u, it should be equal to batch size(%u) or equal to 1.",
-                    ACTUAL_SEQ_Q_LEN_NAME.c_str(), actualSeqLengthsQSize_, bSize_);
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                opName_, "actualSeqLengths", std::to_string(actualSeqLengthsQSize_).c_str(),
+                "The shape size of actualSeqLengths should be equal to batch size(" + std::to_string(bSize_) +
+                    ") or equal to 1");
             return ge::GRAPH_FAILED;
         }
     } else {
         if (actualSeqLengthsQSize_ < bSize_ && actualSeqLengthsQSize_ != 1U) {
-            OP_LOGE(opName_, "%s shape size is %u, it should be bigger or equal to batch size(%u) or equal to 1.",
-                    ACTUAL_SEQ_Q_LEN_NAME.c_str(), actualSeqLengthsQSize_, bSize_);
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                opName_, "actualSeqLengths", std::to_string(actualSeqLengthsQSize_).c_str(),
+                "The shape size of actualSeqLengths should be bigger or equal to batch size(" + std::to_string(bSize_) +
+                    ") or equal to 1");
             return ge::GRAPH_FAILED;
         }
     }
@@ -358,23 +373,26 @@ ge::graphStatus FiaTilingCheck::CheckActualSeqLensKv() const
         if (opParamInfo_.actualSeqLengthsQ.tensor != nullptr &&
             opParamInfo_.actualSeqLengthsQ.tensor->GetData<int64_t>() != nullptr &&
             actualSeqLengthsKvSize_ != actualSeqLengthsQSize_) {
-            OP_LOGE(opName_,
-                    "when key/value's layout is TND, %s shape size is %u, it should be equal to %s shape size(%u).",
-                    ACTUAL_SEQ_KV_LEN_NAME.c_str(), actualSeqLengthsKvSize_, ACTUAL_SEQ_Q_LEN_NAME.c_str(),
-                    actualSeqLengthsQSize_);
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                opName_, "actualSeqLengthsKv", std::to_string(actualSeqLengthsKvSize_).c_str(),
+                "When key/value's layout is TND, the shape size of actualSeqLengthsKv should be equal to the shape "
+                "size of actualSeqLengths(" +
+                    std::to_string(actualSeqLengthsQSize_) + ")");
             return ge::GRAPH_FAILED;
         }
         if (actualSeqLengthsKvSize_ != bSize_ && actualSeqLengthsKvSize_ != 1U) {
-            OP_LOGE(opName_,
-                    "when key/value's layout is TND, %s shape size is %u, it should be equal to batch size(%u) or "
-                    "equal to 1.",
-                    ACTUAL_SEQ_KV_LEN_NAME.c_str(), actualSeqLengthsKvSize_, bSize_);
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                opName_, "actualSeqLengthsKv", std::to_string(actualSeqLengthsKvSize_).c_str(),
+                "When key/value's layout is TND, the shape size of actualSeqLengthsKv should be equal to batch size(" +
+                    std::to_string(bSize_) + ") or equal to 1");
             return ge::GRAPH_FAILED;
         }
     } else {
         if (actualSeqLengthsKvSize_ < bSize_ && actualSeqLengthsKvSize_ != 1U) {
-            OP_LOGE(opName_, "%s shape size is %u, it should be bigger or equal to batch size(%u) or equal to 1.",
-                    ACTUAL_SEQ_KV_LEN_NAME.c_str(), actualSeqLengthsKvSize_, bSize_);
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                opName_, "actualSeqLengthsKv", std::to_string(actualSeqLengthsKvSize_).c_str(),
+                "The shape size of actualSeqLengthsKv should be bigger or equal to batch size(" +
+                    std::to_string(bSize_) + ") or equal to 1");
             return ge::GRAPH_FAILED;
         }
     }
@@ -397,18 +415,16 @@ ge::graphStatus FiaTilingCheck::CheckPseShiftDType()
 {
     if ((inputQType_ == ge::DT_FLOAT16 || inputQType_ == ge::DT_BF16) &&
         opParamInfo_.pseShift.desc->GetDataType() != inputQType_) {
-        OP_LOGE(opName_, "when query's dtype is %s, pseShift dtype should be %s, but got %s.",
-                FusedDataTypeToSerialString(opParamInfo_.query.desc->GetDataType()).c_str(),
-                FusedDataTypeToSerialString(inputQType_).c_str(),
-                FusedDataTypeToSerialString(opParamInfo_.pseShift.desc->GetDataType()).c_str());
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "pseShift",
+                                  FusedDataTypeToSerialString(opParamInfo_.pseShift.desc->GetDataType()).c_str(),
+                                  FusedDataTypeToSerialString(inputQType_).c_str());
         return ge::GRAPH_FAILED;
     }
 
     if (inputQType_ == ge::DT_INT8 && (s1Size_ <= 1 || opParamInfo_.pseShift.desc->GetDataType() != ge::DT_FLOAT16)) {
-        OP_LOGE(opName_, "when query's dtype is %s, pseShift dtype should be %s, but got %s.",
-                FusedDataTypeToSerialString(opParamInfo_.query.desc->GetDataType()).c_str(),
-                FusedDataTypeToSerialString(inputQType_).c_str(),
-                FusedDataTypeToSerialString(opParamInfo_.pseShift.desc->GetDataType()).c_str());
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            opName_, "pseShift", FusedDataTypeToSerialString(opParamInfo_.pseShift.desc->GetDataType()).c_str(),
+            "when query's dtype is INT8, pseShift dtype should be FLOAT16");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -461,17 +477,16 @@ ge::graphStatus FiaTilingCheck::CheckSystemPrefix()
 ge::graphStatus FiaTilingCheck::CheckSystemPrefixDtype()
 {
     if (opParamInfo_.keySharedPrefix.desc->GetDataType() != inputKvType_) {
-        OP_LOGE(opName_, "when key's dtype is %s, keySharedPrefix dtype should be %s, but got %s.",
-                FusedDataTypeToSerialString(opParamInfo_.key.desc->GetDataType()).c_str(),
-                FusedDataTypeToSerialString(inputKvType_).c_str(),
-                FusedDataTypeToSerialString(opParamInfo_.keySharedPrefix.desc->GetDataType()).c_str());
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "keySharedPrefix",
+                                  FusedDataTypeToSerialString(opParamInfo_.keySharedPrefix.desc->GetDataType()).c_str(),
+                                  FusedDataTypeToSerialString(inputKvType_).c_str());
         return ge::GRAPH_FAILED;
     }
     if (opParamInfo_.valueSharedPrefix.desc->GetDataType() != inputKvType_) {
-        OP_LOGE(opName_, "when value's dtype is %s, valueSharedPrefix dtype should be %s, but got %s.",
-                FusedDataTypeToSerialString(opParamInfo_.value.desc->GetDataType()).c_str(),
-                FusedDataTypeToSerialString(inputKvType_).c_str(),
-                FusedDataTypeToSerialString(opParamInfo_.valueSharedPrefix.desc->GetDataType()).c_str());
+        OP_LOGE_FOR_INVALID_DTYPE(
+            opName_, "valueSharedPrefix",
+            FusedDataTypeToSerialString(opParamInfo_.valueSharedPrefix.desc->GetDataType()).c_str(),
+            FusedDataTypeToSerialString(inputKvType_).c_str());
         return ge::GRAPH_FAILED;
     }
 
@@ -489,11 +504,15 @@ ge::graphStatus FiaTilingCheck::CheckSystemPrefixShape()
         std::make_shared<FiaTilingShapeCompare>(prefixKShape, kvLayout_, KEY_SHARED_PREFIX_NAME, opName_);
 
     if (prefixKShape != prefixVShape) {
-        OP_LOGE(opName_, "Prefix shapes mismatch: prefix key shape and prefix value shape");
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName_, "keySharedPrefix, valueSharedPrefix",
+                                               (GetShapeStr(prefixKShape) + ", " + GetShapeStr(prefixVShape)).c_str(),
+                                               "Prefix shapes mismatch: prefix key shape and prefix value shape");
         return ge::GRAPH_FAILED;
     }
     if (prefixKShape.GetDim(0) != 1) {
-        OP_LOGE(opName_, "System prefix is enabled, Prefix batch dimension must be 1, got %ld", prefixKShape.GetDim(0));
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "keySharedPrefix",
+                                                 std::to_string(prefixKShape.GetDim(0)).c_str(),
+                                                 "System prefix is enabled, Prefix batch dimension must be 1");
         return ge::GRAPH_FAILED;
     }
 
@@ -510,7 +529,10 @@ ge::graphStatus FiaTilingCheck::CheckSystemPrefixShape()
         return ge::GRAPH_FAILED;
     }
     if (fiaInfo_.systemPrefixLen > fiaInfo_.systemPrefixMaxLen) {
-        OP_LOGE(opName_, "actual prefix len should be less than or equal to prefixlen");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "actualSharedPrefixLen",
+                                              std::to_string(fiaInfo_.systemPrefixLen).c_str(),
+                                              "actual prefix len should be less than or equal to prefixlen(" +
+                                                  std::to_string(fiaInfo_.systemPrefixMaxLen) + ")");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -546,8 +568,8 @@ ge::graphStatus FiaTilingCheck::SetAttenMaskCompare()
         } else if (maskDimNum == DIM_NUM_FOUR) {
             maskLayout = maskDim0 == 1 ? FiaLayout::I1S1S2 : FiaLayout::B1S1S2;
         } else {
-            OP_LOGE(opName_, "%s dim num only support %zu, %zu, %zu, but got %zu", ATTEN_MASK_NAME.c_str(), DIM_NUM_TWO,
-                    DIM_NUM_THREE, DIM_NUM_FOUR, maskDimNum);
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "attenMask", std::to_string(maskDimNum).c_str(),
+                                                     "attenMask dim num only support 2, 3, 4");
             return ge::GRAPH_FAILED;
         }
     } else if (sparseMode == SPARSE_MODE_TREE) {
@@ -556,8 +578,8 @@ ge::graphStatus FiaTilingCheck::SetAttenMaskCompare()
         } else if (maskDimNum == DIM_NUM_THREE) {
             maskLayout = FiaLayout::BS1S2;
         } else {
-            OP_LOGE(opName_, "%s dim num only support %zu, %zu, but got %zu", ATTEN_MASK_NAME.c_str(), DIM_NUM_ONE,
-                    DIM_NUM_THREE, maskDimNum);
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "attenMask", std::to_string(maskDimNum).c_str(),
+                                                     "attenMask dim num only support 1, 3");
             return ge::GRAPH_FAILED;
         }
     } else {
@@ -568,8 +590,8 @@ ge::graphStatus FiaTilingCheck::SetAttenMaskCompare()
         } else if (maskDimNum == DIM_NUM_FOUR) {
             maskLayout = FiaLayout::I1S1S2;
         } else {
-            OP_LOGE(opName_, "%s dim num only support %zu, but got %zu", ATTEN_MASK_NAME.c_str(), DIM_NUM_TWO,
-                    maskDimNum);
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, "attenMask", std::to_string(maskDimNum).c_str(),
+                                                     "attenMask dim num only support 2");
             return ge::GRAPH_FAILED;
         }
     }
@@ -585,8 +607,7 @@ ge::graphStatus FiaTilingCheck::CheckAttentionMask()
     int32_t sparseMode = *opParamInfo_.sparseMode;
     if (opParamInfo_.attenMask.tensor == nullptr || opParamInfo_.attenMask.desc == nullptr) {
         if (sparseMode != SPARSE_MODE_NO_MASK) {
-            OP_LOGE(opName_, "When %s(%d) not equals to %d, %s must exists", SPARSE_MODE_NAME.c_str(), sparseMode,
-                    SPARSE_MODE_NO_MASK, ATTEN_MASK_NAME.c_str());
+            OP_LOGE_WITH_INVALID_INPUT(opName_, "attenMask");
             return ge::GRAPH_FAILED;
         }
         return ge::GRAPH_SUCCESS;
@@ -642,15 +663,19 @@ ge::graphStatus FiaTilingCheck::CheckTokens()
 {
     preTokens_ = fiaInfo_.preToken;
     nextTokens_ = fiaInfo_.nextToken;
-    OP_CHECK_IF(
-        preTokens_ < 0 && nextTokens_ < 0,
-        OP_LOGE(opName_, "preTokens(%ld) and nextTokens(%ld) cannot be negative numbers.", preTokens_, nextTokens_),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(preTokens_ < 0 && nextTokens_ < 0,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName_, "pre_tokens, next_tokens",
+                    (std::to_string(preTokens_) + ", " + std::to_string(nextTokens_)).c_str(),
+                    "preTokens and nextTokens cannot be negative numbers."),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(
-        nextTokens_ * (-1) > preTokens_,
-        OP_LOGE(opName_, "nextToken line(%ld) should be higher than preToken line(%ld).", nextTokens_, preTokens_),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(nextTokens_ * (-1) > preTokens_,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName_, "next_tokens, pre_tokens",
+                    (std::to_string(nextTokens_) + ", " + std::to_string(preTokens_)).c_str(),
+                    "nextToken line should be higher than preToken line."),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -662,7 +687,7 @@ ge::graphStatus FiaTilingCheck::CheckSoftmaxLse()
     }
 
     if (fiaInfo_.softmaxLseFlag && opParamInfo_.lseOut.desc == nullptr) {
-        OP_LOGE(opName_, "when %s is enabled, softmaxLse should not be NULL.", SOFTMAX_LSE_NAME.c_str());
+        OP_LOGE_WITH_INVALID_INPUT(opName_, "softmaxLse");
         return ge::GRAPH_FAILED;
     }
 
@@ -675,8 +700,9 @@ ge::graphStatus FiaTilingCheck::CheckSoftmaxLse()
 ge::graphStatus FiaTilingCheck::CheckSoftmaxLseDType()
 {
     if (opParamInfo_.lseOut.desc->GetDataType() != ge::DT_FLOAT) {
-        OP_LOGE(opName_, "only support dtype FLOAT32, but got %s",
-                FusedDataTypeToSerialString(opParamInfo_.lseOut.desc->GetDataType()).c_str());
+        OP_LOGE_FOR_INVALID_DTYPE(opName_, "softmaxLse",
+                                  FusedDataTypeToSerialString(opParamInfo_.lseOut.desc->GetDataType()).c_str(),
+                                  "FLOAT32");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -711,9 +737,12 @@ ge::graphStatus FiaTilingCheck::CheckSoftmaxLseShape()
 ge::graphStatus FiaTilingCheck::CheckPostQuant()
 {
     if (fiaInfo_.isOutQuantEnable) {
-        OP_CHECK_IF(opParamInfo_.attenOut.desc->GetDataType() != ge::DT_INT8,
-                    OP_LOGE(opName_, "the quantScale2 exist, output data type should be INT8!"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            opParamInfo_.attenOut.desc->GetDataType() != ge::DT_INT8,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                opName_, "attentionOut", FusedDataTypeToSerialString(opParamInfo_.attenOut.desc->GetDataType()).c_str(),
+                "the quantScale2 exist, output data type should be INT8"),
+            return ge::GRAPH_FAILED);
         const ge::DataType queryDataType_ = opParamInfo_.query.desc->GetDataType();
         const ge::DataType quantScale2Datatype_ = opParamInfo_.quantScale2.desc->GetDataType();
         auto quantScale2Shape_ = opParamInfo_.quantScale2.tensor->GetStorageShape();
@@ -721,22 +750,34 @@ ge::graphStatus FiaTilingCheck::CheckPostQuant()
         // scale2 and offset2 should have same dtype and shape
         if (opParamInfo_.quantOffset2.tensor != nullptr && opParamInfo_.quantOffset2.desc != nullptr) {
             const ge::DataType quantOffset2Datatype_ = opParamInfo_.quantOffset2.desc->GetDataType();
-            OP_CHECK_IF(quantOffset2Datatype_ != quantScale2Datatype_,
-                        OP_LOGE(opName_, "quantScale2 and quantOffset2 should have same dtype!"),
-                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                quantOffset2Datatype_ != quantScale2Datatype_,
+                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(opName_, "quantScale2, quantOffset2",
+                                                       (FusedDataTypeToSerialString(quantScale2Datatype_) + ", " +
+                                                        FusedDataTypeToSerialString(quantOffset2Datatype_))
+                                                           .c_str(),
+                                                       "quantScale2 and quantOffset2 should have same dtype"),
+                return ge::GRAPH_FAILED);
             auto quantOffset2Shape_ = opParamInfo_.quantOffset2.tensor->GetStorageShape();
             OP_CHECK_IF(quantOffset2Shape_ != quantScale2Shape_,
-                        OP_LOGE(opName_, "quantScale2 and quantOffset2 should have same shape!"),
+                        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                            opName_, "quantScale2, quantOffset2",
+                            (GetShapeStr(quantScale2Shape_) + ", " + GetShapeStr(quantOffset2Shape_)).c_str(),
+                            "quantScale2 and quantOffset2 should have same shape"),
                         return ge::GRAPH_FAILED);
         }
 
         // scale2 dtype verification
-        OP_CHECK_IF((queryDataType_ != ge::DT_FLOAT16 && queryDataType_ != ge::DT_BF16),
-                    OP_LOGE(opName_, "in postquant situation, query type should be FLOAT16 or BFLOAT16"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            (queryDataType_ != ge::DT_FLOAT16 && queryDataType_ != ge::DT_BF16),
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "query", FusedDataTypeToSerialString(queryDataType_).c_str(),
+                                                  "in postquant situation, query type should be FLOAT16 or BFLOAT16"),
+            return ge::GRAPH_FAILED);
 
         OP_CHECK_IF((queryDataType_ == ge::DT_FLOAT16 && quantScale2Datatype_ != ge::DT_FLOAT),
-                    OP_LOGE(opName_, "inputQ dtype is FLOAT16, quantScale2 dtype should be FLOAT32"),
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        opName_, "quantScale2", FusedDataTypeToSerialString(quantScale2Datatype_).c_str(),
+                        "inputQ dtype is FLOAT16, quantScale2 dtype should be FLOAT32"),
                     return ge::GRAPH_FAILED);
 
         // scale2 shape verfication
@@ -747,17 +788,19 @@ ge::graphStatus FiaTilingCheck::CheckPostQuant()
                 int64_t expectShapeSize = gert::Shape({n1Size_, vHeadDim_}).GetShapeSize();
                 OP_CHECK_IF(
                     currentShapeSize != expectShapeSize,
-                    OP_LOGE(opName_,
-                            "when input_layout is %s, the shape size of quantScale2 should be %lld(Q_N * V_D), but "
-                            "current is %u, shape is %s",
-                            layout.c_str(), expectShapeSize, currentShapeSize, GetShapeStr(quantScale2Shape_).c_str()),
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                        opName_, "quantScale2", std::to_string(currentShapeSize).c_str(),
+                        ("when input_layout is " + layout + ", the shape size of quantScale2 should be " +
+                         std::to_string(expectShapeSize) + "(Q_N * V_D), shape is " + GetShapeStr(quantScale2Shape_))
+                            .c_str()),
                     return ge::GRAPH_FAILED);
             } else {
                 OP_CHECK_IF(quantScale2Shape_ != gert::Shape({n1Size_, vHeadDim_}),
-                            OP_LOGE(opName_,
-                                    "when input_layout is %s, quantScale2 expectshape is [Q_N, V_D], it is [%u, %u], "
-                                    "but current shape is %s",
-                                    layout.c_str(), n1Size_, vHeadDim_, GetShapeStr(quantScale2Shape_).c_str()),
+                            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                                opName_, "quantScale2", GetShapeStr(quantScale2Shape_).c_str(),
+                                ("when input_layout is " + layout + ", quantScale2 expectshape is [Q_N, V_D], it is [" +
+                                 std::to_string(n1Size_) + ", " + std::to_string(vHeadDim_) + "]")
+                                    .c_str()),
                             return ge::GRAPH_FAILED);
             }
         }
