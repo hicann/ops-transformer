@@ -8,6 +8,9 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#ifndef KV_RMS_NORM_ROPE_CACHE_REGBASE_PLATFORM_H
+#define KV_RMS_NORM_ROPE_CACHE_REGBASE_PLATFORM_H
+
 /*!
  * \file kv_rms_norm_rope_cache_regbase_platform.h
  * \brief platform apator
@@ -55,3 +58,5 @@ __aicore__ inline constexpr uint32_t GetUbBlockSize()
 }
 
 } // namespace platform
+
+#endif // KV_RMS_NORM_ROPE_CACHE_REGBASE_PLATFORM_H

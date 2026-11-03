@@ -179,9 +179,9 @@ struct MropeTokenRegs {
  *       低半、高半两次访存各推 halfDim，两次之后正好走过 headStride（= D = 2*halfDim），
  *       所以调用方的 head 循环不需要再算 h * headStride，直接反复调用即可。
  */
-__aicore__ inline void RmsNormRopeOneHead(__ubuf__ bfloat16_t*& inHead, __ubuf__ bfloat16_t*& outHead,
-                                          Reg::RegTensor<float>& gammaLow, Reg::RegTensor<float>& gammaHigh,
-                                          MropeTokenRegs& regs, const QkvMropeTileShape& shape, Reg::MaskReg pFull)
+__simd_callee__ inline void RmsNormRopeOneHead(__ubuf__ bfloat16_t*& inHead, __ubuf__ bfloat16_t*& outHead,
+                                               Reg::RegTensor<float>& gammaLow, Reg::RegTensor<float>& gammaHigh,
+                                               MropeTokenRegs& regs, const QkvMropeTileShape& shape, Reg::MaskReg pFull)
 {
     const int32_t halfStep = static_cast<int32_t>(shape.halfDim);
     Reg::RegTensor<bfloat16_t> xLowB16;
@@ -256,87 +256,89 @@ __aicore__ inline void RmsNormRopeOneHead(__ubuf__ bfloat16_t*& inHead, __ubuf__
  *                  und 的 gamma。由 CopyIn 顺带产出（那里本来就要读 cat_indices 算源行），
  *                  省掉一次 GM 标量读。tokenSize <= 64 由 host tiling 保证
  */
+__simd_vf__ inline void QkRmsNormMropeTileComputeVF(const QkvMropeTileAddr addr, const QkvMropeTileShape shape,
+                                                    uint16_t tokenSize, uint64_t undMask)
+{
+    const int32_t halfStep = static_cast<int32_t>(shape.halfDim);
+    const int32_t headStep = static_cast<int32_t>(shape.headStride);
+
+    Reg::MaskReg pFull = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+    // V 段按 bf16 原宽处理：一个 head = D 个 bf16 = 一个满 VL，掩码 lane 数是 pFull 的两倍
+    Reg::MaskReg pFullB16 = Reg::CreateMask<bfloat16_t, Reg::MaskPattern::ALL>();
+    Reg::RegTensor<uint32_t> mropeIndex;
+
+    // gather 索引与 token 无关，整个 tile 只加载一次
+    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(mropeIndex, addr.gatherIndex);
+
+    // 地址一律用 post-update 自走，循环体内没有任何 t*stride / h*stride 计算：
+    //   inPtr    每 head 推 headStride，一个 token 走完 Q/K/V 三段正好是 (Hq+Hk+Hv)*D
+    //            = inTokenStride，直接落到下一个 token 的行首，整个 tile 不用重取基址
+    //   qOut/kOut/vOutPtr 各推自己那段的 head 数，一个 token 正好走过各自的 TokenStride
+    // 例外两处：
+    //   1) cos_sin 用 Gather，而 Gather 只有 (dst, baseAddr, index, mask) 一个原型，
+    //      既没有 post-update 也没有 AddrReg 重载，只能保留显式指针每 token 推一次；
+    //   2) gamma 的基址由 undMask 决定，不是单调前进，同样只能显式算。
+    __ubuf__ bfloat16_t* inPtr = addr.qkvIn;
+    __ubuf__ bfloat16_t* qOutPtr = addr.qOut;
+    __ubuf__ bfloat16_t* kOutPtr = addr.kOut;
+    __ubuf__ bfloat16_t* vOutPtr = addr.vOut;
+    __ubuf__ float* cosSinPtr = addr.rawCosSin;
+    // gen 的 gamma 在 UB 上正好排在 und 之后 2*D 处（[undQ|undK|genQ|genK]）
+    const uint32_t genGammaOffset = static_cast<uint32_t>(headStep) * 2U;
+
+    for (uint16_t t = 0; t < tokenSize; ++t) {
+        MropeTokenRegs regs;
+
+        // 三轴合并：一条 Gather 从 [3, D] 窗口里按 axisLut 挑出 D/2 个 lane。
+        // 本 token 的 Q、K 所有 head 共用这一份 cos/sin
+        Reg::Gather(regs.cosValue, cosSinPtr, mropeIndex, pFull);
+        Reg::Gather(regs.sinValue, cosSinPtr + shape.halfDim, mropeIndex, pFull);
+        cosSinPtr += shape.cosSinTokenStride;
+        // 低半 RoPE 是 out_lo = x_lo*cos - x_hi*sin，而乘加原语只有加法版；
+        // 这里取一次负，让 head 内可以用 MulAddDst 把减法折进乘加。
+        // 每 token 一条，摊到 Hq+Hk 个 head 上可忽略
+        Reg::Muls(regs.sinNeg, regs.sinValue, -1.0f, pFull);
+
+        // 选 gamma：und 组在 gammaAll 开头，gen 组在 +2*D 处，用位图算偏移即可，无需分支。
+        // 组内四份（q低|q高|k低|k高）在 UB 上连续，同一个指针连推 4 次 halfDim 取完；
+        // 最后一次自增走出组尾，下个 token 会重新定基址，丢掉即可
+        const uint32_t undBit = static_cast<uint32_t>((undMask >> t) & 1ULL);
+        __ubuf__ float* gammaPtr = addr.gammaAll + (1U - undBit) * genGammaOffset;
+        Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(regs.qGammaLow, gammaPtr,
+                                                                                            halfStep);
+        Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(regs.qGammaHigh, gammaPtr,
+                                                                                            halfStep);
+        Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(regs.kGammaLow, gammaPtr,
+                                                                                            halfStep);
+        Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(regs.kGammaHigh, gammaPtr,
+                                                                                            halfStep);
+
+        for (uint16_t h = 0; h < shape.qHeadNum; ++h) {
+            RmsNormRopeOneHead(inPtr, qOutPtr, regs.qGammaLow, regs.qGammaHigh, regs, shape, pFull);
+        }
+
+        // K 头在同一行 token 内紧跟 Q 头之后，inPtr 已经停在那里
+        for (uint16_t h = 0; h < shape.kHeadNum; ++h) {
+            RmsNormRopeOneHead(inPtr, kOutPtr, regs.kGammaLow, regs.kGammaHigh, regs, shape, pFull);
+        }
+
+        // V 头紧跟 K 头之后，不参与 norm/rope：一个 head 恰好一个满 bf16 VL，直接搬
+        for (uint16_t h = 0; h < shape.vHeadNum; ++h) {
+            Reg::RegTensor<bfloat16_t> vValue;
+            Reg::LoadAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(vValue, inPtr,
+                                                                                                     headStep);
+            Reg::StoreAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B16>(
+                vOutPtr, vValue, headStep, pFullB16);
+        }
+    }
+}
 __aicore__ inline void QkRmsNormMropeTileVF(const QkvMropeTileAddr& addr, const QkvMropeTileShape& shape,
                                             uint16_t tokenSize, uint64_t undMask)
 {
     if (tokenSize == 0) {
         return;
     }
-    const int32_t halfStep = static_cast<int32_t>(shape.halfDim);
-    const int32_t headStep = static_cast<int32_t>(shape.headStride);
-
-    __VEC_SCOPE__
-    {
-        Reg::MaskReg pFull = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
-        // V 段按 bf16 原宽处理：一个 head = D 个 bf16 = 一个满 VL，掩码 lane 数是 pFull 的两倍
-        Reg::MaskReg pFullB16 = Reg::CreateMask<bfloat16_t, Reg::MaskPattern::ALL>();
-        Reg::RegTensor<uint32_t> mropeIndex;
-
-        // gather 索引与 token 无关，整个 tile 只加载一次
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(mropeIndex, addr.gatherIndex);
-
-        // 地址一律用 post-update 自走，循环体内没有任何 t*stride / h*stride 计算：
-        //   inPtr    每 head 推 headStride，一个 token 走完 Q/K/V 三段正好是 (Hq+Hk+Hv)*D
-        //            = inTokenStride，直接落到下一个 token 的行首，整个 tile 不用重取基址
-        //   qOut/kOut/vOutPtr 各推自己那段的 head 数，一个 token 正好走过各自的 TokenStride
-        // 例外两处：
-        //   1) cos_sin 用 Gather，而 Gather 只有 (dst, baseAddr, index, mask) 一个原型，
-        //      既没有 post-update 也没有 AddrReg 重载，只能保留显式指针每 token 推一次；
-        //   2) gamma 的基址由 undMask 决定，不是单调前进，同样只能显式算。
-        __ubuf__ bfloat16_t* inPtr = addr.qkvIn;
-        __ubuf__ bfloat16_t* qOutPtr = addr.qOut;
-        __ubuf__ bfloat16_t* kOutPtr = addr.kOut;
-        __ubuf__ bfloat16_t* vOutPtr = addr.vOut;
-        __ubuf__ float* cosSinPtr = addr.rawCosSin;
-        // gen 的 gamma 在 UB 上正好排在 und 之后 2*D 处（[undQ|undK|genQ|genK]）
-        const uint32_t genGammaOffset = static_cast<uint32_t>(headStep) * 2U;
-
-        for (uint16_t t = 0; t < tokenSize; ++t) {
-            MropeTokenRegs regs;
-
-            // 三轴合并：一条 Gather 从 [3, D] 窗口里按 axisLut 挑出 D/2 个 lane。
-            // 本 token 的 Q、K 所有 head 共用这一份 cos/sin
-            Reg::Gather(regs.cosValue, cosSinPtr, mropeIndex, pFull);
-            Reg::Gather(regs.sinValue, cosSinPtr + shape.halfDim, mropeIndex, pFull);
-            cosSinPtr += shape.cosSinTokenStride;
-            // 低半 RoPE 是 out_lo = x_lo*cos - x_hi*sin，而乘加原语只有加法版；
-            // 这里取一次负，让 head 内可以用 MulAddDst 把减法折进乘加。
-            // 每 token 一条，摊到 Hq+Hk 个 head 上可忽略
-            Reg::Muls(regs.sinNeg, regs.sinValue, -1.0f, pFull);
-
-            // 选 gamma：und 组在 gammaAll 开头，gen 组在 +2*D 处，用位图算偏移即可，无需分支。
-            // 组内四份（q低|q高|k低|k高）在 UB 上连续，同一个指针连推 4 次 halfDim 取完；
-            // 最后一次自增走出组尾，下个 token 会重新定基址，丢掉即可
-            const uint32_t undBit = static_cast<uint32_t>((undMask >> t) & 1ULL);
-            __ubuf__ float* gammaPtr = addr.gammaAll + (1U - undBit) * genGammaOffset;
-            Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(regs.qGammaLow,
-                                                                                                gammaPtr, halfStep);
-            Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(regs.qGammaHigh,
-                                                                                                gammaPtr, halfStep);
-            Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(regs.kGammaLow,
-                                                                                                gammaPtr, halfStep);
-            Reg::LoadAlign<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(regs.kGammaHigh,
-                                                                                                gammaPtr, halfStep);
-
-            for (uint16_t h = 0; h < shape.qHeadNum; ++h) {
-                RmsNormRopeOneHead(inPtr, qOutPtr, regs.qGammaLow, regs.qGammaHigh, regs, shape, pFull);
-            }
-
-            // K 头在同一行 token 内紧跟 Q 头之后，inPtr 已经停在那里
-            for (uint16_t h = 0; h < shape.kHeadNum; ++h) {
-                RmsNormRopeOneHead(inPtr, kOutPtr, regs.kGammaLow, regs.kGammaHigh, regs, shape, pFull);
-            }
-
-            // V 头紧跟 K 头之后，不参与 norm/rope：一个 head 恰好一个满 bf16 VL，直接搬
-            for (uint16_t h = 0; h < shape.vHeadNum; ++h) {
-                Reg::RegTensor<bfloat16_t> vValue;
-                Reg::LoadAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(vValue, inPtr,
-                                                                                                         headStep);
-                Reg::StoreAlign<bfloat16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B16>(
-                    vOutPtr, vValue, headStep, pFullB16);
-            }
-        }
-    }
+    asc_vf_call<QkRmsNormMropeTileComputeVF>(addr, shape, tokenSize, undMask);
 }
 
 } // namespace UndGenQkvRmsNormRopeCache

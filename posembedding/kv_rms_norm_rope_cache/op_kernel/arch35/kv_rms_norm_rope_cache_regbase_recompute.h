@@ -114,69 +114,16 @@ public:
 
     __aicore__ inline void CastPowVF(__ubuf__ float*& xFp32Ptr, __ubuf__ T_KV*& xPtr, uint32_t ubFactor)
     {
-        __VEC_SCOPE__
-        {
-            AscendC::Reg::RegTensor<float> vreg1, vreg2;
-            AscendC::Reg::MaskReg mask;
-
-            uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, VL_FP32);
-            uint16_t regTailWidth = ubFactor - repeatTimesFloor * VL_FP32;
-
-            uint32_t width = VL_FP32;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-
-            // 标准VL计算范式
-            for (uint16_t j = 0; j < repeatTimesFloor; j++) {
-                auto xAddr = xPtr + j * VL_FP32;
-                auto xFp32Addr = xFp32Ptr + j * VL_FP32;
-                LoadDataAndCast2Fp32(vreg1, xAddr, mask);
-                AscendC::Reg::Mul(vreg2, vreg1, vreg1, mask);
-                AscendC::Reg::StoreAlign(xFp32Addr, vreg2, mask);
-            }
-
-            // 尾VL计算
-            width = regTailWidth;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-            auto xAddr = xPtr + repeatTimesFloor * VL_FP32;
-            auto xFp32Addr = xFp32Ptr + repeatTimesFloor * VL_FP32;
-            LoadDataAndCast2Fp32(vreg1, xAddr, mask);
-            AscendC::Reg::Mul(vreg2, vreg1, vreg1, mask);
-            AscendC::Reg::StoreAlign(xFp32Addr, vreg2, mask);
-        }
+        uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, VL_FP32);
+        uint16_t regTailWidth = ubFactor - repeatTimesFloor * VL_FP32;
+        asc_vf_call<CastPowComputeVF<T_KV>>(xFp32Ptr, xPtr, repeatTimesFloor, regTailWidth);
     }
 
     __aicore__ inline void FoldBlockVF(__ubuf__ float*& x1Ptr, __ubuf__ float*& x2Ptr, uint32_t ubFactor)
     {
-        __VEC_SCOPE__
-        {
-            AscendC::Reg::RegTensor<float> vreg1, vreg2, vreg3;
-            AscendC::Reg::MaskReg mask;
-
-            uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, VL_FP32);
-            uint16_t regTailWidth = ubFactor - repeatTimesFloor * VL_FP32;
-            uint32_t width = VL_FP32;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-
-            // 标准VL计算范式
-            for (uint16_t j = 0; j < repeatTimesFloor; j++) {
-                auto x1Addr = x1Ptr + j * VL_FP32;
-                auto x2Addr = x2Ptr + j * VL_FP32;
-                LoadDataAndCast2Fp32<float>(vreg1, x1Addr, mask);
-                LoadDataAndCast2Fp32<float>(vreg2, x2Addr, mask);
-                AscendC::Reg::Add(vreg3, vreg1, vreg2, mask);
-                AscendC::Reg::StoreAlign(x1Addr, vreg3, mask);
-            }
-
-            // 尾VL计算
-            width = regTailWidth;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-            auto x1Addr = x1Ptr + repeatTimesFloor * VL_FP32;
-            auto x2Addr = x2Ptr + repeatTimesFloor * VL_FP32;
-            LoadDataAndCast2Fp32<float>(vreg1, x1Addr, mask);
-            LoadDataAndCast2Fp32<float>(vreg2, x2Addr, mask);
-            AscendC::Reg::Add(vreg3, vreg1, vreg2, mask);
-            AscendC::Reg::StoreAlign(x1Addr, vreg3, mask);
-        }
+        uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, VL_FP32);
+        uint16_t regTailWidth = ubFactor - repeatTimesFloor * VL_FP32;
+        asc_vf_call<FoldBlockComputeVF>(x1Ptr, x2Ptr, repeatTimesFloor, regTailWidth);
     }
 
     __aicore__ inline int64_t GetCacheId(const uint64_t idx)
@@ -197,115 +144,8 @@ public:
         __ubuf__ float* cache = (__ubuf__ float*)dstTensor.GetPhyAddr() + cacheId * stride;
         __ubuf__ float* src = (__ubuf__ float*)srcTensor.GetPhyAddr();
 
-        __VEC_SCOPE__
-        {
-            uint32_t sreg = static_cast<uint32_t>(count);
-            AscendC::Reg::RegTensor<float> aReg, bReg;
-            AscendC::Reg::MaskReg pMask;
-            for (uint16_t i = 0; i < outerLoopTimes; ++i) {
-                pMask = AscendC::Reg::UpdateMask<float>(sreg);
-                AscendC::Reg::LoadAlign(aReg, (__ubuf__ float*)src + i * outerLoopStride);
-                for (uint16_t j = 0; j < innerLoopTimes; ++j) {
-                    AscendC::Reg::LoadAlign(bReg, (__ubuf__ float*)dst + i * outerLoopStride + j * innerLoopStride);
-                    AscendC::Reg::Add<float, AscendC::Reg::MaskMergeMode::ZEROING>(aReg, aReg, bReg, pMask);
-                }
-                AscendC::Reg::StoreAlign((__ubuf__ float*)cache + i * outerLoopStride, aReg, pMask);
-            }
-        }
-    }
-
-    __aicore__ inline void CalculateVOutVF(__ubuf__ T_KV*& yPtr, __ubuf__ T_KV*& xPtr, __ubuf__ T_KV*& gammaPtr,
-                                           __ubuf__ float*& xSumPtr, uint32_t ubFactor)
-    {
-        float reciprocal = this->reciprocal;
-        float epsilon = this->epsilon;
-        __VEC_SCOPE__
-        {
-            AscendC::Reg::RegTensor<float> sumReg, vregX, vregGamma, vregTmp;
-            AscendC::Reg::RegTensor<T_KV> vregY;
-            AscendC::Reg::MaskReg mask;
-            AscendC::Reg::UnalignRegForStore uReg;
-
-            uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, VL_FP32);
-            uint16_t regTailWidth = ubFactor - repeatTimesFloor * VL_FP32;
-            uint32_t width = VL_FP32;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-
-            AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(sumReg, xSumPtr);
-            AscendC::Reg::Muls(sumReg, sumReg, reciprocal, mask);
-            AscendC::Reg::Adds(sumReg, sumReg, epsilon, mask);
-            AscendC::Reg::Sqrt(sumReg, sumReg, mask);
-
-            // 标准VL计算范式
-            for (uint16_t j = 0; j < repeatTimesFloor; j++) {
-                auto xAddr = xPtr + j * VL_FP32;
-                auto yAddr = yPtr + j * VL_FP32;
-                auto gammaAddr = gammaPtr + j * VL_FP32;
-                LoadDataAndCast2Fp32(vregX, xAddr, mask);
-                LoadDataAndCast2Fp32(vregGamma, gammaAddr, mask);
-                AscendC::Reg::Div(vregTmp, vregX, sumReg, mask);
-                AscendC::Reg::Mul(vregTmp, vregTmp, vregGamma, mask);
-                StoreDataAndCastFromFp32(yAddr, vregTmp, uReg, mask, width);
-            }
-
-            // 尾VL
-            width = regTailWidth;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-            auto xAddr = xPtr + repeatTimesFloor * VL_FP32;
-            auto yAddr = yPtr + repeatTimesFloor * VL_FP32;
-            auto gammaAddr = gammaPtr + repeatTimesFloor * VL_FP32;
-            LoadDataAndCast2Fp32(vregX, xAddr, mask);
-            LoadDataAndCast2Fp32(vregGamma, gammaAddr, mask);
-            AscendC::Reg::Div(vregTmp, vregX, sumReg, mask);
-            AscendC::Reg::Mul(vregTmp, vregTmp, vregGamma, mask);
-            StoreDataAndCastFromFp32(yAddr, vregTmp, uReg, mask, width);
-        }
-    }
-
-    template <typename T = T_KV>
-    __aicore__ inline void LoadDataAndCast2Fp32(AscendC::Reg::RegTensor<float>& dst, __ubuf__ T* xAddr,
-                                                AscendC::Reg::MaskReg& mask)
-    {
-        if constexpr (!IsSameType<T, float>::value) {
-            AscendC::Reg::RegTensor<T> vregB16;
-            AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(vregB16, xAddr);
-            AscendC::Reg::Cast<float, T, CAST_B16_TO_B32>(dst, vregB16, mask);
-        } else {
-            AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_NORM>(dst, xAddr);
-        }
-    }
-
-    template <typename T>
-    __aicore__ inline void StoreQuantAndCastFromFp32(__ubuf__ T*& dst, AscendC::Reg::RegTensor<float>& src,
-                                                     AscendC::Reg::MaskReg& mask)
-    {
-        AscendC::Reg::RegTensor<T> vregQuant;
-        if constexpr (IsSameType<T, int8_t>::value) {
-            AscendC::Reg::RegTensor<int16_t> vregInt16;
-            AscendC::Reg::RegTensor<half> vregHalf;
-            AscendC::Reg::Cast<int16_t, float, CAST_FP32_TO_INT16>(vregInt16, src, mask);
-            AscendC::Reg::Cast<half, int16_t, CAST_INT16_TO_FP16>(vregHalf, vregInt16, mask);
-            AscendC::Reg::Cast<T, half, CAST_FP16_TO_INT8>(vregQuant, vregHalf, mask);
-        } else if constexpr (IsSameType<T, hifloat8_t>::value) {
-            AscendC::Reg::Cast<T, float, CAST_FP32_TO_HIFLOAT8>(vregQuant, src, mask);
-        } else if constexpr (IsSameType<T, fp8_e5m2_t>::value || IsSameType<T, fp8_e4m3fn_t>::value) {
-            AscendC::Reg::Cast<T, float, CAST_FP32_TO_FLOAT8>(vregQuant, src, mask);
-        }
-        AscendC::Reg::StoreAlign<T, AscendC::Reg::StoreDist::DIST_PACK4_B32>(dst, vregQuant, mask);
-    }
-
-    template <typename T = T_KV>
-    __aicore__ inline void StoreDataAndCastFromFp32(__ubuf__ T*& dst, AscendC::Reg::RegTensor<float>& src,
-                                                    AscendC::Reg::UnalignRegForStore& uReg, AscendC::Reg::MaskReg& mask,
-                                                    uint32_t postUpdateStride)
-    {
-        if constexpr (!IsSameType<T, float>::value) {
-            AscendC::Reg::RegTensor<T> vregB16, vregB16Pack;
-            AscendC::Reg::Cast<T, float, CAST_FP32_TO_FP16>(vregB16, src, mask);
-            AscendC::Reg::StoreAlign<T, AscendC::Reg::StoreDist::DIST_PACK_B32>(dst, vregB16, mask);
-        } else {
-            AscendC::Reg::StoreAlign(dst, src, mask);
-        }
+        asc_vf_call<UpdateCacheComputeVF>(dst, cache, src, outerLoopTimes, innerLoopTimes, outerLoopStride,
+                                          innerLoopStride, count);
     }
 
     __aicore__ inline void ReduceSumBasicComputeVF(int64_t xDimOffset)
@@ -419,7 +259,12 @@ public:
             xLocal = inQueueX.DeQue<T_KV>();
             gammaLocal = inQueueGamma.DeQue<T_KV>();
 
-            CalculateVOutVF(vPtr, xPtr, gammaPtr, xSumPtr, tmpFactor);
+            float reciprocal = this->reciprocal;
+            float epsilon = this->epsilon;
+            uint16_t repeatTimesFloor = ops::FloorDiv(tmpFactor, VL_FP32);
+            uint16_t regTailWidth = tmpFactor - repeatTimesFloor * VL_FP32;
+            asc_vf_call<CalculateVOutComputeVF<T_KV>>(vPtr, xPtr, gammaPtr, xSumPtr, reciprocal, epsilon,
+                                                      repeatTimesFloor, regTailWidth);
 
             outQueue.EnQue<T_KV>(vOutLocal);
             vOutLocal = outQueue.DeQue<T_KV>();
@@ -441,93 +286,6 @@ public:
     }
 
     // 需要中间结果+量化+偏移
-    __aicore__ inline void CalculateVOutAsymQuantWithKvVF(__ubuf__ T_KV*& outPtr, __ubuf__ T_KV*& xPtr,
-                                                          __ubuf__ T_KV*& gammaPtr, __ubuf__ float*& xSumPtr,
-                                                          __ubuf__ float*& vScalePtr, __ubuf__ float*& vOffsetPtr,
-                                                          __ubuf__ T_V_CACHE*& vQuantPtr, uint32_t ubFactor)
-    {
-        float reciprocal = this->reciprocal;
-        float epsilon = this->epsilon;
-        __VEC_SCOPE__
-        {
-            AscendC::Reg::RegTensor<float> sumReg, vregX, vregGamma, vregTmp;
-            AscendC::Reg::RegTensor<float> vregScale, vregOffset;
-            AscendC::Reg::RegTensor<half> vregHalf;
-            AscendC::Reg::RegTensor<int16_t> vregInt16;
-            AscendC::Reg::RegTensor<T_V_CACHE> vregQuant;
-            AscendC::Reg::MaskReg mask;
-            AscendC::Reg::UnalignRegForStore uReg;
-
-            uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, VL_FP32);
-            uint16_t regTailWidth = ubFactor - repeatTimesFloor * VL_FP32;
-            uint32_t width = VL_FP32;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-
-            AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(sumReg, xSumPtr);
-            AscendC::Reg::Muls(sumReg, sumReg, reciprocal, mask);
-            AscendC::Reg::Adds(sumReg, sumReg, epsilon, mask);
-            AscendC::Reg::Sqrt(sumReg, sumReg, mask);
-
-            // 标准VL计算范式
-            for (uint16_t j = 0; j < repeatTimesFloor; j++) {
-                auto xAddr = xPtr + j * VL_FP32;
-                auto gammaAddr = gammaPtr + j * VL_FP32;
-                auto vScaleAddr = vScalePtr + j * VL_FP32;
-                auto vOffsetAddr = vOffsetPtr + j * VL_FP32;
-                auto outAddr = outPtr + j * VL_FP32;
-                auto vQuantAddr = vQuantPtr + j * VL_FP32;
-                LoadDataAndCast2Fp32(vregX, xAddr, mask);
-                LoadDataAndCast2Fp32(vregGamma, gammaAddr, mask);
-                AscendC::Reg::Div(vregTmp, vregX, sumReg, mask);
-                AscendC::Reg::Mul(vregTmp, vregTmp, vregGamma, mask);
-                StoreDataAndCastFromFp32(outAddr, vregTmp, uReg, mask, width);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-                // FMA: offset = offset + rms_norm_result * scale
-                LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
-                LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
-                AscendC::Reg::MulAddDst(vregOffset, vregTmp, vregScale, mask);
-                StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregOffset, mask);
-#else
-                LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
-                LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
-                AscendC::Reg::Mul(vregTmp, vregTmp, vregScale, mask);
-                AscendC::Reg::Add(vregTmp, vregTmp, vregOffset, mask);
-                StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregTmp, mask);
-#endif
-            }
-
-            // 尾VL
-            width = regTailWidth;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-            auto xAddr = xPtr + repeatTimesFloor * VL_FP32;
-            auto gammaAddr = gammaPtr + repeatTimesFloor * VL_FP32;
-            auto vScaleAddr = vScalePtr + repeatTimesFloor * VL_FP32;
-            auto vOffsetAddr = vOffsetPtr + repeatTimesFloor * VL_FP32;
-            auto outAddr = outPtr + repeatTimesFloor * VL_FP32;
-            auto vQuantAddr = vQuantPtr + repeatTimesFloor * VL_FP32;
-            LoadDataAndCast2Fp32(vregX, xAddr, mask);
-            LoadDataAndCast2Fp32(vregGamma, gammaAddr, mask);
-            AscendC::Reg::Div(vregTmp, vregX, sumReg, mask);
-            AscendC::Reg::Mul(vregTmp, vregTmp, vregGamma, mask);
-            StoreDataAndCastFromFp32(outAddr, vregTmp, uReg, mask, width);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-            // FMA: offset = offset + rms_norm_result * scale
-            LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
-            LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
-            AscendC::Reg::MulAddDst(vregOffset, vregTmp, vregScale, mask);
-            StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregOffset, mask);
-#else
-            LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
-            LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
-            AscendC::Reg::Mul(vregTmp, vregTmp, vregScale, mask);
-            AscendC::Reg::Add(vregTmp, vregTmp, vregOffset, mask);
-            StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregTmp, mask);
-#endif
-        }
-    }
-
     __aicore__ inline void RmsNormAsymQuantWithVCache(int64_t xDimOffset, int64_t rowIdx, int64_t vCacheRowOffset)
     {
         // RmsNorm: step 1. Σ x^2
@@ -617,7 +375,13 @@ public:
             }
 #endif
 
-            CalculateVOutAsymQuantWithKvVF(vPtr, xPtr, gammaPtr, xSumPtr, vScalePtr, vOffsetPtr, vQuantPtr, tmpFactor);
+            float reciprocal = this->reciprocal;
+            float epsilon = this->epsilon;
+            uint16_t repeatTimesFloor = ops::FloorDiv(tmpFactor, VL_FP32);
+            uint16_t regTailWidth = tmpFactor - repeatTimesFloor * VL_FP32;
+            asc_vf_call<CalculateVOutAsymQuantWithKvComputeVF<T_KV, T_V_CACHE>>(
+                vPtr, xPtr, gammaPtr, xSumPtr, vScalePtr, vOffsetPtr, vQuantPtr, reciprocal, epsilon, repeatTimesFloor,
+                regTailWidth);
 
             outQueue.EnQue<T_KV>(vOutLocal);
             vOutLocal = outQueue.DeQue<T_KV>();
@@ -639,71 +403,6 @@ public:
     }
 
     // 需要中间结果 + 量化
-    __aicore__ inline void CalculateVOutSymQuantWithKvVF(__ubuf__ T_KV*& outPtr, __ubuf__ T_KV*& xPtr,
-                                                         __ubuf__ T_KV*& gammaPtr, __ubuf__ float*& xSumPtr,
-                                                         __ubuf__ float*& vScalePtr, __ubuf__ T_V_CACHE*& vQuantPtr,
-                                                         uint32_t ubFactor)
-    {
-        float reciprocal = this->reciprocal;
-        float epsilon = this->epsilon;
-        __VEC_SCOPE__
-        {
-            AscendC::Reg::RegTensor<float> sumReg, vregX, vregGamma, vregTmp;
-            AscendC::Reg::RegTensor<float> vregScale;
-            AscendC::Reg::RegTensor<half> vregHalf;
-            AscendC::Reg::RegTensor<int16_t> vregInt16;
-            AscendC::Reg::RegTensor<T_V_CACHE> vregQuant;
-            AscendC::Reg::MaskReg mask;
-            AscendC::Reg::UnalignRegForStore uReg;
-
-            uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, VL_FP32);
-            uint16_t regTailWidth = ubFactor - repeatTimesFloor * VL_FP32;
-            uint32_t width = VL_FP32;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-
-            AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(sumReg, xSumPtr);
-            AscendC::Reg::Muls(sumReg, sumReg, reciprocal, mask);
-            AscendC::Reg::Adds(sumReg, sumReg, epsilon, mask);
-            AscendC::Reg::Sqrt(sumReg, sumReg, mask);
-
-            // 标准VL计算范式
-            for (uint16_t j = 0; j < repeatTimesFloor; j++) {
-                auto xAddr = xPtr + j * VL_FP32;
-                auto gammaAddr = gammaPtr + j * VL_FP32;
-                auto vScaleAddr = vScalePtr + j * VL_FP32;
-                auto outAddr = outPtr + j * VL_FP32;
-                auto vQuantAddr = vQuantPtr + j * VL_FP32;
-                LoadDataAndCast2Fp32(vregX, xAddr, mask);
-                LoadDataAndCast2Fp32(vregGamma, gammaAddr, mask);
-                AscendC::Reg::Div(vregTmp, vregX, sumReg, mask);
-                AscendC::Reg::Mul(vregTmp, vregTmp, vregGamma, mask);
-                StoreDataAndCastFromFp32(outAddr, vregTmp, uReg, mask, width);
-
-                LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
-                AscendC::Reg::Mul(vregTmp, vregTmp, vregScale, mask);
-                StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregTmp, mask);
-            }
-
-            // 尾VL
-            width = regTailWidth;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-            auto xAddr = xPtr + repeatTimesFloor * VL_FP32;
-            auto gammaAddr = gammaPtr + repeatTimesFloor * VL_FP32;
-            auto vScaleAddr = vScalePtr + repeatTimesFloor * VL_FP32;
-            auto outAddr = outPtr + repeatTimesFloor * VL_FP32;
-            auto vQuantAddr = vQuantPtr + repeatTimesFloor * VL_FP32;
-            LoadDataAndCast2Fp32(vregX, xAddr, mask);
-            LoadDataAndCast2Fp32(vregGamma, gammaAddr, mask);
-            AscendC::Reg::Div(vregTmp, vregX, sumReg, mask);
-            AscendC::Reg::Mul(vregTmp, vregTmp, vregGamma, mask);
-            StoreDataAndCastFromFp32(outAddr, vregTmp, uReg, mask, width);
-
-            LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
-            AscendC::Reg::Mul(vregTmp, vregTmp, vregScale, mask);
-            StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregTmp, mask);
-        }
-    }
-
     __aicore__ inline void RmsNormSymQuantWithVCache(int64_t xDimOffset, int64_t rowIdx, int64_t vCacheRowOffset)
     {
         // RmsNorm: step 1. Σ x^2
@@ -771,7 +470,13 @@ public:
             }
 #endif
 
-            CalculateVOutSymQuantWithKvVF(vPtr, xPtr, gammaPtr, xSumPtr, vScalePtr, vQuantPtr, tmpFactor);
+            float reciprocal = this->reciprocal;
+            float epsilon = this->epsilon;
+            uint16_t repeatTimesFloor = ops::FloorDiv(tmpFactor, VL_FP32);
+            uint16_t regTailWidth = tmpFactor - repeatTimesFloor * VL_FP32;
+            asc_vf_call<CalculateVOutSymQuantWithKvComputeVF<T_KV, T_V_CACHE>>(vPtr, xPtr, gammaPtr, xSumPtr, vScalePtr,
+                                                                               vQuantPtr, reciprocal, epsilon,
+                                                                               repeatTimesFloor, regTailWidth);
 
             outQueue.EnQue<T_KV>(vOutLocal);
             vOutLocal = outQueue.DeQue<T_KV>();
@@ -793,89 +498,6 @@ public:
     }
 
     // 不需要中间结果+量化+偏移
-    __aicore__ inline void CalculateVOutAsymQuantVF(__ubuf__ T_KV*& xPtr, __ubuf__ T_KV*& gammaPtr,
-                                                    __ubuf__ float*& xSumPtr, __ubuf__ float*& vScalePtr,
-                                                    __ubuf__ float*& vOffsetPtr, __ubuf__ T_V_CACHE*& vQuantPtr,
-                                                    uint32_t ubFactor)
-    {
-        float reciprocal = this->reciprocal;
-        float epsilon = this->epsilon;
-        __VEC_SCOPE__
-        {
-            AscendC::Reg::RegTensor<float> sumReg, vregX, vregGamma, vregTmp;
-            AscendC::Reg::RegTensor<float> vregScale, vregOffset;
-            AscendC::Reg::RegTensor<half> vregHalf;
-            AscendC::Reg::RegTensor<int16_t> vregInt16;
-            AscendC::Reg::RegTensor<T_V_CACHE> vregQuant;
-            AscendC::Reg::MaskReg mask;
-            AscendC::Reg::UnalignRegForStore uReg;
-
-            uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, VL_FP32);
-            uint16_t regTailWidth = ubFactor - repeatTimesFloor * VL_FP32;
-            uint32_t width = VL_FP32;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-
-            AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(sumReg, xSumPtr);
-            AscendC::Reg::Muls(sumReg, sumReg, reciprocal, mask);
-            AscendC::Reg::Adds(sumReg, sumReg, epsilon, mask);
-            AscendC::Reg::Sqrt(sumReg, sumReg, mask);
-
-            // 标准VL计算范式
-            for (uint16_t j = 0; j < repeatTimesFloor; j++) {
-                auto xAddr = xPtr + j * VL_FP32;
-                auto gammaAddr = gammaPtr + j * VL_FP32;
-                auto vScaleAddr = vScalePtr + j * VL_FP32;
-                auto vOffsetAddr = vOffsetPtr + j * VL_FP32;
-                auto vQuantAddr = vQuantPtr + j * VL_FP32;
-                LoadDataAndCast2Fp32(vregX, xAddr, mask);
-                LoadDataAndCast2Fp32(vregGamma, gammaAddr, mask);
-                AscendC::Reg::Div(vregTmp, vregX, sumReg, mask);
-                AscendC::Reg::Mul(vregTmp, vregTmp, vregGamma, mask);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-                // FMA: offset = offset + rms_norm_result * scale
-                LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
-                LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
-                AscendC::Reg::MulAddDst(vregOffset, vregTmp, vregScale, mask);
-                StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregOffset, mask);
-#else
-                LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
-                LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
-                AscendC::Reg::Mul(vregTmp, vregTmp, vregScale, mask);
-                AscendC::Reg::Add(vregTmp, vregTmp, vregOffset, mask);
-                StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregTmp, mask);
-#endif
-            }
-
-            // 尾VL
-            width = regTailWidth;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-            auto xAddr = xPtr + repeatTimesFloor * VL_FP32;
-            auto gammaAddr = gammaPtr + repeatTimesFloor * VL_FP32;
-            auto vScaleAddr = vScalePtr + repeatTimesFloor * VL_FP32;
-            auto vOffsetAddr = vOffsetPtr + repeatTimesFloor * VL_FP32;
-            auto vQuantAddr = vQuantPtr + repeatTimesFloor * VL_FP32;
-            LoadDataAndCast2Fp32(vregX, xAddr, mask);
-            LoadDataAndCast2Fp32(vregGamma, gammaAddr, mask);
-            AscendC::Reg::Div(vregTmp, vregX, sumReg, mask);
-            AscendC::Reg::Mul(vregTmp, vregTmp, vregGamma, mask);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-            // FMA: offset = offset + rms_norm_result * scale
-            LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
-            LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
-            AscendC::Reg::MulAddDst(vregOffset, vregTmp, vregScale, mask);
-            StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregOffset, mask);
-#else
-            LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
-            LoadDataAndCast2Fp32<float>(vregOffset, vOffsetAddr, mask);
-            AscendC::Reg::Mul(vregTmp, vregTmp, vregScale, mask);
-            AscendC::Reg::Add(vregTmp, vregTmp, vregOffset, mask);
-            StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregTmp, mask);
-#endif
-        }
-    }
-
     __aicore__ inline void RmsNormAsymQuant(int64_t xDimOffset, int64_t vCacheRowOffset)
     {
         // RmsNorm: step 1. Σ x^2
@@ -962,7 +584,13 @@ public:
             }
 #endif
 
-            CalculateVOutAsymQuantVF(xPtr, gammaPtr, xSumPtr, vScalePtr, vOffsetPtr, vQuantPtr, tmpFactor);
+            float reciprocal = this->reciprocal;
+            float epsilon = this->epsilon;
+            uint16_t repeatTimesFloor = ops::FloorDiv(tmpFactor, VL_FP32);
+            uint16_t regTailWidth = tmpFactor - repeatTimesFloor * VL_FP32;
+            asc_vf_call<CalculateVOutAsymQuantComputeVF<T_KV, T_V_CACHE>>(xPtr, gammaPtr, xSumPtr, vScalePtr,
+                                                                          vOffsetPtr, vQuantPtr, reciprocal, epsilon,
+                                                                          repeatTimesFloor, regTailWidth);
 
             outQueue.EnQue<T_KV>(vOutLocal);
             vOutLocal = outQueue.DeQue<T_KV>();
@@ -977,67 +605,6 @@ public:
             inQueueGamma.FreeTensor(gammaLocal);
             outQueue.FreeTensor(vOutLocal);
             vScaleOffsetQueue.FreeTensor(vScaleLocal);
-        }
-    }
-
-    // 不需要中间结果 + 量化
-    __aicore__ inline void CalculateVOutSymQuantVF(__ubuf__ T_V_CACHE*& vQuantPtr, __ubuf__ T_KV*& xPtr,
-                                                   __ubuf__ T_KV*& gammaPtr, __ubuf__ float*& xSumPtr,
-                                                   __ubuf__ float*& vScalePtr, uint32_t ubFactor)
-    {
-        float reciprocal = this->reciprocal;
-        float epsilon = this->epsilon;
-        __VEC_SCOPE__
-        {
-            AscendC::Reg::RegTensor<float> sumReg, vregX, vregGamma, vregTmp;
-            AscendC::Reg::RegTensor<float> vregScale;
-            AscendC::Reg::RegTensor<half> vregHalf;
-            AscendC::Reg::RegTensor<int16_t> vregInt16;
-            AscendC::Reg::RegTensor<T_V_CACHE> vregQuant;
-            AscendC::Reg::MaskReg mask;
-            AscendC::Reg::UnalignRegForStore uReg;
-
-            uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, VL_FP32);
-            uint16_t regTailWidth = ubFactor - repeatTimesFloor * VL_FP32;
-            uint32_t width = VL_FP32;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-
-            AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(sumReg, xSumPtr);
-            AscendC::Reg::Muls(sumReg, sumReg, reciprocal, mask);
-            AscendC::Reg::Adds(sumReg, sumReg, epsilon, mask);
-            AscendC::Reg::Sqrt(sumReg, sumReg, mask);
-
-            // 标准VL计算范式
-            for (uint16_t j = 0; j < repeatTimesFloor; j++) {
-                auto xAddr = xPtr + j * VL_FP32;
-                auto gammaAddr = gammaPtr + j * VL_FP32;
-                auto vScaleAddr = vScalePtr + j * VL_FP32;
-                auto vQuantAddr = vQuantPtr + j * VL_FP32;
-                LoadDataAndCast2Fp32(vregX, xAddr, mask);
-                LoadDataAndCast2Fp32(vregGamma, gammaAddr, mask);
-                AscendC::Reg::Div(vregTmp, vregX, sumReg, mask);
-                AscendC::Reg::Mul(vregTmp, vregTmp, vregGamma, mask);
-
-                LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
-                AscendC::Reg::Mul(vregTmp, vregTmp, vregScale, mask);
-                StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregTmp, mask);
-            }
-
-            // 尾VL
-            width = regTailWidth;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-            auto xAddr = xPtr + repeatTimesFloor * VL_FP32;
-            auto gammaAddr = gammaPtr + repeatTimesFloor * VL_FP32;
-            auto vScaleAddr = vScalePtr + repeatTimesFloor * VL_FP32;
-            auto vQuantAddr = vQuantPtr + repeatTimesFloor * VL_FP32;
-            LoadDataAndCast2Fp32(vregX, xAddr, mask);
-            LoadDataAndCast2Fp32(vregGamma, gammaAddr, mask);
-            AscendC::Reg::Div(vregTmp, vregX, sumReg, mask);
-            AscendC::Reg::Mul(vregTmp, vregTmp, vregGamma, mask);
-
-            LoadDataAndCast2Fp32<float>(vregScale, vScaleAddr, mask);
-            AscendC::Reg::Mul(vregTmp, vregTmp, vregScale, mask);
-            StoreQuantAndCastFromFp32<T_V_CACHE>(vQuantAddr, vregTmp, mask);
         }
     }
 
@@ -1227,7 +794,12 @@ public:
             }
 #endif
 
-            CalculateVOutSymQuantVF(vQuantPtr, xPtr, gammaPtr, xSumPtr, vScalePtr, tmpFactor);
+            float reciprocal = this->reciprocal;
+            float epsilon = this->epsilon;
+            uint16_t repeatTimesFloor = ops::FloorDiv(tmpFactor, VL_FP32);
+            uint16_t regTailWidth = tmpFactor - repeatTimesFloor * VL_FP32;
+            asc_vf_call<CalculateVOutSymQuantComputeVF<T_KV, T_V_CACHE>>(
+                vQuantPtr, xPtr, gammaPtr, xSumPtr, vScalePtr, reciprocal, epsilon, repeatTimesFloor, regTailWidth);
 
             outQueue.EnQue<T_KV>(vOutLocal);
             vOutLocal = outQueue.DeQue<T_KV>();
@@ -1271,390 +843,6 @@ public:
         } else {
             // 普通情况， outLocal的类型需要指定
             RmsNormWithoutQuant(xDimOffset, rowIdx, vCacheRowOffset);
-        }
-    }
-
-    __aicore__ inline void RopeVF(__ubuf__ T_KV*& outPtr1, __ubuf__ T_KV*& outPtr2, __ubuf__ T_KV*& ropePtr,
-                                  __ubuf__ T_KV*& cosPtr1, __ubuf__ T_KV*& cosPtr2, __ubuf__ T_KV*& sinPtr1,
-                                  __ubuf__ T_KV*& sinPtr2, __ubuf__ float*& tmpBufferPtr, uint32_t ubFactor)
-    {
-        uint32_t vlStride = VL_FP32 * CONST_TWO;
-        uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, vlStride);
-        uint16_t regTailWidth = (ubFactor - repeatTimesFloor * vlStride) / CONST_TWO;
-        __VEC_SCOPE__
-        {
-            AscendC::Reg::RegTensor<float> vregRope1Fp32, vregRope2Fp32, vregCos1Fp32, vregCos2Fp32, vregSin1Fp32,
-                vregSin2Fp32;
-            AscendC::Reg::MaskReg mask;
-            AscendC::Reg::UnalignRegForStore uReg;
-            uint32_t width = VL_FP32;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-
-            // 标准VL计算范式
-            for (uint16_t j = 0; j < repeatTimesFloor; j++) {
-                auto ropeAddr1 = ropePtr + j * VL_FP32 * CONST_TWO;
-                auto ropeAddr2 = ropePtr + (j * CONST_TWO + CONST_ONE) * VL_FP32;
-                auto outAddr1 = outPtr1 + j * VL_FP32;
-                auto outAddr2 = outPtr2 + j * VL_FP32;
-                auto cosAddr1 = cosPtr1 + j * VL_FP32;
-                auto cosAddr2 = cosPtr2 + j * VL_FP32;
-                auto sinAddr1 = sinPtr1 + j * VL_FP32;
-                auto sinAddr2 = sinPtr2 + j * VL_FP32;
-
-                LoadDataAndCast2Fp32(vregRope1Fp32, ropeAddr1, mask);
-                LoadDataAndCast2Fp32(vregRope2Fp32, ropeAddr2, mask);
-                AscendC::Reg::StoreAlign(tmpBufferPtr, vregRope1Fp32, mask);
-                AscendC::Reg::StoreAlign(tmpBufferPtr + VL_FP32, vregRope2Fp32, mask);
-                AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
-                AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_DINTLV_B32>(
-                    vregRope1Fp32, vregRope2Fp32, ((__ubuf__ float*)(tmpBufferPtr)));
-
-                LoadDataAndCast2Fp32(vregCos1Fp32, cosAddr1, mask);
-                LoadDataAndCast2Fp32(vregCos2Fp32, cosAddr2, mask);
-                LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
-                LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-                // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
-                AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
-                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
-                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
-#else
-                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
-                AscendC::Reg::Mul(vregSin1Fp32, vregSin1Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
-                AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
-#endif
-
-                StoreDataAndCastFromFp32(outAddr1, vregCos1Fp32, uReg, mask, width);
-                StoreDataAndCastFromFp32(outAddr2, vregCos2Fp32, uReg, mask, width);
-            }
-
-            // 尾VL计算范式
-            auto ropeAddr1 = ropePtr + repeatTimesFloor * VL_FP32 * CONST_TWO;
-            auto ropeAddr2 = ropePtr + (repeatTimesFloor * CONST_TWO + CONST_ONE) * VL_FP32;
-            auto outAddr1 = outPtr1 + repeatTimesFloor * VL_FP32;
-            auto outAddr2 = outPtr2 + repeatTimesFloor * VL_FP32;
-            auto cosAddr1 = cosPtr1 + repeatTimesFloor * VL_FP32;
-            auto cosAddr2 = cosPtr2 + repeatTimesFloor * VL_FP32;
-            auto sinAddr1 = sinPtr1 + repeatTimesFloor * VL_FP32;
-            auto sinAddr2 = sinPtr2 + repeatTimesFloor * VL_FP32;
-
-            LoadDataAndCast2Fp32(vregRope1Fp32, ropeAddr1, mask);
-            LoadDataAndCast2Fp32(vregRope2Fp32, ropeAddr2, mask);
-            AscendC::Reg::StoreAlign(tmpBufferPtr, vregRope1Fp32, mask);
-            AscendC::Reg::StoreAlign(tmpBufferPtr + VL_FP32, vregRope2Fp32, mask);
-            AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
-            AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_DINTLV_B32>(vregRope1Fp32, vregRope2Fp32,
-                                                                                    ((__ubuf__ float*)(tmpBufferPtr)));
-
-            LoadDataAndCast2Fp32(vregCos1Fp32, cosAddr1, mask);
-            LoadDataAndCast2Fp32(vregCos2Fp32, cosAddr2, mask);
-            LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
-            LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-            // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
-            AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
-            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
-            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
-#else
-            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
-            AscendC::Reg::Mul(vregSin1Fp32, vregSin1Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
-            AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
-#endif
-
-            width = regTailWidth;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-            StoreDataAndCastFromFp32(outAddr1, vregCos1Fp32, uReg, mask, width);
-            StoreDataAndCastFromFp32(outAddr2, vregCos2Fp32, uReg, mask, width);
-        }
-    }
-
-    __aicore__ inline void RopeSymQuantVF(__ubuf__ T_K_CACHE*& quantPtr1, __ubuf__ T_K_CACHE*& quantPtr2,
-                                          __ubuf__ T_KV*& ropePtr, __ubuf__ T_KV*& cosPtr1, __ubuf__ T_KV*& cosPtr2,
-                                          __ubuf__ T_KV*& sinPtr1, __ubuf__ T_KV*& sinPtr2, __ubuf__ float*& scalePtr1,
-                                          __ubuf__ float*& scalePtr2, __ubuf__ float*& tmpBufferPtr, uint32_t ubFactor)
-    {
-        uint32_t vlStride = VL_FP32 * CONST_TWO;
-        uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, vlStride);
-        uint16_t regTailWidth = (ubFactor - repeatTimesFloor * vlStride) / CONST_TWO;
-        __VEC_SCOPE__
-        {
-            AscendC::Reg::RegTensor<float> vregRope1Fp32, vregRope2Fp32, vregCos1Fp32, vregCos2Fp32, vregSin1Fp32,
-                vregSin2Fp32;
-            AscendC::Reg::RegTensor<float> vregScale1Fp32, vregScale2Fp32;
-            AscendC::Reg::RegTensor<half> vregHalf;
-            AscendC::Reg::RegTensor<int16_t> vregInt16;
-            AscendC::Reg::RegTensor<T_K_CACHE> vregQuant;
-            AscendC::Reg::MaskReg mask;
-            AscendC::Reg::UnalignRegForStore uReg;
-            uint32_t width = VL_FP32;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-
-            // 标准VL计算范式
-            for (uint16_t j = 0; j < repeatTimesFloor; j++) {
-                auto ropeAddr1 = ropePtr + j * VL_FP32 * CONST_TWO;
-                auto ropeAddr2 = ropePtr + (j * CONST_TWO + CONST_ONE) * VL_FP32;
-                auto cosAddr1 = cosPtr1 + j * VL_FP32;
-                auto cosAddr2 = cosPtr2 + j * VL_FP32;
-                auto sinAddr1 = sinPtr1 + j * VL_FP32;
-                auto sinAddr2 = sinPtr2 + j * VL_FP32;
-                auto scaleAddr1 = scalePtr1 + j * VL_FP32;
-                auto scaleAddr2 = scalePtr2 + j * VL_FP32;
-                auto kQuantAddr1 = quantPtr1 + j * VL_FP32;
-                auto kQuantAddr2 = quantPtr2 + j * VL_FP32;
-
-                LoadDataAndCast2Fp32(vregRope1Fp32, ropeAddr1, mask);
-                LoadDataAndCast2Fp32(vregRope2Fp32, ropeAddr2, mask);
-                AscendC::Reg::StoreAlign(tmpBufferPtr, vregRope1Fp32, mask);
-                AscendC::Reg::StoreAlign(tmpBufferPtr + VL_FP32, vregRope2Fp32, mask);
-                AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
-                AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_DINTLV_B32>(
-                    vregRope1Fp32, vregRope2Fp32, ((__ubuf__ float*)(tmpBufferPtr)));
-
-                LoadDataAndCast2Fp32(vregCos1Fp32, cosAddr1, mask);
-                LoadDataAndCast2Fp32(vregCos2Fp32, cosAddr2, mask);
-                LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
-                LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-                // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
-                AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
-                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
-                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
-#else
-                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
-                AscendC::Reg::Mul(vregSin1Fp32, vregSin1Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
-                AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
-#endif
-
-                // 量化部分
-                LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
-                LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
-                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
-                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
-
-                // 将结果cast成对应的量化数据类型
-                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregCos1Fp32, mask);
-                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregCos2Fp32, mask);
-            }
-
-            // 尾VL计算范式
-            auto ropeAddr1 = ropePtr + repeatTimesFloor * VL_FP32 * CONST_TWO;
-            auto ropeAddr2 = ropePtr + (repeatTimesFloor * CONST_TWO + CONST_ONE) * VL_FP32;
-            auto cosAddr1 = cosPtr1 + repeatTimesFloor * VL_FP32;
-            auto cosAddr2 = cosPtr2 + repeatTimesFloor * VL_FP32;
-            auto sinAddr1 = sinPtr1 + repeatTimesFloor * VL_FP32;
-            auto sinAddr2 = sinPtr2 + repeatTimesFloor * VL_FP32;
-            auto scaleAddr1 = scalePtr1 + repeatTimesFloor * VL_FP32;
-            auto scaleAddr2 = scalePtr2 + repeatTimesFloor * VL_FP32;
-            auto kQuantAddr1 = quantPtr1 + repeatTimesFloor * VL_FP32;
-            auto kQuantAddr2 = quantPtr2 + repeatTimesFloor * VL_FP32;
-
-            LoadDataAndCast2Fp32(vregRope1Fp32, ropeAddr1, mask);
-            LoadDataAndCast2Fp32(vregRope2Fp32, ropeAddr2, mask);
-            AscendC::Reg::StoreAlign(tmpBufferPtr, vregRope1Fp32, mask);
-            AscendC::Reg::StoreAlign(tmpBufferPtr + VL_FP32, vregRope2Fp32, mask);
-            AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
-            AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_DINTLV_B32>(vregRope1Fp32, vregRope2Fp32,
-                                                                                    ((__ubuf__ float*)(tmpBufferPtr)));
-
-            LoadDataAndCast2Fp32(vregCos1Fp32, cosAddr1, mask);
-            LoadDataAndCast2Fp32(vregCos2Fp32, cosAddr2, mask);
-            LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
-            LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-            // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
-            AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
-            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
-            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
-#else
-            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
-            AscendC::Reg::Mul(vregSin1Fp32, vregSin1Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
-            AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
-#endif
-
-            // 量化部分
-            width = regTailWidth;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-            LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
-            LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
-            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
-            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
-
-            // 将结果cast成对应的量化类型
-            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregCos1Fp32, mask);
-            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregCos2Fp32, mask);
-        }
-    }
-
-    __aicore__ inline void RopeSymQuantWithVF(__ubuf__ T_KV*& outPtr1, __ubuf__ T_KV*& outPtr2,
-                                              __ubuf__ T_K_CACHE*& quantPtr1, __ubuf__ T_K_CACHE*& quantPtr2,
-                                              __ubuf__ T_KV*& ropePtr, __ubuf__ T_KV*& cosPtr1, __ubuf__ T_KV*& cosPtr2,
-                                              __ubuf__ T_KV*& sinPtr1, __ubuf__ T_KV*& sinPtr2,
-                                              __ubuf__ float*& scalePtr1, __ubuf__ float*& scalePtr2,
-                                              __ubuf__ float*& tmpBufferPtr, uint32_t ubFactor)
-    {
-        uint32_t vlStride = VL_FP32 * CONST_TWO;
-        uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, vlStride);
-        uint16_t regTailWidth = (ubFactor - repeatTimesFloor * vlStride) / CONST_TWO;
-        __VEC_SCOPE__
-        {
-            AscendC::Reg::RegTensor<float> vregRope1Fp32, vregRope2Fp32, vregCos1Fp32, vregCos2Fp32, vregSin1Fp32,
-                vregSin2Fp32;
-            AscendC::Reg::RegTensor<float> vregScale1Fp32, vregScale2Fp32;
-            AscendC::Reg::RegTensor<half> vregHalf;
-            AscendC::Reg::RegTensor<int16_t> vregInt16;
-            AscendC::Reg::RegTensor<T_K_CACHE> vregQuant;
-            AscendC::Reg::MaskReg mask;
-            AscendC::Reg::UnalignRegForStore uReg;
-            uint32_t width = VL_FP32;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-
-            // 标准VL计算范式
-            for (uint16_t j = 0; j < repeatTimesFloor; j++) {
-                auto ropeAddr1 = ropePtr + j * VL_FP32 * CONST_TWO;
-                auto ropeAddr2 = ropePtr + (j * CONST_TWO + CONST_ONE) * VL_FP32;
-                auto cosAddr1 = cosPtr1 + j * VL_FP32;
-                auto cosAddr2 = cosPtr2 + j * VL_FP32;
-                auto sinAddr1 = sinPtr1 + j * VL_FP32;
-                auto sinAddr2 = sinPtr2 + j * VL_FP32;
-                auto scaleAddr1 = scalePtr1 + j * VL_FP32;
-                auto scaleAddr2 = scalePtr2 + j * VL_FP32;
-                auto kQuantAddr1 = quantPtr1 + j * VL_FP32;
-                auto kQuantAddr2 = quantPtr2 + j * VL_FP32;
-                auto kOutAddr1 = outPtr1 + j * VL_FP32;
-                auto kOutAddr2 = outPtr2 + j * VL_FP32;
-
-                LoadDataAndCast2Fp32(vregRope1Fp32, ropeAddr1, mask);
-                LoadDataAndCast2Fp32(vregRope2Fp32, ropeAddr2, mask);
-                AscendC::Reg::StoreAlign(tmpBufferPtr, vregRope1Fp32, mask);
-                AscendC::Reg::StoreAlign(tmpBufferPtr + VL_FP32, vregRope2Fp32, mask);
-                AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
-                AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_DINTLV_B32>(
-                    vregRope1Fp32, vregRope2Fp32, ((__ubuf__ float*)(tmpBufferPtr)));
-
-                LoadDataAndCast2Fp32(vregCos1Fp32, cosAddr1, mask);
-                LoadDataAndCast2Fp32(vregCos2Fp32, cosAddr2, mask);
-                LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
-                LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-                // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
-                AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
-                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
-                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
-#else
-                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
-                AscendC::Reg::Mul(vregSin1Fp32, vregSin1Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
-                AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
-#endif
-
-                // 中间结果
-                StoreDataAndCastFromFp32(kOutAddr1, vregCos1Fp32, uReg, mask, width);
-                StoreDataAndCastFromFp32(kOutAddr2, vregCos2Fp32, uReg, mask, width);
-
-                // 量化部分
-                LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
-                LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
-                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
-                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
-
-                // 将结果cast成对应的量化类型
-                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregCos1Fp32, mask);
-                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregCos2Fp32, mask);
-            }
-
-            // 尾VL计算范式
-            auto ropeAddr1 = ropePtr + repeatTimesFloor * VL_FP32 * CONST_TWO;
-            auto ropeAddr2 = ropePtr + (repeatTimesFloor * CONST_TWO + CONST_ONE) * VL_FP32;
-            auto cosAddr1 = cosPtr1 + repeatTimesFloor * VL_FP32;
-            auto cosAddr2 = cosPtr2 + repeatTimesFloor * VL_FP32;
-            auto sinAddr1 = sinPtr1 + repeatTimesFloor * VL_FP32;
-            auto sinAddr2 = sinPtr2 + repeatTimesFloor * VL_FP32;
-            auto scaleAddr1 = scalePtr1 + repeatTimesFloor * VL_FP32;
-            auto scaleAddr2 = scalePtr2 + repeatTimesFloor * VL_FP32;
-            auto kQuantAddr1 = quantPtr1 + repeatTimesFloor * VL_FP32;
-            auto kQuantAddr2 = quantPtr2 + repeatTimesFloor * VL_FP32;
-            auto kOutAddr1 = outPtr1 + repeatTimesFloor * VL_FP32;
-            auto kOutAddr2 = outPtr2 + repeatTimesFloor * VL_FP32;
-
-            LoadDataAndCast2Fp32(vregRope1Fp32, ropeAddr1, mask);
-            LoadDataAndCast2Fp32(vregRope2Fp32, ropeAddr2, mask);
-            AscendC::Reg::StoreAlign(tmpBufferPtr, vregRope1Fp32, mask);
-            AscendC::Reg::StoreAlign(tmpBufferPtr + VL_FP32, vregRope2Fp32, mask);
-            AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
-            AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_DINTLV_B32>(vregRope1Fp32, vregRope2Fp32,
-                                                                                    ((__ubuf__ float*)(tmpBufferPtr)));
-
-            LoadDataAndCast2Fp32(vregCos1Fp32, cosAddr1, mask);
-            LoadDataAndCast2Fp32(vregCos2Fp32, cosAddr2, mask);
-            LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
-            LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-            // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
-            AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
-            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
-            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
-#else
-            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
-            AscendC::Reg::Mul(vregSin1Fp32, vregSin1Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
-            AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
-#endif
-
-            // 中间结果
-            width = regTailWidth;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-            StoreDataAndCastFromFp32(kOutAddr1, vregCos1Fp32, uReg, mask, width);
-            StoreDataAndCastFromFp32(kOutAddr2, vregCos2Fp32, uReg, mask, width);
-
-            // 量化部分
-            LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
-            LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
-            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
-            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
-
-            // 将结果cast成对应的量化类型
-            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregCos1Fp32, mask);
-            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregCos2Fp32, mask);
         }
     }
 
@@ -1748,8 +936,13 @@ public:
             }
 #endif
 
-            RopeSymQuantWithVF(kOutPtr1, kOutPtr2, kQuantPtr1, kQuantPtr2, ropePtr, cosPtr1, cosPtr2, sinPtr1, sinPtr2,
-                               scalePtr1, scalePtr2, tmpBufferPtr, tmpFactor);
+            uint32_t ubFactor = tmpFactor;
+            uint32_t vlStride = VL_FP32 * CONST_TWO;
+            uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, vlStride);
+            uint16_t regTailWidth = (ubFactor - repeatTimesFloor * vlStride) / CONST_TWO;
+            asc_vf_call<RecomputeRopeSymQuantWithComputeVF<T_KV, T_K_CACHE>>(
+                kOutPtr1, kOutPtr2, kQuantPtr1, kQuantPtr2, ropePtr, cosPtr1, cosPtr2, sinPtr1, sinPtr2, scalePtr1,
+                scalePtr2, tmpBufferPtr, repeatTimesFloor, regTailWidth);
 
             outQueue.EnQue<T_KV>(kOutLocal);
             kOutLocal = outQueue.DeQue<T_KV>();
@@ -1768,181 +961,6 @@ public:
             inQueueCosSin.FreeTensor(cosLocalPart1);
             kScaleOffsetQueue.FreeTensor(kScaleLocalPart1);
             inQueueX.FreeTensor(ropeLocal);
-        }
-    }
-
-    __aicore__ inline void RopeAsymQuantVF(__ubuf__ T_K_CACHE*& quantPtr1, __ubuf__ T_K_CACHE*& quantPtr2,
-                                           __ubuf__ T_KV*& ropePtr, __ubuf__ T_KV*& cosPtr1, __ubuf__ T_KV*& cosPtr2,
-                                           __ubuf__ T_KV*& sinPtr1, __ubuf__ T_KV*& sinPtr2, __ubuf__ float*& scalePtr1,
-                                           __ubuf__ float*& scalePtr2, __ubuf__ float*& offsetPtr1,
-                                           __ubuf__ float*& offsetPtr2, __ubuf__ float*& tmpBufferPtr,
-                                           uint32_t ubFactor)
-    {
-        uint32_t vlStride = VL_FP32 * CONST_TWO;
-        uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, vlStride);
-        uint16_t regTailWidth = (ubFactor - repeatTimesFloor * vlStride) / CONST_TWO;
-        __VEC_SCOPE__
-        {
-            AscendC::Reg::RegTensor<float> vregRope1Fp32, vregRope2Fp32, vregCos1Fp32, vregCos2Fp32, vregSin1Fp32,
-                vregSin2Fp32;
-            AscendC::Reg::RegTensor<float> vregScale1Fp32, vregScale2Fp32, vregOffset1Fp32, vregOffset2Fp32;
-            AscendC::Reg::RegTensor<half> vregHalf;
-            AscendC::Reg::RegTensor<int16_t> vregInt16;
-            AscendC::Reg::RegTensor<T_K_CACHE> vregQuant;
-            AscendC::Reg::MaskReg mask;
-            AscendC::Reg::UnalignRegForStore uReg;
-            uint32_t width = VL_FP32;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-
-            // 标准VL计算范式
-            for (uint16_t j = 0; j < repeatTimesFloor; j++) {
-                auto ropeAddr1 = ropePtr + j * VL_FP32 * CONST_TWO;
-                auto ropeAddr2 = ropePtr + (j * CONST_TWO + CONST_ONE) * VL_FP32;
-                auto cosAddr1 = cosPtr1 + j * VL_FP32;
-                auto cosAddr2 = cosPtr2 + j * VL_FP32;
-                auto sinAddr1 = sinPtr1 + j * VL_FP32;
-                auto sinAddr2 = sinPtr2 + j * VL_FP32;
-                auto scaleAddr1 = scalePtr1 + j * VL_FP32;
-                auto scaleAddr2 = scalePtr2 + j * VL_FP32;
-                auto offsetAdd1 = offsetPtr1 + j * VL_FP32;
-                auto offsetAdd2 = offsetPtr2 + j * VL_FP32;
-                auto kQuantAddr1 = quantPtr1 + j * VL_FP32;
-                auto kQuantAddr2 = quantPtr2 + j * VL_FP32;
-
-                LoadDataAndCast2Fp32(vregRope1Fp32, ropeAddr1, mask);
-                LoadDataAndCast2Fp32(vregRope2Fp32, ropeAddr2, mask);
-                AscendC::Reg::StoreAlign(tmpBufferPtr, vregRope1Fp32, mask);
-                AscendC::Reg::StoreAlign(tmpBufferPtr + VL_FP32, vregRope2Fp32, mask);
-                AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
-                AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_DINTLV_B32>(
-                    vregRope1Fp32, vregRope2Fp32, ((__ubuf__ float*)(tmpBufferPtr)));
-
-                LoadDataAndCast2Fp32(vregCos1Fp32, cosAddr1, mask);
-                LoadDataAndCast2Fp32(vregCos2Fp32, cosAddr2, mask);
-                LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
-                LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-                // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
-                AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
-                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
-                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
-#else
-                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
-                AscendC::Reg::Mul(vregSin1Fp32, vregSin1Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
-                AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
-#endif
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-                // FMA: offset = offset + rope_result * scale
-                LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
-                LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
-                LoadDataAndCast2Fp32<float>(vregOffset1Fp32, offsetAdd1, mask);
-                LoadDataAndCast2Fp32<float>(vregOffset2Fp32, offsetAdd2, mask);
-                AscendC::Reg::MulAddDst(vregOffset1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
-                AscendC::Reg::MulAddDst(vregOffset2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
-
-                // 将结果cast成对应的量化类型
-                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregOffset1Fp32, mask);
-                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregOffset2Fp32, mask);
-#else
-                // 量化部分
-                LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
-                LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
-                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
-                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
-                LoadDataAndCast2Fp32<float>(vregOffset1Fp32, offsetAdd1, mask);
-                LoadDataAndCast2Fp32<float>(vregOffset2Fp32, offsetAdd2, mask);
-                AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregOffset1Fp32, mask);
-                AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregOffset2Fp32, mask);
-
-                // 将结果cast成对应的量化类型
-                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregCos1Fp32, mask);
-                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregCos2Fp32, mask);
-#endif
-            }
-
-            // 尾VL计算范式
-            auto ropeAddr1 = ropePtr + repeatTimesFloor * VL_FP32 * CONST_TWO;
-            auto ropeAddr2 = ropePtr + (repeatTimesFloor * CONST_TWO + CONST_ONE) * VL_FP32;
-            auto cosAddr1 = cosPtr1 + repeatTimesFloor * VL_FP32;
-            auto cosAddr2 = cosPtr2 + repeatTimesFloor * VL_FP32;
-            auto sinAddr1 = sinPtr1 + repeatTimesFloor * VL_FP32;
-            auto sinAddr2 = sinPtr2 + repeatTimesFloor * VL_FP32;
-            auto scaleAddr1 = scalePtr1 + repeatTimesFloor * VL_FP32;
-            auto scaleAddr2 = scalePtr2 + repeatTimesFloor * VL_FP32;
-            auto offsetAdd1 = offsetPtr1 + repeatTimesFloor * VL_FP32;
-            auto offsetAdd2 = offsetPtr2 + repeatTimesFloor * VL_FP32;
-            auto kQuantAddr1 = quantPtr1 + repeatTimesFloor * VL_FP32;
-            auto kQuantAddr2 = quantPtr2 + repeatTimesFloor * VL_FP32;
-
-            LoadDataAndCast2Fp32(vregRope1Fp32, ropeAddr1, mask);
-            LoadDataAndCast2Fp32(vregRope2Fp32, ropeAddr2, mask);
-            AscendC::Reg::StoreAlign(tmpBufferPtr, vregRope1Fp32, mask);
-            AscendC::Reg::StoreAlign(tmpBufferPtr + VL_FP32, vregRope2Fp32, mask);
-            AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
-            AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_DINTLV_B32>(vregRope1Fp32, vregRope2Fp32,
-                                                                                    ((__ubuf__ float*)(tmpBufferPtr)));
-
-            LoadDataAndCast2Fp32(vregCos1Fp32, cosAddr1, mask);
-            LoadDataAndCast2Fp32(vregCos2Fp32, cosAddr2, mask);
-            LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
-            LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-            // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
-            AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
-            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
-            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
-#else
-            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
-            AscendC::Reg::Mul(vregSin1Fp32, vregSin1Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
-            AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
-#endif
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-            // FMA: offset = offset + rope_result * scale
-            width = regTailWidth;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-            LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
-            LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
-            LoadDataAndCast2Fp32<float>(vregOffset1Fp32, offsetAdd1, mask);
-            LoadDataAndCast2Fp32<float>(vregOffset2Fp32, offsetAdd2, mask);
-            AscendC::Reg::MulAddDst(vregOffset1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
-            AscendC::Reg::MulAddDst(vregOffset2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
-
-            // 将结果cast成对应的量化类型
-            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregOffset1Fp32, mask);
-            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregOffset2Fp32, mask);
-#else
-            // 量化部分
-            width = regTailWidth;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-            LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
-            LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
-            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
-            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
-            LoadDataAndCast2Fp32<float>(vregOffset1Fp32, offsetAdd1, mask);
-            LoadDataAndCast2Fp32<float>(vregOffset2Fp32, offsetAdd2, mask);
-            AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregOffset1Fp32, mask);
-            AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregOffset2Fp32, mask);
-
-            // 将结果cast成对应的量化类型
-            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregCos1Fp32, mask);
-            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregCos2Fp32, mask);
-#endif
         }
     }
 
@@ -2054,8 +1072,13 @@ public:
             }
 #endif
 
-            RopeAsymQuantVF(kQuantPtr1, kQuantPtr2, ropePtr, cosPtr1, cosPtr2, sinPtr1, sinPtr2, scalePtr1, scalePtr2,
-                            offsetPtr1, offsetPtr2, tmpBufferPtr, tmpFactor);
+            uint32_t ubFactor = tmpFactor;
+            uint32_t vlStride = VL_FP32 * CONST_TWO;
+            uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, vlStride);
+            uint16_t regTailWidth = (ubFactor - repeatTimesFloor * vlStride) / CONST_TWO;
+            asc_vf_call<RecomputeRopeAsymQuantComputeVF<T_KV, T_K_CACHE>>(
+                kQuantPtr1, kQuantPtr2, ropePtr, cosPtr1, cosPtr2, sinPtr1, sinPtr2, scalePtr1, scalePtr2, offsetPtr1,
+                offsetPtr2, tmpBufferPtr, repeatTimesFloor, regTailWidth);
 
             outQueue.EnQue<T_K_CACHE>(kQuantLocal);
             kQuantLocal = outQueue.DeQue<T_K_CACHE>();
@@ -2113,20 +1136,7 @@ public:
         __ubuf__ T* dstPtr = (__ubuf__ T*)scratch.GetPhyAddr() + r; // 非对齐 dst，StoreUnAlign 允许
         uint16_t repeatFloor = static_cast<uint16_t>((width - 1) / VL_FP32);
         uint32_t tailW = static_cast<uint32_t>(width - static_cast<int64_t>(repeatFloor) * VL_FP32);
-        __VEC_SCOPE__
-        {
-            AscendC::Reg::RegTensor<T> reg;
-            AscendC::Reg::UnalignRegForStore ureg;
-            for (uint16_t j = 0; j < repeatFloor; j++) {
-                AscendC::Reg::LoadAlign<T, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(reg, srcPtr,
-                                                                                        static_cast<int32_t>(VL_FP32));
-                AscendC::Reg::StoreUnAlign(dstPtr, reg, ureg, static_cast<uint32_t>(VL_FP32));
-            }
-            AscendC::Reg::LoadAlign<T, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(reg, srcPtr,
-                                                                                    static_cast<int32_t>(tailW));
-            AscendC::Reg::StoreUnAlign(dstPtr, reg, ureg, tailW);
-            AscendC::Reg::StoreUnAlignPost(dstPtr, ureg, static_cast<int32_t>(0));
-        }
+        asc_vf_call<ScatterKNzOddDk1RearrangeVF<T>>(srcPtr, dstPtr, repeatFloor, tailW);
         event_t evtVToMTE3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
         SetFlag<HardEvent::V_MTE3>(evtVToMTE3);
         WaitFlag<HardEvent::V_MTE3>(evtVToMTE3);
@@ -2403,8 +1413,13 @@ public:
             }
 #endif
 
-            RopeSymQuantVF(kQuantPtr1, kQuantPtr2, ropePtr, cosPtr1, cosPtr2, sinPtr1, sinPtr2, scalePtr1, scalePtr2,
-                           tmpBufferPtr, tmpFactor);
+            uint32_t ubFactor = tmpFactor;
+            uint32_t vlStride = VL_FP32 * CONST_TWO;
+            uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, vlStride);
+            uint16_t regTailWidth = (ubFactor - repeatTimesFloor * vlStride) / CONST_TWO;
+            asc_vf_call<RecomputeRopeSymQuantComputeVF<T_KV, T_K_CACHE>>(
+                kQuantPtr1, kQuantPtr2, ropePtr, cosPtr1, cosPtr2, sinPtr1, sinPtr2, scalePtr1, scalePtr2, tmpBufferPtr,
+                repeatTimesFloor, regTailWidth);
 
             outQueue.EnQue<T_K_CACHE>(kQuantLocal);
             kQuantLocal = outQueue.DeQue<T_K_CACHE>();
@@ -2473,7 +1488,12 @@ public:
             inQueueCosSin.EnQue<T_KV>(cosLocalPart1);
             cosLocalPart1 = inQueueCosSin.DeQue<T_KV>();
 
-            RopeVF(outPtr1, outPtr2, ropePtr, cosPtr1, cosPtr2, sinPtr1, sinPtr2, tmpBufferPtr, tmpFactor);
+            uint32_t ubFactor = tmpFactor;
+            uint32_t vlStride = VL_FP32 * CONST_TWO;
+            uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, vlStride);
+            uint16_t regTailWidth = (ubFactor - repeatTimesFloor * vlStride) / CONST_TWO;
+            asc_vf_call<RecomputeRopeComputeVF<T_KV>>(outPtr1, outPtr2, ropePtr, cosPtr1, cosPtr2, sinPtr1, sinPtr2,
+                                                      tmpBufferPtr, repeatTimesFloor, regTailWidth);
 
             outQueue.EnQue<T_KV>(kOutLocal);
             kOutLocal = outQueue.DeQue<T_KV>();
@@ -2492,188 +1512,6 @@ public:
             outQueue.FreeTensor(kOutLocal);
             inQueueCosSin.FreeTensor(cosLocalPart1);
             inQueueX.FreeTensor(ropeLocal);
-        }
-    }
-
-    __aicore__ inline void RopeAsymQuantWithKvVF(
-        __ubuf__ T_KV*& outPtr1, __ubuf__ T_KV*& outPtr2, __ubuf__ T_K_CACHE*& quantPtr1,
-        __ubuf__ T_K_CACHE*& quantPtr2, __ubuf__ T_KV*& ropePtr, __ubuf__ T_KV*& cosPtr1, __ubuf__ T_KV*& cosPtr2,
-        __ubuf__ T_KV*& sinPtr1, __ubuf__ T_KV*& sinPtr2, __ubuf__ float*& scalePtr1, __ubuf__ float*& scalePtr2,
-        __ubuf__ float*& offsetPtr1, __ubuf__ float*& offsetPtr2, __ubuf__ float*& tmpBufferPtr, uint32_t ubFactor)
-    {
-        uint32_t vlStride = VL_FP32 * CONST_TWO;
-        uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, vlStride);
-        uint16_t regTailWidth = (ubFactor - repeatTimesFloor * vlStride) / CONST_TWO;
-        __VEC_SCOPE__
-        {
-            AscendC::Reg::RegTensor<float> vregRope1Fp32, vregRope2Fp32, vregCos1Fp32, vregCos2Fp32, vregSin1Fp32,
-                vregSin2Fp32;
-            AscendC::Reg::RegTensor<float> vregScale1Fp32, vregScale2Fp32, vregOffset1Fp32, vregOffset2Fp32;
-            AscendC::Reg::RegTensor<half> vregHalf;
-            AscendC::Reg::RegTensor<int16_t> vregInt16;
-            AscendC::Reg::RegTensor<T_K_CACHE> vregQuant;
-            AscendC::Reg::MaskReg mask;
-            AscendC::Reg::UnalignRegForStore uReg;
-            uint32_t width = VL_FP32;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-
-            // 标准VL计算范式
-            for (uint16_t j = 0; j < repeatTimesFloor; j++) {
-                auto ropeAddr1 = ropePtr + j * VL_FP32 * CONST_TWO;
-                auto ropeAddr2 = ropePtr + (j * CONST_TWO + CONST_ONE) * VL_FP32;
-                auto cosAddr1 = cosPtr1 + j * VL_FP32;
-                auto cosAddr2 = cosPtr2 + j * VL_FP32;
-                auto sinAddr1 = sinPtr1 + j * VL_FP32;
-                auto sinAddr2 = sinPtr2 + j * VL_FP32;
-                auto scaleAddr1 = scalePtr1 + j * VL_FP32;
-                auto scaleAddr2 = scalePtr2 + j * VL_FP32;
-                auto offsetAdd1 = offsetPtr1 + j * VL_FP32;
-                auto offsetAdd2 = offsetPtr2 + j * VL_FP32;
-                auto kQuantAddr1 = quantPtr1 + j * VL_FP32;
-                auto kQuantAddr2 = quantPtr2 + j * VL_FP32;
-                auto kOutAddr1 = outPtr1 + j * VL_FP32;
-                auto kOutAddr2 = outPtr2 + j * VL_FP32;
-
-                LoadDataAndCast2Fp32(vregRope1Fp32, ropeAddr1, mask);
-                LoadDataAndCast2Fp32(vregRope2Fp32, ropeAddr2, mask);
-                AscendC::Reg::StoreAlign(tmpBufferPtr, vregRope1Fp32, mask);
-                AscendC::Reg::StoreAlign(tmpBufferPtr + VL_FP32, vregRope2Fp32, mask);
-                AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
-                AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_DINTLV_B32>(
-                    vregRope1Fp32, vregRope2Fp32, ((__ubuf__ float*)(tmpBufferPtr)));
-
-                LoadDataAndCast2Fp32(vregCos1Fp32, cosAddr1, mask);
-                LoadDataAndCast2Fp32(vregCos2Fp32, cosAddr2, mask);
-                LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
-                LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-                // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
-                AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
-                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
-                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
-#else
-                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
-                AscendC::Reg::Mul(vregSin1Fp32, vregSin1Fp32, vregRope2Fp32, mask);
-                AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
-                AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
-                AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
-#endif
-                // 中间结果
-                StoreDataAndCastFromFp32(kOutAddr1, vregCos1Fp32, uReg, mask, width);
-                StoreDataAndCastFromFp32(kOutAddr2, vregCos2Fp32, uReg, mask, width);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-                // FMA: offset = offset + rope_result * scale
-                LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
-                LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
-                LoadDataAndCast2Fp32<float>(vregOffset1Fp32, offsetAdd1, mask);
-                LoadDataAndCast2Fp32<float>(vregOffset2Fp32, offsetAdd2, mask);
-                AscendC::Reg::MulAddDst(vregOffset1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
-                AscendC::Reg::MulAddDst(vregOffset2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
-
-                // 将结果cast成对应的量化类型
-                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregOffset1Fp32, mask);
-                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregOffset2Fp32, mask);
-#else
-                // 量化部分
-                LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
-                LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
-                AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
-                AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
-                LoadDataAndCast2Fp32<float>(vregOffset1Fp32, offsetAdd1, mask);
-                LoadDataAndCast2Fp32<float>(vregOffset2Fp32, offsetAdd2, mask);
-                AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregOffset1Fp32, mask);
-                AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregOffset2Fp32, mask);
-
-                // 将结果cast成对应的量化类型
-                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregCos1Fp32, mask);
-                StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregCos2Fp32, mask);
-#endif
-            }
-
-            // 尾VL计算范式
-            auto ropeAddr1 = ropePtr + repeatTimesFloor * VL_FP32 * CONST_TWO;
-            auto ropeAddr2 = ropePtr + (repeatTimesFloor * CONST_TWO + CONST_ONE) * VL_FP32;
-            auto cosAddr1 = cosPtr1 + repeatTimesFloor * VL_FP32;
-            auto cosAddr2 = cosPtr2 + repeatTimesFloor * VL_FP32;
-            auto sinAddr1 = sinPtr1 + repeatTimesFloor * VL_FP32;
-            auto sinAddr2 = sinPtr2 + repeatTimesFloor * VL_FP32;
-            auto scaleAddr1 = scalePtr1 + repeatTimesFloor * VL_FP32;
-            auto scaleAddr2 = scalePtr2 + repeatTimesFloor * VL_FP32;
-            auto offsetAdd1 = offsetPtr1 + repeatTimesFloor * VL_FP32;
-            auto offsetAdd2 = offsetPtr2 + repeatTimesFloor * VL_FP32;
-            auto kQuantAddr1 = quantPtr1 + repeatTimesFloor * VL_FP32;
-            auto kQuantAddr2 = quantPtr2 + repeatTimesFloor * VL_FP32;
-            auto kOutAddr1 = outPtr1 + repeatTimesFloor * VL_FP32;
-            auto kOutAddr2 = outPtr2 + repeatTimesFloor * VL_FP32;
-
-            LoadDataAndCast2Fp32(vregRope1Fp32, ropeAddr1, mask);
-            LoadDataAndCast2Fp32(vregRope2Fp32, ropeAddr2, mask);
-            AscendC::Reg::StoreAlign(tmpBufferPtr, vregRope1Fp32, mask);
-            AscendC::Reg::StoreAlign(tmpBufferPtr + VL_FP32, vregRope2Fp32, mask);
-            AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
-            AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_DINTLV_B32>(vregRope1Fp32, vregRope2Fp32,
-                                                                                    ((__ubuf__ float*)(tmpBufferPtr)));
-
-            LoadDataAndCast2Fp32(vregCos1Fp32, cosAddr1, mask);
-            LoadDataAndCast2Fp32(vregCos2Fp32, cosAddr2, mask);
-            LoadDataAndCast2Fp32(vregSin1Fp32, sinAddr1, mask);
-            LoadDataAndCast2Fp32(vregSin2Fp32, sinAddr2, mask);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-            // FMA: kReal=cos1*rope1+rope2*(-sin1), kImag=cos2*rope2+rope1*sin2, 5 insn
-            AscendC::Reg::Muls(vregSin1Fp32, vregSin1Fp32, CONST_MINUS_ONE, mask);
-            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::MulAddDst(vregCos1Fp32, vregRope2Fp32, vregSin1Fp32, mask);
-            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::MulAddDst(vregCos2Fp32, vregRope1Fp32, vregSin2Fp32, mask);
-#else
-            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::Muls(vregRope2Fp32, vregRope2Fp32, CONST_MINUS_ONE, mask);
-            AscendC::Reg::Mul(vregSin1Fp32, vregSin1Fp32, vregRope2Fp32, mask);
-            AscendC::Reg::Mul(vregSin2Fp32, vregSin2Fp32, vregRope1Fp32, mask);
-            AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregSin1Fp32, mask);
-            AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregSin2Fp32, mask);
-#endif
-            // 中间结果
-            width = regTailWidth;
-            mask = AscendC::Reg::UpdateMask<float>(width);
-            StoreDataAndCastFromFp32(kOutAddr1, vregCos1Fp32, uReg, mask, width);
-            StoreDataAndCastFromFp32(kOutAddr2, vregCos2Fp32, uReg, mask, width);
-
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
-            // FMA: offset = offset + rope_result * scale
-            LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
-            LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
-            LoadDataAndCast2Fp32<float>(vregOffset1Fp32, offsetAdd1, mask);
-            LoadDataAndCast2Fp32<float>(vregOffset2Fp32, offsetAdd2, mask);
-            AscendC::Reg::MulAddDst(vregOffset1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
-            AscendC::Reg::MulAddDst(vregOffset2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
-
-            // 将结果cast成对应的量化类型
-            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregOffset1Fp32, mask);
-            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregOffset2Fp32, mask);
-#else
-            // 量化部分
-            LoadDataAndCast2Fp32<float>(vregScale1Fp32, scaleAddr1, mask);
-            LoadDataAndCast2Fp32<float>(vregScale2Fp32, scaleAddr2, mask);
-            AscendC::Reg::Mul(vregCos1Fp32, vregCos1Fp32, vregScale1Fp32, mask);
-            AscendC::Reg::Mul(vregCos2Fp32, vregCos2Fp32, vregScale2Fp32, mask);
-            LoadDataAndCast2Fp32<float>(vregOffset1Fp32, offsetAdd1, mask);
-            LoadDataAndCast2Fp32<float>(vregOffset2Fp32, offsetAdd2, mask);
-            AscendC::Reg::Add(vregCos1Fp32, vregCos1Fp32, vregOffset1Fp32, mask);
-            AscendC::Reg::Add(vregCos2Fp32, vregCos2Fp32, vregOffset2Fp32, mask);
-
-            // 将结果cast成对应的量化类型
-            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr1, vregCos1Fp32, mask);
-            StoreQuantAndCastFromFp32<T_K_CACHE>(kQuantAddr2, vregCos2Fp32, mask);
-#endif
         }
     }
 
@@ -2794,8 +1632,13 @@ public:
             }
 #endif
 
-            RopeAsymQuantWithKvVF(kOutPtr1, kOutPtr2, kQuantPtr1, kQuantPtr2, ropePtr, cosPtr1, cosPtr2, sinPtr1,
-                                  sinPtr2, scalePtr1, scalePtr2, offsetPtr1, offsetPtr2, tmpBufferPtr, tmpFactor);
+            uint32_t ubFactor = tmpFactor;
+            uint32_t vlStride = VL_FP32 * CONST_TWO;
+            uint16_t repeatTimesFloor = ops::FloorDiv(ubFactor, vlStride);
+            uint16_t regTailWidth = (ubFactor - repeatTimesFloor * vlStride) / CONST_TWO;
+            asc_vf_call<RecomputeRopeAsymQuantWithKvComputeVF<T_KV, T_K_CACHE>>(
+                kOutPtr1, kOutPtr2, kQuantPtr1, kQuantPtr2, ropePtr, cosPtr1, cosPtr2, sinPtr1, sinPtr2, scalePtr1,
+                scalePtr2, offsetPtr1, offsetPtr2, tmpBufferPtr, repeatTimesFloor, regTailWidth);
 
             outQueue.EnQue<T_KV>(kOutLocal);
             kOutLocal = outQueue.DeQue<T_KV>();
