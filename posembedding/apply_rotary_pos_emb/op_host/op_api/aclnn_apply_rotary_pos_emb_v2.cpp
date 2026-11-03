@@ -8,17 +8,41 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include <cstring>
+
 #include "aclnn_apply_rotary_pos_emb_v2.h"
 #include "aclnnInner_apply_rotary_pos_emb.h"
+#include "external/aclnn_kernels/aclnn_platform.h"
+#include "opdev/op_log.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+namespace {
+
+static void CheckRotaryModeSupportAndWarn(const char* rotaryMode)
+{
+    if (Ops::Transformer::AclnnUtil::IsRegbase()) {
+        return;
+    }
+    if (rotaryMode == nullptr || std::strcmp(rotaryMode, "half") == 0) {
+        return;
+    }
+    OP_LOGW("ApplyRotaryPosEmb: rotaryMode=\"%s\" is not supported on the current platform "
+            "(\"interleave\" and \"quarter\" are only supported on Ascend 950PR&950DT). "
+            "The call still returns success, but the result is computed with \"half\" "
+            "semantics and does not match the requested mode.",
+            rotaryMode);
+}
+
+} // namespace
+
 aclnnStatus aclnnApplyRotaryPosEmbV2GetWorkspaceSize(aclTensor* queryRef, aclTensor* keyRef, const aclTensor* cos,
                                                      const aclTensor* sin, int64_t layout, char* rotaryMode,
                                                      uint64_t* workspaceSize, aclOpExecutor** executor)
 {
+    CheckRotaryModeSupportAndWarn(rotaryMode);
     aclnnStatus ret = aclnnInnerApplyRotaryPosEmbGetWorkspaceSize(queryRef, keyRef, cos, sin, layout, rotaryMode,
                                                                   workspaceSize, executor);
     return ret;

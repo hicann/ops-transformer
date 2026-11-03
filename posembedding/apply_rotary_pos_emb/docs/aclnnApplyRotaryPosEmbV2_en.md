@@ -11,7 +11,7 @@
 - <term>Atlas A3 products</term>: Supported
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 products</term>: Not supported
+- <term>Atlas A2 products</term>: Supported
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 inference products</term>: Not supported
@@ -348,6 +348,8 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
   </tbody>
   </table>
 
+  - Compatibility note: On <term>Atlas inference products</term>, <term>Atlas A2 products</term>, and <term>Atlas A3 products</term>, if `"interleave"` or `"quarter"` is passed in, the API does **not** return an error code. A **warning** is logged, and the computation follows `"half"` semantics.
+
   <!-- npu="310p" id7 -->
   - <term>Atlas inference products</term>: Do not support BFLOAT16
 
@@ -376,7 +378,7 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
   <td align="left">The data type or data format of the passed-in queryRef, keyRef, cos, or sin is out of the supported range, or the shape does not match.</td>
   </tr>
   <tr><td align="left">The passed-in layout parameter is out of the supported range.</td></tr>
-  <tr><td align="left">The passed-in rotaryMode parameter is out of the supported range.</td></tr>
+  <tr><td align="left">The passed-in rotaryMode parameter is out of the value range.</td></tr>
   </table>
 
 ## aclnnApplyRotaryPosEmbV2

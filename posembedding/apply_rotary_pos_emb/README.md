@@ -163,7 +163,7 @@
       使用lastDim表示输入shape最后一维head_dim的值，计算需要使用的UB空间大小：
       `ub_required = (q_n + k_n) * lastDim * castSize * 2 + lastDim * DtypeSize * 4 + (q_n + k_n) * lastDim * castSize + (q_n + k_n) * lastDim * castSize * 2 + cast * (lastDim * 4 * 2)`，
       当计算出`ub_required`的大小超过当前AI处理器的UB空间总大小时，不支持使用该融合算子。
-    - rotary_mode只支持"half"。
+    - rotary_mode只支持"half"。若传入`"interleave"`或`"quarter"`，接口不返回错误码，打印 warning，并按`"half"`语义计算。
     - 不支持空tensor场景。
 
 - <term>Ascend 950PR&950DT系列产品</term>：

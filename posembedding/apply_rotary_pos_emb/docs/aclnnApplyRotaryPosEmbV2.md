@@ -352,6 +352,8 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
   </tbody>
   </table>
 
+  - 兼容性说明：在 <term>Atlas推理系列产品</term>、<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term> 上传入 `"interleave"` 或 `"quarter"` 时，接口**不返回错误码**，而是打印 **warning** 日志，并按 `"half"` 语义计算。
+
   <!-- npu="310p" id7 -->
   - <term>Atlas推理系列产品</term>：不支持BFLOAT16
 
@@ -380,7 +382,7 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
   <td align="left">传入的queryRef、keyRef、cos、sin的数据类型、数据格式不在支持的范围内或shape不匹配。</td>
   </tr>
   <tr><td align="left">传入的layout参数不在支持范围内。</td></tr>
-  <tr><td align="left">传入的rotaryMode参数不在支持范围内。</td></tr>
+  <tr><td align="left">传入的rotaryMode参数不在取值范围内。</td></tr>
   </table>
 
 ## aclnnApplyRotaryPosEmbV2
