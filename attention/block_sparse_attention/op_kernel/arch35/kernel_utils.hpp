@@ -41,7 +41,7 @@ struct TaskInfo {
     // ===== PV 稀疏 gather 所需（mxfp4）=====
     int64_t gmOffsetV = 0;          // V 数据 batch+head 基址偏移（fp4 元素单位，sizeof=1 即字节）
     int64_t gmOffsetVScale = 0;     // V-scale batch+head 基址偏移（E8M0 字节单位）
-    uint32_t gmOffsetSparseIdx = 0; // 本 task 的 sparseIdx 起始 = gmOffsetSparseCount * yBlockNumAligned
+    uint64_t gmOffsetSparseIdx = 0; // 本 task 的 sparseIdx 起始 = gmOffsetSparseCount * yBlockNumAligned
     int64_t kvSeqlen = 0;           // 当前 batch 实际 KV 长度
     uint32_t yBlockNumAval = 0;     // CeilDiv(kvSeqlen, blockShapeY)，实际 Y-block 总数
     uint32_t yBlockNumRsvd = 0;     // 本 task 选中 Y-block 数（来自 gSparseCount）

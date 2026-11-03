@@ -89,13 +89,13 @@ public:
                     AscendC::CreateVecIndex(maskIdxUb, static_cast<int32_t>(curLoopColOffset), actDealtColCurLoop);
                     AscendC::PipeBarrier<PIPE_V>();
                     AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(IdxPingPongFlag);
-                    AscendC::DataCopyPad(
-                        maskPatUb8[IdxPingPongFlag], gSparseMask[globalRowOffset * yBlockNumAligned + curLoopColOffset],
-                        AscendC::DataCopyExtParams(actDealtRowCurLoop, actDealtColCurLoop * sizeof(ElementSparseMask),
-                                                   (yBlockNumAligned - actDealtColCurLoop) * sizeof(ElementSparseMask),
-                                                   0, 0),
-                        AscendC::DataCopyPadExtParams<ElementSparseMask>(
-                            true, 0, (actDealtColCurLoop32 - actDealtColCurLoop), 0));
+                    uint64_t maskOffset = static_cast<uint64_t>(globalRowOffset) * yBlockNumAligned + curLoopColOffset;
+                    AscendC::DataCopyPad(maskPatUb8[IdxPingPongFlag], gSparseMask[maskOffset],
+                                         AscendC::DataCopyExtParams(
+                                             actDealtRowCurLoop, actDealtColCurLoop * sizeof(ElementSparseMask),
+                                             (yBlockNumAligned - actDealtColCurLoop) * sizeof(ElementSparseMask), 0, 0),
+                                         AscendC::DataCopyPadExtParams<ElementSparseMask>(
+                                             true, 0, (actDealtColCurLoop32 - actDealtColCurLoop), 0));
                     AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(0);
                     AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(0);
                     AscendC::Cast(maskPatUb16, maskPatUb8[IdxPingPongFlag], AscendC::RoundMode::CAST_NONE,
@@ -122,11 +122,11 @@ public:
                         if (k == 0) {
                             AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(0);
                         }
-                        AscendC::DataCopyPad(
-                            gSparseIdx[globalRowOffset * yBlockNumAligned + k * yBlockNumAligned + rsvdCountPerRow[k]],
-                            sparseIdxUb[IdxPingPongFlag][k * PRE_COL_TILE],
-                            AscendC::DataCopyExtParams(1, rsvdCountPerRowCurColLoop[k] * sizeof(ElementSparseIdx), 0, 0,
-                                                       0));
+                        uint64_t row = static_cast<uint64_t>(globalRowOffset) + k;
+                        uint64_t indexOffset = row * yBlockNumAligned + rsvdCountPerRow[k];
+                        AscendC::DataCopyPad(gSparseIdx[indexOffset], sparseIdxUb[IdxPingPongFlag][k * PRE_COL_TILE],
+                                             AscendC::DataCopyExtParams(
+                                                 1, rsvdCountPerRowCurColLoop[k] * sizeof(ElementSparseIdx), 0, 0, 0));
                         if (k == actDealtRowCurLoop - 1) {
                             AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(IdxPingPongFlag);
                         }

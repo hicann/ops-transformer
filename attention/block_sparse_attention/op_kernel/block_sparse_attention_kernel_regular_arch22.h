@@ -140,6 +140,7 @@ public:
             uint32_t countPingPongFlag = 0;
             for (uint32_t i = 0; i < rowLoop; i++) {
                 uint32_t curLoopRowOffset = i * PRE_ROW_TILE;
+                uint64_t globalRowOffset = static_cast<uint64_t>(curStartRowIdx) + curLoopRowOffset;
                 int32_t actDealtRowCurLoop = (i == rowLoop - 1) ? (actDealtRow - curLoopRowOffset) : PRE_ROW_TILE;
                 uint64_t rsvdCountPerRow[PRE_ROW_TILE] = {0};
                 uint64_t rsvdCountPerRowCurColLoop[PRE_ROW_TILE] = {0};
@@ -151,8 +152,7 @@ public:
                     AscendC::CreateVecIndex(maskIdxUbLocal, static_cast<int32_t>(curLoopColOffset), PRE_COL_TILE);
                     AscendC::PipeBarrier<PIPE_V>();
                     AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(idxPingPongFlag);
-                    int32_t maskOffset =
-                        curStartRowIdx * maxKvBlockNum + curLoopRowOffset * maxKvBlockNum + curLoopColOffset;
+                    uint64_t maskOffset = globalRowOffset * maxKvBlockNum + curLoopColOffset;
                     AscendC::DataCopyPad(
                         maskPatternUbLocal[idxPingPongFlag], maskGM[maskOffset],
                         AscendC::DataCopyExtParams(actDealtRowCurLoop, actDealtColCurLoop * sizeof(int8_t),
@@ -191,10 +191,9 @@ public:
                         if (k == 0) {
                             AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(0);
                         }
+                        uint64_t indexOffset = (globalRowOffset + k) * maxKvBlockNum + rsvdCountPerRow[k];
                         AscendC::DataCopyPad(
-                            selectIdxGM[curStartRowIdx * maxKvBlockNum + curLoopRowOffset * maxKvBlockNum +
-                                        k * maxKvBlockNum + rsvdCountPerRow[k]],
-                            sparseIdxUbLocal[idxPingPongFlag][k * PRE_COL_TILE],
+                            selectIdxGM[indexOffset], sparseIdxUbLocal[idxPingPongFlag][k * PRE_COL_TILE],
                             AscendC::DataCopyExtParams(1, rsvdCountPerRowCurColLoop[k] * sizeof(int32_t), 0, 0, 0));
                         if (k == actDealtRowCurLoop - 1) {
                             AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(idxPingPongFlag);
@@ -492,7 +491,8 @@ public:
             uint32_t kvHeadIdx = qNBlockIdx / qNBlockNumPerGroup;
             uint32_t qHeadIdx = kvHeadIdx * groupSize + qNBlockIdxCurGroup * curQNBlockTile;
 
-            uint32_t curSelectIdx = curBatch * qHeads * maxQBlockNum + qHeadIdx * maxQBlockNum + qXIdx;
+            uint64_t curSelectIdx = static_cast<uint64_t>(curBatch) * qHeads * maxQBlockNum +
+                                    static_cast<uint64_t>(qHeadIdx) * maxQBlockNum + qXIdx;
             uint32_t curSelectNum = static_cast<uint32_t>(gSelectNumIdx.GetValue(curSelectIdx));
             if (curSelectNum == 0) {
                 continue;
