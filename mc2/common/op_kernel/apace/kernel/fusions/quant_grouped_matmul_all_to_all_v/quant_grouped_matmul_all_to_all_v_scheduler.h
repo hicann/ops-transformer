@@ -36,10 +36,15 @@
 #ifndef APACE_QUANT_GROUPED_MATMUL_ALL_TO_ALL_V_SCHEDULER_H__
 #define APACE_QUANT_GROUPED_MATMUL_ALL_TO_ALL_V_SCHEDULER_H__
 
-// 本头仅含流水编排模板，AscendC 核间同步原语（SyncAll/PipeBarrier）由使用方
-// 经先序包含 hcomm_impl.h（blaze/hccl 头链）提供
+// 本头仅含流水编排模板，AscendC 核间同步原语（CrossCoreSetFlag/WaitFlag、
+// PipeBarrier）由使用方经先序包含 hcomm_impl.h（blaze/hccl 头链）提供
 
 namespace Apace {
+
+// AIC 全核屏障事件 ID：同仓 AIC-only apace 实现（matmul_reduce_scatter_v2、
+// all_to_all_quant_matmul 960 同步修复）均使用该值，避开 Blaze 内部 0-7 与
+// SyncAll 保留 11-14
+static constexpr uint16_t GMM_A2AV_AIC_SYNC_EVENT_ID = 3;
 
 template <typename CommOpType, typename ComputationOpType, typename SharedComputationOpType, bool IsNeedMM>
 class GmmA2avHcommScheduler {
@@ -60,8 +65,10 @@ public:
                 computeOp_.Process(batch, tokenPrefix);
             }
             // AIC 核间同步：本批 sendBuf 多核写全部落 GM 后才可提交通信；
-            // 空批也照常提交，保证各 rank 集合通信次数对齐
-            AscendC::SyncAll();
+            // 空批也照常提交，保证各 rank 集合通信次数对齐。
+            // 注意不能用默认 SyncAll()（isAIVOnly=true 时 AIC 核为空操作，
+            // 先到核会提前提交非阻塞 AlltoAllV，读到其他核未落 GM 的陈旧段）
+            SyncAicCores();
             commOp_.Launch(batch);
             // 排空本核数据搬移管线（含 block0 侧参数区拷贝）后再复用参数数组
             AscendC::PipeBarrier<PIPE_ALL>();
@@ -77,11 +84,21 @@ public:
         // 汇聚、Finalize
         commOp_.WaitAll();
         AscendC::PipeBarrier<PIPE_ALL>();
-        AscendC::SyncAll();
+        SyncAicCores();
         commOp_.Finalize();
     }
 
 private:
+    // AIC-only 任务下的 AIC 全核屏障。默认 SyncAll()（isAIVOnly=true）在
+    // AIC 核上是空操作，无法保证本批 GMM 输出（40 核各写各段）全部落 GM；
+    // 必须用 CrossCore 原语做全核对齐后再提交非阻塞 AlltoAllV，否则通信
+    // 引擎会读到陈旧 sendBuf 段导致收端 rank 精度偶发错误。
+    __aicore__ inline void SyncAicCores()
+    {
+        AscendC::CrossCoreSetFlag<0, PIPE_FIX>(GMM_A2AV_AIC_SYNC_EVENT_ID);
+        AscendC::CrossCoreWaitFlag(GMM_A2AV_AIC_SYNC_EVENT_ID);
+    }
+
     CommOpType& commOp_;
     ComputationOpType& computeOp_;
     SharedComputationOpType& sharedOp_;
