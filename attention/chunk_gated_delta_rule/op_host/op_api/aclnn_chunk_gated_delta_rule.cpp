@@ -167,9 +167,7 @@ aclnnStatus aclnnChunkGatedDeltaRuleGetWorkspaceSize(const aclTensor* query, con
                INITIAL_STATE_DIMS_NUM, stateShape.GetDimNum(), stateStrides.size());
     auto initialState_ = initialState;
 
-    const char* socName = aclrtGetSocName();
-    CHECK_RET(socName != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    bool isAscend950 = std::strstr(socName, "Ascend950") != nullptr;
+    bool isAscend950 = GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
     if (isAscend950 && stateStrides[stateStrides.size() - 1] == 1 &&
         stateStrides[stateStrides.size() - 2] == stateShape.GetDim(stateShape.GetDimNum() - 1)) {
         initialState_ = uniqueExecutor.get()->CreateView(initialState, initialState->GetViewShape(),

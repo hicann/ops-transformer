@@ -28,7 +28,7 @@ class aclnnChunkGatedDeltaRule_test : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        // cout << "aclnnChunkGatedDeltaRule_test SetUp" << endl;
+        op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
     }
 
     static void TearDownTestCase()
