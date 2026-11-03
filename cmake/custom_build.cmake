@@ -959,6 +959,7 @@ if(generate_proto_srcs AND TARGET cust_proto AND NOT ENABLE_BUILT_IN AND NOT ENA
     target_link_directories(proto_transformer_cust PRIVATE ${ASCEND_DIR}/${SYSTEM_PREFIX}/lib64)
     target_include_directories(proto_transformer_cust PRIVATE ${OPS_TRANSFORMER_DIR})
 
+    if(NOT ENABLE_OP_KERNEL)
     add_es_library(
         ES_LINKABLE_AND_ALL_TARGET es_transformer_cust
         OPP_PROTO_TARGET proto_transformer_cust
@@ -1012,6 +1013,7 @@ if(generate_proto_srcs AND TARGET cust_proto AND NOT ENABLE_BUILT_IN AND NOT ENA
         ${CMAKE_BINARY_DIR}/es_packages/lib64
         ${ES_LIB_INSTALL_DIR}
     )
+    endif()
 endif()
 
 # ------------------------------------------------ generate adapt py ------------------------------------------------

@@ -73,6 +73,7 @@ function(gen_es_transformer_lib_builtin)
     PRIVATE
     ${OPS_TRANSFORMER_DIR}/common/include/op_host
   )
+  if(NOT ENABLE_OP_KERNEL)
   add_es_library_and_whl(
     ES_LINKABLE_AND_ALL_TARGET es_transformer
     OPP_PROTO_TARGET proto_temp_transformer
@@ -93,6 +94,7 @@ function(gen_es_transformer_lib_builtin)
     DESTINATION ${WHL_INSTALL_DIR}/es_packages/whl
     OPTIONAL
   )
+  endif()
 endfunction()
 
 # graph_plugin shared
@@ -139,6 +141,7 @@ function(gen_opgraph_symbol)
     ${OPS_TRANSFORMER_DIR}/common/include/op_host
   )
 
+  if(NOT ENABLE_OP_KERNEL)
   if(TARGET ${GRAPH_PLUGIN_NAME}_obj)
     message(STATUS "Link es graph to graph plugin obj")
     unset(GRAPH_SOURCE)
@@ -161,6 +164,7 @@ function(gen_opgraph_symbol)
       es_transformer
       -Wl,--as-needed
     )
+  endif()
   endif()
   set_target_properties(${OPGRAPH_NAME} PROPERTIES OUTPUT_NAME "opgraph_transformer")
   install(TARGETS ${OPGRAPH_NAME}

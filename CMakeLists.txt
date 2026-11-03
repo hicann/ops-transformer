@@ -47,6 +47,7 @@ option(ENABLE_OOM                 "Enable kernel oom"               OFF)
 option(ENABLE_MSSANITIZER         "Enable mssanitizer mode"         OFF)
 option(ENABLE_DUMP_CCE            "Enable dump_cce mode"            OFF)
 option(UT_INFERSHAPE_FLAG         "Enable infershape ut"            OFF)
+option(ENABLE_OP_KERNEL           "Enable op kernel only build (skip es package generation)" OFF)
 
 set(ASCEND_COMPUTE_UNIT           "ascend910b"           CACHE   STRING   "soc that need to be compiled")
 set(ASCEND_OP_NAME                "ALL"                           CACHE   STRING   "operators that need to be compiled")

@@ -30,8 +30,10 @@ target_link_libraries(proto_math PRIVATE
 )
 
 # 生成es_math
+if(NOT ENABLE_OP_KERNEL)
 add_es_library_and_whl(
     ES_LINKABLE_AND_ALL_TARGET es_math
     OPP_PROTO_TARGET proto_math
     OUTPUT_PATH ${CMAKE_BINARY_DIR}/es_packages_math
 )
+endif()

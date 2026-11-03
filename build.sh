@@ -67,6 +67,7 @@ OP_HOST=FALSE
 OP_GRAPH=FALSE
 ONNX_PLUGIN=FALSE
 OP_KERNEL=FALSE
+ENABLE_OP_KERNEL=FALSE
 SOC_ARRAY=()
 ENABLE_UT_EXEC=TRUE
 ENABLE_RULE_LAUNCH=""
@@ -1659,6 +1660,8 @@ assemble_cmake_args() {
     CUSTOM_OPTION="${CUSTOM_OPTION} -DPACKAGE_TYPE=${cmake_pkg_type}"
   fi
 
+  CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_OP_KERNEL=${ENABLE_OP_KERNEL}"
+
   if [[ "$ENABLE_AICPU" == "FALSE" ]]; then
     CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_AICPU=OFF -DENABLE_TILING_SINK=OFF "
   fi
@@ -2188,6 +2191,13 @@ fi
 
 if [[ "${OPKERNEL_PKG_PR}" == "TRUE" ]]; then
     parse_changed_pr
+fi
+
+if [[ "$OP_KERNEL" == "TRUE" && "$ENABLE_BUILD_PKG" != "TRUE" && "$ENABLE_TEST" != "TRUE" ]]; then
+    # --opkernel 单独构建二进制 kernel，不依赖 GenerateEsPackage / add_es_library_and_whl
+    ENABLE_OP_KERNEL=TRUE
+else
+    ENABLE_OP_KERNEL=FALSE
 fi
 
 assemble_cmake_args

@@ -232,6 +232,7 @@ if (BUILD_OPEN_PROJECT)
                 -p ${ASCEND_CANN_PACKAGE_PATH}
                 --autogen-dir ${ASCEND_AUTOGEN_DIR}
                 --build-open-project ${BUILD_OPEN_PROJECT}
+                --enable-op-kernel ${ENABLE_OP_KERNEL}
                 --binary-out-dir ${ASCEND_BINARY_OUT_DIR}
                 --impl-out-dir ${ASCEND_IMPL_OUT_DIR}
                 --op-build-tool ${OP_BUILD_TOOL}

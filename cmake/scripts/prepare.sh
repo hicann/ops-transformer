@@ -34,6 +34,10 @@ while [[ $# -gt 0 ]]; do
         BUILD_OPEN_PROJECT="$2"
         shift 2
         ;;
+    --enable-op-kernel)
+        ENABLE_OP_KERNEL="$2"
+        shift 2
+        ;;
     --binary-out-dir)
         ASCEND_BINARY_OUT_DIR="$2"
         shift 2
@@ -164,6 +168,7 @@ function build() {
     cmake ${PATH_TO_SOURCE} \
         -DBUILD_OPEN_PROJECT=${BUILD_OPEN_PROJECT} \
         -DPREPARE_BUILD=ON \
+        -DENABLE_OP_KERNEL=${ENABLE_OP_KERNEL:-OFF} \
         -DCUSTOM_ASCEND_CANN_PACKAGE_PATH=${ASCEND_CANN_PACKAGE_PATH} \
         -DASCEND_AUTOGEN_DIR=${ASCEND_AUTOGEN_DIR} \
         -DASCEND_BINARY_OUT_DIR=${ASCEND_BINARY_OUT_DIR} \
