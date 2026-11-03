@@ -74,18 +74,12 @@ private:
     static constexpr uint64_t SYNC_FDOUTPUT_BUF_FLAG = 2;
     static constexpr uint64_t SYNC_LSEOUTPUT_BUF_FLAG = 4;
 
-    static constexpr uint32_t BUFFER_SIZE_BYTE_32B = 32;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_64B = 64;
     static constexpr uint32_t BUFFER_SIZE_BYTE_256B = 256;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_512B = 512;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_1K = 1024;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_2K = 2048;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_4K = 4096;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_8K = 8192;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_16K = 16384;
-
     static constexpr uint32_t BLOCK_ELEMENT_NUM = BYTE_BLOCK / sizeof(T); // 32/4=8
     static constexpr uint32_t FP32_BLOCK_ELEMENT_NUM = BYTE_BLOCK / sizeof(float);
+
+    // FD 每轮规约的行数（与 ReduceFd 里的 fdBalanceMBaseSize 同源）
+    static constexpr uint32_t FD_BALANCE_M_BASE = 8U;
     static constexpr uint32_t FP32_REPEAT_ELEMENT_NUM = REPEAT_BLOCK_BYTE / sizeof(float);
 
     static constexpr float FLOAT_INF = 3e+99;
@@ -122,15 +116,15 @@ protected:
 
 private:
     // ================================FD Local Buffer区====================================
-    LocalTensor<T> fdSumBuf1_;          // 1.5k: 16*24*4
-    LocalTensor<T> fdSumBuf2_;          // 1.5k: 16*24*4
-    LocalTensor<T> fdMaxBuf1_;          // 1.5k: 16*24*4
-    LocalTensor<T> fdMaxBuf2_;          // 1.5k: 16*24*4
-    LocalTensor<T> fdLseExpBuf_;        // 1.5k: 16*24*4
-    LocalTensor<T> fdMm2ResBuf1_;       // 32k: 16*512*4
-    LocalTensor<T> fdMm2ResBuf2_;       // 32k: 16*512*4
-    LocalTensor<T> fdReduceBuf_;        // 32k: 16*512*4
-    LocalTensor<OUTPUT_T> fdOutputBuf_; // 32k: 16*512*4
+    LocalTensor<T> fdSumBuf1_;          // FD_LSE_BUF_BYTES（24 splits × 8 行 × 8 float）
+    LocalTensor<T> fdSumBuf2_;          // 同上（cntM 奇偶双缓冲）
+    LocalTensor<T> fdMaxBuf1_;          // 同上
+    LocalTensor<T> fdMaxBuf2_;          // 同上
+    LocalTensor<T> fdLseExpBuf_;        // 同上
+    LocalTensor<T> fdMm2ResBuf1_;       // 8 行 × Align(dV,64) × 4B
+    LocalTensor<T> fdMm2ResBuf2_;       // 同上（preLoadNum_ 预取双缓冲）
+    LocalTensor<T> fdReduceBuf_;        // 同上
+    LocalTensor<OUTPUT_T> fdOutputBuf_; // 8 行 × Align(dV,64) × sizeof(OUTPUT_T)
 
     LocalTensor<T> fdLseMaxUbBuf1_;
     LocalTensor<T> fdLseMaxUbBuf2_;
@@ -174,58 +168,60 @@ public:
     __aicore__ inline void InitBuffers()
     {
         if ASCEND_IS_AIV {
-            // 与 FA block 共享UB布局：bmm1/bmm2 区域在前，FD 业务缓冲区紧随其后。
-            // 使用 LocalTensor 构造函数直接指定绝对字节偏移，实现内存完全自主管理，
-            // 无需 LocalMemAllocator 线性分配器。
-            // FD 业务区起始字节偏移（跳过 FA 侧 bmm1/bmm2/mm2In 区域），
-            // 以模板参数传入（取值为 FA vec block 的 GetFdBaseOffset()），避免两侧重复推导漂移
+            // FD 业务区从 matmul 输出区之后开始，区内布局与尺寸由 FD 自管；不得回写 matmul 输出区
+            // （AIC 不参与 SyncAll，FD 运行期间 AIC 可能正在写该区）。
+            // 各块用绝对字节偏移直接构造 LocalTensor，不依赖线性分配器。
             constexpr uint32_t BASE = UB_FD_BASE_OFFSET;
 
-            // 各共享区块的绝对字节偏移（与原 LocalMemAllocator 分配顺序完全一致）
-            // SharedBuffer2[0]：attenMaskBuf[0](FA) / fdLseMaxUb(FD)，8192 bytes
-            constexpr uint32_t OFF_BUF2A = BASE;
-            // Skip attenMaskBuf[1]：8192 bytes
-            // SharedBuffer3：stage2OutBuf(FA) / fdSum/Max/LseExp(FD)，32768 bytes
-            constexpr uint32_t OFF_BUF3 = BASE + BUFFER_SIZE_BYTE_8K + BUFFER_SIZE_BYTE_8K;
-            // SharedBuffer1[0]：stage1OutBuf[0](FA) / fdMm2Res(FD)，33024 bytes
-            constexpr uint32_t OFF_BUF1A = OFF_BUF3 + 32768U;
-            // SharedBuffer1[1]：stage1OutBuf[1](FA) / fdReduce/Output(FD)，33024 bytes
-            constexpr uint32_t OFF_BUF1B = OFF_BUF1A + 33024U;
+            // lse 槽沿用原 6,144B：每个 split = FD_BALANCE_M_BASE 行 × FP32_BLOCK_ELEMENT_NUM 个 float，
+            // 故 FD_SPLIT_MAX = 6,144 / 256 = 24
+            constexpr uint32_t FD_DV_ALIGN64 = ((uint32_t)dVBaseSize + 63U) / 64U * 64U;
+            constexpr uint32_t FD_SPLIT_MAX = 24U;
+            constexpr uint32_t FD_SPLIT_LSE_BYTES = FD_BALANCE_M_BASE * FP32_BLOCK_ELEMENT_NUM * sizeof(T);
+            constexpr uint32_t FD_LSE_BUF_BYTES = FD_SPLIT_MAX * FD_SPLIT_LSE_BYTES;
+            constexpr uint32_t FD_MM2_BUF_BYTES = FD_BALANCE_M_BASE * FD_DV_ALIGN64 * sizeof(T);
+            constexpr uint32_t FD_OUT_BUF_BYTES = FD_BALANCE_M_BASE * FD_DV_ALIGN64 * sizeof(OUTPUT_T);
 
-            // sharedBuf1a 内：fdMm2ResBuf1_（前16K）、fdMm2ResBuf2_（后16K）
-            fdMm2ResBuf1_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_BUF1A, BUFFER_SIZE_BYTE_16K).template ReinterpretCast<T>();
-            fdMm2ResBuf2_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_BUF1A + BUFFER_SIZE_BYTE_16K, BUFFER_SIZE_BYTE_16K)
-                    .template ReinterpretCast<T>();
-            // sharedBuf1b 内：fdReduceBuf_（前16K）、fdOutputBuf_（后16K）
-            fdReduceBuf_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_BUF1B, BUFFER_SIZE_BYTE_16K).template ReinterpretCast<T>();
-            fdOutputBuf_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_BUF1B + BUFFER_SIZE_BYTE_16K, BUFFER_SIZE_BYTE_16K)
-                    .template ReinterpretCast<OUTPUT_T>();
+            // 区内偏移
+            constexpr uint32_t OFF_LSEMAX1 = BASE;
+            constexpr uint32_t OFF_LSEMAX2 = OFF_LSEMAX1 + BUFFER_SIZE_BYTE_256B;
+            constexpr uint32_t OFF_LSEUB = OFF_LSEMAX2 + BUFFER_SIZE_BYTE_256B;
+            constexpr uint32_t OFF_SUM1 = OFF_LSEUB + BUFFER_SIZE_BYTE_256B;
+            constexpr uint32_t OFF_SUM2 = OFF_SUM1 + FD_LSE_BUF_BYTES;
+            constexpr uint32_t OFF_MAX1 = OFF_SUM2 + FD_LSE_BUF_BYTES;
+            constexpr uint32_t OFF_MAX2 = OFF_MAX1 + FD_LSE_BUF_BYTES;
+            constexpr uint32_t OFF_LSEEXP = OFF_MAX2 + FD_LSE_BUF_BYTES;
+            constexpr uint32_t OFF_MM2RES1 = OFF_LSEEXP + FD_LSE_BUF_BYTES;
+            constexpr uint32_t OFF_MM2RES2 = OFF_MM2RES1 + FD_MM2_BUF_BYTES;
+            constexpr uint32_t OFF_REDUCE = OFF_MM2RES2 + FD_MM2_BUF_BYTES;
+            constexpr uint32_t OFF_OUTPUT = OFF_REDUCE + FD_MM2_BUF_BYTES;
 
-            // sharedBuf3 内：5 个 6144-byte 槽（fdSum1/2, fdMax1/2, fdLseExp）
-            constexpr uint32_t STRIDE = BUFFER_SIZE_BYTE_4K + BUFFER_SIZE_BYTE_2K; // 6144 bytes
-            fdSumBuf1_ = LocalTensor<uint8_t>(TPosition::VECIN, OFF_BUF3, STRIDE).template ReinterpretCast<T>();
-            fdSumBuf2_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_BUF3 + STRIDE, STRIDE).template ReinterpretCast<T>();
-            fdMaxBuf1_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_BUF3 + 2U * STRIDE, STRIDE).template ReinterpretCast<T>();
-            fdMaxBuf2_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_BUF3 + 3U * STRIDE, STRIDE).template ReinterpretCast<T>();
-            fdLseExpBuf_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_BUF3 + 4U * STRIDE, STRIDE).template ReinterpretCast<T>();
-
-            // sharedBuf2a 内：fdLseMaxUbBuf1_/2、fdLseUbBuf_，各 256 bytes
-            fdLseMaxUbBuf1_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_BUF2A, BUFFER_SIZE_BYTE_256B).template ReinterpretCast<T>();
-            fdLseMaxUbBuf2_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_BUF2A + BUFFER_SIZE_BYTE_256B, BUFFER_SIZE_BYTE_256B)
-                    .template ReinterpretCast<T>();
+            fdLseMaxUbBuf1_ = LocalTensor<uint8_t>(TPosition::VECIN, OFF_LSEMAX1, BUFFER_SIZE_BYTE_256B)
+                                  .template ReinterpretCast<T>();
+            fdLseMaxUbBuf2_ = LocalTensor<uint8_t>(TPosition::VECIN, OFF_LSEMAX2, BUFFER_SIZE_BYTE_256B)
+                                  .template ReinterpretCast<T>();
             fdLseUbBuf_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_BUF2A + 2U * BUFFER_SIZE_BYTE_256B, BUFFER_SIZE_BYTE_256B)
-                    .template ReinterpretCast<T>();
+                LocalTensor<uint8_t>(TPosition::VECIN, OFF_LSEUB, BUFFER_SIZE_BYTE_256B).template ReinterpretCast<T>();
+
+            fdSumBuf1_ =
+                LocalTensor<uint8_t>(TPosition::VECIN, OFF_SUM1, FD_LSE_BUF_BYTES).template ReinterpretCast<T>();
+            fdSumBuf2_ =
+                LocalTensor<uint8_t>(TPosition::VECIN, OFF_SUM2, FD_LSE_BUF_BYTES).template ReinterpretCast<T>();
+            fdMaxBuf1_ =
+                LocalTensor<uint8_t>(TPosition::VECIN, OFF_MAX1, FD_LSE_BUF_BYTES).template ReinterpretCast<T>();
+            fdMaxBuf2_ =
+                LocalTensor<uint8_t>(TPosition::VECIN, OFF_MAX2, FD_LSE_BUF_BYTES).template ReinterpretCast<T>();
+            fdLseExpBuf_ =
+                LocalTensor<uint8_t>(TPosition::VECIN, OFF_LSEEXP, FD_LSE_BUF_BYTES).template ReinterpretCast<T>();
+
+            fdMm2ResBuf1_ =
+                LocalTensor<uint8_t>(TPosition::VECIN, OFF_MM2RES1, FD_MM2_BUF_BYTES).template ReinterpretCast<T>();
+            fdMm2ResBuf2_ =
+                LocalTensor<uint8_t>(TPosition::VECIN, OFF_MM2RES2, FD_MM2_BUF_BYTES).template ReinterpretCast<T>();
+            fdReduceBuf_ =
+                LocalTensor<uint8_t>(TPosition::VECIN, OFF_REDUCE, FD_MM2_BUF_BYTES).template ReinterpretCast<T>();
+            fdOutputBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, OFF_OUTPUT, FD_OUT_BUF_BYTES)
+                               .template ReinterpretCast<OUTPUT_T>();
         }
     }
 
@@ -419,7 +415,7 @@ public:
         if (!fd.fdCoreEnable) {
             return;
         }
-        uint32_t fdBalanceMBaseSize = 8U;
+        constexpr uint32_t fdBalanceMBaseSize = FD_BALANCE_M_BASE;
         uint32_t fdBalanceMSplitNum = (fd.mLen + fdBalanceMBaseSize - 1) / fdBalanceMBaseSize;
         uint32_t fdBalanceMTailSize =
             (fd.mLen % fdBalanceMBaseSize == 0) ? fdBalanceMBaseSize : fd.mLen % fdBalanceMBaseSize;
