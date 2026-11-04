@@ -12,6 +12,7 @@
 #define FLASH_ATTN_TILING_IMPL_H_ARCH35
 
 #include "../flash_attn_tiling_base.h"
+#include "flash_attn_kernel_config_arch35.h"
 
 namespace optiling {
 namespace flash_attn {
@@ -28,6 +29,10 @@ protected:
     void UpdateTilingKeyConfig() override;
     void UpdateTilingKeyInfo() override;
     void UpdateTilingKeyTemplateId() override;
+
+private:
+    // SplitPolicy 里由 CalcConfig 一次算出，供 UpdateTilingKeyTemplateId 使用
+    fa_tiling_util::FaKernelConfigArch35 kernelConfig_{};
 };
 
 } // namespace flash_attn

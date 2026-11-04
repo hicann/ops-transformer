@@ -22,7 +22,7 @@
 #include "status.h"
 #include "flash_attn_grad_metadata_split.h"
 #include "../../common/op_kernel/aicpu_common.h"
-#include "../../flash_attn/op_host/arch35/fa_adjust_sinner_souter_arch35.h"
+#include "../../flash_attn/op_host/arch35/flash_attn_kernel_config_arch35.h"
 #include "../../flash_attn/op_host/arch92/fa_adjust_sinner_souter_arch92.h"
 
 constexpr uint32_t FA_KERNEL_STATUS_OK = 0;
@@ -343,13 +343,11 @@ bool FlashAttnMetadataCpuKernel::CheckActualKvSeq()
 void FlashAttnMetadataCpuKernel::InitDeviceInfo()
 {
     // Keep aicCoreNum_/aivCoreNum_ unchanged: they define metadata strides and the FAG layout.
-    uint32_t maxUsedAicCores = optiling::flash_attn::fa_tiling_util::GetMaxUsedAicCores(
-        aicCoreNum_, baseInfo.batchSize, numHeadsKv_, numHeadsQ_ / numHeadsKv_, maxSeqlenQ_, maxSeqlenKv_, mBaseSize_,
-        s2BaseSize_);
-    uint32_t maxUsedAivCores = maxUsedAicCores * (aivCoreNum_ / aicCoreNum_);
-    deviceInfo.aicCoreMaxNum = maxUsedAicCores;
+    // 核数已在 InitLoadBalanceParams 里与基本块/模板一起算出, 这里直接使用。
+    uint32_t maxUsedAivCores = maxUsedAicCores_ * (aivCoreNum_ / aicCoreNum_);
+    deviceInfo.aicCoreMaxNum = maxUsedAicCores_;
     deviceInfo.aivCoreMaxNum = maxUsedAivCores;
-    deviceInfo.aicCoreMinNum = maxUsedAicCores;
+    deviceInfo.aicCoreMinNum = maxUsedAicCores_;
     deviceInfo.aivCoreMinNum = maxUsedAivCores;
 }
 
@@ -369,24 +367,41 @@ int64_t FlashAttnMetadataCpuKernel::CostFunc(uint32_t basicM, uint32_t basicS2)
 
 void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
 {
+    uint32_t cvRatio = static_cast<uint32_t>(aivCoreNum_ / aicCoreNum_);
     uint32_t gSize = static_cast<uint32_t>(numHeadsQ_ / numHeadsKv_);
     bool dnUnmergedRouted = false;
     if (socVersion_.find("Ascend960") != std::string::npos) {
-        // arch92: 基本块按 vHeadDim 档位决定, 同步输出 templateId/mBaseSize/s2BaseSize
         uint32_t templateId = 0;
         optiling::flash_attn::fa_tiling_util::GetConfigInfo(static_cast<uint32_t>(headDimV_), maskMode_, maxSeqlenQ_,
                                                             templateId, mBaseSize_, s2BaseSize_);
+        maxUsedAicCores_ = optiling::flash_attn::fa_tiling_util::GetMaxUsedAicCores(
+            aicCoreNum_, baseInfo.batchSize, numHeadsKv_, gSize, maxSeqlenQ_, maxSeqlenKv_, mBaseSize_ * cvRatio,
+            s2BaseSize_);
         dnUnmergedRouted = templateId == FA_Template_DN_Unmerged;
         param.costFunc = nullptr;
     } else {
-        optiling::flash_attn::fa_tiling_util::AdjustSinnerAndSouter(headDimV_, gSize, maxSeqlenQ_, maxSeqlenKv_,
-                                                                    maskMode_, baseInfo.preToken, baseInfo.nextToken,
-                                                                    mBaseSize_, s2BaseSize_);
-        // Share the final template selection with host tiling before applying the CV ratio.
-        dnUnmergedRouted =
-            optiling::flash_attn::fa_tiling_util::GetFlashAttnTemplateId(
-                static_cast<uint32_t>(headDim_), static_cast<uint32_t>(headDimV_), static_cast<int64_t>(maskMode_),
-                static_cast<int64_t>(maxSeqlenQ_), mBaseSize_) == FA_Template_DN_Unmerged;
+        // 与 host tiling 同一个入口: 模板 -> 基本块 -> 核数, 一次算出。
+        optiling::flash_attn::fa_tiling_util::FaKernelParamArch35 kernelParam{
+            .aicNum = aicCoreNum_,
+            .cvRatio = cvRatio,
+            .batchSize = static_cast<uint32_t>(batchSize_),
+            .kvHeads = static_cast<uint32_t>(numHeadsKv_),
+            .gSize = gSize,
+            .qkHeadDim = static_cast<uint32_t>(headDim_),
+            .vHeadDim = static_cast<uint32_t>(headDimV_),
+            .maskMode = maskMode_,
+            .maxSeqlenQ = maxSeqlenQ_,
+            .maxSeqlenKv = maxSeqlenKv_,
+            .winLeft = baseInfo.preToken,
+            .winRight = baseInfo.nextToken,
+        };
+        optiling::flash_attn::fa_tiling_util::FaKernelConfigArch35 kernelConfig{};
+        optiling::flash_attn::fa_tiling_util::CalcFaKernelConfigArch35::CalcConfig(kernelParam, kernelConfig);
+
+        mBaseSize_ = kernelConfig.sOuter;
+        s2BaseSize_ = kernelConfig.sInner;
+        maxUsedAicCores_ = kernelConfig.usedCoreNum;
+        dnUnmergedRouted = kernelConfig.templateId == FA_Template_DN_Unmerged;
         param.costFunc = FlashAttnMetadataCpuKernel::CostFunc;
     }
     mBaseSize_ *= (aivCoreNum_ / aicCoreNum_);

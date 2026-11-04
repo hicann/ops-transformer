@@ -96,8 +96,9 @@ private:
 
     // SplitParams
     uint32_t groupSize_ = 0;
-    uint32_t mBaseSize_ = 64;   // 64: default value
-    uint32_t s2BaseSize_ = 128; // 128: default value
+    uint32_t mBaseSize_ = 64;      // 64: default value
+    uint32_t s2BaseSize_ = 128;    // 128: default value
+    uint32_t maxUsedAicCores_ = 0; // used AIC num from load balance params
     load_balance::DeviceInfo deviceInfo;
     load_balance::BaseInfo baseInfo;
     load_balance::SectionStreamKParam param;

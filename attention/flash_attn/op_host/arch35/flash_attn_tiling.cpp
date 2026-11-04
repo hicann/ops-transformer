@@ -15,7 +15,7 @@
 
 #include "flash_attn_tiling_arch35.h"
 #include "../flash_attn_tiling.h"
-#include "fa_adjust_sinner_souter_arch35.h"
+#include "flash_attn_kernel_config_arch35.h"
 #include <map>
 #include <vector>
 #include <numeric>
@@ -46,13 +46,26 @@ void FlashAttnTilingImplArch35::SplitPolicy()
     if (winRight == -1) {
         winRight = MASK_MODE_INT_MAX;
     }
-    fa_tiling_util::AdjustSinnerAndSouter(
-        static_cast<uint32_t>(faInfo_->vHeadDim), static_cast<uint32_t>(faInfo_->gSize), faInfo_->maxSeqQ,
-        faInfo_->maxSeqKv, static_cast<int32_t>(faInfo_->maskMode), winLeft, winRight, sOuterFactor_, sInnerFactor_);
-    uint32_t maxUsedAicCores = fa_tiling_util::GetMaxUsedAicCores(platformInfo_.aicNum, faInfo_->bSize, faInfo_->n2Size,
-                                                                  faInfo_->gSize, faInfo_->maxSeqQ, faInfo_->maxSeqKv,
-                                                                  sOuterFactor_ * platformInfo_.cvRatio, sInnerFactor_);
-    CalcNumBlocks(maxUsedAicCores);
+    // 一次算完：模板 -> 基本块 -> 核数；host 与 AICPU metadata 共用同一实现。
+    fa_tiling_util::FaKernelParamArch35 param{
+        .aicNum = platformInfo_.aicNum,
+        .cvRatio = platformInfo_.cvRatio,
+        .batchSize = static_cast<uint32_t>(faInfo_->bSize),
+        .kvHeads = static_cast<uint32_t>(faInfo_->n2Size),
+        .gSize = static_cast<uint32_t>(faInfo_->gSize),
+        .qkHeadDim = static_cast<uint32_t>(faInfo_->qkHeadDim),
+        .vHeadDim = static_cast<uint32_t>(faInfo_->vHeadDim),
+        .maskMode = faInfo_->maskMode,
+        .maxSeqlenQ = faInfo_->maxSeqQ,
+        .maxSeqlenKv = faInfo_->maxSeqKv,
+        .winLeft = winLeft,
+        .winRight = winRight,
+    };
+    fa_tiling_util::CalcFaKernelConfigArch35::CalcConfig(param, kernelConfig_);
+
+    sOuterFactor_ = kernelConfig_.sOuter;
+    sInnerFactor_ = kernelConfig_.sInner;
+    CalcNumBlocks(kernelConfig_.usedCoreNum);
     flashDecodeFlag_ = true;
 }
 
@@ -104,10 +117,7 @@ void FlashAttnTilingImplArch35::UpdateTilingKeyInfo()
 void FlashAttnTilingImplArch35::UpdateTilingKeyTemplateId()
 {
     // 与 metadata 共享三路选择：不合轴 DN 优先，其次合轴 DN，最后 ND；D=72 已由 config 8/9 区分。
-    // dnFlag_ 仅表示合轴 DN，不合轴 DN 使用独立的 metadata 分核模式。
-    tilingKeyInfo_.templateId = fa_tiling_util::GetFlashAttnTemplateId(
-        static_cast<uint32_t>(faInfo_->qkHeadDim), static_cast<uint32_t>(faInfo_->vHeadDim), faInfo_->maskMode,
-        faInfo_->maxSeqQ, sOuterFactor_);
+    tilingKeyInfo_.templateId = kernelConfig_.templateId;
     dnFlag_ = tilingKeyInfo_.templateId == FA_Template_DN;
 }
 
