@@ -49,6 +49,13 @@ inline constexpr uint32_t QLD_V2_WORKSPACE_NUM_INDEX = 4;
 inline constexpr uint32_t QLD_V2_M_START_INDEX = 5;
 inline constexpr uint32_t QLD_V2_M_NUM_INDEX = 6;
 
+// fast模板准入标志位于QLD[0][7]，绝对下标由GetAttrAbsIndex按核槽布局计算
+inline constexpr uint32_t QLD_V2_A5_FAST_FLAG_INDEX = 7;
+inline constexpr uint32_t QLD_V2_A5_FAST_DISABLE = 0;
+inline constexpr uint32_t QLD_V2_A5_FAST_ENABLE = 1;
+// fast准入与Kernel TopK状态使用相同的容量上限
+inline constexpr uint32_t QLI_V2_A5_FAST_SPARSE_CAPACITY = 2048U;
+
 /**
  * @brief 获取属性的绝对索引
  * @param coreIdx 核索引

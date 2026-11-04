@@ -17,6 +17,9 @@
 #include "lib/matmul_intf.h"
 #if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)) || (__CCE_AICORE__ == 310)
 #include "arch35/quant_lightning_indexer_v2_kernel_arch35.h"
+#if (__CCE_AICORE__ == 310) && !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+#include "arch35/quant_lightning_indexer_v2_fast_kernel_arch35.h"
+#endif
 #else
 #include "arch22/quant_lightning_indexer_v2_kernel_arch22.h"
 #endif
@@ -57,6 +60,13 @@ __global__ __aicore__ void quant_lightning_indexer_v2(
     constexpr uint32_t QUANT_MODE_HIFLOAT8 = 4;
     constexpr uint32_t QUANT_MODE_MXFP4 = 5;
     constexpr uint32_t QUANT_MODE_HIFLOAT4 = 6;
+#if (__CCE_AICORE__ == 310) && !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+    if (QLIV2FastDispatch<DT_Q, DT_K, PAGE_ATTENTION, Q_LAYOUT_T, K_LAYOUT_T>::TryRun(
+            query, key, weights, queryScale, keyScale, cuSeqlensQ, cuSeqlensK, sequsedK, blockTable, outputIdxOffset,
+            metadata, sparseIndices, sparseValues, user, tiling_data)) {
+        return;
+    }
+#endif
     if (tiling_data->quantMode == QUANT_MODE_FP8) {
         INVOKE_LI_NO_KFC_OP_IMPL(QLIV2Preload, fp8_e4m3fn_t, fp8_e4m3fn_t, float, uint16_t, int32_t, PAGE_ATTENTION,
                                  LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T), float, float, float);

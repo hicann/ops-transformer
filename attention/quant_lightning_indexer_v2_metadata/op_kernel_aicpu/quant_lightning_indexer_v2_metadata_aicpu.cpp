@@ -11,11 +11,18 @@
 #include "quant_lightning_indexer_v2_metadata_aicpu.h"
 #include <cstdio>
 #include <cmath>
+#include <algorithm>
 #include "status.h"
 
 using namespace optiling;
 
 namespace aicpu {
+namespace {
+constexpr uint32_t A5_FAST_QUERY_TILE_SIZE = 16U;
+constexpr uint32_t A5_FAST_KEY_TILE_SIZE = 2048U;
+constexpr uint32_t A5_FAST_MIN_KEY_SIZE = 16384U;
+constexpr uint64_t A5_FAST_MIN_TOTAL_QUERY_SIZE = 1024U;
+} // namespace
 uint32_t QuantLightningIndexerV2MetadataCpuKernel::Compute(CpuKernelContext& ctx)
 {
     bool success = Prepare(ctx);
@@ -38,11 +45,11 @@ bool QuantLightningIndexerV2MetadataCpuKernel::Prepare(CpuKernelContext& ctx)
     // output
     metadata_ = ctx.Output(static_cast<uint32_t>(ParamId::metadata));
 
-    bool requiredAttrs = GetAttrValue(ctx, "aic_core_num", aicCoreNum_) &&
-                         GetAttrValue(ctx, "aiv_core_num", aivCoreNum_) &&
-                         GetAttrValue(ctx, "soc_version", socVersion_) &&
-                         GetAttrValue(ctx, "num_heads_q", numHeadsQ_) && GetAttrValue(ctx, "num_heads_k", numHeadsK_) &&
-                         GetAttrValue(ctx, "head_dim", headDim_) && GetAttrValue(ctx, "topk", topk_);
+    bool requiredAttrs =
+        GetAttrValue(ctx, "aic_core_num", aicCoreNum_) && GetAttrValue(ctx, "aiv_core_num", aivCoreNum_) &&
+        GetAttrValue(ctx, "soc_version", socVersion_) && GetAttrValue(ctx, "num_heads_q", numHeadsQ_) &&
+        GetAttrValue(ctx, "num_heads_k", numHeadsK_) && GetAttrValue(ctx, "head_dim", headDim_) &&
+        GetAttrValue(ctx, "topk", topk_) && GetAttrValue(ctx, "quant_mode", quantMode_);
     if (!requiredAttrs) {
         return false;
     }
@@ -310,6 +317,149 @@ uint64_t QuantLightningIndexerV2MetadataCpuKernel::GetRevertS2Size(uint32_t bIdx
     } else {
         return static_cast<uint64_t>(cmpS2Size) * static_cast<uint64_t>(cmpRatio_);
     }
+}
+
+bool QuantLightningIndexerV2MetadataCpuKernel::IsA5FastInputSupported() const
+{
+    const auto present = [](const Tensor* t) { return t != nullptr && t->GetData() != nullptr; };
+    if ((maskMode_ != static_cast<int32_t>(SparseMode::DEFAULT_MASK) &&
+         maskMode_ != static_cast<int32_t>(SparseMode::RIGHT_DOWN_CAUSAL)) ||
+        cmpRatio_ != 1 || layoutQ_ != "TND" || (layoutK_ != "TND" && layoutK_ != "PA_BBND") || batchSize_ <= 0 ||
+        !present(cuSeqlensQ_) || present(sequsedQ_) || aicCoreNum_ == 0U || aicCoreNum_ > AIC_CORE_MAX_NUM) {
+        return false;
+    }
+    return layoutK_ == "TND" ? (present(cuSeqlensK_) && !present(sequsedK_)) : present(sequsedK_);
+}
+
+bool QuantLightningIndexerV2MetadataCpuKernel::CollectA5FastWorkload(A5FastWorkload& workload)
+{
+    // 统计实际工作量及16Q/2048K任务数，保留Q/K尾块对利用率的影响
+    workload.firstKeyTiles = (GetS2SeqSize(0U) + A5_FAST_KEY_TILE_SIZE - 1U) / A5_FAST_KEY_TILE_SIZE;
+    for (uint32_t b = 0U; b < static_cast<uint32_t>(batchSize_); ++b) {
+        const uint32_t q = GetS1SeqSize(b), k = GetS2SeqSize(b);
+        if (q == 0U || k < A5_FAST_MIN_KEY_SIZE ||
+            static_cast<uint64_t>(k) < static_cast<uint64_t>(q) + A5_FAST_KEY_TILE_SIZE) {
+            return false;
+        }
+        const uint32_t keyTiles = (k + A5_FAST_KEY_TILE_SIZE - 1U) / A5_FAST_KEY_TILE_SIZE;
+        workload.totalQ += q;
+        workload.totalK += k;
+        workload.totalTasks += (q + A5_FAST_QUERY_TILE_SIZE - 1U) / A5_FAST_QUERY_TILE_SIZE;
+        workload.minK = std::min(workload.minK, k);
+        workload.uniformKeyTiles = workload.uniformKeyTiles && (keyTiles == workload.firstKeyTiles);
+        workload.usefulQueryKeyRows += static_cast<uint64_t>(q) * k;
+    }
+    return workload.totalQ >= A5_FAST_MIN_TOTAL_QUERY_SIZE;
+}
+
+uint64_t QuantLightningIndexerV2MetadataCpuKernel::CalcA5FastMaxCoreKeyTiles(const A5FastWorkload& workload)
+{
+    // K块数相同时，最重核负载可直接由全局任务数推导；Q/K尾块损耗留到后续利用率比较中计入
+    uint64_t maxCoreKeyTiles = ((workload.totalTasks + aicCoreNum_ - 1U) / aicCoreNum_) * workload.firstKeyTiles;
+    if (!workload.uniformKeyTiles) {
+        // K块数不同时，将各batch拆为完整轮次和环形余数区间，用差分数组计算最重核负载
+        std::array<int64_t, AIC_CORE_MAX_NUM + 1U> loadDelta{};
+        uint64_t fullRoundLoad = 0U;
+        int64_t taskOffset = 0;
+        for (uint32_t b = 0U; b < static_cast<uint32_t>(batchSize_); ++b) {
+            const uint32_t tasks = (GetS1SeqSize(b) + A5_FAST_QUERY_TILE_SIZE - 1U) / A5_FAST_QUERY_TILE_SIZE;
+            const uint32_t keyTiles = (GetS2SeqSize(b) + A5_FAST_KEY_TILE_SIZE - 1U) / A5_FAST_KEY_TILE_SIZE;
+            fullRoundLoad += static_cast<uint64_t>(tasks / aicCoreNum_) * keyTiles;
+            const int64_t end = taskOffset + tasks % aicCoreNum_;
+            loadDelta[taskOffset] += keyTiles;
+            loadDelta[std::min(end, static_cast<int64_t>(aicCoreNum_))] -= keyTiles;
+            if (end > aicCoreNum_) {
+                loadDelta[0] += keyTiles;
+                loadDelta[end - aicCoreNum_] -= keyTiles;
+            }
+            taskOffset = (end >= aicCoreNum_) ? end - aicCoreNum_ : end;
+        }
+        int64_t remainderLoad = 0;
+        maxCoreKeyTiles = 0U;
+        for (uint32_t core = 0U; core < aicCoreNum_; ++core) {
+            remainderLoad += loadDelta[core];
+            maxCoreKeyTiles = std::max(maxCoreKeyTiles, fullRoundLoad + static_cast<uint64_t>(remainderLoad));
+        }
+    }
+
+    return maxCoreKeyTiles;
+}
+
+bool QuantLightningIndexerV2MetadataCpuKernel::IsA5FastWorkloadEligible(const A5FastWorkload& workload)
+{
+    // 短K通过平均Q摊薄初始化和最终筛选成本，分页场景从32K起准入
+    // 分页FP8的scale预检还需按K加权约束Q；metadata无blockSize信息，按最小合法页16保守估计
+    const bool fp8 = quantMode_ == static_cast<int32_t>(QUANT_MODE_FP8);
+    // 短FP8筛选指K小于64K且TopK小于2048；K小于32K时平均Q至少128，否则短筛选至少32
+    const bool shortFp8Selection = fp8 && (workload.minK < 65536U) && (topk_ < 2048);
+    const uint64_t minAverageQuery = (workload.minK < 32768U) ? 128U : (shortFp8Selection ? 32U : 0U);
+    // 分页FP8至少保留256行的K加权Query预算，用于摊薄scale预检成本
+    constexpr uint64_t PAGE_FP8_SCALE_QUERY_BUDGET = 256U;
+    const bool pagedFp8 = fp8 && (layoutK_ == "PA_BBND");
+    const uint64_t minWeightedQuery = pagedFp8 ? PAGE_FP8_SCALE_QUERY_BUDGET : (shortFp8Selection ? 32U : 0U);
+    if ((workload.minK < 32768U && layoutK_ != "TND") ||
+        workload.totalQ < static_cast<uint64_t>(batchSize_) * minAverageQuery ||
+        workload.usefulQueryKeyRows < workload.totalK * minWeightedQuery) {
+        return false;
+    }
+
+    return IsA5FastUtilizationSufficient(workload, CalcA5FastMaxCoreKeyTiles(workload), pagedFp8);
+}
+
+bool QuantLightningIndexerV2MetadataCpuKernel::IsA5FastUtilizationSufficient(const A5FastWorkload& workload,
+                                                                             uint64_t maxCoreKeyTiles,
+                                                                             bool pagedFp8) const
+{
+    // 按最短K查表选择利用率门槛，16K档要求满载；使用整数比例比较，允许恰好等于门槛的场景准入
+    const uint32_t tier =
+        static_cast<uint32_t>(workload.minK >= 32768U) + static_cast<uint32_t>(workload.minK >= 65536U) +
+        static_cast<uint32_t>(workload.minK >= 131072U) + static_cast<uint32_t>(workload.minK >= 262144U) +
+        static_cast<uint32_t>(workload.minK >= 393216U);
+    // 表的两行依次为TND、PA_BBND；六列依次为K的[16K,32K)、[32K,64K)、
+    // [64K,128K)、[128K,256K)、[256K,384K)、[384K,+∞)档，按分子/分母表示利用率门槛
+    // TND门槛依次为100%、82%、74%、72%、70%、2/3；PA依次为100%、85%、78%、75%、73%、70%
+    static constexpr uint64_t NUMERATORS[2][6] = {{100U, 82U, 74U, 72U, 70U, 2U}, {100U, 85U, 78U, 75U, 73U, 70U}};
+    static constexpr uint64_t DENOMINATORS[2][6] = {{100U, 100U, 100U, 100U, 100U, 3U},
+                                                    {100U, 100U, 100U, 100U, 100U, 100U}};
+    const uint32_t paged = static_cast<uint32_t>(layoutK_ == "PA_BBND");
+    const uint64_t thresholdNumerator = NUMERATORS[paged][tier];
+    const uint64_t thresholdDenominator = DENOMINATORS[paged][tier];
+    const uint64_t usefulQueryKeyTiles = workload.usefulQueryKeyRows / A5_FAST_KEY_TILE_SIZE;
+    const uint64_t scheduledQueryKeyTiles = maxCoreKeyTiles * A5_FAST_QUERY_TILE_SIZE * aicCoreNum_;
+    // 按8头补齐的比例提高短K门槛；K>=256K沿用已验证可覆盖补齐成本的门槛
+    // 普通档门槛最高截为满载，16K且TopK<2048时保留超出满载的门槛，避免误放行
+    // 7是8头向上对齐的偏置；tier从0计数，tier>=4对应K>=256K
+    const uint64_t physicalHeads = (static_cast<uint64_t>(numHeadsQ_) + 7U) / 8U * 8U;
+    const uint64_t referenceHeads =
+        (tier >= 4U) ? physicalHeads : std::max(static_cast<uint64_t>(8U), static_cast<uint64_t>(numHeadsQ_));
+    const uint64_t headDenominator = thresholdDenominator * referenceHeads;
+    const uint64_t paddedNumerator = thresholdNumerator * physicalHeads;
+    const uint64_t headNumerator =
+        ((tier == 0U) && (topk_ < 2048)) ? paddedNumerator : std::min(paddedNumerator, headDenominator);
+    // 为超出单batch、Q=1024性能参照的分页FP8预检预留额外预算，额外K行按1/8个Q-K块折算
+    // 先比较主流水预算，再以除法检查剩余裕量，避免额外成本交叉相乘放大中间值
+    const uint64_t referenceKeyRows = workload.usefulQueryKeyRows / A5_FAST_MIN_TOTAL_QUERY_SIZE;
+    const uint64_t extraScaleKeyRows = pagedFp8 ? workload.totalK - std::min(workload.totalK, referenceKeyRows) : 0U;
+    const uint64_t scaleCheckBudget = (extraScaleKeyRows + 7U) / 8U;
+    const uint64_t usefulBudget = usefulQueryKeyTiles * headDenominator;
+    const uint64_t scheduledBudget = scheduledQueryKeyTiles * headNumerator;
+    return (usefulBudget >= scheduledBudget) &&
+           (((usefulBudget - scheduledBudget) / headDenominator) >= scaleCheckBudget);
+}
+
+bool QuantLightningIndexerV2MetadataCpuKernel::IsA5FastEligible()
+{
+    // 静态范围、输入组合、工作量统计及收益判断分层执行，未授权时沿用原模板
+    constexpr int32_t MAX_HEAD_NUM = 32;
+    constexpr int32_t HEAD_DIM = 128;
+    if (ProcessSocVersion() != ValidSocVersion::ASCEND950 ||
+        (quantMode_ != static_cast<int32_t>(QUANT_MODE_FP8) && quantMode_ != static_cast<int32_t>(QUANT_MODE_MXFP8)) ||
+        numHeadsK_ != 1 || numHeadsQ_ < 1 || numHeadsQ_ > MAX_HEAD_NUM || headDim_ != HEAD_DIM || topk_ < 1 ||
+        topk_ > static_cast<int32_t>(QLI_V2_A5_FAST_SPARSE_CAPACITY) || !IsA5FastInputSupported()) {
+        return false;
+    }
+    A5FastWorkload workload;
+    return CollectA5FastWorkload(workload) && IsA5FastWorkloadEligible(workload);
 }
 
 void QuantLightningIndexerV2MetadataCpuKernel::CalcSplitInfo(SplitContext& splitContext)
@@ -953,6 +1103,9 @@ bool QuantLightningIndexerV2MetadataCpuKernel::GenMetadata(SplitResult& splitRes
         metadataPtr->qldV2Metadata[i][QLD_V2_M_START_INDEX] = splitRes.fdRes.fdMStart[i];
         metadataPtr->qldV2Metadata[i][QLD_V2_M_NUM_INDEX] = splitRes.fdRes.fdMNum[i];
     }
+    // 先生成完整的原模板调度信息再写入准入标志，供kernel检查失败时回退使用
+    metadataPtr->qldV2Metadata[0][QLD_V2_A5_FAST_FLAG_INDEX] =
+        IsA5FastEligible() ? QLD_V2_A5_FAST_ENABLE : QLD_V2_A5_FAST_DISABLE;
     return true;
 }
 

@@ -1759,6 +1759,20 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingI
     constexpr uint32_t S1_BASE_SIZE = 4;              // S1轴基本块的大小
     constexpr uint32_t TOPK_MAX_SIZE = 2048;          // TopK选取个数
     constexpr uint32_t TOPK_MAX_SIZE1 = 8192;         // A5/A6 TopK最大选取个数
+
+    // Host独立定义fast工作区上界；布局调整时须同步核对Kernel fast common中的工作区布局
+    constexpr uint64_t A5_FAST_QUERY_ROWS = 16U;
+    constexpr uint64_t A5_FAST_SPARSE_CAPACITY = 2048U;
+    constexpr uint64_t A5_FAST_CANDIDATE_CAPACITY = 8192U;
+    constexpr uint64_t A5_FAST_SCALE_FLAG_BYTES = 64U; // 每个Cube组的两个AIV各占32字节通信槽
+    constexpr uint64_t A5_FAST_PIPELINE_WORKSPACE_BYTES =
+        A5_FAST_QUERY_ROWS * (A5_FAST_SPARSE_CAPACITY * (sizeof(uint16_t) + sizeof(int32_t)) +
+                              A5_FAST_CANDIDATE_CAPACITY * (sizeof(uint16_t) + sizeof(uint16_t)));
+    constexpr uint64_t A5_FAST_QUERY_STAGE_BYTES =
+        A5_FAST_QUERY_ROWS * G_SIZE_LIMIT_32_950 * (HEAD_DIM_LIMIT + sizeof(float));
+    constexpr uint64_t A5_FAST_CORE_WORKSPACE_BYTES =
+        A5_FAST_PIPELINE_WORKSPACE_BYTES + A5_FAST_SCALE_FLAG_BYTES + A5_FAST_QUERY_STAGE_BYTES;
+    static_assert(SPARSE_LIMIT == A5_FAST_SPARSE_CAPACITY);
     uint64_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
     // 主流程需Workspace大小
     if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201 ||
@@ -1781,6 +1795,14 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingI
             V1_DECODE_DATA_NUM * S1_BASE_SIZE * V1_RES_ELEM_TYPE * TOPK_MAX_SIZE * V1_RES_ELEM_SIZE * aicNum;
         // 临时存储Decode中间参数信息大小: 2(头/尾)*8(s1Base)*16(paramNum)*sizeof(int64_t)*24=48k
         workspaceSize += V1_DECODE_DATA_NUM * S1_BASE_SIZE * V1_DECODE_PARAM_NUM * V1_DECODE_PARAM_ELEM_SIZE * aicNum;
+    }
+    // 同时预留两条路径的工作区
+    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 &&
+        (*tilingInfo->opParamInfo.quantMode == QUANT_MODE_FP8 ||
+         *tilingInfo->opParamInfo.quantMode == QUANT_MODE_MXFP8)) {
+        const uint64_t fastWorkspaceSize =
+            ascendcPlatform.GetLibApiWorkSpaceSize() + static_cast<uint64_t>(aicNum) * A5_FAST_CORE_WORKSPACE_BYTES;
+        workspaceSize = std::max(workspaceSize, fastWorkspaceSize);
     }
     size_t* workSpaces = context_->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;

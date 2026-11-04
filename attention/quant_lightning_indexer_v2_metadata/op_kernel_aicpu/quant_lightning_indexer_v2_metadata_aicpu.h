@@ -32,6 +32,8 @@ constexpr uint32_t COST_WEIGHT_M = 6U;
 constexpr uint32_t COST_WEIGHT_S2 = 10U;
 constexpr uint32_t S1_BASE_SIZE_SMALL = 2;
 constexpr uint32_t TOPK_6K = 6144;
+constexpr uint32_t QUANT_MODE_FP8 = 1;
+constexpr uint32_t QUANT_MODE_MXFP8 = 3;
 
 enum BlockType : uint32_t {
     NORMAL_BLOCK = 0,
@@ -215,6 +217,7 @@ struct AssignContext {
     S1GCache s1GCache{};
     CoreCache coreCache{};
 };
+
 class QuantLightningIndexerV2MetadataCpuKernel : public CpuKernel {
 public:
     QuantLightningIndexerV2MetadataCpuKernel() = default;
@@ -239,6 +242,22 @@ private:
     uint32_t GetS1SeqSize(uint32_t bIdx);
     uint32_t GetS2SeqSize(uint32_t bIdx);
     uint64_t GetRevertS2Size(uint32_t bIdx);
+    // fast准入统计只服务于metadata，不传递到Host或Kernel
+    struct A5FastWorkload {
+        uint64_t totalQ{0U};
+        uint64_t totalK{0U};
+        uint64_t totalTasks{0U};
+        uint64_t usefulQueryKeyRows{0U};
+        uint32_t minK{UINT32_MAX};
+        uint32_t firstKeyTiles{0U};
+        bool uniformKeyTiles{true};
+    };
+    bool IsA5FastInputSupported() const;
+    bool CollectA5FastWorkload(A5FastWorkload& workload);
+    uint64_t CalcA5FastMaxCoreKeyTiles(const A5FastWorkload& workload);
+    bool IsA5FastWorkloadEligible(const A5FastWorkload& workload);
+    bool IsA5FastUtilizationSufficient(const A5FastWorkload& workload, uint64_t maxCoreKeyTiles, bool pagedFp8) const;
+    bool IsA5FastEligible();
     int64_t CalcPreTokenLeftUp(uint32_t s1Size, uint64_t s2Size) const;
     int64_t CalcNextTokenLeftUp(uint32_t s1Size, uint64_t s2Size) const;
     Range<int64_t> CalcS2TokenRange(uint32_t s1GIdx, const BatchCache& batchCache);
