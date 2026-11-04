@@ -125,6 +125,7 @@ inline uint32_t EstMaxVisibleBlocks(gert::TilingContext* context, const MsaIndex
         return vis;
     }
     uint32_t maxTok = 0U;
+    // 顺序布局统一使用 [B+1] 前缀和；PA 使用 [B] 可见长度。
     if (MsaIsSeqKeyLayout(info.keyLayout)) {
         for (uint32_t b = 0; b < info.batch; ++b) {
             const int32_t delta = data[b + 1U] - data[b];
@@ -537,17 +538,9 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
     if (ParseLayoutQueryAttr(context, attrs->GetStr(MSA_ATTR_LAYOUT_QUERY), info.queryLayout) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    if (MsaIsSeqKeyLayout(info.keyLayout)) {
-        const uint32_t queryOfKey = (info.keyLayout == MSA_KEY_LAYOUT_BSND) ? MSA_QUERY_LAYOUT_BSND :
-                                    (info.keyLayout == MSA_KEY_LAYOUT_BNSD) ? MSA_QUERY_LAYOUT_BNSD :
-                                                                              MSA_QUERY_LAYOUT_TND;
-        OP_CHECK_IF(info.queryLayout != queryOfKey, OP_LOGE(context, "non-paged key layout must match layout_query."),
-                    return ge::GRAPH_FAILED);
-    } else {
-        OP_CHECK_IF(info.queryLayout > MSA_QUERY_LAYOUT_BNSD, OP_LOGE(context, "layout_query is invalid."),
-                    return ge::GRAPH_FAILED);
-    }
-    // pool_block_size：缺省 128。只允许 16 / 128；BSND/BNSD 固定 16（两级 maxpool）。
+    // pool_block_size：缺省 128。只允许 16 / 128。顺序布局的 klen 统一为 [B+1] 前缀和。
+    // V2（query 与 key 同布局）的 BSND/BNSD 固定 16，仅 950。
+    // 非 V2（layout_query=TND、pool=128）允许 key 为 BSND/BNSD，A2/A3 与 950 都支持。
     const int64_t* poolBlockSizeAttrPtr = attrs->GetInt(MSA_ATTR_POOL_BLOCK_SIZE);
     const uint32_t poolBlockSizeAttr = (poolBlockSizeAttrPtr == nullptr || *poolBlockSizeAttrPtr <= 0) ?
                                            MSA_BLOCK_SIZE :
@@ -556,10 +549,24 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                 OP_LOGE(context, "pool_block_size must be %u or %u, got %u.", MSA_BLOCK_SIZE, MSA_BLOCK16_SIZE,
                         poolBlockSizeAttr),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF((info.keyLayout == MSA_KEY_LAYOUT_BSND || info.keyLayout == MSA_KEY_LAYOUT_BNSD) &&
-                    poolBlockSizeAttr != MSA_BLOCK16_SIZE,
-                OP_LOGE(context, "BSND/BNSD requires pool_block_size=%u, got %u.", MSA_BLOCK16_SIZE, poolBlockSizeAttr),
-                return ge::GRAPH_FAILED);
+    const bool batchKey128 = (info.keyLayout == MSA_KEY_LAYOUT_BSND || info.keyLayout == MSA_KEY_LAYOUT_BNSD) &&
+                             poolBlockSizeAttr == MSA_BLOCK_SIZE;
+    if (MsaIsSeqKeyLayout(info.keyLayout)) {
+        if (batchKey128) {
+            OP_CHECK_IF(info.queryLayout != MSA_QUERY_LAYOUT_TND,
+                        OP_LOGE(context, "pool_block_size=%u BSND/BNSD requires layout_query=TND.", MSA_BLOCK_SIZE),
+                        return ge::GRAPH_FAILED);
+        } else {
+            const uint32_t queryOfKey = (info.keyLayout == MSA_KEY_LAYOUT_BSND) ? MSA_QUERY_LAYOUT_BSND :
+                                        (info.keyLayout == MSA_KEY_LAYOUT_BNSD) ? MSA_QUERY_LAYOUT_BNSD :
+                                                                                  MSA_QUERY_LAYOUT_TND;
+            OP_CHECK_IF(info.queryLayout != queryOfKey,
+                        OP_LOGE(context, "non-paged key layout must match layout_query."), return ge::GRAPH_FAILED);
+        }
+    } else {
+        OP_CHECK_IF(info.queryLayout > MSA_QUERY_LAYOUT_BNSD, OP_LOGE(context, "layout_query is invalid."),
+                    return ge::GRAPH_FAILED);
+    }
     if (info.queryLayout == MSA_QUERY_LAYOUT_TND) {
         OP_CHECK_IF(q.GetDimNum() != MSA_QUERY_DIM_NUM,
                     OP_LOGE(context, "layout_query=TND requires query rank 3 [T1,N1,D], got %zu.", q.GetDimNum()),
@@ -628,15 +635,17 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
             info.totalQ = static_cast<uint32_t>(scoreTokens);
         }
     }
-    const bool m3Layout = info.queryLayout == MSA_QUERY_LAYOUT_BSND || info.queryLayout == MSA_QUERY_LAYOUT_BNSD ||
-                          info.keyLayout == MSA_KEY_LAYOUT_BSND || info.keyLayout == MSA_KEY_LAYOUT_BNSD;
+    // 块长 16 的 BSND/BNSD（及 query BSND/BNSD）仅 950。非 V2 的 pool=128 key BSND/BNSD 不在此列。
+    const bool m3Layout =
+        info.queryLayout == MSA_QUERY_LAYOUT_BSND || info.queryLayout == MSA_QUERY_LAYOUT_BNSD ||
+        ((info.keyLayout == MSA_KEY_LAYOUT_BSND || info.keyLayout == MSA_KEY_LAYOUT_BNSD) && !batchKey128);
     OP_CHECK_IF(m3Layout && !info.isAscend950, OP_LOGE(context, "BSND/BNSD is only supported on Ascend 950."),
                 return ge::GRAPH_FAILED);
 
     const gert::Shape& kc = KeyLogicalShape(keyShape, info.keyLayout);
 
     if (MsaIsSeqKeyLayout(info.keyLayout)) {
-        // 块长来自 pool_block_size attr：TND 128 / 16，BSND/BNSD 固定 16。顺序布局无分页存储，两者相同。
+        // 块长来自 pool_block_size。TND 与非 V2 的 BSND/BNSD 为 128；V2 的 BSND/BNSD 为 16。
         info.poolBlockSize = poolBlockSizeAttr;
         info.pageSize = poolBlockSizeAttr;
         info.numPages = 0;
@@ -790,6 +799,15 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                 return ge::GRAPH_FAILED);
 
     info.isQuant = (info.keyDtype == ge::DT_INT8);
+    // 预留int8场景，当前拦截
+    OP_CHECK_IF(info.queryDtype == ge::DT_FLOAT16 && info.keyDtype == ge::DT_INT8,
+                OP_LOGE(context, "float16 query with int8 key is not supported yet, got query %d key %d.",
+                        static_cast<int32_t>(info.queryDtype), static_cast<int32_t>(info.keyDtype)),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(info.isAscend950 && info.queryDtype == ge::DT_HIFLOAT8 && info.keyDtype == ge::DT_HIFLOAT8,
+                OP_LOGE(context, "hifloat8 query with hifloat8 key is not supported yet, got query %d key %d.",
+                        static_cast<int32_t>(info.queryDtype), static_cast<int32_t>(info.keyDtype)),
+                return ge::GRAPH_FAILED);
     // 打分块长 16（TND 16、BSND/BNSD、页长 16 的两级 maxpool）仅 fp16 / bf16；int8 与 FP8 固定 128。
     OP_CHECK_IF(info.poolBlockSize == MSA_BLOCK16_SIZE &&
                     (info.isQuant || IsFp8ComputeDtype(info.queryDtype) || IsFp8ComputeDtype(info.keyDtype)),

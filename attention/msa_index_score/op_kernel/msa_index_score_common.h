@@ -117,7 +117,8 @@ constexpr uint32_t MSA_DEFAULT_INIT_BLOCKS = 0;
 constexpr uint32_t MSA_DEFAULT_LOCAL_BLOCKS = 1;
 
 // key 数据排布。BBND / BNBD 为 PageAttention。
-// TND / BSND / BNSD 为非分页序列，无 block_table，且必须与 query 布局相同。
+// TND / BSND / BNSD 为非分页序列，无 block_table。
+// 块长 16 的 BSND/BNSD 必须与 query 布局相同；块长 128 的 BSND/BNSD 配 TND query。
 constexpr uint32_t MSA_KEY_LAYOUT_BBND = 0; // [block_num, block_size, N2, D]
 constexpr uint32_t MSA_KEY_LAYOUT_BNBD = 1; // [block_num, N2, block_size, D]
 constexpr uint32_t MSA_KEY_LAYOUT_TND = 2;  // [T2, N2, D]

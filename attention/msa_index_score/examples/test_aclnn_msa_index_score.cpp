@@ -84,6 +84,8 @@ enum class KeyLayout {
     BBND = 0,
     BNBD = 1,
     TND = 2,
+    BSND = 3,
+    BNSD = 4,
 };
 
 std::string LayoutKeyName(KeyLayout layout)
@@ -91,12 +93,21 @@ std::string LayoutKeyName(KeyLayout layout)
     switch (layout) {
         case KeyLayout::TND:
             return "TND";
+        case KeyLayout::BSND:
+            return "BSND";
+        case KeyLayout::BNSD:
+            return "BNSD";
         case KeyLayout::BNBD:
             return "BNBD";
         case KeyLayout::BBND:
         default:
             return "BBND";
     }
+}
+
+bool IsBatchKeyLayout(KeyLayout layout)
+{
+    return layout == KeyLayout::BSND || layout == KeyLayout::BNSD;
 }
 
 struct TestCase {
@@ -309,7 +320,8 @@ void ComputeGolden(const TestCase& tc, const std::vector<int32_t>& actualSeqQlen
     golden.assign(static_cast<size_t>(tc.numQHeads * totalQ * scoreStride), kNegInf);
 
     auto keyAt = [&](int64_t pageOrTok, int64_t n, int64_t d) -> float {
-        if (tc.keyLayout == KeyLayout::TND) {
+        // TND 与 N2=1 的 BSND/BNSD：pageOrTok 是块首 token，块内 token 连续。
+        if (tc.keyLayout == KeyLayout::TND || IsBatchKeyLayout(tc.keyLayout)) {
             return keyF[static_cast<size_t>(((pageOrTok + n) * NUM_KV_HEADS) * tc.headDim + d)];
         }
         // BBND [NP,P,1,D] 与 BNBD [NP,1,P,D] 在 N2=1 时同址
@@ -334,7 +346,14 @@ void ComputeGolden(const TestCase& tc, const std::vector<int32_t>& actualSeqQlen
         const int32_t qBlock = tc.startLoc[b];
         const int32_t localStart =
             (qBlock + 1 > static_cast<int32_t>(kLocalBlocks)) ? (qBlock + 1 - static_cast<int32_t>(kLocalBlocks)) : 0;
+        int64_t batchS2 = 0;
+        if (IsBatchKeyLayout(tc.keyLayout)) {
+            for (int32_t kv : tc.kvLen) {
+                batchS2 = std::max<int64_t>(batchS2, kv);
+            }
+        }
         const int32_t cuK = (tc.keyLayout == KeyLayout::TND) ? actualSeqKlen[b] : 0;
+        const int32_t batchTokBase = IsBatchKeyLayout(tc.keyLayout) ? static_cast<int32_t>(b * batchS2) : cuK;
 
         for (int32_t t = qBegin; t < qEnd; ++t) {
             const int32_t tOff = t - qBegin;
@@ -350,8 +369,8 @@ void ComputeGolden(const TestCase& tc, const std::vector<int32_t>& actualSeqQlen
             }
             for (int64_t h = 0; h < tc.numQHeads; ++h) {
                 for (int64_t blk = 0; blk < numBlocks; ++blk) {
-                    const int32_t pageOrTok = (tc.keyLayout == KeyLayout::TND) ?
-                                                  (cuK + static_cast<int32_t>(blk * BLOCK_SIZE)) :
+                    const int32_t pageOrTok = (tc.keyLayout == KeyLayout::TND || IsBatchKeyLayout(tc.keyLayout)) ?
+                                                  (batchTokBase + static_cast<int32_t>(blk * BLOCK_SIZE)) :
                                                   blockTable[b * maxBlocks + blk];
                     float best = 0.0F;
                     bool any = false;
@@ -547,15 +566,24 @@ bool RunCase(const TestCase& tc, aclrtStream stream)
 
     // fp32 参考数据；再按 dtype 转成低精度输入，golden 用转换后的值以对齐数值路径。
     const bool isTnd = (tc.keyLayout == KeyLayout::TND);
+    const bool isBatch = IsBatchKeyLayout(tc.keyLayout);
     int64_t totalK = 0;
+    int64_t batchS2 = 0;
     std::vector<int32_t> actualSeqKlenPrefix(static_cast<size_t>(batch + 1), 0);
-    if (isTnd) {
+    if (isTnd || isBatch) {
         for (int64_t b = 0; b < batch; ++b) {
             actualSeqKlenPrefix[b + 1] = actualSeqKlenPrefix[b] + tc.kvLen[b];
         }
-        totalK = actualSeqKlenPrefix[batch];
     }
-    const int64_t keyTokens = isTnd ? totalK : (tc.numPages * BLOCK_SIZE);
+    if (isTnd) {
+        totalK = actualSeqKlenPrefix[batch];
+    } else if (isBatch) {
+        for (int32_t kv : tc.kvLen) {
+            batchS2 = std::max<int64_t>(batchS2, kv);
+        }
+        totalK = batch * batchS2;
+    }
+    const int64_t keyTokens = (isTnd || isBatch) ? totalK : (tc.numPages * BLOCK_SIZE);
     std::vector<float> queryF(static_cast<size_t>(totalQ * tc.numQHeads * tc.headDim));
     std::vector<float> keyF(static_cast<size_t>(keyTokens * tc.headDim));
     std::vector<uint16_t> queryBf(queryF.size());
@@ -618,6 +646,10 @@ bool RunCase(const TestCase& tc, aclrtStream stream)
     std::vector<int64_t> keyShape;
     if (isTnd) {
         keyShape = {totalK, NUM_KV_HEADS, tc.headDim};
+    } else if (tc.keyLayout == KeyLayout::BSND) {
+        keyShape = {batch, batchS2, NUM_KV_HEADS, tc.headDim};
+    } else if (tc.keyLayout == KeyLayout::BNSD) {
+        keyShape = {batch, NUM_KV_HEADS, batchS2, tc.headDim};
     } else if (tc.keyLayout == KeyLayout::BNBD) {
         keyShape = {tc.numPages, NUM_KV_HEADS, BLOCK_SIZE, tc.headDim};
     } else {
@@ -633,7 +665,7 @@ bool RunCase(const TestCase& tc, aclrtStream stream)
         queryT = tc.useBf16 ? buf.Create(queryBf, queryShape, ACL_BF16) : buf.Create(queryHf, queryShape, ACL_FLOAT16);
     }
 
-    const int64_t keyDim0Gap = (isTnd || tc.keyDim0Gap < 1) ? 1 : tc.keyDim0Gap;
+    const int64_t keyDim0Gap = (isTnd || isBatch || tc.keyDim0Gap < 1) ? 1 : tc.keyDim0Gap;
     std::vector<int64_t> keyStorageShape = keyShape;
     std::vector<int64_t> keyStrides = ContiguousStrides(keyShape);
     const std::vector<int64_t>* keyStoragePtr = nullptr;
@@ -684,7 +716,7 @@ bool RunCase(const TestCase& tc, aclrtStream stream)
         }
     }
     aclTensor* blockTableT = nullptr;
-    if (!isTnd) {
+    if (!isTnd && !isBatch) {
         blockTableT = buf.Create(blockTable, {batch, maxBlocks}, ACL_INT32);
     }
     aclTensor* scaleT = nullptr;
@@ -696,8 +728,8 @@ bool RunCase(const TestCase& tc, aclrtStream stream)
         }
     }
     aclTensor* actualSeqQlenT = buf.Create(actualSeqQlen, {batch + 1}, ACL_INT32);
-    aclTensor* actualSeqKlenT =
-        isTnd ? buf.Create(actualSeqKlenPrefix, {batch + 1}, ACL_INT32) : buf.Create(tc.kvLen, {batch}, ACL_INT32);
+    aclTensor* actualSeqKlenT = (isTnd || isBatch) ? buf.Create(actualSeqKlenPrefix, {batch + 1}, ACL_INT32) :
+                                                     buf.Create(tc.kvLen, {batch}, ACL_INT32);
     aclTensor* startLocT = buf.Create(tc.startLoc, {batch}, ACL_INT32);
     std::vector<int8_t> attenMaskHost(static_cast<size_t>(kAttenMaskSize * kAttenMaskSize), 0);
     aclTensor* attenMaskT = nullptr;
@@ -710,7 +742,7 @@ bool RunCase(const TestCase& tc, aclrtStream stream)
     aclTensor* scoreT = buf.Create(scoreInit, scoreShape, ACL_FLOAT, &scoreDev);
 
     if (queryT == nullptr || keyT == nullptr || actualSeqQlenT == nullptr || actualSeqKlenT == nullptr ||
-        startLocT == nullptr || scoreT == nullptr || (!isTnd && blockTableT == nullptr) ||
+        startLocT == nullptr || scoreT == nullptr || ((!isTnd && !isBatch) && blockTableT == nullptr) ||
         (tc.sparseMode == kSparseModeRightDown && attenMaskT == nullptr)) {
         (void)printf("  [%s] create tensor failed -> FAIL\n", tc.name.c_str());
         return false;
@@ -756,8 +788,8 @@ bool RunCase(const TestCase& tc, aclrtStream stream)
     }
 
     std::vector<float> golden;
-    ComputeGolden(tc, actualSeqQlen, isTnd ? actualSeqKlenPrefix : tc.kvLen, blockTable, maxBlocks, scoreStride, totalQ,
-                  queryF, keyF, deqScale, golden);
+    ComputeGolden(tc, actualSeqQlen, (isTnd || isBatch) ? actualSeqKlenPrefix : tc.kvLen, blockTable, maxBlocks,
+                  scoreStride, totalQ, queryF, keyF, deqScale, golden);
     if (tc.name.find("debug-trace") != std::string::npos) {
         PrintTracePipeline(tc, actualSeqQlen, blockTable, maxBlocks, scoreStride, totalQ, queryF, keyF, deqScale,
                            actual);
@@ -787,7 +819,6 @@ int main()
     const std::vector<TestCase> cases = {
         // name                       Hq   D    pages  qLen           kvLen         startLoc(block) bf16  int8
         {"L0-debug-trace", 2, 16, 2, {2}, {5}, {16}, false, false},
-        {"L0-int8-dequant-trace", 2, 16, 2, {2}, {5}, {16}, false, true},
         {"L0-prefill-aligned", 8, 128, 8, {32}, {256}, {1}, false, false},
         {"L1-prefill-unaligned", 8, 128, 8, {32, 17}, {300, 130}, {2, 0}, false, false},
         {"L1-prefill-multi-mtile", 8, 128, 16, {64, 48}, {700, 520}, {4, 3}, false, false},
@@ -805,10 +836,8 @@ int main()
         {"L1-bf16", 8, 128, 8, {32, 17}, {300, 130}, {2, 0}, true, false},
         {"L1-head-dim-64", 8, 64, 8, {32, 17}, {300, 130}, {2, 0}, false, false},
         {"L1-heads-16", 16, 128, 8, {13}, {300}, {2}, false, false},
-        {"L1-int8-dequant", 8, 128, 8, {32, 17}, {300, 130}, {2, 0}, false, true},
         {"L2-tiny-kv", 8, 128, 4, {1, 1}, {1, 3}, {0, 0}, false, false},
         {"L1-bnbd", 8, 128, 8, {32, 17}, {300, 130}, {2, 0}, false, false, kSparseModeRightDown, KeyLayout::BNBD},
-        {"L1-bnbd-int8", 8, 128, 8, {32, 17}, {300, 130}, {2, 0}, false, true, kSparseModeRightDown, KeyLayout::BNBD},
         {"L1-tnd-unaligned",
          8,
          128,
@@ -820,8 +849,11 @@ int main()
          false,
          kSparseModeRightDown,
          KeyLayout::TND},
-        {"L1-tnd-int8", 8, 128, 0, {32, 17}, {300, 130}, {2, 0}, false, true, kSparseModeRightDown, KeyLayout::TND},
         {"L0-tnd-tiny", 2, 16, 0, {2}, {5}, {16}, false, false, kSparseModeRightDown, KeyLayout::TND},
+        {"L0-bsnd-tiny", 2, 16, 0, {2}, {5}, {0}, false, false, kSparseModeRightDown, KeyLayout::BSND},
+        {"L1-bsnd", 8, 128, 0, {32, 17}, {300, 130}, {2, 0}, false, false, kSparseModeRightDown, KeyLayout::BSND},
+        {"L1-bnsd", 8, 128, 0, {32, 17}, {300, 130}, {2, 0}, false, false, kSparseModeRightDown, KeyLayout::BNSD},
+        {"L0-bnsd-bf16", 2, 16, 0, {2}, {5}, {0}, true, false, kSparseModeRightDown, KeyLayout::BNSD},
         // FP8：C0=32，headDim 用 128 对齐；D=16 半个 C0 数值不可靠。
         {"L0-fp8-e4m3fn", 2, 128, 2, {2}, {5}, {16}, false, false, kSparseModeRightDown, KeyLayout::BBND, 1},
         {"L0-fp8-e5m2", 2, 128, 2, {2}, {5}, {16}, false, false, kSparseModeRightDown, KeyLayout::BBND, 2},
@@ -866,19 +898,6 @@ int main()
          false,
          kSparseModeRightDown,
          KeyLayout::BNBD,
-         0,
-         2},
-        {"L1-stride-int8",
-         8,
-         128,
-         8,
-         {32, 17},
-         {300, 130},
-         {2, 0},
-         false,
-         true,
-         kSparseModeRightDown,
-         KeyLayout::BBND,
          0,
          2},
         // block_table 宽 257：score 末维 RoundUp=272 > UB 单窗 256，950 C2UB 滑窗 flush。

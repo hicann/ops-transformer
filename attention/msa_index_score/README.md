@@ -2,244 +2,77 @@
 
 ## 产品支持情况
 
-| 产品                                                      | 是否支持 |
-| --------------------------------------------------------- | :------: |
-| <term>Atlas A2系列产品</term> |    √     |
-| <term>Atlas A3系列产品</term>  |    √     |
-| <term>Ascend 950PR&950DT系列产品</term>                    |    √     |
+| 产品 | 是否支持 |
+| :-- | :--: |
+| <term>Ascend 950PR&950DT系列产品</term> | √ |
+| <term>Atlas A3系列产品</term> | √ |
+| <term>Atlas A2系列产品</term> | √ |
+| <term>Atlas 200I/500 A2推理产品</term> | × |
+| <term>Atlas推理系列产品</term> | × |
+| <term>Atlas训练系列产品</term> | × |
 
 ## 功能说明
 
-- **算子功能**：计算 MSA（MiniMax Sparse Attention）模块 Index Branch 中的 block score。对每个 query token 与每个 KV sparse block，取该 block 内所有因果可见 token 的 $Q_{idx}$ 和 $K_{idx}$（可选 int8 反量化）的"matmul+maxpool"运算，得到逐 block 的重要性分数 `score`，用作 Index Branch 中后续 TopK 的输入。Prefill 与 Decode 由同一接口承载。
+- **算子功能**：计算MSA（MiniMax Sparse Attention）Index Branch的block score。对每个query token与每个KV sparse block，取该block内因果可见token的$Q_{idx}$与$K_{idx}$做matmul，再按block做Maxpool，得到逐block的重要性分数。本算子不包含TopK。Prefill与Decode共用本接口。
 
 - **计算公式**：
-
-    - 非量化场景：
-
-    $$
-    score = Maxpool[ Q_{idx}@K_{idx}^{T} ]
-    $$
-
-    - int8 量化场景：
-
-    $$
-    score = Maxpool[ scale \cdot Q_{idx}@K_{idx}^{T} ]
-    $$
-
-    完整公式：
 
     $$
     score = Maxpool[(scale \cdot) Q_{idx}@K_{idx}^{T} + atten\_mask] + local\_mask
     $$
 
-    其中 Maxpool 按 sparse block（长度为 $block\_size$）在 KV token 维上取最大值。`start_loc`、`init_blocks`、`local_blocks` 共同生成 $local\_mask$，对序列头部 / 当前 query 附近若干强制保留的 block 写入高分，保证后续 TopK 一定选中它们。与 Triton raw score kernel 对齐时可将 `init_blocks`、`local_blocks` 置 0，关闭 $local\_mask$。
+    非量化时没有$scale$。`sparse_mode=3`时$atten\_mask$为右下因果；`sparse_mode=0`时不叠加。$local\_mask$由`start_loc`、`init_blocks`、`local_blocks`生成，对强制保留的block写入高分。
+
+- **主要计算过程**：
+
+    1. 将每个query token的$Q_{idx}$与KV sparse block内因果可见的$K_{idx}$做矩阵乘，得到token级相关性；
+    2. 按`sparse_mode`叠加$atten\_mask$：`sparse_mode=0`不做因果截断，`sparse_mode=3`按rightDownCausal屏蔽不可见位置。
+    3. 在每个长度为$block\_size$的sparse block上做Maxpool，得到逐block的重要性分数。
+    4. 用`start_loc`、`init_blocks`、`local_blocks`生成$local\_mask$，对强制保留的block写入高分，得到输出`score`。本算子不包含TopK。
 
 ## 参数说明
 
 > **说明：**
 >
-> - B（Batch Size）表示输入样本批量大小
-> - S（Sequence Length）表示序列长度，$S1$ 为 query 侧、$S2$ 为 key 侧
-> - T 表示所有 Batch 序列长度累加和，$T1$ 为 query 侧、$T2$ 为 key 侧
-> - N（Head Num）表示头数，$N1$ 为 query 侧、$N2$ 为 key 侧
-> - D（Head Dim）表示单个注意力头维度
-> - PageAttention 场景下 $block\_num$ 为物理 block 总数、$block\_size$ 为每个 block 的 token 数，$maxBlockNumPerSeq$ 为每个 batch 最大逻辑 block 数（通常 $\ge\lceil S2/block\_size\rceil$），$M_b=\lceil S2/block\_size\rceil$ 为逻辑 block 总数
+> - B为batch，S为序列长度（$S1$ query，$S2$ key），T为各batch长度累加（$T1$ / $T2$）。
+> - N为头数（$N1$ query，$N2$ key），D为head dim。
+> - PageAttention下$block\_num$为物理page数，$block\_size$为每页token数。
 
-<table style="undefined;table-layout: fixed; width: 1280px"><colgroup>
-<col style="width: 160px">
-<col style="width: 120px">
-<col style="width: 560px">
-<col style="width: 320px">
-<col style="width: 120px">
-</colgroup>
-<thead>
-  <tr>
-    <th>参数名</th>
-    <th>输入/输出/属性</th>
-    <th>描述</th>
-    <th>数据类型</th>
-    <th>数据格式</th>
-  </tr>
-</thead>
-<tbody>
-  <tr>
-    <td>query</td>
-    <td>输入</td>
-    <td>公式中的 $Q_{idx}$。当前仅支持 TND，shape 为 $[T1, N1, D]$。</td>
-    <td>BFLOAT16、FLOAT16、HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN</td>
-    <td>ND</td>
-  </tr>
-  <tr>
-    <td>key</td>
-    <td>输入</td>
-    <td>公式中的 $K_{idx}$。支持 TND（$[T2, N2, D]$）、BNBD（$[block\_num, N2, block\_size, D]$）、BBND（$[block\_num, block\_size, N2, D]$）。A2/A3 与 950 上 PA（BBND/BNBD）允许首轴（物理 page）按 stride 非连续存放；size>1 的非首轴须连续，否则 tiling 拒绝。</td>
-    <td>BFLOAT16、FLOAT16、INT8、HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN</td>
-    <td>ND</td>
-  </tr>
-  <tr>
-    <td>block_table</td>
-    <td>可选输入</td>
-    <td>PageAttention 的逻辑 block → 物理 page 映射表。PA 场景必须传入，二维，第二维长度不能小于 $maxBlockNumPerSeq$；shape 为 $[B, S2/block\_size]$。</td>
-    <td>INT32</td>
-    <td>ND</td>
-  </tr>
-  <tr>
-    <td>scale</td>
-    <td>可选输入</td>
-    <td>公式中的 $scale$，反量化系数。非量化必须为空；量化场景必选。PA 为 $[block\_num, N2, block\_size]$ 或 $[block\_num, block\_size, N2]$；TND 为 $[T2, N2]$。</td>
-    <td>FLOAT</td>
-    <td>ND</td>
-  </tr>
-  <tr>
-    <td>atten_mask</td>
-    <td>可选输入</td>
-    <td>控制因果可见的 mask。仅在 <code>sparse_mode=3</code> 时使用；取值为 1 表示该位不参与计算，为 0 表示参与计算；shape 为 $[2048, 2048]$。</td>
-    <td>INT8</td>
-    <td>ND</td>
-  </tr>
-  <tr>
-    <td>actual_seq_qlen</td>
-    <td>可选输入</td>
-    <td>每个 Batch 中 Query 的有效 token 数。query 为 TND 时必须传入，单调不减（前缀和），shape 为 $[B+1]$。</td>
-    <td>INT32</td>
-    <td>ND</td>
-  </tr>
-  <tr>
-    <td>actual_seq_klen</td>
-    <td>可选输入</td>
-    <td>每个 Batch 中 Key 的有效 token 数。key 为 TND 时必须传入（前缀和）；PageAttention 场景下为各请求可见 $S2$，shape 为 $[B]$。</td>
-    <td>INT32</td>
-    <td>ND</td>
-  </tr>
-  <tr>
-    <td>start_loc</td>
-    <td>输入</td>
-    <td>当前 query 所在逻辑 block 索引（非 token 前缀），用于生成 $local\_mask$；shape 为 $[B]$。</td>
-    <td>INT32</td>
-    <td>ND</td>
-  </tr>
-  <tr>
-    <td>layout_key</td>
-    <td>属性</td>
-    <td>key 布局。<code>"TND"</code> / <code>"BBND"</code> / <code>"BNBD"</code>。aclnn 参数名为 <code>layoutKeyOptional</code>，不传时默认 <code>"BBND"</code>。</td>
-    <td>STRING</td>
-    <td>-</td>
-  </tr>
-  <tr>
-    <td>sparse_mode</td>
-    <td>属性</td>
-    <td>sparse 模式。0：defaultMask（<code>atten_mask</code> 传空）；3：rightDownCausal（须传入 $[2048, 2048]$ 的 <code>atten_mask</code>）。</td>
-    <td>INT64</td>
-    <td>-</td>
-  </tr>
-  <tr>
-    <td>init_blocks</td>
-    <td>属性</td>
-    <td>$local\_mask$ 强制选中的头部 block 数。对逻辑 block $[0, init\_blocks)$ 写入高分 $1\mathrm{e}30$。可选，默认 $0$。</td>
-    <td>INT64</td>
-    <td>-</td>
-  </tr>
-  <tr>
-    <td>local_blocks</td>
-    <td>属性</td>
-    <td>$local\_mask$ 强制选中的局部窗口长度。窗口为 $[max(0, start\_loc+1-local\_blocks), start\_loc]$，写入高分 $1\mathrm{e}29$（覆盖同位置的 <code>init_blocks</code>）。可选，默认 $1$（对齐 MiniMax HF）；与 Triton raw score 对齐时置 $0$。</td>
-    <td>INT64</td>
-    <td>-</td>
-  </tr>
-  <tr>
-    <td>score</td>
-    <td>输出</td>
-    <td>公式中的 $score$，逐 block 重要性分数。块长 128 的 shape 为 $[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]$；块长 16 做完 head 间 max 后 head 维为 1，shape 为 $[1, T1, RoundUp(maxBlockNumPerSeq, 16)]$</td>
-    <td>FLOAT</td>
-    <td>ND</td>
-  </tr>
-</tbody>
-</table>
+| 参数名 | 输入/输出/属性 | 描述 | 数据类型 | 数据格式 |
+| --- | --- | --- | --- | --- |
+| query | 输入 | $Q_{idx}$。非V2固定TND $[T1, N1, D]$。V2还可为BSND $[B, S1, N1, D]$、BNSD $[B, N1, S1, D]$，这两种仅<term>Ascend 950PR&950DT系列产品</term>。 | BFLOAT16、FLOAT16；<term>Ascend 950PR&950DT系列产品</term>另支持FLOAT8_E5M2、FLOAT8_E4M3FN。 | ND |
+| key | 输入 | $K_{idx}$。TND $[T2, N2, D]$；BSND $[B, S2, N2, D]$；BNSD $[B, N2, S2, D]$；BBND $[block\_num, block\_size, N2, D]$；BNBD $[block\_num, N2, block\_size, D]$。V2的非分页key必须与query同布局，且BSND/BNSD仅<term>Ascend 950PR&950DT系列产品</term>、逻辑块长16。PA允许首轴非连续。 | 与query同型。 | ND |
+| block_table | 可选输入 | PA的逻辑block到物理page映射，shape $[B, maxBlockNumPerSeq]$。TND / BSND / BNSD不传。 | INT32 | ND |
+| scale | 可选输入 | 非量化与FP8必须为空。 | FLOAT | ND |
+| atten_mask | 可选输入 | `sparse_mode=3`时必传，shape $[2048, 2048]$。1表示不参与计算，0表示参与。 | INT8 | ND |
+| actual_seq_qlen | 可选输入 | query前缀和，shape $[B+1]$。 | INT32 | ND |
+| actual_seq_klen | 可选输入 | TND / BSND / BNSD为key前缀和$[B+1]$。PA为各请求可见长度$[B]$。BSND/BNSD每个请求的长度差不超过$S2$。 | INT32 | ND |
+| start_loc | 输入 | 当前query所在逻辑block索引，shape $[B]$，用于$local\_mask$。 | INT32 | ND |
+| layout_key | 属性 | `TND` / `BSND` / `BNSD` / `BBND` / `BNBD`。默认`BBND`。 | STRING | - |
+| sparse_mode | 属性 | 0：defaultMask；3：rightDownCausal。 | INT64 | - |
+| init_blocks | 属性 | 头部强制保留的block数，默认0。 | INT64 | - |
+| local_blocks | 属性 | 当前query附近强制保留的窗口长度，默认1。与raw score对齐时置0。 | INT64 | - |
+| layout_query | 属性 | `TND` / `BSND` / `BNSD`。默认`TND`。（aclnnMsaIndexScore接口不支持设置，固定为`TND`；aclnnMsaIndexScoreV2接口支持设置） | STRING | - |
+| pool_block_size | 属性 | 每个score归约的token数，只允许16 / 128，默认128。（aclnnMsaIndexScore接口不支持设置，固定为128；aclnnMsaIndexScoreV2接口支持设置） | INT64 | - |
+| score | 输出 | 逐block重要性分数。块长128的shape为$[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]$；块长16做完head间max后head维为1，shape为$[1, T1, RoundUp(maxBlockNumPerSeq, 16)]$。 | FLOAT | ND |
+
+`layout_query`与`pool_block_size`由本接口固定为`TND`与128，不在`aclnnMsaIndexScore`参数表中。可配置这两项的是[aclnnMsaIndexScoreV2](./docs/aclnnMsaIndexScoreV2.md)。
 
 ## 约束说明
 
-- 当前 $block\_size$ 仅支持 128。
-- `layout_key` 必须显式指定：`"BBND"` / `"BNBD"` / `"TND"`，与 `key` 实际 shape 一致。
-- PageAttention（`layout_key` 为 `"BBND"` / `"BNBD"`）场景下，`block_table` 必须传入；TND key 场景不得传入 `block_table`，`actual_seq_klen` 为 `[B+1]` 前缀和。
-- 非量化场景下，`key` dtype 与 `query` 相同（BFLOAT16 / FLOAT16；Ascend 950 另支持 HIFLOAT8 / FLOAT8_E5M2 / FLOAT8_E4M3FN），`scale` 必须为空。量化场景仅支持 INT8（fp16 query），`scale` 必选：PA 为 $[block\_num, N2, block\_size]$ 或 $[block\_num, block\_size, N2]$，TND 为 $[T2, N2]$，dtype 为 FLOAT。三种 FP8 仅 950，且 query 与 key 必须同型、不得传 `scale`。
-- `sparse_mode` 当前仅支持 0、3：
-    - 为 0 时，代表 defaultMask 模式，`atten_mask` 传入空；
-    - 为 3 时，代表 rightDownCausal 模式，`atten_mask` 必须传入，shape 为 $[2048, 2048]$，取值为 1 代表该位不参与计算，为 0 代表该位参与计算。
-- `init_blocks`、`local_blocks` 必须 $\ge 0$ 且不超过逻辑 block 数（PA 为 `block_table` 第二维；TND 为 score 末维对齐宽度）。两者均为 0 时跳过 $local\_mask$。
-- PageAttention `block_table` 第二维可以大于实际 KV 逻辑 block 数；score 末维为 $\mathrm{RoundUp}(width, 16)$。Ascend 950 C2UB 对超过 256 列按 256 列滑窗 flush。
-- PageAttention `key` 仅允许 dim0 非连续；dim1 至末维（size>1）stride 必须与紧凑布局一致，否则 tiling 报非法输入。TND `key` 须全连续。
-- A2/A3 与 Ascend 950：`q_len` / `kv_len` 允许为 0（含整 batch）。对应请求跳过 QK；空 KV 的 score 填 `-inf`；整 batch `T1=0` 时 `SetBlockDim(1)`。
-- A2/A3 与 Ascend 950：按估计 M-task 数启动 MIX（`B=1` 时为 $\mathrm{CeilDiv}(T1\cdot N1, 128)$；多 batch 用 packed+$B$ 上界），短 decode 不打满 AIC。950 短 M 长 S 再按可见 KV stile 切 `kvChunks`。
-- 本算子输出止于 block score，**不包含** TopK。
+- 非V2 aclnn接口（`aclnnMsaIndexScore`）：query固定TND，逻辑块长128。key可为`BBND` / `BNBD` / `TND` / `BSND` / `BNSD`，<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>与<term>Ascend 950PR&950DT系列产品</term>都支持。BSND / BNSD不传`block_table`，`actual_seq_klen`为$[B+1]$前缀和，每个请求的长度差不超过key的$S2$。
+- V2 aclnn接口（`aclnnMsaIndexScoreV2`）：query可为TND / BSND / BNSD。非分页key必须与query同布局，仅支持<term>Ascend 950PR&950DT系列产品</term>，`pool_block_size`为16，`actual_seq_klen`为$[B+1]$前缀和。
+- PageAttention必须传`block_table`，`actual_seq_klen`为$[B]$可见长度。TND / BSND / BNSD不得传`block_table`，`actual_seq_klen`为$[B+1]$前缀和。
+- 非量化时key与query同dtype，`scale`为空。<term>Ascend 950PR&950DT系列产品</term>支持FLOAT8_E5M2与FLOAT8_E4M3FN。
+- `sparse_mode`仅0或3。为3时`atten_mask`必须是$[2048, 2048]$。
+- `init_blocks`、`local_blocks`必须$\ge 0$，且不超过逻辑block数。两者都为0时不写$local\_mask$。
+- `q_len` / `kv_len`允许为0。空KV的score填`-inf`。
+- 本算子不包含TopK。
+- 确定性计算：相同输入与属性下，输出与参考实现一致。
 
-## 调用示例
+## 调用说明
 
-<table style="undefined;table-layout: fixed; width: 1100px"><colgroup>
-<col style="width: 180px">
-<col style="width: 400px">
-<col style="width: 520px">
-</colgroup>
-<thead>
-  <tr>
-    <th>调用方式</th>
-    <th>样例代码</th>
-    <th>说明</th>
-  </tr>
-</thead>
-<tbody>
-  <tr>
-    <td>aclnn 单算子调用</td>
-    <td><a href="./examples/test_aclnn_msa_index_score.cpp">test_aclnn_msa_index_score.cpp</a></td>
-    <td>内置 CPU golden 的端到端精度自验证</td>
-  </tr>
-  <tr>
-    <td>接口文档</td>
-    <td><a href="./docs/aclnnMsaIndexScore.md">aclnnMsaIndexScore.md</a></td>
-    <td>两段式接口说明</td>
-  </tr>
-  <tr>
-    <td>测试说明</td>
-    <td><a href="./tests/README.md">tests/README.md</a></td>
-    <td>用例矩阵与运行方式</td>
-  </tr>
-  <tr>
-    <td>PyTorch API</td>
-    <td>-</td>
-    <td>通过<a href="./docs/torchapi_msa_index_score.md">msa_index_score</a>接口调用msa_index_score算子。</td>
-  </tr>
-</tbody>
-</table>
-
-编译与运行（Ascend 950，x86 包名为 `linux-x86_64.run`；A2/A3 将 `--soc` 换成对应平台）：
-
-```bash
-cd /path/to/ops-transformer-ar-950
-bash build.sh --pkg --soc=ascend950 --ops=msa_index_score -j32
-bash ./build_out/cann-ops-transformer-custom_linux-x86_64.run --quiet --install-path=/path/to/msa_opp/
-source /path/to/msa_opp/vendors/custom_transformer/bin/set_env.bash
-export ASCEND_CUSTOM_OPP_PATH=/path/to/msa_opp/vendors/custom_transformer
-
-# aclnn example 必须带 --soc=ascend950（否则默认 910b）
-bash build.sh --run_example msa_index_score eager cust --vendor_name=custom --soc=ascend950
-# 通过：末行 [PASS]: 50/50 cases passed
-# 矩阵：40 条 fp16/bf16/int8（BBND/BNBD/TND，含 pad / 空序列 / key dim0 stride / 宽 block_table / 短 decode / q4-kv275）+ 10 条 FP8（D=128，含 e4m3fn/e5m2 decode-kv275）
-# 容差：fp16/bf16/int8 1e-3，FP8 2e-2
-# A2/A3：同上矩阵去掉 FP8，期望 [PASS]: 40/40（skipped 10 FP8）
-```
-
-torch_extension 见 [msa_index_score.md](./docs/torchapi_msa_index_score.md)。`cann/set_env.sh` 会把 cann 自带 `site-packages` 插到 `PYTHONPATH` 前面，必须把本仓 `torch_extension` 再插回最前。
-
-> **实现备注（A2/A3 / Ascend 950）**
->
-> - key 布局由属性 `layout_key`（aclnn：`layoutKeyOptional`）指定，支持 PageAttention **BBND** / **BNBD**，以及 packed **TND**（无 `block_table`，`actual_seq_klen` 为 `[B+1]` 前缀和）。默认 `"BBND"`。
-> - `sparse_mode=3` 的 `atten_mask[2048,2048]` 在 host 校验必选；device 侧按 rightDownCausal
->   解析可见窗口（与 LightningIndexer 一致），不逐元素加载模板。
-> - `start_loc` 为逻辑 block 索引，与属性 `init_blocks`（默认 0）、`local_blocks`（默认 1）
->   一起在 Maxpool 之后施加 `local_mask`。
-> - 完整公式：`score = Maxpool[(scale·)Q@Kᵀ + atten_mask] + local_mask`。
-> - **950 当前交付**（`op_kernel/arch35/`）：计算骨架与 A2 相同（Q 驻留 × K pingpong × **8-page S GM** + MODE 0x2 握手）。Cube **原生** FP8（TilingKey 4/5/6，`hifloat8_t` / `fp8_e5m2_t` / `fp8_e4m3fn_t`，无 scale，禁止 Cast→fp16）。L0C→AIV UB（C_to_UB）尚未作为主路径。`arch22/` 冻结。
-> - **PA key dim0 stride**（A2/A3 与 950）：key 为 `IgnoreContiguous`；tiling 用 `GetInputStride` / `GetRequiredInputStride` 读首轴元素 stride，写入已有 `strideKvBlock`。从末维到 dim1 按紧凑 stride 校验（对齐 MlaProlog）；size-1 轴不参与寻址故跳过比较。非 size-1 的非首轴不连续则 tiling 失败。TND 不允许非连续。scale 仍按逻辑 page 紧凑布局。
-> - **950 宽 `block_table`**：C2UB score 暂存单窗 256 列；末维 `RoundUp(width,16)>256` 时按窗 flush 并补写后续 `-inf`，不能关掉 stage。
-> - **短 decode**（A2/A3 与 950）：host 按估计 M-task 数 `SetBlockDim`（单请求即 $\mathrm{CeilDiv}(T1\cdot N1,128)$），不再默认打满 AIC；多 M-tile / 大 batch 仍可占满 AIC。Ascend 950 在 M-task 填不满 AIC 且可见 KV stile $>1$ 时，再按 stile 沿 S 切开（`kvChunks`），短 M 长 S 的 decode 打满 MIX；宽表短 KV 仍只起 1 个 MIX。
-> - torch 的 `torch_npu.hifloat8.npu()` 当前会打出非法 device id，脚本跳过；kernel / aclnn 已挂 HIFLOAT8。
-> - 测性能须选 Health=OK 且空闲的卡。
+| 调用方式 | 样例 | 说明 |
+| --- | --- | --- |
+| aclnn接口 | [test_aclnn_msa_index_score](./examples/test_aclnn_msa_index_score.cpp) | 通过[aclnnMsaIndexScore](./docs/aclnnMsaIndexScore.md)接口方式调用算子 |
+| PyTorch API | - | 通过[msa_index_score](./docs/torchapi_msa_index_score.md)接口调用msa_index_score算子 |

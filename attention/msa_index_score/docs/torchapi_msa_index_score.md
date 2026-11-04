@@ -11,24 +11,31 @@
 <!-- npu="A3" id3 -->
 - <term>Atlas A3系列产品</term>：支持
 <!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas推理系列产品</term>：不支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas训练系列产品</term>：不支持
+<!-- end id6 -->
 
 ## 功能说明
 
-- **接口功能**：封装 `aclnnMsaIndexScore`，计算 MSA Index Branch 的 block score。
-- **公式**：
+- **接口功能**：封装`aclnnMsaIndexScore`，计算MSA Index Branch的block score。对每个query token与每个KV sparse block，取该block内因果可见token的$Q_{idx}$与$K_{idx}$做matmul后按block Maxpool，得到逐block重要性分数，作为后续TopK的输入。
+- **计算公式**：
 
 $$
 score = Maxpool[(scale\cdot)Q_{idx}@K_{idx}^{T}+atten\_mask]+local\_mask
 $$
 
-- `sparse_mode=0`：无因果；`sparse_mode=3`：rightDownCausal（须传 `[2048,2048]` `atten_mask`）。
-- `start_loc[B]`：当前 query 所在逻辑 block 索引，用于 `local_mask`。
-- `init_blocks` / `local_blocks`：Maxpool 之后的强制高分块；与 Triton raw score 对齐时置 0。默认 `0` / `1`。
-- Ascend 950 额外支持 query/key 同型 `torch.float8_e4m3fn` / `torch.float8_e5m2` / `torch_npu.hifloat8`（无 `scale`）。`hifloat8.npu()` 当前不安全，测试脚本跳过；kernel 已注册。
-- `q_len` / `kv_len` 允许为 0（含整 batch）。对应请求跳过 QK；空 KV 的 score 为 `-inf`。
-- A2/A3 与 Ascend 950 短 decode 按估计 M-task 启动 MIX，不打满空核。950 短 M 长 S 再按 KV stile 切 `kvChunks`。
-- PageAttention `key` 允许 dim0（物理 page）非连续，须保持为 view（不要 `.contiguous()`）；size>1 的非首轴必须连续，否则 tiling 拒绝。TND 不允许非连续。
-- PageAttention `block_table` 第二维可以大于实际 KV 逻辑 block 数（例如 vLLM 预分配宽表）。950 C2UB 对 score 末维超过 256 列按窗 flush。
+- **主要计算过程**：
+
+  1. 将每个query token的$Q_{idx}$与KV sparse block内因果可见的$K_{idx}$做矩阵乘，得到token级相关性。
+  2. 按`sparse_mode`叠加$atten\_mask$：`sparse_mode=0`不做因果截断，`sparse_mode=3`按rightDownCausal屏蔽不可见位置。
+  3. 在每个长度为$block\_size$的sparse block上做Maxpool，得到逐block的重要性分数。
+  4. 用`start_loc`、`init_blocks`、`local_blocks`生成$local\_mask$，对强制保留的block写入高分，得到输出`score`。本接口不包含TopK。
 
 ## 函数原型
 
@@ -52,113 +59,45 @@ cann_ops_transformer.msa_index_score(
 
 ## 参数说明
 
-<table style="undefined;table-layout: fixed; width: 1180px"><colgroup>
-<col style="width: 160px">
-<col style="width: 120px">
-<col style="width: 360px">
-<col style="width: 280px">
-<col style="width: 260px">
-</colgroup>
-<thead>
-  <tr>
-    <th>参数名</th>
-    <th>可选/必选</th>
-    <th>描述</th>
-    <th>dtype</th>
-    <th>shape</th>
-  </tr>
-</thead>
-<tbody>
-  <tr>
-    <td>query</td>
-    <td>必选</td>
-    <td>$Q_{idx}$ TND</td>
-    <td>fp16/bf16；950 另支持 fp8_e4m3fn / fp8_e5m2 / hifloat8</td>
-    <td><code>[T1,N1,D]</code></td>
-  </tr>
-  <tr>
-    <td>key</td>
-    <td>必选</td>
-    <td>$K_{idx}$ PA BBND/BNBD 或 TND。A2/A3 与 950 上 PA 允许 dim0 非连续。</td>
-    <td>同 query 或 int8（int8 配 fp16 query）</td>
-    <td><code>[NP,P,N2,D]</code> / <code>[NP,N2,P,D]</code> / <code>[T2,N2,D]</code></td>
-  </tr>
-  <tr>
-    <td>start_loc</td>
-    <td>必选</td>
-    <td>query 所在逻辑 block</td>
-    <td>int32</td>
-    <td><code>[B]</code></td>
-  </tr>
-  <tr>
-    <td>block_table</td>
-    <td>PA 必选</td>
-    <td>逻辑→物理 page；TND 不传</td>
-    <td>int32</td>
-    <td><code>[B,MB]</code></td>
-  </tr>
-  <tr>
-    <td>scale</td>
-    <td>量化必选</td>
-    <td>反量化</td>
-    <td>float32</td>
-    <td>PA <code>[NP,N2,P]</code>；TND <code>[T2,N2]</code></td>
-  </tr>
-  <tr>
-    <td>atten_mask</td>
-    <td>mode=3 必选</td>
-    <td>压缩下三角模板</td>
-    <td>int8</td>
-    <td><code>[2048,2048]</code></td>
-  </tr>
-  <tr>
-    <td>actual_seq_qlen</td>
-    <td>TND query 必选</td>
-    <td>query 前缀和</td>
-    <td>int32</td>
-    <td><code>[B+1]</code></td>
-  </tr>
-  <tr>
-    <td>actual_seq_klen</td>
-    <td>必选</td>
-    <td>PA 为各请求 S2；TND 为 key 前缀和</td>
-    <td>int32</td>
-    <td><code>[B]</code> / <code>[B+1]</code></td>
-  </tr>
-  <tr>
-    <td>layout_key</td>
-    <td>可选</td>
-    <td>key 布局：<code>TND</code> / <code>BBND</code> / <code>BNBD</code>，默认 <code>BBND</code></td>
-    <td>str</td>
-    <td>-</td>
-  </tr>
-  <tr>
-    <td>sparse_mode</td>
-    <td>可选</td>
-    <td>0 / 3，默认 3</td>
-    <td>int</td>
-    <td>-</td>
-  </tr>
-  <tr>
-    <td>init_blocks</td>
-    <td>可选</td>
-    <td><code>local_mask</code> 头部强制块数，默认 0</td>
-    <td>int</td>
-    <td>-</td>
-  </tr>
-  <tr>
-    <td>local_blocks</td>
-    <td>可选</td>
-    <td><code>local_mask</code> 局部窗口，默认 1</td>
-    <td>int</td>
-    <td>-</td>
-  </tr>
-</tbody>
-</table>
+| 参数名 | 参数类型 | 描述 | dtype | shape |
+| --- | --- | --- | --- | --- |
+| query | 必选 | $Q_{idx}$，TND | fp16 / bf16 | `[T1,N1,D]` |
+| key | 必选 | $K_{idx}$。PA允许dim0非连续 | 与query同型。 | `[NP,P,N2,D]` / `[NP,N2,P,D]` / `[T2,N2,D]` / `[B,S2,N2,D]` / `[B,N2,S2,D]` |
+| start_loc | 必选 | query所在逻辑block | int32 | `[B]` |
+| block_table | PA必选 | 逻辑block到物理page。TND / BSND / BNSD不传 | int32 | `[B,MB]` |
+| scale | 可选 | 非量化与FP8不传 | float32 | - |
+| atten_mask | mode=3必选 | 因果模板 | int8 | `[2048,2048]` |
+| actual_seq_qlen | 必选 | query前缀和 | int32 | `[B+1]` |
+| actual_seq_klen | 必选 | PA为各请求可见长度；TND / BSND / BNSD为前缀和 | int32 | `[B]` / `[B+1]` |
+| layout_key | 可选 | `TND` / `BSND` / `BNSD` / `BBND` / `BNBD`，默认`BBND` | str | - |
+| sparse_mode | 可选 | 0或3，默认3 | int | - |
+| init_blocks | 可选 | `local_mask`头部强制块数，默认0 | int | - |
+| local_blocks | 可选 | `local_mask`局部窗口，默认1 | int | - |
 
-## 输出
+<!-- npu="A3,910b" id8 -->
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
+    - query、key：数据类型支持BFLOAT16、FLOAT16。
+<!-- end id8 -->
+<!-- npu="950" id7 -->
+- <term>Ascend 950PR&950DT系列产品</term>：
+    - query、key：数据类型除fp16/bf16外，还支持float8_e4m3fn / float8_e5m2。
+<!-- end id7 -->
 
-`[N1, T1, RoundUp(MB,16)]` float32
+## 返回值说明
+
+| 返回值 | dtype | shape |
+| --- | --- | --- |
+| score | float32 | `[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]` |
+
+## 约束说明
+
+- query固定TND，逻辑块长128。BSND / BNSD的$S2$是定长槽，`actual_seq_klen[b+1] - actual_seq_klen[b]`不超过$S2$，且不传`block_table`。
+- `q_len` / `kv_len`允许为0。空KV的score为`-inf`。
+- 本接口不包含TopK。
+
+## 确定性计算
+
+默认支持确定性计算。
 
 ## 调用示例
 
@@ -173,7 +112,6 @@ T1, N1, N2, D, P = 32, 8, 1, 128, 128
 B, NP, MB = 1, 8, 2
 query = torch.randn(T1, N1, D, dtype=torch.float16).npu()
 key_bbnd = torch.randn(NP, P, N2, D, dtype=torch.float16).npu()
-# BNBD 与 BBND 仅 N/P 轴对调：key_bnbd = key_bbnd.permute(0, 2, 1, 3).contiguous()
 block_table = torch.arange(B * MB, dtype=torch.int32).view(B, MB).npu()
 actual_seq_qlen = torch.tensor([0, T1], dtype=torch.int32).npu()
 actual_seq_klen = torch.tensor([256], dtype=torch.int32).npu()
@@ -186,7 +124,7 @@ score = cann_ops_transformer.msa_index_score(
     layout_key="BBND")
 ```
 
-- TND packed key（`layout_key="TND"`，不传 `block_table`，`actual_seq_klen` 为 `[B+1]` 前缀和）：
+- TND packed key（`layout_key="TND"`，不传`block_table`，`actual_seq_klen`为`[B+1]`前缀和）：
 
 ```python
 T2 = 256
@@ -197,4 +135,17 @@ score_tnd = cann_ops_transformer.msa_index_score(
     atten_mask=atten_mask,
     actual_seq_qlen=actual_seq_qlen, actual_seq_klen=actual_seq_klen_tnd,
     layout_key="TND")
+```
+
+- BSND（`actual_seq_klen`为`[B+1]`前缀和，不传`block_table`。BNSD把key换成`[B, N2, S2, D]`）：
+
+```python
+S2 = 256
+key_bsnd = torch.randn(B, S2, N2, D, dtype=torch.float16).npu()
+actual_seq_klen_bsnd = torch.tensor([0, S2], dtype=torch.int32).npu()
+score_bsnd = cann_ops_transformer.msa_index_score(
+    query, key_bsnd, start_loc,
+    atten_mask=atten_mask,
+    actual_seq_qlen=actual_seq_qlen, actual_seq_klen=actual_seq_klen_bsnd,
+    layout_key="BSND")
 ```

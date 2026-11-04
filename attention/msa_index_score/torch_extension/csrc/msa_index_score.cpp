@@ -11,7 +11,7 @@
 /*!
  * \file msa_index_score.cpp
  * \brief torch_extension 适配：aclnnMsaIndexScore C++ wrapper。
- *        key 支持 PA BBND/BNBD 与 TND packed。
+ *        key 支持 PA BBND/BNBD、TND packed，以及 BSND / BNSD（query 仍为 TND，顺序布局 klen 为 [B+1]）。
  *        950 另支持 query/key 同型 HIFLOAT8 / FLOAT8_E5M2 / FLOAT8_E4M3FN；
  *        PA key 允许 dim0 非连续（torch view stride 经 ConvertType 传入）。
  */
@@ -54,8 +54,9 @@ std::string ParseLayoutKey(c10::string_view layout_key)
     if (layoutKeyStr.empty()) {
         layoutKeyStr = "BBND";
     }
-    TORCH_CHECK(layoutKeyStr == "TND" || layoutKeyStr == "BBND" || layoutKeyStr == "BNBD",
-                "layout_key must be TND, BBND or BNBD, got ", layoutKeyStr);
+    TORCH_CHECK(layoutKeyStr == "TND" || layoutKeyStr == "BSND" || layoutKeyStr == "BNSD" || layoutKeyStr == "BBND" ||
+                    layoutKeyStr == "BNBD",
+                "layout_key must be TND, BSND, BNSD, BBND or BNBD, got ", layoutKeyStr);
     return layoutKeyStr;
 }
 
@@ -72,14 +73,19 @@ void CheckMsaRequiredTensors(const at::Tensor& query, const at::Tensor& key, con
 }
 
 void CheckMsaLayoutRanks(const at::Tensor& query, const at::Tensor& key, const c10::optional<at::Tensor>& block_table,
-                         const std::string& layoutKeyStr, bool is_tnd, const at::Tensor& cu_q, const at::Tensor& kv_len,
-                         const at::Tensor& start_loc)
+                         const std::string& layoutKeyStr, bool is_tnd, bool is_batch, const at::Tensor& cu_q,
+                         const at::Tensor& kv_len, const at::Tensor& start_loc)
 {
     TORCH_CHECK(query.dim() == QUERY_DIM, "query must be 3D [T, Hq, D], but got dim=", query.dim());
-    if (is_tnd) {
-        TORCH_CHECK(key.dim() == KEY_TND_DIM, "layout_key=TND requires key [T2,N2,D], but got dim=", key.dim());
-        TORCH_CHECK(!block_table.has_value() || !block_table.value().defined(),
-                    "layout_key=TND must not pass block_table.");
+    if (is_tnd || is_batch) {
+        if (is_tnd) {
+            TORCH_CHECK(key.dim() == KEY_TND_DIM, "layout_key=TND requires key [T2,N2,D], but got dim=", key.dim());
+        } else {
+            TORCH_CHECK(key.dim() == KEY_PA_DIM, "layout_key=", layoutKeyStr,
+                        " requires key rank 4, but got dim=", key.dim());
+        }
+        TORCH_CHECK(!block_table.has_value() || !block_table.value().defined(), "layout_key=", layoutKeyStr,
+                    " must not pass block_table.");
     } else {
         TORCH_CHECK(key.dim() == KEY_PA_DIM, "layout_key=", layoutKeyStr,
                     " requires key rank 4, but got dim=", key.dim());
@@ -198,6 +204,44 @@ MsaKeyMeta ResolvePaKeyMeta(const at::Tensor& key, const at::Tensor& bt, const s
     return meta;
 }
 
+// 非 V2：query 保持 TND，key 为 [B,S2,N2,D] 或 [B,N2,S2,D]，klen 为 [B+1] 前缀和。
+MsaKeyMeta ResolveBatchKeyMeta(const at::Tensor& key, const std::string& layoutKeyStr, const at::Tensor& cu_q,
+                               const at::Tensor& kv_len, const at::Tensor& start_loc, int64_t init_blocks,
+                               int64_t local_blocks)
+{
+    MsaKeyMeta meta;
+    const bool isBsnd = (layoutKeyStr == "BSND");
+    const int64_t batch = key.size(0);
+    const int64_t s2 = isBsnd ? key.size(1) : key.size(DIM_2);
+    meta.numKvHeads = isBsnd ? key.size(DIM_2) : key.size(1);
+    meta.keyHeadDim = key.size(DIM_3);
+    TORCH_CHECK(s2 >= 0, "BSND/BNSD S2 must be non-negative.");
+    TORCH_CHECK(cu_q.size(0) == batch + 1, "actual_seq_qlen size must be batch+1.");
+    TORCH_CHECK(kv_len.size(0) == batch + 1, "BSND/BNSD actual_seq_klen must be [B+1] prefix-sum.");
+    TORCH_CHECK(start_loc.size(0) == batch, "start_loc size must equal batch.");
+    TORCH_CHECK(init_blocks >= 0 && local_blocks >= 0, "init_blocks/local_blocks must be >= 0.");
+    // device tensor 上 .cpu() 会同步。只在已经位于 CPU 时核对每条 klen。
+    if (kv_len.device().is_cpu()) {
+        const int32_t* lens = kv_len.data_ptr<int32_t>();
+        for (int64_t b = 0; b < batch; ++b) {
+            const int64_t kv = static_cast<int64_t>(lens[b + 1]) - static_cast<int64_t>(lens[b]);
+            TORCH_CHECK(kv >= 0 && kv <= s2, "BSND/BNSD kv length ", kv, " exceeds S2=", s2);
+            const int64_t blocks = (kv <= 0) ? 0 : ((kv + SUPPORTED_BLOCK_SIZE - 1) / SUPPORTED_BLOCK_SIZE);
+            if (blocks > meta.maxBlocks) {
+                meta.maxBlocks = blocks;
+            }
+        }
+    } else {
+        meta.maxBlocks = (s2 <= 0) ? 0 : ((s2 + SUPPORTED_BLOCK_SIZE - 1) / SUPPORTED_BLOCK_SIZE);
+    }
+    if (meta.maxBlocks <= 0) {
+        meta.maxBlocks = 1;
+    }
+    TORCH_CHECK(init_blocks <= meta.maxBlocks && local_blocks <= meta.maxBlocks,
+                "init_blocks/local_blocks must be <= maxBlocks.");
+    return meta;
+}
+
 void CheckHeadDim(const at::Tensor& query, int64_t keyHeadDim)
 {
     TORCH_CHECK(query.size(DIM_2) == keyHeadDim, "query/key head_dim mismatch.");
@@ -225,13 +269,20 @@ at::Tensor msa_index_score(const at::Tensor& query, const at::Tensor& key, const
     CheckMsaRequiredTensors(query, key, start_loc, actual_seq_qlen, actual_seq_klen);
     const std::string layoutKeyStr = ParseLayoutKey(layout_key);
     const bool is_tnd = (layoutKeyStr == "TND");
+    const bool is_batch = (layoutKeyStr == "BSND" || layoutKeyStr == "BNSD");
     const at::Tensor& cu_q = actual_seq_qlen.value();
     const at::Tensor& kv_len = actual_seq_klen.value();
-    CheckMsaLayoutRanks(query, key, block_table, layoutKeyStr, is_tnd, cu_q, kv_len, start_loc);
+    CheckMsaLayoutRanks(query, key, block_table, layoutKeyStr, is_tnd, is_batch, cu_q, kv_len, start_loc);
     CheckMsaSparseAndDtypes(query, key, scale, atten_mask, cu_q, kv_len, start_loc, sparse_mode, is_tnd);
-    const MsaKeyMeta meta = is_tnd ? ResolveTndKeyMeta(key, cu_q, kv_len, start_loc, init_blocks, local_blocks) :
-                                     ResolvePaKeyMeta(key, block_table.value(), layoutKeyStr, cu_q, kv_len, start_loc,
-                                                      init_blocks, local_blocks);
+    MsaKeyMeta meta;
+    if (is_tnd) {
+        meta = ResolveTndKeyMeta(key, cu_q, kv_len, start_loc, init_blocks, local_blocks);
+    } else if (is_batch) {
+        meta = ResolveBatchKeyMeta(key, layoutKeyStr, cu_q, kv_len, start_loc, init_blocks, local_blocks);
+    } else {
+        meta = ResolvePaKeyMeta(key, block_table.value(), layoutKeyStr, cu_q, kv_len, start_loc, init_blocks,
+                                local_blocks);
+    }
     TORCH_CHECK(meta.numKvHeads == 1, "num_kv_heads currently only supports 1.");
     CheckHeadDim(query, meta.keyHeadDim);
     at::Tensor score = AllocMsaScore(query, meta.maxBlocks);

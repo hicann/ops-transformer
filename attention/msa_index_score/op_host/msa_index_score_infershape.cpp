@@ -77,7 +77,8 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
     const char* layoutKey = (layoutKeyPtr == nullptr || layoutKeyPtr[0] == '\0') ? "BBND" : layoutKeyPtr;
     const char* layoutQueryPtr = (attrs != nullptr) ? attrs->GetStr(MSA_ATTR_LAYOUT_QUERY) : nullptr;
     const char* layoutQuery = (layoutQueryPtr == nullptr || layoutQueryPtr[0] == '\0') ? "TND" : layoutQueryPtr;
-    // pool_block_size：缺省 128，只允许 16 / 128。BSND/BNSD 固定 16。
+    // pool_block_size：缺省 128，只允许 16 / 128。
+    // V2 的 BSND/BNSD 固定 16。非 V2（layout_query=TND）允许 pool=128 的 key BSND/BNSD。
     const int64_t* poolBlockSizeAttrPtr = (attrs != nullptr) ? attrs->GetInt(MSA_ATTR_POOL_BLOCK_SIZE) : nullptr;
     const int64_t poolBlockSizeAttr =
         (poolBlockSizeAttrPtr == nullptr || *poolBlockSizeAttrPtr <= 0) ? MSA_BLOCK_SIZE : *poolBlockSizeAttrPtr;
@@ -85,11 +86,6 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
                 OP_LOGE(context, "pool_block_size must be %ld or %ld, got %ld.", MSA_BLOCK_SIZE, MSA_BLOCK16_SIZE,
                         poolBlockSizeAttr),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        (std::strcmp(layoutKey, "BSND") == 0 || std::strcmp(layoutKey, "BNSD") == 0) &&
-            poolBlockSizeAttr != MSA_BLOCK16_SIZE,
-        OP_LOGE(context, "BSND/BNSD requires pool_block_size=%ld, got %ld.", MSA_BLOCK16_SIZE, poolBlockSizeAttr),
-        return ge::GRAPH_FAILED);
     uint32_t keyLayout = MSA_KEY_LAYOUT_BBND;
     uint32_t queryLayout = MSA_QUERY_LAYOUT_TND;
     if (std::strcmp(layoutKey, "TND") == 0) {
@@ -114,7 +110,14 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
         OP_LOGE(context, "layout_query must be TND, BSND or BNSD, got %s.", layoutQuery);
         return ge::GRAPH_FAILED;
     }
-    if (MsaIsSeqKeyLayout(keyLayout)) {
+    const bool batchKey128 = (keyLayout == MSA_KEY_LAYOUT_BSND || keyLayout == MSA_KEY_LAYOUT_BNSD) &&
+                             poolBlockSizeAttr == MSA_BLOCK_SIZE && queryLayout == MSA_QUERY_LAYOUT_TND;
+    OP_CHECK_IF((keyLayout == MSA_KEY_LAYOUT_BSND || keyLayout == MSA_KEY_LAYOUT_BNSD) &&
+                    poolBlockSizeAttr != MSA_BLOCK16_SIZE && !batchKey128,
+                OP_LOGE(context, "BSND/BNSD requires pool_block_size=%ld, or %ld with layout_query=TND.",
+                        MSA_BLOCK16_SIZE, MSA_BLOCK_SIZE),
+                return ge::GRAPH_FAILED);
+    if (MsaIsSeqKeyLayout(keyLayout) && !batchKey128) {
         const bool same = (keyLayout == MSA_KEY_LAYOUT_TND && queryLayout == MSA_QUERY_LAYOUT_TND) ||
                           (keyLayout == MSA_KEY_LAYOUT_BSND && queryLayout == MSA_QUERY_LAYOUT_BSND) ||
                           (keyLayout == MSA_KEY_LAYOUT_BNSD && queryLayout == MSA_QUERY_LAYOUT_BNSD);
@@ -186,7 +189,7 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
                 klenData = klenTensor->GetData<int32_t>();
             }
         }
-        // 逻辑块长 = pool_block_size attr：TND 128 / 16，BSND/BNSD 固定 16。
+        // 逻辑块长 = pool_block_size。顺序布局统一用 [B+1] 前缀和。
         const int64_t seqBlock = poolBlockSizeAttr;
         if (klenData != nullptr && klenShape != nullptr && klenShape->GetDimNum() == 1 &&
             klenShape->GetDim(0) >= MSA_KLEN_PREFIX_MIN) {

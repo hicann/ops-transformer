@@ -193,6 +193,55 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_layout_invalid)
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, {});
 }
 
+// 非 V2：query TND，key BSND，klen 为 [B+1] 前缀和，逻辑块长 128。kv=200 → 2 blocks → 对齐 16。
+TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_bsnd_pool128)
+{
+    int32_t klenList[] = {0, 200};
+    gert::InfershapeContextPara infershapeContextPara(
+        "MsaIndexScore",
+        {{{{32, 8, 128}, {32, 8, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{1, 256, 1, 128}, {1, 256, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, klenList},
+         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"init_blocks", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"local_blocks", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}});
+
+    std::vector<std::vector<int64_t>> expectOutputShape = {{8, 32, 16}};
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
+// BNSD 多 batch：klen 为前缀和，取各请求可见长度的最大 block 数。
+TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_bnsd_pool128)
+{
+    int32_t klenList[] = {0, 100, 400};
+    gert::InfershapeContextPara infershapeContextPara(
+        "MsaIndexScore",
+        {{{{48, 4, 128}, {48, 4, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{2, 1, 320, 128}, {2, 1, 320, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{0}, {0}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND, true, klenList},
+         {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"init_blocks", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"local_blocks", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}});
+
+    // max kv = 300, blocks = 3, RoundUp(3, 16) = 16
+    std::vector<std::vector<int64_t>> expectOutputShape = {{4, 48, 16}};
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
 TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_block_table_rank_invalid)
 {
     gert::InfershapeContextPara infershapeContextPara(

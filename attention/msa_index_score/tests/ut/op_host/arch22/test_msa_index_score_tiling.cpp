@@ -82,6 +82,7 @@ struct MsaTilingSpec {
     bool hasMask{false};
     std::vector<int64_t> qlenShape{2};
     std::vector<int64_t> klenShape{1};
+    std::vector<int32_t> klenData{};
     std::vector<int64_t> startLocShape{1};
     std::vector<int64_t> scoreShape{8, 32, 16};
     ge::DataType queryDtype{ge::DT_FLOAT16};
@@ -103,7 +104,13 @@ gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocPa
     inputs.push_back(spec.hasScale ? Present(spec.scaleShape, ge::DT_FLOAT) : Absent(ge::DT_FLOAT));
     inputs.push_back(spec.hasMask ? Present({2048, 2048}, ge::DT_INT8) : Absent(ge::DT_INT8));
     inputs.push_back(spec.qlenShape.empty() ? Absent(ge::DT_INT32) : Present(spec.qlenShape, ge::DT_INT32));
-    inputs.push_back(spec.klenShape.empty() ? Absent(ge::DT_INT32) : Present(spec.klenShape, ge::DT_INT32));
+    auto klenDesc = spec.klenShape.empty() ? Absent(ge::DT_INT32) : Present(spec.klenShape, ge::DT_INT32);
+    if (!spec.klenData.empty()) {
+        klenDesc =
+            gert::TilingContextPara::TensorDescription(MakeStorageShape(spec.klenShape), ge::DT_INT32, ge::FORMAT_ND,
+                                                       true, const_cast<int32_t*>(spec.klenData.data()));
+    }
+    inputs.push_back(klenDesc);
     inputs.push_back(spec.startLocShape.empty() ? Absent(ge::DT_INT32) : Present(spec.startLocShape, ge::DT_INT32));
 
     std::vector<gert::TilingContextPara::TensorDescription> outputs;
@@ -172,6 +179,15 @@ TEST_P(MsaIndexScoreTilingArch22, bbnd_bf16_causal_success)
     RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, MSA_KEY_BF16);
 }
 
+TEST_P(MsaIndexScoreTilingArch22, bbnd_fp16_int8_rejected)
+{
+    MsaTilingSpec spec;
+    spec.keyDtype = ge::DT_INT8;
+    spec.hasScale = true;
+    spec.scaleShape = {2, 1, 128};
+    RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+}
+
 TEST_P(MsaIndexScoreTilingArch22, bnbd_fp16_success)
 {
     MsaTilingSpec spec;
@@ -210,6 +226,57 @@ TEST_P(MsaIndexScoreTilingArch22, layout_invalid_fail)
     MsaTilingSpec spec;
     spec.layout = "BSH";
     RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+}
+
+TEST_P(MsaIndexScoreTilingArch22, bsnd_pool128_success)
+{
+    MsaTilingSpec spec;
+    spec.layout = "BSND";
+    spec.keyShape = {1, 256, 1, 128};
+    spec.hasBlockTable = false;
+    spec.klenShape = {2};
+    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, MSA_KEY_FP16);
+}
+
+TEST_P(MsaIndexScoreTilingArch22, bnsd_pool128_success)
+{
+    MsaTilingSpec spec;
+    spec.layout = "BNSD";
+    spec.keyShape = {1, 1, 256, 128};
+    spec.hasBlockTable = false;
+    spec.klenShape = {2};
+    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, MSA_KEY_FP16);
+}
+
+// 非 V2 顺序布局的 klen 同样为 [B+1] 前缀和，两个请求的长度分别为 1024、4096。
+// 正确 maxTok=4096 -> 32 blocks -> 4 stiles，kvChunks=4、launchAic=16。
+TEST_P(MsaIndexScoreTilingArch22, batch_seq_pool128_host_klen)
+{
+    for (const char* layout : {"BSND", "BNSD"}) {
+        SCOPED_TRACE(layout);
+        MsaTilingSpec spec;
+        spec.layout = layout;
+        spec.keyShape =
+            (spec.layout == "BSND") ? std::vector<int64_t>{2, 4096, 1, 128} : std::vector<int64_t>{2, 1, 4096, 128};
+        spec.hasBlockTable = false;
+        spec.qlenShape = {3};
+        spec.klenShape = {3};
+        spec.klenData = {0, 1024, 5120};
+        spec.startLocShape = {2};
+        spec.scoreShape = {8, 32, 32};
+        struct MsaCompileInfo {
+        } compileInfo;
+        TilingInfo tilingInfo;
+        ASSERT_TRUE(ExecuteTiling(MakeTilingPara(spec, GetParam(), &compileInfo), tilingInfo));
+        EXPECT_EQ(tilingInfo.tilingKey, MSA_KEY_FP16);
+        ASSERT_GE(tilingInfo.tilingDataSize, 29U * sizeof(uint32_t));
+        const auto* words = reinterpret_cast<const uint32_t*>(tilingInfo.tilingData.get());
+        const size_t n = tilingInfo.tilingDataSize / sizeof(uint32_t);
+        size_t base = 0;
+        ASSERT_TRUE(FindTilingBase(words, n, 2, 32, 8, 1, 128, base));
+        EXPECT_EQ(words[base + 11], 16U);
+        EXPECT_EQ(words[base + 28], 4U);
+    }
 }
 
 TEST_P(MsaIndexScoreTilingArch22, bsnd_pool16_rejected_on_a2)

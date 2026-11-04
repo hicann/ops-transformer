@@ -425,6 +425,7 @@ private:
             qLen_ = static_cast<int32_t>(qMaxSeq_);
         }
         curRows_ = static_cast<uint32_t>(qLen_) * numQHeads_;
+        // 顺序布局统一使用 [B+1] 前缀和；PA 使用 [B] 可见长度。
         if (MsaIsSeqKeyLayout(keyLayout_)) {
             cuKStart_ = static_cast<uint32_t>(gActualSeqKlen_.GetValue(b));
             kvLen_ = static_cast<int32_t>(gActualSeqKlen_.GetValue(b + 1)) - static_cast<int32_t>(cuKStart_);

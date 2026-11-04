@@ -24,11 +24,20 @@ $$
 - `sparse_mode=0`：无因果；`sparse_mode=3`：rightDownCausal（须传`[2048,2048]` `atten_mask`）。
 - `start_loc[B]`：当前query所在逻辑block索引，用于`local_mask`。
 - `init_blocks` / `local_blocks`：Maxpool之后的强制高分块；与Triton raw score对齐时置0。默认`0` / `1`。
-- Ascend 950额外支持query/key同型`torch.float8_e4m3fn` / `torch.float8_e5m2` / `torch_npu.hifloat8`（无`scale`）。`hifloat8.npu()`当前不安全，测试脚本跳过；kernel已注册。
 - `q_len` / `kv_len`允许为0（含整batch）。对应请求跳过QK；空KV的score为`-inf`。
-- A2/A3与Ascend 950短decode按估计M-task启动MIX，不打满空核。950短M长S再按KV stile切`kvChunks`。
 - PageAttention `key`允许dim0（物理page）非连续，须保持为view（不要`.contiguous()`）；size>1的非首轴必须连续，否则tiling拒绝。TND / BSND / BNSD不允许非连续。
-- PageAttention `block_table`第二维可以大于实际KV逻辑block数（例如vLLM预分配宽表）。950 C2UB对score末维超过256列按窗flush。
+- PageAttention `block_table`第二维可以大于实际KV逻辑block数（例如vLLM预分配宽表）。
+
+<!-- npu="A3, 910b" id5 -->
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
+    - 短decode按估计M-task启动MIX，不打满空核。
+<!-- end id5 -->
+<!-- npu="950" id6 -->
+- <term>Ascend 950PR&950DT系列产品</term>：
+    - query/key额外支持同型`torch.float8_e4m3fn` / `torch.float8_e5m2`（无`scale`）。
+    - 短decode按估计M-task启动MIX，不打满空核；短M长S再按KV stile切`kvChunks`。
+    - C2UB对score末维超过256列按窗flush。
+<!-- end id6 -->
 
 ## 函数原型
 
@@ -74,15 +83,15 @@ cann_ops_transformer.msa_index_score_v2(
   <tr>
     <td>query</td>
     <td>必选</td>
-    <td>$Q_{idx}$。由<code>layout_query</code>指定：TND/BSND/BNSD，默认TND。BSND、BNSD仅Ascend 950，仅fp16/bf16。</td>
-    <td>fp16/bf16；950另支持fp8_e4m3fn / fp8_e5m2 / hifloat8</td>
+    <td>$Q_{idx}$。由<code>layout_query</code>指定：TND/BSND/BNSD，默认TND。</td>
+    <td>fp16/bf16</td>
     <td><code>[T1,N1,D]</code> / <code>[B,S1,N1,D]</code> / <code>[B,N1,S1,D]</code></td>
   </tr>
   <tr>
     <td>key</td>
     <td>必选</td>
-    <td>$K_{idx}$。非分页TND/BSND/ BNSD必须与query同布局；分页BBND/BNBD可配任意query。A2/A3与950上PA允许dim0非连续。TND缺省逻辑块长128，每head一次块内max；<code>pool_block_size=16</code>时走两级maxpool（仅950 fp16/bf16）。BSND/BNSD仅Ascend 950，逻辑块长16，仅fp16/bf16。</td>
-    <td>同query或int8（int8配fp16 query；仅TND与PA）</td>
+    <td>$K_{idx}$。非分页TND/BSND/ BNSD必须与query同布局；分页BBND/BNBD可配任意query。PA允许dim0非连续。TND缺省逻辑块长128，每head一次块内max。</td>
+    <td>与query同型</td>
     <td><code>[T2,N2,D]</code> / <code>[B,S2,N2,D]</code> / <code>[B,N2,S2,D]</code> / <code>[NP,P,N2,D]</code> / <code>[NP,N2,P,D]</code></td>
   </tr>
   <tr>
@@ -101,10 +110,10 @@ cann_ops_transformer.msa_index_score_v2(
   </tr>
   <tr>
     <td>scale</td>
-    <td>量化必选</td>
-    <td>反量化</td>
+    <td>可选</td>
+    <td>非量化与FP8不传</td>
     <td>float32</td>
-    <td>PA <code>[NP,N2,P]</code>；TND <code>[T2,N2]</code>。BSND/BNSD不支持int8</td>
+    <td>-</td>
   </tr>
   <tr>
     <td>atten_mask</td>
@@ -158,19 +167,28 @@ cann_ops_transformer.msa_index_score_v2(
   <tr>
     <td>layout_query</td>
     <td>可选</td>
-    <td>query布局：<code>TND</code>/<code>BSND</code>/<code>BNSD</code>，默认<code>TND</code>。BSND、BNSD仅Ascend 950。分页key可配任意query；非分页key必须相同</td>
+    <td>query布局：<code>TND</code>/<code>BSND</code>/<code>BNSD</code>，默认<code>TND</code>。分页key可配任意query；非分页key必须相同</td>
     <td>str</td>
     <td>-</td>
   </tr>
   <tr>
     <td>pool_block_size</td>
     <td>可选</td>
-    <td>打分池化块长：每个score归约的token数。<code>16</code>/<code>128</code>，默认128。与BBND/BNBD的存储页长不是同一个量；分页时不能超过页长。128走原单次块内maxpool；16走两级maxpool，仅Ascend 950、fp16/bf16，且<code>N1</code>整除128。BSND/BNSD固定16</td>
+    <td>打分池化块长：每个score归约的token数。<code>16</code>/<code>128</code>，默认128。与BBND/BNBD的存储页长不是同一个量；分页时不能超过页长。128走原单次块内maxpool；16走两级maxpool，且<code>N1</code>整除128。BSND/BNSD固定16</td>
     <td>int</td>
     <td>-</td>
   </tr>
 </tbody>
 </table>
+
+<!-- npu="950" id4 -->
+- <term>Ascend 950PR&950DT系列产品</term>：
+    - query、key：数据类型除fp16/bf16外，还支持float8_e4m3fn / float8_e5m2。
+    - query：BSND、BNSD布局仅支持fp16/bf16。
+    - key：BSND、BNSD的逻辑块长为16，且仅支持fp16/bf16。
+    - layout_query：支持BSND、BNSD。
+    - pool_block_size：取值为16时，仅支持fp16/bf16。
+<!-- end id4 -->
 
 ## 输出
 
@@ -227,7 +245,7 @@ score_bsnd = cann_ops_transformer.msa_index_score_v2(
     layout_key="BBND", layout_query="BSND")
 ```
 
-- query与key同为BNSD（仅Ascend 950，fp16/bf16，不传`block_table`，逻辑块长16）：
+- query与key同为BNSD（仅<term>Ascend 950PR&950DT系列产品</term>，fp16/bf16，不传`block_table`，逻辑块长16）：
 
 ```python
 S2 = 256

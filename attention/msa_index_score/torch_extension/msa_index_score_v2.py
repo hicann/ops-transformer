@@ -282,11 +282,11 @@ def msa_index_score_v2(
         query: ``[T1, N1, D]`` float16 / bfloat16；950 还可为三种 FP8
         key: 与 ``layout_key`` 对应；非量化须与 query 同 dtype；int8 仅 fp16 query + scale
         start_loc: ``[B]``，当前 query 所在逻辑 block 索引（local_mask）
-        block_table: ``[B, MB]``，BBND/BNBD 必选；TND 不传
+        block_table: ``[B, MB]``，BBND/BNBD 必选；TND / BSND / BNSD 不传
         scale: int8 反量化。PA 为 ``[NP, N2, P]``；TND 为 ``[T2, N2]``；非量化 / FP8 为 None
         atten_mask: sparse_mode=3 时 ``[2048, 2048]`` int8
         actual_seq_qlen: query 前缀和 ``[B+1]``
-        actual_seq_klen: PA 为各请求 S2 ``[B]``；TND 为 key 前缀和 ``[B+1]``
+        actual_seq_klen: PA 为各请求 S2 ``[B]``；TND / BSND / BNSD 为 key 前缀和 ``[B+1]``
         layout_key: ``TND`` / ``BSND`` / ``BNSD`` / ``BBND`` / ``BNBD``，默认 ``BBND``
         sparse_mode: 0 或 3
         init_blocks / local_blocks: local_mask 强制选块；与 Triton raw score 对齐时置 0

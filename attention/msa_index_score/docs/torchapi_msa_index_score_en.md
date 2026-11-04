@@ -13,24 +13,27 @@
 <!-- npu="950" id3 -->
 - <term>Ascend 950PR&950DT products</term>: Supported
 <!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2 inference products</term>: Not supported
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas inference products</term>: Not supported
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas training products</term>: Not supported
+<!-- end id6 -->
 
 ## Function
 
-- **Description**: Wraps `aclnnMsaIndexScore` to compute the block score of the MSA Index Branch.
+- **Description**: Wraps `aclnnMsaIndexScore`. Query stays TND. The API does not include TopK.
 - **Formula**:
 
 $$
 score = Maxpool[(scale\cdot)Q_{idx}@K_{idx}^{T}+atten\_mask]+local\_mask
 $$
 
-- `sparse_mode=0`: non-causal; `sparse_mode=3`: rightDownCausal (requires the `[2048,2048]` `atten_mask`).
-- `start_loc[B]`: logical block index of the current query, used by `local_mask`.
-- `init_blocks` / `local_blocks`: forced high-score blocks after Maxpool; set to 0 for alignment with the Triton raw score. Defaults to `0` / `1`.
-- Ascend 950PR&950DT products additionally supports query/key in the same type `torch.float8_e4m3fn` / `torch.float8_e5m2` / `torch_npu.hifloat8` (without `scale`). `hifloat8.npu()` is currently unsafe and is skipped by the test script; the kernel is registered.
-- `q_len` / `kv_len` can be 0 (including the entire batch). The corresponding requests skip QK; the score of empty KV is `-inf`.
-- For short decode on A2/A3 and Ascend 950PR&950DT products, MIX is launched based on the estimated number of M-tasks without saturating idle cores. For Ascend 950PR&950DT products with short M and long S, `kvChunks` are further split by KV stile.
-- PageAttention `key` allows dim0 (physical page) to be non-contiguous and must be kept as a view (do not call `.contiguous()`); non-leading axes with size>1 must be contiguous, otherwise tiling rejects it. TND does not allow non-contiguous input.
-- The second dimension of PageAttention `block_table` can be greater than the actual number of KV logical blocks (for example, a wide table pre-allocated by vLLM). On 950, C2UB flushes by window when the last dimension of score exceeds 256 columns.
+- Computation: load visible $K$ by `layout_key`, compute $QK^{T}$, apply rightDownCausal when `sparse_mode=3`, Maxpool over 128-token blocks, then add `local_mask`.
+- `layout_key` is `TND`, `BSND`, `BNSD`, `BBND`, or `BNBD`. BSND / BNSD omit `block_table` and pass the `[B+1]` key prefix sum.
 
 ## Function Prototype
 
@@ -75,15 +78,15 @@ cann_ops_transformer.msa_index_score(
     <td>query</td>
     <td>Required</td>
     <td>$Q_{idx}$ TND</td>
-    <td>fp16/bf16; 950 also supports fp8_e4m3fn / fp8_e5m2 / hifloat8</td>
+    <td>fp16/bf16</td>
     <td><code>[T1,N1,D]</code></td>
   </tr>
   <tr>
     <td>key</td>
     <td>Required</td>
-    <td>$K_{idx}$ PA BBND/BNBD or TND. PA on A2/A3 and 950 supports non-contiguous dim0.</td>
-    <td>Same as query, or int8 (int8 with fp16 query)</td>
-    <td><code>[NP,P,N2,D]</code> / <code>[NP,N2,P,D]</code> / <code>[T2,N2,D]</code></td>
+    <td>$K_{idx}$. TND, BSND, BNSD, BBND, or BNBD. Query stays TND. BSND / BNSD do not pass <code>block_table</code>. PA may be non-contiguous on dim0.</td>
+    <td>Same dtype as query</td>
+    <td><code>[T2,N2,D]</code> / <code>[B,S2,N2,D]</code> / <code>[B,N2,S2,D]</code> / <code>[NP,P,N2,D]</code> / <code>[NP,N2,P,D]</code></td>
   </tr>
   <tr>
     <td>start_loc</td>
@@ -95,16 +98,16 @@ cann_ops_transformer.msa_index_score(
   <tr>
     <td>block_table</td>
     <td>Required for PA</td>
-    <td>Logical → physical page; not passed for TND.</td>
+    <td>Logical to physical page. Not passed for TND / BSND / BNSD.</td>
     <td>int32</td>
     <td><code>[B,MB]</code></td>
   </tr>
   <tr>
     <td>scale</td>
-    <td>Required for quantization</td>
-    <td>Dequantization.</td>
+    <td>Optional</td>
+    <td>Omitted for non-quantized and FP8 inputs.</td>
     <td>float32</td>
-    <td>PA <code>[NP,N2,P]</code>; TND <code>[T2,N2]</code></td>
+    <td>-</td>
   </tr>
   <tr>
     <td>atten_mask</td>
@@ -123,14 +126,14 @@ cann_ops_transformer.msa_index_score(
   <tr>
     <td>actual_seq_klen</td>
     <td>Required</td>
-    <td>S2 of each request for PA; key prefix sum for TND.</td>
+    <td>Visible length <code>[B]</code> for PA. Prefix sum <code>[B+1]</code> for TND / BSND / BNSD.</td>
     <td>int32</td>
     <td><code>[B]</code> / <code>[B+1]</code></td>
   </tr>
   <tr>
     <td>layout_key</td>
     <td>optional</td>
-    <td>Key layout: <code>TND</code> / <code>BBND</code> / <code>BNBD</code>, default <code>BBND</code>.</td>
+    <td>Key layout: <code>TND</code> / <code>BSND</code> / <code>BNSD</code> / <code>BBND</code> / <code>BNBD</code>, default <code>BBND</code>.</td>
     <td>str</td>
     <td>-</td>
   </tr>
@@ -157,6 +160,15 @@ cann_ops_transformer.msa_index_score(
   </tr>
 </tbody>
 </table>
+
+<!-- npu="950" id8 -->
+- <term>Atlas A2 products</term>, <term>Atlas A3 products</term>:
+    - query and key: BFLOAT16 and FLOAT16 are supported.
+<!-- end id8 -->
+<!-- npu="950" id7 -->
+- <term>Ascend 950PR&950DT products</term>:
+    - query and key: In addition to fp16/bf16, fp8_e4m3fn / fp8_e5m2 are supported.
+<!-- end id7 -->
 
 ## Output
 

@@ -244,7 +244,7 @@ private:
     /// PA block_table 一行可能有数百个 int32。dc_preload 每次 256B，在 QK 开始前发出。
     __aicore__ inline void PreloadBlockTable(const MsaTask& task)
     {
-        if (tiling_->keyLayout == MSA_KEY_LAYOUT_TND || task.sBlkEnd <= task.sBlkBegin) {
+        if (MsaIsSeqKeyLayout(tiling_->keyLayout) || task.sBlkEnd <= task.sBlkBegin) {
             return;
         }
         const uint32_t nBlk = task.sBlkEnd - task.sBlkBegin;
