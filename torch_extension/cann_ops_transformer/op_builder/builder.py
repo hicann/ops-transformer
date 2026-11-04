@@ -193,7 +193,7 @@ class OpBuilder(ABC):
         fprint_path = os.path.join(ext_dir, "%s.compile.fprint" % self.name)
 
         # Lazy import avoids pulling arg_check into every builder import path.
-        from cann_ops_transformer.utils.arg_check import wrap_op_module
+        from ..utils.arg_check import wrap_op_module
 
         with open(lock_path, "w") as lock_file:
             fcntl.flock(lock_file, fcntl.LOCK_EX)

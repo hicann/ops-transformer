@@ -754,6 +754,189 @@ function(enable_pypto_kernel op_file)
     set_property(GLOBAL APPEND PROPERTY PYPTO_ENABLED_OPS ${op_file})
 endfunction()
 
+# Build PIC Host archives and publish devices into the existing ASC kernel tree.
+function(enable_cannbotdsl_kernel op_name source_dir)
+    if(PREPARE_BUILD OR NOT CANNBOTDSL_COMPUTE_UNIT IN_LIST ASCEND_COMPUTE_UNIT)
+        return()
+    endif()
+    if(NOT ENABLE_OPS_HOST AND NOT ENABLE_OPS_KERNEL)
+        return()
+    endif()
+    get_property(_checked GLOBAL PROPERTY CANNBOTDSL_CHECKED)
+    if(NOT _checked)
+        execute_process(COMMAND "${HI_PYTHON}" -c
+            "import importlib.util, sys; sys.exit(0 if all(importlib.util.find_spec(name) for name in ('cannbotdsl', 'opkit')) else 1)"
+            RESULT_VARIABLE _result OUTPUT_QUIET ERROR_QUIET)
+        if(_result EQUAL 0)
+            set_property(GLOBAL PROPERTY CANNBOTDSL_AVAILABLE TRUE)
+        else()
+            set_property(GLOBAL PROPERTY CANNBOTDSL_AVAILABLE FALSE)
+        endif()
+        set_property(GLOBAL PROPERTY CANNBOTDSL_CHECKED TRUE)
+    endif()
+    get_property(_available GLOBAL PROPERTY CANNBOTDSL_AVAILABLE)
+    if(NOT _available)
+        message(WARNING "DSL compilation skipped (not compiled): ${op_name}: cannbotdsl or opkit is unavailable in ${HI_PYTHON}")
+        return()
+    endif()
+    get_filename_component(_source_dir "${source_dir}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    set(_source "${_source_dir}/${op_name}.py")
+    set(_builder "${OPS_ADV_DIR}/cmake/scripts/build_cannbotdsl.py")
+    set(_target_args --soc "${CANNBOTDSL_COMPUTE_UNIT}" --target "${CANNBOTDSL_TARGET}")
+    file(GLOB_RECURSE _sources CONFIGURE_DEPENDS "${_source_dir}/*.py")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${_sources} "${_builder}")
+    set(_env "ASCEND_HOME_PATH=${ASCEND_CANN_PACKAGE_PATH}"
+        TORCH_DEVICE_BACKEND_AUTOLOAD=0 PYTHONDONTWRITEBYTECODE=1)
+    set(_root "${CMAKE_BINARY_DIR}/cannbot_dsl/${op_name}")
+    set(_inputs "${_root}/inputs.json")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${_env}
+        "${HI_PYTHON}" "${_builder}" ${_target_args} --mode inputs --source "${_source}" --output "${_inputs}"
+        RESULT_VARIABLE _result)
+    if(NOT _result EQUAL 0)
+        message(FATAL_ERROR "DSL input discovery failed: ${op_name}")
+    endif()
+    file(STRINGS "${_root}/inputs.list" _dependencies ENCODING UTF-8)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_dependencies}")
+    include("${_root}/inputs.cmake")
+    if(NOT _dsl_native AND NOT _dsl_aclnn)
+        message(FATAL_ERROR "No Native or ACLNN export found in ${_source}")
+    endif()
+    if(_dsl_aclnn AND EXISTS "${_source_dir}/aclnn_${op_name}.py")
+        # A separate adapter declares a standalone public DSL API, independently of ASC.
+        set(_aclnn_type aclnn)
+    elseif(_dsl_aclnn)
+        list(FIND MODULE_OPTYPE "${op_name}" _index)
+        if(_index LESS 0)
+            message(FATAL_ERROR "Register ${op_name} with add_modules_sources before enabling DSL")
+        endif()
+        list(GET MODULE_ACLNNTYPE ${_index} _aclnn_type)
+        if(NOT _aclnn_type MATCHES "^(aclnn|aclnn_inner|aclnn_exclude)$")
+            message(FATAL_ERROR "Unsupported DSL ACLNN type: ${_aclnn_type}")
+        endif()
+    endif()
+    if(_dsl_aclnn)
+        set_property(GLOBAL PROPERTY CANNBOTDSL_ACLNN_ENABLED TRUE)
+    endif()
+    if(ENABLE_OPS_HOST AND _dsl_native)
+        # Imported archive targets and runtime sources must exist at configure time.
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${_env}
+            "${HI_PYTHON}" "${_builder}" ${_target_args} --mode host --source "${_source}" --output "${_root}/host"
+            --inputs "${_inputs}"
+            RESULT_VARIABLE _result)
+        if(NOT _result EQUAL 0)
+            message(FATAL_ERROR "DSL Host archive build failed: ${op_name}")
+        endif()
+        set(CANN_ROOT "${ASCEND_CANN_PACKAGE_PATH}" CACHE PATH "CANN SDK for OpKit runtime" FORCE)
+        add_subdirectory("${_root}/host" "${_root}/host-build")
+        get_property(_archives DIRECTORY "${_root}/host" PROPERTY _OPKIT_NATIVE_ARCHIVE_TARGETS)
+        if(NOT _archives)
+            message(FATAL_ERROR "OpKit Host archive targets missing: ${op_name}")
+        endif()
+        foreach(_archive IN LISTS _archives)
+            if(NOT TARGET "${_archive}")
+                message(FATAL_ERROR "OpKit Host archive target missing: ${_archive}")
+            endif()
+            get_target_property(_archive_path "${_archive}" IMPORTED_LOCATION)
+            get_filename_component(_archive_name "${_archive_path}" NAME_WE)
+            file(GLOB _objects "${_root}/host/objects/${_archive_name}/*.o")
+            if(NOT TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj)
+                add_library(${OPHOST_NAME}_cannbotdsl_tiling_obj OBJECT IMPORTED GLOBAL)
+            endif()
+            set_property(TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj APPEND PROPERTY IMPORTED_OBJECTS ${_objects})
+            target_link_libraries(${OPHOST_NAME}_cannbotdsl_tiling_obj INTERFACE "${_archive}")
+        endforeach()
+    endif()
+    if(ENABLE_OPS_HOST AND _dsl_aclnn)
+        # ACLNN and Native Host packages have different ABIs and independent caches.
+        set(_aclnn_host "${_root}/aclnn/host")
+        set(_aclnn_inputs "${_root}/aclnn/inputs.json")
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${_env}
+            "${HI_PYTHON}" "${_builder}" ${_target_args} --mode inputs --source "${_source}"
+            --output "${_aclnn_inputs}" --aclnn-type "${_aclnn_type}"
+            RESULT_VARIABLE _result)
+        if(NOT _result EQUAL 0)
+            message(FATAL_ERROR "DSL ACLNN input discovery failed: ${op_name}")
+        endif()
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${_env}
+            "${HI_PYTHON}" "${_builder}" ${_target_args} --mode host --source "${_source}" --output "${_aclnn_host}"
+            --inputs "${_aclnn_inputs}" --aclnn-type "${_aclnn_type}"
+            RESULT_VARIABLE _result)
+        if(NOT _result EQUAL 0)
+            message(FATAL_ERROR "DSL ACLNN Host publication failed: ${op_name}")
+        endif()
+        set_property(GLOBAL APPEND PROPERTY CANNBOTDSL_ACLNN_PACKAGES "${_aclnn_host}")
+    endif()
+    if(ENABLE_OPS_KERNEL)
+        set(_stamp "${_root}/kernel.built")
+        add_custom_command(OUTPUT "${_stamp}"
+            COMMAND "${CMAKE_COMMAND}" -E env ${_env}
+                "${HI_PYTHON}" "${_builder}" ${_target_args} --mode kernel --source "${_source}"
+                --output "${_root}/device" --kernel-output "${ASCEND_BINARY_OUT_DIR}/${CANNBOTDSL_COMPUTE_UNIT}/bin"
+                --inputs "${_inputs}"
+            COMMAND "${CMAKE_COMMAND}" -E touch "${_stamp}"
+            DEPENDS ${_dependencies} "${_builder}" "${_inputs}" VERBATIM)
+        add_custom_target(${op_name}_cannbotdsl DEPENDS "${_stamp}")
+        set_property(GLOBAL APPEND PROPERTY CANNBOTDSL_KERNEL_TARGETS ${op_name}_cannbotdsl)
+        set_property(GLOBAL APPEND PROPERTY CANNBOTDSL_KERNEL_STAMPS "${_stamp}")
+        set_property(GLOBAL APPEND PROPERTY CANNBOTDSL_KERNEL_PACKAGES "${_root}/device")
+        if(ENABLE_BUILT_IN)
+            set(_install "opp/built-in/op_impl/ai_core/tbe/kernel/${CANNBOTDSL_COMPUTE_UNIT}/ops_transformer")
+        else()
+            set(_install "packages/vendors/${VENDOR_NAME}_transformer/op_impl/ai_core/tbe/kernel/${CANNBOTDSL_COMPUTE_UNIT}")
+        endif()
+        # The ASC indexer rewrites filePath in its scan copy; install the original OpKit JSON.
+        install(DIRECTORY "${_root}/device/kernel/${CANNBOTDSL_COMPUTE_UNIT}/" DESTINATION "${_install}")
+    endif()
+endfunction()
+
+# Remove only resources owned by unselected DSL builds.
+function(cannbotdsl_clean_resources)
+    set(_host_enabled)
+    if(TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj)
+        set(_host_enabled --host-enabled)
+    endif()
+    if(PREPARE_BUILD)
+        return()
+    endif()
+    if(NOT _host_enabled AND NOT EXISTS "${CMAKE_BINARY_DIR}/cannbot_dsl")
+        return()
+    endif()
+    get_property(_kernel_packages GLOBAL PROPERTY CANNBOTDSL_KERNEL_PACKAGES)
+    set(_builder "${OPS_ADV_DIR}/cmake/scripts/build_cannbotdsl.py")
+    execute_process(COMMAND "${HI_PYTHON}" "${_builder}" --mode clean
+        --output "${CMAKE_BINARY_DIR}/cannbot_dsl" --kernel-output "${ASCEND_BINARY_OUT_DIR}"
+        --packages ${_kernel_packages} ${_host_enabled} RESULT_VARIABLE _result)
+    if(NOT _result EQUAL 0)
+        message(FATAL_ERROR "DSL stale resource cleanup failed")
+    endif()
+    if(NOT _host_enabled)
+        file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/opkit-native")
+    endif()
+endfunction()
+
+# Keep the generated metadata and device validation on the final installed library.
+function(cannbotdsl_finalize_host _target)
+    if(NOT TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj)
+        return()
+    endif()
+    get_property(_kernel_packages GLOBAL PROPERTY CANNBOTDSL_KERNEL_PACKAGES)
+    set(_resources)
+    set(_device_depends)
+    foreach(_package IN LISTS _kernel_packages)
+        list(APPEND _resources "${_package}/kernel")
+    endforeach()
+    if(_kernel_packages)
+        # The generated integration discovers the standard index in this directory.
+        list(APPEND _resources "${ASCEND_BINARY_OUT_DIR}/${CANNBOTDSL_COMPUTE_UNIT}/bin")
+        get_property(_device_depends GLOBAL PROPERTY CANNBOTDSL_KERNEL_TARGETS)
+        list(APPEND _device_depends ops_config_${CANNBOTDSL_COMPUTE_UNIT})
+    endif()
+    # Generated OpKit targets attach metadata and validation after all links exist.
+    set_property(TARGET ${_target} PROPERTY _OPKIT_DEVICE_RESOURCES "${_resources}")
+    set_property(TARGET ${_target} PROPERTY _OPKIT_DEVICE_DEPENDS "${_device_depends}")
+    _opkit_native_finalize(${_target})
+endfunction()
+
 function(add_bin_compile_target)
     cmake_parse_arguments(BINARY "" "COMPUTE_UNIT" "OP_INFO" ${ARGN})
 
@@ -980,6 +1163,11 @@ function(add_bin_compile_target)
         endif ()
     endforeach()
 
+    if(BINARY_COMPUTE_UNIT STREQUAL CANNBOTDSL_COMPUTE_UNIT)
+        get_property(_dsl_targets GLOBAL PROPERTY CANNBOTDSL_KERNEL_TARGETS)
+        list(APPEND _ops_target_list ${_dsl_targets})
+        get_property(_dsl_stamps GLOBAL PROPERTY CANNBOTDSL_KERNEL_STAMPS)
+    endif()
     if (_ops_target_list)
         set(OPS_CONFIG_TARGET ops_config_${BINARY_COMPUTE_UNIT})
         set(BINARY_INFO_CONFIG_FILE ${BIN_OUT_DIR}/binary_info_config.json)
@@ -987,6 +1175,7 @@ function(add_bin_compile_target)
 
         add_custom_command(OUTPUT ${BINARY_INFO_CONFIG_FILE}
                 COMMAND ${HI_PYTHON} ${ASCENDC_CMAKE_UTIL_DIR}/ascendc_ops_config.py -p ${BIN_OUT_DIR} -s ${BINARY_COMPUTE_UNIT}
+                DEPENDS ${_ops_target_list} ${_dsl_stamps}
         )
 
         add_custom_target(${OPS_CONFIG_TARGET}

@@ -11,6 +11,7 @@
 # ophost shared
 function(gen_ophost_symbol)
   add_library(${OPHOST_NAME} SHARED
+    $<$<TARGET_EXISTS:${OPHOST_NAME}_cannbotdsl_tiling_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_cannbotdsl_tiling_obj>>
     $<$<TARGET_EXISTS:${OPHOST_NAME}_infer_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_infer_obj>>
     $<$<TARGET_EXISTS:${OPHOST_NAME}_tiling_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_tiling_obj>>
     $<$<TARGET_EXISTS:${OPHOST_NAME}_aicpu_objs>:$<TARGET_OBJECTS:${OPHOST_NAME}_aicpu_objs>>
@@ -42,6 +43,10 @@ function(gen_ophost_symbol)
     ${ASCEND_DIR}/${SYSTEM_PREFIX}/lib64
   )
 
+  if(TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj)
+    target_link_libraries(${OPHOST_NAME} PRIVATE ${OPHOST_NAME}_cannbotdsl_tiling_obj)
+    cannbotdsl_finalize_host(${OPHOST_NAME})
+  endif()
   install(TARGETS ${OPHOST_NAME}
     LIBRARY DESTINATION ${OPHOST_LIB_INSTALL_PATH}
   )
@@ -181,6 +186,7 @@ endfunction()
 function(gen_opapi_symbol)
   # opapi shared
   add_library(${OPAPI_NAME} SHARED
+    $<$<TARGET_EXISTS:${OPHOST_NAME}_cannbotdsl_opapi_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_cannbotdsl_opapi_obj>>
     $<$<TARGET_EXISTS:${OPHOST_NAME}_opapi_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_opapi_obj>>
     $<$<TARGET_EXISTS:opbuild_gen_aclnn_all>:$<TARGET_OBJECTS:opbuild_gen_aclnn_all>>
     $<$<TARGET_EXISTS:opbase_util_objs>:$<TARGET_OBJECTS:opbase_util_objs>>
@@ -189,6 +195,7 @@ function(gen_opapi_symbol)
   target_link_libraries(${OPAPI_NAME}
     PUBLIC
     $<BUILD_INTERFACE:intf_pub>
+    $<TARGET_NAME_IF_EXISTS:${OPHOST_NAME}_cannbotdsl_opapi_obj>
     -Wl,--whole-archive
     ops_aclnn
     -Wl,--no-whole-archive
@@ -225,10 +232,11 @@ endfunction()
 
 function(gen_cust_optiling_symbol)
   # op_tiling
-  if(NOT TARGET ${OPHOST_NAME}_tiling_obj)
+  if(NOT TARGET ${OPHOST_NAME}_tiling_obj AND NOT TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj)
     return()
   endif()
   add_library(cust_opmaster SHARED
+    $<$<TARGET_EXISTS:${OPHOST_NAME}_cannbotdsl_tiling_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_cannbotdsl_tiling_obj>>
     $<$<TARGET_EXISTS:${OPHOST_NAME}_tiling_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_tiling_obj>
     $<$<TARGET_EXISTS:${COMMON_NAME}_obj>:$<TARGET_OBJECTS:${COMMON_NAME}_obj>>>
     $<$<TARGET_EXISTS:opbase_util_objs>:$<TARGET_OBJECTS:opbase_util_objs>>
@@ -250,6 +258,10 @@ function(gen_cust_optiling_symbol)
     PRIVATE
     ${ASCEND_DIR}/${SYSTEM_PREFIX}/lib64
   )
+  if(TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj)
+    target_link_libraries(cust_opmaster PRIVATE ${OPHOST_NAME}_cannbotdsl_tiling_obj)
+    cannbotdsl_finalize_host(cust_opmaster)
+  endif()
   set_target_properties(cust_opmaster PROPERTIES OUTPUT_NAME "cust_opmaster_rt2.0")
 
   install(TARGETS cust_opmaster

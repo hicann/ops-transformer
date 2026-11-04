@@ -50,6 +50,8 @@ option(UT_INFERSHAPE_FLAG         "Enable infershape ut"            OFF)
 option(ENABLE_OP_KERNEL           "Enable op kernel only build (skip es package generation)" OFF)
 
 set(ASCEND_COMPUTE_UNIT           "ascend910b"           CACHE   STRING   "soc that need to be compiled")
+set(CANNBOTDSL_COMPUTE_UNIT       "ascend950"            CACHE   STRING   "DSL compute unit")
+set(CANNBOTDSL_TARGET             "dav-3510"             CACHE   STRING   "DSL compiler target")
 set(ASCEND_OP_NAME                "ALL"                           CACHE   STRING   "operators that need to be compiled")
 set(ASCEND_MODULE_NAME            "ALL"                           CACHE   STRING   "modules that need to be compiled")
 set(ARCH_DIRECTORY                ""                           CACHE   STRING   "arch directory that need to be compiled")

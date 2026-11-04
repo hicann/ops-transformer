@@ -114,6 +114,22 @@ def _collect_op(op_cat, op_dir, op_te_dir, exported=True):
             f_src = os.path.join(op_te_dir, f)
             _op_py_files.append((os.path.join("ops", op_cat, op_dir, f), f_src))
 
+    # Keep factories and their relative Python imports beside the Torch adapter.
+    dsl_dir = os.path.join(os.path.dirname(op_te_dir), "op_dsl")
+    if os.path.isdir(dsl_dir):
+        for directory, subdirs, filenames in os.walk(dsl_dir):
+            subdirs[:] = sorted(d for d in subdirs if d != "__pycache__")
+            for filename in sorted(filenames):
+                if filename.endswith(".py"):
+                    source = os.path.join(directory, filename)
+                    relative = os.path.relpath(source, dsl_dir)
+                    _op_py_files.append(
+                        (
+                            os.path.join("ops", op_cat, op_dir, "op_dsl", relative),
+                            source,
+                        )
+                    )
+
     csrc_dir = os.path.join(op_te_dir, "csrc")
     if os.path.isdir(csrc_dir):
         for cpp in sorted(os.listdir(csrc_dir)):

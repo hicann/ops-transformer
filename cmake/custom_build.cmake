@@ -330,6 +330,8 @@ endforeach()
 list(APPEND OP_LIST ${COMPILED_OPS})
 list(APPEND OP_DIR_LIST ${COMPILED_OP_DIRS})
 
+get_property(_dsl_aclnn_enabled GLOBAL PROPERTY CANNBOTDSL_ACLNN_ENABLED)
+
 if (UT_TEST_ALL OR OP_HOST_UT OR OP_API_UT OR OP_KERNEL_UT OR OP_GRAPH_UT)
         add_subdirectory(tests/ut/framework_normal)
 endif()
@@ -540,7 +542,8 @@ else()
 endif ()
 
 # 零算子（所有请求算子均被 CANN 版本检查跳过）：打印被跳过算子，写标志文件供 build.sh 跳过打包
-if (NOT generate_aclnn_srcs AND NOT generate_aclnn_inner_srcs AND NOT generate_exclude_proto_srcs)
+if (NOT generate_aclnn_srcs AND NOT generate_aclnn_inner_srcs AND NOT generate_exclude_proto_srcs
+    AND NOT _dsl_aclnn_enabled)
     get_property(_cann_skipped_ops GLOBAL PROPERTY CANN_VERSION_SKIPPED_OPS)
     if (_cann_skipped_ops)
         list(REMOVE_DUPLICATES _cann_skipped_ops)
@@ -749,6 +752,18 @@ else()
             SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}
     )
 endif ()
+cannbotdsl_clean_resources()
+if(NOT ENABLE_BUILT_IN)
+    target_sources(cust_opmaster PRIVATE
+        $<$<TARGET_EXISTS:${OPHOST_NAME}_cannbotdsl_tiling_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_cannbotdsl_tiling_obj>>)
+    if(TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj)
+        target_link_libraries(cust_opmaster PRIVATE ${OPHOST_NAME}_cannbotdsl_tiling_obj)
+        cannbotdsl_finalize_host(cust_opmaster)
+    endif()
+    target_sources(cust_opapi PRIVATE
+        $<$<TARGET_EXISTS:${OPHOST_NAME}_cannbotdsl_opapi_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_cannbotdsl_opapi_obj>>)
+    target_link_libraries(cust_opapi PRIVATE $<TARGET_NAME_IF_EXISTS:${OPHOST_NAME}_cannbotdsl_opapi_obj>)
+endif()
 target_sources(cust_opapi PRIVATE
     $<$<TARGET_EXISTS:${OPHOST_NAME}_opapi_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_opapi_obj>>)
 target_link_libraries(
@@ -757,9 +772,9 @@ target_link_libraries(
 )
 
 if (NOT ENABLE_AICPU_KERNEL)
+    target_link_libraries(cust_opmaster PUBLIC $<TARGET_NAME_IF_EXISTS:${OPHOST_NAME}_tiling_obj>)
     target_link_libraries(
         cust_opmaster
-        PUBLIC ${OPHOST_NAME}_tiling_obj
         PUBLIC $<$<TARGET_EXISTS:${COMMON_NAME}_obj>:${COMMON_NAME}_obj>
         PUBLIC $<$<TARGET_EXISTS:${COMMON_NAME}_fallback_obj>:${COMMON_NAME}_fallback_obj>
         PUBLIC $<$<TARGET_EXISTS:${OPGRAPH_NAME}_fallback_obj>:${OPGRAPH_NAME}_fallback_obj>
