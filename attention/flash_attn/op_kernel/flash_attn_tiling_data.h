@@ -80,13 +80,10 @@ struct FlashAttnBaseParams {
 };
 
 struct FlashAttnAttenMaskParams {
-    uint8_t sparseMode;
+    uint8_t maskMode;
     int32_t winLefts;
     int32_t winRights;
-    uint32_t attenMaskBatch = 0;
-    uint32_t attenMaskS1Size;
     uint32_t attenMaskS2Size;
-    uint8_t isExistRowInvalid = 0;
 };
 
 struct FlashAttnPageAttentionParams {

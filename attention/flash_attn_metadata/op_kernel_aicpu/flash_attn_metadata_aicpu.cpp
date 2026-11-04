@@ -22,7 +22,7 @@
 #include "status.h"
 #include "flash_attn_grad_metadata_split.h"
 #include "../../common/op_kernel/aicpu_common.h"
-#include "../../flash_attn/op_host/fa_adjust_sinner_souter.h"
+#include "../../flash_attn/op_host/arch35/fa_adjust_sinner_souter_arch35.h"
 #include "../../flash_attn/op_host/arch92/fa_adjust_sinner_souter_arch92.h"
 
 constexpr uint32_t FA_KERNEL_STATUS_OK = 0;
@@ -86,6 +86,7 @@ bool CheckFagSequence(const std::vector<int64_t>& cu, const std::vector<int64_t>
 
 uint32_t FlashAttnMetadataCpuKernel::Compute(CpuKernelContext& ctx)
 {
+    KERNEL_LOG_INFO("FlashAttnMetadata Compute enter.");
     bool success = Prepare(ctx);
     KERNEL_CHECK_FALSE(success, FA_KERNEL_STATUS_PARAM_INVALID, "Prepare data failed!");
 
@@ -160,6 +161,7 @@ uint32_t FlashAttnMetadataCpuKernel::Compute(CpuKernelContext& ctx)
     }
     // ===== FAG metadata end =====
 
+    KERNEL_LOG_INFO("FlashAttnMetadata Compute success.");
     return FA_KERNEL_STATUS_OK;
 }
 
@@ -367,12 +369,6 @@ int64_t FlashAttnMetadataCpuKernel::CostFunc(uint32_t basicM, uint32_t basicS2)
 
 void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
 {
-    uint32_t qlayout = optiling::flash_attn::fa_tiling_util::LAYOUT_BNSD;
-    if (baseInfo.layoutQuery == load_balance::Layout::BSH || baseInfo.layoutQuery == load_balance::Layout::BSND) {
-        qlayout = optiling::flash_attn::fa_tiling_util::LAYOUT_BSH;
-    } else if (baseInfo.layoutQuery == load_balance::Layout::TND) {
-        qlayout = optiling::flash_attn::fa_tiling_util::LAYOUT_TND;
-    }
     uint32_t gSize = static_cast<uint32_t>(numHeadsQ_ / numHeadsKv_);
     bool dnUnmergedRouted = false;
     if (socVersion_.find("Ascend960") != std::string::npos) {
@@ -380,17 +376,17 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
         uint32_t templateId = 0;
         optiling::flash_attn::fa_tiling_util::GetConfigInfo(static_cast<uint32_t>(headDimV_), maskMode_, maxSeqlenQ_,
                                                             templateId, mBaseSize_, s2BaseSize_);
-        dnUnmergedRouted = templateId == optiling::flash_attn::fa_tiling_util::FA_TEMPLATE_DN_UNMERGED;
+        dnUnmergedRouted = templateId == FA_Template_DN_Unmerged;
         param.costFunc = nullptr;
     } else {
         optiling::flash_attn::fa_tiling_util::AdjustSinnerAndSouter(headDimV_, gSize, maxSeqlenQ_, maxSeqlenKv_,
                                                                     maskMode_, baseInfo.preToken, baseInfo.nextToken,
-                                                                    qlayout, mBaseSize_, s2BaseSize_);
+                                                                    mBaseSize_, s2BaseSize_);
         // Share the final template selection with host tiling before applying the CV ratio.
-        dnUnmergedRouted = optiling::flash_attn::fa_tiling_util::GetFlashAttnTemplateId(
-                               static_cast<uint32_t>(headDim_), static_cast<uint32_t>(headDimV_),
-                               static_cast<int64_t>(maskMode_), static_cast<int64_t>(maxSeqlenQ_),
-                               mBaseSize_) == optiling::flash_attn::fa_tiling_util::FA_TEMPLATE_DN_UNMERGED;
+        dnUnmergedRouted =
+            optiling::flash_attn::fa_tiling_util::GetFlashAttnTemplateId(
+                static_cast<uint32_t>(headDim_), static_cast<uint32_t>(headDimV_), static_cast<int64_t>(maskMode_),
+                static_cast<int64_t>(maxSeqlenQ_), mBaseSize_) == FA_Template_DN_Unmerged;
         param.costFunc = FlashAttnMetadataCpuKernel::CostFunc;
     }
     mBaseSize_ *= (aivCoreNum_ / aicCoreNum_);
@@ -402,6 +398,8 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
     param.fdOn = true;
     param.kernelSplitMode =
         dnUnmergedRouted ? load_balance::KernelSplitMode::BN1_S1_S2 : load_balance::KernelSplitMode::BN2_S1G_S2;
+    KERNEL_LOG_DEBUG("InitLoadBalanceParams: mBaseSize=%u, s2BaseSize=%u, kernelSplitMode=%u", param.mBaseSize,
+                     param.s2BaseSize, static_cast<uint32_t>(param.kernelSplitMode));
 }
 
 void FlashAttnMetadataCpuKernel::InitBaseInfo()
@@ -429,11 +427,25 @@ void FlashAttnMetadataCpuKernel::InitBaseInfo()
     baseInfo.actualKvSeqSize = actualSeqlenKv_;
     baseInfo.isCumulativeQuerySeq = isActualSeqlenQAccum_;
     baseInfo.actualQuerySeqSize = actualSeqlenQ_;
+    KERNEL_LOG_DEBUG("InitBaseInfo: batchSize=%u, querySeqSize=%u, kvSeqSize=%u, queryHeadNum=%u, kvHeadNum=%u",
+                     baseInfo.batchSize, baseInfo.querySeqSize, baseInfo.kvSeqSize, baseInfo.queryHeadNum,
+                     baseInfo.kvHeadNum);
+    KERNEL_LOG_DEBUG("InitBaseInfo: headDimQk=%u, headDimV=%u, attenMaskFlag=%d, sparseMode=%u, preToken=%ld, "
+                     "nextToken=%ld",
+                     baseInfo.headDimQk, baseInfo.headDimV, static_cast<int32_t>(baseInfo.attenMaskFlag),
+                     baseInfo.sparseMode, baseInfo.preToken, baseInfo.nextToken);
+    KERNEL_LOG_DEBUG("InitBaseInfo: layoutQuery=%u, layoutKv=%u, isCumulativeQuerySeq=%d, isCumulativeKvSeq=%d",
+                     static_cast<uint32_t>(baseInfo.layoutQuery), static_cast<uint32_t>(baseInfo.layoutKv),
+                     static_cast<int32_t>(baseInfo.isCumulativeQuerySeq),
+                     static_cast<int32_t>(baseInfo.isCumulativeKvSeq));
 }
 
 bool FlashAttnMetadataCpuKernel::BalanceSchedule(load_balance::SectionStreamKResult& splitRes)
 {
-    return load_balance::SectionStreamK::Compute(deviceInfo, baseInfo, param, splitRes) == SECTION_STREAM_K_SUCCESS;
+    bool success =
+        load_balance::SectionStreamK::Compute(deviceInfo, baseInfo, param, splitRes) == SECTION_STREAM_K_SUCCESS;
+    KERNEL_LOG_DEBUG("BalanceSchedule: sectionNum=%u", splitRes.sectionNum);
+    return success;
 }
 
 bool FlashAttnMetadataCpuKernel::GenMetadata(load_balance::SectionStreamKResult& splitRes)
@@ -456,6 +468,7 @@ void FlashAttnMetadataCpuKernel::SetMetadataHead(const load_balance::SectionStre
     if (std::any_of(splitRes.sectionFdResult.begin(), splitRes.sectionFdResult.end(),
                     [](load_balance::SectionStreamKFdResult result) { return result.usedVecNum > 0U; })) {
         faMetadata.SetHeadMetadata(HEAD_IS_FD_INDEX, 1U);
+        KERNEL_LOG_INFO("FlashDecode is enabled.");
     }
     faMetadata.SetHeadMetadata(HEAD_AIC_NUM_INDEX, aicCoreNum_);
     faMetadata.SetHeadMetadata(HEAD_AIV_NUM_INDEX, aivCoreNum_);

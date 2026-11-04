@@ -15,13 +15,14 @@
 #ifndef FLASH_ATTN_BLOCK_VEC_FLASHDECODE_H
 #define FLASH_ATTN_BLOCK_VEC_FLASHDECODE_H
 
-#include "utils/attenmask_gs1.h"
+#include "utils/flash_attn_common_def.h"
 #if __has_include("../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h")
 #include "../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
 #else
 #include "../../common/arch35/vf/vf_flash_decode_arch35.h"
 #endif
 #include "memory_copy_arch35.h"
+#include "../../common/op_kernel/vector_common.h"
 
 namespace FlashAttnKernel {
 struct TaskInfo {
@@ -95,9 +96,6 @@ protected:
     static constexpr UbFormat UB_FORMAT = DN_LAYOUT ? UbFormat::S1_ONLY : GetOutUbFormat<LAYOUT_T>();
     int64_t preTokensPerBatch_ = 0;
     int64_t nextTokensPerBatch_ = 0;
-
-    static constexpr T BOOL_ATTEN_MASK_SCALAR_VALUE = -1000000000000.0; // 用于mask为bool类型
-    uint32_t negativeIntScalar_ = *((uint32_t*)&BOOL_ATTEN_MASK_SCALAR_VALUE);
 
     uint64_t actSeqLensKv_ = 0;
     uint64_t actSeqLensQ_ = 0;
@@ -320,13 +318,11 @@ protected:
         uint64_t dSizeV_Align_ = (uint64_t)this->dSizeV_Align_;
         ReduceFinalRes_VF<T>(reduceOut, lseLocal, mm2Res, dealRowCount, dSizeV_Align_, cntKV);
     }
-    __aicore__ inline void CopyFinalResOut(LocalTensor<T>& accumOutLocal, uint32_t startRow, uint32_t dealRowCount,
-                                           uint32_t cntM)
+    __aicore__ inline void CopyFinalResOut(LocalTensor<T>& accumOutLocal, uint32_t startRow, uint32_t dealRowCount)
     {
         LocalTensor<OUTPUT_T> tmpBmm2ResCastTensor = fdOutputBuf_;
         AscendC::PipeBarrier<PIPE_V>();
         DealInvalidRows(accumOutLocal, startRow, dealRowCount, this->dSizeV_Align_);
-        DealInvalidMaskRows(accumOutLocal, startRow, dealRowCount, this->dSizeV_Align_, cntM);
         Mutex::Lock<PIPE_V>(SYNC_FDOUTPUT_BUF_FLAG);
         uint32_t shapeArray[] = {dealRowCount, (uint32_t)constInfo_.dSizeV};
         tmpBmm2ResCastTensor.SetShapeInfo(ShapeInfo(2, shapeArray, DataFormat::ND));
@@ -350,15 +346,11 @@ protected:
         int64_t safePreToken = constInfo_.preTokens;
         int64_t safeNextToken = constInfo_.nextTokens;
 
-        fa_base_vector::GetSafeActToken(actSeqLensQ_, actSeqLensKv_, safePreToken, safeNextToken,
-                                        constInfo_.sparseMode);
+        fa_base_vector::GetSafeActToken(actSeqLensQ_, actSeqLensKv_, safePreToken, safeNextToken, constInfo_.maskMode);
 
-        if (constInfo_.sparseMode == BAND) {
+        if (static_cast<FAMaskMode>(constInfo_.maskMode) == FAMaskMode::BAND) {
             preTokensPerBatch_ = safePreToken;
             nextTokensPerBatch_ = actSeqLensKv_ - actSeqLensQ_ + safeNextToken;
-        } else if ((constInfo_.sparseMode == DEFAULT_MASK) && HAS_MASK) {
-            nextTokensPerBatch_ = safeNextToken;
-            preTokensPerBatch_ = actSeqLensKv_ - actSeqLensQ_ + safePreToken;
         } else {
             nextTokensPerBatch_ = actSeqLensKv_ - actSeqLensQ_;
             preTokensPerBatch_ = 0;
@@ -370,10 +362,6 @@ protected:
                                            uint32_t columnCount)
     {
         if constexpr (!HAS_MASK) {
-            return;
-        }
-
-        if (constInfo_.sparseMode == ALL_MASK || constInfo_.sparseMode == LEFT_UP_CAUSAL) {
             return;
         }
 
@@ -391,22 +379,6 @@ protected:
                                     DN_LAYOUT ? fa_base_vector::UbInputFormat::GS1 : GeInputUbFormat<LAYOUT_T>()>
             invalidRows;
         invalidRows(attenOutUb, params);
-    }
-
-    template <typename UBOUT_T>
-    __aicore__ inline void DealInvalidMaskRows(LocalTensor<UBOUT_T>& attenOutUb, uint32_t startRow,
-                                               uint32_t dealRowCount, uint32_t columnCount, uint32_t cntM)
-    {
-        if constexpr (!HAS_MASK) {
-            return;
-        }
-        if (constInfo_.sparseMode != DEFAULT_MASK && constInfo_.sparseMode != ALL_MASK) {
-            return;
-        }
-        LocalTensor<T> lseMaxUb = (cntM & 1) == 0 ? fdLseMaxUbBuf1_ : fdLseMaxUbBuf2_;
-
-        fa_base_vector::InvalidMaskRows<UBOUT_T, T, true>(0, dealRowCount, columnCount, lseMaxUb, negativeIntScalar_,
-                                                          attenOutUb);
     }
 
 public:
@@ -507,7 +479,7 @@ public:
                 Mutex::Unlock<PIPE_V>(SYNC_MM2RES_BUF1_FLAG + (reduceGlobaLoop & 1));
                 reduceGlobaLoop += 1;
             }
-            CopyFinalResOut(reduceOut, startRow, actualGSplitSize, reduceMLoop);
+            CopyFinalResOut(reduceOut, startRow, actualGSplitSize);
             reduceMLoop += 1;
         }
     }

@@ -43,6 +43,14 @@ enum class FA_LAYOUT : uint32_t {
     NTD = 5
 };
 
+// mask_mode 唯一真源, 与接口 mask_mode 属性对齐(3=CAUSAL, 4=BAND)
+// 注意: AscendC 已定义全局 MaskMode(NORMAL/COUNTER), 故命名为 FAMaskMode 避免冲突
+enum class FAMaskMode : int32_t {
+    NO_MASK = 0,
+    CAUSAL = 3,
+    BAND = 4,
+};
+
 enum class inferFaLayOutTypeEnum {
     None = 0,
     LAYOUT_BSH = 1,
@@ -325,13 +333,10 @@ struct CommonConstInfo {
     uint32_t s2OEnd;
     uint32_t coreFirstTmpOutWsPos;
 
-    uint32_t sparseMode; // sparse
-    uint32_t attenMaskBatch;
-    uint32_t attenMaskS1Size;
+    uint32_t maskMode; // 与接口 mask_mode 对齐
     uint32_t attenMaskS2Size;
     int64_t preTokens;
     int64_t nextTokens;
-    bool isExistRowInvalid;
     float scaleValue;
 
     /* 核信息 */

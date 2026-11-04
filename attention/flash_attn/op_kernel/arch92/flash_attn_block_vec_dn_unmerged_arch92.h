@@ -22,10 +22,9 @@
 #include "../../../common/op_kernel/arch35/vf/vf_div_cast_arch35.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
 #include "../../../common/op_kernel/const_def.h"
-#include "../../../common/op_kernel/vector_common.h"
 #include "../../../common/op_kernel/init_output.h"
 #include "../memory_copy_arch35.h"
-#include "../utils/attenmask_gs1.h"
+#include "../utils/attenmask_m_s1.h"
 #include "../../../common/op_kernel/arch_info.h"
 
 using namespace AscendC;
@@ -142,8 +141,6 @@ public:
     GlobalTensor<float> softmaxFDMaxGm_;
     GlobalTensor<float> sinkGm_;
 
-    static constexpr T BOOL_ATTEN_MASK_SCALAR_VALUE = -1000000000000.0; // 用于mask为bool类型
-    uint32_t negativeIntScalar_ = *((uint32_t*)&BOOL_ATTEN_MASK_SCALAR_VALUE);
     T negativeFloatScalar_;
 
     // ==================== Functions ======================
@@ -479,8 +476,7 @@ public:
                 AttentionCommon::Max(runInfo.preTokensLeftUp + runInfo.actS2Size, 0), runInfo.actS1Size);
             s1LastValidToken = AttentionCommon::Max(s1LastValidToken - 1, 0);
             bool hasValidRow = (s1FirstValidToken > 0) || (s1LastValidToken < runInfo.actS1Size);
-            bool batchNeedRowInvalid = ((constInfo_.sparseMode != SparseMode::LEFT_UP_CAUSAL) &&
-                                        hasValidRow); // sparse = 0 or 3 or 4，preToekens or nextTokens负数
+            bool batchNeedRowInvalid = hasValidRow; // mask_mode = 0 or 3 or 4，preToekens or nextTokens负数
             if (!batchNeedRowInvalid) {
                 return;
             }
@@ -642,26 +638,18 @@ public:
                                              bool& isSkipMask, RunInfo& runInfo)
     {
         uint32_t s2RealSize = runInfo.actSingleLoopS2Size;
-        MaskInfo<MaskFormat::S1_ONLY> maskInfo;
+        MaskInfoUnmerged maskInfo;
         maskInfo.s1StartIdx = runInfo.s1Idx + runInfo.vecMbaseIdx + vecMIdx;
         maskInfo.s1dealNum = mBaseSize;
         maskInfo.s1Size = runInfo.actS1Size;
-        maskInfo.gSize = constInfo_.gSize;
         maskInfo.s2StartIdx = runInfo.s2Idx;
         maskInfo.s2dealNum = s2RealSize;
         maskInfo.s2Size = runInfo.actS2Size;
         maskInfo.nBaseSize = s2BaseSize;
-        maskInfo.preToken = constInfo_.preTokens;
         maskInfo.nextToken = constInfo_.nextTokens;
-        maskInfo.sparseMode = static_cast<SparseMode>(constInfo_.sparseMode);
-        maskInfo.batchIdx = (constInfo_.attenMaskBatch == 1) ? 0 : runInfo.bIdx;
-        maskInfo.attenMaskBatchStride = constInfo_.attenMaskS1Size * constInfo_.attenMaskS2Size;
+        maskInfo.maskMode = static_cast<FAMaskMode>(constInfo_.maskMode);
         maskInfo.attenMaskS1Stride = constInfo_.attenMaskS2Size;
         maskInfo.attenMaskDstStride = 0U;
-        maskInfo.maskValue = negativeIntScalar_;
-        maskInfo.s1LeftPaddingSize = runInfo.qPaddingBeginOffset;
-        maskInfo.s2LeftPaddingSize = runInfo.kvPaddingBeginOffset;
-        maskInfo.attenMaskType = MASK_BOOL; // compatible with int8/uint8
 
         isSkipMask = IsSkipAttentionmask(maskInfo);
         if (!isSkipMask) {

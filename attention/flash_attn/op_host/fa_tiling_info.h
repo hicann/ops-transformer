@@ -23,6 +23,7 @@
 #include <cstdint>
 #include "../../common/op_host/fia_tiling_base.h"
 #include "../../common/op_host/fia_tiling_shape.h"
+#include "../op_kernel/utils/flash_attn_common_def.h"
 
 namespace optiling {
 namespace flash_attn {
@@ -103,11 +104,8 @@ constexpr int64_t MASK_MODE_INT_MAX = 2147483647;
 // Enums
 // ============================================================
 
-enum class MaskMode : int32_t {
-    NO_MASK = 0,
-    CAUSAL = 3,
-    BAND = 4
-};
+// 复用与 kernel 共用的唯一真源, 保留 MaskMode 名称以兼容现有 host 代码
+using MaskMode = FAMaskMode;
 
 using FaLayout = FiaLayout;
 using FaAxis = FiaAxis;

@@ -27,6 +27,7 @@
 #endif
 
 #include "memory_copy_arch35.h"
+#include "../../common/op_kernel/vector_common.h"
 #include "flash_attn_block_vec_flashdecode.h"
 
 #if ASC_DEVKIT_MAJOR >= 9
@@ -185,13 +186,10 @@ public:
         constInfo_.outputLayout = static_cast<FA_LAYOUT>(tilingData_->flashAttnBaseParams.outputLayout);
         constInfo_.needInitOutput = tilingData_->flashAttnBaseParams.needInitOutput;
 
-        constInfo_.sparseMode = tilingData_->flashAttnAttenMaskParams.sparseMode;
+        constInfo_.maskMode = tilingData_->flashAttnAttenMaskParams.maskMode;
         constInfo_.preTokens = tilingData_->flashAttnAttenMaskParams.winLefts;
         constInfo_.nextTokens = tilingData_->flashAttnAttenMaskParams.winRights;
-        constInfo_.attenMaskBatch = tilingData_->flashAttnAttenMaskParams.attenMaskBatch;
-        constInfo_.attenMaskS1Size = tilingData_->flashAttnAttenMaskParams.attenMaskS1Size;
         constInfo_.attenMaskS2Size = tilingData_->flashAttnAttenMaskParams.attenMaskS2Size;
-        constInfo_.isExistRowInvalid = tilingData_->flashAttnAttenMaskParams.isExistRowInvalid;
 
         constInfo_.accumOutSize = tilingData_->flashAttnWorkspaceParams.accumOutSize;
         constInfo_.logSumExpSize = tilingData_->flashAttnWorkspaceParams.logSumExpSize;
@@ -339,15 +337,15 @@ public:
         preTokenLeftUp = constInfo_.preTokens;
         nextTokenLeftUp = constInfo_.nextTokens;
         fa_base_vector::GetSafeActToken(actSeqLensQ, actSeqLensKv, preTokenLeftUp, nextTokenLeftUp,
-                                        constInfo_.sparseMode);
+                                        constInfo_.maskMode);
 
-        if (constInfo_.sparseMode == fa_base_vector::BAND) {
+        if (static_cast<FAMaskMode>(constInfo_.maskMode) == FAMaskMode::BAND) {
             preTokenLeftUp = static_cast<int64_t>(actSeqLensQ) - static_cast<int64_t>(actSeqLensKv) + preTokenLeftUp;
         }
 
-        if (constInfo_.sparseMode == fa_base_vector::RIGHT_DOWN_CAUSAL) {
+        if (static_cast<FAMaskMode>(constInfo_.maskMode) == FAMaskMode::CAUSAL) {
             nextTokenLeftUp = static_cast<int64_t>(actSeqLensKv) - static_cast<int64_t>(actSeqLensQ);
-        } else if (constInfo_.sparseMode == fa_base_vector::BAND) {
+        } else if (static_cast<FAMaskMode>(constInfo_.maskMode) == FAMaskMode::BAND) {
             nextTokenLeftUp = static_cast<int64_t>(actSeqLensKv) - static_cast<int64_t>(actSeqLensQ) + nextTokenLeftUp;
         }
     }

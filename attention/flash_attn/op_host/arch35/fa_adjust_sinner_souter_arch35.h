@@ -8,11 +8,12 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef FLASH_ATTN_FA_ADJUST_SINNER_SOUTER_H
-#define FLASH_ATTN_FA_ADJUST_SINNER_SOUTER_H
+#ifndef FLASH_ATTN_FA_ADJUST_SINNER_SOUTER_ARCH35_H
+#define FLASH_ATTN_FA_ADJUST_SINNER_SOUTER_ARCH35_H
 
 #include <cstdint>
 #include <initializer_list>
+#include "../../op_kernel/utils/flash_attn_common_def.h"
 
 namespace optiling {
 namespace flash_attn {
@@ -20,19 +21,10 @@ namespace fa_tiling_util {
 
 constexpr int64_t MAX_SEQ_LEN_DEFAULT = 2147483647;
 
-// layout 枚举值，与 FiaLayout 一致，供外部算子使用
-constexpr uint32_t LAYOUT_BSH = 0;
-constexpr uint32_t LAYOUT_BSND = 1;
-constexpr uint32_t LAYOUT_BNSD = 2;
-constexpr uint32_t LAYOUT_TND = 4;
-
-// tiling 切块常量
-constexpr uint32_t SOUTER_32 = 32;
-constexpr uint32_t SOUTER_64 = 64;
-constexpr uint32_t SINNER_128 = 128;
-constexpr uint32_t SINNER_256 = 256;
-constexpr uint32_t DSIZE_128 = 128;
-constexpr uint32_t DSIZE_256 = 256;
+// 路由开关: 打开后由 GetFlashAttnTemplateId 按条件路由到不合轴 DN 模板
+// (kernel/block *_dn_unmerged.h 文件, templateId=2), host tiling 与 flash_attn_metadata(AICPU)
+// 共享该开关, 保证两侧分核选择严格一致; 关闭时模板路由维持原逻辑(ND/合轴DN)。
+constexpr bool DN_UNMERGED_ROUTE_ENABLED = true;
 
 /**
  * @brief 根据算子参数决定 sOuter / sInner 切块大小，纯函数，不依赖任何类。
@@ -41,16 +33,15 @@ constexpr uint32_t DSIZE_256 = 256;
  * @param gSize      GQA 的 group 数（n1/n2）
  * @param maxSeqQ    Q 的 max sequence length，-1 表示未知（按极大值处理）
  * @param maxSeqKv   KV 的 max sequence length，-1 表示未知（按极大值处理）
- * @param maskMode   mask 模式（0/2/4 等）
+ * @param maskMode   mask 模式（0/3/4）
  * @param winLeft    左侧窗口
  * @param winRight   右侧窗口
- * @param qLayout    Q 的 layout（使用 LAYOUT_BSH / LAYOUT_BSND / LAYOUT_TND 等）
  * @param sOuterFactor [out] sOuter 切块大小
  * @param sInnerFactor [out] sInner 切块大小
  */
 inline void AdjustSinnerAndSouter(uint32_t vHeadDim, uint32_t gSize, int64_t maxSeqQ, int64_t maxSeqKv,
-                                  int32_t maskMode, int64_t winLeft, int64_t winRight, uint32_t qLayout,
-                                  uint32_t& sOuterFactor, uint32_t& sInnerFactor)
+                                  int32_t maskMode, int64_t winLeft, int64_t winRight, uint32_t& sOuterFactor,
+                                  uint32_t& sInnerFactor)
 {
     if (maxSeqQ == -1) {
         maxSeqQ = MAX_SEQ_LEN_DEFAULT;
@@ -58,12 +49,12 @@ inline void AdjustSinnerAndSouter(uint32_t vHeadDim, uint32_t gSize, int64_t max
     if (maxSeqKv == -1) {
         maxSeqKv = MAX_SEQ_LEN_DEFAULT;
     }
-    sOuterFactor = SOUTER_64;
-    sInnerFactor = SINNER_128;
+    sOuterFactor = 64;
+    sInnerFactor = 128;
 
-    bool checkQueryAndValueS = maxSeqQ <= SOUTER_64 && maxSeqKv > SINNER_128;
+    bool checkQueryAndValueS = maxSeqQ <= 64 && maxSeqKv > 128;
 
-    if (vHeadDim <= DSIZE_128) {
+    if (vHeadDim <= 128) {
         int64_t winLeftTmp = winLeft;
         int64_t winRightTmp = winRight;
         if (maskMode == 0) {
@@ -71,19 +62,19 @@ inline void AdjustSinnerAndSouter(uint32_t vHeadDim, uint32_t gSize, int64_t max
         } else if (maskMode == 4) {
             winRightTmp = (winRightTmp > 0) ? 0 : winRightTmp;
         }
-        bool checkSparseMode = (maskMode != 2 && winLeftTmp + winRightTmp > 128);
-        if (checkQueryAndValueS && checkSparseMode) {
-            sOuterFactor = SOUTER_32;
-            sInnerFactor = SINNER_256;
+        bool checkMaskMode = (maskMode != 2 && winLeftTmp + winRightTmp > 128);
+        if (checkQueryAndValueS && checkMaskMode) {
+            sOuterFactor = 32;
+            sInnerFactor = 256;
         }
     }
-    if (vHeadDim == DSIZE_256) {
-        if (gSize * maxSeqQ < SOUTER_64) {
-            sOuterFactor = SOUTER_32;
-            sInnerFactor = SINNER_256;
+    if (vHeadDim == 256) {
+        if (gSize * maxSeqQ < 64) {
+            sOuterFactor = 32;
+            sInnerFactor = 256;
         } else {
-            sOuterFactor = SOUTER_64;
-            sInnerFactor = SINNER_128;
+            sOuterFactor = 64;
+            sInnerFactor = 128;
         }
     }
 }
@@ -115,34 +106,25 @@ inline uint32_t GetMaxUsedAicCores(uint32_t aicNum, uint32_t batchSize, uint32_t
     return cores;
 }
 
-constexpr uint32_t FA_TEMPLATE_ND = 0;
-constexpr uint32_t FA_TEMPLATE_DN = 1;
-constexpr uint32_t FA_TEMPLATE_DN_UNMERGED = 2; // 不合轴 DN(templateId=2)
-
-// 路由开关: 打开后由 GetFlashAttnTemplateId 按条件路由到不合轴 DN 模板
-// (kernel/block *_dn_unmerged.h 文件, templateId=2), host tiling 与 flash_attn_metadata(AICPU)
-// 共享该开关, 保证两侧分核选择严格一致; 关闭时模板路由维持原逻辑(ND/合轴DN)。
-constexpr bool DN_UNMERGED_ROUTE_ENABLED = true;
-
 // Select the final arch35 template: unmerged DN first, then merged DN, otherwise ND.
 // Host tiling and metadata pass the same per-AIV sOuterFactor before applying the CV ratio.
 inline uint32_t GetFlashAttnTemplateId(uint32_t qkHeadDim, uint32_t vHeadDim, int64_t maskMode, int64_t maxSeqlenQ,
                                        uint32_t sOuterFactor)
 {
-    if (DN_UNMERGED_ROUTE_ENABLED && vHeadDim <= DSIZE_128 && (maskMode == 0 || maskMode == 3) && maxSeqlenQ >= 256) {
-        return FA_TEMPLATE_DN_UNMERGED;
+    if (DN_UNMERGED_ROUTE_ENABLED && vHeadDim <= 128U && (maskMode == 0 || maskMode == 3) && maxSeqlenQ >= 256) {
+        return FA_Template_DN_Unmerged;
     }
     // Equivalent to the existing no-mask config=0/2/6 selection (D=72 uses config=2).
     bool mergedDnDims = (qkHeadDim == vHeadDim && (qkHeadDim == 64 || qkHeadDim == 72 || qkHeadDim == 128)) ||
                         (qkHeadDim == 192 && vHeadDim == 128);
-    if (maskMode == 0 && sOuterFactor == SOUTER_64 && mergedDnDims) {
-        return FA_TEMPLATE_DN;
+    if (maskMode == 0 && sOuterFactor == 64U && mergedDnDims) {
+        return FA_Template_DN;
     }
-    return FA_TEMPLATE_ND;
+    return FA_Template_ND;
 }
 
 } // namespace fa_tiling_util
 } // namespace flash_attn
 } // namespace optiling
 
-#endif // FLASH_ATTN_FA_ADJUST_SINNER_SOUTER_H
+#endif // FLASH_ATTN_FA_ADJUST_SINNER_SOUTER_ARCH35_H

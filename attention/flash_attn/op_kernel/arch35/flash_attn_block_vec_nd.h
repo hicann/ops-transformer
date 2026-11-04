@@ -17,7 +17,7 @@
 
 #include <limits>
 
-#include "../utils/attenmask_gs1.h"
+#include "../utils/attenmask_m_gs1.h"
 #include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
 #include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz.h"
 #include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_dn.h"
@@ -25,7 +25,6 @@
 #include "../../../common/op_kernel/arch35/vf/vf_div_cast_arch35.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
 #include "../../../common/op_kernel/const_def.h"
-#include "../../../common/op_kernel/vector_common.h"
 #include "../../../common/op_kernel/init_output.h"
 #include "../memory_copy_arch35.h"
 #include "../../../common/op_kernel/attn_sink_gs1.h"
@@ -154,8 +153,6 @@ public:
 
     static constexpr MaskFormat MASK_LAYOUT =
         (LAYOUT_T == FA_LAYOUT::BSH || LAYOUT_T == FA_LAYOUT::TND) ? MaskFormat::SG : MaskFormat::GS;
-    static constexpr T BOOL_ATTEN_MASK_SCALAR_VALUE = -1000000000000.0; // 用于mask为bool类型
-    uint32_t negativeIntScalar_ = *((uint32_t*)&BOOL_ATTEN_MASK_SCALAR_VALUE);
     T negativeFloatScalar_;
 
     // ==================== Functions ======================
@@ -561,8 +558,7 @@ public:
                 AttentionCommon::Max(runInfo.preTokensLeftUp + runInfo.actS2Size, 0), runInfo.actS1Size);
             s1LastValidToken = AttentionCommon::Max(s1LastValidToken - 1, 0);
             bool hasValidRow = (s1FirstValidToken > 0) || (s1LastValidToken < runInfo.actS1Size);
-            bool batchNeedRowInvalid = ((constInfo_.sparseMode != SparseMode::LEFT_UP_CAUSAL) &&
-                                        hasValidRow); // sparse = 0 or 3 or 4，preToekens or nextTokens负数
+            bool batchNeedRowInvalid = hasValidRow; // mask_mode = 3 or 4，preToekens or nextTokens负数
             if (!batchNeedRowInvalid) {
                 return;
             }
@@ -723,7 +719,7 @@ public:
                                            RunInfo& runInfo)
     {
         const uint32_t bufIdx = runInfo.loop & (DB - 1);
-        MaskInfo<MASK_LAYOUT> maskInfo;
+        MaskInfoMerged maskInfo;
         maskInfo.gs1StartIdx = runInfo.gS1Idx + runInfo.vecMbaseIdx + vecMIdx;
         maskInfo.gs1dealNum = mDealSize;
         maskInfo.s1Size = runInfo.actS1Size;
@@ -731,21 +727,14 @@ public:
         maskInfo.s2StartIdx = runInfo.s2Idx;
         maskInfo.s2dealNum = runInfo.actSingleLoopS2Size;
         maskInfo.s2Size = runInfo.actS2Size;
-        maskInfo.nBaseSize = s2BaseSize;
         maskInfo.preToken = constInfo_.preTokens;
         maskInfo.nextToken = constInfo_.nextTokens;
-        maskInfo.sparseMode = static_cast<SparseMode>(constInfo_.sparseMode);
-        maskInfo.batchIdx = (constInfo_.attenMaskBatch == 1) ? 0 : runInfo.bIdx;
-        maskInfo.attenMaskBatchStride = constInfo_.attenMaskS1Size * constInfo_.attenMaskS2Size;
+        maskInfo.maskMode = static_cast<FAMaskMode>(constInfo_.maskMode);
         maskInfo.attenMaskS1Stride = constInfo_.attenMaskS2Size;
         maskInfo.attenMaskDstStride = (s2BaseSize - AttentionCommon::Align(maskInfo.s2dealNum, 32U)) / 32;
-        maskInfo.maskValue = negativeIntScalar_;
-        maskInfo.s1LeftPaddingSize = 0;
-        maskInfo.s2LeftPaddingSize = 0;
-        maskInfo.attenMaskType = MASK_BOOL; // compatible with int8/uint8
 
-        bool IsSkipMask = IsSkipAttentionmask(maskInfo);
-        bool IsSkipMaskForPre = IsSkipAttentionmaskForPre(maskInfo);
+        bool IsSkipMask = IsSkipAttentionmask<MASK_LAYOUT>(maskInfo);
+        bool IsSkipMaskForPre = IsSkipAttentionmaskForPre<MASK_LAYOUT>(maskInfo);
         if (IsSkipMask && IsSkipMaskForPre) {
             Mutex::Lock<PIPE_V>(UB_IN_MASK_EVENT0 + bufIdx);
             Duplicate(attenMaskUb, static_cast<uint8_t>(0U), maskInfo.gs1dealNum * s2BaseSize);
