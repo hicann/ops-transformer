@@ -176,6 +176,7 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
     LocalTensor<T2> mm2ResTensor;
     int64_t blockInnerIdx = 0;
     bool hasDqReader = false;
+    bool hasDkDvReader = false;
 
     // Pre-Set
     nextValidBlockInnerIdx = this->GetNextValidIdx(
@@ -250,10 +251,16 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
                     }
                 }
             }
+            if ASCEND_IS_AIC {
+                if (hasDkDvReader && !runInfos[preRunId].nextS2IdxNoChange) {
+                    CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(this->BN2_BLK_V3_TO_C4);
+                }
+            }
             this->cubeBlock.IterateMmDsQ(runInfos[preRunId], this->constInfo, this->dkWorkSpaceGm); // bmm4
             if (!runInfos[preRunId].nextS2IdxNoChange) {
                 if ASCEND_IS_AIC {
                     CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(this->BN2_BLK_C4_TO_V3);
+                    hasDkDvReader = true;
                 } else {
                     CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE2>(this->BN2_BLK_C4_TO_V3);
                 }
@@ -274,6 +281,11 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
                 }
                 this->vecBlock.template ProcessMulsAndCast<T2, DV_IDX>(this->dvWorkSpaceGm, this->constInfo,
                                                                        runInfos[preRunId]);
+                if ASCEND_IS_AIV {
+                    if (!isLastLoop) {
+                        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE2>(this->BN2_BLK_V3_TO_C4);
+                    }
+                }
             }
         }
         if (isLastLoop) {

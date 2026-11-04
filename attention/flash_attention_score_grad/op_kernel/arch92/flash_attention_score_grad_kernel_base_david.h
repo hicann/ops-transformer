@@ -185,6 +185,7 @@ protected:
     static constexpr uint64_t BN2_BLK_C4_TO_V3 = 7;  // dk to mulsAndCast
     static constexpr uint64_t BN2_BLK_C5_TO_V3 = 14; // dv to cast
     static constexpr uint64_t BN2_BLK_V3_TO_C3 = 15; // dq mulsAndCast to dq fixp
+    static constexpr uint64_t BN2_BLK_V3_TO_C4 = 13; // dk/dv mulsAndCast to dk/dv fixp
 
     FagConstInfo constInfo;
     AttenMaskInfo attenMaskInfo;
