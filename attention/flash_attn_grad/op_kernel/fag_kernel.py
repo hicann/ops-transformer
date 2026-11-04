@@ -18,6 +18,7 @@
 
 * :func:`flash_attn_grad_preload3` —— ``Tmpl.BN2GS1S2`` 且 D≤192：
   cube 领先 vector 两个 task（``PRELOAD_TIMES=3``），自带 pre/post。
+  192 档 dK 走 fp32 workspace（与 256 档同口径）、dV 仍常驻 L0C。
 * :func:`flash_attn_grad_preload2` —— 1-ahead。``Tmpl.BN2`` 走
   :mod:`fag_kernel_norm` 的 BN2 循环；GS1S2 再按 ``deter`` 分到
   normal / deterministic。
@@ -372,6 +373,8 @@ def flash_attn_grad_preload3(
         do_l1 = make_do_l1()
         left = make_l0a()
         right = make_l0b()
+        # 192 档 L0C 的两套布局由工厂内部按 template/d_align 自己选（BN2 用 dK/dV
+        # 常驻表，GS1S2 用 acc 双槽表），调用点不传标志位。
         acc = make_l0c_acc()
         q_l1_dk = make_q_lag_view()
         do_l1_dv = make_do_lag_view()
@@ -540,7 +543,7 @@ def flash_attn_grad_preload3(
                     tensor_dsink_ws,
                     tensor_dsink_out,
                     sink_red_ub.current(),
-                    sink_row_ub.current(),
+                    sink_row_ub,
                     constInfo.aivCount,
                 )
 
@@ -577,13 +580,21 @@ def flash_attn_grad_preload2(
     cube/vector 主循环已拆成 BN2、GS normal、GS deterministic 三套。
     路径按编译期 ``template`` / ``deter`` 分发，不是按 D 档。
 
-    ``template!=Tmpl.BN2``（当前即 D=256 GS1S2）：store 到 fp32 workspace；
-    进循环前清 workspace，循环后再 scale+cast。不算 BN2 直出 v5/v6。
-    ``Tmpl.BN2``：一个核独占整个 (b, n2) head；
-    不跑 workspace pre/post（仅 ``bn2_need_zero`` 清 16-bit out）。
+    ``template!=Tmpl.BN2``（GS1S2，含 D=192/256/768 与 64/128 两档）：
+    store 到 fp32 workspace；进循环前清 workspace，循环后再 scale+cast。
+    不含 BN2 的 UB 直出（v5/v6）。
+    ``Tmpl.BN2``：一个核独占整个 (b, n2) head；不跑全局 workspace pre/post
+    （仅 ``bn2_need_zero`` 清 16-bit out，带 sink 时另清 dsink）。
+    ``d_align<=128`` 的结果在 UB 里 Muls+Cast 直出；``d_align>128``（wide）只有
+    经 4D fp32 workspace 的那部分由 vector 逐 D 分块读回 cast：dQ 三档都走
+    workspace；dK 仅 256/768 走（192 驻留 L0C，flush 时搬 UB 再 cast）；dV 仅
+    768 走（192/256 驻留 L0C，flush 时 cube fixpipe 直出）。首写仍用 AtomicNone
+    覆盖，所以同样不需要全局清零。
 
-    MultiBlk（is_bn2_multiblk）：dQ 首有效 s2 覆盖 workspace，其余 AtomicAdd，
-    vector 只在 isLastS1Outer 从 GM Muls+Cast；dK/dV 在 L0C 累加到换 s2 再写回。
+    MultiBlk（is_bn2_multiblk）：核内按 s2 逐块累加，dQ 首有效 s2 覆盖
+    workspace、其余 AtomicAdd，vector 在 ``dqLast`` 时从 4D workspace /
+    per-core 2D 条带 load 后 Muls+Cast；dK/dV 在 L0C 累加到换 s2 再写回
+    （dK 只有 256/768 档直接累加进 workspace；dV 192/256 仍走 L0C）。
     """
     coreNum = pl.get_block_num()
     # swizzle 来自 tilingkey。BN2 is_valid 保证为 0，与原先写死 0 等价。
@@ -674,7 +685,11 @@ def flash_attn_grad_preload2(
     wsRowsQ = constInfo.t1Size * constInfo.n1Size
     wsRowsKV = constInfo.t2Size * constInfo.n2Size
     if template == Tmpl.BN2:
-        # 单块直出 16-bit；dq workspace 是 per-core 条带，不是全量 4D。
+        # BN2 直出 16-bit。d_align<=128 的中间结果在 mm1/mm2 UB（MultiBlk 的
+        # dQ 走 per-core 2D 条带）；d_align>128 放不下的段改走与 GS1S2 同布局的
+        # 4D fp32 workspace：dQ 三档全走，dK 走 256/768，dV 只走 768（192 的
+        # dK 与 192/256 的 dV 驻留 L0C）。workspace 只作本核 staging，不做全局
+        # pre/post：cube 首写 AtomicNone、vector 内联 cast。
         tensor_dq_out = pl.make_tensor(
             dq,
             [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dQ],
@@ -693,12 +708,38 @@ def flash_attn_grad_preload2(
             [s2ndKVv, d2dKVv, dV, 1],
             dtype=input_dtype,
         )
-        # 单块 BN2 的 C3 被 tilingkey 剪掉 store，不能把 UB
-        # 或 16-bit out 冒充成 fp32 GM 参数。
-        alignS1 = constInfo.s1Outer * CUBE_BASEM
-        tensor_dq_ws = pl.make_tensor(
-            ws_ptr, [constInfo.coreNum * alignS1, dQ], [dQ, 1], dtype=pl.DT_FP32
-        )
+        if d_align > 128:
+            # BN2 wide：dq/dk/dv 的 4D fp32 workspace。分段与 GS1S2 一致，
+            # host BuildWorkspacePlan 不必改。
+            dq_workspace = ws_ptr
+            dk_workspace = pl.addptr(dq_workspace, wsRowsQ * tiling.d)
+            dv_workspace = pl.addptr(dk_workspace, wsRowsKV * tiling.d)
+            tensor_dq_ws = pl.make_tensor(
+                dq_workspace,
+                [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dQ],
+                [s1ndQ, d2dQ, dQ, 1],
+                dtype=pl.DT_FP32,
+            )
+            tensor_dk_ws = pl.make_tensor(
+                dk_workspace,
+                [viewD0KV, constInfo.s2ViewSize, viewD2KV, dQ],
+                [s2ndKV, d2dKV, dQ, 1],
+                dtype=pl.DT_FP32,
+            )
+            tensor_dv_ws = pl.make_tensor(
+                dv_workspace,
+                [viewD0KV, constInfo.s2ViewSize, viewD2KV, dV],
+                [s2ndKVv, d2dKVv, dV, 1],
+                dtype=pl.DT_FP32,
+            )
+            v1w = 256 if dv_align == 768 else dv_align
+        else:
+            # 单块 BN2 的 C3 被 tilingkey 剪掉 store，不能把 UB
+            # 或 16-bit out 冒充成 fp32 GM 参数。dQ 用 per-core 条带。
+            alignS1 = constInfo.s1Outer * CUBE_BASEM
+            tensor_dq_ws = pl.make_tensor(
+                ws_ptr, [constInfo.coreNum * alignS1, dQ], [dQ, 1], dtype=pl.DT_FP32
+            )
     else:
         # GS1S2：三段 fp32 累加区，分段必须与 host CalcWorkSpace 对齐。
         dq_workspace = ws_ptr
@@ -870,10 +911,23 @@ def flash_attn_grad_preload2(
         do_l1 = make_do_l1()
         left = make_l0a()
         right = make_l0b()
+        # 192 档 L0C 的两套布局由工厂内部按 template/d_align 选（BN2 用 dK/dV
+        # 常驻 256KB，GS1S2 用 acc 双槽 224KB）；其它档两套指向同一份布局。
         acc = make_l0c_acc()
         if template == Tmpl.BN2:
-            dk_acc = make_dk_l0c_chunk0()
-            dv_acc = make_dv_l0c_chunk0()
+            # dK/dV 每个 D 分块一个槽（c0 = 第 0 块、c1 = 第 1 块）；64/128/768 只有
+            # 一个分块，c1 别名到 c0、trace 期剪掉。L0C 占用（单位 KB，额 256KB）：
+            #   64/128   : acc 2×64 + dK 1×64 + dV 1×64 = 256，各自常驻累加
+            #   192 BN2  : acc 1×64 + dK 2×48 + dV 2×48 = 256，dK/dV 常驻 L0C
+            #   192 GS1S2: acc 2×64 + dV 2×48 = 224，dK 与 acc 同址（mm4 → fp32 ws）
+            #   256      : acc 2×64 + dV 2×64 = 256，dK 与 acc 第 0 槽同址（→ fp32 ws）
+            #   768      : acc 2×64 + dK 1×64 + dV 1×64 = 256，dK/dV 单 scratch → fp32 ws
+            dk_c0 = make_dk_l0c_chunk0()
+            dk_c1 = make_dk_l0c_chunk1()
+            dv_c0 = make_dv_l0c_chunk0()
+            dv_c1 = make_dv_l0c_chunk1()
+            # BN2 192档使用，dK 从 L0C 搬到 UB，chunk0 → mm2_res、chunk1 → l0c_load_ub
+            l0c_load_ub = make_l0c_load_ub()
             runInfos = make_run_infos_2()
             sched = pl.make_tuple(
                 meta=meta,
@@ -888,15 +942,28 @@ def flash_attn_grad_preload2(
                 blockEnd=blockEnd,
                 numBlocks=numBlocks,
             )
-            gm = pl.make_tuple(
-                tensor_q=tensor_q,
-                tensor_k=tensor_k,
-                tensor_k_nt=tensor_k_nt,
-                tensor_dy=tensor_dy,
-                tensor_v=tensor_v,
-                tensor_dq_ws=tensor_dq_ws,
-                tensor_dv_out=tensor_dv_out,
-            )
+            if d_align > 128:
+                gm = pl.make_tuple(
+                    tensor_q=tensor_q,
+                    tensor_k=tensor_k,
+                    tensor_k_nt=tensor_k_nt,
+                    tensor_dy=tensor_dy,
+                    tensor_v=tensor_v,
+                    tensor_dq_ws=tensor_dq_ws,
+                    tensor_dk_ws=tensor_dk_ws,
+                    tensor_dv_ws=tensor_dv_ws,
+                    tensor_dv_out=tensor_dv_out,
+                )
+            else:
+                gm = pl.make_tuple(
+                    tensor_q=tensor_q,
+                    tensor_k=tensor_k,
+                    tensor_k_nt=tensor_k_nt,
+                    tensor_dy=tensor_dy,
+                    tensor_v=tensor_v,
+                    tensor_dq_ws=tensor_dq_ws,
+                    tensor_dv_out=tensor_dv_out,
+                )
             buf = pl.make_tuple(
                 mm1_res=mm1_res,
                 mm2_res=mm2_res,
@@ -908,8 +975,11 @@ def flash_attn_grad_preload2(
                 left=left,
                 right=right,
                 acc=acc,
-                dk_acc=dk_acc,
-                dv_acc=dv_acc,
+                dk_c0=dk_c0,
+                dk_c1=dk_c1,
+                dv_c0=dv_c0,
+                dv_c1=dv_c1,
+                l0c_load_ub=l0c_load_ub,
                 ds_l1=ds_l1,
                 ds_t_l1=ds_t_l1,
                 p_t_l1=p_t_l1,
@@ -999,16 +1069,89 @@ def flash_attn_grad_preload2(
 
     with pl.section_vector():
         subIdx = pl.get_subblock_idx()
-        if template == Tmpl.BN2:
-            y_ub = make_y_ub_bn2()
-            dy_ub = make_dy_ub_bn2()
-            nzp_ub = make_nzp_ub_bn2()
-            sfmg_ub = make_sfmg_ub_bn2()
-            lse_ub = make_lse_ub_bn2()
-            mask_ub = make_mask_view_bn2()
-            mask_pre_ub = make_mask_pre_view_bn2()
-            cast_ub = make_cast_ub_bn2()
-            sink_part_ub = make_sink_part_ub_bn2()
+        if template == Tmpl.BN2 and d_align > 128:
+            y_ub = make_y_ub(v1w)
+            dy_ub = make_dy_ub(v1w)
+            nzp_ub = make_nzp_ub(v1w)
+            sfmg_ub = make_sfmg_ub(v1w)
+            lse_ub = make_lse_ub(v1w)
+            mask_ub = make_mask_view(v1w)
+            mask_pre_ub = make_mask_pre_view(v1w)
+            # gm_ws -> ws_load_ub -> muls_cast_vf -> ws_cast_ub -> gm_out
+            ws_load_ub = make_ws_load_f32_ub()
+            ws_cast_ub = make_ws_cast_f16_ub()
+            # BN2 192档使用，dK 从 L0C 搬到 UB，chunk0 → mm2_res、chunk1 → l0c_load_ub
+            l0c_load_ub = make_l0c_load_ub()
+            l0c_cast_ub = make_l0c_cast_ub()
+            sink_part_ub = make_sink_part_ub(v1w)
+            runInfos = make_run_infos_2()
+            sched = pl.make_tuple(
+                meta=meta,
+                fagOff=fagOff,
+                cBlockIdx=cBlockIdx,
+                coreNum=coreNum,
+                cuQ=cu_q_tensor,
+                cuKv=cu_kv_tensor,
+                usedQ=used_q_tensor,
+                usedKv=used_kv_tensor,
+                blockStart=blockStart,
+                blockEnd=blockEnd,
+                numBlocks=numBlocks,
+                subIdx=subIdx,
+                dv_align=dv_align,
+                v1w=v1w,
+            )
+            gm = pl.make_tuple(
+                tensor_y=tensor_y,
+                tensor_dy=tensor_dy,
+                tensor_lse=tensor_lse,
+                tensor_mask=tensor_mask,
+                tensor_dq_out=tensor_dq_out,
+                tensor_dk_out=tensor_dk_out,
+                tensor_dv_out=tensor_dv_out,
+                tensor_dq_ws=tensor_dq_ws,
+                tensor_dk_ws=tensor_dk_ws,
+                tensor_dv_ws=tensor_dv_ws,
+                tensor_sinks=tensor_sinks,
+                tensor_dsink_ws=tensor_dsink_ws,
+            )
+            buf = pl.make_tuple(
+                mm1_res=mm1_res,
+                mm2_res=mm2_res,
+                y_ub=y_ub,
+                dy_ub=dy_ub,
+                nzp_ub=nzp_ub,
+                sfmg_ub=sfmg_ub,
+                lse_ub=lse_ub,
+                sink_part_ub=sink_part_ub,
+                mask_ub=mask_ub,
+                mask_pre_ub=mask_pre_ub,
+                ws_load_ub=ws_load_ub,
+                ws_cast_ub=ws_cast_ub,
+                l0c_cast_ub=l0c_cast_ub,
+                l0c_load_ub=l0c_load_ub,
+                ds_l1=ds_l1,
+                p_l1=p_l1,
+            )
+            _run_preload2_vector_bn2(constInfo, sched, gm, buf, runInfos, sink)
+        elif template == Tmpl.BN2:
+            # narrow：d==dv 由 host 门 Bn2FamilyFeasible 保证，故 v1w == d_align。
+            # 这里一律传 d_align（tilingkey 常量）而不是 v1w：pypto 的定值分析认为
+            # v1w 在本分支「可能未定义」（旧代码此分支传的是常量 HEAD_DIM_ALIGN，
+            # 所以没暴露过），会报 NameNotFound: __inline_0_v1w。
+            # 地址档由各工厂内部按 template/d_align 判成 HEAD_DIM_ALIGN。
+            y_ub = make_y_ub(d_align)
+            dy_ub = make_dy_ub(d_align)
+            nzp_ub = make_nzp_ub(d_align)
+            sfmg_ub = make_sfmg_ub(d_align)
+            lse_ub = make_lse_ub(d_align)
+            mask_ub = make_mask_view(d_align)
+            mask_pre_ub = make_mask_pre_view(d_align)
+            l0c_cast_ub = make_l0c_cast_ub()
+            # 同上：narrow 不实际使用，但 buf 字段要齐（函数顶部无条件 unpack）
+            l0c_load_ub = make_l0c_load_ub()
+            ws_cast_ub = make_ws_cast_f16_ub()
+            sink_part_ub = make_sink_part_ub(d_align)
             runInfos = make_run_infos_2()
             sched = pl.make_tuple(
                 meta=meta,
@@ -1047,7 +1190,9 @@ def flash_attn_grad_preload2(
                 sink_part_ub=sink_part_ub,
                 mask_ub=mask_ub,
                 mask_pre_ub=mask_pre_ub,
-                cast_ub=cast_ub,
+                ws_cast_ub=ws_cast_ub,
+                l0c_cast_ub=l0c_cast_ub,
+                l0c_load_ub=l0c_load_ub,
                 ds_l1=ds_l1,
                 p_l1=p_l1,
             )
@@ -1198,11 +1343,12 @@ def flash_attn_grad_preload2(
                         tensor_dsink_ws,
                         tensor_dsink_out,
                         sink_red_ub.current(),
-                        sink_row_ub.current(),
+                        sink_row_ub,
                         constInfo.aivCount,
                     )
     if template == Tmpl.BN2:
-        # BN2 writes dQ/dK/dV directly; only dsink needs a global reduction.
+        # BN2 没有全局 workspace post：dQ/dK/dV 都在本核内联 scale/cast 落盘；
+        # 只有 dsink 需要一次全局归约。
         if sink == 1:
             pl.system.sync_all()
             with pl.section_vector():
@@ -1214,6 +1360,6 @@ def flash_attn_grad_preload2(
                         tensor_dsink_ws,
                         tensor_dsink_out,
                         sink_red_ub.current(),
-                        sink_row_ub.current(),
+                        sink_row_ub,
                         constInfo.aivCount,
                     )

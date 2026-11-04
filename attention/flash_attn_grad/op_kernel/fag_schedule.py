@@ -37,6 +37,7 @@ from fag_deter_tnd_dense import (
     tnd_dense_gidx,
 )
 from fag_deter_tnd_sparse import init_tnd_sparse_schedule, tnd_sparse_gidx
+from fag_tiling import Tmpl
 # --- end generated imports ---
 
 
@@ -632,6 +633,9 @@ def set_run_info(
     s2Real = pl.min(CUBE_BASEN, sk - runInfo.s2oIdx * CUBE_BASEN)
     runInfo.s1RealSize = s1Real
     runInfo.s2RealSize = s2Real
+    # dK/dV 的 DualModeSplitM 按这一列的有效行对半。vec0 拿这么多行，
+    # vec1 的 GM 行偏移也是它。两个子核各自算自己的 runInfo。
+    runInfo.firstHalfS2RealSize = (s2Real + 1) // 2
 
     # vector 侧两个子核各承担半个 S1：
     # subIdx=0 取 firstHalf，subIdx=1 取剩余部分
@@ -681,8 +685,7 @@ def set_run_info(
     runInfo.gIdx = index
     runInfo.dqFirst = 1
     runInfo.dqLast = 1
-    if is_bn2_multiblk == 1:
-        check_s1_range_in_bn2(constInfo, runInfo)
+    set_bn2_s2_range(constInfo, runInfo)
 
 
 def padded_sequence_length(used_tensor, batch, has_used, physical_length):
@@ -1022,6 +1025,7 @@ def _set_run_info_tnd_varlen(
     s2Real = pl.max(pl.min(CUBE_BASEN, batchS2Len - runInfo.s2oIdx * CUBE_BASEN), 0)
     runInfo.s1RealSize = s1Real
     runInfo.s2RealSize = s2Real
+    runInfo.firstHalfS2RealSize = (s2Real + 1) // 2
     runInfo.halfS1RealSize = pl.max(
         pl.min(s1Real - subIdx * VECTOR_BASEM, VECTOR_BASEM), 0
     )
@@ -1056,13 +1060,19 @@ def _set_run_info_tnd_varlen(
     runInfo.gIdx = index
     runInfo.dqFirst = 1
     runInfo.dqLast = 1
-    if is_bn2_multiblk == 1:
-        # Host permits BN2 only when both Q and KV are uniformly sized.
-        check_s1_range_in_bn2(constInfo, runInfo)
+    set_bn2_s2_range(constInfo, runInfo)
 
 
-def check_s1_range_in_bn2(constInfo, runInfo):
-    """本 s1 列的首/末有效 s2 块。"""
+def set_bn2_s2_range(constInfo, runInfo):
+    """本 s1 列的首/末有效 s2 块（``dqFirst``/``dqLast``）。
+
+    只有 BN2 的 MultiBlk 需要逐 s2 判首/末；其它模板/单块档保持默认 1，直接返回。
+    Host 只在 Q/KV 等长时才选 BN2，故这里可以按 uniform s1/s2 算。
+    """
+    if template != Tmpl.BN2:
+        return
+    if is_bn2_multiblk != 1:
+        return
     s2o = runInfo.s2oIdx
     s1o = runInfo.s1oIdx
     nextLeft = (s2o + 1) * CUBE_BASEN

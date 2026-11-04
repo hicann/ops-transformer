@@ -157,7 +157,12 @@ class FlashAttnGradTilingKey:
             # GM 排布与 BSND 四维视图逐元素重合，lse 由 TND 2D 视图装载。
             # 变长 TND 被 host 挡在 GS1S2；is_valid 无从区分等长/变长，契约由
             # route 保证。0930 bisect-sink 定案移植。
-            if d_align == 192 or d_align == 256 or d_align == 768 or swizzle != 0:
+            # BN2 禁 swizzle。所有 D 档都编：64/128 走 16-bit 直出（mm1/mm2 UB
+            # + v5/v6）；192/256/768 走 BN2 自己的 per-D 分块 workspace + 内联
+            # cast（不用 GS1S2 的全局 pre/post）：192 只有 dQ 走 workspace
+            # （dK/dV 驻留 L0C），256 走 dQ/dK（dV 驻留 L0C），768 三段全走。
+            # D==Dv 由 host/AICPU 保证。
+            if swizzle != 0:
                 return False
             if d_align != dv_align:
                 return False

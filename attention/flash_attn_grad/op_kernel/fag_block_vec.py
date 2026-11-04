@@ -28,13 +28,18 @@ import pypto_pro.language as pl
 # --- generated imports (fag_fiximports.py) ---
 from fag_common import (
     CUBE_BASEM,
+    D_CHUNK_MAXW,
+    SINK_REDUCE_BATCH,
+    D_NCHUNKS,
     NZP_ROWS,
     VECTOR_BASEM,
     VECTOR_BASEN,
     VF_LANES,
     VF_LANES_F16,
+    chunk_off,
+    chunk_valid_d,
 )
-from fag_mem import BN2_CAST_W, POST_ELEMS, PRE_ELEMS
+from fag_mem import POST_ELEMS, PRE_ELEMS
 from fag_vector_api import (
     broadcast_sub_mul_cast_vf,
     cast_p_vf,
@@ -345,20 +350,49 @@ def process_sink_partial(
 def process_sink_reduce(
     constInfo, tensor_slots, tensor_dsink, acc_ub, row_ub, aiv_count
 ):
-    """AIV0 按行序把各 AIV 的 dsink 部分和加到输出。"""
+    """AIV0 按行序把各 AIV 的 dsink 部分和加到输出。
+
+    ``row_ub`` 是 SINK_REDUCE_BATCH 个独立的 1 行 tile：每批发 BATCH 次 load
+    （偏移与原逐行版完全相同，不依赖任何行距假设），只等 1 次 bar_mte2。
+    实测逐行版每次 load 后都排空流水，aivCount=72 时这一项占 sink 固定开销
+    13.8us 里的 7.5us。
+    """
+    row0 = row_ub[0].current()
+    row1 = row_ub[1].current()
+    row2 = row_ub[2].current()
+    row3 = row_ub[3].current()
     n1Size = constInfo.n1Size
     nsegs = VECTOR_BASEN // VF_LANES
     nChunks = (n1Size + VECTOR_BASEN - 1) // VECTOR_BASEN
+    nRest = aiv_count - 1
+    nBatch = (nRest + SINK_REDUCE_BATCH - 1) // SINK_REDUCE_BATCH
     for c in pl.range(0, nChunks):
         w = pl.min(VECTOR_BASEN, n1Size - c * VECTOR_BASEN)
         pl.set_validshape(acc_ub, [1, w])
         pl.load(acc_ub, tensor_slots, [0, c * VECTOR_BASEN])
         pl.system.bar_mte2()
-        for r in pl.range(1, aiv_count):
-            pl.set_validshape(row_ub, [1, w])
-            pl.load(row_ub, tensor_slots, [0, r * n1Size + c * VECTOR_BASEN])
+        for b in pl.range(0, nBatch):
+            r0 = 1 + b * SINK_REDUCE_BATCH
+            k = pl.min(SINK_REDUCE_BATCH, aiv_count - r0)
+            pl.set_validshape(row0, [1, w])
+            pl.load(row0, tensor_slots, [0, (r0 + 0) * n1Size + c * VECTOR_BASEN])
+            if k > 1:
+                pl.set_validshape(row1, [1, w])
+                pl.load(row1, tensor_slots, [0, (r0 + 1) * n1Size + c * VECTOR_BASEN])
+            if k > 2:
+                pl.set_validshape(row2, [1, w])
+                pl.load(row2, tensor_slots, [0, (r0 + 2) * n1Size + c * VECTOR_BASEN])
+            if k > 3:
+                pl.set_validshape(row3, [1, w])
+                pl.load(row3, tensor_slots, [0, (r0 + 3) * n1Size + c * VECTOR_BASEN])
             pl.system.bar_mte2()
-            dsink_reduce_add_vf(acc_ub, row_ub, nsegs)
+            dsink_reduce_add_vf(acc_ub, row0, nsegs)
+            if k > 1:
+                dsink_reduce_add_vf(acc_ub, row1, nsegs)
+            if k > 2:
+                dsink_reduce_add_vf(acc_ub, row2, nsegs)
+            if k > 3:
+                dsink_reduce_add_vf(acc_ub, row3, nsegs)
         pl.set_validshape(acc_ub, [1, w])
         pl.store(tensor_dsink, acc_ub, [0, c * VECTOR_BASEN])
 
@@ -461,110 +495,97 @@ def process_post(tensor_ws, tensor_out, f32_ub, f16_ub, scale, elemStart, nElems
 # ==================================================================
 
 
-def process_vec1_bn2(
-    constInfo, runInfo, subIdx, tensor_y, tensor_dy, y_ub, dy_ub, sfmg_ub, rowStride
+def muls_cast_ub_out(
+    tensor_out, src_ub, dst_ub, idx0, row, idx2, rows, scale, dim_size, d_off=0
 ):
-    loadRows = _vector_load_rows(constInfo, runInfo)
-    pl.set_validshape(y_ub, [loadRows, constInfo.dSize])
-    pl.set_validshape(dy_ub, [loadRows, constInfo.dSize])
-    pl.load(
-        y_ub,
-        tensor_y,
-        [runInfo.idx0Q, runInfo.loadBase, runInfo.idx2Q, 0],
+    """UB 里的 fp32 结果 → Muls(scale) + Cast → out GM。
+
+    整块 ``[VECTOR_BASEM, VECTOR_BASEN]`` 一次 cast，再按 ``rows``/``dim_size``
+    收窄落盘。BN2 narrow 的 v5/v6 与 192 档 dK 的每个 D 分块（``d_off`` 指定列
+    区间）都用这条；行区间由调用点算（``halfS1RealSize`` / ``firstHalfS2RealSize``，
+    DualModeSplitM 的切点不能钉 64）。
+    """
+    if rows <= 0:
+        return
+    pl.set_validshape(src_ub, [VECTOR_BASEM, VECTOR_BASEN])
+    pl.set_validshape(dst_ub, [VECTOR_BASEM, VECTOR_BASEN])
+    muls_cast_vf(dst_ub, src_ub, scale, VECTOR_BASEM * VECTOR_BASEN // VF_LANES_F16)
+    pl.set_validshape(dst_ub, [rows, dim_size])
+    pl.store(
+        tensor_out,
+        dst_ub,
+        [idx0, row, idx2, d_off],
         order=[1, 3],
+        atomic=pl.AtomicType.AtomicNone,
     )
-    pl.load(
-        dy_ub,
-        tensor_dy,
-        [runInfo.idx0Q, runInfo.loadBase, runInfo.idx2Q, 0],
-        order=[1, 3],
-    )
-    softmax_grad_front_row_vf(
-        sfmg_ub,
-        y_ub,
-        dy_ub,
-        runInfo.halfS1RealSize,
-        runInfo.rowShift,
-        rowStride,
-        constInfo.dvEvenSize,
-        constInfo.dvOddSize,
-    )
+    pl.set_validshape(dst_ub, [VECTOR_BASEM, VECTOR_BASEN])
 
 
-def process_vec3_bn2(
-    constInfo, runInfo, subIdx, ds_l1, mm1_ub, mm2_ub, sfmg_ub, nzp_ub
+def muls_cast_ws_out(
+    tensor_out,
+    tensor_ws,
+    ws_load_ub,
+    ws_cast_ub,
+    idx0,
+    row,
+    idx2,
+    rows,
+    scale,
+    dim_size,
 ):
-    """dS 与 BN2GS1S2 用同一个 VF：都不乘 scale。
+    """4D fp32 workspace → 逐 D 分块 load → Muls(scale) + Cast → out GM。
 
-    scale 在 mm3/mm4 之后由 v5/v6 的 Muls+Cast 施加。dV 不经过 dS，不乘 scale。
+    BN2 wide（d_align>128）：dQ 三档、dK 256/768、dV 768。cube 侧用
+    ``dqFirst``/``dkvAcc`` 保证首写 AtomicNone，故这里不需要 pre 清零，也没有
+    全局 post。整块 cast（chunk=96/128 列）让 16-bit 行宽达到 192B/256B。
     """
-    rowOff = subIdx * VECTOR_BASEM
-    broadcast_sub_mul_cast_vf(
-        nzp_ub, mm1_ub, mm2_ub, sfmg_ub, constInfo.scaleValue, VECTOR_BASEM
-    )
-    copy_ub2l1(ds_l1, nzp_ub, rowOff)
-
-
-def process_muls_cast_dq_bn2(tensor_dq, src_ub, dst_ub, constInfo, runInfo, subIdx):
-    """v5：mm3 的 fp32 UB → muls(scale) → cast 16-bit → dQ GM。
-
-    DualModeSplitM 在第 64 行切开，子核 0/1 各拿半块 S1。
-    """
-    rows = runInfo.halfS1RealSize
-    pl.set_validshape(src_ub, [VECTOR_BASEM, BN2_CAST_W])
-    pl.set_validshape(dst_ub, [VECTOR_BASEM, BN2_CAST_W])
-    muls_cast_vf(
-        dst_ub, src_ub, constInfo.scaleValue, VECTOR_BASEM * BN2_CAST_W // VECTOR_BASEN
-    )
-    if rows > 0:
-        seqOff = runInfo.queryOffset + subIdx * VECTOR_BASEM
-        pl.set_validshape(dst_ub, [rows, constInfo.dSize])
-        pl.store(
-            tensor_dq,
-            dst_ub,
-            [runInfo.idx0Q, seqOff, runInfo.idx2Q, 0],
-            order=[1, 3],
-            atomic=pl.AtomicType.AtomicNone,
-        )
-        pl.set_validshape(dst_ub, [VECTOR_BASEM, BN2_CAST_W])
-
-
-def process_muls_cast_dk_bn2(tensor_dk, src_ub, dst_ub, constInfo, runInfo, subIdx):
-    """v6：mm4 的 fp32 UB → muls(scale) → cast 16-bit → dK GM。"""
-    rowOff = subIdx * VECTOR_BASEM
-    rows = pl.max(pl.min(runInfo.s2RealSize - rowOff, VECTOR_BASEM), 0)
-    pl.set_validshape(src_ub, [VECTOR_BASEM, BN2_CAST_W])
-    pl.set_validshape(dst_ub, [VECTOR_BASEM, BN2_CAST_W])
-    muls_cast_vf(
-        dst_ub, src_ub, constInfo.scaleValue, VECTOR_BASEM * BN2_CAST_W // VECTOR_BASEN
-    )
-    if rows > 0:
-        seqOff = runInfo.keyOffset + rowOff
-        pl.set_validshape(dst_ub, [rows, constInfo.dSize])
-        pl.store(
-            tensor_dk,
-            dst_ub,
-            [runInfo.idx0KV, seqOff, runInfo.idx2KV, 0],
-            order=[1, 3],
-            atomic=pl.AtomicType.AtomicNone,
-        )
-        pl.set_validshape(dst_ub, [VECTOR_BASEM, BN2_CAST_W])
+    if rows <= 0:
+        return
+    tile_w = D_CHUNK_MAXW[d_align]
+    nSegs = tile_w * VECTOR_BASEM // VF_LANES_F16
+    for i in pl.range(0, D_NCHUNKS[d_align]):
+        dOff = chunk_off(i)
+        w = chunk_valid_d(dim_size, i)
+        if w > 0:
+            pl.set_validshape(ws_load_ub, [rows, w])
+            pl.set_validshape(ws_cast_ub, [rows, w])
+            pl.load(ws_load_ub, tensor_ws, [idx0, row, idx2, dOff], order=[1, 3])
+            muls_cast_vf(ws_cast_ub, ws_load_ub, scale, nSegs)
+            pl.store(
+                tensor_out,
+                ws_cast_ub,
+                [idx0, row, idx2, dOff],
+                order=[1, 3],
+                atomic=pl.AtomicType.AtomicNone,
+            )
+    pl.set_validshape(ws_load_ub, [VECTOR_BASEM, tile_w])
+    pl.set_validshape(ws_cast_ub, [VECTOR_BASEM, tile_w])
 
 
 def process_dq_multiblk(
     tensor_dq, tensor_dq_ws, src_ub, dst_ub, constInfo, runInfo, subIdx, cBlockIdx
 ):
-    """只在 isLastS1Outer 从 workspace load。
+    """只在本 s1 列的最后一个有效 s2 块（``dqLast``）从 per-core 2D 条带 load。
 
-    累加已由 cube 按 needAtomic 写在 GM 上。src_ub 是 load 缓冲。
+    累加已由 cube 按 needAtomic 写在 workspace 上。src_ub 是 load 缓冲。
     """
     rows = runInfo.halfS1RealSize
     rowOff = (
         cBlockIdx * constInfo.s1Outer + runInfo.s1oIdx
     ) * CUBE_BASEM + subIdx * VECTOR_BASEM
-    pl.set_validshape(src_ub, [VECTOR_BASEM, BN2_CAST_W])
+    pl.set_validshape(src_ub, [VECTOR_BASEM, VECTOR_BASEN])
     if rows > 0:
         pl.set_validshape(src_ub, [rows, constInfo.dSize])
         pl.load(src_ub, tensor_dq_ws, [rowOff, 0])
-        pl.set_validshape(src_ub, [VECTOR_BASEM, BN2_CAST_W])
-    process_muls_cast_dq_bn2(tensor_dq, src_ub, dst_ub, constInfo, runInfo, subIdx)
+        pl.set_validshape(src_ub, [VECTOR_BASEM, VECTOR_BASEN])
+    muls_cast_ub_out(
+        tensor_dq,
+        src_ub,
+        dst_ub,
+        runInfo.idx0Q,
+        runInfo.queryOffset + subIdx * VECTOR_BASEM,
+        runInfo.idx2Q,
+        rows,
+        constInfo.scaleValue,
+        constInfo.dSize,
+    )
