@@ -232,7 +232,7 @@ aclnnStatus aclnnQuantCompressor(
       <td>stateBlockTableOptional (const aclTensor*)</td>
       <td>Optional input</td>
       <td>Indicates the block mapping table used for state_cache storage.</td>
-      <td><ul><li>When cacheMode=1, the shape is [B, ceil(Smax/block_size)], where Smax is the maximum Sequence Length for each Batch. If the shape of x is [B,S,H], Smax=max(startPosOptional)+S. If the shape of x is [T,H], Smax=max(startPosOptional)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n]).</li><li>When cacheMode=2, the shape is [B].</li></ul></td>
+      <td><ul><li>When cacheMode=1, the shape is [B, ceil(Smax/block_size)], where Smax is the maximum Sequence Length for each Batch. If the shape of x is [B,S,H], Smax=max(startPosOptional)+S. If the shape of x is [T,H], Smax=max(startPosOptional)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n]).</li><li>When cacheMode=2, the shape is [B].</li><li>In the cacheMode=1/2 scenarios supported by the current operator, this parameter is mandatory.</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>When cacheMode=1: [B, ceil(Smax/block_size)]<br>When cacheMode=2: [B]</td>
@@ -322,7 +322,7 @@ aclnnStatus aclnnQuantCompressor(
       <td>cmpKvOut(aclTensor*)</td>
       <td>Output</td>
       <td>Indicates the compressed data.</td>
-      <td>Supports empty tensors with B=0, S=0, T=0.</td>
+      <td><ul><li>Supports empty tensors with B=0, S=0, T=0.</li><li>The content of the pad rows at the tail that do not form a complete compression group is undefined (the operator does not write them, and the memory content before the call is retained). The caller should consume only the valid compressed rows.</li></ul></td>
       <td>BFLOAT16</td>
       <td>ND</td>
       <td>BS axis combination: [min(T,T//cmp_ratio+B),D]; BS non-axis combination: [B,ceil(S/cmp_ratio),D]</td>
@@ -354,7 +354,7 @@ aclnnStatus aclnnQuantCompressor(
 
     aclnnStatus: return status code, for details see [aclnn return code](../../../docs/en/context/aclnn_return_code.md).
 
-    The first-phase API performs input parameter validation and returns an error in the following scenarios:
+    When the first-phase API performs parameter validation and tiling, the following errors may be returned:
 
     <table style="undefined;table-layout: fixed;width: 1155px"><colgroup>
     <col style="width: 319px">
@@ -377,7 +377,7 @@ aclnnStatus aclnnQuantCompressor(
         <tr>
           <td>ACLNN_ERR_PARAM_INVALID</td>
           <td>161002</td>
-          <td>The shape (dimension/size) or dtype (data type) of the input parameter is not supported by the API.</td>
+          <td>The dtype (data type) of the input parameter is not supported by the API.</td>
         </tr>
         <tr>
           <td>ACLNN_ERR_RUNTIME_ERROR</td>
@@ -387,7 +387,7 @@ aclnnStatus aclnnQuantCompressor(
         <tr>
           <td>ACLNN_ERR_INNER_TILING_ERROR</td>
           <td>561002</td>
-          <td>An exception occurs during tiling. The dtype or shape of the input parameter is incorrect.</td>
+          <td>An exception occurs during tiling: the shape (dimension/size), attribute value, or the presence/absence of an optional input does not match the current configuration (for example, cuSeqlensOptional is passed with the BSH layout, or the descale input is missing when quantMode=1).</td>
         </tr>
       </tbody>
     </table>

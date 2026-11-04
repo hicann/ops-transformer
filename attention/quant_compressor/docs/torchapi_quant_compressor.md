@@ -121,7 +121,7 @@ cann_ops_transformer.quant_compressor(
 | x_descale | Tensor | 可选 | x的反量化缩放因子，per-tensor缩放。quant_mode=1时必选。不支持非连续，数据格式支持ND。 | float32 | [1,] |
 | wkv_descale | Tensor | 可选 | wkv的反量化缩放因子，per-channel缩放，通道数为coff\*D。quant_mode=1时必选。不支持非连续，数据格式支持ND。 | float32 | [coff\*D,] |
 | wgate_descale | Tensor | 可选 | wgate的反量化缩放因子，per-channel缩放，通道数为coff\*D。quant_mode=1时必选。不支持非连续，数据格式支持ND。 | float32 | [coff\*D,] |
-| state_block_table | Tensor | 可选 | state_cache存储使用的block映射表。不支持非连续，数据格式支持ND。 | int32 | cache_mode=1时，shape为[B,ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length，当x的shape为[B,S,H]时，Smax=max(start_pos)+S。当x的shape为[T,H]时，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，shape为[B] |
+| state_block_table | Tensor | 可选 | state_cache存储使用的block映射表。不支持非连续，数据格式支持ND。 | int32 | cache_mode=1时，shape为[B,ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length，当x的shape为[B,S,H]时，Smax=max(start_pos)+S。当x的shape为[T,H]时，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，shape为[B]。在当前算子支持的cachemode=1/2场景下，该参数为必选。|
 | cu_seqlens | Tensor | 可选 | 不同Batch上的有效token数。不支持非连续，数据格式支持ND。<br>当x的shape为[B,S,H]时，参数必须为空。<br>当x的shape为[T,H]时，输入shape必须为[B+1,]，该参数为前缀和数组，后一个元素≥前一个元素，第一位必须为0，最后一位必须为T。 | int32 | [B+1,] |
 | seqused | Tensor | 可选 | 不同Batch中实际参与压缩的token数。不支持非连续，数据格式支持ND。<br>指定为None时，数值等于每个Batch上的Sequence Length。<br>[B,S,H]场景：0 ≤ seqused[n] ≤ S<br>[T,H]场景：0 ≤ seqused[n] ≤ cu_seqlens[n+1] - cu_seqlens[n]。 | int32 | [B,] |
 | start_pos | Tensor | 可选 | 计算起始位置。不支持非连续，数据格式支持ND，输入为None时从0开始计算 | int32 | [B,] |
@@ -132,7 +132,7 @@ cann_ops_transformer.quant_compressor(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
 | ---- | ---- | ---- | ---- | ---- | ---- |
-| cmp_kv | Tensor | 必选 | 压缩后的数据。不支持非连续，数据格式支持ND；<br>当x的shape为[B,S,H]时，输出拼接：(\<batch0\>compressed_tokens+pad0) +  (\<batch1\>compressed_tokens+pad1) + ... +  (\<batchN\>compressed_tokens+padN)；<br>当x的shape为[T,H]时，输出拼接：\<batch0\>compressed_tokens + \<batch1\>compressed_tokens + ... + \<batchN\>compressed_tokens + pad。 | bfloat16 | x=[B,S,H]：[B,ceil(S/cmp_ratio),D]<br>x=[T,H]：[min(T,T//cmp_ratio+B),D] |
+| cmp_kv | Tensor | 必选 | 压缩后的数据。不支持非连续，数据格式支持ND；尾部不足一个完整压缩组的pad行内容未定义（算子不写入，保留调用前内存内容），调用方应只消费有效的压缩行。<br>当x的shape为[B,S,H]时，输出拼接：(\<batch0\>compressed_tokens+pad0) +  (\<batch1\>compressed_tokens+pad1) + ... +  (\<batchN\>compressed_tokens+padN)；<br>当x的shape为[T,H]时，输出拼接：\<batch0\>compressed_tokens + \<batch1\>compressed_tokens + ... + \<batchN\>compressed_tokens + pad。 | bfloat16 | x=[B,S,H]：[B,ceil(S/cmp_ratio),D]<br>x=[T,H]：[min(T,T//cmp_ratio+B),D] |
 
 ## 约束说明
 

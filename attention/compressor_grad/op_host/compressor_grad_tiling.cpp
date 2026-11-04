@@ -675,6 +675,14 @@ ge::graphStatus CompressorGradTilingImpl::CheckShapeConsistency() const
     uint8_t coff = coff_;
     auto coffD = baseParams_.headDim * coff;
     const char* opName = context_->opName;
+    // 段数维期望值：BSH 为 ceil(S/cmp_ratio)，TH 为 min(T, T/cmp_ratio + B)
+    uint32_t compressSeqSize = 0U;
+    if (context_->x.shape->GetStorageShape().GetDimNum() == COMPRESSOR_GRAD_DIM_NUM_2) {
+        compressSeqSize =
+            std::min(baseParams_.tokenSize, baseParams_.tokenSize / baseParams_.cmpRatio + baseParams_.batchSize);
+    } else {
+        compressSeqSize = (baseParams_.seqSize + baseParams_.cmpRatio - 1) / baseParams_.cmpRatio;
+    }
     // 公共部分：cuSeqlens/seqUsed/startPos + wkv/wgate 的 hiddenSize 和 coff*headDim
     const ShapeCheckItem commonChecks[] = {
         {"cuSeqlens", context_->cuSeqlens.shape, COMPRESSOR_GRAD_DIM_INDEX_0, "batchSize+1", baseParams_.batchSize + 1},
@@ -694,6 +702,10 @@ ge::graphStatus CompressorGradTilingImpl::CheckShapeConsistency() const
         context_->softmaxScore.shape->GetStorageShape().GetDimNum() == COMPRESSOR_GRAD_DIM_NUM_3 &&
         context_->kv.shape->GetStorageShape().GetDimNum() == COMPRESSOR_GRAD_DIM_NUM_3) {
         const ShapeCheckItem checks2D[] = {
+            {"dCmpKv", context_->dCmpKv.shape, COMPRESSOR_GRAD_DIM_INDEX_0, "min(T,T//cmp_ratio+B)", compressSeqSize},
+            {"softmaxScore", context_->softmaxScore.shape, COMPRESSOR_GRAD_DIM_INDEX_0, "min(T,T//cmp_ratio+B)",
+             compressSeqSize},
+            {"kv", context_->kv.shape, COMPRESSOR_GRAD_DIM_INDEX_0, "min(T,T//cmp_ratio+B)", compressSeqSize},
             {"dCmpKv", context_->dCmpKv.shape, COMPRESSOR_GRAD_DIM_INDEX_1, "headDim", baseParams_.headDim},
             {"softmaxScore", context_->softmaxScore.shape, COMPRESSOR_GRAD_DIM_INDEX_1, "coff*cmp_ratio",
              coff * baseParams_.cmpRatio},
@@ -711,6 +723,10 @@ ge::graphStatus CompressorGradTilingImpl::CheckShapeConsistency() const
         context_->softmaxScore.shape->GetStorageShape().GetDimNum() == COMPRESSOR_GRAD_DIM_NUM_4 &&
         context_->kv.shape->GetStorageShape().GetDimNum() == COMPRESSOR_GRAD_DIM_NUM_4) {
         const ShapeCheckItem checks3D[] = {
+            {"dCmpKv", context_->dCmpKv.shape, COMPRESSOR_GRAD_DIM_INDEX_1, "ceil(S/cmp_ratio)", compressSeqSize},
+            {"softmaxScore", context_->softmaxScore.shape, COMPRESSOR_GRAD_DIM_INDEX_1, "ceil(S/cmp_ratio)",
+             compressSeqSize},
+            {"kv", context_->kv.shape, COMPRESSOR_GRAD_DIM_INDEX_1, "ceil(S/cmp_ratio)", compressSeqSize},
             {"dCmpKv", context_->dCmpKv.shape, COMPRESSOR_GRAD_DIM_INDEX_0, "batchSize", baseParams_.batchSize},
             {"dCmpKv", context_->dCmpKv.shape, COMPRESSOR_GRAD_DIM_INDEX_2, "headDim", baseParams_.headDim},
             {"softmaxScore", context_->softmaxScore.shape, COMPRESSOR_GRAD_DIM_INDEX_0, "batchSize",

@@ -124,7 +124,7 @@ aclnnStatus aclnnCompressorGrad(
 
     aclnnStatus: return status code. For details, see [aclnn Return Codes](../../../docs/en/context/aclnn_return_code.md).
 
-    The first-phase API performs input parameter validation and returns an error in the following scenarios:
+    When the first-phase API performs parameter validation and tiling, the following errors may be returned:
 
     <table style="undefined;table-layout: fixed;width: 1155px"><colgroup>
     <col style="width: 319px">
@@ -147,7 +147,7 @@ aclnnStatus aclnnCompressorGrad(
         <tr>
           <td>ACLNN_ERR_PARAM_INVALID</td>
           <td>161002</td>
-          <td>The shape (dimension/size) or dtype (data type) of the input parameter is not within the range supported by the API.</td>
+          <td>The dtype (data type) of the input parameter is not supported by the API.</td>
         </tr>
         <tr>
           <td>ACLNN_ERR_RUNTIME_ERROR</td>
@@ -157,10 +157,12 @@ aclnnStatus aclnnCompressorGrad(
         <tr>
           <td>ACLNN_ERR_INNER_TILING_ERROR</td>
           <td>561002</td>
-          <td>An exception occurs during tiling. The dtype or shape of the input parameter is incorrect.</td>
+          <td>An exception occurs during tiling: the rank, shape (dimension/size), or attribute value of an input parameter, or the shape consistency between inputs, is not supported by the API.</td>
         </tr>
       </tbody>
     </table>
+
+    Validation layering: failures in the aclnn parameter validation layer (required null pointers, dtype, and so on) return 161001/161002; failures in the tiling-stage validation (rank, shape dimensions, shape consistency between inputs, attribute values, and so on) return 561002. The returned code depends on the validation stage actually reached.
 
 ## aclnnCompressorGrad
 

@@ -519,6 +519,11 @@ aclnnStatus aclnnMlaPrologV2WeightNz(
           <td>561002</td>
           <td>An exception occurs during tiling, and the dtype or shape of the input parameters is incorrect.</td>
         </tr>
+        <tr>
+          <td>ACLNN_ERR_INNER_NULLPTR</td>
+          <td>561103</td>
+          <td>An internal exception occurs and a null pointer is returned (for example, the API fails to create the placeholder tensor for an optional output).</td>
+        </tr>
       </tbody>
     </table>
 

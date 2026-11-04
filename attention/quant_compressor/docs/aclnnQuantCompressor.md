@@ -230,7 +230,7 @@ aclnnStatus aclnnQuantCompressor(
       <td>stateBlockTableOptional（const aclTensor*）</td>
       <td>可选输入</td>
       <td>表示state_cache存储使用的block映射表。</td>
-      <td><ul><li>cacheMode=1时，shape为[B, ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length。当x的shape为[B,S,H]时，Smax=max(startPosOptional)+S；当x的shape为[T,H]时，Smax=max(startPosOptional)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n])。</li><li>cacheMode=2时，shape为[B]。</li></ul></td>
+      <td><ul><li>cacheMode=1时，shape为[B, ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length。当x的shape为[B,S,H]时，Smax=max(startPosOptional)+S；当x的shape为[T,H]时，Smax=max(startPosOptional)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n])。</li><li>cacheMode=2时，shape为[B]。</li><li>在当前算子支持的cachemode=1/2场景下，该参数为必选。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>cacheMode=1时：[B, ceil(Smax/block_size)]<br>cacheMode=2时：[B]</td>
@@ -320,7 +320,7 @@ aclnnStatus aclnnQuantCompressor(
       <td>cmpKvOut（aclTensor*）</td>
       <td>输出</td>
       <td>表示压缩后的数据。</td>
-      <td>支持B=0,S=0,T=0的空Tensor。</td>
+      <td><ul><li>支持B=0,S=0,T=0的空Tensor。</li><li>尾部不足一个压缩组的pad行内容未定义（算子不写入，保留调用前内存内容），调用方应只消费有效的压缩行。</li></ul></td>
       <td>BFLOAT16</td>
       <td>ND</td>
       <td>BS合轴：[min(T,T//cmp_ratio+B),D]、BS非合轴：[B,ceil(S/cmp_ratio),D]</td>
@@ -352,7 +352,7 @@ aclnnStatus aclnnQuantCompressor(
 
     aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-    第一段接口完成入参校验，出现以下场景时报错：
+    第一段接口执行参数校验与tiling时，出现以下场景时报错：
 
     <table style="undefined;table-layout: fixed;width: 1155px"><colgroup>
     <col style="width: 319px">
@@ -375,7 +375,7 @@ aclnnStatus aclnnQuantCompressor(
         <tr>
           <td>ACLNN_ERR_PARAM_INVALID</td>
           <td>161002</td>
-          <td>输入参数的shape（维度/尺寸）、dtype（数据类型）不在接口支持的范围内。</td>
+          <td>输入参数的数据类型（dtype）不在接口支持的范围内。</td>
         </tr>
         <tr>
           <td>ACLNN_ERR_RUNTIME_ERROR</td>
@@ -385,7 +385,7 @@ aclnnStatus aclnnQuantCompressor(
         <tr>
           <td>ACLNN_ERR_INNER_TILING_ERROR</td>
           <td>561002</td>
-          <td>tiling发生异常，入参的dtype类型或者shape错误。</td>
+          <td>tiling发生异常：入参的shape（维度/尺寸）、属性值或可选输入的传入/缺失与当前配置不匹配（如cuSeqlensOptional在BSH布局下被传入、quantMode=1时descale缺失）。</td>
         </tr>
       </tbody>
     </table>

@@ -10,6 +10,7 @@
 #include <cstring>
 #include "graph/types.h"
 #include "aclnn_mla_prolog_v2_weight_nz.h"
+#include "log/log.h"
 #include "opdev/make_op_executor.h"
 #include "opdev/op_dfx.h"
 #include "opdev/op_executor.h"
@@ -86,6 +87,44 @@ private:
     std::string name_;
 };
 
+struct RequiredTensor {
+    const aclTensor* tensor;
+    const char* name;
+};
+
+aclnnStatus CheckRequiredTensorsNotNull(const aclTensor* tokenX, const aclTensor* weightDq, const aclTensor* weightUqQr,
+                                        const aclTensor* weightUk, const aclTensor* weightDkvKr,
+                                        const aclTensor* rmsnormGammaCq, const aclTensor* rmsnormGammaCkv,
+                                        const aclTensor* ropeSin, const aclTensor* ropeCos, const aclTensor* cacheIndex,
+                                        const aclTensor* kvCacheRef, const aclTensor* krCacheRef,
+                                        const aclTensor* queryOut, const aclTensor* queryRopeOut)
+{
+    const RequiredTensor requiredTensors[] = {
+        {tokenX, "tokenX"},
+        {weightDq, "weightDq"},
+        {weightUqQr, "weightUqQr"},
+        {weightUk, "weightUk"},
+        {weightDkvKr, "weightDkvKr"},
+        {rmsnormGammaCq, "rmsnormGammaCq"},
+        {rmsnormGammaCkv, "rmsnormGammaCkv"},
+        {ropeSin, "ropeSin"},
+        {ropeCos, "ropeCos"},
+        {cacheIndex, "cacheIndex"},
+        {kvCacheRef, "kvCacheRef"},
+        {krCacheRef, "krCacheRef"},
+        {queryOut, "queryOut"},
+        {queryRopeOut, "queryRopeOut"},
+    };
+    for (const auto& requiredTensor : requiredTensors) {
+        if (requiredTensor.tensor == nullptr) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("MlaPrologV2", requiredTensor.name, "null",
+                                                  "this parameter is required under current configuration");
+            return ACLNN_ERR_PARAM_NULLPTR;
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+
 aclnnStatus aclnnMlaPrologV2WeightNzGetWorkspaceSize(
     const aclTensor* tokenX, const aclTensor* weightDq, const aclTensor* weightUqQr, const aclTensor* weightUk,
     const aclTensor* weightDkvKr, const aclTensor* rmsnormGammaCq, const aclTensor* rmsnormGammaCkv,
@@ -110,19 +149,18 @@ aclnnStatus aclnnMlaPrologV2WeightNzGetWorkspaceSize(
                 "We apologize for any inconvenience caused and appreciate your timely migration to the new interface.");
         isFirstCall = false;
     }
+    aclnnStatus checkRet = CheckRequiredTensorsNotNull(tokenX, weightDq, weightUqQr, weightUk, weightDkvKr,
+                                                       rmsnormGammaCq, rmsnormGammaCkv, ropeSin, ropeCos, cacheIndex,
+                                                       kvCacheRef, krCacheRef, queryOut, queryRopeOut);
+    if (checkRet != ACLNN_SUCCESS) {
+        return checkRet;
+    }
+
     auto dequantScaleQNopeHolder =
         TensorHolder(dequantScaleQNopeOutOptional, aclDataType::ACL_FLOAT, std::string("dequantScaleQNopeOut"));
     if (dequantScaleQNopeOutOptional == nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "Failed to create the holder of tensor dequantScaleQNopeOut!");
-        return ge::GRAPH_FAILED;
-    }
-    if (tokenX == nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "tokenX cannot be null!");
-        return ge::GRAPH_FAILED;
-    }
-    if (kvCacheRef == nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "kvCacheRef cannot be null!");
-        return ge::GRAPH_FAILED;
+        OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Failed to create the holder of tensor dequantScaleQNopeOut!");
+        return ACLNN_ERR_INNER_NULLPTR;
     }
     dequantScaleQNopeHolder.CheckTensorConditionalNotNull(tokenX->GetDataType() == ge::DT_INT8 &&
                                                           kvCacheRef->GetDataType() == ge::DT_INT8);

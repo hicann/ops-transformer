@@ -551,6 +551,11 @@ aclnnStatus aclnnMlaPrologV2WeightNz(
           <td>561002</td>
           <td>tiling发生异常，入参的dtype类型或者shape错误。</td>
         </tr>
+        <tr>
+          <td>ACLNN_ERR_INNER_NULLPTR</td>
+          <td>561103</td>
+          <td>接口内部发生异常，出现空指针（例如为可选输出创建占位张量失败）。</td>
+        </tr>
       </tbody>
     </table>
 

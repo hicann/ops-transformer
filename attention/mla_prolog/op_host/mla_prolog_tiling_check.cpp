@@ -377,6 +377,14 @@ ge::graphStatus MlaPrologTilingCheck::CheckDtileSize() const
             }
             return ge::GRAPH_FAILED;
         }
+    } else {
+        // MlaProlog / MlaPrologV2 的 kvCache 尾轴恒为 Hckv（不支持 pertile 量化），
+        // dtileSize 直接取自 kvCache 尾轴，必须与权重推导出的 Hckv 一致，否则会越界写。
+        OP_CHECK_IF(baseShapeInfo_.dtileSize != baseShapeInfo_.hckvSize,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        context_.opName, "dtileSize", std::to_string(baseShapeInfo_.dtileSize),
+                        "the last dim of kvCache (Dtile) must equal Hckv = " + std::to_string(baseShapeInfo_.hckvSize)),
+                    return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }

@@ -248,8 +248,8 @@ TEST_F(CompressorGradTilingTest, th_c4a_bf16)
             {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND}, // wkv
             {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND}, // wgate
             {{{4, 512}, {4, 512}}, ge::DT_BF16, ge::FORMAT_ND},         // d_cmp_kv (cmpKvRows, D)
-            {{{2, 8, 512}, {2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},  // softmax_score (B, coff*cmpRatio, D)
-            {{{2, 8, 512}, {2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},  // kv (B, coff*cmpRatio, D)
+            {{{4, 8, 512}, {4, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},  // softmax_score (cmpKvRows, coff*cmpRatio, D)
+            {{{4, 8, 512}, {4, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},  // kv (cmpKvRows, coff*cmpRatio, D)
             {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND},                  // cu_seqlens
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                    // seqused
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                    // start_pos
@@ -280,8 +280,8 @@ TEST_F(CompressorGradTilingTest, th_c4a_fp16)
                                                   {{{1024, 4096}, {1024, 4096}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                                   {{{1024, 4096}, {1024, 4096}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                                   {{{4, 512}, {4, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                  {{{2, 8, 512}, {2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                  {{{2, 8, 512}, {2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{4, 8, 512}, {4, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{4, 8, 512}, {4, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                                   {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND},
                                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
                                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
@@ -483,5 +483,36 @@ TEST_F(CompressorGradTilingTest, err_empty_x_tensor)
                                                   {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
                                               },
                                               &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 0);
+}
+
+// dCmpKv/softmaxScore/kv 的段数维与 ceil(S/cmp_ratio) 不一致：同步扩大到 3 也应被拒绝
+TEST_F(CompressorGradTilingTest, err_bsh_segment_dim_mismatch)
+{
+    optiling::CompressorGradCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "CompressorGrad",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},      // x
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},      // wkv
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},      // wgate
+            {{{2, 3, 512}, {2, 3, 512}}, ge::DT_BF16, ge::FORMAT_ND},        // d_cmp_kv (illegal segment dim)
+            {{{2, 3, 8, 512}, {2, 3, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
+            {{{2, 3, 8, 512}, {2, 3, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cu_seqlens
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // seqused
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // start_pos
+        },
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND}, // d_x
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND}, // d_wkv
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND}, // d_wgate
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},      // d_ape
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+        },
+        &compileInfo, "Ascend950", CompressorGrad_tiling_A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 0);
 }

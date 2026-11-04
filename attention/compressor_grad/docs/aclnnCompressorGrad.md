@@ -122,7 +122,7 @@ aclnnStatus aclnnCompressorGrad(
 
     aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-    第一段接口完成入参校验，出现以下场景时报错：
+    第一段接口执行参数校验与tiling时，出现以下场景时报错：
 
     <table style="undefined;table-layout: fixed;width: 1155px"><colgroup>
     <col style="width: 319px">
@@ -145,7 +145,7 @@ aclnnStatus aclnnCompressorGrad(
         <tr>
           <td>ACLNN_ERR_PARAM_INVALID</td>
           <td>161002</td>
-          <td>输入参数的shape（维度/尺寸）、dtype（数据类型）不在接口支持的范围内。</td>
+          <td>输入参数的数据类型（dtype）不在接口支持的范围内。</td>
         </tr>
         <tr>
           <td>ACLNN_ERR_RUNTIME_ERROR</td>
@@ -155,10 +155,12 @@ aclnnStatus aclnnCompressorGrad(
         <tr>
           <td>ACLNN_ERR_INNER_TILING_ERROR</td>
           <td>561002</td>
-          <td>tiling发生异常，入参的dtype类型或者shape错误。</td>
+          <td>tiling发生异常：输入参数的rank、shape（维度/尺寸）、属性值，或输入间的shape一致性不在接口支持的范围内。</td>
         </tr>
       </tbody>
     </table>
+
+    校验分层说明：aclnn参数校验层（必选参数空指针、dtype等）失败返回161001/161002；tiling阶段校验（rank、shape维度、输入间shape一致性、属性值等）失败返回561002。非法输入的返回码取决于实际执行到的校验阶段。
 
 ## aclnnCompressorGrad
 

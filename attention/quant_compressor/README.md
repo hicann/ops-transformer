@@ -152,7 +152,7 @@
     <tr>
       <td>state_block_table</td>
       <td>可选输入</td>
-      <td>表示state_cache存储使用的block映射表。</td>
+      <td>表示state_cache存储使用的block映射表。在当前算子支持的cachemode=1/2场景下，该参数为必选。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -215,7 +215,7 @@
     <tr>
       <td>cmp_kv</td>
       <td>输出</td>
-      <td>表示压缩后的数据。</td>
+      <td>表示压缩后的数据。尾部不足一个完整压缩组的pad行内容未定义（算子不写入，保留调用前内存内容），调用方应只消费有效的压缩行。</td>
       <td>BFLOAT16</td>
       <td>ND</td>
     </tr>
