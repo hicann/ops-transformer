@@ -9,6 +9,13 @@
 # -----------------------------------------------------------------------------------------------------------
 
 cmake_minimum_required(VERSION 3.18.4)
+
+# Only Ascend 950 has a PyPTO kernel implementation for this operator.
+if(NOT "ascend950" IN_LIST ASCEND_COMPUTE_UNIT)
+    message(STATUS "[dense_lightning_indexer_softmax_lse_v2] Skipped: PyPTO kernel only supports ascend950 (soc=${ASCEND_COMPUTE_UNIT})")
+    return()
+endif()
+
 require_pypto_pro(dense_lightning_indexer_softmax_lse_v2)
 add_op_to_compiled_list()
 

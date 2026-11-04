@@ -7,6 +7,13 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
+
+# Only Ascend 950 has a PyPTO kernel implementation for this operator.
+if(NOT "ascend950" IN_LIST ASCEND_COMPUTE_UNIT)
+    message(STATUS "[flash_attn_grad] Skipped: PyPTO kernel only supports ascend950 (soc=${ASCEND_COMPUTE_UNIT})")
+    return()
+endif()
+
 set(_fag_excluded_versions "9.2.0-beta.1;9.2.0-beta.2")
 set(_fag_cann_version "")
 set(_fag_ver_src "")
