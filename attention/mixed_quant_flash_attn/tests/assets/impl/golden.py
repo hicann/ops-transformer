@@ -15,7 +15,11 @@
 TTK 传入的 tensor 可能是 numpy array，需转为 torch tensor 后传给 tforward。
 """
 
-__golden__ = {"e2e": {"mqfa_ttk_ops.call_npu": "cpu_mixed_quant_flash_attn"}}
+__golden__ = {
+    "e2e": {
+        "torch.ops.cann_ops_transformer.mixed_quant_flash_attn": "cpu_mixed_quant_flash_attn"
+    }
+}
 
 import sys
 import traceback

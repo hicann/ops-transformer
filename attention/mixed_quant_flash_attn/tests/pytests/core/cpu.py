@@ -252,6 +252,15 @@ def trans_pa_to_no_pa(
         block_ids = block_table[b_idx]
         for block_idx, block_id in enumerate(block_ids):
             if block_id > -1:
+                if block_idx * block_size >= s2:
+                    # Padding block entirely beyond the used sequence length:
+                    # skip it. Without this guard the code path below reaches
+                    # data[b_idx, :, block_idx*block_size : s2] with a NEGATIVE
+                    # slice width (s2 - block_idx*block_size < 0), which pytorch
+                    # interprets as "from the end", grabbing the trailing rows of
+                    # block_data_ while the destination slice is empty ->
+                    # RuntimeError: expanded size (0) vs (7) at dim 1.
+                    continue
                 block_data = quant_data[block_id]
                 block_scale = descale[block_id]
                 if layout_kv == "PA_NZ":

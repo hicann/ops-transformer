@@ -15,7 +15,11 @@
 这样 ttk 和 pytest 用完全相同的输入数据（相同种子、相同生成逻辑）。
 """
 
-__input__ = {"e2e": {"mqfa_ttk_ops.call_npu": "generate_mixed_quant_inputs"}}
+__input__ = {
+    "e2e": {
+        "torch.ops.cann_ops_transformer.mixed_quant_flash_attn": "generate_mixed_quant_inputs"
+    }
+}
 
 import os
 import math
@@ -155,6 +159,11 @@ def _write_back(tensor, src):
             )
             dst[...] = src_np.reshape(dst.shape) if src_np.size == dst.size else src_np
     elif torch.is_tensor(tensor):
+        if tuple(tensor.shape) != tuple(src.shape):
+            # pytest 生成的伴随张量（如 block_table）形状可能由随机 seqused_kv
+            # 动态推导（(1, ceil(seqused_kv/block_size))），与 CSV 声明的大小不一致。
+            # 以 pytest（权威数据源）为准，把 ttk 张量 resize 到目标形状再回填。
+            tensor.resize_(src.shape)
         if tensor.dtype == src.dtype:
             tensor.copy_(src)
         elif tensor.dtype == torch.float8_e8m0fnu:

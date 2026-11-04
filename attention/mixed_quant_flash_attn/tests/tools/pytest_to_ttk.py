@@ -20,7 +20,7 @@ pytest_to_ttk.py — 将 pytest TestCases 字典文件转换为 ttk CSV 用例�
 
 pytest 用例字段是列表包装（如 "B": [64]），本脚本取 [0] 解包。
 支持字段: B, N1, N2, S1, S2, D, layout_q, layout_kv, layout_attn_out,
-          block_size, q_dtype, quant_compute_mode, mask_mode, softmax_scale,
+          block_size, q_dtype, quant_mode, mask_mode, softmax_scale,
           max_seqlen_q, max_seqlen_kv, seqused_q, seqused_kv, cu_seqlens_q,
           win_left, win_right, return_softmax_lse, q_range, kv_range,
           attn_mask, sinks
@@ -67,8 +67,8 @@ import sys
 # ============================================================================
 DEFAULT_TTK_PREFIX = ""
 DEFAULT_ATTN_MASK_SHAPE = (2048, 2048)
-DEFAULT_METADATA_SHAPE = (16384,)
-API_NAME = "mqfa_ttk_ops.call_npu"
+DEFAULT_METADATA_SHAPE = (-1,)
+API_NAME = "torch.ops.cann_ops_transformer.mixed_quant_flash_attn"
 
 # pytest dtype -> ttk CSV torch dtype 名
 CSV_DTYPE_MAP = {
@@ -103,27 +103,25 @@ SKIP_FIELDS = {
 # ============================================================================
 # shape 计算（与 xlsx_to_testcase.py 一致，对齐 doc 公式）
 # ============================================================================
-def gen_pa_shape(
-    num_blocks, n, block_size, d, quant_compute_mode, layout_kv, is_key, dtype
-):
+def gen_pa_shape(num_blocks, n, block_size, d, quant_mode, layout_kv, is_key, dtype):
     """
     按公式计算 PA 布局的物理存储 shape（对齐 pytest gen_data.generate_input_shape）。
 
     PA_NZ  kv(fp4 物理): (num_blocks, n, d//64, block_size, 32)
-            scale(qcm=1) K: (num_blocks, n, block_size//16, d//64, 16, 2)  V: (…, d//16, block_size//64, 16, 2)
-            scale(qcm=2) K: (num_blocks, n, block_size//16, d//64, 16)      V: (…, d//16, block_size//64, 16)
+            scale(qm=1) K: (num_blocks, n, block_size//16, d//64, 16, 2)  V: (…, d//16, block_size//64, 16, 2)
+            scale(qm=2) K: (num_blocks, n, block_size//16, d//64, 16)      V: (…, d//16, block_size//64, 16)
     PA_BBND kv(fp4 物理): (num_blocks, block_size, n, d//2)      # (blockNum, S, N, D) pack 后 D//2
             scale       K: (num_blocks, block_size, n, d//group)  V: (num_blocks, n, d, block_size//group)
     PA_BNBD kv(fp4 物理): (num_blocks, n, block_size, d//2)      # (blockNum, N, S, D) pack 后 D//2
             scale       K: (num_blocks, n, block_size, d//group)  V: (num_blocks, n, d, block_size//group)
     """
     kv = dtype in ("fp4_e2m1", "fp4_e1m2")
-    group = 32 if quant_compute_mode == 1 else 64
+    group = 32 if quant_mode == 1 else 64
 
     if layout_kv == "PA_NZ":
         if kv:
             return (num_blocks, n, d // 64, block_size, 32)
-        if quant_compute_mode == 1:
+        if quant_mode == 1:
             return (
                 (num_blocks, n, block_size // 16, d // 64, 16, 2)
                 if is_key
@@ -219,9 +217,7 @@ def parse_pytest_case(name, case):
     layout_kv = _val(case, "layout_kv", layout_q)
     layout_out = _val(case, "layout_attn_out", layout_q)
     q_dtype = _val(case, "q_dtype", "bf16")
-    quant_compute_mode = _val(case, "quant_compute_mode", None) or _val(
-        case, "quant_mode", 1
-    )
+    quant_mode = _val(case, "quant_mode", None) or _val(case, "quant_mode", 1)
     mask_mode = _val(case, "mask_mode", 0)
     softmax_scale = _val(case, "softmax_scale", 1.0 / (D**0.5) if D != 0 else 1.0)
 
@@ -270,7 +266,7 @@ def parse_pytest_case(name, case):
         "layout_kv": layout_kv,
         "layout_out": layout_out,
         "q_dtype": q_dtype,
-        "quant_compute_mode": quant_compute_mode,
+        "quant_mode": quant_mode,
         "mask_mode": mask_mode,
         "softmax_scale": softmax_scale,
         "seqused_q": seqused_q,
@@ -295,7 +291,7 @@ def build_csv_row(c, prefix):
     """构建单行 CSV。PA_NZ 时 block_size 从 k/v shape 第4维确定（= block_size 字段）。"""
     B, N1, N2, S1, S2, D = c["B"], c["N1"], c["N2"], c["S1"], c["S2"], c["D"]
     bs = c["block_size"]
-    qcm = c["quant_compute_mode"]
+    qm = c["quant_mode"]
     layout_q = c["layout_q"]
     layout_kv = c["layout_kv"]
     seqused_q = c["seqused_q"]
@@ -336,15 +332,15 @@ def build_csv_row(c, prefix):
         q_shape = (B, S1, N1, D)
 
     # k/v/descale shapes (按布局公式计算)
-    kv_dtype = "fp4_e2m1" if qcm == 1 else "fp4_e1m2"
-    scale_dtype = "fp8_e8m0" if qcm == 1 else "hifp4_scale"
-    k_shape = gen_pa_shape(num_blocks, N2, bs, D, qcm, layout_kv, True, kv_dtype)
-    v_shape = gen_pa_shape(num_blocks, N2, bs, D, qcm, layout_kv, False, kv_dtype)
+    kv_dtype = "fp4_e2m1" if qm == 1 else "fp4_e1m2"
+    scale_dtype = "fp8_e8m0" if qm == 1 else "hifp4_scale"
+    k_shape = gen_pa_shape(num_blocks, N2, bs, D, qm, layout_kv, True, kv_dtype)
+    v_shape = gen_pa_shape(num_blocks, N2, bs, D, qm, layout_kv, False, kv_dtype)
     k_scale_shape = gen_pa_shape(
-        num_blocks, N2, bs, D, qcm, layout_kv, True, scale_dtype
+        num_blocks, N2, bs, D, qm, layout_kv, True, scale_dtype
     )
     v_scale_shape = gen_pa_shape(
-        num_blocks, N2, bs, D, qcm, layout_kv, False, scale_dtype
+        num_blocks, N2, bs, D, qm, layout_kv, False, scale_dtype
     )
 
     block_table_shape = (B, max_blocks_per_batch)
@@ -403,7 +399,7 @@ def build_csv_row(c, prefix):
     ]
 
     q_csv_dtype = CSV_DTYPE_MAP.get(c["q_dtype"], "bfloat16")
-    scale_csv_dtype = CSV_SCALE_DTYPE.get(qcm, "float8_e8m0fnu")
+    scale_csv_dtype = CSV_SCALE_DTYPE.get(qm, "float8_e8m0fnu")
     dtypes = [
         q_csv_dtype,
         "uint8",
@@ -420,7 +416,7 @@ def build_csv_row(c, prefix):
     ]
 
     attrs = {
-        "quant_compute_mode": qcm,
+        "quant_mode": qm,
         "batch_size": B,
         "num_heads_q": N1,
         "num_heads_kv": N2,
@@ -445,7 +441,7 @@ def build_csv_row(c, prefix):
 
     q_range = c["q_range"] if c["q_range"] else (-10.0, 10.0)
     kv_range = c["kv_range"] if c["kv_range"] else (-10.0, 10.0)
-    scale_range = CSV_SCALE_RANGE.get(qcm, (0.01, 10.0))
+    scale_range = CSV_SCALE_RANGE.get(qm, (0.01, 10.0))
     block_table_range = (0, max(num_blocks - 1, 0))
     cu_seqlens_q_range = (0, S1) if cu_seqlens_q_shape is not None else (-1, -1)
     seqused_q_range = (0, S1) if seqused_q_shape is not None else (-1, -1)
@@ -498,7 +494,7 @@ def _fmt_shapes(shapes):
 
 
 def _fmt_storage_shapes(view_shapes):
-    parts = ["()" if s is None else _fmt_shape(s) for s in view_shapes]
+    parts = ["()" if s in [None, (-1,)] else _fmt_shape(s) for s in view_shapes]
     return '"(' + ",".join(parts) + ')"'
 
 
@@ -592,7 +588,7 @@ def main():
     for c in parsed:
         print(
             f"  {c['name']}: B={c['B']} N1={c['N1']} N2={c['N2']} S1={c['S1']} "
-            f"S2={c['S2']} bs={c['block_size']} qcm={c['quant_compute_mode']} "
+            f"S2={c['S2']} bs={c['block_size']} qm={c['quant_mode']} "
             f"layout_q={c['layout_q']}"
         )
     print()
