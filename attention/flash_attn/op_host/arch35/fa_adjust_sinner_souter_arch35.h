@@ -114,7 +114,7 @@ inline uint32_t GetFlashAttnTemplateId(uint32_t qkHeadDim, uint32_t vHeadDim, in
     if (DN_UNMERGED_ROUTE_ENABLED && vHeadDim <= 128U && (maskMode == 0 || maskMode == 3) && maxSeqlenQ >= 256) {
         return FA_Template_DN_Unmerged;
     }
-    // Equivalent to the existing no-mask config=0/2/6 selection (D=72 uses config=2).
+    // No-mask arch35 config=0/2/6/8 with sOuter=64 selects merged DN (D=72 uses config=8).
     bool mergedDnDims = (qkHeadDim == vHeadDim && (qkHeadDim == 64 || qkHeadDim == 72 || qkHeadDim == 128)) ||
                         (qkHeadDim == 192 && vHeadDim == 128);
     if (maskMode == 0 && sOuterFactor == 64U && mergedDnDims) {

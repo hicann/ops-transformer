@@ -288,12 +288,9 @@ protected:
     __aicore__ inline void Bmm2DataCopyOutTrans(LocalTensor<OUTPUT_T>& attenOutUb, uint32_t startRow,
                                                 uint32_t dealRowCount, uint32_t columnCount)
     {
-        FaUbTensor<OUTPUT_T> ubTensor{
-            .tensor = attenOutUb,
-            .rowCount = dealRowCount,
-            .colCount = columnCount,
-        };
         if constexpr (DN_LAYOUT) {
+            // 不合轴 DN 使用 S1_ONLY，拷贝不按 ROW_PAD 分支，保留默认张量类型。
+            FaUbTensor<OUTPUT_T> ubTensor{.tensor = attenOutUb, .rowCount = dealRowCount, .colCount = columnCount};
             GmCoordS1Only gmCoord{.bIdx = taskInfo_.bIdx,
                                   .n2Idx = taskInfo_.n2Idx,
                                   .gIdx = taskInfo_.gIdx,
@@ -303,6 +300,10 @@ protected:
                                   .dDealSize = (uint32_t)constInfo_.dSizeV};
             copyAttenOutUbToGm_(outGmTensor_, ubTensor, gmCoord);
         } else {
+            // 合轴 S1G 输出拷贝需要 ROW_PAD 区分是否可合并中间多行。
+            constexpr bool rowPad = (static_cast<uint32_t>(FA_T::originalDV) % 16 != 0);
+            FaUbTensor<OUTPUT_T, rowPad> ubTensor{
+                .tensor = attenOutUb, .rowCount = dealRowCount, .colCount = columnCount};
             GmCoordGs1Merge gmCoord{.bIdx = taskInfo_.bIdx,
                                     .n2Idx = taskInfo_.n2Idx,
                                     .gS1Idx = taskInfo_.gS1Idx + startRow,

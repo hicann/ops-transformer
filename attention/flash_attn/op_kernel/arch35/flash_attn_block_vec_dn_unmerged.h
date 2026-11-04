@@ -10,7 +10,7 @@
 
 /*!
  * \file flash_attn_block_vec_dn.h
- * \brief FANoQuantGqaBlockVecDnUnmerged —— Dn 路径专用 Vec Block 模板（独立类，无 base 基类）。
+ * \brief FANoQuantGqaBlockVecDnUnmerged —— 不合轴 DN 路径专用 Vec Block 模板（独立类，无 base 基类）。
  */
 #ifndef FLASH_ATTN_BLOCK_VEC_DN_UNMERGED_H_
 #define FLASH_ATTN_BLOCK_VEC_DN_UNMERGED_H_

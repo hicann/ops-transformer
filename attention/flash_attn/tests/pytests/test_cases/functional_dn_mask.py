@@ -53,7 +53,7 @@ for layout in ("BSND", "BNSD"):
             win_right=[17] if mode == 4 else [-1],
         )
 
-# 全维度注册表 x mask: 72/128/192-128/256(覆盖 config 2/4/6 + 72 pad 路径)
+# 全维度注册表 x mask: 72/128/192-128/256（覆盖 config8/2/6/4，config8 的 originalDV=72）
 for layout in ("BSND", "BNSD"):
     for d, dv in ((72, 72), (128, 128), (192, 128), (256, 256)):
         add(f"DNM_DIM_{layout}_D{d}", s1=145, layout=layout, dim=d, dv=dv, mask=3)

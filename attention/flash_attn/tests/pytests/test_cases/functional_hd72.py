@@ -11,15 +11,16 @@
 
 ####### 参数说明 ########
 # head_dim=72 支持验证用例（2026-09）
-# 覆盖: Dn(无mask config2)/Nd(有mask config2)/TND varlen/PA decode(FlashDecode, config3)/LSE/双精度/GQA
+# 覆盖: DN/ND、TND varlen、PA decode(FlashDecode)、LSE、双精度及 GQA；D=72 使用 config8/9。
 # PA_NZ + D=72 为已知不支持组合(NZ 分形粒度16不整除72), checker 显式拦截
-# D=72 技术路线: 复用 D=128 config 模板, kernel 内 pad 到 Align64(72)=128, GM 搬出按真实 72 裁剪
+# config8/9 的 D=DV=128、originalDV=72；UB 输出行宽为128，ROW_PAD=true，GM 拷出按真实 DV=72 裁剪。
+# config8 对应 sOuter=64，config9 对应 sOuter=32；模板类型由 host 的三路共享函数决定。
 
 # fmt: off
 
 TestCases = {
     # ================================================================
-    # Dn: 无 mask (config 2)
+    # 无 mask: config8/9，DN 类型由 maxSeqQ 和 sOuter 决定
     # ================================================================
     "HD72_DN_BSND_S64": {
         "B": [2],
@@ -125,7 +126,7 @@ TestCases = {
         "v_range": [(-5.0, 5.0)],
     },
     # ================================================================
-    # Nd: 有 mask (config 2)
+    # 有 mask: config8/9，ND/不合轴 DN 由 maskMode 和 maxSeqQ 决定
     # ================================================================
     "HD72_ND_CAUSAL_BSND": {
         "B": [2],
@@ -168,7 +169,7 @@ TestCases = {
         "v_range": [(-5.0, 5.0)],
     },
     # ================================================================
-    # PA decode: FlashDecode split-KV (config 2/3)
+    # PA decode: FlashDecode split-KV (config8/9，originalDV=72)
     # ================================================================
     "HD72_PA_BBND_DECODE": {
         "B": [8],

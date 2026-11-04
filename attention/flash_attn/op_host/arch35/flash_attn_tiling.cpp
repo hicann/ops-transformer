@@ -59,26 +59,34 @@ void FlashAttnTilingImplArch35::SplitPolicy()
 void FlashAttnTilingImplArch35::UpdateTilingKeyConfig()
 {
     if (faInfo_->qkHeadDim == faInfo_->vHeadDim) {
-        // 等长 (QK D == V DV) 按 D 值映射:
-        //   config=0: Dk=64,  Dv=64,  sOuter=64,  sInner=128
-        //   config=1: Dk=64,  Dv=64,  sOuter=32,  sInner=256
-        //   config=2: Dk=128, Dv=128, sOuter=64,  sInner=128 (Dk=72 复用, kernel 内 pad 到 128)
-        //   config=3: Dk=128, Dv=128, sOuter=32,  sInner=256 (Dk=72 复用, kernel 内 pad 到 128)
-        //   config=4: Dk=256, Dv=256, sOuter=64, sInner=128
-        //   config=5: Dk=256, Dv=256, sOuter=32, sInner=256
+        // 等长场景：原始 D=qkHeadDim、原始 DV=vHeadDim；模板 D/DV 为 ConfigParams.d/dv。
+        // originalDV 单独保留原始 V/输出维度，Q/K 的原始 D 仍由运行时 qkHeadDim 提供。
+        // config | 原始 D | 原始 DV | 模板 D | 模板 DV | originalDV | sOuter | sInner
+        //      0 |     64 |      64 |     64 |      64 |         64 |     64 |    128
+        //      1 |     64 |      64 |     64 |      64 |         64 |     32 |    256
+        //      2 |    128 |     128 |    128 |     128 |        128 |     64 |    128
+        //      3 |    128 |     128 |    128 |     128 |        128 |     32 |    256
+        //      4 |    256 |     256 |    256 |     256 |        256 |     64 |    128
+        //      5 |    256 |     256 |    256 |     256 |        256 |     32 |    256
+        //      8 |     72 |      72 |    128 |     128 |         72 |     64 |    128
+        //      9 |     72 |      72 |    128 |     128 |         72 |     32 |    256
         if (faInfo_->qkHeadDim == 64) {
             tilingKeyInfo_.config = (sOuterFactor_ == 64) ? 0 : 1;
-        } else if (faInfo_->qkHeadDim == 128 || faInfo_->qkHeadDim == 72) {
+        } else if (faInfo_->qkHeadDim == 128) {
             tilingKeyInfo_.config = (sOuterFactor_ == 64) ? 2 : 3;
+        } else if (faInfo_->qkHeadDim == 72) {
+            // 真实 Dk=Dv=72；模板 D=DV=128，originalDV=72，sOuter/sInner 切分逻辑沿用原 128 档
+            tilingKeyInfo_.config = (sOuterFactor_ == 64) ? 8 : 9;
         } else if (faInfo_->qkHeadDim == 256) {
             tilingKeyInfo_.config = (sOuterFactor_ == 64) ? 4 : 5;
         }
     } else {
         // 不等长 (qkHeadDim != vHeadDim) 按 (QK D, V DV) 组合映射:
         if (faInfo_->qkHeadDim == 192 && faInfo_->vHeadDim == 128) {
-            // QK D=192 且 V DV=128 (MLA 非吸收形态) 进入此分支:
-            //   config=6: Dk=192, Dv=128, sOuter=64, sInner=128
-            //   config=7: Dk=192, Dv=128, sOuter=32, sInner=256
+            // MLA 非吸收场景：原始 D=192、原始 DV=128；模板 D=192、模板 DV=128、originalDV=128。
+            // config | 原始 D | 原始 DV | 模板 D | 模板 DV | originalDV | sOuter | sInner
+            //      6 |    192 |     128 |    192 |     128 |        128 |     64 |    128
+            //      7 |    192 |     128 |    192 |     128 |        128 |     32 |    256
             tilingKeyInfo_.config = (sOuterFactor_ == 64) ? 6 : 7;
         }
     }
@@ -95,6 +103,8 @@ void FlashAttnTilingImplArch35::UpdateTilingKeyInfo()
 
 void FlashAttnTilingImplArch35::UpdateTilingKeyTemplateId()
 {
+    // 与 metadata 共享三路选择：不合轴 DN 优先，其次合轴 DN，最后 ND；D=72 已由 config 8/9 区分。
+    // dnFlag_ 仅表示合轴 DN，不合轴 DN 使用独立的 metadata 分核模式。
     tilingKeyInfo_.templateId = fa_tiling_util::GetFlashAttnTemplateId(
         static_cast<uint32_t>(faInfo_->qkHeadDim), static_cast<uint32_t>(faInfo_->vHeadDim), faInfo_->maskMode,
         faInfo_->maxSeqQ, sOuterFactor_);

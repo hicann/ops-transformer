@@ -10,7 +10,7 @@
 
 /*!
  * \file flash_attn.cpp
- * \brief FlashAttn Kernel 唯一入口；按 tiling key 编译期推导模板参数，分发 Dn / Nd 两套模板。
+ * \brief FlashAttn Kernel 唯一入口；按 tiling key 编译期推导模板参数，分发 ND、合轴 DN 和不合轴 DN 三套模板。
  *        参考 quant_flash_attn.cpp 单层 __global__ 风格。
  */
 
@@ -125,6 +125,8 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t* query, __gm__ uint8_t* key
     constexpr S2TemplateType s2TemplateType = static_cast<S2TemplateType>(cfg.s2);
     constexpr DTemplateType dTemplateType = static_cast<DTemplateType>(cfg.d);
     constexpr DTemplateType dVTemplateType = static_cast<DTemplateType>(cfg.dv);
+    // cfg.dv 是模板宽度，cfg.originalDV 保留真实 V/输出维度，避免将 72 与 128 混为同一输出拷贝路径。
+    constexpr DTemplateType originalDVType = static_cast<DTemplateType>(cfg.originalDV);
 
     // 根因（静态图）：固定 shape 下 tiling 是编译期常量字节数组而非 __gm__ buffer，
     // 不能直接 reinterpret_cast 成结构体指针访问，必须先拷贝到栈局部结构体对象再取指针。
@@ -136,14 +138,14 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t* query, __gm__ uint8_t* key
     InitSocState();
 
     using FA_T = FlashAttnKernel::FAType<INPUT_T, OUT_T, pageAttention, qLayout, kvLayout, outLayout, s1TemplateType,
-                                         s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask,
+                                         s2TemplateType, dTemplateType, dVTemplateType, originalDVType, hasAttenMask,
                                          cfg.ubMm1ResBufcnt, cfg.ubMm2ResBufcnt, cfg.ubVec1ResBufcnt, cfg.ubMaskBufcnt,
                                          cfg.l1PBufcnt, cfg.l1QBufcnt, cfg.l1KvBufcnt>;
 
     if constexpr (templateId == FA_Template_DN_Unmerged) {
         // 不合轴 DN: BN1_S1 分核, 独立文件(*_dn_unmerged.h), 全部注册维度/有无 mask 实例化;
-        // 路由开关 DN_UNMERGED_ROUTE_ENABLED 打开后由 host tiling 产生 templateId=2
-        // Q >= 256, maskMode in {0, 3}, and QK head dim != 256.
+        // arch35 的 GetFlashAttnTemplateId 默认开启该路由：vHeadDim<=128、maxSeqQ>=256、maskMode 为 0/3。
+        // arch92 由独立的 GetConfigInfo 选择不合轴 DN，不能套用 arch35 的路由阈值。
         using CubeBlock = FlashAttnKernel::FANoQuantGqaBlockCubeDnUnmerged<FA_T>;
         using VecFaBlock = FlashAttnKernel::FANoQuantGqaBlockVecDnUnmerged<FA_T>;
         using VecFdBlock = FlashAttnKernel::FiaBlockVecFlashDecode<FA_T, true>;

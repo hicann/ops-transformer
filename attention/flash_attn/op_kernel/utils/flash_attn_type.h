@@ -100,7 +100,8 @@ template <typename INPUT_T, typename OUTPUT_T, bool PAGE_ATTENTION, FA_LAYOUT LA
           FA_LAYOUT LAYOUT_OUT, regbaseutil::S1TemplateType s1TemplateType = regbaseutil::S1TemplateType::Aligned128,
           regbaseutil::S2TemplateType s2TemplateType = regbaseutil::S2TemplateType::Aligned128,
           regbaseutil::DTemplateType dTemplateType = regbaseutil::DTemplateType::Aligned128,
-          regbaseutil::DTemplateType dVTemplateType = regbaseutil::DTemplateType::Aligned128, bool HAS_MASK = false,
+          regbaseutil::DTemplateType dVTemplateType = regbaseutil::DTemplateType::Aligned128,
+          regbaseutil::DTemplateType ORIGINAL_DV = regbaseutil::DTemplateType::Aligned128, bool HAS_MASK = false,
           uint32_t ubMm1ResBufcnt = 0, uint32_t ubMm2ResBufcnt = 0, uint32_t ubVec1ResBufcnt = 0,
           uint32_t ubMaskBufcnt = 0, uint32_t l1PBufcnt = 0, uint32_t l1QBufcnt = 0, uint32_t l1KvBufcnt = 0>
 struct FAType {
@@ -114,6 +115,9 @@ struct FAType {
     static constexpr regbaseutil::S2TemplateType s2BaseSize = s2TemplateType;
     static constexpr regbaseutil::DTemplateType dBaseSize = dTemplateType;
     static constexpr regbaseutil::DTemplateType dVBaseSize = dVTemplateType;
+    // 原始 V/输出 head dim，由 cfg.originalDV 传入；dVBaseSize 是模板宽度。
+    // ROW_PAD 按 originalDV 是否为 16 的倍数决定：非 16 对齐时为 true，例如 DV=72。
+    static constexpr regbaseutil::DTemplateType originalDV = ORIGINAL_DV;
     static constexpr bool hasMask = HAS_MASK;
     // buffer 档位: 由入口按 config 从 ConfigValue/ConfigValueArch92 填充; arch35 block 不读取, 保持默认 0
     static constexpr uint32_t UB_MM1_RES_BUFCNT = ubMm1ResBufcnt;

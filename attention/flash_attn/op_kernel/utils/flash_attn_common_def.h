@@ -71,6 +71,7 @@ enum class inferDTemplateType {
     Aligned32 = 32,
     Aligned48 = 48,
     Aligned64 = 64,
+    Aligned72 = 72,
     Aligned80 = 80,
     Aligned96 = 96,
     Aligned128 = 128,
@@ -145,10 +146,13 @@ static constexpr inferPFALayoutTypeEnum InOutLayoutPFATypeValue[5][2] = {
 #define FA_Template_DN_Unmerged 2 // 不合轴 DN
 
 struct ConfigParams {
-    inferS1TemplateType s1;
-    inferS2TemplateType s2;
-    inferDTemplateType d;
-    inferDTemplateType dv;
+    inferS1TemplateType s1; // M 方向模板块大小（arch35 为 sOuter*2）
+    inferS2TemplateType s2; // KV 方向模板块大小（sInner）
+    inferDTemplateType d;   // Q/K 的编译期模板宽度，真实 qkHeadDim=72 时取 Aligned128
+    inferDTemplateType dv;  // V/输出的编译期模板宽度，真实 vHeadDim=72 时取 Aligned128
+    // 原始 V/输出 head dim，保留模板对齐前的维度；用于编译期选择输出拷贝的 ROW_PAD。
+    // 原始 DV 非 16 对齐时 ROW_PAD=true；(QK D, V DV)=(192,128) 的 originalDV 为 128。
+    inferDTemplateType originalDV;
     uint32_t ubMm1ResBufcnt;
     uint32_t ubMm2ResBufcnt;
     uint32_t ubVec1ResBufcnt;
@@ -158,89 +162,112 @@ struct ConfigParams {
     uint32_t l1KvBufcnt;
 };
 
-// config:
-//   config=0: sOuter=64, sInner=128 → S1=128, S2=128, D=64
-//   config=1: sOuter=32, sInner=256 → S1=64,  S2=256, D=64
-//   config=2: sOuter=64, sInner=128 → S1=128, S2=128, D=128
-//   config=3: sOuter=32, sInner=256 → S1=64,  S2=256, D=128
-//   config=4: sOuter=64, sInner=128 → S1=128, S2=128, D=256
-//   config=5: sOuter=32, sInner=256 → S1=64,  S2=256, D=256
-//   config=6: sOuter=64, sInner=128 → S1=128, S2=128, D=192, DV=128
-//   config=7: sOuter=32, sInner=256 → S1=64,  S2=256, D=192, DV=128
+// arch35 config: S1=sOuter*2, S2=sInner；D/DV 为模板宽度，originalDV 为真实 V/输出维度。
+//   config=0: sOuter=64, sInner=128 -> S1=128, S2=128, D=64, DV=64, originalDV=64
+//   config=1: sOuter=32, sInner=256 -> S1=64, S2=256, D=64, DV=64, originalDV=64
+//   config=2: sOuter=64, sInner=128 -> S1=128, S2=128, D=128, DV=128, originalDV=128
+//   config=3: sOuter=32, sInner=256 -> S1=64, S2=256, D=128, DV=128, originalDV=128
+//   config=4: sOuter=64, sInner=128 -> S1=128, S2=128, D=256, DV=256, originalDV=256
+//   config=5: sOuter=32, sInner=256 -> S1=64, S2=256, D=256, DV=256, originalDV=256
+//   config=6: sOuter=64, sInner=128 -> S1=128, S2=128, D=192, DV=128, originalDV=128
+//   config=7: sOuter=32, sInner=256 -> S1=64, S2=256, D=192, DV=128, originalDV=128
+//   config=8: sOuter=64, sInner=128 -> S1=128, S2=128, D=128, DV=128, originalDV=72
+//   config=9: sOuter=32, sInner=256 -> S1=64, S2=256, D=128, DV=128, originalDV=72
 static constexpr ConfigParams ConfigValue[] = {
     // D=64 configurations
     {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned64,
-     inferDTemplateType::Aligned64, 0, 0, 0, 0, 0, 0, 0}, // config=0, 最后7个0为默认填充，无实际意义
+     inferDTemplateType::Aligned64, inferDTemplateType::Aligned64, 0, 0, 0, 0, 0, 0,
+     0}, // config=0, 最后7个0为默认填充，无实际意义
     {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned64,
-     inferDTemplateType::Aligned64, 0, 0, 0, 0, 0, 0, 0}, // config=1
+     inferDTemplateType::Aligned64, inferDTemplateType::Aligned64, 0, 0, 0, 0, 0, 0, 0}, // config=1
 
     // D=128 configurations
     {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned128,
-     inferDTemplateType::Aligned128, 0, 0, 0, 0, 0, 0, 0}, // config=2
+     inferDTemplateType::Aligned128, inferDTemplateType::Aligned128, 0, 0, 0, 0, 0, 0, 0}, // config=2
     {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned128,
-     inferDTemplateType::Aligned128, 0, 0, 0, 0, 0, 0, 0}, // config=3
+     inferDTemplateType::Aligned128, inferDTemplateType::Aligned128, 0, 0, 0, 0, 0, 0, 0}, // config=3
 
     // D=256 configurations
     {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned256,
-     inferDTemplateType::Aligned256, 0, 0, 0, 0, 0, 0, 0}, // config=4
+     inferDTemplateType::Aligned256, inferDTemplateType::Aligned256, 0, 0, 0, 0, 0, 0, 0}, // config=4
     {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned256,
-     inferDTemplateType::Aligned256, 0, 0, 0, 0, 0, 0, 0}, // config=5
+     inferDTemplateType::Aligned256, inferDTemplateType::Aligned256, 0, 0, 0, 0, 0, 0, 0}, // config=5
 
     // D=192, DV=128 configurations (MLA qk != v)
     {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned192,
-     inferDTemplateType::Aligned128, 0, 0, 0, 0, 0, 0, 0}, // config=6
+     inferDTemplateType::Aligned128, inferDTemplateType::Aligned128, 0, 0, 0, 0, 0, 0, 0}, // config=6
     {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned192,
-     inferDTemplateType::Aligned128, 0, 0, 0, 0, 0, 0, 0}, // config=7
+     inferDTemplateType::Aligned128, inferDTemplateType::Aligned128, 0, 0, 0, 0, 0, 0, 0}, // config=7
+
+    // D=DV=128, originalDV=72: 除 originalDV 外与 config=2/3 相同；真实 DV=72，UB 输出行宽为 128
+    {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned128,
+     inferDTemplateType::Aligned128, inferDTemplateType::Aligned72, 0, 0, 0, 0, 0, 0, 0}, // config=8
+    {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned128,
+     inferDTemplateType::Aligned128, inferDTemplateType::Aligned72, 0, 0, 0, 0, 0, 0, 0}, // config=9
 };
 
+// arch92 使用独立的 S1/S2/buffer 档位；字段顺序与 ConfigParams 一致，均显式填写 originalDV。
+// 运行时 config 为 1/2/3/4，其 originalDV 等于 dv；0/5/6/7/8/9 仅为共享 SEL 编译枚举占位。
 static constexpr ConfigParams ConfigValueArch92[] = {
-    // 下标 0: 占位, arch92 host 不会下发; 仅为 tiling key 全组合(config 0-7)实例化占位, 档位对齐下标 2
+    // 下标 0: D=DV=originalDV=64，占位，arch92 host 不会下发
     {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned64,
-     inferDTemplateType::Aligned64,
+     inferDTemplateType::Aligned64, inferDTemplateType::Aligned64,
      /*ubMm1*/ 2, /*ubMm2*/ 1, /*ubVec1*/ 2, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 4},
-    // 下标 1: (M=64, S2=256, D=64, DV=64)   仅 ND(D=64) 使用
+    // 下标 1: (S1=64, S2=256, D=64, DV=64, originalDV=64)，ND 使用
     {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned64,
-     inferDTemplateType::Aligned64,
+     inferDTemplateType::Aligned64, inferDTemplateType::Aligned64,
      /*ubMm1*/ 2, /*ubMm2*/ 2, /*ubVec1*/ 2, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 4},
-    // 下标 2: (M=128, S2=128, D=128, DV=128) 仅 ND(D=128) 使用
+    // 下标 2: (S1=128, S2=128, D=128, DV=128, originalDV=128)，ND 使用
     {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned128,
-     inferDTemplateType::Aligned128,
+     inferDTemplateType::Aligned128, inferDTemplateType::Aligned128,
      /*ubMm1*/ 2, /*ubMm2*/ 1, /*ubVec1*/ 2, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 4},
-    // 下标 3: (M=128, S2=256, D=128, DV=128) 仅 DN(D=128) 使用
+    // 下标 3: (S1=128, S2=256, D=128, DV=128, originalDV=128)，不合轴 DN 使用
     {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned128,
-     inferDTemplateType::Aligned128,
+     inferDTemplateType::Aligned128, inferDTemplateType::Aligned128,
      /*ubMm1*/ 1, /*ubMm2*/ 1, /*ubVec1*/ 1, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 4},
-    // 下标 4: (M=64, S2=256, D=256, DV=256)   仅 ND(D=256) 使用
+    // 下标 4: (S1=64, S2=256, D=256, DV=256, originalDV=256)，ND 使用
     {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned256,
-     inferDTemplateType::Aligned256,
+     inferDTemplateType::Aligned256, inferDTemplateType::Aligned256,
      /*ubMm1*/ 2, /*ubMm2*/ 1, /*ubVec1*/ 2, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 2},
-    // 下标 5-7: 占位, arch92 host 不会下发; 档位分别对齐下标 4/2/3
+    // 下标 5-7: 占位，arch92 host 不会下发；originalDV 分别为 256/128/128
     {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned256,
-     inferDTemplateType::Aligned256,
+     inferDTemplateType::Aligned256, inferDTemplateType::Aligned256,
      /*ubMm1*/ 2, /*ubMm2*/ 1, /*ubVec1*/ 2, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 2},
     {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned128,
-     inferDTemplateType::Aligned128,
+     inferDTemplateType::Aligned128, inferDTemplateType::Aligned128,
      /*ubMm1*/ 2, /*ubMm2*/ 1, /*ubVec1*/ 2, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 4},
     {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned128,
-     inferDTemplateType::Aligned128,
+     inferDTemplateType::Aligned128, inferDTemplateType::Aligned128,
+     /*ubMm1*/ 1, /*ubMm2*/ 1, /*ubVec1*/ 1, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 4},
+
+    // 下标 8-9: originalDV=72，占位；除 originalDV 外与下标 2/3 相同，arch92 不支持真实 D=DV=72
+    {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned128, inferDTemplateType::Aligned128,
+     inferDTemplateType::Aligned128, inferDTemplateType::Aligned72,
+     /*ubMm1*/ 2, /*ubMm2*/ 1, /*ubVec1*/ 2, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 4},
+    {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned256, inferDTemplateType::Aligned128,
+     inferDTemplateType::Aligned128, inferDTemplateType::Aligned72,
      /*ubMm1*/ 1, /*ubMm2*/ 1, /*ubVec1*/ 1, /*ubMask*/ 1, /*l1P*/ 3, /*l1Q*/ 2, /*l1Kv*/ 4},
 };
 
-// Config macro definitions for D=64
-#define Config_S1Aligned128_S2Aligned128_DAligned64_DVAligned64 0
-#define Config_S1Aligned64_S2Aligned256_DAligned64_DVAligned64 1
+// Config macro definitions for D=64 (原始DV=64)
+#define Config_S1Aligned128_S2Aligned128_DAligned64_DVAligned64_OriginalDV64 0
+#define Config_S1Aligned64_S2Aligned256_DAligned64_DVAligned64_OriginalDV64 1
 
-// Config macro definitions for D=128
-#define Config_S1Aligned128_S2Aligned128_DAligned128_DVAligned128 2
-#define Config_S1Aligned64_S2Aligned256_DAligned128_DVAligned128 3
+// Config macro definitions for D=128 (原始DV=128, 与模板档一致)
+#define Config_S1Aligned128_S2Aligned128_DAligned128_DVAligned128_OriginalDV128 2
+#define Config_S1Aligned64_S2Aligned256_DAligned128_DVAligned128_OriginalDV128 3
 
-// Config macro definitions for D=256
-#define Config_S1Aligned128_S2Aligned128_DAligned256_DVAligned256 4
-#define Config_S1Aligned64_S2Aligned256_DAligned256_DVAligned256 5
+// Config macro definitions for D=128, 原始DV=72 (DV=72 复用 128 档; 除 originalDV 外与 OriginalDV128 档位相同)
+#define Config_S1Aligned128_S2Aligned128_DAligned128_DVAligned128_OriginalDV72 8
+#define Config_S1Aligned64_S2Aligned256_DAligned128_DVAligned128_OriginalDV72 9
 
-// Config macro definitions for D=192, DV=128 (MLA qk != v)
-#define Config_S1Aligned128_S2Aligned128_DAligned192_DVAligned128 6
-#define Config_S1Aligned64_S2Aligned256_DAligned192_DVAligned128 7
+// Config macro definitions for D=256 (原始DV=256)
+#define Config_S1Aligned128_S2Aligned128_DAligned256_DVAligned256_OriginalDV256 4
+#define Config_S1Aligned64_S2Aligned256_DAligned256_DVAligned256_OriginalDV256 5
+
+// Config macro definitions for D=192, DV=128 (MLA qk != v, 原始DV=128)
+#define Config_S1Aligned128_S2Aligned128_DAligned192_DVAligned128_OriginalDV128 6
+#define Config_S1Aligned64_S2Aligned256_DAligned192_DVAligned128_OriginalDV128 7
 
 // PseMode
 #define PSE_MODE_PSE_OUTER_MUL_ADD_TYPE 0
@@ -279,7 +306,7 @@ struct RunInfo {
 
     uint32_t bIdx = 0;
     uint32_t n2Idx = 0;
-    uint32_t n1Idx = 0; // 不合轴 DN 预埋: 当前 query 头(b*n1 空间), 原 ND/合轴 DN 未使用
+    uint32_t n1Idx = 0; // 不合轴 DN: 当前 query 头索引(bn1Cur % n1Size)，ND/合轴 DN 未使用
     uint32_t gS1Idx = 0;
     uint32_t gIdx = 0;
     uint32_t s1Idx = 0;
@@ -316,7 +343,7 @@ struct CommonConstInfo {
     uint32_t dSizeRope;
     uint32_t gSize; /* g轴的大小 */
     uint32_t n2Size;
-    uint32_t n1Size = 0;      /* N1(query头)轴的大小, 不合轴 DN 预埋使用, 原 ND/合轴 DN 未使用 */
+    uint32_t n1Size = 0;      /* N1(query头)轴的大小, 不合轴 DN 使用，ND/合轴 DN 未使用 */
     uint64_t s1Size;          /* s1总大小 */
     uint64_t s2Size;          /* s2总大小 */
     uint64_t cuSeqLensQSize;  /* 用户输入的actualseq的长度 */

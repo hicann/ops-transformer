@@ -10,7 +10,7 @@
 
 /*!
  * \file flash_attn_block_vec_dn.h
- * \brief FANoQuantGqaBlockVecDn —— Dn 路径专用 Vec Block 模板（独立类，无 base 基类）。
+ * \brief FANoQuantGqaBlockVecDn —— 合轴 DN 路径专用 Vec Block 模板（独立类，无 base 基类）。
  */
 #ifndef FLASH_ATTN_BLOCK_VEC_DN_H_
 #define FLASH_ATTN_BLOCK_VEC_DN_H_
@@ -44,6 +44,7 @@ public:
     static constexpr uint32_t s2BaseSize = (uint32_t)FA_T::s2BaseSize;
     static constexpr uint32_t dBaseSize = (uint32_t)FA_T::dBaseSize;
     static constexpr uint32_t dVBaseSize = (uint32_t)FA_T::dVBaseSize;
+    static constexpr bool rowPad = (static_cast<uint32_t>(FA_T::originalDV) % 16 != 0);
     static constexpr FA_LAYOUT LAYOUT_T = FA_T::qLayout;
     static constexpr FA_LAYOUT LAYOUT_KV = FA_T::kvLayout;
     static constexpr FA_LAYOUT LAYOUT_OUT = FA_T::attnOutLayout;
@@ -466,7 +467,8 @@ public:
     __aicore__ inline void Bmm2DataCopyOutTrans(const RunInfo& info, LocalTensor<OUTPUT_T>& attenOutUb,
                                                 uint32_t vecMIdx, uint32_t dealRowCount)
     {
-        FaUbTensor<OUTPUT_T> ubTensor{.tensor = attenOutUb, .rowCount = dealRowCount, .colCount = dTemplateAlign64};
+        FaUbTensor<OUTPUT_T, rowPad> ubTensor{
+            .tensor = attenOutUb, .rowCount = dealRowCount, .colCount = dTemplateAlign64};
         GmCoordGs1Merge gmCoord{.bIdx = info.bIdx,
                                 .n2Idx = info.n2Idx,
                                 .gS1Idx = info.gS1Idx + info.vecMbaseIdx + vecMIdx,
