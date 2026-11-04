@@ -56,6 +56,7 @@
 - `cacheMode`为`Norm`时，`keyCache`和`valueCache`的数据格式均为ND，shape分别为`[num_blocks, block_size, num_heads, head_size_k]`和`[num_blocks, block_size, num_heads, head_size_v]`；`keyRef`和`valueRef`的shape分别为`[num_tokens, num_heads, head_size_k]`和`[num_tokens, num_heads, head_size_v]`。
 - `cacheMode`为`PA_NZ`时，`keyCache`和`valueCache`的数据格式均为FRACTAL_NZ，shape分别为`[num_blocks, num_heads * head_size_k / elenum_aligned, block_size, elenum_aligned]`和`[num_blocks, num_heads * head_size_v / elenum_aligned, block_size, elenum_aligned]`；`keyRef`和`valueRef`的shape分别为`[num_tokens, num_heads * head_size_k]`和`[num_tokens, num_heads * head_size_v]`。8bit、16bit、32bit数据类型对应的`elenum_aligned`分别为32、16、8。
 - `blockTables`的shape为`[batch, block_indices]`，元素取值范围为`[0, num_blocks)`；`seqLens`的shape为一维。`isSeqLensCumsum`为`false`时，`seqLens`长度为`batch`；为`true`时，`seqLens`长度为`batch + 1`且首元素为0。
+- `blockTables`需满足完整覆盖条件：对每个batch `i`，设该batch的请求序列长度`length[i]`（`isSeqLensCumsum`为`false`时，`length[i] = seqLens[i]`；为`true`时，`length[i] = seqLens[i + 1] - seqLens[i]`），并设表列起始偏移`tableStart[i]`（不传`seqOffset`时为0；传入时为`seqOffset[i] / block_size`，整数除法取商），需满足`tableStart[i] >= 0`且`tableStart[i] + ceil(length[i] / block_size) <= block_indices`，此时输出`keyRef`/`valueRef`全部来自Cache中的实际元素。
 - `seqOffset`可不传；传入时shape为`[batch]`，数据类型与`blockTables`保持一致。
 - `keyRef`与`keyCache`的数据类型保持一致，`valueRef`与`valueCache`的数据类型保持一致；`blockTables`、`seqLens`和`seqOffset`的数据类型保持一致。
 - 单个key或value token的数据量不超过148 KiB。例如FLOAT16或BFLOAT16场景下，`num_heads * head_size`可取`128 * 576`。
@@ -65,6 +66,7 @@
 - <term>Ascend 950PR&950DT系列产品</term>：
   - `cacheMode`支持`Norm`和`PA_NZ`；`Norm`模式下`keyCache`和`valueCache`均为ND格式，`PA_NZ`模式下均为FRACTAL_NZ格式。
   - `keyCache`为FLOAT8_E4M3FN时，`valueCache`还允许使用FLOAT16或BFLOAT16；其他场景下key和value的数据类型保持一致。
+  - 当`blockTables`宽度不满足上述覆盖条件时，`blockTableOffset`越出`block_indices`范围的逻辑块对应的token将被填零后写入输出，`blockId`越界（超出`[0, num_blocks)`范围）的块同样填零；其他产品路径未定义该行为，调用方应保证`blockTables`满足上述覆盖条件。
 
 ## 精度说明
 

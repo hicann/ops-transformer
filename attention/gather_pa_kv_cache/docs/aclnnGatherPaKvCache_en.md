@@ -33,6 +33,7 @@
 
   The constraints on **keyRef** and **valueRef** are as follows:
   - Keep the size of each token within 148k. For example, for the fp16/bf16 data type, set num_heads *head_size(keyRef/valueRef) to 128*576.
+  - To ensure that keyRef/valueRef come entirely from the actual elements in the Cache, blockTables must satisfy the coverage condition: for each batch `i`, let `length[i]` denote the sequence length of that batch (`length[i] = seqLens[i]` when isSeqLensCumsum is false; `length[i] = seqLens[i + 1] - seqLens[i]` when isSeqLensCumsum is true), and let `tableStart[i]` denote the starting table column offset (0 when seqOffsetOptional is not passed in; `seqOffsetOptional[i] / block_size` using integer division when passed in). `tableStart[i] >= 0` and `tableStart[i] + ceil(length[i] / block_size) <= block_indices` must be satisfied.
 
 - Example:
 
@@ -125,7 +126,7 @@ aclnnStatus aclnnGatherPaKvCache(
       <td class="tg-0pky">blockTables (aclTensor*)</td>
       <td class="tg-0pky">Input</td>
       <td class="tg-0pky">Indicates the physical block index corresponding to each sequence.</td>
-      <td class="tg-0pky">shape is [batch, block_indices], where both batch and block_indices must be greater than 0. The value range of elements is [0, num_blocks), indicating that blockId ranges from 0 to num_blocks-1.</td>
+      <td class="tg-0pky">shape is [batch, block_indices], where both batch and block_indices must be greater than 0. The value range of elements is [0, num_blocks), indicating that blockId ranges from 0 to num_blocks-1.<br>To ensure that the output comes entirely from the actual elements in the Cache, the blockTables width must satisfy the coverage condition in the feature description.</td>
       <td class="tg-0pky">INT32, INT64</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">2</td>
@@ -217,10 +218,11 @@ aclnnStatus aclnnGatherPaKvCache(
   <!-- npu="950" id7 -->
   - <term>Ascend 950PR&950DT products</term>:
     - The combination of keyCache in FLOAT8_E4M3FN and valueCache in FLOAT16 or BFLOAT16 is supported.
-
+    - When the blockTables width does not satisfy the coverage condition in the feature description, tokens corresponding to logical blocks whose blockTableOffset exceeds the block_indices range will be zero-filled and written to keyRef/valueRef; blocks whose blockId is out of range (beyond [0, num_blocks)) are also zero-filled. This behavior is undefined on other product paths. Ensure that blockTables satisfies the coverage condition.
   <!-- end id7 -->
   <!-- npu="A3,910b" id8 -->
   - <term>Atlas A2 products</term>, <term>Atlas A3 products</term>:
+    - cacheMode supports only "Norm", and keyCache and valueCache support only the ND format.
     - The input keyCache, valueCache, keyRef, and valueRef do not support the FLOAT, UINT8, INT16, UINT16, INT32, UINT32, HIFLOAT8, FLOAT8_E5M2, and FLOAT8_E4M3FN data types.
     - The input blockTables, seqLens, and seqOffsetOptional do not support the INT64 data type.
 

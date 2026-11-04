@@ -31,6 +31,7 @@
 
   关于**keyRef**、**valueRef**的一些限制条件如下：
   - 每个token大小控制在148k以内，例如，对于fp16/bf16类型，num_heads *head_size(keyRef/valueRef)取128*576。
+  - 为保证keyRef/valueRef全部来自Cache中的实际元素，blockTables需满足覆盖条件：对每个batch `i`，设该batch的请求序列长度`length[i]`（isSeqLensCumsum为false时，`length[i] = seqLens[i]`；isSeqLensCumsum为true时，`length[i] = seqLens[i + 1] - seqLens[i]`），并设表列起始偏移`tableStart[i]`（不传入seqOffsetOptional时为0；传入时为`seqOffsetOptional[i] / block_size`，整数除法取商），需满足`tableStart[i] >= 0`且`tableStart[i] + ceil(length[i] / block_size) <= block_indices`。
 
 - 示例：
 
@@ -123,7 +124,7 @@ aclnnStatus aclnnGatherPaKvCache(
       <td class="tg-0pky">blockTables（aclTensor*）</td>
       <td class="tg-0pky">输入</td>
       <td class="tg-0pky">表示每个序列对应的物理块索引。</td>
-      <td class="tg-0pky">shape为[batch, block_indices]，其中batch、block_indices均须大于0。元素取值范围为[0, num_blocks)，即blockId可取0到num_blocks-1。</td>
+      <td class="tg-0pky">shape为[batch, block_indices]，其中batch、block_indices均须大于0。元素取值范围为[0, num_blocks)，即blockId可取0到num_blocks-1。<br>为保证输出全部来自Cache中的实际元素，blockTables宽度需满足功能说明中的覆盖条件。</td>
       <td class="tg-0pky">INT32、INT64</td>
       <td class="tg-0pky">ND</td>
       <td class="tg-0pky">2</td>
@@ -215,13 +216,13 @@ aclnnStatus aclnnGatherPaKvCache(
   <!-- npu="950" id7 -->
   - <term>Ascend 950PR&950DT系列产品</term>:
     - 允许keyCache为FLOAT8_E4M3FN、valueCache为FLOAT16或BFLOAT16的组合。
-
+    - 当blockTables宽度不满足功能说明中的覆盖条件时，blockTableOffset越出block_indices范围的逻辑块对应的token将被填零后写入keyRef/valueRef；blockId越界（超出[0, num_blocks)范围）的块同样填零。其他产品路径未定义该行为，调用方应保证blockTables满足覆盖条件。
   <!-- end id7 -->
   <!-- npu="A3,910b" id8 -->
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
+    - cacheMode仅支持"Norm"，keyCache和valueCache仅支持ND格式。
     - 输入keyCache、valueCache、keyRef、valueRef不支持FLOAT、UINT8、INT16、UINT16、INT32、UINT32、HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN数据类型。
     - 输入blockTables、seqLens、seqOffsetOptional不支持INT64数据类型。
-
   <!-- end id8 -->
 
 - **返回值：**
