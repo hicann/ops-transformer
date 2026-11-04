@@ -78,7 +78,7 @@ fi
 sudo rm -rf /home/jenkins/Ascend/cann-9.0.0/opp/built-in/op_impl/ai_core/tbe/kernel/config/ascend910_93
 
 if [ "${GIT_TARGET_BRANCH}" = "master" ]; then
-    LOG_DO sh build.sh --PR_UT "pr_filelist.txt" --cov --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
+    LOG_DO sh build.sh --PR_UT "pr_filelist.txt" --asan --cov --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
 else
     LOG_DO sh build.sh --PR_UT "pr_filelist.txt" --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
 fi
