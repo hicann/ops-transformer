@@ -57,6 +57,100 @@ static inline bool CheckNotNull(const aclTensor* qkv, const aclTensor* qGamma, c
     OP_CHECK_NULL(headNums, return false);
     return true;
 }
+
+static const std::initializer_list<op::DataType> QKV_DTYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT16,
+                                                                           op::DataType::DT_BF16};
+
+// arch35(A5) 前置校验 dtype，非法入参在 GetWorkspaceSize 阶段返回 161002
+static bool CheckA5DtypeValid(const aclTensor* qkv, const aclTensor* qGamma, const aclTensor* kGamma,
+                              const aclTensor* cos, const aclTensor* sin, const aclTensor* index, const aclTensor* qOut,
+                              const aclTensor* kCache, const aclTensor* vCache, const aclTensor* kScaleOptional,
+                              const aclTensor* vScaleOptional, const aclTensor* kOffsetOptional,
+                              const aclTensor* vOffsetOptional, const aclTensor* qOutBeforeQuant,
+                              const aclTensor* kOutBeforeQuant, const aclTensor* vOutBeforeQuant)
+{
+    OP_CHECK_DTYPE_NOT_SUPPORT(qkv, QKV_DTYPE_SUPPORT_LIST, return false);
+    const DataType qkvDtype = qkv->GetDataType();
+
+    OP_CHECK_DTYPE_NOT_MATCH(qGamma, qkvDtype, return false);
+    OP_CHECK_DTYPE_NOT_MATCH(kGamma, qkvDtype, return false);
+    OP_CHECK_DTYPE_NOT_MATCH(cos, qkvDtype, return false);
+    OP_CHECK_DTYPE_NOT_MATCH(sin, qkvDtype, return false);
+    OP_CHECK_DTYPE_NOT_MATCH(qOut, qkvDtype, return false);
+    OP_CHECK_DTYPE_NOT_MATCH(index, DataType::DT_INT64, return false);
+
+    OP_CHECK(kCache->GetDataType() == qkvDtype || kCache->GetDataType() == DataType::DT_INT8,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "kCache dtype must be int8 or the same as qkv."), return false);
+    OP_CHECK(vCache->GetDataType() == qkvDtype || vCache->GetDataType() == DataType::DT_INT8,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "vCache dtype must be int8 or the same as qkv."), return false);
+
+    OP_CHECK(kScaleOptional == nullptr || kScaleOptional->GetDataType() == DataType::DT_FLOAT,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "kScale dtype must be float32."), return false);
+    OP_CHECK(vScaleOptional == nullptr || vScaleOptional->GetDataType() == DataType::DT_FLOAT,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "vScale dtype must be float32."), return false);
+    OP_CHECK(kOffsetOptional == nullptr || kOffsetOptional->GetDataType() == DataType::DT_FLOAT,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "kOffset dtype must be float32."), return false);
+    OP_CHECK(vOffsetOptional == nullptr || vOffsetOptional->GetDataType() == DataType::DT_FLOAT,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "vOffset dtype must be float32."), return false);
+
+    OP_CHECK(qOutBeforeQuant == nullptr || qOutBeforeQuant->GetDataType() == qkvDtype,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "qOutBeforeQuant dtype must be the same as qkv."), return false);
+    OP_CHECK(kOutBeforeQuant == nullptr || kOutBeforeQuant->GetDataType() == qkvDtype,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "kOutBeforeQuant dtype must be the same as qkv."), return false);
+    OP_CHECK(vOutBeforeQuant == nullptr || vOutBeforeQuant->GetDataType() == qkvDtype,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "vOutBeforeQuant dtype must be the same as qkv."), return false);
+    return true;
+}
+
+// arch35(A5)：format 仅支持 ND(否则会被 Contiguous 隐式转换)、不支持空 Tensor
+static bool CheckFormatAndSizeValid(const aclTensor* tensor, const char* name)
+{
+    if (tensor == nullptr) {
+        return true;
+    }
+    OP_CHECK(tensor->GetViewFormat() == op::Format::FORMAT_ND && tensor->GetStorageFormat() == op::Format::FORMAT_ND,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Tensor %s only supports ND format.", name), return false);
+    OP_CHECK(tensor->Numel() > 0, OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Tensor %s must not be empty.", name), return false);
+    return true;
+}
+
+static bool CheckA5FormatAndSizeValid(const aclTensor* qkv, const aclTensor* qGamma, const aclTensor* kGamma,
+                                      const aclTensor* cos, const aclTensor* sin, const aclTensor* index,
+                                      const aclTensor* qOut, const aclTensor* kCache, const aclTensor* vCache,
+                                      const aclTensor* kScaleOptional, const aclTensor* vScaleOptional,
+                                      const aclTensor* kOffsetOptional, const aclTensor* vOffsetOptional,
+                                      const aclTensor* qOutBeforeQuant, const aclTensor* kOutBeforeQuant,
+                                      const aclTensor* vOutBeforeQuant)
+{
+    // clang-format off
+    const aclTensor* tensors[] = {qkv, qGamma, kGamma, cos, sin, index, qOut, kCache, vCache,
+                                  kScaleOptional, vScaleOptional, kOffsetOptional, vOffsetOptional,
+                                  qOutBeforeQuant, kOutBeforeQuant, vOutBeforeQuant};
+    static const char* const names[] = {"qkv", "qGamma", "kGamma", "cos", "sin", "index", "qOut", "kCache",
+                                        "vCache", "kScale", "vScale", "kOffset", "vOffset",
+                                        "qOutBeforeQuant", "kOutBeforeQuant", "vOutBeforeQuant"};
+    // clang-format on
+    for (size_t i = 0U; i < sizeof(tensors) / sizeof(tensors[0]); ++i) {
+        if (!CheckFormatAndSizeValid(tensors[i], names[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool CheckA5AttrSizeValid(const aclIntArray* qkvSize, const aclIntArray* headNums)
+{
+    uint64_t qkvSizeLen = 0U;
+    uint64_t headNumsLen = 0U;
+    aclGetIntArraySize(qkvSize, &qkvSizeLen);
+    aclGetIntArraySize(headNums, &headNumsLen);
+    OP_CHECK(qkvSizeLen == 4U,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "qkvSize must have 4 elements, but got %lu.", qkvSizeLen), return false);
+    OP_CHECK(headNumsLen == 3U,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "headNums must have 3 elements, but got %lu.", headNumsLen),
+             return false);
+    return true;
+}
 } // namespace qkv_rms_norm_rope_cache
 
 aclnnStatus aclnnQkvRmsNormRopeCacheGetWorkspaceSize(
@@ -78,6 +172,21 @@ aclnnStatus aclnnQkvRmsNormRopeCacheGetWorkspaceSize(
                                                      qkvSize, headNums);
 
     CHECK_RET(ret, ACLNN_ERR_PARAM_NULLPTR);
+
+    // arch35(A5)：dtype 非法在 GetWorkspaceSize 阶段直接返回 161002；A2/A3 维持原行为
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+        const bool paramValid =
+            qkv_rms_norm_rope_cache::CheckA5DtypeValid(qkv, qGamma, kGamma, cos, sin, index, qOut, kCache, vCache,
+                                                       kScaleOptional, vScaleOptional, kOffsetOptional, vOffsetOptional,
+                                                       qOutBeforeQuant, kOutBeforeQuant, vOutBeforeQuant) &&
+            qkv_rms_norm_rope_cache::CheckA5FormatAndSizeValid(
+                qkv, qGamma, kGamma, cos, sin, index, qOut, kCache, vCache, kScaleOptional, vScaleOptional,
+                kOffsetOptional, vOffsetOptional, qOutBeforeQuant, kOutBeforeQuant, vOutBeforeQuant) &&
+            qkv_rms_norm_rope_cache::CheckA5AttrSizeValid(qkvSize, headNums);
+        if (!paramValid) {
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
 
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();

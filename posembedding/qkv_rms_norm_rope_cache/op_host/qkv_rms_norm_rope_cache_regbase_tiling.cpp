@@ -12,14 +12,13 @@
  * \file qkv_rms_norm_rope_cache_regbase_tiling.cpp
  * \brief QkvRmsNormRopeCache arch35(Ascend950 / DAV_3510)tiling
  *
- * 与 A2 的 QkvRmsNormRopeCacheTilingDs 共用同一套 shape/dtype/attr 校验
- * (直接复用基类的 GetShapeAttrsInfoInner 与 11 个 Check*Valid),只重写:
+ *   - 参数校验:shape/dtype/attr 与本支持的 cache 对齐规则
  *   - 切核:按 (B*S) token 均分,每核连续一段 token(不区分 Q/K/V 核组)
  *   - UB 反推:按 regbase 内核的 buffer 布局重新计算 ubFactor
- *   - tiling key:10000(避开 A2 的默认 tiling 结构体注册)
+ *   - tiling key:10000
  */
 
-#include "qkv_rms_norm_rope_cache_tiling.h"
+#include "qkv_rms_norm_rope_cache_tiling_arch35.h"
 #include <string>
 #include "log/log.h"
 #include "tiling/platform/platform_ascendc.h"
@@ -29,6 +28,372 @@
 #include "op_common/op_host/util/platform_util.h"
 
 namespace optiling {
+
+ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckQkvValid()
+{
+    auto qkvShapeTuple = GetShapeTupleOfTH(context_, QKV_INDEX); // 返回[B*Sqkv, N*D]
+    bool isValid = true;
+    isValid = isValid && (std::get<SHAPE_IDX_BS>(qkvShapeTuple) == batchSize_ * seqLength_);
+    isValid = isValid && (std::get<SHAPE_IDX_ND>(qkvShapeTuple) == numHead_ * qkvDim_);
+    OP_CHECK_IF(!isValid, OP_LOGE(context_->GetNodeName(), "the shape of qkv is incorrect."), return ge::GRAPH_FAILED);
+    auto qkvDesc = context_->GetInputDesc(QKV_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, qkvDesc);
+    qkvDtype_ = qkvDesc->GetDataType();
+    OP_CHECK_IF(qkvDtype_ != ge::DataType::DT_FLOAT16 && qkvDtype_ != ge::DataType::DT_BF16,
+                OP_LOGE(context_->GetNodeName(), "qkv only support float16 and bfloat16 now"), return ge::GRAPH_FAILED);
+    qkvDtypeSize_ = FLOAT16_BYTES;
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckGammaValid(int64_t gammaIdx)
+{
+    const gert::StorageShape* gammaShapePtr = context_->GetInputShape(gammaIdx);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, gammaShapePtr);
+    bool isValid = true;
+    isValid = isValid && (gammaShapePtr->GetStorageShape().GetDimNum() == 1);
+    isValid = isValid && (gammaShapePtr->GetStorageShape().GetDim(0) == qkvDim_);
+    OP_CHECK_IF(!isValid, OP_LOGE(context_->GetNodeName(), "the shape of gamma is invalid."), return ge::GRAPH_FAILED);
+
+    auto gammaDesc = context_->GetInputDesc(gammaIdx);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, gammaDesc);
+    auto gammaDtype = gammaDesc->GetDataType();
+    OP_CHECK_IF(gammaDtype != qkvDtype_, OP_LOGE(context_->GetNodeName(), "gamma dtype must be the same with qkv."),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckCosSinValid()
+{
+    auto cosShapeTuple = GetShapeTupleOfTH(context_, COS_INDEX);
+    auto sinShapeTuple = GetShapeTupleOfTH(context_, SIN_INDEX);
+    bool isValid = true;
+    isValid = isValid && ((std::get<SHAPE_IDX_BS>(cosShapeTuple) == batchSize_ * seqLength_) ||
+                          (std::get<SHAPE_IDX_BS>(cosShapeTuple) == batchSize_ * NUM_ONE));
+    isValid = isValid && (std::get<SHAPE_IDX_ND>(cosShapeTuple) == NUM_ONE * ropeRange_);
+    isValid = isValid && ((std::get<SHAPE_IDX_BS>(sinShapeTuple) == batchSize_ * seqLength_) ||
+                          (std::get<SHAPE_IDX_BS>(sinShapeTuple) == batchSize_ * NUM_ONE));
+    isValid = isValid && (std::get<SHAPE_IDX_ND>(sinShapeTuple) == NUM_ONE * ropeRange_);
+    auto cosSeq = std::get<SHAPE_IDX_BS>(cosShapeTuple);
+    auto sinSeq = std::get<SHAPE_IDX_BS>(sinShapeTuple);
+    isValid = isValid && (cosSeq == sinSeq);
+    OP_CHECK_IF(!isValid, OP_LOGE(context_->GetNodeName(), "the shape of cos or sin is invalid."),
+                return ge::GRAPH_FAILED);
+    rope_seq_ = std::get<SHAPE_IDX_BS>(cosShapeTuple) / batchSize_;
+
+    auto cosDesc = context_->GetInputDesc(COS_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, cosDesc);
+    auto cosDtype = cosDesc->GetDataType();
+    OP_CHECK_IF(cosDtype != qkvDtype_, OP_LOGE(context_->GetNodeName(), "cos dtype must be the same with qkv."),
+                return ge::GRAPH_FAILED);
+
+    auto sinDesc = context_->GetInputDesc(SIN_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, sinDesc);
+    auto sinDtype = sinDesc->GetDataType();
+    OP_CHECK_IF(sinDtype != qkvDtype_, OP_LOGE(context_->GetNodeName(), "sin dtype must be the same with qkv."),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckIndexValid()
+{
+    bool isValid = true;
+    const gert::StorageShape* indexShapePtr = context_->GetInputShape(INDEX_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, indexShapePtr);
+    isValid = isValid && (indexShapePtr->GetStorageShape().GetDimNum() == NUM_ONE);
+    isValid = isValid && (indexShapePtr->GetStorageShape().GetShapeSize() == batchSize_ * seqLength_);
+    OP_CHECK_IF(!isValid, OP_LOGE(context_->GetNodeName(), "Index's shape size must be equal to B*S."),
+                return ge::GRAPH_FAILED);
+
+    auto indexDesc = context_->GetInputDesc(INDEX_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, indexDesc);
+    auto indexDtype = indexDesc->GetDataType();
+    OP_CHECK_IF(indexDtype != ge::DataType::DT_INT64, OP_LOGE(context_->GetNodeName(), "index dtype must be int64."),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckQOutValid()
+{
+    bool isValid = true;
+    const gert::StorageShape* qOutShapePtr = context_->GetInputShape(Q_OUT_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, qOutShapePtr);
+    isValid = isValid && (qOutShapePtr->GetStorageShape().GetDimNum() == NUM_TWO);
+    OP_CHECK_IF(!isValid, OP_LOGE(context_->GetNodeName(), "q_out must be 2D tensor."), return ge::GRAPH_FAILED);
+    isValid = isValid && (qOutShapePtr->GetStorageShape().GetDim(0) == batchSize_ * seqLength_);
+    isValid = isValid && (qOutShapePtr->GetStorageShape().GetDim(1) == numHeadQ_ * qkvDim_);
+    OP_CHECK_IF(!isValid, OP_LOGE(context_->GetNodeName(), "the shape of q_out is invalid."), return ge::GRAPH_FAILED);
+
+    auto qOutDesc = context_->GetInputDesc(Q_OUT_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, qOutDesc);
+    auto qOutDtype = qOutDesc->GetDataType();
+    OP_CHECK_IF(qOutDtype != qkvDtype_, OP_LOGE(context_->GetNodeName(), "q_out dtype must be the same with qkv."),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckKCacheValid()
+{
+    auto kCacheDesc = context_->GetInputDesc(K_CACHE_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, kCacheDesc);
+    auto kcacheDtype = kCacheDesc->GetDataType();
+    OP_CHECK_IF(kcacheDtype != qkvDtype_ && kcacheDtype != ge::DataType::DT_INT8,
+                OP_LOGE(context_->GetNodeName(), "k_cache dtype must either be the same with qkv, or be int8."),
+                return ge::GRAPH_FAILED);
+    isKQuant_ = kcacheDtype == ge::DataType::DT_INT8 ? 1 : 0;
+
+    bool isValid = true;
+    const gert::StorageShape* kCacheShapePtr = context_->GetInputShape(K_CACHE_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, kCacheShapePtr);
+    isValid = isValid && (kCacheShapePtr->GetStorageShape().GetDimNum() == NUM_FOUR);
+    OP_CHECK_IF(!isValid, OP_LOGE(context_->GetNodeName(), "k_cache must be 4D tensor."), return ge::GRAPH_FAILED);
+    blockNum_ = kCacheShapePtr->GetStorageShape().GetDim(0);
+    blockSize_ = kCacheShapePtr->GetStorageShape().GetDim(2);
+    if (isKQuant_) {
+        isValid =
+            isValid && (kCacheShapePtr->GetStorageShape().GetDim(1) == numHeadK_ * qkvDim_ / INT8_BLOCK_ALIGN_NUM);
+        isValid = isValid && (kCacheShapePtr->GetStorageShape().GetDim(3) == INT8_BLOCK_ALIGN_NUM);
+    } else {
+        isValid =
+            isValid && (kCacheShapePtr->GetStorageShape().GetDim(1) == numHeadK_ * qkvDim_ / FP16_BLOCK_ALIGN_NUM);
+        isValid = isValid && (kCacheShapePtr->GetStorageShape().GetDim(3) == FP16_BLOCK_ALIGN_NUM);
+    }
+    OP_CHECK_IF(
+        blockNum_ < ((seqLength_ + blockSize_ - 1) / blockSize_ * batchSize_),
+        OP_LOGE(context_->GetNodeName(), "blockNum must be greater than or equal to Ceil(Sqkv / blockSize) * Bqkv."),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!isValid, OP_LOGE(context_->GetNodeName(), "the shape of k_cache is invalid."),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckVCacheValid()
+{
+    auto vCacheDesc = context_->GetInputDesc(V_CACHE_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, vCacheDesc);
+    auto vcacheDtype = vCacheDesc->GetDataType();
+    OP_CHECK_IF(vcacheDtype != qkvDtype_ && vcacheDtype != ge::DataType::DT_INT8,
+                OP_LOGE(context_->GetNodeName(), "v_cache dtype must either be the same with qkv, or be int8."),
+                return ge::GRAPH_FAILED);
+    isVQuant_ = vcacheDtype == ge::DataType::DT_INT8 ? 1 : 0;
+
+    bool isValid = true;
+    const gert::StorageShape* vCacheShapePtr = context_->GetInputShape(V_CACHE_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, vCacheShapePtr);
+    isValid = isValid && (vCacheShapePtr->GetStorageShape().GetDimNum() == NUM_FOUR);
+    OP_CHECK_IF(!isValid, OP_LOGE(context_->GetNodeName(), "v_cache must be 4D tensor."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(vCacheShapePtr->GetStorageShape().GetDim(0) != blockNum_,
+                OP_LOGE(context_->GetNodeName(), "the blockNums of v_cache must be equal to that of k_cache."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(vCacheShapePtr->GetStorageShape().GetDim(2) != blockSize_,
+                OP_LOGE(context_->GetNodeName(), "the blockSize of v_cache must be equal to that of k_cache."),
+                return ge::GRAPH_FAILED);
+    if (isVQuant_) {
+        isValid =
+            isValid && (vCacheShapePtr->GetStorageShape().GetDim(1) == numHeadV_ * qkvDim_ / INT8_BLOCK_ALIGN_NUM);
+        isValid = isValid && (vCacheShapePtr->GetStorageShape().GetDim(3) == INT8_BLOCK_ALIGN_NUM);
+    } else {
+        isValid =
+            isValid && (vCacheShapePtr->GetStorageShape().GetDim(1) == numHeadV_ * qkvDim_ / FP16_BLOCK_ALIGN_NUM);
+        isValid = isValid && (vCacheShapePtr->GetStorageShape().GetDim(3) == FP16_BLOCK_ALIGN_NUM);
+    }
+    OP_CHECK_IF(!isValid, OP_LOGE(context_->GetNodeName(), "the shape of v_cache is invalid."),
+                return ge::GRAPH_FAILED);
+
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckKScaleValid()
+{
+    const gert::StorageShape* kScaleShapePtr = context_->GetOptionalInputShape(K_SCALE_IDX);
+    OP_CHECK_IF(kScaleShapePtr == nullptr && isKQuant_ == 1,
+                OP_LOGE(context_->GetNodeName(), "when k_Cache dtype is int8, k_scale cannot be None."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(kScaleShapePtr != nullptr && isKQuant_ == 0,
+                OP_LOGE(context_->GetNodeName(), "when k_Cache dtype is not int8, k_scale must be None."),
+                return ge::GRAPH_FAILED);
+    if (kScaleShapePtr != nullptr) {
+        OP_CHECK_IF(kScaleShapePtr->GetStorageShape().GetDimNum() != NUM_TWO,
+                    OP_LOGE(context_->GetNodeName(), "k_scale must be 2D tensor."), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(kScaleShapePtr->GetStorageShape().GetDim(0) != numHeadK_,
+                    OP_LOGE(context_->GetNodeName(), "the first dimension of k_scale must be %ld.", numHeadK_),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(kScaleShapePtr->GetStorageShape().GetDim(1) != qkvDim_,
+                    OP_LOGE(context_->GetNodeName(), "the second dimension of k_scale must be %ld.", qkvDim_),
+                    return ge::GRAPH_FAILED);
+        auto kScaleDesc = context_->GetOptionalInputDesc(K_SCALE_IDX);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, kScaleDesc);
+        auto kscaleDtype = kScaleDesc->GetDataType();
+        OP_CHECK_IF(kscaleDtype != ge::DataType::DT_FLOAT,
+                    OP_LOGE(context_->GetNodeName(), "k_scale dtype must be float32."), return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckVScaleValid()
+{
+    const gert::StorageShape* vScaleShapePtr = context_->GetOptionalInputShape(V_SCALE_IDX);
+    OP_CHECK_IF(vScaleShapePtr == nullptr && isVQuant_ == 1,
+                OP_LOGE(context_->GetNodeName(), "when v_Cache dtype is int8, v_scale cannot be None."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(vScaleShapePtr != nullptr && isVQuant_ == 0,
+                OP_LOGE(context_->GetNodeName(), "when v_Cache dtype is not int8, v_scale must be None."),
+                return ge::GRAPH_FAILED);
+    if (vScaleShapePtr != nullptr) {
+        OP_CHECK_IF(vScaleShapePtr->GetStorageShape().GetDimNum() != NUM_TWO,
+                    OP_LOGE(context_->GetNodeName(), "v_scale must be 2D tensor."), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(vScaleShapePtr->GetStorageShape().GetDim(0) != numHeadV_,
+                    OP_LOGE(context_->GetNodeName(), "the first dimension of v_scale must be %ld.", numHeadV_),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(vScaleShapePtr->GetStorageShape().GetDim(1) != qkvDim_,
+                    OP_LOGE(context_->GetNodeName(), "the second dimension of v_scale must be %ld.", qkvDim_),
+                    return ge::GRAPH_FAILED);
+        auto vScaleDesc = context_->GetOptionalInputDesc(V_SCALE_IDX);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, vScaleDesc);
+        auto vscaleDtype = vScaleDesc->GetDataType();
+        OP_CHECK_IF(vscaleDtype != ge::DataType::DT_FLOAT,
+                    OP_LOGE(context_->GetNodeName(), "v_scale dtype must be float32."), return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckKOffsetValid()
+{
+    const gert::StorageShape* kOffsetShapePtr = context_->GetOptionalInputShape(K_OFFSET_IDX);
+    OP_CHECK_IF(kOffsetShapePtr != nullptr && isKQuant_ == 0,
+                OP_LOGE(context_->GetNodeName(), "when k_Cache dtype is not int8, k_offset must be None."),
+                return ge::GRAPH_FAILED);
+    if (kOffsetShapePtr != nullptr) {
+        auto kOffsetDesc = context_->GetOptionalInputDesc(K_OFFSET_IDX);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, kOffsetDesc);
+        auto kOffsetDtype = kOffsetDesc->GetDataType();
+        OP_CHECK_IF(kOffsetDtype != ge::DataType::DT_FLOAT,
+                    OP_LOGE(context_->GetNodeName(), "k_offset dtype must be float32."), return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckVOffsetValid()
+{
+    const gert::StorageShape* vOffsetShapePtr = context_->GetOptionalInputShape(V_OFFSET_IDX);
+    OP_CHECK_IF(vOffsetShapePtr != nullptr && isVQuant_ == 0,
+                OP_LOGE(context_->GetNodeName(), "when v_Cache dtype is not int8, v_offset must be None."),
+                return ge::GRAPH_FAILED);
+    if (vOffsetShapePtr != nullptr) {
+        auto vOffsetDesc = context_->GetOptionalInputDesc(V_OFFSET_IDX);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, vOffsetDesc);
+        auto vOffsetDtype = vOffsetDesc->GetDataType();
+        OP_CHECK_IF(vOffsetDtype != ge::DataType::DT_FLOAT,
+                    OP_LOGE(context_->GetNodeName(), "v_offset dtype must be float32."), return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::GetShapeAttrsInfoInner()
+{
+    OP_CHECK_IF(context_ == nullptr, OP_LOGE(context_->GetNodeName(), "context_ can not be nullptr."),
+                return ge::GRAPH_FAILED);
+    auto attrs = context_->GetAttrs();
+    OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
+    auto qkvSizePtr = attrs->GetListInt(QKV_SIZE_IDX); // 获取qkv_size
+    OP_CHECK_NULL_WITH_CONTEXT(context_, qkvSizePtr);
+    OP_CHECK_IF(qkvSizePtr->GetSize() != NUM_FOUR,
+                OP_LOGE(context_->GetNodeName(), "Check qkv_size failed, the size of qkv_size must be 4."),
+                return ge::GRAPH_FAILED);
+    batchSize_ = qkvSizePtr->GetData()[SHAPE_IDX_B];
+    seqLength_ = qkvSizePtr->GetData()[SHAPE_IDX_S];
+    numHead_ = qkvSizePtr->GetData()[SHAPE_IDX_N];
+    qkvDim_ = qkvSizePtr->GetData()[SHAPE_IDX_D];
+    OP_CHECK_IF(batchSize_ <= 0 || seqLength_ <= 0 || numHead_ <= 0 || qkvDim_ <= 0,
+                OP_LOGE(context_->GetNodeName(), "Check qkv_size failed, the value of qkv_size must > 0."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(qkvDim_ != 128, OP_LOGE(context_->GetNodeName(), "Dqkv must be 128."), return ge::GRAPH_FAILED);
+    reciprocal_ = 1.0 / static_cast<float>(qkvDim_);
+    auto headNumsPtr = attrs->GetListInt(HEAD_NUMS_IDX); // 获取Nq、Nk、Nv
+    OP_CHECK_NULL_WITH_CONTEXT(context_, headNumsPtr);
+    OP_CHECK_IF(headNumsPtr->GetSize() != 3,
+                OP_LOGE(context_->GetNodeName(), "Check headNums failed, the size of headNums must be 3."),
+                return ge::GRAPH_FAILED);
+    numHeadQ_ = headNumsPtr->GetData()[DIM_ZERO];
+    numHeadK_ = headNumsPtr->GetData()[DIM_ONE];
+    numHeadV_ = headNumsPtr->GetData()[DIM_TWO];
+    OP_CHECK_IF(numHeadQ_ <= 0 || numHeadK_ <= 0 || numHeadV_ <= 0,
+                OP_LOGE(context_->GetNodeName(), "Check headNums failed, the value of headNums must > 0."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(numHead_ != numHeadQ_ + numHeadK_ + numHeadV_,
+                OP_LOGE(context_->GetNodeName(), "Check headNums failed, N is not equal to Nq + Nk + Nv."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(numHeadK_ != numHeadV_,
+                OP_LOGE(context_->GetNodeName(), "Check headNums failed, Nk is not equal to Nv."),
+                return ge::GRAPH_FAILED);
+    ropeRange_ = qkvDim_; // 获取ropeRange
+    const float* epsilon = attrs->GetFloat(EPSILON_IDX);
+    epsilon_ = epsilon == nullptr ? 1e-6 : *epsilon;     // 获取epsilon
+    const char* tmpmode = attrs->GetStr(CACHE_MODE_IDX); // 获取cacheMode
+    std::unordered_map<std::string, CacheMode> cacheModeMap = {{"PA_NZ", CacheMode::PA_NZ}};
+    if (tmpmode == nullptr) {
+        currentCacheMode_ = CacheMode::PA_NZ;
+    } else {
+        std::string cacheMode = tmpmode;
+        if (cacheModeMap.find(cacheMode) != cacheModeMap.end()) {
+            currentCacheMode_ = cacheModeMap[cacheMode];
+        } else {
+            OP_LOGE(context_->GetNodeName(), "Check CacheMode failed, CacheMode only support PA_NZ now.");
+            return ge::GRAPH_FAILED;
+        }
+    }
+    // 获取is_output_qkv
+    const bool* isOutputQkv = attrs->GetBool(IS_OUTPUT_QKV_IDX);
+    bool tmp = isOutputQkv == nullptr ? false : *isOutputQkv;
+    isOutputQkv_ = tmp ? 1 : 0;
+    // 校验并获取输入tensor
+    OP_CHECK_IF(CheckQkvValid() == ge::GRAPH_FAILED, OP_LOGE(context_->GetNodeName(), "qkv is invalid."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckGammaValid(GAMMA_Q_INDEX) == ge::GRAPH_FAILED,
+                OP_LOGE(context_->GetNodeName(), "gamma_q is invalid."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckGammaValid(GAMMA_K_INDEX) == ge::GRAPH_FAILED,
+                OP_LOGE(context_->GetNodeName(), "gamma_k is invalid."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckCosSinValid() == ge::GRAPH_FAILED, OP_LOGE(context_->GetNodeName(), "cos or sin is invalid."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckIndexValid() == ge::GRAPH_FAILED, OP_LOGE(context_->GetNodeName(), "index is invalid."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckQOutValid() == ge::GRAPH_FAILED, OP_LOGE(context_->GetNodeName(), "qout is invalid."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckKCacheValid() == ge::GRAPH_FAILED, OP_LOGE(context_->GetNodeName(), "k_cache is invalid."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckVCacheValid() == ge::GRAPH_FAILED, OP_LOGE(context_->GetNodeName(), "v_cache is invalid."),
+                return ge::GRAPH_FAILED);
+    if (CheckBlockSizeAlign() == ge::GRAPH_FAILED) {
+        return ge::GRAPH_FAILED;
+    }
+    OP_CHECK_IF(CheckKScaleValid() == ge::GRAPH_FAILED, OP_LOGE(context_->GetNodeName(), "k_scale is invalid."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckVScaleValid() == ge::GRAPH_FAILED, OP_LOGE(context_->GetNodeName(), "v_scale is invalid."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckKOffsetValid() == ge::GRAPH_FAILED, OP_LOGE(context_->GetNodeName(), "k_offset is invalid."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckVOffsetValid() == ge::GRAPH_FAILED, OP_LOGE(context_->GetNodeName(), "v_offset is invalid."),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+// cache BlockSize 按 dtype 判 32 Byte 对齐: int8 -> %32, fp16/bf16 -> %16, k/v 混型取严
+ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckBlockSizeAlign()
+{
+    auto kCacheDesc = context_->GetInputDesc(K_CACHE_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, kCacheDesc);
+    auto vCacheDesc = context_->GetInputDesc(V_CACHE_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, vCacheDesc);
+    const int64_t alignBytes = BASE_BLOCK_SIZE; // 32 Byte
+    const int64_t kCacheBytes = static_cast<int64_t>(ge::GetSizeByDataType(kCacheDesc->GetDataType()));
+    const int64_t vCacheBytes = static_cast<int64_t>(ge::GetSizeByDataType(vCacheDesc->GetDataType()));
+    OP_CHECK_IF(
+        blockSize_ * kCacheBytes % alignBytes != 0 || blockSize_ * vCacheBytes % alignBytes != 0,
+        OP_LOGE(context_->GetNodeName(),
+                "blockSize must be 32-Byte aligned per cache dtype, but blockSize=%ld, k_cache=%ldB, v_cache=%ldB.",
+                blockSize_, kCacheBytes, vCacheBytes),
+        return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
 
 bool QkvRmsNormRopeCacheTilingRegbase::IsCapable()
 {
@@ -116,7 +481,7 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CalUbTiling()
 
 // A5(ascend950)侧收紧:cos/sin 的第一维必须恰为 B*S。
 //
-// 基类共享的 CheckCosSinValid(A2/A3 同样在用)额外放行了 batch 内广播形态 [B, D],
+// CheckCosSinValid 额外放行了 batch 内广播形态 [B, D],
 // 但该形态:
 //   ① proto / README / aclnn 三处公开资料均未声明,只承诺 [B*S, D];
 //   ② 内核一律按【全局 token 行】读 cos/sin(tokenStart * D),并未实现广播 ——
@@ -131,7 +496,7 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckCosSinExact()
     const gert::Shape& cosShape = cosShapePtr->GetStorageShape();
     const gert::Shape& sinShape = sinShapePtr->GetStorageShape();
 
-    // 秩已由基类 CheckCosSinValid 校为 2,此处可直接取 dim 0/1
+    // 秩已由 CheckCosSinValid 校为 2,此处可直接取 dim 0/1
     const int64_t expect = batchSize_ * seqLength_;
     OP_CHECK_IF(
         cosShape.GetDim(SHAPE_IDX_BS) != expect || sinShape.GetDim(SHAPE_IDX_BS) != expect,
@@ -144,7 +509,7 @@ ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::CheckCosSinExact()
 
 ge::graphStatus QkvRmsNormRopeCacheTilingRegbase::DoOpTiling()
 {
-    // 复用 A2 的 shape / dtype / attr 校验入口,支持面与 A2 严格一致
+    // A5 私有校验入口(实现见本文件上半部分)
     OP_CHECK_IF(GetShapeAttrsInfoInner() == ge::GRAPH_FAILED,
                 OP_LOGE(context_->GetNodeName(), "GetShapeAttrsInfoInner failed."), return ge::GRAPH_FAILED);
     // 基类放行了 [B,D] 广播形态但内核读不了,A5 侧单独拒掉
