@@ -8,6 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include <algorithm>
+#include <cstdio>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -118,18 +120,18 @@ int main()
 
     std::vector<int64_t> xShape = {M, K};
     std::vector<int64_t> weightLogicalShape = {E, K, N};
-    std::vector<int64_t> weightStorageShape = {E, K / 16, N / 32, 16, 32};
+    std::vector<int64_t> weightStorageShape = {E, Ceil(N, 32), Ceil(K, 16), 16, 32};
     std::vector<int64_t> weightScaleShape = {E, Ceil(K, 64), N, 2};
     std::vector<int64_t> xScaleShape = {M, Ceil(K, 64), 2};
     std::vector<int64_t> groupListShape = {E};
     std::vector<int64_t> outputShape = {M, N / 2};
     std::vector<int64_t> outputScaleShape = {M, Ceil(N / 2, 64), 2};
 
-    std::vector<uint8_t> xHostData(GetShapeSize(xShape), 1);
-    std::vector<uint8_t> weightHostData(GetShapeSize(weightStorageShape), 1);
-    std::vector<int8_t> weightScaleHostData(GetShapeSize(weightScaleShape), 1);
-    std::vector<int8_t> xScaleHostData(GetShapeSize(xScaleShape), 1);
-    // std::vector<int64_t> groupListHostData(E, 1);
+    // E4M3FN code 0x38 is 1.0; E8M0 code 121 is 2^-6.
+    std::vector<uint8_t> xHostData(GetShapeSize(xShape), 0x38);
+    std::vector<uint8_t> weightHostData(GetShapeSize(weightStorageShape), 0x38);
+    std::vector<int8_t> weightScaleHostData(GetShapeSize(weightScaleShape), 121);
+    std::vector<int8_t> xScaleHostData(GetShapeSize(xScaleShape), 121);
     std::vector<int64_t> groupListHostData = {93, 188, 76, 155};
     std::vector<uint8_t> outputHostData(GetShapeSize(outputShape), 0);
     std::vector<int8_t> outputScaleHostData(GetShapeSize(outputScaleShape), 0);
@@ -168,6 +170,8 @@ int main()
     CHECK_RET(weight != nullptr, LOG_PRINT("aclCreateTensorList(weight) failed\n"); return ACL_ERROR_FAILURE);
     std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> weightTensorListPtr(weight,
                                                                                               aclDestroyTensorList);
+    // The TensorList owns its Tensor descriptors; device buffers remain separately owned.
+    weightTensorPtr.release();
     ret = CreateAclTensorND<int8_t>(weightScaleHostData, weightScaleShape, &weightScaleDeviceAddr, ACL_FLOAT8_E8M0,
                                     &weightScaleTensor);
     std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> weightScaleTensorPtr(weightScaleTensor,
@@ -179,6 +183,7 @@ int main()
     CHECK_RET(weightScale != nullptr, LOG_PRINT("aclCreateTensorList(weightScale) failed\n"); return ACL_ERROR_FAILURE);
     std::unique_ptr<aclTensorList, aclnnStatus (*)(const aclTensorList*)> weightScaleTensorListPtr(
         weightScale, aclDestroyTensorList);
+    weightScaleTensorPtr.release();
 
     ret = CreateAclTensorND<int8_t>(xScaleHostData, xScaleShape, &xScaleDeviceAddr, ACL_FLOAT8_E8M0, &xScale);
     std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> xScaleTensorPtr(xScale, aclDestroyTensor);
@@ -246,8 +251,6 @@ int main()
     outputTensorPtr.reset();
     groupListTensorPtr.reset();
     xScaleTensorPtr.reset();
-    weightScaleTensorPtr.reset();
-    weightTensorPtr.reset();
     xTensorPtr.reset();
 
     outputScaleDeviceAddrPtr.reset();

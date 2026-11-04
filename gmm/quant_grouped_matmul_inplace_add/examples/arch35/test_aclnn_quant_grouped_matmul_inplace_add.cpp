@@ -16,6 +16,7 @@
 #include <iostream>
 #include <vector>
 #include <memory>
+#include <utility>
 #include "acl/acl.h"
 #include "aclnnop/aclnn_quant_grouped_matmul_inplace_add.h"
 
@@ -62,7 +63,7 @@ int Init(int32_t deviceId, aclrtStream* stream)
 
 template <typename T>
 int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                    aclDataType dataType, aclTensor** tensor)
+                    aclDataType dataType, aclTensor** tensor, bool transpose = false)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请Device侧内存
@@ -79,8 +80,14 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
         strides[i] = shape[i + 1] * strides[i + 1];
     }
 
+    // shape describes contiguous storage. Transpose the view, not the underlying data.
+    auto viewShape = shape;
+    if (transpose) {
+        std::swap(viewShape[0], viewShape[1]);
+        std::swap(strides[0], strides[1]);
+    }
     // 调用aclCreateTensor接口创建aclTensor
-    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
+    *tensor = aclCreateTensor(viewShape.data(), viewShape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
                               shape.data(), shape.size(), *deviceAddr);
     return 0;
 }
@@ -117,7 +124,6 @@ int aclnnQuantGroupedMatmulInplaceAddTest(int32_t deviceId, aclrtStream& stream)
     aclTensor* scale2 = nullptr;
     aclTensor* yRef = nullptr;
     aclTensor* scale1 = nullptr;
-    aclTensor* out = nullptr;
     int64_t groupListType = 0;
     int64_t groupSize = 0;
     std::vector<uint8_t> xData(GetShapeSize(x1Shape), 0X10); // hifloat8 2.0 转16进制 0X10
@@ -126,8 +132,9 @@ int aclnnQuantGroupedMatmulInplaceAddTest(int32_t deviceId, aclrtStream& stream)
     std::vector<float> yData(GetShapeSize(yShape), 1);
     std::vector<float> scale1Data(GetShapeSize(scale1Shape), 1);
 
-    // 创建x aclTensor
-    ret = CreateAclTensor<uint8_t>(xData, x1Shape, &x1DeviceAddr, aclDataType::ACL_HIFLOAT8, &x1);
+    // Only TN is supported: x1 storage [K, M] -> view [M, K], strides [1, M].
+    // For this square example the shape is unchanged, but the strides must still be transposed.
+    ret = CreateAclTensor<uint8_t>(xData, x1Shape, &x1DeviceAddr, aclDataType::ACL_HIFLOAT8, &x1, true);
     std::unique_ptr<aclTensor, aclnnStatus (*)(const aclTensor*)> x1TensorPtr(x1, aclDestroyTensor);
     std::unique_ptr<void, aclError (*)(void*)> x1DeviceAddrPtr(x1DeviceAddr, aclrtFree);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
@@ -201,7 +208,7 @@ int main()
     // 1. （固定写法）device/stream初始化，参考AscendCL对外接口列表
     // 根据自己的实际device填写deviceId
     int32_t deviceId = 0;
-    aclrtStream stream;
+    aclrtStream stream = nullptr;
     auto ret = aclnnQuantGroupedMatmulInplaceAddTest(deviceId, stream);
     CHECK_FREE_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnQuantGroupedMatmulInplaceAddTest failed. ERROR: %d\n", ret);
                    return ret);

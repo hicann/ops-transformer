@@ -151,4 +151,4 @@
 
 | 调用方式      | 调用样例                 | 说明                                                         |
 |--------------|-------------------------|--------------------------------------------------------------|
-| aclnn调用 | [test_aclnn_quant_grouped_matmul_inplace_add](examples/test_aclnn_quant_grouped_matmul_inplace_add.cpp) | 通过接口方式调用[QuantGroupedMatmulInplaceAdd](docs/aclnnQuantGroupedMatmulInplaceAdd.md)算子。 |
+| aclnn调用 | [test_aclnn_quant_grouped_matmul_inplace_add](examples/arch35/test_aclnn_quant_grouped_matmul_inplace_add.cpp) | 通过接口方式调用[QuantGroupedMatmulInplaceAdd](docs/aclnnQuantGroupedMatmulInplaceAdd.md)算子。 |
