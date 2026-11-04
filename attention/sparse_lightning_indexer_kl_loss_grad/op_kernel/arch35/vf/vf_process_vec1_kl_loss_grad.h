@@ -36,8 +36,9 @@ constexpr static AscendC::Reg::CastTrait castTraitB162B32Even = {
 
 template <typename T, typename INPUT_T>
 __simd_vf__ inline void ProcessVec1BasicVF(__ubuf__ T* dstUb, __ubuf__ T* srcUb, __ubuf__ INPUT_T* weightUb,
-                                           const uint32_t m, const uint32_t nBaseSize)
+                                           const uint32_t mRuntime, const uint32_t nBaseSize)
 {
+    const uint32_t m = mRuntime;
     RegTensor<float> vreg_input_x1;
     RegTensor<float> vreg_input_x2;
     RegTensor<float> vreg_input_x3;
@@ -57,7 +58,6 @@ __simd_vf__ inline void ProcessVec1BasicVF(__ubuf__ T* dstUb, __ubuf__ T* srcUb,
 
     MaskReg pregFullExeB16 = CreateMask<INPUT_T, MaskPattern::ALL>();
     MaskReg preg_all_b32 = CreateMask<float, MaskPattern::ALL>();
-    MaskReg preg_relu;
 
     Duplicate(vreg_output_x1, 0, preg_all_b32);
     Duplicate(vreg_output_x2, 0, preg_all_b32);
@@ -77,27 +77,10 @@ __simd_vf__ inline void ProcessVec1BasicVF(__ubuf__ T* dstUb, __ubuf__ T* srcUb,
 
         LoadAlign(vreg_input_x1, srcUb + i * nBaseSize);
         LoadAlign(vreg_input_x2, srcUb + i * nBaseSize + floatRepSize);
-        LoadAlign(vreg_input_x3, srcUb + i * nBaseSize + floatRepSize * 2);
-        LoadAlign(vreg_input_x4, srcUb + i * nBaseSize + floatRepSize * 3);
-        // SY ReLu计算
-        Compare<T, AscendC::CMPMODE::GT>(preg_relu, vreg_input_x1, vreg_zero, preg_all_b32);
-        Select(vreg_input_x1_new, vreg_input_x1, vreg_zero, preg_relu);
-        Compare<T, AscendC::CMPMODE::GT>(preg_relu, vreg_input_x2, vreg_zero, preg_all_b32);
-        Select(vreg_input_x2_new, vreg_input_x2, vreg_zero, preg_relu);
-        Compare<T, AscendC::CMPMODE::GT>(preg_relu, vreg_input_x3, vreg_zero, preg_all_b32);
-        Select(vreg_input_x3_new, vreg_input_x3, vreg_zero, preg_relu);
-        Compare<T, AscendC::CMPMODE::GT>(preg_relu, vreg_input_x4, vreg_zero, preg_all_b32);
-        Select(vreg_input_x4_new, vreg_input_x4, vreg_zero, preg_relu);
-        // SY 乘weights
-        Mul(vreg_input_x1, vreg_input_x1_new, vreg_weight, preg_all_b32);
-        Mul(vreg_input_x2, vreg_input_x2_new, vreg_weight, preg_all_b32);
-        Mul(vreg_input_x3, vreg_input_x3_new, vreg_weight, preg_all_b32);
-        Mul(vreg_input_x4, vreg_input_x4_new, vreg_weight, preg_all_b32);
-        // SY 累加和ReduceSum
-        Add(vreg_output_x1, vreg_output_x1, vreg_input_x1, preg_all_b32);
-        Add(vreg_output_x2, vreg_output_x2, vreg_input_x2, preg_all_b32);
-        Add(vreg_output_x3, vreg_output_x3, vreg_input_x3, preg_all_b32);
-        Add(vreg_output_x4, vreg_output_x4, vreg_input_x4, preg_all_b32);
+        Max(vreg_input_x1_new, vreg_input_x1, vreg_zero, preg_all_b32);
+        Max(vreg_input_x2_new, vreg_input_x2, vreg_zero, preg_all_b32);
+        MulAddDst(vreg_output_x1, vreg_input_x1_new, vreg_weight, preg_all_b32);
+        MulAddDst(vreg_output_x2, vreg_input_x2_new, vreg_weight, preg_all_b32);
     }
     StoreAlign(((__ubuf__ T*&)dstUb), vreg_output_x1, preg_all_b32);
     StoreAlign(((__ubuf__ T*&)dstUb + floatRepSize), vreg_output_x2, preg_all_b32);

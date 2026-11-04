@@ -29,9 +29,11 @@ template <typename T, typename INPUT_T, bool isAlign>
 __simd_vf__ inline void ProcessVec6BasicVF(__ubuf__ INPUT_T* dstUb, __ubuf__ T* dwUb, __ubuf__ T* srcUb,
                                            __ubuf__ T* softmaxReduceSumUb, __ubuf__ T* weightUb,
                                            __ubuf__ T* reduceSumUb, __ubuf__ T* reluUb, uint32_t regCnt,
-                                           uint32_t tailSize, uint32_t nIndexSize, uint32_t nBaseSize,
-                                           uint32_t repeatSize, uint32_t blockStride)
+                                           uint32_t tailSize, uint32_t nIndexSizeRuntime, uint32_t nBaseSize,
+                                           uint32_t repeatSize, uint32_t blockStrideRuntime)
 {
+    const uint32_t nIndexSize = nIndexSizeRuntime;
+    const uint32_t blockStride = blockStrideRuntime;
     RegTensor<float> vreg_input_x1;
     RegTensor<float> vreg_input_x2;
     RegTensor<float> vreg_input_x2_tmp;
@@ -81,16 +83,15 @@ __simd_vf__ inline void ProcessVec6BasicVF(__ubuf__ INPUT_T* dstUb, __ubuf__ T* 
         StoreAlign(((__ubuf__ T*&)reduceSumUb + regCnt * floatRepSize), vreg_input_sub, preg_all_b32);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
+    LoadAlign(vreg_input_sub, reduceSumUb + regCnt * floatRepSize);
     for (uint16_t i = 0; i < nIndexSize; ++i) {
         Duplicate(vreg_output_dw, 0.0f);
         LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_weight, weightUb + i);
         if constexpr (!isAlign) {
-            LoadAlign(vreg_input_sub_new, reduceSumUb + regCnt * floatRepSize);
             LoadAlign(vreg_input_x1, reluUb + i * nBaseSize + regCnt * floatRepSize);
             Select(vreg_input_x1_new, vreg_input_x1, vreg_zero, preg_tail_n);
-            Mul(vreg_tmp1, vreg_input_sub_new, vreg_input_x1_new, preg_all_b32);
-            Add(vreg_output_dw, vreg_tmp1, vreg_output_dw, preg_all_b32);
-            Mul(vreg_tmp1, vreg_input_sub_new, vreg_weight, preg_all_b32);
+            MulAddDst(vreg_output_dw, vreg_input_sub, vreg_input_x1_new, preg_all_b32);
+            Mul(vreg_tmp1, vreg_input_sub, vreg_weight, preg_all_b32);
             Compare<T, AscendC::CMPMODE::GT>(preg_relugrad, vreg_input_x1_new, vreg_zero, preg_tail_n);
             Select(vreg_tmp2, vreg_tmp1, vreg_zero, preg_relugrad);
             if constexpr (IsSameType<INPUT_T, half>::value) {
@@ -105,10 +106,8 @@ __simd_vf__ inline void ProcessVec6BasicVF(__ubuf__ INPUT_T* dstUb, __ubuf__ T* 
                     ((__ubuf__ INPUT_T*&)dstUb), vreg_relugrad_bf_even, blockStride, 1, preg_bf16);
             }
         } else {
-            LoadAlign(vreg_input_sub, reduceSumUb + regCnt * floatRepSize);
             LoadAlign(vreg_input_x1, reluUb + i * nBaseSize + regCnt * floatRepSize);
-            Mul(vreg_tmp1, vreg_input_sub, vreg_input_x1, preg_all_b32);
-            Add(vreg_output_dw, vreg_tmp1, vreg_output_dw, preg_all_b32);
+            MulAddDst(vreg_output_dw, vreg_input_sub, vreg_input_x1, preg_all_b32);
             Mul(vreg_tmp1, vreg_input_sub, vreg_weight, preg_all_b32);
             Compare<T, AscendC::CMPMODE::GT>(preg_relugrad, vreg_input_x1, vreg_zero, preg_all_b32);
             Select(vreg_tmp2, vreg_tmp1, vreg_zero, preg_relugrad);
@@ -133,13 +132,108 @@ __simd_vf__ inline void ProcessVec6BasicVF(__ubuf__ INPUT_T* dstUb, __ubuf__ T* 
     StoreUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T*&)dwUb), ureg_dst, 0);
 }
 
-template <typename T, typename INPUT_T, bool isAlign>
+template <typename T, typename INPUT_T, bool KeepStoreLoadBarrier = true>
+__simd_vf__ inline void ProcessVec6TwoColVF(__ubuf__ INPUT_T* dstUb0, __ubuf__ INPUT_T* dstUb1, __ubuf__ T* dwUb,
+                                            __ubuf__ T* srcUb, __ubuf__ T* softmaxReduceSumUb, __ubuf__ T* weightUb,
+                                            __ubuf__ T* reduceSumUb, __ubuf__ T* reluUb, uint32_t nIndexSizeRuntime,
+                                            uint32_t nBaseSize, uint32_t repeatSize, uint32_t blockStrideRuntime)
+{
+    const uint32_t nIndexSize = nIndexSizeRuntime;
+    const uint32_t blockStride = blockStrideRuntime;
+    RegTensor<float> vreg_relu0;
+    RegTensor<float> vreg_relu1;
+    RegTensor<float> vreg_input_x2;
+    RegTensor<float> vreg_input_x2_tmp;
+    RegTensor<float> vreg_input_sub0;
+    RegTensor<float> vreg_input_sub1;
+    RegTensor<float> vreg_zero;
+    RegTensor<float> vreg_softmax_reduce;
+    RegTensor<half> vreg_relugrad_half;
+    RegTensor<bfloat16_t> vreg_relugrad_bf;
+    RegTensor<half> vreg_relugrad_half_even;
+    RegTensor<bfloat16_t> vreg_relugrad_bf_even;
+    RegTensor<half> vreg_relugrad_half_odd;
+    RegTensor<bfloat16_t> vreg_relugrad_bf_odd;
+    RegTensor<float> vreg_weight;
+    RegTensor<float> vreg_output_dw;
+    RegTensor<float> vreg_out_dw;
+    RegTensor<float> vreg_dst;
+    RegTensor<float> vreg_tmp1;
+    RegTensor<float> vreg_tmp2;
+    UnalignRegForStore ureg_dst;
+    MaskReg pregFullExeB16 = CreateMask<INPUT_T, MaskPattern::ALL>();
+    MaskReg preg_all_b32 = CreateMask<float, MaskPattern::ALL>();
+    MaskReg preg_relugrad;
+    MaskReg preg_bf16 = UpdateMask<uint16_t>(repeatSize);
+
+    Duplicate(vreg_zero, 0.0f);
+    LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_softmax_reduce, softmaxReduceSumUb);
+
+    LoadAlign(vreg_relu0, srcUb);
+    LoadAlign(vreg_input_x2, reduceSumUb);
+    Mul(vreg_input_x2_tmp, vreg_input_x2, vreg_softmax_reduce, preg_all_b32);
+    Sub(vreg_input_sub0, vreg_input_x2_tmp, vreg_relu0, preg_all_b32);
+    StoreAlign(((__ubuf__ T*&)reduceSumUb), vreg_input_sub0, preg_all_b32);
+    LoadAlign(vreg_relu0, srcUb + floatRepSize);
+    LoadAlign(vreg_input_x2, reduceSumUb + floatRepSize);
+    Mul(vreg_input_x2_tmp, vreg_input_x2, vreg_softmax_reduce, preg_all_b32);
+    Sub(vreg_input_sub1, vreg_input_x2_tmp, vreg_relu0, preg_all_b32);
+    StoreAlign(((__ubuf__ T*&)reduceSumUb + floatRepSize), vreg_input_sub1, preg_all_b32);
+    if constexpr (KeepStoreLoadBarrier) {
+        LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
+    }
+
+    for (uint16_t i = 0; i < nIndexSize; ++i) {
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_weight, weightUb + i);
+        LoadAlign(vreg_relu0, reluUb + i * nBaseSize);
+        Mul(vreg_output_dw, vreg_input_sub0, vreg_relu0, preg_all_b32);
+        Mul(vreg_tmp1, vreg_input_sub0, vreg_weight, preg_all_b32);
+        Compare<T, AscendC::CMPMODE::GT>(preg_relugrad, vreg_relu0, vreg_zero, preg_all_b32);
+        Select(vreg_tmp2, vreg_tmp1, vreg_zero, preg_relugrad);
+        if constexpr (IsSameType<INPUT_T, half>::value) {
+            Cast<INPUT_T, float, castTraitZero>(vreg_relugrad_half, vreg_tmp2, pregFullExeB16);
+            DeInterleave(vreg_relugrad_half_even, vreg_relugrad_half_odd, vreg_relugrad_half, vreg_relugrad_half);
+            StoreAlign<INPUT_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+                ((__ubuf__ INPUT_T*&)dstUb0), vreg_relugrad_half_even, blockStride, 1, preg_bf16);
+        } else if constexpr (IsSameType<INPUT_T, bfloat16_t>::value) {
+            Cast<INPUT_T, float, castTraitZero>(vreg_relugrad_bf, vreg_tmp2, pregFullExeB16);
+            DeInterleave(vreg_relugrad_bf_even, vreg_relugrad_bf_odd, vreg_relugrad_bf, vreg_relugrad_bf);
+            StoreAlign<INPUT_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+                ((__ubuf__ INPUT_T*&)dstUb0), vreg_relugrad_bf_even, blockStride, 1, preg_bf16);
+        }
+        LoadAlign(vreg_relu1, reluUb + i * nBaseSize + floatRepSize);
+        MulAddDst(vreg_output_dw, vreg_input_sub1, vreg_relu1, preg_all_b32);
+        Mul(vreg_tmp1, vreg_input_sub1, vreg_weight, preg_all_b32);
+        Compare<T, AscendC::CMPMODE::GT>(preg_relugrad, vreg_relu1, vreg_zero, preg_all_b32);
+        Select(vreg_tmp2, vreg_tmp1, vreg_zero, preg_relugrad);
+        if constexpr (IsSameType<INPUT_T, half>::value) {
+            Cast<INPUT_T, float, castTraitZero>(vreg_relugrad_half, vreg_tmp2, pregFullExeB16);
+            DeInterleave(vreg_relugrad_half_even, vreg_relugrad_half_odd, vreg_relugrad_half, vreg_relugrad_half);
+            StoreAlign<INPUT_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+                ((__ubuf__ INPUT_T*&)dstUb1), vreg_relugrad_half_even, blockStride, 1, preg_bf16);
+        } else if constexpr (IsSameType<INPUT_T, bfloat16_t>::value) {
+            Cast<INPUT_T, float, castTraitZero>(vreg_relugrad_bf, vreg_tmp2, pregFullExeB16);
+            DeInterleave(vreg_relugrad_bf_even, vreg_relugrad_bf_odd, vreg_relugrad_bf, vreg_relugrad_bf);
+            StoreAlign<INPUT_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+                ((__ubuf__ INPUT_T*&)dstUb1), vreg_relugrad_bf_even, blockStride, 1, preg_bf16);
+        }
+        Reduce<Reg::ReduceType::SUM, float, float, Reg::MaskMergeMode::ZEROING>(vreg_out_dw, vreg_output_dw,
+                                                                                preg_all_b32);
+        LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_dst, (__ubuf__ T*&)dwUb);
+        Add(vreg_dst, vreg_out_dw, vreg_dst, preg_all_b32);
+        StoreUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T*&)dwUb), vreg_dst, ureg_dst, 1);
+    }
+    StoreUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T*&)dwUb), ureg_dst, 0);
+}
+
+template <typename T, typename INPUT_T, bool isAlign, bool KeepStoreLoadBarrier = true>
 __aicore__ inline void ProcessVec6Vf(const LocalTensor<INPUT_T>& dstTensor, const LocalTensor<T>& dwTensor,
                                      const LocalTensor<T>& srcTensor, const LocalTensor<T>& softmaxReduceTensor,
                                      const LocalTensor<T>& weightTensor, const LocalTensor<T>& reduceSumTensor,
-                                     const LocalTensor<T>& reluTensor, const uint32_t m, const uint32_t nIndexSize,
-                                     const uint32_t nBaseSize)
+                                     const LocalTensor<T>& reluTensor, const uint32_t m,
+                                     const uint32_t nIndexSizeRuntime, const uint32_t nBaseSize)
 {
+    const uint32_t nIndexSize = nIndexSizeRuntime;
     if (nIndexSize == 0) {
         return;
     }
@@ -155,10 +249,19 @@ __aicore__ inline void ProcessVec6Vf(const LocalTensor<INPUT_T>& dstTensor, cons
     __ubuf__ T* weightUb = (__ubuf__ T*)weightTensor.GetPhyAddr();
     __ubuf__ T* dwUb = (__ubuf__ T*)dwTensor.GetPhyAddr();
 
-    for (uint32_t regCnt = 0; regCnt < alignCnt; ++regCnt) {
-        __ubuf__ INPUT_T* dstUb = (__ubuf__ INPUT_T*)dstTensor.GetPhyAddr() + (regCnt * nIndexSize) * (s2BaseSize >> 1);
-        ProcessVec6BasicVF<T, INPUT_T, true>(dstUb, dwUb, srcUb, softmaxReduceSumUb, weightUb, reduceSumUb, reluUb,
-                                             regCnt, tailSize, nIndexSize, nBaseSize, repeatSize, blockStride);
+    if (alignCnt == 2) {
+        __ubuf__ INPUT_T* dstUb0 = (__ubuf__ INPUT_T*)dstTensor.GetPhyAddr();
+        __ubuf__ INPUT_T* dstUb1 = dstUb0 + nIndexSize * (s2BaseSize >> 1);
+        ProcessVec6TwoColVF<T, INPUT_T, KeepStoreLoadBarrier>(dstUb0, dstUb1, dwUb, srcUb, softmaxReduceSumUb, weightUb,
+                                                              reduceSumUb, reluUb, nIndexSize, nBaseSize, repeatSize,
+                                                              blockStride);
+    } else {
+        for (uint32_t regCnt = 0; regCnt < alignCnt; ++regCnt) {
+            __ubuf__ INPUT_T* dstUb =
+                (__ubuf__ INPUT_T*)dstTensor.GetPhyAddr() + (regCnt * nIndexSize) * (s2BaseSize >> 1);
+            ProcessVec6BasicVF<T, INPUT_T, true>(dstUb, dwUb, srcUb, softmaxReduceSumUb, weightUb, reduceSumUb, reluUb,
+                                                 regCnt, tailSize, nIndexSize, nBaseSize, repeatSize, blockStride);
+        }
     }
     if constexpr (!isAlign) {
         __ubuf__ INPUT_T* dstUb =

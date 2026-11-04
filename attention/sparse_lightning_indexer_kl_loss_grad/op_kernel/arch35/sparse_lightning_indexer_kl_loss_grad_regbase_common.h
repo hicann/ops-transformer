@@ -33,6 +33,20 @@ enum class SLISparseMode {
 
 constexpr uint32_t L0_MAX_SIZE = 64 * 1024;
 constexpr uint32_t L1_MAX_SIZE = 512 * 1024;
+constexpr uint32_t GATHER_L1_TILES = 8;
+constexpr uint32_t COOP_AIC_GATHER_ROWS = 48;
+__aicore__ inline constexpr uint32_t CoopAicGatherBegin(uint32_t tile)
+{
+    return 0U;
+}
+constexpr uint32_t PAIR_BYTE_INDEX_MAX_ROWS = 1U << 23;
+__aicore__ inline constexpr bool IsAicGatherTile(uint32_t kTaskId, int32_t s2LoopTimes)
+{
+    return (kTaskId & 3U) == 0U && static_cast<int32_t>(kTaskId) + 4 <= s2LoopTimes;
+}
+constexpr bool ENABLE_UNITFLAG_MM2 = false;
+constexpr bool ENABLE_UNITFLAG_MM3 = false;
+constexpr uint32_t D_SIZE_QUERY_INDEX = 128;
 constexpr uint32_t UB_MAX_SIZE = 128 * 1024;
 constexpr uint32_t L0C_MAX_SIZE = 256 * 1024;
 constexpr uint32_t MODE_NUM_2 = 2;
@@ -93,6 +107,7 @@ struct SLIGradConstInfo {
     uint32_t dSizeQueryRope = 64; // Rope，固定等于64
     uint32_t kSize;               // 现阶段只支持2048
     uint32_t kSizeAlign128;
+    bool gatherL1En;
     uint32_t cmpRatio;
     int64_t totalCost;
     SLISparseMode sparseMode; // 0或者3
@@ -106,7 +121,6 @@ struct SLIGradConstInfo {
     int32_t gatherKeyIndexDbNum;
     int32_t gatherKeySize;
     int32_t gatherKeyIndexSize;
-    int32_t sparseBlockSize = 1;
 
     int32_t gatherKBaseSize; // gather一次做的行数，一般128
     int32_t syKBaseSize;
@@ -187,8 +201,72 @@ struct SLIGradPRunInfo {
 };
 // / @}
 
+template <bool ResidentPipeline>
+struct SligShapeTraits {
+    __aicore__ static inline bool PairSortedTile(const SLIGradKRunInfo& info)
+    {
+        if constexpr (ResidentPipeline) {
+            return info.kProcessSize == VEC_P_BASESIZE;
+        }
+        return false;
+    }
+
+    __aicore__ static inline uint32_t GSize(const SLIGradConstInfo& info)
+    {
+        return info.gSizeQueryIndex;
+    }
+    __aicore__ static inline uint32_t DIndexSize(const SLIGradConstInfo& info)
+    {
+        if constexpr (ResidentPipeline) {
+            return D_SIZE_QUERY_INDEX;
+        }
+        return info.dSizeQueryIndex;
+    }
+    __aicore__ static inline int64_t AccumS2Idx(const SLIGradRunInfo& info)
+    {
+        return info.accumS2Idx;
+    }
+    __aicore__ static inline int32_t NIndexSize(const SLIGradRunInfo& info)
+    {
+        return info.nIndexSize;
+    }
+    __aicore__ static inline int32_t FirstNIndexSize(const SLIGradRunInfo& info)
+    {
+        return info.firstNIndexSize;
+    }
+    __aicore__ static inline uint32_t GAlign16(uint32_t runtimeValue)
+    {
+        return runtimeValue;
+    }
+    __aicore__ static inline bool GatherResident(bool runtimeValue)
+    {
+        if constexpr (ResidentPipeline) {
+            return true;
+        }
+        return runtimeValue;
+    }
+    __aicore__ static inline bool GatherResident(const SLIGradConstInfo& info)
+    {
+        if constexpr (ResidentPipeline) {
+            return true;
+        }
+        return info.gatherL1En;
+    }
+};
+
+template <typename IndexT>
+__aicore__ inline void SortSligPair(IndexT& first, IndexT& second)
+{
+    if (first > second) {
+        const IndexT tmp = first;
+        first = second;
+        second = tmp;
+    }
+}
+
 constexpr uint8_t SYNC_GATHER_TO_MM12_FLAG[2] = {9, 10};
 constexpr uint8_t SYNC_MM2_TO_V1_FLAG[2] = {0, 1};
+constexpr uint8_t SYNC_SUM_L1_RELAY_FLAG = 7;
 
 constexpr uint8_t SYNC_V6_TO_C3_FLAG = 8;
 constexpr uint8_t SYNC_C3_TO_V7_FLAG[2] = {13, 14};
@@ -197,6 +275,8 @@ constexpr uint8_t SYNC_V7_TO_C3_FLAG[2] = {3, 4};
 constexpr uint8_t SYNC_ST_TO_P_FLAG = 12;
 constexpr uint8_t SYNC_V6_TO_RELU_FLAG = 11;
 constexpr uint8_t SYNC_RELU_TO_V6_FLAG = 2;
+constexpr uint8_t SYNC_FIRST_RELU_TO_V6_FLAG = 5;
+constexpr uint8_t SYNC_COOP_GATHER_REUSE_FLAG = 6;
 
 constexpr uint8_t SYNC_C3_TO_V7_DETER_MTE2_FLAG[2] = {5, 6};
 constexpr uint8_t SYNC_C3_TO_V7_DETER_SA_FLAG = 15;
@@ -236,7 +316,9 @@ __aicore__ inline T AlignTo(const T n, const T alignSize)
     X(HasSequsedQ, bool, false) \
     X(HasSequsedK, bool, false) \
     X(HasCmpResidualK, bool, false) \
-    X(Deterministic, bool, false)
+    X(Deterministic, bool, false) \
+    X(ResidentPipeline, bool, false) \
+    X(BytePairCache, bool, false)
 
 /* 1. 生成带默认值的模版Template */
 #define GEN_TYPE_PARAM(name) typename name,

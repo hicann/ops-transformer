@@ -1110,11 +1110,13 @@ uint64_t SparseLightningIndexerKLLossGradTilingGeneralRegbase::GetTilingKey() co
     if (context_->GetOptionalInputTensor(CMP_RESIDUAL_KEY_INPUT_INDEX) == nullptr) {
         hasCmpResidualK = false;
     }
+    const bool residentPipeline = !deterministic && kSize <= BUFFER_SIZE_BYTE_1K;
     return GET_TPL_TILING_KEY(static_cast<uint8_t>(topKRange), static_cast<uint8_t>(tilingKeyLayout),
                               static_cast<uint8_t>(tilingKeyLayout), static_cast<uint8_t>(sparseMode),
                               static_cast<uint8_t>(hasCuSeqlensQ), static_cast<uint8_t>(hasCuSeqlensK),
                               static_cast<uint8_t>(hasSequsedQ), static_cast<uint8_t>(hasSequsedK),
-                              static_cast<uint8_t>(hasCmpResidualK), static_cast<uint8_t>(deterministic));
+                              static_cast<uint8_t>(hasCmpResidualK), static_cast<uint8_t>(deterministic),
+                              static_cast<uint8_t>(residentPipeline), static_cast<uint8_t>(residentPipeline));
 }
 
 ge::graphStatus SparseLightningIndexerKLLossGradTilingGeneralRegbase::GetWorkspaceSize()

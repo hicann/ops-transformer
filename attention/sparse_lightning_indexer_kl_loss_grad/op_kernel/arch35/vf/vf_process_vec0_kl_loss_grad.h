@@ -26,11 +26,29 @@ template <typename INPUT_T>
 __simd_vf__ inline void Ub2UbNd2Nz128(__ubuf__ INPUT_T* dstUb, __ubuf__ INPUT_T* srcUb, uint32_t m, uint32_t n)
 {
     RegTensor<INPUT_T> vreg_input_x1;
+    RegTensor<INPUT_T> vreg_input_x2;
+    RegTensor<INPUT_T> vreg_input_x3;
+    RegTensor<INPUT_T> vreg_input_x4;
     uint32_t blockStride = m;
     uint32_t repeatStride = 1;
     uint32_t repeatSize = (uint32_t)128ULL;
     MaskReg preg16 = UpdateMask<uint16_t>(repeatSize);
-    for (uint16_t i = 0; i < m; ++i) {
+    uint16_t i = 0;
+    for (; i + 4 <= m; i += 4) {
+        LoadAlign(vreg_input_x1, srcUb + i * n);
+        LoadAlign(vreg_input_x2, srcUb + (i + 1) * n);
+        LoadAlign(vreg_input_x3, srcUb + (i + 2) * n);
+        LoadAlign(vreg_input_x4, srcUb + (i + 3) * n);
+        StoreAlign<INPUT_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+            ((__ubuf__ INPUT_T*&)dstUb), vreg_input_x1, blockStride, repeatStride, preg16);
+        StoreAlign<INPUT_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+            ((__ubuf__ INPUT_T*&)dstUb), vreg_input_x2, blockStride, repeatStride, preg16);
+        StoreAlign<INPUT_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+            ((__ubuf__ INPUT_T*&)dstUb), vreg_input_x3, blockStride, repeatStride, preg16);
+        StoreAlign<INPUT_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+            ((__ubuf__ INPUT_T*&)dstUb), vreg_input_x4, blockStride, repeatStride, preg16);
+    }
+    for (; i < m; ++i) {
         LoadAlign(vreg_input_x1, srcUb + i * n);
         StoreAlign<INPUT_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ INPUT_T*&)dstUb), vreg_input_x1, blockStride, repeatStride, preg16);
