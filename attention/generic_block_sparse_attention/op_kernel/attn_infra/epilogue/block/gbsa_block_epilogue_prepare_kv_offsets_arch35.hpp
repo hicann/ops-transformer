@@ -18,10 +18,10 @@
 
 namespace NpuArch::Epilogue::Block {
 
-template <bool PAGED_CACHE_FLAG_, bool RESIDUAL_BLOCK_FLAG_>
-class BlockEpilogue<EpilogueAtlasA5PrepareKvOffsets<PAGED_CACHE_FLAG_, RESIDUAL_BLOCK_FLAG_>> {
+template <bool PAGED_CACHE_FLAG_, bool RESIDUAL_BLOCK_FLAG_, uint32_t ELEMENT_BYTES_>
+class BlockEpilogue<EpilogueAtlasA5PrepareKvOffsets<PAGED_CACHE_FLAG_, RESIDUAL_BLOCK_FLAG_, ELEMENT_BYTES_>> {
 public:
-    using DispatchPolicy = EpilogueAtlasA5PrepareKvOffsets<PAGED_CACHE_FLAG_, RESIDUAL_BLOCK_FLAG_>;
+    using DispatchPolicy = EpilogueAtlasA5PrepareKvOffsets<PAGED_CACHE_FLAG_, RESIDUAL_BLOCK_FLAG_, ELEMENT_BYTES_>;
     using ArchTag = typename DispatchPolicy::ArchTag;
 
     static constexpr bool PAGED_CACHE_FLAG = DispatchPolicy::PAGED_CACHE_FLAG;
@@ -119,8 +119,9 @@ public:
                             records[word - 2U] = static_cast<uint64_t>(previousLen) << 1U;
                             records[word - 1U] = static_cast<uint64_t>(previousLen) << 1U;
                         } else if (previousLen == blockY_ && len == blockY_ && reverse == (vOffset < previousVOffset) &&
-                                   kStride <= 0xFFFFFFFFULL && vStride <= 0xFFFFFFFFULL && kStride % 16U == 0U &&
-                                   vStride % 16U == 0U) {
+                                   kStride <= 0xFFFFFFFFULL && vStride <= 0xFFFFFFFFULL &&
+                                   kStride % DispatchPolicy::COPY_ALIGNMENT == 0U &&
+                                   vStride % DispatchPolicy::COPY_ALIGNMENT == 0U) {
                             // Reorder K and V together, only within this group. Short page/tail
                             // fragments stay single, so valid tokens never move into padded columns.
                             if (reverse) {
@@ -149,7 +150,7 @@ public:
                             previousLen += len;
                             records[word - 1U] = static_cast<uint64_t>(previousLen) << 1U;
                         } else if (previousLen == blockY_ && len == blockY_ && stride <= 0xFFFFFFFFULL &&
-                                   stride % 16U == 0U) {
+                                   stride % DispatchPolicy::COPY_ALIGNMENT == 0U) {
                             records[word - 1U] = (stride << 32U) | (static_cast<uint64_t>(len) << 1U) | 1U;
                             previousLen = 0;
                         } else {

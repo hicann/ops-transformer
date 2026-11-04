@@ -18,7 +18,6 @@
 #endif
 #if (__CCE_AICORE__ == 310)
 #include "arch35/generic_block_sparse_attention_kernel_arch35.h"
-#include "arch35/generic_block_sparse_attention_kernel_arch35_full_quant.h"
 #endif
 
 using namespace NpuArch;
@@ -124,8 +123,8 @@ using namespace GbsaKernelArch35;
 
 template <class InDtype, class SMDtype, class REDtype, Format qFormat, Format kvFormat, bool isPaged,
           bool isCausal = true, bool hasResidualBlock = false, Epilogue::LseMode lseMode = Epilogue::LseMode::NONE,
-          Epilogue::LseFormat lseFormat = Epilogue::LseFormat::TN1>
-__global__ __aicore__ void GbsaInferIntfRegular(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
+          Epilogue::LseFormat lseFormat = Epilogue::LseFormat::TN1, class OutDtype = InDtype>
+__aicore__ inline void GbsaInferIntfRegularImpl(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
                                                 GM_ADDR sparseBlockCount, GM_ADDR metaData, GM_ADDR cuSeqLengths,
                                                 GM_ADDR cuSeqLengthsKv, GM_ADDR sequsedQ, GM_ADDR sequsedKv,
                                                 GM_ADDR blockTable, GM_ADDR o, GM_ADDR softmaxLse, GM_ADDR workspace,
@@ -137,7 +136,7 @@ __global__ __aicore__ void GbsaInferIntfRegular(GM_ADDR q, GM_ADDR k, GM_ADDR v,
     using ElementV = InDtype;
     using ElementS = SMDtype;
     using ElementP = InDtype;
-    using ElementO = InDtype;
+    using ElementO = OutDtype;
     using ElementOTmp = REDtype;
 
     using LayoutQ = layout::RowMajor;
@@ -149,7 +148,8 @@ __global__ __aicore__ void GbsaInferIntfRegular(GM_ADDR q, GM_ADDR k, GM_ADDR v,
     using LayoutOTmp = layout::RowMajor;
 
     // Sparse KV offset preparation
-    using DispatchPolicyPrepareKvOffsets = Epilogue::EpilogueAtlasA5PrepareKvOffsets<isPaged, hasResidualBlock>;
+    using DispatchPolicyPrepareKvOffsets =
+        Epilogue::EpilogueAtlasA5PrepareKvOffsets<isPaged, hasResidualBlock, sizeof(ElementK)>;
     using EpiloguePrepareKvOffsets = Epilogue::Block::BlockEpilogue<DispatchPolicyPrepareKvOffsets>;
 
     // QK matmul
@@ -197,6 +197,21 @@ __global__ __aicore__ void GbsaInferIntfRegular(GM_ADDR q, GM_ADDR k, GM_ADDR v,
     gbsaKernel(params);
 }
 
+template <class InDtype, class SMDtype, class REDtype, Format qFormat, Format kvFormat, bool isPaged,
+          bool isCausal = true, bool hasResidualBlock = false, Epilogue::LseMode lseMode = Epilogue::LseMode::NONE,
+          Epilogue::LseFormat lseFormat = Epilogue::LseFormat::TN1, class OutDtype = InDtype>
+__global__ __aicore__ void GbsaInferIntfRegular(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
+                                                GM_ADDR sparseBlockCount, GM_ADDR metaData, GM_ADDR cuSeqLengths,
+                                                GM_ADDR cuSeqLengthsKv, GM_ADDR sequsedQ, GM_ADDR sequsedKv,
+                                                GM_ADDR blockTable, GM_ADDR o, GM_ADDR softmaxLse, GM_ADDR workspace,
+                                                GM_ADDR tiling)
+{
+    GbsaInferIntfRegularImpl<InDtype, SMDtype, REDtype, qFormat, kvFormat, isPaged, isCausal, hasResidualBlock, lseMode,
+                             lseFormat, OutDtype>(q, k, v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths,
+                                                  cuSeqLengthsKv, sequsedQ, sequsedKv, blockTable, o, softmaxLse,
+                                                  workspace, tiling);
+}
+
 template <class InDtype, class SMDtype, class REDtype, Format qFormat,
           Epilogue::LseMode lseMode = Epilogue::LseMode::NONE, Epilogue::LseFormat lseFormat = Epilogue::LseFormat::TN1>
 __global__ __aicore__ void GbsaInferInterfaceFullQuant(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
@@ -206,74 +221,8 @@ __global__ __aicore__ void GbsaInferInterfaceFullQuant(GM_ADDR q, GM_ADDR k, GM_
                                                        GM_ADDR vDequantScale, GM_ADDR o, GM_ADDR softmaxLse,
                                                        GM_ADDR workspace, GM_ADDR tiling)
 {
-    using ArchTag = Arch::AtlasA5;
-    using ElementQ = InDtype;
-    using ElementK = InDtype;
-    using ElementV = InDtype;
-    using ElementS = SMDtype;
-    using ElementP = InDtype;
-    using ElementO = SMDtype;
-    using ElementOTmp = REDtype;
-
-    using LayoutQ = layout::RowMajor;
-    using LayoutK = layout::ColumnMajor;
-    using LayoutS = layout::RowMajor;
-    using LayoutPDummy = layout::zN;
-    using LayoutV = layout::RowMajor;
-    using LayoutO = layout::RowMajor;
-    using LayoutOTmp = layout::RowMajor;
-
-    using L1TileShapeQK = Shape<Int<128>, Int<128>, Int<128>>;
-    using L0TileShapeQK = Shape<Int<128>, Int<128>, Int<128>>;
-    // FP8 resolves physical pages before the matrix loader.
-    using DispatchPolicyQK = Gemm::MmadAtlasA5BsaQK<false>;
-    using TileCopyQK = Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementQ, LayoutQ, ElementK, LayoutK, ElementS,
-                                                         LayoutS, void, Gemm::Tile::CopyL0CToUBMode::NO_SPLIT>;
-    using BlockMmadQK = Gemm::Block::BlockMmadTla<DispatchPolicyQK, L1TileShapeQK, L0TileShapeQK, ElementQ, ElementK,
-                                                  ElementS, void, TileCopyQK>;
-
-    using DispatchPolicyOnlineSoftmax = Epilogue::EpilogueOnlineSoftmaxBsa;
-    using PType = Gemm::GemmType<ElementP, LayoutPDummy>;
-    using SType = Gemm::GemmType<ElementS, LayoutS>;
-    using EpilogueOnlineSoftmax = Epilogue::Block::BlockEpilogue<DispatchPolicyOnlineSoftmax, PType, SType>;
-
-    using L1TileShapePV = Shape<Int<128>, Int<128>, Int<128>>;
-    using L0TileShapePV = Shape<Int<128>, Int<128>, Int<128>>;
-    // FP8 resolves physical pages before the matrix loader.
-    using DispatchPolicyPV = Gemm::MmadAtlasA5BsaPV<false>;
-    using TileCopyPV =
-        Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementP, LayoutPDummy, ElementV, LayoutV, ElementOTmp, LayoutOTmp,
-                                          void, Gemm::Tile::CopyL0CToUBMode::SPLIT_M>;
-    using BlockMmadPV = Gemm::Block::BlockMmadTla<DispatchPolicyPV, L1TileShapePV, L0TileShapePV, ElementP, ElementV,
-                                                  ElementOTmp, void, TileCopyPV>;
-
-    using DispatchPolicyRescaleO = Epilogue::EpilogueAtlasA5BsaRescaleO<lseMode, lseFormat>;
-    using TileCopyRescaleO = Epilogue::Tile::TileCopyRescaleO<ArchTag, ElementO, LayoutO, LayoutOTmp>;
-    using EpilogueRescaleO = Epilogue::Block::BlockEpilogue<DispatchPolicyRescaleO, ElementO, ElementOTmp, ElementS,
-                                                            ElementK, TileCopyRescaleO, Arch::PositionL0C>;
-
-    using GbsaKernel = GbsaFullQuantKernelArch35<BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV, EpilogueRescaleO,
-                                                 qFormat, Format::BSND>;
-
-    GbsaFullQuantKernelParamsArch35 params{q,
-                                           k,
-                                           v,
-                                           sparseBlockIdx,
-                                           sparseBlockCount,
-                                           metaData,
-                                           cuSeqLengths,
-                                           cuSeqLengthsKv,
-                                           sequsedQ,
-                                           sequsedKv,
-                                           blockTable,
-                                           qDequantScale,
-                                           kDequantScale,
-                                           vDequantScale,
-                                           o,
-                                           softmaxLse,
-                                           workspace,
-                                           tiling};
-    GbsaKernel gbsaKernel;
-    gbsaKernel(params);
+    GbsaInferIntfRegularImpl<InDtype, SMDtype, REDtype, qFormat, Format::BSND, true, true, false, lseMode, lseFormat,
+                             SMDtype>(q, k, v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv,
+                                      sequsedQ, sequsedKv, blockTable, o, softmaxLse, workspace, tiling);
 }
 #endif

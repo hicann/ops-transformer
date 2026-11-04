@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -274,6 +275,64 @@ TEST_F(generic_block_sparse_attention_tiling_ut, tnd_paged_fp8_out_bf16_950)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, kFp8Bf16Tiling950);
 }
 
+TEST_F(generic_block_sparse_attention_tiling_ut, fp8_gather_reserves_descriptor_workspace)
+{
+    for (int64_t numHeads : {16, 128}) {
+        for (auto outDtype : {ge::DT_FLOAT16, ge::DT_BF16}) {
+            GenericBlockSparseAttentionCompileInfo compileInfo;
+            gert::TilingContextPara nonQuantCtx("GenericBlockSparseAttention", MakeInputs(outDtype, kD, numHeads),
+                                                MakeOutputs(outDtype, false, kD, numHeads), MakeAttrs(1, 0, 1, 0),
+                                                &compileInfo, "Ascend950", 32, 262144);
+            gert::TilingContextPara quantCtx("GenericBlockSparseAttention",
+                                             MakeInputs(ge::DT_FLOAT8_E4M3FN, kD, numHeads),
+                                             MakeOutputs(outDtype, false, kD, numHeads), MakeAttrs(1, 5, 1, 0),
+                                             &compileInfo, "Ascend950", 32, 262144);
+            TilingInfo nonQuantInfo;
+            TilingInfo quantInfo;
+            ASSERT_TRUE(ExecuteTiling(nonQuantCtx, nonQuantInfo));
+            ASSERT_TRUE(ExecuteTiling(quantCtx, quantInfo));
+            ASSERT_EQ(quantInfo.workspaceSizes.size(), 1U);
+            EXPECT_EQ(quantInfo.workspaceSizes, nonQuantInfo.workspaceSizes);
+            EXPECT_EQ(quantInfo.tilingKey,
+                      static_cast<int64_t>(outDtype == ge::DT_FLOAT16 ? kFp8Fp16Tiling950 : kFp8Bf16Tiling950));
+        }
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, fp8_d512_reserves_lo_gm_workspace)
+{
+    // D=512 + groupSize>64 enables LO GM transit (emb>256 && qBaseTile>64). Non-quant cannot
+    // reach this path on 950 (headDim capped at 256), so assert an absolute workspace floor.
+    constexpr int64_t kEmb512 = 512;
+    constexpr int64_t kNumHeads = 128; // groupSize = 128 / 1 > 64 → qBaseTile = 128
+    constexpr uint64_t kBlockDim = 32;
+    constexpr uint64_t kQBaseTile = 128;
+    constexpr uint64_t kMm1L1TileN = 128;
+    constexpr uint64_t kKvBaseTile = 128;
+    constexpr uint64_t kFdAlign = 512;
+    constexpr uint64_t kBlockShapeY = 128;
+    auto alignUp = [](uint64_t value, uint64_t alignment) { return (value + alignment - 1U) / alignment * alignment; };
+    const uint64_t loBytes = kBlockDim * 2U * kQBaseTile * alignUp(static_cast<uint64_t>(kEmb512), 16U) * sizeof(float);
+    const uint64_t sparseBlocks = (kMm1L1TileN + 2ULL * kBlockShapeY - 2U) / kBlockShapeY;
+    const uint64_t copyBlocks = std::min(kMm1L1TileN, sparseBlocks * 2U); // paged
+    const uint64_t groupBytes = alignUp(64U + copyBlocks * 4U * sizeof(uint64_t), 64U);
+    const uint64_t tileWords = ((kKvBaseTile + kMm1L1TileN - 1U) / kMm1L1TileN) * groupBytes / sizeof(uint64_t);
+    const uint64_t kvOffsetBytes = kBlockDim * 4U * tileWords * sizeof(uint64_t);
+    const int64_t workspaceFloor = static_cast<int64_t>(alignUp(loBytes, kFdAlign) + kvOffsetBytes);
+
+    const float scale512 = 1.0f / sqrt(static_cast<float>(kEmb512));
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    gert::TilingContextPara quantCtx(
+        "GenericBlockSparseAttention", MakeInputs(ge::DT_FLOAT8_E4M3FN, kEmb512, kNumHeads),
+        MakeOutputs(ge::DT_FLOAT16, false, kEmb512, kNumHeads),
+        MakeAttrs(1, 5, 1, 0, 0.0f, -1, -1, 4, "TND", "PA_BBND", 0, false, kBlockShape, scale512), &compileInfo,
+        "Ascend950", kBlockDim, 262144);
+    TilingInfo quantInfo;
+    ASSERT_TRUE(ExecuteTiling(quantCtx, quantInfo));
+    ASSERT_EQ(quantInfo.workspaceSizes.size(), 1U);
+    EXPECT_GE(quantInfo.workspaceSizes[0], workspaceFloor);
+}
+
 std::vector<gert::TilingContextPara::TensorDescription> MakeBnbdInputs(ge::DataType qkvDtype)
 {
     auto inputs = MakeInputs(qkvDtype);
@@ -372,6 +431,16 @@ TEST_F(generic_block_sparse_attention_tiling_ut, residual_block_mode_arch35_non_
             ExecuteTestCase(ctx, ge::GRAPH_SUCCESS, baseKey + lseOffset + residualOffset);
         }
     }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, residual_block_mode_rejects_arch35_quant)
+{
+    // residual_block_mode=1 only supports non-quant.
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    gert::TilingContextPara ctx(
+        "GenericBlockSparseAttention", MakeInputs(ge::DT_FLOAT8_E4M3FN), MakeOutputs(ge::DT_FLOAT16, false),
+        MakeAttrs(1, 5, 1, 0, 0.0f, -1, -1, 4, "TND", "PA_BBND", 1), &compileInfo, "Ascend950", 56, 262144);
+    ExecuteTestCase(ctx, ge::GRAPH_FAILED);
 }
 
 TEST_F(generic_block_sparse_attention_tiling_ut, residual_none_and_consistent_topk_910b)
@@ -535,6 +604,16 @@ TEST_F(generic_block_sparse_attention_tiling_ut, unsupported_fp8_with_lse_950)
     GenericBlockSparseAttentionCompileInfo compileInfo;
     gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", MakeInputs(ge::DT_FLOAT8_E4M3FN),
                                               MakeOutputs(ge::DT_FLOAT16, true), MakeAttrs(1, 5, 1, 1), &compileInfo,
+                                              "Ascend950", 56, 262144);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, fp8_rejects_softmax_precision_0_950)
+{
+    // FP8 full-quant only supports softmaxPrecision=1.
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", MakeInputs(ge::DT_FLOAT8_E4M3FN),
+                                              MakeOutputs(ge::DT_FLOAT16, false), MakeAttrs(1, 5, 0, 0), &compileInfo,
                                               "Ascend950", 56, 262144);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }

@@ -41,12 +41,15 @@ struct EpilogueAtlasA2RescaleO {
     static constexpr LseMode LSE_MODE = LSE_MODE_;
 };
 
-// For AtlasA5
-template <bool PAGED_CACHE_FLAG_, bool RESIDUAL_BLOCK_FLAG_>
+// For AtlasA5. ELEMENT_BYTES is the KV element size in bytes (default 2).
+template <bool PAGED_CACHE_FLAG_, bool RESIDUAL_BLOCK_FLAG_, uint32_t ELEMENT_BYTES_ = 2U>
 struct EpilogueAtlasA5PrepareKvOffsets {
     using ArchTag = Arch::AtlasA5;
     static constexpr bool PAGED_CACHE_FLAG = PAGED_CACHE_FLAG_;
     static constexpr bool RESIDUAL_BLOCK_FLAG = RESIDUAL_BLOCK_FLAG_;
+    // ND matrix strides are in elements; paired copies require 32-byte alignment.
+    static_assert(32U % ELEMENT_BYTES_ == 0U, "ELEMENT_BYTES_ must divide 32 for copy alignment");
+    static constexpr uint32_t COPY_ALIGNMENT = 32U / ELEMENT_BYTES_;
 };
 
 struct EpilogueBsaMask2Idx {

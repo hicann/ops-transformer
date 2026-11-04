@@ -82,55 +82,6 @@ struct GbsaKernelParamsArch35 {
     {}
 };
 
-// Full-quant (FP8) kernel params.
-struct GbsaFullQuantKernelParamsArch35 {
-    GM_ADDR q;
-    GM_ADDR k;
-    GM_ADDR v;
-    GM_ADDR sparseBlockIdx;
-    GM_ADDR sparseBlockCount;
-    GM_ADDR metaData;
-    GM_ADDR cuSeqLengths;
-    GM_ADDR cuSeqLengthsKv;
-    GM_ADDR sequsedQ;
-    GM_ADDR sequsedKv;
-    GM_ADDR blockTable;
-    GM_ADDR qDequantScale;
-    GM_ADDR kDequantScale;
-    GM_ADDR vDequantScale;
-    GM_ADDR o;
-    GM_ADDR softmaxLse;
-    GM_ADDR workSpace;
-    GM_ADDR tiling;
-
-    __aicore__ inline GbsaFullQuantKernelParamsArch35() {}
-    __aicore__ inline GbsaFullQuantKernelParamsArch35(GM_ADDR q_, GM_ADDR k_, GM_ADDR v_, GM_ADDR sparseBlockIdx_,
-                                                      GM_ADDR sparseBlockCount_, GM_ADDR metaData_,
-                                                      GM_ADDR cuSeqLengths_, GM_ADDR cuSeqLengthsKv_, GM_ADDR sequsedQ_,
-                                                      GM_ADDR sequsedKv_, GM_ADDR blockTable_, GM_ADDR qDequantScale_,
-                                                      GM_ADDR kDequantScale_, GM_ADDR vDequantScale_, GM_ADDR o_,
-                                                      GM_ADDR softmaxLse_, GM_ADDR workSpace_, GM_ADDR tiling_)
-        : q(q_),
-          k(k_),
-          v(v_),
-          sparseBlockIdx(sparseBlockIdx_),
-          sparseBlockCount(sparseBlockCount_),
-          metaData(metaData_),
-          cuSeqLengths(cuSeqLengths_),
-          cuSeqLengthsKv(cuSeqLengthsKv_),
-          sequsedQ(sequsedQ_),
-          sequsedKv(sequsedKv_),
-          blockTable(blockTable_),
-          qDequantScale(qDequantScale_),
-          kDequantScale(kDequantScale_),
-          vDequantScale(vDequantScale_),
-          o(o_),
-          softmaxLse(softmaxLse_),
-          workSpace(workSpace_),
-          tiling(tiling_)
-    {}
-};
-
 __aicore__ inline uint32_t CeilDiv(uint32_t a, uint32_t b)
 {
     return (a + b - 1) / b;

@@ -32,7 +32,7 @@ public:
     using ElementP = typename BlockMmadPV::ElementA;
     using ElementV = typename BlockMmadPV::ElementB;
     using ElementOTmp = typename BlockMmadPV::ElementC;
-    using ElementO = typename BlockMmadQK::ElementA;
+    using ElementO = typename EpilogueRescaleO::ElementO;
     using ElementLse = typename EpilogueRescaleO::ElementLse;
 
     using LayoutQ = layout::RowMajor;

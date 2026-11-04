@@ -854,7 +854,7 @@ ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext* context)
         pipelineWorkspaceSize = mm1OutSize_ + smOnlineOutSize_ + mm2OutSize_ + updateSize_;
     } else {
         pipelineWorkspaceSize = static_cast<uint64_t>(topK_) * sizeof(int32_t);
-        if (quantType_ == 0U && embeddingSize_ > GBSA_TILE_SIZE_256 && qBaseTile_ > GBSA_TILE_SIZE_64) {
+        if (embeddingSize_ > GBSA_TILE_SIZE_256 && qBaseTile_ > GBSA_TILE_SIZE_64) {
             // Two complete FP32 LO tiles per physical AIC; FD workspace follows this region.
             mm2OutSize_ =
                 static_cast<uint64_t>(blockDim_) * 2U * qBaseTile_ * AlignUp(embeddingSize_, 16U) * sizeof(float);
@@ -865,7 +865,7 @@ ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext* context)
     // Four per-AIC slots. Each L1-N group has a 64B header and
     // PA entries hold {K offset, V offset, K meta, V meta}; dense entries
     // pack {offset, meta} but retain the original four-word capacity.
-    if (socVer_ == SOC_VER_950_CODE && quantType_ == 0U) {
+    if (socVer_ == SOC_VER_950_CODE) {
         const uint64_t sparseBlocks = (mm1L1TileN_ + 2ULL * blockShapeY_ - 2U) / blockShapeY_;
         const uint64_t copyBlocks = isPaged_ ? std::min<uint64_t>(mm1L1TileN_, sparseBlocks * 2U) : sparseBlocks;
         const uint64_t recordWords = 4U;
@@ -976,7 +976,7 @@ ge::graphStatus GBSATiling::CheckReservedOptionalInputs(gert::TilingContext* con
                                               "p_quant_scale is not supported yet and must be nullptr");
         return ge::GRAPH_FAILED;
     }
-    // Full-quant kernel does not consume dequant scales yet; reject non-null (tests pass null).
+    // FP8 full-quant path does not consume dequant scales yet; reject non-null (tests pass null).
     if (context->GetOptionalInputTensor(Q_DEQUANT_SCALE_INDEX) != nullptr ||
         context->GetOptionalInputTensor(K_DEQUANT_SCALE_INDEX) != nullptr ||
         context->GetOptionalInputTensor(V_DEQUANT_SCALE_INDEX) != nullptr) {
@@ -1169,7 +1169,7 @@ uint64_t GBSATiling::GenerateTilingKey()
     const bool isArch35 = (socVer_ == SOC_VER_950_CODE);
     uint64_t tilingKey = isArch35 ? GBSA_OP_ARCH35_BASE : GBSA_OP_ARCH22_BASE;
 
-    // dtype / FP8 out-dtype (same additives as BSA)
+    // dtype / attentionOut dtype additives
     if (dataType_ == ge::DT_FLOAT16) {
         // +0
     } else if (dataType_ == ge::DT_BF16) {
@@ -1349,10 +1349,10 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
     if (CheckMetadata(context) != ge::GRAPH_SUCCESS || CheckReservedOptionalInputs(context) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    if (socVer_ == SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_NONE) {
+    if (socVer_ == SOC_VER_950_CODE) {
         CalcBaseTileTilingParams950();
         CalcMatmulPhaseL1TileInfo950();
-    } else if (socVer_ != SOC_VER_950_CODE) {
+    } else {
         kvBaseTile_ = GBSA_TILE_SIZE_256;
     }
     ret = CalculateWorkSpace(context);
