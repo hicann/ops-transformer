@@ -70,7 +70,7 @@ bash build.sh --pkg --soc=${soc_version} --ops=add_example -j16
 若提示如下信息，说明编译成功。
 
 ```bash
-Self-extractable archive "cann-ops-transformer-custom_linux.${arch}.run" successfully created.
+Self-extractable archive "cann-ops-transformer-custom_linux-${arch}.run" successfully created.
 ```
 
 编译成功后，run包存放于项目根目录的build_out目录下。
