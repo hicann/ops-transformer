@@ -13,6 +13,7 @@
  * \brief
  */
 
+#include <algorithm>
 #include <set>
 #include "sparse_flash_attention_grad_tiling_bs1_regbase_arch92.h"
 #include "op_host/tiling_templates_registry.h"
@@ -249,6 +250,23 @@ ge::graphStatus SparseFlashAttentionGradBs1Regbase::DoBlockTiling()
     int64_t formerCoreProcessNNums = CeilCommon(nNums, aicNum);
     int64_t remainCoreNum = formerCoreProcessNNums * aicNum - nNums;
 
+    // Small BSND decode batches otherwise leave almost every compute core idle.
+    // Keep at least two tiles per shard to amortize pipeline fill/drain, and cap
+    // the reduction fan-in. Other layouts/modes retain the existing schedule.
+    int64_t kvSplitNum = 1;
+    if (tmpData.deterministic && tmpData.layout == static_cast<uint32_t>(InputLayout::BSND) && tmpData.s1 == 1 &&
+        !tmpData.ropeEnable && !tmpData.hasSinks && nNums > 0 && nNums <= aicNum / 2) {
+        const int64_t tileRows = tmpData.g <= SFAG_HEAD_N_L1_RESIDENT ? 64 : tmpData.singleN;
+        const int64_t selectedRows = std::min<int64_t>(tmpData.selected_block_count, tmpData.s2);
+        if (selectedRows >= 512) {
+            const int64_t tileCount = CeilCommon(selectedRows, tileRows);
+            kvSplitNum = std::min<int64_t>(8, std::min<int64_t>(aicNum / nNums, tileCount / 2));
+        }
+    }
+    baseParams_->set_kvSplitNum(kvSplitNum);
+    OP_LOGI(context_, "SFAG arch92 Q tasks=%d, selected-K splits=%ld, compute cores=%ld.", nNums, kvSplitNum,
+            usedCoreNum * kvSplitNum);
+
     // 使用总核数
     baseParams_->set_totalSize(nNums);
     baseParams_->set_usedCoreNum(usedCoreNum);
@@ -348,17 +366,22 @@ ge::graphStatus SparseFlashAttentionGradBs1Regbase::DoCastTiling()
         tailCoreLastLoopNBurstNum = tailCoreSize - (tailCoreLoopTimes - 1) * singleLoopNBurstNum;
     }
 
-    uint32_t usedCoreNum = sfmgUsedCoreNum;
-    int64_t qPreBlockFactor = (allNumQuery + usedCoreNum - 1) / usedCoreNum;
+    // Workspace initialization follows tensor size, independently of the Q-row reduction.
+    // Round each FP32 partition to a 32-byte boundary for DataCopy (including small Q).
+    const int64_t initAlign = BLOCK / B32;
+    const int64_t initCoreNum = aivNum;
+    // Each selected-K shard owns a separate [B,S1,N1,D] FP32 dQ plane.
+    const int64_t allNumQueryInit = allNumQuery * baseParams_->get_kvSplitNum();
+    int64_t qPreBlockFactor = CeilCommon(CeilCommon(allNumQueryInit, initAlign), initCoreNum) * initAlign;
     int64_t qPreBlockTotal = 0;
     int64_t qPreBlockTail = 0;
     if (qPreBlockFactor > 0) {
-        qPreBlockTotal = (allNumQuery + qPreBlockFactor - 1) / qPreBlockFactor;
-        int64_t qPreBlockTailTmp = allNumQuery % qPreBlockFactor;
+        qPreBlockTotal = (allNumQueryInit + qPreBlockFactor - 1) / qPreBlockFactor;
+        int64_t qPreBlockTailTmp = allNumQueryInit % qPreBlockFactor;
         qPreBlockTail = qPreBlockTailTmp == 0 ? qPreBlockFactor : qPreBlockTailTmp;
     }
 
-    int64_t kPreBlockFactor = (allNumKey + usedCoreNum - 1) / usedCoreNum;
+    int64_t kPreBlockFactor = CeilCommon(CeilCommon(allNumKey, initAlign), initCoreNum) * initAlign;
     int64_t kPreBlockTotal = 0;
     int64_t kPreBlockTail = 0;
     if (kPreBlockFactor > 0) {
@@ -367,7 +390,7 @@ ge::graphStatus SparseFlashAttentionGradBs1Regbase::DoCastTiling()
         kPreBlockTail = kPreBlockTailTmp == 0 ? kPreBlockFactor : kPreBlockTailTmp;
     }
 
-    int64_t vPreBlockFactor = (allNumValue + usedCoreNum - 1) / usedCoreNum;
+    int64_t vPreBlockFactor = CeilCommon(CeilCommon(allNumValue, initAlign), initCoreNum) * initAlign;
     int64_t vPreBlockTotal = 0;
     int64_t vPreBlockTail = 0;
     if (vPreBlockFactor > 0) {
@@ -443,7 +466,7 @@ ge::graphStatus SparseFlashAttentionGradBs1Regbase::DoCastTiling()
     postTilingData_->set_vPostBaseNum(vPostBaseNum);
     postTilingData_->set_vPostTailNum(vPostTailNum);
 
-    tmpData.dqWorkspaceLen = (allNumQuery * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN;
+    tmpData.dqWorkspaceLen = (allNumQueryInit * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN;
     tmpData.dkWorkspaceLen = (allNumKey * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN;
     tmpData.dvWorkspaceLen = (allNumValue * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN;
 

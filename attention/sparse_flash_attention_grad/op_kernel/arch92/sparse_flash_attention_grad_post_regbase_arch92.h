@@ -28,6 +28,7 @@ public:
         __gm__ uint8_t* workspace,
         const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase92* __restrict ordTilingData, TPipe* pipe_in);
     __aicore__ inline void Process();
+    __aicore__ inline void ReduceDqPartials(LocalTensor<float>& dst, uint64_t offset, uint32_t count);
 
     constexpr static uint32_t ADDR_ALIGN_SIZE = 512;
     uint32_t REGBASE_POST_BASE = 128 * 128;
@@ -39,6 +40,7 @@ public:
     TQue<QuePosition::VECOUT, 1> outQueuePing;
     TQue<QuePosition::VECIN, 1> inQueuePong;
     TQue<QuePosition::VECOUT, 1> outQueuePong;
+    TQue<QuePosition::VECIN, 1> dqReduceQueue;
     GlobalTensor<OUTDTYPE> dqkv[3];
     GlobalTensor<OUTDTYPE> dqkRope[2];
     GlobalTensor<float> dqkvWorkspace[3];
@@ -92,6 +94,30 @@ __aicore__ inline void SparseFlashAttentionGradPostRegbase<T1, T2, OUTDTYPE, IS_
     pipe->InitBuffer(outQueuePing, 1, bufElems * sizeof(OUTDTYPE));
     pipe->InitBuffer(inQueuePong, 1, bufElems * sizeof(T2));
     pipe->InitBuffer(outQueuePong, 1, bufElems * sizeof(OUTDTYPE));
+    if (tilingData->baseParams.kvSplitNum > 1) {
+        // Host post tiling reserves 12*postUbBaseSize; the extra FP32 queue uses
+        // 2*postUbBaseSize, bringing these queues to 8*postUbBaseSize in total.
+        pipe->InitBuffer(dqReduceQueue, 1, bufElems * sizeof(T2));
+    }
+}
+
+template <typename T1, typename T2, typename OUTDTYPE, bool IS_ROPE, const bool IS_TND, const bool KV_MERGE>
+__aicore__ inline void SparseFlashAttentionGradPostRegbase<T1, T2, OUTDTYPE, IS_ROPE, IS_TND,
+                                                           KV_MERGE>::ReduceDqPartials(LocalTensor<float>& dst,
+                                                                                       uint64_t offset, uint32_t count)
+{
+    // The entry's existing SyncALLCores completes every shard before post starts.
+    // Fixed split order gives a repeatable FP32 sum; scale/cast still happen once.
+    for (int64_t split = 1; split < tilingData->baseParams.kvSplitNum; ++split) {
+        LocalTensor<float> partial = dqReduceQueue.AllocTensor<float>();
+        const uint64_t srcOffset = split * tilingData->postTilingData.qPostBlockTotal + offset;
+        DataCopy(partial, dqkvWorkspace[0][srcOffset], (count + 7) >> 3 << 3);
+        dqReduceQueue.EnQue(partial);
+        dqReduceQueue.DeQue<float>();
+        Add(dst, dst, partial, count);
+        PipeBarrier<PIPE_V>();
+        dqReduceQueue.FreeTensor(partial);
+    }
 }
 
 template <typename T1, typename T2, typename OUTDTYPE, bool IS_ROPE, const bool IS_TND, const bool KV_MERGE>
@@ -137,6 +163,7 @@ __aicore__ inline void SparseFlashAttentionGradPostRegbase<T1, T2, OUTDTYPE, IS_
             inQueuePing.EnQue(vecInPing);
             inQueuePing.DeQue<float>();
             if (qkvIdx < 1) {
+                ReduceDqPartials(vecInPing, pingIdx, pingSize);
                 Muls(vecInPing, vecInPing, (float)tilingData->baseParams.scaleValue, pingSize);
                 PipeBarrier<PIPE_V>();
             }
@@ -182,6 +209,7 @@ __aicore__ inline void SparseFlashAttentionGradPostRegbase<T1, T2, OUTDTYPE, IS_
                 inQueuePong.EnQue(vecInPong);
                 inQueuePong.DeQue<float>();
                 if (qkvIdx < 1) {
+                    ReduceDqPartials(vecInPong, pongIdx, pongSize);
                     Muls(vecInPong, vecInPong, (float)tilingData->baseParams.scaleValue, pongSize);
                     PipeBarrier<PIPE_V>();
                 }

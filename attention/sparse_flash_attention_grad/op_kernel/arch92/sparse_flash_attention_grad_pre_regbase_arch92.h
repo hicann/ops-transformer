@@ -55,7 +55,7 @@ public:
     const optiling::sfag::SparseFlashAttentionGradTilingDataRegbase92* TilingData;
 
     uint32_t vBlockIdx;
-    uint32_t usedCoreNum;
+    uint32_t sfmgUsedCoreNum;
     uint32_t qPreBlockFactor;
     uint32_t qPreBlockTotal;
     uint32_t qPreBlockTail;
@@ -132,7 +132,7 @@ __aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, IS_SINKS, IS
         vPreBlockFactor = TilingData->preTilingData.vPreBlockFactor;
         vPreBlockTotal = TilingData->preTilingData.vPreBlockTotal;
         vPreBlockTail = TilingData->preTilingData.vPreBlockTail;
-        usedCoreNum = TilingData->preTilingData.sfmgUsedCoreNum;
+        sfmgUsedCoreNum = TilingData->preTilingData.sfmgUsedCoreNum;
 
         dqGm.SetGlobalBuffer((__gm__ T1*)dq);
         dkGm.SetGlobalBuffer((__gm__ T1*)dk);
@@ -211,7 +211,8 @@ __aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, IS_SINKS, IS
 template <typename T1, typename T2, const uint32_t IS_TND, bool IS_SINKS, bool IS_DETER, bool KV_MERGE>
 __aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, IS_SINKS, IS_DETER, KV_MERGE>::Process()
 {
-    if (g_coreType == AIV && vBlockIdx < usedCoreNum) {
+    // All AIVs may own initialization work, even when only one has a softmaxGrad row.
+    if (g_coreType == AIV) {
         Duplicate<T2>(dqTensor, 0, singleInitSize);
         Duplicate<T2>(dkTensor, 0, singleInitSize);
         if constexpr (!KV_MERGE) {
@@ -293,75 +294,73 @@ __aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, IS_SINKS, IS
 template <typename T1, typename T2, const uint32_t IS_TND, bool IS_SINKS, bool IS_DETER, bool KV_MERGE>
 __aicore__ inline void FlashAttentionGradPreRegbase<T1, T2, IS_TND, IS_SINKS, IS_DETER, KV_MERGE>::DoSoftmaxGrad()
 {
-    if (vBlockIdx < usedCoreNum) {
-        uint64_t singleCoreLoopTimes;
-        uint64_t singleCoreLastLoopNBurstNum;
-        if (vBlockIdx == usedCoreNum - 1) {
-            singleCoreLoopTimes = TilingData->preTilingData.tailCoreLoopTimes;
-            singleCoreLastLoopNBurstNum = TilingData->preTilingData.tailCoreLastLoopNBurstNum;
-        } else {
-            singleCoreLoopTimes = TilingData->preTilingData.normalCoreLoopTimes;
-            singleCoreLastLoopNBurstNum = TilingData->preTilingData.normalCoreLastLoopNBurstNum;
+    uint64_t singleCoreLoopTimes = 0;
+    uint64_t singleCoreLastLoopNBurstNum = 0;
+    if (vBlockIdx == sfmgUsedCoreNum - 1) {
+        singleCoreLoopTimes = TilingData->preTilingData.tailCoreLoopTimes;
+        singleCoreLastLoopNBurstNum = TilingData->preTilingData.tailCoreLastLoopNBurstNum;
+    } else if (vBlockIdx < sfmgUsedCoreNum) {
+        singleCoreLoopTimes = TilingData->preTilingData.normalCoreLoopTimes;
+        singleCoreLastLoopNBurstNum = TilingData->preTilingData.normalCoreLastLoopNBurstNum;
+    }
+
+    uint64_t sfmgOutputOffset = vBlockIdx * TilingData->preTilingData.normalCoreNBurstNums;
+    uint64_t nBurst = TilingData->preTilingData.singleLoopNBurstNum;
+    uint64_t taskId = 0;
+    uint64_t commonLoopTimes;
+    if constexpr (KV_MERGE) {
+        commonLoopTimes = Min(Min(dqLoopNum, dkLoopNum), singleCoreLoopTimes);
+    } else {
+        commonLoopTimes = Min(Min(Min(dqLoopNum, dkLoopNum), dvLoopNum), singleCoreLoopTimes);
+    }
+    WaitFlag<HardEvent::V_MTE3>(eventIDVToMte3);
+    for (uint64_t i = 0; i < commonLoopTimes; i++) {
+        if (i == singleCoreLoopTimes - 1) {
+            nBurst = singleCoreLastLoopNBurstNum;
         }
 
-        uint64_t sfmgOutputOffset = vBlockIdx * TilingData->preTilingData.normalCoreNBurstNums;
-        uint64_t nBurst = TilingData->preTilingData.singleLoopNBurstNum;
-        uint64_t taskId = 0;
-        uint64_t commonLoopTimes;
-        if constexpr (KV_MERGE) {
-            commonLoopTimes = Min(Min(dqLoopNum, dkLoopNum), singleCoreLoopTimes);
-        } else {
-            commonLoopTimes = Min(Min(Min(dqLoopNum, dkLoopNum), dvLoopNum), singleCoreLoopTimes);
-        }
-        WaitFlag<HardEvent::V_MTE3>(eventIDVToMte3);
-        for (uint64_t i = 0; i < commonLoopTimes; i++) {
-            if (i == singleCoreLoopTimes - 1) {
-                nBurst = singleCoreLastLoopNBurstNum;
-            }
-
-            input1Buf = input1Que[taskId & 1].AllocTensor<T1>();
-            input2Buf = input2Que[taskId & 1].AllocTensor<T1>();
-            CopyInSfmg(nBurst, sfmgOutputOffset);
-            input1Que[taskId & 1].EnQue(input1Buf);
-            input2Que[taskId & 1].EnQue(input2Buf);
-            CalculateSoftmaxGrad(taskId, sfmgOutputOffset, nBurst);
-            CopyDqkvToGm<DQ_IDX>(i);
-            CopyDqkvToGm<DK_IDX>(i);
-            if constexpr (!KV_MERGE) {
-                CopyDqkvToGm<DV_IDX>(i);
-            }
-
-            input1Que[taskId & 1].FreeTensor(input1Buf);
-            input2Que[taskId & 1].FreeTensor(input2Buf);
-            sfmgOutputOffset += TilingData->preTilingData.singleLoopNBurstNum;
-            taskId++;
-        }
-        for (uint64_t i = commonLoopTimes; i < singleCoreLoopTimes; i++) {
-            if (i == singleCoreLoopTimes - 1) {
-                nBurst = singleCoreLastLoopNBurstNum;
-            }
-
-            input1Buf = input1Que[taskId & 1].AllocTensor<T1>();
-            input2Buf = input2Que[taskId & 1].AllocTensor<T1>();
-            CopyInSfmg(nBurst, sfmgOutputOffset);
-            input1Que[taskId & 1].EnQue(input1Buf);
-            input2Que[taskId & 1].EnQue(input2Buf);
-            CalculateSoftmaxGrad(taskId, sfmgOutputOffset, nBurst);
-            input1Que[taskId & 1].FreeTensor(input1Buf);
-            input2Que[taskId & 1].FreeTensor(input2Buf);
-            sfmgOutputOffset += TilingData->preTilingData.singleLoopNBurstNum;
-            taskId++;
-        }
-        for (uint64_t i = commonLoopTimes; i < dqLoopNum; i++) {
-            CopyDqkvToGm<DQ_IDX>(i);
-        }
-        for (uint64_t i = commonLoopTimes; i < dkLoopNum; i++) {
-            CopyDqkvToGm<DK_IDX>(i);
-        }
+        input1Buf = input1Que[taskId & 1].AllocTensor<T1>();
+        input2Buf = input2Que[taskId & 1].AllocTensor<T1>();
+        CopyInSfmg(nBurst, sfmgOutputOffset);
+        input1Que[taskId & 1].EnQue(input1Buf);
+        input2Que[taskId & 1].EnQue(input2Buf);
+        CalculateSoftmaxGrad(taskId, sfmgOutputOffset, nBurst);
+        CopyDqkvToGm<DQ_IDX>(i);
+        CopyDqkvToGm<DK_IDX>(i);
         if constexpr (!KV_MERGE) {
-            for (uint64_t i = commonLoopTimes; i < dvLoopNum; i++) {
-                CopyDqkvToGm<DV_IDX>(i);
-            }
+            CopyDqkvToGm<DV_IDX>(i);
+        }
+
+        input1Que[taskId & 1].FreeTensor(input1Buf);
+        input2Que[taskId & 1].FreeTensor(input2Buf);
+        sfmgOutputOffset += TilingData->preTilingData.singleLoopNBurstNum;
+        taskId++;
+    }
+    for (uint64_t i = commonLoopTimes; i < singleCoreLoopTimes; i++) {
+        if (i == singleCoreLoopTimes - 1) {
+            nBurst = singleCoreLastLoopNBurstNum;
+        }
+
+        input1Buf = input1Que[taskId & 1].AllocTensor<T1>();
+        input2Buf = input2Que[taskId & 1].AllocTensor<T1>();
+        CopyInSfmg(nBurst, sfmgOutputOffset);
+        input1Que[taskId & 1].EnQue(input1Buf);
+        input2Que[taskId & 1].EnQue(input2Buf);
+        CalculateSoftmaxGrad(taskId, sfmgOutputOffset, nBurst);
+        input1Que[taskId & 1].FreeTensor(input1Buf);
+        input2Que[taskId & 1].FreeTensor(input2Buf);
+        sfmgOutputOffset += TilingData->preTilingData.singleLoopNBurstNum;
+        taskId++;
+    }
+    for (uint64_t i = commonLoopTimes; i < dqLoopNum; i++) {
+        CopyDqkvToGm<DQ_IDX>(i);
+    }
+    for (uint64_t i = commonLoopTimes; i < dkLoopNum; i++) {
+        CopyDqkvToGm<DK_IDX>(i);
+    }
+    if constexpr (!KV_MERGE) {
+        for (uint64_t i = commonLoopTimes; i < dvLoopNum; i++) {
+            CopyDqkvToGm<DV_IDX>(i);
         }
     }
 }

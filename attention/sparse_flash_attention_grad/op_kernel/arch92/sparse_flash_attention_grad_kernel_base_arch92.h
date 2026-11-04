@@ -275,8 +275,11 @@ FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockType, VecBlockType>::Init
         dvGm.SetGlobalBuffer((__gm__ OUTDTYPE*)dv);
     }
     // init workspace address
+    // No inter-core atomic reduction into dQ: post reduces these planes in split order.
+    const int64_t dqSplitOffset =
+        (blockIdx % tilingData->baseParams.kvSplitNum) * tilingData->postTilingData.qPostBlockTotal;
     dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
-                                  tilingData->postTilingData.dqWorkSpaceOffset / sizeof(float));
+                                  tilingData->postTilingData.dqWorkSpaceOffset / sizeof(float) + dqSplitOffset);
     dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                   tilingData->postTilingData.dkWorkSpaceOffset / sizeof(float));
     dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
@@ -510,12 +513,15 @@ __aicore__ inline void FlashAttentionScoreGradKernelBase<ChildClass, CubeBlockTy
         // deter workspace 布局是 [parity][core][block][d]：每个 epoch 每核只放一个 token 的贡献，
         // 没有 n2 维度。消费侧 ScatterAddDeter 的 topkIndices 寻址同样按 n2 == 1 展开。
         // host tiling 已经硬性拒绝 n2 != 1，这里依赖该前提。
+        // Shards write disjoint selected-K ranges into the SAME logical Q slot.
+        // Scatter retains its original [parity][Q-owner][selected-K][D] traversal.
+        const int64_t producerSlot = blockIdx / tilingData->baseParams.kvSplitNum;
         runInfo.mm4ResWsAddr = runInfo.deterTaskIdMod2 * constInfo.selectedBlockCount * constInfo.dTotalSize * coreNum +
-                               blockIdx * constInfo.selectedBlockCount * constInfo.dTotalSize +
+                               producerSlot * constInfo.selectedBlockCount * constInfo.dTotalSize +
                                runInfo.blkCntOffset * constInfo.dTotalSize;
         runInfo.mm5ResWsAddr =
             runInfo.deterTaskIdMod2 * constInfo.selectedBlockCount * constInfo.commonConstInfo.dSizeV * coreNum +
-            blockIdx * constInfo.selectedBlockCount * constInfo.commonConstInfo.dSizeV +
+            producerSlot * constInfo.selectedBlockCount * constInfo.commonConstInfo.dSizeV +
             runInfo.blkCntOffset * constInfo.commonConstInfo.dSizeV;
     }
 }

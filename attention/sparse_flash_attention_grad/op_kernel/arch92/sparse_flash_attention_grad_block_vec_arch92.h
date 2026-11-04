@@ -93,7 +93,8 @@ public:
     constexpr static uint32_t INPUT_BLOCK_NUM = 32 / sizeof(INPUT_TYPE);
     constexpr static uint32_t FRACTAL_NZ_C0_SIZE = 32 / sizeof(INPUT_TYPE);
     constexpr static uint32_t DETER_EXCEED_USE_SIZE = 2 * 1024;
-    constexpr static uint32_t TOPK_UB_SIZE = SFAG_GATHER_S2_HEAD_N * sizeof(int32_t);
+    constexpr static uint32_t TOPK_UB_ELEMENTS = BASE_N; // also covers the N1 > 64 gather tile
+    constexpr static uint32_t TOPK_UB_SIZE = TOPK_UB_ELEMENTS * sizeof(int32_t);
     // 尾部 +VREG_SIZE 是 ND→NZ 的 bank conflict 规避垫片（见 vf_cast_transdata_deconflict_sfag_arch92.h），
     // 与 BASE_M 无关，只跟 srcN/sizeof(INPUT_TYPE) 有关，128 列 b16 下恒为一个 VREG
     constexpr static uint32_t DS_OUT_QUE_SIZE = BASE_M * VREG_SIZE + VREG_SIZE + DETER_EXCEED_USE_SIZE;
@@ -272,10 +273,12 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::InitUbBuffer()
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline LocalTensor<int32_t> FAGBlockVec<TEMPLATE_ARGS>::LoadTopkToUb(uint64_t gmIndex, uint32_t count)
 {
-    constexpr uint32_t INT32_PER_BLK = 8; // 32B
-    uint32_t copyCnt = (count + INT32_PER_BLK - 1) / INT32_PER_BLK * INT32_PER_BLK;
     LocalTensor<int32_t> topkUb = topkUbBuf.Get<int32_t>();
-    DataCopy(topkUb, topkIndicesGm[gmIndex], copyCnt);
+    // Scatter partitions need not start on a 32-byte boundary. Copy exactly the valid
+    // indices: rounding a tail up could read beyond the final query's index array.
+    DataCopyExtParams copyParams{1, static_cast<uint32_t>(count * sizeof(int32_t)), 0, 0, 0};
+    DataCopyPadExtParams<int32_t> padParams{false, 0, 0, 0};
+    DataCopyPad(topkUb, topkIndicesGm[gmIndex], copyParams, padParams);
     event_t eventId = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_S));
     SetFlag<HardEvent::MTE2_S>(eventId);
     WaitFlag<HardEvent::MTE2_S>(eventId);
@@ -310,14 +313,11 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::GatherKV(const GlobalTensor<I
     LocalTensor<INPUT_TYPE> gatherRopeTensorPing = gatherTensorPing[2 * constInfo.commonConstInfo.dSize];
     LocalTensor<INPUT_TYPE> gatherRopeTensorPong = gatherTensorPong[2 * constInfo.commonConstInfo.dSize];
 
-    // N<=64 UnDeter: copy this tile's INT32 indices into leftover UB, then GetValue from UB.
-    bool useUbTopk = false;
+    // Deterministic gathers also benefit from one bulk index load per tile.
+    bool useUbTopk = (IS_DETER || constInfo.isHeadNLe64) && runInfo.actualSelCntOffset > 0;
     LocalTensor<int32_t> topkUb;
-    if constexpr (!IS_DETER) {
-        if (constInfo.isHeadNLe64 && runInfo.actualSelCntOffset > 0) {
-            useUbTopk = true;
-            topkUb = LoadTopkToUb(gmOffset, static_cast<uint32_t>(runInfo.actualSelCntOffset));
-        }
+    if (useUbTopk) {
+        topkUb = LoadTopkToUb(gmOffset, static_cast<uint32_t>(runInfo.actualSelCntOffset));
     }
 
     for (i = 0; i < selCnt / 2 * 2; i += 2) {
@@ -658,7 +658,8 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ProcessVec3(Buffer<BufferType
     }
 
     LocalTensor<uint8_t> selrIndexesTensor;
-    CastTransdataDeconflict<INPUT_TYPE, CALC_TYPE, BASE_N>(vecOutBuffer, mm1ResTensor, selrIndexesTensor, BASE_M);
+    CastTransdataDeconflict<INPUT_TYPE, CALC_TYPE, BASE_N>(vecOutBuffer, mm1ResTensor, selrIndexesTensor,
+                                                           static_cast<uint32_t>(runInfo.gRealSize), BASE_M);
     dSOutQue.EnQue(vecOutBuffer);
     dSOutQue.DeQue<INPUT_TYPE>();
 
@@ -679,7 +680,8 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ProcessVec4(Buffer<BufferType
     ///////////////////////////////////////////////////////////////
     LocalTensor<uint8_t> selrIndexesTensor;
     LocalTensor<INPUT_TYPE> vecOutBuffer1 = pOutQue.AllocTensor<INPUT_TYPE>();
-    CastTransdataDeconflict<INPUT_TYPE, CALC_TYPE, BASE_N>(vecOutBuffer1, mm2ResTensor, selrIndexesTensor, BASE_M);
+    CastTransdataDeconflict<INPUT_TYPE, CALC_TYPE, BASE_N>(vecOutBuffer1, mm2ResTensor, selrIndexesTensor,
+                                                           static_cast<uint32_t>(runInfo.gRealSize), BASE_M);
     pOutQue.EnQue(vecOutBuffer1);
     pOutQue.DeQue<INPUT_TYPE>();
 
@@ -996,98 +998,55 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ScatterAddDeter(const GlobalT
             runInfo.deterTaskIdMod2 * constInfo.selectedBlockCount * constInfo.commonConstInfo.dSizeV * coreNum +
             idx * constInfo.selectedBlockCount * constInfo.commonConstInfo.dSizeV +
             s2SrcOffset * constInfo.selectedBlockSize * constInfo.commonConstInfo.dSizeV;
-        // 1 - main loop
+        // Keep the original 8-row data buffer, but cache up to 128 indices at a time.
         SetFlag<HardEvent::MTE3_MTE2>(eventIDMTE3ToMTE2);
         uint64_t gmOffset = bS1Index * (constInfo.n2Size * constInfo.selectedBlockCount) + s2SrcOffset;
-        for (int64_t loop = 0; loop < maxLoops - 1; loop++) {
+        LocalTensor<int32_t> topkUb;
+        for (int64_t loop = 0; loop < maxLoops; loop++) {
+            int64_t rowOffset = loop * UB_ROW_SIZE;
+            int64_t rows = loop == maxLoops - 1 ? tailRows : UB_ROW_SIZE;
+            uint32_t indexOffset = static_cast<uint32_t>(rowOffset % TOPK_UB_ELEMENTS);
+            if (indexOffset == 0) {
+                uint32_t indexCount =
+                    static_cast<uint32_t>(Min(static_cast<int64_t>(TOPK_UB_ELEMENTS), currentCoreKSize - rowOffset));
+                topkUb = LoadTopkToUb(gmOffset + rowOffset, indexCount);
+            }
             WaitFlag<HardEvent::MTE3_MTE2>(eventIDMTE3ToMTE2);
-            DataCopy(dkInTensor, mm4ResWorkSpaceGm[currentMm4SrcOffset + loop * UB_ROW_SIZE * HEAD_DIM_ALIGN],
-                     UB_ROW_SIZE * HEAD_DIM_ALIGN);
+            DataCopy(dkInTensor, mm4ResWorkSpaceGm[currentMm4SrcOffset + rowOffset * HEAD_DIM_ALIGN],
+                     rows * HEAD_DIM_ALIGN);
             SetFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
             WaitFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
-            Muls(dkInTensor, dkInTensor, (float)constInfo.scaleValue, UB_ROW_SIZE * HEAD_DIM_ALIGN);
-            DataCopy(dvInTensor,
-                     mm5ResWorkSpaceGm[currentMm5SrcOffset + loop * UB_ROW_SIZE * constInfo.commonConstInfo.dSizeV],
-                     UB_ROW_SIZE * constInfo.commonConstInfo.dSizeV);
+            Muls(dkInTensor, dkInTensor, (float)constInfo.scaleValue, rows * HEAD_DIM_ALIGN);
+            DataCopy(dvInTensor, mm5ResWorkSpaceGm[currentMm5SrcOffset + rowOffset * constInfo.commonConstInfo.dSizeV],
+                     rows * constInfo.commonConstInfo.dSizeV);
             SetFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
             WaitFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
             if constexpr (KV_MERGE) {
                 PipeBarrier<PIPE_V>();
-                for (int64_t row = 0; row < UB_ROW_SIZE; row++) {
+                for (int64_t row = 0; row < rows; row++) {
                     Add(dkInTensor[row * HEAD_DIM_ALIGN], dkInTensor[row * HEAD_DIM_ALIGN],
                         dvInTensor[row * constInfo.commonConstInfo.dSizeV], constInfo.commonConstInfo.dSizeV);
                 }
                 PipeBarrier<PIPE_V>();
-                SetFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-                WaitFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
             }
-            int32_t s2IdxLocal[8];
-            for (int64_t row = 0; row < UB_ROW_SIZE; row++) {
-                s2IdxLocal[row] = topkIndicesGm[gmOffset + loop * UB_ROW_SIZE].GetValue(row);
-            }
-            for (int64_t row = 0; row < UB_ROW_SIZE; row++) {
-                int32_t s2Idx = s2IdxLocal[row];
+            // Muls/Add has finished for the whole chunk. One fence protects every row;
+            // no vector instruction modifies this buffer inside the following copy loop.
+            SetFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
+            WaitFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
+            for (int64_t row = 0; row < rows; row++) {
+                int32_t s2Idx = topkUb.GetValue(indexOffset + row);
                 if (s2Idx >= 0) {
-                    if constexpr (!KV_MERGE) {
-                        SetFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-                        WaitFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-                    }
                     DataCopy(dkWorkSpaceGm[runInfo.keyOffsetWithRope + s2Idx * HEAD_DIM_ALIGN],
                              dkInTensor[row * HEAD_DIM_ALIGN], HEAD_DIM_ALIGN);
                     if constexpr (!KV_MERGE) {
-                        int64_t dvOffset = runInfo.commonRunInfo.valueOffset + s2Idx * constInfo.commonConstInfo.dSizeV;
-                        DataCopy(dvWorkSpaceGm[dvOffset], dvInTensor[row * constInfo.commonConstInfo.dSizeV],
-                                 constInfo.commonConstInfo.dSizeV);
+                        DataCopy(
+                            dvWorkSpaceGm[runInfo.commonRunInfo.valueOffset + s2Idx * constInfo.commonConstInfo.dSizeV],
+                            dvInTensor[row * constInfo.commonConstInfo.dSizeV], constInfo.commonConstInfo.dSizeV);
                     }
                 }
             }
             SetFlag<HardEvent::MTE3_MTE2>(eventIDMTE3ToMTE2);
         }
-
-        WaitFlag<HardEvent::MTE3_MTE2>(eventIDMTE3ToMTE2);
-        // 2 - tail loop
-        DataCopy(dkInTensor, mm4ResWorkSpaceGm[currentMm4SrcOffset + (maxLoops - 1) * UB_ROW_SIZE * HEAD_DIM_ALIGN],
-                 tailRows * HEAD_DIM_ALIGN);
-        SetFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
-        WaitFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
-        Muls(dkInTensor, dkInTensor, (float)constInfo.scaleValue, tailRows * HEAD_DIM_ALIGN);
-        DataCopy(
-            dvInTensor,
-            mm5ResWorkSpaceGm[currentMm5SrcOffset + (maxLoops - 1) * UB_ROW_SIZE * constInfo.commonConstInfo.dSizeV],
-            tailRows * constInfo.commonConstInfo.dSizeV);
-        SetFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
-        WaitFlag<HardEvent::MTE2_V>(eventIDMTE2ToV);
-        if constexpr (KV_MERGE) {
-            PipeBarrier<PIPE_V>();
-            for (int64_t row = 0; row < tailRows; row++) {
-                Add(dkInTensor[row * HEAD_DIM_ALIGN], dkInTensor[row * HEAD_DIM_ALIGN],
-                    dvInTensor[row * constInfo.commonConstInfo.dSizeV], constInfo.commonConstInfo.dSizeV);
-            }
-            PipeBarrier<PIPE_V>();
-            SetFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-            WaitFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-        }
-        int32_t s2IdxTail[8];
-        for (int64_t row = 0; row < tailRows; row++) {
-            s2IdxTail[row] = topkIndicesGm[gmOffset + (maxLoops - 1) * UB_ROW_SIZE].GetValue(row);
-        }
-        for (int64_t row = 0; row < tailRows; row++) {
-            int32_t s2Idx = s2IdxTail[row];
-            if (s2Idx >= 0) {
-                if constexpr (!KV_MERGE) {
-                    SetFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-                    WaitFlag<HardEvent::V_MTE3>(eventIDVToMTE3);
-                }
-                DataCopy(dkWorkSpaceGm[runInfo.keyOffsetWithRope + s2Idx * HEAD_DIM_ALIGN],
-                         dkInTensor[row * HEAD_DIM_ALIGN], HEAD_DIM_ALIGN);
-                if constexpr (!KV_MERGE) {
-                    DataCopy(
-                        dvWorkSpaceGm[runInfo.commonRunInfo.valueOffset + s2Idx * constInfo.commonConstInfo.dSizeV],
-                        dvInTensor[row * constInfo.commonConstInfo.dSizeV], constInfo.commonConstInfo.dSizeV);
-                }
-            }
-        }
-        SetFlag<HardEvent::MTE3_MTE2>(eventIDMTE3ToMTE2);
         WaitFlag<HardEvent::MTE3_MTE2>(eventIDMTE3ToMTE2);
         // V核同步等待所有V核完成某一个C核上S2的计算
         CrossCoreSetFlag<0, PIPE_MTE3>(SCATTER_VEC_SYNC_FLAG);

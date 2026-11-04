@@ -162,14 +162,17 @@ __simd_vf__ inline void CastTransdataDeconflictVFfp8(const uint32_t fullExeSize,
 
 template <typename T1, typename T, uint32_t srcN>
 __aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1>& dstTensor, const LocalTensor<T>& srcTensor,
-                                               const LocalTensor<uint8_t>& selrIndexesTensor, uint32_t srcM)
+                                               const LocalTensor<uint8_t>& selrIndexesTensor, uint32_t srcM,
+                                               uint32_t dstM = 0)
 {
     const uint32_t blockSize = 32;
     const uint32_t blockN = blockSize / sizeof(T1);
     const uint32_t fullExeSize = srcN;
     uint64_t srcLocalInt = srcTensor.GetPhyAddr();
     uint64_t dstLocalInt = dstTensor.GetPhyAddr();
-    uint32_t blockStride = (srcM * blockN) * sizeof(T1) / blockSize + 1;
+    // Iterate only valid rows while retaining the consumer's padded NZ column pitch.
+    const uint32_t dstRows = dstM == 0 ? srcM : dstM;
+    uint32_t blockStride = (dstRows * blockN) * sizeof(T1) / blockSize + 1;
     uint32_t repeatStride = 1;
 
     if constexpr (IsSameType<T1, half>::value) {
@@ -177,7 +180,7 @@ __aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1>& dstTensor,
     } else if constexpr (IsSameType<T1, bfloat16_t>::value) {
         CastTransdataDeconflictVFbf16<T1, T>(fullExeSize, srcLocalInt, dstLocalInt, blockStride, repeatStride, srcM);
     } else if constexpr (IsSameType<T1, T>::value && srcN == 128) {
-        uint64_t dstLocalIntTail = dstTensor.GetPhyAddr() + (srcM + 1) * (srcN / 2) * sizeof(T1);
+        uint64_t dstLocalIntTail = dstTensor.GetPhyAddr() + (dstRows + 1) * (srcN / 2) * sizeof(T1);
         CastTransdataDeconflictVFT<T1, T>(fullExeSize, srcLocalInt, dstLocalInt, blockStride, repeatStride,
                                           dstLocalIntTail, srcM);
     } else if constexpr (IsSameType<T1, fp8_e5m2_t>::value || IsSameType<T1, fp8_e4m3fn_t>::value) {
@@ -189,7 +192,8 @@ __aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1>& dstTensor,
 #else
 template <typename T1, typename T, uint32_t srcN>
 __aicore__ inline void CastTransdataDeconflict(const LocalTensor<T1>& dstTensor, const LocalTensor<T>& srcTensor,
-                                               const LocalTensor<uint8_t>& selrIndexesTensor, uint32_t srcM)
+                                               const LocalTensor<uint8_t>& selrIndexesTensor, uint32_t srcM,
+                                               uint32_t dstM = 0)
 {}
 #endif
 } // namespace AscendC

@@ -49,6 +49,8 @@ public:
     int64_t isHeadNLe64;
     // pre 阶段算出的 softmaxGrad 行和 D_i 的 workspace 偏移，主循环按 (t1, n2) 读回
     int64_t softmaxGradWorkSpaceOffset;
+    // Number of selected-K shards per Q token. 1 preserves the original schedule.
+    int64_t kvSplitNum;
 
     int64_t get_b() const
     {
@@ -129,6 +131,14 @@ public:
     int64_t get_softmaxGradWorkSpaceOffset() const
     {
         return softmaxGradWorkSpaceOffset;
+    }
+    int64_t get_kvSplitNum() const
+    {
+        return kvSplitNum;
+    }
+    void set_kvSplitNum(int64_t value)
+    {
+        this->kvSplitNum = value;
     }
     int64_t get_isHeadNLe64() const
     {

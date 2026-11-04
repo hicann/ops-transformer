@@ -261,19 +261,29 @@ __aicore__ inline void FlashAttentionScoreGradKernel<CubeBlockType, VecBlockType
     FagRunInfo runInfos[2];
     FagRunInfo deterRunInfos[2];
     const int64_t maxEpochs = this->GetMaxDeterEpochs();
+    const int64_t splitNum = this->tilingData->baseParams.kvSplitNum;
+    const int64_t splitIdx = this->blockIdx % splitNum;
+    const int64_t logicalCoreIdx = this->blockIdx / splitNum;
 
     // 所有核走同一条 deter epoch 序列。没有 token / sel=0 / TND padding 只跳过 compute，不删除 epoch。
     for (int32_t i = 0; i < maxEpochs; i++) {
         const int64_t taskIdBeforeEpoch = taskId;
-        this->t1Index = this->blockIdx + this->usedCoreNum * i;
-        const bool hasCompute = (this->blockIdx < this->usedCoreNum) && (this->t1Index < this->GetValidTndT1Size());
+        this->t1Index = logicalCoreIdx + this->usedCoreNum * i;
+        const bool hasCompute = (logicalCoreIdx < this->usedCoreNum) && (this->t1Index < this->GetValidTndT1Size());
         if (hasCompute) {
             this->GetTndSeqLen(this->t1Index, this->bIndex);
             for (this->n2Index = 0; this->n2Index < this->tilingData->baseParams.n2; this->n2Index++) {
                 this->GetActualSelCount(this->t1Index, this->n2Index, this->actualSelectedBlockCount);
-                for (this->blkCntOffset = 0; this->blkCntOffset < this->actualSelectedBlockCount;
-                     this->blkCntOffset += this->constInfo.selectedCountOffset) {
+                // Partition whole tiles so each original mm4/mm5 row has exactly one writer.
+                const int64_t tileRows = this->constInfo.selectedCountOffset;
+                const int64_t tileCount = (this->actualSelectedBlockCount + tileRows - 1) / tileRows;
+                const int64_t splitBegin = (tileCount * splitIdx / splitNum) * tileRows;
+                const int64_t splitEnd =
+                    Min((tileCount * (splitIdx + 1) / splitNum) * tileRows, this->actualSelectedBlockCount);
+                for (this->blkCntOffset = splitBegin; this->blkCntOffset < splitEnd; this->blkCntOffset += tileRows) {
                     this->SetRunInfo(runInfos[taskId & 1], taskId, sTaskId, deterTaskId);
+                    // End the Q/Dy residency lifetime at this shard's final tile.
+                    runInfos[taskId & 1].isNextS1IdxNoChange = this->blkCntOffset + tileRows < splitEnd;
                     ProcessGather(runInfos[taskId & 1]);
                     ProcessMm12(runInfos[taskId & 1]);
                     if (taskId > 0) {
