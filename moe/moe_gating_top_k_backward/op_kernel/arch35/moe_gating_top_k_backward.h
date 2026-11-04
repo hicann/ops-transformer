@@ -15,16 +15,15 @@
 #ifndef MOE_GATING_TOP_K_BACKWARD_H
 #define MOE_GATING_TOP_K_BACKWARD_H
 
-#include <cmath>
 #include "moe_gating_top_k_backward_arch35_common.h"
 #include "kernel_operator.h"
-#include "op_kernel/load_store_utils.h"
 #include "moe_gating_top_k_backward_struct.h"
 #include "vf/moe_gating_top_k_backward_vf.h"
 
 namespace MoeGatingTopKBackwardNs {
 using namespace AscendC;
-using Reg::RegTensor;
+
+constexpr int64_t NORM_TYPE_SOFTMAX = 0;
 
 template <typename T>
 class MoeGatingTopKBackward {
@@ -38,8 +37,8 @@ private:
     __aicore__ inline void CopyInGradY(int64_t loopIdx);
     __aicore__ inline void CopyInXNorm(int64_t loopIdx);
     __aicore__ inline void CopyInExpertIdx(int64_t loopIdx);
-    __aicore__ inline void SigmoidRenormBackward();
-    __aicore__ inline void SigmoidGrad();
+    __aicore__ inline void ScatterGrad();
+    __aicore__ inline void ActivationBackward();
     __aicore__ inline void CopyOut(int64_t loopIdx);
 
     TPipe* pipe_;
@@ -60,7 +59,8 @@ private:
     LocalTensor<T> gradXOutTensor_;
 
     int64_t blockIdx_ = 0, loopTimes_ = 0, tailRows_ = 0, curRows_ = 0;
-    int64_t elementCountPerLoop_ = 0, curRowsByKAlign_ = 0, kAlign_ = 0, kAlign16_ = 0;
+    int64_t curRowsByKAlign_ = 0, kAlign_ = 0, kAlign16_ = 0;
+    int64_t expertCount_ = 0, alignedN_ = 0, normType_ = 0, renorm_ = 0;
     const MoeGatingTopKBackwardA5TilingData* tilingData_;
 };
 
@@ -71,6 +71,10 @@ __aicore__ inline void MoeGatingTopKBackward<T>::Init(GM_ADDR xNorm, GM_ADDR gra
     tilingData_ = tilingData;
     pipe_ = tPipe;
     blockIdx_ = GetBlockIdx();
+    expertCount_ = tilingData_->expertCount;
+    alignedN_ = tilingData_->alignedN;
+    normType_ = tilingData_->normType;
+    renorm_ = tilingData_->renorm;
     kAlign_ = Align(tilingData_->k, SIZE_OF_INT32);
     kAlign16_ = Align(tilingData_->k, 2);
     if (blockIdx_ == tilingData_->needCoreNum - 1) {
@@ -80,20 +84,23 @@ __aicore__ inline void MoeGatingTopKBackward<T>::Init(GM_ADDR xNorm, GM_ADDR gra
         loopTimes_ = tilingData_->perLoopTimes;
         tailRows_ = tilingData_->perTailRows;
     }
-    int64_t chunkLane = kReduceChunkLane; // 归约 chunk lane 数(64)
-    int64_t partialSumBytes = ((tilingData_->k + chunkLane - 1) / chunkLane) * SIZE_OF_FLOAT32;
-    xNormGm_.SetGlobalBuffer((__gm__ float*)xNorm + tilingData_->perCoreRows * tilingData_->expertCount * blockIdx_);
+    int64_t chunkLane = kReduceChunkLane;
+    int64_t reduceChunks = (tilingData_->k + chunkLane - 1) / chunkLane;
+    int64_t nChunks = (alignedN_ + chunkLane - 1) / chunkLane;
+    if (nChunks > reduceChunks) {
+        reduceChunks = nChunks;
+    }
+    xNormGm_.SetGlobalBuffer((__gm__ float*)xNorm + tilingData_->perCoreRows * expertCount_ * blockIdx_);
     gradYGm_.SetGlobalBuffer((__gm__ T*)gradY + tilingData_->perCoreRows * tilingData_->k * blockIdx_);
     expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertIdx + tilingData_->perCoreRows * tilingData_->k * blockIdx_);
-    gradXGm_.SetGlobalBuffer((__gm__ T*)gradX + tilingData_->perCoreRows * tilingData_->expertCount * blockIdx_);
+    gradXGm_.SetGlobalBuffer((__gm__ T*)gradX + tilingData_->perCoreRows * expertCount_ * blockIdx_);
     pipe_->InitBuffer(gradYQue_, 2, tilingData_->baseRows * AlignBytes(tilingData_->k, tilingData_->gradYDtypeSize));
     pipe_->InitBuffer(indicesQue_, 2, tilingData_->baseRows * AlignBytes(tilingData_->k, SIZE_OF_INT32));
-    pipe_->InitBuffer(xQue_, 2, AlignBytes(tilingData_->baseRows * tilingData_->expertCount, SIZE_OF_FLOAT32));
-    pipe_->InitBuffer(outQue_, 1,
-                      AlignBytes(tilingData_->baseRows * tilingData_->expertCount, tilingData_->gradYDtypeSize));
-    pipe_->InitBuffer(gradNormXBuf_, AlignBytes(tilingData_->baseRows * tilingData_->expertCount, SIZE_OF_FLOAT32));
+    pipe_->InitBuffer(xQue_, 2, AlignBytes(tilingData_->baseRows * alignedN_, SIZE_OF_FLOAT32));
+    pipe_->InitBuffer(outQue_, 1, AlignBytes(tilingData_->baseRows * alignedN_, tilingData_->gradYDtypeSize));
+    pipe_->InitBuffer(gradNormXBuf_, AlignBytes(tilingData_->baseRows * alignedN_, SIZE_OF_FLOAT32));
     pipe_->InitBuffer(wPrimeCache_, tilingData_->baseRows * AlignBytes(tilingData_->k, SIZE_OF_FLOAT32));
-    pipe_->InitBuffer(partialSumBuf_, AlignBytes(partialSumBytes, SIZE_OF_FLOAT32));
+    pipe_->InitBuffer(partialSumBuf_, AlignBytes(reduceChunks, SIZE_OF_FLOAT32));
 }
 
 template <typename T>
@@ -101,13 +108,12 @@ __aicore__ inline void MoeGatingTopKBackward<T>::Process()
 {
     for (int64_t loopIdx = 0; loopIdx < loopTimes_; loopIdx++) {
         curRows_ = loopIdx == loopTimes_ - 1 ? tailRows_ : tilingData_->baseRows;
-        elementCountPerLoop_ = curRows_ * tilingData_->expertCount;
         curRowsByKAlign_ = curRows_ * kAlign_;
         CopyInGradY(loopIdx);
         CopyInXNorm(loopIdx);
         CopyInExpertIdx(loopIdx);
-        SigmoidRenormBackward();
-        SigmoidGrad();
+        ScatterGrad();
+        ActivationBackward();
         CopyOut(loopIdx);
     }
 }
@@ -150,13 +156,13 @@ __aicore__ inline void MoeGatingTopKBackward<T>::CopyInXNorm(int64_t loopIdx)
 {
     xNormLocal_ = xQue_.AllocTensor<float>();
     DataCopyExtParams copyParams;
-    copyParams.blockCount = static_cast<uint16_t>(1);
-    copyParams.blockLen = static_cast<uint32_t>(curRows_ * tilingData_->expertCount * SIZE_OF_FLOAT32);
+    copyParams.blockCount = static_cast<uint16_t>(curRows_);
+    copyParams.blockLen = static_cast<uint32_t>(expertCount_) * static_cast<uint32_t>(SIZE_OF_FLOAT32);
     copyParams.srcStride = static_cast<uint32_t>(0);
-    copyParams.dstStride = static_cast<uint32_t>(0);
+    // UB 行 pitch 为 alignedN_，行间填充 (alignedN_-N) 个 float 的空隙
+    copyParams.dstStride = static_cast<uint32_t>((alignedN_ - expertCount_) * SIZE_OF_FLOAT32 / BLOCK_BYTES);
     DataCopyPadExtParams<float> padParams{false, 0, 0, 0};
-    DataCopyPad(xNormLocal_, xNormGm_[loopIdx * tilingData_->baseRows * tilingData_->expertCount], copyParams,
-                padParams);
+    DataCopyPad(xNormLocal_, xNormGm_[loopIdx * tilingData_->baseRows * expertCount_], copyParams, padParams);
     xQue_.EnQue(xNormLocal_);
     xNormLocal_ = xQue_.DeQue<float>();
 }
@@ -176,28 +182,44 @@ __aicore__ inline void MoeGatingTopKBackward<T>::CopyInExpertIdx(int64_t loopIdx
     expertIdxLocal_ = indicesQue_.DeQue<int32_t>();
 }
 
+// 散射出 gradNormX[row, alignedN]：Sigmoid 恒 renorm；Softmax 由 renorm 属性决定。
 template <typename T>
-__aicore__ inline void MoeGatingTopKBackward<T>::SigmoidRenormBackward()
+__aicore__ inline void MoeGatingTopKBackward<T>::ScatterGrad()
 {
     PipeBarrier<PIPE_V>();
     LocalTensor<float> wCache = wPrimeCache_.Get<float>();
     LocalTensor<float> gradNormX = gradNormXBuf_.Get<float>();
-    Duplicate<float>(gradNormX, 0.0f, elementCountPerLoop_);
+    Duplicate<float>(gradNormX, 0.0f, curRows_ * alignedN_);
     PipeBarrier<PIPE_V>();
-    CallSigmoidRenormBackwardVF(xNormLocal_, expertIdxLocal_, wCache, gradNormX, tilingData_->eps,
-                                static_cast<uint16_t>(curRows_), static_cast<uint16_t>(tilingData_->k),
-                                static_cast<uint16_t>(kAlign_), static_cast<uint16_t>(tilingData_->expertCount),
-                                partialSumBuf_.Get<float>());
+    if (normType_ == NORM_TYPE_SOFTMAX && renorm_ == 0) {
+        // Softmax + renorm=0：grad_selected = gradY * routedScalingFactor
+        CallSoftmaxScatterNoRenormVF(expertIdxLocal_, wCache, gradNormX, static_cast<uint16_t>(curRows_),
+                                     static_cast<uint16_t>(tilingData_->k), static_cast<uint16_t>(kAlign_),
+                                     static_cast<uint16_t>(alignedN_));
+    } else {
+        // Sigmoid（恒 renorm）或 Softmax + renorm=1：D/beta 反传，行 stride 用 alignedN_
+        CallSigmoidRenormBackwardVF(xNormLocal_, expertIdxLocal_, wCache, gradNormX, tilingData_->eps,
+                                    static_cast<uint16_t>(curRows_), static_cast<uint16_t>(tilingData_->k),
+                                    static_cast<uint16_t>(kAlign_), static_cast<uint16_t>(alignedN_),
+                                    partialSumBuf_.Get<float>());
+    }
     PipeBarrier<PIPE_V>();
     indicesQue_.FreeTensor(expertIdxLocal_);
 }
 
+// 激活反向：唯一分叉点。Sigmoid 逐元素(flat rows*alignedN)，Softmax 逐行 dot。
 template <typename T>
-__aicore__ inline void MoeGatingTopKBackward<T>::SigmoidGrad()
+__aicore__ inline void MoeGatingTopKBackward<T>::ActivationBackward()
 {
     gradXOutTensor_ = outQue_.AllocTensor<T>();
     LocalTensor<float> gradNormX = gradNormXBuf_.Get<float>();
-    CallSigmoidGradVF<T>(gradXOutTensor_, xNormLocal_, gradNormX, static_cast<uint32_t>(elementCountPerLoop_));
+    if (normType_ == NORM_TYPE_SOFTMAX) {
+        CallSoftmaxGradVF<T>(xNormLocal_, gradNormX, gradXOutTensor_, static_cast<uint16_t>(curRows_),
+                             static_cast<uint16_t>(expertCount_), static_cast<uint16_t>(alignedN_),
+                             partialSumBuf_.Get<float>());
+    } else {
+        CallSigmoidGradVF<T>(gradXOutTensor_, xNormLocal_, gradNormX, static_cast<uint32_t>(curRows_ * alignedN_));
+    }
     outQue_.EnQue(gradXOutTensor_);
     xQue_.FreeTensor(xNormLocal_);
 }
@@ -206,8 +228,12 @@ template <typename T>
 __aicore__ inline void MoeGatingTopKBackward<T>::CopyOut(int64_t loopIdx)
 {
     gradXOutTensor_ = outQue_.DeQue<T>();
-    DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(elementCountPerLoop_ * sizeof(T)), 0, 0, 0};
-    DataCopyPad(gradXGm_[loopIdx * tilingData_->baseRows * tilingData_->expertCount], gradXOutTensor_, dataCopyParams);
+    DataCopyExtParams dataCopyParams;
+    dataCopyParams.blockCount = static_cast<uint16_t>(curRows_);
+    dataCopyParams.blockLen = static_cast<uint32_t>(expertCount_) * static_cast<uint32_t>(sizeof(T));
+    dataCopyParams.srcStride = static_cast<uint32_t>((alignedN_ - expertCount_) * sizeof(T) / BLOCK_BYTES);
+    dataCopyParams.dstStride = 0;
+    DataCopyPad(gradXGm_[loopIdx * tilingData_->baseRows * expertCount_], gradXOutTensor_, dataCopyParams);
     outQue_.FreeTensor(gradXOutTensor_);
 }
 

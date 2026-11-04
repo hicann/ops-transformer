@@ -154,7 +154,7 @@ TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_regbase_suc
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_regbase_fail_norm_type_01)
+TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_regbase_succ_softmax_01)
 {
     optiling::MoeGatingTopKBackwardCompileInfo compileInfo = {};
     gert::TilingContextPara tilingContextPara(
@@ -174,7 +174,78 @@ TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_regbase_fai
             {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-20f)},
         },
         &compileInfo, "Ascend950");
-    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 10000, "", {});
+    std::vector<size_t> expectWorkspaces = {0};
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 10000, "", expectWorkspaces);
+}
+
+TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_regbase_succ_softmax_renorm1_01)
+{
+    optiling::MoeGatingTopKBackwardCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKBackward",
+        {
+            {{{2048, 192}, {2048, 192}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2048, 10}, {2048, 10}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2048, 10}, {2048, 10}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2048, 192}, {2048, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"norm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"routed_scaling_factor", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-20f)},
+        },
+        &compileInfo, "Ascend950");
+    std::vector<size_t> expectWorkspaces = {0};
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 10000, "", expectWorkspaces);
+}
+
+TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_regbase_fail_renorm_01)
+{
+    optiling::MoeGatingTopKBackwardCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKBackward",
+        {
+            {{{2048, 192}, {2048, 192}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2048, 10}, {2048, 10}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2048, 10}, {2048, 10}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2048, 192}, {2048, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"norm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"routed_scaling_factor", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-20f)},
+        },
+        &compileInfo, "Ascend950");
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 1, "", {});
+}
+
+TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_a3_fail_softmax_01)
+{
+    optiling::MoeGatingTopKBackwardCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKBackward",
+        {
+            {{{2048, 192}, {2048, 192}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2048, 10}, {2048, 10}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2048, 10}, {2048, 10}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2048, 192}, {2048, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"norm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"routed_scaling_factor", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-20f)},
+        },
+        &compileInfo, "Ascend910B");
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 1, "", {});
 }
 
 // ============================================
@@ -411,7 +482,7 @@ TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_fail_grad_y
             {"routed_scaling_factor", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
             {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-20f)},
         },
-        &compileInfo);
+        &compileInfo, "Ascend950");
     uint64_t expectTilingKey = 10000;
     string expectTilingData = "";
     std::vector<size_t> expectWorkspaces = {16777216};
@@ -759,4 +830,54 @@ TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_fail_ub_spa
     string expectTilingData = "";
     std::vector<size_t> expectWorkspaces = {16777216};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces);
+}
+
+// ============================================
+// A5 (Arch35) K-range validation cases
+// ============================================
+
+TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_a5_fail_grad_y_k_01)
+{
+    optiling::MoeGatingTopKBackwardCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKBackward",
+        {
+            {{{16, 256}, {16, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{16, 0}, {16, 0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{16, 0}, {16, 0}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{16, 256}, {16, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"norm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"routed_scaling_factor", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-20f)},
+        },
+        &compileInfo, "Ascend950");
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 10000, "", {});
+}
+
+TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_a5_fail_expert_idx_k_01)
+{
+    optiling::MoeGatingTopKBackwardCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKBackward",
+        {
+            {{{16, 256}, {16, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{16, 8}, {16, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{16, 16}, {16, 16}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{16, 256}, {16, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"norm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"routed_scaling_factor", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-20f)},
+        },
+        &compileInfo, "Ascend950");
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 10000, "", {});
 }

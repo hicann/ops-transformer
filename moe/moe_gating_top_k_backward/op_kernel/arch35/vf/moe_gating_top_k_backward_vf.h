@@ -162,7 +162,7 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float* xNormBase, __ubuf__ int
             idxU32Reg = (Reg::RegTensor<uint32_t>&)idxReg;
             Reg::DataCopyGather(wPrimeReg, xNormRow, idxU32Reg, chunkMask);
 
-            Reg::ReduceSum(chunkSum, wPrimeReg, chunkMask);
+            Reg::Reduce<Reg::ReduceType::SUM>(chunkSum, wPrimeReg, chunkMask);
             // 部分和(lane0) 落 partialSumBuf[c]
             Reg::StoreAlign<float, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(partialSumBuf + c, chunkSum, chunkMask);
         }
@@ -171,7 +171,7 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float* xNormBase, __ubuf__ int
         uint32_t partCount = repeatTimes;
         Reg::MaskReg partMask = Reg::UpdateMask<float>(partCount);
         Reg::LoadAlign(globalD, partialSumBuf);
-        Reg::ReduceSum(globalD, globalD, partMask);
+        Reg::Reduce<Reg::ReduceType::SUM>(globalD, globalD, partMask);
         Reg::Adds(globalD, globalD, eps, maskLane0);
 
         // ---- Phase 1b: re-gather w', compute w'/D, multiply by gradY, tree-reduce betaNum. ----
@@ -200,7 +200,7 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float* xNormBase, __ubuf__ int
 
             Reg::LoadAlign(gradYReg, gradYRow + chunkOffset);
             Reg::Mul(tmpReg, gradYReg, wNormReg, chunkMask);
-            Reg::ReduceSum(chunkSumB, tmpReg, chunkMask);
+            Reg::Reduce<Reg::ReduceType::SUM>(chunkSumB, tmpReg, chunkMask);
             // 部分和(lane0) 落 partialSumBuf[c]（与 Phase1a 时序复用同一段）
             Reg::StoreAlign<float, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(partialSumBuf + c, chunkSumB, chunkMask);
         }
@@ -209,7 +209,7 @@ __simd_vf__ void SigmoidRenormBackwardVF(__ubuf__ float* xNormBase, __ubuf__ int
         uint32_t partCountB = repeatTimes;
         Reg::MaskReg partMaskB = Reg::UpdateMask<float>(partCountB);
         Reg::LoadAlign(globalBetaNum, partialSumBuf);
-        Reg::ReduceSum(globalBetaNum, globalBetaNum, partMaskB);
+        Reg::Reduce<Reg::ReduceType::SUM>(globalBetaNum, globalBetaNum, partMaskB);
 
         // ---- Phase 2: recompute gradWPrime per chunk, scatter. ----
         uint32_t remainingK2 = k;
@@ -287,6 +287,116 @@ __aicore__ inline void CallSigmoidRenormBackwardVF(LocalTensor<float> xNorm, Loc
     __ubuf__ float* partialSumAddr = (__ubuf__ float*)partialSumBuf.GetPhyAddr();
     SigmoidRenormBackwardVF(xNormAddr, expertIdxAddr, gradYAddr, gradNormXAddr, eps, curRows, k, kAlign, n,
                             partialSumAddr);
+}
+
+// renorm=0：gradYBase 中已存放 gradY*routedScalingFactor，逐行散射到 gradNormX 对齐行。
+__simd_vf__ void SoftmaxScatterNoRenormVF(__ubuf__ int32_t* expertIdxBase, __ubuf__ float* gradYBase,
+                                          __ubuf__ float* gradNormXBase, uint16_t curRows, uint16_t k, uint16_t kAlign,
+                                          uint16_t nAlign)
+{
+    constexpr uint16_t chunkSize = kReduceChunkLane;
+    uint16_t repeatTimes = static_cast<uint16_t>((k + chunkSize - 1) / chunkSize);
+
+    for (uint16_t row = 0; row < curRows; row++) {
+        __ubuf__ int32_t* idxRow = expertIdxBase + row * kAlign;
+        __ubuf__ float* gradYRow = gradYBase + row * kAlign;
+        __ubuf__ float* gradNormXRow = gradNormXBase + row * nAlign;
+
+        uint32_t remainingK = k;
+        for (uint16_t c = 0; c < repeatTimes; c++) {
+            uint16_t chunkOffset = c * chunkSize;
+            Reg::MaskReg chunkMask = Reg::UpdateMask<int32_t>(remainingK);
+
+            Reg::RegTensor<int32_t> idxReg;
+            Reg::RegTensor<uint32_t> idxU32Reg;
+            Reg::RegTensor<float> gradYReg;
+
+            Reg::LoadAlign(idxReg, idxRow + chunkOffset);
+            idxU32Reg = (Reg::RegTensor<uint32_t>&)idxReg;
+            Reg::LoadAlign(gradYReg, gradYRow + chunkOffset);
+            Reg::DataCopyScatter(gradNormXRow, gradYReg, idxU32Reg, chunkMask);
+        }
+    }
+}
+
+// 逐行 Softmax Jacobian：dot = sum_j x*gradNormX, gradX = x*(gradNormX - dot)，并按 T 精度写回对齐行。
+template <typename T>
+__simd_vf__ void SoftmaxGradVF(__ubuf__ float* xNormBase, __ubuf__ float* gradNormXBase, __ubuf__ T* gradXBase,
+                               uint16_t curRows, uint16_t n, uint16_t nAlign, __ubuf__ float* partialSumBuf)
+{
+    constexpr uint16_t chunkSize = kReduceChunkLane;
+    uint16_t repeatTimes = static_cast<uint16_t>((n + chunkSize - 1) / chunkSize);
+    Reg::MaskReg maskLane0 = Reg::CreateMask<float, Reg::MaskPattern::VL1>();
+
+    for (uint16_t row = 0; row < curRows; row++) {
+        __ubuf__ float* xNormRow = xNormBase + row * nAlign;
+        __ubuf__ float* gradNormXRow = gradNormXBase + row * nAlign;
+        __ubuf__ T* gradXRow = gradXBase + row * nAlign;
+
+        // ---- Phase 1: dot = sum_j x*gradNormX ----
+        Reg::RegTensor<float> dotReg;
+        Reg::Duplicate(dotReg, 0.0f, maskLane0);
+        Reg::RegTensor<float> chunkSum;
+
+        uint32_t remainingDot = n;
+        for (uint16_t c = 0; c < repeatTimes; c++) {
+            uint16_t chunkOffset = c * chunkSize;
+            Reg::MaskReg chunkMask = Reg::UpdateMask<float>(remainingDot);
+            Reg::RegTensor<float> xReg, gReg, prodReg;
+            Reg::LoadAlign(xReg, xNormRow + chunkOffset);
+            Reg::LoadAlign(gReg, gradNormXRow + chunkOffset);
+            Reg::Mul(prodReg, xReg, gReg, chunkMask);
+            Reg::Reduce<Reg::ReduceType::SUM>(chunkSum, prodReg, chunkMask);
+            Reg::StoreAlign<float, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(partialSumBuf + c, chunkSum, chunkMask);
+        }
+        Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
+        uint32_t partCount = repeatTimes;
+        Reg::MaskReg partMask = Reg::UpdateMask<float>(partCount);
+        Reg::LoadAlign(dotReg, partialSumBuf);
+        Reg::Reduce<Reg::ReduceType::SUM>(dotReg, dotReg, partMask);
+
+        // ---- Phase 2: gradX = x*(gradNormX - dot) ----
+        uint32_t remainingOut = n;
+        for (uint16_t c = 0; c < repeatTimes; c++) {
+            uint16_t chunkOffset = c * chunkSize;
+            Reg::MaskReg chunkMask = Reg::UpdateMask<float>(remainingOut);
+            Reg::RegTensor<float> xReg, gReg, subReg, outReg, dotBcast;
+            Reg::LoadAlign(xReg, xNormRow + chunkOffset);
+            Reg::LoadAlign(gReg, gradNormXRow + chunkOffset);
+            Reg::Duplicate<float, Reg::HighLowPart::LOWEST, Reg::MaskMergeMode::ZEROING>(dotBcast, dotReg, chunkMask);
+            Reg::Sub(subReg, gReg, dotBcast, chunkMask);
+            Reg::Mul(outReg, xReg, subReg, chunkMask);
+            if constexpr (IsSameType<T, float>::value) {
+                Reg::StoreAlign(gradXRow + chunkOffset, outReg, chunkMask);
+            } else {
+                Reg::RegTensor<T> outPacked;
+                Reg::Cast<T, float, castTraitB322B16>(outPacked, outReg, chunkMask);
+                Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(gradXRow + chunkOffset, outPacked, chunkMask);
+            }
+        }
+    }
+}
+
+__aicore__ inline void CallSoftmaxScatterNoRenormVF(LocalTensor<int32_t> expertIdx, LocalTensor<float> gradY,
+                                                    LocalTensor<float> gradNormX, uint16_t curRows, uint16_t k,
+                                                    uint16_t kAlign, uint16_t nAlign)
+{
+    __ubuf__ int32_t* expertIdxAddr = (__ubuf__ int32_t*)expertIdx.GetPhyAddr();
+    __ubuf__ float* gradYAddr = (__ubuf__ float*)gradY.GetPhyAddr();
+    __ubuf__ float* gradNormXAddr = (__ubuf__ float*)gradNormX.GetPhyAddr();
+    SoftmaxScatterNoRenormVF(expertIdxAddr, gradYAddr, gradNormXAddr, curRows, k, kAlign, nAlign);
+}
+
+template <typename T>
+__aicore__ inline void CallSoftmaxGradVF(LocalTensor<float> xNorm, LocalTensor<float> gradNormX, LocalTensor<T> gradX,
+                                         uint16_t curRows, uint16_t n, uint16_t nAlign,
+                                         LocalTensor<float> partialSumBuf)
+{
+    __ubuf__ float* xNormAddr = (__ubuf__ float*)xNorm.GetPhyAddr();
+    __ubuf__ float* gradNormXAddr = (__ubuf__ float*)gradNormX.GetPhyAddr();
+    __ubuf__ T* gradXAddr = (__ubuf__ T*)gradX.GetPhyAddr();
+    __ubuf__ float* partialSumAddr = (__ubuf__ float*)partialSumBuf.GetPhyAddr();
+    SoftmaxGradVF<T>(xNormAddr, gradNormXAddr, gradXAddr, curRows, n, nAlign, partialSumAddr);
 }
 
 } // namespace MoeGatingTopKBackwardNs

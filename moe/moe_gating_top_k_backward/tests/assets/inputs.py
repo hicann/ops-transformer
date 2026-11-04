@@ -15,8 +15,8 @@ TTK's default random generator creates the three inputs independently.  That is
 not a valid MoE forward result: ``expert_idx`` must be unique in each token row
 and must select entries from the corresponding ``x_norm`` row.  This generator
 preserves an already-normalized ``x_norm`` (the legacy STC cases use the
-``(0.001, 0.999)`` range); for generic logit ranges it first applies sigmoid,
-then derives deterministic Top-K indices.
+``(0.001, 0.999)`` range); for generic values it applies the requested
+normalization, then derives deterministic Top-K indices.
 """
 
 import numpy as np
@@ -36,7 +36,54 @@ __input__ = {
 }
 
 
-def moe_gating_top_k_backward_inputs(x_norm, grad_y, expert_idx, **_unused):
+def _normalize_x_norm(values, norm_type):
+    """Build a valid full-dimension normalization output for backward tests."""
+    values = np.asarray(values, dtype=np.float32)
+    if norm_type == 0:
+        if np.any(values < 0.0) or np.any(values > 1.0):
+            values = values - np.max(values, axis=1, keepdims=True)
+            values = np.exp(values)
+        else:
+            values = np.maximum(values, 0.0)
+        denominator = np.sum(values, axis=1, keepdims=True)
+        zero_rows = denominator <= 0.0
+        if np.any(zero_rows):
+            values = np.where(zero_rows, 1.0, values)
+            denominator = np.sum(values, axis=1, keepdims=True)
+        return values / denominator
+    if norm_type == 1:
+        if np.any(values < 0.0) or np.any(values > 1.0):
+            values = 1.0 / (1.0 + np.exp(-values))
+        return values
+    raise ValueError(f"Unsupported norm_type: {norm_type}")
+
+
+def _normalize_x_norm_torch(values, norm_type):
+    """Torch equivalent of _normalize_x_norm for ACLNN/E2E inputs."""
+    values = values.to(torch.float32)
+    if norm_type == 0:
+        if bool((values < 0).any()) or bool((values > 1).any()):
+            return torch.softmax(values, dim=1)
+        values = torch.clamp_min(values, 0.0)
+        denominator = values.sum(dim=1, keepdim=True)
+        zero_rows = denominator <= 0.0
+        values = torch.where(zero_rows, torch.ones_like(values), values)
+        denominator = torch.where(
+            zero_rows,
+            torch.full_like(denominator, values.shape[1]),
+            denominator,
+        )
+        return values / denominator
+    if norm_type == 1:
+        if bool((values < 0).any()) or bool((values > 1).any()):
+            return torch.sigmoid(values)
+        return values
+    raise ValueError(f"Unsupported norm_type: {norm_type}")
+
+
+def moe_gating_top_k_backward_inputs(
+    x_norm, grad_y, expert_idx, norm_type=0, **_unused
+):
     """Create mutually consistent x_norm and expert_idx inputs for TTK."""
     if x_norm.ndim != 2 or grad_y.ndim != 2 or expert_idx.ndim != 2:
         raise ValueError("MoeGatingTopKBackward expects rank-2 inputs")
@@ -45,9 +92,8 @@ def moe_gating_top_k_backward_inputs(x_norm, grad_y, expert_idx, **_unused):
     if grad_y.shape[1] > x_norm.shape[1]:
         raise ValueError("Top-K width cannot exceed expert count")
 
-    values = np.asarray(x_norm, dtype=np.float32)
-    if np.any(values < 0.0) or np.any(values > 1.0):
-        x_norm[...] = 1.0 / (1.0 + np.exp(-values))
+    values = _normalize_x_norm(x_norm, norm_type)
+    x_norm[...] = values.astype(x_norm.dtype, copy=False)
     topk = grad_y.shape[1]
     expert_idx[...] = np.argsort(-x_norm, axis=1, kind="stable")[:, :topk].astype(
         expert_idx.dtype
@@ -60,7 +106,7 @@ def aclnn_moe_gating_top_k_backward_inputs(
     gradY,
     expertIdx,
     renorm=0,
-    normType=1,
+    normType=0,
     routedScalingFactor=1.0,
     eps=1e-20,
     out=None,
@@ -73,10 +119,8 @@ def aclnn_moe_gating_top_k_backward_inputs(
     torch.Tensor 才能生效。
     """
     topk = expertIdx.shape[1]
-    values = xNorm.to(torch.float32)
-    if bool((values < 0).any()) or bool((values > 1).any()):
-        xNorm.copy_(torch.sigmoid(values))
-        values = xNorm.to(torch.float32)
+    values = _normalize_x_norm_torch(xNorm, normType)
+    xNorm.copy_(values.to(dtype=xNorm.dtype))
     _, sorted_idx = torch.sort(values, dim=1, descending=True, stable=True)
     expertIdx.copy_(sorted_idx[:, :topk].to(expertIdx.dtype))
     return [xNorm, gradY, expertIdx, out]
@@ -87,7 +131,7 @@ def e2e_moe_gating_top_k_backward_inputs(
     grad_y,
     expertIdx,
     renorm=0,
-    norm_type=1,
+    norm_type=0,
     routed_scaling_factor=1.0,
     eps=1e-20,
     **_unused,
@@ -99,9 +143,7 @@ def e2e_moe_gating_top_k_backward_inputs(
     torch.Tensor 才能生效（framework_api/input_generation.py）。
     """
     topk = expertIdx.shape[1]
-    values = x_norm.to(torch.float32)
-    if bool((values < 0).any()) or bool((values > 1).any()):
-        x_norm.copy_(torch.sigmoid(values))
-        values = x_norm.to(torch.float32)
+    values = _normalize_x_norm_torch(x_norm, norm_type)
+    x_norm.copy_(values.to(dtype=x_norm.dtype))
     _, sorted_idx = torch.sort(values, dim=1, descending=True, stable=True)
     expertIdx.copy_(sorted_idx[:, :topk].to(expertIdx.dtype))

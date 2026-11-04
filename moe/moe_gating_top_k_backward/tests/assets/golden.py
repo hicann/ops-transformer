@@ -20,7 +20,13 @@ import torch
 
 
 def _moe_gating_top_k_backward_torch(
-    x_norm, grad_y, expert_idx, routed_scaling_factor=1.0, eps=1e-20
+    x_norm,
+    grad_y,
+    expert_idx,
+    renorm=0,
+    norm_type=0,
+    routed_scaling_factor=1.0,
+    eps=1e-20,
 ):
     """
     PyTorch 实现 MoE Gating Top-K 反向传播的参考计算。
@@ -31,18 +37,37 @@ def _moe_gating_top_k_backward_torch(
     x_f32 = x_norm.to(torch.float32)
     grad_y_f32 = grad_y.to(torch.float32)
     idx = expert_idx.to(torch.int64)
-    # 根据选中的专家索引收集对应的 x_norm 值
-    selected = torch.gather(x_f32, dim=1, index=idx)  # shape (token_count, k)
-    denominator = selected.sum(dim=1, keepdim=True) + eps
-    weights = selected / denominator
     grad_y_scaled = grad_y_f32 * routed_scaling_factor
-    beta = (weights * grad_y_scaled).sum(dim=1, keepdim=True)
-    grad_selected = (grad_y_scaled - beta) / denominator
+    selected = torch.gather(x_f32, dim=1, index=idx)
 
-    grad_norm = torch.zeros_like(x_f32)
-    # 使用 scatter_add_ 将梯度分散到对应专家位置（支持多选，若索引重复则累加）
-    grad_norm.scatter_add_(dim=1, index=idx, src=grad_selected)
-    grad_x = x_f32 * (1 - x_f32) * grad_norm
+    if norm_type == 1:
+        # The forward operator renormalizes Top-K sigmoid values for this mode.
+        denominator = selected.sum(dim=1, keepdim=True) + eps
+        weights = selected / denominator
+        beta = (weights * grad_y_scaled).sum(dim=1, keepdim=True)
+        grad_selected = (grad_y_scaled - beta) / denominator
+
+        grad_norm = torch.zeros_like(x_f32)
+        grad_norm.scatter_add_(dim=1, index=idx, src=grad_selected)
+        grad_x = x_f32 * (1 - x_f32) * grad_norm
+    elif norm_type == 0:
+        if renorm != 0:
+            denominator = selected.sum(dim=1, keepdim=True) + eps
+            weights = selected / denominator
+            beta = (weights * grad_y_scaled).sum(dim=1, keepdim=True)
+            grad_selected = (grad_y_scaled - beta) / denominator
+        else:
+            grad_selected = grad_y_scaled
+
+        # x_norm is the complete N-way Softmax output.  Apply its full
+        # Jacobian-vector product, including non-Top-K experts.
+        grad_norm = torch.zeros_like(x_f32)
+        grad_norm.scatter_add_(dim=1, index=idx, src=grad_selected)
+        softmax_dot = (x_f32 * grad_norm).sum(dim=1, keepdim=True)
+        grad_x = x_f32 * (grad_norm - softmax_dot)
+    else:
+        raise ValueError(f"Unsupported norm_type: {norm_type}")
+
     return grad_x.to(grad_y.dtype)
 
 
@@ -66,7 +91,13 @@ class MoeGatingTopKBackwardKernelSpec:
         g_t = torch.from_numpy(grad_y.astype(np.float32))
         i_t = torch.from_numpy(expert_idx.astype(np.int32))
         out = _moe_gating_top_k_backward_torch(
-            x_t, g_t, i_t, routed_scaling_factor, eps
+            x_t,
+            g_t,
+            i_t,
+            renorm,
+            norm_type,
+            routed_scaling_factor,
+            eps,
         )
         # 内部函数按 fp32 输出（kernel 模式原始 dtype 已在 numpy 侧丢失，g_t 是 fp32），
         # 所以必须在最外层用原始 numpy 的 grad_y.dtype 转回 bf16/fp16
@@ -85,14 +116,20 @@ class MoeGatingTopKBackwardAclnnSpec:
         gradY,
         expertIdx,
         renorm=0,
-        normType=1,
+        normType=0,
         routedScalingFactor=1.0,
         eps=1e-20,
         out=None,
         **_unused,
     ):
         grad_x = _moe_gating_top_k_backward_torch(
-            xNorm, gradY, expertIdx, routedScalingFactor, eps
+            xNorm,
+            gradY,
+            expertIdx,
+            renorm,
+            normType,
+            routedScalingFactor,
+            eps,
         )
         return [grad_x]
 
@@ -109,13 +146,19 @@ class MoeGatingTopKBackwardTorchSpec:
         grad_y,
         expertIdx,
         renorm=0,
-        norm_type=1,
+        norm_type=0,
         routed_scaling_factor=1.0,
         eps=1e-20,
         **_unused,
     ):
         grad_x = _moe_gating_top_k_backward_torch(
-            x_norm, grad_y, expertIdx, routed_scaling_factor, eps
+            x_norm,
+            grad_y,
+            expertIdx,
+            renorm,
+            norm_type,
+            routed_scaling_factor,
+            eps,
         )
         return [grad_x]
 
@@ -124,7 +167,7 @@ class MoeGatingTopKBackwardTorchSpec:
 
 
 __spec__ = {
-    "moe_gating_top_k_backward": MoeGatingTopKBackwardKernelSpec,
-    "aclnnMoeGatingTopKBackward": MoeGatingTopKBackwardAclnnSpec,
-    "torch_npu.npu_moe_gating_top_k_backward": MoeGatingTopKBackwardTorchSpec,
+    "moe_gating_top_k_backward": "MoeGatingTopKBackwardKernelSpec",
+    "aclnnMoeGatingTopKBackward": "MoeGatingTopKBackwardAclnnSpec",
+    "torch_npu.npu_moe_gating_top_k_backward": "MoeGatingTopKBackwardTorchSpec",
 }

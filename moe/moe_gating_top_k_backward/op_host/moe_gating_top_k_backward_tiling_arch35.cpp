@@ -18,6 +18,7 @@
 
 namespace optiling {
 
+const static int64_t NORM_TYPE_SOFTMAX = 0;
 const static int64_t NORM_TYPE_SIGMOID = 1;
 const static size_t X_NORM_INPUT_DIMS = 2;
 const static size_t GRAD_Y_INPUT_DIMS = 2;
@@ -31,13 +32,9 @@ const static int64_t RENORM_ATTR_INDEX = 0;
 const static int64_t NORM_TYPE_ATTR_INDEX = 1;
 const static int64_t ROUTED_SCALING_FACTOR_ATTR_INDEX = 2;
 const static int64_t EPS_ATTR_INDEX = 3;
-const static int64_t M_DIM_INDEX = 0;
-const static int64_t N_DIM_INDEX = 1;
-const static int64_t K_DIM_INDEX = 1;
 const static int64_t DOUBLE_BUFFER_NUM = 2;
 const static int64_t UB_ALIGN_BYTES_MINUS_ONE = 31;
 const static int64_t UB_RESERVE_SPACE = 1024;
-const static int64_t NUM_TWO = 2;
 const static int64_t MAX_EXPERT_COUNT = 2048;
 const static int64_t SIZE_OF_FLOAT32 = 4;
 const static int64_t SIZE_OF_INT32 = 4;
@@ -48,10 +45,18 @@ const static uint64_t TILING_KEY_REGBASE = 10000;
 const static int64_t DIM_ZERO = 0;
 const static int64_t DIM_ONE = 1;
 const static int64_t VF_CHUNK_LANE = 64;
+// 取 32 可同时保证 fp32(32B*4) 与 fp16/bf16(32B*2) 的行 pitch 以及
+// DataCopyPad 的 UB stride((alignedN-N)*dtypeSize/32) 均为整数。
+const static int64_t ALIGN_ELEM_NUM = 32;
 
 inline int64_t AlignBytes_(int64_t x)
 {
     return (x + UB_ALIGN_BYTES_MINUS_ONE) & ~UB_ALIGN_BYTES_MINUS_ONE;
+}
+
+inline int64_t AlignElems_(int64_t x)
+{
+    return (x + ALIGN_ELEM_NUM - 1) / ALIGN_ELEM_NUM * ALIGN_ELEM_NUM;
 }
 
 MoeGatingTopKBackwardTilingArch35::MoeGatingTopKBackwardTilingArch35(gert::TilingContext* context)
@@ -144,6 +149,7 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::PostTiling()
     td.gradYDtypeSize = gradYDtypeSize_;
     td.renorm = renorm_;
     td.normType = normType_;
+    td.alignedN = alignedN_;
     td.routedScalingFactor = routedScalingFactor_;
     td.eps = eps_;
 
@@ -308,15 +314,20 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckAttr()
         renorm_ = *renormPtr;
     }
     OP_LOGI(context_, "Attr renorm: %ld.", renorm_);
+    OP_CHECK_IF(
+        renorm_ != 0 && renorm_ != 1,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "renorm", std::to_string(renorm_).c_str(),
+                                              "The value of renorm must be 0 or 1"),
+        return ge::GRAPH_FAILED);
 
     const int64_t* normTypePtr = attrs->GetAttrPointer<int64_t>(NORM_TYPE_ATTR_INDEX);
     if (normTypePtr != nullptr) {
         normType_ = *normTypePtr;
     }
     OP_LOGI(context_, "Attr normType: %ld.", normType_);
-    if (normType_ != NORM_TYPE_SIGMOID) {
+    if (normType_ != NORM_TYPE_SIGMOID && normType_ != NORM_TYPE_SOFTMAX) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "norm_type", std::to_string(normType_).c_str(),
-                                              "The value of norm_type must be 1");
+                                              "The value of norm_type must be 0 or 1");
         return ge::GRAPH_FAILED;
     }
 
@@ -378,12 +389,13 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckOutShape()
 
 ge::graphStatus MoeGatingTopKBackwardTilingArch35::CalcMaxRows()
 {
+    int64_t nStorage = alignedN_;
     int64_t gradYQuePerTokenSpace = k_ * gradYDtypeSize_;
     int64_t indicesQuePerTokenSpace = k_ * SIZE_OF_INT32;
-    int64_t xQuePerTokenSpace = expertCount_ * SIZE_OF_FLOAT32;
-    int64_t outQuePerTokenSpace = expertCount_ * gradYDtypeSize_;
+    int64_t xQuePerTokenSpace = nStorage * SIZE_OF_FLOAT32;
+    int64_t outQuePerTokenSpace = nStorage * gradYDtypeSize_;
     int64_t wPrimeCachePerTokenSpace = k_ * SIZE_OF_FLOAT32;
-    int64_t bufnPerTokenSpace = expertCount_ * SIZE_OF_FLOAT32;
+    int64_t bufnPerTokenSpace = nStorage * SIZE_OF_FLOAT32;
 
     int64_t availableSpace = static_cast<int64_t>(aicoreParams_.ubSize) - UB_RESERVE_SPACE;
     int64_t quePerTokenSpace =
@@ -392,14 +404,18 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CalcMaxRows()
     int64_t bufPerTokenSpace = bufnPerTokenSpace + wPrimeCachePerTokenSpace;
     int64_t maxRows = availableSpace / (quePerTokenSpace + bufPerTokenSpace);
 
+    // VF 二级归约临时区：k 与 alignedN 两路归约取 chunk 数较大值。
+    int64_t reduceChunks = Ops::Base::CeilDiv(k_, VF_CHUNK_LANE);
+    int64_t nChunks = Ops::Base::CeilDiv(nStorage, VF_CHUNK_LANE);
+    reduceChunks = reduceChunks > nChunks ? reduceChunks : nChunks;
+
     while (maxRows > 0) {
         int64_t queSpace = DOUBLE_BUFFER_NUM * maxRows * AlignBytes_(gradYQuePerTokenSpace) +
                            DOUBLE_BUFFER_NUM * maxRows * AlignBytes_(indicesQuePerTokenSpace) +
                            DOUBLE_BUFFER_NUM * AlignBytes_(maxRows * xQuePerTokenSpace) +
                            AlignBytes_(maxRows * outQuePerTokenSpace);
         int64_t bufSpace = AlignBytes_(maxRows * bufnPerTokenSpace) + maxRows * AlignBytes_(wPrimeCachePerTokenSpace);
-        // VF 二级归约临时区：每行保存 ceil(k/64) 个 chunk 部分和（k<=2048 => <=32 float），逐行复用
-        int64_t partialBufSpace = AlignBytes_(Ops::Base::CeilDiv(k_, VF_CHUNK_LANE) * SIZE_OF_FLOAT32);
+        int64_t partialBufSpace = AlignBytes_(reduceChunks * SIZE_OF_FLOAT32);
 
         int64_t usedSpace = UB_RESERVE_SPACE + queSpace + bufSpace + partialBufSpace;
         if (usedSpace <= static_cast<int64_t>(aicoreParams_.ubSize)) {
@@ -414,6 +430,10 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CalcMaxRows()
 
 ge::graphStatus MoeGatingTopKBackwardTilingArch35::SplitRows()
 {
+    // 统一使用逐行对齐布局 [rows, alignedN]：N 维上存在逐行操作(Softmax 的 dot)，
+    // 行基址必须 32B 对齐；Sigmoid 逐元素天然容忍 padding，故两路共用同一布局。
+    alignedN_ = AlignElems_(expertCount_);
+
     perCoreRows_ = Ops::Base::CeilDiv(tokenCount_, static_cast<int64_t>(aicoreParams_.numBlocks));
     needCoreNum_ = Ops::Base::CeilDiv(tokenCount_, perCoreRows_);
     lastCoreRows_ = tokenCount_ % perCoreRows_ == 0 ? perCoreRows_ : tokenCount_ % perCoreRows_;
@@ -450,6 +470,7 @@ void MoeGatingTopKBackwardTilingArch35::DumpTiling()
     OP_LOGD(context_, "lastLoopTimes:  %ld", lastLoopTimes_);
     OP_LOGD(context_, "lastTailRows:  %ld", lastTailRows_);
     OP_LOGD(context_, "expertCount:  %ld", expertCount_);
+    OP_LOGD(context_, "alignedN:  %ld", alignedN_);
     OP_LOGD(context_, "k:  %ld", k_);
     OP_LOGD(context_, "gradYDtypeSize:  %ld", gradYDtypeSize_);
     OP_LOGD(context_, "renorm:  %ld", renorm_);

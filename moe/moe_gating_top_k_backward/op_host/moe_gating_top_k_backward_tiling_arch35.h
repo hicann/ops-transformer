@@ -55,11 +55,6 @@ private:
     ge::graphStatus SplitRows();
     void DumpTiling();
 
-    const gert::Shape* xNormShape_ = nullptr;
-    const gert::Shape* gradYShape_ = nullptr;
-    const gert::Shape* expertIdxShape_ = nullptr;
-    const gert::Shape* outputGradXShape_ = nullptr;
-
     ge::DataType gradYDtype_;
 
     int64_t needCoreNum_ = 0;
@@ -72,6 +67,7 @@ private:
     int64_t lastTailRows_ = 0;
     int64_t tokenCount_ = 0;
     int64_t expertCount_ = 0;
+    int64_t alignedN_ = 0;
     int64_t k_ = 0;
     int64_t gradYDtypeSize_ = 0;
     int64_t renorm_ = 1;
