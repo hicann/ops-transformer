@@ -49,6 +49,8 @@ constexpr int32_t QUANT_V_OFFSET_INPUT_INDEX = 9;
 constexpr int32_t WEIGHT_SCALES_INPUT_INDEX = 10;
 constexpr int32_t ACTIVATION_INPUT_INDEX = 11;
 constexpr int32_t BIAS_INPUT_INDEX = 12;
+constexpr int32_t QUANT_MODE_INDEX = 1;
+constexpr int32_t LAYOUT_INDEX = 2;
 constexpr int32_t IFKV_INDEX = 3;
 constexpr int32_t CACHE_MODE_IDX = 4;
 constexpr int32_t KVCACHE_HEAD_DIM_INDEX = 2;
@@ -238,9 +240,14 @@ bool CheckPaCacheMode(const gert::RuntimeAttrs* attrs)
     if (tmpmode == nullptr) {
         return false;
     }
-    std::string cacheMode = tmpmode;
-    std::transform(cacheMode.begin(), cacheMode.end(), cacheMode.begin(), ::tolower);
-    return (cacheMode == "page");
+    return detail::ToLowerAscii(tmpmode) == "page";
+}
+
+void WarnForUnsupportedStringAttrs(const gert::RuntimeAttrs* attrs, const ge::char_t* nodeName)
+{
+    auto emitWarning = [nodeName](const std::string& warning) { OP_LOGW(nodeName, "%s", warning.c_str()); };
+    detail::EmitUnsupportedStringAttrWarnings(attrs->GetStr(QUANT_MODE_INDEX), attrs->GetStr(LAYOUT_INDEX),
+                                              attrs->GetStr(CACHE_MODE_IDX), emitWarning);
 }
 
 ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& tilingInfoDRQK)
@@ -263,6 +270,7 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& t
                     "EZ1008", (std::vector<const char*>{"opName", "reason"}),
                     (std::vector<const char*>{nodeName, "Runtime attributes are unavailable during Tiling"})),
                 return ge::GRAPH_FAILED);
+    WarnForUnsupportedStringAttrs(attrs, nodeName);
 
     auto attr = attrs->GetAttrPointer<gert::ContinuousVector>(0);
     OP_CHECK_IF(

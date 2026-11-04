@@ -15,11 +15,51 @@
 #ifndef OPS_BUILD_IN_OP_TILING_DEQUANT_ROPE_QUANT_KVCACHE_H
 #define OPS_BUILD_IN_OP_TILING_DEQUANT_ROPE_QUANT_KVCACHE_H
 
+#include <algorithm>
+#include <cctype>
+#include <string>
+
 #include "register/op_impl_registry.h"
 #include "op_host/tiling_base.h"
 #include "tiling/tiling_api.h"
 
 namespace optiling {
+namespace detail {
+inline std::string ToLowerAscii(const char* value)
+{
+    std::string result = value;
+    std::transform(result.begin(), result.end(), result.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    return result;
+}
+
+template <typename EmitWarning>
+void EmitUnsupportedStringAttrWarnings(const char* quantMode, const char* layout, const char* cacheMode,
+                                       EmitWarning&& emitWarning)
+{
+    if (quantMode != nullptr && std::string(quantMode) != "static") {
+        emitWarning("quant_mode=\"" + std::string(quantMode) +
+                    "\" is not supported; the documented value is \"static\". "
+                    "The value is ignored and execution continues with static quantization behavior.");
+    }
+
+    if (layout != nullptr && std::string(layout) != "BSND") {
+        emitWarning("layout=\"" + std::string(layout) +
+                    "\" is not supported; the documented value is \"BSND\". "
+                    "The value is ignored and execution continues with BSND semantics.");
+    }
+
+    if (cacheMode != nullptr) {
+        const std::string normalizedCacheMode = ToLowerAscii(cacheMode);
+        if (normalizedCacheMode != "page" && normalizedCacheMode != "contiguous") {
+            emitWarning("cache_mode=\"" + std::string(cacheMode) +
+                        "\" is not supported; the documented values are \"page\" and \"contiguous\". "
+                        "Execution continues with the existing cache-mode compatibility mapping.");
+        }
+    }
+}
+} // namespace detail
+
 struct DequantRopeQuantKvcacheCompileInfo {};
 
 BEGIN_TILING_DATA_DEF(DequantRopeQuantKvcacheTilingData)

@@ -57,7 +57,8 @@ static gert::TilingContextPara MakeValidTilingContext(void* compileInfo)
         {{"size_splits", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({8 * 128, 1 * 128, 1 * 128})},
          {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("static")},
          {"layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
-         {"kv_output", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+         {"kv_output", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+         {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("contiguous")}},
         compileInfo);
 }
 
@@ -95,6 +96,49 @@ TEST_F(DequantRopeQuantKvcacheTiling, DequantRopeQuantKvcachetiling_01)
     drqk_test::ClearErrorMessages();
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
     drqk_test::ExpectNoError();
+}
+
+TEST_F(DequantRopeQuantKvcacheTiling, DequantRopeQuantKvcachetiling_unsupported_string_attrs_keep_compatibility)
+{
+    DequantRopeQuantKvcacheCompileInfo compileInfo = {};
+    auto para = MakeValidTilingContext(&compileInfo);
+    para.attrs_[1].attr_ = Ops::Transformer::AnyValue::CreateFrom<std::string>("");
+    para.attrs_[2].attr_ = Ops::Transformer::AnyValue::CreateFrom<std::string>("TND");
+    para.attrs_[4].attr_ = Ops::Transformer::AnyValue::CreateFrom<std::string>("XXXX");
+
+    uint64_t expectTilingKey = 0;
+    string expectTilingData = "8 1 128 128 256 512 44 1024 320 1024 128 128 64 64 5 5 1 1 0 0 0 0 1 ";
+    std::vector<size_t> expectWorkspaces = {16777216};
+    drqk_test::ClearErrorMessages();
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
+    drqk_test::ExpectNoError();
+}
+
+TEST_F(DequantRopeQuantKvcacheTiling, DequantRopeQuantKvcachetiling_unsupported_string_attr_warnings)
+{
+    std::vector<std::string> warnings;
+    auto emitWarning = [&warnings](const std::string& warning) { warnings.push_back(warning); };
+    optiling::detail::EmitUnsupportedStringAttrWarnings("", "TND", "XXXX", emitWarning);
+
+    ASSERT_EQ(warnings.size(), 3U);
+    EXPECT_NE(warnings[0].find("quant_mode=\"\" is not supported"), std::string::npos);
+    EXPECT_NE(warnings[1].find("layout=\"TND\" is not supported"), std::string::npos);
+    EXPECT_NE(warnings[2].find("cache_mode=\"XXXX\" is not supported"), std::string::npos);
+
+    warnings.clear();
+    optiling::detail::EmitUnsupportedStringAttrWarnings("static", "BSND", "Page", emitWarning);
+    EXPECT_TRUE(warnings.empty());
+}
+
+TEST_F(DequantRopeQuantKvcacheTiling, DequantRopeQuantKvcachetiling_supported_cache_case_keeps_compatibility)
+{
+    DequantRopeQuantKvcacheCompileInfo compileInfo = {};
+    auto para = MakeValidTilingContext(&compileInfo);
+    para.inputTensorDesc_[5] =
+        gert::TilingContextPara::TensorDescription({{{320}, {320}}, ge::DT_INT32, ge::FORMAT_ND});
+    para.attrs_[4].attr_ = Ops::Transformer::AnyValue::CreateFrom<std::string>("Page");
+
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS);
 }
 
 TEST_F(DequantRopeQuantKvcacheTiling, DequantRopeQuantKvcachetiling_invalid_x_rank)
