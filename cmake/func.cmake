@@ -723,7 +723,7 @@ function(enable_pypto_kernel op_file)
     list(GET _compute_units 0 _soc_unit)
 
     set(_gen "${ASCEND_BINARY_OUT_DIR}/${_soc_unit}/${op_file}_pypto_gen")
-    set(_py "${CMAKE_CURRENT_SOURCE_DIR}/../op_kernel/${PYPTO_ARCH_DIR}/${op_file}.py")
+    set(_py  "${CMAKE_CURRENT_SOURCE_DIR}/../op_kernel/${op_file}.py")
 
     if (NOT EXISTS ${_py})
         message(FATAL_ERROR "enable_pypto_kernel: kernel python file not found: ${_py}")
@@ -1031,9 +1031,9 @@ function(add_bin_compile_target)
             endif ()
 
             if (${op_file}_pypto_enabled)
-                set(_pypto_install_stamp ${OP_SRC_OUT_DIR}/op_kernel/${PYPTO_ARCH_DIR}/.pypto_install.done)
+                set(_pypto_install_stamp ${OP_SRC_OUT_DIR}/op_kernel/.pypto_install.done)
                 add_custom_command(OUTPUT ${_pypto_install_stamp}
-                        COMMAND ${CMAKE_COMMAND} -E copy_directory ${${op_file}_pypto_gen_dir} ${OP_SRC_OUT_DIR}/op_kernel/${PYPTO_ARCH_DIR}
+                        COMMAND ${CMAKE_COMMAND} -E copy_directory ${${op_file}_pypto_gen_dir} ${OP_SRC_OUT_DIR}/op_kernel
                         COMMAND ${CMAKE_COMMAND} -E touch ${_pypto_install_stamp}
                         DEPENDS ${OP_TARGET_NAME}_src_copy
                         VERBATIM
