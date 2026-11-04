@@ -270,9 +270,6 @@ void FlashAttnMetadataCpuKernel::SetFagSplitAxis()
     int64_t n1 = static_cast<int64_t>(numHeadsQ_);
     int64_t n2 = static_cast<int64_t>(numHeadsKv_);
     int64_t d = static_cast<int64_t>(headDim_);
-    // headDimV_ 未指定时已归一化成 headDim_，故 d1 恒有效；BN2 的 V/dO 固定按
-    // d 建视图，必须 d==d1（对应 host Bn2FamilyFeasible 的 p.d == p.dv）。
-    int64_t d1 = static_cast<int64_t>(headDimV_);
     int64_t b = static_cast<int64_t>(batchSize_);
 
     // isAllSame: all batches have same seq lengths (for TND)
@@ -280,10 +277,8 @@ void FlashAttnMetadataCpuKernel::SetFagSplitAxis()
 
     // Match pypto host: single-block BN2 (S<=128) or MultiBlk (S in (128, 640]
     // and BN gate). Mask 3/4 is allowed on BN2 (kernel skip_invalid / packed).
-    // GQA / D>MAX_HEAD_DIM / D!=Dv / variable-length TND stay on GS1S2.
-    constexpr int64_t BN2_MAX_D = 768;
-    fagIsBn2_ = (s1 <= 128 && s2 <= 128) && (n1 == n2) && (d <= BN2_MAX_D) && (d == d1) && !fagUseTndSplit_ &&
-                !fagIsSeqExistZero_;
+    // GQA / D>128 / variable-length TND stay on GS1S2.
+    fagIsBn2_ = (s1 <= 128 && s2 <= 128) && (n1 == n2) && (d <= 128) && !fagUseTndSplit_ && !fagIsSeqExistZero_;
     constexpr int64_t BN2_MULTIBLK_SEQ = 640;
     constexpr int64_t BN2_MULTIBLK_BN_128 = 128;
     constexpr int64_t BN2_MULTIBLK_BN_256 = 256;
@@ -291,8 +286,8 @@ void FlashAttnMetadataCpuKernel::SetFagSplitAxis()
     bool bnLimit = ((b * n1) >= BN2_MULTIBLK_BN_256) ||
                    ((b * n1) >= BN2_MULTIBLK_BN_128 && (s1 % ALIGN128 == 0) && (s2 % ALIGN128 == 0));
     fagIsBn2MultiBlk_ = bnLimit && !fagUseTndSplit_ && (s1 > 128 || s2 > 128) &&
-                        (s1 <= BN2_MULTIBLK_SEQ && s2 <= BN2_MULTIBLK_SEQ) && (n1 == n2) && (d <= BN2_MAX_D) &&
-                        (d == d1) && !fagIsSeqExistZero_;
+                        (s1 <= BN2_MULTIBLK_SEQ && s2 <= BN2_MULTIBLK_SEQ) && (n1 == n2) && (d <= 128) &&
+                        !fagIsSeqExistZero_;
     if (fagIsBn2MultiBlk_) {
         fagIsBn2_ = true;
     }

@@ -49,7 +49,6 @@ from fag_common import (
     NZP_ROWS,
     VECTOR_BASEM,
     VECTOR_BASEN,
-    SINK_REDUCE_BATCH,
 )
 # --- end generated imports ---
 
@@ -291,52 +290,29 @@ def _build_l0ab(width, pool):
     return {"l0a": l0a, "l0b": l0b, "_arenas": [a, b]}
 
 
-def _build_l0c(width, pool, bn2_d192=False):
-    """L0C：acc 槽位 + dK/dV 的分块块。
+def _build_l0c(width, pool):
+    """L0C：acc 槽位 + dK/dV 各 D 分块的常驻块。
 
-    dV 要在同一 s2 块内跨 s1 轮次累加（GS1S2 ``d_align<=192``、BN2 192/256），
-    s2 切换时才 fixpipe 出 GM，所以每个 D 分块都得有自己的常驻 L0C：192/256
-    档 dV 各占两个分块槽（2×48KB / 2×64KB）。dK 只在 192/256 档的各个组合里
-    走 fp32 workspace（GS1S2 192/256、BN2 256；与 AscendC headDim∈[192,256] 的
-    "only Dv L0C resident" 做法一致），matmul 输出直接复用 acc 的槽位；BN2 192
-    例外，dK/dV 都常驻（见下方分支）；其余档 dK 只有单分块槽（64/128 常驻、
-    768 单 scratch）。
+    dK/dV 要在同一 s2 块内跨 s1 轮次累加（IS_DKV_RESIDENT_L0C），s2 切换时才
+    fixpipe 出 GM，所以每个 D 分块都得有自己的常驻 L0C —— 不能像 acc 那样复用，
+    故一个分块一个号。
 
     acc 单缓冲时 fixpipe 写出期间下一个 matmul 只能干等（实测 fixpipe 0.458
-    而 mac 仅 0.783），故**除 BN2 192 外所有档位都开两槽**。预算：64/128 =
-    acc 2×64 + dk 64 + dv 64 = 256KB；GS 192 = acc 2×64 + dv 2×48 = 224KB；
-    BN2 192 = acc 1×64 + dk 2×48 + dv 2×48 = 256KB；256 = acc 2×64 + dv 2×64
-    = 256KB；768 = acc 2×64 + dk 64 + dv 64 = 256KB。
+    而 mac 仅 0.783），故 64/128 档开两槽；192 档预算被 dK/dV 分块吃掉，退回
+    单槽。64/128/192 都正好用满 256KB；256 档 acc 双缓冲 + dk/dv 各 1 块填表。
     """
     ar = _Arena(f"L0C d_align={width}", _L0C_BYTES, pool)
     accBlk = CUBE_BASEM * ACC_COLS[width] * 4  # acc 要装 MM2/MM1 的 [M,s2]
     dkvBlk = CUBE_BASEN * D_CHUNK_MAXW[width] * 4  # dK/dV 只装一个 D 分块
+    nChunk = D_NCHUNKS[width]
 
-    # 256/768 档 C4/C5 原本都不驻留：每 task atomic 出 GM，只要 acc 双缓冲。
-    # 方案 A 把 192/256 档的 dV 改成常驻（对齐 AscendC FlashAttentionScoreGrad
-    # headDim∈[192,256] 的 "only Dv L0C resident" 做法），见下方分支；GS1S2
-    # 192/256 与 BN2 256 的 dK 走 fp32 workspace，matmul 输出复用 acc 槽位，不再
-    # 单独开块（BN2 192 例外：dK 也常驻，走下面的 bn2_d192 分支）。
-    if width == 192 and bn2_d192:
-        # （BN2 192）：dK/dV 都在 L0C 跨 s1 累加，每个 D 分块一个常驻槽，
-        # 预算 acc 1×64 + dk 2×48 + dv 2×48 = 256KB。acc 因此退回单槽 ——
-        # 实测（2026-10-29）BN2 在 1-ahead 流水下用不上第二槽，而 dK 写 ws
-        # 会让 fixpipe 流量按 s1Outer 倍增长（FIX 30.6%→37.6%）。
-        acc = ar.buf("acc", accBlk, slots=1)
-        nChunk = D_NCHUNKS[width]
-        dk = ar.buf("dk", dkvBlk, slots=nChunk)
-        dv = ar.buf("dv", dkvBlk, slots=nChunk)
-        return {"acc": acc, "dk": dk, "dv": dv, "_arenas": [ar]}
-    acc = ar.buf("acc", accBlk, slots=2)
-    if width == 192 or width == 256:
-        # dV 两个 D 分块常驻 L0C（192→2×48KB，256→2×64KB）：BN2 在 flush 时
-        # fixpipe 直出 16-bit，GS1S2 累加回 fp32 ws 交给全局 post。
-        dv = ar.buf("dv", dkvBlk, slots=2)
-        dk = acc  # 同址同号：dK 与 acc 共用，靠同一 mutex 串行
-    else:
-        # 64/128 单分块常驻、768 单 scratch；dV 同样只有一个分块。
-        dk = ar.buf("dk", dkvBlk, slots=1)
-        dv = ar.buf("dv", dkvBlk, slots=1)
+    # 256/768 档 C4/C5 不驻留：每 task atomic 出 GM，只要 acc 双缓冲。仍留 1 块
+    # dk/dv scratch 填表，主循环不引用。
+    accSlots = 1 if width == 192 else 2
+    nPhys = 1 if width >= 256 else nChunk
+    acc = ar.buf("acc", accBlk, slots=accSlots)
+    dk = ar.buf("dk", dkvBlk, slots=nPhys)
+    dv = ar.buf("dv", dkvBlk, slots=nPhys)
     return {"acc": acc, "dk": dk, "dv": dv, "_arenas": [ar]}
 
 
@@ -379,7 +355,7 @@ def _build_ub(width, pool):
     复用的是**同一条记录**，所以「同址必须同号」是结构保证，不靠人守。
 
     cast 只有 BN2 的 v5/v6 用，但三档都留：它排在最后，不占别人的地方，
-    留着可以让 BN2 直接复用这张图（narrow 传 HEAD_DIM_ALIGN 取档）。
+    留着可以让 BN2 直接复用这张图（见 BN2_UB_*）。
     """
     main = _Arena(f"UB v1w={width}", _UB_BYTES, pool, base=UB_HEAD_RESERVE + 0x20000)
     v1Alloc = 256 if width == 768 else width
@@ -391,15 +367,6 @@ def _build_ub(width, pool):
     lse = main.buf("lse", _UB_ROW_SLOT, slots=2)
     sink_part = main.buf("sink_part", _UB_ROW_SLOT, align=_UB_ROW_SLOT)
     cast = main.buf("cast", VECTOR_BASEM * VECTOR_BASEN * 2)
-    # BN2 192 档 dK 的 chunk1 从 L0C 搬进 UB 后在此 cast。声明成与
-    # mm2_res 同宽 [64,128]，保证 muls_cast_vf 的 flat stride 一致（32KB）。
-    # 其它档不用它，只占 [64,64]=16KB，避免撑爆 768 档预算。
-    _load_w = VECTOR_BASEN if width == 192 else VECTOR_BASEN // 2
-    l0c_load_ub = main.buf("l0c_load_ub", VECTOR_BASEM * _load_w * 4)
-    # BN2 wide（d_align>128）的载入/出口 tile 不再单独占 UB：载入 tile
-    # [64, chunk] fp32 alias 到 y（V2 之后 y 已死），16-bit 出口 alias 到 cast
-    # （BN2 wide 二进制里 GS 的 cast 不用）。整块 cast（chunk=96/128 列）是为了
-    # 让 16-bit 写的行宽达到 192B/256B，避免 64 列(128B)行的短 burst。
 
     shared = _Arena("UB mm1/mm2", _UB_BYTES, pool, base=UB_HEAD_RESERVE)
     resBlk = VECTOR_BASEM * VECTOR_BASEN * 4  # fp32[64,128] = 32KB
@@ -416,11 +383,7 @@ def _build_ub(width, pool):
     n = POST_ELEMS[width]
     f32 = post.buf("post_f32", n * 4, slots=2)
     f16 = post.buf("post_f16", n * 2, slots=2)
-    # 收尾归约用 SINK_REDUCE_BATCH 个独立的 1 行 tile（同一批只等一次 barrier）
-    sink_row_post = [
-        post.buf(f"sink_row_post{i}", _UB_ROW_SLOT, align=_UB_ROW_SLOT)
-        for i in range(SINK_REDUCE_BATCH)
-    ]
+    sink_row_post = post.buf("sink_row_post", _UB_ROW_SLOT, align=_UB_ROW_SLOT)
     sink_red_post = post.buf("sink_red_post", _UB_ROW_SLOT, align=_UB_ROW_SLOT)
 
     return {
@@ -431,7 +394,6 @@ def _build_ub(width, pool):
         "lse": lse,
         "sink_part": sink_part,
         "cast": cast,
-        "l0c_load_ub": l0c_load_ub,
         "mm1": mm1,
         "mm2": mm2,
         "zero": zero,
@@ -451,17 +413,7 @@ _VEC_POOL = {w: _MutexPool("vector", f"d_align={w}") for w in _TIERS}
 
 _L1 = {w: _build_l1(w, _CUBE_POOL[w]) for w in _TIERS}
 _L0AB = {w: _build_l0ab(w, _CUBE_POOL[w]) for w in _TIERS}
-_L0C = {}
-for _w in _TIERS:
-    if _w == 192:
-        # 192 档要两套：GS1S2 用 acc 双槽（224KB），BN2 用 dK/dV 常驻（256KB）
-        _L0C[(_w, "gs")] = _build_l0c(_w, _CUBE_POOL[_w], False)
-        _L0C[(_w, "bn2")] = _build_l0c(_w, _CUBE_POOL[_w], True)
-    else:
-        _lay = _build_l0c(_w, _CUBE_POOL[_w], False)
-        _L0C[(_w, "gs")] = _lay
-        _L0C[(_w, "bn2")] = _lay
-_L0C_KEYS = list(_L0C.keys())
+_L0C = {w: _build_l0c(w, _CUBE_POOL[w]) for w in _TIERS}
 _UB = {w: _build_ub(w, _VEC_POOL[w]) for w in _TIERS}
 
 
@@ -489,63 +441,25 @@ L0AB_ADDRS = _addrs(_L0AB, "l0a")
 MTX_L0A = _mutex(_L0AB, "l0a")
 MTX_L0B = _mutex(_L0AB, "l0b")
 
-
 # ---- L0C ----
-# 192 档两套布局：默认（GS1S2 / 其它档共用）= acc 双槽；_B2 = BN2 192 的
-# dK/dV 常驻版。两套表都按 d_align 取，构造函数按编译期条件选表。
-def _l0c_tabs(field, sub=None):
-    d = {}
-    b2 = {}
-    for w in _TIERS:
-        gs = _L0C[(w, "gs")][field]
-        bn = _L0C[(w, "bn2")][field]
-        d[w] = gs[sub] if sub else gs
-        b2[w] = bn[sub] if sub else bn
-    return d, b2
-
-
-L0C_ACC_ADDRS, L0C_ACC_ADDRS_B2 = _l0c_tabs("acc", "addrs")
-L0C_ACC_MUTEX, L0C_ACC_MUTEX_B2 = _l0c_tabs("acc", "mutex")
-L0C_DK0_ADDR, L0C_DK0_ADDR_B2 = (
-    {w: _L0C[(w, "gs")]["dk"]["addrs"][0] for w in _TIERS},
-    {w: _L0C[(w, "bn2")]["dk"]["addrs"][0] for w in _TIERS},
-)
-L0C_DK1_ADDR, L0C_DK1_ADDR_B2 = (
-    {
-        w: _L0C[(w, "gs")]["dk"]["addrs"][len(_L0C[(w, "gs")]["dk"]["addrs"]) - 1]
-        for w in _TIERS
-    },
-    {
-        w: _L0C[(w, "bn2")]["dk"]["addrs"][len(_L0C[(w, "bn2")]["dk"]["addrs"]) - 1]
-        for w in _TIERS
-    },
-)
-L0C_DV0_ADDR, L0C_DV0_ADDR_B2 = (
-    {w: _L0C[(w, "gs")]["dv"]["addrs"][0] for w in _TIERS},
-    {w: _L0C[(w, "bn2")]["dv"]["addrs"][0] for w in _TIERS},
-)
-L0C_DV1_ADDR, L0C_DV1_ADDR_B2 = (
-    {
-        w: _L0C[(w, "gs")]["dv"]["addrs"][len(_L0C[(w, "gs")]["dv"]["addrs"]) - 1]
-        for w in _TIERS
-    },
-    {
-        w: _L0C[(w, "bn2")]["dv"]["addrs"][len(_L0C[(w, "bn2")]["dv"]["addrs"]) - 1]
-        for w in _TIERS
-    },
-)
-MTX_L0C_DK0, MTX_L0C_DK0_B2 = _l0c_tabs("dk", "mutex")
-MTX_L0C_DK0 = {w: MTX_L0C_DK0[w][0] for w in _TIERS}
-MTX_L0C_DK0_B2 = {w: MTX_L0C_DK0_B2[w][0] for w in _TIERS}
-MTX_L0C_DV0, MTX_L0C_DV0_B2 = _l0c_tabs("dv", "mutex")
-MTX_L0C_DV0 = {w: MTX_L0C_DV0[w][0] for w in _TIERS}
-MTX_L0C_DV0_B2 = {w: MTX_L0C_DV0_B2[w][0] for w in _TIERS}
-MTX_L0C_DK1, MTX_L0C_DK1_B2 = _l0c_tabs("dk", "mutex")
-MTX_L0C_DK1 = {w: MTX_L0C_DK1[w][-1] for w in _TIERS}
-MTX_L0C_DK1_B2 = {w: MTX_L0C_DK1_B2[w][-1] for w in _TIERS}
-MTX_L0C_DV1, MTX_L0C_DV1_B2 = _l0c_tabs("dv", "mutex")
-MTX_L0C_DV1 = {w: MTX_L0C_DV1[w][-1] for w in _TIERS}
-MTX_L0C_DV1_B2 = {w: MTX_L0C_DV1_B2[w][-1] for w in _TIERS}
+L0C_ACC_ADDRS = _addrs(_L0C, "acc")
+L0C_ACC_MUTEX = _mutex(_L0C, "acc")
+# 每个 D 分块单独取一个标量地址/id。不能在 kernel 里写 `TABLE[d_align][-1]`：
+# parser 不支持负下标（报 "GetItemExpr index -1 out of bounds"）。
+_DK = {w: _L0C[w]["dk"] for w in _TIERS}
+_DV = {w: _L0C[w]["dv"] for w in _TIERS}
+L0C_DK0_ADDR = {w: _DK[w]["addrs"][0] for w in _TIERS}
+L0C_DV0_ADDR = {w: _DV[w]["addrs"][0] for w in _TIERS}
+MTX_L0C_DK0 = {w: _DK[w]["mutex"][0] for w in _TIERS}
+MTX_L0C_DV0 = {w: _DV[w]["mutex"][0] for w in _TIERS}
+# 第二个分块。单块档位下这些 tile 永不被真的使用（调用路径被 trace 期的
+# `if D_NCHUNKS > 1` 整块剪掉），故让它别名到第 0 块即可。
+L0C_DK1_ADDR = {w: _DK[w]["addrs"][len(_DK[w]["addrs"]) - 1] for w in _TIERS}
+L0C_DV1_ADDR = {w: _DV[w]["addrs"][len(_DV[w]["addrs"]) - 1] for w in _TIERS}
+MTX_L0C_DK1 = {w: _DK[w]["mutex"][len(_DK[w]["mutex"]) - 1] for w in _TIERS}
+MTX_L0C_DV1 = {w: _DV[w]["mutex"][len(_DV[w]["mutex"]) - 1] for w in _TIERS}
+# BN2 不切 D，但它只编 64/128 两档，那两档 D_NCHUNKS 本来就是 1，所以直接用
+# 上面的第 0 块即可，不需要另一套常量。
 
 # ---- UB ----
 # vector 侧的 buffer 名单与档无关，三档发出的号必然一致，故导出扁平列表。
@@ -569,20 +483,11 @@ MTX_UB_NZP = _flat(_UB, "nzp")
 MTX_UB_SFMG = _flat(_UB, "sfmg")
 MTX_UB_LSE = _flat(_UB, "lse")
 MTX_UB_CAST = _flat(_UB, "cast")  # 仅 BN2
-MTX_UB_L0C_LOAD = _flat(_UB, "l0c_load_ub")  # 仅 BN2 192
-# 仅 wide：载入 tile 复用 y、出口复用 cast（同址必须同号）。
-MTX_UB_WSF32 = _flat(_UB, "y")
-MTX_UB_WSF16 = _flat(_UB, "cast")
 UB_SINK_PART_A = _addr(_UB, "sink_part")
 MTX_UB_SINK_PART = _flat(_UB, "sink_part")
-# sink_row_post 是 SINK_REDUCE_BATCH 个独立的 1 行 tile（不是单个 buffer）
-UB_SINK_ROW_POST_A = {
-    w: [b["addrs"][0] for b in _UB[w]["sink_row_post"]] for w in _TIERS
-}
+UB_SINK_ROW_POST_A = _addr(_UB, "sink_row_post")
 UB_SINK_RED_POST_A = _addr(_UB, "sink_red_post")
-MTX_UB_SINK_ROW_POST = [
-    m for b in _UB[HEAD_DIM_ALIGN]["sink_row_post"] for m in b["mutex"]
-]
+MTX_UB_SINK_ROW_POST = _flat(_UB, "sink_row_post")
 MTX_UB_SINK_RED_POST = _flat(_UB, "sink_red_post")
 
 UB_PRE_ZERO = _UB[HEAD_DIM_ALIGN]["zero"]["addrs"][0]
@@ -594,18 +499,21 @@ MTX_UB_POST_F16 = _flat(_UB, "f16")
 
 
 # ==================================================================
-#  模板相关的 UB 槽位 / 别名
+#  BN2 模板专用的 UB 槽位
 # ==================================================================
-# BN2 narrow（d_align 64/128）的 V1 与 GS1S2 共用 softmax_grad_front_row_vf，
-# 且 y/dy 最宽就是 [64,128]，所以**整张图直接沿用 v1w=128 那一份**：调用点给
-# 工厂传 ``HEAD_DIM_ALIGN``，同地址、同号。不能混用按档取地址的图：
-# d=64 档的 cast 会与 128 档的 nzp 重叠。narrow 与 wide 每个 tilingkey 只编
-# 一个 template，两套用法不会同时活跃。
-CAST_W = VECTOR_BASEN  # 16-bit cast 出口的列宽（整块 [64,128]）
-UB_L0C_LOAD_A = _addr(_UB, "l0c_load_ub")  # dK chunk1 的 L0C→UB 搬入槽
-UB_CAST_A = _addr(_UB, "cast")  # 16-bit cast 出口（按档取图）
-UB_WSF32 = _addr(_UB, "y")  # wide 的 ws 载入 tile alias 到 y（V2 之后已死）
-UB_WSF16 = _addr(_UB, "cast")  # wide 的 16-bit 出口 alias 到 cast
+# BN2 的 V1 与 GS1S2 共用 softmax_grad_front_row_vf，且只在 d_align 64/128 两档
+# 编译（y/dy 最宽就是 [64,128]），所以**整张图直接沿用 v1w=128 那一份** ——
+# 同地址、同号、连 cast 都是同一块。每个 tilingkey 只编一个 template，两套用法
+# 不会同时活跃。
+BN2_V1_ROWS = VECTOR_BASEM
+BN2_CAST_W = VECTOR_BASEN
+_BN2 = _UB[HEAD_DIM_ALIGN]
+BN2_UB_Y = _BN2["y"]["addrs"][0]
+BN2_UB_DY = _BN2["dy"]["addrs"][0]
+BN2_UB_NZP = _BN2["nzp"]["addrs"][0]
+BN2_UB_SFMG = _BN2["sfmg"]["addrs"][0]
+BN2_UB_LSE_0, BN2_UB_LSE_1 = _BN2["lse"]["addrs"]
+BN2_UB_CAST = _BN2["cast"]["addrs"][0]
 
 
 # ==================================================================
@@ -614,10 +522,8 @@ UB_WSF16 = _addr(_UB, "cast")  # wide 的 16-bit 出口 alias 到 cast
 def describe_layout(tier=HEAD_DIM_ALIGN):
     """打印一档的完整片上内存图：地址 + 大小 + 持有的 buffer-id。"""
     arenas = []
-    for group in (_L1, _L0AB, _UB):
+    for group in (_L1, _L0AB, _L0C, _UB):
         arenas.extend(group[tier]["_arenas"])
-    # L0C 表按 (档, 类) 取，默认看 GS1S2 那套；BN2 192 的另一套用 _L0C[(192,"bn2")]
-    arenas.extend(_L0C[(tier, "gs")]["_arenas"])
     return "\n\n".join(a.describe() for a in arenas)
 
 

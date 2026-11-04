@@ -19,23 +19,16 @@
 每个阶段只做「载入 -> matmul -> 输出」，不含分核逻辑、不含跨核同步 ——
 同步全部由 :mod:`fag_kernel` 的主循环在阶段之间插入。
 
-（1）D 轴分块：64/128 一块，192/256 两块，768 是 3 窗 × 128+128。
-（2）C4/C5 驻留 L0C 时必须编译期拆 ``acc0`` / ``acc1``，不能在 ``pl.range`` 里
-用 ``i==0`` 选 tensor —— PyPTO 会把 ``at`` 绑成同一块，192 的第二段 96 列
-写进 acc0，flush 的 acc1 是垃圾。
-（3）驻留只发生在：GS1S2 的 dV（``d_align<=192``）、dK（``d_align<=128``），
-BN2 wide的 dK/dV（192）与 dV（256），BN2 narrow的 dK/dV。
+D 轴分块：64/128 一块，192/256 两块，768 是 3 窗 × 128+128。
+C4/C5 驻留 L0C（``d_align<=192``）必须编译期拆 ``acc0`` / ``acc1``，
+不能在 ``pl.range`` 里用 ``i==0`` 选 tensor —— PyPTO 会把 ``at`` 绑成
+同一块，192 的第二段 96 列写进 acc0，flush 的 acc1 是垃圾。
 
 其余编译期分流：
 
-（1）``d_align==768``：每窗从 GM 重装，空块 ``next()`` 仍推进
-（2）GS1S2：C4(dK) 在 ``d_align>128``（192/256/768）每块 atomic 出 GM；
-  C5(dV) 在 ``d_align>192``（256/768）才这样（192 档因此是 dV 驻留 + dK 走 ws）
-（3）BN2 narrow：C3 按 ``is_bn2_multiblk`` 二选一，单块写 UB、多块写 per-core 2D 条带 ws；
-  C4 的 M 取这一列的 ``s2RealSize``
-（4）BN2 wide：C3(dQ) 三档都写 4D ws；C4(dK) 仅 256/768写（192 驻留 L0C，flush 搬 UB 再 cast）；
-  C5(dV) 仅 768 写（192/256 驻留 L0C，fixpipe 直出）。
-  M 按真实长度裁（C3 用 ``s1RealSize``，C4/C5 用 ``s2RealSize``），否则尾块越界
+* ``d_align==768``：每窗从 GM 重装，空块 ``next()`` 仍推进
+* ``d_align>192``：C4/C5 每块 atomic 出 GM，否则驻留 L0C
+* ``template==BN2``：C3 写出 UB / 2D workspace；C4 的 M 钉 ``CUBE_BASEN``
 """
 
 import pypto_pro.language as pl
@@ -44,23 +37,45 @@ import pypto_pro.language as pl
 from fag_common import (
     CUBE_BASEM,
     CUBE_BASEN,
-    D_CHUNK_MAXW,
     D_CHUNK_OFF0,
     D_CHUNK_OFF1,
     D_CHUNK_W0,
     D_CHUNK_W1,
     D_NCHUNKS,
-    D768_PHYS,
     VECTOR_BASEM,
     VECTOR_BASEN,
-    chunk_local,
-    chunk_off,
-    chunk_valid_d,
-    chunk_win,
-    dv_chunk_valid,
 )
 from fag_tiling import Tmpl
 # --- end generated imports ---
+
+# 768 档：物理窗 256、窗内 128+128。
+_D768_STEP = 128
+_D768_PHYS = 256
+
+
+def _chunk_step():
+    return _D768_STEP if d_align == 768 else D_CHUNK_W0[d_align]
+
+
+def _chunk_off(i):
+    return i * _chunk_step()
+
+
+def _chunk_local(i):
+    return (i % 2) * _D768_STEP if d_align == 768 else _chunk_off(i)
+
+
+def _chunk_win(i):
+    return (i // 2) * _D768_PHYS if d_align == 768 else 0
+
+
+def _chunk_valid_d(dimSize, i):
+    """第 i 块沿 D/Dv 的有效列数：按真实 dim 截断，空块为 0。"""
+    return pl.max(pl.min(_chunk_step(), dimSize - _chunk_off(i)), 0)
+
+
+def dv_chunk_valid(constInfo, chunkIdx):
+    return _chunk_valid_d(constInfo.dvSize, chunkIdx)
 
 
 # ==================================================================
@@ -80,25 +95,9 @@ def _mm_k_chunk(lt, rt, at, srcL, srcR, dOff, validD, s2Real, isFirst):
 
 
 def _mm_n_chunk(
-    left,
-    right,
-    acc,
-    srcL,
-    srcR,
-    tensor_out,
-    outIdx,
-    mReal,
-    kReal,
-    dOff,
-    validD,
-    l1Off,
-    is_first=0,
+    left, right, acc, srcL, srcR, tensor_out, outIdx, mReal, kReal, dOff, validD, l1Off
 ):
-    """N 轴一块：next() 必推进；validD==0 不算（768 空块 / Dv 截断）。
-
-    ``is_first==1`` 用 AtomicNone 覆盖（BN2 每个 (b,n2,s2) 的首个 s1 块 / 每个
-    s1 列的首个 s2 块），否则 AtomicAdd 累加。GS1S2 恒 AtomicAdd（is_first=0）。
-    """
+    """N 轴一块：next() 必推进；validD==0 不算（768 空块 / Dv 截断）。"""
     lt = left.next()
     rt = right.next()
     at = acc.next()
@@ -109,22 +108,13 @@ def _mm_n_chunk(
         pl.move(lt, srcL)
         pl.move(rt, srcR, [0, l1Off])
         pl.matmul(at, lt, rt)
-        if is_first == 1:
-            pl.store(
-                tensor_out,
-                at,
-                [outIdx[0], outIdx[1], outIdx[2], dOff],
-                order=[1, 3],
-                atomic=pl.AtomicType.AtomicNone,
-            )
-        else:
-            pl.store(
-                tensor_out,
-                at,
-                [outIdx[0], outIdx[1], outIdx[2], dOff],
-                order=[1, 3],
-                atomic=pl.AtomicType.AtomicAdd,
-            )
+        pl.store(
+            tensor_out,
+            at,
+            [outIdx[0], outIdx[1], outIdx[2], dOff],
+            order=[1, 3],
+            atomic=pl.AtomicType.AtomicAdd,
+        )
 
 
 def _mm_resident_chunk(left, right, at, srcL, srcR, mReal, kReal, dOff, validD, isAcc):
@@ -184,12 +174,12 @@ def iterate_mm_k(
     at = acc.next()
     if d_align == 768:
         for i in pl.range(0, D_NCHUNKS[d_align]):
-            dOff = chunk_off(i)
-            localOff = chunk_local(i)
-            validD = chunk_valid_d(dimSize, i)
+            dOff = _chunk_off(i)
+            localOff = _chunk_local(i)
+            validD = _chunk_valid_d(dimSize, i)
             if i % 2 == 0:
-                winOff = chunk_win(i)
-                winW = pl.max(pl.min(D768_PHYS, dimSize - winOff), 0)
+                winOff = _chunk_win(i)
+                winW = pl.max(pl.min(_D768_PHYS, dimSize - winOff), 0)
                 pl.set_validshape(l_t, [runInfo.s1RealSize, winW])
                 pl.set_validshape(r_t, [winW, runInfo.s2RealSize])
                 if winW > 0:
@@ -328,13 +318,13 @@ def iterate_mm_dsk(
                 order=[1, 3],
             )
     for i in pl.range(0, D_NCHUNKS[d_align]):
-        dOff = chunk_off(i)
-        localOff = chunk_local(i)
-        validD = chunk_valid_d(constInfo.dSize, i)
+        dOff = _chunk_off(i)
+        localOff = _chunk_local(i)
+        validD = _chunk_valid_d(constInfo.dSize, i)
         if d_align == 768:
             if i % 2 == 0:
-                winOff = chunk_win(i)
-                winW = pl.max(pl.min(D768_PHYS, constInfo.dSize - winOff), 0)
+                winOff = _chunk_win(i)
+                winW = pl.max(pl.min(_D768_PHYS, constInfo.dSize - winOff), 0)
                 pl.set_validshape(k_t, [runInfo.s2RealSize, winW])
                 if winW > 0:
                     pl.load(
@@ -343,7 +333,7 @@ def iterate_mm_dsk(
                         [runInfo.idx0KV, runInfo.keyOffset, runInfo.idx2KV, winOff],
                         order=[1, 3],
                     )
-        if template == Tmpl.BN2 and d_align <= 128:
+        if template == Tmpl.BN2:
             lt = left.next()
             rt = right.next()
             at = acc.next()
@@ -379,36 +369,6 @@ def iterate_mm_dsk(
                         at,
                         acc_to_vec_mode=pl.AccToVecMode.DualModeSplitM,
                     )
-        elif template == Tmpl.BN2:
-            # BN2 wide：dQ 每个 D 分块直接写 4D fp32 workspace；dQ[s1] 在核内
-            # 按 s2 累加，故本 s1 列的首个 s2 贡献（dqFirst）用 AtomicNone 覆盖，
-            # 其余 AtomicAdd，不需要全局清零；M 必须按 s1RealSize 裁
-            lt = left.next()
-            rt = right.next()
-            at = acc.next()
-            if validD > 0:
-                pl.set_validshape(lt, [runInfo.s1RealSize, runInfo.s2RealSize])
-                pl.set_validshape(rt, [runInfo.s2RealSize, validD])
-                pl.set_validshape(at, [runInfo.s1RealSize, validD])
-                pl.move(lt, ds_l1)
-                pl.move(rt, k_t, [0, localOff])
-                pl.matmul(at, lt, rt)
-                if runInfo.dqFirst == 1:
-                    pl.store(
-                        tensor_dq_ws,
-                        at,
-                        [outIdx[0], outIdx[1], outIdx[2], dOff],
-                        order=[1, 3],
-                        atomic=pl.AtomicType.AtomicNone,
-                    )
-                else:
-                    pl.store(
-                        tensor_dq_ws,
-                        at,
-                        [outIdx[0], outIdx[1], outIdx[2], dOff],
-                        order=[1, 3],
-                        atomic=pl.AtomicType.AtomicAdd,
-                    )
         elif d_align == 768 or validD > 0:
             _mm_n_chunk(
                 left,
@@ -427,9 +387,7 @@ def iterate_mm_dsk(
 
 
 # ==================================================================
-#  C4 / C5 —— D 在 N 轴：GS1S2 的 C4 ≤128 驻留、>128 atomic 出 GM，
-#  C5 ≤192 驻留、>192 atomic 出 GM；BN2 的 192 档 dK/dV 都驻留，
-#  256 档只驻留 dV，dK 256/768 与 dV 768 走 atomic 出 GM
+#  C4 / C5 —— D 在 N 轴：≤192 驻留 L0C，>192 atomic 出 GM
 # ==================================================================
 def iterate_mm_n(
     constInfo,
@@ -445,23 +403,21 @@ def iterate_mm_n(
     srcIdx,
     outIdx,
     mReal,
-    is_first=0,
 ):
-    """C4/C5 写出路径：GS1S2 的 C4(dK) ``d_align>128``、C5(dV) ``d_align>192``；
-    BN2 的 C4(dK) 256/768、C5(dV) 768。每块 atomic 出 GM。
+    """C4/C5 写出路径（``d_align>192``）：每块 atomic 出 GM。
 
     ``tensor_out`` / ``tensor_src`` 必须是真 Tensor。新前端不允许把
     ``None`` 默认值再往下传 —— 驻留路径走 ``iterate_mm_n_l0c``。
     """
     kReal = runInfo.s1RealSize
     for i in pl.range(0, D_NCHUNKS[d_align]):
-        dOff = chunk_off(i)
-        localOff = chunk_local(i)
-        validD = chunk_valid_d(dimSize, i)
+        dOff = _chunk_off(i)
+        localOff = _chunk_local(i)
+        validD = _chunk_valid_d(dimSize, i)
         if d_align == 768:
             if i % 2 == 0:
-                winOff = chunk_win(i)
-                winW = pl.max(pl.min(D768_PHYS, dimSize - winOff), 0)
+                winOff = _chunk_win(i)
+                winW = pl.max(pl.min(_D768_PHYS, dimSize - winOff), 0)
                 pl.set_validshape(srcR, [runInfo.s1RealSize, winW])
                 if winW > 0:
                     pl.load(
@@ -484,7 +440,6 @@ def iterate_mm_n(
                 dOff,
                 validD,
                 localOff,
-                is_first,
             )
 
 
@@ -501,11 +456,10 @@ def iterate_mm_n_l0c(
     dimSize,
     mReal,
 ):
-    """
-    C4/C5 驻留 L0C。不接收 Tensor 参数。
+    """C4/C5 驻留 L0C（``d_align<=192``）。不接收 Tensor 参数。
 
-    acc0/acc1 必须是编译期两路。D=64/128 一块；D=192 切 96+96；
-    D=256 档只有 C5(dV) 用这条，切 128+128（
+    acc0/acc1 必须是编译期两路。D=64/128 一块；D=192 是 96+96
+    （Dv=128 时 C5 第二块 validD=32）。
     """
     kReal = runInfo.s1RealSize
     off0 = D_CHUNK_OFF0[d_align]
@@ -554,46 +508,11 @@ def iterate_mm_dsq(
     tensor_out=None,
     tensor_src=None,
 ):
-    # M 是 s2（dS^T 的行）。两档都必须用 s2RealSize，不能钉 CUBE_BASEN：
-    mReal = runInfo.s2RealSize
-    if template == Tmpl.BN2 and d_align == 192:
-        # dK 驻留 L0C —— 同 (b,n2,s2) 的 s1 块在 L0C 上累加（每D 分块一个固定槽），
-        # 只在 flushDkv 时由 flush_dk_l0c_to_ub 搬进 UB 再 cast。
-        iterate_mm_n_l0c(
-            constInfo,
-            runInfo,
-            ds_t_l1,
-            q_t,
-            left,
-            right,
-            acc0,
-            acc1,
-            isAcc,
-            constInfo.dSize,
-            mReal,
-        )
-        return
-    if template == Tmpl.BN2 and d_align > 128:
-        # BN2 wide 的 256/768：dK 每块 atomic 出 workspace
-        iterate_mm_n(
-            constInfo,
-            runInfo,
-            ds_t_l1,
-            q_t,
-            left,
-            right,
-            acc0,
-            tensor_out,
-            tensor_src,
-            constInfo.dSize,
-            [runInfo.idx0Q, runInfo.queryOffset, runInfo.idx2Q],
-            [runInfo.idx0KV, runInfo.keyOffset, runInfo.idx2KV],
-            mReal,
-            1 - isAcc,
-        )
-        return
-    if d_align > 128:
-        # GS1S2 192/256/768：dK 每块 atomic 出 workspace
+    if template == Tmpl.BN2:
+        mReal = CUBE_BASEN
+    else:
+        mReal = runInfo.s2RealSize
+    if d_align > 192:
         iterate_mm_n(
             constInfo,
             runInfo,
@@ -610,7 +529,6 @@ def iterate_mm_dsq(
             mReal,
         )
     else:
-        # GS1S2 64/128 与 BN2 narrow：dK 常驻 L0C（单分块）
         iterate_mm_n_l0c(
             constInfo,
             runInfo,
@@ -639,45 +557,7 @@ def iterate_mm_pdy(
     tensor_out=None,
     tensor_src=None,
 ):
-    if template == Tmpl.BN2 and (d_align == 192 or d_align == 256):
-        # dV 无 scale，直接驻留 L0C，flush 时 fixpipe 一次出 f16
-        iterate_mm_n_l0c(
-            constInfo,
-            runInfo,
-            p_t_l1,
-            do_t,
-            left,
-            right,
-            acc0,
-            acc1,
-            isAcc,
-            constInfo.dvSize,
-            runInfo.s2RealSize,
-        )
-        return
-    if template == Tmpl.BN2 and d_align == 768:
-        # BN2 768：dV 与 dK 同口径（同 (b,n2,s2) 首块 AtomicNone）写 4D
-        # workspace，M 按 s2RealSize 裁 —— 该 workspace 的 S2 轴没有 128 行 pad。
-        iterate_mm_n(
-            constInfo,
-            runInfo,
-            p_t_l1,
-            do_t,
-            left,
-            right,
-            acc0,
-            tensor_out,
-            tensor_src,
-            constInfo.dvSize,
-            [runInfo.idx0Q, runInfo.queryOffset, runInfo.idx2Q],
-            [runInfo.idx0KV, runInfo.keyOffset, runInfo.idx2KV],
-            runInfo.s2RealSize,
-            1 - isAcc,
-        )
-        return
     if d_align > 192:
-        # GS1S2 256/768：dV 与 dK 同口径，每块 atomic 出 workspace
-        # （pre 已清零，故恒 AtomicAdd）。
         iterate_mm_n(
             constInfo,
             runInfo,
@@ -694,7 +574,6 @@ def iterate_mm_pdy(
             runInfo.s2RealSize,
         )
     else:
-        # GS1S2 64/128/192：dV 常驻 L0C，s2 切换时 flush_dv 累加回 ws
         iterate_mm_n_l0c(
             constInfo,
             runInfo,
@@ -711,7 +590,7 @@ def iterate_mm_pdy(
 
 
 def flush_dk(constInfo, runInfo, tensor_dk_ws, dk_acc0, dk_acc1):
-    """把 L0C 上累加完的 dK 写回 GM。只用于 GS1S2 的 d_align≤128"""
+    """把 L0C 上累加完的 dK 写回 GM。只用于 d_align≤192。"""
     i0 = runInfo.idx0KV
     i1 = runInfo.keyOffset
     i2 = runInfo.idx2KV
@@ -733,7 +612,7 @@ def flush_dk(constInfo, runInfo, tensor_dk_ws, dk_acc0, dk_acc1):
 
 
 def flush_dv(constInfo, runInfo, tensor_dv_ws, dv_acc0, dv_acc1):
-    """把 L0C 上累加完的 dV 写回 GM。只用于 GS1S2 的 d_align≤192。"""
+    """把 L0C 上累加完的 dV 写回 GM。只用于 d_align≤192。"""
     i0 = runInfo.idx0KV
     i1 = runInfo.keyOffset
     i2 = runInfo.idx2KV
@@ -754,45 +633,6 @@ def flush_dv(constInfo, runInfo, tensor_dv_ws, dv_acc0, dv_acc1):
                 order=[1, 3],
                 atomic=pl.AtomicType.AtomicAdd,
             )
-
-
-def flush_dk_l0c_to_ub(constInfo, runInfo, dk_c0, dk_c1, mm_ub0, mm_ub1):
-    """
-    BN2 192（P2）：dK 需要乘 scale，把两个 D 分块从 L0C 搬进 UB 交给 vector。
-    chunk0 复用 mm2 的上一槽（与 narrow 同款，受 SYNC_DETER_FIX 保护），
-    chunk1 用 :func:`make_l0c_load_ub` 的专用槽。只在 flushDkv==1 调用。
-    """
-    w0 = chunk_valid_d(constInfo.dSize, 0)
-    if w0 > 0:
-        pl.set_validshape(mm_ub0, [VECTOR_BASEM, w0])
-        pl.move(mm_ub0, dk_c0.current(), acc_to_vec_mode=pl.AccToVecMode.DualModeSplitM)
-    if D_NCHUNKS[d_align] > 1 and chunk_valid_d(constInfo.dSize, 1) > 0:
-        w1 = chunk_valid_d(constInfo.dSize, 1)
-        pl.set_validshape(mm_ub1, [VECTOR_BASEM, w1])
-        pl.move(mm_ub1, dk_c1.current(), acc_to_vec_mode=pl.AccToVecMode.DualModeSplitM)
-
-
-def flush_dv_l0c_to_out(constInfo, runInfo, tensor_dv_out, dv_acc0, dv_acc1):
-    """BN2 192/256（P2）：dV 不乘 scale，直接 fixpipe fp32→16-bit 落 GM。"""
-    i0 = runInfo.idx0KV
-    i1 = runInfo.keyOffset
-    i2 = runInfo.idx2KV
-    if dv_chunk_valid(constInfo, 0) > 0:
-        pl.store(
-            tensor_dv_out,
-            dv_acc0.current(),
-            [i0, i1, i2, D_CHUNK_OFF0[d_align]],
-            order=[1, 3],
-            atomic=pl.AtomicType.AtomicNone,
-        )
-    if D_NCHUNKS[d_align] > 1 and dv_chunk_valid(constInfo, 1) > 0:
-        pl.store(
-            tensor_dv_out,
-            dv_acc1.current(),
-            [i0, i1, i2, D_CHUNK_OFF1[d_align]],
-            order=[1, 3],
-            atomic=pl.AtomicType.AtomicNone,
-        )
 
 
 def flush_dkv(

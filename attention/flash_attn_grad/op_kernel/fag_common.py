@@ -65,62 +65,6 @@ D_CHUNK_MAXW = {64: 128, 128: 128, 192: 96, 256: 128, 768: 128}
 # 768 档物理宽仍 256：整头 768 进 L1 会超 512KB，按窗重载（docs/D256设计.md）。
 D_PHYS_W = {64: 128, 128: 128, 192: 192, 256: 256, 768: 256}
 
-# ---- D 轴分块几何 ----
-# cube 侧按这套几何写 workspace，vector 侧从 workspace 读回 cast 必须用同一套，
-# 否则列偏移/有效宽度对不上。故放在公共层，cube/vec 都只消费、不各自持有一份。
-# 768 档：物理窗 256、窗内 128+128。
-D768_STEP = 128
-D768_PHYS = 256
-
-
-def _chunk_step():
-    return D768_STEP if d_align == 768 else D_CHUNK_W0[d_align]
-
-
-def _chunk_off(i):
-    return i * _chunk_step()
-
-
-def _chunk_local(i):
-    return (i % 2) * D768_STEP if d_align == 768 else _chunk_off(i)
-
-
-def _chunk_win(i):
-    return (i // 2) * D768_PHYS if d_align == 768 else 0
-
-
-def _chunk_valid_d(dimSize, i):
-    """第 i 块沿 D/Dv 的有效列数：按真实 dim 截断，空块为 0。"""
-    return pl.max(pl.min(_chunk_step(), dimSize - _chunk_off(i)), 0)
-
-
-def dv_chunk_valid(constInfo, chunkIdx):
-    return _chunk_valid_d(constInfo.dvSize, chunkIdx)
-
-
-# ---- 公开的 D 分块几何（cube 写 / vector 读，口径必须一致）----
-def chunk_step():
-    return _chunk_step()
-
-
-def chunk_off(chunkIdx):
-    return _chunk_off(chunkIdx)
-
-
-def chunk_local(chunkIdx):
-    """768 档的窗内偏移（L1 按 256 物理窗重载用）；其余档等于全局偏移。"""
-    return _chunk_local(chunkIdx)
-
-
-def chunk_win(chunkIdx):
-    """768 档的物理窗基址；其余档恒为 0。"""
-    return _chunk_win(chunkIdx)
-
-
-def chunk_valid_d(dimSize, chunkIdx):
-    return _chunk_valid_d(dimSize, chunkIdx)
-
-
 CV_CORE_RATIO = 2
 VECTOR_BASEM = CUBE_BASEM // CV_CORE_RATIO  # 64，每个 vector 子核处理半个 S1
 VECTOR_BASEN = CUBE_BASEN
@@ -129,9 +73,6 @@ VECTOR_BASEN = CUBE_BASEN
 VF_LANES = 64
 VF_LANES_F16 = 128  # fp16/bf16 同宽，256B 寄存器各 128 lane
 # 压缩 mask 边长 2048，minValue = 0xFF7FFFFF
-# dsink 槽位按 [aiv][headQ] 分 128 列一块（chunk-major）排布，收尾归约才能
-# 用 2D tile 一次 load 多行：同 chunk 下相邻 AIV 的行间距恰为 VECTOR_BASEN。
-SINK_REDUCE_BATCH = 4
 ATTEN_MASK_COMPRESS = 2048
 ATTEN_MASK_MIN = -3.4028234663852886e38
 
@@ -325,7 +266,6 @@ def make_run_infos():
         s1RealSize=0,
         s2RealSize=0,
         halfS1RealSize=0,
-        firstHalfS2RealSize=0,
         queryOffset=0,
         keyOffset=0,
         goIdx=0,
@@ -362,7 +302,6 @@ def make_run_infos_2():
         s1RealSize=0,
         s2RealSize=0,
         halfS1RealSize=0,
-        firstHalfS2RealSize=0,
         queryOffset=0,
         keyOffset=0,
         goIdx=0,

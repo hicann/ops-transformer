@@ -28,14 +28,7 @@ ge::graphStatus BuildSchedulePlan(gert::TilingContext* context, const FagParsedI
     // sparse / TND / seqused 实际用的核可能比 dense 公式少，这些场景一律保持
     // 全片启动，确保永不少发。
     FagS1S2Outer(info.s1, info.s2, schedule.s1Outer, schedule.s2Outer);
-    // BN2 是"一个核独占整 head"的自持调度：AICPU 的 DoFagBn2DenseSplit /
-    // DoFagSparseBlockInfo 产出的 dense blockOuter 与 FagUsedCubeCores(TMPL_BN2)
-    // 同一口径，所以 mask!=0 与 TND 也应按实际 head 数限核。此前一律满片启动，
-    // 单块 4-head（mask/sink）用例会起 36 个 cube —— msprof 显示 AIC 各 pipe
-    // 合计仅 4.2us / 28.9us；且 sink 的 pre-zero/reduce 成本 ∝ 启动的 AIV 数。
-    const bool bn2SelfScheduled = (kernel.tmpl == TMPL_BN2);
-    schedule.useActualCores =
-        !info.hasSeqused && (bn2SelfScheduled || (!info.isTnd && info.maskMode == MASK_MODE_NO_MASK));
+    schedule.useActualCores = !info.isTnd && (info.maskMode == MASK_MODE_NO_MASK) && !info.hasSeqused;
     schedule.usedCube = info.aicNum;
     if (info.isDeterministic && kernel.tmpl == TMPL_BN2GS1S2) {
         // 确定性按满片 aicNum 启动，核上闭式用 get_block_num() 当 k。

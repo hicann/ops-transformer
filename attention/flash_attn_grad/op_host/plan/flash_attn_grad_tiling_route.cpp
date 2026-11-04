@@ -19,9 +19,9 @@ namespace {
 // ---------------------------------------------------------------------------
 // 能力边界常量：这些数字来自 kernel 实现边界，不是性能标定，改动必须伴随 kernel 改动
 // ---------------------------------------------------------------------------
-constexpr int64_t BN2_MAX_S = 128;          // 单块 BN2 的 S 上限
-constexpr int64_t BN2_MAX_D = MAX_HEAD_DIM; // BN2 一系列模板的 D 上限（=768）
-constexpr int64_t BN2_MULTIBLK_SEQ = 640;   // MultiBlk 的 S 上限
+constexpr int64_t BN2_MAX_S = 128;        // 单块 BN2 的 S 上限
+constexpr int64_t BN2_MAX_D = 128;        // BN2 一系列模板的 D 上限
+constexpr int64_t BN2_MULTIBLK_SEQ = 640; // MultiBlk 的 S 上限
 
 // ---------------------------------------------------------------------------
 // 偏好门限常量：全部来自上板实测，改这里不影响功能正确性，只影响快慢
@@ -31,8 +31,7 @@ constexpr int64_t BN2_MULTIBLK_BN_256 = 256;
 constexpr int64_t BN2_ALIGN128 = 128;
 
 // ===== 能力谓词 =============================================================
-// 共同前提：BN2 系列模板不接变长 TND、GQA 或 D>MAX_HEAD_DIM；且要求 D==Dv
-// （BN2 的 V/dO 固定按 dSize 建视图，只有 GS1S2 处理 D=192/Dv=128）。
+// 共同前提：BN2 系列模板不接变长 TND、GQA 或 D>128。
 bool Bn2FamilyFeasible(const FagParsedInfo& p)
 {
     // 等长 TND（tndAllSame，parser 用 shape 算术判定）的 GM 排布与 BSND
@@ -43,10 +42,9 @@ bool Bn2FamilyFeasible(const FagParsedInfo& p)
     if (p.hasSeqused || (p.isTnd && !p.tndAllSame)) {
         return false;
     }
-    // D==Dv 与 AICPU 的 headDimV==headDim 门一一对应，两边必须同为 D 或同为 GS。
     // Zero-task launches still need GS pre/post to clear a nonempty opposite
     // output side. Single-token sequences remain eligible for BN2.
-    return p.s1 > 0 && p.s2 > 0 && p.n1 == p.n2 && p.d == p.dv && p.d <= BN2_MAX_D;
+    return p.s1 > 0 && p.s2 > 0 && p.n1 == p.n2 && p.d <= BN2_MAX_D;
 }
 
 bool Feasible_Bn2Single(const FagParsedInfo& p)
@@ -56,11 +54,10 @@ bool Feasible_Bn2Single(const FagParsedInfo& p)
 
 bool Feasible_Bn2MultiBlk(const FagParsedInfo& p)
 {
-    // S 落在 (128, 640]：这些都是 MultiBlk kernel 的实现前提。
+    // S 落在 (128, 640] 且 D==Dv：这些都是 MultiBlk kernel 的实现前提。
     // mask 3/4 也可以走 MultiBlk；无效行/列由 bn2NeedZero 另开一份二进制。
-    // D==Dv 已在 Bn2FamilyFeasible 里统一把关。
     return Bn2FamilyFeasible(p) && (p.s1 > BN2_MAX_S || p.s2 > BN2_MAX_S) && p.s1 <= BN2_MULTIBLK_SEQ &&
-           p.s2 <= BN2_MULTIBLK_SEQ;
+           p.s2 <= BN2_MULTIBLK_SEQ && p.d == p.dv;
 }
 
 // D5：BN2S2 是保留位，本轮不实现不编译，host 永不产生 template=3。
