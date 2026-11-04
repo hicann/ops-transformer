@@ -143,7 +143,7 @@ public:
     {
         constexpr uint32_t mm1OutDtype = sizeof(half);
         uint32_t mm1ResultSize = mBaseSize / CV_RATIO * s2BaseSize * mm1OutDtype / 2;
-        constexpr uint32_t mm2ResultSize = (dVBaseSize + 32U) * mBaseSize / CV_RATIO * sizeof(T);
+        constexpr uint32_t mm2ResultSize = dVBaseSize * mBaseSize / CV_RATIO * sizeof(T);
         constexpr uint32_t mm2LeftSize = mBaseSize * s2BaseSize * sizeof(INPUT_T) + mBaseSize * s2BaseSize / 32;
         l1BufferManager_.Init(pipe_, 524288);
 
@@ -256,8 +256,8 @@ public:
                 } else if (taskDealMode == TASK_DEAL_MODE::DEAL_ZERO) {
                     if ASCEND_IS_AIV {
                         if (constInfo_.isSoftmaxLseEnable && actSeqLensQ_ > 0) {
-                            vecFaBlock_.WriteLseNegInf(bN2Cur / constInfo_.realN2Size, bN2Cur % constInfo_.realN2Size,
-                                                       static_cast<uint32_t>(actSeqLensQ_));
+                            vecFaBlock_.WriteLseInf(bN2Cur / constInfo_.realN2Size, bN2Cur % constInfo_.realN2Size,
+                                                    static_cast<uint32_t>(actSeqLensQ_));
                         }
                     }
                     UpdateAxisInfo(taskDealMode, bN2Cur, gS1Cur, s2Cur);

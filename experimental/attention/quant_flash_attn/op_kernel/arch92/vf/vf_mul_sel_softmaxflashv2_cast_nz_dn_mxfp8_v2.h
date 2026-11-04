@@ -10,25 +10,26 @@
 
 /*!
  * \file vf_mul_sel_softmaxflashv2_cast_nz_dn_mxfp8_v2.h
- * \brief MXFP8场景DN布局softmax VF: FP16 softmax/无row_sum/无softmaxscale版本
+ * \brief MXFP8场景DN布局softmax VF: FP16 softmax/在线row_sum/无softmaxscale版本
  *
- * 相比 vf_mul_sel_softmaxflashv2_cast_nz_dn.h 中的 MXFP8 实现, 本文件按以下设计重写:
- * 1. 基本块仍为128*512, m=128一次处理完整的128行S1,
- *    一行S1(128个FP16=256B)恰好占一个寄存器;
- * 2. 保持C1V1C1V1C2V2流水, 保留subLoop概念, 每次VF调用处理一个子环的ubN=256列;
- * 3. softmax数据类型从FP32改为FP16(T=half): S输入/行max/exp均在FP16域计算;
- * 4. 不计算row_sum: C2(MM2)阶段V矩阵d维多一行, p*V直接得到row_sum,
- *    因此VF侧删除全部sum寄存器与sum状态tensor(expSum/preLoopSum/firstLoopSum);
- * 5. 不乘softmaxscale(含Q/K descale): C1阶段FIXPIPE随路完成, S输入已完成缩放。
+ * 设计要点:
+ * 1. 基本块 128*512, m=128 一次处理完整的 128 行 S1, 一行 S1(128 个 FP16=256B)占一个寄存器;
+ * 2. 流水为 C1V1C1V1C2V2, 保留 subLoop, 每次 VF 调用处理一个子环的 ubN=256 列;
+ * 3. softmax 全程 FP16(T=half): S 输入/行 max/exp 均在 FP16 域计算;
+ * 4. 在线累积 row_sum: 全程 FP16 域累加/合并/存储, 跨子环/跨 S2 块按 max 差因子(2 的幂)重缩放,
+ *    终值按 mloop 槽位存放(softmaxSumBuf_), 供 V2 末块除法与 LSE 使用;
+ * 5. 不乘 softmaxscale(含 Q/K descale): 由 C1 阶段 FIXPIPE 随路完成。
  *
- * 调用侧需同步适配的契约:
- * - m必须为128(寄存器一次放下一行S1), 输入S为FP16, DN列主序: 第c列起始地址为 input + c*m;
- * - softmaxMax/softmaxExp/preLoopMax状态tensor改为FP16, 每个m=128个元素;
- * - P输出FP8打包从4-way(4列x64B)改为2-way(2列x128B): 每个pack寄存器=[列A|列B]各128B,
- *   由两个RintZero cast(各列落偶字节)加一条DeInterleave拼成, 不再依赖Gather索引表;
- * - P store的blockStride/repeatStride沿用旧布局取值(ubN>>2|1, 2), pack间指针间隔沿用+32B
- *   约定(x_exp_k = x_exp + 32*k), m=128的新L1排布需在调用侧重新对齐(可直接调VF接口传新值);
- * - pScaleSubLoop0(E8M0)由"64值x2份复制"改为每行一个共m=128个值, L1侧按s2分组复制需适配。
+ * 调用侧契约:
+ * - m 必须为 128(寄存器一次放下一行 S1), 输入 S 为 FP16, DN 列主序: 第 c 列起始地址为 input + c*m;
+ * - softmaxMax/softmaxExp/preLoopMax 状态 tensor 为 FP16, 每个 m=128 个元素;
+ * - rowSum 状态 tensor 为 FP16, 每个 m=128 个元素, 与 softmaxMax 同槽位(mloop%(PRELOAD_N+1));
+ *   另需 preLoopSum/firstLoopSum 两个 FP16 临时槽(m=128), 用于子环0→子环1重缩放;
+ * - P 输出 FP8 按 2-way 打包(2 列 x 128B): 每个 pack 寄存器 = [列A|列B] 各 128B,
+ *   由两个 RintZero cast(各列落偶字节)加一条 DeInterleave 拼成, 不使用 Gather 索引表;
+ * - P store 的 blockStride/repeatStride 取 (ubN>>2|1, 2), pack 间指针间隔 +32B
+ *   (x_exp_k = x_exp + 32*k), m=128 的 L1 排布由调用侧对齐(可通过 VF 接口传值);
+ * - pScaleSubLoop0(E8M0) 每行一个, 共 m=128 个值, L1 侧按 s2 分组复制。
  */
 #ifndef MUL_SEL_SOFTMAXFLASHV2_CAST_NZ_DN_MXFP8_V2_H_
 #define MUL_SEL_SOFTMAXFLASHV2_CAST_NZ_DN_MXFP8_V2_H_
@@ -42,9 +43,11 @@ using namespace AscendC;
 using namespace Reg;
 using namespace regbaseutil;
 
-// half -> bfloat16: 1:1满寄存器数值转换(供E8M0指数提取), 与indexer_quant_cache写法一致
-static constexpr Reg::CastTrait castTraitHalf2Bf16Mx = {Reg::RegLayout::UNKNOWN, Reg::SatMode::UNKNOWN,
-                                                        Reg::MaskMergeMode::ZEROING, RoundMode::CAST_TRUNC};
+// half -> uint8(偶/奇): 整数 ps 字节(127+Δk)直接落成 E8M0 字节
+static constexpr Reg::CastTrait castTraitU8Zero = {Reg::RegLayout::ZERO, Reg::SatMode::SAT, Reg::MaskMergeMode::ZEROING,
+                                                   RoundMode::CAST_RINT};
+static constexpr Reg::CastTrait castTraitU8One = {Reg::RegLayout::ONE, Reg::SatMode::SAT, Reg::MaskMergeMode::ZEROING,
+                                                  RoundMode::CAST_RINT};
 
 /*
  * NoUpdate: 首个mLoop(isFirstS2Loop), 无历史全局max状态, 仅维护new_global_max。
@@ -53,11 +56,11 @@ static constexpr Reg::CastTrait castTraitHalf2Bf16Mx = {Reg::RegLayout::UNKNOWN,
  */
 template <typename T, typename T2, uint16_t ubN = 256>
 __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubuf__ T* input_x_local_UB,
-                                                       __ubuf__ T* new_global_max, __ubuf__ uint8_t* indexesUb,
-                                                       __ubuf__ fp8_e8m0_t* pScaleSubLoop0, const uint32_t m,
-                                                       const uint32_t originN, const float pScale, const T minValue,
-                                                       const uint32_t blockStride, const uint32_t repeatStride,
-                                                       int32_t subLoop)
+                                                       __ubuf__ T* new_global_max, __ubuf__ T* new_global_sum,
+                                                       __ubuf__ uint8_t* indexesUb, __ubuf__ fp8_e8m0_t* pScaleSubLoop0,
+                                                       const uint32_t m, const uint32_t originN, const float pScale,
+                                                       const T minValue, const uint32_t blockStride,
+                                                       const uint32_t repeatStride, int32_t subLoop)
 {
     static_assert(ubN % 8 == 0, "ProcessVec1DnNoUpdateMxfp8V2VF ubN must be multiple of 8");
     RegTensor<T> src0, src1, src2, src3;
@@ -73,13 +76,19 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubu
     RegTensor<float> vreg_ln_p_scale_f;
     RegTensor<T2> vreg_x_exp_fp8_0, vreg_x_exp_fp8_1;
     RegTensor<T2> vreg_x_exp_f8_pack_0, vreg_x_exp_f8_pack_1;
-    RegTensor<bfloat16_t> vreg_p_scale_bf16;
+    RegTensor<T> vreg_ps_k0, vreg_ps_k1, vreg_ps_dk; // ps 字节整数计算用(k_old, k_new, 127+Δk)
     RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0_0, vreg_p_scale_f8e8m0_1;
 
     MaskReg preg_108 = CreateMask<uint16_t, MaskPattern::ALL>();
     MaskReg preg_134 = CreateMask<uint8_t, MaskPattern::ALL>();
     MaskReg preg_135 = CreateMask<T, MaskPattern::ALL>();
     MaskReg preg_f = CreateMask<float, MaskPattern::ALL>();
+
+    // row_sum: 全部在 fp16 域累加/合并，直接以 fp16 存 buffer
+    RegTensor<T> sum_h;  // fp16 全累加器: 整段 subloop 累加
+    RegTensor<T> sum_h2; // fp16 合并临时: 历史累积和 / 子环0和
+    // 四路独立累加器: 打破循环内 4 个 Add 的串行依赖, 循环外再合并
+    RegTensor<T> sum_a, sum_b, sum_c, sum_d;
 
     // 2个pack寄存器store起始指针, pack间+32(T2元素)的间隔约定
     __ubuf__ T2* x_exp_1 = x_exp + 32;
@@ -91,6 +100,11 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubu
 
     Duplicate(local_max, minValue);
     Duplicate(vreg_min, minValue);
+    Duplicate(sum_h, (T)0);
+    Duplicate(sum_a, (T)0);
+    Duplicate(sum_b, (T)0);
+    Duplicate(sum_c, (T)0);
+    Duplicate(sum_d, (T)0);
     // ln(pScale)在float域计算, 再广播成整寄存器FP16
     Duplicate(vreg_p_scale_f, pScale);
     Ln(vreg_ln_p_scale_f, vreg_p_scale_f, preg_f);
@@ -116,17 +130,23 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubu
         Max(local_max, local_max, max01, preg_108); // running max = max(max_01, running max)
     }
 
-    // ln2对齐: 保证exp(旧max-新max)为2的幂, E8M0 scale修正仅需改指数位
-    // softmaxscale已由C1阶段FIXPIPE随路乘, 此处不再乘dScale
+    // max 向上对齐到 k*LN2, 使 max 差值恰为 2 的幂
+    // S 已由 C1 阶段 FIXPIPE 随路乘 softmaxscale, 此处直接使用
     Muls(local_max, local_max, static_cast<T>(INV_LN2), preg_108);
     Truncate<T, RoundMode::CAST_CEIL>(local_max, local_max, preg_108);
     Muls(local_max, local_max, static_cast<T>(LN2), preg_108);
 
     if (subLoop == 1) {
-        // 与子环0存储的max合并; vreg_x_max_b = exp(旧max - 新max), 即P0的scale修正因子
+        // 与子环0的 max 合并; vreg_x_max_b 留作子环0 row_sum 的重缩放因子
         LoadAlign(vreg_x_max_b, new_global_max);
         Max(local_max, local_max, vreg_x_max_b, preg_108);
-        FusedExpSub(vreg_x_max_b, vreg_x_max_b, local_max, preg_134);
+        // ps 字节 = 127 + Δk: max 是 k*LN2 的整数倍, Δk 为精确整数(≤0)
+        Muls(vreg_ps_k0, vreg_x_max_b, static_cast<T>(INV_LN2), preg_108);
+        Muls(vreg_ps_k1, local_max, static_cast<T>(INV_LN2), preg_108);
+        Sub(vreg_ps_dk, vreg_ps_k0, vreg_ps_k1, preg_108);
+        Adds(vreg_ps_dk, vreg_ps_dk, static_cast<T>(127), preg_108);
+        // row_sum 重缩放因子 exp(旧max-新max), 半域求值
+        FusedExpSub(vreg_x_max_b, vreg_x_max_b, local_max, preg_135);
     }
 
     StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T*&)new_global_max, local_max, preg_108);
@@ -136,43 +156,62 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubu
     uint16_t loopNum = ubN / 4;
 
     for (uint16_t i0 = 0; i0 < loopNum; ++i0) {
-        // 每次迭代处理4列(4路并行): 下半区列2*i0与2*i0+1, 上半区列ubN/2+2*i0与ubN/2+2*i0+1;
-        // pack_k = [下半区列c | 上半区列ubN/2+c](c=2*i0+k), 列配对规则与8路版本一致
+        // 每次 4 列: 下半区 2*i0, 2*i0+1; 上半区 ubN/2+2*i0, +1
+        // pack_k = [下半区列c | 上半区列ubN/2+c], c=2*i0+k
         LoadAlign(vreg_x_0, input_x_local_UB + i0 * m * 2);
         LoadAlign(vreg_x_1, input_x_local_UB + ubN * m / 2 + i0 * m * 2);
         LoadAlign(vreg_x_2, input_x_local_UB + i0 * m * 2 + m);
         LoadAlign(vreg_x_3, input_x_local_UB + ubN * m / 2 + i0 * m * 2 + m);
 
+        // 4 个 load 完成后立即做 4 个 exp, 让向量流水拿到更多独立指令
         FusedExpSub(vreg_x_exp_0, vreg_x_0, local_max, preg_134);
         FusedExpSub(vreg_x_exp_1, vreg_x_1, local_max, preg_134);
-
-        // 2-way打包(half->fp8, 2:1): pack_0 = [下半区列2*i0 | 上半区列ubN/2+2*i0], 每列128B;
-        // 两个RintZero cast各将一列放到偶字节, 一条DeInterleave直接拼成[列A|列B], 替代原Or+Gather字节反交织
-        Cast<T2, T, castTraitRintZero>(vreg_x_exp_fp8_0, vreg_x_exp_0, preg_135);
-        Cast<T2, T, castTraitRintZero>((RegTensor<T2>&)vreg_x_exp_0, vreg_x_exp_1, preg_135);
-        DeInterleave<T2, Reg::HighLowPart::LOWEST>(vreg_x_exp_f8_pack_0, vreg_x_exp_fp8_0,
-                                                   (RegTensor<T2>&)vreg_x_exp_0);
-        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-            ((__ubuf__ T2*&)x_exp), vreg_x_exp_f8_pack_0, blockStride, repeatStride, preg_134);
-
         FusedExpSub(vreg_x_exp_2, vreg_x_2, local_max, preg_134);
         FusedExpSub(vreg_x_exp_3, vreg_x_3, local_max, preg_134);
 
-        // pack_1 = [下半区列2*i0+1 | 上半区列ubN/2+2*i0+1]
-        Cast<T2, T, castTraitRintZero>(vreg_x_exp_fp8_1, vreg_x_exp_2, preg_135);
-        Cast<T2, T, castTraitRintZero>((RegTensor<T2>&)vreg_x_exp_2, vreg_x_exp_3, preg_135);
-        DeInterleave<T2, Reg::HighLowPart::LOWEST>(vreg_x_exp_f8_pack_1, vreg_x_exp_fp8_1,
-                                                   (RegTensor<T2>&)vreg_x_exp_2);
+        // pack_0 = [列 2*i0 | 列 ubN/2+2*i0]: Cast -> DeInterleave -> Store -> sum Add
+        // cast 落独立 fp8 寄存器(不覆盖 exp_0/1), 使 add 能排在 store 之后填流水
+        Cast<T2, T, castTraitRintZero>(vreg_x_exp_fp8_0, vreg_x_exp_0, preg_135);
+        Cast<T2, T, castTraitRintZero>(vreg_x_exp_fp8_1, vreg_x_exp_1, preg_135);
+        DeInterleave<T2, Reg::HighLowPart::LOWEST>(vreg_x_exp_f8_pack_0, vreg_x_exp_fp8_0, vreg_x_exp_fp8_1);
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+            ((__ubuf__ T2*&)x_exp), vreg_x_exp_f8_pack_0, blockStride, repeatStride, preg_134);
+        // row_sum: 全 fp16 累加(上限≈列数×pScale, 需防溢出)
+        Add(sum_a, sum_a, vreg_x_exp_0, preg_135); // 四路独立累加器
+        Add(sum_b, sum_b, vreg_x_exp_1, preg_135);
+
+        // pack_1 = [列 2*i0+1 | 列 ubN/2+2*i0+1]: Cast -> DeInterleave -> Store -> sum Add
+        Cast<T2, T, castTraitRintZero>(vreg_x_exp_fp8_0, vreg_x_exp_2, preg_135);
+        Cast<T2, T, castTraitRintZero>(vreg_x_exp_fp8_1, vreg_x_exp_3, preg_135);
+        DeInterleave<T2, Reg::HighLowPart::LOWEST>(vreg_x_exp_f8_pack_1, vreg_x_exp_fp8_0, vreg_x_exp_fp8_1);
         StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2*&)x_exp_1), vreg_x_exp_f8_pack_1, blockStride, repeatStride, preg_134);
+        Add(sum_c, sum_c, vreg_x_exp_2, preg_135);
+        Add(sum_d, sum_d, vreg_x_exp_3, preg_135);
+    }
+
+    // 四路累加器合并(循环外): (sum_a+sum_b) + (sum_c+sum_d) -> sum_h
+    Add(sum_a, sum_a, sum_b, preg_135);
+    Add(sum_c, sum_c, sum_d, preg_135);
+    Add(sum_h, sum_a, sum_c, preg_135);
+
+    // —— row_sum 收尾：直接以 fp16 存储/合并（corr 是 2 的幂, fp16 下无损） ——
+    if (subLoop == 0) {
+        // 首个 S2 loop 的子环0：本子环和即当前累积和
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(new_global_sum, sum_h, preg_135);
+    } else {
+        // 子环1：子环0的和按 exp(子环0 max - 新 max) 缩放后与本子环和合并
+        LoadAlign(sum_h2, new_global_sum);
+        Mul(sum_h2, sum_h2, vreg_x_max_b, preg_135);
+        Add(sum_h, sum_h, sum_h2, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(new_global_sum, sum_h, preg_135);
     }
 
     if (subLoop == 1) {
-        // P0的scale修正因子exp(子环0合并max - 新max)转为E8M0: half -> bf16(1:1) -> e8m0,
-        // 每行一个共m=128个值, MM2读P0时通过MXFP8 scale随路乘
-        Cast<bfloat16_t, T, castTraitHalf2Bf16Mx>(vreg_p_scale_bf16, vreg_x_max_b, preg_108);
-        Cast<fp8_e8m0_t, bfloat16_t, castTraitNoneZero>(vreg_p_scale_f8e8m0_0, vreg_p_scale_bf16, preg_108);
-        Cast<fp8_e8m0_t, bfloat16_t, castTraitNoneOne>(vreg_p_scale_f8e8m0_1, vreg_p_scale_bf16, preg_108);
+        // P0 的 scale 修正因子: 字节 = 127 + Δk 由整数域直接算出, 每行一个共 m=128 个值,
+        // 整数 ps 字节 -> uint8(偶/奇) -> OR 合并
+        Cast<uint8_t, T, castTraitU8Zero>((RegTensor<uint8_t>&)vreg_p_scale_f8e8m0_0, vreg_ps_dk, preg_108);
+        Cast<uint8_t, T, castTraitU8One>((RegTensor<uint8_t>&)vreg_p_scale_f8e8m0_1, vreg_ps_dk, preg_108);
         Or((RegTensor<uint8_t>&)vreg_p_scale_f8e8m0_0, (RegTensor<uint8_t>&)vreg_p_scale_f8e8m0_0,
            (RegTensor<uint8_t>&)vreg_p_scale_f8e8m0_1, preg_134);
         StoreAlign<fp8_e8m0_t, Reg::StoreDist::DIST_NORM_B8>(((__ubuf__ fp8_e8m0_t*&)pScaleSubLoop0),
@@ -182,7 +221,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubu
 
 template <typename T, typename T2, uint16_t ubN = 256>
 __aicore__ inline void ProcessVec1DnNoUpdateMxfp8V2(const LocalTensor<T2>& dstTensor, const LocalTensor<T>& maxTensor,
-                                                    const LocalTensor<T>& srcTensor,
+                                                    const LocalTensor<T>& sumTensor, const LocalTensor<T>& srcTensor,
                                                     const LocalTensor<uint8_t>& vselrIndexesBuf, const uint32_t m,
                                                     const uint32_t originN, const float pScale, const T minValue,
                                                     int32_t subLoop,
@@ -191,33 +230,33 @@ __aicore__ inline void ProcessVec1DnNoUpdateMxfp8V2(const LocalTensor<T2>& dstTe
     __ubuf__ T2* x_exp = (__ubuf__ T2*)dstTensor.GetPhyAddr();
     __ubuf__ T* input_x_local_UB = (__ubuf__ T*)srcTensor.GetPhyAddr();
     __ubuf__ T* new_global_max = (__ubuf__ T*)maxTensor.GetPhyAddr();
+    __ubuf__ T* new_global_sum = (__ubuf__ T*)sumTensor.GetPhyAddr();
     __ubuf__ fp8_e8m0_t* pScaleSubLoop0Ub = (__ubuf__ fp8_e8m0_t*)pScaleSubLoop0Tensor.GetPhyAddr();
     __ubuf__ uint8_t* indexesUb = (__ubuf__ uint8_t*)vselrIndexesBuf.GetPhyAddr();
-    // DN布局FP8输出store参数: block b落于ptr+b*blockStride*32B, POST步进repeatStride*32B;
-    // 4路并行下每次迭代2个pack指针(相邻32B), 步进64B(repeatStride=2), 最终UB布局与8路版本一致
-    const uint32_t blockStride = ubN >> 1;
+    // DN FP8 store: block b 落在 ptr + b*blockStride*32B, 步进 repeatStride*32B
+    // 每迭代 2 个 pack 指针(相邻 32B), 步进 64B(repeatStride=2)
+    const uint32_t blockStride = ubN >> 1 | 0x1;
     const uint32_t repeatStride = 2;
 
-    ProcessVec1DnNoUpdateMxfp8V2VF<T, T2, ubN>(x_exp, input_x_local_UB, new_global_max, indexesUb, pScaleSubLoop0Ub, m,
-                                               originN, pScale, minValue, blockStride, repeatStride, subLoop);
+    ProcessVec1DnNoUpdateMxfp8V2VF<T, T2, ubN>(x_exp, input_x_local_UB, new_global_max, new_global_sum, indexesUb,
+                                               pScaleSubLoop0Ub, m, originN, pScale, minValue, blockStride,
+                                               repeatStride, subLoop);
 }
 
 /*
  * Update: 非首个mLoop, 行max需与历史全局max合并, 并维护三类修正状态:
  * - pre_loop_max: 子环0时保存历史全局max, 供子环1计算O重缩放因子;
- * - expMax: O重缩放因子exp(历史max - 新max), V2阶段重缩放已累积的O与row_sum;
+ * - expMax: O重缩放因子exp(历史max - 新max), V2阶段重缩放已累积的O; sum 在 V1 同步重缩放;
  * - pScaleSubLoop0(E8M0): 本mLoop冻结P0的scale修正因子exp(子环0合并max - 新max),
  *   MM2读P0时随路乘。
  * 子环0: P0以max(本块, 历史)为基数量化; 子环1: P1以max(本块, 子环0, 历史)为基数量化。
  */
 template <typename T, typename T2, uint16_t ubN = 256>
-__simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubuf__ T* input_x_local_UB,
-                                                     __ubuf__ T* exp_max, __ubuf__ T* new_global_max,
-                                                     __ubuf__ uint8_t* indexesUb, __ubuf__ fp8_e8m0_t* pScaleSubLoop0,
-                                                     const uint32_t m, const uint32_t originN, const float pScale,
-                                                     const T minValue, const uint32_t blockStride,
-                                                     const uint32_t repeatStride, __ubuf__ T* pre_loop_max,
-                                                     int32_t subLoop)
+__simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(
+    __ubuf__ T2* x_exp, __ubuf__ T* input_x_local_UB, __ubuf__ T* exp_max, __ubuf__ T* new_global_max,
+    __ubuf__ T* new_global_sum, __ubuf__ T* pre_loop_sum, __ubuf__ T* first_loop_sum, __ubuf__ uint8_t* indexesUb,
+    __ubuf__ fp8_e8m0_t* pScaleSubLoop0, const uint32_t m, const uint32_t originN, const float pScale, const T minValue,
+    const uint32_t blockStride, const uint32_t repeatStride, __ubuf__ T* pre_loop_max, int32_t subLoop)
 {
     static_assert(ubN % 8 == 0, "ProcessVec1DnUpdateMxfp8V2VF ubN must be multiple of 8");
     RegTensor<T> src0, src1, src2, src3;
@@ -234,7 +273,7 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubuf_
     RegTensor<float> vreg_ln_p_scale_f;
     RegTensor<T2> vreg_x_exp_fp8_0, vreg_x_exp_fp8_1;
     RegTensor<T2> vreg_x_exp_f8_pack_0, vreg_x_exp_f8_pack_1;
-    RegTensor<bfloat16_t> vreg_p_scale_bf16;
+    RegTensor<T> vreg_ps_k0, vreg_ps_k1, vreg_ps_dk; // ps 字节整数计算用(k_old, k_new, 127+Δk)
     RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0_0;
     RegTensor<fp8_e8m0_t> vreg_p_scale_f8e8m0_1;
 
@@ -242,6 +281,12 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubuf_
     MaskReg preg_134 = CreateMask<uint8_t, MaskPattern::ALL>();
     MaskReg preg_135 = CreateMask<T, MaskPattern::ALL>();
     MaskReg preg_f = CreateMask<float, MaskPattern::ALL>();
+
+    // row_sum: 全部在 fp16 域累加/合并，直接以 fp16 存 buffer
+    RegTensor<T> sum_h;  // fp16 全累加器: 整段 subloop 累加
+    RegTensor<T> sum_h2; // fp16 合并临时: 历史累积和 / 子环0和
+    // 四路独立累加器: 打破循环内 4 个 Add 的串行依赖, 循环外再合并
+    RegTensor<T> sum_a, sum_b, sum_c, sum_d;
 
     // 2个pack寄存器store起始指针, pack间+32(T2元素)的间隔约定
     __ubuf__ T2* x_exp_1 = x_exp + 32;
@@ -253,6 +298,11 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubuf_
 
     Duplicate(local_max, minValue);
     Duplicate(vreg_min, minValue);
+    Duplicate(sum_h, (T)0);
+    Duplicate(sum_a, (T)0);
+    Duplicate(sum_b, (T)0);
+    Duplicate(sum_c, (T)0);
+    Duplicate(sum_d, (T)0);
     // ln(pScale)在float域计算, 再广播成整寄存器FP16
     Duplicate(vreg_p_scale_f, pScale);
     Ln(vreg_ln_p_scale_f, vreg_p_scale_f, preg_f);
@@ -278,24 +328,30 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubuf_
         Max(local_max, local_max, max01, preg_108); // running max = max(max_01, running max)
     }
 
-    LoadAlign(vreg_x_max_b, new_global_max); // 历史全局max(此前mLoop累积)
-    // ln2对齐: 保证exp(旧max-新max)为2的幂, E8M0 scale修正仅需改指数位
-    // softmaxscale已由C1阶段FIXPIPE随路乘, 此处不再乘dScale
+    LoadAlign(vreg_x_max_b, new_global_max); // 历史全局 max(前序 mLoop 累积)
+    // max 向上对齐到 k*LN2, 使 max 差值恰为 2 的幂
+    // S 已由 C1 阶段 FIXPIPE 随路乘 softmaxscale, 此处直接使用
     Muls(local_max, local_max, static_cast<T>(INV_LN2), preg_108);
     Truncate<T, RoundMode::CAST_CEIL>(local_max, local_max, preg_108);
     Muls(local_max, local_max, static_cast<T>(LN2), preg_108);
-    // 与历史max合并(两者均为ln2对齐, 合并后仍对齐)
+    // 与历史 max 合并(两者都对齐到 ln2 倍数)
     Max(local_max, local_max, vreg_x_max_b, preg_108);
-
     if (subLoop == 0) {
-        // 保存历史max, 供子环1计算O重缩放因子
+        // 保存历史 max, 供子环1算 O 重缩放因子
         StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T*&)pre_loop_max, vreg_x_max_b, preg_108);
-        FusedExpSub(vreg_x_max_b, vreg_x_max_b, local_max, preg_134); // exp(历史max - 合并max)
+        // exp(历史max - 合并max): O 重缩放因子
+        FusedExpSub(vreg_x_max_b, vreg_x_max_b, local_max, preg_135);
     } else {
-        // exp(子环0合并max - 新max): 本mLoop冻结P0的scale修正因子
-        FusedExpSub(vreg_subloop_update, vreg_x_max_b, local_max, preg_134);
+        // ps 字节 = 127 + Δk: max 是 k*LN2 的整数倍, Δk 为精确整数(≤0)
+        Muls(vreg_ps_k0, vreg_x_max_b, static_cast<T>(INV_LN2), preg_108);
+        Muls(vreg_ps_k1, local_max, static_cast<T>(INV_LN2), preg_108);
+        Sub(vreg_ps_dk, vreg_ps_k0, vreg_ps_k1, preg_108);
+        Adds(vreg_ps_dk, vreg_ps_dk, static_cast<T>(127), preg_108);
+        // 子环0 row_sum 的重缩放因子 exp(子环0 max - 新max)
+        FusedExpSub(vreg_subloop_update, vreg_x_max_b, local_max, preg_135);
         LoadAlign(vreg_x_max_b, pre_loop_max);
-        FusedExpSub(vreg_x_max_b, vreg_x_max_b, local_max, preg_134); // exp(历史max - 新max): O重缩放因子
+        // exp(历史max - 新max): O 重缩放因子
+        FusedExpSub(vreg_x_max_b, vreg_x_max_b, local_max, preg_135);
     }
 
     StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>((__ubuf__ T*&)new_global_max, local_max, preg_108);
@@ -306,43 +362,70 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubuf_
     uint16_t loopNum = ubN / 4;
 
     for (uint16_t i0 = 0; i0 < loopNum; ++i0) {
-        // 每次迭代处理4列(4路并行): 下半区列2*i0与2*i0+1, 上半区列ubN/2+2*i0与ubN/2+2*i0+1;
-        // pack_k = [下半区列c | 上半区列ubN/2+c](c=2*i0+k), 列配对规则与8路版本一致
+        // 每次 4 列: 下半区 2*i0, 2*i0+1; 上半区 ubN/2+2*i0, +1
+        // pack_k = [下半区列c | 上半区列ubN/2+c], c=2*i0+k
         LoadAlign(vreg_x_0, input_x_local_UB + i0 * m * 2);
         LoadAlign(vreg_x_1, input_x_local_UB + ubN * m / 2 + i0 * m * 2);
         LoadAlign(vreg_x_2, input_x_local_UB + i0 * m * 2 + m);
         LoadAlign(vreg_x_3, input_x_local_UB + ubN * m / 2 + i0 * m * 2 + m);
 
+        // 4 个 load 完成后立即做 4 个 exp, 让向量流水拿到更多独立指令
         FusedExpSub(vreg_x_exp_0, vreg_x_0, local_max, preg_134);
         FusedExpSub(vreg_x_exp_1, vreg_x_1, local_max, preg_134);
-
-        // 2-way打包(half->fp8, 2:1): pack_0 = [下半区列2*i0 | 上半区列ubN/2+2*i0], 每列128B;
-        // 两个RintZero cast各将一列放到偶字节, 一条DeInterleave直接拼成[列A|列B], 替代原Or+Gather字节反交织
-        Cast<T2, T, castTraitRintZero>(vreg_x_exp_fp8_0, vreg_x_exp_0, preg_135);
-        Cast<T2, T, castTraitRintZero>((RegTensor<T2>&)vreg_x_exp_0, vreg_x_exp_1, preg_135);
-        DeInterleave<T2, Reg::HighLowPart::LOWEST>(vreg_x_exp_f8_pack_0, vreg_x_exp_fp8_0,
-                                                   (RegTensor<T2>&)vreg_x_exp_0);
-        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-            ((__ubuf__ T2*&)x_exp), vreg_x_exp_f8_pack_0, blockStride, repeatStride, preg_134);
-
         FusedExpSub(vreg_x_exp_2, vreg_x_2, local_max, preg_134);
         FusedExpSub(vreg_x_exp_3, vreg_x_3, local_max, preg_134);
 
-        // pack_1 = [下半区列2*i0+1 | 上半区列ubN/2+2*i0+1]
-        Cast<T2, T, castTraitRintZero>(vreg_x_exp_fp8_1, vreg_x_exp_2, preg_135);
-        Cast<T2, T, castTraitRintZero>((RegTensor<T2>&)vreg_x_exp_2, vreg_x_exp_3, preg_135);
-        DeInterleave<T2, Reg::HighLowPart::LOWEST>(vreg_x_exp_f8_pack_1, vreg_x_exp_fp8_1,
-                                                   (RegTensor<T2>&)vreg_x_exp_2);
+        // pack_0 = [列 2*i0 | 列 ubN/2+2*i0]: Cast -> DeInterleave -> Store -> sum Add
+        // cast 落独立 fp8 寄存器(不覆盖 exp_0/1), 使 add 能排在 store 之后填流水
+        Cast<T2, T, castTraitRintZero>(vreg_x_exp_fp8_0, vreg_x_exp_0, preg_135);
+        Cast<T2, T, castTraitRintZero>(vreg_x_exp_fp8_1, vreg_x_exp_1, preg_135);
+        DeInterleave<T2, Reg::HighLowPart::LOWEST>(vreg_x_exp_f8_pack_0, vreg_x_exp_fp8_0, vreg_x_exp_fp8_1);
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
+            ((__ubuf__ T2*&)x_exp), vreg_x_exp_f8_pack_0, blockStride, repeatStride, preg_134);
+        // row_sum: 全 fp16 累加(上限≈列数×pScale, 需防溢出)
+        Add(sum_a, sum_a, vreg_x_exp_0, preg_135); // 四路独立累加器
+        Add(sum_b, sum_b, vreg_x_exp_1, preg_135);
+
+        // pack_1 = [列 2*i0+1 | 列 ubN/2+2*i0+1]: Cast -> DeInterleave -> Store -> sum Add
+        Cast<T2, T, castTraitRintZero>(vreg_x_exp_fp8_0, vreg_x_exp_2, preg_135);
+        Cast<T2, T, castTraitRintZero>(vreg_x_exp_fp8_1, vreg_x_exp_3, preg_135);
+        DeInterleave<T2, Reg::HighLowPart::LOWEST>(vreg_x_exp_f8_pack_1, vreg_x_exp_fp8_0, vreg_x_exp_fp8_1);
         StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ T2*&)x_exp_1), vreg_x_exp_f8_pack_1, blockStride, repeatStride, preg_134);
+        Add(sum_c, sum_c, vreg_x_exp_2, preg_135);
+        Add(sum_d, sum_d, vreg_x_exp_3, preg_135);
+    }
+
+    // 四路累加器合并(循环外): (sum_a+sum_b) + (sum_c+sum_d) -> sum_h
+    Add(sum_a, sum_a, sum_b, preg_135);
+    Add(sum_c, sum_c, sum_d, preg_135);
+    Add(sum_h, sum_a, sum_c, preg_135);
+
+    // row_sum 收尾: 直接 fp16 存储/合并(corr/factor 均为 2 的幂, 无损)
+    if (subLoop == 0) {
+        // 保存历史累积和(供子环1重缩放)与本子环和
+        LoadAlign(sum_h2, new_global_sum);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(pre_loop_sum, sum_h2, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(first_loop_sum, sum_h, preg_135);
+        Mul(sum_h2, sum_h2, vreg_x_max_b, preg_135);
+        Add(sum_h, sum_h, sum_h2, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(new_global_sum, sum_h, preg_135);
+    } else {
+        // 子环1: 本子环和 + 子环0和 x corr + 历史累积和 x factor
+        LoadAlign(sum_h2, first_loop_sum);
+        Mul(sum_h2, sum_h2, vreg_subloop_update, preg_135);
+        Add(sum_h, sum_h, sum_h2, preg_135);
+        LoadAlign(sum_h2, pre_loop_sum);
+        Mul(sum_h2, sum_h2, vreg_x_max_b, preg_135);
+        Add(sum_h, sum_h, sum_h2, preg_135);
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(new_global_sum, sum_h, preg_135);
     }
 
     if (subLoop == 1) {
-        // P0的scale修正因子exp(子环0合并max - 新max)转为E8M0: half -> bf16(1:1) -> e8m0,
-        // 每行一个共m=128个值, MM2读P0时通过MXFP8 scale随路乘
-        Cast<bfloat16_t, T, castTraitHalf2Bf16Mx>(vreg_p_scale_bf16, vreg_subloop_update, preg_108);
-        Cast<fp8_e8m0_t, bfloat16_t, castTraitNoneZero>(vreg_p_scale_f8e8m0_0, vreg_p_scale_bf16, preg_108);
-        Cast<fp8_e8m0_t, bfloat16_t, castTraitNoneOne>(vreg_p_scale_f8e8m0_1, vreg_p_scale_bf16, preg_108);
+        // P0 的 scale 修正因子: 字节 = 127 + Δk 由整数域直接算出, 每行一个共 m=128 个值,
+        // 整数 ps 字节 -> uint8(偶/奇) -> OR 合并
+        Cast<uint8_t, T, castTraitU8Zero>((RegTensor<uint8_t>&)vreg_p_scale_f8e8m0_0, vreg_ps_dk, preg_108);
+        Cast<uint8_t, T, castTraitU8One>((RegTensor<uint8_t>&)vreg_p_scale_f8e8m0_1, vreg_ps_dk, preg_108);
         Or((RegTensor<uint8_t>&)vreg_p_scale_f8e8m0_0, (RegTensor<uint8_t>&)vreg_p_scale_f8e8m0_0,
            (RegTensor<uint8_t>&)vreg_p_scale_f8e8m0_1, preg_134);
         StoreAlign<fp8_e8m0_t, Reg::StoreDist::DIST_NORM_B8>(((__ubuf__ fp8_e8m0_t*&)pScaleSubLoop0),
@@ -351,28 +434,31 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubuf_
 }
 
 template <typename T, typename T2, uint16_t ubN = 256>
-__aicore__ inline void ProcessVec1DnUpdateMxfp8V2(const LocalTensor<T2>& dstTensor, const LocalTensor<T>& maxTensor,
-                                                  const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor,
-                                                  const LocalTensor<uint8_t>& vselrIndexesBuf, const uint32_t m,
-                                                  const uint32_t originN, const float pScale, const T minValue,
-                                                  const LocalTensor<T>& preLoopMaxTensor, int32_t subLoop,
-                                                  const LocalTensor<fp8_e8m0_t>& pScaleSubLoop0Tensor)
+__aicore__ inline void ProcessVec1DnUpdateMxfp8V2(
+    const LocalTensor<T2>& dstTensor, const LocalTensor<T>& maxTensor, const LocalTensor<T>& sumTensor,
+    const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor, const LocalTensor<uint8_t>& vselrIndexesBuf,
+    const uint32_t m, const uint32_t originN, const float pScale, const T minValue,
+    const LocalTensor<T>& preLoopMaxTensor, const LocalTensor<T>& preLoopSumTensor,
+    const LocalTensor<T>& firstLoopSumTensor, int32_t subLoop, const LocalTensor<fp8_e8m0_t>& pScaleSubLoop0Tensor)
 {
     __ubuf__ T2* x_exp = (__ubuf__ T2*)dstTensor.GetPhyAddr();
     __ubuf__ T* input_x_local_UB = (__ubuf__ T*)srcTensor.GetPhyAddr();
     __ubuf__ T* exp_max = (__ubuf__ T*)expMaxTensor.GetPhyAddr();
     __ubuf__ T* new_global_max = (__ubuf__ T*)maxTensor.GetPhyAddr();
+    __ubuf__ T* new_global_sum = (__ubuf__ T*)sumTensor.GetPhyAddr();
+    __ubuf__ T* pre_loop_sum = (__ubuf__ T*)preLoopSumTensor.GetPhyAddr();
+    __ubuf__ T* first_loop_sum = (__ubuf__ T*)firstLoopSumTensor.GetPhyAddr();
     __ubuf__ T* pre_loop_max = (__ubuf__ T*)preLoopMaxTensor.GetPhyAddr();
     __ubuf__ fp8_e8m0_t* pScaleSubLoop0Ub = (__ubuf__ fp8_e8m0_t*)pScaleSubLoop0Tensor.GetPhyAddr();
     __ubuf__ uint8_t* indexesUb = (__ubuf__ uint8_t*)vselrIndexesBuf.GetPhyAddr();
-    // DN布局FP8输出store参数: block b落于ptr+b*blockStride*32B, POST步进repeatStride*32B;
-    // 4路并行下每次迭代2个pack指针(相邻32B), 步进64B(repeatStride=2), 最终UB布局与8路版本一致
-    const uint32_t blockStride = ubN >> 1;
+    // DN FP8 store: block b 落在 ptr + b*blockStride*32B, 步进 repeatStride*32B
+    // 每迭代 2 个 pack 指针(相邻 32B), 步进 64B(repeatStride=2)
+    const uint32_t blockStride = ubN >> 1 | 0x1;
     const uint32_t repeatStride = 2;
 
-    ProcessVec1DnUpdateMxfp8V2VF<T, T2, ubN>(x_exp, input_x_local_UB, exp_max, new_global_max, indexesUb,
-                                             pScaleSubLoop0Ub, m, originN, pScale, minValue, blockStride, repeatStride,
-                                             pre_loop_max, subLoop);
+    ProcessVec1DnUpdateMxfp8V2VF<T, T2, ubN>(x_exp, input_x_local_UB, exp_max, new_global_max, new_global_sum,
+                                             pre_loop_sum, first_loop_sum, indexesUb, pScaleSubLoop0Ub, m, originN,
+                                             pScale, minValue, blockStride, repeatStride, pre_loop_max, subLoop);
 }
 
 /*
@@ -382,7 +468,7 @@ __aicore__ inline void ProcessVec1DnUpdateMxfp8V2(const LocalTensor<T2>& dstTens
  * @param [out] maxTensor, new_global_max(本子环合并后的ln2对齐行max)
  * @param [in] srcTensor, 输入S LocalTensor(FP16, DN列主序, 第c列起始地址为 + c*m)
  * @param [out] expMaxTensor, O重缩放因子exp(历史max - 新max), 仅Update使用
- * @param [in] vselrIndexesBuf, 预留参数(原DN->NZ Gather索引表, DeInterleave打包后不再使用)
+ * @param [in] vselrIndexesBuf, 预留参数, 当前未使用
  * @param [out] pScaleSubLoop0Tensor, P0的E8M0 scale修正因子, 仅subLoop==1写入
  * @param [in] m, 输入行数, 必须为128(一行S1恰好占满一个寄存器)
  * @param [in] originN, 输入原始列数, 0 < originN <= ubN
@@ -392,22 +478,25 @@ __aicore__ inline void ProcessVec1DnUpdateMxfp8V2(const LocalTensor<T2>& dstTens
  */
 template <typename T, typename T2, bool isUpdate = false, uint16_t ubN = 256>
 __aicore__ inline void ProcessVec1VfDnMxfp8V2(const LocalTensor<T2>& dstTensor, const LocalTensor<T>& maxTensor,
-                                              const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor,
-                                              TBuf<>* vselrIndexesBuf,
+                                              const LocalTensor<T>& sumTensor, const LocalTensor<T>& srcTensor,
+                                              const LocalTensor<T>& expMaxTensor, TBuf<>* vselrIndexesBuf,
                                               const LocalTensor<fp8_e8m0_t>& pScaleSubLoop0Tensor, const uint32_t m,
                                               const uint32_t originN, const float pScale, const T minValue,
-                                              const LocalTensor<T>& preLoopMaxTensor, int32_t subLoop)
+                                              const LocalTensor<T>& preLoopMaxTensor,
+                                              const LocalTensor<T>& preLoopSumTensor,
+                                              const LocalTensor<T>& firstLoopSumTensor, int32_t subLoop)
 {
     static_assert(IsSameType<T, half>::value, "ProcessVec1VfDnMxfp8V2, T must be half(FP16 softmax)");
     static_assert(IsSameType<T2, fp8_e4m3fn_t>::value, "ProcessVec1VfDnMxfp8V2, T2 must be fp8_e4m3fn(MXFP8)");
     LocalTensor<uint8_t> indexesTensor;
     indexesTensor = vselrIndexesBuf[static_cast<int>(VselrIndexEnum::DN_INDEX)].template Get<uint8_t>();
     if constexpr (!isUpdate) {
-        ProcessVec1DnNoUpdateMxfp8V2<T, T2, ubN>(dstTensor, maxTensor, srcTensor, indexesTensor, m, originN, pScale,
-                                                 minValue, subLoop, pScaleSubLoop0Tensor);
+        ProcessVec1DnNoUpdateMxfp8V2<T, T2, ubN>(dstTensor, maxTensor, sumTensor, srcTensor, indexesTensor, m, originN,
+                                                 pScale, minValue, subLoop, pScaleSubLoop0Tensor);
     } else {
-        ProcessVec1DnUpdateMxfp8V2<T, T2, ubN>(dstTensor, maxTensor, srcTensor, expMaxTensor, indexesTensor, m, originN,
-                                               pScale, minValue, preLoopMaxTensor, subLoop, pScaleSubLoop0Tensor);
+        ProcessVec1DnUpdateMxfp8V2<T, T2, ubN>(dstTensor, maxTensor, sumTensor, srcTensor, expMaxTensor, indexesTensor,
+                                               m, originN, pScale, minValue, preLoopMaxTensor, preLoopSumTensor,
+                                               firstLoopSumTensor, subLoop, pScaleSubLoop0Tensor);
     }
 }
 } // namespace FaVectorApi

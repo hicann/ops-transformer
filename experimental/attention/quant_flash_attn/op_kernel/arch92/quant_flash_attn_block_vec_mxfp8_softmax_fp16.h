@@ -62,7 +62,7 @@ public:
     using ConstInfoX = ConstInfo_t;
 
     using MM1_OUT_T = half; // C1 FIXPIPE随路cast FP16
-    using MM2_OUT_T = T;    // MM2输出仍为float(O累加与row_sum除法需要FP32精度)
+    using MM2_OUT_T = T;    // MM2输出为float(O累加与除row_sum需要FP32精度,sum由V1提供)
     using OUT_T = OUTPUT_T;
 
     TPipe* tPipe_ = nullptr;
@@ -85,11 +85,15 @@ public:
     TEventID vToMte3Id_[2]; // V_MTE3事件: [0]=VfDivAndCast写outputT完→MTE3搬GM, [1]预留
     TBuf<> softmaxMaxBuf_[PRELOAD_N + 1];
     TBuf<> softmaxExpBuf_[PRELOAD_N + 1];
+    TBuf<> softmaxSumBuf_[PRELOAD_N + 1]; // V1 在线 row_sum 终值(每 mloop 一份, fp16 x128)
+    TBuf<> sumF32Buf_;                    // 消费侧 fp16 -> fp32 转换暂存(除法/LSE)
     TBuf<> preLoopMaxBuf_;
+    TBuf<> preLoopSumBuf_;   // 子环0的历史累积和快照(供子环1重缩放)
+    TBuf<> firstLoopSumBuf_; // 子环0的原始和(供子环1乘 corr)
     TBuf<> vselrIndexesBuf_[4];
-    TBuf<> rowSumAccBuf_;
     TBuf<> expF32Buf_;
-    TBuf<> lseTmpBuf_;
+    TBuf<> lseTmpBuf_;                             // LSE 的 max(half->float) 暂存
+    TQue<QuePosition::VECOUT, 1> softmaxLseQueue_; // LSE 输出队列: EnQue/DeQue/Free 自带 V<->MTE3 同步
 
     const ConstInfoX& constInfo_;
     half negativeHalfScalar_; // HF16_MIN: FP16域的padding/初始max值
@@ -192,15 +196,14 @@ public:
     }
 
     // =================================Private Functions=================================
-    __aicore__ inline void WriteLseNegInf(uint32_t bIdx, uint32_t realN2Idx, uint32_t rowCount)
+    // 无效批(DEAL_ZERO)的 LSE 填 FLOAT_INF(3e+99, 即 fp32 +inf)
+    __aicore__ inline void WriteLseInf(uint32_t bIdx, uint32_t realN2Idx, uint32_t rowCount)
     {
-        static constexpr int32_t NEG_INF_BITS = static_cast<int32_t>(0xFF800000U); // fp32 -inf 位模式
-        const float negInfValue = *reinterpret_cast<const float*>(&NEG_INF_BITS);
-        WaitFlag<AscendC::HardEvent::MTE3_V>(mte3ToVId_[1]);
-        LocalTensor<float> lseInfUb = lseTmpBuf_.template Get<float>();
-        Duplicate(lseInfUb, negInfValue, 2 * mBaseSize);
-        SetFlag<AscendC::HardEvent::V_MTE3>(vToMte3Id_[1]);
-        WaitFlag<AscendC::HardEvent::V_MTE3>(vToMte3Id_[1]);
+        // 输出缓冲走 VECOUT 队列: Alloc/Free 负责 V 与 MTE3 同步
+        LocalTensor<float> lseInfUb = this->softmaxLseQueue_.template AllocTensor<float>();
+        Duplicate(lseInfUb, FLOAT_INF, 2 * mBaseSize);
+        this->softmaxLseQueue_.template EnQue(lseInfUb);
+        this->softmaxLseQueue_.template DeQue<float>();
 
         uint64_t base = ((uint64_t)bIdx * constInfo_.realN2Size + realN2Idx) * constInfo_.s1Size;
         uint32_t offset = 0U;
@@ -209,7 +212,7 @@ public:
             SafeStrideCopy<float>(softmaxLseGm_[base + offset], lseInfUb, 1U, chunk * sizeof(float), 0U, 0U);
             offset += chunk;
         }
-        SetFlag<AscendC::HardEvent::MTE3_V>(mte3ToVId_[1]);
+        this->softmaxLseQueue_.template FreeTensor(lseInfUb);
     }
 
     __aicore__ inline void ProcessVec1Dn(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& outputBuf,
@@ -220,9 +223,12 @@ public:
         uint32_t expBufIdx = runInfo.loop % (PRELOAD_N + 1);
         int64_t stage1Offset = subLoop % DB;
 
-        // FP16 softmax状态tensor: half, 每行m=128个元素; 无sum tensor(row_sum由C2阶段随路得出)
+        // softmax 状态(half, 每行 m=128); row_sum 在 V1 全 fp16 累积
         LocalTensor<half> maxUb = this->softmaxMaxBuf_[softmaxBufIdx].template Get<half>();
+        LocalTensor<half> sumUb = this->softmaxSumBuf_[softmaxBufIdx].template Get<half>();
         LocalTensor<half> preLoopMaxUb = this->preLoopMaxBuf_.template Get<half>();
+        LocalTensor<half> preLoopSumUb = this->preLoopSumBuf_.template Get<half>();
+        LocalTensor<half> firstLoopSumUb = this->firstLoopSumBuf_.template Get<half>();
         LocalTensor<half> expUb = this->softmaxExpBuf_[expBufIdx].template Get<half>();
 
         // C1 FIXPIPE随路cast FP16: bmm1结果直接为half, softmaxscale已随路乘完
@@ -242,13 +248,13 @@ public:
         if (unlikely(runInfo.isFirstS2Loop)) {
             // NoUpdate: 首个S2 loop无历史max
             FaVectorApi::ProcessVec1VfDnMxfp8V2<half, INPUT_T, false, s2BaseSizeCur>(
-                stage1CastTensor, maxUb, mmRes, expUb, this->vselrIndexesBuf_, pScaleSubLoop0Tensor, vfM, s2CalcSize,
-                pScaleValue_, negativeHalfScalar_, preLoopMaxUb, subLoop);
+                stage1CastTensor, maxUb, sumUb, mmRes, expUb, this->vselrIndexesBuf_, pScaleSubLoop0Tensor, vfM,
+                s2CalcSize, pScaleValue_, negativeHalfScalar_, preLoopMaxUb, preLoopSumUb, firstLoopSumUb, subLoop);
         } else {
-            // Update: 与历史max合并, expUb输出O的重缩放因子exp(旧max-新max)(half)
+            // Update: 与历史 max 合并; expUb 输出 O 的重缩放因子(half)
             FaVectorApi::ProcessVec1VfDnMxfp8V2<half, INPUT_T, true, s2BaseSizeCur>(
-                stage1CastTensor, maxUb, mmRes, expUb, this->vselrIndexesBuf_, pScaleSubLoop0Tensor, vfM, s2CalcSize,
-                pScaleValue_, negativeHalfScalar_, preLoopMaxUb, subLoop);
+                stage1CastTensor, maxUb, sumUb, mmRes, expUb, this->vselrIndexesBuf_, pScaleSubLoop0Tensor, vfM,
+                s2CalcSize, pScaleValue_, negativeHalfScalar_, preLoopMaxUb, preLoopSumUb, firstLoopSumUb, subLoop);
         }
         bmm1ResBuf.SetCrossCore();
 
@@ -256,58 +262,66 @@ public:
         this->stage1OutQue_[stage1Offset].template DeQue<INPUT_T>();
         uint64_t pScaleL1Offset = mBaseSize * s2BaseSize; // PScale在L1的偏移量（单位：元素）
         LocalTensor<fp8_e8m0_t> mm2AScaleL1Tensor = outputBuf.GetTensor<fp8_e8m0_t>(pScaleL1Offset);
-        constexpr uint16_t pScaleDstStride = s2BaseSizeCur / MXFP_GROUP_SIZE / 4 - 1;
-        constexpr uint32_t copyTimes = s2BaseSizeCur / MXFP_GROUP_SIZE / 4;
-        constexpr uint16_t pScaleBlockCount = mBaseSize / 16;
+        // P scale 区(每 subloop 1024B = 32 个 32B 块)布局:
+        //   VF 按 2B/行 输出 128 行的修正因子 -> 256B = 8 个源块(每块 16 行, 32B);
+        // L1 侧每个源块重复 4 次(对应 4 个 k-group), 8 源块 x 4 = 32 块 = 1024B
+        //   因此分 4 次搬, 每次把全部 8 个源块按"目标块间隔 4 块(块内 32B 连续)"落位:
+        //     i=0 -> 目标块 0,4,8,...,28   i=1 -> 1,5,9,...,29   依此类推
+        constexpr uint16_t scaleBlockBytes = 32;                                              // 一个 32B 块
+        constexpr uint16_t scaleBytesPerRow = 2;                                              // VF 输出每行 2B
+        constexpr uint16_t scaleSrcBlockNum = mBaseSize * scaleBytesPerRow / scaleBlockBytes; // 8 个源块
+        constexpr uint16_t scaleRepeatTimes = 4; // 每个源块重复 4 次
+        constexpr uint16_t scaleRegionBlocks =
+            mBaseSize * (s2SplitSize / MXFP_GROUP_SIZE) / scaleBlockBytes;        // 32 块 = 1024B
+        constexpr uint16_t scaleCopyTimes = scaleRegionBlocks / scaleSrcBlockNum; // 4 次
         if ((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) {
-            // VF写128个per-row E8M0, 8个k-group共享; 两次DataCopy各4iter从同一源复制到L1 1024B
-            for (uint16_t i = 0; i < copyTimes; i++) {
-                DataCopy(mm2AScaleL1Tensor[i * 32], pScaleSubLoop0Tensor, {pScaleBlockCount, 1, 0, pScaleDstStride});
+            for (uint16_t i = 0; i < scaleCopyTimes; i++) {
+                DataCopy(mm2AScaleL1Tensor[i * scaleBlockBytes], pScaleSubLoop0Tensor,
+                         {scaleSrcBlockNum, 1, 0, static_cast<uint16_t>(scaleRepeatTimes - 1U)});
             }
         }
 
         LocalTensor<INPUT_T> mm2AL1Tensor = outputBuf.GetTensor<INPUT_T>();
-        // 一个DataCopy搬整个P矩阵(256×128)到L1: subLoop0/1分别写L1偏移256*128*subLoop;
-        // 源为2-way打包(行距2080B), srcStride=65(2080B)与VF blockStride对齐
-        int64_t subLoopOffset = s2BaseSizeCur * mBaseSize * subLoop;
-        constexpr uint16_t stage1RowStride32B = (s2BaseSizeCur >> 2) | 1U; // 65
-        constexpr uint16_t stage1SrcStride32B = stage1RowStride32B;        // 65, 与VF blockStride对齐
-        constexpr uint16_t stage1BlockCount = 1;
-        DataCopy(mm2AL1Tensor[subLoopOffset], stage1CastTensor, {stage1BlockCount, 256 * 128 / 32, 0, 0});
+        // P 在 L1 为「128x256 NZ」: 32 行带内 K 连续(0..255), 每行带 8KB, 4 带共 32KB/subloop;
+        // 源为 VF 的 8 个平面(2-way 打包, 平面间距 4128B = 129*32B): 行带 i 取 (i, i+4) 两平面,
+        // 每次 2 块 x 4096B: srcStride=129*3+1, 第二块源地址 = +16512B(4 个平面)
+        //   c0..c3 = K 0..127 的 4 个行带, c4..c7 = K 128..255 的 4 个行带;
+
+        uint32_t subLoopOffset = s2BaseSizeCur * mBaseSize * subLoop;
+        constexpr uint16_t stage1RowStride32B = (s2BaseSizeCur >> 1) | 1U;
+        constexpr uint16_t stage1SrcStride32B = stage1RowStride32B * 3 + 1;
+        constexpr uint16_t stage1BlockCount = 2;
+        constexpr uint16_t elementSize = 32;
+        constexpr uint32_t actCopyCount = (mBaseSize + elementSize - 1) / elementSize;
+        for (uint32_t i = 0; i < actCopyCount; i++) {
+            uint32_t dstOffset = 32 * s2BaseSizeCur * i + subLoopOffset;
+            uint32_t srcOffset = i * (((s2BaseSizeCur >> 1) + 1) << 5);
+            DataCopy(mm2AL1Tensor[dstOffset], stage1CastTensor[srcOffset],
+                     {stage1BlockCount, (s2BaseSizeCur >> 1), stage1SrcStride32B, 0});
+        }
         this->stage1OutQue_[stage1Offset].template FreeTensor(stage1CastTensor);
 
         if (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
             (runInfo.actSingleLoopS2Size <= s2SplitSize)) {
             outputBuf.SetCrossCore();
         }
+
+        // LSE 由 V2 在末块写: V2 比该任务的 V1 晚 PRELOAD_N 轮, 读同一 slot 时 max/row_sum 已是终值。
     }
 
-    // CastExpToF32: half exp(half) -> float, softmaxExpBuf[loop%(PRELOAD_N+1)] -> expF32Buf
+    // CastExpToF32: softmaxExpBuf[loop%(PRELOAD_N+1)] half -> expF32Buf float
     __aicore__ inline void CastExpToF32(LocalTensor<float>& expF32Ub, RunInfoX& runInfo)
     {
         LocalTensor<half> expUb = this->softmaxExpBuf_[runInfo.loop % (PRELOAD_N + 1)].template Get<half>();
         Cast(expF32Ub, expUb, RoundMode::CAST_NONE, mBaseSize);
     }
 
+    // LSE 写 GM: 末个 S2 块后由 V2 调用(max/row_sum 已终值)
     __aicore__ inline void SoftmaxLseCopyOut(RunInfoX& runInfo, uint32_t vecMSize)
     {
         if (unlikely(vecMSize == 0)) {
             return;
         }
-        // lseTmp布局: [0, mBaseSize) = maxF32(half->float), [mBaseSize, 2*mBaseSize) = lse结果
-        LocalTensor<float> lseTmp = this->lseTmpBuf_.template Get<float>();
-        LocalTensor<float> maxF32Ub = lseTmp[0];
-        LocalTensor<float> lseUb = lseTmp[mBaseSize];
-        LocalTensor<half> maxUb = this->softmaxMaxBuf_[runInfo.mloop % (PRELOAD_N + 1)].template Get<half>();
-        Cast(maxF32Ub, maxUb, RoundMode::CAST_NONE, mBaseSize); // half->float无损
-
-        LocalTensor<T> rowSumAccUb = this->rowSumAccBuf_.template Get<T>();
-        float pScaleRec = 1.0f / pScaleValue_;   // pScale默认1.0, lse = max + ln(rs/pScale)
-        float minValueF = *((float*)&minValue_); // half域LN2对齐后的无效行max(float域)
-        FaVectorApi::ComputeLseTrans<float>(lseUb, rowSumAccUb, maxF32Ub, vecMSize, pScaleRec, minValueF);
-        SetFlag<HardEvent::V_MTE3>(vToMte3Id_[0]); // V写lse -> MTE3读
-        WaitFlag<HardEvent::V_MTE3>(vToMte3Id_[0]);
-
         uint32_t s1Start = runInfo.gS1Idx;
         uint64_t qActSeqLens = qActSeqLensParser_->GetActualSeqLength(runInfo.bIdx);
         uint32_t dealCount = vecMSize;
@@ -317,6 +331,21 @@ public:
         if (dealCount == 0) {
             return;
         }
+        LocalTensor<float> maxF32Ub = this->lseTmpBuf_.template Get<float>();
+        LocalTensor<half> maxUb = this->softmaxMaxBuf_[runInfo.mloop % (PRELOAD_N + 1)].template Get<half>();
+        Cast(maxF32Ub, maxUb, RoundMode::CAST_NONE, mBaseSize); // half->float无损
+        LocalTensor<half> sumH = this->softmaxSumBuf_[runInfo.mloop % (PRELOAD_N + 1)].template Get<half>();
+        LocalTensor<float> sumUb = this->sumF32Buf_.template Get<float>();
+        Cast(sumUb, sumH, RoundMode::CAST_NONE, mBaseSize); // fp16 存量 -> fp32 供 LSE
+        float pScaleRec = 1.0f / pScaleValue_;              // pScale默认1.0, lse = max + ln(rs/pScale)
+        float minValueF = *((float*)&minValue_);            // half域LN2对齐后的无效行max(float域)
+        // LSE 结果走 VECOUT 队列, 由 EnQue/DeQue/FreeTensor 管理同步
+        // V 写 -> MTE3 读 的同步由 VECOUT 队列保证
+        LocalTensor<float> lseUb = this->softmaxLseQueue_.template AllocTensor<float>();
+        FaVectorApi::ComputeLseTrans<float>(lseUb, sumUb, maxF32Ub, vecMSize, pScaleRec, minValueF);
+        this->softmaxLseQueue_.template EnQue(lseUb);
+        this->softmaxLseQueue_.template DeQue<float>();
+
         uint64_t gmOffset =
             ((uint64_t)runInfo.bIdx * constInfo_.realN2Size + runInfo.realN2Idx) * constInfo_.s1Size + s1Start;
         DataCopyExtParams lseCopyParams;
@@ -325,6 +354,7 @@ public:
         lseCopyParams.srcStride = 0;
         lseCopyParams.dstStride = 0;
         DataCopyPad(softmaxLseGm_[gmOffset], lseUb, lseCopyParams);
+        this->softmaxLseQueue_.template FreeTensor(lseUb);
     }
 
     __aicore__ inline void ProcessVec2(mm2ResPos& bmm2ResBuf, RunInfoX runInfo)
@@ -335,24 +365,27 @@ public:
             return;
         }
         uint32_t vecMSize = runInfo.actVecMSize;
-        LocalTensor<float> mmRes = bmm2ResBuf.template GetTensor<float>(); // (d+32)x128 float
+        LocalTensor<float> mmRes = bmm2ResBuf.template GetTensor<float>(); // d x 128 float(仅 O)
         LocalTensor<float> stage2OutUb = this->stage2OutBuf_.template Get<float>();
-        LocalTensor<float> accRowsumUb = this->rowSumAccBuf_.template Get<float>();
+        // row_sum 由 V1 在线累积(mloop 维度, fp16 存储)
+        LocalTensor<half> sumH = this->softmaxSumBuf_[runInfo.mloop % (PRELOAD_N + 1)].template Get<half>();
         LocalTensor<float> expF32Ub = this->expF32Buf_.template Get<float>();
         WaitFlag<HardEvent::MTE3_V>(mte3ToVId_[0]);
         // 跨S2分块累积: 首块纯拷贝起步(无需exp), 后续乘加
         if (unlikely(runInfo.isFirstS2Loop)) {
-            FaVectorApi::VfFlashUpdateAcc<false>(stage2OutUb, accRowsumUb, mmRes, expF32Ub);
+            FaVectorApi::VfFlashUpdateAcc<false>(stage2OutUb, mmRes, expF32Ub);
         } else {
             CastExpToF32(expF32Ub, runInfo);
-            FaVectorApi::VfFlashUpdateAcc<true>(stage2OutUb, accRowsumUb, mmRes, expF32Ub);
+            FaVectorApi::VfFlashUpdateAcc<true>(stage2OutUb, mmRes, expF32Ub);
         }
 
         // 末块: 除cast转置带pad输出(mm2Res别名区) + GM搬出
         if (unlikely(runInfo.isLastS2Loop)) {
             PipeBarrier<PIPE_V>();
             LocalTensor<bfloat16_t> outputT = mmRes.template ReinterpretCast<bfloat16_t>();
-            FaVectorApi::VfDivAndCast(outputT, stage2OutUb, accRowsumUb);
+            LocalTensor<float> sumUb = this->sumF32Buf_.template Get<float>();
+            Cast(sumUb, sumH, RoundMode::CAST_NONE, mBaseSize); // fp16 存量 -> fp32 供除法
+            FaVectorApi::VfDivAndCast(outputT, stage2OutUb, sumUb);
             SetFlag<HardEvent::V_MTE3>(vToMte3Id_[0]);
             WaitFlag<HardEvent::V_MTE3>(vToMte3Id_[0]);
 
@@ -372,12 +405,13 @@ public:
             CopyAttenOutUbToGm<OUTPUT_T, OUT_FORMAT, UbFormat::S1_ONLY> copyAttenOutUbToGm;
             copyAttenOutUbToGm(outGmTensor, ubTensor, gmCoord);
 
-            if (constInfo_.isSoftmaxLseEnable) {
-                SoftmaxLseCopyOut(runInfo, vecMSize);
-            }
+            // LSE 在本任务(晚 PRELOAD_N 轮)写: 届时 max/row_sum 已写完且 slot 未被覆盖(ring=3)。
 
             SetFlag<HardEvent::MTE3_V>(mte3ToVId_[0]);
             WaitFlag<HardEvent::MTE3_V>(mte3ToVId_[0]);
+            if (unlikely(constInfo_.isSoftmaxLseEnable)) {
+                SoftmaxLseCopyOut(runInfo, vecMSize);
+            }
         }
         SetFlag<HardEvent::MTE3_V>(mte3ToVId_[0]);
         bmm2ResBuf.SetCrossCore();
@@ -385,7 +419,7 @@ public:
 
     __aicore__ inline void SoftmaxInitBuffer()
     {
-        // FP16 softmax状态tensor: 每行m=128个half(256B), 无sum相关buffer
+        // FP16 softmax状态tensor: 每行m=128个half(256B); sum状态见InitBuffers
         tPipe_->InitBuffer(softmaxMaxBuf_[0], 256);
         tPipe_->InitBuffer(softmaxMaxBuf_[1], 256);
         tPipe_->InitBuffer(softmaxMaxBuf_[2], 256);
@@ -404,12 +438,20 @@ public:
         // P(FP8 2-way打包)区域33280B + pScale(E8M0 x128)256B对齐
         tPipe_->InitBuffer(stage1OutQue_[0], 1, 2 * 16640 + 256);
         tPipe_->InitBuffer(stage1OutQue_[1], 1, 2 * 16640 + 256);
-        tPipe_->InitBuffer(rowSumAccBuf_, mBaseSize * sizeof(float));
+        // V1 在线 row_sum: 每 mloop 一份 fp16 终值, 另需子环0的快照/原始和
+        tPipe_->InitBuffer(softmaxSumBuf_[0], mBaseSize * sizeof(half));
+        tPipe_->InitBuffer(softmaxSumBuf_[1], mBaseSize * sizeof(half));
+        tPipe_->InitBuffer(softmaxSumBuf_[2], mBaseSize * sizeof(half));
+        tPipe_->InitBuffer(preLoopSumBuf_, mBaseSize * sizeof(half));
+        tPipe_->InitBuffer(firstLoopSumBuf_, mBaseSize * sizeof(half));
+        tPipe_->InitBuffer(sumF32Buf_, mBaseSize * sizeof(float));
         tPipe_->InitBuffer(expF32Buf_, mBaseSize * sizeof(float));
-        tPipe_->InitBuffer(lseTmpBuf_, 2 * mBaseSize * sizeof(float));
+        tPipe_->InitBuffer(lseTmpBuf_, mBaseSize * sizeof(float));
+        // LSE 输出槽: 2*mBaseSize 个 float(结果 + WriteLseInf 的 FLOAT_INF 填充块)
+        tPipe_->InitBuffer(softmaxLseQueue_, 1, 2 * mBaseSize * sizeof(float));
 
-        // DN->NZ Gather索引表: 按VF V2的2-way打包重排, 位置128i+j取值i+2j,
-        // 即输出位置p取源(p>>7)+2*(p&127), 与VF V2的Gather语义一致
+        // DN->NZ 重排索引表(预留参数, 当前未使用): 位置 128i+j 取值 i+2j,
+        // 即输出位置 p 取源 (p>>7)+2*(p&127)
         tPipe_->InitBuffer(vselrIndexesBuf_[static_cast<int>(VselrIndexEnum::DN_INDEX)], 256);
         LocalTensor<uint8_t> vselrIndexesTensor =
             vselrIndexesBuf_[static_cast<int>(VselrIndexEnum::DN_INDEX)].template Get<uint8_t>();

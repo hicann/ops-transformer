@@ -12,7 +12,7 @@
  * \file quant_flash_attn_block_cube_mxfp8_softmax_fp16.h
  * \brief quant_mode=3 (QFA_MXFP8_SOFTMAX_FP16) cube 层:
  *        基本块 128x512, MM1 FIXPIPE 随路 FP32->FP16 并乘 softmaxscale;
- *        MM2 ND2NZ 方案 (V经ND2NZ搬入L1不转置, L1→L0转置为V^T, 尾行全1随路得出 row_sum)
+ *        MM2 ND2NZ 方案 (V经ND2NZ搬入L1不转置, L1→L0转置为V^T), 只输出 O (d×S1)
  */
 #ifndef QUANT_FLASH_ATTN_BLOCK_CUBE_MXFP8_SOFTMAX_FP16_H_
 #define QUANT_FLASH_ATTN_BLOCK_CUBE_MXFP8_SOFTMAX_FP16_H_
@@ -60,12 +60,16 @@ public:
     static constexpr uint32_t MXFP_DIVISOR_SIZE = 64U;
     static constexpr uint32_t MXFP_MULTI_BASE_SIZE = 2U;
     /* ============MM2 (FP16 softmax) DN方案参数============= */
-    // 基本块128x512拆4次进mm2, 每次算(d+32)x128
-    static constexpr uint32_t mm2BaseK = 128U;
-    // V在L1未转置: s2行×(d+32)列含全1带, L1→L0时转置为(d+32)×K
-    static constexpr uint32_t mm2VtMSize = dVBaseSize + 32U;
-    static constexpr uint32_t mm2VtSegDataSize = mm2VtMSize * mm2BaseK;
-    static constexpr uint32_t mm2VtSegScaleSize = dVBaseSize * mm2BaseK;
+    // S2 基本块 512 按 K 分成两段(每段 K=256)进 MM2: A=V^T(d×256), B=P(256×S1), 输出 d×S1(128×128)
+    static constexpr uint32_t mm2BaseK = 256U;
+    // V 在 L1 未转置: s2 行 x d 列, L1->L0 时转置为 d x K
+    static constexpr uint32_t mm2VtMSize = dVBaseSize;
+    // 每块缓冲放一个 K=256 段: v(128×256) + vscale(128×8) = mm2VtSegSize(33792B); 3 块缓冲按 k 段轮转
+    // MM2_VT_SEGS: 一个 512 块的段数(=2)
+    static constexpr uint32_t MM2_VT_SEGS = (uint32_t)s2BaseSize / mm2BaseK;
+    static constexpr uint32_t mm2VtSegDataSize = mm2VtMSize * mm2BaseK;               // 128×256 = 32768
+    static constexpr uint32_t mm2VtSegScaleSize = mm2VtSegDataSize / MXFP_GROUP_SIZE; // 128×8   = 1024
+    static constexpr uint32_t mm2VtSegSize = mm2VtSegDataSize + mm2VtSegScaleSize;    // 33792
     static constexpr LayOutTypeEnum LAYOUT = layout;
     // 仅DN方案(prefill): Q按S1_ONLY布局, realG=1, gIdx恒为0
     static constexpr InnerMLayout Q_M_LAYOUT = InnerMLayout::S1_ONLY_LAYOUT;
@@ -86,9 +90,9 @@ public:
     using MM2_PBUF_T = Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>;
     using MM2_DBUF_T = Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>;
 
-    // K与V^T的L1 tile大小不同(V^T含全1带), 由原KV共享4buff改为各自独立2buff池
-    using L1KType = BuffersPolicyDB<BufferType::L1>;
-    using L1VtType = BuffersPolicyDB<BufferType::L1>;
+    // K与V^T的L1 tile大小不同, 各自独立 3buff 池
+    using L1KType = BuffersPolicy3buff<BufferType::L1>;
+    using L1VtType = BuffersPolicy3buff<BufferType::L1>;
     using L0AType = typename L0ABuffSel::Type;
     using L0BType = typename L0BBuffSel<s2BaseSize, dBaseSize>::Type;
     using L0CType = typename L0CBuffSel<mBaseSize, s2BaseSize, dVBaseSize>::Type;
@@ -140,9 +144,6 @@ public:
     L0BType mmL0BBuffers_;
     L0CType mmL0CBuffers_;
 
-    __gm__ uint8_t* keyPtr_ = nullptr;
-    __gm__ uint8_t* valuePtr_ = nullptr;
-
     const ConstInfoX& constInfo_;
 
     __aicore__ inline QuantFlashAttnBlockCubeMxfp8SoftmaxFp16(ConstInfoX& constInfo)
@@ -169,14 +170,11 @@ public:
         constexpr uint32_t mm1KSize = dBaseSize * s2BaseSizeCur * sizeof(INPUT_T);
         constexpr uint32_t mm1KScaleSize = s2BaseSizeCur * dBaseSize / MXFP_GROUP_SIZE * sizeof(SCALE_T);
         constexpr uint32_t mm2VtBufSize =
-            (mm2VtSegDataSize + mm2VtSegScaleSize) * sizeof(INPUT_T); // per-bank: 20480+16384=36864B
+            mm2VtSegSize * sizeof(INPUT_T); // 每块 = 单段 v+vscale = 32768+1024 = 33792B (INPUT_T 为 1B)
 
         l1QBuffers_.Init((*l1BufferManagerPtr_), mm1QSize + mm1QScaleSize);
         l1KBuffers_.Init((*l1BufferManagerPtr_), mm1KSize + mm1KScaleSize);
         l1VtBuffers_.Init((*l1BufferManagerPtr_), mm2VtBufSize);
-        // A(V^T)两个bank均在kernel启动时全置1(数据0x38/scale 0x7f), 此后各k段搬运只写真实d通道
-        InitVtL1AllOne();
-        AscendC::PipeBarrier<PIPE_MTE2>();
 
         l0aBufferManager_.Init(tPipe_, 65536);
         l0bBufferManager_.Init(tPipe_, 65536);
@@ -196,8 +194,6 @@ public:
         InitQScaleBuffer(constInfo_.bSize, constInfo_.realN2Size, constInfo_.realGSize, constInfo_.s1Size,
                          dBaseSize / MXFP_GROUP_SIZE, queryScaleGm_, dequantScaleQuery);
 
-        keyPtr_ = key;
-        valuePtr_ = value;
         InitKVBuffer(constInfo_.bSize, constInfo_.s2Size, constInfo_.n2Size, constInfo_.blockSize, constInfo_.dSize,
                      keyGm_, key, constInfo_.keyStrides.bnStride, constInfo_.keyStrides.n2Stride);
         InitKVBuffer(constInfo_.bSize, constInfo_.s2Size, constInfo_.n2Size, constInfo_.blockSize, constInfo_.dSizeV,
@@ -324,6 +320,8 @@ public:
         copyKeyScaleGmToL1_(l1Tensor, keyScaleGm_, gmCoord);
     }
 
+    // MM2 V^T 单段: GM(s2 行 x d) -> L1 未转置 NZ; rowCount 固定 mm2BaseK(256) 作 tile 行数
+    // s2DealSize 为实搬行数(尾部段 < 256), s2Offset 为起始 token 下标
     __aicore__ inline void CopyValueAsATile(LocalTensor<KV_T>& dstTensor, uint32_t s2Offset, uint32_t realK,
                                             RunInfoX& runInfo)
     {
@@ -338,6 +336,8 @@ public:
         copyKvGmToL1_(l1Tensor, valueGm_, gmCoord);
     }
 
+    // MM2 V scale 单段: 64-token 行 x D*2(bf16 视图); rowCount 固定 mm2BaseK/64(4) 作 tile 行数
+    // s2DealSize 为实搬 scale 行数, s2Offset 单位为 64-token 行(即 s2Idx/64)
     __aicore__ inline void CopyValueScaleTile(const LocalTensor<SCALE_T>& dstTensor, uint32_t s2Offset,
                                               uint32_t s2ScaleUnits, RunInfoX& runInfo)
     {
@@ -350,46 +350,6 @@ public:
                           .s2DealSize = s2ScaleUnits,
                           .dDealSize = constInfo_.dSizeV * MXFP_MULTI_BASE_SIZE};
         copyValueScaleGmToL1_(l1Tensor, valueScaleGm_, gmCoord);
-    }
-
-    // A位一次性初始化: 两个bank的整块V^T L1(数据+scale)开机全置1(fp8数据0x38, scale 0x7f, 均为1.0);
-    __aicore__ inline void InitVtL1AllOne()
-    {
-        for (uint32_t bank = 0; bank < 2; ++bank) {
-            Buffer<BufferType::L1>& vtBuf = l1VtBuffers_.Get();
-            // V^T数据区(d+32)×128=160×128=20480B, 全置0x38
-            InitConstValueParams<uint16_t> vtDataInitParams(1, static_cast<uint16_t>(mm2VtSegDataSize / 32), 0, 0x3838);
-            Fill(vtBuf.template GetTensor<KV_T>().template ReinterpretCast<uint16_t>(), vtDataInitParams);
-
-            AscendC::PipeBarrier<PIPE_MTE2>();
-
-            // VScale区 d×128=128×128=16384B, 全置0x7f
-            InitConstValueParams<uint16_t> vtScaleInitParams(1, static_cast<uint16_t>(mm2VtSegScaleSize / 32), 0,
-                                                             0x7f7f);
-            Fill(vtBuf.template GetTensor<SCALE_T>(mm2VtSegDataSize).template ReinterpretCast<uint16_t>(),
-                 vtScaleInitParams);
-        }
-    }
-
-    __aicore__ inline void UpdateKey(uint32_t bIdx)
-    {
-        ListTensorDesc keyListTensorDesc((__gm__ void*)(this->keyPtr_));
-        __gm__ uint8_t* key_ = (__gm__ uint8_t*)keyListTensorDesc.GetDataPtr<__gm__ uint8_t>(bIdx);
-
-        uint64_t s2Size = SeqLenFromTensorList<LAYOUT>(this->keyPtr_, bIdx);
-        keyGm_.gmTensor.SetGlobalBuffer((__gm__ KV_T*)key_);
-        keyGm_.offsetCalculator.Init(0, constInfo_.n2Size, s2Size, constInfo_.dSize);
-        keyGm_.offsetCalculator.Init(*this->kvSeqParserPtr_);
-    }
-
-    __aicore__ inline void UpdateValue(uint32_t bIdx)
-    {
-        ListTensorDesc valueListTensorDesc((__gm__ void*)(this->valuePtr_));
-        __gm__ uint8_t* value_ = (__gm__ uint8_t*)valueListTensorDesc.GetDataPtr<__gm__ uint8_t>(bIdx);
-        uint64_t s2Size = SeqLenFromTensorList<LAYOUT>(valuePtr_, bIdx);
-        valueGm_.gmTensor.SetGlobalBuffer((__gm__ KV_T*)value_);
-        valueGm_.offsetCalculator.Init(0, constInfo_.n2Size, s2Size, constInfo_.dSizeV);
-        valueGm_.offsetCalculator.Init(*this->kvSeqParserPtr_);
     }
 
     /* MM1: K * Q^T, Q驻留L1(首个S2 loop搬入, isLastS2Loop释放), K按subLoop搬入 */
@@ -460,10 +420,10 @@ public:
                                       uint32_t s2RealSize)
     {
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
-        // L0C上的bmm1结果矩阵N方向的size大小, 使能NZ2ND, nSize*sizeof(T) 必须是32B的倍数
+        // L0C 上 bmm1 结果 N 方向 size(NZ2ND), nSize*sizeof(T) 需 32B 对齐
         fixpipeParams.nSize = (runInfo.actMSize + 15) >> 4 << 4;
         fixpipeParams.mSize = (s2RealSize + 15) >> 4 << 4;
-        // L0C上matmul结果相邻连续数据片断间隔（前面一个数据块的头与后面数据块的头的间隔），单位为16 *sizeof(T)
+        // L0C 相邻输出块的间隔, 单位 16*sizeof(T)
         // 源NZ矩阵中相邻Z排布的起始地址偏移
         fixpipeParams.srcStride = ((fixpipeParams.mSize + 15) / 16) * 16;
         fixpipeParams.dstStride = mBaseSize; // mmResUb上两行之间的间隔，单位：element
@@ -472,7 +432,7 @@ public:
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
 
-        // C1 FIXPIPE 随路: FP32 -> FP16 (QF322F16_PRE), 并乘以 softmaxscale (deqScalar)
+        // C1 FIXPIPE 随路: FP32 -> FP16(QF322F16_PRE), 并乘 softmaxscale(deqScalar)
         float softmaxScale = constInfo_.scaleValue;
         fixpipeParams.quantPre = QuantMode_t::QF322F16_PRE;
         fixpipeParams.deqScalar = static_cast<uint64_t>(*reinterpret_cast<int32_t*>(&softmaxScale));
@@ -480,12 +440,12 @@ public:
         Fixpipe<half, T, PFA_CFG_ROW_MAJOR_UB>(dstTensor, l0C, fixpipeParams);
     }
 
-    /* ============ MM2: A=V(s2×(d+32)) 经ND2NZ搬入L1不转置 × B=P(Kx128) ============
-     * V GM→L1为ND2NZ不转置(s2行×(d+32)列含全1带), L1→L0时转置为(d+32)×K(即V^T);
-     * A的m方向尾32行为全1带 -> Mmad(m=d+32)后L0C尾32行自然为row_sum(全等);
-     * V在L1为专用2buff乒乓, 两bank全1带均在kernel启动时初始化一次, k循环数据搬运只写真实d通道;
+    /* ============ MM2: A=V(s2×d) 经ND2NZ搬入L1不转置 × B=P(Kx128) ============
+     * V GM→L1为ND2NZ不转置(s2行×d列), L1→L0时转置为d×K(即V^T);
+     * C2 只输出 O (d×128);
+     * V在L1为专用 3 块缓冲(按 k 段轮转): 每个 K=256 段独占一块, 搬完即 Mmad, 相邻段可重叠;
      * B(P)由vec层写入l1PBuffers_(3buff轮转), isRightTranspose=true走LoadData转置分支;
-     * C输出(d+32)x128 float, fixpipe到UB后由V2除以row_sum并cast bf16。
+     * C输出 d×128 float, fixpipe到UB后交由V2后处理并cast bf16。
      */
     __aicore__ inline void IterateBmm2(MM2_DBUF_T& outputBuf, MM2_PBUF_POLICY_T& inputBuf, RunInfoX& runInfo)
     {
@@ -494,15 +454,26 @@ public:
         mm2P.WaitCrossCore();
 
         // 2. P的scale区域初始化0x7f(E8M0 1.0): vec层仅在subLoop%2==1时写入P0修正,
-        //    其余k段(前半/单subLoop尾块)的scale必须为1.0, 每个P buffer(3buff轮转)每次使用前初始化
+        // 其余 k 段(前半/单 subLoop 尾块)的 scale 必须为 1.0; 每个 P buffer(3buff 轮转)用前初始化
         InitPScaleRegion(mm2P, runInfo);
 
-        // 3. k循环: baseK=128, 每轮 搬V^T段 -> 搬P scale修正(仅subLoop奇数次) -> Mmad累加
+        // 按段搬运 + Mmad: 每个 K=256 段独占一块 L1 缓冲(3buff 轮转), 搬完即算, 相邻段可重叠
         Buffer<BufferType::L0C> mm2ResL0C = mmL0CBuffers_.Get();
         mm2ResL0C.Wait<HardEvent::FIX_M>();
-        IterateBmm2KLoop(mm2P, mm2ResL0C, runInfo);
 
-        // 4. fixpipe搬出: (d+32)x128 float到UB, 供V2做row_sum除法
+        uint32_t kLoops = (runInfo.actSingleLoopS2Size + mm2BaseK - 1) / mm2BaseK;
+        for (uint32_t k = 0; k < kLoops; k++) {
+            uint32_t realK = (k == kLoops - 1U) ? (runInfo.actSingleLoopS2Size - k * mm2BaseK) : mm2BaseK;
+            Buffer<BufferType::L1>& vtBuf = l1VtBuffers_.Get();
+            vtBuf.Wait<HardEvent::MTE1_MTE2>();
+            CopyVtSegToL1(vtBuf, k, realK, runInfo);
+            vtBuf.Set<HardEvent::MTE2_MTE1>();
+            vtBuf.Wait<HardEvent::MTE2_MTE1>();
+            MmadBmm2Seg(vtBuf, mm2P, mm2ResL0C, k);
+            vtBuf.Set<HardEvent::MTE1_MTE2>();
+        }
+
+        // 4. fixpipe搬出: d×128 float到UB, 供V2后处理
         mm2ResL0C.Set<HardEvent::M_FIX>();
         mm2ResL0C.Wait<HardEvent::M_FIX>();
         outputBuf.WaitCrossCore();
@@ -511,8 +482,8 @@ public:
         outputBuf.SetCrossCore();
     }
 
-    // 双subLoop(>s2SplitSize): vec在subLoop1写入前半的P0修正(从scale区起点起), 此处初始化后半;
-    // 单subLoop(<=s2SplitSize): vec不写修正, 此处初始化前半(即本loop实际占用的scale区域)
+    // 双 subLoop(>s2SplitSize): vec 在 subLoop1 写前半的 P0 修正, 此处初始化后半
+    // 单 subLoop(<=s2SplitSize): vec 不写修正, 此处初始化前半(本 loop 实际占用的 scale 区)
     __aicore__ inline void InitPScaleRegion(MM2_PBUF_T& mm2P, RunInfoX& runInfo)
     {
         constexpr uint32_t pScaleOffset = mBaseSize * s2BaseSize; // PScale在L1的偏移量(元素)
@@ -527,72 +498,68 @@ public:
         InitConstValue(mm2PScaleTensor, {1, initBlockNum, 0, 0x7f7f});
     }
 
-    // MM2 k循环: 总K(本loopS2)拆baseK=128段, 每段V^T搬运(Dn2Nz直通)+P scale修正+Mmad累加;
-    // V^T为2buff乒乓: k循环Get()按段轮转bank, CopyVtSegToL1/MmadBmm2Seg内部用GetPre()取同段bank,
-    __aicore__ inline void IterateBmm2KLoop(MM2_PBUF_T& mm2P, Buffer<BufferType::L0C>& mm2ResL0C, RunInfoX& runInfo)
+    // V^T 缓冲: 每块放一个 K=256 段(v+vscale = 33792B), 3 块按 k 段轮转;
+    // 单段搬运走既有接口:
+    //   数据: rowCount=mm2BaseK(256), s2DealSize=256 行, dDealSize=dSizeV
+    //   scale: rowCount=mm2BaseK/64(4), s2DealSize=4, dDealSize=dSizeV*2
+    //   tile 行数恒为 mm2BaseK, 但尾段(realK < mm2BaseK)先清零整段再只搬 realK 行:
+    //   尾段(realK < mm2BaseK)前先把整段 V^T tile 清零、scale 置 E8M0 1.0,
+    //   避免从 GM 读越界数据(序列尾之后可能是脏值/Inf/NaN) -> 0*Inf=NaN 会散点污染 O.
+    __aicore__ inline void ClearVtTileForTail(Buffer<BufferType::L1>& vtBuf)
     {
-        uint32_t kLoops = (runInfo.actSingleLoopS2Size + mm2BaseK - 1) / mm2BaseK;
-        uint32_t realK = mm2BaseK;
-        for (uint32_t k = 0; k < kLoops; k++) {
-            if (k == kLoops - 1) {
-                realK = runInfo.actSingleLoopS2Size - k * mm2BaseK;
-            }
-            Buffer<BufferType::L1>& vtBuf = l1VtBuffers_.Get();
+        LocalTensor<KV_T> vtL1 = vtBuf.template GetTensor<KV_T>();
+        InitConstValueParams<uint16_t> dataParams(1U, static_cast<uint16_t>(mm2VtSegDataSize / 32U), 0U, 0U);
+        InitConstValue(vtL1.template ReinterpretCast<uint16_t>(), dataParams);
+        LocalTensor<SCALE_T> vtScaleL1 = vtBuf.template GetTensor<SCALE_T>(mm2VtSegDataSize);
+        // e8m0 2^0 = 0x7F7F
+        InitConstValueParams<uint16_t> scaleParams(1U, static_cast<uint16_t>(mm2VtSegScaleSize / 32U), 0U, 0x7F7FU);
+        InitConstValue(vtScaleL1.template ReinterpretCast<uint16_t>(), scaleParams);
+        AscendC::PipeBarrier<PIPE_MTE2>();
+    }
 
-            vtBuf.Wait<HardEvent::MTE1_MTE2>();
-
-            CopyVtSegToL1(k * mm2BaseK, realK, runInfo);
-
-            vtBuf.Set<HardEvent::MTE2_MTE1>();
-            vtBuf.Wait<HardEvent::MTE2_MTE1>();
-
-            MmadBmm2Seg(mm2P, mm2ResL0C, k, realK, runInfo);
-
-            vtBuf.Set<HardEvent::MTE1_MTE2>();
+    // 满段搬 mm2BaseK 行; 尾段先清理再只搬 realK 行(scale 搬 ceil(realK/64) 行)
+    __aicore__ inline void CopyVtSegToL1(Buffer<BufferType::L1>& vtBuf, uint32_t k, uint32_t realK, RunInfoX& runInfo)
+    {
+        uint32_t s2SegStart = runInfo.s2Idx + k * mm2BaseK;
+        LocalTensor<KV_T> vtL1 = vtBuf.template GetTensor<KV_T>();
+        LocalTensor<SCALE_T> vtScaleL1 = vtBuf.template GetTensor<SCALE_T>(mm2VtSegDataSize);
+        if (realK < mm2BaseK) {
+            ClearVtTileForTail(vtBuf);
         }
+        CopyValueAsATile(vtL1, s2SegStart, realK, runInfo);
+        CopyValueScaleTile(vtScaleL1, s2SegStart / MXFP_DIVISOR_SIZE,
+                           (realK + MXFP_DIVISOR_SIZE - 1U) / MXFP_DIVISOR_SIZE, runInfo);
     }
 
-    __aicore__ inline void CopyVtSegToL1(uint32_t kStart, uint32_t realK, RunInfoX& runInfo)
+    // 单段Mmad: A=V^T(d×K), B=P(K×128, 从第 k 段的 k*mm2BaseK 列起);
+    // A 在 bank 起点(未转置 s2 x d), L1->L0 转置为 d x K(isLeftTranspose=true); scale 紧随数据
+    __aicore__ inline void MmadBmm2Seg(Buffer<BufferType::L1>& vtBuf, MM2_PBUF_T& mm2P,
+                                       Buffer<BufferType::L0C>& mm2ResL0C, uint32_t k)
     {
-        Buffer<BufferType::L1>& vtBuf = l1VtBuffers_.GetPre();
-        // vtBuf: 每bank数据区=mm2VtSegDataSize=20480B, scale区紧随其后;
-        // V数据固定写在bank数据区起点, kStart仅决定GM源地址
-        LocalTensor<KV_T> vtL1 = vtBuf.template GetTensor<KV_T>();
-        LocalTensor<SCALE_T> vtScaleL1 = vtBuf.template GetTensor<SCALE_T>(mm2VtSegDataSize);
-        CopyValueAsATile(vtL1, runInfo.s2Idx + kStart, realK, runInfo);
-        CopyValueScaleTile(vtScaleL1, (runInfo.s2Idx + kStart) / MXFP_DIVISOR_SIZE, (realK + 63) / MXFP_DIVISOR_SIZE,
-                           runInfo);
-    }
-
-    // 单段Mmad: V在L1未转置(s2×(d+32)), L1→L0需转置为(d+32)×K(isLeftTranspose=true);
-    __aicore__ inline void MmadBmm2Seg(MM2_PBUF_T& mm2P, Buffer<BufferType::L0C>& mm2ResL0C, uint32_t k, uint32_t realK,
-                                       RunInfoX& runInfo)
-    {
-        Buffer<BufferType::L1>& vtBuf = l1VtBuffers_.GetPre();
         LocalTensor<KV_T> vtL1 = vtBuf.template GetTensor<KV_T>();
         LocalTensor<SCALE_T> vtScaleL1 = vtBuf.template GetTensor<SCALE_T>(mm2VtSegDataSize);
 
-        // B位(P)的scale: P的E8M0按行scale(P0修正, vec层已写入L1), 按k段偏移寻址;
-        // 双subLoop时vec在subLoop1写入的P0修正落在k段0的scale区, k=1的Mmad也按段0寻址
+        // B(P)的 scale: K=256 时一段对应一个 V1 子环(k=0 读 P0 修正区, k=1 读 1.0 区)
         constexpr uint32_t pScaleOffset = mBaseSize * s2BaseSize;
         constexpr uint32_t pScaleKSegOffset = mm2BaseK * mBaseSize / MXFP_GROUP_SIZE;
-        uint32_t pScaleK = ((k == 1) ? 0 : k);
+        uint32_t pScaleK = k; // K=256: 一段对应一个 V1 子环(k=0 读 P0 修正区, k=1 读 1.0 区)
         LocalTensor<SCALE_T> pScaleFakeTensor = mm2P.GetTensor<SCALE_T>(pScaleOffset);
 
-        MMParam param = MakeMMParam(mm2VtMSize, mBaseSize, (realK + 127) >> 7 << 7, true, false, k == 0, k == 0);
+        // K 取 mm2BaseK(=256), 与物理 tile(A=256 行 / P=256 宽)一致
+        MMParam param = MakeMMParam(mm2VtMSize, mBaseSize, mm2BaseK, true, false, k == 0, k == 0);
         MatmulFullMX<KV_T, INPUT_T, T, mm2VtMSize, mBaseSize, mm2BaseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
                      SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
             vtL1, mm2P.GetTensor<INPUT_T>()[k * mm2BaseK * mBaseSize], mmL0ABuffers_, mmL0BBuffers_,
             mm2ResL0C.GetTensor<T>(), param, vtScaleL1, pScaleFakeTensor[pScaleK * pScaleKSegOffset]);
     }
 
-    // MM2 DN方案fixpipe: L0C (d+32)x128 float -> UB, 搬出前129行(V2取前128行O + 第128行row_sum)
+    // MM2 DN fixpipe: L0C d x 128 float -> UB(仅 O)
     __aicore__ inline void FixpipeMm2(const LocalTensor<T>& dstTensor, const LocalTensor<T>& l0C, RunInfoX& runInfo)
     {
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
-        fixpipeParams.mSize = 129; // d真实行 + 1行row_sum(全1带首行, 其余31行冗余不搬)
+        fixpipeParams.mSize = static_cast<uint16_t>(mm2VtMSize); // 128: 仅 O 的 d 行
         fixpipeParams.nSize = mBaseSize;
-        fixpipeParams.srcStride = ((mm2VtMSize + 15) / 16 * 16); // 160, 匹配MMAD L0C stride
+        fixpipeParams.srcStride = ((mm2VtMSize + 15) / 16 * 16); // 128, 匹配MMAD L0C stride
         fixpipeParams.dstStride = mBaseSize;
         fixpipeParams.dualDstCtl = 0;
         fixpipeParams.params.ndNum = 1;

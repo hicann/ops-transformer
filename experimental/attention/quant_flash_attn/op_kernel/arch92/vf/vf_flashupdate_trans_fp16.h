@@ -25,28 +25,21 @@ using namespace AscendC;
 using namespace AscendC::Reg;
 
 template <bool isUpdate>
-__simd_vf__ inline void VfFlashUpdateAccVF(__ubuf__ float* dstOut, __ubuf__ float* dstSum, __ubuf__ float* cur,
-                                           __ubuf__ float* rowsum, __ubuf__ float* factor)
+__simd_vf__ inline void VfFlashUpdateAccVF(__ubuf__ float* dstOut, __ubuf__ float* cur, __ubuf__ float* factor)
 {
     RegTensor<float> vreg_factor_a;
     RegTensor<float> vreg_factor_b;
-    RegTensor<float> vreg_sum_acc;
-    RegTensor<float> vreg_sum_new;
     RegTensor<float> vreg_out_0, vreg_out_1, vreg_out_2, vreg_out_3;
     RegTensor<float> vreg_cur_0, vreg_cur_1, vreg_cur_2, vreg_cur_3;
     MaskReg preg_f32 = CreateMask<float, MaskPattern::ALL>();
 
     // 首块：纯 Load→Store 拷贝起步（消费者统一 V 管道）
     if constexpr (!isUpdate) {
-        LoadAlign(vreg_sum_new, rowsum);
-        StoreAlign(dstSum, vreg_sum_new, preg_f32);
-        LoadAlign(vreg_sum_new, rowsum + 64);
-        StoreAlign(dstSum + 64, vreg_sum_new, preg_f32);
-        for (uint32_t row = 0; row < 128; row += 4) {
-            uint32_t base0 = row * 128;
-            uint32_t base1 = (row + 1) * 128;
-            uint32_t base2 = (row + 2) * 128;
-            uint32_t base3 = (row + 3) * 128;
+        for (uint16_t row = 0; row < 128; row += 4) {
+            uint16_t base0 = row * 128;
+            uint16_t base1 = (row + 1) * 128;
+            uint16_t base2 = (row + 2) * 128;
+            uint16_t base3 = (row + 3) * 128;
             LoadAlign(vreg_out_0, cur + base0);
             LoadAlign(vreg_out_1, cur + base1);
             LoadAlign(vreg_out_2, cur + base2);
@@ -71,25 +64,13 @@ __simd_vf__ inline void VfFlashUpdateAccVF(__ubuf__ float* dstOut, __ubuf__ floa
     LoadAlign(vreg_factor_a, factor);
     LoadAlign(vreg_factor_b, factor + 64);
 
-    // dstSum = dstSum × factor + rowsum
-    LoadAlign(vreg_sum_acc, dstSum);
-    Mul(vreg_sum_acc, vreg_sum_acc, vreg_factor_a, preg_f32);
-    LoadAlign(vreg_sum_new, rowsum);
-    Add(vreg_sum_acc, vreg_sum_acc, vreg_sum_new, preg_f32);
-    StoreAlign(dstSum, vreg_sum_acc, preg_f32);
-
-    LoadAlign(vreg_sum_acc, dstSum + 64);
-    Mul(vreg_sum_acc, vreg_sum_acc, vreg_factor_b, preg_f32);
-    LoadAlign(vreg_sum_new, rowsum + 64);
-    Add(vreg_sum_acc, vreg_sum_acc, vreg_sum_new, preg_f32);
-    StoreAlign(dstSum + 64, vreg_sum_acc, preg_f32);
-
+    // V2 只做 O 的乘加累积（row_sum 在末块除 cast 时使用）
     // dstOut = dstOut × factor + cur，128行×2列半，4路行展开
-    for (uint32_t row = 0; row < 128; row += 4) {
-        uint32_t base0 = row * 128;
-        uint32_t base1 = (row + 1) * 128;
-        uint32_t base2 = (row + 2) * 128;
-        uint32_t base3 = (row + 3) * 128;
+    for (uint16_t row = 0; row < 128; row += 4) {
+        uint16_t base0 = row * 128;
+        uint16_t base1 = (row + 1) * 128;
+        uint16_t base2 = (row + 2) * 128;
+        uint16_t base3 = (row + 3) * 128;
 
         LoadAlign(vreg_out_0, dstOut + base0);
         LoadAlign(vreg_out_1, dstOut + base1);
@@ -136,16 +117,13 @@ __simd_vf__ inline void VfFlashUpdateAccVF(__ubuf__ float* dstOut, __ubuf__ floa
 }
 
 template <bool isUpdate>
-__aicore__ inline void VfFlashUpdateAcc(const LocalTensor<float>& stage2Out, const LocalTensor<float>& accRowsum,
-                                        const LocalTensor<float>& mm2Res, const LocalTensor<float>& expF32)
+__aicore__ inline void VfFlashUpdateAcc(const LocalTensor<float>& stage2Out, const LocalTensor<float>& mm2Res,
+                                        const LocalTensor<float>& expF32)
 {
-    constexpr uint32_t rowsumOff = 128 * 128;
     __ubuf__ float* dstOutPtr = reinterpret_cast<__ubuf__ float*>(stage2Out.GetPhyAddr());
-    __ubuf__ float* dstSumPtr = reinterpret_cast<__ubuf__ float*>(accRowsum.GetPhyAddr());
     __ubuf__ float* curPtr = reinterpret_cast<__ubuf__ float*>(mm2Res.GetPhyAddr());
-    __ubuf__ float* rowsumPtr = curPtr + rowsumOff;
     __ubuf__ float* factorPtr = reinterpret_cast<__ubuf__ float*>(expF32.GetPhyAddr());
-    VfFlashUpdateAccVF<isUpdate>(dstOutPtr, dstSumPtr, curPtr, rowsumPtr, factorPtr);
+    VfFlashUpdateAccVF<isUpdate>(dstOutPtr, curPtr, factorPtr);
 }
 
 /* **************************************************************************************************
@@ -169,13 +147,13 @@ __simd_vf__ inline void VfDivAndCastVF(__ubuf__ bfloat16_t* dstT, __ubuf__ float
     Duplicate(vreg_ones, 1.0f);
 
     // 按列分成前后两半（每半 64 列）
-    for (uint32_t colHalf = 0; colHalf < 2; colHalf++) {
+    for (uint16_t colHalf = 0; colHalf < 2; colHalf++) {
         LoadAlign(vreg_recip, rowsum + colHalf * 64);
         Div(vreg_recip, vreg_ones, vreg_recip, preg_f32);
 
         // 按行分成 8 块（每块 16 行，覆盖 128 个头维度行）
-        for (uint32_t block = 0; block < 8; block++) {
-            uint32_t blockBase = block * 16 * 128 + colHalf * 64;
+        for (uint16_t block = 0; block < 8; block++) {
+            uint16_t blockBase = block * 16 * 128 + colHalf * 64;
             LoadAlign(vreg_src_1, src + blockBase + 0 * 128);
             LoadAlign(vreg_src_2, src + blockBase + 1 * 128);
             LoadAlign(vreg_src_3, src + blockBase + 2 * 128);
