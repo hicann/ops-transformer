@@ -176,7 +176,7 @@ TEST_F(LightningIndexerV2Tiling, LightningIndexerV2_910b_tiling_3)
     // 尾部两个值: candidateTopkBlocks(-1) 与 returnValue(0) 打包为 -4294967296, candidateBlockSize(8)
     // （candidate_topk_blocks 缺省 off，TilingData 布局见 tiling.h 尾部 candidate 字段）
     std::string expectTilingData = "2 167503724608 8796093022272 274877906944 0 3 "
-                                   "9223372036854775807 9223372036854775807 1 0 -4294967296 8 ";
+                                   "9223372036854775807 9223372036854775807 1 0 -4294967296 8 0 ";
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData);
 }
 
@@ -219,7 +219,7 @@ TEST_F(LightningIndexerV2Tiling, LightningIndexerV2_910b_tiling_4)
     // 尾部两个值: candidateTopkBlocks(-1) 与 returnValue(0) 打包为 -4294967296, candidateBlockSize(8)
     // （candidate_topk_blocks 缺省 off，TilingData 布局见 tiling.h 尾部 candidate 字段）
     std::string expectTilingData = "2 167503724608 8796093022224 274877906944 4294967312 3 "
-                                   "9223372036854775807 9223372036854775807 1 0 -4294967296 8 ";
+                                   "9223372036854775807 9223372036854775807 1 0 -4294967296 8 0 ";
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData);
 }
 
@@ -1381,7 +1381,7 @@ TEST_F(LightningIndexerV2Tiling, LightningIndexerV2_910b_tiling_tnd_candidate_s1
         TilingInfo info;
         ASSERT_TRUE(ExecuteTiling(buildTndCase(64), info));
         const int64_t* data = reinterpret_cast<const int64_t*>(info.tilingData.get());
-        ASSERT_EQ(info.tilingDataSize / sizeof(int64_t), 12U);
+        ASSERT_EQ(info.tilingDataSize / sizeof(int64_t), 13U);
         EXPECT_EQ(static_cast<uint32_t>(data[1] >> 32), 78U); // s1Size = q.dim0
         EXPECT_EQ(data[10], static_cast<int64_t>(64) << 32);  // returnValue=0 | candTopk=64
         EXPECT_EQ(data[11], 8);                               // candidateBlockSize 缺省 8
@@ -1391,7 +1391,7 @@ TEST_F(LightningIndexerV2Tiling, LightningIndexerV2_910b_tiling_tnd_candidate_s1
         TilingInfo info;
         ASSERT_TRUE(ExecuteTiling(buildTndCase(-1), info));
         const int64_t* data = reinterpret_cast<const int64_t*>(info.tilingData.get());
-        ASSERT_EQ(info.tilingDataSize / sizeof(int64_t), 12U);
+        ASSERT_EQ(info.tilingDataSize / sizeof(int64_t), 13U);
         EXPECT_EQ(static_cast<uint32_t>(data[1] >> 32), 0U);        // s1Size 保持 0
         EXPECT_EQ(data[10], static_cast<int64_t>(-1) * 4294967296); // returnValue=0 | candTopk=-1
         EXPECT_EQ(data[11], 8);                                     // candidateBlockSize 缺省 8

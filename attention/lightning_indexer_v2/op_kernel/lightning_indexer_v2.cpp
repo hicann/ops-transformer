@@ -21,6 +21,29 @@
 #else
 #include "arch22/lightning_indexer_v2_kernel_arch22.h"
 #endif
+
+// Legacy core-version gate: 310. NPU architecture 9201 identifies Ascend960.
+// Keep the 950-only fast implementation out of the 960 compilation branch.
+#if (__CCE_AICORE__ == 310) && (!defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201))
+#include "arch35/lightning_indexer_v2_fast_kernel_arch35.h"
+#define INVOKE_LI_V2_FAST(...) \
+    do { \
+        GlobalTensor<uint32_t> fastMetadata; \
+        if (tiling_data->fastPathCandidate != 0U && metadata != nullptr) { \
+            fastMetadata.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(metadata)); \
+        } \
+        if (tiling_data->fastPathCandidate != 0U && metadata != nullptr && \
+            fastMetadata.GetValue(optiling::LI_V2_FAST_ENABLE_INDEX) != 0U) { \
+            RunLightningIndexerV2FastPath<LIV2Type<__VA_ARGS__>>(q, k, w, sparseIndices, sparseValues, user, \
+                                                                 tiling_data, &tPipe, cuSeqlensQ, cuSeqlensK, \
+                                                                 blocktable, sequsedK, metadata); \
+            return; \
+        } \
+    } while (0)
+#else
+#define INVOKE_LI_V2_FAST(...)
+#endif
+
 using namespace LIV2Kernel;
 
 #define INVOKE_LI_NO_KFC_OP_IMPL(templateClass, ...) \
@@ -28,6 +51,7 @@ using namespace LIV2Kernel;
         templateClass<LIV2Type<__VA_ARGS__>> op; \
         GET_TILING_DATA_WITH_STRUCT(LIV2TilingData, tiling_data_in, tiling); \
         const LIV2TilingData* __restrict tiling_data = &tiling_data_in; \
+        INVOKE_LI_V2_FAST(__VA_ARGS__); \
         op.Init(q, k, w, cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, blocktable, outputIdxOffset, \
                 metadata, sparseIndices, sparseValues, user, tiling_data, &tPipe); \
         op.Process(); \

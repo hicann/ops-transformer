@@ -233,6 +233,16 @@ private:
     bool ParamsInit();
     bool BalanceSchedule(SplitResult& splitRes);
     bool GenMetadata(SplitResult& splitRes);
+    struct FastSequenceInputs {
+        const int32_t* cuQ{nullptr};
+        const int32_t* cuK{nullptr};
+        bool queryTnd{false};
+        bool keyTnd{false};
+    };
+    bool IsFastMetadataCandidate();
+    bool InitFastSequenceInputs(FastSequenceInputs& inputs) const;
+    bool GetFastSequenceWork(uint32_t batch, const FastSequenceInputs& inputs, uint32_t& q, uint32_t& k);
+    void GenFastMetadata();
 
     // util
     uint32_t GetS1SeqSize(uint32_t bIdx);

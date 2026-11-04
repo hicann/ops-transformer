@@ -11,6 +11,7 @@
 #include "lightning_indexer_v2_metadata_aicpu.h"
 #include <cstdio>
 #include <cmath>
+#include <algorithm>
 #include "status.h"
 
 using namespace optiling;
@@ -24,6 +25,9 @@ uint32_t LightningIndexerV2MetadataCpuKernel::Compute(CpuKernelContext& ctx)
     }
     SplitResult splitRes{aicCoreNum_, aivCoreNum_};
     success = BalanceSchedule(splitRes) && GenMetadata(splitRes);
+    if (success) {
+        GenFastMetadata();
+    }
     return success ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;
 }
 
@@ -934,6 +938,293 @@ bool LightningIndexerV2MetadataCpuKernel::GenMetadata(SplitResult& splitRes)
         metadataPtr->ldV2Metadata[i][LD_V2_M_NUM_INDEX] = splitRes.fdRes.fdMNum[i];
     }
     return true;
+}
+
+struct LiV2FastConfig {
+    static constexpr uint32_t CORE_COUNT = 32U;
+    static constexpr uint32_t MAX_HEADS = 32U;
+    static constexpr int32_t HEAD_DIM = 128;
+    static constexpr int32_t TOPK_STATE_SIZE = 2048;
+    static constexpr uint32_t QUERY_TILE = 8U;
+    static constexpr uint32_t MAX_QUERY_LENGTH = 16384U;
+    static constexpr int32_t CAUSAL_MASK_MODE = 3;
+    // Work is counted in Q8*K256 blocks; each scan executes a full K512 pair.
+    static constexpr uint32_t KEY_WORK_TILE = 256U;
+    static constexpr uint32_t KEY_SCAN_TILE = 512U;
+    static constexpr uint32_t WORK_BLOCKS_PER_SCAN = KEY_SCAN_TILE / KEY_WORK_TILE;
+    static constexpr uint64_t MIN_QUERY_TOKENS = 1024U;
+    static constexpr uint64_t MIN_KEY_LENGTH = 32768U;
+    static constexpr uint64_t SHORT_KEY_LIMIT = 65536U;
+    static constexpr uint64_t LONG_KEY_LIMIT = 262144U;
+    // Smaller TopK retains a higher K floor, with a separate floor for G<=16.
+    static constexpr uint32_t SMALL_HEAD_LIMIT = 16U;
+    static constexpr uint64_t SMALL_TOPK_KEY_FLOOR = 131072U;
+    // Utilization floors: 95% below 64K, 90% below 256K, otherwise 85%.
+    static constexpr uint64_t SHORT_KEY_UTILIZATION = 95U;
+    static constexpr uint64_t MEDIUM_KEY_UTILIZATION = 90U;
+    static constexpr uint64_t LONG_KEY_UTILIZATION = 85U;
+    static constexpr uint64_t PERCENT_BASE = 100U;
+};
+
+struct LiV2FastSequenceWork {
+    uint32_t queryLength;
+    uint32_t keyLength;
+};
+
+struct LiV2FastPartition {
+    static constexpr uint32_t MAX_CORES = LiV2FastConfig::CORE_COUNT;
+    std::array<uint32_t, MAX_CORES> tileStart{};
+    std::array<uint32_t, MAX_CORES> tileEnd{};
+    std::array<uint64_t, MAX_CORES> coreWork{};
+    uint32_t totalTiles{0U};
+    uint64_t totalWork{0U};
+};
+
+// Count executed Q8*K256 blocks. The cube/vector pipeline consumes a K512
+// pair at a time, including the final partially masked pair in sparse mode 3.
+inline uint32_t LiV2FastTileWork(const LiV2FastSequenceWork& sequence, uint32_t queryTile, uint32_t sparseMode)
+{
+    uint64_t keys = sequence.keyLength;
+    if (sparseMode == static_cast<uint32_t>(LiV2FastConfig::CAUSAL_MASK_MODE)) {
+        const uint64_t queryEnd =
+            (static_cast<uint64_t>(queryTile) + 1U) * LiV2FastConfig::QUERY_TILE < sequence.queryLength ?
+                (static_cast<uint64_t>(queryTile) + 1U) * LiV2FastConfig::QUERY_TILE :
+                sequence.queryLength;
+        const uint64_t maskedKeys = sequence.queryLength - queryEnd;
+        keys = keys > maskedKeys ? keys - maskedKeys : 0U;
+    }
+    return static_cast<uint32_t>(((keys + (LiV2FastConfig::KEY_SCAN_TILE - 1U)) / LiV2FastConfig::KEY_SCAN_TILE) *
+                                 LiV2FastConfig::WORK_BLOCKS_PER_SCAN);
+}
+
+// Count all Q tiles and their executed work before assigning core ranges.
+inline bool LiV2CountFastWork(const std::vector<LiV2FastSequenceWork>& sequences, uint32_t sparseMode, uint32_t cores,
+                              LiV2FastPartition& plan)
+{
+    uint64_t tiles = 0U;
+    for (const auto& sequence : sequences) {
+        if (sequence.queryLength == 0U || sequence.keyLength == 0U) {
+            return false;
+        }
+        const uint32_t count = (static_cast<uint64_t>(sequence.queryLength) + LiV2FastConfig::QUERY_TILE - 1U) /
+                               LiV2FastConfig::QUERY_TILE;
+        tiles += count;
+        if (tiles > UINT32_MAX) {
+            return false;
+        }
+        for (uint32_t tile = 0U; tile < count; ++tile) {
+            plan.totalWork += LiV2FastTileWork(sequence, tile, sparseMode);
+        }
+    }
+    if (tiles < cores) {
+        return false;
+    }
+    plan.totalTiles = static_cast<uint32_t>(tiles);
+    return true;
+}
+
+// Traverse complete Q tiles in batch order. Close a core's contiguous range
+// at the closer side of ceil(remainingWork / remainingCores), reserving at
+// least one tile per remaining core. Never split a Q tile along K.
+inline bool LiV2BuildFastPartition(const std::vector<LiV2FastSequenceWork>& sequences, uint32_t sparseMode,
+                                   uint32_t cores, LiV2FastPartition& plan)
+{
+    plan = {};
+    if (cores == 0U || cores > LiV2FastPartition::MAX_CORES) {
+        return false;
+    }
+    if (!LiV2CountFastWork(sequences, sparseMode, cores, plan)) {
+        return false;
+    }
+    uint64_t remainingWork = plan.totalWork;
+    uint64_t target = (remainingWork + cores - 1U) / cores;
+    uint32_t core = 0U;
+    uint32_t cursor = 0U;
+    for (const auto& sequence : sequences) {
+        const uint32_t count = (static_cast<uint64_t>(sequence.queryLength) + LiV2FastConfig::QUERY_TILE - 1U) /
+                               LiV2FastConfig::QUERY_TILE;
+        for (uint32_t tile = 0U; tile < count; ++tile) {
+            const uint64_t work = LiV2FastTileWork(sequence, tile, sparseMode);
+            const uint64_t currentWork = plan.coreWork[core];
+            // Compare stopping here with adding the pending whole Q tile.
+            // On a tie, stop here to avoid an unnecessary heavy core.
+            if (core + 1U < cores && cursor > plan.tileStart[core] && currentWork < target &&
+                work >= target - currentWork && target - currentWork <= work - (target - currentWork)) {
+                plan.tileEnd[core] = cursor;
+                remainingWork -= currentWork;
+                ++core;
+                plan.tileStart[core] = cursor;
+                const uint32_t activeCores = cores - core;
+                target = (remainingWork + activeCores - 1U) / activeCores;
+            }
+            plan.coreWork[core] += work;
+            ++cursor;
+            const uint32_t remainingTiles = plan.totalTiles - cursor;
+            const uint32_t remainingCores = cores - core - 1U;
+            if (remainingCores != 0U && remainingTiles >= remainingCores &&
+                (plan.coreWork[core] >= target || remainingTiles == remainingCores)) {
+                plan.tileEnd[core] = cursor;
+                remainingWork -= plan.coreWork[core];
+                ++core;
+                plan.tileStart[core] = cursor;
+                target = (remainingWork + remainingCores - 1U) / remainingCores;
+            }
+        }
+    }
+    plan.tileEnd[core] = cursor;
+    return true;
+}
+
+struct LiV2FastPerformanceShape {
+    uint64_t queryTokens{0U};
+    uint64_t usefulQueryKeyPairs{0U};
+    uint64_t minKeyLength{UINT64_MAX};
+    uint32_t topk{0U};
+    uint32_t coreCount{0U};
+    uint32_t heads{0U};
+};
+
+// Reject unsupported performance shapes before traversing and partitioning Q tiles.
+inline bool LiV2FastPerformanceShapeSupported(const LiV2FastPerformanceShape& shape)
+{
+    if (shape.coreCount != LiV2FastConfig::CORE_COUNT || shape.queryTokens < LiV2FastConfig::MIN_QUERY_TOKENS ||
+        shape.minKeyLength < LiV2FastConfig::MIN_KEY_LENGTH) {
+        return false;
+    }
+
+    // TopK=2048 shares one K floor across G1-32. Preserve smaller-TopK admission.
+    if (shape.topk != static_cast<uint32_t>(LiV2FastConfig::TOPK_STATE_SIZE)) {
+        const uint64_t topkKeyFloor = shape.heads <= LiV2FastConfig::SMALL_HEAD_LIMIT ?
+                                          LiV2FastConfig::LONG_KEY_LIMIT :
+                                          LiV2FastConfig::SMALL_TOPK_KEY_FLOOR;
+        if (shape.minKeyLength < topkKeyFloor) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Compare useful Q-K pairs with the capacity occupied until the heaviest core
+// finishes. This accounts for Q/K padding, causal masking and core imbalance.
+inline bool LiV2FastPerformanceSupported(const LiV2FastPerformanceShape& shape, const LiV2FastPartition& plan)
+{
+    if (plan.totalWork == 0U) {
+        return false;
+    }
+
+    const uint64_t maxWork = *std::max_element(plan.coreWork.begin(), plan.coreWork.end());
+    const uint64_t scheduledWork = maxWork * shape.coreCount;
+    const uint64_t usefulWork =
+        shape.usefulQueryKeyPairs / (LiV2FastConfig::QUERY_TILE * LiV2FastConfig::KEY_WORK_TILE);
+    const uint64_t minUtilization =
+        shape.minKeyLength < LiV2FastConfig::SHORT_KEY_LIMIT ?
+            LiV2FastConfig::SHORT_KEY_UTILIZATION :
+            (shape.minKeyLength < LiV2FastConfig::LONG_KEY_LIMIT ? LiV2FastConfig::MEDIUM_KEY_UTILIZATION :
+                                                                   LiV2FastConfig::LONG_KEY_UTILIZATION);
+    // Round the required capacity up without multiplying the full workload by
+    // a percentage. Long K still needs enough utilization to amortize padding.
+    const uint64_t requiredWork =
+        scheduledWork / LiV2FastConfig::PERCENT_BASE * minUtilization +
+        (scheduledWork % LiV2FastConfig::PERCENT_BASE * minUtilization + (LiV2FastConfig::PERCENT_BASE - 1U)) /
+            LiV2FastConfig::PERCENT_BASE;
+    // Require the useful-to-scheduled work ratio to meet the threshold using integer arithmetic.
+    return usefulWork >= requiredWork;
+}
+
+bool LightningIndexerV2MetadataCpuKernel::IsFastMetadataCandidate()
+{
+    return ProcessSocVersion() == ValidSocVersion::ASCEND950 && aicCoreNum_ == LiV2FastConfig::CORE_COUNT &&
+           numHeadsK_ == 1 && groupSize_ >= 1U && groupSize_ <= LiV2FastConfig::MAX_HEADS &&
+           headDim_ == LiV2FastConfig::HEAD_DIM && topk_ >= 1 && topk_ <= LiV2FastConfig::TOPK_STATE_SIZE &&
+           (maskMode_ == 0 || maskMode_ == LiV2FastConfig::CAUSAL_MASK_MODE) && cmpRatio_ == 1 &&
+           (cmpResidualK_ == nullptr || cmpResidualK_->GetData() == nullptr);
+}
+
+bool LightningIndexerV2MetadataCpuKernel::InitFastSequenceInputs(FastSequenceInputs& inputs) const
+{
+    inputs.queryTnd = layoutQ_ == "TND";
+    inputs.keyTnd = layoutK_ == "TND";
+    const bool pageAttention = layoutK_ == "PA_BBND";
+    inputs.cuQ = cuSeqlensQ_ != nullptr ? static_cast<const int32_t*>(cuSeqlensQ_->GetData()) : nullptr;
+    inputs.cuK = cuSeqlensK_ != nullptr ? static_cast<const int32_t*>(cuSeqlensK_->GetData()) : nullptr;
+    const auto* usedK = sequsedK_ != nullptr ? static_cast<const int32_t*>(sequsedK_->GetData()) : nullptr;
+    return (!inputs.queryTnd || inputs.cuQ != nullptr) && (!inputs.keyTnd || inputs.cuK != nullptr) &&
+           (!pageAttention || usedK != nullptr) && (pageAttention || layoutQ_ == layoutK_);
+}
+
+bool LightningIndexerV2MetadataCpuKernel::GetFastSequenceWork(uint32_t batch, const FastSequenceInputs& inputs,
+                                                              uint32_t& q, uint32_t& k)
+{
+    const int64_t storedQ =
+        inputs.queryTnd ? static_cast<int64_t>(inputs.cuQ[batch + 1]) - inputs.cuQ[batch] : maxSeqlenQ_;
+    const int64_t storedK =
+        inputs.keyTnd ? static_cast<int64_t>(inputs.cuK[batch + 1]) - inputs.cuK[batch] : maxSeqlenK_;
+    q = GetS1SeqSize(batch);
+    k = GetS2SeqSize(batch);
+    if (q != storedQ || q < 1U || q > LiV2FastConfig::MAX_QUERY_LENGTH || k > storedK) {
+        return false;
+    }
+    // Each causal row needs the complete initial TopK state.
+    return maskMode_ != LiV2FastConfig::CAUSAL_MASK_MODE ||
+           static_cast<uint64_t>(k) + 1U >= static_cast<uint64_t>(q) + LiV2FastConfig::TOPK_STATE_SIZE;
+}
+
+inline void LiV2PublishFastPartition(optiling::detail::LiV2Metadata& metadata, const LiV2FastPartition& plan,
+                                     uint32_t cores)
+{
+    auto& fast = metadata.fastMetadata;
+    fast.coreNum = cores;
+    for (uint32_t core = 0; core < cores; ++core) {
+        fast.tileStart[core] = plan.tileStart[core];
+        fast.tileEnd[core] = plan.tileEnd[core];
+    }
+    fast.enable = 1U;
+}
+
+void LightningIndexerV2MetadataCpuKernel::GenFastMetadata()
+{
+    if (!IsFastMetadataCandidate()) {
+        return;
+    }
+    FastSequenceInputs inputs{};
+    if (!InitFastSequenceInputs(inputs)) {
+        return;
+    }
+    LiV2FastPerformanceShape performance{};
+    performance.topk = topk_;
+    performance.heads = groupSize_;
+    performance.coreCount = aicCoreNum_;
+    std::vector<LiV2FastSequenceWork> sequences;
+    for (int32_t batch = 0; batch < batchSize_; ++batch) {
+        uint32_t q = 0U;
+        uint32_t k = 0U;
+        if (!GetFastSequenceWork(batch, inputs, q, k)) {
+            return;
+        }
+        sequences.push_back({q, k});
+        uint64_t usefulPairs = static_cast<uint64_t>(q) * k;
+        if (maskMode_ == LiV2FastConfig::CAUSAL_MASK_MODE) {
+            // Masked prefixes sum to 0 + ... + (q-1) = q*(q-1)/2.
+            usefulPairs -= static_cast<uint64_t>(q) * (q - 1U) / 2U;
+        }
+        if (usefulPairs > UINT64_MAX - performance.usefulQueryKeyPairs) {
+            return;
+        }
+        performance.usefulQueryKeyPairs += usefulPairs;
+        performance.queryTokens += q;
+        performance.minKeyLength = std::min(performance.minKeyLength, static_cast<uint64_t>(k));
+    }
+    if (!LiV2FastPerformanceShapeSupported(performance)) {
+        return;
+    }
+    LiV2FastPartition plan;
+    const uint32_t cores = aicCoreNum_;
+    if (!LiV2BuildFastPartition(sequences, maskMode_, cores, plan) ||
+        !LiV2FastPerformanceSupported(performance, plan)) {
+        return;
+    }
+    auto* metadata = static_cast<optiling::detail::LiV2Metadata*>(metadata_->GetData());
+    LiV2PublishFastPartition(*metadata, plan, cores);
 }
 
 namespace {

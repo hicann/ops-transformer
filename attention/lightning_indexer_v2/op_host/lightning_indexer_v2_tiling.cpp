@@ -1217,12 +1217,41 @@ static ge::graphStatus TilingPrepareForLightningIndexerV2(gert::TilingParseConte
 }
 
 // --------------------------LightningIndexerV2Tiling类成员函数定义-----------------------
+// Host checks only static capabilities. Sequence admission and partitioning
+// are produced by LightningIndexerV2Metadata on the AICPU.
+static bool LiV2HasInput(gert::TilingContext* context, uint32_t index)
+{
+    const auto* shape = context->GetOptionalInputShape(index);
+    return shape != nullptr && shape->GetStorageShape().GetShapeSize() != 0;
+}
+
+// Check only information unavailable to the metadata operator.
+// AICPU owns the remaining functional and performance admission checks.
+static bool LiV2CanUseFastMetadata(gert::TilingContext* context, const LIV2TilingInfo& info)
+{
+    auto platform = platform_ascendc::PlatformAscendC(info.platformInfo);
+    return platform.GetCurNpuArch() == NpuArch::DAV_3510 && info.candidateTopkBlocks == CANDIDATE_TOPK_BLOCKS_OFF &&
+           LiV2HasInput(context, METADATA_INDEX) && !LiV2HasInput(context, OUTPUT_IDX_OFFSET_INDEX) &&
+           (info.inputQType == ge::DT_BF16 || info.inputQType == ge::DT_FLOAT16) && info.inputKType == info.inputQType;
+}
+
+static uint64_t LiV2FastWorkspaceSize(uint32_t blocks)
+{
+    constexpr uint64_t rowsPerBlock = 8;
+    constexpr uint64_t topk = 2048;
+    constexpr uint64_t candidates = 4096;
+    constexpr uint64_t epochs = 2;
+    constexpr uint64_t keyIndexPairSize = 2;
+    return rowsPerBlock * blocks * keyIndexPairSize * (topk + candidates * epochs) * sizeof(uint32_t);
+}
+
 ge::graphStatus LightningIndexerV2Tiling::DoTiling(LIV2TilingInfo* tilingInfo)
 {
     // -------------set blockdim-----------------
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo->platformInfo);
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
     uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
+    const bool fastCandidate = LiV2CanUseFastMetadata(context_, *tilingInfo);
     uint32_t blockDim = ascendcPlatform.CalcTschBlockDim(aivNum, aicNum, aivNum);
     context_->SetBlockDim(blockDim);
 
@@ -1259,10 +1288,18 @@ ge::graphStatus LightningIndexerV2Tiling::DoTiling(LIV2TilingInfo* tilingInfo)
         workspaceSize += V1_DECODE_DATA_NUM * S1_BASE_SIZE * V1_DECODE_PARAM_NUM * V1_DECODE_PARAM_ELEM_SIZE * aicNum;
     }
 
+    if (fastCandidate) {
+        // The two kernels are mutually exclusive. Reuse the generic scratch;
+        // keep its original layout and reserve enough bytes for either path.
+        workspaceSize =
+            std::max(workspaceSize, ascendcPlatform.GetLibApiWorkSpaceSize() + LiV2FastWorkspaceSize(aicNum));
+    }
+
     size_t* liV2WorkSpaces = context_->GetWorkspaceSizes(1);
     liV2WorkSpaces[0] = workspaceSize;
 
     // -------------set tilingdata-----------------
+    tilingData_.set_fastPathCandidate(fastCandidate ? 1U : 0U);
     tilingData_.set_bSize(tilingInfo->bSize);
     tilingData_.set_s2Size(tilingInfo->s2Size);
     tilingData_.set_s1Size(tilingInfo->s1Size);

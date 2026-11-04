@@ -39,6 +39,17 @@ inline constexpr uint32_t LI_V2_M_END_INDEX = 5;
 inline constexpr uint32_t LI_V2_S2_END_INDEX = 6;
 inline constexpr uint32_t LI_V2_FIRST_LD_V2_DATA_WORKSPACE_IDX_INDEX = 7;
 
+// Fast metadata is produced and consumed by the same package version.
+inline constexpr uint32_t LI_V2_FAST_CORE_MAX_NUM = 32U;
+inline constexpr uint32_t LI_V2_FAST_METADATA_OFFSET =
+    LI_V2_METADATA_SIZE * AIC_CORE_MAX_NUM + LD_V2_METADATA_SIZE * AIV_CORE_MAX_NUM;
+inline constexpr uint32_t LI_V2_FAST_ENABLE_INDEX = LI_V2_FAST_METADATA_OFFSET;
+inline constexpr uint32_t LI_V2_FAST_CORE_NUM_INDEX = LI_V2_FAST_METADATA_OFFSET + 1U;
+// The fast header contains two uint32_t words: enable and coreNum.
+inline constexpr uint32_t LI_V2_FAST_HEADER_WORDS = 2U;
+inline constexpr uint32_t LI_V2_FAST_TILE_START_INDEX = LI_V2_FAST_METADATA_OFFSET + LI_V2_FAST_HEADER_WORDS;
+inline constexpr uint32_t LI_V2_FAST_TILE_END_INDEX = LI_V2_FAST_TILE_START_INDEX + LI_V2_FAST_CORE_MAX_NUM;
+
 // LD Metadata Index Definitions
 inline constexpr uint32_t LD_V2_CORE_ENABLE_INDEX = 0;
 inline constexpr uint32_t LD_V2_BN2_IDX_INDEX = 1;
@@ -67,12 +78,21 @@ __aicore__ inline uint32_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx, b
 #endif
 
 namespace detail {
+struct LiV2FastMetadata {
+    uint32_t enable;
+    uint32_t coreNum;
+    uint32_t tileStart[LI_V2_FAST_CORE_MAX_NUM];
+    uint32_t tileEnd[LI_V2_FAST_CORE_MAX_NUM];
+};
+
 struct LiV2Metadata {
     uint32_t liV2Metadata[AIC_CORE_MAX_NUM][LI_V2_METADATA_SIZE];
     uint32_t ldV2Metadata[AIV_CORE_MAX_NUM][LD_V2_METADATA_SIZE];
+    LiV2FastMetadata fastMetadata;
 };
 }; // namespace detail
 
+static_assert(sizeof(detail::LiV2Metadata) == (LI_V2_FAST_TILE_END_INDEX + LI_V2_FAST_CORE_MAX_NUM) * sizeof(uint32_t));
 static_assert(LI_V2_METADATA_TOTAL_SIZE * sizeof(LI_V2_METADATA_T) >= sizeof(detail::LiV2Metadata));
 }; // namespace optiling
 

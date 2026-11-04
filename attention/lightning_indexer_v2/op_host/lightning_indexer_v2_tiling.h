@@ -119,6 +119,7 @@ TILING_DATA_FIELD_DEF(uint32_t, returnValue)
 TILING_DATA_FIELD_DEF(int32_t, candidateTopkBlocks) // -1=off；有效值 (0,2048] 且 64 的倍数
 TILING_DATA_FIELD_DEF(uint32_t, candidateBlockSize) // [2,64] 2 的幂，默认 8
 TILING_DATA_FIELD_DEF(uint32_t, batchInvariant)
+TILING_DATA_FIELD_DEF(uint32_t, fastPathCandidate)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(LightningIndexerV2, LIV2TilingData)
 
