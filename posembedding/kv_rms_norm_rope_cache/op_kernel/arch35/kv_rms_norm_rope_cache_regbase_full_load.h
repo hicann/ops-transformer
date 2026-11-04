@@ -276,6 +276,319 @@ public:
         }
     }
 
+    __aicore__ inline void RopeAsymQuantWithKvVF(
+        __ubuf__ T_KV* outFront, __ubuf__ T_KV* outBack, __ubuf__ T_K_CACHE* quantFront, __ubuf__ T_K_CACHE* quantBack,
+        __ubuf__ T_KV* x, __ubuf__ T_KV* realCos, __ubuf__ T_KV* imgCos, __ubuf__ T_KV* realSin, __ubuf__ T_KV* imgSin,
+        __ubuf__ float* realKScale, __ubuf__ float* imgKScale, __ubuf__ float* realKOffset, __ubuf__ float* imgKOffset,
+        __ubuf__ float* ws, uint16_t row, uint16_t colLoopCount, uint32_t colCosSin, uint32_t xOffset,
+        uint32_t cosSinOffset, uint32_t quantOutOffset)
+    {
+        __VEC_SCOPE__
+        {
+            AscendC::Reg::RegTensor<float> x_0, x_1, cos_0, cos_1, sin_0, sin_1, scale_0, scale_1, offset_0, offset_1;
+            AscendC::Reg::UnalignRegForStore UReg0, UReg1, UReg2, UReg3;
+            AscendC::Reg::MaskReg mask;
+            AscendC::Reg::MaskReg maskAll = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
+            for (uint16_t rowId = 0; rowId < row; rowId++) {
+                uint32_t sreg = colCosSin;
+                __ubuf__ T_KV* out0 = outFront + rowId * xOffset;
+                __ubuf__ T_KV* out1 = outBack + rowId * xOffset;
+                __ubuf__ T_K_CACHE* out2 = quantFront + rowId * quantOutOffset;
+                __ubuf__ T_K_CACHE* out3 = quantBack + rowId * quantOutOffset;
+                for (uint16_t i = 0; i < colLoopCount; i++) {
+                    mask = AscendC::Reg::UpdateMask<float>(sreg);
+                    RopeBasicComputeVF(x, x_0, x_1, cos_0, cos_1, sin_0, sin_1, realCos, imgCos, realSin, imgSin, ws,
+                                       xOffset, cosSinOffset, rowId, i, mask, maskAll);
+                    StoreUnAlignOneTensor<T_KV>(out0, sin_0, UReg0, mask, VL_FP32);
+                    StoreUnAlignOneTensor<T_KV>(out1, sin_1, UReg1, mask, VL_FP32);
+                    LoadTensorForDtypeT(realKScale, scale_0, mask, i * VL_FP32);
+                    LoadTensorForDtypeT(imgKScale, scale_1, mask, i * VL_FP32);
+                    LoadTensorForDtypeT(realKOffset, offset_0, mask, i * VL_FP32);
+                    LoadTensorForDtypeT(imgKOffset, offset_1, mask, i * VL_FP32);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                    AscendC::Reg::MulAddDst(offset_0, sin_0, scale_0, mask);
+                    AscendC::Reg::MulAddDst(offset_1, sin_1, scale_1, mask);
+#else
+                    AscendC::Reg::Mul(scale_0, sin_0, scale_0, mask);
+                    AscendC::Reg::Mul(scale_1, sin_1, scale_1, mask);
+                    AscendC::Reg::Add(offset_0, offset_0, scale_0, mask);
+                    AscendC::Reg::Add(offset_1, offset_1, scale_1, mask);
+#endif
+                    StoreUnAlignOneTensor<T_K_CACHE>(out2, offset_0, UReg2, mask, VL_FP32);
+                    StoreUnAlignOneTensor<T_K_CACHE>(out3, offset_1, UReg3, mask, VL_FP32);
+                }
+                mask = AscendC::Reg::UpdateMask<float>(sreg);
+                RopeBasicComputeVF(x, x_0, x_1, cos_0, cos_1, sin_0, sin_1, realCos, imgCos, realSin, imgSin, ws,
+                                   xOffset, cosSinOffset, rowId, colLoopCount, mask, maskAll);
+                StoreUnAlignOneTensor<T_KV>(out0, sin_0, UReg0, mask, kVFTail);
+                StoreUnAlignOneTensor<T_KV>(out1, sin_1, UReg1, mask, kVFTail);
+                LoadTensorForDtypeT(realKScale, scale_0, mask, colLoopCount * VL_FP32);
+                LoadTensorForDtypeT(imgKScale, scale_1, mask, colLoopCount * VL_FP32);
+                LoadTensorForDtypeT(realKOffset, offset_0, mask, colLoopCount * VL_FP32);
+                LoadTensorForDtypeT(imgKOffset, offset_1, mask, colLoopCount * VL_FP32);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                AscendC::Reg::MulAddDst(offset_0, sin_0, scale_0, mask);
+                AscendC::Reg::MulAddDst(offset_1, sin_1, scale_1, mask);
+#else
+                AscendC::Reg::Mul(scale_0, sin_0, scale_0, mask);
+                AscendC::Reg::Mul(scale_1, sin_1, scale_1, mask);
+                AscendC::Reg::Add(offset_0, offset_0, scale_0, mask);
+                AscendC::Reg::Add(offset_1, offset_1, scale_1, mask);
+#endif
+                StoreUnAlignOneTensor<T_K_CACHE>(out2, offset_0, UReg2, mask, kVFTail);
+                StoreUnAlignOneTensor<T_K_CACHE>(out3, offset_1, UReg3, mask, kVFTail);
+                AscendC::Reg::StoreUnAlignPost(out0, UReg0, 0);
+                AscendC::Reg::StoreUnAlignPost(out1, UReg1, 0);
+                AscendC::Reg::StoreUnAlignPost(out2, UReg2, 0);
+                AscendC::Reg::StoreUnAlignPost(out3, UReg3, 0);
+            }
+        }
+    }
+
+    __aicore__ inline void RopeSymQuantWithKvVF(
+        __ubuf__ T_KV* outFront, __ubuf__ T_KV* outBack, __ubuf__ T_K_CACHE* quantFront, __ubuf__ T_K_CACHE* quantBack,
+        __ubuf__ T_KV* x, __ubuf__ T_KV* realCos, __ubuf__ T_KV* imgCos, __ubuf__ T_KV* realSin, __ubuf__ T_KV* imgSin,
+        __ubuf__ float* realKScale, __ubuf__ float* imgKScale, __ubuf__ float* ws, uint16_t row, uint16_t colLoopCount,
+        uint32_t colCosSin, uint32_t xOffset, uint32_t cosSinOffset, uint32_t quantOutOffset)
+    {
+        __VEC_SCOPE__
+        {
+            AscendC::Reg::RegTensor<float> x_0, x_1, cos_0, cos_1, sin_0, sin_1, scale_0, scale_1;
+            AscendC::Reg::UnalignRegForStore UReg0, UReg1, UReg2, UReg3;
+            AscendC::Reg::MaskReg mask;
+            AscendC::Reg::MaskReg maskAll = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
+            for (uint16_t rowId = 0; rowId < row; rowId++) {
+                uint32_t sreg = colCosSin;
+                __ubuf__ T_KV* out0 = outFront + rowId * xOffset;
+                __ubuf__ T_KV* out1 = outBack + rowId * xOffset;
+                __ubuf__ T_K_CACHE* out2 = quantFront + rowId * quantOutOffset;
+                __ubuf__ T_K_CACHE* out3 = quantBack + rowId * quantOutOffset;
+                for (uint16_t i = 0; i < colLoopCount; i++) {
+                    mask = AscendC::Reg::UpdateMask<float>(sreg);
+                    RopeBasicComputeVF(x, x_0, x_1, cos_0, cos_1, sin_0, sin_1, realCos, imgCos, realSin, imgSin, ws,
+                                       xOffset, cosSinOffset, rowId, i, mask, maskAll);
+                    StoreUnAlignOneTensor<T_KV>(out0, sin_0, UReg0, mask, VL_FP32);
+                    StoreUnAlignOneTensor<T_KV>(out1, sin_1, UReg1, mask, VL_FP32);
+                    LoadTensorForDtypeT(realKScale, scale_0, mask, i * VL_FP32);
+                    LoadTensorForDtypeT(imgKScale, scale_1, mask, i * VL_FP32);
+                    AscendC::Reg::Mul(scale_0, sin_0, scale_0, mask);
+                    AscendC::Reg::Mul(scale_1, sin_1, scale_1, mask);
+                    StoreUnAlignOneTensor<T_K_CACHE>(out2, scale_0, UReg2, mask, VL_FP32);
+                    StoreUnAlignOneTensor<T_K_CACHE>(out3, scale_1, UReg3, mask, VL_FP32);
+                }
+                mask = AscendC::Reg::UpdateMask<float>(sreg);
+                RopeBasicComputeVF(x, x_0, x_1, cos_0, cos_1, sin_0, sin_1, realCos, imgCos, realSin, imgSin, ws,
+                                   xOffset, cosSinOffset, rowId, colLoopCount, mask, maskAll);
+                StoreUnAlignOneTensor<T_KV>(out0, sin_0, UReg0, mask, kVFTail);
+                StoreUnAlignOneTensor<T_KV>(out1, sin_1, UReg1, mask, kVFTail);
+                LoadTensorForDtypeT(realKScale, scale_0, mask, colLoopCount * VL_FP32);
+                LoadTensorForDtypeT(imgKScale, scale_1, mask, colLoopCount * VL_FP32);
+                AscendC::Reg::Mul(scale_0, sin_0, scale_0, mask);
+                AscendC::Reg::Mul(scale_1, sin_1, scale_1, mask);
+                StoreUnAlignOneTensor<T_K_CACHE>(out2, scale_0, UReg2, mask, kVFTail);
+                StoreUnAlignOneTensor<T_K_CACHE>(out3, scale_1, UReg3, mask, kVFTail);
+                AscendC::Reg::StoreUnAlignPost(out0, UReg0, 0);
+                AscendC::Reg::StoreUnAlignPost(out1, UReg1, 0);
+                AscendC::Reg::StoreUnAlignPost(out2, UReg2, 0);
+                AscendC::Reg::StoreUnAlignPost(out3, UReg3, 0);
+            }
+        }
+    }
+
+    __aicore__ inline void RopeAsymQuantVF(__ubuf__ T_K_CACHE* quantFront, __ubuf__ T_K_CACHE* quantBack,
+                                           __ubuf__ T_KV* x, __ubuf__ T_KV* realCos, __ubuf__ T_KV* imgCos,
+                                           __ubuf__ T_KV* realSin, __ubuf__ T_KV* imgSin, __ubuf__ float* realKScale,
+                                           __ubuf__ float* imgKScale, __ubuf__ float* realKOffset,
+                                           __ubuf__ float* imgKOffset, __ubuf__ float* ws, uint16_t row,
+                                           uint16_t colLoopCount, uint32_t colCosSin, uint32_t xOffset,
+                                           uint32_t cosSinOffset, uint32_t quantOutOffset)
+    {
+        __VEC_SCOPE__
+        {
+            AscendC::Reg::RegTensor<float> x_0, x_1, cos_0, cos_1, sin_0, sin_1, scale_0, scale_1, offset_0, offset_1;
+            AscendC::Reg::UnalignRegForStore UReg2, UReg3;
+            AscendC::Reg::MaskReg mask;
+            AscendC::Reg::MaskReg maskAll = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
+            for (uint16_t rowId = 0; rowId < row; rowId++) {
+                uint32_t sreg = colCosSin;
+                __ubuf__ T_K_CACHE* out2 = quantFront + rowId * quantOutOffset;
+                __ubuf__ T_K_CACHE* out3 = quantBack + rowId * quantOutOffset;
+                for (uint16_t i = 0; i < colLoopCount; i++) {
+                    mask = AscendC::Reg::UpdateMask<float>(sreg);
+                    RopeBasicComputeVF(x, x_0, x_1, cos_0, cos_1, sin_0, sin_1, realCos, imgCos, realSin, imgSin, ws,
+                                       xOffset, cosSinOffset, rowId, i, mask, maskAll);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                    // FMA: offset = offset + rope_result * scale
+                    LoadTensorForDtypeT(realKScale, scale_0, mask, i * VL_FP32);
+                    LoadTensorForDtypeT(imgKScale, scale_1, mask, i * VL_FP32);
+                    LoadTensorForDtypeT(realKOffset, offset_0, mask, i * VL_FP32);
+                    LoadTensorForDtypeT(imgKOffset, offset_1, mask, i * VL_FP32);
+                    AscendC::Reg::MulAddDst(offset_0, sin_0, scale_0, mask);
+                    AscendC::Reg::MulAddDst(offset_1, sin_1, scale_1, mask);
+                    StoreUnAlignOneTensor<T_K_CACHE>(out2, offset_0, UReg2, mask, VL_FP32);
+                    StoreUnAlignOneTensor<T_K_CACHE>(out3, offset_1, UReg3, mask, VL_FP32);
+#else
+                    LoadTensorForDtypeT(realKScale, scale_0, mask, i * VL_FP32);
+                    LoadTensorForDtypeT(imgKScale, scale_1, mask, i * VL_FP32);
+                    AscendC::Reg::Mul(scale_0, sin_0, scale_0, mask);
+                    AscendC::Reg::Mul(scale_1, sin_1, scale_1, mask);
+                    LoadTensorForDtypeT(realKOffset, offset_0, mask, i * VL_FP32);
+                    LoadTensorForDtypeT(imgKOffset, offset_1, mask, i * VL_FP32);
+                    AscendC::Reg::Add(offset_0, offset_0, scale_0, mask);
+                    AscendC::Reg::Add(offset_1, offset_1, scale_1, mask);
+                    StoreUnAlignOneTensor<T_K_CACHE>(out2, offset_0, UReg2, mask, VL_FP32);
+                    StoreUnAlignOneTensor<T_K_CACHE>(out3, offset_1, UReg3, mask, VL_FP32);
+#endif
+                }
+                mask = AscendC::Reg::UpdateMask<float>(sreg);
+                RopeBasicComputeVF(x, x_0, x_1, cos_0, cos_1, sin_0, sin_1, realCos, imgCos, realSin, imgSin, ws,
+                                   xOffset, cosSinOffset, rowId, colLoopCount, mask, maskAll);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+                // FMA: offset = offset + rope_result * scale
+                LoadTensorForDtypeT(realKScale, scale_0, mask, colLoopCount * VL_FP32);
+                LoadTensorForDtypeT(imgKScale, scale_1, mask, colLoopCount * VL_FP32);
+                LoadTensorForDtypeT(realKOffset, offset_0, mask, colLoopCount * VL_FP32);
+                LoadTensorForDtypeT(imgKOffset, offset_1, mask, colLoopCount * VL_FP32);
+                AscendC::Reg::MulAddDst(offset_0, sin_0, scale_0, mask);
+                AscendC::Reg::MulAddDst(offset_1, sin_1, scale_1, mask);
+                StoreUnAlignOneTensor<T_K_CACHE>(out2, offset_0, UReg2, mask, kVFTail);
+                StoreUnAlignOneTensor<T_K_CACHE>(out3, offset_1, UReg3, mask, kVFTail);
+#else
+                LoadTensorForDtypeT(realKScale, scale_0, mask, colLoopCount * VL_FP32);
+                LoadTensorForDtypeT(imgKScale, scale_1, mask, colLoopCount * VL_FP32);
+                AscendC::Reg::Mul(scale_0, sin_0, scale_0, mask);
+                AscendC::Reg::Mul(scale_1, sin_1, scale_1, mask);
+                LoadTensorForDtypeT(realKOffset, offset_0, mask, colLoopCount * VL_FP32);
+                LoadTensorForDtypeT(imgKOffset, offset_1, mask, colLoopCount * VL_FP32);
+                AscendC::Reg::Add(offset_0, offset_0, scale_0, mask);
+                AscendC::Reg::Add(offset_1, offset_1, scale_1, mask);
+                StoreUnAlignOneTensor<T_K_CACHE>(out2, offset_0, UReg2, mask, kVFTail);
+                StoreUnAlignOneTensor<T_K_CACHE>(out3, offset_1, UReg3, mask, kVFTail);
+#endif
+                AscendC::Reg::StoreUnAlignPost(out2, UReg2, 0);
+                AscendC::Reg::StoreUnAlignPost(out3, UReg3, 0);
+            }
+        }
+    }
+
+    __aicore__ inline void RopeSymQuantVF(__ubuf__ T_K_CACHE* quantFront, __ubuf__ T_K_CACHE* quantBack,
+                                          __ubuf__ T_KV* x, __ubuf__ T_KV* realCos, __ubuf__ T_KV* imgCos,
+                                          __ubuf__ T_KV* realSin, __ubuf__ T_KV* imgSin, __ubuf__ float* realKScale,
+                                          __ubuf__ float* imgKScale, __ubuf__ float* ws, uint16_t row,
+                                          uint16_t colLoopCount, uint32_t colCosSin, uint32_t xOffset,
+                                          uint32_t cosSinOffset, uint32_t quantOutOffset)
+    {
+        __VEC_SCOPE__
+        {
+            AscendC::Reg::RegTensor<float> x_0, x_1, cos_0, cos_1, sin_0, sin_1, scale_0, scale_1;
+            AscendC::Reg::UnalignRegForStore UReg2, UReg3;
+            AscendC::Reg::MaskReg mask;
+            AscendC::Reg::MaskReg maskAll = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
+            for (uint16_t rowId = 0; rowId < row; rowId++) {
+                uint32_t sreg = colCosSin;
+                __ubuf__ T_K_CACHE* out2 = quantFront + rowId * quantOutOffset;
+                __ubuf__ T_K_CACHE* out3 = quantBack + rowId * quantOutOffset;
+                for (uint16_t i = 0; i < colLoopCount; i++) {
+                    mask = AscendC::Reg::UpdateMask<float>(sreg);
+                    RopeBasicComputeVF(x, x_0, x_1, cos_0, cos_1, sin_0, sin_1, realCos, imgCos, realSin, imgSin, ws,
+                                       xOffset, cosSinOffset, rowId, i, mask, maskAll);
+                    LoadTensorForDtypeT(realKScale, scale_0, mask, i * VL_FP32);
+                    LoadTensorForDtypeT(imgKScale, scale_1, mask, i * VL_FP32);
+                    AscendC::Reg::Mul(scale_0, sin_0, scale_0, mask);
+                    AscendC::Reg::Mul(scale_1, sin_1, scale_1, mask);
+                    StoreUnAlignOneTensor<T_K_CACHE>(out2, scale_0, UReg2, mask, VL_FP32);
+                    StoreUnAlignOneTensor<T_K_CACHE>(out3, scale_1, UReg3, mask, VL_FP32);
+                }
+                mask = AscendC::Reg::UpdateMask<float>(sreg);
+                RopeBasicComputeVF(x, x_0, x_1, cos_0, cos_1, sin_0, sin_1, realCos, imgCos, realSin, imgSin, ws,
+                                   xOffset, cosSinOffset, rowId, colLoopCount, mask, maskAll);
+                LoadTensorForDtypeT(realKScale, scale_0, mask, colLoopCount * VL_FP32);
+                LoadTensorForDtypeT(imgKScale, scale_1, mask, colLoopCount * VL_FP32);
+                AscendC::Reg::Mul(scale_0, sin_0, scale_0, mask);
+                AscendC::Reg::Mul(scale_1, sin_1, scale_1, mask);
+                StoreUnAlignOneTensor<T_K_CACHE>(out2, scale_0, UReg2, mask, kVFTail);
+                StoreUnAlignOneTensor<T_K_CACHE>(out3, scale_1, UReg3, mask, kVFTail);
+                AscendC::Reg::StoreUnAlignPost(out2, UReg2, 0);
+                AscendC::Reg::StoreUnAlignPost(out3, UReg3, 0);
+            }
+        }
+    }
+
+    __aicore__ inline void RopeBasicComputeVF(
+        __ubuf__ T_KV* x, AscendC::Reg::RegTensor<float>& x_0, AscendC::Reg::RegTensor<float>& x_1,
+        AscendC::Reg::RegTensor<float>& cos_0, AscendC::Reg::RegTensor<float>& cos_1,
+        AscendC::Reg::RegTensor<float>& sin_0, AscendC::Reg::RegTensor<float>& sin_1, __ubuf__ T_KV* realCos,
+        __ubuf__ T_KV* imgCos, __ubuf__ T_KV* realSin, __ubuf__ T_KV* imgSin, __ubuf__ float* ws, uint32_t xOffset,
+        uint32_t cosSinOffset, uint16_t rowId, uint16_t colId, AscendC::Reg::MaskReg mask,
+        AscendC::Reg::MaskReg maskAll)
+    {
+        // cast to float32
+        LoadTensorForDtypeT<T_KV>(x, x_0, maskAll, colId * CONST_TWO * VL_FP32 + rowId * xOffset);
+        LoadTensorForDtypeT<T_KV>(x, x_1, maskAll, (colId * CONST_TWO + CONST_ONE) * VL_FP32 + rowId * xOffset);
+        StoreTensorForDtypeTOut<float>(ws, x_0, maskAll, 0);
+        StoreTensorForDtypeTOut<float>(ws, x_1, maskAll, VL_FP32);
+        AscendC::Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
+        // get x
+        AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_DINTLV_B32>(x_0, x_1, ((__ubuf__ float*)(ws)));
+        LoadTensorForDtypeT(realCos, cos_0, mask, colId * VL_FP32 + rowId * cosSinOffset);
+        LoadTensorForDtypeT(imgCos, cos_1, mask, colId * VL_FP32 + rowId * cosSinOffset);
+        LoadTensorForDtypeT(realSin, sin_0, mask, colId * VL_FP32 + rowId * cosSinOffset);
+        LoadTensorForDtypeT(imgSin, sin_1, mask, colId * VL_FP32 + rowId * cosSinOffset);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+        // FMA: kReal = -x1*sin + x0*cos, kImag = x0*sin + x1*cos
+        AscendC::Reg::Mul(sin_0, x_1, sin_0, mask);
+        AscendC::Reg::Muls(sin_0, sin_0, -1.0f, mask);
+        AscendC::Reg::MulAddDst(sin_0, x_0, cos_0, mask);
+        AscendC::Reg::Mul(sin_1, x_0, sin_1, mask);
+        AscendC::Reg::MulAddDst(sin_1, x_1, cos_1, mask);
+#else
+        AscendC::Reg::Mul(cos_0, x_0, cos_0, mask);
+        AscendC::Reg::Mul(cos_1, x_1, cos_1, mask);
+        AscendC::Reg::Muls(x_1, x_1, -1, mask);
+        AscendC::Reg::Mul(sin_0, x_1, sin_0, mask);
+        AscendC::Reg::Mul(sin_1, x_0, sin_1, mask);
+        AscendC::Reg::Add(sin_0, cos_0, sin_0, mask);
+        AscendC::Reg::Add(sin_1, cos_1, sin_1, mask);
+#endif
+    }
+
+    __aicore__ inline void RopeVF(__ubuf__ T_KV* outFront, __ubuf__ T_KV* outBack, __ubuf__ T_KV* x,
+                                  __ubuf__ T_KV* realCos, __ubuf__ T_KV* imgCos, __ubuf__ T_KV* realSin,
+                                  __ubuf__ T_KV* imgSin, __ubuf__ float* ws, uint16_t row, uint16_t colLoopCount,
+                                  uint32_t colCosSin, uint32_t xOffset, uint32_t cosSinOffset)
+    {
+        __VEC_SCOPE__
+        {
+            AscendC::Reg::RegTensor<float> x_0, x_1, cos_0, cos_1, sin_0, sin_1;
+            AscendC::Reg::UnalignRegForStore UReg0;
+            AscendC::Reg::UnalignRegForStore UReg1;
+            AscendC::Reg::MaskReg mask;
+            AscendC::Reg::MaskReg maskAll = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
+            for (uint16_t rowId = 0; rowId < row; rowId++) {
+                uint32_t sreg = colCosSin;
+                // 跨行地址重刷新
+                __ubuf__ T_KV* out0 = outFront + rowId * xOffset;
+                __ubuf__ T_KV* out1 = outBack + rowId * xOffset;
+                // 整块
+                for (uint16_t i = 0; i < colLoopCount; i++) {
+                    mask = AscendC::Reg::UpdateMask<float>(sreg);
+                    RopeBasicComputeVF(x, x_0, x_1, cos_0, cos_1, sin_0, sin_1, realCos, imgCos, realSin, imgSin, ws,
+                                       xOffset, cosSinOffset, rowId, i, mask, maskAll);
+                    StoreUnAlignOneTensor<T_KV>(out0, sin_0, UReg0, mask, VL_FP32);
+                    StoreUnAlignOneTensor<T_KV>(out1, sin_1, UReg1, mask, VL_FP32);
+                }
+                // 尾块
+                mask = AscendC::Reg::UpdateMask<float>(sreg);
+                RopeBasicComputeVF(x, x_0, x_1, cos_0, cos_1, sin_0, sin_1, realCos, imgCos, realSin, imgSin, ws,
+                                   xOffset, cosSinOffset, rowId, colLoopCount, mask, maskAll);
+                StoreUnAlignOneTensor<T_KV>(out0, sin_0, UReg0, mask, kVFTail);
+                StoreUnAlignOneTensor<T_KV>(out1, sin_1, UReg1, mask, kVFTail);
+                AscendC::Reg::StoreUnAlignPost(out0, UReg0, 0);
+                AscendC::Reg::StoreUnAlignPost(out1, UReg1, 0);
+            }
+        }
+    }
+
     __aicore__ inline void Rope(const LocalTensor<T_KV>& xLocal, const LocalTensor<T_KV>& realCosLocal,
                                 const LocalTensor<T_KV>& imgCosLocal, const LocalTensor<T_KV>& realSinLocal,
                                 const LocalTensor<T_KV>& imgSinLocal, const LocalTensor<float>& realKScaleLocal,
@@ -314,14 +627,13 @@ public:
                 __ubuf__ T_K_CACHE* quantFront = (__ubuf__ T_K_CACHE*)kQuantLocal.GetPhyAddr();
                 __ubuf__ T_K_CACHE* quantBack = (__ubuf__ T_K_CACHE*)kQuantLocal.GetPhyAddr() + tilingData_->halfDk;
                 if (tilingData_->kOffsetType > 0) {
-                    asc_vf_call<FullLoadRopeAsymQuantWithKvComputeVF<T_KV, T_K_CACHE>>(
-                        outFront, outBack, quantFront, quantBack, x, realCos, imgCos, realSin, imgSin, realKScale,
-                        imgKScale, realKOffset, imgKOffset, ws, row, kVFLoop, colCosSin, xOffset, cosSinOffset,
-                        quantOutOffset, kVFTail);
+                    RopeAsymQuantWithKvVF(outFront, outBack, quantFront, quantBack, x, realCos, imgCos, realSin, imgSin,
+                                          realKScale, imgKScale, realKOffset, imgKOffset, ws, row, kVFLoop, colCosSin,
+                                          xOffset, cosSinOffset, quantOutOffset);
                 } else {
-                    asc_vf_call<FullLoadRopeSymQuantWithKvComputeVF<T_KV, T_K_CACHE>>(
-                        outFront, outBack, quantFront, quantBack, x, realCos, imgCos, realSin, imgSin, realKScale,
-                        imgKScale, ws, row, kVFLoop, colCosSin, xOffset, cosSinOffset, quantOutOffset, kVFTail);
+                    RopeSymQuantWithKvVF(outFront, outBack, quantFront, quantBack, x, realCos, imgCos, realSin, imgSin,
+                                         realKScale, imgKScale, ws, row, kVFLoop, colCosSin, xOffset, cosSinOffset,
+                                         quantOutOffset);
                 }
                 outQueue.EnQue(kOutLocal);
                 kOutLocal = outQueue.DeQue<T_KV>();
@@ -330,13 +642,12 @@ public:
                 __ubuf__ T_K_CACHE* quantFront = (__ubuf__ T_K_CACHE*)kQuantLocal.GetPhyAddr();
                 __ubuf__ T_K_CACHE* quantBack = (__ubuf__ T_K_CACHE*)kQuantLocal.GetPhyAddr() + tilingData_->halfDk;
                 if (tilingData_->kOffsetType > 0) {
-                    asc_vf_call<FullLoadRopeAsymQuantComputeVF<T_KV, T_K_CACHE>>(
-                        quantFront, quantBack, x, realCos, imgCos, realSin, imgSin, realKScale, imgKScale, realKOffset,
-                        imgKOffset, ws, row, kVFLoop, colCosSin, xOffset, cosSinOffset, quantOutOffset, kVFTail);
+                    RopeAsymQuantVF(quantFront, quantBack, x, realCos, imgCos, realSin, imgSin, realKScale, imgKScale,
+                                    realKOffset, imgKOffset, ws, row, kVFLoop, colCosSin, xOffset, cosSinOffset,
+                                    quantOutOffset);
                 } else {
-                    asc_vf_call<FullLoadRopeSymQuantComputeVF<T_KV, T_K_CACHE>>(
-                        quantFront, quantBack, x, realCos, imgCos, realSin, imgSin, realKScale, imgKScale, ws, row,
-                        kVFLoop, colCosSin, xOffset, cosSinOffset, quantOutOffset, kVFTail);
+                    RopeSymQuantVF(quantFront, quantBack, x, realCos, imgCos, realSin, imgSin, realKScale, imgKScale,
+                                   ws, row, kVFLoop, colCosSin, xOffset, cosSinOffset, quantOutOffset);
                 }
                 outQueue.EnQue(kQuantLocal);
                 kQuantLocal = outQueue.DeQue<T_K_CACHE>();
@@ -345,8 +656,8 @@ public:
             kOutLocal = outQueue.AllocTensor<T_KV>();
             __ubuf__ T_KV* outFront = (__ubuf__ T_KV*)kOutLocal.GetPhyAddr();
             __ubuf__ T_KV* outBack = (__ubuf__ T_KV*)kOutLocal.GetPhyAddr() + tilingData_->halfDk;
-            asc_vf_call<FullLoadRopeComputeVF<T_KV>>(outFront, outBack, x, realCos, imgCos, realSin, imgSin, ws, row,
-                                                     kVFLoop, colCosSin, xOffset, cosSinOffset, kVFTail);
+            RopeVF(outFront, outBack, x, realCos, imgCos, realSin, imgSin, ws, row, kVFLoop, colCosSin, xOffset,
+                   cosSinOffset);
             outQueue.EnQue(kOutLocal);
             kOutLocal = outQueue.DeQue<T_K_CACHE>();
         }
