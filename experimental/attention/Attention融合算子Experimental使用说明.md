@@ -63,6 +63,17 @@
     <td>将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://atomgit.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
   </tr>
   <tr>
+    <td>sparse_flash_attention_antiquant_v2</td>
+    <td><a href="./sparse_flash_attention_antiquant_v2/README.md">文档</a></td>
+    <td>√</td>
+    <td>√</td>
+    <td>√</td>
+    <td>×</td>
+    <td>√</td>
+    <td>AI Core</td>
+    <td>支持Per-Token-Head-Tile-128量化的稀疏Flash Attention计算。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://atomgit.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
+  </tr>
+  <tr>
     <td>kv_quant_sparse_attn_sharedkv</td>
     <td><a href="./kv_quant_sparse_attn_sharedkv/README.md">文档</a></td>
     <td>√</td>
@@ -275,6 +286,10 @@ torch_ops_extension包为自定义算子提供了torch.ops的拓展接口，具�
   <tr>
     <td>compressor</td>
     <td><a href="./compressor/tests/pytest/README.md">示例</a></td>
+  </tr>
+  <tr>
+    <td>sparse_flash_attention_antiquant_v2</td>
+    <td><a href="./sparse_flash_attention_antiquant_v2/tests/pytest/README.md">示例</a></td>
   </tr>
   <tr>
     <td>kv_quant_sparse_attn_sharedkv</td>
