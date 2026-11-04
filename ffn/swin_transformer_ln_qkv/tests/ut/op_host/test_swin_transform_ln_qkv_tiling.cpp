@@ -106,12 +106,13 @@ struct SwinTransformerLnQKVCompileInfo {
     fe::PlatFormInfos platformInfo; \
     platformInfo.Init(); \
     auto tilingData = gert::TilingData::CreateCap(tilingContextPara.tilingDataSize_); \
-    gert::ContinuousVector workspace; \
+    auto workspaceSizeHolder = gert::ContinuousVector::Create<size_t>(4096); \
+    auto workspace = reinterpret_cast<gert::ContinuousVector*>(workspaceSizeHolder.get()); \
     auto contextHolder = contextFaker.SetOpType(tilingContextPara.opName_.c_str()) \
                              .CompileInfo(tilingContextPara.compileInfo_) \
                              .PlatformInfo(reinterpret_cast<char*>(&platformInfo)) \
                              .TilingData(tilingData.get()) \
-                             .Workspace(&workspace) \
+                             .Workspace(workspace) \
                              .Build(); \
     string compileInfoStringPrefix = \
         R"({"hardware_info": {"BT_SIZE": 0, "load3d_constraints": "1", "Intrinsic_fix_pipe_l0c2out": false, "Intrinsic_data_move_l12ub": true, "Intrinsic_data_move_l0c2ub": true, "Intrinsic_data_move_out2l1_nd2nz": false, "UB_SIZE": )"; \
@@ -214,8 +215,10 @@ static void ExecuteTestCaseWithoutTilingKey(const gert::TilingContextPara& tilin
 
     // check workspace
     size_t workspaceCount = tilingContext->GetWorkspaceNum();
+    ASSERT_EQ(workspaceCount, expectWorkspaces.size());
     if (workspaceCount > 0) {
         auto workspaceSizes = tilingContext->GetWorkspaceSizes(workspaceCount);
+        ASSERT_NE(workspaceSizes, nullptr);
         for (size_t i = 0; i < workspaceCount; i++) {
             ASSERT_EQ(workspaceSizes[i], expectWorkspaces[i]);
         }
