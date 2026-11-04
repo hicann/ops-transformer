@@ -349,8 +349,14 @@ function(op_add_subdirectory OP_LIST OP_DIR_LIST)
 endfunction()
 
 macro(add_op_to_compiled_list)
-    get_filename_component(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
-    get_filename_component(OP_NAME ${PARENT_DIR} NAME)
+    # OP_DIR accepts an absolute path or a path relative to the caller.
+    cmake_parse_arguments(COMPILED "" "OP_DIR" "" ${ARGN})
+    if(NOT "${COMPILED_OP_DIR}" STREQUAL "")
+        get_filename_component(PARENT_DIR "${COMPILED_OP_DIR}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    else()
+        get_filename_component(PARENT_DIR "${CMAKE_CURRENT_SOURCE_DIR}" DIRECTORY)
+    endif()
+    get_filename_component(OP_NAME "${PARENT_DIR}" NAME)
     # 记录全局的COMPILED_OPS和COMPILED_OP_DIRS，其中COMPILED_OP_DIRS只记录到算子名，例如moe/moe_token_permute_with_routing_map_grad
     set(COMPILED_OPS ${COMPILED_OPS} ${OP_NAME} CACHE STRING "Compiled Ops" FORCE)
     set(COMPILED_OP_DIRS ${COMPILED_OP_DIRS} ${PARENT_DIR} CACHE STRING "Compiled Ops Dirs" FORCE)
