@@ -427,7 +427,7 @@ aclnnStatus aclnnQuantSparseFlashMla(
       <td>quantMode (int64_t)</td>
       <td>Input</td>
       <td>Indicates the quantization mode.</td>
-      <td>Quantization mode 1 indicates that Q, K, and V use per-token quantization and the data type is HIFLOAT8.</td>
+      <td>Quantization mode 1 indicates that Q, K, and V use per-tensor quantization and the data type is HIFLOAT8.</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>

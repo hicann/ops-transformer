@@ -205,7 +205,7 @@
     <tr>
       <td>quant_mode</td>
       <td>属性</td>
-      <td>表示量化模式。量化模式1表示Q、K、V 为per-token量化，Q、K、V 数据类型为HIFLOAT8。</td>
+      <td>表示量化模式。量化模式1表示Q、K、V 为per-tensor量化，Q、K、V 数据类型为HIFLOAT8。</td>
       <td>INT</td>
       <td>-</td>
     </tr>

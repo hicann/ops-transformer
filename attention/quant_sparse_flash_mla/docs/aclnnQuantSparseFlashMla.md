@@ -435,7 +435,7 @@ aclnnStatus aclnnQuantSparseFlashMla(
       <td>quantMode（int64_t）</td>
       <td>输入</td>
       <td>表示量化模式。</td>
-      <td>量化模式1表示Q、K、V 为per-token量化，数据类型为HIFLOAT8。</td>
+      <td>量化模式1表示Q、K、V 为per-tensor量化，数据类型为HIFLOAT8。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
