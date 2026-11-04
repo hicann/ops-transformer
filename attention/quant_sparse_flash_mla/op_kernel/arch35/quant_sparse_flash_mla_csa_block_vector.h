@@ -122,13 +122,13 @@ public:
                                             __gm__ uint8_t* sequsedOriKv, __gm__ uint8_t* sequsedCmpKv,
                                             __gm__ uint8_t* cmpResidualKv);
     __aicore__ inline void InitOutputSingleCore(ConstInfo& qs35VecConstInfo);
-    __aicore__ inline void InitS2SplitStaging(Buffer<BufferType::GM, SyncType::INNER_CORE_SYNC>& fdStaging)
+    __aicore__ inline void InitS2SplitStaging(Buffer<BufferType::GM, SyncType::NO_SYNC>& fdStaging)
     {
         fdStagingBase = fdStaging.template GetTensor<uint8_t>().GetPhyAddr(0);
         stagingOutGm = fdStaging.template GetTensor<float>();
     }
-    __aicore__ inline void InitS2SplitStaging(Buffer<BufferType::GM, SyncType::INNER_CORE_SYNC>& intraCoreCombine,
-                                              Buffer<BufferType::GM, SyncType::INNER_CORE_SYNC>& crossCoreCombine)
+    __aicore__ inline void InitS2SplitStaging(Buffer<BufferType::GM, SyncType::NO_SYNC>& intraCoreCombine,
+                                              Buffer<BufferType::GM, SyncType::NO_SYNC>& crossCoreCombine)
     {
         intraCoreCombineBase = intraCoreCombine.template GetTensor<uint8_t>().GetPhyAddr(0);
         intraCoreCombineGm = intraCoreCombine.template GetTensor<float>();
@@ -2079,9 +2079,9 @@ public:
 
     using mm2ResPos = Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>;
     __aicore__ inline void ProcessVec2(mm2ResPos& bmm2ResBuf, RunInfo& qs35VecRunInfo, ConstInfo& qs35VecConstInfo) {}
-    __aicore__ inline void InitS2SplitStaging(Buffer<BufferType::GM, SyncType::INNER_CORE_SYNC>& fdStaging) {}
-    __aicore__ inline void InitS2SplitStaging(Buffer<BufferType::GM, SyncType::INNER_CORE_SYNC>& intraCoreCombine,
-                                              Buffer<BufferType::GM, SyncType::INNER_CORE_SYNC>& crossCoreCombine)
+    __aicore__ inline void InitS2SplitStaging(Buffer<BufferType::GM, SyncType::NO_SYNC>& fdStaging) {}
+    __aicore__ inline void InitS2SplitStaging(Buffer<BufferType::GM, SyncType::NO_SYNC>& intraCoreCombine,
+                                              Buffer<BufferType::GM, SyncType::NO_SYNC>& crossCoreCombine)
     {}
     __aicore__ inline void ProcessFlashDecode(FdRunInfo& fdRunInfo, ConstInfo& qs35VecConstInfo) {}
 };

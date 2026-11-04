@@ -106,9 +106,9 @@ private:
     /* 核间通道 */
     BufferManager<BufferType::GM> v0ResGmBufferManager;
     BufferManager<BufferType::GM> fdStagingBufferManager;
-    BuffersPolicySingleBuffer<BufferType::GM> fdStagingBuffer;
-    BuffersPolicySingleBuffer<BufferType::GM> intraCoreCombineBuffer;
-    BuffersPolicySingleBuffer<BufferType::GM> crossCoreCombineBuffer;
+    BuffersPolicySingleBuffer<BufferType::GM, SyncType::NO_SYNC> fdStagingBuffer;
+    BuffersPolicySingleBuffer<BufferType::GM, SyncType::NO_SYNC> intraCoreCombineBuffer;
+    BuffersPolicySingleBuffer<BufferType::GM, SyncType::NO_SYNC> crossCoreCombineBuffer;
 
     BufferManager<BufferType::UB> ubBufferManager;
     BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> bmm1Buffers;
