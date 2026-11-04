@@ -62,7 +62,7 @@
     <tr>
       <td>value</td>
       <td>输入</td>
-      <td>attention结构的Value输入，不支持空tensor，shape与key的shape一致。</td>
+      <td>attention结构的Value输入，支持不传入（torch传None，aclnn传nullptr），不传入时使用key作为value；不支持空tensor，shape与key的shape一致。</td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
     </tr>

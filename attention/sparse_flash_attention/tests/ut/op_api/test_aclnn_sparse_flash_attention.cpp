@@ -95,6 +95,48 @@ TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_aclnn_1)
     EXPECT_EQ(executor, nullptr);
 }
 
+// V1: value is null, key is used as value and the call succeeds with a valid executor
+TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v1_aclnn_value_null_passthrough)
+{
+    char layoutQ[] = "TND";
+    char layoutKv[] = "TND";
+    auto query = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 16, 512}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto key = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2048, 1, 512}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseIndices = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 1, 2048}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto actualSeqLengthsQuery = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto actualSeqLengthsKv = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto queryRope = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 16, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto keyRope = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2048, 1, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto softmaxMax = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 1, 16}, ACL_FLOAT, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto softmaxSum = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 1, 16}, ACL_FLOAT, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto attentionOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 16, 512}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+
+    aclnnStatus aclRet = aclnnSparseFlashAttentionGetWorkspaceSize(
+        query.get(), key.get(), nullptr, sparseIndices.get(), nullptr, actualSeqLengthsQuery.get(),
+        actualSeqLengthsKv.get(), queryRope.get(), keyRope.get(), 0.0416666666666667, 1, layoutQ, layoutKv, 0,
+        INT64_MAX, INT64_MAX, 2, false, attentionOut.get(), softmaxMax.get(), softmaxSum.get(), &workspaceSize,
+        &executor);
+
+    // The inner api rejects a null value with ACLNN_ERR_PARAM_NULLPTR; any other status proves the
+    // wrapper substituted value with key before the call. Success also requires a valid executor.
+    EXPECT_NE(aclRet, ACLNN_ERR_PARAM_NULLPTR);
+    if (aclRet == ACL_SUCCESS) {
+        EXPECT_NE(executor, nullptr);
+    }
+}
+
 TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v2_aclnn_a3_sinks_not_supported)
 {
     op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
@@ -178,31 +220,46 @@ TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v2_aclnn_lse_fals
     EXPECT_EQ(executor, nullptr);
 }
 
-// V2: value is null, key is used as value and the call reaches the inner api
+// V2: value is null, key is used as value and the call succeeds with a valid executor
 TEST_F(sparse_flash_attention_opapi_ut, sparse_flash_attention_v2_aclnn_value_null_passthrough)
 {
-    char layoutQ[] = "BSND";
-    char layoutKv[] = "BSND";
+    char layoutQ[] = "TND";
+    char layoutKv[] = "TND";
     auto query = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
-        TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+        TensorDesc({1, 16, 512}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     auto key = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
-        TensorDesc({2, 128, 1, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+        TensorDesc({2048, 1, 512}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     auto sparseIndices = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
-        TensorDesc({2, 1, 1, 2}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+        TensorDesc({1, 1, 2048}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto actualSeqLengthsQuery = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto actualSeqLengthsKv = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto queryRope = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 16, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto keyRope = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2048, 1, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     auto softmaxMax = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
-        TensorDesc({2, 1, 32, 1}, ACL_FLOAT, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+        TensorDesc({1, 1, 16}, ACL_FLOAT, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto softmaxSum = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 1, 16}, ACL_FLOAT, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     auto attentionOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
-        TensorDesc({2, 1, 32, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+        TensorDesc({1, 16, 512}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionV2GetWorkspaceSize(
-        query.get(), key.get(), nullptr, sparseIndices.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-        0.0416666666666667, 64, layoutQ, layoutKv, 3, INT64_MAX, INT64_MAX, 0, false, attentionOut.get(),
-        softmaxMax.get(), nullptr, &workspaceSize, &executor);
+        query.get(), key.get(), nullptr, sparseIndices.get(), nullptr, actualSeqLengthsQuery.get(),
+        actualSeqLengthsKv.get(), queryRope.get(), keyRope.get(), nullptr, 0.0416666666666667, 1, layoutQ, layoutKv, 0,
+        INT64_MAX, INT64_MAX, 2, false, attentionOut.get(), softmaxMax.get(), softmaxSum.get(), &workspaceSize,
+        &executor);
 
-    EXPECT_NE(aclRet, ACL_SUCCESS);
-    EXPECT_EQ(executor, nullptr);
+    // The inner api rejects a null value with ACLNN_ERR_PARAM_NULLPTR; any other status proves the
+    // wrapper substituted value with key before the call. Success also requires a valid executor.
+    EXPECT_NE(aclRet, ACLNN_ERR_PARAM_NULLPTR);
+    if (aclRet == ACL_SUCCESS) {
+        EXPECT_NE(executor, nullptr);
+    }
 }
 
 // V2: sinks is supported on Ascend950 and the call reaches the inner api

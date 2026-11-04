@@ -143,7 +143,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
       <td>value (aclTensor)</td>
       <td>Input</td>
       <td>Value input of the attention structure.</td>
-      <td>Does not support null tensor.</td>
+      <td>Supports passing a null pointer. When a null pointer is passed, key is used as value. Does not support null tensor.</td>
       <td>FLOAT16, BFLOAT16</td>
       <td>ND</td>
       <td>The shape is the same as that of key.</td>
@@ -459,7 +459,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
             <tr>
                 <td>ACLNN_ERR_PARAM_NULLPTR</td>
                 <td>161001</td>
-                <td>If a passed-in parameter is a required input, output, or attribute and is a null pointer, 161001 is returned.</td>
+                <td>If a passed-in parameter is a required input, output, or attribute and is a null pointer, 161001 is returned. When value is a null pointer, key is used as value, and this error code is not returned due to a null value.</td>
             </tr>
             <tr>
                 <td>ACLNN_ERR_PARAM_INVALID</td>

@@ -144,7 +144,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
       <td>value（aclTensor）</td>
       <td>输入</td>
       <td>attention结构的Value输入。</td>
-      <td>不支持空tensor。</td>
+      <td>支持传入空指针。传入空指针时，使用key作为value；不支持空tensor。</td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>shape与key的shape一致。</td>
@@ -477,7 +477,7 @@ aclnnStatus aclnnSparseFlashAttentionV2(
             <tr>
                 <td>ACLNN_ERR_PARAM_NULLPTR</td>
                 <td>161001</td>
-                <td>如果传入参数是必选输入，输出或者必选属性，且是空指针，则返回161001。</td>
+                <td>如果传入参数是必选输入，输出或者必选属性，且是空指针，则返回161001。value传入空指针时，使用key作为value，不因value为空指针返回该错误码。</td>
             </tr>
             <tr>
                 <td>ACLNN_ERR_PARAM_INVALID</td>
