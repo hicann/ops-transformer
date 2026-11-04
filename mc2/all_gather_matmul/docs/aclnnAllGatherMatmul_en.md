@@ -309,7 +309,6 @@ aclnnStatus aclnnAllGatherMatmul(
 <!-- npu="950" id11 -->
 - <term>Ascend 950PR&950DT products</term>:
   - Supports 2, 4, 8, 16, 32, and 64 cards, and only supports HCCS link all mesh networking.
-  - The total data volume of the AllGather(x1) collective communication cannot exceed 63 \* 256MB. The total communication data volume is calculated as: m \* k \* sizeof(x1_dtype) \* number of devices. Due to different shapes, the internal implementation of the operator may vary, and the actually supported total communication data volume may be slightly smaller than this value.
 <!-- end id11 -->
 <!-- npu="910b" id12 -->
 - <term>Atlas A2 products</term>: The communication-computation fusion MC2 operators in a model only support the same communication domain.

@@ -307,7 +307,6 @@ aclnnStatus aclnnAllGatherMatmul(
 <!-- npu="950" id11 -->
 - <term>Ascend 950PR&950DT系列产品</term>:
   - 支持2、4、8、16、32、64卡，并且仅支持HCCS链路all mesh组网。
-  - AllGather(x1)集合通信数据总量不能超过63 \* 256MB，集合通信数据总量计算方式为：m \* k \* sizeof(x1_dtype) \* 卡数。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
 <!-- end id11 -->
 <!-- npu="910b" id12 -->
 - <term>Atlas A2系列产品</term>:一个模型中的通算融合MC2算子，仅支持相同通信域。
