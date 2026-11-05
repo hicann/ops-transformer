@@ -1028,19 +1028,21 @@ bool QuantMatmulDequantTiling::GetCheckAttr(gert::TilingContext* context)
                         (context->GetNodeName() == nullptr ? "QuantGroupedMatmulDequant" : context->GetNodeName()),
                         "Tiling framework object attrs is unavailable; check context construction and OPP metadata."})),
                 return ge::GRAPH_FAILED);
-    //  optional
-    const std::string x_quant_mode = static_cast<std::string>(attrs->GetStr(0));
-    const bool* transpose_weight = attrs->GetAttrPointer<bool>(1);
+    //  optional, fall back to IR defaults when attributes are absent
+    const char* xQuantModePtr = attrs->GetStr(0);
+    const std::string x_quant_mode = xQuantModePtr == nullptr ? std::string("pertoken") : std::string(xQuantModePtr);
+    const bool* transposeWeightPtr = attrs->GetAttrPointer<bool>(1);
+    const bool transposeWeight = transposeWeightPtr == nullptr ? true : *transposeWeightPtr;
 
     OP_CHECK_IF(x_quant_mode != "pertoken" && x_quant_mode != "pertensor",
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     (context->GetNodeName() == nullptr ? "QuantGroupedMatmulDequant" : context->GetNodeName()),
                     "x_quant_mode", x_quant_mode.c_str(), "Supported values are pertoken and pertensor."),
                 return false);
-    OP_CHECK_IF(*transpose_weight == false,
+    OP_CHECK_IF(transposeWeight == false,
                 OP_LOGE_FOR_INVALID_VALUE(
                     (context->GetNodeName() == nullptr ? "QuantGroupedMatmulDequant" : context->GetNodeName()),
-                    "transpose_weight", (*transpose_weight ? "true" : "false"), "true"),
+                    "transpose_weight", (transposeWeight ? "true" : "false"), "true"),
                 return false);
 
     _Params.perToken = x_quant_mode == "pertoken" ? true : false;

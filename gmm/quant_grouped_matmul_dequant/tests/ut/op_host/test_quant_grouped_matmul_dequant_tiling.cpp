@@ -122,3 +122,136 @@ TEST_F(QuantGroupedMatmulDequantTiling, test_tiling_float16_2)
     std::vector<size_t> expectWorkspaces = {};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
+
+TEST_F(QuantGroupedMatmulDequantTiling, test_tiling_attr_default)
+{
+    int64_t G = 16;
+    int64_t M = 256;
+    int64_t N = 1024;
+    int64_t K = 1024;
+
+    optiling::QuantMatmulDequantCompileInfo compileInfo = {};
+    compileInfo.coreNum = 8;
+    compileInfo.ubSize = 262144;
+    compileInfo.l1Size = 1048576;
+    compileInfo.l2Size = 16777216;
+    compileInfo.l0CSize = 262144;
+    compileInfo.l0ASize = 65536;
+    compileInfo.l0BSize = 65536;
+    compileInfo.socVersionStr = "Ascend310P";
+
+    string socInfoString = R"({"hardware_info": {"BT_SIZE": 0, "load3d_constraints": "1", )"
+                           R"("Intrinsic_fix_pipe_l0c2out": false, "Intrinsic_data_move_l12ub": true, )"
+                           R"("Intrinsic_data_move_l0c2ub": true, "Intrinsic_data_move_out2l1_nd2nz": false, )"
+                           R"("UB_SIZE": 262144, "L2_SIZE": 16777216, "L1_SIZE": 1048576, )"
+                           R"("L0A_SIZE": 65536, "L0B_SIZE": 65536, "L0C_SIZE": 262144, )"
+                           R"("CORE_NUM": 8, "socVersion":"Ascend310P"} })";
+
+    gert::TilingContextPara tilingContextPara(
+        "QuantGroupedMatmulDequant",
+        {{{{M, K}, {M, K}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{G, K / 32, N / 16, 16, 32}, {G, K / 32, N / 16, 16, 32}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ},
+         {{{G, N}, {G, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{G}, {G}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{M}, {M}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{K}, {K}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        {{{{M, N}, {M, N}}, ge::DT_FLOAT16, ge::FORMAT_ND}}, {}, &compileInfo, "Ascend310P", 8, 262144, 4096,
+        socInfoString);
+
+    int64_t expectTilingKey = 10000003;
+    string expectTilingData = "";
+    std::vector<size_t> expectWorkspaces = {};
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
+}
+
+TEST_F(QuantGroupedMatmulDequantTiling, test_tiling_invalid_x_quant_mode)
+{
+    int64_t G = 16;
+    int64_t M = 256;
+    int64_t N = 1024;
+    int64_t K = 1024;
+
+    optiling::QuantMatmulDequantCompileInfo compileInfo = {};
+    compileInfo.coreNum = 8;
+    compileInfo.ubSize = 262144;
+    compileInfo.l1Size = 1048576;
+    compileInfo.l2Size = 16777216;
+    compileInfo.l0CSize = 262144;
+    compileInfo.l0ASize = 65536;
+    compileInfo.l0BSize = 65536;
+    compileInfo.socVersionStr = "Ascend310P";
+
+    string socInfoString = R"({"hardware_info": {"BT_SIZE": 0, "load3d_constraints": "1", )"
+                           R"("Intrinsic_fix_pipe_l0c2out": false, "Intrinsic_data_move_l12ub": true, )"
+                           R"("Intrinsic_data_move_l0c2ub": true, "Intrinsic_data_move_out2l1_nd2nz": false, )"
+                           R"("UB_SIZE": 262144, "L2_SIZE": 16777216, "L1_SIZE": 1048576, )"
+                           R"("L0A_SIZE": 65536, "L0B_SIZE": 65536, "L0C_SIZE": 262144, )"
+                           R"("CORE_NUM": 8, "socVersion":"Ascend310P"} })";
+
+    gert::TilingContextPara tilingContextPara(
+        "QuantGroupedMatmulDequant",
+        {{{{M, K}, {M, K}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{G, K / 32, N / 16, 16, 32}, {G, K / 32, N / 16, 16, 32}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ},
+         {{{G, N}, {G, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{G}, {G}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{M}, {M}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{K}, {K}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        {{{{M, N}, {M, N}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        {{"x_quant_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("invalid")},
+         {"transpose_weight", Ops::Transformer::AnyValue::CreateFrom<bool>(true)}},
+        &compileInfo, "Ascend310P", 8, 262144, 4096, socInfoString);
+
+    int64_t expectTilingKey = 0;
+    string expectTilingData = "";
+    std::vector<size_t> expectWorkspaces = {};
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces);
+}
+
+TEST_F(QuantGroupedMatmulDequantTiling, test_tiling_transpose_weight_false)
+{
+    int64_t G = 16;
+    int64_t M = 256;
+    int64_t N = 1024;
+    int64_t K = 1024;
+
+    optiling::QuantMatmulDequantCompileInfo compileInfo = {};
+    compileInfo.coreNum = 8;
+    compileInfo.ubSize = 262144;
+    compileInfo.l1Size = 1048576;
+    compileInfo.l2Size = 16777216;
+    compileInfo.l0CSize = 262144;
+    compileInfo.l0ASize = 65536;
+    compileInfo.l0BSize = 65536;
+    compileInfo.socVersionStr = "Ascend310P";
+
+    string socInfoString = R"({"hardware_info": {"BT_SIZE": 0, "load3d_constraints": "1", )"
+                           R"("Intrinsic_fix_pipe_l0c2out": false, "Intrinsic_data_move_l12ub": true, )"
+                           R"("Intrinsic_data_move_l0c2ub": true, "Intrinsic_data_move_out2l1_nd2nz": false, )"
+                           R"("UB_SIZE": 262144, "L2_SIZE": 16777216, "L1_SIZE": 1048576, )"
+                           R"("L0A_SIZE": 65536, "L0B_SIZE": 65536, "L0C_SIZE": 262144, )"
+                           R"("CORE_NUM": 8, "socVersion":"Ascend310P"} })";
+
+    gert::TilingContextPara tilingContextPara(
+        "QuantGroupedMatmulDequant",
+        {{{{M, K}, {M, K}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{G, K / 32, N / 16, 16, 32}, {G, K / 32, N / 16, 16, 32}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ},
+         {{{G, N}, {G, N}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{G}, {G}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{M}, {M}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{K}, {K}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        {{{{M, N}, {M, N}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        {{"x_quant_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("pertoken")},
+         {"transpose_weight", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo, "Ascend310P", 8, 262144, 4096, socInfoString);
+
+    int64_t expectTilingKey = 0;
+    string expectTilingData = "";
+    std::vector<size_t> expectWorkspaces = {};
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces);
+}
