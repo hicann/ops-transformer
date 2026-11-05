@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 
+#include "fusion_report_utils.h"
 #include "ge/fusion/pass/pattern_fusion_pass.h" // for the REG_FUSION_PASS macro
 #include "log/log.h"
 
@@ -116,27 +117,42 @@ bool TransferControlEdges(const ge::GraphPtr& graph, const ge::GNodePtr& tmNode,
 // TensorMove is an identity copy, so the ApplyRotaryPosEmb input desc is unchanged and
 // does not need to be refreshed, same as the built-in pass.
 ge::graphStatus RemoveTensorMoveNode(const ge::GraphPtr& graph, ge::GNode& arpeNode, int32_t inputIdx,
-                                     const ge::GNodePtr& tmNode, const ge::GNodePtr& srcNode, int32_t srcOutPort)
+                                     const ge::GNodePtr& tmNode, const ge::GNodePtr& srcNode, int32_t srcOutPort,
+                                     ge::CustomPassContext& passContext)
 {
     if (graph->RemoveEdge(*tmNode, kTensorMoveIoIdx, arpeNode, inputIdx) != ge::GRAPH_SUCCESS) {
         OP_LOGE(kPassName, "Remove TensorMove out data edge failed.");
+        passContext.SetErrorMessage(
+            ge::AscendString("ApplyRotaryPosEmbTensorMoveFusionPass: remove TensorMove out data edge failed."));
         return ge::GRAPH_FAILED;
     }
     if (graph->AddDataEdge(*srcNode, srcOutPort, arpeNode, inputIdx) != ge::GRAPH_SUCCESS) {
         OP_LOGE(kPassName, "Add data edge to ApplyRotaryPosEmb input %d failed.", inputIdx);
+        passContext.SetErrorMessage(
+            ge::AscendString("ApplyRotaryPosEmbTensorMoveFusionPass: add data edge to ApplyRotaryPosEmb failed."));
         return ge::GRAPH_FAILED;
     }
     if (!TransferControlEdges(graph, tmNode, arpeNode)) {
+        passContext.SetErrorMessage(
+            ge::AscendString("ApplyRotaryPosEmbTensorMoveFusionPass: transfer TensorMove control edges failed."));
         return ge::GRAPH_FAILED;
+    }
+    // Report after the rewiring and before removing the TensorMove node, as required by
+    // GraphFuseInspectorUtils::ReportFuse. No new node is created, so the after list is empty.
+    if (ops::fusion::ReportFuseNodes({*tmNode}, {}, passContext) != ge::SUCCESS) {
+        OP_LOGW(kPassName, "Failed to report fusion result for ApplyRotaryPosEmb input %d.", inputIdx);
     }
     if (graph->RemoveNode(*tmNode) != ge::GRAPH_SUCCESS) {
         OP_LOGE(kPassName, "Remove TensorMove node failed.");
+        passContext.SetErrorMessage(
+            ge::AscendString("ApplyRotaryPosEmbTensorMoveFusionPass: remove TensorMove node failed."));
         return ge::GRAPH_FAILED;
     }
     return ge::SUCCESS;
 }
 
-ge::graphStatus FusionProcess(const ge::GraphPtr& graph, ge::GNode& arpeNode, int32_t inputIdx)
+ge::graphStatus FusionProcess(const ge::GraphPtr& graph, ge::GNode& arpeNode, int32_t inputIdx,
+                              ge::CustomPassContext& passContext)
 {
     const auto inNodeAndPort = arpeNode.GetInDataNodesAndPortIndexs(inputIdx);
     const ge::GNodePtr& tmNode = inNodeAndPort.first;
@@ -147,6 +163,12 @@ ge::graphStatus FusionProcess(const ge::GraphPtr& graph, ge::GNode& arpeNode, in
     if (!IsType(tmNode, kTensorMoveOpType)) {
         OP_LOGD(kPassName, "Node before ApplyRotaryPosEmb(input %d) is not %s.", inputIdx, kTensorMoveOpType);
         return ge::GRAPH_NOT_CHANGED;
+    }
+
+    // The TensorMove -> ApplyRotaryPosEmb structure is matched; report it regardless of
+    // whether the fusion guards below pass, so the match hit rate can be counted.
+    if (ops::fusion::ReportMatchNodes({*tmNode, arpeNode}, passContext) != ge::SUCCESS) {
+        OP_LOGW(kPassName, "Failed to report matched nodes for ApplyRotaryPosEmb input %d.", inputIdx);
     }
 
     // The TensorMove output must only be used by the ApplyRotaryPosEmb node.
@@ -170,17 +192,17 @@ ge::graphStatus FusionProcess(const ge::GraphPtr& graph, ge::GNode& arpeNode, in
         return ge::GRAPH_NOT_CHANGED;
     }
 
-    return RemoveTensorMoveNode(graph, arpeNode, inputIdx, tmNode, srcNode, srcOutPort);
+    return RemoveTensorMoveNode(graph, arpeNode, inputIdx, tmNode, srcNode, srcOutPort, passContext);
 }
 
-ge::graphStatus FusionArpeNode(const ge::GraphPtr& graph, ge::GNode& arpeNode)
+ge::graphStatus FusionArpeNode(const ge::GraphPtr& graph, ge::GNode& arpeNode, ge::CustomPassContext& passContext)
 {
-    const auto queryResult = FusionProcess(graph, arpeNode, kQueryIdx);
+    const auto queryResult = FusionProcess(graph, arpeNode, kQueryIdx, passContext);
     if (queryResult == ge::GRAPH_FAILED) {
         OP_LOGE(kPassName, "ApplyRotaryPosEmbTensorMoveFusionPass failed due to query input fail.");
         return ge::GRAPH_FAILED;
     }
-    const auto keyResult = FusionProcess(graph, arpeNode, kKeyIdx);
+    const auto keyResult = FusionProcess(graph, arpeNode, kKeyIdx, passContext);
     if (keyResult == ge::GRAPH_FAILED) {
         OP_LOGE(kPassName, "ApplyRotaryPosEmbTensorMoveFusionPass failed due to key input fail.");
         return ge::GRAPH_FAILED;
@@ -194,7 +216,6 @@ ge::graphStatus FusionArpeNode(const ge::GraphPtr& graph, ge::GNode& arpeNode)
 
 ge::Status ApplyRotaryPosEmbTensorMoveFusionPass::Run(ge::GraphPtr& graph, ge::CustomPassContext& passContext)
 {
-    (void)passContext;
     OP_LOGD(kPassName, "Enter ApplyRotaryPosEmbTensorMoveFusionPass.");
     if (graph == nullptr || !graph->IsValid()) {
         OP_LOGW(kPassName, "Graph is null or invalid.");
@@ -213,7 +234,7 @@ ge::Status ApplyRotaryPosEmbTensorMoveFusionPass::Run(ge::GraphPtr& graph, ge::C
 
     bool changed = false;
     for (auto& arpeNode : arpeNodes) {
-        const auto status = FusionArpeNode(graph, arpeNode);
+        const auto status = FusionArpeNode(graph, arpeNode, passContext);
         if (status == ge::GRAPH_FAILED) {
             return ge::GRAPH_FAILED;
         }
