@@ -409,7 +409,7 @@ __aicore__ inline void MoeDistributeDispatchV2A6<DISPATCH_V2_A6_TEMPLATE_ARGS>::
 {
     SetTilingData(tilingData);
     SetTilingDataAndCalParam();
-    useSerialMode_ = (axisMaxBS_ < SERIAL_MODE_BS_THRESHOLD) &&
+    useSerialMode_ = (axisMaxBS_ <= SERIAL_MODE_BS_THRESHOLD) &&
                      (epWorldSizeOriginal_ < SERIAL_MODE_EP_WORLD_SIZE_THRESHOLD) && !isScalingDownFlag_;
     aivUsedCumSum_ = totalExpertNum_ / 16; // 单核处理16个专家cnt发送
     aivUsedCumSum_ = (aivUsedCumSum_ == 0) ? 1 : aivUsedCumSum_;

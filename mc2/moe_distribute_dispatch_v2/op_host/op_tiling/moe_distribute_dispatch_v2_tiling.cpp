@@ -89,8 +89,8 @@ constexpr uint32_t WORKSPACE_ELEMENT_OFFSET = 512;
 constexpr uint64_t A5_CUMSUM_WS_FLAG_OFFSET = 32UL * 1024UL; // 32*32*32=32KB
 constexpr uint64_t A5_CUMSUM_WORKSPACE_MAX_CORE_NUM = 32U;
 constexpr uint32_t A5_CUMSUM_MAX_CORE_NUM = 8U;
-constexpr uint32_t A5_SERIAL_MODE_BS_THRESHOLD = 32U;
-constexpr uint32_t A5_SERIAL_MODE_EP_WORLD_SIZE_THRESHOLD = 16U;
+constexpr uint32_t SERIAL_MODE_BS_THRESHOLD = 32U;
+constexpr uint32_t SERIAL_MODE_EP_WORLD_SIZE_THRESHOLD = 16U;
 constexpr uint64_t UB_ALIGN_VAL = 32U;
 constexpr uint32_t UB_ALIGN_INT32_NUM = UB_ALIGN_VAL / sizeof(int32_t);
 constexpr uint32_t RANK_LIST_NUM = 2;
@@ -1662,6 +1662,12 @@ static uint32_t Ceil(uint32_t dividend, uint32_t divisor, const char* nodeName)
     return 0;
 }
 
+static bool IsFullMeshSerialMode(const MoeDistributeDispatchV2Info& info)
+{
+    uint32_t maxBs = info.globalBs / info.epWorldSize;
+    return maxBs <= SERIAL_MODE_BS_THRESHOLD && info.epWorldSize < SERIAL_MODE_EP_WORLD_SIZE_THRESHOLD;
+}
+
 static uint32_t SendToMoeExpertUsedBuffer(const gert::TilingContext* context,
                                           const MoeDistributeDispatchV2TilingData& tilingData,
                                           uint32_t expertIdsBufSize, uint32_t kSize, const char* nodeName)
@@ -1678,7 +1684,6 @@ static uint32_t SendToMoeExpertUsedBuffer(const gert::TilingContext* context,
     uint32_t moeExpertRankNum = epWorldSize - sharedExpertRankNum;
     uint32_t moeExpertNumPerRank = moeExpertNum / moeExpertRankNum;
     uint32_t rscvStatusNum = epRankId < sharedExpertRankNum ? epWorldSize : epWorldSize * moeExpertNumPerRank;
-    uint32_t maxBs = tilingData.moeDistributeDispatchV2Info.globalBs / epWorldSize;
     uint32_t aivUsedCumSum = totalExpertNum / 16; // 单核处理16个专家cnt发送
     aivUsedCumSum = (aivUsedCumSum == 0) ? 1 : aivUsedCumSum;
     aivUsedCumSum = (aivUsedCumSum >= (aivNum / HALF_NUM)) ? (aivNum / HALF_NUM) : aivUsedCumSum;
@@ -1699,16 +1704,21 @@ static uint32_t SendToMoeExpertUsedBuffer(const gert::TilingContext* context,
         UbForMoe = UbForMoe + expertMaskBufSize;                                        // expertMaskBuf
         UbForMoe = UbForMoe + Ceil(moeExpertNum * sizeof(int32_t), UB_ALIGN, nodeName); // tokenNumToExpertBuf
     }
-    if (maxBs < A5_SERIAL_MODE_BS_THRESHOLD && epWorldSize < A5_SERIAL_MODE_EP_WORLD_SIZE_THRESHOLD &&
+    if (IsFullMeshSerialMode(tilingData.moeDistributeDispatchV2Info) &&
         mc2tiling::GetNpuArch(context) != Ops::Base::DAV_2201) {
-        // 串行模式下各核按rank分片统计专家count，statusBuf_只需容纳本核分片
         uint32_t countNumPerCore = Ceil(totalExpertNum, aivNum, nodeName) / aivNum;
-        uint32_t rankNumPerCore = Ceil(epWorldSize, aivNum, nodeName) / aivNum;
-        uint32_t expertNumPerRank = moeExpertNumPerRank > 1U ? moeExpertNumPerRank : 1U;
-        uint32_t serialCountNumPerCore = rankNumPerCore * expertNumPerRank;
-        countNumPerCore = countNumPerCore > serialCountNumPerCore ? countNumPerCore : serialCountNumPerCore;
+        if (mc2tiling::GetNpuArch(context) != Ops::Base::DAV_3510) {
+            uint32_t rankNumPerCore = Ceil(epWorldSize, aivNum, nodeName) / aivNum;
+            uint32_t expertNumPerRank = std::max(moeExpertNumPerRank, 1U);
+            countNumPerCore = std::max(countNumPerCore, rankNumPerCore * expertNumPerRank);
+        }
         uint32_t statusCntAlign = Ceil(countNumPerCore, UB_ALIGN_INT32_NUM, nodeName);
         UbForMoe = UbForMoe + statusCntAlign * UB_ALIGN_VAL;
+        if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) {
+            uint32_t histoGroupNum =
+                (statusCntAlign + Mc2Kernel::EXPERT_PER_HISTO_GROUP - 1U) / Mc2Kernel::EXPERT_PER_HISTO_GROUP;
+            UbForMoe += histoGroupNum * Mc2Kernel::EXPERT_HISTO_BIN_NUM * sizeof(uint16_t);
+        }
     }
     return UbForMoe;
 }
@@ -2044,9 +2054,9 @@ static uint32_t CalcCumSumRecStatusNumPerCore(const MoeDistributeDispatchV2Info&
     return (rscvStatusNum + coreNum - 1U) / coreNum;
 }
 
-static uint32_t CalcCumSumUsedUbSize(const MoeDistributeDispatchV2Info& info, uint32_t recStatusNumPerCore,
-                                     uint32_t statusCntAlign, uint32_t expertIdsBufSize, uint32_t maxSizeForUbBuffer,
-                                     uint32_t aivNum, const char* nodeName)
+static uint32_t CalcCumSumUsedUbSize(const gert::TilingContext* context, const MoeDistributeDispatchV2Info& info,
+                                     uint32_t recStatusNumPerCore, uint32_t statusCntAlign, uint32_t expertIdsBufSize,
+                                     uint32_t maxSizeForUbBuffer, uint32_t aivNum, const char* nodeName)
 {
     uint32_t moeExpertNumPerRank = info.moeExpertNum / (info.epWorldSize - info.sharedExpertRankNum);
     uint32_t cumSumUbSize = 2U * UB_ALIGN;
@@ -2067,8 +2077,10 @@ static uint32_t CalcCumSumUsedUbSize(const MoeDistributeDispatchV2Info& info, ui
     uint32_t recStatusSpace = Ceil(recStatusNumPerCore * sizeof(float), UB_ALIGN, nodeName);
     uint32_t recvWinSpace = Ceil(info.epWorldSize * moeExpertNumPerRank * sizeof(float), UB_ALIGN, nodeName);
     cumSumUbSize += std::max(recStatusSpace, recvWinSpace);
+    uint32_t histoExpertNum =
+        mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 ? statusCntAlign : info.moeExpertNum;
     uint32_t histoGroupNum =
-        (info.moeExpertNum + Mc2Kernel::EXPERT_PER_HISTO_GROUP - 1U) / Mc2Kernel::EXPERT_PER_HISTO_GROUP;
+        (histoExpertNum + Mc2Kernel::EXPERT_PER_HISTO_GROUP - 1U) / Mc2Kernel::EXPERT_PER_HISTO_GROUP;
     histoGroupNum = (histoGroupNum == 0U) ? 1U : histoGroupNum;
     cumSumUbSize += histoGroupNum * Mc2Kernel::EXPERT_HISTO_BIN_NUM * sizeof(uint16_t);
     cumSumUbSize += 2U * aivNum * UB_ALIGN;
@@ -2099,8 +2111,7 @@ static ge::graphStatus CheckCumSumUbSizeA5(const gert::TilingContext* context, c
     OP_TILING_CHECK(CalcA5CumsumUbBudget(ubRealSize, nodeName, cumsumUbBudget) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Calc cumsum UB budget failed."), return ge::GRAPH_FAILED);
     const auto& info = tilingData.moeDistributeDispatchV2Info;
-    uint32_t maxBs = info.globalBs / info.epWorldSize;
-    if (maxBs < A5_SERIAL_MODE_BS_THRESHOLD && info.epWorldSize < A5_SERIAL_MODE_EP_WORLD_SIZE_THRESHOLD) {
+    if (IsFullMeshSerialMode(info)) {
         OP_TILING_CHECK(CheckSerialReceiveUbSizeA5(context, nodeName, tilingData, config) != ge::GRAPH_SUCCESS,
                         OP_LOGE(nodeName, "Check serial receive UB size failed."), return ge::GRAPH_FAILED);
         if (!info.hasElasticInfo) {
@@ -2109,7 +2120,7 @@ static ge::graphStatus CheckCumSumUbSizeA5(const gert::TilingContext* context, c
     }
     uint32_t recStatusNumPerCore = CalcCumSumRecStatusNumPerCore(info, aivNum, nodeName);
     uint32_t statusCntAlign = CalcCumSumStatusCntAlign(info, aivNum, nodeName);
-    uint32_t cumSumUbSize = CalcCumSumUsedUbSize(info, recStatusNumPerCore, statusCntAlign, expertIdsBufSize,
+    uint32_t cumSumUbSize = CalcCumSumUsedUbSize(context, info, recStatusNumPerCore, statusCntAlign, expertIdsBufSize,
                                                  maxSizeForUbBuffer, aivNum, nodeName);
     OP_TILING_CHECK(
         cumSumUbSize > cumsumUbBudget,
@@ -2240,6 +2251,10 @@ static ge::graphStatus CheckUBSize(const gert::TilingContext* context, MoeDistri
         SetMaxSizeForUbBuffer(tilingData, hSize, bsSize, kSize, expertIdsCnt, isScales, nodeName);
 
     uint32_t calTokenIdxBuffSize = Ceil(expertIdsCnt * sizeof(int32_t), UB_ALIGN, nodeName);
+    if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 &&
+        IsFullMeshSerialMode(tilingData.moeDistributeDispatchV2Info)) {
+        calTokenIdxBuffSize = std::max(calTokenIdxBuffSize, SIZE_ALIGN_256);
+    }
     uint32_t calTempBufSize = calTokenIdxBuffSize; // A3 维持原公式
     if (!isArch22) {
         // 规约只需保存每64个float的中间结果（与 kernel 侧 reduceBytes 公式对齐）
