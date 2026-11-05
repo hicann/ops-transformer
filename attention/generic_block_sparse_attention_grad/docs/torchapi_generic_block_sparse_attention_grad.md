@@ -237,10 +237,23 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 | metadata | Tensor   | 必选      | 主算子分核与负载均衡数据 | int32    | ND       | `(metaSize,)` |
 
 其中：
+<!-- npu="950" id7 -->
+- <term>Ascend 950PR&950DT系列产品</term>
 
-$$
-metaSize = 80 + B \times N1 \times J \times 4,\quad J = \lceil max\_seqlen\_kv / blockShapeY \rceil
-$$
+    $$
+    metaSize = 80 + B \times N1 \times J \times 4,\quad J = \lceil max\_seqlen\_kv / blockShapeY \rceil
+    $$
+
+<!-- end id7 -->
+
+<!-- npu="A3,910b" id8 -->
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
+
+    $$
+    metaSize = 198
+    $$
+
+<!-- end id8 -->
 
 ### generic_block_sparse_attention_grad
 
@@ -256,7 +269,7 @@ $$
 
 ## 约束说明
 
-- 确定性计算：`generic_block_sparse_attention_grad`默认为非确定性实现，暂不支持确定性实现，确定性计算配置后不会生效。
+- 确定性计算：`generic_block_sparse_attention_grad`默认不支持确定性计算。
 
 **`layout_sparse_pattern=1`：**
 
@@ -530,7 +543,7 @@ $$
                 <td>metadata</td>
                 <td>
                     <ul>
-                        <li>`layout_sparse_pattern=1`：tensor_type仅支持int32，shape[0] ≥ 80 + B×N1×J×4</li>
+                        <li>`layout_sparse_pattern=1`：tensor_type仅支持int32，不同产品长度支持范围不一样，具体见下方说明</li>
                     </ul>
                 </td>
                 <td>`layout_sparse_pattern=1`必须存在；`layout_sparse_pattern=0`须为None</td>
@@ -539,6 +552,15 @@ $$
             </tr>
         </tbody>
     </table>
+
+<!-- npu="A3,910b" id9 -->
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
+    metadata长度≥198。
+<!-- end id9 -->
+
+<!-- npu="950" id10 -->
+  - <term>Ascend 950PR&950DT系列产品</term>：metadata长度≥80+B×N1×J×4。
+<!-- end id10 -->
 
 #### Mask参数组
 

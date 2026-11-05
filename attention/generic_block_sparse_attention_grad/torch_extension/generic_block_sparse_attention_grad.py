@@ -20,7 +20,8 @@ from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 GSAG_TASK_LIST_OFFSET = 80  # 8 + 2 * 36
 GSAG_TASK_ENTRY_SIZE = 4
 GSAG_METADATA_OP_NAME = "generic_block_sparse_attention_grad_metadata"
-ARC22_GBSAG_TASK_LIST_SIZE = 198  # 6 + 64 * 3
+ARC22_GBSAG_TASK_LIST_SIZE = 198  # 6 + 64 * 3（arch22 ABI 上界，具名常量）
+GSAG_ARCH35_SOC_MARK = "Ascend950"  # 与 csrc / AICPU 分发器保持同一判定串
 FLOAT32_MAX = torch.finfo(torch.float32).max
 _OP_PREFIX = "GenericBlockSparseAttentionGrad"
 
@@ -233,15 +234,35 @@ def _check_qsag(
             raise ValueError("all QSAG tensors must be on the same device")
 
 
-def calc_gsag_metadata_size(batch_size: int, num_heads_q: int, num_j: int) -> int:
-    """Required metadata int32 length:
-    A5 : TASK_LIST_OFFSET + B * N1 * J * TASK_ENTRY_SIZE
-    A2 : 6 (param_nums) + 64 (max_aicore_nums) * 3
+def _is_arch35_soc() -> bool:
+    """当前 SoC 是否 arch35（Ascend950）。
+
+    与 csrc CalcGsagMetadataSizeForSoc 的 aclrtGetSocName() + strstr 判定保持一致；
+    异常时回退 arch22（固定容量），与 csrc socName == nullptr 的回退一致，
+    避免 fake/meta 与真实分配 shape 分叉。
     """
-    arc35_size = (
-        GSAG_TASK_LIST_OFFSET + batch_size * num_heads_q * num_j * GSAG_TASK_ENTRY_SIZE
-    )
-    return max(arc35_size, ARC22_GBSAG_TASK_LIST_SIZE)
+    try:
+        return GSAG_ARCH35_SOC_MARK in torch.npu.get_device_name()
+    except Exception:
+        return False
+
+
+def calc_gsag_metadata_size(
+    batch_size: int, num_heads_q: int, num_j: int, is_arch35: Optional[bool] = None
+) -> int:
+    """metadata int32 长度（必须与 csrc CalcGsagMetadataSize 逐平台一致）:
+    A5/arch35  : TASK_LIST_OFFSET + B * N1 * J * TASK_ENTRY_SIZE
+    A2/A3/arch22: ARC22_GBSAG_TASK_LIST_SIZE（6 + 64 * 3 = 198）
+    is_arch35 仅供单测显式指定；缺省按当前 SoC 自动判定。
+    """
+    if is_arch35 is None:
+        is_arch35 = _is_arch35_soc()
+    if is_arch35:
+        return (
+            GSAG_TASK_LIST_OFFSET
+            + batch_size * num_heads_q * num_j * GSAG_TASK_ENTRY_SIZE
+        )
+    return ARC22_GBSAG_TASK_LIST_SIZE
 
 
 def _max_segment_from_cu_seqlens(cu_seqlens: torch.Tensor) -> int:

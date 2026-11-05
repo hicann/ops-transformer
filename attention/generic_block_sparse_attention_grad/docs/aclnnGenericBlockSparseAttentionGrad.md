@@ -247,7 +247,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   <td>
                       <ul>
                           <li>必须传入。</li>
-                          <li>长度≥max(80+B×N1×J×4, 198)（int32元素个数）。</li>
+                          <li>不同产品metaSize支持长度不一样，具体见表格下方说明。</li>
                       </ul>
                   </td>
                   <td>INT32</td>
@@ -479,6 +479,15 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
           </tbody>
       </table>
 
+  <!-- npu="A3,910b" id10 -->
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
+    metadataOptional长度≥198。
+  <!-- end id10 -->
+
+  <!-- npu="950" id9 -->
+  - <term>Ascend 950PR&950DT系列产品</term>：metadataOptional长度≥80+B×N1×J×4（int32元素个数）。
+  <!-- end id9 -->
+
 - **返回值**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
@@ -563,7 +572,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
 ## 约束说明
 
 - 确定性计算：
-  - aclnnGenericBlockSparseAttentionGrad默认为非确定性实现，暂不支持确定性实现，确定性计算配置后不会生效。
+  - aclnnGenericBlockSparseAttentionGrad默认为非确定性实现，不支持通过aclrtSetSysParamOpt开启确定性。
 - 参数query、key、value、dout、out、dQuery、dKey、dValue的数据类型应保持一致，支持FLOAT16和BFLOAT16；lse为FLOAT32，sparseBlockIdx、sparseBlockCount为INT32，cuSeqLengthsQOptional/cuSeqLengthsKvOptional为INT64，sequsedQOptional/sequsedKvOptional为INT32。
 - layoutQ和layoutKv须相同，支持TND、BNSD、BSND。TND布局须传入对应的INT64 `(B+1,)` cuSeqLengths；BNSD/BSND布局下seqused须传nullptr。
 - softmaxPrecision仅支持0；winLeft和winRight不使能时必须为-1；attenMaskOptional当前应传nullptr。Softmax LSE的head/seq轴语义须与query布局一致。

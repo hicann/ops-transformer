@@ -13,6 +13,8 @@
  * \brief PyTorch ACLNN binding for GenericBlockSparseAttentionGrad.
  */
 
+#include <cstring>
+
 #include <torch/extension.h>
 
 #include "aclnn_common.h"
@@ -22,12 +24,26 @@ namespace {
 // Keep in sync with generic_block_sparse_attention_grad_metadata.h
 constexpr int64_t GSAG_TASK_LIST_OFFSET = 80; // 8 + 2 * 36
 constexpr int64_t GSAG_TASK_ENTRY_SIZE = 4;
-constexpr int64_t ARC22_GBSAG_TASK_LIST_SIZE = 198; // 6 + 64 * 3
+constexpr int64_t ARC22_GBSAG_TASK_LIST_SIZE = 198; // 6 + 64 * 3（arch22 ABI 上界，具名常量）
+
+// arch35 判定串：与 AICPU 分发器（soc_version attr）及 aclnn 校验（op_host check.h）保持一致
+constexpr const char* GSAG_ARCH35_SOC_MARK = "Ascend950";
+
+// 按芯片计算 metadata 容量（int32 字数）：
+// Ascend950(arch35)  ：TASK_LIST_OFFSET + B * N1 * J * TASK_ENTRY_SIZE
+// Atlas A2/A3(arch22)：ARC22_GBSAG_TASK_LIST_SIZE（6 + 64 * 3，与 B*N1*J 无关）
+inline int64_t CalcGsagMetadataSizeForSoc(const char* socName, int64_t batchSize, int64_t numQHeads, int64_t numJ)
+{
+    if (socName != nullptr && std::strstr(socName, GSAG_ARCH35_SOC_MARK) != nullptr) {
+        return GSAG_TASK_LIST_OFFSET + batchSize * numQHeads * numJ * GSAG_TASK_ENTRY_SIZE;
+    }
+    return ARC22_GBSAG_TASK_LIST_SIZE;
+}
 
 inline int64_t CalcGsagMetadataSize(int64_t batchSize, int64_t numQHeads, int64_t numJ)
 {
-    int64_t arc35Size = GSAG_TASK_LIST_OFFSET + batchSize * numQHeads * numJ * GSAG_TASK_ENTRY_SIZE;
-    return arc35Size >= ARC22_GBSAG_TASK_LIST_SIZE ? arc35Size : ARC22_GBSAG_TASK_LIST_SIZE;
+    // 不缓存：同进程多代 SoC 时 static 会判错；aclrtGetSocName 仅返回内部指针，开销可忽略
+    return CalcGsagMetadataSizeForSoc(aclrtGetSocName(), batchSize, numQHeads, numJ);
 }
 } // namespace
 

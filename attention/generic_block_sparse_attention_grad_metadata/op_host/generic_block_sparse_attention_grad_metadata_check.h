@@ -40,6 +40,10 @@ static constexpr int64_t GSAG_BLOCK_SHAPE_Y_MIN = 128;
 static constexpr int64_t GSAG_BLOCK_SHAPE_Y_ALIGN = 64;
 static constexpr int64_t GSAG_SUPPORTED_MASK_TYPE = 1;
 static constexpr int64_t GSAG_SUPPORTED_SOFTMAX_PRECISION = 0;
+// metadata 长度按平台分支：Ascend950(arch35) 为 TASK_LIST_OFFSET + B * N1 * J * TASK_ENTRY_SIZE；
+// Atlas A2/A3(arch22) 为 6 字头 + 64 核 * 3 字（每核一条 KTask，与 B*N1*J 无关），即 198。
+static constexpr int64_t GSAG_ARCH22_METADATA_MIN_WORDS = 198;
+static constexpr const char* GSAG_ARCH35_SOC_MARK = "Ascend950";
 // sparse_block_idx: [B, N2, J, maxS1]; sparse_block_count: [B, N2, J]
 static constexpr size_t SPARSE_BLOCK_IDX_DIM_NUM = 4;
 static constexpr size_t SPARSE_BLOCK_COUNT_DIM_NUM = 3;
@@ -177,7 +181,7 @@ aclnnStatus CheckExistence(const aclTensor* sparseBlockIdx, const aclTensor* spa
 
 aclnnStatus CheckConsistency(const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount, int64_t maxQSeqlen,
                              int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads, int64_t blockShapeY,
-                             const aclTensor* metadata)
+                             const aclTensor* metadata, const char* socVersion)
 {
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
     if (sparseBlockIdx->GetViewShape().GetDimNum() != SPARSE_BLOCK_IDX_DIM_NUM) {
@@ -241,8 +245,12 @@ aclnnStatus CheckConsistency(const aclTensor* sparseBlockIdx, const aclTensor* s
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    const int64_t requiredMetadataSize = static_cast<int64_t>(optiling::CalcGsagMetadataSize(
-        static_cast<uint64_t>(batchSize), static_cast<uint64_t>(numQHeads), static_cast<uint64_t>(j)));
+    const bool isArch35 =
+        (socVersion != nullptr) && (std::string(socVersion).find(GSAG_ARCH35_SOC_MARK) != std::string::npos);
+    const int64_t requiredMetadataSize =
+        isArch35 ? static_cast<int64_t>(optiling::CalcGsagMetadataSize(
+                       static_cast<uint64_t>(batchSize), static_cast<uint64_t>(numQHeads), static_cast<uint64_t>(j))) :
+                   GSAG_ARCH22_METADATA_MIN_WORDS;
 
     aclGetDataType(sparseBlockIdx, &dataType);
     if (dataType != aclDataType::ACL_INT32) {
@@ -261,7 +269,9 @@ aclnnStatus CheckConsistency(const aclTensor* sparseBlockIdx, const aclTensor* s
         OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(GSAG_ACLNN_OP_NAME, "metadata",
                                                   std::to_string(metadata->GetViewShape().GetDim(0)),
                                                   "metadata length must be >= " + std::to_string(requiredMetadataSize) +
-                                                      " (TASK_LIST_OFFSET + B * num_q_heads * J * TASK_ENTRY_SIZE)");
+                                                      (isArch35 ? " (TASK_LIST_OFFSET + B * num_q_heads * J * "
+                                                                  "TASK_ENTRY_SIZE)" :
+                                                                  " (arch22: 6 + 64 * 3)"));
         return ACLNN_ERR_PARAM_INVALID;
     }
     aclGetDataType(metadata, &dataType);
@@ -269,6 +279,53 @@ aclnnStatus CheckConsistency(const aclTensor* sparseBlockIdx, const aclTensor* s
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(GSAG_ACLNN_OP_NAME, "metadata", ToString(dataType).GetString(),
                                               "dtype of metadata must be int32");
         return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+// 序列长度张量校验：与 aclnnGenericBlockSparseAttentionGrad 的校验保持逐字段一致，
+// 避免同一组张量在两个接口上结论不同。
+//   cuSeqLengthsQ/Kv：TND 前缀和数组，int64，元素数必须为 B+1（B = sparse_block_idx 第 0 维）；
+//   sequsedQ/Kv     ：TND 实际长度，int32，元素数必须为 B。
+aclnnStatus CheckSeqLengthTensors(const aclTensor* sparseBlockIdx, const aclTensor* cuSeqLengthsQOptional,
+                                  const aclTensor* cuSeqLengthsKvOptional, const aclTensor* sequsedQOptional,
+                                  const aclTensor* sequsedKvOptional)
+{
+    // CheckConsistency 已保证 sparse_block_idx 为 4 维且 B/N2/J/maxS1 均 > 0。
+    const int64_t batchSize = sparseBlockIdx->GetViewShape().GetDim(DIM_B);
+    const struct {
+        const aclTensor* tensor;
+        const char* name;
+        aclDataType dtype;
+        int64_t expectedElems;
+        const char* elemsReason;
+    } seqTensors[] = {
+        {cuSeqLengthsQOptional, "cu_seq_lengths_q", aclDataType::ACL_INT64, batchSize + 1,
+         "cu_seq_lengths_q must be int64 with B+1 elements"},
+        {cuSeqLengthsKvOptional, "cu_seq_lengths_kv", aclDataType::ACL_INT64, batchSize + 1,
+         "cu_seq_lengths_kv must be int64 with B+1 elements"},
+        {sequsedQOptional, "seqused_q", aclDataType::ACL_INT32, batchSize, "seqused_q must be int32 with B elements"},
+        {sequsedKvOptional, "seqused_kv", aclDataType::ACL_INT32, batchSize,
+         "seqused_kv must be int32 with B elements"},
+    };
+    for (const auto& seq : seqTensors) {
+        if (seq.tensor == nullptr) {
+            continue; // 仅在传入时校验；TND 必传已由 CheckExistence 保证。
+        }
+        aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
+        aclGetDataType(seq.tensor, &dataType);
+        if (dataType != seq.dtype) {
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(GSAG_ACLNN_OP_NAME, seq.name, ToString(dataType).GetString(),
+                                                  seq.elemsReason);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        const int64_t elems = seq.tensor->GetViewShape().GetShapeSize();
+        if (elems != seq.expectedElems) {
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                GSAG_ACLNN_OP_NAME, seq.name, std::to_string(elems),
+                std::string(seq.elemsReason) + " (B = sparse_block_idx dim0 = " + std::to_string(batchSize) + ")");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
     return ACLNN_SUCCESS;
 }
@@ -283,10 +340,6 @@ static aclnnStatus ParamsCheck(const aclTensor* sparseBlockIdx, const aclTensor*
                                bool isConsistentTopk, uint32_t aicCoreNum, uint32_t aivCoreNum, const char* socVersion,
                                const aclTensor* metadata)
 {
-    (void)sequsedQOptional;
-    (void)sequsedKvOptional;
-    (void)socVersion;
-
     if (CheckSingleParam(maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, headDim, blockShapeX, blockShapeY, layoutQ,
                          layoutKv, layoutSparsePattern, maskType, softmaxPrecision, winLeft, winRight,
                          residualBlockMode, isConsistentTopk, aicCoreNum, aivCoreNum) != ACLNN_SUCCESS) {
@@ -297,7 +350,11 @@ static aclnnStatus ParamsCheck(const aclTensor* sparseBlockIdx, const aclTensor*
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (CheckConsistency(sparseBlockIdx, sparseBlockCount, maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, blockShapeY,
-                         metadata) != ACLNN_SUCCESS) {
+                         metadata, socVersion) != ACLNN_SUCCESS) {
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (CheckSeqLengthTensors(sparseBlockIdx, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, sequsedQOptional,
+                              sequsedKvOptional) != ACLNN_SUCCESS) {
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;

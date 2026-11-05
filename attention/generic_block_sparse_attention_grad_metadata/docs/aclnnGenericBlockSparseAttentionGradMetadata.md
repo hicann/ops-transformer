@@ -31,9 +31,9 @@
   <!-- end id9 -->
 
   <!-- npu="A3,910b" id10 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
     按B → N2 → J顺序展开`(b, n2, j)`任务列表，并在AIC核间做`[baseM, baseN] = [128, 128]`基本块粒度的贪心负载均衡，输出metadata供主Grad算子消费。
-   <!-- end id10 -->
+  <!-- end id10 -->
 
 - 该算子不建议单独使用，建议与aclnnGenericBlockSparseAttentionGrad配合使用，形成完整工作流。
 
@@ -49,7 +49,7 @@
   <!-- end id7 -->
 
   <!-- npu="A3,910b" id8 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> 以及 <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>:
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>:
 
     $$
     \text{metaSize} = 198
@@ -198,7 +198,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>maxKvSeqlen</td>
         <td>输入</td>
         <td>所有batch中kvSeqlen的最大值。</td>
-        <td>须≥0。用于计算J = ceilDiv(maxKvSeqlen, blockShapeY)。</td>
+        <td>须>0。用于计算J = ceilDiv(maxKvSeqlen, blockShapeY)。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -338,7 +338,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>metadata</td>
         <td>输出</td>
         <td>稀疏attention的分核信息。</td>
-        <td>不支持空Tensor。metaSize ≥ (80 + B×N1×J×4, 198)。</td>
+        <td>不支持空Tensor。不同产品metaSize支持长度不一样，具体见表格下方说明或者约束说明。</td>
         <td>INT32</td>
         <td>ND</td>
         <td>[metaSize]</td>
@@ -366,6 +366,15 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
       </tr>
     </tbody>
   </table>
+
+  <!-- npu="A3,910b" id11 -->
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
+    metadata长度≥198。
+  <!-- end id11 -->
+
+  <!-- npu="950" id12 -->
+  - <term>Ascend 950PR&950DT系列产品</term>：metadata长度≥80+B×N1×J×4（int32元素个数）。
+  <!-- end id12 -->
 
 - **返回值**
 
@@ -464,7 +473,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
 - sequsedQOptional/sequsedKvOptional仅在TND时生效；BNSD/BSND须传nullptr，实际序列长度取自maxQSeqlen/maxKvSeqlen（须与Q/K的S维一致）。
 - winLeft和winRight不使能时必须为-1。
 - sparseBlockIdx最后一维maxS1须≥maxQSeqlen；J = ceilDiv(maxKvSeqlen, blockShapeY)须与sparseBlockIdx第3维一致。
-- metadata长度须满足shape[0] ≥ max(80 + B × numQHeads × J × 4, 198)；任务数上界B × numQHeads × J ≤ 1048576。
+- 任务数上界B × numQHeads × J ≤ 1048576。
 
 ## 调用示例
 

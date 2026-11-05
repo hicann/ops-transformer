@@ -22,6 +22,7 @@
 #include "opdev/make_op_executor.h"
 #include "opdev/op_dfx.h"
 #include "opdev/common_types.h"
+#include "opdev/platform.h"
 #include <acl/acl.h>
 
 using namespace op;
@@ -39,6 +40,7 @@ static constexpr int64_t GSAG_SUPPORTED_SOFTMAX_PRECISION = 0;
 static constexpr size_t GSAG_SPARSE_IDX_RANK = 4;
 static constexpr size_t GSAG_SPARSE_CNT_RANK = 3;
 static constexpr int64_t GSAG_METADATA_HEADER_SIZE = 80;
+static constexpr int64_t GSAG_ARCH22_METADATA_MIN_ELEMS = 198; // 6 + 64 * 3（arch22 ABI 上界）
 
 struct LayoutDims {
     int64_t batch;
@@ -238,11 +240,14 @@ aclnnStatus CheckSparseAndSeqShapes(const aclTensor* query, const aclTensor* spa
                 op::ToString(idxShape).GetString(), op::ToString(cntShape).GetString());
         return ACLNN_ERR_PARAM_INVALID;
     }
+
+    const bool isArch35 = op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510;
+    const int64_t minMetaElems = isArch35 ? GSAG_METADATA_HEADER_SIZE : GSAG_ARCH22_METADATA_MIN_ELEMS;
     const int64_t metaElems = metadata->GetViewShape().GetShapeSize();
-    if (metaElems < GSAG_METADATA_HEADER_SIZE) {
+    if (metaElems < minMetaElems) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                 "GenericBlockSparseAttentionGrad: metadata must hold at least %ld int32 elements, got %ld.",
-                GSAG_METADATA_HEADER_SIZE, metaElems);
+                minMetaElems, metaElems);
         return ACLNN_ERR_PARAM_INVALID;
     }
 

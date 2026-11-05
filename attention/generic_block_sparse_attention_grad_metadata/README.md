@@ -32,7 +32,7 @@
 
     其中`J = ceilDiv(maxKvSeqlen, blockShapeY)`。
 
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> 以及 <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>:
+  - <term>Atlas A3 系列产品</term> 以及 <term>Atlas A2 系列产品</term>:
 
     $$
     \text{metaSize} = 198
@@ -199,7 +199,7 @@
   <tr>
     <td class="tg-0pky">metadata</td>
     <td class="tg-0pky">输出</td>
-    <td class="tg-0pky">分核信息，长度≥max(80+B×N1×J×4, 198)。</td>
+    <td class="tg-0pky">分核信息，不同产品metaSize支持长度不一样，具体见约束说明。</td>
     <td class="tg-0pky">INT32</td>
     <td class="tg-0pky">ND</td>
   </tr>
@@ -213,7 +213,9 @@
 * HeadDim固定为128；numQHeads/numKvHeads取值范围[1, 128]，且numQHeads % numKvHeads == 0。
 * blockShape：blockShapeX仅支持1, blockShapeY须≥128且为64的倍数；layoutSparsePattern当前仅支持1；residualBlockMode当前仅支持0；maskType当前仅支持1。
 * winLeft/winRight不使能时必须为-1。
-* metadata长度须满足shape[0] ≥ max(80 + B × numQHeads × J × 4, 198)；任务数上界B × numQHeads × J ≤ 1048576。
+* 任务数上界B × numQHeads × J ≤ 1048576，且metadata的长度需要满足如下要求：
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：metadata长度 ≥ 198。
+  - <term>Ascend 950PR&950DT系列产品</term>：metadata长度须满足shape[0] ≥ 80 + B × numQHeads × J × 4。
 
 ## 调用说明
 

@@ -262,7 +262,7 @@ $$
 - `layoutSparsePattern=1`时，residualBlockMode仅支持0，maskType仅支持1。
 - softmaxPrecision当前仅支持0；
 - winLeft/winRight不使能时必须为-1；attenMaskOptional当前应传nullptr。
-- 使用非确定性计算路径；确定性计算配置后不会生效。
+- 使用非确定性计算路径；暂不支持确定性计算。
 
 ## 调用说明
 
