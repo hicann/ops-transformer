@@ -135,7 +135,8 @@ void QuantFlashAttnTilingArch92::InitImplParam()
             !((seqUsedKvDims == 0) || (seqUsedKv == nullptr) || (seqUsedKv->GetData<int32_t>() == nullptr));
     }
 
-    decodeS1GMerge_ = (qfaInfo_->layoutQDescale == QfaLayout::N2TGD);
+    // TND 与 BSND 的合轴系数布局分别为 N2TGD、BN2SGD，必须与 metadata 的 ND 路由一致。
+    decodeS1GMerge_ = (qfaInfo_->layoutQDescale == QfaLayout::N2TGD || qfaInfo_->layoutQDescale == QfaLayout::BN2SGD);
 }
 
 void QuantFlashAttnTilingArch92::SplitPolicy()
@@ -145,7 +146,8 @@ void QuantFlashAttnTilingArch92::SplitPolicy()
         qfaInfo_->winLeft, qfaInfo_->winRight, static_cast<uint32_t>(qfaInfo_->qLayout),
         static_cast<uint32_t>(qfaInfo_->quantMode), decodeS1GMerge_, sOuterFactor_, sInnerFactor_);
     CalcNumBlocks(platformInfo_.aicNum);
-    flashDecodeFlag_ = false;
+    // 此标志选择具备 FD 能力的模板并预留 workspace；实际是否切分由 metadata 决定。
+    flashDecodeFlag_ = true;
 }
 
 void QuantFlashAttnTilingArch92::UpdateTilingKeyConfig()
@@ -282,9 +284,13 @@ void QuantFlashAttnTilingArch92::CalcWorkspaceSize()
     }
 
     if (flashDecodeFlag_) {
-        uint32_t faTmpAttenGmSize = numBlocks_ * 2 * mSize * dSize;
-        uint32_t fatmpResLseGmSize = numBlocks_ * 2 * mSize * 8;
-        workspaceSize_ += (faTmpAttenGmSize + 2 * fatmpResLseGmSize) * sizeof(float);
+        // 每个 FA 核最多产生头、尾两个跨核任务；统计量每行复制为 8 个 float（32 字节）。
+        constexpr uint32_t partialsPerCore = 2U;
+        const uint64_t faTmpAttenGmSize = static_cast<uint64_t>(platformInfo_.aicNum) * partialsPerCore * mSize * dSize;
+        const uint64_t fatmpResLseGmSize =
+            static_cast<uint64_t>(platformInfo_.aicNum) * partialsPerCore * mSize * QFA_FD_BROADCAST_ELEMENTS;
+        // accumOutSize/logSumExpSize 的 ABI 单位为 float 元素，只有总 workspace 才转换为字节。
+        workspaceSize_ += (faTmpAttenGmSize + 2U * fatmpResLseGmSize) * sizeof(float);
         tilingData_.baseTiling.quantFlashAttnWorkspaceParams.accumOutSize = faTmpAttenGmSize;
         tilingData_.baseTiling.quantFlashAttnWorkspaceParams.logSumExpSize = fatmpResLseGmSize;
     }

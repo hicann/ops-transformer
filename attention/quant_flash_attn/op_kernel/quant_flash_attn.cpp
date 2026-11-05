@@ -60,7 +60,7 @@ __aicore__ inline void quant_flash_attn_mxfp8_dn(
     constexpr bool isDAligned = ConfigValue[config].d != inferDTemplateType::NotAligned &&
                                 static_cast<int32_t>(ConfigValue[config].d) % 64 == 0;
 
-    constexpr bool isFdConst = false;
+    constexpr bool isFdConst = isFd;
     constexpr bool useDn = true;
 
     using CubeBlock =
@@ -128,7 +128,7 @@ __aicore__ inline void quant_flash_attn_mxfp8_nd(
     constexpr bool isDAligned = ConfigValue[config].d != inferDTemplateType::NotAligned &&
                                 static_cast<int32_t>(ConfigValue[config].d) % 64 == 0;
 
-    constexpr bool isFdConst = false;
+    constexpr bool isFdConst = isFd;
     constexpr bool useDn = false;
 
     using CubeBlock = BaseApi::QuantFlashAttnBlockCubeMxfp8Nd<INPUT_T, float, inputLayoutType, s1TemplateType,
@@ -252,7 +252,7 @@ __global__ __aicore__ void quant_flash_attn(
         quant_flash_attn_mxfp8_dn<inOutLayoutType, config, quantMode, hasAttenMask, KvLayoutType, isFd, hasVTail>(
             query, key, value, dequantScaleQuery, dequantScaleKey, dequantScaleValue, blockTable, pScale, cuSeqLensQ,
             cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata, vTail, blockTableTail, sequsedVTail, attnOut,
-            softmaxLse, workspace, tilingData);
+            softmaxLse, user, tilingData);
         return;
     }
     if constexpr (quantMode == QFA_MXFP8_FP32_DECODE) {
@@ -260,7 +260,7 @@ __global__ __aicore__ void quant_flash_attn(
         quant_flash_attn_mxfp8_nd<inOutLayoutType, config, quantMode, hasAttenMask, KvLayoutType, isFd, hasVTail>(
             query, key, value, dequantScaleQuery, dequantScaleKey, dequantScaleValue, blockTable, pScale, cuSeqLensQ,
             cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata, vTail, blockTableTail, sequsedVTail, attnOut,
-            softmaxLse, workspace, tilingData);
+            softmaxLse, user, tilingData);
         PipeBarrier<PIPE_ALL>();
         return;
     }

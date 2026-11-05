@@ -126,6 +126,10 @@ public:
     static constexpr bool HAS_V_TAIL = hasVTail;
     using ConstInfoX = std::conditional_t<HAS_V_TAIL, ConstInfoVTail_t, ConstInfo_t>;
     using RunInfoX = std::conditional_t<HAS_V_TAIL, RunInfoVTailX, ::RunInfoX>;
+    __aicore__ inline float GetPScaleValue() const
+    {
+        return pScaleValue_;
+    }
 
     using MM1_OUT_T = T;
     using MM2_OUT_T = T;
@@ -232,10 +236,12 @@ public:
         }
 
         if constexpr (FLASH_DECODE) {
-            accumOutGm_.SetGlobalBuffer((__gm__ float*)workspace);
-            softmaxFDSumGm_.SetGlobalBuffer((__gm__ float*)workspace + constInfo_.accumOutSize);
-            softmaxFDMaxGm_.SetGlobalBuffer((__gm__ float*)workspace + constInfo_.accumOutSize +
-                                            constInfo_.logSumExpSize);
+            if (constInfo_.enableFlashDecode) {
+                accumOutGm_.SetGlobalBuffer((__gm__ float*)workspace);
+                softmaxFDSumGm_.SetGlobalBuffer((__gm__ float*)workspace + constInfo_.accumOutSize);
+                softmaxFDMaxGm_.SetGlobalBuffer((__gm__ float*)workspace + constInfo_.accumOutSize +
+                                                constInfo_.logSumExpSize);
+            }
         }
     }
 
@@ -494,8 +500,8 @@ public:
                                            RunInfoX runInfo)
     {
         // 2 为 BF16 每元素字节数；每个 16 列片在 UB 预留 M+1 行，64 为尾 P 对齐列数。
-        // 16640 是既有 stage1 输出槽的字节容量，不是尾长或 BF16 元素个数。
-        static_assert(2U * (mBaseSize + 1U) * QFA_VTAIL_SIZE <= 16640U,
+        // 非 D256 的第零槽保留 16640 字节；D256 尾槽在 InitBuffers 中按此 BF16 公式单独申请。
+        static_assert(QFA_BF16_ELEMENT_BYTES * (mBaseSize + 1U) * QFA_VTAIL_SIZE <= 16640U,
                       "BF16 tail P must fit the original stage1 UB slot");
         // 下标 0 选择已有的输出队列，与 P 环形槽编号、批次或尾页号无关。
         auto storage = stage1OutQue_[0].template AllocTensor<INPUT_T>();
@@ -545,13 +551,13 @@ public:
     __aicore__ inline void SoftmaxDataCopyOut(RunInfoX runInfo, LocalTensor<float>& sumUb, LocalTensor<float>& maxUb)
     {
         if constexpr (FLASH_DECODE) {
-            if (runInfo.isS2SplitCore) {
+            if (constInfo_.enableFlashDecode && runInfo.isS2SplitCore) {
                 ComputeLogSumExpAndCopyToGm(runInfo, sumUb, maxUb);
             }
         }
 
         if constexpr (FLASH_DECODE) {
-            if (!runInfo.isS2SplitCore && constInfo_.isSoftmaxLseEnable) {
+            if (!(constInfo_.enableFlashDecode && runInfo.isS2SplitCore) && constInfo_.isSoftmaxLseEnable) {
                 SoftmaxLseCopyOut(sumUb, maxUb, runInfo);
             }
         } else {
@@ -604,15 +610,17 @@ public:
             DataCopySoftmaxLseNTDArch35<T, ConstInfoX>(softmaxLseGm_, lseUb, bN2Offset, vecMIdx, gmDealRowCount,
                                                        constInfo_, s1Size);
         } else if constexpr (layout == LayOutTypeEnum::LAYOUT_BSH) {
-            uint64_t bN2Offset = runInfo.bIdx * constInfo_.n2Size * constInfo_.gSize * constInfo_.s1Size +
-                                 runInfo.n2Idx * constInfo_.gSize * constInfo_.s1Size;
+            uint64_t bN2Offset =
+                static_cast<uint64_t>(runInfo.bIdx) * constInfo_.realN2Size * constInfo_.realGSize * constInfo_.s1Size +
+                static_cast<uint64_t>(runInfo.realN2Idx) * constInfo_.realGSize * constInfo_.s1Size;
             uint64_t qActSeqLens = qActSeqLensParser_->GetActualSeqLength(runInfo.bIdx);
             uint64_t s1LeftPaddingSize = 0;
             DataCopySoftmaxLseBSNDArch35<T, ConstInfoX>(softmaxLseGm_, lseUb, bN2Offset, vecMIdx, gmDealRowCount,
                                                         constInfo_, s1LeftPaddingSize);
         } else { // BNSD
-            uint64_t bN2Offset = runInfo.bIdx * constInfo_.n2Size * constInfo_.gSize * constInfo_.s1Size +
-                                 runInfo.n2Idx * constInfo_.gSize * constInfo_.s1Size;
+            uint64_t bN2Offset =
+                static_cast<uint64_t>(runInfo.bIdx) * constInfo_.realN2Size * constInfo_.realGSize * constInfo_.s1Size +
+                static_cast<uint64_t>(runInfo.realN2Idx) * constInfo_.realGSize * constInfo_.s1Size;
             uint64_t qActSeqLens = qActSeqLensParser_->GetActualSeqLength(runInfo.bIdx);
             uint64_t s1LeftPaddingSize = 0;
             DataCopySoftmaxLseBNSDArch35<T, ConstInfoX>(softmaxLseGm_, lseUb, bN2Offset, vecMIdx, gmDealRowCount,
@@ -703,7 +711,7 @@ public:
                                                uint32_t mDealSize, uint32_t gmDealRowCount)
     {
         if constexpr (FLASH_DECODE) {
-            if (runInfo.isS2SplitCore) {
+            if (constInfo_.enableFlashDecode && runInfo.isS2SplitCore) {
                 Bmm2ResForFDCopyOut(runInfo, vec2ResUb, mStartVec, mDealSize);
             } else {
                 Bmm2ResCastAndCopyOut(runInfo, vec2ResUb, mStartVec, mDealSize, gmDealRowCount);
@@ -895,47 +903,62 @@ public:
 
     __aicore__ inline void SoftmaxInitBuffer()
     {
-        tPipe_->InitBuffer(softmaxSumBuf_[0], 512); // [128, 1] softmax_sum_buffer size: 64 * 4B
-        tPipe_->InitBuffer(softmaxSumBuf_[1], 512); // [128, 1]
-        tPipe_->InitBuffer(softmaxSumBuf_[2], 512); // [128, 1]
+        // 每槽 512 字节保存 128 行 FP32；sum/max/exp 各三轮，再加三个跨子循环临时槽。
+        tPipe_->InitBuffer(softmaxSumBuf_[0], 512);
+        tPipe_->InitBuffer(softmaxSumBuf_[1], 512);
+        tPipe_->InitBuffer(softmaxSumBuf_[2], 512);
 
-        tPipe_->InitBuffer(softmaxMaxBuf_[0], 512); // [128, 1] softmax_max_buffer size: 64 * 4B
-        tPipe_->InitBuffer(softmaxMaxBuf_[1], 512); // [128, 1]
-        tPipe_->InitBuffer(softmaxMaxBuf_[2], 512); // [128, 1]
+        tPipe_->InitBuffer(softmaxMaxBuf_[0], 512);
+        tPipe_->InitBuffer(softmaxMaxBuf_[1], 512);
+        tPipe_->InitBuffer(softmaxMaxBuf_[2], 512);
 
-        tPipe_->InitBuffer(softmaxExpBuf_[0], 512); // [128, 1] softmax_exp_buffer size: 64 * 4B
-        tPipe_->InitBuffer(softmaxExpBuf_[1], 512); // [128, 1]
-        tPipe_->InitBuffer(softmaxExpBuf_[2], 512); // [128, 1]
+        tPipe_->InitBuffer(softmaxExpBuf_[0], 512);
+        tPipe_->InitBuffer(softmaxExpBuf_[1], 512);
+        tPipe_->InitBuffer(softmaxExpBuf_[2], 512);
 
-        tPipe_->InitBuffer(preLoopMaxBuf_, 512);   // [128, 1]
-        tPipe_->InitBuffer(preLoopSumBuf_, 512);   // [128, 1]
-        tPipe_->InitBuffer(firstLoopSumBuf_, 512); // [128, 1]
+        tPipe_->InitBuffer(preLoopMaxBuf_, 512);
+        tPipe_->InitBuffer(preLoopSumBuf_, 512);
+        tPipe_->InitBuffer(firstLoopSumBuf_, 512);
 
         if constexpr (FLASH_DECODE) {
-            tPipe_->InitBuffer(maxBrdcst_, 1, 4096); // [128, 8]
-            tPipe_->InitBuffer(sumBrdcst_, 1, 4096); // [128, 8]
+            // 每行广播为 8 个 FP32，共 128×8×4=4096 字节；队列深度保持 1。
+            tPipe_->InitBuffer(maxBrdcst_, 1, 4096);
+            tPipe_->InitBuffer(sumBrdcst_, 1, 4096);
         }
     }
 
     __aicore__ inline void InitBuffers()
     {
-        uint32_t mm1ResultSize = mBaseSize / CV_RATIO * s2BaseSize * sizeof(T);
-        uint32_t mm2ResultSize = mBaseSize / CV_RATIO * dTemplateAlign64 * sizeof(T);
         SoftmaxInitBuffer();
+        // stage2 保持原来的 128 行 FP32 累计输出，后续各缓冲的申请顺序不变。
         tPipe_->InitBuffer(stage2OutBuf_, 128 * dTemplateAlign64 * sizeof(T));
-        tPipe_->InitBuffer(stage1OutQue_[0], 1, 16640); // (32 + 1) * (128 / 32) * 128
-        tPipe_->InitBuffer(stage1OutQue_[1], 1, 16640);
-        tPipe_->InitBuffer(pScaleSubLoop0Que_, 1, 512);
-        tPipe_->InitBuffer(commonTBuf_, 1024);
+        if constexpr (dTemplateAlign64 == 256U) {
+            // D256 每个子循环为 128×64 个 FP8，数据为 8192 字节。
+            // 每 16 行追加一个 32 字节 bank 间隔，共 8×32=256 字节，单槽合计 8448。
+            if constexpr (HAS_V_TAIL) {
+                // BF16 尾 P 复用第零槽，保留额外一行间隔：(128+1)×64×2=16512 字节。
+                tPipe_->InitBuffer(stage1OutQue_[0], 1, QFA_BF16_ELEMENT_BYTES * (mBaseSize + 1U) * QFA_VTAIL_SIZE);
+            } else {
+                tPipe_->InitBuffer(stage1OutQue_[0], 1, 8448);
+            }
+            tPipe_->InitBuffer(stage1OutQue_[1], 1, 8448);
+        } else {
+            // 其余维度仍为 128×128 字节数据加 8×32 字节 bank 间隔，共 16640 字节。
+            tPipe_->InitBuffer(stage1OutQue_[0], 1, 16640);
+            tPipe_->InitBuffer(stage1OutQue_[1], 1, 16640);
+        }
+        tPipe_->InitBuffer(pScaleSubLoop0Que_, 1, 512); // 原有 512 字节 P 系数槽，深度为 1。
+        tPipe_->InitBuffer(commonTBuf_, 1024);          // 原有 1 KiB 临时计算槽，包含 DN 无效行判值。
         if constexpr (HAS_MASK) {
-            tPipe_->InitBuffer(attenMaskInQue_[0], 1, 16384); // 256 * 64
+            tPipe_->InitBuffer(attenMaskInQue_[0], 1, 16384); // 原有掩码槽：256×64 个单字节元素。
         }
 
         if (constInfo_.isSoftmaxLseEnable) {
-            // 8: 适配TND，每行的结果存为8个重复lse元素（32B对齐）
-            this->tPipe_->InitBuffer(softmaxLseQueue_, 1, mBaseSize * sizeof(float) * 8);
+            // 每行保存 8 个重复 FP32 LSE 元素，使行宽对齐 32 字节。
+            tPipe_->InitBuffer(softmaxLseQueue_, 1, mBaseSize * sizeof(float) * 8);
         }
         if constexpr (isFp8) {
+            // 原有 256 字节索引分为四路，每路 64 个元素；FD 不覆盖该索引表。
             tPipe_->InitBuffer(vselrIndexesBuf_[static_cast<int>(VselrIndexEnum::DN_INDEX)], 256);
             LocalTensor<uint8_t> vselrIndexesTensor =
                 vselrIndexesBuf_[static_cast<int>(VselrIndexEnum::DN_INDEX)].template Get<uint8_t>();
@@ -945,6 +968,24 @@ public:
                 }
             }
             UpdateMinCheckValue();
+        }
+    }
+
+    __aicore__ inline void ReleaseQueueEventsForFd()
+    {
+        // 每个 section 的队列均已出队并归还 Tensor；只释放事件，不重置 UB 地址。
+        stage1OutQue_[0].FreeAllEvent();
+        stage1OutQue_[1].FreeAllEvent();
+        pScaleSubLoop0Que_.FreeAllEvent();
+        if (constInfo_.isSoftmaxLseEnable) {
+            softmaxLseQueue_.FreeAllEvent();
+        }
+        if constexpr (HAS_MASK) {
+            attenMaskInQue_[0].FreeAllEvent();
+        }
+        if constexpr (FLASH_DECODE) {
+            maxBrdcst_.FreeAllEvent();
+            sumBrdcst_.FreeAllEvent();
         }
     }
 

@@ -312,9 +312,10 @@ public:
                      valueGm_, value, constInfo_.valueStrides.bnStride, constInfo_.valueStrides.n2Stride);
         InitKScaleBuffer(constInfo_.bSize, constInfo_.s2Size, constInfo_.n2Size, constInfo_.blockSize,
                          dBaseSize / MXFP_GROUP_SIZE, keyScaleGm_, dequantScaleKey);
-        InitVScaleBuffer(constInfo_.bSize, constInfo_.s2Size / MXFP_DIVISOR_SIZE, constInfo_.n2Size,
-                         constInfo_.blockSize / MXFP_DIVISOR_SIZE, constInfo_.dSizeV * MXFP_MULTI_BASE_SIZE,
-                         valueScaleGm_, dequantScaleValue);
+        // V 系数的物理序列轴按 64 元素量化组向上取整，不能用有效长度或向下截断的组数作批次跨度。
+        InitVScaleBuffer(constInfo_.bSize, (constInfo_.s2Size + MXFP_DIVISOR_SIZE - 1U) / MXFP_DIVISOR_SIZE,
+                         constInfo_.n2Size, constInfo_.blockSize / MXFP_DIVISOR_SIZE,
+                         constInfo_.dSizeV * MXFP_MULTI_BASE_SIZE, valueScaleGm_, dequantScaleValue);
     }
 
     __aicore__ inline void InitVTailBuffer(__gm__ uint8_t* vTail, __gm__ uint8_t* blockTableTail)

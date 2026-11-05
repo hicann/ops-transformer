@@ -22,6 +22,8 @@ using TD = gert::TilingContextPara::TensorDescription;
 using Attr = gert::TilingContextPara::OpAttr;
 
 constexpr uint64_t VTAIL_KEY_BIT = 1ULL << 27;
+// FD 能力位位于原六字段编码的第 26 位；尾窗仍使用第 27 位，旧编码保持可解码。
+constexpr uint64_t FD_KEY_BIT = 1ULL << 26;
 // 固定保存原六字段编码的数值，避免依赖当前声明和宏来生成期望值。
 constexpr uint64_t LEGACY_DN_KEY = 33817090ULL;
 constexpr uint64_t LEGACY_ND_KEY = 34080258ULL;
@@ -110,7 +112,7 @@ struct VTailCase {
         const auto config = decode ? Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128 :
                                      Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128;
         const auto mode = decode ? QFA_MXFP8_FP32_DECODE : QFA_MXFP8_FP32_PREFILL;
-        return GET_TPL_TILING_KEY(InOutLayoutType_TND_TND, config, mode, false, KvLayoutType_PA_BNBD, false, hasTail);
+        return GET_TPL_TILING_KEY(InOutLayoutType_TND_TND, config, mode, false, KvLayoutType_PA_BNBD, true, hasTail);
     }
 };
 
@@ -134,9 +136,10 @@ TEST(QuantFlashAttnArch92VTailTiling, TripletAndNoTailSerializeWithDistinctKeys)
         ::TilingInfo ordinaryResult;
         ASSERT_TRUE(ExecuteTiling(ordinary.Context(), ordinaryResult));
         EXPECT_EQ(static_cast<uint64_t>(ordinaryResult.tilingKey), ordinary.ExpectedKey(false));
-        EXPECT_EQ(static_cast<uint64_t>(ordinaryResult.tilingKey), decode ? LEGACY_ND_KEY : LEGACY_DN_KEY);
+        EXPECT_EQ(static_cast<uint64_t>(ordinaryResult.tilingKey),
+                  (decode ? LEGACY_ND_KEY : LEGACY_DN_KEY) | FD_KEY_BIT);
         EXPECT_EQ(static_cast<uint64_t>(tailResult.tilingKey),
-                  (decode ? LEGACY_ND_KEY : LEGACY_DN_KEY) | VTAIL_KEY_BIT);
+                  (decode ? LEGACY_ND_KEY : LEGACY_DN_KEY) | FD_KEY_BIT | VTAIL_KEY_BIT);
         EXPECT_NE(tailResult.tilingKey, ordinaryResult.tilingKey);
         ASSERT_EQ(ordinaryResult.tilingDataSize, sizeof(parsed));
         std::memcpy(&parsed, ordinaryResult.tilingData.get(), sizeof(parsed));
@@ -146,6 +149,44 @@ TEST(QuantFlashAttnArch92VTailTiling, TripletAndNoTailSerializeWithDistinctKeys)
         EXPECT_EQ(empty.tailMaxBlockNum, 0U);
         EXPECT_EQ(empty.vTailStrides.bnStride, 0U);
         EXPECT_EQ(empty.vTailStrides.n2Stride, 0U);
+    }
+}
+
+TEST(QuantFlashAttnArch92FdLayoutTiling, FixedLayoutsSelectRouteAndReservePartials)
+{
+    // 两个批次、四个 Q 头、两个 KV 头；物理序列长度 17，沿用现有 PA 缓存用例。
+    for (bool bnsd : {false, true}) {
+        for (bool decode : {false, true}) {
+            if (bnsd && decode) {
+                continue; // BNSD 的 Q 系数没有 ND 合轴格式，必须保持 DN。
+            }
+            VTailCase params(decode, false);
+            const std::string layout = bnsd ? "BNSD" : "BSND";
+            params.inputs[0] = Tensor(bnsd ? "2 4 17 128" : "2 17 4 128", ge::DT_FLOAT8_E4M3FN);
+            params.inputs[3] = Tensor(bnsd ? "2 4 17 2 2" : decode ? "2 2 17 2 2 2" : "2 17 4 2 2", ge::DT_FLOAT8_E8M0);
+            params.inputs[8] = Tensor("", ge::DT_INT32);
+            params.outputs[0] = Tensor(bnsd ? "2 4 17 128" : "2 17 4 128", ge::DT_BF16);
+            params.attrs[7] = {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)};
+            params.attrs[8] = {"layout_q_descale",
+                               Ops::Transformer::AnyValue::CreateFrom<std::string>(decode ? "BN2SGD" : layout)};
+            params.attrs[10] = {"layout_out", Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)};
+            ::TilingInfo result;
+            ASSERT_TRUE(ExecuteTiling(params.Context(), result));
+            const auto config = decode ? Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128 :
+                                         Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128;
+            const auto mode = decode ? QFA_MXFP8_FP32_DECODE : QFA_MXFP8_FP32_PREFILL;
+            const auto layoutKey = bnsd ? InOutLayoutType_BNSD : InOutLayoutType_BSND;
+            EXPECT_EQ(static_cast<uint64_t>(result.tilingKey),
+                      GET_TPL_TILING_KEY(layoutKey, config, mode, false, KvLayoutType_PA_BNBD, true, false));
+            optiling::QuantFlashAttnTilingData parsed{};
+            ASSERT_EQ(result.tilingDataSize, sizeof(parsed));
+            std::memcpy(&parsed, result.tilingData.get(), sizeof(parsed));
+            const auto& workspace = parsed.baseTiling.quantFlashAttnWorkspaceParams;
+            const uint32_t rows = decode ? 64U : 128U; // ND 和 DN 模板的 M 基本块。
+            // 64 个 AIC，每核最多头/尾两个 partial；每个 sum/max 行保存 8 个重复 float。
+            EXPECT_EQ(workspace.accumOutSize, 64U * 2U * rows * 128U);
+            EXPECT_EQ(workspace.logSumExpSize, 64U * 2U * rows * 8U);
+        }
     }
 }
 
@@ -167,20 +208,21 @@ TEST(QuantFlashAttnArch92VTailTiling, ZeroTailTensorRetainsSpecialization)
     }
 }
 
-TEST(QuantFlashAttnArch92VTailTiling, SeventhBooleanPreservesLegacyKeys)
+TEST(QuantFlashAttnArch92VTailTiling, FdAndTailBitsPreserveExistingKeyEncoding)
 {
+    // MXFP8 仅注册 IsFd=true；用受支持的 key 验证原编码位，避免调试版检查已删除的选择。
     EXPECT_EQ(GET_TPL_TILING_KEY(InOutLayoutType_TND_TND, Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128,
-                                 QFA_MXFP8_FP32_PREFILL, false, KvLayoutType_PA_BNBD, false, false),
-              LEGACY_DN_KEY);
+                                 QFA_MXFP8_FP32_PREFILL, false, KvLayoutType_PA_BNBD, true, false),
+              LEGACY_DN_KEY | FD_KEY_BIT);
     EXPECT_EQ(GET_TPL_TILING_KEY(InOutLayoutType_TND_TND, Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128,
-                                 QFA_MXFP8_FP32_PREFILL, false, KvLayoutType_PA_BNBD, false, true),
-              LEGACY_DN_KEY | VTAIL_KEY_BIT);
+                                 QFA_MXFP8_FP32_PREFILL, false, KvLayoutType_PA_BNBD, true, true),
+              LEGACY_DN_KEY | FD_KEY_BIT | VTAIL_KEY_BIT);
     EXPECT_EQ(GET_TPL_TILING_KEY(InOutLayoutType_TND_TND, Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128,
-                                 QFA_MXFP8_FP32_DECODE, false, KvLayoutType_PA_BNBD, false, false),
-              LEGACY_ND_KEY);
+                                 QFA_MXFP8_FP32_DECODE, false, KvLayoutType_PA_BNBD, true, false),
+              LEGACY_ND_KEY | FD_KEY_BIT);
     EXPECT_EQ(GET_TPL_TILING_KEY(InOutLayoutType_TND_TND, Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128,
-                                 QFA_MXFP8_FP32_DECODE, false, KvLayoutType_PA_BNBD, false, true),
-              LEGACY_ND_KEY | VTAIL_KEY_BIT);
+                                 QFA_MXFP8_FP32_DECODE, false, KvLayoutType_PA_BNBD, true, true),
+              LEGACY_ND_KEY | FD_KEY_BIT | VTAIL_KEY_BIT);
     EXPECT_EQ(GET_TPL_TILING_KEY(InOutLayoutType_BNSD_BNSD, Config_S1Aligned128_S2Aligned1024_DAligned128_DVAligned128,
                                  QFA_HIFP4_FP16_PREFILL, false, KvLayoutType_NO_PA, false, false),
               LEGACY_HIFP4_KEY);
@@ -281,29 +323,43 @@ bool SelectionSupports(const std::array<uint64_t, 7>& args)
 TEST(QuantFlashAttnArch92VTailTiling, TemplateSelectionsKeepTailAndHiFP4Boundaries)
 {
 #ifdef ASCENDC_DEBUG
-    ASSERT_EQ(g_tilingSelectParams.size(), 7U);
+    ASSERT_EQ(g_tilingSelectParams.size(), 9U); // 八组 MXFP8 和一组 HiFP4。
     for (const auto& selection : g_tilingSelectParams) {
         ASSERT_EQ(selection.size(), 7U);
         for (size_t i = 0; i < selection.size(); ++i) {
             EXPECT_STREQ(selection[i].name, g_tilingDeclareParams[i].name);
         }
-        EXPECT_EQ(ParameterValues(selection[5]), (std::vector<uint64_t>{0})); // FD 保持关闭。
+        const auto modes = ParameterValues(selection[2]);
+        const bool mxfp8 = std::find(modes.begin(), modes.end(), QFA_MXFP8_FP32_PREFILL) != modes.end() ||
+                           std::find(modes.begin(), modes.end(), QFA_MXFP8_FP32_DECODE) != modes.end();
+        EXPECT_EQ(ParameterValues(selection[5]), (std::vector<uint64_t>{mxfp8 ? 1U : 0U}));
     }
-    // 保留原普通配置（含 NO_PA）的选择范围；尾窗仅选择与 DN/ND 相匹配的配置。
-    for (uint64_t config = 0; config < 8; ++config) {
-        for (uint64_t mode : {1U, 2U}) {
-            for (uint64_t mask : {0U, 1U}) {
-                for (uint64_t layout = 0; layout < 4; ++layout) {
-                    const bool d72Nz = (config == 1 || config == 5) && layout == KvLayoutType_PA_NZ;
-                    EXPECT_EQ(SelectionSupports({2, config, mode, mask, layout, 0, 0}), !d72Nz);
-                    const bool matchingPath = (config < 4) == (mode == QFA_MXFP8_FP32_PREFILL);
-                    EXPECT_EQ(SelectionSupports({2, config, mode, mask, layout, 0, 1}),
-                              matchingPath && layout != KvLayoutType_NO_PA && !d72Nz);
+    // 覆盖全部 Q 布局、DN/ND 配置及 FD 值，统计实际可选组合并排除不合法边界。
+    size_t supportedMxfp8 = 0;
+    for (uint64_t qLayout = 0; qLayout < 3; ++qLayout) {
+        for (uint64_t config = 0; config < 8; ++config) {
+            for (uint64_t mode : {1U, 2U}) {
+                for (uint64_t mask : {0U, 1U}) {
+                    for (uint64_t kvLayout = 0; kvLayout < 4; ++kvLayout) {
+                        const bool d72Nz = (config == 1 || config == 5) && kvLayout == KvLayoutType_PA_NZ;
+                        const bool matchingPath = (config < 4) == (mode == QFA_MXFP8_FP32_PREFILL);
+                        const bool bnsdNd = qLayout == InOutLayoutType_BNSD && mode == QFA_MXFP8_FP32_DECODE;
+                        for (uint64_t tail : {0U, 1U}) {
+                            const bool expected =
+                                matchingPath && !bnsdNd && !d72Nz && (tail == 0 || kvLayout != KvLayoutType_NO_PA);
+                            const bool actual = SelectionSupports({qLayout, config, mode, mask, kvLayout, 1, tail});
+                            EXPECT_EQ(actual, expected);
+                            EXPECT_FALSE(SelectionSupports({qLayout, config, mode, mask, kvLayout, 0, tail}));
+                            supportedMxfp8 += actual ? 1U : 0U;
+                        }
+                    }
                 }
             }
         }
     }
+    EXPECT_EQ(supportedMxfp8, 260U);
     EXPECT_TRUE(SelectionSupports({1, 8, 10, 0, 0, 0, 0}));
+    EXPECT_FALSE(SelectionSupports({1, 8, 10, 0, 0, 1, 0}));
     EXPECT_FALSE(SelectionSupports({1, 8, 10, 0, 0, 0, 1}));
     EXPECT_FALSE(SelectionSupports({1, 8, 10, 1, 0, 0, 0}));
     EXPECT_FALSE(SelectionSupports({1, 8, 10, 0, 1, 0, 0}));

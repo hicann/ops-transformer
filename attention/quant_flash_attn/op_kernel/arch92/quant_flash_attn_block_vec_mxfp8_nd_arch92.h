@@ -97,6 +97,10 @@ public:
     static constexpr bool HAS_V_TAIL = hasVTail;
     using ConstInfoX = std::conditional_t<HAS_V_TAIL, ConstInfoVTail_t, ConstInfo_t>;
     using RunInfoX = std::conditional_t<HAS_V_TAIL, RunInfoVTailX, ::RunInfoX>;
+    __aicore__ inline float GetPScaleValue() const
+    {
+        return pScaleValue_;
+    }
 
     using MM1_OUT_T = T;
     using MM2_OUT_T = T;
@@ -223,10 +227,12 @@ public:
         }
 
         if constexpr (FLASH_DECODE) {
-            accumOutGm_.SetGlobalBuffer((__gm__ float*)workspace);
-            softmaxFDSumGm_.SetGlobalBuffer((__gm__ float*)workspace + constInfo_.accumOutSize);
-            softmaxFDMaxGm_.SetGlobalBuffer((__gm__ float*)workspace + constInfo_.accumOutSize +
-                                            constInfo_.logSumExpSize);
+            if (constInfo_.enableFlashDecode) {
+                accumOutGm_.SetGlobalBuffer((__gm__ float*)workspace);
+                softmaxFDSumGm_.SetGlobalBuffer((__gm__ float*)workspace + constInfo_.accumOutSize);
+                softmaxFDMaxGm_.SetGlobalBuffer((__gm__ float*)workspace + constInfo_.accumOutSize +
+                                                constInfo_.logSumExpSize);
+            }
         }
     }
 
@@ -389,13 +395,13 @@ public:
     __aicore__ inline void SoftmaxDataCopyOut(RunInfoX runInfo, LocalTensor<float>& sumUb, LocalTensor<float>& maxUb)
     {
         if constexpr (FLASH_DECODE) {
-            if (runInfo.isS2SplitCore) {
+            if (constInfo_.enableFlashDecode && runInfo.isS2SplitCore) {
                 ComputeLogSumExpAndCopyToGm(runInfo, sumUb, maxUb);
             }
         }
 
         if constexpr (FLASH_DECODE) {
-            if (!runInfo.isS2SplitCore && constInfo_.isSoftmaxLseEnable) {
+            if (!(constInfo_.enableFlashDecode && runInfo.isS2SplitCore) && constInfo_.isSoftmaxLseEnable) {
                 SoftmaxLseCopyOut(sumUb, maxUb, runInfo);
             }
         } else {
@@ -427,7 +433,6 @@ public:
         SetFlag<HardEvent::V_MTE3>(V_MTE3_EVENT1);  // softmaxLseUB EnQue
         WaitFlag<HardEvent::V_MTE3>(V_MTE3_EVENT1); // softmaxLseUB DeQue
 
-        // MXFP8 目前只支持 TND
         if constexpr (layout == LayOutTypeEnum::LAYOUT_TND) {
             uint32_t prefixBS1 = qActSeqLensParser_->GetTBase(runInfo.bIdx);
             uint64_t bN2Offset = runInfo.realN2Idx * constInfo_.realGSize * constInfo_.t1Size + prefixBS1;
@@ -660,7 +665,7 @@ public:
                                                uint32_t mDealSize, uint32_t gmDealRowCount)
     {
         if constexpr (FLASH_DECODE) {
-            if (runInfo.isS2SplitCore) {
+            if (constInfo_.enableFlashDecode && runInfo.isS2SplitCore) {
                 Bmm2ResForFDCopyOut(runInfo, vec2ResUb, mStartVec, mDealSize);
             } else {
                 Bmm2ResCastAndCopyOut(runInfo, vec2ResUb, mStartVec, mDealSize, gmDealRowCount);
@@ -881,6 +886,8 @@ public:
 
     __aicore__ inline void InitBuffers()
     {
+        // 保持原地址顺序；stage1 双槽、softmax、临时槽、stage2、P 系数、索引、掩码和可选 LSE 依次排列。
+        // softmax 使用 128 行、三轮状态；P 系数 512 字节、临时槽 1024 字节、索引 128+64 字节。
         uint32_t addrUBStart = (mm1ResultSize * 2 + mm2ResultSize) * sizeof(float);
         stage1OutQue = LocalTensor<fp8_e4m3fn_t>(TPosition::VECCALC, addrUBStart, stage1OutSize * 2);
 
@@ -925,6 +932,7 @@ public:
             addrUBStart += 128 * 8 * sizeof(float);
         }
 
+        // 前 128 个索引选偶数位置，后 64 个选四倍位置；FD 结束后无需重建。
         for (int i = 0; i < 128; i++) {
             vselrIndexesUB.SetValue(i, i * 2);
         }

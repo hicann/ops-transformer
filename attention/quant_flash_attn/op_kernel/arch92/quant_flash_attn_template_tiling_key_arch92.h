@@ -52,40 +52,61 @@ ASCENDC_TPL_ARGS_DECL(QuantFlashAttn,
                       //    3: KvLayoutType_PA_NZ
                       ASCENDC_TPL_UINT_DECL(KvLayoutType, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 3),
                       //    IsFd
-                      //    false / true
+                      //    公共声明保留 false/true：HiFP4 选择 false，MXFP8 统一选择 true。
                       ASCENDC_TPL_BOOL_DECL(IsFd, false, true),
                       //    HasVTail：独立控制尾窗特化，与 arch35 保持一致。
                       ASCENDC_TPL_BOOL_DECL(HasVTail, false, true));
 
 ASCENDC_TPL_SEL(
-    // MXFP8
+    // MXFP8 DN 完整头，D64/128/256，普通主段。
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND,
+                                              InOutLayoutType_BSND, InOutLayoutType_BNSD),
+                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
+                                              Config_S1Aligned128_S2Aligned256_DAligned64_DVAligned64,
+                                              Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128,
+                                              Config_S1Aligned128_S2Aligned128_DAligned256_DVAligned256),
+                         ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_FP32_PREFILL),
+                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
+                         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA,
+                                              KvLayoutType_PA_BBND, KvLayoutType_PA_BNBD, KvLayoutType_PA_NZ),
+                         ASCENDC_TPL_BOOL_SEL(IsFd, true), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
+                         ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
+    // MXFP8 DN 完整头，D72 排除 NZ，普通主段。
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND,
+                                              InOutLayoutType_BSND, InOutLayoutType_BNSD),
+                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
+                                              Config_S1Aligned128_S2Aligned256_DAligned72_DVAligned72),
+                         ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_FP32_PREFILL),
+                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
+                         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA,
+                                              KvLayoutType_PA_BBND, KvLayoutType_PA_BNBD),
+                         ASCENDC_TPL_BOOL_SEL(IsFd, true), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
+                         ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
+    // MXFP8 ND 合轴，D64/128/256，普通主段。
     ASCENDC_TPL_ARGS_SEL(
-        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND_TND),
-        ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_S1Aligned128_S2Aligned256_DAligned64_DVAligned64,
-                             Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128,
-                             Config_S1Aligned128_S2Aligned128_DAligned256_DVAligned256,
-                             Config_S1Aligned64_S2Aligned512_DAligned64_DVAligned64,
+        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND, InOutLayoutType_BSND),
+        ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_S1Aligned64_S2Aligned512_DAligned64_DVAligned64,
                              Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128,
                              Config_S1Aligned64_S2Aligned512_DAligned256_DVAligned256),
-        ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_FP32_PREFILL, QFA_MXFP8_FP32_DECODE),
+        ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_FP32_DECODE),
         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA, KvLayoutType_PA_BBND,
                              KvLayoutType_PA_BNBD, KvLayoutType_PA_NZ),
-        ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
+        ASCENDC_TPL_BOOL_SEL(IsFd, true), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
         ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
-    // dim=72
+    // MXFP8 ND 合轴，D72 排除 NZ，普通主段。
     ASCENDC_TPL_ARGS_SEL(
-        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND_TND),
-        ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_S1Aligned128_S2Aligned256_DAligned72_DVAligned72,
-                             Config_S1Aligned64_S2Aligned512_DAligned72_DVAligned72),
-        ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_FP32_PREFILL, QFA_MXFP8_FP32_DECODE),
+        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND, InOutLayoutType_BSND),
+        ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_S1Aligned64_S2Aligned512_DAligned72_DVAligned72),
+        ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_FP32_DECODE),
         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA, KvLayoutType_PA_BBND,
                              KvLayoutType_PA_BNBD),
-        ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
+        ASCENDC_TPL_BOOL_SEL(IsFd, true), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
         ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
-    // MXFP8 高精尾窗 DN 路径：仅支持 PA。
-    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND_TND),
+    // MXFP8 DN 完整头，D64/128/256，尾窗仅支持 PA。
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND,
+                                              InOutLayoutType_BSND, InOutLayoutType_BNSD),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
                                               Config_S1Aligned128_S2Aligned256_DAligned64_DVAligned64,
                                               Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128,
@@ -94,37 +115,38 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_PA_BBND,
                                               KvLayoutType_PA_BNBD, KvLayoutType_PA_NZ),
-                         ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_BOOL_SEL(HasVTail, true),
+                         ASCENDC_TPL_BOOL_SEL(IsFd, true), ASCENDC_TPL_BOOL_SEL(HasVTail, true),
                          ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
-    // MXFP8 高精尾窗 DN 路径，D=72：仅支持 PA。
+    // MXFP8 DN 完整头，D72 排除 NZ，尾窗仅支持 PA。
     ASCENDC_TPL_ARGS_SEL(
-        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND_TND),
+        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND, InOutLayoutType_BSND,
+                             InOutLayoutType_BNSD),
         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_S1Aligned128_S2Aligned256_DAligned72_DVAligned72),
         ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_FP32_PREFILL),
         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_PA_BBND, KvLayoutType_PA_BNBD),
-        ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_BOOL_SEL(HasVTail, true),
+        ASCENDC_TPL_BOOL_SEL(IsFd, true), ASCENDC_TPL_BOOL_SEL(HasVTail, true),
         ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
-    // MXFP8 高精尾窗 ND 路径：仅支持 PA。
-    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND_TND),
-                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
-                                              Config_S1Aligned64_S2Aligned512_DAligned64_DVAligned64,
-                                              Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128,
-                                              Config_S1Aligned64_S2Aligned512_DAligned256_DVAligned256),
-                         ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_FP32_DECODE),
-                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
-                         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_PA_BBND,
-                                              KvLayoutType_PA_BNBD, KvLayoutType_PA_NZ),
-                         ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_BOOL_SEL(HasVTail, true),
-                         ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
-    // MXFP8 高精尾窗 ND 路径，D=72：仅支持 PA。
+    // MXFP8 ND 合轴，D64/128/256，尾窗仅支持 PA。
     ASCENDC_TPL_ARGS_SEL(
-        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND_TND),
+        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND, InOutLayoutType_BSND),
+        ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_S1Aligned64_S2Aligned512_DAligned64_DVAligned64,
+                             Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128,
+                             Config_S1Aligned64_S2Aligned512_DAligned256_DVAligned256),
+        ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_FP32_DECODE),
+        ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
+        ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_PA_BBND, KvLayoutType_PA_BNBD,
+                             KvLayoutType_PA_NZ),
+        ASCENDC_TPL_BOOL_SEL(IsFd, true), ASCENDC_TPL_BOOL_SEL(HasVTail, true),
+        ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
+    // MXFP8 ND 合轴，D72 排除 NZ，尾窗仅支持 PA。
+    ASCENDC_TPL_ARGS_SEL(
+        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND, InOutLayoutType_BSND),
         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_S1Aligned64_S2Aligned512_DAligned72_DVAligned72),
         ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_FP32_DECODE),
         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_PA_BBND, KvLayoutType_PA_BNBD),
-        ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_BOOL_SEL(HasVTail, true),
+        ASCENDC_TPL_BOOL_SEL(IsFd, true), ASCENDC_TPL_BOOL_SEL(HasVTail, true),
         ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
     // HiF4
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BNSD_BNSD),

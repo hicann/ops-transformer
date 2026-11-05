@@ -32,6 +32,8 @@ static constexpr float FLOAT_MAX = 3.402823466e+38F;
 static constexpr float FLOAT_INF = 3e+99;
 
 static constexpr uint32_t QFA_HEAD_NEED_INIT_OUTPUT_INDEX = 15U;
+// metadata 头第 1 项与 AICPU 的 HEAD_IS_FD_INDEX 保持一致，表示本次调度实际采用 FD。
+static constexpr uint32_t QFA_HEAD_IS_FD_INDEX = 1U;
 
 #define ASCENDC_TPL_5_BW 5
 #define ASCENDC_TPL_10_BW 10
@@ -215,6 +217,12 @@ static constexpr uint32_t QFA_MXFP_SCALE_GROUP_ELEMENTS = 32U;
 static constexpr uint32_t QFA_L1_ALIGNMENT_BYTES = BUFFER_SIZE_BYTE_32B;
 // BF16 使用 16 位存储；此头文件与主机侧共用，不能依赖内核的 bfloat16_t 类型。
 static constexpr uint32_t QFA_BF16_ELEMENT_BYTES = sizeof(uint16_t);
+
+// FD 每次最多处理 8 行；每行 sum/max 用 8 个 float 广播为一个 32 字节块。
+static constexpr uint32_t QFA_FD_MAX_ROWS = 8U;
+static constexpr uint32_t QFA_FD_LSE_BYTES = 6U * BUFFER_SIZE_BYTE_1K;
+static constexpr uint32_t QFA_FD_BROADCAST_ELEMENTS = BUFFER_SIZE_BYTE_32B / sizeof(float);
+
 struct RunInfoVTailX : RunInfoX {
     uint32_t kvTailLen = 0;
     bool isVtailTask = false;
@@ -312,6 +320,8 @@ struct CommonConstInfo {
 
     FA_LAYOUT outputLayout;
     bool needInitOutput;
+    // 模板具备 FD 能力不等于本次任务启用 FD；该值来自 metadata 头。
+    bool enableFlashDecode = false;
     StridesConstInfo keyStrides;
     StridesConstInfo valueStrides;
     StridesConstInfo kDescaleStrides;

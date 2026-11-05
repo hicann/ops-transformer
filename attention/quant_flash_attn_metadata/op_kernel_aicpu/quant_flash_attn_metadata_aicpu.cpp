@@ -315,11 +315,12 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     mBaseSize_ = mBaseSize_ * (aivCoreNum_ / aicCoreNum_);
     param.mBaseSize = mBaseSize_;
     param.s2BaseSize = s2BaseSize_;
-    if (quantMode_ == 1 &&
-        socVersion_.find("Ascend960") == std::string::npos) { // 仅 MXFP8 在支持 FlashDecode 的平台开启 FD
-        param.l2Byte = 96U * 1024U * 1024U;                   // 96: 96MB, 1024: Mb2Kb, 1024:Kb2Mb
-        param.fdTolerance = 10;                               // 10: tolerance block
-        param.fdLeastBlock = 3;                               // 3: least block
+    if (quantMode_ == 1) { // 模式 1 为 MXFP8；其他量化模式沿用原有不启用 FD 的策略。
+        // 调度成本模型使用的 L2 字节容量：arch92 为 128 MiB，其他既有平台保持 96 MiB。
+        // 两次乘 1024 将 MiB 转为字节，不改变输入数据或 workspace 的计量单位。
+        param.l2Byte = socVersion_.find("Ascend960") != std::string::npos ? 128U * 1024U * 1024U : 96U * 1024U * 1024U;
+        param.fdTolerance = 10; // FD 切分允许的负载容差，单位为调度基本块，沿用既有策略。
+        param.fdLeastBlock = 3; // 每份 FD 至少三个 S2 基本块，避免过细切分增加归并开销。
         param.fdOn = true;
     } else {
         param.l2Byte = 0;

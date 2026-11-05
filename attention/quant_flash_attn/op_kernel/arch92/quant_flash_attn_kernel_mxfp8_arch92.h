@@ -161,6 +161,8 @@ public:
     {
         this->pipe_ = tPipe;
         InitConstInfo(tiling);
+        // 所有核读取同一 metadata 开关，模板能力关闭时编译期禁止进入 FD。
+        constInfo_.enableFlashDecode = FLASH_DECODE && (((__gm__ uint32_t*)metadata)[QFA_HEAD_IS_FD_INDEX] != 0U);
         constInfo_.needInitOutput = ((__gm__ uint32_t*)metadata)[QFA_HEAD_NEED_INIT_OUTPUT_INDEX] != 0;
         if constexpr (HAS_V_TAIL) {
             seqUsedVTailGm_.SetGlobalBuffer((__gm__ int32_t*)sequsedVTail, constInfo_.seqUsedKvTailSize);
@@ -219,24 +221,42 @@ public:
         }
         if constexpr (FLASH_DECODE) {
             if ASCEND_IS_AIV {
-                fdMetaDataGm_.SetGlobalBuffer(
-                    (__gm__ uint32_t*)(metadata + METADATA_HEADER_OFFSET +
-                                       sectionNum_ * metadataAicNum_ * METADATA_STRIDE * sizeof(uint32_t)),
-                    sectionNum_ * metadataAivNum_ * METADATA_STRIDE);
-                vecFdBlock_.InitParams();
-                vecFdBlock_.InitGlobalTensor(this->vecFaBlock_.softmaxFDMaxGm_, this->vecFaBlock_.softmaxFDSumGm_,
-                                             this->vecFaBlock_.accumOutGm_, this->vecFaBlock_.attentionOutGm_, keyPtr_);
-                if (constInfo_.isSoftmaxLseEnable) {
-                    softmaxLseGm_.SetGlobalBuffer((__gm__ float*)softmaxLse);
-                    vecFdBlock_.InitSoftmaxLseGm(softmaxLseGm_);
-                }
-                if constexpr (LAYOUT_Q == LayOutTypeEnum::LAYOUT_TND) {
-                    vecFdBlock_.SetCuSeqLensParsers(qCuSeqLensParser_, kvCuSeqLensParser_);
-                } else {
-                    vecFdBlock_.SetCuSeqLensParsers(qSeqUsedParser_, kvSeqUsedParser_);
+                if (constInfo_.enableFlashDecode) {
+                    fdMetaDataGm_.SetGlobalBuffer(
+                        (__gm__ uint32_t*)(metadata + METADATA_HEADER_OFFSET +
+                                           sectionNum_ * metadataAicNum_ * METADATA_STRIDE * sizeof(uint32_t)),
+                        sectionNum_ * metadataAivNum_ * METADATA_STRIDE);
+                    vecFdBlock_.InitParams();
+                    vecFdBlock_.InitGlobalTensor(this->vecFaBlock_.softmaxFDMaxGm_, this->vecFaBlock_.softmaxFDSumGm_,
+                                                 this->vecFaBlock_.accumOutGm_, this->vecFaBlock_.attentionOutGm_,
+                                                 keyPtr_);
+                    if (constInfo_.isSoftmaxLseEnable) {
+                        softmaxLseGm_.SetGlobalBuffer((__gm__ float*)softmaxLse);
+                        vecFdBlock_.InitSoftmaxLseGm(softmaxLseGm_);
+                    }
+                    if constexpr (LAYOUT_Q == LayOutTypeEnum::LAYOUT_TND) {
+                        vecFdBlock_.SetCuSeqLensParsers(qCuSeqLensParser_, kvCuSeqLensParser_);
+                    } else {
+                        vecFdBlock_.SetCuSeqLensParsers(qSeqUsedParser_, kvSeqUsedParser_);
+                    }
+                    vecFdBlock_.InitPScaleValue(vecFaBlock_.GetPScaleValue());
+                    // DN 原顺序中，stage2 前为十二个 512 字节 softmax 槽和两个 4096 字节广播槽。
+                    constexpr uint32_t fdBase =
+                        GetMmUbTotalSize() + 12U * BUFFER_SIZE_BYTE_512B + 2U * BUFFER_SIZE_BYTE_4K;
+                    // FD 只借用 stage2 和第一份 stage1 的前 8 KiB；最小 stage1 仍有 8448 字节。
+                    static_assert(VecFdBlockType::GetFdTotalUbSize() <=
+                                      mBaseSize * dVBaseSize * sizeof(float) + BUFFER_SIZE_BYTE_8K,
+                                  "FD 超过可复用的 stage2 与 stage1 范围");
+                    vecFdBlock_.template InitBuffers<fdBase>();
                 }
             }
         }
+    }
+
+    static __aicore__ inline constexpr uint32_t GetMmUbTotalSize()
+    {
+        // 两个半 N 的 BMM1 槽加一个完整 BMM2 槽，arch92 每个 AIC 对应一个 AIV。
+        return (mBaseSize * s2BaseSize + mBaseSize * dVBaseSize) * sizeof(float);
     }
 
     __aicore__ inline void InitMMResBuf(__gm__ uint8_t*& workspace)
@@ -818,16 +838,26 @@ public:
 
     __aicore__ inline void FlashDecode(uint32_t sectionIdx)
     {
-        GetFDSectionInfo(sectionIdx);
-        if (!fdParams_.fdCoreEnable) {
+        if (!constInfo_.enableFlashDecode) {
             return;
         }
-        vecFdBlock_.InitBuffers(this->pipe_);
-        AscendC::ICachePreLoad(2);
-        vecFdBlock_.AllocEventID();
+        GetFDSectionInfo(sectionIdx);
+        if (constInfo_.aicIdx < constInfo_.coreNum) {
+            // 先退役 FA 手工事件；DN 还必须释放全部已初始化队列的内部事件。
+            vecFaBlock_.FreeEventID();
+            vecFaBlock_.ReleaseQueueEventsForFd();
+        }
+        // 全流水屏障排空异步写出；全 AIV 屏障保证各核 partial 已可读取。
+        AscendC::PipeBarrier<PIPE_ALL>();
         SyncAll();
         vecFdBlock_.FlashDecode(fdParams_);
-        vecFdBlock_.FreeEventID();
+        // 无归并任务的 AIV 同样经过第二道屏障，避免下一 section 提前覆盖 workspace。
+        AscendC::PipeBarrier<PIPE_ALL>();
+        SyncAll();
+        if (constInfo_.aicIdx < constInfo_.coreNum) {
+            // 最后一轮也恢复，使 Process 末尾原有释放路径仍然配对。
+            vecFaBlock_.AllocEventID();
+        }
     }
 
     __aicore__ inline void GetFASectionInfo(uint32_t sectionIdx)
