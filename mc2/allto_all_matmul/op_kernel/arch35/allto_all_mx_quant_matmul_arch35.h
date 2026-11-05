@@ -219,7 +219,7 @@ __aicore__ inline void AlltoAllMxQuantMatmulArch35<SchedulerType, SchedulerConte
     pipeLineContext_.computationContext->baseData.aOffset = tileMMultiRankK * mc2Tiling_.rankDim * sizeof(DTYPE_X1);
     pipeLineContext_.computationContext->baseData.bOffset = 0UL;
     pipeLineContext_.computationContext->baseData.cOffset =
-        static_cast<uint64_t>(mc2Tiling_.tileM * mc2Tiling_.rankN * sizeof(DTYPE_Y));
+        static_cast<uint64_t>(mc2Tiling_.tileM) * mc2Tiling_.rankN * sizeof(DTYPE_Y);
     pipeLineContext_.computationContext->additionalData.x1Scale = transX1ScaleGM1_;
     pipeLineContext_.computationContext->additionalData.x1ScaleOffset =
         static_cast<uint64_t>(mc2Tiling_.tileM) *

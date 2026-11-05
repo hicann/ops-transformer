@@ -198,6 +198,7 @@ __aicore__ inline void MxQuantMatmulAlltoAllArch35<SchedulerType, SchedulerConte
                                                    MatmulAlltoAllTilingDataType>::ProcessTail(uint32_t taskCnt)
 {
     auto&& mc2Tiling_ = tilingData_->quantMatmulAlltoAllTilingInfo;
+    uint64_t tileCntMultitileM = (uint64_t)mc2Tiling_.tileCnt * mc2Tiling_.tileM;
 
     // 使用封装的 ComputeGMAddr 函数，自动处理 fp4/fp8 差异
     pipeLineContext_.computationContext->baseData.aGM =
@@ -225,9 +226,8 @@ __aicore__ inline void MxQuantMatmulAlltoAllArch35<SchedulerType, SchedulerConte
 
     pipeLineContext_.transposeContext->transposeSrcAddr =
         ComputeGMAddr<DTYPE_Y>(tempComputeOutGM_, (uint64_t)mc2Tiling_.tileM * mc2Tiling_.rankN * mc2Tiling_.tileCnt);
-    pipeLineContext_.transposeContext->transposeDstAddr = transOutGM_ + mc2Tiling_.tileCnt * mc2Tiling_.tileM *
-                                                                            mc2Tiling_.rankN * sizeof(DTYPE_Y) /
-                                                                            (uint64_t)mc2Tiling_.rankDim;
+    pipeLineContext_.transposeContext->transposeDstAddr =
+        transOutGM_ + tileCntMultitileM * mc2Tiling_.rankN * sizeof(DTYPE_Y) / (uint64_t)mc2Tiling_.rankDim;
     pipeLineContext_.transposeContext->transposeSrcOffset =
         ComputeByteOffset<DTYPE_Y>((uint64_t)mc2Tiling_.tailM * mc2Tiling_.rankN);
     pipeLineContext_.transposeContext->transposeDstOffset =
@@ -237,7 +237,7 @@ __aicore__ inline void MxQuantMatmulAlltoAllArch35<SchedulerType, SchedulerConte
     pipeLineContext_.communicationContext->taskCnt = mc2Tiling_.tailCnt;
     pipeLineContext_.communicationContext->sendBuffer = pipeLineContext_.transposeContext->transposeDstAddr;
     pipeLineContext_.communicationContext->recvBuffer =
-        y_ + mc2Tiling_.tileCnt * mc2Tiling_.tileM * mc2Tiling_.rankN * sizeof(DTYPE_Y) / (uint64_t)mc2Tiling_.rankDim;
+        y_ + tileCntMultitileM * mc2Tiling_.rankN * sizeof(DTYPE_Y) / (uint64_t)mc2Tiling_.rankDim;
     pipeLineContext_.communicationContext->sendOffset =
         (uint64_t)mc2Tiling_.tailM * mc2Tiling_.rankN * sizeof(DTYPE_Y) / (uint64_t)mc2Tiling_.rankDim;
     pipeLineContext_.communicationContext->recvOffset = pipeLineContext_.communicationContext->sendOffset;
