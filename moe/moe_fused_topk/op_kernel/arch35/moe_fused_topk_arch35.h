@@ -550,8 +550,11 @@ __aicore__ inline void MoeFusedTopkArch35<inputT, calT, enableExpertMapping>::Co
         WaitFlag<HardEvent::V_S>(eventIdVToS);
         for (size_t kIndex = 0; kIndex < k_; ++kIndex) {
             uint32_t expertId = indicesLocal.GetValue(kIndex);
-            uint32_t expertMappingNum = mappingNumLocal.GetValue(expertId);
-            uint32_t redundantOffset = expertMappingNum == 0 ? 0 : (batchOffset_ + loop) % expertMappingNum;
+            int32_t expertMappingNum = mappingNumLocal.GetValue(expertId);
+            // Keep invalid counts from addressing outside this expert's mapping row.
+            uint32_t mappingCount = expertMappingNum > 0 ? static_cast<uint32_t>(expertMappingNum) : 0U;
+            mappingCount = mappingCount > tableDim_ ? tableDim_ : mappingCount;
+            uint32_t redundantOffset = mappingCount == 0 ? 0 : (batchOffset_ + loop) % mappingCount;
             uint32_t tableOffset = expertId * tableDim_ + redundantOffset;
             indicesLocal.SetValue(kIndex, mappingTableGm_[tableOffset].GetValue(0));
         }

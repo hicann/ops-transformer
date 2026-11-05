@@ -289,6 +289,8 @@ aclnnStatus aclnnMoeFusedTopk(
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
+  输出 y 和 indices 的不同逻辑元素必须对应不同存储位置，不支持零步长广播或其他内部重叠的输出视图。合法的转置、带间隔非连续输出仍受支持。
+
   第一段接口完成入参校验，出现以下场景时报错：
 
   <table style="undefined;table-layout: fixed; width: 1149px"><colgroup>
@@ -323,7 +325,7 @@ aclnnStatus aclnnMoeFusedTopk(
       <td>输入的参数不满足约束。</td>
     </tr>
     <tr>
-      <td>输入输出的Shape不满足约束。</td>
+      <td>输入输出的Shape不满足约束，或者输出y、indices的视图步长导致元素存储重叠。</td>
     </tr>
   </tbody>
   </table>
