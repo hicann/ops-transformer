@@ -593,11 +593,11 @@ ge::graphStatus FlashAttentionScoreGraTilingBasicDet::GetPlatformInfo()
     if (platformInfoPtr == nullptr) {
         auto compileInfoPtr = reinterpret_cast<const Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo*>(
             context_->GetCompileInfo());
-        OP_CHECK_IF(
-            compileInfoPtr == nullptr,
-            OP_LOGE(context_,
-                    "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(compileInfoPtr == nullptr,
+                    REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                              (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                        "GetPlatformInfo: [compile_info is null]"})),
+                    return ge::GRAPH_FAILED);
 
         aicoreParams_.numBlocks = compileInfoPtr->aivNum;
         aicoreParams_.aicNum = compileInfoPtr->aicNum;
@@ -618,10 +618,13 @@ ge::graphStatus FlashAttentionScoreGraTilingBasicDet::GetPlatformInfo()
     }
 
     OP_CHECK_IF((aicoreParams_.numBlocks == 0) || (aicoreParams_.aicNum == 0),
-                OP_LOGE(context_,
-                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: [num of coreNum(aivNum) "
-                        "is %lu, num of aicNum is %lu.]",
-                        aicoreParams_.numBlocks, aicoreParams_.aicNum),
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                              (std::string("GetPlatformInfo: [num of coreNum(aivNum) is ") +
+                                               std::to_string(aicoreParams_.numBlocks) + ", num of aicNum is " +
+                                               std::to_string(aicoreParams_.aicNum) + ".]")
+                                                  .c_str()})),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;

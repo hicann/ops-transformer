@@ -169,11 +169,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetPlatformInfo()
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
         auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context_->GetCompileInfo());
-        OP_CHECK_IF(
-            compileInfoPtr == nullptr,
-            OP_LOGE(context_,
-                    "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(compileInfoPtr == nullptr,
+                    REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                              (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                        "GetPlatformInfo: [compile_info is null]"})),
+                    return ge::GRAPH_FAILED);
 
         fBaseParams.coreNum = compileInfoPtr->aivNum;
         fBaseParams.aicNum = compileInfoPtr->aicNum;
@@ -193,17 +193,21 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetPlatformInfo()
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, fBaseParams.l0cSize);
     }
     OP_CHECK_IF((fBaseParams.coreNum == 0) || (fBaseParams.aicNum == 0),
-                OP_LOGE(context_,
-                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: [num of coreNum(aivNum) "
-                        "is %ld, num of aicNum is %ld.]",
-                        fBaseParams.coreNum, fBaseParams.aicNum),
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                              (std::string("GetPlatformInfo: [num of coreNum(aivNum) is ") +
+                                               std::to_string(fBaseParams.coreNum) + ", num of aicNum is " +
+                                               std::to_string(fBaseParams.aicNum) + ".]")
+                                                  .c_str()})),
                 return ge::GRAPH_FAILED);
 
     fBaseParams.ubSize -= MATMUL_SIZE;
-    OP_CHECK_IF(
-        fBaseParams.ubSize <= 0,
-        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [ubSize is invalid.]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(fBaseParams.ubSize <= 0,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad", "GetPlatformInfo: [ubSize is invalid.]"})),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1010,14 +1014,15 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessDropInfo(const
 
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetShapeAttrsInfo()
 {
-    OP_CHECK_IF(
-        context_ == nullptr,
-        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]."),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        context_->GetAttrs() == nullptr,
-        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [GetAttrs is null]."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context_ == nullptr,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad", "GetShapeAttrsInfo: [context is null]."})),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context_->GetAttrs() == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "attributes",
+                                                         "required attributes are missing"),
+                return ge::GRAPH_FAILED);
 
     if (ge::GRAPH_SUCCESS != GetMaxWorkspaceFlag()) {
         return ge::GRAPH_FAILED;
@@ -1226,11 +1231,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoSplit()
     std::tuple<uint32_t, uint32_t, uint32_t> bestSplitRes = FuzzyForBestSplit();
     uint32_t s1Inner = std::get<0>(bestSplitRes);
     uint32_t s1CvInner = s1Inner * fBaseParams.s1CvRatio;
-    OP_CHECK_IF(
-        s1CvInner == 0,
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor s1CvInner is 0.]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(s1CvInner == 0,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad", "DoSplit: [divisor s1CvInner is 0.]"})),
+                return ge::GRAPH_FAILED);
     int64_t s1Outer = (fBaseParams.s1 + s1CvInner - 1) / s1CvInner;
     uint32_t s1TailTmp = fBaseParams.s1 % s1Inner;
     uint32_t s1CvTailTmp = fBaseParams.s1 % s1CvInner;
@@ -1242,11 +1247,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoSplit()
 
     uint32_t s2Inner = std::get<1>(bestSplitRes);
     uint32_t cvS2Inner = s2Inner * fBaseParams.s2CvRatio;
-    OP_CHECK_IF(
-        cvS2Inner == 0,
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor cvS2Inner is 0.]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(cvS2Inner == 0,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad", "DoSplit: [divisor cvS2Inner is 0.]"})),
+                return ge::GRAPH_FAILED);
     int64_t s2Outer = (fBaseParams.s2 + cvS2Inner - 1) / cvS2Inner;
     uint32_t s2TailTmp = fBaseParams.s2 % s2Inner;
     uint32_t s2CvTailTmp = fBaseParams.s2 % cvS2Inner;
@@ -1259,8 +1264,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoSplit()
     fBaseParams.baseMN = s1Inner * s2Inner;
 
     OP_CHECK_IF((fBaseParams.baseMN == 0 || fBaseParams.s2Outer == 0 || fBaseParams.s1Outer == 0),
-                OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [baseMN or "
-                                  "s2Outer or s1Outer is 0.]"),
+                REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                          (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                    "DoSplit: [baseMN or s2Outer or s1Outer is 0.]"})),
                 return ge::GRAPH_FAILED);
 
     uint32_t sfmgdInner = std::get<2>(bestSplitRes);
@@ -1270,11 +1276,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoSplit()
         sfmgdInner = (fBaseParams.value_d + FP16_BLOCK_NUMS - 1) / FP16_BLOCK_NUMS * FP16_BLOCK_NUMS;
     }
 
-    OP_CHECK_IF(
-        sfmgdInner == 0,
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor sfmgdInner is 0.]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(sfmgdInner == 0,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad", "DoSplit: [divisor sfmgdInner is 0.]"})),
+                return ge::GRAPH_FAILED);
     uint32_t sfmgdOuter = (fBaseParams.value_d + sfmgdInner - 1) / sfmgdInner;
     uint32_t sfmgdTailTmp = fBaseParams.value_d % sfmgdInner;
     uint32_t sfmgdTail = sfmgdTailTmp == 0 ? sfmgdInner : sfmgdTailTmp;
@@ -1293,19 +1299,22 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoSparse()
     if (fBaseParams.isSparse) {
         if (fBaseParams.layoutType == INPUT_FORMAT_TND) {
             OP_CHECK_IF((GetSparseUnpadBlockInfo() != ge::GRAPH_SUCCESS),
-                        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [get "
-                                          "SparseUnpadBlockInfo fail.]"),
+                        OP_LOGE_WITHOUT_REPORT(
+                            context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [get "
+                                      "SparseUnpadBlockInfo fail.]"),
                         return ge::GRAPH_FAILED);
         } else {
             if (fBaseParams.sparseMode == PREFIX || fBaseParams.sparseMode == PREFIX_COMPRESS) {
                 OP_CHECK_IF((GetSparsePrefixBlockInfo() != ge::GRAPH_SUCCESS),
-                            OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: "
-                                              "[get SparsePrefixBlockInfo fail.]"),
+                            OP_LOGE_WITHOUT_REPORT(
+                                context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: "
+                                          "[get SparsePrefixBlockInfo fail.]"),
                             return ge::GRAPH_FAILED);
             } else {
                 OP_CHECK_IF((GetSparseBlockInfo() != ge::GRAPH_SUCCESS),
-                            OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: "
-                                              "[get SparseBlockInfo fail.]"),
+                            OP_LOGE_WITHOUT_REPORT(
+                                context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: "
+                                          "[get SparseBlockInfo fail.]"),
                             return ge::GRAPH_FAILED);
             }
         }
@@ -1318,17 +1327,19 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoSparse()
         // coreNum前面已做非0校验
         int64_t blockFactor = (fusedOuter + fBaseParams.coreNum - 1) / fBaseParams.coreNum; // 单核块数
         // 除0校验
-        OP_CHECK_IF(
-            blockFactor == 0,
-            OP_LOGE(context_,
-                    "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor blockFactor is 0.]"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(blockFactor == 0,
+                    REPORT_PREDEFINED_ERR_MSG(
+                        "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                        (std::vector<const char*>{"FlashAttentionScoreGrad", "DoSparse: [divisor blockFactor is 0.]"})),
+                    return ge::GRAPH_FAILED);
         int64_t blockOuter = (fusedOuter + blockFactor - 1) / blockFactor; // 实际核数
         // 防止下标越界
-        OP_CHECK_IF(blockOuter > CORE_LIST_NUM,
-                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: "
-                                      "[blockStarts and blockEnds array bound.]"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            blockOuter > CORE_LIST_NUM,
+            REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                      (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                "DoSparse: [blockStarts and blockEnds array bound.]"})),
+            return ge::GRAPH_FAILED);
 
         fBaseParams.blockOuter = blockOuter;
         fBaseParams.blockFactor = blockFactor;
@@ -1488,11 +1499,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
         mm1.SetFixSplit(-1, -1, -1);
     }
 
-    OP_CHECK_IF(
-        mm1.GetTiling(tilingData->mm1TilingData) != 0,
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [matmul1 tilingData get fail.]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(mm1.GetTiling(tilingData->mm1TilingData) != 0,
+                REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                          (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                    "DoLibApiTiling: [matmul1 tilingData get fail.]"})),
+                return ge::GRAPH_FAILED);
     SetMatmulTilingBufferInfo(&tilingData->mm1TilingData);
 
     // format left[B, N2, G, S1, S2] right[B, N2, G, S1, D] result[B, N2, G, S2, D]
@@ -1524,11 +1535,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
         mm2.SetFixSplit(-1, -1, -1);
     }
 
-    OP_CHECK_IF(
-        mm2.GetTiling(tilingData->mm2TilingData) != 0,
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [matmul2 tilingData get fail.]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(mm2.GetTiling(tilingData->mm2TilingData) != 0,
+                REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                          (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                    "DoLibApiTiling: [matmul2 tilingData get fail.]"})),
+                return ge::GRAPH_FAILED);
     SetMatmulTilingBufferInfo(&tilingData->mm2TilingData);
 
     // format left[B, N2, G, S1, S2] right[B, N2, 1, S2, D] result[B, N2, G, S1, D]
@@ -1555,11 +1566,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
     } else {
         mm3.SetFixSplit(-1, -1, -1);
     }
-    OP_CHECK_IF(
-        mm3.GetTiling(tilingData->mm3TilingData) != 0,
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [matmul3 tilingData get fail.]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(mm3.GetTiling(tilingData->mm3TilingData) != 0,
+                REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                          (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                    "DoLibApiTiling: [matmul3 tilingData get fail.]"})),
+                return ge::GRAPH_FAILED);
     SetMatmulTilingBufferInfo(&tilingData->mm3TilingData);
 
     uint32_t cvS2Inner = fBaseParams.s2Inner * fBaseParams.s2CvRatio;
@@ -1576,10 +1587,13 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
         uint32_t dAlignTmp = fBaseParams.sfmgdInner;
         uint32_t s1VecSize1 = SFMG_DB_CLC1_UBSIZE / FP32_BYTES / dAlignTmp;
         OP_CHECK_IF(s1VecSize1 == 0,
-                    OP_LOGE(context_,
-                            "The op [FlashAttentionScoreGrad] received bad params, the reason is: [enable tnd "
-                            "s1pingpong sfmgDInner [%u] is larger than [%u].]",
-                            dAlignTmp, SFMG_DB_CLC1_UBSIZE / FP32_BYTES),
+                    REPORT_PREDEFINED_ERR_MSG(
+                        "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                        (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                  (std::string("DoLibApiTiling: [enable tnd s1pingpong sfmgDInner [") +
+                                                   std::to_string(dAlignTmp) + "] is larger than [" +
+                                                   std::to_string(SFMG_DB_CLC1_UBSIZE / FP32_BYTES) + "].]")
+                                                      .c_str()})),
                     return ge::GRAPH_FAILED);
         // SFMG计算时输入的数据行数，尽量是8的倍数，否则SoftmaxGradFront接口中会存在 scalar等vector的wait等待，导致SFMG
         // pingpong不起来，存在串行时序；
@@ -1688,12 +1702,15 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::PostTiling()
     SaveToTilingData();
     auto blockdim = CalcTschBlockDim(tilingData->s1s2BNGS1S2SplitCoreParams.get_blockOuter(), fBaseParams.aicNum,
                                      fBaseParams.coreNum);
-    OP_CHECK_IF(blockdim == 0,
-                OP_LOGE(context_,
-                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: [blockdim is 0, aicNum "
-                        "is %ld, aivNum is %ld.]",
-                        fBaseParams.aicNum, fBaseParams.coreNum),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        blockdim == 0,
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                            (std::string("PostTiling: [blockdim is 0, aicNum is ") +
+                                                             std::to_string(fBaseParams.aicNum) + ", aivNum is " +
+                                                             std::to_string(fBaseParams.coreNum) + ".]")
+                                                                .c_str()})),
+        return ge::GRAPH_FAILED);
     context_->SetBlockDim(blockdim);
     context_->SetScheduleMode(1);
 
@@ -1908,10 +1925,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseBlockInfo()
     // [s2OuterIdx][begin, end, length]
     std::unique_ptr<int64_t[][ARRAY_LENGTH]> parseInfo(
         new (std::nothrow) int64_t[static_cast<size_t>(fBaseParams.s2Outer)][ARRAY_LENGTH]);
-    OP_CHECK_IF(
-        parseInfo == nullptr,
-        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [parseInfo is null]."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(parseInfo == nullptr,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad", "GetSparseBlockInfo: [parseInfo is null]."})),
+                return ge::GRAPH_FAILED);
     GetParseS1S2OuterInfo(parseInfo.get());
     int64_t s1s2oCount = parseInfo[fBaseParams.s2Outer - 1][LENGTH_IDX];
 
@@ -1920,8 +1938,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseBlockInfo()
     // coreNum前面已做非0校验
     int64_t blockFactor = (fusedOuter + fBaseParams.coreNum - 1) / fBaseParams.coreNum;
     if (blockFactor == 0) {
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor blockFactor is 0.]");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{"FlashAttentionScoreGrad", "GetSparseBlockInfo: [divisor blockFactor is 0.]"}));
         return ge::GRAPH_FAILED;
     }
     int64_t blockOuter = (fusedOuter + blockFactor - 1) / blockFactor;
@@ -1942,8 +1961,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseBlockInfo()
     int64_t s2oIdx = 0;
 
     if (s1s2oCount == 0) {
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor s1s2oCount is 0.]");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{"FlashAttentionScoreGrad", "GetSparseBlockInfo: [divisor s1s2oCount is 0.]"}));
         return ge::GRAPH_FAILED;
     }
 
@@ -1954,8 +1974,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseBlockInfo()
     int64_t blockEnds[CORE_LIST_NUM];
     blockStarts[0] = 0;
     if (blockOuter > CORE_LIST_NUM) {
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [blockEnds array bound.]");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{"FlashAttentionScoreGrad", "GetSparseBlockInfo: [blockEnds array bound.]"}));
         return ge::GRAPH_FAILED;
     }
     blockEnds[blockOuter - 1] = static_cast<int64_t>(fBaseParams.b) * fBaseParams.n2 * fBaseParams.g *
@@ -2078,8 +2099,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparsePrefixBlockI
         (totalValidBaseBlock + fBaseParams.coreNum - 1) / fBaseParams.coreNum; // 每个核处理的最多数据个数
     OP_CHECK_IF(
         blockFactor == 0,
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor blockFactor is 0.]"),
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                            "GetSparsePrefixBlockInfo: [divisor blockFactor is 0.]"})),
         return ge::GRAPH_FAILED);
     int64_t blockOuter = (totalValidBaseBlock + blockFactor - 1) / blockFactor; // 实际使用的核数
 
@@ -2092,8 +2114,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparsePrefixBlockI
     blockStarts[0] = 0;
     OP_CHECK_IF(
         blockOuter > CORE_LIST_NUM,
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [blockEnds array bound.]"),
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                            "GetSparsePrefixBlockInfo: [blockEnds array bound.]"})),
         return ge::GRAPH_FAILED);
     blockEnds[blockOuter - 1] = static_cast<int64_t>(fBaseParams.b) * fBaseParams.n2 * fBaseParams.g *
                                 fBaseParams.s1Outer * fBaseParams.s2Outer;
@@ -2435,8 +2458,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseUnpadBlockIn
     int64_t blockFactor = (fusedOuter + fBaseParams.coreNum - 1) / fBaseParams.coreNum;
     OP_CHECK_IF(
         blockFactor == 0,
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor blockFactor is 0.]"),
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                            "GetSparseUnpadBlockInfo: [divisor blockFactor is 0.]"})),
         return ge::GRAPH_FAILED);
     int64_t blockOuter = (fusedOuter + blockFactor - 1) / blockFactor;
 
@@ -2459,8 +2483,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseUnpadBlockIn
     blockStarts[0] = 0;
     OP_CHECK_IF(
         blockOuter > CORE_LIST_NUM,
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [blockEnds array bound.]"),
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{"FlashAttentionScoreGrad", "GetSparseUnpadBlockInfo: [blockEnds array bound.]"})),
         return ge::GRAPH_FAILED);
     blockEnds[blockOuter - 1] = totalBlockInfo[fBaseParams.b - 1][1];
 
@@ -2474,12 +2499,12 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseUnpadBlockIn
             if (calculatedBlockInfo[b][0][SUM_ALL] > currentIdx) {
                 bIdx = b;
                 auto s1os2o = calculatedBlockInfo[b][fBaseParams.s2Outer - 1][SUM_S1S2];
-                OP_CHECK_IF(
-                    s1os2o == 0,
-                    OP_LOGE(
-                        context_,
-                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor s1os2o is 0.]"),
-                    return ge::GRAPH_FAILED);
+                OP_CHECK_IF(s1os2o == 0,
+                            REPORT_PREDEFINED_ERR_MSG(
+                                "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                          "GetSparseUnpadBlockInfo: [divisor s1os2o is 0.]"})),
+                            return ge::GRAPH_FAILED);
                 auto gs1os2o = s1os2o * fBaseParams.g;
                 bTail = (b == 0) ? currentIdx : currentIdx - calculatedBlockInfo[b - 1][0][SUM_ALL];
                 n2Idx = bTail / gs1os2o;
@@ -2565,27 +2590,29 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPreTiling()
     tilingData->preTilingData.set_maskTailCoreLoop(tailCoreUBLoop);
     tilingData->preTilingData.set_maskTailCoreLastLoopNum(tailCoreUBLastLoopNum);
 
-    OP_CHECK_IF(
-        maskUsedCoreNum == 0,
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor maskUsedCoreNumis 0.]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(maskUsedCoreNum == 0,
+                REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                          (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                    "DoPreTiling: [divisor maskUsedCoreNumis 0.]"})),
+                return ge::GRAPH_FAILED);
     int64_t qPreBlockFactor = (fBaseParams.qSizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
-    OP_CHECK_IF(
-        qPreBlockFactor == 0,
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor qPreBlockFactor is 0.]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(qPreBlockFactor == 0,
+                REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                          (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                    "DoPreTiling: [divisor qPreBlockFactor is 0.]"})),
+                return ge::GRAPH_FAILED);
     int64_t qPreBlockTotal = (fBaseParams.qSizeAlign + qPreBlockFactor - 1) / qPreBlockFactor;
     int64_t qPreTailNumTmp = fBaseParams.qSizeAlign % qPreBlockFactor;
     int64_t qPreTailNum = qPreTailNumTmp == 0 ? qPreBlockFactor : qPreTailNumTmp;
 
     {
         int64_t kvPreBlockFactor = (fBaseParams.kvSizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
-        OP_CHECK_IF(kvPreBlockFactor == 0,
-                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor "
-                                      "kvPreBlockFactor is 0.]"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            kvPreBlockFactor == 0,
+            REPORT_PREDEFINED_ERR_MSG(
+                "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                (std::vector<const char*>{"FlashAttentionScoreGrad", "DoPreTiling: [divisor kvPreBlockFactor is 0.]"})),
+            return ge::GRAPH_FAILED);
         int64_t kvPreBlockTotal = (fBaseParams.kvSizeAlign + kvPreBlockFactor - 1) / kvPreBlockFactor;
         int64_t kvPreTailNumTmp = fBaseParams.kvSizeAlign % kvPreBlockFactor;
         int64_t kvPreTailNum = kvPreTailNumTmp == 0 ? kvPreBlockFactor : kvPreTailNumTmp;
@@ -2599,18 +2626,23 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPreTiling()
         OP_LOGI(context_, "qRopeSizeAlign, is %ld. maskUsedCoreNum %ld ", fBaseParams.qRopeSizeAlign, maskUsedCoreNum);
         int64_t qRopePreBlockFactor = (fBaseParams.qRopeSizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
         OP_CHECK_IF(qRopePreBlockFactor == 0,
-                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor "
-                                      "qRopePreBlockFactor is 0. fBaseParams.qRopeSizeAlign]"),
+                    REPORT_PREDEFINED_ERR_MSG(
+                        "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                        (std::vector<const char*>{
+                            "FlashAttentionScoreGrad",
+                            "DoPreTiling: [divisor qRopePreBlockFactor is 0. fBaseParams.qRopeSizeAlign]"})),
                     return ge::GRAPH_FAILED);
         int64_t qRopePreBlockTotal = (fBaseParams.qRopeSizeAlign + qRopePreBlockFactor - 1) / qRopePreBlockFactor;
         int64_t qRopePreTailNumTmp = fBaseParams.qRopeSizeAlign % qRopePreBlockFactor;
         int64_t qRopePreTailNum = qRopePreTailNumTmp == 0 ? qRopePreBlockFactor : qRopePreTailNumTmp;
 
         int64_t kRopePreBlockFactor = (fBaseParams.kRopeSizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
-        OP_CHECK_IF(kRopePreBlockFactor == 0,
-                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor "
-                                      "kRopePreBlockFactor is 0.]"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            kRopePreBlockFactor == 0,
+            REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                      (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                "DoPreTiling: [divisor kRopePreBlockFactor is 0.]"})),
+            return ge::GRAPH_FAILED);
         int64_t kRopePreBlockTotal = (fBaseParams.kRopeSizeAlign + kRopePreBlockFactor - 1) / kRopePreBlockFactor;
         int64_t kRopePreTailNumTmp = fBaseParams.kRopeSizeAlign % kRopePreBlockFactor;
         int64_t kRopePreTailNum = kRopePreTailNumTmp == 0 ? kRopePreBlockFactor : kRopePreTailNumTmp;
@@ -2623,11 +2655,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPreTiling()
     }
 
     int64_t vPreBlockFactor = (fBaseParams.vSizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
-    OP_CHECK_IF(
-        vPreBlockFactor == 0,
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor vPreBlockFactor is 0.]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(vPreBlockFactor == 0,
+                REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                          (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                    "DoPreTiling: [divisor vPreBlockFactor is 0.]"})),
+                return ge::GRAPH_FAILED);
     int64_t vPreBlockTotal = (fBaseParams.vSizeAlign + vPreBlockFactor - 1) / vPreBlockFactor;
     int64_t vPreTailNumTmp = fBaseParams.vSizeAlign % vPreBlockFactor;
     int64_t vPreTailNum = vPreTailNumTmp == 0 ? vPreBlockFactor : vPreTailNumTmp;
@@ -2680,15 +2712,17 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPostTiling()
     int64_t qPostBaseNum = fBaseParams.mm2IsNZOut ?
                                (postUbBaseSize / fBaseParams.dataTypeSize / dAlign * fBaseParams.d) :
                                (postUbBaseSize / fBaseParams.dataTypeSize);
-    OP_CHECK_IF(
-        qPostBaseNum == 0,
-        OP_LOGE(context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor qPostBaseNum is 0.]"),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(fBaseParams.blockOuter == 0,
-                OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor "
-                                  "fBaseParams.blockOuter is 0.]"),
+    OP_CHECK_IF(qPostBaseNum == 0,
+                REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                          (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                    "DoPostTiling: [divisor qPostBaseNum is 0.]"})),
                 return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        fBaseParams.blockOuter == 0,
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                            "DoPostTiling: [divisor fBaseParams.blockOuter is 0.]"})),
+        return ge::GRAPH_FAILED);
     int64_t qPostBlockTotal = nzPostNeedEffectiveT ?
                                   fBaseParams.effectiveT1 * fBaseParams.n2 * fBaseParams.g * fBaseParams.d :
                                   fBaseParams.qSize;
@@ -2701,9 +2735,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPostTiling()
         int64_t kvPostBaseNum = qPostBaseNum;
         OP_CHECK_IF(
             kvPostBaseNum == 0,
-            OP_LOGE(
-                context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor kvPostBaseNum is 0.]"),
+            REPORT_PREDEFINED_ERR_MSG(
+                "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                (std::vector<const char*>{"FlashAttentionScoreGrad", "DoPostTiling: [divisor kvPostBaseNum is 0.]"})),
             return ge::GRAPH_FAILED);
         int64_t kvPostBlockTotal =
             nzPostNeedEffectiveT ? fBaseParams.effectiveT2 * fBaseParams.n2 * fBaseParams.d : fBaseParams.kvSize;
@@ -2723,13 +2757,17 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPostTiling()
         int64_t qRopePostBaseNum = fBaseParams.mm2IsNZOut ?
                                        (postUbBaseSize / fBaseParams.dataTypeSize / rope_dAlign * fBaseParams.rope_d) :
                                        (postUbBaseSize / fBaseParams.dataTypeSize);
-        OP_CHECK_IF(qRopePostBaseNum == 0,
-                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor "
-                                      "qRopePostBaseNum is 0.]"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            qRopePostBaseNum == 0,
+            REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                      (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                "DoPostTiling: [divisor qRopePostBaseNum is 0.]"})),
+            return ge::GRAPH_FAILED);
         OP_CHECK_IF(fBaseParams.blockOuter == 0,
-                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor "
-                                      "fBaseParams.blockOuter is 0.]"),
+                    REPORT_PREDEFINED_ERR_MSG(
+                        "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                        (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                  "DoPostTiling: [divisor fBaseParams.blockOuter is 0.]"})),
                     return ge::GRAPH_FAILED);
         int64_t qRopePostBlockTotal =
             nzPostNeedEffectiveT ? fBaseParams.effectiveT1 * fBaseParams.n2 * fBaseParams.g * fBaseParams.rope_d :
@@ -2740,10 +2778,12 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPostTiling()
         int64_t qRopePostBlockFactor = (qRopePostBlockOuterTotal + fBaseParams.blockOuter - 1) / fBaseParams.blockOuter;
 
         int64_t kRopePostBaseNum = qRopePostBaseNum;
-        OP_CHECK_IF(kRopePostBaseNum == 0,
-                    OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor "
-                                      "kRopePostBaseNum is 0.]"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            kRopePostBaseNum == 0,
+            REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                      (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                "DoPostTiling: [divisor kRopePostBaseNum is 0.]"})),
+            return ge::GRAPH_FAILED);
         int64_t kRopePostBlockTotal = nzPostNeedEffectiveT ?
                                           fBaseParams.effectiveT2 * fBaseParams.n2 * fBaseParams.rope_d :
                                           fBaseParams.kRopeSize;
@@ -2766,12 +2806,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPostTiling()
 
     {
         int64_t vPostBaseNum = qPostBaseNum;
-        OP_CHECK_IF(
-            vPostBaseNum == 0,
-            OP_LOGE(
-                context_,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor vPostBaseNum is 0.]"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(vPostBaseNum == 0,
+                    REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                              (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                        "DoPostTiling: [divisor vPostBaseNum is 0.]"})),
+                    return ge::GRAPH_FAILED);
         int64_t vPostBlockTotal =
             nzPostNeedEffectiveT ? fBaseParams.effectiveT2 * fBaseParams.n2 * fBaseParams.value_d : fBaseParams.vSize;
         int64_t vPostTailNumTmp = vPostBlockTotal % vPostBaseNum;

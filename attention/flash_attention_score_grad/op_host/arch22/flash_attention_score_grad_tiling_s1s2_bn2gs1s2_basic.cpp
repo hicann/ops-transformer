@@ -404,11 +404,11 @@ ge::graphStatus FlashAttentionScoreGraTilingMla::GetPlatformInfo()
     if (platformInfoPtr == nullptr) {
         auto compileInfoPtr = reinterpret_cast<const Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo*>(
             context_->GetCompileInfo());
-        OP_CHECK_IF(
-            compileInfoPtr == nullptr,
-            OP_LOGE(context_,
-                    "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(compileInfoPtr == nullptr,
+                    REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                              (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                        "GetPlatformInfo: [compile_info is null]"})),
+                    return ge::GRAPH_FAILED);
 
         aicoreParams_.numBlocks = compileInfoPtr->aivNum;
         aicoreParams_.aicNum = compileInfoPtr->aicNum;
@@ -429,10 +429,13 @@ ge::graphStatus FlashAttentionScoreGraTilingMla::GetPlatformInfo()
     }
 
     OP_CHECK_IF((aicoreParams_.numBlocks == 0) || (aicoreParams_.aicNum == 0),
-                OP_LOGE(context_,
-                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: [num of coreNum(aivNum) "
-                        "is %lu, num of aicNum is %lu.]",
-                        aicoreParams_.numBlocks, aicoreParams_.aicNum),
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                              (std::string("GetPlatformInfo: [num of coreNum(aivNum) is ") +
+                                               std::to_string(aicoreParams_.numBlocks) + ", num of aicNum is " +
+                                               std::to_string(aicoreParams_.aicNum) + ".]")
+                                                  .c_str()})),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -441,22 +444,28 @@ ge::graphStatus FlashAttentionScoreGraTilingMla::GetPlatformInfo()
 ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForMultiHeadLatentAttentionGrad(gert::TilingParseContext* context)
 {
     OP_CHECK_IF(context == nullptr,
-                OP_LOGE("TilingPrepare",
-                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]"),
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                              "TilingPrepareForMultiHeadLatentAttentionGrad: [context is null]"})),
                 return ge::GRAPH_FAILED);
 
     fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(
         platformInfoPtr == nullptr,
-        OP_LOGE(context,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [platformInfoPtr is null]"),
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                      "TilingPrepareForMultiHeadLatentAttentionGrad: [platformInfoPtr is null]"})),
         return ge::GRAPH_FAILED);
 
     auto compileInfoPtr = context->GetCompiledInfo<MultiHeadLatentAttentionGradCompileInfo>();
     OP_CHECK_IF(
         compileInfoPtr == nullptr,
-        OP_LOGE(context,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compileInfoPtr is null]"),
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                      "TilingPrepareForMultiHeadLatentAttentionGrad: [compileInfoPtr is null]"})),
         return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);

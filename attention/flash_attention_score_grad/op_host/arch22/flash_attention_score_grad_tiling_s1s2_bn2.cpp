@@ -274,11 +274,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetPlatformInfo()
     if (platformInfoPtr == nullptr) {
         auto compileInfoPtr = reinterpret_cast<const Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo*>(
             context_->GetCompileInfo());
-        OP_CHECK_IF(
-            compileInfoPtr == nullptr,
-            OP_LOGE(context_,
-                    "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(compileInfoPtr == nullptr,
+                    REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                              (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                        "GetPlatformInfo: [compile_info is null]"})),
+                    return ge::GRAPH_FAILED);
 
         aicoreParams_.numBlocks = compileInfoPtr->aivNum;
         aicoreParams_.aicNum = compileInfoPtr->aicNum;
@@ -302,17 +302,20 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetPlatformInfo()
     }
 
     OP_CHECK_IF((aicoreParams_.numBlocks == 0) || (aicoreParams_.aicNum == 0),
-                OP_LOGE(context_,
-                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: num of coreNum(aivNum) "
-                        "is %lu, num of aicNum is %lu.",
-                        aicoreParams_.numBlocks, aicoreParams_.aicNum),
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                              (std::string("GetPlatformInfo: num of coreNum(aivNum) is ") +
+                                               std::to_string(aicoreParams_.numBlocks) + ", num of aicNum is " +
+                                               std::to_string(aicoreParams_.aicNum) + ".")
+                                                  .c_str()})),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(
         aicoreParams_.ubSize <= 0 || l2CacheSize <= 0,
-        OP_LOGE(
-            context_,
-            "The op [FlashAttentionScoreGrad] received bad params, the reason is: ubSize or l2CacheSize is invalid."),
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                            "GetPlatformInfo: ubSize or l2CacheSize is invalid."})),
         return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -837,14 +840,15 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetShapeAttrsInfo()
     /*
     Get all shape info and attr
     */
-    OP_CHECK_IF(
-        context_ == nullptr,
-        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]"),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        context_->GetAttrs() == nullptr,
-        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [GetAttrs is null]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context_ == nullptr,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad", "GetShapeAttrsInfo: [context is null]"})),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context_->GetAttrs() == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "attributes",
+                                                         "required attributes are missing"),
+                return ge::GRAPH_FAILED);
     if (ge::GRAPH_SUCCESS != GetMaxWorkspaceFlag()) {
         return ge::GRAPH_FAILED;
     }
@@ -1506,14 +1510,16 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::DoCastTiling()
         qPostBaseNum = postUbBaseSize / typeSize / dAlign * td_->opInfo.get_D();
     }
 
-    OP_CHECK_IF(
-        qPostBaseNum == 0,
-        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: qPostBaseNum is 0."),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        usedCoreNum == 0,
-        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: castUsedCoreNum is 0."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(qPostBaseNum == 0,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad", "DoCastTiling: qPostBaseNum is 0."})),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(usedCoreNum == 0,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad", "DoCastTiling: castUsedCoreNum is 0."})),
+                return ge::GRAPH_FAILED);
     int64_t qPostBlockTotal = allNumQuery / dAlign * td_->opInfo.get_D();
     int64_t qSizeAlign = (qPostBlockTotal + BASE_LEN_256 - 1) / GM_ALIGN * GM_ALIGN * typeSize;
     int64_t qPostTailNumTmp = qPostBlockTotal % qPostBaseNum;
@@ -1522,10 +1528,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::DoCastTiling()
     int64_t qPostBlockFactor = (qPostBlockOuterTotal + usedCoreNum - 1) / usedCoreNum;
 
     int64_t kvPostBaseNum = qPostBaseNum;
-    OP_CHECK_IF(
-        kvPostBaseNum == 0,
-        OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: kvPostBaseNum is 0."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(kvPostBaseNum == 0,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad", "DoCastTiling: kvPostBaseNum is 0."})),
+                return ge::GRAPH_FAILED);
     int64_t kvPostBlockTotal = allNumKv / dAlign * td_->opInfo.get_D();
     int64_t kvSizeAlign = (kvPostBlockTotal + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN * typeSize;
     int64_t kvPostTailNumTmp = kvPostBlockTotal % kvPostBaseNum;
@@ -1673,10 +1680,13 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetWorkspaceSize()
     // Tiling传递的内存大小、起始地址，统一为字节数，单位为B
     auto blockdim = CalcTschBlockDim(launchBlockDims, aicoreParams_.aicNum, aicoreParams_.numBlocks);
     OP_CHECK_IF(blockdim == 0,
-                OP_LOGE(context_,
-                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: blockdim is 0, aicNum is "
-                        "%lu, aivNum is %lu.",
-                        aicoreParams_.aicNum, aicoreParams_.numBlocks),
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                              (std::string("GetWorkspaceSize: blockdim is 0, aicNum is ") +
+                                               std::to_string(aicoreParams_.aicNum) + ", aivNum is " +
+                                               std::to_string(aicoreParams_.numBlocks) + ".")
+                                                  .c_str()})),
                 return ge::GRAPH_FAILED);
     context_->SetBlockDim(blockdim);
     context_->SetScheduleMode(1);

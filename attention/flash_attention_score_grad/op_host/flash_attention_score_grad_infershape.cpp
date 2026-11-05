@@ -29,22 +29,44 @@ static const uint64_t INDEX_OUT_6 = 6;
 static const uint64_t INDEX_OUTDTYPE = 11;
 ge::graphStatus InferShape4FlashAttentionScoreGrad(gert::InferShapeContext* context)
 {
-    OP_CHECK_NULL_WITH_CONTEXT(context, context);
+    OP_CHECK_IF(
+        context == nullptr,
+        REPORT_PREDEFINED_ERR_MSG("EZ1014", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{"FlashAttentionScoreGrad", "InferShape: context is null"})),
+        return ge::GRAPH_FAILED);
     OP_LOGI(context, "Enter FlashAttentionScoreGrad runtime infershape impl.");
     const gert::Shape* queryShape = context->GetInputShape(0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
+    OP_CHECK_IF(queryShape == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "query",
+                                                         "required shape or attribute is missing"),
+                return ge::GRAPH_FAILED);
     const gert::Shape* keyShape = context->GetInputShape(1);
-    OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
+    OP_CHECK_IF(keyShape == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "key",
+                                                         "required shape or attribute is missing"),
+                return ge::GRAPH_FAILED);
     const gert::Shape* valueShape = context->GetInputShape(2);
-    OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
+    OP_CHECK_IF(valueShape == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "value",
+                                                         "required shape or attribute is missing"),
+                return ge::GRAPH_FAILED);
 
     auto attrs = context->GetAttrs();
-    OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    OP_CHECK_IF(attrs == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "attributes",
+                                                         "required attributes are missing"),
+                return ge::GRAPH_FAILED);
 
     auto headNum = attrs->GetInt(4); // N1
-    OP_CHECK_NULL_WITH_CONTEXT(context, headNum);
+    OP_CHECK_IF(headNum == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "head_num",
+                                                         "required shape or attribute is missing"),
+                return ge::GRAPH_FAILED);
     const char* inputLayout = attrs->GetAttrPointer<char>(5);
-    OP_CHECK_NULL_WITH_CONTEXT(context, inputLayout);
+    OP_CHECK_IF(inputLayout == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "input_layout",
+                                                         "required shape or attribute is missing"),
+                return ge::GRAPH_FAILED);
     std::string inputLayoutStr = std::string(inputLayout) == "" ? "empty" : std::string(inputLayout);
     for (auto& c : inputLayoutStr) {
         c = toupper(c);
@@ -80,20 +102,36 @@ ge::graphStatus InferShape4FlashAttentionScoreGrad(gert::InferShapeContext* cont
             inputLayoutStr.c_str());
 
     gert::Shape* dqShape = context->GetOutputShape(0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, dqShape);
+    OP_CHECK_IF(
+        dqShape == nullptr,
+        REPORT_PREDEFINED_ERR_MSG("EZ1014", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{"FlashAttentionScoreGrad", "InferShape: dqShape is null"})),
+        return ge::GRAPH_FAILED);
     *dqShape = *queryShape;
 
     gert::Shape* dkShape = context->GetOutputShape(1);
-    OP_CHECK_NULL_WITH_CONTEXT(context, dkShape);
+    OP_CHECK_IF(
+        dkShape == nullptr,
+        REPORT_PREDEFINED_ERR_MSG("EZ1014", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{"FlashAttentionScoreGrad", "InferShape: dkShape is null"})),
+        return ge::GRAPH_FAILED);
     *dkShape = *keyShape;
 
     gert::Shape* dvShape = context->GetOutputShape(2);
-    OP_CHECK_NULL_WITH_CONTEXT(context, dvShape);
+    OP_CHECK_IF(
+        dvShape == nullptr,
+        REPORT_PREDEFINED_ERR_MSG("EZ1014", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{"FlashAttentionScoreGrad", "InferShape: dvShape is null"})),
+        return ge::GRAPH_FAILED);
     *dvShape = *valueShape;
 
     // dpse output
     gert::Shape* dpseShape = context->GetOutputShape(3);
-    OP_CHECK_NULL_WITH_CONTEXT(context, dpseShape);
+    OP_CHECK_IF(dpseShape == nullptr,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1014", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad", "InferShape: dpseShape is null"})),
+                return ge::GRAPH_FAILED);
 
     gert::Shape* dqRopeShape = context->GetOutputShape(4);
 
@@ -130,13 +168,20 @@ ge::graphStatus InferShape4FlashAttentionScoreGrad(gert::InferShapeContext* cont
 
 ge::graphStatus InferDataType4FlashAttentionScoreGrad(gert::InferDataTypeContext* context)
 {
-    OP_CHECK_NULL_WITH_CONTEXT(context, context);
+    OP_CHECK_IF(
+        context == nullptr,
+        REPORT_PREDEFINED_ERR_MSG("EZ1014", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{"FlashAttentionScoreGrad", "InferShape: context is null"})),
+        return ge::GRAPH_FAILED);
     OP_LOGI(context, "Enter FlashAttentionScoreGrad infer data type impl.");
 
     auto dtype = context->GetInputDataType(0);
     if (dtype == DT_FLOAT8_E5M2 || dtype == DT_FLOAT8_E4M3FN || dtype == DT_HIFLOAT8) {
         auto attrs = context->GetAttrs();
-        OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+        OP_CHECK_IF(attrs == nullptr,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "attributes",
+                                                             "required attributes are missing"),
+                    return ge::GRAPH_FAILED);
 
         auto outDtypePtr = attrs->GetAttrPointer<int64_t>(INDEX_OUTDTYPE);
         int64_t outDtype = *outDtypePtr;

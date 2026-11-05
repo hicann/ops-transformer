@@ -270,7 +270,10 @@ ge::graphStatus CheckShapeValid(gert::TilingContext* context, int64_t b, int64_t
 ge::graphStatus CheckTndShapeValid(gert::TilingContext* context, int64_t t1, int64_t n1, int64_t d)
 {
     if (context == nullptr) {
-        OP_LOGE(context, "In op [FlashAttentionScoreGrad], context is null");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                      "CheckTndShapeValid: In op [FlashAttentionScoreGrad], context is null"}));
         return ge::GRAPH_FAILED;
     }
 
@@ -301,7 +304,10 @@ ge::graphStatus CheckTndShapeValid(gert::TilingContext* context, int64_t t1, int
 ge::graphStatus CheckDtypeValid(gert::TilingContext* context)
 {
     if (context == nullptr) {
-        OP_LOGE(context, "In op [FlashAttentionScoreGrad], context is null");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                      "CheckDtypeValid: In op [FlashAttentionScoreGrad], context is null"}));
         return ge::GRAPH_FAILED;
     }
 

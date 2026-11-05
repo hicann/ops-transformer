@@ -350,7 +350,13 @@ void SparseLightningIndexerGradKLLossTilingBase::GetActualSeqLenData(int64_t inp
     try {
         res.reserve(seqLen);
     } catch (...) {
-        OPS_REPORT_VECTOR_INNER_ERR(opName, "Init actual_seq_len failed, array is too long.");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{
+                "SparseLightningIndexerGradKLLoss",
+                ("GetActualSeqLenData: failed to reserve host vector for actual sequence lengths, input index=" +
+                 std::to_string(inputIdx) + ", element count=" + std::to_string(seqLen))
+                    .c_str()}));
         return;
     }
     res.emplace_back(value[0]);

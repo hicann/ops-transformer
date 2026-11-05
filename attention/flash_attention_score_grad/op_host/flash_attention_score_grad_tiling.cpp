@@ -87,11 +87,11 @@ public:
         auto platformInfoPtr = context->GetPlatformInfo();
         if (platformInfoPtr == nullptr) {
             auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context->GetCompileInfo());
-            OP_CHECK_IF(
-                compilePtr == nullptr,
-                OP_LOGE(context,
-                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
-                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(compilePtr == nullptr,
+                        REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                                  (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                            "RunEmptyTiling: [compile_info is null]"})),
+                        return ge::GRAPH_FAILED);
             aivNum = compilePtr->aivNum;
             aicNum = compilePtr->aicNum;
         } else {
@@ -99,10 +99,11 @@ public:
             aicNum = ascendcPlatform.GetCoreNumAic();
             aivNum = ascendcPlatform.GetCoreNumAiv();
         }
-        OP_CHECK_IF(
-            aivNum == 0,
-            OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [num of aiv is 0]"),
-            return GRAPH_FAILED);
+        OP_CHECK_IF(aivNum == 0,
+                    REPORT_PREDEFINED_ERR_MSG(
+                        "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                        (std::vector<const char*>{"FlashAttentionScoreGrad", "RunEmptyTiling: [num of aiv is 0]"})),
+                    return GRAPH_FAILED);
         uint64_t dqNum =
             static_cast<uint64_t>(context->GetOutputShape(OUTPUT_IDX_DQ)->GetStorageShape().GetShapeSize());
         if (dqNum % aivNum == 0ULL) {
@@ -169,8 +170,9 @@ public:
             auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context->GetCompileInfo());
             OP_CHECK_IF(
                 compilePtr == nullptr,
-                OP_LOGE(context,
-                        "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
+                REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                          (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                    "RunEmptyTilingRegbase: [compile_info is null]"})),
                 return ge::GRAPH_FAILED);
             aivNum = compilePtr->aivNum;
             aicNum = compilePtr->aicNum;
@@ -179,10 +181,11 @@ public:
             aicNum = ascendcPlatform.GetCoreNumAic();
             aivNum = ascendcPlatform.GetCoreNumAiv();
         }
-        OP_CHECK_IF(
-            aivNum == 0,
-            OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [num of aiv is 0]"),
-            return GRAPH_FAILED);
+        OP_CHECK_IF(aivNum == 0,
+                    REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                              (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                                        "RunEmptyTilingRegbase: [num of aiv is 0]"})),
+                    return GRAPH_FAILED);
         uint64_t dqNum =
             static_cast<uint64_t>(context->GetOutputShape(OUTPUT_IDX_DQ)->GetStorageShape().GetShapeSize());
         if (dqNum % aivNum == 0ULL) {
@@ -330,7 +333,10 @@ static bool IsTndAllSeqLenZero(gert::TilingContext* context)
 static ge::graphStatus CheckAttrs(gert::TilingContext* context)
 {
     auto attrs = context->GetAttrs();
-    OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    OP_CHECK_IF(attrs == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "attributes",
+                                                         "required attributes are missing"),
+                return ge::GRAPH_FAILED);
     size_t idx = 0;
     auto scaleValuePtr = attrs->GetAttrPointer<float>(idx++);
     auto keepProbPtr = attrs->GetAttrPointer<float>(idx++);
@@ -340,13 +346,35 @@ static ge::graphStatus CheckAttrs(gert::TilingContext* context)
     auto inputLayoutPtr = attrs->GetAttrPointer<char>(idx++);
     size_t* workspaces = context->GetWorkspaceSizes(1);
 
-    OP_CHECK_NULL_WITH_CONTEXT(context, scaleValuePtr);
-    OP_CHECK_NULL_WITH_CONTEXT(context, keepProbPtr);
-    OP_CHECK_NULL_WITH_CONTEXT(context, preTokensPtr);
-    OP_CHECK_NULL_WITH_CONTEXT(context, nextTokensPtr);
-    OP_CHECK_NULL_WITH_CONTEXT(context, n1SizePtr);
-    OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutPtr);
-    OP_CHECK_NULL_WITH_CONTEXT(context, workspaces);
+    OP_CHECK_IF(scaleValuePtr == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "scale_value",
+                                                         "required shape or attribute is missing"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(keepProbPtr == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "keep_prob",
+                                                         "required shape or attribute is missing"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(preTokensPtr == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "pre_tockens",
+                                                         "required shape or attribute is missing"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(nextTokensPtr == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "next_tockens",
+                                                         "required shape or attribute is missing"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(n1SizePtr == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "head_num",
+                                                         "required shape or attribute is missing"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(inputLayoutPtr == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "input_layout",
+                                                         "required shape or attribute is missing"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        workspaces == nullptr,
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{"FlashAttentionScoreGrad", "Tiling: workspaces is null"})),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -455,14 +483,15 @@ static ge::graphStatus CheckBaseInput(gert::TilingContext* context)
 
 static ge::graphStatus CheckParams(gert::TilingContext* context)
 {
-    OP_CHECK_IF(
-        context == nullptr,
-        OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]"),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        CheckAttrs(context) != ge::GRAPH_SUCCESS,
-        OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [invalid attrs]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context == nullptr,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad", "CheckParams: [context is null]"})),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckAttrs(context) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(
+                    context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [invalid attrs]"),
+                return ge::GRAPH_FAILED);
     const auto* queryRopeShape = context->GetOptionalInputShape(QUERY_ROPE_INPUT_INDEX);
     const auto* keyRopeShape = context->GetOptionalInputShape(KEY_ROPE_INPUT_INDEX);
     const bool hasQueryRope = queryRopeShape != nullptr;
@@ -491,8 +520,8 @@ static ge::graphStatus CheckParams(gert::TilingContext* context)
             "FlashAttentionScoreGrad",
             "query or keyIn or value or dy or softmaxMaxOptional or softmaxSumOptional or attentionInOptional");
     }
-    OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, "
-                     "the reason is: [fail to get shape or attr from context]");
+    OP_LOGE_WITHOUT_REPORT(context, "The op [FlashAttentionScoreGrad] received bad params, "
+                                    "the reason is: [fail to get shape or attr from context]");
     return ge::GRAPH_FAILED;
 }
 
@@ -558,7 +587,9 @@ ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionGradScore(gert::TilingConte
     auto compilePtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context->GetCompileInfo());
     OP_CHECK_IF(
         compilePtr == nullptr,
-        OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compile_info is null]"),
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                                            "TilingFlashAttentionGradScore: [compile_info is null]"})),
         return ge::GRAPH_FAILED);
     auto npuArch = compilePtr->npuArch;
     if (npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_9201) {
@@ -579,23 +610,27 @@ ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionGradScore(gert::TilingConte
 
 ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFlashAttentionScoreGrad(gert::TilingParseContext* context)
 {
-    OP_CHECK_IF(
-        context == nullptr,
-        OP_LOGE(context, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [context is null]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context == nullptr,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                              "TilingPrepareForFlashAttentionScoreGrad: [context is null]"})),
+                return ge::GRAPH_FAILED);
     fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
-    OP_CHECK_IF(
-        platformInfoPtr == nullptr,
-        OP_LOGE(context,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [platformInfoPtr is null]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(platformInfoPtr == nullptr,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                              "TilingPrepareForFlashAttentionScoreGrad: [platformInfoPtr is null]"})),
+                return ge::GRAPH_FAILED);
 
     auto compileInfoPtr = context->GetCompiledInfo<FlashAttentionScoreGradCompileInfo>();
-    OP_CHECK_IF(
-        compileInfoPtr == nullptr,
-        OP_LOGE(context,
-                "The op [FlashAttentionScoreGrad] received bad params, the reason is: [compileInfoPtr is null]"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(compileInfoPtr == nullptr,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"FlashAttentionScoreGrad",
+                                              "TilingPrepareForFlashAttentionScoreGrad: [compileInfoPtr is null]"})),
+                return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();

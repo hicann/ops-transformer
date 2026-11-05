@@ -46,8 +46,10 @@ protected:
         if (!layout || *layout != 0)
             return ge::GRAPH_PARAM_INVALID;
         if (context_->GetDeterministic() != 0)
-            return Fail("QSAG does not support deterministic execution");
+            return Fail("QSAG does not support deterministic execution", "deterministic");
         std::array<qsag::TensorInfo, 17> tensors;
+        constexpr const char* optionalInputNames[] = {"metadata",          "atten_mask", "cu_seq_lengths_q",
+                                                      "cu_seq_lengths_kv", "seqused_q",  "seqused_kv"};
         for (size_t i = 0; i < tensors.size(); ++i) {
             const auto* shape = i < 8 ?
                                     context_->GetInputShape(i) :
@@ -56,7 +58,7 @@ protected:
                                        (i < 14 ? context_->GetOptionalInputDesc(i) : context_->GetOutputDesc(i - 14));
             auto& t = tensors[i];
             if (i >= 8 && i < 14 && ((shape == nullptr) != (desc == nullptr)))
-                return Fail("optional input shape/descriptor presence mismatch");
+                return Fail("optional input shape/descriptor presence mismatch", optionalInputNames[i - 8]);
             // The shared L0 wrapper represents omitted optionals with rank-0 descriptors.
             // User-provided scalar inputs are rejected by ACLNN validation before L0.
             if (i >= 8 && i < 14 && shape && shape->GetStorageShape().GetDimNum() == 0)
@@ -72,7 +74,7 @@ protected:
         qsag::Config cfg;
         const auto *q = attrs->GetAttrPointer<char>(1), *kv = attrs->GetAttrPointer<char>(2);
         if (!q || !kv)
-            return Fail("missing Q/KV layout");
+            return Fail("missing Q/KV layout", q == nullptr ? "layout_q" : "layout_kv");
         cfg.layoutQ = q;
         cfg.layoutKv = kv;
         const auto* block = attrs->GetListInt(0);
@@ -84,7 +86,13 @@ protected:
         const auto* res = attrs->GetAttrPointer<int64_t>(9);
         const auto* topk = attrs->GetAttrPointer<bool>(10);
         if (!scale || !mask || !precision || !left || !right || !res || !topk)
-            return Fail("missing QSAG attributes");
+            return Fail("missing QSAG attributes", !scale     ? "scale_value" :
+                                                   !mask      ? "mask_type" :
+                                                   !precision ? "softmax_precision" :
+                                                   !left      ? "win_left" :
+                                                   !right     ? "win_right" :
+                                                   !res       ? "residual_block_mode" :
+                                                                "is_consistent_topk");
         cfg.scale = *scale;
         cfg.mask = *mask;
         cfg.precision = *precision;
@@ -95,14 +103,19 @@ protected:
         auto error =
             qsag::Validate(tensors, cfg, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT, ge::DT_INT32, ge::DT_INT64, s_);
         if (!error.empty())
-            return Fail(error.c_str());
+            return Fail(
+                error.c_str(),
+                "query, key, value, dout, out, lse, sparse_block_idx, sparse_block_count, metadata, atten_mask, "
+                "cu_seq_lengths_q, cu_seq_lengths_kv, seqused_q, seqused_kv, dQuery, dKey, dValue, "
+                "block_shape, layout_q, layout_kv, scale_value, mask_type, softmax_precision, win_left, "
+                "win_right, residual_block_mode, is_consistent_topk");
         if (s_.group > 256 || s_.d > 256)
-            return Fail("QSAG arch35 supports G<=256 and D<=256");
+            return Fail("QSAG arch35 supports G<=256 and D<=256", "query, key");
         const uint64_t baseKtile = s_.group <= 128 ? 128 : 64;
         // The small-G Ktile=256 optimization can still become n=128 in the kernel.
         // Bound Bs by the base tile so n/Bs cannot become zero in sparse scheduling.
         if (s_.bs > baseKtile)
-            return Fail("QSAG arch35 requires Bs<=128 for G<=128, Bs<=64 otherwise");
+            return Fail("QSAG arch35 requires Bs<=128 for G<=128, Bs<=64 otherwise", "block_shape, query, key");
         s_.ktile = s_.dtile = baseKtile;
         s_.dp = (s_.d + 15) / 16 * 16;
         if (s_.group <= 16 && s_.dp <= 128) {
@@ -239,9 +252,14 @@ protected:
     }
 
 private:
-    ge::graphStatus Fail(const char* message)
+    ge::graphStatus Fail(const char* message, const char* parameters = nullptr)
     {
-        OP_LOGE(context_->GetNodeName(), "%s", message);
+        if (parameters != nullptr) {
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), parameters, message);
+        } else {
+            REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                      (std::vector<const char*>{context_->GetNodeName(), message}));
+        }
         return ge::GRAPH_FAILED;
     }
     QsagShapeInfoArch35 s_{};

@@ -315,13 +315,23 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::PostTiling()
     // 判断如果GetDataSize > GetCapacity的异常情况,其中确定性计算下终止流程，非确定性计算流入下一个模板判断
     OP_CHECK_IF(
         (tilingData.GetDataSize() > context_->GetRawTilingData()->GetCapacity()) && (context_->GetDeterministic() == 1),
-        OP_LOGE(context_, "The size of TilingDataSize[%zu] is larger than the size of MaxDataCapacity[%zu].",
-                tilingData.GetDataSize(), context_->GetRawTilingData()->GetCapacity()),
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{
+                "SparseFlashAttentionGrad",
+                ("PostTiling: serialized tiling data requires " + std::to_string(tilingData.GetDataSize()) +
+                 " bytes, available capacity=" + std::to_string(context_->GetRawTilingData()->GetCapacity()))
+                    .c_str()})),
         return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         (tilingData.GetDataSize() > context_->GetRawTilingData()->GetCapacity()) && (context_->GetDeterministic() != 1),
-        OP_LOGE(context_, "The size of TilingDataSize[%zu] is larger than the size of MaxDataCapacity[%zu].",
-                tilingData.GetDataSize(), context_->GetRawTilingData()->GetCapacity()),
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{
+                "SparseFlashAttentionGrad",
+                ("PostTiling: serialized tiling data requires " + std::to_string(tilingData.GetDataSize()) +
+                 " bytes, available capacity=" + std::to_string(context_->GetRawTilingData()->GetCapacity()))
+                    .c_str()})),
         return ge::GRAPH_FAILED);
 
     tilingData.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
