@@ -43,7 +43,7 @@ class QuantMlaAclGraph(torch.nn.Module):
         seqused_q=None,
         attn_mask=None,
         metadata=None,
-        softmax_scale=1.0,
+        softmax_scale=None,
         mask_mode=0,
         max_seqlen_q=-1,
         max_seqlen_kv=-1,

@@ -33,7 +33,7 @@ _DIRECTORY = "_qfmla_cross_check"
 _VERSION = 1
 _DEFAULTS = {
     "quant_mode": 1,
-    "softmax_scale": 1.0,
+    "softmax_scale": 1.0 / (576**0.5),
     "mask_mode": 0,
     "max_seqlen_q": -1,
     "max_seqlen_kv": -1,

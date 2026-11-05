@@ -131,7 +131,7 @@ private:
 
     // quant
     QfmlaQuantMode quantMode_ = QfmlaQuantMode::MLA_FP8_E4M3_FULLQUANT;
-    float softmaxScale_ = -1.0f;
+    float softmaxScale_ = 1.0f / 24.0f;
 
     // layout
     QfmlaLayout layoutQ_ = QfmlaLayout::BSND;

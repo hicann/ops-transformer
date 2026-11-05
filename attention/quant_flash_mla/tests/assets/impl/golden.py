@@ -303,7 +303,7 @@ def cpu_qfmla(
     seqused_q=None,
     attn_mask=None,
     metadata=None,
-    softmax_scale=1.0,
+    softmax_scale=None,
     mask_mode=0,
     max_seqlen_q=-1,
     max_seqlen_kv=-1,
@@ -339,6 +339,8 @@ def cpu_qfmla(
         512 if head_dim_v is None else head_dim_v,
         quant_mode,
     )
+    if softmax_scale is None:
+        softmax_scale = q.size(-1) ** -0.5
     _configure_reference(
         cfg,
         quant_mode,

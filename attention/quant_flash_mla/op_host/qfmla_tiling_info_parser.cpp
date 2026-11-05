@@ -386,7 +386,8 @@ ge::graphStatus QfmlaInfoParser::ParseFeatureInfo()
     seqUsedQFlag_ = (opParamInfo_.sequsedQ.tensor != nullptr);
 
     returnSoftmaxLse_ = (opParamInfo_.returnSoftmaxLse == nullptr) ? false : *opParamInfo_.returnSoftmaxLse;
-    softmaxScale_ = (opParamInfo_.softmaxScale == nullptr) ? -1.0f : *opParamInfo_.softmaxScale;
+    constexpr float DEFAULT_SOFTMAX_SCALE = 1.0f / 24.0f; // 1 / sqrt(576)
+    softmaxScale_ = (opParamInfo_.softmaxScale == nullptr) ? DEFAULT_SOFTMAX_SCALE : *opParamInfo_.softmaxScale;
     metadataFlag_ = (opParamInfo_.metadata.tensor != nullptr);
     return ge::GRAPH_SUCCESS;
 }

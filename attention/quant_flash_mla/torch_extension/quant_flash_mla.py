@@ -77,6 +77,16 @@ def _normalize_optional_tensor(t: Optional[torch.Tensor]) -> Optional[torch.Tens
     return t
 
 
+def _resolve_softmax_scale(q, softmax_scale):
+    """Use the documented default only when softmax_scale is omitted or None."""
+    if softmax_scale is None:
+        torch._check(q.dim() > 0, lambda: "q must have at least one dimension")
+        head_dim_qk = q.size(-1)
+        torch._check(head_dim_qk > 0, lambda: "head_dim_qk must be greater than 0")
+        return head_dim_qk**-0.5
+    return softmax_scale
+
+
 def _get_core_nums():
     """Return the core counts used by the metadata AICPU scheduler."""
     npu = getattr(torch, "npu", None)
@@ -228,13 +238,13 @@ def _check_metadata_parameters(
         lambda: f"mask_mode only supports 0 or 3, but got {mask_mode}",
     )
     torch._check(
-        max_seqlen_kv == -1 or max_seqlen_kv >= 1,
-        lambda: f"max_seqlen_kv must be -1 or greater than 0, but got {max_seqlen_kv}",
+        max_seqlen_kv == -1 or max_seqlen_kv >= 0,
+        lambda: f"max_seqlen_kv must be -1 or greater than or equal to 0, but got {max_seqlen_kv}",
     )
     # max_seqlen_q 上限 16 对所有 layout 生效 (与主算子 SeqLenChecker/metadata aclnn 校验一致)
     torch._check(
-        max_seqlen_q == -1 or (max_seqlen_q >= 1 and max_seqlen_q <= 16),
-        lambda: f"max_seqlen_q must be -1 or in range [1, 16], but got {max_seqlen_q}",
+        max_seqlen_q == -1 or (max_seqlen_q >= 0 and max_seqlen_q <= 16),
+        lambda: f"max_seqlen_q must be -1 or in range [0, 16], but got {max_seqlen_q}",
     )
     _check_int32_1d("cache_seqlens", cache_seqlens)
     batch_size = cache_seqlens.numel()
@@ -252,7 +262,7 @@ def _check_metadata_parameters(
         )
         # 非 TND (BSND/BNSD): seqused_q 与 max_seqlen_q 至少传入其一
         torch._check(
-            seqused_q is not None or max_seqlen_q > 0,
+            seqused_q is not None or max_seqlen_q >= 0,
             lambda: "When layout_q is not TND, at least one of seqused_q or max_seqlen_q must be provided",
         )
     if seqused_q is not None:
@@ -286,7 +296,7 @@ class QuantFlashMlaOpBuilder(OpBuilder):
             "Tensor block_table, Tensor cache_seqlens, int quant_mode, *, "
             "Tensor? cu_seqlens_q=None, Tensor? seqused_q=None, "
             "Tensor? attn_mask=None, Tensor? metadata=None, "
-            "int head_dim_v=512, float softmax_scale=1.0, int mask_mode=0, "
+            "int head_dim_v=512, float? softmax_scale=None, int mask_mode=0, "
             "int max_seqlen_q=-1, int max_seqlen_kv=-1, "
             'str layout_q="TND", str layout_kv="PA_BNBD", str layout_out="TND", '
             "bool return_softmax_lse=False) -> (Tensor, Tensor)",
@@ -332,7 +342,7 @@ class QuantFlashMlaOpBuilder(OpBuilder):
             attn_mask: Optional[torch.Tensor] = None,
             metadata: Optional[torch.Tensor] = None,
             head_dim_v: Optional[int] = MLA_HEAD_DIM_V,
-            softmax_scale: Optional[float] = 1.0,
+            softmax_scale: Optional[float] = None,
             mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
             max_seqlen_q: Optional[int] = -1,
             max_seqlen_kv: Optional[int] = -1,
@@ -361,6 +371,7 @@ class QuantFlashMlaOpBuilder(OpBuilder):
                 q.dim() >= 2,
                 lambda: f"q must have at least 2 dimensions, but got {q.dim()}D",
             )
+            softmax_scale = _resolve_softmax_scale(q, softmax_scale)
             # 形状推导与 csrc/quant_flash_mla.cpp 运行时保持同一套 layout_q/layout_out 分支
             layout_q_str = str(layout_q).upper() if layout_q else "TND"
             layout_out_str = str(layout_out).upper() if layout_out else "TND"
@@ -536,7 +547,7 @@ def quant_flash_mla(
     attn_mask: Optional[torch.Tensor] = None,
     metadata: Optional[torch.Tensor] = None,
     head_dim_v: Optional[int] = MLA_HEAD_DIM_V,
-    softmax_scale: Optional[float] = 1.0,
+    softmax_scale: Optional[float] = None,
     mask_mode: Optional[Union[MaskMode, int]] = MaskMode.NO_MASK,
     max_seqlen_q: Optional[int] = -1,
     max_seqlen_kv: Optional[int] = -1,
@@ -635,6 +646,7 @@ def quant_flash_mla(
             )
 
     _check_mla_layout_pair(layout_q, layout_out)
+    softmax_scale = _resolve_softmax_scale(q, softmax_scale)
 
     op_module = quant_flash_mla_op_builder.load()
     return op_module.quant_flash_mla(

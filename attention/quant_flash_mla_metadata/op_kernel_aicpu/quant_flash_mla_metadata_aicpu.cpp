@@ -253,11 +253,11 @@ bool QuantFlashMlaMetadataCpuKernel::ParamsInit()
     // MLA的M轴为GS1合轴(n2=1, g=numHeadsQ), 与FA kernel的M轴遍历方式一致
     param.kernelSplitMode = load_balance::KernelSplitMode::BN2_S1G_S2;
 
-    // 防御: 分核需要有效的Q/KV长度, 无任何varlen信息且max_seqlen未传时报错
-    if (baseInfo.querySeqSize == 0U || baseInfo.kvSeqSize == 0U) {
-        KERNEL_LOG_ERROR("invalid seq size, querySeqSize: %u, kvSeqSize: %u, need seqused_q/cu_seqlens_q or "
-                         "max_seqlen_q/max_seqlen_kv",
-                         baseInfo.querySeqSize, baseInfo.kvSeqSize);
+    // Preserve the existing Q-length requirement. Zero KV length is handled by
+    // the shared scheduler and output initialization, as in QuantFlashAttn.
+    if (baseInfo.querySeqSize == 0U) {
+        KERNEL_LOG_ERROR("invalid Q seq size, querySeqSize: %u, need seqused_q/cu_seqlens_q or max_seqlen_q",
+                         baseInfo.querySeqSize);
         return false;
     }
 

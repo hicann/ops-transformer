@@ -86,7 +86,8 @@ public:
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Attr("quant_compute_mode").AttrType(REQUIRED).Int();
-        this->Attr("softmax_scale").AttrType(OPTIONAL).Float(-1.0f);
+        // MLA currently supports head_dim_qk=576, so the default is 1/sqrt(576).
+        this->Attr("softmax_scale").AttrType(OPTIONAL).Float(1.0f / 24.0f);
         this->Attr("mask_mode").AttrType(OPTIONAL).Int(0);
         this->Attr("max_seqlen_q").AttrType(OPTIONAL).Int(-1);
         this->Attr("max_seqlen_kv").AttrType(OPTIONAL).Int(-1);

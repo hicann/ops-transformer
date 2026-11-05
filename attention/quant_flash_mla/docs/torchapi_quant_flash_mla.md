@@ -623,7 +623,7 @@ mask_mode参数解释
             <td>
                 <ul>
                     <li>data_type支持int32</li>
-                    <li>值需为-1，或[1,16]范围内的整数（传入时上限16对所有layout生效）</li>
+                    <li>值需为-1，或[0,16]范围内的整数（传入时上限16对所有layout生效）</li>
                     <li>默认值为-1</li>
                 </ul>
             </td>
@@ -650,6 +650,12 @@ mask_mode参数解释
 > [!NOTE]
 >
 > 算子不校验 `seqused_q` 中的最大值是否与 `max_seqlen_q` 一致。若同时传入这两个参数，用户需自行保证 `max(seqused_q) <= max_seqlen_q`。
+>
+> 1. TND 场景下，若未传入 `seqused_q`，`cu_seqlens_q` 的相邻元素差值等价于每个 batch 的 `seqused_q`，即 `seqused_q[i] = cu_seqlens_q[i + 1] - cu_seqlens_q[i]`，用户需自行保证 `max(seqused_q) <= max_seqlen_q`。
+> 2. 非 TND 场景下，若未传入 `seqused_q`，使用 q 的物理序列长度 `Q_S` 作为每个 batch 的 `seqused_q`，即 `seqused_q[i] = Q_S`，用户需自行保证 `max(seqused_q) <= max_seqlen_q`。
+>
+> 算子不校验 `cache_seqlens` 中的最大值是否与 `max_seqlen_kv` 一致，用户需自行保证 `max(cache_seqlens) <= max_seqlen_kv`。
+
 
 #### Paged Attention参数组 <a name="Paged Attention参数组"></a>
 

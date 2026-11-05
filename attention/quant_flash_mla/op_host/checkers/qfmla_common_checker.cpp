@@ -154,9 +154,8 @@ ge::graphStatus CommonChecker::CheckSingleParaShapeDim(const QfmlaTilingInfo& qf
 
 ge::graphStatus CommonChecker::CheckSingleParaSoftmaxScale(const QfmlaTilingInfo& qfmlaInfo)
 {
-    // softmax_scale 可选传入，未传入时默认 -1.0f (算子内部取 1/sqrt(headdim))
-    // 传入时必须 > 0
-    OP_CHECK_IF(qfmlaInfo.softmaxScale != -1.0f && qfmlaInfo.softmaxScale <= 0.0f,
+    // softmax_scale 必须大于 0。
+    OP_CHECK_IF(qfmlaInfo.softmaxScale <= 0.0f,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfmlaInfo.opName, "softmax_scale",
                                                       std::to_string(qfmlaInfo.softmaxScale).c_str(),
                                                       "softmax_scale must be greater than 0 when provided"),
@@ -220,12 +219,12 @@ ge::graphStatus CommonChecker::CheckAxis(const QfmlaTilingInfo& qfmlaInfo)
             "In MLA scenario, Q_N must be one of {1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128}");
         return ge::GRAPH_FAILED;
     }
-    // S1 约束: TND 时 s1Size=-1 表示未传 max_seqlen_q (哨兵值), 跳过范围校验;
-    //          传入 max_seqlen_q (s1Size > 0) 时校验 [1, 16]
-    OP_CHECK_IF(qfmlaInfo.s1Size != -1 && (qfmlaInfo.s1Size < 1 || qfmlaInfo.s1Size > 16),
+    // BSND/BNSD s1Size comes from the physical Q shape, independently of max_seqlen_q.
+    // TND max_seqlen_q is validated by SeqLenChecker; actual lengths are in cu/seq tensors.
+    OP_CHECK_IF(qfmlaInfo.layoutQ != QfmlaLayout::TND && (qfmlaInfo.s1Size < 1 || qfmlaInfo.s1Size > 16),
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     opName, "q", std::to_string(qfmlaInfo.s1Size).c_str(),
-                    "In MLA scenario, Q_S must be in range [1, 16] when max_seqlen_q is provided"),
+                    "In MLA scenario, Q_S of q must be in range [1, 16] when layout_q is BSND or BNSD"),
                 return ge::GRAPH_FAILED);
     // S2 约束: >= 1
     OP_CHECK_IF(

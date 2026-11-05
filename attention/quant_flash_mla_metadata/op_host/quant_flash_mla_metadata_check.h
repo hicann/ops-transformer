@@ -90,12 +90,12 @@ inline aclnnStatus QuantFlashMlaMetadataCheck::CheckBaseAttr(int64_t maxSeqlenQ,
     CHECK_COND(quantModeSet.count(quantMode) > 0, ACLNN_ERR_RUNTIME_ERROR,
                "quantMode only supports 1 (MLA_FP8_E4M3_FULLQUANT) or 0 (MLA_HIF8_FULLQUANT), but got %ld", quantMode);
 
-    // -1表示未传; 显式传入时序列长度必须大于0, 上限16对所有layout生效。
+    // -1表示未传; 显式传入时序列长度必须非负, 上限16对所有layout生效。
     // 场景相关的存在性约束由 CheckExistency(特性交叉校验)负责: 非TND时与seqused_q至少传1个
-    CHECK_COND((maxSeqlenQ == -1 || (maxSeqlenQ >= 1 && maxSeqlenQ <= 16)), ACLNN_ERR_RUNTIME_ERROR,
-               "maxSeqlenQ must be -1 or in range [1, 16], but got %ld", maxSeqlenQ);
-    CHECK_COND((maxSeqlenKv == -1 || maxSeqlenKv >= 1), ACLNN_ERR_RUNTIME_ERROR,
-               "maxSeqlenKv must be -1 or greater than 0, but got %ld", maxSeqlenKv);
+    CHECK_COND((maxSeqlenQ == -1 || (maxSeqlenQ >= 0 && maxSeqlenQ <= 16)), ACLNN_ERR_RUNTIME_ERROR,
+               "maxSeqlenQ must be -1 or in range [0, 16], but got %ld", maxSeqlenQ);
+    CHECK_COND((maxSeqlenKv == -1 || maxSeqlenKv >= 0), ACLNN_ERR_RUNTIME_ERROR,
+               "maxSeqlenKv must be -1 or greater than or equal to 0, but got %ld", maxSeqlenKv);
 
     static const std::unordered_set<int64_t> numHeadsQSet = {1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128};
     CHECK_COND(numHeadsQSet.count(numHeadsQ) > 0, ACLNN_ERR_RUNTIME_ERROR,
@@ -155,7 +155,7 @@ inline aclnnStatus QuantFlashMlaMetadataCheck::CheckExistency(int64_t maxSeqlenQ
         CHECK_COND(!IsTensorExist(cuSeqlensQOptional), ACLNN_ERR_RUNTIME_ERROR,
                    "When layoutQ is not TND, cuSeqlensQOptional should not be provided, but got non-null");
         // 文档约束: 非TND(BSND/BNSD)时, seqused_q与max_seqlen_q至少传入其中一个 (-1表示max_seqlen_q未传)
-        CHECK_COND(((maxSeqlenQ > 0) || IsTensorExist(sequsedQOptional)), ACLNN_ERR_RUNTIME_ERROR,
+        CHECK_COND(((maxSeqlenQ >= 0) || IsTensorExist(sequsedQOptional)), ACLNN_ERR_RUNTIME_ERROR,
                    "When layoutQ is not TND, at least one of maxSeqlenQ or sequsedQOptional must be provided");
     }
     return ACLNN_SUCCESS;

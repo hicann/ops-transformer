@@ -86,23 +86,23 @@ ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensQ(const QfmlaTilingInfo& 
 
 ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenQ(const QfmlaTilingInfo& qfmlaInfo)
 {
-    // max_seqlen_q: -1 (未传入) 或 [1, 16]; 0 无意义需拦截。
+    // max_seqlen_q: -1 (未传入) 或 [0, 16]。
     // 上限 16 对所有 layout 生效 (TND 单 batch Q 长度上限; BSND/BNSD 传入时同样约束)
-    OP_CHECK_IF(qfmlaInfo.maxSeqQ < -1 || qfmlaInfo.maxSeqQ == 0 || qfmlaInfo.maxSeqQ > 16,
+    OP_CHECK_IF(qfmlaInfo.maxSeqQ < -1 || qfmlaInfo.maxSeqQ > 16,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfmlaInfo.opName, "max_seqlen_q",
                                                       std::to_string(qfmlaInfo.maxSeqQ).c_str(),
-                                                      "max_seqlen_q must be -1 (not provided) or in range [1, 16]"),
+                                                      "max_seqlen_q must be -1 (not provided) or in range [0, 16]"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenKv(const QfmlaTilingInfo& qfmlaInfo)
 {
-    // max_seqlen_kv: -1 (未传入) 或 >= 1；0 无意义需拦截。
-    OP_CHECK_IF(qfmlaInfo.maxSeqKv < -1 || qfmlaInfo.maxSeqKv == 0,
+    // max_seqlen_kv: -1 (未传入) 或 >= 0。
+    OP_CHECK_IF(qfmlaInfo.maxSeqKv < -1,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfmlaInfo.opName, "max_seqlen_kv",
                                                       std::to_string(qfmlaInfo.maxSeqKv).c_str(),
-                                                      "max_seqlen_kv must be -1 (not provided) or >= 1"),
+                                                      "max_seqlen_kv must be -1 (not provided) or >= 0"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -150,7 +150,7 @@ ge::graphStatus SeqLenChecker::CheckSequsedMaxSeqlenAtLeastOne(const QfmlaTiling
     // layout_q 为 BSND/BNSD 时, seqused_q 与 max_seqlen_q 至少传入其中一个
     // (TND 场景 cu_seqlens_q 已提供精确 Q 长度, 不做此要求)
     if (qfmlaInfo.layoutQ != QfmlaLayout::TND) {
-        OP_CHECK_IF(!qfmlaInfo.seqUsedQFlag && qfmlaInfo.maxSeqQ <= 0,
+        OP_CHECK_IF(!qfmlaInfo.seqUsedQFlag && qfmlaInfo.maxSeqQ < 0,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                         opName, "seqused_q", "provided",
                         "When layout_q is BSND/BNSD, seqused_q and max_seqlen_q must be provided at least one of "

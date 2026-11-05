@@ -132,7 +132,7 @@ struct QfmlaTilingInfo : public TilingInfo {
 
     // Quant
     QfmlaQuantMode quantMode = QfmlaQuantMode::MLA_FP8_E4M3_FULLQUANT;
-    float softmaxScale = -1.0f;
+    float softmaxScale = 1.0f / 24.0f;
 
     // Layout
     QfmlaLayout layoutQ = QfmlaLayout::BSND;
