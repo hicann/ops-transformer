@@ -690,7 +690,7 @@ static void RunUrmaTilingCase(int64_t xBs, int64_t topkIdsBs, int64_t topkWeight
                               int64_t maxRecvTokenNum, int64_t hiddenDim, const std::string& activation,
                               const std::vector<float>& activationParams, ge::graphStatus expectedStatus,
                               int64_t combineCommMode = 0, int64_t combineQuantMode = 0, int64_t topoType = 1,
-                              int64_t h = 4096)
+                              int64_t h = 4096, MegaMoeTilingData* result = nullptr)
 {
     ASSERT_GT(hiddenDim, 0);
     ASSERT_EQ(hiddenDim % (MegaMoeImpl::ACTIVATION_N_HALF * MegaMoeImpl::MXFP_DIVISOR_SIZE), 0);
@@ -755,11 +755,21 @@ static void RunUrmaTilingCase(int64_t xBs, int64_t topkIdsBs, int64_t topkWeight
             {"combine_comm_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(combineCommMode)},
         },
         &compileInfo);
+    if (result != nullptr) {
+        // 配置契约测试固定平台核数，避免依赖框架默认平台的 AIC/AIV 比例。
+        tilingContextPara.socVersion_ = "Ascend950";
+        tilingContextPara.coreNum_ = 36;
+        tilingContextPara.socInfoString_ = R"({"hardware_info": {
+            "CORE_NUM": 36, "cube_core_cnt": 36, "vector_core_cnt": 72,
+            "UB_SIZE": 262144, "L1_SIZE": 524288, "L0A_SIZE": 65536,
+            "L0B_SIZE": 65536, "L0C_SIZE": 131072, "BT_SIZE": 0,
+            "L2_SIZE": 33554432, "VECTOR_REG_WIDTH": 256, "load3d_constraints": "1"}})";
+    }
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 2}};
     const uint64_t expectedTilingKey = expectedStatus == ge::GRAPH_SUCCESS ? 42607652UL : 0UL;
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, expectedStatus, expectedTilingKey);
 
-    if (expectedStatus != ge::GRAPH_SUCCESS || (activation != "situglu" && combineCommMode != 2)) {
+    if (expectedStatus != ge::GRAPH_SUCCESS || (result == nullptr && activation != "situglu" && combineCommMode != 2)) {
         return;
     }
 
@@ -773,6 +783,9 @@ static void RunUrmaTilingCase(int64_t xBs, int64_t topkIdsBs, int64_t topkWeight
     ASSERT_GE(tilingInfo.tilingDataSize, sizeof(MegaMoeTilingData));
     MegaMoeTilingData tilingData{};
     std::memcpy(&tilingData, tilingInfo.tilingData.get(), sizeof(tilingData));
+    if (result != nullptr) {
+        *result = tilingData;
+    }
     if (combineCommMode == 2) {
         EXPECT_EQ(tilingData.compute.dedupMode, MegaMoeImpl::DEDUP_MODE_SERVER_COMBINE);
         EXPECT_TRUE(tilingData.comm.serverCombineReduce);
@@ -797,6 +810,87 @@ static void RunUrmaTilingCase(int64_t xBs, int64_t topkIdsBs, int64_t topkWeight
                                                                    MegaMoeImpl::MegaMoeActSubMode::DEFAULT));
     EXPECT_FLOAT_EQ(tilingData.activationAlpha, activationParams.size() == 2U ? activationParams[1] : 0.0f);
     EXPECT_FLOAT_EQ(tilingData.activationBeta, activationParams[0]);
+}
+
+struct MockWorkRange {
+    uint32_t start;
+    uint32_t count;
+};
+
+// Mock kernel 的连续均分规则，Host UT 不依赖设备侧类型和函数。
+static MockWorkRange MockGetBalancedWorkRange(uint32_t tokenCount, uint32_t core, uint32_t coreCount)
+{
+    const uint32_t base = tokenCount / coreCount;
+    const uint32_t extra = tokenCount % coreCount;
+    return {core * base + (core < extra ? core : extra), base + static_cast<uint32_t>(core < extra)};
+}
+
+TEST_F(MegaMoeArch35TilingTest, UrmaUnpermuteConfigsMatchBalancedWorkRanges)
+{
+    using namespace MegaMoeImpl;
+    struct Case {
+        uint32_t bs;
+        uint32_t fullCoreCount;
+        uint32_t fullTokenCount;
+        uint32_t tailTokenCount;
+    };
+    // 72 个 AIV：空任务核、整除、首核多一项、末核少一项。
+    const Case cases[] = {{8, 8, 1, 0}, {144, 72, 2, 0}, {145, 1, 3, 2}, {143, 71, 2, 1}};
+    for (const auto& testCase : cases) {
+        SCOPED_TRACE(testCase.bs);
+        MegaMoeTilingData tilingData{};
+        RunUrmaTilingCase(testCase.bs, testCase.bs, testCase.bs, testCase.bs, 0, 2048, "swiglu",
+                          {std::numeric_limits<float>::max()}, ge::GRAPH_SUCCESS, 0, 0, TOPO_TYPE_URMA, 4096,
+                          &tilingData);
+        ASSERT_EQ(tilingData.blockAivNum, 72U);
+        EXPECT_EQ(tilingData.compute.aicNum, 36U);
+        EXPECT_EQ(tilingData.unpermuteFullTokenChunkCoreCount, testCase.fullCoreCount);
+        // 小用例无需进一步分 batch，直接锁住两套配置各自的 token 数。
+        EXPECT_EQ(tilingData.unpermuteConfigForFullTokenChunk.tokensPerBatch, testCase.fullTokenCount);
+        EXPECT_EQ(tilingData.unpermuteConfigForTailTokenChunk.tokensPerBatch, testCase.tailTokenCount);
+        if (testCase.tailTokenCount == 0U) {
+            const auto& tail = tilingData.unpermuteConfigForTailTokenChunk;
+            EXPECT_EQ(tail.inputBufferCount, 0);
+            EXPECT_EQ(tail.bf16SlotElementCount, 0U);
+            EXPECT_EQ(tail.fp32SlotElementCount, 0U);
+            EXPECT_EQ(tail.topKWeightsBufferBytes, 0U);
+            EXPECT_EQ(tail.topKWeightsConversionBufferBytes, 0U);
+        }
+
+        uint32_t coveredTokens = 0U;
+        for (uint32_t core = 0U; core < tilingData.blockAivNum; ++core) {
+            SCOPED_TRACE(core);
+            const auto range = MockGetBalancedWorkRange(testCase.bs, core, tilingData.blockAivNum);
+            EXPECT_EQ(range.start, coveredTokens);
+            coveredTokens += range.count;
+            const bool isFull = core < tilingData.unpermuteFullTokenChunkCoreCount;
+            const auto& config =
+                isFull ? tilingData.unpermuteConfigForFullTokenChunk : tilingData.unpermuteConfigForTailTokenChunk;
+            EXPECT_EQ(range.count, isFull ? testCase.fullTokenCount : testCase.tailTokenCount);
+            if (range.count == 0U) {
+                // 空任务核不创建 ring，也不进入 token 循环。
+                EXPECT_EQ(config.tokensPerBatch, 0);
+                continue;
+            }
+            ASSERT_GT(config.tokensPerBatch, 0);
+            EXPECT_LE(static_cast<uint32_t>(config.tokensPerBatch), range.count);
+            EXPECT_GE(config.inputBufferCount, MIN_UNPERMUTE_INPUT_BUFFER_COUNT);
+            EXPECT_LE(config.inputBufferCount, MAX_UNPERMUTE_INPUT_BUFFER_COUNT);
+            EXPECT_EQ(config.bf16SlotElementCount, tilingData.compute.h);
+            EXPECT_EQ(config.fp32SlotElementCount, tilingData.compute.h);
+            EXPECT_GE(config.topKWeightsBufferBytes,
+                      static_cast<uint64_t>(config.tokensPerBatch) * tilingData.compute.topK * sizeof(float));
+            EXPECT_EQ(config.topKWeightsBufferBytes % ALIGN_32, 0U);
+            EXPECT_EQ(config.topKWeightsConversionBufferBytes, 0U);
+            // 与 kernel 非通信量化布局对应：BF16 输出+输入 ring、FP32 累加区、权重区。
+            const uint64_t ubBytes =
+                (static_cast<uint64_t>(config.inputBufferCount) + 1U) * config.bf16SlotElementCount * sizeof(uint16_t) +
+                static_cast<uint64_t>(config.fp32SlotElementCount) * sizeof(float) + config.topKWeightsBufferBytes +
+                config.topKWeightsConversionBufferBytes;
+            EXPECT_LE(ubBytes, LAYERED_USABLE_UB_BYTES);
+        }
+        EXPECT_EQ(coveredTokens, testCase.bs);
+    }
 }
 
 TEST_F(MegaMoeArch35TilingTest, UbxUsesOrdinaryLayeredTiling)

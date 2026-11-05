@@ -23,6 +23,49 @@ namespace MegaMoeImpl {
 
 using namespace AscendC;
 
+// Cast 的 trait 是引用模板参数，配置对象须具有静态存储期。
+static constexpr Reg::CastTrait UNPERMUTE_BF16_TO_FP32_CAST_TRAIT = {
+    Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN, Reg::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN};
+
+// 普通 Unpermute 按专家槽累加；转换、乘权结果只保留在寄存器中。
+// 首项直接初始化，不读取旧累加值；权重已预乘时不访问 weightUb。
+template <typename InputType, bool ApplyWeight, bool InitAccum>
+__simd_vf__ inline void AccumulateUnpermuteExpertVF(__ubuf__ float* accumUb, __ubuf__ InputType* inputUb,
+                                                    __ubuf__ float* weightUb, uint32_t elementCount)
+{
+    constexpr uint32_t ELEMENTS_PER_VECTOR = AscendC::GetVecLen() / sizeof(float);
+    // 使用 uint16_t、从 0 开始且步长为 1 的循环，满足 Hardware Loop 编码规范。
+    const uint16_t repeatCount = static_cast<uint16_t>((elementCount + ELEMENTS_PER_VECTOR - 1U) / ELEMENTS_PER_VECTOR);
+    AscendC::Reg::RegTensor<float> valueReg;
+    AscendC::Reg::RegTensor<float> accumReg;
+    AscendC::Reg::RegTensor<float> weightReg;
+    AscendC::Reg::RegTensor<bfloat16_t> inputReg;
+    if constexpr (ApplyWeight) {
+        // topk 权重为连续 float，单个权重只需 4B 对齐。
+        AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(weightReg, weightUb);
+    }
+    uint32_t remaining = elementCount;
+    for (uint16_t repeatIdx = 0U; repeatIdx < repeatCount; ++repeatIdx) {
+        const uint32_t offset = static_cast<uint32_t>(repeatIdx) * ELEMENTS_PER_VECTOR;
+        AscendC::Reg::MaskReg activeMask = AscendC::Reg::UpdateMask<float>(remaining);
+        if constexpr (Std::IsSame<InputType, bfloat16_t>::value) {
+            AscendC::Reg::LoadAlign<bfloat16_t, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(inputReg, inputUb + offset);
+            AscendC::Reg::Cast<float, bfloat16_t, UNPERMUTE_BF16_TO_FP32_CAST_TRAIT>(valueReg, inputReg, activeMask);
+        } else {
+            AscendC::Reg::LoadAlign(valueReg, inputUb + offset);
+        }
+        if constexpr (ApplyWeight) {
+            // 保留独立 FP32 Mul 和 Add，不使用 FMA。
+            AscendC::Reg::Mul(valueReg, valueReg, weightReg, activeMask);
+        }
+        if constexpr (!InitAccum) {
+            AscendC::Reg::LoadAlign(accumReg, accumUb + offset);
+            AscendC::Reg::Add(valueReg, accumReg, valueReg, activeMask);
+        }
+        AscendC::Reg::StoreAlign(accumUb + offset, valueReg, activeMask);
+    }
+}
+
 /*
  * 复用同一个比较 mask：打包输出位图，并通过 0/1 向量累加统计命中数量。
  * 全程在 V 流水内更新 UB count，不使用 AR、Scalar 取数或废弃压缩输出。
@@ -130,20 +173,19 @@ __simd_vf__ inline void BuildDispatchRelayCandidatesByServerVF(__ubuf__ int32_t*
                                                                uint32_t serverStart, uint32_t serverCount)
 {
     constexpr uint32_t ROW_ELEMENTS = AscendC::GetVecLen() / sizeof(int32_t);
-    using namespace AscendC::Reg;
-    RegTensor<int32_t> expertReg, laneReg;
-    RegTensor<uint32_t> oneReg, zeroReg, bitsReg, groupReg, bitmapReg, outputReg;
-    MaskReg fullMask = CreateMask<uint32_t, MaskPattern::ALL>();
-    MaskReg activeMask, lowerMask, groupMask, laneMask;
+    AscendC::Reg::RegTensor<int32_t> expertReg, laneReg;
+    AscendC::Reg::RegTensor<uint32_t> oneReg, zeroReg, bitsReg, groupReg, bitmapReg, outputReg;
+    AscendC::Reg::MaskReg fullMask = AscendC::Reg::CreateMask<uint32_t, AscendC::Reg::MaskPattern::ALL>();
+    AscendC::Reg::MaskReg activeMask, lowerMask, groupMask, laneMask;
     uint32_t activeCount = topK;
-    activeMask = UpdateMask<uint32_t>(activeCount);
-    Arange(laneReg, 0);
-    Duplicate(oneReg, 1U, fullMask);
-    Duplicate(zeroReg, 0U, fullMask);
-    ShiftLeft(bitsReg, oneReg, laneReg, activeMask);
+    activeMask = AscendC::Reg::UpdateMask<uint32_t>(activeCount);
+    AscendC::Reg::Arange(laneReg, 0);
+    AscendC::Reg::Duplicate(oneReg, 1U, fullMask);
+    AscendC::Reg::Duplicate(zeroReg, 0U, fullMask);
+    AscendC::Reg::ShiftLeft(bitsReg, oneReg, laneReg, activeMask);
     for (uint32_t token = 0; token < tokenCount; ++token) {
-        LoadAlign(expertReg, topkIds + token * ROW_ELEMENTS);
-        Duplicate(outputReg, 0U, fullMask);
+        AscendC::Reg::LoadAlign(expertReg, topkIds + token * ROW_ELEMENTS);
+        AscendC::Reg::Duplicate(outputReg, 0U, fullMask);
         for (uint32_t index = 0; index < serverCount; ++index) {
             const uint32_t server = serverStart + index;
             if constexpr (!CombineServerDedup) {
@@ -154,15 +196,15 @@ __simd_vf__ inline void BuildDispatchRelayCandidatesByServerVF(__ubuf__ int32_t*
             int32_t begin = static_cast<int32_t>(static_cast<uint64_t>(server) * expertsPerServer);
             uint64_t end = static_cast<uint64_t>(server + 1U) * expertsPerServer;
             int32_t limit = end < static_cast<uint64_t>(expertCount) ? static_cast<int32_t>(end) : expertCount;
-            Compares<int32_t, CMPMODE::GE>(lowerMask, expertReg, begin, activeMask);
-            Compares<int32_t, CMPMODE::LT>(groupMask, expertReg, limit, lowerMask);
-            Select(groupReg, bitsReg, zeroReg, groupMask);
-            Reduce<ReduceType::SUM>(bitmapReg, groupReg, fullMask);
-            Duplicate(bitmapReg, bitmapReg, fullMask);
-            Compares<int32_t, CMPMODE::EQ>(laneMask, laneReg, static_cast<int32_t>(index), fullMask);
-            Select(outputReg, bitmapReg, outputReg, laneMask);
+            AscendC::Reg::Compares<int32_t, CMPMODE::GE>(lowerMask, expertReg, begin, activeMask);
+            AscendC::Reg::Compares<int32_t, CMPMODE::LT>(groupMask, expertReg, limit, lowerMask);
+            AscendC::Reg::Select(groupReg, bitsReg, zeroReg, groupMask);
+            AscendC::Reg::Reduce<AscendC::Reg::ReduceType::SUM>(bitmapReg, groupReg, fullMask);
+            AscendC::Reg::Duplicate(bitmapReg, bitmapReg, fullMask);
+            AscendC::Reg::Compares<int32_t, CMPMODE::EQ>(laneMask, laneReg, static_cast<int32_t>(index), fullMask);
+            AscendC::Reg::Select(outputReg, bitmapReg, outputReg, laneMask);
         }
-        StoreAlign(bitmaps + token * ROW_ELEMENTS, outputReg, fullMask);
+        AscendC::Reg::StoreAlign(bitmaps + token * ROW_ELEMENTS, outputReg, fullMask);
     }
 }
 
@@ -172,24 +214,23 @@ __simd_vf__ inline void CheckServerContributionsVF(__ubuf__ uint32_t* arrivedBit
                                                    uint32_t tokenCount)
 {
     constexpr uint32_t ELEMENTS_PER_VECTOR = AscendC::GetVecLen() / sizeof(uint32_t);
-    using namespace AscendC::Reg;
-    RegTensor<uint32_t> arrivedReg, expectedReg, matchedReg, pendingReg, oneReg, resultReg;
-    MaskReg fullMask = CreateMask<uint32_t, MaskPattern::ALL>();
-    MaskReg firstLaneMask = CreateMask<uint32_t, MaskPattern::VL1>();
-    MaskReg activeMask, mismatchMask;
-    Duplicate(pendingReg, 0U, fullMask);
-    Duplicate(oneReg, 1U, fullMask);
+    AscendC::Reg::RegTensor<uint32_t> arrivedReg, expectedReg, matchedReg, pendingReg, oneReg, resultReg;
+    AscendC::Reg::MaskReg fullMask = AscendC::Reg::CreateMask<uint32_t, AscendC::Reg::MaskPattern::ALL>();
+    AscendC::Reg::MaskReg firstLaneMask = AscendC::Reg::CreateMask<uint32_t, AscendC::Reg::MaskPattern::VL1>();
+    AscendC::Reg::MaskReg activeMask, mismatchMask;
+    AscendC::Reg::Duplicate(pendingReg, 0U, fullMask);
+    AscendC::Reg::Duplicate(oneReg, 1U, fullMask);
     for (uint32_t offset = 0U; offset < tokenCount; offset += ELEMENTS_PER_VECTOR) {
         uint32_t validCount = tokenCount - offset;
-        activeMask = UpdateMask<uint32_t>(validCount);
-        LoadAlign(arrivedReg, arrivedBitmaps + offset);
-        LoadAlign(expectedReg, expectedBitmaps + offset);
-        And(matchedReg, arrivedReg, expectedReg, activeMask);
-        Compare<uint32_t, AscendC::CMPMODE::NE>(mismatchMask, matchedReg, expectedReg, activeMask);
-        Select(pendingReg, oneReg, pendingReg, mismatchMask);
+        activeMask = AscendC::Reg::UpdateMask<uint32_t>(validCount);
+        AscendC::Reg::LoadAlign(arrivedReg, arrivedBitmaps + offset);
+        AscendC::Reg::LoadAlign(expectedReg, expectedBitmaps + offset);
+        AscendC::Reg::And(matchedReg, arrivedReg, expectedReg, activeMask);
+        AscendC::Reg::Compare<uint32_t, AscendC::CMPMODE::NE>(mismatchMask, matchedReg, expectedReg, activeMask);
+        AscendC::Reg::Select(pendingReg, oneReg, pendingReg, mismatchMask);
     }
-    Reduce<ReduceType::MAX>(resultReg, pendingReg, fullMask);
-    StoreAlign(pending, resultReg, firstLaneMask);
+    AscendC::Reg::Reduce<AscendC::Reg::ReduceType::MAX>(resultReg, pendingReg, fullMask);
+    AscendC::Reg::StoreAlign(pending, resultReg, firstLaneMask);
 }
 
 } // namespace MegaMoeImpl

@@ -55,9 +55,6 @@ namespace MegaMoeImpl {
 
 using namespace AscendC;
 
-constexpr uint32_t UNPERMUTE_LIST_NUM = 3U;
-constexpr int64_t HALF_TO_FP32 = 2U;
-
 #if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL)
 using TupleShape = Shape<int64_t, int64_t, int64_t, int64_t>;
 
@@ -165,12 +162,15 @@ private:
     __aicore__ inline GM_ADDR GetSendMaskSlot(uint32_t expertId) const;
     __aicore__ inline void UpdateLocalRelayWeight(int32_t copyIdx, int32_t outIdx, TEventID eventId);
     __aicore__ inline QuantProcessScratch<ActivationType> InitSharedExpertInputBuffers();
-    __aicore__ inline void InitUnpermuteWeightChunk(uint32_t dataResBufAlign, uint32_t dataResFp32BufAlign);
-    __aicore__ inline void LoadUnpermuteWeights(int32_t chunkStart, int32_t chunkTokenCnt);
+    __aicore__ inline void UnpermuteTokenChunk(const WorkRange& tokenRange,
+                                               const MegaMoeUnpermuteBufferConfig& bufferConfig,
+                                               uint32_t& inputBufferIdx);
     __aicore__ inline void LoadUnpermuteExpertInput(__gm__ bfloat16_t* expandedX, int32_t tokenIdx, int32_t expId,
                                                     TEventID event, __ubuf__ bfloat16_t* dataInBf16,
                                                     __ubuf__ float* dataInFp32);
-    __aicore__ inline void AccumulateUnpermuteExperts(__gm__ bfloat16_t* expandedX, int32_t tokenIdx, int32_t localIdx);
+    __aicore__ inline void AccumulateUnpermuteExperts(__gm__ bfloat16_t* expandedX, int32_t tokenIdx, int32_t localIdx,
+                                                      const MegaMoeUnpermuteBufferConfig& bufferConfig,
+                                                      uint32_t& inputBufferIdx);
     __aicore__ inline void LoadLocalRelayToken(uint32_t srcServer, uint32_t tokenIndex, int32_t bufferIdx,
                                                uint32_t copyInNum, TEventID eventId);
     __aicore__ inline uint32_t GetChannelOwnerBlock(uint32_t rank) const;
@@ -191,7 +191,7 @@ private:
     __aicore__ inline void DispatchBuffInit();
     __aicore__ inline void DispatchPrepareBuffInit();
     __aicore__ inline void SendAndQuantBuffInit();
-    __aicore__ inline void UnpermuteBuffInit();
+    __aicore__ inline MegaMoeUnpermuteBufferConfig UnpermuteBuffInit();
     __aicore__ inline void ResetState();
     __aicore__ inline void CopyExpertMaskCounts(const WorkRange& expertRange);
     __aicore__ inline void ComputeExpertMasks(const WorkRange& expertRange);
@@ -227,7 +227,7 @@ private:
                                                   uint32_t rowOffsetInExpert = 0U);
     template <AddrUpdateMode Mode>
     __aicore__ inline void UpdateSharedGlobalBuffer(GMMAddrInfo& gmmAddrInfo, const ExpertLoopState& state);
-    __aicore__ inline void Unpermute();
+    __aicore__ inline void Unpermute(const MegaMoeUnpermuteBufferConfig& bufferConfig);
     __aicore__ inline void InitCombineBuffers();
     __aicore__ inline void ProcessCombineTokenRange(const ExpertLoopState& waveBeginState,
                                                     const ExpertTokenRange& range);
@@ -276,7 +276,8 @@ private:
     __aicore__ inline void ProcessSharedExpertGmm2Loop(GMMAddrInfo& sharedGmm2AddrInfo,
                                                        ExpertLoopState& sharedGmm2State);
     __aicore__ inline void ProcessSharedExpertGmm2();
-    __aicore__ inline void UnpermuteSharedExpert(int32_t tokenIdx);
+    __aicore__ inline void UnpermuteSharedExpert(int32_t tokenIdx, const MegaMoeUnpermuteBufferConfig& bufferConfig,
+                                                 uint32_t& inputBufferIdx);
     __aicore__ inline void LoadTopkWeightsToUb(__ubuf__ ActivationType* xOutTensor, int32_t currentOffset,
                                                int32_t index, TEventID event);
     template <bool IsShared, typename Epilogue>
@@ -367,7 +368,6 @@ private:
     uint64_t dispatchRelayQueueBytesPerServer_ = 0;
     uint64_t dispatchRelayFlagSnapshotBytesPerBlock_ = 0;
     int64_t combineUbTensorSize_ = 0; // combineUbTensor 的大小（元素数）
-    uint32_t topKWeightsChunkLen_ = 0;
     uint32_t topKWeightsTempAddr_ = 0;
     uint32_t sharedExpertNum_ = 0;
     uint32_t moeExpertPerRank_ = 0;
@@ -380,7 +380,6 @@ private:
     static constexpr int32_t DISPATCH_COPY_BUFFER_COUNT = 5;
     static constexpr uint32_t MX_QUANT_TEMP_UB_BYTES = 2U * 1024U;
     static constexpr uint32_t DISPATCH_MAX_TOPK = 32U;
-    static constexpr uint32_t SEND_MASK_UB_LIMIT = LAYERED_USABLE_UB_BYTES - DISPATCH_READY_CACHE_RESERVE_BYTES;
     // 二级读取在 TopkWeightsPrefetch 路径下每 token 需要 data/scale/weight 三条 WQE。
     // 64 KiB 可容纳 1024 条 WQE，足够一次提交完整的 256-token 批次（最多 768 条 WQE）。
     static_assert(LAYERED_HCOMM_BATCH_WQE_CAPACITY >= L1_TILE_M_256 * 3U,
@@ -1339,8 +1338,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Process()
         if (IsCombineServerDedupEnabled()) {
             UnpermuteServerCombine();
         } else {
-            UnpermuteBuffInit();
-            Unpermute();
+            const auto unpermuteBufferConfig = UnpermuteBuffInit();
+            Unpermute(unpermuteBufferConfig);
         }
     }
     // 两条 GM 激活同步链独立，在主流程末尾回收剩余 ACK，让共享 GMM2 先推进。
