@@ -122,6 +122,10 @@ static bool CheckA5FormatAndSizeValid(const aclTensor* qkv, const aclTensor* qGa
                                       const aclTensor* qOutBeforeQuant, const aclTensor* kOutBeforeQuant,
                                       const aclTensor* vOutBeforeQuant)
 {
+    OP_CHECK(
+        qkv->GetViewShape().GetDimNum() == 2U,
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "qkv must be 2-D tensor, but got %zu dims.", qkv->GetViewShape().GetDimNum()),
+        return false);
     // clang-format off
     const aclTensor* tensors[] = {qkv, qGamma, kGamma, cos, sin, index, qOut, kCache, vCache,
                                   kScaleOptional, vScaleOptional, kOffsetOptional, vOffsetOptional,
