@@ -18,6 +18,8 @@
 #define TILING_KEY_EMPTY 10000
 #define TILING_KEY_UPDATE_TYPE_ZERO 20000
 #define TILING_KEY_UPDATE_TYPE_ONE 20001
+#define TILING_KEY_ROW_STRIDED_ZERO 21000
+#define TILING_KEY_ROW_STRIDED_ONE 21001
 
 using namespace AttentionUpdateOpt;
 
@@ -25,16 +27,53 @@ extern "C" __global__ __aicore__ void attention_update(GM_ADDR lse, GM_ADDR go, 
                                                        GM_ADDR workSpace, GM_ADDR tiling)
 {
     TPipe pipe;
-    GET_TILING_DATA_WITH_STRUCT(AttentionUpdateTilingData, tilingData, tiling);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
 
     if (TILING_KEY_IS(TILING_KEY_EMPTY)) {
         return;
+    } else if (TILING_KEY_IS(TILING_KEY_ROW_STRIDED_ZERO)) {
+        GET_TILING_DATA_WITH_STRUCT(AttentionUpdateStridedTilingData, data, tiling);
+        AttentionUpdateTilingData baseData;
+        baseData.sp = data.sp;
+        baseData.d = data.d;
+        baseData.usedCoreNum = data.usedCoreNum;
+        baseData.perCoreCount = data.perCoreCount;
+        baseData.lastCoreCount = data.lastCoreCount;
+        baseData.perCoreLoops = data.perCoreLoops;
+        baseData.lastCoreLoops = data.lastCoreLoops;
+        baseData.perCorePerLoopCount = data.perCorePerLoopCount;
+        baseData.perCoreLastLoopCount = data.perCoreLastLoopCount;
+        baseData.lastCoreLastLoopCount = data.lastCoreLastLoopCount;
+        baseData.bshInLoop = data.bshInLoop;
+
+        AttentionUpdateWithoutLse<DTYPE_GO, true> op(&pipe, &baseData, data.rowStride);
+        op.Init(lse, go, out, outLseMax, workSpace);
+        op.Process();
+    } else if (TILING_KEY_IS(TILING_KEY_ROW_STRIDED_ONE)) {
+        GET_TILING_DATA_WITH_STRUCT(AttentionUpdateStridedTilingData, data, tiling);
+        AttentionUpdateTilingData baseData;
+        baseData.sp = data.sp;
+        baseData.d = data.d;
+        baseData.usedCoreNum = data.usedCoreNum;
+        baseData.perCoreCount = data.perCoreCount;
+        baseData.lastCoreCount = data.lastCoreCount;
+        baseData.perCoreLoops = data.perCoreLoops;
+        baseData.lastCoreLoops = data.lastCoreLoops;
+        baseData.perCorePerLoopCount = data.perCorePerLoopCount;
+        baseData.perCoreLastLoopCount = data.perCoreLastLoopCount;
+        baseData.lastCoreLastLoopCount = data.lastCoreLastLoopCount;
+        baseData.bshInLoop = data.bshInLoop;
+
+        AttentionUpdateWithLse<DTYPE_GO, true> op(&pipe, &baseData, data.rowStride);
+        op.Init(lse, go, out, outLseMax, workSpace);
+        op.Process();
     } else if (TILING_KEY_IS(TILING_KEY_UPDATE_TYPE_ZERO)) {
+        GET_TILING_DATA_WITH_STRUCT(AttentionUpdateTilingData, tilingData, tiling);
         AttentionUpdateWithoutLse<DTYPE_GO> op(&pipe, &tilingData);
         op.Init(lse, go, out, outLseMax, workSpace);
         op.Process();
     } else if (TILING_KEY_IS(TILING_KEY_UPDATE_TYPE_ONE)) {
+        GET_TILING_DATA_WITH_STRUCT(AttentionUpdateTilingData, tilingData, tiling);
         AttentionUpdateWithLse<DTYPE_GO> op(&pipe, &tilingData);
         op.Init(lse, go, out, outLseMax, workSpace);
         op.Process();

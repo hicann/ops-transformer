@@ -29,6 +29,9 @@
 #include "opdev/platform.h"
 #include "aclnn_kernels/common/op_error_check.h"
 
+#include <limits>
+#include <vector>
+
 using namespace op;
 
 namespace attention_update {
@@ -385,6 +388,180 @@ static aclnnStatus CheckParams(const aclTensorList* lse, const aclTensorList* lo
     return ACLNN_SUCCESS;
 }
 
+namespace packed_input {
+constexpr int64_t MAX_SP = 128;
+constexpr int64_t MAX_SP_REGBASE = 16;
+constexpr int64_t MAX_D = 512;
+
+static bool IsOutputType(DataType type)
+{
+    return type == DataType::DT_FLOAT || type == DataType::DT_FLOAT16 || type == DataType::DT_BF16;
+}
+
+enum class LocalOutLayout {
+    CONTIGUOUS_SHARDS,
+    ROW_STRIDED,
+    GENERAL,
+};
+
+static LocalOutLayout ClassifyLocalOut(const aclTensor* tensor)
+{
+    const auto& shape = tensor->GetViewShape();
+    const auto& strides = tensor->GetViewStrides();
+    if (shape.GetDimNum() != 3 || strides.size() != 3 || strides[0] < 0) {
+        return LocalOutLayout::GENERAL;
+    }
+    const int64_t t = shape.GetDim(1);
+    const int64_t d = shape.GetDim(2);
+    // Strides on singleton dimensions do not affect the accessed elements.
+    if ((d <= 1 || strides[2] == 1) && (t <= 1 || strides[1] == d)) {
+        return LocalOutLayout::CONTIGUOUS_SHARDS;
+    }
+    if ((d <= 1 || strides[2] == 1) && (t <= 1 || strides[1] >= d)) {
+        return LocalOutLayout::ROW_STRIDED;
+    }
+    return LocalOutLayout::GENERAL;
+}
+
+static const aclTensor* PrepareLocalOut(const aclTensor* localOut, aclOpExecutor* executor)
+{
+    if (ClassifyLocalOut(localOut) != LocalOutLayout::GENERAL) {
+        return localOut;
+    }
+    return l0op::Contiguous(localOut, executor);
+}
+
+static aclnnStatus CheckInputs(const aclTensor* lse, const aclTensor* go, int64_t updateType, const aclTensor* out,
+                               const aclTensor* lseOut)
+{
+    if (lse == nullptr || go == nullptr || out == nullptr) {
+        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "lse, localOut and out must not be null");
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
+    if ((updateType != 0 && updateType != 1) || (updateType == 0 && lseOut != nullptr) ||
+        (updateType == 1 && lseOut == nullptr)) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Invalid updateType or lseOut");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    const auto& ls = lse->GetViewShape();
+    const auto& gs = go->GetViewShape();
+    const auto& os = out->GetViewShape();
+    if (ls.GetDimNum() != 2 || gs.GetDimNum() != 3 || os.GetDimNum() != 2) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Expected lse [P,T], localOut [P,T,D], out [T,D]");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    int64_t p = ls.GetDim(0), t = ls.GetDim(1), d = gs.GetDim(2);
+    int64_t spLimit = Ops::Transformer::AclnnUtil::IsRegbase() ? MAX_SP_REGBASE : MAX_SP;
+    if (p < 1 || p > spLimit || t < 0 || gs.GetDim(0) != p || gs.GetDim(1) != t || d < 8 || d > MAX_D || d % 8 != 0 ||
+        os.GetDim(0) != t || os.GetDim(1) != d) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Invalid input/output shape");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (lse->GetDataType() != DataType::DT_FLOAT || !IsOutputType(go->GetDataType()) ||
+        !IsOutputType(out->GetDataType()) ||
+        (Ops::Transformer::AclnnUtil::IsRegbase() && go->GetDataType() != out->GetDataType())) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Unsupported dtype");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (updateType == 1 && (lseOut->GetDataType() != DataType::DT_FLOAT || lseOut->GetViewShape().GetDimNum() != 1 ||
+                            lseOut->GetViewShape().GetDim(0) != t)) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "lseOut must have shape [T] and dtype float32");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (lse->GetViewStrides().size() != ls.GetDimNum() || go->GetViewStrides().size() != gs.GetDimNum()) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Input stride rank must match shape rank");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (!IsContiguous(lse)) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "lse must be contiguous");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (ClassifyLocalOut(go) != LocalOutLayout::GENERAL && t > 0) {
+        const auto& stride = go->GetViewStrides();
+        const int64_t maxElements = std::numeric_limits<int64_t>::max() /
+                                    (go->GetDataType() == DataType::DT_FLOAT ? sizeof(float) : sizeof(uint16_t));
+        int64_t last = go->GetViewOffset();
+        if (last < 0 || last >= maxElements) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Invalid localOut offset");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        for (size_t dim = 0; dim < gs.GetDimNum(); ++dim) {
+            const int64_t count = gs.GetDim(dim) - 1;
+            if (count == 0) {
+                continue;
+            }
+            if (stride[dim] < 0 || stride[dim] > (maxElements - 1 - last) / count) {
+                OP_LOGE(ACLNN_ERR_PARAM_INVALID, "localOut address range overflows int64");
+                return ACLNN_ERR_PARAM_INVALID;
+            }
+            last += count * stride[dim];
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+
+static const aclTensorList* MakeShards(const aclTensor* input, int64_t p, bool isLse, aclOpExecutor* executor)
+{
+    const auto& shape = input->GetViewShape();
+    const auto& strides = input->GetViewStrides();
+    if (strides.size() != shape.GetDimNum() || strides[0] < 0 || input->GetViewOffset() < 0) {
+        return nullptr;
+    }
+    op::Shape shardShape;
+    op::Strides shardStrides;
+    for (size_t dim = 1; dim < shape.GetDimNum(); ++dim) {
+        shardShape.AppendDim(shape.GetDim(dim));
+        shardStrides.push_back(strides[dim]);
+    }
+    if (shardShape.GetDimNum() != (isLse ? 1U : 2U)) {
+        return nullptr;
+    }
+    std::vector<const aclTensor*> views;
+    views.reserve(static_cast<size_t>(p));
+    for (int64_t i = 0; i < p; ++i) {
+        if (strides[0] != 0 && i > (std::numeric_limits<int64_t>::max() - input->GetViewOffset()) / strides[0]) {
+            return nullptr;
+        }
+        auto view = executor->CreateView(input, shardShape, input->GetStorageShape(), shardStrides,
+                                         input->GetViewOffset() + i * strides[0]);
+        if (view == nullptr) {
+            return nullptr;
+        }
+        if (isLse || ClassifyLocalOut(input) == LocalOutLayout::CONTIGUOUS_SHARDS) {
+            view->SetStorageShape(shardShape);
+        }
+        views.push_back(view);
+    }
+    return executor->AllocTensorList(views.data(), views.size());
+}
+
+static aclnnStatus BuildGraph(const aclTensor* lse, const aclTensor* localOut, int64_t updateType, aclTensor* out,
+                              aclTensor* lseOut, aclOpExecutor* executor)
+{
+    auto ret = CheckInputs(lse, localOut, updateType, out, lseOut);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    if (lse->GetViewShape().GetDim(1) == 0) {
+        return ACLNN_SUCCESS;
+    }
+    const int64_t p = lse->GetViewShape().GetDim(0);
+    auto preparedLocalOut = PrepareLocalOut(localOut, executor);
+    CHECK_RET(preparedLocalOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    auto lseList = MakeShards(lse, p, true, executor);
+    CHECK_RET(lseList != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    auto goList = MakeShards(preparedLocalOut, p, false, executor);
+    CHECK_RET(lseList != nullptr && goList != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    auto [result, lseResult] = l0op::AttentionUpdate(lseList, goList, updateType, p, executor);
+    CHECK_RET(result != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(l0op::ViewCopy(result, out, executor) != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    if (updateType == 1) {
+        CHECK_RET(lseResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        CHECK_RET(l0op::ViewCopy(lseResult, lseOut, executor) != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    }
+    return ACLNN_SUCCESS;
+}
+
+} // namespace packed_input
+
 } // namespace attention_update
 
 #ifdef __cplusplus
@@ -401,6 +578,16 @@ aclnnStatus aclnnAttentionUpdateGetWorkspaceSize(const aclTensorList* lse, const
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
+
+    if (lse != nullptr && localOut != nullptr && lse->Size() == 1 && localOut->Size() == 1 &&
+        (*localOut)[0] != nullptr && (*localOut)[0]->GetViewShape().GetDimNum() == 3) {
+        auto ret = attention_update::packed_input::BuildGraph((*lse)[0], (*localOut)[0], updateType, out, lseOut,
+                                                              uniqueExecutor.get());
+        CHECK_RET(ret == ACLNN_SUCCESS, ret);
+        *workspaceSize = (*lse)[0]->GetViewShape().GetDim(1) == 0 ? 0 : uniqueExecutor->GetWorkspaceSize();
+        uniqueExecutor.ReleaseTo(executor);
+        return ACLNN_SUCCESS;
+    }
 
     // 固定写法，参数检查
     aclnnStatus ret;

@@ -31,6 +31,9 @@ extern "C" {
  * device侧的aclTensorList, 数据类型支持FLOAT32,数据格式支持ND。
  * @param [in] localOut: npu
  * device侧的aclTensorList, 数据类型支持FLOAT32，FLOAT16，BFLOAT16,数据格式支持ND。
+ * 两个TensorList均为单元素且localOut[0]为三维时，支持首轴拼接输入：
+ * lse[0]为连续FLOAT32 [P,T]，localOut[0]为[P,T,D]且支持非连续。
+ * 原有lse元素[T]、localOut元素[T,D]的TensorList输入保持原语义。
  * @param [in] updateType：表示AttentionUpdate类型。
  * int64_t, 控制lseOut是否输出，支持0,1，分别表示不输出lseOut，输出lseOut。
  * @param [out] out: npu

@@ -44,6 +44,23 @@ END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(AttentionUpdate_20000, AttentionUpdateTilingData)
 REGISTER_TILING_DATA_CLASS(AttentionUpdate_20001, AttentionUpdateTilingData)
 
+BEGIN_TILING_DATA_DEF(AttentionUpdateStridedTilingData)
+TILING_DATA_FIELD_DEF(uint64_t, sp);
+TILING_DATA_FIELD_DEF(uint64_t, d);
+TILING_DATA_FIELD_DEF(uint64_t, usedCoreNum);
+TILING_DATA_FIELD_DEF(uint64_t, perCoreCount);
+TILING_DATA_FIELD_DEF(uint64_t, lastCoreCount);
+TILING_DATA_FIELD_DEF(uint64_t, perCoreLoops);
+TILING_DATA_FIELD_DEF(uint64_t, lastCoreLoops);
+TILING_DATA_FIELD_DEF(uint64_t, perCorePerLoopCount);
+TILING_DATA_FIELD_DEF(uint64_t, perCoreLastLoopCount);
+TILING_DATA_FIELD_DEF(uint64_t, lastCoreLastLoopCount);
+TILING_DATA_FIELD_DEF(uint64_t, bshInLoop);
+TILING_DATA_FIELD_DEF(uint64_t, rowStride);
+END_TILING_DATA_DEF;
+REGISTER_TILING_DATA_CLASS(AttentionUpdate_21000, AttentionUpdateStridedTilingData)
+REGISTER_TILING_DATA_CLASS(AttentionUpdate_21001, AttentionUpdateStridedTilingData)
+
 class AttentionUpdateTiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
     explicit AttentionUpdateTiling(gert::TilingContext* context)
@@ -79,6 +96,7 @@ private:
     uint64_t updateType_ = 0;
     uint64_t bshSize_ = 0;
     uint64_t goDtypeSize_ = 0;
+    uint64_t rowStride_ = 0;
 
     // 分核信息，核个数
     uint64_t usedCoreNum_ = 0;

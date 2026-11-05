@@ -18,7 +18,8 @@
 namespace ops {
 class AttentionUpdate : public OpDef {
 public:
-    explicit AttentionUpdate(const char *name) : OpDef(name)
+    explicit AttentionUpdate(const char* name)
+        : OpDef(name)
     {
         this->Input("lse")
             .ParamType(DYNAMIC)
@@ -27,6 +28,7 @@ public:
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND});
         this->Input("go")
             .ParamType(DYNAMIC)
+            .IgnoreContiguous()
             .DataType({ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16})
             .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND});
@@ -63,4 +65,4 @@ public:
 };
 
 OP_ADD(AttentionUpdate);
-}  // namespace ops
+} // namespace ops

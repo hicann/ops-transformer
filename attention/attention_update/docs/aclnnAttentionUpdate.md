@@ -42,6 +42,20 @@ $$
 O = \sum_i O_i \cdot \text{exp}(lse_i - lse_m)
 $$
 
+## 输入说明
+
+`lse`和`localOut`的类型为`aclTensorList*`，支持以下两种输入表示：
+
+| 输入表示 | lse | localOut | SP数 |
+| --- | --- | --- | --- |
+| 分片输入 | 长度为P，每个Tensor的shape为`[T]` | 长度为P，每个Tensor的shape为`[T,D]` | P |
+| 首轴拼接输入 | 长度为1，Tensor的shape为`[P,T]` | 长度为1，Tensor的shape为`[P,T,D]` | P |
+
+其中，P表示序列并行的并行度sp，`T = batch * seqLen * headNum`，`D = headDim`。两个输入的P、T必须一致；两种输入表示均支持P=1。
+
+首轴拼接输入的`lse`必须为连续FLOAT32 Tensor，`localOut`支持非连续Tensor。
+输出`out`的shape为`[T,D]`；`updateType=1`时，`lseOut`的shape为`[T]`、数据类型为FLOAT32。
+
 ## 函数原型
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnAttentionUpdateGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnAttentionUpdate”接口执行计算。
@@ -97,21 +111,21 @@ aclnnStatus aclnnAttentionUpdate(
         <td>lse</td>
         <td>输入</td>
         <td>各SP域的局部lse。</td>
-        <td>tensorList长度为sp。</td>
+        <td>分片输入长度为sp；首轴拼接输入长度为1，详见输入说明。</td>
         <td>FLOAT32</td>
         <td>ND</td>
-        <td>[batch * seqLen * headNum]</td>
+        <td>[batch * seqLen * headNum]；首轴拼接输入为 [sp, batch * seqLen * headNum]</td>
         <td>x</td>
       </tr>
       <tr>
         <td>localOut</td>
         <td>输入</td>
         <td>各SP域的局部attentionout。</td>
-        <td>tensorList长度为sp。</td>
+        <td>分片输入长度为sp；首轴拼接输入长度为1，详见输入说明。</td>
         <td>FLOAT32，FLOAT16，BFLOAT16</td>
         <td>ND</td>
-        <td>[batch * seqLen * headNum, headDim]</td>
-        <td>x</td>
+        <td>[batch * seqLen * headNum, headDim]；首轴拼接输入为 [sp, batch * seqLen * headNum, headDim]</td>
+        <td>首轴拼接输入支持</td>
       </tr>
       <tr>
         <td>updateType</td>
@@ -139,7 +153,7 @@ aclnnStatus aclnnAttentionUpdate(
         <td>lseOut</td>
         <td>可选输出</td>
         <td>作为lse_m可选输出。</td>
-        <td>不输出lseOut可传入nullptr。</td>
+        <td>updateType为0时必须为nullptr；为1时必须提供。</td>
         <td>FLOAT32</td>
         <td>ND</td>
         <td>[batch * seqLen * headNum]</td>
@@ -195,7 +209,6 @@ aclnnStatus aclnnAttentionUpdate(
           <td>传入的lse、localOut或者out是空指针。</td>
         </tr>
         <tr>
-          <!-- 合并单元格添加merged-cell类，与模板结构保持一致 -->
           <td class="merged-cell" rowspan="5">ACLNN_ERR_PARAM_INVALID</td>
           <td class="merged-cell" rowspan="5">161002</td>
           <td>传入的lse、localOut或者out的数据类型/数据格式不在支持的范围之内。</td>
@@ -268,7 +281,7 @@ aclnnStatus aclnnAttentionUpdate(
   <!-- end id8 -->
 
 - headDim取值范围[8, 512]且是8的倍数。
-- 支持空Tensor。
+- 支持T=0的空输入，此时out的shape为`[0,D]`；updateType为1时，lseOut的shape为`[0]`。
 
 ## 调用示例
 

@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 #include <iostream>
+#include <cstring>
 
 #include "../../../op_host/decode_update_tiling.h"
 #include "tiling_case_executor.h"
@@ -21,7 +22,7 @@ constexpr uint64_t SYS_WORKSPACE_SIZE = 16 * 1024 * 1024UL;
 gert::TilingContextPara BuildCase(optiling::DecodeUpdateCompileInfo& compileInfo, ge::DataType dtype,
                                   int64_t updateType, int64_t sp, const gert::StorageShape& lseShape,
                                   const gert::StorageShape& localOutShape, const gert::StorageShape& outShape,
-                                  const gert::StorageShape& lseOutShape = {{}, {}})
+                                  const gert::StorageShape& lseOutShape = {{}, {}}, uint64_t rowStride = 0)
 {
     std::vector<gert::TilingContextPara::TensorDescription> inputs;
     std::vector<gert::TilingContextPara::TensorDescription> outputs = {
@@ -32,18 +33,25 @@ gert::TilingContextPara BuildCase(optiling::DecodeUpdateCompileInfo& compileInfo
         inputs.push_back({lseShape, ge::DT_FLOAT, ge::FORMAT_ND});
     }
     for (int64_t i = 0; i < sp; ++i) {
-        inputs.push_back({localOutShape, dtype, ge::FORMAT_ND});
+        gert::TilingContextPara::TensorDescription go(localOutShape, dtype, ge::FORMAT_ND);
+        if (rowStride != 0) {
+            go.stride_ = gert::Stride({static_cast<int64_t>(rowStride), 1});
+            go.hasStride_ = true;
+        }
+        inputs.push_back(go);
     }
     if (updateType == 1) {
         outputs.push_back({lseOutShape, ge::DT_FLOAT, ge::FORMAT_ND});
     }
 
-    return gert::TilingContextPara("AttentionUpdate", inputs, outputs,
-                                   {
-                                       {"update_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(updateType)},
-                                       {"sp", Ops::Transformer::AnyValue::CreateFrom<int64_t>(sp)},
-                                   },
-                                   &compileInfo, "Ascend910B", compileInfo.coreNum, compileInfo.ubSize);
+    return gert::TilingContextPara(
+        "AttentionUpdate", inputs, outputs,
+        {
+            {"update_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(updateType)},
+            {"sp", Ops::Transformer::AnyValue::CreateFrom<int64_t>(sp)},
+        },
+        {static_cast<uint32_t>(sp), static_cast<uint32_t>(sp)}, {1, updateType == 1 ? 1U : 0U}, &compileInfo,
+        compileInfo.is_ascendc ? "Ascend950" : "Ascend910B", compileInfo.coreNum, compileInfo.ubSize);
 }
 
 optiling::DecodeUpdateCompileInfo LegacyCompileInfo(uint32_t coreNum = 40, uint64_t ubSize = 196608)
@@ -381,3 +389,31 @@ TEST_F(AttentionUpdateTilingTest, AscendCOutputLseMDtypeMismatchRejected)
 
 // 分支: GetPlatformInfo - 平台Vector核数为0 / UB大小为0（OP_LOGE_WITHOUT_REPORT）
 // 说明：平台coreNum/ubSize由硬件信息保证非0，UT假平台不随TilingContextPara参数变化，该分支UT不可达，不构造用例。
+
+TEST_F(AttentionUpdateTilingTest, LegacyRowStridedFloat)
+{
+    auto compileInfo = LegacyCompileInfo();
+    auto context = BuildCase(compileInfo, ge::DT_FLOAT, 0, 5, {{33}, {33}}, {{33, 72}, {33, 76}}, {{33, 72}, {33, 72}},
+                             {{}, {}}, 76);
+    TilingInfo info;
+    ASSERT_TRUE(ExecuteTiling(context, info));
+    EXPECT_EQ(info.tilingKey, 11010);
+    ASSERT_EQ(info.tilingDataSize, 40U);
+    uint64_t rowStride = 0;
+    std::memcpy(&rowStride, info.tilingData.get() + info.tilingDataSize - sizeof(rowStride), sizeof(rowStride));
+    EXPECT_EQ(rowStride, 76U);
+}
+
+TEST_F(AttentionUpdateTilingTest, AscendCRowStridedBf16WithLseOut)
+{
+    auto compileInfo = AscendCCompileInfo();
+    auto context = BuildCase(compileInfo, ge::DT_BF16, 1, 9, {{33}, {33}}, {{33, 72}, {33, 76}}, {{33, 72}, {33, 72}},
+                             {{33}, {33}}, 76);
+    TilingInfo info;
+    ASSERT_TRUE(ExecuteTiling(context, info));
+    EXPECT_EQ(info.tilingKey, 21001);
+    ASSERT_EQ(info.tilingDataSize, 96U);
+    uint64_t rowStride = 0;
+    std::memcpy(&rowStride, info.tilingData.get() + info.tilingDataSize - sizeof(rowStride), sizeof(rowStride));
+    EXPECT_EQ(rowStride, 76U);
+}

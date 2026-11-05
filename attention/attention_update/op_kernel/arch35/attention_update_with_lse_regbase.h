@@ -16,15 +16,19 @@
 #define ATTENTION_UPDATE_WITH_LSE_REGBASE_H_
 
 #include "attention_update_base_regbase.h"
+#include "attention_update_output_regbase.h"
+#include "../attention_update_copy.h"
 
 namespace AttentionUpdateOpt {
 
-template <typename goType>
+template <typename goType, bool RowStrided = false>
 class AttentionUpdateWithLse {
 public:
-    __aicore__ inline AttentionUpdateWithLse(TPipe* pipe, const AttentionUpdateTilingData* __restrict tiling)
+    __aicore__ inline AttentionUpdateWithLse(TPipe* pipe, const AttentionUpdateTilingData* __restrict tiling,
+                                             uint64_t rowStride = 0)
         : pipe_(pipe),
-          tilingData_(tiling){};
+          tilingData_(tiling),
+          rowStride_(rowStride){};
     __aicore__ inline void Init(GM_ADDR lse, GM_ADDR go, GM_ADDR out, GM_ADDR outLseMax, GM_ADDR workSpace);
     __aicore__ inline void Process();
 
@@ -40,8 +44,15 @@ private:
     __aicore__ inline void ComputeOutVF(uint32_t lseUbOffset, uint32_t bshNum, uint16_t bshInLoopNum,
                                         uint32_t dAlignNum, uint32_t goAlignNum, uint16_t unrollLoops);
 
+    __aicore__ inline void ComputeCachedOutputVF(uint32_t lseUbOffset, uint32_t bshNum, uint16_t rows, uint32_t dAlign,
+                                                 uint32_t goAlign);
+
+    __aicore__ inline void ComputeOutput(uint32_t lseOffset, uint32_t lseStride, uint16_t rows, uint32_t dAlign,
+                                         uint32_t shardStride, bool hasTail, uint16_t unrollLoops);
+
     TPipe* pipe_ = nullptr;
     const AttentionUpdateTilingData* tilingData_;
+    uint64_t rowStride_ = 0;
 
     uint32_t blockIdx_;
     uint64_t bshInLoop_;
@@ -69,9 +80,9 @@ private:
     TBuf<> ubTmpBuf_;
 };
 
-template <typename goType>
-__aicore__ inline void AttentionUpdateWithLse<goType>::Init(GM_ADDR lse, GM_ADDR go, GM_ADDR out, GM_ADDR outLseMax,
-                                                            GM_ADDR workSpace)
+template <typename goType, bool RowStrided>
+__aicore__ inline void AttentionUpdateWithLse<goType, RowStrided>::Init(GM_ADDR lse, GM_ADDR go, GM_ADDR out,
+                                                                        GM_ADDR outLseMax, GM_ADDR workSpace)
 {
     blockIdx_ = AscendC::GetBlockIdx();
     lseBlockNum_ = UB_BLOCK_SIZE / sizeof(float);
@@ -96,8 +107,8 @@ __aicore__ inline void AttentionUpdateWithLse<goType>::Init(GM_ADDR lse, GM_ADDR
     pipe_->InitBuffer(ubTmpBuf_, tilingData_->sp * perCorePerLoopCountAlign * sizeof(float));
 }
 
-template <typename goType>
-__aicore__ inline void AttentionUpdateWithLse<goType>::Process()
+template <typename goType, bool RowStrided>
+__aicore__ inline void AttentionUpdateWithLse<goType, RowStrided>::Process()
 {
     if (blockIdx_ >= tilingData_->usedCoreNum) {
         return;
@@ -137,19 +148,16 @@ __aicore__ inline void AttentionUpdateWithLse<goType>::Process()
 
             uint64_t goAlignNum = bshInLoopNum * dAlignNum_;
             CopyGoToUb(goOffset, tilingData_->d, bshInLoopNum, goAlignNum);
-            if (hasTailRoll) {
-                ComputeOutVF<true>(lseUbOffset, bshAlignNum, bshInLoopNum, dAlignNum_, goAlignNum, unrollLoops);
-            } else {
-                ComputeOutVF<false>(lseUbOffset, bshAlignNum, bshInLoopNum, dAlignNum_, goAlignNum, unrollLoops);
-            }
+            ComputeOutput(lseUbOffset, bshAlignNum, bshInLoopNum, dAlignNum_, goAlignNum, hasTailRoll, unrollLoops);
             CopyOutToGm(goOffset, tilingData_->d, bshInLoopNum);
         }
     }
 }
 
-template <typename goType>
-__aicore__ inline void AttentionUpdateWithLse<goType>::CopyLseToUb(uint64_t lseGmOffset, uint64_t curBlockNum,
-                                                                   uint64_t curBlockNumAlign)
+template <typename goType, bool RowStrided>
+__aicore__ inline void AttentionUpdateWithLse<goType, RowStrided>::CopyLseToUb(uint64_t lseGmOffset,
+                                                                               uint64_t curBlockNum,
+                                                                               uint64_t curBlockNumAlign)
 {
     LocalTensor<float> lseTensor = lseQueue_.template AllocTensor<float>();
     uint32_t blockLen = curBlockNum * sizeof(float);
@@ -166,8 +174,8 @@ __aicore__ inline void AttentionUpdateWithLse<goType>::CopyLseToUb(uint64_t lseG
     lseQueue_.template EnQue<float>(lseTensor);
 }
 
-template <typename goType>
-__aicore__ inline void AttentionUpdateWithLse<goType>::ComputeMaxVF(uint32_t curBlockNum)
+template <typename goType, bool RowStrided>
+__aicore__ inline void AttentionUpdateWithLse<goType, RowStrided>::ComputeMaxVF(uint32_t curBlockNum)
 {
     LocalTensor<float> lseTensor = lseQueue_.template DeQue<float>();
     LocalTensor<float> expTensor = ubTmpBuf_.Get<float>(tilingData_->sp * curBlockNum);
@@ -244,8 +252,9 @@ __aicore__ inline void AttentionUpdateWithLse<goType>::ComputeMaxVF(uint32_t cur
     outLseMaxQueue_.template EnQue<float>(maxTensor);
 }
 
-template <typename goType>
-__aicore__ inline void AttentionUpdateWithLse<goType>::CopyLseMaxToGm(uint64_t lseGmOffset, uint64_t curBlockNum)
+template <typename goType, bool RowStrided>
+__aicore__ inline void AttentionUpdateWithLse<goType, RowStrided>::CopyLseMaxToGm(uint64_t lseGmOffset,
+                                                                                  uint64_t curBlockNum)
 {
     LocalTensor<float> outLseMaxTensor = outLseMaxQueue_.template DeQue<float>();
     uint32_t blockLen = curBlockNum * sizeof(float);
@@ -256,9 +265,10 @@ __aicore__ inline void AttentionUpdateWithLse<goType>::CopyLseMaxToGm(uint64_t l
     outLseMaxQueue_.template FreeTensor<float>(outLseMaxTensor);
 }
 
-template <typename goType>
-__aicore__ inline void AttentionUpdateWithLse<goType>::CopyGoToUb(uint64_t goOffset, uint64_t curBlockNum,
-                                                                  uint64_t bshInLoopNum, uint64_t goAlignNum)
+template <typename goType, bool RowStrided>
+__aicore__ inline void AttentionUpdateWithLse<goType, RowStrided>::CopyGoToUb(uint64_t goOffset, uint64_t curBlockNum,
+                                                                              uint64_t bshInLoopNum,
+                                                                              uint64_t goAlignNum)
 {
     LocalTensor<goType> goTensor = goQueue_.template AllocTensor<goType>();
     uint32_t blockLen = curBlockNum * sizeof(goType);
@@ -268,16 +278,22 @@ __aicore__ inline void AttentionUpdateWithLse<goType>::CopyGoToUb(uint64_t goOff
                                                 static_cast<goType>(0)};
     for (uint32_t i = 0; i < tilingData_->sp; i++) {
         goGm_.SetGlobalBuffer((__gm__ goType*)goList_.GetDataPtr<goType>(i));
-        DataCopyPad(goTensor[i * goAlignNum], goGm_[goOffset], params, padParamIdx);
+        if constexpr (RowStrided) {
+            AttentionUpdateCopy::CopyRows(goTensor[i * goAlignNum], goGm_, goOffset / tilingData_->d, bshInLoopNum,
+                                          curBlockNum, rowStride_, dAlignNum_);
+        } else {
+            DataCopyPad(goTensor[i * goAlignNum], goGm_[goOffset], params, padParamIdx);
+        }
     }
     goQueue_.template EnQue<goType>(goTensor);
 }
 
-template <typename goType>
+template <typename goType, bool RowStrided>
 template <bool hasTailRoll>
-__aicore__ inline void AttentionUpdateWithLse<goType>::ComputeOutVF(uint32_t lseUbOffset, uint32_t bshNum,
-                                                                    uint16_t bshInLoopNum, uint32_t dAlignNum,
-                                                                    uint32_t goAlignNum, uint16_t unrollLoops)
+__aicore__ inline void AttentionUpdateWithLse<goType, RowStrided>::ComputeOutVF(uint32_t lseUbOffset, uint32_t bshNum,
+                                                                                uint16_t bshInLoopNum,
+                                                                                uint32_t dAlignNum, uint32_t goAlignNum,
+                                                                                uint16_t unrollLoops)
 {
     LocalTensor<goType> sumTensor = outQueue_.template AllocTensor<goType>();
     LocalTensor<float> expTensor = ubTmpBuf_.Get<float>(tilingData_->sp * bshNum);
@@ -335,9 +351,9 @@ __aicore__ inline void AttentionUpdateWithLse<goType>::ComputeOutVF(uint32_t lse
     outQueue_.template EnQue<goType>(sumTensor);
 }
 
-template <typename goType>
-__aicore__ inline void AttentionUpdateWithLse<goType>::CopyOutToGm(uint64_t outOffset, uint64_t curBlockNum,
-                                                                   uint64_t bshInLoopNum)
+template <typename goType, bool RowStrided>
+__aicore__ inline void AttentionUpdateWithLse<goType, RowStrided>::CopyOutToGm(uint64_t outOffset, uint64_t curBlockNum,
+                                                                               uint64_t bshInLoopNum)
 {
     LocalTensor<goType> outTensor = outQueue_.template DeQue<goType>();
     uint32_t blockLen = curBlockNum * sizeof(goType);
@@ -346,5 +362,40 @@ __aicore__ inline void AttentionUpdateWithLse<goType>::CopyOutToGm(uint64_t outO
     DataCopyPad(outGm_[outOffset], outTensor, params);
     outQueue_.template FreeTensor<goType>(outTensor);
 }
+
+template <typename goType, bool RowStrided>
+__aicore__ inline void AttentionUpdateWithLse<goType, RowStrided>::ComputeOutput(uint32_t lseOffset, uint32_t lseStride,
+                                                                                 uint16_t rows, uint32_t dAlign,
+                                                                                 uint32_t shardStride, bool hasTail,
+                                                                                 uint16_t unrollLoops)
+{
+    if (ShouldCacheOutputWeights(rows, tilingData_->d, tilingData_->sp)) {
+        ComputeCachedOutputVF(lseOffset, lseStride, rows, dAlign, shardStride);
+        return;
+    }
+    if (hasTail) {
+        ComputeOutVF<true>(lseOffset, lseStride, rows, dAlign, shardStride, unrollLoops);
+    } else {
+        ComputeOutVF<false>(lseOffset, lseStride, rows, dAlign, shardStride, unrollLoops);
+    }
+}
+
+template <typename goType, bool RowStrided>
+__aicore__ inline void AttentionUpdateWithLse<goType, RowStrided>::ComputeCachedOutputVF(uint32_t lseUbOffset,
+                                                                                         uint32_t bshNum, uint16_t rows,
+                                                                                         uint32_t dAlign,
+                                                                                         uint32_t goAlign)
+{
+    LocalTensor<goType> sumTensor = outQueue_.template AllocTensor<goType>();
+    LocalTensor<float> expTensor = ubTmpBuf_.Get<float>(tilingData_->sp * bshNum);
+    LocalTensor<goType> goTensor = goQueue_.template DeQue<goType>();
+    const CachedOutputTile tile{lseUbOffset, bshNum, static_cast<uint32_t>(tilingData_->d), dAlign,
+                                goAlign,     rows,   static_cast<uint16_t>(tilingData_->sp)};
+    DispatchCachedOutput<goType>((__ubuf__ goType*)sumTensor.GetPhyAddr(), (__ubuf__ float*)expTensor.GetPhyAddr(),
+                                 (__ubuf__ goType*)goTensor.GetPhyAddr(), tile);
+    goQueue_.template FreeTensor<goType>(goTensor);
+    outQueue_.template EnQue<goType>(sumTensor);
+}
+
 } // namespace AttentionUpdateOpt
 #endif // ATTENTION_UPDATE_WITH_LSE_REGBASE_H_

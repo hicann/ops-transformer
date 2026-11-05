@@ -14,6 +14,7 @@
  */
 
 #include "attention_update_tiling.h"
+#include "attention_update_layout.h"
 
 namespace optiling {
 using namespace Ops::Base;
@@ -304,7 +305,7 @@ ge::graphStatus AttentionUpdateTiling::GetShapeAttrsInfo()
     OP_CHECK_IF(CheckOutputParams() != ge::GRAPH_SUCCESS,
                 OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "AttentionUpdate CheckOutputParams FAILED."),
                 return ge::GRAPH_FAILED);
-    return ge::GRAPH_SUCCESS;
+    return GetAttentionUpdateRowStride(context_, sp_, bshSize_, d_, goDtypeSize_, rowStride_);
 }
 
 ge::graphStatus AttentionUpdateTiling::DoOpTiling()
@@ -355,7 +356,7 @@ uint64_t AttentionUpdateTiling::GetTilingKey() const
     if (bshSize_ == 0) {
         tilingKey = TILING_KEY_EMPTY;
     } else {
-        tilingKey = TILING_KEY_INIT_VALUE + updateType_;
+        tilingKey = TILING_KEY_INIT_VALUE + updateType_ + (rowStride_ != d_ ? 1000UL : 0UL);
     }
     return tilingKey;
 }
@@ -395,8 +396,26 @@ ge::graphStatus AttentionUpdateTiling::PostTiling()
     tilingData_.set_lastCoreLastLoopCount(lastCoreLastLoopCount_);
     tilingData_.set_bshInLoop(bshInLoop_);
 
-    tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
-    context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
+    if (rowStride_ != d_) {
+        AttentionUpdateStridedTilingData stridedData;
+        stridedData.set_sp(tilingData_.get_sp());
+        stridedData.set_d(tilingData_.get_d());
+        stridedData.set_usedCoreNum(tilingData_.get_usedCoreNum());
+        stridedData.set_perCoreCount(tilingData_.get_perCoreCount());
+        stridedData.set_lastCoreCount(tilingData_.get_lastCoreCount());
+        stridedData.set_perCoreLoops(tilingData_.get_perCoreLoops());
+        stridedData.set_lastCoreLoops(tilingData_.get_lastCoreLoops());
+        stridedData.set_perCorePerLoopCount(tilingData_.get_perCorePerLoopCount());
+        stridedData.set_perCoreLastLoopCount(tilingData_.get_perCoreLastLoopCount());
+        stridedData.set_lastCoreLastLoopCount(tilingData_.get_lastCoreLastLoopCount());
+        stridedData.set_bshInLoop(tilingData_.get_bshInLoop());
+        stridedData.set_rowStride(rowStride_);
+        stridedData.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
+        context_->GetRawTilingData()->SetDataSize(stridedData.GetDataSize());
+    } else {
+        tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
+        context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
+    }
     return ge::GRAPH_SUCCESS;
 }
 

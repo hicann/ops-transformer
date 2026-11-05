@@ -77,10 +77,12 @@ $$
 
 * <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持FLOAT32、FLOAT16、BFLOAT16的O<sub>i</sub>和O。
 * <term>Ascend 950PR&950DT系列产品</term>：支持FLOAT32、FLOAT16、BFLOAT16的O<sub>i</sub>和O，且O<sub>i</sub>和O数据类型相同。
-* 序列并行的并行度sp取值范围[1, 16]。
+* 序列并行的并行度sp取值范围：
+  * <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：[1, 128]。
+  * <term>Ascend 950PR&950DT系列产品</term>：[1, 16]。
 * headDim取值范围[8, 512]且是8的倍数。
-* 不支持非连续的Tensor。
-* 支持空Tensor。
+* localout支持非连续的Tensor。
+* 支持T=0的空输入，此时输出为空，不执行计算。
 
 ## 调用说明
 

@@ -13,6 +13,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 #pragma pack(1)
 struct DecodeUpdateTilingData {
@@ -27,13 +28,24 @@ struct DecodeUpdateTilingData {
 };
 #pragma pack()
 
-inline void InitAttentionUpdateTilingData(uint8_t* tiling, DecodeUpdateTilingData* constData)
+struct DecodeUpdateStridedTilingData {
+    uint32_t formerLength = 0;
+    uint32_t tailLength = 0;
+    uint32_t formerNum = 0;
+    uint32_t tailNum = 0;
+    uint32_t hDim = 0;
+    uint32_t updateType = 0;
+    uint32_t sp = 0;
+    uint32_t totalLength = 0;
+    uint64_t rowStride = 0;
+};
+static_assert(sizeof(DecodeUpdateTilingData) == 32, "Legacy tiling ABI");
+static_assert(sizeof(DecodeUpdateStridedTilingData) == 40, "Strided tiling ABI");
+
+template <typename T>
+inline void InitAttentionUpdateTilingData(uint8_t* tiling, T* constData)
 {
-    auto* src = reinterpret_cast<uint32_t*>(tiling);
-    auto* dst = reinterpret_cast<uint32_t*>(constData);
-    for (size_t i = 0; i < sizeof(DecodeUpdateTilingData) / sizeof(uint32_t); ++i) {
-        dst[i] = src[i];
-    }
+    std::memcpy(constData, tiling, sizeof(T));
 }
 
 #define GET_TILING_DATA(tiling_data, tiling_arg) \

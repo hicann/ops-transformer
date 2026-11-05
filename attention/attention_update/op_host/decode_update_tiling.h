@@ -40,6 +40,21 @@ TILING_DATA_FIELD_DEF(uint32_t, totalLength);
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(AttentionUpdate, DecodeUpdateTilingData);
+
+BEGIN_TILING_DATA_DEF(DecodeUpdateStridedTilingData)
+TILING_DATA_FIELD_DEF(uint32_t, formerLength);
+TILING_DATA_FIELD_DEF(uint32_t, tailLength);
+TILING_DATA_FIELD_DEF(uint32_t, formerNum);
+TILING_DATA_FIELD_DEF(uint32_t, tailNum);
+TILING_DATA_FIELD_DEF(uint32_t, hDim);
+TILING_DATA_FIELD_DEF(uint32_t, updateType);
+TILING_DATA_FIELD_DEF(uint32_t, sp);
+TILING_DATA_FIELD_DEF(uint32_t, totalLength);
+TILING_DATA_FIELD_DEF(uint64_t, rowStride);
+END_TILING_DATA_DEF;
+REGISTER_TILING_DATA_CLASS(AttentionUpdate_11010, DecodeUpdateStridedTilingData);
+REGISTER_TILING_DATA_CLASS(AttentionUpdate_11020, DecodeUpdateStridedTilingData);
+REGISTER_TILING_DATA_CLASS(AttentionUpdate_11030, DecodeUpdateStridedTilingData);
 } // namespace optiling
 
 #endif

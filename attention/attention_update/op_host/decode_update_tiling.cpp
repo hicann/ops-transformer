@@ -23,6 +23,8 @@
 #include "decode_update_tiling.h"
 #include "op_host/tiling_templates_registry.h"
 #include "attention_update_tiling.h"
+#include "attention_update_layout.h"
+#include <limits>
 
 namespace {
 constexpr uint64_t TILING_KEY_GO_FP32_WITHOUT_MAX_OUT = 10010;
@@ -72,13 +74,37 @@ ge::graphStatus DecodeUpdateTiling(gert::TilingContext* context)
 
     auto updateType = *updateTypePtr;
     auto sp = *spPtr;
+    OP_CHECK_IF(
+        sp < 1 || sp > 128 || context->GetComputeNodeInputNum() != static_cast<uint64_t>(2 * sp),
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            nodeName, "sp,inputCount", std::to_string(sp) + "," + std::to_string(context->GetComputeNodeInputNum()),
+            "sp must be in [1,128] and inputCount must equal 2 * sp"),
+        return ge::GRAPH_FAILED);
 
     ge::DataType goType_ = context->GetInputDesc(LOCAL_OUT_INDEX * sp)->GetDataType();
     auto tilingKey = GetTilingKey(sp, goType_);
-    context->SetTilingKey(tilingKey);
-
-    auto lseShape = context->GetInputShape(0)->GetStorageShape();
-    auto inShape = context->GetInputShape(sp)->GetStorageShape();
+    OP_CHECK_IF(tilingKey == 0,
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "localOut", Ops::Base::ToString(goType_),
+                                                      "Supported dtypes are FLOAT, FLOAT16 and BF16"),
+                return ge::GRAPH_FAILED);
+    auto lseShape = context->GetInputShape(0)->GetOriginShape();
+    auto inShape = context->GetInputShape(sp)->GetOriginShape();
+    OP_CHECK_IF(lseShape.GetDimNum() != 1 || inShape.GetDimNum() != 2 || lseShape.GetDim(0) <= 0 ||
+                    lseShape.GetDim(0) > std::numeric_limits<uint32_t>::max() ||
+                    inShape.GetDim(0) != lseShape.GetDim(0) || inShape.GetDim(1) < 8 || inShape.GetDim(1) > 512 ||
+                    inShape.GetDim(1) % 8 != 0,
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    nodeName, "lse,localOut", Ops::Base::ToString(lseShape) + "," + Ops::Base::ToString(inShape),
+                    "Expected lse [T] and localOut [T,D], 0 < T <= UINT32_MAX, 8 <= D <= 512 and D divisible by 8"),
+                return ge::GRAPH_FAILED);
+    uint64_t rowStride = 0;
+    const uint64_t elementBytes = goType_ == ge::DT_FLOAT ? sizeof(float) : sizeof(uint16_t);
+    OP_CHECK_IF(GetAttentionUpdateRowStride(context, sp, lseShape.GetDim(0), inShape.GetDim(1), elementBytes,
+                                            rowStride) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(nodeName, "AttentionUpdate row-stride validation failed"),
+                return ge::GRAPH_FAILED);
+    const bool rowStrided = rowStride != static_cast<uint64_t>(inShape.GetDim(1));
+    context->SetTilingKey(tilingKey + (rowStrided ? 1000 : 0));
 
     // sp, B*s*hc in1
     // sp, B*s*hc, hd in2
@@ -118,8 +144,23 @@ ge::graphStatus DecodeUpdateTiling(gert::TilingContext* context)
     workspaces[0] = SYS_WORKSPACE_SIZE;
 
     context->SetBlockDim(blockDims);
-    tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
-    context->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
+    if (rowStrided) {
+        DecodeUpdateStridedTilingData stridedData;
+        stridedData.set_formerLength(tilingData.get_formerLength());
+        stridedData.set_tailLength(tilingData.get_tailLength());
+        stridedData.set_formerNum(tilingData.get_formerNum());
+        stridedData.set_tailNum(tilingData.get_tailNum());
+        stridedData.set_hDim(tilingData.get_hDim());
+        stridedData.set_updateType(tilingData.get_updateType());
+        stridedData.set_sp(tilingData.get_sp());
+        stridedData.set_totalLength(tilingData.get_totalLength());
+        stridedData.set_rowStride(rowStride);
+        stridedData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
+        context->GetRawTilingData()->SetDataSize(stridedData.GetDataSize());
+    } else {
+        tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
+        context->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
+    }
 
     return ge::GRAPH_SUCCESS;
 }

@@ -19,6 +19,7 @@
 #include <limits>
 #include "kernel_operator.h"
 #include "kernel_tiling/kernel_tiling.h"
+#include "attention_update_copy.h"
 
 using namespace AscendC;
 
@@ -44,17 +45,25 @@ static const int32_t ALIGNED_TO_2 = 2;
 static const uint32_t SPLIT_TO_2 = 2;
 static const uint32_t ELEM_PER_256B = NUM256 / sizeof(float);
 
-template <typename lseType, typename outType>
+template <typename lseType, typename outType, bool RowStrided = false>
 class DecodeUpdate {
 public:
     __aicore__ inline DecodeUpdate() {}
     __aicore__ inline void Init(GM_ADDR lse, GM_ADDR in, GM_ADDR out, GM_ADDR lesout,
-                                const DecodeUpdateTilingData* tdata)
+                                const DecodeUpdateTilingData* tdata, uint64_t rowStride = 0)
     {
         this->lsePtr = GetTensorPtr(lse);
         this->inPtr = GetTensorPtr(in);
         ParseTilingData(tdata);
+        this->rowStride_ = RowStrided ? rowStride : hDim;
+        this->inputRowAlign_ = ((hDim * sizeof(outType) + NUM32 - 1) / NUM32) * NUM32 / sizeof(outType);
         CalcTileLength();
+        if constexpr (RowStrided) {
+            inputSpan_ = static_cast<uint64_t>(totalLength - 1) * rowStride_ + hDim;
+            inputStartOffset_ = gmStartOffset * rowStride_;
+            inputLoopStride_ = static_cast<uint64_t>(tileLength) * rowStride_;
+            inputRowGapBytes_ = (rowStride_ - hDim) * sizeof(outType);
+        }
         // totalLength 表示 Tiling 约束下的元素个数，保证可落在 uint32_t 内；
         // 参与 GM 地址计算（如 totalLength * hDim）时再显式宽化到 uint64_t。
         // 设置全局变量的起始地址与总长度: BLOCK_LENGTH; sp, B*s*hc in1 sp; B*s*hc, hd in2
@@ -136,6 +145,26 @@ private:
         }
     }
 
+    __aicore__ inline uint64_t AlignUbBytes(uint64_t bytes, uint64_t alignment = NUM32)
+    {
+        return (bytes + alignment - 1) / alignment * alignment;
+    }
+
+    __aicore__ inline uint64_t GetStridedUbBytes(uint32_t rows)
+    {
+        const uint64_t alignedRows = (rows + NUM7) / NUM8 * NUM8;
+        const uint64_t lseBytes = AlignUbBytes(alignedRows * spAlloc * sizeof(float), NUM256);
+        const uint64_t floatInputBytes = static_cast<uint64_t>(rows) * hDim * spAlloc * sizeof(float);
+        const uint64_t nativeInputBytes = static_cast<uint64_t>(rows) * inputRowAlign_ * spAlloc * sizeof(outType);
+        const uint64_t broadcastDim = (hDim > NUM256 && spAlloc >= NUM8) ? NUM64 : hDim;
+        return BUFFER_NUM * lseBytes + BUFFER_NUM * AlignUbBytes(floatInputBytes) +
+               BUFFER_NUM * AlignUbBytes(nativeInputBytes) +
+               BUFFER_NUM * AlignUbBytes(static_cast<uint64_t>(rows) * hDim * sizeof(float)) +
+               (BUFFER_NUM + NUM2) * AlignUbBytes(alignedRows * sizeof(float)) +
+               AlignUbBytes(alignedRows * spAlloc * sizeof(float)) +
+               AlignUbBytes(alignedRows * spAlloc * broadcastDim * sizeof(float)) + AlignUbBytes(lseBytes);
+    }
+
     __aicore__ inline void CalcTileLength()
     {
         uint32_t spAligned = (spAlloc + NUM7) / NUM8 * NUM8;
@@ -156,7 +185,25 @@ private:
             maxTileLength = maxTileLength / SPLIT_TO_2;
         }
         maxTileLength = maxTileLength < NUM1 ? NUM1 : maxTileLength;
-        this->tileLength = maxTileLength < blockLength ? maxTileLength : blockLength;
+        uint32_t candidate = maxTileLength < blockLength ? maxTileLength : blockLength;
+        if constexpr (RowStrided && !std::is_same<outType, float>::value) {
+            const uint64_t budget =
+                MAX_UB_SIZE - NUM8 * sizeof(uint32_t) - (ELEM_PER_256B - 1) * (sizeof(float) + sizeof(uint8_t));
+            if (GetStridedUbBytes(candidate) > budget) {
+                uint32_t lower = 1;
+                uint32_t upper = candidate;
+                while (lower < upper) {
+                    const uint32_t middle = (lower + upper + 1) / 2;
+                    if (GetStridedUbBytes(middle) <= budget) {
+                        lower = middle;
+                    } else {
+                        upper = middle - 1;
+                    }
+                }
+                candidate = lower;
+            }
+        }
+        this->tileLength = candidate;
         this->curLength = this->tileLength;
         this->lastLength = blockLength % tileLength;
         this->loopCount = blockLength / tileLength + (lastLength == NUM0 ? NUM0 : NUM1);
@@ -168,7 +215,7 @@ private:
     {
         uint32_t inQueueLseLengthAlign = (tileLengthAlig * spAlloc * sizeof(float) + NUM255) / NUM256 * NUM256;
         pipe.InitBuffer(inQueueLse, BUFFER_NUM, inQueueLseLengthAlign);
-        if constexpr (std::is_same<outType, float>::value) {
+        if constexpr (RowStrided || std::is_same<outType, float>::value) {
             pipe.InitBuffer(inQueueIn, BUFFER_NUM, tileLength * hDim * spAlloc * sizeof(float));
         } else {
             pipe.InitBuffer(inQueueIn, BUFFER_NUM,
@@ -187,6 +234,9 @@ private:
             pipe.InitBuffer(lseexpBroadcastBuffer, tileLengthAlig * spAlloc * hDim * sizeof(float));
         }
         pipe.InitBuffer(selMaskBuffer, inQueueLseLengthAlign * sizeof(uint8_t));
+        if constexpr (RowStrided && !std::is_same<outType, float>::value) {
+            pipe.InitBuffer(stridedInputQueue, BUFFER_NUM, tileLength * inputRowAlign_ * spAlloc * sizeof(outType));
+        }
     }
 
     __aicore__ inline void CopyInSpAccData(LocalTensor<float>& lseLocal, LocalTensor<float>& inLocal, int32_t spLoopIdx,
@@ -212,6 +262,72 @@ private:
                         lseGm[static_cast<uint64_t>(progress) * tileLength + gmStartOffset],
                         {static_cast<uint16_t>(1), static_cast<uint32_t>(curLength * sizeof(lseType)), 0, 0, 0},
                         {true, 0, static_cast<uint8_t>(NUM8 - curLength % NUM8), 0});
+        }
+    }
+
+    __aicore__ inline void CopyStridedRows(const LocalTensor<outType>& dst, uint64_t gmOffset,
+                                           const DataCopyExtParams& params, bool useSingleDma)
+    {
+        if (useSingleDma) {
+            DataCopyPad(dst, inGm[gmOffset], params, {false, 0, 0, static_cast<outType>(0)});
+        } else {
+            AttentionUpdateCopy::CopyRows(dst, inGm[gmOffset], 0, curLength, hDim, rowStride_, inputRowAlign_);
+        }
+    }
+
+    __aicore__ inline void CastStridedInput(LocalTensor<float>& dst, const LocalTensor<outType>& src,
+                                            uint32_t posOffset, uint32_t currentSp)
+    {
+        const uint32_t rowCount = curLength * currentSp;
+        const uint32_t firstRow = posOffset * curLength;
+        if (inputRowAlign_ == hDim) {
+            Cast(dst[firstRow * hDim], src[firstRow * hDim], RoundMode::CAST_NONE, rowCount * hDim);
+        } else {
+            const UnaryRepeatParams repeatParams{1, 1, static_cast<uint8_t>(hDim * sizeof(float) / NUM32),
+                                                 static_cast<uint8_t>(inputRowAlign_ * sizeof(outType) / NUM32)};
+            for (uint32_t row = 0; row < rowCount;) {
+                const uint32_t repeats = (rowCount - row > NUM255) ? NUM255 : rowCount - row;
+                for (uint32_t column = 0; column < hDim; column += ELEM_PER_256B) {
+                    const uint64_t mask = (hDim - column > ELEM_PER_256B) ? ELEM_PER_256B : hDim - column;
+                    Cast(dst[(firstRow + row) * hDim + column], src[(firstRow + row) * inputRowAlign_ + column],
+                         RoundMode::CAST_NONE, mask, static_cast<uint8_t>(repeats), repeatParams);
+                }
+                row += repeats;
+            }
+        }
+    }
+
+    __aicore__ inline void CopyInStridedSp(LocalTensor<float>& lseLocal, LocalTensor<float>& inLocal,
+                                           uint32_t posOffset, uint32_t gmSpBase, uint32_t currentSp, int32_t progress,
+                                           uint32_t curLengthPad)
+    {
+        LocalTensor<outType> nativeInput;
+        if constexpr (!std::is_same<outType, float>::value) {
+            nativeInput = stridedInputQueue.template AllocTensor<outType>();
+        }
+        constexpr uint32_t MAX_DMA_ROWS = 4095;
+        const bool useSingleDma =
+            curLength <= MAX_DMA_ROWS && (curLength == 1 || inputRowGapBytes_ <= std::numeric_limits<uint32_t>::max());
+        const uint32_t srcGap = curLength > 1 && useSingleDma ? static_cast<uint32_t>(inputRowGapBytes_) : 0;
+        const DataCopyExtParams params{static_cast<uint16_t>(useSingleDma ? curLength : 1),
+                                       static_cast<uint32_t>(hDim * sizeof(outType)), srcGap, 0, 0};
+        const uint64_t gmOffset = inputStartOffset_ + static_cast<uint64_t>(progress) * inputLoopStride_;
+        for (uint32_t i = 0; i < currentSp; ++i) {
+            const uint32_t posIdx = posOffset + i;
+            CopyInLsePerSp(lseLocal, posIdx, gmSpBase + i, progress, curLengthPad);
+            inGm.SetGlobalBuffer(reinterpret_cast<__gm__ outType*>(*(inPtr + gmSpBase + i)), inputSpan_);
+            if constexpr (std::is_same<outType, float>::value) {
+                CopyStridedRows(inLocal[posIdx * curLength * hDim], gmOffset, params, useSingleDma);
+            } else {
+                CopyStridedRows(nativeInput[posIdx * curLength * inputRowAlign_], gmOffset, params, useSingleDma);
+            }
+        }
+        if constexpr (!std::is_same<outType, float>::value) {
+            stridedInputQueue.template EnQue<outType>(nativeInput);
+            nativeInput = stridedInputQueue.template DeQue<outType>();
+            CastStridedInput(inLocal, nativeInput, posOffset, currentSp);
+            PipeBarrier<PIPE_V>();
+            stridedInputQueue.template FreeTensor<outType>(nativeInput);
         }
     }
 
@@ -261,26 +377,30 @@ private:
             CopyInSpAccData(lseLocal, inLocal, spLoopIdx, curLengthPad);
         }
 
-        uint64_t inLocalFp16Offset = static_cast<uint64_t>(tileLength) * hDim * spAlloc;
-        if ((inLocalFp16Offset * NUM2) % NUM32 == NUM16) {
-            inLocalFp16Offset += NUM8;
-        }
-        LocalTensor<outType> inLocalFp16 = inLocal.template ReinterpretCast<outType>()[inLocalFp16Offset];
+        if constexpr (RowStrided) {
+            CopyInStridedSp(lseLocal, inLocal, posOffset, gmSpBase, currentSp, progress, curLengthPad);
+        } else {
+            uint64_t inLocalFp16Offset = static_cast<uint64_t>(tileLength) * hDim * spAlloc;
+            if ((inLocalFp16Offset * NUM2) % NUM32 == NUM16) {
+                inLocalFp16Offset += NUM8;
+            }
+            LocalTensor<outType> inLocalFp16 = inLocal.template ReinterpretCast<outType>()[inLocalFp16Offset];
 
-        for (uint32_t i = 0; i < currentSp; i++) {
-            uint32_t posIdx = posOffset + i;
-            uint32_t gmSpIdx = gmSpBase + i;
-            CopyInLsePerSp(lseLocal, posIdx, gmSpIdx, progress, curLengthPad);
-            CopyInOPerSp(inLocal, inLocalFp16, posIdx, gmSpIdx, progress);
-        }
+            for (uint32_t i = 0; i < currentSp; i++) {
+                uint32_t posIdx = posOffset + i;
+                uint32_t gmSpIdx = gmSpBase + i;
+                CopyInLsePerSp(lseLocal, posIdx, gmSpIdx, progress, curLengthPad);
+                CopyInOPerSp(inLocal, inLocalFp16, posIdx, gmSpIdx, progress);
+            }
 
-        if constexpr (!std::is_same<outType, float>::value) {
-            if (curLength % ALIGNED_TO_8 == 0) {
-                inQueueIn.EnQue(inLocal);
-                inLocal = inQueueIn.DeQue<float>();
-                inLocalFp16 = inLocal.template ReinterpretCast<outType>()[inLocalFp16Offset];
-                Cast(inLocal[posOffset * curLength * hDim], inLocalFp16[posOffset * curLength * hDim],
-                     RoundMode::CAST_NONE, curLength * hDim * currentSp);
+            if constexpr (!std::is_same<outType, float>::value) {
+                if (curLength % ALIGNED_TO_8 == 0) {
+                    inQueueIn.EnQue(inLocal);
+                    inLocal = inQueueIn.DeQue<float>();
+                    inLocalFp16 = inLocal.template ReinterpretCast<outType>()[inLocalFp16Offset];
+                    Cast(inLocal[posOffset * curLength * hDim], inLocalFp16[posOffset * curLength * hDim],
+                         RoundMode::CAST_NONE, curLength * hDim * currentSp);
+                }
             }
         }
 
@@ -477,6 +597,7 @@ private:
     TBuf<QuePosition::VECCALC> lseexpsumBuffer;
     TBuf<QuePosition::VECCALC> lseexpBroadcastBuffer;
     TBuf<QuePosition::VECCALC> selMaskBuffer;
+    TQue<QuePosition::VECIN, BUFFER_NUM> stridedInputQueue;
 
     GlobalTensor<lseType> lseGm;
     GlobalTensor<outType> inGm;
@@ -503,6 +624,12 @@ private:
     uint32_t spFirstLoop;
     uint32_t spNextLoop;
     uint32_t spAlloc;
+    uint64_t rowStride_;
+    uint32_t inputRowAlign_;
+    uint64_t inputSpan_;
+    uint64_t inputStartOffset_;
+    uint64_t inputLoopStride_;
+    uint64_t inputRowGapBytes_;
 };
 } // namespace AttentionUpdate
 

@@ -857,3 +857,56 @@ TEST_F(l2_attention_update_950_test, ascend950_error_lseBshcNeLseOutBshc)
     uint64_t workspace_size = 0;
     EXPECT_EQ(ut.TestGetWorkspaceSize(&workspace_size), ACLNN_ERR_PARAM_INVALID);
 }
+
+namespace op {
+extern SocVersion g_socVersion;
+}
+namespace {
+class AttentionUpdateSocGuard {
+public:
+    explicit AttentionUpdateSocGuard(op::SocVersion soc)
+        : saved_(op::g_socVersion)
+    {
+        op::g_socVersion = soc;
+    }
+    ~AttentionUpdateSocGuard()
+    {
+        op::g_socVersion = saved_;
+    }
+
+private:
+    op::SocVersion saved_;
+};
+
+aclnnStatus CheckPackedAttentionUpdate(op::SocVersion soc, int64_t update, bool mismatchedRows = false)
+{
+    AttentionUpdateSocGuard guard(soc);
+    auto lse = TensorListDesc({TensorDesc({5, mismatchedRows ? 34 : 33}, ACL_FLOAT, ACL_FORMAT_ND)});
+    auto localOut =
+        TensorListDesc({TensorDesc({5, 33, 72}, ACL_BF16, ACL_FORMAT_ND, {33 * 76, 76, 1}, 3, {5 * 33 * 76 + 3})});
+    auto out = TensorDesc({33, 72}, ACL_BF16, ACL_FORMAT_ND);
+    uint64_t workspace = 0;
+    if (update == 1) {
+        auto lseOut = TensorDesc({33}, ACL_FLOAT, ACL_FORMAT_ND);
+        auto ut = OP_API_UT(aclnnAttentionUpdate, INPUT(lse, localOut, update), OUTPUT(out, lseOut));
+        return ut.TestGetWorkspaceSize(&workspace);
+    }
+    auto ut = OP_API_UT(aclnnAttentionUpdate, INPUT(lse, localOut, update), OUTPUT(out, nullptr));
+    return ut.TestGetWorkspaceSize(&workspace);
+}
+} // namespace
+
+TEST_F(l2_attention_update_test, PackedRowStridedA3WithoutLseOut)
+{
+    EXPECT_EQ(CheckPackedAttentionUpdate(op::SocVersion::ASCEND910_93, 0), ACLNN_SUCCESS);
+}
+
+TEST_F(l2_attention_update_test, PackedRowStridedA5WithLseOut)
+{
+    EXPECT_EQ(CheckPackedAttentionUpdate(op::SocVersion::ASCEND950, 1), ACLNN_SUCCESS);
+}
+
+TEST_F(l2_attention_update_test, PackedMismatchedRowsRejected)
+{
+    EXPECT_EQ(CheckPackedAttentionUpdate(op::SocVersion::ASCEND950, 1, true), ACLNN_ERR_PARAM_INVALID);
+}
