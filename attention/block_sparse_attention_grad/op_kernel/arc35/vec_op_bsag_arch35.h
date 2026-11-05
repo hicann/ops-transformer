@@ -239,9 +239,12 @@ public:
         s2_process_align_ = runTimeInfo.s2LenAlign;
         half_s1_process_align_ = s1_process_align_ / 2;
         data_size = half_s1_process_align_ * s2_process_align_;
-        half_s1_process_real_ = v_sub_core_idx_ == 0 ?
-                                    half_s1_process_align_ :
-                                    (runTimeInfo.s1Len - half_s1_process_align_); // GM CopyIn仍采用实际的mProcess
+        if (runTimeInfo.s1Len <= half_s1_process_align_) {
+            half_s1_process_real_ = v_sub_core_idx_ == 0 ? runTimeInfo.s1Len : 0;
+        } else {
+            half_s1_process_real_ =
+                v_sub_core_idx_ == 0 ? half_s1_process_align_ : (runTimeInfo.s1Len - half_s1_process_align_);
+        }
         l1_offset_ = v_sub_core_idx_ * half_s1_process_align_ * C0_SIZE;
 
         if (half_s1_process_real_ > 0) {
@@ -268,10 +271,13 @@ public:
 
         if (nextRunTimeInfo.need_compute) {
             int32_t tmp_half_s1_process_align_ = nextRunTimeInfo.s1LenAlign / 2;
-            int32_t tmp_half_s1_process_real_ =
-                v_sub_core_idx_ == 0 ?
-                    tmp_half_s1_process_align_ :
-                    (nextRunTimeInfo.s1Len - tmp_half_s1_process_align_); // GM CopyIn仍采用实际的mProcess
+            int32_t tmp_half_s1_process_real_ = 0;
+            if (nextRunTimeInfo.s1Len <= tmp_half_s1_process_align_) {
+                tmp_half_s1_process_real_ = v_sub_core_idx_ == 0 ? nextRunTimeInfo.s1Len : 0;
+            } else {
+                tmp_half_s1_process_real_ = v_sub_core_idx_ == 0 ? tmp_half_s1_process_align_ :
+                                                                   (nextRunTimeInfo.s1Len - tmp_half_s1_process_align_);
+            }
             if (tmp_half_s1_process_real_ > 0) {
                 LocalTensor<float> tmp_lse_tensor_ = pingpong_idx == 1 ? lse_tensor_ping_ : lse_tensor_pong_;
                 LocalTensor<float> tmp_sftg_front_tensor_ =
