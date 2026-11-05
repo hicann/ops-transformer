@@ -24,9 +24,9 @@
 	  $$
     hiddenState_q = \text{Norm}(query, normQueryWeight, normQueryBias, eps) \\
     hiddenState_{eq} = \text{Norm}(encoderQuery, normEncoderQueryWeight, normEncoderQueryBias, eps) \\
-    concatedHiddenState = \text{Concat}(hiddenState_q, hiddenState_{eq}) \\
-    transposedHiddenState = \text{Transpose}(concatedHiddenState, (0, 2, 1, 3)) \\
-    hiddenState = \text{RoPE}(concatedHiddenState, ropeSin, ropeCos)
+    concatenatedHiddenState = \text{Concat}(hiddenState_q, hiddenState_{eq}) \\
+    transposedHiddenState = \text{Transpose}(concatenatedHiddenState, (0, 2, 1, 3)) \\
+    hiddenState = \text{RoPE}(concatenatedHiddenState, ropeSin, ropeCos)
     $$
 
 - 说明：

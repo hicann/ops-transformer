@@ -69,7 +69,7 @@
         <tr>
           <td>gradQueryOutput</td>
           <td>输入</td>
-          <td>网络层对query和encoderQuery正向输出结果的反向梯度值，对应公式中的y，encoderQuery参数为nullptr时seqEncoderQuery值为0，headDim长度大小需在[1~1024]间且为偶数，shape为[batch, headNum, seqQuery+seqEncoderQuery, headDim]。</td>
+          <td>网络层对query和encoderQuery正向输出结果的反向梯度值，对应公式中的y，encoderQuery参数为nullptr时seqEncoderQuery值为0，headDim长度需在[1~1024]间且为偶数，shape为[batch, headNum, seqQuery+seqEncoderQuery, headDim]。</td>
           <td>FLOAT32、FLOAT16、BFLOAT16</td>
           <td>ND</td>
         </tr>
@@ -83,7 +83,7 @@
         <tr>
           <td>gradValueOutput</td>
           <td>输入</td>
-          <td>网络层对value和encoderValue正向输出结果的反向梯度值，对应公式中的y，encoderValue参数为nullptr时seqEncoderValue值为0，seqValue长度大小与seqKey一致，seqEncoderValue长度大小与seqEncoderKey一致，数据类型与参数gradQueryOutput保持一致，shape为[batch, headNum, seqValue+seqEncoderValue, headDim]。</td>
+          <td>网络层对value和encoderValue正向输出结果的反向梯度值，对应公式中的y，encoderValue参数为nullptr时seqEncoderValue值为0，seqValue长度与seqKey一致，seqEncoderValue长度与seqEncoderKey一致，数据类型与参数gradQueryOutput保持一致，shape为[batch, headNum, seqValue+seqEncoderValue, headDim]。</td>
           <td>FLOAT32、FLOAT16、BFLOAT16</td>
           <td>ND</td>
         </tr>
@@ -202,7 +202,7 @@
         <tr>
           <td>ropeSin</td>
           <td>可选输入</td>
-          <td>公式中正向输入进行旋转位置编码操作的sin值，当图片或文本Query、Key进行旋转位置编码操作时传入，seqRope长度大小需在[1~min(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)]之间，数据类型与参数gradQueryOutput保持一致，shape为[seqRope, headDim]。</td>
+          <td>公式中正向输入进行旋转位置编码操作的sin值，当图片或文本Query、Key进行旋转位置编码操作时传入，seqRope长度需在[1~min(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)]之间，数据类型与参数gradQueryOutput保持一致，shape为[seqRope, headDim]。</td>
           <td>FLOAT32、FLOAT16、BFLOAT16</td>
           <td>ND</td>
         </tr>
