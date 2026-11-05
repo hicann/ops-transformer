@@ -12,6 +12,7 @@
  * \file moe_token_permute_with_ep_infershape.cpp
  * \brief
  */
+#include <cstdint>
 #include <string>
 #include "register/op_impl_registry.h"
 #include "log/log.h"
@@ -74,6 +75,11 @@ static ge::graphStatus InferShape4MoeTokenPermuteWithEp(gert::InferShapeContext*
                 return ge::GRAPH_FAILED);
     auto rangePtr = attrs->GetAttrPointer<gert::ContinuousVector>(PERMUTE_WITH_EP_ARRT_RANGE);
     const int64_t* numOutTokensPtr = attrs->GetAttrPointer<int64_t>(PERMUTE_WITH_EP_ARRT_NUM_OUT_TOKENS);
+    OP_CHECK_IF(numOutTokensPtr == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    context->GetNodeName(), "num_out_tokens",
+                    "Required attr num_out_tokens is null; it must provide a valid object."),
+                return ge::GRAPH_FAILED);
 
     int64_t sortedIndicesLen = NEG_ONE;
     sortedIndices->SetDimNum(DIM_ONE);
@@ -89,7 +95,14 @@ static ge::graphStatus InferShape4MoeTokenPermuteWithEp(gert::InferShapeContext*
         }
         int64_t topK = (IndicesDimNnum == 1) ? 1 : indicesShape->GetDim(1);
         int64_t N = indicesShape->GetDim(0);
-        sortedIndicesLen = (topK * N > 0) ? topK * N : ((topK * N == 0) ? 0 : NEG_ONE);
+        // 任一维未知/为负或乘积可能溢出时传播未知维，避免负负得正或回绕成正数
+        if (topK < 0 || N < 0) {
+            sortedIndicesLen = NEG_ONE;
+        } else if (topK != 0 && N > INT64_MAX / topK) {
+            sortedIndicesLen = NEG_ONE;
+        } else {
+            sortedIndicesLen = topK * N;
+        }
         sortedIndices->SetDim(0U, sortedIndicesLen);
     }
 
@@ -107,6 +120,15 @@ static ge::graphStatus InferShape4MoeTokenPermuteWithEp(gert::InferShapeContext*
     } else {
         start = 0;
         end = *numOutTokensPtr;
+    }
+
+    // 与 tiling 保持一致：shape 已知时校验 range/numOutTokens 取值域，越界直接失败
+    if (sortedIndicesLen != NEG_ONE && (start < 0 || start > sortedIndicesLen || end < 0 || end > sortedIndicesLen)) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "range, num_out_tokens",
+                                                 "The start [" + std::to_string(start) + "] and end [" +
+                                                     std::to_string(end) + "] should be in [0, " +
+                                                     std::to_string(sortedIndicesLen) + "].");
+        return ge::GRAPH_FAILED;
     }
 
     *permuteXShape = *xShape;

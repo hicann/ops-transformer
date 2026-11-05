@@ -13,6 +13,7 @@
  * \brief
  */
 #include "log/log.h"
+#include <cstdint>
 #include <string>
 #include "moe_token_permute_with_ep_tiling.h"
 #include "op_host/tiling_base.h"
@@ -275,12 +276,13 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::GetPlatformInfo()
         return ge::GRAPH_FAILED;
     }
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-    auto indicesPtr = context_->GetInputTensor(1);
-    if (indicesPtr == nullptr) {
+    // 未声明 ValueDepend 的输入不可调用 GetInputTensor，改用 GetInputShape 取形状
+    const gert::StorageShape* indicesStorageShape = context_->GetInputShape(PERMUTE_WITH_EP_INPUT_IDX);
+    if (indicesStorageShape == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(opName, "indices");
         return ge::GRAPH_FAILED;
     }
-    if (indicesPtr->GetShapeSize() <= SORT32_ALIGN_ELEMENT) {
+    if (indicesStorageShape->GetStorageShape().GetShapeSize() <= SORT32_ALIGN_ELEMENT) {
         aivNum = 1;
     } else {
         aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -408,6 +410,16 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::CheckAndGetAttrsInfo()
     auto rangePtr = attrs->GetAttrPointer<gert::ContinuousVector>(PERMUTE_WITH_EP_ARRT_RANGE);
     const int64_t* numOutTokensPtr = attrs->GetAttrPointer<int64_t>(PERMUTE_WITH_EP_ARRT_NUM_OUT_TOKENS);
     const bool* paddedModePtr = attrs->GetAttrPointer<bool>(PERMUTE_WITH_EP_ARRT_PADDED_MODE);
+    OP_CHECK_IF(numOutTokensPtr == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    context_->GetNodeName(), "num_out_tokens",
+                    "Required attr num_out_tokens is null; it must provide a valid object."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        paddedModePtr == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "padded_mode",
+                                                 "Required attr padded_mode is null; it must provide a valid object."),
+        return ge::GRAPH_FAILED);
 
     if (rangePtr != nullptr) {
         if (rangePtr->GetSize() != RANGE_SIZE) {
@@ -438,11 +450,27 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::CheckInputShape()
     auto probsTensor = context_->GetOptionalInputTensor(PERMUTE_WITH_EP_INPUT_PROBS);
     const gert::StorageShape* probsStorageShapePtr =
         (probsTensor == nullptr) ? nullptr : context_->GetOptionalInputShape(PERMUTE_WITH_EP_INPUT_PROBS);
+    size_t tokensDimNum = tokensShape.GetDimNum();
+    if (tokensDimNum != DIM_TWO) {
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            context_->GetNodeName(), "tokens", std::to_string(tokensDimNum),
+            "The dim number of tokens should be 2 but got [" + std::to_string(tokensDimNum) + "].");
+        return ge::GRAPH_FAILED;
+    }
+
     size_t indicesDimNum = IndicesShape.GetDimNum();
     if (indicesDimNum != DIM_TWO && indicesDimNum != DIM_ONE) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
             context_->GetNodeName(), "indices", std::to_string(indicesDimNum),
             "The dim number of indices should be 2 or 1 but got [" + std::to_string(indicesDimNum) + "].");
+        return ge::GRAPH_FAILED;
+    }
+
+    if (tokensShape.GetDim(0) <= 0 || IndicesShape.GetDim(0) <= 0) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            context_->GetNodeName(), "tokens, indices",
+            "Empty tensor is not supported, the dim 0 of tokens [" + std::to_string(tokensShape.GetDim(0)) +
+                "] and indices [" + std::to_string(IndicesShape.GetDim(0)) + "] should be greater than 0.");
         return ge::GRAPH_FAILED;
     }
 
@@ -527,7 +555,21 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::GetShapeAttrsInfo()
     size_t TokensDimNnum = tokensShape.GetDimNum();
     int64_t cols = 1;
     for (size_t i = 1; i < TokensDimNnum; i++) {
-        cols *= tokensShape.GetDim(i);
+        int64_t dimValue = tokensShape.GetDim(i);
+        if (dimValue <= 0 || cols > INT64_MAX / dimValue) {
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                context_->GetNodeName(), "tokens",
+                "The hidden size of tokens should be positive and must not overflow, but got [" +
+                    std::to_string(dimValue) + "] at axis [" + std::to_string(i) + "].");
+            return ge::GRAPH_FAILED;
+        }
+        cols *= dimValue;
+    }
+    if (cols > INT64_MAX / NUM_FOUR) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            context_->GetNodeName(), "tokens",
+            "The hidden size of tokens [" + std::to_string(cols) + "] is too large to be processed.");
+        return ge::GRAPH_FAILED;
     }
 
     moeTokenPermuteWithEpTilingData.set_cols(cols);
@@ -545,7 +587,16 @@ ge::graphStatus MoeTokenPermuteWithEpTilingBase::GetShapeAttrsInfo()
     }
 
     moeTokenPermuteWithEpTilingData.set_topK(topK);
-    totalLength = moeTokenPermuteWithEpTilingData.get_n() * moeTokenPermuteWithEpTilingData.get_topK();
+    int64_t tokenNum = moeTokenPermuteWithEpTilingData.get_n();
+    // 先约束 token 数再相乘：topK >= 1 时 n >= SORT_LIMIT_LENGTH 必然越界，可避免 n*topK 溢出
+    if (tokenNum <= 0 || tokenNum >= SORT_LIMIT_LENGTH) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "indices",
+                                                 "The token num of indices [" + std::to_string(tokenNum) +
+                                                     "] should be in (0, [" + std::to_string(SORT_LIMIT_LENGTH) +
+                                                     "]).");
+        return ge::GRAPH_FAILED;
+    }
+    totalLength = tokenNum * moeTokenPermuteWithEpTilingData.get_topK();
     if (totalLength >= SORT_LIMIT_LENGTH) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "indices",
                                                  "The elements num of indices [" + std::to_string(totalLength) +
