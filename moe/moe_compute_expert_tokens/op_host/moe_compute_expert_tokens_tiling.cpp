@@ -81,11 +81,14 @@ inline static int64_t CalcWorkLocal(int64_t handleNum)
 inline static ge::graphStatus MoeComputeExpertTokensSetTilingData(gert::TilingContext* context,
                                                                   MoeComputeExpertTokensTilingData& tilingData)
 {
-    if (tilingData.GetDataSize() > context->GetRawTilingData()->GetCapacity()) {
+    auto rawTilingData = context->GetRawTilingData();
+    OP_CHECK_NULL_WITH_CONTEXT(context, rawTilingData);
+    OP_CHECK_NULL_WITH_CONTEXT(context, rawTilingData->GetData());
+    if (tilingData.GetDataSize() > rawTilingData->GetCapacity()) {
         return ge::GRAPH_FAILED;
     }
-    tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
-    context->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
+    tilingData.SaveToBuffer(rawTilingData->GetData(), rawTilingData->GetCapacity());
+    rawTilingData->SetDataSize(tilingData.GetDataSize());
     return ge::GRAPH_SUCCESS;
 }
 
@@ -111,6 +114,10 @@ static bool CheckParamsShape(const gert::TilingContext* context)
     int32_t dtypeSize = ge::GetSizeByDataType(sortedExpertType);
 
     auto attrs = context->GetAttrs();
+    if (attrs == nullptr) {
+        OP_LOGE(context->GetNodeName(), "attrs is nullptr!");
+        return false;
+    }
     auto numOfExpert = *(attrs->GetAttrPointer<int64_t>(0));
 
     std::string sortedExpertDimNum = std::to_string(sortedExpertShape.GetDimNum());
