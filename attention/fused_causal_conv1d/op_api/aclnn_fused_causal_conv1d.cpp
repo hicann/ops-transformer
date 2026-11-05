@@ -57,6 +57,13 @@ aclnnStatus FusedCausalConv1dCommonProcess(const aclTensor* x, const aclTensor* 
                                    convStates->GetViewStrides(), convStates->GetViewOffset());
     CHECK_COND(convStatesFinal != nullptr, ACLNN_ERR_PARAM_NULLPTR, "CreateView for convStates failed.");
 
+    // Output y: PTA may pass a flattened aclTensor (view shape kept, storage/origin shape flattened to 1-D numel).
+    // Normalize via CreateView so downstream infershape/tiling sees the real view shape and
+    // origin-vs-storage equality checks remain consistent (same treatment as x / convStates).
+    aclTensor* yFinal =
+        uniqueExecutor->CreateView(y, y->GetViewShape(), y->GetStorageShape(), y->GetViewStrides(), y->GetViewOffset());
+    CHECK_COND(yFinal != nullptr, ACLNN_ERR_PARAM_NULLPTR, "CreateView for y failed.");
+
     // weight must be contiguous
     const aclTensor* weightFinal = l0op::Contiguous(weight, uniqueExecutor.get());
     CHECK_COND(weightFinal != nullptr, ACLNN_ERR_PARAM_NULLPTR, "Contiguous weight failed.");
@@ -111,7 +118,7 @@ aclnnStatus FusedCausalConv1dCommonProcess(const aclTensor* x, const aclTensor* 
                                       initialStateModeFinal, biasFinal, numAcceptedTokensFinal, numComputedTokensFinal,
                                       blockIdxFirstFinal, blockIdxLastFinal, initialStateIdxFinal, activationMode,
                                       padSlotId, runMode, maxQueryLen, residualConnection, blockSize, convMode,
-                                      maxDraftTokens, y, uniqueExecutor.get());
+                                      maxDraftTokens, yFinal, uniqueExecutor.get());
     CHECK_RET(ok, ACLNN_ERR_INNER_TILING_ERROR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
