@@ -317,8 +317,10 @@ AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, Is
 
     uint32_t shift = isTail ? cfg.tileCnt : 0;
     for (uint32_t i = 0; i < count; i++) {
+#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
         GetTPipePtr()->Destroy();
         GetTPipePtr()->Init();
+#endif
         // 开始计算前确认是否搬运完成，debug模式只做本片内计算，则不需要判断搬运状态
         if (debugMode_ != MC2_DEBUG_ONLY_CUBE) {
             hcclAllgather_.Wait(handleList_[i + shift]);
