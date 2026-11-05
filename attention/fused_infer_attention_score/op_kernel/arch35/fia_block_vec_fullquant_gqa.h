@@ -148,8 +148,8 @@ public:
     TQue<QuePosition::VECOUT, 1> FDResOutputQue;
     TQue<QuePosition::VECIN, 1> accumOutInputQue;
 
-    TBuf<> queryAntiqScaleInputBuf;
-    TBuf<> keyAntiqScaleInputBuf[2]; // 2:DB
+    TBuf<> queryAntiqScaleInputBuf[2]; // 2:DB
+    TBuf<> keyAntiqScaleInputBuf[2];   // 2:DB
     const ConstInfoX &constInfo;
     T negativeFloatScalar;
     float pScaleValue{1.0f};
@@ -429,6 +429,7 @@ public:
 
         auto expUb = this->softmaxExpBuf[runInfo.loop % PRELOAD_N].template Get<T>()[0];
         int64_t stage1Offset = runInfo.loop % DB;
+        int64_t qscaleOffset = runInfo.mloop % DB;
         float descaleQK = 1.0;
 
         // 加载qScale/kScale
@@ -436,11 +437,12 @@ public:
         LocalTensor<float> kScaleUbTensor;
         if (unlikely(runInfo.isFirstS2Loop)) {
             WaitFlag<HardEvent::V_MTE2>(vToMte2Id[stage1Offset]);
-            qScaleUbTensor = queryAntiqScaleInputBuf.template Get<float>();
+            qScaleUbTensor = queryAntiqScaleInputBuf[qscaleOffset].template Get<float>();
             CopyQueryScaleTile(qScaleUbTensor, runInfo);
             kScaleUbTensor = keyAntiqScaleInputBuf[stage1Offset].template Get<float>();
             CopyKeyScaleTile(kScaleUbTensor, runInfo, false);
         } else {
+            qScaleUbTensor = queryAntiqScaleInputBuf[qscaleOffset].template Get<float>();
             kScaleUbTensor = keyAntiqScaleInputBuf[stage1Offset].template Get<float>();
         }
 
@@ -900,7 +902,9 @@ public:
             tPipe->InitBuffer(mm2InBuf, 32768); // bmm2结果在Gm，vector2开启多层循环，每次处理32KB
         }
         SoftmaxInitBuffer();
-        tPipe->InitBuffer(queryAntiqScaleInputBuf, (mBaseSize >> 1U) * sizeof(float));
+        tPipe->InitBuffer(queryAntiqScaleInputBuf[0], (mBaseSize >> 1U) * sizeof(float));
+        tPipe->InitBuffer(queryAntiqScaleInputBuf[1], (mBaseSize >> 1U) * sizeof(float));
+
         // 4: 4份解bank冲突
         tPipe->InitBuffer(keyAntiqScaleInputBuf[0], (s2BaseSize + (FA_BYTE_BLOCK / sizeof(T))) * sizeof(float) * 4);
         tPipe->InitBuffer(keyAntiqScaleInputBuf[1], (s2BaseSize + (FA_BYTE_BLOCK / sizeof(T))) * sizeof(float) * 4);
