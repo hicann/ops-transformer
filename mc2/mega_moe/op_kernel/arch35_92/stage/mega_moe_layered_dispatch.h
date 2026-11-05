@@ -402,8 +402,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ComputeEx
             const uint32_t bufferIdx = expertOffset % DOUBLE_BUFFER;
             // mutex 0/1 分别保护两块 mask 缓冲，首次可直接获取，复用时由硬件等待前次搬出。
             asc_lock(PIPE_V, bufferIdx);
-            ComputeExpertMaskVF(topkIdsTensor_, sendMaskTensor_[bufferIdx],
-                                sendMaskCounts_ + expertOffset * COUNT_STRIDE, expertId, roundLen);
+            CallVf<ComputeExpertMaskVF>(topkIdsTensor_, sendMaskTensor_[bufferIdx],
+                                        sendMaskCounts_ + expertOffset * COUNT_STRIDE, expertId, roundLen);
             asc_unlock(PIPE_V, bufferIdx);
             asc_lock(PIPE_MTE3, bufferIdx);
             CopyUbToGm(reinterpret_cast<__gm__ uint8_t*>(GetSendMaskSlot(expertId) + byteOffset),
@@ -577,7 +577,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::BuildDisp
     const LocalTensor<int32_t>& topkIds, const LocalTensor<uint32_t>& masks, uint32_t tokenCount,
     const WorkRange& serverRange)
 {
-    BuildDispatchRelayCandidatesByServerVF<CombineServerDedup>(
+    CallVf<BuildDispatchRelayCandidatesByServerVF<CombineServerDedup>>(
         reinterpret_cast<__ubuf__ int32_t*>(topkIds.GetPhyAddr()),
         reinterpret_cast<__ubuf__ uint32_t*>(masks.GetPhyAddr()), tokenCount, topK_,
         static_cast<int32_t>(worldSize_ * moeExpertPerRank_),
@@ -976,7 +976,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::PrepareEx
     // 缓存仅由本核 AIV1 消费，先发布整表就绪，再用 VF 完成元数据统计，避免延后其他角色读取计数。
     // VF 复用 metadata 区前缀：result[0] 为 totalMGroups，result[8] 为最后非空专家下标。
     auto* waveMetaTensor = reinterpret_cast<__ubuf__ int32_t*>(ubBufferUsedAddr_);
-    ComputeLayeredWaveMetaVF(expertTokenNumsOutTensor_, waveMetaTensor, moeExpertPerRank_);
+    CallVf<ComputeLayeredWaveMetaVF>(expertTokenNumsOutTensor_, waveMetaTensor, moeExpertPerRank_);
     PipeFence<PIPE_V, PIPE_S, SYNC_EVENT_ID2>();
 
     const int32_t totalMGroups = waveMetaTensor[0];

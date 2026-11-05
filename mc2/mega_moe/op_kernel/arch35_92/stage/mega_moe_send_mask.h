@@ -117,7 +117,7 @@ __simd_vf__ inline void SelectExpertIndicesVF(__ubuf__ int32_t* idsUb, __ubuf__ 
             asc_deintlv_b16(selectedMask, discardedMask, selectedMask, upperMask);
         }
         asc_loadalign(indicesReg, indicesUb + offset);
-        asc_squeeze_with_status(packedReg, indicesReg, selectedMask);
+        asc_squeeze_v2(packedReg, indicesReg, selectedMask);
         asc_storeunalign_postupdate(selectedUb, storeState, packedReg);
     }
     // 输出偏移由 AR 管理，所有迭代及收尾均使用同一基址和同一个非对齐存储状态。
@@ -139,7 +139,7 @@ __aicore__ inline uint64_t SelectTopkIdsIndexByExpert(const SendMaskConfig& conf
     const uint32_t compareMaskBytes = static_cast<uint32_t>(bufferConfig.routeItemsPerBatch) / BITS_PER_BYTE;
     uint32_t slotOffset = routeInfo.bufferIdx * bufferConfig.bufferBytes;
     // 保留原 bitmap 预留区和输出偏移，首版不调整 ring 的 Host tiling。
-    // 仅匹配非负的合法专家号，topk_ids 中的 -1 自然排除；保留有效项的原始下标位置。
+    // 保存 topkIdsTensor 中值等于当前专家号的元素所对应的下标位置。
     selectedTopkIdsIndexTensor =
         reinterpret_cast<__ubuf__ TopkIndexType*>((scratch.routeRingTensor + (slotOffset + compareMaskBytes)));
 
@@ -171,7 +171,7 @@ __aicore__ inline uint64_t SelectTopkIdsIndexByExpert(const SendMaskConfig& conf
     PipeFence<PIPE_V, PIPE_S, SYNC_EVENT_ID2>();
     // AR 累计压缩输出的字节数；零长度不发射 VF，也不读取上次调用遗留的 AR。
     if (validLen > 0) {
-        return static_cast<uint64_t>(asc_get_squeeze_status()) / sizeof(TopkIndexType);
+        return static_cast<uint64_t>(asc_get_ar_spr()) / sizeof(TopkIndexType);
     }
     return 0U;
 #endif
@@ -316,9 +316,9 @@ __aicore__ inline void SendTopkIdsCountForExperts(const WorkRange& ownedExpertRa
             countTensorToSend = (scratch.countSendScratchTensor + (scratchOffset));
             scratchOffset += alignedCount;
         }
-        PrepareCountForSendVF(reinterpret_cast<__ubuf__ uint32_t*>(scratch.sendCntAccTensor),
-                              reinterpret_cast<__ubuf__ uint32_t*>(countTensorToSend), countRangeInAccTensor.start,
-                              countRangeInAccTensor.count, syncRoundTag);
+        CallVf<PrepareCountForSendVF>(reinterpret_cast<__ubuf__ uint32_t*>(scratch.sendCntAccTensor),
+                                      reinterpret_cast<__ubuf__ uint32_t*>(countTensorToSend),
+                                      countRangeInAccTensor.start, countRangeInAccTensor.count, syncRoundTag);
         PipeFence<PIPE_V, PIPE_MTE3, SYNC_EVENT_ID3>();
         SendTopkIdsCountToRank(countTensorToSend, countRangeInAccTensor.count, sendExpertBegin - dstRankExpertBegin,
                                winRankAddr[dstRank], common, config);

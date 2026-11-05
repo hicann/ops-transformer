@@ -68,7 +68,7 @@ __simd_callee__ inline void ConvertBf16ToFp32(__ubuf__ float* destination, __ubu
     for (uint16_t i = 0U; i < fullRepeatCount; ++i) {
         const uint32_t offset = static_cast<uint32_t>(i) * ELEMENTS_PER_VECTOR;
         asc_loadalign_unpack(inputReg, source + offset);
-        asc_bfloat162float(outputReg, inputReg, fullMask, ASC_POSITION_EVEN);
+        asc_bfloat162float(outputReg, inputReg, fullMask);
         asc_storealign(destination + offset, outputReg, fullMask);
     }
     const uint32_t tailOffset = static_cast<uint32_t>(fullRepeatCount) * ELEMENTS_PER_VECTOR;
@@ -81,7 +81,7 @@ __simd_callee__ inline void ConvertBf16ToFp32(__ubuf__ float* destination, __ubu
     asc_arange(indexReg, 0);
     // b32索引将BF16放入偶数b16 lane，未激活项不访问UB。
     asc_gather(inputReg, source + safeOffset, reinterpret_cast<vector_uint32_t&>(indexReg), active);
-    asc_bfloat162float(outputReg, inputReg, active, ASC_POSITION_EVEN);
+    asc_bfloat162float(outputReg, inputReg, active);
     asc_storealign(destination + safeOffset, outputReg, active);
 }
 
@@ -105,7 +105,7 @@ __simd_vf__ inline void AccumulateBf16ExpertSlotVF(__ubuf__ float* accumUb, __ub
         const uint32_t offset = static_cast<uint32_t>(i) * ELEMENTS_PER_VECTOR;
         // 64 个连续 BF16 放在偶数 b16 lane，转换后与 64 个 FP32 累加值逐项对应。
         asc_loadalign_unpack(inputReg, inputUb + offset);
-        asc_bfloat162float(valueReg, inputReg, active, ASC_POSITION_EVEN);
+        asc_bfloat162float(valueReg, inputReg, active);
         if constexpr (ApplyWeight) {
             // 保持独立 FP32 乘法和加法，不使用 FMA 或乘加后转半精度的接口。
             asc_mul_scalar(valueReg, valueReg, expertScale, active);
@@ -129,7 +129,7 @@ __simd_vf__ inline void CastFp32ToBf16VF(__ubuf__ bfloat16_t* destination, __ubu
     vector_bfloat16_t outputReg;
     for (uint32_t offset = 0U; offset < elementCount; offset += ELEMENTS_PER_VECTOR) {
         asc_loadalign(inputReg, source + offset);
-        asc_float2bfloat16_rn_sat(outputReg, inputReg, fullMask, ASC_POSITION_EVEN);
+        asc_float2bfloat16_rn_sat(outputReg, inputReg, fullMask);
         // 每个32bit槽取低16bit连续存储，避免误用BF16重载的PK_B16。
         asc_storealign_pack(reinterpret_cast<__ubuf__ uint32_t*>(destination + offset),
                             reinterpret_cast<vector_uint32_t&>(outputReg), fullMask);
@@ -213,7 +213,7 @@ __simd_callee__ inline void ConvertMxScaleToFp32(__ubuf__ bfloat16_t* dyScaleBf1
     for (uint16_t i = 0; i < repeatTimes; ++i) {
         vector_bool mask = asc_update_mask_b32(quantCount);
         asc_loadalign_unpack_postupdate(bf16Reg, dyScaleBf16Ptr, fp32RepeatSize);
-        asc_bfloat162float(fp32Reg, bf16Reg, mask, ASC_POSITION_EVEN);
+        asc_bfloat162float(fp32Reg, bf16Reg, mask);
         asc_storealign_intlv(reinterpret_cast<__ubuf__ uint32_t*>(dyScaleFp32Ptr),
                              reinterpret_cast<vector_uint32_t&>(fp32Reg), reinterpret_cast<vector_uint32_t&>(fp32Reg));
         dyScaleFp32Ptr += fp32RepeatSize * 2U;
@@ -229,19 +229,17 @@ __simd_callee__ inline void DequantizeMxFp8Token(__ubuf__ T* tokenPtr, __ubuf__ 
     static_assert(IsSameType<T, fp8_e4m3fn_t>::value || IsSameType<T, fp8_e5m2_t>::value);
     using TokenReg =
         typename std::conditional<IsSameType<T, fp8_e4m3fn_t>::value, vector_fp8_e4m3fn_t, vector_fp8_e5m2_t>::type;
-    // 每个 32B DataBlock 使用一个展开后的 scale，步长为本轮消费的 FP32 scale 元素数。
-    constexpr int32_t SCALE_LOAD_STEP = static_cast<int32_t>(asc_get_vf_len() / ALIGN_32);
     TokenReg tokenReg;
     vector_float valueReg;
     vector_float scaleReg;
     for (uint16_t i = 0; i < repeatTimes; ++i) {
         vector_bool mask = asc_update_mask_b32(tokenLen);
-        asc_loadalign_brc_elem2datablock_postupdate(scaleReg, dyScaleFp32Ptr, SCALE_LOAD_STEP);
-        asc_loadalign_unpack4_postupdate(tokenReg, tokenPtr, fp32RepeatSize);
+        asc_loadalign_brc_postupdate_v3(scaleReg, dyScaleFp32Ptr, 8);
+        asc_loadalign_unpack_postupdate_v2(tokenReg, tokenPtr, fp32RepeatSize);
         if constexpr (IsSameType<T, fp8_e4m3fn_t>::value) {
-            asc_e4m32float(valueReg, tokenReg, mask, ASC_DISPERSE_FIRST_QUARTER);
+            asc_e4m32float(valueReg, tokenReg, mask);
         } else {
-            asc_e5m22float(valueReg, tokenReg, mask, ASC_DISPERSE_FIRST_QUARTER);
+            asc_e5m22float(valueReg, tokenReg, mask);
         }
         asc_mul(valueReg, scaleReg, valueReg, mask);
         if constexpr (ApplyWeight) {
@@ -264,8 +262,8 @@ __simd_vf__ inline void DeQuantMxFp8Vf(__ubuf__ XType* inAddr, __ubuf__ float* s
     auto* tokenPtr = reinterpret_cast<__ubuf__ T*>(inAddr);
     uint32_t tokenStorageElementCount = ((tokenLen + ALIGN_256 - 1U) / ALIGN_256 * ALIGN_256) / 2U;
     auto* scalePtr = reinterpret_cast<__ubuf__ fp8_e8m0_t*>(inAddr + tokenStorageElementCount);
-    constexpr uint32_t bf16RepeatSize = static_cast<uint32_t>(asc_get_vf_len()) / sizeof(bfloat16_t);
-    constexpr uint32_t fp32RepeatSize = static_cast<uint32_t>(asc_get_vf_len()) / sizeof(float);
+    constexpr uint32_t bf16RepeatSize = AscendC::VECTOR_REG_WIDTH / sizeof(bfloat16_t);
+    constexpr uint32_t fp32RepeatSize = AscendC::VECTOR_REG_WIDTH / sizeof(float);
     uint16_t bf16RepeatTimes = (scaleLen + bf16RepeatSize - 1U) / bf16RepeatSize;
     uint32_t quantCount = scaleLen * 2U;
     uint16_t scaleFp32RepeatTimes = (quantCount + fp32RepeatSize - 1U) / fp32RepeatSize;
@@ -284,7 +282,7 @@ __simd_vf__ inline void AccumulateMxFp8VF(__ubuf__ T* tokenPtr, __ubuf__ fp8_e8m
     static_assert(IsSameType<T, fp8_e4m3fn_t>::value || IsSameType<T, fp8_e5m2_t>::value);
     using TokenReg =
         typename std::conditional<IsSameType<T, fp8_e4m3fn_t>::value, vector_fp8_e4m3fn_t, vector_fp8_e5m2_t>::type;
-    constexpr uint32_t fp32RepeatSize = static_cast<uint32_t>(asc_get_vf_len()) / sizeof(float);
+    constexpr uint32_t fp32RepeatSize = AscendC::VECTOR_REG_WIDTH / sizeof(float);
     constexpr uint32_t SCALE_GROUP_SIZE = 32U;
     constexpr uint32_t SCALES_PER_TOKEN_VECTOR = fp32RepeatSize / SCALE_GROUP_SIZE;
     vector_bool fullMask = asc_create_mask_b32(PAT_ALL);
@@ -302,7 +300,7 @@ __simd_vf__ inline void AccumulateMxFp8VF(__ubuf__ T* tokenPtr, __ubuf__ fp8_e8m
             vector_bool scaleMask = asc_update_mask_b32(maskCount);
             validScaleCount -= maskCount;
             vector_bool nanMask;
-            asc_loadalign_unpack4(rawScaleReg, reinterpret_cast<__ubuf__ uint8_t*>(scalePtr) + scaleBase);
+            asc_loadalign_unpack_v2(rawScaleReg, reinterpret_cast<__ubuf__ uint8_t*>(scalePtr) + scaleBase);
             asc_shiftleft_scalar(scaleBits, reinterpret_cast<vector_uint32_t&>(rawScaleReg), int16_t{23}, scaleMask);
             asc_eq_scalar(nanMask, scaleBits, uint32_t{0x7f800000}, scaleMask);
             vdup(scaleBits, uint32_t{0x7fc00000}, nanMask, MODE_MERGING);
@@ -317,11 +315,11 @@ __simd_vf__ inline void AccumulateMxFp8VF(__ubuf__ T* tokenPtr, __ubuf__ fp8_e8m
             vector_bool mask = asc_update_mask_b32(tokenLen);
             TokenReg tokenReg;
             vector_float valueReg;
-            asc_loadalign_unpack4_postupdate(tokenReg, tokenPtr, fp32RepeatSize);
+            asc_loadalign_unpack_postupdate_v2(tokenReg, tokenPtr, fp32RepeatSize);
             if constexpr (IsSameType<T, fp8_e4m3fn_t>::value) {
-                asc_e4m32float(valueReg, tokenReg, mask, ASC_DISPERSE_FIRST_QUARTER);
+                asc_e4m32float(valueReg, tokenReg, mask);
             } else {
-                asc_e5m22float(valueReg, tokenReg, mask, ASC_DISPERSE_FIRST_QUARTER);
+                asc_e5m22float(valueReg, tokenReg, mask);
             }
             asc_mul(valueReg, scaleReg, valueReg, mask);
             if constexpr (ApplyWeight) {

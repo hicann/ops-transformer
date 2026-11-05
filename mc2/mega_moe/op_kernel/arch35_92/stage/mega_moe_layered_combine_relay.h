@@ -164,9 +164,10 @@ __aicore__ inline bool MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::IsServerC
     // 每 token 固定 32 个输入对应一个 u32 掩码；未加载 topK 尾位由 expected 掩盖。
     // 奇数尾批比较补齐到 256B，多比较的一行不参与结果判断。
     CompareScalar(arrivedMaskTensor, contributionReadyTensor, uint32_t(1), CMPMODE::EQ, compareCount);
-    CheckServerContributionsVF(reinterpret_cast<__ubuf__ uint32_t*>(arrivedMaskTensor.GetPhyAddr()),
-                               reinterpret_cast<__ubuf__ uint32_t*>(expectedTopkBitmapsTensor.GetPhyAddr()),
-                               reinterpret_cast<__ubuf__ uint32_t*>(pendingTensor.GetPhyAddr()), batchTokenCount);
+    CallVf<CheckServerContributionsVF>(reinterpret_cast<__ubuf__ uint32_t*>(arrivedMaskTensor.GetPhyAddr()),
+                                       reinterpret_cast<__ubuf__ uint32_t*>(expectedTopkBitmapsTensor.GetPhyAddr()),
+                                       reinterpret_cast<__ubuf__ uint32_t*>(pendingTensor.GetPhyAddr()),
+                                       batchTokenCount);
     PipeFence<PIPE_V, PIPE_S, SYNC_EVENT_ID2>();
     return pendingTensor.GetValue(0U) == 0U;
 }

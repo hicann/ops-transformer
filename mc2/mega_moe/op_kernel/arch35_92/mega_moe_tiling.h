@@ -33,7 +33,6 @@
  *   1 个累加槽 + 2 个输入槽 = 3 * (8192 * 2B + 8192 * 4B) = 144KB；
  *   8192 个 weight item       = 8192 * (4B + 2B)              = 48KB；
  *   BF16/FP32 scale scratch   = 1KB + 4KB                     = 5KB；
- *   当前 token 的 expertRanks 固定预留 32 * sizeof(int32_t) = 128B；
  *   合计约 197KB；当前支持平台动态获取的 UB 预算可容纳该布局。
  * 若修改 MAX_H、weight batch 基准、scale scratch 布局或最低 buffer 数，必须重新验证该前提。
  *
@@ -54,7 +53,6 @@ constexpr int32_t UNPERMUTE_BASE_TOPK = 8;
 constexpr int32_t UNPERMUTE_BASE_TOKENS_PER_BATCH = 1024;
 constexpr int32_t UNPERMUTE_WEIGHT_ITEMS_PER_BATCH = UNPERMUTE_BASE_TOPK * UNPERMUTE_BASE_TOKENS_PER_BATCH;
 constexpr uint32_t UNPERMUTE_WEIGHT_ALIGNMENT_RESERVE_BYTES = 64U;
-constexpr uint32_t UNPERMUTE_EXPERT_RANKS_UB_BYTES = 32U * sizeof(int32_t);
 constexpr uint32_t DEQUANT_BF16_SCALE_EXPANSION = 2U;
 constexpr uint32_t DEQUANT_FP32_SCALE_EXPANSION = 4U;
 
