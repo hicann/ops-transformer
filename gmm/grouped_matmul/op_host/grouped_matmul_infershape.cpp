@@ -26,14 +26,15 @@
 using namespace ge;
 namespace ops {
 
-static const std::set<std::string> GmmDavidSupportSoc = {"Ascend350", "Ascend950", "Ascend960DT"};
+static const std::set<std::string> GmmDavidSupportSoc = {"Ascend350", "Ascend950", "Ascend960DT", "Ascend960PR"};
 
 enum class PlatformID : std::uint8_t {
     UNKNOWN,
     ASCEND310P,
     ASCEND910B,
     ASCEND950,
-    ASCEND960DT
+    ASCEND960DT,
+    ASCEND960PR
 };
 
 struct GMMParamsInfo {
@@ -66,6 +67,9 @@ static PlatformID GetGmmPlatformId(const std::string& shortSocVersion)
     }
     if (shortSocVersion.find("960DT") != std::string::npos) {
         return PlatformID::ASCEND960DT;
+    }
+    if (shortSocVersion.find("960PR") != std::string::npos) {
+        return PlatformID::ASCEND960PR;
     }
     if (IsGmmDavidSupportSoc(shortSocVersion)) {
         return PlatformID::ASCEND950;
@@ -1685,7 +1689,8 @@ static ge::graphStatus CheckCaseSplitK(gert::InferShapeContext* context, bool tr
     const size_t& weightSize = paramsInfo.numWeight;
     const size_t& ySize = paramsInfo.numY;
     if (xSize == 1UL) {
-        if (paramsInfo.platform == PlatformID::ASCEND950 || paramsInfo.platform == PlatformID::ASCEND960DT) {
+        if (paramsInfo.platform == PlatformID::ASCEND950 || paramsInfo.platform == PlatformID::ASCEND960DT ||
+            paramsInfo.platform == PlatformID::ASCEND960PR) {
             return GRAPH_SUCCESS;
         }
         OP_CHECK_IF(!transposeX,
