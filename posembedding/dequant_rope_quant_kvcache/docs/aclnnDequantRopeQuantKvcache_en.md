@@ -458,6 +458,7 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
 4. When the input x is not INT32, the data types of x, cos, sin, and the outputs qOut, kOut, and vOut must be consistent. In this case, activationScaleOptional, weightScaleOptional, and biasOptional do not take effect.
 5. When the input x is INT32, the data types of cos, sin, and the outputs qOut, kOut, and vOut must be consistent. In this case, weightScaleOptional is mandatory, while activationScaleOptional and biasOptional are optional (biasOptional does not need to match the data type of other inputs).
 6. The last dimension of x must be less than or equal to 4096 and aligned to 64.
+7. Empty tensors with B=0 or S=0 are supported. If x is two-dimensional and B=0, or x is three-dimensional and B=0 or S=0, qOut, kOut, and vOut contain zero elements, while kCacheRef and vCacheRef remain unchanged. The last dimension of x, Nkv, D, scaleK, and scaleV must still satisfy the constraints above; D=0, Nkv=0, and empty mandatory scales are not supported.
 
 ## Example
 

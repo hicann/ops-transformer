@@ -304,7 +304,7 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
         <td>kvOutput</td>
         <td>输入</td>
         <td>Host侧布尔值。表示是否输出kOut和vOut。</td>
-        <td>为true时输出有效shape的kOut和vOut；为false时kOut和vOut的shape为空。</td>
+        <td>为true时，kOut和vOut必须具有与x对应的3维或4维shape；为false时，kOut和vOut均必须为空Tensor（元素个数为0），不能传入空指针。</td>
         <td>BOOL</td>
         <td>-</td>
         <td>-</td>
@@ -324,7 +324,7 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
         <td>qOut</td>
         <td>输出</td>
         <td>公式中经旋转位置编码后的q。</td>
-        <td>x为3维时shape为[B, S, Nq, D]，x为2维时shape为[B, Nq, D]。数据类型与cos、sin保持一致。</td>
+        <td>x为3维时shape必须为[B, S, Nq, D]，x为2维时shape必须为[B, Nq, D]，维度数和各轴大小均须一致。数据类型与cos、sin保持一致。</td>
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>
         <td>3-4</td>
@@ -334,20 +334,20 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
         <td>kOut</td>
         <td>输出</td>
         <td>公式中经旋转位置编码后的k。</td>
-        <td>kvOutput为true时，x为3维时shape为[B, S, Nkv, D]，x为2维时shape为[B, Nkv, D]；kvOutput为false时shape为空。数据类型与cos、sin保持一致。</td>
+        <td>kvOutput为true时，x为3维时shape必须为[B, S, Nkv, D]，x为2维时shape必须为[B, Nkv, D]，维度数和各轴大小均须一致；kvOutput为false时必须为空Tensor（元素个数为0）。数据类型与cos、sin保持一致。</td>
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>
-        <td>1-4</td>
+        <td>kvOutput为true时为3-4；为false时为空Tensor</td>
         <td>×</td>
     </tr>
     <tr>
         <td>vOut</td>
         <td>输出</td>
         <td>公式中切分得到的v。</td>
-        <td>kvOutput为true时，x为3维时shape为[B, S, Nkv, D]，x为2维时shape为[B, Nkv, D]；kvOutput为false时shape为空。数据类型与cos、sin保持一致。</td>
+        <td>kvOutput为true时，x为3维时shape必须为[B, S, Nkv, D]，x为2维时shape必须为[B, Nkv, D]，维度数和各轴大小均须一致；kvOutput为false时必须为空Tensor（元素个数为0）。数据类型与cos、sin保持一致。</td>
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>
-        <td>1-4</td>
+        <td>kvOutput为true时为3-4；为false时为空Tensor</td>
         <td>×</td>
     </tr>
     <tr>
@@ -376,7 +376,7 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-  第一段接口完成入参校验，出现以下场景时报错：
+  第一段接口在计算workspace的过程中进行参数校验和tiling，出现以下场景时报错：
 
   <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
   <col style="width: 269px">
@@ -398,7 +398,12 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td>输入、输出的数据类型、shape、维度或属性值不符合约束。</td>
+      <td>输入和输出的数据类型不在支持的范围内。</td>
+    </tr>
+    <tr>
+      <td>ACLNN_ERR_INNER_TILING_ERROR</td>
+      <td>561002</td>
+      <td>tiling执行失败。其中，仅Ascend 950系列产品执行以下输出shape校验：qOut的维度数或任一轴大小不符合参数约束；kvOutput为true时kOut或vOut的维度数或任一轴大小不符合参数约束；kvOutput为false时kOut或vOut的元素个数不为0。</td>
     </tr>
   </tbody>
   </table>
@@ -458,6 +463,9 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
 6. x的尾轴小于等于4096，且按64对齐。
 7. sizeSplits的元素个数必须为3，各元素均不得小于0；sizeSplits[1]与sizeSplits[2]必须相等，且分别等于Nkv*D；x的尾轴必须等于sizeSplits三个元素之和。
 8. kCacheRef和vCacheRef必须为4维且shape一致；D必须为16的正整数倍。scaleK、scaleV以及可选输入offsetKOptional、offsetVOptional的元素个数均必须为Nkv*D。
+9. qOut以及kvOutput为true时的kOut、vOut必须满足参数说明中的完整shape约束。不支持仅保持元素个数相同的其他shape，例如将4维qOut展平为2维或扩展为5维。
+10. kvOutput为false时，kOut和vOut均必须为空Tensor（元素个数为0），不能传入空指针。
+11. 支持B=0或S=0的空tensor场景：x为2维且B=0，或x为3维且B=0或S=0时，qOut、kOut、vOut的元素个数为0，kCacheRef、vCacheRef保持输入值不变。该场景仍要求x尾轴、Nkv、D、scaleK、scaleV等结构参数满足上述约束；D=0、Nkv=0或必选scale为空不属于本支持场景。
 
 ## 调用示例
 

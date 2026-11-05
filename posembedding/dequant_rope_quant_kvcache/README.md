@@ -237,6 +237,9 @@
 - 输入x不为int32时，x、cos、sin与输出qOut、kOut、vOut的数据类型保持一致，此时activationScaleOptional，weightScaleOptional、biasOptional不生效；x为int32时，cos、sin与输出qOut、kOut、vOut的数据类型保持一致，此时weightScaleOptional必选，activationScaleOptional、biasOptional可选（biasOptional不需要与其他输入类型一致）。
 - sizeSplits的元素个数必须为3，各元素均不得小于0；sizeSplits[1]与sizeSplits[2]必须相等，且分别等于Nkv*D；x的尾轴必须等于sizeSplits三个元素之和。
 - kCacheRef和vCacheRef必须为4维且shape一致；D必须为16的正整数倍。scaleK、scaleV以及可选输入offsetKOptional、offsetVOptional的元素个数均必须为Nkv*D。
+- qOut的shape在x为3维时必须为[B, S, Nq, D]，在x为2维时必须为[B, Nq, D]。kvOutput为true时，kOut和vOut在x为3维时的shape均必须为[B, S, Nkv, D]，在x为2维时均必须为[B, Nkv, D]。维度数和各轴大小均须满足约束，不支持仅保持元素个数相同的其他shape。
+- kvOutput为false时，kOut和vOut均必须为空Tensor（元素个数为0），不能传入空指针。通过aclnn调用时，输出shape的tiling校验失败会使第一段接口返回ACLNN_ERR_INNER_TILING_ERROR（561002）。
+- 支持B=0或S=0的空tensor场景：x为2维且B=0，或x为3维且B=0或S=0时，qOut、kOut、vOut的元素个数为0，kCacheRef、vCacheRef保持输入值不变。该场景仍要求x尾轴、Nkv、D、scaleK、scaleV等结构参数满足上述约束；D=0、Nkv=0或必选scale为空不属于本支持场景。
 
 ## 调用说明
 

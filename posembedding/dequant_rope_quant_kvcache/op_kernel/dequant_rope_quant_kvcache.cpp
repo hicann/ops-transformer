@@ -28,7 +28,9 @@ extern "C" __global__ __aicore__ void dequant_rope_quant_kvcache(
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
     GET_TILING_DATA(tilingData, tiling);
-    if (TILING_KEY_IS(0)) {
+    if (tilingData.batch == 0 || tilingData.seqlen == 0) {
+        return;
+    } else if (TILING_KEY_IS(0)) {
         RopeQuantKvcacheV2<DTYPE_X, float, DTYPE_COS> op(&tilingData);
         op.Init(x, cos, sin, k_cache, v_cache, indices, weight_scale, activation_scale, bias, scale_k, scale_v,
                 offset_k, offset_v, q, k, v, k_cache_ref, v_cache_ref);

@@ -51,6 +51,9 @@ constexpr int32_t ACTIVATION_INPUT_INDEX = 11;
 constexpr int32_t BIAS_INPUT_INDEX = 12;
 constexpr int32_t QUANT_MODE_INDEX = 1;
 constexpr int32_t LAYOUT_INDEX = 2;
+constexpr int32_t Q_OUTPUT_INDEX = 0;
+constexpr int32_t K_OUTPUT_INDEX = 1;
+constexpr int32_t V_OUTPUT_INDEX = 2;
 constexpr int32_t IFKV_INDEX = 3;
 constexpr int32_t CACHE_MODE_IDX = 4;
 constexpr int32_t KVCACHE_HEAD_DIM_INDEX = 2;
@@ -250,6 +253,75 @@ void WarnForUnsupportedStringAttrs(const gert::RuntimeAttrs* attrs, const ge::ch
                                               attrs->GetStr(CACHE_MODE_IDX), emitWarning);
 }
 
+ge::graphStatus CheckDRQKOutputShapes(gert::TilingContext* context, const TilingInfoDRQK& info, int64_t xDimNum)
+{
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
+    if (ascendcPlatform.GetSocVersion() != platform_ascendc::SocVersion::ASCEND950) {
+        return ge::GRAPH_SUCCESS;
+    }
+
+    const auto* qShape = context->GetOutputShape(Q_OUTPUT_INDEX);
+    const auto* kShape = context->GetOutputShape(K_OUTPUT_INDEX);
+    const auto* vShape = context->GetOutputShape(V_OUTPUT_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context, qShape);
+    OP_CHECK_NULL_WITH_CONTEXT(context, kShape);
+    OP_CHECK_NULL_WITH_CONTEXT(context, vShape);
+
+    std::vector<int64_t> expQ = {info.batch, info.seqlen, info.qHeadNum, info.hiddenSize};
+    std::vector<int64_t> expKv = {info.batch, info.seqlen, info.kvHeadNum, info.hiddenSize};
+    if (xDimNum == BASE_2) {
+        expQ = {info.batch, info.qHeadNum, info.hiddenSize};
+        expKv = {info.batch, info.kvHeadNum, info.hiddenSize};
+    }
+    const auto* nodeName = context->GetNodeName();
+    if (checkDRQKDim(qShape, expQ, nodeName, "qOut") != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (info.ifKVout == 0) {
+        OP_CHECK_IF(kShape->GetStorageShape().GetShapeSize() != 0 || vShape->GetStorageShape().GetShapeSize() != 0,
+                    OP_LOGE(nodeName, "kOut and vOut should be empty tensors when kv_output is false."),
+                    return ge::GRAPH_FAILED);
+        return ge::GRAPH_SUCCESS;
+    }
+    if (checkDRQKDim(kShape, expKv, nodeName, "kOut") != ge::GRAPH_SUCCESS ||
+        checkDRQKDim(vShape, expKv, nodeName, "vOut") != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus CheckDRQKInputDtypes(gert::TilingContext* context)
+{
+    const auto nodeName = context->GetNodeName();
+    const auto* xDesc = context->GetInputDesc(X_INPUT_INDEX);
+    const auto* cosDesc = context->GetInputDesc(COS_INDEX);
+    const auto* sinDesc = context->GetInputDesc(SIN_INDEX);
+    OP_CHECK_IF(xDesc == nullptr || cosDesc == nullptr || sinDesc == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "x, cos, sin",
+                                                         "Input descriptors must be available for dtype validation"),
+                return ge::GRAPH_FAILED);
+    const auto xType = xDesc->GetDataType();
+    const auto cosType = cosDesc->GetDataType();
+    const auto sinType = sinDesc->GetDataType();
+    OP_CHECK_IF(
+        xType != ge::DT_FLOAT16 && xType != ge::DT_BF16 && xType != ge::DT_INT32,
+        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "x", Ops::Base::ToString(xType).c_str(), "FLOAT16, BFLOAT16 or INT32"),
+        return ge::GRAPH_FAILED);
+    const bool ropeTypeSupported = cosType == ge::DT_FLOAT16 || cosType == ge::DT_BF16;
+    if (ropeTypeSupported && cosType == sinType && (xType == ge::DT_INT32 || xType == cosType)) {
+        return ge::GRAPH_SUCCESS;
+    }
+    const std::string constraint =
+        xType == ge::DT_INT32 ?
+            "cos.dtype and sin.dtype must match and be FLOAT16 or BFLOAT16 when x.dtype is INT32" :
+            "x.dtype, cos.dtype and sin.dtype must be consistent when x.dtype is FLOAT16 or BFLOAT16";
+    const std::string reason = constraint + ". Actual dtypes: x.dtype=" + Ops::Base::ToString(xType) +
+                               ", cos.dtype=" + Ops::Base::ToString(cosType) +
+                               ", sin.dtype=" + Ops::Base::ToString(sinType);
+    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "x, cos, sin", reason.c_str());
+    return ge::GRAPH_FAILED;
+}
+
 ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& tilingInfoDRQK)
 {
     auto platformInfo = context->GetPlatformInfo();
@@ -258,6 +330,9 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& t
                 REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
                                           (std::vector<const char*>{nodeName, "Tiling platformInfo is unavailable"})),
                 return ge::GRAPH_FAILED);
+    if (CheckDRQKInputDtypes(context) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     tilingInfoDRQK.coreNum = ascendcPlatform.GetCoreNumAiv();
     uint64_t ubSize = 0;
@@ -408,6 +483,10 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& t
                     "must be a multiple of k_cache.shape[3] " + std::to_string(tilingInfoDRQK.hiddenSize)),
                 return ge::GRAPH_FAILED);
     tilingInfoDRQK.qHeadNum = GetDiv(tilingInfoDRQK.attrData[0], tilingInfoDRQK.hiddenSize);
+    // Validate against the original input shape before page mode flattens B and S for scheduling.
+    if (CheckDRQKOutputShapes(context, tilingInfoDRQK, xShapeDimNum) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     const gert::StorageShape* cosShape = context->GetInputShape(COS_INDEX);
     const gert::StorageShape* sinShape = context->GetInputShape(SIN_INDEX);
     const gert::StorageShape* vCacheShape = context->GetInputShape(VCACHE_INPUT_INDEX);
@@ -610,32 +689,22 @@ static ge::graphStatus TilingDequantRopeQuantKvcache(gert::TilingContext* contex
         return ge::GRAPH_FAILED;
     }
     int64_t taskNum = tilingInfoDRQK.batch * tilingInfoDRQK.seqlen;
-
-#if (__NPU_ARCH__ == 3510)
-    if (taskNum == 0) {
-        OP_LOGD(nodeName, "taskNum is 0, empty tensor, set block dim to 0.");
-        context->SetBlockDim(0);
-        DequantRopeQuantKvcacheTilingData emptyTiling;
-        emptyTiling.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
-        context->GetRawTilingData()->SetDataSize(emptyTiling.GetDataSize());
-        size_t* currentWorkspace = context->GetWorkspaceSizes(1);
-        OP_CHECK_IF(currentWorkspace == nullptr,
-                    REPORT_PREDEFINED_ERR_MSG(
-                        "EZ1008", (std::vector<const char*>{"opName", "reason"}),
-                        (std::vector<const char*>{nodeName, "workspace size storage is unavailable during Tiling"})),
-                    return ge::GRAPH_FAILED);
-        currentWorkspace[0] = MINIMAL_WORKSPACE;
-        return ge::GRAPH_SUCCESS;
+    const bool isEmpty = (taskNum == 0);
+    int64_t frontCoreNum = 1;
+    int64_t tailCoreNum = 0;
+    int64_t numBlocks = 1;
+    int64_t blockFactor = 0;
+    int64_t lastCoreNum = 0;
+    if (!isEmpty) {
+        int64_t taskNumRem = GetRem(taskNum, tilingInfoDRQK.coreNum);
+        frontCoreNum = taskNumRem != 0 ? taskNumRem : tilingInfoDRQK.coreNum;
+        tailCoreNum = taskNum <= tilingInfoDRQK.coreNum ? 0 : tilingInfoDRQK.coreNum - frontCoreNum;
+        numBlocks = frontCoreNum + tailCoreNum;
+        blockFactor = GetCeilInt(taskNum, numBlocks);
+        lastCoreNum = GetDiv(taskNum, numBlocks);
+    } else {
+        OP_LOGD(nodeName, "taskNum is 0, launch one no-op core.");
     }
-#endif
-
-    int64_t taskNumRem = GetRem(taskNum, tilingInfoDRQK.coreNum);
-    int64_t frontCoreNum = taskNumRem != 0 ? taskNumRem : tilingInfoDRQK.coreNum;
-    int64_t tailCoreNum = taskNum <= tilingInfoDRQK.coreNum ? 0 : tilingInfoDRQK.coreNum - frontCoreNum;
-    int64_t numBlocks = frontCoreNum + tailCoreNum;
-
-    int64_t blockFactor = GetCeilInt(taskNum, numBlocks);
-    int64_t lastCoreNum = GetDiv(taskNum, numBlocks);
 
     DequantRopeQuantKvcacheTilingData tiling;
     tiling.set_cacheSeqlen(tilingInfoDRQK.cacheSeqlen);
@@ -664,7 +733,7 @@ static ge::graphStatus TilingDequantRopeQuantKvcache(gert::TilingContext* contex
     tiling.set_hasBias(tilingInfoDRQK.hasBias);
     tiling.set_hasAS(tilingInfoDRQK.hasAS);
     tiling.set_batch(tilingInfoDRQK.batch);
-    uint32_t tilingKey = tilingInfoDRQK.biasDataType;
+    uint32_t tilingKey = static_cast<uint32_t>(tilingInfoDRQK.biasDataType);
 
     context->SetBlockDim(numBlocks);
     context->SetTilingKey(tilingKey);
@@ -676,7 +745,7 @@ static ge::graphStatus TilingDequantRopeQuantKvcache(gert::TilingContext* contex
                     (std::vector<const char*>{nodeName, "workspace size storage is unavailable during Tiling"})),
                 return ge::GRAPH_FAILED);
 
-    currentWorkspace[0] = MINIMAL_WORKSPACE;
+    currentWorkspace[0] = isEmpty ? 0U : MINIMAL_WORKSPACE;
 
     tiling.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
     context->GetRawTilingData()->SetDataSize(tiling.GetDataSize());
