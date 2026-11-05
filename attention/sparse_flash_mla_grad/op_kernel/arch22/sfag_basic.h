@@ -154,6 +154,9 @@ private:
     constexpr static uint32_t CUBE_WAIT_VEC_GATHER_PONG = 5;
     constexpr static uint32_t SCATTER_SYNC_FLAG = 6;
     constexpr static uint32_t DETER_KV_SYNC_FLAG = 7;
+    // AIV 完成本轮 flag9 / SyncAll / Scatter 后回执，AIC 等到后再进下一轮。
+    // 与 0-10、SyncAll 占用的 11-14 错开。
+    constexpr static uint32_t DETER_ROUND_DONE_FLAG = 15;
     bool changePingpong = false;
     bool isLastBlockSelected = false;
 
@@ -314,6 +317,8 @@ __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::Process(
                 DrainCubeDeter(cubeOp, hasPendingTask);
                 // 通知本 cube AIV：本轮 mm45 已完成（空 S1 也发，对齐轮次）
                 CrossCoreSetFlag<2, PIPE_FIX>(SCATTER_SYNC_FLAG);
+                // 两个 AIV 都 Set 后返回。本轮 Scatter 结束前不进入下一轮 gather。
+                CrossCoreWaitFlag<2, PIPE_MTE2>(DETER_ROUND_DONE_FLAG);
             }
         } else {
             bool changeS1 = false;
@@ -412,10 +417,12 @@ __aicore__ inline void SelectedAttentionGradBasic<SMLAGT>::Process(
                 DrainVecDeter(vecOp, hasPendingTask);
                 DeterAccumulateAfterLocalSync(vecOp);
 
-                // smlag_det：(1) 本轮 mm45 结束后 SyncAll，再 Scatter 本轮 face
+                // 本轮 flag9 仍在 Drain 之后、等 flag6 之前，累加顺序不变。
+                // Scatter 结束后两个 AIV 一起回执，AIC 才能进入下一轮。
                 CrossCoreWaitFlag<2, PIPE_MTE2>(SCATTER_SYNC_FLAG);
                 SyncAll();
                 vecOp.ScatterAddDeter(i, roundDbIdx);
+                CrossCoreSetFlag<2, PIPE_MTE3>(DETER_ROUND_DONE_FLAG);
             }
         } else {
             for (int32_t i = 0; i < processBS1ByCore; i++) {
