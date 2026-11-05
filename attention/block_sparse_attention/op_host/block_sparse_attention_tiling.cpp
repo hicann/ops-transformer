@@ -631,6 +631,28 @@ ge::graphStatus BSATiling::ParseQKVInBSND(gert::TilingContext* bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus BSATiling::CheckQKVShape(gert::TilingContext* bsaContext)
+{
+    for (int index = QUERY_INDEX; index <= VALUE_INDEX; ++index) {
+        const auto* shape = bsaContext->GetInputShape(index);
+        OP_CHECK_NULL_WITH_CONTEXT(bsaContext, shape);
+        if (shape->GetStorageShape().GetShapeSize() == 0) {
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(bsaContext->GetNodeName(), "query/key/value", "empty tensor",
+                                                   "query, key and value must not be empty");
+            return ge::GRAPH_FAILED;
+        }
+    }
+    const auto& keyShape = bsaContext->GetInputShape(KEY_INDEX)->GetStorageShape();
+    const auto& valueShape = bsaContext->GetInputShape(VALUE_INDEX)->GetStorageShape();
+    if (keyShape != valueShape) {
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(bsaContext->GetNodeName(), "key and value", "inconsistent shapes",
+                                               "key and value must have identical shapes");
+        return ge::GRAPH_FAILED;
+    }
+
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus BSATiling::CheckAttentionOutDtype(gert::TilingContext* bsaContext)
 {
     if (dataType_ == ge::DT_FLOAT8_E4M3FN || dataType_ == ge::DT_HIFLOAT8) {
@@ -661,6 +683,9 @@ ge::graphStatus BSATiling::CheckAttentionOutDtype(gert::TilingContext* bsaContex
 ge::graphStatus BSATiling::ParseRequiredTensors(gert::TilingContext* bsaContext)
 {
     if (CheckQKVDtype(bsaContext) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckQKVShape(bsaContext) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     ge::graphStatus ret = ge::GRAPH_SUCCESS;
