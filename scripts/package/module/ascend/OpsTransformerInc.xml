@@ -13,8 +13,8 @@
     <file_info copy_type="delivery" src_path=""
         dst_path="opp/built-in/op_impl/aicpu/"
         install_path="opp/built-in/op_impl/aicpu/" install_type="all" optional="true">
-        <file value="config" entity="true" install_mod="755"/>
-        <file value="kernel" entity="true" install_mod="755"/>
+        <file value="config" install_mod="755"/>
+        <file value="kernel" install_mod="755"/>
     </file_info>
     <file_info copy_type="delivery" src_path=""
         dst_path="opp/built-in/op_graph/inc"

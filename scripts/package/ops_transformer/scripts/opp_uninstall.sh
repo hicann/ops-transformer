@@ -180,6 +180,17 @@ remove_init_py() {
   [ -e ${built_in_impl_path}/dynamic/__init__.py ] && rm ${built_in_impl_path}/dynamic/__init__.py > /dev/null 2>&1
 }
 
+remove_builtin_aicpu_files() {
+  local aicpu_impl_path=${TARGET_OPP_BUILT_IN}/op_impl/aicpu
+
+  rm -f "${aicpu_impl_path}/config/aicpu_transformer.json" > /dev/null 2>&1
+  rm -f "${aicpu_impl_path}/kernel/libtransformer_aicpu_kernels.so" > /dev/null 2>&1
+
+  remove_dir_if_empty "${aicpu_impl_path}/config"
+  remove_dir_if_empty "${aicpu_impl_path}/kernel"
+  remove_dir_if_empty "${aicpu_impl_path}"
+}
+
 remove_whl_package() {
   local python_dir="${TARGET_VERSION_DIR}/python/site-packages"
 
@@ -217,6 +228,8 @@ remove_ops_transformer() {
   fi
 
   remove_init_py
+
+  remove_builtin_aicpu_files
 
   remove_whl_package
 
