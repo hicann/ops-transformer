@@ -321,20 +321,18 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGat
             const float invAlpha = activationAlpha_ != 0.0f ? 1.0f / activationAlpha_ : 1.0f;
             const Activation::SituGluParams situGluParams{clampLimit_, activationBeta_, invBeta, activationAlpha_,
                                                           invAlpha};
-            CallVf<Activation::RunSiTUGLU<DataTypeIn, TopkWeightsPrefetch, true>>(gatedActivationContext,
-                                                                                  situGluParams);
+            Activation::RunSiTUGLU<DataTypeIn, TopkWeightsPrefetch, true>(gatedActivationContext, situGluParams);
         } else {
             const Activation::SituGluParams situGluParams{clampLimit_, activationBeta_, invBeta, 1.0f, 1.0f};
-            CallVf<Activation::RunSiTUGLU<DataTypeIn, TopkWeightsPrefetch, false>>(gatedActivationContext,
-                                                                                   situGluParams);
+            Activation::RunSiTUGLU<DataTypeIn, TopkWeightsPrefetch, false>(gatedActivationContext, situGluParams);
         }
     } else if (actMode == ActMode::SWIGLU_STEP) {
-        CallVf<Activation::RunSwiGLU<DataTypeIn, TopkWeightsPrefetch, true>>(gatedActivationContext, clampLimit_);
+        Activation::RunSwiGLU<DataTypeIn, TopkWeightsPrefetch, true>(gatedActivationContext, clampLimit_);
     } else if (actMode == ActMode::SWIGLU_OAI) {
         const Activation::SwiGluOaiParams swiGluOaiParams{clampLimit_, activationAlpha_, activationBeta_};
-        CallVf<Activation::RunSwiGLUOAI<DataTypeIn, TopkWeightsPrefetch>>(gatedActivationContext, swiGluOaiParams);
+        Activation::RunSwiGLUOAI<DataTypeIn, TopkWeightsPrefetch>(gatedActivationContext, swiGluOaiParams);
     } else {
-        CallVf<Activation::RunSwiGLU<DataTypeIn, TopkWeightsPrefetch, false>>(gatedActivationContext, clampLimit_);
+        Activation::RunSwiGLU<DataTypeIn, TopkWeightsPrefetch, false>(gatedActivationContext, clampLimit_);
     }
 }
 
@@ -349,7 +347,7 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGel
     context.rowStrideElements = TileN;
     context.rowCount = static_cast<uint16_t>(tileContext.geometry.rowCount);
     context.validColumnCount = static_cast<uint16_t>(tileContext.geometry.columnCount);
-    CallVf<Activation::RunGeluActivation<DataTypeIn, TopkWeightsPrefetch>>(context);
+    Activation::RunGeluActivation<DataTypeIn, TopkWeightsPrefetch>(context);
 }
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
@@ -367,7 +365,7 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGel
     context.quantRowStrideBytes = TopkWeightsPrefetch ? (isFp4 ? TileN / 2U : TileN) : TileN * sizeof(DataTypeIn);
     context.scaleRowStrideBytes =
         TopkWeightsPrefetch ? (TileN / MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE : TileN * sizeof(DataTypeIn);
-    CallVf<GeluQuant::RunGeluMxQuant<DataTypeOut, TileN>>(context);
+    GeluQuant::RunGeluMxQuant<DataTypeOut, TileN>(context);
 }
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS

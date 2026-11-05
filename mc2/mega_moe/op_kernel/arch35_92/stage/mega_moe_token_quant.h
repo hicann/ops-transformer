@@ -293,7 +293,7 @@ __simd_vf__ inline void PreQuantCastBf16Weights(__ubuf__ uint8_t* stage, uint32_
         auto* weightDst = reinterpret_cast<__ubuf__ float*>(stage + row * recordBytes + weightDstOffset);
         asc_gather(inputReg, weightSrc + row * (weightSrcRowBytes / sizeof(bfloat16_t)),
                    reinterpret_cast<vector_uint32_t&>(indexReg), active);
-        asc_bfloat162float(outputReg, inputReg, active);
+        asc_bfloat162float(outputReg, inputReg, active, ASC_POSITION_EVEN);
         asc_storealign(weightDst, outputReg, active);
     }
 }

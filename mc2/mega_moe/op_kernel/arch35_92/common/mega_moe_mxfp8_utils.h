@@ -143,7 +143,7 @@ __aicore__ inline void DeQuantMxFp8(__ubuf__ XType* inLocal, __ubuf__ float* sum
     __ubuf__ bfloat16_t* dyScaleBf16Ptr = (__ubuf__ bfloat16_t*)scaleBf16Tensor;
     __ubuf__ float* dyScaleFp32Ptr = (__ubuf__ float*)scaleFP32Tensor;
     __ubuf__ float* sumDstPtr = (__ubuf__ float*)sumTensor;
-    CallVf<DeQuantMxFp8Vf<T, XType>>(inAddr, sumDstPtr, dyScaleBf16Ptr, dyScaleFp32Ptr, scaleLen, tokenLen);
+    DeQuantMxFp8Vf<T, XType>(inAddr, sumDstPtr, dyScaleBf16Ptr, dyScaleFp32Ptr, scaleLen, tokenLen);
 }
 
 } // namespace Mxfp8
