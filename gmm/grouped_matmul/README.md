@@ -78,7 +78,7 @@ $$
 y_i=x_i\times weight_i + bias_i
 $$
 
-详细计算公式（按场景分类：非量化、伪量化、全量化）及版本演进请参见 [aclnnGroupedMatmulV5功能说明](docs/aclnnGroupedMatmulV5.md#3-功能说明)。
+详细计算公式（按场景分类：非量化、伪量化、全量化）及版本演进请参见 [aclnnGroupedMatmulV5功能说明](docs/aclnnGroupedMatmulV5.md#功能说明)。
 
 ---
 
@@ -136,7 +136,7 @@ $$
   - groupListType=1：须为非负数列（各组大小）。
   - groupListType=2：须为非负数列，shape `[E, 2]`（[组索引, 组大小]），非零组前置。
 
-> 各场景详细约束请参见 [aclnnGroupedMatmulV5约束说明](docs/aclnnGroupedMatmulV5.md#7-约束说明)。  
+> 各场景详细约束请参见 [aclnnGroupedMatmulV5约束说明](docs/aclnnGroupedMatmulV5.md#约束说明)。  
 > weight nz场景详细约束请参见 [aclnnGroupedMatmulWeightNz约束说明](docs/aclnnGroupedMatmulWeightNz.md#约束说明)。
 
 ---
