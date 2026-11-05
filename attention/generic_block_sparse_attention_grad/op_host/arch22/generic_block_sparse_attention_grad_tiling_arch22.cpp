@@ -19,6 +19,9 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <vector>
+#include "base/err_msg.h"
+#include "util/shape_util.h"
 
 #include "err/ops_err.h"
 #include "graph/types.h"
@@ -216,11 +219,16 @@ ge::graphStatus GBSAGTiling::GetNpuInfo(gert::TilingContext* context)
 
 ge::graphStatus GBSAGTiling::ProcessTND(gert::TilingContext* context)
 {
+    const char* opName = context->GetNodeName() == nullptr ? "GenericBlockSparseAttentionGrad" : context->GetNodeName();
     const auto* queryShape = context->GetInputShape(ToIndex(InputId::Query));
     const auto* kvShape = context->GetInputShape(ToIndex(InputId::Key));
     if (queryShape->GetOriginShape().GetDimNum() != TND_DIM_NUM ||
         kvShape->GetOriginShape().GetDimNum() != TND_DIM_NUM) {
-        OP_LOGE(context->GetNodeName(), "TND format must have 3 dimensions");
+        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(opName, "query,key",
+                                                  (std::to_string(queryShape->GetOriginShape().GetDimNum()) + "," +
+                                                   std::to_string(kvShape->GetOriginShape().GetDimNum()))
+                                                      .c_str(),
+                                                  "TND layout requires query and key rank 3 [T,N,D].");
         return ge::GRAPH_FAILED;
     }
     totalTokensT_ = queryShape->GetOriginShape().GetDim(TND_DIM_T);
@@ -236,14 +244,22 @@ ge::graphStatus GBSAGTiling::ProcessTND(gert::TilingContext* context)
 
     // 契约：TND 场景 cuSeq 必传（int64 前缀和数组，长度 b+1）；seqused 不作为 TND 长度来源。
     if (cuQ == nullptr || cuKv == nullptr) {
-        OP_LOGE(context->GetNodeName(), "TND requires both cuSeqLengthsQ and cuSeqLengthsKv to be provided");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            opName, "cu_seq_lengths_q,cu_seq_lengths_kv",
+            "TND layout requires both cumulative INT64 sequence-length arrays [B+1].");
         return ge::GRAPH_FAILED;
     }
 
     const uint32_t qBatch = static_cast<uint32_t>(cuQ->GetShapeSize() - 1);
     const uint32_t kvBatch = static_cast<uint32_t>(cuKv->GetShapeSize() - 1);
     if (qBatch == 0 || qBatch != kvBatch) {
-        OP_LOGE(context->GetNodeName(), "Q/KV sequence metadata batch mismatch: q=%u kv=%u", qBatch, kvBatch);
+        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+            opName, "cu_seq_lengths_q,cu_seq_lengths_kv",
+            (std::string("elements=") + std::to_string(cuQ->GetShapeSize()) + "," +
+             std::to_string(cuKv->GetShapeSize()) + "; batches=" + std::to_string(qBatch) + "," +
+             std::to_string(kvBatch))
+                .c_str(),
+            "Cumulative sequence-length arrays must have equal lengths and describe a positive number of batches.");
         return ge::GRAPH_FAILED;
     }
     batch_ = qBatch;
@@ -260,6 +276,7 @@ ge::graphStatus GBSAGTiling::ProcessTND(gert::TilingContext* context)
 
 ge::graphStatus GBSAGTiling::ProcessBNSD(gert::TilingContext* context)
 {
+    const char* opName = context->GetNodeName() == nullptr ? "GenericBlockSparseAttentionGrad" : context->GetNodeName();
     const auto* queryShape = context->GetInputShape(ToIndex(InputId::Query));
     const auto* kvShape = context->GetInputShape(ToIndex(InputId::Key));
     auto idxShape = context->GetInputShape(ToIndex(InputId::RsvdBlockIdx));
@@ -267,7 +284,14 @@ ge::graphStatus GBSAGTiling::ProcessBNSD(gert::TilingContext* context)
     if (queryShape->GetOriginShape().GetDimNum() != BNSD_DIM_NUM ||
         kvShape->GetOriginShape().GetDimNum() != BNSD_DIM_NUM || idxShape->GetOriginShape().GetDimNum() != 4 ||
         countShape->GetOriginShape().GetDimNum() != 3) {
-        OP_LOGE(context->GetNodeName(), "BNSD requires rank-4 inputs and rank-4/rank-3 sparse tensors");
+        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+            opName, "query,key,sparse_block_idx,sparse_block_count",
+            (std::to_string(queryShape->GetOriginShape().GetDimNum()) + "," +
+             std::to_string(kvShape->GetOriginShape().GetDimNum()) + "," +
+             std::to_string(idxShape->GetOriginShape().GetDimNum()) + "," +
+             std::to_string(countShape->GetOriginShape().GetDimNum()))
+                .c_str(),
+            "BNSD requires query/key/sparse_block_idx rank 4 and sparse_block_count rank 3.");
         return ge::GRAPH_FAILED;
     }
     batch_ = static_cast<uint32_t>(queryShape->GetOriginShape().GetDim(BNSD_DIM_B));
@@ -281,7 +305,9 @@ ge::graphStatus GBSAGTiling::ProcessBNSD(gert::TilingContext* context)
     auto cuQ = NormalizeOptionalTensor(context->GetOptionalInputTensor(ToIndex(InputId::CuSeqLengthsQ)));
     auto cuKv = NormalizeOptionalTensor(context->GetOptionalInputTensor(ToIndex(InputId::CuSeqLengthsKv)));
     if (cuQ != nullptr || cuKv != nullptr) {
-        OP_LOGE(context->GetNodeName(), "cuSeqLengths are only valid for TND");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            opName, "cu_seq_lengths_q,cu_seq_lengths_kv",
+            "Cumulative sequence-length arrays are only valid for TND; omit them for BNSD layout.");
         return ge::GRAPH_FAILED;
     }
     // seqused 仅 TND 生效：BNSD 为定长布局，长度一律取物理 S 维，不再读取 seqused。
@@ -298,6 +324,7 @@ ge::graphStatus GBSAGTiling::ProcessBNSD(gert::TilingContext* context)
 
 ge::graphStatus GBSAGTiling::ProcessBSND(gert::TilingContext* context)
 {
+    const char* opName = context->GetNodeName() == nullptr ? "GenericBlockSparseAttentionGrad" : context->GetNodeName();
     const auto* queryShape = context->GetInputShape(ToIndex(InputId::Query));
     const auto* kvShape = context->GetInputShape(ToIndex(InputId::Key));
     batch_ = static_cast<uint32_t>(queryShape->GetOriginShape().GetDim(BNSD_DIM_B));
@@ -311,7 +338,9 @@ ge::graphStatus GBSAGTiling::ProcessBSND(gert::TilingContext* context)
     auto cuQ = NormalizeOptionalTensor(context->GetOptionalInputTensor(ToIndex(InputId::CuSeqLengthsQ)));
     auto cuKv = NormalizeOptionalTensor(context->GetOptionalInputTensor(ToIndex(InputId::CuSeqLengthsKv)));
     if (cuQ != nullptr || cuKv != nullptr) {
-        OP_LOGE(context->GetNodeName(), "cuSeqLengths are only valid for TND");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            opName, "cu_seq_lengths_q,cu_seq_lengths_kv",
+            "Cumulative sequence-length arrays are only valid for TND; omit them for BSND layout.");
         return ge::GRAPH_FAILED;
     }
     // seqused 仅 TND 生效：BSND 为定长布局，长度一律取物理 S 维，不再读取 seqused。
@@ -328,27 +357,30 @@ ge::graphStatus GBSAGTiling::ProcessBSND(gert::TilingContext* context)
 
 ge::graphStatus GBSAGTiling::ProcessAttrs(gert::TilingContext* context)
 {
+    const char* opName = context->GetNodeName() == nullptr ? "GenericBlockSparseAttentionGrad" : context->GetNodeName();
     // block_shape 为 def 级 OPTIONAL ListInt 属性（默认 {1, 128}），与前向算子一致；
     // aclnn 路径总是显式传入，图模式缺省时框架会落地 def 默认值。
     const auto* blockShapeArr = context->GetAttrs()->GetListInt(ToIndex(AttrId::BlockShape));
     if (blockShapeArr == nullptr) {
-        OP_LOGE(context->GetNodeName(), "block_shape attr is missing");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            opName, "block_shape",
+            "Required block_shape is unavailable; provide [1,Y] or check the operator-definition defaults.");
         return ge::GRAPH_FAILED;
     }
     if (blockShapeArr->GetSize() != 2) {
-        OP_LOGE(context->GetNodeName(), "block_shape must contain two elements [x, y], got size %zu.",
-                blockShapeArr->GetSize());
+        OP_LOGE_WITH_INVALID_ATTR_SIZE(opName, "block_shape", std::to_string(blockShapeArr->GetSize()).c_str(), "2");
         return ge::GRAPH_FAILED;
     }
     blockShapeX_ = blockShapeArr->GetData()[0];
     blockShapeY_ = blockShapeArr->GetData()[1];
 
     if (blockShapeX_ != 1) {
-        OP_LOGE(context->GetNodeName(), "only support block_shape[0] == 1, got %ld.", blockShapeX_);
+        OP_LOGE_FOR_INVALID_VALUE(opName, "block_shape[0]", std::to_string(blockShapeX_).c_str(), "1");
         return ge::GRAPH_FAILED;
     }
     if (blockShapeY_ < 128 || (blockShapeY_ % 64) != 0) {
-        OP_LOGE(context->GetNodeName(), "block_shape[1] must be >= 128 and 64-aligned, got %ld.", blockShapeY_);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "block_shape[1]", std::to_string(blockShapeY_).c_str(),
+                                              "The block width must be at least 128 and divisible by 64.");
         return ge::GRAPH_FAILED;
     }
     if (layout_ == GsagInputLayout::TND) {
@@ -374,11 +406,12 @@ ge::graphStatus GBSAGTiling::ProcessAttrs(gert::TilingContext* context)
     // maskType 仅支持 1（CAUSAL）：缺失或非 1 直接拒绝。
     auto maskTypeAttr = context->GetAttrs()->GetAttrPointer<int64_t>(ToIndex(AttrId::MaskType));
     if (maskTypeAttr == nullptr) {
-        OP_LOGE(context->GetNodeName(), "mask_type attr is missing.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            opName, "mask_type", "Required mask_type is unavailable; provide mask_type=1 for this implementation.");
         return ge::GRAPH_FAILED;
     }
     if (*maskTypeAttr != 1) {
-        OP_LOGE(context->GetNodeName(), "only support mask_type == 1, got %ld.", *maskTypeAttr);
+        OP_LOGE_FOR_INVALID_VALUE(opName, "mask_type", std::to_string(*maskTypeAttr).c_str(), "1");
         return ge::GRAPH_FAILED;
     }
     maskType_ = static_cast<uint32_t>(*maskTypeAttr);
@@ -388,9 +421,10 @@ ge::graphStatus GBSAGTiling::ProcessAttrs(gert::TilingContext* context)
     const int64_t layoutSparsePattern = sparseLayout != nullptr ? *sparseLayout : 1;
     const int64_t residualBlockMode = residualMode != nullptr ? *residualMode : 0;
     if (layoutSparsePattern != 1 || residualBlockMode != 0) {
-        OP_LOGE(context->GetNodeName(),
-                "Only layout_sparse_pattern=1 and residual_block_mode=0 are supported, got %ld and %ld.",
-                layoutSparsePattern, residualBlockMode);
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            opName, "layout_sparse_pattern,residual_block_mode",
+            (std::to_string(layoutSparsePattern) + "," + std::to_string(residualBlockMode)).c_str(),
+            "This tiling implementation requires layout_sparse_pattern=1 and residual_block_mode=0.");
         return ge::GRAPH_FAILED;
     }
     layoutSparsePattern_ = static_cast<uint32_t>(layoutSparsePattern);
@@ -415,21 +449,28 @@ ge::graphStatus GBSAGTiling::ProcessAttrs(gert::TilingContext* context)
 
     auto qInputDesc = context->GetInputDesc(ToIndex(InputId::Query));
     if (qInputDesc == nullptr) {
-        OP_LOGE(context->GetNodeName(), "Query inputDesc is null");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{
+                opName,
+                "Query input descriptor is unavailable; check Tiling context metadata and operator registration."}));
         return ge::GRAPH_FAILED;
     } else {
         dataType_ = qInputDesc->GetDataType();
     }
 
     if (kvHeads_ == 0) {
-        OP_LOGE(context->GetNodeName(), "kvHeads can not be zero.");
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(opName, "key", (std::to_string(kvHeads_)).c_str(),
+                                                  "The key/value head count must be greater than zero.");
         return ge::GRAPH_FAILED;
     }
 
     if (!(numHeads_ >= kvHeads_ && numHeads_ % kvHeads_ == 0)) {
-        OP_LOGE(context->GetNodeName(),
-                "Invalid head config: query heads(%u) must be >=kv heads(%u) and divisible by it.", numHeads_,
-                kvHeads_);
+        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+            opName, "query,key",
+            (std::string("query heads=") + std::to_string(numHeads_) + ",key heads=" + std::to_string(kvHeads_))
+                .c_str(),
+            "Query heads must be greater than or equal to key heads and divisible by key heads.");
         return ge::GRAPH_FAILED;
     }
 
@@ -438,7 +479,11 @@ ge::graphStatus GBSAGTiling::ProcessAttrs(gert::TilingContext* context)
 
 ge::graphStatus GBSAGTiling::ProcessInput(gert::TilingContext* context)
 {
+    const char* opName = context->GetNodeName() == nullptr ? "GenericBlockSparseAttentionGrad" : context->GetNodeName();
     if (context->GetAttrs()->GetAttrPointer<char>(ToIndex(AttrId::QInputLayout)) == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            opName, "layout_q",
+            "Required query input layout is unavailable; provide the layout attribute in the operator definition.");
         return ge::GRAPH_FAILED;
     }
 
@@ -450,47 +495,54 @@ ge::graphStatus GBSAGTiling::ProcessInput(gert::TilingContext* context)
     } else if (qLayout == "BSND") {
         layout_ = GsagInputLayout::BSND;
     } else {
-        OP_LOGE(context->GetNodeName(), "Unsupported layout: %s. Supported formats: TND, BNSD, BSND",
-                context->GetAttrs()->GetAttrPointer<char>(ToIndex(AttrId::QInputLayout)));
+        OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(opName, "layout_q", qLayout.c_str(),
+                                               "Supported query layouts are TND, BNSD and BSND.");
         return ge::GRAPH_FAILED;
     }
 
     // 核心 Shape 的判空前置，保证安全性
     if (context->GetInputShape(ToIndex(InputId::Query)) == nullptr) {
-        OP_LOGE(context->GetNodeName(), "Query shape is null");
+        OP_LOGE_WITH_INVALID_INPUT(opName, "query");
         return ge::GRAPH_FAILED;
     }
     if (context->GetInputShape(ToIndex(InputId::Key)) == nullptr) {
-        OP_LOGE(context->GetNodeName(), "KV shape is null");
+        OP_LOGE_WITH_INVALID_INPUT(opName, "key");
         return ge::GRAPH_FAILED;
     }
     if (context->GetInputShape(ToIndex(InputId::RsvdBlockIdx)) == nullptr) {
-        OP_LOGE(context->GetNodeName(), "rsvdBlockIdx shape is null");
+        OP_LOGE_WITH_INVALID_INPUT(opName, "sparse_block_idx");
         return ge::GRAPH_FAILED;
     }
     if (context->GetInputShape(ToIndex(InputId::RsvdBlockCount)) == nullptr) {
-        OP_LOGE(context->GetNodeName(), "rsvdBlockCount shape is null");
+        OP_LOGE_WITH_INVALID_INPUT(opName, "sparse_block_count");
         return ge::GRAPH_FAILED;
     }
     const auto* rsvdBlockIdxShape = context->GetInputShape(ToIndex(InputId::RsvdBlockIdx));
     const auto* rsvdBlockCountShape = context->GetInputShape(ToIndex(InputId::RsvdBlockCount));
     if (rsvdBlockIdxShape->GetOriginShape().GetDimNum() != 4 ||
         rsvdBlockCountShape->GetOriginShape().GetDimNum() != 3) {
-        OP_LOGE(context->GetNodeName(), "rsvdBlockIdx/count must be rank 4/3");
+        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+            opName, "sparse_block_idx,sparse_block_count",
+            (std::to_string(rsvdBlockIdxShape->GetOriginShape().GetDimNum()) + "," +
+             std::to_string(rsvdBlockCountShape->GetOriginShape().GetDimNum()))
+                .c_str(),
+            "sparse_block_idx must have rank 4 and sparse_block_count must have rank 3.");
         return ge::GRAPH_FAILED;
     }
 
     // metadata 为必传输入；arch22 ABI 按最大核数固定预留，容量须 >= 198 个 int32。
     const auto* metadataTensor = NormalizeOptionalTensor(context->GetOptionalInputTensor(ToIndex(InputId::Metadata)));
     if (metadataTensor == nullptr) {
-        OP_LOGE(context->GetNodeName(), "metadata must be provided.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            opName, "metadata",
+            "The metadata input is required for the arch22 tiling ABI; provide at least 198 INT32 elements.");
         return ge::GRAPH_FAILED;
     }
     const int64_t metadataElems = metadataTensor->GetShapeSize();
     if (metadataElems < ARC22_METADATA_MIN_ELEMS) {
-        OP_LOGE(context->GetNodeName(),
-                "metadata must hold at least %ld int32 elements for arch22 (6 + 64 * 3), got %ld.",
-                ARC22_METADATA_MIN_ELEMS, metadataElems);
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            opName, "metadata", (std::to_string(metadataElems)).c_str(),
+            "Arch22 metadata must contain at least 198 INT32 elements (6 + 64 * 3).");
         return ge::GRAPH_FAILED;
     }
 
@@ -512,9 +564,12 @@ ge::graphStatus GBSAGTiling::ProcessInput(gert::TilingContext* context)
     const int64_t idxBatchNum = rsvdBlockIdxShape->GetOriginShape().GetDim(0);
     const int64_t idxKvHeadNum = rsvdBlockIdxShape->GetOriginShape().GetDim(1);
     if (idxBatchNum != static_cast<int64_t>(batch_) || idxKvHeadNum != static_cast<int64_t>(kvHeads_)) {
-        OP_LOGE(context->GetNodeName(),
-                "sparseBlockIdx [B, N2] = [%ld, %ld] mismatch with query/key [B, N2] = [%u, %u].", idxBatchNum,
-                idxKvHeadNum, batch_, kvHeads_);
+        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+            opName, "sparse_block_idx,query,key",
+            (std::string("sparse B,N2=[") + std::to_string(idxBatchNum) + "," + std::to_string(idxKvHeadNum) +
+             "],query/key B,N2=[" + std::to_string(batch_) + "," + std::to_string(kvHeads_) + "]")
+                .c_str(),
+            "Sparse block-index batch and key-head dimensions must match query/key batch and key heads.");
         return ge::GRAPH_FAILED;
     }
 
@@ -531,9 +586,12 @@ ge::graphStatus GBSAGTiling::CalculatePostUbBaseSize(gert::TilingContext* contex
 
 ge::graphStatus GBSAGTiling::CalculateSoftmaxGradTiling(gert::TilingContext* context)
 {
+    const char* opName = context->GetNodeName() == nullptr ? "GenericBlockSparseAttentionGrad" : context->GetNodeName();
     // 安全校验：防止除以 0 导致 Core Dump 崩溃
     if (headDim_ == 0) {
-        OP_LOGE(context->GetNodeName(), "CalculateSoftmaxGradTiling failed: headDim_ is 0");
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            opName, "query", (std::to_string(headDim_)).c_str(),
+            "The query head dimension D must be greater than zero for SoftmaxGrad tiling.");
         return ge::GRAPH_FAILED;
     }
 
@@ -562,8 +620,14 @@ ge::graphStatus GBSAGTiling::CalculateTaskSplit(gert::TilingContext* context)
 
 ge::graphStatus GBSAGTiling::CalculateWorkSpace(gert::TilingContext* context)
 {
+    const char* opName = context->GetNodeName() == nullptr ? "GenericBlockSparseAttentionGrad" : context->GetNodeName();
     if (blockDim_ == 0) {
-        OP_LOGE(context->GetNodeName(), "blockDim is 0");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{opName, (std::string("Workspace tiling requires a positive blockDim; actual=") +
+                                               std::to_string(blockDim_) + ", AIC cores=" + std::to_string(aicNum_) +
+                                               "; check task splitting and platform resources.")
+                                                  .c_str()}));
         return ge::GRAPH_FAILED;
     }
 
@@ -655,46 +719,65 @@ uint64_t GBSAGTiling::GenerateTilingKey() const
 ge::graphStatus GBSAGTiling::GetGBSAGTiling(gert::TilingContext* context,
                                             GenericBlockSparseAttentionGradTilingData& tilingData)
 {
+    const char* opName = context->GetNodeName() == nullptr ? "GenericBlockSparseAttentionGrad" : context->GetNodeName();
     tilingData_ = &tilingData;
     ge::graphStatus ret = GetNpuInfo(context);
     if (ret != ge::GRAPH_SUCCESS) {
-        OP_LOGE(context->GetNodeName(), "GetNpuInfo failed");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{opName, (std::string("GetNpuInfo failed; ret=") + std::to_string(ret) +
+                                               "; check the SoC-specific platform resource metadata.")
+                                                  .c_str()}));
         return ret;
     }
 
     ret = ProcessInput(context);
     if (ret != ge::GRAPH_SUCCESS) {
-        OP_LOGE(context->GetNodeName(), "ProcessInput failed");
+        OP_LOGE_WITHOUT_REPORT(context, "ProcessInput failed; retain its first error.");
         return ret;
     }
 
     ret = CalculateTaskSplit(context);
     if (ret != ge::GRAPH_SUCCESS) {
-        OP_LOGE(context->GetNodeName(), "CalculateTaskSplit failed");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{
+                opName, (std::string("CalculateTaskSplit failed; ret=") + std::to_string(ret) +
+                         ", AIC cores=" + std::to_string(aicNum_) + "; a positive AIC core count is required.")
+                            .c_str()}));
         return ret;
     }
 
     ret = CalculateWorkSpace(context);
     if (ret != ge::GRAPH_SUCCESS) {
-        OP_LOGE(context->GetNodeName(), "CalculateWorkSpace failed");
+        OP_LOGE_WITHOUT_REPORT(context, "CalculateWorkSpace failed; retain its first error.");
         return ret;
     }
 
     ret = CalculatePostUbBaseSize(context);
     if (ret != ge::GRAPH_SUCCESS) {
-        OP_LOGE(context->GetNodeName(), "CalculatePostUbBaseSize failed");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{
+                opName, (std::string("CalculatePostUbBaseSize failed; ret=") + std::to_string(ret) +
+                         ", UB bytes=" + std::to_string(ubSize_) + "; check post-processing UB resource calculation.")
+                            .c_str()}));
         return ret;
     }
 
     ret = CalculateSoftmaxGradTiling(context);
     if (ret != ge::GRAPH_SUCCESS) {
-        OP_LOGE(context->GetNodeName(), "CalculateSoftmaxGradTiling failed");
+        OP_LOGE_WITHOUT_REPORT(context, "CalculateSoftmaxGradTiling failed; retain its first error.");
         return ret;
     }
 
     ret = FillTilingData(context);
     if (ret != ge::GRAPH_SUCCESS) {
-        OP_LOGE(context->GetNodeName(), "FillTilingData failed");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{opName, (std::string("FillTilingData failed; ret=") + std::to_string(ret) +
+                                               "; check the GenericBlockSparseAttentionGrad tiling-data object.")
+                                                  .c_str()}));
         return ret;
     }
 
@@ -704,10 +787,13 @@ ge::graphStatus GBSAGTiling::GetGBSAGTiling(gert::TilingContext* context,
 ge::graphStatus GBSAGTiling::SetTilingData(gert::TilingContext* context,
                                            GenericBlockSparseAttentionGradTilingData& tilingData)
 {
-    OP_CHECK_IF(
-        context->GetRawTilingData() == nullptr,
-        OPS_REPORT_VECTOR_INNER_ERR("GenericBlockSparseAttentionGrad", "RawTilingData got from GE context is nullptr."),
-        return ge::GRAPH_FAILED);
+    const char* opName = context->GetNodeName() == nullptr ? "GenericBlockSparseAttentionGrad" : context->GetNodeName();
+    OP_CHECK_IF(context->GetRawTilingData() == nullptr,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{
+                        opName, "Raw tiling-data buffer is unavailable; check Tiling context output construction."})),
+                return ge::GRAPH_FAILED);
     tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
     context->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
     return ge::GRAPH_SUCCESS;
@@ -738,10 +824,14 @@ protected:
     ge::graphStatus DoOpTiling() override
     {
         OP_CHECK_IF(context_ == nullptr,
-                    OPS_REPORT_VECTOR_INNER_ERR("GenericBlockSparseAttentionGrad", "Context is nullptr."),
+                    REPORT_PREDEFINED_ERR_MSG(
+                        "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                        (std::vector<const char*>{"GenericBlockSparseAttentionGrad",
+                                                  "Tiling context is null; check GenericBlockSparseAttentionGrad "
+                                                  "Tiling invocation and registration."})),
                     return ge::GRAPH_FAILED);
         if (tiling_.GetGBSAGTiling(context_, tilingData_) != ge::GRAPH_SUCCESS) {
-            OP_LOGE(context_->GetNodeName(), "GetGBSAGTiling failed");
+            OP_LOGE_WITHOUT_REPORT(context_, "GetGBSAGTiling failed; retain its first error.");
             return ge::GRAPH_FAILED;
         }
         tilingKey_ = tilingData_.get_tilingKey();

@@ -20,6 +20,9 @@
 #include "op_host/tiling_templates_registry.h"
 #include "log/log.h"
 #include <algorithm>
+#include <string>
+#include <vector>
+#include "base/err_msg.h"
 
 namespace optiling {
 namespace {
@@ -47,7 +50,8 @@ protected:
             return Fail("QSAG attributes are missing");
         const auto* layout = attrs->GetAttrPointer<int64_t>(3);
         if (!layout)
-            return Fail("QSAG layout_sparse_pattern is missing");
+            return Fail("QSAG layout_sparse_pattern is missing; provide the operator attribute.",
+                        "layout_sparse_pattern");
         if (*layout != 0)
             return ge::GRAPH_PARAM_INVALID;
         std::array<qsag::TensorInfo, 17> tensors;
@@ -71,7 +75,7 @@ protected:
         qsag::Config cfg;
         const auto *q = attrs->GetAttrPointer<char>(1), *kv = attrs->GetAttrPointer<char>(2);
         if (!q || !kv)
-            return Fail("missing Q/KV layout");
+            return Fail("Q/KV layouts are missing; supply matching TND, BNSD or BSND layouts.", "layout_q,layout_kv");
         cfg.layoutQ = q;
         cfg.layoutKv = kv;
         const auto* block = attrs->GetListInt(0);
@@ -83,7 +87,9 @@ protected:
         const auto* res = attrs->GetAttrPointer<int64_t>(9);
         const auto* topk = attrs->GetAttrPointer<bool>(10);
         if (!scale || !mask || !precision || !left || !right || !res || !topk)
-            return Fail("missing QSAG attributes");
+            return Fail("Required QSAG attributes are missing; check scale_value, mask_type, softmax_precision, "
+                        "win_left, win_right, residual_block_mode and is_consistent_topk.",
+                        "QSAG attributes");
         cfg.scale = *scale;
         cfg.mask = *mask;
         cfg.precision = *precision;
@@ -94,20 +100,30 @@ protected:
         auto error =
             qsag::Validate(tensors, cfg, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT, ge::DT_INT32, ge::DT_INT64, s_);
         if (!error.empty())
-            return Fail(error.c_str());
+            return Fail(error.c_str(), "QSAG inputs and attributes");
         // Architecture-specific kernel limits stay outside the shared descriptor validator.
         for (const auto& tensor : tensors) {
             if (tensor.present &&
                 std::any_of(tensor.shape.begin(), tensor.shape.end(), [](int64_t dimension) { return dimension == 0; }))
-                return Fail("QSAG arch22 does not support zero-length tensor dimensions");
+                return Fail("QSAG arch22 does not support zero-length tensor dimensions.", "QSAG tensors");
         }
         if (s_.group > 256 || s_.d > 256)
-            return Fail("QSAG arch22 supports G<=256 and D<=256");
+            return Fail((std::string("QSAG arch22 requires G<=256 and D<=256; actual G=") + std::to_string(s_.group) +
+                         ", D=" + std::to_string(s_.d))
+                            .c_str(),
+                        "query,key");
         if (s_.layout == 0 && s_.qcap < s_.sq / s_.batch + (s_.sq % s_.batch != 0))
-            return Fail("QSAG arch22 requires TND Qcap>=ceil(T1/B)");
+            return Fail((std::string("TND requires Qcap>=ceil(T1/B); actual Qcap=") + std::to_string(s_.qcap) +
+                         ", T1=" + std::to_string(s_.sq) + ", B=" + std::to_string(s_.batch) +
+                         "; enlarge the sparse query capacity.")
+                            .c_str(),
+                        "query,sparse_block_idx,sparse_block_count");
         const uint64_t baseKtile = s_.group <= 128 ? 128 : 64;
         if (s_.bs > baseKtile)
-            return Fail("QSAG arch22 requires Bs<=128 for G<=128, Bs<=64 otherwise");
+            return Fail((std::string("QSAG arch22 requires Bs<=") + std::to_string(baseKtile) +
+                         "; actual Bs=" + std::to_string(s_.bs) + ", G=" + std::to_string(s_.group))
+                            .c_str(),
+                        "block_shape,query,key");
         // Arch22 UB capacity limits Ktile to 128 even for the small-group case.
         s_.ktile = s_.dtile = baseKtile;
         s_.dp = (s_.d + 15) / 16 * 16;
@@ -239,7 +255,7 @@ protected:
             return Fail("total workspace overflow");
         auto* workspaceSizes = context_->GetWorkspaceSizes(1);
         if (!workspaceSizes)
-            return Fail("missing workspace descriptor");
+            return Fail("GetWorkspaceSizes(1) returned null; check the Tiling workspace output slot.");
         workspaceSizes[0] = systemWorkspaceBytes + workspaceOffset;
         return ge::GRAPH_SUCCESS;
     }
@@ -248,7 +264,10 @@ protected:
     {
         auto* raw = context_->GetRawTilingData();
         if (!raw || raw->GetCapacity() < data_.GetDataSize())
-            return Fail("tiling buffer too small");
+            return Fail((std::string("Tiling buffer is unavailable or too small; capacity=") +
+                         std::to_string(raw == nullptr ? 0U : raw->GetCapacity()) +
+                         ", required=" + std::to_string(data_.GetDataSize()) + "; check Tiling output buffers.")
+                            .c_str());
         data_.SaveToBuffer(raw->GetData(), raw->GetCapacity());
         raw->SetDataSize(data_.GetDataSize());
         return ge::GRAPH_SUCCESS;
@@ -260,9 +279,16 @@ protected:
     }
 
 private:
-    ge::graphStatus Fail(const char* message)
+    ge::graphStatus Fail(const char* message, const char* paramName = nullptr)
     {
-        OP_LOGE(context_->GetNodeName(), "%s", message);
+        const char* opName =
+            context_->GetNodeName() == nullptr ? "GenericBlockSparseAttentionGrad" : context_->GetNodeName();
+        if (paramName != nullptr) {
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName, paramName, message);
+        } else {
+            REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                      (std::vector<const char*>{opName, message}));
+        }
         return ge::GRAPH_FAILED;
     }
     struct Arch22ShapeInfo : qsag::ShapeInfo {
