@@ -85,6 +85,7 @@ constexpr float DEFAULT_CLAMP_LIMIT = 7.0F;
 constexpr float DEFAULT_GLU_ALPHA = 1.702F;
 constexpr float DEFAULT_GLU_BIAS = 1.0F;
 constexpr uint16_t SINGLE_DMA_BLOCK = 1;
+constexpr uint64_t MAX_SCALE_DMA_BLOCK_COUNT = 4095UL;
 constexpr uint16_t EXPONENT_ROUND_INCREMENT = 1;
 constexpr uint32_t VECTOR_CEIL_ADJUSTMENT = 1;
 constexpr uint32_t PACKED_HALF_LANE_SHIFT = 1;
@@ -392,16 +393,18 @@ __aicore__ inline void BlockEpilogueSwigluQuant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_
     auto validScaleN = CeilDiv(static_cast<uint64_t>(singleN_), scaleGroupSize);
     const bool hasPadding = HasSwigluMxScalePadding(n_, singleN_, Get<Y_IDX>(blockCoord_) % n_);
     const uint64_t writeScaleN = validScaleN + static_cast<uint64_t>(hasPadding);
-    // quantScaleBlockOutput_ uses a 32-byte UB row for every logical M row,
-    // whereas this tile writes writeScaleN compact bytes in each GM row. A multi-row
-    // DataCopyPad with a sub-32-byte blockLen expresses its source stride in
-    // hardware blocks, so it cannot represent this 32-byte-to-compact-row
-    // conversion without rounding ambiguity.  Copy each row from its explicit
-    // 32-byte UB address instead.  This keeps the public yScale rows compact
-    // for all N tiles, including the common N=64 output tile.
+    // TransMxScaleLayout stages each M row in one 32-byte UB block. For a
+    // short blockLen, DataCopyPad rounds the source advance up to 32 bytes;
+    // srcStride=0 therefore preserves that UB row pitch. The GM stride is
+    // specified in bytes and skips only the other columns in the scale row.
     AscendC::DataCopyExtParams params{SINGLE_DMA_BLOCK, 0, 0, 0, 0};
-    params.blockCount = SINGLE_DMA_BLOCK;
     params.blockLen = static_cast<uint32_t>(writeScaleN * sizeof(SwigluMxScaleCopyType));
+    if (params.blockLen <= AscendC::ONE_BLK_SIZE && blockCount <= MAX_SCALE_DMA_BLOCK_COUNT) {
+        params.blockCount = static_cast<uint16_t>(blockCount);
+        params.dstStride = static_cast<uint32_t>((scaleN_ - writeScaleN) * sizeof(SwigluMxScaleCopyType));
+        AscendC::DataCopyPad(quantScaleGlobal_[offset], src, params);
+        return;
+    }
     for (uint64_t row = 0; row < blockCount; ++row) {
         AscendC::DataCopyPad(quantScaleGlobal_[offset + row * scaleN_], src[row * AscendC::ONE_BLK_SIZE], params);
     }
@@ -718,11 +721,11 @@ __aicore__ inline void BlockEpilogueSwigluQuant<QMM_BLOCK_EPILOGUE_DEQUANT_FUNC_
     __VEC_SCOPE__
     {
         for (uint16_t mIdx = 0; mIdx < mSize; mIdx++) { // 需要计算m次
+            uint32_t elementNum = nSize;
             AscendC::Reg::MaskReg mask;
             for (uint16_t vfBlockIdx = 0; vfBlockIdx < OneRowRepeatTimes; vfBlockIdx++) { // 每次计算m=1, n=64的数据大小
                 uint32_t outputOffset = static_cast<uint32_t>(vfBlockIdx) * sizePerRepeat;
-                uint32_t remaining = nSize - outputOffset;
-                uint32_t elementNum = remaining < sizePerRepeat ? remaining : sizePerRepeat;
+                // UpdateMask consumes elementNum, preserving partial lanes on the last repeat.
                 // The vector computation is performed in the MMAD accumulator
                 // type (FP32); keep this mask in the accumulator lane domain
                 // so the PACK_B32 store uses the same register layout as the
