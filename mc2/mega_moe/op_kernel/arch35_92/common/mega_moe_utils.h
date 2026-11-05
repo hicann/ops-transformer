@@ -365,7 +365,7 @@ __aicore__ inline GM_ADDR GetTensorAddr(uint16_t index, GM_ADDR tensorPtr)
 }
 #if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
 // OOM 检测的合法地址段登记: 窗口/tiling 不属于框架自动登记的输入输出张量,
-// 不登记会被越界检查误拦。长度=实际使用范围(见各调用点)。
+// 不登记会被越界检查误拦。长度见各调用点。
 __aicore__ inline void OOMRegisterRange(GM_ADDR base, uint64_t bytes)
 {
     if (base == nullptr || bytes == 0ULL) {

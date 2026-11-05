@@ -594,14 +594,10 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitWorks
     params_.communication.layout = PeermemInfo(tilingData->comm, params_.workspace.layout.workspaceSize);
     params_.workspace.base = params_.communication.layout.workspace.get_ptr(params_.communication.base);
 #if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
-    // HCCL 窗口: 逐 rank 登记实际使用范围(通信布局区+workspace 区), 长度与窗口布局同源(PeermemInfo)
+    // HCCL 窗口: 逐 rank 登记整窗(ccl_buffer_size), 覆盖通信布局区与 workspace 区
     for (int i = 0; i < worldSize_; i++) {
-        OOMRegisterRange(reinterpret_cast<GM_ADDR>(mc2Context_->epHcclBuffer_[i]),
-                         static_cast<uint64_t>(params_.communication.layout.workspace.offsetBytes) +
-                             static_cast<uint64_t>(params_.communication.layout.workspace.sizeBytes));
+        OOMRegisterRange(reinterpret_cast<GM_ADDR>(mc2Context_->epHcclBuffer_[i]), tilingData->cclBufferSize);
     }
-    // tiling 常驻 GM(大 tiling 会被 DataCopy 搬入 UB)
-    OOMRegisterRange(reinterpret_cast<GM_ADDR>(reinterpret_cast<uintptr_t>(tilingData)), sizeof(MegaMoeTilingData));
 #endif
     params_.tilingData = tilingData;
     const auto& workspace = params_.workspace.layout;

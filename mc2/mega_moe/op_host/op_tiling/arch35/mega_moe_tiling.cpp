@@ -498,6 +498,8 @@ static ge::graphStatus CommitTilingResult(gert::TilingContext* context, const Me
     WorkspaceLayout workspaceLayout(tilingData->compute);
     OP_TILING_CHECK(CheckCclBufferCapacity(context, config, tilingData, workspaceLayout, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "CCL buffer capacity is insufficient."), return ge::GRAPH_FAILED);
+    tilingData->cclBufferSize =
+        static_cast<uint64_t>(*context->GetAttrs()->GetAttrPointer<int64_t>(config.attrCclBufferSizeIndex));
     OP_TILING_CHECK(SetWorkspace(context, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Tiling set workspace failed."), return ge::GRAPH_FAILED);
 

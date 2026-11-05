@@ -225,5 +225,7 @@ struct MegaMoeTilingData {
     uint32_t preQuantStageBytes;
     // A6 按实际可用 UB 容量计算常驻表基址；追加字段保持已有字段偏移不变。
     uint32_t dispatchTableUbBaseAddr;
+    // HCCL 窗口总字节数（ccl_buffer_size），OOM 检测按整窗登记合法地址段。
+    uint64_t cclBufferSize;
 };
 #endif
