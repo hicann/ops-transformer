@@ -58,23 +58,33 @@ public:
     // 索引使用 loop & (DB - 1) 代替 loop % DB，要求 DB 必须是2的幂，否则位掩码结果错误
     static_assert(DB > 0 && (DB & (DB - 1)) == 0, "DB must be a power of two for bitmask indexing");
 
+    // mmRes 槽数来自 ConfigValue 的 count 常量（与 cube 侧同源，同类 buffer 的 id 连续）
+    static constexpr uint32_t UB_MM1_RES_BUFCNT = (uint32_t)FA_T::UB_MM1_RES_BUFCNT;
+    static constexpr uint32_t UB_MM2_RES_BUFCNT = (uint32_t)FA_T::UB_MM2_RES_BUFCNT;
+    static constexpr bool MM_RES_SEPARATE_BMM2 = (UB_MM2_RES_BUFCNT != 0U);
+    static constexpr uint32_t MM1_BUF_BYTES = mBaseSize / CV_RATIO * s2BaseSize * sizeof(T);
+    static constexpr uint32_t MM2_BUF_BYTES =
+        mBaseSize / CV_RATIO * ((((uint32_t)dVBaseSize + 15U) >> 4) << 4) * sizeof(T);
+    static constexpr uint32_t UB_MM_RES_FLAGCNT = UB_MM1_RES_BUFCNT + UB_MM2_RES_BUFCNT;
+
     // 核间同步ID
     static constexpr uint64_t CROSS_CORE_SYNC_MODE = 4;
-    static constexpr uint32_t CC_MM_0 = 0U;
+    static constexpr uint32_t CC_MM_0 = 0U; // 0 .. UB_MM_RES_FLAGCNT-1: mmRes 槽（连续）
     static constexpr uint32_t CC_MM_1 = 1U;
     static constexpr uint32_t CC_MM_2 = 2U;
     static constexpr uint32_t CC_MM_3 = 3U;
-    static constexpr uint32_t CC_L1P_0 = 5U;
-    static constexpr uint32_t CC_L1P_1 = 6U;
-    static constexpr uint32_t CC_L1P_2 = 7U;
+    static constexpr uint32_t CC_L1P_0 = CC_MM_0 + UB_MM_RES_FLAGCNT; // 紧随 mmRes 槽（连续）
+    static constexpr uint32_t CC_L1P_1 = CC_L1P_0 + 1U;
+    static constexpr uint32_t CC_L1P_2 = CC_L1P_0 + 2U;
 
-    // 核内同步ID
-    // MTE3<->V, 输出buffer
+    // 核内同步ID（同类 buffer 连续）
+    //   0                              -> vec2Res
+    //   1 .. 1+UB_VEC1_RES_BUFCNT-1    -> vec1Res
+    //   1+UB_VEC1_RES_BUFCNT .. +1     -> LSE out
     static constexpr uint32_t UB_OUT_VEC2_RES_EVENT0 = 0;
-    static constexpr uint32_t UB_OUT_VEC1_RES_EVENT0 = 2;
-    static constexpr uint32_t UB_OUT_VEC1_RES_EVENT1 = 3;
-    static constexpr uint32_t UB_OUT_LSE_OUT_EVENT0 = 4;
-    static constexpr uint32_t UB_OUT_LSE_OUT_EVENT1 = 5;
+    static constexpr uint32_t UB_OUT_VEC1_RES_EVENT0 = UB_OUT_VEC2_RES_EVENT0 + 1U;
+    static constexpr uint32_t UB_OUT_LSE_OUT_EVENT0 = UB_OUT_VEC1_RES_EVENT0 + (uint32_t)FA_T::UB_VEC1_RES_BUFCNT;
+    static constexpr uint32_t UB_OUT_LSE_OUT_EVENT1 = UB_OUT_LSE_OUT_EVENT0 + 1U;
 
     // L1
     static constexpr uint32_t L1_P_BUFCNT = 3U;
@@ -82,11 +92,9 @@ public:
     LocalTensor<uint8_t> l1PBuffers_;
 
     // UB
-    static constexpr uint32_t UB_MM_RES_BUFCNT = (dBaseSize > 128) ? 2U : 4U;
-    static constexpr uint32_t UB_MM_RES_BUF_BYTES =
-        mBaseSize / CV_RATIO * (s2BaseSize > dVBaseSize ? s2BaseSize : dVBaseSize) * sizeof(T);
     // bmm1/bmm2(mmRes) 区域总字节数：FD block 以此作为 FD 业务区的 UB 起始偏移
-    static constexpr uint32_t UB_MM_RES_TOTAL_BYTES = UB_MM_RES_BUFCNT * UB_MM_RES_BUF_BYTES;
+    static constexpr uint32_t UB_MM_RES_TOTAL_BYTES =
+        UB_MM1_RES_BUFCNT * MM1_BUF_BYTES + UB_MM2_RES_BUFCNT * MM2_BUF_BYTES;
     // FD 业务区在 UB 中的起始字节偏移，供 kernel 传给 FD block 的 InitBuffers
     static __aicore__ inline constexpr uint32_t GetFdBaseOffset()
     {
@@ -98,7 +106,8 @@ public:
     static constexpr uint32_t UB_VEC2_RES_BUF_BYTES = mBaseSize / CV_RATIO * dTemplateAlign64 * sizeof(T);
     LocalTensor<T> ubVec2Res_; // 存放vec2阶段VEC的中间处理结果, 并且作为attn_out的输出buffer, 需配对的MTE3和V的同步ID
 
-    static constexpr uint32_t UB_VEC1_RES_BUFCNT = 2U;
+    // vec1Res 块数来自 ConfigValue 的 count 常量（MTE3(P->L1) 暂存桶深度）
+    static constexpr uint32_t UB_VEC1_RES_BUFCNT = (uint32_t)FA_T::UB_VEC1_RES_BUFCNT;
     // P 的容量: 32 列一组, 组内 8 个 544B 槽(每槽 = 16x16 fractal 512B + 32B pad),
     // 组 = 8 x 544B = 4352B, 故容量 = ceil(s2BaseSize/32) * 4352B (= 4.25 x s2BaseSize)。
     // 依据: StoreAlign<DATA_BLOCK_COPY> 一条指令写 8 个 32B DataBlock, 块间距离 17 个 DataBlock(544B)
@@ -128,7 +137,7 @@ public:
 
     // 这些缓冲区加起来不能超过 UB 可用大小, 超了直接编译报错(不含 FD block 复用的那块空间)
     static constexpr uint32_t UB_TOTAL_BYTES =
-        UB_MM_RES_BUFCNT * UB_MM_RES_BUF_BYTES + UB_VEC2_RES_BUF_BYTES + UB_VEC1_RES_BUFCNT * UB_VEC1_RES_BUF_BYTES +
+        UB_MM_RES_TOTAL_BYTES + UB_VEC2_RES_BUF_BYTES + UB_VEC1_RES_BUFCNT * UB_VEC1_RES_BUF_BYTES +
         UB_SOFTMAX_SUM_BUFCNT * UB_SOFTMAX_SUM_BUF_BYTES + UB_SOFTMAX_MAX_BUFCNT * UB_SOFTMAX_MAX_BUF_BYTES +
         UB_SOFTMAX_EXP_BUFCNT * UB_SOFTMAX_EXP_BUF_BYTES + UB_LSE_OUT_BUFCNT * UB_LSE_OUT_BUF_BYTES;
     static_assert(UB_TOTAL_BYTES <= 254016U, "DN vec UB buffers exceed device capacity (248KB)");
@@ -200,9 +209,8 @@ public:
 
         /*--------------------------------------------UB--------------------------------------------*/
         uint32_t addrUb = 0;
-        ubMmResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb,
-                                               UB_MM_RES_BUFCNT * UB_MM_RES_BUF_BYTES); // CV通信BUF
-        addrUb = UB_MM_RES_BUFCNT * UB_MM_RES_BUF_BYTES;
+        ubMmResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb, UB_MM_RES_TOTAL_BYTES); // CV通信BUF
+        addrUb = UB_MM_RES_TOTAL_BYTES;
         ubVec2Res_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb, UB_VEC2_RES_BUF_BYTES)
                          .template ReinterpretCast<T>(); // 输出BUF: attn_out拷出
         addrUb += UB_VEC2_RES_BUF_BYTES;
@@ -275,8 +283,10 @@ public:
     {
         CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_MM_0);
         CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_MM_1);
-        if constexpr (dBaseSize <= 128) {
+        if constexpr (UB_MM_RES_FLAGCNT > 2U) {
             CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_MM_2);
+        }
+        if constexpr (UB_MM_RES_FLAGCNT > 3U) {
             CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_MM_3);
         }
     }
@@ -290,12 +300,19 @@ public:
     __aicore__ inline void ProcessVec1(RunInfo runInfo)
     {
         uint32_t mmResUbBufId = mmResBufId_;
-        mmResBufId_ = (mmResBufId_ + 1) % UB_MM_RES_BUFCNT;
+        uint32_t mm1BufOffset = 0U;
+        if constexpr (MM_RES_SEPARATE_BMM2) {
+            mmResUbBufId = (uint32_t)(runInfo.loop % UB_MM1_RES_BUFCNT); // 与 cube 的 bmm1 同源(任务奇偶)
+            mm1BufOffset = mmResUbBufId * MM1_BUF_BYTES;
+        } else {
+            mmResBufId_ = (mmResBufId_ + 1) % UB_MM1_RES_BUFCNT;
+            mm1BufOffset = mmResUbBufId * MM1_BUF_BYTES;
+        }
         uint32_t pL1BufId = runInfo.loop % L1_P_BUFCNT;
         uint32_t mmSyncIdx = CC_MM_0 + mmResUbBufId;
         uint32_t v1c2CrossCoreSyncIdx = CC_L1P_0 + pL1BufId;
         LocalTensor<INPUT_T> pL1Tensor = l1PBuffers_[pL1BufId * L1_P_BUF_BYTES].template ReinterpretCast<INPUT_T>();
-        auto mm1ResUbTensor = ubMmResBuffers_[mmResUbBufId * UB_MM_RES_BUF_BYTES].template ReinterpretCast<T>();
+        auto mm1ResUbTensor = ubMmResBuffers_[mm1BufOffset].template ReinterpretCast<T>();
 
         if (unlikely(runInfo.isFirstS2Loop)) {
             ResetSoftmaxBuffer(runInfo.mloop % UB_SOFTMAX_SUM_BUFCNT, runInfo);
@@ -536,7 +553,15 @@ public:
     __aicore__ inline void ProcessVec2(RunInfo runInfo)
     {
         uint32_t mmResUbBufId = mmResBufId_;
-        mmResBufId_ = (mmResBufId_ + 1) % UB_MM_RES_BUFCNT;
+        uint32_t mm2BufOffset = 0U;
+        if constexpr (MM_RES_SEPARATE_BMM2) {
+            (void)mmResBufId_;
+            mmResUbBufId = UB_MM1_RES_BUFCNT; // 独立的 bmm2 结果槽, id 紧随分数槽
+            mm2BufOffset = UB_MM1_RES_BUFCNT * MM1_BUF_BYTES;
+        } else {
+            mmResBufId_ = (mmResBufId_ + 1) % UB_MM1_RES_BUFCNT;
+            mm2BufOffset = mmResUbBufId * MM1_BUF_BYTES;
+        }
         uint32_t mmSyncIdx = CC_MM_0 + mmResUbBufId;
         if (unlikely(runInfo.actVecMSize == 0)) {
             CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx);
@@ -547,8 +572,7 @@ public:
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx);
         {
             Mutex::Lock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
-            LocalTensor<T> mm2ResUbTensor =
-                ubMmResBuffers_[mmResUbBufId * UB_MM_RES_BUF_BYTES].template ReinterpretCast<T>();
+            LocalTensor<T> mm2ResUbTensor = ubMmResBuffers_[mm2BufOffset].template ReinterpretCast<T>();
             if (unlikely(runInfo.isFirstS2Loop)) {
                 uint32_t vec2CalcSize = runInfo.actVecMSize * dTemplateAlign64;
                 DataCopy(ubVec2Res_, mm2ResUbTensor, vec2CalcSize);

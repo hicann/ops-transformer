@@ -71,6 +71,19 @@ void FlashAttnTilingImplArch35::SplitPolicy()
 
 void FlashAttnTilingImplArch35::UpdateTilingKeyConfig()
 {
+    if (kernelConfig_.templateId == FA_Template_DN_Unmerged) {
+        // 不合轴 DN(template 2): M=128 + S2=256，按真实 D 选档；D=72 用 originalDV=72 档
+        if (faInfo_->qkHeadDim == 64) {
+            tilingKeyInfo_.config = 10;
+        } else if (faInfo_->qkHeadDim == 72) {
+            tilingKeyInfo_.config = 13;
+        } else if (faInfo_->qkHeadDim == 128) {
+            tilingKeyInfo_.config = 11;
+        } else if (faInfo_->qkHeadDim == 192 && faInfo_->vHeadDim == 128) {
+            tilingKeyInfo_.config = 12;
+        }
+        return;
+    }
     if (faInfo_->qkHeadDim == faInfo_->vHeadDim) {
         // 等长场景：原始 D=qkHeadDim、原始 DV=vHeadDim；模板 D/DV 为 ConfigParams.d/dv。
         // originalDV 单独保留原始 V/输出维度，Q/K 的原始 D 仍由运行时 qkHeadDim 提供。

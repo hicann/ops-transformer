@@ -134,8 +134,9 @@ private:
             config.sOuter = 64;
             config.sInner = 128;
         } else if (config.templateId == FA_Template_DN_Unmerged) {
+            // 不合轴 DN: 基本块 M=128(两 AIV 各 64 行) + S2=256, 全档统一
             config.sOuter = 64;
-            config.sInner = 128;
+            config.sInner = 256;
         }
     }
 };

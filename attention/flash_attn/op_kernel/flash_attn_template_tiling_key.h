@@ -95,14 +95,14 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 2, 6, 8),
                          ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)),
     // DN不合轴模板（templateId=2）：kernel 侧为独立文件(*_dn_unmerged.h),
-    // 全部已注册 D/DV config(0-9) 与有无 attenMask 全量实例化;
+    // config 10-13 为 S2=Aligned256 专用档(D=64/128/192-128/D=72, originalDV 与真实 V 一致);
     // arch35: vHeadDim<=128、maxSeqQ>=256 且 maskMode 为 0/3；arch92 使用 GetConfigInfo。
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
                                               InOutLayoutType_BNSD, InOutLayoutType_TND, InOutLayoutType_BNSD_BSND),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3),
                          ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
                          ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 2),
-                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 10, 11, 12, 13),
                          ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)), );
 
 #endif // TEMPLATE_TILING_KEY_FLASH_ATTN_H_

@@ -63,13 +63,27 @@ public:
 
     // 核间同步ID
     static constexpr uint64_t CROSS_CORE_SYNC_MODE = 4U;
+    // mmRes 槽数来自 ConfigValue 的 count 常量（同类 buffer 的 id 连续）：
+    //   0 .. UB_MM1_RES_BUFCNT-1         -> bmm1 分数槽
+    //   UB_MM1_RES_BUFCNT .. +UB_MM2-1   -> bmm2 结果槽（UB_MM2_RES_BUFCNT=0 时不存在，bmm2 复用分数槽）
+    //   CROSSCORE_L1P_0 (= MM_0 + UB_MM_RES_FLAGCNT) 起 -> L1 P 三缓冲
+    static constexpr uint32_t UB_MM1_RES_BUFCNT = (uint32_t)FA_T::UB_MM1_RES_BUFCNT;
+    static constexpr uint32_t UB_MM2_RES_BUFCNT = (uint32_t)FA_T::UB_MM2_RES_BUFCNT;
+    static constexpr bool MM_RES_SEPARATE_BMM2 = (UB_MM2_RES_BUFCNT != 0U);
+    static constexpr uint32_t MM1_BUF_BYTES = mBaseSize / CV_RATIO * s2BaseSize * sizeof(MM_T);
+    static constexpr uint32_t MM2_BUF_BYTES =
+        mBaseSize / CV_RATIO * ((((uint32_t)dVBaseSize + 15U) >> 4) << 4) * sizeof(MM_T);
+    static constexpr uint32_t UB_MM_RES_TOTAL_BYTES =
+        UB_MM1_RES_BUFCNT * MM1_BUF_BYTES + UB_MM2_RES_BUFCNT * MM2_BUF_BYTES;
+    static constexpr uint32_t UB_MM_RES_FLAGCNT = UB_MM1_RES_BUFCNT + UB_MM2_RES_BUFCNT;
+
     static constexpr uint32_t CROSSCORE_MM_0 = 0U;
     static constexpr uint32_t CROSSCORE_MM_1 = 1U;
     static constexpr uint32_t CROSSCORE_MM_2 = 2U;
     static constexpr uint32_t CROSSCORE_MM_3 = 3U;
-    static constexpr uint32_t CROSSCORE_L1P_0 = 5U;
-    static constexpr uint32_t CROSSCORE_L1P_1 = 6U;
-    static constexpr uint32_t CROSSCORE_L1P_2 = 7U;
+    static constexpr uint32_t CROSSCORE_L1P_0 = CROSSCORE_MM_0 + UB_MM_RES_FLAGCNT;
+    static constexpr uint32_t CROSSCORE_L1P_1 = CROSSCORE_L1P_0 + 1U;
+    static constexpr uint32_t CROSSCORE_L1P_2 = CROSSCORE_L1P_0 + 2U;
 
     // 核内同步ID
     static constexpr uint32_t Q_L1_BUFFER_ID0 = 0U;
@@ -88,9 +102,6 @@ public:
     static constexpr uint32_t L0C_BUFFER_ID3 = 13U;
 
     // UB
-    static constexpr uint32_t UB_MM_RES_BUFCNT = (dBaseSize > 128) ? 2U : 4U;
-    static constexpr uint32_t UB_MM_RES_BUF_BYTES =
-        mBaseSize / CV_RATIO * (s2BaseSize > dVBaseSize ? s2BaseSize : dVBaseSize) * sizeof(MM_T);
     LocalTensor<uint8_t> ubMmResBuffers_;
     // L1
     static constexpr uint32_t L1_P_BUFCNT = 3U;
@@ -151,7 +162,7 @@ public:
     {
         /*--------------------------------------------UB--------------------------------------------*/
         uint32_t addrUb = 0;
-        ubMmResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb, UB_MM_RES_BUFCNT * UB_MM_RES_BUF_BYTES);
+        ubMmResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb, UB_MM_RES_TOTAL_BYTES);
 
         /*--------------------------------------------L1--------------------------------------------*/
         uint32_t addrL1 = 0;
@@ -211,9 +222,11 @@ public:
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_MM_0 + AIV0_AIV1_OFFSET);
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_MM_1);
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_MM_1 + AIV0_AIV1_OFFSET);
-        if constexpr (dBaseSize <= 128) {
+        if constexpr (UB_MM_RES_FLAGCNT > 2U) {
             CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_MM_2);
             CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_MM_2 + AIV0_AIV1_OFFSET);
+        }
+        if constexpr (UB_MM_RES_FLAGCNT > 3U) {
             CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_MM_3);
             CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_MM_3 + AIV0_AIV1_OFFSET);
         }
@@ -281,9 +294,16 @@ public:
     __aicore__ inline void IterateBmm1(RunInfo& runInfo)
     {
         uint32_t mmResUbBufId = mmResBufId_;
-        mmResBufId_ = (mmResBufId_ + 1) % UB_MM_RES_BUFCNT;
-        LocalTensor<MM_T> mm1ResUbTensor =
-            ubMmResBuffers_[mmResUbBufId * UB_MM_RES_BUF_BYTES].template ReinterpretCast<MM_T>();
+        uint32_t mm1BufOffset = 0U;
+        if constexpr (MM_RES_SEPARATE_BMM2) {
+            // bmm2 有独立槽时, 分数槽按任务奇偶轮转 -> 复用距离 2 轮(bmm1 双缓冲)
+            mmResUbBufId = (uint32_t)(runInfo.loop % UB_MM1_RES_BUFCNT);
+            mm1BufOffset = mmResUbBufId * MM1_BUF_BYTES;
+        } else {
+            mmResBufId_ = (mmResBufId_ + 1) % UB_MM1_RES_BUFCNT;
+            mm1BufOffset = mmResUbBufId * MM1_BUF_BYTES;
+        }
+        LocalTensor<MM_T> mm1ResUbTensor = ubMmResBuffers_[mm1BufOffset].template ReinterpretCast<MM_T>();
         uint32_t mmSyncIdx = CROSSCORE_MM_0 + mmResUbBufId;
 
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(mmSyncIdx);
@@ -294,11 +314,11 @@ public:
     }
 
     __aicore__ inline void FixpipeMm1Dn(const LocalTensor<MM_T>& dstTensor, const LocalTensor<MM_T>& l0C,
-                                        RunInfo& runInfo)
+                                        uint32_t mSize, RunInfo& runInfo)
     {
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
         fixpipeParams.nSize = (runInfo.actMSize + 31) >> 5 << 5;
-        fixpipeParams.mSize = runInfo.actSingleLoopS2Size;
+        fixpipeParams.mSize = mSize;
         fixpipeParams.srcStride = (fixpipeParams.mSize + 15) >> 4 << 4;
         fixpipeParams.dstStride = fixpipeParams.nSize / 2;
         fixpipeParams.dualDstCtl = 2;
@@ -324,30 +344,46 @@ public:
         Mutex::Unlock<PIPE_MTE2>(KV_L1_BUFFER_ID0 + kvL1BufId_);
         Mutex::Lock<PIPE_MTE1>(KV_L1_BUFFER_ID0 + kvL1BufId_);
         {
-            Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
-            LocalTensor<MM_T> l0CSubTensor = l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
+            // bmm1 沿 s2(M 轴) 按 128 行切块: 单次 Mmad 的结果 mSize*nSize*4B <= 128*128*4B = 64KB,
+            // 正好占一个 L0C 槽, 4 槽轮转不变; s2=256 整块会产出 128KB 并跨槽。
+            // 切块只影响 L0C/Mmad, UB 侧两次 fixpipe 仍写同一个 mmRes 槽的两个半区(无需跨槽配对)。
+            constexpr uint32_t mm1L0cMTile = 128U;
+            const uint32_t actS2Size = (uint32_t)runInfo.actSingleLoopS2Size;
+            const uint32_t mChunks = (actS2Size + mm1L0cMTile - 1U) / mm1L0cMTile;
+            const uint32_t dstStride = ((((uint32_t)runInfo.actMSize + 31) >> 5) << 5) >> 1; // 每 AIV 的行宽
             // Mmad K=D 精确累加; LoadData 搬运宽度按分形粒度对齐(对齐D=原值, D=72→80与Nd2Nz写入组数一致)
             uint32_t ldK = ((constInfo_.dSize + 15) >> 4) << 4;
-            MMParam param = MakeMMParam((uint32_t)runInfo.actSingleLoopS2Size, (uint32_t)runInfo.actMSize,
-                                        constInfo_.dSize, false, true, true, true, 0, 0, ldK, 0);
-            if constexpr (s2BaseSize == 256) {
-                // L0A 双缓冲单槽 32KiB: 256 行 S2 时 K 分块收缩到 64, 保证单分形不越槽
-                MatmulK<KV_T, Q_T, MM_T, 256, 64, 64, ABLayout::MK, ABLayout::KN>(kL1Tensor, qL1Tensor, mmL0APolicy_,
-                                                                                  mmL0BPolicy_, l0CSubTensor, param);
-            } else if constexpr (dBaseSize > 128) {
-                MatmulK<KV_T, Q_T, MM_T, 128, 128, 128, ABLayout::MK, ABLayout::KN>(kL1Tensor, qL1Tensor, mmL0APolicy_,
-                                                                                    mmL0BPolicy_, l0CSubTensor, param);
-            } else {
-                MatmulBase<KV_T, Q_T, MM_T, 128, 128, dBaseSize, ABLayout::MK, ABLayout::KN>(
-                    kL1Tensor, qL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
+            for (uint32_t mChunk = 0U; mChunk < mChunks; ++mChunk) {
+                const uint32_t mSize = (mChunk + 1U == mChunks) ? (actS2Size - mChunk * mm1L0cMTile) : mm1L0cMTile;
+                Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
+                LocalTensor<MM_T> l0CSubTensor =
+                    l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
+                // singleM 保持真实 s2 宽度: L1 的 K 分形是"每个 K 分形含整段 M"的主序, K 步进依赖真实行数;
+                // realM 才是一次 Mmad/一次 fixpipe 的行数(<=128), 保证单个 L0C 槽装得下。
+                MMParam param = MakeMMParam(actS2Size, (uint32_t)runInfo.actMSize, constInfo_.dSize, false, true, true,
+                                            true, 0, mSize, ldK, 0);
+                // M 分形偏移: 每个 16 行分形固定 256 个元素, 与 D 无关
+                LocalTensor<KV_T> kL1ChunkTensor = kL1Tensor[mChunk * mm1L0cMTile * 16U];
+                if constexpr (s2BaseSize == 256) {
+                    // L0A/L0B 单缓冲 32KiB: 128 行 x baseK 128 x 2B = 32KiB, 恰好一槽;
+                    // K 不再多切一片, 每 256 列的 Mmad 次数与 s2=128 基线持平(2 次)
+                    MatmulK<KV_T, Q_T, MM_T, 128, 128, 128, ABLayout::MK, ABLayout::KN>(
+                        kL1ChunkTensor, qL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
+                } else if constexpr (dBaseSize > 128) {
+                    MatmulK<KV_T, Q_T, MM_T, 128, 128, 128, ABLayout::MK, ABLayout::KN>(
+                        kL1ChunkTensor, qL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
+                } else {
+                    MatmulBase<KV_T, Q_T, MM_T, 128, 128, dBaseSize, ABLayout::MK, ABLayout::KN>(
+                        kL1ChunkTensor, qL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
+                }
+                Mutex::Unlock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
+                Mutex::Lock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
+
+                FixpipeMm1Dn(mm1ResUbTensor[mChunk * mm1L0cMTile * dstStride], l0CSubTensor, mSize, runInfo);
+
+                Mutex::Unlock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
+                l0cBufId_ = (l0cBufId_ + 1) % L0C_BUFCNT;
             }
-            Mutex::Unlock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
-            Mutex::Lock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
-
-            FixpipeMm1Dn(mm1ResUbTensor, l0CSubTensor, runInfo);
-
-            Mutex::Unlock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
-            l0cBufId_ = (l0cBufId_ + 1) % L0C_BUFCNT;
         }
         Mutex::Unlock<PIPE_MTE1>(KV_L1_BUFFER_ID0 + kvL1BufId_);
         kvL1BufId_ = (kvL1BufId_ + 1) % L1_KV_BUFCNT;
@@ -361,13 +397,21 @@ public:
     __aicore__ inline void IterateBmm2(RunInfo& runInfo)
     {
         uint32_t mmResUbBufId = mmResBufId_;
-        mmResBufId_ = (mmResBufId_ + 1) % UB_MM_RES_BUFCNT;
+        uint32_t mm2BufOffset = 0U;
+        if constexpr (MM_RES_SEPARATE_BMM2) {
+            // 独立的 bmm2 结果槽, id 紧接在分数槽之后
+            (void)mmResBufId_;
+            mmResUbBufId = UB_MM1_RES_BUFCNT;
+            mm2BufOffset = UB_MM1_RES_BUFCNT * MM1_BUF_BYTES;
+        } else {
+            mmResBufId_ = (mmResBufId_ + 1) % UB_MM1_RES_BUFCNT;
+            mm2BufOffset = mmResUbBufId * MM1_BUF_BYTES;
+        }
         uint32_t pL1BufId = runInfo.loop % L1_P_BUFCNT;
         uint32_t v1c2CrossCoreSyncIdx = CROSSCORE_L1P_0 + pL1BufId;
         uint32_t mmSyncIdx = CROSSCORE_MM_0 + mmResUbBufId;
         LocalTensor<Q_T> pL1Tensor = l1PBuffers_[pL1BufId * L1_P_BUF_BYTES].template ReinterpretCast<Q_T>();
-        LocalTensor<MM_T> mm2ResUbTensor =
-            ubMmResBuffers_[mmResUbBufId * UB_MM_RES_BUF_BYTES].template ReinterpretCast<MM_T>();
+        LocalTensor<MM_T> mm2ResUbTensor = ubMmResBuffers_[mm2BufOffset].template ReinterpretCast<MM_T>();
 
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(v1c2CrossCoreSyncIdx);
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(v1c2CrossCoreSyncIdx + AIV0_AIV1_OFFSET);
