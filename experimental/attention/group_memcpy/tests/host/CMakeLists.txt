@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.16)
+project(group_memcpy_host_tests LANGUAGES CXX)
+enable_testing()
+add_executable(test_tiling_policy test_tiling_policy.cpp)
+target_compile_features(test_tiling_policy PRIVATE cxx_std_14)
+add_test(NAME group_memcpy_tiling_policy COMMAND test_tiling_policy)

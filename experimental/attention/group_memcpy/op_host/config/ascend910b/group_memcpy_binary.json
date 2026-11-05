@@ -1,0 +1,293 @@
+{
+  "op_type": "GroupMemcpy",
+  "op_list": [
+    {
+      "bin_filename": "GroupMemcpy_ND_int8",
+      "inputs": [
+        [
+          {
+            "name": "src",
+            "index": 0,
+            "dtype": "int8",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "outputs": [
+        [
+          {
+            "name": "dst",
+            "index": 0,
+            "dtype": "int8",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "attrs": []
+    },
+    {
+      "bin_filename": "GroupMemcpy_ND_uint8",
+      "inputs": [
+        [
+          {
+            "name": "src",
+            "index": 0,
+            "dtype": "uint8",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "outputs": [
+        [
+          {
+            "name": "dst",
+            "index": 0,
+            "dtype": "uint8",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "attrs": []
+    },
+    {
+      "bin_filename": "GroupMemcpy_ND_int16",
+      "inputs": [
+        [
+          {
+            "name": "src",
+            "index": 0,
+            "dtype": "int16",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "outputs": [
+        [
+          {
+            "name": "dst",
+            "index": 0,
+            "dtype": "int16",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "attrs": []
+    },
+    {
+      "bin_filename": "GroupMemcpy_ND_int32",
+      "inputs": [
+        [
+          {
+            "name": "src",
+            "index": 0,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "outputs": [
+        [
+          {
+            "name": "dst",
+            "index": 0,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "attrs": []
+    },
+    {
+      "bin_filename": "GroupMemcpy_ND_int64",
+      "inputs": [
+        [
+          {
+            "name": "src",
+            "index": 0,
+            "dtype": "int64",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "outputs": [
+        [
+          {
+            "name": "dst",
+            "index": 0,
+            "dtype": "int64",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "attrs": []
+    },
+    {
+      "bin_filename": "GroupMemcpy_ND_float16",
+      "inputs": [
+        [
+          {
+            "name": "src",
+            "index": 0,
+            "dtype": "float16",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "outputs": [
+        [
+          {
+            "name": "dst",
+            "index": 0,
+            "dtype": "float16",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "attrs": []
+    },
+    {
+      "bin_filename": "GroupMemcpy_ND_bfloat16",
+      "inputs": [
+        [
+          {
+            "name": "src",
+            "index": 0,
+            "dtype": "bfloat16",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "outputs": [
+        [
+          {
+            "name": "dst",
+            "index": 0,
+            "dtype": "bfloat16",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "attrs": []
+    },
+    {
+      "bin_filename": "GroupMemcpy_ND_float32",
+      "inputs": [
+        [
+          {
+            "name": "src",
+            "index": 0,
+            "dtype": "float32",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "outputs": [
+        [
+          {
+            "name": "dst",
+            "index": 0,
+            "dtype": "float32",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "attrs": []
+    },
+    {
+      "bin_filename": "GroupMemcpy_ND_bool",
+      "inputs": [
+        [
+          {
+            "name": "src",
+            "index": 0,
+            "dtype": "bool",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "outputs": [
+        [
+          {
+            "name": "dst",
+            "index": 0,
+            "dtype": "bool",
+            "format": "ND",
+            "paramType": "dynamic",
+            "shape": [
+              -2
+            ]
+          }
+        ]
+      ],
+      "attrs": []
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+[
+  {
+    "op": "GroupMemcpy",
+    "input_desc": [
+      {"name": "src", "param_type": "dynamic",
+       "format": ["ND", "ND", "ND", "ND", "ND", "ND", "ND", "ND", "ND"],
+       "type": ["int8", "uint8", "int16", "int32", "int64", "float16", "bfloat16", "float", "bool"]}
+    ],
+    "output_desc": [
+      {"name": "dst", "param_type": "dynamic",
+       "format": ["ND", "ND", "ND", "ND", "ND", "ND", "ND", "ND", "ND"],
+       "type": ["int8", "uint8", "int16", "int32", "int64", "float16", "bfloat16", "float", "bool"]}
+    ],
+    "attr": []
+  }
+]
