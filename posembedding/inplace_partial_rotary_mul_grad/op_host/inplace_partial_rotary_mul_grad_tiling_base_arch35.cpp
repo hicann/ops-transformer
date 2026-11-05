@@ -364,7 +364,7 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckAttr()
     int32_t modeValue = (mode == nullptr) ? 0 : static_cast<int32_t>(*mode);
     if (IsInplacePartialRotaryMulGradMode(modeValue) != true) {
         std::string modeStr = std::to_string(modeValue);
-        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "mode", modeStr.c_str(), "0, 1, 2 or 3");
+        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "mode", modeStr.c_str(), "1 (interleave)");
         return ge::GRAPH_FAILED;
     }
     rotaryMode_ = static_cast<InplacePartialRotaryMulGradMode>(modeValue);

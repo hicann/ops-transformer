@@ -38,7 +38,7 @@
     $$
     则梯度计算公式可表达如下：
 
-    （1）half模式（rotary_mode等于0）：
+    （1）half模式（rotary_mode等于0）（当前版本未实现）：
 
     $$
     dy1', dy2' = chunk(dy', chunks=2, dim=-1)
@@ -78,7 +78,7 @@
 
     dx'的结果inplace写回dy的[start, end)区间。
 
-    （3）quarter模式（rotary_mode等于2）：
+    （3）quarter模式（rotary_mode等于2）（当前版本未实现）：
 
     $$
     dy1', dy2', dy3', dy4' = chunk(dy', chunks=4, dim=-1)
@@ -98,7 +98,7 @@
 
     dx'的结果inplace写回dy的[start, end)区间。
 
-    （4）interleave-half模式（rotary_mode等于3）：
+    （4）interleave-half模式（rotary_mode等于3）（当前版本未实现）：
 
     $$
     dy1', dy2' = chunk(dy', chunks=2, dim=-1)
@@ -276,7 +276,7 @@ aclnnStatus aclnnInplacePartialRotaryMulGrad(
       <td>传入的参数shape不满足约束说明章节中的条件。</td>
     </tr>
     <tr>
-      <td>传入的rotaryMode参数不在0、1、2、3范围内。 </td>
+      <td>传入的rotaryMode参数仅支持1（interleave模式），其余取值不支持。 </td>
     </tr>
     <tr>
       <td>传入的partialSlice元素个数不为2（必须为[start, end)两个元素）。</td>

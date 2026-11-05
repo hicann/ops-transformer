@@ -40,7 +40,7 @@
     $$
     The gradient computation formula is as follows:
 
-    (1) half mode (rotary_mode equal to 0):
+    (1) half mode (rotary_mode equal to 0) (not implemented yet):
 
     $$
     dy1', dy2' = chunk(dy', chunks=2, dim=-1)
@@ -80,7 +80,7 @@
 
     The result of dx' is written back in place to the [start, end) range of dy.
 
-    (3) quarter mode (rotary_mode is equal to 2):
+    (3) quarter mode (rotary_mode is equal to 2) (not implemented yet):
 
     $$
     dy1', dy2', dy3', dy4' = chunk(dy', chunks=4, dim=-1)
@@ -100,7 +100,7 @@
 
     The result of dx' is written back in place to the [start, end) range of dy.
 
-    (4) interleave-half mode (rotary_mode is equal to 3):
+    (4) interleave-half mode (rotary_mode is equal to 3) (not implemented yet):
 
     $$
     dy1', dy2' = chunk(dy', chunks=2, dim=-1)
@@ -278,7 +278,7 @@ aclnnStatus aclnnInplacePartialRotaryMulGrad(
       <td>The shape of the input parameter does not meet the conditions in the Constraints section.</td>
     </tr>
     <tr>
-      <td>The input rotaryMode parameter is not 0, 1, 2, or 3. </td>
+      <td>The input rotaryMode parameter supports only the value 1 (interleave mode). Other values are not supported. </td>
     </tr>
     <tr>
       <td>The number of elements in partialSlice is not 2 (it must be two elements, [start, end)).</td>
