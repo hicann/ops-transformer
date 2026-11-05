@@ -590,18 +590,19 @@ int64_t MoeFinalizeRoutingTiling::GetTilingKey() const
 inline static ge::graphStatus MoeFinalizeRoutingSetTilingData(gert::TilingContext* context,
                                                               MoeFinalizeRoutingTilingData& tilingData)
 {
-    if (tilingData.GetDataSize() > context->GetRawTilingData()->GetCapacity()) {
+    auto rawTilingData = context->GetRawTilingData();
+    OP_CHECK_NULL_WITH_CONTEXT(context, rawTilingData);
+    if (tilingData.GetDataSize() > rawTilingData->GetCapacity()) {
         const std::string opName = context->GetNodeName();
         const std::string reason = "Tiling data size " + std::to_string(tilingData.GetDataSize()) +
-                                   " exceeds buffer capacity " +
-                                   std::to_string(context->GetRawTilingData()->GetCapacity()) + ".";
+                                   " exceeds buffer capacity " + std::to_string(rawTilingData->GetCapacity()) + ".";
         OP_LOGE_LIBOPAPI_REPORT(opName.c_str(), "%s", reason.c_str());
         REPORT_PREDEFINED_ERR_MSG("EZ1008", std::vector<const char*>({"opName", "reason"}),
                                   std::vector<const char*>({opName.c_str(), reason.c_str()}));
         return ge::GRAPH_FAILED;
     }
-    tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
-    context->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
+    tilingData.SaveToBuffer(rawTilingData->GetData(), rawTilingData->GetCapacity());
+    rawTilingData->SetDataSize(tilingData.GetDataSize());
     return ge::GRAPH_SUCCESS;
 }
 

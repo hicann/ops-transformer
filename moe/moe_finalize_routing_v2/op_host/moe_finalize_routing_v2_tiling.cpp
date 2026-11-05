@@ -54,6 +54,8 @@ ge::graphStatus MoeFinalizeRoutingTilingV2::GetWorkspaceSize()
 
 ge::graphStatus MoeFinalizeRoutingTilingV2::PostTiling()
 {
+    auto rawTilingData = context_->GetRawTilingData();
+    OP_CHECK_NULL_WITH_CONTEXT(context_, rawTilingData);
     DoPostTiling();
     uint64_t tilingKey = GetTilingKey();
     context_->SetTilingKey(tilingKey);
