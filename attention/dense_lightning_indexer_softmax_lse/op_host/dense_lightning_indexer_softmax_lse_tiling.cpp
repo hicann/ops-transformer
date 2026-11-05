@@ -492,6 +492,66 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::GetStorageSeqSize()
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus DenseLISoftmaxLseInfoParser::CheckSeqLenRelation()
+{
+    if (layout_ == DataLayout::BSND) {
+        // 约束说明: 当layout为BSND时, S1<=S2
+        OP_CHECK_IF(s1Size_ > s2Size_,
+                    OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                        opName_, "query_index,key_index",
+                        (std::string("S1=") + std::to_string(s1Size_) + ",S2=" + std::to_string(s2Size_)).c_str(),
+                        "When layout is BSND, the query sequence length must not exceed the key sequence length."),
+                    return ge::GRAPH_FAILED);
+        return ge::GRAPH_SUCCESS;
+    }
+
+    // TND: actual_seq_lengths_query/actual_seq_lengths_key为必传的累计值数组, 元素个数均为bSize_
+    const gert::Tensor* querySeqTensor = opParamInfo_.actualSeqLengthsQ.tensor;
+    const gert::Tensor* keySeqTensor = opParamInfo_.actualSeqLengths.tensor;
+    OP_CHECK_IF(querySeqTensor == nullptr || keySeqTensor == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "actual_seq_lengths_query,actual_seq_lengths_key",
+                                                         "This input must be provided when layout is TND."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        querySeqTensor->GetShapeSize() != keySeqTensor->GetShapeSize(),
+        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+            opName_, "actual_seq_lengths_query,actual_seq_lengths_key",
+            (std::to_string(querySeqTensor->GetShapeSize()) + "," + std::to_string(keySeqTensor->GetShapeSize()))
+                .c_str(),
+            "The two sequence-length arrays must have the same element count."),
+        return ge::GRAPH_FAILED);
+    const int64_t* querySeqData = querySeqTensor->GetData<int64_t>();
+    const int64_t* keySeqData = keySeqTensor->GetData<int64_t>();
+    OP_CHECK_IF(querySeqData == nullptr || keySeqData == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "actual_seq_lengths_query,actual_seq_lengths_key",
+                                                         "The sequence-length tensor data must not be nullptr."),
+                return ge::GRAPH_FAILED);
+    // 逐索引校验: 累计值单调不减, 且相同索引位置S1<=S2(等价于相同索引位置累计值query<=key)
+    int64_t prevQueryLen = 0;
+    int64_t prevKeyLen = 0;
+    for (uint32_t i = 0; i < bSize_; ++i) {
+        const int64_t batchQueryLen = querySeqData[i] - prevQueryLen;
+        const int64_t batchKeyLen = keySeqData[i] - prevKeyLen;
+        OP_CHECK_IF(batchQueryLen < 0 || batchKeyLen < 0,
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        opName_, "actual_seq_lengths_query,actual_seq_lengths_key",
+                        (std::to_string(querySeqData[i]) + "," + std::to_string(keySeqData[i])).c_str(),
+                        "The accumulated sequence lengths must be non-decreasing."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(batchQueryLen > batchKeyLen,
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        opName_, "actual_seq_lengths_query,actual_seq_lengths_key",
+                        (std::to_string(batchQueryLen) + "," + std::to_string(batchKeyLen)).c_str(),
+                        (std::string("At index ") + std::to_string(i) +
+                         ", the query sequence length must be less than or equal to the key sequence length.")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
+        prevQueryLen = querySeqData[i];
+        prevKeyLen = keySeqData[i];
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus DenseLISoftmaxLseInfoParser::GetMaxSeqLenFromTensor(const gert::Tensor* tensor, uint64_t& maxSeqLen,
                                                                     bool isAccumSeq)
 {
@@ -693,7 +753,7 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::ParseAndCheck(DenseLISoftmaxLseTili
 
     if (ge::GRAPH_SUCCESS != GetBatchSize() || ge::GRAPH_SUCCESS != GetS1Size() || ge::GRAPH_SUCCESS != GetHeadDim() ||
         ge::GRAPH_SUCCESS != GetS2Size() || ge::GRAPH_SUCCESS != CheckSeqLenLimit() ||
-        ge::GRAPH_SUCCESS != GetStorageSeqSize()) {
+        ge::GRAPH_SUCCESS != CheckSeqLenRelation() || ge::GRAPH_SUCCESS != GetStorageSeqSize()) {
         return ge::GRAPH_FAILED;
     }
     if (ge::GRAPH_SUCCESS != ValidateInputShapesMatch()) {

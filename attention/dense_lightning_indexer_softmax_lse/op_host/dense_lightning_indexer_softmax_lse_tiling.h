@@ -178,6 +178,7 @@ public:
     ge::graphStatus CheckShapeDim();
     ge::graphStatus GetS2Size();
     ge::graphStatus CheckSeqLenLimit();
+    ge::graphStatus CheckSeqLenRelation();
     ge::graphStatus GetMaxSeqLenFromTensor(const gert::Tensor* tensor, uint64_t& maxSeqLen, bool isAccumSeq);
     ge::graphStatus GetStorageSeqSize();
     ge::graphStatus GetQueryKeyAndOutLayout();
