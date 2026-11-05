@@ -268,7 +268,7 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
         <td>num_experts</td>
         <td>int</td>
         <td>必选</td>
-        <td>MoE专家数量，取值范围[1, 1024]，并且满足以下条件：num_experts%(ep_world_size - shared_expert_rank_num)=0。对于<term>Ascend 950PR&950DT系列产品</term>，取值范围为[1, 2048]。</td>
+        <td>MoE专家数量，取值范围[1, 1024]，并且满足以下条件：num_experts%(ep_world_size - shared_expert_rank_num)=0。具体产品差异见下方说明。</td>
         <td>int</td>
         <td>-</td>
     </tr>
@@ -411,7 +411,6 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
         <td>
             <ul>
                 <li>表示`expand_x`输出的逻辑数据类型，默认值为None，由`quant_mode`和输入类型推导。</li>
-                <li>Ascend 950场景可通过该参数指定低精度输出类型。</li>
                 <li>`quant_mode=1`支持int8、hifloat8。</li>
                 <li>`quant_mode=2`支持int8、float8_e4m3fn、float8_e5m2。</li>
                 <li>`quant_mode=3`支持float8_e4m3fn、float8_e5m2。</li>
@@ -440,6 +439,13 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
     </tr>
 </tbody>
 </table>
+
+<!-- npu="950" id15 -->
+- num_experts：对于<term>Ascend 950PR&950DT系列产品</term>，取值范围为[1, 2048]。
+<!-- end id15 -->
+<!-- npu="950" id17 -->
+- y_dtype：<term>Ascend 950PR&950DT系列产品</term>场景可通过该参数指定低精度输出类型。
+<!-- end id17 -->
 
 ## 返回值说明
 
@@ -603,7 +609,10 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
 
   - local\_expert\_num：表示本卡专家数量。
     - 对于共享专家卡，local\_expert\_num为1。
-    - 对于MoE专家卡，local\_expert\_num=num\_experts/\(ep\_world\_size-shared\_expert\_rank\_num)，应满足0 < local_expert_num * ep_world_size ≤ 2048；对于<term>Ascend 950PR&950DT系列产品</term>，应满足0 < local_expert_num * ep_world_size ≤ 4096。
+    - 对于MoE专家卡，local\_expert\_num=num\_experts/\(ep\_world\_size-shared\_expert\_rank\_num)，应满足0 < local_expert_num * ep_world_size ≤ 2048。
+    <!-- npu="950" id16 -->
+    - 对于<term>Ascend 950PR&950DT系列产品</term>，应满足0 < local_expert_num * ep_world_size ≤ 4096。
+    <!-- end id16 -->
 
 - 在不同产品型号、不同通信算法或不同版本中，`low_latency_dispatch`的Tensor输出`assist_info_for_combine`、`ep_recv_counts`、`expand_scales`中的元素值可能不同，使用时直接将上述Tensor传给`low_latency_combine`对应参数即可，模型其他业务逻辑不应对其存在依赖。
 - 调用接口过程中使用的`num_experts`、`expert_shard_type`、`shared_expert_num`、`shared_expert_rank_num`、`num_max_dispatch_tokens_per_rank`参数取值所有卡需保持一致，`expert_shard_type`、`num_max_dispatch_tokens_per_rank`网络中不同层中也需保持一致，且和[low_latency_combine](torchapi_low_latency_combine.md)对应参数也保持一致。
@@ -638,6 +647,10 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
   - ep通信域内，comm\_alg配置为"fullmesh_v1"或"": 设置大小要求 \>= 2 \* \(local\_expert\_num \* max\_bs \* ep\_world\_size \* Align512\(Align32\(2 \* H\) + <b>44</b>\) + \(K + shared\_expert\_num\) \* max\_bs \* Align512\(2 \* H\)\)。
   - ep通信域内，comm\_alg配置为"fullmesh_v2": 设置大小要求 \>= 2 \* \(local\_expert\_num \* max\_bs \* ep\_world\_size \* 480Align512\(Align32\(2 \* H\) + <b>44</b>\) + \(K + shared\_expert\_num\) \* max\_bs \* Align512\(2 \* H\)\)。
   - 其中480Align512(x) = ((x+480-1)/480)\*512,Align512(x) = ((x+512-1)/512)\*512,Align32(x) = ((x+32-1)/32)\*32。
+  <!-- npu="950" id18 -->
+  - 对于<term>Ascend 950PR&950DT系列产品</term>，当quant\_mode=0且x\_smooth\_scale非空时，dispatch token长度取max(Align32(2 \* H) + 44, Align32(Align32(2 \* H) + 4 \* H) + 16)，再按上述规则对齐。
+  - 对于<term>Ascend 950PR&950DT系列产品</term>，上式中 combine 项按 `480Align512(2 * H)` 计算。
+  <!-- end id18 -->
   - 通信域开设大小可通过调用MoeDistributeBuffer.get_low_latency_ccl_buffer_size接口计算。
 
 - 本文公式中的“/”表示整除。

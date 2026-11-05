@@ -589,11 +589,33 @@ aclnnStatus aclnnMoeDistributeCombineV2(
   | 变量         | 定义与取值范围                                                                 |
   | :----------- | :----------------------------------------------------------------------------- |
   | A            | 本卡需分发的最大token数，取值范围如下: <ul><li>对于共享专家，要满足<code>A = BS \* epWorldSize \* sharedExpertNum / sharedExpertRankNum</code>。</li><li>对于MoE专家，当globalBs为0时，要满足<code>A >= BS \* epWorldSize \* min(localExpertNum, K)</code>；当globalBs非0时，要满足<code>A >= globalBs \* min(localExpertNum, K)</code>。</li></ul>|
-  | H            |表示hidden size隐藏层大小:<ul><li> <term>Atlas A2系列产品</term>：(0, 10240]且为32的整数倍。</li><li><term>Atlas A3系列产品</term>、Ascend 950DT系列产品：[1024, 8192]。 </li></ul>|
-  | BS           | 表示batch sequence size（本卡最终输出的token数量）:<ul><li> <term>Atlas A2系列产品</term>：依commAlg取值，"fullmesh"支持(0, 256]；"hierarchy"并且驱动版本≥25.0.RC1.1时支持(0, 512]；</li><li><term>Atlas A3系列产品</term>、Ascend 950DT系列产品：0 < BS ≤512。</li></ul> |
+  | H            | 表示hidden size隐藏层大小: 具体产品差异见下方说明。 |
+  | BS           | 表示batch sequence size（本卡最终输出的token数量）: 具体产品差异见下方说明。 |
   | K            |表示选取topK个专家，取值范围为(0 < K ≤ 16)且满足(0 < K ≤ moeExpertNum)。 |
-  | serverNum    | 服务器节点数:<br><term>Atlas A2系列产品</term>：仅该场景的shape使用了该变量，仅支持2、4、8。
-  | localExpertNum | 本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，localExpertNum > 1时不支持TP通信。 </li><li><term>Atlas A3系列产品</term>：应满足0 < localExpertNum * epWorldSize ≤ 2048。</li><li><term>Ascend 950DT系列产品</term>：应满足0 < localExpertNum * epWorldSize ≤ 4096。</li></ul>|
+  | serverNum    | 服务器节点数:具体产品差异见下方说明。 |
+  | localExpertNum |  本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，localExpertNum > 1时不支持TP通信。 </li><li>具体产品差异见下方说明。</li></ul> |
+
+  <!-- npu="910b" id22 -->
+  - H：<term>Atlas A2系列产品</term>：(0, 10240]且为32的整数倍。
+  <!-- end id22 -->
+  <!-- npu="950,A3" id23 -->
+  - H：<term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：[1024, 8192]。
+  <!-- end id23 -->
+  <!-- npu="910b" id24 -->
+  - BS：<term>Atlas A2系列产品</term>：依commAlg取值，"fullmesh"支持(0, 256]；"hierarchy"并且驱动版本≥25.0.RC1.1时支持(0, 512]。
+  <!-- end id24 -->
+  <!-- npu="950,A3" id25 -->
+  - BS：<term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：0 < BS ≤512。
+  <!-- end id25 -->
+  <!-- npu="910b" id26 -->
+  - serverNum：<term>Atlas A2系列产品</term>：仅该场景的shape使用了该变量，仅支持2、4、8。
+  <!-- end id26 -->
+  <!-- npu="A3" id27 -->
+  - localExpertNum：<term>Atlas A3系列产品</term>：应满足0 < localExpertNum * epWorldSize ≤ 2048。
+  <!-- end id27 -->
+  <!-- npu="950" id28 -->
+  - localExpertNum：<term>Ascend 950DT系列产品</term>：应满足0 < localExpertNum * epWorldSize ≤ 4096。
+  <!-- end id28 -->
 
 - **环境变量约束**：
   - **HCCL_BUFFSIZE**：调用本接口前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。
@@ -610,7 +632,11 @@ aclnnStatus aclnnMoeDistributeCombineV2(
       - tp通信域内：设置大小要求\>=A \* (H \* 2 + 128) \* 2。
     <!-- end id12 -->
     <!-- npu="950" id13 -->
-    - <term>Ascend 950DT系列产品</term>：设置大小要求(≥ 2)且满足(≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* Align512(Align32(2 \* H) + 44) + (K + sharedExpertNum) \* maxBS \* Align512(2 \* H)))（`localExpertNum`需使用MoE专家卡的本卡专家数；`Align512(x) = ((x + 512 - 1) / 512) * 512`；`Align32(x) = ((x + 32 - 1) / 32) * 32`）。
+    - <term>Ascend 950DT系列产品</term>：
+      - 当commAlg为"fullmesh_v1"或""时：设置大小要求(≥ 2)且满足(≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* Align512(Align32(2 \* H) + 44) + (K + sharedExpertNum) \* maxBS \* 480Align512(2 \* H)))（`localExpertNum`需使用MoE专家卡的本卡专家数；`Align512(x) = ((x + 512 - 1) / 512) * 512`；`Align32(x) = ((x + 32 - 1) / 32) * 32`）。
+      - 当commAlg为"fullmesh_v2"时：设置大小要求(≥ 2)且满足(≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* 480Align512(Align32(2 \* H) + 44) + (K + sharedExpertNum) \* maxBS \* 480Align512(2 \* H)))（`localExpertNum`需使用MoE专家卡的本卡专家数；`Align32(x) = ((x + 32 - 1) / 32) * 32`）。
+      - 其中`480Align512(x) = ((x + 480 - 1) / 480) * 512`，`Align512(x) = ((x + 512 - 1) / 512) * 512`，`Align32(x) = ((x + 32 - 1) / 32) * 32`。
+      - 当dispatch侧`quantMode`为0（非量化）且`scalesOptional`非空时，式中每个token的长度取`max(Align32(2 * H) + 44, Align32(Align32(2 * H) + 4 * H) + 16)`，再按上述规则对齐。
 
     <!-- end id13 -->
 

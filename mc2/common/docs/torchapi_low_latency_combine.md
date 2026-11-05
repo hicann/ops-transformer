@@ -122,7 +122,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
         <td>num_experts</td>
         <td>int</td>
         <td>可选</td>
-        <td>MoE专家数量，取值范围[1, 1024]，并且满足以下条件：num_experts%(ep_world_size - shared_expert_rank_num)=0。对于<term>Ascend 950PR&950DT系列产品</term>，取值范围为[1, 2048]。默认值为0。</td>
+        <td>MoE专家数量，取值范围[1, 1024]，并且满足以下条件：num_experts%(ep_world_size - shared_expert_rank_num)=0。默认值为0。具体产品差异见下方说明。</td>
         <td>int</td>
         <td>-</td>
     </tr>
@@ -275,6 +275,10 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
 </tbody>
 </table>
 
+<!-- npu="950" id9 -->
+- num_experts：对于<term>Ascend 950PR&950DT系列产品</term>，取值范围为[1, 2048]。
+<!-- end id9 -->
+
 ## 返回值说明
 
 <table style="undefined;table-layout: fixed; width:1200px"><colgroup>
@@ -419,7 +423,10 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
   - local_expert_num：表示本卡专家数量。
     - 对于共享专家卡，local_expert_num=1。
     - 对于MoE专家卡，local_expert_num=num_experts/(ep_world_size-shared_expert_rank_num)。
-    - 应满足0 < local_expert_num \* ep_world_size ≤ 2048；对于<term>Ascend 950PR&950DT系列产品</term>，应满足0 < local_expert_num \* ep_world_size ≤ 4096。
+    - 应满足0 < local_expert_num \* ep_world_size ≤ 2048。
+    <!-- npu="950" id10 -->
+    - 对于<term>Ascend 950PR&950DT系列产品</term>，应满足0 < local_expert_num \* ep_world_size ≤ 4096。
+    <!-- end id10 -->
 
 - `low_latency_dispatch`和`low_latency_combine`必须配套使用。
 - 在不同产品型号、不同通信算法或不同版本中，`low_latency_dispatch`的Tensor输出`assist_info_for_combine`、`ep_recv_counts`、`expand_scales`中的元素值可能不同，使用时直接将上述Tensor传给`low_latency_combine`对应参数即可，模型其他业务逻辑不应对其存在依赖。
@@ -441,6 +448,10 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
   - 该场景仅支持通过环境变量HCCL_BUFFSIZE配置，该环境变量按通信域粒度管理，每个通信域独占一组“2\*HCCL_BUFFSIZE”大小的内存。
   - ep通信域内：设置大小要求 >= 2且满足>= 2 \* (local_expert_num \* max_bs \* ep_world_size \* Align512(Align32(2 \* h) + 64) + (k + shared_expert_num) \* max_bs\* Align512(2 \* h))。
   - 其中480Align512(x) = ((x+480-1)/480)\*512,Align512(x) = ((x+512-1)/512)\*512,Align32(x) = ((x+32-1)/32)\*32。
+  <!-- npu="950" id11 -->
+  - 对于<term>Ascend 950PR&950DT系列产品</term>，当dispatch侧quant\_mode=0且x\_smooth\_scale非空时，dispatch token长度取max(Align32(2 \* h) + 64, Align32(Align32(2 \* h) + 4 \* h) + 16)，再按上述规则对齐。
+  - 对于<term>Ascend 950PR&950DT系列产品</term>，上式中 combine 项按 `480Align512(2 * h)` 计算。
+  <!-- end id11 -->
   - 通信域内开设大小可通过调用MoeDistributeBuffer.get_low_latency_ccl_buffer_size接口计算。
 
 - 本文公式中的“/”表示整除。

@@ -35,6 +35,8 @@
 
         其中max_out_dtype_size为token类型转为字节数，scale_expand_index_buffer为scale（32B）+ expand_idx（3 × 4B）
 
+        对于<term>Ascend 950PR&950DT系列产品</term>，按scales最大占位（`hidden * 4B`）计算，`token_actual_len`取上式与`Align32(Align32(hidden * max_out_dtype_size) + hidden * 4) + 12B(expand_idx) + 4B(expert scale)`中的较大值。
+
   - 根据`comm_alg`计算dispatch阶段每个token所需大小：
 
         若`comm_alg`为"fullmesh_v2"：
@@ -49,6 +51,10 @@
 
         $$token\_need\_size\_combine = Align512(hidden * max\_out\_dtype\_size)$$
 
+        对于<term>Ascend 950PR&950DT系列产品</term>，combine阶段按480B对齐：
+
+        $$token\_need\_size\_combine = Align480(hidden * max\_out\_dtype\_size) / full\_mesh\_data\_align * win\_addr\_align$$
+
         其中，full_mesh_data_align为480B对齐，win_addr_align为512B对齐
 
   - 计算ccl_buffer_size大小：
@@ -56,6 +62,8 @@
         $$dispatch\_buffer\_size = 2 * num\_max\_dispatch\_tokens\_per\_rank * token\_need\_size\_dispatch * world\_size * local\_moe\_expert\_num$$
         $$combine\_buffer\_size = 2 * num\_max\_dispatch\_tokens\_per\_rank * token\_need\_size\_combine * (topk + num\_shared\_expert)$$
         $$ccl\_buffer\_size = Align2(Align1MB(dispatch\_buffer\_size + combine\_buffer\_size + 1MB) / 1MB) / 2$$
+
+        对于<term>Ascend 950PR&950DT系列产品</term>，上式中还需额外加入 `world_size * 1024B` 的 rank offset 预留。
 
 ## 函数原型
 
@@ -88,7 +96,7 @@ MoeDistributeBuffer.get_low_latency_ccl_buffer_size(world_size, num_max_dispatch
         <td>world_size</td>
         <td>int</td>
         <td>必选</td>
-        <td>表示通信域的大小。取值范围[2, 768]。</td>
+        <td>表示通信域的大小。取值范围[2, 768]；对于<term>Ascend 950PR&950DT系列产品</term>，取值范围为[2, 1024]。</td>
         <td>int</td>
         <td>-</td>
     </tr>
@@ -112,7 +120,7 @@ MoeDistributeBuffer.get_low_latency_ccl_buffer_size(world_size, num_max_dispatch
         <td>num_moe_expert</td>
         <td>int</td>
         <td>必选</td>
-        <td>MoE专家数量，取值范围[1, 1024]，并且满足以下条件：num_experts % (ep_world_size - shared_expert_rank_num) = 0。</td>
+        <td>MoE专家数量，取值范围[1, 1024]；对于<term>Ascend 950PR&950DT系列产品</term>，取值范围为[1, 2048]。并且满足以下条件：num_experts % (ep_world_size - shared_expert_rank_num) = 0。</td>
         <td>int</td>
         <td>-</td>
     </tr>
@@ -189,6 +197,7 @@ MoeDistributeBuffer.get_low_latency_ccl_buffer_size(world_size, num_max_dispatch
 - 该接口支持单算子模式和torchair图模式调用。
 - get_low_latency_ccl_buffer_size、low_latency_dispatch和low_latency_combine必须配套使用。
 - 本文公式中的“/”表示整除。
+- 对于<term>Ascend 950PR&950DT系列产品</term>，local_moe_expert_num * world_size应满足0 < local_moe_expert_num * world_size ≤ 4096；其余产品应满足0 < local_moe_expert_num * world_size ≤ 2048。
 
 变量说明：
 

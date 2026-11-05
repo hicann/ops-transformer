@@ -423,7 +423,11 @@
         - `sharedExpertRankNum`取值范围[0, epWorldSize)；为0时需满足sharedExpertNum为0或1，不为0时需满足sharedExpertRankNum % sharedExpertNum = 0。
         - `commQuantMode`取值范围0或2（0表示不量化，2表示int8量化）。
         - `performanceInfoOptional`：预留参数，当前版本不支持，传空指针即可。
-    - `HCCL_BUFFSIZE`：调用本算子前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。要求 >= 2且满足>= 2 *(`localExpertNum`* `maxBS` *`epWorldSize`* Align512(Align32(2 *`H`) + 64) + (`K` + `sharedExpertNum`)* `maxBS` *Align512(2* `H`))，`localExpertNum`需使用MoE专家卡的本卡专家数，其中Align512(x) = ((x + 512 - 1) / 512) *512，Align32(x) = ((x + 32 - 1) / 32)* 32。
+    - `HCCL_BUFFSIZE`：调用本算子前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。要求 >= 2且满足：
+        - `commAlg` = "fullmesh_v1"或""：>= 2 * (`localExpertNum` * `maxBS` * `epWorldSize` * Align512(Align32(2 * `H`) + 64) + (`K` + `sharedExpertNum`) * `maxBS` * 480Align512(2 * `H`))。
+        - `commAlg` = "fullmesh_v2"：>= 2 * (`localExpertNum` * `maxBS` * `epWorldSize` * 480Align512(Align32(2 * `H`) + 64) + (`K` + `sharedExpertNum`) * `maxBS` * 480Align512(2 * `H`))。
+        - 其中`480Align512(x) = ((x + 480 - 1) / 480) * 512`，`Align512(x) = ((x + 512 - 1) / 512) * 512`，`Align32(x) = ((x + 32 - 1) / 32) * 32`。
+        - 对于<term>Ascend 950DT系列产品</term>，当dispatch侧`quantMode`为0（非量化）且`scalesOptional`非空时，式中每个token的长度取`max(Align32(2 * H) + 44, Align32(Align32(2 * H) + 4 * H) + 16)`，再按fullmesh_v1的512B或fullmesh_v2的480B对齐。
 
 ## 调用说明
 

@@ -625,11 +625,33 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
   | 变量         | 定义与取值范围                                                                 |
   | :----------- | :----------------------------------------------------------------------------- |
   | A            | 表示本卡需要分发的最大token数量，取值范围如下：<ul> <li>对于共享专家，令 <code>ranksPerSharedExpert = sharedExpertRankNum / sharedExpertNum</code>、<code>maxBS = (globalBs == 0 ? BS : globalBs / epWorldSize)</code>，要满足 <code>A &gt;= maxBS * ((epWorldSize + ranksPerSharedExpert - 1) / ranksPerSharedExpert)</code>。</li> <li>对于MoE专家，当globalBs为0时，要满足A >= BS \* epWorldSize \* min(localExpertNum, K)；当globalBs非0时，要满足A >= globalBs \* min(localExpertNum, K)。</li> </ul>|
-  | H（hidden size） | 表示hidden size隐藏层大小。<ul><li><term>Atlas A2系列产品</term>：当`x`的数据类型为INT32时，取值范围为(0, 5120]且为32的整数倍；其他数据类型的取值范围为(0, 10240]且为32的整数倍。</li> <li><term>Atlas A3系列产品</term>、Ascend 950DT系列产品：取值范围[1024, 8192]。</li> </ul> |
-  | BS           | 表示本卡最终输出token数。<ul><li><term>Atlas A2系列产品</term>：依commAlg取值，"fullmesh"取值范围为(0 < BS ≤ 256)；"hierarchy"并且驱动版本≥25.0.RC1.1时取值范围为(0 < BS ≤ 512)；</li><li><term>Atlas A3系列产品</term>、Ascend 950DT系列产品：0 < BS ≤ 512。 </li> </ul> |
+  | H（hidden size） | 表示hidden size隐藏层大小。 具体产品差异见下方说明。 |
+  | BS           | 表示本卡最终输出token数。 具体产品差异见下方说明。 |
   | K    | 表示选取topK个专家，取值范围为(0 < K ≤ 16)且满足(0 < K ≤ moeExpertNum)。|
-  | serverNum    | 表示服务器节点数，仅支持2、4、8。<br>Atlas A2训练系列产品/Atlas A2推理系列产品：仅该场景的shape使用了该变量。                                                  |
-  | localExpertNum |  本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum / (epWorldSize - sharedExpertRankNum)</code>，当前版本不支持TP域通信。 </li><li><term>Atlas A3系列产品</term>：应满足0 < localExpertNum * epWorldSize ≤ 2048。</li><li><term>Ascend 950DT系列产品</term>：应满足0 < localExpertNum * epWorldSize ≤ 4096。</li></ul>|
+  | serverNum    | 表示服务器节点数，仅支持2、4、8。具体产品差异见下方说明。 |
+  | localExpertNum |   本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum / (epWorldSize - sharedExpertRankNum)</code>，当前版本不支持TP域通信。 </li><li>具体产品差异见下方说明。</li></ul> |
+
+  <!-- npu="910b" id27 -->
+  - H（hidden size）：<term>Atlas A2系列产品</term>：当`x`的数据类型为INT32时，取值范围为(0, 5120]且为32的整数倍；其他数据类型的取值范围为(0, 10240]且为32的整数倍。
+  <!-- end id27 -->
+  <!-- npu="950,A3" id28 -->
+  - H（hidden size）：<term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：取值范围[1024, 8192]。
+  <!-- end id28 -->
+  <!-- npu="910b" id29 -->
+  - BS：<term>Atlas A2系列产品</term>：依commAlg取值，"fullmesh"取值范围为(0 < BS ≤ 256)；"hierarchy"并且驱动版本≥25.0.RC1.1时取值范围为(0 < BS ≤ 512)。
+  <!-- end id29 -->
+  <!-- npu="950,A3" id30 -->
+  - BS：<term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：0 < BS ≤ 512。
+  <!-- end id30 -->
+  <!-- npu="910b" id31 -->
+  - serverNum：<term>Atlas A2系列产品</term>：仅该场景的shape使用了该变量。
+  <!-- end id31 -->
+  <!-- npu="A3" id32 -->
+  - localExpertNum：<term>Atlas A3系列产品</term>：应满足0 < localExpertNum * epWorldSize ≤ 2048。
+  <!-- end id32 -->
+  <!-- npu="950" id33 -->
+  - localExpertNum：<term>Ascend 950DT系列产品</term>：应满足0 < localExpertNum * epWorldSize ≤ 4096。
+  <!-- end id33 -->
 
 - **quantMode相关约束**：
 
@@ -696,7 +718,11 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
               - ep通信域内：设置大小要求(≥ 2)且满足(≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* Align512(Align32(2 \* H) + 64) + (K +   sharedExpertNum) \* maxBS \* Align512(2 \* H)))（`localExpertNum`需使用MoE专家卡的本卡专家数；`Align512(x) = ((x + 512 - 1) /   512) * 512`；`Align32(x) = ((x + 32 - 1) / 32) * 32`）。当前不支持TP通信域。
           <!-- end id17 -->
           <!-- npu="950" id18 -->
-          - <term>Ascend 950DT系列产品</term>：ep通信域内设置大小要求(≥ 2)且满足(≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* Align512(Align32(2 \* H) + 64) + (K + sharedExpertNum) \* maxBS \* Align512(2 \* H)))（`localExpertNum`需使用MoE专家卡的本卡专家数；`Align512(x) = ((x + 512 - 1) / 512) * 512`；`Align32(x) = ((x + 32 - 1) / 32) * 32`）。不支持TP通信域。
+          - <term>Ascend 950DT系列产品</term>：
+              - 当commAlg为"fullmesh_v1"或空字符串或空指针时：设置大小要求(≥ 2)且满足(≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* Align512(Align32(2 \* H) + 64) + (K + sharedExpertNum) \* maxBS \* 480Align512(2 \* H)))（`localExpertNum`需使用MoE专家卡的本卡专家数；`Align512(x) = ((x + 512 - 1) / 512) * 512`；`Align32(x) = ((x + 32 - 1) / 32) * 32`）。不支持TP通信域。
+              - 当commAlg为"fullmesh_v2"时：设置大小要求(≥ 2)且满足(≥ 2 \* (localExpertNum \* maxBS \* epWorldSize \* 480Align512(Align32(2 \* H) + 64) + (K + sharedExpertNum) \* maxBS \* 480Align512(2 \* H)))（`localExpertNum`需使用MoE专家卡的本卡专家数；`Align32(x) = ((x + 32 - 1) / 32) * 32`）。不支持TP通信域。
+              - 其中`480Align512(x) = ((x + 480 - 1) / 480) * 512`，`Align512(x) = ((x + 512 - 1) / 512) * 512`，`Align32(x) = ((x + 32 - 1) / 32) * 32`。
+              - 当`quantMode`为0（非量化）且`scalesOptional`非空时，式中每个token的长度取`max(Align32(2 * H) + 64, Align32(Align32(2 * H) + 4 * H) + 16)`，再按上述规则对齐。
 
           <!-- end id18 -->
 

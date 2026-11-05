@@ -17,6 +17,10 @@ def _empty_topk_weights_like(tensor):
     return tensor.new_empty((0,), dtype=torch.float32)
 
 
+def _is_a5_device():
+    return "Ascend950" in torch_npu.npu.get_device_name()
+
+
 def _get_hccl_comm_name(group, rank_id):
     if hasattr(group, "get_hccl_comm_name"):
         return group.get_hccl_comm_name(rank_id, init_comm=False)
@@ -30,7 +34,7 @@ class MoeDistributeBuffer:
         self.rank_id = torch.distributed.get_rank(group)
         self.world_size = torch.distributed.get_world_size(group)
         self.group_name = _get_hccl_comm_name(group, self.rank_id)
-        self._is_a5 = "Ascend950" in torch_npu.npu.get_device_name()
+        self._is_a5 = _is_a5_device()
         self._ctx_manager = None
         self.context = None
         self.ccl_buffer_size = ccl_buffer_size
@@ -63,9 +67,16 @@ class MoeDistributeBuffer:
         def inline_align(value, base):
             return (value + base - 1) // base * base
 
+        is_a5 = _is_a5_device()
+        max_world_size = 1024 if is_a5 else 768
+        max_moe_expert = 2048 if is_a5 else 1024
+        max_local_expert_product = 4096 if is_a5 else 2048
+
         torch._check(
-            ((world_size >= 2) and (world_size <= 768)),  # world_size当前仅支持[2,768]
-            lambda: (f"world_size only support in [2, 768], but got {world_size=}."),
+            ((world_size >= 2) and (world_size <= max_world_size)),
+            lambda: (
+                f"world_size only support in [2, {max_world_size}], but got {world_size=}."
+            ),
         )
         torch._check(
             ((hidden >= 1024) and (hidden <= 8192)),  # hidden当前仅支持[1024,8192]
@@ -83,11 +94,9 @@ class MoeDistributeBuffer:
             ),
         )
         torch._check(
-            (
-                (num_moe_expert >= 1) and (num_moe_expert <= 1024)
-            ),  # num_moe_expert当前仅支持[1,1024]
+            ((num_moe_expert >= 1) and (num_moe_expert <= max_moe_expert)),
             lambda: (
-                f"num_moe_expert only support in [1, 1024], but got {num_moe_expert=}."
+                f"num_moe_expert only support in [1, {max_moe_expert}], but got {num_moe_expert=}."
             ),
         )
         torch._check(
@@ -109,15 +118,15 @@ class MoeDistributeBuffer:
                 f"but got {world_size=} {num_shared_expert_ranks=}."
             ),
         )
-        # local_moe_expert_num*world_size仅支持(0，2048]
         local_moe_expert_num = num_moe_expert // (world_size - num_shared_expert_ranks)
         torch._check(
             (
                 (local_moe_expert_num * world_size > 0)
-                and (local_moe_expert_num * world_size <= 2048)
+                and (local_moe_expert_num * world_size <= max_local_expert_product)
             ),
             lambda: (
-                f"local_moe_expert_num * world_size only support in (0, 2048], "
+                f"local_moe_expert_num * world_size only support in "
+                f"(0, {max_local_expert_product}], "
                 f"but got {world_size=} {num_shared_expert_ranks=}, "
                 f"local_moe_expert_num = num_moe_expert // (world_size - num_shared_expert_ranks), "
                 f"{local_moe_expert_num=}"
@@ -128,6 +137,8 @@ class MoeDistributeBuffer:
         mb_conversion = 1024 * 1024
         ub_align = 32  # 32B
         scale_expand_index_buffer = 44  # scale 32B + 3 * 4 expand_idx
+        expand_idx_info = 3  # 3 int32 expand_idx
+        expert_scale_bytes = 4  # sizeof(float)
         full_mesh_data_align = 480
         win_addr_align = 512
 
@@ -139,10 +150,16 @@ class MoeDistributeBuffer:
             ),
         )
 
-        token_actual_len = (
-            inline_align(hidden * max_out_dtype_size, ub_align)
-            + scale_expand_index_buffer
-        )
+        token_align = inline_align(hidden * max_out_dtype_size, ub_align)
+        token_actual_len = token_align + scale_expand_index_buffer
+        if is_a5:
+            max_scale_bytes = hidden * 4
+            dispatch_token_bytes = (
+                inline_align(token_align + max_scale_bytes, ub_align)
+                + expand_idx_info * 4
+                + expert_scale_bytes
+            )
+            token_actual_len = max(token_actual_len, dispatch_token_bytes)
         if comm_alg == "fullmesh_v2":
             token_need_size_dispatch = (
                 inline_align(token_actual_len, full_mesh_data_align)
@@ -151,10 +168,13 @@ class MoeDistributeBuffer:
             )
         else:
             token_need_size_dispatch = inline_align(token_actual_len, win_addr_align)
-        # A3 Combine uses raw 512-byte-aligned data, including fullmesh_v2.
+        # A3 combine uses 512-byte-aligned data; A5 uses 480-byte-aligned data.
         # Keep this reservation consistent with the host check and Dispatch offset.
-        token_need_size_combine = inline_align(
-            hidden * max_out_dtype_size, win_addr_align
+        combine_data_align = full_mesh_data_align if is_a5 else win_addr_align
+        token_need_size_combine = (
+            inline_align(hidden * max_out_dtype_size, combine_data_align)
+            // combine_data_align
+            * win_addr_align
         )
         minimum_buffer_size = (
             2
@@ -173,6 +193,8 @@ class MoeDistributeBuffer:
             )
             + mb_conversion
         )
+        if is_a5:
+            minimum_buffer_size += world_size * 1024
         # Return the HCCL configuration in MiB, not the data-window size.
         # HCCL allocates twice this value; the first MiB is reserved for state.
         ccl_buffer_size = (
