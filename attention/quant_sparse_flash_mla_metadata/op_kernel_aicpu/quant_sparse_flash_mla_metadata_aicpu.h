@@ -34,6 +34,7 @@ constexpr bool ORI_KV = false;
 constexpr bool CMP_KV = true;
 constexpr uint32_t NO_MASK = 0;
 constexpr uint32_t HAS_MASK = 1;
+constexpr uint32_t NUM_2 = 2;
 
 enum BlockType : uint32_t {
     ORI_NORMAL_BLOCK = 0,
@@ -54,7 +55,8 @@ enum class SparseMode : uint8_t {
 
 enum class ValidSocVersion {
     ASCEND910 = 0,
-    ASCEND950
+    ASCEND950,
+    ASCEND960
 };
 
 template <class T>

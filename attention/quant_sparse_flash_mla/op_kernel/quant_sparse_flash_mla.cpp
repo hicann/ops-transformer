@@ -21,11 +21,54 @@
 #endif
 #include "lib/matmul_intf.h"
 #include "quant_sparse_flash_mla_template_tiling_key.h"
-#include "arch35/quant_sparse_flash_mla_csa_kernel.h"
 #include "quant_sparse_flash_mla_common.h"
+#if (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+#include "arch92/quant_sparse_flash_mla_csa_kernel_arch92.h"
+#else
+#include "arch35/quant_sparse_flash_mla_csa_kernel.h"
+#endif
 
 using namespace AscendC;
+#if (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+#define QSMLA_OP_IMPL(templateClass, tilingdataClass, ...) \
+    do { \
+        using CubeBlockType = \
+            typename std::conditional<g_coreType == AscendC::AIC, BaseApi::SCFABlockCube<__VA_ARGS__>, \
+                                      BaseApi::SCFABlockCubeDummy<__VA_ARGS__>>::type; \
+        using VecBlockType = \
+            typename std::conditional<g_coreType == AscendC::AIC, BaseApi::SCFABlockVecDummy<__VA_ARGS__>, \
+                                      BaseApi::SCFABlockVec<__VA_ARGS__>>::type; \
+        templateClass<CubeBlockType, VecBlockType> op; \
+        GET_TILING_DATA_WITH_STRUCT(tilingdataClass, tilingDataIn, tiling); \
+        const tilingdataClass* __restrict tilingData = &tilingDataIn; \
+        op.Init(query, oriKV, cmpKV, qDescale, oriKVDescale, cmpKVDescale, oriSparseIndices, cmpSparseIndices, \
+                oriBlockTable, cmpBlockTable, cuSeqlensQ, cuSeqlensOriKv, cuSeqlensCmpKv, seqUsedQ, seqUsedOriKV, \
+                seqUsedCmpKV, cmpResidualKv, oriTopkLength, cmpTopkLength, sinks, metadata, attentionOut, user, \
+                tilingData, &tPipe); \
+        op.Process(); \
+    } while (0)
 
+template <int FLASH_DECODE, int LAYOUT_T, int KV_LAYOUT_T, int TEMPLATE_MODE, int SPLIT_G, int KV_DTYPE>
+__global__ __aicore__ void quant_sparse_flash_mla(
+    __gm__ uint8_t* query, __gm__ uint8_t* oriKV, __gm__ uint8_t* cmpKV, __gm__ uint8_t* qDescale,
+    __gm__ uint8_t* oriKVDescale, __gm__ uint8_t* cmpKVDescale, __gm__ uint8_t* oriSparseIndices,
+    __gm__ uint8_t* cmpSparseIndices, __gm__ uint8_t* oriBlockTable, __gm__ uint8_t* cmpBlockTable,
+    __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensOriKv, __gm__ uint8_t* cuSeqlensCmpKv,
+    __gm__ uint8_t* seqUsedQ, __gm__ uint8_t* seqUsedOriKV, __gm__ uint8_t* seqUsedCmpKV, __gm__ uint8_t* cmpResidualKv,
+    __gm__ uint8_t* oriTopkLength, __gm__ uint8_t* cmpTopkLength, __gm__ uint8_t* sinks, __gm__ uint8_t* metadata,
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmax_lse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
+{
+    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+
+    TPipe tPipe;
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
+
+    QSMLA_OP_IMPL(BaseApi::QuantSparseFlashMlaScfa, QuantSparseFlashMlaTilingData, hifloat8_t, hifloat8_t, float,
+                  bfloat16_t, FLASH_DECODE, KV_LAYOUT_T == QSMLA_LAYOUT_PA_BBND, static_cast<QSMLA_LAYOUT>(LAYOUT_T),
+                  static_cast<QSMLA_LAYOUT>(KV_LAYOUT_T), static_cast<QSMLATemplateMode>(TEMPLATE_MODE), SPLIT_G);
+}
+
+#else
 #define QSMLA_OP_IMPL(templateClass, tilingdataClass, ...) \
     do { \
         using CubeBlockType = \
@@ -66,3 +109,4 @@ __global__ __aicore__ void quant_sparse_flash_mla(
                       static_cast<TopkValueMode>(TOPK_VALUE_MODE));
     }
 }
+#endif

@@ -94,7 +94,7 @@ ge::graphStatus QSMLAInfoParser::GetNpuInfo()
 
     socVersion_ = ascendcPlatform.GetSocVersion();
     npuArch_ = ascendcPlatform.GetCurNpuArch();
-    if (npuArch_ != NpuArch::DAV_3510) {
+    if (npuArch_ != NpuArch::DAV_3510 && npuArch_ != NpuArch::DAV_9201 && npuArch_ != NpuArch::DAV_9202) {
         OP_LOGE(qsmlaOpName_, "NpuArch[%d] is not support.", static_cast<int32_t>(npuArch_));
         return GRAPH_FAILED;
     }
@@ -514,6 +514,11 @@ ge::graphStatus QSMLAInfoParser::GetKvstride()
     return ge::GRAPH_SUCCESS;
 }
 
+static bool IsA6Arch(NpuArch npuArch)
+{
+    return npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202;
+}
+
 void QSMLAInfoParser::GenerateInfo(QSMLATilingInfo& qsmlaInfo)
 {
     qsmlaInfo.opName = qsmlaOpName_;
@@ -649,9 +654,11 @@ ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo* tilingInf
     constexpr uint32_t M_BASE_SIZE = 64;   // m轴基本块大小
     constexpr uint32_t S2_BASE_SIZE = 128; // S2轴基本块大小
     constexpr uint32_t D_SIZE = 512;
-    constexpr uint32_t VEC_RES_ELEM_SIZE = 2;        // 2: fp16/bf16
-    constexpr uint32_t TOPK_MAX_SIZE = 2048;         // TopK选取个数
-    constexpr uint32_t UB_SIZE = 248 * 1024;         // UB大小共256KB,预留8k
+    constexpr uint32_t VEC_RES_ELEM_SIZE = 2; // 2: fp16/bf16
+    constexpr uint32_t TOPK_MAX_SIZE = 2048;  // TopK选取个数
+    constexpr uint32_t A5_SIZE = 248 * 1024;  // UB大小共256KB,预留8k
+    constexpr uint32_t A6_SIZE = 376 * 1024;
+    const uint32_t UB_SIZE = IsA6Arch(tilingInfo->npuArch) ? A6_SIZE : A5_SIZE;
     constexpr uint32_t SPARSE_BLOCK_ALIGN_NUM = 128; // VF向量化处理的元素对齐粒度
     constexpr uint32_t MAX_S2_SPLIT_NUM = 2;         // 普通FD每核最多S2切分次数
     constexpr uint32_t FLOAT_ELEM_SIZE = 4;          // sizeof(float)
