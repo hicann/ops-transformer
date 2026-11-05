@@ -925,16 +925,17 @@ __aicore__ inline void EngramFetchGradArch35::RunSortPhase(uint32_t numRecv)
     sortParams.isSingleCore = 0;
     sortParams.jobIndex = aivId_ - sortCoreBase_; // sort 子集内的连续编号
     sortParams.totalJobs = numSortCores_;
-    // radix 轮数按 key 值域裁剪: 排序 key 为本 rank 局部 entry id ∈ [0, numEntriesPerRank), 非负。
+    // radix 轮数按 key 值域裁剪: 排序 key 为 recv_local_entry 中的全局索引, 值域
+    // [0, numEntriesPerRank × rankSize), 非负(局部 entry id 在 unique 阶段才按 mod 换算)。
     // 值域位宽不足 32 位时最高字节为常量, 跳过无效轮(每轮省 1 次散写后大屏障+1 次小屏障+一轮扫描)。
-    // 例: numEntriesPerRank=282800 → 19 位 → 3 轮; 7239680 → 23 位 → 3 轮。
+    // 例: numEntriesPerRank=282800×32 → 24 位 → 3 轮; 646400×32=20684800 → 25 位 → 4 轮(不可裁)。
     // actCores < 12 的小场景保守回退全 4 轮: 小场景 sort 本身极短, 裁轮无收益, 且与跨 kernel
     // 时序敏感(参见 InitWinLayout 的跨kernel保留区说明)。
-    uint32_t maxEntryId = (numEntriesPerRank_ > 0) ? static_cast<uint32_t>(numEntriesPerRank_ - 1) : 0U;
+    uint64_t maxKeyId = (numEntriesPerRank_ > 0) ? static_cast<uint64_t>(numEntriesPerRank_) * numRanks_ - 1ULL : 0ULL;
     uint32_t keyBits = 0;
-    while (maxEntryId != 0U) {
+    while (maxKeyId != 0ULL) {
         keyBits++;
-        maxEntryId >>= 1;
+        maxKeyId >>= 1;
     }
     uint32_t radixRounds = (keyBits + RADIX_BITS_PER_ROUND - 1U) / RADIX_BITS_PER_ROUND;
     if (radixRounds == 0U || sortParams.activeCores < RADIX_TRIM_MIN_ACTIVE_CORES) {
