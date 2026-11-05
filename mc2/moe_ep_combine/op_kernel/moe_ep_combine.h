@@ -137,6 +137,7 @@ private:
     uint32_t hAlignSize_{0};
     uint64_t combineStateWinOffset_{0};
     uint64_t combineDataWinOffset_{0};
+    uint64_t totalWinSizeEp_{0};
 
     // WQEBBs occupied per token write: multi-SGE (x + weight) rounds up to 2, single-SGE is 1.
     static constexpr uint32_t kTokenWqebbCount = (HasTopkWeight == 1) ? 2U : 1U;
@@ -226,6 +227,13 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::Init(GM_ADDR 
     combineStateWinOffset_ = tilingData->combineStateWinOffset;
     combineDataWinOffset_ = tilingData->combineDataWinOffset;
     flagSourceWinAddr_ = GetUrmaStateAddrByRankId(rankId_, tilingData->combineFlagSourceWinOffset);
+    totalWinSizeEp_ = tilingData->totalWinSizeEp;
+#if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
+    for (uint32_t oomRankId = 0; oomRankId < epWorldSize_; ++oomRankId) {
+        OOMCheckAddrRange<uint8_t>(reinterpret_cast<__gm__ uint8_t*>(GetUrmaWinAddrByRankId(oomRankId, 0)),
+                                   totalWinSizeEp_);
+    }
+#endif
 
     xGm_.SetGlobalBuffer((__gm__ XType*)x);
     recvSrcMetadataGm_.SetGlobalBuffer((__gm__ int32_t*)recvSrcMetadata);

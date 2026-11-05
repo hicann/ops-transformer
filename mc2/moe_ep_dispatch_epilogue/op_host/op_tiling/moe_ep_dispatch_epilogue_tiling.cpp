@@ -473,6 +473,7 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext* cont
     info.winDataOffset = layout.winDataOffset;
     info.slotWinStateOffset = layout.slotWinStateOffset;
     info.dispatchNotifyCount = layout.dispatchNotifyCount;
+    info.totalWinSizeEp = maxWindowSize;
     return ge::GRAPH_SUCCESS;
 }
 

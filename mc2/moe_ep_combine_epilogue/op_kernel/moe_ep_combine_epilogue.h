@@ -111,6 +111,7 @@ private:
     uint32_t hAlignSize_{0};
     uint64_t combineStateWinOffset_{0};
     uint64_t combineDataWinOffset_{0};
+    uint64_t totalWinSizeEp_{0};
 
     uint32_t aivNum_{0};
     uint32_t aivId_{0};
@@ -192,6 +193,13 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
 
     combineStateWinOffset_ = tilingData->combineStateWinOffset;
     combineDataWinOffset_ = tilingData->combineDataWinOffset;
+    totalWinSizeEp_ = tilingData->totalWinSizeEp;
+#if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
+    for (uint32_t oomRankId = 0; oomRankId < epWorldSize_; ++oomRankId) {
+        OOMCheckAddrRange<uint8_t>(reinterpret_cast<__gm__ uint8_t*>(GetUrmaWinAddrByRankId(oomRankId, 0)),
+                                   totalWinSizeEp_);
+    }
+#endif
 
     xGm_.SetGlobalBuffer((__gm__ XType*)x);
     localRecvIndexGm_.SetGlobalBuffer(

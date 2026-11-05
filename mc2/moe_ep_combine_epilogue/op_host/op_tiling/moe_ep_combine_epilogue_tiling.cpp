@@ -375,6 +375,7 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext* cont
     info.dumpMetadata = BuildMoeEpDumpMetadata(params, layout, info.aivNum);
     info.combineStateWinOffset = layout.combineStateWinOffset;
     info.combineDataWinOffset = layout.combineDataWinOffset;
+    info.totalWinSizeEp = maxWindowSize;
 
     return ge::GRAPH_SUCCESS;
 }

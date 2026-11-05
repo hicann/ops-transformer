@@ -247,6 +247,7 @@ private:
     uint64_t dstRankWinOffset_{0};
     uint64_t dstRankStateOffset_{0};
     uint64_t dstStateWinOffset_{0};
+    uint64_t totalWinSizeEp_{0};
     bool coreAssigned_{false};
 
     DataCopyParams statusCopyParams_;
@@ -299,6 +300,13 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::Init(
     payloadStashWinOffset_ = info.window.payloadStashWinOffset;
     dispatchNotifyCount_ = info.dispatchNotifyCount;
     hostPinnedCounterAddrGM_ = reinterpret_cast<GM_ADDR>(info.hostPinnedCounterAddr);
+    totalWinSizeEp_ = info.totalWinSizeEp;
+#if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
+    for (uint32_t rankId = 0; rankId < epWorldSize_; ++rankId) {
+        OOMCheckAddrRange<uint8_t>(reinterpret_cast<__gm__ uint8_t*>(GetWinAddrByRankId(mc2Context_, rankId, 0)),
+                                   totalWinSizeEp_);
+    }
+#endif
 
     tokenSize_ = axisH_ * sizeof(XType);
     kAlignSize_ = Ceil(axisK_ * TOPK_INFO_SIZE, UB_ALIGN) * UB_ALIGN;
