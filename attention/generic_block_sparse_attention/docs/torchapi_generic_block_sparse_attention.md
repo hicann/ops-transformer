@@ -269,7 +269,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 - <term>Ascend 950PR&950DT系列产品</term> FP8量化场景：`head_dim`仅支持128，`layout_q/layout_kv`仅支持`TND/PA_BBND`，`mask_mode=1`、`residual_block_mode=0`、`block_shape=[1,128]`。
 <!-- end id9 -->
 <!-- npu="950,A3,910b" id10 -->
-- 稀疏索引最后一维容量：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>支持1～512，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term> FP8量化支持1～256；容量均须不小于稀疏块有效计数的最大值。
+- 稀疏索引最后一维容量：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term> FP8量化支持1～256；容量均须不小于稀疏块有效计数的最大值。
 <!-- end id10 -->
 <!-- npu="950,A3,910b" id11 -->
 - `quant_mode`：<term>Ascend 950PR&950DT系列产品</term>支持0（非量化）或5（FP8量化）；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>仅支持0。

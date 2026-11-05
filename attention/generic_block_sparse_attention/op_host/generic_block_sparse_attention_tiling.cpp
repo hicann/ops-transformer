@@ -683,10 +683,8 @@ ge::graphStatus GBSATiling::ParseSparseTensors(gert::TilingContext* context)
         return ge::GRAPH_FAILED;
     }
     constexpr int64_t GBSA_LEGACY_MAX_TOPK = 256;
-    constexpr int64_t GBSA_ARCH22_MAX_TOPK = 512;
-    const int64_t maxTopK = socVer_ == SOC_VER_950_CODE && quantType_ == GBSA_QUANT_TYPE_NONE ?
-                                std::numeric_limits<int32_t>::max() :
-                                (socVer_ != SOC_VER_950_CODE ? GBSA_ARCH22_MAX_TOPK : GBSA_LEGACY_MAX_TOPK);
+    const int64_t maxTopK =
+        quantType_ == GBSA_QUANT_TYPE_NONE ? std::numeric_limits<int32_t>::max() : GBSA_LEGACY_MAX_TOPK;
     if (topK > maxTopK) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             context->GetNodeName(), "sparseBlockIdx",

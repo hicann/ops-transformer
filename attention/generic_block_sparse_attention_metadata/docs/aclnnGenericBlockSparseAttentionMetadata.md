@@ -491,7 +491,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 - <term>Ascend 950PR&950DT系列产品</term> FP8量化场景：`headDim`仅支持128，`layoutQ/layoutKv`仅支持`TND/PA_BBND`，`maskType=1`、`residualBlockMode=0`、`blockShape=[1,128]`。
 <!-- end id10 -->
 <!-- npu="950,A3,910b" id11 -->
-- 稀疏索引最后一维容量：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>支持1～512，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term> FP8量化支持1～256；容量均须不小于稀疏块有效计数的最大值。
+- 稀疏索引最后一维容量：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化FLOAT16/BFLOAT16支持1～INT32_MAX，<term>Ascend 950PR&950DT系列产品</term> FP8量化支持1～256；容量均须不小于稀疏块有效计数的最大值。
 <!-- end id11 -->
 <!-- npu="950,A3,910b" id12 -->
 - `quantType`：<term>Ascend 950PR&950DT系列产品</term>支持0（非量化）或5（FP8量化）；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>仅支持0。
@@ -552,7 +552,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 - 布局组合及适用范围见[产品差异约束](#产品差异约束)。`layoutSparsePattern=4`、`blockShapeX=1`、`winLeft=winRight=-1`；headDim范围见[产品差异约束](#产品差异约束)。<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>及<term>Ascend 950PR&950DT系列产品</term>非量化支持maskType为0或1，FP8量化仅支持1。
 <!-- end id14 -->
 <!-- npu="950,A3,910b" id15 -->
-- `sparseBlockIdx`的shape为`[numKvHeads, totalQBlocks, maxSparseBlockCount]`，`sparseBlockCount`的shape为`[numKvHeads, totalQBlocks]`。`maxSparseBlockCount`须大于0，且须不小于`sparseBlockCount`中所有元素的最大值。容量上限：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>为512，<term>Ascend 950PR&950DT系列产品</term>非量化为INT32_MAX，<term>Ascend 950PR&950DT系列产品</term> FP8量化为256。
+- `sparseBlockIdx`的shape为`[numKvHeads, totalQBlocks, maxSparseBlockCount]`，`sparseBlockCount`的shape为`[numKvHeads, totalQBlocks]`。`maxSparseBlockCount`须大于0，且须不小于`sparseBlockCount`中所有元素的最大值。容量上限：<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化为INT32_MAX，<term>Ascend 950PR&950DT系列产品</term>非量化为INT32_MAX，<term>Ascend 950PR&950DT系列产品</term> FP8量化为256。
 <!-- end id15 -->
 - 每组有效稀疏索引须非负、严格升序且不重复，位于前`sparseBlockCount`个位置；随机升序即可，不要求等步长或物理页连续。
 <!-- npu="A3,910b" id16 -->

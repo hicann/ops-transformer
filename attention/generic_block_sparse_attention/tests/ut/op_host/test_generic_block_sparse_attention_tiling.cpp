@@ -1225,12 +1225,25 @@ TEST_F(generic_block_sparse_attention_tiling_ut, group_size_exceeds_max)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(generic_block_sparse_attention_tiling_ut, topk_exceeds_max)
+TEST_F(generic_block_sparse_attention_tiling_ut, arch22_nonquant_large_topk)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    for (int64_t topK : {512LL, 513LL, 1024LL, 2147483647LL}) {
+        auto inputs = MakeInputs(ge::DT_FLOAT16);
+        inputs[3] = {{{kN2, kTotalQBlocks, topK}, {kN2, kTotalQBlocks, topK}}, ge::DT_INT32, ge::FORMAT_ND};
+        gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs,
+                                                  MakeOutputs(ge::DT_FLOAT16, false), MakeAttrs(1, 0, 0, 0),
+                                                  &compileInfo, "Ascend910B", 40, 196608);
+        ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, kFp16Tiling910B);
+    }
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, topk_exceeds_int32_max)
 {
     GenericBlockSparseAttentionCompileInfo compileInfo;
     auto inputs = MakeInputs(ge::DT_FLOAT16);
-    // A2/A3 supports topK up to 512; 513 must be rejected.
-    inputs[3] = {{{kN2, kTotalQBlocks, 513}, {kN2, kTotalQBlocks, 513}}, ge::DT_INT32, ge::FORMAT_ND};
+    constexpr int64_t topK = 2147483648LL;
+    inputs[3] = {{{kN2, kTotalQBlocks, topK}, {kN2, kTotalQBlocks, topK}}, ge::DT_INT32, ge::FORMAT_ND};
     gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
                                               MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);

@@ -51,7 +51,6 @@ constexpr int64_t GBSA_MAX_BLOCK_SHAPE_Y = 128;
 constexpr int64_t GBSA_LAYOUT_SPARSE_KVN_TOTALQB_KB = 4;
 constexpr int64_t GBSA_RESIDUAL_BLOCK_MODE_NONE = 0;
 constexpr int64_t GBSA_RESIDUAL_BLOCK_MODE_FORCE = 1;
-constexpr int64_t GBSA_CURRENT_MAX_SPARSE_BLOCK_COUNT = 512;
 constexpr int64_t GBSA_ARCH35_QUANT_MAX_SPARSE_BLOCK_COUNT = 256;
 constexpr int64_t GBSA_QUANT_TYPE_NONE = 0;
 constexpr int64_t GBSA_QUANT_TYPE_FLOAT8 = 5;
@@ -441,8 +440,7 @@ aclnnStatus CheckGbsaSparseBlockCapacity(const aclTensor* sparseBlockIdx, bool a
     const int64_t dimNum = sparseBlockIdx->GetViewShape().GetDimNum();
     const int64_t capacity = sparseBlockIdx->GetViewShape().GetDim(dimNum - 1);
     const int64_t maxCapacity =
-        arch35NonQuant ? std::numeric_limits<int32_t>::max() :
-                         (isArch35 ? GBSA_ARCH35_QUANT_MAX_SPARSE_BLOCK_COUNT : GBSA_CURRENT_MAX_SPARSE_BLOCK_COUNT);
+        (!isArch35 || arch35NonQuant) ? std::numeric_limits<int32_t>::max() : GBSA_ARCH35_QUANT_MAX_SPARSE_BLOCK_COUNT;
     if (capacity > maxCapacity) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "sparseBlockIdx last dimension cannot exceed %lld, but got %lld.", maxCapacity,
                 capacity);

@@ -269,63 +269,59 @@ public:
         uint32_t mRound = RoundUp<L1AAlignHelper::M_ALIGNED>(mActual);
         LayoutBInL1 layoutBInL1 = LayoutBInL1::template MakeLayout<ElementB>(kActual, nActual);
 
-        uint32_t mL0Loop = CeilDiv<L0TileShape::M>(mActual);
+        // The arch22 entry limits rowNum to one M tile (16 or 128 rows).
         uint32_t kL0Loop = CeilDiv<L0TileShape::K>(kActual);
 
-        for (uint32_t mL0Idx = 0; mL0Idx < mL0Loop; mL0Idx++) {
-            uint32_t mL0Actual = (mL0Idx < mL0Loop - 1) ? L0TileShape::M : (mActual - mL0Idx * L0TileShape::M);
+        AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(l0CPingPongFlag);
 
-            AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(l0CPingPongFlag);
+        for (uint32_t kL0Idx = 0; kL0Idx < kL0Loop; kL0Idx++) {
+            uint32_t kL0Actual = (kL0Idx < kL0Loop - 1) ? L0TileShape::K : (kActual - kL0Idx * L0TileShape::K);
 
-            for (uint32_t kL0Idx = 0; kL0Idx < kL0Loop; kL0Idx++) {
-                uint32_t kL0Actual = (kL0Idx < kL0Loop - 1) ? L0TileShape::K : (kActual - kL0Idx * L0TileShape::K);
+            LayoutAInL0 layoutAInL0 = LayoutAInL0::template MakeLayout<ElementA>(mActual, kL0Actual);
+            MatrixCoord l1ATileCoord{0U, kL0Idx * L0TileShape::K};
+            auto l1ATile = l1ATensor[layoutAInL1.GetOffset(l1ATileCoord)];
 
-                LayoutAInL0 layoutAInL0 = LayoutAInL0::template MakeLayout<ElementA>(mL0Actual, kL0Actual);
-                MatrixCoord l1ATileCoord{mL0Idx * L0TileShape::M, kL0Idx * L0TileShape::K};
-                auto l1ATile = l1ATensor[layoutAInL1.GetOffset(l1ATileCoord)];
+            AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag);
+            copyL1ToL0A(l0ATensor[l0ABPingPongFlag], l1ATile, layoutAInL0, layoutAInL1);
 
-                AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag);
-                copyL1ToL0A(l0ATensor[l0ABPingPongFlag], l1ATile, layoutAInL0, layoutAInL1);
+            LayoutBInL0 layoutBInL0 = LayoutBInL0::template MakeLayout<ElementB>(kL0Actual, nActual);
+            MatrixCoord l1BTileCoord{kL0Idx * L0TileShape::K, 0};
+            auto l1BTile = l1BTensor[stage][layoutBInL1.GetOffset(l1BTileCoord)];
 
-                LayoutBInL0 layoutBInL0 = LayoutBInL0::template MakeLayout<ElementB>(kL0Actual, nActual);
-                MatrixCoord l1BTileCoord{kL0Idx * L0TileShape::K, 0};
-                auto l1BTile = l1BTensor[stage][layoutBInL1.GetOffset(l1BTileCoord)];
-
-                if ((mL0Idx == 0) && (kL0Idx == 0)) {
-                    AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(stage);
-                }
-
-                AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag + 2);
-                copyL1ToL0B(l0BTensor[l0ABPingPongFlag], l1BTile, layoutBInL0, layoutBInL1);
-
-                if ((mL0Idx == mL0Loop - 1) && (kL0Idx == kL0Loop - 1)) {
-                    AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(stage);
-                }
-
-                AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
-                AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
-
-                bool initMmad = kL0Idx == 0;
-                tileMmad(l0CTensor[l0CPingPongFlag], l0ATensor[l0ABPingPongFlag], l0BTensor[l0ABPingPongFlag], mRound,
-                         nActual, kL0Actual, initMmad);
-
-                AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag);
-                AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag + 2);
-
-                l0ABPingPongFlag = 1 - l0ABPingPongFlag;
+            if (kL0Idx == 0) {
+                AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(stage);
             }
-            AscendC::SetFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
-            AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
 
-            MatrixCoord gmCTileCoord{mL0Idx * L0TileShape::M, nL1Idx * L1TileShape::N};
-            LayoutC layoutCTile = layoutC.GetTileLayout(MakeCoord(mL0Actual, nActual));
-            auto layoutInL0C = LayoutCInL0::MakeLayoutInL0C(MakeCoord(mL0Actual, nActual));
+            AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag + 2);
+            copyL1ToL0B(l0BTensor[l0ABPingPongFlag], l1BTile, layoutBInL0, layoutBInL1);
 
-            copyL0CToGm(gC[layoutC.GetOffset(gmCTileCoord)], l0CTensor[l0CPingPongFlag], layoutCTile, layoutInL0C);
+            if (kL0Idx == kL0Loop - 1) {
+                AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(stage);
+            }
 
-            AscendC::SetFlag<AscendC::HardEvent::FIX_M>(l0CPingPongFlag);
-            l0CPingPongFlag = 1 - l0CPingPongFlag;
+            AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
+            AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
+
+            bool initMmad = kL0Idx == 0;
+            tileMmad(l0CTensor[l0CPingPongFlag], l0ATensor[l0ABPingPongFlag], l0BTensor[l0ABPingPongFlag], mRound,
+                     nActual, kL0Actual, initMmad);
+
+            AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag);
+            AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag + 2);
+
+            l0ABPingPongFlag = 1 - l0ABPingPongFlag;
         }
+        AscendC::SetFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
+        AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
+
+        MatrixCoord gmCTileCoord{0U, nL1Idx * L1TileShape::N};
+        LayoutC layoutCTile = layoutC.GetTileLayout(MakeCoord(mActual, nActual));
+        auto layoutInL0C = LayoutCInL0::MakeLayoutInL0C(MakeCoord(mActual, nActual));
+
+        copyL0CToGm(gC[layoutC.GetOffset(gmCTileCoord)], l0CTensor[l0CPingPongFlag], layoutCTile, layoutInL0C);
+
+        AscendC::SetFlag<AscendC::HardEvent::FIX_M>(l0CPingPongFlag);
+        l0CPingPongFlag = 1 - l0CPingPongFlag;
     }
 
     __aicore__ inline void operator()(AscendC::GlobalTensor<ElementA> gA, AscendC::GlobalTensor<ElementB> gB,
