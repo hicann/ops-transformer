@@ -38,6 +38,32 @@ using namespace regbaseutil;
 using namespace fa_base_vector_gs1;
 
 namespace BaseApi {
+// Remove the sink seed only for lanes whose query has no visible KV.
+template <bool GS1>
+__simd_vf__ inline void MaskInvalidSinkRows(__ubuf__ float* maxUb, __ubuf__ float* sumUb, uint32_t start,
+                                            uint32_t innerDimSize, int32_t firstValid, int32_t endValid, uint32_t rows)
+{
+    Reg::MaskReg lanes = Reg::UpdateMask<float>(rows);
+    Reg::RegTensor<int32_t> index, divisor, query;
+    Reg::Arange<int32_t>(index, static_cast<int32_t>(start));
+    // GS1: query = index % s1Size. S1G: query = index / gSize.
+    Reg::Duplicate<int32_t>(divisor, static_cast<int32_t>(innerDimSize));
+    Reg::Div<int32_t>(query, index, divisor, lanes);
+    if constexpr (GS1) {
+        Reg::Mul<int32_t>(query, query, divisor, lanes);
+        Reg::Sub<int32_t>(query, index, query, lanes);
+    }
+    Reg::MaskReg before, after, invalid;
+    Reg::Compares<int32_t, CMPMODE::LT>(before, query, firstValid, lanes);
+    Reg::Compares<int32_t, CMPMODE::GE>(after, query, endValid, lanes);
+    Reg::MaskOr(invalid, before, after, lanes);
+    Reg::RegTensor<float> invalidMax, zero;
+    Reg::Duplicate<float>(invalidMax, -FLT_MAX_NEW);
+    Reg::Duplicate<float>(zero, 0.0f);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(maxUb, invalidMax, invalid);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>(sumUb, zero, invalid);
+}
+
 template <typename MQFA_T>
 class VecBlockBase {
 public:
@@ -68,7 +94,9 @@ public:
     static constexpr uint32_t PRELOAD_N = 2U;
 
     static constexpr fa_base_vector_gs1::LAYOUT_Q MASK_LAYOUT =
-        (layout == LayOutTypeEnum::LAYOUT_BSH) ? fa_base_vector_gs1::LAYOUT_Q::SG : fa_base_vector_gs1::LAYOUT_Q::GS;
+        (layout == LayOutTypeEnum::LAYOUT_BSH || layout == LayOutTypeEnum::LAYOUT_TND) ?
+            fa_base_vector_gs1::LAYOUT_Q::SG :
+            fa_base_vector_gs1::LAYOUT_Q::GS;
 
     static constexpr uint32_t VEC1_RES_BYTE = (mBaseSize + 1) * s2BaseSize * sizeof(SOFTMAX_OUT_T); // +1解bank冲突
     static constexpr uint32_t VEC2_RES_BYTE = mBaseSize * dTemplateAlign64 * sizeof(T);
@@ -114,7 +142,9 @@ public:
     static constexpr uint32_t DB = 2U;
     static constexpr uint32_t PRELOAD_N = 2U;
     static constexpr fa_base_vector_gs1::LAYOUT_Q MASK_LAYOUT =
-        (layout == LayOutTypeEnum::LAYOUT_BSH) ? fa_base_vector_gs1::LAYOUT_Q::SG : fa_base_vector_gs1::LAYOUT_Q::GS;
+        (layout == LayOutTypeEnum::LAYOUT_BSH || layout == LayOutTypeEnum::LAYOUT_TND) ?
+            fa_base_vector_gs1::LAYOUT_Q::SG :
+            fa_base_vector_gs1::LAYOUT_Q::GS;
 
     static constexpr T BOOL_ATTEN_MASK_SCALAR_VALUE = -1000000000000.0; // 用于mask为bool类型
     uint32_t negativeIntScalar = *((uint32_t*)&BOOL_ATTEN_MASK_SCALAR_VALUE);
@@ -514,6 +544,22 @@ public:
                 constInfo.gSize);
         }
         Duplicate<float>(sumUb, 1.0f, SOFTMAX_BUF_BYTES / sizeof(float));
+        if constexpr (HAS_MASK) {
+            int64_t firstValid =
+                AttentionCommon::Min(AttentionCommon::Max(-runInfo.nextTokensLeftUp, 0), runInfo.actS1Size);
+            int64_t endValid = AttentionCommon::Min(
+                AttentionCommon::Max(runInfo.preTokensLeftUp + static_cast<int64_t>(runInfo.actS2Size), 0),
+                runInfo.actS1Size);
+            if (runInfo.actVecMSize > 0 && (firstValid > 0 || endValid < runInfo.actS1Size) &&
+                CalcBlockNeedRowInvalid(runInfo, firstValid, endValid - 1)) {
+                PipeBarrier<PIPE_V>();
+                constexpr bool gs1 = layout == LayOutTypeEnum::LAYOUT_BNSD;
+                MaskInvalidSinkRows<gs1>((__ubuf__ float*)maxUb.GetPhyAddr(), (__ubuf__ float*)sumUb.GetPhyAddr(),
+                                         runInfo.gS1Idx + runInfo.vecMbaseIdx,
+                                         gs1 ? runInfo.actS1Size : constInfo.gSize, firstValid, endValid,
+                                         runInfo.actVecMSize);
+            }
+        }
         PipeBarrier<PIPE_V>();
         SetFlag<HardEvent::V_MTE2>(V_MTE2_SINK);
     }

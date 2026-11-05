@@ -58,8 +58,8 @@ def load_impl_module(stem):
 # 三方比对专用容差（仅 --compare cross_check 时生效）。与 tolerance 分开声明，
 # 避免默认(stat_rel_err)模式下触发 TTK 的 golden Promote / 第三方抓取逻辑。
 CROSS_CHECK_TOLERANCE = {
-    "float16": {"standard": "cross_check", "level": "L0"},
-    "bfloat16": {"standard": "cross_check", "level": "L0"},
+    "float16": {"standard": "cross_check", "level": "L2"},
+    "bfloat16": {"standard": "cross_check", "level": "L2"},
 }
 
 

@@ -1255,6 +1255,9 @@ def tforward(sinner=-1, souter=-1, mode="cpu", **kwargs):
                         )
                         if s1_idx < (valid_qs_cur_batch - kvs_cur_batch):
                             out_block[m_idx] = 0
+                            # A sink cannot make a fully masked row valid for LSE.
+                            if return_softmax_lse and sinks is not None:
+                                block_sum[m_idx] = 0
                 if layout_q == "TND":
                     q_start = int(cu_seqlens_q[b_idx])
                     for m_idx in range(
