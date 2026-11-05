@@ -56,6 +56,7 @@ private:
     uint64_t totalRows_ = 0;
     uint32_t d_ = 0;
     uint32_t k_ = 0;
+    bool hasRms0_ = false;
     bool hasMid_ = false;
     ge::DataType inputType_ = ge::DT_UNDEFINED;
     mega_mhc::ProjectionMode projectionMode_ = mega_mhc::ProjectionMode::FP32;

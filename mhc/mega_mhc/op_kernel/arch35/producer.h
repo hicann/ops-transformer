@@ -17,6 +17,7 @@
 namespace MegaMhc::Schedule {
 using namespace AscendC;
 
+// WITH_RMS0=false bypasses the RMS0 stage in every producer; Post then consumes hOut directly.
 constexpr uint32_t kProducerCoefficientPlaneOffset = 64U;
 constexpr uint32_t kProducerCoefficientSlotStride = 128U;
 constexpr uint32_t kProducerCoefficientBufferElements = 128U;
@@ -73,12 +74,12 @@ __aicore__ inline void PrefetchNoMidStagedProducer(Kernel::Tensors<T>& tensors, 
 }
 
 /** Compute one RMS0/Post row with the required x1 Cast, avoiding its UB round trip. */
-template <typename T>
+template <typename T, bool WITH_RMS0>
 __aicore__ inline void ComputeNoMidProducerRow(LocalTensor<T> input, LocalTensor<T> residual, LocalTensor<float> gamma,
                                                LocalTensor<float> coefficients, LocalTensor<float> stats,
                                                const MegaMhcTilingData& tiling)
 {
-    Compute::ComputeRmsNorm0PostRow<T>(
+    Compute::ComputeRmsNorm0PostRow<T, false, false, WITH_RMS0>(
         reinterpret_cast<__ubuf__ T*>(input.GetPhyAddr()), reinterpret_cast<__ubuf__ float*>(gamma.GetPhyAddr()),
         tiling.normEps, reinterpret_cast<__ubuf__ T*>(residual.GetPhyAddr()),
         reinterpret_cast<__ubuf__ float*>(coefficients.GetPhyAddr()),
@@ -88,7 +89,7 @@ __aicore__ inline void ComputeNoMidProducerRow(LocalTensor<T> input, LocalTensor
 }
 
 /** AIVs with exactly one row need one input/output slot and no slot credits. */
-template <typename T>
+template <typename T, bool WITH_RMS0>
 __aicore__ inline void RunNoMidSingleRowProducer(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling,
                                                  TPipe* pipe, uint32_t row)
 {
@@ -105,7 +106,9 @@ __aicore__ inline void RunNoMidSingleRowProducer(Kernel::Tensors<T>& tensors, co
     auto gamma = gammaBuffer.Get<float>();
     auto coefficients = coefficientBuffer.Get<float>();
     auto stats = statsBuffer.Get<float>();
-    Kernel::CopyGlobalToUb(gamma, tensors.gamma0, 0U, tiling.d);
+    if constexpr (WITH_RMS0) {
+        Kernel::CopyGlobalToUb(gamma, tensors.gamma0, 0U, tiling.d);
+    }
     Kernel::EnqueueGlobalToUb(input, tensors.hOut, static_cast<uint64_t>(row) * tiling.d, tiling.d);
     Kernel::EnqueueGlobalToUb(coefficients, tensors.hPost, static_cast<uint64_t>(row) * Kernel::kHeadCount,
                               Kernel::kHeadCount);
@@ -114,7 +117,7 @@ __aicore__ inline void RunNoMidSingleRowProducer(Kernel::Tensors<T>& tensors, co
     Kernel::EnqueueGlobalToUb(residual, tensors.residual, static_cast<uint64_t>(row) * tiling.k, tiling.k);
     SetFlag<HardEvent::MTE2_V>(EVENT_ID0);
     WaitFlag<HardEvent::MTE2_V>(EVENT_ID0);
-    ComputeNoMidProducerRow<T>(input, residual, gamma, coefficients, stats, tiling);
+    ComputeNoMidProducerRow<T, WITH_RMS0>(input, residual, gamma, coefficients, stats, tiling);
     SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
     WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
     DataCopyExtParams copy{1U, static_cast<uint32_t>(tiling.k * sizeof(T)), 0U, 0U, 0U};
@@ -127,7 +130,7 @@ __aicore__ inline void RunNoMidSingleRowProducer(Kernel::Tensors<T>& tensors, co
  * Two input slots and three aliased residual/output slots overlap MTE2, Vector and MTE3.
  * Post output retains its input-type rounding before GM publication; the phase barrier remains.
  */
-template <typename T, bool SKIP_IDLE_AIV = false>
+template <typename T, bool SKIP_IDLE_AIV, bool WITH_RMS0>
 __aicore__ inline void RunNoMidStagedProducer(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling, TPipe* pipe)
 {
     if ASCEND_IS_AIV {
@@ -138,7 +141,7 @@ __aicore__ inline void RunNoMidStagedProducer(Kernel::Tensors<T>& tensors, const
             }
         }
         if (firstRow < tiling.totalRows && static_cast<uint64_t>(firstRow) + tiling.activeAiv >= tiling.totalRows) {
-            RunNoMidSingleRowProducer<T>(tensors, tiling, pipe, firstRow);
+            RunNoMidSingleRowProducer<T, WITH_RMS0>(tensors, tiling, pipe, firstRow);
             return;
         }
         TBuf<TPosition::VECCALC> inputBuffer, residualBuffer;
@@ -154,7 +157,9 @@ __aicore__ inline void RunNoMidStagedProducer(Kernel::Tensors<T>& tensors, const
         auto gamma = gammaBuffer.Get<float>();
         auto coefficients = coefficientBuffer.Get<float>();
         auto stats = statsBuffer.Get<float>();
-        Kernel::CopyGlobalToUb(gamma, tensors.gamma0, 0U, tiling.d);
+        if constexpr (WITH_RMS0) {
+            Kernel::CopyGlobalToUb(gamma, tensors.gamma0, 0U, tiling.d);
+        }
         // Event IDs are scoped by HardEvent type: input credits use V_MTE2 2/3,
         // residual credits use MTE3_MTE2 4/5/6, and row readiness uses MTE2_V 4/5/6.
         SetFlag<HardEvent::V_MTE2>(EVENT_ID2);
@@ -186,8 +191,9 @@ __aicore__ inline void RunNoMidStagedProducer(Kernel::Tensors<T>& tensors, const
                                             coefficients[nextInputSlot * kProducerCoefficientSlotStride],
                                             nextInputEvent, nextResidualEvent);
             }
-            ComputeNoMidProducerRow<T>(input[inputSlot * tiling.d], residual[residualSlot * tiling.k], gamma,
-                                       coefficients[inputSlot * kProducerCoefficientSlotStride], stats, tiling);
+            ComputeNoMidProducerRow<T, WITH_RMS0>(input[inputSlot * tiling.d], residual[residualSlot * tiling.k], gamma,
+                                                  coefficients[inputSlot * kProducerCoefficientSlotStride], stats,
+                                                  tiling);
             SetFlag<HardEvent::V_MTE2>(inputEvent);
             SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
             WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
@@ -250,7 +256,7 @@ __aicore__ inline void PrefetchCachedGammaResidual(Kernel::Tensors<T>& tensors, 
 /** Cache gamma0/gamma2 once with the Host-selected residual slot count.
  * In-place RMS0 avoids a separate x1 buffer; double residual slots overlap the next row load.
  */
-template <typename T, bool DOUBLE_RESIDUAL = false>
+template <typename T, bool DOUBLE_RESIDUAL, bool WITH_RMS0>
 __aicore__ inline void RunCachedGammaWithMidProducer(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling,
                                                      TPipe* pipe)
 {
@@ -270,7 +276,9 @@ __aicore__ inline void RunCachedGammaWithMidProducer(Kernel::Tensors<T>& tensors
         auto coefficients = coefficientBuffer.Get<float>();
         auto stats = statsBuffer.Get<float>();
         auto sum = reinterpret_cast<__ubuf__ float*>(stats.GetPhyAddr());
-        Kernel::CopyGlobalToUb(gamma, tensors.gamma0, 0U, tiling.d);
+        if constexpr (WITH_RMS0) {
+            Kernel::CopyGlobalToUb(gamma, tensors.gamma0, 0U, tiling.d);
+        }
         Kernel::CopyGlobalToUb(gamma2, tensors.gamma2, 0U, tiling.k);
         SetFlag<HardEvent::V_MTE2>(EVENT_ID4);
         SetFlag<HardEvent::V_MTE2>(EVENT_ID5);
@@ -302,9 +310,11 @@ __aicore__ inline void RunCachedGammaWithMidProducer(Kernel::Tensors<T>& tensors
                 }
             }
             auto x1 = reinterpret_cast<__ubuf__ T*>(input[slot * tiling.d].GetPhyAddr());
-            Compute::AccumulateRowSquares<T>(x1, tiling.d, sum + 1U);
-            Compute::ComputeRmsNormFromSquares<T>(x1, reinterpret_cast<__ubuf__ float*>(gamma.GetPhyAddr()), tiling.d,
-                                                  tiling.normEps, sum + 1U, x1);
+            if constexpr (WITH_RMS0) {
+                Compute::AccumulateRowSquares<T>(x1, tiling.d, sum + 1U);
+                Compute::ComputeRmsNormFromSquares<T>(x1, reinterpret_cast<__ubuf__ float*>(gamma.GetPhyAddr()),
+                                                      tiling.d, tiling.normEps, sum + 1U, x1);
+            }
             // Residual DMA can overlap RMS0; Post needs its completion before reading the aliased row.
             WaitFlag<HardEvent::MTE2_V>(residualEvent);
             Compute::ComputePostFourHeads<T, true>(
@@ -341,16 +351,16 @@ __aicore__ inline void RunCachedGammaWithMidProducer(Kernel::Tensors<T>& tensors
     }
 }
 
-template <typename T, bool BS_OWNERSHIP = false>
+template <typename T, bool BS_OWNERSHIP, bool WITH_RMS0>
 __aicore__ inline void RunPrefetchedWithMidProducer(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling,
                                                     TPipe* pipe)
 {
     if constexpr (BS_OWNERSHIP) {
         if (tiling.withMidProducerResidualSlots != 0U) {
             if (tiling.withMidProducerResidualSlots == kProducerDoubleResidualSlots) {
-                RunCachedGammaWithMidProducer<T, true>(tensors, tiling, pipe);
+                RunCachedGammaWithMidProducer<T, true, WITH_RMS0>(tensors, tiling, pipe);
             } else {
-                RunCachedGammaWithMidProducer<T, false>(tensors, tiling, pipe);
+                RunCachedGammaWithMidProducer<T, false, WITH_RMS0>(tensors, tiling, pipe);
             }
             return;
         }
@@ -373,7 +383,9 @@ __aicore__ inline void RunPrefetchedWithMidProducer(Kernel::Tensors<T>& tensors,
         auto gamma = gammaBuffer.Get<float>();
         auto coefficients = coefficientBuffer.Get<float>();
         auto stats = statsBuffer.Get<float>();
-        Kernel::CopyGlobalToUb(gamma, tensors.gamma0, 0U, tiling.d);
+        if constexpr (WITH_RMS0) {
+            Kernel::CopyGlobalToUb(gamma, tensors.gamma0, 0U, tiling.d);
+        }
         if (tiling.midGammaTileCount == 1U) {
             Kernel::CopyGlobalToUb(gamma2, tensors.gamma2, 0U, tiling.k);
         }
@@ -420,12 +432,14 @@ __aicore__ inline void RunPrefetchedWithMidProducer(Kernel::Tensors<T>& tensors,
             }
             auto post = residual[(prefetchResidual ? slot : 0U) * tiling.k];
             // RMS0 statistics depend only on input, so keep them overlapped with residual DMA.
-            Compute::AccumulateRowSquares<T>(reinterpret_cast<__ubuf__ T*>(input[slot * tiling.d].GetPhyAddr()),
-                                             tiling.d, reinterpret_cast<__ubuf__ float*>(stats.GetPhyAddr()));
+            if constexpr (WITH_RMS0) {
+                Compute::AccumulateRowSquares<T>(reinterpret_cast<__ubuf__ T*>(input[slot * tiling.d].GetPhyAddr()),
+                                                 tiling.d, reinterpret_cast<__ubuf__ float*>(stats.GetPhyAddr()));
+            }
             if (!prefetchResidual) {
                 WaitFlag<HardEvent::MTE2_V>(EVENT_ID6);
             }
-            Compute::ComputeRmsNorm0PostRow<T, true, true>(
+            Compute::ComputeRmsNorm0PostRow<T, true, true, WITH_RMS0>(
                 reinterpret_cast<__ubuf__ T*>(input[slot * tiling.d].GetPhyAddr()),
                 reinterpret_cast<__ubuf__ float*>(gamma.GetPhyAddr()), tiling.normEps,
                 reinterpret_cast<__ubuf__ T*>(post.GetPhyAddr()),
@@ -485,7 +499,7 @@ __aicore__ inline void RunPrefetchedWithMidProducer(Kernel::Tensors<T>& tensors,
  * RMS0 and Mid accumulate statistics across every D tile before their apply pass; each token has one AIV owner.
  * Rounded Post lives temporarily in new_residual, then Mid overwrites it with its rounded result.
  */
-template <typename T, bool WITH_MID>
+template <typename T, bool WITH_MID, bool WITH_RMS0>
 __aicore__ inline void RunTiledProducer(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling, TPipe* pipe)
 {
     if ASCEND_IS_AIV {
@@ -494,34 +508,40 @@ __aicore__ inline void RunTiledProducer(Kernel::Tensors<T>& tensors, const MegaM
         auto stats = reinterpret_cast<__ubuf__ float*>(buffer.stats.GetPhyAddr());
         for (uint64_t row = GetBlockIdx(); row < tiling.totalRows; row += tiling.activeAiv) {
             Kernel::ZeroFp32Values(stats, Kernel::kRmsStatElements);
-            buffer.template PrefetchNorm<false>(tensors.hOut, row * tiling.d, tensors.gamma0, 0U, 0U);
-            for (uint32_t tile = 0U; tile < tiling.dTileCount; ++tile) {
-                buffer.Wait(tile);
-                if (tile + 1U < tiling.dTileCount) {
-                    buffer.template PrefetchNorm<false>(tensors.hOut, row * tiling.d, tensors.gamma0, 0U, tile + 1U);
+            if constexpr (WITH_RMS0) {
+                buffer.template PrefetchNorm<false>(tensors.hOut, row * tiling.d, tensors.gamma0, 0U, 0U);
+                for (uint32_t tile = 0U; tile < tiling.dTileCount; ++tile) {
+                    buffer.Wait(tile);
+                    if (tile + 1U < tiling.dTileCount) {
+                        buffer.template PrefetchNorm<false>(tensors.hOut, row * tiling.d, tensors.gamma0, 0U,
+                                                            tile + 1U);
+                    }
+                    auto input = buffer.Input(tile);
+                    Compute::AccumulateCompensatedSquares<T>(reinterpret_cast<__ubuf__ T*>(input.GetPhyAddr()),
+                                                             buffer.Count(tile), stats,
+                                                             stats + kProducerRms0CarryIndex);
+                    buffer.Release(tile);
                 }
-                auto input = buffer.Input(tile);
-                Compute::AccumulateCompensatedSquares<T>(reinterpret_cast<__ubuf__ T*>(input.GetPhyAddr()),
-                                                         buffer.Count(tile), stats, stats + kProducerRms0CarryIndex);
-                buffer.Release(tile);
+                Compute::FinalizeInverseRms<true>(stats, tiling.d, tiling.normEps, stats + 1U,
+                                                  stats + kProducerRms0CarryIndex);
             }
-            Compute::FinalizeInverseRms<true>(stats, tiling.d, tiling.normEps, stats + 1U,
-                                              stats + kProducerRms0CarryIndex);
             Kernel::CopyGlobalToUb(buffer.coefficients, tensors.hPost, row * Kernel::kHeadCount, Kernel::kHeadCount);
             Kernel::CopyGlobalToUb(buffer.coefficients[kProducerCoefficientPlaneOffset], tensors.hRes,
                                    row * Kernel::kHeadMatrixElements, Kernel::kHeadMatrixElements);
-            buffer.template PrefetchHeads<true>(tensors, row, 0U);
+            buffer.template PrefetchHeads<true, WITH_RMS0>(tensors, row, 0U);
             for (uint32_t tile = 0U; tile < tiling.dTileCount; ++tile) {
                 buffer.Wait(tile);
                 if (tile + 1U < tiling.dTileCount) {
-                    buffer.template PrefetchHeads<true>(tensors, row, tile + 1U);
+                    buffer.template PrefetchHeads<true, WITH_RMS0>(tensors, row, tile + 1U);
                 }
                 auto input = buffer.Input(tile);
                 auto heads = buffer.Heads(tile);
                 auto gamma = buffer.Gamma(tile);
-                Compute::ApplyRmsNorm<T>(reinterpret_cast<__ubuf__ T*>(input.GetPhyAddr()),
-                                         reinterpret_cast<__ubuf__ float*>(gamma.GetPhyAddr()), buffer.Count(tile),
-                                         stats + 1U, reinterpret_cast<__ubuf__ T*>(input.GetPhyAddr()));
+                if constexpr (WITH_RMS0) {
+                    Compute::ApplyRmsNorm<T>(reinterpret_cast<__ubuf__ T*>(input.GetPhyAddr()),
+                                             reinterpret_cast<__ubuf__ float*>(gamma.GetPhyAddr()), buffer.Count(tile),
+                                             stats + 1U, reinterpret_cast<__ubuf__ T*>(input.GetPhyAddr()));
+                }
                 Compute::ComputePostFourHeads<T>(reinterpret_cast<__ubuf__ T*>(input.GetPhyAddr()),
                                                  reinterpret_cast<__ubuf__ T*>(heads.GetPhyAddr()),
                                                  reinterpret_cast<__ubuf__ float*>(buffer.coefficients.GetPhyAddr()),
@@ -561,7 +581,7 @@ __aicore__ inline void RunTiledProducer(Kernel::Tensors<T>& tensors, const MegaM
  * x2=Cast<T>(Post(Cast<T>(RMS0(hOut)),residual)); arithmetic stays in shared RegBase functions.
  * Producer buffers coexist with projection buffers; host owns row counts and tick spacing.
  */
-template <typename T>
+template <typename T, bool WITH_RMS0>
 class WavePostProducer {
 public:
     /** Allocate the host-budgeted two input slots and bind one host-planned AIV M group. */
@@ -579,7 +599,9 @@ public:
         gamma_ = gammaBuffer_.template Get<float>();
         coefficients_ = coefficientsBuffer_.template Get<float>();
         stats_ = statsBuffer_.template Get<float>();
-        Kernel::CopyGlobalToUb(gamma_, tensors.gamma0, 0U, tiling.d);
+        if constexpr (WITH_RMS0) {
+            Kernel::CopyGlobalToUb(gamma_, tensors.gamma0, 0U, tiling.d);
+        }
         SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID4);
         SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID5);
     }
@@ -631,8 +653,8 @@ public:
         if (produced_ + 1U < rows_) {
             Prefetch(row_ + 1U, next);
         }
-        ComputeNoMidProducerRow<T>(input_[slot_ * t.d], residual_[slot_ * t.k], gamma_,
-                                   coefficients_[slot_ * kProducerCoefficientSlotStride], stats_, t);
+        ComputeNoMidProducerRow<T, WITH_RMS0>(input_[slot_ * t.d], residual_[slot_ * t.k], gamma_,
+                                              coefficients_[slot_ * kProducerCoefficientSlotStride], stats_, t);
         // All four sources for each column are read before stores in the shared Post VF.
         // Return input-slot credit only after MTE3 finishes reading this aliased output.
         SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
@@ -701,7 +723,7 @@ private:
 /** Prefetch two input slots independently of the three aliased residual/output slots.
  * BS retains full K. Each AIV produces the rows owned by its paired Cube, unlike MK cyclic ownership.
  */
-template <typename T>
+template <typename T, bool WITH_RMS0>
 __aicore__ inline void RunBsNoMidProducer(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling, TPipe* pipe)
 {
     if ASCEND_IS_AIV {
@@ -721,7 +743,9 @@ __aicore__ inline void RunBsNoMidProducer(Kernel::Tensors<T>& tensors, const Meg
         auto gamma = gammaBuffer.Get<float>();
         auto coefficients = coefficientBuffer.Get<float>();
         auto stats = statsBuffer.Get<float>();
-        Kernel::CopyGlobalToUb(gamma, tensors.gamma0, 0U, tiling.d);
+        if constexpr (WITH_RMS0) {
+            Kernel::CopyGlobalToUb(gamma, tensors.gamma0, 0U, tiling.d);
+        }
         // Seed independent input and residual/output credits; all slots start writable.
         SetFlag<HardEvent::V_MTE2>(EVENT_ID2);
         SetFlag<HardEvent::V_MTE2>(EVENT_ID3);
@@ -770,8 +794,9 @@ __aicore__ inline void RunBsNoMidProducer(Kernel::Tensors<T>& tensors, const Meg
                                                 nextResidualSlot == 1U ? EVENT_ID5 :
                                                                          EVENT_ID6);
                 }
-                ComputeNoMidProducerRow<T>(input[inputSlot * tiling.d], residual[residualSlot * tiling.k], gamma,
-                                           coefficients[inputSlot * kProducerCoefficientSlotStride], stats, tiling);
+                ComputeNoMidProducerRow<T, WITH_RMS0>(input[inputSlot * tiling.d], residual[residualSlot * tiling.k],
+                                                      gamma, coefficients[inputSlot * kProducerCoefficientSlotStride],
+                                                      stats, tiling);
                 // Input and coefficients are no longer read; their next load need not wait for MTE3.
                 SetFlag<HardEvent::V_MTE2>(inputEvent);
                 SetFlag<HardEvent::V_MTE3>(EVENT_ID0);

@@ -621,15 +621,43 @@ TEST(MegaMhcTiling, RejectInvalidContract)
     }
     ExecuteTestCase(MakeContext(0, 2560, false, 0), ge::GRAPH_FAILED);
     ExecuteTestCase(MakeContext(16, 2560, false, 2), ge::GRAPH_FAILED);
-    auto missingGamma = MakeContext(16, 2560, false, 0);
-    missingGamma.inputTensorDesc_[9] = MakeTensor({}, ge::DT_FLOAT);
-    ExecuteTestCase(missingGamma, ge::GRAPH_FAILED);
+    auto invalidGamma = MakeContext(16, 2560, false, 0);
+    invalidGamma.inputTensorDesc_[9] = MakeTensor({2576}, ge::DT_FLOAT);
+    ExecuteTestCase(invalidGamma, ge::GRAPH_FAILED);
     auto reservedMix = MakeContext(16, 2560, false, 0);
     reservedMix.inputTensorDesc_[8] = MakeTensor({16, 4, 1}, ge::DT_FLOAT);
     ExecuteTestCase(reservedMix, ge::GRAPH_FAILED);
     auto epsilon = MakeContext(16, 2560, false, 0);
     epsilon.attrs_[0] = {"rms_norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(0.0f)};
     ExecuteTestCase(epsilon, ge::GRAPH_FAILED);
+}
+
+TEST(MegaMhcTiling, OptionalRms0PreservesGeometryAndSelectsBypass)
+{
+    for (const int64_t rows : {1, 33, 512, 1024, 1536, 3072}) {
+        for (const int64_t d : {16, 2560, 8192, 16384}) {
+            for (auto type : {ge::DT_FLOAT16, ge::DT_BF16}) {
+                for (bool mid : {false, true}) {
+                    for (int64_t mode : {0, 1}) {
+                        SCOPED_TRACE(::testing::Message()
+                                     << rows << ":" << d << ":" << type << ":" << mid << ":" << mode);
+                        auto withRms0 = MakeContext(rows, d, mid, mode, type);
+                        auto withoutRms0 = MakeContext(rows, d, mid, mode, type);
+                        withoutRms0.inputTensorDesc_[9] = MakeTensor({}, ge::DT_FLOAT);
+                        TilingInfo enabled, skipped;
+                        ASSERT_TRUE(ExecuteTiling(withRms0, enabled));
+                        ASSERT_TRUE(ExecuteTiling(withoutRms0, skipped));
+                        EXPECT_NE(enabled.tilingKey, skipped.tilingKey);
+                        EXPECT_EQ(enabled.blockNum, skipped.blockNum);
+                        EXPECT_EQ(enabled.workspaceSizes, skipped.workspaceSizes);
+                        ASSERT_EQ(enabled.tilingDataSize, skipped.tilingDataSize);
+                        EXPECT_EQ(
+                            std::memcmp(enabled.tilingData.get(), skipped.tilingData.get(), enabled.tilingDataSize), 0);
+                    }
+                }
+            }
+        }
+    }
 }
 
 TEST(MegaMhcTiling, RejectReservedAndInvalidOutputModes)

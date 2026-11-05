@@ -22,6 +22,7 @@ namespace {
 struct Case {
     bool mid = false;
     bool missingGamma = false;
+    bool invalidGamma = false;
     bool reservedInput = false;
     bool reservedOutput = false;
     bool wrongOutputShape = false;
@@ -47,6 +48,7 @@ aclnnStatus Workspace(const Case& c)
     auto scales = TensorDesc({3}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.1, 0.2);
     auto bases = TensorDesc({24}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-0.1, 0.1);
     auto gamma = TensorDesc({c.d}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(1, 1);
+    auto invalidGamma = TensorDesc({c.d + 16}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(1, 1);
     auto gammaMid = TensorDesc({4 * c.d}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(1, 1);
     auto comb = TensorDesc({2, 4, 4}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.25, 0.25);
     auto previous = TensorDesc({2, 4, 1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 1);
@@ -64,7 +66,13 @@ aclnnStatus Workspace(const Case& c)
         return ut.TestGetWorkspaceSize(&size);
     };
     if (c.missingGamma) {
+        if (c.mid) {
+            return run(nullptr, gammaMid, nullptr, nullptr);
+        }
         return run(nullptr, nullptr, nullptr, nullptr);
+    }
+    if (c.invalidGamma) {
+        return run(invalidGamma, nullptr, nullptr, nullptr);
     }
     if (c.reservedInput) {
         return run(gamma, nullptr, previous, nullptr);
@@ -151,11 +159,27 @@ TEST(MegaMhcOpApi, ReservedSinkhornEpsilonUsesFloatAttributePrecision)
     }
 }
 
-TEST(MegaMhcOpApi, RejectMissingWeightAndReservedTensors)
+TEST(MegaMhcOpApi, OptionalRms0WithBothTypesModesAndMidStates)
+{
+    for (auto type : {ACL_FLOAT16, ACL_BF16}) {
+        for (bool mid : {false, true}) {
+            for (int64_t mode : {0, 1}) {
+                Case c;
+                c.type = type;
+                c.mid = mid;
+                c.mode = mode;
+                c.missingGamma = true;
+                EXPECT_EQ(Workspace(c), ACLNN_SUCCESS);
+            }
+        }
+    }
+}
+
+TEST(MegaMhcOpApi, RejectInvalidWeightAndReservedTensors)
 {
     Case c;
-    c.missingGamma = true;
-    EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_NULLPTR);
+    c.invalidGamma = true;
+    EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
     c = Case{};
     c.reservedInput = true;
     EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);

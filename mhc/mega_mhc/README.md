@@ -14,13 +14,13 @@
 ## 功能说明
 
 - 算子功能：
-  MegaMhc融合多阶段RmsNorm、MhcPost和MhcPre计算，支持可选的中间RmsNorm，更新多路残差状态与Post/Res混合系数，并将各路残差加权合并、归一化为下一子层的输入。
+  MegaMhc融合多阶段RmsNorm、MhcPost和MhcPre计算，支持可选的输入RmsNorm和中间RmsNorm，更新多路残差状态与Post/Res混合系数，并将各路残差加权合并、归一化为下一子层的输入。
 
 - 计算公式：
 
   以下公式从融合算子中RmsNorm、MhcPost和MhcPre各小算子的计算功能与执行顺序出发，分阶段说明算子功能。$B$为批大小，$S$为序列长度，$T=B\times S$为展平后的token数，$N$为残差head数，$D$为每个head的隐藏维度。使用BS布局时按下式计算；T布局等价于将$B$、$S$折叠为$T$。$\operatorname{FP32}$表示转换为float32，$\operatorname{Cast}_{dtype(x)}$表示转换为输入x的数据类型。
 
-  1. 执行RmsNorm算子功能，对输入x进行均方根归一化，简称rms_norm_0阶段。
+  1. 可选执行RmsNorm算子功能，对输入x进行均方根归一化，简称rms_norm_0阶段。仅当`rms_norm_0_weight`非空时执行下式；为空时跳过本阶段，直接令$x\_1=x$。
 
      $$
      \begin{aligned}
@@ -162,7 +162,7 @@
 | rms_norm_1_weight | 输入 | RmsNorm算子的rms_norm_1阶段的逐通道权重，对应公式中的rms_norm_1_weight，shape为[D]。 | FLOAT32 | ND |
 | comb_res_mix | 可选输入 | MhcPost算子的残差映射阶段的变换矩阵，对应公式中的comb_res_mix；默认值为空，本版必须非空。shape为[B,S,N,N]或[T,N,N]。 | FLOAT32 | ND |
 | shifted_prev_mix | 可选输入 | 预留参数，默认值为空，本版仅支持空值。 | FLOAT32 | ND |
-| rms_norm_0_weight | 可选输入 | RmsNorm算子的rms_norm_0阶段的逐通道权重，对应公式中的rms_norm_0_weight，shape为[D]；默认值为空，本版必须非空。 | FLOAT32 | ND |
+| rms_norm_0_weight | 可选输入 | RmsNorm算子的rms_norm_0阶段的逐通道权重，对应公式中的rms_norm_0_weight，shape为[D]；默认值为空，此时跳过rms_norm_0阶段，直接将x送入MhcPost。 | FLOAT32 | ND |
 | rms_norm_mid_weight | 可选输入 | 默认值为空，跳过RmsNorm算子的rms_norm_mid阶段；非空时为RmsNorm算子的rms_norm_mid阶段的逐通道权重，对应公式中的rms_norm_mid_weight，shape为[K]。 | FLOAT32 | ND |
 | new_residual | 输出 | 更新后的残差状态，对应公式中的new_residual；未执行rms_norm_mid阶段时为MhcPost算子的输出融合阶段的输出，执行时为RmsNorm算子的rms_norm_mid阶段的输出，shape为[B,S,N,D]或[T,N,D]。 | 与x相同 | ND |
 | new_post_mix | 输出 | MhcPre算子的Post分支系数生成阶段的新系数，对应公式中的new_post_mix；shape为[B,S,N,1]或[T,N,1]。 | FLOAT32 | ND |

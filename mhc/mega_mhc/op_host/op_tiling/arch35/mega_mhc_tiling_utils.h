@@ -103,6 +103,7 @@ inline BsHfEpilogueTiling CalcBsHfEpilogueTiling(uint64_t totalRows, uint32_t d,
 /** Count the live full-row producer buffers, including double input and coefficient slots.
  * NoMid non-wave aliases Post with three residual slots; Mid/Wave use their planned residual slots.
  * Wave RMS0 writes back into its input slot, so it needs no separate x1 allocation.
+ * RMS0 bypass retains this conservative layout; its gamma0 allocation is reserved but never loaded.
  */
 inline uint64_t CalcProducerUbSize(uint32_t d, bool hasMid, bool wavePipeline = false, uint32_t gammaElements = 0U,
                                    uint32_t residualSlots = kDoubleBufferSlots)

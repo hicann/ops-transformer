@@ -30,14 +30,17 @@ constexpr ProjectionTransport kWithMidProjectionTransport = ProjectionTransport:
 #define MEGA_MHC_SPLIT_M_K 0
 #define MEGA_MHC_SPLIT_BS 2
 
+// Append SKIP_RMS0 so calls supplying gamma0 retain their existing tiling keys.
 ASCENDC_TPL_ARGS_DECL(MegaMhc,
                       ASCENDC_TPL_UINT_DECL(TILING_MODE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, MEGA_MHC_SPLIT_M_K,
                                             MEGA_MHC_SPLIT_BS),
-                      ASCENDC_TPL_BOOL_DECL(WITH_MID, 0, 1), ASCENDC_TPL_BOOL_DECL(USE_HF32, 0, 1));
+                      ASCENDC_TPL_BOOL_DECL(WITH_MID, 0, 1), ASCENDC_TPL_BOOL_DECL(USE_HF32, 0, 1),
+                      ASCENDC_TPL_BOOL_DECL(SKIP_RMS0, 0, 1));
 
 ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_2),
                                      ASCENDC_TPL_UINT_SEL(TILING_MODE, ASCENDC_TPL_UI_LIST, MEGA_MHC_SPLIT_M_K,
                                                           MEGA_MHC_SPLIT_BS),
-                                     ASCENDC_TPL_BOOL_SEL(WITH_MID, 0, 1), ASCENDC_TPL_BOOL_SEL(USE_HF32, 0, 1)));
+                                     ASCENDC_TPL_BOOL_SEL(WITH_MID, 0, 1), ASCENDC_TPL_BOOL_SEL(USE_HF32, 0, 1),
+                                     ASCENDC_TPL_BOOL_SEL(SKIP_RMS0, 0, 1)));
 
 #endif // OPS_TRANSFORMER_MHC_MEGA_MHC_TILING_KEY_H

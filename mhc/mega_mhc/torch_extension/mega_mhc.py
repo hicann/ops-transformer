@@ -166,10 +166,11 @@ def mega_mhc(
     Optional[torch.Tensor],
     Optional[torch.Tensor],
 ]:
-    """Compute RMSNorm_0 -> Post -> optional Mid -> Pre -> RMSNorm_1.
+    """Compute optional RMSNorm_0 -> Post -> optional Mid -> Pre -> RMSNorm_1.
 
     Coefficients post_mix/new_post_mix retain a trailing singleton dimension.
-    shifted_prev_mix is reserved. comb_res_mix and rms_norm_0_weight must be present.
+    shifted_prev_mix is reserved. comb_res_mix must be present.
+    rms_norm_0_weight=None skips RMSNorm_0 and sends x directly to Post.
     hc_post_scale scales the post sigmoid; Sinkhorn and quantized outputs are reserved.
     output_mode=0 returns non-quantized results; 1/2 reserve MX Quant output modes.
     Returns (new_residual, new_post_mix, new_comb_res_mix, None, y, None, None).

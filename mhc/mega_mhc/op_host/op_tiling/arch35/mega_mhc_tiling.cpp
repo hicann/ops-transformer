@@ -111,7 +111,8 @@ constexpr const char* kOutputNames[] = {"new_residual", "new_post_mix", "new_com
 /** Inputs absent from the public call may omit their descriptor and shape. */
 bool MayOmitInput(size_t index)
 {
-    return index == kShiftedPrevMixInputIndex || index == kRmsNormMidWeightInputIndex;
+    return index == kShiftedPrevMixInputIndex || index == kRmsNorm0WeightInputIndex ||
+           index == kRmsNormMidWeightInputIndex;
 }
 
 /** Check dimensions only after establishing the tensor rank. */
@@ -287,7 +288,7 @@ ge::graphStatus MegaMhcTiling::ParseInputsAndAttributes()
     }
     constexpr size_t kInputCount = 11;
     for (size_t index = 0; index < kInputCount; ++index) {
-        // comb_res_mix and rms_norm_0_weight are declared optional, but must be present in this version.
+        // comb_res_mix is declared optional, but must be present in this version.
         const bool mayBeAbsent = MayOmitInput(index);
         // Optional inputs are indexed by their prototype position even when earlier options are absent.
         const bool declaredOptional = index >= kFirstOptionalInputIndex;
@@ -412,8 +413,9 @@ ge::graphStatus MegaMhcTiling::ParseInputsAndAttributes()
         }
     }
 
+    hasRms0_ = context_->GetDynamicInputTensor(kRmsNorm0WeightInputIndex, 0) != nullptr;
     hasMid_ = context_->GetDynamicInputTensor(kRmsNormMidWeightInputIndex, 0) != nullptr;
-    {
+    if (hasRms0_) {
         const auto* gamma0Context = context_->GetOptionalInputShape(kRmsNorm0WeightInputIndex);
         if (gamma0Context == nullptr || !HasVectorShape(gamma0Context->GetStorageShape(), d_)) {
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
@@ -960,7 +962,7 @@ ge::graphStatus MegaMhcTiling::DoLibApiTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-/** Encode schedule, Mid and Cube precision in the tiling key. */
+/** Encode schedule, Mid, Cube precision and the optional RMS0 bypass in the tiling key. */
 uint64_t MegaMhcTiling::GetTilingKey() const
 {
     static_assert(static_cast<uint32_t>(mega_mhc::ScheduleMode::MK) == MEGA_MHC_SPLIT_M_K);
@@ -968,7 +970,7 @@ uint64_t MegaMhcTiling::GetTilingKey() const
     // D-tiled rows use global producer/epilogue ownership. Keep the planned Cube grid,
     // but select its actual staged MK executor here instead of rerouting inside Kernel.
     return GET_TPL_TILING_KEY(static_cast<uint64_t>(dispatchMode_), hasMid_,
-                              projectionMode_ == mega_mhc::ProjectionMode::HF32);
+                              projectionMode_ == mega_mhc::ProjectionMode::HF32, !hasRms0_);
 }
 
 /** Workspace is sized in DoOpTiling. */

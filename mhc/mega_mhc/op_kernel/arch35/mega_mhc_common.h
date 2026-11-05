@@ -251,7 +251,7 @@ public:
     }
 
     /** Enqueue all four source heads once; Post additionally loads the RMS0 source and weight tile. */
-    template <bool POST>
+    template <bool POST, bool WITH_RMS0 = true>
     __aicore__ inline void PrefetchHeads(Kernel::Tensors<T>& tensors, uint64_t row, uint32_t tile)
     {
         const event_t event = Event(tile);
@@ -259,7 +259,9 @@ public:
         const uint64_t offset = static_cast<uint64_t>(tile) * plan_->dTile;
         if constexpr (POST) {
             Kernel::EnqueueGlobalToUb(Input(tile), tensors.hOut, row * plan_->d + offset, Count(tile));
-            Kernel::EnqueueGlobalToUb(Gamma(tile), tensors.gamma0, offset, Count(tile));
+            if constexpr (WITH_RMS0) {
+                Kernel::EnqueueGlobalToUb(Gamma(tile), tensors.gamma0, offset, Count(tile));
+            }
         }
         const auto& source = POST ? tensors.residual : tensors.x2Out;
         for (uint32_t head = 0U; head < kHeadCount; ++head) {

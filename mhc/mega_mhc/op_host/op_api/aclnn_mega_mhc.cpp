@@ -33,6 +33,7 @@ constexpr size_t ACTIVE_OUTPUTS[] = {0, 1, 2, 4};
 constexpr size_t RESERVED_OUTPUTS[] = {3, 5, 6};
 constexpr size_t MID_INDEX = 10;
 constexpr size_t PRE_MIX_INDEX = 8;
+constexpr size_t RMS0_INDEX = 9;
 constexpr int64_t HEADS = 4;
 constexpr int64_t PROJECTION = 24;
 using Inputs = std::array<const aclTensor*, INPUT_COUNT>;
@@ -100,7 +101,7 @@ aclnnStatus CheckContract(const Inputs& inputs, const Outputs& outputs, double n
         return ACLNN_ERR_PARAM_INVALID;
     }
     for (size_t i = 0; i < MID_INDEX; ++i) {
-        if (i != PRE_MIX_INDEX) {
+        if (i != PRE_MIX_INDEX && i != RMS0_INDEX) {
             CHECK_RET(inputs[i] != nullptr, ACLNN_ERR_PARAM_NULLPTR);
         }
     }
@@ -171,7 +172,7 @@ aclnnStatus CheckContract(const Inputs& inputs, const Outputs& outputs, double n
                            "rms_norm_0_weight",
                            "rms_norm_mid_weight"};
     for (size_t i = 0; i < INPUT_COUNT; ++i) {
-        if (i == PRE_MIX_INDEX || (i == MID_INDEX && inputs[i] == nullptr)) {
+        if (i == PRE_MIX_INDEX || ((i == RMS0_INDEX || i == MID_INDEX) && inputs[i] == nullptr)) {
             continue;
         }
         CHECK_RET(CheckTensor(inputs[i], names[i], shapes[i], i < 2 ? dtype : op::DataType::DT_FLOAT),

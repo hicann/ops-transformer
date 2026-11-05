@@ -22,8 +22,8 @@ using namespace AscendC;
  * hRes[j,n]*FP32(residual[j,d])+hPost[n]*FP32(x1[d])). Preserve the x1 Cast before Post. Accumulate residual heads
  * 0,1,2,3 first, then add hPost*x1. Residual and output may alias: load all four source heads before each store. The
  * caller ensures MTE2_V readiness. HAS_ROW_SQUARES consumes precomputed RMS0 squares; ACCUMULATE_SQUARES produces
- * rounded Post squares for Mid. */
-template <typename T, bool ACCUMULATE_SQUARES = false, bool HAS_ROW_SQUARES = false>
+ * rounded Post squares for Mid. WITH_RMS0=false uses hOut directly and never reads gamma0 or RMS0 statistics. */
+template <typename T, bool ACCUMULATE_SQUARES = false, bool HAS_ROW_SQUARES = false, bool WITH_RMS0 = true>
 __aicore__ inline void ComputeRmsNorm0PostRow(__ubuf__ T* hOut, __ubuf__ float* gamma0, float epsilon,
                                               __ubuf__ T* residual, __ubuf__ float* hPost, __ubuf__ float* hRes,
                                               __ubuf__ T* output, uint32_t d, __ubuf__ float* sumScratch,
@@ -31,7 +31,7 @@ __aicore__ inline void ComputeRmsNorm0PostRow(__ubuf__ T* hOut, __ubuf__ float* 
 {
     const float meanScale = 1.0f / static_cast<float>(d);
     const uint16_t repeatTimes = static_cast<uint16_t>((d + kRegLaneRounding) / kRegFloatLanes);
-    if constexpr (!HAS_ROW_SQUARES) {
+    if constexpr (WITH_RMS0 && !HAS_ROW_SQUARES) {
         AccumulateRowSquares<T>(hOut, d, sumScratch);
     }
     __VEC_SCOPE__
@@ -71,8 +71,10 @@ __aicore__ inline void ComputeRmsNorm0PostRow(__ubuf__ T* hOut, __ubuf__ float* 
         Reg::RegTensor<float> term1;
         Reg::RegTensor<float> reduced;
         Reg::MaskReg mask;
-        InverseRmsRegister(sumScratch, meanScale, epsilon, scalarInverse);
-        Reg::Duplicate(inverse, scalarInverse, fullMask);
+        if constexpr (WITH_RMS0) {
+            InverseRmsRegister(sumScratch, meanScale, epsilon, scalarInverse);
+            Reg::Duplicate(inverse, scalarInverse, fullMask);
+        }
         Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(post0, hPost + 0U);
         Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(post1, hPost + 1U);
         Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(post2, hPost + 2U);
@@ -111,11 +113,13 @@ __aicore__ inline void ComputeRmsNorm0PostRow(__ubuf__ T* hOut, __ubuf__ float* 
             mask = Reg::UpdateMask<float>(remaining);
             Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, hOut + column);
             Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
-            Reg::LoadAlign<float>(gamma, gamma0 + column);
-            Reg::Mul(value, value, inverse, mask);
-            Reg::Mul(value, value, gamma, mask);
-            Reg::Cast<T, float, kCastFloatToInput>(input, value, mask);
-            Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
+            if constexpr (WITH_RMS0) {
+                Reg::LoadAlign<float>(gamma, gamma0 + column);
+                Reg::Mul(value, value, inverse, mask);
+                Reg::Mul(value, value, gamma, mask);
+                Reg::Cast<T, float, kCastFloatToInput>(input, value, mask);
+                Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
+            }
             AccumulatePostSource<T, true>(residual0 + column, w00, w01, w02, w03, sum0, sum1, sum2, sum3, mask);
             AccumulatePostSource<T>(residual1 + column, w10, w11, w12, w13, sum0, sum1, sum2, sum3, mask);
             AccumulatePostSource<T>(residual2 + column, w20, w21, w22, w23, sum0, sum1, sum2, sum3, mask);

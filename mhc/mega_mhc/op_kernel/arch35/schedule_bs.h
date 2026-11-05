@@ -48,12 +48,12 @@ __aicore__ inline void WaitBsNoMidProjectionReady()
 }
 
 /** Use compact partials for single-grid HF32 BS no_mid; other cases use separate partial planes. */
-template <typename T, bool USE_HF32>
+template <typename T, bool USE_HF32, bool WITH_RMS0>
 __aicore__ inline void RunBsCompactNoMidSchedule(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling)
 {
     using StageTransfer = Transfer::StagePolicyT<kNoMidProjectionTransport>;
     TPipe producerPipe;
-    RunBsNoMidProducer<T>(tensors, tiling, &producerPipe);
+    RunBsNoMidProducer<T, WITH_RMS0>(tensors, tiling, &producerPipe);
     producerPipe.Destroy();
     WaitBsNoMidRowsReady();
     TPipe projectionPipe;
@@ -78,21 +78,21 @@ __aicore__ inline void RunBsCompactNoMidSchedule(Kernel::Tensors<T>& tensors, co
  * Formula: x2=Post(RMS0(hOut),residual), optionally RMSMid(x2); y=RMS1(Pre(x2)).
  * Host owns all tile sizes. This entry owns stage lifetimes, synchronization and finalization.
  */
-template <typename T, bool WITH_MID, bool USE_HF32>
+template <typename T, bool WITH_MID, bool USE_HF32, bool WITH_RMS0>
 __aicore__ inline void RunBsSchedule(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling)
 {
     if constexpr (!WITH_MID && USE_HF32) {
         if (tiling.compactPartials != 0U) {
-            RunBsCompactNoMidSchedule<T, USE_HF32>(tensors, tiling);
+            RunBsCompactNoMidSchedule<T, USE_HF32, WITH_RMS0>(tensors, tiling);
             return;
         }
     }
     using StageTransfer = Transfer::StagePolicyT<WITH_MID ? kWithMidProjectionTransport : kNoMidProjectionTransport>;
     TPipe producerPipe;
     if constexpr (WITH_MID) {
-        RunPrefetchedWithMidProducer<T, true>(tensors, tiling, &producerPipe);
+        RunPrefetchedWithMidProducer<T, true, WITH_RMS0>(tensors, tiling, &producerPipe);
     } else {
-        RunBsNoMidProducer<T>(tensors, tiling, &producerPipe);
+        RunBsNoMidProducer<T, WITH_RMS0>(tensors, tiling, &producerPipe);
     }
     producerPipe.Destroy();
     if constexpr (!WITH_MID) {

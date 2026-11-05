@@ -23,13 +23,13 @@
 
 ## 功能说明
 
-- 接口功能：MegaMhc融合多阶段RmsNorm、MhcPost和MhcPre计算，支持可选的中间RmsNorm，更新多路残差状态与Post/Res混合系数，并将各路残差加权合并、归一化为下一子层的输入。
+- 接口功能：MegaMhc融合多阶段RmsNorm、MhcPost和MhcPre计算，支持可选的输入RmsNorm和中间RmsNorm，更新多路残差状态与Post/Res混合系数，并将各路残差加权合并、归一化为下一子层的输入。
 
 - 计算公式：
 
   以下公式从融合算子中RmsNorm、MhcPost和MhcPre各小算子的计算功能与执行顺序出发，分阶段说明算子功能。$B$为批大小，$S$为序列长度，$T=B\times S$为展平后的token数，$N$为残差head数，$D$为每个head的隐藏维度。使用BS布局时按下式计算；T布局等价于将$B$、$S$折叠为$T$。$\operatorname{FP32}$表示转换为float32，$\operatorname{Cast}_{dtype(x)}$表示转换为输入x的数据类型。
 
-  1. 执行RmsNorm算子功能，对输入x进行均方根归一化，简称rms_norm_0阶段。
+  1. 可选执行RmsNorm算子功能，对输入x进行均方根归一化，简称rms_norm_0阶段。仅当`rms_norm_0_weight`非空时执行下式；为空时跳过本阶段，直接令$x\_1=x$。
 
      $$
      \begin{aligned}
@@ -317,7 +317,7 @@ aclnnStatus aclnnMegaMhc(
     <td>rmsNorm0WeightOptional（const aclTensor*）</td>
     <td>可选输入</td>
     <td>RmsNorm算子的rms_norm_0阶段的逐通道权重，对应公式中的rms_norm_0_weight。</td>
-    <td>本版不支持nullptr。</td>
+    <td>nullptr时跳过rms_norm_0阶段，直接将x送入MhcPost；非空时不支持空Tensor。</td>
     <td>FLOAT32</td>
     <td>ND</td>
     <td>[D]</td>
@@ -543,7 +543,7 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>ACLNN_ERR_PARAM_NULLPTR</td>
     <td>161001</td>
-    <td>七个必选输入、combResMixOptional、三个必选输出、workspaceSize或executor存在空指针；yOut为空指针；rmsNorm0WeightOptional为空指针。</td>
+    <td>七个必选输入、combResMixOptional、三个必选输出、workspaceSize或executor存在空指针；yOut为空指针。</td>
   </tr>
   <tr>
     <td>ACLNN_ERR_PARAM_INVALID</td>

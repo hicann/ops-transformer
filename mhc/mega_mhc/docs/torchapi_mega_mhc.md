@@ -23,13 +23,13 @@
 
 ## 功能说明
 
-- 接口功能：MegaMhc融合多阶段RmsNorm、MhcPost和MhcPre计算，支持可选的中间RmsNorm，更新多路残差状态与Post/Res混合系数，并将各路残差加权合并、归一化为下一子层的输入。
+- 接口功能：MegaMhc融合多阶段RmsNorm、MhcPost和MhcPre计算，支持可选的输入RmsNorm和中间RmsNorm，更新多路残差状态与Post/Res混合系数，并将各路残差加权合并、归一化为下一子层的输入。
 
 - 计算公式：
 
   以下公式从融合算子中RmsNorm、MhcPost和MhcPre各小算子的计算功能与执行顺序出发，分阶段说明算子功能。$B$为批大小，$S$为序列长度，$T=B\times S$为展平后的token数，$N$为残差head数，$D$为每个head的隐藏维度。使用BS布局时按下式计算；T布局等价于将$B$、$S$折叠为$T$。$\operatorname{FP32}$表示转换为float32，$\operatorname{Cast}_{dtype(x)}$表示转换为输入x的数据类型。
 
-  1. 执行RmsNorm算子功能，对输入x进行均方根归一化，简称rms_norm_0阶段。
+  1. 可选执行RmsNorm算子功能，对输入x进行均方根归一化，简称rms_norm_0阶段。仅当`rms_norm_0_weight`非空时执行下式；为空时跳过本阶段，直接令$x\_1=x$。
 
      $$
      \begin{aligned}
@@ -202,7 +202,7 @@ $N=hc\_mult$，当前为4；$Q=N(N+2)=24$，$K=N\cdot D$。
 | rms_norm_1_weight | Tensor | 必选 | RmsNorm算子的rms_norm_1阶段的逐通道权重，对应公式中的rms_norm_1_weight。 | float32 | `[D]` |
 | comb_res_mix | Optional[Tensor] | 可选 | MhcPost算子的残差映射阶段的变换矩阵，对应公式中的comb_res_mix；接口默认值为None，本版必须非None。 | float32 | `[B,S,N,N]`或`[T,N,N]` |
 | shifted_prev_mix | Optional[Tensor] | 可选 | 预留参数，默认值为None，本版仅支持None。 | float32 | `[B,S,N,1]`或`[T,N,1]` |
-| rms_norm_0_weight | Optional[Tensor] | 可选 | RmsNorm算子的rms_norm_0阶段的逐通道权重，对应公式中的rms_norm_0_weight；接口默认值为None，本版必须非None。 | float32 | `[D]` |
+| rms_norm_0_weight | Optional[Tensor] | 可选 | RmsNorm算子的rms_norm_0阶段的逐通道权重，对应公式中的rms_norm_0_weight；接口默认值为None，此时跳过rms_norm_0阶段，直接将x送入MhcPost。 | float32 | `[D]` |
 | rms_norm_mid_weight | Optional[Tensor] | 可选 | 默认值为None，RmsNorm算子的rms_norm_mid阶段的逐通道权重，对应公式中的rms_norm_mid_weight；None时跳过本阶段。 | float32 | `[K]` |
 | rms_norm_eps | float | 可选 | 默认1e-6，对应公式中的rms_norm_eps，用于RmsNorm算子的rms_norm_0、rms_norm_mid和rms_norm_1阶段。转为float32后须有限且大于0。 | - | - |
 | hc_norm_eps | float | 可选 | 默认1e-6，MhcPre算子的均方根归一化阶段的稳定项，对应公式中的hc_norm_eps。转为float32后须有限且大于0。 | - | - |

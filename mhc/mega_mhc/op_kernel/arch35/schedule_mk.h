@@ -64,7 +64,7 @@ __aicore__ inline void WaitWaveProjectionReady(uint32_t wave)
 
 /** Overlap Post[w+1], projection[w] and Pre/RMS1[w-1].
  * This class owns cross-wave notifications; Producer/Epilogue own local buffers and events. */
-template <typename T>
+template <typename T, bool WITH_RMS0>
 class MkWavePipeline {
 public:
     /** Allocate wave buffers and produce the first Post wave. */
@@ -141,23 +141,23 @@ public:
 
 private:
     const MegaMhcTilingData* tiling_;
-    WavePostProducer<T> producer_;
+    WavePostProducer<T, WITH_RMS0> producer_;
     WaveEpilogue<T> epilogue_;
 };
 
 /** Materialize x2=Post(RMS0(hOut),residual), optionally followed by RMSMid.
  * Phase-local resources are released on return, before projection reuses UB.
  */
-template <typename T, bool WITH_MID>
+template <typename T, bool WITH_MID, bool WITH_RMS0>
 __aicore__ inline void RunMkProducerPhase(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling)
 {
     TPipe pipe;
     if (tiling.rowTileMode != 0U) {
-        RunTiledProducer<T, WITH_MID>(tensors, tiling, &pipe);
+        RunTiledProducer<T, WITH_MID, WITH_RMS0>(tensors, tiling, &pipe);
     } else if constexpr (WITH_MID) {
-        RunPrefetchedWithMidProducer<T>(tensors, tiling, &pipe);
+        RunPrefetchedWithMidProducer<T, false, WITH_RMS0>(tensors, tiling, &pipe);
     } else {
-        RunNoMidStagedProducer<T, true>(tensors, tiling, &pipe);
+        RunNoMidStagedProducer<T, true, WITH_RMS0>(tensors, tiling, &pipe);
     }
 }
 
@@ -176,11 +176,11 @@ __aicore__ inline void RunMkEpiloguePhase(Kernel::Tensors<T>& tensors, const Meg
 }
 
 /** Run producer, projection and epilogue as separate phases with visibility waits between them. */
-template <typename T, bool WITH_MID, bool USE_HF32>
+template <typename T, bool WITH_MID, bool USE_HF32, bool WITH_RMS0>
 __aicore__ inline void RunMkStagedSchedule(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling)
 {
     using StageTransfer = Transfer::StagePolicyT<WITH_MID ? kWithMidProjectionTransport : kNoMidProjectionTransport>;
-    RunMkProducerPhase<T, WITH_MID>(tensors, tiling);
+    RunMkProducerPhase<T, WITH_MID, WITH_RMS0>(tensors, tiling);
     WaitMkRowsReady();
 
     RunProjectionPhase<T, StageTransfer, USE_HF32>(tensors, tiling);
@@ -190,11 +190,11 @@ __aicore__ inline void RunMkStagedSchedule(Kernel::Tensors<T>& tensors, const Me
 }
 
 /** Overlap Post and projection; drain the epilogue separately when wave epilogue is disabled. */
-template <typename T, bool USE_HF32>
+template <typename T, bool USE_HF32, bool WITH_RMS0>
 __aicore__ inline void RunMkWaveSchedule(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling)
 {
     using StageTransfer = Transfer::StagePolicyT<kNoMidProjectionTransport>;
-    RunProjectionPhase<T, StageTransfer, USE_HF32, true, MkWavePipeline<T>>(tensors, tiling);
+    RunProjectionPhase<T, StageTransfer, USE_HF32, true, MkWavePipeline<T, WITH_RMS0>>(tensors, tiling);
     if (tiling.waveEpilogueRows == 0U) {
         WaitMkProjectionReady();
         RunMkEpiloguePhase<T>(tensors, tiling);
@@ -203,15 +203,15 @@ __aicore__ inline void RunMkWaveSchedule(Kernel::Tensors<T>& tensors, const Mega
 
 /** with_mid uses separate phases; no_mid selects wave overlap or the same staged schedule.
  * Phase functions own their TPipe; this entry owns cross-core ordering. */
-template <typename T, bool WITH_MID, bool USE_HF32>
+template <typename T, bool WITH_MID, bool USE_HF32, bool WITH_RMS0>
 __aicore__ inline void RunMkSchedule(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling)
 {
     if constexpr (WITH_MID) {
-        RunMkStagedSchedule<T, true, USE_HF32>(tensors, tiling);
+        RunMkStagedSchedule<T, true, USE_HF32, WITH_RMS0>(tensors, tiling);
     } else if (tiling.wavePipeline != 0U) {
-        RunMkWaveSchedule<T, USE_HF32>(tensors, tiling);
+        RunMkWaveSchedule<T, USE_HF32, WITH_RMS0>(tensors, tiling);
     } else {
-        RunMkStagedSchedule<T, false, USE_HF32>(tensors, tiling);
+        RunMkStagedSchedule<T, false, USE_HF32, WITH_RMS0>(tensors, tiling);
     }
 }
 
