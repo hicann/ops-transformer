@@ -128,7 +128,10 @@ ge::graphStatus MhcPostTilingBaseArch22::GetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
-        OP_LOGE(context_, "fail to get platform info");
+        const std::string errorReason = "Failed to obtain platform info from GE context.";
+        OP_LOGE_LIBOPAPI_REPORT(context_->GetNodeName(), "%s", errorReason.c_str());
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", std::vector<const char*>({"opName", "reason"}),
+                                  std::vector<const char*>({context_->GetNodeName(), errorReason.c_str()}));
         return ge::GRAPH_FAILED;
     }
 
@@ -479,7 +482,13 @@ ge::graphStatus MhcPostTilingBaseArch22::CheckShapeConsistency()
 ge::graphStatus MhcPostTilingBaseArch22::CheckSpecConstraints()
 {
     auto platformInfo = context_->GetPlatformInfo();
-    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context_, "fail to get platform info"), return ge::GRAPH_FAILED);
+    if (platformInfo == nullptr) {
+        const std::string errorReason = "Failed to obtain platform info from GE context.";
+        OP_LOGE_LIBOPAPI_REPORT(context_->GetNodeName(), "%s", errorReason.c_str());
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", std::vector<const char*>({"opName", "reason"}),
+                                  std::vector<const char*>({context_->GetNodeName(), errorReason.c_str()}));
+        return ge::GRAPH_FAILED;
+    }
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     uint32_t socVer = static_cast<uint32_t>(ascendcPlatform.GetSocVersion());
@@ -488,8 +497,8 @@ ge::graphStatus MhcPostTilingBaseArch22::CheckSpecConstraints()
     }
 
     OP_CHECK_IF(d_ <= 0 || d_ >= D_MAX_VALUE || d_ % D_ALIGN_SIZE != 0,
-                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "Value of d", std::to_string(d_).c_str(),
-                                          "> 0, < 100000 and divisible by 128"),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "Value of d", std::to_string(d_).c_str(),
+                                                      "must be greater than 0, less than 100000 and divisible by 128"),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(n_ != N_SIZE_4,
@@ -519,7 +528,8 @@ ge::graphStatus MhcPostTilingBaseArch22::CheckParam()
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", "invalid", "CheckShapeConsistency failed"),
         return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(CheckSpecConstraints() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "CheckSpecConstraints failed"),
+    OP_CHECK_IF(CheckSpecConstraints() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "CheckSpecConstraints failed"),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -585,7 +595,10 @@ ge::graphStatus MhcPostTilingBaseArch22::GetWorkspaceSize()
 {
     auto platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
-        OP_LOGE(context_, "fail to get platform info");
+        const std::string errorReason = "Failed to obtain platform info from GE context.";
+        OP_LOGE_LIBOPAPI_REPORT(context_->GetNodeName(), "%s", errorReason.c_str());
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", std::vector<const char*>({"opName", "reason"}),
+                                  std::vector<const char*>({context_->GetNodeName(), errorReason.c_str()}));
         return ge::GRAPH_FAILED;
     }
 

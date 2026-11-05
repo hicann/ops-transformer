@@ -16,6 +16,9 @@
 #include "mhc_post.h"
 #include "opdev/aicpu/aicpu_task.h"
 #include "opdev/op_log.h"
+#include "log/log.h"
+#include <string>
+#include <vector>
 #include "opdev/op_executor.h"
 #include "opdev/make_op_executor.h"
 #include "opdev/shape_utils.h"
@@ -39,7 +42,10 @@ const aclTensor* MhcPostAICore(const aclTensor* x, const aclTensor* hRes, const 
     // 使用框架宏 ADD_TO_LAUNCHER_LIST_AICORE，将算子加入任务队列
     auto retAicore = ADD_TO_LAUNCHER_LIST_AICORE(MhcPost, OP_INPUT(x, hRes, hOut, hPost), OP_OUTPUT(output));
     if (retAicore != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "MhcPost launch kernel failed.");
+        const std::string errorReason = "MhcPost launch kernel failed; launcher status: " + std::to_string(retAicore);
+        OP_LOGE_LIBOPAPI_REPORT("MhcPost", "%s", errorReason.c_str());
+        REPORT_PREDEFINED_ERR_MSG("EZ1009", std::vector<const char*>({"opName", "reason"}),
+                                  std::vector<const char*>({"MhcPost", errorReason.c_str()}));
         return nullptr;
     }
     return output;
@@ -50,7 +56,10 @@ const aclTensor* MhcPost(const aclTensor* x, const aclTensor* hRes, const aclTen
 {
     auto output = executor->AllocTensor(x->GetViewShape(), x->GetDataType(), x->GetViewFormat());
     if (output == nullptr) {
-        OP_LOGE(ACLNN_ERR_INNER, "MhcPost AllocTensor failed.");
+        const std::string errorReason = "MhcPost AllocTensor returned nullptr.";
+        OP_LOGE_LIBOPAPI_REPORT("MhcPost", "%s", errorReason.c_str());
+        REPORT_PREDEFINED_ERR_MSG("EZ1009", std::vector<const char*>({"opName", "reason"}),
+                                  std::vector<const char*>({"MhcPost", errorReason.c_str()}));
         return nullptr;
     }
 

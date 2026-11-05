@@ -112,20 +112,26 @@ ge::graphStatus MQSMLAInfoParser::GetOpName()
 ge::graphStatus MQSMLAInfoParser::GetNpuInfo()
 {
     mqsmlaPlatformInfo_ = context_->GetPlatformInfo();
-    OP_CHECK_IF(mqsmlaPlatformInfo_ == nullptr, OP_LOGE(mqsmlaOpName_, "GetPlatformInfo is nullptr."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        mqsmlaPlatformInfo_ == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(mqsmlaOpName_, "platform_info", "GetPlatformInfo returned nullptr"),
+        return ge::GRAPH_FAILED);
 
     auto mqsmlaPlatform = platform_ascendc::PlatformAscendC(mqsmlaPlatformInfo_);
     uint32_t mqsmlaAivNum = mqsmlaPlatform.GetCoreNumAiv();
     uint32_t mqsmlaAicNum = mqsmlaPlatform.GetCoreNumAic();
-    OP_CHECK_IF(mqsmlaAicNum == 0 || mqsmlaAivNum == 0, OP_LOGE(mqsmlaOpName_, "num of core obtained is 0."),
+    OP_CHECK_IF(mqsmlaAicNum == 0 || mqsmlaAivNum == 0,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(mqsmlaOpName_, "core_count",
+                                                         "The obtained AIC or AIV core count is zero"),
                 return ge::GRAPH_FAILED);
 
     socVersion_ = mqsmlaPlatform.GetSocVersion();
     npuArch_ = mqsmlaPlatform.GetCurNpuArch();
     if (npuArch_ != NpuArch::DAV_2201 && npuArch_ != NpuArch::DAV_3510 && npuArch_ != NpuArch::DAV_9201 &&
         npuArch_ != NpuArch::DAV_9202) {
-        OP_LOGE(mqsmlaOpName_, "NpuArch[%d] is not support.", static_cast<int32_t>(npuArch_));
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(mqsmlaOpName_, "npu_arch",
+                                              std::to_string(static_cast<int32_t>(npuArch_)).c_str(),
+                                              "unsupported NPU architecture");
         return GRAPH_FAILED;
     }
     batchConsistency_ = (context_->GetDeterministicLevel() == BATCH_CONSISTENCY_LEVEL);
@@ -176,7 +182,8 @@ ge::graphStatus MQSMLAInfoParser::GetAttrParaInfo()
 {
     auto mqsmlaAttrs = context_->GetAttrs();
     OP_CHECK_IF(mqsmlaAttrs == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "attrs got from ge is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "attrs",
+                                                         "attrs obtained from GE context is nullptr"),
                 return ge::GRAPH_FAILED);
 
     OP_LOGI(context_->GetNodeName(), "GetAttrParaInfo start");
@@ -236,7 +243,7 @@ ge::graphStatus MQSMLAInfoParser::GetQueryAndOutLayout()
         mqsmlaQLayout_ = it->second.first;
         mqsmlaOutputLayout_ = it->second.second;
     } else {
-        OP_LOGE_FOR_INVALID_VALUE(mqsmlaOpName_, "layout_q", layout.c_str(), "BSND or TND");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(mqsmlaOpName_, "layout_q", layout.c_str(), "must be BSND or TND");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -255,7 +262,8 @@ ge::graphStatus MQSMLAInfoParser::GetKvLayout()
     if (it != mqsmlaKvLayoutMap.end()) {
         mqsmlaKvLayout_ = it->second;
     } else {
-        OP_LOGE_FOR_INVALID_VALUE(mqsmlaOpName_, "layout_kv", layout.c_str(), "BSND, PA_BBND or TND");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(mqsmlaOpName_, "layout_kv", layout.c_str(),
+                                              "must be BSND, PA_BBND or TND");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -645,7 +653,7 @@ void MQSMLAInfoParser::GenerateInfo(MQSMLATilingInfo& mqsmlaInfo)
 ge::graphStatus MQSMLAInfoParser::Parse(MQSMLATilingInfo& mqsmlaInfo)
 {
     if (context_ == nullptr) {
-        OP_LOGE("SparseFlashAttention", "tiling context is nullptr!");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("MixedQuantSparseFlashMla", "context", "tiling context is nullptr");
         return ge::GRAPH_FAILED;
     }
 
@@ -696,8 +704,10 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoOpTiling(MQSMLATilingInfo* til
 // --------------------------Tiling函数定义---------------------------
 ge::graphStatus TilingMixedQuantSparseFlashMla(gert::TilingContext* context)
 {
-    OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("MixedQuantSparseFlashMla", "Tiling context is null."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        context == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("MixedQuantSparseFlashMla", "context", "Tiling context is null"),
+        return ge::GRAPH_FAILED);
     MQSMLATilingInfo mqsmlaInfo;
     MQSMLAInfoParser mqsmlaInfoParser(context);
     if (mqsmlaInfoParser.Parse(mqsmlaInfo) != ge::GRAPH_SUCCESS) {

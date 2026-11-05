@@ -24,8 +24,10 @@ using namespace optiling;
 namespace ops {
 ge::graphStatus InferShapeMixedQuantSparseFlashMla(gert::InferShapeContext* context)
 {
-    OP_CHECK_IF(context == nullptr, OP_LOGE("MixedQuantSparseFlashMla", "InferShapeContext is nullptr"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        context == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("MixedQuantSparseFlashMla", "context", "InferShapeContext is nullptr"),
+        return ge::GRAPH_FAILED);
     return SMLAInferShape(context, "MixedQuantSparseFlashMla", MQ_ATTR_RETURN_SOFTMAX_LSE_INDEX, MQ_ATTR_LAYOUT_Q_INDEX,
                           MQ_ATTR_LAYOUT_KV_INDEX);
 }

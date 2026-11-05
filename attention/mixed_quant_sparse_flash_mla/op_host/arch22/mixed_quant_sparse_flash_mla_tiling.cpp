@@ -12,6 +12,8 @@
 #include "../../op_kernel/arch22/mixed_quant_sparse_flash_mla_tiling_data_arch22.h"
 #include "../../op_kernel/arch22/mixed_quant_sparse_flash_mla_template_tiling_key_arch22.h"
 #include <algorithm>
+#include <string>
+#include <vector>
 
 using namespace ge;
 using namespace AscendC;
@@ -49,13 +51,24 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoTurboQuantTiling(MQSMLATilingI
     workspaceSize += static_cast<size_t>(MERGE_CACHE_GM_BUF_NUM) * S2_BASE_SIZE * tilingInfo->qkHeadDim *
                      MERGE_CACHE_ELEM_SIZE * aicNum;
     size_t* workspaces = context_->GetWorkspaceSizes(1);
-    OP_CHECK_IF(workspaces == nullptr, OP_LOGE(tilingInfo->opName, "workspace sizes is nullptr"),
-                return ge::GRAPH_FAILED);
+    if (workspaces == nullptr) {
+        const std::string errorReason =
+            "Failed to obtain workspace_sizes from GE context: GetWorkspaceSizes(1) returned nullptr.";
+        OP_LOGE_LIBOPAPI_REPORT(tilingInfo->opName, "%s", errorReason.c_str());
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", std::vector<const char*>({"opName", "reason"}),
+                                  std::vector<const char*>({tilingInfo->opName, errorReason.c_str()}));
+        return ge::GRAPH_FAILED;
+    }
     workspaces[0] = workspaceSize;
 
     auto* tqTilingData = context_->GetTilingData<MixedQuantSparseFlashMlaTqTilingData>();
-    OP_CHECK_IF(tqTilingData == nullptr, OP_LOGE(tilingInfo->opName, "tiling data is nullptr"),
-                return ge::GRAPH_FAILED);
+    if (tqTilingData == nullptr) {
+        const std::string errorReason = "Failed to obtain tiling data from GE context: GetTilingData returned nullptr.";
+        OP_LOGE_LIBOPAPI_REPORT(tilingInfo->opName, "%s", errorReason.c_str());
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", std::vector<const char*>({"opName", "reason"}),
+                                  std::vector<const char*>({tilingInfo->opName, errorReason.c_str()}));
+        return ge::GRAPH_FAILED;
+    }
     tqTilingData->tqBaseParams.batchSize = tilingInfo->bSize;
     tqTilingData->tqBaseParams.qSeqSize = tilingInfo->s1Size;
     tqTilingData->tqBaseParams.kvSeqSize = tilingInfo->s2Size;

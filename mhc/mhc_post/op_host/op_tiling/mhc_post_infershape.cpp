@@ -51,15 +51,20 @@ static ge::graphStatus InferShapeForMhcPost(gert::InferShapeContext* context)
 {
     OP_LOGD(context, "Begin to do MhcPostInfershape.");
     const gert::Shape* xShape = context->GetInputShape(INDEX_X);
-    OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
+    OP_CHECK_IF(xShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "xShape"),
+                return ge::GRAPH_FAILED);
     const gert::Shape* hResShape = context->GetInputShape(INDEX_HRES);
-    OP_CHECK_NULL_WITH_CONTEXT(context, hResShape);
+    OP_CHECK_IF(hResShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "hResShape"),
+                return ge::GRAPH_FAILED);
     const gert::Shape* hOutShape = context->GetInputShape(INDEX_HOUT);
-    OP_CHECK_NULL_WITH_CONTEXT(context, hOutShape);
+    OP_CHECK_IF(hOutShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "hOutShape"),
+                return ge::GRAPH_FAILED);
     const gert::Shape* hPostShape = context->GetInputShape(INDEX_HPOST);
-    OP_CHECK_NULL_WITH_CONTEXT(context, hPostShape);
+    OP_CHECK_IF(hPostShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "hPostShape"),
+                return ge::GRAPH_FAILED);
     gert::Shape* yShape = context->GetOutputShape(INDEX_Y);
-    OP_CHECK_NULL_WITH_CONTEXT(context, yShape);
+    OP_CHECK_IF(yShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "yShape"),
+                return ge::GRAPH_FAILED);
 
     if (Ops::Base::IsUnknownRank(*xShape)) {
         Ops::Base::SetUnknownRank(*yShape);

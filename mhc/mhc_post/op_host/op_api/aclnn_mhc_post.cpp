@@ -27,6 +27,9 @@
 #include "opdev/op_dfx.h"
 #include "opdev/op_executor.h"
 #include "opdev/op_log.h"
+#include "log/log.h"
+#include <string>
+#include <vector>
 #include "opdev/platform.h"
 #include "opdev/shape_utils.h"
 #include "opdev/tensor_view_utils.h"
@@ -340,7 +343,10 @@ aclnnStatus aclnnMhcPost(void* workspace, uint64_t workspaceSize, aclOpExecutor*
     L2_DFX_PHASE_2(aclnnMhcPost);
     auto ret = CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
     if (ret != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_INNER, "This is an error in MhcPost launch aicore");
+        const std::string errorReason = "MhcPost execution failed; executor status: " + std::to_string(ret);
+        OP_LOGE_LIBOPAPI_REPORT("MhcPost", "%s", errorReason.c_str());
+        REPORT_PREDEFINED_ERR_MSG("EZ1009", std::vector<const char*>({"opName", "reason"}),
+                                  std::vector<const char*>({"MhcPost", errorReason.c_str()}));
         return ACLNN_ERR_INNER;
     }
     return ACLNN_SUCCESS;
