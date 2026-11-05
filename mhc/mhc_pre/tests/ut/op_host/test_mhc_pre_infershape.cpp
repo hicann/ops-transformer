@@ -259,6 +259,62 @@ TEST_F(MhcPreProto, Ut_Check_mHCPreProto_BSND_DifferentBatch)
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
+TEST_F(MhcPreProto, Ut_Check_mHCPreProto_UnknownN)
+{
+    gert::InfershapeContextPara infershapeContextPara(
+        "MhcPre",
+        {{{{1, -1, 2560}, {1, -1, 2560}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{24, 10240}, {24, 10240}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{3}, {3}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{24}, {24}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{10240}, {10240}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"out_flag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+         {"hc_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)}});
+
+    std::vector<std::vector<int64_t>> expectOutputShape = {};
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, expectOutputShape);
+}
+
+TEST_F(MhcPreProto, Ut_Check_mHCPreProto_BSND_UnknownN)
+{
+    constexpr int64_t d = 4096;
+    for (int64_t n : {-1, 4}) {
+        SCOPED_TRACE(n);
+        const int64_t phiCols = n == -1 ? -1 : n * d;
+        gert::InfershapeContextPara infershapeContextPara(
+            "MhcPre",
+            {{{{1, 1, n, d}, {1, 1, n, d}}, ge::DT_BF16, ge::FORMAT_ND},
+             {{{24, phiCols}, {24, phiCols}}, ge::DT_FLOAT, ge::FORMAT_ND},
+             {{{3}, {3}}, ge::DT_FLOAT, ge::FORMAT_ND},
+             {{{24}, {24}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+            {{{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+            {{"out_flag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+             {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+             {"hc_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+             {"op_impl_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+            {1, 1, 1, 1, 0}, {1, 1, 1, 1, 1, 1});
+
+        if (n == -1) {
+            ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, {});
+        } else {
+            ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS,
+                            {{1, 1, d}, {1, 1, n}, {1, 1, n, n}, {1, 1}, {1, 1, 24}, {1, 1, n}});
+        }
+    }
+}
+
 TEST_F(MhcPreProto, Ut_Check_mHCPreProto_InvalidAlphaShape)
 {
     constexpr uint32_t T = 1;

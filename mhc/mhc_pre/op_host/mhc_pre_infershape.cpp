@@ -131,15 +131,18 @@ static ge::graphStatus InferShape4MhcPre(InferShapeContext* context)
                                  context->GetOutputShape(OUT_H_MIX_INDEX), context->GetOutputShape(OUT_H_PRE_INDEX)};
 
     uint64_t phiDim0 = phiShape->GetDim(0);
-    uint64_t n = 0;
+    const int64_t nDim = xShape->GetDim(xDim == BSND_DIM_NUM ? 2 : 1);
+    OP_CHECK_IF(nDim != 4 && nDim != 6 && nDim != 8,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x", Ops::Base::ToString(*xShape).c_str(),
+                                                      "N in x shape must be 4, 6 or 8"),
+                return GRAPH_FAILED);
+    const uint64_t n = static_cast<uint64_t>(nDim);
     uint64_t d = 0;
     uint64_t nn = 0;
     bool isFac = false;
     if (xDim == BSND_DIM_NUM) {
-        n = xShape->GetDim(2);
         d = xShape->GetDim(3);
     } else {
-        n = xShape->GetDim(1);
         d = xShape->GetDim(2);
     }
 
