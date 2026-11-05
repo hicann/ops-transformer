@@ -277,11 +277,7 @@ aclnnStatus CheckSingleParamQliV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t 
     }
     // 核心数校验
     CHECK_COND(aicCoreNum > 0, ACLNN_ERR_PARAM_INVALID, "AIC num should be larger than 0, but got %u", aicCoreNum);
-    CHECK_COND(aicCoreNum <= optiling::AIC_CORE_MAX_NUM, ACLNN_ERR_PARAM_INVALID,
-               "The maximum supported AIC num is %u, but got %u", optiling::AIC_CORE_MAX_NUM, aicCoreNum);
     CHECK_COND(aivCoreNum > 0, ACLNN_ERR_PARAM_INVALID, "AIV num should be larger than 0, but got %u", aivCoreNum);
-    CHECK_COND(aivCoreNum <= optiling::AIV_CORE_MAX_NUM, ACLNN_ERR_PARAM_INVALID,
-               "The maximum supported AIV num is %u, but got %u", optiling::AIV_CORE_MAX_NUM, aivCoreNum);
     return ACLNN_SUCCESS;
 }
 
@@ -343,7 +339,7 @@ aclnnStatus CheckConsistencyQliV2(int64_t batchSize, const aclTensor* cuSeqlensQ
                                   const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
                                   const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional,
                                   const char* layoutQOptional, const char* layoutKOptional, const aclTensor* metadata,
-                                  const std::string& socVersion)
+                                  const std::string& socVersion, uint32_t aicCoreNum, uint32_t aivCoreNum)
 {
     int64_t dimNum = -1;
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
@@ -433,10 +429,10 @@ aclnnStatus CheckConsistencyQliV2(int64_t batchSize, const aclTensor* cuSeqlensQ
             return ACLNN_ERR_PARAM_INVALID;
         }
         // 校验 metadata 元素数
-        if (metadata->GetViewShape().GetDim(0) != optiling::QLI_V2_METADATA_TOTAL_SIZE) {
-            OP_LOGE_FOR_INVALID_SHAPESIZE(QLI_V2_ACLNN_OP_NAME, "metadata",
-                                          std::to_string(metadata->GetViewShape().GetDim(0)).c_str(),
-                                          std::to_string(optiling::QLI_V2_METADATA_TOTAL_SIZE).c_str());
+        if (metadata->GetViewShape().GetDim(0) < optiling::GetQliV2MetadataSize(aicCoreNum, aivCoreNum)) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The element num of metadata must be at least %llu, but got %lld",
+                    static_cast<unsigned long long>(optiling::GetQliV2MetadataSize(aicCoreNum, aivCoreNum)),
+                    metadata->GetViewShape().GetDim(0));
             return ACLNN_ERR_PARAM_INVALID;
         }
     }
@@ -541,7 +537,8 @@ aclnnStatus ParamsCheckQliV2(const aclTensor* cuSeqlensQOptional, const aclTenso
     CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     ret = CheckConsistencyQliV2(batchSize, cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional,
-                                cmpResidualKOptional, layoutQOptional, layoutKOptional, metadata, socVersion);
+                                cmpResidualKOptional, layoutQOptional, layoutKOptional, metadata, socVersion,
+                                aicCoreNum, aivCoreNum);
     CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     return ACLNN_SUCCESS;

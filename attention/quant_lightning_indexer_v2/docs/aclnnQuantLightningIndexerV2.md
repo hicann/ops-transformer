@@ -288,12 +288,12 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>
           <ul>
                 <li>包含使用核数、分块大小以及每个核处理数据的起始点等内容。</li>
-                <li>shape大小为[1024]，当前不支持传空。</li>
+                <li>shape大小为[8 * (1 + aic_num + aiv_num) + 256]，aic_num和aiv_num从当前设备获取，当前不支持传空。</li>
           </ul>
       </td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(1024,)</td>
+      <td>(8 * (1 + aic_num + aiv_num) + 256,)</td>
       <td>x</td>
     </tr>
     <tr>
@@ -688,7 +688,17 @@ int InitializeTensors(TensorResources& resources) {
     std::vector<int64_t> weightsShape = {B, S1, N1};
     std::vector<int64_t> qScaleShape = {B, S1, N1};
     std::vector<int64_t> kScaleShape = {B, S2, N2};
-    std::vector<int64_t> metadataShape = {1024};
+    uint32_t aicCoreNum = 0;
+    uint32_t aivCoreNum = 0;
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &aicCoreNum) != ACL_SUCCESS) {
+        LOG_PRINT("Failed to query AIC count\n");
+        return ACL_ERROR_INVALID_PARAM;
+    }
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &aivCoreNum) != ACL_SUCCESS) {
+        LOG_PRINT("Failed to query AIV count\n");
+        return ACL_ERROR_INVALID_PARAM;
+    }
+    std::vector<int64_t> metadataShape = {8LL * (1 + aicCoreNum + aivCoreNum) + 256LL};
     std::vector<int64_t> sparseIndicesShape = {B, S1, N2, topk};
     std::vector<int64_t> sparseValuesShape = {B, S1, N2, topk};
 

@@ -17,6 +17,7 @@
 
 #include "../../lightning_indexer_v2/op_host/checkers/checker_adapter_lightning_indexer_v2.h"
 #include "checkers/qliv2_checker.h"
+#include "../op_kernel/quant_lightning_indexer_v2_metadata.h"
 
 namespace optiling {
 namespace {
@@ -189,6 +190,15 @@ ge::graphStatus ParseAndCheckQLIV2Arch35(gert::TilingContext* context, QLIV2Tili
     }
     const lightning_indexer_v2_checker::QLIV2Checker checker(checkerInfo);
     if (checker.Process() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    platform_ascendc::PlatformAscendC platform(tilingInfo.platformInfo);
+    const int64_t metadataSize =
+        static_cast<int64_t>(GetQliV2MetadataSize(platform.GetCoreNumAic(), platform.GetCoreNumAiv()));
+    if (checkerInfo.metadata.GetShape()->GetShapeSize() < metadataSize) {
+        const std::string actual = std::to_string(checkerInfo.metadata.GetShape()->GetShapeSize());
+        const std::string reason = "Metadata size must be at least " + std::to_string(metadataSize);
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(tilingInfo.opName, "metadata", actual.c_str(), reason.c_str());
         return ge::GRAPH_FAILED;
     }
     tilingInfo.quantMode = static_cast<int32_t>(checkerInfo.quantMode);

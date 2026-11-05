@@ -102,16 +102,12 @@ const int DIM_1 = 1;
 const int DIM_2 = 2;
 const int DIM_3 = 3;
 
-constexpr int64_t QLI_V2_METADATA_SIZE = 2048;
-
-at::Tensor QuantLightningIndexerMetadata(int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk,
-                                         int64_t quantMode, const c10::optional<at::Tensor>& cuSeqlensQ,
-                                         const c10::optional<at::Tensor>& cuSeqlensK,
-                                         const c10::optional<at::Tensor>& sequsedQ,
-                                         const c10::optional<at::Tensor>& sequsedK,
-                                         const c10::optional<at::Tensor>& cmpResidualK, int64_t batchSize,
-                                         int64_t maxSeqlenQ, int64_t maxSeqlenK, c10::string_view layoutQ,
-                                         c10::string_view layoutK, int64_t maskMode, int64_t cmpRatio)
+at::Tensor QuantLightningIndexerMetadata(
+    int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk, int64_t quantMode,
+    const c10::optional<at::Tensor>& cuSeqlensQ, const c10::optional<at::Tensor>& cuSeqlensK,
+    const c10::optional<at::Tensor>& sequsedQ, const c10::optional<at::Tensor>& sequsedK,
+    const c10::optional<at::Tensor>& cmpResidualK, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenK,
+    c10::string_view layoutQ, c10::string_view layoutK, int64_t maskMode, int64_t cmpRatio, int64_t metadataSize)
 {
     at::Device outputDevice = at::Device(std::string("npu"));
     if (cuSeqlensQ.has_value()) {
@@ -126,7 +122,7 @@ at::Tensor QuantLightningIndexerMetadata(int64_t numHeadsQ, int64_t numHeadsK, i
         outputDevice = cmpResidualK.value().device();
     }
 
-    at::Tensor output = torch::empty({QLI_V2_METADATA_SIZE}, torch::dtype(torch::kInt32).device(outputDevice));
+    at::Tensor output = torch::empty({metadataSize}, torch::dtype(torch::kInt32).device(outputDevice));
     auto cuSeqlensQVal = get_valid_tensor(cuSeqlensQ, outputDevice);
     auto cuSeqlensKVal = get_valid_tensor(cuSeqlensK, outputDevice);
     auto sequsedQVal = get_valid_tensor(sequsedQ, outputDevice);

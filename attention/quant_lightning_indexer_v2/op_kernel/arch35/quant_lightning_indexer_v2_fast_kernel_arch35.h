@@ -438,7 +438,12 @@ class QLIV2FastDispatch {
         }
         GlobalTensor<uint32_t> metadataGm;
         metadataGm.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(metadata));
-        return metadataGm.GetValue(GetAttrAbsIndex(0U, QLD_V2_A5_FAST_FLAG_INDEX, true)) == QLD_V2_A5_FAST_ENABLE;
+        const uint32_t metadataAicNum = metadataGm.GetValue(QLI_V2_METADATA_AIC_NUM_INDEX);
+        const uint32_t metadataAivNum = metadataGm.GetValue(QLI_V2_METADATA_AIV_NUM_INDEX);
+        const int64_t fastFlagOffset =
+            static_cast<int64_t>(GetQliV2MetadataExtensionOffset(metadataAicNum, metadataAivNum)) +
+            QLI_V2_A5_FAST_FLAG_OFFSET;
+        return metadataGm.GetValue(fastFlagOffset) == QLI_V2_A5_FAST_ENABLE;
     }
 
 public:

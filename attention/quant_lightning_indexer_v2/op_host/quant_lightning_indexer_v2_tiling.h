@@ -90,7 +90,7 @@ constexpr uint32_t G_SIZE_LIMIT_32_950 = 32;
 constexpr uint32_t BLOCK_SIZE_LIMIT = 1024;
 constexpr uint32_t BLOCK_SIZE_FACTOR = 16;
 constexpr uint32_t SPARSE_MODE_LOWER = 3;
-constexpr uint32_t METADATA_LIMIT = 2048;
+
 using lightning_indexer_v2_checker::QUANT_MODE_FP8;
 using lightning_indexer_v2_checker::QUANT_MODE_INT8;
 using lightning_indexer_v2_checker::QUANT_MODE_MXFP8;

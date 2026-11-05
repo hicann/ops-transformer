@@ -334,7 +334,8 @@ ge::graphStatus CommonChecker::CheckMultiPara(const LightningIndexerV2CheckerInf
     if (CheckMainShapes(info) != ge::GRAPH_SUCCESS || CheckOutputShapes(info) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    if (info.metadata.IsPresent() && info.metadata.GetShape()->GetShapeSize() != METADATA_SIZE) {
+    // Quantized V2 validates its platform-dependent metadata capacity in its parser.
+    if (!info.quantized && info.metadata.IsPresent() && info.metadata.GetShape()->GetShapeSize() != METADATA_SIZE) {
         const std::string actual = ShapeToString(info.metadata);
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(info.opName, "metadata", actual.c_str(), "Metadata size must be 2048");
         return ge::GRAPH_FAILED;

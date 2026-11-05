@@ -26,6 +26,8 @@ using namespace std;
 
 namespace {
 
+constexpr int64_t METADATA_EXTENSION_SIZE = 256; // 动态分核记录之后的扩展区元素数
+
 #define CHECK_RET(cond) ((cond) ? true : (false))
 
 #define LOG_PRINT(message, ...) \
@@ -124,7 +126,17 @@ int InitializeTensors(TensorResources& resources)
     std::vector<int64_t> weightsShape = {B, S1, N1};
     std::vector<int64_t> qScaleShape = {B, S1, N1};
     std::vector<int64_t> kScaleShape = {B, S2, N2};
-    std::vector<int64_t> metadataShape = {1024};
+    uint32_t aicCoreNum = 0;
+    uint32_t aivCoreNum = 0;
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &aicCoreNum) != ACL_SUCCESS) {
+        LOG_PRINT("Failed to query AIC count\n");
+        return ACL_ERROR_INVALID_PARAM;
+    }
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &aivCoreNum) != ACL_SUCCESS) {
+        LOG_PRINT("Failed to query AIV count\n");
+        return ACL_ERROR_INVALID_PARAM;
+    }
+    std::vector<int64_t> metadataShape = {8LL * (1 + aicCoreNum + aivCoreNum) + METADATA_EXTENSION_SIZE};
     std::vector<int64_t> sparseIndicesShape = {B, S1, N2, topk};
     std::vector<int64_t> sparseValuesShape = {B, S1, N2, topk};
 
@@ -396,9 +408,6 @@ void CleanupResources(TensorResources& resources, void* workspaceAddr, aclrtStre
 
 int main()
 {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
-        return 0;
-    }
     int32_t deviceId = 0;
     aclrtStream stream = nullptr;
     TensorResources resources = {};
@@ -418,6 +427,10 @@ int main()
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         LOG_PRINT("Init acl failed. ERROR: %d\n", ret);
         return ret;
+    }
+
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+        return 0;
     }
 
     ret = InitializeTensors(resources);

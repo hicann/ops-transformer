@@ -139,7 +139,7 @@ cann_ops_transformer.quant_lightning_indexer(
 | cmp_residual_k | Tensor | 可选 | 表示key压缩前token数量除以cmp_ratio的余数，需满足0 \<= cmp_residual_k\[i\] \< cmp_ratio。需要在mask_mode等于3、cmp_ratio不等于1的场景下使用。数据格式为ND。 | int32 | (b,) |
 | block_table | Tensor | 可选 | 表示PageAttention中KV存储使用的block映射表。不支持空tensor。layout_k为PA_BBND时必须传入。数据格式为ND。 | int32 | (b, k_s_max/block_size) |
 | output_idx_offset | Tensor | 可选 | 表示topK结果输出索引所需要加上的偏移。值必须大于等于0，加上偏移后topk index不能超过int32最大值。数据格式为ND。 | int32 | layout_q为BSND时shape为(b,q_s,k_n)；layout_q为TND时shape为(q_t,k_n) |
-| metadata | Tensor | 可选 | quant_lightning_indexer_metadata算子传入的分核信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容。不支持空tensor。数据格式为ND。 | int32 | (1024,) |
+| metadata | Tensor | 可选 | quant_lightning_indexer_metadata算子传入的分核信息，包含使用核数、分块大小以及每个核处理数据的起始点等内容。不支持空tensor。数据格式为ND。 | int32 | (8 * (1 + aic_num + aiv_num) + 256,) |
 | max_seqlen_q | int | 可选 | query的最大序列长度。-1表示任意可能长度，默认值为-1。 | int64 | - |
 | layout_q | str | 可选 | 用于标识输入query的数据排布格式，支持BSND、TND，默认值为BSND。 | string | - |
 | layout_k | str | 可选 | 用于标识输入key的数据排布格式，支持BSND、TND、PA_BBND，默认值为BSND。 | string | - |
@@ -153,7 +153,7 @@ cann_ops_transformer.quant_lightning_indexer(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
-| metadata | Tensor | 必选 | 每个AIcore的Attention计算任务的batch、head、以及Q和K的分块的索引。数据格式为ND，不支持非连续的Tensor。 | int32 | (1024, )  |
+| metadata | Tensor | 必选 | 每个AIcore的Attention计算任务的batch、head、以及Q和K的分块的索引。数据格式为ND，不支持非连续的Tensor。 | int32 | (8 * (1 + aic_num + aiv_num) + 256,)  |
 
 ### quant_lightning_indexer
 
@@ -199,7 +199,7 @@ cann_ops_transformer.quant_lightning_indexer(
   - cmp_ratio支持[1, 128]。
   - 当传入output_idx_offset时，支持大于等于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparse_indices值不超过INT32的最大值。
   - 当layout_q为TND时，必须传入cu_seqlens_q，如果也传入seqused_q，应保证由seqused_q传入的各个batch的query长度不超过根据cu_seqlens_q计算出的各个batch的query序列长度。当某个batch由seqused_q传入的query序列长度seqlen1小于由cu_seqlens_q计算出的query长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1的差值部分的query输出的sparse_indices和sparse_values全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
-  - 参数metadata必须传入，shape为(1024,)。
+  - 参数metadata必须传入，shape为(8 * (1 + aic_num + aiv_num) + 256,)，核数从当前设备获取。
   - query、key在quant_mode为1/3时支持float8_e4m3fn，quant_mode为4时支持HIfloat8，quant_mode为5时支持float4_e2m1，quant_mode为2时支持int8。
   - query_dequant_scale和key_dequant_scale在quant_mode为3/5时支持float8_e8m0，quant_mode为1/4时支持float32，quant_mode为2时支持float16。
   - weights在quant_mode为2时支持float16，quant_mode为1/3/4/5时支持float32。

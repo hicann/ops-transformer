@@ -141,7 +141,7 @@ cann_ops_transformer.quant_lightning_indexer(
 | cmp_residual_k | Tensor | Optional | Remainder of the number of k tokens before compression divided by cmp_ratio, which must satisfy 0 \<= cmp_residual_k\[i\] \< cmp_ratio. Used when mask_mode is 3 and cmp_ratio is not 1. Data format: ND. | int32 | (b,) |
 | block_table | Tensor | Optional | Block mapping table used for KV storage in PageAttention. Empty tensor not supported. Must be passed when layout_k is PA_BBND. Data format: ND. | int32 | (b, k_s_max/block_size) |
 | output_idx_offset | Tensor | Optional | Offset to be added to the output indices of the topK result. The value must be greater than 0, and the topk index plus the offset must not exceed the maximum value of int32. Data format: ND. | int32 | shape is (b,q_s,k_n) when layout_q is BSND; shape is (q_t,k_n) when layout_q is TND |
-| metadata | Tensor | Optional | Core allocation information passed by the quant_lightning_indexer_metadata operator, including the number of cores used, block size, and the start point of data processed by each core. Empty tensor not supported. Data format: ND. | int32 | (1024,) |
+| metadata | Tensor | Optional | Core allocation information passed by the quant_lightning_indexer_metadata operator, including the number of cores used, block size, and the start point of data processed by each core. Empty tensor not supported. Data format: ND. | int32 | (8 * (1 + aic_num + aiv_num) + 256,) |
 | max_seqlen_q | int | Optional | Maximum sequence length of q. -1 indicates any possible length. Default value is -1. | int64 | - |
 | layout_q | str | Optional | Data layout format of input q. Supports BSND and TND. Default value is BSND. | string | - |
 | layout_k | str | Optional | Data layout format of input k. Supports BSND, TND, and PA_BBND. Default value is BSND. | string | - |
@@ -155,7 +155,7 @@ cann_ops_transformer.quant_lightning_indexer(
 
 | Name | Type | Required/Optional | Description | Data Type | Dimension (Shape) |
 |--------|----------|-----------|------|----------|-------------|
-| metadata | Tensor | Required | Index of batch, head, and Q and K chunking for the Attention computation task of each AIcore. The data format is ND, and non-contiguous tensors are not supported. | int32 | (1024, )  |
+| metadata | Tensor | Required | Index of batch, head, and Q and K chunking for the Attention computation task of each AIcore. The data format is ND, and non-contiguous tensors are not supported. | int32 | (8 * (1 + aic_num + aiv_num) + 256,)  |
 
 ### quant_lightning_indexer
 
@@ -201,7 +201,7 @@ cann_ops_transformer.quant_lightning_indexer(
   - cmp_ratio supports [1, 128].
   - When output_idx_offset is passed, index offsets greater than or equal to 0 are supported. In addition, the following constraint must be satisfied: after the passed index offset is added, the resulting sparseIndice value must not exceed the maximum value of INT32.
   - When layout_q is TND, cu_seqlens_q must be passed. If seqused_q is also passed, ensure that the q length of each batch passed by seqused_q does not exceed the q sequence length of each batch calculated based on cu_seqlens_q. When the q sequence length seqlen1 of a batch passed by seqused_q is less than the q length seqlen2 calculated based on cu_seqlens_q, TND Padding is enabled, and the sparse_indices and sparse_values of the q output in the batch for the part corresponding to the difference between seqlen2 and seqlen1 are all set to invalid values. In some long-sequence use cases, if the invalid data to be padded is too large, the aicore execution may time out due to hardware limitations. The amount of data to be padded can be calculated as (seqlen2 - seqlen1) * topk. It is recommended to control this data amount within 400 million.
-  - The parameter metadata must be passed, and its shape is (1024,).
+  - The parameter metadata must be passed, and its shape is (8 * (1 + aic_num + aiv_num) + 256,), where the core counts are obtained from the current device.
   - For q and k, float8_e4m3fn is supported when quant_mode is 1/3, HIfloat8 is supported when quant_mode is 4, float4_e2m1 is supported when quant_mode is 5, and int8 is supported when quant_mode is 2.
   - For q_descale and k_descale, float8_e8m0 is supported when quant_mode is 3/5, float32 is supported when quant_mode is 1/4, and float16 is supported when quant_mode is 2.
   - For w, float16 is supported when quant_mode is 2, and float32 is supported when quant_mode is 1/3/4/5.

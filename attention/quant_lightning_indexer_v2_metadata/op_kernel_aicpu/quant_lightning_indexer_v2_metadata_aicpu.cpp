@@ -10,14 +10,16 @@
 
 #include "quant_lightning_indexer_v2_metadata_aicpu.h"
 #include <cstdio>
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 #include "status.h"
 
 using namespace optiling;
 
 namespace aicpu {
 namespace {
+// fast负载差分数组的容量上限，不依赖metadata的动态存储布局
+constexpr uint32_t A5_FAST_MAX_AIC_CORE_NUM = 80U;
 constexpr uint32_t A5_FAST_QUERY_TILE_SIZE = 16U;
 constexpr uint32_t A5_FAST_KEY_TILE_SIZE = 2048U;
 constexpr uint32_t A5_FAST_MIN_KEY_SIZE = 16384U;
@@ -325,7 +327,7 @@ bool QuantLightningIndexerV2MetadataCpuKernel::IsA5FastInputSupported() const
     if ((maskMode_ != static_cast<int32_t>(SparseMode::DEFAULT_MASK) &&
          maskMode_ != static_cast<int32_t>(SparseMode::RIGHT_DOWN_CAUSAL)) ||
         cmpRatio_ != 1 || layoutQ_ != "TND" || (layoutK_ != "TND" && layoutK_ != "PA_BBND") || batchSize_ <= 0 ||
-        !present(cuSeqlensQ_) || present(sequsedQ_) || aicCoreNum_ == 0U || aicCoreNum_ > AIC_CORE_MAX_NUM) {
+        !present(cuSeqlensQ_) || present(sequsedQ_) || aicCoreNum_ == 0U || aicCoreNum_ > A5_FAST_MAX_AIC_CORE_NUM) {
         return false;
     }
     return layoutK_ == "TND" ? (present(cuSeqlensK_) && !present(sequsedK_)) : present(sequsedK_);
@@ -358,7 +360,7 @@ uint64_t QuantLightningIndexerV2MetadataCpuKernel::CalcA5FastMaxCoreKeyTiles(con
     uint64_t maxCoreKeyTiles = ((workload.totalTasks + aicCoreNum_ - 1U) / aicCoreNum_) * workload.firstKeyTiles;
     if (!workload.uniformKeyTiles) {
         // K块数不同时，将各batch拆为完整轮次和环形余数区间，用差分数组计算最重核负载
-        std::array<int64_t, AIC_CORE_MAX_NUM + 1U> loadDelta{};
+        std::array<int64_t, A5_FAST_MAX_AIC_CORE_NUM + 1U> loadDelta{};
         uint64_t fullRoundLoad = 0U;
         int64_t taskOffset = 0;
         for (uint32_t b = 0U; b < static_cast<uint32_t>(batchSize_); ++b) {
@@ -1067,45 +1069,56 @@ bool QuantLightningIndexerV2MetadataCpuKernel::BalanceSchedule(SplitResult& spli
 
 bool QuantLightningIndexerV2MetadataCpuKernel::GenMetadata(SplitResult& splitRes)
 {
-    optiling::detail::QliV2Metadata* metadataPtr = static_cast<optiling::detail::QliV2Metadata*>(metadata_->GetData());
-    *metadataPtr = {};
+    const uint64_t metadataSize = GetQliV2MetadataSize(aicCoreNum_, aivCoreNum_);
+    if (aicCoreNum_ == 0 || aivCoreNum_ == 0 || metadata_->NumElements() < metadataSize) {
+        return false;
+    }
+    auto* metadataPtr = static_cast<uint32_t*>(metadata_->GetData());
+    std::fill_n(metadataPtr, metadataSize, 0U);
+    metadataPtr[QLI_V2_METADATA_AIC_NUM_INDEX] = aicCoreNum_;
+    metadataPtr[QLI_V2_METADATA_AIV_NUM_INDEX] = aivCoreNum_;
+    auto* qliMetadata = metadataPtr + QLI_V2_METADATA_HEADER_SIZE;
+    auto* qldMetadata = qliMetadata + static_cast<uint64_t>(aicCoreNum_) * QLI_V2_METADATA_SIZE;
     // LI Metadata Generate
     for (size_t i = 0; i < aicCoreNum_; ++i) {
         if (i >= splitRes.usedCoreNum) {
-            metadataPtr->qliV2Metadata[i][QLI_V2_CORE_ENABLE_INDEX] = 0; // AIC disenable
+            qliMetadata[i * QLI_V2_METADATA_SIZE + QLI_V2_CORE_ENABLE_INDEX] = 0; // AIC disenable
             continue;
         }
-        metadataPtr->qliV2Metadata[i][QLI_V2_CORE_ENABLE_INDEX] = 1; // AIC enable
+        qliMetadata[i * QLI_V2_METADATA_SIZE + QLI_V2_CORE_ENABLE_INDEX] = 1; // AIC enable
         // FA START
-        metadataPtr->qliV2Metadata[i][QLI_V2_BN2_START_INDEX] = i == 0 ? 0 : splitRes.bN2End[i - 1];
-        metadataPtr->qliV2Metadata[i][QLI_V2_M_START_INDEX] = i == 0 ? 0 : splitRes.gS1End[i - 1];
-        metadataPtr->qliV2Metadata[i][QLI_V2_S2_START_INDEX] = i == 0 ? 0 : splitRes.s2End[i - 1];
+        qliMetadata[i * QLI_V2_METADATA_SIZE + QLI_V2_BN2_START_INDEX] = i == 0 ? 0 : splitRes.bN2End[i - 1];
+        qliMetadata[i * QLI_V2_METADATA_SIZE + QLI_V2_M_START_INDEX] = i == 0 ? 0 : splitRes.gS1End[i - 1];
+        qliMetadata[i * QLI_V2_METADATA_SIZE + QLI_V2_S2_START_INDEX] = i == 0 ? 0 : splitRes.s2End[i - 1];
         // FA END
-        metadataPtr->qliV2Metadata[i][QLI_V2_BN2_END_INDEX] = splitRes.bN2End[i];
-        metadataPtr->qliV2Metadata[i][QLI_V2_M_END_INDEX] = splitRes.gS1End[i];
-        metadataPtr->qliV2Metadata[i][QLI_V2_S2_END_INDEX] = splitRes.s2End[i];
-        metadataPtr->qliV2Metadata[i][QLI_V2_FIRST_QLD_V2_DATA_WORKSPACE_IDX_INDEX] =
+        qliMetadata[i * QLI_V2_METADATA_SIZE + QLI_V2_BN2_END_INDEX] = splitRes.bN2End[i];
+        qliMetadata[i * QLI_V2_METADATA_SIZE + QLI_V2_M_END_INDEX] = splitRes.gS1End[i];
+        qliMetadata[i * QLI_V2_METADATA_SIZE + QLI_V2_S2_END_INDEX] = splitRes.s2End[i];
+        qliMetadata[i * QLI_V2_METADATA_SIZE + QLI_V2_FIRST_QLD_V2_DATA_WORKSPACE_IDX_INDEX] =
             splitRes.firstFdDataWorkspaceIdx[i];
     }
 
     // LD Metadata Generate
     for (size_t i = 0; i < aivCoreNum_; ++i) {
         if (i >= splitRes.fdRes.fdUsedVecNum) {
-            metadataPtr->qldV2Metadata[i][QLD_V2_CORE_ENABLE_INDEX] = 0; // AIV disenable
+            qldMetadata[i * QLD_V2_METADATA_SIZE + QLD_V2_CORE_ENABLE_INDEX] = 0; // AIV disenable
             continue;
         }
-        metadataPtr->qldV2Metadata[i][QLD_V2_CORE_ENABLE_INDEX] = 1; // AIV enable
+        qldMetadata[i * QLD_V2_METADATA_SIZE + QLD_V2_CORE_ENABLE_INDEX] = 1; // AIV enable
         uint32_t curFdIdx = splitRes.fdRes.fdIdx[i];
-        metadataPtr->qldV2Metadata[i][QLD_V2_BN2_IDX_INDEX] = splitRes.fdRes.fdBN2Idx[curFdIdx];
-        metadataPtr->qldV2Metadata[i][QLD_V2_M_IDX_INDEX] = splitRes.fdRes.fdMIdx[curFdIdx];
-        metadataPtr->qldV2Metadata[i][QLD_V2_WORKSPACE_IDX_INDEX] = splitRes.fdRes.fdWorkspaceIdx[curFdIdx];
-        metadataPtr->qldV2Metadata[i][QLD_V2_WORKSPACE_NUM_INDEX] = splitRes.fdRes.fdS2SplitNum[curFdIdx];
-        metadataPtr->qldV2Metadata[i][QLD_V2_M_START_INDEX] = splitRes.fdRes.fdMStart[i];
-        metadataPtr->qldV2Metadata[i][QLD_V2_M_NUM_INDEX] = splitRes.fdRes.fdMNum[i];
+        qldMetadata[i * QLD_V2_METADATA_SIZE + QLD_V2_BN2_IDX_INDEX] = splitRes.fdRes.fdBN2Idx[curFdIdx];
+        qldMetadata[i * QLD_V2_METADATA_SIZE + QLD_V2_M_IDX_INDEX] = splitRes.fdRes.fdMIdx[curFdIdx];
+        qldMetadata[i * QLD_V2_METADATA_SIZE + QLD_V2_WORKSPACE_IDX_INDEX] = splitRes.fdRes.fdWorkspaceIdx[curFdIdx];
+        qldMetadata[i * QLD_V2_METADATA_SIZE + QLD_V2_WORKSPACE_NUM_INDEX] = splitRes.fdRes.fdS2SplitNum[curFdIdx];
+        qldMetadata[i * QLD_V2_METADATA_SIZE + QLD_V2_M_START_INDEX] = splitRes.fdRes.fdMStart[i];
+        qldMetadata[i * QLD_V2_METADATA_SIZE + QLD_V2_M_NUM_INDEX] = splitRes.fdRes.fdMNum[i];
     }
     // 先生成完整的原模板调度信息再写入准入标志，供kernel检查失败时回退使用
-    metadataPtr->qldV2Metadata[0][QLD_V2_A5_FAST_FLAG_INDEX] =
-        IsA5FastEligible() ? QLD_V2_A5_FAST_ENABLE : QLD_V2_A5_FAST_DISABLE;
+    auto* extensionMetadata = metadataPtr + GetQliV2MetadataExtensionOffset(aicCoreNum_, aivCoreNum_);
+    if (ProcessSocVersion() == ValidSocVersion::ASCEND950) {
+        extensionMetadata[QLI_V2_A5_FAST_FLAG_OFFSET] =
+            IsA5FastEligible() ? QLI_V2_A5_FAST_ENABLE : QLI_V2_A5_FAST_DISABLE;
+    }
     return true;
 }
 

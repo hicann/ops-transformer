@@ -18,6 +18,7 @@
 #include "base/err_msg.h"
 #include "log/log.h"
 #include "quant_lightning_indexer_v2_tiling.h"
+#include "../op_kernel/quant_lightning_indexer_v2_metadata.h"
 
 #include "../op_kernel/quant_lightning_indexer_v2_template_tiling_key.h"
 #include "quant_lightning_indexer_v2_tiling_info_parser.h"
@@ -909,8 +910,11 @@ ge::graphStatus QLIV2InfoParser::GetActualSeqLenSize(int64_t& size, const gert::
 
 ge::graphStatus QLIV2InfoParser::GetAndCheckN2Size()
 {
-    // PA_BBND
-    n2Size_ = qliV2Params_.key.shape->GetStorageShape().GetDim(DIM_IDX_TWO);
+    if (kLayout_ == DataLayout::TND) {
+        n2Size_ = qliV2Params_.key.shape->GetStorageShape().GetDim(DIM_IDX_ONE);
+    } else {
+        n2Size_ = qliV2Params_.key.shape->GetStorageShape().GetDim(DIM_IDX_TWO);
+    }
     OP_LOGI(context_->GetNodeName(), "N2 is %d", n2Size_);
     OP_CHECK_IF(n2Size_ != 1,
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "k",
@@ -1319,10 +1323,13 @@ ge::graphStatus QLIV2InfoParser::ValidateInputShapesMatch()
         }
     }
     // -----------------------check metadata-------------------
-    OP_CHECK_IF((qliV2Params_.metadata.tensor->GetShapeSize() != METADATA_LIMIT),
+    platform_ascendc::PlatformAscendC metadataPlatform(platformInfo_);
+    const int64_t metadataSize =
+        GetQliV2MetadataSize(metadataPlatform.GetCoreNumAic(), metadataPlatform.GetCoreNumAiv());
+    OP_CHECK_IF((qliV2Params_.metadata.tensor->GetShapeSize() < metadataSize),
                 OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
                     opName_, "metadata", std::to_string(qliV2Params_.metadata.tensor->GetShapeSize()).c_str(),
-                    "The shape size of metadata must be " + std::to_string(METADATA_LIMIT)),
+                    "The shape size of metadata must be at least " + std::to_string(metadataSize)),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

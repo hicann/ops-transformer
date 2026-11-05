@@ -21,14 +21,36 @@
 namespace optiling {
 
 // Constants
-inline constexpr uint32_t AIC_CORE_MAX_NUM = 80;
-inline constexpr uint32_t AIV_CORE_MAX_NUM = 80;
-constexpr uint32_t QLI_V2_METADATA_TOTAL_SIZE = 2048;
+inline constexpr uint32_t QLI_V2_METADATA_HEADER_SIZE = 8;
+// 动态分核记录之后统一保留256个int32元素，供fast标志及后续分核扩展使用
+inline constexpr uint32_t QLI_V2_METADATA_EXTENSION_SIZE = 256;
+inline constexpr uint32_t QLI_V2_METADATA_AIC_NUM_INDEX = 0;
+inline constexpr uint32_t QLI_V2_METADATA_AIV_NUM_INDEX = 1;
 
 using QLI_V2_METADATA_T = int32_t;
 
 inline constexpr uint32_t QLI_V2_METADATA_SIZE = 8;
 inline constexpr uint32_t QLD_V2_METADATA_SIZE = 8;
+
+// 扩展区起点由实际核数确定，与调用方分配的缓冲区总长度无关
+#ifdef __CCE_AICORE__
+__aicore__ inline constexpr uint64_t GetQliV2MetadataExtensionOffset(uint32_t aicNum, uint32_t aivNum)
+#else
+inline constexpr uint64_t GetQliV2MetadataExtensionOffset(uint32_t aicNum, uint32_t aivNum)
+#endif
+{
+    return QLI_V2_METADATA_HEADER_SIZE + static_cast<uint64_t>(aicNum) * QLI_V2_METADATA_SIZE +
+           static_cast<uint64_t>(aivNum) * QLD_V2_METADATA_SIZE;
+}
+
+#ifdef __CCE_AICORE__
+__aicore__ inline constexpr uint64_t GetQliV2MetadataSize(uint32_t aicNum, uint32_t aivNum)
+#else
+inline constexpr uint64_t GetQliV2MetadataSize(uint32_t aicNum, uint32_t aivNum)
+#endif
+{
+    return GetQliV2MetadataExtensionOffset(aicNum, aivNum) + QLI_V2_METADATA_EXTENSION_SIZE;
+}
 
 // LI Metadata Index Definitions
 inline constexpr uint32_t QLI_V2_CORE_ENABLE_INDEX = 0;
@@ -49,10 +71,10 @@ inline constexpr uint32_t QLD_V2_WORKSPACE_NUM_INDEX = 4;
 inline constexpr uint32_t QLD_V2_M_START_INDEX = 5;
 inline constexpr uint32_t QLD_V2_M_NUM_INDEX = 6;
 
-// fast模板准入标志位于QLD[0][7]，绝对下标由GetAttrAbsIndex按核槽布局计算
-inline constexpr uint32_t QLD_V2_A5_FAST_FLAG_INDEX = 7;
-inline constexpr uint32_t QLD_V2_A5_FAST_DISABLE = 0;
-inline constexpr uint32_t QLD_V2_A5_FAST_ENABLE = 1;
+// fast模板准入标志使用扩展区第0项，不占用AIC/AIV分核记录
+inline constexpr uint32_t QLI_V2_A5_FAST_FLAG_OFFSET = 0;
+inline constexpr uint32_t QLI_V2_A5_FAST_DISABLE = 0;
+inline constexpr uint32_t QLI_V2_A5_FAST_ENABLE = 1;
 // fast准入与Kernel TopK状态使用相同的容量上限
 inline constexpr uint32_t QLI_V2_A5_FAST_SPARSE_CAPACITY = 2048U;
 
@@ -64,24 +86,16 @@ inline constexpr uint32_t QLI_V2_A5_FAST_SPARSE_CAPACITY = 2048U;
  * @return 返回属性的绝对索引
  */
 #ifdef __CCE_AICORE__
-__aicore__ inline uint32_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx, bool isAIV = false)
+__aicore__ inline uint32_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx, uint32_t aicNum, bool isAIV = false)
 {
     if (isAIV) {
-        return QLI_V2_METADATA_SIZE * AIC_CORE_MAX_NUM + QLD_V2_METADATA_SIZE * coreIdx + metaIdx;
+        return QLI_V2_METADATA_HEADER_SIZE + QLI_V2_METADATA_SIZE * aicNum + QLD_V2_METADATA_SIZE * coreIdx + metaIdx;
     } else {
-        return QLI_V2_METADATA_SIZE * coreIdx + metaIdx;
+        return QLI_V2_METADATA_HEADER_SIZE + QLI_V2_METADATA_SIZE * coreIdx + metaIdx;
     }
 }
 #endif
 
-namespace detail {
-struct QliV2Metadata {
-    uint32_t qliV2Metadata[AIC_CORE_MAX_NUM][QLI_V2_METADATA_SIZE];
-    uint32_t qldV2Metadata[AIV_CORE_MAX_NUM][QLD_V2_METADATA_SIZE];
-};
-}; // namespace detail
-
-static_assert(QLI_V2_METADATA_TOTAL_SIZE * sizeof(QLI_V2_METADATA_T) >= sizeof(detail::QliV2Metadata));
 }; // namespace optiling
 
 #endif // QUANT_LIGHTNING_INDEXER_V2_METADATA_H

@@ -12,7 +12,18 @@ import torch
 from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
-QLI_METADATA_SIZE = 2048
+
+QLI_METADATA_EXTENSION_SIZE = 256
+
+
+def _calculate_metadata_size(device=None):
+    properties = torch.npu.get_device_properties(device)
+    return (
+        8 * (1 + properties.cube_core_num + properties.vector_core_num)
+        + QLI_METADATA_EXTENSION_SIZE
+    )
+
+
 QLI_METADATA_OP_NAME = "quant_lightning_indexer_metadata"
 
 
@@ -68,7 +79,9 @@ class QuantLightningIndexerOpBuilder(OpBuilder):
             mask_mode: Optional[int] = None,
             cmp_ratio: Optional[int] = None,
         ):
-            return torch.empty((QLI_METADATA_SIZE), dtype=torch.int32, device="npu")
+            return torch.empty(
+                (_calculate_metadata_size()), dtype=torch.int32, device="npu"
+            )
 
         @impl(get_as_library(), self.name, "Meta")
         def quant_lightning_indexer_meta(
@@ -167,6 +180,8 @@ def quant_lightning_indexer_metadata(
     cmp_ratio = 1 if cmp_ratio is None else cmp_ratio
 
     op_module = quant_lightning_indexer_op_builder.load()
+    tensors = (cu_seqlens_q, cu_seqlens_k, seqused_q, seqused_k, cmp_residual_k)
+    device = next((t.device for t in tensors if t is not None), None)
     return op_module.quant_lightning_indexer_metadata(
         num_heads_q,
         num_heads_k,
@@ -185,6 +200,7 @@ def quant_lightning_indexer_metadata(
         layout_k,
         mask_mode,
         cmp_ratio,
+        _calculate_metadata_size(device),
     )
 
 

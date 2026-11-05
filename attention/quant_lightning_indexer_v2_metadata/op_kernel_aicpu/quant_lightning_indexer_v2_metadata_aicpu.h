@@ -303,8 +303,8 @@ private:
     // attributes
     std::string socVersion_ = "";
     bool supportFd_ = false;
-    uint32_t aicCoreNum_ = optiling::AIC_CORE_MAX_NUM;
-    uint32_t aivCoreNum_ = optiling::AIV_CORE_MAX_NUM;
+    uint32_t aicCoreNum_ = 0;
+    uint32_t aivCoreNum_ = 0;
     int32_t batchSize_ = 0;
     int32_t maxSeqlenQ_ = 0;
     int32_t maxSeqlenK_ = 0;

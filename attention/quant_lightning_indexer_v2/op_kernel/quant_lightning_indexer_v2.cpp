@@ -25,7 +25,6 @@
 #endif
 #include "quant_lightning_indexer_v2_template_tiling_key.h"
 using namespace QLIV2Kernel;
-using namespace optiling::detail;
 
 #define INVOKE_LI_NO_KFC_OP_IMPL(templateClass, ...) \
     do { \

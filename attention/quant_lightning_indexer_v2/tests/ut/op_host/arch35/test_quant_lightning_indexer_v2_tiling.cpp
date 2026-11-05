@@ -414,7 +414,7 @@ TEST_F(QuantLightningIndexerV2TilingArch35, QuantLightningIndexerV2_950_tiling_m
     qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
 }
 
-// metadata shape size must be 2048
+// metadata容量不能小于动态分核记录与扩展区的总长度
 TEST_F(QuantLightningIndexerV2TilingArch35, QuantLightningIndexerV2_950_tiling_metadata_size_failed)
 {
     qliv2_ut::CaseParam p = Make950TndPaFp8();
@@ -1574,11 +1574,17 @@ TEST_F(QuantLightningIndexerV2TilingArch35, QuantLightningIndexerV2_960_tiling_m
     qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
 }
 
-TEST_F(QuantLightningIndexerV2TilingArch35, QuantLightningIndexerV2_960_tiling_metadata_size_failed)
+TEST_F(QuantLightningIndexerV2TilingArch35, QuantLightningIndexerV2_960_tiling_metadata_size_boundary)
 {
     qliv2_ut::CaseParam p = Make960TndPaFp8();
-    p.metadata = {1024};
+    // The default AICore mock reports coreNum for both AIC and AIV.
+    const int64_t coreNum = static_cast<int64_t>(p.coreNum);
+    constexpr int64_t METADATA_EXTENSION_SIZE = 256; // 统一扩展区元素数
+    const int64_t requiredSize = 8 + 8 * coreNum + 8 * coreNum + METADATA_EXTENSION_SIZE;
+    p.metadata = {requiredSize - 1};
     qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+    p.metadata = {requiredSize};
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_SUCCESS);
 }
 
 TEST_F(QuantLightningIndexerV2TilingArch35, QuantLightningIndexerV2_960_tiling_gsize_over_limit_failed)
