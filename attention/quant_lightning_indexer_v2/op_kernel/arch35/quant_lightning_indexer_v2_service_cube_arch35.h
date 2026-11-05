@@ -445,10 +445,10 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2NzForPA(uint64_t s2L1RealSize,
     while (s2L1Offset < s2L1RealSize) {
         uint64_t s2BlkId = (s2L1Offset + qliV2S2GmOffset) / qliV2CubeConstInfo.kCacheBlockSize;
         uint64_t s2BlkOffset = (s2L1Offset + qliV2S2GmOffset) % qliV2CubeConstInfo.kCacheBlockSize;
-        uint64_t keyGmOffset =
-            blkTableGm_.GetValue(qliV2CubeRunInfo.bIdx * qliV2CubeConstInfo.maxBlockNumPerBatch + s2BlkId) *
-                qliV2CubeConstInfo.keyStride0 +
-            s2BlkOffset * qkHeadDim_;
+        uint64_t keyGmOffset = static_cast<uint64_t>(blkTableGm_.GetValue(
+                                   qliV2CubeRunInfo.bIdx * qliV2CubeConstInfo.maxBlockNumPerBatch + s2BlkId)) *
+                                   qliV2CubeConstInfo.keyStride0 +
+                               s2BlkOffset * qkHeadDim_;
 
         uint64_t s2Mte2Size = s2L1RealSize - s2L1Offset;
         s2Mte2Size = s2BlkOffset + s2Mte2Size >= qliV2CubeConstInfo.kCacheBlockSize ?

@@ -437,9 +437,10 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::GetKeyScale(const QLIV2Common::RunIn
             int32_t blockId = blockTableGm.GetValue(blockTableBatchOffset + startBlockTableIdx);
             SetFlag<HardEvent::S_MTE2>(KSCALE_S_MTE2_EVENT);
             WaitFlag<HardEvent::S_MTE2>(KSCALE_S_MTE2_EVENT);
-            AscendC::DataCopyPad(kScaleUB[16 * (runInfo.kScaleLoop % 2) * s2BaseSize_],
-                                 kScaleGm[blockId * constInfo_.keyDequantScaleStride0 + startBlockTableOffset],
-                                 copyInParams, padParams);
+            AscendC::DataCopyPad(
+                kScaleUB[16 * (runInfo.kScaleLoop % 2) * s2BaseSize_],
+                kScaleGm[static_cast<uint64_t>(blockId) * constInfo_.keyDequantScaleStride0 + startBlockTableOffset],
+                copyInParams, padParams);
             startBlockTableIdx++;
             getLen = getLen - firstPartLen;
             resUbBaseOffset = firstPartLen;
@@ -455,7 +456,7 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::GetKeyScale(const QLIV2Common::RunIn
             WaitFlag<HardEvent::S_MTE2>(KSCALE_S_MTE2_EVENT);
             AscendC::DataCopyPad(
                 kScaleUB[16 * (runInfo.kScaleLoop % 2) * s2BaseSize_ + resUbBaseOffset + i * kCacheBlockSize_],
-                kScaleGm[blockId * constInfo_.keyDequantScaleStride0], copyInParams, padParams);
+                kScaleGm[static_cast<uint64_t>(blockId) * constInfo_.keyDequantScaleStride0], copyInParams, padParams);
         }
     } else {
         copyInParams.blockCount = 1;
