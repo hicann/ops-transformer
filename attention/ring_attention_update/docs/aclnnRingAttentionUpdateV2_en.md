@@ -280,19 +280,19 @@ aclnnStatus aclnnRingAttentionUpdateV2(
       <td>prevAttnOut, prevSoftmaxMax, prevSoftmaxSum, curAttnOut, curSoftmaxMax, curSoftmaxSum, attnOutOut, softmaxMaxOut, or softmaxSumOut is a null pointer.</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="2">161002</td>
+      <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="3">161002</td>
       <td>The data types of prevAttnOut, prevSoftmaxMax, prevSoftmaxSum, curAttnOut, curSoftmaxMax, curSoftmaxSum, attnOutOut, softmaxMaxOut, and softmaxSumOut are not within the supported range.</td>
     </tr>
     <tr>
       <td>The shapes of prevAttnOut, prevSoftmaxMax, prevSoftmaxSum, curAttnOut, curSoftmaxMax, curSoftmaxSum, attnOutOut, softmaxMaxOut, and softmaxSumOut are not supported.</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_INNER_TILING_ERROR</td>
-      <td rowspan="2">561002</td>
       <td>When actualSeqQlenOptional has an input, the input data format is not within the supported range.</td>
     </tr>
     <tr>
+      <td>ACLNN_ERR_INNER_TILING_ERROR</td>
+      <td>561002</td>
       <td>When the input value of inputSoftmaxLayoutOptional is not within the supported range.</td>
     </tr>
   </tbody>
@@ -349,8 +349,8 @@ aclnnStatus aclnnRingAttentionUpdateV2(
 - When inputLayoutOptional is set to "TND":
     - N:
 
-      <!-- npu="A3,910b" id8 -->
-      - <term>Atlas A2 products</term>, <term>Atlas A3 products</term>: N<=256.
+      <!-- npu="A3,910b,950" id8 -->
+      - <term>Atlas A2 products</term>, <term>Atlas A3 products</term>, <term>Ascend 950PR&950DT products</term>: N<=256.
       <!-- end id8 -->
 
     - D:
@@ -358,6 +358,9 @@ aclnnStatus aclnnRingAttentionUpdateV2(
       <!-- npu="A3,910b" id9 -->
       - <term>Atlas A2 products</term>, <term>Atlas A3 products</term>: D<=768 and D is a multiple of 64.
       <!-- end id9 -->
+      <!-- npu="950" id10 -->
+      - <term>Ascend 950PR&950DT products</term>: D<=768.
+      <!-- end id10 -->
 
 - **inputSoftmaxLayoutOptional takes effect only when inputLayoutOptional is set to "TND". inputSoftmaxLayoutOptional supports only three inputs: an empty string, "SBH", and "TND".**
 

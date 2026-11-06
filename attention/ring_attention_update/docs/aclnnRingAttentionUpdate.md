@@ -285,7 +285,7 @@ aclnnStatus aclnnRingAttentionUpdate(
     </tr>
     <tr>
       <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="3">561002</td>
+      <td rowspan="3">161002</td>
       <td>当actualSeqQlenOptional有输入时，输入数据格式不在支持的范围之内。</td>
     </tr>
     <tr>
@@ -347,16 +347,18 @@ aclnnStatus aclnnRingAttentionUpdate(
   - 当inputLayoutOptional为“TND”时，其中：
     - N：
 
-      <!-- npu="A3,910b" id8 -->
-      - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：N<=256。
+      <!-- npu="A3,910b,950" id8 -->
+      - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：N<=256。
       <!-- end id8 -->
 
     - D：
 
       <!-- npu="A3,910b" id9 -->
       - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：D<=768且D为64的倍数。
-
       <!-- end id9 -->
+      <!-- npu="950" id10 -->
+      - <term>Ascend 950PR&950DT系列产品</term>：D<=768。
+      <!-- end id10 -->
 
 ## 调用示例
 

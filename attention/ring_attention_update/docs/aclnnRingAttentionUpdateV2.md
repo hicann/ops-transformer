@@ -291,19 +291,19 @@ aclnnStatus aclnnRingAttentionUpdateV2(
       <td>传入的prevAttnOut、prevSoftmaxMax、prevSoftmaxSum、curAttnOut、curSoftmaxMax、curSoftmaxSum、attnOutOut、softmaxMaxOut、softmaxSumOut是空指针。</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="2">161002</td>
+      <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="3">161002</td>
       <td>prevAttnOut、prevSoftmaxMax、prevSoftmaxSum、curAttnOut、curSoftmaxMax、curSoftmaxSum、attnOutOut、softmaxMaxOut、softmaxSumOut数据类型不在支持的范围之内。</td>
     </tr>
     <tr>
       <td>prevAttnOut、prevSoftmaxMax、prevSoftmaxSum、curAttnOut、curSoftmaxMax、curSoftmaxSum、attnOutOut、softmaxMaxOut、softmaxSumOut的shape不支持。</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_INNER_TILING_ERROR</td>
-      <td rowspan="2">561002</td>
       <td>当actualSeqQlenOptional有输入时，输入数据格式不在支持的范围之内。</td>
     </tr>
     <tr>
+      <td>ACLNN_ERR_INNER_TILING_ERROR</td>
+      <td>561002</td>
       <td>当inputSoftmaxLayoutOptional输入值不在支持范围之内。</td>
     </tr>
   </tbody>
@@ -360,8 +360,8 @@ aclnnStatus aclnnRingAttentionUpdateV2(
 - 当inputLayoutOptional为“TND”时，其中：
     - N：
 
-      <!-- npu="A3,910b" id8 -->
-      - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：N<=256。
+      <!-- npu="A3,910b,950" id8 -->
+      - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：N<=256。
       <!-- end id8 -->
 
     - D：
@@ -369,6 +369,9 @@ aclnnStatus aclnnRingAttentionUpdateV2(
       <!-- npu="A3,910b" id9 -->
       - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：D<=768且D为64的倍数。
       <!-- end id9 -->
+      <!-- npu="950" id10 -->
+      - <term>Ascend 950PR&950DT系列产品</term>：D<=768。
+      <!-- end id10 -->
 
 - **当inputLayoutOptional为“TND”时，inputSoftmaxLayoutOptional才生效。inputSoftmaxLayoutOptional只支持三种输入：空字符串、“SBH”、“TND”**
 

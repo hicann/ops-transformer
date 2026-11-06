@@ -21,11 +21,11 @@
     $$
 
     $$
-    softmax\_sum = prev\_softmax\_sum * exp(prev\_softmax\_max - softmax\_max) + exp(cur\_softmax\_max - softmax\_max)
+    softmax\_sum = prev\_softmax\_sum * exp(prev\_softmax\_max - softmax\_max) + cur\_softmax\_sum * exp(cur\_softmax\_max - softmax\_max)
     $$
 
     $$
-    attn\_out = prev\_attn\_out * exp(prev\_softmax\_max - softmax\_max) / softmax\_sum + cur\_attn\_out * exp(cur\_softmax\_max - softmax\_max) / softmax\_sum
+    attn\_out = prev\_attn\_out * exp(prev\_softmax\_max - softmax\_max) * prev\_softmax\_sum / softmax\_sum + cur\_attn\_out * exp(cur\_softmax\_max - softmax\_max) * cur\_softmax\_sum / softmax\_sum
     $$
 
 ## 参数说明

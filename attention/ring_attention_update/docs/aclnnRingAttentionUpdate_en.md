@@ -275,7 +275,7 @@ aclnnStatus aclnnRingAttentionUpdate(
     </tr>
     <tr>
       <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="3">561002</td>
+      <td rowspan="3">161002</td>
       <td>If actualSeqQlenOptional has an input, the input data format is not in the supported range.</td>
     </tr>
     <tr>
@@ -337,16 +337,18 @@ aclnnStatus aclnnRingAttentionUpdate(
   - When inputLayoutOptional is set to "TND":
     - N:
 
-      <!-- npu="A3,910b" id8 -->
-      - <term>Atlas A2 products</term>, <term>Atlas A3 products</term>: N<=256.
+      <!-- npu="A3,910b,950" id8 -->
+      - <term>Atlas A2 products</term>, <term>Atlas A3 products</term>, <term>Ascend 950PR&950DT products</term>: N<=256.
       <!-- end id8 -->
 
     - D:
 
       <!-- npu="A3,910b" id9 -->
       - <term>Atlas A2 products</term>, <term>Atlas A3 products</term>: D<=768 and D is a multiple of 64.
-
       <!-- end id9 -->
+      <!-- npu="950" id10 -->
+      - <term>Ascend 950PR&950DT products</term>: D<=768.
+      <!-- end id10 -->
 
 ## Example
 
