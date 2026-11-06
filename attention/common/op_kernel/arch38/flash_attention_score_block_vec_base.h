@@ -277,12 +277,14 @@ __aicore__ inline void FABlockVecBase<TEMPLATE_BASE_ARGS>::ProcessVec1DnRegbaseV
     //-------------------------Data copy to l1-------------------------
     LocalTensor<INPUT_T> mm2AL1Tensor = outputBuf.GetTensor<INPUT_T>();
     if (runInfo.s2RealSize > vec1S2CopyLenDn) {
-        DataCopy(
-            mm2AL1Tensor[0], stage1CastTensor[0],
-            {vec1S2CopyCountDn, vec1S2CopyLenDn, 0, static_cast<uint16_t>(runInfo.s2AlignedSize - vec1S2CopyLenDn)});
+        const uint16_t pL1Pitch = static_cast<uint16_t>((runInfo.s2RealSize + 63) / 64 * 64);
+        const uint16_t secondLen = static_cast<uint16_t>(runInfo.s2AlignedSize - vec1S2CopyLenDn);
+        DataCopy(mm2AL1Tensor[0], stage1CastTensor[0],
+                 {vec1S2CopyCountDn, vec1S2CopyLenDn, 0, static_cast<uint16_t>(pL1Pitch - vec1S2CopyLenDn)});
+
         DataCopy(mm2AL1Tensor[s2BaseSize * 16], stage1CastTensor[s2BaseSize * 64],
-                 {vec1S2CopyCountDn, static_cast<uint16_t>(runInfo.s2AlignedSize - vec1S2CopyLenDn),
-                  static_cast<uint16_t>(s2BaseSize - runInfo.s2AlignedSize), vec1S2CopyLenDn});
+                 {vec1S2CopyCountDn, secondLen, static_cast<uint16_t>(s2BaseSize - runInfo.s2AlignedSize),
+                  static_cast<uint16_t>(pL1Pitch - secondLen)});
     } else {
         DataCopy(mm2AL1Tensor, stage1CastTensor,
                  {vec1S2CopyCountDn, static_cast<uint16_t>(runInfo.s2AlignedSize),
