@@ -3979,7 +3979,7 @@ protected:
             isSameAB = true;
             if (dSize == SAMEAB_D_LIMIT_192 && s1Size % HIGH_PERF_SUPPORT_S1_BASIC == 0 &&
                 s2Size % HIGH_PERF_SUPPORT_S2_BASIC == 0 && inputLayout[0] == 'B' && inputLayout[1] == 'N' &&
-                inputLayout[2] == 'S' && inputLayout[3] == 'D') {
+                inputLayout[2] == 'S' && inputLayout[3] == 'D' && d2Size % FRACTAL_NUM == 0) {
                 matmulPolicyType = MATMUL_POLICY_UNSPLITK;
             }
             return true;
