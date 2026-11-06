@@ -87,8 +87,9 @@ public:
     using MM_T = T;
     using MLA_FULLQUANT_MM2_T = std::conditional_t<isInt8, int32_t, T>;
 
-    // Q: TND, cu_seq(含前导0)+seq_used, int32
-    using QSeqParserType = ActualSeqLensParser<ActualSeqLensMode::ACCUM, int32_t, true>;
+    // Dense layouts use per-batch lengths; TND uses cumulative offsets.
+    static constexpr ActualSeqLensMode Q_MODE = GetQActSeqMode<layout>();
+    using QSeqParserType = ActualSeqLensParser<Q_MODE, int32_t, Q_MODE == ActualSeqLensMode::ACCUM>;
     // KV: PA, cache_seqlens按batch, int32
     using KvSeqParserType = ActualSeqLensParser<ActualSeqLensMode::BY_BATCH, int32_t>;
 
@@ -260,7 +261,13 @@ public:
                                        __gm__ uint8_t* gm)
     {
         qGmTensor.gmTensor.SetGlobalBuffer((__gm__ Q_T*)gm);
-        qGmTensor.offsetCalculator.Init(n2Size, gSize, headDim, *this->qSeqParserPtr_);
+        if constexpr (GmLayoutParams<Q_FORMAT>::CATEGORY == FormatCategory::GM_Q_OUT_TND) {
+            // TND: 按累积T索引
+            qGmTensor.offsetCalculator.Init(n2Size, gSize, headDim, *this->qSeqParserPtr_);
+        } else { // BSNGD/BNGSD: 按batch的s1维度
+            qGmTensor.offsetCalculator.Init(constInfo_.bSize, n2Size, gSize, constInfo_.s1Size, headDim,
+                                            *this->qSeqParserPtr_);
+        }
     }
 
     __aicore__ inline void InitKVBuffer(uint32_t n2Size, uint32_t kvCacheBlockSize, uint32_t headDim,
@@ -489,17 +496,18 @@ public:
             ubMmResBuffers_[mmResUbBufId * UB_MM1_RES_BUF_BYTES].template ReinterpretCast<T>();
         uint32_t mmSyncIdx = CROSSCORE_MM_0 + mmResUbBufId;
 
-        // 等待AIV释放UB bmm1 result slot
-        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(mmSyncIdx);
-
-        IterateBmm1Internal(mm1ResUbTensor, runInfo, qPreloaded);
+        // 等待AIV释放UB bmm1 result slot的同步下移到Fixpipe之前(见IterateBmm1Internal):
+        // 该等待只约束Fixpipe写UB, 不能挡住本轮Mmad发射, 否则bmm1(本轮)无法与vec1(上轮)重叠
+        IterateBmm1Internal(mm1ResUbTensor, runInfo, qPreloaded, mmSyncIdx);
 
         // 通知AIV bmm1 result已就绪
         CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(mmSyncIdx);
     }
 
     // qPreloaded: Q已由IterateQPreload提前发起MTE2, 跳过重复拷贝, 仅锁MTE1
-    __aicore__ inline void IterateBmm1Internal(LocalTensor<T>& mm1ResUbTensor, RunInfoX& runInfo, bool qPreloaded)
+    // mmSyncIdx: bmm1 result slot对应的跨核同步ID, 仅在Fixpipe写UB前等待
+    __aicore__ inline void IterateBmm1Internal(LocalTensor<T>& mm1ResUbTensor, RunInfoX& runInfo, bool qPreloaded,
+                                               uint32_t mmSyncIdx)
     {
         // MLA全量化bmm1(rope方案A): Q[64,576] @ K[576,256]单次matmul
         // Q(含rope)首次全载L1，后续s2循环复用
@@ -534,6 +542,9 @@ public:
             Mutex::Unlock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
             Mutex::Lock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
 
+            // 等AIV释放UB bmm1 result slot: 只约束Fixpipe写UB, 放在Mmad之后使本轮bmm1的
+            // 矩阵乘可与AIV上一轮的vec1并行, 而Fixpipe仍在vec消费完该slot后才落地
+            CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(mmSyncIdx);
             FixpipeMm1(mm1ResUbTensor, l0CSubTensor, runInfo, s2CurSize);
 
             Mutex::Unlock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
@@ -583,11 +594,8 @@ public:
         LocalTensor<INPUT_T> pL1Tensor =
             l1PBuffers_[pL1BufId * L1_KV_BUF_BYTES + 512U * s2BaseSize].template ReinterpretCast<INPUT_T>();
 
-        // b. 如果bmm2写UB: 等待AIV vec2释放UB bmm2 result对应slot
-        if constexpr (BMM2_TOUB) {
-            CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(mm2SyncIdx);
-            // CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(mm2SyncIdx + AIV0_AIV1_OFFSET);
-        }
+        // b. 如果bmm2写UB: 等AIV vec2释放UB bmm2 result对应slot的同步下移到Fixpipe之前,
+        //    避免挡住本轮bmm2的Mmad发射(该等待只约束Fixpipe写UB slot)
 
         // c. K复用: MLA中V = K_nope, bmm2复用bmm1加载的K buffer
         //    直接使用bmm1加载/预取时记录的buffer id, 不做轮转推算
@@ -607,10 +615,14 @@ public:
         // e. 释放K的MTE1锁, 允许下一轮bmm1复用加载K
         Mutex::Unlock<PIPE_MTE1>(KV_L1_BUFFER_ID0 + kvReuseBufId);
 
-        // f. Fixpipe: 写bmm2 result到UB对应slot
+        // f. Fixpipe: 写bmm2 result到UB对应slot (写前才等vec2释放该slot)
         LocalTensor<MLA_FULLQUANT_MM2_T> mm2ResUbTensor =
             ubMmResBuffers_[UB_MM1_RES_BUFCNT * UB_MM1_RES_BUF_BYTES + mm2ResUbBufId * UB_MM2_RES_BUF_BYTES]
                 .template ReinterpretCast<MLA_FULLQUANT_MM2_T>();
+        if constexpr (BMM2_TOUB) {
+            CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(mm2SyncIdx);
+            // CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(mm2SyncIdx + AIV0_AIV1_OFFSET);
+        }
         FixpipeMm2(mm2ResUbTensor, l0CSubTensor, runInfo);
 
         // g. 释放L0C

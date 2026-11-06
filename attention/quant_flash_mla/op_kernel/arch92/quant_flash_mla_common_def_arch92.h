@@ -27,13 +27,17 @@
 
 // QuantMode（quant_mode属性/tiling key取值）
 // 1: Q/K均为FP8_E4M3全量化, Q per-token-head动态量化, K per-tensor静态量化
+// 0: Q/K均为HIFLOAT8全量化, 量化粒度与FP8场景一致
 #define QFMLA_MLA_FP8_E4M3_FULLQUANT 1
+#define QFMLA_MLA_HIF8_FULLQUANT 0
 
-// InOutLayoutType: 输入layout固定TND, 输出layout由layout_out属性决定
-#define InOutLayoutType_TND_TND 0  // 输出TND
-#define InOutLayoutType_TND_BSND 1 // 输出BSND
-#define InOutLayoutType_TND_BNSD 2 // 输出BNSD
-#define InOutLayoutType_TND_NTD 3  // 输出NTD
+// InOutLayoutType: TND输入时输出layout由layout_out属性决定; BSND/BNSD输入时输出与输入同layout
+#define InOutLayoutType_TND_TND 0   // 输入TND, 输出TND
+#define InOutLayoutType_TND_BSND 1  // 输入TND, 输出BSND
+#define InOutLayoutType_TND_BNSD 2  // 输入TND, 输出BNSD
+#define InOutLayoutType_TND_NTD 3   // 输入TND, 输出NTD
+#define InOutLayoutType_BSND_BSND 4 // 输入BSND, 输出BSND
+#define InOutLayoutType_BNSD_BNSD 5 // 输入BNSD, 输出BNSD
 
 // Config: 分块对齐（M=64（cube视角, SOuter=32*cvRatio）, S2Inner=256, D=576, DV=512）
 // 与FIA MLA实现及metadata分核mBaseSize=32*cvRatio=64保持一致
@@ -62,11 +66,13 @@ enum class QfmlaInferLayOutType {
 };
 
 // inOutLayoutType → (输入layout, 输出layout), BSND输出与BSH模板等价
-static constexpr QfmlaInferLayOutType InOutLayoutTypeValue[4][2] = {
+static constexpr QfmlaInferLayOutType InOutLayoutTypeValue[6][2] = {
     {QfmlaInferLayOutType::LAYOUT_TND, QfmlaInferLayOutType::LAYOUT_TND},  // InOutLayoutType_TND_TND
     {QfmlaInferLayOutType::LAYOUT_TND, QfmlaInferLayOutType::LAYOUT_BSH},  // InOutLayoutType_TND_BSND
     {QfmlaInferLayOutType::LAYOUT_TND, QfmlaInferLayOutType::LAYOUT_BNSD}, // InOutLayoutType_TND_BNSD
     {QfmlaInferLayOutType::LAYOUT_TND, QfmlaInferLayOutType::LAYOUT_NTD},  // InOutLayoutType_TND_NTD
+    {QfmlaInferLayOutType::LAYOUT_BSH, QfmlaInferLayOutType::LAYOUT_BSH},  // InOutLayoutType_BSND_BSND
+    {QfmlaInferLayOutType::LAYOUT_BNSD, QfmlaInferLayOutType::LAYOUT_BNSD} // InOutLayoutType_BNSD_BNSD
 };
 
 // 与kernel侧S1TemplateType/S2TemplateType/DTemplateType（util_regbase.h）取值一致

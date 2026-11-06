@@ -123,6 +123,61 @@ def _to_torch(x):
     return torch.as_tensor(x)
 
 
+def display_error_output_torch(real_data, expect_data, err_idx, relative_diff):
+    logger.info(
+        "Error Line-----------------------------------------------------------------------------"
+    )
+    logger.info("Loop \t ExpectOut \t RealOut \t FpDiff \t RateDiff")
+    logger.info(
+        "---------------------------------------------------------------------------------------"
+    )
+
+    len_err = int(err_idx.numel())
+    for count, i in enumerate(err_idx[:100].tolist(), 1):
+        if count < 10 or (90 < count < 100):
+            expect_value = float(expect_data[i])
+            real_value = float(real_data[i])
+            logger.info(
+                "%08d \t %.7f \t %.7f \t %.7f \t %.7f",
+                i,
+                expect_value,
+                real_value,
+                abs(expect_value - real_value),
+                float(relative_diff[count - 1].item()),
+            )
+        elif count == 10 or (count == 100 and len_err > 100):
+            logger.info(
+                "%08s \t %07s \t %07s \t %07s \t %07s",
+                "...",
+                "...",
+                "...",
+                "...",
+                "...",
+            )
+
+    logger.info(
+        "Max-RE line:---------------------------------------------------------------------------"
+    )
+    max_error = (
+        float(torch.max(relative_diff).item()) if relative_diff.numel() > 0 else 0.0
+    )
+    m_idx_list = err_idx[relative_diff == max_error]
+    for m_idx in m_idx_list[:3].tolist():
+        expect_value = float(expect_data[m_idx])
+        real_value = float(real_data[m_idx])
+        logger.info(
+            "%08d \t %.7f \t %.7f \t %.7f \t %.7f",
+            m_idx,
+            expect_value,
+            real_value,
+            abs(expect_value - real_value),
+            max_error,
+        )
+    logger.info(
+        "---------------------------------------------------------------------------------------"
+    )
+
+
 def check_result(
     expect,
     npu_result,
@@ -200,6 +255,9 @@ def check_result(
         result,
         max_error,
     )
+
+    if result == "Failed":
+        display_error_output_torch(real_data, expect_data, err_idx, err_diff)
 
     return result, fulfill_percent, max_error
 

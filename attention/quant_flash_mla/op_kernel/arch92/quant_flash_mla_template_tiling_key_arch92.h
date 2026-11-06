@@ -28,12 +28,15 @@ ASCENDC_TPL_ARGS_DECL(QuantFlashMla,
                       //    1: InOutLayoutType_TND_BSND（输入TND, 输出BSND）
                       //    2: InOutLayoutType_TND_BNSD（输入TND, 输出BNSD）
                       //    3: InOutLayoutType_TND_NTD（输入TND, 输出NTD）
+                      //    4: InOutLayoutType_BSND_BSND（输入BSND, 输出BSND）
+                      //    5: InOutLayoutType_BNSD_BNSD（输入BNSD, 输出BNSD）
                       ASCENDC_TPL_UINT_DECL(InOutLayoutType, ASCENDC_TPL_8_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 255),
                       //    Config (10-bit)
                       //    0: Config_S1Aligned64_S2Aligned256_DAligned576_DVAligned512
                       ASCENDC_TPL_UINT_DECL(Config, ASCENDC_TPL_10_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 1023),
                       //    QuantMode (5-bit)
                       //    1: QFMLA_MLA_FP8_E4M3_FULLQUANT
+                      //    0: QFMLA_MLA_HIF8_FULLQUANT
                       ASCENDC_TPL_UINT_DECL(QuantMode, ASCENDC_TPL_5_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 31),
                       //    HasAttenMask
                       //    false / true
@@ -49,14 +52,14 @@ ASCENDC_TPL_ARGS_DECL(QuantFlashMla,
 
 ASCENDC_TPL_SEL(
     // FP8
-    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND_TND),
-                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
-                                              Config_S1Aligned64_S2Aligned256_DAligned576_DVAligned512),
-                         ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFMLA_MLA_FP8_E4M3_FULLQUANT),
-                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
-                         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_PA_BBND,
-                                              KvLayoutType_PA_BNBD, KvLayoutType_PA_NZ),
-                         ASCENDC_TPL_BOOL_SEL(IsFd, false, true),
-                         ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashMlaTilingData)));
+    ASCENDC_TPL_ARGS_SEL(
+        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND_TND, InOutLayoutType_TND_NTD,
+                             InOutLayoutType_BSND_BSND, InOutLayoutType_BNSD_BNSD),
+        ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_S1Aligned64_S2Aligned256_DAligned576_DVAligned512),
+        ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFMLA_MLA_FP8_E4M3_FULLQUANT, QFMLA_MLA_HIF8_FULLQUANT),
+        ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
+        ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_PA_BBND, KvLayoutType_PA_BNBD,
+                             KvLayoutType_PA_NZ),
+        ASCENDC_TPL_BOOL_SEL(IsFd, false, true), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashMlaTilingData)));
 
 #endif // TEMPLATE_TILING_KEY_QUANT_FLASH_MLA_ARCH92_H_

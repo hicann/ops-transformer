@@ -113,8 +113,9 @@ protected:
 
     static constexpr UbFormat UB_FORMAT = GetOutUbFormat<layout>();
 
-    // Q: TND, cu_seq(含前导0)+seq_used, int32（与FA vec block保持一致的解析器）
-    using QSeqParserType = ActualSeqLensParser<ActualSeqLensMode::ACCUM, int32_t, true>;
+    // Flash-decode shares the FA parser for all query layouts.
+    static constexpr ActualSeqLensMode Q_MODE = GetQActSeqMode<layout>();
+    using QSeqParserType = ActualSeqLensParser<Q_MODE, int32_t, Q_MODE == ActualSeqLensMode::ACCUM>;
     QSeqParserType* qActSeqLensParser_ = nullptr;
 
     // ================================类成员变量====================================
@@ -298,10 +299,20 @@ protected:
             copyAttenOutUbToGm(outGmTensor, ubTensor, gmCoord);
         } else { // BNSD
             constexpr GmFormat OUT_FORMAT = GmFormat::BNGSD;
-            FaGmTensor<OUTPUT_T, OUT_FORMAT> outGmTensor;
+            // ACTLEN_T必须为int32_t以匹配qActSeqLensParser_(ActualSeqLensParser<BY_BATCH,int32_t>)类型
+            FaGmTensor<OUTPUT_T, OUT_FORMAT, int32_t> outGmTensor;
             outGmTensor.gmTensor = attentionOutGm_;
-            outGmTensor.offsetCalculator.Init(constInfo_.bSize, constInfo_.realN2Size, constInfo_.realGSize,
-                                              constInfo_.s1Size, constInfo_.dSizeV);
+            if constexpr (Q_MODE == ActualSeqLensMode::BY_BATCH) {
+                // BNSD输入: UB行序为GS1(m=g*actS1+s1), CopyAttenOutUbToGm<GS1>需按actualSeqLens分解m序,
+                // 不等长batch(actS1<s1Size)时若用padded s1Size分解会导致输出写回错位
+                outGmTensor.offsetCalculator.Init(constInfo_.bSize, constInfo_.realN2Size, constInfo_.realGSize,
+                                                  constInfo_.s1Size, constInfo_.dSizeV, *qActSeqLensParser_);
+            } else {
+                // TND输入(TND_BNSD组合): UB行序为S1G(m=s1*G+g), CopyAttenOutUbToGm<S1G>
+                // 不依赖parser分解, 5参Init即可; 且ACCUM parser与BNGSD的6参Init类型不匹配
+                outGmTensor.offsetCalculator.Init(constInfo_.bSize, constInfo_.realN2Size, constInfo_.realGSize,
+                                                  constInfo_.s1Size, constInfo_.dSizeV);
+            }
             CopyAttenOutUbToGm<OUTPUT_T, OUT_FORMAT, GetOutUbFormat<layout>()> copyAttenOutUbToGm;
             copyAttenOutUbToGm(outGmTensor, ubTensor, gmCoord);
         }
@@ -340,11 +351,28 @@ protected:
             LocalTensor<T> maxLseUb = fdLseUbBuf_;
             Mutex::Lock<PIPE_MTE3>(SYNC_LSEOUTPUT_BUF_FLAG);
             uint32_t mOffset = taskInfo_.gS1Idx + startRow;
-            // 新接口LSE输出统一为NT格式[N2*G, T]，与FA vec block一致
-            uint32_t prefixBS1 = qActSeqLensParser_->GetTBase(taskInfo_.bIdx);
-            uint64_t bN2Offset = taskInfo_.n2Idx * constInfo_.realGSize * constInfo_.t1Size + prefixBS1;
-            DataCopySoftmaxLseTNDtoNTArch35NoGS1Merge<T, ConstInfoX>(softmaxLseGm_, maxLseUb, bN2Offset, mOffset,
-                                                                     actualGSplitSize, constInfo_);
+            if constexpr (Q_MODE == ActualSeqLensMode::ACCUM) {
+                // TND输入: LSE输出为NT格式[N2*G, T]
+                uint32_t prefixBS1 = qActSeqLensParser_->GetTBase(taskInfo_.bIdx);
+                uint64_t bN2Offset = taskInfo_.n2Idx * constInfo_.realGSize * constInfo_.t1Size + prefixBS1;
+                DataCopySoftmaxLseTNDtoNTArch35NoGS1Merge<T, ConstInfoX>(softmaxLseGm_, maxLseUb, bN2Offset, mOffset,
+                                                                         actualGSplitSize, constInfo_);
+            } else {
+                // BSND/BNSD输入: LSE输出为BNS[B,N1,S1]
+                uint64_t bN2Offset =
+                    (uint64_t)taskInfo_.bIdx * constInfo_.realN2Size * constInfo_.realGSize * constInfo_.s1Size +
+                    (uint64_t)taskInfo_.n2Idx * constInfo_.realGSize * constInfo_.s1Size;
+                if constexpr (layout == LayOutTypeEnum::LAYOUT_BSH) {
+                    // UB为S1G序(m = s1*G + g)
+                    DataCopySoftmaxLseBSNDArch35<T, ConstInfoX>(softmaxLseGm_, maxLseUb, bN2Offset, mOffset,
+                                                                actualGSplitSize, constInfo_);
+                } else {
+                    // BNSD输入: UB为GS1序(m = g*actS1 + s1)
+                    DataCopySoftmaxLseBNSDArch35<T, ConstInfoX>(softmaxLseGm_, maxLseUb, bN2Offset, mOffset,
+                                                                actualGSplitSize, constInfo_,
+                                                                qActSeqLensParser_->GetActualSeqLength(taskInfo_.bIdx));
+                }
+            }
             Mutex::Unlock<PIPE_MTE3>(SYNC_LSEOUTPUT_BUF_FLAG);
         }
     }

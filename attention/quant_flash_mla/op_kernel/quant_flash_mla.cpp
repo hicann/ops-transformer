@@ -44,7 +44,7 @@ inline __aicore__ void quant_flash_mla_fp8(__gm__ uint8_t* query, __gm__ uint8_t
 {
     fa_base_matmul::ResetIdCounter();
 
-    // 输入layout固定TND, 输出layout由inOutLayoutType编码（BSND输出与BSH模板等价）
+    // Compile-time input/output layouts are encoded by inOutLayoutType.
     constexpr LayOutTypeEnum inputLayoutType = static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][0]);
     constexpr LayOutTypeEnum outputLayoutType = static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][1]);
 
@@ -106,6 +106,12 @@ __global__ __aicore__ void quant_flash_mla(__gm__ uint8_t* query, __gm__ uint8_t
 #if (ORIG_DTYPE_Q == DT_FLOAT8_E4M3FN)
     if constexpr (quantMode == QFMLA_MLA_FP8_E4M3_FULLQUANT) {
         quant_flash_mla_fp8<fp8_e4m3fn_t, bfloat16_t, inOutLayoutType, KvLayoutType, hasAttenMask, config, isFd>(
+            query, key, qDescale, kDescale, blockTable, cacheSeqLens, cuSeqLensQ, sequsedQ, attnMask, metadata, attnOut,
+            softmaxLse, workspace, tiling);
+    }
+#elif (ORIG_DTYPE_Q == DT_HIFLOAT8)
+    if constexpr (quantMode == QFMLA_MLA_HIF8_FULLQUANT) {
+        quant_flash_mla_fp8<hifloat8_t, bfloat16_t, inOutLayoutType, KvLayoutType, hasAttenMask, config, isFd>(
             query, key, qDescale, kDescale, blockTable, cacheSeqLens, cuSeqLensQ, sequsedQ, attnMask, metadata, attnOut,
             softmaxLse, workspace, tiling);
     }

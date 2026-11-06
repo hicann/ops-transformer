@@ -10,7 +10,7 @@
 
 /*!
  * \file quant_flash_mla_tiling_arch92.cpp
- * \brief QuantFlashMla arch92 tiling implementation (MLA_FP8_E4M3_FULLQUANT)
+ * \brief QuantFlashMla arch92 tiling implementation (MLA_FP8_E4M3_FULLQUANT / MLA_HIF8_FULLQUANT)
  */
 
 #include "quant_flash_mla_tiling_arch92.h"
@@ -46,10 +46,14 @@ bool QuantFlashMlaTilingFp8Arch92Impl::IsCapable()
     if (qfmlaInfo_ == nullptr) {
         return false;
     }
-    if (qfmlaInfo_->quantMode != QfmlaQuantMode::MLA_FP8_E4M3_FULLQUANT) {
+    if (qfmlaInfo_->quantMode != QfmlaQuantMode::MLA_FP8_E4M3_FULLQUANT &&
+        qfmlaInfo_->quantMode != QfmlaQuantMode::MLA_HIF8_FULLQUANT) {
         return false;
     }
-    if (qfmlaInfo_->qType != ge::DT_FLOAT8_E4M3FN) {
+    if (qfmlaInfo_->quantMode == QfmlaQuantMode::MLA_FP8_E4M3_FULLQUANT && qfmlaInfo_->qType != ge::DT_FLOAT8_E4M3FN) {
+        return false;
+    }
+    if (qfmlaInfo_->quantMode == QfmlaQuantMode::MLA_HIF8_FULLQUANT && qfmlaInfo_->qType != ge::DT_HIFLOAT8) {
         return false;
     }
     return true;
@@ -133,7 +137,16 @@ void QuantFlashMlaTilingFp8Arch92Impl::CalcNumBlocks(uint32_t aicNum)
 
 void QuantFlashMlaTilingFp8Arch92Impl::UpdateTilingKeyLayout()
 {
-    // MLA 输入固定TND layout, 输出layout由layout_out属性决定（kernel侧为编译期模板参数）
+    // BSND/BNSD输入: 输出与输入同layout; TND输入: 输出layout由layout_out属性决定（kernel侧为编译期模板参数）
+    // 规格仅支持4种组合(BSND/BNSD/TND/TND_NTD), TND输入仅允许输出TND/NTD,
+    if (qfmlaInfo_->layoutQ == QfmlaLayout::BSND) {
+        tilingKeyInfo_.inputLayout = InOutLayoutType_BSND_BSND;
+        return;
+    }
+    if (qfmlaInfo_->layoutQ == QfmlaLayout::BNSD) {
+        tilingKeyInfo_.inputLayout = InOutLayoutType_BNSD_BNSD;
+        return;
+    }
     switch (qfmlaInfo_->layoutOut) {
         case QfmlaOutLayout::NTD:
             tilingKeyInfo_.inputLayout = InOutLayoutType_TND_NTD;
@@ -164,7 +177,10 @@ void QuantFlashMlaTilingFp8Arch92Impl::UpdateTilingKeyKvLayout()
 
 void QuantFlashMlaTilingFp8Arch92Impl::UpdateTilingKeyQuantMode()
 {
-    tilingKeyInfo_.quantMode = QFMLA_MLA_FP8_E4M3_FULLQUANT;
+    // tiling key的QuantMode与quant_mode属性一致: 1=FP8_E4M3全量化, 0=HIF8全量化
+    tilingKeyInfo_.quantMode = (qfmlaInfo_->quantMode == QfmlaQuantMode::MLA_HIF8_FULLQUANT) ?
+                                   QFMLA_MLA_HIF8_FULLQUANT :
+                                   QFMLA_MLA_FP8_E4M3_FULLQUANT;
 }
 
 void QuantFlashMlaTilingFp8Arch92Impl::UpdateTilingKeyInfo()
