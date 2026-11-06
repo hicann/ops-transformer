@@ -163,12 +163,21 @@
  *
  * @tparam FIAT FIA算子模板参数，参见FIAType
  */
+// 紧凑 GQA 流水配置。
+struct FiaCubeBlockGqaTileSyncCfg {
+    static constexpr bool ENABLE_UNIFLAG = false;
+    static constexpr uint32_t PRELOAD_NUM = 2;
+    static constexpr bool S2_BASICSIZE_IS_1024 = false;
+    static constexpr bool ENABLE_V1C2_TILE_SYNC = true;
+};
+
 template <typename FIAT, typename Config = void>
 class FiaBlockCubeNonQuantGqa {
     struct DefaultCfg {
         static constexpr bool ENABLE_UNIFLAG = false;
         static constexpr uint32_t PRELOAD_NUM = 2; // same as fia_kernel_nonquant.h PRELOAD_NUM
         static constexpr bool S2_BASICSIZE_IS_1024 = false;
+        static constexpr bool ENABLE_V1C2_TILE_SYNC = false;
     };
     using T = float;
     using CFG = typename AscendC::Conditional<IsSameType<Config, void>::value, DefaultCfg, Config>::type;
@@ -1101,7 +1110,10 @@ __aicore__ inline void FiaBlockCubeNonQuantGqa<FIAT, Config>::ComputeMm2(const R
         }
     }
 
-    CrossCoreWaitFlag(constInfo.syncV1C2);
+    const bool useTileSync = CFG::ENABLE_V1C2_TILE_SYNC && (info.actMBaseSize <= ConstInfo::SYNC_V1_C2_TILE_MAX_M);
+    if (!useTileSync) {
+        CrossCoreWaitFlag(constInfo.syncV1C2);
+    }
 #if !DEBUG_DISABLE_C2
     constexpr uint32_t M_SPLIT_SIZE = 128;
     constexpr uint32_t K_SPLIT_SIZE = 256;
@@ -1123,7 +1135,20 @@ __aicore__ inline void FiaBlockCubeNonQuantGqa<FIAT, Config>::ComputeMm2(const R
     vL1Snapshot.firstBufId = this->vL1BufId;
     vL1Snapshot.signature = vCoord;
 
+    uint32_t v1c2TileIdx = 0U;
     for (auto& mL1 : m.Split(M_SPLIT_SIZE)) {
+        if (likely(useTileSync)) {
+            if (v1c2TileIdx == 0U) {
+                CrossCoreWaitFlag(constInfo.syncV1C2);
+            } else if (v1c2TileIdx == 1U) {
+                CrossCoreWaitFlag(ConstInfo::SYNC_V1_C2_TILE1_FLAG);
+            } else if (v1c2TileIdx == 2U) {
+                CrossCoreWaitFlag(ConstInfo::SYNC_V1_C2_TILE2_FLAG);
+            } else {
+                CrossCoreWaitFlag(ConstInfo::SYNC_V1_C2_TILE3_FLAG);
+            }
+        }
+        ++v1c2TileIdx;
         WaitFlag<HardEvent::FIX_M>(L0C_EVENT0 + this->cL0BufId);
 
         int32_t kL1Id = -1;
@@ -1214,4 +1239,5 @@ __aicore__ inline void FiaBlockCubeNonQuantGqa<FIAT, Config>::ComputeMm2(const R
 #endif
     CrossCoreSetFlag<ConstInfo::FIA_SYNC_MODE2, PIPE_FIX>(constInfo.syncC2V2);
 }
+
 #endif // FIA_BLOCK_CUBE_NONQUANT_GQA_H

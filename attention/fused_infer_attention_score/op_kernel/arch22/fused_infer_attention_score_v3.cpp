@@ -61,9 +61,49 @@ using namespace AscendC;
         op.Process(); \
     } while (0)
 
+#define INVOKE_FIA_OP_COMPACT_GQA_IMPL(templateClass, ...) \
+    do { \
+        using FIATypeT = FIAType<__VA_ARGS__>; \
+        using CubeBlockTypeT = \
+            typename std::conditional<g_coreType == AscendC::AIC, \
+                                      FiaBlockCubeNonQuantGqa<FIATypeT, FiaCubeBlockGqaTileSyncCfg>, \
+                                      FiaBlockCubeNonQuantGqaDummy<FIATypeT>>::type; \
+        using VecBlockTypeT = \
+            typename std::conditional<g_coreType == AscendC::AIC, FiaBlockVecNonQuantDummy<FIATypeT>, \
+                                      FiaBlockVecNonQuant<FIATypeT, true>>::type; \
+        using FdBlockTypeT = \
+            typename std::conditional<g_coreType == AscendC::AIC, FiaBlockVecFlashDecodeDummy<FIATypeT>, \
+                                      FiaBlockVecFlashDecode<FIATypeT>>::type; \
+        templateClass<FIATypeT, CubeBlockTypeT, VecBlockTypeT, FdBlockTypeT> op; \
+        FIA_COPY_TILING_DATA(FusedInferAttentionScoreTilingData, tiling); \
+        op.Init(query, key, value, pseShift, attenMask, actualSeqLengthsQ, actualSeqLengths, deqScale1, quantScale1, \
+                deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset, blockTable, queryPaddingSize, \
+                kvPaddingSize, keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, \
+                keySharedPrefix, valueSharedPrefix, actualSharedPrefixLen, queryRope, keyRope, keyRopeAntiquantScale, \
+                learnableSink, attentionOut, softmaxLse, user, tiling_data, tiling, &tPipe); \
+        op.Process(); \
+    } while (0)
+
 #define FIA_COPY_TILING_DATA(tilingDataStruct, tiling) \
     GET_TILING_DATA_WITH_STRUCT(tilingDataStruct, tiling_data_in, tiling); \
     const tilingDataStruct* __restrict tiling_data = &tiling_data_in;
+
+template <typename TilingDataType>
+__aicore__ inline bool ShouldUseCompactGqaPipeline(const TilingDataType* __restrict tilingData,
+                                                   __gm__ uint8_t* queryRope, __gm__ uint8_t* learnableSink)
+{
+    const auto& base = tilingData->baseParams;
+    const auto& mask = tilingData->maskParams;
+    const auto& pse = tilingData->pseParams;
+    const auto& padding = tilingData->leftPaddingParams;
+    const auto& prefix = tilingData->prefixParams;
+    return (base.gSize * base.n2Size == base.usedCoreNum) &&
+           (static_cast<FIA_LAYOUT>(base.outputLayout) == FIA_LAYOUT::BSH) && base.batchContinuous &&
+           (base.actualSeqS1Dims == 0U) && (base.actualSeqS2Dims == 0U) && (!base.accumQSeqFlag) &&
+           (!base.accumKVSeqFlag) && (!pse.pseShiftFlag) && (!mask.attenMaskFlag) && (!base.softmaxLseFlag) &&
+           (!padding.qPaddingFlag) && (!padding.kvPaddingFlag) && (!prefix.prefixFlag) && (queryRope == nullptr) &&
+           (mask.sparseMode == 0U) && (learnableSink == nullptr);
+}
 
 extern "C" __global__ __aicore__ void fused_infer_attention(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
@@ -1005,9 +1045,17 @@ extern "C" __global__ __aicore__ void fused_infer_attention(
                                half, half, half, half, false, false, FIA_LAYOUT::BNSD, false, false, FIA_LAYOUT::BNSD,
                                false, true);
 #elif TILING_KEY_VAR == 103000000010000001
-    INVOKE_FIA_OP_GENERAL_IMPL(FiaKernelNonQuant, FiaBlockCubeNonQuantGqa, FiaBlockVecNonQuant, FiaBlockVecFlashDecode,
-                               half, half, half, half, false, false, FIA_LAYOUT::BSH, false, false, FIA_LAYOUT::BSH,
-                               false);
+    {
+        FIA_COPY_TILING_DATA(FusedInferAttentionScoreTilingData, tiling);
+        if (likely(ShouldUseCompactGqaPipeline(tiling_data, queryRope, learnableSink))) {
+            INVOKE_FIA_OP_COMPACT_GQA_IMPL(FiaKernelNonQuant, half, half, half, half, false, false, FIA_LAYOUT::BSH,
+                                           false, false, FIA_LAYOUT::BSH, false);
+        } else {
+            INVOKE_FIA_OP_GENERAL_IMPL(FiaKernelNonQuant, FiaBlockCubeNonQuantGqa, FiaBlockVecNonQuant,
+                                       FiaBlockVecFlashDecode, half, half, half, half, false, false, FIA_LAYOUT::BSH,
+                                       false, false, FIA_LAYOUT::BSH, false);
+        }
+    }
 #elif TILING_KEY_VAR == 103000000210000001
     INVOKE_FIA_OP_GENERAL_IMPL(FiaKernelNonQuant, FiaBlockCubeNonQuantGqa, FiaBlockVecNonQuant, FiaBlockVecFlashDecode,
                                half, half, half, half, false, false, FIA_LAYOUT::BSH, false, false, FIA_LAYOUT::BSH,
@@ -2557,9 +2605,17 @@ extern "C" __global__ __aicore__ void fused_infer_attention(
                                bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false, FIA_LAYOUT::BNSD, false,
                                false, FIA_LAYOUT::BNSD, false, true);
 #elif TILING_KEY_VAR == 103000000010022221
-    INVOKE_FIA_OP_GENERAL_IMPL(FiaKernelNonQuant, FiaBlockCubeNonQuantGqa, FiaBlockVecNonQuant, FiaBlockVecFlashDecode,
-                               bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false, FIA_LAYOUT::BSH, false,
-                               false, FIA_LAYOUT::BSH);
+    {
+        FIA_COPY_TILING_DATA(FusedInferAttentionScoreTilingData, tiling);
+        if (likely(ShouldUseCompactGqaPipeline(tiling_data, queryRope, learnableSink))) {
+            INVOKE_FIA_OP_COMPACT_GQA_IMPL(FiaKernelNonQuant, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false,
+                                           false, FIA_LAYOUT::BSH, false, false, FIA_LAYOUT::BSH);
+        } else {
+            INVOKE_FIA_OP_GENERAL_IMPL(FiaKernelNonQuant, FiaBlockCubeNonQuantGqa, FiaBlockVecNonQuant,
+                                       FiaBlockVecFlashDecode, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false,
+                                       false, FIA_LAYOUT::BSH, false, false, FIA_LAYOUT::BSH);
+        }
+    }
 #elif TILING_KEY_VAR == 103000000210022221
     INVOKE_FIA_OP_GENERAL_IMPL(FiaKernelNonQuant, FiaBlockCubeNonQuantGqa, FiaBlockVecNonQuant, FiaBlockVecFlashDecode,
                                bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false, FIA_LAYOUT::BSH, false,

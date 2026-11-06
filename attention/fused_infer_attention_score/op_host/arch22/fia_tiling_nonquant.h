@@ -43,6 +43,8 @@ private:
 
     void EmptyTensorProcess() const;
     bool IsHighPerformanceTemplate() const;
+    bool IsCompactGqaEligible() const;
+    bool UseCompactGqaPipeline() const;
     void InitParams();
 
     void Split();

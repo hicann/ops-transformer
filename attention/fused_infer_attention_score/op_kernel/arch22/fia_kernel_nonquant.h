@@ -73,6 +73,7 @@ protected:
     using ORIGIN_T = typename FIAT::orginalType;
     static constexpr bool PAGE_ATTENTION = FIAT::pageAttention;
     static constexpr bool FLASH_DECODE = FIAT::flashDecode;
+    static constexpr bool USE_COMPACT_GQA_PIPELINE = VecBlockType::USE_COMPACT_GQA_PIPELINE;
     static constexpr FIA_LAYOUT LAYOUT_T = FIAT::layout;
     static constexpr FIA_LAYOUT KV_LAYOUT_T = FIAT::kvLayout;
     static constexpr ActualSeqLensMode Q_MODE = GetQActSeqMode<LAYOUT_T>();
@@ -228,6 +229,7 @@ template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename
 __aicore__ inline void FiaKernelNonQuant<FIAT, CubeBlockType, VecBlockType, FdBlockType>::InitTilingData()
 {
     usedCoreNum = tilingData->baseParams.usedCoreNum;
+    constInfo.usedCoreNum = usedCoreNum;
 
     constInfo.scaleValue = tilingData->baseParams.scaleValue;
     constInfo.batchSize = tilingData->baseParams.bSize;
@@ -472,26 +474,29 @@ __aicore__ inline void FiaKernelNonQuant<FIAT, CubeBlockType, VecBlockType, FdBl
 
     // init global buffer
     attentionOutGm.SetGlobalBuffer((__gm__ OUT_T*)attentionOut);
-    if (constInfo.softmaxLseFlag) {
-        softmaxLseGm.SetGlobalBuffer((__gm__ float*)softmaxLse);
-    }
-
-    if (constInfo.isQHasLeftPadding) {
-        // left padding
-        GlobalTensor<int64_t> queryPaddingSizeGm;
-        queryPaddingSizeGm.SetGlobalBuffer((__gm__ int64_t*)queryPaddingSize);
-        int64_t qPaddingSize = queryPaddingSizeGm.GetValue(0);
-        constInfo.qLeftPaddingSize = (qPaddingSize >= 0) ? qPaddingSize : 0;
-    }
-    if (constInfo.isKVHasLeftPadding) {
-        GlobalTensor<int64_t> kvPaddingSizeGm;
-        kvPaddingSizeGm.SetGlobalBuffer((__gm__ int64_t*)kvPaddingSize);
-        int64_t kvPaddingSize = kvPaddingSizeGm.GetValue(0);
-        constInfo.kvLeftPaddingSize = (kvPaddingSize >= 0) ? kvPaddingSize : 0;
+    if constexpr (!USE_COMPACT_GQA_PIPELINE) {
+        if (constInfo.softmaxLseFlag) {
+            softmaxLseGm.SetGlobalBuffer((__gm__ float*)softmaxLse);
+        }
+        if (constInfo.isQHasLeftPadding) {
+            // left padding
+            GlobalTensor<int64_t> queryPaddingSizeGm;
+            queryPaddingSizeGm.SetGlobalBuffer((__gm__ int64_t*)queryPaddingSize);
+            int64_t qPaddingSize = queryPaddingSizeGm.GetValue(0);
+            constInfo.qLeftPaddingSize = (qPaddingSize >= 0) ? qPaddingSize : 0;
+        }
+        if (constInfo.isKVHasLeftPadding) {
+            GlobalTensor<int64_t> kvPaddingSizeGm;
+            kvPaddingSizeGm.SetGlobalBuffer((__gm__ int64_t*)kvPaddingSize);
+            int64_t kvPaddingSize = kvPaddingSizeGm.GetValue(0);
+            constInfo.kvLeftPaddingSize = (kvPaddingSize >= 0) ? kvPaddingSize : 0;
+        }
     }
 
     if ASCEND_IS_AIV {
-        InitOutputSingleCore();
+        if constexpr (!USE_COMPACT_GQA_PIPELINE) {
+            InitOutputSingleCore();
+        }
     }
 
     InitWorkspace(workspace);
@@ -527,7 +532,9 @@ __aicore__ inline void FiaKernelNonQuant<FIAT, CubeBlockType, VecBlockType, FdBl
                            attentionOut, softmaxLse);
         vectorService.InitVec1GlobalTensor(vec1ResGm, mm1ResGm);
         vectorService.InitVec2GlobalTensor(vec2ResGm, mm2ResGm);
-        vectorService.InitFlashDecodeGlobalTensor(accumOutGm, lseMaxFdGm, lseSumFdGm);
+        if constexpr (!USE_COMPACT_GQA_PIPELINE) {
+            vectorService.InitFlashDecodeGlobalTensor(accumOutGm, lseMaxFdGm, lseSumFdGm);
+        }
     }
 }
 
@@ -635,37 +642,44 @@ __aicore__ inline void FiaKernelNonQuant<FIAT, CubeBlockType, VecBlockType, FdBl
     info.actualSingleProcessSInnerSizeAlign =
         AttentionCommon::Align((uint32_t)info.actualSingleProcessSInnerSize, (uint32_t)AttentionCommon::BYTE_BLOCK);
 
-    if (constInfo.isQHasLeftPadding) {
-        info.qPaddingBeginOffset = constInfo.qSeqSize - actSeqLensQ - constInfo.qLeftPaddingSize;
-    }
-    if (constInfo.isKVHasLeftPadding) {
-        info.kvPaddingBeginOffset = constInfo.kvSeqSize - actSeqLensKv - constInfo.kvLeftPaddingSize;
-    }
-
-    if (constInfo.batchContinuous) {
-        info.isChangeBatch = false;
-    } else {
-        if (loop == 0) { // 第一个有效任务才需要重置KV的tensor
-            info.isChangeBatch = true;
+    if constexpr (!USE_COMPACT_GQA_PIPELINE) {
+        if (constInfo.isQHasLeftPadding) {
+            info.qPaddingBeginOffset = constInfo.qSeqSize - actSeqLensQ - constInfo.qLeftPaddingSize;
+        }
+        if (constInfo.isKVHasLeftPadding) {
+            info.kvPaddingBeginOffset = constInfo.kvSeqSize - actSeqLensKv - constInfo.kvLeftPaddingSize;
+        }
+        if (constInfo.batchContinuous) {
+            info.isChangeBatch = false;
         } else {
-            info.isChangeBatch = (info.n2Idx == 0 && s2Cur == curS2Start);
+            if (loop == 0) { // 第一个有效任务才需要重置KV的tensor
+                info.isChangeBatch = true;
+            } else {
+                info.isChangeBatch = (info.n2Idx == 0 && s2Cur == curS2Start);
+            }
         }
     }
 
-    int64_t safePreToken = constInfo.preToken;
-    int64_t safeNextToken = constInfo.nextToken;
-    fa_base_vector::GetSafeActToken(info.actS1Size, info.actS2Size, safePreToken, safeNextToken, constInfo.sparseMode);
-    if (constInfo.sparseMode == fa_base_vector::BAND) {
-        info.preTokensPerBatch = safePreToken;
-        info.nextTokensPerBatch =
-            static_cast<int32_t>(info.actS2Size) - static_cast<int32_t>(info.actS1Size) + safeNextToken;
-    } else if ((constInfo.sparseMode == fa_base_vector::DEFAULT_MASK) && constInfo.attenMaskFlag) {
-        info.nextTokensPerBatch = safeNextToken;
-        info.preTokensPerBatch =
-            static_cast<int32_t>(info.actS2Size) - static_cast<int32_t>(info.actS1Size) + safePreToken;
-    } else {
+    if constexpr (USE_COMPACT_GQA_PIPELINE) {
         info.nextTokensPerBatch = static_cast<int32_t>(info.actS2Size) - static_cast<int32_t>(info.actS1Size);
         info.preTokensPerBatch = 0;
+    } else {
+        int64_t safePreToken = constInfo.preToken;
+        int64_t safeNextToken = constInfo.nextToken;
+        fa_base_vector::GetSafeActToken(info.actS1Size, info.actS2Size, safePreToken, safeNextToken,
+                                        constInfo.sparseMode);
+        if (constInfo.sparseMode == fa_base_vector::BAND) {
+            info.preTokensPerBatch = safePreToken;
+            info.nextTokensPerBatch =
+                static_cast<int32_t>(info.actS2Size) - static_cast<int32_t>(info.actS1Size) + safeNextToken;
+        } else if ((constInfo.sparseMode == fa_base_vector::DEFAULT_MASK) && constInfo.attenMaskFlag) {
+            info.nextTokensPerBatch = safeNextToken;
+            info.preTokensPerBatch =
+                static_cast<int32_t>(info.actS2Size) - static_cast<int32_t>(info.actS1Size) + safePreToken;
+        } else {
+            info.nextTokensPerBatch = static_cast<int32_t>(info.actS2Size) - static_cast<int32_t>(info.actS1Size);
+            info.preTokensPerBatch = 0;
+        }
     }
 
     // 情况1: loop不等于0时, 第一个S2 inner循环就是第一个S2 outer循环, 即s2Cur=0
@@ -900,51 +914,72 @@ template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename
 __aicore__ inline TASK_DEAL_MODE FiaKernelNonQuant<FIAT, CubeBlockType, VecBlockType, FdBlockType>::GetTaskDealMode(
     uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur)
 {
-    bool isFirstTask = (bN2Cur == constInfo.bN2Start) && (gS1Cur == constInfo.gS1Start) && (s2Cur == constInfo.s2Start);
-    uint32_t bIdx = GetBIdx(bN2Cur);
-    if (isFirstTask || prevBIdx != bIdx) {
-        prevBIdx = bIdx;
-        if (constInfo.actualLenDims == 0 && !constInfo.batchContinuous) {
-            actSeqLensKv = fa_base_kernel::SeqLenFromTensorList<LAYOUT_T>(keyPtr, bIdx);
-        } else {
-            actSeqLensKv = kvActSeqLensParser.GetActualSeqLength(bIdx);
+    if constexpr (USE_COMPACT_GQA_PIPELINE) {
+        bool isFirstTask =
+            (bN2Cur == constInfo.bN2Start) && (gS1Cur == constInfo.gS1Start) && (s2Cur == constInfo.s2Start);
+        uint32_t bIdx = GetBIdx(bN2Cur);
+        if (isFirstTask || prevBIdx != bIdx) {
+            prevBIdx = bIdx;
+            actSeqLensKv = constInfo.kvSeqSize;
+            actSeqLensQ = constInfo.qSeqSize;
         }
-        actSeqLensKv += constInfo.systemPrefixLen;
-        actSeqLensQ = qActSeqLensParser.GetActualSeqLength(bIdx);
-    }
+        if (isFirstTask || bN2Cur != prevBN2Idx || gS1Cur != prevGS1Idx) {
+            CalcCurS2StartEndNoSparse(bN2Cur, gS1Cur);
+            prevBN2Idx = bN2Cur;
+            prevGS1Idx = gS1Cur;
+        }
+        if (s2Cur < curS2Start || s2Cur >= curS2End) {
+            return TASK_DEAL_MODE::SKIP;
+        }
+        return TASK_DEAL_MODE::CREATE_TASK;
+    } else {
+        bool isFirstTask =
+            (bN2Cur == constInfo.bN2Start) && (gS1Cur == constInfo.gS1Start) && (s2Cur == constInfo.s2Start);
+        uint32_t bIdx = GetBIdx(bN2Cur);
+        if (isFirstTask || prevBIdx != bIdx) {
+            prevBIdx = bIdx;
+            if (constInfo.actualLenDims == 0 && !constInfo.batchContinuous) {
+                actSeqLensKv = fa_base_kernel::SeqLenFromTensorList<LAYOUT_T>(keyPtr, bIdx);
+            } else {
+                actSeqLensKv = kvActSeqLensParser.GetActualSeqLength(bIdx);
+            }
+            actSeqLensKv += constInfo.systemPrefixLen;
+            actSeqLensQ = qActSeqLensParser.GetActualSeqLength(bIdx);
+        }
 
-    uint64_t s2LoopTimes = (actSeqLensKv + constInfo.s2BaseSize - 1) / constInfo.s2BaseSize;
-    uint64_t gS1Size = actSeqLensQ * constInfo.gSize;
-    uint64_t gS1LoopTimes = (gS1Size + constInfo.mBaseSize - 1) / constInfo.mBaseSize;
+        uint64_t s2LoopTimes = (actSeqLensKv + constInfo.s2BaseSize - 1) / constInfo.s2BaseSize;
+        uint64_t gS1Size = actSeqLensQ * constInfo.gSize;
+        uint64_t gS1LoopTimes = (gS1Size + constInfo.mBaseSize - 1) / constInfo.mBaseSize;
 
-    if (s2LoopTimes == 0 || gS1LoopTimes == 0) {
-        if (gS1Cur == 0 && s2Cur == 0) {
+        if (s2LoopTimes == 0 || gS1LoopTimes == 0) {
+            if (gS1Cur == 0 && s2Cur == 0) {
+                return TASK_DEAL_MODE::DEAL_ZERO;
+            }
+            return TASK_DEAL_MODE::SKIP_ZERO;
+        }
+
+        // 对paddingSize设置不合理的任务结果置0
+        if ((constInfo.isQHasLeftPadding && (actSeqLensQ + constInfo.qLeftPaddingSize > constInfo.qSeqSize)) ||
+            (constInfo.isKVHasLeftPadding && (actSeqLensKv + constInfo.kvLeftPaddingSize > constInfo.kvSeqSize))) {
             return TASK_DEAL_MODE::DEAL_ZERO;
         }
-        return TASK_DEAL_MODE::SKIP_ZERO;
-    }
 
-    // 对paddingSize设置不合理的任务结果置0
-    if ((constInfo.isQHasLeftPadding && (actSeqLensQ + constInfo.qLeftPaddingSize > constInfo.qSeqSize)) ||
-        (constInfo.isKVHasLeftPadding && (actSeqLensKv + constInfo.kvLeftPaddingSize > constInfo.kvSeqSize))) {
-        return TASK_DEAL_MODE::DEAL_ZERO;
-    }
-
-    // 计算每一行的起止点，只有当换行时（bN2Cur、gS1Cur更新）才需要重新计算
-    if (isFirstTask || bN2Cur != prevBN2Idx || gS1Cur != prevGS1Idx) {
-        if (constInfo.attenMaskFlag == 0U) {
-            CalcCurS2StartEndNoSparse(bN2Cur, gS1Cur);
-        } else {
-            CalcCurS2StartEndWithSparse(bN2Cur, gS1Cur);
+        // 计算每一行的起止点，只有当换行时（bN2Cur、gS1Cur更新）才需要重新计算
+        if (isFirstTask || bN2Cur != prevBN2Idx || gS1Cur != prevGS1Idx) {
+            if (constInfo.attenMaskFlag == 0U) {
+                CalcCurS2StartEndNoSparse(bN2Cur, gS1Cur);
+            } else {
+                CalcCurS2StartEndWithSparse(bN2Cur, gS1Cur);
+            }
+            prevBN2Idx = bN2Cur;
+            prevGS1Idx = gS1Cur;
         }
-        prevBN2Idx = bN2Cur;
-        prevGS1Idx = gS1Cur;
-    }
 
-    if (s2Cur < curS2Start || s2Cur >= curS2End) {
-        return TASK_DEAL_MODE::SKIP;
+        if (s2Cur < curS2Start || s2Cur >= curS2End) {
+            return TASK_DEAL_MODE::SKIP;
+        }
+        return TASK_DEAL_MODE::CREATE_TASK;
     }
-    return TASK_DEAL_MODE::CREATE_TASK;
 }
 
 template <typename FIAT, typename CubeBlockType, typename VecBlockType, typename FdBlockType>

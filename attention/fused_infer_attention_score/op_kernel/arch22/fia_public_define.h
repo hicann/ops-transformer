@@ -126,6 +126,15 @@ struct RunInfo {
 struct ConstInfo {
     // CUBE与VEC核间同步的模式
     static constexpr uint32_t FIA_SYNC_MODE2 = 2;
+    // 按 MM2 的 128 行 M 子块细分 V1->C2 同步；tile0 复用 syncV1C2。
+    // 该 kernel 的手工 Mmad 路径不使用 mode-4 通道，且 SyncAll 保留 11-14，因此使用 0-2。
+    static constexpr uint32_t SYNC_V1_C2_TILE1_FLAG = 0U;
+    static constexpr uint32_t SYNC_V1_C2_TILE2_FLAG = 1U;
+    static constexpr uint32_t SYNC_V1_C2_TILE3_FLAG = 2U;
+    static constexpr uint32_t SYNC_V1_C2_TILE_M = 128U;
+    static constexpr uint32_t SYNC_V1_C2_MAX_TILE_CNT = 4U;
+    static constexpr uint32_t SYNC_V1_C2_TILE_MAX_M = SYNC_V1_C2_MAX_TILE_CNT * SYNC_V1_C2_TILE_M;
+    static constexpr uint32_t SYNC_V1_C2_TILE_SIGNAL_DISABLED = 0x80000000U;
     // BUFFER的字节数
     static constexpr uint32_t BUFFER_SIZE_BYTE_32B = 32;
     static constexpr uint32_t BUFFER_SIZE_BYTE_64B = 64;
@@ -151,6 +160,7 @@ struct ConstInfo {
 
     // preLoad的总次数
     uint32_t preLoadNum = 0U;
+    uint32_t usedCoreNum = 0U;
     uint32_t nBufferMBaseSize = 0U;
     // CUBE和VEC的核间同步EventID
     uint32_t syncV1NupdateC2 = 0U;

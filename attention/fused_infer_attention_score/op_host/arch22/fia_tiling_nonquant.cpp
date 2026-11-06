@@ -256,6 +256,37 @@ bool FiaTilingNonQuant::IsHighPerformanceTemplate() const
     return false;
 }
 
+bool FiaTilingNonQuant::IsCompactGqaEligible() const
+{
+    if ((fiaInfo_ == nullptr) || fiaInfo_->isMaxWorkspace || fiaInfo_->emptyTensorFlag || (usedCoreNum_ == 0U) ||
+        (usedCoreNum_ != fiaInfo_->n1Size)) {
+        return false;
+    }
+
+    const bool supportedLayout = (fiaInfo_->inputLayout == TilingKeyLayout::BSH_BSND) &&
+                                 (fiaInfo_->inputKvLayout == TilingKeyLayout::BSH_BSND) &&
+                                 (fiaInfo_->outputLayout == TilingKeyLayout::BSH_BSND);
+    const bool supportedType = ((fiaInfo_->inputQType == ge::DT_FLOAT16) || (fiaInfo_->inputQType == ge::DT_BF16)) &&
+                               (fiaInfo_->inputKvType == fiaInfo_->inputQType) &&
+                               (fiaInfo_->outputType == fiaInfo_->inputQType);
+    const bool denseSequence = (fiaInfo_->kvStorageMode == KvStorageMode::BATCH_CONTINUOUS) &&
+                               (fiaInfo_->actualLenQDims == 0U) && (fiaInfo_->actualLenKvDims == 0U) &&
+                               (!fiaInfo_->isAccumQSeq) && (!fiaInfo_->isAccumKVSeq);
+    const bool noOptionalFeatures = (!fiaInfo_->attenMaskFlag) && (!fiaInfo_->softmaxLseFlag) &&
+                                    (!fiaInfo_->pseShiftFlag) && (!fiaInfo_->learnableSinkFlag) &&
+                                    (!fiaInfo_->sysPrefixFlag) && (!fiaInfo_->qPaddingSizeFlag) &&
+                                    (!fiaInfo_->kvPaddingSizeFlag) && (!fiaInfo_->pageAttentionFlag) &&
+                                    (kvSplit_ == 0U) && (!softmaxWithBrcbFlag_) && (!fiaInfo_->slidingFlag);
+    const bool noRope = fiaInfo_->ropeMode == RopeMode::NO_ROPE;
+    const bool noSparseStage = fiaInfo_->sparseMode == SPARSE_MODE_NO_MASK;
+    return supportedLayout && supportedType && denseSequence && noOptionalFeatures && noRope && noSparseStage;
+}
+
+bool FiaTilingNonQuant::UseCompactGqaPipeline() const
+{
+    return (perfMode_ == FiaTemplateId::HIGH_PERFORMANCE_GQA) && IsCompactGqaEligible();
+}
+
 void FiaTilingNonQuant::InitParams()
 {
     perfMode_ = FiaTemplateId::GENERAL_GQA;
@@ -460,32 +491,77 @@ void FiaTilingNonQuant::Split()
 
 uint32_t FiaTilingNonQuant::GetL2CacheOffFlag()
 {
-    uint64_t kvTypeSize = 2;
-    uint64_t kvSize = 0;
-    if (fiaInfo_->kvStorageMode == KvStorageMode::PAGE_ATTENTION) {
-        kvSize = fiaInfo_->opParamInfo.key.shape->GetStorageShape().GetShapeSize();
-    } else if (fiaInfo_->kvStorageMode == KvStorageMode::TENSOR_LIST) {
+    const uint64_t kvTypeSize = static_cast<uint64_t>(ge::GetSizeByDataType(fiaInfo_->inputKvType));
+    uint64_t kvCacheBytes = 0;
+
+    auto addShapeBytes = [&](const gert::Shape* shape) {
+        if (shape != nullptr) {
+            kvCacheBytes += shape->GetShapeSize() * kvTypeSize;
+        }
+    };
+    auto addStorageShapeBytes = [&](const gert::StorageShape* shape) {
+        if (shape != nullptr) {
+            addShapeBytes(&shape->GetShape());
+        }
+    };
+    auto addTensorBytes = [&](const gert::Tensor* tensor) {
+        if (tensor != nullptr) {
+            addShapeBytes(&tensor->GetStorageShape());
+        }
+    };
+    // Track the complete cache-resident K/V working set, including separately stored RoPE and shared-prefix data.
+    if (fiaInfo_->kvStorageMode == KvStorageMode::TENSOR_LIST) {
         for (int64_t size = 0; size < fiaInfo_->bSize; ++size) {
-            auto keyTensorInList = fiaInfo_->kCache[size];
-            kvSize += keyTensorInList->GetStorageShape().GetShapeSize();
+            kvCacheBytes += fiaInfo_->kCache[size]->GetStorageShape().GetShapeSize() * kvTypeSize;
+            kvCacheBytes += fiaInfo_->vCache[size]->GetStorageShape().GetShapeSize() * kvTypeSize;
         }
     } else {
-        kvSize = fiaInfo_->opParamInfo.key.shape->GetStorageShape().GetShapeSize();
+        addStorageShapeBytes(fiaInfo_->opParamInfo.key.shape);
+        addStorageShapeBytes(fiaInfo_->opParamInfo.value.shape);
+        addTensorBytes(fiaInfo_->opParamInfo.keyRope.tensor);
+        addTensorBytes(fiaInfo_->opParamInfo.keySharedPrefix.tensor);
+        addTensorBytes(fiaInfo_->opParamInfo.valueSharedPrefix.tensor);
     }
 
     uint64_t l2CacheSize = 0;
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(fiaInfo_->platformInfo);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, l2CacheSize);
 
-    // 之前路由到IFA的GQA场景才需要考虑关闭L2Cache
-    if ((fiaInfo_->ropeMode == RopeMode::NO_ROPE) && (fiaInfo_->s1Size == 1) &&
-        (fiaInfo_->gSize <= 64)) { // 1:qs=1 64:g<=64 IFA的GQA场景
+    // Classify the cache by capacity so the policy does not depend on product-name strings.
+    constexpr uint64_t LIMITED_L2_CAPACITY_BYTES = 180ULL * 1024ULL * 1024ULL;
+    const bool hasLimitedL2 = (l2CacheSize != 0U) && (l2CacheSize < LIMITED_L2_CAPACITY_BYTES);
+    const bool hasKvSharing = fiaInfo_->n1Size > fiaInfo_->n2Size;
+    const bool hasRope = fiaInfo_->ropeMode != RopeMode::NO_ROPE;
+    const bool isDenseCachePolicyCandidate =
+        (fiaInfo_->inputLayout == TilingKeyLayout::BSH_BSND) &&
+        (fiaInfo_->inputKvLayout == TilingKeyLayout::BSH_BSND) &&
+        ((fiaInfo_->inputQType == ge::DT_FLOAT16) || (fiaInfo_->inputQType == ge::DT_BF16)) &&
+        (fiaInfo_->inputKvType == fiaInfo_->inputQType) && (fiaInfo_->outputType == fiaInfo_->inputQType) &&
+        (fiaInfo_->kvStorageMode == KvStorageMode::BATCH_CONTINUOUS) && (!fiaInfo_->pageAttentionFlag) &&
+        (!softmaxWithBrcbFlag_) && (!fiaInfo_->attenMaskFlag) && (!fiaInfo_->softmaxLseFlag) &&
+        (!fiaInfo_->pseShiftFlag) && (!fiaInfo_->sysPrefixFlag) && (!fiaInfo_->slidingFlag) &&
+        (fiaInfo_->actualLenQDims == 0U) && (fiaInfo_->actualLenKvDims == 0U) &&
+        (fiaInfo_->sparseMode == SPARSE_MODE_NO_MASK) && (kvTypeSize != 0U);
+
+    if (isDenseCachePolicyCandidate) {
+        if (hasLimitedL2) {
+            // A constrained L2 benefits from bypass unless GQA keeps a small shared K/V working set resident.
+            const double sharedCacheLimit = hasRope ? 0.75 : 0.25;
+            const bool retainCacheForSharedKv =
+                hasKvSharing && (static_cast<double>(kvCacheBytes) < sharedCacheLimit * l2CacheSize);
+            l2CacheOffFlag_ = retainCacheForSharedKv ? 0U : 1U;
+        } else {
+            // With more L2 capacity, shared K/V can tolerate a larger resident working set.
+            const double cacheLimit = hasKvSharing ? 1.5 : 0.65;
+            l2CacheOffFlag_ = (static_cast<double>(kvCacheBytes) >= cacheLimit * l2CacheSize) ? 1U : 0U;
+        }
+    } else if ((fiaInfo_->ropeMode == RopeMode::NO_ROPE) && (fiaInfo_->s1Size == 1) &&
+               (fiaInfo_->gSize <= 64)) { // 1:qs=1 64:g<=64 IFA的GQA场景
         // 1. 连续访存时, 即KV的layout为BNSD或者BnNBsD, 不涉及数据预取, 可以直接关闭L2Cache
         // 2. 考虑K和V数据的总大小超过一定值后, 关闭L2Cache, 当前系数确定为1.2
         if (fiaInfo_->kvLayout == FiaLayout::BNSD || fiaInfo_->kvLayout == FiaLayout::BnNBsD) {
             l2CacheOffFlag_ = 1U;
-        } else if (static_cast<double>(kvSize) * kvTypeSize * 2.0f >=
-                   l2CacheSize * 1.2) { // 2:K和V数据的总大小    1.2:阈值系数
+        } else if (static_cast<double>(kvCacheBytes) >= l2CacheSize * 1.2) { // 2:K和V数据的总大小    1.2:阈值系数
             l2CacheOffFlag_ = 1U;
         } else {
             l2CacheOffFlag_ = 0;
@@ -494,8 +570,10 @@ uint32_t FiaTilingNonQuant::GetL2CacheOffFlag()
         l2CacheOffFlag_ = 0;
     }
 
-    OP_LOGD(fiaInfo_->opName, "l2CacheOffFlag_: %u, kvSize: %lu, kvTypeSize: %u, l2CacheSize: %lu", l2CacheOffFlag_,
-            kvSize, kvTypeSize, l2CacheSize);
+    OP_LOGD(fiaInfo_->opName,
+            "l2CacheOffFlag_: %u, kvCacheBytes: %lu, l2CacheSize: %lu, sharing: %d, rope: %d, limitedL2: %d",
+            l2CacheOffFlag_, kvCacheBytes, l2CacheSize, static_cast<int32_t>(hasKvSharing),
+            static_cast<int32_t>(hasRope), static_cast<int32_t>(hasLimitedL2));
     return l2CacheOffFlag_;
 }
 
