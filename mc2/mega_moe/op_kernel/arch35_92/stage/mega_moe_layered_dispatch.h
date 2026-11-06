@@ -134,7 +134,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::DispatchB
 
 // =================================================================================================
 // DispatchPrepareBuffInit：一级 Dispatch 前置量化使用的双缓冲。
-// SendMask/reset 和本阶段之间已有全核同步，Wave 内 DispatchBuffInit 会在前置阶段结束后复用同一 UB。
+// 仅绑定 UB 地址，调用方负责与清零、mask 及后续计算之间的复用依赖。
 // =================================================================================================
 template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::DispatchPrepareBuffInit()
@@ -225,7 +225,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitSendM
 //   在 UB 中计算部分 mask 后拼写到 workspace 对应偏移，最终合并为完整 mask slot。
 // ======================================================================================
 template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendAndQuantBuffInit()
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendAndQuantBuffInit(uint32_t maskWorkerCount)
 {
     // 输入准备与 DispatchBuffInit 生命期不重叠，可复用同一 UB 地址。
     // 减去通信 scratch、清零和专家 count 区后，按 4R + R/4 字节计算单轮容量。
@@ -234,7 +234,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendAndQu
 
     uint32_t resetTensorSize = InitResetBatch();
     // 每核负责的专家 count 独立保存在 32B 槽中，供 VF 累加、MTE3 搬出。
-    const uint32_t countSlots = Ops::Base::CeilDiv(worldSize_ * moeExpertPerRank_, blockAivNum_);
+    const uint32_t countSlots = Ops::Base::CeilDiv(worldSize_ * moeExpertPerRank_, maskWorkerCount);
     const uint32_t countTensorSize =
         Ops::Base::CeilAlign(countSlots * static_cast<uint32_t>(ALIGN_32), static_cast<uint32_t>(ALIGN_256));
     InitSendMaskRounds(resetTensorSize, countTensorSize);
@@ -416,15 +416,15 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ComputeEx
     CopyExpertMaskCounts(expertRange);
 }
 
-// 固定 channel owner 发送其他计算核准备的完整 [mask | count] 槽，锁继续由 Sync1 释放。
+// 按 job 分配 channel 发送完整 [mask | count] 槽，调用方负责完成等待与锁交接。
 template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendExpertMasks()
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendExpertMasks(const AivJobContext& job)
 {
     const auto& workspace = params_.workspace.layout;
     const auto& buffer = params_.workspace.base;
     const auto& peermem = params_.communication.layout;
     const uint64_t rankMaskBytes = static_cast<uint64_t>(moeExpertPerRank_) * maskSlotSize_;
-    for (uint32_t targetRank = aivCoreIdx_; targetRank < worldSize_; targetRank += blockAivNum_) {
+    for (uint32_t targetRank = job.jobIndex; targetRank < worldSize_; targetRank += job.totalJobs) {
         if (targetRank == rankId_) {
             continue;
         }
@@ -653,7 +653,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::PublishDi
  * 输入每批只搬一次；每段位图完成标量消费及 MTE 发布后，复用同一输出缓冲。
  */
 template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::PrepareDispatchRelayQueues()
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::PrepareDispatchRelayQueues(
+    const AivJobContext& job)
 {
     constexpr uint32_t ROW_ELEMENTS = AscendC::GetVecLen() / sizeof(int32_t);
     constexpr uint32_t ROW_BYTES = ROW_ELEMENTS * sizeof(int32_t);
@@ -673,8 +674,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::PrepareDi
         transposedMasks =
             LocalTensor<uint32_t>(TPosition::VECCALC, ALIGN_512 + 2U * bufferBytes, batchTokens * ROW_ELEMENTS);
     }
-    // 全部物理 AIV 处理互不重叠的 token 区间。
-    const auto tokenRange = GetBalancedWorkRange(m_, {.jobIndex = aivCoreIdx_, .totalJobs = blockAivNum_});
+    // 调用方指定参与核，处理互不重叠的 token 区间。
+    const auto tokenRange = GetBalancedWorkRange(m_, job);
     if (combineServerDedup) {
         BuildDispatchRelayQueues<true>(topkIds, masks, transposedMasks, tokenRange, batchTokens);
     } else {
@@ -744,8 +745,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::BuildDisp
     PipeWait<PIPE_S, PIPE_V>(static_cast<event_t>(SYNC_EVENT_ID2));
     if constexpr (CombineServerDedup) {
         PipeWait<PIPE_MTE3, PIPE_V>(static_cast<event_t>(SYNC_EVENT_ID2));
-        // 上面的 Wait 只阻塞 V；Scalar 返回前仍需确认全部 GM ready 发布完成。
-        PipeFence<PIPE_MTE3, PIPE_S, SYNC_EVENT_ID2>();
+        // 通信消费前的写回完成由调用方的全 AIV 会合保证。
     }
 }
 
@@ -1506,89 +1506,6 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReceiveDi
     PrepareDispatchReceive();
     ReceiveDispatchServerPhase<true>(range);
     ReceiveDispatchServerPhase<false>(range);
-}
-
-template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline auto MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitSharedExpertInputBuffers()
-    -> QuantProcessScratch<ActivationType>
-{
-    uint32_t xInAddr = ALIGN_512;
-    uint32_t xInSize = Ops::Base::CeilAlign(k_, static_cast<uint32_t>(ALIGN_128)) * sizeof(bfloat16_t);
-    __ubuf__ bfloat16_t* xInBuf0 = reinterpret_cast<__ubuf__ bfloat16_t*>(xInAddr);
-    __ubuf__ bfloat16_t* xInBuf1 = reinterpret_cast<__ubuf__ bfloat16_t*>(xInAddr + xInSize);
-    uint32_t mxTempAddr = xInAddr + xInSize * 2;
-    __ubuf__ uint16_t* mxTempBuf = reinterpret_cast<__ubuf__ uint16_t*>(mxTempAddr);
-    uint32_t xOutAddr = mxTempAddr + MX_QUANT_TEMP_UB_BYTES;
-    uint32_t xOutSize =
-        Ops::Base::CeilAlign(mxQuantTokenAlignBytes_ + mxQuantScaleAlignBytes_, static_cast<uint32_t>(ALIGN_32));
-    __ubuf__ ActivationType* xOutBuf0 = reinterpret_cast<__ubuf__ ActivationType*>(xOutAddr);
-    __ubuf__ ActivationType* xOutBuf1 = reinterpret_cast<__ubuf__ ActivationType*>(xOutAddr + xOutSize);
-    QuantProcessScratch<ActivationType> scratch{};
-    scratch.xInTensor0 = xInBuf0;
-    scratch.xInTensor1 = xInBuf1;
-    scratch.xOutTensor0 = xOutBuf0;
-    scratch.xOutTensor1 = xOutBuf1;
-    scratch.mxTempTensor = mxTempBuf;
-    return scratch;
-}
-
-// ===============================================================
-// SharedExpertCopyInput：从原始 bf16 输入量化后写入共享专家专用缓冲区
-//   源: aGmAddr [bs × h] bf16（layered URMA 模式下 quantTokenScale 区域未分配，需直接从原始输入量化）
-//   目标: sharedExpertInputDataPtr [bs × h] fp8 连续, sharedExpertInputScalePtr [bs × scaleN] 连续
-//   AIV 执行，在 AIC GMM1 开始前调用
-// ===============================================================
-template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SharedExpertCopyInput()
-{
-    const auto& workspace = params_.workspace.layout;
-    const auto& buffer = params_.workspace.base;
-    int32_t currentNum;
-    int32_t currentOffset;
-    TilingByCore(m_, currentNum, currentOffset, 1);
-
-    int64_t widthA = k_ / A_ELEMS_PER_BYTE;
-    int64_t widthAScale =
-        Ops::Base::CeilDiv(static_cast<int64_t>(k_), static_cast<int64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
-
-    auto scratch = InitSharedExpertInputBuffers();
-    __gm__ bfloat16_t* inputGm = nullptr;
-    __gm__ ActivationType* dataOutputGm = nullptr;
-    __gm__ QuantScaleOutType* scaleOutputGm = nullptr;
-    dataOutputGm = workspace.shared.gmm1Input.data.template get_ptr<ActivationType>(buffer);
-    scaleOutputGm = workspace.shared.gmm1Input.scale.template get_ptr<QuantScaleOutType>(buffer);
-
-    PipeNotify<PIPE_MTE3, PIPE_MTE2>(EVENT_ID0);
-    PipeNotify<PIPE_MTE3, PIPE_MTE2>(EVENT_ID1);
-    for (int32_t index = 0; index < currentNum; index++) {
-        int32_t tokenIdx = currentOffset + index;
-        auto event = (index % DOUBLE_BUFFER == 0) ? EVENT_ID0 : EVENT_ID1;
-        auto xInBuf = (index % DOUBLE_BUFFER == 0) ? scratch.xInTensor0 : scratch.xInTensor1;
-        auto xOutBuf = (index % DOUBLE_BUFFER == 0) ? scratch.xOutTensor0 : scratch.xOutTensor1;
-
-        inputGm = reinterpret_cast<__gm__ bfloat16_t*>(params_.aGmAddr +
-                                                       static_cast<uint64_t>(tokenIdx) * k_ * sizeof(bfloat16_t));
-        PipeWait<PIPE_MTE3, PIPE_MTE2>(event);
-        CopyGmToUb(xInBuf, inputGm, static_cast<uint16_t>(k_ * sizeof(bfloat16_t)),
-                   GmLoadCacheMode::NORMAL_FIRST_VICTIM, true);
-        PipeNotify<PIPE_MTE2, PIPE_V>(event);
-        PipeWait<PIPE_MTE2, PIPE_V>(event);
-
-        QuantizeTokenInUb(xInBuf, xOutBuf, scratch.mxTempTensor);
-
-        PipeNotify<PIPE_V, PIPE_MTE3>(event);
-        PipeWait<PIPE_V, PIPE_MTE3>(event);
-        __ubuf__ QuantScaleOutType* bufScale =
-            reinterpret_cast<__ubuf__ QuantScaleOutType*>((xOutBuf + (mxQuantTokenAlignBytes_)));
-        CopyUbToGm((dataOutputGm + (tokenIdx * widthA)), xOutBuf,
-                   static_cast<uint16_t>(widthA * sizeof(ActivationType)));
-        CopyUbToGm((scaleOutputGm + (tokenIdx * widthAScale)), bufScale,
-                   static_cast<uint16_t>(widthAScale * sizeof(QuantScaleOutType)));
-        PipeNotify<PIPE_MTE3, PIPE_MTE2>(event);
-    }
-    PipeWait<PIPE_MTE3, PIPE_MTE2>(EVENT_ID0);
-    PipeWait<PIPE_MTE3, PIPE_MTE2>(EVENT_ID1);
-    PipeBarrier<PIPE_ALL>();
 }
 
 } // namespace MegaMoeImpl

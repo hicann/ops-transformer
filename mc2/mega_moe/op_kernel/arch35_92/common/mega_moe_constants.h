@@ -25,6 +25,8 @@ constexpr uint32_t MTE_COUNT_SLOT_BYTES = 512U;
 constexpr uint8_t ALL_AICORE_SYNC_MODE = 0;
 // mode 4：同一 AI Core 内 AIC 与单个 AIV 的同步，支持双向通知。
 constexpr uint8_t AIC_SINGLE_AIV_SYNC_MODE = 4;
+// Layered 全部 mask/count 已写回；与 token 量化完成及通用全 AIV 会合分开计数。
+constexpr uint16_t EXPERT_MASK_READY_FLAG = 7;
 // token 数据就绪事件编号：count 发送前等待全部 AIV 完成 token 数据及 scale 写回。
 constexpr uint16_t TOKEN_DATA_READY_FLAG = 8;
 // count 表读取完成事件编号：count 表清零前等待所有读取结束。

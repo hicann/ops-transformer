@@ -174,8 +174,16 @@ TEST(MegaMoeWorkspace, SharedGmm1InputKeepsTopologyStorageContract)
     EXPECT_EQ(mte.shared.gmm1Input.scale.offsetBytes, -1);
     p.topoType = TOPO_TYPE_URMA;
     WorkspaceLayout urma(p);
-    EXPECT_GT(urma.shared.gmm1Input.data.sizeBytes, 0);
-    EXPECT_GT(urma.shared.gmm1Input.scale.sizeBytes, 0);
+    EXPECT_EQ(urma.shared.gmm1Input.data.offsetBytes, -1);
+    EXPECT_EQ(urma.shared.gmm1Input.scale.offsetBytes, -1);
+    p.topoType = TOPO_TYPE_URMA_ROCE;
+    WorkspaceLayout ubx(p);
+    EXPECT_EQ(ubx.shared.gmm1Input.data.offsetBytes, -1);
+    EXPECT_EQ(ubx.shared.gmm1Input.scale.offsetBytes, -1);
+    // 本次仅调整 Arch35 Layered，Arch92 的连续输入布局保留。
+    WorkspaceLayout arch92(p, WorkspaceLayout::Arch92{GMM_MODE_A8W8_ND, GMM_MODE_A8W8_ND});
+    EXPECT_GT(arch92.shared.gmm1Input.data.sizeBytes, 0);
+    EXPECT_GT(arch92.shared.gmm1Input.scale.sizeBytes, 0);
     p.topoType = TOPO_TYPE_MTE;
     p.sharedInputIndependent = false;
     EXPECT_EQ(WorkspaceLayout(p).shared.gmm1Input.data.offsetBytes, -1);

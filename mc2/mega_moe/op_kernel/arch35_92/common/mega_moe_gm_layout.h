@@ -662,7 +662,10 @@ private:
         }
         if (params.sharedExpertNum > 0) {
             InitializeSharedExpertGmmOutputs(params);
-            InitializeUrmaSharedExpertInput(params);
+            // Arch35 Layered 直接读取本卡交织量化记录；保留 Arch92 的原布局。
+            if (arch == Architecture::Arch92) {
+                InitializeUrmaSharedExpertInput(params);
+            }
             InitializeSharedExpertActivationBuffers(params);
         }
     }
@@ -909,7 +912,7 @@ private:
 
     HOST_DEVICE constexpr void InitializeUrmaSharedExpertInput(const CclComputeLayoutParams& params)
     {
-        // URMA layered kernel 仍使用连续 data/scale，两块地址契约保持不变。
+        // 保留 Arch92 的连续 data/scale 输入布局。
         Allocate(shared.gmm1Input.data,
                  MemoryLayoutDetail::CeilAlign(SIZE_INT_8 * params.bs * params.h, MemoryLayoutDetail::ALIGN_512));
         Allocate(shared.gmm1Input.scale,
