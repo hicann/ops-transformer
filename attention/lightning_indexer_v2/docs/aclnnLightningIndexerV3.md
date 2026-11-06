@@ -3,7 +3,7 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR&950DT系列产品</term>：不支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
 - <term>Atlas A3系列产品</term>：支持
@@ -460,6 +460,7 @@ aclnnStatus aclnnLightningIndexerV3(
 
 <!-- npu="A3,910b" id7 -->
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
+  - 支持本接口，且支持开启candidate（两级TopK候选源）模式。
   - topk取值范围当前仅支持[1, 2048]，以及3072、4096、5120、6144、7168、8192。
   - 当前不支持sequsedQOptional、outputIdxOffsetOptional、maxSeqlenQ功能，不建议传入这些参数。
   - 当layoutKOptional为PA_BBND时，必须传入sequsedKOptional；当layoutK为BSND或TND时，sequsedKOptional可选传入。
@@ -467,6 +468,7 @@ aclnnStatus aclnnLightningIndexerV3(
 <!-- end id7 -->
 <!-- npu="950" id8 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
+  - 支持本接口；candidate关闭（candidateTopkBlocks传入-1）时，接口行为与aclnnLightningIndexerV2一致。
   - 两级TopK候选源（source）模式在本系列产品上暂不支持开启：candidateTopkBlocks传入非-1时会被host侧tiling校验拒绝并返回错误。
 <!-- end id8 -->
 
