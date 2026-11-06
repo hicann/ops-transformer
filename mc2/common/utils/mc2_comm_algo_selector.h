@@ -82,9 +82,15 @@ uint64_t CalcCommDataBytes(const char* opName, uint64_t factorA, uint64_t factor
 
 class Mc2CommAlgoSelector {
 public:
+    // 表项匹配选择通信算法名（纯匹配，不查组网）：topo标志字由调用方先调GetTopoFlags单次查询获取后传入；
+    // 组网未知（相应标志未置）时具体表项不命中，由兜底表项承接回退默认算法
     static std::string SelectAlgoName(const std::string& opName, const char* group, uint8_t commEngine,
                                       uint64_t commDataBytes, uint32_t rankSize, const CommAlgoEntry* entries,
-                                      uint32_t entryCount, const std::string& defaultAlgoName);
+                                      uint32_t entryCount, const std::string& defaultAlgoName, uint64_t topoFlags);
+
+    // 一次性装配组网整体信息并拼接组网标志字（单次查询，与SelectAlgoName表匹配同一事实源，供调用方组网判定复用）；
+    // 装配失败返回false，此时topoInfo为默认值、topoFlags相应位不置位（表项不命中，由兜底表项承接回退默认算法）
+    static bool GetTopoFlags(const char* group, Mc2TopoInfo& topoInfo, uint64_t& topoFlags);
 
 private:
     // 一次性装配组网整体信息(Mc2TopoInfo)，装配失败返回false，调用方按维度未知处理

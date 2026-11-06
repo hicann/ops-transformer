@@ -1311,3 +1311,130 @@ TEST_F(TestAclnnAlltoAllMatmulV2, casesParams)
         }
     }
 }
+
+// 960dt(ascend960dt/DAV_9201) commMode合法域为{ai_cpu, ccu}(门禁1放开, 对齐950双模),
+// 独立fixture mock DAV_9201平台
+class TestAclnnAlltoAllMatmulV2A6 : public testing::Test {
+protected:
+    static void SetUpTestCase()
+    {
+        op::SetPlatformNpuArch(Ops::Base::DAV_9201);
+        cout << "TestAclnnAlltoAllMatmulV2A6 SetUp" << endl;
+    }
+
+    static void TearDownTestCase()
+    {
+        op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
+        cout << "TestAclnnAlltoAllMatmulV2A6 TearDown" << endl;
+    }
+};
+
+// 960dt commMode门禁用例: ccu通过 / ai_cpu回归 / 缺省按ai_cpu回归 / aiv等非法值拒绝(161002)
+static AlltoAllMatmulV2AclnnTestParam casesParamsV2A6[] = {
+    // 1. ccu正向(原被门禁1拒绝"A6 has no CCU engine", 现已放开): fp16 + bias fp16 + alltoallout产出
+    {"AclnnAlltoAllMatmulV2-a6-ccu-01",
+     2,
+     {256, 64},
+     {128, 256},
+     {256},
+     {128, 256},
+     {128, 128},
+     ACL_FLOAT16,
+     ACL_FLOAT16,
+     ACL_FLOAT16,
+     ACL_FLOAT16,
+     ACL_FLOAT16,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     {-2, -1},
+     "ut_test_allto_all_matmul",
+     "ccu",
+     false,
+     false,
+     ACLNN_SUCCESS},
+    // 2. ai_cpu默认回归: 合法值行为不变
+    {"AclnnAlltoAllMatmulV2-a6-aicpu-01",
+     2,
+     {256, 64},
+     {128, 256},
+     {256},
+     {128, 256},
+     {128, 128},
+     ACL_FLOAT16,
+     ACL_FLOAT16,
+     ACL_FLOAT16,
+     ACL_FLOAT16,
+     ACL_FLOAT16,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     {-2, -1},
+     "ut_test_allto_all_matmul",
+     "ai_cpu",
+     false,
+     false,
+     ACLNN_SUCCESS},
+    // 3. 缺省回归(aclnn接口commMode为必传字符串, GE IR属性缺省为"ai_cpu", 以"ai_cpu"表达默认行为;
+    //    bias/alltoallout均空, 覆盖全可选输入缺省分支)
+    {"AclnnAlltoAllMatmulV2-a6-default-01",
+     2,
+     {256, 64},
+     {128, 256},
+     {},
+     {128, 256},
+     {},
+     ACL_FLOAT16,
+     ACL_FLOAT16,
+     ACL_DT_UNDEFINED,
+     ACL_FLOAT16,
+     ACL_DT_UNDEFINED,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     {-2, -1},
+     "ut_test_allto_all_matmul",
+     "ai_cpu",
+     false,
+     false,
+     ACLNN_SUCCESS},
+    // 4. aiv为960dt平台非法值, 拒绝(161002, expected为"ccu" or "ai_cpu")
+    {"error-AclnnAlltoAllMatmulV2-a6-wrong-commMode-aiv-01",
+     2,
+     {256, 64},
+     {128, 256},
+     {256},
+     {128, 256},
+     {128, 128},
+     ACL_FLOAT16,
+     ACL_FLOAT16,
+     ACL_FLOAT16,
+     ACL_FLOAT16,
+     ACL_FLOAT16,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     {-2, -1},
+     "ut_test_allto_all_matmul",
+     "aiv",
+     false,
+     false,
+     ACLNN_ERR_PARAM_INVALID}};
+
+TEST_F(TestAclnnAlltoAllMatmulV2A6, casesParams)
+{
+    if (std::size(casesParamsV2A6) != 0) {
+        uint64_t numCases = sizeof(casesParamsV2A6) / sizeof(casesParamsV2A6[0]);
+        for (size_t idx = 0; idx < numCases; idx += 1) {
+            TestV2OneParamCase(casesParamsV2A6[idx]);
+        }
+    }
+}

@@ -78,16 +78,6 @@ ge::graphStatus MatmulAlltoAllTilingUtil::GetAndConvertCommMode(const gert::Tili
     if (strncmp(commModeStr, "ai_cpu", maxLength) == 0) {
         commMode = mc2tiling::A5_AICPU_TS_ENGINE;
     } else if (strncmp(commModeStr, "ccu", maxLength) == 0) {
-        auto platformInfo = context->GetPlatformInfo();
-        if (platformInfo != nullptr) {
-            platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
-            if (ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_9201) {
-                // A6(ascend960dt)无CCU引擎，显式ccu直接报错(默认ai_cpu不受影响)
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "comm_mode", commModeStr,
-                                                      "A6 has no CCU engine, only 'ai_cpu' is supported");
-                return ge::GRAPH_FAILED;
-            }
-        }
         commMode = mc2tiling::A5_CCU_ENGINE;
     } else {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "comm_mode", commModeStr,

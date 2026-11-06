@@ -234,7 +234,8 @@ aclnnStatus CheckAndHandleCommMode(const char* opName, const char* group, const 
     (void)group;
     const size_t maxLength = 7UL;
     // 获取通信引擎参数
-    if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+    if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510 ||
+        GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201) {
         if (strncmp(commModeStr, "ai_cpu", maxLength) == 0) {
             commModeEnum = Mc2Comm::COMM_MODE_AICPU;
         } else if (strncmp(commModeStr, "ccu", maxLength) == 0) {
@@ -243,14 +244,6 @@ aclnnStatus CheckAndHandleCommMode(const char* opName, const char* group, const 
             OP_LOGE_FOR_INVALID_VALUE(opName, "commMode", commModeStr, "\"ccu\" or \"ai_cpu\"");
             return ACLNN_ERR_PARAM_INVALID;
         }
-        OP_LOGD("The commMode is [%s].", commModeStr);
-    } else if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_9201) {
-        // A6(ascend960dt)无CCU引擎, 通信模式仅支持ai_cpu
-        if (strncmp(commModeStr, "ai_cpu", maxLength) != 0) {
-            OP_LOGE_FOR_INVALID_VALUE(opName, "commMode", commModeStr, "\"ai_cpu\" (A6 has no CCU engine)");
-            return ACLNN_ERR_PARAM_INVALID;
-        }
-        commModeEnum = Mc2Comm::COMM_MODE_AICPU;
         OP_LOGD("The commMode is [%s].", commModeStr);
     } else if (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910_93) {
         if (strncmp(commModeStr, "ai_cpu", maxLength) != 0) {

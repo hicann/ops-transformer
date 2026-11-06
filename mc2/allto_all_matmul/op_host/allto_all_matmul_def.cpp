@@ -267,7 +267,6 @@ public:
             .ExtendCfgInfo("opFile.value", "allto_all_matmul_apt");
         this->AICore().AddConfig("ascend960dt", aicoreConfig_960dt);
         this->MC2().HcclGroup("group");
-        this->MC2().HcclServerType(HcclServerType::AICPU, "ascend960dt");
 #endif // ENABLE_AAMM_DT_HIFLOAT4
 
         // ascend910_93 AI处理器定义OpAICoreConfig变量，定制化配置参数

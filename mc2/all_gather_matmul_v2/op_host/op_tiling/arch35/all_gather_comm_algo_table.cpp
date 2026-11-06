@@ -99,7 +99,11 @@ std::string SelectAllGatherAlgoName(const std::string& opName, const std::string
             commDataBytes, tileM, kValue, dtypeSize, rankDim, static_cast<uint32_t>(commEngine));
     uint32_t algoCount = 0;
     const Mc2Hcom::CommAlgoEntry* algoEntries = GetAllGatherCommAlgoTable(algoCount);
+    // 组网事实单次查询后传入(SelectAlgoName纯匹配不自查)
+    Mc2Hcom::Mc2TopoInfo topoInfo;
+    uint64_t topoFlags = Mc2Hcom::TOPO_FLAG_NONE;
+    Mc2Hcom::Mc2CommAlgoSelector::GetTopoFlags(group.c_str(), topoInfo, topoFlags);
     return Mc2Hcom::Mc2CommAlgoSelector::SelectAlgoName(opName, group.c_str(), commEngine, commDataBytes, rankDim,
-                                                        algoEntries, algoCount, ALLGATHER_DEFAULT_ALGO_NAME);
+                                                        algoEntries, algoCount, ALLGATHER_DEFAULT_ALGO_NAME, topoFlags);
 }
 } // namespace Mc2Tiling

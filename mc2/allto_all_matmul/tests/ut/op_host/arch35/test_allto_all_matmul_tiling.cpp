@@ -13,6 +13,7 @@
 #include "../allto_all_matmul_host_ut_param.h"
 #include "tiling_case_executor.h"
 #include "mc2_hcom_topology_mocker.h"
+#include "mc2_hcom_topo_info.h"
 
 static std::string GetCsvPath(const char* file)
 {
@@ -29,6 +30,19 @@ static const std::string OP_NAME = "AlltoAllMatmul";
 
 struct AlltoAllMatmulCompileInfo {
 } compileInfo;
+
+// 960dt(a6)+CCU 白名单正向 mock 模板: 单层纯 fullmesh 1D 主路径(六键显式设置, 不隐式依赖 mocker 默认值;
+// mocker 默认为单层 Mesh+CLOS 混联, 是 960dt CCU 拦截面, 正向用例不 mock 会被默认拦截)
+static void SetFullmesh1DMainPathMock(uint64_t userRankSize)
+{
+    auto& mocker = Mc2Hcom::MC2HcomTopologyMocker::GetInstance();
+    mocker.SetValue("l0InstTypeSet", 1ULL << COMM_TOPO_1DMESH);  // 实例类型位图恰为 1DMESH 单位
+    mocker.SetValue("l0CoverTypeSet", 1ULL << COMM_TOPO_1DMESH); // 覆盖类型位图恰为 1DMESH 单位
+    mocker.SetValue("level0Topo", static_cast<uint64_t>(Mc2Hcom::Mc2Level0Topo::MESH_1D)); // 日志辅助字段
+    mocker.SetValue("topoLevelNums", 1U);                                                  // 单层组网
+    mocker.SetValue("getTopoInfoRet", static_cast<uint64_t>(HCCL_SUCCESS));                // 组网查询成功
+    mocker.SetValue("userRankSize", userRankSize);                                         // 防御面正常态(<=16)
+}
 
 class AlltoAllMatmulArch35TilingTest : public testing::TestWithParam<AlltoAllMatmulTilingUtParam> {
 protected:
@@ -82,8 +96,44 @@ TEST_P(AlltoAllMatmulArch35TilingTest, param)
          (param.x1QuantMode == 8 && param.x2QuantMode == 8))) { // MX与HiF4量化均需mock通信域rank数
         Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValue("rankNum", static_cast<uint64_t>(param.worldSize));
     }
+    // 960dt+CCU 组网白名单 mock 路由: 正向用例显式 mock 单层纯 fullmesh 1D 主路径; 四类拦截面负向
+    // 按用例名逐类构造(meshclos 为 mocker 默认形态零设置)
+    if (param.soc == "9201" && param.commMode == "ccu" && param.expectResult == ge::GRAPH_SUCCESS) {
+        SetFullmesh1DMainPathMock(8U);
+    } else if (param.soc == "9201" && param.commMode == "ccu" &&
+               param.case_name.find("_clos_blocked") != std::string::npos) { // 拦截面：纯CLOS
+        auto& mocker = Mc2Hcom::MC2HcomTopologyMocker::GetInstance();
+        mocker.SetValue("l0InstTypeSet", 1ULL << COMM_TOPO_CLOS);
+        mocker.SetValue("l0CoverTypeSet", 1ULL << COMM_TOPO_CLOS);
+        mocker.SetValue("level0Topo", static_cast<uint64_t>(Mc2Hcom::Mc2Level0Topo::CLOS));
+    } else if (param.soc == "9201" && param.commMode == "ccu" &&
+               param.case_name.find("_multilevel_blocked") != std::string::npos) { // 拦截面：跨机多层
+        SetFullmesh1DMainPathMock(8U);
+        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValue("topoLevelNums", 2U);
+    } else if (param.soc == "9201" && param.commMode == "ccu" &&
+               param.case_name.find("_queryfail_blocked") != std::string::npos) { // 拦截面：组网查询失败
+        SetFullmesh1DMainPathMock(8U);
+        Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValue("getTopoInfoRet", static_cast<uint64_t>(HCCL_E_PARA));
+    } else if (param.soc == "9201" && param.commMode == "ccu" &&
+               param.case_name.find("_ranksize_blocked") != std::string::npos) { // 防御面：超rank上限（>16）
+        SetFullmesh1DMainPathMock(32U);
+    } else if (param.soc == "9201" && param.commMode == "ai_cpu" &&
+               param.case_name.find("fullmesh_mock") != std::string::npos) {
+        // 默认回归: AICPU 在白名单组网下行为一致（白名单函数引擎前置过滤零干预）
+        SetFullmesh1DMainPathMock(8U);
+    }
     ExecuteTestCase(tilingContextPara, param.expectResult, param.expectTilingKey, param.expectTilingData,
                     param.expectWorkspaces, param.mc2TilingDataReservedLen);
+    // 960dt+ccu 白名单正向: 断言生效算法名被强制为 sole[mesh](经 Mc2CcTilingConfigBuilder 写入
+    // tilingData 的 mc2CcTiling.algConfig, 覆盖算法表兜底 legacy 默认名)
+    if (param.soc == "9201" && param.commMode == "ccu" && param.expectResult == ge::GRAPH_SUCCESS) {
+        TilingInfo tilingInfo;
+        ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
+        const std::string rawTiling(reinterpret_cast<const char*>(tilingInfo.tilingData.get()),
+                                    tilingInfo.tilingDataSize);
+        EXPECT_NE(rawTiling.find("sole[mesh]"), std::string::npos)
+            << "960dt+ccu effective algoName (mc2CcTiling.algConfig) should be forced to sole[mesh]";
+    }
 }
 
 INSTANTIATE_TEST_SUITE_P(AlltoAllMatmulTilingUT, AlltoAllMatmulArch35TilingTest,

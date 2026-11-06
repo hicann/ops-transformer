@@ -213,7 +213,10 @@ ge::graphStatus AllToAllFpMatmulTilingBase::SetHcclTiling()
     hcclServerType_ = hcclServerEngine;
     std::string algoName = Mc2Tiling::SelectAllToAllAlgoName(
         opName_, contextInfo_.group, hcclServerEngine, inferredInfo_.tileM, contextInfo_.args_.kValue,
-        contextInfo_.args_.inputDtypeSize, contextInfo_.args_.rankDim);
+        contextInfo_.args_.inputDtypeSize, contextInfo_.args_.rankDim, npuArch_);
+    OP_TILING_CHECK(algoName.empty(),
+                    OP_LOGE_WITHOUT_REPORT(opName_, "SelectAllToAllAlgoName failed, empty algo name returned."),
+                    return ge::GRAPH_FAILED);
 
     Mc2CcTilingConfigBuilder allToAllBuilder =
         Mc2CcTilingConfigBuilder::create(contextInfo_.group, mc2tiling::AicpuComType::HCCL_CMD_ALLTOALL, algoName);

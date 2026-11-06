@@ -663,7 +663,7 @@ aclnnStatus aclnnQuantMatmulAlltoAllBase(void* workspace, uint64_t workspaceSize
             uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
             uint8_t commMode = static_cast<uint8_t>(handleVal);
 
-            if (commMode == Mc2Comm::COMM_MODE_CCU && GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+            if (commMode == Mc2Comm::COMM_MODE_CCU) {
                 OP_LOGD("QuantMatmulAlltoAll: use CCU mode");
                 NnopbaseSetHcclServerType(executor, NnopbaseHcclServerType::NNOPBASE_HCCL_SERVER_TYPE_CCU);
             } else {

@@ -5647,3 +5647,135 @@ TEST_F(test_aclnn_allto_all_quant_matmul_v2, MXQuant_v2_cases_params)
         }
     }
 }
+
+// 960dt(ascend960dt/DAV_9201) commMode合法域为{ai_cpu, ccu}(门禁1放开, 对齐950双模),
+// 独立fixture mock DAV_9201平台; 两个V2接口共用commMode校验链路, 同步生效
+class TestAclnnAlltoAllQuantMatmulV2A6 : public testing::Test {
+protected:
+    static void SetUpTestCase()
+    {
+        op::SetPlatformNpuArch(Ops::Base::DAV_9201);
+        cout << "TestAclnnAlltoAllQuantMatmulV2A6 SetUp" << endl;
+    }
+
+    static void TearDownTestCase()
+    {
+        op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
+        cout << "TestAclnnAlltoAllQuantMatmulV2A6 TearDown" << endl;
+    }
+};
+
+// 960dt commMode门禁用例(KC动态量化代表组合): ccu通过 / ai_cpu回归 / aiv拒绝(161002)
+static AlltoAllQuantMatmulV2AclnnTestParam KCDynQuant_v2_cases_params_a6[] = {
+    // 1. ccu正向: bf16/fp8_e4m3fn + bias为fp32 + y输出bf16 + 量化后e4m3 + 无转置 + 有alltoallout
+    {"AAQMMV2_DYNKC_a6_ccu_succ1",
+     2,
+     7,
+     2,
+     {256, 64},
+     {128, 256},
+     {256},
+     {},
+     {256},
+     {128, 256},
+     {128, 128},
+     ACL_BF16,
+     ACL_FLOAT8_E4M3FN,
+     ACL_FLOAT,
+     ACL_BF16,
+     ACL_FLOAT,
+     ACL_BF16,
+     ACL_BF16,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     36,
+     0,
+     {-2, -1},
+     "ut_test_allto_all_quant_matmul",
+     "ccu",
+     false,
+     false,
+     ACLNN_SUCCESS},
+    // 2. ai_cpu默认回归: 合法值行为不变
+    {"AAQMMV2_DYNKC_a6_aicpu_succ2",
+     2,
+     7,
+     2,
+     {256, 64},
+     {128, 256},
+     {256},
+     {},
+     {256},
+     {128, 256},
+     {128, 128},
+     ACL_BF16,
+     ACL_FLOAT8_E4M3FN,
+     ACL_FLOAT,
+     ACL_BF16,
+     ACL_FLOAT,
+     ACL_BF16,
+     ACL_BF16,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     36,
+     0,
+     {-2, -1},
+     "ut_test_allto_all_quant_matmul",
+     "ai_cpu",
+     false,
+     false,
+     ACLNN_SUCCESS},
+    // 3. aiv为960dt平台非法值, 拒绝(161002, expected为"ccu" or "ai_cpu")
+    {"error-AAQMMV2_DYNKC_a6_wrong_commMode_aiv",
+     2,
+     7,
+     2,
+     {256, 64},
+     {128, 256},
+     {256},
+     {},
+     {256},
+     {128, 256},
+     {128, 128},
+     ACL_BF16,
+     ACL_FLOAT8_E4M3FN,
+     ACL_FLOAT,
+     ACL_BF16,
+     ACL_FLOAT,
+     ACL_BF16,
+     ACL_BF16,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     ACL_FORMAT_ND,
+     36,
+     0,
+     {-2, -1},
+     "ut_test_allto_all_quant_matmul",
+     "aiv",
+     false,
+     false,
+     ACLNN_ERR_PARAM_INVALID}};
+
+TEST_F(TestAclnnAlltoAllQuantMatmulV2A6, KCDynQuant_v2_cases_params_a6)
+{
+    if (std::size(KCDynQuant_v2_cases_params_a6) != 0) {
+        uint64_t numCases = sizeof(KCDynQuant_v2_cases_params_a6) / sizeof(KCDynQuant_v2_cases_params_a6[0]);
+        for (size_t idx = 0; idx < numCases; idx += 1) {
+            TestQuantV2OneParamCase(KCDynQuant_v2_cases_params_a6[idx]);
+        }
+    }
+}

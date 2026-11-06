@@ -77,9 +77,25 @@ uint64_t Mc2CommAlgoSelector::CalcTopoFlags(const Mc2TopoInfo& topoInfo)
     return flags;
 }
 
+bool Mc2CommAlgoSelector::GetTopoFlags(const char* group, Mc2TopoInfo& topoInfo, uint64_t& topoFlags)
+{
+    const bool topoValid = GetTopoInfo(group, topoInfo);
+    topoFlags = CalcTopoFlags(topoInfo);
+    if (group != nullptr) {
+        OP_LOGI("",
+                "[GetTopoFlags] group=%s, topoValid=%d, topoFlags=0x%llx, level0Topo=%u, levelNum(cover)=%u, "
+                "level0RankSize=%u, userRankSize=%u",
+                group, static_cast<int>(topoValid), static_cast<unsigned long long>(topoFlags),
+                static_cast<uint32_t>(topoInfo.level0Topo), topoInfo.topoLevelNums, topoInfo.level0RankSize,
+                topoInfo.userRankSize);
+    }
+    return topoValid;
+}
+
 std::string Mc2CommAlgoSelector::SelectAlgoName(const std::string& opName, const char* group, uint8_t commEngine,
                                                 uint64_t commDataBytes, uint32_t rankSize, const CommAlgoEntry* entries,
-                                                uint32_t entryCount, const std::string& defaultAlgoName)
+                                                uint32_t entryCount, const std::string& defaultAlgoName,
+                                                uint64_t topoFlags)
 {
     if (group == nullptr || entries == nullptr || entryCount == 0) {
         OP_LOGW(opName.c_str(), "[CommAlgoSelector] invalid input, fallback to default: %s", defaultAlgoName.c_str());
@@ -92,17 +108,12 @@ std::string Mc2CommAlgoSelector::SelectAlgoName(const std::string& opName, const
                 MAX_COMM_ALGO_CANDIDATES);
         n = MAX_COMM_ALGO_CANDIDATES;
     }
-    // 一次性装配组网整体信息，拼出组网标志字匹配量；
-    // 装配失败时相应标志不置位，具体表项不命中、由兜底表项承接回退默认算法
-    Mc2TopoInfo topoInfo;
-    const bool topoValid = GetTopoInfo(group, topoInfo);
-    const uint64_t topoFlags = CalcTopoFlags(topoInfo);
+    // topo标志字由调用方先经GetTopoFlags单次查询后传入（组网事实日志随GetTopoFlags打印），此处仅消费；
+    // 组网未知（标志未置）时具体表项不命中，由兜底表项承接回退默认算法
     OP_LOGI(opName.c_str(),
-            "[CommAlgoSelector] group=%s, topoValid=%d, topoFlags=0x%llx, level0Topo=%u, levelNum(cover)=%u, "
-            "level0RankSize=%u, userRankSize=%u, commEngine=%u, commDataBytes=%llu, rankSize=%u, entries=%u",
-            group, static_cast<int>(topoValid), static_cast<unsigned long long>(topoFlags),
-            static_cast<uint32_t>(topoInfo.level0Topo), topoInfo.topoLevelNums, topoInfo.level0RankSize,
-            topoInfo.userRankSize, commEngine, static_cast<unsigned long long>(commDataBytes), rankSize, n);
+            "[CommAlgoSelector] topoFlags=0x%llx, commEngine=%u, commDataBytes=%llu, rankSize=%u, entries=%u",
+            static_cast<unsigned long long>(topoFlags), commEngine, static_cast<unsigned long long>(commDataBytes),
+            rankSize, n);
 
     const CommAlgoEntry* buf[2][MAX_COMM_ALGO_CANDIDATES];
     uint32_t cnt[2] = {n, 0};

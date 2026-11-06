@@ -243,8 +243,6 @@ public:
             .ExtendCfgInfo("opFile.value", "matmul_allto_all_apt");
         #ifdef ENABLE_MQFA_DT_HIFLOAT4
         this->AICore().AddConfig("ascend960dt", aicoreConfig_960dt);
-        // A6(ascend960dt)无CCU引擎, 通信服务器类型固定为AICPU
-        this->MC2().HcclServerType(HcclServerType::AICPU, "ascend960dt");
         #endif // ENABLE_MQFA_DT_HIFLOAT4
 
         // ascend910_93 AI处理器定义OpAICoreConfig变量，定制化配置参数

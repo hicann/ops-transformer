@@ -758,7 +758,10 @@ ge::graphStatus MxQuantMatmulAllToAllTilingBase::SetHcclTiling()
     }
     std::string algoName = Mc2Tiling::SelectAllToAllAlgoName(
         opName_, contextInfo.group, engineType, inferredInfo.tileM, contextInfo.args_.nValue,
-        contextInfo.args_.outputDtypeSize, contextInfo.args_.rankDim);
+        contextInfo.args_.outputDtypeSize, contextInfo.args_.rankDim, npuArch_);
+    OP_TILING_CHECK(algoName.empty(),
+                    OP_LOGE_WITHOUT_REPORT(opName_, "SelectAllToAllAlgoName failed, empty algo name returned."),
+                    return ge::GRAPH_FAILED);
 
     Mc2CcTilingConfigBuilder matmulAllToAllBuilder =
         Mc2CcTilingConfigBuilder::create(contextInfo.group, mc2tiling::AicpuComType::HCCL_CMD_ALLTOALL, algoName);
