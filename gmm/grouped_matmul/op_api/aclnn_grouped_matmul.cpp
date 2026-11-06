@@ -64,11 +64,11 @@ extern "C" {
 #endif
 
 namespace {
-// 判断是否为DAV_3510系列(含DAV_9201、DAV_9202兼容版本)，用于非量化场景复用arch35实现
+// 判断是否为DAV_3510系列(含V121/DAV_9201兼容版本)，用于非量化场景复用arch35实现
 static inline bool IsNpuArch3510Series()
 {
     auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
-    return npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202;
+    return npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_9201;
 }
 
 static constexpr int64_t X_Y_SEPARATED = 0L; // x,y no split
@@ -953,7 +953,7 @@ static aclnnStatus CheckNonQuantMatmulDataType(const gmm::GroupedMatmulParams& g
                                                const char* opName)
 {
     DataType biasDtype = gmmParams.xDtype == DataType::DT_BF16 ? DataType::DT_FLOAT : gmmParams.xDtype;
-    // DAV_3510系列支持bf16的bias
+    // DAV_3510系列(含V121)支持bf16的bias
     if (IsNpuArch3510Series()) {
         if (gmmParams.biasOptional != nullptr) {
             biasDtype = (*gmmParams.biasOptional)[0]->GetDataType();

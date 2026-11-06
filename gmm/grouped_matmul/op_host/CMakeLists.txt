@@ -32,13 +32,6 @@ if (BUILD_OPEN_PROJECT)
             OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
         )
     endif()
-    if("ascend960pr" IN_LIST ASCEND_COMPUTE_UNIT)
-        add_ops_compile_options(
-            OP_NAME GroupedMatmul
-            COMPUTE_UNIT Ascend960PR_969A1
-            OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
-        )
-    endif()
     if("ascend350" IN_LIST ASCEND_COMPUTE_UNIT)
         add_ops_compile_options(
             OP_NAME GroupedMatmul
@@ -61,14 +54,6 @@ if("ascend960dt" IN_LIST ASCEND_COMPUTE_UNIT)
     add_ops_compile_options(
         OP_NAME GroupedMatmul
         COMPUTE_UNIT Ascend960DT_968B7
-        OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
-    )
-endif()
-if("ascend960pr" IN_LIST ASCEND_COMPUTE_UNIT)
-    set(grouped_matmul_depends gmm/common CACHE INTERNAL "Dependencies for grouped_matmul")
-    add_ops_compile_options(
-        OP_NAME GroupedMatmul
-        COMPUTE_UNIT Ascend960PR_969A1
         OPTIONS -DENABLE_CV_COMM_VIA_SSBUF=true
     )
 endif()

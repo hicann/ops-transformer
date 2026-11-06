@@ -2437,8 +2437,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingGMM(gert::TilingContext* context)
     ge::DataType weightDtype = w0Desc->GetDataType();
     auto compileInfoPtr = context->GetCompileInfo<GMMCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfoPtr);
-    if (compileInfoPtr->npuArch == NpuArch::DAV_3510 || compileInfoPtr->npuArch == NpuArch::DAV_9201 ||
-        compileInfoPtr->npuArch == NpuArch::DAV_9202) {
+    if (compileInfoPtr->npuArch == NpuArch::DAV_3510 || compileInfoPtr->npuArch == NpuArch::DAV_9201) {
         const bool isS8S4PseudoQuant = IsS8S4PseudoQuant(context, xDType, weightDtype);
         // 全量化：双8bits或双4bits(不会有A4W2)
         bool isQuant =
@@ -2520,7 +2519,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForGMM(gert::TilingParseContext* c
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, compileInfoPtr->l2Size);
 
     OP_CHECK_IF((compileInfoPtr->npuArch != NpuArch::DAV_3510 && compileInfoPtr->npuArch != NpuArch::DAV_9201 &&
-                 compileInfoPtr->npuArch != NpuArch::DAV_9202 && compileInfoPtr->aivNum == 0),
+                 compileInfoPtr->aivNum == 0),
                 OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
                                             "platform info is invalid, aicNum=%u, aivNum=%u, ubSize=%lu, l1Size=%lu, "
                                             "l0CSize=%lu, l0ASize=%lu, l0BSize=%lu",
