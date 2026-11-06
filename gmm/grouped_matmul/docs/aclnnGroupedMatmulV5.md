@@ -7,8 +7,6 @@ abbr {
 }
 </style>
 
-[查看源码](https://atomgit.com/cann/ops-transformer/tree/master/gmm/grouped_matmul)
-
 ---
 
 ## 产品支持情况
@@ -788,7 +786,7 @@ aclnnGroupedMatmulV5默认确定性实现。
   - offset不为空时
     - scale为pergroup与perchannel离线融合后的结果，shape要求为 $[E, 1, N]$
     - 该场景下offsetOptional不为空。非对称量化offsetOptional为计算过程中离线计算辅助结果，即 $antiquantOffset \times scale$，shape要求为 $[E, 1, N]$，dtype为FLOAT32
-  - tuningConfigOptional数组第二个元素可置1，以使能A8W4场景(仅支持perchannel)中weight的特殊格式模板，以优化算子性能(性能优势的shape范围参考：K >= 2048 && N >= 2048)。需要说明的是，该模板要求weight的shape为（E，N，K）,然后再对其进行ND2NZ转换后作为算子输入
+  - tuningConfigOptional数组第二个元素可置1，以开启A8W4场景(仅支持perchannel)中weight的特殊格式模板，以优化算子性能(性能优势的shape范围参考：K >= 2048 && N >= 2048)。需要说明的是，该模板要求weight的shape为（E，N，K）,然后再对其进行ND2NZ转换后作为算子输入
 
 </details>
 

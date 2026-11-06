@@ -1,7 +1,5 @@
 # aclnnMoeDistributeCombineV2
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/mc2/moe_distribute_combine_v2)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -463,7 +461,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
     <!-- end id8 -->
     <!-- npu="950" id9 -->
     - <term>Ascend 950DT系列产品</term>：
-        - `expertScales`可选择是否使能专家权重功能；`expertScales`传形状为(BS, K)的有效Tensor时使能并进行加权，传空Tensor时不使能并直接对专家输出求和。
+        - `expertScales`可选择是否开启专家权重功能；`expertScales`传形状为(BS, K)的有效Tensor时开启并进行加权，传空Tensor时不开启并直接对专家输出求和。
         - `commAlg`当前版本不支持，传空指针即可。
         - `epSendCounts`的shape为(epWorldSize \* max(tpWorldSize, 1) \* localExpertNum, )。
         - `tpSendCountsOptional`当前版本不支持，传空指针即可。
@@ -591,8 +589,8 @@ aclnnStatus aclnnMoeDistributeCombineV2(
   | 变量         | 定义与取值范围                                                                 |
   | :----------- | :----------------------------------------------------------------------------- |
   | A            | 本卡需分发的最大token数，取值范围如下: <ul><li>对于共享专家，要满足<code>A = BS \* epWorldSize \* sharedExpertNum / sharedExpertRankNum</code>。</li><li>对于MoE专家，当globalBs为0时，要满足<code>A >= BS \* epWorldSize \* min(localExpertNum, K)</code>；当globalBs非0时，要满足<code>A >= globalBs \* min(localExpertNum, K)</code>。</li></ul>|
-  | H            |表示hidden size隐藏层大小:<ul><li> <term>Atlas A2系列产品</term>：(0, 10240]且为32的整数倍。</li><li><term>Atlas A3系列产品</term>、Ascend 950DT系列产品：[1024, 8192]。 </li></ul>|
-  | BS           | 表示batch sequence size（本卡最终输出的token数量）:<ul><li> <term>Atlas A2系列产品</term>：依commAlg取值，"fullmesh"支持(0, 256]；"hierarchy"并且驱动版本≥25.0.RC1.1时支持(0, 512]；</li><li><term>Atlas A3系列产品</term>、Ascend 950DT系列产品：0 < BS ≤512。</li></ul> |
+  | H            |表示hidden size隐藏层大小:<ul><li> <term>Atlas A2系列产品</term>：(0, 10240]且为32的整数倍。</li><li><term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：[1024, 8192]。 </li></ul>|
+  | BS           | 表示batch sequence size（本卡最终输出的token数量）:<ul><li> <term>Atlas A2系列产品</term>：依commAlg取值，"fullmesh"支持(0, 256]；"hierarchy"并且驱动版本≥25.0.RC1.1时支持(0, 512]；</li><li><term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：0 < BS ≤512。</li></ul> |
   | K            |表示选取topK个专家，取值范围为(0 < K ≤ 16)且满足(0 < K ≤ moeExpertNum)。 |
   | serverNum    | 服务器节点数:<br><term>Atlas A2系列产品</term>：仅该场景的shape使用了该变量，仅支持2、4、8。
   | localExpertNum | 本卡专家数：<ul><li>对于共享专家卡，localExpertNum = 1；</li><li>对于MoE专家卡，localExpertNum = <code>moeExpertNum/(epWorldSize-sharedExpertRankNum)</code>，localExpertNum > 1时不支持TP通信。 </li><li><term>Atlas A3系列产品</term>  、<term>Ascend 950DT系列产品</term>：应满足0 < localExpertNum * epWorldSize ≤ 2048。</li></ul>|
@@ -622,7 +620,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
     - <term>Atlas A2系列产品</term>：该环境变量不再推荐使用，建议通过`commAlg`配置为"hierarchy"。
     <!-- end id14 -->
     <!-- npu="950,A3" id15 -->
-    - <term>Atlas A3系列产品</term>、Ascend 950DT系列产品：不支持该环境变量。
+    - <term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：不支持该环境变量。
 
     <!-- end id15 -->
 

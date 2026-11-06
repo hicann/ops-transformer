@@ -119,7 +119,7 @@
   </tr>
   <tr>
     <td>sparse_attn_sharedkv_metadata</td>
-    <td><a href="./sparse_attn_sharedkv_metadata/README.md">文档</td>
+    <td><a href="./sparse_attn_sharedkv_metadata/README.md"文档</td>
     <td>√</td>
     <td>√</td>
     <td>√</td>
@@ -232,14 +232,18 @@
 
     # 如要使用 k2q_csr（q2k → k2q CSR）：
     # bash build.sh --pkg --experimental --soc=ascend950 --ops=minimax_build_k2q_csr
+
     ```
-    - --soc：\$\{soc\_version\}表示NPU型号。Atlas A2系列产品使用"ascend910b"，Atlas A3系列产品使用"ascend910_93"。
+
+    - --soc：\$\{soc\_version\}表示NPU型号。<term>Atlas A2系列产品</term>使用"ascend910b"，<term>Atlas A3系列产品</term>使用"ascend910_93"。
     - --ops：自定义算子名称，多个自定义算子通过`,`分割。
 
     若提示如下信息，说明编译成功。
+
     ```bash
     Self-extractable archive "cann-ops-transformer-custom_linux.${arch}.run" successfully created.
     ```
+
     编译成功后，run包存放于项目根目录的build_out目录下。
 
 2. 安装自定义算子包
@@ -264,6 +268,7 @@
 torch_ops_extension包为自定义算子提供了torch.ops的拓展接口，具体编译安装方法请见[torch_ops_extension安装方法](https://atomgit.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85)。
 
 ## 自定义算子执行
+
 项目中各算子通过pytest验证各算子的功能是否正常，各算子的pytest调用方法如下表。
 <table><thead>
   <tr>

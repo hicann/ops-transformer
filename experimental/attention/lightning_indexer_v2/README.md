@@ -20,6 +20,7 @@
   ```text
   sparseIndices/sparseValues = Top-k{ (W @ [1]_{1×Sk}) ⊙ ReLU(Q_index @ K^T_index) }
   ```
+
   逐 token 在压缩后 K 上计算相关性×权重，取前 k 大；无效槽位填 -1/-inf。
 
 - 主要计算过程为：

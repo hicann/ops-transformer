@@ -1,7 +1,5 @@
 # aclnnMsaIndexScore
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/msa_index_score)
-
 ## 产品支持情况
 
 <!-- npu="910b" id1 -->
@@ -60,7 +58,7 @@
 
 ## 函数原型
 
-每个算子分为[两段式接口](https://atomgit.com/cann/ops-transformer/blob/master/docs/zh/context/two_phase_api.md)，必须先调用 `aclnnMsaIndexScoreGetWorkspaceSize` 接口获取入参并计算所需 workspace 大小，再调用 `aclnnMsaIndexScore` 接口执行计算。
+每个算子分为[两段式接口](https://atomgit.com/cann/ops-transformer/blob/9.3.0-beta.1/docs/zh/context/two_phase_api.md)，必须先调用 `aclnnMsaIndexScoreGetWorkspaceSize` 接口获取入参并计算所需 workspace 大小，再调用 `aclnnMsaIndexScore` 接口执行计算。
 
 ```cpp
 aclnnStatus aclnnMsaIndexScoreGetWorkspaceSize(
@@ -372,7 +370,6 @@ aclnnStatus aclnnMsaIndexScore(
 - PageAttention `blockTable` 第二维可以大于实际 KV 逻辑 block 数；score 末维为 $\mathrm{RoundUp}(width, 16)$。Ascend 950 C2UB 路径对超过 256 列的末维按 256 列滑窗 flush，并补写后续 $-inf$。
 - 精度自验证矩阵：40 条 fp16/bf16/int8（含 PA key dim0 stride、宽 `blockTable`、短 decode、q4-kv275）+ 10 条 FP8。950 通过标准末行 `[PASS]: 50/50 cases passed`。A2/A3 跳过 FP8，期望 40/40（skipped 10）。容差 fp16/bf16/int8 为 $1\mathrm{e}{-3}$，FP8 为 $2\mathrm{e}{-2}$。
 - Ascend 950 核实现位于 `op_kernel/arch35/`：当前与 A2 共用 8-page S workspace（非量化 fp16 / int8 fp32）；Cube 原生三种 FP8。`--run_example` 默认 soc 为 910b，950 必须显式 `--soc=ascend950`。
-
 
 ## 调用示例
 

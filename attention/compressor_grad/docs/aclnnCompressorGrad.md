@@ -62,6 +62,7 @@
         $$
         dW^{KV} = dNewKv^T @ X,~ dW^{Gate} = dNewScore^T @ X
         $$
+
 ## 函数原型
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnCompressorGradGetWorkspaceSize”接口获取入参并根据流程计算所需workspace大小，再调用“aclnnCompressorGrad”接口执行计算。

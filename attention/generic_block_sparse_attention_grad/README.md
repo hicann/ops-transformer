@@ -201,14 +201,14 @@ $$
   <tr>
     <td class="tg-0pky">winLeft</td>
     <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">滑窗向前包含token数，不使能时须为-1。</td>
+    <td class="tg-0pky">滑窗向前包含token数，不开启时须为-1。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>
   <tr>
     <td class="tg-0pky">winRight</td>
     <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">滑窗向后包含token数，不使能时须为-1。</td>
+    <td class="tg-0pky">滑窗向后包含token数，不开启时须为-1。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>
@@ -260,7 +260,7 @@ $$
 * layoutSparsePattern当前仅支持1；residualBlockMode当前仅支持0；
 * maskType当前仅支持1。
 * softmaxPrecision当前仅支持0；
-* winLeft/winRight不使能时必须为-1；attenMaskOptional当前应传nullptr。
+* winLeft/winRight不开启时必须为-1；attenMaskOptional当前应传nullptr。
 * 默认为非确定性实现，暂不支持确定性实现。
 
 ## 调用说明

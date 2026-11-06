@@ -146,6 +146,7 @@ cann_ops_transformer.sparse_flash_attention(
 - 当前只支持 query_rope 和 key_rope 传入，不支持 rope 为空。
 
 ## 确定性计算
+
 - 默认支持确定性计算
 
 ## 调用示例

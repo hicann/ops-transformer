@@ -41,6 +41,7 @@
   $$
   permutedTokensGradOut[sortedIndices[i]] = ((unpermutedTokensGrad.unsqueeze(1) * probs.unsqueeze(-1)).reshape(-1, hiddenSize))[i]
   $$
+
 - probsOptional为None：
 
   $$

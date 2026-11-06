@@ -1,7 +1,5 @@
 # aclnnMlaPrologV4WeightNz
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/mla_prolog_v3)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -800,12 +798,12 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
       </tr>
   </table>
 
-<!-- npu="A3,910b" id4 -->
+<!-- npu="A3,910b" id9 -->
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - tokenX、weightDq、weightUqQr、weightDkvKr、kvCacheRef、queryOut、queryNormOutOptional不支持FLOAT8_E4M3FN、HIFLOAT8数据类型。
   - dequantScaleXOptional、dequantScaleWDqOptional、dequantScaleWUqQrOptional、dequantScaleWDkvKrOptional、dequantScaleQNormOutOptional不支持FLOAT8_E8M0数据类型。
+<!-- end id9 -->
 
-<!-- end id4 -->
 - **返回值**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。

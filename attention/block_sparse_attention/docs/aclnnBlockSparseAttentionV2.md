@@ -48,7 +48,7 @@
   - kvInputLayout: "TND" "BNSD" "BSND"
 
 <!-- npu="950" id7 -->
-- **FP8特性说明（仅<term>Ascend 950PR&950DT系列产品</term>支持）**：
+- **FP8特性说明（仅Ascend 950PR&950DT系列产品支持）**：
 
   本算子新增支持FP8数据类型的输入，以提供计算效率并降低显存占用。当使用FP8输入时，需要提供相应的量化缩放因子用于反量化计算。
 
@@ -445,7 +445,7 @@ aclnnStatus aclnnBlockSparseAttentionV2(
     <tr>
       <td>softmaxLseFlag（int64_t）</td>
       <td>输入</td>
-      <td>是否使能softmaxLse输出的标志位。</td>
+      <td>是否开启softmaxLse输出的标志位。</td>
       <td>
         当前只支持传0或1。
         <ul>

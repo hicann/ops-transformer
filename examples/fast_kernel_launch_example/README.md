@@ -30,7 +30,7 @@
 3. 构建Wheel包 | Build the Wheel:
 
     ```sh
-    # NPU_SOC_VERSION设置编译款型, Atlas A2系列产品使用"ascend910b"（默认），Atlas A3系列产品使用"ascend910_93"，Ascend 950PR&950DT系列产品使用"ascend950"
+    # NPU_SOC_VERSION设置编译款型, <term>Atlas A2系列产品</term>使用"ascend910b"（默认），<term>Atlas A3系列产品</term>使用"ascend910_93"，<term>Ascend 950PR&950DT系列产品</term>使用"ascend950"
     export NPU_SOC_VERSION=ascend910b
     # -n: non-isolated build (uses existing environment)
     python3 -m build --wheel -n

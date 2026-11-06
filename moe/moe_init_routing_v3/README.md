@@ -313,7 +313,7 @@
     - expertNum<=1024
     - expertEnd-expertStart<=128
     - quantMode为-1或0
-    - NUM_ROWS * H * x.dtype >= 1.5 * totalUbSize
+    - NUM_ROWS \* H \* x.dtype >= 1.5 * totalUbSize
     - NUM_ROWS * K >= 8192
     - dropPadMode=1（DropPad场景）时还需NUM_ROWS>=512
     - UB空间满足该模板各缓冲区叠加后的需求

@@ -724,7 +724,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
     - layoutKvOptional为PA_BBND时，优先通过sequsedCmpKvOptional中的元素获取seqlen，sequsedCmpKvOptional未传入则通过cmpTopkLengthOptional获取seqlen。
 <!-- end id12 -->
 <!-- npu="A3" id13 -->
-- Atlas A3系列产品约束：
+- <term>Atlas A3系列产品</term>约束：
   - SWA稀疏oriKvOptional场景下，仅支持SWA模板，`hasOriKv`为true、`hasCmpKv`为false、`oriTopk`大于0、`oriMaskMode`为0，`oriWinLeft`和`oriWinRight`为非负数，且必须传入`oriTopkLengthOptional`。`oriTopk`应与配套主算子oriSparseIndicesOptional最后一维K保持一致；`oriTopkLengthOptional`表示每个q token和KV head的左对齐有效索引条目数，取值应在[0, K]范围内；Metadata仅使用`oriTopkLengthOptional`生成任务切分。配套主算子在PA_BBND场景仍要求传入`sequsedOriKvOptional`。
   - layoutQOptional为TND时，`cuSeqlensQOptional`必须传入。
   - layoutKvOptional为PA_BBND时，`sequsedOriKvOptional`必须传入。BSND场景可选传入`sequsedOriKvOptional`覆盖每个batch的oriKvOptional有效长度；TND场景使用`cuSeqlensOriKvOptional`表达oriKvOptional序列边界。
@@ -733,7 +733,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
   - `cmpResidualKvOptional`为`aclnnSparseFlashMlaMetadata`和`aclnnSparseFlashMla`的可选输入，在CSA、HCA、cmpRatio不等于1且cmpMaskMode为3场景必传，用于恢复cmp侧mask使用的压缩前长度。
 <!-- end id13 -->
 <!-- npu="910b" id14 -->
-- Atlas A2系列产品约束：
+- <term>Atlas A2系列产品</term>约束：
   - SWA稀疏oriKvOptional场景下，仅支持SWA模板，`hasOriKv`为true、`hasCmpKv`为false、`oriTopk`大于0、`oriMaskMode`为0，`oriWinLeft`和`oriWinRight`为非负数，且必须传入`oriTopkLengthOptional`。`oriTopk`应与配套主算子oriSparseIndicesOptional最后一维K保持一致；`oriTopkLengthOptional`表示每个q token和KV head的左对齐有效索引条目数，取值应在[0, K]范围内；Metadata仅使用`oriTopkLengthOptional`生成任务切分。配套主算子在PA_BBND场景仍要求传入`sequsedOriKvOptional`。
   - layoutQOptional为TND时，`cuSeqlensQOptional`必须传入。
   - layoutKvOptional为PA_BBND时，`sequsedOriKvOptional`必须传入。BSND场景可选传入`sequsedOriKvOptional`覆盖每个batch的oriKvOptional有效长度；TND场景使用`cuSeqlensOriKvOptional`表达oriKvOptional序列边界。

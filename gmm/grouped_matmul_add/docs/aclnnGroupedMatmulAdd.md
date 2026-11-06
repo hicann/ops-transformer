@@ -1,7 +1,5 @@
 # aclnnGroupedMatmulAdd
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/gmm/grouped_matmul_add)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -285,6 +283,7 @@ aclnnStatus aclnnGroupedMatmulAdd(
 调用示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 <!-- npu="A3,910b" id8 -->
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
+
     ```c++
     #include <iostream>
     #include <vector>
@@ -485,6 +484,7 @@ aclnnStatus aclnnGroupedMatmulAdd(
 
 <!-- npu="950" id9 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
+
     ```c++
     #include <iostream>
     #include <vector>

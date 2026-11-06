@@ -192,6 +192,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 > [!NOTE]
 >
 > 当前仅支持 layout_sparse_pattern = 4。
+>
 ## 参数说明
 
 ### generic_block_sparse_attention_metadata

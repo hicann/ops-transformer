@@ -26,12 +26,12 @@
 - 接口功能：aclnnGenericBlockSparseAttentionGradMetadata根据sparseBlockIdx、sparseBlockCount、seqlen等信息进行稀疏attention的分核与负载均衡，为aclnnGenericBlockSparseAttentionGrad的前置AICPU算子。
 
   <!-- npu="950" id9 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
     按B → N2 → J → G顺序展开`(b, n2, j, g)`任务列表，并在AIC核间做`[baseM, baseN] = [128, 128]`基本块粒度的贪心负载均衡，输出metadata供主Grad算子消费。
   <!-- end id9 -->
 
   <!-- npu="A3,910b" id10 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
     按B → N2 → J顺序展开`(b, n2, j)`任务列表，并在AIC核间做`[baseM, baseN] = [128, 128]`基本块粒度的贪心负载均衡，输出metadata供主Grad算子消费。
    <!-- end id10 -->
 
@@ -39,7 +39,7 @@
 
 - Metadata size计算公式：
   <!-- npu="950" id7 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>:
+  - <term>Ascend 950PR&950DT系列产品</term>:
 
     $$
     \text{metaSize} = 80 + B \times N1 \times J \times 4
@@ -49,7 +49,7 @@
   <!-- end id7 -->
 
   <!-- npu="A3,910b" id8 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> 以及 <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>:
+  - <term>Atlas A3系列产品</term> 以及 <term>Atlas A2系列产品</term>:
 
     $$
     \text{metaSize} = 198
@@ -298,7 +298,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>winLeft</td>
         <td>输入</td>
         <td>滑窗向前包含token数。</td>
-        <td>不使能时必须为-1。</td>
+        <td>不开启时必须为-1。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -308,7 +308,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>winRight</td>
         <td>输入</td>
         <td>滑窗向后包含token数。</td>
-        <td>不使能时必须为-1。</td>
+        <td>不开启时必须为-1。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -462,7 +462,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
 - blockShape：blockShapeX仅支持1, blockShapeY须≥128且为64的倍数；layoutSparsePattern当前仅支持1；maskType当前仅支持1。
 - layoutQ与layoutKv须相同，取值"TND"/"BNSD"/"BSND"；TND布局下cuSeqLengthsQOptional/cuSeqLengthsKvOptional必选。
 - sequsedQOptional/sequsedKvOptional仅在TND时生效；BNSD/BSND须传nullptr，实际序列长度取自maxQSeqlen/maxKvSeqlen（须与Q/K的S维一致）。
-- winLeft和winRight不使能时必须为-1。
+- winLeft和winRight不开启时必须为-1。
 - sparseBlockIdx最后一维maxS1须≥maxQSeqlen；J = ceilDiv(maxKvSeqlen, blockShapeY)须与sparseBlockIdx第3维一致。
 - metadata长度须满足shape[0] ≥ max(80 + B × numQHeads × J × 4, 198)；任务数上界B × numQHeads × J ≤ 1048576。
 

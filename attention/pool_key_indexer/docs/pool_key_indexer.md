@@ -197,6 +197,7 @@ cann_ops_transformer.pool_key_indexer(
   print(f"sparse_indices shape: {sparse_indices.shape}")  # (2, 64, 143)
   print(f"sparse_values shape: {sparse_values.shape}")    # (2, 64, 8)
   ```
+
 - 单算子模式调用（TND + 无掩码 + 退化场景pool_size=1）：
 
   ```python
@@ -239,6 +240,7 @@ cann_ops_transformer.pool_key_indexer(
   print(f"sparse_indices shape: {sparse_indices.shape}")  # (80, 64)
   # return_value=False时sparse_values为空tensor
   ```
+
 - TorchAir（GE图）模式调用：
 
   ```python
@@ -281,6 +283,7 @@ cann_ops_transformer.pool_key_indexer(
   sparse_indices, sparse_values = npu_mode(query, pool_key, weights, pool_tail_k)
   print(f"sparse_indices shape: {sparse_indices.shape}")
   ```
+
 - TorchAir（aclgraph）图模式调用：
 
   ```python

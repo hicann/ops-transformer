@@ -108,6 +108,7 @@
 > Q、K、V数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小batch_size、S（Seq-Length）表示输入样本序列长度、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸headdim。Q_S表示输入q tensor的序列长度，Q_N表示输入q tensor的头数，KV_S表示输入k/v tensor的序列长度，KV_N表示输入k/v tensor的头数。TND排布下Q_T表示所有batch的q序列长度累加和，KV_T表示所有batch的k/v序列长度累加和。
 
 ## 函数原型
+
 调用quant_flash_attn_grad接口之前，请先调用前置接口quant_flash_attn_metadata，完成quant_flash_attn_grad负载均衡的计算。
 
 ```python
@@ -231,6 +232,7 @@ cann_ops_transformer.quant_flash_attn_grad(
 | layout_kv | string | 可选 | 定义输入k/v张量的布局格式，支持"BSND"、"BNSD"、"TND"，默认值为"BSND" | string | - | - | - |
 
 ### quant_mode 枚举
+
 `quant_mode`在Python接口中支持传入`IntEnum`枚举或对应int值，枚举定义于`cann_ops_transformer.ops.quant_flash_attn_grad`
 
 | 枚举名 | 值 | 含义 |
@@ -238,6 +240,7 @@ cann_ops_transformer.quant_flash_attn_grad(
 | `HIF8_PER_TENSOR` | 0 | HIFLOAT8 per-tensor 量化 |
 
 ### mask_mode 枚举
+
 与`mask_mode`在Python接口中支持传入`IntEnum`枚举或对应int值，枚举定义于`cann_ops_transformer.ops.quant_flash_attn_grad`
 
 | 枚举名 | 值 | 含义 |
@@ -967,7 +970,6 @@ mask_mode参数解释
 ## 确定性计算
 
 - 确定性说明：quant_flash_attn_grad默认确定性实现。
-
 
 ## 调用示例
 

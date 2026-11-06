@@ -1,7 +1,5 @@
 # aclnnMlaPrologV3WeightNz
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/mla_prolog_v3)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->

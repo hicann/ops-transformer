@@ -1,7 +1,5 @@
 # aclnnFusedCausalConv1d
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/fused_causal_conv1d)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -651,7 +649,7 @@ aclnnStatus aclnnFusedCausalConv1d(
     - convStates必须是3维[..., K-1, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cacheIndices不等于padSlotId的batch个数）。
     - queryStartLoc必须存在。
     - cacheIndices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cuSeqLen范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
+    - cuSeqLen范围[batch, 1024 \* 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 \* batch, 4G], batch范围[1, 256]。
     - maxNumBlocks >= ceiv(maxQueryLen, blockSize)。
     - maxQueryLen > 8。
   - prefill和decode混合场景：
@@ -660,7 +658,7 @@ aclnnStatus aclnnFusedCausalConv1d(
     - convStates必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cacheIndices不等于padSlotId的batch个数）。
     - queryStartLoc必须存在。
     - cacheIndices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cuSeqLen范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
+    - cuSeqLen范围[batch, 1024 \* 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 \* batch, 4G], batch范围[1, 256]。
     - maxNumBlocks >= ceiv(maxQueryLen, blockSize)。
     - maxQueryLen > 8。
   - decode场景（变长序列）：

@@ -1,7 +1,5 @@
 # aclnnMoeTokenUnpermuteWithEpGrad
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/moe/moe_token_unpermute_with_ep_grad)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -339,7 +337,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEpGrad(
 
 - 有效topK约束：probsOptional传入时有效topK为probsOptional第2维，probsOptional不传入时有效topK为topkNum（默认1），有效topK取值范围为[1, 512]。
 
-- rangeOptional约束：支持nullptr（不生效，全程处理）或长度为2的aclIntArray。传入时支持负值（按tokens_num * topK归一化），会被裁剪到[0, tokens_num * topK]范围内，表示左闭右开区间[start, end)，要求归一化后start <= end，且仅该范围内sortedIndices元素参与写入。
+- rangeOptional约束：支持nullptr（不生效，全程处理）或长度为2的aclIntArray。传入时支持负值（按tokens\_num \* topK归一化），会被裁剪到[0, tokens\_num \* topK]范围内，表示左闭右开区间[start, end)，要求归一化后start <= end，且仅该范围内sortedIndices元素参与写入。
 
 - 空Tensor约束：当tokens_num、hidden_size或有效topK为0时为空Tensor场景。
 

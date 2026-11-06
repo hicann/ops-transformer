@@ -77,7 +77,7 @@
 - 输入shape限制：
     - wkv支持输入shape[coff* D,H]
     - wgate支持输入shape[coff* D,H]
-    - state\_cache支持输入shape[block_num,block_size,2* coff* D]，要求block_num>0，cache_mode=2时，需要满足block_size >= coff * cmp_ratio + S - 1。
+    - state\_cache支持输入shape[block\_num,block\_size,2\* coff\* D]，要求block\_num>0，cache\_mode=2时，需要满足block\_size >= coff \* cmp\_ratio + S - 1。
     - ape支持输入shape[cmp_ratio,coff* D]
     - norm\_weight支持输入shape[D,]
     - start\_pos支持输入shape[B,]
@@ -86,13 +86,13 @@
         - cu\_seqlens输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须为0。
         - seqused，支持输入shape[B,]，要求每个Batch的有效token数小于等于对应Sequence Length长度，即seqused[n] <= cu\_seqlens[n+1] - cu\_seqlens[n]，且不小于0。
         - cache_mode=1时，state\_block\_table支持输入shape[B,ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(start\_pos)+max(cu\_seqlens[n+1] - cu\_seqlens[n])。cache_mode=2时，state\_block\_table支持输入shape[B]。
-        - cmp\_kv，输出shape为[min(T,T//cmp_ratio+B),D]：<batch0>compressed_tokens + <batch1>compressed_tokens + ... + <batchN>compressed_tokens + pad。
+        - cmp\_kv，输出shape为[min(T,T//cmp_ratio+B),D]：\<batch0>compressed_tokens + \<batch1>compressed_tokens + ... + \<batchN>compressed_tokens + pad。
     - 若x的维度不采用BS合轴，即x的输入shape为[B,S,H]
         - rope_sin、rope_cos要求输入shape为[B,ceil(S/cmp_ratio),rope_head_dim]。
         - cu\_seqlens，参数必须为空。
         - seqused，支持输入shape[B,]，要求每个Batch的有效token数小于等于对应Sequence Length长度，即要求seqused[n] <= S，且不小于0。
         - cache_mode=1时，state\_block\_table支持输入shape[B,ceil(Smax/block_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(start\_pos)+S。cache_mode=2时，state\_block\_table支持输入shape[B]。
-        - cmp\_kv，输出shape为[B,ceil(S/cmp_ratio),D]：(<batch0>compressed_tokens+pad0) + (<batch1>compressed_tokens+pad1) + ...  + (<batchN>compressed_tokens+padN)。
+        - cmp\_kv，输出shape为[B,ceil(S/cmp_ratio),D]：(\<batch0>compressed_tokens+pad0) + (\<batch1>compressed_tokens+pad1) + ...  + (\<batchN>compressed_tokens+padN)。
 - 输入值域限制：
   - 该接口支持B、S泛化，且存在如下场景限制：
       - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU内存的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
@@ -142,7 +142,7 @@
   - 支持rotary_mode为2，Rope计算模式为interleave。
   - 该接口支持aclgraph模式。
 
-## Atlas A3推理系列产品 调用说明
+## Atlas A3推理系列产品调用说明
 
 - 单算子模式调用
 
@@ -328,6 +328,7 @@
         )
     )
     ```
+
 - aclgraph调用
 
     ```python

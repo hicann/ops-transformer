@@ -87,7 +87,6 @@ BlockSparseAttentionGrad输入dout、query、key、value, attentionOut的数据�
 * qInputLayout: "TND" "BNSD" "BSND"
 * kvInputLayout: "TND" "BNSD" "BSND"
 
-
 ## 函数原型
 
 每个算子分为[两段式接口](../../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnBlockSparseAttentionGradGetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnBlockSparseAttentionGrad"接口执行计算。
@@ -128,6 +127,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
 ```
 
 ## aclnnBlockSparseAttentionGradGetWorkspaceSize
+
 ## 参数说明
 
 <table style="undefined;table-layout: fixed; width: 1550px">

@@ -11,7 +11,6 @@
 | <term>Atlas推理系列产品</term>                               |    ×     |
 | <term>Atlas训练系列产品</term>                               |    ×     |
 
-
 ## 功能说明
 
 - **算子功能**：将 QKV 三次矩阵乘法融合为一次，通过单次 Matmul 计算 `hidden_states @ weight` 得到融合投影，再拆分为独立的 Q、K、V 输出张量，可选加 bias。

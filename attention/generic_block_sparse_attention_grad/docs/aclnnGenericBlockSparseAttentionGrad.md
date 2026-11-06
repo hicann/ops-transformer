@@ -390,7 +390,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   <td>winLeft</td>
                   <td>输入</td>
                   <td>滑窗attention场景下，滑窗需要向前包含多少个token。</td>
-                  <td>不使能时必须为-1，需要与maskType、mask配合使用。</td>
+                  <td>不开启时必须为-1，需要与maskType、mask配合使用。</td>
                   <td>INT64</td>
                   <td>-</td>
                   <td>-</td>
@@ -400,7 +400,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   <td>winRight</td>
                   <td>输入</td>
                   <td>滑窗attention场景下，滑窗需要向后包含多少个token。</td>
-                  <td>不使能时必须为-1，需要与maskType、mask配合使用。</td>
+                  <td>不开启时必须为-1，需要与maskType、mask配合使用。</td>
                   <td>INT64</td>
                   <td>-</td>
                   <td>-</td>
@@ -576,7 +576,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
 - sequsedQOptional/sequsedKvOptional仅在TND时生效；BNSD/BSND须传nullptr，实际序列长度取自Q/K的S维。
 - HeadDim固定为128；N1/N2取值范围[1, 128]，且N1 > N2，N1 % N2 == 0。
 - blockShape：blockShapeX仅支持1；blockShapeY须≥128且为64的倍数；layoutSparsePattern当前仅支持1；maskType当前仅支持1；softmaxPrecision当前仅支持0。
-- winLeft和winRight不使能时必须为-1；attenMaskOptional当前应传nullptr。
+- winLeft和winRight不开启时必须为-1；attenMaskOptional当前应传nullptr。
 - Softmax LSE的head/seq轴语义须与query布局一致。
 - `sparseBlockIdx`第4维maxS1应≥`sparseBlockCount`中所有元素的最大值。
 

@@ -39,15 +39,15 @@
 
   3. npu_lightning_indexer会单独训练，对应的loss function为：
 
-  $$
-  Loss{=}\sum_tD_{KL}(p_{t,:}||Softmax(I_{t,:}))
-  $$
+    $$
+    Loss{=}\sum_tD_{KL}(p_{t,:}||Softmax(I_{t,:}))
+    $$
 
-  其中，$p_{t,:}$是target distribution，通过对main attention score进行所有的head的求和，然后把求和结果沿着上下文方向进行L1正则化得到。$D_{KL}$为KL散度，其表达式为：
+    其中，$p_{t,:}$是target distribution，通过对main attention score进行所有的head的求和，然后把求和结果沿着上下文方向进行L1正则化得到。$D_{KL}$为KL散度，其表达式为：
 
-  $$
-  D_{KL}(a||b){=}\sum_ia_i\mathrm{log}{\left(\frac{a_i}{b_i}\right)}
-  $$
+    $$
+    D_{KL}(a||b){=}\sum_ia_i\mathrm{log}{\left(\frac{a_i}{b_i}\right)}
+    $$
 
   4. 通过求导可得Loss的梯度表达式：
 

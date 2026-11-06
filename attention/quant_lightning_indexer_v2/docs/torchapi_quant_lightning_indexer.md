@@ -218,11 +218,13 @@ cann_ops_transformer.quant_lightning_indexer(
 ### 基准信息说明
 
 #### 公共参数组
+
 - 入参为空的场景处理：
     - 空Tensor指必选输入和输出的shape size为0，即有任意轴为0。
     - 触发空tensor的用例将全部拦截报错。
 
 - query、key、sparse_indices、sparse_values校验
+
 <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
 <col style="width: 147px">
 <col style="width: 232px">
@@ -306,7 +308,6 @@ cann_ops_transformer.quant_lightning_indexer(
     </tr>
 </tbody>
 </table>
-
 
 layout匹配关系表：
 <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
@@ -509,6 +510,7 @@ mask_mode参数解释
 </table>
 
 #### Paged Attention参数组
+
 当block_table不为空时，开启Paged Attention
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>
@@ -550,6 +552,7 @@ mask_mode参数解释
 </table>
 
 ## 确定性计算
+
 默认支持确定性计算
 
 ## 调用示例

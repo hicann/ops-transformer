@@ -16,7 +16,7 @@
 - 接口功能：进行AllToAllV通信，最后将接收的数据整合。
 
     相较于MoeDistributeCombine算子，该算子变更如下：
-    - 输入了更详细的token信息辅助`MoeDistributeCombineV2`高效地进行全卡同步，因此原算子中shape为(`BS` * `K`,)的`expandIdx`入参替换为shape为(`A` * 128,)的`assistInfoForCombine`参数；
+    - 输入了更详细的token信息辅助`MoeDistributeCombineV2`高效地进行全卡同步，因此原算子中shape为(`BS` \* `K`,)的`expandIdx`入参替换为shape为(`A` \* 128,)的`assistInfoForCombine`参数；
     - 新增`sharedExpertXOptional`入参，支持在`sharedExpertNum`为0时，由用户输入共享专家计算后的token；
     - 新增`commAlg`入参，代替`HCCL_INTRA_PCIE_ENABLE`和`HCCL_INTRA_ROCE_ENABLE`环境变量。
     详细说明请参考以下参数说明。
@@ -327,7 +327,7 @@
     * moeExpertNum取值范围(0, 1024]；当commAlg="hierarchy"场景时，取值范围为(0, 512]。
 
 - <term>Ascend 950DT系列产品</term>：
-    * 可选择是否使能expertScales专家权重功能；`expertScales`传形状为(BS, K)的有效Tensor时使能并进行加权，传空Tensor时不使能并直接对专家输出求和。
+    * 可选择是否开启expertScales专家权重功能；`expertScales`传形状为(BS, K)的有效Tensor时开启并进行加权，传空Tensor时不开启并直接对专家输出求和。
     * 不支持`expandScalesOptional`。
     * 不支持`commAlg`。
     * 仅支持EP域，无TP域，不支持`groupTp`、`tpWorldSize`、`tpRankId`属性，且`tpRecvCounts`输出为无效内容。

@@ -609,7 +609,7 @@ MoeDistributeBuffer.low_latency_dispatch(x, topk_idx, num_experts, *, quant_mode
   <!-- end id8 -->
   <!-- npu="950" id9 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
-    - `topk_weights`可传有效Tensor或None。传有效Tensor时使能topK专家权重功能，有效Tensor为2D Tensor，shape为(BS, K)，且`expand_scales`输出有效；传None时不使能topK专家权重功能，`expand_scales`输出无效。不支持空Tensor。
+    - `topk_weights`可传有效Tensor或None。传有效Tensor时开启topK专家权重功能，有效Tensor为2D Tensor，shape为(BS, K)，且`expand_scales`输出有效；传None时不开启topK专家权重功能，`expand_scales`输出无效。不支持空Tensor。
     - `quant_mode=0`表示非量化场景。当`x`为float16或bfloat16时，`expand_x`可与`x`一致，也可通过`y_dtype`指定为hifloat8，`x_smooth_scale`必须为None；当`x`为hifloat8、float8_e5m2、float8_e4m3fn、float4_e2m1、float4_e1m2时，`x_smooth_scale`必须传有效Tensor，`expand_x`与`x`逻辑类型一致。`x`为hifloat8时，`x_smooth_scale`逻辑类型为float；`x`为float8_e5m2或float8_e4m3fn时，`x_smooth_scale`逻辑类型为float或float8_e8m0；`x`为float4_e2m1或float4_e1m2时，`x_smooth_scale`逻辑类型为float8_e8m0，且H必须为偶数。此时`x_smooth_scale` shape为(BS, dim1)，其中dim1 <= H。
     - `quant_mode=1`表示静态量化场景，`expand_x`支持int8、hifloat8，`x_smooth_scale`必须传有效Tensor。`expand_x`为int8时，`x_smooth_scale`可表示量化系数，shape为(1,)；也可表示每个专家共享的平滑权重，shape为(H,)；也可表示融合了每个专家平滑权重的量化系数，有共享专家时shape为(shared_expert_num + num_experts, H)，无共享专家时shape为(num_experts, H)。`expand_x`为hifloat8时，`x_smooth_scale` shape必须为(1,)。
     - `quant_mode=2`表示pertoken动态量化场景，`expand_x`支持int8、float8_e4m3fn、float8_e5m2，`x_smooth_scale`可传可不传；若传入有效Tensor，其专家维shape规则同`quant_mode=1`，输出`dynamic_scales` shape为(A,)。

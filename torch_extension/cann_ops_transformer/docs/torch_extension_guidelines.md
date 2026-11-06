@@ -95,6 +95,7 @@ ops-transformer/
 - **模块级常量**：全大写蛇形（UPPER_SNAKE_CASE），如`ASCEND_HOME_PATH`、`TORCH_DTYPE_ENUM_VALUE_TO_SCALAR_TYPE_MAP`。
 - **模块内部私有符号**：以单下划线`_`前缀标识，如`_flash_attn_op_builder`、`_flash_attn`。
 - **类型注解**：对外接口与关键内部函数应带类型注解（`from typing import Optional, Tuple, List`），可选参数统一用`Optional[...]`，例如：
+
   ```python
   def flash_attn(
       query: torch.Tensor,
@@ -106,6 +107,7 @@ ops-transformer/
       input_layout: str = "BSH",
   ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
   ```
+
 - **参数命名一致性**：同一算子在schema、meta、dispatcher、对外函数、Converter中的同义参数应使用相同的名字（如`head_num`、`scale_value`、`input_layout`），避免在不同层出现不一致写法。
 
 #### C++ 标识符
@@ -146,11 +148,14 @@ ops-transformer/
 1. 文件头部包含`#include <torch/extension.h>`与`#include "aclnn_common.h"`，实现置于`namespace op_api`。
 2. 函数签名与schema严格对应：必选/可选参数类型按[2.3 C++入参类型约定](#c-标识符)选择。
 3. **入参校验**：使用`TORCH_CHECK(cond, msg...)`校验shape、dtype、维度、取值范围等，错误信息要可读且包含实际值，例如：
+
    ```cpp
    TORCH_CHECK((head_num > 0), "The head_num should be greater than 0, current is: ", head_num);
    TORCH_CHECK((query.scalar_type() == key.scalar_type()), "query and key should have the same dtype.");
    ```
+
 4. **设置DeviceGuard（关键）**：在申请输出张量之前，必须先根据输入张量设置`c10::OptionalDeviceGuard`，把当前NPU设备切到输入张量所在设备，并用`{}`作用域把「DeviceGuard +输出申请」包在一起（否则非默认卡调用时输出张量会落到错误设备，导致device不一致）：
+
    ```cpp
    at::Tensor attention_out{nullptr};
    {
@@ -160,6 +165,7 @@ ops-transformer/
        // ... 其余输出 ...
    }
    ```
+
 5. **输出张量手动申请**：在DeviceGuard生效的作用域内，按meta推导的shape/dtype用`at::empty(...)`申请输出（标准PyTorch实践），dtype通过`query.options().dtype(...)`指定。
 6. **拉起kernel**：使用`ACLNN_CMD(aclnn接口名, 入参..., 出参...)`宏调用aclnn接口（如`ACLNN_CMD(aclnnFlashAttentionScore, ...)`），入参顺序需与aclnn接口定义一致；该宏自动完成类型转换、workspace申请、stream下发与资源释放。
 7. **导出绑定**：通过`PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)`将C++函数绑定为与schema同名的Python接口（`m.def("flash_attn", &flash_attn, "flash_attn");`）。
@@ -205,13 +211,16 @@ ops-transformer/
     - `schema()`：返回算子schema字符串（见[2.3 Schema标识符](#schema-标识符算子签名)）；
     - `register_meta()`：用`@impl(get_as_library(), self.name, "Meta")`注册Meta实现，仅做shape/dtype推导，不触碰真实NPU计算（FakeTensor/图模式必需）。Meta中同样可用`torch._check(...)`做约束校验。
 2. **实例化与编译**：模块加载时实例化builder并调用`_ensure_initialized()`完成延迟初始化，编译由首次`load()`触发：
+
     ```python
     _flash_attn_op_builder = _FlashAttnOpBuilder()
     _flash_attn_op_builder._ensure_initialized()
     ```
+
 3. **PrivateUse1 dispatcher**：用`@impl(get_as_library(), builder.name, "PrivateUse1")`注册NPU后端实现，函数体透传到编译产物`builder.load().<算子名>(...)`。`PrivateUse1`是PyTorch为自定义NPU后端预留的dispatch key。
 4. **对外接口**：提供面向用户的函数`flash_attn(...)`，负责参数整理、默认值处理等，最终调用dispatcher实现。
 5. **对外api必须书写注释（docstring）**：每个对外导出的接口都要有docstring，至少覆盖「功能说明、各参数含义/shape/dtype/取值范围、返回值说明」，必要时给出简短调用示例。docstring内容应与`<category>/<op>/docs/torchapi_${op_api}.md`保持一致，便于IDE提示与`help()`查看。例如：
+
    ```python
    def flash_attn(
        query: torch.Tensor,
@@ -238,6 +247,7 @@ ops-transformer/
                softmax_max、softmax_sum、softmax_out、attention_out。
        """
    ```
+
 6. Meta实现、dispatcher、对外函数三者的参数顺序与默认值必须与schema一致。
 
 ### 3.3 图模式 Converter（`<category>/<op>/torch_extension/graph_convert_${op_api}.py`）
@@ -254,12 +264,14 @@ ops-transformer/
 对外导出分两级，包根已无需手动维护 import 列表：
 
 1. **`<category>/<op>/torch_extension/__init__.py`（算子层）**：每个新增算子的对外接口与Converter都需在`__all__`中声明并显式import导出。导入即触发schema/meta/converter注册：
+
     ```python
     __all__ = ["flash_attn", "convert_flash_attn"]
 
     from .flash_attn import flash_attn
     from .graph_convert_flash_attn import convert_flash_attn
     ```
+
     若算子有额外的辅助导出（如`flash_attn_metadata`、`get_symm_buffer_for_mega_moe`），也一并加入`__all__`和import。
 2. **`ops/__init__.py`（子包层）**：已改造为自动发现模式（目录扫描 + entry point），无需手动添加import。新增算子只要按规范放置文件并定义`__init__.py`的`__all__`，就会被自动加载。
 3. **`cann_ops_transformer/__init__.py`（包根层）**：通过`from . import ops`触发注册，并通过`__getattr__`和`__dir__`动态导出算子接口，使用户可直接通过`cann_ops_transformer.<接口名>`访问。

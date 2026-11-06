@@ -1,7 +1,5 @@
 # aclnnKvCompressEpilog
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/kv_compress_epilog)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->

@@ -1297,7 +1297,7 @@ sym_buffer.update_group(group) -> None
 
 - **通信域约束**：
     - 所有卡的`ep_world_size`参数取值需保持一致。
-    - Atlas A2系列产品、Atlas A3系列产品的通信域缓存区大小应当一致。`ccl_buffer_size` 为 HBM 上分配的 CCL 通信缓冲区**总大小**（Bytes），包含等大小的 **windowIn** 和 **windowOut** 两块空间，校验时以单个空间 `ccl_buffer_size / 2` 为准，需满足：
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>的通信域缓存区大小应当一致。`ccl_buffer_size` 为 HBM 上分配的 CCL 通信缓冲区**总大小**（Bytes），包含等大小的 **windowIn** 和 **windowOut** 两块空间，校验时以单个空间 `ccl_buffer_size / 2` 为准，需满足：
 
         $$ccl\_buffer\_size\ /\ 2 \ge \mathrm{offsetTokenPerExpert} + \mathrm{offsetTensor} + \mathrm{offsetFlag} + 10\,\mathrm{MB}$$
     <!-- npu="910b" id11 -->

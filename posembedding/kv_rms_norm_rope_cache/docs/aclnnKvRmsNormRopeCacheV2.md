@@ -1,7 +1,5 @@
 # aclnnKvRmsNormRopeCacheV2
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/posembedding/kv_rms_norm_rope_cache)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -627,16 +625,16 @@ aclnnStatus aclnnKvRmsNormRopeCacheV2(
     * 当cacheModeOptional为PA_BNSD、PA_NZ、PA_BLK_BNSD、PA_BLK_NZ时，cache中的数据排布方式为：
       * 非量化模式下：kCacheRef 为 [block_num, Dk//16, block_size, 1, 16]；ckvCacheRef 为 [block_num, Dv//16, block_size, 1, 16]。
       * 静态量化模式下：kCacheRef 为 [block_num, Dk//32, block_size, 1, 32]；ckvCacheRef 为 [block_num, Dv//32, block_size, 1, 32]。
-    * 当cacheModeOptional为PA_BNSD、PA_NZ时，shape为1维[Bkv * Skv]，要求index的value值范围为[-1,block_num * block_size)。value数值不能重复。
-    * 当cacheModeOptional为PA_BLK_BNSD、PA_BLK_NZ时，shape为1维[Bkv * ceil_div(Skv,block_size)]，要求index的value的数值范围为[-1,block_num * block_size)。value/block_size的值不能重复。
+    \* 当cacheModeOptional为PA\_BNSD、PA\_NZ时，shape为1维[Bkv \* Skv]，要求index的value值范围为[-1,block\_num \* block\_size)。value数值不能重复。
+    \* 当cacheModeOptional为PA\_BLK\_BNSD、PA\_BLK\_NZ时，shape为1维[Bkv \* ceil\_div(Skv,block\_size)]，要求index的value的数值范围为[-1,block\_num \* block\_size)。value/block\_size的值不能重复。
   * isOutputKv约束：
-    * 作用是输出具体场景的中间处理结果，使能 kRopeOut 和 cKvOut 两项输出。
+    * 作用是输出具体场景的中间处理结果，开启 kRopeOut 和 cKvOut 两项输出。
     * 在cacheModeOptional为PA, PA_BNSD, PA_NZ, PA_BLK_BNSD, PA_BLK_NZ模式时有效。
-    * 在cacheModeOptional为Norm时，仅在V2场景中使能量化模式时有效。
+    * 在cacheModeOptional为Norm时，仅在V2场景中开启量化模式时有效。
 
   * 输入组合约束：
 
-    * 本约束内条目，仅适用于<b>Atlas A3系列产品</b>、<b>Atlas A2系列产品</b>。
+    * 本约束内条目，仅适用于<b><term>Atlas A3系列产品</term></b>、<b><term>Atlas A2系列产品</term></b>。
     * 在所有cacheModeOptional下，必定支持`非广播模式`：即`[B, N, S]`三个维度与`kv`严格一致的`旋转位置编码（RoPE）参数`和`量化参数`。
     * 在各种cacheModeOptional下，支持的合法输入shape模式如下表：
 
@@ -686,7 +684,7 @@ aclnnStatus aclnnKvRmsNormRopeCacheV2(
 
   * vOptional：
     * 该参数仅限aclnnKvRmsNormRopeCacheV2接口，aclnnKvRmsNormRopeCache接口不支持该参数！
-    * 该参数仅限<b>Atlas A3系列产品</b>、<b>Atlas A2系列产品</b>。
+    * 该参数仅限<b><term>Atlas A3系列产品</term></b>、<b><term>Atlas A2系列产品</term></b>。
       * 该参数仅在<b>kv分离场景(V2)</b>中作为必需入参，在其他类型中会作为无效参数被忽略。
       * 当vOptional存在时，它的类型必须与kv一致，`[B, N, S]`维度也必须与kv一致。
 

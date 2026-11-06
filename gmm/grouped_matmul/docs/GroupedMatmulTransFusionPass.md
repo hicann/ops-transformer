@@ -2,12 +2,13 @@
 
 ## 融合模式
 
-### 融合模式一：
+### 融合模式一
+
 将Transpose或TransposeD从图中删除，并将x/weight转置信息添加在算子属性上。如下图所示。
 
 该融合模式支持的产品如下：
 <!-- npu="950" id4 -->
-Ascend 950PR&950DT系列产品
+<term>Ascend 950PR&950DT系列产品</term>
 <!-- end id4 -->
 **场景一**：
 
@@ -18,21 +19,23 @@ Ascend 950PR&950DT系列产品
 ![](../../../docs/zh/figures/GroupedMatmulTransFusionPass_2.png)
 
 <!-- npu="950,A3,910b" id1 -->
-### 融合模式二：
+
+### 融合模式二
+
 将x/weight前的Reshape+Transpose/TransposeD+Reshape从图中删除，并将x/weight转置信息打在算子属性上。如下图所示。
 
 该融合模式支持的产品如下：
 
 <!-- npu="910b" id2 -->
-Atlas A2系列产品
+<term>Atlas A2系列产品</term>
 <!-- end id2 -->
 
 <!-- npu="A3" id3 -->
-Atlas A3系列产品
+<term>Atlas A3系列产品</term>
 <!-- end id3 -->
 
 <!-- npu="950" id4 -->
-Ascend 950PR&950DT系列产品
+<term>Ascend 950PR&950DT系列产品</term>
 <!-- end id4 -->
 
 **场景一**：
@@ -45,28 +48,31 @@ Ascend 950PR&950DT系列产品
 
 <!-- end id1 -->
 <!-- npu="950" id5 -->
-### 融合模式三：
-Ascend 950PR&950DT系列产品的伪量化场景下，将weight/antiquantScale前的Reshape+Transpose/TransposeD+Reshape从图中删除，并将weight转置信息打在算子属性上。如下图所示。
+
+### 融合模式三
+
+<term>Ascend 950PR&950DT系列产品</term>的伪量化场景下，将weight/antiquantScale前的Reshape+Transpose/TransposeD+Reshape从图中删除，并将weight转置信息打在算子属性上。如下图所示。
 
 该融合模式支持的产品如下：
-<!-- npu="950" id4 -->
-Ascend 950PR&950DT系列产品
-<!-- end id4 -->
-
+<!-- npu="950" id6 -->
+<term>Ascend 950PR&950DT系列产品</term>
+<!-- end id6 -->
 ![](../../../docs/zh/figures/GroupedMatmulTransFusionPass_5.png)
 
-### 融合模式四：
-Ascend 950PR&950DT系列产品的MX/GB量化场景下，融合模式是：将Transpose或TransposeD从图中删除，并将x和weight的转置信息打在算子属性上。如下图所示：
+### 融合模式四
+
+<term>Ascend 950PR&950DT系列产品</term>的MX/GB量化场景下，融合模式是：将Transpose或TransposeD从图中删除，并将x和weight的转置信息打在算子属性上。如下图所示：
 
 该融合模式支持的产品如下：
-<!-- npu="950" id4 -->
-Ascend 950PR&950DT系列产品
-<!-- end id4 -->
+
+<!-- npu="950" id7 -->
+<term>Ascend 950PR&950DT系列产品</term>
+<!-- end id7 -->
 
 ![](../../../docs/zh/figures/GroupedMatmulTransFusionPass_6.png)
 
 >[!NOTE]说明
->Ascend 950PR&950DT系列产品的MX/GB量化场景下，scale跟随weight的转置信息，pertokenScale跟随x的转置信息。
+><term>Ascend 950PR&950DT系列产品</term>的MX/GB量化场景下，scale跟随weight的转置信息，pertokenScale跟随x的转置信息。
 <!-- end id5 -->
 
 ## 使用约束

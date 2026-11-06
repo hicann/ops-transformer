@@ -1,7 +1,5 @@
 # aclnnGroupedMatMulAlltoAllv
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/mc2/grouped_mat_mul_allto_allv)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -342,10 +340,10 @@ aclnnStatus aclnnGroupedMatMulAlltoAllv(
 - 通信引擎约束：
 
   <!-- npu="A3" id7 -->
-  - Atlas A3系列产品：支持 AI CPU 通信。
+  - <term>Atlas A3系列产品</term>：支持AI CPU通信。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
-  - Ascend 950DT系列产品：支持 AI CPU 通信。
+  - <term>Ascend 950DT系列产品</term>：支持AI CPU通信。
 
   <!-- end id8 -->
 

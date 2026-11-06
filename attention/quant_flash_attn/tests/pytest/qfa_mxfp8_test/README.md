@@ -229,6 +229,7 @@ python quant_flash_attn_golden.py --mode npu,compare --case-name my_case
 ```
 
 输出说明：
+
 - `[NPU vs Golden]`：NPU 输出 vs FP64 golden 的误差指标
 - `[Benchmark vs Golden]`：FP32 golden vs FP64 golden 的误差指标（量化引入的固有偏差）
 - 判定：NPU 指标不超过 benchmark 的容忍倍率（max_re_rtol=10, avg_re_rtol=2, rmse_rtol=2）→ Pass；

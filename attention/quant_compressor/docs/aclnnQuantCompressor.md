@@ -1,7 +1,5 @@
 # aclnnQuantCompressor
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/quant_compressor)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -436,6 +434,7 @@ aclnnStatus aclnnQuantCompressor(
     aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
 ## 约束说明
+
 - 确定性计算：
   - aclnnQuantCompressor默认确定性实现。
   - batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。

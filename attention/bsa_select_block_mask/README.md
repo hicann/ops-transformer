@@ -149,7 +149,7 @@
 - query张量Shape中head维度大小记为N1，key张量Shape中head维度大小记为N2。必须满足N1 = N2（仅支持MHA）。
 - headDim = 128。
 - block_shape中的blockShapeX和blockShapeY必须为8的倍数。
-- query和key压缩后，query和key对应的Xblocks和Yblocks需满足Xblocks * Yblocks > 1；post_block_shape非null时，BNSD场景进一步要求postXBlocks * postYBlocks > 1（粗粒度网格坍缩为1×1时无TopK选择语义，host侧拒绝；TND变长场景允许）。
+- query和key压缩后，query和key对应的Xblocks和Yblocks需满足Xblocks \* Yblocks > 1；post\_block\_shape非null时，BNSD场景进一步要求postXBlocks \* postYBlocks > 1（粗粒度网格坍缩为1×1时无TopK选择语义，host侧拒绝；TND变长场景允许）。
 - query和key的数据类型必须一致，仅支持FLOAT16和BFLOAT16。
 - block_sparse_mask_out数据类型为INT8（二值：0或1）。
 - post_block_shape为可选输入，传入nullptr时禁用二次pooling（向后兼容）；传入`[postBlockShapeX, postBlockShapeY]`时启用，postBlockShapeX/postBlockShapeY为8的倍数，表示block分组数。

@@ -15,8 +15,6 @@
 
 - 算子功能：将FFN节点上的数据发往Attention节点。
 
-
-
 ## 参数说明
 
 <table style="table-layout: auto; width: 100%">
@@ -161,7 +159,6 @@ $$cclBufferSize \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{recvInfoSi
 
 - 通信域使用约束：
     - FFNToAttentionV2算子的通信域中不允许有其他算子。
-
 
 ## 调用说明
 

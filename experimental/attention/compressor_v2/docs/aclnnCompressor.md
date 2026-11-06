@@ -1,7 +1,5 @@
 # aclnnCompressorV2
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/experimental/attention/compressor_v2)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->

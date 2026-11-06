@@ -56,7 +56,7 @@ V侧流水设计需要考虑Vector内部的搬运及计算过程，实施的优�
 
 - C侧总耗时 > V侧总耗时
 
-  该场景流水特征下，Vector计算节点少，计算速度快，在Atlas A2训练系列产品C:V=1:2的情况下，Cube的搬运时长足以掩盖Vector的计算时长，因此只要关注Cube的MTE2耗时即可，最终达成MTE2 bound。在Cube双发机制下，提前发射两块Cube计算，Cube1、Cube2计算可以衔接，使得Cube利用率最高，达成Cube bound。
+  该场景流水特征下，Vector计算节点少，计算速度快，在<term>Atlas A2训练系列产品</term>C:V=1:2的情况下，Cube的搬运时长足以掩盖Vector的计算时长，因此只要关注Cube的MTE2耗时即可，最终达成MTE2 bound。在Cube双发机制下，提前发射两块Cube计算，Cube1、Cube2计算可以衔接，使得Cube利用率最高，达成Cube bound。
 
 - C侧总耗时 < V侧总耗时
 

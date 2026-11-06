@@ -1,7 +1,5 @@
 # aclnnFfnWorkerBatchingV2
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/ffn/ffn_worker_batching)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->

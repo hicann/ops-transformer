@@ -83,7 +83,7 @@
 
 ## 函数原型
 
-每个算子分为[两段式接口](https://atomgit.com/cann/ops-transformer/blob/master/docs/zh/context/two_phase_api.md)，必须先调用"aclnnBlockSparseAttentionV3GetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnBlockSparseAttentionV3"接口执行计算。
+每个算子分为[两段式接口](https://atomgit.com/cann/ops-transformer/blob/9.3.0-beta.1/docs/zh/context/two_phase_api.md)，必须先调用"aclnnBlockSparseAttentionV3GetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnBlockSparseAttentionV3"接口执行计算。
 
 ```c++
 aclnnStatus aclnnBlockSparseAttentionV3GetWorkspaceSize(
@@ -306,7 +306,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         当配置此输入时：
         <ul>
           <li>当quantMode=1, shape为[batch, headNum, ceilDiv(maxQSeqLength, 128), 1]。</li>
-  		   <li>quantMode=2/3/4, 约束见<a href="#MXFP4量化模式的量化缩放因子">MX量化模式的量化缩放因子。</a></li>
+       <li>quantMode=2/3/4, 约束见<a href="#MXFP4量化模式的量化缩放因子">MX量化模式的量化缩放因子。</a></li>
           <li>当quantMode=5时，必须传入FLOAT32类型的per-tensor反量化缩放因子，shape为[1]，所有batch、head及token共用一个缩放因子。</li>
         </ul>
       </td>
@@ -328,7 +328,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         当配置此输入时：
         <ul>
           <li>当quantMode=1,shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 256), 1]或shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 512), 1]。</li>
-  		 <li>quantMode=2/3/4, 约束见<a href="#MXFP4量化模式的量化缩放因子">MX量化模式的量化缩放因子。</a></li>
+     <li>quantMode=2/3/4, 约束见<a href="#MXFP4量化模式的量化缩放因子">MX量化模式的量化缩放因子。</a></li>
           <li>当quantMode=5时，必须传入FLOAT32类型的per-tensor反量化缩放因子，shape为[1]，所有batch、head及token共用一个缩放因子。</li>
         </ul>
       </td>
@@ -480,7 +480,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
     <tr>
       <td>softmaxLseFlag（int64_t）</td>
       <td>输入</td>
-      <td>是否使能softmaxLse输出的标志位。</td>
+      <td>是否开启softmaxLse输出的标志位。</td>
       <td>
         当前只支持传0或1。
         <ul>
@@ -684,7 +684,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 - actualSeqLengthsOptional与actualSeqLengthsKvOptional当前必须同时配置或同时不配置，仅配置其中之一的行为将被算子拦截。
 - blockTableOptional当前只支持传入nullptr，表示不开启PagedAttention特性。
 <!-- npu="950,A3,910b" id9 -->
-- innerPrecise必须为0或1或4，其中，<term>Ascend 950PR&950DT系列产品</term>在FLOAT16/BFLOAT16输入时支持配置为0或4，FP8/MXFP4/MXFP8量化（quantMode=1/2/3/4）时仅支持4，HIF8量化（quantMode=5）时仅支持0；<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>仅支持配置为0或1。
+- innerPrecise必须为0或1或4，其中，<term>Ascend 950PR&950DT系列产品</term>在FLOAT16/BFLOAT16输入时支持配置为0或4，FP8/MXFP4/MXFP8量化（quantMode=1/2/3/4）时仅支持4，HIF8量化（quantMode=5）时仅支持0；<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>仅支持配置为0或1。
 <!-- end id9 -->
 - softmaxLseFlag仅支持配置0或1，分别表示不开启/开启softmaxLse输出。
 - qSeqlen和kvSeqlen不需要被blockShape整除，支持非对齐场景，实际分块数通过向上取整计算。

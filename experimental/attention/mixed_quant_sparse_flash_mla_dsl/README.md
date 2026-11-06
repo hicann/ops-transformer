@@ -70,7 +70,6 @@ mixed_quant_sparse_flash_mla(
 ) -> tuple[Tensor, Tensor]
 ```
 
-
 ### 维度说明
 
 | 命名 | 含义 |
@@ -114,7 +113,6 @@ mixed_quant_sparse_flash_mla(
 | `layout_q` | string | 可选 | Q布局，当前仅支持`"TND"`，默认值为`"TND"`。 | string | - | - |
 | `layout_kv` | string | 可选 | KV布局，当前仅支持`"PA_BBND"`，默认值为`"PA_BBND"`。 | string | - | - |
 | `return_softmax_lse` | bool | 可选 | 是否计算Softmax的log-sum-exp结果，默认值为`False`；始终返回`softmax_lse` Tensor，关闭时为空Tensor。 | bool | - | - |
-
 
 ### 输出
 
@@ -179,7 +177,6 @@ mixed_quant_sparse_flash_mla_metadata(
 
 query token总数依次由`cu_seqlens_q[-1]`、`seqused_q.sum()`或`batch_size * max_seqlen_q`派生；均未提供时使用`ori_topk_length.shape[0]`。`has_cmp_kv`默认True；`ORI_SPARSE`必须显式传False。该函数按均摊负载模型（每个query的负载视为恒定：`ori_kv` 128个token，`ORI_CMP_SPARSE`模式下再加`cmp_kv` 512个token）用贪心均衡算法切分，返回int32 `(2 * blocks,)`分核任务表（等权重下即近似均分）；返回值**直接落在NPU设备上**，可原样传给算子入口。
 
-
 ### KV 量化与分页布局
 
 每个 token 数据的物理和逻辑顺序均为 `nope[448] + rope[64]`，其后紧接 scale，ori 每连续 32 个元素共享一个 BF16 scale，共 16 个 scale；cmp 每连续 16 个元素共享一个 BF16 scale，共 32 个 scale。输入均为 uint8 字节视图，token 内没有额外 padding。
@@ -214,7 +211,6 @@ byte_offset = physical_page * kv.stride(0) + (p % block_size) * row_bytes
 - `sinks`必须显式传入（不需要sink时传全0张量）；`metadata`必须显式传入（用`mixed_quant_sparse_flash_mla_metadata`生成，两阶段调用）。`metadata`为分核任务表：`int32`且形状为`(2 * blocks,)`；前blocks项是各核的query行起点、后blocks项是各核的query行数量，各核区间必须恰好覆盖`[0, T1)`（无缝、无重叠）。
 - q、ori_kv、cmp_kv、稀疏索引及block table等输入不支持空Tensor（各维度必须大于0）。
 - 各参数shape中使用相同符号的维度必须保持一致。
-
 
 - `sinks` 仅支持 `(64,)`，所有 batch/query 共用。
 - metadata 接口的两个 topk_length 始终必传，即使 has_cmp_kv=False 也需传同形状全零 cmp 长度。attention 省略长度时，调用方须为 metadata 单独准备全 K 长度；不使用的 cmp 侧准备全零长度。
@@ -288,7 +284,6 @@ python3 -m pytest -q -s experimental/attention/mixed_quant_sparse_flash_mla_dsl/
 
 CPU golden 独立执行反量化、稀疏 gather 与注意力计算，使用测试侧契约常量。`kv_axis0_noncontiguous` 控制 KV 页间非连续输入，统一作用于所有活动KV侧，框架固定页间padding为64字节，storage起点为0；活动KV侧默认显式传入topk_length，可用omit_ori_topk_length / omit_cmp_topk_length省略对应attention参数，手动指定长度优先，未指定的侧才按`fullK` / `random`生成全K长度/随机有效前缀。新增用例和形状组合可修改参数集或 Excel 表格。
 
-
 ### Excel 批量用例
 
 Excel 模式复用同一个 `tests/test_mqsmla.py` 入口，每行运行一个独立用例并显示 `Testcase_Name`，继续进行 CPU golden 与已安装 wheel 的 `torch.ops` 精度比较。指定 Excel 后只运行该表格，不追加 Python 参数集；未指定时仍运行 `ENABLED_PARAMS`。
@@ -355,7 +350,6 @@ bash experimental/attention/mixed_quant_sparse_flash_mla_dsl/tests/test_run.sh b
 直接pytest也支持`--data-mode run/save/replay/save-run`与`--pt-dir`；默认run保持原测试行为。save模式仅执行CPU数据准备，replay模式完全以文件为用例来源。
 
 保存/回放验证：两个小用例（ORI_SPARSE连续KV、ORI_CMP_SPARSE非连续KV且开启LSE）保存2/2通过，读取保存文件后的真实NPU精度比较2/2通过。另验证了逐Tensor读写一致、回放不调用生成/golden、原子写失败保留旧文件、损坏/不兼容文件报错、跨目录和空格路径，以及默认36条decode用例收集。未执行完整36条NPU批跑。
-
 
 ## net Native wheel 调用
 

@@ -1,6 +1,7 @@
 # QuantLightningIndexer
 
 ## 产品支持情况
+
 | 产品                                                         | 是否支持 |
 | ------------------------------------------------------------ | :------: |
 |<term>Ascend 950PR&950DT系列产品</term>|      √     |
@@ -12,9 +13,9 @@
 
 ## 功能说明
 
--   API功能：QuantLightningIndexer是推理场景下，稀疏attention前处理的计算，选出关键的稀疏token，并对输入query和key进行量化实现存8算8，获取最大收益。
+- API功能：QuantLightningIndexer是推理场景下，稀疏attention前处理的计算，选出关键的稀疏token，并对输入query和key进行量化实现存8算8，获取最大收益。
 
--   计算公式：
+- 计算公式：
     $$out = \text{Top-}k\left\{[1]_{1\times g}@\left[(W@[1]_{1\times S_{k}})\odot\text{ReLU}\left(\left(Scale_Q@Scale_K^T\right)\odot\left(Q_{index}^{Quant}@{\left(K_{index}^{Quant}\right)}^T\right)\right)\right]\right\}$$
     主要计算过程为：
     1. 将某个token对应的输入参数`query`（$Q_{index}^{Quant}\in\R^{g\times d}$）乘以给定上下文`key`（$K_{index}^{Quant}\in\R^{S_{k}\times d}$），得到相关性。
@@ -22,6 +23,7 @@
     3. 将其与权重系数`weights`（$W$）相乘后，沿g的方向，选取前$Top-k$个索引值得到输出$out$，作为Attention的输入。
 
 ## 参数说明
+
 | 参数名                     | 输入/输出/属性 | 描述  | 数据类型       | 数据格式   |
 |----------------------------|-----------|----------------------------------------------------------------------|----------------|------------|
 | query                     | 输入      | 公式中的$Q_{index}^{Quant}\in\R^{g\times d}，表示输入Index Query$，不支持非连续。 | INT8、FLOAT8_e4m3fn、HIFLOAT8 | ND         |
@@ -41,7 +43,7 @@
 | sparse_mode | 可选属性      | 表示sparse的模式，支持0/3，数据类型支持`int32`。 sparse_mode为0时，代表defaultMask模式。sparse_mode为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景。 | INT32          | -         |
 | pre_tokens    | 可选属性      | 预留参数，表示attention需要和前几个Token计算关联，仅支持默认值2^63-1 | INT64          | -         |
 | next_tokens    | 可选属性      | 预留参数，表示attention需要和前几个Token计算关联，仅支持默认值2^63-1 | INT64          | -         |
-| cmp_ratio      | 可选属性      | 用于稀疏计算，表示key的压缩倍数。数据类型支持`int32`。Atlas A3推理系列产品支持1/2/4/8/16/32/64/128，Ascend 950PR&950DT系列产品支持1/4/128，默认值1。 | INT32          | -         |
+| cmp_ratio      | 可选属性      | 用于稀疏计算，表示key的压缩倍数。数据类型支持`int32`。<term>Atlas A3推理系列产品</term>支持1/2/4/8/16/32/64/128，<term>Ascend 950PR&950DT系列产品</term>支持1/4/128，默认值1。 | INT32          | -         |
 | return_value      |  可选属性     | 表示是否输出`sparse_values`。True表示输出，False表示不输出；仅支持默认值False | BOOL          | -         |
 | sparse_indices     | 输出      | 公式中的输出Out，参与稀疏attention计算的token索引值 | INT32          | ND         |
 | sparse_values           | 输出      | 公式中的Indices输出对应的value值，**目前暂不支持返回sparse_values。** | FLOAT32         | ND          |
@@ -49,21 +51,22 @@
 - <term>Ascend 950PR&950DT系列产品</term>：query、key不支持INT8；weights、query_dequant_scale和key_dequant_scale不支持FLOAT16。
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：query、key不支持FLOAT8_e4m3fn和HIFLOAT8；weights、query_dequant_scale和key_dequant_scale不支持FLOAT32。
 
-
 ## 约束说明
--   该接口支持图模式。
--   该接口要求$W \odot Scale_Q$的结果在`float16`(Atlas A3)/`float32`(Ascend 950PR&950DT系列产品)的表示范围内。
--   该接口的TopK过程对NAN排序是未定义行为。
--   参数query中的D轴和参数key中的D轴值相等为128。
--   参数query和key中的N轴分别仅支持64和1。
--   当`layout_query`为TND时，`actual_seq_lengths_query`必须传入，且以该入参元素的数量作为B值，该入参中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。不能出现负值。
--   当`layout_key`为PA_BSND时，`actual_seq_lengths_key`该入参必须传入。
--   PageAttention场景下，`block_table`必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq(maxBlockNumPerSeq为每个batch中最大`actual_seq_lengths_key`对应的block数量)，支持block_size取值为16的整数倍，最大支持到1024。
--   query、key、weights、query_dequant_scale、key_dequant_scale数据排布格式支持从多种维度解读，其中B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、N（Head Num）表示多头数、D（Head Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
 
-## Atlas A3推理系列产品 调用说明
+- 该接口支持图模式。
+- 该接口要求$W \odot Scale_Q$的结果在`float16`(Atlas A3)/`float32`(Ascend 950PR&950DT系列产品)的表示范围内。
+- 该接口的TopK过程对NAN排序是未定义行为。
+- 参数query中的D轴和参数key中的D轴值相等为128。
+- 参数query和key中的N轴分别仅支持64和1。
+- 当`layout_query`为TND时，`actual_seq_lengths_query`必须传入，且以该入参元素的数量作为B值，该入参中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。不能出现负值。
+- 当`layout_key`为PA_BSND时，`actual_seq_lengths_key`该入参必须传入。
+- PageAttention场景下，`block_table`必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq(maxBlockNumPerSeq为每个batch中最大`actual_seq_lengths_key`对应的block数量)，支持block_size取值为16的整数倍，最大支持到1024。
+- query、key、weights、query_dequant_scale、key_dequant_scale数据排布格式支持从多种维度解读，其中B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、N（Head Num）表示多头数、D（Head Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
 
--   单算子模式调用
+## Atlas A3推理系列产品调用说明
+
+- 单算子模式调用
+
     ```python
     import torch
     import torch_npu
@@ -138,7 +141,8 @@
                                                     sparse_mode=sparse_mode, pre_tokens=(1<<63)-1,
                                                     next_tokens=(1<<63)-1, cmp_ratio=cmp_ratio)
     ```
--   aclgarph调用
+
+- aclgarph调用
 
     ```python
     import torch

@@ -15,16 +15,16 @@
 
 + 算子功能：GenericBlockSparseAttentionGradMetadata根据KV2Q稀疏块索引表`sparseBlockIdx`/`sparseBlockCount`，根据算法按照顺序展开任务列表，并在AIC核间做负载均衡，供后续GenericBlockSparseAttentionGrad算子消费。
 
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
     按B → N2 → J → G顺序展开`(b, n2, j, g)`任务列表，并在AIC核间做负载均衡，供后续GenericBlockSparseAttentionGrad算子消费。
 
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
     按B → N2 → J顺序展开`(b, n2, j)`任务列表，并在AIC核间做负载均衡，供后续GenericBlockSparseAttentionGrad算子消费。
 
 + 该算子不建议单独使用，建议与aclnnGenericBlockSparseAttentionGrad配合使用。
 
 + Metadata size计算公式：
-  - <term>Ascend 950PR/Ascend 950DT</term>:
+  - <term>Ascend 950PR&950DT系列产品</term>:
 
     $$
     \text{metaSize} = 80 + B \times N1 \times J \times 4
@@ -32,7 +32,7 @@
 
     其中`J = ceilDiv(maxKvSeqlen, blockShapeY)`。
 
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> 以及 <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>:
+  - <term>Atlas A3系列产品</term> 以及 <term>Atlas A2系列产品</term>:
 
     $$
     \text{metaSize} = 198
@@ -171,14 +171,14 @@
   <tr>
     <td class="tg-0pky">winLeft</td>
     <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">滑窗向前包含token数，不使能时须为-1。</td>
+    <td class="tg-0pky">滑窗向前包含token数，不开启时须为-1。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>
   <tr>
     <td class="tg-0pky">winRight</td>
     <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">滑窗向后包含token数，不使能时须为-1。</td>
+    <td class="tg-0pky">滑窗向后包含token数，不开启时须为-1。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>
@@ -212,7 +212,7 @@
 * sequsedQOptional/sequsedKvOptional仅在TND时生效；BNSD/BSND须传nullptr，实际序列长度取自maxQSeqlen/maxKvSeqlen（须与Q/K的S维一致）。
 * HeadDim固定为128；numQHeads/numKvHeads取值范围[1, 128]，且numQHeads % numKvHeads == 0。
 * blockShape：blockShapeX仅支持1, blockShapeY须≥128且为64的倍数；layoutSparsePattern当前仅支持1；residualBlockMode当前仅支持0；maskType当前仅支持1。
-* winLeft/winRight不使能时必须为-1。
+* winLeft/winRight不开启时必须为-1。
 * metadata长度须满足shape[0] ≥ max(80 + B × numQHeads × J × 4, 198)；任务数上界B × numQHeads × J ≤ 1048576。
 
 ## 调用说明

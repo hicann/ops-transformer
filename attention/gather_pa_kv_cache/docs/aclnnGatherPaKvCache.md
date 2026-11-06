@@ -1,7 +1,5 @@
 # aclnnGatherPaKvCache
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/gather_pa_kv_cache)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->

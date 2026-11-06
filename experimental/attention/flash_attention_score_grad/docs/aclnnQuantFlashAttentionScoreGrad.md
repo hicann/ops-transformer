@@ -88,7 +88,7 @@ aclnnStatus aclnnQuantFlashAttentionScoreGradGetWorkspace(
   const aclTensor   *dsScale,
   const aclTensor   *pScale,
   double             scaleValue,
-  int64_t 			     preTokens,
+  int64_t         preTokens,
   int64_t            nextTokens,
   int64_t            headNum,
   char              *inputLayout,

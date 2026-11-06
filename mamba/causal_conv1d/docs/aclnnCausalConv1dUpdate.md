@@ -1,7 +1,5 @@
 # aclnnCausalConv1dUpdate
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/mamba/causal_conv1d)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->

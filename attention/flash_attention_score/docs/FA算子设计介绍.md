@@ -100,7 +100,7 @@ FA（FlashAttentionScore，简称FA）融合算子的多模板设计思路主要
 
   FA算子包含B、N2(key和value的N)、G(query_N/kv_N)、S1(query的S)、S2(key和value的S)共5个轴，切分顺序是先核内再核间，核内切分依据基本块大小选择切分轴，核间切分是把核内切分后剩余的轴合并后依据AI Core核数再进行切分。由于shape的大小不同，切分轴会发生变化。
 
-    - Atlas A2训练系列产品：从Vector视角，FA算子划分为如下几类模板，模板按序号排优先级，序号越小，优先级越高，越先匹配。
+    - <term>Atlas A2训练系列产品</term>：从Vector视角，FA算子划分为如下几类模板，模板按序号排优先级，序号越小，优先级越高，越先匹配。
 
     <table style="undefined;table-layout: fixed; width: 1576px">
     <colgroup>
@@ -191,7 +191,7 @@ FA（FlashAttentionScore，简称FA）融合算子的多模板设计思路主要
   **xxx.o**: 表示经过基本块切分后某根轴的分数，xxx可以是B、N2、G、S1、S2;
 
   例如，S1 = 512, S2 = 1024， S1.i = 64, S2.i = 128,表示把[S1, S2]切分成大小是[64, 128]的基本块，S1.o = 512 / 64 = 8, S2.o = 1024 / 128 = 8 ，一共切分成8 * 8个基本块。
-  - Atlas A2训练系列产品：FA算子根据切分轴不同，划分成以下几类模板，对于以下FA模板，目前都不会把S2轴切分到多核：
+  - <term>Atlas A2训练系列产品</term>：FA算子根据切分轴不同，划分成以下几类模板，对于以下FA模板，目前都不会把S2轴切分到多核：
     > 1. 核间切分B、N2、G、S1轴，核内切分S1轴、S2轴模板，该模板是最通用模板，支持所有输入（TND除外）：
     >
     >    tiling代码文件：ops-transformer-dev/attention/flash_attention_score/op_host/flash_attention_score_tiling_general.cpp

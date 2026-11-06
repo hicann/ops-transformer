@@ -1,7 +1,5 @@
 # aclnnMoeFinalizeRoutingV2Grad
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/moe/moe_finalize_routing_v2_grad)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->

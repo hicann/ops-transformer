@@ -1,6 +1,7 @@
 # FA
 
 ## 核心交付件
+
 1. `csrc/flash_attn_minimal/op_kernel` 算子kernel实现
 2. `csrc/flash_attn_minimal/torch_interface.cpp` 算子pytorch层和C++实现层接口
 3. `csrc/flash_attn_minimal/CMakeLists.txt` 算子cmake配置
@@ -20,7 +21,6 @@ $$
 **说明**：
 <blockquote>query、key、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N。
 <br>Q_S表示query shape中的S，KV_S表示key和value shape中的S，Q_N表示num_query_heads，KV_N表示num_key_value_heads。P表示Softmax(<span>(QK<sup class="superscript">T</sup>) / <span class="sqrt">d</span></span>)的计算结果。</blockquote>
-
 
 ## 接口
 
@@ -103,7 +103,9 @@ torch.ops.ascend_ops.flash_attn_minimal(query, key, value, softmaxScale=0) -> Te
     </table>
 
 ## 代码架构
+
 算子执行在 Device 侧（NPU，执行 Kernel 函数），输入由 Host 侧（CPU）准备并拉起 Kernel。代码主要分为如下两部分：
+
  - **csrc/flash_attn_minimal/torch_interface.cpp** 包含算子执行的整体流程：上层 python 入参传递到该文件，校验输入合法性后直接拉起算子的 Kernel 函数执行，无独立的 Host Tiling 阶段。
  - **csrc/flash_attn_minimal/op_kernel** 算子的 Kernel 函数所有文件都在该目录下。
 

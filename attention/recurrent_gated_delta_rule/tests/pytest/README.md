@@ -126,6 +126,7 @@ random/random_npu/mss 模式均使用同一套随机参数生成器（`_generate
 **内存约束**：Dk×Dv 受 state 元素数上限 `_STATE_ELEM_CAP=2.0B` 约束（`budget = STATE_ELEM_CAP // (BlockNum × Nv)`），防止单进程 host OOM。
 
 **随机种子机制**：
+
 - `RANDOM_SEED` 控制 shape/参数序列（一个 seed 对应一组确定的 N 条用例参数）
 - `TORCH_SEED` 控制张量数值（每条用例独立，conftest 自动生成并记 CSV）
 - 不设 `RANDOM_SEED` 时自动生成并回写 `os.environ`，conftest 落 CSV

@@ -81,6 +81,7 @@ experimental/
 其中 mamba2_chunk_xxx 四个算子为 Prefill 过程中 Chunk 计算的核心实现模块。
 
 每个算子子目录包含：
+
 - 算子实现（op_kernel/）
 - torch封装（torch_interface.cpp）
 - 精度和性能测试脚本（tests/）

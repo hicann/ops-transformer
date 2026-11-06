@@ -913,9 +913,6 @@ q/k/v/attn_out shape匹配关系表：<a name="qkv_attn_out_shape匹配关系表
     </tbody>
 </table>
 
-
-
-
 #### Mask参数组
 
 mask_mode参数解释：
@@ -1356,6 +1353,7 @@ mask_mode参数解释：
 ## 调用示例
 
 - quant_flash_attn_metadata + quant_flash_attn联合调用示例（TND，非PA场景）
+
   ```python
   import torch
   import torch_npu
@@ -1434,6 +1432,7 @@ mask_mode参数解释：
   ```
 
 - quant_flash_attn_metadata + quant_flash_attn联合调用示例（TND + PA场景，causal mask）
+
   ```python
   import torch
   import torch_npu

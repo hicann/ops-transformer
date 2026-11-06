@@ -427,7 +427,7 @@ aclnnStatus aclnnFlashAttentionScoreV4(
         <td>seed</td>
         <td>输入</td>
         <td>Host侧的int64_t，生成dropmask的seed。</td>
-        <td>如果使能内部生成dropmask，需要传入该参数，否则内部生成dropmask时使用默认值：seed=0。</td>
+        <td>如果开启内部生成dropmask，需要传入该参数，否则内部生成dropmask时使用默认值：seed=0。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -437,7 +437,7 @@ aclnnStatus aclnnFlashAttentionScoreV4(
         <td>offset</td>
         <td>输入</td>
         <td>生成dropmask的offset。</td>
-        <td>如果使能内部生成dropmask，需要传入该参数，否则内部生成dropmask时使用默认值：offset=0。</td>
+        <td>如果开启内部生成dropmask，需要传入该参数，否则内部生成dropmask时使用默认值：offset=0。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>

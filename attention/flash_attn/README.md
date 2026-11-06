@@ -548,10 +548,10 @@ BMM2:      P×V → L0C → Fixpipe → mmRes[bufId']（bufId' 由 mmResBufId_ �
 - **L1(P) 交接**：Vec1 结果由两个 AIV 各自写 L1(P) 后 CrossCoreSetFlag(CC_L1P)（3 buffer 对应三路 flag），AIC 在 BMM2 前等待两路都就绪。
 - **行分担**：两个 AIV 各算 `mBaseSize/2` 行（Dn 按 `align32(actM)>>1`、Nd 按 `(actM+1)>>1` 切分），与 BMM1/BMM2 fixpipe 的双目标写（`dualDstCtl=1`，按 M 维对半拆分写入两个 AIV 的 UB）配合，保证每 AIV 恰好拿到自己那半。
 
-
 ### 8. block cube 层
 
 #### 8.1 buffer 分配
+
 AIC 侧按存储层级分配 buffer，覆盖 BMM1（Q×K^T）与 BMM2（P×V）两级 Matmul 的数据流。flash_attn_block_cube_nd.h的总体分配如下：
 
 | 存储层 | Buffer | 数量×大小 | 用途 |
@@ -579,6 +579,7 @@ AIC 侧按存储层级分配 buffer，覆盖 BMM1（Q×K^T）与 BMM2（P×V）�
 ### 9. block vector 层
 
 #### 9.1 buffer 分配
+
 **UB buffer 分配（以 Nd 为例，`UbLayout` 结构体定义，`flash_attn_block_vec_nd.h:203-216`）**：Nd 是功能最全的路径（含 mask），其布局覆盖 Dn 全部 buffer 并多出 mask/tmp 两项；按地址从低到高排布，`static_assert(sizeof(UbLayout) <= 248KB)` 限制总占用；UB总size为256KB，但是由于需要为AscendC和VF预留8K，所以业务只能使用248K。
 
 | Buffer | 数量×大小 | 用途 | 分配策略 |
@@ -667,25 +668,30 @@ FD 与 FA 通过 **workspace 槽位**衔接：FA 阶段每个跨核行的部分�
 common 层位于 `attention/common/op_kernel/`，按功能分四类基础设施：
 
 **① buffer 管理（`buffer.h`、`buffer_manager.h`、`buffers_policy.h`）**：`fa_base_matmul` 命名空间下与 buffer 生命周期/同步策略相关的基础设施：
+
 - `BufferManager`（`buffer_manager.h`）：L0A/L0B/L0C buffer 的分配与管理（初始化、大小划分）。
 - `BuffersPolicy*`（`buffers_policy.h`）：buffer 使用策略——`BuffersPolicySingleBuffer`（单 buffer）、`BuffersPolicyDB`（双 buffer，LOCK_UNLOCK/外部 eventID，block_cube 的 L0A/L0B 即用此策略）、`BuffersPolicy3buff`（三 buffer）、`BuffersPolicy4buff`（四 buffer），决定 MTE1 搬运与 Matmul 计算的重叠方式。
 - 辅助工具：`buffer.h` 中与 buffer 访问/同步相关的通用函数。
 
 **② Matmul 封装（`matmul.h`）**：`fa_base_matmul` 命名空间的 Matmul 指令封装，供 block_cube 层调用：
+
 - 指令族：`MatmulBase`（K 维固定 128）、`MatmulK`（K 方向 128 分块循环）、`MatmulN`（N 方向 128 分块）、`MatmulFull`（全量一次算完）。
 - 配套：`ABLayout`（MK/KN 排布枚举）、`LoadDataToL0A/L0B`、`MakeMMParam`、MM 参数（M/N/K、转置标志），与 `BuffersPolicyDB` 配合完成 L1→L0 搬运与计算。
 
 **③ 数据搬移（`memcopy/`，含 `copy_gm_to_l1.h`、`copy_gm_to_ub.h`、`copy_ub_to_gm.h`）**：GM 与 L1/UB 间的拷贝封装：
+
 - `copy_gm_to_l1.h`：GM→L1 的 `DataCopy` 封装（含 ND→NZ 变换，配合 `offset_calculator_v2.h` 的 GM 坐标定位）。
 - `copy_gm_to_ub.h` / `copy_ub_to_gm.h`：GM↔UB 拷贝。
 - 配套的 GM/UB 张量描述：`fa_gm_tensor.h`、`fa_l1_tensor.h`、`fa_ub_tensor.h`、`gm_layout.h`、`gm_coord.h`。
 
 **④ VF 指令库（`arch35/` 与 `arch35/vf/`）**：指令级 VF 算子集合，被 block vector 层调用：
+
 - 入口与通用 API：`flash_attention_score_common_regbase_arch35.h`（`FaVectorApi`：`ProcessVec1VfDn`、`FusedExpSub`、`FlashUpdateNew`、`ComputeLseOutputVF`、`RowInvalidUpdateVF` 等）。
 - `vf/` 下的 VF 算子族：softmax/update 系列（`vf_basic_block_*`）、flash_decode（`vf_flash_decode_arch35.h`）、antiquant（`vf_antiquant_*`）等，按 D/对齐/更新策略拆分多个变体。
 - 与 flash_attention_score 等算子共享，**改 VF 影响所有使用方**。
 
 此外还有：
+
 - **类型/布局工具**（flash_attn 侧 `op_kernel/utils/`）：`flash_attn_type.h`（FAType/布局映射）、`flash_attn_common_def.h`（常量/枚举）、`attenmask_gs1.h`（掩码计算）。
 - **负载均衡算法**（`common/op_kernel/load_balance/section_stream_k/`）：host 侧 metadata 生成的算法库（见 §4）。
 

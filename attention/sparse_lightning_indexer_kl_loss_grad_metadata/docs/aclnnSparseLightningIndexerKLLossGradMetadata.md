@@ -1,7 +1,5 @@
 # aclnnSparseLightningIndexerKLLossGradMetadata
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/sparse_lightning_indexer_kl_loss_grad_metadata)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -454,7 +452,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
         - layoutQOptional为TND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过cuSeqlensQOptional中的元素获取seqlen。
   <!-- end id13 -->
   <!-- npu="A3" id14 -->
-  - Atlas A3系列产品约束：
+  - <term>Atlas A3系列产品</term>约束：
     - Batch取值规则
       - 如果batchSize大于0，优先使用batchSize。
       - 如果batchSize为0，优先通过sequsedQOptional的shape推导batch。
@@ -475,7 +473,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       - maskMode当前仅支持0和3。
   <!-- end id14 -->
   <!-- npu="910b" id15 -->
-  - Atlas A2系列产品约束：
+  - <term>Atlas A2系列产品</term>约束：
     - Batch取值规则
       - 如果batchSize大于0，优先使用batchSize。
       - 如果batchSize为0，优先通过sequsedQOptional的shape推导batch。

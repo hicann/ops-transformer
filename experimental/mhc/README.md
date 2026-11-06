@@ -103,7 +103,7 @@ out = mhc_pre_ext.forward(x, h)             # [batch, seq, dim]
 
 ## KernelCAT内测申请
 
-KernelCAT限时免费内测中，欢迎体验：https://kernelcat.autokernel.cn
+KernelCAT限时免费内测中，欢迎体验，[KernelCAT站点](https://kernelcat.cn)
 
 ## 参考文献
 
@@ -120,4 +120,4 @@ KernelCAT限时免费内测中，欢迎体验：https://kernelcat.autokernel.cn
 
 ## 许可证
 
-CANN Open Software License Agreement Version 2.0 - 详见 [LICENSE](LICENSE)文件。
+CANN Open Software License Agreement Version 2.0 - 详见 [LICENSE](../../LICENSE)文件。

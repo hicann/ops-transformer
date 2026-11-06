@@ -305,7 +305,8 @@ aclnnStatus aclnnNsaCompressGrad(
 
 ## 调用示例
 
-通过aclnn单算子调用示例代码如下（以Atlas A2训练系列产品），仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
+<!-- npu="910b" id7 -->
+通过aclnn单算子调用示例代码如下（以<term>Atlas A2训练系列产品</term>），仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 ```c++
 #include <algorithm>
@@ -546,3 +547,4 @@ int main() {
     return 0;
 }
 ```
+<!-- end id7 -->

@@ -40,7 +40,6 @@ BNSD 与 BSND 都是 4 维，**不能只靠 shape 区分**（`N==S` 时 shape �
 | `actual_seq_lengths` | `[batch]` | int32 | **必选**。每个 batch 的 Q sequence length。允许 **0**：padding / dummy 请求。TND 模式下 `batch` 取该 tensor（或 `actual_seq_lengths_kv`）的长度。 |
 | `actual_seq_lengths_kv` | `[batch]` | int32 | **必选**。每个 batch 的 KV sequence length。允许 **0**，与 `actual_seq_lengths` 一起标识 dummy 请求。 |
 
-
 ### 2.2 反向索引输入约束
 
 `k2q_row_ptr`、`k2q_q_indices`、`k2q_slot_indices` 由 host 在调用算子前构建（CSR 格式，对齐 CUDA `build_k2q_csr_reference`），并作为 GM 输入传入 kernel，不放入 workspace。
@@ -55,7 +54,6 @@ BNSD 与 BSND 都是 4 维，**不能只靠 shape 区分**（`N==S` 时 shape �
 6. `qToken = k2q_q_indices[kvHeadIdx, csrStart + qi]`（global flattened q id），`slotK = k2q_slot_indices[...]`。
 7. `k2qNnzUpperBound = k2q_q_indices.shape[1]`，通常为 `totalQTokens * topK`。
 8. GQA 下不同 `kvHeadIdx` 可有不同 topK 选块。
-
 
 ### 2.3 输出
 
@@ -422,7 +420,7 @@ CopyLseIn(max, sum)
 
 各步骤说明：
 
-- **`CopyLseIn`**：从 GM 读当前 task 的 compact `softmaxMax` / `softmaxSum`（逻辑 shape `[topK, groupSize]`）。当前实现：对 `startRow=0` 且 `dealRowCount×topK` 连续段做 `DataCopyPad`，再 `Broadcast` 到 UB 布局 `[topK, dealRow, 8]`（32B 行对齐）。**当前实现仅支持 `loopCount == 1`（即 `groupSize <= gSplitSize`）**：`CopyLseIn` 中 `taskBase` 未加 `startRow` 偏移、`blockLen = dealRowCount * topK * sizeof(float)` 假设整段连续，当 `groupSize > gSplitSize` 分多片 combine 时既漏掉 `startRow` 之后的行、又跨 split 拼接错误数据。大 `groupSize` 分片 `startRow` gather 路径待实现（与 §9 item 3 一致），在完成前应避免 `groupSize > gSplitSize` 的 shape。
+- **`CopyLseIn`**：从 GM 读当前 task 的 compact `softmaxMax` / `softmaxSum`（逻辑 shape `[topK, groupSize]`）。当前实现：对 `startRow=0` 且 `dealRowCount×topK` 连续段做 `DataCopyPad`，再 `Broadcast` 到 UB 布局 `[topK, dealRow, 8]`（32B 行对齐）。**当前实现仅支持 `loopCount == 1`（即 `groupSize <= gSplitSize`）**：`CopyLseIn` 中 `taskBase` 未加 `startRow` 偏移、`blockLen = dealRowCount * topK * sizeof(float)` 假设整段连续，当 `groupSize > gSplitSize` 分多片 combine 时既漏掉 `startRow` 之后的行、又跨 split 拼接错误数据。大 `groupSize` 分片 `startRow` gather 路径当前不支持（与 §9 item 3 一致），在完成前应避免 `groupSize > gSplitSize` 的 shape。
 - **`ComputeScaleValue_VF`**：输入 UB 中 `(rowMax, rowSum)`，输出 **scale 权重** 写回 `lseSum` UB（与 IFA 相同公式）。`softmaxLseFlag=true` 时额外计算 `lse = log(Σ_k rowSum[k] * exp(rowMax[k]-max)) + max`，UB 布局 `[groupSize, 8]`，再 `DataCopyPad` 到 `softmax_lse`（TND/BSND 同一 token 的 heads 连续；BNSD 同一 token 的 heads 间隔 S）。
 - **`CopyAccumOutIn`**：按 split 索引 `j` 从 `accumOutGm` 读未归一化 `O_partial`；**必须从 `gmSoftmaxSum` 读取原始 `rowSum`**（因 `lseSum` UB 已被 scale 覆盖），对每 row 做 `O_norm = O_partial / rowSum`（当前 kernel 用 `Divs`；Golden 对 `rowSum<=0` 置 0）。
 - **`ReduceFinalRes_VF`**：对 topK 个 split 累加 `scale[j] * O_norm[j]` 到 `dst`。
@@ -558,6 +556,7 @@ Golden 不模拟 Cube tile 搬运；数值路径与 §7.2 一致。
 1. **正确性加固**：~~workspace 预置；`CopyAccumOutIn` 除零保护~~ —— 已完成；剩余 `CopyLseIn` 大 `groupSize` 分片 gather。
 2. Phase 1 扩展 `qTile > 1`：批量 gather Q，拼 `M = qTile * groupSize` 做 Cube QK/PV。
 3. 性能：
+
 - PRE_LAUNCH 流水（已启用，可继续调优）
 - double buffer / L1/L0 preload
 - score/softmax UB 复用

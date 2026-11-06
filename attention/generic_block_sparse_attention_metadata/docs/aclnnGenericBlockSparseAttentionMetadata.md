@@ -345,7 +345,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>winLeft</td>
       <td>输入</td>
       <td>滑窗attention场景下，滑窗需要向前包含多少个token。</td>
-      <td>用于滑窗attention；不使能时必须为-1，需与maskType配合，见<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#掩码说明">掩码说明</a>。当前只支持传入-1。</td>
+      <td>用于滑窗attention；不开启时必须为-1，需与maskType配合，见<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#掩码说明">掩码说明</a>。当前只支持传入-1。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -355,7 +355,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>winRight</td>
       <td>输入</td>
       <td>滑窗attention场景下，滑窗需要向后包含多少个token。</td>
-      <td>用于滑窗attention；不使能时必须为-1，需与maskType配合，见<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#掩码说明">掩码说明</a>。当前只支持传入-1。</td>
+      <td>用于滑窗attention；不开启时必须为-1，需与maskType配合，见<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#掩码说明">掩码说明</a>。当前只支持传入-1。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>

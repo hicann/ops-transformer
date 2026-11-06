@@ -47,6 +47,7 @@
 | LIV2_MODEL_S2_16K_N1_4_MODE3 | k_seq=16384（numBlocks==candidate_topk_blocks 满覆盖边界），需 `LIV2_MODEL_LARGE=1` |
 
 Per case 校验：
+
 1. `sparse_indices` vs golden（source 不得改变位置级 topk）；
 2. `candidate_block_length` 恒空 (0,)；
 3. `candidate_topk_indices` vs golden（行级块号集合 + -1 槽数硬校验）。

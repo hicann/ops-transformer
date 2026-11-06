@@ -3,6 +3,7 @@
 ## 功能说明
 
 基于pytest测试框架，实现quant_sparse_flash_mla算子的功能验证：
+
 - **CPU侧**：复现算子功能用以生成golden数据
 - **NPU侧**：通过TorchNPU进行算子直调、图模式调用获取实际数据
 - **精度对比**：进行CPU与NPU结果的精度对比验证算子功能
@@ -35,10 +36,12 @@
 - pytest.ini                                                # 创建测试标记
 
 单用例测试：
+
 - test_quant_sparse_flash_mla_single.py              # pytest测试单用例运行主程序
 - quant_sparse_flash_mla_paramset.py                 # 单用例入参数配置
 
 批量测试：
+
 - test_quant_sparse_flash_mla_batch.py               # 用例批量测试主程序，读取pt用例并获取npu输出，结果保存至excel文件
 - ./batch/test_quant_sparse_flash_mla_pt_save.py     # 读取excel表格批量生成用例pt文件
 - ./batch/quant_sparse_flash_mla_process.py          # 调用算子接口获取npu输出
@@ -54,6 +57,7 @@
 1、手动配置quant_sparse_flash_mla_paramset.py的参数
 
 2、执行指令：
+
 ``` bash
 bash test_run.sh single
 ```

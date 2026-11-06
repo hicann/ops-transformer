@@ -104,7 +104,6 @@ cann_ops_transformer.all_to_all_quant_matmul(
 | --------------- | -------- | ------------------------------------------------------------ | ------------------------------- | -------------- | -------------------- |
 | `y`           | Tensor   | 矩阵乘输出。                                                 | 由`y_dtype`指定（BF16或FP16） | ND             | `(BS/rankSize, N)` |
 
-
 ## 约束说明
 
 - 适用场景：该接口支持训练、推理场景下使用。
@@ -199,6 +198,7 @@ cann_ops_transformer.all_to_all_quant_matmul(
       for p in procs:
           p.join()
   ```
+
   运行方式：
 
   ```bash

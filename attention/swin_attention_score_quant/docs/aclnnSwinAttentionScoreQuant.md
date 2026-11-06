@@ -1,7 +1,5 @@
 # aclnnSwinAttentionScoreQuant
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/swin_attention_score_quant)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->

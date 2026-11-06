@@ -482,8 +482,8 @@ struct MoeEpCoreDiagRecord {
 
 | 偏移 | 大小 | 字段 |
 |------|------|------|
-| rank_id * 512B + expert_id * 4B | 4B | 该专家收到的 token 计数 (uint32) |
-| rank_id * 512B + localExpertNum * 4B | 512 - localExpertNum*4 B | 保留 |
+| rank\_id \* 512B + expert\_id \* 4B | 4B | 该专家收到的 token 计数 (uint32) |
+| rank\_id \* 512B + localExpertNum \* 4B | 512 - localExpertNum\*4 B | 保留 |
 
 #### Dispatch Slot State (`dispatch_slot_state.bin`)
 
@@ -495,7 +495,7 @@ struct MoeEpCoreDiagRecord {
 
 | 偏移 | 大小 | 字段 |
 |------|------|------|
-| (token_id * topK + topk_id) * 512B | 4B | 回传完成状态 (uint32) |
+| (token\_id \* topK + topk\_id) \* 512B | 4B | 回传完成状态 (uint32) |
 | ... + 4B | 508B | 保留 |
 
 #### Hybrid Scaleout Status (`hybrid_scaleout_status.bin`)

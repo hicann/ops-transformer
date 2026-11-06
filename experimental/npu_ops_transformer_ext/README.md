@@ -23,6 +23,7 @@ NpuOpsTransformerExt是一个轻量级，高性能的算子开发工程模板，
 1. `experimental/xxx/算子目录/算子名_torch.cpp`算子Kernel实现
 2. `experimental/xxx/算子目录/CMakeLists.txt`算子cmake配置
 3. `experimental/npu_ops_transformer_ext/npu_ops_transformer_ext/npu_ops_def.cpp`注册算子接口
+
 - 其中xxx为attention/ffn/gmm/mc2/moe/posembedding
 
 ## 环境要求 | Prerequisites
@@ -53,13 +54,13 @@ NpuOpsTransformerExt是一个轻量级，高性能的算子开发工程模板，
 
 2. **配置环境变量**
 
-	根据实际场景，选择合适的命令。
+ 根据实际场景，选择合适的命令。
 
     ```bash
-   # 默认路径安装，以root用户为例（非root用户，将/usr/local替换为${HOME}）
-   source /usr/local/Ascend/ascend-toolkit/set_env.sh
-   # 指定路径安装
-   # source ${install-path}/ascend-toolkit/set_env.sh
+    # 默认路径安装，以root用户为例（非root用户，将/usr/local替换为${HOME}）
+    source /usr/local/Ascend/ascend-toolkit/set_env.sh
+    # 指定路径安装
+    # source ${install-path}/ascend-toolkit/set_env.sh
     ```
 
 3. **安装torch与TorchNPU包**
@@ -89,17 +90,20 @@ NpuOpsTransformerExt是一个轻量级，高性能的算子开发工程模板，
 ## 安装步骤 | Installation
 
 1. 进入目录，安装依赖
+
     ```sh
     cd experimental/npu_ops_transformer_ext
     pip install -r requirements.txt
     ```
 
 2. 从源码构建.whl包
+
     ```sh
     python -m build --wheel -n
     ```
 
 3. 安装构建好的.whl包
+
     ```sh
     pip install dist/xxx.whl
     ```

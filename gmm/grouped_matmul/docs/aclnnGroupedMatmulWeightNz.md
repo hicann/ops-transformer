@@ -1,7 +1,5 @@
 # aclnnGroupedMatmulWeightNz
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/gmm/grouped_matmul)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -751,7 +749,6 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
       |:---------:|:---------:| :------ |
       |0|x单tensor|pertoken场景：每个tensor 1维，shape为（M,）|
 
-
   - K-G（pertoken-pergroup）量化场景支持的输入类型与shape为：
     - 以下入参为空：biasOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional
     - 不为空的参数支持的数据类型组合要满足下表：
@@ -775,7 +772,6 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
     - 约束说明：
 
       - 全量化的int4的weight支持NZ转置输入，即输入为[E,N,K]，但view shape为[E,K,N]以保证算子识别转置状态，转置输入下，$k/G$要求按照64对齐，K按照64对齐，N按照16对齐。
-
 
   - 动态量化（mx量化）场景支持的输入类型与shape为：
     - 以下入参为空：offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional

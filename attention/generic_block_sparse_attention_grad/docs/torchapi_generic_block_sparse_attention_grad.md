@@ -168,7 +168,6 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 
 主算子与 Metadata 的 Python 封装接口均默认使用 `ResidualBlockMode.MARKED_BY_SPARSE_BLK_IDX`，也支持整数 `0` 或枚举名字符串 `"MARKED_BY_SPARSE_BLK_IDX"`。字符串解析与 `mask_mode` 一致：忽略大小写及首尾空格。
 
-
 ## 参数说明
 
 ### generic_block_sparse_attention_grad_metadata
@@ -192,8 +191,8 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 | layout_sparse_pattern | int | 可选 | sparse_block_idx、sparse_block_count的数据排布；当前仅支持1（BNKQ），默认1 | int64 | - | - |
 | mask_mode          | int/MaskMode | 可选      | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」。当前仅支持1（`CAUSAL`），默认1 | int32    | -        | -                                                         |
 | softmax_precision  | int          | 可选      | Softmax精度级别，当前仅支持0，默认0                                                                   | int32    | -        | -                                                         |
-| win_left           | int          | 可选      | 滑窗向前包含token数，不使能时必须为-1，默认-1                                                       | int32    | -        | -                                                         |
-| win_right          | int          | 可选      | 滑窗向后包含token数，不使能时必须为-1，默认-1                                                       | int32    | -        | -                                                         |
+| win_left           | int          | 可选      | 滑窗向前包含token数，不开启时必须为-1，默认-1                                                       | int32    | -        | -                                                         |
+| win_right          | int          | 可选      | 滑窗向后包含token数，不开启时必须为-1，默认-1                                                       | int32    | -        | -                                                         |
 | residual_block_mode | int/ResidualBlockMode/str | 可选 | 尾部不完整KV块的处理模式；默认且仅支持模式0，可传枚举、整数0或枚举名字符串，由稀疏索引决定是否参与 | int64 | - | - |
 | is_consistent_topk | bool | 可选 | 前置稀疏选择中，同一batch同一head内每个Q块选择的KV块最大数量是否一致，默认False；两种值均走通用计算路径 | bool | - | - |
 
@@ -222,8 +221,8 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 | softmax_scale      | float        | 可选      | 缩放因子，建议值$1/\sqrt{D}$，默认1.0                                               | float32          | -        | -                                                                        |
 | mask_mode          | int/MaskMode | 可选      | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」。当前仅支持1，默认1 | int32            | -        | -                                                                        |
 | softmax_precision  | int          | 可选      | Softmax精度级别，当前仅支持0，默认0                                           | int32            | -        | -                                                                        |
-| win_left           | int          | 可选      | 滑窗向前包含token数，不使能时必须为-1，默认-1                                         | int32            | -        | -                                                                        |
-| win_right          | int          | 可选      | 滑窗向后包含token数，不使能时必须为-1，默认-1                                         | int32            | -        | -                                                                        |
+| win_left           | int          | 可选      | 滑窗向前包含token数，不开启时必须为-1，默认-1                                         | int32            | -        | -                                                                        |
+| win_right          | int          | 可选      | 滑窗向后包含token数，不开启时必须为-1，默认-1                                         | int32            | -        | -                                                                        |
 | residual_block_mode | int/ResidualBlockMode/str | 可选 | 尾部不完整KV块的处理模式；默认且仅支持模式0，可传枚举、整数0或枚举名字符串，由稀疏索引决定是否参与 | int64 | - | - |
 | is_consistent_topk | bool | 可选 | 前置稀疏选择中，同一batch同一head内每个Q块选择的KV块最大数量是否一致，默认False；两种值均走通用计算路径 | bool | - | - |
 
@@ -537,7 +536,7 @@ $$
 mask_mode参数解释：
 
 - `MaskMode.CAUSAL`（1）：当前默认且唯一支持
-- win_left / win_right：不使能时必须为-1；attn_mask当前应传`None`
+- win_left / win_right：不开启时必须为-1；attn_mask当前应传`None`
 
 #### SeqLens参数组
 

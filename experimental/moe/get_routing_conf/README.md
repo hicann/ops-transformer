@@ -4,12 +4,13 @@
 
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
-| Atlas A2训练系列产品                                         | 是       |
+| <term>Atlas A2训练系列产品</term>                                        | 是       |
 
 ## 功能说明
 
 - 算子功能：moeinitrouting计算前的数据准备工作。
-- 计算公式：
+
+- 计算公式
   -
 
 ## 参数说明
@@ -37,28 +38,28 @@
       <td>int64_t</td>
       <td>-</td>
     </tr>
-	<tr>
+ <tr>
       <td>stream</td>
       <td>输入</td>
       <td>Device端的stream</td>
       <td>AclrtStream</td>
       <td>-</td>
     </tr>
-	<tr>
+ <tr>
       <td>indices</td>
       <td>输入</td>
       <td>专家索引，shape(token, topk)</td>
       <td>int32_t</td>
       <td>ND</td>
     </tr>
-	<tr>
+ <tr>
       <td>scores</td>
       <td>输入</td>
       <td>专家得分，shape(token, topk)</td>
       <td>bfloat16</td>
       <td>ND</td>
     </tr>
-	<tr>
+ <tr>
       <td>init_token_table</td>
       <td>输出</td>
       <td>当前卡上每个token对应的专家的token位置，shape为((expert, token))</td>
@@ -79,21 +80,21 @@
       <td>BFLOAT16</td>
       <td>ND</td>
     </tr>
-	<tr>
+ <tr>
       <td>token_idx_intra_expert</td>
       <td>输出</td>
       <td>中间结果，每条routing信息在其对应专家内部的编号，是initTokenTable的逆映射，shape(expert, token)</td>
       <td>int32</td>
       <td>ND</td>
     </tr>
-	<tr>
+ <tr>
       <td>start_expert_id</td>
       <td>输入</td>
       <td>当前eprank上专家的起始id</td>
       <td>int64</td>
       <td>-</td>
     </tr>
-	<tr>
+ <tr>
       <td>end_expert_id</td>
       <td>输入</td>
       <td>当前eprank上最后专家的id的后一位id</td>

@@ -67,7 +67,6 @@ torch.ops.custom.npu_quant_block_sparse_attn(
 ) -> Tuple[Tensor, Tensor]
 ```
 
-
 ## 参数说明
 
 维度编号说明：本文中“第 N 维”按从 1 开始计数；代码表达式如 `shape[2]`、`dim[0]` 保留从 0 开始的写法。
@@ -591,7 +590,7 @@ QuantBlockSparseAttn 算子约束分为 4 个档位，按约束复杂程度递�
   - `attention_out` 数据类型为 `BFLOAT16`，数据格式为 ND。`layout_q="TND"` 时输出 shape 为 `(QueryTokenNum, N1, D_v)`；`layout_q="NTD"` 时 PyTorch 接入层输出仍为 TND 语义的 `(QueryTokenNum, N1, D_v)`。
   - `sparse_q_block_size` 和 `sparse_kv_block_size` 当前均仅支持 128。
   - `layout_q` 当前仅支持 `TND`、`NTD`。
-  - `layout_out` 为预留参数，当前不使能；传入非 `TND` 类型会被拦截。
+  - `layout_out` 为预留参数，当前不开启；传入非 `TND` 类型会被拦截。
   - `quant_mode` 当前主算子仅支持 1，表示 `A8C8_QKV_FP8_P_STATIC_SOFTMAX_FP32`。
   - `softmax_scale` 为 float 属性，取值范围必须为 `(0, 1]`，常用值为 `1 / sqrt(D)`。
 

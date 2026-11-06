@@ -1,9 +1,11 @@
 # AscendOps — flash_attn_minimal
 
 ## 项目简介
+
 AscendOps 是一个轻量级，高性能的算子开发工程模板，它集成了PyTorch、PyBind11和昇腾CANN工具链，提供了从算子内核编写，编译到Python封装的完整工具链。
 
 ## 核心特性
+
 🚀 开箱即用 (Out-of-the-Box): 预置完整的昇腾NPU算子开发环境配置，克隆后即可开始开发。
 
 🧩 极简设计 (Minimalist Design): 代码结构清晰直观，专注于核心算子开发流程。
@@ -15,16 +17,18 @@ AscendOps 是一个轻量级，高性能的算子开发工程模板，它集成�
 🔌 PyTorch集成 (PyTorch Integration): 无缝集成PyTorch张量操作，支持自动微分和GPU/NPU统一接口。
 
 ## 核心组件
+
 1. `csrc/flash_attn_minimal/torch_interface.cpp` 算子Kernel实现
 2. `csrc/flash_attn_minimal/CMakeLists.txt` 算子cmake配置
 
 ## 环境要求
-*   AI处理器：Ascend 950PR&950DT系列产品
-*   Python: 3.8+
-*   PyTorch: 2.6.0+
-*   PyTorchAdapter 7.1.0+
-*   CMake: 3.18.4+
-*   CANN Ascend Toolkit
+
+* AI处理器：Ascend 950PR&950DT系列产品
+* Python: 3.8+
+* PyTorch: 2.6.0+
+* PyTorchAdapter 7.1.0+
+* CMake: 3.18.4+
+* CANN Ascend Toolkit
 
 ## 环境准备
 
@@ -44,7 +48,7 @@ AscendOps 是一个轻量级，高性能的算子开发工程模板，它集成�
 
 2. **配置环境变量**
 
-	根据实际场景，选择合适的命令。
+ 根据实际场景，选择合适的命令。
 
     ```bash
    # 默认路径安装，以root用户为例（非root用户，将/usr/local替换为${HOME}）
@@ -85,26 +89,31 @@ AscendOps 是一个轻量级，高性能的算子开发工程模板，它集成�
 ## 安装步骤
 
 1. 进入目录，安装依赖
+
     ```sh
     pip3 install -r requirements.txt
     ```
 
 2. 从源码构建.whl包
+
     ```sh
     python3 -m build --wheel -n
     ```
 
 3. 安装构建好的.whl包
+
     ```sh
     pip3 install dist/ascend_ops-*.whl
     ```
 
     重新安装请使用以下命令覆盖已安装过的版本：
+
     ```sh
     pip3 install dist/ascend_ops-*.whl --force-reinstall --no-deps
     ```
 
 4. (可选)再次构建前建议先执行以下命令清理编译缓存
+
     ```sh
     python3 setup.py clean
     ```
@@ -112,11 +121,13 @@ AscendOps 是一个轻量级，高性能的算子开发工程模板，它集成�
 ## 开发模式构建
 
 此命令实现即时生效的开发环境配置，执行后即可使源码修改生效，省略了构建完整whl包和安装的过程，适用于需要多次修改验证算子的场景：
+
   ```sh
   pip3 install --no-build-isolation -e .
   ```
 
 ## 使用示例
+
 1. 上板执行
 
 安装完成后，您可以像使用普通PyTorch操作一样使用NPU算子，以flash_attn_minimal算子为例，您可以在`ascend_ops/csrc/flash_attn_minimal/test`目录下找到并执行这个脚本:
@@ -127,17 +138,19 @@ python3 test_fa.py
 ```
 
 最终看到如下输出，即为执行成功：
+
 ```bash
 compare CPU Result vs NPU Result: True
 ```
 
 同时支持算子性能采集，使用如下命令可以快速采集:
+
 ```bash
 msprof --application="python3 test_fa.py"
 ```
 
-
 ## 进阶参考
+
 下述资料可让您更深入的理解算子的开发与实现，实现更优性能的算子。
 
 - [FA简化算子实践](./ascend_ops/csrc/flash_attn_minimal/README.md)。

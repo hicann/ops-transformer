@@ -2,8 +2,6 @@
 
 维度编号说明：本文中"第 N 维"按从 1 开始计数；代码表达式如 `shape[2]`、`dim[0]` 保留从 0 开始的写法。
 
-
-
 ## 产品支持情况
 
 | 产品 | 是否支持 |
@@ -100,7 +98,6 @@ torch.ops.custom.npu_quant_block_sparse_attn(
 - `block_num`：PageAttention KV Cache 物理 block 总数。
 - `pa_block_size`：PA KV Cache 的物理 block 大小，对应 `key`/`value` 第 3 维；必须为 `sparse_kv_block_size` 的正整数倍且不超过 1024。
 - `quant_group_size`：MXFP8 量化分组大小，固定为 32；Q/K scale 按 D 轴每 32 元素一个 scale，V scale 按 S 轴每 32 元素一个 scale。
-
 
 - **参数说明：**
 
@@ -387,7 +384,6 @@ PyTorch 接口返回 `(attention_out, softmax_lse)`：
 - `attention_out`：BF16 Tensor，最后一维为 `D_v`。布局与 Q 一致：TND 为 `(T1,N1,D_v)`，BSND 为 `(B,Sq,N1,D_v)`，BNSD 为 `(B,N1,Sq,D_v)`。
 - `softmax_lse`：FLOAT32 Tensor。`return_softmax_lse=True` 时，TND 返回 `(T1,N1)`，BSND/BNSD 返回 `(B,N1,Sq)`（与 `quant_mode=1` 的 `(N1,T1)` 布局不同）；`return_softmax_lse=False` 时返回无有效 LSE 的占位 Tensor。
 
-
 ## 约束说明
 
 ### 约束类型说明
@@ -646,7 +642,6 @@ QuantBlockSparseAttnMx 算子约束分为 4 个档位，按约束复杂程度递
   - `k_descale` 的 PA block、KV head、block 内 token、D-group 维度必须与 `key`、`block_table`、`pa_block_size`、`D` 对齐。
   - `v_descale` 的 PA block、KV head、S-group、D_v 维度必须与 `value`、`block_table`、`pa_block_size`、`D_v` 对齐。
   - `p_scale` 非空时数值应大于 0，且是有限正数；Tiling 阶段无法读取 Tensor 数值，该数值合法性由调用者保证。
-
 
 - 特性交叉约束
 

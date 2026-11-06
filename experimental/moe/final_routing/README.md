@@ -4,7 +4,7 @@
 
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
-| Atlas A2训练系列产品                                         | 是       |
+| <term>Atlas A2训练系列产品</term>                                        | 是       |
 
 ## 功能说明
 
@@ -44,28 +44,28 @@ $$
       <td>int64_t</td>
       <td>-</td>
     </tr>
-	<tr>
+ <tr>
       <td>in</td>
       <td>输入</td>
       <td>expert输出张量， shape为(expert_num*token_num, hidden_size)</td>
       <td>BFLOAT16</td>
       <td>ND</td>
     </tr>
-	<tr>
+ <tr>
       <td>token_table</td>
       <td>输入</td>
       <td>token到expert的映射表， shape为(token_num, expert_num)</td>
       <td>int32_t</td>
       <td>ND</td>
     </tr>
-	<tr>
+ <tr>
       <td>score_table</td>
       <td>输入</td>
       <td>每个token在每个expert的评分，shape为(token_num, expert_num)</td>
       <td>BFLOAT16</td>
       <td>ND</td>
     </tr>
-	<tr>
+ <tr>
       <td>out</td>
       <td>输出</td>
       <td>加权合并后的输出张量，shape为(token_num, hidden_size)</td>

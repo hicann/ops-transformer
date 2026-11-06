@@ -4,7 +4,7 @@
 
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
-| Atlas A2训练系列产品                                         | 是       |
+| <term>Atlas A2训练系列产品</term>                                        | 是       |
 
 ## 功能说明
 
@@ -41,35 +41,35 @@
       <td>int64_t</td>
       <td>-</td>
     </tr>
-	<tr>
+ <tr>
       <td>in</td>
       <td>输入</td>
       <td>公式中的输入张量x，shape为(B, S, N, stride)</td>
       <td>BFLOAT16/HALF</td>
       <td>ND</td>
     </tr>
-	<tr>
+ <tr>
       <td>sin</td>
       <td>输入</td>
       <td>公式中的输入张量sin，shape为(MaxS, D)，MaxS指最大序列长度</td>
       <td>FLOAT</td>
       <td>ND</td>
     </tr>
-	<tr>
+ <tr>
       <td>cos</td>
       <td>输入</td>
       <td>公式中的输入张量x，shape为(MaxS, D)，MaxS指最大序列长度</td>
       <td>FLOAT</td>
       <td>ND</td>
     </tr>
-	<tr>
+ <tr>
       <td>out</td>
       <td>输入</td>
       <td>公式中的输出张量y，shape为(B, S, N, stride)</td>
       <td>BFLOAT16/HALF</td>
       <td>ND</td>
     </tr>
-	<tr>
+ <tr>
       <td>gbD</td>
       <td>输入</td>
       <td>head_dim维度的大小</td>
@@ -84,6 +84,7 @@
 - stride >= head_dim。
 
 ## 调用说明
+
 ```
 torch.ops.npu_ops_transformer_ext.rotary_stride(blockDim, in, sin, cos, out, gbD)
 ```

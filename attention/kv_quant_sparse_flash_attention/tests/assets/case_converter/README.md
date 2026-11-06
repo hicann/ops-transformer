@@ -64,7 +64,6 @@ list、tuple、字典使用 Python 字面量，例如 `[0, 16, 32]`、`(1, 16, 8
 - `kv_type=hifloat8` 采用字节存储并保留 dtype 语义；查询形状包含 RoPE，输出形状去除 RoPE。
 - V1 支持量化模式 3/3 的 TQ4：PA 布局、偶数 D，packed KV 尾维为 `D/2 + 2*rope_head_dim + 2`。
 
-
 `is_enabled` 缺省 True；显式 False 保持 False，不根据历史测试结果修改启用状态。
 `precision_tolerances/absolute_precision` 可显式覆盖转换默认值。
 `remark/network_name/priority/soc_series/golden_api/device_ids` 及已有 batch 字段按表中值保留。

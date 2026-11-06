@@ -6,22 +6,23 @@
 
 关于Dispatch算子的核心功能、计算公式及通信原理，详见 [aclnnMoeDistributeDispatchV3文档介绍。
 
-
 ## 产品支持情况
 
 | 产品 | 是否支持 |
 |:-----|:--------:|
-| Atlas A3系列产品 | √ |
+| <term>Atlas A3系列产品</term>| √ |
 
 ## 约束说明
 
 想要完整开启功能，需要满足以下版本要求：
+
 - gcc 9.4.0+
 - python 3.9+
 - torch>=2.7.1
 - cann 9.0.0+
 
 该算子支持的平台为ascend910_93，默认构建环境为ascend910b，在ascend910_93 构建环境下构建，请先执行命令：
+
 ```sh
 export NPU_SOC_VERSION=ascend910_93
 ```
@@ -144,6 +145,7 @@ npu_moe_distribute_dispatch_v2 方法将用户参数与缓存的上下文信息�
 **阶段3：输出Tensor创建**
 
 根据计算出的Shape和配置创建输出Tensor：
+
 - expand_x：行数为a，列数为h，数据类型根据量化模式选择（非量化保持原类型，量化为INT8）
 - dynamic_scales：行数为a，数据类型为Float
 - assist_info_forcombine：长度为max(bs*k, a*128)，数据类型为Int（存储三元组）
@@ -207,11 +209,11 @@ Profiling用于记录算子执行的详细信息，便于性能分析和调试�
 **工作原理**：通过`aclprofRangePushEx`和`aclprofRangePop`两个API包裹 <<<>>> 调用，形成一个profiling区间。在此区间内，记录算子的元信息。
 
 **记录的信息**：
+
 - **算子标识**：opName（算子名称字符串转换为ID）、opType（算子类型字符串转换为ID）
 - **执行配置**：blockDim（AIV核数）、kernelType（kernel类型，如MIX_AIV=5 表示混合AIV kernel）、stream（执行流）
 - **Tensor信息**：每个输入/输出tensor的type（输入0/输出1）、format（数据格式）、dataType（数据类型）、shape（维度信息）
 - **算子性能**：算子每一次执行所需时间，包括vector、scalar、mte等细分项所耗时间
-
 
 ### 4. Entry层
 
@@ -226,6 +228,7 @@ moe_distribute_dispatch_v2_entry函数使用 <<<>>> 语法启动moe_distribute_d
 SK（Super Kernel）是Ascend C提供的一种算子融合机制，通过将同一个模型中的多个算子融合为一个整体算子，避免host下发开销。
 
 **SK模式说明**：
+
 - `__sk__`标记的函数为SK kernel，支持算子融合
 - `split_num`模板参数表示分割模式，支持0-3 四种模式，对应不同的核间任务分配策略
 - `SK_BIND`宏将SK kernel的不同分割模式绑定到主kernel，由底层调度器自动选择最优模式

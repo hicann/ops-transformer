@@ -25,6 +25,7 @@
     $$
     Y=Dropout(Softmax(Mask(\frac{QK^T+pse}{\sqrt{d}}),atten\_mask),keep\_prob)V
     $$
+
   - pseType≠1时，公式如下：
 
     $$
@@ -210,8 +211,8 @@
   - N：取值范围为1\~256。
   - S：取值范围为1\~1M。
   - D：
-      - Atlas A2训练系列产品：取值范围为1\~512。
-      - Atlas A3训练系列产品：取值范围为1\~512。
+      - <term>Atlas A2训练系列产品</term>：取值范围为1\~512。
+      - <term>Atlas A3训练系列产品</term>：取值范围为1\~512。
       - Ascend 950PR&950DT系列产品:取值范围为1\~768。
 - keepProb的取值范围为(0, 1]。
 - 部分场景下，如果计算量过大可能会导致算子执行超时（aicore error类型报错，errorStr为：timeout or trap error），此时建议做轴切分处理，注：这里的计算量会受B、S、N、D等参数的影响，值越大计算量越大。

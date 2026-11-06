@@ -1,7 +1,5 @@
 # aclnnBlockAttnResPrepare
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/block_attn_res_prepare)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -99,7 +97,6 @@
     - $\epsilon$ 表示输入 `eps`，是计算 RMS 归一化因子时使用的数值稳定项。
     - $T$ 表示 token 数，$N$ 表示 `blockRes` 第 1 维可容纳的历史残差块数，$S$ 表示目标 slot 数，$D$ 表示HiddenSize。
     - $t\in[0,T)$、$n\in[0,N_v)$、$s\in[0,S)$、$d\in[0,D)$ 分别表示 token、有效历史残差块、目标 slot 和隐藏特征的索引。
-
 
 ## 函数原型
 

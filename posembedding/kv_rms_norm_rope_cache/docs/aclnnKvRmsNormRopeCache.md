@@ -1,7 +1,5 @@
 # aclnnKvRmsNormRopeCache
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/posembedding/kv_rms_norm_rope_cache)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->

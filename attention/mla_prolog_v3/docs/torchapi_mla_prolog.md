@@ -141,7 +141,6 @@
 
     其中$Q_{max}$为量化输出类型的最大值：INT8取127，FLOAT8_E4M3FN取448，HIFLOAT8取32768，8为FLOAT8_E4M3FN指数位的最大值emax。
 
-
 ## 函数原型
 
 `mla_prolog`为原地 cache 更新接口，直接更新调用方传入的`kv_cache`/`kr_cache`。

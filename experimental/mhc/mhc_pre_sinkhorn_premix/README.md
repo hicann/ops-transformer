@@ -99,7 +99,7 @@
       <tr>
         <td>premix</td>
         <td>可选输入</td>
-        <td>premix加权系数（通常填上一轮输出的hPre），shape为x.shape[:-1]。仅Ascend 950PR&950DT系列产品支持。</td>
+        <td>premix加权系数（通常填上一轮输出的hPre），shape为x.shape[:-1]。仅<term>Ascend 950PR&950DT系列产品</term>支持。</td>
         <td>FLOAT32</td>
         <td>ND</td>
       </tr>

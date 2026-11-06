@@ -1,7 +1,5 @@
 # aclnnMoeInitRoutingV3
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/moe/moe_init_routing_v3)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->

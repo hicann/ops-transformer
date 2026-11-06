@@ -84,7 +84,7 @@ ${op_class}                    # 算子分类
 |------|------|---------|
 | 代码交付件 | 需提供算子 Kernel 实现、算子测试文件 | [fast_kernel_launch_example](examples/fast_kernel_launch_example/README.md) |
 | 文档交付件 | 算子 README 文档为必选，其余文档可视情况提供 | [文档贡献指南](docs/CONTRIBUTING_DOCS.md) |
-| 精度要求 | 新贡献算子需满足精度标准 | [生态算子开源精度标准](https://atomgit.com/cann/opbase/blob/master/docs/zh/ops_precision_standard/mixed_tolerance_standard.md) |
+| 精度要求 | 新贡献算子需满足精度标准 | [生态算子开源精度标准](https://atomgit.com/cann/opbase/blob/9.3.0-beta.1/docs/zh/ops_precision_standard/mixed_tolerance_standard.md) |
 
 **合规检查：**
 

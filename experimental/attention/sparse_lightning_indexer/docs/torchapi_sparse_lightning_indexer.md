@@ -7,7 +7,6 @@ source 算子（`lightning_indexer_candidate`，即 aclnnLightningIndexerV2 cand
 输出的候选块索引，做候选外 leak 降级 TopK。仅支持 ascend910b/ascend910_93
 （Atlas A2/A3 系列，arch22），无 ascend950 路径。
 
-
 ## 接口定义
 
 ```python

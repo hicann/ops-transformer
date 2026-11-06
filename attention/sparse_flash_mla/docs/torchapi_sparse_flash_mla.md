@@ -322,7 +322,7 @@ cann_ops_transformer.sparse_flash_mla(
 
 layout匹配关系表：
 
-| layout_q | layout_kv | q/kv维度 | softmax_lse维度（使能时） |
+| layout_q | layout_kv | q/kv维度 | softmax_lse维度（开启时） |
 | :--- | :--- | :--- | :--- |
 | `BSND` | `BSND` | q：(b, q_s, q_n, d)<br>kv：(b, ori_kv_s, kv_n, d) | (b, kv_n, q_s, q_n/kv_n) |
 | `TND` | `TND` | q：(q_t, q_n, d)<br>kv：(ori_kv_t, kv_n, d) | (kv_n, q_t, q_n/kv_n) |

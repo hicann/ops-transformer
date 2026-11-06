@@ -246,7 +246,6 @@ cann_ops_transformer.flash_attn_metadata(
 ) -> Tensor
 ```
 
-
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度(shape) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | num_heads_q | int | 必选 | Query head数，即N1 | int32 | - | - |

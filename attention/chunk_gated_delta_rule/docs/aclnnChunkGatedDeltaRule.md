@@ -1,7 +1,5 @@
 # aclnnChunkGatedDeltaRule
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/chunk_gated_delta_rule)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -309,7 +307,7 @@ aclnnStatus aclnnChunkGatedDeltaRule(
   - $-1 \le key[i][j][k] \le 1$，且key需要归一化处理
   - $-1 \le g[i][j] \le 0$
   - $0 < beta[i][j] < 1$
-- initialState、finalState float32数据类型仅在Ascend 950PR&950DT系列产品支持。
+- initialState、finalState float32数据类型仅在<term>Ascend 950PR&950DT系列产品</term>支持。
 
 ## 调用示例
 

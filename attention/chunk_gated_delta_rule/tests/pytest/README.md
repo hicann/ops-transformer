@@ -116,11 +116,13 @@ random/random_npu 模式均使用同一套随机参数生成器（`_generate_ran
 **shape 约束**：B>0、seqlen>0、0<Nk<=64、0<Nv<=64 且 Nv>=Nk 且 Nv%Nk==0、0<Dk<=128、0<Dv<=128。
 
 **内存约束**：
+
 - Dk×Dv 受 state 元素数上限 `_STATE_ELEM_CAP=2.0B` 约束（`budget = STATE_ELEM_CAP // (B × Nv)`）
 - T×max(Nk×Dk, Nv×Dv) 受 QKV 张量元素上限 `_QKV_ELEM_CAP=1.0B` 约束（`max_seqlen = QKV_ELEM_CAP // (B × qkv_per_token)`）
 - 两项约束共同防止单进程 OOM
 
 **随机种子机制**：
+
 - `RANDOM_SEED` 控制 shape/参数序列（一个 seed 对应一组确定的 N 条用例参数）
 - `TORCH_SEED` 控制张量数值（每条用例独立，conftest 自动生成并记 CSV）
 - 不设 `RANDOM_SEED` 时自动生成并回写 `os.environ`，conftest 落 CSV

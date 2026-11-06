@@ -8,7 +8,6 @@
 
 融合时TensorMove节点的输入/输出控制边会一并转移到ApplyRotaryPosEmb节点，保证执行时序不变；由于TensorMove是恒等拷贝，ApplyRotaryPosEmb的输入描述无需刷新。
 
-
 ## 使用约束
 
 - 无平台门控，所有支持ApplyRotaryPosEmb图模式的平台上均可生效。

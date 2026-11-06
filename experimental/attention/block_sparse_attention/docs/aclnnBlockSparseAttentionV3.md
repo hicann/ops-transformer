@@ -80,7 +80,7 @@
 
 ## 函数原型
 
-每个算子分为[两段式接口](https://atomgit.com/cann/ops-transformer/blob/master/docs/zh/context/two_phase_api.md)，必须先调用"aclnnBlockSparseAttentionV3GetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnBlockSparseAttentionV3"接口执行计算。
+每个算子分为[两段式接口](https://atomgit.com/cann/ops-transformer/blob/9.3.0-beta.1/docs/zh/context/two_phase_api.md)，必须先调用"aclnnBlockSparseAttentionV3GetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnBlockSparseAttentionV3"接口执行计算。
 
 ```c++
 aclnnStatus aclnnBlockSparseAttentionV3GetWorkspaceSize(
@@ -303,7 +303,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         当配置此输入时：
         <ul>
           <li>当quantMode=1, shape为[batch, headNum, ceilDiv(maxQSeqLength, 128), 1]。</li>
-  		   <li>quantMode=2/3, 约束见<a href="#MXFP4量化模式的量化缩放因子">MXFP4量化模式的量化缩放因子。</a></li>
+       <li>quantMode=2/3, 约束见<a href="#MXFP4量化模式的量化缩放因子">MXFP4量化模式的量化缩放因子。</a></li>
         </ul>
       </td>
       <td>FLOAT32、FLOAT8_E8M0</td>
@@ -324,7 +324,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         当配置此输入时：
         <ul>
           <li>当quantMode=1,shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 256), 1]或shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 512), 1]。</li>
-  		 <li>quantMode=2/3, 约束见<a href="#MXFP4量化模式的量化缩放因子">MXFP4量化模式的量化缩放因子。</a></li>
+     <li>quantMode=2/3, 约束见<a href="#MXFP4量化模式的量化缩放因子">MXFP4量化模式的量化缩放因子。</a></li>
         </ul>
       </td>
       <td>FLOAT32、FLOAT8_E8M0</td>
@@ -473,7 +473,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
     <tr>
       <td>softmaxLseFlag（int64_t）</td>
       <td>输入</td>
-      <td>是否使能softmaxLse输出的标志位。</td>
+      <td>是否开启softmaxLse输出的标志位。</td>
       <td>
         当前只支持传0或1。
         <ul>
@@ -685,7 +685,9 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 - preTokens和nextTokens当前只支持输入2147483647，表示当前token的前后所有token都参与attention运算，即不支持滑窗attention。
 - **quantMode=1(FP8静态量化模式)相关约束**：
 
-  - 仅Ascend 950PR&950DT系列产品支持。
+  <!-- npu="950" id10 -->
+  - 仅<term>Ascend 950PR&950DT系列产品</term>支持。
+  <!-- end id10 -->
   - 输入的query、key、value采用FLOAT8_E4M3FN数据类型，需要提供以下量化缩放因子参数：
     - qDequantScale（query量化缩放因子）
 
@@ -711,8 +713,9 @@ aclnnStatus aclnnBlockSparseAttentionV3(
   - blockShapeOptional必须传入。
   - q和kv的量化块大小必须与blockShapeOptional的两个元素大小分别保持一致。
 - **quantMode=2/3 (MXFP4量化模式)相关约束（新增）**
-
-  - 仅Ascend 950PR&950DT系列产品支持
+<!-- npu="950" id11 -->
+  - 仅<term>Ascend 950PR&950DT系列产品</term>支持
+<!-- end id11 -->
   - D仅支持64/128;
   - attentionOut数据类型仅支持FLOAT16或BFLOAT16；
   - 暂不支持attenMaskOptional、PagedAttention、softmaxLse等高阶特性。

@@ -108,12 +108,12 @@
    Quant表示前述量化计算过程，对原地更新参数k\_cache和ckv\_cache：
 
   $$
-  k\_cache[scatter\_idx, ...] = Quant(x = rope\_out, scale = k\_scale, offset = k\_offset)[b, n, s]
+  k\_cache[scatter\_idx, ...] = Quant[x = rope\_out, scale = k\_scale, offset = k\_offset](b, n, s)
   $$
 
   $$
   ckv\_cache[scatter\_idx, ...] = \begin{cases} Quant(x = \operatorname{RmsNorm}(x), scale = v\_scale, offset = v\_offset)[b, n, s], \quad vOptional = None \\
-  Quant(x = vOptional, scale = v\_scale, offset = v\_offset)[b, n, s],  \quad vOptional != None
+  Quant[x = vOptional, scale = v\_scale, offset = v\_offset](b, n, s),  \quad vOptional != None
   \end{cases}
   $$
 
@@ -130,7 +130,6 @@
   vOptional,  \quad vOptional != None
   \end{cases}
   $$
-
 
 ## 参数说明
 
@@ -416,8 +415,8 @@
     * 当cache_mode为PA_BNSD、PA_NZ、PA_BLK_BNSD、PA_BLK_NZ时，cache中的数据排布方式为：
       * 非量化模式下：k_cache 为 [block_num, Dk//16, block_size, 1, 16]；ckv_cache 为 [block_num, Dv//16, block_size, 1, 16]。
       * 静态量化模式下：k_cache 为 [block_num, Dk//32, block_size, 1, 32]；ckv_cache 为 [block_num, Dv//32, block_size, 1, 32]。
-    * 当cache_mode为PA_BNSD、PA_NZ时，shape为1维[Bkv * Skv]，要求index的value值范围为[-1,block_num * block_size)。value数值不能重复。
-    * 当cache_mode为PA_BLK_BNSD、PA_BLK_NZ时，shape为1维[Bkv * ceil_div(Skv,block_size)]，要求index的value的数值范围为[-1,block_num * block_size)。value/block_size的值不能重复。
+    \* 当cache\_mode为PA\_BNSD、PA\_NZ时，shape为1维[Bkv \* Skv]，要求index的value值范围为[-1,block\_num \* block\_size)。value数值不能重复。
+    \* 当cache\_mode为PA\_BLK\_BNSD、PA\_BLK\_NZ时，shape为1维[Bkv \* ceil\_div(Skv,block\_size)]，要求index的value的数值范围为[-1,block\_num \* block\_size)。value/block\_size的值不能重复。
   * is_output_kv约束：
     * 作用是输出中间处理结果：开启 k_rope 和 c_kv。
     * 在cache_mode为PA, PA_BNSD, PA_NZ, PA_BLK_BNSD, PA_BLK_NZ模式时有效。
@@ -425,7 +424,7 @@
 
   * 输入组合约束：
 
-    * 本约束内条目，仅适用于<b>Atlas A3系列产品</b>、<b>Atlas A2系列产品</b>。
+    * 本约束内条目，仅适用于<b><term>Atlas A3系列产品</term></b>、<b><term>Atlas A2系列产品</term></b>。
     * 在所有cache_mode下，必定支持`非广播模式`：即`[B, N, S]`三个维度与`kv`严格一致的`旋转位置编码（RoPE）参数`和`量化参数`。
     * 在各种cache_mode下，支持的合法输入shape模式如下表：
 
@@ -475,7 +474,7 @@
 
   * vOptional：
     * 该参数仅限aclnnKvRmsNormRopeCacheV2接口，aclnnKvRmsNormRopeCache接口不支持该参数！
-    * 该参数仅限<b>Atlas A3系列产品</b>、<b>Atlas A2系列产品</b>。
+    * 该参数仅限<b><term>Atlas A3系列产品</term></b>、<b><term>Atlas A2系列产品</term></b>。
       * 该参数仅在<b>kv分离场景(V2)</b>中作为必须入参，在其他类型中会作为无效参数被忽略。
       * 当vOptional存在时，它的类型必须与kv一致，`[B, N, S]`维度也必须与kv一致。
     * Ascend 950PR&950DT系列产品：不会拦截该参数，但实际功能不支持，也不会处理该参数。

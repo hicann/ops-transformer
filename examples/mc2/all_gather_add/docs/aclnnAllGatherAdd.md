@@ -1,7 +1,5 @@
 # aclnnAllGatherAdd
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/examples/mc2/all_gather_add)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -250,7 +248,7 @@ aclnnStatus aclnnAllGatherAdd(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考本算子README文件调用说明中的[编译与运行样例](../README.md)。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[ <<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="A3,910b" id7 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：

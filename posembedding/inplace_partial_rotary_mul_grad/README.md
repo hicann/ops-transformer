@@ -46,8 +46,6 @@
     dx' = cat((cos1' * dy1' + sin2' * dy2', cos2' * dy2' - sin1' * dy1'), dim=-1)
     $$
 
-
-
     （2）interleave模式（rotary_mode等于1）：
     $$
     dy1', dy2' = dy'[..., :: 2], dy'[..., 1 :: 2]
@@ -64,8 +62,6 @@
     $$
     dx' = stack((cos1' * dy1' + sin2' * dy2', cos2' * dy2' - sin1' * dy1'), dim=-1).reshape(dy'.shape)
     $$
-
-
 
     （3）quarter模式（rotary_mode等于2）：
     $$
@@ -84,8 +80,6 @@
     dx' = cat((cos1' * dy1' + sin2' * dy2', cos2' * dy2' - sin1' * dy1', cos3' * dy3' + sin4' * dy4', cos4' * dy4' - sin3' * dy3'), dim=-1)
     $$
 
-
-
     （4）interleave-half模式（rotary_mode等于3）：
     $$
     dy1', dy2' = chunk(dy', chunks=2, dim=-1)
@@ -102,8 +96,6 @@
     $$
     dx' = stack((cos1' * dy1' + sin2' * dy2', cos2' * dy2' - sin1' * dy1'), dim=-1).reshape(dy'.shape)
     $$
-
-
 
 ## 参数说明
 
@@ -177,7 +169,6 @@
   - quarter模式下，当切片长度(end - start)大于0时，切片长度必须能被4整除。
   - 输入张量cos和sin的数据类型必须相同。
 - **空输入支持**：当切片长度为0（`partial_slice`的start等于end，如`[0, 0]`），或dy、cos、sin中存在空Tensor（某维大小为0）时，算子执行no-op操作，不做旋转位置编码计算，直接返回。
-
 
 ## 调用说明
 

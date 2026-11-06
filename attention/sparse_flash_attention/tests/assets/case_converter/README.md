@@ -61,7 +61,6 @@ list、tuple、字典使用 Python 字面量，例如 `[0, 16, 32]`、`(1, 16, 8
 
 - `q_type/kv_type` 支持 FP16/BF16 别名；使用 `use_sinks=True` 启用 sinks。
 
-
 `is_enabled` 缺省 True；显式 False 保持 False，不根据历史测试结果修改启用状态。
 `precision_tolerances/absolute_precision` 可显式覆盖转换默认值。
 `remark/network_name/priority/soc_series/golden_api/device_ids` 及已有 batch 字段按表中值保留。

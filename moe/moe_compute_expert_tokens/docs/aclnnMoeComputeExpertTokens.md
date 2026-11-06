@@ -1,7 +1,5 @@
 # aclnnMoeComputeExpertTokens
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/moe/moe_compute_expert_tokens)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->

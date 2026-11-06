@@ -275,8 +275,8 @@ If this block-sparse kernel is of interest, please consider merging it with the 
 </tbody>
 </table>
 
-- Atlas A2系列产品：数据类型支持FLOAT16、BFLOAT16、INT8。
-- Atlas推理系列产品：仅支持FLOAT16。
+- <term>Atlas A2系列产品</term>：数据类型支持FLOAT16、BFLOAT16、INT8。
+- <term>Atlas推理系列产品</term>：仅支持FLOAT16。
 
 ## 约束说明
 
@@ -286,7 +286,7 @@ If this block-sparse kernel is of interest, please consider merging it with the 
 
 - query，key，value输入，功能使用限制如下：
 
-  - Atlas A2系列产品：
+  - <term>Atlas A2系列产品</term>：
 
     - 支持B轴小于等于65536（64k），输入类型包含INT8时D轴非32对齐或输入类型为FLOAT16或BFLOAT16时D轴非16对齐时，B轴仅支持到128。
 
@@ -347,7 +347,7 @@ If this block-sparse kernel is of interest, please consider merging it with the 
 
     - 支持D轴小于等于512。inputLayout为BSH或者BSND时，要求N*D小于65535。
 
-  - Atlas A2系列产品：在TND场景下query，key，value输入的综合限制：
+  - <term>Atlas A2系列产品</term>：在TND场景下query，key，value输入的综合限制：
     - T小于等于65536。
     - N等于8/16/32/64/128，且Q_N、K_N、V_N相等。
     - Q_D、K_D等于192，V_D等于128/192。

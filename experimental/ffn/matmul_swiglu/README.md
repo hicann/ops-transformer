@@ -21,6 +21,7 @@ $$
 $$
 
 其中：
+
 - x：输入激活，形状 `[M, K]`。
 - weight：打包权重，形状 `[K, 2N]`（`transpose_weight=true` 时为 `[2N, K]`）。
 - bias：可选偏置，形状 `[2N]`。

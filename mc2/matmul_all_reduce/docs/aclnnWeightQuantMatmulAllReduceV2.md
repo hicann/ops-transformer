@@ -1,7 +1,5 @@
 # aclnnWeightQuantMatmulAllReduceV2
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/mc2/matmul_all_reduce)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -347,7 +345,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceV2(
   - Ascend 950PR&950DT系列产品：`aclnnWeightQuantMatmulAllReduceV2`默认确定性实现。
   <!-- end id10 -->
 
-- 增量场景不使能MC2，全量场景使能MC2。
+- 增量场景不开启MC2，全量场景开启MC2。
 - 输入x1可为二维或者三维，其shape为(b, s, k)或者(m, k)。
 - x2必须是二维。其shape为(k, n)，k轴满足mm算子入参要求，k轴相等，m的范围为[1, 2147483647]，k、n的范围为[1, 65535]。
 - 传入的x1、x2、antiquantScale或者output不为空指针。

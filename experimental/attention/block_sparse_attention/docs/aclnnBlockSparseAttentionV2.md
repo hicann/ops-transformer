@@ -445,7 +445,7 @@ aclnnStatus aclnnBlockSparseAttentionV2(
     <tr>
       <td>softmaxLseFlag（int64_t）</td>
       <td>输入</td>
-      <td>是否使能softmaxLse输出的标志位。</td>
+      <td>是否开启softmaxLse输出的标志位。</td>
       <td>
         当前只支持传0或1。
         <ul>

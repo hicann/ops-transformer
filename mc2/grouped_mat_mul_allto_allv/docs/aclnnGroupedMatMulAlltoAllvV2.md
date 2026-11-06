@@ -1,7 +1,5 @@
 # aclnnGroupedMatMulAlltoAllvV2
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/mc2/grouped_mat_mul_allto_allv)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -372,13 +370,13 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
 - 通信引擎约束：
 
   <!-- npu="A3" id10 -->
-  - Atlas A3系列产品：支持AI CPU通信和AIV通信。
+  - <term>Atlas A3系列产品</term>：支持AI CPU通信和AIV通信。
   <!-- end id10 -->
   <!-- npu="910b" id11 -->
-  - Atlas A2系列产品：仅支持AIV通信。
+  - <term>Atlas A2系列产品</term>：仅支持AIV通信。
   <!-- end id11 -->
   <!-- npu="950" id12 -->
-  - Ascend 950DT系列产品：支持 CCU 通信和 AI CPU 通信，CCU 仅支持单机 UB 域内互联，AI CPU 可支持跨机 UB 域内互联。
+  - <term>Ascend 950DT系列产品</term>：支持 CCU 通信和 AI CPU 通信，CCU 仅支持单机 UB 域内互联，AI CPU 可支持跨机 UB 域内互联。
 
   <!-- end id12 -->
 
@@ -386,11 +384,11 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
   - BSK：本卡接收的token数，是recvCounts参数累加之和，取值范围(0, 52428800)。
   - H1：表示路由专家hidden size隐藏层大小，取值范围(0, 65536)。
   - H2：表示共享专家hidden size隐藏层大小，取值范围(0, 12288]。
-  - e：表示单卡上专家个数，AIV通信要求e > 0且e * epWorldSize最大支持1024；其他通信引擎要求e<=32且e * epWorldSize最大支持256。
+  - e：表示单卡上专家个数，AIV通信要求e > 0且e \* epWorldSize最大支持1024；其他通信引擎要求e<=32且e \* epWorldSize最大支持256。
   - N1：表示路由专家的head_num，取值范围(0, 65536)。
   - N2：表示共享专家的head_num，取值范围(0, 65536)。
   - BS：batch sequence size。
-  - K：表示选取TopK个专家，Atlas A3系列产品的AIV通信支持[2, 16]，其他场景支持[2, 8]。
+  - K：表示选取TopK个专家，<term>Atlas A3系列产品</term>的AIV通信支持[2, 16]，其他场景支持[2, 8]。
   - A：本卡发送的token数，是sendCounts参数累加之和。
   - ep通信域内所有卡的A参数的累加和等于所有卡上的BSK参数的累加和。
 

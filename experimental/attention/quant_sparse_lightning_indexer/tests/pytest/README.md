@@ -11,6 +11,7 @@
 | `qli_cand_orig_consumer.py` | 第二级设备测试（38 个用例）。由主算子测试 `qli_cand_orig.py`（上溯 `/opt/tjj/qli_cand_test/test_qli_cand.py`）按 `cand_mode` 切片迁移而来，并在 2026-10-08 并入原 `qli_consumer_two_level.py`（算子级精度矩阵）中形状不重复的 13 个用例与其端到端检查。用例形态：大 shape（16K/128K）、TND、0 轴非连续（pa_gap）、output_idx_offset、g 32/64、B=2/4 变长、topk=2048，以及两个锚点 —— `pin_overflow`（位置块数 2049 = 候选容量 2048 + 1，部分覆盖 + pin 尾块）与 `decode_long_m1`（s1=1 × s2=131072，生产 pool/table 规格） |
 
 **两条比对路径**（同一文件内）：
+
 1. **吃 golden 候选**（全部 38 个用例默认执行）：候选索引由参考实现生成，隔离 consumer 自身精度；
 2. **吃第一级 NPU 候选**（`E2E_IDS` 内 8 个用例额外执行）：先跑第一级 `quant_lightning_indexer_candidate`
    取候选，再喂给 consumer，与「同一候选下」的 golden 比对 —— 属链路一致性验证（第一级自身精度由

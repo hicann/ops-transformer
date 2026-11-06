@@ -198,7 +198,6 @@ cann_ops_transformer.lightning_indexer(
   - 参数metadata必须传入，shape为(1024,)。
 <!-- end id8 -->
 
-
 ### 特性参数组
 
 |      特性参数组      |     参数字段名称     |
@@ -209,16 +208,16 @@ cann_ops_transformer.lightning_indexer(
 |   稀疏压缩参数组    | cmp_ratio、cmp_residual_k |
 | Paged Attention参数组 | block_table |
 
-
-
 ### 基准信息说明
 
 #### 公共参数组
+
 - 入参为空的场景处理：
     - 空Tensor指必选输入和输出的shape size为0，即有任意轴为0。
     - 触发空tensor的用例将全部拦截报错。
 
 - q、k、sparse_indices、sparse_values校验
+
 <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
 <col style="width: 147px">
 <col style="width: 232px">
@@ -302,7 +301,6 @@ cann_ops_transformer.lightning_indexer(
     </tr>
 </tbody>
 </table>
-
 
 layout匹配关系表：
 <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
@@ -505,6 +503,7 @@ mask_mode参数解释
 </table>
 
 #### Paged Attention参数组
+
 当block_table不为空时，开启Paged Attention
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>
@@ -546,6 +545,7 @@ mask_mode参数解释
 </table>
 
 ## 确定性计算
+
 默认支持确定性计算
 
 ## 调用示例

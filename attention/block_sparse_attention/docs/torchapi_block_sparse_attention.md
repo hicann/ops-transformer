@@ -133,7 +133,7 @@ cann_ops_transformer.block_sparse_attention(
 | inner_precise | int | 可选 | Softmax计算采取的精度级别，默认1，支持0、1、4 | int64 | - | - | - |
 | actual_seq_lengths | list[int] | TND时必选/其余可选 | 每个batch对应的query实际序列长度 | int64 | - | 长度为B | - |
 | actual_seq_lengths_kv | list[int] | TND时必选/其余可选 | 每个batch对应的key/value实际序列长度 | int64 | - | 长度为B | - |
-| return_softmax_lse | bool | 可选 | 是否使能softmaxLse输出，默认False | BOOL | - | - | - |
+| return_softmax_lse | bool | 可选 | 是否开启softmaxLse输出，默认False | BOOL | - | - | - |
 | mask_type | int | 可选 | attention计算中的掩码类型，默认0，当前仅支持0 | int64 | - | - | - |
 | quant_mode | int/QuantMode | 可选 | 量化模式，默认 `NO_QUANT`（0）。支持传入枚举或对应 int 值，枚举定义见「quant_mode 枚举」。量化公式见「约束说明」 | int64 | - | - | - |
 | block_size | int | 可选 | PagedAttention的block大小，默认0，当前不支持PagedAttention，仅支持0 | int64 | - | - | - |
@@ -187,7 +187,9 @@ cann_ops_transformer.block_sparse_attention(
 
 ### quant_mode=FP8_QUANT（1，FP8量化）相关约束
 
+<!-- npu="950" id12 -->
 - 仅<term>Ascend 950PR&950DT系列产品</term>支持。
+<!-- end id12 -->
 - query、key、value必须同时为float8_e4m3fn，且必须同时提供q_dequant_scale、k_dequant_scale、v_dequant_scale三个反量化缩放因子。
 - 反量化缩放因子的数据类型必须为float32：
   - q_dequant_scale：shape为[Batch, HeadNum, ceilDiv(maxQSeqLength, 128), 1]，在QK矩阵乘法时对query进行反量化；
@@ -197,7 +199,9 @@ cann_ops_transformer.block_sparse_attention(
 
 ### quant_mode=MXFP4_OCP_QUANT / MXFP4_CX_QUANT（2/3，MXFP4量化）相关约束
 
+<!-- npu="950" id13 -->
 - 仅<term>Ascend 950PR&950DT系列产品</term>支持。
+<!-- end id13 -->
 - query、key、value为float4_e2m1fn_x2（以uint8伪装传入，D轴为uint8元素个数，逻辑headDim为2*D），需要提供float8_e8m0fnu类型的descale张量：
   - q_dequant_scale：MX量化模式，仅支持Rowwise E8M0 Micro Scaling，shape为：
     - BNSD: [B, Nq, Sq, ceilDiv(D, 64), 2]；
@@ -231,7 +235,9 @@ cann_ops_transformer.block_sparse_attention(
 
 ### quant_mode=MXFP8_OCP_QUANT（4，MXFP8 OCP量化）相关约束
 
+<!-- npu="950" id14 -->
 - 仅<term>Ascend 950PR&950DT系列产品</term>支持。
+<!-- end id14 -->
 - query、key、value为float8_e4m3fn（最后一维为逻辑headDim，不翻倍），需要提供float8_e8m0fnu类型的descale张量，shape与MXFP4相同。
 - attention_out_dtype必须为float16或bfloat16，attentionOut的shape与query一致。
 - block_x和block_y均须为64的倍数。
@@ -244,7 +250,9 @@ cann_ops_transformer.block_sparse_attention(
 
 ### quant_mode=HIF8_QKVP_PERTENSOR_QUANT（5，HIF8 per-tensor量化）相关约束
 
+<!-- npu="950" id15 -->
 - 仅<term>Ascend 950PR&950DT系列产品</term>支持。query、key、value必须同时为uint8，并按HIFLOAT8编码解释；HIFLOAT8输入必须使用`quant_mode=HIF8_QKVP_PERTENSOR_QUANT`（5）。
+<!-- end id15 -->
 - q_input_layout与kv_input_layout必须一致，仅支持"TND"、"BNSD"、"BSND"；query、key、value的D轴仅支持64或128。
 - q_dequant_scale、k_dequant_scale、v_dequant_scale必须同时传入，均为float32、shape为[1]，分别作为整个query、key、value张量共用的反量化缩放因子；不支持per-token或per-channel缩放因子。
 - p_quant_scale可选。传入时必须为float32、shape为[1]，且为有限正数，用于softmax结果P的量化；传入None时默认使用16.0。其他量化模式必须为None。

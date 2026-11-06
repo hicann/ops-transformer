@@ -28,7 +28,6 @@ AllGatherAdd算子实现了[AllGather](https://www.hiascend.com/document/detail/
 - 算子输入输出的数据类型为float16，[format](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/ascendcopapi/atlasascendc_api_07_0961.html)为：ND。
 - group为算子属性，表示通信域名称，明确算子运行时所在的通信域。
 
-
 ### 1.3 核函数名称和参数
 
 - 本样例中核函数命名为all_gather_add。
@@ -38,9 +37,9 @@ AllGatherAdd算子实现了[AllGather](https://www.hiascend.com/document/detail/
 
 | 接口 | 描述 | 参考连接 |
 |--|--------------------------------------------------------------------------|--|
-| AllGather | 算子涉及AllGather通信，需要使用Hccl高阶API来实现AllGather通信。 |https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/commlib/hcclug/hcclug_000001.html  |
-| DataCopy | 算子涉及Add被加数和加数在外部存储和内部存储间的数据搬运，需要使用DataCopy来实现数据搬运。 | https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/ascendcopapi/atlasascendc_api_07_0103.html  |
-| Add | 计算过程涉及Add矢量计算操作，需要使用Add基础算术API实现加法计算。| https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/ascendcopapi/atlasascendc_api_07_0035.html |
+| AllGather | 算子涉及AllGather通信，需要使用Hccl高阶API来实现AllGather通信。 |<https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/commlib/hcclug/hcclug_000001.html>  |
+| DataCopy | 算子涉及Add被加数和加数在外部存储和内部存储间的数据搬运，需要使用DataCopy来实现数据搬运。 | <https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/ascendcopapi/atlasascendc_api_07_0103.html>  |
+| Add | 计算过程涉及Add矢量计算操作，需要使用Add基础算术API实现加法计算。| <https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/ascendcopapi/atlasascendc_api_07_0035.html> |
 
 ### 1.5 算子规格
 
@@ -120,7 +119,6 @@ AllGatherAdd算子实现了[AllGather](https://www.hiascend.com/document/detail/
         <td colspan="4">GetHcclContext：获取通信Context</td>
     </tr>
 </table>
-
 
 ## 数据流分析
 
@@ -214,7 +212,7 @@ OP_ADD(AllGatherAdd);
 - 通信切分策略：每轮通信数据块的大小，对通算融合算子的性能有较大影响。本样例为了向通算融合算子的初次使用者清晰展示通信计算掩盖的流程，将通信切分为两轮进行，第二轮通信和前一轮通信结果的Add计算进行掩盖。具体场景中如何切分使得性能最优，请参考[《Ascend C最佳实践》](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/opdevg/Ascendcopdevg/atlas_ascendc_map_10_0002.html)中的优秀实践：[MC²算子性能调优案例](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/opdevg/Ascendcopdevg/atlas_ascendc_best_practices_10_0043.html)。
 - Add多核切分: 根据当前核数(rank_size = 2)，对输入shape的Y轴进行多核切分，得到单核内shape的大小。
 
-本样例中计算数据量为x2的数据量，即480 * 256 * sizeof (float16) = 480 * 256 *（2 bytes/1024） KB = 240KB。当AIV核数为48时，单核计算量为5KB，当AIV核数为40时，单核计算量为6KB，两种情况均小于最大可分配Unified Buffer（AIV的[统一缓冲区](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/opdevg/Ascendcopdevg/atlas_ascendc_10_0008.html)，向量和标量计算的输入和输出）大小192KB，进行Add计算时需要均分给三个操作数，因此每个操作数有64KB最大可用片上UB（开启[Double Buffer](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/opdevg/Ascendcopdevg/atlas_ascendc_10_0090.html)时最大可用32KB），因此不需要核内切分。
+本样例中计算数据量为x2的数据量，即480 \* 256 \* sizeof (float16) = 480 \* 256 \*（2 bytes/1024） KB = 240KB。当AIV核数为48时，单核计算量为5KB，当AIV核数为40时，单核计算量为6KB，两种情况均小于最大可分配Unified Buffer（AIV的[统一缓冲区](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/opdevg/Ascendcopdevg/atlas\_ascendc\_10\_0008.html)，向量和标量计算的输入和输出）大小192KB，进行Add计算时需要均分给三个操作数，因此每个操作数有64KB最大可用片上UB（开启[Double Buffer](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/opdevg/Ascendcopdevg/atlas\_ascendc\_10\_0090.html)时最大可用32KB），因此不需要核内切分。
 
 下面给出本样例Tiling实现关键步骤：
 
@@ -393,7 +391,7 @@ extern "C" __global__ __aicore__ void all_gather_add(GM_ADDR aGM, GM_ADDR bGM, G
 
     ![all_gather_add_core_partition_diagram.png](figures/all_gather_add_core_partition_diagram.png)
 
-    如上图所示，假设当前在AIV-26核进行第一次Add计算，根据Process()函数逻辑，当i = 0时，CalcAddGmAddr函数第一次触发执行，根据[hccl.wait()](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/ascendcopapi/atlasascendc_api_07_0878.html)接口说明，此时第一轮通信已经完成，第二轮通信开始，因此CalcAddGmAddr函数中计算本核需要处理数据的起始地址偏移时，首先偏移i * 单次通信数据长度的距离，如图commOffset；每次Add操作对上一轮通信的结果进行计算，由于通信分多轮进行，每张卡的相邻数据块在gatherOutGM中起始地址存在偏移（即strideCount），因此需要根据卡数和当前核的index计算当前核被分到处理哪个rank的通信数据，如图，总共40个AIV核被均分给两个rank，则AIV-26被分到处理来自rank1的数据，blockOffset如图；计算出当前核处理的rank后，最终偏移需要再加上在此rank数据上的偏移，即6 * 每个核处理的数据个数。
+    如上图所示，假设当前在AIV-26核进行第一次Add计算，根据Process()函数逻辑，当i = 0时，CalcAddGmAddr函数第一次触发执行，根据[hccl.wait()](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/ascendcopapi/atlasascendc\_api\_07\_0878.html)接口说明，此时第一轮通信已经完成，第二轮通信开始，因此CalcAddGmAddr函数中计算本核需要处理数据的起始地址偏移时，首先偏移i \* 单次通信数据长度的距离，如图commOffset；每次Add操作对上一轮通信的结果进行计算，由于通信分多轮进行，每张卡的相邻数据块在gatherOutGM中起始地址存在偏移（即strideCount），因此需要根据卡数和当前核的index计算当前核被分到处理哪个rank的通信数据，如图，总共40个AIV核被均分给两个rank，则AIV-26被分到处理来自rank1的数据，blockOffset如图；计算出当前核处理的rank后，最终偏移需要再加上在此rank数据上的偏移，即6 \* 每个核处理的数据个数。
     CalcAddGmAddr函数实现如下：
 
     ```cpp
@@ -419,7 +417,7 @@ extern "C" __global__ __aicore__ void all_gather_add(GM_ADDR aGM, GM_ADDR bGM, G
 ## 编译和运行
 
 编译部署算子请参考开源仓算子README：
-https://atomgit.com/cann/ops-transformer/blob/master/examples/mc2/all_gather_add/README.md
+<https://atomgit.com/cann/ops-transformer/blob/9.3.0-beta.1/examples/mc2/all_gather_add/README.md>
 
 ## 算子执行样例
 

@@ -1,7 +1,5 @@
 # aclnnMatmulReduceScatterV2
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/mc2/matmul_reduce_scatter_v2)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -434,7 +432,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
     - mx量化场景下，x2/x2Scale支持转置/不转置输入。
     - mx量化场景下，且x1和x2输入为FLOAT4_E2M1（MXFP4量化）时，k必须是偶数，当x2不转置输入时，n必须也是偶数。
     - 支持2、4、8、16、32、64卡；支持CCU通信和AICPU通信，CCU仅支持单机UB域内互联，AICPU可支持跨机UB域内互联。
-    - ReduceScatter集合通信数据总量不能超过16 * 256MB，集合通信数据总量计算方式为：m * n * sizeof(output_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
+    - ReduceScatter集合通信数据总量不能超过16 \* 256MB，集合通信数据总量计算方式为：m \* n \* sizeof(output\_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
 
 <!-- end id14 -->
 <!-- npu="A3,910b" id15 -->

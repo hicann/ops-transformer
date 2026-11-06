@@ -1,7 +1,5 @@
 # aclnnMatmulAllReduceV3
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/mc2/matmul_all_reduce)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -313,7 +311,7 @@ aclnnStatus aclnnMatmulAllReduceV3(
   - <term>Ascend 950PR&950DT系列产品</term>：`aclnnMatmulAllReduceV3`默认确定性实现。
   <!-- end id10 -->
 
-- 增量场景不使能MC2，全量场景使能MC2。
+- 增量场景不开启MC2，全量场景开启MC2。
 - 输入x1可为二维或者三维，其shape为(b, s, k)或者(m, k)。x2必须是二维，其shape为(k, n)，轴满足mm算子入参要求，k轴相等。bias若非空，其shape为(n)。
 - b*s、m、k、n的值均不得超过2147483647(INT32_MAX)。
 - 当输入x1的shape为(b, s, k)时，输出output的shape为(b, s, n)；当输入x1的shape为(m, k)时，输出output的shape为(m, n)。

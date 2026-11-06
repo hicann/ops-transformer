@@ -11,7 +11,7 @@ InterleaveRope与RotaryPositionEmbedding的输入一一对应（x/cos/sin），�
 ## 支持的型号
 
 <!-- npu="950" id1 -->
-Ascend 950PR&950DT系列产品
+<term>Ascend 950PR&950DT系列产品</term>
 <!-- end id1 -->
 
 ## 使用约束

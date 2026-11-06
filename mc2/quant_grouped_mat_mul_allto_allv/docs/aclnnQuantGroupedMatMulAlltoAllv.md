@@ -1,7 +1,5 @@
 # aclnnQuantGroupedMatMulAlltoAllv
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/mc2/grouped_mat_mul_allto_allv)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -514,7 +512,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
 - 通信引擎约束：
 
   <!-- npu="950" id7 -->
-  - Ascend 950DT系列产品：支持AI CPU通信。
+  - <term>Ascend 950DT系列产品</term>：支持AI CPU通信。
   <!-- end id7 -->
 
 - e * epWorldSize 乘积最大支持 256，其中 e（单卡专家数），最大支持 32，epWorldSize 支持 2/4/8/16/32/64/128/256;
@@ -573,7 +571,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-注意：由于量化接口仅支持Ascend 950DT系列产品，以下示例基于该系列实现。本示例代码以2卡为例，请根据实际环境卡数修改 EP_WORLD_SIZE。
+注意：由于量化接口仅支持<term>Ascend 950DT系列产品</term>，以下示例基于该系列实现。本示例代码以2卡为例，请根据实际环境卡数修改 EP_WORLD_SIZE。
 
 <!-- npu="950" id8 -->
 - <term>Ascend 950DT系列产品</term>：

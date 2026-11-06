@@ -2,14 +2,14 @@
 
 ## 产品支持情况
 
-| 产品                                                         | 是否支持 |
-| ------------------------------------------------------------ | :------: |
+|       产品                          | 是否支持 |
+| ---------------------------------    | :------: |
 |<term>Ascend 950PR&950DT系列产品</term>|      √     |
-|<term>Atlas A3系列产品</term>|      √     |
-|<term>Atlas A2系列产品</term>|      ×     |
-|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
-|<term>Atlas推理系列产品</term>|      ×     |
-|<term>Atlas训练系列产品</term>|      ×     |
+|<term>Atlas A3系列产品</term>           |      √     |
+|<term>Atlas A2系列产品</term>           |      ×     |
+|<term>Atlas 200I/500 A2推理产品</term>  |      ×     |
+|<term>Atlas推理系列产品</term>         |      ×     |
+|<term>Atlas训练系列产品</term>         |      ×     |
 
 ## 功能说明
 
@@ -67,6 +67,7 @@
 | state\_cache | 输出 | 更新后的state\_cache数据（与输入state\_cache共享存储）。 | FLOAT32         | ND          |
 
 ## 约束说明
+
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Hidden Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 - 输入shape限制：
     - wkv支持输入shape[coff\* D,H]
@@ -81,12 +82,12 @@
         - cu\_seqlens输入shape必须为[B+1,]。该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值，且第一位必须为0。**TH布局下为必选输入**。
         - seqused，支持输入shape[B,]，要求每个Batch的有效token数小于等于对应Sequence Length，即seqused[n] <= cu\_seqlens[n+1] - cu\_seqlens[n]，且不小于0。
         - state\_block\_table支持输入shape[B,ceil(Smax/block\_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(start\_pos)+max(cu\_seqlens[n+1] - cu\_seqlens[n])。
-        - cmp\_kv，输出shape为[min(T,T//cmp\_ratio+B),D]：<batch0>compressed\_tokens + <batch1>compressed\_tokens + ... + <batchN>compressed\_tokens + pad。
+        - cmp\_kv，输出shape为[min(T,T//cmp\_ratio+B),D]：\<batch0>compressed\_tokens + \<batch1>compressed\_tokens + ... + \<batchN>compressed\_tokens + pad。
     - 若x的维度不采用BS合轴，即x的输入shape为[B,S,H]
         - cu\_seqlens，**参数必须为空**。
         - seqused，支持输入shape[B,]，要求每个Batch的有效token数小于等于对应Sequence Length，即要求seqused[n] <= S，且不小于0。
         - state\_block\_table支持输入shape[B,ceil(Smax/block\_size)]。Smax为每个Batch中最大的Sequence Length，即Smax=max(start\_pos)+S。
-        - cmp\_kv，输出shape为[B,ceil(S/cmp\_ratio),D]：(<batch0>compressed\_tokens+pad0) + (<batch1>compressed\_tokens+pad1) + ...  + (<batchN>compressed\_tokens+padN)。
+        - cmp\_kv，输出shape为[B,ceil(S/cmp\_ratio),D]：(\<batch0>compressed\_tokens+pad0) + (\<batch1>compressed\_tokens+pad1) + ...  + (\<batchN>compressed\_tokens+padN)。
 - 输入值域限制：
   - 该接口支持B、S泛化，且存在如下场景限制：
       - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU内存的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
@@ -136,8 +137,10 @@
   - state\_cache支持非连续输入（通过state\_cache\_stride\_dim0属性指定stride）。
   - 该接口支持aclgraph模式。
 
-## Atlas A3推理系列产品 调用说明
+## Atlas A3推理系列产品调用说明
+
 - 单算子模式调用
+
     ```python
     import torch
     import torch_npu
@@ -314,7 +317,9 @@
         )
     )
     ```
+
 - aclgraph调用
+
     ```python
     import torch
     import torch_npu

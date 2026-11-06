@@ -137,6 +137,7 @@ attention layer 算子中，输入输出张量的排布格式通过 `inputLayout
 | PA_NZ / NZ | `[BlockNum, N, D/D0, BlockSize, D0]` | PA 场景 KV Cache 布局，D 维拆分为 D/D0 × D0 的 NZ 分形结构，5 维；最内层 D0=32（FP8/INT8）或 16（FP16/BF16/keyRope）；量化场景专用，INT8 时**仅支持** NZ | PageAttention 量化场景 KV Cache 存储 |
 
 > **补充说明**：
+>
 > - **BNSD_BSND**：特殊组合布局，输入为 BNSD 时输出格式为 BSND。
 > - PA_BSND 与 PA_NZ 的核心区别：PA_BSND 的 D 维连续存放（4 维），PA_NZ 将 D 维拆分为 NZ 分形（5 维），量化场景下对 Cube 指令更友好。
 
@@ -168,6 +169,7 @@ blockTable = [
 ```
 
 访问 batch 0 的 token 0~255 时：
+
 - token 0~127 → 逻辑块 0 → 查表得 block_id=3 → 读物理 `kvCache[3]`
 - token 128~255 → 逻辑块 1 → 查表得 block_id=7 → 读物理 `kvCache[7]`
 

@@ -312,7 +312,6 @@ aclnnStatus aclnnQkvRmsNormRopeCacheWithKScale(
     aclrtStream    stream);
 ```
 
-
 ## aclnnQkvRmsNormRopeCacheWithKScaleGetWorkspaceSize
 
 - **参数说明**

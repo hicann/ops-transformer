@@ -85,6 +85,7 @@ AIV，只由本 AIV 写，无跨核竞争；进主循环前该行已由 pre 阶�
 ### 1. custom 包编译与安装
 
 完整脚本（整合编译与安装步骤；`CANN_DIR` 为 CANN 安装根目录，按实际调整）：
+
 ```bash
 # 前置：加载 CANN 环境
 source ${CANN_DIR}/cann/set_env.sh
@@ -104,6 +105,7 @@ cd build_out
 编译产物：`build_out/cann-ops-transformer-custom_linux-x86_64.run`
 
 **可选参数说明**：
+
 - **`-j`（限制并行线程数）**：默认按机器核数并行。当机器内存不足、或 cgroup 实际限制核数小于 `/proc/cpuinfo` 报告值导致编译 OOM 或失败时，需显式指定较小值：
 
   ```bash
@@ -129,6 +131,7 @@ python3 -m pip install build_out/*.whl --force-reinstall --no-deps
 ```
 
 **安装后验证**：
+
 ```bash
 python3 -c "from cann_ops_transformer.ops import flash_attn_grad; print('ok')"
 ```

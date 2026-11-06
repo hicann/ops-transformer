@@ -38,17 +38,21 @@ void quest_prefill_metadata(at::Tensor k_cache,
 ```
 
 Operator sizing parameters are:
+
  - `B` - batch size
  - `N` - number of KV heads
  - `BLOCK_SIZE` - number of tokens that fits in one maxblock and one minblock (default: 128)
  - `D` - head dimension (default: 128)
+
  * `MKBPR` - maximum number of blocks in every entry of the block_tables (num columns)
  * `MMBPR` - maximum number of blocks in every entry of the metadata_block_tables (num columns)
 
 __Kernel Limitations__: BLOCK_SIZE=D=128
 
 ### Usage
+
 Once the operator was built, it can be used in your python code as follows:
+
 ```python
 import torch
 import torch_npu
@@ -81,9 +85,11 @@ quest_prefill_metadata(k_cache, seq_lens, block_tables, metadata_block_tables, m
 ```
 
 ### TODOs
+
 1. Double check why bf16 passes even though the whole min/max processing happens in fp16.
 
 ### Good practices
+
 1. If you only modify the operator file `quest_prefill_metadata.cpp`, you need to only re-run compile.sh to start observing the effect.
 2. If you modify the `torch_interface.cpp`, you need to rebuild the select_attn_ops python package using build.sh.
 
@@ -115,7 +121,9 @@ Algorithm steps:
     2.3. selected_values, selected_indices = Find the top-k indices across all relevant blocks
 3. Return selected_indices
 ```
+
 The operator prototype is as follows.  
+
 ```c++
 /** @brief Interface the `quest_block_select_paged` kernel.
  *
@@ -188,6 +196,7 @@ void quest_block_select_paged_in_out_w(at::Tensor query,
 ```
 
 Operator sizing parameters are:
+
  - `B` - batch size
  - `N` - number of KV heads
  - `H` - number of attention (aka query) heads, must be a multiple of N
@@ -198,6 +207,7 @@ Operator sizing parameters are:
  - `k` - number of important block indices to return for each KV head (top-k, default:8)
 
 Implementation Notes
+
  - Performance limitations require *D* = 128 and *BLOCK_SIZE* = 128
  - Requires Grouped Query Attention (GQA) configuration where H % N == 0
  - When for a given request r: `k > seq_lens[r] // BLOCK_SIZE` (i.e. there is not yet k blocks in the kv-cache at all) the kernel will run nevertheless, providing top-k indices, although some of them garbage (computed on the filler part of the metadata block) - it is therefore the user's responsibility to use this kernel with a k that is larger than the number of the KV blocks.

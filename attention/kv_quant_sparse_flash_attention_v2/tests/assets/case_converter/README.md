@@ -64,7 +64,6 @@ list、tuple、字典使用 Python 字面量，例如 `[0, 16, 32]`、`(1, 16, 8
 - `kv_type=hifloat8` 采用字节存储并保留 dtype 语义；查询形状包含 RoPE，输出形状去除 RoPE。
 - V2 使用 `enable_sinks` 和 `return_softmax_lse`，当前参数转换不包含 TQ4。
 
-
 `is_enabled` 缺省 True；显式 False 保持 False，不根据历史测试结果修改启用状态。
 `precision_tolerances/absolute_precision` 可显式覆盖转换默认值。
 `remark/network_name/priority/soc_series/golden_api/device_ids` 及已有 batch 字段按表中值保留。

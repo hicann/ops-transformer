@@ -10,6 +10,7 @@
 bash install_cann_950.sh    # 安装CANN 9.1.0 + 950 ops
 bash install_torch_npu.sh   # 安装PyTorch + TorchNPU
 ```
+
 参考docs/zh/install/compile.md，编译experimental并安装自定义算子包。
 
 ### 1.2 每次执行前加载环境

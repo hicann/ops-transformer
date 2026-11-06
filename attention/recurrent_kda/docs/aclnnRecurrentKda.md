@@ -1,7 +1,5 @@
 # aclnnRecurrentKda
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/recurrent_kda)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -67,6 +65,7 @@
   其中，$S_{t-1},S_t \in R^{V_{dim}\times K_{dim}}$，$q_t,k_t\in R^{K_{dim}}$，$v_t,o_t\in R^{V_{dim}}$。$d_t$ 沿状态矩阵的 K 维广播。多个 value head 可以共享同一个 query/key head，要求 $H_v$ 能被 $H_k$ 整除。
 
 - 符号说明
+
   | 符号        | 含义                                                                               |
   | ----------- | ---------------------------------------------------------------------------------- |
   | B           | Batch Size，输入样本批量大小                                                       |

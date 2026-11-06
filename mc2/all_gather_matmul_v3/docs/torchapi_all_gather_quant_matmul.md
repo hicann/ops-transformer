@@ -194,6 +194,7 @@ cann_ops_transformer.all_gather_quant_matmul(
       for p in procs:
           p.join()
   ```
+
   运行方式：
 
   ```bash

@@ -107,7 +107,7 @@ cann_ops_transformer.mhc_post(x, h_res, h_out, h_post) -> Tensor
         <td>h_res</td>
         <td>Tensor</td>
         <td>可选</td>
-        <td>残差连接矩阵，对应公式中的H<sub>l</sub><sup>res</sup>。传入None时跳过Res Mapping，计算公式退化为直接残差连接，仅Ascend 950PR&950DT系列产品支持传入None，其他产品形态传入None会报错。</td>
+        <td>残差连接矩阵，对应公式中的H<sub>l</sub><sup>res</sup>。传入None时跳过Res Mapping，计算公式退化为直接残差连接，仅<term>Ascend 950PR&950DT系列产品</term>支持传入None，其他产品形态传入None会报错。</td>
         <td>float32</td>
         <td>
             <ul>
@@ -191,7 +191,7 @@ cann_ops_transformer.mhc_post(x, h_res, h_out, h_post) -> Tensor
   - 输出`y`的数据类型与`x`保持一致。
 
 - `h_res`可选约束：
-  - `h_res`传入None时跳过Res Mapping，仅Ascend 950PR&950DT系列产品支持；Atlas A2/A3系列产品`h_res`为必传参数，传入None会报错。
+  - `h_res`传入None时跳过Res Mapping，仅<term>Ascend 950PR&950DT系列产品</term>支持；Atlas A2/A3系列产品`h_res`为必传参数，传入None会报错。
   - `h_res`传入None仅支持单算子模式调用；图模式（torch.compile）下`h_res`必须传入，传入None会在GE编译阶段报错。
 
 - 维度约束：

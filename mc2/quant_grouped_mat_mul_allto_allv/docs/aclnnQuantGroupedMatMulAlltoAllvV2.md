@@ -1,7 +1,5 @@
 # aclnnQuantGroupedMatMulAlltoAllvV2
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/mc2/grouped_mat_mul_allto_allv)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
@@ -535,7 +533,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
 - 通信引擎约束：
 
   <!-- npu="950" id8 -->
-  - Ascend 950DT系列产品：支持CCU通信和AI CPU通信，CCU仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
+  - <term>Ascend 950DT系列产品</term>：支持CCU通信和AI CPU通信，CCU仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
   <!-- end id8 -->
 
 - e * epWorldSize 乘积最大支持256，其中e（单卡专家数），最大支持32，epWorldSize支持2/4/8/16/32/64/128/256;

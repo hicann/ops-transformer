@@ -283,11 +283,11 @@
     - layout_kv为BSND时，优先通过seqused_cmp_kv中的元素获取seqlen，seqused_cmp_kv未传入则通过max_seqlen_cmp_kv获取seqlen。
     - layout_kv为TND时，优先通过seqused_cmp_kv中的元素获取seqlen，seqused_cmp_kv未传入则通过cu_seqlens_cmp_kv中的元素获取seqlen。
     - layout_kv为PA_BBND时，优先通过seqused_cmp_kv中的元素获取seqlen，seqused_cmp_kv未传入则通过cmp_topk_length获取seqlen。
-- Atlas A3系列产品约束：
+- <term>Atlas A3系列产品</term>约束：
   - SWA稀疏ori_kv场景下，仅支持SWA模板，`has_ori_kv`为true、`has_cmp_kv`为false、`ori_topk`大于0、`ori_mask_mode`为0，`ori_win_left`和`ori_win_right`为非负数，且必须传入`ori_topk_length`。`ori_topk`应与配套主算子`ori_sparse_indices`最后一维K保持一致；`ori_topk_length`表示每个q token和KV head的左对齐有效索引条目数，取值应在[0, K]范围内；Metadata仅使用`ori_topk_length`生成任务切分。配套主算子在PA_BBND场景仍要求传入`seqused_ori_kv`。
   - `cmp_ratio`表示`cmp_kv`相对于压缩前KV长度的压缩倍率；仅传入`ori_kv`时不参与压缩KV计算。CSA场景传1、2或4，HCA场景传128。
   - `cmp_topk`在CSA场景支持[1, 8192]内的任意整数，SWA、HCA场景传0。
-- Atlas A2系列产品约束：
+- <term>Atlas A2系列产品</term>约束：
   - SWA稀疏ori_kv场景下，仅支持SWA模板，`has_ori_kv`为true、`has_cmp_kv`为false、`ori_topk`大于0、`ori_mask_mode`为0，`ori_win_left`和`ori_win_right`为非负数，且必须传入`ori_topk_length`。`ori_topk`应与配套主算子`ori_sparse_indices`最后一维K保持一致；`ori_topk_length`表示每个q token和KV head的左对齐有效索引条目数，取值应在[0, K]范围内；Metadata仅使用`ori_topk_length`生成任务切分。配套主算子在PA_BBND场景仍要求传入`seqused_ori_kv`。
   - `cmp_ratio`表示`cmp_kv`相对于压缩前KV长度的压缩倍率；仅传入`ori_kv`时不参与压缩KV计算。CSA场景传1、2或4，HCA场景传128。
   - `cmp_topk`在CSA场景支持[1, 8192]内的任意整数，SWA、HCA场景传0。

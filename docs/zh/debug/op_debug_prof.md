@@ -107,7 +107,7 @@
 
 [msSanitizer](https://www.hiascend.com/document/redirect/CannCommunityToolMssanitizer)是Ascend C算子内存检测和竞争检测工具，可用于检测Kernel运行过程中的GM/UB越界访问、内存泄漏、并发竞争等问题。下面以`add_example`算子为例，介绍使用步骤：
 
-1. **编译使能检测的Kernel**
+1. **编译开启检测的Kernel**
 
    通过`--op_debug_config "sanitizer"`选项编译带检测的Kernel，将下述命令中的`add_example`替换为实际待检测的算子名：
 

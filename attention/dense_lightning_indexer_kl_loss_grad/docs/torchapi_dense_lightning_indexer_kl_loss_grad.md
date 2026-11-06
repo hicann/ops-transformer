@@ -152,8 +152,6 @@ dense_lightning_indexer_kl_loss_grad(
 | mask_mode | int | 可选属性 | mask 模式。 | `int` | 当前支持 `0` 和 `3`，默认 `0`。 |
 | cmp_ratio | int | 可选属性 | key 压缩比例。 | `int` | 取值范围 `[1, 128]`，默认 `1`。 |
 
-
-
 ### dense_lightning_indexer_kl_loss_grad_metadata
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
@@ -173,7 +171,6 @@ dense_lightning_indexer_kl_loss_grad(
 | layout_k | str | 可选 | `k` 侧 layout，支持 `"BSND"`、`"TND"`，默认值为 `"BSND"` 。 | string | - |
 | mask_mode | int | 可选 | mask 模式。0表示No mask，3表示rightDownCausal模式，默认值为0。 | int32 | - |
 | cmp_ratio | int | 可选 | key 压缩比例，当前支持[1, 128]，默认值为 1。 | int32 | - |
-
 
 ## 返回值说明
 
@@ -226,6 +223,7 @@ dense_lightning_indexer_kl_loss_grad(
 ## 调用示例
 
 - 单算子模式调用：
+
 ```python
 import torch
 import torch_npu

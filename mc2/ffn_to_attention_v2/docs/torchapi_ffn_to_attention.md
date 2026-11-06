@@ -248,6 +248,7 @@ ffn_to_attention(buffer, x, session_ids, micro_batch_ids, token_ids, expert_offs
 $$ccl\_buffer\_size \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{recvInfoSize} + \mathrm{recvDataSize} + 32\,\mathrm{KiB},\,512) + \mathrm{tableBytes},\ 2\,\mathrm{MB}\big)$$
 
 其中（`sessionNum`为布局会话数：传入`attn_rank_table`时为其dim0，未传入时为保守上界`worldSize - 1`；接口内部默认按`worldSize - 1`计算）：
+
   - `recvInfoSize = CeilAlign(sessionNum × microBatchNum × (2 + BS × expertNumPerToken) × 4B, 512)`（`attention_to_ffn` 下发的 N 会话 token 信息表区，镜像其对侧布局公式）
   - `recvDataSize = CeilAlign(sessionNum × microBatchNum × BS × expertNumPerToken × HS × 2B, 512)`（`attention_to_ffn` 下发的 N 会话 token 数据区；2B 为对侧非量化元素宽度，量化模式下对侧按 1B 下发，此处为保守上界）
   - `tableBytes = world_size × rankTableStride + 1025 × countRowStride`（各rank地址表与AIV计数行；1025 = 1条总计数行 + 1024条AIV预留计数行）

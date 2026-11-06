@@ -156,7 +156,6 @@ if (!IsCommCalibrated(rankDim_, commEngine, calib)) { /* miss → 核利用率�
 cut = FitBalanceCut(args, calib);
 ```
 
-
 ### 数据流形态（CALIBRATION.dataflow 三元组）
 
 算子接入时定死的**结构声明**，引擎据此推导其余全部结构量：
@@ -179,6 +178,7 @@ cut = FitBalanceCut(args, calib);
 perRankM 错 → 通信量与 mm 总量估计整体偏移。
 
 判定方法（只看本算子自己的通信方向与 kernel 实现，不考虑其他因素）：
+
 1. **order**：通信的输入是 matmul 的输入 → `COMM_FIRST`；通信的输入是 matmul 的输出 →
    `COMPUTE_FIRST`
 2. **localMMPosition**：与通算顺序和 kernel 侧实现绑定——

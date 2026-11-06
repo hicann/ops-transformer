@@ -10,45 +10,45 @@ This catalog contains custom operators for ShadowKV method, based on the cann-op
 
 ```mermaid
 stateDiagram-v2
-	Active: Low-rank SVD
-	Gauss: Gauss matrix
-	Jacobi: Jacobi SVD<br>fp32
-	MatMul1: Y = A @ G
-	MatMul2: A' = Q<sup>T</sup> @ A
-	MatMul3: U = Q @ U`
-	MatMul4: Calculation Q<br>fp32
+ Active: Low-rank SVD
+ Gauss: Gauss matrix
+ Jacobi: Jacobi SVD<br>fp32
+ MatMul1: Y = A @ G
+ MatMul2: A' = Q<sup>T</sup> @ A
+ MatMul3: U = Q @ U`
+ MatMul4: Calculation Q<br>fp32
 
-	classDef ActiveState font-size:18pt,font-weight:bold,font-style:italic,color:black,fill:white
-	classDef TSQRState font-size:16pt,font-weight:bold,color:black,fill:white,stroke-width:2px,stroke:#b0d89c
-	classDef CUBState font-size:14pt,font-weight:bold,color:black,fill:#dd80aa,stroke:#dd80aa
-	classDef VECState font-size:14pt,font-weight:bold,color:black,fill:#94dae2,stroke:#94dae2
+ classDef ActiveState font-size:18pt,font-weight:bold,font-style:italic,color:black,fill:white
+ classDef TSQRState font-size:16pt,font-weight:bold,color:black,fill:white,stroke-width:2px,stroke:#b0d89c
+ classDef CUBState font-size:14pt,font-weight:bold,color:black,fill:#dd80aa,stroke:#dd80aa
+ classDef VECState font-size:14pt,font-weight:bold,color:black,fill:#94dae2,stroke:#94dae2
 
-	state TSQR {
-		HouseholderQR: Householder QR<br>fp32
-		MatMul4 --> HouseholderQR
-		HouseholderQR --> MatMul4
-	}
-	TSQR: TSQR fp32
+ state TSQR {
+  HouseholderQR: Householder QR<br>fp32
+  MatMul4 --> HouseholderQR
+  HouseholderQR --> MatMul4
+ }
+ TSQR: TSQR fp32
     state Active {
-		direction LR
-		[*] --> MatMul1: A{B,S,D}
-		Gauss --> MatMul1: G{D,R}
-		MatMul1 --> TSQR: Y{B,S,R}
-		TSQR --> MatMul2: Q{B,S,R}
-		[*] --> MatMul2: A{B,S,D}
-		MatMul2 --> Jacobi: A'{B,R,D}
-		TSQR --> MatMul3: Q{B,S,R}
-		Jacobi --> MatMul3: U`{B,R,R}
-		Jacobi --> [*]: S{B,R}<br>V<sup>T</sup>{B,D,R}
-		MatMul3 --> [*]: U{B,S,R}
-		MatMul: CUB
-		Vector: VEC
-	}
+  direction LR
+  [*] --> MatMul1: A{B,S,D}
+  Gauss --> MatMul1: G{D,R}
+  MatMul1 --> TSQR: Y{B,S,R}
+  TSQR --> MatMul2: Q{B,S,R}
+  [*] --> MatMul2: A{B,S,D}
+  MatMul2 --> Jacobi: A'{B,R,D}
+  TSQR --> MatMul3: Q{B,S,R}
+  Jacobi --> MatMul3: U`{B,R,R}
+  Jacobi --> [*]: S{B,R}<br>V<sup>T</sup>{B,D,R}
+  MatMul3 --> [*]: U{B,S,R}
+  MatMul: CUB
+  Vector: VEC
+ }
 
-	class Active ActiveState
-	class MatMul1, MatMul2, MatMul3, MatMul4, MatMul CUBState
-	class Gauss, Jacobi, HouseholderQR, Vector VECState
-	class TSQR TSQRState
+ class Active ActiveState
+ class MatMul1, MatMul2, MatMul3, MatMul4, MatMul CUBState
+ class Gauss, Jacobi, HouseholderQR, Vector VECState
+ class TSQR TSQRState
 ```
 
 ## Custom Kernel Input/Output (I/O)
@@ -63,8 +63,7 @@ R: SVD rank size (15 < R < D)
 
 | Tensor | Layout | dType | Description                                                                  |
 |--------|--------|-------|------------------------------------------------------------------------------|
-| A      | BSD    | FP32  | Tensor of shape (*, S, D) where * is zero or more batch dimensions and S > D |
-
+| A      | BSD    | FP32  | Tensor of shape (\*, S, D) where \* is zero or more batch dimensions and S > D |
 
 **Output**
 
@@ -98,7 +97,7 @@ There are 4 linear algebra operators npu_linalg are the core implementation modu
       |   └── test_svd.py # Accuracy tests for all operators
       ├── build_and_install.sh # Compilation NPU linear algebra wheel package
       ├── requirements.txt# Python required installation
-	  └── setup.py        # Wheel package compilation file
+   └── setup.py        # Wheel package compilation file
 ```
 
 **Compilation and use**
@@ -151,6 +150,7 @@ tensor(3.0957e-06)
 ```
 
 **Feature description**
+
 1. The current version of the operator supports FP32 input/output real valued precision numbers;
 2. All 'npu_linalg' series operators support BSN data layout;
 3. The accuracy has been verified by comparison with the PyTorch reference implementation (test scripts can be found in the test directory of each operator).

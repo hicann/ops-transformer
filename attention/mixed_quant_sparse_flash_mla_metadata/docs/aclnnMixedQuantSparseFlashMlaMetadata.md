@@ -1,7 +1,5 @@
 # aclnnMixedQuantSparseFlashMlaMetadata
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/mixed_quant_sparse_flash_mla_metadata)
-
 ## 产品支持情况
 
 <!-- npu="950" id1 -->

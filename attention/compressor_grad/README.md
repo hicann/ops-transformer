@@ -52,6 +52,7 @@
         $$
         dW^{KV} = dNewKv^T @ X,~ dW^{Gate} = dNewScore^T @ X
         $$
+
 ## 参数说明
 
 | 参数名                      | 输入/输出/属性 | 描述  | 数据类型       | 数据格式   |

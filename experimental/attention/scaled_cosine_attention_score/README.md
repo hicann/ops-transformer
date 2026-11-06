@@ -2,14 +2,14 @@
 
 ## 产品支持情况
 
-| 产品 | 是否支持 |
-|---|:---:|
-| Ascend 950PR&950DT系列产品 | × |
-| Atlas A3系列产品 | √ |
-| Atlas A2系列产品 | √ |
-| Atlas 200I/500 A2推理产品 | × |
-| Atlas推理系列产品 | × |
-| Atlas训练系列产品 | × |
+|产品      | 是否支持 |
+|:----------------------------|:-----------:|
+|<term>Ascend 950PR&950DT系列产品</term>|       ×     |
+|<term>Atlas A3系列产品</term>|      √     |
+|<term>Atlas A2系列产品</term>|      √     |
+|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
+|<term>Atlas推理系列产品</term>|      ×     |
+|<term>Atlas训练系列产品</term>|      ×     |
 
 ## 功能说明
 

@@ -1,6 +1,7 @@
 # SparseAttnSharedkvMetadata
 
 ## 产品支持情况
+
 | 产品                                                         | 是否支持 |
 | ------------------------------------------------------------ | :------: |
 |<term>Ascend 950PR&950DT系列产品</term>                        | ×  |
@@ -11,6 +12,7 @@
 |<term>Atlas训练系列产品</term>                                | ×  |
 
 ## 功能说明
+
 - 算子功能：`SparseAttnSharedkvMetadata`是`SparseAttnSharedkv`算子的前置算子，用于后续Attention计算生成负载均衡的任务划分方案。本算子不执行实际的Attention计算，而是根据输入参数在AI CPU计算出每个AI Core应处理的Attention计算起止范围，从而最大化计算资源的利用率，避免各Core间负载不均衡的问题。
 
 ## 参数说明
@@ -205,8 +207,9 @@
 
 ## 约束说明
 
--   该接口支持推理场景下使用。
--   该接口支持aclgraph模式。
+- 该接口支持推理场景下使用。
+- 该接口支持aclgraph模式。
 
-## Atlas A3推理系列产品 调用说明
+## Atlas A3推理系列产品调用说明
+
 - 支持单算子模式调用和aclgraph模式调用，作为SparseAttnSharedkv算子的前序算子，调用示例见[SparseAttnSharedkv调用示例](../sparse_attn_sharedkv/README.md)。

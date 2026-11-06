@@ -25,7 +25,9 @@
 
 - 接口功能：SparseLightningIndexerGradKLLoss算子是LightningIndexer的反向算子，再额外融合了Loss计算功能。LightningIndexer算子将QueryToken和KeyToken之间的最高内在联系的TopK个筛选出来，存放在SparseIndices中，从而减少长序列场景下Attention的计算量，加速长序列网络的推理和训练。
 
-- aclnnSparseLightningIndexerGradKLLossV2在aclnnSparseLightningIndexerGradKLLoss的基础上新增了sinks参数，sinks用于修正target distribution（p）归一化因子，仅Ascend 950PR&950DT系列产品支持。
+<!-- npu="950" id7 -->
+- aclnnSparseLightningIndexerGradKLLossV2在aclnnSparseLightningIndexerGradKLLoss的基础上新增了sinks参数，sinks用于修正target distribution（p）归一化因子，仅<term>Ascend 950PR&950DT系列产品</term>支持。
+<!-- end id7 -->
 
 - 计算公式：
    用于取Top-k的value的计算公式可以表示为：
@@ -377,7 +379,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
               <ul>
                 <li>需为1维且长度等于query的N维度。</li>
                 <li>该参数可选，不传入时与aclnnSparseLightningIndexerGradKLLoss接口行为一致。</li>
-                <li>仅Ascend 950PR&950DT系列产品支持。</li>
+                <li>仅<term>Ascend 950PR&950DT系列产品</term>支持。</li>
               </ul>
         </td>
         <td>FLOAT32</td>

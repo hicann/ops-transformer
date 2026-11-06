@@ -370,7 +370,6 @@ BlockSparseAttentionGrad输入dout、query、key、value, attentionOut的数据�
   - PerBlockSizeMask 路径仅在 ascend950 平台（arch35 实现）支持。
 * 不支持确定性计算场景。
 
-
 ## 调用说明
 
 | 调用方式           | 调用样例                                                                                                          | 说明                                                                                                                  |

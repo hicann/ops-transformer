@@ -4,7 +4,7 @@
 
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
-| Atlas A2训练系列产品                                         | 是       |
+| <term>Atlas A2训练系列产品</term>                                        | 是       |
 
 ## 功能说明
 
@@ -48,28 +48,28 @@
       <td>int64_t</td>
       <td>-</td>
     </tr>
-	<tr>
+ <tr>
       <td>expertX</td>
       <td>输入</td>
       <td>输入张量（Router logits），shape为(rows, expert_num)</td>
       <td>BFLOAT16/HALF</td>
       <td>ND</td>
     </tr>
-	<tr>
+ <tr>
       <td>bias</td>
       <td>输入</td>
       <td>偏置张量，shape为(expert_num,)，将被广播加到每一行</td>
       <td>BFLOAT16/HALF</td>
       <td>ND</td>
     </tr>
-	<tr>
+ <tr>
       <td>sigmoidOut</td>
       <td>输出</td>
       <td>Sigmoid激活后的输出张量，shape同输入X</td>
       <td>BFLOAT16/HALF</td>
       <td>ND</td>
     </tr>
-	<tr>
+ <tr>
       <td>biasOut</td>
       <td>输出</td>
       <td>Sigmoid叠加Bias后的输出张量，shape同输入X</td>

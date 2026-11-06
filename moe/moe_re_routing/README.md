@@ -141,6 +141,8 @@
   - E：表示卡上的专家数，取值无限制。
 - 输入值域限制
   - expert_token_num_type，即输出expert_token_num的模式。0为cumsum模式，1为count模式，默认值为1。当前只支持为1。
-  - idx_type，即输出permute_token_idx的索引类型。0为gather索引，1为scatter索引，默认值为0。Ascend 950PR&950DT系列产品支持0或1，其余产品仅支持0。
+  <!-- npu="950" id1 -->
+  - idx_type，即输出permute_token_idx的索引类型。0为gather索引，1为scatter索引，默认值为0。<term>Ascend 950PR&950DT系列产品</term>支持0或1，其余产品仅支持0。
+  <!-- end id1 -->
 - 输出类型限制
   - expert_token_num类型应与输入的expert_token_num_per_rank类型保持一致。

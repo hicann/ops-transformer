@@ -116,7 +116,6 @@ metadata 返回 NPU 上固定 shape `[1024]` 的 int32 Tensor，由 AICPU 生成
 
 Torch 接口包含 NPU（PrivateUse1）实现、metadata fallback 注册和 register_fake。fake 仅描述输出 shape/dtype；fallback 不表示支持 CPU 执行 NPU 算子。显式生成 metadata 可避免把生成开销混入计算算子的计时。
 
-
 ## 返回值
 
 始终返回四个 Tensor：

@@ -1,6 +1,7 @@
 # QuantLightningIndexerMetadata
 
 ## 产品支持情况
+
 | 产品                                                         | 是否支持 |
 | ------------------------------------------------------------ | :------: |
 |<term>Ascend 950PR&950DT系列产品</term>|      √     |
@@ -12,13 +13,12 @@
 
 ## 功能说明
 
--   API功能：QuantLightningIndexerMetadata是QuantLightningIndexer的前置算子，通过AICPU为QuantLightningIndexer算子生成分核结果，包括每个核需要处理的数据的起始点、结束点等内容，随后，QuantLightningIndexer根据该分核结果进行实际计算。
+- API功能：QuantLightningIndexerMetadata是QuantLightningIndexer的前置算子，通过AICPU为QuantLightningIndexer算子生成分核结果，包括每个核需要处理的数据的起始点、结束点等内容，随后，QuantLightningIndexer根据该分核结果进行实际计算。
 
--   主要计算过程为：
+- 主要计算过程为：
     1. 获取每个`batch`的基本块大小，并计算负载。
     2. 计算所有`batch`的总负载和总的基本块个数。
     3. 为每个核分配负载，并记录分核结果，分核结果包括每个核需要处理的数据的起始点、结束点等内容。
-
 
 ## 参数说明
 
@@ -116,7 +116,7 @@
          <tr>
            <td>cmp_ratio</td>
            <td>可选属性</td>
-           <td>用于稀疏计算，表示key的压缩倍数。数据类型支持int32。Atlas A3推理系列产品支持1/2/4/8/16/32/64/128，Ascend 950PR&950DT系列产品支持1/4/128，默认值1。</td>
+           <td>用于稀疏计算，表示key的压缩倍数。数据类型支持int32。<term>Atlas A3推理系列产品</term>支持1/2/4/8/16/32/64/128，<term>Ascend 950PR&950DT系列产品</term>支持1/4/128，默认值1。</td>
            <td>INT32</td>
            <td>-</td>
          </tr>
@@ -179,8 +179,10 @@
      </table>
 
 ## 约束说明
--   该接口支持推理场景下使用。
--   该接口支持aclgraph模式。
 
-## Atlas A3推理系列产品 调用说明
+- 该接口支持推理场景下使用。
+- 该接口支持aclgraph模式。
+
+## Atlas A3推理系列产品调用说明
+
 - 支持单算子模式调用和aclgraph模式调用，作为QuantLightningIndexer算子的前序算子，调用示例见[QuantLightningIndexer调用示例](../quant_lightning_indexer/README.md)。

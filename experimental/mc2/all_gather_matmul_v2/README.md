@@ -66,9 +66,11 @@ chmod +x *.run
 cd script
 python test.py
 ```
+
 该脚本以$worldsize = 4$，$m, k, n = 1024, 10240, 5120$ 为示例shape大小，输入示例数据类型为fp16；运行完成后，该脚本会逐卡比对小算子级联（即AllGather通信+Matmul计算串行执行）与AllGatherMatmul算子的$output$与$gatherOut$，并打印一致性结果。
 
 > 💡 **提示**：如果遇到环境配置问题，请确保：
+>
 > 1. `ASCEND_HOME_PATH`环境变量已正确设置
 > 2. Bisheng编译器已安装并可用
 > 3. CMake版本为3.18.4或更高
@@ -167,6 +169,7 @@ __aicore__ inline void AllGatherMatmulFP16BF16<AType, BType, BiasType, CType>::I
     }
 }
 ```
+
 **性能统计**
 
 加入local块提前启动后，AllGatherMatmul算子性能如下：
@@ -176,7 +179,6 @@ AllGatherMatmul耗时：1316μs
 小算子级联耗时：1635μs
 
 加速比：1.23x
-
 
 ### 优化实现2-非连续转连续
 

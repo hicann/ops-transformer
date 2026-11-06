@@ -53,8 +53,8 @@ Using ```AscendC::CrossCoreSetFlag``` and ```AscendC::CrossCoreWaitFlag``` to co
 2. design host and kernel: take 2 sub-project as reference:
 
 ```bash
-from example: https://gitee.com/ascend/samples/blob/master/operator/ascendc/0_introduction/22_baremix_kernellaunch/BareMixInvocation/baremix_custom.cpp
-from example: https://atomgit.com/cann/ops-transformer/blob/master/posembedding/rotary_position_embedding/rotate_half_bf16.h
+from example: https://gitee.com/ascend/samples/blob/9.3.0-beta.1/operator/ascendc/0_introduction/22_baremix_kernellaunch/BareMixInvocation/baremix_custom.cpp
+from example: https://atomgit.com/cann/ops-transformer/blob/9.3.0-beta.1/posembedding/rotary_position_embedding/rotate_half_bf16.h
 ```
 
 we simplify the code from origin rope-fused operator to fit our cases.
@@ -510,6 +510,7 @@ if __name__ == '__main__':
 ```
 
 you can add more test case as follows by using full test cases:
+
 ```bash
 half mode:
 outq1, outk1 = apply_3drotary_pos_v1(q, k, freqs_cis_3d, mode)
@@ -518,6 +519,7 @@ outq3, outk3 = apply_3drotary_pos_v3(q, k, freqs_cis_3d, inter_mat_128)
 outq3, outk3 = op(q, k, freqs_cis_3d, inter_mat_128)
 outq4, outk4 = apply_3drotary_pos_v4(q, k, freqs_cis_3d, mode)
 ```
+
 ```bash
 interleave mode:
 outq1, outk1 = apply_3drotary_pos_v1(q, k, freqs_cis_3d, mode)

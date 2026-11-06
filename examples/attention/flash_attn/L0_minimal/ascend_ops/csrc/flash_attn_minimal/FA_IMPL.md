@@ -138,6 +138,7 @@ torch_interface.cpp              ← PyTorch 注册 + 入口（输入校验，�
 ### 2.2 Torch 接口：`torch_interface.cpp`
 
 唯一入口 `FlashAttnNpu()`（`torch_interface.cpp`）：
+
 1. `CheckInput` 校验 bf16、4 维、`D=128`，且 `S1=S2`、`S1%128=0`、`N1>=N2`、`N1%N2=0`、batch 维度一致。
 2. 取平台信息与当前 NPU stream，分配同形状输出与空 workspace。
 3. 固定 `fixedAicNum=32 / fixedAivNum=64`，`blockDim = CalcTschBlockDim(64, GetCoreNumAic(), GetCoreNumAiv())`。

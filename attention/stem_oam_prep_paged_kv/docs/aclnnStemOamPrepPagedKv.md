@@ -1,7 +1,5 @@
 # aclnnStemOamPrepPagedKv
 
-[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/stem_oam_prep_paged_kv)
-
 ## 产品支持情况
 <!-- npu="950" id1 -->
 - <term>Ascend 950PR&950DT系列产品</term>：支持

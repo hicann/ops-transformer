@@ -128,7 +128,6 @@ metadata 返回 NPU 上固定 shape `[1024]` 的 int32 Tensor，由 AICPU 生成
 
 Torch 接口包含 NPU（PrivateUse1）实现、metadata fallback 注册和 register_fake。fake 仅描述输出 shape/dtype；fallback 不表示支持 CPU 执行 NPU 算子。显式生成 metadata 可避免把生成开销混入计算算子的计时。
 
-
 QSLI metadata 额外必选 `candidate_block_length` Tensor，以及关键字属性 `quant_mode=1`、`candidate_block_size=8`；这些属性没有默认值。metadata 依据实际 candidate 长度生成调度边界，调用方不必把 candidate 数量换算为 max_seqlen_k。
 
 ## 返回值与有效索引
