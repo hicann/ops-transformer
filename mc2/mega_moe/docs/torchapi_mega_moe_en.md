@@ -643,7 +643,7 @@ sym_buffer.get_local_buffer_tensor(dtype, size=None, offset=0) -> Tensor
 sym_buffer.update_group(group) -> None
 ```
 
-`mask_buffer` and the five `SymmBuffer` elastic scaling APIs above currently support only <term>Atlas A3 products</term>. By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all product generations, this parameter is not passed to the operator by default. The all-0 int32 mask with shape `[ep_world_size]` is created on the NPU only upon the first call to `query_mask_buffer`, `update_mask_buffer`, or `clean_mask_buffer`. 0 indicates a normal rank, and 1 indicates a disabled rank. Disabled ranks are skipped in subsequent computation and inter-device communication.
+By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all product generations, this parameter is not passed to the operator by default. The all-0 int32 mask with shape `[ep_world_size]` is created on the NPU only upon the first call to `query_mask_buffer`, `update_mask_buffer`, or `clean_mask_buffer`. 0 indicates a normal rank, and 1 indicates a disabled rank. Disabled ranks are skipped in subsequent computation and inter-device communication.
 
 - `query_mask_buffer` receives `mask_status` pre-created by the caller. Its dtype must be `torch.int32`, and its shape and NPU must be the same as those of the internal `mask_buffer`. The API writes the current mask to `mask_status` through a D2D copy and does not return a tensor.
 - `update_mask_buffer` updates only the local mask in the current process. The caller must ensure mask consistency across ranks. When a rank is restored (that is, the `masked` input is `False`), you must call `get_local_buffer_tensor` to clear the existing communication buffer flags of the operator. The sample code is as follows:
@@ -658,6 +658,13 @@ sym_buffer.update_group(group) -> None
 - `clean_mask_buffer` sets all elements of the local mask to zero on the current NPU stream. Each rank must call this API separately, and the caller must still ensure consistency across ranks. If the mask has not been created, the API creates an all-0 mask.
 - `get_local_buffer_tensor` wraps the local CCL buffer of the current rank into an NPU tensor through zero copy. `offset` is in units of `dtype` elements. If `size` is `None`, a 1D view from `offset` to the end of the buffer is returned; otherwise, a tensor of the specified shape is returned. The returned tensor does not own the underlying memory, and its lifecycle must not exceed that of `SymmBuffer`. After `update_group` is called, old views become invalid and must be re-obtained. Before writing to the original communication buffer, the caller must ensure that the related operators have completed execution and that the write range is correct.
 - `update_group` fully rebuilds the communication link using the new group. The caller must ensure that operators on the old communication link complete execution and that the new group is consistent with the existing mask shape. To clear the disabled status, explicitly call `clean_mask_buffer`.
+
+<!-- npu="A3" id26 -->
+- <term>Atlas A3 products</term>: `mask_buffer` and the five `SymmBuffer` elastic scaling APIs above are supported.
+<!-- end id26 -->
+<!-- npu="950,910b" id27 -->
+- <term>Ascend 950PR&950DT products</term>, <term>Atlas A2 products</term>: `mask_buffer` and the five `SymmBuffer` elastic scaling APIs above are not supported and must not be called.
+<!-- end id27 -->
 
 ## Mandatory
 
@@ -694,7 +701,7 @@ sym_buffer.update_group(group) -> None
         <td>num_max_tokens_per_rank</td>
         <td>int</td>
         <td>Required</td>
-        <td>Maximum number of tokens per device that may occur on each Rank in the communicator. <term>Ascend 950PR&950DT products</term> supports different actual token counts across Ranks. In each call, x.shape[0] must not exceed this value. All Ranks must use the same upper bound.</td>
+        <td>Maximum number of tokens per device that may occur on each Rank in the communicator. In each call, x.shape[0] must not exceed this value. All Ranks must use the same upper bound. For whether the actual token count may differ across Ranks, see Constraints.</td>
     </tr>
     <tr>
         <td>num_topk</td>
@@ -752,6 +759,10 @@ sym_buffer.update_group(group) -> None
     </tr>
 </tbody>
 </table>
+
+<!-- npu="950" id28 -->
+- <term>Ascend 950PR&950DT products</term>: the actual number of tokens may differ across Ranks; `num_max_tokens_per_rank` only sets the common upper bound.
+<!-- end id28 -->
 
 ### mega_moe
 
@@ -1187,25 +1198,25 @@ sym_buffer.update_group(group) -> None
         </tr>
         <tr>
             <td>l1_weights</td>
-            <td>For Atlas A2 products and Atlas A3 products, the value is num_experts_per_rank. For Ascend 950PR&950DT products, the value is local_moe_expert_num in the per-expert layout and 1 in the stacked layout.</td>
+            <td>local_moe_expert_num in the per-expert layout and 1 in the stacked layout. For the supported layouts and the exact values, see the constraints below this table.</td>
             <td>No (bfloat16/int8/int4 use cases)/Yes (float8_e5m2/float8_e4m3fn/float4_E2M1 use cases)</td>
             <td>Not supported</td>
         </tr>
         <tr>
             <td>l2_weights</td>
-            <td>num_experts_per_rank for Atlas A2 products and Atlas A3 products; for Ascend 950PR&950DT products, local_moe_expert_num for the per-expert layout and 1 for the stacked layout.</td>
+            <td>local_moe_expert_num in the per-expert layout and 1 in the stacked layout. For the supported layouts and the exact values, see the constraints below this table.</td>
             <td>No (bfloat16/int8/int4 use cases)/Yes (float8_e5m2/float8_e4m3fn/float4_E2M1 use cases)</td>
             <td>Not supported</td>
         </tr>
         <tr>
             <td>l1_weights_sf</td>
-            <td>Same as the TensorList length and layout of the corresponding weight; num_experts_per_rank for Atlas A2 products and Atlas A3 products; for Ascend 950PR&950DT products, local_moe_expert_num for the per-expert layout and 1 for the stacked layout.</td>
+            <td>Same as the TensorList length and layout of the corresponding weight; local_moe_expert_num in the per-expert layout and 1 in the stacked layout. For the supported layouts and the exact values, see the constraints below this table.</td>
             <td>No</td>
             <td>Not supported</td>
         </tr>
         <tr>
             <td>l2_weights_sf</td>
-            <td>Same as the TensorList length and layout of the corresponding weight; num_experts_per_rank for Atlas A2 products and Atlas A3 products; for Ascend 950PR&950DT products, local_moe_expert_num for the per-expert layout and 1 for the stacked layout.</td>
+            <td>Same as the TensorList length and layout of the corresponding weight; local_moe_expert_num in the per-expert layout and 1 in the stacked layout. For the supported layouts and the exact values, see the constraints below this table.</td>
             <td>No</td>
             <td>Not supported</td>
         </tr>
@@ -1231,8 +1242,11 @@ sym_buffer.update_group(group) -> None
     </table>
 
   <!-- npu="950" id21 -->
-  - The MXFP use case on Ascend 950PR&950DT products supports two TensorList layouts. For `l1_weights`, `l2_weights`, `l1_weights_sf`, and `l2_weights_sf`, in the per-expert layout, all four TensorLists have a length of `local_moe_expert_num`; tensors in the weight lists are 2D, and tensors in the weight scale factor lists are 3D. In the stacked layout, all four TensorLists have a length of 1; the weight tensors are 3D, the weight scale factor tensors are 4D, and dim0 of each tensor is `local_moe_expert_num`. The four inputs must use the same layout. When the shared expert is enabled, the corresponding four shared expert inputs must also use the same layout as the MoE experts.
+  - <term>Ascend 950PR&950DT products</term>: the MXFP use case supports two TensorList layouts. For `l1_weights`, `l2_weights`, `l1_weights_sf`, and `l2_weights_sf`, in the per-expert layout, all four TensorLists have a length of `local_moe_expert_num`; tensors in the weight lists are 2D, and tensors in the weight scale factor lists are 3D. In the stacked layout, all four TensorLists have a length of 1; the weight tensors are 3D, the weight scale factor tensors are 4D, and dim0 of each tensor is `local_moe_expert_num`. The four inputs must use the same layout. When the shared expert is enabled, the corresponding four shared expert inputs must also use the same layout as the MoE experts.
   <!-- end id21 -->
+  <!-- npu="A3,910b" id29 -->
+  - <term>Atlas A2 products</term>, <term>Atlas A3 products</term>: `l1_weights`, `l2_weights`, `l1_weights_sf`, and `l2_weights_sf` support only the per-expert layout, and all four TensorLists have a length of `num_experts_per_rank` (= `num_experts` / `ep_world_size`, the same value as `local_moe_expert_num`).
+  <!-- end id29 -->
 
 - **Parameter Consistency Constraints**:
   - All input parameters of the mega_moe API and their corresponding tensor dimensions must be consistent with the parameters of the same names in get_symm_buffer_for_mega_moe (for example, `num_experts`, `hidden`, `intermediate_hidden`, etc.).
@@ -1240,11 +1254,13 @@ sym_buffer.update_group(group) -> None
 
 - **Communicator constraints**:
     - The value of the `ep_world_size` parameter must be consistent across all devices.
-    - The communicator buffer size must be consistent across Atlas A2 products and Atlas A3 products. `ccl_buffer_size` is the **total size** (in Bytes) of the CCL communication buffer allocated on HBM. It consists of two equal-sized spaces, **windowIn** and **windowOut**. During verification, the size of a single space, `ccl_buffer_size / 2`, must satisfy:
+    <!-- npu="A3,910b" id30 -->
+    - <term>Atlas A2 products</term>, <term>Atlas A3 products</term>: the communicator buffer size must be consistent. `ccl_buffer_size` is the **total size** (in Bytes) of the CCL communication buffer allocated on HBM. It consists of two equal-sized spaces, **windowIn** and **windowOut**. During verification, the size of a single space, `ccl_buffer_size / 2`, must satisfy:
 
         $$ccl\_buffer\_size\ /\ 2 \ge \mathrm{offsetTokenPerExpert} + \mathrm{offsetTensor} + \mathrm{offsetFlag} + 10\,\mathrm{MB}$$
+    <!-- end id30 -->
     <!-- npu="910b" id11 -->
-     **Atlas A2 products:**
+     **<term>Atlas A2 products</term>:**
 
     ```text
     offsetTokenPerExpert = ep_world_size × CeilAlign(ep_world_size × maxExpertPerRank + 1, 128) × 4B
@@ -1270,7 +1286,7 @@ sym_buffer.update_group(group) -> None
     <!-- end id11 -->
 
     <!-- npu="A3" id12 -->
-     **Atlas A3 products:**
+     **<term>Atlas A3 products</term>:**
 
     ```text
     offsetTokenPerExpert = ep_world_size × CeilAlign(ep_world_size × maxExpertPerRank + 1, 128) × 4B
@@ -1290,7 +1306,7 @@ sym_buffer.update_group(group) -> None
     <!-- end id12 -->
 
     <!-- npu="950" id13 -->
-     **Ascend 950PR&950DT products:**
+     **<term>Ascend 950PR&950DT products</term>:**
 
     The communication buffer is automatically calculated and allocated by `get_symm_buffer_for_mega_moe` based on parameters such as the communicator configuration and `num_max_tokens_per_rank`. Users do not need to calculate or set `ccl_buffer_size`. A larger `num_max_tokens_per_rank` value requires more internally allocated communication memory. Set the value appropriately based on the expected maximum number of tokens per device.
     <!-- end id13 -->
@@ -1305,13 +1321,13 @@ sym_buffer.update_group(group) -> None
   - <term>Atlas A3 products</term>: A multi-node communicator must be within one SuperPoD. Dual-device direct connection and cross-SuperPoD networking are not supported.
   <!-- end id15 -->
   <!-- npu="950" id16 -->
-  - <term>Ascend 950PR&950DT products</term>: Only the UB Memory communication protocol is supported.
+  - <term>Ascend 950PR&950DT products</term>: With `topo_type` = 0 (MTE topology), the UB Memory protocol is used and each rank accesses the peer communication window directly; with `topo_type` = 1 (URMA cross-SuperPoD topology), URMA (UB_CTP) is used for all peers.
   <!-- end id16 -->
 
 - **Parameter Constraints**:
 
   <!-- npu="A3,910b" id17 -->
-  - **Atlas A2 products, Atlas A3 products:**
+  - **<term>Atlas A2 products</term>, <term>Atlas A3 products</term>:**
 
     - `num_tokens` must be consistent across devices. Value range: `1 ≤ num_tokens ≤ num_max_tokens_per_rank`.
     - `ep_world_size`: values `2`, `4`, `8`, `16`, `32`, `48`, `64`, `96`, `128`.
@@ -1394,7 +1410,7 @@ sym_buffer.update_group(group) -> None
 
   <!-- end id17 -->
   <!-- npu="950" id18 -->
-  - **Ascend 950PR&950DT products:**
+  - **<term>Ascend 950PR&950DT products</term>:**
     - `activation` supports "swiglu", "swiglustep", "swigluoai", and "situglu". `activation_clamp` configures the clamp values of the first three activations; `activation_params` configures `alpha` and `beta` of "swigluoai" as well as `beta` and `linear_beta` of "situglu".
     - num_tokens (x.dim0) is in the range [1, +∞) and must not exceed `num_max_tokens_per_rank` configured when creating `sym_buffer` for each call. The actual num_tokens can vary across ranks, and the same `sym_buffer` can also be used for multiple calls with different num_tokens values.
     - `num_max_tokens_per_rank` must be greater than or equal to 1, and its value must be consistent across all ranks. It is recommended to set it to the maximum number of tokens on a single device that may occur on all ranks during `sym_buffer` reuse. If the original upper bound is exceeded, recreate `sym_buffer` with a larger upper bound.
@@ -1526,7 +1542,7 @@ Defaults to a deterministic implementation.
   The following example chains the two APIs in call order: initialize the communicator first, construct sym_buffer using get_symm_buffer_for_mega_moe, and then call mega_moe to run the operator.
 
   <!-- npu="950" id19 -->
-  - **Ascend 950PR&950DT products**:
+  - **<term>Ascend 950PR&950DT products</term>**:
 
     ```python
     import os
@@ -1763,7 +1779,7 @@ Defaults to a deterministic implementation.
   <!-- end id19 -->
 
   <!-- npu="A3,910b" id20 -->
-  - **Atlas A2 products, Atlas A3 products**:
+  - **<term>Atlas A2 products</term>, <term>Atlas A3 products</term>**:
 
     ```python
     import torch

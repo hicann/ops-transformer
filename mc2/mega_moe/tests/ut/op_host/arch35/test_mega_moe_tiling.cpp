@@ -17,6 +17,7 @@
 #include <vector>
 #include <gtest/gtest.h>
 #include "op_common/op_host/util/math_util.h"
+#include "../../../../op_host/op_tiling/arch35_92/mega_moe_dedup_gate.h"
 #include "../../../../op_kernel/arch35_92/common/mega_moe_gm_layout.h"
 #include "../../../../op_kernel/arch35_92/common/mega_moe_utils.h"
 #include "../../../../op_kernel/arch35_92/mega_moe_tiling.h"
@@ -106,6 +107,146 @@ TEST_F(MegaMoeArch35TilingTest, DedupModePredicatesMatchKernelContract)
     EXPECT_FALSE(IsCombineDedupOn(DEDUP_MODE_DISPATCH_ONLY));
     EXPECT_TRUE(IsDispatchDedupOn(DEDUP_MODE_BOTH));
     EXPECT_TRUE(IsCombineDedupOn(DEDUP_MODE_BOTH));
+}
+
+/*
+ * 门禁分数的逐形状标定锚。网格即标定批的参数全组合（9x2x2x3x3=324），遍历序 b->h->i->e->k；
+ * 期望串每 36 位（h x i x e x k 的 2x2x3x3 组合）对应一个 b 取值，'1' 判开、'0' 判关。
+ * 期望值取自标定公式的独立实现并在此冻结，不从被测代码回填。逐形状断言是必要的：只断言总开启数
+ * 拦不住互相抵消的笔误——把 A8W4-combine关 的 0.068 写成 -0.068 会翻转 10 个形状而总数仍为 149。
+ */
+TEST_F(MegaMoeArch35TilingTest, DedupGateScoreReproducesCalibratedDecisions)
+{
+    constexpr int64_t gridB[] = {4, 32, 128, 256, 512, 1024, 2048, 4096, 8192};
+    constexpr int64_t gridH[] = {2048, 3200};
+    constexpr int64_t gridI[] = {768, 1536};
+    constexpr int64_t gridE[] = {32, 48, 128};
+    constexpr int64_t gridK[] = {8, 12, 16};
+    constexpr size_t DEDUP_GATE_GRID_POINTS = 324U;
+    const struct {
+        uint8_t gmmMode;
+        bool combineDedupOn;
+        int expectedOpened;
+        const char* expectedDecisions;
+    } expectations[] = {
+        {MegaMoeImpl::GMM_MODE_A8W8_ND, false, 148,
+         "000000000000000000000000000000000000"   // b=4
+         "000000000000000000000000000000000000"   // b=32
+         "000000000000000000000000000000000000"   // b=128
+         "000000000000000000000000000000001000"   // b=256
+         "000000000001000000000110000011111000"   // b=512
+         "011011011111111011011111111111111111"   // b=1024
+         "111111111111111111111111111111111111"   // b=2048
+         "111111111111111111111111111111111111"   // b=4096
+         "111111111111111111111111111111111111"}, // b=8192
+        {MegaMoeImpl::GMM_MODE_A8W4_NZ, false, 149,
+         "000000000000000000000000000000000000"   // b=4
+         "000000000000000000000000000000000000"   // b=32
+         "000000000000000000000000000000000000"   // b=128
+         "000000000000000000000000000000000000"   // b=256
+         "000000000001000000101000000011101010"   // b=512
+         "111111011111011011111111111111111111"   // b=1024
+         "111111111111111111111111111111111111"   // b=2048
+         "111111111111111111111111111111111111"   // b=4096
+         "111111111111111111111111111111111111"}, // b=8192
+        {MegaMoeImpl::GMM_MODE_A8W8_ND, true, 177,
+         "000000000000000000000000000000000000"   // b=4
+         "000000000000000000000000000000000000"   // b=32
+         "000000000000000000000110000000000000"   // b=128
+         "000000000000000000111111111111111000"   // b=256
+         "000000000000100000111111111111111111"   // b=512
+         "011111111111111001111111111111111111"   // b=1024
+         "111111111111111111111111111111111111"   // b=2048
+         "111111111111111111111111111111111111"   // b=4096
+         "111111111111111111111111111111111111"}, // b=8192
+        {MegaMoeImpl::GMM_MODE_A8W4_NZ, true, 189,
+         "000000100000000000000000000000000000"   // b=4
+         "000000000000000000000000000000000000"   // b=32
+         "000000000000000011000000001000000000"   // b=128
+         "000000000000000111001111111000000011"   // b=256
+         "001000100111111111111111111111111111"   // b=512
+         "111111111111111111111111111111111111"   // b=1024
+         "111111111111111111111111111111111111"   // b=2048
+         "111111111111111111111111111111111111"   // b=4096
+         "111111111111111111111111111111111111"}, // b=8192
+    };
+    for (const auto& expectation : expectations) {
+        ASSERT_EQ(std::strlen(expectation.expectedDecisions), DEDUP_GATE_GRID_POINTS);
+        size_t index = 0;
+        int opened = 0;
+        for (const int64_t b : gridB) {
+            for (const int64_t h : gridH) {
+                for (const int64_t i : gridI) {
+                    for (const int64_t e : gridE) {
+                        for (const int64_t k : gridK) {
+                            const MegaMoeImpl::DedupGateShape shape{4, b, h, i, e, k};
+                            ASSERT_TRUE(MegaMoeImpl::IsDedupGateShapeCalibrated(shape, expectation.gmmMode));
+                            const double score =
+                                MegaMoeImpl::CalcDedupGateScore(shape, expectation.gmmMode, expectation.combineDedupOn);
+                            const bool opens = MegaMoeImpl::IsDispatchDedupBeneficial(score);
+                            SCOPED_TRACE(testing::Message()
+                                         << "gmmMode=" << static_cast<uint32_t>(expectation.gmmMode)
+                                         << ", combineDedupOn=" << expectation.combineDedupOn << ", shape=(4," << b
+                                         << "," << h << "," << i << "," << e << "," << k << "), score=" << score);
+                            EXPECT_EQ(opens, expectation.expectedDecisions[index] == '1');
+                            if (opens) {
+                                ++opened;
+                            }
+                            ++index;
+                        }
+                    }
+                }
+            }
+        }
+        // 总开启数作为辅助检查，判别力由上面的逐形状断言提供。
+        EXPECT_EQ(index, DEDUP_GATE_GRID_POINTS);
+        EXPECT_EQ(opened, expectation.expectedOpened);
+    }
+}
+
+/*
+ * 标定域边界：逐轴取越界值都必须判为域外（调用方据此回落旧判据），域内基准点必须命中。
+ */
+TEST_F(MegaMoeArch35TilingTest, DedupGateRejectsShapesOutsideCalibratedDomain)
+{
+    const MegaMoeImpl::DedupGateShape inDomain{4, 1024, 2048, 1536, 32, 8};
+    EXPECT_TRUE(MegaMoeImpl::IsDedupGateShapeCalibrated(inDomain, MegaMoeImpl::GMM_MODE_A8W8_ND));
+    EXPECT_TRUE(MegaMoeImpl::IsDispatchDedupBeneficial(
+        MegaMoeImpl::CalcDedupGateScore(inDomain, MegaMoeImpl::GMM_MODE_A8W8_ND, true)));
+    // A8W8 的 ND 与 NZ 共用一档：同形状同 combine 状态必须给出完全相同的分数。
+    EXPECT_DOUBLE_EQ(MegaMoeImpl::CalcDedupGateScore(inDomain, MegaMoeImpl::GMM_MODE_A8W8_ND, true),
+                     MegaMoeImpl::CalcDedupGateScore(inDomain, MegaMoeImpl::GMM_MODE_A8W8_NZ, true));
+
+    const MegaMoeImpl::DedupGateShape outOfDomain[] = {
+        {2, 1024, 2048, 1536, 32, 8},  // 卡数非 4
+        {4, 2, 2048, 1536, 32, 8},     // 每卡 token 数下界外
+        {4, 16384, 2048, 1536, 32, 8}, // 每卡 token 数上界外
+        {4, 1024, 1024, 1536, 32, 8},  // 输入隐藏维下界外
+        {4, 1024, 4096, 1536, 32, 8},  // 输入隐藏维上界外
+        {4, 1024, 2064, 1536, 32, 8},  // 输入隐藏维未按 32 对齐
+        {4, 1024, 2048, 640, 32, 8},   // 中间维下界外
+        {4, 1024, 2048, 2048, 32, 8},  // 中间维上界外
+        {4, 1024, 2048, 1088, 32, 8},  // 中间维未按 128 对齐
+        {4, 1024, 2048, 1536, 16, 8},  // 全局专家数下界外
+        {4, 1024, 2048, 1536, 256, 8}, // 全局专家数上界外
+        {4, 1024, 2048, 1536, 34, 8},  // 全局专家数不被 4 整除
+        {4, 1024, 2048, 1536, 32, 6},  // topK 下界外
+        {4, 1024, 2048, 1536, 32, 20}, // topK 上界外
+    };
+    for (const auto& shape : outOfDomain) {
+        SCOPED_TRACE(
+            testing::Message() << "epWorldSize=" << shape.epWorldSize << ", maxTokensPerRank=" << shape.maxTokensPerRank
+                               << ", hidden=" << shape.hidden << ", intermediateHidden=" << shape.intermediateHidden
+                               << ", globalMoeExpertNum=" << shape.globalMoeExpertNum << ", topK=" << shape.topK);
+        EXPECT_FALSE(MegaMoeImpl::IsDedupGateShapeCalibrated(shape, MegaMoeImpl::GMM_MODE_A8W8_ND));
+    }
+    // A8W4 的输入隐藏维按 64 对齐：只按 32 对齐的取值在 A8W4 档为域外、在 A8W8 档仍在域内。
+    const MegaMoeImpl::DedupGateShape w8OnlyAlignment{4, 1024, 2080, 1536, 32, 8};
+    EXPECT_FALSE(MegaMoeImpl::IsDedupGateShapeCalibrated(w8OnlyAlignment, MegaMoeImpl::GMM_MODE_A8W4_NZ));
+    EXPECT_TRUE(MegaMoeImpl::IsDedupGateShapeCalibrated(w8OnlyAlignment, MegaMoeImpl::GMM_MODE_A8W8_ND));
+    // 未标定的量化模式一律判域外，由调用方回落旧判据。
+    EXPECT_FALSE(MegaMoeImpl::IsDedupGateShapeCalibrated(inDomain, MegaMoeImpl::GMM_MODE_A4W4_ND));
+    EXPECT_FALSE(MegaMoeImpl::IsDedupGateShapeCalibrated(inDomain, MegaMoeImpl::GMM_MODE_A4W4_NZ));
 }
 
 TEST_F(MegaMoeArch35TilingTest, GmBuffersPreserveTopologyOrder)

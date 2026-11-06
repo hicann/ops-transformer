@@ -48,12 +48,14 @@ static ge::graphStatus CheckAndSetUrmaDedupMode(int64_t combineCommMode, MegaMoe
 {
     OP_TILING_CHECK(combineCommMode != COMBINE_COMM_MODE_NO_DEDUP && combineCommMode != COMBINE_COMM_MODE_SERVER_DEDUP,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_comm_mode", std::to_string(combineCommMode).c_str(),
-                                              "URMA only supports combine_comm_mode=0 or 2"),
+                                              "0 or 2 on Layered topology (topo_type=1 or 2)"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(combineCommMode == COMBINE_COMM_MODE_SERVER_DEDUP &&
                         tilingData->combineQuantMode != COMBINE_QUANT_OUT_TYPE_NO_QUANT,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_comm_mode", "2",
-                                              "server combine reduction requires combineQuantMode=0"),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        nodeName, "combine_comm_mode", "2",
+                        "enabling server combine reduction does not support quantized combine; it requires "
+                        "combine_quant_mode=0"),
                     return ge::GRAPH_FAILED);
     tilingData->compute.dedupMode =
         combineCommMode == COMBINE_COMM_MODE_SERVER_DEDUP ? DEDUP_MODE_SERVER_COMBINE : DEDUP_MODE_OFF;
@@ -67,18 +69,22 @@ static ge::graphStatus CheckAndSetMteDedupMode(const gert::TilingContext* contex
 {
     OP_TILING_CHECK(combineCommMode != COMBINE_COMM_MODE_NO_DEDUP && combineCommMode != COMBINE_COMM_MODE_RANK_DEDUP,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_comm_mode", std::to_string(combineCommMode).c_str(),
-                                              "MTE only supports combine_comm_mode=0 or 1"),
+                                              "0 or 1 on MTE topology (topo_type=0)"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(combineCommMode == COMBINE_COMM_MODE_RANK_DEDUP &&
-                        tilingData->combineQuantMode != COMBINE_QUANT_OUT_TYPE_NO_QUANT,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_comm_mode", "1",
-                                              "combine dedup requires combineQuantMode=0 (no-quant) for now"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        combineCommMode == COMBINE_COMM_MODE_RANK_DEDUP &&
+            tilingData->combineQuantMode != COMBINE_QUANT_OUT_TYPE_NO_QUANT,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "combine_comm_mode", "1",
+                                              "enabling combine dedup does not support quantized combine; it requires "
+                                              "combine_quant_mode=0"),
+        return ge::GRAPH_FAILED);
     const bool isPreQuantizedX = IsPreQuantizedXType(context->GetInputDesc(config.xIndex)->GetDataType());
     OP_TILING_CHECK(
         combineCommMode == COMBINE_COMM_MODE_RANK_DEDUP && tilingData->topkWeightsPrefetch == 0 && isPreQuantizedX,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_comm_mode", "1",
-                                  "combine dedup with topk_weights_type=0 does not support pre-quantized x"),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            nodeName, "combine_comm_mode", "1",
+            "enabling combine dedup does not support pre-quantized x together with topk_weights_type=0; "
+            "set topk_weights_type=1, or pass a non-pre-quantized x"),
         return ge::GRAPH_FAILED);
     tilingData->compute.dedupMode =
         combineCommMode == COMBINE_COMM_MODE_RANK_DEDUP ? DEDUP_MODE_BOTH : DEDUP_MODE_DISPATCH_ONLY;
@@ -95,19 +101,19 @@ static ge::graphStatus CheckAndSetDedupMode(const gert::TilingContext* context, 
     auto attrs = context->GetAttrs();
     auto ccmPtr = attrs->GetAttrPointer<int64_t>(static_cast<int>(config.attrCombineCommModeIndex));
     const int64_t combineCommMode = ccmPtr == nullptr ? COMBINE_COMM_MODE_NO_DEDUP : *ccmPtr;
-    OP_TILING_CHECK(combineCommMode != COMBINE_COMM_MODE_NO_DEDUP && combineCommMode != COMBINE_COMM_MODE_RANK_DEDUP &&
-                        combineCommMode != COMBINE_COMM_MODE_SERVER_DEDUP,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "combineCommMode", std::to_string(combineCommMode).c_str(),
-                                              "only support 0, 1 or 2"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        combineCommMode != COMBINE_COMM_MODE_NO_DEDUP && combineCommMode != COMBINE_COMM_MODE_RANK_DEDUP &&
+            combineCommMode != COMBINE_COMM_MODE_SERVER_DEDUP,
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_comm_mode", std::to_string(combineCommMode).c_str(), "0, 1 or 2"),
+        return ge::GRAPH_FAILED);
     if (IsLayeredTopology(tilingData->compute.topoType)) {
         return CheckAndSetUrmaDedupMode(combineCommMode, tilingData, nodeName);
     }
     if (tilingData->compute.topoType == TOPO_TYPE_MTE) {
         return CheckAndSetMteDedupMode(context, config, combineCommMode, tilingData, nodeName);
     }
-    OP_LOGE_FOR_INVALID_VALUE(nodeName, "topoType", std::to_string(tilingData->compute.topoType).c_str(),
-                              "only support MTE(0), URMA(1) or UBX(2)");
+    OP_LOGE_FOR_INVALID_VALUE(nodeName, "topo_type", std::to_string(tilingData->compute.topoType).c_str(),
+                              "MTE(0), URMA(1) or UBX(2)");
     return ge::GRAPH_FAILED;
 }
 

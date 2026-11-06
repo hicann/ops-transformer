@@ -648,7 +648,7 @@ sym_buffer.get_local_buffer_tensor(dtype, size=None, offset=0) -> Tensor
 sym_buffer.update_group(group) -> None
 ```
 
-`mask_buffer` 及以上五个 `SymmBuffer` 弹性扩缩容接口当前仅支持 <term>Atlas A3系列产品</term>。`SymmBuffer` 默认不创建 `mask_buffer`，因此各代际默认均不会向算子传入该参数。第一次调用 `query_mask_buffer`、`update_mask_buffer` 或 `clean_mask_buffer` 时，才会在 NPU 上创建 shape 为 `[ep_world_size]` 的全 0 int32 掩码；0 表示正常 rank，1 表示失能 rank，失能 rank 会在后续计算和卡间通信中被跳过。
+`SymmBuffer` 默认不创建 `mask_buffer`，因此各代际默认均不会向算子传入该参数。第一次调用 `query_mask_buffer`、`update_mask_buffer` 或 `clean_mask_buffer` 时，才会在 NPU 上创建 shape 为 `[ep_world_size]` 的全 0 int32 掩码；0 表示正常 rank，1 表示失能 rank，失能 rank 会在后续计算和卡间通信中被跳过。
 
 - `query_mask_buffer` 接收调用者预先创建的 `mask_status`，其 dtype 必须为 `torch.int32`，shape、所在 NPU 必须与内部 `mask_buffer` 一致。接口通过 D2D 拷贝将当前掩码写入 `mask_status`，不返回 Tensor。
 - `update_mask_buffer` 只更新当前进程中的本地掩码，各 rank 的掩码一致性由调用者保证。当恢复 rank，即 `masked` 输入为 `False` 时，必须调用 `get_local_buffer_tensor` 清空算子现存通信缓存区标志位。样例如下：
@@ -663,6 +663,13 @@ sym_buffer.update_group(group) -> None
 - `clean_mask_buffer` 在当前 NPU stream 上将本地掩码的所有元素清零；各 rank 需要分别调用，跨 rank 的一致性仍由调用者保证。掩码尚未创建时，接口会创建全 0 掩码。
 - `get_local_buffer_tensor` 将当前 Rank 的本地 CCL Buffer 零拷贝包装为 NPU Tensor。`offset` 以 `dtype` 元素为单位，`size` 为 `None` 时返回从 `offset` 到 Buffer 末尾的一维视图，否则返回指定 shape。返回 Tensor 不持有底层内存，其生命周期不得超过 `SymmBuffer`；调用 `update_group` 后旧视图失效，必须重新获取。调用者写入原始通信 Buffer 前必须保证相关算子已经执行完成，并确保写入范围正确。
 - `update_group` 使用新 group 原地更新 `context`，不会改变 `context` Tensor 的地址，以便已捕获的图继续复用。新 group 的 world size 必须与原通信域一致，旧通信链路的算子执行完成需要调用者保证。如需清除失能状态，应显式调用 `clean_mask_buffer`。
+
+<!-- npu="A3" id24 -->
+- <term>Atlas A3系列产品</term>：支持`mask_buffer`及上述五个`SymmBuffer`弹性扩缩容接口。
+<!-- end id24 -->
+<!-- npu="950,910b" id28 -->
+- <term>Ascend 950PR&950DT系列产品</term>、<term>Atlas A2系列产品</term>：不支持`mask_buffer`及上述五个`SymmBuffer`弹性扩缩容接口，上述五个接口不可调用。
+<!-- end id28 -->
 
 ## 参数说明
 
@@ -735,7 +742,7 @@ sym_buffer.update_group(group) -> None
         <td>dispatch_quant_out_dtype</td>
         <td>torch.dtype 或 int</td>
         <td>可选</td>
-        <td>dispatch量化后输出的数据类型。<term>Ascend 950PR&950DT系列产品</term>上该参数必须显式指定，保持默认值None会在创建`sym_buffer`时直接报错。支持torch.int8、torch.float8_e5m2、torch.float8_e4m3fn、torch_npu.float4_e2m1fn_x2。其中FLOAT4_E2M1只能传类型枚举torch_npu.float4_e2m1fn_x2（int，取值296），不能传torch.dtype。dispatch_quant_mode为4时该参数表示算子内量化的输出类型；预量化直通场景（dispatch_quant_mode为0且该参数为float8_e5m2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）下表示预量化x的逻辑类型，此时必须与x的实际数据类型一致。各产品支持的取值见约束说明。默认值为None。</td>
+        <td>dispatch量化后输出的数据类型。支持torch.int8、torch.float8_e5m2、torch.float8_e4m3fn、torch_npu.float4_e2m1fn_x2。其中FLOAT4_E2M1只能传类型枚举torch_npu.float4_e2m1fn_x2（int，取值296），不能传torch.dtype。dispatch_quant_mode为4时该参数表示算子内量化的输出类型；预量化直通场景（dispatch_quant_mode为0且该参数为float8_e5m2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）下表示预量化x的逻辑类型，此时必须与x的实际数据类型一致。各产品支持的取值、以及该参数是否必须显式指定见约束说明。默认值为None。</td>
     </tr>
     <tr>
         <td>combine_quant_mode</td>
@@ -763,6 +770,10 @@ sym_buffer.update_group(group) -> None
     </tr>
 </tbody>
 </table>
+
+<!-- npu="950" id29 -->
+- <term>Ascend 950PR&950DT系列产品</term>：`dispatch_quant_out_dtype`必须显式指定，保持默认值None会在创建`sym_buffer`时直接报错。
+<!-- end id29 -->
 
 ### mega_moe
 
@@ -1292,7 +1303,7 @@ sym_buffer.update_group(group) -> None
     </table>
 
   <!-- npu="950" id21 -->
-  - Ascend 950PR&950DT系列产品的MXFP场景支持两种TensorList布局。对于`l1_weights`、`l2_weights`、`l1_weights_sf`和`l2_weights_sf`，逐专家布局下四个TensorList的长度均为`local_moe_expert_num`，权重列表中的Tensor为二维，权重缩放因子列表中的Tensor为三维；堆叠布局下四个TensorList的长度均为1，权重Tensor为三维，权重缩放因子Tensor为四维，且各Tensor的dim0均为`local_moe_expert_num`。四个输入必须采用同一种布局；启用共享专家时，对应的四个共享专家输入也必须采用与MoE专家相同的布局。
+  - <term>Ascend 950PR&950DT系列产品</term>：MXFP场景支持两种TensorList布局。对于`l1_weights`、`l2_weights`、`l1_weights_sf`和`l2_weights_sf`，逐专家布局下四个TensorList的长度均为`local_moe_expert_num`，权重列表中的Tensor为二维，权重缩放因子列表中的Tensor为三维；堆叠布局下四个TensorList的长度均为1，权重Tensor为三维，权重缩放因子Tensor为四维，且各Tensor的dim0均为`local_moe_expert_num`。四个输入必须采用同一种布局；启用共享专家时，对应的四个共享专家输入也必须采用与MoE专家相同的布局。
   <!-- end id21 -->
   <!-- npu="A3,910b" id27 -->
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：`l1_weights`、`l2_weights`、`l1_weights_sf`、`l2_weights_sf`仅支持逐专家布局，四个TensorList的长度均为`num_experts_per_rank`（= `num_experts` / `ep_world_size`，与`local_moe_expert_num`同值）。
@@ -1304,11 +1315,13 @@ sym_buffer.update_group(group) -> None
 
 - **通信域约束**：
     - 所有卡的`ep_world_size`参数取值需保持一致。
-    - Atlas A2系列产品、Atlas A3系列产品的通信域缓存区大小应当一致。`ccl_buffer_size` 为 HBM 上分配的 CCL 通信缓冲区**总大小**（Bytes），包含等大小的 **windowIn** 和 **windowOut** 两块空间，校验时以单个空间 `ccl_buffer_size / 2` 为准，需满足：
+    <!-- npu="A3,910b" id30 -->
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：通信域缓存区大小应当一致。`ccl_buffer_size` 为 HBM 上分配的 CCL 通信缓冲区**总大小**（Bytes），包含等大小的 **windowIn** 和 **windowOut** 两块空间，校验时以单个空间 `ccl_buffer_size / 2` 为准，需满足：
 
         $$ccl\_buffer\_size\ /\ 2 \ge \mathrm{offsetTokenPerExpert} + \mathrm{offsetTensor} + \mathrm{offsetFlag} + 10\,\mathrm{MB}$$
+    <!-- end id30 -->
     <!-- npu="910b" id11 -->
-     **Atlas A2系列产品：**
+     **<term>Atlas A2系列产品</term>：**
 
     ```text
     offsetTokenPerExpert = ep_world_size × CeilAlign(ep_world_size × maxExpertPerRank + 1, 128) × 4Byte
@@ -1334,7 +1347,7 @@ sym_buffer.update_group(group) -> None
     <!-- end id11 -->
 
     <!-- npu="A3" id12 -->
-     **Atlas A3系列产品：**
+     **<term>Atlas A3系列产品</term>：**
 
     ```text
     offsetTokenPerExpert = ep_world_size × CeilAlign(ep_world_size × maxExpertPerRank + 1, 128) × 4Byte
@@ -1354,7 +1367,7 @@ sym_buffer.update_group(group) -> None
     <!-- end id12 -->
 
     <!-- npu="950" id13 -->
-     **Ascend 950PR&950DT系列产品：**
+     **<term>Ascend 950PR&950DT系列产品</term>：**
 
     通信buffer由`get_symm_buffer_for_mega_moe`根据通信域配置、`num_max_tokens_per_rank`等参数自动计算并申请，用户无需自行计算或设置`ccl_buffer_size`。`num_max_tokens_per_rank`越大，内部申请的通信内存越多，建议按预期最大单卡token数合理设置。
     <!-- end id13 -->
@@ -1369,13 +1382,13 @@ sym_buffer.update_group(group) -> None
   - <term>Atlas A3系列产品</term>：多机通信域要求在一个超节点内，不支持双机直连组网和跨超节点组网。
   <!-- end id15 -->
   <!-- npu="950" id16 -->
-  - <term>Ascend 950PR&950DT系列产品</term>：topo_type = 0、1时仅使用UB Memory通信协议；topo_type = 2（URMA与RoCE混合拓扑）下UB域内使用UB Memory通信协议、UB域之间使用RoCE。
+  - <term>Ascend 950PR&950DT系列产品</term>：topo_type = 0（MTE拓扑）使用UB Memory协议，由各卡直接访问对端的通信窗口完成跨卡数据搬运；topo_type = 1（URMA跨超拓扑）对所有对端均使用URMA（UB_CTP）；topo_type = 2（URMA与RoCE混合拓扑）按对端所在的UB域分流，同一UB域内使用URMA（UB_CTP）、跨UB域使用RoCE。
   <!-- end id16 -->
 
 - **参数约束**：
 
   <!-- npu="A3,910b" id17 -->
-  - **Atlas A2系列产品、Atlas A3系列产品：**
+  - **<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：**
 
     - 各卡 `num_tokens` 需保持一致，取值范围为 `1 ≤ num_tokens ≤ num_max_tokens_per_rank`。
     - `ep_world_size`：取值为 `2`、`4`、`8`、`16`、`32`、`48`、`64`、`96`、`128`。
@@ -1461,7 +1474,7 @@ sym_buffer.update_group(group) -> None
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持combine阶段通信去重，`combine_comm_mode`必须保持默认值0；`scales`为预留输入，当前必须传入None；输出`y`的数据类型与`x`一致。
   <!-- end id26 -->
   <!-- npu="950" id18 -->
-  - **Ascend 950PR&950DT系列产品：**
+  - **<term>Ascend 950PR&950DT系列产品</term>：**
     - `activation`支持"swiglu"、"swiglustep"、"swigluoai"、"situglu"和"gelu"。`activation_clamp`用于配置前三种激活的截断值，"situglu"忽略该值、"gelu"不支持该参数；`activation_params`用于配置"swigluoai"的`alpha`、`beta`以及"situglu"的`beta`、`linear_beta`，"gelu"不接受任何参数键。
     - num_tokens（x.dim0）范围[1, +∞)，每次调用必须不大于创建`sym_buffer`时配置的`num_max_tokens_per_rank`。不同Rank的实际num_tokens可以不同，同一个`sym_buffer`也可以用于多次不同num_tokens的调用。
     - `num_max_tokens_per_rank`取值范围[1, UINT32_MAX]，所有Rank取值必须一致，建议设置为`sym_buffer`复用期间所有Rank可能出现的最大单卡token数。超过原上界时需使用更大的上界重新创建`sym_buffer`。
@@ -1483,7 +1496,11 @@ sym_buffer.update_group(group) -> None
     - **通信去重约束**：
         - combine_comm_mode取值为0、1或2：0表示关闭combine阶段通信去重，1表示MTE卡内去重，2表示URMA或URMA+RoCE混合拓扑的Server内归约及域间二级回传。两种开启方式按拓扑分流：MTE拓扑只接受0或1，Layered拓扑只接受0或2，配错一律在tiling阶段报错。模式2要求combine_quant_mode=0，且y与模式0不逐位相同。是否开启完全由调用方决定，算子内部不做收益裁决。适用场景：num_topk较大、同一token命中同卡多个专家的比例较高、性能瓶颈在通信的形状，开启后收益明显；专家数多且瓶颈在计算的形状可能没有收益甚至变慢，建议按实际形状实测后再决定。
         - combine_comm_mode在`get_symm_buffer_for_mega_moe`处设置，`mega_moe`调用时从`sym_buffer`继承，无需重复传入；同一通信域内所有Rank必须配置相同取值，否则跨卡的通信记录布局不一致会导致读写错位。
-        - combine_comm_mode = 1时的能力约束（不满足时算子在tiling阶段直接报错并提示改回0，不做静默回退）：仅支持topo_type = 0（MTE拓扑）；combine_quant_mode必须为0（combine不量化）；topk_weights_type = 0时不支持预量化x；num_max_tokens_per_rank需满足 num_max_tokens_per_rank ≤ 128 × min(512, ⌊4608 / num_topk⌋)（例如num_topk = 32时上限为18432，num_topk ≤ 9时上限为65536）。
+        - combine_comm_mode = 1（开启combine卡内去重）有以下四条能力约束。任一条不满足，算子都在tiling阶段直接报错，不做静默回退，需要调用方把combine_comm_mode改回0。
+            - **拓扑**：仅支持topo_type = 0（MTE拓扑）。topo_type = 1或2（Layered拓扑）下不支持combine_comm_mode = 1，该拓扑的去重请使用combine_comm_mode = 2。
+            - **combine量化**：combine_quant_mode必须为0（combine不量化）。combine_comm_mode = 1不支持与combine侧MX量化（combine_quant_mode = 3或4）叠加。
+            - **预量化x**：combine_comm_mode = 1、topk_weights_type = 0、预量化x，这三者不能同时成立。此处的预量化x指预量化直通场景（dispatch_quant_mode = 0且dispatch_quant_out_dtype为float8_e5m2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）下传入的已量化x。开启combine卡内去重又要用预量化x时，请把topk_weights_type置为1（topk_weights_type = 1叠加预量化x是支持的，被拦截的只有topk_weights_type = 0这一种组合）。
+            - **单卡token数上限**：num_max_tokens_per_rank ≤ 128 × min(512, ⌊4608 / num_topk⌋)。该上限来自去重预处理（prepass）在UB上的分块容量，num_topk越大上限越小。常用取值：num_topk ≤ 9时上限65536，num_topk = 16时上限36864，num_topk = 32时上限18432。超限时报错会直接给出当前num_topk下的具体上限值。
         - combine_comm_mode = 1时，同一token在同一张卡上的多个专家输出改为在该卡按float32累加后一次转bfloat16发送，累加顺序与中间取整次数与关闭态不同，因此y与combine_comm_mode = 0的结果不逐位相同。偏差来源是bfloat16累加顺序与中间取整次数的差异，在存在数值抵消的元素上相对偏差可能明显放大；需要与关闭态逐位一致时请使用combine_comm_mode = 0，切换该开关后请按目标形状重新做精度验证。
     - 门控激活下l1_weights的Linear1输出维等于2 × intermediate_hidden、l2_weights的输入维等于intermediate_hidden；"gelu"下l1_weights的Linear1输出维等于2 × intermediate_hidden、l2_weights的输入维等于2 × intermediate_hidden。不满足时算子在tiling阶段报错。
     - l1_weights_sf和l2_weights_sf不可为空指针。
@@ -1587,6 +1604,67 @@ sym_buffer.update_group(group) -> None
             </tr>
         </tfoot>
         </table>
+    - **共享专家独立量化的支持组合**：启用共享专家（shared_expert_num_per_rank > 0）时，MoE专家与共享专家的量化场景**各自独立确定**，可以取不同场景（例如MoE专家走A8W4-FP、共享专家走A8W8-FP）。**两组取不同量化配置仅在topo_type = 0（MTE拓扑）下支持**，topo_type = 1或2下两组的量化场景与量化输出类型必须完全相同，否则算子在tiling阶段报错。每一组的场景由该组自己的「量化输出类型 + 权重数据类型 + 两层权重format」三者共同决定，对应关系见下表；在上述拓扑前提下两组各自按下表任取一行，算子不再对组合本身做额外限制，但仍须同时满足表下方的四条跨组约束。
+        <table>
+        <thead>
+            <tr>
+            <th>量化场景</th>
+            <th>量化输出类型<br>MoE专家取dispatch_quant_out_dtype<br>共享专家取shared_expert_quant_out_dtype</th>
+            <th>权重数据类型<br>MoE专家取l1_weights/l2_weights<br>共享专家取shared_l1_weights/shared_l2_weights</th>
+            <th>第一层权重format</th>
+            <th>第二层权重format</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+            <td><strong>A8W8-FP</strong></td>
+            <td>FLOAT8_E5M2</td>
+            <td>FLOAT8_E5M2</td>
+            <td>ND</td>
+            <td>ND</td>
+            </tr>
+            <tr>
+            <td><strong>A8W8-FP</strong></td>
+            <td>FLOAT8_E4M3FN</td>
+            <td>FLOAT8_E4M3FN</td>
+            <td>ND</td>
+            <td>ND</td>
+            </tr>
+            <tr>
+            <td><strong>A8W8-FP</strong></td>
+            <td>FLOAT8_E4M3FN</td>
+            <td>FLOAT8_E4M3FN</td>
+            <td>FRACTAL_NZ</td>
+            <td>FRACTAL_NZ</td>
+            </tr>
+            <tr>
+            <td><strong>A8W4-FP</strong></td>
+            <td>FLOAT8_E4M3FN</td>
+            <td>FLOAT4_E2M1</td>
+            <td>FORMAT_FRACTAL_NZ_C0_32</td>
+            <td>FORMAT_FRACTAL_NZ_C0_32</td>
+            </tr>
+            <tr>
+            <td><strong>A4W4-FP</strong></td>
+            <td>FLOAT4_E2M1</td>
+            <td>FLOAT4_E2M1</td>
+            <td>FRACTAL_NZ</td>
+            <td>FORMAT_FRACTAL_NZ_C0_32</td>
+            </tr>
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="5">同一组内第一层与第二层权重的数据类型必须一致；不在上表之内的「量化输出类型 + 权重数据类型 + format」组合，算子在tiling阶段报错。</td>
+            </tr>
+        </tfoot>
+        </table>
+
+        跨组约束（四条，均在tiling阶段校验）：
+
+        - 两组量化配置不同（场景不同或量化输出类型不同）时，仅支持topo_type = 0（MTE拓扑）；topo_type = 1或2下两组的量化配置必须完全相同。
+        - 预量化直通（dispatch_quant_mode = 0）时，shared_expert_quant_out_dtype只能取None或与dispatch_quant_out_dtype相同，即此时两组的**量化输出类型必须一致**，仅**权重类型**仍可不同。
+        - 共享专家的权重类型由shared_weight1_type、shared_weight2_type指定，省略时从shared_l1_weights、shared_l2_weights的数据类型推导；W4场景（权重为FLOAT4_E2M1）下必须显式指定为float4_e2m1fn_x2对应的类型枚举，且两者一致。
+        - shared_expert_quant_out_dtype默认值None表示与dispatch_quant_out_dtype保持一致；两组的权重format各自按本组场景取值，可以不同（例如MoE专家为FORMAT_FRACTAL_NZ_C0_32、共享专家为ND）。
 
   <!-- end id18 -->
 
@@ -1601,7 +1679,7 @@ sym_buffer.update_group(group) -> None
   下面示例将两个接口按调用顺序串联：先初始化通信域，再用get_symm_buffer_for_mega_moe构造sym_buffer，最后调用mega_moe运行算子。
 
   <!-- npu="950" id19 -->
-  - **Ascend 950PR&950DT系列产品**：
+  - **<term>Ascend 950PR&950DT系列产品</term>**：
 
     ```python
     import os
@@ -1841,7 +1919,7 @@ sym_buffer.update_group(group) -> None
   <!-- end id19 -->
 
   <!-- npu="A3,910b" id20 -->
-  - **Atlas A2系列产品、Atlas A3系列产品**：
+  - **<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>**：
 
     ```python
     import torch
