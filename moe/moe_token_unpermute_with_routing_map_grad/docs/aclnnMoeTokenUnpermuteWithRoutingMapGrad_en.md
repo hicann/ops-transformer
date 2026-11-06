@@ -20,7 +20,7 @@
 - <term>Atlas inference products</term>: Not supported
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas training products</term>: Not supported
+- <term>Atlas training products</term>: Supported
 <!-- end id6 -->
 
 ## Function
