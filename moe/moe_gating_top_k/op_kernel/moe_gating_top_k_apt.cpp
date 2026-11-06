@@ -14,6 +14,7 @@
  */
 
 #include "arch35/moe_gating_top_k_regbase.h"
+#include "arch35/moe_gating_top_k_hash_regbase.h"
 #include "arch35/moe_gating_top_k_without_group_regbase.h"
 #include "arch35/moe_gating_top_k_e_k_fullload_regbase.h"
 using namespace AscendC;
@@ -57,20 +58,24 @@ extern "C" __global__ __aicore__ void moe_gating_top_k(GM_ADDR x, GM_ADDR bias, 
         MoeGatingTopKWithoutGroupRegbase<DTYPE_X> op;
         op.Init(x, bias, y, expertIdx, out, userWS, tilingData, &tPipe);
         op.Process();
-    } else if (TILING_KEY_IS(TILING_KEY_REGBASE) || TILING_KEY_IS(TILING_KEY_HASH_INT32_INT32)) {
+    } else if (TILING_KEY_IS(TILING_KEY_REGBASE)) {
         MoeGatingTopKRegbase<DTYPE_X> op;
+        op.Init(x, bias, y, expertIdx, out, userWS, tilingData, &tPipe);
+        op.Process();
+    } else if (TILING_KEY_IS(TILING_KEY_HASH_INT32_INT32)) {
+        MoeGatingTopKHashRegbase<DTYPE_X, int32_t, int32_t> op;
         op.Init(x, bias, inputIds, tid2eid, y, expertIdx, out, userWS, tilingData, &tPipe);
         op.Process();
     } else if (TILING_KEY_IS(TILING_KEY_HASH_INT32_INT64)) {
-        MoeGatingTopKRegbase<DTYPE_X, int32_t, int64_t> op;
+        MoeGatingTopKHashRegbase<DTYPE_X, int32_t, int64_t> op;
         op.Init(x, bias, inputIds, tid2eid, y, expertIdx, out, userWS, tilingData, &tPipe);
         op.Process();
     } else if (TILING_KEY_IS(TILING_KEY_HASH_INT64_INT64)) {
-        MoeGatingTopKRegbase<DTYPE_X, int64_t, int64_t> op;
+        MoeGatingTopKHashRegbase<DTYPE_X, int64_t, int64_t> op;
         op.Init(x, bias, inputIds, tid2eid, y, expertIdx, out, userWS, tilingData, &tPipe);
         op.Process();
     } else if (TILING_KEY_IS(TILING_KEY_HASH_INT64_INT32)) {
-        MoeGatingTopKRegbase<DTYPE_X, int64_t, int32_t> op;
+        MoeGatingTopKHashRegbase<DTYPE_X, int64_t, int32_t> op;
         op.Init(x, bias, inputIds, tid2eid, y, expertIdx, out, userWS, tilingData, &tPipe);
         op.Process();
     }

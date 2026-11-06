@@ -30,16 +30,15 @@ constexpr int32_t CONSTANT_THREE = 3;
 constexpr int32_t CONSTANT_FOUR = 4;
 constexpr int32_t CONSTANT_EIGHT = 8;
 
-template <typename T, typename U1 = int32_t, typename U2 = int32_t>
+template <typename T>
 class MoeGatingTopKRegbase {
 public:
     __aicore__ inline MoeGatingTopKRegbase(){};
-    __aicore__ inline void Init(GM_ADDR x, GM_ADDR bias, GM_ADDR inputIds, GM_ADDR tid2eid, GM_ADDR y,
-                                GM_ADDR expertIdx, GM_ADDR out, GM_ADDR workspace,
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR bias, GM_ADDR y, GM_ADDR expertIdx, GM_ADDR out, GM_ADDR workspace,
                                 const MoeGatingTopKRegbaseTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
-private:
+protected:
     __aicore__ inline void CopyInBias();
     __aicore__ inline void CopyInX(int64_t progress);
     __aicore__ inline void ComputeX();
@@ -82,16 +81,7 @@ private:
                                                 int32_t sortedBaseRow, int32_t quotient, int32_t remainder,
                                                 int32_t nextBaseRow);
     __aicore__ inline void SelectTopKExpertScore();
-    __aicore__ inline void HashCompute(int64_t row);
     __aicore__ inline void CopyOut(int64_t progress);
-
-    __aicore__ inline void HashGatherWithSmallKAlignE(LocalTensor<float> xSigmoidTensor,
-                                                      LocalTensor<int32_t> expertIdxTensor, LocalTensor<T> yTensor,
-                                                      uint32_t k, float eps, float routedScalingFactor);
-    __aicore__ inline void HashGatherWithSmallKNotAlignE(LocalTensor<float> xSigmoidTensor,
-                                                         LocalTensor<int32_t> expertIdxTensor, LocalTensor<T> yTensor,
-                                                         uint32_t k, float eps, float routedScalingFactor,
-                                                         int32_t expertIdxPad, int32_t perGroupExpertCountAlign);
 
     __aicore__ inline void smallKAlignEVF(LocalTensor<float> xSigmoidTensor, LocalTensor<int32_t> mrgSortTensor,
                                           LocalTensor<int32_t> expertIdxTensor, LocalTensor<T> yTensor, uint32_t k,
@@ -140,7 +130,7 @@ private:
                                                      uint32_t k, float eps, float routedScalingFactor,
                                                      int32_t expertIdxPad, int32_t perGroupExpertCountAlign);
 
-private:
+protected:
     TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> xInQueue_;
     TQue<QuePosition::VECOUT, 1> yOutQueue_;
@@ -161,8 +151,6 @@ private:
     GlobalTensor<T> yGm_;
     GlobalTensor<int32_t> expertIdxGm_;
     GlobalTensor<float> outGm_;
-    GlobalTensor<U1> inputIdsGm_;
-    GlobalTensor<U2> tid2eidGm_;
 
     LocalTensor<uint32_t> indexTensor;
     LocalTensor<float> sortedInGroupTensor;
@@ -178,7 +166,6 @@ private:
     float routedScalingFactor_;
     float eps_;
     bool hasBias_ = false;
-    bool hashFlag_ = false;
     bool noNorm_ = false;
 
     int64_t perGroupExpertCount_;
@@ -188,8 +175,8 @@ private:
     const MoeGatingTopKRegbaseTilingData* tilingData_;
 };
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::CopyInBias()
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::CopyInBias()
 {
     if (!hasBias_) {
         return;
@@ -209,8 +196,8 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::CopyInBias()
     WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::CopyInX(int64_t row)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::CopyInX(int64_t row)
 {
     DataCopyExtParams dataCopyParams;
     dataCopyParams.blockCount = groupCount_;
@@ -234,11 +221,10 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::CopyInX(int64_t row)
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::PadWithMinFp32(__ubuf__ float* addBiasOutAddr,
-                                                                       uint16_t groupCount0,
-                                                                       uint32_t perGroupExpertCount0,
-                                                                       uint32_t perGroupExpertCountAlign0)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::PadWithMinFp32(__ubuf__ float* addBiasOutAddr, uint16_t groupCount0,
+                                                               uint32_t perGroupExpertCount0,
+                                                               uint32_t perGroupExpertCountAlign0)
 {
     RegTensor<float> vregPad;
     Reg::UnalignRegForStore u0;
@@ -250,11 +236,11 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::PadWithMinFp32(__ubuf__ 
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::GenerateIndexAndCopy(__ubuf__ float* sigmoidOutAddr,
-                                                                             __ubuf__ float* addBiasOutAddr,
-                                                                             __ubuf__ int32_t* indexOutAddr,
-                                                                             uint32_t size, uint32_t vfLoopNum)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::GenerateIndexAndCopy(__ubuf__ float* sigmoidOutAddr,
+                                                                     __ubuf__ float* addBiasOutAddr,
+                                                                     __ubuf__ int32_t* indexOutAddr, uint32_t size,
+                                                                     uint32_t vfLoopNum)
 {
     RegTensor<int32_t> vregIndex;
     RegTensor<float> vregSoftmaxResult;
@@ -270,10 +256,10 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::GenerateIndexAndCopy(__u
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftMaxWithBias(LocalTensor<float> xSigmoidTensor,
-                                                                        LocalTensor<float> xBiasTensor,
-                                                                        LocalTensor<uint32_t> indexTensor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::SoftMaxWithBias(LocalTensor<float> xSigmoidTensor,
+                                                                LocalTensor<float> xBiasTensor,
+                                                                LocalTensor<uint32_t> indexTensor)
 {
     uint32_t size = perGroupExpertCountAlign_ * groupCount_;
     uint16_t vfLoopNum = static_cast<uint16_t>(CeilDiv(size, VL_FLOAT_SIZE));
@@ -307,10 +293,10 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftMaxWithBias(LocalTen
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftMaxWithoutBias(LocalTensor<float> xSigmoidTensor,
-                                                                           LocalTensor<float> xBiasTensor,
-                                                                           LocalTensor<uint32_t> indexTensor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::SoftMaxWithoutBias(LocalTensor<float> xSigmoidTensor,
+                                                                   LocalTensor<float> xBiasTensor,
+                                                                   LocalTensor<uint32_t> indexTensor)
 {
     uint32_t size = perGroupExpertCountAlign_ * groupCount_;
 
@@ -326,11 +312,11 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftMaxWithoutBias(Local
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::ComputeWithSoftMax(LocalTensor<float> xInLocalTensor,
-                                                                           LocalTensor<float> xSigmoidTensor,
-                                                                           LocalTensor<float> xBiasTensor,
-                                                                           LocalTensor<uint32_t> indexTensor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::ComputeWithSoftMax(LocalTensor<float> xInLocalTensor,
+                                                                   LocalTensor<float> xSigmoidTensor,
+                                                                   LocalTensor<float> xBiasTensor,
+                                                                   LocalTensor<uint32_t> indexTensor)
 {
     if constexpr (!IsSameType<T, float>::value) {
         Cast(xInLocalTensor, xInLocalTensor[expertCountAlign_].template ReinterpretCast<T>(), RoundMode::CAST_NONE,
@@ -362,11 +348,11 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::ComputeWithSoftMax(Local
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SigmoidWithBias(LocalTensor<T> xInLocalTensor,
-                                                                        LocalTensor<float> xSigmoidTensor,
-                                                                        LocalTensor<float> xBiasTensor,
-                                                                        LocalTensor<uint32_t> indexTensor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::SigmoidWithBias(LocalTensor<T> xInLocalTensor,
+                                                                LocalTensor<float> xSigmoidTensor,
+                                                                LocalTensor<float> xBiasTensor,
+                                                                LocalTensor<uint32_t> indexTensor)
 {
     uint32_t size = perGroupExpertCountAlign_ * groupCount_;
     uint16_t vfLoopNum = static_cast<uint16_t>(CeilDiv(size, VL_FLOAT_SIZE));
@@ -412,11 +398,11 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SigmoidWithBias(LocalTen
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SigmoidWithoutBias(LocalTensor<T> xInLocalTensor,
-                                                                           LocalTensor<float> xSigmoidTensor,
-                                                                           LocalTensor<float> xBiasTensor,
-                                                                           LocalTensor<uint32_t> indexTensor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::SigmoidWithoutBias(LocalTensor<T> xInLocalTensor,
+                                                                   LocalTensor<float> xSigmoidTensor,
+                                                                   LocalTensor<float> xBiasTensor,
+                                                                   LocalTensor<uint32_t> indexTensor)
 {
     uint32_t size = perGroupExpertCountAlign_ * groupCount_;
     uint16_t vfLoopNum = static_cast<uint16_t>(CeilDiv(size, VL_FLOAT_SIZE));
@@ -456,11 +442,11 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SigmoidWithoutBias(Local
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::ComputeWithSigmoid(LocalTensor<T> xInLocalTensor,
-                                                                           LocalTensor<float> xSigmoidTensor,
-                                                                           LocalTensor<float> xBiasTensor,
-                                                                           LocalTensor<uint32_t> indexTensor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::ComputeWithSigmoid(LocalTensor<T> xInLocalTensor,
+                                                                   LocalTensor<float> xSigmoidTensor,
+                                                                   LocalTensor<float> xBiasTensor,
+                                                                   LocalTensor<uint32_t> indexTensor)
 {
     if (hasBias_) {
         SigmoidWithBias(xInLocalTensor, xSigmoidTensor, xBiasTensor, indexTensor);
@@ -469,11 +455,11 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::ComputeWithSigmoid(Local
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftplusWithBias(LocalTensor<T> xInLocalTensor,
-                                                                         LocalTensor<float> xSigmoidTensor,
-                                                                         LocalTensor<float> xBiasTensor,
-                                                                         LocalTensor<uint32_t> indexTensor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::SoftplusWithBias(LocalTensor<T> xInLocalTensor,
+                                                                 LocalTensor<float> xSigmoidTensor,
+                                                                 LocalTensor<float> xBiasTensor,
+                                                                 LocalTensor<uint32_t> indexTensor)
 {
     uint32_t size = perGroupExpertCountAlign_ * groupCount_;
     uint16_t vfLoopNum = static_cast<uint16_t>(CeilDiv(size, VL_FLOAT_SIZE));
@@ -537,11 +523,11 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftplusWithBias(LocalTe
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftplusWithoutBias(LocalTensor<T> xInLocalTensor,
-                                                                            LocalTensor<float> xSigmoidTensor,
-                                                                            LocalTensor<float> xBiasTensor,
-                                                                            LocalTensor<uint32_t> indexTensor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::SoftplusWithoutBias(LocalTensor<T> xInLocalTensor,
+                                                                    LocalTensor<float> xSigmoidTensor,
+                                                                    LocalTensor<float> xBiasTensor,
+                                                                    LocalTensor<uint32_t> indexTensor)
 {
     uint32_t size = perGroupExpertCountAlign_ * groupCount_;
     uint16_t vfLoopNum = static_cast<uint16_t>(CeilDiv(size, VL_FLOAT_SIZE));
@@ -599,11 +585,11 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SoftplusWithoutBias(Loca
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::ComputeWithSoftplus(LocalTensor<T> xInLocalTensor,
-                                                                            LocalTensor<float> xSigmoidTensor,
-                                                                            LocalTensor<float> xBiasTensor,
-                                                                            LocalTensor<uint32_t> indexTensor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::ComputeWithSoftplus(LocalTensor<T> xInLocalTensor,
+                                                                    LocalTensor<float> xSigmoidTensor,
+                                                                    LocalTensor<float> xBiasTensor,
+                                                                    LocalTensor<uint32_t> indexTensor)
 {
     if (hasBias_) {
         SoftplusWithBias(xInLocalTensor, xSigmoidTensor, xBiasTensor, indexTensor);
@@ -612,8 +598,8 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::ComputeWithSoftplus(Loca
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::ComputeX()
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::ComputeX()
 {
     LocalTensor<float> xSigmoidTensor = xSigmoidBuf_.Get<float>();
     LocalTensor<float> xBiasTensor = xBiasBuf_.Get<float>();
@@ -634,8 +620,8 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::ComputeX()
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::CopyOutXNorm(int64_t progress)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::CopyOutXNorm(int64_t progress)
 {
     if (tilingData_->outFlag == 0) {
         return;
@@ -652,8 +638,8 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::CopyOutXNorm(int64_t pro
     outOutQueue_.FreeTensor(outOutTensor);
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SortInGroup()
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::SortInGroup()
 {
     LocalTensor<float> xBiasTensor = xBiasBuf_.Get<float>();
     LocalTensor<float> sortedInGroupTensor = sortedInGroupBuf_.Get<float>(); // 组内排序的结果, 后续归并需要
@@ -670,148 +656,12 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SortInGroup()
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::HashGatherWithSmallKAlignE(LocalTensor<float> xSigmoidTensor,
-                                                                                   LocalTensor<int32_t> expertIdxTensor,
-                                                                                   LocalTensor<T> yTensor, uint32_t k,
-                                                                                   float eps, float routedScalingFactor)
-{
-    __ubuf__ float* inputAddr = (__ubuf__ float*)xSigmoidTensor.GetPhyAddr();
-    __ubuf__ uint32_t* expertIdxAddr = (__ubuf__ uint32_t*)expertIdxTensor.GetPhyAddr();
-    __ubuf__ T* outputAddr = (__ubuf__ T*)yTensor.GetPhyAddr();
-
-    if (noNorm_) {
-        __VEC_SCOPE__
-        {
-            RegTensor<uint32_t> vreg1;
-            RegTensor<float> vreg2;
-
-            Reg::MaskReg preg0 = Reg::UpdateMask<uint32_t>(k);
-            Reg::LoadAlign(vreg1, expertIdxAddr);
-            Reg::Gather(vreg2, inputAddr, vreg1, preg0);
-            Reg::Muls(vreg2, vreg2, routedScalingFactor, preg0);
-            ops::StoreOneTensorForDtypeT<T>(outputAddr, vreg2, preg0, 0);
-        }
-    } else {
-        __VEC_SCOPE__
-        {
-            RegTensor<uint32_t> vreg1;
-            RegTensor<float> vreg2;
-            RegTensor<float> vreg3;
-            RegTensor<float> vreg4;
-
-            Reg::MaskReg preg0 = Reg::UpdateMask<uint32_t>(k);
-            Reg::LoadAlign(vreg1, expertIdxAddr);
-            Reg::Gather(vreg2, inputAddr, vreg1, preg0);
-            Reg::Reduce<Reg::ReduceType::SUM>(vreg3, vreg2, preg0);
-            Reg::Adds(vreg3, vreg3, eps, preg0);
-            Reg::Duplicate(vreg4, vreg3, preg0);
-            Reg::Div(vreg4, vreg2, vreg4, preg0);
-            Reg::Muls(vreg4, vreg4, routedScalingFactor, preg0);
-            ops::StoreOneTensorForDtypeT<T>(outputAddr, vreg4, preg0, 0);
-        }
-    }
-}
-
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::HashGatherWithSmallKNotAlignE(
-    LocalTensor<float> xSigmoidTensor, LocalTensor<int32_t> expertIdxTensor, LocalTensor<T> yTensor, uint32_t k,
-    float eps, float routedScalingFactor, int32_t expertIdxPad, int32_t perGroupExpertCountAlign)
-{
-    __ubuf__ float* inputAddr = (__ubuf__ float*)xSigmoidTensor.GetPhyAddr();
-    __ubuf__ uint32_t* expertIdxAddr = (__ubuf__ uint32_t*)expertIdxTensor.GetPhyAddr();
-    __ubuf__ T* outputAddr = (__ubuf__ T*)yTensor.GetPhyAddr();
-
-    if (noNorm_) {
-        __VEC_SCOPE__
-        {
-            RegTensor<uint32_t> vreg1;
-            RegTensor<float> vreg2;
-            RegTensor<uint32_t> vregAlign;
-
-            Reg::MaskReg preg0 = Reg::UpdateMask<float>(k);
-            Reg::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
-
-            Reg::LoadAlign(vreg1, expertIdxAddr);
-            Reg::Gather(vreg2, inputAddr, vreg1, preg0);
-            Reg::Muls(vreg2, vreg2, routedScalingFactor, preg0);
-
-            Reg::Div(vregAlign, vreg1, vregAlign, preg0);
-            Reg::Muls(vregAlign, vregAlign, expertIdxPad, preg0);
-            Reg::Sub(vreg1, vreg1, vregAlign, preg0);
-
-            ops::StoreOneTensorForDtypeT<T>(outputAddr, vreg2, preg0, 0);
-        }
-    } else {
-        __VEC_SCOPE__
-        {
-            RegTensor<uint32_t> vreg1;
-            RegTensor<float> vreg2;
-            RegTensor<float> vreg3;
-            RegTensor<float> vreg4;
-            RegTensor<uint32_t> vregAlign;
-
-            Reg::MaskReg preg0 = Reg::UpdateMask<float>(k);
-            Reg::Duplicate(vregAlign, perGroupExpertCountAlign, preg0);
-
-            Reg::LoadAlign(vreg1, expertIdxAddr);
-            Reg::Gather(vreg2, inputAddr, vreg1, preg0);
-            Reg::Reduce<Reg::ReduceType::SUM>(vreg3, vreg2, preg0);
-            Reg::Adds(vreg3, vreg3, eps, preg0);
-            Reg::Duplicate(vreg4, vreg3, preg0);
-            Reg::Div(vreg4, vreg2, vreg4, preg0);
-            Reg::Muls(vreg4, vreg4, routedScalingFactor, preg0);
-
-            Reg::Div(vregAlign, vreg1, vregAlign, preg0);
-            Reg::Muls(vregAlign, vregAlign, expertIdxPad, preg0);
-            Reg::Sub(vreg1, vreg1, vregAlign, preg0);
-
-            ops::StoreOneTensorForDtypeT<T>(outputAddr, vreg4, preg0, 0);
-        }
-    }
-}
-
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::HashCompute(int64_t row)
-{
-    LocalTensor<int32_t> expertIdxTensor = expertIdxOutQueue_.AllocTensor<int32_t>();
-    LocalTensor<U2> hashExpertId = sortedInGroupBuf_.Get<U2>();
-    LocalTensor<int32_t> hashExpertIdInt32 = hashExpertId.template ReinterpretCast<int32_t>();
-
-    U1 key = inputIdsGm_.GetValue(row);
-    SetWaitFlag<HardEvent::MTE3_MTE2>(HardEvent::MTE3_MTE2);
-    DataCopyExtParams dataCopyParams{1, static_cast<uint32_t>(k_ * sizeof(U2)), 0, 0, 0};
-    DataCopyPadExtParams dataCopyPadParams{false, 0, 0, static_cast<U2>(0)};
-    DataCopyPad(hashExpertId, tid2eidGm_[key * k_], dataCopyParams, dataCopyPadParams);
-    SetWaitFlag<HardEvent::MTE2_V>(HardEvent::MTE2_V);
-    if constexpr (IsSameType<U2, int32_t>::value) {
-        DataCopy(expertIdxTensor, hashExpertId, Align(k_, sizeof(int32_t)));
-    } else {
-        Cast(hashExpertIdInt32, hashExpertId, RoundMode::CAST_NONE, Align(k_, sizeof(U2)));
-        PipeBarrier<PIPE_V>();
-        DataCopy(expertIdxTensor, hashExpertIdInt32, Align(k_, sizeof(int32_t)));
-    }
-    PipeBarrier<PIPE_V>();
-
-    LocalTensor<float> xSigmoidTensor = xSigmoidBuf_.Get<float>();
-    LocalTensor<T> yTensor = yOutQueue_.AllocTensor<T>();
-    int32_t expertIdxPad = perGroupExpertCountAlign_ - perGroupExpertCount_;
-    if (expertIdxPad != 0) {
-        HashGatherWithSmallKNotAlignE(xSigmoidTensor, expertIdxTensor, yTensor, k_, eps_, routedScalingFactor_,
-                                      expertIdxPad, perGroupExpertCountAlign_);
-    } else {
-        HashGatherWithSmallKAlignE(xSigmoidTensor, expertIdxTensor, yTensor, k_, eps_, routedScalingFactor_);
-    }
-    yOutQueue_.EnQue(yTensor);
-    expertIdxOutQueue_.EnQue<int32_t>(expertIdxTensor);
-}
-
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SelectTopKInGroup(LocalTensor<float> sortedInGroupTensor,
-                                                                          LocalTensor<float> top2InGroupTensor,
-                                                                          uint16_t groupCount0,
-                                                                          uint32_t perGroupExpertCountAlign0,
-                                                                          uint32_t padNegInfNum)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::SelectTopKInGroup(LocalTensor<float> sortedInGroupTensor,
+                                                                  LocalTensor<float> top2InGroupTensor,
+                                                                  uint16_t groupCount0,
+                                                                  uint32_t perGroupExpertCountAlign0,
+                                                                  uint32_t padNegInfNum)
 {
     if (groupSelectMode_ == 1) {
         __VEC_SCOPE__
@@ -855,11 +705,10 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SelectTopKInGroup(LocalT
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SelectTopKAfterSort(LocalTensor<float> sortedGroupTensor,
-                                                                            LocalTensor<float> top2InGroupTensor,
-                                                                            uint32_t size, int32_t kGroup0,
-                                                                            LocalTensor<float> tmpLocal)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::SelectTopKAfterSort(LocalTensor<float> sortedGroupTensor,
+                                                                    LocalTensor<float> top2InGroupTensor, uint32_t size,
+                                                                    int32_t kGroup0, LocalTensor<float> tmpLocal)
 {
     int32_t kGroupNumAlign = (kGroup0 + 31) / 32 * 32;
     uint32_t padkGroupNum = kGroupNumAlign - kGroup0;
@@ -890,8 +739,8 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SelectTopKAfterSort(Loca
                       kGroupNumAlign / ONE_REPEAT_SORT_NUM);
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::FinalSortByKGroup()
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::FinalSortByKGroup()
 {
     mrgSortTensor = finalSortBuffer_.Get<float>();
     LocalTensor<uint32_t> tmpLocal = sortedGroupTensor.template ReinterpretCast<uint32_t>();
@@ -944,10 +793,10 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::FinalSortByKGroup()
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::ProcessQuartetSort(LocalTensor<float> srcTensor,
-                                                                           LocalTensor<float> dstTensor,
-                                                                           int32_t sortedBaseRow, int32_t quotient)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::ProcessQuartetSort(LocalTensor<float> srcTensor,
+                                                                   LocalTensor<float> dstTensor, int32_t sortedBaseRow,
+                                                                   int32_t quotient)
 {
     if (quotient <= 0) {
         return;
@@ -971,11 +820,11 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::ProcessQuartetSort(Local
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::ProcessRemainderSort(LocalTensor<float> srcTensor,
-                                                                             LocalTensor<float> dstTensor,
-                                                                             int32_t sortedBaseRow, int32_t quotient,
-                                                                             int32_t remainder, int32_t nextBaseRow)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::ProcessRemainderSort(LocalTensor<float> srcTensor,
+                                                                     LocalTensor<float> dstTensor,
+                                                                     int32_t sortedBaseRow, int32_t quotient,
+                                                                     int32_t remainder, int32_t nextBaseRow)
 {
     if (remainder <= 0) {
         return;
@@ -1017,8 +866,8 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::ProcessRemainderSort(Loc
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::FinalSortAfterKGroup()
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::FinalSortAfterKGroup()
 {
     LocalTensor<float> srcTensor;
     LocalTensor<float> dstTensor;
@@ -1041,12 +890,12 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::FinalSortAfterKGroup()
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKAlignEVF(LocalTensor<float> xSigmoidTensor,
-                                                                       LocalTensor<int32_t> mrgSortTensor,
-                                                                       LocalTensor<int32_t> expertIdxTensor,
-                                                                       LocalTensor<T> yTensor, uint32_t k, float eps,
-                                                                       float routedScalingFactor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::smallKAlignEVF(LocalTensor<float> xSigmoidTensor,
+                                                               LocalTensor<int32_t> mrgSortTensor,
+                                                               LocalTensor<int32_t> expertIdxTensor,
+                                                               LocalTensor<T> yTensor, uint32_t k, float eps,
+                                                               float routedScalingFactor)
 {
     if (noNorm_) {
         smallKAlignEVFNoNorm(xSigmoidTensor, mrgSortTensor, expertIdxTensor, yTensor, k, routedScalingFactor);
@@ -1055,12 +904,12 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKAlignEVF(LocalTens
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKAlignEVFNoNorm(LocalTensor<float> xSigmoidTensor,
-                                                                             LocalTensor<int32_t> mrgSortTensor,
-                                                                             LocalTensor<int32_t> expertIdxTensor,
-                                                                             LocalTensor<T> yTensor, uint32_t k,
-                                                                             float routedScalingFactor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::smallKAlignEVFNoNorm(LocalTensor<float> xSigmoidTensor,
+                                                                     LocalTensor<int32_t> mrgSortTensor,
+                                                                     LocalTensor<int32_t> expertIdxTensor,
+                                                                     LocalTensor<T> yTensor, uint32_t k,
+                                                                     float routedScalingFactor)
 {
     __ubuf__ float* inputAddr = (__ubuf__ float*)xSigmoidTensor.GetPhyAddr();
     __ubuf__ T* outputAddr = (__ubuf__ T*)yTensor.GetPhyAddr();
@@ -1069,12 +918,12 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKAlignEVFNoNorm(Loc
     SmallKAlignEVFNoNorm<T>(inputAddr, mrgSortAddr, outputAddr, expertIdxAddr, k, routedScalingFactor);
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKAlignEVFWithNorm(LocalTensor<float> xSigmoidTensor,
-                                                                               LocalTensor<int32_t> mrgSortTensor,
-                                                                               LocalTensor<int32_t> expertIdxTensor,
-                                                                               LocalTensor<T> yTensor, uint32_t k,
-                                                                               float eps, float routedScalingFactor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::smallKAlignEVFWithNorm(LocalTensor<float> xSigmoidTensor,
+                                                                       LocalTensor<int32_t> mrgSortTensor,
+                                                                       LocalTensor<int32_t> expertIdxTensor,
+                                                                       LocalTensor<T> yTensor, uint32_t k, float eps,
+                                                                       float routedScalingFactor)
 {
     __ubuf__ float* inputAddr = (__ubuf__ float*)xSigmoidTensor.GetPhyAddr();
     __ubuf__ T* outputAddr = (__ubuf__ T*)yTensor.GetPhyAddr();
@@ -1083,12 +932,12 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKAlignEVFWithNorm(L
     SmallKAlignEVFWithNorm<T>(inputAddr, mrgSortAddr, outputAddr, expertIdxAddr, k, eps, routedScalingFactor);
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::largeKAlignEVFNoNorm(LocalTensor<float> xSigmoidTensor,
-                                                                             LocalTensor<int32_t> mrgSortTensor,
-                                                                             LocalTensor<int32_t> expertIdxTensor,
-                                                                             LocalTensor<T> yTensor, uint32_t k,
-                                                                             float routedScalingFactor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::largeKAlignEVFNoNorm(LocalTensor<float> xSigmoidTensor,
+                                                                     LocalTensor<int32_t> mrgSortTensor,
+                                                                     LocalTensor<int32_t> expertIdxTensor,
+                                                                     LocalTensor<T> yTensor, uint32_t k,
+                                                                     float routedScalingFactor)
 {
     __ubuf__ float* inputAddr = (__ubuf__ float*)xSigmoidTensor.GetPhyAddr();
     __ubuf__ T* outputAddr = (__ubuf__ T*)yTensor.GetPhyAddr();
@@ -1097,12 +946,12 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::largeKAlignEVFNoNorm(Loc
     LargeKAlignEVFNoNorm<T>(inputAddr, mrgSortAddr, outputAddr, expertIdxAddr, k, routedScalingFactor);
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::largeKAlignEVFWithNorm(LocalTensor<float> xSigmoidTensor,
-                                                                               LocalTensor<int32_t> mrgSortTensor,
-                                                                               LocalTensor<int32_t> expertIdxTensor,
-                                                                               LocalTensor<T> yTensor, uint32_t k,
-                                                                               float eps, float routedScalingFactor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::largeKAlignEVFWithNorm(LocalTensor<float> xSigmoidTensor,
+                                                                       LocalTensor<int32_t> mrgSortTensor,
+                                                                       LocalTensor<int32_t> expertIdxTensor,
+                                                                       LocalTensor<T> yTensor, uint32_t k, float eps,
+                                                                       float routedScalingFactor)
 {
     __ubuf__ float* inputAddr = (__ubuf__ float*)xSigmoidTensor.GetPhyAddr();
     __ubuf__ T* outputAddr = (__ubuf__ T*)yTensor.GetPhyAddr();
@@ -1111,12 +960,12 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::largeKAlignEVFWithNorm(L
     LargeKAlignEVFWithNorm<T>(inputAddr, mrgSortAddr, outputAddr, expertIdxAddr, k, eps, routedScalingFactor);
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::largeKAlignEVF(LocalTensor<float> xSigmoidTensor,
-                                                                       LocalTensor<int32_t> mrgSortTensor,
-                                                                       LocalTensor<int32_t> expertIdxTensor,
-                                                                       LocalTensor<T> yTensor, uint32_t k, float eps,
-                                                                       float routedScalingFactor)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::largeKAlignEVF(LocalTensor<float> xSigmoidTensor,
+                                                               LocalTensor<int32_t> mrgSortTensor,
+                                                               LocalTensor<int32_t> expertIdxTensor,
+                                                               LocalTensor<T> yTensor, uint32_t k, float eps,
+                                                               float routedScalingFactor)
 {
     if (noNorm_) {
         largeKAlignEVFNoNorm(xSigmoidTensor, mrgSortTensor, expertIdxTensor, yTensor, k, routedScalingFactor);
@@ -1124,11 +973,13 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::largeKAlignEVF(LocalTens
         largeKAlignEVFWithNorm(xSigmoidTensor, mrgSortTensor, expertIdxTensor, yTensor, k, eps, routedScalingFactor);
     }
 }
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKNotAlignEVF(
-    LocalTensor<float> xSigmoidTensor, LocalTensor<int32_t> mrgSortTensor, LocalTensor<int32_t> expertIdxTensor,
-    LocalTensor<T> yTensor, uint32_t k, float eps, float routedScalingFactor, int32_t expertIdxPad,
-    int32_t perGroupExpertCountAlign)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::smallKNotAlignEVF(LocalTensor<float> xSigmoidTensor,
+                                                                  LocalTensor<int32_t> mrgSortTensor,
+                                                                  LocalTensor<int32_t> expertIdxTensor,
+                                                                  LocalTensor<T> yTensor, uint32_t k, float eps,
+                                                                  float routedScalingFactor, int32_t expertIdxPad,
+                                                                  int32_t perGroupExpertCountAlign)
 {
     if (noNorm_) {
         smallKNotAlignEVFNoNorm(xSigmoidTensor, mrgSortTensor, expertIdxTensor, yTensor, k, routedScalingFactor,
@@ -1139,11 +990,13 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKNotAlignEVF(
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKNotAlignEVFNoNorm(
-    LocalTensor<float> xSigmoidTensor, LocalTensor<int32_t> mrgSortTensor, LocalTensor<int32_t> expertIdxTensor,
-    LocalTensor<T> yTensor, uint32_t k, float routedScalingFactor, int32_t expertIdxPad,
-    int32_t perGroupExpertCountAlign)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::smallKNotAlignEVFNoNorm(LocalTensor<float> xSigmoidTensor,
+                                                                        LocalTensor<int32_t> mrgSortTensor,
+                                                                        LocalTensor<int32_t> expertIdxTensor,
+                                                                        LocalTensor<T> yTensor, uint32_t k,
+                                                                        float routedScalingFactor, int32_t expertIdxPad,
+                                                                        int32_t perGroupExpertCountAlign)
 {
     __ubuf__ float* inputAddr = (__ubuf__ float*)xSigmoidTensor.GetPhyAddr();
     __ubuf__ T* outputAddr = (__ubuf__ T*)yTensor.GetPhyAddr();
@@ -1171,8 +1024,8 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKNotAlignEVFNoNorm(
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKNotAlignEVFWithNorm(
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::smallKNotAlignEVFWithNorm(
     LocalTensor<float> xSigmoidTensor, LocalTensor<int32_t> mrgSortTensor, LocalTensor<int32_t> expertIdxTensor,
     LocalTensor<T> yTensor, uint32_t k, float eps, float routedScalingFactor, int32_t expertIdxPad,
     int32_t perGroupExpertCountAlign)
@@ -1210,11 +1063,13 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::smallKNotAlignEVFWithNor
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::LargeKNotAlignEVFNoNorm(
-    LocalTensor<float> xSigmoidTensor, LocalTensor<int32_t> mrgSortTensor, LocalTensor<int32_t> expertIdxTensor,
-    LocalTensor<T> yTensor, uint32_t k, float routedScalingFactor, int32_t expertIdxPad,
-    int32_t perGroupExpertCountAlign)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::LargeKNotAlignEVFNoNorm(LocalTensor<float> xSigmoidTensor,
+                                                                        LocalTensor<int32_t> mrgSortTensor,
+                                                                        LocalTensor<int32_t> expertIdxTensor,
+                                                                        LocalTensor<T> yTensor, uint32_t k,
+                                                                        float routedScalingFactor, int32_t expertIdxPad,
+                                                                        int32_t perGroupExpertCountAlign)
 {
     uint32_t k1 = k_;
     __ubuf__ T* outputAddr = (__ubuf__ T*)yTensor.GetPhyAddr();
@@ -1260,8 +1115,8 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::LargeKNotAlignEVFNoNorm(
         }
     }
 }
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::LargeKNotAlignEVFWithNorm(
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::LargeKNotAlignEVFWithNorm(
     LocalTensor<float> xSigmoidTensor, LocalTensor<int32_t> mrgSortTensor, LocalTensor<int32_t> expertIdxTensor,
     LocalTensor<T> yTensor, uint32_t k, float eps, float routedScalingFactor, int32_t expertIdxPad,
     int32_t perGroupExpertCountAlign)
@@ -1314,11 +1169,13 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::LargeKNotAlignEVFWithNor
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::largeKNotAlignEVF(
-    LocalTensor<float> xSigmoidTensor, LocalTensor<int32_t> mrgSortTensor, LocalTensor<int32_t> expertIdxTensor,
-    LocalTensor<T> yTensor, uint32_t k, float eps, float routedScalingFactor, int32_t expertIdxPad,
-    int32_t perGroupExpertCountAlign)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::largeKNotAlignEVF(LocalTensor<float> xSigmoidTensor,
+                                                                  LocalTensor<int32_t> mrgSortTensor,
+                                                                  LocalTensor<int32_t> expertIdxTensor,
+                                                                  LocalTensor<T> yTensor, uint32_t k, float eps,
+                                                                  float routedScalingFactor, int32_t expertIdxPad,
+                                                                  int32_t perGroupExpertCountAlign)
 {
     if (noNorm_) {
         LargeKNotAlignEVFNoNorm(xSigmoidTensor, mrgSortTensor, expertIdxTensor, yTensor, k, routedScalingFactor,
@@ -1329,8 +1186,8 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::largeKNotAlignEVF(
     }
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SelectTopKExpertScore()
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::SelectTopKExpertScore()
 {
     LocalTensor<int32_t> expertIdxTensor = expertIdxOutQueue_.AllocTensor<int32_t>();
     LocalTensor<int32_t> mrgSortTensor = finalSortBuffer_.Get<int32_t>();
@@ -1363,8 +1220,8 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SelectTopKExpertScore()
     expertIdxOutQueue_.EnQue<int32_t>(expertIdxTensor);
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::CopyOut(int64_t row)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::CopyOut(int64_t row)
 {
     LocalTensor<T> yOutTensor = yOutQueue_.DeQue<T>();
     LocalTensor<int32_t> expertIdxTensor = expertIdxOutQueue_.DeQue<int32_t>();
@@ -1378,8 +1235,8 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::CopyOut(int64_t row)
     yOutQueue_.FreeTensor(yOutTensor);
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SelectTopKGroupIndex()
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::SelectTopKGroupIndex()
 {
     sortedInGroupTensor = sortedInGroupBuf_.Get<float>();
     LocalTensor<float> top2InGroupTensor = groupBuf_.Get<float>();
@@ -1401,12 +1258,10 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::SelectTopKGroupIndex()
     SelectTopKAfterSort(sortedGroupTensor, top2InGroupTensor, size, kGroup0, tmpLocal);
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::Init(GM_ADDR x, GM_ADDR bias, GM_ADDR inputIds, GM_ADDR tid2eid,
-                                                             GM_ADDR y, GM_ADDR expertIdx, GM_ADDR out,
-                                                             GM_ADDR workspace,
-                                                             const MoeGatingTopKRegbaseTilingData* tilingData,
-                                                             TPipe* tPipe)
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::Init(GM_ADDR x, GM_ADDR bias, GM_ADDR y, GM_ADDR expertIdx, GM_ADDR out,
+                                                     GM_ADDR workspace,
+                                                     const MoeGatingTopKRegbaseTilingData* tilingData, TPipe* tPipe)
 {
     tilingData_ = tilingData;
     pipe_ = tPipe;
@@ -1426,7 +1281,6 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::Init(GM_ADDR x, GM_ADDR 
     routedScalingFactor_ = tilingData_->routedScalingFactor;
     groupSelectMode_ = tilingData_->groupSelectMode;
     eps_ = tilingData_->eps;
-    hashFlag_ = tilingData_->hashFlag == 1;
     noNorm_ = !ShouldRenormalize(tilingData_->normType, tilingData_->renorm);
 
     xGm_.SetGlobalBuffer((__gm__ T*)x + tilingData_->perCoreRowCount * expertCount_ * blockIdx_, expertCount_);
@@ -1437,11 +1291,6 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::Init(GM_ADDR x, GM_ADDR 
     yGm_.SetGlobalBuffer((__gm__ T*)y + tilingData_->perCoreRowCount * k_ * blockIdx_, k_);
     expertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expertIdx + tilingData_->perCoreRowCount * k_ * blockIdx_, k_);
     outGm_.SetGlobalBuffer((__gm__ float*)out + tilingData_->perCoreRowCount * expertCount_ * blockIdx_, expertCount_);
-
-    if (hashFlag_) {
-        inputIdsGm_.SetGlobalBuffer((__gm__ U1*)inputIds);
-        tid2eidGm_.SetGlobalBuffer((__gm__ U2*)tid2eid);
-    }
 
     int32_t expertGroupAlign = groupCount_ * perGroupExpertCountAlign_;
     int32_t groupAlign = static_cast<int32_t>(CeilAlign(groupCount_, ONE_REPEAT_SORT_NUM));
@@ -1460,28 +1309,13 @@ __aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::Init(GM_ADDR x, GM_ADDR 
     pipe_->InitBuffer(sortedGroupBuf_, groupAlign * sizeof(float) * 2);
 }
 
-template <typename T, typename U1, typename U2>
-__aicore__ inline void MoeGatingTopKRegbase<T, U1, U2>::Process()
+template <typename T>
+__aicore__ inline void MoeGatingTopKRegbase<T>::Process()
 {
     CopyInBias();
     // 非hash的简化路径(kGroup==groupCount或groupCount==expertCount)由tiling路由到
-    // MoeGatingTopKWithoutGroupRegbase(tiling key 10005), 本kernel的逐行流水分支仅服务hash模式
-    if (hashFlag_) {
-        CopyInX(0);
-        for (int64_t row = 1; row < curCoreRowCount_; row++) {
-            ComputeX();
-            CopyOutXNorm(row - 1);
-            CopyInX(row);
-            HashCompute(row - 1 + tilingData_->perCoreRowCount * blockIdx_);
-            CopyOut(row - 1);
-        }
-        ComputeX();
-        CopyOutXNorm(curCoreRowCount_ - 1);
-        HashCompute(curCoreRowCount_ - 1 + tilingData_->perCoreRowCount * blockIdx_);
-        CopyOut(curCoreRowCount_ - 1);
-        return;
-    }
-
+    // MoeGatingTopKWithoutGroupRegbase(tiling key 10005), hash模式路由到MoeGatingTopKHashRegbase(tiling key
+    // 10001~10004)
     CopyInX(0);
     for (int64_t row = 1; row < curCoreRowCount_; row++) {
         ComputeX();
