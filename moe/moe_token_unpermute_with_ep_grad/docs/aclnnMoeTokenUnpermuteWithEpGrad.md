@@ -276,13 +276,13 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEpGrad(
     <tr>
       <td rowspan="3"> ACLNN_ERR_INNER_TILING_ERROR </td>
       <td rowspan="3"> 561002 </td>
-      <td>topkNum > 512。</td>
+      <td>topkNum不在[1, 512]范围内。</td>
     </tr>
     <tr>
-      <td>输入和输出的shape不符合要求。</td>
+      <td>输入或输出 shape 不符合要求，例如 probsOptional 与 unpermutedTokensGrad 的第 0 维不一致。</td>
     </tr>
     <tr>
-      <td>rangeOptional[1] < rangeOptional[0]。</td>
+      <td>归一化后的 range 起始位置大于结束位置，或当前平台不支持传入的 paddedMode。</td>
     </tr>
   </tbody>
   </table>
@@ -332,6 +332,8 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEpGrad(
 ## 约束说明
 
 - 确定性说明：aclnnMoeTokenUnpermuteWithEpGrad默认确定性实现。
+
+- 调用方必须保证 `sortedIndices` 的每个值都在 `[0, tokens_num * topK)` 内。第一段接口和 Tiling 均不读取 Device 侧的索引值。Kernel 会跳过有效范围外的索引。
 
 - Shape匹配约束：不支持broadcast，各输入、输出shape需显式匹配。permutedTokensOptional传入时其第0维需等于sortedIndices第0维、第1维需等于unpermutedTokensGrad第1维（hidden_size）；probsOptional传入时其第0维需等于unpermutedTokensGrad第0维（tokens_num）；permutedTokensGradOut第0维需等于sortedIndices第0维、第1维需等于hidden_size；probsOptional传入时probsGradOut需与probsOptional一致。
 

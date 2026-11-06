@@ -278,13 +278,13 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEpGrad(
     <tr>
       <td rowspan="3"> ACLNN_ERR_INNER_TILING_ERROR </td>
       <td rowspan="3"> 561002 </td>
-      <td>topkNum > 512.</td>
+      <td>topkNum is outside [1, 512].</td>
     </tr>
     <tr>
-      <td>The shape of the input or output does not meet the requirements.</td>
+      <td>An input or output shape is invalid, including a mismatch between probsOptional and unpermutedTokensGrad in the first dimension.</td>
     </tr>
     <tr>
-      <td>rangeOptional[1] < rangeOptional[0].</td>
+      <td>The normalized range start exceeds its end, or paddedMode is unsupported on the current platform.</td>
     </tr>
   </tbody>
   </table>
@@ -334,6 +334,8 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEpGrad(
 ## Constraints
 
 - Determinism: aclnnMoeTokenUnpermuteWithEpGrad defaults to a deterministic implementation.
+
+- The caller must ensure that every value in `sortedIndices` is within `[0, tokens_num * topK)`. The first-phase API and tiling do not read index values on the device. The kernel skips indices outside the effective range.
 
 - Shape matching constraints: broadcast is not supported, and the shapes of all inputs and outputs must match explicitly. When permutedTokensOptional is passed in, its 0th dimension must equal the 0th dimension of sortedIndices, and its 1st dimension must equal the 1st dimension of unpermutedTokensGrad (hidden_size); when probsOptional is passed in, its 0th dimension must equal the 0th dimension of unpermutedTokensGrad (tokens_num); the 0th dimension of permutedTokensGradOut must equal the 0th dimension of sortedIndices, and its 1st dimension must equal hidden_size; when probsOptional is passed in, probsGradOut must be consistent with probsOptional.
 

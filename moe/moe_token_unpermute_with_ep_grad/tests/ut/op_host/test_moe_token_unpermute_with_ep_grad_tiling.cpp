@@ -95,7 +95,7 @@ TEST_F(MoeTokenUnpermuteWithEpGradTiling, test_tiling_prob_not_none_bf16_001)
             {"padded_mode", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
             {"restore_shape", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>({1, 1})},
             {"range", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>({-1, -1})},
-            {"topk_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"topk_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
         },
         &compileInfo);
     uint64_t expectTilingKey = 1;
