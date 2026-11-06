@@ -130,15 +130,14 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::GetNpuInfo()
                                                            .c_str()})),
                 return GRAPH_FAILED);
 
-    socVersion_ = ascendcPlatform.GetSocVersion();
-    if ((socVersion_ != platform_ascendc::SocVersion::ASCEND910B) &&
-        (socVersion_ != platform_ascendc::SocVersion::ASCEND910_93) &&
-        (!Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_))) {
+    npuArch_ = ascendcPlatform.GetCurNpuArch();
+    if ((npuArch_ != Ops::Base::DAV_2201) && (!Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_))) {
         REPORT_PREDEFINED_ERR_MSG(
             "EZ3002", (std::vector<const char*>{"optype", "opskernel", "reason"}),
             (std::vector<const char*>{
                 "DenseLightningIndexerSoftmaxLse", "AiCore",
-                (std::string("SOC Version[") + std::to_string((int32_t)socVersion_) + "] is not support.").c_str()}));
+                (std::string("NpuArch[") + std::to_string(static_cast<int32_t>(npuArch_)) + "] is not support.")
+                    .c_str()}));
         return GRAPH_FAILED;
     }
     OP_CHECK_IF(context_->GetWorkspaceSizes(1) == nullptr,
@@ -713,7 +712,7 @@ void DenseLISoftmaxLseInfoParser::GenerateInfo(DenseLISoftmaxLseTilingInfo& dens
     denseLISoftmaxTilingInfo.opName = opName_;
     denseLISoftmaxTilingInfo.platformInfo = platformInfo_;
     denseLISoftmaxTilingInfo.opParamInfo = opParamInfo_;
-    denseLISoftmaxTilingInfo.socVersion = socVersion_;
+    denseLISoftmaxTilingInfo.npuArch = npuArch_;
 
     denseLISoftmaxTilingInfo.bSize = bSize_;
     denseLISoftmaxTilingInfo.n1Size = n1Size_;

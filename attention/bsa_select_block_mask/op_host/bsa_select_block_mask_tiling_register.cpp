@@ -28,12 +28,23 @@ static ge::graphStatus BSASelectBlockMaskTilingFunc(gert::TilingContext* context
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingParseForBSASelectBlockMask([[maybe_unused]] gert::TilingParseContext* context)
+static ge::graphStatus TilingParseForBSASelectBlockMask(gert::TilingParseContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Start parsing tiling for BSASelectBlockMask.");
     auto compileInfoPtr = context->GetCompiledInfo<BSASelectBlockMaskCompileInfo>();
     OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "compileInfoPtr is null"),
                 return ge::GRAPH_FAILED);
+    auto platformInfoPtr = context->GetPlatformInfo();
+    OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "platformInfoPtr is null"),
+                return ge::GRAPH_FAILED);
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
+    compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();
+    compileInfoPtr->aicNum = ascendcPlatform.GetCoreNumAic();
+    compileInfoPtr->npuArch = ascendcPlatform.GetCurNpuArch();
+    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfoPtr->ubSize);
+    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, compileInfoPtr->l1Size);
+    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, compileInfoPtr->l0cSize);
+    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, compileInfoPtr->l2CacheSize);
 
     return ge::GRAPH_SUCCESS;
 }

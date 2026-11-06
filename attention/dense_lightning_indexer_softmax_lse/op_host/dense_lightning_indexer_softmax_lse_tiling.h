@@ -122,7 +122,7 @@ public:
     fe::PlatFormInfos* platformInfo = nullptr;
     DenseLISoftmaxLseParaInfo opParamInfo;
     // Base Param
-    platform_ascendc::SocVersion socVersion = platform_ascendc::SocVersion::ASCEND910B;
+    NpuArch npuArch = Ops::Base::DAV_2201;
     uint32_t bSize = 0;
     uint32_t n1Size = 0;
     uint32_t n2Size = 0;
@@ -208,7 +208,7 @@ public:
     uint32_t headDim_ = 0;
     // Layout
     DataLayout layout_ = DataLayout::BSND;
-    platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND910B;
+    NpuArch npuArch_ = Ops::Base::DAV_2201;
     ge::DataType inputQType_ = ge::DT_FLOAT16;
     ge::DataType inputKType_ = ge::DT_FLOAT16;
     ge::DataType weightsType_ = ge::DT_FLOAT16;

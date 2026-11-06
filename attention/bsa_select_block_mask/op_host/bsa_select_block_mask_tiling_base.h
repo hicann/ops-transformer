@@ -19,6 +19,7 @@
 #include "../op_kernel/bsa_select_block_mask_tiling_key.h"
 #include "../op_kernel/bsa_select_block_mask_tiling_data.h"
 #include "tiling_base_class.h"
+#include "op_host/util/op_const_def.h"
 
 using namespace ge;
 using namespace AscendC;
@@ -34,6 +35,7 @@ struct BSASelectBlockMaskCompileInfo {
     uint64_t l0cSize;
     uint64_t l2CacheSize;
     platform_ascendc::SocVersion socVersion;
+    NpuArch npuArch;
 };
 
 class BSASelectBlockMaskTilingBase : public TilingBaseClass {
@@ -79,7 +81,7 @@ protected:
         queryLayout = nullptr;
         kvLayout = nullptr;
         opName = nullptr;
-        socVersion = platform_ascendc::SocVersion::ASCEND910B;
+        npuArch = Ops::Base::DAV_2201;
     }
 
     [[nodiscard]] gert::TilingContext* GetContext()
@@ -142,7 +144,7 @@ protected:
     uint64_t l1Size;
     uint64_t l0cSize;
     uint64_t l2CacheSize;
-    platform_ascendc::SocVersion socVersion;
+    NpuArch npuArch;
 
     LayoutType tilingKeyLayoutQ;
     LayoutType tilingKeyLayoutKV;

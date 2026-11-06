@@ -21,7 +21,7 @@ namespace optiling {
 
 bool BSASelectBlockMaskTilingBase::IsA5Platform() const
 {
-    return socVersion == platform_ascendc::SocVersion::ASCEND950;
+    return npuArch == Ops::Base::DAV_3510;
 }
 
 uint32_t BSASelectBlockMaskTilingBase::GetAivRatio() const
@@ -454,12 +454,12 @@ ge::graphStatus BSASelectBlockMaskTilingBase::GetPlatformInfo()
         l1Size = compileInfoPtr->l1Size;
         l0cSize = compileInfoPtr->l0cSize;
         l2CacheSize = compileInfoPtr->l2CacheSize;
-        socVersion = compileInfoPtr->socVersion;
+        npuArch = compileInfoPtr->npuArch;
     } else {
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
         aivNum = ascendcPlatform.GetCoreNumAiv();
         aicNum = ascendcPlatform.GetCoreNumAic();
-        socVersion = ascendcPlatform.GetSocVersion();
+        npuArch = ascendcPlatform.GetCurNpuArch();
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, l1Size);
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, l0cSize);
@@ -469,9 +469,9 @@ ge::graphStatus BSASelectBlockMaskTilingBase::GetPlatformInfo()
                 OP_LOGE(opName, "invalid platform core num, aivNum[%u] aicNum[%u].", aivNum, aicNum),
                 return ge::GRAPH_FAILED);
     OP_LOGD(opName,
-            "platform info: socVersion(%d) aivNum(%u) aicNum(%u) ubSize(%lu) l1Size(%lu) "
+            "platform info: npuArch(%d) aivNum(%u) aicNum(%u) ubSize(%lu) l1Size(%lu) "
             "l0cSize(%lu) l2CacheSize(%lu).",
-            static_cast<int32_t>(socVersion), aivNum, aicNum, ubSize, l1Size, l0cSize, l2CacheSize);
+            static_cast<int32_t>(npuArch), aivNum, aicNum, ubSize, l1Size, l0cSize, l2CacheSize);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -488,9 +488,9 @@ ge::graphStatus BSASelectBlockMaskTilingBase::DoOpTiling()
     CalcOutputParams();
 
     OP_LOGD(opName,
-            "DoOpTiling: socVersion[%d] blockDim[%u] activeCoreNum[%u] activeYVecCoreNum[%u] "
+            "DoOpTiling: npuArch[%d] blockDim[%u] activeCoreNum[%u] activeYVecCoreNum[%u] "
             "launchAivNum[%u] rowsPerCore[%u] yBlocksPerCore[%u] xBlocks[%u] yBlocks[%u].",
-            static_cast<int32_t>(socVersion), blockDim, multiCoreParams_->get_activeCoreNum(),
+            static_cast<int32_t>(npuArch), blockDim, multiCoreParams_->get_activeCoreNum(),
             multiCoreParams_->get_activeYCoreNum(), launchAivNum, multiCoreParams_->get_rowsPerCore(),
             multiCoreParams_->get_yBlocksPerCore(), multiCoreParams_->get_totalRows(), yBlocks);
     return ge::GRAPH_SUCCESS;
