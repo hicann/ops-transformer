@@ -25,7 +25,7 @@
 #include "../../sparse_flash_mla/op_kernel/sparse_flash_mla_kernel_metadata.h"
 #include "../../common/op_kernel/aicpu_common.h"
 
-namespace aicpu {
+namespace aicpu::smla_metadata {
 constexpr int64_t FA_TOLERANCE_RATIO = 2;
 constexpr uint32_t COST_WEIGHT_M = 6U;
 constexpr uint32_t COST_WEIGHT_S2 = 10U;
@@ -118,10 +118,11 @@ struct SplitResult {
     std::vector<uint32_t> s2End{};                   // 每个核处理数据的S2结束点
     std::vector<uint32_t> firstFdDataWorkspaceIdx{}; // 每个核第一份归约任务的存放位置
     int64_t maxCost{0};                              // 慢核开销
-    uint32_t numOfFdHead{0U};                        // 归约任务数量
-    uint32_t maxS2SplitNum{0U};                      // 单个归约任务最大分核数量
-    uint32_t maxS2LoopNum{0U};                       // 单个核最大s2计算轮次数量
-    FlashDecodeResult fdRes{0U, 0U};                 // FD信息
+    uint32_t maxBlockNum{0U};        // 慢核处理的最大基本块数量，尾块按一个基本块计数
+    uint32_t numOfFdHead{0U};        // 归约任务数量
+    uint32_t maxS2SplitNum{0U};      // 单个归约任务最大分核数量
+    uint32_t maxS2LoopNum{0U};       // 单个核最大s2计算轮次数量
+    FlashDecodeResult fdRes{0U, 0U}; // FD信息
 
     SplitResult(uint32_t aicNum, uint32_t aivNum)
         : bN2End(aicNum),
@@ -321,6 +322,7 @@ private:
     // main
     void SplitFD(SplitResult& splitRes);
     void CalcSplitPlan(int64_t costLimit, const SplitContext& splitContext, SplitResult& result);
+    bool ShouldUseFd(const SplitResult& nonFdSplitRes, const SplitResult& fdSplitRes) const;
 
 private:
     // input
@@ -396,6 +398,11 @@ private:
         metaData = 0,
     };
 };
+} // namespace aicpu::smla_metadata
+
+namespace aicpu {
+// Preserve the kernel class name used by existing callers and tests.
+using SparseFlashMlaMetadataCpuKernel = smla_metadata::SparseFlashMlaMetadataCpuKernel;
 } // namespace aicpu
 
 #endif

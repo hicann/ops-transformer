@@ -117,6 +117,12 @@ for _, params in enumerate(ENABLED_PARAMS):
         v = normalized_params.get(ik)
         if v is not None and not isinstance(v, bool):
             normalized_params[ik] = int(v)
+    # Excel 的核数列包含空单元格时，pandas 可能把整数读成浮点数。
+    # 仅转换整数值，非整数仍交给 prepare_fd_params 校验。
+    for key in ("fd_aic_core_num", "fd_aiv_core_num"):
+        value = normalized_params.get(key)
+        if isinstance(value, float) and value.is_integer():
+            normalized_params[key] = int(value)
     template_run_mode = normalized_params["template_run_mode"]
     if isinstance(template_run_mode, list):
         template_run_mode = template_run_mode[0]
@@ -170,6 +176,8 @@ for _, params in enumerate(ENABLED_PARAMS):
         "ori_kv_datarange",
         "cmp_kv_datarange",
         "batch_consistency",
+        "fd_aic_core_num",
+        "fd_aiv_core_num",
         "batch_consistency_seed",
         "batch_consistency_order",
         "batch_consistency_batch_split",
@@ -227,6 +235,8 @@ for _, params in enumerate(ENABLED_PARAMS):
         [normalized_params["ori_kv_datarange"]],
         [normalized_params["cmp_kv_datarange"]],
         [normalized_params.get("batch_consistency")],
+        [normalized_params.get("fd_aic_core_num")],
+        [normalized_params.get("fd_aiv_core_num")],
         [normalized_params.get("batch_consistency_seed")],
         [normalized_params.get("batch_consistency_order")],
         [normalized_params.get("batch_consistency_batch_split")],

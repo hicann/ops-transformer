@@ -445,10 +445,8 @@ def fill_none_params(params_dict):
         "ori_topk_length": params_dict.get("ori_topk_length", None),
         "cmp_topk_length": params_dict.get("cmp_topk_length", None),
         "batch_consistency": params_dict.get("batch_consistency"),
-        "fd_mode": params_dict.get("fd_mode"),
         "fd_aic_core_num": params_dict.get("fd_aic_core_num"),
         "fd_aiv_core_num": params_dict.get("fd_aiv_core_num"),
-        "fd_require_split": params_dict.get("fd_require_split"),
         "batch_consistency_seed": params_dict.get("batch_consistency_seed"),
         "batch_consistency_order": params_dict.get("batch_consistency_order"),
         "batch_consistency_batch_split": params_dict.get(

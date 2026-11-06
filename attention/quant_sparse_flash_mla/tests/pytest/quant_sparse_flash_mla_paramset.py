@@ -14,10 +14,8 @@ import torch
 
 TEST_PARAMS = {
     "decode_first": {
-        "fd_mode": [False],
         "fd_aic_core_num": [32],
         "fd_aiv_core_num": [None],
-        "fd_require_split": [False],
         "Testcase_Name": [None],
         "layout_q": ["TND"],
         "layout_kv": ["PA_BBND"],

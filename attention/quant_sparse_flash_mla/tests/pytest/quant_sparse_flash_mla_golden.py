@@ -27,6 +27,13 @@ DATA_RANGE_RIGHT = 2
 FP8_DATA_RANGE_LEFT = -5
 FP8_DATA_RANGE_RIGHT = 5
 
+# 与 quant_sparse_flash_mla_metadata.h / smla_metadata_common.h 的接口布局一致。
+QSMLA_METADATA_SIZE = 2048
+AIC_CORE_MAX_NUM = 80
+AIV_CORE_MAX_NUM = 80
+FA_METADATA_END = AIC_CORE_MAX_NUM * 9
+FD_METADATA_END = FA_METADATA_END + AIV_CORE_MAX_NUM * 8
+
 
 def _nonfinite_fill(shape, data_range):
     """Return a constant tensor for an INF/NAN range, or None for finite data."""
@@ -57,21 +64,10 @@ def _resolve_descale_range(data_range):
     ]
 
 
-def prepare_fd_params(params, policy="auto"):
-    """配置普通 FD 模式，与确定性批次一致性模式分别处理。"""
-    if policy not in ("auto", "on", "off"):
-        raise ValueError("QSMLA_FD must be auto, on or off")
-    configured = params.get("fd_mode")
-    if configured not in (None, False, True, 0, 1):
-        raise ValueError("fd_mode must be a boolean")
-    enabled = policy == "on" or (policy == "auto" and bool(configured))
-    params["fd_mode"] = enabled
-    if not enabled:
-        return False
+def prepare_fd_params(params):
+    """配置普通 FA/FD golden 的核数，批次一致性使用独立参考路径。"""
     if params.get("batch_consistency"):
-        raise ValueError(
-            "fd_mode requires batch_consistency=False (deterministic level 0)"
-        )
+        return False
     for key, env, default in (
         ("fd_aic_core_num", "QSMLA_FD_AIC_NUM", 32),
         ("fd_aiv_core_num", "QSMLA_FD_AIV_NUM", None),
@@ -85,19 +81,19 @@ def prepare_fd_params(params, policy="auto"):
     _validate_fd_cores(
         params["fd_aic_core_num"], params["fd_aiv_core_num"], params["N1"]
     )
-    required = params.get("fd_require_split", False)
-    if required not in (None, False, True, 0, 1):
-        raise ValueError("fd_require_split must be a boolean")
-    params["fd_require_split"] = bool(required)
     params["npu_deterministic_level"] = 0
     return True
 
 
 def _validate_fd_cores(aic_num, aiv_num, heads):
-    if type(aic_num) is not int or not 1 <= aic_num <= 36:
-        raise ValueError("fd_aic_core_num must be an integer in [1,36]")
-    if type(aiv_num) is not int or not 1 <= aiv_num <= 72:
-        raise ValueError("fd_aiv_core_num must be an integer in [1,72]")
+    if type(aic_num) is not int or not 1 <= aic_num <= AIC_CORE_MAX_NUM:
+        raise ValueError(
+            f"fd_aic_core_num must be an integer in [1,{AIC_CORE_MAX_NUM}]"
+        )
+    if type(aiv_num) is not int or not 1 <= aiv_num <= AIV_CORE_MAX_NUM:
+        raise ValueError(
+            f"fd_aiv_core_num must be an integer in [1,{AIV_CORE_MAX_NUM}]"
+        )
     if heads > 64 and (aic_num < 2 or aiv_num < 2):
         raise ValueError("split-G needs at least two AICs and two AIVs")
 
@@ -131,11 +127,11 @@ class _MetadataRowCosts:
 
 
 def generate_metadata_golden(meta, aic_num=32, aiv_num=None):
-    """用 Python 复现 Ascend950 的普通 FD 调度，返回 int32[1024]。
+    """用 Python 复现 Ascend950 的普通 FA/FD 自动调度，返回 int32[2048]。
 
     对应 CalcS1GCache、AssignByBatch/Row/Block、RecordFDInfo 和 SplitFD 的调度逻辑。
-    FA/FD 存储区大小固定为 36*9 和 72*8，不随请求核数变化。
-    前 900 个元素由 metadata 接口约定定义，其余填充为零。
+    FA/FD 存储区大小固定为 80*9 和 80*8，不随请求核数变化。
+    前 1360 个元素由 metadata 接口约定定义，其余填充为零。
     """
     aiv_num = 2 * aic_num if aiv_num is None else aiv_num
     heads = int(meta["num_heads_q"])
@@ -143,7 +139,7 @@ def generate_metadata_golden(meta, aic_num=32, aiv_num=None):
     if int(meta["num_heads_kv"]) != 1 or not 1 <= heads <= 128:
         raise ValueError("QSMLA requires N2=1 and N1 in [1,128]")
     if meta.get("is_batch_consistency", False):
-        raise ValueError("metadata golden supports ordinary FD only")
+        raise ValueError("metadata golden supports ordinary scheduling only")
     batch = int(meta["batch_size"])
     layout_q, layout_kv = meta["layout_q"], meta["layout_kv"]
     if (
@@ -288,8 +284,9 @@ def generate_metadata_golden(meta, aic_num=32, aiv_num=None):
             next((row[-1] - row[-2] for row in reversed(current) if len(row) > 1), 0)
         )
 
-    metadata = torch.zeros(1024, dtype=torch.int32)
-    fa, fd = metadata[:324].reshape(36, 9), metadata[324:900].reshape(72, 8)
+    metadata = torch.zeros(QSMLA_METADATA_SIZE, dtype=torch.int32)
+    fa = metadata[:FA_METADATA_END].reshape(AIC_CORE_MAX_NUM, 9)
+    fd = metadata[FA_METADATA_END:FD_METADATA_END].reshape(AIV_CORE_MAX_NUM, 8)
     split_g = heads > 64
     cores = aic_num // 2 if split_g else aic_num
     if not any(batch_blocks):
@@ -302,80 +299,102 @@ def generate_metadata_golden(meta, aic_num=32, aiv_num=None):
                 [1, 0, 0, 0, batch if all_kv_zero else 0, 0, 0, 0]
             )
         return metadata
-    b = q = tile = 0
-    remaining_cost, remaining_blocks = batch_costs[0], batch_blocks[0]
-    unassigned = sum(batch_costs)
-    endpoints, first_slots, tasks, max_loops = [], [], [], 0
-    split_parts, previous_slots = 1, 0
-    for core in range(cores):
-        if b == batch or unassigned <= 0:
-            break
-        limit = unassigned // (cores - core)
-        used_cost = used_blocks = 0
-        first_slots.append(previous_slots + split_parts - 1)
-        while b < batch and (
-            remaining_cost == 0
-            or limit + batch_last[b] // 2 >= used_cost + remaining_cost
-        ):
-            used_cost += remaining_cost
-            used_blocks += remaining_blocks
-            b, q, tile = b + 1, 0, 0
+    max_row_cost = max(row[-1] for current in rows for row in current)
+
+    def split_plan(support_fd):
+        # b、q、tile 记录待分配位置：batch、query 和 query 内的 S2 块。
+        b = q = tile = 0
+        remaining_cost, remaining_blocks = batch_costs[0], batch_blocks[0]
+        unassigned = sum(batch_costs)
+        endpoints, first_slots, tasks, max_loops = [], [], [], 0
+        split_parts, previous_slots = 1, 0
+        for core in range(cores):
+            if b == batch or unassigned <= 0:
+                break
+            # 均摊剩余工作量；FA 不拆 query，预算至少能容纳一整行。
+            limit = unassigned // (cores - core)
+            if not support_fd:
+                limit = max(limit, max_row_cost)
+            used_cost = used_blocks = 0
+            first_slots.append(previous_slots + split_parts - 1)
+            # 优先接收当前 batch 的剩余任务，再逐个接收 query。
+            while b < batch and (
+                remaining_cost == 0
+                or limit + batch_last[b] // 2 >= used_cost + remaining_cost
+            ):
+                used_cost += remaining_cost
+                used_blocks += remaining_blocks
+                b, q, tile = b + 1, 0, 0
+                if b < batch:
+                    remaining_cost, remaining_blocks = batch_costs[b], batch_blocks[b]
             if b < batch:
-                remaining_cost, remaining_blocks = batch_costs[b], batch_blocks[b]
-        if b < batch:
-            while q < q_lengths[b]:
-                row = rows[b][q]
-                row_cost, row_blocks = row[-1] - row[tile], len(row) - 1 - tile
-                last = row[-1] - row[-2] if len(row) > 1 else 0
-                if limit + last // 2 < used_cost + row_cost:
-                    break
-                used_cost += row_cost
-                used_blocks += row_blocks
-                remaining_cost -= row_cost
-                remaining_blocks -= row_blocks
-                q, tile = q + 1, 0
-            if q >= q_lengths[b]:
-                raise RuntimeError(
-                    "Metadata row cursor exceeded batch before batch assignment"
-                )
-            row = rows[b][q]
-            while tile + 1 < len(row):
-                cost = row[tile + 1] - row[tile]
-                if limit + cost // 2 < used_cost + cost:
-                    break
-                used_cost += cost
-                used_blocks += 1
-                remaining_cost -= cost
-                remaining_blocks -= 1
-                tile += 1
-            if used_blocks == 0:
-                cost = row[tile + 1] - row[tile]
-                used_cost += cost
-                used_blocks = 1
-                remaining_cost -= cost
-                remaining_blocks -= 1
-                tile += 1
-                if tile == len(row) - 1:
+                while q < q_lengths[b]:
+                    row = rows[b][q]
+                    row_cost, row_blocks = row[-1] - row[tile], len(row) - 1 - tile
+                    last = row[-1] - row[-2] if len(row) > 1 else 0
+                    if limit + last // 2 < used_cost + row_cost:
+                        break
+                    used_cost += row_cost
+                    used_blocks += row_blocks
+                    remaining_cost -= row_cost
+                    remaining_blocks -= row_blocks
                     q, tile = q + 1, 0
-                if q == q_lengths[b]:
-                    b, q = b + 1, 0
-                    if b < batch:
-                        remaining_cost, remaining_blocks = (
-                            batch_costs[b],
-                            batch_blocks[b],
-                        )
-        end = (b, q, tile)
-        if core and split_parts > 1 and end[:2] != endpoints[-1][:2]:
-            tasks.append((*endpoints[-1][:2], previous_slots, split_parts, heads))
-            previous_slots += split_parts
-            split_parts = 1
-        if tile > 0:
-            split_parts += 1
-        endpoints.append(end)
-        max_loops = max(max_loops, used_blocks)
-        unassigned -= used_cost
-    if unassigned != 0:
-        raise RuntimeError("Metadata scheduling did not cover all KV tiles")
+                if q >= q_lengths[b]:
+                    raise RuntimeError(
+                        "Metadata row cursor exceeded batch before batch assignment"
+                    )
+                if support_fd:
+                    # FD 允许继续按 S2 块分配，将一个 query 拆到多个核。
+                    row = rows[b][q]
+                    while tile + 1 < len(row):
+                        cost = row[tile + 1] - row[tile]
+                        if limit + cost // 2 < used_cost + cost:
+                            break
+                        used_cost += cost
+                        used_blocks += 1
+                        remaining_cost -= cost
+                        remaining_blocks -= 1
+                        tile += 1
+                    if used_blocks == 0:
+                        cost = row[tile + 1] - row[tile]
+                        used_cost += cost
+                        used_blocks = 1
+                        remaining_cost -= cost
+                        remaining_blocks -= 1
+                        tile += 1
+                        if tile == len(row) - 1:
+                            q, tile = q + 1, 0
+                        if q == q_lengths[b]:
+                            b, q = b + 1, 0
+                            if b < batch:
+                                remaining_cost, remaining_blocks = (
+                                    batch_costs[b],
+                                    batch_blocks[b],
+                                )
+            end = (b, q, tile)
+            # 跨过此前拆分的 query 时，记录其合并任务并推进 workspace 槽位。
+            if core and split_parts > 1 and end[:2] != endpoints[-1][:2]:
+                tasks.append((*endpoints[-1][:2], previous_slots, split_parts, heads))
+                previous_slots += split_parts
+                split_parts = 1
+            if tile > 0:
+                split_parts += 1
+            endpoints.append(end)
+            max_loops = max(max_loops, used_blocks)
+            unassigned -= used_cost
+        if unassigned != 0:
+            raise RuntimeError("Metadata scheduling did not cover all KV tiles")
+        # 各核结束位置、起始槽位、FD 合并任务，以及单核最大 S2 循环次数。
+        return endpoints, first_slots, tasks, max_loops
+
+    plan = split_plan(False)
+    # 与 BalanceSchedule / ShouldUseFd 一致，核数为 split-G 后的有效核数。
+    if cores > 4 and batch <= cores - 4:
+        fd_plan = split_plan(True)
+        # 普通模式下每个基本块对应一次 S2 循环，max_loops 即 maxBlockNum。
+        if fd_plan[2] and plan[3] - fd_plan[3] >= 4:
+            plan = fd_plan
+    endpoints, first_slots, tasks, max_loops = plan
     for core, end in enumerate(endpoints):
         start = endpoints[core - 1] if core else (0, 0, 0)
         record = torch.tensor(
@@ -415,12 +434,12 @@ def generate_metadata_golden(meta, aic_num=32, aiv_num=None):
 
 
 def metadata_fa_ranges(metadata):
-    if metadata.dtype != torch.int32 or metadata.numel() != 1024:
-        raise ValueError("metadata must be int32[1024]")
+    if metadata.dtype != torch.int32 or metadata.numel() != QSMLA_METADATA_SIZE:
+        raise ValueError(f"metadata must be int32[{QSMLA_METADATA_SIZE}]")
     return sorted(
         {
             (tuple(map(int, row[1:4])), tuple(map(int, row[4:7])))
-            for row in metadata[:324].reshape(36, 9)
+            for row in metadata[:FA_METADATA_END].reshape(AIC_CORE_MAX_NUM, 9)
             if int(row[0])
         }
     )
@@ -690,7 +709,10 @@ class GeneralizedSFAQuant:
             for block in range(low, high):
                 is_ori = block < ori_tiles
                 start = (block if is_ori else block - ori_tiles) * 128
-                tile = (ori if is_ori else cmp)[start : start + 128]
+                source = ori if is_ori else cmp
+                if source is None or start >= source.shape[0]:
+                    continue
+                tile = source[start : start + 128]
                 descale = self.ori_kv_descale_val if is_ori else self.cmp_kv_descale_val
                 maximum, total, accum = self._update_s2_tile(
                     q,
@@ -1973,8 +1995,15 @@ def save_test_case(input_data, output_dir):
     input_filename = f"qsmla_case_{case_name}.pt"
     input_filepath = os.path.join(output_dir, input_filename)
 
-    # 保存数据
-    torch.save(input_data, input_filepath)
+    # 调度信息仅用于生成 golden；执行 PT 时由真实 metadata 算子选路。
+    saved_data = dict(input_data)
+    saved_data["params"] = dict(input_data["params"])
+    saved_data.pop("golden_metadata", None)
+    saved_data.pop("fd_partition_trace", None)
+    if "golden_state" in saved_data:
+        saved_data["golden_state"] = dict(saved_data["golden_state"])
+        saved_data["golden_state"].pop("fd_metadata", None)
+    torch.save(saved_data, input_filepath)
     logging.info(f"测试用例已保存到: {input_filepath}")
 
     return input_filepath
@@ -1986,7 +2015,7 @@ def gen_data(params, generate_golden=True):
     runNpu: 生成完毕后执行npu计算
     return test_data
     """
-    prepare_fd_params(params)
+    ordinary_schedule = prepare_fd_params(params)
     seed = 42
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -2312,7 +2341,7 @@ def gen_data(params, generate_golden=True):
         "return_softmax_lse": return_softmax_lse,
         "batch_consistency": batch_consistency,
     }
-    if generate_golden and not params.get("fd_mode"):
+    if generate_golden and not ordinary_schedule:
         generate_cpu_golden({"golden_state": golden_state})
         cpu_result = golden_state["cpu_output"]
         cpu_lse = golden_state["cpu_lse"]
@@ -2436,7 +2465,7 @@ def gen_data(params, generate_golden=True):
         "cpu_lse": cpu_lse if return_softmax_lse else None,
     }
 
-    if params.get("fd_mode"):
+    if ordinary_schedule:
         prepare_fd_data(input_data, generate_golden=generate_golden)
     return input_data
 
@@ -2511,11 +2540,9 @@ def generate_cpu_golden(input_data):
     return cpu_output, cpu_lse
 
 
-def prepare_fd_data(data, generate_golden=True):
-    """核数变化时，重新生成 metadata 和数值参考结果。"""
+def _generate_fd_metadata(data):
+    """根据用例输入和核数生成调度方案，不修改已有数值 golden。"""
     params = data["params"]
-    if not prepare_fd_params(params):
-        raise ValueError("prepare_fd_data requires fd_mode=True")
     meta_input = dict(data["metadata_input"])
     for name in (
         "cu_seqlens_q",
@@ -2529,35 +2556,32 @@ def prepare_fd_data(data, generate_golden=True):
         "cmp_topk_length",
     ):
         meta_input[name] = data["op_input"].get(name)
-    metadata = generate_metadata_golden(
+    return generate_metadata_golden(
         meta_input, params["fd_aic_core_num"], params["fd_aiv_core_num"]
     )
-    actual_fd = bool(metadata[324:900].reshape(72, 8)[:, 0].any())
-    if params.get("fd_require_split") and not actual_fd:
-        raise ValueError(
-            "FD split required but this shape/core configuration has no FD task"
-        )
+
+
+def prepare_fd_data(data, generate_golden=True):
+    """核数变化时，重新生成 metadata 和数值参考结果。"""
+    params = data["params"]
+    if not prepare_fd_params(params):
+        raise ValueError("ordinary FA/FD scheduling requires batch_consistency=False")
+    metadata = _generate_fd_metadata(data)
+    actual_fd = bool(
+        metadata[FA_METADATA_END:FD_METADATA_END]
+        .reshape(AIV_CORE_MAX_NUM, 8)[:, 0]
+        .any()
+    )
     data["golden_metadata"] = metadata
     data["fd_actual_split"] = actual_fd
     data["fd_core_config"] = (params["fd_aic_core_num"], params["fd_aiv_core_num"])
-    data["golden_state"]["fd_metadata"] = metadata.clone()
+    if actual_fd:
+        data["golden_state"]["fd_metadata"] = metadata.clone()
+    else:
+        data["golden_state"].pop("fd_metadata", None)
     data["cpu_output"] = data["cpu_lse"] = None
     data["golden_state"]["cpu_output"] = data["golden_state"]["cpu_lse"] = None
     data.pop("fd_partition_trace", None)
     if generate_golden:
         generate_cpu_golden(data)
     return metadata
-
-
-def get_fd_metadata_for_device(data, device):
-    """将 FD 参考计算使用的同一份 CPU 调度方案传给计算内核。"""
-    params = data["params"]
-    expected = (params["fd_aic_core_num"], params["fd_aiv_core_num"])
-    if tuple(data.get("fd_core_config", ())) != expected:
-        raise ValueError("FD core counts changed; regenerate metadata and golden first")
-    metadata = data.get("golden_metadata")
-    if metadata is None or not torch.equal(
-        metadata, data["golden_state"]["fd_metadata"]
-    ):
-        raise ValueError("FD metadata does not match the numerical reference")
-    return metadata.to(device=device)
