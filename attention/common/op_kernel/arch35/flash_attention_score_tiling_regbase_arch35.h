@@ -890,7 +890,7 @@ public:
     int64_t s1OuterSize;
     int64_t splitFactorSize;
     int64_t splitFactorTailSize;
-    static constexpr int maxCoreNum = 70;
+    static constexpr int maxCoreNum = 80; // arch 9202 maxcore
     uint32_t bnStartIdx[maxCoreNum];
     int64_t sparseStartIdx[maxCoreNum];
     int64_t firstFullLoadS1OuterIdx;

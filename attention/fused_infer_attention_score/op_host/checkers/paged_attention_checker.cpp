@@ -742,7 +742,8 @@ ge::graphStatus PagedAttentionChecker::CheckNonContiguousSupport(const FiaTiling
     }
 
     OP_CHECK_IF(
-        fiaInfo.npuArch != Ops::Base::DAV_3510 && fiaInfo.npuArch != Ops::Base::DAV_9201,
+        fiaInfo.npuArch != Ops::Base::DAV_3510 && fiaInfo.npuArch != Ops::Base::DAV_9201 &&
+            fiaInfo.npuArch != Ops::Base::DAV_9202,
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(fiaInfo.opName, "key/value/keyRope",
                                                  "Non-contiguous cache is not supported on the current architecture."),
         return ge::GRAPH_FAILED);
