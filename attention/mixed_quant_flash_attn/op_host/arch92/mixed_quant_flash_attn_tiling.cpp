@@ -97,8 +97,8 @@ void MixedQuantFlashAttnTilingImpl::InitImplParam()
 {
     const gert::Tensor* actSeqLenQ = faInfo_->opParamInfo.cuSeqlensQ.tensor;
     const gert::Tensor* actSeqLenKV = faInfo_->opParamInfo.cuSeqlensKv.tensor;
-    uint32_t actSeqLenQDims = 0;
-    uint32_t actSeqLenKVDims = 0;
+    int64_t actSeqLenQDims = 0;
+    int64_t actSeqLenKVDims = 0;
     actSeqLenQDims = (actSeqLenQ != nullptr) ? actSeqLenQ->GetShapeSize() : 0;
     actSeqLenKVDims = (actSeqLenKV != nullptr) ? actSeqLenKV->GetShapeSize() : 0;
     cuSeqLenQFlag_ = !((actSeqLenQDims == 0) || (actSeqLenQ == nullptr) || (actSeqLenQ->GetData<int32_t>() == nullptr));
@@ -107,8 +107,8 @@ void MixedQuantFlashAttnTilingImpl::InitImplParam()
 
     const gert::Tensor* seqUsedQ = faInfo_->opParamInfo.seqUsedQ.tensor;
     const gert::Tensor* seqUsedKv = faInfo_->opParamInfo.seqUsedKv.tensor;
-    uint32_t seqUsedQDims = (seqUsedQ != nullptr) ? seqUsedQ->GetShapeSize() : 0;
-    uint32_t seqUsedKvDims = (seqUsedKv != nullptr) ? seqUsedKv->GetShapeSize() : 0;
+    int64_t seqUsedQDims = (seqUsedQ != nullptr) ? seqUsedQ->GetShapeSize() : 0;
+    int64_t seqUsedKvDims = (seqUsedKv != nullptr) ? seqUsedKv->GetShapeSize() : 0;
     seqUsedQFlag_ = !((seqUsedQDims == 0) || (seqUsedQ == nullptr) || (seqUsedQ->GetData<int32_t>() == nullptr));
     seqUsedKvFlag_ = !((seqUsedKvDims == 0) || (seqUsedKv == nullptr) || (seqUsedKv->GetData<int32_t>() == nullptr));
 }

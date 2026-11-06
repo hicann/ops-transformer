@@ -70,9 +70,9 @@ struct MixedQuantFlashAttnAttenMaskParams {
     uint8_t sparseMode;
     int32_t winLefts;
     int32_t winRights;
-    uint32_t attenMaskBatch = 0;
-    uint32_t attenMaskS1Size;
-    uint32_t attenMaskS2Size;
+    uint64_t attenMaskBatch = 0;
+    uint64_t attenMaskS1Size;
+    uint64_t attenMaskS2Size;
     uint8_t isExistRowInvalid = 0;
 };
 
