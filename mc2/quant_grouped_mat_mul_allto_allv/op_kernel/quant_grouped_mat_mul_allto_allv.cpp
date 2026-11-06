@@ -21,7 +21,7 @@
 // apace hcomm 融合通路（结构对齐镜像算子 a2avgmm apace 实现的最新代码）：
 // MX tiling 类按 CheckApaceImplCapable 动态编码 TILINGKEY_USING_APACE_IMPL，kernel
 // 经 GET_TILING_DATA_WITH_STRUCT 直接解析算子 legacy tiling 数据（无独立紧凑结构），
-// GMM 计算复用 apace GroupedMatmulMxKernel（每批栈上局部构造），AllToAllV 通信在
+// GMM 计算复用 apace GroupedMatmulKernel（每批栈上局部构造），AllToAllV 通信在
 // AIC 核内经 Hccl 提交（Blaze 与 AIV 侧 KFC 通信引擎同 kernel 共存会致 AIV 通信
 // 任务参数校验失败）。该组合经 tiling key 的 ASCENDC_TPL_KERNEL_TYPE_SEL 声明
 // AIC_ONLY 任务类型；TT 量化实例恒编码 USING=0 走原通路（MIX_AIC_1_2）。

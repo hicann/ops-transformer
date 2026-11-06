@@ -35,7 +35,7 @@
 #include "blaze/gemm/policy/dispatch_policy.h"
 #include "blaze/gemm/block/block_mmad_qgmm_mx.h"
 #include "blaze/gemm/block/block_scheduler_gmm_swat_with_tail_split.h"
-#include "../../matmul/grouped_matmul/grouped_matmul_mx_kernel.h"
+#include "../../matmul/grouped_matmul/gmm_kernel.h"
 #include "../../../../../../allto_allv_quant_grouped_mat_mul/op_kernel/mc2_templates/common/a2av_common_tiling.h"
 #include "../../../../../../allto_allv_quant_grouped_mat_mul/op_kernel/mc2_templates/communication/a2av_comm_params.h"
 
@@ -67,7 +67,7 @@ __aicore__ inline void FillGmmA2avTiling(GmmTiling& out, const GmmTilingData& in
     out.baseK = static_cast<uint32_t>(mmTiling.baseK);
     out.kAL1 = 0U;
     out.kBL1 = 0U;
-    out.scaleKAL1 = 0U;
+    out.scaleKL1 = 0U;
     out.isBias = static_cast<uint8_t>(mmTiling.isBias != 0 ? 1 : 0);
     out.dbL0C = static_cast<uint8_t>(mmTiling.dbL0C);
     out.l1BufferStage = Blaze::Gemm::DOUBLE_BUFFER_COUNT;
@@ -140,12 +140,12 @@ public:
         params.problemShape = ProblemShape{maxM, static_cast<int64_t>(n1), static_cast<int64_t>(h1), 0};
         // A/scaleA/C 基址推进至批前全局 token 前缀；B/scaleB 基址推进至本批首个
         // expert（批内经偏移表按 expert 定位）
-        params.mmadParams.aGmAddr = xGM_ + tokenPrefix * dataAxis;
-        params.mmadParams.scaleAGmAddr = xScaleGM_ + tokenPrefix * scaleK;
-        params.mmadParams.bGmAddr = weightGM_ + ((start * h1 * n1) >> packedShift);
-        params.mmadParams.scaleBGmAddr = weightScaleGM_ + start * n1 * scaleK;
-        params.mmadParams.cGmAddr = gmmOutputGM_ + tokenPrefix * n1 * sizeof(CType);
-        params.mmadParams.biasGmAddr = nullptr;
+        params.mmadAddrs.aGmAddr = xGM_ + tokenPrefix * dataAxis;
+        params.mmadAddrs.scaleAGmAddr = xScaleGM_ + tokenPrefix * scaleK;
+        params.mmadAddrs.bGmAddr = weightGM_ + ((start * h1 * n1) >> packedShift);
+        params.mmadAddrs.scaleBGmAddr = weightScaleGM_ + start * n1 * scaleK;
+        params.mmadAddrs.cGmAddr = gmmOutputGM_ + tokenPrefix * n1 * sizeof(CType);
+        params.mmadAddrs.biasGmAddr = nullptr;
         params.groupListGmAddr = groupListGm_;
         params.gmmParams = gmmTiling;
         params.groupOffsetTables = {};
@@ -158,8 +158,7 @@ public:
         // dtor WaitFlag 消费），任意时刻仅一个 Blaze 实例存活
         {
             GmmKernel kernel;
-            kernel.Init(params);
-            kernel.Run();
+            kernel(params);
         }
         AscendC::PipeBarrier<PIPE_ALL>();
     }
@@ -179,7 +178,8 @@ private:
     using DispatchPolicy = Blaze::Gemm::GroupedMatmulWithScaleMx<0, false, Blaze::Gemm::KernelGroupedMmadWithScaleMx>;
     using BlockMmad = Blaze::Gemm::Block::BlockMmad<DispatchPolicy, AType, LayoutA, BType, LayoutB, CType, LayoutC,
                                                     float, LayoutBias>;
-    using GmmKernel = Blaze::Gemm::Kernel::GroupedMatmulMxKernel<ProblemShape, BlockMmad, BlockScheduler>;
+    using GmmKernel = Blaze::Gemm::Kernel::GroupedMatmulKernel<ProblemShape, BlockMmad, BlockScheduler,
+                                                               Blaze::Gemm::Kernel::GroupedMatmulMode::MX_QUANT>;
 
     __aicore__ inline uint32_t RankSize() const
     {
@@ -325,12 +325,12 @@ public:
         typename MmKernel::Params params{};
         params.problemShape =
             ProblemShape{static_cast<int64_t>(m), static_cast<int64_t>(n), static_cast<int64_t>(k), 0};
-        params.mmadParams.aGmAddr = mmXGM_;
-        params.mmadParams.scaleAGmAddr = mmXScaleGM_;
-        params.mmadParams.bGmAddr = mmWeightGM_;
-        params.mmadParams.scaleBGmAddr = mmWeightScaleGM_;
-        params.mmadParams.cGmAddr = mmYGM_;
-        params.mmadParams.biasGmAddr = nullptr;
+        params.mmadAddrs.aGmAddr = mmXGM_;
+        params.mmadAddrs.scaleAGmAddr = mmXScaleGM_;
+        params.mmadAddrs.bGmAddr = mmWeightGM_;
+        params.mmadAddrs.scaleBGmAddr = mmWeightScaleGM_;
+        params.mmadAddrs.cGmAddr = mmYGM_;
+        params.mmadAddrs.biasGmAddr = nullptr;
         params.groupListGmAddr = mmGroupListGm_;
         params.gmmParams = mmTiling;
         params.groupOffsetTables = {};
@@ -339,8 +339,7 @@ public:
         // 消费事件，本 ctor 为全新预置，无双实例并存）
         {
             MmKernel kernel;
-            kernel.Init(params);
-            kernel.Run();
+            kernel(params);
         }
         AscendC::PipeBarrier<PIPE_ALL>();
     }
@@ -357,7 +356,8 @@ private:
     using DispatchPolicy = Blaze::Gemm::GroupedMatmulWithScaleMx<0, false, Blaze::Gemm::KernelGroupedMmadWithScaleMx>;
     using MmBlockMmad = Blaze::Gemm::Block::BlockMmad<DispatchPolicy, AType, LayoutA, BType, MmLayoutB, CType, LayoutC,
                                                       float, LayoutBias>;
-    using MmKernel = Blaze::Gemm::Kernel::GroupedMatmulMxKernel<ProblemShape, MmBlockMmad, BlockScheduler>;
+    using MmKernel = Blaze::Gemm::Kernel::GroupedMatmulKernel<ProblemShape, MmBlockMmad, BlockScheduler,
+                                                              Blaze::Gemm::Kernel::GroupedMatmulMode::MX_QUANT>;
 
     __aicore__ inline uint32_t RankSize() const
     {

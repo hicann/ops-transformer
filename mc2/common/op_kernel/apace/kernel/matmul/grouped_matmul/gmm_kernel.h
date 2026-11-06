@@ -9,8 +9,8 @@
  */
 
 /*!
- * \file all_to_allv_gmm_kernel.h
- * \brief 量化和非量化的 GroupedMatmul 实现。
+ * \file gmm_kernel.h
+ * \brief MX 量化和非量化的 GroupedMatmul 实现。
  */
 
 #pragma once
@@ -36,7 +36,7 @@ namespace Kernel {
 
 enum class GroupedMatmulMode : uint8_t {
     NON_QUANT = 0, // 非量化
-    QUANT = 1,     // 量化
+    MX_QUANT = 1,  // MX 量化（64 元素分组 MXFP scale）
 };
 
 template <class ProblemShape, class BlockMmad, class BlockScheduler, GroupedMatmulMode matmulMode,
@@ -66,7 +66,25 @@ public:
     static constexpr bool TRANS_A = IsTrans<LayoutA>::value;
     static constexpr bool TRANS_B = IsTrans<LayoutB>::value;
     static constexpr bool WEIGHT_NZ = IsWeightNz<LayoutB>::value;
-    static constexpr bool IS_QUANT = matmulMode == GroupedMatmulMode::QUANT;
+    static constexpr bool IS_QUANT = matmulMode == GroupedMatmulMode::MX_QUANT;
+
+    static_assert(!IS_QUANT || (IsFp4<AType>() && IsFp4<BType>()) || (IsFp8<AType>() && IsFp8<BType>()),
+                  "GroupedMatmulKernel MX_QUANT only supports same bit-width MXFP4/MXFP8 AType and BType "
+                  "(A_C0_SIZE/B_C0_SIZE/perGroupB derivation requires it).");
+    static_assert(!IS_QUANT || AscendC::Std::is_one_of_v<CType, half, bfloat16_t, float>,
+                  "GroupedMatmulKernel MX_QUANT only supports half/bfloat16_t/float CType.");
+    static_assert(!IS_QUANT || AscendC::Std::is_same_v<BiasType, float>,
+                  "GroupedMatmulKernel MX_QUANT only supports float BiasType.");
+    static_assert(!IS_QUANT || AscendC::Std::is_same_v<LayoutA, asc::te::nd_ext_layout_ptn>,
+                  "GroupedMatmulKernel MX_QUANT supports ND LayoutA only (A transpose unsupported).");
+    static_assert(!IS_QUANT || AscendC::Std::is_one_of_v<LayoutB, asc::te::nd_ext_layout_ptn,
+                                                         asc::te::dn_ext_layout_ptn, asc::te::nz_layout_ptn,
+                                                         asc::te::zn_layout_ptn>,
+                  "GroupedMatmulKernel MX_QUANT only supports ND/DN/NZ/ZN LayoutB.");
+    static_assert(!IS_QUANT || (!AscendC::Std::is_one_of_v<LayoutC, asc::te::nz_layout_ptn, asc::te::zn_layout_ptn> &&
+                                !AscendC::Std::is_one_of_v<LayoutBias, asc::te::nz_layout_ptn,
+                                                           asc::te::zn_layout_ptn>),
+                  "GroupedMatmulKernel MX_QUANT does not support NZ/ZN LayoutC or LayoutBias.");
 
     using SchedulerProblemShape = typename BlockScheduler::ProblemShape;
     using BlockCoord = asc::te::coord<int64_t, int64_t, int64_t, int64_t>;
@@ -320,8 +338,11 @@ private:
             if constexpr (IS_QUANT) {
                 typename BlockMmad::BlockShape blockShape{blockM, blockN, problemK, 0};
                 const int64_t scaleK = GetScaleK(problemK);
-                auto gmScaleA = MakeGroupScaleAView(problemM, scaleK);
-                auto gmScaleB = MakeGroupScaleBView(scaleK, problemN);
+                auto gmScaleA = MakeScaleA(problemM, scaleK);
+                auto gmScaleB = MakeScaleB(scaleK, problemN);
+                if constexpr (!isLastGroupAndNeedSplit) {
+                    SetL2CacheHint(gmScaleB, problemM, static_cast<int64_t>(curBaseM_));
+                }
                 auto gmBlockScaleA = gmScaleA.slice(asc::te::make_coord(mPos, static_cast<int64_t>(0)),
                                                     asc::te::make_shape(blockM, scaleK));
                 auto gmBlockScaleB = gmScaleB.slice(asc::te::make_coord(static_cast<int64_t>(0), nPos),
@@ -337,15 +358,13 @@ private:
     template <typename TensorB>
     __aicore__ inline void SetL2CacheHint(TensorB& gmB, int64_t mSize, int64_t curBaseM)
     {
+        gmB.set_l2_cache_hint(GetBCacheMode(mSize, curBaseM));
+    }
+
+    __aicore__ inline asc::te::cache_mode GetBCacheMode(int64_t mSize, int64_t curBaseM) const
+    {
         const bool singlePass = curBaseM >= mSize;
-        const auto cacheMode =
-            (singlePass && IsBLineAligned()) ? asc::te::cache_mode::disable : asc::te::cache_mode::normal;
-        gmB.set_l2_cache_hint(cacheMode);
-        if constexpr (IS_QUANT) {
-            auto gmScaleB =
-                MakeGroupScaleBView(GetScaleK(asc::te::get<MNK_K>(problemShape_)), asc::te::get<MNK_N>(problemShape_));
-            gmScaleB.set_l2_cache_hint(cacheMode);
-        }
+        return (singlePass && IsBLineAligned()) ? asc::te::cache_mode::disable : asc::te::cache_mode::normal;
     }
 
     __aicore__ inline bool IsBLineAligned() const
@@ -364,7 +383,7 @@ private:
         }
     }
 
-    __aicore__ inline auto MakeGroupScaleAView(int64_t problemM, int64_t scaleK)
+    __aicore__ inline auto MakeScaleA(int64_t problemM, int64_t scaleK)
     {
         using MakeLayoutScaleA = AscendC::Std::conditional_t<
             TRANS_A, asc::te::frame_layout_format<asc::te::scalea_dn_layout_ptn, AscendC::Std::Int<SCALE_C0>>,
@@ -375,7 +394,7 @@ private:
         return gmScaleA;
     }
 
-    __aicore__ inline auto MakeGroupScaleBView(int64_t scaleK, int64_t problemN)
+    __aicore__ inline auto MakeScaleB(int64_t scaleK, int64_t problemN)
     {
         auto layoutScaleB =
             asc::te::frame_layout_format<typename BlockMmad::LayoutScaleB, AscendC::Std::Int<SCALE_C0>>{}(scaleK,

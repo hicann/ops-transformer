@@ -686,7 +686,7 @@ ge::graphStatus MxQuantGroupedMatmulAllToAllvTiling::SetGmmA2avWorkspaceInfo()
     auto gmmYDtypeSize = mc2tiling::GetDataTypeSize(opName_, localParams_.gmmYDtype);
     inferredInfo_.gmmResultLen = mc2tiling::AlignUp(localParams_.A * localParams_.N1 * gmmYDtypeSize, alignAddrLen);
     localTilingData_.workspaceInfo.wsGmmOutputSize = inferredInfo_.gmmResultLen;
-    // MX 量化路径 workspace：GroupedMatmulMxKernel 的 group 序
+    // MX 量化路径 workspace：GroupedMatmulKernel 的 group 序
     // (expertIdx * ep + rankIdx) 与 expert 序不一致，B/ScaleB 无法走 kernel 默认公式，
     // 需在公共布局（groupList + cGroupOffsetTable + ptrTable + scale repeat）基础上
     // 追加 B/scaleB 偏移表
@@ -717,7 +717,7 @@ uint64_t MxQuantGroupedMatmulAllToAllvTiling::GetTilingKey() const
     }
     // apace 融合通路按 CheckApaceImplCapable 动态选路：命中时编码 USING=1，
     // 对应 kernel 组合经 tiling key 的 ASCENDC_TPL_KERNEL_TYPE_SEL 声明 AIC_ONLY
-    // 任务类型（GMM 走 GroupedMatmulMxKernel，AllToAllV 在 AIC 核内经 Hccl 提交）
+    // 任务类型（GMM 走 GroupedMatmulKernel，AllToAllV 在 AIC 核内经 Hccl 提交）
     const uint64_t tilingKey = GET_TPL_TILING_KEY(localParams_.hasSharedMm, localParams_.isGmmWeightTrans,
                                                   localParams_.isMmWeightTrans, commMode, usingApaceImpl_);
     OP_LOGD(opName_, "GET_TPL_TILING_KEY: [%d,%d,%d,%d,%d], TilingKey is [%lu].", localParams_.hasSharedMm,
@@ -749,7 +749,7 @@ bool MxQuantGroupedMatmulAllToAllvTiling::CheckApaceImplCapable() const
         localParams_.ep * localParams_.epWorldSize > MAX_EXPERT_NUM) {
         return false;
     }
-    // Blaze GroupedMatmulMxKernel 仅支持同位宽 MXFP4/MXFP8 组合
+    // Blaze GroupedMatmulKernel 仅支持同位宽 MXFP4/MXFP8 组合
     const bool xSupported = localParams_.gmmXDtype == ge::DT_FLOAT8_E5M2 ||
                             localParams_.gmmXDtype == ge::DT_FLOAT8_E4M3FN ||
                             localParams_.gmmXDtype == ge::DT_FLOAT4_E2M1;

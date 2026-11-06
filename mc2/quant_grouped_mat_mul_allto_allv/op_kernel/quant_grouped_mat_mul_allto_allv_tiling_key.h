@@ -52,7 +52,7 @@
  * - TILINGKEY_GMM_WEIGHT_TRANS: GMM 计算权重转置场景 (0=不转置, 1=转置)
  * - TILINGKEY_SHARED_MM_WEIGHT_TRANS: 共享专家 MM 计算转置场景 (0=不转置, 1=转置)
  * - TILINGKEY_USING_APACE_IMPL: 是否走 apace 融合通路（MX 量化场景，GMM 走 apace
- *   GroupedMatmulMxKernel、AllToAllV 在 AIC 核内经 Hccl 提交）。USING=1 组合经
+ *   GroupedMatmulKernel、AllToAllV 在 AIC 核内经 Hccl 提交）。USING=1 组合经
  *   ASCENDC_TPL_KERNEL_TYPE_SEL 声明 AIC_ONLY 任务类型（无 AIV 参与），USING=0 组合
  *   保持原通路（A5 MIX_AIC_1_2 / A6 MIX_AIC_1_1，AIC 计算 + AIV 通信）；USING 为 DECL 末位参数，原有
  *   4 参编码值不变。

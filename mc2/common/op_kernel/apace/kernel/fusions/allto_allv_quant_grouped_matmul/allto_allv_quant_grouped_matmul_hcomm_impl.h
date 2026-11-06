@@ -19,7 +19,7 @@
 #include "blaze/gemm/policy/dispatch_policy.h"
 #include "blaze/gemm/block/block_mmad_qgmm_mx.h"
 #include "blaze/gemm/block/block_scheduler_gmm_swat_with_tail_split.h"
-#include "../../matmul/grouped_matmul/all_to_allv_gmm_kernel.h"
+#include "../../matmul/grouped_matmul/gmm_kernel.h"
 
 namespace Apace {
 
@@ -115,13 +115,13 @@ private:
     using BlockMmad = Blaze::Gemm::Block::BlockMmad<DispatchPolicy, AType, LayoutA, BType, LayoutB, CType, LayoutC,
                                                     float, LayoutBias>;
     using GmmKernel = Blaze::Gemm::Kernel::GroupedMatmulKernel<ProblemShape, BlockMmad, BlockScheduler,
-                                                               Blaze::Gemm::Kernel::GroupedMatmulMode::QUANT>;
+                                                               Blaze::Gemm::Kernel::GroupedMatmulMode::MX_QUANT>;
 
     using MmLayoutB = AscendC::Std::conditional_t<TransMmB, asc::te::dn_ext_layout_ptn, asc::te::nd_ext_layout_ptn>;
     using MmBlockMmad = Blaze::Gemm::Block::BlockMmad<DispatchPolicy, AType, LayoutA, BType, MmLayoutB, CType, LayoutC,
                                                       float, LayoutBias>;
     using MmKernel = Blaze::Gemm::Kernel::GroupedMatmulKernel<ProblemShape, MmBlockMmad, BlockScheduler,
-                                                              Blaze::Gemm::Kernel::GroupedMatmulMode::QUANT>;
+                                                              Blaze::Gemm::Kernel::GroupedMatmulMode::MX_QUANT>;
 
     __aicore__ inline uint32_t RankSize() const
     {
