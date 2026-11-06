@@ -242,6 +242,9 @@ aclnnStatus aclnnAllGatherMatmul(
     <tr>
         <td>streamMode不在合法范围内。</td>
     </tr>
+    <tr>
+        <td>x1的k轴为0。</td>
+    </tr>
     </tbody></table>
 
 ## aclnnAllGatherMatmul
@@ -299,14 +302,14 @@ aclnnStatus aclnnAllGatherMatmul(
 - 输出为2维，其shape为(m*rank_size, n)，rank_size为卡数。
 
 <!-- npu="910b" id9 -->
-- <term>Atlas A2系列产品</term>：支持2、4、8卡，并且仅支持HCCS链路all mesh组网。
+- <term>Atlas A2系列产品</term>：支持2、4、8卡，并且仅支持HCCS链路Full Mesh（全互连）组网。
 <!-- end id9 -->
 <!-- npu="A3" id10 -->
 - <term>Atlas A3系列产品</term>  ：支持2、4、8、16、32卡，并且仅支持HCCS链路double ring组网。
 <!-- end id10 -->
 <!-- npu="950" id11 -->
 - <term>Ascend 950PR&950DT系列产品</term>:
-  - 支持2、4、8、16、32、64卡，并且仅支持HCCS链路all mesh组网。
+  - 支持2、4、8、16、32、64卡，并且仅支持HCCS链路Full Mesh（全互连）组网。
 <!-- end id11 -->
 <!-- npu="910b" id12 -->
 - <term>Atlas A2系列产品</term>:一个模型中的通算融合MC2算子，仅支持相同通信域。

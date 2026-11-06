@@ -380,7 +380,13 @@ aclnnStatus aclnnAllGatherMatmulV2(
     <tr>
         <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
         <td rowspan="3">161002</td>
-        <td>传入的x1、x2、x1Scale、x2Scale、bias、quantScale、output、gatherOut或amaxOut的数据类型和维度不在支持的范围内。</td>
+        <td>传入的x1、x2、x1Scale、x2Scale、bias、quantScale、output、gatherOut或amaxOut的数据类型和shape（维度/尺寸）不在支持的范围内。</td>
+    </tr>
+    <tr>
+        <td>streamMode、commMode取值不在合法范围内。</td>
+    </tr>
+    <tr>
+        <td>传入的x1、x2、output、bias、gatherOut或amaxOut的format不为ND，x1Scale、x2Scale的format不为ND/NCL（x2为INT4时format不支持FRACTAL_NZ），或量化场景下x1Scale、x2Scale为空指针，fp16/bf16场景下amaxOut不为空指针。</td>
     </tr>
     </tbody></table>
 

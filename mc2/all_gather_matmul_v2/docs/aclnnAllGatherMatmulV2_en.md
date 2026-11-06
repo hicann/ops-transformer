@@ -381,7 +381,13 @@ aclnnStatus aclnnAllGatherMatmulV2(
     <tr>
         <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
         <td rowspan="3">161002</td>
-        <td>The data types and dimensions of the input x1, x2, x1Scale, x2Scale, bias, quantScale, output, gatherOut, or amaxOut are out of the supported range.</td>
+        <td>The data types and shapes (dimensions/sizes) of the input x1, x2, x1Scale, x2Scale, bias, quantScale, output, gatherOut, or amaxOut are out of the supported range.</td>
+    </tr>
+    <tr>
+        <td>streamMode or commMode is not in the valid range.</td>
+    </tr>
+    <tr>
+        <td>The format of the input x1, x2, output, bias, gatherOut, or amaxOut is not ND, the format of x1Scale or x2Scale is not ND/NCL (the FRACTAL_NZ format is not supported when x2 is INT4), or x1Scale and x2Scale are null pointers in quantization scenarios, or amaxOut is not a null pointer in fp16/bf16 scenarios.</td>
     </tr>
     </tbody></table>
 

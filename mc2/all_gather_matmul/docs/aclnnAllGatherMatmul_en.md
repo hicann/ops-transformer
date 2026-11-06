@@ -244,6 +244,9 @@ aclnnStatus aclnnAllGatherMatmul(
     <tr>
         <td>streamMode is not in the valid range.</td>
     </tr>
+    <tr>
+        <td>The k-axis of x1 is 0.</td>
+    </tr>
     </tbody></table>
 
 ## aclnnAllGatherMatmul
@@ -301,14 +304,14 @@ aclnnStatus aclnnAllGatherMatmul(
 - The output is 2-dimensional, with a shape of (m*rank_size, n), where rank_size is the number of cards.
 
 <!-- npu="910b" id9 -->
-- <term>Atlas A2 products</term>: Supports 2, 4, and 8 cards, and only supports HCCS link all mesh networking.
+- <term>Atlas A2 products</term>: Supports 2, 4, and 8 cards, and only supports HCCS link full mesh networking.
 <!-- end id9 -->
 <!-- npu="A3" id10 -->
 - <term>Atlas A3 products</term>: supports 2, 4, 8, 16, and 32 devices, and only supports double ring networking over HCCS links.
 <!-- end id10 -->
 <!-- npu="950" id11 -->
 - <term>Ascend 950PR&950DT products</term>:
-  - Supports 2, 4, 8, 16, 32, and 64 cards, and only supports HCCS link all mesh networking.
+  - Supports 2, 4, 8, 16, 32, and 64 cards, and only supports HCCS link full mesh networking.
 <!-- end id11 -->
 <!-- npu="910b" id12 -->
 - <term>Atlas A2 products</term>: The communication-computation fusion MC2 operators in a model only support the same communication domain.

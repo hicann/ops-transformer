@@ -139,7 +139,7 @@
 * gather_index当前版本仅支持输入0。
 * commTurn当前版本仅支持输入0。
 * <term>Atlas A2系列产品</term>：
-    * 支持2、4、8卡，并且仅支持HCCS链路all mesh组网。
+    * 支持2、4、8卡，并且仅支持HCCS链路Full Mesh（全互连）组网。
     * 一个模型中的通算融合MC2算子，仅支持相同通信域。
 * <term>Atlas A3系列产品</term>  ：
     * 支持2、4、8、16、32卡，并且仅支持HCCS链路double ring组网。
