@@ -1171,13 +1171,6 @@ __aicore__ inline void FANoQuantBlockCube<TEMPLATE_ARGS>::IterateBmm1NdL0Split(
             }
             uint64_t gmRopeOffset = this->queryRopeGm.offsetCalculator.GetOffset(
                 runInfo.boIdx, runInfo.n2oIdx, runInfo.goIdx, coordInfo[runInfo.taskIdMod3].s1Coord, 0);
-#if __NPU_ARCH__ != 3510
-            if (s1BaseSize >= constInfo.s1Size) {
-                gmRopeOffset = this->queryRopeGm.offsetCalculator.GetOffset(
-                    runInfo.boIdx, runInfo.n2oIdx, runInfo.goIdx * (s1BaseSize / constInfo.s1Size),
-                    coordInfo[runInfo.taskIdMod3].s1Coord, 0);
-            }
-#endif
             CopyToL1Nd2Nz<INPUT_T>(mm1ATensor[dstNzC0Stride * constInfo.dSize],
                                    this->queryRopeGm.gmTensor[gmRopeOffset], runInfo.s1RealSize, constInfo.dSizeRope,
                                    constInfo.mm1RopeKa);
