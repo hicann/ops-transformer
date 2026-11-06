@@ -66,6 +66,12 @@ static ge::graphStatus TilingForRopeQuantKvcache(gert::TilingContext* context)
     context->GetRawTilingData()->SetDataSize(tiling.GetDataSize());
 
     size_t* currentWorkspace = context->GetWorkspaceSizes(1);
+    OP_CHECK_IF(
+        currentWorkspace == nullptr,
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{context->GetNodeName(), "workspace size storage is unavailable during Tiling"})),
+        return ge::GRAPH_FAILED);
     currentWorkspace[0] = MINIMAL_WORKSPACE;
     return ge::GRAPH_SUCCESS;
 }

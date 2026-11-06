@@ -50,7 +50,10 @@ static ge::graphStatus RopeQuantKvcacheInferShape(gert::InferShapeContext* conte
     int64_t qkvSeqlen = qkvShape->GetDim(1);
     int64_t kvHead = cacheShape->GetDim(THIRD_DIM);
     int64_t hiddenSize = cacheShape->GetDim(FORTH_DIM);
-    int64_t qHead = splitSizeArray[0] / hiddenSize;
+    int64_t qHead = -1;
+    if (hiddenSize > 0) {
+        qHead = splitSizeArray[0] / hiddenSize;
+    }
 
     qOutShape->SetDimNum(TOTAL_DIM);
     qOutShape->SetDim(0, batch);
