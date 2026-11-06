@@ -35,10 +35,14 @@ class InplacePartialRotaryMulFn(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         r1, r2 = ctx.saved_tensors
-        if not grad_output.is_contiguous():
-            grad_input = grad_output.contiguous()
-        else:
-            grad_input = grad_output
+        if ctx.partial_slice[0] == ctx.partial_slice[1]:
+            # 空切片：前向不旋转任何元素，梯度恒等直通，无需调用反向算子
+            return grad_output, None, None, None, None
+        grad_input = grad_output.contiguous()
+        if grad_input is grad_output:
+            # 已连续时contiguous()返回自身；反向算子原地写回grad_input，
+            # 缓冲区必须归本层所有，故先克隆，避免改写调用方传入的上游梯度
+            grad_input = grad_input.clone()
         torch.ops.cann_ops_transformer.inplace_partial_rotary_mul_backward(
             grad_input,
             r1,
