@@ -335,7 +335,6 @@ aclnnStatus aclnnMatmulReduceScatter(
 <!-- end id11 -->
 <!-- npu="950" id12 -->
 - <term>Ascend 950PR&950DT系列产品</term>：支持2、4、8、16、32、64卡，并且仅支持hccs链路all mesh组网。
-  - ReduceScatter集合通信数据总量不能超过16*256MB，集合通信数据总量计算方式为：m* n * sizeof(output_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
   - aclnnMatmulReduceScatter默认为确定性实现。
 
 <!-- end id12 -->

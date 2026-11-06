@@ -333,7 +333,6 @@ aclnnStatus aclnnMatmulReduceScatter(
 <!-- end id11 -->
 <!-- npu="950" id12 -->
 - <term>Ascend 950PR&950DT products</term>: Supports 2, 4, 8, 16, 32, and 64 cards, and only supports hccs link all mesh networking.
-  - The total data volume of ReduceScatter collective communication cannot exceed 16*256MB. The total data volume is calculated as: m* n * sizeof(output_dtype). Due to shape differences, the operator implementation may vary, and the actually supported total communication volume may be slightly smaller than this value.
   - aclnnMatmulReduceScatter defaults to a deterministic implementation.
 
 <!-- end id12 -->
