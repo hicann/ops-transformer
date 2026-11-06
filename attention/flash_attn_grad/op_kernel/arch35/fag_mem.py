@@ -29,7 +29,7 @@ pypto 的 tile 地址与 mutex id 都必须是 trace 期常量，所以布局在
 
 ::
 
-    cd attention/flash_attn_grad/op_kernel
+    cd attention/flash_attn_grad/op_kernel/arch35
     python -c "import fag_mem; print(fag_mem.describe_layout(192))"
     python -c "import fag_mem; print(fag_mem.audit_mutex(192))"
     python -c "import fag_mem; print(fag_mem.describe_layout(256))"

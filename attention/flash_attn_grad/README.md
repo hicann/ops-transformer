@@ -149,7 +149,7 @@ from cann_ops_transformer.ops import flash_attn_grad
 
 | 文件 | 说明 |
 |------|------|
-| `op_kernel/flash_attn_grad.py` | pypto-pro kernel 实现（BN2GS1S2 模板） |
+| `op_kernel/arch35/flash_attn_grad.py` | pypto-pro kernel 实现（BN2GS1S2 模板） |
 | `op_host/flash_attn_grad_tiling.cpp` | tiling 实现（tilingkey 编码、workspace 布局） |
 | `op_host/flash_attn_grad_def.cpp` | 算子定义（op_proto/输入输出/属性） |
 | `op_host/flash_attn_grad_infershape.cpp` | shape/dtype 推导 |

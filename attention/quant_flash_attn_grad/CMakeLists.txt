@@ -8,6 +8,12 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+# Only Ascend 950 has a PyPTO kernel implementation for this operator.
+if(NOT "ascend950" IN_LIST ASCEND_COMPUTE_UNIT)
+    message(STATUS "[quant_flash_attn_grad] Skipped: PyPTO kernel only supports ascend950 (soc=${ASCEND_COMPUTE_UNIT})")
+    return()
+endif()
+
 file(GLOB CURRENT_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*)
 if(NOT ENABLE_TEST AND NOT BENCHMARK)
     list(REMOVE_ITEM CURRENT_DIRS tests)
