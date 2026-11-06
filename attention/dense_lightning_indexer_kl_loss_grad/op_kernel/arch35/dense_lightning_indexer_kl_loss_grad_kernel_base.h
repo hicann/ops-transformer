@@ -714,19 +714,28 @@ __aicore__ inline void DenseLightningIndexerKLLossGradKernelBase<CubeBlockType, 
         softmaxOutPreBlockTotal = tilingData->multiCoreParams.softmaxOutPreBlockTotal;
         softmaxOutPreBlockTail = tilingData->multiCoreParams.softmaxOutPreBlockTail;
 
-        initdqSize = vBlockIdx == qPreBlockTotal - 1 ? qPreBlockTail : qPreBlockFactor;
-        initdkSize = vBlockIdx == kPreBlockTotal - 1 ? kPreBlockTail : kPreBlockFactor;
-        dqOffset = (uint64_t)vBlockIdx * qPreBlockFactor;
-        dkOffset = (uint64_t)vBlockIdx * kPreBlockFactor;
-        initdweightSize = vBlockIdx == weightPreBlockTotal - 1 ? weightPreBlockTail : weightPreBlockFactor;
-        dweightOffset = (uint64_t)vBlockIdx * weightPreBlockFactor;
-        initsoftMaxSize = vBlockIdx == softmaxOutPreBlockTotal - 1 ? softmaxOutPreBlockTail : softmaxOutPreBlockFactor;
-        softMaxOffset = (uint64_t)vBlockIdx * softmaxOutPreBlockFactor;
-        InitOutput<float>(softmaxOutGm[softMaxOffset], initsoftMaxSize, 0);
-        InitOutput<float>(dWeightGm[dweightOffset], initdweightSize, 0);
-        InitOutput<OUT_T>(dqGm[dqOffset], initdqSize, 0);
-        InitOutput<OUT_T>(dkGm[dkOffset], initdkSize, 0);
-        InitOutput<T>(bmm3Res[dkOffset], initdkSize, 0);
+        if (vBlockIdx < softmaxOutPreBlockTotal) {
+            initsoftMaxSize =
+                vBlockIdx == softmaxOutPreBlockTotal - 1 ? softmaxOutPreBlockTail : softmaxOutPreBlockFactor;
+            softMaxOffset = (uint64_t)vBlockIdx * softmaxOutPreBlockFactor;
+            InitOutput<float>(softmaxOutGm[softMaxOffset], initsoftMaxSize, 0);
+        }
+        if (vBlockIdx < weightPreBlockTotal) {
+            initdweightSize = vBlockIdx == weightPreBlockTotal - 1 ? weightPreBlockTail : weightPreBlockFactor;
+            dweightOffset = (uint64_t)vBlockIdx * weightPreBlockFactor;
+            InitOutput<float>(dWeightGm[dweightOffset], initdweightSize, 0);
+        }
+        if (vBlockIdx < qPreBlockTotal) {
+            initdqSize = vBlockIdx == qPreBlockTotal - 1 ? qPreBlockTail : qPreBlockFactor;
+            dqOffset = (uint64_t)vBlockIdx * qPreBlockFactor;
+            InitOutput<OUT_T>(dqGm[dqOffset], initdqSize, 0);
+        }
+        if (vBlockIdx < kPreBlockTotal) {
+            initdkSize = vBlockIdx == kPreBlockTotal - 1 ? kPreBlockTail : kPreBlockFactor;
+            dkOffset = (uint64_t)vBlockIdx * kPreBlockFactor;
+            InitOutput<OUT_T>(dkGm[dkOffset], initdkSize, 0);
+            InitOutput<T>(bmm3Res[dkOffset], initdkSize, 0);
+        }
     }
     SyncAll<false>();
 }
