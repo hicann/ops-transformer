@@ -930,7 +930,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
 
   返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-  第一段接口完成入参校验，出现以下场景时报错：
+  第一段接口完成入参校验与tiling校验，出现以下场景时报错：
 
   <table style="undefined;table-layout: fixed;width: 1155px"><colgroup>
     <col style="width: 319px">
@@ -957,6 +957,11 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
             <td>ACLNN_ERR_RUNTIME_ERROR</td>
             <td>361001</td>
             <td>API内存调用npu runtime的接口异常。</td>
+        </tr>
+        <tr>
+            <td>ACLNN_ERR_INNER_TILING_ERROR</td>
+            <td>561002</td>
+            <td>入参的shape（维度/尺寸）、属性取值或参数组合不满足“约束说明”中的约束时，API内部执行tiling发生异常。</td>
         </tr>
     </tbody>
     </table>
@@ -1003,6 +1008,27 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
 - **返回值：**
 
   返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+
+  第二段接口下发算子执行，入参校验与tiling校验已在第一段接口aclnnFusedInferAttentionScoreV5GetWorkspaceSize中完成，出现以下场景时报错：
+
+  <table style="undefined;table-layout: fixed;width: 1155px"><colgroup>
+    <col style="width: 319px">
+    <col style="width: 144px">
+    <col style="width: 671px">
+    </colgroup>
+    <thead>
+        <th>返回值</th>
+        <th>错误码</th>
+        <th>描述</th>
+    </thead>
+    <tbody>
+        <tr>
+            <td>ACLNN_ERR_RUNTIME_ERROR</td>
+            <td>361001</td>
+            <td>API内存调用npu runtime的接口异常。</td>
+        </tr>
+    </tbody>
+    </table>
 
 ## 约束说明
 
@@ -1497,13 +1523,6 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
         </tbody>
     </table>
 
-      <!-- npu="A3,910b" id7 -->
-      - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-        - Prefill MLA场景下，不支持tensorlist、左padding
-        - MLA场景下，不支持后量化
-
-      <!-- end id7 -->
-
 #### PSE参数组
 
 - 单参数约束
@@ -1578,13 +1597,8 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
       - <term>Ascend 950PR&950DT系列产品</term>：
         - 维度为2时，不支持sparseMode为0/1模式
       <!-- end id8 -->
-      <!-- npu="A3,910b" id9 -->
-      - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-        - sparseMode为0/1模式时，若传入query_rope和key_rope，或者query与key的D不等于value的D，则不支持attenMask输入维度为2
-        - sparseMode为0/1模式时，若attenMask输入维度为2，则layout仅支持为BSH、BSND、BNSD、BNSD_BSND
-      <!-- end id9 -->
 
-    - 入参sparseMode为0/1模式时，attenMask矩阵的shape应满足 [batchSize/1，>=Q_S，>=KV_S + actualSharedPrefixLen]
+    - 入参sparseMode为0/1模式时，attenMask矩阵的shape应满足 [batchSize/1，>=Q_S，>=KV_S + actualSharedPrefixLen]；当输入维度为4时，shape应满足 [batchSize/1，1，>=Q_S，>=KV_S + actualSharedPrefixLen]，即第2维必须为1，不支持按numHeads扩展
     - 入参sparseMode为2/3/4模式时，attenMask矩阵的shape最后两维应等于2048，即支持传入(2048,2048)或(1,2048,2048)或(1,1,2048,2048)
     - 非伪量化或Q_S大于1时，preTokens与nextTokens应满足nextTokens * (-1) <= preTokens，以确保具有有效数据
   - 伪量化

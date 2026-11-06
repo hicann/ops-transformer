@@ -889,7 +889,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
 
   Returns an aclnnStatus status code. For details, see [aclnn Return Codes](../../../docs/en/context/aclnn_return_code.md).
 
-  The first-phase API performs input parameter validation and returns an error in the following scenarios:
+  The first-phase API performs input parameter validation and tiling validation and returns an error in the following scenarios:
 
   <table style="undefined;table-layout: fixed;width: 1155px"><colgroup>
     <col style="width: 319px">
@@ -916,6 +916,11 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
             <td>ACLNN_ERR_RUNTIME_ERROR</td>
             <td>361001</td>
             <td>An exception occurs when the API calls the NPU runtime interface for memory.</td>
+        </tr>
+        <tr>
+            <td>ACLNN_ERR_INNER_TILING_ERROR</td>
+            <td>561002</td>
+            <td>When the shape (dimensions/sizes), attribute values, or parameter combinations of the input parameters do not meet the constraints in "Constraints", an exception occurs when the API internally performs tiling.</td>
         </tr>
     </tbody>
     </table>
@@ -962,6 +967,27 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
 - **Return value**
 
   Returns an aclnnStatus status code. For details, see [aclnn Return Codes](../../../docs/en/context/aclnn_return_code.md).
+
+  The second-phase API dispatches the operator for execution. Input parameter validation and tiling validation have been completed in the first-phase API aclnnFusedInferAttentionScoreV5GetWorkspaceSize. An error is returned in the following scenarios:
+
+  <table style="undefined;table-layout: fixed;width: 1155px"><colgroup>
+    <col style="width: 319px">
+    <col style="width: 144px">
+    <col style="width: 671px">
+    </colgroup>
+    <thead>
+        <th>Return Value</th>
+        <th>Error Code</th>
+        <th>Description</th>
+    </thead>
+    <tbody>
+        <tr>
+            <td>ACLNN_ERR_RUNTIME_ERROR</td>
+            <td>361001</td>
+            <td>An exception occurs when the API calls the NPU runtime interface for memory.</td>
+        </tr>
+    </tbody>
+    </table>
 
 ## Constraints
 
@@ -1450,13 +1476,6 @@ In the documented constraints, common fields are described as follows:
         </tbody>
     </table>
 
-      <!-- npu="A3,910b" id7 -->
-      - x1 is INT8, x2 is INT8, x1Scale is FLOAT32, and x2Scale is FLOAT32.
-        - In the Prefill MLA use case, tensorlist and left padding are not supported
-        - In the MLA use case, post quantization is not supported
-
-      <!-- end id7 -->
-
 #### PSE Parameter Group
 
 - Single Parameter Constraint
@@ -1531,13 +1550,8 @@ In the documented constraints, common fields are described as follows:
       - <term>Ascend 950PR&950DT products</term>:
         - When the number of input dimensions is 2, sparseMode 0/1 modes are not supported
       <!-- end id8 -->
-      <!-- npu="A3,910b" id9 -->
-      - x1 is INT8, x2 is INT8, x1Scale is FLOAT32, and x2Scale is FLOAT32.
-        - In sparseMode 0/1 modes, if query_rope and key_rope are passed in, or the D of query or key is not equal to the D of value, the attenMask input dimension of 2 is not supported
-        - In sparseMode 0/1 modes, if the attenMask input dimension is 2, layout supports only BSH, BSND, BNSD, and BNSD_BSND
-      <!-- end id9 -->
 
-    - When input parameter sparseMode is 0/1, the shape of the attenMask matrix must satisfy [batchSize/1, >=Q_S, >=KV_S + actualSharedPrefixLen].
+    - When input parameter sparseMode is 0/1, the shape of the attenMask matrix must satisfy [batchSize/1, >=Q_S, >=KV_S + actualSharedPrefixLen]; when the number of input dimensions is 4, the shape must satisfy [batchSize/1, 1, >=Q_S, >=KV_S + actualSharedPrefixLen]. That is, the second dimension must be 1, and extension by numHeads is not supported.
     - When input parameter sparseMode is 2/3/4, the last two dimensions of the attenMask matrix shape must be 2048. That is, (2048,2048), (1,2048,2048), or (1,1,2048,2048) can be passed in.
     - When pseudo quantization is not used or Q_S is greater than 1, preTokens and nextTokens must satisfy nextTokens * (-1) <= preTokens to ensure valid data exists.
   - Pseudo quantization
