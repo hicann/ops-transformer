@@ -161,8 +161,9 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
     // 1. 检查 query 数据类型（仅FP16）
     auto queryDataType = context->GetInputDesc(0)->GetDataType();
     if (queryDataType != ge::DT_FLOAT16) {
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "arch31 only supports FP16 query, got dtype=%d",
-                                    static_cast<int>(queryDataType));
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "query",
+                                              std::to_string(static_cast<int>(queryDataType)).c_str(),
+                                              "arch31 only supports FLOAT16 query");
         return ge::GRAPH_FAILED;
     }
 
@@ -204,9 +205,8 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
 
     // 3. 检查 layout 白名单 {BNSD, BSND, BSH, TND}
     if (layout != "BNSD" && layout != "BSND" && layout != "BSH" && layout != "TND") {
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                    "arch31 layout=%s not supported (whitelist {BNSD, BSND, BSH, TND})",
-                                    layout.c_str());
+        OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context->GetNodeName(), "input_layout", layout.c_str(),
+                                               "arch31 supports BNSD, BSND, BSH or TND");
         return ge::GRAPH_FAILED;
     }
 
@@ -224,9 +224,7 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
         auto seqQTensor = context->GetOptionalInputTensor(ACTUAL_SEQ_Q_INDEX);
         auto seqKvTensor = context->GetOptionalInputTensor(ACTUAL_SEQ_KV_INDEX);
         if (seqQShape == nullptr || seqKvShape == nullptr) {
-            OPS_REPORT_VECTOR_INNER_ERR(
-                context->GetNodeName(),
-                "arch31 TND layout requires actual_seq_lengths and actual_seq_lengths_kv inputs");
+            OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "actual_seq_lengths/actual_seq_lengths_kv");
             return ge::GRAPH_FAILED;
         }
         seqQNum = static_cast<uint32_t>(seqQShape->GetStorageShape().GetDim(0));
@@ -238,15 +236,15 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
             seqKvVals = seqKvTensor->GetData<int64_t>();
         }
         if (seqQVals == nullptr || seqKvVals == nullptr) {
-            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                        "arch31 TND layout actual_seq_lengths data pointer is null");
+            OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "actual_seq_lengths/actual_seq_lengths_kv");
             return ge::GRAPH_FAILED;
         }
         if (seqQNum > ARCH31_TND_MAX_BATCH || seqQNum != seqKvNum) {
-            OPS_REPORT_VECTOR_INNER_ERR(
-                context->GetNodeName(),
-                "arch31 TND batch=%u exceeds limit %u or mismatch with actual_seq_lengths_kv count %u", seqQNum,
-                ARCH31_TND_MAX_BATCH, seqKvNum);
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                context->GetNodeName(), "actual_seq_lengths,actual_seq_lengths_kv",
+                (std::string("batch=") + std::to_string(seqQNum) + ", kv batch=" + std::to_string(seqKvNum)).c_str(),
+                "arch31 TND batch must not exceed " + std::to_string(ARCH31_TND_MAX_BATCH) +
+                    " and must match actual_seq_lengths_kv count");
             return ge::GRAPH_FAILED;
         }
     }
@@ -254,25 +252,30 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
     Arch31Dims dims;
     if (!ParseLayoutDimsArch31(queryShape, keyShape, valueShape, layout, headsAttr, kvHeadsAttr, dims, seqQVals,
                                seqQNum, seqKvVals, seqKvNum)) {
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                    "arch31 layout=%s shape parse failed (expect BNSD/BSND 4D or BSH 3D; BSH requires "
-                                    "num_heads/kv_head_nums attrs and dim2 divisible by heads, i.e. dim2==H*D==KvH*D)",
-                                    layout.c_str());
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            context->GetNodeName(), "query,key,value",
+            (std::string("query dimNum=") + std::to_string(queryShape.GetDimNum()) + ", key dimNum=" +
+             std::to_string(keyShape.GetDimNum()) + ", value dimNum=" + std::to_string(valueShape.GetDimNum()))
+                .c_str(),
+            "arch31 layout " + layout +
+                " expects BNSD/BSND 4D or BSH 3D with num_heads/kv_head_nums and dim2 divisible by heads, or TND 3D");
         return ge::GRAPH_FAILED;
     }
 
     // 5. 检查 D 值域：16 ≤ D ≤ 512 且为16的倍数
     if (dims.dQ < ARCH31_D_MIN) {
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "arch31 D=%u below minimum %u", dims.dQ, ARCH31_D_MIN);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "D", std::to_string(dims.dQ).c_str(),
+                                              "arch31 D must be >= " + std::to_string(ARCH31_D_MIN));
         return ge::GRAPH_FAILED;
     }
     if (dims.dQ % ARCH31_D_FRAC != 0) {
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "arch31 D=%u is not a multiple of %u", dims.dQ,
-                                    ARCH31_D_FRAC);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "D", std::to_string(dims.dQ).c_str(),
+                                              "arch31 D must be a multiple of " + std::to_string(ARCH31_D_FRAC));
         return ge::GRAPH_FAILED;
     }
     if (dims.dQ > ARCH31_D_LIMIT) {
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "arch31 D=%u exceeds limit %u", dims.dQ, ARCH31_D_LIMIT);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "D", std::to_string(dims.dQ).c_str(),
+                                              "arch31 D must be <= " + std::to_string(ARCH31_D_LIMIT));
         return ge::GRAPH_FAILED;
     }
     bool decodeGateHit = IsDecodeSparseBypass(context, dims, layout);
@@ -286,8 +289,9 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
     int64_t tndMaskSumSq = 0;
     if (layout == "TND") {
         if (sparseMode != ARCH31_SPARSE_MODE_NOMASK && sparseMode != ARCH31_SPARSE_MODE_TREE_MASK) {
-            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "arch31 TND layout sparseMode=%ld not in {0,9}",
-                                        sparseMode);
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "sparse_mode",
+                                                  std::to_string(sparseMode).c_str(),
+                                                  "arch31 TND layout sparse_mode must be 0 or 9");
             return ge::GRAPH_FAILED;
         }
         int64_t qT = queryShape.GetDim(0);
@@ -295,31 +299,41 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
         int64_t vT = valueShape.GetDim(0);
         for (uint32_t i = 0; i < seqQNum; i++) {
             if (seqQVals[i] < 0 || seqKvVals[i] < 0) {
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                            "arch31 TND actual_seq_lengths values must be non-negative, got "
-                                            "seqQ[%u]=%ld seqKv[%u]=%ld",
-                                            i, seqQVals[i], i, seqKvVals[i]);
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    context->GetNodeName(), "actual_seq_lengths,actual_seq_lengths_kv",
+                    (std::string("seqQ[") + std::to_string(i) + "]=" + std::to_string(seqQVals[i]) + ", seqKv[" +
+                     std::to_string(i) + "]=" + std::to_string(seqKvVals[i]))
+                        .c_str(),
+                    "arch31 TND actual_seq_lengths values must be non-negative");
                 return ge::GRAPH_FAILED;
             }
             if (i > 0 && (seqQVals[i] < seqQVals[i - 1] || seqKvVals[i] < seqKvVals[i - 1])) {
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                            "arch31 TND actual_seq_lengths must be non-decreasing, "
-                                            "got seqQ[%u]=%ld < seqQ[%u]=%ld or seqKv[%u]=%ld < seqKv[%u]=%ld",
-                                            i, seqQVals[i], i - 1, seqQVals[i - 1], i, seqKvVals[i], i - 1,
-                                            seqKvVals[i - 1]);
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    context->GetNodeName(), "actual_seq_lengths,actual_seq_lengths_kv",
+                    (std::string("seqQ[") + std::to_string(i) + "]=" + std::to_string(seqQVals[i]) + ", seqQ[" +
+                     std::to_string(i - 1) + "]=" + std::to_string(seqQVals[i - 1]) + ", seqKv[" + std::to_string(i) +
+                     "]=" + std::to_string(seqKvVals[i]) + ", seqKv[" + std::to_string(i - 1) +
+                     "]=" + std::to_string(seqKvVals[i - 1]))
+                        .c_str(),
+                    "arch31 TND actual_seq_lengths must be non-decreasing");
                 return ge::GRAPH_FAILED;
             }
         }
         if (seqQVals[seqQNum - 1] != qT || seqKvVals[seqKvNum - 1] != kT || seqKvVals[seqKvNum - 1] != vT) {
-            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                        "arch31 TND actual_seq_lengths last element must equal token cout T "
-                                        "got seqQ_last=%ld vs query T=%ld, seqKv_last=%ld vs key T=%ld value T=%ld",
-                                        seqQVals[seqQNum - 1], qT, seqKvVals[seqKvNum - 1], kT, vT);
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                context->GetNodeName(), "actual_seq_lengths,actual_seq_lengths_kv",
+                (std::string("seqQ_last=") + std::to_string(seqQVals[seqQNum - 1]) + ", query T=" + std::to_string(qT) +
+                 ", seqKv_last=" + std::to_string(seqKvVals[seqKvNum - 1]) + ", key T=" + std::to_string(kT) +
+                 ", value T=" + std::to_string(vT))
+                    .c_str(),
+                "arch31 TND actual_seq_lengths last element must equal token count T");
             return ge::GRAPH_FAILED;
         }
         if (sparseMode == ARCH31_SPARSE_MODE_NOMASK && context->GetOptionalInputShape(ATTEN_MASK_INDEX) != nullptr) {
-            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                        "arch31 TND layout with sparse_mode=0 consumes no atten_mask in current phase");
+            REPORT_PREDEFINED_ERR_MSG(
+                "EZ1009", (std::vector<const char*>{"opName", "reason"}),
+                (std::vector<const char*>{context->GetNodeName(),
+                                          "arch31 TND layout with sparse_mode=0 does not consume atten_mask"}));
             return ge::GRAPH_FAILED;
         }
         if (sparseMode == ARCH31_SPARSE_MODE_TREE_MASK) {
@@ -327,10 +341,12 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
                 int64_t s1 = seqQVals[i] - ((i == 0) ? 0 : seqQVals[i - 1]);
                 int64_t s2 = seqKvVals[i] - ((i == 0) ? 0 : seqKvVals[i - 1]);
                 if (s2 != 0 && s1 > s2) {
-                    OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                                "arch31 TND sparse_mode=9 requires Q_S<=KV_S per batch, "
-                                                "got batch %u: Q_S=%ld > KV_S=%ld",
-                                                i, s1, s2);
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        context->GetNodeName(), "actual_seq_lengths,actual_seq_lengths_kv",
+                        (std::string("batch=") + std::to_string(i) + ", Q_S=" + std::to_string(s1) +
+                         ", KV_S=" + std::to_string(s2))
+                            .c_str(),
+                        "arch31 TND sparse_mode=9 requires Q_S<=KV_S per batch");
                     return ge::GRAPH_FAILED;
                 }
                 tndMaskSumSq += s1 * s1;
@@ -342,7 +358,8 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
     if (sparseMode != ARCH31_SPARSE_MODE_NOMASK && sparseMode != ARCH31_SPARSE_MODE_ALL_MASK &&
         sparseMode != ARCH31_SPARSE_MODE_LEFTUP_CAUSAL && sparseMode != ARCH31_SPARSE_MODE_CAUSAL &&
         sparseMode != ARCH31_SPARSE_MODE_BAND && sparseMode != ARCH31_SPARSE_MODE_TREE_MASK) {
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "arch31 sparseMode=%ld not in {0,1,2,3,4,9}", sparseMode);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "sparse_mode", std::to_string(sparseMode).c_str(),
+                                              "arch31 sparse_mode must be one of {0,1,2,3,4,9}");
         return ge::GRAPH_FAILED;
     }
 
@@ -352,32 +369,37 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
         auto maskDesc = context->GetOptionalInputDesc(ATTEN_MASK_INDEX);
         ge::DataType maskDtype = (maskDesc != nullptr) ? maskDesc->GetDataType() : ge::DT_UNDEFINED;
         if (maskDtype != ge::DT_BOOL && maskDtype != ge::DT_INT8 && maskDtype != ge::DT_UINT8) {
-            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "arch31 attenMask dtype=%d not in {BOOL, INT8, UINT8}",
-                                        static_cast<int>(maskDtype));
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "atten_mask",
+                                                  std::to_string(static_cast<int>(maskDtype)).c_str(),
+                                                  "arch31 atten_mask dtype must be BOOL, INT8 or UINT8");
             return ge::GRAPH_FAILED;
         }
         auto maskShape = attenMaskShape->GetStorageShape();
         if (sparseMode == ARCH31_SPARSE_MODE_TREE_MASK) {
             if (layout == "TND") {
                 if (maskShape.GetDimNum() != 1 || maskShape.GetDim(0) != tndMaskSumSq) {
-                    OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                                "arch31 TND sparse_mode=9 attenMask must be 1D packed triangular mask "
-                                                "with dim0=%ld (sum of S1_i^2), got dimNum=%u dim0=%ld",
-                                                tndMaskSumSq, static_cast<uint32_t>(maskShape.GetDimNum()),
-                                                maskShape.GetDim(0));
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        context->GetNodeName(), "atten_mask",
+                        (std::string("dimNum=") + std::to_string(maskShape.GetDimNum()) +
+                         ", dim0=" + std::to_string(maskShape.GetDim(0)))
+                            .c_str(),
+                        "arch31 TND sparse_mode=9 atten_mask must be 1D packed triangular mask with dim0=" +
+                            std::to_string(tndMaskSumSq));
                     return ge::GRAPH_FAILED;
                 }
             } else {
                 if (maskShape.GetDimNum() != 3 || maskShape.GetDim(0) != static_cast<int64_t>(dims.b) ||
                     maskShape.GetDim(1) != static_cast<int64_t>(dims.s1) ||
                     maskShape.GetDim(2) != static_cast<int64_t>(dims.s1)) {
-                    OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                                "arch31 sparse_mode=9 attenMask must be 3D (B,S1,S1) with "
-                                                "B=%u S1 =%u, got dimNum=%u dims=(%ld,%ld,%ld)",
-                                                dims.b, dims.s1, static_cast<uint32_t>(maskShape.GetDimNum()),
-                                                maskShape.GetDimNum() > 0 ? maskShape.GetDim(0) : -1,
-                                                maskShape.GetDimNum() > 1 ? maskShape.GetDim(1) : -1,
-                                                maskShape.GetDimNum() > 2 ? maskShape.GetDim(2) : -1);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        context->GetNodeName(), "atten_mask",
+                        (std::string("dimNum=") + std::to_string(maskShape.GetDimNum()) + ", dims=(" +
+                         std::to_string(maskShape.GetDimNum() > 0 ? maskShape.GetDim(0) : -1) + "," +
+                         std::to_string(maskShape.GetDimNum() > 1 ? maskShape.GetDim(1) : -1) + "," +
+                         std::to_string(maskShape.GetDimNum() > 2 ? maskShape.GetDim(2) : -1) + ")")
+                            .c_str(),
+                        "arch31 sparse_mode=9 atten_mask must be 3D (B,S1,S1) with B=" + std::to_string(dims.b) +
+                            ", S1=" + std::to_string(dims.s1));
                     return ge::GRAPH_FAILED;
                 }
             }
@@ -395,10 +417,11 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
                           (maskShape.GetDim(0) == 1 || maskShape.GetDim(0) == static_cast<int64_t>(dims.b));
             }
             if (!shapeOk) {
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                            "arch31 sparseMode=%ld attenMask shape not in {(2048,2048),(1,2048,2048), "
-                                            "(1,1,2048,2048)}",
-                                            sparseMode);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context->GetNodeName(), "atten_mask",
+                    (std::string("dimNum=") + std::to_string(maskShape.GetDimNum())).c_str(),
+                    "arch31 sparse_mode=" + std::to_string(sparseMode) +
+                        " atten_mask shape must be (2048,2048), (1,2048,2048) or (1,1,2048,2048)");
                 return ge::GRAPH_FAILED;
             }
         } else {
@@ -413,18 +436,18 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
                           (maskShape.GetDim(0) == static_cast<int64_t>(dims.b) || maskShape.GetDim(0) == 1);
             }
             if (!shapeOk) {
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    context->GetNodeName(),
-                    "arch31 attenMask shape not in {(B,S1,S2),(1,S1,S2),(B,1,S1,S2),(1,1,S1,S2)} "
-                    "with S1=%u S2=%u B=%u",
-                    dims.s1, dims.s2, dims.b);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context->GetNodeName(), "atten_mask",
+                    (std::string("dimNum=") + std::to_string(maskShape.GetDimNum())).c_str(),
+                    "arch31 atten_mask shape must be (B,S1,S2), (1,S1,S2), (B,1,S1,S2) or (1,1,S1,S2) with S1=" +
+                        std::to_string(dims.s1) + ", S2=" + std::to_string(dims.s2) + ", B=" + std::to_string(dims.b));
                 return ge::GRAPH_FAILED;
             }
             if (dims.s2 % ARCH31_MASK_S2_ALIGN != 0) {
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    context->GetNodeName(),
-                    "arch31 KV_S=%u is not a multiple of %u (attenMask GM row base 32B alignment)", dims.s2,
-                    ARCH31_MASK_S2_ALIGN);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "KV_S", std::to_string(dims.s2).c_str(),
+                                                      "arch31 KV_S must be a multiple of " +
+                                                          std::to_string(ARCH31_MASK_S2_ALIGN) +
+                                                          " (attenMask GM row base 32B alignment)");
                 return ge::GRAPH_FAILED;
             }
         }
@@ -432,30 +455,25 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
 
     // 9. sm=1 必传 mask
     if (sparseMode == ARCH31_SPARSE_MODE_ALL_MASK && attenMaskShape == nullptr) {
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                    "arch31 sparseMode=1 (allMask) requires full attenMask tensor");
+        OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "atten_mask");
         return ge::GRAPH_FAILED;
     }
     // sm=2,3,4 必传 mask
     if ((sparseMode == ARCH31_SPARSE_MODE_LEFTUP_CAUSAL || sparseMode == ARCH31_SPARSE_MODE_CAUSAL ||
          sparseMode == ARCH31_SPARSE_MODE_BAND) &&
         attenMaskShape == nullptr) {
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                    "arch31 sparse_mode %ld requires atten_mask of shape (2048,2048)/(1,2048,2048)/"
-                                    "(1,1,2048,2048), nullptr is rejected",
-                                    sparseMode);
+        OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "atten_mask");
         return ge::GRAPH_FAILED;
     }
     // sm=9 必传 mask
     if (sparseMode == ARCH31_SPARSE_MODE_TREE_MASK && attenMaskShape == nullptr) {
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "arch31 sparse_mode is 9, atten_mask cannot be empty");
+        OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "atten_mask");
         return ge::GRAPH_FAILED;
     }
     if (sparseMode == ARCH31_SPARSE_MODE_TREE_MASK && layout != "TND" && dims.s2 != 0 && dims.s1 > dims.s2) {
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                    "arch31 sparse_mode=9 requires Q_S<=KV_S, "
-                                    "got Q_S=%u > KV_S=%u",
-                                    dims.s1, dims.s2);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "sparse_mode", std::to_string(sparseMode).c_str(),
+                                              "arch31 sparse_mode=9 requires Q_S<=KV_S, got Q_S=" +
+                                                  std::to_string(dims.s1) + " > KV_S=" + std::to_string(dims.s2));
         return ge::GRAPH_FAILED;
     }
     // 10. sm=0 且mask 存在
@@ -463,11 +481,14 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
         int64_t windowFirst =
             static_cast<int64_t>(dims.s1) - static_cast<int64_t>(dims.s2) - ARCH31_PREFIX_LEN - preTokens;
         if (windowFirst > 0 || nextTokens < 0) {
-            OPS_REPORT_VECTOR_INNER_ERR(
-                context->GetNodeName(),
-                "arch31 sparseMode=0 illegal mask window: S1(%u)-S2(%u)-prefixLen(%ld)-preTokens"
-                "(%ld)=%ld>0 || nextTokens(%ld)<0",
-                dims.s1, dims.s2, ARCH31_PREFIX_LEN, preTokens, windowFirst, nextTokens);
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                context->GetNodeName(), "pre_token,next_token",
+                (std::string("pre_token=") + std::to_string(preTokens) + ", next_token=" + std::to_string(nextTokens) +
+                 ", windowFirst=" + std::to_string(windowFirst))
+                    .c_str(),
+                "arch31 sparse_mode=0 illegal mask window: S1(" + std::to_string(dims.s1) + ")-S2(" +
+                    std::to_string(dims.s2) + ")-prefixLen(" + std::to_string(ARCH31_PREFIX_LEN) +
+                    ")-pre_token must be <= 0 and next_token must be >= 0");
             return ge::GRAPH_FAILED;
         }
     }
@@ -477,10 +498,14 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
         int64_t bandSecond =
             nextTokens + static_cast<int64_t>(dims.s2) + ARCH31_PREFIX_LEN - static_cast<int64_t>(dims.s1);
         if (preTokens < 0 || bandSecond < 0) {
-            OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                        "arch31 sparseMode=4 illegal band window: preTokens=%ld<0 || "
-                                        "nextTokens(%ld)+KV_S(%u)+prefixLen(%ld)-Q_S(%u)=%ld<0",
-                                        preTokens, nextTokens, dims.s2, ARCH31_PREFIX_LEN, dims.s1, bandSecond);
+            OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                context->GetNodeName(), "pre_token,next_token",
+                (std::string("pre_token=") + std::to_string(preTokens) + ", next_token=" + std::to_string(nextTokens) +
+                 ", bandSecond=" + std::to_string(bandSecond))
+                    .c_str(),
+                "arch31 sparse_mode=4 illegal band window: pre_token must be >= 0 and next_token+KV_S(" +
+                    std::to_string(dims.s2) + ")+prefixLen(" + std::to_string(ARCH31_PREFIX_LEN) + ")-Q_S(" +
+                    std::to_string(dims.s1) + ") must be >= 0");
             return ge::GRAPH_FAILED;
         }
     }
@@ -490,10 +515,11 @@ ge::graphStatus CheckArch31Inputs(gert::TilingContext* context)
     auto queryPaddingSizeInput = context->GetOptionalInputShape(QUERY_PADDING_SIZE_INDEX);
     auto kvPaddingSizeInput = context->GetOptionalInputShape(KV_PADDING_SIZE_INDEX);
     if (blockTableInput != nullptr || queryPaddingSizeInput != nullptr || kvPaddingSizeInput != nullptr) {
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                    "arch31 does not support PagedAttention (blockTable[%u]/queryPaddingSize[%u]/"
-                                    "kvPaddingSize[%u] input present)",
-                                    BLOCK_TABLE_INDEX, QUERY_PADDING_SIZE_INDEX, KV_PADDING_SIZE_INDEX);
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1009", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{context->GetNodeName(),
+                                      "arch31 does not support PagedAttention (block_table/query_padding_size/"
+                                      "kv_padding_size input present)"}));
         return ge::GRAPH_FAILED;
     }
 

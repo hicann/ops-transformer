@@ -676,7 +676,13 @@ ge::graphStatus FlashAttentionScoreTilingBase::GetPlatformInfo()
 ge::graphStatus FlashAttentionScoreTilingBase::CheckContext()
 {
     auto attrs = context_->GetAttrs();
-    OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
+    OP_CHECK_IF(
+        attrs == nullptr,
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{context_->GetNodeName(),
+                                      "attributes are unavailable; check operator prototype attribute registration."})),
+        return ge::GRAPH_FAILED);
     size_t idx = 0;
     auto scaleValuePtr = attrs->GetAttrPointer<float>(idx++);
     auto keepProbPtr = attrs->GetAttrPointer<float>(idx++);
@@ -686,25 +692,51 @@ ge::graphStatus FlashAttentionScoreTilingBase::CheckContext()
     auto inputLayoutPtr = attrs->GetAttrPointer<char>(idx++);
     size_t* workspaces = context_->GetWorkspaceSizes(1);
 
-    OP_CHECK_NULL_WITH_CONTEXT(context_, scaleValuePtr);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, keepProbPtr);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, preTokensPtr);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, nextTokensPtr);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, n1SizePtr);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, inputLayoutPtr);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
+    OP_CHECK_IF(scaleValuePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "scale_value"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(keepProbPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "keep_prob"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(preTokensPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "pre_tokens"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(nextTokensPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "next_tokens"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(n1SizePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "head_num"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(inputLayoutPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "input_layout"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        workspaces == nullptr,
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{context_->GetNodeName(),
+                                      "workspace buffer is unavailable; check tiling workspace registration."})),
+        return ge::GRAPH_FAILED);
 
     auto queryShape = context_->GetInputShape(0);
     auto queryDesc = context_->GetInputDesc(0);
     auto keyShape = context_->GetInputShape(1);
     auto attenOutShape = context_->GetOutputShape(ATTEN_OUT_INDEX);
 
-    OP_CHECK_NULL_WITH_CONTEXT(context_, queryShape);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, queryDesc);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, keyShape);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, attenOutShape);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, context_->GetRawTilingData());
-    OP_CHECK_NULL_WITH_CONTEXT(context_, context_->GetRawTilingData()->GetData());
+    OP_CHECK_IF(queryShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "query"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(queryDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "query"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(keyShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "key"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(attenOutShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "attention_out"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context_->GetRawTilingData() == nullptr,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{context_->GetNodeName(),
+                                              "raw tiling data is unavailable; check tiling data capacity."})),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context_->GetRawTilingData()->GetData() == nullptr,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{context_->GetNodeName(),
+                                              "raw tiling data buffer is unavailable; check tiling data capacity."})),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

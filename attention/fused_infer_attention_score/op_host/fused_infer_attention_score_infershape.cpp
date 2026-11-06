@@ -301,32 +301,45 @@ static ge::graphStatus InferShapeFusedInferAttentionScore(gert::InferShapeContex
     OP_LOGD(context->GetNodeName(), "Enter FusedInferAttentionScore InferShape impl.");
     // query shape
     const gert::Shape* queryShape = context->GetInputShape(FIA_QUERY_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
+    OP_CHECK_IF(queryShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "query"),
+                return ge::GRAPH_FAILED);
 
     // value shape
     const gert::Shape* valueShape = context->GetDynamicInputShape(FIA_VALUE_INDEX, FIA_DYNAMIC_VALUE_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
+    OP_CHECK_IF(valueShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "value"),
+                return ge::GRAPH_FAILED);
 
     // Page Attention
     bool isPageAttention = (context->GetOptionalInputShape(FIA_BLOCK_TABLE_INDEX) == nullptr) ? false : true;
 
     // attentionOut
     gert::Shape* attentionOutShape = context->GetOutputShape(FIA_ATTENTION_OUT_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
+    OP_CHECK_IF(attentionOutShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "attention_out"),
+                return ge::GRAPH_FAILED);
 
     // lseout
     gert::Shape* softmaxLseShape = context->GetOutputShape(FIA_SOFTMAX_LSE_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, softmaxLseShape);
+    OP_CHECK_IF(softmaxLseShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "softmax_lse"),
+                return ge::GRAPH_FAILED);
 
     // Get attr
     auto attrs = context->GetAttrs();
-    OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    OP_CHECK_IF(attrs == nullptr,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1014", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{context->GetNodeName(),
+                                              "attributes are unavailable; check operator prototype attribute "
+                                              "registration."})),
+                return ge::GRAPH_FAILED);
     const char* inputLayoutPtr = attrs->GetAttrPointer<char>(FIA_ATTR_INPUT_LAYOUT_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutPtr);
+    OP_CHECK_IF(inputLayoutPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "input_layout"),
+                return ge::GRAPH_FAILED);
     const int64_t* numHeadsPtr = attrs->GetInt(FIA_ATTR_NUM_HEADS_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, numHeadsPtr);
+    OP_CHECK_IF(numHeadsPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "num_heads"),
+                return ge::GRAPH_FAILED);
     const int64_t* numKeyValueHeadsPtr = attrs->GetInt(FIA_ATTR_NUM_KV_HEADS_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, numKeyValueHeadsPtr);
+    OP_CHECK_IF(numKeyValueHeadsPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "num_kv_heads"),
+                return ge::GRAPH_FAILED);
 
     // KV_N除零保护, 当KV_N为零时KV_N = Q_N
     if (*numHeadsPtr == 0) {
@@ -401,7 +414,13 @@ static ge::graphStatus InferDataTypeFusedInferAttentionScore(gert::InferDataType
         outputType = ge::DT_INT8;
 
         auto attrs = context->GetAttrs();
-        OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+        OP_CHECK_IF(attrs == nullptr,
+                    REPORT_PREDEFINED_ERR_MSG(
+                        "EZ1014", (std::vector<const char*>{"opName", "reason"}),
+                        (std::vector<const char*>{context->GetNodeName(),
+                                                  "attributes are unavailable; check operator prototype attribute "
+                                                  "registration."})),
+                    return ge::GRAPH_FAILED);
         const int64_t* outTypePtr = attrs->GetInt(FIA_OUT_DTYPE_INDEX);
         if (outTypePtr != nullptr) {
             auto it = TORCH_DTYOE_NOT_SUPPORT_MAP.find(*outTypePtr);
@@ -426,7 +445,13 @@ static ge::graphStatus InferDataTypeFusedInferAttentionScore(gert::InferDataType
             outputType = ge::DT_FLOAT16;
         }
         auto attrs = context->GetAttrs();
-        OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+        OP_CHECK_IF(attrs == nullptr,
+                    REPORT_PREDEFINED_ERR_MSG(
+                        "EZ1014", (std::vector<const char*>{"opName", "reason"}),
+                        (std::vector<const char*>{context->GetNodeName(),
+                                                  "attributes are unavailable; check operator prototype attribute "
+                                                  "registration."})),
+                    return ge::GRAPH_FAILED);
         const int64_t* outTypePtr = attrs->GetInt(FIA_OUT_DTYPE_INDEX);
         if (outTypePtr != nullptr) {
             auto iter = TORCH_DTYPE_ENUM_VALUE_TO_GE_DTYPE_MAP.find(*outTypePtr);

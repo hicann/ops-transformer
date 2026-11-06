@@ -1182,8 +1182,10 @@ void FusedInferAttentionScoreTilingImpl::DequantCubeSplitBNSeq(const FiaTilingIn
 
     int64_t s1OuterSize = (fiaInfo.s1Size + sOuterFactor_ - 1) / sOuterFactor_;
     faRunTilingAdapter_.multiCoreParamsRegbase.set_s1OuterSize(s1OuterSize);
+    // The vector length must be no less than MultiCoreParamsRegbase::maxCoreNum (70); the set interfaces copy
+    // a fixed number of elements, so keep the lower bound at 80 to avoid out-of-bounds reads.
     const size_t tilingElementArrayLen =
-        (static_cast<size_t>(curCoreNum) > 64UL) ? static_cast<size_t>(curCoreNum) : 64UL;
+        (static_cast<size_t>(curCoreNum) > 80UL) ? static_cast<size_t>(curCoreNum) : 80UL;
     uint32_t curIndx = 0;
     ComputeDequantSplitNBSeq(fiaInfo, sOuterLoopTimes, sInnerLoopTimes, sInnerLoopTimesPrefix, coreWeightTarget,
                              curIndx, tilingElementArrayLen);

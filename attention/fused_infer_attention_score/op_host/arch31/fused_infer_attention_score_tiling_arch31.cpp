@@ -59,21 +59,27 @@ ge::graphStatus FusedInferAttentionScoreTilingArch31::DoOpTiling()
     // 1. 平台信息获取（Host 侧）
     auto platformInfoPtr = context_->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "platformInfoPtr is null"),
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{context_->GetNodeName(), "GetPlatformInfo returned nullptr"})),
                 return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
 
     // 2. arch31 专属 tiling 检查
-    OP_CHECK_IF(CheckArch31Inputs(context_) != ge::GRAPH_SUCCESS,
-                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "arch31 tiling check failed"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        CheckArch31Inputs(context_) != ge::GRAPH_SUCCESS,
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{context_->GetNodeName(), "arch31 tiling check failed"})),
+        return ge::GRAPH_FAILED);
     // 3. 单核 BLOCK_DIM=1
     context_->SetBlockDim(1);
 
     // 4. 调用arch31 non-quant tiling 实现
     FiaTilingNonQuantArch31 fiaTiling(context_);
     OP_CHECK_IF(fiaTiling.DoTiling() != ge::GRAPH_SUCCESS,
-                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "FiaTilingNonQuantArch31 failed"),
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{context_->GetNodeName(), "FiaTilingNonQuantArch31 failed"})),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;

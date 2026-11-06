@@ -269,7 +269,7 @@ ge::graphStatus FiaTilingCheck::CheckAttrValueByMap(std::map<std::string, std::p
         const std::string& name = kv.first;
         const std::pair<const T*, T>& pointerValuePair = kv.second;
         if (pointerValuePair.first == nullptr) {
-            OP_LOGE(opName_, "%s should not be nullptr", name.c_str());
+            OP_LOGE_WITH_INVALID_INPUT(opName_, name.c_str());
             return ge::GRAPH_FAILED;
         }
 

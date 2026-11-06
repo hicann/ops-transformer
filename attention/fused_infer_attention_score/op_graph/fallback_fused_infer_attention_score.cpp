@@ -283,10 +283,15 @@ static void GetFusedInferHostScalarParams(const FusedInferHostAttrPtrs& attrPoin
 
 static graphStatus FusedInferHostExecuteFunc(OpExecuteContext* host_api_ctx)
 {
-    OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE("aclnnfallback", "host_api_ctx is null"), return GRAPH_FAILED);
+    OP_CHECK_IF(host_api_ctx == nullptr,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"aclnnfallback", "host_api_ctx is null; check graph fallback "
+                                                               "execution context."})),
+                return GRAPH_FAILED);
     FusedInferHostTensorParams fiaTensors{};
     auto apiRet = FiaFillTensorParams(host_api_ctx, fiaTensors);
-    OP_CHECK_IF(apiRet != GRAPH_SUCCESS, OP_LOGE("aclnnfallback", "Input Tensors invalid"), return GRAPH_FAILED);
+    OP_CHECK_IF(apiRet != GRAPH_SUCCESS, OP_LOGE_WITH_INVALID_INPUT("aclnnfallback", "input"), return GRAPH_FAILED);
 
     std::vector<const gert::Tensor*> ge_tenserListKey;
     ge_tenserListKey.push_back(fiaTensors.key);
@@ -299,7 +304,12 @@ static graphStatus FusedInferHostExecuteFunc(OpExecuteContext* host_api_ctx)
 
     FusedInferHostAttrPtrs attrPointers{};
     auto attrs = host_api_ctx->GetAttrs();
-    OP_CHECK_IF(attrs == nullptr, OP_LOGE("aclnnfallback", "host_api_ctx Attrs is null"), return GRAPH_FAILED);
+    OP_CHECK_IF(attrs == nullptr,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{"aclnnfallback", "host_api_ctx attrs is null; check operator "
+                                                               "prototype attribute registration."})),
+                return GRAPH_FAILED);
     FillAttrPointers(attrs, attrPointers);
 
     FusedInferHostScalarParams scalarParams{};
@@ -343,7 +353,13 @@ static graphStatus FusedInferHostExecuteFunc(OpExecuteContext* host_api_ctx)
         scalarParams.softmaxLseFlag, scalarParams.keyAntiquantMode, scalarParams.valueAntiquantMode,
         scalarParams.queryQuantMode, scalarParams.pseType, fiaTensors.output, fiaTensors.softmaxLse);
 
-    OP_CHECK_IF(apiRet != GRAPH_SUCCESS, OP_LOGE(host_api_ctx->GetNodeName(), "apiRet failed:%u", apiRet),
+    OP_CHECK_IF(apiRet != GRAPH_SUCCESS,
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{
+                        host_api_ctx->GetNodeName(),
+                        (std::string("aclnnFusedInferAttentionScoreV5 execution failed; ret=") + std::to_string(apiRet))
+                            .c_str()})),
                 return GRAPH_FAILED);
 
     return GRAPH_SUCCESS;

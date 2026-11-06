@@ -267,15 +267,20 @@ static bool GetEmptyArgs(EmptyArgs& emptyArgs, gert::TilingContext* context, con
 static bool IsEmptyInputRegbase(gert::TilingContext* context)
 {
     auto attentionOutShape = context->GetOutputShape(ATTENTIONOUT_OUTPUT_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
+    OP_CHECK_IF(attentionOutShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "attention_out"),
+                return ge::GRAPH_FAILED);
     auto queryShape = context->GetInputShape(QUERY_INPUT_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
+    OP_CHECK_IF(queryShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "query"),
+                return ge::GRAPH_FAILED);
     auto keyShape = context->GetInputShape(KEY_INPUT_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
+    OP_CHECK_IF(keyShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "key"),
+                return ge::GRAPH_FAILED);
     auto valueShape = context->GetInputShape(VALUE_INPUT_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
+    OP_CHECK_IF(valueShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "value"),
+                return ge::GRAPH_FAILED);
     auto softmaxSumShape = context->GetOutputShape(SOFTMAXSUM_OUTPUT_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, softmaxSumShape);
+    OP_CHECK_IF(softmaxSumShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "softmax_sum"),
+                return ge::GRAPH_FAILED);
 
     uint64_t attentionOutShapeSize = attentionOutShape->GetStorageShape().GetShapeSize();
     int64_t queryShapeSize = queryShape->GetStorageShape().GetShapeSize();
@@ -333,16 +338,20 @@ static bool IsEmptyInputRegbase(gert::TilingContext* context)
 static bool IsEmptyInput(gert::TilingContext* context)
 {
     auto attentionOutShape = context->GetOutputShape(ATTENTIONOUT_OUTPUT_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
+    OP_CHECK_IF(attentionOutShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "attention_out"),
+                return ge::GRAPH_FAILED);
 
     auto queryShape = context->GetInputShape(QUERY_INPUT_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
+    OP_CHECK_IF(queryShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "query"),
+                return ge::GRAPH_FAILED);
 
     auto keyShape = context->GetInputShape(KEY_INPUT_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
+    OP_CHECK_IF(keyShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "key"),
+                return ge::GRAPH_FAILED);
 
     auto softmaxSumShape = context->GetOutputShape(SOFTMAXSUM_OUTPUT_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, softmaxSumShape);
+    OP_CHECK_IF(softmaxSumShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "softmax_sum"),
+                return ge::GRAPH_FAILED);
 
     int64_t attentionOutShapeSize = attentionOutShape->GetStorageShape().GetShapeSize();
     int64_t queryShapeSize = queryShape->GetStorageShape().GetShapeSize();

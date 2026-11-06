@@ -248,7 +248,9 @@ ge::graphStatus FiaTilingNonQuantArch31::DoTiling()
     // 1. 平台信息获取
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "platformInfoPtr is null");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{context_->GetNodeName(), "GetPlatformInfo returned nullptr"}));
         return ge::GRAPH_FAILED;
     }
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
@@ -308,20 +310,21 @@ ge::graphStatus FiaTilingNonQuantArch31::DoTiling()
     uint32_t seqQNum = 0;
     uint32_t seqKvNum = 0;
     if (inputLayout == "TND" && !LoadTndSeqPtrs(context_, seqQVals, seqQNum, seqKvVals, seqKvNum)) {
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(),
-                                    "arch31 TND layout actual_seq_lengths/actual_seq_lengths_kv tensor missing or "
-                                    "data pointer null (tiling prefix-sum derivation requires actual values)");
+        OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "actual_seq_lengths/actual_seq_lengths_kv");
         return ge::GRAPH_FAILED;
     }
 
     Arch31Dims dims;
     if (!ParseLayoutDimsArch31(queryShape, keyShape, valueShape, inputLayout, static_cast<uint32_t>(numHeadsAttr),
                                kvHeadNumsAttr, dims, seqQVals, seqQNum, seqKvVals, seqKvNum)) {
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(),
-                                    "arch31 layout=%s shape parse failed (expect BNSD/BSND 4D, BSH 3D with "
-                                    "num_heads/kv_head_nums attrs and dim2==H*D==KvH*D, or TND 3D packed with "
-                                    "actual_seq_lengths/Kv tensors)",
-                                    inputLayout.c_str());
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{context_->GetNodeName(),
+                                      (std::string("arch31 layout ") + inputLayout +
+                                       " shape parse failed: query dimNum=" + std::to_string(queryShape.GetDimNum()) +
+                                       ", key dimNum=" + std::to_string(keyShape.GetDimNum()) +
+                                       ", value dimNum=" + std::to_string(valueShape.GetDimNum()))
+                                          .c_str()}));
         return ge::GRAPH_FAILED;
     }
     uint32_t B = dims.b;
@@ -349,7 +352,8 @@ ge::graphStatus FiaTilingNonQuantArch31::DoTiling()
     uint32_t kTileV = 0;
     if (CalcTilingParams(mBase, nBase, dInner, needSplitD, dTile, kTileQK, nTileV, mBaseDeal, kTileV) !=
         ge::GRAPH_SUCCESS) {
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "CalcTilingParams failed");
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{context_->GetNodeName(), "CalcTilingParams failed"}));
         return ge::GRAPH_FAILED;
     }
 
@@ -387,14 +391,17 @@ ge::graphStatus FiaTilingNonQuantArch31::DoTiling()
     // 6. 计算workspace 大小
     uint64_t workspaceSize = 0;
     if (CalcWorkspaceSize(workspaceSize, mBase, nBase, dInner) != ge::GRAPH_SUCCESS) {
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "CalcWorkspaceSize failed");
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{context_->GetNodeName(), "CalcWorkspaceSize failed"}));
         return ge::GRAPH_FAILED;
     }
     size_t* workSpaces = context_->GetWorkspaceSizes(1);
     if (workSpaces != nullptr) {
         workSpaces[0] = static_cast<size_t>(workspaceSize);
     } else {
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "GetWorkspaceSizes returned nullptr");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{context_->GetNodeName(), "GetWorkspaceSizes returned nullptr"}));
         return ge::GRAPH_FAILED;
     }
 
@@ -475,12 +482,13 @@ ge::graphStatus FiaTilingNonQuantArch31::DoTiling()
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, l0cSizeB);
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizeB);
         OP_CHECK_IF(l0bSizeB == 0 || l0cSizeB == 0 || ubSizeB == 0,
-                    OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(),
-                                                "Hp: GetCoreMemSize returned 0 (l0b=%llu l0c=%llu ub=%llu); "
-                                                "platform ini missing, refusing to derive tiling",
-                                                static_cast<unsigned long long>(l0bSizeB),
-                                                static_cast<unsigned long long>(l0cSizeB),
-                                                static_cast<unsigned long long>(ubSizeB)),
+                    REPORT_PREDEFINED_ERR_MSG(
+                        "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                        (std::vector<const char*>{
+                            context_->GetNodeName(),
+                            (std::string("GetCoreMemSize returned 0 (l0b=") + std::to_string(l0bSizeB) +
+                             ", l0c=" + std::to_string(l0cSizeB) + ", ub=" + std::to_string(ubSizeB) + ")")
+                                .c_str()})),
                     return ge::GRAPH_FAILED);
         uint32_t nDealMaxB = static_cast<uint32_t>(l0bSizeB / (static_cast<uint64_t>(dTile) * ARCH31_FP16_BYTES));
         nDealMaxB = (nDealMaxB / ARCH31_CUBE_M) * ARCH31_CUBE_M;
@@ -509,21 +517,28 @@ ge::graphStatus FiaTilingNonQuantArch31::DoTiling()
         mBase = mDealB;
         nBase = nDealMaxB;
 
-        OP_CHECK_IF(
-            static_cast<uint64_t>(nDealMaxB) * dTile * ARCH31_FP16_BYTES > l0bSizeB,
-            OPS_REPORT_VECTOR_INNER_ERR(
-                context_->GetNodeName(), "HP: L0B overflow nDeal=%u D=%u need=%llu > l0b=%llu", nDealMaxB, dTile,
-                static_cast<unsigned long long>(static_cast<uint64_t>(nDealMaxB) * dTile * ARCH31_FP16_BYTES),
-                static_cast<unsigned long long>(l0bSizeB)),
-            return ge::GRAPH_FAILED);
-        OP_CHECK_IF(
-            static_cast<uint64_t>(2) * mDealB * dTile * ARCH31_FP16_BYTES * 2ULL > l0cSizeB,
-            OPS_REPORT_VECTOR_INNER_ERR(
-                context_->GetNodeName(), "HP: L0C overflow (pingpong) mDeal=%u D=%u need=%llu > l0c=%llu", mDealB,
-                dTile,
-                static_cast<unsigned long long>(static_cast<uint64_t>(2) * mDealB * dTile * ARCH31_FP16_BYTES * 2ULL),
-                static_cast<unsigned long long>(l0cSizeB)),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(static_cast<uint64_t>(nDealMaxB) * dTile * ARCH31_FP16_BYTES > l0bSizeB,
+                    REPORT_PREDEFINED_ERR_MSG(
+                        "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                        (std::vector<const char*>{
+                            context_->GetNodeName(),
+                            (std::string("HP L0B overflow: nDeal=") + std::to_string(nDealMaxB) +
+                             ", D=" + std::to_string(dTile) +
+                             ", need=" + std::to_string(static_cast<uint64_t>(nDealMaxB) * dTile * ARCH31_FP16_BYTES) +
+                             " > l0b=" + std::to_string(l0bSizeB))
+                                .c_str()})),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(static_cast<uint64_t>(2) * mDealB * dTile * ARCH31_FP16_BYTES * 2ULL > l0cSizeB,
+                    REPORT_PREDEFINED_ERR_MSG(
+                        "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                        (std::vector<const char*>{
+                            context_->GetNodeName(),
+                            (std::string("HP L0C overflow (pingpong): mDeal=") + std::to_string(mDealB) +
+                             ", D=" + std::to_string(dTile) + ", need=" +
+                             std::to_string(static_cast<uint64_t>(2) * mDealB * dTile * ARCH31_FP16_BYTES * 2ULL) +
+                             " > l0c=" + std::to_string(l0cSizeB))
+                                .c_str()})),
+                    return ge::GRAPH_FAILED);
         OP_LOGI(context_->GetNodeName(),
                 "HP: code=%u prefill=%d D=%u l0b=%llu l0c=%llu ub=%llu "
                 "-> mDeal=%u nDeal=%u kQK=%u kV=%u",
@@ -552,11 +567,13 @@ ge::graphStatus FiaTilingNonQuantArch31::DoTiling()
         mm1ResSize = static_cast<uint64_t>(H) * sumS1S2;
         mm2ResSize = static_cast<uint64_t>(H) * sumS1 * D;
         if (mm1ResSize > ARCH31_TND_WS_INT32_MAX || mm2ResSize > ARCH31_TND_WS_INT32_MAX) {
-            OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(),
-                                        "arch31 TND workspace element count overflow: mm1ResSize=%llu mm2ResSize=%llu "
-                                        "exceeds INT32_MAX",
-                                        static_cast<unsigned long long>(mm1ResSize),
-                                        static_cast<unsigned long long>(mm2ResSize));
+            REPORT_PREDEFINED_ERR_MSG(
+                "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                (std::vector<const char*>{
+                    context_->GetNodeName(),
+                    (std::string("arch31 TND workspace element count overflow: mm1ResSize=") +
+                     std::to_string(mm1ResSize) + ", mm2ResSize=" + std::to_string(mm2ResSize) + " exceeds INT32_MAX")
+                        .c_str()}));
             return ge::GRAPH_FAILED;
         }
     } else {
@@ -619,13 +636,19 @@ ge::graphStatus FiaTilingNonQuantArch31::DoTiling()
     // 8. 成员对象序列化回写 context
     auto rawTilingData = context_->GetRawTilingData();
     OP_CHECK_IF(rawTilingData == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "RawTilingData got from GE context is nullptr."),
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{context_->GetNodeName(), "GetRawTilingData returned nullptr"})),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        rawTilingData->GetCapacity() < tilingData_.GetDataSize(),
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "RawTilingData capacity %zu < tiling data size %zu",
-                                    static_cast<size_t>(rawTilingData->GetCapacity()), tilingData_.GetDataSize()),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(rawTilingData->GetCapacity() < tilingData_.GetDataSize(),
+                REPORT_PREDEFINED_ERR_MSG(
+                    "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                    (std::vector<const char*>{
+                        context_->GetNodeName(),
+                        (std::string("RawTilingData capacity ") + std::to_string(rawTilingData->GetCapacity()) +
+                         " < tiling data size " + std::to_string(tilingData_.GetDataSize()))
+                            .c_str()})),
+                return ge::GRAPH_FAILED);
     tilingData_.SaveToBuffer(rawTilingData->GetData(), rawTilingData->GetCapacity());
     rawTilingData->SetDataSize(tilingData_.GetDataSize());
 
@@ -671,19 +694,25 @@ ge::graphStatus FiaTilingNonQuantArch31::CalcTilingParams(uint32_t& mBase, uint3
     uint32_t seqQNum2 = 0;
     uint32_t seqKvNum2 = 0;
     if (layoutStr2 == "TND" && !LoadTndSeqPtrs(context_, seqQVals2, seqQNum2, seqKvVals2, seqKvNum2)) {
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(),
-                                    "CalcTilingParams: TND actual_seq_lengths tensor missing or null");
+        OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "actual_seq_lengths/actual_seq_lengths_kv");
         return ge::GRAPH_FAILED;
     }
     if (!ParseLayoutDimsArch31(queryShape, keyShape, valueShape, layoutStr2, headsAttr2, kvHeadsAttr2, dims2, seqQVals2,
                                seqQNum2, seqKvVals2, seqKvNum2)) {
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "CalcTilingParams: layout=%s shape parse failed",
-                                    layoutStr2.c_str());
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{context_->GetNodeName(),
+                                      (std::string("CalcTilingParams: layout ") + layoutStr2 +
+                                       " shape parse failed: query dimNum=" + std::to_string(queryShape.GetDimNum()) +
+                                       ", key dimNum=" + std::to_string(keyShape.GetDimNum()) +
+                                       ", value dimNum=" + std::to_string(valueShape.GetDimNum()))
+                                          .c_str()}));
         return ge::GRAPH_FAILED;
     }
     uint32_t D = dims2.dQ;
     if (D == 0) {
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "D is 0");
+        REPORT_PREDEFINED_ERR_MSG("EZ1008", (std::vector<const char*>{"opName", "reason"}),
+                                  (std::vector<const char*>{context_->GetNodeName(), "CalcTilingParams: D is 0"}));
         return ge::GRAPH_FAILED;
     }
     uint64_t l0cPingPongUnsplit = static_cast<uint64_t>(D) * ARCH31_FP16_BYTES * 2;
@@ -738,7 +767,9 @@ ge::graphStatus FiaTilingNonQuantArch31::CalcTilingParams(uint32_t& mBase, uint3
     nTileV = dTile;
     uint32_t nDealMax = needSplitD ? nDealMaxSplit : nDealMaxUnsplit;
     if (nTileV == 0) {
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "nTileV is 0, cannot derive kTileV");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{context_->GetNodeName(), "CalcTilingParams: nTileV is 0, cannot derive kTileV"}));
         return ge::GRAPH_FAILED;
     }
     uint64_t kTileVRaw = l0bSize / (static_cast<uint64_t>(nTileV) * ARCH31_FP16_BYTES * 2);
@@ -815,14 +846,19 @@ ge::graphStatus FiaTilingNonQuantArch31::CalcWorkspaceSize(uint64_t& workspaceSi
     uint32_t seqQNum3 = 0;
     uint32_t seqKvNum3 = 0;
     if (layoutStr3 == "TND" && !LoadTndSeqPtrs(context_, seqQVals3, seqQNum3, seqKvVals3, seqKvNum3)) {
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(),
-                                    "CalcWorkspaceSize: TND actual_seq_lengths tensor missing or null");
+        OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "actual_seq_lengths/actual_seq_lengths_kv");
         return ge::GRAPH_FAILED;
     }
     if (!ParseLayoutDimsArch31(queryShape, keyShape, valueShape, layoutStr3, headsAttr3, kvHeadsAttr3, dims3, seqQVals3,
                                seqQNum3, seqKvVals3, seqKvNum3)) {
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "CalcWorkspaceSize: layout=%s shape parse failed",
-                                    layoutStr3.c_str());
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1008", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{context_->GetNodeName(),
+                                      (std::string("CalcWorkspaceSize: layout ") + layoutStr3 +
+                                       " shape parse failed: query dimNum=" + std::to_string(queryShape.GetDimNum()) +
+                                       ", key dimNum=" + std::to_string(keyShape.GetDimNum()) +
+                                       ", value dimNum=" + std::to_string(valueShape.GetDimNum()))
+                                          .c_str()}));
         return ge::GRAPH_FAILED;
     }
     uint32_t B = dims3.b;

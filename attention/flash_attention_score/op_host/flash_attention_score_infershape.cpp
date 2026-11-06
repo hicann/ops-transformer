@@ -39,21 +39,33 @@ ge::graphStatus InferShapeFlashAttentionScore(gert::InferShapeContext* context)
         return ge::GRAPH_FAILED;
     }
     const gert::Shape* queryShape = context->GetInputShape(0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
+    OP_CHECK_IF(queryShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "query"),
+                return ge::GRAPH_FAILED);
     const auto* queryDesc = context->GetInputDesc(0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, queryDesc);
+    OP_CHECK_IF(queryDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "query"),
+                return ge::GRAPH_FAILED);
 
     const gert::Shape* keyShape = context->GetInputShape(1);
-    OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
+    OP_CHECK_IF(keyShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "key"),
+                return ge::GRAPH_FAILED);
     const gert::Shape* valueShape = context->GetInputShape(INDEX_2);
-    OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
+    OP_CHECK_IF(valueShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "value"),
+                return ge::GRAPH_FAILED);
 
     auto attrs = context->GetAttrs();
-    OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    OP_CHECK_IF(
+        attrs == nullptr,
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1014", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{context->GetNodeName(),
+                                      "attributes are unavailable; check operator prototype attribute registration."})),
+        return ge::GRAPH_FAILED);
     auto headNum = attrs->GetInt(INDEX_HEAD_NUM);
-    OP_CHECK_NULL_WITH_CONTEXT(context, headNum);
+    OP_CHECK_IF(headNum == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "num_heads"),
+                return ge::GRAPH_FAILED);
     const char* inputLayout = attrs->GetAttrPointer<char>(INDEX_LAYOUT);
-    OP_CHECK_NULL_WITH_CONTEXT(context, inputLayout);
+    OP_CHECK_IF(inputLayout == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "input_layout"),
+                return ge::GRAPH_FAILED);
 
     std::string inputLayoutStr = std::string(inputLayout);
     for (auto& c : inputLayoutStr) {
@@ -87,13 +99,16 @@ ge::graphStatus InferShapeFlashAttentionScore(gert::InferShapeContext* context)
 
     // softmaxMax, fp32: (B, N, S, 8)
     gert::Shape* softmaxMaxShape = context->GetOutputShape(0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, softmaxMaxShape);
+    OP_CHECK_IF(softmaxMaxShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "softmax_max"),
+                return ge::GRAPH_FAILED);
     // softmaxSum, shape same as softmaxMax
     gert::Shape* softmaxSumShape = context->GetOutputShape(1);
-    OP_CHECK_NULL_WITH_CONTEXT(context, softmaxSumShape);
+    OP_CHECK_IF(softmaxSumShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "softmax_sum"),
+                return ge::GRAPH_FAILED);
 
     auto inputDesc = context->GetInputDesc(0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, inputDesc);
+    OP_CHECK_IF(inputDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "input"),
+                return ge::GRAPH_FAILED);
     auto dtype = inputDesc->GetDataType();
     if (dtype == DT_HIFLOAT8) {
         softmaxMaxShape->SetDimNum(DIM_NUM_4);
@@ -120,7 +135,8 @@ ge::graphStatus InferShapeFlashAttentionScore(gert::InferShapeContext* context)
 
     // softmaxOut, shape: (B, N, S, S)
     gert::Shape* softmaxOutShape = context->GetOutputShape(INDEX_2);
-    OP_CHECK_NULL_WITH_CONTEXT(context, softmaxOutShape);
+    OP_CHECK_IF(softmaxOutShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "softmax_out"),
+                return ge::GRAPH_FAILED);
     // 0, 1, 2, 3, 4 : dim idx
     softmaxOutShape->SetDimNum(DIM_NUM_4);
     softmaxOutShape->SetDim(DIM_NUM_3, 0);
@@ -129,7 +145,8 @@ ge::graphStatus InferShapeFlashAttentionScore(gert::InferShapeContext* context)
     softmaxOutShape->SetDim(0, 0);
 
     gert::Shape* attentionOutShape = context->GetOutputShape(INDEX_3);
-    OP_CHECK_NULL_WITH_CONTEXT(context, attentionOutShape);
+    OP_CHECK_IF(attentionOutShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "attention_out"),
+                return ge::GRAPH_FAILED);
     *attentionOutShape = *queryShape;
     if (inputLayoutStr == "BSND" || inputLayoutStr == "BNSD") {
         auto shapeD2 = valueShape->GetDim(3);
@@ -182,7 +199,13 @@ ge::graphStatus InferDataTypeFlashAttentionScore(gert::InferDataTypeContext* con
 
     if (dtype == DT_FLOAT8_E5M2 || dtype == DT_FLOAT8_E4M3FN || dtype == DT_HIFLOAT8) {
         auto attrs = context->GetAttrs();
-        OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+        OP_CHECK_IF(attrs == nullptr,
+                    REPORT_PREDEFINED_ERR_MSG(
+                        "EZ1014", (std::vector<const char*>{"opName", "reason"}),
+                        (std::vector<const char*>{
+                            context->GetNodeName(),
+                            "attributes are unavailable; check operator prototype attribute registration."})),
+                    return ge::GRAPH_FAILED);
 
         auto outDtypePtr = attrs->GetAttrPointer<int64_t>(INDEX_OUTDTYPE);
         int64_t outDtype = *outDtypePtr;
