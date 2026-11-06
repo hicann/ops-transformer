@@ -395,6 +395,23 @@ attention:
     options:
       - flash_attention_score_grad
 
+  sparse_lightning_indexer_kl_loss_grad:
+    module: True
+    src:
+      - attention/sparse_lightning_indexer_kl_loss_grad
+    exclude:
+      - attention/sparse_lightning_indexer_kl_loss_grad/docs
+      - attention/sparse_lightning_indexer_kl_loss_grad/README.md
+    test:
+      ut: True
+    ut_cov_exclude:
+      - attention/sparse_lightning_indexer_kl_loss_grad/op_api
+      - attention/sparse_lightning_indexer_kl_loss_grad/op_graph
+      - attention/sparse_lightning_indexer_kl_loss_grad/op_kernel
+      - attention/sparse_lightning_indexer_kl_loss_grad/tests
+    options:
+      - sparse_lightning_indexer_kl_loss_grad
+
   fused_infer_attention_score:
     module: True
     src:

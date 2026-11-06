@@ -24,6 +24,11 @@ constexpr uint64_t TILING_BUFFER_SIZE = 65536;
 // Golden workspace sizes for B=2, S1=128, S2=256, N2=1, G=8, D=128.
 constexpr size_t EXPECT_WORKSPACE_SIZE = 18251776U;
 constexpr size_t EXPECT_DETERMINISTIC_WORKSPACE_SIZE = 20611072U;
+// Arch35 enables both optimizations for non-deterministic TopK <= 1024.
+constexpr uint64_t RESIDENT_PIPELINE_KEY = 1ULL << 22;
+constexpr uint64_t BYTE_PAIR_CACHE_KEY = 1ULL << 23;
+constexpr uint64_t SMALL_TOPK_OPT_KEY = RESIDENT_PIPELINE_KEY | BYTE_PAIR_CACHE_KEY;
+constexpr uint64_t DETERMINISTIC_KEY = 1ULL << 21;
 
 const std::string SOC_INFO = R"({
     "hardware_info": {
@@ -40,7 +45,8 @@ const std::string SOC_INFO = R"({
     }
 })";
 
-gert::TilingContextPara MakeTilingContext(const std::string& layout = "BSND", ge::DataType dtype = ge::DT_FLOAT16)
+gert::TilingContextPara MakeTilingContext(const std::string& layout = "BSND", ge::DataType dtype = ge::DT_FLOAT16,
+                                          int64_t topK = 64)
 {
     // The context builder requires non-null compile info; keep it alive for the returned context.
     static optiling::SparseLightningIndexerGradCompileInfo compileInfo = [] {
@@ -59,23 +65,23 @@ gert::TilingContextPara MakeTilingContext(const std::string& layout = "BSND", ge
     gert::TilingContextPara context(
         "SparseLightningIndexerKLLossGrad",
         {
-            {{{2, 128, 8, 128}, {2, 128, 8, 128}}, dtype, ge::FORMAT_ND},      // q
-            {{{2, 256, 1, 128}, {2, 256, 1, 128}}, dtype, ge::FORMAT_ND},      // k
-            {{{2, 128, 8}, {2, 128, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},         // w
-            {{{2, 128, 1, 64}, {2, 128, 1, 64}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
-            {{{2, 128, 1, 64}, {2, 128, 1, 64}}, ge::DT_FLOAT, ge::FORMAT_ND}, // attn_softmax_l1_norm
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                           // cu_seqlens_q
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                           // cu_seqlens_k
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                           // seqused_q
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                           // seqused_k
-            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                           // cmp_residual_k
-            {{{64}, {64}}, ge::DT_INT32, ge::FORMAT_ND},                       // metadata
+            {{{2, 128, 8, 128}, {2, 128, 8, 128}}, dtype, ge::FORMAT_ND},          // q
+            {{{2, 256, 1, 128}, {2, 256, 1, 128}}, dtype, ge::FORMAT_ND},          // k
+            {{{2, 128, 8}, {2, 128, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w
+            {{{2, 128, 1, topK}, {2, 128, 1, topK}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{2, 128, 1, topK}, {2, 128, 1, topK}}, ge::DT_FLOAT, ge::FORMAT_ND}, // attn_softmax_l1_norm
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k
+            {{{64}, {64}}, ge::DT_INT32, ge::FORMAT_ND},                           // metadata
         },
         {
             {{{2, 128, 8, 128}, {2, 128, 8, 128}}, dtype, ge::FORMAT_ND},
             {{{2, 256, 1, 128}, {2, 256, 1, 128}}, dtype, ge::FORMAT_ND},
             {{{2, 128, 8}, {2, 128, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{2, 128, 1, 64}, {2, 128, 1, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 128, 1, topK}, {2, 128, 1, topK}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
             {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)},
@@ -88,8 +94,8 @@ gert::TilingContextPara MakeTilingContext(const std::string& layout = "BSND", ge
         context.inputTensorDesc_[0].shape_ = {{256, 8, 128}, {256, 8, 128}};
         context.inputTensorDesc_[1].shape_ = {{512, 1, 128}, {512, 1, 128}};
         context.inputTensorDesc_[2].shape_ = {{256, 8}, {256, 8}};
-        context.inputTensorDesc_[3].shape_ = {{256, 1, 64}, {256, 1, 64}};
-        context.inputTensorDesc_[4].shape_ = {{256, 1, 64}, {256, 1, 64}};
+        context.inputTensorDesc_[3].shape_ = {{256, 1, topK}, {256, 1, topK}};
+        context.inputTensorDesc_[4].shape_ = {{256, 1, topK}, {256, 1, topK}};
         context.inputTensorDesc_[5].shape_ = {{3}, {3}};
         context.inputTensorDesc_[6].shape_ = {{3}, {3}};
         for (size_t index = 0; index < 3; ++index) {
@@ -101,7 +107,7 @@ gert::TilingContextPara MakeTilingContext(const std::string& layout = "BSND", ge
 }
 
 void CheckTiling(const gert::TilingContextPara& context, uint8_t layout, uint64_t expectTilingKey, int32_t maskMode = 0,
-                 uint32_t cmpRatio = 1)
+                 uint32_t cmpRatio = 1, int64_t topK = 64, size_t expectWorkspaceSize = EXPECT_WORKSPACE_SIZE)
 {
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(context, tilingInfo));
@@ -112,8 +118,7 @@ void CheckTiling(const gert::TilingContextPara& context, uint8_t layout, uint64_
     EXPECT_EQ(tilingInfo.blockNum, 32U);
     ASSERT_EQ(tilingInfo.workspaceSizes.size(), 1U);
     EXPECT_EQ(tilingInfo.tilingKey, expectTilingKey);
-    EXPECT_EQ(tilingInfo.workspaceSizes[0],
-              context.deterministicInfo_ == 1 ? EXPECT_DETERMINISTIC_WORKSPACE_SIZE : EXPECT_WORKSPACE_SIZE);
+    EXPECT_EQ(tilingInfo.workspaceSizes[0], expectWorkspaceSize);
     EXPECT_EQ(tilingData.multiCoreParams.get_coreNum(), 32);
     EXPECT_EQ(tilingData.multiCoreParams.get_totalSize(), 256);
     EXPECT_EQ(tilingData.multiCoreParams.get_splitFactorSize(), 8);
@@ -128,7 +133,7 @@ void CheckTiling(const gert::TilingContextPara& context, uint8_t layout, uint64_
     EXPECT_EQ(tilingData.baseParams.get_cmpRatio(), cmpRatio);
     EXPECT_EQ(tilingData.baseParams.get_s1Size(), layout == 0 ? 128 : 256);
     EXPECT_EQ(tilingData.baseParams.get_s2Size(), layout == 0 ? 256 : 512);
-    EXPECT_EQ(tilingData.baseParams.get_kSize(), 64);
+    EXPECT_EQ(tilingData.baseParams.get_kSize(), topK);
 }
 } // namespace
 
@@ -148,32 +153,32 @@ protected:
 TEST_F(SparseLightningIndexerKLLossGradTiling, sparse_lightning_indexer_kl_loss_grad_tiling_bsnd_float16)
 {
     auto context = MakeTilingContext("BSND", ge::DT_FLOAT16);
-    CheckTiling(context, 0, 0U);
+    CheckTiling(context, 0, SMALL_TOPK_OPT_KEY);
 }
 
 TEST_F(SparseLightningIndexerKLLossGradTiling, sparse_lightning_indexer_kl_loss_grad_tiling_bsnd_bf16)
 {
     auto context = MakeTilingContext("BSND", ge::DT_BF16);
-    CheckTiling(context, 0, 0U);
+    CheckTiling(context, 0, SMALL_TOPK_OPT_KEY);
 }
 
 TEST_F(SparseLightningIndexerKLLossGradTiling, sparse_lightning_indexer_kl_loss_grad_tiling_tnd_float16)
 {
     auto context = MakeTilingContext("TND", ge::DT_FLOAT16);
-    CheckTiling(context, 1, 196880U);
+    CheckTiling(context, 1, 196880U | SMALL_TOPK_OPT_KEY);
 }
 
 TEST_F(SparseLightningIndexerKLLossGradTiling, sparse_lightning_indexer_kl_loss_grad_tiling_tnd_bf16)
 {
     auto context = MakeTilingContext("TND", ge::DT_BF16);
-    CheckTiling(context, 1, 196880U);
+    CheckTiling(context, 1, 196880U | SMALL_TOPK_OPT_KEY);
 }
 
 TEST_F(SparseLightningIndexerKLLossGradTiling, sparse_lightning_indexer_kl_loss_grad_tiling_causal)
 {
     auto context = MakeTilingContext();
     context.attrs_[2].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(3);
-    CheckTiling(context, 0, 4096U, 3);
+    CheckTiling(context, 0, 4096U | SMALL_TOPK_OPT_KEY, 3);
 }
 
 TEST_F(SparseLightningIndexerKLLossGradTiling, sparse_lightning_indexer_kl_loss_grad_tiling_compressed_causal)
@@ -182,7 +187,7 @@ TEST_F(SparseLightningIndexerKLLossGradTiling, sparse_lightning_indexer_kl_loss_
     context.attrs_[2].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(3);
     context.attrs_[3].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(128);
     context.inputTensorDesc_[9].shape_ = {{2}, {2}};
-    CheckTiling(context, 0, 1052672U, 3, 128);
+    CheckTiling(context, 0, 1052672U | SMALL_TOPK_OPT_KEY, 3, 128);
 }
 
 TEST_F(SparseLightningIndexerKLLossGradTiling, sparse_lightning_indexer_kl_loss_grad_tiling_optional_inputs_change_key)
@@ -194,16 +199,62 @@ TEST_F(SparseLightningIndexerKLLossGradTiling, sparse_lightning_indexer_kl_loss_
         auto context = MakeTilingContext();
         const int64_t length = index < 7 ? 3 : 2;
         context.inputTensorDesc_[index].shape_ = {{length}, {length}};
-        CheckTiling(context, 0, expectTilingKeys[index - 5]);
+        CheckTiling(context, 0, expectTilingKeys[index - 5] | SMALL_TOPK_OPT_KEY);
     }
 }
 
 TEST_F(SparseLightningIndexerKLLossGradTiling, sparse_lightning_indexer_kl_loss_grad_tiling_deterministic_workspace)
 {
     auto context = MakeTilingContext();
-    CheckTiling(context, 0, 0U);
+    CheckTiling(context, 0, SMALL_TOPK_OPT_KEY);
     context.deterministicInfo_ = 1;
-    CheckTiling(context, 0, 2097152U);
+    CheckTiling(context, 0, DETERMINISTIC_KEY, 0, 1, 64, EXPECT_DETERMINISTIC_WORKSPACE_SIZE);
+}
+
+TEST_F(SparseLightningIndexerKLLossGradTiling,
+       sparse_lightning_indexer_kl_loss_grad_tiling_resident_pipeline_topk_boundary)
+{
+    struct TopKCase {
+        int64_t topK;
+        uint64_t optimizationKey;
+        size_t workspaceSize;
+        size_t deterministicWorkspaceSize;
+    };
+    // Keep expected dispatch choices explicit, including the unaligned value above 1024.
+    // Workspace goldens use the same tensor totals as MakeTilingContext, with TopK scratch
+    // aligned to 128 and an additional per-core FP32 matmul buffer in deterministic mode.
+    const TopKCase cases[] = {
+        {1023, SMALL_TOPK_OPT_KEY, 26738688U, 60522496U},
+        {1024, SMALL_TOPK_OPT_KEY, 26738688U, 60555264U},
+        {1025, 0U, 27951104U, 61800448U},
+        {2048, 0U, 36438016U, 103809024U},
+    };
+    for (const std::string& layout : {"BSND", "TND"}) {
+        const uint8_t layoutType = layout == "TND" ? 1 : 0;
+        const uint64_t layoutKey = layout == "TND" ? 196880U : 0U;
+        for (const auto dtype : {ge::DT_FLOAT16, ge::DT_BF16}) {
+            for (const auto& testCase : cases) {
+                for (const int32_t maskMode : {0, 3}) {
+                    SCOPED_TRACE(testing::Message() << "layout=" << layout << ", dtype=" << dtype
+                                                    << ", topK=" << testCase.topK << ", maskMode=" << maskMode);
+                    auto context = MakeTilingContext(layout, dtype, testCase.topK);
+                    context.attrs_[2].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(maskMode);
+                    const uint64_t baseKey = layoutKey | (maskMode == 3 ? 4096U : 0U);
+                    {
+                        SCOPED_TRACE("non-deterministic");
+                        CheckTiling(context, layoutType, baseKey | testCase.optimizationKey, maskMode, 1, testCase.topK,
+                                    testCase.workspaceSize);
+                    }
+                    {
+                        SCOPED_TRACE("deterministic");
+                        context.deterministicInfo_ = 1;
+                        CheckTiling(context, layoutType, baseKey | DETERMINISTIC_KEY, maskMode, 1, testCase.topK,
+                                    testCase.deterministicWorkspaceSize);
+                    }
+                }
+            }
+        }
+    }
 }
 
 TEST_F(SparseLightningIndexerKLLossGradTiling, sparse_lightning_indexer_kl_loss_grad_tiling_invalid_layout)
