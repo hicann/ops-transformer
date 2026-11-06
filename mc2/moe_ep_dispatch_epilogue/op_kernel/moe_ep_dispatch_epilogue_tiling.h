@@ -49,6 +49,7 @@ struct MoeEpDispatchEpilogueInfo {
     uint64_t slotEndsOffset = 0;            // compact slot list ends, capacity entries
     uint64_t slotRowIdsOffset = 0;          // metadata row ids grouped by slot, capacity entries
     uint64_t totalWinSizeEp = 0;            // 通信窗口总字节数（OOM 检查地址范围登记用）
+    uint32_t commAlg = 0;
 };
 
 struct MoeEpDispatchEpilogueTilingData {

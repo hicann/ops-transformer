@@ -32,13 +32,14 @@
 #include "moe_ep_dispatch_tiling_key.h"
 #include "moe_ep_dispatch_tiling.h"
 #include "moe_ep_dispatch.h"
+#include "moe_ep_dispatch_clos_only.h"
 #include "moe_ep_dispatch_hybrid.h"
 
 using namespace MoeEpDispatchImpl;
 using namespace Mc2Tiling;
 using namespace AscendC;
 
-template <bool DoCpuSync, bool IsCached, bool IsTopkWeights, bool IsMxQuant, uint8_t NetworkMode>
+template <bool DoCpuSync, bool IsCached, bool IsTopkWeights, bool IsMxQuant, uint8_t NetworkMode, bool ClosOnly>
 __global__ __aicore__ void moe_ep_dispatch(GM_ADDR context, GM_ADDR x, GM_ADDR topkIdx, GM_ADDR topkWeights,
                                            GM_ADDR scales, GM_ADDR cachedSlotIdx, GM_ADDR cachedRouteCount,
                                            GM_ADDR cachedRouteDstScaleout, GM_ADDR cachedRouteScaleoutSlot,
@@ -62,8 +63,14 @@ __global__ __aicore__ void moe_ep_dispatch(GM_ADDR context, GM_ADDR x, GM_ADDR t
                 cachedRouteScaleoutSlot, numRecvPerRank, numRecvPerExpert, dstBufferSlotIdx, routeCount,
                 routeDstScaleout, routeScaleoutSlot, workspaceGM, tilingGM, &pipe, &tilingData);
         op.Process();
+    } else if constexpr (ClosOnly) {
+        MoeEpDispatchClosOnlyImpl::MoeEpDispatch<DTYPE_X, ScalesType, DoCpuSync, IsCached, IsTopkWeights, NetworkMode>
+            op;
+        op.Init(context, x, topkIdx, topkWeights, scales, cachedSlotIdx, numRecvPerRank, numRecvPerExpert,
+                dstBufferSlotIdx, workspaceGM, tilingGM, &pipe, &tilingData);
+        op.Process();
     } else {
-        MoeEpDispatch<DTYPE_X, ScalesType, DoCpuSync, IsCached, IsTopkWeights, NetworkMode> op;
+        MoeEpDispatchImpl::MoeEpDispatch<DTYPE_X, ScalesType, DoCpuSync, IsCached, IsTopkWeights, NetworkMode> op;
         op.Init(context, x, topkIdx, topkWeights, scales, cachedSlotIdx, numRecvPerRank, numRecvPerExpert,
                 dstBufferSlotIdx, workspaceGM, tilingGM, &pipe, &tilingData);
         op.Process();

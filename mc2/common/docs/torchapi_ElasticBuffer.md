@@ -44,6 +44,7 @@ class ElasticBuffer:
         with_grad: bool = False,
         explicitly_destroy: bool = False,
         netlayer: str = "auto",
+        comm_alg: str = "auto",
     )
 
     def engram_write(
@@ -138,6 +139,7 @@ class ElasticBuffer:
 - **with_grad** (`bool`)：可选参数，是否开启训练。默认为 `False`（推理）。设为 `True` 时，前向 [engram_fetch](#engram_fetch) 会额外保存反向所需的通信元数据（封装为 [EngramFetchCtx](#engramfetchctx)），并可通过 [engram_fetch_grad](#engram_fetch_grad) 执行反向。
 - **explicitly_destroy** (`bool`)：可选参数，是否需要显式调用 [destroy](#destroy) 释放资源。默认为 `False`，实例被垃圾回收时会自动调用 `destroy` 释放资源；设为 `True` 时，调用方需要显式调用 `destroy` 释放资源。推荐设置为 `True` 并在使用结束后手动调用 `destroy` 释放资源，以确保资源释放时机确定。
 - **netlayer** (`str`)：可选参数，HCCL网络分层（netlayer）选择，仅作用于Engram建链。取值：`"auto"`（默认）自netlayer 0起逐层探测尝试建链；非负整数字符串（如 `"1"`）表示netlayer编号，仅在该分层内建链，失败则报错返回。建议按“d2d与h2d同die”的原则选择分层建链：使对端访问本卡host映射内存的d2d链路，与本卡NPU访问该内存的h2d路径位于同一die，避免跨die转发，获得更优通信带宽与时延。
+- **comm_alg** (`str`)：可选参数，指定Dispatch/Combine使用的通信端口策略。支持 `"auto"` 和 `"clos_only"`，默认值为 `"auto"`。`"auto"` 表示使用FullMesh口；`"clos_only"` 表示只使用Clos口、不使用FullMesh口。
 
 **输出**：无返回值，构造ElasticBuffer实例。
 
@@ -551,6 +553,9 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
 - **Dispatch/Combine配套约束**：
   - [dispatch](#dispatch) 和 [combine](#combine) 必须配套使用。
   - 调用接口过程中使用的 `num_experts`、`num_max_tokens_per_rank` 参数取值所有卡需保持一致，且 [dispatch](#dispatch) 和 [combine](#combine) 对应参数也需保持一致。
+  - `comm_alg` 在构造ElasticBuffer实例时确定，同一EP通信域中的所有rank必须使用相同取值；同一实例的dispatch、dispatch epilogue、combine和combine epilogue使用同一种通信算法。
+  - `comm_alg="auto"` 时使用FullMesh口。
+  - `comm_alg="clos_only"` 时只使用Clos口、不使用FullMesh口。
   - 当前版本不支持bias参数，`bias` 必须传入 `None`。
   - cached模式下，`topk_idx` 和 `topk_weights` 必须为 `None`，`do_cpu_sync` 必须为 `False`；非cached模式下，`topk_idx` 为必选参数，`topk_weights` 为可选参数。
 

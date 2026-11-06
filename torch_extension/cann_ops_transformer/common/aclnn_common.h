@@ -271,7 +271,7 @@ enum QuantMode {
     TORCH_CHECK(ret == 0, "memcpy_s failed, error:", ret); \
     g_hashOffset += size_expression;
 
-aclDataType ConvertToAclDataType(const at::ScalarType& data_type)
+inline aclDataType ConvertToAclDataType(const at::ScalarType& data_type)
 {
     int64_t dtype_index = static_cast<int64_t>(data_type);
     TORCH_CHECK(dtype_index >= 0 && dtype_index < static_cast<int64_t>(at::ScalarType::NumOptions) + 1,
@@ -702,7 +702,7 @@ inline const char* ConvertType(const string& str)
     return str.c_str();
 }
 
-aclTensor* ConvertType(const TensorWrapper& tensor_r)
+inline aclTensor* ConvertType(const TensorWrapper& tensor_r)
 {
     static const auto aclCreateTensor = GET_OP_API_FUNC(aclCreateTensor);
     if (aclCreateTensor == nullptr) {
@@ -766,7 +766,7 @@ aclTensor* ConvertType(const TensorWrapper& tensor_r)
     return acl_tensor;
 }
 
-aclTensorList* ConvertType(const TensorListWrapper& tensor_list_wrapper)
+inline aclTensorList* ConvertType(const TensorListWrapper& tensor_list_wrapper)
 {
     if (tensor_list_wrapper.tensor_list_.size() == 0) {
         return nullptr;

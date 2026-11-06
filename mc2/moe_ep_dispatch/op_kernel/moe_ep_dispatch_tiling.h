@@ -52,9 +52,19 @@ struct MoeEpDispatchWindowLayout {
     uint64_t scaleoutRecvDataOffset;
     uint64_t scaleoutRecvStatusOffset;
     uint64_t payloadStashWinOffset;
+    uint64_t completionFlagSourceWinOffset;
 };
 
 struct MoeEpDispatchWorkspaceLayout {
+    // DIRECT tile-pipeline workspace. HYBRID uses the legacy fields below.
+    uint32_t tileTokens;
+    uint32_t tileCount;
+    uint64_t sendCntOffset;
+    uint64_t tilePrefixOffset;
+    uint64_t expertPartialOffset;
+    uint64_t tileReadyOffset;
+    uint64_t srcTokenListBytes;
+    uint64_t srcTokenTableOffset;
     uint64_t sendEntryTokenRangeBytes; // 单个 token 范围的发送记录字节数
     uint64_t dstRankInfoOffset;        // dstRank 区偏移（sendCnt 区之后），布局 [BS][K] int16
     uint64_t routeWorkspaceOffset;
@@ -82,6 +92,7 @@ struct MoeEpDispatchInfo {
     uint32_t networkMode;
     uint32_t dispatchNotifyCount;
     uint32_t aivNum;
+    uint32_t commAlg;
 };
 
 struct MoeEpDispatchTilingData {

@@ -37,7 +37,7 @@ using namespace MoeEpCombineEpilogueImpl;
 using namespace Mc2Tiling;
 using namespace AscendC;
 
-template <uint32_t HasTopkWeight, uint32_t ArchTag>
+template <uint32_t HasTopkWeight, uint32_t ArchTag, bool ClosOnly>
 __global__ __aicore__ void moe_ep_combine_epilogue(GM_ADDR context, GM_ADDR x, GM_ADDR topkIdx, GM_ADDR recvSrcMetadata,
                                                    GM_ADDR topkWeights, GM_ADDR combinedX, GM_ADDR combinedTopkWeights,
                                                    GM_ADDR workspace, GM_ADDR tilingGM)
@@ -47,6 +47,7 @@ __global__ __aicore__ void moe_ep_combine_epilogue(GM_ADDR context, GM_ADDR x, G
     TPipe pipe;
     GET_TILING_DATA_WITH_STRUCT(MoeEpCombineEpilogueTilingData, tilingData, tilingGM);
 #if defined(ENABLE_MOE_EP_COMBINE_EPILOGUE_KERNEL)
+    (void)ClosOnly;
     MoeEpCombineEpilogue<DTYPE_COMBINED_X, HasTopkWeight> op;
     op.Init(context, x, topkIdx, recvSrcMetadata, topkWeights, combinedX, combinedTopkWeights, workspace, tilingGM,
             &pipe, &tilingData.moeEpCombineEpilogueInfo);

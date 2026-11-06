@@ -45,6 +45,7 @@ struct MoeEpCombineInfo {
     uint64_t combineFlagSourceWinOffset = 0;
     uint64_t metadataRankOffsetsOffset = 0; // byte offset of the aligned tail in packed metadata
     uint64_t localRecvIndexOffset = 0;      // byte offset of [num_tokens, top_k] local recv_x reverse index
+    uint32_t commAlg = 0;
 };
 
 struct MoeEpCombineTilingData {

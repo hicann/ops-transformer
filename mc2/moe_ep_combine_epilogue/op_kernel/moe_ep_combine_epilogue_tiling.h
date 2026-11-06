@@ -39,6 +39,7 @@ struct MoeEpCombineEpilogueInfo {
     uint64_t combineStateWinOffset = 0;
     uint64_t combineDataWinOffset = 0;
     uint64_t totalWinSizeEp = 0; // 通信窗口总字节数（OOM 检查地址范围登记用）
+    uint32_t commAlg = 0;
 };
 
 struct MoeEpCombineEpilogueTilingData {

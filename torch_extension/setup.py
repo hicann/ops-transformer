@@ -101,7 +101,18 @@ for _subdir in ("csrc", "common"):
 # --- 收集 ops-transformer/ 下所有 torch_extension/ 中的算子文件 ---
 _op_category_inits = {}
 _op_py_files = []
-_op_cpp_files = []
+_op_cpp_files = [
+    (
+        os.path.join("common", "moe_shared_jetty_context.h"),
+        os.path.join(
+            OPS_TRANSFORMER_ROOT,
+            "mc2",
+            "common",
+            "op_kernel",
+            "moe_shared_jetty_context.h",
+        ),
+    ),
+]
 _op_locations = {}
 
 

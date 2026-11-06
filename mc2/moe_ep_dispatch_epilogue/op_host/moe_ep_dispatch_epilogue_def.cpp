@@ -66,6 +66,7 @@ public:
         this->Attr("has_topk_weights").AttrType(OPTIONAL).Bool(true);
         this->Attr("topo_type").AttrType(OPTIONAL).Int(0);
         this->Attr("rank_num_per_server").AttrType(OPTIONAL).Int(1);
+        this->Attr("comm_alg").AttrType(OPTIONAL).String("auto");
 
         OpAICoreConfig aicore_config;
         aicore_config.DynamicCompileStaticFlag(true)

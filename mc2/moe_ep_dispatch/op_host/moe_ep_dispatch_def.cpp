@@ -102,6 +102,7 @@ public:
         this->Attr("host_pinned_counter_addr").AttrType(OPTIONAL).Int(0);
         this->Attr("topo_type").AttrType(OPTIONAL).Int(0);
         this->Attr("rank_num_per_server").AttrType(OPTIONAL).Int(1);
+        this->Attr("comm_alg").AttrType(OPTIONAL).String("auto");
 
         OpAICoreConfig aicore_config;
         aicore_config.DynamicCompileStaticFlag(true)

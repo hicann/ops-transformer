@@ -13,18 +13,21 @@
 
 #include "adv_api/hcomm/hcomm.h"
 #include "mc2_moe_context.h"
+#include "moe_shared_jetty_context.h"
 
 namespace MoeEpCompletion {
 using namespace AscendC;
+
+constexpr uint32_t HCOMM_WORKSPACE_SIZE = 512U;
 
 __aicore__ inline void DrainChannels(__gm__ Mc2Aclnn::MoeCommContext* context, uint32_t worldSize, TPipe* pipe)
 {
     PipeBarrier<PIPE_ALL>();
     pipe->Reset();
     TBuf<TPosition::VECCALC> commBuf;
-    pipe->InitBuffer(commBuf, 512U);
+    pipe->InitBuffer(commBuf, HCOMM_WORKSPACE_SIZE);
     Hcomm<COMM_PROTOCOL_UBC_CTP> comm;
-    comm.Init(commBuf.Get<uint8_t>(), 512U);
+    comm.Init(commBuf.Get<uint8_t>(), HCOMM_WORKSPACE_SIZE);
     uint32_t channelsPerRank = context->channelsPerRank == 0U ? 1U : context->channelsPerRank;
     // Assign one core per channel to consume CQEs. Unused channels have no pending CQEs.
     for (uint32_t index = GetBlockIdx(); index < worldSize * channelsPerRank; index += GetBlockNum()) {
@@ -34,6 +37,35 @@ __aicore__ inline void DrainChannels(__gm__ Mc2Aclnn::MoeCommContext* context, u
         uint64_t channel = context->hcommHandle[index];
         int32_t ret = comm.Drain(channel);
         ASCENDC_ASSERT(ret == 0, { KERNEL_LOG(KERNEL_ERROR, "MoE send drain failed: %d", ret); });
+    }
+    GlobalTensor<uint32_t> contextTensor;
+    contextTensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(context));
+    DataCacheCleanAndInvalid<uint32_t, CacheLine::ENTIRE_DATA_CACHE, DcciDst::CACHELINE_OUT>(contextTensor);
+}
+
+__aicore__ inline void DrainChannels(__gm__ Mc2Kernel::MoeSharedJettyContext* context, uint32_t worldSize, TPipe* pipe)
+{
+    PipeBarrier<PIPE_ALL>();
+    pipe->Reset();
+    TBuf<TPosition::VECCALC> commBuf;
+    pipe->InitBuffer(commBuf, HCOMM_WORKSPACE_SIZE);
+    LocalTensor<uint8_t> scratch = commBuf.Get<uint8_t>();
+    Duplicate<uint8_t>(scratch, 0U, HCOMM_WORKSPACE_SIZE);
+    SyncFunc<HardEvent::V_S>();
+    Hcomm<COMM_PROTOCOL_UBC_CTP> comm;
+    for (uint32_t jetty = GetBlockIdx(); jetty < context->sharedJettyNum; jetty += GetBlockNum()) {
+        auto batch = comm.MakeBatchHandle(static_cast<MultiChannelHandle>(context->multiChannelHandles[jetty]), scratch,
+                                          HCOMM_WORKSPACE_SIZE);
+        for (uint32_t peer = 0; peer < worldSize; ++peer) {
+            if (peer == context->epRankId) {
+                continue;
+            }
+            uint32_t peerIndex = peer < context->epRankId ? peer : peer - 1U;
+            GM_ADDR remoteWindow = reinterpret_cast<GM_ADDR>(context->epHcclBuffer[peer]);
+            auto& handle = comm.GetHandleRef(batch, peerIndex, remoteWindow);
+            int32_t ret = comm.Drain(handle);
+            ASCENDC_ASSERT(ret == 0, { KERNEL_LOG(KERNEL_ERROR, "MoE shared Jetty drain failed: %d", ret); });
+        }
     }
     GlobalTensor<uint32_t> contextTensor;
     contextTensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(context));

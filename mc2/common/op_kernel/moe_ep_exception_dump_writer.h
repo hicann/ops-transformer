@@ -24,6 +24,7 @@ namespace MoeEpExceptionDump {
 
 class MoeEpCoreDiagWriter {
 public:
+    template <typename ContextType>
     __aicore__ inline void Init(GM_ADDR context, MoeEpCoreDiagOpIndex opIndex, AscendC::TPipe* tpipe)
     {
         if ASCEND_IS_NOT_AIV {
@@ -34,7 +35,7 @@ public:
         }
 
         tpipe_ = tpipe;
-        auto commContext = reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(context);
+        auto commContext = reinterpret_cast<__gm__ ContextType*>(context);
         uint32_t aivId = AscendC::GetBlockIdx();
         GM_ADDR localWin = reinterpret_cast<GM_ADDR>(commContext->epHcclBuffer[commContext->epRankId]);
         recordAddr_ = localWin + MOE_EP_DUMP_METADATA_BYTES +
@@ -62,6 +63,11 @@ public:
         AscendC::DataCopyPad(recordGlobal, recordLocal,
                              {1U, static_cast<uint16_t>(MOE_EP_CORE_DIAG_RECORD_BYTES), 0U, 0U, 0U});
         AscendC::SyncFunc<AscendC::HardEvent::MTE3_S>();
+    }
+
+    __aicore__ inline void Init(GM_ADDR context, MoeEpCoreDiagOpIndex opIndex, AscendC::TPipe* tpipe)
+    {
+        Init<Mc2Aclnn::MoeCommContext>(context, opIndex, tpipe);
     }
 
     __aicore__ inline void RunPosRecord(uint32_t runPosition)
@@ -93,6 +99,7 @@ private:
     AscendC::TPipe* tpipe_{nullptr};
 };
 
+template <typename ContextType>
 __aicore__ inline void WriteMetadata(GM_ADDR context, GM_ADDR metadataSource)
 {
     if ASCEND_IS_NOT_AIV {
@@ -102,7 +109,7 @@ __aicore__ inline void WriteMetadata(GM_ADDR context, GM_ADDR metadataSource)
         return;
     }
 
-    auto commContext = reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(context);
+    auto commContext = reinterpret_cast<__gm__ ContextType*>(context);
     GM_ADDR localWin = reinterpret_cast<GM_ADDR>(commContext->epHcclBuffer[commContext->epRankId]);
     AscendC::LocalTensor<uint8_t> metadataLocal{AscendC::TPosition::LCM, 0,
                                                 static_cast<uint32_t>(sizeof(MoeEpDumpMetadata))};
@@ -117,6 +124,11 @@ __aicore__ inline void WriteMetadata(GM_ADDR context, GM_ADDR metadataSource)
     AscendC::DataCopyPad(metadataWinGlobal, metadataLocal,
                          {1U, static_cast<uint16_t>(sizeof(MoeEpDumpMetadata)), 0U, 0U, 0U});
     AscendC::SyncFunc<AscendC::HardEvent::MTE3_S>();
+}
+
+__aicore__ inline void WriteMetadata(GM_ADDR context, GM_ADDR metadataSource)
+{
+    WriteMetadata<Mc2Aclnn::MoeCommContext>(context, metadataSource);
 }
 
 } // namespace MoeEpExceptionDump

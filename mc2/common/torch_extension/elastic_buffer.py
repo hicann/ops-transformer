@@ -31,6 +31,11 @@ _ENGRAM_INT_TO_DTYPE = {v: k for k, v in _ENGRAM_DTYPE_TO_INT.items()}
 _ENGRAM_SF_DTYPES = (torch.float32, torch.float8_e8m0fnu)
 _ENGRAM_GRAD_DTYPES = (torch.bfloat16, torch.float16, torch.float32)
 _MOE_EP_METADATA_FIELDS = 5
+_MOE_SHARED_JETTY_NUM = 32
+_MOE_COMM_ALG_AUTO = "auto"
+_MOE_COMM_ALG_CLOS_ONLY = "clos_only"
+_MOE_COMM_ALGS = ("", _MOE_COMM_ALG_AUTO, _MOE_COMM_ALG_CLOS_ONLY)
+_MOE_CLOS_ONLY_MIN_WORLD_SIZE = 64
 
 _MOE_EP_METADATA_ALIGN_ELEMENTS = 128  # 512 bytes, int32 elements
 
@@ -149,7 +154,11 @@ class ElasticBufferOpBuilder(OpBuilder):
 
     def sources(self):
         """Path to C++ source code."""
-        return ["csrc/mc2/elastic_buffer.cpp"]
+        return [
+            "csrc/mc2/elastic_buffer.cpp",
+            "csrc/mc2/moe_shared_jetty_context.cpp",
+            "csrc/mc2/moe_shared_jetty_adapter.cpp",
+        ]
 
     def schema(self):
         """PyTorch operator signature."""
@@ -269,6 +278,15 @@ class ElasticBufferOpBuilder(OpBuilder):
         """Override include paths to ensure CANN headers are prioritized."""
         return [
             os.path.join(self._cann_path, "include"),
+            # Package-internal HCOMM headers include public HCOMM headers by
+            # basename (for example "hcomm_res_defs.h").
+            os.path.join(self._cann_path, "include/hcomm"),
+            # hcomm_host_impl.h includes package-internal HCOMM headers as
+            # "hcomm/<name>.h".  They are installed below CANN's pkg_inc
+            # directory (for example pkg_inc/hcomm/hcomm_res_entity_defs.h).
+            os.path.join(self._cann_path, "pkg_inc"),
+            os.path.join(self._cann_path, "asc/include"),
+            os.path.join(self._cann_path, "asc/include/comm_api"),
             os.path.join(self._torch_npu_path, "include"),
             os.path.join(self._torch_npu_path, "include/third_party/hccl/inc"),
             os.path.join(self._torch_npu_path, "include/third_party/acl/inc"),
@@ -363,13 +381,10 @@ def _get_moe_ep_window_layout(
     hidden: int,
     num_experts: int,
     topk: int,
+    comm_alg: str,
 ) -> _MoeEpWindowLayout:
     win_addr_align = 512
     ub_align = 32
-    max_dispatch_channel_count = 56
-    max_dispatch_notify_count = 8
-    # Must match ElasticBuffer's direct-network MOE_CHANNEL_HANDLE_NUM reservation.
-    combine_channel_handle_count = 64
     max_out_dtype_size = 2
     metadata_dtype_size = 4
     state_dtype_size = 4
@@ -380,10 +395,13 @@ def _get_moe_ep_window_layout(
     dispatch_count_size = world_size * _inline_align(
         local_experts_num * state_dtype_size, win_addr_align
     )
-    dispatch_notify_count = min(
-        max_dispatch_notify_count, max_dispatch_channel_count // (world_size - 1)
-    )
-    dispatch_notify_count = max(dispatch_notify_count, 1)
+    if comm_alg == _MOE_COMM_ALG_CLOS_ONLY:
+        dispatch_notify_count = _MOE_SHARED_JETTY_NUM
+        combine_flag_count = world_size * _MOE_SHARED_JETTY_NUM
+    else:
+        dispatch_notify_count = min(8, 56 // (world_size - 1))
+        dispatch_notify_count = max(dispatch_notify_count, 1)
+        combine_flag_count = max(world_size, 64)
 
     dispatch_notify_size = (
         world_size * win_addr_align
@@ -391,7 +409,7 @@ def _get_moe_ep_window_layout(
     )
     combine_state_size = (
         num_max_tokens_per_rank * topk * win_addr_align
-        + max(world_size, combine_channel_handle_count) * win_addr_align
+        + combine_flag_count * win_addr_align
         + win_addr_align  # Persistent constant source for asynchronous combine completion flags.
     )
     # payload 发送状态位区: 按每对端预留 notify 槽位数预留
@@ -452,6 +470,7 @@ def _get_moe_ep_window_bytes(
     hidden: int,
     num_experts: int,
     topk: int,
+    comm_alg: str,
 ) -> int:
     torch._check(
         2 <= num_experts <= 2048,
@@ -473,12 +492,16 @@ def _get_moe_ep_window_bytes(
         hidden,
         num_experts,
         topk,
+        comm_alg,
     )
     direct_minimum_window_bytes = _get_moe_ep_direct_window_bytes(
         window_layout,
         num_max_tokens_per_rank,
         topk,
     )
+    if comm_alg == _MOE_COMM_ALG_CLOS_ONLY:
+        return _inline_align(direct_minimum_window_bytes, 2 * mb_conversion)
+
     win_addr_align = 512
     state_dtype_size = 4
 
@@ -502,20 +525,18 @@ def _get_moe_ep_window_bytes(
             + payload_stash_size
         )
 
-    # Context topology is unavailable here, so reserve for the largest valid hybrid layout.
     rank_num_per_server_candidates = [
-        rank_num_per_server
-        for rank_num_per_server in range(1, world_size + 1)
-        if world_size % rank_num_per_server == 0
+        candidate
+        for candidate in range(1, world_size + 1)
+        if world_size % candidate == 0
     ]
     dispatch_buffer_size = max(
-        get_dispatch_buffer_size(rank_num_per_server)
-        for rank_num_per_server in rank_num_per_server_candidates
+        get_dispatch_buffer_size(candidate)
+        for candidate in rank_num_per_server_candidates
     )
     combine_buffer_size = (
         num_max_tokens_per_rank * window_layout.combine_slot_bytes * topk
     )
-
     hybrid_minimum_window_bytes = (
         window_layout.state_buffer_bytes + dispatch_buffer_size + combine_buffer_size
     )
@@ -637,6 +658,7 @@ class ElasticBuffer:
         with_grad: bool = False,
         explicitly_destroy: bool = False,
         netlayer: str = "auto",
+        comm_alg: str = "auto",
     ):
         """
         Initialize the ElasticBuffer.
@@ -662,6 +684,11 @@ class ElasticBuffer:
                 be reachable in that layer, otherwise the build fails). A
                 specified netlayer that does not exist fails the build
                 directly.
+            comm_alg: MoE communication port mode. ``"auto"`` (default) uses
+                FullMesh ports only and disables Clos ports; ``""`` is kept
+                as a backward-compatible alias for ``"auto"``;
+                ``"clos_only"`` uses Clos ports only and disables FullMesh
+                ports.
         """
         moe_args = (num_max_tokens_per_rank, hidden, num_topk)
         self._validate_init_args(group, num_cpu_bytes, moe_args, with_grad)
@@ -696,6 +723,21 @@ class ElasticBuffer:
                 self._group_name is not None and len(self._group_name) > 0,
                 lambda: "HCCL comm name is empty, please check HCCL group initialization.",
             )
+        torch._check(
+            comm_alg in _MOE_COMM_ALGS,
+            lambda: (
+                f"comm_alg must be '', 'auto' or 'clos_only', but got {comm_alg!r}."
+            ),
+        )
+        torch._check(
+            comm_alg != _MOE_COMM_ALG_CLOS_ONLY
+            or self._ep_world_size >= _MOE_CLOS_ONLY_MIN_WORLD_SIZE,
+            lambda: (
+                "clos_only requires at least "
+                f"{_MOE_CLOS_ONLY_MIN_WORLD_SIZE} ranks, but got {self._ep_world_size}."
+            ),
+        )
+        self._comm_alg = comm_alg
         _elastic_buffer_ops = _elastic_buffer_op_builder.load()
         self._runtime = _elastic_buffer_ops.ElasticBuffer(
             self._group_name,
@@ -704,6 +746,7 @@ class ElasticBuffer:
             self._with_grad,
             self._explicitly_destroy,
             self._netlayer,
+            self._comm_alg,
         )
 
         self._num_max_tokens_per_rank = num_max_tokens_per_rank
@@ -1226,6 +1269,7 @@ class ElasticBuffer:
             self._hidden,
             args.num_experts,
             self._num_topk,
+            self._comm_alg,
         )
 
         event = self._reserve_moe_epilogue(
@@ -1367,6 +1411,7 @@ class ElasticBuffer:
             self._hidden,
             handle.num_experts,
             self._num_topk,
+            self._comm_alg,
         )
 
         metadata = _checked_handle_metadata_buffer(

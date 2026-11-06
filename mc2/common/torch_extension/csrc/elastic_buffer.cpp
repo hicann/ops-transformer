@@ -39,6 +39,7 @@
 
 // HCCL common utilities
 #include "hccl_common.h"
+#include "moe_shared_jetty_adapter.h"
 
 // ACLNN common utilities
 #include "aclnn_common.h"
@@ -1800,7 +1801,8 @@ private:
 class ElasticBuffer {
 public:
     ElasticBuffer(const std::optional<std::string>& groupName, int64_t numCpuBytes, int64_t numMaxTokensPerRank = 0,
-                  bool withGrad = false, bool explicitlyDestroy = false, const std::string& netLayer = "auto");
+                  bool withGrad = false, bool explicitlyDestroy = false, const std::string& netLayer = "auto",
+                  const std::string& moeCommAlg = MOE_COMM_ALG_DEFAULT);
     ~ElasticBuffer();
 
     void EngramWrite(const at::Tensor& storage, const c10::optional<at::Tensor>& sf, bool zeroCopy);
@@ -1884,7 +1886,7 @@ public:
 private:
     void EnsureEngramContext(void* externalHostPtr = nullptr, int64_t externalBytes = 0, void* sfHostPtr = nullptr,
                              int64_t sfBytes = 0);
-    void EnsureMoeContext(int64_t cclBufferSize);
+    void EnsureMoeContext(int64_t cclBufferSize, int64_t epWorldSize);
     int64_t ResolveRankNumPerServer(int64_t epWorldSize) const;
     int64_t ResolveTopoType(int64_t epWorldSize, int64_t rankNumPerServer) const;
     void CheckExternalStorageUnchanged(const at::Tensor& storage, bool zeroCopy, bool localMode) const;
@@ -1896,6 +1898,7 @@ private:
     bool explicitlyDestroy_ = false;
     bool withGrad_ = false;
     std::string netLayer_ = "auto";
+    std::string moeCommAlg_ = MOE_COMM_ALG_DEFAULT;
 
     void* engramHostBufPtr_ = nullptr;
     void* engramDeviceBufPtr_ = nullptr;
@@ -1938,7 +1941,7 @@ private:
 
 ElasticBuffer::ElasticBuffer(const std::optional<std::string>& groupName, int64_t numCpuBytes,
                              int64_t numMaxTokensPerRank, bool withGrad, bool explicitlyDestroy,
-                             const std::string& netLayer)
+                             const std::string& netLayer, const std::string& moeCommAlg)
     : groupName_(groupName),
       localFullVocab_(!groupName.has_value()),
       engramNumCpuBytes_(numCpuBytes),
@@ -1947,8 +1950,11 @@ ElasticBuffer::ElasticBuffer(const std::optional<std::string>& groupName, int64_
       numMaxTokensPerRank_(numMaxTokensPerRank),
       explicitlyDestroy_(explicitlyDestroy),
       withGrad_(withGrad),
-      netLayer_(netLayer)
+      netLayer_(netLayer),
+      moeCommAlg_(moeCommAlg)
 {
+    TORCH_CHECK(moeCommAlg_.empty() || moeCommAlg_ == MOE_COMM_ALG_AUTO || moeCommAlg_ == MOE_COMM_ALG_CLOS_ONLY,
+                "Invalid MoE communication algorithm: ", moeCommAlg_);
     if (!localFullVocab_) {
         InitHcclEngineCtxFunctions();
         InitHcclFunctions();
@@ -2016,27 +2022,40 @@ void ElasticBuffer::EnsureEngramContext(void* externalHostPtr, int64_t externalB
 // keep equal triggering rights, same as the original pattern). The CCL buffer size is computed
 // by Python from the actual operator arguments and passed in; it is internally allocated as
 // 2M-hugepage pinned physical memory and registered to the comm domain.
-void ElasticBuffer::EnsureMoeContext(int64_t cclBufferSize)
+void ElasticBuffer::EnsureMoeContext(int64_t cclBufferSize, int64_t epWorldSize)
 {
     TORCH_CHECK(!destroyed_, "ElasticBuffer cannot be used after destroy, please create a new ElasticBuffer instance");
     TORCH_CHECK(!localFullVocab_, "MoE operations are not supported when group is None");
     if (moeContextInitialized_) {
+        TORCH_CHECK(cclBufferSize <= moeCclBufferSize_,
+                    "MoE communication buffer cannot grow after context initialization, requested ", cclBufferSize,
+                    ", allocated ", moeCclBufferSize_, "; use a new communication group");
         return;
     }
-    MoeContextBuilder builder;
-    MoeContextResources resources = builder.Build(*groupName_, cclBufferSize);
-    moeContextTensor_ = resources.contextTensor;
-    moeCclBufferSize_ = resources.cclBufferSize;
-    moeRankSizePerServer_ = resources.rankSizePerServer;
-    moeDeviceBufPtr_ = resources.deviceBufPtr;
-    moePhysicalMemHandle_ = resources.physicalMemHandle;
-    moeMemHandle_ = resources.memHandle;
-    moeContextTag_ = resources.contextTag;
+    if (moeCommAlg_ == MOE_COMM_ALG_CLOS_ONLY) {
+        TORCH_CHECK(epWorldSize >= MOE_CLOS_ONLY_MIN_RANK_SIZE, "clos_only requires at least ",
+                    MOE_CLOS_ONLY_MIN_RANK_SIZE, " ranks, but got ", epWorldSize);
+        moeContextTensor_ = BuildMoeSharedJettyContext(*groupName_, static_cast<uint64_t>(cclBufferSize));
+        moeCclBufferSize_ = cclBufferSize;
+    } else {
+        MoeContextBuilder builder;
+        MoeContextResources resources = builder.Build(*groupName_, cclBufferSize);
+        moeContextTensor_ = resources.contextTensor;
+        moeCclBufferSize_ = resources.cclBufferSize;
+        moeRankSizePerServer_ = resources.rankSizePerServer;
+        moeDeviceBufPtr_ = resources.deviceBufPtr;
+        moePhysicalMemHandle_ = resources.physicalMemHandle;
+        moeMemHandle_ = resources.memHandle;
+        moeContextTag_ = resources.contextTag;
+    }
     moeContextInitialized_ = true;
 }
 
 int64_t ElasticBuffer::ResolveRankNumPerServer(int64_t epWorldSize) const
 {
+    if (moeCommAlg_ == MOE_COMM_ALG_CLOS_ONLY) {
+        return epWorldSize;
+    }
     int64_t rankNumPerServer = static_cast<int64_t>(moeRankSizePerServer_);
     TORCH_CHECK(rankNumPerServer > 0, "rank_num_per_server must be positive, got ", rankNumPerServer);
     TORCH_CHECK(epWorldSize % rankNumPerServer == 0, "ep_world_size must be divisible by rank_num_per_server, got ",
@@ -2046,6 +2065,9 @@ int64_t ElasticBuffer::ResolveRankNumPerServer(int64_t epWorldSize) const
 
 int64_t ElasticBuffer::ResolveTopoType(int64_t epWorldSize, int64_t rankNumPerServer) const
 {
+    if (moeCommAlg_ == MOE_COMM_ALG_CLOS_ONLY) {
+        return NETWORK_DIRECT;
+    }
     return (epWorldSize / rankNumPerServer > 1) ? NETWORK_HYBRID : NETWORK_DIRECT;
 }
 
@@ -2463,7 +2485,7 @@ Mc2Api::ElasticBuffer::DispatchTensorList Mc2Api::ElasticBuffer::MoeEpDispatch(
     TORCH_CHECK(x.dim() == DIM_TWO, "x dims must be 2, but got ", x.dim());
     TORCH_CHECK(topkIdx.dim() == DIM_TWO, "topk_idx dims must be 2, but got ", topkIdx.dim());
     TORCH_CHECK(epWorldSize > 0, "ep_world_size must be positive, got ", epWorldSize);
-    EnsureMoeContext(cclBufferSize);
+    EnsureMoeContext(cclBufferSize, epWorldSize);
     int64_t rankNumPerServer = ResolveRankNumPerServer(epWorldSize);
     int64_t topoType = ResolveTopoType(epWorldSize, rankNumPerServer);
 
@@ -2505,12 +2527,11 @@ Mc2Api::ElasticBuffer::DispatchTensorList Mc2Api::ElasticBuffer::MoeEpDispatch(
                                   aclDataType::ACL_FLOAT8_E8M0 :
                                   ConvertToAclDataType(scales.has_value() ? scalesTensor.scalar_type() : at::kFloat);
     TensorWrapper scalesWrapper = TensorWrapper{scalesTensor, scalesDtype};
-
     ACLNN_CMD(aclnnMoeEpDispatch, moeContextTensor_, x, topkIdx, topkWeightsTensor, scalesWrapper, cachedSlotTensor,
               cachedRouteCountTensor, cachedRouteDstScaleoutTensor, cachedRouteScaleoutSlotTensor, epWorldSize,
               epRankId, numExperts, numMaxTokensPerRank, moeCclBufferSize_, expertAlignment, doCpuSync,
-              hostPinnedCounterAddr, topoType, rankNumPerServer, numRecvPerRank, numRecvPerExpert, dstSlot, routeCount,
-              routeDstScaleout, routeScaleoutSlot);
+              hostPinnedCounterAddr, topoType, rankNumPerServer, moeCommAlg_, numRecvPerRank, numRecvPerExpert, dstSlot,
+              routeCount, routeDstScaleout, routeScaleoutSlot);
 
     return std::make_tuple(numRecvPerRank, numRecvPerExpert, dstSlot, routeCount, routeDstScaleout, routeScaleoutSlot);
 }
@@ -2531,7 +2552,7 @@ Mc2Api::ElasticBuffer::DispatchEpilogueTensorList Mc2Api::ElasticBuffer::MoeEpDi
                                  topkIdx.numel(), recvX.device());
     }
 
-    EnsureMoeContext(cclBufferSize);
+    EnsureMoeContext(cclBufferSize, epWorldSize);
     int64_t rankNumPerServer = ResolveRankNumPerServer(epWorldSize);
     int64_t topoType = ResolveTopoType(epWorldSize, rankNumPerServer);
 
@@ -2549,10 +2570,9 @@ Mc2Api::ElasticBuffer::DispatchEpilogueTensorList Mc2Api::ElasticBuffer::MoeEpDi
     at::Tensor recvTopkWeightsTensor =
         recvTopkWeightsOpt.has_value() ? *recvTopkWeightsOpt : at::empty({1}, recvX.options().dtype(at::kFloat));
     bool hasTopkWeights = recvTopkWeightsOpt.has_value();
-
     ACLNN_CMD(aclnnMoeEpDispatchEpilogue, moeContextTensor_, x, topkIdx, numRecvPerRank, numRecvPerExpert,
               cachedRecvSrcMetadataTensor, epWorldSize, epRankId, numExperts, numMaxTokensPerRank, moeCclBufferSize_,
-              hasTopkWeights, topoType, rankNumPerServer, recvX, recvSrcMetadata, recvTopkWeightsTensor,
+              hasTopkWeights, topoType, rankNumPerServer, moeCommAlg_, recvX, recvSrcMetadata, recvTopkWeightsTensor,
               recvScalesWrapper);
 
     c10::optional<at::Tensor> recvTopkWeightsOutput;
@@ -2575,14 +2595,14 @@ void Mc2Api::ElasticBuffer::MoeEpCombine(const at::Tensor& x, const at::Tensor& 
     TORCH_CHECK(x.dim() == DIM_TWO, "x dims must be 2, but got ", x.dim());
     TORCH_CHECK(topkIdx.dim() == DIM_TWO, "topk_idx dims must be 2, but got ", topkIdx.dim());
     CheckMoeEpMetadataTensor(recvSrcMetadata, "recv_src_metadata", x.size(0), epWorldSize, topkIdx.numel(), x.device());
-    EnsureMoeContext(cclBufferSize);
+    EnsureMoeContext(cclBufferSize, epWorldSize);
     int64_t rankNumPerServer = ResolveRankNumPerServer(epWorldSize);
     int64_t topoType = ResolveTopoType(epWorldSize, rankNumPerServer);
 
     c10::optional<at::Tensor> topkWeightsOpt = topkWeights;
-
     ACLNN_CMD(aclnnMoeEpCombine, moeContextTensor_, x, topkIdx, recvSrcMetadata, numRecvTokensPerExpert, topkWeightsOpt,
-              epWorldSize, epRankId, numExperts, numMaxTokensPerRank, moeCclBufferSize_, topoType, rankNumPerServer);
+              epWorldSize, epRankId, numExperts, numMaxTokensPerRank, moeCclBufferSize_, topoType, rankNumPerServer,
+              moeCommAlg_);
 }
 
 Mc2Api::ElasticBuffer::CombineEpilogueTensorList Mc2Api::ElasticBuffer::MoeEpCombineEpilogue(
@@ -2594,7 +2614,7 @@ Mc2Api::ElasticBuffer::CombineEpilogueTensorList Mc2Api::ElasticBuffer::MoeEpCom
     TORCH_CHECK(x.dim() == DIM_TWO, "x dims must be 2, but got ", x.dim());
     TORCH_CHECK(topkIdx.dim() == DIM_TWO, "topk_idx dims must be 2, but got ", topkIdx.dim());
     CheckMoeEpMetadataTensor(recvSrcMetadata, "recv_src_metadata", x.size(0), epWorldSize, topkIdx.numel(), x.device());
-    EnsureMoeContext(cclBufferSize);
+    EnsureMoeContext(cclBufferSize, epWorldSize);
     int64_t rankNumPerServer = ResolveRankNumPerServer(epWorldSize);
     int64_t topoType = ResolveTopoType(epWorldSize, rankNumPerServer);
 
@@ -2602,10 +2622,9 @@ Mc2Api::ElasticBuffer::CombineEpilogueTensorList Mc2Api::ElasticBuffer::MoeEpCom
     at::Tensor combinedTopkWeightsTensor = combinedTopkWeightsOpt.has_value() ?
                                                *combinedTopkWeightsOpt :
                                                at::empty({1}, combinedX.options().dtype(at::kFloat));
-
     ACLNN_CMD(aclnnMoeEpCombineEpilogue, moeContextTensor_, x, topkIdx, recvSrcMetadata, topkWeights, epWorldSize,
               epRankId, numExperts, numMaxTokensPerRank, moeCclBufferSize_, hasTopkWeights, topoType, rankNumPerServer,
-              combinedX, combinedTopkWeightsTensor);
+              moeCommAlg_, combinedX, combinedTopkWeightsTensor);
 
     c10::optional<at::Tensor> combinedTopkWeightsOutput;
     if (hasTopkWeights) {
@@ -2625,10 +2644,11 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         .def("host_ptr", &OpApi::HostPinnedCounter::HostPtr);
 
     pybind11::class_<Mc2Api::ElasticBuffer>(m, "ElasticBuffer")
-        .def(pybind11::init<const std::optional<std::string>&, int64_t, int64_t, bool, bool, const std::string&>(),
+        .def(pybind11::init<const std::optional<std::string>&, int64_t, int64_t, bool, bool, const std::string&,
+                            const std::string&>(),
              pybind11::arg("groupName"), pybind11::arg("numCpuBytes"), pybind11::arg("numMaxTokensPerRank") = 0,
              pybind11::arg("withGrad") = false, pybind11::arg("explicitlyDestroy") = false,
-             pybind11::arg("netLayer") = "auto")
+             pybind11::arg("netLayer") = "auto", pybind11::arg("moeCommAlg") = Mc2Api::MOE_COMM_ALG_DEFAULT)
         .def("engram_write", &Mc2Api::ElasticBuffer::EngramWrite, pybind11::arg("storage").noconvert(),
              pybind11::arg("sf") = pybind11::none(), pybind11::arg("zeroCopy"))
         .def_static("engram_fetch",

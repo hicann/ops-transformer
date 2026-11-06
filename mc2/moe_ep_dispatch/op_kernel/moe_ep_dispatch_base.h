@@ -75,8 +75,71 @@ __aicore__ inline void GetExpertFreq(LocalTensor<uint16_t>& dstLocal, LocalTenso
     PipeBarrier<PIPE_V>();
 }
 
-__aicore__ inline GM_ADDR GetWindowAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext* context, uint32_t rankId,
-                                                uint64_t offset)
+// The data and mask must be packed together; -1 must never alias valid bin 255.
+template <Reg::HighLowPart part>
+__simd_callee__ inline void PackHistogramPage(Reg::RegTensor<uint8_t>& packed, Reg::MaskReg& packedMask,
+                                              __ubuf__ int16_t* src, int16_t base, uint16_t bins, Reg::MaskReg& tail)
+{
+    Reg::RegTensor<int16_t> ids;
+    Reg::MaskReg valid;
+    Reg::LoadAlign(ids, src);
+    Reg::Adds(ids, ids, static_cast<int16_t>(-base), tail);
+    Reg::Compares<uint16_t, CMPMODE::LT>(valid, (Reg::RegTensor<uint16_t>&)ids, bins, tail);
+    Reg::Pack<uint8_t, int16_t, part>(packed, ids);
+    Reg::Pack<part>(packedMask, valid);
+}
+
+template <bool highBins>
+__simd_vf__ __aicore__ inline void RouteHistogramsVf(__ubuf__ uint16_t* dst, __ubuf__ int16_t* src, uint32_t count,
+                                                     int16_t base, uint16_t bins)
+{
+    constexpr uint32_t lanes = GetVecLen() / sizeof(int16_t);
+    uint16_t repeatTimes = (count + 2U * lanes - 1U) / (2U * lanes);
+    Reg::RegTensor<uint8_t> packedLow, packedHigh, packed;
+    Reg::RegTensor<uint16_t> low, high;
+    Reg::MaskReg outputMask = Reg::CreateMask<uint16_t>();
+    Reg::MaskReg mergeMask = Reg::CreateMask<uint8_t>();
+    Reg::MaskReg maskLow, maskHigh, packedMask;
+    Reg::Duplicate(low, 0);
+    if constexpr (highBins) {
+        Reg::Duplicate(high, 0);
+    }
+    for (uint16_t i = 0; i < repeatTimes; ++i) {
+        Reg::MaskReg tail = Reg::UpdateMask<int16_t>(count);
+        PackHistogramPage<Reg::HighLowPart::LOWEST>(packedLow, maskLow, src + 2U * lanes * i, base, bins, tail);
+        tail = Reg::UpdateMask<int16_t>(count);
+        PackHistogramPage<Reg::HighLowPart::HIGHEST>(packedHigh, maskHigh, src + (2U * i + 1U) * lanes, base, bins,
+                                                     tail);
+        Reg::Or<uint8_t>(packed, packedLow, packedHigh, mergeMask);
+        Reg::Or(packedMask, maskLow, maskHigh, mergeMask);
+        Reg::Histograms<uint8_t, uint16_t, Reg::HistogramsBinType::BIN0, Reg::HistogramsType::FREQUENCY>(low, packed,
+                                                                                                         packedMask);
+        if constexpr (highBins) {
+            Reg::Histograms<uint8_t, uint16_t, Reg::HistogramsBinType::BIN1, Reg::HistogramsType::FREQUENCY>(
+                high, packed, packedMask);
+        }
+    }
+    Reg::StoreAlign(dst, low, outputMask);
+    if constexpr (highBins) {
+        Reg::StoreAlign(dst + lanes, high, outputMask);
+    }
+}
+
+__aicore__ inline void GetRouteHistogram(LocalTensor<uint16_t> dstLocal, LocalTensor<int16_t> srcLocal, uint32_t count,
+                                         uint32_t base, uint32_t bins)
+{
+    __ubuf__ int16_t* src = (__ubuf__ int16_t*)srcLocal.GetPhyAddr();
+    __ubuf__ uint16_t* dst = (__ubuf__ uint16_t*)dstLocal.GetPhyAddr();
+    if (bins <= GetVecLen() / sizeof(uint16_t)) {
+        asc_vf_call<RouteHistogramsVf<false>>(dst, src, count, static_cast<int16_t>(base), static_cast<uint16_t>(bins));
+    } else {
+        asc_vf_call<RouteHistogramsVf<true>>(dst, src, count, static_cast<int16_t>(base), static_cast<uint16_t>(bins));
+    }
+    PipeBarrier<PIPE_V>();
+}
+
+template <typename ContextType>
+__aicore__ inline GM_ADDR GetWindowAddrByRankId(__gm__ ContextType* context, uint32_t rankId, uint64_t offset)
 {
     return (GM_ADDR)context->epHcclBuffer[rankId] + offset;
 }
@@ -115,8 +178,10 @@ namespace Mc2Kernel {
 
 using MoeEpDispatchBase::GetCommHandle;
 using MoeEpDispatchBase::GetExpertFreq;
+using MoeEpDispatchBase::GetRouteHistogram;
 
-__aicore__ inline GM_ADDR GetWinAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext* context, uint32_t rankId, uint64_t offset)
+template <typename ContextType>
+__aicore__ inline GM_ADDR GetWinAddrByRankId(__gm__ ContextType* context, uint32_t rankId, uint64_t offset)
 {
     return MoeEpDispatchBase::GetWindowAddrByRankId(context, rankId, offset);
 }

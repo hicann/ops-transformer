@@ -41,6 +41,8 @@
 #include "../../common/op_kernel/mc2_kernel_utils.h"
 #include "../../common/op_kernel/mc2_moe_context.h"
 #include "../../common/op_kernel/moe_ep_exception_dump_writer.h"
+#include "../../common/op_kernel/moe_shared_jetty_context.h"
+#include "../../common/op_kernel/moe_ep_comm_alg_def.h"
 #include "../../common/op_kernel/moe_ep_send_completion.h"
 
 #include "moe_ep_combine_epilogue_tiling_key.h"
@@ -98,7 +100,8 @@ private:
 
     TPipe* tpipe_{nullptr};
     const MoeEpCombineEpilogueInfo* tilingData_{nullptr};
-    __gm__ Mc2Aclnn::MoeCommContext* mc2Context_{nullptr};
+    GM_ADDR mc2Context_{nullptr};
+    bool useSharedJetty_{false};
     MoeEpExceptionDump::MoeEpCoreDiagWriter diagWriter_;
 
     uint32_t rankId_{0};
@@ -183,12 +186,22 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
     recvCapacity_ = tilingData->recvCapacity;
     hAlignSize_ = Ceil(axisH_ * sizeof(XType), UB_ALIGN) * UB_ALIGN;
     xCopyParams_ = {1U, static_cast<uint16_t>(hAlignSize_), 0U, 0U};
-    mc2Context_ = reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(context);
-    rankId_ = mc2Context_->epRankId;
-    combineChannelCount_ = mc2Context_->channelsPerRank;
-    combineChannelCount_ = combineChannelCount_ == 0U ? 1U : combineChannelCount_;
-    for (uint32_t i = 0; i < epWorldSize_; ++i) {
-        winRankAddr_[i] = (GM_ADDR)mc2Context_->epHcclBuffer[i];
+    mc2Context_ = context;
+    useSharedJetty_ = tilingData->commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY;
+    if (useSharedJetty_) {
+        auto ctx = reinterpret_cast<__gm__ Mc2Kernel::MoeSharedJettyContext*>(context);
+        rankId_ = ctx->epRankId;
+        combineChannelCount_ = ctx->sharedJettyNum < aivNum_ ? ctx->sharedJettyNum : aivNum_;
+        for (uint32_t i = 0; i < epWorldSize_; ++i) {
+            winRankAddr_[i] = (GM_ADDR)ctx->epHcclBuffer[i];
+        }
+    } else {
+        auto ctx = reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(context);
+        rankId_ = ctx->epRankId;
+        combineChannelCount_ = ctx->channelsPerRank == 0U ? 1U : ctx->channelsPerRank;
+        for (uint32_t i = 0; i < epWorldSize_; ++i) {
+            winRankAddr_[i] = (GM_ADDR)ctx->epHcclBuffer[i];
+        }
     }
 
     combineStateWinOffset_ = tilingData->combineStateWinOffset;
@@ -216,8 +229,13 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
 
     constexpr size_t metadataOffset = offsetof(MoeEpCombineEpilogueTilingData, moeEpCombineEpilogueInfo) +
                                       offsetof(MoeEpCombineEpilogueInfo, dumpMetadata);
-    MoeEpExceptionDump::WriteMetadata(context, tilingGM + metadataOffset);
-    diagWriter_.Init(context, MOE_EP_CORE_DIAG_COMBINE_EPILOGUE, tpipe_);
+    if (useSharedJetty_) {
+        MoeEpExceptionDump::WriteMetadata<Mc2Kernel::MoeSharedJettyContext>(context, tilingGM + metadataOffset);
+        diagWriter_.Init<Mc2Kernel::MoeSharedJettyContext>(context, MOE_EP_CORE_DIAG_COMBINE_EPILOGUE, tpipe_);
+    } else {
+        MoeEpExceptionDump::WriteMetadata<Mc2Aclnn::MoeCommContext>(context, tilingGM + metadataOffset);
+        diagWriter_.Init<Mc2Aclnn::MoeCommContext>(context, MOE_EP_CORE_DIAG_COMBINE_EPILOGUE, tpipe_);
+    }
     diagWriter_.RunPosRecord(MOE_EP_COMBINE_EPILOGUE_RUN_POS_INIT_DONE);
 }
 
@@ -276,6 +294,9 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
 template <TemplateMoeEpCombineEpilogueTypeClass>
 __aicore__ inline uint32_t MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc>::GetCompletionChannelCount()
 {
+    if (useSharedJetty_) {
+        return combineChannelCount_;
+    }
     if (aivNum_ < epWorldSize_) {
         return 1U;
     }
@@ -504,7 +525,13 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
     LoadLocalRecvIndex();
     MaskCheck();
     RecvPhaseReduce();
-    MoeEpCompletion::DrainChannels(mc2Context_, epWorldSize_, tpipe_);
+    if (useSharedJetty_) {
+        MoeEpCompletion::DrainChannels(reinterpret_cast<__gm__ Mc2Kernel::MoeSharedJettyContext*>(mc2Context_),
+                                       epWorldSize_, tpipe_);
+    } else {
+        MoeEpCompletion::DrainChannels(reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(mc2Context_), epWorldSize_,
+                                       tpipe_);
+    }
 }
 
 #endif

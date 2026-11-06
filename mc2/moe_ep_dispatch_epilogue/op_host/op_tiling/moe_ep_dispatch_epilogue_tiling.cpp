@@ -29,6 +29,8 @@
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
 #include "../../op_kernel/moe_ep_dispatch_epilogue_tiling.h"
+#include "../../../common/op_kernel/moe_shared_jetty_context.h"
+#include "../../../common/op_api/moe_ep_comm_alg.h"
 #include "../../op_kernel/moe_ep_dispatch_epilogue_tiling_key.h"
 
 #ifndef ALIGN_UP
@@ -61,6 +63,7 @@ constexpr uint32_t ATTR_CCL_BUFFER_SIZE_INDEX = 4;
 constexpr uint32_t ATTR_HAS_TOPK_WEIGHTS_INDEX = 5;
 constexpr uint32_t ATTR_TOPO_TYPE_INDEX = 6;
 constexpr uint32_t ATTR_RANK_NUM_PER_SERVER_INDEX = 7;
+constexpr uint32_t ATTR_COMM_ALG_INDEX = 8;
 
 constexpr uint32_t ONE_DIM = 1U;
 constexpr uint32_t TWO_DIMS = 2U;
@@ -111,6 +114,7 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext* context, const
     auto cclBufferSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_CCL_BUFFER_SIZE_INDEX);
     auto requestedNetworkModePtr = attrs->GetAttrPointer<int64_t>(ATTR_TOPO_TYPE_INDEX);
     auto rankNumPerServerPtr = attrs->GetAttrPointer<int64_t>(ATTR_RANK_NUM_PER_SERVER_INDEX);
+    auto commAlgPtr = attrs->GetAttrPointer<char>(ATTR_COMM_ALG_INDEX);
 
     OP_TILING_CHECK(epWorldSizePtr == nullptr, OP_LOGE(nodeName, "epWorldSizePtr is null."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(epRankIdPtr == nullptr, OP_LOGE(nodeName, "epRankIdPtr is null."), return ge::GRAPH_FAILED);
@@ -122,7 +126,6 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext* context, const
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(rankNumPerServerPtr == nullptr, OP_LOGE(nodeName, "rankNumPerServerPtr is null."),
                     return ge::GRAPH_FAILED);
-
     int64_t epWorldSize = *epWorldSizePtr;
     int64_t requestedNetworkMode = *requestedNetworkModePtr;
     int64_t rankNumPerServer = *rankNumPerServerPtr;
@@ -146,6 +149,17 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext* context, const
     OP_TILING_CHECK(*cclBufferSizePtr <= 0,
                     OP_LOGE(nodeName, "ccl_buffer_size must be positive, but got %ld.", *cclBufferSizePtr),
                     return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(!Mc2Aclnn::IsValidMoeEpCommAlg(commAlgPtr), OP_LOGE(nodeName, "Invalid comm_alg=%s.", commAlgPtr),
+                    return ge::GRAPH_FAILED);
+    if (Mc2Aclnn::IsMoeEpClosOnly(commAlgPtr)) {
+        OP_TILING_CHECK(epWorldSize < Mc2Aclnn::MOE_EP_SHARED_JETTY_MIN_RANK_SIZE,
+                        OP_LOGE(nodeName, "clos_only requires at least %ld ranks, but got %ld.",
+                                Mc2Aclnn::MOE_EP_SHARED_JETTY_MIN_RANK_SIZE, epWorldSize),
+                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(requestedNetworkMode != NETWORK_DIRECT,
+                        OP_LOGE(nodeName, "clos_only dispatch epilogue supports direct topology only."),
+                        return ge::GRAPH_FAILED);
+    }
     MoeEpTopology topology{};
     OP_TILING_CHECK(ResolveMoeEpTopology(static_cast<uint32_t>(epWorldSize), requestedNetworkMode, rankNumPerServer,
                                          topology) != ge::GRAPH_SUCCESS,
@@ -162,6 +176,7 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext* context, const
     serverNum = topology.serverNum;
     networkMode = topology.networkMode;
     rankNumPerServerOut = topology.rankNumPerServer;
+    info.commAlg = Mc2Aclnn::ParseMoeEpCommAlg(commAlgPtr);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -235,7 +250,14 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext* context,
         contextStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
         OP_LOGE(nodeName, "context dims must be 1, but got %lu.", contextStorageShape->GetStorageShape().GetDimNum()),
         return ge::GRAPH_FAILED);
-
+    // Preserve the legacy auto-context shape contract; clos_only has a new, fixed shared-Jetty context ABI.
+    if (info.commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY) {
+        constexpr int64_t expectedContextElements = sizeof(Mc2Kernel::MoeSharedJettyContext) / sizeof(int32_t);
+        OP_TILING_CHECK(contextStorageShape->GetStorageShape().GetDim(0) != expectedContextElements,
+                        OP_LOGE(nodeName, "Shared Jetty context length must be %ld, but got %ld.",
+                                expectedContextElements, contextStorageShape->GetStorageShape().GetDim(0)),
+                        return ge::GRAPH_FAILED);
+    }
     // ---- x [num_tokens, hidden]，hidden 为 cfg 唯一真值来源 ----
     const gert::StorageShape* xShape = context->GetInputShape(X_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
@@ -462,7 +484,8 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext* cont
                                             info.cfg.hidden,
                                             networkMode,
                                             rankNumPerServer,
-                                            serverNum};
+                                            serverNum,
+                                            info.commAlg};
     MoeEpWindowLayout layout{};
     OP_TILING_CHECK(CalcMoeEpWindowLayout(params, layout) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Calculate Moe EP window layout failed."), return ge::GRAPH_FAILED);
@@ -540,6 +563,10 @@ static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext* cont
     uint64_t ubSize = 0UL;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
     OP_TILING_CHECK(aivNum == 0U, OP_LOGE(nodeName, "Platform reports aiv_num=0."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        aivNum > MOE_EP_PER_CORE_DIAG_SLOT_COUNT,
+        OP_LOGE(nodeName, "aiv_num=%u exceeds diagnostic slot capacity %lu.", aivNum, MOE_EP_PER_CORE_DIAG_SLOT_COUNT),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(ubSize == 0UL, OP_LOGE(nodeName, "Platform reports ub_size=0."), return ge::GRAPH_FAILED);
     uint32_t blockDim = ascendcPlatform.CalcTschBlockDim(aivNum, 0, aivNum);
     context->SetBlockDim(blockDim);
@@ -564,7 +591,8 @@ static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext* cont
     workSpaces[0] = SYSTEM_NEED_WORKSPACE + jointCountBytesAlign512;
 
     uint64_t tilingKey =
-        GET_TPL_TILING_KEY(TILINGKEY_TPL_A5, cached ? 1U : 0U, hasTopkWeights ? 1U : 0U, info.isMxQuant ? 1U : 0U);
+        GET_TPL_TILING_KEY(TILINGKEY_TPL_A5, cached ? 1U : 0U, hasTopkWeights ? 1U : 0U, info.isMxQuant ? 1U : 0U,
+                           info.commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY);
     context->SetTilingKey(tilingKey);
     OP_LOGD(nodeName, "tilingKey=%lu, blockDim=%u, aivNum=%u, cached=%u, hasTopkWeights=%u, isMxQuant=%u", tilingKey,
             blockDim, aivNum, info.cached, hasTopkWeights ? 1U : 0U, info.isMxQuant);

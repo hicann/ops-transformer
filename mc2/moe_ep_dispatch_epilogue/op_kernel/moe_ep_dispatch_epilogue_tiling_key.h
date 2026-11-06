@@ -20,12 +20,13 @@ namespace Mc2Tiling {
 ASCENDC_TPL_ARGS_DECL(MoeEpDispatchEpilogue,
                       ASCENDC_TPL_UINT_DECL(ARCH_TAG, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, TILINGKEY_TPL_A5),
                       ASCENDC_TPL_BOOL_DECL(IS_CACHED, 0, 1), ASCENDC_TPL_BOOL_DECL(HAS_TOPK_WEIGHTS, 0, 1),
-                      ASCENDC_TPL_BOOL_DECL(IS_MXQUANT, 0, 1));
+                      ASCENDC_TPL_BOOL_DECL(IS_MXQUANT, 0, 1), ASCENDC_TPL_BOOL_DECL(TILINGKEY_CLOS_ONLY, 0, 1));
 
 ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(ARCH_TAG, ASCENDC_TPL_UI_LIST, TILINGKEY_TPL_A5),
                                      ASCENDC_TPL_BOOL_SEL(IS_CACHED, 0, 1),
                                      ASCENDC_TPL_BOOL_SEL(HAS_TOPK_WEIGHTS, 0, 1),
                                      ASCENDC_TPL_BOOL_SEL(IS_MXQUANT, 0, 1),
+                                     ASCENDC_TPL_BOOL_SEL(TILINGKEY_CLOS_ONLY, 0, 1),
                                      ASCENDC_TPL_TILING_STRUCT_SEL(MoeEpDispatchEpilogueTilingData)), );
 
 } // namespace Mc2Tiling

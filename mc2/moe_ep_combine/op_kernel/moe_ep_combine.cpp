@@ -32,12 +32,13 @@
 #include "moe_ep_combine_tiling_key.h"
 #include "moe_ep_combine_tiling.h"
 #include "moe_ep_combine.h"
+#include "moe_ep_combine_clos_only.h"
 
 using namespace MoeEpCombineImpl;
 using namespace Mc2Tiling;
 using namespace AscendC;
 
-template <uint32_t HasTopkWeight, uint32_t ArchTag>
+template <uint32_t HasTopkWeight, uint32_t ArchTag, bool ClosOnly>
 __global__ __aicore__ void moe_ep_combine(GM_ADDR context, GM_ADDR x, GM_ADDR topkIdx, GM_ADDR recvSrcMetadata,
                                           GM_ADDR numRecvPerExpert, GM_ADDR topkWeights, GM_ADDR workspace,
                                           GM_ADDR tilingGM)
@@ -47,9 +48,16 @@ __global__ __aicore__ void moe_ep_combine(GM_ADDR context, GM_ADDR x, GM_ADDR to
     TPipe pipe;
     GET_TILING_DATA_WITH_STRUCT(MoeEpCombineTilingData, tilingData, tilingGM);
 #if defined(ENABLE_MOE_EP_COMBINE_KERNEL)
-    MoeEpCombine<DTYPE_X, HasTopkWeight> op;
-    op.Init(context, x, topkIdx, recvSrcMetadata, numRecvPerExpert, topkWeights, workspace, tilingGM, &pipe,
-            &tilingData.moeEpCombineInfo);
-    op.Process();
+    if constexpr (ClosOnly) {
+        MoeEpCombineClosOnlyImpl::MoeEpCombine<DTYPE_X, HasTopkWeight> op;
+        op.Init(context, x, topkIdx, recvSrcMetadata, numRecvPerExpert, topkWeights, workspace, tilingGM, &pipe,
+                &tilingData.moeEpCombineInfo);
+        op.Process();
+    } else {
+        MoeEpCombineImpl::MoeEpCombine<DTYPE_X, HasTopkWeight> op;
+        op.Init(context, x, topkIdx, recvSrcMetadata, numRecvPerExpert, topkWeights, workspace, tilingGM, &pipe,
+                &tilingData.moeEpCombineInfo);
+        op.Process();
+    }
 #endif
 }

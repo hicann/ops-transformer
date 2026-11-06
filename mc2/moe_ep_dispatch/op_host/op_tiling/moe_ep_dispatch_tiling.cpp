@@ -29,6 +29,9 @@
 #include "tiling/tiling_api.h"
 #include "../../op_kernel/moe_ep_dispatch_tiling.h"
 #include "../../op_kernel/moe_ep_dispatch_tiling_key.h"
+#include "../../op_kernel/moe_ep_dispatch_schedule.h"
+#include "../../../common/op_kernel/moe_shared_jetty_context.h"
+#include "../../../common/op_api/moe_ep_comm_alg.h"
 
 using namespace AscendC;
 using namespace ge;
@@ -63,6 +66,7 @@ constexpr uint32_t ATTR_DO_CPU_SYNC_INDEX = 6;
 constexpr uint32_t ATTR_HOST_PINNED_COUNTER_ADDR_INDEX = 7;
 constexpr uint32_t ATTR_TOPO_TYPE_INDEX = 8;
 constexpr uint32_t ATTR_RANK_NUM_PER_SERVER_INDEX = 9;
+constexpr uint32_t ATTR_COMM_ALG_INDEX = 10;
 
 constexpr uint32_t ONE_DIM = 1U;
 constexpr uint32_t TWO_DIMS = 2U;
@@ -144,6 +148,14 @@ static bool CheckInputTensorShape(const gert::TilingContext* context, const char
         contextShape->GetStorageShape().GetDimNum() != ONE_DIM,
         OP_LOGE(nodeName, "context dims must be 1, but got %lu.", contextShape->GetStorageShape().GetDimNum()),
         return false);
+    // Preserve the legacy auto-context shape contract; clos_only has a new, fixed shared-Jetty context ABI.
+    if (info.commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY) {
+        constexpr int64_t expectedContextElements = sizeof(Mc2Kernel::MoeSharedJettyContext) / sizeof(int32_t);
+        OP_TILING_CHECK(contextShape->GetStorageShape().GetDim(0) != expectedContextElements,
+                        OP_LOGE(nodeName, "Shared Jetty context length must be %ld, but got %ld.",
+                                expectedContextElements, contextShape->GetStorageShape().GetDim(0)),
+                        return false);
+    }
     OP_TILING_CHECK(xShape->GetStorageShape().GetDimNum() != TWO_DIMS,
                     OP_LOGE(nodeName, "x dims must be 2, but got %lu.", xShape->GetStorageShape().GetDimNum()),
                     return false);
@@ -657,6 +669,7 @@ static ge::graphStatus CheckCommAttr(const gert::TilingContext* context, const c
     auto cclBufferSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_CCL_BUFFER_SIZE_INDEX);
     auto requestedNetworkModePtr = attrs->GetAttrPointer<int64_t>(ATTR_TOPO_TYPE_INDEX);
     auto rankNumPerServerPtr = attrs->GetAttrPointer<int64_t>(ATTR_RANK_NUM_PER_SERVER_INDEX);
+    auto commAlgPtr = attrs->GetAttrPointer<char>(ATTR_COMM_ALG_INDEX);
     OP_TILING_CHECK(epWorldSizePtr == nullptr, OP_LOGE(nodeName, "epWorldSizePtr is null."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(epRankIdPtr == nullptr, OP_LOGE(nodeName, "epRankIdPtr is null."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(cclBufferSizePtr == nullptr, OP_LOGE(nodeName, "cclBufferSizePtr is null."),
@@ -665,7 +678,6 @@ static ge::graphStatus CheckCommAttr(const gert::TilingContext* context, const c
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(rankNumPerServerPtr == nullptr, OP_LOGE(nodeName, "rankNumPerServerPtr is null."),
                     return ge::GRAPH_FAILED);
-
     int64_t epWorldSize = *epWorldSizePtr;
     int64_t requestedNetworkMode = *requestedNetworkModePtr;
     int64_t rankNumPerServer = *rankNumPerServerPtr;
@@ -680,6 +692,17 @@ static ge::graphStatus CheckCommAttr(const gert::TilingContext* context, const c
     OP_TILING_CHECK(*cclBufferSizePtr <= 0,
                     OP_LOGE(nodeName, "ccl_buffer_size must be positive, but got %ld.", *cclBufferSizePtr),
                     return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(!Mc2Aclnn::IsValidMoeEpCommAlg(commAlgPtr), OP_LOGE(nodeName, "Invalid comm_alg=%s.", commAlgPtr),
+                    return ge::GRAPH_FAILED);
+    if (Mc2Aclnn::IsMoeEpClosOnly(commAlgPtr)) {
+        OP_TILING_CHECK(epWorldSize < Mc2Aclnn::MOE_EP_SHARED_JETTY_MIN_RANK_SIZE,
+                        OP_LOGE(nodeName, "clos_only requires at least %ld ranks, but got %ld.",
+                                Mc2Aclnn::MOE_EP_SHARED_JETTY_MIN_RANK_SIZE, epWorldSize),
+                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(requestedNetworkMode != NETWORK_DIRECT,
+                        OP_LOGE(nodeName, "clos_only dispatch supports direct topology only."),
+                        return ge::GRAPH_FAILED);
+    }
 
     MoeEpTopology topology{};
     OP_TILING_CHECK(ResolveMoeEpTopology(static_cast<uint32_t>(epWorldSize), requestedNetworkMode, rankNumPerServer,
@@ -694,6 +717,7 @@ static ge::graphStatus CheckCommAttr(const gert::TilingContext* context, const c
     info.hybrid.rankNumPerServer = topology.rankNumPerServer;
     info.hybrid.serverNum = topology.serverNum;
     info.networkMode = topology.networkMode;
+    info.commAlg = Mc2Aclnn::ParseMoeEpCommAlg(commAlgPtr);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -828,8 +852,43 @@ static void SetSendEntryLayout(MoeEpDispatchInfo& info)
     info.workspace.sendEntryTokenRangeBytes = AlignUp(tokenRangeCapacity * MOE_EP_SEND_ENTRY_BYTES, UB_ALIGN);
 }
 
-static uint64_t BuildDispatchWorkspaceLayout(MoeEpDispatchInfo& info)
+static uint64_t BuildClosOnlyDispatchWorkspaceLayout(MoeEpDispatchInfo& info)
 {
+    uint64_t peers = info.cfg.epWorldSize;
+    uint64_t experts = info.cfg.numExperts;
+    uint64_t cores = info.aivNum;
+    uint64_t tokens = info.cfg.numTokens;
+    auto& workspace = info.workspace;
+    workspace.tileTokens =
+        MoeEpDispatchSchedule::TileTokens(info.cfg.numTokens, info.aivNum, info.cfg.topK, info.metaSlotBytes);
+    workspace.tileCount = MoeEpDispatchSchedule::TileCount(info.cfg.numTokens, workspace.tileTokens);
+    uint64_t rankStride = AlignUpWin(peers * sizeof(int32_t));
+    uint64_t expertStride = AlignUpWin(experts * sizeof(int32_t));
+    workspace.sendCntOffset = workspace.tileCount * rankStride;
+    workspace.tilePrefixOffset = workspace.sendCntOffset + rankStride + expertStride;
+    workspace.expertPartialOffset = workspace.tilePrefixOffset + (workspace.tileCount + 1ULL) * rankStride;
+    workspace.tileReadyOffset = workspace.expertPartialOffset + cores * expertStride;
+    workspace.dstRankInfoOffset = workspace.tileReadyOffset + AlignUpWin(workspace.tileCount * uint64_t{UB_ALIGN});
+    uint64_t rankInfoBytes = AlignUpWin(tokens * info.cfg.topK * sizeof(int16_t));
+    workspace.srcTokenTableOffset = workspace.dstRankInfoOffset + rankInfoBytes;
+    workspace.srcTokenListBytes = AlignUpWin(tokens * sizeof(int32_t));
+    workspace.sendEntryTokenRangeBytes = 0UL;
+    workspace.routeWorkspaceOffset = 0UL;
+    workspace.scaleoutSendEntryOffset = 0UL;
+    workspace.scaleupSendEntryOffset = 0UL;
+    return SYSTEM_NEED_WORKSPACE + workspace.srcTokenTableOffset + peers * workspace.srcTokenListBytes + UB_ALIGN;
+}
+
+static uint64_t BuildAutoDispatchWorkspaceLayout(MoeEpDispatchInfo& info)
+{
+    info.workspace.tileTokens = 0U;
+    info.workspace.tileCount = 0U;
+    info.workspace.sendCntOffset = 0UL;
+    info.workspace.tilePrefixOffset = 0UL;
+    info.workspace.expertPartialOffset = 0UL;
+    info.workspace.tileReadyOffset = 0UL;
+    info.workspace.srcTokenListBytes = 0UL;
+    info.workspace.srcTokenTableOffset = 0UL;
     uint64_t epWorldSize = static_cast<uint64_t>(info.cfg.epWorldSize);
     uint64_t moeExpertNumPerRank = static_cast<uint64_t>(info.cfg.numLocalExperts);
     uint64_t aivNum = static_cast<uint64_t>(info.aivNum);
@@ -887,7 +946,8 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext* cont
     uint32_t aivNum = info.aivNum;
     const MoeEpWindowLayoutParams params = {
         info.cfg.epWorldSize, info.cfg.numLocalExperts, info.cfg.numMaxTokensPerRank, info.cfg.topK,
-        info.cfg.hidden,      info.networkMode,         info.hybrid.rankNumPerServer, info.hybrid.serverNum};
+        info.cfg.hidden,      info.networkMode,         info.hybrid.rankNumPerServer, info.hybrid.serverNum,
+        info.commAlg};
     MoeEpWindowLayout layout{};
     OP_TILING_CHECK(CalcMoeEpWindowLayout(params, layout) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Calculate Moe EP window layout failed."), return ge::GRAPH_FAILED);
@@ -913,6 +973,7 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext* cont
     info.window.scaleoutRecvDataOffset = layout.scaleoutRecvDataOffset;
     info.window.scaleoutRecvStatusOffset = layout.scaleoutRecvStatusOffset;
     info.window.payloadStashWinOffset = layout.payloadStashWinOffset;
+    info.window.completionFlagSourceWinOffset = layout.combineFlagSourceWinOffset;
     OP_LOGD(nodeName, "windowSize = %lu, requiredBytes = %lu", maxWindowSize, layout.requiredBytes);
     return ge::GRAPH_SUCCESS;
 }
@@ -921,12 +982,16 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext* context, MoeEpDispatchI
 {
     size_t* workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(nodeName, "workSpaces is nullptr."), return ge::GRAPH_FAILED);
-    workSpaces[0] = BuildDispatchWorkspaceLayout(info);
+    if (info.networkMode == NETWORK_DIRECT && info.commAlg == Mc2Tiling::MOE_EP_COMM_ALG_CLOS_ONLY) {
+        workSpaces[0] = BuildClosOnlyDispatchWorkspaceLayout(info);
+    } else {
+        workSpaces[0] = BuildAutoDispatchWorkspaceLayout(info);
+    }
     return ge::GRAPH_SUCCESS;
 }
 
 static uint64_t CalTilingKey(const uint32_t doCpuSync, const uint32_t isCached, const uint32_t isTopkWeights,
-                             const uint32_t isMxQuant, const uint32_t networkMode)
+                             const uint32_t isMxQuant, const uint32_t networkMode, const uint32_t commAlg)
 {
     bool cpuSyncMode = false;
     bool CachedMode = false;
@@ -945,7 +1010,8 @@ static uint64_t CalTilingKey(const uint32_t doCpuSync, const uint32_t isCached, 
         mxQuantMode = true;
     }
 
-    return GET_TPL_TILING_KEY(cpuSyncMode, CachedMode, topkWeightsMode, mxQuantMode, static_cast<uint8_t>(networkMode));
+    return GET_TPL_TILING_KEY(cpuSyncMode, CachedMode, topkWeightsMode, mxQuantMode, static_cast<uint8_t>(networkMode),
+                              commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY);
 }
 
 static ge::graphStatus SetPlatformAndNetworkInfo(gert::TilingContext* context, MoeEpDispatchInfo& info,
@@ -957,7 +1023,25 @@ static ge::graphStatus SetPlatformAndNetworkInfo(gert::TilingContext* context, M
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
     uint64_t ubSize = 0UL;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
+    if (info.commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY && info.networkMode == NETWORK_DIRECT) {
+        OP_TILING_CHECK(aivNum <= Mc2Kernel::MOE_SHARED_JETTY_NUM,
+                        OP_LOGE(nodeName,
+                                "clos_only dispatch requires %u sender AIVs and at least one prepare AIV, "
+                                "but got %u AIVs.",
+                                Mc2Kernel::MOE_SHARED_JETTY_NUM, aivNum),
+                        return ge::GRAPH_FAILED);
+    } else if (info.commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY) {
+        OP_TILING_CHECK(aivNum < Mc2Kernel::MOE_SHARED_JETTY_NUM,
+                        OP_LOGE(nodeName, "clos_only dispatch requires at least %u AIVs, but got %u.",
+                                Mc2Kernel::MOE_SHARED_JETTY_NUM, aivNum),
+                        return ge::GRAPH_FAILED);
+        aivNum = Mc2Kernel::MOE_SHARED_JETTY_NUM;
+    }
     OP_TILING_CHECK(aivNum == 0U, OP_LOGE(nodeName, "Platform reports aiv_num=0."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        aivNum > MOE_EP_PER_CORE_DIAG_SLOT_COUNT,
+        OP_LOGE(nodeName, "aiv_num=%u exceeds diagnostic slot capacity %lu.", aivNum, MOE_EP_PER_CORE_DIAG_SLOT_COUNT),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(ubSize == 0UL, OP_LOGE(nodeName, "Platform reports ub_size=0."), return ge::GRAPH_FAILED);
     uint32_t blockDim = ascendcPlatform.CalcTschBlockDim(aivNum, 0, aivNum);
     info.aivNum = aivNum;
@@ -1027,7 +1111,7 @@ static ge::graphStatus MoeEpDispatchTilingFunc(gert::TilingContext* context)
                     OP_LOGE(nodeName, "Set workspace failed."), return ge::GRAPH_FAILED);
 
     uint64_t tilingKey =
-        CalTilingKey(info.doCpuSync, info.isCached, info.isTopkWeights, info.isMxQuant, info.networkMode);
+        CalTilingKey(info.doCpuSync, info.isCached, info.isTopkWeights, info.isMxQuant, info.networkMode, info.commAlg);
     OP_LOGD(nodeName, "tilingKey is %lu", tilingKey);
     context->SetTilingKey(tilingKey);
     PrintTilingDataInfo(nodeName, info);

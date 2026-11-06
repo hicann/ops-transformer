@@ -28,7 +28,8 @@ ASCENDC_TPL_ARGS_DECL(MoeEpDispatch, ASCENDC_TPL_BOOL_DECL(TILINGKEY_DO_CPU_SYNC
                       ASCENDC_TPL_BOOL_DECL(TILINGKEY_IS_TOPK_WEIGHTS, 0, 1),
                       ASCENDC_TPL_BOOL_DECL(TILINGKEY_IS_MXQUANT, 0, 1),
                       ASCENDC_TPL_UINT_DECL(TILINGKEY_NETWORK_MODE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST,
-                                            TILINGKEY_DIRECT, TILINGKEY_HYBRID));
+                                            TILINGKEY_DIRECT, TILINGKEY_HYBRID),
+                      ASCENDC_TPL_BOOL_DECL(TILINGKEY_CLOS_ONLY, 0, 1));
 
 ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_BOOL_SEL(TILINGKEY_DO_CPU_SYNC, 0, 1),
                                      ASCENDC_TPL_BOOL_SEL(TILINGKEY_IS_CACHED, 0, 1),
@@ -36,6 +37,7 @@ ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_BOOL_SEL(TILINGKEY_DO_CPU_SYNC,
                                      ASCENDC_TPL_BOOL_SEL(TILINGKEY_IS_MXQUANT, 0, 1),
                                      ASCENDC_TPL_UINT_SEL(TILINGKEY_NETWORK_MODE, ASCENDC_TPL_UI_LIST, TILINGKEY_DIRECT,
                                                           TILINGKEY_HYBRID),
+                                     ASCENDC_TPL_BOOL_SEL(TILINGKEY_CLOS_ONLY, 0, 1),
                                      ASCENDC_TPL_TILING_STRUCT_SEL(MoeEpDispatchTilingData)), );
 
 } // namespace Mc2Tiling

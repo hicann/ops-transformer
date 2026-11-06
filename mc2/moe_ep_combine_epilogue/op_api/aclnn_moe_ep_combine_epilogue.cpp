@@ -14,6 +14,7 @@
 #include "opdev/op_log.h"
 #include "opdev/common_types.h"
 #include "aclnnInner_moe_ep_combine_epilogue.h"
+#include "../../common/op_api/moe_ep_comm_alg.h"
 
 using namespace op;
 
@@ -34,7 +35,7 @@ static aclnnStatus CheckNotNull(const aclTensor* context, const aclTensor* x, co
 }
 
 static aclnnStatus CheckParams(int64_t epWorldSize, int64_t epRankId, int64_t numExperts, int64_t numMaxTokensPerRank,
-                               int64_t cclBufferSize, int64_t topoType, int64_t rankNumPerServer)
+                               int64_t cclBufferSize, int64_t topoType, int64_t rankNumPerServer, const char* commAlg)
 {
     CHECK_RET(epWorldSize > 1, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(epRankId >= 0 && epRankId < epWorldSize, ACLNN_ERR_PARAM_INVALID);
@@ -44,6 +45,11 @@ static aclnnStatus CheckParams(int64_t epWorldSize, int64_t epRankId, int64_t nu
     CHECK_RET(topoType == NETWORK_DIRECT || topoType == NETWORK_HYBRID, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(rankNumPerServer > 0, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(epWorldSize % rankNumPerServer == 0, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(Mc2Aclnn::IsValidMoeEpCommAlg(commAlg), ACLNN_ERR_PARAM_INVALID);
+    if (Mc2Aclnn::IsMoeEpClosOnly(commAlg)) {
+        CHECK_RET(epWorldSize >= Mc2Aclnn::MOE_EP_SHARED_JETTY_MIN_RANK_SIZE, ACLNN_ERR_PARAM_INVALID);
+        CHECK_RET(topoType == NETWORK_DIRECT, ACLNN_ERR_PARAM_INVALID);
+    }
     return ACLNN_SUCCESS;
 }
 
@@ -61,31 +67,35 @@ aclnnStatus MoeEpCombineEpilogueGetWorkspaceSize(const aclTensor* context, const
                                                  int64_t epWorldSize, int64_t epRankId, int64_t numExperts,
                                                  int64_t numMaxTokensPerRank, int64_t cclBufferSize,
                                                  bool hasTopkWeights, int64_t topoType, int64_t rankNumPerServer,
-                                                 aclTensor* combinedX, aclTensor* combinedTopkWeights,
-                                                 uint64_t* workspaceSize, aclOpExecutor** executor)
+                                                 const char* commAlg, aclTensor* combinedX,
+                                                 aclTensor* combinedTopkWeights, uint64_t* workspaceSize,
+                                                 aclOpExecutor** executor)
 {
     OP_LOGD("MoeEpCombineEpilogue", "Begin to do MoeEpCombineEpilogueGetWorkspaceSize");
     auto retNotNull = CheckNotNull(context, x, topkIdx, recvSrcMetadata, combinedX);
     CHECK_RET(retNotNull == ACLNN_SUCCESS, retNotNull);
-    auto retParams =
-        CheckParams(epWorldSize, epRankId, numExperts, numMaxTokensPerRank, cclBufferSize, topoType, rankNumPerServer);
+    auto retParams = CheckParams(epWorldSize, epRankId, numExperts, numMaxTokensPerRank, cclBufferSize, topoType,
+                                 rankNumPerServer, commAlg);
     CHECK_RET(retParams == ACLNN_SUCCESS, retParams);
 
-    return aclnnInnerMoeEpCombineEpilogueGetWorkspaceSize(context, x, topkIdx, recvSrcMetadata, topkWeights,
-                                                          epWorldSize, epRankId, numExperts, numMaxTokensPerRank,
-                                                          cclBufferSize, hasTopkWeights, topoType, rankNumPerServer,
-                                                          combinedX, combinedTopkWeights, workspaceSize, executor);
+    return aclnnInnerMoeEpCombineEpilogueGetWorkspaceSize(
+        context, x, topkIdx, recvSrcMetadata, topkWeights, epWorldSize, epRankId, numExperts, numMaxTokensPerRank,
+        cclBufferSize, hasTopkWeights, topoType, rankNumPerServer, const_cast<char*>(commAlg), combinedX,
+        combinedTopkWeights, workspaceSize, executor);
 }
 
-aclnnStatus aclnnMoeEpCombineEpilogueGetWorkspaceSize(
-    const aclTensor* context, const aclTensor* x, const aclTensor* topkIdx, const aclTensor* recvSrcMetadata,
-    const aclTensor* topkWeights, int64_t epWorldSize, int64_t epRankId, int64_t numExperts,
-    int64_t numMaxTokensPerRank, int64_t cclBufferSize, bool hasTopkWeights, int64_t topoType, int64_t rankNumPerServer,
-    aclTensor* combinedX, aclTensor* combinedTopkWeights, uint64_t* workspaceSize, aclOpExecutor** executor)
+aclnnStatus aclnnMoeEpCombineEpilogueGetWorkspaceSize(const aclTensor* context, const aclTensor* x,
+                                                      const aclTensor* topkIdx, const aclTensor* recvSrcMetadata,
+                                                      const aclTensor* topkWeights, int64_t epWorldSize,
+                                                      int64_t epRankId, int64_t numExperts, int64_t numMaxTokensPerRank,
+                                                      int64_t cclBufferSize, bool hasTopkWeights, int64_t topoType,
+                                                      int64_t rankNumPerServer, const char* commAlg,
+                                                      aclTensor* combinedX, aclTensor* combinedTopkWeights,
+                                                      uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     return MoeEpCombineEpilogueGetWorkspaceSize(context, x, topkIdx, recvSrcMetadata, topkWeights, epWorldSize,
                                                 epRankId, numExperts, numMaxTokensPerRank, cclBufferSize,
-                                                hasTopkWeights, topoType, rankNumPerServer, combinedX,
+                                                hasTopkWeights, topoType, rankNumPerServer, commAlg, combinedX,
                                                 combinedTopkWeights, workspaceSize, executor);
 }
 

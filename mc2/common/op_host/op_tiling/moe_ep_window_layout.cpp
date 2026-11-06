@@ -57,11 +57,15 @@ ge::graphStatus CalcMoeEpWindowLayout(const MoeEpWindowLayoutParams& params, Moe
     const uint64_t countNotifySize = epWorldSize * MOE_EP_WIN_ALIGN;
     const uint64_t expertCountSize = epWorldSize * AlignMoeEpWin(params.localExpertNum * sizeof(int32_t));
 
-    uint64_t notifySlots = MOE_EP_CHANNEL_BUDGET / (epWorldSize - 1UL);
-    if (notifySlots > MOE_EP_DISPATCH_NOTIFY_COUNT) {
-        notifySlots = MOE_EP_DISPATCH_NOTIFY_COUNT;
+    if (params.commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY) {
+        layout.dispatchNotifyCount = static_cast<uint32_t>(MOE_EP_DISPATCH_NOTIFY_COUNT);
+    } else {
+        uint64_t notifySlots = MOE_EP_FULLMESH_CHANNEL_BUDGET / (epWorldSize - 1UL);
+        if (notifySlots > MOE_EP_FULLMESH_DISPATCH_NOTIFY_COUNT) {
+            notifySlots = MOE_EP_FULLMESH_DISPATCH_NOTIFY_COUNT;
+        }
+        layout.dispatchNotifyCount = static_cast<uint32_t>(notifySlots == 0UL ? 1UL : notifySlots);
     }
-    layout.dispatchNotifyCount = static_cast<uint32_t>(notifySlots == 0UL ? 1UL : notifySlots);
 
     layout.cntWinStateOffset = MOE_EP_FIXED_PREFIX_BYTES;
     layout.cntWinStateSize = countNotifySize + expertCountSize;
@@ -71,7 +75,10 @@ ge::graphStatus CalcMoeEpWindowLayout(const MoeEpWindowLayoutParams& params, Moe
     layout.payloadWinStateSize = layout.dispatchNotifyCount * MOE_EP_WIN_ALIGN;
     layout.combineStateWinOffset = layout.payloadWinStateOffset + layout.payloadWinStateSize;
     const uint64_t combineFlagCount =
-        epWorldSize > MOE_EP_COMBINE_CHANNEL_HANDLE_COUNT ? epWorldSize : MOE_EP_COMBINE_CHANNEL_HANDLE_COUNT;
+        params.commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY ?
+            epWorldSize * MOE_EP_JETTY_COUNT :
+            (epWorldSize > MOE_EP_FULLMESH_COMBINE_CHANNEL_HANDLE_COUNT ? epWorldSize :
+                                                                          MOE_EP_FULLMESH_COMBINE_CHANNEL_HANDLE_COUNT);
     const uint64_t combineReceiveStateSize = nmt * topK * MOE_EP_WIN_ALIGN + combineFlagCount * MOE_EP_WIN_ALIGN;
     layout.combineFlagSourceWinOffset = layout.combineStateWinOffset + combineReceiveStateSize;
     // The non-inline asynchronous completion write must read from persistent window storage, not op workspace.

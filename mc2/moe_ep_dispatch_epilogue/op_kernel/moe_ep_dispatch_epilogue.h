@@ -43,6 +43,8 @@
 #include "../../common/op_kernel/moe_distribute_base.h"
 #include "../../common/op_kernel/mc2_kernel_utils.h"
 #include "../../common/op_kernel/mc2_moe_context.h"
+#include "../../common/op_kernel/moe_shared_jetty_context.h"
+#include "../../common/op_kernel/moe_ep_comm_alg_def.h"
 #include "../../common/op_kernel/moe_ep_exception_dump_writer.h"
 #include "../../common/op_kernel/moe_ep_send_completion.h"
 
@@ -124,8 +126,13 @@ private:
 
     __aicore__ inline void SplitToCore(uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t& startId, uint32_t& endId,
                                        uint32_t& sendNum);
-    __aicore__ inline GM_ADDR GetWinAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext* ctx, uint32_t rankId, uint64_t offset)
+    __aicore__ inline GM_ADDR GetWinAddrByRankId(uint32_t rankId, uint64_t offset)
     {
+        if (useSharedJetty_) {
+            auto ctx = reinterpret_cast<__gm__ Mc2Kernel::MoeSharedJettyContext*>(mc2Context_);
+            return (GM_ADDR)ctx->epHcclBuffer[rankId] + offset;
+        }
+        auto ctx = reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(mc2Context_);
         return (GM_ADDR)ctx->epHcclBuffer[rankId] + offset;
     }
     __aicore__ inline uint32_t ReduceSumWorkNeedSize(int32_t count, int32_t typeSize)
@@ -138,7 +145,8 @@ private:
     }
 
     TPipe* tpipe_{nullptr};
-    __gm__ Mc2Aclnn::MoeCommContext* mc2Context_{nullptr};
+    GM_ADDR mc2Context_{nullptr};
+    bool useSharedJetty_{false};
     MoeEpExceptionDump::MoeEpCoreDiagWriter diagWriter_;
     uint32_t epRankId_{0};
     uint32_t networkMode_{0};      // 0 = direct(自段 x 直读输入), 1 = hybrid(自段 x 读win)
@@ -292,21 +300,28 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     winDataOffset_ = tilingData->winDataOffset;
     slotWinStateOffset_ = tilingData->slotWinStateOffset;
 
-    mc2Context_ = reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(context);
-    epRankId_ = mc2Context_->epRankId;
+    mc2Context_ = context;
+    useSharedJetty_ = tilingData->commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY;
+    epRankId_ = useSharedJetty_ ? reinterpret_cast<__gm__ Mc2Kernel::MoeSharedJettyContext*>(context)->epRankId :
+                                  reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(context)->epRankId;
     totalWinSizeEp_ = tilingData->totalWinSizeEp;
 #if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
     for (uint32_t oomRankId = 0; oomRankId < epWorldSize_; ++oomRankId) {
-        OOMCheckAddrRange<uint8_t>(reinterpret_cast<__gm__ uint8_t*>(GetWinAddrByRankId(mc2Context_, oomRankId, 0)),
+        OOMCheckAddrRange<uint8_t>(reinterpret_cast<__gm__ uint8_t*>(GetWinAddrByRankId(oomRankId, 0)),
                                    totalWinSizeEp_);
     }
 #endif
     constexpr size_t metadataOffset = offsetof(MoeEpDispatchEpilogueTilingData, moeEpDispatchEpilogueInfo) +
                                       offsetof(MoeEpDispatchEpilogueInfo, dumpMetadata);
-    MoeEpExceptionDump::WriteMetadata(context, tilingGM + metadataOffset);
-    diagWriter_.Init(context, MOE_EP_CORE_DIAG_DISPATCH_EPILOGUE, tpipe_);
-    localSlotStateWinAddr_ = GetWinAddrByRankId(mc2Context_, epRankId_, slotWinStateOffset_);
-    localWinAddr_ = GetWinAddrByRankId(mc2Context_, epRankId_, winDataOffset_);
+    if (useSharedJetty_) {
+        MoeEpExceptionDump::WriteMetadata<Mc2Kernel::MoeSharedJettyContext>(context, tilingGM + metadataOffset);
+        diagWriter_.Init<Mc2Kernel::MoeSharedJettyContext>(context, MOE_EP_CORE_DIAG_DISPATCH_EPILOGUE, tpipe_);
+    } else {
+        MoeEpExceptionDump::WriteMetadata<Mc2Aclnn::MoeCommContext>(context, tilingGM + metadataOffset);
+        diagWriter_.Init<Mc2Aclnn::MoeCommContext>(context, MOE_EP_CORE_DIAG_DISPATCH_EPILOGUE, tpipe_);
+    }
+    localSlotStateWinAddr_ = GetWinAddrByRankId(epRankId_, slotWinStateOffset_);
+    localWinAddr_ = GetWinAddrByRankId(epRankId_, winDataOffset_);
     // 槽内 scales/meta 基址: direct 紧拼 tokenSize; hybrid 为 ALIGN32(tokenSize)（hybrid dispatch 整槽布局）
     uint32_t hAlignSize = Ceil((uint32_t)(axisH_ * sizeof(XType)), UB_ALIGN) * UB_ALIGN;
     uint32_t slotMetaBase = (tilingData->networkMode == NETWORK_HYBRID) ? hAlignSize : axisH_ * sizeof(XType);
@@ -530,7 +545,13 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     // 所有输出在交给Combine前写完，包含metadata及slot索引。
     SyncFunc<AscendC::HardEvent::MTE3_S>();
     diagWriter_.RunPosRecord(MOE_EP_DISPATCH_EPILOGUE_RUN_POS_OUTPUT_DONE);
-    MoeEpCompletion::DrainChannels(mc2Context_, epWorldSize_, tpipe_);
+    if (useSharedJetty_) {
+        MoeEpCompletion::DrainChannels(reinterpret_cast<__gm__ Mc2Kernel::MoeSharedJettyContext*>(mc2Context_),
+                                       epWorldSize_, tpipe_);
+    } else {
+        MoeEpCompletion::DrainChannels(reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(mc2Context_), epWorldSize_,
+                                       tpipe_);
+    }
 }
 
 template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>

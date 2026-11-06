@@ -32,7 +32,7 @@ using namespace MoeEpDispatchEpilogueImpl;
 using namespace Mc2Tiling;
 using namespace AscendC;
 
-template <uint32_t ArchTag, bool IsCached, bool HasTopkWeights, bool IsMxQuant>
+template <uint32_t ArchTag, bool IsCached, bool HasTopkWeights, bool IsMxQuant, bool ClosOnly>
 __global__ __aicore__ void moe_ep_dispatch_epilogue(GM_ADDR context, GM_ADDR x, GM_ADDR topkIdx, GM_ADDR numRecvPerRank,
                                                     GM_ADDR numRecvPerExpert, GM_ADDR cachedRecvSrcMetadata,
                                                     GM_ADDR recvX, GM_ADDR recvSrcMetadata, GM_ADDR recvTopkWeights,
@@ -46,6 +46,7 @@ __global__ __aicore__ void moe_ep_dispatch_epilogue(GM_ADDR context, GM_ADDR x, 
     using ScalesType = typename std::conditional<IsMxQuant, fp8_e8m0_t, float>::type;
 
 #if defined(ENABLE_MOE_EP_DISPATCH_EPILOGUE_KERNEL)
+    (void)ClosOnly;
     MoeEpDispatchEpilogue<DTYPE_RECV_X, ScalesType, IsCached, HasTopkWeights> op;
     op.Init(context, x, topkIdx, numRecvPerRank, numRecvPerExpert, cachedRecvSrcMetadata, recvX, recvSrcMetadata,
             recvTopkWeights, recvScales, workspace, tilingGM, &pipe, &tilingData.moeEpDispatchEpilogueInfo);
