@@ -9,13 +9,18 @@
  */
 
 /*!
- * \file all_to_all_qbmm_mx_kernel_tpn.h
- * \brief MatmulAllToAll MX 场景 matmul 内核
+ * \file qbmm_kernel_slice_n.h
+ * \brief MatmulAllToAll MX/HiF4 场景 matmul 内核
  */
 
 #pragma once
 
+#if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"
+#else
+#include "kernel_operator.h"
+#include "kernel_operator_intf.h"
+#endif
 #include "kernel_tiling/kernel_tiling.h"
 
 #include "blaze/gemm/block/block_mmad_qbmm_mx.h"
@@ -36,10 +41,10 @@ using namespace AscendC;
 using asc::te::get;
 
 /**
- * @brief MX 量化批量矩阵乘kernel
+ * @brief MX/HiF4 量化批量矩阵乘kernel
  *
  * 每次 Run(params) 处理一个 tile 的全部 batch 计算：
- *   - 遍历 batchCount 个 batch（每个 batch 对应一个 rank 的 B 段）
+ *   - 遍历 batchCount 个 batch（每个 batch 对应一个 rank 的 B 段），按 realRank 坐标切片计算
  *   - 每个 batch 内通过 BlockScheduler 调度 tile，调用 mmadOp_ 执行计算
  *   - 支持 skipSelfBatch 跳过本 rank batch（LocalDelay 场景）
  *   - 支持 cGmSelfAddr 将本 rank 结果直接写入 cGM
@@ -57,15 +62,18 @@ public:
     using LayoutA = typename BlockMmad::LayoutA;
     using LayoutB = typename BlockMmad::LayoutB;
     using LayoutC = typename BlockMmad::LayoutC;
-    using TypeScaleA = ::fp8_e8m0_t;
-    using TypeScaleB = ::fp8_e8m0_t;
+    // Scale 元素类型由 BlockMmad 按 AType 键控导出(ops-tensor 公共 MxScaleType):
+    // MX 量化 → fp8_e8m0_t, HiF4 量化(hifloat4x2_t) → hif4_scale，A/B 两侧 scale 元素类型对称。
+    using ScaleType = typename BlockMmad::ScaleType;
+    static_assert(Std::is_same_v<MxScaleType<AType>, MxScaleType<BType>>,
+                  "A/B scale element types must be identical (MX/HiF4 symmetric quant)");
 
     static constexpr bool WEIGHT_NZ = BlockMmad::WEIGHT_NZ;
     static constexpr bool TRANS_B = BlockMmad::TRANS_B;
     static constexpr int64_t C0_SIZE = IsFp4<AType>() ? C0_SIZE_B4 : C0_SIZE_B8;
     static constexpr int64_t CACHE_LINE_ALIGN_MASK = IsFp4<AType>() ? 0xff : 0x7f;
-    static constexpr int32_t SCALE_C0 = 2;
-    static constexpr uint64_t SIZE_SHIFT = IsFp4<AType>() ? 1 : 0; // FP4 两元素共 1 字节，元素数转字节数右移 1
+    // Scale framing C0 由 ops-tensor 公共 GetScaleC0 按数据类型导出(MX/E8M0 → 2, HiF4 → 1)
+    static constexpr int32_t SCALE_C0 = static_cast<int32_t>(GetScaleC0<AType>());
 
     using BlockMmadParams = typename BlockMmad::Params;
     using L1Params = typename BlockMmad::L1Params;
@@ -78,7 +86,9 @@ public:
     using MakeLayoutB = asc::te::frame_layout_format<LayoutB, Std::Int<C0_SIZE>>;
     using MakeLayoutC = asc::te::frame_layout_format<LayoutC, Std::Int<asc::te::c0_element<CType>>>;
     using MakeLayoutScaleA = asc::te::frame_layout_format<asc::te::scalea_nd_layout_ptn, Std::Int<SCALE_C0>>;
-    using MakeLayoutScaleB = asc::te::frame_layout_format<asc::te::scaleb_dn_layout_ptn, Std::Int<SCALE_C0>>;
+    // ScaleB 布局: TRANS_B 为 DN(N, K组), 非转置为 ND(K组, N)，与 B 矩阵布局分支一致
+    using MakeLayoutScaleB = asc::te::frame_layout_format<
+        Std::conditional_t<TRANS_B, asc::te::scaleb_dn_layout_ptn, asc::te::scaleb_nd_layout_ptn>, Std::Int<SCALE_C0>>;
 
     struct QBMMTiling {
         enum BiasMode : uint32_t {
@@ -96,7 +106,7 @@ public:
 
     struct LocalParams {
         uint64_t origM;        // Win 区单个 rank chunk 的 M 行数（主/尾块取较大者）
-        uint32_t selfBatchIdx; // 本 rank 对应的 batch 序号
+        uint32_t selfBatchIdx; // 需要单独输出到 cGmSelfAddr 地址的 batch 序号，通常是本卡对应的 batch 序号;无 self batch 场景传 batchCount 作哨兵。
         GM_ADDR cGmSelfAddr;   // 融合模式下本 rank 结果直写 cGM 的目标地址
         bool skipSelfBatch;    // true 时 batch 循环跳过 selfBatchIdx（LocalDelay 的 remote 计算）
     };
@@ -119,8 +129,8 @@ public:
 
 private:
     __aicore__ inline void ResetGmAddr(const Params& params);
-    __aicore__ inline void ProcessSingleBatch(const Params& params, BlockScheduler& bs, uint64_t restBatch,
-                                              bool isTailRound);
+    __aicore__ inline void ProcessSingleBatch(const Params& params, BlockScheduler& bs, uint32_t realRank,
+                                              bool isSelfBatch, uint64_t restBatch, bool isTailRound);
 
     template <typename TensorB, typename TensorScaleB, typename TensorC>
     __aicore__ inline void SetL2Cache(const ProblemShape& problemShape, uint64_t curBaseM, uint64_t baseN,
@@ -137,8 +147,8 @@ private:
     __gm__ CType* cGmAddr_{};
     __gm__ CType* cGmSelfAddr_{};
     __gm__ BiasType* biasGmAddr_{};
-    __gm__ TypeScaleA* scaleAGmAddr_{};
-    __gm__ TypeScaleB* scaleBGmAddr_{};
+    __gm__ ScaleType* scaleAGmAddr_{};
+    __gm__ ScaleType* scaleBGmAddr_{};
 
     bool isBias_{false};
     bool needUpdateTail_{false};
@@ -172,10 +182,6 @@ __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARA
 
     BlockScheduler bs(params.problemShape, params.schParams);
 
-    int64_t n = asc::te::get<MNK_N>(params.problemShape);
-    int64_t k = asc::te::get<MNK_K>(params.problemShape);
-    int64_t scaleKLen = Blaze::Gemm::CeilDiv(k, static_cast<int64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
-
     uint32_t batchCnt = params.qbmmParams.batchCount;
     uint64_t singleBatchTileCnt = bs.GetTotalCnt();
     uint64_t tailRoundStart = (singleBatchTileCnt * batchCnt / AscendC::GetBlockNum()) * AscendC::GetBlockNum();
@@ -188,23 +194,11 @@ __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARA
         // batch 序号到真实 rank 的映射：skipSelfBatch 时跳过本 rank，
         // 即 b < selfBatchIdx 时 rank=b，否则 rank=b+1
         uint32_t realRank = params.localParams.skipSelfBatch ? ((b < params.localParams.selfBatchIdx) ? b : b + 1) : b;
-
-        ResetGmAddr(params);
-        // B/scaleB/bias 按 rank 分段，寻址到起始地址
-        bGmAddr_ += (static_cast<uint64_t>(realRank) * n * k) >> SIZE_SHIFT;
-        scaleBGmAddr_ += static_cast<uint64_t>(realRank) * n * static_cast<uint64_t>(scaleKLen);
-        if (isBias_) {
-            biasGmAddr_ += static_cast<uint64_t>(realRank) * n;
-        }
-
         // C 写入去向：本 rank batch 直写 cGmSelfAddr，其余写 Win 区
-        if (!params.localParams.skipSelfBatch && b == params.localParams.selfBatchIdx) {
-            cGmAddr_ = cGmSelfAddr_;
-        } else {
-            cGmAddr_ += static_cast<uint64_t>(realRank) * params.localParams.origM * n;
-        }
+        // (selfBatchIdx 传 batchCount 哨兵时 b == selfBatchIdx 恒不成立, 恒走 Win 区分支)
+        bool isSelfBatch = (!params.localParams.skipSelfBatch && b == params.localParams.selfBatchIdx);
 
-        ProcessSingleBatch(params, bs, restBatch, isTailRound);
+        ProcessSingleBatch(params, bs, realRank, isSelfBatch, restBatch, isTailRound);
     }
 }
 
@@ -219,8 +213,8 @@ __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARA
     bGmAddr_ = reinterpret_cast<__gm__ BType*>(params.mmadParams.bGmAddr);
     cGmAddr_ = reinterpret_cast<__gm__ CType*>(params.mmadParams.cGmAddr);
     cGmSelfAddr_ = reinterpret_cast<__gm__ CType*>(params.localParams.cGmSelfAddr);
-    scaleAGmAddr_ = reinterpret_cast<__gm__ TypeScaleA*>(params.mmadParams.scaleAGmAddr);
-    scaleBGmAddr_ = reinterpret_cast<__gm__ TypeScaleB*>(params.mmadParams.scaleBGmAddr);
+    scaleAGmAddr_ = reinterpret_cast<__gm__ ScaleType*>(params.mmadParams.scaleAGmAddr);
+    scaleBGmAddr_ = reinterpret_cast<__gm__ ScaleType*>(params.mmadParams.scaleBGmAddr);
     if (isBias_) {
         biasGmAddr_ = reinterpret_cast<__gm__ BiasType*>(params.mmadParams.biasGmAddr);
     }
@@ -228,17 +222,21 @@ __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARA
 
 QBMM_MX_KERNEL_TPN_CLASS_TEM_PARAMS
 __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARAMS>::ProcessSingleBatch(
-    const Params& params, BlockScheduler& bs, uint64_t restBatch, bool isTailRound)
+    const Params& params, BlockScheduler& bs, uint32_t realRank, bool isSelfBatch, uint64_t restBatch, bool isTailRound)
 {
     const auto m = asc::te::get<MNK_M>(params.problemShape);
     const auto n = asc::te::get<MNK_N>(params.problemShape);
     const auto k = asc::te::get<MNK_K>(params.problemShape);
-    const auto scaleKLen = Blaze::Gemm::CeilDiv(k, static_cast<int64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
+    const auto scaleKLen = static_cast<int64_t>(MxScaleKLen<AType>(static_cast<uint64_t>(k)));
+
+    // 每次重建覆盖 batchCount×n 完整 N 区间的 B/scaleB/bias 视图
+    const int64_t fullN =
+        n * static_cast<int64_t>(params.qbmmParams.batchCount + (params.localParams.skipSelfBatch ? 1U : 0U));
     auto layoutA = MakeLayoutA{}(m, k);
     auto layoutScaleA = MakeLayoutScaleA{}(m, scaleKLen);
-    auto layoutB = MakeLayoutB{}(k, n);
-    auto layoutScaleB = MakeLayoutScaleB{}(scaleKLen, n);
-    auto layoutBias = asc::te::make_frame_layout<asc::te::nd_ext_layout_ptn>(1L, n);
+    auto layoutB = MakeLayoutB{}(k, fullN);
+    auto layoutScaleB = MakeLayoutScaleB{}(scaleKLen, fullN);
+    auto layoutBias = asc::te::make_frame_layout<asc::te::nd_ext_layout_ptn>(1L, fullN);
     auto layoutC = MakeLayoutC{}(m, n);
 
     auto gmA = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(aGmAddr_), layoutA);
@@ -246,7 +244,13 @@ __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARA
     auto gmB = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(bGmAddr_), layoutB);
     auto gmScaleB = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(scaleBGmAddr_), layoutScaleB);
     auto gmBias = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(biasGmAddr_), layoutBias);
-    auto gmC = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(cGmAddr_), layoutC);
+    auto gmCSelf = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(cGmSelfAddr_), layoutC);
+
+    const uint64_t cBatchStride = params.localParams.origM * static_cast<uint64_t>(n);
+    auto gmC = isSelfBatch ? gmCSelf :
+                             asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(
+                                                      cGmAddr_ + static_cast<uint64_t>(realRank) * cBatchStride),
+                                                  layoutC);
 
     auto& mTailTile = params.schParams.mTailTile;
     auto& nTailTile = params.schParams.nTailTile;
@@ -273,11 +277,19 @@ __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARA
         }
 
         bs.GetTileCoord(blockIdx, mPos, nPos);
+        // rank 段在 B/scaleB/bias 全量视图中的列坐标
+        const int64_t fullNPos = static_cast<int64_t>(realRank) * n + nPos;
         auto gmBlockA = gmA.slice(asc::te::make_coord(mPos, kPos), asc::te::make_shape(baseM, k));
         auto gmBlockScaleA = gmScaleA.slice(asc::te::make_coord(mPos, kPos), asc::te::make_shape(baseM, scaleKLen));
-        auto gmBlockB = gmB.slice(asc::te::make_coord(kPos, nPos), asc::te::make_shape(k, baseN));
-        auto gmBlockScaleB = gmScaleB.slice(asc::te::make_coord(kPos, nPos), asc::te::make_shape(scaleKLen, baseN));
-        auto gmBlockBias = gmBias.slice(asc::te::make_coord(0L, nPos), asc::te::make_shape(1L, baseN));
+        auto gmBlockB = gmB.slice(asc::te::make_coord(kPos, fullNPos), asc::te::make_shape(k, baseN));
+        // HiF4+非转置: scale 沿 N 每列字段占 2B, hif4_scale 指针单位为 4B
+        int64_t scaleBColPos = fullNPos;
+        if constexpr (IsHif4<AType>() && !TRANS_B) {
+            scaleBColPos = fullNPos >> 1;
+        }
+        auto gmBlockScaleB =
+            gmScaleB.slice(asc::te::make_coord(kPos, scaleBColPos), asc::te::make_shape(scaleKLen, baseN));
+        auto gmBlockBias = gmBias.slice(asc::te::make_coord(0L, fullNPos), asc::te::make_shape(1L, baseN));
         auto gmBlockC = gmC.slice(asc::te::make_coord(mPos, nPos), asc::te::make_shape(baseM, baseN));
         mmadOp_(gmBlockA, gmBlockB, gmBlockScaleA, gmBlockScaleB, gmBlockBias, gmBlockC, singleShape);
     }
@@ -296,17 +308,21 @@ __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARA
     if (asc::te::get<MNK_B>(problemShape) != 1) {
         return;
     }
+    // 每64元素的 scale 字节数: MX 为 2(E8M0), HiF4 为 4(hif4_scale), 单元数由公共 MxScaleKLen 按数据类型导出
     if constexpr (TRANS_B) {
         const int64_t scaleKRowBytes =
-            Blaze::Gemm::CeilDiv(asc::te::get<MNK_K>(problemShape), static_cast<int64_t>(MXFP_DIVISOR_SIZE)) *
-            MXFP_MULTI_BASE_SIZE;
-        const int64_t scaleKL1RowBytes = Blaze::Gemm::CeilDiv(scaleKL1, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE;
+            static_cast<int64_t>(MxScaleKLen<BType>(static_cast<uint64_t>(asc::te::get<MNK_K>(problemShape)))) *
+            static_cast<int64_t>(sizeof(ScaleType));
+        const int64_t scaleKL1RowBytes =
+            static_cast<int64_t>(MxScaleKLen<BType>(scaleKL1)) * static_cast<int64_t>(sizeof(ScaleType));
         const bool scaleAlignForL2Stream =
             (scaleKRowBytes & CACHE_LINE_ALIGN_MASK) == 0 && (scaleKL1RowBytes & CACHE_LINE_ALIGN_MASK) == 0;
         gmScaleB.set_l2_cache_hint(scaleAlignForL2Stream ? asc::te::cache_mode::disable : asc::te::cache_mode::normal);
     } else {
-        const int64_t scaleNStrideBytes = asc::te::get<MNK_N>(problemShape) * MXFP_MULTI_BASE_SIZE;
-        const int64_t scaleBaseNStrideBytes = baseN * MXFP_MULTI_BASE_SIZE;
+        const int64_t scaleBytesPerDivisor =
+            static_cast<int64_t>(MxScaleKLen<BType>(MXFP_DIVISOR_SIZE)) * static_cast<int64_t>(sizeof(ScaleType));
+        const int64_t scaleNStrideBytes = asc::te::get<MNK_N>(problemShape) * scaleBytesPerDivisor;
+        const int64_t scaleBaseNStrideBytes = static_cast<int64_t>(baseN) * scaleBytesPerDivisor;
         const bool scaleAlignForL2Stream =
             (scaleNStrideBytes & CACHE_LINE_ALIGN_MASK) == 0 && (scaleBaseNStrideBytes & CACHE_LINE_ALIGN_MASK) == 0;
         gmScaleB.set_l2_cache_hint(scaleAlignForL2Stream ? asc::te::cache_mode::disable : asc::te::cache_mode::normal);

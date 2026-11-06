@@ -19,7 +19,7 @@
 #include "blaze/gemm/policy/dispatch_policy.h"
 #include "blaze/gemm/block/block_mmad_qbmm_mx.h"
 #include "blaze/gemm/block/block_scheduler_qbmm.h"
-#include "../../matmul/quant_batch_matmul/matmul_all_to_all_qbmm_mx_kernel.h"
+#include "../../matmul/quant_batch_matmul/qbmm_kernel_slice_n.h"
 #include "../../../../mc2_templates/communication/communicator/hccl_communicator.h"
 #include "../../../../mc2_templates/communication/primitives/hccl_primitives.h"
 #include "../../../tiling/matmul_tiling/quant_matmul_tiling_data.h"
@@ -112,12 +112,12 @@ private:
     using DispatchPolicy = Blaze::Gemm::MatmulWithScaleMx<0, false>;
     using BlockMmad = Blaze::Gemm::Block::BlockMmad<DispatchPolicy, X1Type, LayoutA, X2Type, LayoutB, YType, LayoutC,
                                                     BiasType, LayoutBias>;
-    using KernelImpl = Blaze::Gemm::Kernel::MatmulAllToAllQbmmMxKernel<ProblemShape, BlockMmad, BlockScheduler>;
+    using KernelImpl = Blaze::Gemm::Kernel::QuantBatchMatmulMxKernel<ProblemShape, BlockMmad, BlockScheduler>;
     // Scale 元素类型由 kernel 侧 BlockMmad 按 X1Type 键控导出(ops-tensor 公共 MxScaleType):
     // MX 量化 → fp8_e8m0_t, HiF4 量化(hifloat4x2_t) → hif4_scale; 编排层不显式传 scale 类型
-    using ScaleType = typename KernelImpl::ScaleType;
+    using ScaleType = typename BlockMmad::ScaleType;
     using Params = typename KernelImpl::Params;
-    using SliceParams = typename KernelImpl::SliceParams;
+    using LocalParams = typename KernelImpl::LocalParams;
     using BlockMmadParams = typename KernelImpl::BlockMmadParams;
     using L1Params = typename KernelImpl::L1Params;
     using BlockSchedulerParams = typename KernelImpl::BlockSchedulerParams;
@@ -126,32 +126,19 @@ private:
         MC2KernelTemplate::HcclCommunicator<true, ServerType, MC2KernelTemplate::MC2AlltoAllContext, TilingDataType,
                                             MC2KernelTemplate::MC2AlltoAllPrimitives, 1, 0>;
 
-    // Keep the QBMM kernel independent of the concrete HCCL communicator.
-    struct HcommIssuePolicy {
-        CommunicationType* communication;
+    static constexpr uint16_t AIC_BARRIER_FLAG_ID = 8U;
 
-        __aicore__ inline void IssueSlice(uint32_t sliceIndex)
-        {
-            communication->Process(sliceIndex);
-        }
-    };
-
-    __aicore__ inline void SetupParams(Params& params, uint64_t rowOffset, uint32_t taskM, uint32_t taskCnt,
-                                       const QuantMatmulTilingData& mmTile)
+    __aicore__ inline void SetupParams(Params& params, uint64_t rowOffset, const QuantMatmulTilingData& mmTile,
+                                       uint64_t rankK, uint64_t rankNChunk, uint64_t scaleK)
     {
         const auto& tilingInfo = tilingData_->matmulAllToAllTilingInfo;
-        const uint64_t rankNPerPeer = static_cast<uint64_t>(tilingInfo.rankN) / tilingInfo.rankDim;
-        // scale K 向单元数(按 scale 元素计), 由 ops-tensor 公共 MxScaleKLen 按数据类型(X1Type)导出:
-        // MX 为 E8M0 单元(K/64*2), HiF4 为 hif4_scale 单元(K/64)
-        const uint64_t scaleK = Blaze::Gemm::MxScaleKLen<X1Type>(static_cast<uint64_t>(tilingInfo.rankK));
-
         ProblemShape problemShape{mmTile.m, mmTile.n, mmTile.k, 1UL};
         BlockMmadParams mmParams;
-        mmParams.aGmAddr = MatmulAllToAllMxGmAddr<X1Type>(x1_, rowOffset * tilingInfo.rankK);
+        mmParams.aGmAddr = MatmulAllToAllMxGmAddr<X1Type>(x1_, rowOffset * rankK);
         mmParams.scaleAGmAddr = MatmulAllToAllMxGmAddr<ScaleType>(x1Scale_, rowOffset * scaleK);
         mmParams.bGmAddr = x2_;
         mmParams.scaleBGmAddr = x2Scale_;
-        mmParams.cGmAddr = MatmulAllToAllMxGmAddr<YType>(workspaceGM_, rowOffset * rankNPerPeer);
+        mmParams.cGmAddr = MatmulAllToAllMxGmAddr<YType>(workspaceGM_, rowOffset * rankNChunk);
         mmParams.biasGmAddr = bias_;
 
         L1Params l1Params{static_cast<uint64_t>(mmTile.stepK) * mmTile.baseK, mmTile.scaleKL1, mmTile.nBufferNum};
@@ -163,23 +150,41 @@ private:
                                              mmTile.nBaseTailSplitCnt,
                                              mmTile.mTailMain,
                                              mmTile.nTailMain};
-        QBMMTiling qbmmParams{mmTile.baseM, mmTile.baseN, mmTile.baseK, mmTile.dbL0c, bias_ != nullptr};
-        SliceParams sliceParams{MatmulAllToAllMxByteOffset<X1Type>(static_cast<uint64_t>(taskM) * tilingInfo.rankK),
-                                MatmulAllToAllMxByteOffset<ScaleType>(static_cast<uint64_t>(taskM) * scaleK),
-                                MatmulAllToAllMxByteOffset<YType>(static_cast<uint64_t>(taskM) * rankNPerPeer),
-                                taskCnt};
-        params = {problemShape,       mmParams,   l1Params,
-                  schedulerParams,    qbmmParams, static_cast<uint64_t>(tilingInfo.rankM) * rankNPerPeer,
-                  tilingInfo.rankDim, sliceParams};
+        QBMMTiling qbmmParams{tilingInfo.rankDim,
+                              mmTile.baseM,
+                              mmTile.baseN,
+                              mmTile.baseK,
+                              bias_ != nullptr ? QBMMTiling::BIAS_ENABLED : QBMMTiling::BIAS_DISABLED,
+                              mmTile.dbL0c,
+                              false};
+        // 模版中通过 selfBatchIdx 传入，将其对应的 batch 计算得到的数据单独放在 cGmSelfAddr 中
+        // hcomm 无 self batch 直写: 全部 rank 结果写 Win 区供 Hcomm 提交
+        // 因此 selfBatchIdx 传 rankDim 作哨兵，不会单独处理任何 batch
+        LocalParams localParams{static_cast<uint64_t>(tilingInfo.rankM), tilingInfo.rankDim, nullptr, false};
+        params = {problemShape, mmParams, l1Params, schedulerParams, qbmmParams, localParams};
     }
 
     __aicore__ inline void MatmulProcess(uint64_t startRow, uint32_t taskM, uint32_t taskCnt,
-                                         const QuantMatmulTilingData& mmTile)
+                                         const QuantMatmulTilingData& mmTile, uint64_t rankK, uint64_t rankNChunk)
     {
+        // scale K 向单元数(按 scale 元素计), 由 ops-tensor 公共 MxScaleKLen 按数据类型(X1Type)导出:
+        // MX 为 E8M0 单元(K/64*2), HiF4 为 hif4_scale 单元(K/64)
+        const uint64_t scaleK = Blaze::Gemm::MxScaleKLen<X1Type>(rankK);
         Params params;
-        SetupParams(params, startRow, taskM, taskCnt, mmTile);
-        HcommIssuePolicy commPolicy{&communication_};
-        kernel_(params, commPolicy);
+        SetupParams(params, startRow, mmTile, rankK, rankNChunk, scaleK);
+        for (uint32_t sliceIdx = 0; sliceIdx < taskCnt; ++sliceIdx) {
+            kernel_(params);
+            AscendC::CrossCoreSetFlag<0, PIPE_FIX>(AIC_BARRIER_FLAG_ID);
+            AscendC::CrossCoreWaitFlag<0, PIPE_S>(AIC_BARRIER_FLAG_ID);
+            communication_.Process(sliceIdx);
+            if (sliceIdx + 1 < taskCnt) {
+                params.mmadParams.aGmAddr += MatmulAllToAllMxByteOffset<X1Type>(static_cast<uint64_t>(taskM) * rankK);
+                params.mmadParams.scaleAGmAddr +=
+                    MatmulAllToAllMxByteOffset<ScaleType>(static_cast<uint64_t>(taskM) * scaleK);
+                params.mmadParams.cGmAddr +=
+                    MatmulAllToAllMxByteOffset<YType>(static_cast<uint64_t>(taskM) * rankNChunk);
+            }
+        }
     }
 
     /**
@@ -190,18 +195,19 @@ private:
                                         const QuantMatmulTilingData& mmTile)
     {
         const auto& tilingInfo = tilingData_->matmulAllToAllTilingInfo;
-        const uint64_t rankNPerPeer = static_cast<uint64_t>(tilingInfo.rankN) / tilingInfo.rankDim;
+        const uint64_t rankNChunk = static_cast<uint64_t>(tilingInfo.rankN) / tilingInfo.rankDim;
+        const uint64_t rankK = static_cast<uint64_t>(tilingInfo.rankK);
         auto* communicationContext = communication_.GetContextPtr();
-        communicationContext->sendBuffer = MatmulAllToAllMxGmAddr<YType>(workspaceGM_, startRow * rankNPerPeer);
-        communicationContext->recvBuffer = MatmulAllToAllMxGmAddr<YType>(y_, startRow * rankNPerPeer);
-        communicationContext->sendOffset = static_cast<uint64_t>(taskM) * rankNPerPeer * sizeof(YType);
+        communicationContext->sendBuffer = MatmulAllToAllMxGmAddr<YType>(workspaceGM_, startRow * rankNChunk);
+        communicationContext->recvBuffer = MatmulAllToAllMxGmAddr<YType>(y_, startRow * rankNChunk);
+        communicationContext->sendOffset = static_cast<uint64_t>(taskM) * rankNChunk * sizeof(YType);
         communicationContext->recvOffset = communicationContext->sendOffset;
-        communicationContext->sendCount = static_cast<uint64_t>(taskM) * rankNPerPeer;
-        communicationContext->strideCount = static_cast<uint64_t>(tilingInfo.rankM) * rankNPerPeer;
+        communicationContext->sendCount = static_cast<uint64_t>(taskM) * rankNChunk;
+        communicationContext->strideCount = static_cast<uint64_t>(tilingInfo.rankM) * rankNChunk;
         communicationContext->hcclDataType = tilingInfo.hcclDataType;
 
         communication_.PrepareAll(taskCnt);
-        MatmulProcess(startRow, taskM, taskCnt, mmTile);
+        MatmulProcess(startRow, taskM, taskCnt, mmTile, rankK, rankNChunk);
     }
 
     TilingDataType* tilingData_;

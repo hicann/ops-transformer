@@ -24,7 +24,7 @@
 #include "matmul_all_to_all_tiling_data.h"
 #include "adv_api/hcomm/hcomm.h"
 
-#include "../../matmul/quant_batch_matmul/all_to_all_qbmm_mx_kernel_tpn.h"
+#include "../../matmul/quant_batch_matmul/qbmm_kernel_slice_n.h"
 #include "../../../core/aiv_comm/collective_comm_api.h"
 #include "../../../core/aiv_comm/collective_comm_context.h"
 #include "../../../tiling/tiling_data_struct_define.h"
