@@ -85,6 +85,7 @@ def test_backward_empty_slice_is_identity():
     snapshot = grad_output.clone()
     grad = torch.autograd.grad(y, base, grad_outputs=grad_output)[0]
     assert torch.equal(grad_output, snapshot), "调用方上游梯度被反向修改"
+    assert grad.data_ptr() != grad_output.data_ptr(), "空切片返回梯度与调用方存储别名"
     assert torch.allclose(grad.flatten().cpu(), torch.tensor([1.0, 2.0]))
 
 

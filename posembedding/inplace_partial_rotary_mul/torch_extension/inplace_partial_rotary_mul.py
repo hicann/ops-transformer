@@ -36,8 +36,10 @@ class InplacePartialRotaryMulFn(torch.autograd.Function):
     def backward(ctx, grad_output):
         r1, r2 = ctx.saved_tensors
         if ctx.partial_slice[0] == ctx.partial_slice[1]:
-            # 空切片：前向不旋转任何元素，梯度恒等直通，无需调用反向算子
-            return grad_output, None, None, None, None
+            # 空切片：前向不旋转任何元素，梯度恒等直通，无需调用反向算子。
+            # 所有权约定：backward 返回的梯度缓冲一律归本层所有（clone），
+            # 与非空分支一致，避免 autograd 累加时就地写入上游传入的 grad_output
+            return grad_output.clone(), None, None, None, None
         grad_input = grad_output.contiguous()
         if grad_input is grad_output:
             # 已连续时contiguous()返回自身；反向算子原地写回grad_input，
