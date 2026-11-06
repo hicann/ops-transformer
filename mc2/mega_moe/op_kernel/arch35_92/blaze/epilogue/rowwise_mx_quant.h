@@ -225,7 +225,7 @@ __simd_callee__ inline void ComputeRowScale(vector_bfloat16_t& firstHalf, vector
     asc_shiftright_scalar(scaleValue, sharedExponent, static_cast<int16_t>(Quant::SHR_NUM_FOR_BF16), all);
     vdup(scaleValue, static_cast<uint16_t>(Quant::MAX_EXP_FOR_FP8), nanMask, MODE_MERGING);
     vdup(scaleValue, static_cast<uint16_t>(0), zeroMask, MODE_MERGING);
-    asc_pack(scaleBytes, scaleValue);
+    asc_pack_to_low(scaleBytes, scaleValue);
 
     asc_eq_scalar(specialMask, sharedExponent, static_cast<uint16_t>(Quant::BF16_EXP_BIAS), all);
     asc_sub(inverseScale, bias, sharedExponent, all);
@@ -238,35 +238,25 @@ __simd_callee__ inline void ComputeRowScale(vector_bfloat16_t& firstHalf, vector
 template <typename OutputType, bool SecondHalf>
 __simd_callee__ inline void ConvertGeluFp8Half(vector_uint8_t& output, vector_bfloat16_t& input, vector_bool all)
 {
+    using EvenPosition = std::integral_constant<asc_position_quarter_mode,
+                                                SecondHalf ? asc_position_quarter_mode::DISPERSE_SECOND_QUARTER :
+                                                             asc_position_quarter_mode::DISPERSE_FIRST_QUARTER>;
+    using OddPosition = std::integral_constant<asc_position_quarter_mode,
+                                               SecondHalf ? asc_position_quarter_mode::DISPERSE_FOURTH_QUARTER :
+                                                            asc_position_quarter_mode::DISPERSE_THIRD_QUARTER>;
     vector_float expanded;
     vector_uint8_t odd;
-    asc_bfloat162float(expanded, input, all);
+    asc_bfloat162float(expanded, input, all, ASC_POSITION_EVEN);
     if constexpr (Std::IsSame<OutputType, fp8_e4m3fn_t>::value) {
-        if constexpr (SecondHalf) {
-            asc_float2e4m3_rn_sat_v2(reinterpret_cast<vector_fp8_e4m3fn_t&>(output), expanded, all);
-        } else {
-            asc_float2e4m3_rn_sat(reinterpret_cast<vector_fp8_e4m3fn_t&>(output), expanded, all);
-        }
+        asc_float2e4m3_rn_sat(reinterpret_cast<vector_fp8_e4m3fn_t&>(output), expanded, all, EvenPosition{});
     } else {
-        if constexpr (SecondHalf) {
-            asc_float2e5m2_rn_sat_v2(reinterpret_cast<vector_fp8_e5m2_t&>(output), expanded, all);
-        } else {
-            asc_float2e5m2_rn_sat(reinterpret_cast<vector_fp8_e5m2_t&>(output), expanded, all);
-        }
+        asc_float2e5m2_rn_sat(reinterpret_cast<vector_fp8_e5m2_t&>(output), expanded, all, EvenPosition{});
     }
-    asc_bfloat162float_v2(expanded, input, all);
+    asc_bfloat162float(expanded, input, all, ASC_POSITION_ODD);
     if constexpr (Std::IsSame<OutputType, fp8_e4m3fn_t>::value) {
-        if constexpr (SecondHalf) {
-            asc_float2e4m3_rn_sat_v4(reinterpret_cast<vector_fp8_e4m3fn_t&>(odd), expanded, all);
-        } else {
-            asc_float2e4m3_rn_sat_v3(reinterpret_cast<vector_fp8_e4m3fn_t&>(odd), expanded, all);
-        }
+        asc_float2e4m3_rn_sat(reinterpret_cast<vector_fp8_e4m3fn_t&>(odd), expanded, all, OddPosition{});
     } else {
-        if constexpr (SecondHalf) {
-            asc_float2e5m2_rn_sat_v4(reinterpret_cast<vector_fp8_e5m2_t&>(odd), expanded, all);
-        } else {
-            asc_float2e5m2_rn_sat_v3(reinterpret_cast<vector_fp8_e5m2_t&>(odd), expanded, all);
-        }
+        asc_float2e5m2_rn_sat(reinterpret_cast<vector_fp8_e5m2_t&>(odd), expanded, all, OddPosition{});
     }
     asc_add(output, output, odd, all);
 }
@@ -330,14 +320,22 @@ __simd_vf__ inline void RunGeluMxQuant(TileContext context)
             asc_storealign_postupdate(quantOutput, reinterpret_cast<vector_int8_t&>(firstPacked),
                                       context.quantRowStrideBytes, all);
         } else {
+            using FirstPosition =
+                std::integral_constant<asc_position_quarter_mode, asc_position_quarter_mode::DISPERSE_FIRST_QUARTER>;
+            using SecondPosition =
+                std::integral_constant<asc_position_quarter_mode, asc_position_quarter_mode::DISPERSE_SECOND_QUARTER>;
             vector_uint8_t firstPacked;
             vector_uint8_t secondPacked;
             if constexpr (Std::IsSame<OutputType, fp4x2_e2m1_t>::value) {
-                asc_bfloat162e2m1x2_rn(reinterpret_cast<vector_fp4x2_e2m1_t&>(firstPacked), firstHalf, all);
-                asc_bfloat162e2m1x2_rn_v2(reinterpret_cast<vector_fp4x2_e2m1_t&>(secondPacked), secondHalf, all);
+                asc_bfloat162e2m1x2_rn(reinterpret_cast<vector_fp4x2_e2m1_t&>(firstPacked), firstHalf, all,
+                                       FirstPosition{});
+                asc_bfloat162e2m1x2_rn(reinterpret_cast<vector_fp4x2_e2m1_t&>(secondPacked), secondHalf, all,
+                                       SecondPosition{});
             } else {
-                asc_bfloat162e1m2x2_rn(reinterpret_cast<vector_fp4x2_e1m2_t&>(firstPacked), firstHalf, all);
-                asc_bfloat162e1m2x2_rn_v2(reinterpret_cast<vector_fp4x2_e1m2_t&>(secondPacked), secondHalf, all);
+                asc_bfloat162e1m2x2_rn(reinterpret_cast<vector_fp4x2_e1m2_t&>(firstPacked), firstHalf, all,
+                                       FirstPosition{});
+                asc_bfloat162e1m2x2_rn(reinterpret_cast<vector_fp4x2_e1m2_t&>(secondPacked), secondHalf, all,
+                                       SecondPosition{});
             }
             asc_add(firstPacked, firstPacked, secondPacked, all);
             asc_storealign_pack_postupdate(fp4Output, reinterpret_cast<vector_uint32_t&>(firstPacked),

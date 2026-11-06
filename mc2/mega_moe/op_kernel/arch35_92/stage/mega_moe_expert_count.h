@@ -90,9 +90,8 @@ __aicore__ inline void WaitForCountTable(__gm__ int32_t* countGm, __ubuf__ int32
             CopyRows{static_cast<uint16_t>(elementCount), sizeof(int32_t), MTE_COUNT_SLOT_BYTES, sizeof(int32_t)},
             GmLoadCacheMode::NORMAL_FIRST_VICTIM, true);
         PipeFence<PIPE_MTE2, PIPE_V, SYNC_EVENT_ID2>();
-        CallVf<CheckCountRoundTagsVF>(reinterpret_cast<__ubuf__ uint32_t*>(counts),
-                                      reinterpret_cast<__ubuf__ uint32_t*>(pending), elementCount,
-                                      expectedSyncRoundTag);
+        CheckCountRoundTagsVF(reinterpret_cast<__ubuf__ uint32_t*>(counts),
+                              reinterpret_cast<__ubuf__ uint32_t*>(pending), elementCount, expectedSyncRoundTag);
         PipeFence<PIPE_V, PIPE_S, SYNC_EVENT_ID2>();
         if (pending[0U] == 0) {
             return;
@@ -105,7 +104,7 @@ __aicore__ inline void WaitForCountTable(__gm__ int32_t* countGm, __ubuf__ int32
 
 /*
  * MegaMoe count 表的融合版本：先复用 int32 prefix-scan，再在同一次 VF 中提取每个专家的累计尾值
- * 并作差。相比先调用通用前缀和、再启动第二个 VF，融合实现省去一次 CallVf 和外部流水同步。
+ * 并作差。相比先调用通用前缀和、再启动第二个 VF，融合实现省去一次 VF 启动和外部流水同步。
  */
 __simd_vf__ inline void ComputeExpertCountTablesVF(__ubuf__ int32_t* count, __ubuf__ int32_t* expertCounts,
                                                    uint32_t elementCount, uint32_t expertCount, uint32_t worldSize,
@@ -213,8 +212,8 @@ __simd_vf__ inline void ComputeExpertCountTablesVF(__ubuf__ int32_t* count, __ub
 __aicore__ inline void ComputeExpertCountTables(__ubuf__ int32_t* countTensor, __ubuf__ int32_t* expertCountTensor,
                                                 uint32_t expertCount, uint32_t worldSize, uint32_t maxOutputSize)
 {
-    CallVf<ComputeExpertCountTablesVF>(countTensor, expertCountTensor, expertCount * worldSize, expertCount, worldSize,
-                                       maxOutputSize);
+    ComputeExpertCountTablesVF(countTensor, expertCountTensor, expertCount * worldSize, expertCount, worldSize,
+                               maxOutputSize);
 }
 
 } // namespace MegaMoeImpl

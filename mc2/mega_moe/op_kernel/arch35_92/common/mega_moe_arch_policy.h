@@ -44,7 +44,7 @@ struct MegaMoeArch35HardwarePolicy {
     {
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510) && (!defined(ASCENDC_CPU_DEBUG) || ASCENDC_CPU_DEBUG != 1)
         if ASCEND_IS_AIV {
-            return static_cast<uint32_t>(block_idx * get_subblockdim() + get_subblockid());
+            return static_cast<uint32_t>(block_idx * asc_get_sub_block_num() + asc_get_sub_block_id());
         }
         return static_cast<uint32_t>(block_idx);
 #else
@@ -70,7 +70,7 @@ struct MegaMoeArch35HardwarePolicy {
     __aicore__ static uint32_t GetSubBlockIdx()
     {
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510) && (!defined(ASCENDC_CPU_DEBUG) || ASCENDC_CPU_DEBUG != 1)
-        return static_cast<uint32_t>(get_subblockid());
+        return static_cast<uint32_t>(asc_get_sub_block_id());
 #else
         return static_cast<uint32_t>(AscendC::GetSubBlockIdx());
 #endif

@@ -317,8 +317,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Unpermute
         CopyGmToUb(dataInBf16, (sharedResult + ((sharedIdx * m_ + tokenIdx) * k_)), (k_) * sizeof(bfloat16_t));
         PipeNotify<PIPE_MTE2, PIPE_V>(event);
         PipeWait<PIPE_MTE2, PIPE_V>(event);
-        CallVf<AccumulateUnpermuteExpertVF<bfloat16_t, false, false>>(dataResFp32Tensor_, dataInBf16,
-                                                                      static_cast<__ubuf__ float*>(nullptr), k_);
+        AccumulateUnpermuteExpertVF<bfloat16_t, false, false>(dataResFp32Tensor_, dataInBf16,
+                                                              static_cast<__ubuf__ float*>(nullptr), k_);
         PipeNotify<PIPE_V, PIPE_MTE2>(event);
         inputBufferIdx = (inputBufferIdx + 1U) % static_cast<uint32_t>(bufferConfig.inputBufferCount);
     }
@@ -380,11 +380,11 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Accumulat
         }
         // 首槽与后续槽分别实例化，避免 VF 的每次向量迭代都判断初始化状态。
         if (expId == 0) {
-            CallVf<AccumulateUnpermuteExpertVF<InputType, !TopkWeightsPrefetch, true>>(dataResFp32Tensor_, inputUb,
-                                                                                       weightUb, k_);
+            AccumulateUnpermuteExpertVF<InputType, !TopkWeightsPrefetch, true>(dataResFp32Tensor_, inputUb, weightUb,
+                                                                               k_);
         } else {
-            CallVf<AccumulateUnpermuteExpertVF<InputType, !TopkWeightsPrefetch, false>>(dataResFp32Tensor_, inputUb,
-                                                                                        weightUb, k_);
+            AccumulateUnpermuteExpertVF<InputType, !TopkWeightsPrefetch, false>(dataResFp32Tensor_, inputUb, weightUb,
+                                                                                k_);
         }
         PipeNotify<PIPE_V, PIPE_MTE2>(event);
         inputBufferIdx = (inputBufferIdx + 1U) % static_cast<uint32_t>(bufferConfig.inputBufferCount);

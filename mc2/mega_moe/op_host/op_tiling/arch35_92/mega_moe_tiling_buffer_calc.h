@@ -492,6 +492,8 @@ static MegaMoeUnpermuteBufferConfig CalcMteUnpermuteBufferConfig(const MegaMoeTi
         return bufferConfig;
     }
 
+    // 当前 token 的 rank 表独立放在 UB 尾部，两阶段预算均先扣除该固定区域。
+    const uint32_t dataUbBudgetBytes = availableUbBytes - UNPERMUTE_EXPERT_RANKS_UB_BYTES;
     uint32_t dataSlotBytes = 0U;
     uint32_t scaleBytes = 0U;
     CalcMteUnpermuteSlotAndScaleBytes(tilingData, bufferConfig, dataSlotBytes, scaleBytes, bufferPolicy);
@@ -510,7 +512,7 @@ static MegaMoeUnpermuteBufferConfig CalcMteUnpermuteBufferConfig(const MegaMoeTi
     uint32_t bytesBeforeInputBuffers = bufferConfig.topKWeightsBufferBytes +
                                        bufferConfig.topKWeightsConversionBufferBytes + scaleBytes + dataSlotBytes;
     uint32_t inputBufferBudgetBytes =
-        availableUbBytes > bytesBeforeInputBuffers ? availableUbBytes - bytesBeforeInputBuffers : 0U;
+        dataUbBudgetBytes > bytesBeforeInputBuffers ? dataUbBudgetBytes - bytesBeforeInputBuffers : 0U;
     bufferConfig.inputBufferCount = static_cast<int32_t>(inputBufferBudgetBytes / inputSlotBytes);
     bufferConfig.inputBufferCount = std::min(bufferConfig.inputBufferCount, MAX_UNPERMUTE_INPUT_BUFFER_COUNT);
     int32_t accumulationItemCount =
@@ -525,7 +527,7 @@ static MegaMoeUnpermuteBufferConfig CalcMteUnpermuteBufferConfig(const MegaMoeTi
         uint32_t fixedBytes =
             scaleBytes + dataSlotBytes + static_cast<uint32_t>(bufferConfig.inputBufferCount) * inputSlotBytes;
         // weightBudgetBytes 是 FP32 weight 及可选转换中转区可使用的 UB。
-        uint32_t weightBudgetBytes = availableUbBytes - fixedBytes - UNPERMUTE_WEIGHT_ALIGNMENT_RESERVE_BYTES;
+        uint32_t weightBudgetBytes = dataUbBudgetBytes - fixedBytes - UNPERMUTE_WEIGHT_ALIGNMENT_RESERVE_BYTES;
         uint32_t weightBytesPerToken =
             tilingData->compute.topK * (static_cast<uint32_t>(sizeof(float)) + topKWeightsConversionElementBytes);
         uint32_t expandedTokensPerBatch = std::min(weightBudgetBytes / weightBytesPerToken, coreTokenCount);

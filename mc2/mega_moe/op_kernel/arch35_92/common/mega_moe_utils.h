@@ -53,12 +53,6 @@ namespace MegaMoeImpl {
 
 using namespace AscendC;
 
-template <auto Function, typename... Args>
-__aicore__ inline void CallVf(Args&&... args)
-{
-    asc_vf_call<Function>(static_cast<Args&&>(args)...);
-}
-
 constexpr uint32_t UINT64_BYTE_OFFSET_SHIFT = 3U;
 
 __aicore__ inline __gm__ int32_t* GetSyncCountAddress(GM_ADDR rankSyncBase, uint32_t aivCoreIdx)
