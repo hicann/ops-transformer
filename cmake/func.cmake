@@ -762,6 +762,10 @@ endfunction()
 
 # Build PIC Host archives and publish devices into the existing ASC kernel tree.
 function(enable_cannbotdsl_kernel op_name source_dir)
+    # Unit-test targets do not publish DSL Host archives or device resources.
+    if(UT_TEST_ALL OR OP_HOST_UT OR OP_API_UT OR OP_KERNEL_UT OR OP_GRAPH_UT)
+        return()
+    endif()
     if(PREPARE_BUILD OR NOT CANNBOTDSL_COMPUTE_UNIT IN_LIST ASCEND_COMPUTE_UNIT)
         return()
     endif()
