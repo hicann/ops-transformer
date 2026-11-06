@@ -57,15 +57,13 @@
 bash build.sh --pkg --soc=${soc_version} --ops=add_example -j16
 ```
 
-**SoC 取值映射表**<a id="soc-version-mapping"></a>
+<a id="soc-version-mapping"></a>
 
 产品名对应的${soc_version}取值如下，请按实际场景传参。
 
-| 产品系列 | ${soc_version} 取值 |
-| -------- | ------------------- |
-| Atlas A2 系列（训练/推理） | ascend910b |
-| Atlas A3 系列（训练/推理） | ascend910_93 |
-| 950 系列 | ascend950 |
+- Atlas A2系列产品：取值为ascend910b
+- Atlas A3系列产品：取值为ascend910_93
+- 950系列产品：取值为ascend950
 
 若提示如下信息，说明编译成功。
 
