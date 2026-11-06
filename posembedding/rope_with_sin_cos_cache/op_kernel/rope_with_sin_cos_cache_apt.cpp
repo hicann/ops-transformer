@@ -24,6 +24,9 @@ extern "C" __global__ __aicore__ void rope_with_sin_cos_cache(GM_ADDR position_i
                                                               GM_ADDR workspace, GM_ADDR tiling)
 {
     GET_TILING_DATA(tilingData, tiling);
+    if (g_coreType == AIC) {
+        return;
+    }
     GM_ADDR usrWorkspace = AscendC::GetUserWorkspace(workspace);
     TPipe pipe;
 #if ORIG_DTYPE_QUERYIN == DT_BF16
