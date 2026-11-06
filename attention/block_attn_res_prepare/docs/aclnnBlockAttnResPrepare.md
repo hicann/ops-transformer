@@ -215,7 +215,7 @@ aclnnStatus aclnnBlockAttnResPrepare(
       <td>eps（double）</td>
       <td>输入</td>
       <td>表示RMS归一化的稳定项，通常为1e-6。</td>
-      <td><li>必选。</li><li>必须为有限正数。</li></td>
+      <td><li>必选。</li><li>内部按 FLOAT32 计算；必须为有限值，且位于 `[FLT_MIN, FLT_MAX]`（约 `[1.1754943508222875e-38, 3.4028234663852886e+38]`）。不支持次正规数或收窄后为零、Inf 的值。</li></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -253,7 +253,7 @@ aclnnStatus aclnnBlockAttnResPrepare(
   | ----------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------- |
   | `ACLNN_SUCCESS`                   | 0      | 接口调用成功。                                                                                                                        |
   | `ACLNN_ERR_PARAM_NULLPTR`         | 161001 | `blockRes`、`validBlocks`、`pseudoQuery`、`numerator`、`logitMax`、`expSum`、`workspaceSize` 或 `executor` 为空指针。 |
-  | `ACLNN_ERR_PARAM_INVALID`         | 161002 | 输入或输出的数据类型、维数、shape 或连续性不满足约束，或者`eps` 不是有限正数。                                                      |
+  | `ACLNN_ERR_PARAM_INVALID`         | 161002 | 输入或输出的数据类型、维数、shape 或连续性不满足约束，或者 `eps` 非有限值或不在上述 FLOAT32 正规正数范围内。                                                      |
   | `ACLNN_ERR_RUNTIME_ERROR`         | 361001 | 该接口运行在不支持的产品型号上。                                                                                                      |
   | `ACLNN_ERR_INNER_CREATE_EXECUTOR` | 561101 | 接口内部创建`aclOpExecutor` 失败。                                                                                                  |
   | `ACLNN_ERR_INNER_NULLPTR`         | 561103 | 接口内部执行连续化处理、创建算子输出或创建输出拷贝节点时返回空指针。                                                                  |

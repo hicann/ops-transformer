@@ -111,7 +111,7 @@ cann_ops_transformer.block_attn_res_prepare(
 | block_res | Tensor | Required | Historical residual block, corresponding to $V$ in the formula. Data format: ND. $T$ is the number of tokens, $N$ is the number of historical residual blocks that can be stored, and $D$ is the hidden feature dimension. | float32 | [T, N, D] |
 | valid_blocks | Tensor | Required | Number of currently valid historical residual blocks $N_v$. Data format: ND. If the value is 0, `numerator` returns an all-zero Tensor, `logit_max` returns a Tensor in which all elements are the minimum finite value of float32, and `exp_sum` returns an all-zero Tensor. If the value is greater than $N$, it is treated as $N$. | uint64 | [1] |
 | pseudo_query | Tensor | Required | Pseudo Query, corresponding to $Q$ in the formula. Each target slot corresponds to one Query vector, and the last dimension must be the same as the last dimension of `block_res`. Data format: ND. | float32 | [S, D] |
-| eps | float | Optional | Numerical stability term for RMS normalization. Must be a finite positive number. The default value is `1.0e-6`. | float | - |
+| eps | float | Optional | Numerical stability term for RMS normalization. Computed internally in FLOAT32. Must be finite and in `[FLT_MIN, FLT_MAX]` (approximately `[1.1754943508222875e-38, 3.4028234663852886e+38]`); subnormal values are not supported. The default value is `1.0e-6`. | float | - |
 
 ## Return Values
 

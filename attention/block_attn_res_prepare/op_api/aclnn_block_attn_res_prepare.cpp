@@ -17,6 +17,8 @@
 #include "block_attn_res_prepare.h"
 
 #include <cmath>
+#include <limits>
+#include <sstream>
 #include <string>
 
 #include "aclnn_kernels/common/op_error_check.h"
@@ -272,9 +274,15 @@ aclnnStatus CheckParams(const aclTensor* blockRes, const aclTensor* validBlocks,
     CHECK_RET(CheckNotNull(blockRes, validBlocks, pseudoQuery, numerator, logitMax, expSum, workspaceSize, executor) ==
                   ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_NULLPTR);
-    if (!std::isfinite(eps) || eps <= 0.0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnBlockAttnResPrepareGetWorkspaceSize", "eps",
-                                              std::to_string(eps).c_str(), "eps must be finite and greater than zero");
+    // Validate before narrowing the public double attribute to the float used by the kernel.
+    const double minEps = static_cast<double>(std::numeric_limits<float>::min());
+    const double maxEps = static_cast<double>(std::numeric_limits<float>::max());
+    if (!std::isfinite(eps) || eps < minEps || eps > maxEps) {
+        std::ostringstream epsValue;
+        epsValue << eps;
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnBlockAttnResPrepareGetWorkspaceSize", "eps", epsValue.str().c_str(),
+                                              "eps must be finite and in the float32 normal range "
+                                              "[1.1754943508222875e-38, 3.4028234663852886e+38]");
         return ACLNN_ERR_PARAM_INVALID;
     }
     CHECK_RET(CheckDtype(blockRes, validBlocks, pseudoQuery, numerator, logitMax, expSum) == ACLNN_SUCCESS,

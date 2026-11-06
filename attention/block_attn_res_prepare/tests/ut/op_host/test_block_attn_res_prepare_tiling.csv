@@ -11,3 +11,13 @@ Ascend950,mismatched_d,true,mismatched_d,1:8:7168,18:4096,FLOAT,UINT64,FLOAT,1e-
 Ascend950,non_positive_eps,true,non_positive_eps,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,0,32,64,64,false,-1,none,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
 Ascend950,invalid_dtype,true,invalid_dtype,1:8:7168,18:7168,FLOAT16,UINT64,FLOAT,1e-6,32,64,64,false,-1,none,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
 Ascend950,work_count_exceeds_int64,true,work_count_exceeds_int64,4294967295:1:1,4294967295:1,FLOAT,UINT64,FLOAT,1e-6,32,64,64,false,-1,none,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,false
+Ascend950,eps_float_min,true,eps_float_min,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,float_min,32,64,64,true,0,vector,7168,1,2,1,4,-1,-1,-1,-1,-1,false
+Ascend950,eps_above_float_min,true,eps_above_float_min,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,float_min_above,32,64,64,true,0,vector,7168,1,2,1,4,-1,-1,-1,-1,-1,false
+Ascend950,eps_smallest_subnormal,true,eps_smallest_subnormal,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,float_denorm_min,32,64,64,false,-1,none,7168,1,2,1,4,-1,-1,-1,-1,-1,false
+Ascend950,eps_largest_subnormal,true,eps_largest_subnormal,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,float_max_subnormal,32,64,64,false,-1,none,7168,1,2,1,4,-1,-1,-1,-1,-1,false
+Ascend950,eps_float_max,true,eps_float_max,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,float_max,32,64,64,true,0,vector,7168,1,2,1,4,-1,-1,-1,-1,-1,false
+Ascend950,eps_negative,true,eps_negative,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,-1e-6,32,64,64,false,-1,none,7168,1,2,1,4,-1,-1,-1,-1,-1,false
+Ascend950,eps_negative_zero,true,eps_negative_zero,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,-0.0,32,64,64,false,-1,none,7168,1,2,1,4,-1,-1,-1,-1,-1,false
+Ascend950,eps_nan,true,eps_nan,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,nan,32,64,64,false,-1,none,7168,1,2,1,4,-1,-1,-1,-1,-1,false
+Ascend950,eps_positive_inf,true,eps_positive_inf,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,inf,32,64,64,false,-1,none,7168,1,2,1,4,-1,-1,-1,-1,-1,false
+Ascend950,eps_negative_inf,true,eps_negative_inf,1:8:7168,18:7168,FLOAT,UINT64,FLOAT,-inf,32,64,64,false,-1,none,7168,1,2,1,4,-1,-1,-1,-1,-1,false

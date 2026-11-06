@@ -216,7 +216,7 @@ aclnnStatus aclnnBlockAttnResPrepare(
       <td>eps (double)</td>
       <td>Input</td>
       <td>Represents the stabilization term for RMS normalization, typically 1e-6.</td>
-      <td>Must be a finite positive number.</td>
+      <td>Computed internally in FLOAT32. Must be finite and in `[FLT_MIN, FLT_MAX]` (approximately `[1.1754943508222875e-38, 3.4028234663852886e+38]`). Subnormal values and values that narrow to zero or Inf are not supported.</td>
       <td>FLOAT</td>
       <td>-</td>
       <td>-</td>
@@ -254,7 +254,7 @@ aclnnStatus aclnnBlockAttnResPrepare(
   | ----------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------- |
   | `ACLNN_SUCCESS`                    | 0      | The API call succeeds.                                                                                                                        |
   | `ACLNN_ERR_PARAM_NULLPTR`          | 161001 | One of `blockRes`, `validBlocks`, `pseudoQuery`, `numerator`, `logitMax`, `expSum`, `workspaceSize`, or `executor` is a null pointer. |
-  | `ACLNN_ERR_PARAM_INVALID`          | 161002 | The data type, dimension, shape, or contiguity of the input or output does not meet the constraints, or `eps` is not a finite positive number.                                                      |
+  | `ACLNN_ERR_PARAM_INVALID`          | 161002 | The data type, dimension, shape, or contiguity of the input or output does not meet the constraints, or `eps` is non-finite or outside the positive normal FLOAT32 range above.                                                      |
   | `ACLNN_ERR_RUNTIME_ERROR`          | 361001 | The API runs on an unsupported product model.                                                                                                      |
   | `ACLNN_ERR_INNER_CREATE_EXECUTOR`  | 561101 | The API fails to create `aclOpExecutor` internally.                                                                                                  |
   | `ACLNN_ERR_INNER_NULLPTR`          | 561103 | A null pointer is returned when the API internally performs contiguity processing, creates the operator output, or creates the output copy node.                                                                  |

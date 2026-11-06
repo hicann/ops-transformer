@@ -15,9 +15,11 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <exception>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -34,6 +36,34 @@ namespace {
 constexpr size_t CSV_COLUMN_COUNT = 25U;
 constexpr const char* CSV_FILE_NAME = "test_aclnn_block_attn_res_prepare.csv";
 constexpr const char* CSV_REPO_DIR = "attention/block_attn_res_prepare/tests/ut/op_api";
+
+double ParseEps(const std::string& value)
+{
+    const double minEps = static_cast<double>(std::numeric_limits<float>::min());
+    const double maxEps = static_cast<double>(std::numeric_limits<float>::max());
+    if (value == "float_min") {
+        return minEps;
+    }
+    if (value == "float_min_below") {
+        return std::nextafter(minEps, 0.0);
+    }
+    if (value == "float_min_above") {
+        return std::nextafter(minEps, std::numeric_limits<double>::infinity());
+    }
+    if (value == "float_denorm_min") {
+        return static_cast<double>(std::numeric_limits<float>::denorm_min());
+    }
+    if (value == "float_max_subnormal") {
+        return static_cast<double>(std::nextafter(std::numeric_limits<float>::min(), 0.0F));
+    }
+    if (value == "float_max") {
+        return maxEps;
+    }
+    if (value == "float_max_above") {
+        return std::nextafter(maxEps, std::numeric_limits<double>::infinity());
+    }
+    return std::stod(value);
+}
 
 std::vector<uint64_t> ParseU64List(const std::string& value)
 {
@@ -161,7 +191,7 @@ std::vector<BlockAttnResPrepareOpApiCase> LoadCases()
             testCase.expSumShape = ops::ut::Trim(items[index++]);
             testCase.expSumDtype = ops::ut::Trim(items[index++]);
             testCase.expSumFormat = ops::ut::Trim(items[index++]);
-            testCase.eps = std::stod(ops::ut::Trim(items[index++]));
+            testCase.eps = ParseEps(ops::ut::Trim(items[index++]));
             testCase.expectRet = ops::ut::ParseAclnnStatus(items[index++]);
             cases.emplace_back(std::move(testCase));
         } catch (const std::exception& error) {

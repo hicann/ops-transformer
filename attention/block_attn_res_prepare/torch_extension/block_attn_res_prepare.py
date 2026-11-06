@@ -18,6 +18,8 @@ from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
 DEFAULT_EPS = 1.0e-6
+FLOAT32_MIN_NORMAL = float.fromhex("0x1p-126")
+FLOAT32_MAX = float.fromhex("0x1.fffffep+127")
 BLOCK_RES_RANK = 3
 VALID_BLOCKS_RANK = 1
 PSEUDO_QUERY_RANK = 2
@@ -158,8 +160,11 @@ def _check_inputs(
     _check_dtypes(block_res, valid_blocks, pseudo_query)
     _check_device_and_layout(block_res, valid_blocks, pseudo_query)
     torch_check(
-        math.isfinite(eps) and eps > 0.0,
-        lambda: f"eps must be finite and greater than zero, but got {eps}",
+        math.isfinite(eps) and FLOAT32_MIN_NORMAL <= eps <= FLOAT32_MAX,
+        lambda: (
+            f"eps must be finite and in [{FLOAT32_MIN_NORMAL}, {FLOAT32_MAX}], "
+            f"but got {eps}"
+        ),
     )
 
 
@@ -222,7 +227,8 @@ def block_attn_res_prepare(
         valid_blocks: UINT64 device tensor with shape ``[1]``. Zero produces the empty online-softmax state,
             and values above ``N`` are clipped to ``N``.
         pseudo_query: FP32 tensor with shape ``[S, D]``.
-        eps: Positive numerical-stability coefficient. Defaults to ``1e-6``.
+        eps: Finite numerical-stability coefficient in the positive normal float32 range.
+            Defaults to ``1e-6``.
 
     Returns:
         ``(numerator, logit_max, exp_sum)`` with shapes

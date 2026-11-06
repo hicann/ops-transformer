@@ -109,7 +109,7 @@ cann_ops_transformer.block_attn_res_prepare(
 | block_res | Tensor | 必选 | 历史残差块，对应公式中的 $V$。数据格式为 ND；$T$ 为 token 数，$N$ 为可容纳的历史残差块数，$D$ 为隐藏特征维度。 | float32 | [T, N, D] |
 | valid_blocks | Tensor | 必选 | 当前有效历史残差块数 $N_v$。数据格式为 ND。值为0时，`numerator` 返回全0 Tensor、`logit_max` 返回所有元素均为float32最小有限值的Tensor、`exp_sum` 返回全0 Tensor；值大于 $N$ 时按 $N$ 处理。 | uint64 | [1] |
 | pseudo_query | Tensor | 必选 | 伪 Query，对应公式中的 $Q$；每个目标 slot 对应一个 Query 向量，最后一维必须与 `block_res` 的最后一维相同。数据格式为 ND。 | float32 | [S, D] |
-| eps | float | 可选 | RMS 归一化的数值稳定项，必须为有限正数，默认值为 `1.0e-6`。 | float | - |
+| eps | float | 可选 | RMS 归一化的数值稳定项，内部按 FLOAT32 计算，必须为有限值且位于 `[FLT_MIN, FLT_MAX]`（约 `[1.1754943508222875e-38, 3.4028234663852886e+38]`），不支持次正规数；默认值为 `1.0e-6`。 | float | - |
 
 ## 返回值说明
 

@@ -9,3 +9,17 @@ Ascend950,invalid_block_res_dtype,true,invalid_block_res_dtype,2:8:128,FLOAT16,N
 Ascend950,mismatched_numerator_shape,true,mismatched_numerator_shape,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:129,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,1e-6,ACLNN_ERR_PARAM_INVALID
 Ascend950,non_positive_eps,true,non_positive_eps,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,0,ACLNN_ERR_PARAM_INVALID
 Ascend950,non_finite_eps,true,non_finite_eps,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,inf,ACLNN_ERR_PARAM_INVALID
+Ascend950,eps_float_min,true,eps_float_min,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,float_min,ACLNN_SUCCESS
+Ascend950,eps_below_float_min,true,eps_below_float_min,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,float_min_below,ACLNN_ERR_PARAM_INVALID
+Ascend950,eps_above_float_min,true,eps_above_float_min,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,float_min_above,ACLNN_SUCCESS
+Ascend950,eps_smallest_subnormal,true,eps_smallest_subnormal,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,float_denorm_min,ACLNN_ERR_PARAM_INVALID
+Ascend950,eps_largest_subnormal,true,eps_largest_subnormal,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,float_max_subnormal,ACLNN_ERR_PARAM_INVALID
+Ascend950,eps_issue_subnormal,true,eps_issue_subnormal,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,1e-40,ACLNN_ERR_PARAM_INVALID
+Ascend950,eps_issue_underflow,true,eps_issue_underflow,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,1e-46,ACLNN_ERR_PARAM_INVALID
+Ascend950,eps_float_max,true,eps_float_max,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,float_max,ACLNN_SUCCESS
+Ascend950,eps_above_float_max,true,eps_above_float_max,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,float_max_above,ACLNN_ERR_PARAM_INVALID
+Ascend950,eps_float_overflow,true,eps_float_overflow,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,1e39,ACLNN_ERR_PARAM_INVALID
+Ascend950,eps_negative,true,eps_negative,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,-1e-6,ACLNN_ERR_PARAM_INVALID
+Ascend950,eps_negative_zero,true,eps_negative_zero,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,-0.0,ACLNN_ERR_PARAM_INVALID
+Ascend950,eps_nan,true,eps_nan,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,nan,ACLNN_ERR_PARAM_INVALID
+Ascend950,eps_negative_inf,true,eps_negative_inf,2:8:128,FLOAT,ND,1,UINT64,ND,8,3:128,FLOAT,ND,3:2:128,FLOAT,ND,3:2,FLOAT,ND,3:2,FLOAT,ND,-inf,ACLNN_ERR_PARAM_INVALID

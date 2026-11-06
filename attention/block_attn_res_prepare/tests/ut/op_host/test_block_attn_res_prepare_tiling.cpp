@@ -15,10 +15,12 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <exception>
 #include <fstream>
 #include <iostream>
 #include <algorithm>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -48,6 +50,27 @@ constexpr size_t S_DIM_INDEX = 0U;
 constexpr size_t CSV_COLUMN_COUNT = 27U;
 constexpr const char* CSV_FILE_NAME = "test_block_attn_res_prepare_tiling.csv";
 constexpr const char* CSV_REPO_DIR = "attention/block_attn_res_prepare/tests/ut/op_host";
+
+float ParseEps(const std::string& value)
+{
+    const float minEps = std::numeric_limits<float>::min();
+    if (value == "float_min") {
+        return minEps;
+    }
+    if (value == "float_min_above") {
+        return std::nextafter(minEps, std::numeric_limits<float>::infinity());
+    }
+    if (value == "float_denorm_min") {
+        return std::numeric_limits<float>::denorm_min();
+    }
+    if (value == "float_max_subnormal") {
+        return std::nextafter(minEps, 0.0F);
+    }
+    if (value == "float_max") {
+        return std::numeric_limits<float>::max();
+    }
+    return std::stof(value);
+}
 
 struct VectorTilingDataView {
     uint32_t totalT;
@@ -279,7 +302,7 @@ std::vector<BlockAttnResPrepareTilingCase> LoadCases()
             testCase.blockResDtype = ops::ut::Trim(items[index++]);
             testCase.validBlocksDtype = ops::ut::Trim(items[index++]);
             testCase.pseudoQueryDtype = ops::ut::Trim(items[index++]);
-            testCase.eps = std::stof(ops::ut::Trim(items[index++]));
+            testCase.eps = ParseEps(ops::ut::Trim(items[index++]));
             testCase.aicCoreNum = std::stoll(ops::ut::Trim(items[index++]));
             testCase.aivCoreNum = std::stoll(ops::ut::Trim(items[index++]));
             testCase.contextCoreNum = std::stoll(ops::ut::Trim(items[index++]));

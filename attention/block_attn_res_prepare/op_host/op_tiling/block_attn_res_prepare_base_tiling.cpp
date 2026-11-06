@@ -19,6 +19,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <sstream>
 #include <string>
 
 #include "log/log.h"
@@ -208,10 +209,14 @@ ge::graphStatus BlockAttnResPrepareBaseTiling::GetShapeAttrsInfo()
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is null"), return ge::GRAPH_FAILED);
     const float* eps = attrs->GetFloat(EPS_ATTR_INDEX);
     eps_ = eps == nullptr ? BLOCK_ATTN_RES_PREPARE_DEFAULT_EPS : *eps;
-    OP_CHECK_IF(!std::isfinite(eps_) || eps_ <= 0.0F,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "eps", std::to_string(eps_).c_str(),
-                                                      "eps must be finite and be greater than zero"),
-                return ge::GRAPH_FAILED);
+    if (!std::isfinite(eps_) || eps_ < std::numeric_limits<float>::min()) {
+        std::ostringstream epsValue;
+        epsValue << eps_;
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "eps", epsValue.str().c_str(),
+                                              "eps must be finite and in the float32 normal range "
+                                              "[1.1754943508222875e-38, 3.4028234663852886e+38]");
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 
