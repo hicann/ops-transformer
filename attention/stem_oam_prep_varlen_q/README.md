@@ -78,15 +78,15 @@
   <tr>
     <td>qSeqLens</td>
     <td>输入</td>
-    <td>Device侧的aclTensor，每个batch的Q序列长度，shape为[batch]。长度等于batch，每个值≥0，不支持空Array。batch最大值为1024。</td>
-    <td>INT32</td>
+    <td>Host侧的aclIntArray，每个batch的Q序列长度，长度为batch，每个值≥0，不支持空Array。batch最大值为1024。</td>
+    <td>INT64</td>
     <td>-</td>
   </tr>
   <tr>
     <td>cuSeqLensQ</td>
     <td>输入</td>
-    <td>Device侧的aclTensor，Q的累积序列长度偏移量，用于varlen索引。shape为[batch+1]。cuSeqLensQ[0]必须为0，cuSeqLensQ[batch]必须等于total_tokens，单调递增。</td>
-    <td>INT32</td>
+    <td>Host侧的aclIntArray，Q的累积序列长度偏移量，用于varlen索引。长度为batch+1。cuSeqLensQ[0]必须为0，cuSeqLensQ[batch]必须等于total_tokens，单调递增。</td>
+    <td>INT64</td>
     <td>-</td>
   </tr>
   <tr>

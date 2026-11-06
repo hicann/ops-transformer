@@ -22,8 +22,8 @@ extern "C" {
  *
  * @param q              [IN]  变长Q tensor，所有batch的token拼接存储。
  *                             数据类型FLOAT8_E4M3FN，ND格式，shape=(totalTokens, numHeadQ, dimQk)。
- * @param qSeqLens       [IN]  每个batch的Q序列长度。INT32数组，长度等于batch。
- * @param cuSeqLensQ     [IN]  Q的累积序列长度偏移量。INT32数组，长度等于batch+1，首元素必须为0。
+ * @param qSeqLens       [IN]  每个batch的Q序列长度。INT64数组，长度等于batch。
+ * @param cuSeqLensQ     [IN]  Q的累积序列长度偏移量。INT64数组，长度等于batch+1，首元素必须为0。
  * @param qScale         [IN]  可选。Q的per-token scale factor。FLOAT，ND格式，shape=(totalTokens, numHeadQ)。
  *                             FP8输入时必填；BF16/FP16输入时传nullptr。
  * @param stemBlockSize  [IN]  stem block大小，默认128。必须是32的倍数，最大256。
