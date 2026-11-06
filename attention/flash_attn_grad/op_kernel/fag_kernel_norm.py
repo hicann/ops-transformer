@@ -245,31 +245,54 @@ def _run_preload3_cube_normal(
                 mm1_cur,
                 cBlockIdx,
             )
-            iterate_mm_dsq(
-                constInfo,
-                fixInfo,
-                ds_t_l1.current(),
-                q_fix,
-                left,
-                right,
-                dk_acc0,
-                dk_acc1,
-                fixInfo.dkvAcc,
-            )
+            if d_align <= 128:
+                # 窄档（64/128）：dK 常驻 L0C（单 D 分块一个槽），跨 s1 累加，
+                # 到 flush 时由 flush_dkv 一并写回 fp32 workspace
+                iterate_mm_dsq(
+                    constInfo,
+                    fixInfo,
+                    ds_t_l1.current(),
+                    q_fix,
+                    left,
+                    right,
+                    dk_acc0,
+                    dk_acc1,
+                    fixInfo.dkvAcc,
+                )
+            else:
+                # 192 档 dK 不驻留、复用 acc 的两个槽作 mm4 scratch
+                iterate_mm_dsq(
+                    constInfo,
+                    fixInfo,
+                    ds_t_l1.current(),
+                    q_fix,
+                    left,
+                    right,
+                    acc,
+                    acc,
+                    fixInfo.dkvAcc,
+                    tensor_dk_ws,
+                    tensor_q,
+                )
             needFlush = fixInfo.flushDkv
             if taskId - 2 >= nFetched - 1:
                 needFlush = 1
             if needFlush == 1:
-                flush_dkv(
-                    constInfo,
-                    fixInfo,
-                    tensor_dk_ws,
-                    tensor_dv_ws,
-                    dk_acc0,
-                    dk_acc1,
-                    dv_acc0,
-                    dv_acc1,
-                )
+                if d_align <= 128:
+                    # 窄档：dK/dV 都常驻 L0C，这里一起累加回 ws
+                    flush_dkv(
+                        constInfo,
+                        fixInfo,
+                        tensor_dk_ws,
+                        tensor_dv_ws,
+                        dk_acc0,
+                        dk_acc1,
+                        dv_acc0,
+                        dv_acc1,
+                    )
+                else:
+                    # 192 档：dK 已每块 atomic 进 ws、不驻留 L0C，这里只有 dV 还常驻，单独累加回 ws。
+                    flush_dv(constInfo, fixInfo, tensor_dv_ws, dv_acc0, dv_acc1)
             pl.system.set_cross_core(pipe=pl.PipeType.MTE1, event_id=SYNC_C4_TO_V3_FLAG)
         if isLastLoop == 1:
             drainDone = drainDone + 1
@@ -545,6 +568,11 @@ def _run_preload2_cube_bn2(
     tensor_v = gm.tensor_v
     tensor_dq_ws = gm.tensor_dq_ws
     tensor_dv_out = gm.tensor_dv_out
+    if d_align > 128:
+        # BN2 wide：dK 256/768、dV 768 走 4D fp32 workspace（192 的 dK/dV、
+        # 256 的 dV 驻留 L0C）。
+        tensor_dk_ws = gm.tensor_dk_ws
+        tensor_dv_ws = gm.tensor_dv_ws
     mm1_res = buf.mm1_res
     mm2_res = buf.mm2_res
     q_l1 = buf.q_l1
@@ -555,8 +583,13 @@ def _run_preload2_cube_bn2(
     left = buf.left
     right = buf.right
     acc = buf.acc
-    dk_acc = buf.dk_acc
-    dv_acc = buf.dv_acc
+    # dK/dV 每个 D 分块各一个槽：c0 是第 0 块、c1 是第 1 块（D_NCHUNKS==1 的
+    # 档位只有 c0，c1 别名到 c0、不被引用）。
+    dk_c0 = buf.dk_c0
+    dk_c1 = buf.dk_c1
+    dv_c0 = buf.dv_c0
+    dv_c1 = buf.dv_c1
+    l0c_load_ub = buf.l0c_load_ub
     ds_l1 = buf.ds_l1
     ds_t_l1 = buf.ds_t_l1
     p_t_l1 = buf.p_t_l1
@@ -680,7 +713,7 @@ def _run_preload2_cube_bn2(
                 mm1_prev,
                 cBlockIdx,
             )
-            if is_bn2_multiblk == 1:
+            if d_align <= 128 and is_bn2_multiblk == 1:
                 if fixInfo.dqLast == 1:
                     pl.system.set_cross_core(
                         pipe=pl.PipeType.FIX, event_id=SYNC_C3_TO_V5_FLAG
@@ -692,15 +725,15 @@ def _run_preload2_cube_bn2(
                     q_fix,
                     left,
                     right,
-                    dk_acc,
-                    dk_acc,
+                    dk_c0,
+                    dk_c0,
                     fixInfo.dkvAcc,
                 )
                 if fixInfo.flushDkv == 1:
                     pl.set_validshape(mm2_prev, [VECTOR_BASEM, VECTOR_BASEN])
                     pl.move(
                         mm2_prev,
-                        dk_acc.current(),
+                        dk_c0.current(),
                         acc_to_vec_mode=pl.AccToVecMode.DualModeSplitM,
                     )
                     pl.system.set_cross_core(
@@ -713,14 +746,14 @@ def _run_preload2_cube_bn2(
                     do_fix,
                     left,
                     right,
-                    dv_acc,
-                    dv_acc,
+                    dv_c0,
+                    dv_c0,
                     fixInfo.dkvAcc,
                 )
                 if fixInfo.flushDkv == 1:
                     pl.store(
                         tensor_dv_out,
-                        dv_acc.current(),
+                        dv_c0.current(),
                         [
                             fixInfo.idx0KV,
                             fixInfo.keyOffset,
@@ -730,7 +763,7 @@ def _run_preload2_cube_bn2(
                         order=[1, 3],
                         atomic=pl.AtomicType.AtomicNone,
                     )
-            else:
+            elif d_align <= 128:
                 pl.system.set_cross_core(
                     pipe=pl.PipeType.FIX, event_id=SYNC_C3_TO_V5_FLAG
                 )
@@ -741,14 +774,14 @@ def _run_preload2_cube_bn2(
                     q_fix,
                     left,
                     right,
-                    dk_acc,
-                    dk_acc,
+                    dk_c0,
+                    dk_c0,
                     0,
                 )
                 pl.set_validshape(mm2_prev, [VECTOR_BASEM, VECTOR_BASEN])
                 pl.move(
                     mm2_prev,
-                    dk_acc.current(),
+                    dk_c0.current(),
                     acc_to_vec_mode=pl.AccToVecMode.DualModeSplitM,
                 )
                 pl.system.set_cross_core(
@@ -761,17 +794,129 @@ def _run_preload2_cube_bn2(
                     do_fix,
                     left,
                     right,
-                    dv_acc,
-                    dv_acc,
+                    dv_c0,
+                    dv_c0,
                     0,
                 )
                 pl.store(
                     tensor_dv_out,
-                    dv_acc.current(),
+                    dv_c0.current(),
                     [fixInfo.idx0KV, fixInfo.keyOffset, fixInfo.idx2KV, 0],
                     order=[1, 3],
                     atomic=pl.AtomicType.AtomicNone,
                 )
+            else:
+                # BN2 wide：
+                # （1）dQ 192/256/768档 走workspace
+                # （2）dK 256/768档 走workspace，192档走L0C
+                # （3）dV 768档 走workspace，192/256 常驻 L0C
+                if fixInfo.dqLast == 1:
+                    pl.system.set_cross_core(
+                        pipe=pl.PipeType.FIX, event_id=SYNC_C3_TO_V5_FLAG
+                    )
+                if d_align == 192:
+                    iterate_mm_dsq(
+                        constInfo,
+                        fixInfo,
+                        ds_t_l1.current(),
+                        q_fix,
+                        left,
+                        right,
+                        dk_c0,
+                        dk_c1,
+                        fixInfo.dkvAcc,
+                    )
+                    iterate_mm_pdy(
+                        constInfo,
+                        fixInfo,
+                        p_t_l1.current(),
+                        do_fix,
+                        left,
+                        right,
+                        dv_c0,
+                        dv_c1,
+                        fixInfo.dkvAcc,
+                    )
+                    if fixInfo.flushDkv == 1:
+                        flush_dv_l0c_to_out(
+                            constInfo, fixInfo, tensor_dv_out, dv_c0, dv_c1
+                        )
+                        flush_dk_l0c_to_ub(
+                            constInfo,
+                            fixInfo,
+                            dk_c0,
+                            dk_c1,
+                            mm2_prev,
+                            l0c_load_ub.current(),
+                        )
+                        pl.system.set_cross_core(
+                            pipe=pl.PipeType.FIX, event_id=SYNC_C4_TO_V6_FLAG
+                        )
+                elif d_align == 256:
+                    iterate_mm_dsq(
+                        constInfo,
+                        fixInfo,
+                        ds_t_l1.current(),
+                        q_fix,
+                        left,
+                        right,
+                        dk_c0,
+                        dk_c0,
+                        fixInfo.dkvAcc,
+                        tensor_dk_ws,
+                        tensor_q,
+                    )
+                    iterate_mm_pdy(
+                        constInfo,
+                        fixInfo,
+                        p_t_l1.current(),
+                        do_fix,
+                        left,
+                        right,
+                        dv_c0,
+                        dv_c1,
+                        fixInfo.dkvAcc,
+                    )
+                    if fixInfo.flushDkv == 1:
+                        flush_dv_l0c_to_out(
+                            constInfo, fixInfo, tensor_dv_out, dv_c0, dv_c1
+                        )
+                        pl.system.set_cross_core(
+                            pipe=pl.PipeType.FIX, event_id=SYNC_C4_TO_V6_FLAG
+                        )
+                else:
+                    iterate_mm_dsq(
+                        constInfo,
+                        fixInfo,
+                        ds_t_l1.current(),
+                        q_fix,
+                        left,
+                        right,
+                        dk_c0,
+                        dk_c0,
+                        fixInfo.dkvAcc,
+                        tensor_dk_ws,
+                        tensor_q,
+                    )
+                    iterate_mm_pdy(
+                        constInfo,
+                        fixInfo,
+                        p_t_l1.current(),
+                        do_fix,
+                        left,
+                        right,
+                        dv_c0,
+                        dv_c0,
+                        fixInfo.dkvAcc,
+                        tensor_dv_ws,
+                        tensor_dy,
+                    )
+                    if fixInfo.flushDkv == 1:
+                        # dK 与 dV 在同一个 flush 边界就绪，vector 收到本事件后
+                        # 同时 cast 两者。
+                        pl.system.set_cross_core(
+                            pipe=pl.PipeType.FIX, event_id=SYNC_C4_TO_V6_FLAG
+                        )
             pl.system.set_cross_core(pipe=pl.PipeType.MTE1, event_id=SYNC_C5_TO_V4_FLAG)
             pl.system.set_cross_core(pipe=pl.PipeType.MTE1, event_id=SYNC_C4_TO_V3_FLAG)
         if isLastLoop == 1:
@@ -1011,6 +1156,14 @@ def _run_preload2_vector_bn2(
     tensor_dq_out = gm.tensor_dq_out
     tensor_dk_out = gm.tensor_dk_out
     tensor_dq_ws = gm.tensor_dq_ws
+    if d_align > 128:
+        # BN2 wide：V1~V4 走 GS1S2 的 D 档编排，v5/v6 从 4D workspace 内联
+        # cast（192 的 dK 读 cube 搬进 UB 的结果；192/256 的 dV 不经过 vector）。
+        v1w = sched.v1w
+        tensor_dv_out = gm.tensor_dv_out
+        tensor_dk_ws = gm.tensor_dk_ws
+        tensor_dv_ws = gm.tensor_dv_ws
+        ws_load_ub = buf.ws_load_ub
     mm1_res = buf.mm1_res
     mm2_res = buf.mm2_res
     y_ub = buf.y_ub
@@ -1024,7 +1177,9 @@ def _run_preload2_vector_bn2(
     tensor_dsink_ws = gm.tensor_dsink_ws
     sink_part_ub = buf.sink_part_ub
     aivIdx = pl.get_block_idx()
-    cast_ub = buf.cast_ub
+    ws_cast_ub = buf.ws_cast_ub
+    l0c_cast_ub = buf.l0c_cast_ub
+    l0c_load_ub = buf.l0c_load_ub
     ds_l1 = buf.ds_l1
     p_l1 = buf.p_l1
     taskId = 0
@@ -1043,17 +1198,32 @@ def _run_preload2_vector_bn2(
         # so V2-V6 see any updated L0C flush boundary on the previous task.
         if taskId > 0:
             prevInfo = runInfos[(taskId + 1) % 2]
-            process_vec1_bn2(
-                constInfo,
-                prevInfo,
-                subIdx,
-                tensor_y,
-                tensor_dy,
-                y_ub.current(),
-                dy_ub.current(),
-                sfmg_ub.current(),
-                dv_align,
-            )
+            if d_align > 128:
+                process_vec1(
+                    constInfo,
+                    prevInfo,
+                    subIdx,
+                    tensor_y,
+                    tensor_dy,
+                    y_ub.current(),
+                    dy_ub.current(),
+                    sfmg_ub.current(),
+                    v1w,
+                )
+            else:
+                # BN2 的 host 门（Bn2FamilyFeasible）保证 d==dv，且 dv_align<=128
+                # 落在 process_vec1 的同一分支，直接复用。
+                process_vec1(
+                    constInfo,
+                    prevInfo,
+                    subIdx,
+                    tensor_y,
+                    tensor_dy,
+                    y_ub.current(),
+                    dy_ub.current(),
+                    sfmg_ub.current(),
+                    dv_align,
+                )
         gIdx = pl.const(-1, pl.DT_INT64)
         fetchedGIdx, fetchedDenseCursor = fetch_work_gidx(
             constInfo,
@@ -1147,8 +1317,6 @@ def _run_preload2_vector_bn2(
                 pl.system.wait_cross_core(
                     pipe=pl.PipeType.MTE3, event_id=SYNC_C4_TO_V3_FLAG
                 )
-            # C3/C4 reuse mm1/mm2 for dQ/dK in BN2. Finish reading the
-            # original dP/P before V3's V->MTE3 copy and either ready event.
             if sink == 1:
                 headQ = vecInfo.n2oIdx * constInfo.gSize + vecInfo.goIdx
                 sink_val = pl.getval(tensor_sinks, headQ)
@@ -1163,7 +1331,7 @@ def _run_preload2_vector_bn2(
                     sink_part_ub.current(),
                     sink_val,
                 )
-            process_vec3_bn2(
+            process_vec3(
                 constInfo,
                 vecInfo,
                 subIdx,
@@ -1187,7 +1355,7 @@ def _run_preload2_vector_bn2(
                 nzp_ub.current(),
             )
             pl.system.set_cross_core(pipe=pl.PipeType.MTE3, event_id=SYNC_V4_TO_C5_FLAG)
-            if is_bn2_multiblk == 1:
+            if d_align <= 128 and is_bn2_multiblk == 1:
                 if vecInfo.dqLast == 1:
                     pl.system.wait_cross_core(
                         pipe=pl.PipeType.MTE2, event_id=SYNC_C3_TO_V5_FLAG
@@ -1196,7 +1364,7 @@ def _run_preload2_vector_bn2(
                         tensor_dq_out,
                         tensor_dq_ws,
                         mm1_t,
-                        cast_ub.current(),
+                        l0c_cast_ub.current(),
                         constInfo,
                         vecInfo,
                         subIdx,
@@ -1206,40 +1374,190 @@ def _run_preload2_vector_bn2(
                     pl.system.wait_cross_core(
                         pipe=pl.PipeType.V, event_id=SYNC_C4_TO_V6_FLAG
                     )
-                    process_muls_cast_dk_bn2(
+                    first = vecInfo.firstHalfS2RealSize
+                    if subIdx == 0:
+                        rows = first
+                    else:
+                        rows = pl.max(vecInfo.s2RealSize - first, 0)
+                    muls_cast_ub_out(
                         tensor_dk_out,
                         mm2_t,
-                        cast_ub.current(),
-                        constInfo,
-                        vecInfo,
-                        subIdx,
+                        l0c_cast_ub.current(),
+                        vecInfo.idx0KV,
+                        vecInfo.keyOffset + first * subIdx,
+                        vecInfo.idx2KV,
+                        rows,
+                        constInfo.scaleValue,
+                        constInfo.dSize,
                     )
                 pl.system.set_cross_core(
                     pipe=pl.PipeType.V, event_id=SYNC_DETER_FIX_FLAG
                 )
-            else:
+            elif d_align <= 128:
                 pl.system.wait_cross_core(
                     pipe=pl.PipeType.V, event_id=SYNC_C3_TO_V5_FLAG
                 )
-                process_muls_cast_dq_bn2(
+                muls_cast_ub_out(
                     tensor_dq_out,
                     mm1_t,
-                    cast_ub.current(),
-                    constInfo,
-                    vecInfo,
-                    subIdx,
+                    l0c_cast_ub.current(),
+                    vecInfo.idx0Q,
+                    vecInfo.queryOffset + subIdx * VECTOR_BASEM,
+                    vecInfo.idx2Q,
+                    vecInfo.halfS1RealSize,
+                    constInfo.scaleValue,
+                    constInfo.dSize,
                 )
                 pl.system.wait_cross_core(
                     pipe=pl.PipeType.V, event_id=SYNC_C4_TO_V6_FLAG
                 )
-                process_muls_cast_dk_bn2(
+                first = vecInfo.firstHalfS2RealSize
+                if subIdx == 0:
+                    rows = first
+                else:
+                    rows = pl.max(vecInfo.s2RealSize - first, 0)
+                muls_cast_ub_out(
                     tensor_dk_out,
                     mm2_t,
-                    cast_ub.current(),
-                    constInfo,
-                    vecInfo,
-                    subIdx,
+                    l0c_cast_ub.current(),
+                    vecInfo.idx0KV,
+                    vecInfo.keyOffset + first * subIdx,
+                    vecInfo.idx2KV,
+                    rows,
+                    constInfo.scaleValue,
+                    constInfo.dSize,
                 )
+                pl.system.set_cross_core(
+                    pipe=pl.PipeType.V, event_id=SYNC_DETER_FIX_FLAG
+                )
+            else:
+                # BN2 wide：
+                # （1）dQ 192/258/768、dK 256/768、dV 768 从 workspace 读回、Muls/Cast、落 out
+                # （2）dK 192 从 L0C 搬进；dV 192/256 由 cube 直出，vector 不参与。
+                if vecInfo.dqLast == 1:
+                    pl.system.wait_cross_core(
+                        pipe=pl.PipeType.MTE2, event_id=SYNC_C3_TO_V5_FLAG
+                    )
+                    muls_cast_ws_out(
+                        tensor_dq_out,
+                        tensor_dq_ws,
+                        ws_load_ub.current(),
+                        ws_cast_ub.current(),
+                        vecInfo.idx0Q,
+                        vecInfo.queryOffset + subIdx * VECTOR_BASEM,
+                        vecInfo.idx2Q,
+                        vecInfo.halfS1RealSize,
+                        constInfo.scaleValue,
+                        constInfo.dSize,
+                    )
+                if vecInfo.flushDkv == 1:
+                    if d_align == 192:
+                        # P2（BN2 192）：读的是 cube 刚搬进 UB 的 dK（不是 GM ws）
+                        # → 等 V；chunk0 复用 mm2 的上一槽，chunk1 用 l0c_load_ub 槽。
+                        # dV 已由 cube fixpipe 直出，vector 不再参与。
+                        pl.system.wait_cross_core(
+                            pipe=pl.PipeType.V, event_id=SYNC_C4_TO_V6_FLAG
+                        )
+                        first = vecInfo.firstHalfS2RealSize
+                        if subIdx == 0:
+                            rows = first
+                        else:
+                            rows = pl.max(vecInfo.s2RealSize - first, 0)
+                        muls_cast_ub_out(
+                            tensor_dk_out,
+                            mm2_t,
+                            l0c_cast_ub.current(),
+                            vecInfo.idx0KV,
+                            vecInfo.keyOffset + first * subIdx,
+                            vecInfo.idx2KV,
+                            rows,
+                            constInfo.scaleValue,
+                            chunk_valid_d(constInfo.dSize, 0),
+                            D_CHUNK_OFF0[d_align],
+                        )
+                        if (
+                            D_NCHUNKS[d_align] > 1
+                            and chunk_valid_d(constInfo.dSize, 1) > 0
+                        ):
+                            muls_cast_ub_out(
+                                tensor_dk_out,
+                                l0c_load_ub.current(),
+                                l0c_cast_ub.current(),
+                                vecInfo.idx0KV,
+                                vecInfo.keyOffset + first * subIdx,
+                                vecInfo.idx2KV,
+                                rows,
+                                constInfo.scaleValue,
+                                chunk_valid_d(constInfo.dSize, 1),
+                                D_CHUNK_OFF1[d_align],
+                            )
+                    elif d_align == 256:
+                        # 方案 A：dV 已由 cube 在 flush 时 fixpipe 直出，不再经过
+                        # workspace；vector 只负责 dK 的 Muls(scale)+Cast，从
+                        # fp32 workspace 读回。
+                        pl.system.wait_cross_core(
+                            pipe=pl.PipeType.MTE2, event_id=SYNC_C4_TO_V6_FLAG
+                        )
+                        muls_cast_ws_out(
+                            tensor_dk_out,
+                            tensor_dk_ws,
+                            ws_load_ub.current(),
+                            ws_cast_ub.current(),
+                            vecInfo.idx0KV,
+                            vecInfo.keyOffset + subIdx * VECTOR_BASEM,
+                            vecInfo.idx2KV,
+                            pl.max(
+                                pl.min(
+                                    vecInfo.s2RealSize - subIdx * VECTOR_BASEM,
+                                    VECTOR_BASEM,
+                                ),
+                                0,
+                            ),
+                            constInfo.scaleValue,
+                            constInfo.dSize,
+                        )
+                    else:
+                        # 768：首读是 workspace 的 MTE2 load，等待必须阻塞 MTE2；
+                        # dK/dV 都在同一个 flush 边界就绪，一起 cast。
+                        pl.system.wait_cross_core(
+                            pipe=pl.PipeType.MTE2, event_id=SYNC_C4_TO_V6_FLAG
+                        )
+                        muls_cast_ws_out(
+                            tensor_dk_out,
+                            tensor_dk_ws,
+                            ws_load_ub.current(),
+                            ws_cast_ub.current(),
+                            vecInfo.idx0KV,
+                            vecInfo.keyOffset + subIdx * VECTOR_BASEM,
+                            vecInfo.idx2KV,
+                            pl.max(
+                                pl.min(
+                                    vecInfo.s2RealSize - subIdx * VECTOR_BASEM,
+                                    VECTOR_BASEM,
+                                ),
+                                0,
+                            ),
+                            constInfo.scaleValue,
+                            constInfo.dSize,
+                        )
+                        muls_cast_ws_out(
+                            tensor_dv_out,
+                            tensor_dv_ws,
+                            ws_load_ub.current(),
+                            ws_cast_ub.current(),
+                            vecInfo.idx0KV,
+                            vecInfo.keyOffset + subIdx * VECTOR_BASEM,
+                            vecInfo.idx2KV,
+                            pl.max(
+                                pl.min(
+                                    vecInfo.s2RealSize - subIdx * VECTOR_BASEM,
+                                    VECTOR_BASEM,
+                                ),
+                                0,
+                            ),
+                            1.0,
+                            constInfo.dvSize,
+                        )
                 pl.system.set_cross_core(
                     pipe=pl.PipeType.V, event_id=SYNC_DETER_FIX_FLAG
                 )

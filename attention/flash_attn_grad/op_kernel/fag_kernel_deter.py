@@ -282,26 +282,46 @@ def _run_preload3_cube_deter(
                 event_id=SYNC_DK_DETER_FIX_FLAG,
                 sync_mode=pl.CrossCoreSyncMode.INTER_BLOCK,
             )
-            iterate_mm_dsq(
-                constInfo,
-                fixInfo,
-                ds_t_l1.current(),
-                q_fix,
-                left,
-                right,
-                dk_acc0,
-                dk_acc1,
-                fixInfo.dkvAcc,
-            )
-            needFlush = fixInfo.flushDkv
-            if needFlush == 1:
-                flush_dk(
+            if d_align <= 128:
+                # 窄档（64/128）：dK 常驻 L0C（单 D 分块一个槽），跨 s1 累加，
+                # 到 flush 时由 flush_dk 写回 fp32 workspace（dV 在下面统一 flush）
+                iterate_mm_dsq(
                     constInfo,
                     fixInfo,
-                    tensor_dk_ws,
+                    ds_t_l1.current(),
+                    q_fix,
+                    left,
+                    right,
                     dk_acc0,
                     dk_acc1,
+                    fixInfo.dkvAcc,
                 )
+            else:
+                # 192 档 dK 不驻留、复用 acc 的两个槽作 mm4 scratch
+                iterate_mm_dsq(
+                    constInfo,
+                    fixInfo,
+                    ds_t_l1.current(),
+                    q_fix,
+                    left,
+                    right,
+                    acc,
+                    acc,
+                    fixInfo.dkvAcc,
+                    tensor_dk_ws,
+                    tensor_q,
+                )
+            needFlush = fixInfo.flushDkv
+            if d_align <= 128:
+                # 窄档：dK 常驻 L0C，需要从 L0C flush 回 ws。
+                if needFlush == 1:
+                    flush_dk(
+                        constInfo,
+                        fixInfo,
+                        tensor_dk_ws,
+                        dk_acc0,
+                        dk_acc1,
+                    )
             pl.system.set_cross_core(
                 pipe=pl.PipeType.FIX,
                 event_id=SYNC_DK_DETER_FIX_FLAG,

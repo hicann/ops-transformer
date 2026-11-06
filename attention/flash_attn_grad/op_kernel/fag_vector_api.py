@@ -414,20 +414,22 @@ def dsink_partial_vf(
     for m in pl.range(0, srcM):
         vregLse = vf.load_align(lse_ub, m + rowShift, dist=pl.LoadDist.BRC_B32)
         vregExp = vf.exp_sub(vregSink, vregLse, pregFullExe)
+        # 段内先做 elementwise 累加（不跨 lane），整行只做 1 次 reduce_sum：
+        # exp 是行内标量，提到归约之后乘，数学等价、又少一轮跨 lane 归约。
+        vregRow = vf.full(0.0, dtype=pl.DT_FP32)
         for n in pl.range(0, loopTimes):
             off = m * VECTOR_BASEN + n * VF_LANES
             vregP = vf.load_align(p_ub, off)
             vregDp = vf.load_align(dp_ub, off)
             vregMul = vf.mul(vregP, vregDp, pregFullExe)
-            vregMul = vf.mul(vregMul, vregExp, pregFullExe)
-            vregRed = vf.reduce_sum(vregMul, pregFullExe)
-            vregAcc = vf.add(vregAcc, vregRed, pregOne)
+            vregRow = vf.add(vregRow, vregMul, pregFullExe)
         offTail = m * VECTOR_BASEN + loopTimes * VF_LANES
         vregP = vf.load_align(p_ub, offTail)
         vregDp = vf.load_align(dp_ub, offTail)
         vregMul = vf.mul(vregP, vregDp, pregTail)
-        vregMul = vf.mul(vregMul, vregExp, pregTail)
-        vregRed = vf.reduce_sum(vregMul, pregTail)
+        vregRow = vf.add(vregRow, vregMul, pregFullExe)
+        vregRow = vf.mul(vregRow, vregExp, pregFullExe)
+        vregRed = vf.reduce_sum(vregRow, pregFullExe)
         vregAcc = vf.add(vregAcc, vregRed, pregOne)
     vregNeg = vf.muls(vregAcc, -1.0, pregFullExe)
     vf.store_align(sink_part_ub, vregNeg, pregOne)
