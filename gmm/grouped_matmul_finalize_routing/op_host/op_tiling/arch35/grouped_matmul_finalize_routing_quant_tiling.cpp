@@ -905,14 +905,14 @@ ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::DeterministicTilingProc
     uint64_t l2Size;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, l2Size);
     deterWorkspaceSize_ = static_cast<uint32_t>((l2Size - SYS_WORKSPACE_SIZE) * DETER_WORKSPACE_RATIO);
-    OP_CHECK_IF(
-        static_cast<int64_t>(deterWorkspaceSize_) <
-            static_cast<int64_t>(inputParams_.nSize) * static_cast<int64_t>(sizeof(float)),
-        OPS_REPORT_CUBE_INNER_ERR(context_->GetNodeName(),
-                                  "deterministic workspace size(%u) is less than one row(N=%ld * sizeof(float)), "
-                                  "cannot enable deterministic mode",
-                                  deterWorkspaceSize_, static_cast<int64_t>(inputParams_.nSize)),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(static_cast<uint64_t>(deterWorkspaceSize_) < static_cast<uint64_t>(inputParams_.nSize) * sizeof(float) *
+                                                                 static_cast<uint64_t>(tilingData_.matmulTiling.baseM),
+                OPS_REPORT_CUBE_INNER_ERR(
+                    context_->GetNodeName(),
+                    "deterministic workspace size(%u) cannot hold baseM=%d rows(N=%ld * sizeof(float)), "
+                    "cannot enable deterministic mode",
+                    deterWorkspaceSize_, tilingData_.matmulTiling.baseM, static_cast<int64_t>(inputParams_.nSize)),
+                return ge::GRAPH_FAILED);
     tilingData_.gmmFinalizeRoutingDataParams.deterWorkspaceSize = deterWorkspaceSize_;
     OP_LOGD(context_->GetNodeName(), "DeterministicTilingProcess: flag=%u, wsSize=%u",
             tilingData_.gmmFinalizeRoutingDataParams.deterministicFlag,
