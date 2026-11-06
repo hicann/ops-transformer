@@ -16,7 +16,6 @@
 #define OPS_OP_PROTO_INC_MOE_RE_ROUTING_OPS_H_
 
 #include "graph/operator_reg.h"
-#include "common/include/op_host/op_const_def_transformer.h"
 
 namespace ge {
 /**
@@ -55,11 +54,11 @@ namespace ge {
 */
 REG_OP(MoeReRouting)
     .INPUT(tokens, TensorType({DT_FLOAT16, DT_BF16, DT_INT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_HIFLOAT8,
-                               DT_FLOAT4_E2M1, DT_FLOAT4_E1M2, Ops::Transformer::DT_HIFLOAT4}))
+                               DT_FLOAT4_E2M1, DT_FLOAT4_E1M2}))
     .INPUT(expert_token_num_per_rank, TensorType({DT_INT32, DT_INT64}))
     .OPTIONAL_INPUT(per_token_scales, TensorType({DT_FLOAT, DT_FLOAT8_E8M0}))
     .OUTPUT(permute_tokens, TensorType({DT_FLOAT16, DT_BF16, DT_INT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_HIFLOAT8,
-                                        DT_FLOAT4_E2M1, DT_FLOAT4_E1M2, Ops::Transformer::DT_HIFLOAT4}))
+                                        DT_FLOAT4_E2M1, DT_FLOAT4_E1M2}))
     .OUTPUT(permute_per_token_scales, TensorType({DT_FLOAT, DT_FLOAT8_E8M0}))
     .OUTPUT(permute_token_idx, TensorType({DT_INT32}))
     .OUTPUT(expert_token_num, TensorType({DT_INT32, DT_INT64}))
