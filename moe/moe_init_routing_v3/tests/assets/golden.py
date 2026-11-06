@@ -23,6 +23,42 @@ __spec__ = {
 
 import numpy
 
+try:
+    from ttk.utilities.dtypes import (
+        numpy_float8_e4m3fn,
+        numpy_float8_e5m2,
+        numpy_float8_e8m0,
+        numpy_float4_e2m1,
+        numpy_float4_e1m2,
+        numpy_hifloat8,
+    )
+except ImportError:
+    from ml_dtypes import float8_e4m3fn as _float8_e4m3fn, float8_e5m2 as _float8_e5m2
+    from en_dtypes import (
+        float4_e1m2 as _float4_e1m2,
+        float4_e2m1 as _float4_e2m1,
+        float8_e8m0 as _float8_e8m0,
+        hifloat8 as _hifloat8,
+    )
+
+    def numpy_float8_e4m3fn():
+        return _float8_e4m3fn
+
+    def numpy_float8_e5m2():
+        return _float8_e5m2
+
+    def numpy_float8_e8m0():
+        return _float8_e8m0
+
+    def numpy_float4_e2m1():
+        return _float4_e2m1
+
+    def numpy_float4_e1m2():
+        return _float4_e1m2
+
+    def numpy_hifloat8():
+        return _hifloat8
+
 
 def MoeInitRoutingV3_input(*input_arrays, **kwargs):
     return tuple(input_arrays)
@@ -57,12 +93,6 @@ def _bf16_bits_to_float32(x):
 
 
 def _mxfp8_roundscale_quant_numpy(x, dst_type_str, clamp_amax=False, block_size=32):
-    from ttk.utilities.dtypes import (
-        numpy_float8_e4m3fn,
-        numpy_float8_e5m2,
-        numpy_float8_e8m0,
-    )
-
     x_array = numpy.asarray(x)
     x_f32 = x_array.astype(numpy.float32)
     rows, cols = x_f32.shape
@@ -238,13 +268,6 @@ def _moe_init_routing_v3_numpy(
         if scale is None:
             expanded_scale = None
         else:
-            from ttk.utilities.dtypes import (
-                numpy_float8_e4m3fn,
-                numpy_float8_e5m2,
-                numpy_float8_e8m0,
-                numpy_float4_e2m1,
-            )
-
             if (
                 x.dtype == numpy_float8_e4m3fn()
                 or x.dtype == numpy_float8_e5m2()
@@ -317,8 +340,6 @@ def _moe_init_routing_v3_numpy(
         if expanded_x.dtype == "bfloat16":
             expanded_x = expanded_x.astype(numpy.float32)
 
-        from ttk.utilities import numpy_hifloat8
-
         expanded_x = expanded_x.astype(numpy_hifloat8(), copy=False)
 
     elif quant_mode == 7:
@@ -331,8 +352,6 @@ def _moe_init_routing_v3_numpy(
 
         expanded_x = expanded_x * scale
         expanded_x = numpy.clip(expanded_x, HIFLOAT8_MIN, HIFLOAT8_MAX)
-
-        from ttk.utilities import numpy_hifloat8
 
         expanded_x = expanded_x.astype(numpy_hifloat8(), copy=False)
 
@@ -350,8 +369,6 @@ def _moe_init_routing_v3_numpy(
         expanded_scale_safe = numpy.where(expanded_scale == 0, 1.0, expanded_scale)
         expanded_x = expanded_x / expanded_scale_safe
         expanded_x = numpy.clip(expanded_x, HIFLOAT8_MIN, HIFLOAT8_MAX)
-
-        from ttk.utilities import numpy_hifloat8
 
         expanded_x = expanded_x.astype(numpy_hifloat8(), copy=False)
 
@@ -374,7 +391,6 @@ def _moe_init_routing_v3_numpy(
         expanded_x = expanded_x[:actual_expert_total_num, :]
         quant_mode_dtype_str_map = {11: "float8_e5m2", 12: "float8_e4m3fn"}
         from ttk.utilities import get_dtype_range
-        from ttk.utilities import numpy_float8_e5m2, numpy_float8_e4m3fn
 
         def block_max_with_padding(expanded_x, row_block_size, col_block_size):
             batch, rows, cols = expanded_x.shape
@@ -699,12 +715,6 @@ def _torch_to_numpy(tensor):
             if any(name in dtype_name for name in ("e4m3", "e5m2", "e8m0")):
                 # Torch FP8 不能直接转为 NumPy 时保留原始 1-byte 编码；若先转
                 # float32，会破坏非量化透传场景的 dtype 及后续字节级比较语义。
-                from ttk.utilities.dtypes import (
-                    numpy_float8_e4m3fn,
-                    numpy_float8_e5m2,
-                    numpy_float8_e8m0,
-                )
-
                 dtype_map = {
                     "e4m3": numpy_float8_e4m3fn,
                     "e5m2": numpy_float8_e5m2,
@@ -777,12 +787,6 @@ def _restore_fp8_golden_dtype(npu_arr, golden_arr):
     npu_dtype_name = str(npu_arr.dtype).lower()
     if not any(name in npu_dtype_name for name in ("e4m3", "e5m2", "e8m0")):
         return golden_arr
-    from ttk.utilities.dtypes import (
-        numpy_float8_e4m3fn,
-        numpy_float8_e5m2,
-        numpy_float8_e8m0,
-    )
-
     dtype_map = {
         "e4m3": numpy_float8_e4m3fn,
         "e5m2": numpy_float8_e5m2,
@@ -843,15 +847,6 @@ def _numpy_to_torch(arr, template):
         # 做 view(uint8)，元素数会放大 4 倍，导致 reshape 失败。
         target_np_dtype_name = target_dtype_name.replace("torch.", "")
         if arr_dtype_name not in target_np_dtype_name and arr_np.dtype.kind == "f":
-            from ttk.utilities.dtypes import (
-                numpy_float8_e4m3fn,
-                numpy_float8_e5m2,
-                numpy_float8_e8m0,
-                numpy_float4_e2m1,
-                numpy_float4_e1m2,
-                numpy_hifloat8,
-            )
-
             dtype_map = {
                 "float8_e4m3fn": numpy_float8_e4m3fn,
                 "float8_e5m2": numpy_float8_e5m2,

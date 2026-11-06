@@ -306,7 +306,8 @@ static ge::graphStatus MoeCopyShapeInput2OutputWithIdx(gert::InferShapeContext* 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus Infershape4MoeFinalizeRoutingV2(gert::InferShapeContext* context)
+static ge::graphStatus GetDropPadModeAndOutShape(gert::InferShapeContext* context, int64_t& dropPadMode,
+                                                 gert::Shape*& outShape)
 {
     auto attrs = context->GetAttrs();
     OP_CHECK_IF(attrs == nullptr,
@@ -317,36 +318,41 @@ static ge::graphStatus Infershape4MoeFinalizeRoutingV2(gert::InferShapeContext* 
     const int64_t* dropPadModePtr = attrs->GetAttrPointer<int64_t>(ATTR_DROP_PAD_MODE);
     OP_CHECK_IF(dropPadModePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "drop_pad_mode"),
                 return ge::GRAPH_FAILED);
-    const int64_t dropPadMode = *dropPadModePtr;
+    dropPadMode = *dropPadModePtr;
 
-    auto outShape = context->GetOutputShape(INDEX_OUT);
+    outShape = context->GetOutputShape(INDEX_OUT);
     OP_CHECK_IF(dropPadMode < VALUE_MODE_0 || dropPadMode > VALUE_MODE_3,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "drop_pad_mode",
                                                       std::to_string(dropPadMode).c_str(), "must be in [0, 3]"),
                 return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
 
-    bool earlyReturn = false;
-    const gert::Shape* expandedXShape = nullptr;
-    int64_t lastDimExpandedX = -1;
+static ge::graphStatus CheckExpandedShapes(gert::InferShapeContext* context, int64_t dropPadMode, gert::Shape* outShape,
+                                           const gert::Shape*& expandedXShape, int64_t& lastDimExpandedX,
+                                           const gert::Shape*& expandedRowIdxShape, bool& earlyReturn)
+{
     ge::graphStatus ret =
         CheckExpandedXShape(context, dropPadMode, outShape, &expandedXShape, &lastDimExpandedX, earlyReturn);
     if (ret != ge::GRAPH_SUCCESS || earlyReturn) {
         return ret;
     }
 
-    const gert::Shape* expandedRowIdxShape = nullptr;
     ret = CheckExpandedRowIdxShape(context, outShape, &expandedRowIdxShape, earlyReturn);
     if (ret != ge::GRAPH_SUCCESS || earlyReturn) {
         return ret;
     }
 
-    const gert::Shape* skip1InputShape = nullptr;
-    const gert::Shape* skip2InputShape = nullptr;
-    const gert::Shape* biasInputShape = nullptr;
-    const gert::Shape* scalesInputShape = nullptr;
-    const gert::Shape* expertIdxShape = nullptr;
+    return ge::GRAPH_SUCCESS;
+}
 
-    ret = CheckOptionalInputShape(context, INDEX_IN_SKIP1, "skip1", outShape, &skip1InputShape, earlyReturn);
+static ge::graphStatus CheckOptionalShapesAndK(gert::InferShapeContext* context, gert::Shape* outShape,
+                                               const gert::Shape*& skip1InputShape, const gert::Shape*& skip2InputShape,
+                                               const gert::Shape*& biasInputShape, const gert::Shape*& scalesInputShape,
+                                               const gert::Shape*& expertIdxShape, int64_t& k, bool& earlyReturn)
+{
+    ge::graphStatus ret =
+        CheckOptionalInputShape(context, INDEX_IN_SKIP1, "skip1", outShape, &skip1InputShape, earlyReturn);
     if (ret != ge::GRAPH_SUCCESS || earlyReturn) {
         return ret;
     }
@@ -363,9 +369,10 @@ static ge::graphStatus Infershape4MoeFinalizeRoutingV2(gert::InferShapeContext* 
         return ret;
     }
 
+    auto attrs = context->GetAttrs();
     const int64_t* kPtr = attrs->GetAttrPointer<int64_t>(ATTR_K);
     OP_CHECK_IF(kPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "k"), return ge::GRAPH_FAILED);
-    int64_t k = *kPtr;
+    k = *kPtr;
     if (scalesInputShape != nullptr && !IsUnknownRank(scalesInputShape)) {
         int64_t scalesDim1 = scalesInputShape->GetDim(1);
         // k > 1 means user explicitly specified k, need to verify consistency with scales dim1
@@ -379,6 +386,38 @@ static ge::graphStatus Infershape4MoeFinalizeRoutingV2(gert::InferShapeContext* 
     }
 
     ret = CheckOptionalInputShape(context, INDEX_IN_EXPERT_IDX, "expert_idx", outShape, &expertIdxShape, earlyReturn);
+    if (ret != ge::GRAPH_SUCCESS || earlyReturn) {
+        return ret;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus Infershape4MoeFinalizeRoutingV2(gert::InferShapeContext* context)
+{
+    int64_t dropPadMode = 0;
+    gert::Shape* outShape = nullptr;
+    if (GetDropPadModeAndOutShape(context, dropPadMode, outShape) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+
+    const gert::Shape* expandedXShape = nullptr;
+    const gert::Shape* expandedRowIdxShape = nullptr;
+    const gert::Shape* skip1InputShape = nullptr;
+    const gert::Shape* skip2InputShape = nullptr;
+    const gert::Shape* biasInputShape = nullptr;
+    const gert::Shape* scalesInputShape = nullptr;
+    const gert::Shape* expertIdxShape = nullptr;
+    int64_t lastDimExpandedX = -1;
+    int64_t k = 0;
+    bool earlyReturn = false;
+    ge::graphStatus ret = CheckExpandedShapes(context, dropPadMode, outShape, expandedXShape, lastDimExpandedX,
+                                              expandedRowIdxShape, earlyReturn);
+    if (ret != ge::GRAPH_SUCCESS || earlyReturn) {
+        return ret;
+    }
+
+    ret = CheckOptionalShapesAndK(context, outShape, skip1InputShape, skip2InputShape, biasInputShape, scalesInputShape,
+                                  expertIdxShape, k, earlyReturn);
     if (ret != ge::GRAPH_SUCCESS || earlyReturn) {
         return ret;
     }

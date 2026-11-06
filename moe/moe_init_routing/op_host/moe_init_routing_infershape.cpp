@@ -154,33 +154,35 @@ static void ShowOutputShapeInfo(const gert::InferShapeContext* context, const ge
             Ops::Base::ToString(*expandedExpertIdxShape).c_str());
 }
 
-static ge::graphStatus InferShape4MoeInitRouting(gert::InferShapeContext* context)
+static ge::graphStatus GetShapesAndAttrs(gert::InferShapeContext* context, const gert::Shape*& xShape,
+                                         const gert::Shape*& rowIdxShape, const gert::Shape*& expertIdxShape,
+                                         gert::Shape*& expandedXShape, gert::Shape*& expandedRowIdx,
+                                         gert::Shape*& expandedExpertIdxShape, int64_t& activeNum)
 {
-    OP_LOGD(context->GetNodeName(), "Begin to do MoeInitRoutingInfershape.");
     // 获取输入shape
-    const gert::Shape* xShape = context->GetInputShape(0);
+    xShape = context->GetInputShape(0);
     OP_CHECK_IF(xShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "x"), return ge::GRAPH_FAILED);
-    const gert::Shape* rowIdxShape = context->GetInputShape(1);
+    rowIdxShape = context->GetInputShape(1);
     OP_CHECK_IF(rowIdxShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "row_idx"),
                 return ge::GRAPH_FAILED);
-    const gert::Shape* expertIdxShape = context->GetInputShape(2);
+    expertIdxShape = context->GetInputShape(2);
     OP_CHECK_IF(expertIdxShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "expert_idx"),
                 return ge::GRAPH_FAILED);
-    gert::Shape* expandedXShape = context->GetOutputShape(0);
+    expandedXShape = context->GetOutputShape(0);
     OP_CHECK_IF(
         expandedXShape == nullptr,
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
             context->GetNodeName(), "expandedXShape",
             "Required expandedXShape metadata is null; context->GetOutputShape(0) must provide a valid object."),
         return ge::GRAPH_FAILED);
-    gert::Shape* expandedRowIdx = context->GetOutputShape(1);
+    expandedRowIdx = context->GetOutputShape(1);
     OP_CHECK_IF(
         expandedRowIdx == nullptr,
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
             context->GetNodeName(), "expandedRowIdx",
             "Required expandedRowIdx metadata is null; context->GetOutputShape(1) must provide a valid object."),
         return ge::GRAPH_FAILED);
-    gert::Shape* expandedExpertIdxShape = context->GetOutputShape(2);
+    expandedExpertIdxShape = context->GetOutputShape(2);
     OP_CHECK_IF(expandedExpertIdxShape == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                     context->GetNodeName(), "expandedExpertIdxShape",
@@ -197,18 +199,14 @@ static ge::graphStatus InferShape4MoeInitRouting(gert::InferShapeContext* contex
     const int64_t* activeNumPtr = attrs->GetAttrPointer<int64_t>(0);
     OP_CHECK_IF(activeNumPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "active_num"),
                 return ge::GRAPH_FAILED);
-    const int64_t activeNum = *activeNumPtr;
-    ShowInputShapeInfo(context, xShape, rowIdxShape, expertIdxShape, activeNum);
+    activeNum = *activeNumPtr;
+    return ge::GRAPH_SUCCESS;
+}
 
-    // 参数校验
-    if (CheckInputDimsAndAttr(context, xShape, rowIdxShape, expertIdxShape, activeNum) != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
-
-    if (CheckInputShape(context, xShape, rowIdxShape, expertIdxShape) != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
-
+static void SetOutputShapes(const gert::Shape* xShape, const gert::Shape* rowIdxShape,
+                            const gert::Shape* expertIdxShape, const int64_t activeNum, gert::Shape* expandedXShape,
+                            gert::Shape* expandedRowIdx, gert::Shape* expandedExpertIdxShape)
+{
     int64_t x_n = xShape->GetDimNum() == 1U ? NEG_ONE : xShape->GetDim(0);
     int64_t cols = xShape->GetDimNum() == 1U ? NEG_ONE : xShape->GetDim(1);
 
@@ -233,6 +231,35 @@ static ge::graphStatus InferShape4MoeInitRouting(gert::InferShapeContext* contex
 
     expandedExpertIdxShape->SetDimNum(DIM_ONE);
     expandedExpertIdxShape->SetDim(0U, expertForSourceRowNum);
+}
+
+static ge::graphStatus InferShape4MoeInitRouting(gert::InferShapeContext* context)
+{
+    OP_LOGD(context->GetNodeName(), "Begin to do MoeInitRoutingInfershape.");
+    const gert::Shape* xShape = nullptr;
+    const gert::Shape* rowIdxShape = nullptr;
+    const gert::Shape* expertIdxShape = nullptr;
+    gert::Shape* expandedXShape = nullptr;
+    gert::Shape* expandedRowIdx = nullptr;
+    gert::Shape* expandedExpertIdxShape = nullptr;
+    int64_t activeNum = 0;
+    if (GetShapesAndAttrs(context, xShape, rowIdxShape, expertIdxShape, expandedXShape, expandedRowIdx,
+                          expandedExpertIdxShape, activeNum) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    ShowInputShapeInfo(context, xShape, rowIdxShape, expertIdxShape, activeNum);
+
+    // 参数校验
+    if (CheckInputDimsAndAttr(context, xShape, rowIdxShape, expertIdxShape, activeNum) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+
+    if (CheckInputShape(context, xShape, rowIdxShape, expertIdxShape) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+
+    SetOutputShapes(xShape, rowIdxShape, expertIdxShape, activeNum, expandedXShape, expandedRowIdx,
+                    expandedExpertIdxShape);
 
     ShowOutputShapeInfo(context, expandedXShape, expandedRowIdx, expandedExpertIdxShape);
     OP_LOGD(context->GetNodeName(), "End to do MoeInitRoutingInfershape.");

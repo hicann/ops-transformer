@@ -86,6 +86,12 @@ protected:
 
 private:
     ge::graphStatus CheckOutShape();
+    ge::graphStatus CheckOutputShapeBase(const gert::Shape& expandedXShape, const gert::Shape& expandedRowIdxShape,
+                                         const gert::Shape& expandedExpertIdxShape);
+    ge::graphStatus CheckOutputShapeValue(const gert::Shape& expandedXShape, const gert::Shape& expandedRowIdxShape,
+                                          const gert::Shape& expandedExpertIdxShape);
+    ge::graphStatus CheckInputShapeAndAttr(const gert::Shape& xShape, const gert::Shape& rowIdxShape,
+                                           const gert::Shape& expertIdxShape);
     void Tiling4GatherOutComputeSplitK();
     void Tiling4GatherOutComputeSplitN();
     void Tiling4GatherOutComputeRow();
@@ -95,6 +101,8 @@ private:
     void Tiling4VMSMiddleCompute();
     void Tiling4VBSCompute();
     void ShowTilingData();
+    void ShowCoreTilingData();
+    void ShowSubComputeTilingData();
     void Tinlig4VBSMultiCoreCompute(VBSComputeTilingData* tilingData);
     void Tinlig4VBSOneCoreCompute(VBSComputeTilingData* tilingData);
     bool IsFullLoad();
@@ -145,6 +153,17 @@ ge::graphStatus MoeInitRountingTilingBase::CheckOutShape()
     const gert::Shape expandedRowIdxShape = context_->GetOutputShape(1)->GetStorageShape();
     const gert::Shape expandedExpertIdxShape = context_->GetOutputShape(2)->GetStorageShape();
 
+    if (CheckOutputShapeBase(expandedXShape, expandedRowIdxShape, expandedExpertIdxShape) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+
+    return CheckOutputShapeValue(expandedXShape, expandedRowIdxShape, expandedExpertIdxShape);
+}
+
+ge::graphStatus MoeInitRountingTilingBase::CheckOutputShapeBase(const gert::Shape& expandedXShape,
+                                                                const gert::Shape& expandedRowIdxShape,
+                                                                const gert::Shape& expandedExpertIdxShape)
+{
     size_t expandedXDimNnum = expandedXShape.GetDimNum();
     if (expandedXDimNnum != DIM_TWO) {
         std::string expandedXDimNumStr = std::to_string(expandedXDimNnum);
@@ -168,7 +187,13 @@ ge::graphStatus MoeInitRountingTilingBase::CheckOutShape()
                                                "The shape of expanded_row_idx and expanded_expert_idx should be same");
         return ge::GRAPH_FAILED;
     }
+    return ge::GRAPH_SUCCESS;
+}
 
+ge::graphStatus MoeInitRountingTilingBase::CheckOutputShapeValue(const gert::Shape& expandedXShape,
+                                                                 const gert::Shape& expandedRowIdxShape,
+                                                                 const gert::Shape& expandedExpertIdxShape)
+{
     if (expandedXShape.GetDim(0) !=
         std::min(moeInitRoutingTilingData.get_n(), activateNum) * moeInitRoutingTilingData.get_k()) {
         std::string expandedXShapeStr = Ops::Base::ToString(expandedXShape);
@@ -202,25 +227,10 @@ ge::graphStatus MoeInitRountingTilingBase::CheckOutShape()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeInitRountingTilingBase::GetShapeAttrsInfo()
+ge::graphStatus MoeInitRountingTilingBase::CheckInputShapeAndAttr(const gert::Shape& xShape,
+                                                                  const gert::Shape& rowIdxShape,
+                                                                  const gert::Shape& expertIdxShape)
 {
-    // 获取输入shape
-    const gert::Shape xShape = context_->GetInputShape(0)->GetStorageShape();
-    const gert::Shape rowIdxShape = context_->GetInputShape(1)->GetStorageShape();
-    const gert::Shape expertIdxShape = context_->GetInputShape(2)->GetStorageShape();
-
-    auto attrs = context_->GetAttrs();
-    OP_CHECK_IF(attrs == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                    context_->GetNodeName(), "attrs",
-                    "Required attrs metadata is null; context_->GetAttrs() must provide a valid object."),
-                return ge::GRAPH_FAILED);
-    const int64_t* activateNumPtr = attrs->GetAttrPointer<int64_t>(0);
-    OP_CHECK_IF(activateNumPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "active_num"),
-                return ge::GRAPH_FAILED);
-    activateNum = *activateNumPtr;
-    OP_LOGI(context_->GetNodeName(), "activateNum is: %ld", activateNum);
-
     // 参数校验
     size_t xDimNnum = xShape.GetDimNum();
     if (xDimNnum != DIM_TWO) {
@@ -256,6 +266,31 @@ ge::graphStatus MoeInitRountingTilingBase::GetShapeAttrsInfo()
                                               "must be a non-negative number");
         return ge::GRAPH_FAILED;
     }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeInitRountingTilingBase::GetShapeAttrsInfo()
+{
+    // 获取输入shape
+    const gert::Shape xShape = context_->GetInputShape(0)->GetStorageShape();
+    const gert::Shape rowIdxShape = context_->GetInputShape(1)->GetStorageShape();
+    const gert::Shape expertIdxShape = context_->GetInputShape(2)->GetStorageShape();
+
+    auto attrs = context_->GetAttrs();
+    OP_CHECK_IF(attrs == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    context_->GetNodeName(), "attrs",
+                    "Required attrs metadata is null; context_->GetAttrs() must provide a valid object."),
+                return ge::GRAPH_FAILED);
+    const int64_t* activateNumPtr = attrs->GetAttrPointer<int64_t>(0);
+    OP_CHECK_IF(activateNumPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "active_num"),
+                return ge::GRAPH_FAILED);
+    activateNum = *activateNumPtr;
+    OP_LOGI(context_->GetNodeName(), "activateNum is: %ld", activateNum);
+
+    if (CheckInputShapeAndAttr(xShape, rowIdxShape, expertIdxShape) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
 
     this->n_ = expertIdxShape.GetDim(0);
     this->k_ = expertIdxShape.GetDim(1);
@@ -271,7 +306,7 @@ ge::graphStatus MoeInitRountingTilingBase::GetShapeAttrsInfo()
     return ret;
 }
 
-void MoeInitRountingTilingBase::ShowTilingData()
+void MoeInitRountingTilingBase::ShowCoreTilingData()
 {
     OP_LOGI(opName, "moeInitRoutingTilingData is coreNum:%ld, n:%ld, cols:%ld,k:%ld",
             moeInitRoutingTilingData.get_coreNum(), moeInitRoutingTilingData.get_n(),
@@ -295,6 +330,10 @@ void MoeInitRountingTilingBase::ShowTilingData()
             moeInitRoutingTilingData.vmsMiddleComputeParamsOp.get_needCoreNum());
     OP_LOGI(opName, "SortOutComputeTilingData is oneLoopMaxElements:%ld",
             moeInitRoutingTilingData.sortOutComputeParamsOp.get_oneLoopMaxElements());
+}
+
+void MoeInitRountingTilingBase::ShowSubComputeTilingData()
+{
     OP_LOGI(opName,
             "SrcToDstComputeTilingData is needCoreNum:%ld, activateRows:%ld, perCoreRows:%ld, perCorePerLoopRows:%ld, "
             "perCoreLastLoopRows:%ld, lastCoreRows:%ld, lastCorePerLoopRows:%ld, lastCoreLastLoopRows:%ld, "
@@ -330,6 +369,12 @@ void MoeInitRountingTilingBase::ShowTilingData()
             moeInitRoutingTilingData.gatherOutComputeParamsOp.get_lastCoreLastLoopRows(),
             moeInitRoutingTilingData.gatherOutComputeParamsOp.get_maxColsOneLoop(),
             moeInitRoutingTilingData.gatherOutComputeParamsOp.get_splitFlag());
+}
+
+void MoeInitRountingTilingBase::ShowTilingData()
+{
+    ShowCoreTilingData();
+    ShowSubComputeTilingData();
 }
 ge::graphStatus MoeInitRountingTilingBase::DoOpTiling()
 {

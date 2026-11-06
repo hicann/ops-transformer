@@ -102,28 +102,43 @@ static ge::graphStatus SetGradScalesOutputShape(const gert::InferShapeContext* c
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeFinalizeRoutingV2GradInferShape(gert::InferShapeContext* context)
+static ge::graphStatus GetShapesFromContext(gert::InferShapeContext* context, const gert::Shape*& gradYShape,
+                                            const gert::Shape*& expandedRowIdxShape, gert::Shape*& gradExpandedXShape,
+                                            gert::Shape*& gradScalesShape)
 {
-    const gert::Shape* gradYShape = context->GetInputShape(INPUT_0_IDX);
+    gradYShape = context->GetInputShape(INPUT_0_IDX);
     OP_CHECK_IF(gradYShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "grad_y"),
                 return ge::GRAPH_FAILED);
-    const gert::Shape* expandedRowIdxShape = context->GetInputShape(INPUT_1_IDX);
+    expandedRowIdxShape = context->GetInputShape(INPUT_1_IDX);
     OP_CHECK_IF(expandedRowIdxShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "expanded_row_idx"),
                 return ge::GRAPH_FAILED);
-    gert::Shape* gradExpandedXShape = context->GetOutputShape(OUTPUT_0_IDX);
+    gradExpandedXShape = context->GetOutputShape(OUTPUT_0_IDX);
     OP_CHECK_IF(
         gradExpandedXShape == nullptr,
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "gradExpandedXShape",
                                                  "Required gradExpandedXShape metadata is null; "
                                                  "context->GetOutputShape(OUTPUT_0_IDX) must provide a valid object."),
         return ge::GRAPH_FAILED);
-    gert::Shape* gradScalesShape = context->GetOutputShape(OUTPUT_1_IDX);
+    gradScalesShape = context->GetOutputShape(OUTPUT_1_IDX);
     OP_CHECK_IF(gradScalesShape == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                     context->GetNodeName(), "gradScalesShape",
                     "Required gradScalesShape metadata is null; context->GetOutputShape(OUTPUT_1_IDX) "
                     "must provide a valid object."),
                 return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus MoeFinalizeRoutingV2GradInferShape(gert::InferShapeContext* context)
+{
+    const gert::Shape* gradYShape = nullptr;
+    const gert::Shape* expandedRowIdxShape = nullptr;
+    gert::Shape* gradExpandedXShape = nullptr;
+    gert::Shape* gradScalesShape = nullptr;
+    if (GetShapesFromContext(context, gradYShape, expandedRowIdxShape, gradExpandedXShape, gradScalesShape) !=
+        ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     if (IsUnknownRank(gradYShape)) {
         *gradExpandedXShape = *gradYShape;
         *gradScalesShape = *gradYShape;

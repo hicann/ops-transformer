@@ -154,3 +154,34 @@ class MoeReRoutingTestSpec:
         "int32": {"standard": "stat_rel_err"},
         "int64": {"standard": "stat_rel_err"},
     }
+
+    @staticmethod
+    def pre_compare(*outputs, **kwargs):
+        # ttk 传入顺序为 (*npu_outputs, *goldens)；golden 经框架管线会被提升为 float32，
+        # 对 fp8 输出恢复为 NPU 实际 dtype 后再走默认比对，避免 cross-dtype 不可比
+        half = len(outputs) // 2
+        npu_outputs = list(outputs[:half])
+        golden_outputs = list(outputs[half:])
+        for i, (npu_out, golden_out) in enumerate(zip(npu_outputs, golden_outputs)):
+            if npu_out is None or golden_out is None:
+                continue
+            try:
+                npu_name = str(npu_out.dtype).lower()
+                golden_name = str(golden_out.dtype).lower()
+                if "float32" not in golden_name and "float64" not in golden_name:
+                    continue
+                if "e8m0" in npu_name:
+                    import en_dtypes
+
+                    golden_outputs[i] = golden_out.astype(en_dtypes.float8_e8m0)
+                elif "e4m3" in npu_name:
+                    import ml_dtypes
+
+                    golden_outputs[i] = golden_out.astype(ml_dtypes.float8_e4m3fn)
+                elif "e5m2" in npu_name:
+                    import ml_dtypes
+
+                    golden_outputs[i] = golden_out.astype(ml_dtypes.float8_e5m2)
+            except Exception:
+                continue
+        return tuple(npu_outputs) + tuple(golden_outputs)

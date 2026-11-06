@@ -104,6 +104,7 @@ protected:
                                             const char* reason);
     ge::graphStatus CheckShapeAndDtypeIsValid();
     ge::graphStatus CheckPartShapeAndDtypeIsValid();
+    ge::graphStatus CheckScalesDtypeIsValid();
     ge::graphStatus CheckConstExpertPartShapeAndDtypeIsValid(int64_t idx);
     ge::graphStatus DoGetZeroShapeAttrsInfo(int64_t idx, int64_t& start, int64_t& end);
     ge::graphStatus GetDropPadModeAndExpertRangeAttrs();
@@ -439,29 +440,8 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckConstExpertPartShapeAndDtypeIs
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckPartShapeAndDtypeIsValid()
+ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckScalesDtypeIsValid()
 {
-    gert::Shape bsh = {row, h};
-
-    if (CheckOptionalInputShape(X2_IDX, "x2", bsh, "shape of x2 must be (bs,h).") != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
-    if (CheckOptionalInputDtype(BIAS_IDX, "bias", dtype) != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
-
-    auto biasShape = context_->GetOptionalInputShape(BIAS_IDX);
-    if (biasShape) {
-        OP_CHECK_IF(
-            CheckBiasShape(biasShape) != ge::GRAPH_SUCCESS,
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "bias", "GRAPH_FAILED", "failed to get e."),
-            return ge::GRAPH_FAILED);
-        OP_CHECK_IF(biasShape->GetStorageShape().GetDim(1) != h,
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "bias", "invalid",
-                                                          "dim 1 of bias should be h."),
-                    return ge::GRAPH_FAILED);
-    }
-
     auto scalesDesc = context_->GetOptionalInputDesc(SCALES_IDX);
     scaleDtypeSize = dtypeSize;
     if (isHif4Dequant_) {
@@ -488,6 +468,35 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckPartShapeAndDtypeIsValid()
                 scaleDtypeKey = BFLOAT16_TILING_KEY;
             }
         }
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckPartShapeAndDtypeIsValid()
+{
+    gert::Shape bsh = {row, h};
+
+    if (CheckOptionalInputShape(X2_IDX, "x2", bsh, "shape of x2 must be (bs,h).") != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckOptionalInputDtype(BIAS_IDX, "bias", dtype) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+
+    auto biasShape = context_->GetOptionalInputShape(BIAS_IDX);
+    if (biasShape) {
+        OP_CHECK_IF(
+            CheckBiasShape(biasShape) != ge::GRAPH_SUCCESS,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "bias", "GRAPH_FAILED", "failed to get e."),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(biasShape->GetStorageShape().GetDim(1) != h,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "bias", "invalid",
+                                                          "dim 1 of bias should be h."),
+                    return ge::GRAPH_FAILED);
+    }
+
+    if (CheckScalesDtypeIsValid() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
 
     if (CheckConstExpertPartShapeAndDtypeIsValid(CONST_EXPERT_ALPHA1_IDX) != ge::GRAPH_SUCCESS) {

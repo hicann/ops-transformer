@@ -383,6 +383,7 @@ private:
 
     // CheckInputShape使用的子函数
     ge::graphStatus CheckInputX();
+    ge::graphStatus CheckInputXDtype();
     ge::graphStatus CheckInputExpertIdx();
     ge::graphStatus CheckInputScale();
     ge::graphStatus CheckEssentialQuantScale();
@@ -407,6 +408,7 @@ private:
     ge::graphStatus ValidateExpandedXShapeDropPad();
     ge::graphStatus ValidateExpandedXShapeDropless();
     ge::graphStatus ValidateExpandedXDtype();
+    ge::DataType GetExpectedExpandedXDtype() const;
     void CalculateExpectedScaleShape(int64_t& expectedRank, int64_t& expectedDim0, int64_t& expectedDim1,
                                      int64_t& expectedDim2);
     ge::graphStatus ValidateScaleShape(int64_t expectedRank, int64_t expectedDim0, int64_t expectedDim1,
@@ -425,6 +427,7 @@ private:
     void Tiling4GatherOutMxQuant();
     void Tiling4GatherOutFP8Quant();
     void Tiling4GatherOutHIF4Quant();
+    void Tiling4GatherOutByQuantMode();
     void Tiling4SortOutCompute();
     void Tiling4VMSMiddleCompute();
     void Tiling4VBSCompute();
@@ -436,6 +439,7 @@ private:
     int64_t CalcMaxRowIdxPerLoopFP8GroupQuant(int64_t perLoopCols);
     int64_t CalcMaxRowIdxPerLoopHIF4Quant(int64_t perLoopCols);
     bool IsFullLoad();
+    int64_t CalcFullLoadRemainUb(int64_t perCoreTokens) const;
     bool IsSupportGatherCopyKernels() const;
     void ComputeUseGatherCopy();
     void SetIndicesLoopParams4GatherOut(int64_t perLoopMaxIndicesElements, int64_t perCoreIndicesElements,
@@ -447,8 +451,15 @@ private:
     bool IsCountingSortApplicable();
     void ComputeCountingSortMode();
     int64_t EstimateArch35CountingSortFullLoadUB(int64_t perCoreTokens);
+    int64_t EstimateArch35CountingSortExpertTokensUB(int64_t actualExpertNum) const;
+    void AddArch35CountingSortQuantAggrUB(int64_t& total, int64_t coreEntries, int64_t colsAligned,
+                                          int64_t actualExpertNum) const;
     void ComputeArch35CountingSortFullLoadTiling();
     void ComputeArch35CountingSortCutOriginTiling();
+    void ComputeArch35CountingSortCutOriginBufSizes(int64_t expertCountStride, int64_t needCoreNum,
+                                                    int64_t& persistentSize, int64_t& phaseASize,
+                                                    int64_t& expertCountAlign, int64_t& batchBufSize,
+                                                    int64_t& phaseBSize) const;
 
     // DropPad模式Tiling计算函数
     void SetCoreSplitParams4SrcToDstDropPad(int64_t& needCoreNum, int64_t& perCoreRows, int64_t& lastCoreRows);

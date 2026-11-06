@@ -91,6 +91,28 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::DoGetShapeAttrsInfo()
     return ge::GRAPH_SUCCESS;
 }
 
+void MoeInitRoutingV3TilingArch35::Tiling4GatherOutByQuantMode()
+{
+    ComputeUseGatherCopy();
+    if (quantMode_ == QUANT_MODE_MXFP8_E5M2 || quantMode_ == QUANT_MODE_MXFP8_E4M3FN ||
+        quantMode_ == QUANT_MODE_MXFP8_ROUNDSCALE_AMAX_E5M2 || quantMode_ == QUANT_MODE_MXFP8_ROUNDSCALE_AMAX_E4M3FN ||
+        quantMode_ == QUANT_MODE_MXFP4_E2M1) {
+        Tiling4GatherOutMxQuant();
+    } else if (quantMode_ == QUANT_MODE_FP8_PERBLOCK_E5M2 || quantMode_ == QUANT_MODE_FP8_PERBLOCK_E4M3FN ||
+               quantMode_ == QUANT_MODE_FP8_GROUP_E5M2 || quantMode_ == QUANT_MODE_FP8_GROUP_E4M3FN ||
+               quantMode_ == QUANT_MODE_FP8_GROUP_AMAX_E5M2 || quantMode_ == QUANT_MODE_FP8_GROUP_AMAX_E4M3FN) {
+        Tiling4GatherOutFP8Quant();
+    } else if (dropPadMode_ == DROP_PAD_MODE_DROPPAD && !isFullload_) {
+        Tiling4GatherOutDropPadCompute();
+    } else if (IsMXFP8NoQuantCase(quantMode_, xDtype_)) {
+        Tiling4GatherOutMxFP8NoQuantCompute();
+    } else if (quantMode_ == QUANT_MODE_HIF4) {
+        Tiling4GatherOutHIF4Quant();
+    } else {
+        Tiling4GatherOutCompute();
+    }
+}
+
 ge::graphStatus MoeInitRoutingV3TilingArch35::DoOpTiling()
 {
     OP_LOGD(context_, "Entered MoeInitRoutingV3TilingArch35::DoOpTiling()");
@@ -136,24 +158,7 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::DoOpTiling()
         return ge::GRAPH_SUCCESS;
     }
 
-    ComputeUseGatherCopy();
-    if (quantMode_ == QUANT_MODE_MXFP8_E5M2 || quantMode_ == QUANT_MODE_MXFP8_E4M3FN ||
-        quantMode_ == QUANT_MODE_MXFP8_ROUNDSCALE_AMAX_E5M2 || quantMode_ == QUANT_MODE_MXFP8_ROUNDSCALE_AMAX_E4M3FN ||
-        quantMode_ == QUANT_MODE_MXFP4_E2M1) {
-        Tiling4GatherOutMxQuant();
-    } else if (quantMode_ == QUANT_MODE_FP8_PERBLOCK_E5M2 || quantMode_ == QUANT_MODE_FP8_PERBLOCK_E4M3FN ||
-               quantMode_ == QUANT_MODE_FP8_GROUP_E5M2 || quantMode_ == QUANT_MODE_FP8_GROUP_E4M3FN ||
-               quantMode_ == QUANT_MODE_FP8_GROUP_AMAX_E5M2 || quantMode_ == QUANT_MODE_FP8_GROUP_AMAX_E4M3FN) {
-        Tiling4GatherOutFP8Quant();
-    } else if (dropPadMode_ == DROP_PAD_MODE_DROPPAD && !isFullload_) {
-        Tiling4GatherOutDropPadCompute();
-    } else if (IsMXFP8NoQuantCase(quantMode_, xDtype_)) {
-        Tiling4GatherOutMxFP8NoQuantCompute();
-    } else if (quantMode_ == QUANT_MODE_HIF4) {
-        Tiling4GatherOutHIF4Quant();
-    } else {
-        Tiling4GatherOutCompute();
-    }
+    Tiling4GatherOutByQuantMode();
     return ge::GRAPH_SUCCESS;
 }
 
@@ -567,25 +572,8 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::CheckSetListAttrs()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeInitRoutingV3TilingArch35::CheckInputX()
+ge::graphStatus MoeInitRoutingV3TilingArch35::CheckInputXDtype()
 {
-    OP_LOGD(context_, "Entered MoeInitRoutingV3TilingArch35::CheckInputX()");
-
-    // rank
-    auto rank = static_cast<int64_t>(xShape_.GetDimNum());
-    OP_CHECK_IF(rank != 2, OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "x", std::to_string(rank), "2"),
-                return ge::GRAPH_FAILED);
-    if (quantMode_ == QUANT_MODE_HIF4) {
-        int64_t xDim1 = xShape_.GetDim(1);
-        OP_CHECK_IF(
-            xDim1 % HIFP4_GROUP_ELE_NUM != 0,
-            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "shape of x", std::to_string(xDim1),
-                                                  "The dim1 of input x should be multiple of 64 when quant mode is 10"),
-            return ge::GRAPH_FAILED);
-        OP_CHECK_IF(xDtype_ != ge::DT_BF16,
-                    OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "x", Ops::Base::ToString(xDtype_), "DT_BF16"),
-                    return ge::GRAPH_FAILED);
-    }
     // dtype
     using ge::DataType;
     using std::unordered_set;
@@ -627,6 +615,32 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::CheckInputX()
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "dtype of x", Ops::Base::ToString(xDtype_),
                                               ("unsupported under quant_mode " + std::to_string(quantMode_))),
         return ge::GRAPH_FAILED);
+
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeInitRoutingV3TilingArch35::CheckInputX()
+{
+    OP_LOGD(context_, "Entered MoeInitRoutingV3TilingArch35::CheckInputX()");
+
+    // rank
+    auto rank = static_cast<int64_t>(xShape_.GetDimNum());
+    OP_CHECK_IF(rank != 2, OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "x", std::to_string(rank), "2"),
+                return ge::GRAPH_FAILED);
+    if (quantMode_ == QUANT_MODE_HIF4) {
+        int64_t xDim1 = xShape_.GetDim(1);
+        OP_CHECK_IF(
+            xDim1 % HIFP4_GROUP_ELE_NUM != 0,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "shape of x", std::to_string(xDim1),
+                                                  "The dim1 of input x should be multiple of 64 when quant mode is 10"),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(xDtype_ != ge::DT_BF16,
+                    OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "x", Ops::Base::ToString(xDtype_), "DT_BF16"),
+                    return ge::GRAPH_FAILED);
+    }
+    if (CheckInputXDtype() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
 
     return ge::GRAPH_SUCCESS;
 }
@@ -949,7 +963,7 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::ValidateExpandedXShapeDropless()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeInitRoutingV3TilingArch35::ValidateExpandedXDtype()
+ge::DataType MoeInitRoutingV3TilingArch35::GetExpectedExpandedXDtype() const
 {
     using ge::DataType;
     DataType expectedDtype = DataType::DT_UNDEFINED;
@@ -992,7 +1006,13 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::ValidateExpandedXDtype()
         default:
             break;
     }
+    return expectedDtype;
+}
 
+ge::graphStatus MoeInitRoutingV3TilingArch35::ValidateExpandedXDtype()
+{
+    using ge::DataType;
+    DataType expectedDtype = GetExpectedExpandedXDtype();
     if (expectedDtype != DataType::DT_UNDEFINED) {
         OP_CHECK_IF(
             expandedXDtype_ != expectedDtype,
@@ -1994,29 +2014,8 @@ void MoeInitRoutingV3TilingArch35::Tiling4GatherOutHIF4Quant()
     LogGatherOutTilingData();
 }
 
-bool MoeInitRoutingV3TilingArch35::IsFullLoad()
+int64_t MoeInitRoutingV3TilingArch35::CalcFullLoadRemainUb(int64_t perCoreTokens) const
 {
-    if (dropPadMode_ == DROP_PAD_MODE_DROPPAD) {
-        return false;
-    }
-    int64_t perCoreTokens = 1;
-    if (expertStart_ == 0 && expertEnd_ == expertNum_) {
-        ep_ = 0;
-        if (!IsAnyDynamicQuantCase()) {
-            int64_t perCoreTokensEst = n_ / aivCoreNum_;
-            int64_t remainder = n_ % aivCoreNum_;
-            perCoreTokens = remainder <= 1 ? perCoreTokensEst + 1 : perCoreTokensEst + NUM_TWO;
-        }
-    } else {
-        ep_ = 1;
-        perCoreTokens = 1;
-    }
-    tilingDataPtr_->epFullload = ep_;
-
-    if (totalLength_ > sortLoopMaxElement_) {
-        return false;
-    }
-
     int64_t tileLength = Align(totalLength_, static_cast<int64_t>(sizeof(int32_t)));
     int64_t sortNum = Ops::Base::CeilDiv(tileLength, SORT32_ALIGN_ELEMENT) * SORT32_ALIGN_ELEMENT;
     int64_t sortSpace = sortNum * sizeof(int32_t) * ONE_CORE_SORT_BUFFER;
@@ -2052,7 +2051,33 @@ bool MoeInitRoutingV3TilingArch35::IsFullLoad()
         }
     }
 
-    return remainUb > 0;
+    return remainUb;
+}
+
+bool MoeInitRoutingV3TilingArch35::IsFullLoad()
+{
+    if (dropPadMode_ == DROP_PAD_MODE_DROPPAD) {
+        return false;
+    }
+    int64_t perCoreTokens = 1;
+    if (expertStart_ == 0 && expertEnd_ == expertNum_) {
+        ep_ = 0;
+        if (!IsAnyDynamicQuantCase()) {
+            int64_t perCoreTokensEst = n_ / aivCoreNum_;
+            int64_t remainder = n_ % aivCoreNum_;
+            perCoreTokens = remainder <= 1 ? perCoreTokensEst + 1 : perCoreTokensEst + NUM_TWO;
+        }
+    } else {
+        ep_ = 1;
+        perCoreTokens = 1;
+    }
+    tilingDataPtr_->epFullload = ep_;
+
+    if (totalLength_ > sortLoopMaxElement_) {
+        return false;
+    }
+
+    return CalcFullLoadRemainUb(perCoreTokens) > 0;
 }
 
 bool MoeInitRoutingV3TilingArch35::IsCountingSortApplicable()
@@ -2112,6 +2137,41 @@ void MoeInitRoutingV3TilingArch35::ComputeCountingSortMode()
     }
 }
 
+int64_t MoeInitRoutingV3TilingArch35::EstimateArch35CountingSortExpertTokensUB(int64_t actualExpertNum) const
+{
+    int64_t expertTokensBufElems = (expertTokensNumType_ == EXPERT_TOKENS_TYPE_KEY_VALUE) ?
+                                       std::min(actualExpertNum + 1, expertNum_) * DIM_VALUE_TWO :
+                                       actualExpertNum;
+    int64_t expertTokensUbBytes =
+        Ops::Base::CeilAlign(expertTokensBufElems * static_cast<int64_t>(sizeof(int64_t)), UB_BLOCK_SIZE);
+    if (expertTokensNumType_ != EXPERT_TOKENS_TYPE_KEY_VALUE) {
+        int64_t tokenIntlvBytes = Ops::Base::CeilAlign(
+            COUTSORT_HIST_BIN_NUM / NUM_TWO * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
+        expertTokensUbBytes = std::max(expertTokensUbBytes, tokenIntlvBytes);
+    }
+    return expertTokensUbBytes;
+}
+
+void MoeInitRoutingV3TilingArch35::AddArch35CountingSortQuantAggrUB(int64_t& total, int64_t coreEntries,
+                                                                    int64_t colsAligned, int64_t actualExpertNum) const
+{
+    if (quantMode_ != QUANT_MODE_UNQUANT) {
+        total += Ops::Base::CeilAlign(colsAligned * static_cast<int64_t>(sizeof(int8_t)), UB_BLOCK_SIZE);
+        total += Ops::Base::CeilAlign(COUTSORT_ONE_BLOCK_ELEMENT * static_cast<int64_t>(sizeof(float)), UB_BLOCK_SIZE);
+        if (quantMode_ == QUANT_MODE_DYNAMIC && isInputScale_ == 1) {
+            total += Ops::Base::CeilAlign(colsAligned * static_cast<int64_t>(sizeof(float)), UB_BLOCK_SIZE);
+        }
+    }
+    int64_t aggrOutRows = AGGRBUFBYTES_A5 / (colsAligned * inputXDtypeSize_);
+    bool aggrEnable = (aggrOutRows >= NUM_TWO) && (actualExpertNum <= COUTSORT_FULLLOAD_MAX_ACTUAL_EXPERT_NUM) &&
+                      (quantMode_ == QUANT_MODE_UNQUANT);
+    if (aggrEnable) {
+        total += Ops::Base::CeilAlign(coreEntries * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
+        total += Ops::Base::CeilAlign(actualExpertNum * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE) * NUM_TWO;
+        total += Ops::Base::CeilAlign(AGGRBUFBYTES_A5, UB_BLOCK_SIZE);
+    }
+}
+
 int64_t MoeInitRoutingV3TilingArch35::EstimateArch35CountingSortFullLoadUB(int64_t perCoreTokens)
 {
     // 全载模版 UB 叠加模型（SIMT DCache 已在 availUbSize_ 扣除）
@@ -2137,17 +2197,7 @@ int64_t MoeInitRoutingV3TilingArch35::EstimateArch35CountingSortFullLoadUB(int64
     total +=
         Ops::Base::CeilAlign(aivCoreNum_ * expertCountStride * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
     int64_t actualExpertNum = expertEnd_ - expertStart_;
-    int64_t expertTokensBufElems = (expertTokensNumType_ == EXPERT_TOKENS_TYPE_KEY_VALUE) ?
-                                       std::min(actualExpertNum + 1, expertNum_) * DIM_VALUE_TWO :
-                                       actualExpertNum;
-    int64_t expertTokensUbBytes =
-        Ops::Base::CeilAlign(expertTokensBufElems * static_cast<int64_t>(sizeof(int64_t)), UB_BLOCK_SIZE);
-    if (expertTokensNumType_ != EXPERT_TOKENS_TYPE_KEY_VALUE) {
-        int64_t tokenIntlvBytes = Ops::Base::CeilAlign(
-            COUTSORT_HIST_BIN_NUM / NUM_TWO * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
-        expertTokensUbBytes = std::max(expertTokensUbBytes, tokenIntlvBytes);
-    }
-    total += expertTokensUbBytes;
+    total += EstimateArch35CountingSortExpertTokensUB(actualExpertNum);
     total += Ops::Base::CeilAlign(expertCountStride * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
     total += Ops::Base::CeilAlign(entriesAligned * NUM_TWO * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
     total += Ops::Base::CeilAlign(entriesAligned * static_cast<int64_t>(sizeof(float)), UB_BLOCK_SIZE);
@@ -2160,21 +2210,7 @@ int64_t MoeInitRoutingV3TilingArch35::EstimateArch35CountingSortFullLoadUB(int64
         Ops::Base::CeilAlign((expertCountStride < COUTSORT_HIST_BIN_NUM ? expertCountStride : COUTSORT_HIST_BIN_NUM) *
                                  static_cast<int64_t>(sizeof(uint32_t)),
                              UB_BLOCK_SIZE);
-    if (quantMode_ != QUANT_MODE_UNQUANT) {
-        total += Ops::Base::CeilAlign(colsAligned * static_cast<int64_t>(sizeof(int8_t)), UB_BLOCK_SIZE);
-        total += Ops::Base::CeilAlign(COUTSORT_ONE_BLOCK_ELEMENT * static_cast<int64_t>(sizeof(float)), UB_BLOCK_SIZE);
-        if (quantMode_ == QUANT_MODE_DYNAMIC && isInputScale_ == 1) {
-            total += Ops::Base::CeilAlign(colsAligned * static_cast<int64_t>(sizeof(float)), UB_BLOCK_SIZE);
-        }
-    }
-    int64_t aggrOutRows = AGGRBUFBYTES_A5 / (colsAligned * inputXDtypeSize_);
-    bool aggrEnable = (aggrOutRows >= NUM_TWO) && (actualExpertNum <= COUTSORT_FULLLOAD_MAX_ACTUAL_EXPERT_NUM) &&
-                      (quantMode_ == QUANT_MODE_UNQUANT);
-    if (aggrEnable) {
-        total += Ops::Base::CeilAlign(coreEntries * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
-        total += Ops::Base::CeilAlign(actualExpertNum * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE) * NUM_TWO;
-        total += Ops::Base::CeilAlign(AGGRBUFBYTES_A5, UB_BLOCK_SIZE);
-    }
+    AddArch35CountingSortQuantAggrUB(total, coreEntries, colsAligned, actualExpertNum);
     return total;
 }
 
@@ -2242,6 +2278,31 @@ void MoeInitRoutingV3TilingArch35::ComputeUseGatherCopy()
     }
 }
 
+void MoeInitRoutingV3TilingArch35::ComputeArch35CountingSortCutOriginBufSizes(
+    int64_t expertCountStride, int64_t needCoreNum, int64_t& persistentSize, int64_t& phaseASize,
+    int64_t& expertCountAlign, int64_t& batchBufSize, int64_t& phaseBSize) const
+{
+    int64_t chunkAligned = Ops::Base::CeilAlign(COUTSORT_FILTER_CHUNK_SIZE, COUTSORT_ONE_BLOCK_ELEMENT);
+    persistentSize =
+        Ops::Base::CeilAlign(expertCountStride * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE) * NUM_TWO;
+    phaseASize = Ops::Base::CeilAlign(chunkAligned * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
+    phaseASize += Ops::Base::CeilAlign(chunkAligned * static_cast<int64_t>(sizeof(float)), UB_BLOCK_SIZE);
+    int64_t maskBytesA = Ops::Base::CeilAlign(Ops::Base::CeilDiv(chunkAligned, COUTSORT_ONE_BLOCK_ELEMENT),
+                                              static_cast<int64_t>(sizeof(int8_t)));
+    phaseASize += maskBytesA * NUM_THREE;
+    phaseASize += Ops::Base::CeilAlign(chunkAligned * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE) * NUM_THREE;
+
+    expertCountAlign = Ops::Base::CeilAlign(expertCountStride * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
+    int64_t maxBatchBufSize = availUbSize_ - persistentSize - NUM_TWO * expertCountAlign - COUTSORT_UB_MARGIN_BYTES;
+    int64_t allCoresBufSize =
+        Ops::Base::CeilAlign(needCoreNum * expertCountStride * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
+    batchBufSize = std::min(allCoresBufSize, std::max(maxBatchBufSize, expertCountAlign));
+    int64_t pairsBatchSlot =
+        Ops::Base::CeilAlign(HALF_COUTSORT_FILTER_CHUNK_SIZE * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
+    int64_t scatterTempSize = pairsBatchSlot * NUM_TWO + UB_BLOCK_SIZE;
+    phaseBSize = NUM_TWO * expertCountAlign + batchBufSize + scatterTempSize;
+}
+
 void MoeInitRoutingV3TilingArch35::ComputeArch35CountingSortCutOriginTiling()
 {
     auto* cs = &tilingDataPtr_->countingSortParamsOp;
@@ -2254,26 +2315,13 @@ void MoeInitRoutingV3TilingArch35::ComputeArch35CountingSortCutOriginTiling()
     int64_t actualExpertNum = expertEnd_ - expertStart_;
     int64_t expertCountStride = Ops::Base::CeilAlign(actualExpertNum, COUTSORT_ONE_BLOCK_ELEMENT);
 
-    int64_t chunkAligned = Ops::Base::CeilAlign(COUTSORT_FILTER_CHUNK_SIZE, COUTSORT_ONE_BLOCK_ELEMENT);
-    int64_t persistentSize =
-        Ops::Base::CeilAlign(expertCountStride * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE) * NUM_TWO;
-    int64_t phaseASize = Ops::Base::CeilAlign(chunkAligned * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
-    phaseASize += Ops::Base::CeilAlign(chunkAligned * static_cast<int64_t>(sizeof(float)), UB_BLOCK_SIZE);
-    int64_t maskBytesA = Ops::Base::CeilAlign(Ops::Base::CeilDiv(chunkAligned, COUTSORT_ONE_BLOCK_ELEMENT),
-                                              static_cast<int64_t>(sizeof(int8_t)));
-    phaseASize += maskBytesA * NUM_THREE;
-    phaseASize += Ops::Base::CeilAlign(chunkAligned * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE) * NUM_THREE;
-
-    int64_t expertCountAlign =
-        Ops::Base::CeilAlign(expertCountStride * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
-    int64_t maxBatchBufSize = availUbSize_ - persistentSize - NUM_TWO * expertCountAlign - COUTSORT_UB_MARGIN_BYTES;
-    int64_t allCoresBufSize =
-        Ops::Base::CeilAlign(needCoreNum * expertCountStride * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
-    int64_t batchBufSize = std::min(allCoresBufSize, std::max(maxBatchBufSize, expertCountAlign));
-    int64_t pairsBatchSlot =
-        Ops::Base::CeilAlign(HALF_COUTSORT_FILTER_CHUNK_SIZE * static_cast<int64_t>(sizeof(int32_t)), UB_BLOCK_SIZE);
-    int64_t scatterTempSize = pairsBatchSlot * NUM_TWO + UB_BLOCK_SIZE;
-    int64_t phaseBSize = NUM_TWO * expertCountAlign + batchBufSize + scatterTempSize;
+    int64_t persistentSize = 0;
+    int64_t phaseASize = 0;
+    int64_t expertCountAlign = 0;
+    int64_t batchBufSize = 0;
+    int64_t phaseBSize = 0;
+    ComputeArch35CountingSortCutOriginBufSizes(expertCountStride, needCoreNum, persistentSize, phaseASize,
+                                               expertCountAlign, batchBufSize, phaseBSize);
 
     int64_t totalUB = persistentSize + std::max(phaseASize, phaseBSize);
     if (totalUB > availUbSize_) {

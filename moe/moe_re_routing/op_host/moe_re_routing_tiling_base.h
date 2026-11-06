@@ -46,8 +46,14 @@ protected:
 
 private:
     ge::graphStatus CheckDtypeAndAttr() const;
+    ge::graphStatus CheckScaleDtype() const;
+    ge::graphStatus CheckOutputDtypeAndIdxType() const;
     ge::graphStatus CheckOutputShape() const;
+    ge::graphStatus CheckOutputShapeBase() const;
+    ge::graphStatus CheckOutputShapeValue() const;
     ge::graphStatus CheckNullptr() const;
+    ge::graphStatus CheckScaleInfo();
+    ge::graphStatus Check3DScaleShape(const gert::Shape& scaleShape);
 
 protected:
     int64_t coreNum_{0};

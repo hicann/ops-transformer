@@ -15,7 +15,34 @@ import torch
 
 __spec__ = {
     "moe_finalize_routing_v2": "MoeFinalizeRoutingV2TestSpec",
+    "aclnnMoeFinalizeRoutingV2": "AclnnMoeFinalizeRoutingV2TestSpec",
 }
+
+
+def _to_numpy(value):
+    if hasattr(value, "cpu") and hasattr(value, "numpy"):
+        value = value.detach().cpu()
+        try:
+            return value.numpy()
+        except TypeError:
+            import ml_dtypes
+
+            return value.to(torch.float32).numpy().astype(ml_dtypes.bfloat16)
+    return value
+
+
+def _restore_type(value, template):
+    if (
+        template is not None
+        and hasattr(template, "cpu")
+        and hasattr(template, "numpy")
+        and value is not None
+    ):
+        try:
+            return torch.from_numpy(value)
+        except TypeError:
+            return torch.from_numpy(value.astype(numpy.float32)).to(torch.bfloat16)
+    return value
 
 
 class MoeFinalizeRoutingV2TestSpec:
@@ -167,6 +194,75 @@ class MoeFinalizeRoutingV2TestSpec:
             alpha1,
             alpha2,
             v,
+        )
+
+    tolerance = {
+        "float32": {"standard": "stat_rel_err"},
+        "float16": {"standard": "stat_rel_err"},
+        "bfloat16": {"standard": "stat_rel_err"},
+    }
+
+
+class AclnnMoeFinalizeRoutingV2TestSpec:
+    @staticmethod
+    def golden(
+        expandedX,
+        expandedRowIdx,
+        x1=None,
+        x2=None,
+        bias=None,
+        scales=None,
+        expertIdx=None,
+        dropPadMode=0,
+        out=None,
+        *args,
+        **kwargs,
+    ):
+        return MoeFinalizeRoutingV2TestSpec.golden(
+            _to_numpy(expandedX),
+            _to_numpy(expandedRowIdx),
+            _to_numpy(x1),
+            _to_numpy(x2),
+            _to_numpy(bias),
+            _to_numpy(scales),
+            _to_numpy(expertIdx),
+            x=_to_numpy(kwargs.get("x")),
+            alpha1=_to_numpy(kwargs.get("alpha1")),
+            alpha2=_to_numpy(kwargs.get("alpha2")),
+            v=_to_numpy(kwargs.get("v")),
+            drop_pad_mode=dropPadMode,
+            zero_expert_range=kwargs.get("zeroExpertRange"),
+            copy_expert_range=kwargs.get("copyExpertRange"),
+            constant_expert_range=kwargs.get("constantExpertRange"),
+            k=kwargs.get("k", 1),
+        )
+
+    @staticmethod
+    def customize_inputs(
+        expandedX,
+        expandedRowIdx,
+        x1=None,
+        x2=None,
+        bias=None,
+        scales=None,
+        expertIdx=None,
+        dropPadMode=0,
+        out=None,
+        *args,
+        **kwargs,
+    ):
+        templates = (expandedX, expandedRowIdx, x1, x2, bias, scales, expertIdx)
+        results = MoeFinalizeRoutingV2TestSpec.customize_inputs(
+            *[_to_numpy(t) for t in templates],
+            x=None,
+            alpha1=None,
+            alpha2=None,
+            v=None,
+            **kwargs,
+        )[:7]
+        return tuple(
+            _restore_type(value, template)
+            for value, template in zip(results, templates)
         )
 
     tolerance = {

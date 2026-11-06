@@ -92,9 +92,9 @@ class AclnnMoeFinalizeRoutingV2GradTestSpec:
             return [grad_expanded_x.to(grad_y_dtype), grad_scales]
         else:
             scales_dtype = scalesOptional.dtype
-            scales = scalesOptional.reshape(BSK, topK).to(torch.float32)
+            scales = scalesOptional.reshape(N, topK).to(torch.float32)
             grad_expanded_x = torch.zeros((out_rows, H), dtype=torch.float32)
-            grad_scales = torch.zeros((BSK, topK), dtype=torch.float32)
+            grad_scales = torch.zeros((N, topK), dtype=torch.float32)
 
             expanded_x = (
                 expandedXOptional.to(torch.float32)
@@ -112,9 +112,17 @@ class AclnnMoeFinalizeRoutingV2GradTestSpec:
                     scale_val = scales[grad_row_idx, k_idx]
                     grad_expanded_x[src_row] = grad_y[grad_row_idx] * scale_val
                     if expanded_x is not None:
+                        # 规格公式: gradScales[i] = sum((expandedX[erow] + bias[expertIdx[i]]) * gradY[i/K])
                         grad_scales[grad_row_idx, k_idx] = torch.sum(
                             expanded_x[src_row] * grad_y[grad_row_idx]
                         )
+                        if biasOptional is not None and expertIdxOptional is not None:
+                            expert_id = int(expertIdxOptional[grad_row_idx, k_idx])
+                            if 0 <= expert_id < biasOptional.shape[0]:
+                                grad_scales[grad_row_idx, k_idx] += torch.sum(
+                                    biasOptional[expert_id].to(torch.float32)
+                                    * grad_y[grad_row_idx]
+                                )
                     else:
                         grad_scales[grad_row_idx, k_idx] = 0.0
             grad_expanded_x = grad_expanded_x.reshape(out_shape)
@@ -152,25 +160,22 @@ class AclnnMoeFinalizeRoutingV2GradTestSpec:
                 args[idx].zero_()
 
     def pre_compare(*outputs, **kwargs):
-        import numpy as _np
-
-        try:
-            for i in range(0, len(outputs) - 1, 2):
-                npu_out = outputs[i]
-                golden_out = outputs[i + 1]
-                if npu_out is None or golden_out is None:
-                    continue
-                if not isinstance(npu_out, _np.ndarray) or not isinstance(
-                    golden_out, _np.ndarray
-                ):
-                    continue
-                if npu_out.shape != golden_out.shape:
+        # ttk 传入顺序为 (*npu_outputs, *goldens)，前半为 NPU 输出、后半为 golden；
+        # NPU 输出可能是 torch 张量或 numpy 数组，统一用布尔掩码赋值（两者均支持）
+        half = len(outputs) // 2
+        npu_outputs = outputs[:half]
+        golden_outputs = outputs[half:]
+        for npu_out, golden_out in zip(npu_outputs, golden_outputs):
+            if npu_out is None or golden_out is None:
+                continue
+            try:
+                if tuple(npu_out.shape) != tuple(golden_out.shape):
                     continue
                 mask = golden_out == 0
                 if mask.any():
                     npu_out[mask] = 0
-        except Exception:
-            pass
+            except Exception:
+                continue
 
     tolerance = {
         "float32": {"standard": "stat_rel_err"},
@@ -244,15 +249,23 @@ class MoeFinalizeRoutingV2GradTestSpec:
                     scale_val = scales_np[grad_row_idx, k_idx]
                     grad_expanded_x[src_row] = grad_y[grad_row_idx] * scale_val
                     if expanded_x_np is not None:
+                        # 规格公式: gradScales[i] = sum((expandedX[erow] + bias[expertIdx[i]]) * gradY[i/K])
                         grad_scales[grad_row_idx, k_idx] = numpy.sum(
                             expanded_x_np[src_row] * grad_y[grad_row_idx]
                         )
+                        if bias is not None and expert_idx is not None:
+                            expert_id = int(expert_idx[grad_row_idx, k_idx])
+                            if 0 <= expert_id < bias.shape[0]:
+                                grad_scales[grad_row_idx, k_idx] += numpy.sum(
+                                    bias[expert_id].astype(numpy.float32)
+                                    * grad_y[grad_row_idx]
+                                )
                     else:
                         grad_scales[grad_row_idx, k_idx] = 0.0
             grad_expanded_x = grad_expanded_x.reshape(out_shape)
             return [
                 grad_expanded_x.astype(ori_dtype),
-                grad_scales.reshape(BSK, 1).astype(scales.dtype),
+                grad_scales.reshape(N, topK).astype(scales.dtype),
             ]
 
     @staticmethod
@@ -282,6 +295,8 @@ class MoeFinalizeRoutingV2GradTestSpec:
         perm = numpy.random.permutation(min(out_rows, BSK)).astype(numpy.int32)
         new_eri[: len(perm)] = perm
         return (grad_y, new_eri, expanded_x, scales, expert_idx, bias)
+
+    pre_compare = staticmethod(AclnnMoeFinalizeRoutingV2GradTestSpec.pre_compare)
 
     tolerance = {
         "float32": {"standard": "stat_rel_err"},

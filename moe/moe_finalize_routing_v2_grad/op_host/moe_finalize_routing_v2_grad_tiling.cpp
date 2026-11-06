@@ -71,26 +71,10 @@ ge::graphStatus MoeFinalizeRoutingV2GradTiling::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeFinalizeRoutingV2GradTiling::GetRequiredTensorInfo()
+static ge::graphStatus GetOutputTensorInfo(gert::TilingContext* context_, gert::Shape& gradExpandedXShape_,
+                                           ge::DataType& gradExpandedXType_, gert::Shape& gradScalesShape_,
+                                           ge::DataType& gradScalesType_)
 {
-    auto gradYShapePtr = context_->GetInputShape(INPUT_0_IDX);
-    OP_CHECK_IF(gradYShapePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "grad_y"),
-                return ge::GRAPH_FAILED);
-    gradYShape_ = Ops::Transformer::OpTiling::EnsureNotScalar(gradYShapePtr->GetOriginShape());
-    auto gradYDescPtr = context_->GetInputDesc(INPUT_0_IDX);
-    OP_CHECK_IF(gradYDescPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "grad_y"),
-                return ge::GRAPH_FAILED);
-    gradYType_ = gradYDescPtr->GetDataType();
-
-    auto expandedRowIdxShapePtr = context_->GetInputShape(INPUT_1_IDX);
-    OP_CHECK_IF(expandedRowIdxShapePtr == nullptr,
-                OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "expanded_row_idx"), return ge::GRAPH_FAILED);
-    expandedRowIdxShape_ = Ops::Transformer::OpTiling::EnsureNotScalar(expandedRowIdxShapePtr->GetOriginShape());
-    auto expandedRowIdxDescPtr = context_->GetInputDesc(INPUT_1_IDX);
-    OP_CHECK_IF(expandedRowIdxDescPtr == nullptr,
-                OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "expanded_row_idx"), return ge::GRAPH_FAILED);
-    expandedRowIdxType_ = expandedRowIdxDescPtr->GetDataType();
-
     auto gradExpandedXShapePtr = context_->GetOutputShape(OUTPUT_0_IDX);
     OP_CHECK_IF(
         gradExpandedXShapePtr == nullptr,
@@ -124,6 +108,33 @@ ge::graphStatus MoeFinalizeRoutingV2GradTiling::GetRequiredTensorInfo()
                                                  "context_->GetOutputDesc(OUTPUT_1_IDX) must provide a valid object."),
         return ge::GRAPH_FAILED);
     gradScalesType_ = gradScalesDescPtr->GetDataType();
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeFinalizeRoutingV2GradTiling::GetRequiredTensorInfo()
+{
+    auto gradYShapePtr = context_->GetInputShape(INPUT_0_IDX);
+    OP_CHECK_IF(gradYShapePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "grad_y"),
+                return ge::GRAPH_FAILED);
+    gradYShape_ = Ops::Transformer::OpTiling::EnsureNotScalar(gradYShapePtr->GetOriginShape());
+    auto gradYDescPtr = context_->GetInputDesc(INPUT_0_IDX);
+    OP_CHECK_IF(gradYDescPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "grad_y"),
+                return ge::GRAPH_FAILED);
+    gradYType_ = gradYDescPtr->GetDataType();
+
+    auto expandedRowIdxShapePtr = context_->GetInputShape(INPUT_1_IDX);
+    OP_CHECK_IF(expandedRowIdxShapePtr == nullptr,
+                OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "expanded_row_idx"), return ge::GRAPH_FAILED);
+    expandedRowIdxShape_ = Ops::Transformer::OpTiling::EnsureNotScalar(expandedRowIdxShapePtr->GetOriginShape());
+    auto expandedRowIdxDescPtr = context_->GetInputDesc(INPUT_1_IDX);
+    OP_CHECK_IF(expandedRowIdxDescPtr == nullptr,
+                OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "expanded_row_idx"), return ge::GRAPH_FAILED);
+    expandedRowIdxType_ = expandedRowIdxDescPtr->GetDataType();
+
+    if (GetOutputTensorInfo(context_, gradExpandedXShape_, gradExpandedXType_, gradScalesShape_, gradScalesType_) !=
+        ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
 
     return ge::GRAPH_SUCCESS;
 }
@@ -318,6 +329,15 @@ ge::graphStatus MoeFinalizeRoutingV2GradTiling::CheckOptionalInputShape()
                                               "same shape size"),
                 return ge::GRAPH_FAILED);
 
+    if (CheckBiasExpertIdxShape() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeFinalizeRoutingV2GradTiling::CheckBiasExpertIdxShape()
+{
     if (isBiasExist_) {
         OP_CHECK_IF((expertIdxShape_.GetDim(0) != gradYShape_.GetDim(0)),
                     OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(

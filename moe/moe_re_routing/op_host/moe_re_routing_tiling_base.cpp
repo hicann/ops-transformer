@@ -134,19 +134,8 @@ ge::graphStatus MoeReRoutingTilingBase::CheckNullptr() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeReRoutingTilingBase::CheckDtypeAndAttr() const
+ge::graphStatus MoeReRoutingTilingBase::CheckScaleDtype() const
 {
-    OP_CHECK_IF(std::find(TOKENS_DTYPE.begin(), TOKENS_DTYPE.end(), tokenDtype_) == TOKENS_DTYPE.end(),
-                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                    context_->GetNodeName(), "tokens", ge::TypeUtils::DataTypeToSerialString(tokenDtype_).c_str(),
-                    "Supported dtypes: INT8, BF16, F16, FP8_E4M3FN, FP8_E5M2, HIFLOAT8, FP4_E2M1, FP4_E1M2."),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(std::find(EXPERT_TOKEN_NUM_DTYPE.begin(), EXPERT_TOKEN_NUM_DTYPE.end(), expertDtype_) ==
-                    EXPERT_TOKEN_NUM_DTYPE.end(),
-                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "expert_token_num_per_rank",
-                                                      ge::TypeUtils::DataTypeToSerialString(expertDtype_).c_str(),
-                                                      "Supported dtypes: INT32, INT64."),
-                return ge::GRAPH_FAILED);
     if (tokenDtype_ == ge::DT_FLOAT8_E4M3FN || tokenDtype_ == ge::DT_FLOAT8_E5M2) {
         OP_CHECK_IF(
             (scaleDtype_ != ge::DT_FLOAT8_E8M0 && scaleDtype_ != ge::DT_FLOAT),
@@ -179,6 +168,11 @@ ge::graphStatus MoeReRoutingTilingBase::CheckDtypeAndAttr() const
                                                   "When tokens dtype is HIFLOAT4, scale dtype should be FLOAT."),
             return ge::GRAPH_FAILED);
     }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeReRoutingTilingBase::CheckOutputDtypeAndIdxType() const
+{
     if (hasScale_) {
         auto outputScaleType = context_->GetOutputDesc(OUT_SCALE_INDEX)->GetDataType();
         OP_CHECK_IF(outputScaleType != scaleDtype_,
@@ -223,7 +217,29 @@ ge::graphStatus MoeReRoutingTilingBase::CheckDtypeAndAttr() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeReRoutingTilingBase::CheckOutputShape() const
+ge::graphStatus MoeReRoutingTilingBase::CheckDtypeAndAttr() const
+{
+    OP_CHECK_IF(std::find(TOKENS_DTYPE.begin(), TOKENS_DTYPE.end(), tokenDtype_) == TOKENS_DTYPE.end(),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                    context_->GetNodeName(), "tokens", ge::TypeUtils::DataTypeToSerialString(tokenDtype_).c_str(),
+                    "Supported dtypes: INT8, BF16, F16, FP8_E4M3FN, FP8_E5M2, HIFLOAT8, FP4_E2M1, FP4_E1M2."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(std::find(EXPERT_TOKEN_NUM_DTYPE.begin(), EXPERT_TOKEN_NUM_DTYPE.end(), expertDtype_) ==
+                    EXPERT_TOKEN_NUM_DTYPE.end(),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "expert_token_num_per_rank",
+                                                      ge::TypeUtils::DataTypeToSerialString(expertDtype_).c_str(),
+                                                      "Supported dtypes: INT32, INT64."),
+                return ge::GRAPH_FAILED);
+    if (CheckScaleDtype() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckOutputDtypeAndIdxType() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeReRoutingTilingBase::CheckOutputShapeBase() const
 {
     const gert::StorageShape* outTokenShapePtr = context_->GetOutputShape(OUTPUT_PERMUTE_TOKENS_INDEX);
     OP_CHECK_IF(outTokenShapePtr == nullptr,
@@ -254,6 +270,11 @@ ge::graphStatus MoeReRoutingTilingBase::CheckOutputShape() const
                         "The output permute_per_token_scales shape should be the same as per_token_scales."),
                     return ge::GRAPH_FAILED);
     }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeReRoutingTilingBase::CheckOutputShapeValue() const
+{
     const gert::StorageShape* tokenIdxShapePtr = context_->GetOutputShape(OUT_PERMUTE_TOKEN_IDX_IDNEX);
     OP_CHECK_IF(tokenIdxShapePtr == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "permute_tokens_idx shape", "nullptr",
@@ -288,6 +309,17 @@ ge::graphStatus MoeReRoutingTilingBase::CheckOutputShape() const
             ("Dim 0 of expert_token_num should be equal to expertNum, expertNum is " + std::to_string(expertNum_))
                 .c_str()),
         return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeReRoutingTilingBase::CheckOutputShape() const
+{
+    if (CheckOutputShapeBase() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckOutputShapeValue() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     if (hasTopkWeight_) {
         const gert::StorageShape* outTopkWeightShapePtr = context_->GetOutputShape(OUT_PERMUTE_TOPK_WEIGHT_INDEX);
         OP_CHECK_IF(outTopkWeightShapePtr == nullptr,
@@ -353,25 +385,35 @@ ge::graphStatus MoeReRoutingTilingBase::CheckParam()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeReRoutingTilingBase::GetShapeAttrsInfo()
+ge::graphStatus MoeReRoutingTilingBase::Check3DScaleShape(const gert::Shape& scaleShape)
 {
-    OP_CHECK_IF(context_ == nullptr,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "context", "nullptr",
-                                                      "Context should not be null."),
+    if (tokenDtype_ != ge::DT_FLOAT8_E4M3FN && tokenDtype_ != ge::DT_FLOAT8_E5M2) {
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            context_->GetNodeName(), "tokens", ge::TypeUtils::DataTypeToSerialString(tokenDtype_).c_str(),
+            "3D per_token_scales requires token dtype DT_FLOAT8_E4M3FN or DT_FLOAT8_E5M2.");
+        return ge::GRAPH_FAILED;
+    }
+    auto scaleShapeTuple3D = GetShapeTupleN(context_, IN_TOKEN_SCALE_INDEX, true);
+    auto scaleSum0 = std::get<DIM_INDEX_0>(scaleShapeTuple3D);
+    auto scaleDim1 = std::get<DIM_INDEX_1>(scaleShapeTuple3D);
+    auto scaleDim2 = std::get<DIM_INDEX_2>(scaleShapeTuple3D);
+    OP_CHECK_IF(scaleSum0 != tokenSum_,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "per_token_scales", Ops::Base::ToString(scaleShape).c_str(),
+                    ("Dim 0 of per_token_scales should be equal to tokenSum, tokenSum is " + std::to_string(tokenSum_))
+                        .c_str()),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "input/output desc or shape", "nullptr",
-                                                      "Required input/output desc and shape should not be null."),
+    OP_CHECK_IF(scaleDim2 != DIM_SIZE_TWO,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "per_token_scales",
+                                                      Ops::Base::ToString(scaleShape).c_str(),
+                                                      "Dim 2 of 3D per_token_scales should be 2."),
                 return ge::GRAPH_FAILED);
-    auto tokenShapeTuple = GetShapeTuple(context_, IN_TOKEN_INDEX);
-    auto expertShapeTuple = GetShapeTuple(context_, IN_EXPERT_TOKEN_NUM_PER_RANK_INDEX);
-    tokenSum_ = std::get<0>(tokenShapeTuple);
-    tokenSize_ = std::get<1>(tokenShapeTuple);
-    tokenSizeH_ = std::get<1>(tokenShapeTuple);
-    rankNums_ = std::get<0>(expertShapeTuple);
-    expertNum_ = std::get<1>(expertShapeTuple);
-    tokenDtype_ = context_->GetInputDesc(IN_TOKEN_INDEX)->GetDataType();
-    expertDtype_ = context_->GetInputDesc(IN_EXPERT_TOKEN_NUM_PER_RANK_INDEX)->GetDataType();
+    scaleSize_ = scaleDim1 * scaleDim2;
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeReRoutingTilingBase::CheckScaleInfo()
+{
     auto scalePtr = context_->GetOptionalInputDesc(IN_TOKEN_SCALE_INDEX);
     if (scalePtr != nullptr) {
         auto scaleShapePtr = context_->GetOptionalInputShape(IN_TOKEN_SCALE_INDEX);
@@ -392,29 +434,9 @@ ge::graphStatus MoeReRoutingTilingBase::GetShapeAttrsInfo()
                         .c_str()),
                 return ge::GRAPH_FAILED);
         } else if (scaleDimNum == DIM_3) {
-            if (tokenDtype_ != ge::DT_FLOAT8_E4M3FN && tokenDtype_ != ge::DT_FLOAT8_E5M2) {
-                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                    context_->GetNodeName(), "tokens", ge::TypeUtils::DataTypeToSerialString(tokenDtype_).c_str(),
-                    "3D per_token_scales requires token dtype DT_FLOAT8_E4M3FN or DT_FLOAT8_E5M2.");
+            if (Check3DScaleShape(scaleShape) != ge::GRAPH_SUCCESS) {
                 return ge::GRAPH_FAILED;
             }
-            auto scaleShapeTuple3D = GetShapeTupleN(context_, IN_TOKEN_SCALE_INDEX, true);
-            auto scaleSum0 = std::get<DIM_INDEX_0>(scaleShapeTuple3D);
-            auto scaleDim1 = std::get<DIM_INDEX_1>(scaleShapeTuple3D);
-            auto scaleDim2 = std::get<DIM_INDEX_2>(scaleShapeTuple3D);
-            OP_CHECK_IF(
-                scaleSum0 != tokenSum_,
-                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                    context_->GetNodeName(), "per_token_scales", Ops::Base::ToString(scaleShape).c_str(),
-                    ("Dim 0 of per_token_scales should be equal to tokenSum, tokenSum is " + std::to_string(tokenSum_))
-                        .c_str()),
-                return ge::GRAPH_FAILED);
-            OP_CHECK_IF(scaleDim2 != DIM_SIZE_TWO,
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "per_token_scales",
-                                                              Ops::Base::ToString(scaleShape).c_str(),
-                                                              "Dim 2 of 3D per_token_scales should be 2."),
-                        return ge::GRAPH_FAILED);
-            scaleSize_ = scaleDim1 * scaleDim2;
         } else {
             OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "per_token_scales",
                                          std::to_string(scaleDimNum).c_str(), "1, 2 or 3");
@@ -422,6 +444,31 @@ ge::graphStatus MoeReRoutingTilingBase::GetShapeAttrsInfo()
         }
         scaleDtype_ = scalePtr->GetDataType();
         hasScale_ = true;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeReRoutingTilingBase::GetShapeAttrsInfo()
+{
+    OP_CHECK_IF(context_ == nullptr,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "context", "nullptr",
+                                                      "Context should not be null."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "input/output desc or shape", "nullptr",
+                                                      "Required input/output desc and shape should not be null."),
+                return ge::GRAPH_FAILED);
+    auto tokenShapeTuple = GetShapeTuple(context_, IN_TOKEN_INDEX);
+    auto expertShapeTuple = GetShapeTuple(context_, IN_EXPERT_TOKEN_NUM_PER_RANK_INDEX);
+    tokenSum_ = std::get<0>(tokenShapeTuple);
+    tokenSize_ = std::get<1>(tokenShapeTuple);
+    tokenSizeH_ = std::get<1>(tokenShapeTuple);
+    rankNums_ = std::get<0>(expertShapeTuple);
+    expertNum_ = std::get<1>(expertShapeTuple);
+    tokenDtype_ = context_->GetInputDesc(IN_TOKEN_INDEX)->GetDataType();
+    expertDtype_ = context_->GetInputDesc(IN_EXPERT_TOKEN_NUM_PER_RANK_INDEX)->GetDataType();
+    if (CheckScaleInfo() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
     hasTopkWeight_ = false;
     if (tokenDtype_ == Ops::Transformer::DT_HIFLOAT4) {

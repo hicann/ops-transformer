@@ -131,6 +131,7 @@ protected:
     ge::graphStatus CheckAttr();
     ge::graphStatus CheckRequiredInput();
     ge::graphStatus CheckOptionalInputShape();
+    ge::graphStatus CheckBiasExpertIdxShape();
     virtual ge::graphStatus CheckOptionalInputDtype();
     ge::graphStatus CheckBiasExpertIdxDtype();
     ge::graphStatus CheckExpandedXAndRowIdxDtype();

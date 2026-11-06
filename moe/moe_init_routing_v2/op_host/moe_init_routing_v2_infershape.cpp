@@ -121,9 +121,9 @@ static ge::graphStatus CheckInputShapes(const gert::InferShapeContext* context, 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckAttrParams(const gert::InferShapeContext* context, const gert::Shape* xShape,
-                                       const int64_t activeNum, const int64_t expertCapacity, const int64_t expertNum,
-                                       const int64_t dropPadMode, const int64_t expertTokensCountOrCumsumFlag)
+static ge::graphStatus CheckAttrValueRange(const gert::InferShapeContext* context, const int64_t activeNum,
+                                           const int64_t expertCapacity, const int64_t expertNum,
+                                           const int64_t dropPadMode)
 {
     if (activeNum < 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "activeNum", std::to_string(activeNum).c_str(),
@@ -144,6 +144,16 @@ static ge::graphStatus CheckAttrParams(const gert::InferShapeContext* context, c
     if (dropPadMode < 0 || dropPadMode > 1) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "dropPadMode",
                                               std::to_string(dropPadMode).c_str(), "must be 0 or 1");
+        return ge::GRAPH_FAILED;
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus CheckAttrParams(const gert::InferShapeContext* context, const gert::Shape* xShape,
+                                       const int64_t activeNum, const int64_t expertCapacity, const int64_t expertNum,
+                                       const int64_t dropPadMode, const int64_t expertTokensCountOrCumsumFlag)
+{
+    if (CheckAttrValueRange(context, activeNum, expertCapacity, expertNum, dropPadMode) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     if (dropPadMode > 0 && (expertCapacity < 1 || expertNum < 1)) {
@@ -240,9 +250,11 @@ static void InferOutputShape(const gert::Shape* xShape, const gert::Shape* exper
     }
 }
 
-static ge::graphStatus InferShape4MoeInitRoutingV2(gert::InferShapeContext* context)
+static ge::graphStatus GetMoeInitRoutingV2Attrs(gert::InferShapeContext* context, int64_t& activeNum,
+                                                int64_t& expertCapacity, int64_t& expertNum, int64_t& dropPadMode,
+                                                int64_t& expertTokensCountOrCumsumFlag,
+                                                bool& expertTokensBeforeCapacityFlag)
 {
-    OP_LOGD(context->GetNodeName(), "Begin to do MoeInitRountingV2Infershape.");
     // 获取attr
     auto attrs = context->GetAttrs();
     OP_CHECK_IF(attrs == nullptr,
@@ -251,43 +263,58 @@ static ge::graphStatus InferShape4MoeInitRoutingV2(gert::InferShapeContext* cont
                     "Required attrs metadata is null; context->GetAttrs() must provide a valid object."),
                 return ge::GRAPH_FAILED);
     const int64_t* activeNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_ACTIVE_ROWS);
-    const int64_t activeNum = (activeNumPtr == nullptr) ? 0 : *activeNumPtr;
+    activeNum = (activeNumPtr == nullptr) ? 0 : *activeNumPtr;
     const int64_t* expertCapacityPtr = attrs->GetAttrPointer<int64_t>(ATTR_EXPERT_CAPACITY);
-    const int64_t expertCapacity = (expertCapacityPtr == nullptr) ? 0 : *expertCapacityPtr;
+    expertCapacity = (expertCapacityPtr == nullptr) ? 0 : *expertCapacityPtr;
     const int64_t* expertNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_EXPERT_NUM);
-    const int64_t expertNum = (expertNumPtr == nullptr) ? 0 : *expertNumPtr;
+    expertNum = (expertNumPtr == nullptr) ? 0 : *expertNumPtr;
     const int64_t* dropPadModePtr = attrs->GetAttrPointer<int64_t>(ATTR_DROP_PAD_MODE);
-    const int64_t dropPadMode = (dropPadModePtr == nullptr) ? 0 : *dropPadModePtr;
+    dropPadMode = (dropPadModePtr == nullptr) ? 0 : *dropPadModePtr;
     const int64_t* expertTokensCountOrCumsumFlagPtr =
         attrs->GetAttrPointer<int64_t>(ATTR_EXPERT_TOKENS_COUNT_OR_CUMSUM_FLAG);
-    const int64_t expertTokensCountOrCumsumFlag =
+    expertTokensCountOrCumsumFlag =
         (expertTokensCountOrCumsumFlagPtr == nullptr) ? 0 : *expertTokensCountOrCumsumFlagPtr;
     const bool* expertTokensBeforeCapacityFlagPtr =
         attrs->GetAttrPointer<bool>(ATTR_EXPERT_TOKENS_BEFORE_CAPACITY_FLAG);
-    const bool expertTokensBeforeCapacityFlag =
+    expertTokensBeforeCapacityFlag =
         (expertTokensBeforeCapacityFlagPtr == nullptr) ? false : *expertTokensBeforeCapacityFlagPtr;
+    return ge::GRAPH_SUCCESS;
+}
 
+static ge::graphStatus GetMoeInitRoutingV2InputShapes(gert::InferShapeContext* context, const gert::Shape*& xShape,
+                                                      const gert::Shape*& expertIdxShape)
+{
     // 获取输入shape
-    const gert::Shape* xShape = context->GetInputShape(INDEX_INPUT_X);
+    xShape = context->GetInputShape(INDEX_INPUT_X);
     OP_CHECK_IF(xShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "x"), return ge::GRAPH_FAILED);
-    const gert::Shape* expertIdxShape = context->GetInputShape(INDEX_INPUT_EXPERT_IDX);
+    expertIdxShape = context->GetInputShape(INDEX_INPUT_EXPERT_IDX);
     OP_CHECK_IF(expertIdxShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "expert_idx"),
                 return ge::GRAPH_FAILED);
-    gert::Shape* expandedXShape = context->GetOutputShape(OUTOUT_EXPANDED_X);
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus GetMoeInitRoutingV2OutputShapes(gert::InferShapeContext* context, const int64_t dropPadMode,
+                                                       const int64_t expertTokensCountOrCumsumFlag,
+                                                       const bool expertTokensBeforeCapacityFlag,
+                                                       gert::Shape*& expandedXShape, gert::Shape*& expandedRowIdx,
+                                                       gert::Shape*& expertTokensCountOrCumsumShape,
+                                                       gert::Shape*& expertTokensBeforeCapacityShape)
+{
+    expandedXShape = context->GetOutputShape(OUTOUT_EXPANDED_X);
     OP_CHECK_IF(expandedXShape == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                     context->GetNodeName(), "expandedXShape",
                     "Required expandedXShape metadata is null; "
                     "context->GetOutputShape(OUTOUT_EXPANDED_X) must provide a valid object."),
                 return ge::GRAPH_FAILED);
-    gert::Shape* expandedRowIdx = context->GetOutputShape(OUTOUT_EXPANDED_ROW_IDX);
+    expandedRowIdx = context->GetOutputShape(OUTOUT_EXPANDED_ROW_IDX);
     OP_CHECK_IF(expandedRowIdx == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                     context->GetNodeName(), "expandedRowIdx",
                     "Required expandedRowIdx metadata is null; "
                     "context->GetOutputShape(OUTOUT_EXPANDED_ROW_IDX) must provide a valid object."),
                 return ge::GRAPH_FAILED);
-    gert::Shape* expertTokensCountOrCumsumShape = context->GetOutputShape(OUTOUT_EXPERT_TOKENS_COUNT_OR_CUMSUM);
+    expertTokensCountOrCumsumShape = context->GetOutputShape(OUTOUT_EXPERT_TOKENS_COUNT_OR_CUMSUM);
     if (dropPadMode == 0 && expertTokensCountOrCumsumFlag > 0) {
         OP_CHECK_IF(expertTokensCountOrCumsumShape == nullptr,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
@@ -296,7 +323,7 @@ static ge::graphStatus InferShape4MoeInitRoutingV2(gert::InferShapeContext* cont
                         "context->GetOutputShape(OUTOUT_EXPERT_TOKENS_COUNT_OR_CUMSUM) must provide a valid object."),
                     return ge::GRAPH_FAILED);
     }
-    gert::Shape* expertTokensBeforeCapacityShape = context->GetOutputShape(OUTOUT_EXPERT_TOKENS_BEFORE_CAPACITY);
+    expertTokensBeforeCapacityShape = context->GetOutputShape(OUTOUT_EXPERT_TOKENS_BEFORE_CAPACITY);
     if (dropPadMode == 1 && expertTokensBeforeCapacityFlag) {
         OP_CHECK_IF(expertTokensBeforeCapacityShape == nullptr,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
@@ -304,6 +331,37 @@ static ge::graphStatus InferShape4MoeInitRoutingV2(gert::InferShapeContext* cont
                         "Required expertTokensBeforeCapacityShape metadata is null; "
                         "context->GetOutputShape(OUTOUT_EXPERT_TOKENS_BEFORE_CAPACITY) must provide a valid object."),
                     return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus InferShape4MoeInitRoutingV2(gert::InferShapeContext* context)
+{
+    OP_LOGD(context->GetNodeName(), "Begin to do MoeInitRountingV2Infershape.");
+    int64_t activeNum = 0;
+    int64_t expertCapacity = 0;
+    int64_t expertNum = 0;
+    int64_t dropPadMode = 0;
+    int64_t expertTokensCountOrCumsumFlag = 0;
+    bool expertTokensBeforeCapacityFlag = false;
+    if (GetMoeInitRoutingV2Attrs(context, activeNum, expertCapacity, expertNum, dropPadMode,
+                                 expertTokensCountOrCumsumFlag, expertTokensBeforeCapacityFlag) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+
+    const gert::Shape* xShape = nullptr;
+    const gert::Shape* expertIdxShape = nullptr;
+    gert::Shape* expandedXShape = nullptr;
+    gert::Shape* expandedRowIdx = nullptr;
+    gert::Shape* expertTokensCountOrCumsumShape = nullptr;
+    gert::Shape* expertTokensBeforeCapacityShape = nullptr;
+    if (GetMoeInitRoutingV2InputShapes(context, xShape, expertIdxShape) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (GetMoeInitRoutingV2OutputShapes(
+            context, dropPadMode, expertTokensCountOrCumsumFlag, expertTokensBeforeCapacityFlag, expandedXShape,
+            expandedRowIdx, expertTokensCountOrCumsumShape, expertTokensBeforeCapacityShape) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
 
     if (CheckInputShape(context, xShape, expertIdxShape) != ge::GRAPH_SUCCESS) {

@@ -789,6 +789,69 @@ static void SetExpandedScaleShape(gert::Shape* expandedScaleShape, const gert::S
         expandedScaleShape->SetDim(DIM_TWO, SCALE_THIRD_DIM_SIZE);
     }
 }
+static ge::graphStatus GetOutputShapes(gert::InferShapeContext* context, gert::Shape*& expandedXShape,
+                                       gert::Shape*& expandedRowIdxShape, gert::Shape*& expertTokenCumsumOrCountShape,
+                                       gert::Shape*& expandedScaleShape)
+{
+    expandedXShape = context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_X);
+    OP_CHECK_IF(expandedXShape == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    context->GetNodeName(), "expandedXShape",
+                    "Required expandedXShape metadata is null; "
+                    "context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_X) must provide a valid object."),
+                return ge::GRAPH_FAILED);
+    expandedRowIdxShape = context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_ROW_IDX);
+    OP_CHECK_IF(
+        expandedRowIdxShape == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            context->GetNodeName(), "expandedRowIdxShape",
+            "Required expandedRowIdxShape metadata is null; "
+            "context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_ROW_IDX) must provide a valid object."),
+        return ge::GRAPH_FAILED);
+    expertTokenCumsumOrCountShape = context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPERT_TOKEN_CUMSUM_OR_COUNT);
+    OP_CHECK_IF(expertTokenCumsumOrCountShape == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    context->GetNodeName(), "expertTokenCumsumOrCountShape",
+                    "Required expertTokenCumsumOrCountShape metadata is null; "
+                    "context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPERT_TOKEN_CUMSUM_OR_COUNT) "
+                    "must provide a valid object."),
+                return ge::GRAPH_FAILED);
+    expandedScaleShape = context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_SCALE);
+    OP_CHECK_IF(expandedScaleShape == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    context->GetNodeName(), "expandedScaleShape",
+                    "Required expandedScaleShape metadata is null; "
+                    "context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_SCALE) must provide a valid object."),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+static void SetOutputShapes(const gert::InferShapeContext* context, const gert::Shape* xShape,
+                            const gert::Shape* expertIdxShape, const gert::Shape* scaleShape,
+                            gert::Shape* expandedXShape, gert::Shape* expandedRowIdxShape,
+                            gert::Shape* expertTokenCumsumOrCountShape, gert::Shape* expandedScaleShape,
+                            int64_t dropPadMode, int64_t activeNum, int64_t experNum, int64_t expertCapacity,
+                            bool expertTokenNumFlag, int64_t expertTokenNumType, int64_t expertStart, int64_t expertEnd,
+                            int64_t quantMode)
+{
+    int64_t cols = 0;
+    int64_t outNum = 0;
+    int64_t xOutNum = 0;
+
+    CalculateOutputDims(xShape, expertIdxShape, activeNum, cols, outNum, xOutNum);
+
+    SetExpandedXandRowIdxShape(expandedXShape, expandedRowIdxShape, dropPadMode, xOutNum, outNum, experNum,
+                               expertCapacity, cols);
+
+    SetExpertTokenCumsumOrCountShape(expertTokenCumsumOrCountShape, expertTokenNumFlag, expertTokenNumType, experNum,
+                                     expertStart, expertEnd);
+
+    SetExpandedScaleShape(expandedScaleShape, scaleShape, quantMode, dropPadMode, xOutNum, outNum, experNum,
+                          expertCapacity, cols);
+
+    ShowOutputShapeInfo(context, expandedXShape, expandedRowIdxShape, expertTokenCumsumOrCountShape,
+                        expandedScaleShape);
+}
 
 static ge::graphStatus InferShape4MoeInitRoutingV3(gert::InferShapeContext* context)
 {
@@ -823,55 +886,18 @@ static ge::graphStatus InferShape4MoeInitRoutingV3(gert::InferShapeContext* cont
         return ge::GRAPH_FAILED;
     }
 
-    gert::Shape* expandedXShape = context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_X);
-    OP_CHECK_IF(expandedXShape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                    context->GetNodeName(), "expandedXShape",
-                    "Required expandedXShape metadata is null; "
-                    "context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_X) must provide a valid object."),
-                return ge::GRAPH_FAILED);
-    gert::Shape* expandedRowIdxShape = context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_ROW_IDX);
-    OP_CHECK_IF(
-        expandedRowIdxShape == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-            context->GetNodeName(), "expandedRowIdxShape",
-            "Required expandedRowIdxShape metadata is null; "
-            "context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_ROW_IDX) must provide a valid object."),
-        return ge::GRAPH_FAILED);
-    gert::Shape* expertTokenCumsumOrCountShape =
-        context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPERT_TOKEN_CUMSUM_OR_COUNT);
-    OP_CHECK_IF(expertTokenCumsumOrCountShape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                    context->GetNodeName(), "expertTokenCumsumOrCountShape",
-                    "Required expertTokenCumsumOrCountShape metadata is null; "
-                    "context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPERT_TOKEN_CUMSUM_OR_COUNT) "
-                    "must provide a valid object."),
-                return ge::GRAPH_FAILED);
-    gert::Shape* expandedScaleShape = context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_SCALE);
-    OP_CHECK_IF(expandedScaleShape == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                    context->GetNodeName(), "expandedScaleShape",
-                    "Required expandedScaleShape metadata is null; "
-                    "context->GetOutputShape(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_SCALE) must provide a valid object."),
-                return ge::GRAPH_FAILED);
+    gert::Shape* expandedXShape = nullptr;
+    gert::Shape* expandedRowIdxShape = nullptr;
+    gert::Shape* expertTokenCumsumOrCountShape = nullptr;
+    gert::Shape* expandedScaleShape = nullptr;
+    if (GetOutputShapes(context, expandedXShape, expandedRowIdxShape, expertTokenCumsumOrCountShape,
+                        expandedScaleShape) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
 
-    int64_t cols = 0;
-    int64_t outNum = 0;
-    int64_t xOutNum = 0;
-
-    CalculateOutputDims(xShape, expertIdxShape, activeNum, cols, outNum, xOutNum);
-
-    SetExpandedXandRowIdxShape(expandedXShape, expandedRowIdxShape, dropPadMode, xOutNum, outNum, experNum,
-                               expertCapacity, cols);
-
-    SetExpertTokenCumsumOrCountShape(expertTokenCumsumOrCountShape, expertTokenNumFlag, expertTokenNumType, experNum,
-                                     expertStart, expertEnd);
-
-    SetExpandedScaleShape(expandedScaleShape, scaleShape, quantMode, dropPadMode, xOutNum, outNum, experNum,
-                          expertCapacity, cols);
-
-    ShowOutputShapeInfo(context, expandedXShape, expandedRowIdxShape, expertTokenCumsumOrCountShape,
-                        expandedScaleShape);
+    SetOutputShapes(context, xShape, expertIdxShape, scaleShape, expandedXShape, expandedRowIdxShape,
+                    expertTokenCumsumOrCountShape, expandedScaleShape, dropPadMode, activeNum, experNum, expertCapacity,
+                    expertTokenNumFlag, expertTokenNumType, expertStart, expertEnd, quantMode);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -908,15 +934,10 @@ static ge::graphStatus ValidateInputDtype(const gert::InferDataTypeContext* cont
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::DataType DetermineOutputDtypes(const gert::InferDataTypeContext* context, ge::DataType xDtype,
-                                          int64_t quantMode, ge::DataType& expandedScaleDtype)
+static void SetExpandedDtypesByQuantMode(const gert::InferDataTypeContext* context, ge::DataType xDtype,
+                                         int64_t quantMode, ge::DataType& expandedXDtype,
+                                         ge::DataType& expandedScaleDtype)
 {
-    ge::DataType expandedXDtype = xDtype;
-    expandedScaleDtype = context->GetInputDataType(MOE_INIT_ROUTING_V3_INPUT_SCALE);
-    if (expandedScaleDtype == ge::DT_UNDEFINED) {
-        expandedScaleDtype = ge::DT_FLOAT;
-    }
-
     if (QuantMode::STATIC_QUANT == quantMode) {
         expandedXDtype = ge::DT_INT8;
     } else if (QuantMode::DYNAMIC_QUANT == quantMode) {
@@ -963,6 +984,18 @@ static ge::DataType DetermineOutputDtypes(const gert::InferDataTypeContext* cont
                (xDtype == ge::DT_FLOAT8_E5M2 || xDtype == ge::DT_FLOAT8_E4M3FN || xDtype == ge::DT_FLOAT4_E2M1)) {
         expandedScaleDtype = ge::DT_FLOAT8_E8M0;
     }
+}
+
+static ge::DataType DetermineOutputDtypes(const gert::InferDataTypeContext* context, ge::DataType xDtype,
+                                          int64_t quantMode, ge::DataType& expandedScaleDtype)
+{
+    ge::DataType expandedXDtype = xDtype;
+    expandedScaleDtype = context->GetInputDataType(MOE_INIT_ROUTING_V3_INPUT_SCALE);
+    if (expandedScaleDtype == ge::DT_UNDEFINED) {
+        expandedScaleDtype = ge::DT_FLOAT;
+    }
+
+    SetExpandedDtypesByQuantMode(context, xDtype, quantMode, expandedXDtype, expandedScaleDtype);
 
     return expandedXDtype;
 }
@@ -1053,18 +1086,19 @@ static void LogShapeRangeInfo(gert::InferShapeRangeContext* context, const char*
             Ops::Base::ToString(*(expanded_scale->GetMax())).c_str());
 }
 
-static ge::graphStatus InferShapeRange4MoeInitRoutingV3(gert::InferShapeRangeContext* context)
+static ge::graphStatus GetOutputShapeRanges(gert::InferShapeRangeContext* context,
+                                            gert::Range<gert::Shape>*& expanded_x,
+                                            gert::Range<gert::Shape>*& expanded_row_idx,
+                                            gert::Range<gert::Shape>*& count, gert::Range<gert::Shape>*& expanded_scale)
 {
-    OP_LOGD(context, "Begin to do MoeInitRoutingV3InferRange.");
-
-    auto expanded_x = context->GetOutputShapeRange(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_X);
+    expanded_x = context->GetOutputShapeRange(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_X);
     OP_CHECK_IF(expanded_x == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                     context->GetNodeName(), "expanded_x",
                     "Required expanded_x metadata is null; "
                     "context->GetOutputShapeRange(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_X) must provide a valid object."),
                 return ge::GRAPH_FAILED);
-    auto expanded_row_idx = context->GetOutputShapeRange(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_ROW_IDX);
+    expanded_row_idx = context->GetOutputShapeRange(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_ROW_IDX);
     OP_CHECK_IF(expanded_row_idx == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                     context->GetNodeName(), "expanded_row_idx",
@@ -1072,7 +1106,7 @@ static ge::graphStatus InferShapeRange4MoeInitRoutingV3(gert::InferShapeRangeCon
                     "context->GetOutputShapeRange(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_ROW_IDX) must "
                     "provide a valid object."),
                 return ge::GRAPH_FAILED);
-    auto count = context->GetOutputShapeRange(MOE_INIT_ROUTING_V3_OUTPUT_EXPERT_TOKEN_CUMSUM_OR_COUNT);
+    count = context->GetOutputShapeRange(MOE_INIT_ROUTING_V3_OUTPUT_EXPERT_TOKEN_CUMSUM_OR_COUNT);
     OP_CHECK_IF(count == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                     context->GetNodeName(), "count",
@@ -1080,7 +1114,7 @@ static ge::graphStatus InferShapeRange4MoeInitRoutingV3(gert::InferShapeRangeCon
                     "context->GetOutputShapeRange(MOE_INIT_ROUTING_V3_OUTPUT_EXPERT_TOKEN_CUMSUM_OR_"
                     "COUNT) must provide a valid object."),
                 return ge::GRAPH_FAILED);
-    auto expanded_scale = context->GetOutputShapeRange(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_SCALE);
+    expanded_scale = context->GetOutputShapeRange(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_SCALE);
     OP_CHECK_IF(
         expanded_scale == nullptr,
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
@@ -1088,6 +1122,20 @@ static ge::graphStatus InferShapeRange4MoeInitRoutingV3(gert::InferShapeRangeCon
             "Required expanded_scale metadata is null; "
             "context->GetOutputShapeRange(MOE_INIT_ROUTING_V3_OUTPUT_EXPANDED_SCALE) must provide a valid object."),
         return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus InferShapeRange4MoeInitRoutingV3(gert::InferShapeRangeContext* context)
+{
+    OP_LOGD(context, "Begin to do MoeInitRoutingV3InferRange.");
+
+    gert::Range<gert::Shape>* expanded_x = nullptr;
+    gert::Range<gert::Shape>* expanded_row_idx = nullptr;
+    gert::Range<gert::Shape>* count = nullptr;
+    gert::Range<gert::Shape>* expanded_scale = nullptr;
+    if (GetOutputShapeRanges(context, expanded_x, expanded_row_idx, count, expanded_scale) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
 
     LogShapeRangeInfo(context, "Before");
 
