@@ -166,7 +166,7 @@ protected:
     TaskInfo taskInfo_{};
 
 private:
-    // ================================FD Local Buffer区(静态Tensor)====================================
+    // ================================FD Local Buffer区===================================
     LocalTensor<T> fdSumBuf1_;          // FD_LSE_BUF_BYTES
     LocalTensor<T> fdSumBuf2_;          // FD_LSE_BUF_BYTES
     LocalTensor<T> fdMaxBuf1_;          // FD_LSE_BUF_BYTES
@@ -275,7 +275,7 @@ public:
         if ASCEND_IS_AIV {
             pipe->Reset();
             TBuf<> tmpBuf;
-            // InQue, DB, SYNC_LSE_MAX_SUM_BUF1_FLAG SYNC_LSE_MAX_SUM_BUF2_FLAG
+            // 输入双buffer: SYNC_LSE_MAX_SUM_BUF1_FLAG SYNC_LSE_MAX_SUM_BUF2_FLAG
             pipe->InitBuffer(tmpBuf, FD_LSE_BUF_BYTES);
             fdSumBuf1_ = tmpBuf.Get<T>();
             pipe->InitBuffer(tmpBuf, FD_LSE_BUF_BYTES);
@@ -287,7 +287,7 @@ public:
             // TmpBuf
             pipe->InitBuffer(tmpBuf, FD_LSE_BUF_BYTES);
             fdLseExpBuf_ = tmpBuf.Get<T>();
-            // InQue, DB, SYNC_MM2RES_BUF1_FLAG SYNC_MM2RES_BUF2_FLAG
+            // 输入双buffer: SYNC_MM2RES_BUF1_FLAG SYNC_MM2RES_BUF2_FLAG
             pipe->InitBuffer(tmpBuf, FD_MM2_BUF_BYTES);
             fdMm2ResBuf1_ = tmpBuf.Get<T>();
             pipe->InitBuffer(tmpBuf, FD_MM2_BUF_BYTES);
@@ -295,14 +295,14 @@ public:
             // TmpBuf
             pipe->InitBuffer(tmpBuf, FD_MM2_BUF_BYTES);
             fdReduceBuf_ = tmpBuf.Get<T>();
-            // OutQue, SYNC_FDOUTPUT_BUF_FLAG
+            // 输出buffer: SYNC_FDOUTPUT_BUF_FLAG
             pipe->InitBuffer(tmpBuf, FD_MM2_BUF_BYTES);
             fdOutputBuf_ = tmpBuf.Get<OUTPUT_T>();
             pipe->InitBuffer(tmpBuf, BUFFER_SIZE_BYTE_256B);
             fdLseMaxUbBuf1_ = tmpBuf.Get<T>();
             pipe->InitBuffer(tmpBuf, BUFFER_SIZE_BYTE_256B);
             fdLseMaxUbBuf2_ = tmpBuf.Get<T>();
-            // OutQue, SYNC_LSEOUTPUT_BUF_FLAG
+            // 输出buffer: SYNC_LSEOUTPUT_BUF_FLAG
             pipe->InitBuffer(tmpBuf, BUFFER_SIZE_BYTE_256B);
             fdLseUbBuf_ = tmpBuf.Get<T>();
             // CalcMinCheckValueVF 的结果缓存

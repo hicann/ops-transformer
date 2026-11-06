@@ -3609,33 +3609,21 @@ __aicore__ inline void ProcessVec1DnUpdatePerTokenHead(
 
 template <typename T, typename T2, bool isUpdate = false, bool hasAtten = false, uint16_t ubN = 256,
           bool isTail = false>
-__aicore__ inline void ProcessVec1VfDnPerTokenHead(const LocalTensor<T2>& dstTensor, const LocalTensor<T>& expSumTensor,
-                                                   const LocalTensor<T>& maxTensor, const LocalTensor<T>& srcTensor,
-                                                   const LocalTensor<T>& expMaxTensor, TBuf<>* vselrIndexesBuf,
-                                                   const LocalTensor<T>& qScaleUbTensor,
-                                                   const LocalTensor<T>& kScaleUbTensor, const uint32_t m,
-                                                   const uint32_t n, const uint32_t originN, const T scale,
-                                                   float deScaleQK, float pScale, const T minValue, float keepProb,
-                                                   int64_t maskLine)
+__aicore__ inline void ProcessVec1VfDnPerTokenHead(
+    const LocalTensor<T2>& dstTensor, const LocalTensor<T>& expSumTensor, const LocalTensor<T>& maxTensor,
+    const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor, const LocalTensor<uint8_t>& vselrIndexesTensor,
+    const LocalTensor<T>& qScaleUbTensor, const LocalTensor<T>& kScaleUbTensor, const uint32_t m, const uint32_t n,
+    const uint32_t originN, const T scale, float deScaleQK, float pScale, const T minValue, float keepProb,
+    int64_t maskLine)
 {
     if constexpr (!isUpdate) {
-        LocalTensor<uint8_t> indexesTensor;
-        if constexpr (IsSameType<T2, fp8_e5m2_t>::value || IsSameType<T2, fp8_e4m3fn_t>::value ||
-                      IsSameType<T2, hifloat8_t>::value) {
-            indexesTensor = vselrIndexesBuf[static_cast<int>(VselrIndexEnum::DN_INDEX)].template Get<uint8_t>();
-        }
         ProcessVec1DnNoUpdatePerTokenHead<T, T2, hasAtten, ubN, isTail>(
-            dstTensor, expSumTensor, maxTensor, srcTensor, expMaxTensor, indexesTensor, qScaleUbTensor, kScaleUbTensor,
-            m, n, originN, scale, deScaleQK, pScale, minValue, keepProb, maskLine);
+            dstTensor, expSumTensor, maxTensor, srcTensor, expMaxTensor, vselrIndexesTensor, qScaleUbTensor,
+            kScaleUbTensor, m, n, originN, scale, deScaleQK, pScale, minValue, keepProb, maskLine);
     } else {
-        LocalTensor<uint8_t> indexesTensor;
-        if constexpr (IsSameType<T2, fp8_e5m2_t>::value || IsSameType<T2, fp8_e4m3fn_t>::value ||
-                      IsSameType<T2, hifloat8_t>::value) {
-            indexesTensor = vselrIndexesBuf[static_cast<int>(VselrIndexEnum::DN_INDEX)].template Get<uint8_t>();
-        }
         ProcessVec1DnUpdatePerTokenHead<T, T2, hasAtten, ubN, isTail>(
-            dstTensor, expSumTensor, maxTensor, srcTensor, expMaxTensor, indexesTensor, qScaleUbTensor, kScaleUbTensor,
-            m, n, originN, scale, deScaleQK, pScale, minValue, keepProb, maskLine);
+            dstTensor, expSumTensor, maxTensor, srcTensor, expMaxTensor, vselrIndexesTensor, qScaleUbTensor,
+            kScaleUbTensor, m, n, originN, scale, deScaleQK, pScale, minValue, keepProb, maskLine);
     }
 }
 
