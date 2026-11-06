@@ -15,10 +15,14 @@ set(MC2_EXCLUDE_DIRS 3rd common)
 # 先遍历算子目录
 foreach(SUBDIR ${SUBDIRECTORIES})
   # 检查子目录中是否存在 CMakeLists.txt
-  if(NOT ${SUBDIR} IN_LIST MC2_EXCLUDE_DIRS
-     AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${SUBDIR}/CMakeLists.txt
-    )
-    add_subdirectory(${SUBDIR})
+  if(NOT ${SUBDIR} IN_LIST MC2_EXCLUDE_DIRS)
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${SUBDIR}/CMakeLists.txt)
+      add_subdirectory(${SUBDIR})
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${SUBDIR}/op_dsl/CMakeLists.txt")
+      add_subdirectory(${SUBDIR}/op_dsl)
+    else()
+      continue()
+    endif()
     if(DEFINED ${SUBDIR}_depends)
         set(${SUBDIR}_depends "${${SUBDIR}_depends}" PARENT_SCOPE)
     endif()

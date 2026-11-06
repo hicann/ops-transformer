@@ -18,6 +18,8 @@ else()
     # 检查子目录中是否存在 CMakeLists.txt
     if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${SUBDIR}/CMakeLists.txt)
       add_subdirectory(${SUBDIR})
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${SUBDIR}/op_dsl/CMakeLists.txt")
+      add_subdirectory(${SUBDIR}/op_dsl)
     endif()
   endforeach()
 endif()
