@@ -487,7 +487,7 @@ __aicore__ inline void DispatchTokenRange(const TokenDispatchConfig& context, co
     if constexpr (g_coreType == AIC) {
         return;
     }
-    if (!IsSubBlockIdx<1U>() || blockJob.totalJobs == 0U) {
+    if (blockJob.totalJobs == 0U) {
         return;
     }
     WaitDedupPrepassPublishGate(context, params);

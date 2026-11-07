@@ -31,10 +31,11 @@
 #include "../arch35_92/stage/mega_moe_send_mask.h"
 #include "../arch35_92/stage/mega_moe_workspace_reset.h"
 #include "../arch35_92/stage/mega_moe_token_dispatch_dedup.h"
-#include "../arch35_92/stage/mega_moe_gmm1_activation.h"
 #include "../arch35_92/stage/mega_moe_gmm2_combine_dedup.h"
 #include "../arch35_92/stage/mega_moe_unpermute.h"
 #include "../../../common/op_kernel/quantize_functions.h"
+#include "stage/mega_moe_gmm1_activation_arch35.h"
+#include "stage/mega_moe_gmm2_combine_arch35.h"
 
 namespace MegaMoeImpl {
 
@@ -94,6 +95,7 @@ protected:
     __aicore__ inline void DispatchBuffInit();
     template <bool NeedCumsumReload = false>
     __aicore__ inline void PrepareMoeExpertTokenCountTable();
+    __aicore__ inline void BuildMoeDedupRowDescTable();
     __aicore__ inline void ReloadDispatchCumsumRange(uint32_t firstExpertIdx, uint32_t lastExpertIdx);
     __aicore__ inline void ExportExpertTokenCounts();
     __aicore__ inline void EnterSteadyDispatch();
@@ -466,6 +468,24 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::PrepareMoeExpertTokenCo
     GmWrite(countTableReady, static_cast<int32_t>(1));
 }
 
+template <TemplateMegaMoeTypeClass>
+__aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::BuildMoeDedupRowDescTable()
+{
+    const auto& blockJob = gmmExecutionConfig_.blockJob;
+    const bool aiv0Joins = params_.tilingData->compute.hiddenDim <= DEDUP_AIV0_PREPASS_MAX_HIDDEN_DIM;
+    const bool isAiv1 = MegaMoeHardwarePolicy::GetSubBlockIdx() == 1U;
+    if (!isAiv1 && !aiv0Joins) {
+        return;
+    }
+    BlockJobContext workerJob{isAiv1 ? blockJob.jobIndex : blockJob.jobIndex + blockJob.totalJobs,
+                              aiv0Joins ? blockJob.totalJobs * 2U : blockJob.totalJobs};
+    // AIV1 计低 16 位，AIV0 计高 16 位；保持 dispatch/combine 的既有等待协议。
+    const int32_t doneIncrement =
+        isAiv1 ? static_cast<int32_t>(1) : static_cast<int32_t>(1) << DEDUP_PREPASS_DONE_AIV0_SHIFT;
+    BuildDedupRowDescTable<TopkIndexType>(tokenDispatchConfig_.dedup, commonConfig_, workerJob, doneIncrement,
+                                          syncWorkspaceLayout_, params_, tokenDispatchScratch_);
+}
+
 // Activation 可能覆盖前缀表，Dispatch 前恢复所需专家范围。
 template <TemplateMegaMoeTypeClass>
 __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ReloadDispatchCumsumRange(uint32_t firstExpertIdx,
@@ -714,7 +734,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::RunSharedExpertGmm1Acti
                            true, true>(sharedEpilogueOp_, params_, problemShape, gmmAddrInfo,
                                        runtimeState.startBlockIdx, runtimeState.vecSetSyncCom, gmmConfig.blockJob,
                                        expertBeforeCnt, sharedExpertIdx, runtimeState.pingpongIdx,
-                                       commonConfig_.activationOutputDivisor, nullptr,
+                                       commonConfig_.activationOutputDivisor,
                                        SharedQuantConfig::AXW_MODE == AxWMode::A8W8, layoutArgs...);
         }
     };
@@ -862,7 +882,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::RunSharedExpertGmm2(con
         RunGmm2Generic<COMBINE_NO_QUANT, typename SharedQuantConfig::QuantOutType,
                        typename SharedQuantConfig::QuantOutType, bfloat16_t, SharedQuantScaleType, SharedQuantScaleType,
                        SharedWeight2Format != FORMAT_ND, false, GMM1_TILE_M, false, true, true>(
-            problemShape, gmmAddrInfo, startBlockIdx_, gmmExecutionConfig_.blockJob, nullptr, true, 0U, nullptr,
+            problemShape, gmmAddrInfo, startBlockIdx_, gmmExecutionConfig_.blockJob, true, 0U, nullptr,
             commonConfig_.activationOutputDivisor);
     }
 }

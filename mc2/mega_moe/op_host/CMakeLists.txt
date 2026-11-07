@@ -46,6 +46,10 @@ else() # 回黄host
     set(SUB_MC2_COMPILE TRUE PARENT_SCOPE)
 endif()
 
+# arch35_92 为共用 kernel 源码目录，不能按硬件架构目录过滤。
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../op_kernel/arch35_92
+        DESTINATION ${IMPL_INSTALL_DIR}/ascendc/mega_moe/op_kernel)
+
 # Torch 复用算子包中的纯布局头，不再单独维护 CCL 容量公式。
 if (BUILD_OPEN_PROJECT OR ENABLE_BUILT_IN)
     set(MEGA_MOE_LAYOUT_INC_INSTALL_DIR ${ACLNN_INC_INSTALL_DIR})

@@ -149,21 +149,14 @@ __aicore__ inline void CombineQuantizedTokens(uint32_t batchStart, uint32_t curR
 
 } // namespace CombineImpl
 
-// 非 layered 路径统一使用的 Combine 行环。常规 Wave 只有 AIV1 建立并使用这些 UB 视图；
-// 最后一轮不再与 GMM1/Activation 并行时，调用方才为 AIV0 补充初始化。
-template <uint8_t CombineMode, bool IncludeAiv0 = false, uint32_t MaxRowBufferCount = WAVE_COMBINE_MAX_ROW_BUFFER_COUNT>
+// 调用方决定参与核与阶段；这里只计算 Combine 行环布局并绑定当前核的 UB 视图。
+template <uint8_t CombineMode, uint32_t MaxRowBufferCount = WAVE_COMBINE_MAX_ROW_BUFFER_COUNT>
 __aicore__ inline WaveCombineBufferConfig InitWaveCombineBuffers(const MoeStageCommonConfig& common,
                                                                  WaveCombineScratch& scratch)
 {
     static_assert(MaxRowBufferCount > 0U && MaxRowBufferCount <= WAVE_COMBINE_MAX_ROW_BUFFER_COUNT,
                   "invalid Combine row buffer count");
     WaveCombineBufferConfig bufferConfig{};
-    if constexpr (g_coreType == AIC) {
-        return bufferConfig;
-    }
-    if (!IncludeAiv0 && !IsSubBlockIdx<1U>()) {
-        return bufferConfig;
-    }
     bufferConfig.rowBytes = common.tokenHiddenDim * sizeof(bfloat16_t);
     bufferConfig.rowStrideBytes = static_cast<uint32_t>(
         Ops::Base::CeilAlign(static_cast<uint64_t>(bufferConfig.rowBytes), static_cast<uint64_t>(ALIGN_32)));
@@ -201,21 +194,6 @@ __aicore__ inline WaveCombineBufferConfig InitWaveCombineBuffers(const MoeStageC
     return bufferConfig;
 }
 
-// 默认由 AIV1 复用既有配置，仅为 AIV0 绑定最终 Combine 的 UB 视图。steady Wave 使用较小行环，
-// 调用方排空旧行环后通过 ReinitializeAllAiv 让两个 AIV 都恢复最终 Wave 的最大容量。
-template <uint8_t CombineMode, bool ReinitializeAllAiv = false>
-__aicore__ inline WaveCombineBufferConfig PrepareFinalWaveCombineBuffers(
-    const MoeStageCommonConfig& common, const WaveCombineBufferConfig& currentBufferConfig, WaveCombineScratch& scratch)
-{
-    if constexpr (g_coreType == AIC) {
-        return currentBufferConfig;
-    }
-    if (ReinitializeAllAiv || IsSubBlockIdx<0U>()) {
-        return InitWaveCombineBuffers<CombineMode, true>(common, scratch);
-    }
-    return currentBufferConfig;
-}
-
 // 构造量化 Unpermute 输入记录的单 token 存储布局。
 __aicore__ inline QuantTokenBufferConfig CreateQuantTokenBufferConfig(uint32_t tokenHiddenDim)
 {
@@ -228,7 +206,7 @@ __aicore__ inline QuantTokenBufferConfig CreateQuantTokenBufferConfig(uint32_t t
 }
 
 // 按专家累计 token 行数滚动物理 AIV 起点，每个 AIV 在当前专家内仍负责一个连续均衡区间。
-// 常规 Wave 只使用每个 AIC 配对的 AIV1；最终专家可把同组 AIV0/AIV1 展开成两个独立任务。
+// arch35 常规 Wave 使用 AIV1，最终专家可展开两组 AIV；arch92 始终使用唯一 AIV 的原始任务编号。
 template <bool IncludeAiv0 = false>
 __aicore__ inline WorkRange GetWaveCombineOwnedRange(const AivJobContext& job, uint32_t tokenCount,
                                                      uint64_t expertRowPrefix)
@@ -236,18 +214,22 @@ __aicore__ inline WorkRange GetWaveCombineOwnedRange(const AivJobContext& job, u
     if constexpr (g_coreType == AIC) {
         return {};
     }
+#ifdef MEGA_MOE_ARCH92_DEVICE
+    return GetRotatedBalancedWorkRange(tokenCount, job.jobIndex, job.totalJobs, expertRowPrefix);
+#else
     AivJobContext combineJob = job;
     if constexpr (IncludeAiv0) {
         constexpr uint32_t AIV_CORE_COUNT_PER_AIC = MegaMoeHardwarePolicy::VECTOR_CORE_COUNT_PER_CUBE;
         uint32_t vectorRoleIdx = MegaMoeHardwarePolicy::GetSubBlockIdx();
         combineJob = {job.jobIndex * AIV_CORE_COUNT_PER_AIC + vectorRoleIdx, job.totalJobs * AIV_CORE_COUNT_PER_AIC};
-    } else if (!IsSubBlockIdx<1U>()) {
+    } else if (MegaMoeHardwarePolicy::GetSubBlockIdx() != 1U) {
         return {};
     }
     if (combineJob.totalJobs == 0U || combineJob.jobIndex >= combineJob.totalJobs) {
         return {};
     }
     return GetRotatedBalancedWorkRange(tokenCount, combineJob.jobIndex, combineJob.totalJobs, expertRowPrefix);
+#endif
 }
 
 // 等待并消费当前 Wave 的 Combine 发送在行环形 buffer 上产生的全部完成事件，使该环不再有在途 slot。
@@ -609,257 +591,10 @@ __aicore__ inline void Gmm2Aiv0PrologueA8W4(BlockPrologue& blockPrologue, Schedu
 }
 
 // 根据 GM 地址建立执行资源，并执行通用 GMM2 阶段。
-template <uint8_t CombineQuantMode, typename BlockMmad, typename ElementC, bool IsLayered = false,
-          bool IsShared = false, bool NotifyCombineTileReady = false, typename Scheduler, typename Config>
-__aicore__ inline void Gmm2ExecGeneric(Scheduler& scheduler, const GMMAddrInfo& gmmAddrInfo, const Config& config,
-                                       uint32_t startLoopIdx, uint32_t tileNum,
-                                       BlockMmadContext<BlockMmad>* blockMmadContext, bool allowWeightL2Bypass,
-                                       uint32_t rowOffsetInExpert = 0U, const Params* params = nullptr,
-                                       uint32_t expertTokenCount = 0U)
-{
-    using KernelConfig = typename Config::KernelConfig;
-    using ElementA = typename KernelConfig::ElementAType;
-    using ElementB = typename KernelConfig::ElementBType;
-    using ElementMxScaleA = typename KernelConfig::ElementMxScaleAType;
-    using ElementMxScaleB = typename KernelConfig::ElementMxScaleBType;
-    using BiasType = typename KernelConfig::BiasType;
-
-    auto layouts = KernelConfig::BuildLayouts(config);
-    auto gmA = asc::te::make_tensor(
-        asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ ElementA*>(gmmAddrInfo.aGlobal)),
-        layouts.a);
-    auto gmB = asc::te::make_tensor(
-        asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ ElementB*>(gmmAddrInfo.bGlobal)),
-        layouts.b);
-    auto gmScaleA = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(
-                                             reinterpret_cast<__gm__ ElementMxScaleA*>(gmmAddrInfo.aScaleGlobal)),
-                                         layouts.scaleA);
-    auto gmScaleB = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(
-                                             reinterpret_cast<__gm__ ElementMxScaleB*>(gmmAddrInfo.bScaleGlobal)),
-                                         layouts.scaleB);
-    if constexpr (Config::IS_WAVE_FLAG_GRAINED && g_coreType == AscendC::AIC) {
-        SetWaveWeightL2CacheHint<KernelConfig::IS_WEIGHT_NZ, KernelConfig>(config, allowWeightL2Bypass, gmB, gmScaleB);
-    }
-    auto gmBias = asc::te::make_tensor(
-        asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ BiasType*>(0UL)), layouts.bias);
-    auto gmC = asc::te::make_tensor(
-        asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ ElementC*>(gmmAddrInfo.gmm2OutGlobal)),
-        layouts.c);
-
-    using WorkSetType = GroupMatmulWorkSet<Scheduler, decltype(gmA), decltype(gmB), decltype(gmScaleA),
-                                           decltype(gmScaleB), decltype(gmBias), decltype(gmC)>;
-    WorkSetType workSet{scheduler, gmA, gmB, gmScaleA, gmScaleB, gmBias, gmC};
-
-    if constexpr (g_coreType == AscendC::AIC) {
-        if (blockMmadContext != nullptr) {
-            blockMmadContext->template Init<GmmStage::GMM2>(config);
-            Gmm2AicMmadGeneric<CombineQuantMode, BlockMmad, IsShared, IsLayered, NotifyCombineTileReady>(
-                blockMmadContext->blockMmad, workSet, gmmAddrInfo, config, startLoopIdx, tileNum, rowOffsetInExpert,
-                expertTokenCount);
-        } else {
-            BlockMmadContext<BlockMmad> localBlockMmadContext;
-            localBlockMmadContext.template Init<GmmStage::GMM2>(config);
-            Gmm2AicMmadGeneric<CombineQuantMode, BlockMmad, IsShared, IsLayered, NotifyCombineTileReady>(
-                localBlockMmadContext.blockMmad, workSet, gmmAddrInfo, config, startLoopIdx, tileNum, rowOffsetInExpert,
-                expertTokenCount);
-        }
-    } else if constexpr (NotifyCombineTileReady) {
-        // NotifyCombineTileReady 为真时 AIV1 逐 tile 锁步消费。combine 去重的独立消费路径
-        // （RunWaveCombineStageDedup）由调用方把本参数实例化为 false，整个分支编译期裁掉。
-        if (IsSubBlockIdx<1U>()) {
-            using MakeLayoutC = typename KernelConfig::MakeLayoutC;
-            CombineTokenRange<ElementC, MakeLayoutC>(workSet.scheduler, workSet.gmC, *params, gmmAddrInfo, config,
-                                                     startLoopIdx, tileNum);
-        }
-    }
-}
 
 // 根据 GM 地址建立执行资源，并执行 A8W4 GMM2 阶段。
-template <typename BlockMmad, typename BlockPrologue, typename ElementC, bool IsShared, bool IsLayered,
-          bool NotifyCombineTileReady, typename Scheduler, typename Config>
-__aicore__ inline void Gmm2ExecA8W4(Scheduler& scheduler, const GMMAddrInfo& gmmAddrInfo, const Config& config,
-                                    uint32_t startLoopIdx, uint32_t tileNum, uint32_t expertTokenCount,
-                                    uint32_t rowOffsetInExpert, const Params* params,
-                                    const A8W4BlockContext<BlockMmad, BlockPrologue>& pipeline)
-{
-    using KernelConfig = typename Config::KernelConfig;
-    using ElementA = typename KernelConfig::ElementAType;
-    using ElementB = typename KernelConfig::ElementBType;
-    using ElementMxScaleA = typename KernelConfig::ElementMxScaleAType;
-    using ElementMxScaleB = typename KernelConfig::ElementMxScaleBType;
-    using BiasType = typename KernelConfig::BiasType;
-
-    auto layouts = KernelConfig::BuildLayouts(config);
-    auto gmC = asc::te::make_tensor(
-        asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ ElementC*>(gmmAddrInfo.gmm2OutGlobal)),
-        layouts.c);
-    auto gmA = asc::te::make_tensor(
-        asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ ElementA*>(gmmAddrInfo.aGlobal)),
-        layouts.a);
-    auto gmB = asc::te::make_tensor(
-        asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ ElementB*>(gmmAddrInfo.bGlobal)),
-        layouts.b);
-    auto gmScaleA = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(
-                                             reinterpret_cast<__gm__ ElementMxScaleA*>(gmmAddrInfo.aScaleGlobal)),
-                                         layouts.scaleA);
-    auto gmScaleB = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(
-                                             reinterpret_cast<__gm__ ElementMxScaleB*>(gmmAddrInfo.bScaleGlobal)),
-                                         layouts.scaleB);
-    auto gmBias = asc::te::make_tensor(
-        asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ BiasType*>(0UL)), layouts.bias);
-
-    using WorkSetType = GroupMatmulWorkSet<Scheduler, decltype(gmA), decltype(gmB), decltype(gmScaleA),
-                                           decltype(gmScaleB), decltype(gmBias), decltype(gmC)>;
-    WorkSetType workSet{scheduler, gmA, gmB, gmScaleA, gmScaleB, gmBias, gmC};
-
-    if constexpr (g_coreType == AscendC::AIC) {
-        auto& blockMmad = *pipeline.block;
-        typename BlockMmad::BlockShape l0TileShape{config.blockMmadTiling.tileM, config.blockMmadTiling.tileN,
-                                                   L0_TILE_K, 0};
-        typename BlockMmad::ProblemShape matmulShape{config.m, config.outputN, config.k, 0};
-        // GMM2 has no gate/up concatenation; preserve the persistent buffer indices.
-        blockMmad.template Init<false>(matmulShape, l0TileShape, false);
-        Gmm2AicMmadA8W4<IsShared, IsLayered, NotifyCombineTileReady, BlockMmad, decltype(workSet.scheduler),
-                        decltype(workSet.gmA), decltype(workSet.gmScaleA), decltype(workSet.gmScaleB),
-                        std::remove_reference_t<decltype(workSet.gmC)>, Config>(
-            blockMmad, workSet.scheduler, workSet.gmA, workSet.gmScaleA, workSet.gmScaleB, workSet.gmC, gmmAddrInfo,
-            config, startLoopIdx, tileNum, expertTokenCount, rowOffsetInExpert);
-    } else {
-        if (IsSubBlockIdx<0U>()) {
-            Gmm2Aiv0PrologueA8W4(*pipeline.block, workSet.scheduler, workSet.gmB, config, startLoopIdx, tileNum);
-        } else if constexpr (NotifyCombineTileReady) {
-            // 同上：W4 路径去重开关走运行时判断（嵌套模板参数触发编译器代码生成问题）。
-            if (!IsCombineDedupOn(params->tilingData->compute.dedupMode)) {
-                using MakeLayoutC = typename KernelConfig::MakeLayoutC;
-                CombineTokenRange<ElementC, MakeLayoutC>(workSet.scheduler, workSet.gmC, *params, gmmAddrInfo, config,
-                                                         startLoopIdx, tileNum);
-            }
-        }
-    }
-}
 
 } // namespace GmmKernel
-
-// RunGmm2Generic：执行 Generic GMM2，支持量化和非量化 Combine 模式。
-// =================================================================================================
-template <uint8_t CombineQuantMode, typename ElementA, typename ElementB, typename ElementC, typename ElementMxScaleA,
-          typename ElementMxScaleB, bool IsWeightNZ = false, bool IsLayered = false, uint32_t Gmm1TileM = L1_TILE_M_256,
-          bool TopkWeightsPrefetch = false, bool IsShared = false, bool IsWaveFlagGrained = false,
-          bool NotifyCombineTileReady = false>
-__aicore__ inline void RunGmm2Generic(const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
-                                      const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
-                                      const BlockJobContext& blockJob, void* blockMmadContext = nullptr,
-                                      bool allowWeightL2Bypass = false, uint32_t rowOffsetInExpert = 0U,
-                                      const Params* params = nullptr,
-                                      uint32_t activationOutputDivisor = ACTIVATION_N_HALF,
-                                      uint32_t expertTokenCount = 0U)
-{
-    static_assert(!IsShared || !NotifyCombineTileReady, "Shared expert GMM2 has its own completion counter");
-    static_assert(!IsLayered || !NotifyCombineTileReady, "Layered GMM2 selects its synchronization through IsLayered");
-    using GmmConfig =
-        GmmKernel::Config<false, CombineQuantMode, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB,
-                          IsWeightNZ, TopkWeightsPrefetch, IsShared, IsLayered, IsWaveFlagGrained>;
-    auto config = GmmConfig::BuildGmm2ProblemConfig(problemShape, blockJob, Gmm1TileM, activationOutputDivisor);
-
-    GmmKernel::BlockScheduler scheduler({config.m, config.schedulerN, config.k},
-                                        GmmKernel::BlockScheduler::Params{asc::te::make_coord(
-                                            static_cast<int64_t>(config.tileM), static_cast<int64_t>(L1_TILE_N))});
-    uint32_t tileNum = scheduler.GetTileNum();
-
-    if constexpr (CombineQuantMode == COMBINE_NO_QUANT && g_coreType == AscendC::AIV && !NotifyCombineTileReady) {
-        startBlockIdx = (startBlockIdx + tileNum) % config.blockNum;
-        return;
-    }
-
-    uint32_t startLoopIdx =
-        (config.blockIdx < startBlockIdx ? config.blockIdx + config.blockNum : config.blockIdx) - startBlockIdx;
-    using BlockMmad = typename GmmConfig::BlockMmad;
-    using MmadContext = GmmKernel::BlockMmadContext<BlockMmad>;
-    auto* typedBlockMmadContext = reinterpret_cast<MmadContext*>(blockMmadContext);
-    GmmKernel::Gmm2ExecGeneric<CombineQuantMode, BlockMmad, ElementC, IsLayered, IsShared, NotifyCombineTileReady>(
-        scheduler, gmmAddrInfo, config, startLoopIdx, tileNum, typedBlockMmadContext, allowWeightL2Bypass,
-        rowOffsetInExpert, params, expertTokenCount);
-
-    startBlockIdx = (startBlockIdx + tileNum) % config.blockNum;
-}
-
-template <uint8_t CombineQuantMode, typename ElementA, typename ElementB, typename ElementC, typename ElementMxScaleA,
-          typename ElementMxScaleB, bool IsWeightNZ = false, bool IsLayered = false, uint32_t Gmm1TileM = L1_TILE_M_256,
-          bool TopkWeightsPrefetch = false, bool IsShared = false, bool IsWaveFlagGrained = false,
-          bool NotifyCombineTileReady = false>
-__aicore__ inline void RunGmm2Generic(const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
-                                      const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
-                                      void* blockMmadContext = nullptr, bool allowWeightL2Bypass = false,
-                                      uint32_t rowOffsetInExpert = 0U, const Params* params = nullptr,
-                                      uint32_t activationOutputDivisor = ACTIVATION_N_HALF,
-                                      uint32_t expertTokenCount = 0U)
-{
-    BlockJobContext blockJob{MegaMoeHardwarePolicy::GetAicBlockIdx(),
-                             static_cast<uint32_t>(MegaMoeHardwarePolicy::GetBlockNum())};
-    RunGmm2Generic<CombineQuantMode, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, IsWeightNZ,
-                   IsLayered, Gmm1TileM, TopkWeightsPrefetch, IsShared, IsWaveFlagGrained, NotifyCombineTileReady>(
-        problemShape, gmmAddrInfo, startBlockIdx, blockJob, blockMmadContext, allowWeightL2Bypass, rowOffsetInExpert,
-        params, activationOutputDivisor, expertTokenCount);
-}
-
-// RunGmm2A8W4：AIV0执行W4→W8 prologue，AIC执行GMM2；可选由配对AIV1逐tile Combine。
-template <typename ElementA, typename ElementB, typename ElementC, typename ElementMxScaleA, typename ElementMxScaleB,
-          uint32_t Gmm1TileM = L1_TILE_M_256, bool TopkWeightsPrefetch = false, bool IsShared = false,
-          bool IsLayered = false, bool IsWaveFlagGrained = false, bool NotifyCombineTileReady = false,
-          typename BlockContext>
-__aicore__ inline void RunGmm2A8W4(const BlockContext& pipeline,
-                                   const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
-                                   const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
-                                   const BlockJobContext& blockJob, uint32_t expertTokenCount,
-                                   uint32_t rowOffsetInExpert, const Params* params = nullptr,
-                                   uint32_t activationOutputDivisor = ACTIVATION_N_HALF)
-{
-    static_assert(!IsShared || !NotifyCombineTileReady, "Shared expert GMM2 has its own completion counter");
-    static_assert(!IsLayered || !NotifyCombineTileReady, "Layered GMM2 selects its synchronization through IsLayered");
-    static_assert(std::is_same_v<ElementA, __fp8e4m3>, "Activation must be __fp8e4m3");
-    static_assert(std::is_same_v<ElementB, __fp4e2m1x2>, "Weight must be __fp4e2m1x2");
-
-    using GmmConfig = GmmKernel::Config<true, 0, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, false,
-                                        TopkWeightsPrefetch, IsShared, IsLayered, IsWaveFlagGrained>;
-    auto config = GmmConfig::BuildGmm2ProblemConfig(problemShape, blockJob, Gmm1TileM, activationOutputDivisor);
-
-    using BlockMmad = typename GmmConfig::BlockMmad;
-    using BlockPrologue = typename GmmConfig::BlockPrologue;
-    GmmKernel::BlockScheduler scheduler({config.m, config.outputN, config.k},
-                                        GmmKernel::BlockScheduler::Params{asc::te::make_coord(
-                                            static_cast<int64_t>(config.tileM), static_cast<int64_t>(L1_TILE_N))});
-    // tileNum 与 mega_moe_utils.h 的 GetGmmProblemTileCount 同源，预判无活的口径不得各算一份。
-    uint32_t tileNum = GetGmmProblemTileCount(config.m, config.outputN);
-    uint32_t startLoopIdx =
-        (config.blockIdx < startBlockIdx ? config.blockIdx + config.blockNum : config.blockIdx) - startBlockIdx;
-    if (startLoopIdx >= tileNum) {
-        startBlockIdx = (startBlockIdx + tileNum) % config.blockNum;
-        return;
-    }
-
-    GmmKernel::Gmm2ExecA8W4<BlockMmad, BlockPrologue, ElementC, IsShared, IsLayered, NotifyCombineTileReady,
-                            GmmKernel::BlockScheduler, decltype(config)>(
-        scheduler, gmmAddrInfo, config, startLoopIdx, tileNum, expertTokenCount, rowOffsetInExpert, params, pipeline);
-
-    startBlockIdx = (startBlockIdx + tileNum) % config.blockNum;
-}
-
-template <typename ElementA, typename ElementB, typename ElementC, typename ElementMxScaleA, typename ElementMxScaleB,
-          uint32_t Gmm1TileM = L1_TILE_M_256, bool TopkWeightsPrefetch = false, bool IsShared = false,
-          bool IsLayered = false, bool IsWaveFlagGrained = false, bool NotifyCombineTileReady = false,
-          typename BlockContext>
-__aicore__ inline void RunGmm2A8W4(const BlockContext& pipeline,
-                                   const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
-                                   const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx,
-                                   const Params* params = nullptr, uint32_t activationOutputDivisor = ACTIVATION_N_HALF)
-{
-    BlockJobContext blockJob{MegaMoeHardwarePolicy::GetAicBlockIdx(),
-                             static_cast<uint32_t>(MegaMoeHardwarePolicy::GetBlockNum())};
-    RunGmm2A8W4<ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB, Gmm1TileM, TopkWeightsPrefetch,
-                IsShared, IsLayered, IsWaveFlagGrained, NotifyCombineTileReady>(
-        pipeline, problemShape, gmmAddrInfo, startBlockIdx, blockJob, static_cast<uint32_t>(Get<M_VALUE>(problemShape)),
-        0U, params, activationOutputDivisor);
-}
 
 // 紧凑 token 资源按累计行偏移寻址，专家固定资源按 expertIdx 寻址。
 template <typename WeightType, typename ActivationOutType, typename QuantScaleType>

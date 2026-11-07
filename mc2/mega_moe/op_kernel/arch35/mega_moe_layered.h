@@ -47,9 +47,9 @@
 #include "../arch35_92/stage/mega_moe_token_quant.h"
 #include "../arch35_92/stage/mega_moe_expert_count.h"
 #include "../arch35_92/mega_moe_vf/mega_moe_layered_vf.h"
-#include "../arch35_92/stage/mega_moe_gmm1_activation.h"
-#include "../arch35_92/stage/mega_moe_gmm2_combine.h"
 #include "../arch35_92/stage/mega_moe_layered_combine_send.h"
+#include "stage/mega_moe_gmm1_activation_arch35.h"
+#include "stage/mega_moe_gmm2_combine_arch35.h"
 
 namespace MegaMoeImpl {
 
@@ -933,7 +933,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::RunGmm1Wi
                        QuantScaleOutType, Weight1Format != FORMAT_ND, GMM1_TILE_M, epilogueTileM, prefetchWeights,
                        IsShared, !IsShared>(epilogue, params_, state.problemShape, gmmAddrInfo, startBlockIdx_,
                                             vecSetSyncCom, blockJob, expertRowStart, expertIdx, gmm1PingPongIdx_,
-                                            activationOutputDivisor_, nullptr, false, layoutArgs...);
+                                            activationOutputDivisor_, false, layoutArgs...);
     }
 }
 
@@ -1006,7 +1006,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::GroupMatm
     } else {
         RunGmm2Generic<CombineQuantMode, QuantOutType, QuantOutType, bfloat16_t, QuantScaleOutType, QuantScaleOutType,
                        Weight2Format != FORMAT_ND, true, L1_TILE_M_256, TopkWeightsPrefetch, IsShared, !IsShared>(
-            state.problemShape, gmmAddrInfo, startBlockIdx_, nullptr, false, rowOffsetInExpert, nullptr,
+            state.problemShape, gmmAddrInfo, startBlockIdx_, false, rowOffsetInExpert, nullptr,
             activationOutputDivisor_, expertTokenCount);
     }
 }

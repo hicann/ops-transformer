@@ -87,8 +87,12 @@ private:
         std::conditional_t<g_coreType == AIC, GmmKernel::BlockMmadContext<BlockMmad>, EmptyMmadContext>;
     static constexpr bool ROUTED_AND_SHARED_USE_SAME_MMAD = std::is_same_v<Gmm1BlockMmad, SharedGmm1BlockMmad>;
     static constexpr bool SHARED_GMM_STAGES_USE_SAME_MMAD = std::is_same_v<SharedGmm1BlockMmad, SharedGmm2BlockMmad>;
+    static_assert(std::is_same_v<Gmm1BlockMmad, Gmm2BlockMmad>,
+                  "Arch92 routed GMM1/GMM2 must share the persistent MMAD context type");
+    static_assert(SHARED_GMM_STAGES_USE_SAME_MMAD,
+                  "Arch92 shared GMM1/GMM2 must share the persistent MMAD context type");
     using SharedMmadContextStorage =
-        std::conditional_t<g_coreType == AIC && SHARED_GMM_STAGES_USE_SAME_MMAD && !ROUTED_AND_SHARED_USE_SAME_MMAD,
+        std::conditional_t<g_coreType == AIC && !ROUTED_AND_SHARED_USE_SAME_MMAD,
                            GmmKernel::BlockMmadContext<SharedGmm1BlockMmad>, EmptyMmadContext>;
 
     __aicore__ inline void* GetRoutedMmadContext()
@@ -101,15 +105,12 @@ private:
 
     __aicore__ inline void* GetRoutedGmm2MmadContext()
     {
-        if constexpr (std::is_same_v<Gmm1BlockMmad, Gmm2BlockMmad>) {
-            return GetRoutedMmadContext();
-        }
-        return nullptr;
+        return GetRoutedMmadContext();
     }
 
     __aicore__ inline void* GetSharedMmadContext()
     {
-        if constexpr (g_coreType == AIC && SHARED_GMM_STAGES_USE_SAME_MMAD) {
+        if constexpr (g_coreType == AIC) {
             if constexpr (ROUTED_AND_SHARED_USE_SAME_MMAD) {
                 return static_cast<void*>(&routedMmadContext_);
             }
@@ -201,8 +202,11 @@ template <TemplateMegaMoeArch92WaveTypeClass>
 __aicore__ inline typename MegaMoeArch92Wave<TemplateMegaMoeArch92WaveTypeFunc>::CombineBufferConfig
 MegaMoeArch92Wave<TemplateMegaMoeArch92WaveTypeFunc>::InitCombineBuffers()
 {
-    return InitWaveCombineBuffers<CombineQuantMode, false, WAVE_COMBINE_STEADY_ROW_BUFFER_COUNT>(commonConfig_,
-                                                                                                 waveCombineScratch_);
+    if constexpr (g_coreType == AIV) {
+        return InitWaveCombineBuffers<CombineQuantMode, WAVE_COMBINE_STEADY_ROW_BUFFER_COUNT>(commonConfig_,
+                                                                                              waveCombineScratch_);
+    }
+    return {};
 }
 
 template <TemplateMegaMoeArch92WaveTypeClass>
@@ -358,12 +362,13 @@ MegaMoeArch92Wave<TemplateMegaMoeArch92WaveTypeFunc>::ProcessNextDispatchAndCurr
             gmm1Position.tokenIndexInExpert == 0U && static_cast<uint64_t>(waveEndTokenIndexInExpert) == expertRowCount;
         uint32_t waveTokenStartIndex =
             static_cast<uint32_t>(gmm1ExpertState.globalTokenStartIndex) + gmm1Position.tokenIndexInExpert;
+        int32_t vecSetSyncCom = 0;
         void* blockMmadContext = GetRoutedMmadContext();
-        RunGmm1ToGm<QuantOutType, ActivationType, MoeWeightType, bfloat16_t, QuantScaleOutType, QuantScaleOutType,
-                    MoeWeight1Format != FORMAT_ND, GMM1_TILE_M, EPILOGUE_TILE_M, TopkWeightsPrefetch, false, true>(
-            epilogueOp_, params_, gmm1WaveProblemShape, gmm1AddrInfo, startBlockIdx_, gmmExecutionConfig_.blockJob,
-            waveTokenStartIndex, gmm1Position.expertIdx, gmm1PingPongIdx_, commonConfig_.activationOutputDivisor,
-            blockMmadContext, isWholeExpert);
+        RunGmm1Generic<QuantOutType, ActivationType, MoeWeightType, bfloat16_t, QuantScaleOutType, QuantScaleOutType,
+                       MoeWeight1Format != FORMAT_ND, GMM1_TILE_M, EPILOGUE_TILE_M, TopkWeightsPrefetch, false, true>(
+            epilogueOp_, params_, gmm1WaveProblemShape, gmm1AddrInfo, startBlockIdx_, vecSetSyncCom,
+            gmmExecutionConfig_.blockJob, waveTokenStartIndex, gmm1Position.expertIdx, gmm1PingPongIdx_,
+            commonConfig_.activationOutputDivisor, blockMmadContext, isWholeExpert);
 
         processedMGroupCount += problemMGroupCount;
         gmm1Position.tokenIndexInExpert = waveEndTokenIndexInExpert;
@@ -570,8 +575,11 @@ __aicore__ inline void MegaMoeArch92Wave<TemplateMegaMoeArch92WaveTypeFunc>::Pro
     PrepareMoeExpertTokenCountTable();
     if (tokenDispatchConfig_.dedup.dedupMode != 0) {
         // Arch92 没有独立的 AIV0 工作核，也不使用完成计数的高 16 位。
-        BuildDedupRowDescTable<TopkIndexType>(tokenDispatchConfig_.dedup, commonConfig_, gmmExecutionConfig_.blockJob,
-                                              syncWorkspaceLayout_, params_, tokenDispatchScratch_);
+        if constexpr (g_coreType == AIV) {
+            BuildDedupRowDescTable<TopkIndexType>(tokenDispatchConfig_.dedup, commonConfig_,
+                                                  gmmExecutionConfig_.blockJob, static_cast<int32_t>(1),
+                                                  syncWorkspaceLayout_, params_, tokenDispatchScratch_);
+        }
     }
 
     GMMAddrInfo gmm1AddrInfo{};

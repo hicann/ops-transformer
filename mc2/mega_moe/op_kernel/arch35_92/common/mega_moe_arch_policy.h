@@ -114,17 +114,6 @@ using MegaMoeHardwarePolicy = MegaMoeArch92HardwarePolicy;
 using MegaMoeHardwarePolicy = MegaMoeArch35HardwarePolicy;
 #endif
 
-// 单 AIV 执行原先按子核号分配的分支；双 AIV 按真实子核号选择。
-template <uint32_t SubBlockIdx>
-__aicore__ inline bool IsSubBlockIdx()
-{
-    if constexpr (MegaMoeHardwarePolicy::VECTOR_CORE_COUNT_PER_CUBE == 1U) {
-        return true;
-    } else {
-        return MegaMoeHardwarePolicy::GetSubBlockIdx() == SubBlockIdx;
-    }
-}
-
 } // namespace MegaMoeImpl
 
 #endif // MEGA_MOE_ARCH_POLICY_H

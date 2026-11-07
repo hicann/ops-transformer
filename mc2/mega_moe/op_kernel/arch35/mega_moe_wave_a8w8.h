@@ -58,6 +58,7 @@ private:
 
     using MegaMoeBase::DispatchBuffInit;
     using MegaMoeBase::PrepareMoeExpertTokenCountTable;
+    using MegaMoeBase::BuildMoeDedupRowDescTable;
     using MegaMoeBase::EnterSteadyDispatch;
     using MegaMoeBase::commonConfig_;
     using MegaMoeBase::countWorkspace_;
@@ -163,8 +164,13 @@ template <TemplateMegaMoeA8W8WaveTypeClass>
 __aicore__ inline typename MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc>::CombineBufferConfig
 MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc>::InitCombineBuffers()
 {
-    return InitWaveCombineBuffers<CombineQuantMode, false, WAVE_COMBINE_STEADY_ROW_BUFFER_COUNT>(commonConfig_,
-                                                                                                 waveCombineScratch_);
+    if constexpr (g_coreType == AIV) {
+        if (MegaMoeHardwarePolicy::GetSubBlockIdx() == 1U) {
+            return InitWaveCombineBuffers<CombineQuantMode, WAVE_COMBINE_STEADY_ROW_BUFFER_COUNT>(commonConfig_,
+                                                                                                  waveCombineScratch_);
+        }
+    }
+    return {};
 }
 
 template <TemplateMegaMoeA8W8WaveTypeClass>
@@ -192,9 +198,13 @@ __aicore__ inline ExpertTokenPosition MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTyp
         plannedDispatchPosition = nextDispatchRange.end;
         dispatchRange.end = nextDispatchRange.end;
     }
-    DispatchTokenRange<TopkIndexType, ActivationType, QuantScaleOutType, GMM1_TILE_M, TopkWeightsPrefetch>(
-        tokenDispatchConfig_, commonConfig_, gmmExecutionConfig_.blockJob, syncWorkspaceLayout_, params_,
-        g_winRankAddr_, tokenDispatchScratch_, dispatchRange);
+    if constexpr (g_coreType == AIV) {
+        if (MegaMoeHardwarePolicy::GetSubBlockIdx() == 1U) {
+            DispatchTokenRange<TopkIndexType, ActivationType, QuantScaleOutType, GMM1_TILE_M, TopkWeightsPrefetch>(
+                tokenDispatchConfig_, commonConfig_, gmmExecutionConfig_.blockJob, syncWorkspaceLayout_, params_,
+                g_winRankAddr_, tokenDispatchScratch_, dispatchRange);
+        }
+    }
     // 整 WAVE 的数据和 ready flag 发布完成后，再提交 Dispatch 进度。
     dispatchPosition = plannedDispatchPosition;
     return dispatchPosition;
@@ -305,7 +315,7 @@ __aicore__ inline ExpertTokenPosition MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTyp
                        MoeWeight1Format != FORMAT_ND, GMM1_TILE_M, EPILOGUE_TILE_M, TopkWeightsPrefetch, false, true>(
             epilogueOp_, params_, gmm1WaveProblemShape, gmm1AddrInfo, runtimeState.startBlockIdx,
             runtimeState.vecSetSyncCom, gmmExecutionConfig_.blockJob, waveTokenStartIndex, gmm1Position.expertIdx,
-            runtimeState.pingpongIdx, commonConfig_.activationOutputDivisor, nullptr, isWholeExpert);
+            runtimeState.pingpongIdx, commonConfig_.activationOutputDivisor, isWholeExpert);
 
         processedMGroupCount += problemMGroupCount;
         gmm1Position.tokenIndexInExpert = waveEndTokenIndexInExpert;
@@ -351,13 +361,13 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc>::Process
     if (IsCombineDedupOn(params_.tilingData->compute.dedupMode)) {
         RunGmm2Generic<COMBINE_NO_QUANT, QuantOutType, QuantOutType, bfloat16_t, QuantScaleOutType, QuantScaleOutType,
                        MoeWeight2Format != FORMAT_ND, false, GMM1_TILE_M, TopkWeightsPrefetch, false, true, false>(
-            gmm2WaveProblemShape, gmm2AddrInfo, startBlockIdx, gmmExecutionConfig_.blockJob, nullptr, isWholeExpert,
+            gmm2WaveProblemShape, gmm2AddrInfo, startBlockIdx, gmmExecutionConfig_.blockJob, isWholeExpert,
             gmm2Position.tokenIndexInExpert, &params_, commonConfig_.activationOutputDivisor);
     } else {
         RunGmm2Generic<COMBINE_NO_QUANT, QuantOutType, QuantOutType, bfloat16_t, QuantScaleOutType, QuantScaleOutType,
                        MoeWeight2Format != FORMAT_ND, false, GMM1_TILE_M, TopkWeightsPrefetch, false, true,
                        CombineQuantMode == COMBINE_NO_QUANT>(
-            gmm2WaveProblemShape, gmm2AddrInfo, startBlockIdx, gmmExecutionConfig_.blockJob, nullptr, isWholeExpert,
+            gmm2WaveProblemShape, gmm2AddrInfo, startBlockIdx, gmmExecutionConfig_.blockJob, isWholeExpert,
             gmm2Position.tokenIndexInExpert, &params_, commonConfig_.activationOutputDivisor);
     }
 }
@@ -631,8 +641,9 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc>::Prepare
     if (tokenDispatchConfig_.dedup.dedupMode != 0) {
         // 去重建表：route 槽到达保证与 count epoch 校验同源；函数尾部含 AIV1 间栅栏。
         PrepareDedupPrepassAiv0Local(tokenDispatchConfig_.dedup, commonConfig_, params_, tokenDispatchScratch_);
-        BuildDedupRowDescTable<TopkIndexType>(tokenDispatchConfig_.dedup, commonConfig_, gmmExecutionConfig_.blockJob,
-                                              syncWorkspaceLayout_, params_, tokenDispatchScratch_);
+        if constexpr (g_coreType == AIV) {
+            BuildMoeDedupRowDescTable();
+        }
     }
 }
 

@@ -421,34 +421,6 @@ __aicore__ inline void DedupStoreRowDescChunk(DedupPrepassWorker<TopkIndexType>&
     }
 }
 
-#ifndef MEGA_MOE_ARCH92_DEVICE
-// 建表工人集按档切换（判据见 DEDUP_AIV0_PREPASS_MAX_HIDDEN_DIM）：AIV0 参与档按
-// AIV1=jobIndex / AIV0=jobIndex+totalJobs 平铺；不参与档保持 AIV1 单方建表。
-// 返回 false = 本子核不参与建表。
-__aicore__ inline bool GetDedupPrepassWorkerSlot(const BlockJobContext& blockJob, const Params& params,
-                                                 uint32_t& workerIndex, uint32_t& totalWorkers)
-{
-    const bool aiv0Joins = params.tilingData->compute.hiddenDim <= DEDUP_AIV0_PREPASS_MAX_HIDDEN_DIM;
-    if (!IsSubBlockIdx<1U>() && !aiv0Joins) {
-        return false;
-    }
-    workerIndex = IsSubBlockIdx<1U>() ? blockJob.jobIndex : blockJob.jobIndex + blockJob.totalJobs;
-    totalWorkers = aiv0Joins ? blockJob.totalJobs * 2U : blockJob.totalJobs;
-    return true;
-}
-#endif
-
-#ifdef MEGA_MOE_ARCH92_DEVICE
-// Arch92 单 AIV 配比，直接使用 block 的任务编号与总数。
-__aicore__ inline bool GetDedupPrepassWorkerSlot(const BlockJobContext& blockJob, const Params&, uint32_t& workerIndex,
-                                                 uint32_t& totalWorkers)
-{
-    workerIndex = blockJob.jobIndex;
-    totalWorkers = blockJob.totalJobs;
-    return true;
-}
-#endif
-
 // 计算工作项 chunkIdx 的 token 窗口（末段按 numTokens 截断）。
 __aicore__ inline DedupChunkWindow MakeDedupChunkWindow(uint32_t chunkIdx, uint32_t chunkTokens, uint32_t numTokens,
                                                         uint32_t topK, int32_t& tokenHi)
@@ -504,27 +476,20 @@ __aicore__ inline void RunDedupPrepassWorkItem(DedupPrepassWorker<TopkIndexType>
 
 /*
  * 去重 prepass 主入口：扫描 route 槽，为每个接收行写一条 rowDesc（布局见 mega_moe_constants.h）。
- * 分工：工作项 = (srcRank, token 段)，全体 AIV1+AIV0 平铺认领（AIV0 的本地前缀表与 UB 布局由
- * PrepareDedupPrepassAiv0Local 先行就位）。同一 (srcRank, token) 的所有出现恒落在同一工作项内，
- * 工作项之间零交叠，无需原子。
+ * 仅由参与建表的 AIV 调用；架构编排提供 worker 编号、总数和完成计数增量，并先准备本地前缀表与 UB。
+ * 工作项 = (srcRank, token 段)，按 workerJob 平铺认领。同一 (srcRank, token) 的所有出现恒落在同一
+ * 工作项内，工作项之间零交叠，无需原子。
  * 依赖：count 表已就绪（cumsumInfoTensor；count 到达即 route 槽到达，是 dispatch 沿用的既有契约）。
  * 不得把 prepass 整体挪给 AIV0 提前跑：大 bs 下 AIV0 早期密集访问 route 窗口会触发 aicore trap
  * （驱动侧机制未明，实测复现），当前平铺形态是稳定边界。
  */
 template <typename TopkIndexType, typename DispatchScratch>
 __aicore__ inline void BuildDedupRowDescTable(const DedupConfig& dedup, const MoeStageCommonConfig& common,
-                                              const BlockJobContext& blockJob, const MoeSyncWorkspaceLayout& syncLayout,
-                                              const Params& params, DispatchScratch& scratch)
+                                              const BlockJobContext& workerJob, int32_t doneIncrement,
+                                              const MoeSyncWorkspaceLayout& syncLayout, const Params& params,
+                                              DispatchScratch& scratch)
 {
-    if constexpr (g_coreType == AIC) {
-        return;
-    }
-    if (blockJob.totalJobs == 0U) {
-        return;
-    }
-    uint32_t workerIndex = 0U;
-    uint32_t totalWorkers = 0U;
-    if (!GetDedupPrepassWorkerSlot(blockJob, params, workerIndex, totalWorkers)) {
+    if (workerJob.totalJobs == 0U) {
         return;
     }
 
@@ -538,18 +503,15 @@ __aicore__ inline void BuildDedupRowDescTable(const DedupConfig& dedup, const Mo
     PipeNotify<PIPE_MTE3, PIPE_S>(static_cast<TEventID>(SYNC_EVENT_ID3));
     PipeNotify<PIPE_MTE3, PIPE_S>(static_cast<TEventID>(SYNC_EVENT_ID5));
 
-    for (uint32_t workItem = workerIndex; workItem < totalWorkItems; workItem += totalWorkers) {
+    for (uint32_t workItem = workerJob.jobIndex; workItem < totalWorkItems; workItem += workerJob.totalJobs) {
         RunDedupPrepassWorkItem(worker, common, params, scratch, dedup, workItem);
     }
     // 消费掉最后一次武装，不留悬挂 flag 毒化后续同 id 同步。
     PipeWait<PIPE_MTE3, PIPE_S>(static_cast<TEventID>(SYNC_EVENT_ID3));
     PipeWait<PIPE_MTE3, PIPE_S>(static_cast<TEventID>(SYNC_EVENT_ID5));
 
-    // 槽 0 = done 计数，AIV1 计低 16 位、AIV0 计高 16 位。dispatch 发布 gate 只等高位（全体 AIV0）：
-    // 每个 AIV1 发布前自己必然已建完，AIV1 互等会打断 prepass 与 dispatch 的流水交叠（实测大形状
-    // 明显劣化）；combine 兜底等全值。本核不等任何人。
-    AtomicAdd(readyBase,
-              IsSubBlockIdx<1U>() ? static_cast<int32_t>(1) : static_cast<int32_t>(1) << DEDUP_PREPASS_DONE_AIV0_SHIFT);
+    // 架构编排决定完成计数编码；参与核即使未分到工作项，也必须上报一次。
+    AtomicAdd(readyBase, doneIncrement);
 }
 
 } // namespace MegaMoeImpl
