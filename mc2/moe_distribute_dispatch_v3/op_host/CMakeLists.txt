@@ -23,8 +23,6 @@ if (BUILD_OPEN_PROJECT)  # custom
     set(moe_distribute_dispatch_v3_a3_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch_v2 PARENT_SCOPE)
     set(moe_distribute_dispatch_v3_apt_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch_v2 PARENT_SCOPE)
     set(moe_distribute_dispatch_v3_a6_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch_v2 PARENT_SCOPE)
-    get_filename_component(_dispatch_v3_a6_dir "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
-    set(moe_distribute_dispatch_v3_a6_dir "${_dispatch_v3_a6_dir}" PARENT_SCOPE)
 
     # --cce-auto-sync=off：指定CCE编译器是否自动执行线程间或模块间的同步操作
     add_ops_compile_options(

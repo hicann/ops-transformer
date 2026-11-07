@@ -23,8 +23,6 @@ if (BUILD_OPEN_PROJECT)  # custom
     set(moe_distribute_combine_add_rms_norm_a3_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch_v2 mc2/moe_distribute_combine_v2 mc2/moe_distribute_dispatch_v3 mc2/moe_distribute_combine_v3 PARENT_SCOPE)
     set(moe_distribute_combine_add_rms_norm_apt_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch_v2 mc2/moe_distribute_combine_v2 mc2/moe_distribute_dispatch_v3 mc2/moe_distribute_combine_v3 PARENT_SCOPE)
     set(moe_distribute_combine_add_rms_norm_a6_depends mc2/common mc2/3rd mc2/moe_distribute_dispatch_v2 mc2/moe_distribute_combine_v2 mc2/moe_distribute_dispatch_v3 mc2/moe_distribute_combine_v3 PARENT_SCOPE)
-    # 为 _a6 opFile 提供源码目录（等价于 func.cmake 里硬编码的 _a2/_a3/_apt_dir 白名单），避免改共享 func.cmake
-    set(moe_distribute_combine_add_rms_norm_a6_dir ${CMAKE_CURRENT_SOURCE_DIR}/.. PARENT_SCOPE)
     install(
         DIRECTORY
         ${OPS_ADV_DIR}/mc2/3rd/rms_norm
