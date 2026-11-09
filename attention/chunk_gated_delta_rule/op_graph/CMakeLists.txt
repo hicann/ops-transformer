@@ -9,3 +9,6 @@
 # -----------------------------------------------------------------------------------------------------------
 
 message(STATUS "=== Debug: start ops.attention.chunk_gated_delta_rule.op_graph.CMakeLists.txt ")
+if (BUILD_OPEN_PROJECT)
+    add_graph_plugin_sources()
+endif()

@@ -24,6 +24,9 @@ import os
 import gc
 
 _USE_GRAPH = os.environ.get("USE_GRAPH", "false").lower() in ("true", "1", "yes")
+_GRAPH_MODE = os.environ.get("GRAPH_MODE", "reduce-overhead")
+# torchair 图模式到底层图实现的映射
+_GRAPH_IMPL = {"reduce-overhead": "aclgraph", "max-autotune": "ge"}
 _ENABLE_PROF = os.environ.get("ENABLE_PROF", "false").lower() in ("true", "1", "yes")
 _SAVE_PT = os.environ.get("SAVE_PT", "false").lower() in ("true", "1", "yes")
 _LOAD_PT = os.environ.get("LOAD_PT", "false").lower() in ("true", "1", "yes")
@@ -42,7 +45,7 @@ if _USE_GRAPH:
     os.environ["ENABLE_ACLNN"] = "false"
     # 配置图模式 aclgraph config
     config = torchair.CompilerConfig()
-    config.mode = "reduce-overhead"
+    config.mode = _GRAPH_MODE
     config.debug.aclgraph.clone_input = False
     npu_backend = torchair.get_npu_backend(compiler_config=config)
 
@@ -256,9 +259,10 @@ def cgdr_benchmark(
 
 
 def cgdr_npu(q, k, v, g, beta, scale, initial_state, actual_seq_lengths):
-    logger.info(
-        f"[cgdr_npu] run mode: {'aclgraph' if _USE_GRAPH else 'torch direct call'}"
+    run_mode = (
+        _GRAPH_IMPL.get(_GRAPH_MODE, _GRAPH_MODE) if _USE_GRAPH else "torch direct call"
     )
+    logger.info(f"[cgdr_npu] run mode: {run_mode}")
     if _USE_GRAPH:
         model = MyModel().npu()
         model = torch.compile(model, backend=npu_backend, dynamic=False)
