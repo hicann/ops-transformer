@@ -222,7 +222,7 @@ English | [简体中文](./README.md)
   <tr>
     <td>kvCacheRope</td>
     <td>Input</td>
-    <td>Device-side aclTensor, optional parameter; passing a null pointer is supported. This is the same tensor as the output krCacheOut. The input format varies with cacheMode.<br><br>When cacheMode is 0: not passed.<br>When cacheMode is 1: shape [blockNum,blockSize,1,64]<br>When cacheMode is 2 or 3: shape [blockNum, headNum*64 / 16 ,block_size, 16]</td>
+    <td>Device-side aclTensor. Required; a null pointer is not supported. This is the same tensor as the output krCacheOut. When it does not participate in the computation, a placeholder tensor must still be passed and its content is not read.<br><br>When cacheMode is 0: does not participate in the computation. Placeholder shape [blockNum,blockSize,1,64], data format ND<br>When cacheMode is 1: shape [blockNum,blockSize,1,64]<br>When cacheMode is 2 or 3: shape [blockNum, headNum*64 / 16 ,block_size, 16]</td>
     <td>Same as input</td>
     <td><br>ND<br>NZ</td>
   </tr>
@@ -236,14 +236,14 @@ English | [简体中文](./README.md)
   <tr>
     <td>ctkvScale</td>
     <td>Input</td>
-    <td>Device-side aclTensor, the coefficient involved in the output quantization processing. Pass this parameter only when cacheMode is 2, with shape [1]</td>
+    <td>Device-side aclTensor. Required; a null pointer is not supported. Coefficient involved in the output quantization processing, shape [1]. It participates in the computation only when cacheMode is 2. For any other cacheMode, pass a placeholder of the same shape; its content is not read</td>
     <td>FLOAT16, BFLOAT16</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>qNopeScale</td>
     <td>Input</td>
-    <td>Device-side aclTensor, the coefficient involved in the output quantization processing. Pass this parameter only when cacheMode is 2, with shape [1]</td>
+    <td>Device-side aclTensor. Required; a null pointer is not supported. Coefficient involved in the output quantization processing, shape [1]. It participates in the computation only when cacheMode is 2. For any other cacheMode, pass a placeholder of the same shape; its content is not read</td>
     <td>FLOAT16, BFLOAT16</td>
     <td>ND</td>
   </tr>
@@ -355,16 +355,16 @@ English | [简体中文](./README.md)
   <tr>
     <td>qRopeOut</td>
     <td>Output</td>
-    <td>Indicates the output of the Query after rotary position embedding. The shape and dtype vary with cacheMode<br><br>When cacheMode is 0: no output<br>When cacheMode is 1 or 3: shape [tokenNum, headNum, 64]<br>When cacheMode is 2: shape [tokenNum, headNum, 64]</td>
-    <td><br>When cacheMode is 1 or 3: same as input<br>When cacheMode is 2: same as input</td>
-    <td><br>ND<br>ND</td>
+    <td>Indicates the output of the Query after rotary position embedding. Required; a null pointer is not supported. When it does not participate in the computation, a placeholder tensor must still be passed and its content is not written<br><br>When cacheMode is 0: does not participate in the computation. Placeholder shape [tokenNum, headNum, 64]<br>When cacheMode is 1 or 3: shape [tokenNum, headNum, 64]<br>When cacheMode is 2: shape [tokenNum, headNum, 64]</td>
+    <td>When cacheMode is 0: same as input<br>When cacheMode is 1 or 3: same as input<br>When cacheMode is 2: same as input</td>
+    <td>ND<br>ND<br>ND</td>
   </tr>
   <tr>
     <td>krCacheOut</td>
     <td>Output</td>
-    <td>Indicates the output of the Key after ROPE and ReshapeAndCache. The shape and dtype vary with cacheMode,<br><br>When cacheMode is 0: no output<br>When cacheMode is 1: shape [blockNum, blockSize, 1, 64]<br>When cacheMode is 2 or 3: shape [blockNum, headNum*64 / 16 ,block_size, 16]</td>
-    <td><br>When cacheMode is 1: same as input<br>When cacheMode is 2 or 3: same as input</td>
-    <td><br>ND<br>NZ</td>
+    <td>Indicates the output of the Key after ROPE and ReshapeAndCache. Required; a null pointer is not supported. When it does not participate in the computation, a placeholder tensor must still be passed and its content is not written<br><br>When cacheMode is 0: does not participate in the computation. Placeholder shape [blockNum, blockSize, 1, 64]<br>When cacheMode is 1: shape [blockNum, blockSize, 1, 64]<br>When cacheMode is 2 or 3: shape [blockNum, headNum*64 / 16 ,block_size, 16]</td>
+    <td>When cacheMode is 0: same as input<br>When cacheMode is 1: same as input<br>When cacheMode is 2 or 3: same as input</td>
+    <td>ND<br>ND<br>NZ</td>
   </tr>
 </tbody></table>
 

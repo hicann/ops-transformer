@@ -41,10 +41,10 @@ extern "C" {
  * @param sin [IN] RoPE计算的正弦Tensor。与cos同时传入nullptr时关闭RoPE，仅一个为nullptr时输入非法。
  * @param wuk [IN] 计算Q-nope输出时使用的Key升维权重。
  * @param kvCache [IN] 根据slotMapping更新的Key/Value Cache Tensor。
- * @param kvCacheRope [IN] RoPE Cache Tensor，是否需要传入及其布局由cacheMode决定。
+ * @param kvCacheRope [IN] RoPE Cache Tensor。必填，不支持空指针。cacheMode为0占位[blockNum,blockSize,1,64]，不读取。
  * @param slotMapping [IN] 每个输入Token对应的Cache槽位索引。
- * @param ctkvScale [IN] cacheMode为2时，压缩Key/Value Cache的量化缩放参数。
- * @param qNopeScale [IN] cacheMode为2时，Q-nope输出的量化缩放参数。
+ * @param ctkvScale [IN] 压缩KV量化缩放。必填，不支持空指针，shape为[1]。仅cacheMode为2参与计算。
+ * @param qNopeScale [IN] Q-nope量化缩放。必填，不支持空指针，shape为[1]。仅cacheMode为2参与计算。
  * @param wdqDim [IN] 从wdqkv矩阵乘结果中拆分出的Query LoRA维度。
  * @param qRopeDim [IN] Query中参与RoPE计算的维度。
  * @param kRopeDim [IN] Key中参与RoPE计算的维度。
@@ -60,8 +60,8 @@ extern "C" {
  * @param wdkvSplitCount [IN] wdqkv降维权重的拆分段数。
  * @param qOut [OUT] Query输出Tensor。
  * @param kvCacheOut [OUT] 更新后的Key/Value Cache输出Tensor。
- * @param qRopeOut [OUT] Cache拆分模式下的Query RoPE分量输出Tensor。
- * @param krCacheOut [OUT] Cache拆分模式下更新后的Key RoPE Cache输出Tensor。
+ * @param qRopeOut [OUT] Query RoPE输出。必填，不支持空指针。cacheMode为0占位[tokenNum,headNum,64]，不写入。
+ * @param krCacheOut [OUT] Key RoPE Cache输出。必填，不支持空指针。cacheMode为0占位[blockNum,blockSize,1,64]，不写入。
  * @param workspaceSize [OUT] 返回Device侧所需的workspace大小，单位为字节。
  * @param executor [OUT] 返回包含算子执行流程的执行器。
  * @return aclnnStatus 成功时返回ACLNN_SUCCESS，否则返回对应错误码。

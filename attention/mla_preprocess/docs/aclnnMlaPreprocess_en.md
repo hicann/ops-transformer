@@ -371,8 +371,8 @@ aclnnStatus aclnnMlaPreprocess(
       <td>kvCacheRope</td>
       <td>Input</td>
       <td>Same tensor as the output krCacheOut.</td>
-      <td>Optional parameter. Passing a null pointer is supported. The input format varies with cacheMode:<ul>
-        <li>cacheMode is 0: Do not pass.</li>
+      <td>Required parameter. A null pointer is not supported. When it does not participate in the computation, a placeholder tensor must still be passed and its content is not read. The shape and format vary with cacheMode:<ul>
+        <li>cacheMode is 0: does not participate in the computation. The placeholder shape is [blockNum,blockSize,1,64], dtype is consistent with input, and the <a href="../../../docs/en/context/data_format.md">data format</a> is ND.</li>
         <li>cacheMode is 1: shape is [blockNum,blockSize,1,64], dtype is consistent with input, <a href="../../../docs/en/context/data_format.md">data format</a> is ND.</li>
         <li>cacheMode is 2 or 3: shape is [blockNum,4,blockSize,16], dtype is consistent with input, <a href="../../../docs/en/context/data_format.md">data format</a> is NZ.</li>
         <li>Only the first axis can be non-contiguous.</li></ul>
@@ -396,7 +396,7 @@ aclnnStatus aclnnMlaPreprocess(
       <td>ctkvScale</td>
       <td>Input</td>
       <td>Coefficient that participates in the calculation during output quantization.</td>
-      <td>Passed in only when cacheMode is 2.</td>
+      <td>Required parameter. A null pointer is not supported. shape is [1], dtype is consistent with input, and the data format is ND. It participates in the computation only when cacheMode is 2. For any other cacheMode, pass a placeholder of the same shape; its content is not read.</td>
       <td>FLOAT16, BFLOAT16</td>
       <td>ND</td>
       <td>[1]</td>
@@ -406,7 +406,7 @@ aclnnStatus aclnnMlaPreprocess(
       <td>qNopeScale</td>
       <td>Input</td>
       <td>Coefficient participating in calculation during output quantization processing.</td>
-      <td>Passed in only when cacheMode is 2</td>
+      <td>Required parameter. A null pointer is not supported. shape is [1], dtype is consistent with input, and the data format is ND. It participates in the computation only when cacheMode is 2. For any other cacheMode, pass a placeholder of the same shape; its content is not read.</td>
       <td>FLOAT16, BFLOAT16</td>
       <td>ND</td>
       <td>[1]</td>
@@ -588,8 +588,8 @@ aclnnStatus aclnnMlaPreprocess(
       <td>qRopeOut</td>
       <td>Output</td>
       <td>Indicates the output of Query after rotary encoding.</td>
-      <td>shape and dtype vary with cacheMode:<ul>
-        <li>cacheMode is 0: no output.</li>
+      <td>Required parameter. A null pointer is not supported. When it does not participate in the computation, a placeholder tensor must still be passed and its content is not written. shape and dtype vary with cacheMode:<ul>
+        <li>cacheMode is 0: does not participate in the computation. The placeholder shape is [tokenNum, headNum, 64], dtype is the same as that of input, and the <a href="../../../docs/en/context/data_format.md">data format</a> is ND.</li>
         <li>cacheMode is 1 or 3: shape is [tokenNum, headNum, 64], dtype is the same as that of input, <a href="../../../docs/en/context/data_format.md">data format</a> is ND.</li>
         <li>cacheMode is 2: shape is [tokenNum, headNum, 64], dtype is the same as that of input, <a href="../../../docs/en/context/data_format.md">data format</a> is ND.</li></ul>
       </td>
@@ -602,8 +602,8 @@ aclnnStatus aclnnMlaPreprocess(
       <td>krCacheOut</td>
       <td>Output</td>
       <td>Indicates the output of Key after passing through ROPE and ReshapeAndCache.</td>
-      <td>The shape and dtype vary with cacheMode:<ul>
-        <li>cacheMode is 0: no output.</li>
+      <td>Required parameter. A null pointer is not supported. When it does not participate in the computation, a placeholder tensor must still be passed and its content is not written. The shape and dtype vary with cacheMode:<ul>
+        <li>cacheMode is 0: does not participate in the computation. The placeholder shape is [blockNum, blockSize, 1, 64], the dtype is the same as input, and the <a href="../../../docs/en/context/data_format.md">data format</a> is ND.</li>
         <li>cacheMode is 1: the shape is [blockNum, blockSize, 1, 64], the dtype is the same as input, and the <a href="../../../docs/en/context/data_format.md">data format</a> is ND.</li>
         <li>cacheMode is 2 or 3: the shape is [blockNum, 4, blockSize, 16], the dtype is the same as input, and the <a href="../../../docs/en/context/data_format.md">data format</a> is NZ.</li></ul>
       </td>

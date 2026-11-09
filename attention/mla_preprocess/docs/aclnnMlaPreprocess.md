@@ -369,8 +369,8 @@ aclnnStatus aclnnMlaPreprocess(
       <td>kvCacheRope</td>
       <td>输入</td>
       <td>与输出的krCacheOut为同一tensor。</td>
-      <td>可选参数，支持传入空指针，输入格式随cacheMode变化：<ul>
-        <li>cacheMode为0：不传入。</li>
+      <td>必填参数，不支持空指针。不参与计算时仍需传入占位张量，其内容不会被读取。shape和格式随cacheMode变化：<ul>
+        <li>cacheMode为0：不参与计算。占位张量shape为[blockNum,blockSize,1,64]，dtype与input保持一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为1：shape为[blockNum,blockSize,1,64]，dtype与input保持一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为2或3：shape为[blockNum,4,blockSize,16]，dtype与input保持一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为NZ。</li>
         <li>仅支持首轴非连续</li></ul>
@@ -394,7 +394,7 @@ aclnnStatus aclnnMlaPreprocess(
       <td>ctkvScale</td>
       <td>输入</td>
       <td>输出量化处理中参与计算的系数</td>
-      <td>仅在cacheMode为2时传入。</td>
+      <td>必填参数，不支持空指针。shape为[1]，dtype与input一致，数据格式为ND。仅在cacheMode为2时参与计算；其余cacheMode仍需传入同形状占位张量，其内容不会被读取。</td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>[1]</td>
@@ -404,7 +404,7 @@ aclnnStatus aclnnMlaPreprocess(
       <td>qNopeScale</td>
       <td>输入</td>
       <td>输出量化处理中参与计算的系数。</td>
-      <td>仅在cacheMode为2时传入</td>
+      <td>必填参数，不支持空指针。shape为[1]，dtype与input一致，数据格式为ND。仅在cacheMode为2时参与计算；其余cacheMode仍需传入同形状占位张量，其内容不会被读取。</td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>[1]</td>
@@ -586,8 +586,8 @@ aclnnStatus aclnnMlaPreprocess(
       <td>qRopeOut</td>
       <td>输出</td>
       <td>表示Query经过旋转编码后的输出。</td>
-      <td>shape和dtype随cacheMode变化：<ul>
-        <li>cacheMode为0：不输出。</li>
+      <td>必填参数，不支持空指针。不参与计算时仍需传入占位张量，其内容不会被写入。shape和dtype随cacheMode变化：<ul>
+        <li>cacheMode为0：不参与计算。占位张量shape为[tokenNum, headNum, 64]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为1或3：shape为[tokenNum, headNum, 64]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为2：shape为[tokenNum, headNum, 64]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li></ul>
       </td>
@@ -600,8 +600,8 @@ aclnnStatus aclnnMlaPreprocess(
       <td>krCacheOut</td>
       <td>输出</td>
       <td>表示Key经过ROPE和ReshapeAndCache后的输出。</td>
-      <td>shape和dtype随cacheMode变化：<ul>
-        <li>cacheMode为0：不输出。</li>
+      <td>必填参数，不支持空指针。不参与计算时仍需传入占位张量，其内容不会被写入。shape和dtype随cacheMode变化：<ul>
+        <li>cacheMode为0：不参与计算。占位张量shape为[blockNum, blockSize, 1, 64]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为1：shape为[blockNum, blockSize, 1, 64]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为2或3：shape为[blockNum, 4, blockSize, 16]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为NZ。</li></ul>
       </td>

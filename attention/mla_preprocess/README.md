@@ -220,7 +220,7 @@
   <tr>
     <td>kvCacheRope</td>
     <td>输入</td>
-    <td>Device侧的aclTensor，可选参数，支出传入空指针。与输出的krCacheOut为同一tensor，输入格式随cacheMode变化。<br><br>cacheMode为0：不传入。<br>cacheMode为1：shape为[blockNum,blockSize,1,64]<br>cacheMode为2或3：shape为[blockNum, 4 ,block_size, 16]</td>
+    <td>Device侧的aclTensor，必填，不支持空指针。与输出的krCacheOut为同一tensor。不参与计算时仍需传入占位张量，其内容不会被读取。<br><br>cacheMode为0：不参与计算。占位张量shape为[blockNum,blockSize,1,64]，数据格式为ND<br>cacheMode为1：shape为[blockNum,blockSize,1,64]<br>cacheMode为2或3：shape为[blockNum, 4 ,block_size, 16]</td>
     <td>与input一致</td>
     <td><br>ND<br>NZ</td>
   </tr>
@@ -234,14 +234,14 @@
   <tr>
     <td>ctkvScale</td>
     <td>输入</td>
-    <td>Device侧的aclTensor，输出量化处理中参与计算的系数，仅在cacheMode为2时传入，shape为[1]</td>
+    <td>Device侧的aclTensor，必填，不支持空指针。输出量化处理中参与计算的系数，shape为[1]。仅在cacheMode为2时参与计算；其余cacheMode仍需传入同形状占位张量，其内容不会被读取</td>
     <td>FLOAT16, BFLOAT16</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>qNopeScale</td>
     <td>输入</td>
-    <td>Device侧的aclTensor，输出量化处理中参与计算的系数，仅在cacheMode为2时传入，shape为[1]</td>
+    <td>Device侧的aclTensor，必填，不支持空指针。输出量化处理中参与计算的系数，shape为[1]。仅在cacheMode为2时参与计算；其余cacheMode仍需传入同形状占位张量，其内容不会被读取</td>
     <td>FLOAT16, BFLOAT16</td>
     <td>ND</td>
   </tr>
@@ -353,16 +353,16 @@
   <tr>
     <td>qRopeOut</td>
     <td>输出</td>
-    <td>表示Query经过旋转编码后的输出，shape和dtype随cacheMode变化<br><br>cacheMode为0：不输出<br>cacheMode为1或3：shape为[tokenNum, headNum, 64]<br>cacheMode为2：shape为[tokenNum, headNum, 64]</td>
-    <td><br>cacheMode为1或3：与input一致<br>cacheMode为2：与input一致</td>
-    <td><br>ND<br>ND</td>
+    <td>表示Query经过旋转编码后的输出。必填，不支持空指针。不参与计算时仍需传入占位张量，其内容不会被写入<br><br>cacheMode为0：不参与计算。占位张量shape为[tokenNum, headNum, 64]<br>cacheMode为1或3：shape为[tokenNum, headNum, 64]<br>cacheMode为2：shape为[tokenNum, headNum, 64]</td>
+    <td>cacheMode为0：与input一致<br>cacheMode为1或3：与input一致<br>cacheMode为2：与input一致</td>
+    <td>ND<br>ND<br>ND</td>
   </tr>
   <tr>
     <td>krCacheOut</td>
     <td>输出</td>
-    <td>表示Key经过ROPE和ReshapeAndCache后的输出，shape和dtype随cacheMode变化，<br><br>cacheMode为0：不输出<br>cacheMode为1：shape为[blockNum, blockSize, 1, 64]<br>cacheMode为2或3：shape为[blockNum, 4 ,block_size, 16]</td>
-    <td><br>cacheMode为1：与input一致<br>cacheMode为2或3：与input一致</td>
-    <td><br>ND<br>NZ</td>
+    <td>表示Key经过ROPE和ReshapeAndCache后的输出。必填，不支持空指针。不参与计算时仍需传入占位张量，其内容不会被写入<br><br>cacheMode为0：不参与计算。占位张量shape为[blockNum, blockSize, 1, 64]<br>cacheMode为1：shape为[blockNum, blockSize, 1, 64]<br>cacheMode为2或3：shape为[blockNum, 4 ,block_size, 16]</td>
+    <td>cacheMode为0：与input一致<br>cacheMode为1：与input一致<br>cacheMode为2或3：与input一致</td>
+    <td>ND<br>ND<br>NZ</td>
   </tr>
 </tbody></table>
 
