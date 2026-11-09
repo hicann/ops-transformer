@@ -185,14 +185,15 @@ cann_ops_transformer.quant_lightning_indexer(
   - The value range of topk currently only supports [1, 2048].
   - When layout_k is TND, passing seqused_k is not supported.
   - output_idx_offset is not supported.
-  - Only num_heads_q = 64 and q_n = 64 are supported.
+  - num_heads_q supports 64, 32, and 24: when num_heads_q is 24/32, layout_q must be TND, layout_k must be TND or PA_BBND, mask_mode must be 3, cmp_ratio must be 1, and return_value must be 0; otherwise the API reports an error.
   - Only quant_mode = 2 is supported.
   - q and k only support int8; float8_e4m3fn, HIfloat8, and float4_e2m1 are not supported.
   - q_descale and k_descale support float16; float32 and float8_e8m0 are not supported.
   - w supports float16; float32 is not supported.
-  - layout_k only supports PA_BBND, and seqused_k must be passed.
-  - cmp_ratio only supports powers of 2: 1/2/4/8/16/32/64/128.
+  - layout_k supports PA_BBND and TND: when num_heads_q is 64, only PA_BBND is supported, and seqused_k must be passed; when num_heads_q is 24/32, PA_BBND (seqused_k must be passed) or TND (cu_seqlens_k must be passed, and seqused_k is not supported) is supported.
+  - cmp_ratio only supports powers of 2: 1/2/4/8/16/32/64/128; only 1 is supported when num_heads_q is 24/32.
   - The return_value function is not supported; passing this parameter is not recommended.
+  - When num_heads_q is 24/32, the TND Padding feature is not supported: do not pass in seqused_q when layout_q is TND; passing it causes the API to report an error.
 <!-- end id7 -->
 <!-- npu="950" id5 -->
 - <term>Ascend 950PR&950DT products</term>:

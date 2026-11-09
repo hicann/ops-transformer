@@ -78,6 +78,14 @@ inline constexpr uint32_t QLI_V2_A5_FAST_ENABLE = 1;
 // fast准入与Kernel TopK状态使用相同的容量上限
 inline constexpr uint32_t QLI_V2_A5_FAST_SPARSE_CAPACITY = 2048U;
 
+// arch22 fast 分核记录（扩展区，3 槽连续）：每 group 依次为 enable、tile 起点与终点
+// （左闭右开）；每 group 占 3 槽，扩展区容量最多 85 group（256 int32），
+// 当前 910B AIC 核数不超过 36，即最多 36 group（108 int32）
+inline constexpr uint32_t QLI_V2_A3_FAST_GROUP_SLOT_NUM = 3;
+inline constexpr uint32_t QLI_V2_A3_FAST_ENABLE_SLOT = 0;
+inline constexpr uint32_t QLI_V2_A3_FAST_START_SLOT = 1;
+inline constexpr uint32_t QLI_V2_A3_FAST_END_SLOT = 2;
+
 /**
  * @brief 获取属性的绝对索引
  * @param coreIdx 核索引

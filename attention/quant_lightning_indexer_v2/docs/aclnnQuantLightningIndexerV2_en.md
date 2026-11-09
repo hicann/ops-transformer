@@ -451,16 +451,17 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 <!-- end id10 -->
 <!-- npu="A3,910b" id11 -->
 - x1 is INT8, x2 is INT8, x1Scale is FLOAT32, and x2Scale is FLOAT32.
-  - `layoutKOptional` supports only PA_BBND.
+  - `layoutKOptional` supports PA_BBND and TND: when q N1 is 64, only PA_BBND is supported (sequsedKOptional must be passed in); when N1 is 24/32, PA_BBND (sequsedKOptional must be passed in) or TND (cuSeqLensKOptional must be passed in, and sequsedKOptional is not supported) is supported.
   - `quantMode` supports only 2 (Per-Token-Head quantization).
-  - `cmpRatioOptional` supports only powers of 2 in the range of [1, 128], namely 1/2/4/8/16/32/64/128.
+  - `cmpRatioOptional` supports only powers of 2 in the range of [1, 128], namely 1/2/4/8/16/32/64/128; only 1 is supported when N1 is 24/32.
   - `outputIdxOffsetOptional` is not supported.
   - `returnValueOptional` is not supported.
   - query and key: INT8 is supported, while FLOAT8_e4m3fn, HIFLOAT8, and FLOAT4_e2m1 are not supported.
   - queryDequantScale and keyDequantScale: FLOAT16 is supported, while FLOAT32 and FLOAT8_e8m0 are not supported.
   - weights: FLOAT16 is supported, while FLOAT32 is not supported.
-  - query N1 supports only 64.
+  - query N1 supports 64, 32, and 24: when N1 is 24/32, `layoutQOptional` must be TND, `maskMode` must be 3, `cmpRatio` must be 1, and `returnValue` must not be passed in; otherwise the API reports an error.
   - topk supports only [1, 2048].
+  - When N1 is 24/32, the TND Padding feature is not supported: do not pass in sequsedQOptional when `layoutQOptional` is TND; passing it causes the API to report an error.
 <!-- end id11 -->
 
 - **Return value**
@@ -542,7 +543,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 - block_size must be a multiple of 16, with a maximum supported value of 1024.
 - When `layoutKOptional` is not PA_BBND, `layoutQOptional` and `layoutKOptional` must be consistent.
 - When `quantMode` is 3/5, `queryDequantScale` and `keyDequantScale` have 1 more dimension than `query` and `key` respectively, with consistent prefix dimensions and the last two dimensions of (D/64, 2); D must be a multiple of 64, and each scale corresponds to 32 consecutive logical elements along the D dimension.
-- When the input parameter layoutQOptional is TND, cuSeqLensQOptional must be passed in. If sequsedQOptional is also passed in, ensure that the query length of each batch passed in by sequsedQOptional does not exceed the q sequence length of each batch calculated based on cuSeqLensQOptional. When the q sequence length seqlen1 passed in by sequsedQOptional for a batch is less than the query length seqlen2 calculated based on cuSeqLensQOptional, the TND Padding feature is enabled, and the sparseIndices and sparseValues of the query output for the difference between seqlen2 and seqlen1 in that batch are all set to invalid values. In some long-sequence use cases, if too much invalid data needs to be padded, aicore execution may time out due to hardware limitations. Calculate the amount of data to be padded using (seqlen2 - seqlen1) * topk. It is recommended to keep this amount within 400 million.
+- When the input parameter layoutQOptional is TND, cuSeqLensQOptional must be passed in. If sequsedQOptional is also passed in, ensure that the query length of each batch passed in by sequsedQOptional does not exceed the q sequence length of each batch calculated based on cuSeqLensQOptional. When the q sequence length seqlen1 passed in by sequsedQOptional for a batch is less than the query length seqlen2 calculated based on cuSeqLensQOptional, the TND Padding feature is enabled, and the sparseIndices and sparseValues of the query output for the difference between seqlen2 and seqlen1 in that batch are all set to invalid values. In some long-sequence use cases, if too much invalid data needs to be padded, aicore execution may time out due to hardware limitations. Calculate the amount of data to be padded using (seqlen2 - seqlen1) * topk. It is recommended to keep this amount within 400 million. The TND Padding feature is not supported when q N1 is 24 or 32; do not pass in sequsedQOptional, and passing it causes the API to report an error.
 - **Deterministic computation:** aclnnQuantLightningIndexerV2 defaults to a deterministic implementation.
 
 ## Example

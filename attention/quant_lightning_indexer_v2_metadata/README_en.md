@@ -166,8 +166,8 @@ English | [简体中文](./README.md)
   </table>
 
   <ul>
-    <li><term>Atlas A3 products</term>: num_heads_q supports only 64; quant_mode = 1/3/4/5 is not supported; topk supports only [1, 2048]; layout_k = BSND/TND is not supported; not every value in [1, 128] is supported for cmp_ratio; only cmp_ratio = 1/2/4/8/16/32/64/128 is supported.</li>
-    <li><term>Atlas A2 products</term>: num_heads_q supports only 64; quant_mode = 1/3/4/5 is not supported; topk supports only [1, 2048]; layout_k = BSND/TND is not supported; not every value in [1, 128] is supported for cmp_ratio; only cmp_ratio = 1/2/4/8/16/32/64/128 is supported.</li>
+    <li><term>Atlas A3 products</term>: num_heads_q supports 64, 32, and 24 (when num_heads_q is 24/32, layout_q must be TND, mask_mode must be 3, and cmp_ratio must be 1); quant_mode = 1/3/4/5 is not supported; topk supports only [1, 2048]; layout_k = BSND is not supported; not every value in [1, 128] is supported for cmp_ratio; only cmp_ratio = 1/2/4/8/16/32/64/128 is supported.</li>
+    <li><term>Atlas A2 products</term>: num_heads_q supports 64, 32, and 24 (when num_heads_q is 24/32, layout_q must be TND, mask_mode must be 3, and cmp_ratio must be 1); quant_mode = 1/3/4/5 is not supported; topk supports only [1, 2048]; layout_k = BSND is not supported; not every value in [1, 128] is supported for cmp_ratio; only cmp_ratio = 1/2/4/8/16/32/64/128 is supported.</li>
   </ul>
 
 ## Constraints

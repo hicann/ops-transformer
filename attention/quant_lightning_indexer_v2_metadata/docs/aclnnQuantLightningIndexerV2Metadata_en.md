@@ -299,10 +299,10 @@ aclnnStatus aclnnQuantLightningIndexerV2Metadata(
 
   <ul>
     <!-- npu="A3" id7 -->
-    <li><term>Atlas A3 products</term>: numHeadsQ only supports 64, quantMode = 1/3/4/5 is not supported, topk only supports [1, 2048], layoutKOptional = BSND/TND is not supported, cmpRatio does not support any value in [1, 128], and only cmpRatio = 1/2/4/8/16/32/64/128 is supported.</li>
+    <li><term>Atlas A3 products</term>: numHeadsQ supports 64, 32, and 24 (when numHeadsQ is 24/32, layoutQOptional must be TND, maskMode must be 3, and cmpRatio must be 1), quantMode = 1/3/4/5 is not supported, topk only supports [1, 2048], layoutKOptional = BSND is not supported, cmpRatio does not support any value in [1, 128], and only cmpRatio = 1/2/4/8/16/32/64/128 is supported.</li>
     <!-- end id7 -->
     <!-- npu="910b" id8 -->
-    <li><term>Atlas A2 products</term>: numHeadsQ only supports 64, quantMode = 1/3/4/5 is not supported, topk only supports [1, 2048], layoutKOptional = BSND/TND is not supported, cmpRatio does not support any value in [1, 128], and only cmpRatio = 1/2/4/8/16/32/64/128 is supported.</li>
+    <li><term>Atlas A2 products</term>: numHeadsQ supports 64, 32, and 24 (when numHeadsQ is 24/32, layoutQOptional must be TND, maskMode must be 3, and cmpRatio must be 1), quantMode = 1/3/4/5 is not supported, topk only supports [1, 2048], layoutKOptional = BSND is not supported, cmpRatio does not support any value in [1, 128], and only cmpRatio = 1/2/4/8/16/32/64/128 is supported.</li>
     <!-- end id8 -->
   </ul>
 

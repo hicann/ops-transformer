@@ -69,7 +69,9 @@ English | [简体中文](./README.md)
   - `q_descale` and `k_descale` support FLOAT16 and do not support FLOAT32 or FLOAT8_e8m0.
   - `w` supports FLOAT16 and does not support FLOAT32.
   - `output_idx_offset` and `return_value` are not supported.
-  - N of `q` supports only 64, and N of `k` supports only 1.
+  - `layout_k` supports PA_BBND and TND: when N of `q` is 64, only PA_BBND is supported (`seqused_k` must be passed in); when N is 24/32, PA_BBND (`seqused_k` must be passed in) or TND (`cu_seqlens_k` must be passed in, and `seqused_k` is not supported) is supported.
+  - N of `q` supports 64, 32, and 24, and N of `k` supports only 1; when N is 24/32, `layout_q` must be TND, `mask_mode` must be 3, and `cmp_ratio` must be 1; otherwise the API reports an error.
+  - When N is 24/32, the TND Padding feature is not supported: passing in `seqused_q` when `layout_q` is TND causes the API to report an error.
   - `topk` supports [1, 2048].
 
 ## Invocation Example

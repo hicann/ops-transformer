@@ -31,6 +31,11 @@ uint32_t QuantLightningIndexerV2MetadataCpuKernel::Compute(CpuKernelContext& ctx
     if (!success) {
         return KERNEL_STATUS_PARAM_INVALID;
     }
+    if (IsFastTemplate()) {
+        SplitResult splitRes{aicCoreNum_, aivCoreNum_};
+        success = FastSplit(splitRes) && GenMetadata(splitRes);
+        return success ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;
+    }
     SplitResult splitRes{aicCoreNum_, aivCoreNum_};
     success = BalanceSchedule(splitRes) && GenMetadata(splitRes);
     return success ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;
@@ -267,6 +272,11 @@ bool QuantLightningIndexerV2MetadataCpuKernel::ParamsInit()
     } else {
         mBaseSize_ = s1BaseSize_ * groupSize_;
         s2BaseSize_ = 128U;
+    }
+    // fast 模板：每个 S1 tile 覆盖的 token 数 = QLI_FAST_S1_TILE_ROWS / gSize
+    // （gSize=24 -> 16，gSize=32 -> 12），与 fast kernel KernelConfig::S1_TILE 一致
+    if (IsFastTemplate()) {
+        fastS1Tile_ = QLI_FAST_S1_TILE_ROWS / groupSize_;
     }
     return true;
 }
@@ -1067,19 +1077,106 @@ bool QuantLightningIndexerV2MetadataCpuKernel::BalanceSchedule(SplitResult& spli
     return true;
 }
 
+bool QuantLightningIndexerV2MetadataCpuKernel::IsFastTemplate()
+{
+    // fast 模板仅存在于 arch22。AICPU 侧无 PlatformAscendC，只能用 soc_version attr
+    // 判定：ASCEND910B 分支表示"非 Ascend950/960"，覆盖现有 arch22 芯片（910B/910_93）
+    if (ProcessSocVersion() != ValidSocVersion::ASCEND910B) {
+        return false;
+    }
+    // 此处只判 gSize/sparse_mode/cmp_ratio；layout/dtype/return_value 等其余条件由
+    // 主算子 host tiling（IsFastTemplateEligible）统一校验
+    const int32_t gSize = (numHeadsK_ == 0) ? 0 : numHeadsQ_ / numHeadsK_;
+    return (maskMode_ == QLI_FAST_SPARSE_MODE_LOWER) && (cmpRatio_ == 1) &&
+           ((gSize == QLI_FAST_GSIZE_24) || (gSize == QLI_FAST_GSIZE_32));
+}
+
+uint32_t QuantLightningIndexerV2MetadataCpuKernel::FastGetS1SeqSize(uint32_t bIdx) const
+{
+    // fast 模板 layout_q 恒为 TND，序列长度取 cu_seqlens_q 差分；cu 序列不保证升序，
+    // 差分为负时按 0 处理，避免转无符号后放大（与 fast kernel 侧物理截断行为一致）
+    if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
+        const int32_t* s1Ptr = static_cast<const int32_t*>(cuSeqlensQ_->GetData());
+        const int32_t diff = s1Ptr[bIdx + 1U] - s1Ptr[bIdx];
+        return diff > 0 ? static_cast<uint32_t>(diff) : 0U;
+    }
+    return static_cast<uint32_t>(maxSeqlenQ_);
+}
+
+bool QuantLightningIndexerV2MetadataCpuKernel::FastSplit(SplitResult& splitRes)
+{
+    // 分核算法与 fast kernel 原 device 侧均分逻辑一致：
+    // 工作单元是 S1 tile（QLI_FAST_S1_TILE_ROWS / gSize 个 token），tile 总数按每个
+    // batch 的 S1 长度独立向上取整后累加（不剔除 S2 为 0 的 batch，与 device 侧的
+    // tile↔batch 映射保持一致），再均分到 min(totalTiles, aicCoreNum) 个 Mix group
+    if (aicCoreNum_ == 0U || fastS1Tile_ == 0U) {
+        return false;
+    }
+    uint64_t totalTileCount = 0;
+    for (uint32_t bIdx = 0; bIdx < static_cast<uint32_t>(batchSize_); bIdx++) {
+        const uint32_t s1Size = FastGetS1SeqSize(bIdx);
+        totalTileCount += (static_cast<uint64_t>(s1Size) + fastS1Tile_ - 1U) / fastS1Tile_;
+    }
+    if (totalTileCount == 0U) {
+        // 全空 case：仅 0 号核空转，与慢模板 isKvSeqAllZero 的处理一致
+        splitRes.usedCoreNum = 1U;
+        splitRes.bN2End[0] = 0U;
+        splitRes.gS1End[0] = 0U;
+        splitRes.s2End[0] = 0U;
+        return true;
+    }
+
+    const uint32_t activeGroups = static_cast<uint32_t>(std::min<uint64_t>(totalTileCount, aicCoreNum_));
+    const uint64_t baseTileCount = totalTileCount / activeGroups;
+    const uint64_t remainder = totalTileCount % activeGroups;
+    uint64_t cursor = 0;
+    for (uint32_t coreIdx = 0; coreIdx < activeGroups; coreIdx++) {
+        const uint64_t begin = cursor;
+        const uint64_t end = begin + baseTileCount + (coreIdx < remainder ? 1U : 0U);
+        cursor = end;
+        // gS1End 承载 tile 前缀端点（左闭右开），GenMetadata 据此写入扩展区每 group
+        // 的 [begin, end)；bN2End/s2End 仅按通用 SplitResult 结构填充，fast 路径不消费
+        splitRes.bN2End[coreIdx] = 1U;
+        // tile 端点不超过 cu_seqlens_q 累计值（int32 域），收窄安全
+        splitRes.gS1End[coreIdx] = static_cast<uint32_t>(end);
+        splitRes.s2End[coreIdx] = 1U;
+    }
+    splitRes.usedCoreNum = activeGroups;
+    return true;
+}
+
 bool QuantLightningIndexerV2MetadataCpuKernel::GenMetadata(SplitResult& splitRes)
 {
     const uint64_t metadataSize = GetQliV2MetadataSize(aicCoreNum_, aivCoreNum_);
-    if (aicCoreNum_ == 0 || aivCoreNum_ == 0 || metadata_->NumElements() < metadataSize) {
+    if ((aicCoreNum_ == 0) || (aivCoreNum_ == 0) || (metadata_->NumElements() < metadataSize)) {
         return false;
     }
     auto* metadataPtr = static_cast<uint32_t*>(metadata_->GetData());
     std::fill_n(metadataPtr, metadataSize, 0U);
     metadataPtr[QLI_V2_METADATA_AIC_NUM_INDEX] = aicCoreNum_;
     metadataPtr[QLI_V2_METADATA_AIV_NUM_INDEX] = aivCoreNum_;
+    auto* extensionMetadata = metadataPtr + GetQliV2MetadataExtensionOffset(aicCoreNum_, aivCoreNum_);
+
+    if (IsFastTemplate()) {
+        // arch22 fast 分核数据写入扩展区（参考 A5：fast 专属信息不再占用分核记录区，
+        // 记录区仅承载 slow 分核）。3 槽连续紧凑布局：每 group 依次为 enable、tile 起点、
+        // tile 终点（左闭右开）；0 号 group 从 0 开始，后续 group 取前一 group 的 END。
+        // 每 group 占 3 槽，fastGroups 已按扩展区容量截断（256 int32 最多 85 group）；
+        // 未启用 group 保持 fill_n 的 0（disable）
+        constexpr uint32_t maxFastGroups = QLI_V2_METADATA_EXTENSION_SIZE / QLI_V2_A3_FAST_GROUP_SLOT_NUM;
+        const uint32_t fastGroups = std::min<uint32_t>(splitRes.usedCoreNum, maxFastGroups);
+        for (size_t i = 0; i < fastGroups; ++i) {
+            const size_t groupBase = i * QLI_V2_A3_FAST_GROUP_SLOT_NUM;
+            extensionMetadata[groupBase + QLI_V2_A3_FAST_ENABLE_SLOT] = 1; // group enable
+            extensionMetadata[groupBase + QLI_V2_A3_FAST_START_SLOT] = i == 0 ? 0 : splitRes.gS1End[i - 1];
+            extensionMetadata[groupBase + QLI_V2_A3_FAST_END_SLOT] = splitRes.gS1End[i];
+        }
+        return true;
+    }
+
+    // LI Metadata Generate（slow：标准分核记录区）
     auto* qliMetadata = metadataPtr + QLI_V2_METADATA_HEADER_SIZE;
     auto* qldMetadata = qliMetadata + static_cast<uint64_t>(aicCoreNum_) * QLI_V2_METADATA_SIZE;
-    // LI Metadata Generate
     for (size_t i = 0; i < aicCoreNum_; ++i) {
         if (i >= splitRes.usedCoreNum) {
             qliMetadata[i * QLI_V2_METADATA_SIZE + QLI_V2_CORE_ENABLE_INDEX] = 0; // AIC disenable
@@ -1114,7 +1211,6 @@ bool QuantLightningIndexerV2MetadataCpuKernel::GenMetadata(SplitResult& splitRes
         qldMetadata[i * QLD_V2_METADATA_SIZE + QLD_V2_M_NUM_INDEX] = splitRes.fdRes.fdMNum[i];
     }
     // 先生成完整的原模板调度信息再写入准入标志，供kernel检查失败时回退使用
-    auto* extensionMetadata = metadataPtr + GetQliV2MetadataExtensionOffset(aicCoreNum_, aivCoreNum_);
     if (ProcessSocVersion() == ValidSocVersion::ASCEND950) {
         extensionMetadata[QLI_V2_A5_FAST_FLAG_OFFSET] =
             IsA5FastEligible() ? QLI_V2_A5_FAST_ENABLE : QLI_V2_A5_FAST_DISABLE;

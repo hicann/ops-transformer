@@ -40,6 +40,9 @@ inline constexpr int64_t QLI_V2_CMP_RATIO_LOWER_BOUND = 1;
 inline constexpr int64_t QLI_V2_CMP_RATIO_UPPER_BOUND = 128;
 inline constexpr int64_t QLI_V2_NUM_HEADS_Q_LOWER_BOUND = 1;
 inline constexpr int64_t QLI_V2_NUM_HEADS_Q_UPPER_BOUND = 64;
+// fast 模板专用取值
+inline constexpr int64_t QLI_V2_FAST_GSIZE_24 = 24;
+inline constexpr int64_t QLI_V2_FAST_GSIZE_32 = 32;
 inline constexpr int64_t QLI_V2_TOPK_LOWER_BOUND = 1;
 inline constexpr int64_t QLI_V2_A5_TOPK_UPPER_BOUND = 8192;
 inline constexpr int64_t QLI_V2_A3_TOPK_UPPER_BOUND = 2048;
@@ -243,8 +246,10 @@ aclnnStatus CheckSingleParamQliV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t 
                    "For Ascend 950PR/Ascend 950DT, layout_k must be TND/BSND/PA_BBND, but got %s", layoutKOptional);
     } else { // 校验 A2/A3 参数
         // num_heads_q 校验
-        CHECK_COND(numHeadsQ == QLI_V2_NUM_HEADS_Q_UPPER_BOUND, ACLNN_ERR_PARAM_INVALID,
-                   "For Atlas A2/A3, num_heads_q should be %lld, but got %lld", QLI_V2_NUM_HEADS_Q_UPPER_BOUND,
+        CHECK_COND(numHeadsQ == QLI_V2_NUM_HEADS_Q_UPPER_BOUND || numHeadsQ == QLI_V2_FAST_GSIZE_24 ||
+                       numHeadsQ == QLI_V2_FAST_GSIZE_32,
+                   ACLNN_ERR_PARAM_INVALID,
+                   "For Atlas A2/A3, num_heads_q should be 64, or 24/32 for the fast template, but got %lld",
                    numHeadsQ);
         // topk 校验
         CHECK_COND(topk >= QLI_V2_TOPK_LOWER_BOUND && topk <= QLI_V2_A3_TOPK_UPPER_BOUND, ACLNN_ERR_PARAM_INVALID,
@@ -258,8 +263,9 @@ aclnnStatus CheckSingleParamQliV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t 
                        ((cmpRatio & (cmpRatio - 1)) == 0),
                    ACLNN_ERR_PARAM_INVALID, "For Atlas A2/A3, cmp_ratio should be 1/2/4/8/16/32/64/128, but got %lld",
                    cmpRatio);
-        CHECK_COND(strcmp(layoutKOptional, "PA_BBND") == 0, ACLNN_ERR_PARAM_INVALID,
-                   "For Atlas A2/A3, layout_k must be PA_BBND, but got %s", layoutKOptional);
+        CHECK_COND(strcmp(layoutKOptional, "PA_BBND") == 0 || strcmp(layoutKOptional, "TND") == 0,
+                   ACLNN_ERR_PARAM_INVALID, "For Atlas A2/A3, layout_k must be PA_BBND or TND, but got %s",
+                   layoutKOptional);
     }
     // 校验 layout_q 为 BSND 时，max_seqlen_q 必须大于 0
     if ((strcmp(layoutQOptional, "BSND") == 0) && (maxSeqlenQ <= 0)) {

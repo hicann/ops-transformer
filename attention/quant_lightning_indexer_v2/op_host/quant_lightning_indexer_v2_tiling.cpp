@@ -18,8 +18,11 @@
 #include "base/err_msg.h"
 #include "log/log.h"
 #include "quant_lightning_indexer_v2_tiling.h"
-#include "../op_kernel/quant_lightning_indexer_v2_metadata.h"
 
+#include <algorithm>
+#include <limits>
+
+#include "../op_kernel/quant_lightning_indexer_v2_metadata.h"
 #include "../op_kernel/quant_lightning_indexer_v2_template_tiling_key.h"
 #include "quant_lightning_indexer_v2_tiling_info_parser.h"
 
@@ -361,10 +364,11 @@ ge::graphStatus QLIV2InfoParser::CheckAttrParaInfo()
     std::string layout_query(qliV2Params_.layOutQuery);
 
     if (npuArch_ == NpuArch::DAV_2201) {
-        OP_CHECK_IF((std::string(qliV2Params_.layOutKey) != "PA_BBND"),
-                    OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(opName_, "layout_k", layout_key.c_str(),
-                                                           "This SoC requires PA_BBND."),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            (std::string(qliV2Params_.layOutKey) != "PA_BBND") && (std::string(qliV2Params_.layOutKey) != "TND"),
+            OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(opName_, "layout_k", layout_key.c_str(),
+                                                   "This SoC requires PA_BBND or TND."),
+            return ge::GRAPH_FAILED);
     } else if (npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) {
         OP_CHECK_IF(
             ((std::string(qliV2Params_.layOutKey) != "PA_BBND") && (std::string(qliV2Params_.layOutKey) != "BSND") &&
@@ -946,11 +950,11 @@ ge::graphStatus QLIV2InfoParser::GetGSize()
                         "The value of (the head num of q divided by the head num of k) must <= 64"),
                     return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(gSize_ != G_SIZE_LIMIT,
-                    OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
-                        opName_, "q,k", (std::to_string(n1Size_) + "," + std::to_string(n2Size_)).c_str(),
-                        "query_head_num divided by key_head_num must equal 64."),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            gSize_ != G_SIZE_LIMIT && gSize_ != GSIZE_FAST_24 && gSize_ != GSIZE_FAST_32,
+            OP_LOGE(opName_, "N1 is %u, N2 is %u, N1 divided by N2 must equal 64, or be 24/32 for the fast template.",
+                    n1Size_, n2Size_),
+            return ge::GRAPH_FAILED);
     }
 
     return ge::GRAPH_SUCCESS;
@@ -1036,6 +1040,8 @@ ge::graphStatus QLIV2InfoParser::GetS1Size()
 {
     if (qLayout_ == DataLayout::BSND) {
         s1Size_ = qliV2Params_.query.shape->GetStorageShape().GetDim(1);
+    } else if (qLayout_ == DataLayout::TND) {
+        t1Size_ = static_cast<uint64_t>(qliV2Params_.query.shape->GetStorageShape().GetDim(DIM_IDX_ZERO));
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -1538,14 +1544,14 @@ ge::graphStatus QLIV2InfoParser::CheckKeyContiguous() const
 {
     bool keyNonContiguous = false;
     bool scaleNonContiguous = false;
-    // A5 PA_BBND: 0轴允许非连续，从1轴开始检查；非PA_BBND或A3: 从0轴开始检查
+    // A5/A3 PA_BBND: 0轴允许非连续，从1轴开始检查；其他: 从0轴开始检查
     // PA_BBND: axis 0 allows non-contiguous, check starts from axis 1
     // Non-PA_BBND: check starts from axis 0
-    size_t checkStartIdx =
-        ((npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) &&
-         kLayout_ == DataLayout::PA_BBND) ?
-            1 :
-            0;
+    size_t checkStartIdx = ((npuArch_ == NpuArch::DAV_3510 || npuArch_ == NpuArch::DAV_9201 ||
+                             npuArch_ == NpuArch::DAV_9202 || npuArch_ == NpuArch::DAV_2201) &&
+                            kLayout_ == DataLayout::PA_BBND) ?
+                               1 :
+                               0;
     if (!keyStridesVec_.empty() && qliV2Params_.key.shape != nullptr) {
         auto& shape = qliV2Params_.key.shape->GetStorageShape();
         std::vector<uint32_t> expectedStrides;
@@ -1658,6 +1664,7 @@ void QLIV2InfoParser::GenerateInfo(QLIV2TilingInfo& QLIV2Info)
     QLIV2Info.n1Size = n1Size_;
     QLIV2Info.n2Size = n2Size_;
     QLIV2Info.s1Size = s1Size_;
+    QLIV2Info.t1Size = t1Size_;
     QLIV2Info.s2Size = s2Size_;
     QLIV2Info.gSize = gSize_;
 
@@ -1732,6 +1739,10 @@ ge::graphStatus QLIV2InfoParser::ParseAndCheck(QLIV2TilingInfo& QLIV2Info)
         return ge::GRAPH_FAILED;
     }
 
+    if (ge::GRAPH_SUCCESS != CheckTemplateCombinationSupport()) {
+        return ge::GRAPH_FAILED;
+    }
+
     GenerateInfo(QLIV2Info);
 
     return ge::GRAPH_SUCCESS;
@@ -1744,13 +1755,105 @@ static ge::graphStatus TilingPrepareForQuantLightningIndexerV2(gert::TilingParse
 }
 
 // --------------------------QuantLightningIndexerV2Tiling类成员函数定义-----------------------
+namespace {
+// ------------------fast 模板判定（仅 host tiling 使用）------------------
+constexpr uint64_t FAST_S1_TILE_ROWS = 384ULL;
+
+bool IsFastTemplateEligible(uint32_t gSize, DataLayout layoutQ, DataLayout layoutK, int32_t sparseMode,
+                            uint32_t cmpRatio, bool returnValue, bool isArch22, bool isInt8)
+{
+    const bool supportFastKeyLayout = (layoutK == DataLayout::TND) || (layoutK == DataLayout::PA_BBND);
+    return isArch22 && isInt8 && ((gSize == GSIZE_FAST_24) || (gSize == GSIZE_FAST_32)) &&
+           (layoutQ == DataLayout::TND) && supportFastKeyLayout && (sparseMode == SPARSE_MODE_LOWER) &&
+           (cmpRatio == 1U) && !returnValue;
+}
+
+// 每个 S1 tile 覆盖的 token 数：384 / gSize（gSize=24 -> 16，gSize=32 -> 12）
+uint64_t FastS1Tile(uint32_t gSize)
+{
+    return gSize == 0U ? 0ULL : FAST_S1_TILE_ROWS / static_cast<uint64_t>(gSize);
+}
+
+// fast 模板 tile 总数的安全上界，仅用于 host 侧 workspace 预留（TND 每 batch 独立向上取整）
+uint64_t FastTileCountUpper(uint64_t t1Size, uint32_t bSize, uint32_t gSize)
+{
+    const uint64_t tile = FastS1Tile(gSize);
+    if ((tile == 0ULL) || (bSize == 0U)) {
+        return 0ULL;
+    }
+    return ((t1Size + tile - 1U) / tile) + static_cast<uint64_t>(bSize) - 1ULL;
+}
+} // namespace
+
+// arch22 上 gSize 决定模板归属：24/32 只能走 fast，64 只能走 slow；
+// 若 arch22 芯片集合扩展（见 DoTiling 中的 isArch22 判定），此处需同步
+ge::graphStatus QLIV2InfoParser::CheckTemplateCombinationSupport()
+{
+    if (npuArch_ != NpuArch::DAV_2201) {
+        return ge::GRAPH_SUCCESS;
+    }
+    if ((gSize_ == GSIZE_FAST_24) || (gSize_ == GSIZE_FAST_32)) {
+        OP_CHECK_IF(!IsFastTemplateEligible(static_cast<uint32_t>(gSize_), qLayout_, kLayout_, *qliV2Params_.sparseMode,
+                                            static_cast<uint32_t>(*qliV2Params_.cmpRatio),
+                                            (*qliV2Params_.returnValue != 0), true, inputQType_ == ge::DT_INT8),
+                    OP_LOGE(opName_,
+                            "gSize %ld is only supported by the fast template, which requires query dtype int8, "
+                            "layout_q TND, layout_k TND or PA_BBND, sparse_mode 3, cmp_ratio 1, return_value false; "
+                            "now layout_q=%d, layout_k=%d, sparse_mode=%d, cmp_ratio=%ld, return_value=%d.",
+                            gSize_, static_cast<int32_t>(qLayout_), static_cast<int32_t>(kLayout_),
+                            *qliV2Params_.sparseMode, *qliV2Params_.cmpRatio, *qliV2Params_.returnValue),
+                    return ge::GRAPH_FAILED);
+        // fast 模板不支持 TND Padding，seqused_q 传入不会被消费，直接拦截
+        OP_CHECK_IF(qliV2Params_.sequsedQ.tensor != nullptr,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        opName_, "seqused_q",
+                        "When gSize is 24/32 (fast template), TND Padding is not supported and seqused_q "
+                        "must not be provided"),
+                    return ge::GRAPH_FAILED);
+    } else if (gSize_ == static_cast<int64_t>(G_SIZE_LIMIT)) {
+        OP_CHECK_IF(kLayout_ != DataLayout::PA_BBND,
+                    OP_LOGE(opName_, "layout_k must be PA_BBND when gSize is 64 on arch22, but now layout_k is %d.",
+                            static_cast<int32_t>(kLayout_)),
+                    return ge::GRAPH_FAILED);
+    }
+    // 其余 gSize 已由 GetGSize 拦截，不会到达这里
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingInfo)
 {
     // -------------set blockdim-----------------
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo->platformInfo);
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
     uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
-    uint32_t blockDim = ascendcPlatform.CalcTschBlockDim(aivNum, aicNum, aivNum);
+
+    // ----------------fast template judge----------------
+    // 当前 arch22 对应 DAV_2201（910B/910_93）；若新增同架构芯片，在此处扩展
+    const bool isArch22 = ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_2201;
+    const bool fastTemplate = IsFastTemplateEligible(
+        tilingInfo->gSize, tilingInfo->inputQLayout, tilingInfo->inputKLayout, tilingInfo->sparseMode,
+        tilingInfo->cmpRatio, tilingInfo->returnValue, isArch22, tilingInfo->inputQType == ge::DT_INT8);
+
+    // 一个 Mix group 含 1 个 AIC 与 2 个 AIV；与 kernel 侧 CrossCoreMessageId::AIV_COUNT_PER_GROUP 一致
+    constexpr uint32_t FAST_AIV_PER_GROUP = 2U;
+
+    uint32_t blockDim = 0;
+    uint32_t fastTemplateAicNum = 0;
+    uint64_t fastS1Tile = 0;
+    uint64_t fastTileCountUpper = 0;
+    uint64_t fastWorkspaceGroupStride = 0;
+    if (fastTemplate) {
+        fastS1Tile = FastS1Tile(tilingInfo->gSize);
+        fastTileCountUpper = FastTileCountUpper(tilingInfo->t1Size, tilingInfo->bSize, tilingInfo->gSize);
+        const uint64_t workGroupCount = fastTileCountUpper * tilingInfo->n2Size;
+        fastTemplateAicNum = static_cast<uint32_t>(std::min<uint64_t>(aicNum, workGroupCount));
+        OP_CHECK_IF(fastTemplateAicNum == 0U, OP_LOGE(tilingInfo->opName, "Fast template has no executable S1 tile"),
+                    return ge::GRAPH_FAILED);
+        blockDim = ascendcPlatform.CalcTschBlockDim(fastTemplateAicNum * FAST_AIV_PER_GROUP, fastTemplateAicNum,
+                                                    fastTemplateAicNum * FAST_AIV_PER_GROUP);
+    } else {
+        blockDim = ascendcPlatform.CalcTschBlockDim(aivNum, aicNum, aivNum);
+    }
     context_->SetBlockDim(blockDim);
 
     // -------------set workspacesize-----------------
@@ -1793,6 +1896,47 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingI
             V1_DECODE_DATA_NUM * S1_BASE_SIZE * V1_RES_ELEM_TYPE * TOPK_MAX_SIZE1 * V1_RES_ELEM_SIZE * aicNum;
         // 临时存储Decode中间参数信息大小: 2(头/尾)*8(s1Base)*16(paramNum)*sizeof(int64_t)*24=48k
         workspaceSize += V1_DECODE_DATA_NUM * S1_BASE_SIZE * V1_DECODE_PARAM_NUM * V1_DECODE_PARAM_ELEM_SIZE * aicNum;
+    } else if (fastTemplate) {
+        // 一个 Mix group 含一个 AIC 和两个 AIV。Score ring 和两个 AIV 的 TopK 状态
+        // 在整个 group 生命周期内常驻，Weight 放在其后，不能相互复用
+        constexpr uint64_t SCORE_RING_DEPTH = 56;
+        constexpr uint64_t SCORE_ROWS = 512;
+        constexpr uint64_t SCORE_STORAGE_COLS = 16;
+        constexpr uint64_t TOPK_STATE_ELEM_NUM = 2; // value + index
+        constexpr uint64_t WEIGHT_ELEM_BYTES = sizeof(uint16_t);
+        constexpr uint64_t WORKSPACE_RESERVE = 64ULL * 1024ULL; // 组内常驻状态与 weight 区之外的固定预留
+        constexpr uint64_t GROUP_ALIGN = 512ULL * 1024ULL;      // 相邻 group workspace 起始地址的对齐粒度
+
+        const uint64_t sequencePerAiv = fastS1Tile / FAST_AIV_PER_GROUP;
+        const uint64_t scoreRingBytes = SCORE_RING_DEPTH * SCORE_ROWS * SCORE_STORAGE_COLS * sizeof(float);
+        const uint64_t topkStateBytes =
+            FAST_AIV_PER_GROUP * sequencePerAiv * TOPK_MAX_SIZE * TOPK_STATE_ELEM_NUM * sizeof(float);
+        const uint64_t residentStateBytes = scoreRingBytes + topkStateBytes;
+
+        // TND 的每个 batch 需要分别向上取整，maxTilePerGroup 取安全上界
+        const uint64_t maxTilePerGroup = (fastTileCountUpper + fastTemplateAicNum - 1ULL) / fastTemplateAicNum;
+        // 与 kernel 侧 QLIV2Fast 的 WEIGHT_ROW_STRIDE_N24 / WEIGHT_ROW_STRIDE(N32) 同步维护：
+        // gSize=24 经 Gather 补齐后行 stride 为 40 个 half，gSize=32 行 stride 即 32
+        constexpr uint64_t FAST_WEIGHT_ROW_STRIDE_G24 = 40ULL;
+        constexpr uint64_t FAST_WEIGHT_ROW_STRIDE_G32 = 32ULL;
+        const uint64_t weightRowStride =
+            (tilingInfo->gSize == GSIZE_FAST_24) ? FAST_WEIGHT_ROW_STRIDE_G24 : FAST_WEIGHT_ROW_STRIDE_G32;
+        const uint64_t weightTileBytes = fastS1Tile * weightRowStride * WEIGHT_ELEM_BYTES;
+        const uint64_t weightWorkspaceBytes = maxTilePerGroup * weightTileBytes;
+
+        OP_CHECK_IF(
+            (residentStateBytes > std::numeric_limits<uint64_t>::max() - weightWorkspaceBytes) ||
+                (residentStateBytes + weightWorkspaceBytes > std::numeric_limits<uint64_t>::max() - WORKSPACE_RESERVE),
+            OP_LOGE(tilingInfo->opName, "Fast template workspace size overflows uint64"), return ge::GRAPH_FAILED);
+        const uint64_t groupBytes = residentStateBytes + weightWorkspaceBytes + WORKSPACE_RESERVE;
+        OP_CHECK_IF(groupBytes > std::numeric_limits<uint64_t>::max() - (GROUP_ALIGN - 1ULL),
+                    OP_LOGE(tilingInfo->opName, "Fast template workspace alignment overflows uint64"),
+                    return ge::GRAPH_FAILED);
+        fastWorkspaceGroupStride = ((groupBytes + GROUP_ALIGN - 1ULL) / GROUP_ALIGN) * GROUP_ALIGN;
+        OP_CHECK_IF(fastWorkspaceGroupStride > std::numeric_limits<uint64_t>::max() / fastTemplateAicNum,
+                    OP_LOGE(tilingInfo->opName, "Fast template total workspace size overflows uint64"),
+                    return ge::GRAPH_FAILED);
+        workspaceSize += fastWorkspaceGroupStride * fastTemplateAicNum;
     } else {
         uint32_t mm1ResSize = M_BASE_SIZE * S2_BASE_SIZE;
         workspaceSize += mm1ResSize * MM1_RES_ELEM_SIZE * DOUBLE_BUFFER * aicNum;
@@ -1816,6 +1960,7 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingI
 
     // -------------set tilingdata-----------------
     tilingData_.set_bSize(tilingInfo->bSize);
+    tilingData_.set_n2Size(tilingInfo->n2Size);
     tilingData_.set_s2Size(tilingInfo->s2Size);
     tilingData_.set_s1Size(tilingInfo->s1Size);
     tilingData_.set_sparseCount(tilingInfo->sparseCount);
@@ -1829,7 +1974,9 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingI
     tilingData_.set_keyStride0(tilingInfo->keyStride0);
     tilingData_.set_keyDequantScaleStride0(tilingInfo->keyDequantScaleStride0);
     tilingData_.set_quantMode(*tilingInfo->opParamInfo.quantMode);
-    tilingData_.set_usedCoreNum(blockDim);
+    tilingData_.set_usedCoreNum(fastTemplate ? fastTemplateAicNum : blockDim);
+    tilingData_.set_fastUsedCoreNum(fastTemplate ? fastTemplateAicNum : 0U);
+    tilingData_.set_fastWorkspaceGroupStride(fastTemplate ? fastWorkspaceGroupStride : 0ULL);
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
 
@@ -1844,7 +1991,10 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingI
     uint64_t tilingKey =
         GET_TPL_TILING_KEY(inputQType, inputKType, outputType, pageAttentionFlag, inputQLayout, inputKLayout);
     context_->SetTilingKey(tilingKey);
-    context_->SetScheduleMode(1);
+    // fast 模板不设置 ScheduleMode，慢路径保持 mode 1
+    if (!fastTemplate) {
+        context_->SetScheduleMode(1);
+    }
 
     return ge::GRAPH_SUCCESS;
 }

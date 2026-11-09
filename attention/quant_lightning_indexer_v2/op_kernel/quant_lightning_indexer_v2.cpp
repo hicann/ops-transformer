@@ -22,6 +22,7 @@
 #endif
 #else
 #include "arch22/quant_lightning_indexer_v2_kernel_arch22.h"
+#include "arch22/quant_lightning_indexer_v2_fast_kernel_arch22.h"
 #endif
 #include "quant_lightning_indexer_v2_template_tiling_key.h"
 using namespace QLIV2Kernel;
@@ -34,6 +35,15 @@ using namespace QLIV2Kernel;
         op.Process(); \
     } while (0)
 
+// fast 模板不使用 TPipe
+#define INVOKE_LI_FAST_OP_IMPL(templateClass, ...) \
+    do { \
+        templateClass<QLIV2Type<__VA_ARGS__>> op; \
+        op.Init(query, key, weights, queryScale, keyScale, cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, \
+                blockTable, outputIdxOffset, metadata, sparseIndices, sparseValues, user, tiling_data, nullptr); \
+        op.Process(); \
+    } while (0)
+
 template <int DT_Q, int DT_K, int DT_OUT, int PAGE_ATTENTION, int Q_LAYOUT_T, int K_LAYOUT_T>
 __global__ __aicore__ void quant_lightning_indexer_v2(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* weights, __gm__ uint8_t* queryScale,
@@ -42,7 +52,6 @@ __global__ __aicore__ void quant_lightning_indexer_v2(
     __gm__ uint8_t* metadata, __gm__ uint8_t* sparseIndices, __gm__ uint8_t* sparseValues, __gm__ uint8_t* workspace,
     __gm__ uint8_t* tiling)
 {
-    TPipe tPipe;
     __gm__ uint8_t* user = GetUserWorkspace(workspace);
 #if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
@@ -53,6 +62,8 @@ __global__ __aicore__ void quant_lightning_indexer_v2(
     const QLIV2TilingData* __restrict tiling_data = &tiling_data_in;
 
 #if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)) || (__CCE_AICORE__ == 310)
+    // 声明条件与本分支条件保持一致，避免在 9201/9202 下 __CCE_AICORE__ != 310 的编译组合漏声明
+    TPipe tPipe;
     constexpr uint32_t QUANT_MODE_FP8 = 1;
     constexpr uint32_t QUANT_MODE_INT8 = 2;
     constexpr uint32_t QUANT_MODE_MXFP8 = 3;
@@ -91,6 +102,13 @@ __global__ __aicore__ void quant_lightning_indexer_v2(
 #endif
 
 #else
+    // fastUsedCoreNum != 0 表示 tiling 侧已判定走 fast 模板
+    if (tiling_data->fastUsedCoreNum != 0U) {
+        INVOKE_LI_FAST_OP_IMPL(QLIV2FastKernel, int8_t, int8_t, float, uint16_t, int32_t, PAGE_ATTENTION,
+                               LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T));
+        return;
+    }
+    TPipe tPipe;
     INVOKE_LI_NO_KFC_OP_IMPL(QLIV2Preload, int8_t, int8_t, float, uint16_t, int32_t, PAGE_ATTENTION,
                              LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T));
 #endif

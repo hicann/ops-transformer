@@ -67,7 +67,9 @@
   - `q_descale`和`k_descale`支持FLOAT16，不支持FLOAT32和FLOAT8_e8m0。
   - `w`支持FLOAT16，不支持FLOAT32。
   - 不支持`output_idx_offset`和`return_value`。
-  - `q`的N仅支持64，`k`的N仅支持1。
+  - `layout_k`支持PA_BBND、TND：`q`的N为64时仅支持PA_BBND（必须传入`seqused_k`）；N为24/32时支持PA_BBND（必须传入`seqused_k`）或TND（必须传入`cu_seqlens_k`，不支持传入`seqused_k`）。
+  - `q`的N支持64、32、24，`k`的N仅支持1；N为24/32时要求`layout_q`为TND、`mask_mode`为3、`cmp_ratio`为1，不满足时接口报错。
+  - N为24/32暂不支持TND Padding功能：`layout_q`为TND时不支持传入`seqused_q`，传入时接口报错。
   - `topk`支持[1, 2048]。
 
 ## 调用示例

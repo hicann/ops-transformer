@@ -35,6 +35,12 @@ constexpr uint32_t TOPK_6K = 6144;
 constexpr uint32_t QUANT_MODE_FP8 = 1;
 constexpr uint32_t QUANT_MODE_MXFP8 = 3;
 
+// fast 模板常量，与主算子 host tiling（FAST_S1_TILE_ROWS 等）和 fast kernel 侧保持一致
+constexpr int32_t QLI_FAST_GSIZE_24 = 24;
+constexpr int32_t QLI_FAST_GSIZE_32 = 32;
+constexpr uint32_t QLI_FAST_S1_TILE_ROWS = 384U; // fast 每个 S1 tile 覆盖的 Q 行数（token×g）
+constexpr int32_t QLI_FAST_SPARSE_MODE_LOWER = 3;
+
 enum BlockType : uint32_t {
     NORMAL_BLOCK = 0,
     TAIL_BLOCK,
@@ -238,6 +244,12 @@ private:
     bool BalanceSchedule(SplitResult& splitRes);
     bool GenMetadata(SplitResult& splitRes);
 
+    // fast 模板（arch22, gSize 24/32, TND, sparse_mode 3, cmp_ratio 1）专用：
+    // 分核算法与 fast kernel 原 device 侧均分逻辑一致，只是计算位置移到本 AICPU
+    bool IsFastTemplate();
+    bool FastSplit(SplitResult& splitRes);
+    uint32_t FastGetS1SeqSize(uint32_t bIdx) const;
+
     // util
     uint32_t GetS1SeqSize(uint32_t bIdx);
     uint32_t GetS2SeqSize(uint32_t bIdx);
@@ -318,6 +330,9 @@ private:
     int32_t maskMode_ = 0;
     int32_t cmpRatio_ = 1;
     uint32_t attentionMode_ = 0;
+
+    // fast 模板成员
+    uint32_t fastS1Tile_ = 0; // fast 每个 S1 tile 覆盖的 token 数（384/gSize）
 
     // SplitParams
     int64_t preToken_ = INT64_MAX;

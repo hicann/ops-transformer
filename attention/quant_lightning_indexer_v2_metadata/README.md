@@ -164,8 +164,8 @@
   </table>
 
   <ul>
-    <li><term>Atlas A3系列产品</term> ：num_heads_q仅支持64，不支持quant_mode = 1/3/4/5，topk仅支持[1, 2048]，不支持layout_k = BSND/TND，不支持cmp_ratio在[1，128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。</li>
-    <li><term>Atlas A2系列产品</term> ：num_heads_q仅支持64，不支持quant_mode = 1/3/4/5，topk仅支持[1, 2048]，不支持layout_k = BSND/TND，不支持cmp_ratio在[1，128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。</li>
+    <li><term>Atlas A3系列产品</term> ：num_heads_q支持64、32、24（为24/32时要求layout_q=TND、mask_mode=3、cmp_ratio=1），不支持quant_mode = 1/3/4/5，topk仅支持[1, 2048]，不支持layout_k = BSND，不支持cmp_ratio在[1，128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。</li>
+    <li><term>Atlas A2系列产品</term> ：num_heads_q支持64、32、24（为24/32时要求layout_q=TND、mask_mode=3、cmp_ratio=1），不支持quant_mode = 1/3/4/5，topk仅支持[1, 2048]，不支持layout_k = BSND，不支持cmp_ratio在[1，128]任意取值，仅支持cmp_ratio = 1/2/4/8/16/32/64/128。</li>
   </ul>
 
 ## 约束说明

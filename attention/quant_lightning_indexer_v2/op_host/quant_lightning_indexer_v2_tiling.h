@@ -86,11 +86,12 @@ constexpr uint32_t HEAD_DIM_LIMIT = 128;
 constexpr uint32_t SPARSE_LIMIT = 2048;
 constexpr uint32_t SPARSE_LIMIT_8K = 8192;
 constexpr uint32_t G_SIZE_LIMIT = 64;
+constexpr uint32_t GSIZE_FAST_24 = 24;
+constexpr uint32_t GSIZE_FAST_32 = 32;
 constexpr uint32_t G_SIZE_LIMIT_32_950 = 32;
 constexpr uint32_t BLOCK_SIZE_LIMIT = 1024;
 constexpr uint32_t BLOCK_SIZE_FACTOR = 16;
 constexpr uint32_t SPARSE_MODE_LOWER = 3;
-
 using lightning_indexer_v2_checker::QUANT_MODE_FP8;
 using lightning_indexer_v2_checker::QUANT_MODE_INT8;
 using lightning_indexer_v2_checker::QUANT_MODE_MXFP8;
@@ -122,6 +123,9 @@ TILING_DATA_FIELD_DEF(int32_t, maxSeqlenQ)
 TILING_DATA_FIELD_DEF(uint32_t, keyStride0)
 TILING_DATA_FIELD_DEF(uint32_t, keyDequantScaleStride0)
 TILING_DATA_FIELD_DEF(uint32_t, quantMode)
+// fast 模板专用字段，追加在末尾以保持既有字段的二进制布局不变
+TILING_DATA_FIELD_DEF(uint32_t, fastUsedCoreNum)
+TILING_DATA_FIELD_DEF(uint64_t, fastWorkspaceGroupStride)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(QuantLightningIndexerV2, QLIV2TilingData)
 
@@ -173,6 +177,9 @@ public:
     int64_t s2Size = 0;
     uint32_t qkHeadDim = 0;
     uint32_t gSize = 0;
+    // TND 下 query shape 为 [Total, N, D]，t1Size 记录物理 T1；
+    // slow 路径的 s1Size 在 TND 下保持 0，fast 的 workspace 预留上界计算单独使用本字段。
+    uint64_t t1Size = 0;
     // PageAttention
     bool pageAttentionFlag = false;
     int32_t blockSize = 0;
@@ -238,6 +245,7 @@ public:
     ge::graphStatus GetAttenMaskInfo();
     ge::graphStatus GetActualSeqInfo();
     ge::graphStatus CheckKeyContiguous() const;
+    ge::graphStatus CheckTemplateCombinationSupport();
     void GenerateInfo(QLIV2TilingInfo& QLIV2Info);
     ge::graphStatus ParseAndCheck(QLIV2TilingInfo& QLIV2Info);
 
@@ -253,6 +261,7 @@ public:
     int64_t n2Size_ = 0;
     int64_t gSize_ = 0;
     int64_t s1Size_ = 0;
+    uint64_t t1Size_ = 0;
     int64_t s2Size_ = 0;
     int64_t headDim_ = 0;
     // Layout
