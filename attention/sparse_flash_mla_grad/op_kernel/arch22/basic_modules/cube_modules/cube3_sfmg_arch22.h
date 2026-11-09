@@ -31,6 +31,8 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube3Process(
     mmParam.singleK = selectedBlockSize * blockOffset;
     mmParam.isRightTranspose = true;
     mmParam.dstStride = dimDTotal;
+    const int64_t curS1gAlign = AlignTo<int64_t>(runInfo.curS1g, SIZE_16);
+    const int64_t actualSel = selectedCntOffset * selectedBlockSize;
     int64_t dsL1Offset = 0;
     int64_t dsL1CachedSize = 0;
 
@@ -47,27 +49,28 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube3Process(
         dsL1CachedSize = 0;
         // selectedBlockSize较小时，nIdx需要+2或者更多
         for (int32_t nIdx = blkCntOffset; nIdx < blkCntOffset + selectedCntOffset; nIdx += blockOffset) {
-            int64_t l1Offset = static_cast<int64_t>(nIdx - blkCntOffset) * selectedBlockSize *
-                               AlignTo<int64_t>(mmParam.singleM, SIZE_16);
+            int64_t localM = static_cast<int64_t>(nIdx - blkCntOffset) * selectedBlockSize;
+            int64_t l1Offset = localM * curS1gAlign;
             bool isFirstLoop = (nIdx == blkCntOffset);
             bool isLastLoop = (nIdx + blockOffset >= blkCntOffset + selectedCntOffset);
 
-            uint32_t totalSel = selectedCntOffset * selectedBlockSize;
+            int64_t totalSel = actualSel;
             if (isLastBasicBlock && isLastLoop) {
                 totalSel = totalSel - selectedBlockSize + lastBlockSize;
             }
-            mmParam.singleK =
-                min(selectedBlockSize * blockOffset, totalSel - (nIdx - blkCntOffset) * selectedBlockSize);
+            mmParam.singleK = min(selectedBlockSize * blockOffset, totalSel - localM);
 
             if (dSL1TotalSize <= 128 * 512) {
                 current_l1_ds_tensor = l1_ds_tensor[l1Offset];
             } else {
                 if (l1Offset >= dsL1CachedSize) {
+                    int64_t remainCol = actualSel - localM;
+                    uint32_t srcD = min(static_cast<uint32_t>(512), static_cast<uint32_t>(remainCol));
                     SetFlag<HardEvent::MTE1_MTE2>(MM_L1_DS_EVENT);
                     WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_DS_EVENT);
-                    CopyGmToL1(l1_ds_tensor, dsWorkspaceGm[runInfo.mm345GmOffset + (nIdx - blkCntOffset)],
-                               mmParam.singleM, 512, singleN);
-                    dsL1CachedSize += 512 * AlignTo<int64_t>(mmParam.singleM, SIZE_16);
+                    CopyGDimToL1(l1_ds_tensor, dsWorkspaceGm[runInfo.mm345GmOffset + localM], mmParam.singleM, srcD,
+                                 singleN);
+                    dsL1CachedSize += static_cast<int64_t>(srcD) * curS1gAlign;
                     dsL1Offset = l1Offset;
                 }
                 current_l1_ds_tensor = l1_ds_tensor[l1Offset - dsL1Offset];
@@ -77,7 +80,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube3Process(
                 keyGmOffset + (nIdx - blkCntOffset) * selectedBlockSize * dimDTotal + dIdx * perLoopDSize;
 
             WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
-            if constexpr (MODE == SMLAG_SCFA_MODE) {
+            if constexpr (MODE == SMLAG_SCFA_MODE || MODE == SMLAG_ORI_SPARSE_MODE) {
                 if (!runInfo.isOri) {
                     CopyGmToL1(l1_key_tensor, selectedKWorkspaceGm[currentKeyOffset], mmParam.singleK, mmParam.singleN,
                                dimDTotal);

@@ -34,6 +34,7 @@ public:
     static constexpr bool IS_BSND = SMLAGT::is_bsnd;
     static constexpr uint32_t MODE = SMLAGT::mode;
     static constexpr bool IS_DETER = SMLAGT::is_deter;
+    static constexpr bool HAS_SEQUSED = SMLAGT::has_seqused;
 
     __aicore__ inline VecOp(){};
     __aicore__ inline void Init(GM_ADDR ori_kv, GM_ADDR cmp_kv, GM_ADDR attention_out, GM_ADDR attention_out_grad,
@@ -43,8 +44,12 @@ public:
                                 const TILING_CLASS* __restrict ordTilingData, TPipe* pipe);
     __aicore__ inline void Process(const RunInfo& runInfo);
     __aicore__ inline void GatherKV(const int64_t n2Index, uint64_t currentS1Offset, const RunInfo& runInfo);
+    __aicore__ inline void GatherOriKV(const RunInfo& runInfo);
     __aicore__ inline void ScatterAdd(const RunInfo& runInfo);
+    __aicore__ inline void ScatterAddOri(const RunInfo& runInfo);
     __aicore__ inline void ScatterAddDeter(int64_t s1Round, int64_t scatterDbIdx);
+    __aicore__ inline void SetOriSparseDeterCtx(GM_ADDR oriTopkLength, GM_ADDR sequsedQ, GM_ADDR sequsedOriKv);
+    __aicore__ inline void ScatterAddOriDeter(int64_t s1Round, int64_t scatterDbIdx);
     __aicore__ inline void PublishDeterAccMeta(bool valid, const RunInfo& runInfo);
     __aicore__ inline void AccumulateKvDeter();
     __aicore__ inline void CopyOutDsinks();
@@ -57,6 +62,9 @@ protected:
     __aicore__ inline bool ResolveCoreS1ForScatter(int64_t coreIdx, int64_t s1Round, int64_t n2Idx,
                                                    int64_t& indicesGmOffset, int64_t& cmpKeyGmOffset,
                                                    int64_t& actualSelCnt);
+    __aicore__ inline bool ResolveOriSparseForScatter(int64_t coreIdx, int64_t s1Round, int64_t n2Idx,
+                                                      int64_t& indicesGmOffset, int64_t& oriKeyGmOffset,
+                                                      int64_t& actualSelCnt, int64_t& usedS2);
     __aicore__ inline void InitUB(TPipe* pipe);
     __aicore__ inline void AtomicClean();
     __aicore__ inline void DumpGmZero(GlobalTensor<float>& gm, int64_t num, int64_t offset = 0);
@@ -120,7 +128,6 @@ protected:
     GM_ADDR cuSeqlensOriKv{nullptr};
     GM_ADDR cuSeqlensCmpKv{nullptr};
     GM_ADDR cmpResidualKv{nullptr};
-
     bool scatterSeqInited{false};
     int64_t scatterSeqBIdx{0};
     int64_t scatterSeqPrevT1{0};
@@ -129,6 +136,17 @@ protected:
     int64_t scatterSeqCurT3{0};
     int64_t scatterSeqResidualBIdx{-1};
     int64_t scatterSeqResidual{0};
+    GM_ADDR oriTopkLength_{nullptr};
+    GM_ADDR sequsedQ_{nullptr};
+    GM_ADDR sequsedOriKv_{nullptr};
+    bool hasUsedSeqQ{false};
+    bool hasUsedSeqOriKV{false};
+    bool oriScatterSeqInited{false};
+    int64_t oriScatterSeqBIdx{0};
+    int64_t oriScatterSeqPrevT1{0};
+    int64_t oriScatterSeqCurT1{0};
+    int64_t oriScatterSeqPrevT2{0};
+    int64_t oriScatterSeqCurT2{0};
 
     TBuf<> vecQue;
     LocalTensor<uint8_t> helpTensor;
@@ -520,7 +538,7 @@ template <typename SMLAGT>
 __aicore__ inline void VecOp<SMLAGT>::AtomicClean()
 {
     DumpGmZero(dqWorkspaceGm, dqWorkspaceLen / sizeof(float));
-    if constexpr (MODE != SMLAG_SCFA_MODE) {
+    if constexpr (MODE != SMLAG_SCFA_MODE && MODE != SMLAG_ORI_SPARSE_MODE) {
         DumpGmZero(dkWorkspaceGm, (dkWorkspaceLen * 2) / sizeof(float));
     } else {
         DumpGmZero(dkWorkspaceGm, dkWorkspaceLen / sizeof(float));
@@ -532,10 +550,15 @@ __aicore__ inline void VecOp<SMLAGT>::AtomicClean()
         DumpGmZero(additionalWorkspaceGm, additionalWorkspaceLen / sizeof(float));
         DumpGmZero(cmpSoftmaxL1Gm, dimTq * dimN2 * selectedBlockCount);
     }
+    if constexpr (MODE == SMLAG_ORI_SPARSE_MODE) {
+        DumpGmZero(additionalWorkspaceGm, additionalWorkspaceLen / sizeof(float));
+    }
     if constexpr (IS_DETER) {
-        int64_t metaFloatOff = deterKvDataLen / static_cast<int64_t>(sizeof(float));
-        int64_t metaFloatNum = static_cast<int64_t>(DETER_ACC_META_BYTES) / static_cast<int64_t>(sizeof(float));
-        DumpGmZero(deterKvWorkspaceGm, metaFloatNum, metaFloatOff);
+        if constexpr (MODE != SMLAG_ORI_SPARSE_MODE) {
+            int64_t metaFloatOff = deterKvDataLen / static_cast<int64_t>(sizeof(float));
+            int64_t metaFloatNum = static_cast<int64_t>(DETER_ACC_META_BYTES) / static_cast<int64_t>(sizeof(float));
+            DumpGmZero(deterKvWorkspaceGm, metaFloatNum, metaFloatOff);
+        }
         DumpGmZero(dSinkWorkspaceGm, dSinkWorkspaceLen / sizeof(float));
     }
 }
@@ -653,7 +676,7 @@ __aicore__ inline void VecOp<SMLAGT>::CalSoftmax(const int32_t processM, const i
                                                  const int64_t s1Index)
 {
     WAIT_FLAG(MTE3, MTE2, mte2WaitMte3);
-    if constexpr (MODE != SMLAG_SCFA_MODE) {
+    if constexpr (MODE != SMLAG_SCFA_MODE && MODE != SMLAG_ORI_SPARSE_MODE) {
         if (MODE == SMLAG_SWA_MODE || runInfo.isOri) {
             int64_t curOriWinStart = Max(s1Index - oriWinLeft + runInfo.oriWinDiagOffset, 0);
             int64_t curOriWinEnd = Min(s1Index + oriWinRight + 1 + runInfo.oriWinDiagOffset, runInfo.curS2);
@@ -691,9 +714,22 @@ __aicore__ inline void VecOp<SMLAGT>::CalSoftmax(const int32_t processM, const i
     Muls(pTensor, pTensor, scaleValue, dataSize);
     PIPE_BARRIER(PIPE_V);
 
-    if constexpr (MODE != SMLAG_SCFA_MODE) {
+    if constexpr (MODE != SMLAG_SCFA_MODE && MODE != SMLAG_ORI_SPARSE_MODE) {
         CalAttenMsk(processM, runInfo, *((float*)&ATTEN_MASK_SCALE));
         PIPE_BARRIER(PIPE_V);
+    }
+    if constexpr (MODE == SMLAG_ORI_SPARSE_MODE) {
+        // 前缀里的非法下标与正向的 -inf 对齐，反向概率为 0。
+        float maskVal = *((float*)&ATTEN_MASK_SCALE);
+        for (int32_t col = 0; col < actualSelS2; ++col) {
+            int32_t index = topkIndicesGm.GetValue(runInfo.indicesGmOffset + runInfo.blkCntOffset + col);
+            if (index < 0 || index >= runInfo.curS2) {
+                for (int32_t row = 0; row < processM; ++row) {
+                    pTensor.SetValue(row * actualSelS2Align + col, maskVal);
+                }
+            }
+        }
+        PIPE_BARRIER(PIPE_ALL);
     }
 
     // pTensor: [processM, actualSelS2Align]
@@ -768,7 +804,7 @@ __aicore__ inline void VecOp<SMLAGT>::CalSoftmaxGrad(const int32_t processM, con
     Mul(pTensor, pTensor, dPTensor, dataSize);
     PIPE_BARRIER(PIPE_V);
 
-    if constexpr (MODE != SMLAG_SCFA_MODE) {
+    if constexpr (MODE != SMLAG_SCFA_MODE && MODE != SMLAG_ORI_SPARSE_MODE) {
         CalAttenMsk(processM, runInfo, 0.0);
         PIPE_BARRIER(PIPE_V);
     }
@@ -799,7 +835,7 @@ __aicore__ inline void VecOp<SMLAGT>::CalSoftmaxGrad(const int32_t processM, con
 template <typename SMLAGT>
 __aicore__ inline void VecOp<SMLAGT>::CalDsinks(const int32_t processM, const RunInfo& runInfo, const int32_t mOffset)
 {
-    if (MODE != SMLAG_SCFA_MODE && curActualRight - curActualLeft == 0) {
+    if (MODE != SMLAG_SCFA_MODE && MODE != SMLAG_ORI_SPARSE_MODE && curActualRight - curActualLeft == 0) {
         return;
     }
     uint64_t tailS2 = actualSelS2Align % 64 ? actualSelS2Align % 64 : 64;
@@ -812,7 +848,7 @@ __aicore__ inline void VecOp<SMLAGT>::CalDsinks(const int32_t processM, const Ru
         }
         PIPE_BARRIER(PIPE_V);
 
-        if constexpr (MODE != SMLAG_SCFA_MODE) {
+        if constexpr (MODE != SMLAG_SCFA_MODE && MODE != SMLAG_ORI_SPARSE_MODE) {
             ReduceSum(sinkTensor[i * BLOCK_FP32], dSinkSumTensor[i * actualSelS2Align], sinkTmpBuf, curActualRight);
         } else {
             ReduceSum(sinkTensor[i * BLOCK_FP32], dSinkSumTensor[i * actualSelS2Align], sinkTmpBuf, actualSelS2);
@@ -1475,6 +1511,333 @@ __aicore__ inline void VecOp<SMLAGT>::AccumulateKvDeter()
         }
     }
     WaitFlag<AscendC::HardEvent::MTE3_MTE2>(mte2WaitMte3);
+    SetFlag<AscendC::HardEvent::MTE3_V>(vWaitMte3);
+    WaitFlag<AscendC::HardEvent::MTE3_V>(vWaitMte3);
+}
+
+template <typename SMLAGT>
+__aicore__ inline void VecOp<SMLAGT>::GatherOriKV(const RunInfo& runInfo)
+{
+    uint64_t kSelectedWsAddr = runInfo.selectedKGmOffset;
+    uint64_t gmOffset = static_cast<uint64_t>(runInfo.indicesGmOffset + runInfo.blkCntOffset);
+    uint32_t s2Pair = CeilDiv(runInfo.actualSelCntOffset, 2) * 2;
+    uint32_t firstVecEnd = s2Pair / 2;
+    uint32_t curBlk = subBlockIdx == 0 ? 0 : firstVecEnd;
+    uint32_t curEnd = subBlockIdx == 0 ? firstVecEnd : static_cast<uint32_t>(runInfo.actualSelCntOffset);
+    int64_t usedS2 = runInfo.curS2;
+
+    intriParamsKey.blockCount = 1;
+    intriParamsKey.blockLen = dimDqk * sizeof(T1);
+    intriParamsKey.srcStride = 0;
+    intriParamsKey.dstStride = 0;
+    outParamK.blockCount = 1;
+    outParamK.blockLen = dimDqk * sizeof(T1);
+    outParamK.srcStride = 0;
+    outParamK.dstStride = 0;
+
+    // [fix-B2] masked 列改用常驻零缓冲 gatherTensorPong(ori_sparse 的 GatherOriKV 不用 pong):
+    // 入口置零一次并配平 V->MTE3; 循环内 masked 只读它(不再走 V Duplicate), valid 仍用 ping。
+    // 两类列物理分离 + masked 循环内不触发 V, 消除 masked 纯 V 路径跨 launch 同地址重放的 race。
+    Duplicate(gatherTensorPong, static_cast<T1>(0), dimDqk);
+    PIPE_BARRIER(PIPE_V);
+    SET_FLAG(V, MTE3, mte3WaitV);
+    WAIT_FLAG(V, MTE3, mte3WaitV);
+    SET_FLAG(MTE3, MTE2, mte2WaitMte3);
+    for (uint32_t col = curBlk; col < curEnd; ++col) {
+        WAIT_FLAG(MTE3, MTE2, mte2WaitMte3);
+        int32_t index = topkIndicesGm.GetValue(gmOffset + col);
+        bool valid = index >= 0 && index < usedS2;
+        if (valid) {
+            DataCopyPad(gatherTensorPing,
+                        oriKvGm[runInfo.oriKeyGmOffset + static_cast<int64_t>(index) * dimN2 * dimDqk], intriParamsKey,
+                        padParams);
+            SET_FLAG(MTE2, MTE3, mte3WaitMte2);
+            WAIT_FLAG(MTE2, MTE3, mte3WaitMte2);
+            DataCopyPad(selectedKWorkspaceGm[kSelectedWsAddr + static_cast<uint64_t>(col) * dimDqk], gatherTensorPing,
+                        outParamK);
+        } else {
+            DataCopyPad(selectedKWorkspaceGm[kSelectedWsAddr + static_cast<uint64_t>(col) * dimDqk], gatherTensorPong,
+                        outParamK);
+        }
+        SET_FLAG(MTE3, MTE2, mte2WaitMte3);
+    }
+    WAIT_FLAG(MTE3, MTE2, mte2WaitMte3);
+}
+
+template <typename SMLAGT>
+__aicore__ inline void VecOp<SMLAGT>::ScatterAddOri(const RunInfo& runInfo)
+{
+    int64_t s2RealSize = runInfo.actualSelectedBlockCount;
+    int64_t firstCoreKSize = s2RealSize / 2;
+    int64_t currentCoreKSize = subBlockIdx == 0 ? firstCoreKSize : s2RealSize - firstCoreKSize;
+    int64_t curS2Index = subBlockIdx == 0 ? 0 : firstCoreKSize;
+    if (currentCoreKSize <= 0) {
+        return;
+    }
+
+    constexpr int64_t UB_ROW_SIZE = 16;
+    GlobalTensor<float> dOriGm = dkWorkspaceGm[runInfo.oriKeyGmOffset];
+    int64_t currentDkSrcOffset = runInfo.scatterTaskId * MAX_CORE_NUM * selectedBlockCount * dimDAlign +
+                                 cubeBlockIdx * selectedBlockCount * dimDAlign +
+                                 subBlockIdx * firstCoreKSize * dimDAlign;
+    int64_t currentDvSrcOffset = runInfo.scatterTaskId * MAX_CORE_NUM * selectedBlockCount * dimD2Align +
+                                 cubeBlockIdx * selectedBlockCount * dimD2Align +
+                                 subBlockIdx * firstCoreKSize * dimD2Align;
+    GlobalTensor<float> dkSrcGm = mm4ResWorkspaceGm[currentDkSrcOffset];
+    GlobalTensor<float> dvSrcGm = mm5ResWorkspaceGm[currentDvSrcOffset];
+    GlobalTensor<int32_t> indicesGm = topkIndicesGm[runInfo.indicesGmOffset];
+    int64_t usedS2 = runInfo.curS2;
+
+    SetAtomicAdd<float>();
+    int64_t maxLoops = CeilDiv(currentCoreKSize, UB_ROW_SIZE);
+    SetFlag<AscendC::HardEvent::MTE3_MTE2>(mte2WaitMte3);
+    for (int64_t loop = 0; loop < maxLoops; ++loop) {
+        int64_t rows = (loop == maxLoops - 1) ? (currentCoreKSize - loop * UB_ROW_SIZE) : UB_ROW_SIZE;
+        WaitFlag<AscendC::HardEvent::MTE3_MTE2>(mte2WaitMte3);
+        LocalTensor<float> dkInUb = scatterAddTensorK;
+        LocalTensor<float> dvInUb = scatterAddTensorV;
+        DataCopy(dkInUb, dkSrcGm[loop * UB_ROW_SIZE * dimDAlign], rows * dimDAlign);
+        SetFlag<AscendC::HardEvent::MTE2_V>(vWaitMte2);
+        WaitFlag<AscendC::HardEvent::MTE2_V>(vWaitMte2);
+        Muls(dkInUb, dkInUb, (float)tilingData->opInfo.scaleValue, rows * dimDAlign);
+        DataCopy(dvInUb, dvSrcGm[loop * UB_ROW_SIZE * dimD2Align], rows * dimD2Align);
+        SetFlag<AscendC::HardEvent::MTE2_V>(vWaitMte2);
+        WaitFlag<AscendC::HardEvent::MTE2_V>(vWaitMte2);
+        PipeBarrier<PIPE_V>();
+        Add(dkInUb, dkInUb, dvInUb, rows * dimDAlign);
+        SetFlag<AscendC::HardEvent::V_MTE3>(mte3WaitV);
+        WaitFlag<AscendC::HardEvent::V_MTE3>(mte3WaitV);
+        for (int64_t row = 0; row < rows; ++row) {
+            int32_t s2Idx = indicesGm.GetValue(curS2Index + row);
+            if (s2Idx >= 0 && s2Idx < usedS2) {
+                DataCopy(dOriGm[static_cast<int64_t>(s2Idx) * dimDAlign], dkInUb[row * dimDAlign], dimDAlign);
+            }
+        }
+        curS2Index += rows;
+        SetFlag<AscendC::HardEvent::MTE3_MTE2>(mte2WaitMte3);
+    }
+    WaitFlag<AscendC::HardEvent::MTE3_MTE2>(mte2WaitMte3);
+    SetAtomicNone();
+    SetFlag<AscendC::HardEvent::MTE3_V>(vWaitMte3);
+    WaitFlag<AscendC::HardEvent::MTE3_V>(vWaitMte3);
+}
+
+template <typename SMLAGT>
+__aicore__ inline void VecOp<SMLAGT>::SetOriSparseDeterCtx(GM_ADDR oriTopkLength, GM_ADDR sequsedQ,
+                                                           GM_ADDR sequsedOriKv)
+{
+    oriTopkLength_ = oriTopkLength;
+    sequsedQ_ = sequsedQ;
+    sequsedOriKv_ = sequsedOriKv;
+    if constexpr (HAS_SEQUSED) {
+        hasUsedSeqQ = tilingData->opInfo.hasUsedSeqQ;
+        hasUsedSeqOriKV = tilingData->opInfo.hasUsedSeqOriKV;
+    }
+}
+
+template <typename SMLAGT>
+__aicore__ inline bool VecOp<SMLAGT>::ResolveOriSparseForScatter(int64_t coreIdx, int64_t s1Round, int64_t n2Idx,
+                                                                 int64_t& indicesGmOffset, int64_t& oriKeyGmOffset,
+                                                                 int64_t& actualSelCnt, int64_t& usedS2)
+{
+    int64_t coreProcess = (coreIdx < formerCoreNum) ? formerProcessNNum : remainProcessNNum;
+    if (s1Round >= coreProcess || coreIdx >= usedCoreNum) {
+        return false;
+    }
+
+    int64_t t1Index = coreIdx + usedCoreNum * s1Round;
+    int64_t bIdx = 0;
+    int64_t s1Idx = 0;
+    int64_t t1Off = 0;
+    int64_t t2Off = 0;
+    int64_t curS1Local = dimS1;
+    int64_t curS2Local = dimS2;
+
+    if constexpr (IS_BSND) {
+        if (t1Index >= dimB * dimS1) {
+            return false;
+        }
+        bIdx = t1Index / dimS1;
+        s1Idx = t1Index % dimS1;
+        t1Off = t1Index;
+        t2Off = bIdx * dimS2;
+        curS1Local = dimS1;
+        curS2Local = dimS2;
+        indicesGmOffset = t1Off * (dimN2 * selectedBlockCount) + n2Idx * selectedBlockCount;
+        oriKeyGmOffset = t2Off * (dimN2 * dimDqk) + n2Idx * dimDqk;
+    } else {
+        if (cuSeqlensQ == nullptr || cuSeqlensOriKv == nullptr) {
+            return false;
+        }
+        if (!oriScatterSeqInited || t1Index < oriScatterSeqPrevT1) {
+            oriScatterSeqBIdx = 0;
+            oriScatterSeqPrevT1 = 0;
+            oriScatterSeqPrevT2 = 0;
+            oriScatterSeqCurT1 = ((__gm__ int32_t*)cuSeqlensQ)[0];
+            oriScatterSeqCurT2 = ((__gm__ int32_t*)cuSeqlensOriKv)[0];
+            oriScatterSeqInited = true;
+        }
+        while (t1Index >= oriScatterSeqCurT1) {
+            oriScatterSeqBIdx++;
+            oriScatterSeqPrevT1 = oriScatterSeqCurT1;
+            oriScatterSeqPrevT2 = oriScatterSeqCurT2;
+            oriScatterSeqCurT1 = ((__gm__ int32_t*)cuSeqlensQ)[oriScatterSeqBIdx];
+            oriScatterSeqCurT2 = ((__gm__ int32_t*)cuSeqlensOriKv)[oriScatterSeqBIdx];
+        }
+        bIdx = oriScatterSeqBIdx;
+        if (bIdx == 0) {
+            t1Off = 0;
+            t2Off = 0;
+            curS1Local = ((__gm__ int32_t*)cuSeqlensQ)[1];
+            curS2Local = ((__gm__ int32_t*)cuSeqlensOriKv)[1];
+        } else {
+            t1Off = oriScatterSeqPrevT1;
+            t2Off = oriScatterSeqPrevT2;
+            curS1Local = oriScatterSeqCurT1 - oriScatterSeqPrevT1;
+            curS2Local = oriScatterSeqCurT2 - oriScatterSeqPrevT2;
+        }
+        s1Idx = t1Index - t1Off;
+        indicesGmOffset = (t1Off + s1Idx) * (dimN2 * selectedBlockCount) + n2Idx * selectedBlockCount;
+        oriKeyGmOffset = t2Off * (dimN2 * dimDqk) + n2Idx * dimDqk;
+    }
+
+    int64_t usedS1 = curS1Local;
+    usedS2 = curS2Local;
+    if constexpr (HAS_SEQUSED) {
+        int64_t batch = IS_BSND ? bIdx : (bIdx == 0 ? 0 : bIdx - 1);
+        if (hasUsedSeqQ) {
+            usedS1 = ((__gm__ int32_t*)sequsedQ_)[batch];
+        }
+        if (hasUsedSeqOriKV) {
+            usedS2 = ((__gm__ int32_t*)sequsedOriKv_)[batch];
+        }
+    }
+    if (s1Idx >= usedS1) {
+        actualSelCnt = 0;
+        return false;
+    }
+
+    int64_t globalT1 = IS_BSND ? t1Off : (t1Off + s1Idx);
+    int64_t len = 0;
+    if (oriTopkLength_ != nullptr) {
+        len = ((__gm__ int32_t*)oriTopkLength_)[globalT1 * dimN2 + n2Idx];
+    }
+    if (len < 0) {
+        len = 0;
+    }
+    int64_t cap = Min(static_cast<int64_t>(selectedBlockCount), usedS2);
+    actualSelCnt = Min(len, cap);
+    return actualSelCnt > 0;
+}
+
+template <typename SMLAGT>
+__aicore__ inline void VecOp<SMLAGT>::ScatterAddOriDeter(int64_t s1Round, int64_t scatterDbIdx)
+{
+    // 同一 token 内 topk 下标需唯一。重复下标可能落到同一核的两个 AIV，仍会并发写同一地址。
+    LocalTensor<float> dkInUb;
+    LocalTensor<float> dvInUb;
+    int64_t UB_ROW_SIZE = 16;
+    int64_t totalVec = usedCoreNum * 2;
+    if (totalVec <= 0) {
+        return;
+    }
+    int64_t myVecId = static_cast<int64_t>(cubeBlockIdx) * 2 + static_cast<int64_t>(subBlockIdx);
+    bool isActiveVec = (static_cast<int64_t>(cubeBlockIdx) < usedCoreNum);
+
+    SetAtomicAdd<float>();
+    SetFlag<AscendC::HardEvent::MTE3_MTE2>(mte2WaitMte3);
+    SetFlag<AscendC::HardEvent::MTE3_MTE2>(mte2WaitMte3Pong);
+
+    for (int64_t coreIdx = 0; coreIdx < usedCoreNum; coreIdx++) {
+        bool coreHasWork = false;
+        for (int64_t n2Idx = 0; n2Idx < dimN2; ++n2Idx) {
+            int64_t indicesGmOffset = 0;
+            int64_t oriKeyGmOffset = 0;
+            int64_t s2RealSize = 0;
+            int64_t usedS2 = 0;
+            if (ResolveOriSparseForScatter(coreIdx, s1Round, n2Idx, indicesGmOffset, oriKeyGmOffset, s2RealSize,
+                                           usedS2) &&
+                s2RealSize > 0) {
+                coreHasWork = true;
+            }
+        }
+        if (!coreHasWork) {
+            continue;
+        }
+
+        if (isActiveVec) {
+            for (int64_t n2Idx = 0; n2Idx < dimN2; ++n2Idx) {
+                int64_t indicesGmOffset = 0;
+                int64_t oriKeyGmOffset = 0;
+                int64_t s2RealSize = 0;
+                int64_t usedS2 = 0;
+                bool headHasWork = ResolveOriSparseForScatter(coreIdx, s1Round, n2Idx, indicesGmOffset, oriKeyGmOffset,
+                                                              s2RealSize, usedS2) &&
+                                   s2RealSize > 0;
+                if (!headHasWork) {
+                    continue;
+                }
+
+                int64_t remainder = s2RealSize % totalVec;
+                int64_t avgSize = s2RealSize / totalVec;
+                int64_t mySize = avgSize + (myVecId < remainder ? 1 : 0);
+                int64_t myOffset = myVecId < remainder ? (myVecId * (avgSize + 1)) :
+                                                         (remainder * (avgSize + 1) + (myVecId - remainder) * avgSize);
+                if (mySize <= 0) {
+                    continue;
+                }
+
+                GlobalTensor<float> dOriGm = dkWorkspaceGm[oriKeyGmOffset];
+                GlobalTensor<int32_t> indicesGm = topkIndicesGm[indicesGmOffset];
+                int64_t dkCoreBase = scatterDbIdx * MAX_CORE_NUM * selectedBlockCount * dimDAlign +
+                                     coreIdx * selectedBlockCount * dimDAlign;
+                int64_t dvCoreBase = scatterDbIdx * MAX_CORE_NUM * selectedBlockCount * dimD2Align +
+                                     coreIdx * selectedBlockCount * dimD2Align;
+                GlobalTensor<float> dkSrcGm = mm4ResWorkspaceGm[dkCoreBase + myOffset * dimDAlign];
+                GlobalTensor<float> dvSrcGm = mm5ResWorkspaceGm[dvCoreBase + myOffset * dimD2Align];
+                int64_t maxLoops = CeilDiv(mySize, UB_ROW_SIZE);
+
+                for (int64_t loop = 0; loop < maxLoops; loop++) {
+                    int64_t rowBase = loop * UB_ROW_SIZE;
+                    int64_t rows = (loop == maxLoops - 1) ? (mySize - rowBase) : UB_ROW_SIZE;
+
+                    event_t backEvent = pingPongIdx == 0 ? mte2WaitMte3 : mte2WaitMte3Pong;
+                    WaitFlag<AscendC::HardEvent::MTE3_MTE2>(backEvent);
+                    dkInUb = scatterAddTensorK[pingPongIdx * (UB_ROW_SIZE * dimDAlign)];
+                    dvInUb = scatterAddTensorV[pingPongIdx * (UB_ROW_SIZE * dimD2Align)];
+                    DataCopy(dkInUb, dkSrcGm[rowBase * dimDAlign], rows * dimDAlign);
+                    event_t event = pingPongIdx == 0 ? vWaitMte2 : vWaitMte2Pong;
+                    SetFlag<AscendC::HardEvent::MTE2_V>(event);
+                    WaitFlag<AscendC::HardEvent::MTE2_V>(event);
+                    Muls(dkInUb, dkInUb, (float)tilingData->opInfo.scaleValue, rows * dimDAlign);
+                    DataCopy(dvInUb, dvSrcGm[rowBase * dimD2Align], rows * dimD2Align);
+                    SetFlag<AscendC::HardEvent::MTE2_V>(event);
+                    WaitFlag<AscendC::HardEvent::MTE2_V>(event);
+                    PipeBarrier<PIPE_V>();
+                    Add(dkInUb, dkInUb, dvInUb, rows * dimDAlign);
+                    SetFlag<AscendC::HardEvent::V_MTE3>(mte3WaitV);
+                    WaitFlag<AscendC::HardEvent::V_MTE3>(mte3WaitV);
+                    for (int64_t row = 0; row < rows; row++) {
+                        int32_t s2Idx = indicesGm.GetValue(myOffset + rowBase + row);
+                        if (s2Idx >= 0 && s2Idx < usedS2) {
+                            DataCopy(dOriGm[static_cast<int64_t>(s2Idx) * dimDAlign], dkInUb[row * dimDAlign],
+                                     dimDAlign);
+                        }
+                    }
+                    SetFlag<AscendC::HardEvent::MTE3_MTE2>(backEvent);
+                    pingPongIdx = 1 - pingPongIdx;
+                }
+            }
+        }
+
+        CrossCoreSetFlag<0, PIPE_MTE3>(DETER_SCATTER_VEC_SYNC_FLAG);
+        CrossCoreWaitFlag<0, PIPE_MTE3>(DETER_SCATTER_VEC_SYNC_FLAG);
+    }
+
+    WaitFlag<AscendC::HardEvent::MTE3_MTE2>(mte2WaitMte3);
+    WaitFlag<AscendC::HardEvent::MTE3_MTE2>(mte2WaitMte3Pong);
+    SetAtomicNone();
+
     SetFlag<AscendC::HardEvent::MTE3_V>(vWaitMte3);
     WaitFlag<AscendC::HardEvent::MTE3_V>(vWaitMte3);
 }

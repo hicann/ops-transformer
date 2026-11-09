@@ -25,6 +25,7 @@ namespace SMLAG_BASIC {
 #define SMLAG_SWA_MODE 0
 #define SMLAG_CFA_MODE 1
 #define SMLAG_SCFA_MODE 2
+#define SMLAG_ORI_SPARSE_MODE 3
 
 constexpr static uint64_t MAX_CORE_NUM = 24;
 // SCFA deter mm4/mm5 scatter staging：2 面 ping-pong（对齐 SFAG，非三缓冲）

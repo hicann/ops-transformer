@@ -111,6 +111,22 @@ __aicore__ inline void CopyGmToL1(const LocalTensor<T>& l1Tensor, const GlobalTe
     DataCopy(l1Tensor, gmTensor, nd2nzPara);
 }
 
+// G 维走 NZ 行时，先把 Align(G,16) x Align(D,16) 填 0，再 ND2NZ 有效行。
+// Cube 最后一个 K 分形按 16 收；pad 行必须是 0，否则 dK/dV 会被 L1 旧值污染。
+// srcN 已 16 对齐时与 CopyGmToL1 完全等价。
+template <typename T>
+__aicore__ inline void CopyGmToL1PadG(const LocalTensor<T>& l1Tensor, const GlobalTensor<T>& gmTensor,
+                                      const GlobalTensor<T>& zeroGm, uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
+{
+    const uint32_t nRowsAlign = AlignTo(srcN, static_cast<uint32_t>(C0_SIZE));
+    const uint32_t nColsAlign = AlignTo(srcD, static_cast<uint32_t>(C0_SIZE));
+    if (srcN != nRowsAlign && nRowsAlign > 0 && nColsAlign > 0) {
+        CopyGmToL1(l1Tensor, zeroGm, nRowsAlign, nColsAlign, nColsAlign);
+        PipeBarrier<PIPE_MTE2>();
+    }
+    CopyGmToL1(l1Tensor, gmTensor, srcN, srcD, srcDstride);
+}
+
 template <typename T>
 __aicore__ inline void LoadDataMm1A(LocalTensor<T>& aL0Tensor, LocalTensor<T>& aL1Tensor, struct MMParam& mmParam)
 {

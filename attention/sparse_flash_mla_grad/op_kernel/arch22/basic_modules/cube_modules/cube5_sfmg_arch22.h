@@ -34,10 +34,11 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube5Process(c
     mmParam.isLeftTranspose = true;
     mmParam.isRightTranspose = true;
     mmParam.dstStride = dimDv * dimN2;
+    const int64_t curS1gAlign = AlignTo<int64_t>(runInfo.curS1g, SIZE_16);
 
     int64_t mm5ResOutBaseOffset;
     if constexpr (IS_DETER) {
-        if constexpr (MODE == SMLAG_SCFA_MODE) {
+        if constexpr (MODE == SMLAG_SCFA_MODE || MODE == SMLAG_ORI_SPARSE_MODE) {
             if (!runInfo.isOri) {
                 mm5ResOutBaseOffset = runInfo.roundDbIdx * MAX_CORE_NUM * selectedBlockCount * dimDv +
                                       cBlockIdx * selectedBlockCount * dimDv;
@@ -57,7 +58,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube5Process(c
                                   blkCntOffset * selectedBlockSize * dimDv;
             mm5ResWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + deterKvAddr);
         }
-    } else if constexpr (MODE == SMLAG_SCFA_MODE) {
+    } else if constexpr (MODE == SMLAG_SCFA_MODE || MODE == SMLAG_ORI_SPARSE_MODE) {
         if (!runInfo.isOri) {
             mm5ResOutBaseOffset = runInfo.scatterTaskId * MAX_CORE_NUM * selectedBlockCount * dimDv +
                                   cBlockIdx * selectedBlockCount * dimDv;
@@ -82,11 +83,11 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube5Process(c
 
         int64_t mm5ResOutOffset = mm5ResOutBaseOffset + mIdx * selectedBlockSize * dimDv;
         WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
-        CopyGmToL1(l1_p_tensor, pWorkspaceGm[pGmOffset + (mIdx - blkCntOffset) * selectedBlockSize], mmParam.singleK,
-                   mmParam.singleM, singleN);
+        CopyGDimToL1(l1_p_tensor, pWorkspaceGm[pGmOffset + (mIdx - blkCntOffset) * selectedBlockSize], mmParam.singleK,
+                     mmParam.singleM, singleN);
 
         for (int32_t dIdx = 0; dIdx < dLoopTimes; dIdx++) {
-            current_l1_dy_tensor = l1_dy_tensor[dIdx * perLoopDSize * AlignTo<int64_t>(mmParam.singleK, SIZE_16)];
+            current_l1_dy_tensor = l1_dy_tensor[dIdx * perLoopDSize * curS1gAlign];
             LocalTensor<float> l0cTensor = cL0TensorPingPong[ping_pong_flag_l0c_ & 1];
 
             int64_t currentOutGmOffset = mm5ResOutOffset + dIdx * perLoopDSize;
@@ -98,7 +99,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube5Process(c
                     l0a_ping_pong_flag, ping_pong_flag_l0b_, ping_pong_flag_l0c_, dIdx == 0,
                     mm5ResWorkspaceGm[currentOutGmOffset]);
             } else {
-                MmadInnerWithSync<T1, IS_DETER ? false : (MODE != SMLAG_SCFA_MODE)>(
+                MmadInnerWithSync<T1, IS_DETER ? false : (MODE != SMLAG_SCFA_MODE && MODE != SMLAG_ORI_SPARSE_MODE)>(
                     l0cTensor, l1_p_tensor, current_l1_dy_tensor, aL0TensorPingPong, bL0TensorPingPong, mmParam,
                     l0a_ping_pong_flag, ping_pong_flag_l0b_, ping_pong_flag_l0c_, dIdx == 0,
                     mm5ResWorkspaceGm[currentOutGmOffset]);

@@ -31,13 +31,16 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube2Process(
     mmParam.singleK = perLoopDSize;
     mmParam.isFixOut = false;
     mmParam.dstStride = singleN;
+    const int64_t curS1gAlign = AlignTo<int64_t>(runInfo.curS1g, SIZE_16);
 
     LocalTensor<T1> l1_dy_tensor = l1_dy_tensors[mmPingPongIdx];
-    CopyGmToL1(l1_dy_tensor, attentionGradGm[dyGmOffset], mmParam.singleM, dimDv,
-               dimDv); // [Align(s1g, 16) * (dimDv, 16), 16]
+    CopyGDimToL1(l1_dy_tensor, attentionGradGm[dyGmOffset], mmParam.singleM, dimDv,
+                 dimDv); // [Align(s1g, 16) * (dimDv, 16), 16]
     for (int32_t nIdx = blkCntOffset; nIdx < blkCntOffset + selectedCntOffset; nIdx += blockOffset) {
         int64_t remainN = static_cast<int64_t>(selectedCntOffset) - (nIdx - blkCntOffset);
-        mmParam.singleN = MODE == SMLAG_SCFA_MODE ? min(selectedBlockSize * blockOffset, remainN) : selectedCntOffset;
+        mmParam.singleN = (MODE == SMLAG_SCFA_MODE || MODE == SMLAG_ORI_SPARSE_MODE) ?
+                              min(selectedBlockSize * blockOffset, remainN) :
+                              selectedCntOffset;
         LocalTensor<float> l0cTensor = cL0TensorPingPong[ping_pong_flag_l0c_ & 1];
         int64_t mm2WorkspaceGmOffset = outGmOffset + (nIdx - blkCntOffset) * selectedBlockSize;
 
@@ -50,12 +53,12 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube2Process(
             mmParam.isFixOut = dIdx == dLoopTimes - 1;
             l1_v_tensor = l1_common_tensors[ping_pong_flag_l1_common_];
 
-            currentDyOffset = dIdx * AlignTo<int64_t>(mmParam.singleM, SIZE_16) * K_SPLIT_SIZE;
+            currentDyOffset = dIdx * curS1gAlign * K_SPLIT_SIZE;
             currentVOffset =
                 valueGmOffset + (nIdx - blkCntOffset) * selectedBlockSize * dimDTotal + dIdx * K_SPLIT_SIZE;
 
             WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
-            if constexpr (MODE == SMLAG_SCFA_MODE) {
+            if constexpr (MODE == SMLAG_SCFA_MODE || MODE == SMLAG_ORI_SPARSE_MODE) {
                 if (!runInfo.isOri) {
                     CopyGmToL1(l1_v_tensor, selectedKWorkspaceGm[currentVOffset], mmParam.singleN, K_SPLIT_SIZE,
                                dimDTotal);

@@ -25,6 +25,7 @@ namespace smlag {
 #define SMLAG_SWA_MODE 0
 #define SMLAG_CFA_MODE 1
 #define SMLAG_SCFA_MODE 2
+#define SMLAG_ORI_SPARSE_MODE 3
 
 struct TempParams {
     uint32_t dataTypeSize;

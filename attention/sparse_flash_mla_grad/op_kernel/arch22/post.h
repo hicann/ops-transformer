@@ -322,7 +322,7 @@ __aicore__ inline void SparseFlashMlaGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LA
     WaitFlag<HardEvent::V_MTE2>(0);
     PIPE_BARRIER(PIPE_ALL);
 
-    if constexpr (MODE != SMLAG_SWA_MODE) {
+    if constexpr (MODE == SMLAG_CFA_MODE || MODE == SMLAG_SCFA_MODE) {
         // init cmpKv
         uint64_t cmpKvBegin = cBlockIdx * cmpKvPostBlockFactor * cmpKvPostBaseNum;
         uint64_t cmpKvEnd = (cBlockIdx + 1) * cmpKvPostBlockFactor * cmpKvPostBaseNum;

@@ -69,6 +69,8 @@ private:
     __aicore__ inline void InitGMBuffer(GM_ADDR query, GM_ADDR ori_kv, GM_ADDR cmp_kv, GM_ADDR attention_out_grad,
                                         GM_ADDR workspace);
     __aicore__ inline void InitLocalTensor();
+    __aicore__ inline void CopyGDimToL1(const LocalTensor<T1>& l1Tensor, const GlobalTensor<T1>& gmTensor,
+                                        uint32_t srcN, uint32_t srcD, uint32_t srcDstride);
 
     AscendC::Nd2NzParams commonNd2NzParams{1, 0, 0, 0, 128, 128, 1, 0};
     AscendC::Nd2NzParams cube1Nd2NzParams{1, 0, 0, 0, 0, 0, 1, 0};
@@ -97,6 +99,7 @@ private:
     GlobalTensor<float> mm4ResWorkspaceGm; // 24 * 2 * K * Dk
     GlobalTensor<float> mm5ResWorkspaceGm; // 24 * 2 * K * Dv
     GlobalTensor<float> deterKvWorkspaceGm;
+    GlobalTensor<T1> zeroPadGm; // additional / dq，AtomicClean 后为 0，供 G 维 L1 pad
     // workspace
     uint32_t mm12WorkspaceLen;
     int64_t dqWorkspaceLen;
@@ -260,7 +263,7 @@ __aicore__ inline void CubeOp<SMLAGT>::InitGMBuffer(GM_ADDR query, GM_ADDR ori_k
     queryGm.SetGlobalBuffer((__gm__ T1*)query);
     attentionGradGm.SetGlobalBuffer((__gm__ T1*)attention_out_grad);
 
-    if constexpr (MODE == SMLAG_SWA_MODE) {
+    if constexpr (MODE == SMLAG_SWA_MODE || MODE == SMLAG_ORI_SPARSE_MODE) {
         oriKvGm.SetGlobalBuffer((__gm__ T1*)ori_kv);
     } else if (MODE == SMLAG_CFA_MODE || MODE == SMLAG_SCFA_MODE) {
         oriKvGm.SetGlobalBuffer((__gm__ T1*)ori_kv);
@@ -292,13 +295,21 @@ __aicore__ inline void CubeOp<SMLAGT>::InitGMBuffer(GM_ADDR query, GM_ADDR ori_k
     dkAddr = dqAddr + dqWorkspaceLen / sizeof(float);
     usedWorkspaceLen += dqWorkspaceLen + dkWorkspaceLen;
 
-    if constexpr (MODE == SMLAG_SCFA_MODE) {
+    if constexpr (MODE == SMLAG_SCFA_MODE || MODE == SMLAG_ORI_SPARSE_MODE) {
         // scatter add
         mm4ResAddr = (usedWorkspaceLen + additionalWorkspaceLen) / sizeof(float);
         mm5ResAddr = mm4ResAddr + MAX_CORE_NUM * selectedBlockCount * dimDTotal * 2;
     } else {
         mm5ResAddr = dkAddr;
         mm4ResAddr = usedWorkspaceLen / sizeof(float);
+    }
+
+    // G 不齐 16 时 CopyGDimToL1 从这块读 0。SCFA/ori 用 additional（vec 已清零）；
+    // SWA/CFA 的 curS1g 一般已齐，走不到 pad，退回 dq（AtomicClean 已清零）。
+    if (additionalWorkspaceLen > 0) {
+        zeroPadGm.SetGlobalBuffer((__gm__ T1*)workspace + usedWorkspaceLen / sizeof(T1));
+    } else {
+        zeroPadGm.SetGlobalBuffer((__gm__ T1*)workspace + dqAddr * sizeof(float) / sizeof(T1));
     }
 
     mm1WorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + mm1Addr);
@@ -355,6 +366,13 @@ __aicore__ inline void CubeOp<SMLAGT>::InitLocalTensor()
 
     cL0TensorPingPong[0] = asdopsBuf.GetBuffer<BufferType::ASCEND_L0C, float>(0);
     cL0TensorPingPong[1] = asdopsBuf.GetBuffer<BufferType::ASCEND_L0C, float>(128 * 128 * sizeof(float));
+}
+
+template <typename SMLAGT>
+__aicore__ inline void CubeOp<SMLAGT>::CopyGDimToL1(const LocalTensor<T1>& l1Tensor, const GlobalTensor<T1>& gmTensor,
+                                                    uint32_t srcN, uint32_t srcD, uint32_t srcDstride)
+{
+    CopyGmToL1PadG(l1Tensor, gmTensor, zeroPadGm, srcN, srcD, srcDstride);
 }
 
 #include "./cube_modules/cube1_sfmg_arch22.h"

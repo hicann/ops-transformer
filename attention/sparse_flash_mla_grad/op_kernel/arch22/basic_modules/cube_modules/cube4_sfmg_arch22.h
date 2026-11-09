@@ -36,15 +36,17 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube4Process(c
     mmParam.isLeftTranspose = true;
     mmParam.isRightTranspose = true;
     mmParam.dstStride = dimDTotal * dimN2;
+    const int64_t curS1gAlign = AlignTo<int64_t>(runInfo.curS1g, SIZE_16);
+    const int64_t actualSel = selectedCntOffset * selectedBlockSize;
     int64_t dsL1Offset = 0;
     int64_t dsL1CachedSize = 0;
 
     int64_t mm4ResOutBaseOffset;
-    // Deterministic: ori / CFA 写 deterKv staging；SCFA cmp 仍写 mm4Res staging
+    // Deterministic: 连续窗口写 deterKv staging；SCFA cmp 与 ori sparse 写 mm4Res staging
     if constexpr (IS_DETER) {
-        if constexpr (MODE == SMLAG_SCFA_MODE) {
+        if constexpr (MODE == SMLAG_SCFA_MODE || MODE == SMLAG_ORI_SPARSE_MODE) {
             if (!runInfo.isOri) {
-                // cmp_kv
+                // SCFA cmp_kv / ori sparse indices
                 mm4ResOutBaseOffset = runInfo.roundDbIdx * MAX_CORE_NUM * selectedBlockCount * dimDTotal +
                                       cBlockIdx * selectedBlockCount * dimDTotal;
                 mm4ResWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + mm4ResAddr);
@@ -64,7 +66,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube4Process(c
                 dbIdx * usedCoreNum * perCore + cBlockIdx * perCore - blkCntOffset * selectedBlockSize * dimDTotal;
             mm4ResWorkspaceGm.SetGlobalBuffer((__gm__ float*)workspace + deterKvAddr);
         }
-    } else if constexpr (MODE == SMLAG_SCFA_MODE) {
+    } else if constexpr (MODE == SMLAG_SCFA_MODE || MODE == SMLAG_ORI_SPARSE_MODE) {
         if (!runInfo.isOri) {
             mm4ResOutBaseOffset = runInfo.scatterTaskId * MAX_CORE_NUM * selectedBlockCount * dimDTotal +
                                   cBlockIdx * selectedBlockCount * dimDTotal;
@@ -78,29 +80,28 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube4Process(c
                                   runInfo.selectedKGmOffset - blkCntOffset * selectedBlockSize * dimDTotal :
                                   runInfo.selectedKGmOffset - blkCntOffset * selectedBlockSize * dimDTotal + dOriKvSize;
     }
-    dSL1TotalSize = selectedCntOffset * selectedBlockSize * AlignTo<int64_t>(mmParam.singleK, SIZE_16);
+    dSL1TotalSize = actualSel * curS1gAlign;
     if (dSL1TotalSize <= 128 * 512) { // 此时dS可全载
-        CopyGmToL1(l1_ds_tensor, dsWorkspaceGm[dsGmOffset], mmParam.singleK, selectedCntOffset * selectedBlockSize,
-                   singleN);
+        CopyGDimToL1(l1_ds_tensor, dsWorkspaceGm[dsGmOffset], mmParam.singleK, actualSel, singleN);
     }
     for (int32_t mIdx = blkCntOffset; mIdx < blkCntOffset + selectedCntOffset; mIdx += blockOffset) {
-        int64_t l1Offset =
-            static_cast<int64_t>(mIdx - blkCntOffset) * selectedBlockSize * AlignTo<int64_t>(mmParam.singleK, SIZE_16);
+        int64_t localM = static_cast<int64_t>(mIdx - blkCntOffset) * selectedBlockSize;
+        int64_t l1Offset = localM * curS1gAlign;
 
         mmParam.singleN = perLoopDSize;
-        mmParam.singleM = min(selectedBlockSize * blockOffset,
-                              selectedCntOffset * selectedBlockSize - (mIdx - blkCntOffset) * selectedBlockSize);
+        mmParam.singleM = min(selectedBlockSize * blockOffset, actualSel - localM);
 
         LocalTensor<T1> current_l1_ds_tensor, l1_query_tensor;
         if (dSL1TotalSize <= 128 * 512) {
             current_l1_ds_tensor = l1_ds_tensor[l1Offset];
         } else {
             if (l1Offset >= dsL1CachedSize) {
+                int64_t remainCol = actualSel - localM;
+                uint32_t srcD = min(static_cast<uint32_t>(512), static_cast<uint32_t>(remainCol));
                 SetFlag<HardEvent::MTE1_MTE2>(MM_L1_DS_EVENT);
                 WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_DS_EVENT);
-                CopyGmToL1(l1_ds_tensor, dsWorkspaceGm[dsGmOffset + (mIdx - blkCntOffset)], mmParam.singleK, 512,
-                           singleN); // 重新搬运singleK * 512
-                dsL1CachedSize += 512 * AlignTo<int64_t>(mmParam.singleK, SIZE_16);
+                CopyGDimToL1(l1_ds_tensor, dsWorkspaceGm[dsGmOffset + localM], mmParam.singleK, srcD, singleN);
+                dsL1CachedSize += static_cast<int64_t>(srcD) * curS1gAlign;
                 dsL1Offset = l1Offset;
             }
             current_l1_ds_tensor = l1_ds_tensor[l1Offset - dsL1Offset];
@@ -114,7 +115,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube4Process(c
 
             currentQueryOffset = queryGmOffset + dIdx * N_SPLIT_SIZE;
             WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_QUERY_EVENTS[ping_pong_flag_l1_query_]);
-            CopyGmToL1(l1_query_tensor, queryGm[currentQueryOffset], mmParam.singleK, N_SPLIT_SIZE, dimDqk);
+            CopyGDimToL1(l1_query_tensor, queryGm[currentQueryOffset], mmParam.singleK, N_SPLIT_SIZE, dimDqk);
 
             int64_t currentOutGmOffset = mm4ResOutOffset + dIdx * perLoopDSize;
 
@@ -126,7 +127,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube4Process(c
                     l0a_ping_pong_flag, ping_pong_flag_l0b_, ping_pong_flag_l0c_, dIdx == 0,
                     mm4ResWorkspaceGm[currentOutGmOffset]);
             } else {
-                MmadInnerWithSync<T1, IS_DETER ? false : (MODE != SMLAG_SCFA_MODE)>(
+                MmadInnerWithSync<T1, IS_DETER ? false : (MODE != SMLAG_SCFA_MODE && MODE != SMLAG_ORI_SPARSE_MODE)>(
                     l0cTensor, current_l1_ds_tensor, l1_query_tensor, aL0TensorPingPong, bL0TensorPingPong, mmParam,
                     l0a_ping_pong_flag, ping_pong_flag_l0b_, ping_pong_flag_l0c_, dIdx == 0,
                     mm4ResWorkspaceGm[currentOutGmOffset]);
@@ -144,7 +145,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube4Process(c
         GlobalTensor<T1> srcGm = queryGm[currentQueryOffset];
         int64_t destStride = dimDqk;
         WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_QUERY_EVENTS[ping_pong_flag_l1_query_]);
-        CopyGmToL1(l1_query_tensor, srcGm, mmParam.singleK, tailLoopDSize, destStride);
+        CopyGDimToL1(l1_query_tensor, srcGm, mmParam.singleK, tailLoopDSize, destStride);
 
         int64_t currentOutGmOffset = mm4ResOutOffset + (dLoopTimes - 1) * perLoopDSize;
 
@@ -154,7 +155,7 @@ __aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube4Process(c
                 ping_pong_flag_l0a_, ping_pong_flag_l0b_, ping_pong_flag_l0c_, true,
                 mm4ResWorkspaceGm[currentOutGmOffset]);
         } else {
-            MmadInnerWithSync<T1, IS_DETER ? false : (MODE != SMLAG_SCFA_MODE)>(
+            MmadInnerWithSync<T1, IS_DETER ? false : (MODE != SMLAG_SCFA_MODE && MODE != SMLAG_ORI_SPARSE_MODE)>(
                 l0cTensor, current_l1_ds_tensor, l1_query_tensor, aL0TensorPingPong, bL0TensorPingPong, mmParam,
                 ping_pong_flag_l0a_, ping_pong_flag_l0b_, ping_pong_flag_l0c_, true,
                 mm4ResWorkspaceGm[currentOutGmOffset]);

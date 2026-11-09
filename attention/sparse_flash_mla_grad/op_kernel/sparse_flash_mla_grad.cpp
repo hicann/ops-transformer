@@ -26,6 +26,7 @@
 #include "sparse_flash_mla_grad_template_tiling_key.h"
 #include "arch22/sfag_basic.h"
 #include "arch22/smlag_basic.h"
+#include "arch22/ori_sparse_smlag.h"
 #endif
 #include "kernel_operator.h"
 using namespace AscendC;
@@ -64,6 +65,16 @@ __global__ __aicore__ void sparse_flash_mla_grad(
                    d_ori_kv, d_cmp_kv, d_sinks, cmp_softmax_l1_norm, user, tilingData); \
     } while (0)
 
+#define INVOKE_SMLAG_ORI_SPARSE_IMPL(...) \
+    do { \
+        __gm__ uint8_t* user = GetUserWorkspace(workspace); \
+        GET_TILING_DATA_WITH_STRUCT(SparseFlashMlaGradTilingData, tiling_data_in, tiling_data); \
+        const SparseFlashMlaGradTilingData* __restrict tilingData = &tiling_data_in; \
+        SMLAG_BASIC::OriSparseAttentionGrad<SMLAG_BASIC::SMLAG_TYPE<SparseFlashMlaGradTilingData, __VA_ARGS__>> op; \
+        op.Process(query, ori_kv, out, d_out, lse, ori_sparse_indices, ori_topk_length, cu_seqlens_q, \
+                   cu_seqlens_ori_kv, seqused_q, seqused_ori_kv, sinks, d_query, d_ori_kv, d_sinks, user, tilingData); \
+    } while (0)
+
 template <int LAYOUT, int MODE, bool HAS_SEQUSED, bool Deterministic>
 __global__ __aicore__ void sparse_flash_mla_grad(
     __gm__ uint8_t* query, __gm__ uint8_t* d_out, __gm__ uint8_t* out, __gm__ uint8_t* lse, __gm__ uint8_t* ori_kv,
@@ -82,7 +93,13 @@ __global__ __aicore__ void sparse_flash_mla_grad(
 #endif
 
     if constexpr (ORIG_DTYPE_QUERY == DT_FLOAT16) {
-        if (MODE == SMLAG_SCFA_MODE) {
+        if (MODE == SMLAG_ORI_SPARSE_MODE) {
+            if (LAYOUT == SMLAG_LAYOUT_BSND) {
+                INVOKE_SMLAG_ORI_SPARSE_IMPL(half, true, SMLAG_ORI_SPARSE_MODE, HAS_SEQUSED, Deterministic);
+            } else {
+                INVOKE_SMLAG_ORI_SPARSE_IMPL(half, false, SMLAG_ORI_SPARSE_MODE, HAS_SEQUSED, Deterministic);
+            }
+        } else if (MODE == SMLAG_SCFA_MODE) {
             if (LAYOUT == SMLAG_LAYOUT_BSND) {
                 INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SelectedAttentionGradBasic, half, true, SMLAG_SCFA_MODE,
                                         HAS_SEQUSED, Deterministic);
@@ -99,7 +116,13 @@ __global__ __aicore__ void sparse_flash_mla_grad(
         }
     }
     if constexpr (ORIG_DTYPE_QUERY == DT_BF16) {
-        if (MODE == SMLAG_SCFA_MODE) {
+        if (MODE == SMLAG_ORI_SPARSE_MODE) {
+            if (LAYOUT == SMLAG_LAYOUT_BSND) {
+                INVOKE_SMLAG_ORI_SPARSE_IMPL(bfloat16_t, true, SMLAG_ORI_SPARSE_MODE, HAS_SEQUSED, Deterministic);
+            } else {
+                INVOKE_SMLAG_ORI_SPARSE_IMPL(bfloat16_t, false, SMLAG_ORI_SPARSE_MODE, HAS_SEQUSED, Deterministic);
+            }
+        } else if (MODE == SMLAG_SCFA_MODE) {
             if (LAYOUT == SMLAG_LAYOUT_BSND) {
                 INVOKE_SMLAG_BASIC_IMPL(SMLAG_BASIC::SelectedAttentionGradBasic, bfloat16_t, true, SMLAG_SCFA_MODE,
                                         HAS_SEQUSED, Deterministic);
