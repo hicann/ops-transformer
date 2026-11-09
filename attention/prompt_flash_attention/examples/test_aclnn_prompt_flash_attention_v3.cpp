@@ -17,6 +17,7 @@
 #include <vector>
 #include <cmath>
 #include <cstring>
+#include <string>
 #include "acl/acl.h"
 #include "aclnn/opdev/fp16_t.h"
 #include "aclnnop/aclnn_prompt_flash_attention_v3.h"
@@ -168,7 +169,10 @@ int ExecutePromptFlashAttention(TensorResources& resources, aclrtStream stream, 
     int64_t preTokens = 2147483647;
     int64_t nextTokens = 0;
     int64_t sparseMode = 0;
+    const char* socName = aclrtGetSocName();
+    std::string socVersion = (socName != nullptr) ? std::string(socName) : std::string();
     int64_t innerPrecise = 1;
+    LOG_PRINT("[PromptFlashAttentionV3] soc=%s, innerPrecise=%ld\n", socVersion.c_str(), innerPrecise);
 
     constexpr const char LAYER_OUT_STR[] = "BNSD";
     constexpr size_t LAYER_OUT_LEN = sizeof(LAYER_OUT_STR);

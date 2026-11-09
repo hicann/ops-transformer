@@ -670,6 +670,15 @@ aclnnStatus aclnnPromptFlashAttentionV3(
 
   - BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLOAT16和INT8均生效。当前0、1为保留配置值，当计算过程中“参与计算的mask部分”存在某整行全为1的情况时，精度可能会有损失。此时可以尝试将该参数配置为2或3来开启行无效功能以提升精度，但是该配置会导致性能下降。如果算子可判断出存在无效行场景，会自动开启无效行计算，例如sparse_mode为3，Sq > Skv场景。
 
+  - 各芯片型号对 innerPrecise 的取值约束如下：
+
+    <!-- npu="910b" id13 -->
+    - <term>Atlas A2系列产品</term>：支持0、1、2、3；不支持4（近似计算 APPROXIMATE_COMPUTATION），传入4会校验报错。
+    <!-- end id13 -->
+    <!-- npu="310p" id24 -->
+    - <term>Atlas推理系列产品</term>：支持 0、1、2、3，额外支持4（近似计算，softmax 累加采用 FP16）；base-api 场景下仅支持1（高性能），其余取值会校验报错。
+    <!-- end id24 -->
+
 - attentionOut输出，功能使用限制如下：
 
   - 当inputLayout为BNSD_BSND时，输入query的shape是BNSD，输出shape为BSND；其余情况该入参的shape需要与入参query的shape保持一致。
