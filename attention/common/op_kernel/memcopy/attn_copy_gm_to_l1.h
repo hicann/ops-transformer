@@ -473,7 +473,7 @@ private:
     }
 };
 
-#if (__CCE_AICORE__ == 310) || (defined __DAV_310R6__) || (__NPU_ARCH__ == 9201)
+#if (__CCE_AICORE__ == 310) || (defined __DAV_310R6__) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
 // ----------------------------------------------CopyQueryScaleGmToL1--------------------------------
 template <typename T>
 __aicore__ inline void CopySingleMXScaleDNToNZ(LocalTensor<T> l1Tensor, const GlobalTensor<T> gmTensor, uint32_t nValue,
@@ -586,7 +586,7 @@ private:
         uint32_t s1IdxStart = gmCoord.gS1Idx % offsetCalculator.GetDimS1();
 
         uint64_t offset = offsetCalculator.GetOffset(gmCoord.bIdx, gmCoord.n2Idx, gIdxStart, s1IdxStart, gmCoord.dIdx);
-#if (__NPU_ARCH__ == 9201)
+#if (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
         if (std::is_same_v<Q_SCALE_T, hif4_scale>) {
             CopySingleHIScaleDNToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.dDealSize,
                                     gmCoord.gS1DealSize, offsetCalculator.GetDimD(), gmCoord.dDealSize);
@@ -632,7 +632,7 @@ private:
         }
 
         uint64_t offset = queryScaleGmbaseOffset + s1IdxStart * offsetCalculator.GetDimD();
-#if (__NPU_ARCH__ == 9201)
+#if (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
         if (std::is_same_v<Q_SCALE_T, hif4_scale>) {
             CopySingleHIScaleDNToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.dDealSize, headSize,
                                     offsetCalculator.GetStrideS1(), gmCoord.dDealSize);
@@ -709,7 +709,7 @@ private:
             CopySingleMXScaleDNToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.dDealSize, gmCoord.s2DealSize,
                                     offsetCalculator.GetStrideS2(), gmCoord.dDealSize);
         }
-#if (__NPU_ARCH__ == 9201)
+#if (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
         else if (std::is_same_v<K_SCALE_T, hif4_scale>) {
             CopySingleHIScaleDNToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.dDealSize, gmCoord.s2DealSize,
                                     offsetCalculator.GetStrideS2(), gmCoord.dDealSize);
@@ -738,7 +738,7 @@ private:
                 intriParams.dstStride = 0;
                 intriParams.srcStride = 0;
                 intriParams.blockCount = 1;
-#if (__NPU_ARCH__ == 9201)
+#if (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
                 if constexpr (std::is_same_v<K_SCALE_T, hif4_scale>) {
                     intriParams.blockLen = ((copyRowCnt + 15) >> 4) * gmCoord.dDealSize * 2; // 每个最小分型组64B 要 * 2
                 } else
@@ -756,7 +756,7 @@ private:
                     CopySingleMXScaleDNToNZ(dstTensor.tensor[l1Offset], srcTensor.gmTensor[gmOffset], gmCoord.dDealSize,
                                             copyRowCnt, offsetCalculator.GetStrideBlockSize(), gmCoord.dDealSize);
                 }
-#if (__NPU_ARCH__ == 9201)
+#if (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
                 else if constexpr (std::is_same_v<K_SCALE_T, hif4_scale>) {
                     CopySingleHIScaleDNToNZ(dstTensor.tensor[l1Offset], srcTensor.gmTensor[gmOffset], gmCoord.dDealSize,
                                             copyRowCnt, offsetCalculator.GetStrideBlockSize(), gmCoord.dDealSize);
@@ -824,7 +824,7 @@ private:
                 CopySingleMXScaleDNToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.s2DealSize,
                                         gmCoord.dDealSize, offsetCalculator.GetStrideD(), gmCoord.s2DealSize);
             }
-#if (__NPU_ARCH__ == 9201)
+#if (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
             else if constexpr (std::is_same_v<V_SCALE_T, hif4_scale>) {
                 CopySingleHIScaleDNToNZ(dstTensor.tensor, srcTensor.gmTensor[offset], gmCoord.s2DealSize,
                                         gmCoord.dDealSize, offsetCalculator.GetStrideD(), gmCoord.s2DealSize);
@@ -855,7 +855,7 @@ private:
             if constexpr (GM_FORMAT == GmFormat::PA_NZ_V_SCALE) {
                 DataCopyParams intriParams;
                 intriParams.blockCount = gmCoord.dDealSize / 16U;
-#if (__NPU_ARCH__ == 9201)
+#if (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
                 if constexpr (std::is_same_v<V_SCALE_T, hif4_scale>) {
                     intriParams.blockLen = copyRowCnt * 2U; // 每个最小分型组64B 要 * 2
                     intriParams.dstStride = (dstTensor.rowCount - copyRowCnt) * 2U;
@@ -890,7 +890,7 @@ private:
                         CopySingleMXScaleDNToNZ(dstTensor.tensor[l1Offset], srcTensor.gmTensor[gmOffset], copyRowCnt,
                                                 gmCoord.dDealSize, offsetCalculator.GetBlockSize(), gmCoord.s2DealSize);
                     }
-#if (__NPU_ARCH__ == 9201)
+#if (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
                     else if constexpr (std::is_same_v<V_SCALE_T, hif4_scale>) {
                         CopySingleHIScaleDNToNZ(dstTensor.tensor[l1Offset], srcTensor.gmTensor[gmOffset], copyRowCnt,
                                                 gmCoord.dDealSize, offsetCalculator.GetBlockSize(), gmCoord.s2DealSize);
