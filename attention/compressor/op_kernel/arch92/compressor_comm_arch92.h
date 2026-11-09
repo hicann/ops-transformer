@@ -140,6 +140,7 @@ struct BasicBlockInfo {
     uint32_t compressedTcNum = 0;
     uint32_t dealSeqCnt = 0;
     uint32_t dealTcNum = 0;
+    uint32_t windowSeqCnt = 0; // 本轮的 T 轴行数（所有核组共享），vec 按 batch 分核时用于算 batch 总数
 };
 
 struct BatchInfo {
@@ -262,6 +263,7 @@ struct Vec1RunInfo {
     uint32_t sStart = 0;
     uint32_t dealTcNum = 0;
     uint32_t dealScSize = 0;
+    uint32_t windowSeqCnt = 0; // 本轮 T 轴行数，按 batch 分核时用于算 batch 总数
 };
 
 struct MSplitInfo {

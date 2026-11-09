@@ -31,7 +31,8 @@ namespace Compressor {
 template <typename COMP, bool IS_FULL_LOAD = false>
 class CompressorKernel {
 public:
-    __aicore__ inline CompressorKernel(TPipe* pipe, const optiling::CompressorTilingData* __restrict tilingData)
+    __aicore__ inline CompressorKernel(TPipe* pipe,
+                                       __tiling_data_ptr__ optiling::CompressorTilingData* __restrict tilingData)
         : pipe_(pipe),
           tilingData_(tilingData)
     {}
@@ -93,7 +94,7 @@ private:
 
     // ==============================TilingData&TPipe==============================
     TPipe* pipe_;
-    const optiling::CompressorTilingData* __restrict tilingData_;
+    __tiling_data_ptr__ optiling::CompressorTilingData* __restrict tilingData_;
     // ===========================Workspace Global Tensor===========================
     GlobalTensor<MM1_OUT_T> mm1KvResGm;
     GlobalTensor<MM1_OUT_T> mm1ScoreResGm;

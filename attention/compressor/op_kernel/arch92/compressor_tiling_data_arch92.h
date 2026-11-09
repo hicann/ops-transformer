@@ -20,6 +20,9 @@
 
 const uint32_t CMP_MAX_AIC_CORE_NUM = aclrtDevAttr::ACL_DEV_ATTR_AICORE_CORE_NUM;
 constexpr uint32_t BATCH_CONSISTENCY = 3;
+// arch92 NORMAL 模板: seqSize 不超过该值时 vec 按 batch 分核（与 FULL_LOAD 模板一致），
+// 此时轮次需按 batch 收尾（一个 batch 不被切到两轮）
+constexpr uint32_t VEC_BATCH_SPLIT_MAX_SEQ_SIZE = 4;
 
 namespace optiling {
 struct CompressorSplitCoreParams {

@@ -37,6 +37,114 @@ struct ReduceMulRegList {
     Reg::RegTensor<T> vregSum;
 };
 
+/* 8 行窗口（coff*cmpRatio==8）在寄存器内一步完成 softmax 与加权归约，替掉
+ * SoftmaxDN(SoftmaxDnVF) + KvMulReduceScore(MulReduceSumbaseVF) 两步，省掉概率写回 UB 再读出的往返。
+ * 与旧两步路径的累加顺序对应关系（T=float，dDealSize 为本函数 baseD64 的整数倍）：
+ *   1) max：旧路径偶数行链式 max、奇数行链式 max，再取两者 max
+ *      （见 SoftmaxDndBase64 的 max00/max01 与 Max(max00, max00, max01)）；
+ *      maxEven/maxOdd 同树。max 精确且可结合，与逐行 max 等价。
+ *   2) 分母：旧路径 vregSum 按行奇偶分成 0/1 两组各自链式累加，最后 Add(sum0, sum0, sum1)；
+ *      各列独立、SIMD lane 不参与跳列合并，所以这里 sumEven/sumOdd 只是把 4 列的列分块
+ *      换成一次 64 列，逐列加法树完全一致（dDealSize==64 已对 SoftmaxDndBase64 核对）。
+ *      128/256/512 走 SoftmaxDndBase128 / DndBaseChunked，树形需用例复核。
+ *   3) 加权归约：旧路径 MulReduceSumbase64VFImpl 从 rLoop=0 顺序 Mul+Add 到 coff*cmpRatio-1；
+ *      这里 Div/Mul/Add 也按行 0 -> 7 顺序推进、共用同一个累加器，顺序一致。
+ * 仍需 batch 一致性用例覆盖（BATCH_CONSISTENCY 且 coff*cmpRatio==8）。*/
+template <typename T>
+__simd_vf__ void SoftmaxMulReduce8VFImpl(__ubuf__ T* kvAddr, __ubuf__ T* scoreAddr, __ubuf__ T* outputAddr,
+                                         uint32_t baseD, uint32_t scLoopCnt, T minValue)
+{
+    Reg::MaskReg mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
+    for (uint16_t sc = 0; sc < scLoopCnt; ++sc) {
+        for (uint16_t chunk = 0; chunk < baseD / baseD64; ++chunk) {
+            const uint32_t offset = sc * 8 * baseD + chunk * baseD64;
+            Reg::RegTensor<T> score[8];
+            Reg::RegTensor<T> maxEven, maxOdd, sumEven, sumOdd, sum, result, kv, product;
+            Reg::Duplicate(maxEven, minValue);
+            Reg::Duplicate(maxOdd, minValue);
+            Reg::LoadAlign(score[0], scoreAddr + offset + 0 * baseD);
+            Reg::LoadAlign(score[1], scoreAddr + offset + 1 * baseD);
+            Reg::Max(maxEven, maxEven, score[0], mask);
+            Reg::Max(maxOdd, maxOdd, score[1], mask);
+            Reg::LoadAlign(score[2], scoreAddr + offset + 2 * baseD);
+            Reg::LoadAlign(score[3], scoreAddr + offset + 3 * baseD);
+            Reg::Max(maxEven, maxEven, score[2], mask);
+            Reg::Max(maxOdd, maxOdd, score[3], mask);
+            Reg::LoadAlign(score[4], scoreAddr + offset + 4 * baseD);
+            Reg::LoadAlign(score[5], scoreAddr + offset + 5 * baseD);
+            Reg::Max(maxEven, maxEven, score[4], mask);
+            Reg::Max(maxOdd, maxOdd, score[5], mask);
+            Reg::LoadAlign(score[6], scoreAddr + offset + 6 * baseD);
+            Reg::LoadAlign(score[7], scoreAddr + offset + 7 * baseD);
+            Reg::Max(maxEven, maxEven, score[6], mask);
+            Reg::Max(maxOdd, maxOdd, score[7], mask);
+            Reg::Max(maxEven, maxEven, maxOdd, mask);
+            Reg::Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(sumEven, 0, mask);
+            Reg::Duplicate<T, Reg::MaskMergeMode::ZEROING, T>(sumOdd, 0, mask);
+            Reg::FusedExpSub(score[0], score[0], maxEven, mask);
+            Reg::FusedExpSub(score[1], score[1], maxEven, mask);
+            Reg::Add(sumEven, score[0], sumEven, mask);
+            Reg::Add(sumOdd, score[1], sumOdd, mask);
+            Reg::FusedExpSub(score[2], score[2], maxEven, mask);
+            Reg::FusedExpSub(score[3], score[3], maxEven, mask);
+            Reg::Add(sumEven, score[2], sumEven, mask);
+            Reg::Add(sumOdd, score[3], sumOdd, mask);
+            Reg::FusedExpSub(score[4], score[4], maxEven, mask);
+            Reg::FusedExpSub(score[5], score[5], maxEven, mask);
+            Reg::Add(sumEven, score[4], sumEven, mask);
+            Reg::Add(sumOdd, score[5], sumOdd, mask);
+            Reg::FusedExpSub(score[6], score[6], maxEven, mask);
+            Reg::FusedExpSub(score[7], score[7], maxEven, mask);
+            Reg::Add(sumEven, score[6], sumEven, mask);
+            Reg::Add(sumOdd, score[7], sumOdd, mask);
+            Reg::Add(sum, sumEven, sumOdd, mask);
+            Reg::Duplicate(result, 0, mask);
+            Reg::Div(score[0], score[0], sum, mask);
+            Reg::LoadAlign(kv, kvAddr + offset + 0 * baseD);
+            Reg::Mul(product, kv, score[0], mask);
+            Reg::Add(result, result, product, mask);
+            Reg::Div(score[1], score[1], sum, mask);
+            Reg::LoadAlign(kv, kvAddr + offset + 1 * baseD);
+            Reg::Mul(product, kv, score[1], mask);
+            Reg::Add(result, result, product, mask);
+            Reg::Div(score[2], score[2], sum, mask);
+            Reg::LoadAlign(kv, kvAddr + offset + 2 * baseD);
+            Reg::Mul(product, kv, score[2], mask);
+            Reg::Add(result, result, product, mask);
+            Reg::Div(score[3], score[3], sum, mask);
+            Reg::LoadAlign(kv, kvAddr + offset + 3 * baseD);
+            Reg::Mul(product, kv, score[3], mask);
+            Reg::Add(result, result, product, mask);
+            Reg::Div(score[4], score[4], sum, mask);
+            Reg::LoadAlign(kv, kvAddr + offset + 4 * baseD);
+            Reg::Mul(product, kv, score[4], mask);
+            Reg::Add(result, result, product, mask);
+            Reg::Div(score[5], score[5], sum, mask);
+            Reg::LoadAlign(kv, kvAddr + offset + 5 * baseD);
+            Reg::Mul(product, kv, score[5], mask);
+            Reg::Add(result, result, product, mask);
+            Reg::Div(score[6], score[6], sum, mask);
+            Reg::LoadAlign(kv, kvAddr + offset + 6 * baseD);
+            Reg::Mul(product, kv, score[6], mask);
+            Reg::Add(result, result, product, mask);
+            Reg::Div(score[7], score[7], sum, mask);
+            Reg::LoadAlign(kv, kvAddr + offset + 7 * baseD);
+            Reg::Mul(product, kv, score[7], mask);
+            Reg::Add(result, result, product, mask);
+            Reg::StoreAlign(outputAddr + sc * baseD + chunk * baseD64, result, mask);
+        }
+    }
+}
+
+template <typename T>
+__aicore__ inline void SoftmaxMulReduce8VF(const LocalTensor<T>& kvLocal, const LocalTensor<T>& scoreLocal,
+                                           const LocalTensor<T>& outputLocal, uint32_t baseD, uint32_t scLoopCnt,
+                                           T minValue)
+{
+    SoftmaxMulReduce8VFImpl((__ubuf__ T*)kvLocal.GetPhyAddr(), (__ubuf__ T*)scoreLocal.GetPhyAddr(),
+                            (__ubuf__ T*)outputLocal.GetPhyAddr(), baseD, scLoopCnt, minValue);
+}
+
 template <typename T>
 __simd_callee__ void LoadMulAddVFImpl(__ubuf__ T* kvAddr, __ubuf__ T* scoreAddr, ReduceMulRegList<T>& regList,
                                       uint64_t offset, uint32_t maskValue)

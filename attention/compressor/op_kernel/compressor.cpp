@@ -54,15 +54,26 @@ __global__ __aicore__ void compressor(__gm__ uint8_t* x, __gm__ uint8_t* wKv, __
     REGISTER_TILING_DEFAULT(optiling::CompressorTilingData);
 #if (defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)))
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
-    GET_TILING_DATA_PTR_WITH_STRUCT(optiling::CompressorTilingData, tilingData, tiling);
 #else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
-    GET_TILING_DATA_WITH_STRUCT(optiling::CompressorTilingData, tilingDataIn, tiling);
-    const optiling::CompressorTilingData* __restrict tilingData = &tilingDataIn;
 #endif
     if constexpr (static_cast<TEMPLATE_ID>(TemplateId) == TEMPLATE_ID::EMPTY_X) {
         return;
     }
+#if (defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 3510)))
+    // arch35(3510) / arch92(9201)：静态 shape 编译（含 static kernel）下 tiling 是编译期常量，
+    // WITH_STRUCT 会展开成 static constexpr、保留常量折叠；动态 shape 用 PTR 零拷贝。
+#ifdef CONST_TILING
+    GET_TILING_DATA_WITH_STRUCT(optiling::CompressorTilingData, tilingDataIn, tiling);
+    const optiling::CompressorTilingData* __restrict tilingData = &tilingDataIn;
+#else
+    GET_TILING_DATA_PTR_WITH_STRUCT(optiling::CompressorTilingData, tilingData, tiling);
+#endif
+#else
+    // arch22：保持 WITH_STRUCT
+    GET_TILING_DATA_WITH_STRUCT(optiling::CompressorTilingData, tilingDataIn, tiling);
+    const optiling::CompressorTilingData* __restrict tilingData = &tilingDataIn;
+#endif
     TPipe pipe;
     constexpr auto xLayout = static_cast<X_LAYOUT>(XLayout);
     constexpr auto xDtype = static_cast<X_DTYPE>(XDType);

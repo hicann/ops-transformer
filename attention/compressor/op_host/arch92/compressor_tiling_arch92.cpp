@@ -312,10 +312,14 @@ ge::graphStatus CompressorTiling::SetNormalSplitInfo()
     baseParams_->kBaseNum = 1;
     baseParams_->kBaseSize = baseParams_->hiddenSize;
     if (dBaseNum * mBaseNum < baseParams_->usedCoreNum && baseParams_->batchConsistency != BATCH_CONSISTENCY) {
-        baseParams_->kBaseNum = baseParams_->coreGroupNum / mBaseNum;
+        uint32_t mGroupNum = std::max((mBaseNum + 1U) / 2U, 1U);
+        while (mGroupNum > 1U && baseParams_->coreGroupNum % mGroupNum != 0U) {
+            --mGroupNum;
+        }
+        baseParams_->kBaseNum = baseParams_->coreGroupNum / mGroupNum;
         uint32_t kAlignSize = (baseParams_->hiddenSize + baseParams_->kBaseNum - 1) / baseParams_->kBaseNum;
         baseParams_->kBaseSize = kAlignSize / 16 * 16; // 切k的size需要16对齐
-        baseParams_->mGroupNum = mBaseNum;
+        baseParams_->mGroupNum = mGroupNum;
     }
     return ge::GRAPH_SUCCESS;
 }

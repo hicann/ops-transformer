@@ -44,7 +44,6 @@ public:
     __aicore__ inline void InitBuffers(TPipe* pipe);
     // =================================执行计算=================================
     __aicore__ inline void ComputeVec1();
-    __aicore__ inline void Warmup();
 
 private:
     __aicore__ inline void CopyInApe(uint32_t dStartIdx, uint32_t dDealSize);
@@ -85,7 +84,6 @@ private:
     LocalTensor<T> scoreUb;
     LocalTensor<T> kvUb;
     TQue<QuePosition::VECIN, 1> inputQueApe;
-    Vec1SplitInfo splitInfo_;
 };
 
 template <typename COMP>
@@ -375,37 +373,9 @@ __aicore__ inline Vec1SplitInfo QuantCompressorBlockVectorFullLoad<COMP>::SplitC
 }
 
 template <typename COMP>
-__aicore__ inline void QuantCompressorBlockVectorFullLoad<COMP>::Warmup()
-{
-    splitInfo_ = SplitCoreV1();
-    if (splitInfo_.dealBatchNum == 0) {
-        return;
-    }
-
-    __gm__ uint64_t* blockTableAddr = reinterpret_cast<__gm__ uint64_t*>(this->stateBlockTableGm_.GetPhyAddr(0));
-    if constexpr (COMP::cacheMode == CACHE_MODE::RING_BUFFER) {
-        int64_t blockTableOffset = splitInfo_.curBStart * sizeof(int32_t);
-        dc_preload(blockTableAddr, blockTableOffset);
-    } else {
-        uint32_t batchStart = splitInfo_.curBStart;
-        uint32_t batchEnd = batchStart + splitInfo_.dealBatchNum;
-        for (uint32_t curB = batchStart; curB < batchEnd; ++curB) {
-            if (this->GetSeqUsed(curB) == 0) {
-                continue;
-            }
-            uint32_t startPos = this->GetStartPos(curB);
-            uint64_t rowOffset = curB * this->constInfo_.maxBlockNumPerBatch;
-            uint32_t firstBlock = startPos / this->constInfo_.blockSize;
-            int64_t blockTableOffset = (rowOffset + firstBlock) * sizeof(int32_t);
-            dc_preload(blockTableAddr, blockTableOffset);
-        }
-    }
-}
-
-template <typename COMP>
 __aicore__ inline void QuantCompressorBlockVectorFullLoad<COMP>::ComputeVec1()
 {
-    Vec1SplitInfo& splitInfo = splitInfo_;
+    Vec1SplitInfo splitInfo = SplitCoreV1();
     // 计算当前VecCore的任务量
     if (splitInfo.dealBatchNum == 0) {
         return;

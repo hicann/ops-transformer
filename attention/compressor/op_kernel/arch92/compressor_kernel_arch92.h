@@ -74,6 +74,8 @@ private:
 
     __aicore__ inline uint32_t GetBatchByTIdx(uint64_t tIdx, uint32_t& bIdxLow);
     __aicore__ inline uint32_t CalcTotalDataSize(uint64_t loopStartTIdx, uint32_t& bIdxLow);
+    // NORMAL 模板 vec 按 batch 分核（s<=4）时，轮次需按 batch 收尾
+    __aicore__ inline bool IsVecSplitByBatch() const;
     __aicore__ inline void CalcCubeParamsByTIdx(RunInfo& info, uint64_t& loopStartTIdx, uint32_t& bIdxLow);
     __aicore__ inline uint32_t GetLoopTimesByTIdx();
 
@@ -182,7 +184,7 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::Init(
         blockVec_.InitParams(constInfo, tools_, cvRatio_);
         blockVec_.Init(x, wKv, wGate, stateCache, ape, stateBlockTable, cuSeqlens, seqUsed, startPos, cmpKvOut,
                        softmaxScoreOut, kvOut);
-        blockVec_.InitBuffers(pipe_);
+        blockVec_.InitStaticTensors();
         blockVec_.InitVec1GlobalTensor(Vec1InputKvGm, Vec1InputScoreGm, vec1KvCacheGm, vec1ScoreCacheGm);
     }
 }
@@ -356,6 +358,7 @@ __aicore__ inline BasicBlockInfo CompressorKernel<COMP, IS_FULL_LOAD>::SkipOneLo
         }
     }
     uint32_t totalDataSize = constInfo.mGroupNum * constInfo.mBaseSize - quota;
+    basicBlockInfo.windowSeqCnt = totalDataSize;
     // 2. 当前组的起始偏移
     uint32_t currentGroupStart = constInfo.mCurGroupIdx * constInfo.mBaseSize;
 
@@ -375,6 +378,10 @@ __aicore__ inline BasicBlockInfo CompressorKernel<COMP, IS_FULL_LOAD>::SkipOneLo
 template <typename COMP, bool IS_FULL_LOAD>
 __aicore__ inline uint32_t CompressorKernel<COMP, IS_FULL_LOAD>::GetBatchByTIdx(uint64_t tIdx, uint32_t& bIdxLow)
 {
+    if constexpr (COMP::xLayout == X_LAYOUT::BSH) {
+        bIdxLow = static_cast<uint32_t>(tIdx / constInfo.sSize);
+        return bIdxLow;
+    }
     uint32_t bIdxHigh = constInfo.batchSize;
     while (bIdxLow < bIdxHigh) {
         uint32_t bIdxMiddle = bIdxLow + ((bIdxHigh - bIdxLow) >> 1);
@@ -388,12 +395,35 @@ __aicore__ inline uint32_t CompressorKernel<COMP, IS_FULL_LOAD>::GetBatchByTIdx(
     return bIdxLow;
 }
 
-// 本轮实际消费行数：末尾对齐到所在 batch 的压缩窗口分界
+// 本轮实际消费行数：末尾对齐到所在 batch 的压缩窗口分界。
+// NORMAL 模板 vec 按 batch 分核（BSH 且 s<=4）时改为对齐到 batch 起点：一个 batch 不能被切到两轮
+// （会影响 vec 的 batch 份额与 workspace 行偏移），但核组之间可以切 batch（vec 等所有 cube 做完才
+// 启动，对核组划分透明），所以只有每轮最后一组的尾部（= 轮次末尾）受此影响。
+// 小 S 的 AIV 也按相同 shape 公式计算；其他场景与 SkipOneLoop 保持一致。
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline bool CompressorKernel<COMP, IS_FULL_LOAD>::IsVecSplitByBatch() const
+{
+    if constexpr (IS_FULL_LOAD) {
+        return false;
+    }
+    return COMP::xLayout == X_LAYOUT::BSH && constInfo.sSize > 0 && constInfo.sSize <= VEC_BATCH_SPLIT_MAX_SEQ_SIZE;
+}
+
 template <typename COMP, bool IS_FULL_LOAD>
 __aicore__ inline uint32_t CompressorKernel<COMP, IS_FULL_LOAD>::CalcTotalDataSize(uint64_t loopStartTIdx,
                                                                                    uint32_t& bIdxLow)
 {
     const uint32_t quota = constInfo.mGroupNum * constInfo.mBaseSize;
+    if (IsVecSplitByBatch()) {
+        // BSH 小 S：轮次只由 shape 决定，AIC/AIV 独立计算，不读取 startPos。
+        const uint32_t batchCapacity = quota / constInfo.sSize;
+        const uint32_t startBatch = static_cast<uint32_t>(loopStartTIdx / constInfo.sSize);
+        // startBatch < batchSize 由 GetLoopTimesByTIdx() 与本函数步长同源保证（轮次 =
+        // ceil(batchSize/batchCapacity)，每轮最多推进 batchCapacity 个 batch）；这里仍显式钳位，
+        // 避免任一处步长/轮次公式变动后 32 位无符号回绕成超大值。
+        const uint32_t remainBatch = startBatch < constInfo.batchSize ? constInfo.batchSize - startBatch : 0U;
+        return min(batchCapacity, remainBatch) * constInfo.sSize;
+    }
     uint64_t tIdxEnd = loopStartTIdx + quota;
     uint64_t totalTIdx = static_cast<uint64_t>(constInfo.tokenSize);
     if (tIdxEnd >= totalTIdx) {
@@ -451,6 +481,9 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::CalcCubeParamsByTId
 template <typename COMP, bool IS_FULL_LOAD>
 __aicore__ inline uint32_t CompressorKernel<COMP, IS_FULL_LOAD>::GetLoopTimesByTIdx()
 {
+    if (IsVecSplitByBatch()) {
+        return CeilDivT(constInfo.batchSize, constInfo.mGroupNum * constInfo.mBaseSize / constInfo.sSize);
+    }
     uint32_t times = 0;
     uint64_t loopStartTIdx = 0;
     uint32_t bIdxLow = 0;
@@ -607,6 +640,7 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::CalcC1V1Params(RunI
     info.hStart = hStart_;
     vec1Info.dealTcNum = basicBlockInfo.dealTcNum;
     vec1Info.dealScSize = basicBlockInfo.compressedTcNum;
+    vec1Info.windowSeqCnt = basicBlockInfo.windowSeqCnt;
 }
 
 template <typename COMP, bool IS_FULL_LOAD>
@@ -631,9 +665,20 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::ProcessNormalLoop()
         BatchInfo batchInfo{};
         RunInfo info{};
         Vec1RunInfo vec1Info{};
-        SkipInvalidBatch(batchInfo);
+        if (!IsVecSplitByBatch()) {
+            SkipInvalidBatch(batchInfo);
+        }
         for (uint32_t i = 0; i < loopTimes; ++i) {
-            CalcC1V1Params(info, vec1Info, batchInfo, i);
+            if (IsVecSplitByBatch()) {
+                // 与 AIC 使用同一 shape 公式；各 AIV 仅在分到的 batch 内读取 sp/seqUsed。
+                const uint32_t batchCapacity = constInfo.mGroupNum * constInfo.mBaseSize / constInfo.sSize;
+                vec1Info.bStart = i * batchCapacity;
+                vec1Info.sStart = 0;
+                vec1Info.c1v1DbIdx = (vec1Loop++ & (constInfo.dbWorkspaceRatio - 1));
+                vec1Info.windowSeqCnt = min(batchCapacity, constInfo.batchSize - vec1Info.bStart) * constInfo.sSize;
+            } else {
+                CalcC1V1Params(info, vec1Info, batchInfo, i);
+            }
             ComputeVec1(vec1Info);
         }
     }
@@ -648,7 +693,6 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::ProcessFullLoadLoop
         CalcCubeParams(extraInfo0);
         ComputeMm1(extraInfo0);
     } else {
-        blockVec_.Warmup();
         ComputeVec1(Vec1RunInfo{});
     }
 }
