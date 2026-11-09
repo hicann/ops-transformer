@@ -743,9 +743,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNormV2(
 
 ## 调用示例
 
-<term>Atlas A3系列产品</term>  、<term>Ascend 950DT系列产品</term>，调用aclnnMoeDistributeDispatchV3和aclnnMoeDistributeCombineAddRmsNormV2接口，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
-
-- 示例代码如下，仅供参考
+示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
     ```Cpp
     #include <thread>

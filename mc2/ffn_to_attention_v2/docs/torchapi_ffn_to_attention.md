@@ -122,7 +122,7 @@ ffn_to_attention(buffer, x, session_ids, micro_batch_ids, token_ids, expert_offs
         <td>window_addr</td>
         <td>int</td>
         <td>可选</td>
-        <td>本卡（ffn侧）通信窗口内存的设备地址，与<code>window_size</code>必须成对传入。传入后该内存替代框架内部分配的通信窗口：框架会将其清零一次并注册进通信域，不会分配或释放该内存；调用方需保证该内存在buffer销毁前持续有效。仅channel后端（Ascend 950）支持。默认值为None，表示由框架内部分配。</td>
+        <td>本卡（ffn侧）通信窗口内存的设备地址，与<code>window_size</code>必须成对传入。传入后该内存替代框架内部分配的通信窗口：框架会将其清零一次并注册进通信域，不会分配或释放该内存；调用方需保证该内存在buffer销毁前持续有效。默认值为None，表示由框架内部分配。</td>
     </tr>
     <tr>
         <td>window_size</td>
@@ -259,7 +259,7 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{flagSi
     - 两个参数必须成对传入，`window_size`为本卡窗口内存的实际大小（Bytes），同时作为算子`ccl_buffer_size`。
     - FFN卡上传入的为ffn侧内存大小，需不小于FFN侧窗口所需大小（承接`attention_to_ffn`的下发接收区，按对侧实际quant_mode：量化按1B、非量化按2B。
     - 窗口内存由调用方管理，需在`buffer.destroy()`之前保持有效；框架仅负责清零一次，不负责分配与释放。
-    - 仅channel后端（Ascend950）支持；同一进程同一group下只应创建一个通信buffer（attn卡创建`attention_to_ffn`的buffer，FFN卡创建`ffn_to_attention`的buffer）。
+    - 同一进程同一group下只应创建一个通信buffer（attn卡创建`attention_to_ffn`的buffer，FFN卡创建`ffn_to_attention`的buffer）。
 
 - 参数说明里shape格式说明：
     - `Y`：表示本卡需要分发的最大token数量。

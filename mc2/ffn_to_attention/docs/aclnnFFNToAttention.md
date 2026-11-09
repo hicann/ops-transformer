@@ -310,9 +310,9 @@ aclnnStatus aclnnFFNToAttention(
   | 变量         | 定义与取值范围                                                                           |
   | :----------- | :------------------------------------------------------------------------------------- |
   | Y            | 表示本卡需要分发的最大token数量。|
-  | Bs           | 表示各Attention节点上的发送token数。<ul><li><term>Atlas A3系列产品</term>  ：<code>0 < Bs ≤ 512 </code>。</li></ul> |
-  | H（hidden size） | 表示hidden size隐藏层大小。<ul><li><term>Atlas A3系列产品</term>  ：<code>1024 ≤  H ≤ 8192 </code>。</li></ul> |
-  | HS（hidden and scale size） | 表示hidden与scale隐藏层大小。<ul><li><term>Atlas A3系列产品</term>  ：<code>1152 ≤  HS ≤ 8320 </code>。</li></ul>|
+  | Bs           | 表示各Attention节点上的发送token数，取值范围为<code>0 < Bs ≤ 512 </code>。 |
+  | H（hidden size） | 表示hidden size隐藏层大小，取值范围为<code>1024 ≤  H ≤ 8192 </code>。 |
+  | HS（hidden and scale size） | 表示hidden与scale隐藏层大小，取值范围为<code>1152 ≤  HS ≤ 8320 </code>。 |
   | MicroBatchNum    | 表示microBatch的大小，目前仅支持<code>MicroBatchNum = 1</code>。 |
   | ExpertNumPerToken    | 表示每个Token对应的Expert数量，<code>ExpertNumPerToken = K + sharedExpertNum</code>。 |
   | K    | 表示选取topK个专家，取值范围为<code>0 < K ≤ 16 </code>。 |

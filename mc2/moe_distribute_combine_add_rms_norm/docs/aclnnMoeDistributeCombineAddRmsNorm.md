@@ -554,16 +554,18 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
 
 ## 约束说明
 
-1. 确定性计算：
+- 确定性计算：
      - aclnnMoeDistributeCombineAddRmsNorm默认确定性实现。
 
-2. `aclnnMoeDistributeDispatchV2`接口与`aclnnMoeDistributeCombineAddRmsNorm`接口必须配套使用，具体参考调用示例。
+- `aclnnMoeDistributeDispatchV2`接口与`aclnnMoeDistributeCombineAddRmsNorm`接口必须配套使用，具体参考调用示例。
 
-3. 调用接口过程中使用的`groupEp`、`epWorldSize`、`moeExpertNum`、`groupTp`、`tpWorldSize`、`expertShardType`、`sharedExpertNum`、`sharedExpertRankNum`、`globalBs`参数取值所有卡需保持一致，网络中不同层也需保持一致，且和`aclnnMoeDistributeDispatchV2`对应参数也保持一致。
+- 调用接口过程中使用的`groupEp`、`epWorldSize`、`moeExpertNum`、`groupTp`、`tpWorldSize`、`expertShardType`、`sharedExpertNum`、`sharedExpertRankNum`、`globalBs`参数取值所有卡需保持一致，网络中不同层也需保持一致，且和`aclnnMoeDistributeDispatchV2`对应参数也保持一致。
 
-4. <term>Atlas A3系列产品</term>：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
+<!-- npu="A3" id10 -->
+- <term>Atlas A3系列产品</term>：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
+<!-- end id10 -->
 
-5. 参数说明里shape格式说明：
+- 参数说明里shape格式说明：
     - **A**：表示本卡需要分发的最大token数量，取值范围如下：
       - 对于共享专家，需满足(A = Bs *epWorldSize* sharedExpertNum / sharedExpertRankNum)。
       - 对于MoE专家，当`globalBs`为0时，需满足(A >= Bs *epWorldSize* min(localExpertNum, K))；当`globalBs`非0时，需满足(A >= globalBs * min(localExpertNum, K))。
@@ -574,12 +576,12 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
       - 对于共享专家卡，(localExpertNum = 1)。
       - 对于MoE专家卡，(localExpertNum = moeExpertNum / (epWorldSize - sharedExpertRankNum))；当(localExpertNum > 1)时，不支持TP域通信。
 
-6. **HCCL_BUFFSIZE**：
+- **HCCL_BUFFSIZE**：
    调用本接口前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。
     - ep通信域内：设置大小要求(≥ 2)且满足(1024^2 *(HCCL_BUFFSIZE - 2) / 2 ≥ Bs* 2 *(H + 128)* (epWorldSize * localExpertNum + K + 1))，其中`localExpertNum`需使用MoE专家卡的本卡专家数。
     - tp通信域内：预留参数，当前版本不支持。
 
-7. 通信域使用约束：
+- 通信域使用约束：
     - 一个模型中的`aclnnMoeDistributeCombineAddRmsNorm`和`aclnnMoeDistributeDispatchV2`仅支持相同EP通信域，且该通信域中不允许有其他算子。
     - 当前不支持TP域通信。
 
@@ -588,7 +590,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
 
    <!-- end id7 -->
 
-8. 通信方式约束：
+- 通信方式约束：
 
     <!-- npu="950" id8 -->
     - <term>Ascend 950DT系列产品</term>：仅支持UB Memory通信。
@@ -598,9 +600,6 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
-
-<!-- npu="950,A3" id9 -->
-- <term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：
 
     ```Cpp
     #include <thread>
@@ -1069,5 +1068,3 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
         return 0;
     }
     ```
-
-<!-- end id9 -->
