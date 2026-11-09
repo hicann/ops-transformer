@@ -132,6 +132,13 @@ def _golden(
     #     downcast 目标: innerPrecise=1 → fp16, innerPrecise=0 → bf16
     # rain_fusion_attention_forward 内部根据 query.dtype 选择高/低精度路径
     orig_dtype = query.dtype if isinstance(query, torch.Tensor) else torch.float32
+    if orig_dtype == torch.bfloat16 and innerPrecise != 0:
+        print(
+            f"[RFA-GOLDEN] BF16 currently supports only innerPrecise=0; "
+            f"innerPrecise is normalized from {innerPrecise} to 0.",
+            flush=True,
+        )
+        innerPrecise = 0
     if orig_dtype == torch.float32:
         golden_dtype = torch.float16 if innerPrecise == 1 else torch.bfloat16
     else:

@@ -405,13 +405,15 @@ TEST_F(RainFusionAttentionTiling, rain_fusion_attention_blockshape_elem_num_inva
     ExecuteTestCase(para, ge::GRAPH_FAILED, SKIP_TILING_KEY_CHECK);
 }
 
-// 对应 ValidateConfiguration：OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("innerPrecise", BF16时必须为0)
-TEST_F(RainFusionAttentionTiling, rain_fusion_attention_bf16_innerprecise_invalid)
+// BF16 当前仅支持 float32 softmax，innerPrecise=1 会被归一化为 0
+TEST_F(RainFusionAttentionTiling, rain_fusion_attention_bf16_innerprecise_normalized)
 {
     RfaTilingCase c;
     c.dtype = ge::DT_BF16;
     c.innerPrecise = 1;
-    RunCase(c, ge::GRAPH_FAILED);
+    optiling::RainFusionAttentionCompileInfo compileInfo;
+    auto para = BuildPara(c, compileInfo);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 9000000030022222ULL);
 }
 
 // 对应 CheckKvCacheLayout：OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("qInputLayout, kvInputLayout", 必须一致)

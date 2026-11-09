@@ -442,7 +442,7 @@ aclnnStatus aclnnRainFusionAttention(
 - blockShape must contain at least two elements [blockShapeX, blockShapeY], and their values must be greater than 0.
 - The shape of selectIdx must be [T, headNum, maxKvBlockNum], where T is the total number of Q-direction blocks across all batches.
 - The shape of selectNumIdx must be [T, headNum].
-- innerPrecise must be 0 (float32 softmax) or 1 (fp16 softmax). When the query input is BFLOAT16, only 0 can be configured.
+- innerPrecise must be 0 (float32 softmax) or 1 (fp16 softmax). When the query input is BFLOAT16, the current implementation supports only innerPrecise=0. If a non-zero value is passed, the operator automatically normalizes it to 0 and uses float32 softmax.
 - qSeqlen and kvSeqlen do not need to be divisible by blockShape. Non-aligned scenarios are supported, and the actual number of blocks is calculated by rounding up.
 - qSeqlen is mandatory when qInputLayout is "TND" or "BNSD". kvSeqlen is mandatory when kvInputLayout is "TND" or "BNSD".
 - Sparse block indices must be within the valid range. Invalid positions are filled with -1.

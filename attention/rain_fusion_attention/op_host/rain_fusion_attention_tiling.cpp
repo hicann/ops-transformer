@@ -735,11 +735,10 @@ ge::graphStatus RFATiling::ValidateConfiguration(gert::TilingContext* rfaContext
         return ge::GRAPH_FAILED;
     }
     dataType_ = rfaContext->GetInputDesc(QUERY_INDEX)->GetDataType();
-    if (innerPrecise_ == 1 && dataType_ == ge::DT_BF16) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(rfaContext->GetNodeName(), "innerPrecise",
-                                              std::to_string(innerPrecise_).c_str(),
-                                              "innerPrecise must be 0 when dataType is BF16");
-        return ge::GRAPH_FAILED;
+    if (dataType_ == ge::DT_BF16 && innerPrecise_ != 0) {
+        OP_LOGW(rfaContext->GetNodeName(),
+                "BF16 currently supports only innerPrecise=0; innerPrecise is normalized from %u to 0.", innerPrecise_);
+        innerPrecise_ = 0;
     }
 
     return ge::GRAPH_SUCCESS;

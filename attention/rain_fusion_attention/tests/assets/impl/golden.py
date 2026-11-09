@@ -379,6 +379,15 @@ def rain_fusion_attention_forward_fp16(
     # 函数内部根据 query.dtype 选择计算精度, 输出转fp32
     # 再转回原dtype作为benchmark输出
     orig_dtype = query.dtype if isinstance(query, torch.Tensor) else torch.float16
+    # NPU tiling normalizes BF16 to the only implemented path:
+    # innerPrecise=0 (float32 softmax), even when the caller passes 1.
+    if orig_dtype == torch.bfloat16 and inner_precise != 0:
+        print(
+            f"[RFA-BENCHMARK] BF16 currently supports only innerPrecise=0; "
+            f"innerPrecise is normalized from {inner_precise} to 0.",
+            flush=True,
+        )
+        inner_precise = 0
     out = rain_fusion_attention_forward(
         query,
         key,

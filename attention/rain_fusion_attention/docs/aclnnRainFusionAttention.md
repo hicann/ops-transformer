@@ -453,7 +453,7 @@ aclnnStatus aclnnRainFusionAttention(
 - 输入query的D（embeddingSize）当前仅支持64或128。
 - selectIdx的shape必须为[T, headNum, maxKvBlockNum]，其中T为所有batch中Q方向切块的总数。
 - selectNumIdx的shape必须为[T, headNum]。
-- innerPrecise必须为0（float32 softmax）或1（fp16 softmax），query输入为BFLOAT16时，只能配置为0。
+- innerPrecise必须为0（float32 softmax）或1（fp16 softmax）。当query输入为BFLOAT16时，当前实现仅支持innerPrecise=0；若传入非0值，算子会将其自动归一化为0，并使用float32 softmax计算。
 - qSeqlen和kvSeqlen不需要被blockShape整除，支持非对齐场景，实际分块数通过向上取整计算。
 - qSeqlen在qInputLayout为“TND”和"BNSD"时必选；kvSeqlen在kvInputLayout为“TND”和"BNSD"时必选。
 - 稀疏块索引必须在有效范围内，无效位置用-1填充。
