@@ -33,7 +33,6 @@ __aicore__ inline void DynamicQuantMultiRow(const GlobalTensor<O>& outputGm, con
 {
     constexpr uint64_t inputBlockAlign = (ALIGN_BLOCK_SIZE / sizeof(T));
     constexpr uint64_t outputBlockAlign = (ALIGN_BLOCK_SIZE / sizeof(O));
-    // DataCopyParams  : count len srcStrideIn dstStrideIn
     DataCopyParams outParams{static_cast<uint16_t>(subRow), static_cast<uint16_t>(col / outputBlockAlign), 0,
                              static_cast<uint16_t>((queryOutStride - col) / outputBlockAlign)};
     DataCopyParams inputParams{static_cast<uint16_t>(subRow), static_cast<uint16_t>(col / inputBlockAlign),
@@ -60,11 +59,7 @@ __aicore__ inline void DynamicQuantMultiRow(const GlobalTensor<O>& outputGm, con
 
         LocalTensor<O> output = outputLocal.template ReinterpretCast<O>();
         WaitFlag<HardEvent::MTE3_V>(DYNAMIC_QUANT_OUTPUT_READY);
-        if constexpr (MLA_USE_DQ_V2) {
-            DynamicQuantPerTokenVf2(output, scaleOutputLocal[scaleOffset], inputHalf, subRow, col);
-        } else {
-            DynamicQuantPerTokenVf(output, scaleOutputLocal[scaleOffset], inputHalf, subRow, col);
-        }
+        DynamicQuantPerTokenVf2(output, scaleOutputLocal[scaleOffset], inputHalf, subRow, col);
         SetFlag<HardEvent::V_MTE2>(DYNAMIC_QUANT_INPUT_READY);
         SetFlag<HardEvent::V_MTE3>(DYNAMIC_QUANT_OUTPUT_READY);
         WaitFlag<HardEvent::V_MTE3>(DYNAMIC_QUANT_OUTPUT_READY); // 计算是否已经完成可以搬运
@@ -90,7 +85,6 @@ __aicore__ inline void MulQr(const GlobalTensor<T>& outputGmRope, const GlobalTe
     uint64_t lastSubRowRope = row - (loopCntRope - 1) * subRowRope;
     uint32_t computeSizeRope = subRowRope * colRope;
 
-    // DataCopyParams  : count len srcStrideIn dstStrideIn
     DataCopyParams inputParamsRope{static_cast<uint16_t>(row), static_cast<uint16_t>(colRope / inputBlockAlign),
                                    static_cast<uint16_t>((qrOutputStrideRope - colRope) / inputBlockAlign), 0};
     DataCopyParams outputParamsRope{static_cast<uint16_t>(subRowRope), static_cast<uint16_t>(colRope / inputBlockAlign),
@@ -115,7 +109,6 @@ __aicore__ inline void MulQr(const GlobalTensor<T>& outputGmRope, const GlobalTe
         WaitFlag<HardEvent::MTE2_V>(MUL_QR);
 
         Cast(qrFp32Local, qrInputLocal[inputLocalRopeOffset], RoundMode::CAST_NONE, computeSizeRope);
-        // Every chunk consumes its own token scales, independently of the AIC/AIV ratio.
         MulQrVF(qrFp32Local, qrFp32Local, dequantScaleBrcbLocal[dequantScaleOffset], quantScaleCkvRope, computeSizeRope,
                 computeBlockAlign);
         Cast(outputLocalRope, qrFp32Local, RoundMode::CAST_RINT, computeSizeRope);
@@ -130,6 +123,7 @@ __aicore__ inline void MulQr(const GlobalTensor<T>& outputGmRope, const GlobalTe
     }
     SetFlag<HardEvent::V_MTE2>(MUL_QR_INPUT_COPY_READY);
 }
+
 /**
  * @brief DynamicQuantQnWithMulQr 流程中dynamicquant和ropeMul融合流程
           UB，流水，中间产物统筹规划
@@ -177,14 +171,14 @@ __aicore__ inline void DynamicQuantQnWithMulQr(
     constexpr uint64_t inputBlockAlign = (ALIGN_BLOCK_SIZE / sizeof(T));
     constexpr float maxInt8 = 127.0;
     // Dynamic Quant 局部变量
-    uint64_t rowStepSize = 8 * cvRatio; // 单次处理最大行数
+    uint64_t rowStepSize = 8 * cvRatio; // 8：每路 CV 单次 8 行；单次处理最大行数
 
     uint64_t subRow = row < rowStepSize ? row : rowStepSize;
     uint32_t computeSize = subRow * col;
     uint32_t brcbCnt = Align(subRow, computeBlockAlign);
 
     // Rope Post Process 局部变量
-    uint64_t rowStepSizeRope = 64; // 单次处理最大行数
+    uint64_t rowStepSizeRope = 64; // 64：Rope 侧单次最多 64 行
     uint64_t subRowRope = row < rowStepSizeRope ? row : rowStepSizeRope;
     uint32_t computeSizeRope = subRowRope * colRope;
     uint32_t loadRopeGmSize = row * colRope;
@@ -215,7 +209,6 @@ __aicore__ inline void DynamicQuantQnWithMulQr(
 
     Brcb(scaleBrcb, scaleOutputLocal, CeilDivT(row, computeBlockAlign), {1, computeBlockAlign});
 
-    // DataCopyParams  : count len srcStrideIn dstStrideIn
     DataCopyParams scaleOutCopyParams{(uint16_t)row, (uint16_t)sizeof(C), 0,
                                       (uint16_t)((scaleOutStride - 1) * sizeof(C))};
 

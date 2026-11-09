@@ -71,16 +71,6 @@ __simd_vf__ void RmsNormVFImpl(__ubuf__ InType* inputBuf, __ubuf__ GammaType* ga
     }
 }
 
-/**
- * ★迁移(false 开关, V2/MLA_TOKEN_BATCH): RmsNorm 两行交织版(row==2 专用)。
- * 与单行版的结构差异(数值路径不变——Mul+Add 保持原样):
- *   1. 两行独立累加器交织: 行0 的 Add 依赖链间隙被行1 的 Load/Mul 填充(官方双发·队列深度),
- *      单次 VF 调用处理 2 行(消一次 VF 发射——"VF 框架开销"family: 逐行调用 ~62c/次);
- *   2. pass2 的 gamma 一次 Load 供两行(gamma Load 次数减半);
- *   3. 归约/rsqrt 链两行镜像(各一组 pregFirst 标量链)。
- * 输入/输出为 [2, col] 紧凑布局(行距 = rmsNormParams.col)。
- * 调用方: RmsNormVF wrapper 按 row 路由(仅 RmsNormCq 合批路径传 row=2)。
- */
 template <typename InType, typename GammaType, typename C, typename OutType>
 __simd_vf__ void RmsNormVFImplRow2(__ubuf__ InType* inputBuf, __ubuf__ GammaType* gammaBuf, __ubuf__ OutType* outputBuf,
                                    uint32_t repeatTimes, const RmsNormParam rmsNormParams)
@@ -175,7 +165,7 @@ __aicore__ inline void RmsNormVF(const LocalTensor<OutType>& outputLocal, const 
     __ubuf__ GammaType* gammaBuf = (__ubuf__ GammaType*)gammaLocal.GetPhyAddr();
     __ubuf__ OutType* outputBuf = (__ubuf__ OutType*)outputLocal.GetPhyAddr();
 
-    if (rmsNormParams.row == 2u) {
+    if (rmsNormParams.row == 2u) { // 2u：2 行特化分支
         const uint32_t rowRepeatTimes = (rmsNormParams.col + FLOAT_REP_SIZE - 1) / FLOAT_REP_SIZE;
         RmsNormVFImplRow2<InType, GammaType, C, OutType>(inputBuf, gammaBuf, outputBuf, rowRepeatTimes, rmsNormParams);
     } else {

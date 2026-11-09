@@ -18,6 +18,50 @@
 #include "vf_comm_arch92.h"
 
 namespace MlaProlog {
+// D64 only. Input is the already-rounded BF16 RoPE result; scales keep the
+// existing Brcb layout (one row per 32-byte block). No intermediate UB stores.
+// Each head is stored contiguously with a 64-element BF16 row stride.
+__simd_vf__ inline void MulQrBf16D64VFImpl(__ubuf__ bfloat16_t* inputBuf, __ubuf__ bfloat16_t* outputBuf,
+                                           __ubuf__ float* dequantScaleBrcbBuf, uint16_t rows, float quantScaleCkvRope)
+{
+    // Match the dav_9201 continuous Cast overload, including saturation.
+    static constexpr Reg::CastTrait toFloat = {Reg::RegLayout::ZERO, Reg::SatMode::SAT, Reg::MaskMergeMode::ZEROING,
+                                               RoundMode::CAST_NONE};
+    static constexpr Reg::CastTrait toBf16 = {Reg::RegLayout::ZERO, Reg::SatMode::SAT, Reg::MaskMergeMode::ZEROING,
+                                              RoundMode::CAST_RINT};
+    Reg::MaskReg mask = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+    Reg::RegTensor<float> quantScale;
+    Reg::Duplicate(quantScale, quantScaleCkvRope);
+    for (uint16_t row = 0; row < rows; ++row) {
+        const uint32_t offset = static_cast<uint32_t>(row) * 64U; // 64U：VF 一个 repeat 的 fp32 宽度
+        Reg::RegTensor<bfloat16_t> input;
+        Reg::RegTensor<float> inputFp32;
+        Reg::RegTensor<float> scale;
+        Reg::RegTensor<float> mulScale;
+        Reg::RegTensor<float> resultFp32;
+        Reg::RegTensor<bfloat16_t> result;
+        Reg::LoadAlign<bfloat16_t, Reg::LoadDist::DIST_UNPACK_B16>(input, inputBuf + offset);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(
+            scale, dequantScaleBrcbBuf + static_cast<uint32_t>(row) * 8U); // 8U：brcb 后每行 8 个 fp32
+        Reg::Cast<float, bfloat16_t, toFloat>(inputFp32, input, mask);
+        // Preserve the original Div-then-Mul and the default Div precision mode.
+        Reg::Div(mulScale, quantScale, scale, mask);
+        Reg::Mul<float, Reg::MaskMergeMode::ZEROING>(resultFp32, inputFp32, mulScale, mask);
+        Reg::Cast<bfloat16_t, float, toBf16>(result, resultFp32, mask);
+        Reg::StoreAlign<bfloat16_t, Reg::StoreDist::DIST_PACK_B32>(outputBuf + static_cast<uint32_t>(row) * 64U, result,
+                                                                   mask); // 64U：与输入同一 repeat 宽度
+    }
+}
+
+__aicore__ inline void MulQrBf16D64VF(const LocalTensor<bfloat16_t>& outputLocal,
+                                      const LocalTensor<bfloat16_t>& inputLocal,
+                                      const LocalTensor<float>& dequantScaleBrcbLocal, float quantScaleCkvRope,
+                                      uint16_t rows)
+{
+    MulQrBf16D64VFImpl((__ubuf__ bfloat16_t*)inputLocal.GetPhyAddr(), (__ubuf__ bfloat16_t*)outputLocal.GetPhyAddr(),
+                       (__ubuf__ float*)dequantScaleBrcbLocal.GetPhyAddr(), rows, quantScaleCkvRope);
+}
+
 template <typename T>
 __simd_vf__ void MulQrVFImpl(__ubuf__ T* inputBuf, __ubuf__ T* outputBuf, __ubuf__ T* dequantScaleBrcbBuf,
                              const uint16_t floatRepSize, uint16_t repeatTimes, float quantScaleCkvRope,

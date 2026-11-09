@@ -107,13 +107,6 @@ private:
     template <bool needQnDynamicQuant>
     __aicore__ inline void AivProcess(AivOffset& aivOffset, int64_t batchOffset, int64_t curMSize,
                                       int64_t numHeadOffset, int64_t mmQnLoops);
-    template <typename T, typename O, typename S, bool needCheckEmptyTensor = false, bool needCheckAFullLoad = false,
-              bool isContinuousCopy = true>
-    __aicore__ inline void MatmulSplitM(const GlobalTensor<O>& tensorResGm, const GlobalTensor<T>& tensorAGm,
-                                        const GlobalTensor<T>& tensorBGm, const MMParams& mmPara,
-                                        const UsedBlockParams& mmBlockParams,
-                                        const GlobalTensor<S>& tensorAScaleGm = {},
-                                        const GlobalTensor<S>& tensorBScaleGm = {});
     __aicore__ inline void MatmulQcQr(AicOffset& aicOffset);
     __aicore__ inline void MatmulQcQrLoadA(AicOffset& aicOffset);
     __aicore__ inline void MatmulQcQrSplitN(AicOffset& aicOffset, bool isAFullLoad, uint32_t nInput,
@@ -403,11 +396,11 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::MmCqParamInit()
     mmCqParam_.orgKa = mmCqParam_.k;
     mmCqParam_.orgKb = mmCqParam_.k;
     mmCqParam_.orgKc = baseParams_->headSizeCq;
-    mmCqParam_.baseK = (sizeof(mmInputType) == ONE_BYTE_TYPE_SIZE) ? 256 : 128;
-    mmCqParam_.baseN = (std::is_same<mmInputType, FP8E4M3>::value && isFp8E8m0) ? 64 : 128;
-    mmCqParam_.stepK = 4;
+    mmCqParam_.baseK = (sizeof(mmInputType) == ONE_BYTE_TYPE_SIZE) ? 256 : 128; // 256/128：1B/2B 权重的 baseK
+    mmCqParam_.baseN = (std::is_same<mmInputType, FP8E4M3>::value && isFp8E8m0) ? 64 : 128; // 64：mxfp8 收窄 N 块
+    mmCqParam_.stepK = 4; // 每个 L1 窗口默认装入 4 个 baseK 块
     if ((mmCqParam_.k / mmCqParam_.baseK) % mmCqParam_.stepK != 0) {
-        mmCqParam_.stepK = 3;
+        mmCqParam_.stepK = 3; // K / baseK 不是 4 的倍数时改用 3 块
     }
     mmCqParam_.kL1StepSize = mmCqParam_.baseK * mmCqParam_.stepK;
     mmCqParam_.kScale = mmCqParam_.k / FP8_E4M3_BLOCK_SIZE;
@@ -425,11 +418,11 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::MmCkvKrParamInit()
     mmCkvKrParam_.orgKa = mmCkvKrParam_.k;
     mmCkvKrParam_.orgKb = mmCkvKrParam_.k;
     mmCkvKrParam_.orgKc = (baseParams_->headSizeCkv + baseParams_->dimHeadRope);
-    mmCkvKrParam_.baseK = (sizeof(mmInputType) == sizeof(int8_t)) ? 256 : 128;
-    mmCkvKrParam_.baseN = (std::is_same<mmInputType, FP8E4M3>::value && isFp8E8m0) ? 64 : 128;
-    mmCkvKrParam_.stepK = 4;
+    mmCkvKrParam_.baseK = (sizeof(mmInputType) == sizeof(int8_t)) ? 256 : 128; // 256/128：1B/2B 权重的 baseK
+    mmCkvKrParam_.baseN = (std::is_same<mmInputType, FP8E4M3>::value && isFp8E8m0) ? 64 : 128; // 64：mxfp8 收窄 N 块
+    mmCkvKrParam_.stepK = 4; // 每个 L1 窗口默认装入 4 个 baseK 块
     if ((mmCkvKrParam_.k / mmCkvKrParam_.baseK) % mmCkvKrParam_.stepK != 0) {
-        mmCkvKrParam_.stepK = 3;
+        mmCkvKrParam_.stepK = 3; // K / baseK 不是 4 的倍数时改用 3 块
     }
     mmCkvKrParam_.kL1StepSize = mmCkvKrParam_.baseK * mmCkvKrParam_.stepK;
     mmCkvKrParam_.kScale = mmCkvKrParam_.k / FP8_E4M3_BLOCK_SIZE;
@@ -446,14 +439,14 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::MmQcQrParamInit()
     mmQcQrParam_.orgN = mmQcQrParam_.n;
     mmQcQrParam_.orgKa = mmQcQrParam_.k;
     mmQcQrParam_.orgKb = mmQcQrParam_.k;
-    mmQcQrParam_.orgKc = (baseParams_->headSizeQc + baseParams_->headSizeQr); // (128 * 32 + 64 * 32)
-    mmQcQrParam_.baseK = (sizeof(mmQcQrInputType) == sizeof(int8_t)) ? 128 : 64;
+    mmQcQrParam_.orgKc = (baseParams_->headSizeQc + baseParams_->headSizeQr);    // (128 * 32 + 64 * 32)
+    mmQcQrParam_.baseK = (sizeof(mmQcQrInputType) == sizeof(int8_t)) ? 128 : 64; // 128/64：1B/2B 权重的 baseK
     if constexpr (MLAPT::enableGroupComputeOpt) {
-        mmQcQrParam_.baseN = 128;
+        mmQcQrParam_.baseN = 128; // 128：算力分组场景固定 N 块
     } else {
         mmQcQrParam_.baseN = 128;
     }
-    mmQcQrParam_.stepK = 4;
+    mmQcQrParam_.stepK = 4; // MM3 每个 L1 窗口装入 4 个 baseK 块
     mmQcQrParam_.kL1StepSize = mmQcQrParam_.baseK * mmQcQrParam_.stepK;
     mmQcQrParam_.kScale = mmQcQrParam_.k / FP8_E4M3_BLOCK_SIZE;
 }
@@ -474,12 +467,12 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::MmQnParamInit()
     }
     mmQnParam_.orgKb = baseParams_->dimHeadSizeQc;
     mmQnParam_.orgKc = baseParams_->headSizeCkv * baseParams_->numHeadSize;
-    mmQnParam_.baseN = 128;
-    mmQnParam_.baseK = 128;
+    mmQnParam_.baseN = 128; // 128：MM4 的 N 基本块
+    mmQnParam_.baseK = 128; // 128：MM4 的 K 基本块
     mmQnParam_.stepK = 1;
     if ((mmQnParam_.k > mmQnParam_.baseK) && (mmQnParam_.k % mmQnParam_.baseK != 0)) {
-        mmQnParam_.baseK = 64;
-        mmQnParam_.stepK = 3; // support D = 192
+        mmQnParam_.baseK = 64; // 64：D=192 时拆成 64 的块
+        mmQnParam_.stepK = 3;  // support D = 192
     }
     mmQnParam_.kL1StepSize = mmQnParam_.baseK * mmQnParam_.stepK;
     mmQnParam_.kScale = mmQnParam_.k / FP8_E4M3_BLOCK_SIZE;
@@ -509,8 +502,9 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::VectorBufferInit()
         quantScaleCkvLocal_ = quantScaleCkvBuffer_.Get<float>();
     }
 
-    // 预留brcb的空间
-    pipe_->InitBuffer(dequantTool_.deQuantScaleCqBuffer_, (baseParams_->stepBatchSize + 7) * ALIGN_BLOCK_SIZE);
+    // Brcb 每组处理 8 行
+    pipe_->InitBuffer(dequantTool_.deQuantScaleCqBuffer_,
+                      (baseParams_->stepBatchSize + 7) * ALIGN_BLOCK_SIZE); // 7:为尾组最多额外预留行数。
     dequantTool_.deQuantScaleCqLocal_ = dequantTool_.deQuantScaleCqBuffer_.template Get<dequantScaleType>();
     uint32_t sincosTokenCount = (baseParams_->stepBatchSize + cvRatio_ - 1) / cvRatio_;
     if constexpr (MLAPT::enableDequantOpt) {
@@ -805,8 +799,8 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::AicProcess(AicOffset& aicOffset
                 const uint32_t smNBlocks2 = CeilDivT(mmCkvKrParam_.n, mmCkvKrParam_.baseN);
                 const uint32_t smSubN02 = (smNBlocks2 == 1U) ? mmCkvKrParam_.n : mmCkvKrParam_.baseN;
                 const uint32_t smMAlign2 = Align(mmCkvKrParam_.m, BLOCK_CUBE_SIZE);
-                const uint32_t smBScaleOff2 =
-                    (L1_B_SIZE / 2 + smMAlign2 * mmCkvKrParam_.kScale) / FP8_TWO; // 镜像 MatmulSplitMKOuter
+                // A scale 从 L1B 槽中点开始，B scale 紧随其后，偏移按 BF16 元素计。
+                const uint32_t smBScaleOff2 = (L1_B_SIZE / 2 + smMAlign2 * mmCkvKrParam_.kScale) / FP8_TWO; // 2：单ping
                 LoadL1BOuter<mmInputType, dequantScaleType>(weightDkvKrGm_[0], dequantScaleWDkvkrGm_[0], smSubN02,
                                                             mmCkvKrParam_.kL1StepSize, mmCkvKrParam_.k,
                                                             mmCkvKrParam_.kScale, 0, smBScaleOff2, bufParam_);
@@ -878,7 +872,7 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::AicProcess(AicOffset& aicOffset
             const uint32_t smNBlocks1 = CeilDivT(mmCqParam_.n, mmCqParam_.baseN);
             const uint32_t smSubN01 = (smNBlocks1 == 1U) ? mmCqParam_.n : mmCqParam_.baseN;
             const uint32_t smMAlign1 = Align(static_cast<uint32_t>(nextMSize), BLOCK_CUBE_SIZE);
-            const uint32_t smBScaleOff1 = (L1_B_SIZE / 2 + smMAlign1 * mmCqParam_.kScale) / FP8_TWO;
+            const uint32_t smBScaleOff1 = (L1_B_SIZE / 2 + smMAlign1 * mmCqParam_.kScale) / FP8_TWO; // 2：单ping
             LoadL1BOuter<mmInputType, dequantScaleType>(weightDqGm_[0], dequantScaleWDqGm_[0], smSubN01,
                                                         mmCqParam_.kL1StepSize, mmCqParam_.k, mmCqParam_.kScale, 0,
                                                         smBScaleOff1, bufParam_);
@@ -908,7 +902,6 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::AivProcess(AivOffset& aivOffset
 
     int64_t tokenIndex = mOffset + aivOffset.curBlockTokenOffset;
     int64_t curTokenStart = mOffset + aivOffset.curBlockTokenOffset;
-    int64_t curTokenEnd = mOffset + aivOffset.curBlockTokenOffset + aivOffset.curVecToken;
 
     CopyInSinCos(curTokenStart, aivOffset.curVecToken, mOffset, curMSize);
 
@@ -957,48 +950,6 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::AivProcess(AivOffset& aivOffset
 }
 
 template <typename MLAPT>
-template <typename T, typename O, typename S, bool needCheckEmptyTensor, bool needCheckAFullLoad, bool isContinuousCopy>
-__aicore__ inline void MlaPrologV3SplitM<MLAPT>::MatmulSplitM(const GlobalTensor<O>& tensorResGm,
-                                                              const GlobalTensor<T>& tensorAGm,
-                                                              const GlobalTensor<T>& tensorBGm, const MMParams& mmPara,
-                                                              const UsedBlockParams& mmBlockParams,
-                                                              const GlobalTensor<S>& tensorAScaleGm,
-                                                              const GlobalTensor<S>& tensorBScaleGm)
-{
-    if constexpr (needCheckEmptyTensor) {
-        if constexpr (MLAPT::emptyMode == EMPTY_TENSOR_MODE::EMPTY_CACHE) {
-            return;
-        }
-    }
-    if (blockIdx_ < mmBlockParams.blockStartIdx || blockIdx_ >= mmBlockParams.blockEndIdx) {
-        return;
-    }
-    // 用于enableGroupComputeOpt场景
-    if constexpr (needCheckAFullLoad) {
-        constexpr uint32_t mSize =
-            (sizeof(mmQcQrInputType) == sizeof(int8_t)) ? INT8_AFULLLOAD_MAX_MSIZE : BF16_AFULLLOAD_MAX_MSIZE;
-        bool isAFullLoad = (mmQcQrParam_.m <= mSize) ? true : false;
-        if (isAFullLoad) {
-            MatmulGroupComputeAFullLoad<T, O, S, isContinuousCopy>(tensorResGm, tensorAGm, tensorBGm, mmPara,
-                                                                   bufParam_);
-            return;
-        }
-    }
-
-    uint32_t nInput = mmPara.n;
-    uint32_t nL1SplitSize = mmPara.baseN;
-    uint32_t nL1loops = CeilDivT(nInput, nL1SplitSize);
-    uint32_t subNL1SplitSize = nL1SplitSize;
-    for (int64_t nL1 = 0; nL1 < nL1loops; nL1++) {
-        if (nL1 == nL1loops - 1) {
-            subNL1SplitSize = nInput - (nL1loops - 1) * nL1SplitSize;
-        }
-        MatmulSplitK<T, O, S>(tensorResGm, tensorAGm, tensorBGm, mmPara, bufParam_, nL1 * nL1SplitSize, subNL1SplitSize,
-                              tensorAScaleGm, tensorBScaleGm);
-    }
-}
-
-template <typename MLAPT>
 __aicore__ inline void MlaPrologV3SplitM<MLAPT>::MatmulQcQr(AicOffset& aicOffset)
 {
     if (blockIdx_ >= baseParams_->mm3BlockNum) {
@@ -1017,10 +968,10 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::MatmulQcQr(AicOffset& aicOffset
     uint32_t smSubNL1SplitSize = smNL1SplitSize;
 
     const uint32_t smMAligned = Align(mmQcQrParam_.m, BLOCK_CUBE_SIZE);
-    const bool smAResident =
-        (!smIsAFullLoad) &&
-        (static_cast<uint64_t>(smMAligned) * mmQcQrParam_.k * sizeof(mmQcQrInputType) <= 2ULL * L1_A_SIZE) &&
-        ((bufParam_.aL1BufIter & 1u) == 0U);
+    const bool smAResident = (!smIsAFullLoad) &&
+                             (static_cast<uint64_t>(smMAligned) * mmQcQrParam_.k * sizeof(mmQcQrInputType) <=
+                              2ULL * L1_A_SIZE) && // A 可占用 ping、pong 两个槽
+                             ((bufParam_.aL1BufIter & 1u) == 0U);
     if (smAResident) {
         if constexpr (std::is_same<mmQcQrInputType, FP8E4M3>::value && isFp8E8m0) {
             // A-scale 的 GM 行距按 padded 口径(scaleSrcPadFlag=true, 与 MatmulQcQrLoadA 同参源)
@@ -1114,7 +1065,6 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::MatmulQnSyncDynamicQuantAndMulQ
     // MatmulQcQr ──> MatmulQn ──> query_out
     // [32, 128] * [128, 512] = [32, 512]
     // [32, 2, 128] * [2, 128, 512] = [32, 2, 512]
-
     for (int64_t i = 0; i < subLoopTimes; i++) {
         uint32_t coarse = CeilDivT(static_cast<uint32_t>(subLoopTimes), static_cast<uint32_t>(MAX_SYNC_FLAG_COUNT - 1));
         if (i % coarse == 0) {
@@ -1128,7 +1078,7 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::MatmulQnSyncDynamicQuantAndMulQ
             (static_cast<uint64_t>(mmQnParam_.m) * mmQnParam_.k * sizeof(mmQnInputType) <= L1_A_SIZE);
         const uint32_t smK0Load = (mmQnParam_.k < mmQnParam_.kL1StepSize) ? mmQnParam_.k : mmQnParam_.kL1StepSize;
         if (smAReuseHead) {
-            // A 驻留: 一次装载本 head 的 A(消费方 hasL1ALoaded 路径不再装 A/不推进 aL1BufIter)
+            // A 驻留: 一次装载本 head 的 A
             LoadL1A(mmQcQrResDequantGm_[qcOffset], mmQnParam_.m, smK0Load, mmQnParam_.orgKa, bufParam_);
             WaitFlag<HardEvent::MTE2_MTE1>(A_EVENT0 + (bufParam_.aL1BufIter & 1u));
         }
@@ -1145,8 +1095,8 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::MatmulQnSyncDynamicQuantAndMulQ
                                   mmQnParam_.baseN;
             }
             const bool smHasNextN1 = (nL1 + mmQnParam_.baseN < mmQnParam_.n);
-            const bool smB0Pre = (nL1 > 0); // 首块冷启动: head 内无人预取(head 边界预取走 b0BPreloaded)
-            const bool smB0BPre = (i > 0) && MLA_MM4_NEXTB_PRELOAD && (nL1 == 0); // head(i-1) 尾已预取本块 B
+            const bool smB0Pre = (nL1 > 0);              // 首块冷启动: head 内无人预取
+            const bool smB0BPre = (i > 0) && (nL1 == 0); // head(i-1) 尾已预取本块 B
             if (smAReuseHead) {
                 MatmulSplitK<mmQnInputType, mmQnOutputType, dequantScaleType, true, false, true, DataFormat::ND>(
                     mmQnResGm_[qnResOffset], mmQcQrResDequantGm_[qcOffset], weightUkGm_[weightUkOffset], mmQnParam_,
@@ -1165,14 +1115,12 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::MatmulQnSyncDynamicQuantAndMulQ
             bufParam_.aL1BufIter++;
         }
 
-        if constexpr (MLA_MM4_NEXTB_PRELOAD) {
-            if (i + 1 < subLoopTimes) {
-                const uint32_t smSubN0 = (mmQnParam_.baseN < mmQnParam_.n) ? mmQnParam_.baseN : mmQnParam_.n;
-                LoadL1B<mmQnInputType, DataFormat::ND, false>(
-                    weightUkGm_[weightUkOffset + static_cast<int64_t>(baseParams_->dimHeadSizeQc) *
-                                                     static_cast<int64_t>(baseParams_->headSizeCkv)],
-                    smSubN0, mmQnParam_.n, smK0Load, smK0Load, bufParam_);
-            }
+        if (i + 1 < subLoopTimes) {
+            const uint32_t smSubN0 = (mmQnParam_.baseN < mmQnParam_.n) ? mmQnParam_.baseN : mmQnParam_.n;
+            LoadL1B<mmQnInputType, DataFormat::ND, false>(
+                weightUkGm_[weightUkOffset + static_cast<int64_t>(baseParams_->dimHeadSizeQc) *
+                                                 static_cast<int64_t>(baseParams_->headSizeCkv)],
+                smSubN0, mmQnParam_.n, smK0Load, smK0Load, bufParam_);
         }
 
         if constexpr (std::is_same<mmQcQrOutputType, int32_t>::value || std::is_same<mmQcQrInputType, FP8E4M3>::value ||
@@ -1198,7 +1146,6 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::CopyInSinCos(int64_t tokenIndex
     }
     LocalTensor<uint8_t> smShareTmpUb = shareBuffer_.Get<uint8_t>();
     if constexpr (MLAPT::enableDequantOpt) {
-        // 如果是切N场景，mm3的每个C核都会做rope
         if (cubeBlockIdx_ >= baseParams_->mm3BlockNum) {
             return;
         }
@@ -1228,7 +1175,6 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::CopyGlobalParams()
     DataCopy(rmsnormGammaCkvLocal_, rmsnormGammaCkvGm_, baseParams_->headSizeCkv);
 
     // quantScaleCkv
-
     if constexpr (IsFullQuantMode<rmsNormCkvOutputType, dequantScaleType, false>() && !isPertile) {
         if constexpr (std::is_same<mmCkvKrOutputType, int32_t>::value ||
                       std::is_same<mmCkvKrOutputType, float>::value) {
@@ -1248,21 +1194,15 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::CopyGlobalParams()
     }
 }
 
-/**
- * @brief RmsNormCq流程，融合了dynamicquant
-          内部所需空间约为 curVecToken(128) * 8*4 + 8*4 + (4*vectorRow_*baseParams_->headSizeCq + 8)*4 = 28.0625K
- */
 template <typename MLAPT>
 __aicore__ inline void MlaPrologV3SplitM<MLAPT>::RmsNormCq(int64_t tokenIndex, int64_t rmsNormCqOffset,
                                                            int64_t rmsNormCqResOffset, int64_t curVecToken,
                                                            int64_t curBlockTokenOffset)
 {
-    // curMSize==1 && cvRatio==2 can yield curVecToken==0 on one vector core;
-    // DataCopy with blockCount=0 is undefined / can hang on Ascend NPU.
     if (curVecToken == 0) {
         return;
     }
-    if (blockIdx_ < 0 || blockIdx_ >= cvRatio_ * baseParams_->mm1BlockNum) {
+    if (blockIdx_ >= cvRatio_ * baseParams_->mm1BlockNum) { // 只有拥有 MM1 分块的核参与（blockIdx_ 为无符号，无需判负）
         return;
     }
 
@@ -1284,24 +1224,27 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::RmsNormCq(int64_t tokenIndex, i
     int64_t batchedTokens = 0;
     if constexpr (std::is_same<rmsNormCqOutputType, FP8E4M3>::value && isFp8E8m0) {
         if (curVecToken >= 2) {
+            // GatherSinCos may still read shareBuffer_ before the first GA DMA reuses it.
+            SetFlag<HardEvent::V_MTE2>(EVENT_ID1);
+            WaitFlag<HardEvent::V_MTE2>(EVENT_ID1);
             const SplitKnAccumParams smGaParams{1U, static_cast<uint64_t>(baseParams_->headSizeCq)};
             RmsNormParam smGaRmsParams = {
                 baseParams_->reciprocalCq, baseParams_->epsilonCq, static_cast<uint32_t>(vectorRow_),
                 baseParams_->headSizeCq,   baseParams_->qcQrScale, baseParams_->isQcQrScaleEnable};
+            // 每个 token 的 RMS 输出和输入各占一行 FP32，量化复用输入区。
+            // halfScale 每 32 个元素占 2 字节，按 32B 对齐。
             const uint32_t smSlotBytes =
-                static_cast<uint32_t>(baseParams_->headSizeCq) * sizeof(float) * 2U +
-                Align(static_cast<uint32_t>(baseParams_->headSizeCq) / 16U, static_cast<uint32_t>(BYTE_BLOCK));
-            // MX block quantization keeps halfScale after the two float-sized regions.
-            // Include its aligned tail so the two token slots remain disjoint.
+                static_cast<uint32_t>(baseParams_->headSizeCq) * sizeof(float) * 2U + // 2U：A/B 两块 fp32 累加区
+                Align(static_cast<uint32_t>(baseParams_->headSizeCq) / 16U,
+                      static_cast<uint32_t>(BYTE_BLOCK)); // 16：量化临时槽数
+
             for (int64_t t = 0; t + 1 < curVecToken; t += 2) {
-                // ---- L 阶段: 相邻两 token 的读连续发射(不同槽, 互不等待) ----
                 for (int64_t tt = 0; tt < 2; tt++) {
                     RmsNormKnAccumIssue<float>(
                         shareTmpUb[static_cast<uint32_t>(tt) * smSlotBytes],
                         mmCqResGm_[rmsNormCqOffset + static_cast<int64_t>(tt) * baseParams_->headSizeCq], 1U,
                         baseParams_->headSizeCq, smGaParams, (tt == 0) ? EVENT_ID0 : EVENT_ID1);
                 }
-                // ---- C 阶段: 等本槽读完成 → RmsNorm → Cast bf16 → mxfp8 分块 DQ(与 per-token 路径同源) ----
                 for (int64_t tt = 0; tt < 2; tt++) {
                     RmsNormKnMxCompute<rmsNormGammaType, rmsNormCqOutputType, dequantScaleType>(
                         outputLocal[static_cast<int64_t>(tt) * baseParams_->headSizeCq],
@@ -1309,7 +1252,6 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::RmsNormCq(int64_t tokenIndex, i
                         shareTmpUb[static_cast<uint32_t>(tt) * smSlotBytes], smGaRmsParams, smGaParams,
                         (tt == 0) ? EVENT_ID0 : EVENT_ID1);
                 }
-                // ---- 两 token 合并写(RES_ONE_WRITE 同款) + 批尾排空(跨批 WAR 守卫) ----
                 SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
                 WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
                 DataCopy(rmsNormCqResGm_[rmsNormCqResOffset], outputLocal, 2 * baseParams_->headSizeCq);
@@ -1322,7 +1264,7 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::RmsNormCq(int64_t tokenIndex, i
             batchedTokens = curVecToken - (curVecToken % 2);
         }
     }
-    // 奇数尾 token / 门控不满足 → 原 per-token 路径(行为零变化; 共用上方同一套布局张量)
+
     for (int64_t curVecTokenIdx = batchedTokens; curVecTokenIdx < curVecToken; curVecTokenIdx++) {
         RmsNormCqProcess(outputLocal, dequantScaleQcQr, dequantScaleXLocal, shareTmpUb, tokenIndex, rmsNormCqOffset,
                          rmsNormCqResOffset, curVecTokenIdx, dequantScaleCqElementNum);
@@ -1687,7 +1629,7 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::ScatterKr(LocalTensor<krCacheTy
                                    baseParams_->dimHeadRope, static_cast<int64_t>(baseParams_->krCacheStride0)});
         }
     } else if constexpr ((MLAPT::cacheMode == CACHE_MODE::PA_BLK_BSND) || (MLAPT::cacheMode == CACHE_MODE::PA_BLK_NZ)) {
-        // 使用  已计算好的偏移参数
+        // 按预先计算的页内和跨页偏移写回
         ScatterCacheMultiRows<krCacheType, (MLAPT::cacheMode == CACHE_MODE::PA_BLK_NZ)>(
             krCacheGm_, outputKrLocal,
             ScatterCacheParams{baseParams_->blockSize, ropeAndScatterKrParams.cacheOffset, vectorRow_,
@@ -1696,14 +1638,6 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::ScatterKr(LocalTensor<krCacheTy
                                ropeAndScatterKrParams.tokenIndex},
             ropeAndScatterKrParams.rowsInCurBatch, ropeAndScatterKrParams.cacheOffset,
             ropeAndScatterKrParams.nextBatchOffset);
-    } else {
-        int64_t batchTokenIndex = 0;
-        int64_t batchIndex = 0;
-        int64_t batchSeqSize = 0;
-        int64_t batchIndexOffset = 0;
-        int64_t rowsInCurBatch = 0;
-        int64_t cacheOffset = 0;
-        int64_t nextBatchOffset = 0;
     }
 }
 
@@ -1711,11 +1645,10 @@ template <typename MLAPT>
 __aicore__ inline void MlaPrologV3SplitM<MLAPT>::RmsNormRopeScatterCkvKr(int64_t tokenIndex, int64_t rmsNormCkvOffset,
                                                                          int64_t ropeKrOffset, int64_t curVecToken)
 {
-    // Avoid DataCopy/GatherSinCos with count 0 when this vector core owns no tokens.
     if (curVecToken == 0) {
         return;
     }
-    if (blockIdx_ < 0 || blockIdx_ >= cvRatio_ * baseParams_->mm2BlockNum) {
+    if (blockIdx_ >= cvRatio_ * baseParams_->mm2BlockNum) { // 只有拥有 MM2 分块的核参与（blockIdx_ 为无符号，无需判负）
         return;
     }
     LocalTensor<float> dequantScaleXLocal = shareBuffer_.Get<float>();
@@ -1772,7 +1705,6 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::QcQrSplit(int64_t curVecToken, 
                                                            int64_t mmQnPreDequantResOffset, int64_t ropeQrOffset,
                                                            int64_t ropeQrResOffset)
 {
-    // Avoid DataCopyParams with blockCount=0 when this vector core owns no tokens.
     if (curVecToken == 0) {
         return;
     }
@@ -1932,7 +1864,6 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::DynamicQuantQnAndMulQrSyncMMQn(
     int64_t blockBatchOffset = (blockIdx_ % cvRatio_) * (curStepBatchSize / cvRatio_);
     int64_t totalSizeCkv =
         static_cast<int64_t>(baseParams_->numHeadSize) * static_cast<int64_t>(baseParams_->headSizeCkv);
-    // 由于两个vec核分curStepBatchSize，各处理curStepBatchSize/2，blockIdx_ & 1 表示是否为第二个vec核
     int64_t dynamicQuantQueryOffset =
         baseParams_->stepBatchSize * baseParams_->numHeadSize * baseParams_->headSizeCkv * cubeBlockIdx_ +
         blockBatchOffset * totalSizeCkv + numHeadOffset * static_cast<int64_t>(baseParams_->headSizeCkv);

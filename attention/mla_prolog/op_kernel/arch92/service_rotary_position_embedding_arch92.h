@@ -82,7 +82,7 @@ __aicore__ inline void PreprocessRopeInput(const GlobalTensor<T>& inputGm, Local
  * @param scale 量化参数；该tensor共用
  */
 template <typename T, typename C, typename O, bool enableDequant = false, bool doRope = true,
-          bool knAccumBf16Align = false>
+          bool knAccumBf16Align = false, bool preserveNan = false>
 __aicore__ inline void RotaryPosEmbPerTensor(LocalTensor<O>& outputLocal, const GlobalTensor<T>& inputGm,
                                              const LocalTensor<C>& cosLocal, const LocalTensor<C>& sinLocal,
                                              LocalTensor<uint8_t>& shareTmpUb, Rectangle ropeParams,
@@ -127,7 +127,11 @@ __aicore__ inline void RotaryPosEmbPerTensor(LocalTensor<O>& outputLocal, const 
             RotaryPosEmb<C>(outputLocal, kFp32Local, cosLocal, sinLocal, ropeParams.row, ropeParams.col, 0);
         } else {
             RotaryPosEmb<C>(kFp32OutputLocal, kFp32Local, cosLocal, sinLocal, ropeParams.row, ropeParams.col, 0);
-            Cast(outputLocal, kFp32OutputLocal, RoundMode::CAST_RINT, cnt);
+            if constexpr (preserveNan) {
+                CastF32ToB16NoSat(outputLocal, kFp32OutputLocal, static_cast<uint32_t>(cnt));
+            } else {
+                Cast(outputLocal, kFp32OutputLocal, RoundMode::CAST_RINT, cnt);
+            }
         }
     } else {
         DataSyncBarrier<MemDsbT::UB>();
@@ -135,7 +139,11 @@ __aicore__ inline void RotaryPosEmbPerTensor(LocalTensor<O>& outputLocal, const 
             DataCopy(outputLocal, kFp32Local, cnt);
             PipeBarrier<PIPE_V>();
         } else {
-            Cast(outputLocal, kFp32Local, RoundMode::CAST_RINT, cnt);
+            if constexpr (preserveNan) {
+                CastF32ToB16NoSat(outputLocal, kFp32Local, static_cast<uint32_t>(cnt));
+            } else {
+                Cast(outputLocal, kFp32Local, RoundMode::CAST_RINT, cnt);
+            }
             PipeBarrier<PIPE_V>();
         }
     }
@@ -158,7 +166,7 @@ __aicore__ inline void RotaryPosEmbPerTensor(LocalTensor<O>& outputLocal, const 
  * @param channelDeqScaleGm 量化参数：最终使用shape[1,col]
  * @param deQuantScale 量化参数；最终使用shape[row,8]
  */
-template <typename T, typename C, typename O, bool enableDequant = false, bool doRope = true>
+template <typename T, typename C, typename O, bool enableDequant = false, bool doRope = true, bool preserveNan = false>
 __aicore__ inline void RotaryPosEmbPerHead(LocalTensor<O>& outputLocal, const GlobalTensor<T>& inputGm,
                                            const LocalTensor<C>& cosLocal, const LocalTensor<C>& sinLocal,
                                            LocalTensor<uint8_t>& shareTmpUb, Rectangle ropeParams, int64_t strideScale,
@@ -203,6 +211,8 @@ __aicore__ inline void RotaryPosEmbPerHead(LocalTensor<O>& outputLocal, const Gl
                         ropeParams.col);
         if constexpr (std::is_same<O, C>::value) {
             DataCopy(outputLocal, kFp32OutputLocal, cnt);
+        } else if constexpr (preserveNan) {
+            CastF32ToB16NoSat(outputLocal, kFp32OutputLocal, static_cast<uint32_t>(cnt));
         } else {
             Cast(outputLocal, kFp32OutputLocal, RoundMode::CAST_RINT, cnt);
         }
@@ -210,6 +220,8 @@ __aicore__ inline void RotaryPosEmbPerHead(LocalTensor<O>& outputLocal, const Gl
         DataSyncBarrier<MemDsbT::UB>();
         if constexpr (std::is_same<O, C>::value) {
             DataCopy(outputLocal, kFp32Local, cnt);
+        } else if constexpr (preserveNan) {
+            CastF32ToB16NoSat(outputLocal, kFp32Local, static_cast<uint32_t>(cnt));
         } else {
             Cast(outputLocal, kFp32Local, RoundMode::CAST_RINT, cnt);
         }

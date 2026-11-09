@@ -41,39 +41,63 @@ constexpr uint8_t PER_TILE_QUANT_MODE = 1;
 constexpr float NEG_INFINITY = -INFINITY;
 constexpr uint16_t REDUCE_SIZE = 8;
 
+namespace DynamicQuantDetail {
+constexpr Reg::CastTrait TO_FP32_EVEN = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN, Reg::MaskMergeMode::ZEROING,
+                                         RoundMode::UNKNOWN};
+constexpr Reg::CastTrait TO_FP32_ODD = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN, Reg::MaskMergeMode::ZEROING,
+                                        RoundMode::UNKNOWN};
+
+template <typename T>
+__simd_callee__ inline void LoadFp32(Reg::RegTensor<float>& values, __ubuf__ T* src, Reg::MaskReg& mask)
+{
+    if constexpr (std::is_same<T, float>::value) {
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_NORM>(values, src);
+    } else {
+        Reg::RegTensor<T> packed;
+        Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(packed, src);
+        Reg::Cast<float, T, TO_FP32_EVEN>(values, packed, mask);
+    }
+}
+
+template <typename O>
+__simd_callee__ inline void QuantizeAndStore(__ubuf__ O* dst, Reg::RegTensor<float>& values,
+                                             Reg::RegTensor<float>& scale, Reg::MaskReg& mask)
+{
+    static constexpr Reg::CastTrait roundToNearest = {Reg::RegLayout::ZERO, Reg::SatMode::SAT,
+                                                      Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
+    Reg::RegTensor<float> normalized;
+    Reg::RegTensor<O> output;
+    Reg::Div(normalized, values, scale, mask);
+    if constexpr (std::is_same<O, fp8_e4m3fn_t>::value) {
+        Reg::Cast<O, float, roundToNearest>(output, normalized, mask);
+    } else if constexpr (std::is_same<O, hifloat8_t>::value) {
+        static constexpr Reg::CastTrait roundToHif8 = {Reg::RegLayout::ZERO, Reg::SatMode::SAT,
+                                                       Reg::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
+        Reg::Cast<O, float, roundToHif8>(output, normalized, mask);
+    } else {
+        static constexpr Reg::CastTrait roundToHalf = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
+                                                       Reg::MaskMergeMode::ZEROING, RoundMode::CAST_ODD};
+        Reg::RegTensor<half> halfValues;
+        Reg::Cast<half, float, roundToHalf>(halfValues, normalized, mask);
+        Reg::Cast<O, half, roundToNearest>(output, halfValues, mask);
+    }
+    Reg::StoreAlign<O, Reg::StoreDist::DIST_PACK4_B32>(dst, output, mask);
+}
+} // namespace DynamicQuantDetail
+
 template <typename T, typename C, typename O, uint8_t M = 0>
 __simd_vf__ void ComputeVFImpl(__ubuf__ T* xAddr, __ubuf__ O* yAddr, __ubuf__ float* scaleAddr, uint32_t rowIndex,
                                uint32_t rowCount, uint32_t dtypeSize, uint16_t VL, uint16_t vfLoop,
                                const float alphaValue)
 {
-    constexpr static AscendC::Reg::CastTrait castTraitB16ToF32 = {
-        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
-        AscendC::RoundMode::UNKNOWN};
-    constexpr static AscendC::Reg::CastTrait castTraitPack2 = {
-        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::SAT, AscendC::Reg::MaskMergeMode::ZEROING,
-        RoundMode::CAST_RINT};
-    constexpr static AscendC::Reg::CastTrait castTraitF32ToHalf = {
-        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::NO_SAT, AscendC::Reg::MaskMergeMode::ZEROING,
-        RoundMode::CAST_ODD};
-    constexpr static AscendC::Reg::CastTrait castTraitF32ToHif8 = {
-        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::SAT, AscendC::Reg::MaskMergeMode::ZEROING,
-        RoundMode::CAST_ROUND};
-    static constexpr AscendC::Reg::DivSpecificMode mode = {AscendC::Reg::MaskMergeMode::ZEROING, true};
-    AscendC::Reg::RegTensor<T> xInput;       // 搬入的x
     AscendC::Reg::RegTensor<float> xFp32;    // cast成float之后的x
     AscendC::Reg::RegTensor<float> xFp32Abs; // x的绝对值absvalue
     AscendC::Reg::RegTensor<float> xMaxAbs; // x的abs与-inf比较的结果，可以认为是x的absvalue的一些最大值
     AscendC::Reg::RegTensor<float> xReduceMax; // reduceMax
     AscendC::Reg::RegTensor<float> xScale;     // scale
     AscendC::Reg::RegTensor<float> xScaleDup;  // Duplicate之后的scale，为了和input一起得到y
-    AscendC::Reg::RegTensor<float> xNorm;      // input/scale
-    AscendC::Reg::RegTensor<half> yHalf;       // float-->half-->int8
-    AscendC::Reg::RegTensor<O> yOutput;        // 最终y
 
-    AscendC::Reg::MaskReg validMask0; // 有效掩码
-    AscendC::Reg::MaskReg fullMask1 =
-        AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>(); // 启用所有通道，全掩码
-    AscendC::Reg::MaskReg validMask2;
+    Reg::MaskReg fullMask1 = Reg::CreateMask<float, Reg::MaskPattern::ALL>(); // 启用所有通道，全掩码
 
     AscendC::Reg::UnalignRegForStore ureg0;
     AscendC::Reg::Duplicate(xMaxAbs, NEG_INFINITY, fullMask1);
@@ -81,14 +105,8 @@ __simd_vf__ void ComputeVFImpl(__ubuf__ T* xAddr, __ubuf__ O* yAddr, __ubuf__ fl
 
     // 计算量化参数
     for (uint16_t j = 0; j < vfLoop; j++) {
-        validMask0 = AscendC::Reg::UpdateMask<float>(sreg0); // 有效元素
-        if constexpr (!std::is_same<T, float>::value) {
-            AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(xInput,
-                                                                                xAddr + rowIndex * rowCount + j * VL);
-            AscendC::Reg::Cast<float, T, castTraitB16ToF32>(xFp32, xInput, validMask0);
-        } else {
-            AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_NORM>(xFp32, xAddr + rowIndex * rowCount + j * VL);
-        }
+        Reg::MaskReg validMask0 = Reg::UpdateMask<float>(sreg0); // 有效元素
+        DynamicQuantDetail::LoadFp32(xFp32, xAddr + rowIndex * rowCount + j * VL, validMask0);
         AscendC::Reg::Abs(xFp32Abs, xFp32, validMask0);
         AscendC::Reg::Max(xMaxAbs, xFp32Abs, xMaxAbs, fullMask1);
     }
@@ -107,24 +125,9 @@ __simd_vf__ void ComputeVFImpl(__ubuf__ T* xAddr, __ubuf__ O* yAddr, __ubuf__ fl
     uint32_t sreg1 = rowCount;
     for (uint16_t j = 0; j < vfLoop; j++) {
         auto addr = yAddr + rowIndex * rowCount + j * VL;
-        validMask2 = AscendC::Reg::UpdateMask<float>(sreg1);
-        if constexpr (!std::is_same<T, float>::value) {
-            AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(xInput,
-                                                                                xAddr + rowIndex * rowCount + j * VL);
-            AscendC::Reg::Cast<float, T, castTraitB16ToF32>(xFp32, xInput, validMask2);
-        } else {
-            AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_NORM>(xFp32, xAddr + rowIndex * rowCount + j * VL);
-        }
-        AscendC::Reg::Div(xNorm, xFp32, xScaleDup, validMask2);
-        if constexpr (std::is_same<O, fp8_e4m3fn_t>::value) {
-            AscendC::Reg::Cast<O, float, castTraitPack2>(yOutput, xNorm, validMask2);
-        } else if constexpr (std::is_same<O, hifloat8_t>::value) {
-            AscendC::Reg::Cast<O, float, castTraitF32ToHif8>(yOutput, xNorm, validMask2);
-        } else {
-            AscendC::Reg::Cast<half, float, castTraitF32ToHalf>(yHalf, xNorm, validMask2);
-            AscendC::Reg::Cast<O, half, castTraitPack2>(yOutput, yHalf, validMask2);
-        }
-        AscendC::Reg::StoreAlign<O, AscendC::Reg::StoreDist::DIST_PACK4_B32>(addr, yOutput, validMask2);
+        Reg::MaskReg validMask2 = Reg::UpdateMask<float>(sreg1);
+        DynamicQuantDetail::LoadFp32(xFp32, xAddr + rowIndex * rowCount + j * VL, validMask2);
+        DynamicQuantDetail::QuantizeAndStore(addr, xFp32, xScaleDup, validMask2);
     }
     AscendC::Reg::StoreUnAlignPost(scaleAddr, ureg0, 0);
 }
@@ -158,150 +161,131 @@ __aicore__ inline void DynamicQuantPerTokenVf(const LocalTensor<O>& outputLocal,
     }
 }
 
-template <typename T, typename C, typename O, uint16_t NCHUNK>
+namespace DynamicQuantDetail {
+// Keep the four input registers distinct: the D512 path reuses them for the stores below.
+template <typename T>
+struct Bf16RowChunks {
+    Reg::RegTensor<T> first;
+    Reg::RegTensor<T> second;
+    Reg::RegTensor<T> third;
+    Reg::RegTensor<T> fourth;
+};
+
+template <typename T>
+__simd_callee__ inline void LoadChunkMagnitude(__ubuf__ T* src, Reg::RegTensor<T>& values,
+                                               Reg::RegTensor<uint16_t>& magnitude, Reg::RegTensor<uint16_t>& absMask,
+                                               Reg::MaskReg& mask)
+{
+    Reg::LoadAlign<T, Reg::LoadDist::DIST_NORM>(values, src);
+    Reg::And(magnitude, (Reg::RegTensor<uint16_t>&)values, absMask, mask);
+}
+
+template <typename T, uint16_t NCHUNK>
+__simd_callee__ inline void ReduceBf16RowMax(__ubuf__ T* row, Bf16RowChunks<T>& values,
+                                             Reg::RegTensor<uint16_t>& absMask, Reg::MaskReg& bf16Mask,
+                                             Reg::MaskReg& floatMask, Reg::RegTensor<float>& maxAbs)
+{
+    constexpr uint16_t chunkSize = 128;
+    Reg::RegTensor<uint16_t> abs0, abs1, abs2, abs3;
+    LoadChunkMagnitude(row, values.first, abs0, absMask, bf16Mask);
+    if constexpr (NCHUNK >= 2) {
+        LoadChunkMagnitude(row + chunkSize, values.second, abs1, absMask, bf16Mask);
+    }
+    if constexpr (NCHUNK >= 3) {
+        LoadChunkMagnitude(row + 2 * chunkSize, values.third, abs2, absMask, bf16Mask);
+    }
+    if constexpr (NCHUNK >= 4) {
+        LoadChunkMagnitude(row + 3 * chunkSize, values.fourth, abs3, absMask, bf16Mask);
+    }
+    Reg::RegTensor<T> max01, max23, maxAll;
+    Reg::RegTensor<float> even, odd, maxPair;
+    if constexpr (NCHUNK == 1) {
+        Reg::Cast<float, T, TO_FP32_EVEN>(even, (Reg::RegTensor<T>&)abs0, bf16Mask);
+        Reg::Cast<float, T, TO_FP32_ODD>(odd, (Reg::RegTensor<T>&)abs0, bf16Mask);
+    } else {
+        if constexpr (NCHUNK == 2) {
+            Reg::Max(maxAll, (Reg::RegTensor<T>&)abs0, (Reg::RegTensor<T>&)abs1, bf16Mask);
+        } else {
+            Reg::Max(max01, (Reg::RegTensor<T>&)abs0, (Reg::RegTensor<T>&)abs1, bf16Mask);
+            if constexpr (NCHUNK == 4) {
+                Reg::Max(max23, (Reg::RegTensor<T>&)abs2, (Reg::RegTensor<T>&)abs3, bf16Mask);
+                Reg::Max(maxAll, max01, max23, bf16Mask);
+            } else {
+                Reg::Max(maxAll, max01, (Reg::RegTensor<T>&)abs2, bf16Mask);
+            }
+        }
+        Reg::Cast<float, T, TO_FP32_EVEN>(even, maxAll, bf16Mask);
+        Reg::Cast<float, T, TO_FP32_ODD>(odd, maxAll, bf16Mask);
+    }
+    Reg::Max(maxPair, even, odd, floatMask);
+    Reg::Reduce<Reg::ReduceType::MAX, float, float, Reg::MaskMergeMode::ZEROING>(maxAbs, maxPair, floatMask);
+}
+
+template <typename T, typename O>
+__simd_callee__ inline void StoreBf16Chunk(__ubuf__ O* dst, Reg::RegTensor<T>& values, Reg::RegTensor<float>& scale,
+                                           Reg::MaskReg& bf16Mask, Reg::MaskReg& floatMask)
+{
+    Reg::RegTensor<float> even, odd;
+    Reg::Cast<float, T, TO_FP32_EVEN>(even, values, bf16Mask);
+    Reg::Cast<float, T, TO_FP32_ODD>(odd, values, bf16Mask);
+    Reg::Interleave(even, odd, even, odd);
+    QuantizeAndStore(dst, even, scale, floatMask);
+    QuantizeAndStore(dst + 64, odd, scale, floatMask);
+}
+} // namespace DynamicQuantDetail
+
+template <typename T, typename C, typename O, uint16_t NCHUNK, bool REUSE_D512 = false>
 __simd_vf__ void DynamicQuantPerTokenVFImpl2(__ubuf__ T* xAddr, __ubuf__ O* yAddr, __ubuf__ float* scaleAddr,
                                              uint16_t row, uint16_t col, const float alphaValue)
 {
-    constexpr static AscendC::Reg::CastTrait castTraitB16ToF32Zero = {
-        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
-        RoundMode::UNKNOWN};
-    constexpr static AscendC::Reg::CastTrait castTraitB16ToF32One = {
-        AscendC::Reg::RegLayout::ONE, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
-        RoundMode::UNKNOWN};
-    constexpr static AscendC::Reg::CastTrait castTraitPack2 = {
-        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::SAT, AscendC::Reg::MaskMergeMode::ZEROING,
-        RoundMode::CAST_RINT};
-    constexpr static AscendC::Reg::CastTrait castTraitF32ToHalf = {
-        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::NO_SAT, AscendC::Reg::MaskMergeMode::ZEROING,
-        RoundMode::CAST_ODD};
-
-    if (row == 0u || col == 0u) {
-        return;
+    static_assert(!REUSE_D512 || (NCHUNK == 4 && std::is_same<T, bfloat16_t>::value && std::is_same<C, float>::value &&
+                                  std::is_same<O, fp8_e4m3fn_t>::value),
+                  "D512 register reuse requires BF16 input, FP32 scale and E4M3 output");
+    if constexpr (!REUSE_D512) {
+        if (row == 0u || col == 0u) {
+            return;
+        }
     }
-    constexpr uint16_t BF16_REP = 128;
-    constexpr uint16_t F32_REP = 64;
-
-    AscendC::Reg::MaskReg pregBf16All = AscendC::Reg::CreateMask<T, AscendC::Reg::MaskPattern::ALL>();
-    AscendC::Reg::MaskReg pregF32All = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
-
-    AscendC::Reg::RegTensor<uint16_t> vAbsMask;
-    AscendC::Reg::Duplicate(vAbsMask, static_cast<uint16_t>(0x7FFF));
-
-    AscendC::Reg::UnalignRegForStore uregScale;
-    const uint16_t vfLoop = col / F32_REP;
-
-    for (uint16_t r = 0; r < row; r++) {
+    constexpr uint16_t bf16Rep = 128;
+    constexpr uint16_t floatRep = 64;
+    Reg::MaskReg bf16Mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
+    Reg::MaskReg floatMask = Reg::CreateMask<float, Reg::MaskPattern::ALL>();
+    Reg::RegTensor<uint16_t> absMask;
+    Reg::Duplicate(absMask, static_cast<uint16_t>(0x7FFF));
+    Reg::UnalignRegForStore scaleStore;
+    const uint16_t vfLoop = col / floatRep;
+    for (uint16_t r = 0; r < row; ++r) {
         __ubuf__ T* rowX = xAddr + static_cast<uint32_t>(r) * col;
         __ubuf__ O* rowY = yAddr + static_cast<uint32_t>(r) * col;
-
-        AscendC::Reg::RegTensor<T> x0;
-        AscendC::Reg::RegTensor<T> x1;
-        AscendC::Reg::RegTensor<T> x2;
-        AscendC::Reg::RegTensor<T> x3;
-        AscendC::Reg::RegTensor<uint16_t> a0;
-        AscendC::Reg::RegTensor<uint16_t> a1;
-        AscendC::Reg::RegTensor<uint16_t> a2;
-        AscendC::Reg::RegTensor<uint16_t> a3;
-        AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_NORM>(x0, rowX);
-        AscendC::Reg::And(a0, (AscendC::Reg::RegTensor<uint16_t>&)x0, vAbsMask, pregBf16All);
-        if constexpr (NCHUNK >= 2) {
-            AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_NORM>(x1, rowX + BF16_REP);
-            AscendC::Reg::And(a1, (AscendC::Reg::RegTensor<uint16_t>&)x1, vAbsMask, pregBf16All);
-        }
-        if constexpr (NCHUNK >= 3) {
-            AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_NORM>(x2, rowX + 2 * BF16_REP);
-            AscendC::Reg::And(a2, (AscendC::Reg::RegTensor<uint16_t>&)x2, vAbsMask, pregBf16All);
-        }
-        if constexpr (NCHUNK >= 4) {
-            AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_NORM>(x3, rowX + 3 * BF16_REP);
-            AscendC::Reg::And(a3, (AscendC::Reg::RegTensor<uint16_t>&)x3, vAbsMask, pregBf16All);
-        }
-        AscendC::Reg::RegTensor<float> fLo;
-        AscendC::Reg::RegTensor<float> fHi;
-        if constexpr (NCHUNK == 4) {
-            AscendC::Reg::RegTensor<T> m01;
-            AscendC::Reg::RegTensor<T> m23;
-            AscendC::Reg::RegTensor<T> mAll;
-            AscendC::Reg::Max(m01, (AscendC::Reg::RegTensor<T>&)a0, (AscendC::Reg::RegTensor<T>&)a1, pregBf16All);
-            AscendC::Reg::Max(m23, (AscendC::Reg::RegTensor<T>&)a2, (AscendC::Reg::RegTensor<T>&)a3, pregBf16All);
-            AscendC::Reg::Max(mAll, m01, m23, pregBf16All);
-            AscendC::Reg::Cast<float, T, castTraitB16ToF32Zero>(fLo, mAll, pregBf16All);
-            AscendC::Reg::Cast<float, T, castTraitB16ToF32One>(fHi, mAll, pregBf16All);
-        } else if constexpr (NCHUNK == 3) {
-            AscendC::Reg::RegTensor<T> m01;
-            AscendC::Reg::RegTensor<T> mAll;
-            AscendC::Reg::Max(m01, (AscendC::Reg::RegTensor<T>&)a0, (AscendC::Reg::RegTensor<T>&)a1, pregBf16All);
-            AscendC::Reg::Max(mAll, m01, (AscendC::Reg::RegTensor<T>&)a2, pregBf16All);
-            AscendC::Reg::Cast<float, T, castTraitB16ToF32Zero>(fLo, mAll, pregBf16All);
-            AscendC::Reg::Cast<float, T, castTraitB16ToF32One>(fHi, mAll, pregBf16All);
-        } else if constexpr (NCHUNK == 2) {
-            AscendC::Reg::RegTensor<T> mAll;
-            AscendC::Reg::Max(mAll, (AscendC::Reg::RegTensor<T>&)a0, (AscendC::Reg::RegTensor<T>&)a1, pregBf16All);
-            AscendC::Reg::Cast<float, T, castTraitB16ToF32Zero>(fLo, mAll, pregBf16All);
-            AscendC::Reg::Cast<float, T, castTraitB16ToF32One>(fHi, mAll, pregBf16All);
+        DynamicQuantDetail::Bf16RowChunks<T> values;
+        Reg::RegTensor<float> maxAbs, scale, scaleDup;
+        DynamicQuantDetail::ReduceBf16RowMax<T, NCHUNK>(rowX, values, absMask, bf16Mask, floatMask, maxAbs);
+        Reg::Muls(scale, maxAbs, alphaValue, floatMask);
+        Reg::Duplicate(scaleDup, scale, floatMask);
+        Reg::StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(scaleAddr, scale, scaleStore, 1);
+        if constexpr (REUSE_D512) {
+            DynamicQuantDetail::StoreBf16Chunk(rowY, values.first, scaleDup, bf16Mask, floatMask);
+            DynamicQuantDetail::StoreBf16Chunk(rowY + bf16Rep, values.second, scaleDup, bf16Mask, floatMask);
+            DynamicQuantDetail::StoreBf16Chunk(rowY + 2 * bf16Rep, values.third, scaleDup, bf16Mask, floatMask);
+            DynamicQuantDetail::StoreBf16Chunk(rowY + 3 * bf16Rep, values.fourth, scaleDup, bf16Mask, floatMask);
         } else {
-            AscendC::Reg::Cast<float, T, castTraitB16ToF32Zero>(fLo, (AscendC::Reg::RegTensor<T>&)a0, pregBf16All);
-            AscendC::Reg::Cast<float, T, castTraitB16ToF32One>(fHi, (AscendC::Reg::RegTensor<T>&)a0, pregBf16All);
+            for (uint16_t j = 0; j < vfLoop; ++j) {
+                const uint32_t offset = static_cast<uint32_t>(j) * floatRep;
+                Reg::RegTensor<float> chunk;
+                DynamicQuantDetail::LoadFp32(chunk, rowX + offset, floatMask);
+                DynamicQuantDetail::QuantizeAndStore(rowY + offset, chunk, scaleDup, floatMask);
+            }
         }
-        AscendC::Reg::RegTensor<float> fMax;
-        AscendC::Reg::RegTensor<float> xReduceMax;
-        AscendC::Reg::RegTensor<float> xScale;
-        AscendC::Reg::RegTensor<float> xScaleDup;
-        AscendC::Reg::Max(fMax, fLo, fHi, pregF32All);
-        AscendC::Reg::Reduce<AscendC::Reg::ReduceType::MAX, float, float, AscendC::Reg::MaskMergeMode::ZEROING>(
-            xReduceMax, fMax, pregF32All);
-        AscendC::Reg::Muls(xScale, xReduceMax, alphaValue, pregF32All);
-        AscendC::Reg::Duplicate(xScaleDup, xScale, pregF32All);
-        AscendC::Reg::StoreUnAlign<float, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(scaleAddr, xScale, uregScale, 1);
-
-#define MLA_VF_DQ_LD(J, XIN) \
-    AscendC::Reg::LoadAlign<T, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(XIN, rowX + static_cast<uint32_t>(J) * F32_REP)
-#define MLA_VF_DQ_C2F(XFP, XIN) AscendC::Reg::Cast<float, T, castTraitB16ToF32Zero>(XFP, XIN, pregF32All)
-#define MLA_VF_DQ_NRM(XNR, XFP) AscendC::Reg::Div(XNR, XFP, xScaleDup, pregF32All)
-#define MLA_VF_DQ_C2O(YOUT, YHALF, XNR) \
-    do { \
-        if constexpr (std::is_same<O, fp8_e4m3fn_t>::value) { \
-            AscendC::Reg::Cast<O, float, castTraitPack2>(YOUT, XNR, pregF32All); \
-        } else if constexpr (std::is_same<O, hifloat8_t>::value) { \
-            constexpr static AscendC::Reg::CastTrait castTraitF32ToHif8U = { \
-                AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::SAT, AscendC::Reg::MaskMergeMode::ZEROING, \
-                RoundMode::CAST_ROUND}; \
-            AscendC::Reg::Cast<O, float, castTraitF32ToHif8U>(YOUT, XNR, pregF32All); \
-        } else { \
-            AscendC::Reg::Cast<half, float, castTraitF32ToHalf>(YHALF, XNR, pregF32All); \
-            AscendC::Reg::Cast<O, half, castTraitPack2>(YOUT, YHALF, pregF32All); \
-        } \
-    } while (0)
-#define MLA_VF_DQ_ST(J, YOUT) \
-    AscendC::Reg::StoreAlign<O, AscendC::Reg::StoreDist::DIST_PACK4_B32>(rowY + static_cast<uint32_t>(J) * F32_REP, \
-                                                                         YOUT, pregF32All)
-
-        for (uint16_t j = 0; j < vfLoop; j++) {
-            AscendC::Reg::RegTensor<T> xInput;
-            AscendC::Reg::RegTensor<float> xFp32;
-            AscendC::Reg::RegTensor<float> xNorm;
-            AscendC::Reg::RegTensor<O> yOutput;
-            AscendC::Reg::RegTensor<half> yHalf;
-            MLA_VF_DQ_LD(j, xInput);
-            MLA_VF_DQ_C2F(xFp32, xInput);
-            MLA_VF_DQ_NRM(xNorm, xFp32);
-            MLA_VF_DQ_C2O(yOutput, yHalf, xNorm);
-            MLA_VF_DQ_ST(j, yOutput);
-        }
-#undef MLA_VF_DQ_LD
-#undef MLA_VF_DQ_C2F
-#undef MLA_VF_DQ_NRM
-#undef MLA_VF_DQ_C2O
-#undef MLA_VF_DQ_ST
     }
-    AscendC::Reg::StoreUnAlignPost(scaleAddr, uregScale, 0);
+    Reg::StoreUnAlignPost(scaleAddr, scaleStore, 0);
 }
 
 /**
  * @brief V1 wrapper: 按col路由到v2原语, 门控外回退原DynamicQuantPerTokenVf。
  *        门控: T为bfloat16_t && col%128==0 && col/128∈[1,4]。
+ *        REUSE_D512 is opt-in for disjoint UB-Qr input/output/scale banks, BF16/FP32/E4M3, 64x512 only.
  */
-template <typename T, typename C, typename O>
+template <typename T, typename C, typename O, bool REUSE_D512 = false>
 __aicore__ inline void DynamicQuantPerTokenVf2(const LocalTensor<O>& outputLocal, const LocalTensor<C>& scale,
                                                const LocalTensor<T>& inputLocal, uint64_t row, uint64_t col)
 {
@@ -310,8 +294,8 @@ __aicore__ inline void DynamicQuantPerTokenVf2(const LocalTensor<O>& outputLocal
         DynamicQuantPerTokenVf<T, C, O>(outputLocal, scale, inputLocal, row, col);
         return;
     } else {
-        const uint32_t nChunk = static_cast<uint32_t>(col) / 128u;
-        if (col % 128u != 0u || nChunk < 1u || nChunk > 4u) {
+        const uint32_t nChunk = static_cast<uint32_t>(col) / 128u; // 128u：bf16 一个 256B repeat 的元素数
+        if (col % 128u != 0u || nChunk < 1u || nChunk > 4u) {      // 4u：最多 4 个 chunk，对应 D=512
             DynamicQuantPerTokenVf<T, C, O>(outputLocal, scale, inputLocal, row, col);
             return;
         }
@@ -324,6 +308,12 @@ __aicore__ inline void DynamicQuantPerTokenVf2(const LocalTensor<O>& outputLocal
         const float alphaValue = static_cast<float>(1.0) / maxValue;
         const uint16_t rowU16 = static_cast<uint16_t>(row);
         const uint16_t colU16 = static_cast<uint16_t>(col);
+        if constexpr (REUSE_D512 && std::is_same<C, float>::value && std::is_same<O, fp8_e4m3fn_t>::value) {
+            if (row == 64U && col == 512U) { // 64×512：D=512 的专用复用路径
+                DynamicQuantPerTokenVFImpl2<T, C, O, 4, true>(xAddr, yAddr, scaleAddr, rowU16, colU16, alphaValue);
+                return;
+            }
+        }
         if (nChunk == 4u) {
             DynamicQuantPerTokenVFImpl2<T, C, O, 4>(xAddr, yAddr, scaleAddr, rowU16, colU16, alphaValue);
         } else if (nChunk == 2u) {

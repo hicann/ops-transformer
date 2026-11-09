@@ -136,6 +136,8 @@ constexpr int FINISH_VEC_DEQUANT_QC = 0x6;
 constexpr int FINISH_VEC_CKVKR = 0x9;
 constexpr int FINISH_VEC_ALL = 0x7;
 constexpr int FINISH_VEC_CKVKR_READS = 0x5;
+constexpr int FINISH_VEC_CQ_READY = 0x0;
+constexpr int FINISH_VEC_CQ_SCALE_READY = 0x2;
 
 constexpr int FINISH_MM_QCQR_SPLIT_N = 0XA;
 constexpr int FINISH_MM_QCQR_SPLIT_BATCH = 0x3;
@@ -144,12 +146,6 @@ constexpr int FINISH_VEC_DEQUANT_QC_SPLIT_N_GAP = 0X1;
 constexpr int FINISH_MM_QN_SPLIT_N = 0X8;
 
 constexpr int FINISH_VEC_QCQR_CONSUMED = 0XB;
-
-#ifdef ENABLE_DUMP_DATA
-#define DO_DUMP_DATA(srcTensor, id, len) DumpTensor(srcTensor, id, len)
-#else
-#define DO_DUMP_DATA(srcTensor, id, len)
-#endif
 
 class NoneType {};
 
@@ -461,36 +457,17 @@ __aicore__ constexpr bool IsFullQuantMode()
 {
     constexpr bool IS_FP8_E8M0 = std::is_same<SCALE_T, FP8E8M0>::value;
     if constexpr (EXCLUDE_MXFP8) {
-        // Pattern A: INT8 ‖ HIF8 ‖ (FP8E4M3 && !IS_FP8_E8M0)
         return std::is_same<INPUT_T, int8_t>::value || std::is_same<INPUT_T, HIF8>::value ||
                (std::is_same<INPUT_T, FP8E4M3>::value && !IS_FP8_E8M0);
     } else {
-        // Pattern B: INT8 ‖ FP8E4M3 ‖ HIF8
         return std::is_same<INPUT_T, int8_t>::value || std::is_same<INPUT_T, FP8E4M3>::value ||
                std::is_same<INPUT_T, HIF8>::value;
     }
 }
 
-constexpr bool MLA_USE_UB_DIRECT = true;
-constexpr bool MLA_USE_MM4_UB = true;
-constexpr bool MLA_USE_DQ_V2 = true;
-constexpr bool MLA_CKVKR_BATCH2 = true;
-
 #define CKVKR_STEP_DRAIN EVENT_ID2
 
-constexpr bool MLA_CKVKR_MERGE_KV = true;
-constexpr bool MLA_PRELOAD_QCQR_SCALE = true;
-constexpr bool MLA_USE_STAGING2 = false;
-constexpr bool MLA_MM4_MULQR_FUSED = false;
-constexpr bool MLA_FLAG06_EARLY = true;
-constexpr bool MLA_MM4_NEXTB_PRELOAD = true;
 constexpr uint32_t MLA_MM3_STEP_K = 4U; // 实测 4 最优(mxfp8 的 stepK=2 在 MmQcQrParamInit 内单独收敛)
-constexpr bool MLA_RMSNORM_RES_ONE_WRITE = true;
-constexpr bool MLA_MM4_UB_MXFP8_ENABLE = true; // mxfp8 的 MM4-UB 总门(修复后置 true 恢复)
-constexpr bool MLA_MM4_UB_INT8_ENABLE = false; // int8 的 MM4-UB 总门(修复后置 true 恢复)
-constexpr bool MLA_NQ_WAVE_ENABLE = true;
-constexpr bool MLA_NQ_MM1B0_XSTEP = true;
-constexpr bool MLA_NQ_MM2B0_PRE = true;
 
 } // namespace MlaProlog
 #endif

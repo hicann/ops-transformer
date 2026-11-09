@@ -42,10 +42,6 @@
 
 namespace optiling {
 
-namespace mla_ub {
-struct Params;
-}
-
 // INPUT
 constexpr uint32_t TOKEN_X_INPUT_INDEX = 0;
 constexpr uint32_t WEIGHT_DQ_INPUT_INDEX = 1;
@@ -110,7 +106,7 @@ constexpr uint32_t MLA_PROLOG_DIM_NUM_2 = 2;
 constexpr uint32_t MLA_PROLOG_DIM_NUM_3 = 3;
 constexpr uint32_t MLA_PROLOG_DIM_NUM_4 = 4;
 
-constexpr uint32_t HEAD_SIZE1 = 7168;
+constexpr uint32_t HEAD_SIZE1 = 7168; // 7168/7680：仅这两个 He 支持路由到切 M 模板
 constexpr uint32_t HEAD_SIZE2 = 7680;
 
 constexpr char CACHE_MODE_BSND[]{"BSND"};
@@ -316,7 +312,7 @@ struct RequiredParaInfo : BaseParaInfo {};
 
 struct OptionalParaInfo : BaseParaInfo {};
 
-constexpr uint32_t BLOCK_SIZE = 32;
+constexpr uint32_t BLOCK_SIZE = 32; // 32B：NZ 一个 C0 块
 constexpr uint32_t NUM_BYTES_BF16 = 2;
 constexpr uint32_t NUM_BYTES_INT8 = 1;
 constexpr uint32_t NUM_BYTES_INT32 = 4;
@@ -407,7 +403,6 @@ private:
     QUANT_MODE GetQuantizationMode() const;
     QUANT_MODE GetQuantizationModeV3() const;
     QUANT_MODE GetQuantizationModeV3Dav() const;
-    ge::graphStatus CheckTokenShape() const;
     ge::graphStatus SetShapeInfo();
     void SetCacheShapeInfo();
     void SetShapeInfoDrSize();
@@ -418,11 +413,7 @@ private:
     ge::graphStatus FillMatmul2Tiling();
     ge::graphStatus FillMatmul3Tiling();
     ge::graphStatus FillMatmul4Tiling();
-    ge::graphStatus BuildUbBudgetParams(mla_ub::Params& params) const;
-    ge::graphStatus ReduceStepBatchForUb();
-    void LogUbStepChange(uint32_t step, uint32_t mm1Ng, uint32_t mm1Kg, uint32_t mm2Ng, uint32_t mm2Kg) const;
-    ge::graphStatus RefineStepBatchForUb();
-    uint32_t CalcSingleCoreN(uint32_t n, uint32_t coreNum, uint32_t alignNum = 16) const;
+    uint32_t CalcSingleCoreN(uint32_t n, uint32_t coreNum, uint32_t alignNum) const;
 
     bool IsSplitKnSupported() const;
     bool GetMatmulType(ge::DataType getype, matmul_tiling::DataType* mmType);
@@ -468,7 +459,7 @@ private:
     QUERY_QUANT_MODE queryQuantMode_ = QUERY_QUANT_MODE::NO_QUANT;
     CKVKR_REPO_MODE ckvkrRepoMode_ = CKVKR_REPO_MODE::DIVIDE;
     QUANT_SCALE_REPO_MODE quantSacleRepoMode_ = QUANT_SCALE_REPO_MODE::DIVIDE;
-    uint32_t tileSize_ = 128;
+    uint32_t tileSize_ = 128; // 128：当前仅支持 128
     float qcQrScale_ = 1.0f;
     float kcScale_ = 1.0f;
 
@@ -477,7 +468,6 @@ private:
     bool enableGroupComputeOpt_ = false; // 低延时场景算例分组标记
     bool enableRope_ = true; // rope开关写入 tiling key ENABLE_ROPE；由 do_rope attr 控制，默认 true
 
-    size_t ubSize_ = 0;
     size_t l1Size_ = 0;
     size_t l0cSize_ = 0;
     size_t l0bSize_ = 0;

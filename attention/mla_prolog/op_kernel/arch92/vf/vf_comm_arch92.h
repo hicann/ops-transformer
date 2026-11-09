@@ -49,6 +49,14 @@ __simd_vf__ inline void CastF32ToB16NoSatVFImpl(__ubuf__ B16T* dstUb, __ubuf__ f
         Reg::Cast<B16T, float, castTraitB322B16>(vregDst, vregSrc, maskAll);
         Reg::StoreAlign<B16T, Reg::StoreDist::DIST_PACK_B32>(dstUb + i * repSize, vregDst, maskAll);
     }
+    uint32_t remaining = cnt - fullLoop * repSize;
+    if (remaining > 0U) {
+        // Qc can have 96 columns per vector core when D=192 and cvRatio=2.
+        Reg::MaskReg tailMask = Reg::UpdateMask<float>(remaining);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_NORM>(vregSrc, srcUb + fullLoop * repSize);
+        Reg::Cast<B16T, float, castTraitB322B16>(vregDst, vregSrc, tailMask);
+        Reg::StoreAlign<B16T, Reg::StoreDist::DIST_PACK_B32>(dstUb + fullLoop * repSize, vregDst, tailMask);
+    }
 }
 
 template <typename B16T>

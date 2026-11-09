@@ -109,8 +109,7 @@ __aicore__ inline void RowMuls(LocalTensor<T> dstUb, LocalTensor<T> src0Ub, Loca
         }
     } else {
         // dstBlkStrideIn src0BlkStrideIn  src1BlkStrideIn dstRepStrideIn src0RepStrideIn src1RepStrideIn
-        // 8 : 每个repeat为256B数据，正好8个datablock
-        BinaryRepeatParams repeatParams{1, 1, 0, 8, 8, 0};
+        BinaryRepeatParams repeatParams{1, 1, 0, 8, 8, 0}; // 8 : 每个repeat为256B数据，正好8个datablock
 
         // 每次计算一行，共计算dealRowCount行
         for (uint32_t i = 0; i < rectangleParams.row; i++) {
@@ -299,7 +298,7 @@ __aicore__ inline void DynamicQuant(const LocalTensor<float>& outputLocal, const
     Muls(aMaxAlpha, aMax, alpha, row);
     Muls(scale, aMaxAlpha, 1.0f / maxInt8, row);
     Div(scaleReciprocal, dupTensor, scale, row);
-    Brcb(scaleReciprocalBrcb, scaleReciprocal, CeilDivT(row, 8UL), {1, 8});
+    Brcb(scaleReciprocalBrcb, scaleReciprocal, CeilDivT(row, 8UL), {1, 8}); // 8：brcb 一次展开 8 个 fp32
     RowMuls(outputLocal, inputLocal, scaleReciprocalBrcb,
             Rectangle{static_cast<uint32_t>(row), static_cast<uint32_t>(col), static_cast<uint32_t>(col)});
 }
@@ -457,8 +456,9 @@ __aicore__ inline void AccumulateKnPartialsIssue(const LocalTensor<AccumType>& o
     if (nLen == 0 || mLen == 0 || kGroups == 0) {
         return;
     }
-    uint16_t chunkElems = CeilDivT(static_cast<uint32_t>(mLen * nLen), static_cast<uint32_t>(8));
-    uint16_t srcGap = CeilDivT(static_cast<uint32_t>(partialStride - mLen * nLen), static_cast<uint32_t>(8));
+    uint16_t chunkElems =
+        CeilDivT(static_cast<uint32_t>(mLen * nLen), static_cast<uint32_t>(8)); // 8：一个 block 的 fp32 元素数
+    uint16_t srcGap = CeilDivT(static_cast<uint32_t>(partialStride - mLen * nLen), static_cast<uint32_t>(8)); // 8：同上
     DataCopy(output, partials[mStart * nLen], {static_cast<uint16_t>(kGroups), chunkElems, srcGap, 0});
     SetFlag<HardEvent::MTE2_V>(evtId);
 }

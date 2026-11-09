@@ -171,7 +171,6 @@ __aicore__ inline void RmsNormDynamicQuant(const LocalTensor<O>& outputLocal, co
         LocalTensor<uint8_t> tmpLocal = xBf16Local[cnt].template ReinterpretCast<uint8_t>();
         DynamicQuantPerBlockMxfp8Vf<bfloat16_t, fp8_e4m3fn_t>(outLocal, outputScalesLocal, xBf16Local, tmpLocal,
                                                               rmsNormParams.row, rmsNormParams.col);
-        LocalTensor<uint8_t> scale = outputScalesLocal.template ReinterpretCast<uint8_t>();
     } else {
         if (enableSmoothScalesCq) {
             Mul(xFp32Local, xFp32Local, smoothLocal, cnt);
@@ -206,6 +205,7 @@ __aicore__ inline void RmsNormKnDqCompute(
     Dequant(bUb, bUb, dequantScaleWDqLocal, dequantScaleXLocal, rectangleParams);
     SetFlag<HardEvent::MTE3_V>(EVENT_ID1);
     WaitFlag<HardEvent::MTE3_V>(EVENT_ID1);
+
     RmsNormVF<C, GammaType, C, C>(aUb, bUb, gammaLocal, rmsNormParams);
     if (enableSmoothScalesCq) {
         Mul(aUb, aUb, smoothLocal, cnt);

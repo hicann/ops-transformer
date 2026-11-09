@@ -55,11 +55,11 @@ template <typename SrcT>
 __aicore__ inline constexpr uint32_t GetC0Num()
 {
     if (sizeof(SrcT) == sizeof(float)) {
-        return 8;
+        return 8; // 8：32B / sizeof(float)
     } else if (sizeof(SrcT) == sizeof(int8_t)) {
-        return 32;
+        return 32; // 32：32B / 1B
     }
-    return 16;
+    return 16; // 16：32B / 2B（bf16/fp16）
 }
 
 template <typename T>
@@ -241,49 +241,17 @@ __aicore__ inline void LoadDataL1ToL0(const LocalTensor<T>& l0Tensor, const Loca
         loadData2DV2.ifTranspose = true;
         LoadData<T>(l0Tensor, l1Tensor, loadData2DV2);
     } else { // A
-        constexpr bool use2DLoad = true;
-        if constexpr (use2DLoad) {
-            LoadData2DParamsV2 loadDataA2D;
-            loadDataA2D.mStartPosition = 0;
-            loadDataA2D.kStartPosition = 0;
-            loadDataA2D.ifTranspose = false;
-            const uint32_t mStep16 = CeilDivT(mSize, BLOCK_CUBE_SIZE); // = ceil(m/16)
-            loadDataA2D.mStep = static_cast<uint16_t>(mStep16);
-            const uint32_t kUnitElems = K_STEP_SIZE_32 / static_cast<uint32_t>(sizeof(T));
-            loadDataA2D.kStep = static_cast<uint16_t>(CeilDivT(kSize, kUnitElems));
-            loadDataA2D.srcStride = static_cast<uint16_t>(mStep16);
-            loadDataA2D.dstStride = static_cast<uint16_t>(mStep16);
-            LoadData<T>(l0Tensor, l1Tensor, loadDataA2D);
-        } else {
-            LoadData3DParamsV2<T> loadDataAParams;
-            loadDataAParams.l1W = 1;
-            loadDataAParams.l1H = mSize;
-            loadDataAParams.channelSize = kSize;
-            loadDataAParams.kExtension = kSize;
-            loadDataAParams.mExtension = mSize;
-            loadDataAParams.kStartPt = 0;
-            loadDataAParams.mStartPt = 0;
-            loadDataAParams.strideW = 1;
-            loadDataAParams.strideH = 1;
-            loadDataAParams.filterW = 1;
-            loadDataAParams.filterH = 1;
-            loadDataAParams.dilationFilterW = 1;
-            loadDataAParams.dilationFilterH = 1;
-            loadDataAParams.enTranspose = false;
-            loadDataAParams.enSmallK = false;
-            loadDataAParams.padValue = 0;
-            loadDataAParams.filterSizeW = 0;
-            loadDataAParams.filterSizeH = 0;
-            loadDataAParams.fMatrixCtrl = false;
-            uint16_t dstStride = CeilDivT(mSize, BLOCK_CUBE_SIZE);
-#if defined(ASC_DEVKIT_VERSION_NUM) && (ASC_DEVKIT_VERSION_NUM >= 90000000)
-            SetLoadDataRepeatWithStride({0, 1, 0, dstStride}); // >= 9.0.0 release 新 API
-            LoadDataWithStride<T>(l0Tensor, l1Tensor, loadDataAParams);
-#else
-            SetLoadDataRepeat({0, 1, 0, dstStride}); // < 9.0.0 (beta.2) 旧 API
-            LoadData<T>(l0Tensor, l1Tensor, loadDataAParams);
-#endif
-        }
+        LoadData2DParamsV2 loadDataA2D;
+        loadDataA2D.mStartPosition = 0;
+        loadDataA2D.kStartPosition = 0;
+        loadDataA2D.ifTranspose = false;
+        const uint32_t mStep16 = CeilDivT(mSize, BLOCK_CUBE_SIZE); // = ceil(m/16)
+        loadDataA2D.mStep = static_cast<uint16_t>(mStep16);
+        const uint32_t kUnitElems = K_STEP_SIZE_32 / static_cast<uint32_t>(sizeof(T));
+        loadDataA2D.kStep = static_cast<uint16_t>(CeilDivT(kSize, kUnitElems));
+        loadDataA2D.srcStride = static_cast<uint16_t>(mStep16);
+        loadDataA2D.dstStride = static_cast<uint16_t>(mStep16);
+        LoadData<T>(l0Tensor, l1Tensor, loadDataA2D);
     }
 }
 
@@ -534,7 +502,7 @@ __aicore__ inline void LoadL1ABAndScale(const GlobalTensor<T>& tensorAGm, const 
                                         uint32_t kL1, uint32_t kL1Loops, const MMParams& para, uint32_t nL1Offset,
                                         uint32_t nL1Size, uint32_t kOffesetUnit, MMBufParams& bufParam)
 {
-    uint64_t offsetL1B = L1_B_SIZE / 2 / sizeof(T); // // 2表示scale起始地址固定从L1B上ping的64k开始
+    uint64_t offsetL1B = L1_B_SIZE / 2 / sizeof(T); // 2表示scale起始地址固定从L1B上ping的64k开始
     const uint32_t kStart = para.kStart;
     uint32_t kLoadSize0 = para.k - kL1 * para.kL1StepSize;
     kLoadSize0 = (kLoadSize0 > para.kL1StepSize) ? para.kL1StepSize : kLoadSize0;
@@ -804,7 +772,7 @@ __aicore__ inline void MatmulFullLoad(const GlobalTensor<O>& tensorCGm, const Gl
     }
     LocalTensor<T> bL1 = localTensors.bL1Tensor[(bufParam.bL1BufIter & 1u) * bL1Offset];
 
-    uint32_t nSplitSize = 128;
+    uint32_t nSplitSize = 128; // 128：MM4 的 N 分块宽度
     uint32_t nSplitSizeAct = nSplitSize;
     uint32_t nloops = CeilDivT(para.n, nSplitSize);
 
@@ -1009,7 +977,7 @@ __aicore__ inline void MatmulSplitMKOuter(const GlobalTensor<O>& tensorCGm, cons
     uint32_t bScaleBf16Off = 0;
     uint32_t bScaleL1BaseOff = 0;
     if constexpr (std::is_same<T, FP8E4M3>::value && std::is_same<S, fp8_e8m0_t>::value) {
-        uint64_t scaleAOff = L1_B_SIZE / 2 / sizeof(T);
+        uint64_t scaleAOff = L1_B_SIZE / 2 / sizeof(T); // /2：L1B 上半区留给 scale
         LocalTensor<bfloat16_t> bL1Bf16;
         bL1Bf16.SetAddr(bufParam.bL1BufAddr);
         GlobalTensor<bfloat16_t> scaleGmCast;
@@ -1027,6 +995,11 @@ __aicore__ inline void MatmulSplitMKOuter(const GlobalTensor<O>& tensorCGm, cons
         // 等待前一次调用或上一轮M迭代的MTE1 scale读排空, 再覆写共享L1B scale区域
         WaitFlag<HardEvent::MTE1_MTE2>(SCALE_EVENT);
         DataCopy(bL1Bf16[scaleAOff / FP8_TWO], scaleGmCast, dn2nz);
+        if (a0Pre && b0Pre) {
+            // Both slot-ready events precede this A-scale copy. Order the first L1 scale read after it.
+            SetFlag<HardEvent::MTE2_MTE1>(SCALE_EVENT);
+            WaitFlag<HardEvent::MTE2_MTE1>(SCALE_EVENT);
+        }
         aScaleL1Base = localTensors.bL1Tensor[scaleAOff];
 
         uint32_t aScaleTotalSize = mSizeAligned * para.kScale;

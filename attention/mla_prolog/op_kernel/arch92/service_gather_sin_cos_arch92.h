@@ -17,6 +17,7 @@
 #define SERVICE_GATHER_SIN_COS_arch92_H
 
 #include "mla_prolog_comm_arch92.h"
+#include "vf/vf_gather_sin_cos_arch92.h"
 
 namespace MlaProlog {
 
@@ -35,7 +36,8 @@ namespace MlaProlog {
 template <typename T, typename O>
 __aicore__ inline void GatherSinCos(LocalTensor<O>& cosLocal, LocalTensor<O>& sinLocal, const GlobalTensor<T>& cosGm,
                                     const GlobalTensor<T>& sinGm, int64_t tokenIndex, int64_t curVecToken,
-                                    LocalTensor<uint8_t>& shareTmpUb, int64_t row, int64_t col)
+                                    LocalTensor<uint8_t>& shareTmpUb, int64_t row, int64_t col,
+                                    bool useFusedD64 = false)
 {
     int64_t offset = col * tokenIndex;
     int64_t curDataSize = col * curVecToken;
@@ -47,6 +49,16 @@ __aicore__ inline void GatherSinCos(LocalTensor<O>& cosLocal, LocalTensor<O>& si
         DataCopy(tmpUbBf16[curDataSize], sinGm[offset], curDataSize);
         SetFlag<HardEvent::MTE2_V>(EVENT_ID0);
         WaitFlag<HardEvent::MTE2_V>(EVENT_ID0);
+        if constexpr (IsSameType<T, bfloat16_t>::value) {
+            if (useFusedD64 && col == 64 &&
+                curVecToken == 128) { // RoPE 维度 Dr=64 且当前有 128 个 token 时使用融合实现
+                GatherSinCosD64VF(cosLocal, sinLocal, tmpUbBf16, tmpUbBf16[curDataSize],
+                                  static_cast<uint16_t>(curVecToken));
+                SetFlag<HardEvent::V_MTE2>(EVENT_ID0);
+                WaitFlag<HardEvent::V_MTE2>(EVENT_ID0);
+                return;
+            }
+        }
         Cast(cosLocal, tmpUbBf16, RoundMode::CAST_NONE, curDataSize);
         Cast(sinLocal, tmpUbBf16[curDataSize], RoundMode::CAST_NONE, curDataSize);
     } else {

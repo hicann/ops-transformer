@@ -18,6 +18,7 @@
 
 #include "mla_prolog_comm_arch92.h"
 #include "mla_prolog_vector_comm_arch92.h"
+#include "vf/vf_comm_arch92.h"
 
 namespace MlaProlog {
 
@@ -43,15 +44,19 @@ __aicore__ inline void DequantPerTokenQc(const GlobalTensor<O>& outputGm, const 
 {
     int64_t count = dequantRowColStrideParams.row * dequantRowColStrideParams.col;
 
-    LocalTensor<T> inputLocal = shareTmpUb.ReinterpretCast<T>();                         // count * sizeof(T)
-    LocalTensor<C> scaleLocal = inputLocal[count + 16].template ReinterpretCast<C>();    // count * sizeof(C)
-    LocalTensor<C> computeLocal = scaleLocal[count + 16].template ReinterpretCast<C>();  // count * sizeof(C)
-    LocalTensor<O> outputLocal = computeLocal[count + 16].template ReinterpretCast<O>(); // count * sizeof(O)
+    LocalTensor<T> inputLocal = shareTmpUb.ReinterpretCast<T>(); // count * sizeof(T)
+    LocalTensor<C> scaleLocal =
+        inputLocal[count + 16].template ReinterpretCast<C>(); // +16：tensor 间距；count * sizeof(C)
+    LocalTensor<C> computeLocal =
+        scaleLocal[count + 16].template ReinterpretCast<C>(); // +16：tensor 间距；count * sizeof(C)
+    LocalTensor<O> outputLocal =
+        computeLocal[count + 16].template ReinterpretCast<O>(); // +16：tensor 间距；count * sizeof(O)
 
     DataCopyParams copyParams{
         static_cast<uint16_t>(dequantRowColStrideParams.row),
         static_cast<uint16_t>(dequantRowColStrideParams.col * sizeof(T) / 32U),
-        static_cast<uint16_t>((dequantRowColStrideParams.stride - dequantRowColStrideParams.col) * sizeof(T) / 32U), 0};
+        static_cast<uint16_t>((dequantRowColStrideParams.stride - dequantRowColStrideParams.col) * sizeof(T) / 32U),
+        0}; // 32U：块长 32B
 
     Rectangle rectangleParams{
         static_cast<uint32_t>(1),     // row
@@ -98,20 +103,22 @@ __aicore__ inline void DequantPerTokenQc(const GlobalTensor<O>& outputGm, const 
           stride 一行的真实长度
  * @param oriRow 一共有多少行
 */
-template <typename T, typename O>
+template <typename T, typename O, bool preserveNan = false>
 __aicore__ inline void CastPerTokenQc(const GlobalTensor<O>& outputGm, const GlobalTensor<T>& inputGm,
                                       const LocalTensor<uint8_t>& shareTmpUb, Rectangle castRowColStrideParams,
                                       uint32_t oriRow)
 {
     int64_t count = castRowColStrideParams.row * castRowColStrideParams.col;
 
-    LocalTensor<T> inputLocal = shareTmpUb.ReinterpretCast<T>();                       // count * sizeof(T)
-    LocalTensor<O> outputLocal = inputLocal[count + 16].template ReinterpretCast<O>(); // count * sizeof(O)
+    LocalTensor<T> inputLocal = shareTmpUb.ReinterpretCast<T>(); // count * sizeof(T)
+    LocalTensor<O> outputLocal =
+        inputLocal[count + 16].template ReinterpretCast<O>(); // +16：tensor 间距；count * sizeof(O)
 
     DataCopyParams copyParams{
         static_cast<uint16_t>(castRowColStrideParams.row),
         static_cast<uint16_t>(castRowColStrideParams.col * sizeof(T) / 32U),
-        static_cast<uint16_t>((castRowColStrideParams.stride - castRowColStrideParams.col) * sizeof(T) / 32U), 0};
+        static_cast<uint16_t>((castRowColStrideParams.stride - castRowColStrideParams.col) * sizeof(T) / 32U),
+        0}; // 32U：块长 32B
 
     for (int64_t rowOffset = 0; rowOffset < oriRow; rowOffset += castRowColStrideParams.row) {
         const uint32_t remainingRows = oriRow - static_cast<uint32_t>(rowOffset);
@@ -128,7 +135,11 @@ __aicore__ inline void CastPerTokenQc(const GlobalTensor<O>& outputGm, const Glo
         SetFlag<HardEvent::MTE2_V>(EVENT_ID1);
         WaitFlag<HardEvent::MTE2_V>(EVENT_ID1);
         // cast
-        Cast(outputLocal, inputLocal, RoundMode::CAST_RINT, currentCount);
+        if constexpr (preserveNan) {
+            CastF32ToB16NoSat(outputLocal, inputLocal, currentCount);
+        } else {
+            Cast(outputLocal, inputLocal, RoundMode::CAST_RINT, currentCount);
+        }
         SetFlag<HardEvent::V_MTE3>(EVENT_ID2);
         // copy out
         WaitFlag<HardEvent::V_MTE3>(EVENT_ID2);
@@ -162,17 +173,21 @@ __aicore__ inline void DequantSplitNQc(const GlobalTensor<O>& outputGm, const Gl
                                        uint32_t oriCol, uint32_t dstStride, uint32_t subBlockIdx_)
 {
     int64_t count = dequantRowColStrideParams.col * 1;
-    LocalTensor<T> inputLocal = shareTmpUb.ReinterpretCast<T>();                         // count * sizeof(T)
-    LocalTensor<C> scaleLocal = inputLocal[count + 16].template ReinterpretCast<C>();    // count * sizeof(C)
-    LocalTensor<C> computeLocal = scaleLocal[count + 16].template ReinterpretCast<C>();  // count * sizeof(C)
-    LocalTensor<O> outputLocal = computeLocal[count + 16].template ReinterpretCast<O>(); // count * sizeof(O)
+    LocalTensor<T> inputLocal = shareTmpUb.ReinterpretCast<T>(); // count * sizeof(T)
+    LocalTensor<C> scaleLocal =
+        inputLocal[count + 16].template ReinterpretCast<C>(); // +16：tensor 间距；count * sizeof(C)
+    LocalTensor<C> computeLocal =
+        scaleLocal[count + 16].template ReinterpretCast<C>(); // +16：tensor 间距；count * sizeof(C)
+    LocalTensor<O> outputLocal =
+        computeLocal[count + 16].template ReinterpretCast<O>(); // +16：tensor 间距；count * sizeof(O)
 
     DataCopyParams inputCopyParams{
         static_cast<uint16_t>(1), static_cast<uint16_t>(count * sizeof(T) / 32U),
-        static_cast<uint16_t>((dequantRowColStrideParams.stride - dequantRowColStrideParams.col) * sizeof(T) / 32U), 0};
+        static_cast<uint16_t>((dequantRowColStrideParams.stride - dequantRowColStrideParams.col) * sizeof(T) / 32U),
+        0}; // 32U：块长 32B
 
     DataCopyParams outputCopyParams{static_cast<uint16_t>(1), static_cast<uint16_t>(count * sizeof(O) / 32U), 0,
-                                    static_cast<uint16_t>(dstStride * sizeof(O) / 32U)};
+                                    static_cast<uint16_t>(dstStride * sizeof(O) / 32U)}; // 32U：块长 32B
 
     Rectangle rectangleParams{
         static_cast<uint32_t>(1),     // row
