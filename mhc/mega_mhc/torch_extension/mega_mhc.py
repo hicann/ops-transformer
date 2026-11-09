@@ -72,7 +72,9 @@ class MegaMhcOpBuilder(OpBuilder):
                 x.new_empty(residual.shape),
                 x.new_empty((*leading, 4, 1), dtype=torch.float32),
                 x.new_empty((*leading, 4, 4), dtype=torch.float32),
-                None,
+                None
+                if shifted_prev_mix is None
+                else x.new_empty((*leading, 4, 1), dtype=torch.float32),
                 x.new_empty(x.shape),
                 None,
                 None,
@@ -169,11 +171,20 @@ def mega_mhc(
     """Compute optional RMSNorm_0 -> Post -> optional Mid -> Pre -> RMSNorm_1.
 
     Coefficients post_mix/new_post_mix retain a trailing singleton dimension.
-    shifted_prev_mix is reserved. comb_res_mix must be present.
+    x2 is the rounded Post result after optional Mid. Projection RMS scaling
+    generates the current coefficients while the weighted sum still uses x2.
+    shifted_prev_mix, when provided, replaces the current pre_mix for the
+    head-wise weighted sum of x2; None uses the current pre_mix.
+    The Pre branch's sigmoid and hc_pre_eps apply only to the current pre_mix.
+    RMSNorm_1 is still applied to the summed result.
+    comb_res_mix must be provided in this version.
     rms_norm_0_weight=None skips RMSNorm_0 and sends x directly to Post.
+    rms_norm_mid_weight=None skips Mid; the projection RMS scaling still runs.
     hc_post_scale scales the post sigmoid; Sinkhorn and quantized outputs are reserved.
-    output_mode=0 returns non-quantized results; 1/2 reserve MX Quant output modes.
-    Returns (new_residual, new_post_mix, new_comb_res_mix, None, y, None, None).
+    Only output_mode=0 is supported; modes 1/2 are reserved for MX Quant outputs.
+    Returns (new_residual, new_post_mix, new_comb_res_mix, new_prev_mix, y, None, None).
+    new_prev_mix contains the current pre_mix when shifted_prev_mix is provided;
+    otherwise it is None. The quantized outputs remain reserved and return None.
     """
     return torch.ops.cann_ops_transformer.mega_mhc(
         x,

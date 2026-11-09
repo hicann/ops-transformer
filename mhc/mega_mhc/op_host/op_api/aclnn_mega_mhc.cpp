@@ -29,8 +29,7 @@ namespace {
 constexpr const char* ACLNN_OP_NAME = "aclnnMegaMhcGetWorkspaceSize";
 constexpr size_t INPUT_COUNT = 11;
 constexpr size_t OUTPUT_COUNT = 7;
-constexpr size_t ACTIVE_OUTPUTS[] = {0, 1, 2, 4};
-constexpr size_t RESERVED_OUTPUTS[] = {3, 5, 6};
+constexpr size_t PRE_OUTPUT_INDEX = 3;
 constexpr size_t MID_INDEX = 10;
 constexpr size_t PRE_MIX_INDEX = 8;
 constexpr size_t RMS0_INDEX = 9;
@@ -38,6 +37,12 @@ constexpr int64_t HEADS = 4;
 constexpr int64_t PROJECTION = 24;
 using Inputs = std::array<const aclTensor*, INPUT_COUNT>;
 using Outputs = std::array<const aclTensor*, OUTPUT_COUNT>;
+
+/** External mixing also exposes this invocation's newly generated pre coefficients. */
+bool IsActiveOutput(size_t index, bool hasShiftedPrevMix)
+{
+    return index < PRE_OUTPUT_INDEX || index == 4 || (index == PRE_OUTPUT_INDEX && hasShiftedPrevMix);
+}
 
 /** Format expected dimensions for diagnostics. */
 std::string ShapeToString(const std::vector<int64_t>& shape)
@@ -105,16 +110,13 @@ aclnnStatus CheckContract(const Inputs& inputs, const Outputs& outputs, double n
             CHECK_RET(inputs[i] != nullptr, ACLNN_ERR_PARAM_NULLPTR);
         }
     }
-    if (inputs[PRE_MIX_INDEX] != nullptr) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "shiftedPrevMixOptional", "non-null",
-                                              "reserved input must be null in this version");
-        return ACLNN_ERR_PARAM_INVALID;
-    }
-    for (const auto index : RESERVED_OUTPUTS) {
-        CHECK_RET(outputs[index] == nullptr, ACLNN_ERR_PARAM_INVALID);
-    }
-    for (const auto index : ACTIVE_OUTPUTS) {
-        CHECK_RET(outputs[index] != nullptr, ACLNN_ERR_PARAM_NULLPTR);
+    const bool hasShiftedPrevMix = inputs[PRE_MIX_INDEX] != nullptr;
+    for (size_t index = 0; index < OUTPUT_COUNT; ++index) {
+        if (IsActiveOutput(index, hasShiftedPrevMix)) {
+            CHECK_RET(outputs[index] != nullptr, ACLNN_ERR_PARAM_NULLPTR);
+        } else {
+            CHECK_RET(outputs[index] == nullptr, ACLNN_ERR_PARAM_INVALID);
+        }
     }
     CHECK_RET(hcMult == HEADS && numSinkhornIters == 0 && static_cast<float>(sinkhornEps) == 1.0e-6f &&
                   rmsNormScale == 1.0 && std::isfinite(static_cast<float>(hcPostScale)),
@@ -172,7 +174,7 @@ aclnnStatus CheckContract(const Inputs& inputs, const Outputs& outputs, double n
                            "rms_norm_0_weight",
                            "rms_norm_mid_weight"};
     for (size_t i = 0; i < INPUT_COUNT; ++i) {
-        if (i == PRE_MIX_INDEX || ((i == RMS0_INDEX || i == MID_INDEX) && inputs[i] == nullptr)) {
+        if ((i == PRE_MIX_INDEX || i == RMS0_INDEX || i == MID_INDEX) && inputs[i] == nullptr) {
             continue;
         }
         CHECK_RET(CheckTensor(inputs[i], names[i], shapes[i], i < 2 ? dtype : op::DataType::DT_FLOAT),
@@ -181,7 +183,10 @@ aclnnStatus CheckContract(const Inputs& inputs, const Outputs& outputs, double n
     const size_t outputSources[] = {1, 2, 7, 2, 0, 0, 0};
     const char* outputNames[] = {"new_residual", "new_post_mix", "new_comb_res_mix", "new_prev_mix", "y",
                                  "y_quant",      "y_scale"};
-    for (const auto i : ACTIVE_OUTPUTS) {
+    for (size_t i = 0; i < OUTPUT_COUNT; ++i) {
+        if (outputs[i] == nullptr) {
+            continue;
+        }
         CHECK_RET(CheckTensor(outputs[i], outputNames[i], shapes[outputSources[i]],
                               i == 0 || i == 4 ? dtype : op::DataType::DT_FLOAT),
                   ACLNN_ERR_PARAM_INVALID);
@@ -208,18 +213,18 @@ aclnnStatus BuildExecution(Inputs inputs, const Outputs& outputs, double normEps
         }
     }
     Outputs contiguousOutputs{};
-    for (const auto i : ACTIVE_OUTPUTS) {
-        contiguousOutputs[i] =
-            owner->AllocTensor(outputs[i]->GetViewShape(), outputs[i]->GetDataType(), op::Format::FORMAT_ND);
+    for (size_t i = 0; i < OUTPUT_COUNT; ++i) {
+        if (outputs[i] != nullptr) {
+            contiguousOutputs[i] =
+                owner->AllocTensor(outputs[i]->GetViewShape(), outputs[i]->GetDataType(), op::Format::FORMAT_ND);
+        } else {
+            // Preserve absent output slots with empty launcher tensors of their declared types.
+            const auto dtype = i == 5 ? op::DataType::DT_FLOAT8_E4M3FN :
+                               i == 6 ? op::DataType::DT_FLOAT8_E8M0 :
+                                        op::DataType::DT_FLOAT;
+            contiguousOutputs[i] = owner->AllocTensor(op::Shape{0}, dtype, op::Format::FORMAT_ND);
+        }
         CHECK_RET(contiguousOutputs[i] != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    }
-    // Keep all seven argument slots even though the public reserved outputs are null.
-    const op::DataType reservedTypes[] = {op::DataType::DT_FLOAT, op::DataType::DT_FLOAT8_E4M3FN,
-                                          op::DataType::DT_FLOAT8_E8M0};
-    for (size_t i = 0; i < 3; ++i) {
-        contiguousOutputs[RESERVED_OUTPUTS[i]] =
-            owner->AllocTensor(op::Shape{0}, reservedTypes[i], op::Format::FORMAT_ND);
-        CHECK_RET(contiguousOutputs[RESERVED_OUTPUTS[i]] != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
     const bool launched = l0op::MegaMhc(
         inputs[0], inputs[1], inputs[2], inputs[3], inputs[4], inputs[5], inputs[6], inputs[7], inputs[8], inputs[9],
@@ -227,7 +232,10 @@ aclnnStatus BuildExecution(Inputs inputs, const Outputs& outputs, double normEps
         rmsNormScale, outputMode, contiguousOutputs[0], contiguousOutputs[1], contiguousOutputs[2],
         contiguousOutputs[3], contiguousOutputs[4], contiguousOutputs[5], contiguousOutputs[6], owner.get());
     CHECK_RET(launched, ACLNN_ERR_INNER_NULLPTR);
-    for (const auto i : ACTIVE_OUTPUTS) {
+    for (size_t i = 0; i < OUTPUT_COUNT; ++i) {
+        if (outputs[i] == nullptr) {
+            continue;
+        }
         CHECK_RET(l0op::ViewCopy(contiguousOutputs[i], outputs[i], owner.get()) != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
     *workspaceSize = owner->GetWorkspaceSize();

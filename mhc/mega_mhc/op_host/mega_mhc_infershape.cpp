@@ -23,7 +23,9 @@ ge::graphStatus InferShape(gert::InferShapeContext* context)
         (x->GetDimNum() != 2 && x->GetDimNum() != 3)) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape* shapes[] = {residual, post, comb, nullptr, x, nullptr, nullptr};
+    const auto* shifted = context->GetDynamicInputShape(8, 0);
+    const bool hasShiftedPrevMix = shifted != nullptr && shifted->GetDimNum() != 0;
+    const gert::Shape* shapes[] = {residual, post, comb, hasShiftedPrevMix ? post : nullptr, x, nullptr, nullptr};
     for (uint32_t index = 0; index < 7U; ++index) {
         auto* output = context->GetOutputShape(index);
         if (output == nullptr) {

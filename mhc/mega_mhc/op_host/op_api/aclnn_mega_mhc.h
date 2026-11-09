@@ -13,7 +13,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-/** Build the documented seven-output forward contract; reserved output pointers must be null. */
+/** Build the seven-output contract; newPrevMixOut is required exactly when shiftedPrevMixOptional is supplied.
+ * Quantized output pointers remain reserved and must be null. */
 aclnnStatus aclnnMegaMhcGetWorkspaceSize(
     const aclTensor* x, const aclTensor* residual, const aclTensor* postMix, const aclTensor* fn,
     const aclTensor* mixScales, const aclTensor* mixBases, const aclTensor* rmsNorm1Weight,

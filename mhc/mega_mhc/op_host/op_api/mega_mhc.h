@@ -12,7 +12,7 @@
 #include <cstdint>
 #include "opdev/op_executor.h"
 namespace l0op {
-/** Launch RMS0 -> Post -> optional Mid -> Pre -> RMS1 with contiguous output views. */
+/** Launch optional RMS0 -> Post -> optional Mid -> Pre -> RMS1 with contiguous output views. */
 bool MegaMhc(const aclTensor* x, const aclTensor* residual, const aclTensor* postMix, const aclTensor* fn,
              const aclTensor* mixScales, const aclTensor* mixBases, const aclTensor* rmsNorm1Weight,
              const aclTensor* combResMixOptional, const aclTensor* shiftedPrevMixOptional,

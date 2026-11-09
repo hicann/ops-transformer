@@ -91,6 +91,7 @@ class MegaMhcTestSpec:
             weights.astype(np.float32) * x2.astype(np.float32), axis=-2
         ).astype(x.dtype)
         y = _rms_norm(h_in, rms_norm_1_weight, rms_norm_eps)
-        # Keep all prototype positions: reserved outputs are represented by empty tensors.
+        # Keep all prototype positions: inactive outputs are represented by empty tensors.
         empty = np.empty((0,), dtype=np.float32)
-        return [x2, post, comb, empty, y, empty.copy(), empty.copy()]
+        pre_output = pre if shifted_prev_mix is not None else empty
+        return [x2, post, comb, pre_output, y, empty.copy(), empty.copy()]

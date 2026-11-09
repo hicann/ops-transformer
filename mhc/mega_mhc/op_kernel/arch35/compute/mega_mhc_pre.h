@@ -180,8 +180,9 @@ __aicore__ inline void PrepareProjectionTile(__ubuf__ T* input, uint32_t rows, u
 
 using namespace AscendC;
 
-/** Normalize a row batch in place in group zero.
+/** Scale projection rows in place in group zero using the complete input-row RMS.
  * Formula: z[r,q] = ordered_sum_g(P[g,r,q]) * rsqrt(ordered_sum_k(S[k,r])/K + eps).
+ * Only projection results are scaled; the x2 values used by ComputeHInTile remain unchanged.
  * Use Sqrt/Div as in MhcPre; ordered partial addition is unchanged and rsqrt(+Inf)=0.
  */
 __aicore__ inline void NormalizeProjectionRows(__ubuf__ float* partial, __ubuf__ float* rms, uint32_t rows,
@@ -222,6 +223,7 @@ __aicore__ inline void NormalizeProjectionRows(__ubuf__ float* partial, __ubuf__
 
 /** Compute gates from packed [pre:4, post:4, res:16]: logits=alpha[branch]*normalized+bias;
  * pre=sigmoid(logits[0:4])+eps; post=hc_post_scale*sigmoid(logits[4:8]); res=logits[8:24].
+ * This produces current pre coefficients; external shifted_prev_mix uses a separate caller-owned UB plane.
  * Keep separate Mul/Add rounding. Output planes are [pre:4*alignedRows, post:4*alignedRows, res:16*alignedRows]. */
 __aicore__ inline void ComputeGateRows(__ubuf__ float* normalized, __ubuf__ float* alpha, __ubuf__ float* bias,
                                        float eps, float hcPostScale, uint32_t rows, uint32_t rowStride,
@@ -271,6 +273,8 @@ __aicore__ inline void ComputeGateRows(__ubuf__ float* normalized, __ubuf__ floa
 }
 
 /** Mix four heads: hIn[d]=Cast<T>(sum_n hPre[n]*FP32(x2[n,d])).
+ * The caller supplies hPre from shifted_prev_mix when present, or the current sigmoid-plus-eps pre coefficients.
+ * This function applies the selected coefficients; RMSNorm1 follows on the rounded hIn.
  * Accumulate sumSquares from rounded hIn using independent even/odd 64-column chains. */
 template <typename T>
 __aicore__ inline void ComputeHInTile(__ubuf__ float* hPre, __ubuf__ T* x2, uint32_t d, uint32_t dStart,

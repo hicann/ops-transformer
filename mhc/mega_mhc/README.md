@@ -14,7 +14,7 @@
 ## 功能说明
 
 - 算子功能：
-  MegaMhc融合多阶段RmsNorm、MhcPost和MhcPre计算，支持可选的输入RmsNorm和中间RmsNorm，更新多路残差状态与Post/Res混合系数，并将各路残差加权合并、归一化为下一子层的输入。
+  MegaMhc融合多阶段RmsNorm、MhcPost和MhcPre计算，支持可选的输入RmsNorm和中间RmsNorm，更新多路残差状态与Post/Res混合系数，并将各路残差加权合并、归一化为下一子层的输入。传入外部Pre混合系数时，还输出本次计算的Pre系数。
 
 - 计算公式：
 
@@ -30,21 +30,17 @@
      \end{aligned}
      $$
 
-  2. 执行MhcPost算子功能，将归一化结果与映射后的残差融合，简称mhc_post阶段。
+  2. 执行MhcPost算子功能，将上一阶段的`x_1`与映射后的残差融合，简称mhc_post阶段。
 
      $$
      \begin{aligned}
      term1_{b,s,n,d} &= \operatorname{FP32}(post\_mix_{b,s,n,0})\cdot \operatorname{FP32}(x\_1_{b,s,d}), \\
-     term2_{b,s,n,d} &=
-     \begin{cases}
-     \displaystyle\sum_{j=0}^{N-1}\operatorname{FP32}(comb\_res\_mix_{b,s,j,n})\cdot \operatorname{FP32}(residual_{b,s,j,d}), & comb\_res\_mix\neq\mathrm{None},\\
-     \operatorname{FP32}(residual_{b,s,n,d}), & comb\_res\_mix=\mathrm{None},
-     \end{cases} \\
+     term2_{b,s,n,d} &= \sum_{j=0}^{N-1}\operatorname{FP32}(comb\_res\_mix_{b,s,j,n})\cdot \operatorname{FP32}(residual_{b,s,j,d}), \\
      x\_2_{b,s,n,d} &= \operatorname{Cast}_{dtype(x)}\left(term1_{b,s,n,d}+term2_{b,s,n,d}\right).
      \end{aligned}
      $$
 
-     $j$为归约head，$n$为输出head。
+     $j$为归约head，$n$为输出head。当前版本要求`comb_res_mix`非空。
 
   3. 可选执行RmsNorm算子功能，对融合后的完整残差行进行均方根归一化，简称rms_norm_mid阶段。
 
@@ -58,7 +54,7 @@
      \end{aligned}
      $$
 
-     当`rms_norm_mid_weight`为空时，跳过本阶段，`x_2`保持MhcPost算子的输出融合阶段的输出；随后固定保存：
+     当`rms_norm_mid_weight`为空时，跳过本阶段，`x_2`保持MhcPost算子的输出融合阶段的输出。无论是否执行本阶段，均保存：
 
      $$
      new\_residual=x\_2.
@@ -75,7 +71,7 @@
      \end{aligned}
      $$
 
-     先执行矩阵乘$x\_2\_rs\cdot proj\_w$，再乘$inv\_rms\_pre$。按照`[N,N,N*N]`切分：
+     先执行矩阵乘$x\_2\_rs\cdot proj\_w$，再乘$inv\_rms\_pre$，用于生成本次混合系数；该RMS缩放不改变后续加权合并使用的`x_2`。按照`[N,N,N*N]`切分：
 
      $$
      (x\_pre,x\_post,x\_comb)=\operatorname{split}(x\_hat,[N,N,N^2]),
@@ -89,7 +85,7 @@
 
      $$
      \begin{aligned}
-     new\_prev\_mix_{b,s,n,0} &= \operatorname{sigmoid}(mix\_scales_0\cdot x\_pre_{b,s,n}+bias\_pre_n)+hc\_pre\_eps, \\
+     pre\_mix_{b,s,n,0} &= \operatorname{sigmoid}(mix\_scales_0\cdot x\_pre_{b,s,n}+bias\_pre_n)+hc\_pre\_eps, \\
      new\_post\_mix_{b,s,n,0} &= hc\_post\_scale\cdot\operatorname{sigmoid}(mix\_scales_1\cdot x\_post_{b,s,n}+bias\_post_n), \\
      x\_comb &= \operatorname{reshape}(x\_comb,[B,S,N,N]), \\
      bias\_res &= \operatorname{reshape}(bias\_res,[N,N]), \\
@@ -97,26 +93,28 @@
      \end{aligned}
      $$
 
-     公式中的new_post_mix是MhcPre算子的Post分支系数生成阶段的新系数，comb_logits是MhcPre算子的Res分支系数生成阶段的新logits，均不覆盖输入post_mix、comb_res_mix。bias_res由长度为N²的一维偏置按行优先顺序还原为[N,N]，再与MhcPre算子的Res分支投影阶段的结果逐元素相加。
+     `pre_mix`是本次MhcPre计算的混合系数。`shifted_prev_mix`非空时，通过`new_prev_mix`返回本次计算的`pre_mix`；为空时不输出`new_prev_mix`。该输出不回传外部传入的`shifted_prev_mix`。公式中的new_post_mix是MhcPre算子的Post分支系数生成阶段的新系数，comb_logits是MhcPre算子的Res分支系数生成阶段的新logits，均不覆盖输入post_mix、comb_res_mix。bias_res由长度为N²的一维偏置按行优先顺序还原为[N,N]，再与MhcPre算子的Res分支投影阶段的结果逐元素相加。
 
-     根据MhcPre算子的Pre分支系数生成阶段的系数对完整`x_2`中的各路残差加权合并：
+     `shifted_prev_mix`为空时使用本次计算的`pre_mix`，非空时使用传入值替代`pre_mix`。将选中的系数与`x_2`相乘，并沿head维求和：
 
      $$
      \begin{aligned}
-     w &= \begin{cases}new\_prev\_mix, & shifted\_prev\_mix=\mathrm{None},\\shifted\_prev\_mix, & shifted\_prev\_mix\neq\mathrm{None},\end{cases} \\
+     w &= \begin{cases}pre\_mix, & shifted\_prev\_mix=\mathrm{None},\\shifted\_prev\_mix, & shifted\_prev\_mix\neq\mathrm{None},\end{cases} \\
      h\_in_{b,s,d} &= \operatorname{Cast}_{dtype(x)}\left(\sum_{n=0}^{N-1}w_{b,s,n,0}\cdot\operatorname{FP32}(x\_2_{b,s,n,d})\right).
      \end{aligned}
      $$
 
+     传入的`shifted_prev_mix`不再经过上述Pre分支的Sigmoid和`hc_pre_eps`处理；它仅替换加权合并所用的`pre_mix`，不改变Post、Res分支系数的生成。合并结果`h_in`仍在第5阶段执行`rms_norm_1`。本次`pre_mix`与外部`shifted_prev_mix`使用独立UB区域；外部系数可提前载入，本次系数写回后，其UB区域方可再次生成新值。
+
      MhcPre算子的Res分支Sinkhorn归一化阶段（预留功能）
 
-     令$L=num\_sinkhorn\_iters$。$L=0$时直接返回MhcPre算子的Res分支系数生成阶段的logits，不执行指数变换或归一化：
+     令$L=num\_sinkhorn\_iters$。当前版本仅支持$L=0$，直接返回MhcPre算子的Res分支系数生成阶段的logits，不执行指数变换或Sinkhorn归一化：
 
      $$
      new\_comb\_res\_mix=comb\_logits.
      $$
 
-     $L>0$时，对每个token的$N\times N$矩阵独立执行以下计算。第一次迭代先沿最后一维执行softmax，再执行列归一化：
+     以下$L>0$的计算为预留功能，当前版本不支持。对每个token的$N\times N$矩阵独立计算，第一次迭代先沿最后一维执行softmax，再执行列归一化：
 
      $$
      \begin{aligned}
@@ -157,22 +155,22 @@
 | residual | 输入 | 多head残差输入，对应公式中的residual；shape为[B,S,N,D]或[T,N,D]。 | 与x相同 | ND |
 | post_mix | 输入 | MhcPost算子的输出融合阶段的输入系数，对应公式中的post_mix；shape为[B,S,N,1]或[T,N,1]。 | FLOAT32 | ND |
 | fn | 输入 | MhcPre算子的投影阶段权重，对应公式中的fn，分量顺序为Pre、Post、Res；shape为[Q,K]，Q=N*(N+2)、K=N*D。 | FLOAT32 | ND |
-| mix_scales | 输入 | MhcPre算子的投影阶段的三路缩放系数，依次对应公式中的mix_scales_0、mix_scales_1、mix_scales_2；shape为[3]。 | FLOAT32 | ND |
+| mix_scales | 输入 | MhcPre算子的系数生成阶段的三路缩放系数，依次对应公式中的mix_scales_0、mix_scales_1、mix_scales_2；shape为[3]。 | FLOAT32 | ND |
 | mix_bases | 输入 | MhcPre算子的系数生成阶段的三路偏置，对应公式中的mix_bases，按[N,N,N²]切分为bias_pre、bias_post、bias_res；shape为[Q]。 | FLOAT32 | ND |
 | rms_norm_1_weight | 输入 | RmsNorm算子的rms_norm_1阶段的逐通道权重，对应公式中的rms_norm_1_weight，shape为[D]。 | FLOAT32 | ND |
 | comb_res_mix | 可选输入 | MhcPost算子的残差映射阶段的变换矩阵，对应公式中的comb_res_mix；默认值为空，本版必须非空。shape为[B,S,N,N]或[T,N,N]。 | FLOAT32 | ND |
-| shifted_prev_mix | 可选输入 | 预留参数，默认值为空，本版仅支持空值。 | FLOAT32 | ND |
+| shifted_prev_mix | 可选输入 | MhcPre加权合并阶段的外部混合系数，形状与`post_mix`相同；为空时使用本次计算的`pre_mix`，非空时使用传入值替代`pre_mix`，与`x_2`相乘并沿head维求和。后续`rms_norm_1`保持执行。 | FLOAT32 | ND |
 | rms_norm_0_weight | 可选输入 | RmsNorm算子的rms_norm_0阶段的逐通道权重，对应公式中的rms_norm_0_weight，shape为[D]；默认值为空，此时跳过rms_norm_0阶段，直接将x送入MhcPost。 | FLOAT32 | ND |
 | rms_norm_mid_weight | 可选输入 | 默认值为空，跳过RmsNorm算子的rms_norm_mid阶段；非空时为RmsNorm算子的rms_norm_mid阶段的逐通道权重，对应公式中的rms_norm_mid_weight，shape为[K]。 | FLOAT32 | ND |
 | new_residual | 输出 | 更新后的残差状态，对应公式中的new_residual；未执行rms_norm_mid阶段时为MhcPost算子的输出融合阶段的输出，执行时为RmsNorm算子的rms_norm_mid阶段的输出，shape为[B,S,N,D]或[T,N,D]。 | 与x相同 | ND |
 | new_post_mix | 输出 | MhcPre算子的Post分支系数生成阶段的新系数，对应公式中的new_post_mix；shape为[B,S,N,1]或[T,N,1]。 | FLOAT32 | ND |
 | new_comb_res_mix | 输出 | MhcPre算子的Res分支系数生成阶段的新系数，对应公式中的new_comb_res_mix；本版仅输出comb_logits，Sinkhorn归一化为预留功能。shape为[B,S,N,N]或[T,N,N]。 | FLOAT32 | ND |
-| new_prev_mix | 可选输出 | 预留参数，默认不指定，本版不输出。 | FLOAT32 | ND |
-| y | 可选输出 | 默认不指定；MhcPre算子的加权合并阶段与RmsNorm算子的rms_norm_1阶段计算并应用倍率后的原精度结果，对应公式中的y；shape为[B,S,D]或[T,D]。本版必须输出。 | 与x相同 | ND |
+| new_prev_mix | 可选输出 | `shifted_prev_mix`非空时必须输出本次计算的`pre_mix`，形状与`post_mix`相同；为空时不输出。本次系数与外部系数使用独立UB区域，并分别写出和参与加权合并。 | FLOAT32 | ND |
+| y | 可选输出 | MhcPre算子的加权合并阶段与RmsNorm算子的rms_norm_1阶段计算后的原精度结果，对应公式中的y；shape为[B,S,D]或[T,D]。接口原型声明为可选，本版必须输出。 | 与x相同 | ND |
 | y_quant | 可选输出 | 预留参数，默认不指定，本版不输出。 | FLOAT8_E4M3FN | ND |
 | y_scale | 可选输出 | 预留参数，默认不指定，本版不输出。 | FLOAT8_E8M0 | ND |
 | rms_norm_eps | 可选属性 | 默认值为1e-6，作用于RmsNorm算子的rms_norm_0、rms_norm_mid和rms_norm_1阶段，对应公式中的rms_norm_eps；转换为FLOAT32后须有限且大于0。 | FLOAT | - |
-| hc_norm_eps | 可选属性 | 默认值为1e-6，MhcPre算子的均方根归一化阶段的稳定项，对应公式中的hc_norm_eps；转换为FLOAT32后须有限且大于0。 | FLOAT | - |
+| hc_norm_eps | 可选属性 | 默认值为1e-6，用于计算`x_2`完整N*D行的均方根并缩放投影结果，对应公式中的hc_norm_eps；转换为FLOAT32后须有限且大于0。 | FLOAT | - |
 | hc_pre_eps | 可选属性 | 默认值为1e-6，MhcPre算子的Pre分支Sigmoid阶段的输出附加项，对应公式中的hc_pre_eps；转换为FLOAT32后须有限且大于0。 | FLOAT | - |
 | op_impl_mode | 可选属性 | 默认值为0，选择MhcPre算子的矩阵乘阶段的计算模式：0表示FLOAT32计算，1表示HF32计算；2（3BF16）为预留取值，本版不支持。 | INT | - |
 | hc_mult | 可选属性 | 默认值为4，对应公式中的N，须与residual的head维一致；本版仅支持4，其他取值为预留取值。 | INT | - |

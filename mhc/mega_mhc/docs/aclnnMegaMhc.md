@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：MegaMhc融合多阶段RmsNorm、MhcPost和MhcPre计算，支持可选的输入RmsNorm和中间RmsNorm，更新多路残差状态与Post/Res混合系数，并将各路残差加权合并、归一化为下一子层的输入。
+- 接口功能：MegaMhc融合多阶段RmsNorm、MhcPost和MhcPre计算，支持可选的输入RmsNorm和中间RmsNorm，更新多路残差状态与Post/Res混合系数，并将各路残差加权合并、归一化为下一子层的输入。传入外部Pre混合系数时，还输出本次计算的Pre系数。
 
 - 计算公式：
 
@@ -39,21 +39,17 @@
      \end{aligned}
      $$
 
-  2. 执行MhcPost算子功能，将归一化结果与映射后的残差融合，简称mhc_post阶段。
+  2. 执行MhcPost算子功能，将上一阶段的`x_1`与映射后的残差融合，简称mhc_post阶段。
 
      $$
      \begin{aligned}
      term1_{b,s,n,d} &= \operatorname{FP32}(post\_mix_{b,s,n,0})\cdot \operatorname{FP32}(x\_1_{b,s,d}), \\
-     term2_{b,s,n,d} &=
-     \begin{cases}
-     \displaystyle\sum_{j=0}^{N-1}\operatorname{FP32}(comb\_res\_mix_{b,s,j,n})\cdot \operatorname{FP32}(residual_{b,s,j,d}), & comb\_res\_mix\neq\mathrm{nullptr},\\
-     \operatorname{FP32}(residual_{b,s,n,d}), & comb\_res\_mix=\mathrm{nullptr},
-     \end{cases} \\
+     term2_{b,s,n,d} &= \sum_{j=0}^{N-1}\operatorname{FP32}(comb\_res\_mix_{b,s,j,n})\cdot \operatorname{FP32}(residual_{b,s,j,d}), \\
      x\_2_{b,s,n,d} &= \operatorname{Cast}_{dtype(x)}\left(term1_{b,s,n,d}+term2_{b,s,n,d}\right).
      \end{aligned}
      $$
 
-     $j$为归约head，$n$为输出head。
+     $j$为归约head，$n$为输出head。当前版本要求`comb_res_mix`非空。
 
   3. 可选执行RmsNorm算子功能，对融合后的完整残差行进行均方根归一化，简称rms_norm_mid阶段。
 
@@ -67,7 +63,7 @@
      \end{aligned}
      $$
 
-     当`rms_norm_mid_weight`为空时，跳过本阶段，`x_2`保持MhcPost算子的输出融合阶段的输出；随后固定保存：
+     当`rms_norm_mid_weight`为空时，跳过本阶段，`x_2`保持MhcPost算子的输出融合阶段的输出。无论是否执行本阶段，均保存：
 
      $$
      new\_residual=x\_2.
@@ -84,7 +80,7 @@
      \end{aligned}
      $$
 
-     先执行矩阵乘$x\_2\_rs\cdot proj\_w$，再乘$inv\_rms\_pre$。按照`[N,N,N*N]`切分：
+     先执行矩阵乘$x\_2\_rs\cdot proj\_w$，再乘$inv\_rms\_pre$，用于生成本次混合系数；该RMS缩放不改变后续加权合并使用的`x_2`。按照`[N,N,N*N]`切分：
 
      $$
      (x\_pre,x\_post,x\_comb)=\operatorname{split}(x\_hat,[N,N,N^2]),
@@ -98,7 +94,7 @@
 
      $$
      \begin{aligned}
-     new\_prev\_mix_{b,s,n,0} &= \operatorname{sigmoid}(mix\_scales_0\cdot x\_pre_{b,s,n}+bias\_pre_n)+hc\_pre\_eps, \\
+     pre\_mix_{b,s,n,0} &= \operatorname{sigmoid}(mix\_scales_0\cdot x\_pre_{b,s,n}+bias\_pre_n)+hc\_pre\_eps, \\
      new\_post\_mix_{b,s,n,0} &= hc\_post\_scale\cdot\operatorname{sigmoid}(mix\_scales_1\cdot x\_post_{b,s,n}+bias\_post_n), \\
      x\_comb &= \operatorname{reshape}(x\_comb,[B,S,N,N]), \\
      bias\_res &= \operatorname{reshape}(bias\_res,[N,N]), \\
@@ -106,26 +102,28 @@
      \end{aligned}
      $$
 
-     公式中的new_post_mix是MhcPre算子的Post分支系数生成阶段的新系数，comb_logits是MhcPre算子的Res分支系数生成阶段的新logits，均不覆盖输入post_mix、comb_res_mix。bias_res由长度为N²的一维偏置按行优先顺序还原为[N,N]，再与MhcPre算子的Res分支投影阶段的结果逐元素相加。
+     `pre_mix`是本次MhcPre计算的混合系数。`shifted_prev_mix`非空时，通过`new_prev_mix`返回本次计算的`pre_mix`；为空时不输出`new_prev_mix`。该输出不回传外部传入的`shifted_prev_mix`。公式中的new_post_mix是MhcPre算子的Post分支系数生成阶段的新系数，comb_logits是MhcPre算子的Res分支系数生成阶段的新logits，均不覆盖输入post_mix、comb_res_mix。bias_res由长度为N²的一维偏置按行优先顺序还原为[N,N]，再与MhcPre算子的Res分支投影阶段的结果逐元素相加。
 
-     根据MhcPre算子的Pre分支系数生成阶段的系数对完整`x_2`中的各路残差加权合并：
+     `shifted_prev_mix`为空时使用本次计算的`pre_mix`，非空时使用传入值替代`pre_mix`。将选中的系数与`x_2`相乘，并沿head维求和：
 
      $$
      \begin{aligned}
-     w &= \begin{cases}new\_prev\_mix, & shifted\_prev\_mix=\mathrm{nullptr},\\shifted\_prev\_mix, & shifted\_prev\_mix\neq\mathrm{nullptr},\end{cases} \\
+     w &= \begin{cases}pre\_mix, & shifted\_prev\_mix=\mathrm{nullptr},\\shifted\_prev\_mix, & shifted\_prev\_mix\neq\mathrm{nullptr},\end{cases} \\
      h\_in_{b,s,d} &= \operatorname{Cast}_{dtype(x)}\left(\sum_{n=0}^{N-1}w_{b,s,n,0}\cdot\operatorname{FP32}(x\_2_{b,s,n,d})\right).
      \end{aligned}
      $$
 
+     传入的`shifted_prev_mix`不再经过上述Pre分支的Sigmoid和`hc_pre_eps`处理；它仅替换加权合并所用的`pre_mix`，不改变Post、Res分支系数的生成。合并结果`h_in`仍在第5阶段执行`rms_norm_1`。本次`pre_mix`与外部`shifted_prev_mix`使用独立UB区域；外部系数可提前载入，本次系数写回后，其UB区域方可再次生成新值。
+
      MhcPre算子的Res分支Sinkhorn归一化阶段（预留功能）
 
-     令$L=num\_sinkhorn\_iters$。$L=0$时直接返回MhcPre算子的Res分支系数生成阶段的logits，不执行指数变换或归一化：
+     令$L=num\_sinkhorn\_iters$。当前版本仅支持$L=0$，直接返回MhcPre算子的Res分支系数生成阶段的logits，不执行指数变换或Sinkhorn归一化：
 
      $$
      new\_comb\_res\_mix=comb\_logits.
      $$
 
-     $L>0$时，对每个token的$N\times N$矩阵独立执行以下计算。第一次迭代先沿最后一维执行softmax，再执行列归一化：
+     以下$L>0$的计算为预留功能，当前版本不支持。对每个token的$N\times N$矩阵独立计算，第一次迭代先沿最后一维执行softmax，再执行列归一化：
 
      $$
      \begin{aligned}
@@ -306,8 +304,8 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>shiftedPrevMixOptional（const aclTensor*）</td>
     <td>可选输入</td>
-    <td>预留参数。</td>
-    <td>本版仅支持nullptr。</td>
+    <td>MhcPre加权合并阶段的外部混合系数，对应公式中的shifted_prev_mix；用于与x_2相乘并沿head维求和，后续rms_norm_1保持执行。</td>
+    <td>nullptr时使用本次计算的pre_mix；非空时使用传入值替代pre_mix，形状须与postMix相同，不支持空Tensor。</td>
     <td>FLOAT32</td>
     <td>ND</td>
     <td>[B,S,N,1]或[T,N,1]</td>
@@ -346,7 +344,7 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>hcNormEps（double）</td>
     <td>输入</td>
-    <td>MhcPre算子的均方根归一化阶段的稳定项，对应公式中的hc_norm_eps。</td>
+    <td>用于计算x_2完整N*D行的均方根并缩放投影结果，对应公式中的hc_norm_eps。</td>
     <td>建议值为1e-6；转换为FLOAT32后须有限且大于0。</td>
     <td>-</td>
     <td>-</td>
@@ -466,8 +464,8 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>newPrevMixOut（aclTensor*）</td>
     <td>可选输出</td>
-    <td>预留参数。</td>
-    <td>本版仅支持nullptr。</td>
+    <td>本次MhcPre计算的pre_mix，与外部shifted_prev_mix分开存放于独立UB区域；该输出不回传外部输入。</td>
+    <td>shiftedPrevMixOptional非空时必须非空且形状与postMix相同；shiftedPrevMixOptional为nullptr时必须传入nullptr。不支持空Tensor。</td>
     <td>FLOAT32</td>
     <td>ND</td>
     <td>[B,S,N,1]或[T,N,1]</td>
@@ -543,12 +541,12 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>ACLNN_ERR_PARAM_NULLPTR</td>
     <td>161001</td>
-    <td>七个必选输入、combResMixOptional、三个必选输出、workspaceSize或executor存在空指针；yOut为空指针。</td>
+    <td>七个必选输入、combResMixOptional、三个必选输出、workspaceSize或executor存在空指针；yOut为空指针；shiftedPrevMixOptional非空时newPrevMixOut为空指针。</td>
   </tr>
   <tr>
     <td>ACLNN_ERR_PARAM_INVALID</td>
     <td>161002</td>
-    <td>数据类型、格式、shape或输出布局不符合参数规格；系数最后一维不为1；hcMult不为4；opImplMode不为0或1；预留参数numSinkhornIters不为0或sinkhornEps不为1e-6；参与计算的epsilon转换为FLOAT32后非有限或不大于0；hcPostScale转换为FLOAT32后非有限；预留参数rmsNormScale不为1.0；outputMode不为0（1、2为预留取值，其他值非法）；shiftedPrevMixOptional、newPrevMixOut、yQuantOut或yScaleOut非空。</td>
+    <td>数据类型、格式、shape或输出布局不符合参数规格；系数最后一维不为1；hcMult不为4；opImplMode不为0或1；预留参数numSinkhornIters不为0或sinkhornEps不为1e-6；参与计算的epsilon转换为FLOAT32后非有限或不大于0；hcPostScale转换为FLOAT32后非有限；预留参数rmsNormScale不为1.0；outputMode不为0（1、2为预留取值，其他值非法）；yQuantOut或yScaleOut非空；shiftedPrevMixOptional为空时newPrevMixOut非空。</td>
   </tr>
   </tbody>
   </table>

@@ -56,6 +56,14 @@ inline uint64_t CalcUbAllocSize(uint64_t bytes)
     return (bytes + kUbAlignmentBytes - 1U) / kUbAlignmentBytes * kUbAlignmentBytes;
 }
 
+/** External pre coefficients occupy their own aligned UB allocation only when supplied. */
+inline uint64_t CalcShiftedPreMixUbSize(uint32_t rows, bool hasShiftedPrevMix)
+{
+    const uint64_t alignedRows =
+        (static_cast<uint64_t>(rows) + kReductionRowAlignment - 1U) / kReductionRowAlignment * kReductionRowAlignment;
+    return hasShiftedPrevMix ? CalcUbAllocSize(alignedRows * kHeadCount * kMemoryFp32Bytes) : 0U;
+}
+
 /** Host-owned BS HF32 epilogue layout; inputBytes includes both input slots. */
 struct BsHfEpilogueTiling {
     uint32_t batch = 0U;
@@ -65,7 +73,7 @@ struct BsHfEpilogueTiling {
 
 /** Count all aligned live buffers: 2*batch*K inputs, two D outputs, gamma, partials, gates and scalar scratch. */
 inline uint64_t CalcBsHfEpilogueUbSize(uint32_t d, uint32_t rows, uint32_t alignedRows, uint32_t partialStride,
-                                       uint32_t kGrid, uint32_t batch)
+                                       uint32_t kGrid, uint32_t batch, bool hasShiftedPrevMix = false)
 {
     const uint64_t k = static_cast<uint64_t>(kHeadCount) * d;
     return CalcUbAllocSize(static_cast<uint64_t>(kBsHfInputSlots) * batch * k * kInputElementBytes) +
@@ -76,12 +84,14 @@ inline uint64_t CalcBsHfEpilogueUbSize(uint32_t d, uint32_t rows, uint32_t align
            CalcUbAllocSize(static_cast<uint64_t>(alignedRows) * kProjectionWidth * kMemoryFp32Bytes) +
            CalcUbAllocSize(kBsHfScalarElements * kMemoryFp32Bytes) +
            CalcUbAllocSize(kBsHfGateElements * kMemoryFp32Bytes) +
-           CalcUbAllocSize(kBsHfScalarElements * kMemoryFp32Bytes);
+           CalcUbAllocSize(kBsHfScalarElements * kMemoryFp32Bytes) +
+           CalcShiftedPreMixUbSize(alignedRows, hasShiftedPrevMix);
 }
 
 /** Select the largest validated batch b in {4,2} with aligned live UB(b)<=availableUb; zero keeps the row path. */
 inline BsHfEpilogueTiling CalcBsHfEpilogueTiling(uint64_t totalRows, uint32_t d, uint32_t rows, uint32_t alignedRows,
-                                                 uint32_t partialStride, uint32_t kGrid, uint64_t availableUb)
+                                                 uint32_t partialStride, uint32_t kGrid, uint64_t availableUb,
+                                                 bool hasShiftedPrevMix = false)
 {
     constexpr uint32_t kMinimumBatchedRows = 3072U;
     BsHfEpilogueTiling result;
@@ -89,7 +99,8 @@ inline BsHfEpilogueTiling CalcBsHfEpilogueTiling(uint64_t totalRows, uint32_t d,
         return result;
     }
     for (uint32_t batch = kMaximumBsHfBatch; batch >= kMinimumBsHfBatch; batch /= kBsHfBatchDivisor) {
-        const uint64_t bytes = CalcBsHfEpilogueUbSize(d, rows, alignedRows, partialStride, kGrid, batch);
+        const uint64_t bytes =
+            CalcBsHfEpilogueUbSize(d, rows, alignedRows, partialStride, kGrid, batch, hasShiftedPrevMix);
         if (bytes <= availableUb) {
             result.batch = batch;
             result.inputBytes = kBsHfInputSlots * batch * kHeadCount * d * kInputElementBytes;
@@ -184,7 +195,7 @@ inline uint32_t CalcMidGammaTile(uint32_t d, uint64_t availableUb)
 
 /** Epilogue owns one x2/hIn row plus a host-sized batch of projection partials. */
 inline uint64_t CalcEpilogueUbSize(uint32_t d, uint32_t partialGroups, uint32_t partialStride, uint32_t reduceRows = 1U,
-                                   uint32_t kGrid = 1U, bool reserveInput = false)
+                                   uint32_t kGrid = 1U, bool reserveInput = false, bool hasShiftedPrevMix = false)
 {
     uint64_t partialBytes =
         (static_cast<uint64_t>(partialGroups) * reduceRows * partialStride + kFp32VectorElements) * kMemoryFp32Bytes;
@@ -200,14 +211,14 @@ inline uint64_t CalcEpilogueUbSize(uint32_t d, uint32_t partialGroups, uint32_t 
            CalcUbAllocSize(static_cast<uint64_t>((reduceRows + kReductionRowAlignment - 1U) / kReductionRowAlignment *
                                                  kReductionRowAlignment) *
                            kGrid * kMemoryFp32Bytes) +
-           CalcUbAllocSize(partialBytes);
+           CalcUbAllocSize(partialBytes) + CalcShiftedPreMixUbSize(reduceRows, hasShiftedPrevMix);
 }
 /** Select the largest eight-row batch fitting the exact epilogue live allocation; small M keeps its tail. */
 inline uint32_t FitReductionRows(uint32_t rowLimit, uint32_t d, uint32_t groups, uint32_t stride, uint32_t kGrid,
-                                 uint64_t availableUb)
+                                 uint64_t availableUb, bool hasShiftedPrevMix = false)
 {
     uint32_t rows = CalcReductionRows(rowLimit);
-    while (rows > 0U && CalcEpilogueUbSize(d, groups, stride, rows, kGrid) > availableUb) {
+    while (rows > 0U && CalcEpilogueUbSize(d, groups, stride, rows, kGrid, false, hasShiftedPrevMix) > availableUb) {
         rows =
             rows > kReductionRowAlignment ? (rows - 1U) / kReductionRowAlignment * kReductionRowAlignment : rows - 1U;
     }
@@ -241,12 +252,13 @@ inline uint64_t CalcRowTileProducerUbSize(uint32_t tile)
 }
 
 /** Add the one-row ordered projection partials, RMS shards and immutable gate parameters to the tiled epilogue. */
-inline uint64_t CalcRowTileEpilogueUbSize(uint32_t tile, uint32_t groups, uint32_t stride, uint32_t kGrid)
+inline uint64_t CalcRowTileEpilogueUbSize(uint32_t tile, uint32_t groups, uint32_t stride, uint32_t kGrid,
+                                          bool hasShiftedPrevMix = false)
 {
     return CalcRowTileProducerUbSize(tile) +
            CalcUbAllocSize((static_cast<uint64_t>(groups) * stride + kFp32VectorElements) * kMemoryFp32Bytes) +
            CalcUbAllocSize(static_cast<uint64_t>(kRowTileRmsShardElements) * kGrid * kMemoryFp32Bytes) +
-           kRowTileExtraAllocations * kUbAlignmentBytes;
+           kRowTileExtraAllocations * kUbAlignmentBytes + CalcShiftedPreMixUbSize(1U, hasShiftedPrevMix);
 }
 
 struct RowTilingInfo {
@@ -261,16 +273,16 @@ struct RowTilingInfo {
  * All loop counts and valid tail lengths are Host results; no shape-specific constants or kernel tiling search.
  */
 inline RowTilingInfo CalcRowTiling(uint32_t d, bool hasMid, uint32_t groups, uint32_t stride, uint32_t kGrid,
-                                   uint64_t availableUb)
+                                   uint64_t availableUb, bool hasShiftedPrevMix = false)
 {
     if (d == 0U) {
         return {};
     }
     if (CalcProducerUbSize(d, hasMid, false, hasMid ? kFp32VectorElements : 0U) <= availableUb &&
-        CalcEpilogueUbSize(d, groups, stride, 1U, kGrid) <= availableUb) {
+        CalcEpilogueUbSize(d, groups, stride, 1U, kGrid, false, hasShiftedPrevMix) <= availableUb) {
         return {0U, d, 1U, d};
     }
-    const uint64_t fixed = CalcRowTileEpilogueUbSize(0U, groups, stride, kGrid);
+    const uint64_t fixed = CalcRowTileEpilogueUbSize(0U, groups, stride, kGrid, hasShiftedPrevMix);
     if (availableUb < fixed + kRowTileBytesPerElement * kRowTileAlignmentElements) {
         return {};
     }

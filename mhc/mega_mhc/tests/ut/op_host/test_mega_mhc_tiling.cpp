@@ -624,9 +624,9 @@ TEST(MegaMhcTiling, RejectInvalidContract)
     auto invalidGamma = MakeContext(16, 2560, false, 0);
     invalidGamma.inputTensorDesc_[9] = MakeTensor({2576}, ge::DT_FLOAT);
     ExecuteTestCase(invalidGamma, ge::GRAPH_FAILED);
-    auto reservedMix = MakeContext(16, 2560, false, 0);
-    reservedMix.inputTensorDesc_[8] = MakeTensor({16, 4, 1}, ge::DT_FLOAT);
-    ExecuteTestCase(reservedMix, ge::GRAPH_FAILED);
+    auto invalidMix = MakeContext(16, 2560, false, 0);
+    invalidMix.inputTensorDesc_[8] = MakeTensor({16, 4, 2}, ge::DT_FLOAT);
+    ExecuteTestCase(invalidMix, ge::GRAPH_FAILED);
     auto epsilon = MakeContext(16, 2560, false, 0);
     epsilon.attrs_[0] = {"rms_norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(0.0f)};
     ExecuteTestCase(epsilon, ge::GRAPH_FAILED);
@@ -669,4 +669,103 @@ TEST(MegaMhcTiling, RejectReservedAndInvalidOutputModes)
     omitted.attrs_.pop_back();
     TilingInfo info;
     EXPECT_TRUE(ExecuteTiling(omitted, info));
+}
+
+TEST(MegaMhcTiling, ExternalMixPreservesDispatchAndLogicalDimensions)
+{
+    for (const int64_t rows : {1, 48, 96, 1536, 4096}) {
+        for (const int64_t d : {128, 5120, 16384}) {
+            for (auto type : {ge::DT_FLOAT16, ge::DT_BF16}) {
+                for (bool mid : {false, true}) {
+                    for (int64_t mode : {0, 1}) {
+                        auto original = MakeContext(rows, d, mid, mode, type);
+                        auto external = MakeContext(rows, d, mid, mode, type);
+                        external.inputTensorDesc_[8] = MakeTensor({rows, 4, 1}, ge::DT_FLOAT);
+                        external.outputTensorDesc_[3] = MakeTensor({rows, 4, 1}, ge::DT_FLOAT);
+                        TilingInfo baseline, withMix;
+                        ASSERT_TRUE(ExecuteTiling(original, baseline));
+                        ASSERT_TRUE(ExecuteTiling(external, withMix));
+                        EXPECT_EQ(baseline.tilingKey, withMix.tilingKey);
+                        EXPECT_EQ(baseline.workspaceSizes, withMix.workspaceSizes);
+                        ASSERT_EQ(baseline.tilingDataSize, withMix.tilingDataSize);
+                        // Separate external coefficients may reduce the UB-sized epilogue batch.
+                        // The serialized leading fields T/D/K and the dispatch contract remain identical.
+                        constexpr size_t logicalDimensionsBytes = 3U * sizeof(uint32_t);
+                        EXPECT_EQ(
+                            std::memcmp(baseline.tilingData.get(), withMix.tilingData.get(), logicalDimensionsBytes),
+                            0);
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST(MegaMhcTiling, RejectInvalidExternalMix)
+{
+    for (const auto dims : {std::vector<int64_t>{16, 4}, std::vector<int64_t>{15, 4, 1}, std::vector<int64_t>{16, 4, 2},
+                            std::vector<int64_t>{0, 4, 1}}) {
+        auto context = MakeContext(16, 2560, false, 0);
+        context.inputTensorDesc_[8] = MakeTensor(dims, ge::DT_FLOAT);
+        ExecuteTestCase(context, ge::GRAPH_FAILED);
+    }
+    auto context = MakeContext(16, 2560, false, 0);
+    context.inputTensorDesc_[8] = MakeTensor({16, 4, 1}, ge::DT_FLOAT16);
+    ExecuteTestCase(context, ge::GRAPH_FAILED);
+}
+
+TEST(MegaMhcTiling, ExternalMixRequiresMatchingCurrentPreOutput)
+{
+    auto context = MakeContext(16, 2560, false, 0);
+    context.inputTensorDesc_[8] = MakeTensor({16, 4, 1}, ge::DT_FLOAT);
+    ExecuteTestCase(context, ge::GRAPH_FAILED);
+    for (const auto dims :
+         {std::vector<int64_t>{16, 4}, std::vector<int64_t>{15, 4, 1}, std::vector<int64_t>{16, 4, 2}}) {
+        context.outputTensorDesc_[3] = MakeTensor(dims, ge::DT_FLOAT);
+        ExecuteTestCase(context, ge::GRAPH_FAILED);
+    }
+    context.outputTensorDesc_[3] = MakeTensor({16, 4, 1}, ge::DT_FLOAT16);
+    ExecuteTestCase(context, ge::GRAPH_FAILED);
+    context.outputTensorDesc_[3] = MakeTensor({16, 4, 1}, ge::DT_FLOAT);
+    TilingInfo info;
+    EXPECT_TRUE(ExecuteTiling(context, info));
+}
+
+TEST(MegaMhcTiling, SeparateExternalMixUbIsIncludedInEveryEpilogueBudget)
+{
+    for (uint32_t rows : {1U, 8U, 16U, 24U, 32U, 40U, 48U}) {
+        const uint32_t alignedRows = (rows + 7U) / 8U * 8U;
+        const uint64_t extra = CalcUbAllocSize(static_cast<uint64_t>(alignedRows) * 4U * sizeof(float));
+        EXPECT_EQ(CalcShiftedPreMixUbSize(rows, false), 0U);
+        EXPECT_EQ(CalcShiftedPreMixUbSize(rows, true), extra);
+        EXPECT_EQ(CalcEpilogueUbSize(5120, 2, 32, rows, 2, false, true),
+                  CalcEpilogueUbSize(5120, 2, 32, rows, 2) + extra);
+        EXPECT_EQ(CalcEpilogueUbSize(5120, 2, 32, rows, 2, true, true),
+                  CalcEpilogueUbSize(5120, 2, 32, rows, 2, true) + extra);
+        EXPECT_EQ(CalcBsHfEpilogueUbSize(2560, rows, alignedRows, 32, 1, 2, true),
+                  CalcBsHfEpilogueUbSize(2560, rows, alignedRows, 32, 1, 2) + extra);
+    }
+    EXPECT_EQ(CalcRowTileEpilogueUbSize(128, 2, 32, 2, true),
+              CalcRowTileEpilogueUbSize(128, 2, 32, 2) + kUbAlignmentBytes);
+}
+
+TEST(MegaMhcTiling, SeparateExternalMixUbRespectsTightCapacityBoundaries)
+{
+    const uint64_t originalCapacity = CalcEpilogueUbSize(5120, 1, 32, 48, 1);
+    EXPECT_EQ(FitReductionRows(48, 5120, 1, 32, 1, originalCapacity), 48U);
+    const uint32_t reduced = FitReductionRows(48, 5120, 1, 32, 1, originalCapacity, true);
+    EXPECT_GT(reduced, 0U);
+    EXPECT_LT(reduced, 48U);
+    EXPECT_LE(CalcEpilogueUbSize(5120, 1, 32, reduced, 1, false, true), originalCapacity);
+
+    const uint64_t fourRowCapacity = CalcBsHfEpilogueUbSize(2560, 8, 8, 32, 1, 4);
+    EXPECT_EQ(CalcBsHfEpilogueTiling(4096, 2560, 8, 8, 32, 1, fourRowCapacity).batch, 4U);
+    const auto separate = CalcBsHfEpilogueTiling(4096, 2560, 8, 8, 32, 1, fourRowCapacity, true);
+    EXPECT_EQ(separate.batch, 2U);
+    EXPECT_LE(separate.ubBytes, fourRowCapacity);
+
+    const uint64_t available = 248U * 1024U;
+    const auto tiled = CalcRowTiling(16384, true, 2, 32, 2, available, true);
+    ASSERT_GT(tiled.count, 0U);
+    EXPECT_LE(CalcRowTileEpilogueUbSize(tiled.tile, 2, 32, 2, true), available);
 }

@@ -145,7 +145,8 @@ private:
     WaveEpilogue<T> epilogue_;
 };
 
-/** Materialize x2=Post(RMS0(hOut),residual), optionally followed by RMSMid.
+/** Materialize rounded x2=Post(x1,residual), optionally followed by RMSMid.
+ * x1=RMSNorm0(hOut) when WITH_RMS0=true, otherwise hOut.
  * Phase-local resources are released on return, before projection reuses UB.
  */
 template <typename T, bool WITH_MID, bool WITH_RMS0>
@@ -161,7 +162,8 @@ __aicore__ inline void RunMkProducerPhase(Kernel::Tensors<T>& tensors, const Meg
     }
 }
 
-/** Reduce projection partials, compute Pre weights and finish hInPrime=RMS1(weighted_sum(x2)).
+/** Reduce projection partials and generate current coefficients; select shifted_prev_mix when supplied.
+ * Finish hInPrime=RMSNorm1(Cast<T>(weighted_sum_heads(x2))) using the selected pre coefficients.
  * The final phase owns its pipe until all output work has completed on return.
  */
 template <typename T>

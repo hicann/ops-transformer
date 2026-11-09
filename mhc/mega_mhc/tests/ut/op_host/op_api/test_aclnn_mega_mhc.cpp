@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include <limits>
+#include <vector>
 #include <gtest/gtest.h>
 #include "../../../../op_host/op_api/aclnn_mega_mhc.h"
 #include "op_api_ut_common/tensor_desc.h"
@@ -23,7 +24,15 @@ struct Case {
     bool mid = false;
     bool missingGamma = false;
     bool invalidGamma = false;
-    bool reservedInput = false;
+    bool externalMix = false;
+    bool missingPreOutput = false;
+    int64_t preOutputLast = 1;
+    aclDataType preOutputType = ACL_FLOAT;
+    bool sequence = false;
+    bool wrongMixRank = false;
+    int64_t mixTokens = 2;
+    int64_t mixLast = 1;
+    aclDataType mixType = ACL_FLOAT;
     bool reservedOutput = false;
     bool wrongOutputShape = false;
     aclDataType type = ACL_FLOAT16;
@@ -41,21 +50,33 @@ struct Case {
 
 aclnnStatus Workspace(const Case& c)
 {
-    auto x = TensorDesc({2, c.d}, c.type, ACL_FORMAT_ND).ValueRange(-1, 1);
-    auto residual = TensorDesc({2, 4, c.d}, c.type, ACL_FORMAT_ND).ValueRange(-1, 1);
-    auto post = TensorDesc({2, 4, 1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 1);
+    const std::vector<int64_t> leading = c.sequence ? std::vector<int64_t>{1, 2} : std::vector<int64_t>{2};
+    auto shape = [&](std::initializer_list<int64_t> tail) {
+        auto dims = leading;
+        dims.insert(dims.end(), tail);
+        return dims;
+    };
+    auto x = TensorDesc(shape({c.d}), c.type, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto residual = TensorDesc(shape({4, c.d}), c.type, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto post = TensorDesc(shape({4, 1}), ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 1);
     auto fn = TensorDesc({24, 4 * c.d}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-0.01, 0.01);
     auto scales = TensorDesc({3}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.1, 0.2);
     auto bases = TensorDesc({24}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-0.1, 0.1);
     auto gamma = TensorDesc({c.d}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(1, 1);
     auto invalidGamma = TensorDesc({c.d + 16}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(1, 1);
     auto gammaMid = TensorDesc({4 * c.d}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(1, 1);
-    auto comb = TensorDesc({2, 4, 4}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.25, 0.25);
-    auto previous = TensorDesc({2, 4, 1}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 1);
-    auto x2 = TensorDesc({2, 4, c.d}, c.type, ACL_FORMAT_ND);
-    auto postOut = TensorDesc({2, 4, 1}, ACL_FLOAT, ACL_FORMAT_ND);
-    auto combOut = TensorDesc({2, 4, 4}, ACL_FLOAT, ACL_FORMAT_ND);
-    auto y = TensorDesc({2, c.d + (c.wrongOutputShape ? 16 : 0)}, c.type, ACL_FORMAT_ND);
+    auto comb = TensorDesc(shape({4, 4}), ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0.25, 0.25);
+    auto mixShape = shape({4, c.mixLast});
+    mixShape[c.sequence ? 1U : 0U] = c.mixTokens;
+    if (c.wrongMixRank) {
+        mixShape.pop_back();
+    }
+    auto previous = TensorDesc(mixShape, c.mixType, ACL_FORMAT_ND).ValueRange(-2, 2);
+    auto x2 = TensorDesc(shape({4, c.d}), c.type, ACL_FORMAT_ND);
+    auto postOut = TensorDesc(shape({4, 1}), ACL_FLOAT, ACL_FORMAT_ND);
+    auto combOut = TensorDesc(shape({4, 4}), ACL_FLOAT, ACL_FORMAT_ND);
+    auto preOut = TensorDesc(shape({4, c.preOutputLast}), c.preOutputType, ACL_FORMAT_ND);
+    auto y = TensorDesc(shape({c.d + (c.wrongOutputShape ? 16 : 0)}), c.type, ACL_FORMAT_ND);
     auto run = [&](auto g0, auto g2, auto prevIn, auto prevOut) {
         auto ut = OP_API_UT(
             aclnnMegaMhc,
@@ -65,25 +86,25 @@ aclnnStatus Workspace(const Case& c)
         uint64_t size = 0;
         return ut.TestGetWorkspaceSize(&size);
     };
-    if (c.missingGamma) {
-        if (c.mid) {
-            return run(nullptr, gammaMid, nullptr, nullptr);
+    auto runMix = [&](auto g0, auto g2) {
+        if (c.externalMix) {
+            if (c.missingPreOutput) {
+                return run(g0, g2, previous, nullptr);
+            }
+            return run(g0, g2, previous, preOut);
         }
-        return run(nullptr, nullptr, nullptr, nullptr);
+        return run(g0, g2, nullptr, nullptr);
+    };
+    if (c.missingGamma) {
+        return c.mid ? runMix(nullptr, gammaMid) : runMix(nullptr, nullptr);
     }
     if (c.invalidGamma) {
-        return run(invalidGamma, nullptr, nullptr, nullptr);
-    }
-    if (c.reservedInput) {
-        return run(gamma, nullptr, previous, nullptr);
+        return runMix(invalidGamma, nullptr);
     }
     if (c.reservedOutput) {
         return run(gamma, nullptr, nullptr, previous);
     }
-    if (c.mid) {
-        return run(gamma, gammaMid, nullptr, nullptr);
-    }
-    return run(gamma, nullptr, nullptr, nullptr);
+    return c.mid ? runMix(gamma, gammaMid) : runMix(gamma, nullptr);
 }
 } // namespace
 
@@ -175,14 +196,12 @@ TEST(MegaMhcOpApi, OptionalRms0WithBothTypesModesAndMidStates)
     }
 }
 
-TEST(MegaMhcOpApi, RejectInvalidWeightAndReservedTensors)
+TEST(MegaMhcOpApi, RejectInvalidWeightAndReservedOutputs)
 {
     Case c;
     c.invalidGamma = true;
     EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
-    c = Case{};
-    c.reservedInput = true;
-    EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
+
     c = Case{};
     c.reservedOutput = true;
     EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
@@ -201,4 +220,65 @@ TEST(MegaMhcOpApi, RejectInvalidDimensionsTypesAndOutputs)
     c = Case{};
     c.wrongOutputShape = true;
     EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
+}
+
+TEST(MegaMhcOpApi, ExternalMixBothRanksTypesModesAndRmsStates)
+{
+    for (auto type : {ACL_FLOAT16, ACL_BF16}) {
+        for (bool sequence : {false, true}) {
+            for (bool missingGamma : {false, true}) {
+                for (bool mid : {false, true}) {
+                    for (int64_t mode : {0, 1}) {
+                        Case c;
+                        c.externalMix = true;
+                        c.type = type;
+                        c.sequence = sequence;
+                        c.missingGamma = missingGamma;
+                        c.mid = mid;
+                        c.mode = mode;
+                        EXPECT_EQ(Workspace(c), ACLNN_SUCCESS);
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST(MegaMhcOpApi, RejectInvalidExternalMixShapeAndType)
+{
+    for (bool sequence : {false, true}) {
+        Case c;
+        c.externalMix = true;
+        c.sequence = sequence;
+        c.mixLast = 2;
+        EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
+        c.mixLast = 1;
+        c.mixTokens = 3;
+        EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
+        c.mixTokens = 2;
+        c.wrongMixRank = true;
+        EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
+        c.wrongMixRank = false;
+        c.mixType = ACL_FLOAT16;
+        EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
+    }
+}
+
+TEST(MegaMhcOpApi, ExternalMixRequiresMatchingCurrentPreOutput)
+{
+    for (bool sequence : {false, true}) {
+        Case c;
+        c.externalMix = true;
+        c.sequence = sequence;
+        c.missingPreOutput = true;
+        EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_NULLPTR);
+        c.missingPreOutput = false;
+        c.preOutputLast = 2;
+        EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
+        c.preOutputLast = 1;
+        c.preOutputType = ACL_FLOAT16;
+        EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
+        c.preOutputType = ACL_FLOAT;
+        EXPECT_EQ(Workspace(c), ACL_SUCCESS);
+    }
 }

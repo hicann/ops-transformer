@@ -17,7 +17,7 @@
 namespace MegaMhc::Schedule {
 using namespace AscendC;
 
-// WITH_RMS0=false bypasses the RMS0 stage in every producer; Post then consumes hOut directly.
+// In every producer, x1=RMSNorm0(hOut) when WITH_RMS0=true; otherwise x1=hOut and gamma0 is not read.
 constexpr uint32_t kProducerCoefficientPlaneOffset = 64U;
 constexpr uint32_t kProducerCoefficientSlotStride = 128U;
 constexpr uint32_t kProducerCoefficientBufferElements = 128U;
@@ -31,7 +31,7 @@ constexpr uint32_t kProducerMidSumIndex = 2U;
 constexpr uint32_t kProducerMidInverseIndex = 3U;
 constexpr uint32_t kProducerMidCarryIndex = 5U;
 
-/** Enqueue producer inputs: hOut=x[row], optional residual=r[row], coefficients=H[row].
+/** Enqueue hOut=x[row] and Post/Res coefficients; load residual=r[row] only when LOAD_RESIDUAL=true.
  * Wait for V_MTE2 input credit or MTE3_MTE2 aliased output credit; MTE2_V publishes the loaded inputs.
  */
 template <typename T, bool OUTPUT_CREDIT = false, bool LOAD_RESIDUAL = true>
@@ -73,7 +73,7 @@ __aicore__ inline void PrefetchNoMidStagedProducer(Kernel::Tensors<T>& tensors, 
     SetFlag<HardEvent::MTE2_V>(residualEvent);
 }
 
-/** Compute one RMS0/Post row with the required x1 Cast, avoiding its UB round trip. */
+/** Compute one Post row after optional RMS0, preserving the x1 Cast when RMS0 runs and avoiding its UB round trip. */
 template <typename T, bool WITH_RMS0>
 __aicore__ inline void ComputeNoMidProducerRow(LocalTensor<T> input, LocalTensor<T> residual, LocalTensor<float> gamma,
                                                LocalTensor<float> coefficients, LocalTensor<float> stats,
@@ -126,7 +126,7 @@ __aicore__ inline void RunNoMidSingleRowProducer(Kernel::Tensors<T>& tensors, co
     WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
 }
 
-/** Produce x2[row]=Post(Cast<T>(RMS0(hOut[row])), residual[row]) without Mid.
+/** Produce rounded x2[row]=Post(x1[row], residual[row]) without Mid; x1 follows the WITH_RMS0 selection above.
  * Two input slots and three aliased residual/output slots overlap MTE2, Vector and MTE3.
  * Post output retains its input-type rounding before GM publication; the phase barrier remains.
  */
@@ -211,8 +211,8 @@ __aicore__ inline void RunNoMidStagedProducer(Kernel::Tensors<T>& tensors, const
     }
 }
 
-/** Produce x2[row]=Post(Cast<T>(RMS0(hOut[row])), residual[row]) followed by RMSMid, with both input-type stage
- * roundings. Input/coefficient prefetch remains double-buffered. A single residual slot can keep the full Mid gamma
+/** Produce rounded Post(x1[row], residual[row]) followed by RMSMid; x1 follows WITH_RMS0 and stage roundings remain.
+ * Input/coefficient prefetch remains double-buffered. A single residual slot can keep the full Mid gamma
  * resident; its next load waits until the current in-place Post/Mid output has reached GM.
  */
 /** Map a with_mid producer to the same token half-tile as its paired BS projection.
@@ -253,8 +253,8 @@ __aicore__ inline void PrefetchCachedGammaResidual(Kernel::Tensors<T>& tensors, 
     SetFlag<HardEvent::MTE2_V>(event);
 }
 
-/** Cache gamma0/gamma2 once with the Host-selected residual slot count.
- * In-place RMS0 avoids a separate x1 buffer; double residual slots overlap the next row load.
+/** Cache gamma2 and, when WITH_RMS0=true, gamma0 with the Host-selected residual slot count.
+ * Enabled RMS0 runs in place; the bypass uses hOut directly. Double residual slots overlap the next row load.
  */
 template <typename T, bool DOUBLE_RESIDUAL, bool WITH_RMS0>
 __aicore__ inline void RunCachedGammaWithMidProducer(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling,
@@ -494,10 +494,10 @@ __aicore__ inline void RunPrefetchedWithMidProducer(Kernel::Tensors<T>& tensors,
     }
 }
 
-/** Materialize RMS0/Post and optional Mid with a bounded D working set.
- * Formula: x1=Cast<T>(x*rsqrt(sum_D(x*x)/D+eps)*gamma0), post=Cast<T>(postMix*x1+resMix*residual).
- * RMS0 and Mid accumulate statistics across every D tile before their apply pass; each token has one AIV owner.
- * Rounded Post lives temporarily in new_residual, then Mid overwrites it with its rounded result.
+/** Materialize optional RMS0, Post and optional Mid with a bounded D working set.
+ * x1 follows WITH_RMS0; post=Cast<T>(postMix*FP32(x1)+sum_heads(resMix*FP32(residual))).
+ * Enabled RMS0/Mid stages accumulate full-axis statistics before applying them; each token has one AIV owner.
+ * Rounded Post is stored in new_residual; when WITH_MID=true, Mid overwrites it with its rounded result.
  */
 template <typename T, bool WITH_MID, bool WITH_RMS0>
 __aicore__ inline void RunTiledProducer(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling, TPipe* pipe)
@@ -578,7 +578,7 @@ __aicore__ inline void RunTiledProducer(Kernel::Tensors<T>& tensors, const MegaM
 }
 
 /** Stateful row producer used only by the outer projection schedule.
- * x2=Cast<T>(Post(Cast<T>(RMS0(hOut)),residual)); arithmetic stays in shared RegBase functions.
+ * Rounded x2=Post(x1,residual), with x1 selected by WITH_RMS0; arithmetic stays in shared RegBase functions.
  * Producer buffers coexist with projection buffers; host owns row counts and tick spacing.
  */
 template <typename T, bool WITH_RMS0>
@@ -643,7 +643,7 @@ public:
         SetFlag<HardEvent::MTE2_V>(event);
     }
 
-    /** Compute one rounded RMS0/Post row and enqueue x2[row,:]; slot reuse waits for its store. */
+    /** Compute one rounded Post row after optional RMS0 and enqueue x2[row,:]; reuse waits for its store. */
     __aicore__ inline void ProduceOne()
     {
         const auto& t = *tiling_;

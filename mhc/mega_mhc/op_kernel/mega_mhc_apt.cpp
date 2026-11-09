@@ -20,8 +20,8 @@ using namespace MegaMhc;
 
 /**
  * Total entry for the 950 no_mid/with_mid M-K and BS families.
- * NoMid: complete RMS0/Post rows -> overlapped m-k projection when wave tiling is selected.
- * WithMid: complete RMS0/Post/Mid -> barrier -> m-k projection -> barrier.
+ * NoMid: optional RMS0 -> complete Post rows -> overlapped m-k projection when wave tiling is selected.
+ * WithMid: optional RMS0 -> complete Post/Mid -> barrier -> m-k projection -> barrier.
  * SKIP_RMS0 bypasses RMS0 in both families and passes x directly to Post.
  * MK supports arbitrary M/K grids, including one M lane; BS partitions tokens with full K.
  * All variants reuse the same ordered Pre/RMS1 compute routines.
@@ -47,6 +47,11 @@ __global__ __aicore__ void mega_mhc(GM_ADDR x, GM_ADDR residual, GM_ADDR postMix
     tensors.alpha.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(mixScales));
     tensors.bias.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(mixBases));
     tensors.gamma1.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(rmsNorm1Weight));
+    tensors.hasShiftedPrevMix = shiftedPrevMix != nullptr;
+    if (tensors.hasShiftedPrevMix) {
+        tensors.shiftedPrevMix.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(shiftedPrevMix));
+        tensors.hPreNew.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(newPrevMix));
+    }
     if constexpr (!SKIP_RMS0) {
         tensors.gamma0.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(rmsNorm0Weight));
     }

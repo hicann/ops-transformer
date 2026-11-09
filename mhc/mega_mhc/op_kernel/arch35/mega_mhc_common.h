@@ -47,6 +47,9 @@ struct Tensors {
     GlobalTensor<float> alpha;
     GlobalTensor<float> bias;
     GlobalTensor<float> gamma1;
+    GlobalTensor<float> shiftedPrevMix;
+    GlobalTensor<float> hPreNew;
+    bool hasShiftedPrevMix = false;
     GlobalTensor<float> gamma0;
     GlobalTensor<float> gamma2;
     GlobalTensor<T> hInPrime;

@@ -30,6 +30,85 @@ constexpr uint32_t kEpilogueStatsElements = 4U;
 constexpr uint32_t kEpiloguePrefetchFull = 2U;
 constexpr uint32_t kEpilogueRmsCarryIndex = 2U;
 
+// Direction-specific event namespaces: projection uses MTE3_V 6/7, BS y uses 6/7,
+// and tiled-row inputs use MTE2_V 2/3. These two channels remain independent.
+constexpr event_t kShiftedPreInputEvent = EVENT_ID7;
+constexpr event_t kCurrentPreOutputEvent = EVENT_ID2;
+
+/** Keep external mixing coefficients separate from the current Pre/Post/Res planes.
+ * External input DMA starts before projection reduction. Current pre output DMA is
+ * drained only before its source plane is overwritten, or before the pipe is released. */
+template <typename T>
+class PreMixStorage {
+public:
+    __aicore__ inline void Init(TPipe* pipe, const MegaMhcTilingData& tiling, bool enabled)
+    {
+        enabled_ = enabled;
+        outputPending_ = false;
+        if (enabled_) {
+            Kernel::InitUbBuffer(pipe, shiftedBuffer_, tiling.reduceRowsAligned * Kernel::kHeadCount * sizeof(float));
+            shifted_ = shiftedBuffer_.template Get<float>();
+        }
+    }
+
+    /** V_MTE2 protects external coefficients until all Vector readers from the previous batch finish. */
+    __aicore__ inline void Prefetch(Kernel::Tensors<T>& tensors, uint64_t row, uint32_t rows)
+    {
+        if (enabled_) {
+            SetFlag<HardEvent::V_MTE2>(kShiftedPreInputEvent);
+            WaitFlag<HardEvent::V_MTE2>(kShiftedPreInputEvent);
+            Kernel::EnqueueGlobalToUb(shifted_, tensors.shiftedPrevMix, row * Kernel::kHeadCount,
+                                      rows * Kernel::kHeadCount);
+            SetFlag<HardEvent::MTE2_V>(kShiftedPreInputEvent);
+        }
+    }
+
+    /** The current pre plane may be regenerated only after its previous MTE3 reader completes. */
+    __aicore__ inline void BeforeOverwrite()
+    {
+        if (outputPending_) {
+            WaitFlag<HardEvent::MTE3_V>(kCurrentPreOutputEvent);
+            outputPending_ = false;
+        }
+    }
+
+    __aicore__ inline void StoreCurrent(Kernel::Tensors<T>& tensors, uint64_t row, uint32_t rows,
+                                        const LocalTensor<float>& current)
+    {
+        if (enabled_) {
+            SetFlag<HardEvent::V_MTE3>(kCurrentPreOutputEvent);
+            WaitFlag<HardEvent::V_MTE3>(kCurrentPreOutputEvent);
+            DataCopyExtParams copy{1U, static_cast<uint32_t>(rows * Kernel::kHeadCount * sizeof(float)), 0U, 0U, 0U};
+            DataCopyPad(tensors.hPreNew[row * Kernel::kHeadCount], current, copy);
+            SetFlag<HardEvent::MTE3_V>(kCurrentPreOutputEvent);
+            outputPending_ = true;
+        }
+    }
+
+    __aicore__ inline void WaitReady()
+    {
+        if (enabled_) {
+            WaitFlag<HardEvent::MTE2_V>(kShiftedPreInputEvent);
+        }
+    }
+
+    __aicore__ inline const LocalTensor<float>& Select(const LocalTensor<float>& current) const
+    {
+        return enabled_ ? shifted_ : current;
+    }
+
+    __aicore__ inline void End()
+    {
+        BeforeOverwrite();
+    }
+
+private:
+    TBuf<TPosition::VECCALC> shiftedBuffer_;
+    LocalTensor<float> shifted_;
+    bool enabled_ = false;
+    bool outputPending_ = false;
+};
+
 /** Load consecutive rows from each projection group; UB layout is [group, planned rows, stride]. */
 template <typename T, bool WAIT_READY = true>
 __aicore__ inline void LoadPrePartialRows(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling, uint64_t row,
@@ -62,8 +141,10 @@ template <typename T, bool ASYNC_COEFFICIENTS = false>
 __aicore__ inline void PrepareEpilogueRows(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling, uint64_t row,
                                            uint32_t rows, const LocalTensor<float>& partial,
                                            const LocalTensor<float>& rms, const LocalTensor<float>& coefficients,
-                                           const LocalTensor<float>& alpha, const LocalTensor<float>& bias)
+                                           const LocalTensor<float>& alpha, const LocalTensor<float>& bias,
+                                           PreMixStorage<T>& preMix)
 {
+    preMix.Prefetch(tensors, row, rows);
     LoadPrePartialRows<T, false>(tensors, tiling, row, rows, partial);
     const uint64_t gap = static_cast<uint64_t>(tiling.totalRows - rows) * sizeof(float);
     if (gap <= kMaxDmaGapBytes) {
@@ -86,6 +167,7 @@ __aicore__ inline void PrepareEpilogueRows(Kernel::Tensors<T>& tensors, const Me
                                      reinterpret_cast<__ubuf__ float*>(rms.GetPhyAddr()), rows, tiling.nzN,
                                      tiling.reduceRows * tiling.nzN, tiling.partialGroupCount, tiling.reduceRowsAligned,
                                      tiling.kGrid, tiling.k, tiling.mhcPreNormEps);
+    preMix.BeforeOverwrite();
     Compute::ComputeGateRows(
         reinterpret_cast<__ubuf__ float*>(partial.GetPhyAddr()), reinterpret_cast<__ubuf__ float*>(alpha.GetPhyAddr()),
         reinterpret_cast<__ubuf__ float*>(bias.GetPhyAddr()), tiling.hcEps, tiling.hcPostScale, rows, tiling.nzN,
@@ -109,9 +191,12 @@ __aicore__ inline void PrepareEpilogueRows(Kernel::Tensors<T>& tensors, const Me
                                       coefficients[tiling.reduceRowsAligned * kPackedHResPlaneOffset],
                                       rows * Kernel::kHeadMatrixElements);
     }
+    preMix.StoreCurrent(tensors, row, rows, coefficients);
+    preMix.WaitReady();
 }
 
-/** Mix x2 using precomputed gates, round h_in, then normalize: output=RMSNorm(Cast<T>(sum_n pre[n]*x2[n])). */
+/** Mix x2 using the selected internal or external pre coefficients, then round h_in and apply RMSNorm1.
+ * Formula: output=RMSNorm1(Cast<T>(sum_n pre[n]*FP32(x2[n]))). */
 template <typename T>
 __aicore__ inline void FinalizeMhcRow(Kernel::Tensors<T>& tensors, const MegaMhcTilingData& tiling, uint64_t row,
                                       const LocalTensor<T>& x2Row, const LocalTensor<T>& hIn,
@@ -141,8 +226,9 @@ __aicore__ inline void PrefetchEpilogueRow(Kernel::Tensors<T>& tensors, const Me
     SetFlag<HardEvent::MTE2_V>(event);
 }
 
-/** Finalize a precomputed gate batch while overlapping next-row loads and previous-row output stores.
- * Formula: y[r]=RMSNorm(Cast<T>(sum_n pre[r,n]*x2[r,n])); both explicit input-type roundings remain.
+/** Finalize a selected-coefficient batch while overlapping next-row loads and previous-row output stores.
+ * pre is shifted_prev_mix when present, otherwise the current sigmoid-plus-eps pre coefficients.
+ * Formula: y[r]=RMSNorm1(Cast<T>(sum_n pre[r,n]*FP32(x2[r,n]))); stage roundings remain.
  * The host enables reuse of dead partial storage only when it fits a complete x2 row.
  */
 template <typename T>
@@ -218,6 +304,7 @@ __aicore__ inline void RunEpilogue(Kernel::Tensors<T>& tensors, const MegaMhcTil
         TBuf<TPosition::VECCALC> alphaBuffer;
         TBuf<TPosition::VECCALC> biasBuffer;
         TBuf<TPosition::VECCALC> statsBuffer;
+        PreMixStorage<T> preMix;
         Kernel::InitUbBuffer(pipe, x2Buffer, tiling.k * sizeof(T));
         Kernel::InitUbBuffer(pipe, hInBuffer, tiling.d * sizeof(T));
         Kernel::InitUbBuffer(pipe, hInPrimeBuffer, tiling.d * sizeof(T));
@@ -234,6 +321,7 @@ __aicore__ inline void RunEpilogue(Kernel::Tensors<T>& tensors, const MegaMhcTil
         Kernel::InitUbBuffer(pipe, alphaBuffer, kAlphaBufferElements * sizeof(float));
         Kernel::InitUbBuffer(pipe, biasBuffer, kBiasBufferElements * sizeof(float));
         Kernel::InitUbBuffer(pipe, statsBuffer, kEpilogueStatsElements * sizeof(float));
+        preMix.Init(pipe, tiling, tensors.hasShiftedPrevMix);
 
         LocalTensor<T> x2 = x2Buffer.Get<T>();
         LocalTensor<T> hIn = hInBuffer.Get<T>();
@@ -273,16 +361,17 @@ __aicore__ inline void RunEpilogue(Kernel::Tensors<T>& tensors, const MegaMhcTil
             for (uint64_t start = first; start < end; start += stride) {
                 const uint32_t rows =
                     end - start < tiling.reduceRows ? static_cast<uint32_t>(end - start) : tiling.reduceRows;
-                PrepareEpilogueRows<T, BS_OWNERSHIP || ASYNC_COEFFICIENTS>(tensors, tiling, start, rows, partial,
-                                                                           rmsPartials, coefficients, alpha, bias);
-                FinalizeMhcRows<T>(tensors, tiling, start, rows, x2, hIn, hInPrime, gamma1, partial, coefficients,
-                                   stats);
+                PrepareEpilogueRows<T, BS_OWNERSHIP || ASYNC_COEFFICIENTS>(
+                    tensors, tiling, start, rows, partial, rmsPartials, coefficients, alpha, bias, preMix);
+                FinalizeMhcRows<T>(tensors, tiling, start, rows, x2, hIn, hInPrime, gamma1, partial,
+                                   preMix.Select(coefficients), stats);
                 if constexpr (BS_OWNERSHIP || ASYNC_COEFFICIENTS) {
                     // Finalize reads the separate Pre plane; drain Post/Res output reads before reusing coefficients.
                     WaitFlag<HardEvent::MTE3_V>(EVENT_ID3);
                 }
             }
         }
+        preMix.End();
     }
 }
 
@@ -307,6 +396,7 @@ public:
         Kernel::InitUbBuffer(pipe, alphaBuffer, kAlphaBufferElements * sizeof(float));
         Kernel::InitUbBuffer(pipe, biasBuffer, kBiasBufferElements * sizeof(float));
         Kernel::InitUbBuffer(pipe, statsBuffer, kEpilogueStatsElements * sizeof(float));
+        preMix_.Init(pipe, tiling, tensors.hasShiftedPrevMix);
 
         x2 = x2Buffer.Get<T>();
         hIn = hInBuffer.Get<T>();
@@ -345,7 +435,7 @@ public:
         SetFlag<HardEvent::MTE3_V>(EVENT_ID5);
     }
 
-    /** Advance one output row: gates=Pre(partials), output=RMS1(Cast(sum(pre*x2))). */
+    /** Generate current gates, select external pre coefficients when present, then finish one row with RMSNorm1. */
     __aicore__ inline void Tick(Kernel::Tensors<T>& tensors)
     {
         if (done_ >= count_) {
@@ -355,7 +445,7 @@ public:
             batchStart_ = done_;
             batchRows_ = count_ - done_ < plan_->reduceRows ? count_ - done_ : plan_->reduceRows;
             PrepareEpilogueRows(tensors, *plan_, first_ + done_, batchRows_, partial, rmsPartials, coefficients, alpha,
-                                bias);
+                                bias, preMix_);
         }
         if (done_ == 0U) {
             PrefetchEpilogueRow(tensors, *plan_, first_, x2, EVENT_ID1);
@@ -365,10 +455,10 @@ public:
         WaitFlag<HardEvent::MTE2_V>(EVENT_ID1);
         WaitFlag<HardEvent::MTE3_V>(outputEvent);
         auto statsPtr = reinterpret_cast<__ubuf__ float*>(stats.GetPhyAddr());
-        Compute::ComputeHInTile<T>(
-            reinterpret_cast<__ubuf__ float*>(coefficients.GetPhyAddr()) + (done_ - batchStart_) * Kernel::kHeadCount,
-            reinterpret_cast<__ubuf__ T*>(x2.GetPhyAddr()), plan_->d, 0U, plan_->d,
-            reinterpret_cast<__ubuf__ T*>(output.GetPhyAddr()), statsPtr);
+        Compute::ComputeHInTile<T>(reinterpret_cast<__ubuf__ float*>(preMix_.Select(coefficients).GetPhyAddr()) +
+                                       (done_ - batchStart_) * Kernel::kHeadCount,
+                                   reinterpret_cast<__ubuf__ T*>(x2.GetPhyAddr()), plan_->d, 0U, plan_->d,
+                                   reinterpret_cast<__ubuf__ T*>(output.GetPhyAddr()), statsPtr);
         SetFlag<HardEvent::V_MTE2>(EVENT_ID1);
         // The next x2 load overlaps RMS1 and the following projection work; input is no longer read by RMS1.
         if (done_ + 1U < count_) {
@@ -394,9 +484,11 @@ public:
         WaitFlag<HardEvent::V_MTE2>(EVENT_ID1);
         WaitFlag<HardEvent::MTE3_V>(EVENT_ID4);
         WaitFlag<HardEvent::MTE3_V>(EVENT_ID5);
+        preMix_.End();
     }
 
 private:
+    PreMixStorage<T> preMix_;
     const MegaMhcTilingData* plan_ = nullptr;
     uint64_t first_;
     uint32_t count_, done_, batchStart_, batchRows_;
@@ -406,8 +498,8 @@ private:
     LocalTensor<float> gamma1, partial, rmsPartials, coefficients, alpha, bias, stats;
 };
 
-/** Finish ordered Pre coefficients, then stream the rounded weighted sum through RMS1.
- * Formula: hIn=Cast<T>(sum_n pre[n]*x2[n,:]); y=Cast<T>(FP32(hIn)*rsqrt(sum_D(hIn*hIn)/D+eps)*gamma1).
+/** Generate ordered current coefficients, select the internal/external pre plane, then stream hIn through RMS1.
+ * Formula: hIn=Cast<T>(sum_n pre[n]*FP32(x2[n,:])); y=RMSNorm1(hIn).
  * y temporarily holds the rounded hIn until its complete-D statistic is known; token ownership prevents races.
  */
 template <typename T>
@@ -426,11 +518,13 @@ __aicore__ inline void RunTiledEpilogue(Kernel::Tensors<T>& tensors, const MegaM
         auto rms = rmsBuffer.Get<float>();
         auto alpha = alphaBuffer.Get<float>();
         auto bias = biasBuffer.Get<float>();
+        PreMixStorage<T> preMix;
+        preMix.Init(pipe, tiling, tensors.hasShiftedPrevMix);
         auto stats = reinterpret_cast<__ubuf__ float*>(buffer.stats.GetPhyAddr());
         Kernel::CopyGlobalToUb(alpha, tensors.alpha, 0U, kAlphaElements);
         Kernel::CopyGlobalToUb(bias, tensors.bias, 0U, kProjectionColumns);
         for (uint64_t row = GetBlockIdx(); row < tiling.totalRows; row += tiling.activeAiv) {
-            PrepareEpilogueRows(tensors, tiling, row, 1U, partial, rms, buffer.coefficients, alpha, bias);
+            PrepareEpilogueRows(tensors, tiling, row, 1U, partial, rms, buffer.coefficients, alpha, bias, preMix);
             Kernel::ZeroFp32Values(stats, 1U);
             buffer.template PrefetchHeads<false>(tensors, row, 0U);
             for (uint32_t tile = 0U; tile < tiling.dTileCount; ++tile) {
@@ -440,10 +534,10 @@ __aicore__ inline void RunTiledEpilogue(Kernel::Tensors<T>& tensors, const MegaM
                 }
                 auto input = buffer.Input(tile);
                 auto heads = buffer.Heads(tile);
-                Compute::ComputeHInTile<T>(reinterpret_cast<__ubuf__ float*>(buffer.coefficients.GetPhyAddr()),
-                                           reinterpret_cast<__ubuf__ T*>(heads.GetPhyAddr()), tiling.dTile, 0U,
-                                           buffer.Count(tile), reinterpret_cast<__ubuf__ T*>(input.GetPhyAddr()),
-                                           stats + kEpilogueRmsCarryIndex);
+                Compute::ComputeHInTile<T>(
+                    reinterpret_cast<__ubuf__ float*>(preMix.Select(buffer.coefficients).GetPhyAddr()),
+                    reinterpret_cast<__ubuf__ T*>(heads.GetPhyAddr()), tiling.dTile, 0U, buffer.Count(tile),
+                    reinterpret_cast<__ubuf__ T*>(input.GetPhyAddr()), stats + kEpilogueRmsCarryIndex);
                 Compute::AddFp32Scalar(stats, stats + kEpilogueRmsCarryIndex);
                 Kernel::CopyUbToGlobal(tensors.hInPrime, row * tiling.d + static_cast<uint64_t>(tile) * tiling.dTile,
                                        input, buffer.Count(tile));
@@ -453,6 +547,7 @@ __aicore__ inline void RunTiledEpilogue(Kernel::Tensors<T>& tensors, const MegaM
             Kernel::ApplyTiledNormalization(buffer, tiling, tensors.hInPrime, tensors.hInPrime, row * tiling.d,
                                             tensors.gamma1, 0U, stats + 1U);
         }
+        preMix.End();
         buffer.End();
     }
 }
@@ -462,8 +557,10 @@ __aicore__ inline void PrepareBsCompactEpilogueRows(Kernel::Tensors<T>& tensors,
                                                     uint64_t row, uint32_t rows, const LocalTensor<float>& partial,
                                                     const LocalTensor<float>& rms,
                                                     const LocalTensor<float>& coefficients,
-                                                    const LocalTensor<float>& alpha, const LocalTensor<float>& bias)
+                                                    const LocalTensor<float>& alpha, const LocalTensor<float>& bias,
+                                                    PreMixStorage<T>& preMix)
 {
+    preMix.Prefetch(tensors, row, rows);
     SetFlag<HardEvent::V_MTE2>(EVENT_ID0);
     WaitFlag<HardEvent::V_MTE2>(EVENT_ID0);
     Kernel::EnqueueGlobalToUb(partial, tensors.partialMm, row * tiling.nzN, rows * tiling.nzN);
@@ -488,6 +585,7 @@ __aicore__ inline void PrepareBsCompactEpilogueRows(Kernel::Tensors<T>& tensors,
                                      reinterpret_cast<__ubuf__ float*>(rms.GetPhyAddr()), rows, tiling.nzN,
                                      tiling.reduceRows * tiling.nzN, 1U, tiling.reduceRowsAligned, tiling.kGrid,
                                      tiling.k, tiling.mhcPreNormEps);
+    preMix.BeforeOverwrite();
     Compute::ComputeGateRows(
         reinterpret_cast<__ubuf__ float*>(partial.GetPhyAddr()), reinterpret_cast<__ubuf__ float*>(alpha.GetPhyAddr()),
         reinterpret_cast<__ubuf__ float*>(bias.GetPhyAddr()), tiling.hcEps, tiling.hcPostScale, rows, tiling.nzN,
@@ -504,6 +602,8 @@ __aicore__ inline void PrepareBsCompactEpilogueRows(Kernel::Tensors<T>& tensors,
                 coefficients[tiling.reduceRowsAligned * kPackedHResPlaneOffset], resParams);
     SetFlag<HardEvent::MTE3_V>(EVENT_ID0);
     WaitFlag<HardEvent::MTE3_V>(EVENT_ID0);
+    preMix.StoreCurrent(tensors, row, rows, coefficients);
+    preMix.WaitReady();
 }
 
 /** Pipeline the single-input epilogue when the partial buffer cannot hold another x2 row.
@@ -643,6 +743,7 @@ __aicore__ inline void RunBsOwnedEpilogue(Kernel::Tensors<T>& tensors, const Meg
         TBuf<TPosition::VECCALC> alphaBuffer;
         TBuf<TPosition::VECCALC> biasBuffer;
         TBuf<TPosition::VECCALC> statsBuffer;
+        PreMixStorage<T> preMix;
         Kernel::InitUbBuffer(pipe, x2Buffer, BATCHED_INPUT ? tiling.bsEpilogueInputBytes : tiling.k * sizeof(T));
         Kernel::InitUbBuffer(pipe, hInBuffer, tiling.d * sizeof(T));
         Kernel::InitUbBuffer(pipe, hInPrimeBuffer, tiling.d * sizeof(T));
@@ -658,6 +759,7 @@ __aicore__ inline void RunBsOwnedEpilogue(Kernel::Tensors<T>& tensors, const Meg
         Kernel::InitUbBuffer(pipe, alphaBuffer, kAlphaBufferElements * sizeof(float));
         Kernel::InitUbBuffer(pipe, biasBuffer, kBiasBufferElements * sizeof(float));
         Kernel::InitUbBuffer(pipe, statsBuffer, kEpilogueStatsElements * sizeof(float));
+        preMix.Init(pipe, tiling, tensors.hasShiftedPrevMix);
 
         LocalTensor<T> x2 = x2Buffer.Get<T>();
         LocalTensor<T> hIn = hInBuffer.Get<T>();
@@ -699,19 +801,21 @@ __aicore__ inline void RunBsOwnedEpilogue(Kernel::Tensors<T>& tensors, const Meg
                 const uint32_t rows = count - done < tiling.reduceRows ? count - done : tiling.reduceRows;
                 if constexpr (COMPACT_PARTIALS) {
                     PrepareBsCompactEpilogueRows(tensors, tiling, start, rows, partial, rmsPartials, coefficients,
-                                                 alpha, bias);
+                                                 alpha, bias, preMix);
                 } else {
-                    PrepareEpilogueRows(tensors, tiling, start, rows, partial, rmsPartials, coefficients, alpha, bias);
+                    PrepareEpilogueRows(tensors, tiling, start, rows, partial, rmsPartials, coefficients, alpha, bias,
+                                        preMix);
                 }
                 if constexpr (BATCHED_INPUT) {
                     FinalizeBsHfEpilogueBatches(tensors, tiling, start, rows, batch, x2, hIn, hInPrime, gamma1,
-                                                coefficients, stats);
+                                                preMix.Select(coefficients), stats);
                 } else {
-                    FinalizeBsMhcRows(tensors, tiling, start, rows, x2, hIn, hInPrime, gamma1, partial, coefficients,
-                                      stats);
+                    FinalizeBsMhcRows(tensors, tiling, start, rows, x2, hIn, hInPrime, gamma1, partial,
+                                      preMix.Select(coefficients), stats);
                 }
             }
         }
+        preMix.End();
     }
 }
 

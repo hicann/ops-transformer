@@ -57,8 +57,12 @@ TEST(MegaMhcInferShape, BothLayoutsAndActivationTypes)
                                                                                 Tensor({}, type),
                                                                                 Tensor({}, ge::DT_FLOAT8_E4M3FN),
                                                                                 Tensor({}, ge::DT_FLOAT8_E8M0)};
-            gert::InfershapeContextPara para("MegaMhc", inputs, outputs);
-            ExecuteTestCase(para, ge::GRAPH_SUCCESS, {residual, post, comb, {0}, x, {0}, {0}});
+            for (bool external : {false, true}) {
+                inputs[8] = Tensor(external ? post : std::vector<int64_t>{}, ge::DT_FLOAT);
+                gert::InfershapeContextPara para("MegaMhc", inputs, outputs);
+                ExecuteTestCase(para, ge::GRAPH_SUCCESS,
+                                {residual, post, comb, external ? post : std::vector<int64_t>{0}, x, {0}, {0}});
+            }
         }
     }
 }

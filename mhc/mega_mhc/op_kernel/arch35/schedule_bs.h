@@ -75,7 +75,8 @@ __aicore__ inline void RunBsCompactNoMidSchedule(Kernel::Tensors<T>& tensors, co
 }
 
 /** BS owns distinct token tiles and full K; no_mid materializes x2 in GM.
- * Formula: x2=Post(RMS0(hOut),residual), optionally RMSMid(x2); y=RMS1(Pre(x2)).
+ * x1=RMSNorm0(hOut) when WITH_RMS0=true, otherwise hOut; x2=Post(x1,residual), then optional RMSMid.
+ * y=RMSNorm1(Cast<T>(sum_heads(w*FP32(x2)))); w is external shifted_prev_mix or the current pre coefficients.
  * Host owns all tile sizes. This entry owns stage lifetimes, synchronization and finalization.
  */
 template <typename T, bool WITH_MID, bool USE_HF32, bool WITH_RMS0>
