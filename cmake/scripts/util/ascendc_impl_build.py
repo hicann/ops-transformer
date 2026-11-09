@@ -29,8 +29,8 @@ COMPUTE_UNIT = None
 ENABLE_EXPERIMENTAL = "OFF"
 PYPTO_ARCH_MAP = {
     "ascend950": "a5",
-    "ascend960dt": "a6",
-    "ascend960pr": "a6",
+    "ascend960dt": "9201",
+    "ascend960pr": "9201",
 }
 
 PYPTO_KERNEL_ARCH_DIR_MAP = {
