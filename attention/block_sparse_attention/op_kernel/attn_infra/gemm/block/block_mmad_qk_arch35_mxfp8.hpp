@@ -155,16 +155,38 @@ public:
         return (a < b) ? a : b;
     }
 
-    // qs64：L1 Q / Q-scale 按 128 行布局，先清零再只搬有效 64 行，避免 pad 行脏数据进 S。
-    __aicore__ inline void PadQL1Zero(uint32_t qBufId)
+    // L1 Q 按 128 行 zN 摆。只补 [qsActBaseTile, 128)，不覆盖即将写入的有效行。
+    // 每个 K 面 128×32B，一行恰好 32B，tail 在面内连续。
+    __aicore__ inline void PadQL1Zero(uint32_t qBufId, uint32_t qsActBaseTile, uint32_t embed, uint32_t scaleK)
     {
-        constexpr uint32_t BLOCK = 32;
-        AscendC::InitConstValueParams<uint16_t> qFill(1, static_cast<uint16_t>(MXFP8::L1_Q_BUF_SIZE / BLOCK), 0,
-                                                      MXFP8::ZERO_FILL_PATTERN);
-        AscendC::Fill(l1BTensor[qBufId].template ReinterpretCast<uint16_t>(), qFill);
-        AscendC::InitConstValueParams<uint16_t> qScaleFill(
-            1, static_cast<uint16_t>(MXFP8::L1_Q_DESCALE_BUF_SIZE / BLOCK), 0, MXFP8::ZERO_FILL_PATTERN);
-        AscendC::Fill(l1BScaleTensor[qBufId].template ReinterpretCast<uint16_t>(), qScaleFill);
+        constexpr uint32_t c0 = MXFP8::FP8_C0_ELEMS;
+        constexpr uint32_t padM = Q_M_PAD;
+        if (qsActBaseTile >= padM || embed == 0 || scaleK == 0) {
+            return;
+        }
+        uint32_t tailRows = padM - qsActBaseTile;
+        uint32_t kPlanes = embed / c0;
+        AscendC::InitConstValueParams<uint16_t> qFill(1, static_cast<uint16_t>(tailRows), 0, MXFP8::ZERO_FILL_PATTERN);
+        auto qU16 = l1BTensor[qBufId].template ReinterpretCast<uint16_t>();
+        for (uint32_t p = 0; p < kPlanes; ++p) {
+            uint32_t byteOff = p * padM * c0 + qsActBaseTile * c0;
+            AscendC::Fill(qU16[byteOff / sizeof(uint16_t)], qFill);
+        }
+
+        // scale 按 token 紧排。Fill 要求 32B 对齐，起点向下对齐；被多清的几个字节由随后的 GM→L1 覆盖。
+        // 不用 SetValue：Cube 标量写 L1 会触发 aicore 271（internal buffer 越界）。
+        uint32_t head = qsActBaseTile * scaleK;
+        uint32_t end = padM * scaleK;
+        if (end > MXFP8::L1_Q_DESCALE_BUF_SIZE) {
+            end = MXFP8::L1_Q_DESCALE_BUF_SIZE;
+        }
+        uint32_t fillStart = head & ~(MXFP8::BLOCK_SIZE - 1u);
+        if (fillStart < end) {
+            uint32_t blocks = (end - fillStart) / MXFP8::BLOCK_SIZE;
+            AscendC::InitConstValueParams<uint16_t> scaleFill(1, static_cast<uint16_t>(blocks), 0,
+                                                              MXFP8::ZERO_FILL_PATTERN);
+            AscendC::Fill(l1BScaleTensor[qBufId][fillStart].template ReinterpretCast<uint16_t>(), scaleFill);
+        }
     }
 
     // Q 稠密 GM → L1（RowMajor → zN）
@@ -384,7 +406,7 @@ public:
         copyL1ToL0BMxQk(l0BTensor[qkL0abBufId].template ReinterpretCast<AscendC::mx_fp8_e4m3_t>(),
                         l1BTensor[qBufId].template ReinterpretCast<fp8_e4m3fn_t>(),
                         l1BScaleTensor[qBufId].template ReinterpretCast<AscendC::fp8_e8m0_t>(), qsActBaseTileAlign16,
-                        kCur, qsActBaseTileAlign16L0, scaleMAlign16, kStart);
+                        kCur, qsActBaseTileAlign16L0, scaleMAlign16, kStart, Q_M_PAD);
     }
 
     // K → L0A（非转置，带 mx scale，n 方向子切分 + D 方向切段）
@@ -497,9 +519,12 @@ public:
         if (isFirstKvsTile) {
             AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1QEventId);
             if (qsActBaseTile < Q_M_PAD) {
-                PadQL1Zero(qBufId);
+                PadQL1Zero(qBufId, qsActBaseTile, embed, scaleK);
+                // Q-scale padding may overlap the following GM-to-L1 copy.
+                AscendC::PipeBarrier<PIPE_MTE2>();
             }
-            auto l1QLayout = tla::MakeLayout<ElementA, layout::zN>(qsMmadN, embed);
+            // 面距按 128 行。qs=64 时 mmad N 仍是 64，LoadQ 的 srcStride 用 Q_M_PAD。
+            auto l1QLayout = tla::MakeLayout<ElementA, layout::zN>(Q_M_PAD, embed);
             auto l1QTensorTla = tla::MakeTensor(l1BTensor[qBufId], l1QLayout, Arch::PositionL1{});
             CopyQGmToL1(qsActBaseTile, embed, gQTensorTla, l1QTensorTla);
             CopyQScaleGmToL1(qsActBaseTile, scaleK, gQDequantScale, qBufId, qHeadMul);

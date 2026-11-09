@@ -106,7 +106,8 @@ public:
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(MXFP8::SYNC_VEC1_RES_BUF0_FLAG);
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(MXFP8::SYNC_VEC1_RES_BUF1_FLAG);
 
-        // 与 softmax 一致：group-max 仍是 128 宽，pscale 走 qs128。
+        // group-max 物理上仍是 128 宽，pscale / L1 继续按 128 宽写。
+        // qs=64 时 softmax 只用低 64 lane，这里按 lane 取 max，高 64 lane 不进低 64 的 scale。
         const bool sRowIsQs128 = (taskInfo.qsActBaseTileAlign128 == MXFP8::QS_BASE_SIZE);
         if (tileInfo.curKvsTileLoopIdx / MXFP8Kernel::TILE_GROUP_N == 0) {
             if (sRowIsQs128) {

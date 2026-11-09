@@ -24,10 +24,15 @@ __simd_vf__ void processOutVF(__ubuf__ float* attenOutMD, __ubuf__ float* attenO
 {
     MaskReg preg_all32 = CreateMask<float, MaskPattern::ALL>();
     MaskReg preg_all16 = CreateMask<uint16_t, MaskPattern::ALL>();
-    RegTensor<float> vreg_rrsum, vreg_ones;
+    MaskReg preg_zero_sum;
+    RegTensor<float> vreg_rrsum, vreg_ones, vreg_zero;
     Duplicate(vreg_ones, (float)1.0);
+    Duplicate(vreg_zero, 0.0f);
     LoadAlign(vreg_rrsum, (__ubuf__ float*)rsum);
+    // 空行 rowsum=0 时 1/0=Inf，Inf*0 得到 NaN，payload 随 UB 残留变化，两次运行对不齐。
+    Compare<float, AscendC::CMPMODE::EQ>(preg_zero_sum, vreg_rrsum, vreg_zero, preg_all32);
     Div(vreg_rrsum, vreg_ones, vreg_rrsum, preg_all32);
+    Select(vreg_rrsum, vreg_zero, vreg_rrsum, preg_zero_sum);
 
     for (uint16_t i = 0; i < QsBase / 16; i++) {
         RegTensor<float> vreg_src1, vreg_src2, vreg_src3, vreg_src4, vreg_src5, vreg_src6, vreg_src7, vreg_src8;

@@ -114,9 +114,20 @@ public:
 
         const uint32_t actKvsTile = actualBlockShape.m();
         const uint32_t groupMaxIdx = GetLocalGroupMaxBufIdx(tileInfo.loop);
-        // QK 在 qs=64 时 N=64，S 仍按 128 宽行的前 64 列存放。softmax 继续走 qs128 VF，
-        // 有效列与后 64 列互不影响。qs64 VF 的 P 落点与当前 PV 的 K-outer 不一致。
-        const bool sRowIsQs128 = (taskInfo.qsActBaseTileAlign128 == MXFP8::QS_BASE_SIZE);
+        // QK 满块 qs=64 只写每行前 64 列，行距仍是 256。qs128 VF / LSE 的 K_g 打包依赖这 128 宽，
+        // 不能改走 qs64 VF。后 64 列不参与有效 query，但残留 UB 会进入 hi lane 的 max，两次运行不一致。
+        if (taskInfo.qsActBaseTile == 64) {
+            constexpr uint32_t kRowStride = 256;
+            constexpr uint32_t kTailCol = 64;
+            constexpr uint32_t kTailCount = 64;
+            constexpr uint32_t kRows = 128;
+            auto sTail = sUBTensor[spBuffIdx];
+            for (uint32_t row = 0; row < kRows; ++row) {
+                AscendC::Duplicate(sTail[row * kRowStride + kTailCol], Mxfp8VF::MIN_VALUE, kTailCount);
+            }
+            AscendC::PipeBarrier<PIPE_V>();
+        }
+        const bool sRowIsQs128 = true;
 
         if (actKvsTile == MXFP8::KVS_BASE_SIZE) {
             if (sRowIsQs128) {

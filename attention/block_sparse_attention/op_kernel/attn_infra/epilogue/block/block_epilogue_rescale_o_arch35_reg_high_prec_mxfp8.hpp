@@ -149,27 +149,23 @@ public:
         }
     }
 
-    // 连续 64-float lse → 每行 32B 槽（与 regular Incontinuous 写出一致）
+    // 连续 lse → 每行 32B 槽。单流写出，奇数行不再读 row 后面的未初始化元素。
+    // 双 UnalignReg 从同一地址起写时，两条 unalign 引擎的提交顺序不保证，BSND/TND
+    // 的 LSE 会随运行变化。
     __simd_vf__ inline void ExpandLseToUnalignVF(__ubuf__ float* lseUb, uint32_t row)
     {
         using namespace AscendC::Reg;
-        UnalignReg ureg0;
-        UnalignReg ureg1;
+        UnalignReg ureg;
         static constexpr uint32_t postUpdateStride = 32 / sizeof(float);
-        uint16_t rowEven = static_cast<uint16_t>((row + 1u) & ~1u);
-        // 先拷到 scratch：lse 连续区在 [0, row)，broadcast 写到 [64, ...) 再不回头踩。
-        // 这里 lseUb 调用方保证 [0,64) 是连续结果、[64,64+row*8) 可写。
+        uint16_t rowCnt = static_cast<uint16_t>(row);
+        // lse 连续区在 [0, row)，broadcast 写到 [64, ...) 再不回头踩。
         __ubuf__ float* dst = lseUb + 64;
-        for (uint16_t i = 0; i < rowEven; i += 2) {
-            RegTensor<float> v0;
-            RegTensor<float> v1;
-            LoadAlign<float, LoadDist::DIST_BRC_B32>(v0, lseUb + i);
-            LoadAlign<float, LoadDist::DIST_BRC_B32>(v1, lseUb + (i + 1));
-            StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(dst, v0, ureg0, postUpdateStride);
-            StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(dst, v1, ureg1, postUpdateStride);
+        for (uint16_t i = 0; i < rowCnt; ++i) {
+            RegTensor<float> v;
+            LoadAlign<float, LoadDist::DIST_BRC_B32>(v, lseUb + i);
+            StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(dst, v, ureg, postUpdateStride);
         }
-        StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(dst, ureg0, postUpdateStride);
-        StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(dst, ureg1, postUpdateStride);
+        StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(dst, ureg, postUpdateStride);
     }
 
     __aicore__ inline void ExpandLseToUnalign(__ubuf__ float* lsePtr, uint32_t row)

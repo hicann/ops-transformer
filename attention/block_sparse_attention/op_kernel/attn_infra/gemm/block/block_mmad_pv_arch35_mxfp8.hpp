@@ -388,6 +388,8 @@ public:
                      l1ATensor[l1ABufId].template ReinterpretCast<fp8_e4m3fn_t>(),
                      l1AScaleTensor[l1ABufId].template ReinterpretCast<AscendC::fp8_e8m0_t>(), loadData2DParamsA,
                      loadData2DMXParamsA);
+            AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(PV_L0AB_EVENT0 + pvL0abBufId);
+            AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(PV_L0AB_EVENT0 + pvL0abBufId);
             AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(PV_L0AB_EVENT0 + pvL0abBufId);
             pvL0abBufId = (pvL0abBufId + 1) % MXFP8::L0A_PV_BUF_CNT;
         }
@@ -447,6 +449,17 @@ public:
             pairRows += MXFP8::Mxfp8NextKvsTileRows(gatheredKvSTileIdx, kvSBaseTile, delay20TaskInfo.gatheredKvSeqlen);
         }
         uint32_t pairAlign64 = MXFP8::Mxfp8Align64(pairRows);
+        // Mmad K 固定 128。1～64 行那一半只对齐到 64，LoadV 盖不住后 64 个 K，L0 会留下上一拍的 V / scale。
+        // 把这一半扩成 128 行窗口：数据补 0。不能改成 K=64，L0 的 128 布局和短 K 对不上。
+        uint32_t naturalAlign64 = pairAlign64;
+        if (pairEven) {
+            uint32_t oddRows = pairRows - curBaseTileSize;
+            if (oddRows < MXFP8::S2_BASE_TILE_SIZE && pairAlign64 < MXFP8::QK_HALF_KVS + MXFP8::S2_BASE_TILE_SIZE) {
+                pairAlign64 = MXFP8::QK_HALF_KVS + MXFP8::S2_BASE_TILE_SIZE;
+            }
+        } else if (pairAlign64 != 0 && pairAlign64 < MXFP8::S2_BASE_TILE_SIZE) {
+            pairAlign64 = MXFP8::S2_BASE_TILE_SIZE;
+        }
         uint32_t vSlot = l1ABufId;
         uint32_t scaleRows = pairRows;
         uint32_t vScaleAlign64 = pairAlign64;
@@ -459,6 +472,14 @@ public:
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(KV_EVENT0 + vSlot);
         if (pairRows != pairAlign64) {
             PadVS2NotAlign64(pairAlign64, pairRows, vSlot);
+        }
+        // 扩出来的 scale 组不在 GM 拷贝范围内。先整槽铺 0x7F，有效段随后覆盖。0xFF 进归约会变成 NaN。
+        if (pairAlign64 > naturalAlign64) {
+            constexpr uint16_t vScaleFillBlocks =
+                static_cast<uint16_t>(MXFP8::L1_KV_DESCALE_BUF_SIZE / MXFP8::BLOCK_SIZE);
+            AscendC::InitConstValueParams<uint16_t> vscaleFillParams(1, vScaleFillBlocks, 0, MXFP8::SEED_V_SCALE_FILL);
+            AscendC::Fill(l1AScaleTensor[vSlot].template ReinterpretCast<uint16_t>(), vscaleFillParams);
+            AscendC::PipeBarrier<PIPE_MTE2>();
         }
 
         auto l1ATensorTla = tla::MakeTensor(
@@ -498,10 +519,6 @@ public:
         uint32_t pairAlign64 = pairVL1Align64_;
         uint32_t mMmad = MXFP8::PV_MMAD_M_DIM;
 
-        if (delay20TileInfo.kvsActBaseTileAlign32 != delay20TileInfo.kvsActBaseTileAlign64) {
-            PadPS2NotAlign64(delay20TileInfo.kvsActBaseTileAlign64, delay20TileInfo.kvsActBaseTileAlign32, pSlot);
-        }
-
         if (!pairOdd) {
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(KV_EVENT0 + vSlot);
         }
@@ -518,14 +535,26 @@ public:
         AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0ABEventId);
 
         uint32_t s2Full = delay20TileInfo.kvsActBaseTileAlign64;
+        uint32_t s2Mmad = MXFP8::S2_BASE_TILE_SIZE;
+        // 短尾 align64=64，但 L0 / Mmad 仍是 K=128。L1 已把这一半补到 128（数据 0、scale 0x7F），这里整段装入。
+        uint32_t s2Load = (s2Full != 0 && s2Full < s2Mmad) ? s2Mmad : s2Full;
         uint32_t s2Start = pairOdd ? MXFP8::QK_HALF_KVS : 0;
         bool initC = delay20TileInfo.isTileGoupFirstTile;
-        LoadPToL0(pSlot, l0BBufId, s2Full, embedReal, delay20TaskInfo.qsActBaseTileAlign64, 0);
-        LoadVToL0(vSlot, l0ABufId, embedReal, s2Full, s2Start, pairAlign64, vSlot, s2Start, pairAlign64);
+        // 有效 P 只写到 align32，[align32, s2Mmad) 由 MTE2 Fill。
+        // 这次 Fill 在 V 的 MTE2_MTE1 之后才发出，必须单独等完再让 MTE1 LoadP。
+        // Q 占用 MTE2_MTE1 的 2/3，KV 占用 4..7，P 补零用 0。
+        if (delay20TileInfo.kvsActBaseTileAlign32 < s2Mmad) {
+            PadPS2NotAlign64(s2Mmad, delay20TileInfo.kvsActBaseTileAlign32, pSlot);
+            AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(0);
+            AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(0);
+        }
+        LoadPToL0(pSlot, l0BBufId, s2Mmad, embedReal, delay20TaskInfo.qsActBaseTileAlign64, 0);
+        LoadVToL0(vSlot, l0ABufId, embedReal, s2Load, s2Start, pairAlign64, vSlot, s2Start, pairAlign64);
+        AscendC::PipeBarrier<PIPE_MTE1>();
         AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(l0ABEventId);
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(l0ABEventId);
 
-        MatmulPV(l0ABufId, l0BBufId, mMmad, delay20TaskInfo.qsActBaseTileAlign64, s2Full, initC);
+        MatmulPV(l0ABufId, l0BBufId, mMmad, delay20TaskInfo.qsActBaseTileAlign64, s2Mmad, initC);
 
         AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0ABEventId);
         pvL0abBufId = (pvL0abBufId + 1) % MXFP8::L0A_PV_BUF_CNT;

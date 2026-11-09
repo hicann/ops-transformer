@@ -60,7 +60,7 @@ struct CopyL1ToL0AMxFp8A5 {
         load2DMxParamsA.xStep = (dAct + NZ_C0 - 1) / NZ_C0;
         load2DMxParamsA.yStep = (s2Act + MX_FRAC - 1) / MX_FRAC;
         load2DMxParamsA.srcStride = load2DMxParamsA.yStep;
-        load2DMxParamsA.dstStride = load2DMxParamsA.yStep;
+        load2DMxParamsA.dstStride = Block::MXFP8::S2_BASE_TILE_SIZE / MX_FRAC;
 
         AscendC::LoadData(dst, src, scale, loadData2DParamsA, load2DMxParamsA);
     }
@@ -96,7 +96,7 @@ struct CopyL1ToL0AMxFp8A5 {
         load2DMxParamsA.xStep = (dAct + NZ_C0 - 1) / NZ_C0;
         load2DMxParamsA.yStep = (s2Act + MX_FRAC - 1) / MX_FRAC;
         load2DMxParamsA.srcStride = (scaleS2FullAlign16 + MX_FRAC - 1) / MX_FRAC;
-        load2DMxParamsA.dstStride = load2DMxParamsA.yStep;
+        load2DMxParamsA.dstStride = Block::MXFP8::S2_BASE_TILE_SIZE / MX_FRAC;
 
         AscendC::LoadData(dst, src, scale, loadData2DParamsA, load2DMxParamsA);
     }
@@ -187,11 +187,13 @@ struct CopyL1ToL0BMxFp8QKA5 {
     template <class TensorDst, class TensorSrc, class TensorScale>
     __aicore__ inline void operator()(TensorDst const& dst, TensorSrc const& src, TensorScale const& scale,
                                       uint32_t mAlignL1, uint32_t alignK, uint32_t mAlignL0, uint32_t scaleMAlignL1,
-                                      uint32_t kStart = 0)
+                                      uint32_t kStart = 0, uint32_t mStrideL1 = 0)
     {
         constexpr uint32_t NZ_C0 = Block::MXFP8::NZ_C0_ELEMS;
         constexpr uint32_t FP8_C0 = Block::MXFP8::FP8_C0_ELEMS;
         uint32_t scaleRowHalf = (alignK + 63) / 64;
+        // L1 按 128 行摆时，srcStride 用整面行数，mStep 仍只搬本次 mmad 的行。
+        uint32_t srcM = (mStrideL1 == 0) ? mAlignL1 : mStrideL1;
 
         AscendC::LoadData2DParamsV2 loadDataParams;
         loadDataParams.sid = 0;
@@ -199,7 +201,7 @@ struct CopyL1ToL0BMxFp8QKA5 {
         loadDataParams.kStartPosition = kStart / FP8_C0;
         loadDataParams.mStep = (mAlignL1 + NZ_C0 - 1) / NZ_C0;
         loadDataParams.kStep = (alignK + FP8_C0 - 1) / FP8_C0;
-        loadDataParams.srcStride = (mAlignL1 + NZ_C0 - 1) / NZ_C0;
+        loadDataParams.srcStride = (srcM + NZ_C0 - 1) / NZ_C0;
         loadDataParams.dstStride = (mAlignL0 + NZ_C0 - 1) / NZ_C0;
         loadDataParams.ifTranspose = false;
 
