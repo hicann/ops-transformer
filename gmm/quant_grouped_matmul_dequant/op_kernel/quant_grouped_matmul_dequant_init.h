@@ -12,7 +12,7 @@
  * \file quant_grouped_matmul_dequant_init.h
  * \brief Out-of-class definitions for Init / Init{Ub,L0,L1}Layout / Prime/DrainEvents.
  *
- * Included from quant_grouped_matmul_dequant.h AFTER the class template
+ * Included from quant_grouped_matmul_dequant_kernel.h AFTER the class template
  * declaration. Reopens namespace AscendC for the member function bodies.
  */
 #ifndef QUANT_GROUPED_MATMUL_DEQUANT_INIT_H

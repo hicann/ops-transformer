@@ -15,7 +15,7 @@
  *
  * The bulk of Phase D work (VDEQ16 + scatter + pertoken Mul + CopyOut) lives
  * inline in ProcessColBatch (_phase_mm.h). Included from
- * quant_grouped_matmul_dequant.h AFTER the class template declaration.
+ * quant_grouped_matmul_dequant_kernel.h AFTER the class template declaration.
  * Reopens namespace AscendC for the member function bodies.
  */
 #ifndef QUANT_GROUPED_MATMUL_DEQUANT_PHASE_D_H

@@ -12,7 +12,7 @@
  * \file quant_grouped_matmul_dequant_phase_x.h
  * \brief Out-of-class definitions for Phase X (PhaseXDynamicQuant + PhaseXWriteXL1).
  *
- * Included from quant_grouped_matmul_dequant.h AFTER the class template
+ * Included from quant_grouped_matmul_dequant_kernel.h AFTER the class template
  * declaration. Reopens namespace AscendC for the member function bodies.
  */
 #ifndef QUANT_GROUPED_MATMUL_DEQUANT_PHASE_X_H

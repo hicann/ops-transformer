@@ -346,48 +346,53 @@ bool QuantMatmulDequantTiling::GetPlatformInfo(gert::TilingContext* context)
     return true;
 }
 
-static bool ShouldUseOptimizedPertokenDynamic(const QuantMatmulDequantParam& params)
+static uint64_t SelectOptimizedPertokenDynamicKey(const QuantMatmulDequantParam& params)
 {
     const bool hasSmoothFp32Scale = params.smoothScale && !params.scaleIsInt64;
 
     // QWEN MoE decode: consistently faster in benchmark for E>=128, M<=64.
     if (params.originE >= 128ULL && params.originM <= 64ULL) {
-        return true;
+        return TILING_KEY_GROUPED_DQ_PERTOKEN_OPT;
     }
 
     // QWEN 35B prefill-like cases: E=256 is faster across measured prefill shapes.
     if (params.originE >= 256ULL && params.originM >= 1024ULL) {
-        return true;
+        return TILING_KEY_GROUPED_DQ_PERTOKEN_OPT;
     }
 
     // Sparse MoE shapes with enough experts and K=2048 benefit from the optimized split-distribution path.
     if (params.originE >= 8ULL && params.originM <= 640ULL && params.originK == 2048ULL && params.originN >= 768ULL) {
-        return true;
+        return TILING_KEY_GROUPED_DQ_PERTOKEN_OPT;
+    }
+
+    // Wide-M path for aggregated MTP decode/verify shapes that otherwise use legacy grouped.
+    if (params.originE >= 128ULL && params.originM > 64ULL && params.originM <= 256ULL && params.originN >= 256ULL) {
+        return TILING_KEY_GROUPED_DQ_PERTOKEN_OPT_WIDE_M;
     }
 
     // Tiny MoE measured positive; keep this narrow to avoid nearby light-tier regressions.
     if (params.originE >= 4ULL && params.originM <= 32ULL && params.originK <= 512ULL && params.originN == 256ULL) {
-        return true;
+        return TILING_KEY_GROUPED_DQ_PERTOKEN_OPT;
     }
 
     // Dense large-N / large-prefill cases with clear or near-clear gains.
     if (params.originE == 1ULL && params.originM >= 512ULL && params.originK == 2048ULL && params.originN >= 4096ULL) {
-        return true;
+        return TILING_KEY_GROUPED_DQ_PERTOKEN_OPT;
     }
     if (params.originE == 1ULL && params.originM >= 2048ULL && params.originK >= 4096ULL && params.originN >= 4096ULL) {
-        return true;
+        return TILING_KEY_GROUPED_DQ_PERTOKEN_OPT;
     }
     if (params.originE == 1ULL && params.originN >= 65536ULL) {
-        return true;
+        return TILING_KEY_GROUPED_DQ_PERTOKEN_OPT;
     }
 
     // Tall dense case only wins in the measured smooth fp32-scale variant.
     if (params.originE == 1ULL && params.originM >= 512ULL && params.originK >= 4096ULL && params.originN >= 2048ULL &&
         hasSmoothFp32Scale) {
-        return true;
+        return TILING_KEY_GROUPED_DQ_PERTOKEN_OPT;
     }
 
-    return false;
+    return 0U;
 }
 
 bool QuantMatmulDequantTiling::GetOptimizedPertokenDynamicTilingData(gert::TilingContext* context)
@@ -395,7 +400,8 @@ bool QuantMatmulDequantTiling::GetOptimizedPertokenDynamicTilingData(gert::Tilin
     if (!(isGrouped && _Params.dynamicQuant && _Params.perToken)) {
         return true;
     }
-    if (!ShouldUseOptimizedPertokenDynamic(_Params)) {
+    const uint64_t optTilingKey = SelectOptimizedPertokenDynamicKey(_Params);
+    if (optTilingKey == 0U) {
         return true;
     }
 
@@ -411,13 +417,15 @@ bool QuantMatmulDequantTiling::GetOptimizedPertokenDynamicTilingData(gert::Tilin
         phaseXChunkUB <<= 1U;
     }
 
+    // Budget only the buffers used by Wide-M; keep the 10000005 UB budget unchanged.
+    const bool isWideM = (optTilingKey == TILING_KEY_GROUPED_DQ_PERTOKEN_OPT_WIDE_M);
     auto ubFits = [&](uint32_t mb, uint32_t nb) -> bool {
         const uint64_t chunk = phaseXChunkUB;
         uint64_t persistent = 2ULL * mb * nb * sizeof(uint16_t) + 2ULL * nb * sizeof(uint64_t) + mb * sizeof(float);
         if (_Params.originE == 1ULL) {
             persistent += static_cast<uint64_t>(mb) * nb * sizeof(uint16_t);
         }
-        if (!_Params.scaleIsInt64) {
+        if (!_Params.scaleIsInt64 && !isWideM) {
             persistent += nb * sizeof(uint32_t);
         }
         if (_Params.smoothScale) {
@@ -425,13 +433,20 @@ bool QuantMatmulDequantTiling::GetOptimizedPertokenDynamicTilingData(gert::Tilin
         }
 
         const uint64_t mbAlignedPhX = (mb < NM_FRACTAL_INT8) ? NM_FRACTAL_INT8 : mb;
-        uint64_t phaseX = mbAlignedPhX * chunk + 2ULL * chunk * sizeof(uint16_t) + chunk * sizeof(uint16_t) +
+        const uint64_t xRawBuffers = isWideM ? 1ULL : 2ULL;
+        uint64_t phaseX = mbAlignedPhX * chunk + xRawBuffers * chunk * sizeof(uint16_t) + chunk * sizeof(uint16_t) +
                           2ULL * chunk * sizeof(float) + chunk * sizeof(int32_t) + chunk * sizeof(uint16_t);
 
         const uint64_t mbAligned = (mb < NM_FRACTAL_INT8) ? NM_FRACTAL_INT8 : mb;
-        uint64_t phaseD = mbAligned * nb * sizeof(uint16_t);
-        if (!_Params.scaleIsInt64) {
-            phaseD += nb * sizeof(float);
+        uint64_t phaseD;
+        if (isWideM) {
+            // int32 NZ, fp32 NZ mirror and fp32 ND tiles.
+            phaseD = 3ULL * mbAligned * nb * sizeof(uint32_t);
+        } else {
+            phaseD = mbAligned * nb * sizeof(uint16_t);
+            if (!_Params.scaleIsInt64) {
+                phaseD += nb * sizeof(float);
+            }
         }
 
         return persistent + (phaseX > phaseD ? phaseX : phaseD) + 2048ULL <= ubSize;
@@ -588,7 +603,7 @@ bool QuantMatmulDequantTiling::GetOptimizedPertokenDynamicTilingData(gert::Tilin
     if (_Params.useXZNWorkspace)
         flags |= QGMMD_FLAG_USE_XZN_WORKSPACE;
     _Params.flags = flags;
-    tilingKey = QuantMatmulDequantTilingKey::GROUPED_DQ_PERTOKEN_OPT;
+    tilingKey = static_cast<QuantMatmulDequantTilingKey>(optTilingKey);
     return true;
 }
 
@@ -1000,7 +1015,8 @@ bool QuantMatmulDequantTiling::SetLaunchInfo(gert::TilingContext* context)
     context->SetTilingKey(static_cast<uint64_t>(tilingKey));
 
     int64_t workspaceSize = SYS_WORKSPACE_310P;
-    if (tilingKey == QuantMatmulDequantTilingKey::GROUPED_DQ_PERTOKEN_OPT) {
+    if (tilingKey == QuantMatmulDequantTilingKey::GROUPED_DQ_PERTOKEN_OPT ||
+        tilingKey == QuantMatmulDequantTilingKey::GROUPED_DQ_PERTOKEN_OPT_WIDE_M) {
         workspaceSize += _Params.xZNWorkspaceBytes;
         if (_Params.useXZNWorkspace) {
             workspaceSize += _Params.CoreNum * BLOCK_SIZE;

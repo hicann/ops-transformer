@@ -16,6 +16,7 @@
 #include "quant_matmul_dequant_grouped.h"
 #include "quant_grouped_matmul_dequant_kernel.h"
 #include "quant_grouped_matmul_dequant_staged_run.h"
+#include "quant_grouped_matmul_dequant_pertoken_wide_m.h"
 
 using namespace AscendC;
 
@@ -90,6 +91,11 @@ extern "C" __global__ __aicore__ void quant_grouped_matmul_dequant(GM_ADDR x, GM
         } else {
             QGMMD_OPT_DISPATCH_BLOCKED(false);
         }
+    } else if (TILING_KEY_IS(10000006)) {
+        // MTP-on aggregated decode & verify (64 < M <= 256): dedicated path,
+        // tuned independently of the pinned M<=64 (10000005) dispatch.
+        RunPertokenDynamicWideM(x, quantized_weight, weight_scale, group_list, bias, x_scale, x_offset, smooth_scale, y,
+                                usrworkspace, tilingData);
     } else if (TILING_KEY_IS(10000003)) {
         QuantMatmulDequantGrouped handle;
         handle.Init(x, quantized_weight, weight_scale, group_list, bias, x_scale, x_offset, smooth_scale, y,

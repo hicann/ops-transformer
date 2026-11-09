@@ -14,7 +14,7 @@
  *
  * ProcessColBatch is the matmul-centric function: full Mmad K-pass loop plus
  * post-Mmad VDEQ16 + scatter + pertoken Mul + CopyOut. Included from
- * quant_grouped_matmul_dequant.h AFTER the class template declaration.
+ * quant_grouped_matmul_dequant_kernel.h AFTER the class template declaration.
  * Reopens namespace AscendC for the member function bodies.
  */
 #ifndef QUANT_GROUPED_MATMUL_DEQUANT_PHASE_MM_H
