@@ -184,6 +184,7 @@ remove_builtin_aicpu_files() {
   local aicpu_impl_path=${TARGET_OPP_BUILT_IN}/op_impl/aicpu
 
   rm -f "${aicpu_impl_path}/config/aicpu_transformer.json" > /dev/null 2>&1
+  rm -f "${aicpu_impl_path}/config/builtin_cust_aicpu.json" > /dev/null 2>&1
   rm -f "${aicpu_impl_path}/kernel/libtransformer_aicpu_kernels.so" > /dev/null 2>&1
 
   remove_dir_if_empty "${aicpu_impl_path}/config"
