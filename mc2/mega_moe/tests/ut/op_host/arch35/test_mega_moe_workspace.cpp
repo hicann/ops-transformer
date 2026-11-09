@@ -92,7 +92,8 @@ TEST(MegaMoeWorkspace, ModeCombinationsHaveDisjointBoundedRegions)
                     w.sync.activationReady.sizeBytes + w.sync.dispatchReady.sizeBytes + w.sync.countsReady.sizeBytes +
                     w.mte.sync.sharedActivationReady.sizeBytes + w.mte.sync.dedupReady.sizeBytes +
                     w.mte.sync.gmm2Ready.sizeBytes + w.mte.sync.sharedGmm2Tiles.sizeBytes +
-                    w.mte.sync.aiv1TopkReady.sizeBytes + w.urma.sync.combineCounters.sizeBytes;
+                    w.mte.sync.aiv1TopkReady.sizeBytes + w.urma.sync.combineCounters.sizeBytes +
+                    w.urma.sync.sharedGmm2Tiles.sizeBytes;
                 EXPECT_EQ(w.reset.flags.sizeBytes, liveFlagBytes);
                 std::vector<GmBuffer> regions{w.routed.gmm1Input.data,
                                               w.routed.gmm1Input.scale,
@@ -117,6 +118,7 @@ TEST(MegaMoeWorkspace, ModeCombinationsHaveDisjointBoundedRegions)
                                               w.urma.relaySendQueue,
                                               w.urma.remoteReadySnapshot,
                                               w.urma.sync.combineCounters,
+                                              w.urma.sync.sharedGmm2Tiles,
                                               w.urma.serverCombine.tokenIds,
                                               w.urma.serverCombine.tokenBitmaps,
                                               w.urma.serverCombine.completedCounts,
@@ -187,6 +189,34 @@ TEST(MegaMoeWorkspace, SharedGmm1InputKeepsTopologyStorageContract)
     p.topoType = TOPO_TYPE_MTE;
     p.sharedInputIndependent = false;
     EXPECT_EQ(WorkspaceLayout(p).shared.gmm1Input.data.offsetBytes, -1);
+}
+
+TEST(MegaMoeWorkspace, UrmaSharedCompletionCountersAreResetPerTokenGroup)
+{
+    for (int topo : {TOPO_TYPE_MTE, TOPO_TYPE_URMA, TOPO_TYPE_URMA_ROCE}) {
+        for (int bs : {0, 1, 255, 256, 257, 3405}) {
+            for (int shared : {0, 1, 4}) {
+                auto p = MakeLayoutParams();
+                p.topoType = topo;
+                p.bs = bs;
+                p.sharedExpertNum = shared;
+                WorkspaceLayout layout(p);
+                const auto& counters = layout.urma.sync.sharedGmm2Tiles;
+                const int64_t groups = (bs + 255) / 256;
+                const int64_t expectedBytes = topo == TOPO_TYPE_MTE ? 0 : groups * shared * 64;
+                EXPECT_EQ(counters.sizeBytes, expectedBytes);
+                if (expectedBytes != 0) {
+                    EXPECT_EQ(counters.offsetBytes % MemoryLayoutDetail::ALIGN_32, 0);
+                    EXPECT_LE(layout.reset.flags.offsetBytes, counters.offsetBytes);
+                    EXPECT_EQ(counters.offsetBytes + counters.sizeBytes,
+                              layout.reset.flags.offsetBytes + layout.reset.flags.sizeBytes);
+                }
+                // Arch92 的同步布局保持不变，不分配 Arch35 URMA 的完成计数。
+                WorkspaceLayout arch92(p, WorkspaceLayout::Arch92{GMM_MODE_A8W8_ND, GMM_MODE_A8W8_ND});
+                EXPECT_EQ(arch92.urma.sync.sharedGmm2Tiles.offsetBytes, -1);
+            }
+        }
+    }
 }
 
 TEST(MegaMoeWorkspace, RingReuseAndServerCombineRetainCapacityBoundaries)

@@ -304,13 +304,33 @@ __aicore__ inline MegaMoeUnpermuteBufferConfig MegaMoeLayered<TemplateMegaMoeLay
 // UnpermuteSharedExpert：共享专家结果累加到当前 token 的 fp32 累加器
 // ===============================================================
 template <TemplateMegaMoeLayeredTypeClass>
-__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::UnpermuteSharedExpert(
-    int32_t tokenIdx, const MegaMoeUnpermuteBufferConfig& bufferConfig, uint32_t& inputBufferIdx)
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::WaitForSharedExpertResult(
+    uint32_t sharedExpertIdx, uint32_t tokenIdx)
 {
+    const uint32_t tokenGroupCount = Ops::Base::CeilDiv(m_, COMBINE_TOKEN_GROUP_SIZE);
+    auto* expertCounters =
+        params_.workspace.layout.urma.sync.sharedGmm2Tiles.template get_ptr<int32_t>(params_.workspace.base) +
+        static_cast<uint64_t>(sharedExpertIdx) * tokenGroupCount * INT_CACHELINE;
+    auto* counter = GetCombineSyncCounterAddress(expertCounters, tokenIdx / COMBINE_TOKEN_GROUP_SIZE);
+    const uint32_t outputTileCount = Ops::Base::CeilDiv(k_, static_cast<uint32_t>(L1_TILE_N));
+    // FIX 写完该组的全部输出列块后，才允许 Unpermute 读取共享结果。
+    WaitUntilGmFlagEquals(counter, static_cast<int32_t>(outputTileCount));
+}
+
+template <TemplateMegaMoeLayeredTypeClass>
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::UnpermuteSharedExpert(
+    int32_t tokenIdx, uint32_t& readySharedGroup, const MegaMoeUnpermuteBufferConfig& bufferConfig,
+    uint32_t& inputBufferIdx)
+{
+    const uint32_t tokenGroup = static_cast<uint32_t>(tokenIdx) / COMBINE_TOKEN_GROUP_SIZE;
+    const bool waitForGroup = tokenGroup != readySharedGroup;
     const auto& workspace = params_.workspace.layout;
     const auto& buffer = params_.workspace.base;
     __gm__ bfloat16_t* sharedResult = workspace.shared.gmm2Output.template get_ptr<bfloat16_t>(buffer);
     for (uint32_t sharedIdx = 0; sharedIdx < sharedExpertNum_; sharedIdx++) {
+        if (waitForGroup) {
+            WaitForSharedExpertResult(sharedIdx, static_cast<uint32_t>(tokenIdx));
+        }
         auto event = static_cast<TEventID>(inputBufferIdx);
         auto dataInBf16 = dataResTensor_ + (inputBufferIdx + 1U) * bufferConfig.bf16SlotElementCount;
         PipeWait<PIPE_V, PIPE_MTE2>(event);
@@ -322,6 +342,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Unpermute
         PipeNotify<PIPE_V, PIPE_MTE2>(event);
         inputBufferIdx = (inputBufferIdx + 1U) % static_cast<uint32_t>(bufferConfig.inputBufferCount);
     }
+    readySharedGroup = tokenGroup; // 全部共享专家已就绪，后续 token 复用本组结果。
 }
 
 template <TemplateMegaMoeLayeredTypeClass>
@@ -394,7 +415,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Accumulat
 /* 单个权重 chunk：搬入并转换权重、逐 token 累加、转换输出并搬出。 */
 template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::UnpermuteTokenChunk(
-    const WorkRange& tokenRange, const MegaMoeUnpermuteBufferConfig& bufferConfig, uint32_t& inputBufferIdx)
+    const WorkRange& tokenRange, const MegaMoeUnpermuteBufferConfig& bufferConfig, uint32_t& inputBufferIdx,
+    uint32_t& readySharedGroup)
 {
     // 权重区和输出区各使用一个核内 mutex，与输入 ring 的 Set/Wait 事件编号独立。
     constexpr uint8_t UNPERMUTE_WEIGHT_MUTEX_ID = 0U;
@@ -435,7 +457,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Unpermute
         }
         // 共享专家结果累加（直接加，不乘 topk_weight）
         if (sharedExpertNum_ > 0) {
-            UnpermuteSharedExpert(tokenIdx, bufferConfig, inputBufferIdx);
+            UnpermuteSharedExpert(tokenIdx, readySharedGroup, bufferConfig, inputBufferIdx);
         }
         // 输出区 [0,k) 在最终 Cast 处复用；复用等待放在 Cast 前，让输入搬入和 FP32 累加
         // 与上一 token 的搬出重叠。
@@ -467,6 +489,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Unpermute
     const uint32_t tokenEnd = tokenRange.start + tokenRange.count;
     const uint32_t batchTokens = bufferConfig.tokensPerBatch;
     // 普通专家、共享专家和后续 token 共用游标，跨权重 chunk 也不重置。
+    uint32_t readySharedGroup = UINT32_MAX; // 本次调用内跨权重 chunk 缓存；首 token 必须等待。
     uint32_t inputBufferIdx = 0U;
     // 输入 ring 使用事件 0..5；权重区由 mutex 保护，不占用预留事件 6/7。
     for (int32_t bufferIdx = 0; bufferIdx < bufferConfig.inputBufferCount; ++bufferIdx) {
@@ -475,7 +498,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Unpermute
     for (uint32_t chunkStart = tokenRange.start; chunkStart < tokenEnd; chunkStart += batchTokens) {
         const uint32_t remainingTokens = tokenEnd - chunkStart;
         const WorkRange chunkRange{chunkStart, batchTokens < remainingTokens ? batchTokens : remainingTokens};
-        UnpermuteTokenChunk(chunkRange, bufferConfig, inputBufferIdx);
+        UnpermuteTokenChunk(chunkRange, bufferConfig, inputBufferIdx, readySharedGroup);
     }
     // 最后一次输出搬出完成，也保证其前序权重 V mutex 已释放。
     PipeFence<PIPE_MTE3, PIPE_S, SYNC_EVENT_ID3>();

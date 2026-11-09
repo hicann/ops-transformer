@@ -332,6 +332,7 @@ struct MteBuffers {
 
 struct UrmaSyncBuffers {
     GmBuffer combineCounters{};
+    GmBuffer sharedGmm2Tiles{};
 };
 
 struct ServerCombineBuffers {
@@ -652,7 +653,7 @@ private:
         int64_t expertRecvTokenCountBytes = expertRecvTokenCountStride * SIZE_INT_32 * params.aicNum;
         InitializeActivationBuffers(params);
         InitializeRoutingMetadata(params, expertRecvTokenCountBytes);
-        InitializeUrmaSyncFlags(params);
+        InitializeUrmaSyncFlags(params, arch);
         // URMA 所有 GMM 模式均保留 dispatch 累积计数。
         InitializeGmmIntermediateBuffers(params, true, false);
         InitializeDedupRowDesc(params);
@@ -795,7 +796,7 @@ private:
                                ((workspaceSize - flagRegionBeginOffset) / SIZE_INT_32) * SIZE_INT_32};
     }
 
-    HOST_DEVICE constexpr void InitializeUrmaSyncFlags(const CclComputeLayoutParams& params)
+    HOST_DEVICE constexpr void InitializeUrmaSyncFlags(const CclComputeLayoutParams& params, Architecture arch)
     {
         // 标量通知区连续分配，保证统一清零范围。
         int64_t flagRegionBeginOffset = workspaceSize;
@@ -808,6 +809,12 @@ private:
         InitializeRoutingFlags(params);
         Allocate(urma.sync.combineCounters, static_cast<int64_t>(params.combineSyncSlotCountPerExpert) *
                                                 moeExpertCount * MemoryLayoutDetail::INT_CACHELINE * SIZE_INT_32);
+        if (params.sharedExpertNum > 0 && arch == Architecture::Arch35) {
+            const int64_t tokenGroupCount = MemoryLayoutDetail::CeilDiv(
+                static_cast<int64_t>(params.bs), static_cast<int64_t>(MemoryLayoutDetail::L1_TILE_M_256));
+            Allocate(urma.sync.sharedGmm2Tiles,
+                     SIZE_INT_32 * tokenGroupCount * params.sharedExpertNum * MemoryLayoutDetail::INT_CACHELINE);
+        }
         reset.flags = GmBuffer{sync.activationReady.offsetBytes,
                                ((workspaceSize - flagRegionBeginOffset) / SIZE_INT_32) * SIZE_INT_32};
     }

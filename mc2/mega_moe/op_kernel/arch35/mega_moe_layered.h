@@ -168,7 +168,7 @@ private:
     __aicore__ inline void UpdateLocalRelayWeight(int32_t copyIdx, int32_t outIdx, TEventID eventId);
     __aicore__ inline void UnpermuteTokenChunk(const WorkRange& tokenRange,
                                                const MegaMoeUnpermuteBufferConfig& bufferConfig,
-                                               uint32_t& inputBufferIdx);
+                                               uint32_t& inputBufferIdx, uint32_t& readySharedGroup);
     __aicore__ inline void LoadUnpermuteExpertInput(__gm__ bfloat16_t* expandedX, int32_t tokenIdx, int32_t expId,
                                                     TEventID event, __ubuf__ bfloat16_t* dataInBf16,
                                                     __ubuf__ float* dataInFp32);
@@ -235,8 +235,11 @@ private:
     __aicore__ inline void InitCombineBuffers();
     __aicore__ inline void ProcessCombineTokenRange(const ExpertLoopState& waveBeginState,
                                                     const ExpertTokenRange& range);
+    __aicore__ inline int32_t AdvanceRankSyncRound();
     template <bool ReuseChannelLock>
-    __aicore__ inline void CrossRankSyncInWorldSize();
+    __aicore__ inline void CrossRankSync(const AivJobContext& syncJob);
+    template <bool ReuseChannelLock>
+    __aicore__ inline void CrossRankSync(const AivJobContext& syncJob, int32_t syncRound);
     __aicore__ inline void ExpertTokenNumCopyOut();
     __aicore__ inline void CopyLocalDispatchTokens(int32_t dstRow, int32_t srcRank, int32_t tokenOffset,
                                                    int32_t tokenCount);
@@ -279,7 +282,11 @@ private:
     __aicore__ inline void ProcessSharedExpertGmm2Loop(GMMAddrInfo& sharedGmm2AddrInfo,
                                                        ExpertLoopState& sharedGmm2State);
     __aicore__ inline void ProcessSharedExpertGmm2();
-    __aicore__ inline void UnpermuteSharedExpert(int32_t tokenIdx, const MegaMoeUnpermuteBufferConfig& bufferConfig,
+    __aicore__ inline void FinishCombineAndSync();
+    __aicore__ inline void ProcessSharedExpertGmm2AndSync();
+    __aicore__ inline void WaitForSharedExpertResult(uint32_t sharedExpertIdx, uint32_t tokenIdx);
+    __aicore__ inline void UnpermuteSharedExpert(int32_t tokenIdx, uint32_t& readySharedGroup,
+                                                 const MegaMoeUnpermuteBufferConfig& bufferConfig,
                                                  uint32_t& inputBufferIdx);
     __aicore__ inline void LoadTopkWeightsToUb(__ubuf__ ActivationType* xOutTensor, int32_t currentOffset,
                                                int32_t index, TEventID event);
@@ -784,6 +791,10 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::UpdateSha
             static_cast<uint64_t>(Get<N_VALUE>(state.problemShape)) / activationOutputDivisor_;
         const uint64_t scaleN =
             Ops::Base::CeilDiv(activationCols, static_cast<uint64_t>(MXFP_DIVISOR_SIZE)) * MXFP_MULTI_BASE_SIZE;
+        const uint32_t tokenGroupCount = Ops::Base::CeilDiv(m_, COMBINE_TOKEN_GROUP_SIZE);
+        gmmAddrInfo.sharedExpertGmm2TileCounter =
+            workspace.urma.sync.sharedGmm2Tiles.template get_ptr<int32_t>(buffer) +
+            static_cast<uint64_t>(expertIdx) * tokenGroupCount * INT_CACHELINE;
         gmmAddrInfo.gmm2OutGlobal = workspace.shared.gmm2Output.get_ptr(buffer) + rows * k * sizeof(bfloat16_t);
         gmmAddrInfo.aGlobal = workspace.shared.gmm2Input.data.get_ptr(buffer) +
                               rows * activationCols / C_ELEMS_PER_BYTE * sizeof(ActivationType);
@@ -843,53 +854,65 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::DrainAndU
     }
 }
 
-// ==============================================================================================
-// CrossRankSyncInWorldSize：全卡同步，rank 槽位之后的独立区域记录各 AIV 的 syncCnt。
-// ==============================================================================================
+/* 全部 AIV 每次同步均推进本核轮次，保持参与范围改变时的通知值一致。 */
 template <TemplateMegaMoeLayeredTypeClass>
-template <bool ReuseChannelLock>
-__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CrossRankSyncInWorldSize()
+__aicore__ inline int32_t MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::AdvanceRankSyncRound()
 {
     const auto& peermem = params_.communication.layout;
     const auto& commBuffer = params_.communication.base;
-    if constexpr (g_coreType == AIC) {
-        return;
-    }
-    __gm__ int32_t* syncRank = (__gm__ int32_t*)peermem.rankSync.get_ptr(commBuffer);
-    __gm__ int32_t* syncCount =
-        (__gm__ int32_t*)(peermem.syncCount.get_ptr(commBuffer) + aivCoreIdx_ * PEERMEM_SYNC_SLOT_SIZE);
-    int count = GmRead(syncCount) + 1;
-    GmWrite(syncCount, count);
-    // E_dsburma1: 旁路 GM 写只进本核写队列，WriteNbi 的 DMA 引擎直读 GM，不嗅探未排空的写队列；
-    // 不加 DSB 则 DMA 可能把上一轮 count 发往远端，对端 GmSignalWaitBarrier 等值等待永不命中即全卡挂死。
-    GmDataBarrier();
+    auto* syncCount =
+        reinterpret_cast<__gm__ int32_t*>(peermem.syncCount.get_ptr(commBuffer) + aivCoreIdx_ * PEERMEM_SYNC_SLOT_SIZE);
+    const int32_t syncRound = GmRead(syncCount) + 1;
+    GmWrite(syncCount, syncRound);
+    GmDataBarrier(); // 通信引擎读取本核通知槽前，确保旁路 GM 写已完成。
+    return syncRound;
+}
+
+/* 常规入口：推进本核轮次，再执行本核负责的跨卡通信。 */
+template <TemplateMegaMoeLayeredTypeClass>
+template <bool ReuseChannelLock>
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CrossRankSync(const AivJobContext& syncJob)
+{
+    const auto syncRound = AdvanceRankSyncRound();
+    CrossRankSync<ReuseChannelLock>(syncJob, syncRound);
+}
+
+/* 按 syncJob 分担跨卡通知和等待；本卡会合及参与核选择由调用处编排。 */
+template <TemplateMegaMoeLayeredTypeClass>
+template <bool ReuseChannelLock>
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CrossRankSync(const AivJobContext& syncJob,
+                                                                                     int32_t syncRound)
+{
+    const auto& peermem = params_.communication.layout;
+    const auto& commBuffer = params_.communication.base;
+    auto* syncRank = reinterpret_cast<__gm__ int32_t*>(peermem.rankSync.get_ptr(commBuffer));
+    auto* syncCount =
+        reinterpret_cast<__gm__ int32_t*>(peermem.syncCount.get_ptr(commBuffer) + aivCoreIdx_ * PEERMEM_SYNC_SLOT_SIZE);
     // 先向本 AIV 负责的所有 peer 发出通知，再进入等待。256P 场景下可同时维持多个
     // channel 在途，避免原实现逐 peer“写-等-Drain”造成的串行握手。
-    for (int rankIndex = aivCoreIdx_; rankIndex < worldSize_; rankIndex += blockAivNum_) {
+    for (uint32_t rankIndex = syncJob.jobIndex; rankIndex < worldSize_; rankIndex += syncJob.totalJobs) {
         if (rankIndex == rankId_) {
             continue;
         }
         Channel channel = comm_.GetChannel(rankIndex);
         if constexpr (!ReuseChannelLock) {
-            // Wave 结束后同步任务重新按物理 AIV 分核，可能不同于 Wave 的固定归属核，因此先取得通道锁。
+            // 同步任务的通道归属可能与 Wave 不同，先由当前通信核取得锁。
             comm_.Lock(channel);
         }
         __gm__ int32_t* syncRemoteAddr = (__gm__ int32_t*)(g_winRankAddr_[rankIndex]) + rankId_ * 16;
         comm_.WriteNbi(channel, (GM_ADDR)syncRemoteAddr, (GM_ADDR)syncCount, static_cast<int64_t>(sizeof(int32_t)));
     }
-    for (int rankIndex = aivCoreIdx_; rankIndex < worldSize_; rankIndex += blockAivNum_) {
+    for (uint32_t rankIndex = syncJob.jobIndex; rankIndex < worldSize_; rankIndex += syncJob.totalJobs) {
         if (rankIndex == rankId_) {
             continue;
         }
         Channel channel = comm_.GetChannel(rankIndex);
         auto syncCheck = syncRank + rankIndex * 16;
-        GmSignalWaitBarrier(syncCheck, count);
+        GmSignalWaitBarrier(syncCheck, syncRound);
         // 等待完成后释放通道锁：复用调用方已持有的锁时由本函数统一释放，否则释放本函数取得的锁。
         comm_.Drain(channel);
         comm_.Unlock(channel);
     }
-    PipeBarrier<PIPE_ALL>();
-    AllVectorBarrier();
 }
 
 // ===============================================================
@@ -1088,7 +1111,6 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessSh
     } else {
         ProcessSharedExpertGmm2Loop(sharedGmm2AddrInfo, sharedGmm2State);
     }
-    AllCoreBarrier();
 }
 
 template <TemplateMegaMoeLayeredTypeClass>
@@ -1259,18 +1281,6 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessMo
         Gmm1UbActivationSync::EndSync(vecSetSyncCom, gmm1PingPongIdx_);
     }
     gmm1PingPongIdx_ = 0U;
-    if constexpr (g_coreType == AIV) {
-        if (IsCombineServerDedupEnabled()) {
-            ProcessCombineRelay();
-        }
-        if (subBlockIdx_ == 1U) {
-            PipeBarrier<PIPE_ALL>();
-            ExpertTokenNumCopyOut();
-            DrainAndUnlockOwnedRemoteChannels();
-        }
-        PipeBarrier<PIPE_ALL>();
-        AllVectorBarrier();
-    }
 }
 
 template <TemplateMegaMoeLayeredTypeClass>
@@ -1293,7 +1303,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::PrepareWi
     AllCoreBarrier(); // AIC 等待同步标志清零完成
 
     if constexpr (g_coreType == AIV) {
-        // 所有物理 AIV 在 CrossRankSync 前完成各自 token 分片的量化。
+        // 所有物理 AIV 在跨卡同步前完成各自 token 分片的量化。
         DispatchPrepareBuffInit();
         QuantizeLocalTokensToRelay();
         // Server Combine 仍需位图和有效 token 数量；
@@ -1310,9 +1320,10 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::PrepareWi
         // 每个对端的跨卡同步通知由一个 AIV 发送，发送前须确保本卡所有 AIV 均已完成量化，
         // 使本 Server 的二级接收可以直接读取原始记录。
         AllVectorBarrier();
+        const AivJobContext syncJob{aivCoreIdx_, blockAivNum_};
+        CrossRankSync<true>(syncJob); // 复用本核 SendMask 的锁，同步结束后释放。
+        AllVectorBarrier();           // 等本卡全部同步核完成，才进入 MoE wave。
     }
-
-    CrossRankSyncInWorldSize<true>(); // 同一物理 AIV 继续使用 SendMask 已取得的锁，并在同步结束后释放。
 }
 
 /* 全部 AIV 清理本轮状态，并量化各自负责的本卡输入。 */
@@ -1393,8 +1404,57 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::PrepareWi
 
     if constexpr (g_coreType == AIV) {
         AllVectorBarrier(); // 等全体 AIV 完成共享工作、建表及 mask 通道解锁。
+        const AivJobContext syncJob{aivCoreIdx_, blockAivNum_};
+        CrossRankSync<false>(syncJob); // 跨卡确认量化与 mask 就绪。
+        AllVectorBarrier();            // 等本卡全部同步核完成，才进入 MoE wave。
     }
-    CrossRankSyncInWorldSize<false>(); // 跨卡确认量化与 mask 就绪，再进入 MoE wave。
+}
+
+/* AIV1 收尾通信，全部 AIV 会合后分担跨卡同步，确认 Combine 结果可读。 */
+template <TemplateMegaMoeLayeredTypeClass>
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::FinishCombineAndSync()
+{
+    if constexpr (g_coreType == AIV) {
+        if (subBlockIdx_ == 1U) {
+            PipeBarrier<PIPE_ALL>();
+            ExpertTokenNumCopyOut();
+            DrainAndUnlockOwnedRemoteChannels();
+        }
+        AllVectorBarrier(); // 全部通信归属核完成回传并交还通道。
+        const AivJobContext syncJob{aivCoreIdx_, blockAivNum_};
+        CrossRankSync<false>(syncJob);
+        AllVectorBarrier(); // 本卡全部 Sync2 完成后，允许任意 AIV 读取 Combine 结果。
+    }
+}
+
+/* W4 共享 GMM2：AIV0 转换权重，AIV1 收尾通信并执行 Sync2。 */
+template <TemplateMegaMoeLayeredTypeClass>
+__aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessSharedExpertGmm2AndSync()
+{
+    if (subBlockIdx_ == 0U) {
+        // AIV0：权重转换与 AIV1 的通信收尾、Sync2 重叠。
+        PipeBarrier<PIPE_ALL>();
+        SyncInterArrive<PIPE_MTE3>(COMBINE_COMM_DONE_FLAG);
+        AdvanceRankSyncRound();                            // AIV0 推进轮次，跨卡通信由 AIV1 分担。
+        SyncInterArrive<PIPE_MTE3>(ALL_AIV_BARRIER_EVENT); // 提前到达，AIV1 完成 Sync2 后补齐。
+        ProcessSharedExpertGmm2();
+        PipeFence<PIPE_MTE3, PIPE_MTE2, SYNC_EVENT_ID3>(); // prologue 搬出读完 UB，允许 Unpermute 搬入。
+        PipeFence<PIPE_MTE3, PIPE_V, SYNC_EVENT_ID3>();    // 允许 Unpermute 覆盖同一段 UB。
+        SyncInterWait<PIPE_S>(COMBINE_COMM_DONE_FLAG);
+        SyncInterWait<PIPE_S>(ALL_AIV_BARRIER_EVENT); // 读取 Combine 结果前，等本卡 Sync2 全部完成。
+    } else {
+        // AIV1：输出 token 数并排空通道，然后代表本卡执行 Sync2。
+        PipeBarrier<PIPE_ALL>();
+        ExpertTokenNumCopyOut();
+        DrainAndUnlockOwnedRemoteChannels();
+        PipeBarrier<PIPE_ALL>();
+        SyncInterArrive<PIPE_MTE3>(COMBINE_COMM_DONE_FLAG);
+        SyncInterWait<PIPE_S>(COMBINE_COMM_DONE_FLAG); // 全部中继归约、回传及通道解锁完成。
+        const AivJobContext syncJob{blockIdx_, blockNum_};
+        CrossRankSync<false>(syncJob);
+        SyncInterArrive<PIPE_MTE3>(ALL_AIV_BARRIER_EVENT);
+        SyncInterWait<PIPE_S>(ALL_AIV_BARRIER_EVENT);
+    }
 }
 
 template <TemplateMegaMoeLayeredTypeClass>
@@ -1413,14 +1473,27 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Process()
     Gmm1ActivationSync gmm1ActivationSync(MoeQuantConfig::AXW_MODE == AxWMode::A8W4 ? 1U : 0U, GmmEventPair::MOE_GMM1);
     ProcessMoeExpertWave(gmm1ActivationSync);
 
-    // 3.5: 共享专家 GMM2 (MoE GMM2 之后, 复用 MoE 函数)
-    if (sharedExpertNum_ > 0) {
-        ProcessSharedExpertGmm2();
+    if constexpr (g_coreType == AIV) {
+        if (IsCombineServerDedupEnabled()) {
+            ProcessCombineRelay();
+        }
     }
 
-    // 4. 本卡数据Unpermute
+    if constexpr (g_coreType == AIC) {
+        if (sharedExpertNum_ > 0) {
+            // 共享激活写回完成后，读取共享 GMM2 输入。
+            sharedGmm1ActivationSync.EndSync();
+            ProcessSharedExpertGmm2();
+        }
+    } else {
+        if (sharedExpertNum_ > 0 && MoeQuantConfig::AXW_MODE != AxWMode::A8W8) {
+            ProcessSharedExpertGmm2AndSync();
+        } else {
+            FinishCombineAndSync();
+        }
+    }
     if constexpr (g_coreType == AIV) {
-        CrossRankSyncInWorldSize<false>(); // Wave 已释放固定归属锁，同步核重新取得通道后确认 Combine 完成。
+        // 全部 AIV 均分 token；共享结果的组就绪等待在 Unpermute 内部完成。
         if (IsCombineServerDedupEnabled()) {
             UnpermuteServerCombine();
         } else {
@@ -1428,7 +1501,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Process()
             Unpermute(unpermuteBufferConfig);
         }
     }
-    // 两条 GM 激活同步链独立，在主流程末尾回收剩余 ACK，让共享 GMM2 先推进。
+    // 出口排空剩余 ACK；共享 GMM1 的 AIC 已在共享 GMM2 前完成回收。
     sharedGmm1ActivationSync.EndSync();
     gmm1ActivationSync.EndSync();
     SetCtrlSpr<OVERFLOW_MODE_CTRL, OVERFLOW_MODE_CTRL>(oriOverflowMode);

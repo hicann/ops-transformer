@@ -461,7 +461,7 @@ __aicore__ inline void Gmm2AicMmadGeneric(BlockMmad& blockMmad, WorkSet& workSet
         } else if constexpr (IsLayered && !IsShared) {
             NotifyCombineConsumersOfTileCompletion(rowOffsetInExpert + mLoc, groupSyncSlotLayout,
                                                    gmmAddrInfo.gmm2CombineSyncCounter);
-        } else if constexpr (IsShared && !IsLayered) {
+        } else if constexpr (IsShared) {
             NotifySharedExpertTileCompletion(mLoc, gmmAddrInfo.sharedExpertGmm2TileCounter);
         }
     }
@@ -570,7 +570,7 @@ __aicore__ inline void Gmm2AicMmadA8W4(BlockMmad& blockMmad, Scheduler& schedule
         } else if constexpr (IsLayered && !IsShared) {
             NotifyCombineConsumersOfTileCompletion(rowOffsetInExpert + mLoc, groupSyncSlotLayout,
                                                    gmmAddrInfo.gmm2CombineSyncCounter);
-        } else if constexpr (IsShared && !IsLayered) {
+        } else if constexpr (IsShared) {
             NotifySharedExpertTileCompletion(mLoc, gmmAddrInfo.sharedExpertGmm2TileCounter);
         }
     }

@@ -486,6 +486,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Unpermute
     __gm__ bfloat16_t* sharedResultsGlobalTensor = nullptr;
     sharedResultsGlobalTensor = reinterpret_cast<__gm__ bfloat16_t*>(workspace.shared.gmm2Output.get_ptr(buffer));
     const WorkRange tokenRange = GetBalancedWorkRange(m_, {.jobIndex = aivCoreIdx_, .totalJobs = blockAivNum_});
+    uint32_t readySharedGroup = UINT32_MAX; // 每次调用重新开始，不复用上轮就绪状态。
     for (uint32_t tokenOffset = 0U; tokenOffset < tokenRange.count; ++tokenOffset) {
         const uint32_t token = tokenRange.start + tokenOffset;
         Duplicate(sumTensor, 0.0f, k_);
@@ -507,7 +508,12 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Unpermute
             PipeNotify<PIPE_V, PIPE_MTE2>(static_cast<event_t>(SYNC_EVENT_ID2));
             Add(sumTensor, sumTensor, inputTensor, k_);
         }
+        const uint32_t tokenGroup = token / COMBINE_TOKEN_GROUP_SIZE;
+        const bool waitForGroup = tokenGroup != readySharedGroup;
         for (uint32_t expert = 0; expert < sharedExpertNum_; ++expert) {
+            if (waitForGroup) {
+                WaitForSharedExpertResult(expert, token);
+            }
             PipeWait<PIPE_V, PIPE_MTE2>(static_cast<event_t>(SYNC_EVENT_ID2));
             CopyGmToUb(reinterpret_cast<__ubuf__ bfloat16_t*>((bf16Tensor).GetPhyAddr()),
                        (sharedResultsGlobalTensor + ((static_cast<uint64_t>(expert) * m_ + token) * k_)),
@@ -517,6 +523,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Unpermute
             PipeNotify<PIPE_V, PIPE_MTE2>(static_cast<event_t>(SYNC_EVENT_ID2));
             Add(sumTensor, sumTensor, inputTensor, k_);
         }
+        readySharedGroup = tokenGroup;
         // 回收最后一个事件；没有输入时回收入口预置事件。
         PipeWait<PIPE_V, PIPE_MTE2>(static_cast<event_t>(SYNC_EVENT_ID2));
         Cast(outputTensor, sumTensor, RoundMode::CAST_RINT, k_);
