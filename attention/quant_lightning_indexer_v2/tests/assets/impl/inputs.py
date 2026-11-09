@@ -607,16 +607,16 @@ class QuantLightningIndexerV2InputAdapter:
         for source, target in aliases.items():
             if target not in attributes and source in attributes:
                 attributes[target] = attributes[source]
-        if int(attributes.get("quant_mode", 0)) == QUANT_MODE_HIF4:
-            for name, value in (
-                ("layout_query", "BSND"),
-                ("layout_key", "BSND"),
-                ("sparse_mode", 0),
-                ("cmp_ratio", 1),
-                ("return_value", 0),
-                ("max_seqlen_q", -1),
-            ):
-                attributes.setdefault(name, value)
+        # Replay context contains CSV attributes, not the bound API defaults.
+        for name, value in (
+            ("layout_query", "BSND"),
+            ("layout_key", "BSND"),
+            ("sparse_mode", 0),
+            ("cmp_ratio", 1),
+            ("return_value", 0),
+            ("max_seqlen_q", -1),
+        ):
+            attributes.setdefault(name, value)
         return attributes
 
     def rebuild_compare_data(self, compare_context):

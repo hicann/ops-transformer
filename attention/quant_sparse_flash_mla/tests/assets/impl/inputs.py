@@ -430,6 +430,14 @@ def generate_quant_sparse_flash_mla_inputs(
     for name in ("ori_topk_length", "cmp_topk_length"):
         if name + "_values" in params:
             params[name] = params[name + "_values"]
+    if (
+        cmp_mask_mode != 0
+        and cmp_topk_length is not None
+        and cmp_sparse_indices is not None
+        and "cmp_topk_length" not in params
+    ):
+        # Metadata uses the mask and K here; keep legacy length slots neutral.
+        params["cmp_topk_length"] = [int(cmp_sparse_indices.shape[-1])]
     params.update(
         {
             "quant_mode": quant_mode,

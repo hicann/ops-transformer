@@ -335,6 +335,16 @@ class LightningIndexerV2InputAdapter:
         for source, target in aliases.items():
             if target not in attributes and source in attributes:
                 attributes[target] = attributes[source]
+        # Replay context contains CSV attributes, not the bound API defaults.
+        for name, value in (
+            ("max_seqlen_q", -1),
+            ("layout_q", "BSND"),
+            ("layout_k", "BSND"),
+            ("mask_mode", 0),
+            ("cmp_ratio", 1),
+            ("return_value", 0),
+        ):
+            attributes.setdefault(name, value)
         return attributes
 
     def rebuild_compare_data(self, compare_context):

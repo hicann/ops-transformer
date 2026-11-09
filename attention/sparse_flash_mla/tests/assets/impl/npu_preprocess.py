@@ -93,22 +93,8 @@ def expect_error(kwargs):
     return bool(value)
 
 
-def zero_metadata_for_expected_error(metadata, target, testcase_name):
-    if metadata is None:
-        generated = torch.zeros(1024, dtype=torch.int32, device=target.device)
-        logging.info(
-            "[%s] created zero SMLA metadata for dynamic error case", testcase_name
-        )
-        return {"metadata": generated}
-    metadata.zero_()
-    logging.info(
-        "[%s] zeroed SMLA metadata for main-operator error case", testcase_name
-    )
-    return None
-
-
 def get_values(kwargs, name):
-    value = kwargs.get(f"{name}_values")
+    value = None if expect_error(kwargs) else kwargs.get(f"{name}_values")
     if value is None:
         return None
     if torch.is_tensor(value):
@@ -191,10 +177,15 @@ def build_metadata_arguments(q, ori_kv, cmp_kv, kwargs):
     cmp_topk = 0 if cmp_sparse_indices is None else int(cmp_sparse_indices.shape[-1])
 
     cmp_ratio = int(get_attribute(kwargs, "cmp_ratio", 1) or 1)
-    max_seqlen_q = max_sequence(
-        cu_q_values if cu_q_values is not None else cu_q,
-        seq_q_values if seq_q_values is not None else seq_q,
-        q_fallback,
+    # BSND TopK-length rows use the physical S1 stride, not seqused_q.
+    max_seqlen_q = (
+        q_fallback
+        if layout_q == "BSND"
+        else max_sequence(
+            cu_q_values if cu_q_values is not None else cu_q,
+            seq_q_values if seq_q_values is not None else seq_q,
+            q_fallback,
+        )
     )
     max_seqlen_ori_kv = max_sequence(
         cu_ori_values if cu_ori_values is not None else cu_ori,
@@ -294,26 +285,26 @@ def run_metadata(arguments, metadata):
 def run(q, *, ori_kv=None, cmp_kv=None, metadata=None, _metadata_target=None, **kwargs):
     """Generate metadata dynamically, or fill an existing static placeholder."""
     testcase_name = kwargs.get("testcase_name")
-    if expect_error(kwargs):
-        target = (
-            metadata
-            if metadata is not None
-            else (_metadata_target if _metadata_target is not None else q)
-        )
-        return zero_metadata_for_expected_error(metadata, target, testcase_name)
-
+    is_error_case = expect_error(kwargs)
     protocol = load_metadata_protocol()
-    force_metadata_refresh = bool(get_attribute(kwargs, "metadata_refresh", False))
-    if protocol.metadata_is_materialized(metadata) and not force_metadata_refresh:
+    # Error cases use raw TTK inputs, not cached metadata or input-side overrides.
+    force_metadata_refresh = is_error_case or bool(
+        get_attribute(kwargs, "metadata_refresh", False)
+    )
+    if not force_metadata_refresh and protocol.metadata_is_materialized(metadata):
         logging.info("[%s] reuse nonzero SMLA metadata input", testcase_name)
         return None
 
-    arguments = protocol.load_metadata_inputs(OPERATOR, testcase_name)
+    arguments = (
+        None
+        if is_error_case
+        else protocol.load_metadata_inputs(OPERATOR, testcase_name)
+    )
     if arguments is not None:
         source = "manual-data sidecar"
     else:
         arguments = build_metadata_arguments(q, ori_kv, cmp_kv, kwargs)
-        source = "main API fallback (sidecar unavailable)"
+        source = "main API inputs"
     logging.info(
         "[%s] build SMLA metadata from %s; forced=%s",
         testcase_name,

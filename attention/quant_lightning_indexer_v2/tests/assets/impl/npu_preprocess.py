@@ -85,22 +85,8 @@ def expect_error(kwargs):
     return bool(value)
 
 
-def zero_metadata_for_expected_error(metadata, target, testcase_name):
-    if metadata is None:
-        generated = torch.zeros(1024, dtype=torch.int32, device=target.device)
-        logging.info(
-            "[%s] created zero QLI_V2 metadata for dynamic error case", testcase_name
-        )
-        return {"metadata": generated}
-    metadata.zero_()
-    logging.info(
-        "[%s] zeroed QLI_V2 metadata for main-operator error case", testcase_name
-    )
-    return None
-
-
 def get_values(kwargs, name, tensor):
-    value = kwargs.get(f"{name}_values")
+    value = None if expect_error(kwargs) else kwargs.get(f"{name}_values")
     if value is None:
         value = tensor
     if value is None:
@@ -295,14 +281,7 @@ def run(
 ):
     """Generate metadata dynamically, or fill an existing static placeholder."""
     testcase_name = kwargs.get("testcase_name")
-    if expect_error(kwargs):
-        target = (
-            metadata
-            if metadata is not None
-            else (_metadata_target if _metadata_target is not None else query)
-        )
-        return zero_metadata_for_expected_error(metadata, target, testcase_name)
-
+    is_error_case = expect_error(kwargs)
     del weights
     restore_mx_dtypes(query, key, query_dequant_scale, key_dequant_scale, quant_mode)
     arguments_kwargs = dict(kwargs)
@@ -316,11 +295,18 @@ def run(
         }
     )
     protocol = load_metadata_protocol()
-    force_metadata_refresh = bool(get_attribute(kwargs, "metadata_refresh", False))
-    if protocol.metadata_is_materialized(metadata) and not force_metadata_refresh:
+    # Error cases use raw TTK inputs, not cached metadata or input-side overrides.
+    force_metadata_refresh = is_error_case or bool(
+        get_attribute(kwargs, "metadata_refresh", False)
+    )
+    if not force_metadata_refresh and protocol.metadata_is_materialized(metadata):
         logging.info("[%s] reuse nonzero QLI_V2 metadata input", testcase_name)
         return None
-    arguments = protocol.load_metadata_inputs(OPERATOR, testcase_name)
+    arguments = (
+        None
+        if is_error_case
+        else protocol.load_metadata_inputs(OPERATOR, testcase_name)
+    )
     if arguments is not None:
         source = "manual-data sidecar"
     else:
@@ -335,7 +321,7 @@ def run(
             cmp_ratio,
             arguments_kwargs,
         )
-        source = "main API fallback (sidecar unavailable)"
+        source = "main API inputs"
     if (
         int(quant_mode) == QUANT_MODE_MXFP4
         and int(arguments["quant_mode"]) == QUANT_MODE_MXFP4

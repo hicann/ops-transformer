@@ -78,22 +78,8 @@ def expect_error(kwargs):
     return bool(value)
 
 
-def zero_metadata_for_expected_error(metadata, target, testcase_name):
-    if metadata is None:
-        generated = torch.zeros(1024, dtype=torch.int32, device=target.device)
-        logging.info(
-            "[%s] created zero LI_V2 metadata for dynamic error case", testcase_name
-        )
-        return {"metadata": generated}
-    metadata.zero_()
-    logging.info(
-        "[%s] zeroed LI_V2 metadata for main-operator error case", testcase_name
-    )
-    return None
-
-
 def get_values(kwargs, name, tensor):
-    value = kwargs.get(f"{name}_values")
+    value = None if expect_error(kwargs) else kwargs.get(f"{name}_values")
     if value is None:
         value = tensor
     if value is None:
@@ -141,9 +127,8 @@ def build_metadata_arguments(
         else:
             batch_size = 0
 
-    q_fallback = q_shape[1] if layout_q == "BSND" else q_shape[0]
-    if int(max_seqlen_q) >= 0:
-        q_fallback = int(max_seqlen_q)
+    # Match pytest: BSND uses capacity; TND forwards the API value, including -1.
+    metadata_max_q = q_shape[1] if layout_q == "BSND" else int(max_seqlen_q)
     if layout_k == "BSND":
         k_fallback = k_shape[1]
     elif layout_k == "TND":
@@ -170,14 +155,16 @@ def build_metadata_arguments(
             get_attribute(
                 kwargs,
                 "metadata_max_seqlen_q",
-                max_sequence(cu_q_values, seq_q_values, q_fallback),
+                metadata_max_q,
             )
         ),
         "max_seqlen_k": int(
             get_attribute(
                 kwargs,
                 "metadata_max_seqlen_k",
-                max_sequence(cu_k_values, seq_k_values, k_fallback),
+                k_fallback
+                if layout_k == "BSND"
+                else max_sequence(cu_k_values, seq_k_values, k_fallback),
             )
         ),
         "layout_q": str(layout_q),
@@ -240,14 +227,7 @@ def run(
 ):
     """Generate metadata dynamically, or fill an existing static placeholder."""
     testcase_name = kwargs.get("testcase_name")
-    if expect_error(kwargs):
-        target = (
-            metadata
-            if metadata is not None
-            else (_metadata_target if _metadata_target is not None else q)
-        )
-        return zero_metadata_for_expected_error(metadata, target, testcase_name)
-
+    is_error_case = expect_error(kwargs)
     del w
     arguments_kwargs = dict(kwargs)
     arguments_kwargs.update(
@@ -260,11 +240,18 @@ def run(
         }
     )
     protocol = load_metadata_protocol()
-    force_metadata_refresh = bool(get_attribute(kwargs, "metadata_refresh", False))
-    if protocol.metadata_is_materialized(metadata) and not force_metadata_refresh:
+    # Error cases use raw TTK inputs, not cached metadata or input-side overrides.
+    force_metadata_refresh = is_error_case or bool(
+        get_attribute(kwargs, "metadata_refresh", False)
+    )
+    if not force_metadata_refresh and protocol.metadata_is_materialized(metadata):
         logging.info("[%s] reuse nonzero LI_V2 metadata input", testcase_name)
         return None
-    arguments = protocol.load_metadata_inputs(OPERATOR, testcase_name)
+    arguments = (
+        None
+        if is_error_case
+        else protocol.load_metadata_inputs(OPERATOR, testcase_name)
+    )
     if arguments is not None:
         source = "manual-data sidecar"
     else:
@@ -279,7 +266,7 @@ def run(
             cmp_ratio,
             arguments_kwargs,
         )
-        source = "main API fallback (sidecar unavailable)"
+        source = "main API inputs"
     logging.info(
         "[%s] build LI_V2 metadata from %s; forced=%s",
         testcase_name,

@@ -151,18 +151,22 @@ class SparseFlashMlaInputAdapter:
         return repr(list(value))
 
     @staticmethod
-    def select_topk_override(name, tensor, mask_mode, attributes):
-        """Use an explicit CSV override, otherwise keep pytest's generated value."""
-        if attributes is None:
-            return tensor
+    def select_topk_override(name, tensor, mask_mode, attributes, sparse_indices=None):
+        """Honor explicit lengths; keep masked CMP placeholders neutral."""
         if hasattr(attributes, "attributes"):
             attributes = attributes.attributes
-        attributes = attributes or {}
-        if name + "_values" in attributes:
-            return attributes[name + "_values"]
-        if name in attributes:
-            return attributes[name]
-        if mask_mode != 0:
+        if attributes is not None:
+            attributes = attributes or {}
+            if name + "_values" in attributes:
+                return attributes[name + "_values"]
+            if name in attributes:
+                return attributes[name]
+        if name == "cmp_topk_length" and mask_mode != 0:
+            if tensor is None or sparse_indices is None:
+                return None
+            # Metadata uses the mask and K here; keep legacy length slots neutral.
+            return torch.full_like(tensor, sparse_indices.shape[-1])
+        if attributes is None or mask_mode != 0:
             return tensor
         return None
 
@@ -470,7 +474,11 @@ def generate_sparse_flash_mla_inputs(
                 "ori_topk_length", ori_topk_length, ori_mask_mode, params
             ),
             "cmp_topk_length": INPUT_ADAPTER.select_topk_override(
-                "cmp_topk_length", cmp_topk_length, cmp_mask_mode, params
+                "cmp_topk_length",
+                cmp_topk_length,
+                cmp_mask_mode,
+                params,
+                cmp_sparse_indices,
             ),
         }
     )
