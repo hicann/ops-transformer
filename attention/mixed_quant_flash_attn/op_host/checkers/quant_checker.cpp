@@ -207,6 +207,220 @@ ge::graphStatus QuantChecker::CheckMultiPara(const FaTilingInfo& faInfo)
                         return ge::GRAPH_FAILED);
         }
     }
+    if (faInfo.kvLayout == FaLayout::PA_BNBD) {
+        if (faInfo.faQuantMode == FaQuantMode::A16C4_KV_MXFP4_SOFTMAX_FP32) {
+            // k_descale: (num_blocks, KV_N, block_size, ceil(D/32))
+            // v_descale: (num_blocks, KV_N, D, ceil(block_size/32))
+            uint32_t n2Size = faInfo.n2Size;
+            uint32_t blockSize = faInfo.blockSize;
+            uint32_t headDim = faInfo.qkHeadDim;
+            uint32_t ceilD32 = (headDim + 31) / 32;
+            uint32_t ceilBs32 = (blockSize + 31) / 32;
+
+            // k_descale: (num_blocks, KV_N, block_size, ceil(D/32))
+            OP_CHECK_IF(kDescaleShape.GetDim(0) != faInfo.totalBlockNum,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                            ("dim[0] must be num_blocks=" + std::to_string(faInfo.totalBlockNum)).c_str()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                kDescaleShape.GetDim(1) != n2Size,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                                                      ("dim[1] must be KV_N=" + std::to_string(n2Size)).c_str()),
+                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(kDescaleShape.GetDim(2) != blockSize,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                            ("dim[2] must be block_size=" + std::to_string(blockSize)).c_str()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                kDescaleShape.GetDim(3) != ceilD32,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                                                      ("dim[3] must be ceil(D/32)=" + std::to_string(ceilD32)).c_str()),
+                return ge::GRAPH_FAILED);
+
+            // v_descale: (num_blocks, KV_N, D, ceil(block_size/32))
+            OP_CHECK_IF(vDescaleShape.GetDim(0) != faInfo.totalBlockNum,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                            ("dim[0] must be num_blocks=" + std::to_string(faInfo.totalBlockNum)).c_str()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                vDescaleShape.GetDim(1) != n2Size,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                                                      ("dim[1] must be KV_N=" + std::to_string(n2Size)).c_str()),
+                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                vDescaleShape.GetDim(2) != headDim,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                                                      ("dim[2] must be D=" + std::to_string(headDim)).c_str()),
+                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(vDescaleShape.GetDim(3) != ceilBs32,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                            ("dim[3] must be ceil(block_size/32)=" + std::to_string(ceilBs32)).c_str()),
+                        return ge::GRAPH_FAILED);
+        } else if (faInfo.faQuantMode == FaQuantMode::A16C4_KV_HIF4_SOFTMAX_FP32) {
+            // k_descale: (num_blocks, KV_N, block_size, ceil(D/64))
+            // v_descale: (num_blocks, KV_N, D, ceil(block_size/64))
+            uint32_t n2Size = faInfo.n2Size;
+            uint32_t blockSize = faInfo.blockSize;
+            uint32_t headDim = faInfo.qkHeadDim;
+            uint32_t ceilD64 = (headDim + 63) / 64;
+            uint32_t ceilBs64 = (blockSize + 63) / 64;
+
+            // k_descale: (num_blocks, KV_N, block_size, ceil(D/64))
+            OP_CHECK_IF(kDescaleShape.GetDim(0) != faInfo.totalBlockNum,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                            ("dim[0] must be num_blocks=" + std::to_string(faInfo.totalBlockNum)).c_str()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                kDescaleShape.GetDim(1) != n2Size,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                                                      ("dim[1] must be KV_N=" + std::to_string(n2Size)).c_str()),
+                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(kDescaleShape.GetDim(2) != blockSize,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                            ("dim[2] must be block_size=" + std::to_string(blockSize)).c_str()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                kDescaleShape.GetDim(3) != ceilD64,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                                                      ("dim[3] must be ceil(D/64)=" + std::to_string(ceilD64)).c_str()),
+                return ge::GRAPH_FAILED);
+
+            // v_descale: (num_blocks, KV_N, D, ceil(block_size/64))
+            OP_CHECK_IF(vDescaleShape.GetDim(0) != faInfo.totalBlockNum,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                            ("dim[0] must be num_blocks=" + std::to_string(faInfo.totalBlockNum)).c_str()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                vDescaleShape.GetDim(1) != n2Size,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                                                      ("dim[1] must be KV_N=" + std::to_string(n2Size)).c_str()),
+                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                vDescaleShape.GetDim(2) != headDim,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                                                      ("dim[2] must be D" + std::to_string(headDim)).c_str()),
+                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(vDescaleShape.GetDim(3) != ceilBs64,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                            ("dim[3] must be ceil(block_size/64)=" + std::to_string(ceilBs64)).c_str()),
+                        return ge::GRAPH_FAILED);
+        }
+    }
+    if (faInfo.kvLayout == FaLayout::PA_BBND) {
+        if (faInfo.faQuantMode == FaQuantMode::A16C4_KV_MXFP4_SOFTMAX_FP32) {
+            // k_descale: (num_blocks, block_size, KV_N, ceil(D/32))
+            // v_descale: (num_blocks, KV_N, D, ceil(block_size/32))
+            uint32_t n2Size = faInfo.n2Size;
+            uint32_t blockSize = faInfo.blockSize;
+            uint32_t headDim = faInfo.qkHeadDim;
+            uint32_t ceilD32 = (headDim + 31) / 32;
+            uint32_t ceilBs32 = (blockSize + 31) / 32;
+
+            // k_descale: (num_blocks, block_size, KV_N, ceil(D/32))
+            OP_CHECK_IF(kDescaleShape.GetDim(0) != faInfo.totalBlockNum,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                            ("dim[0] must be num_blocks=" + std::to_string(faInfo.totalBlockNum)).c_str()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(kDescaleShape.GetDim(1) != blockSize,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                            ("dim[1] must be block_size=" + std::to_string(blockSize)).c_str()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                kDescaleShape.GetDim(2) != n2Size,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                                                      ("dim[2] must be KV_N=" + std::to_string(n2Size)).c_str()),
+                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                kDescaleShape.GetDim(3) != ceilD32,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                                                      ("dim[3] must be ceil(D/32)=" + std::to_string(ceilD32)).c_str()),
+                return ge::GRAPH_FAILED);
+
+            // v_descale: (num_blocks, KV_N, D, ceil(block_size/32))
+            OP_CHECK_IF(vDescaleShape.GetDim(0) != faInfo.totalBlockNum,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                            ("dim[0] must be num_blocks=" + std::to_string(faInfo.totalBlockNum)).c_str()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                vDescaleShape.GetDim(1) != n2Size,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                                                      ("dim[1] must be KV_N=" + std::to_string(n2Size)).c_str()),
+                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                vDescaleShape.GetDim(2) != headDim,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                                                      ("dim[2] must be D=" + std::to_string(headDim)).c_str()),
+                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(vDescaleShape.GetDim(3) != ceilBs32,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                            ("dim[3] must be ceil(block_size/32)=" + std::to_string(ceilBs32)).c_str()),
+                        return ge::GRAPH_FAILED);
+        } else if (faInfo.faQuantMode == FaQuantMode::A16C4_KV_HIF4_SOFTMAX_FP32) {
+            // k_descale: (num_blocks, block_size, KV_N, ceil(D/64))
+            // v_descale: (num_blocks, KV_N, D, ceil(block_size/64))
+            uint32_t n2Size = faInfo.n2Size;
+            uint32_t blockSize = faInfo.blockSize;
+            uint32_t headDim = faInfo.qkHeadDim;
+            uint32_t ceilD64 = (headDim + 63) / 64;
+            uint32_t ceilBs64 = (blockSize + 63) / 64;
+
+            // k_descale: (num_blocks, block_size, KV_N, ceil(D/64))
+            OP_CHECK_IF(kDescaleShape.GetDim(0) != faInfo.totalBlockNum,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                            ("dim[0] must be num_blocks=" + std::to_string(faInfo.totalBlockNum)).c_str()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(kDescaleShape.GetDim(1) != blockSize,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                            ("dim[1] must be block_size=" + std::to_string(blockSize)).c_str()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                kDescaleShape.GetDim(2) != n2Size,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                                                      ("dim[2] must be KV_N=" + std::to_string(n2Size)).c_str()),
+                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                kDescaleShape.GetDim(3) != ceilD64,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "k_descale", ToStringRaw(kDescaleShape).c_str(),
+                                                      ("dim[3] must be ceil(D/64)=" + std::to_string(ceilD64)).c_str()),
+                return ge::GRAPH_FAILED);
+
+            // v_descale: (num_blocks, KV_N, D, ceil(block_size/64))
+            OP_CHECK_IF(vDescaleShape.GetDim(0) != faInfo.totalBlockNum,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                            ("dim[0] must be num_blocks=" + std::to_string(faInfo.totalBlockNum)).c_str()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                vDescaleShape.GetDim(1) != n2Size,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                                                      ("dim[1] must be KV_N=" + std::to_string(n2Size)).c_str()),
+                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                vDescaleShape.GetDim(2) != headDim,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                                                      ("dim[2] must be D" + std::to_string(headDim)).c_str()),
+                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(vDescaleShape.GetDim(3) != ceilBs64,
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            faInfo.opName, "v_descale", ToStringRaw(vDescaleShape).c_str(),
+                            ("dim[3] must be ceil(block_size/64)=" + std::to_string(ceilBs64)).c_str()),
+                        return ge::GRAPH_FAILED);
+        }
+    }
     return ge::GRAPH_SUCCESS;
 }
 

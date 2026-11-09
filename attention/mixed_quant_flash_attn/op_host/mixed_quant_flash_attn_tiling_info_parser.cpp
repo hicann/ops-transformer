@@ -30,9 +30,30 @@ namespace mixed_quant_flash_attn {
 
 namespace {
 
-bool IsEmptyShape(const gert::StorageShape* shape)
+bool IsEmptyShape(const gert::StorageShape* shape, FaLayout layout)
 {
-    return shape != nullptr && shape->GetStorageShape().GetShapeSize() == 0;
+    if (shape == nullptr) {
+        return false;
+    }
+    if (layout == FaLayout::BSND && shape->GetStorageShape().GetDimNum() == 4U) {
+        return shape->GetStorageShape().GetDim(0) * shape->GetStorageShape().GetDim(1) == 0;
+    }
+    if (layout == FaLayout::BNSD && shape->GetStorageShape().GetDimNum() == 4U) {
+        return shape->GetStorageShape().GetDim(0) * shape->GetStorageShape().GetDim(2) == 0;
+    }
+    if (layout == FaLayout::TND && shape->GetStorageShape().GetDimNum() == 3U) {
+        return shape->GetStorageShape().GetDim(0) == 0;
+    }
+    if (layout == FaLayout::PA_NZ && shape->GetStorageShape().GetDimNum() == 5U) {
+        return shape->GetStorageShape().GetDim(0) * shape->GetStorageShape().GetDim(3) == 0;
+    }
+    if (layout == FaLayout::PA_BBND && shape->GetStorageShape().GetDimNum() == 4U) {
+        return shape->GetStorageShape().GetDim(0) * shape->GetStorageShape().GetDim(1) == 0;
+    }
+    if (layout == FaLayout::PA_BNBD && shape->GetStorageShape().GetDimNum() == 4U) {
+        return shape->GetStorageShape().GetDim(0) * shape->GetStorageShape().GetDim(2) == 0;
+    }
+    return false;
 }
 
 ge::graphStatus GetQLogicalAxes(const gert::Shape& shape, FaLayout layout, int64_t& b, int64_t& n, int64_t& s,
@@ -73,14 +94,12 @@ ge::graphStatus FaInfoParser::GetEmptyTensorFlag()
     const auto& kDescaleShape = opParamInfo_.kDescale.shape->GetStorageShape();
     const auto& vDescaleShape = opParamInfo_.vDescale.shape->GetStorageShape();
 
-    const bool queryEmpty = IsEmptyShape(opParamInfo_.query.shape);
-    const bool attnOutEmpty = IsEmptyShape(opParamInfo_.attnOut.shape);
+    const bool queryEmpty = IsEmptyShape(opParamInfo_.query.shape, layoutQ_);
+    const bool attnOutEmpty = IsEmptyShape(opParamInfo_.attnOut.shape, layoutOut_);
 
-    const bool keyEmpty = IsEmptyShape(opParamInfo_.key.shape);
-    const bool valueEmpty = IsEmptyShape(opParamInfo_.value.shape);
-    const bool kDescaleEmpty = IsEmptyShape(opParamInfo_.kDescale.shape);
-    const bool vDescaleEmpty = IsEmptyShape(opParamInfo_.vDescale.shape);
-    const bool anyEmpty = queryEmpty || attnOutEmpty || keyEmpty || valueEmpty || kDescaleEmpty || vDescaleEmpty;
+    const bool keyEmpty = IsEmptyShape(opParamInfo_.key.shape, layoutKV_);
+    const bool valueEmpty = IsEmptyShape(opParamInfo_.value.shape, layoutKV_);
+    const bool anyEmpty = queryEmpty || attnOutEmpty || keyEmpty || valueEmpty;
     if (!anyEmpty) {
         emptyTensorFlag_ = false;
         return ge::GRAPH_SUCCESS;
