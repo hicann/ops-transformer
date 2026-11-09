@@ -21,6 +21,7 @@
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
 #include "sparse_flash_attention_common.h"
+#include "sfa_split_kv_merge.h"
 
 using AscendC::CrossCoreSetFlag;
 using AscendC::CrossCoreWaitFlag;
@@ -28,6 +29,8 @@ using AscendC::CrossCoreWaitFlag;
 template <typename SFAT>
 class SFAVectorService {
 public:
+    using RunInfo =
+        std::conditional_t<SFAT::flashDecode && SFAT::templateMode == C_TEMPLATE, CTemplateRunInfo, ::RunInfo>;
     // 中间计算数据类型为float，高精度模式
     using T = float;
     using KV_T = typename SFAT::kvType;
@@ -48,13 +51,20 @@ public:
                                                 const GlobalTensor<KV_T>& keyRopeGm, const GlobalTensor<KV_T>& keyGm,
                                                 const GlobalTensor<int32_t>& blkTableGm);
     __aicore__ inline void InitVec1GlobalTensor(GlobalTensor<MM1_OUT_T> mm1ResGm, GlobalTensor<KV_T> vec1ResGm,
+                                                GlobalTensor<KV_T> vec1ResLoGm,
                                                 GlobalTensor<int32_t> actualSeqLengthsQGm,
-                                                GlobalTensor<int32_t> actualSeqLengthsKVGm, GlobalTensor<T> lseMaxFdGm,
-                                                GlobalTensor<T> lseSumFdGm, GlobalTensor<int32_t> topKGm,
-                                                GlobalTensor<T> softmaxMaxGm, GlobalTensor<T> softmaxSumGm);
-    __aicore__ inline void InitVec2GlobalTensor(GlobalTensor<T> accumOutGm, GlobalTensor<UPDATE_T> vec2ResGm,
-                                                GlobalTensor<MM2_OUT_T> mm2ResGm, GlobalTensor<OUT_T> attentionOutGm);
+                                                GlobalTensor<int32_t> actualSeqLengthsKVGm,
+                                                GlobalTensor<int32_t> topKGm, GlobalTensor<T> softmaxMaxGm,
+                                                GlobalTensor<T> softmaxSumGm);
+    __aicore__ inline void InitVec2GlobalTensor(GlobalTensor<UPDATE_T> vec2ResGm, GlobalTensor<MM2_OUT_T> mm2ResGm,
+                                                GlobalTensor<OUT_T> attentionOutGm);
     __aicore__ inline void InitSoftmaxDefaultBuffer();
+    __aicore__ inline void InitZeroLse(uint64_t offset);
+    __aicore__ inline void InitSplitKVOutput(GlobalTensor<T> partialOut, uint64_t partitionOffset);
+    __aicore__ inline void MergeSplitKV(GlobalTensor<T>& partialOut, GlobalTensor<T>& partialMax,
+                                        GlobalTensor<T>& partialSum, GlobalTensor<OUT_T>& finalOut,
+                                        GlobalTensor<T>& finalMax, GlobalTensor<T>& finalSum, bool returnSoftmaxLse,
+                                        uint32_t queryIdx, uint32_t splitCount);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
     // ================================Base Vector==========================================
@@ -80,6 +90,8 @@ public:
                                      uint64_t startId, uint64_t endId);
     // ================================Vector1==========================================
     __aicore__ inline void ProcessVec1SingleBuf(const RunInfo& sfaVecInfo, const MSplitInfo& sfaVecSplitInfo);
+    __aicore__ inline void PrefetchBmm1Res(const RunInfo& sfaVecInfo, const MSplitInfo& sfaVecSplitInfo,
+                                           uint32_t startRow, uint32_t rows, uint32_t bufferIdx);
     __aicore__ inline void DealBmm1ResBaseBlock(const RunInfo& sfaVecInfo, const MSplitInfo& sfaVecSplitInfo,
                                                 uint32_t startRow, uint32_t sfaDealRows, uint32_t sfaColumns,
                                                 uint32_t loopId);
@@ -94,8 +106,6 @@ public:
     __aicore__ inline void ElewiseCompute(const RunInfo& sfaVecInfo, const LocalTensor<T>& mmResUb,
                                           uint32_t sfaDealRows, uint32_t sfaColumns);
     __aicore__ inline void ProcessAmlaNupdate(const RunInfo& sfaVecInfo, const MSplitInfo& sfaVecSplitInfo);
-    __aicore__ inline void ComputeLogSumExpAndCopyToGm(const RunInfo& sfaVecInfo, const MSplitInfo& sfaVecSplitInfo,
-                                                       LocalTensor<T>& softmaxSumUb, LocalTensor<T>& softmaxMaxUb);
     __aicore__ inline void CopyFALseToGm(const RunInfo& sfaVecInfo, const MSplitInfo& sfaVecSplitInfo,
                                          LocalTensor<T>& softmaxSumUb, LocalTensor<T>& softmaxMaxUb);
     __aicore__ inline void SetBmm2FirstSInnerBias(const RunInfo& sfaVecInfo, const MSplitInfo& sfaVecSplitInfo);
@@ -109,16 +119,9 @@ public:
     __aicore__ inline void Bmm2DataCopyOutTrans(const RunInfo& sfaVecInfo, LocalTensor<OUT_T>& attenOutUb,
                                                 uint32_t sfaWorkspaceRow, uint32_t sfaDealRows, uint32_t sfaColumns,
                                                 uint32_t sfaActualColumns);
-    __aicore__ inline void Bmm2ResCopyOut(const RunInfo& sfaVecInfo, LocalTensor<T>& sfaBmm2ResultUb,
-                                          uint32_t sfaWorkspaceRow, uint32_t sfaDealRows, uint32_t sfaColumns,
-                                          uint32_t sfaActualColumns);
     __aicore__ inline void Bmm2CastAndCopyOut(const RunInfo& sfaVecInfo, LocalTensor<T>& sfaBmm2ResultUb,
                                               uint32_t sfaWorkspaceRow, uint32_t sfaDealRows, uint32_t sfaColumns,
                                               uint32_t sfaActualColumns);
-    __aicore__ inline void Bmm2FDDataCopyOut(const RunInfo& sfaVecInfo, LocalTensor<T>& sfaBmm2ResultUb,
-                                             uint32_t sfaWorkspaceRow, uint32_t sfaDealRows, uint32_t sfaColumns,
-                                             uint32_t sfaActualColumns);
-    __aicore__ inline uint64_t CalcAccumOffset(uint32_t bN2Idx, uint32_t gS1Idx);
     __aicore__ inline void GetConfusionTransposeTiling(int64_t numR, int64_t numC, const uint32_t stackBufferSize,
                                                        const uint32_t typeSize, ConfusionTransposeTiling& tiling);
 
@@ -154,6 +157,8 @@ private:
     static constexpr T LN2 = 0.6931471805599453094172;
     static constexpr T RECIP_OF_LN2 = 1 / LN2;
     static constexpr T SOFTMAX_MIN_NUM = -2e38;
+    // 2^11 keeps scaled FP16/BF16 weights and normalizer in a useful exponent range; the common factor cancels.
+    static constexpr float DUAL_MM2_SCALE = 2048.0f;
 
     const SparseFlashAttentionTilingDataMla* __restrict tilingData;
 
@@ -163,8 +168,7 @@ private:
     GlobalTensor<int32_t> mm2ResInt32Gm;
     GlobalTensor<MM1_OUT_T> mm1ResGm;
     GlobalTensor<KV_T> vec1ResGm;
-    GlobalTensor<T> lseSumFdGm;
-    GlobalTensor<T> lseMaxFdGm;
+    GlobalTensor<KV_T> vec1ResLoGm;
     GlobalTensor<T> softmaxMaxGm;
     GlobalTensor<T> softmaxSumGm;
 
@@ -172,8 +176,10 @@ private:
     GlobalTensor<int32_t> actualSeqLengthsKVGm;
     GlobalTensor<UPDATE_T> vec2ResGm;
     GlobalTensor<MM2_OUT_T> mm2ResGm;
-    GlobalTensor<T> accumOutGm;
     GlobalTensor<OUT_T> attentionOutGm;
+    GlobalTensor<T> splitAttentionOutGm;
+    uint64_t splitOutputOffset = 0;
+    bool splitOutputActive = false;
     GlobalTensor<int32_t> blkTableGm_;
 
     GlobalTensor<KV_T> kvMergeGm_;
@@ -183,7 +189,7 @@ private:
     GlobalTensor<int32_t> kvValidSizeGm_;
 
     // ================================Local Buffer区====================================
-    TBuf<> inputBuff1;  // 32K
+    TBuf<> inputBuff1;  // 64K
     TBuf<> inputBuff2;  // 16K
     TBuf<> outputBuff1; // 32K
     TBuf<> outputBuff2; // 4K
@@ -284,28 +290,25 @@ __aicore__ inline void SFAVectorService<SFAT>::InitVec0GlobalTensor(const Global
 
 template <typename SFAT>
 __aicore__ inline void SFAVectorService<SFAT>::InitVec1GlobalTensor(
-    GlobalTensor<MM1_OUT_T> mm1ResGm, GlobalTensor<KV_T> vec1ResGm, GlobalTensor<int32_t> actualSeqLengthsQGm,
-    GlobalTensor<int32_t> actualSeqLengthsKVGm, GlobalTensor<T> lseMaxFdGm, GlobalTensor<T> lseSumFdGm,
-    GlobalTensor<int32_t> topKGm, GlobalTensor<T> softmaxMaxGm, GlobalTensor<T> softmaxSumGm)
+    GlobalTensor<MM1_OUT_T> mm1ResGm, GlobalTensor<KV_T> vec1ResGm, GlobalTensor<KV_T> vec1ResLoGm,
+    GlobalTensor<int32_t> actualSeqLengthsQGm, GlobalTensor<int32_t> actualSeqLengthsKVGm, GlobalTensor<int32_t> topKGm,
+    GlobalTensor<T> softmaxMaxGm, GlobalTensor<T> softmaxSumGm)
 {
     this->mm1ResGm = mm1ResGm;
     this->vec1ResGm = vec1ResGm;
+    this->vec1ResLoGm = vec1ResLoGm;
     this->actualSeqLengthsQGm = actualSeqLengthsQGm;
     this->actualSeqLengthsKVGm = actualSeqLengthsKVGm;
-    this->lseMaxFdGm = lseMaxFdGm;
-    this->lseSumFdGm = lseSumFdGm;
     this->topkGm_ = topKGm;
     this->softmaxMaxGm = softmaxMaxGm;
     this->softmaxSumGm = softmaxSumGm;
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAVectorService<SFAT>::InitVec2GlobalTensor(GlobalTensor<T> accumOutGm,
-                                                                    GlobalTensor<UPDATE_T> vec2ResGm,
+__aicore__ inline void SFAVectorService<SFAT>::InitVec2GlobalTensor(GlobalTensor<UPDATE_T> vec2ResGm,
                                                                     GlobalTensor<MM2_OUT_T> mm2ResGm,
                                                                     GlobalTensor<OUT_T> attentionOutGm)
 {
-    this->accumOutGm = accumOutGm;
     this->vec2ResGm = vec2ResGm;
     this->mm2ResGm = mm2ResGm;
     this->attentionOutGm = attentionOutGm;
@@ -341,6 +344,55 @@ __aicore__ inline void SFAVectorService<SFAT>::InitSoftmaxDefaultBuffer()
 }
 
 template <typename SFAT>
+__aicore__ inline void SFAVectorService<SFAT>::InitZeroLse(uint64_t offset)
+{
+    LocalTensor<T> zeros = outputBuff2.template Get<T>();
+    WaitFlag<HardEvent::MTE3_V>(SYNC_OUTPUT_BUF2_FLAG);
+    Duplicate(zeros, ConstInfo::FLOAT_ZERO, sfaVecConstInfo.gSize);
+    SetFlag<HardEvent::V_MTE3>(SYNC_OUTPUT_BUF2_FLAG);
+    WaitFlag<HardEvent::V_MTE3>(SYNC_OUTPUT_BUF2_FLAG);
+    const DataCopyExtParams copy{1, static_cast<uint32_t>(sfaVecConstInfo.gSize * sizeof(T)), 0, 0, 0};
+    DataCopyPad(softmaxMaxGm[offset], zeros, copy);
+    DataCopyPad(softmaxSumGm[offset], zeros, copy);
+    SetFlag<HardEvent::MTE3_V>(SYNC_OUTPUT_BUF2_FLAG);
+}
+
+template <typename SFAT>
+__aicore__ inline void SFAVectorService<SFAT>::InitSplitKVOutput(GlobalTensor<T> partialOut, uint64_t partitionOffset)
+{
+    splitAttentionOutGm = partialOut;
+    splitOutputOffset = partitionOffset;
+    splitOutputActive = true;
+}
+
+template <typename SFAT>
+__aicore__ inline void SFAVectorService<SFAT>::MergeSplitKV(GlobalTensor<T>& partialOut, GlobalTensor<T>& partialMax,
+                                                            GlobalTensor<T>& partialSum, GlobalTensor<OUT_T>& finalOut,
+                                                            GlobalTensor<T>& finalMax, GlobalTensor<T>& finalSum,
+                                                            bool returnSoftmaxLse, uint32_t queryIdx,
+                                                            uint32_t splitCount)
+{
+    constexpr uint32_t chunkElements = AttentionCommon::SPLIT_KV_HEADS_PER_CHUNK * AttentionCommon::SPLIT_KV_HEAD_DIM;
+    static_assert(chunkElements * sizeof(T) <= ConstInfo::SFA_BUFFER_BYTES_32K,
+                  "Split-KV partial and accum each require a 32 KiB buffer");
+    static_assert(chunkElements * sizeof(OUT_T) <= ConstInfo::SFA_BUFFER_BYTES_8K * 2,
+                  "Split-KV result must fit in 16 KiB");
+    // UB 布局（float = 4 B；splitCount ≤ aicNum / queryRows，A2=24，按 48 上限算也够）：
+    //   inputBuff1 64 KiB：前 32 KiB 存 max/sum/weight，后 32 KiB 预取下一分区的 FP32 partial 输出。
+    //           统计量按 splitCount 动态分块，并按 8 个 float 对齐；两个 AIV 子核各负责一半 head。
+    //   partialOutUb/accum = outputBuff1/tmpBuff1 各 32 KiB = 16 head × 512 × 4 B：一次处理 16 个 head 的 512 维输出
+    //                      （512 是 head 维 D，不是 key 数；key 的份数由 splitCount 表示）
+    //   work = outputBuff2 4 KiB = 2 行 × 128 个 float：max/sum 各一行，一行最多 128 个 head 的统计量，共 1 KiB
+    //   result = inputBuff2 16 KiB = 16 head × 512 × 2 B：一次处理 16 个 head 的 fp16/bf16 输出
+    const uint32_t queryCount =
+        LAYOUT_T == SFA_LAYOUT::TND ? sfaVecConstInfo.qSeqSize : sfaVecConstInfo.batchSize * sfaVecConstInfo.qSeqSize;
+    AttentionCommon::MergeSparseSplitKV<KV_LAYOUT_T != SFA_LAYOUT::PA_BSND, TEMPLATE_MODE == C_TEMPLATE>(
+        queryCount, queryIdx, splitCount, sfaVecConstInfo.gSize, partialOut, partialMax, partialSum, finalOut, finalMax,
+        finalSum, returnSoftmaxLse, outputBuff1.template Get<T>(), tmpBuff1.template Get<T>(),
+        inputBuff1.template Get<T>(), outputBuff2.template Get<T>(), inputBuff2.template Get<OUT_T>());
+}
+
+template <typename SFAT>
 __aicore__ inline void SFAVectorService<SFAT>::CopyFALseToGm(const RunInfo& sfaVecInfo,
                                                              const MSplitInfo& sfaVecSplitInfo,
                                                              LocalTensor<T>& softmaxSumUb, LocalTensor<T>& softmaxMaxUb)
@@ -367,7 +419,8 @@ __aicore__ inline void SFAVectorService<SFAT>::CopyFALseToGm(const RunInfo& sfaV
                   sfaVecSplitInfo.vecStartM;
     }
 
-    if (sfaVecInfo.actualSingleProcessSInnerSize != 0) {
+    // C-template empty loops propagate prior statistics, including the empty-row defaults.
+    if (TEMPLATE_MODE == C_TEMPLATE || sfaVecInfo.actualSingleProcessSInnerSize != 0) {
         DataCopyExtParams dataCopyParams;
         dataCopyParams.blockCount = 1;
         dataCopyParams.blockLen = sizeof(T) * size;
@@ -390,47 +443,11 @@ __aicore__ inline void SFAVectorService<SFAT>::CopyFALseToGm(const RunInfo& sfaV
         DataCopyPad(softmaxSumGm[offset], tmp, dataCopyParams);
         SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF2_FLAG);
     } else {
+        // The two fills share stack UB; wait for each GM write before reusing it.
         matmul::InitOutput<T>(softmaxSumGm[offset], size, ConstInfo::FLOAT_ZERO);
+        PipeBarrier<PIPE_ALL>();
         matmul::InitOutput<T>(softmaxMaxGm[offset], size, SOFTMAX_MIN_NUM);
-    }
-}
-
-template <typename SFAT>
-__aicore__ inline void SFAVectorService<SFAT>::ComputeLogSumExpAndCopyToGm(const RunInfo& sfaVecInfo,
-                                                                           const MSplitInfo& sfaVecSplitInfo,
-                                                                           LocalTensor<T>& softmaxSumUb,
-                                                                           LocalTensor<T>& softmaxMaxUb)
-{
-    if (sfaVecSplitInfo.vecDealM == 0) {
-        return;
-    }
-    uint64_t baseOffset = sfaVecSplitInfo.nBufferStartM / 2;
-    size_t size = sfaVecSplitInfo.vecDealM * FP32_BLOCK_ELEMENT_NUM;
-    uint64_t sfaAccumOutputCount = CalcAccumOffset(sfaVecInfo.bIdx, sfaVecInfo.gS1Idx);
-    uint64_t offset =
-        (sfaAccumOutputCount * sfaVecConstInfo.kvHeadNum * sfaVecConstInfo.mBaseSize +               // taskoffset
-         sfaVecInfo.tndCoreStartKVSplitPos * sfaVecConstInfo.kvHeadNum * sfaVecConstInfo.mBaseSize + // 份数offset
-         sfaVecSplitInfo.nBufferStartM + sfaVecSplitInfo.vecStartM) *
-        FP32_BLOCK_ELEMENT_NUM; // m轴offset
-    if (sfaVecInfo.actualSingleProcessSInnerSize != 0) {
-        LocalTensor<T> tmp = outputBuff2.Get<T>();
-        WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF2_FLAG);
-        Brcb(tmp, softmaxSumUb[baseOffset], (sfaVecSplitInfo.vecDealM + 7) / 8, {1, 8});
-        SetFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF2_FLAG);
-        WaitFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF2_FLAG);
-        DataCopy(lseSumFdGm[offset], tmp, size);
-        SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF2_FLAG);
-
-        tmp = outputBuff2.Get<T>();
-        WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF2_FLAG);
-        Brcb(tmp, softmaxMaxUb[baseOffset], (sfaVecSplitInfo.vecDealM + 7) / 8, {1, 8});
-        SetFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF2_FLAG);
-        WaitFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF2_FLAG);
-        DataCopy(lseMaxFdGm[offset], tmp, size);
-        SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF2_FLAG);
-    } else {
-        matmul::InitOutput<T>(lseSumFdGm[offset], size, ConstInfo::FLOAT_ZERO);
-        matmul::InitOutput<T>(lseMaxFdGm[offset], size, SOFTMAX_MIN_NUM);
+        PipeBarrier<PIPE_ALL>();
     }
 }
 
@@ -614,6 +631,10 @@ __aicore__ inline void SFAVectorService<SFAT>::AmlaVecCompute(const RunInfo& sfa
     PipeBarrier<PIPE_V>();
     if (sfaVecInfo.s2Idx + 1 == sfaVecInfo.curSInnerLoopTimes) {
         Mul(aMlaSumUb[softmaxOutOffset], softmaxSumUb[softmaxOutOffset], nUpdateTmp2, calCount);
+        if constexpr (FLASH_DECODE) {
+            PipeBarrier<PIPE_V>();
+            Muls(aMlaSumUb[softmaxOutOffset], aMlaSumUb[softmaxOutOffset], DUAL_MM2_SCALE, calCount);
+        }
     }
     if (sfaActualColumns == 0) {
         WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF2_FLAG);
@@ -662,6 +683,20 @@ __aicore__ inline void SFAVectorService<SFAT>::AmlaVecCompute(const RunInfo& sfa
 }
 
 template <typename SFAT>
+__aicore__ inline void SFAVectorService<SFAT>::PrefetchBmm1Res(const RunInfo& sfaVecInfo,
+                                                               const MSplitInfo& sfaVecSplitInfo, uint32_t startRow,
+                                                               uint32_t rows, uint32_t bufferIdx)
+{
+    const uint32_t columns = sfaVecInfo.actualSingleProcessSInnerSizeAlign;
+    const uint64_t offset = (sfaVecInfo.loop % sfaVecConstInfo.preLoadNum) * sfaVecConstInfo.mmResUbSize +
+                            (sfaVecSplitInfo.nBufferStartM + sfaVecSplitInfo.vecStartM + startRow) * columns;
+    LocalTensor<MM1_OUT_T> input = inputBuff1.Get<MM1_OUT_T>()[bufferIdx * INPUT1_BUFFER_OFFSET / sizeof(MM1_OUT_T)];
+    WaitFlag<HardEvent::V_MTE2>(SYNC_INPUT_BUF1_FLAG + bufferIdx);
+    DataCopy(input, mm1ResGm[offset], rows * columns);
+    SetFlag<HardEvent::MTE2_V>(SYNC_INPUT_BUF1_FLAG + bufferIdx);
+}
+
+template <typename SFAT>
 __aicore__ inline void SFAVectorService<SFAT>::DealBmm1ResBaseBlock(const RunInfo& sfaVecInfo,
                                                                     const MSplitInfo& sfaVecSplitInfo,
                                                                     uint32_t startRow, uint32_t sfaDealRows,
@@ -672,16 +707,12 @@ __aicore__ inline void SFAVectorService<SFAT>::DealBmm1ResBaseBlock(const RunInf
                              (sfaVecSplitInfo.nBufferStartM + sfaVecSplitInfo.vecStartM + startRow) * sfaColumns;
     LocalTensor<MM1_OUT_T> mmResUb = inputBuff1.Get<MM1_OUT_T>();
     mmResUb = mmResUb[pingpongFlag * INPUT1_BUFFER_OFFSET / sizeof(MM1_OUT_T)];
-    WaitFlag<AscendC::HardEvent::V_MTE2>(SYNC_INPUT_BUF1_FLAG + pingpongFlag);
-
-    DataCopy(mmResUb, mm1ResGm[inOutGmOffset], computeSize);
     if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
         if (loopId == 0) {
             WaitFlag<HardEvent::MTE2_S>(0);
         }
     }
-    SetFlag<AscendC::HardEvent::MTE2_V>(SYNC_INPUT_BUF1_FLAG);
-    WaitFlag<AscendC::HardEvent::MTE2_V>(SYNC_INPUT_BUF1_FLAG);
+    WaitFlag<AscendC::HardEvent::MTE2_V>(SYNC_INPUT_BUF1_FLAG + pingpongFlag);
 
     ElewiseCompute(sfaVecInfo, mmResUb, sfaDealRows, sfaColumns);
 
@@ -700,12 +731,33 @@ __aicore__ inline void SFAVectorService<SFAT>::DealBmm1ResBaseBlock(const RunInf
     LocalTensor<KV_T> tmpMMResCastTensor = outputBuff1.Get<KV_T>();
     WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
 
+    if constexpr (FLASH_DECODE) {
+        Muls(mmResUb, mmResUb, DUAL_MM2_SCALE, computeSize);
+        PipeBarrier<PIPE_V>();
+    }
     Cast(tmpMMResCastTensor, mmResUb, AscendC::RoundMode::CAST_ROUND, computeSize);
-    SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_INPUT_BUF1_FLAG + pingpongFlag);
+    if constexpr (!FLASH_DECODE) {
+        SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_INPUT_BUF1_FLAG + pingpongFlag);
+    }
 
     SetFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF1_FLAG);
     WaitFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF1_FLAG);
     DataCopy(vec1ResGm[inOutGmOffset], tmpMMResCastTensor, computeSize);
+    if constexpr (FLASH_DECODE) {
+        // KV(W) = KV(high) + KV(residual) preserves the discarded mantissa.
+        SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
+        WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
+        LocalTensor<T> residualUb = tmpBuff1.Get<T>();
+        Cast(residualUb, tmpMMResCastTensor, AscendC::RoundMode::CAST_NONE, computeSize);
+        PipeBarrier<PIPE_V>();
+        Sub(residualUb, mmResUb, residualUb, computeSize);
+        PipeBarrier<PIPE_V>();
+        Cast(tmpMMResCastTensor, residualUb, AscendC::RoundMode::CAST_ROUND, computeSize);
+        SetFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF1_FLAG);
+        WaitFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF1_FLAG);
+        DataCopy(vec1ResLoGm[inOutGmOffset], tmpMMResCastTensor, computeSize);
+        SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_INPUT_BUF1_FLAG + pingpongFlag);
+    }
     SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
 }
 
@@ -832,9 +884,15 @@ __aicore__ inline void SFAVectorService<SFAT>::ProcessVec1SingleBuf(const RunInf
             WaitFlag<HardEvent::MTE2_S>(0);
         }
     }
+    PrefetchBmm1Res(sfaVecInfo, sfaVecSplitInfo, 0, loopCount == 1 ? tailSplitSize : mSplitSize, pingpongFlag);
     for (uint32_t i = 0, dealSize = mSplitSize; i < loopCount; i++) {
         if (i == (loopCount - 1)) {
             dealSize = tailSplitSize;
+        }
+        if (i + 1 < loopCount) {
+            // Prefetch the next MM1 output while processing the current UB chunk.
+            PrefetchBmm1Res(sfaVecInfo, sfaVecSplitInfo, (i + 1) * mSplitSize,
+                            i + 2 == loopCount ? tailSplitSize : mSplitSize, pingpongFlag ^ 1);
         }
         DealBmm1ResBaseBlock(sfaVecInfo, sfaVecSplitInfo, i * mSplitSize, dealSize,
                              sfaVecInfo.actualSingleProcessSInnerSizeAlign, i);
@@ -1157,28 +1215,14 @@ __aicore__ inline void SFAVectorService<SFAT>::ProcessVec1L(const RunInfo& sfaVe
             ProcessAmlaNupdate(sfaVecInfo, sfaVecSplitInfo);
             CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_MTE3>(sfaVecConstInfo.syncV1NupdateC2);
         }
-        // move lse for flash decode or FA
-        if (sfaVecInfo.s2Idx == sfaVecInfo.curSInnerLoopTimes - 1 &&
-            (sfaVecConstInfo.returnSoftmaxLse || sfaVecInfo.tndIsS2SplitCore)) {
+        // Public FA statistics or internal split-KV merge statistics.
+        if (sfaVecInfo.s2Idx == sfaVecInfo.curSInnerLoopTimes - 1 && sfaVecConstInfo.returnSoftmaxLse) {
             uint32_t outIdx = sfaVecInfo.loop % (sfaVecConstInfo.preLoadNum);
             auto sumTensor = softmaxSumUb[outIdx * SOFTMAX_TMP_BUFFER_OFFSET / sizeof(T)];
             auto maxTensor = softmaxMaxUb[outIdx * SOFTMAX_TMP_BUFFER_OFFSET / sizeof(T)];
-            if (sfaVecConstInfo.returnSoftmaxLse) {
-                CopyFALseToGm(sfaVecInfo, sfaVecSplitInfo, sumTensor, maxTensor);
-            }
-            if (sfaVecInfo.tndIsS2SplitCore) {
-                if constexpr (FLASH_DECODE) {
-                    ComputeLogSumExpAndCopyToGm(sfaVecInfo, sfaVecSplitInfo, sumTensor, maxTensor);
-                }
-            }
+            CopyFALseToGm(sfaVecInfo, sfaVecSplitInfo, sumTensor, maxTensor);
         }
     }
-}
-
-template <typename SFAT>
-__aicore__ inline uint64_t SFAVectorService<SFAT>::CalcAccumOffset(uint32_t bN2Idx, uint32_t gS1Idx)
-{
-    return 0;
 }
 
 template <typename SFAT>
@@ -1265,37 +1309,6 @@ __aicore__ inline void SFAVectorService<SFAT>::GetConfusionTransposeTiling(int64
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAVectorService<SFAT>::Bmm2FDDataCopyOut(const RunInfo& sfaVecInfo,
-                                                                 LocalTensor<T>& sfaBmm2ResultUb,
-                                                                 uint32_t sfaWorkspaceRow, uint32_t sfaDealRows,
-                                                                 uint32_t sfaColumns, uint32_t sfaActualColumns)
-{
-    LocalTensor<T> tmp = outputBuff1.Get<T>();
-    WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
-    DataCopy(tmp, sfaBmm2ResultUb, sfaColumns * sfaDealRows);
-    SetFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF1_FLAG);
-    WaitFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF1_FLAG);
-    uint64_t sfaAccumOutputCount = CalcAccumOffset(sfaVecInfo.bIdx, sfaVecInfo.gS1Idx);
-    uint64_t offset = sfaAccumOutputCount * sfaVecConstInfo.kvHeadNum * sfaVecConstInfo.mBaseSize *
-                          sfaVecConstInfo.headDim + // taskoffset
-                      sfaVecInfo.tndCoreStartKVSplitPos * sfaVecConstInfo.kvHeadNum * sfaVecConstInfo.mBaseSize *
-                          sfaVecConstInfo.headDim +       // 份数offset
-                      sfaWorkspaceRow * sfaActualColumns; // m轴offset
-    GlobalTensor<T> dst = accumOutGm[offset];
-    if (sfaVecInfo.actualSingleProcessSInnerSize == 0) {
-        DataCopyExtParams dataCopyParams;
-        dataCopyParams.blockCount = sfaDealRows;
-        dataCopyParams.blockLen = sfaActualColumns * sizeof(T);
-        dataCopyParams.dstStride = 0;
-        dataCopyParams.srcStride = (sfaColumns - sfaActualColumns) / (BYTE_BLOCK / sizeof(T));
-        DataCopyPad(dst, tmp, dataCopyParams);
-    } else {
-        matmul::InitOutput<T>(dst, sfaDealRows * sfaActualColumns, ConstInfo::FLOAT_ZERO);
-    }
-    SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
-}
-
-template <typename SFAT>
 __aicore__ inline void SFAVectorService<SFAT>::Bmm2DataCopyOutTrans(const RunInfo& sfaVecInfo,
                                                                     LocalTensor<OUT_T>& attenOutUb,
                                                                     uint32_t sfaWorkspaceRow, uint32_t sfaDealRows,
@@ -1317,6 +1330,26 @@ __aicore__ inline void SFAVectorService<SFAT>::Bmm2CastAndCopyOut(const RunInfo&
                                                                   uint32_t sfaWorkspaceRow, uint32_t sfaDealRows,
                                                                   uint32_t sfaColumns, uint32_t sfaActualColumns)
 {
+    if constexpr (SFAT::flashDecode) {
+        if (splitOutputActive) {
+            // Preserve FP32 partition results; only the final merge rounds to OUT_T.
+            LocalTensor<T> partialOut = outputBuff1.Get<T>();
+            WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
+            DataCopy(partialOut, sfaBmm2ResultUb, sfaDealRows * sfaColumns);
+            SetFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF1_FLAG);
+            WaitFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF1_FLAG);
+            DataCopyExtParams copyParams;
+            copyParams.blockCount = sfaDealRows;
+            copyParams.blockLen = sfaActualColumns * sizeof(T);
+            copyParams.srcStride = (sfaColumns - sfaActualColumns) / (BYTE_BLOCK / sizeof(T));
+            copyParams.dstStride = 0;
+            DataCopyPad(
+                splitAttentionOutGm[splitOutputOffset + sfaVecInfo.attenOutOffset + sfaWorkspaceRow * sfaActualColumns],
+                partialOut, copyParams);
+            SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
+            return;
+        }
+    }
     LocalTensor<OUT_T> tmpBmm2ResCastTensor = outputBuff1.Get<OUT_T>();
     WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
     if constexpr (IsSameType<OUT_T, bfloat16_t>::value) { // bf16 采取四舍六入五成双模式
@@ -1332,23 +1365,6 @@ __aicore__ inline void SFAVectorService<SFAT>::Bmm2CastAndCopyOut(const RunInfo&
 }
 
 template <typename SFAT>
-__aicore__ inline void SFAVectorService<SFAT>::Bmm2ResCopyOut(const RunInfo& sfaVecInfo,
-                                                              LocalTensor<T>& sfaBmm2ResultUb, uint32_t sfaWorkspaceRow,
-                                                              uint32_t sfaDealRows, uint32_t sfaColumns,
-                                                              uint32_t sfaActualColumns)
-{
-    if constexpr (FLASH_DECODE) {
-        if (sfaVecInfo.tndIsS2SplitCore) {
-            Bmm2FDDataCopyOut(sfaVecInfo, sfaBmm2ResultUb, sfaWorkspaceRow, sfaDealRows, sfaColumns, sfaActualColumns);
-        } else {
-            Bmm2CastAndCopyOut(sfaVecInfo, sfaBmm2ResultUb, sfaWorkspaceRow, sfaDealRows, sfaColumns, sfaActualColumns);
-        }
-    } else {
-        Bmm2CastAndCopyOut(sfaVecInfo, sfaBmm2ResultUb, sfaWorkspaceRow, sfaDealRows, sfaColumns, sfaActualColumns);
-    }
-}
-
-template <typename SFAT>
 __aicore__ inline void SFAVectorService<SFAT>::DealBmm2ResBaseBlock(const RunInfo& sfaVecInfo,
                                                                     const MSplitInfo& sfaVecSplitInfo,
                                                                     uint32_t startRow, uint32_t sfaDealRows,
@@ -1356,6 +1372,16 @@ __aicore__ inline void SFAVectorService<SFAT>::DealBmm2ResBaseBlock(const RunInf
 {
     uint32_t vec2ComputeSize = sfaDealRows * sfaColumns;
     uint32_t mStart = sfaVecSplitInfo.nBufferStartM + sfaVecSplitInfo.vecStartM + startRow;
+    if constexpr (TEMPLATE_MODE == C_TEMPLATE) {
+        if (sfaVecInfo.isSInnerAccumulationEmpty) {
+            // No normalized MM2 result exists for an entirely masked query or partition.
+            LocalTensor<T> zeros = tmpBuff1.Get<T>();
+            Duplicate(zeros, ConstInfo::FLOAT_ZERO, vec2ComputeSize);
+            PipeBarrier<PIPE_V>();
+            Bmm2CastAndCopyOut(sfaVecInfo, zeros, mStart, sfaDealRows, sfaColumns, sfaActualColumns);
+            return;
+        }
+    }
     uint64_t srcGmOffset =
         (sfaVecInfo.bn2IdxInCurCore % sfaVecConstInfo.preLoadNum) * sfaVecConstInfo.bmm2ResUbSize + mStart * sfaColumns;
     LocalTensor<MM2_OUT_T> tmpBmm2ResUb = inputBuff1.Get<MM2_OUT_T>();
@@ -1386,7 +1412,7 @@ __aicore__ inline void SFAVectorService<SFAT>::DealBmm2ResBaseBlock(const RunInf
     RowDivs(sfaBmm2ResultUb, tmpBmm2ResUb, tmpSumUb, sfaDealRows, sfaColumns, sfaActualColumns);
     PipeBarrier<PIPE_V>();
     SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_INPUT_BUF1_FLAG + pingpongFlag);
-    Bmm2ResCopyOut(sfaVecInfo, sfaBmm2ResultUb, mStart, sfaDealRows, sfaColumns, sfaActualColumns);
+    Bmm2CastAndCopyOut(sfaVecInfo, sfaBmm2ResultUb, mStart, sfaDealRows, sfaColumns, sfaActualColumns);
 }
 
 template <typename SFAT>

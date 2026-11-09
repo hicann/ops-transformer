@@ -98,7 +98,7 @@ struct RunInfo {
     uint32_t mSizeVStart;
     uint32_t tndIsS2SplitCore;
     uint32_t tndCoreStartKVSplitPos;
-    bool isBmm2Output;
+    bool isSInnerAccumulationEmpty;
     bool isValid = false;
 
     static constexpr uint32_t n2Idx = 0;
@@ -113,6 +113,11 @@ struct RunInfo {
     int64_t threshold;
     uint32_t curTopKIdx = 0;
     uint64_t curOffsetInSparseBlock = 0;
+};
+
+// Extra C-template state does not enlarge the V-template pipeline records.
+struct CTemplateRunInfo : RunInfo {
+    uint32_t splitTopKEnd;
 };
 
 struct ConstInfo {

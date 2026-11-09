@@ -51,6 +51,8 @@ struct TempLoopInfo {
 template <typename SFAT>
 class SparseFlashAttentionMla {
 public:
+    using RunInfo =
+        std::conditional_t<SFAT::flashDecode && SFAT::templateMode == C_TEMPLATE, CTemplateRunInfo, ::RunInfo>;
     // 中间计算数据类型为float，高精度模式
     using T = float;
     using Q_T = typename SFAT::queryType;
@@ -123,6 +125,17 @@ private:
     uint32_t tmpBlockIdx = 0U;
     uint32_t aiCoreIdx = 0U;
     uint32_t usedCoreNum = 0U;
+    uint32_t splitPart = 0U;
+    uint32_t splitQueryIdx = 0U;
+    uint32_t splitMergeCount = 0U;
+    uint32_t sparseBlocksPerLoop = 0U;  // 一个 s2BaseSize tile 覆盖的 TopK block 数
+    uint32_t totalS2Tiles = 0U;         // 一行 query 覆盖的 tile 数
+    uint64_t splitTopKRowOffset = 0ULL; // 映射行在 sparseIndices 里的起始元素偏移
+    uint64_t splitQueryCount = 0ULL;    // split-KV staging 布局里的 query 行数
+    int64_t splitVisibleKV = 0;         // 映射行的可见 KV 数
+    bool splitActive = false;
+    bool splitHasPadding = false;
+    bool hasValidTokens = false;
 
     __gm__ uint8_t* keyPtr = nullptr;
     __gm__ uint8_t* valuePtr = nullptr;
@@ -151,6 +164,7 @@ private:
     // workspace
     GlobalTensor<MM1_OUT_T> mm1ResGm;
     GlobalTensor<KV_T> vec1ResGm;
+    GlobalTensor<KV_T> vec1ResLoGm;
     GlobalTensor<MM2_OUT_T> mm2ResGm;
     GlobalTensor<KV_T> kvMergeGm_;
     GlobalTensor<int32_t> kvValidSizeGm_;
@@ -158,16 +172,25 @@ private:
     GlobalTensor<int32_t> mm2ResInt32Gm;
     GlobalTensor<UPDATE_T> vec2ResGm;
 
-    GlobalTensor<T> accumOutGm;
-    GlobalTensor<T> lseSumFdGm;
-    GlobalTensor<T> lseMaxFdGm;
-
     GlobalTensor<T> lseSumFaGm;
     GlobalTensor<T> lseMaxFaGm;
+    GlobalTensor<OUT_T> finalAttentionOutGm;
+    GlobalTensor<T> finalSoftmaxMaxGm;
+    GlobalTensor<T> finalSoftmaxSumGm;
+    GlobalTensor<T> splitAttentionOutGm;
+    GlobalTensor<T> splitMaxGm;
+    GlobalTensor<T> splitSumGm;
 
     // ================================Init functions===================================
     __aicore__ inline void InitTilingData();
     __aicore__ inline void InitCalcParamsEach();
+    __aicore__ inline void InitNeedInitFlag();
+    __aicore__ inline void InitSplitKVQueryMapping();
+    __aicore__ inline void InitSplitKV(__gm__ uint8_t* workspace);
+    __aicore__ inline bool IsSplitKVQueryVisible();
+    __aicore__ inline void CalcSplitKVQueryState();
+    __aicore__ inline void CalcSplitKVMergeRange();
+    __aicore__ inline void BindSplitKVWorkspace(__gm__ uint8_t* workspace);
     __aicore__ inline void InitBuffers();
     __aicore__ inline void InitActualSeqLen(__gm__ uint8_t* actualSeqLengthsQ, __gm__ uint8_t* actualSeqLengths);
     __aicore__ inline void InitOutputSingleCore();
@@ -181,6 +204,7 @@ private:
     __aicore__ inline void GetSparseActualSeqLen(uint32_t bIdx, uint32_t s1Idx, uint32_t n2Idx);
     __aicore__ inline void CalcSinnerTopKBegin(RunInfo& sfaKernelRunInfo, uint32_t& curTopKIdx,
                                                uint64_t& curOffsetInSparseBlock);
+    __aicore__ inline void CalcSplitTopKBegin(RunInfo& runInfo, uint32_t& curTopKIdx, uint64_t& curOffsetInSparseBlock);
     __aicore__ inline void UpdateInnerLoopCond();
     __aicore__ inline void DealActSeqLenIsZero(uint32_t bIdx, uint32_t s1Idx, uint32_t n2Idx);
     __aicore__ inline void CalcParams(uint32_t loop, uint64_t s2Start, uint32_t s2LoopIdx, RunInfo& sfaKernelRunInfo);
@@ -276,9 +300,7 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::InitAllZeroOutput(uint32_t
             uint64_t softmaxSumOffset =
                 n2Idx * actualSeqLengthsQGm.GetValue(sfaKernelConstInfo.batchSize - 1) * sfaKernelConstInfo.gSize +
                 (tBase + s1Idx) * sfaKernelConstInfo.gSize;
-            uint64_t softmaxMaxOffset = softmaxSumOffset;
-            matmul::InitOutput<T>(softmaxSumGm[softmaxSumOffset], sfaKernelConstInfo.gSize, 0);
-            matmul::InitOutput<T>(softmaxMaxGm[softmaxMaxOffset], sfaKernelConstInfo.gSize, 0);
+            sfaKernelVectorService.InitZeroLse(softmaxSumOffset);
         }
     } else if (sfaKernelConstInfo.outputLayout == SFA_LAYOUT::BSND) {
         uint64_t attenOutOffset = bIdx * sfaKernelConstInfo.qSeqSize * kvHeadNum * sfaKernelConstInfo.gSize * headDim +
@@ -379,7 +401,9 @@ template <typename SFAT>
 __aicore__ inline void SparseFlashAttentionMla<SFAT>::DealActSeqLenIsZero(uint32_t bIdx, uint32_t s1Idx, uint32_t n2Idx)
 {
     if ASCEND_IS_AIV {
-        InitAllZeroOutput(bIdx, s1Idx, n2Idx);
+        if (GetSubBlockIdx() == 0) {
+            InitAllZeroOutput(bIdx, s1Idx, n2Idx);
+        }
     }
 }
 
@@ -458,8 +482,13 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::Init(
     }
 
     attentionOutGm.SetGlobalBuffer((__gm__ OUT_T*)attentionOut);
+    finalAttentionOutGm.SetGlobalBuffer((__gm__ OUT_T*)attentionOut);
     softmaxMaxGm.SetGlobalBuffer((__gm__ T*)softmaxMax);
     softmaxSumGm.SetGlobalBuffer((__gm__ T*)softmaxSum);
+    if constexpr (FLASH_DECODE && KV_LAYOUT_T != SFA_LAYOUT::PA_BSND) {
+        finalSoftmaxMaxGm.SetGlobalBuffer((__gm__ T*)softmaxMax);
+        finalSoftmaxSumGm.SetGlobalBuffer((__gm__ T*)softmaxSum);
+    }
     if ASCEND_IS_AIV {
         if (sfaKernelConstInfo.needInit && LAYOUT_T != SFA_LAYOUT::TND) {
             InitOutputSingleCore();
@@ -470,9 +499,12 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::Init(
         blockTableGm.SetGlobalBuffer((__gm__ int32_t*)blockTable);
     }
     topKGm.SetGlobalBuffer((__gm__ int32_t*)sparseIndices);
+    if constexpr (FLASH_DECODE) {
+        InitSplitKV(workspace);
+    }
 
     // workspace 内存排布
-    // |Q--|mm1ResGm(存S)|vec1ResGm(存A1,A2)|mm2ResGm(存O)|vec2ResGm
+    // |Q--|mm1ResGm(存S)|vec1ResGm(存A1,A2)|vec1ResLoGm(双MM2)|mm2ResGm(存O)|vec2ResGm
     // |Core0_Q1-Core0_Q2-Core1_Q1-Core1_Q2....Core32_Q1-Core32_Q2|Core0_mmRes
     uint64_t offset = 0;
     mm1ResGm.SetGlobalBuffer(
@@ -484,6 +516,13 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::Init(
         (__gm__ KV_T*)(workspace + offset +
                        aiCoreIdx * dbWorkspaceRatio * sfaKernelConstInfo.mmResUbSize * sizeof(KV_T)));
     offset += GetBlockNum() * dbWorkspaceRatio * sfaKernelConstInfo.mmResUbSize * sizeof(KV_T);
+
+    if constexpr (FLASH_DECODE) {
+        vec1ResLoGm.SetGlobalBuffer(
+            (__gm__ KV_T*)(workspace + offset +
+                           aiCoreIdx * dbWorkspaceRatio * sfaKernelConstInfo.mmResUbSize * sizeof(KV_T)));
+        offset += GetBlockNum() * dbWorkspaceRatio * sfaKernelConstInfo.mmResUbSize * sizeof(KV_T);
+    }
 
     mm2ResGm.SetGlobalBuffer(
         (__gm__ MM2_OUT_T*)(workspace + offset +
@@ -500,29 +539,27 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::Init(
             (__gm__ int32_t*)(workspace + offset + (aiCoreIdx * 2) * 128 * 4 * sizeof(int32_t)));
     }
 
-    if constexpr (FLASH_DECODE) {
-        accumOutGm.SetGlobalBuffer((__gm__ float*)(workspace + offset));
-        offset = offset + tilingData->splitKVParams.accumOutSize * sizeof(float);
-        lseSumFdGm.SetGlobalBuffer((__gm__ float*)(workspace + offset));
-        lseMaxFdGm.SetGlobalBuffer((__gm__ float*)(workspace + offset) + tilingData->splitKVParams.logSumExpSize / 2);
-        offset = offset + tilingData->splitKVParams.logSumExpSize * sizeof(float);
-    }
-
     if ASCEND_IS_AIV {
         sfaKernelVectorService.InitParams(sfaKernelConstInfo, tilingData);
         sfaKernelVectorService.InitMm2ResInt32GmGlobalTensor(mm2ResInt32Gm);
         if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
             sfaKernelVectorService.InitVec0GlobalTensor(kvValidSizeGm_, kvMergeGm_, kRopeGm, keyGm, blockTableGm);
         }
-        sfaKernelVectorService.InitVec1GlobalTensor(mm1ResGm, vec1ResGm, actualSeqLengthsQGm, actualSeqLengthsKVGm,
-                                                    lseMaxFdGm, lseSumFdGm, topKGm, softmaxMaxGm, softmaxSumGm);
-        sfaKernelVectorService.InitVec2GlobalTensor(accumOutGm, vec2ResGm, mm2ResGm, attentionOutGm);
+        sfaKernelVectorService.InitVec1GlobalTensor(mm1ResGm, vec1ResGm, vec1ResLoGm, actualSeqLengthsQGm,
+                                                    actualSeqLengthsKVGm, topKGm, softmaxMaxGm, softmaxSumGm);
+        sfaKernelVectorService.InitVec2GlobalTensor(vec2ResGm, mm2ResGm, attentionOutGm);
+        if constexpr (FLASH_DECODE) {
+            if (splitActive) {
+                sfaKernelVectorService.InitSplitKVOutput(
+                    splitAttentionOutGm, splitPart * splitQueryCount * sfaKernelConstInfo.gSize * headDim);
+            }
+        }
     }
 
     if ASCEND_IS_AIC {
         matmulService.InitParams(sfaKernelConstInfo);
         matmulService.InitMm1GlobalTensor(queryGm, qRopeGm, keyGm, kRopeGm, mm1ResGm);
-        matmulService.InitMm2GlobalTensor(vec1ResGm, valueGm, mm2ResGm, attentionOutGm);
+        matmulService.InitMm2GlobalTensor(vec1ResGm, vec1ResLoGm, valueGm, mm2ResGm, attentionOutGm);
         matmulService.InitPageAttentionInfo(kvMergeGm_, blockTableGm, topKGm, sfaKernelConstInfo.kvCacheBlockSize,
                                             sfaKernelConstInfo.maxBlockNumPerBatch);
     }
@@ -535,6 +572,15 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::Init(
 template <typename SFAT>
 __aicore__ inline void SparseFlashAttentionMla<SFAT>::InitCalcParamsEach()
 {
+    if constexpr (FLASH_DECODE) {
+        // needInit 必须各核一致，放在无效核返回之前；无效核之后不再做 splitPart/splitQueryIdx 的除法和取余。
+        InitNeedInitFlag();
+        if (aiCoreIdx >= usedCoreNum) {
+            return;
+        }
+        InitSplitKVQueryMapping();
+        return;
+    }
     // 计算总的基本块
     uint32_t actBatchS2 = 1;
     uint32_t totalBaseNum = 0;
@@ -610,6 +656,161 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::InitCalcParamsEach()
     }
 }
 
+// Split-KV 初始化：一个核负责一个 (query 行, KV 分片)，由第 0 个分片合并各分片的 partial 结果。
+// tile 几何和行映射来自 InitCalcParamsEach()，它比本函数先执行。
+template <typename SFAT>
+__aicore__ inline void SparseFlashAttentionMla<SFAT>::InitSplitKV(__gm__ uint8_t* workspace)
+{
+    if (aiCoreIdx >= usedCoreNum) {
+        return;
+    }
+    if (IsSplitKVQueryVisible()) {
+        CalcSplitKVQueryState();
+    } else {
+        usedCoreNum = 0U;
+    }
+    if (!splitActive) {
+        // 空行/整行 padding/无效行由第 0 个分片按整行处理。
+        if (splitPart == 0) {
+            sfaKernelConstInfo.s2Start = 0;
+            sfaKernelConstInfo.s2End = totalS2Tiles;
+        }
+        return;
+    }
+    CalcSplitKVMergeRange();
+    BindSplitKVWorkspace(workspace);
+}
+
+// host 按静态 query 行数下发 usedCoreNum，运行期实际序列可能更短，
+// 映射出的行可能没有 query，需要单独剔除。
+template <typename SFAT>
+__aicore__ inline bool SparseFlashAttentionMla<SFAT>::IsSplitKVQueryVisible()
+{
+    if constexpr (LAYOUT_T == SFA_LAYOUT::TND) {
+        return splitQueryIdx < actualSeqLengthsQGm.GetValue(sfaKernelConstInfo.batchSize - 1);
+    } else {
+        return sfaKernelConstInfo.gS1Start <
+               GetBalanceActualSeqLengths(actualSeqLengthsQGm, sfaKernelConstInfo.bN2Start);
+    }
+}
+
+// 判断该行能否按 split-KV 执行：有可见 KV，且不是以 padding 开头。
+template <typename SFAT>
+__aicore__ inline void SparseFlashAttentionMla<SFAT>::CalcSplitKVQueryState()
+{
+    splitVisibleKV = GetActualSeqLenKV(sfaKernelConstInfo.bN2Start);
+    if (sfaKernelConstInfo.sparseMode == 3) {
+        splitVisibleKV += static_cast<int64_t>(sfaKernelConstInfo.gS1Start) + 1 -
+                          GetBalanceActualSeqLengths(actualSeqLengthsQGm, sfaKernelConstInfo.bN2Start);
+    }
+    splitHasPadding = topKGm.GetValue(splitTopKRowOffset + sfaKernelConstInfo.sparseBlockCount - 1) < 0;
+    // A full row needs no additional per-partition padding check.
+    splitActive = (!splitHasPadding || topKGm.GetValue(splitTopKRowOffset) >= 0) && splitVisibleKV > 0;
+}
+
+// 把分片范围截到可见尾部，再算出第 0 个分片需要合并多少个分片。
+template <typename SFAT>
+__aicore__ inline void SparseFlashAttentionMla<SFAT>::CalcSplitKVMergeRange()
+{
+    uint32_t mergeEnd = totalS2Tiles;
+    if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
+        // 截到最后一个可见 loop，避免空尾部把已累计的统计量丢掉。
+        const uint32_t visibleLoops = (static_cast<uint32_t>(splitVisibleKV) - 1U) / sfaKernelConstInfo.s2BaseSize + 1U;
+        mergeEnd = Min(mergeEnd, visibleLoops);
+        sfaKernelConstInfo.s2End = Min(sfaKernelConstInfo.s2End, mergeEnd);
+    }
+    if ASCEND_IS_AIV {
+        if (splitPart != 0) {
+            return;
+        }
+        const uint64_t splitCount = sfaKernelConstInfo.splitKVNum;
+        splitMergeCount = (static_cast<uint64_t>(mergeEnd) * splitCount - 1U) / totalS2Tiles + 1U;
+        if (!splitHasPadding) {
+            return;
+        }
+        // 只检查各分片起点：连续的 -1 padding 使空分片只能是后缀。
+        for (uint32_t part = 1; part < splitMergeCount; ++part) {
+            const uint32_t partBegin = static_cast<uint64_t>(totalS2Tiles) * part / splitCount;
+            if (topKGm.GetValue(splitTopKRowOffset + static_cast<uint64_t>(partBegin) * sparseBlocksPerLoop) < 0) {
+                splitMergeCount = part;
+                break;
+            }
+        }
+    }
+}
+
+// 绑定各分片的 staging 缓冲：partial 输出和每分片统计量共用 split-KV workspace。
+template <typename SFAT>
+__aicore__ inline void SparseFlashAttentionMla<SFAT>::BindSplitKVWorkspace(__gm__ uint8_t* workspace)
+{
+    splitQueryCount = LAYOUT_T == SFA_LAYOUT::TND ?
+                          static_cast<uint64_t>(sfaKernelConstInfo.qSeqSize) :
+                          static_cast<uint64_t>(sfaKernelConstInfo.batchSize) * sfaKernelConstInfo.qSeqSize;
+    const uint64_t headCount = sfaKernelConstInfo.gSize;
+    const uint64_t splitCount = sfaKernelConstInfo.splitKVNum;
+    __gm__ uint8_t* outStaging = workspace + tilingData->splitKVParams.stagingOffset;
+    const uint64_t outputElems = splitCount * splitQueryCount * headCount * headDim;
+    const uint64_t statsElems = splitCount * splitQueryCount * headCount;
+    __gm__ uint8_t* maxStaging = outStaging + outputElems * sizeof(T);
+    __gm__ uint8_t* sumStaging = maxStaging + statsElems * sizeof(T);
+    splitAttentionOutGm.SetGlobalBuffer((__gm__ T*)outStaging);
+    splitMaxGm.SetGlobalBuffer((__gm__ T*)maxStaging);
+    splitSumGm.SetGlobalBuffer((__gm__ T*)sumStaging);
+    softmaxMaxGm.SetGlobalBuffer((__gm__ T*)maxStaging + splitPart * splitQueryCount * headCount);
+    softmaxSumGm.SetGlobalBuffer((__gm__ T*)sumStaging + splitPart * splitQueryCount * headCount);
+    // 分片统计量走 workspace；需要 LSE 时由合并阶段写公共输出。
+    sfaKernelConstInfo.returnSoftmaxLse = true;
+}
+
+// 运行期序列可能短于 qSeqSize，公共输出要先清零；needInit 必须各核一致（后续初始化和同步都依赖），
+// 所以在无效核返回之前计算。
+template <typename SFAT>
+__aicore__ inline void SparseFlashAttentionMla<SFAT>::InitNeedInitFlag()
+{
+    if constexpr (LAYOUT_T == SFA_LAYOUT::BSND) {
+        for (uint32_t batch = 0; batch < sfaKernelConstInfo.batchSize; ++batch) {
+            if (GetBalanceActualSeqLengths(actualSeqLengthsQGm, batch) < sfaKernelConstInfo.qSeqSize) {
+                sfaKernelConstInfo.needInit = true;
+                break;
+            }
+        }
+    }
+}
+
+// 把 aiCoreIdx 映射成 (query 行, 分片)，并给分片分配该行内连续的 tile 区间 [s2Start, s2End)。
+// totalS2Tiles 的单位是 tile（一个 tile 含 sparseBlocksPerLoop 个 TopK block），不是 TopK block。
+template <typename SFAT>
+__aicore__ inline void SparseFlashAttentionMla<SFAT>::InitSplitKVQueryMapping()
+{
+    // tiling 保证 TopK 非 0，且 s2BaseSize 是 sparseBlockSize 的整数倍。
+    sparseBlocksPerLoop = sfaKernelConstInfo.s2BaseSize / static_cast<uint32_t>(sfaKernelConstInfo.sparseBlockSize);
+    totalS2Tiles = (sfaKernelConstInfo.sparseBlockCount - 1U) / sparseBlocksPerLoop + 1U;
+    // core id 与 query id 的关系：splitQueryIdx = aiCoreIdx / splitKVNum，
+    // 即连续 splitKVNum 个核对应同一行 query，同一行内由 splitPart 区分分片。
+    splitPart = aiCoreIdx % sfaKernelConstInfo.splitKVNum;     // 该 query 的第几个 KV 分片
+    splitQueryIdx = aiCoreIdx / sfaKernelConstInfo.splitKVNum; // 第几个 query（跨 batch 的全局 query 号）
+    splitTopKRowOffset = static_cast<uint64_t>(splitQueryIdx) * sfaKernelConstInfo.sparseBlockCount;
+    uint32_t batchIdx = 0;
+    uint32_t queryIdx = splitQueryIdx;
+    if constexpr (LAYOUT_T == SFA_LAYOUT::TND) {
+        // TND 的 query 行按 batch 顺序排，splitQueryIdx 是 cumulative actualSeqLengthsQ 里的偏移。
+        while (batchIdx + 1 < sfaKernelConstInfo.batchSize && splitQueryIdx >= actualSeqLengthsQGm.GetValue(batchIdx)) {
+            ++batchIdx;
+        }
+        queryIdx -= batchIdx == 0 ? 0 : actualSeqLengthsQGm.GetValue(batchIdx - 1);
+    } else {
+        batchIdx = splitQueryIdx / sfaKernelConstInfo.qSeqSize;
+        queryIdx = splitQueryIdx % sfaKernelConstInfo.qSeqSize;
+    }
+    sfaKernelConstInfo.bN2Start = batchIdx;
+    sfaKernelConstInfo.bN2End = batchIdx;
+    sfaKernelConstInfo.gS1Start = queryIdx;
+    sfaKernelConstInfo.gS1End = sfaKernelConstInfo.gS1Start;
+    // 每个分片占用该行内一段连续的半开 tile 区间 [s2Start, s2End)。
+    sfaKernelConstInfo.s2Start = totalS2Tiles * splitPart / sfaKernelConstInfo.splitKVNum;
+    sfaKernelConstInfo.s2End = totalS2Tiles * (splitPart + 1) / sfaKernelConstInfo.splitKVNum;
+}
+
 template <typename SFAT>
 __aicore__ inline void SparseFlashAttentionMla<SFAT>::Bmm2DataCopyOut(uint64_t attenOutOffset,
                                                                       LocalTensor<OUT_T>& attenOutUb, uint32_t startRow,
@@ -637,7 +838,10 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::CalcParams(uint32_t loop, 
 
     sfaKernelRunInfo.tndIsS2SplitCore = sfaKernelLoopInfo.tndIsS2SplitCore;
     sfaKernelRunInfo.tndCoreStartKVSplitPos = sfaKernelLoopInfo.tndCoreStartKVSplitPos;
-    sfaKernelRunInfo.isBmm2Output = false;
+    sfaKernelRunInfo.isSInnerAccumulationEmpty = false;
+    if constexpr (FLASH_DECODE && TEMPLATE_MODE == C_TEMPLATE) {
+        sfaKernelRunInfo.splitTopKEnd = sfaKernelConstInfo.sparseBlockCount;
+    }
 
     sfaKernelRunInfo.actS1Size = sfaKernelLoopInfo.actS1Size;
 
@@ -790,7 +994,23 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::ComputeMm2(const RunInfo& 
 template <typename SFAT>
 __aicore__ inline void SparseFlashAttentionMla<SFAT>::Process()
 {
-    if (aiCoreIdx < usedCoreNum) {
+    bool runCore = aiCoreIdx < usedCoreNum;
+    if constexpr (FLASH_DECODE) {
+        runCore = runCore && (splitActive || splitPart == 0);
+        if (runCore && splitActive) {
+            bool emptyPartition = sfaKernelConstInfo.s2Start >= sfaKernelConstInfo.s2End;
+            if (!emptyPartition && splitHasPadding) {
+                const uint64_t firstIndex =
+                    splitTopKRowOffset + static_cast<uint64_t>(sfaKernelConstInfo.s2Start) * sparseBlocksPerLoop;
+                emptyPartition = topKGm.GetValue(firstIndex) < 0;
+            }
+            if (emptyPartition) {
+                // The merge excludes this empty suffix, so no partial result needs initialization.
+                runCore = false;
+            }
+        }
+    }
+    if (runCore) {
         if ASCEND_IS_AIV {
             sfaKernelVectorService.AllocEventID();
             sfaKernelVectorService.InitSoftmaxDefaultBuffer();
@@ -803,6 +1023,16 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::Process()
             sfaKernelVectorService.FreeEventID();
         } else {
             matmulService.FreeEventID();
+        }
+    }
+    if constexpr (FLASH_DECODE) {
+        SyncAll();
+        if (splitActive && splitPart == 0 && aiCoreIdx < usedCoreNum) {
+            if ASCEND_IS_AIV {
+                sfaKernelVectorService.MergeSplitKV(
+                    splitAttentionOutGm, splitMaxGm, splitSumGm, finalAttentionOutGm, finalSoftmaxMaxGm,
+                    finalSoftmaxSumGm, tilingData->baseParams.returnSoftmaxLse, splitQueryIdx, splitMergeCount);
+            }
         }
     }
 }
@@ -856,11 +1086,21 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::ProcessBalance()
             // 分核修改后需要打开
             // 当前s2是否被切，决定了输出是否要写到attenOut上
             sfaKernelLoopInfo.tndIsS2SplitCore =
-                ((sfaKernelConstInfo.s2Start == 0) && (sfaKernelLoopInfo.s2LoopTimes == s2SplitNum)) ? false : true;
+                !((sfaKernelConstInfo.s2Start == 0) && (sfaKernelLoopInfo.s2LoopTimes == s2SplitNum));
             sfaKernelLoopInfo.tndCoreStartKVSplitPos = globalLoopStart ? sfaKernelConstInfo.coreStartKVSplitPos : 0;
             uint32_t extraLoop = isEnd ? 2 : 0;
 
             uint32_t curTopKIdx = 0;
+            if constexpr (FLASH_DECODE) {
+                if (splitActive) {
+                    sfaKernelLoopInfo.s2LoopTimes = sfaKernelConstInfo.s2End;
+                    sfaKernelLoopInfo.tndIsS2SplitCore = false;
+                    curTopKIdx = sfaKernelConstInfo.s2Start * sfaKernelConstInfo.s2BaseSize;
+                    if constexpr (TEMPLATE_MODE == C_TEMPLATE) {
+                        curTopKIdx /= sfaKernelConstInfo.sparseBlockSize;
+                    }
+                }
+            }
             uint64_t curOffsetInSparseBlock = 0;
             for (int s2LoopIdx = sfaKernelConstInfo.s2Start; s2LoopIdx < (sfaKernelLoopInfo.s2LoopTimes + extraLoop);
                  s2LoopIdx++) {
@@ -898,6 +1138,13 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::PreloadPipeline(uint32_t l
 
     CalcParams(loop, s2Start, s2LoopIdx, extraInfo0);
     CalcSinnerTopKBegin(extraInfo0, curTopKIdx, curOffsetInSparseBlock);
+    if constexpr (TEMPLATE_MODE == C_TEMPLATE) {
+        if (extraInfo0.isFirstSInnerLoop) {
+            hasValidTokens = false;
+        }
+        hasValidTokens = hasValidTokens || (extraInfo0.isValid && extraInfo0.actualSingleProcessSInnerSize != 0);
+        extraInfo0.isSInnerAccumulationEmpty = !hasValidTokens;
+    }
 
     if (extraInfo0.isValid) {
         if ASCEND_IS_AIC {
@@ -976,6 +1223,56 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::GetAxisStartIdx(uint32_t b
 }
 
 template <typename SFAT>
+__aicore__ inline void SparseFlashAttentionMla<SFAT>::CalcSplitTopKBegin(RunInfo& runInfo, uint32_t& curTopKIdx,
+                                                                         uint64_t& curOffsetInSparseBlock)
+{
+    // Match the native C-template limit on visited index slots for short visible KV.
+    const uint32_t visibleBlocks =
+        (static_cast<uint32_t>(runInfo.threshold) - 1U) / static_cast<uint32_t>(sfaKernelConstInfo.sparseBlockSize) +
+        1U;
+    const uint32_t validBlocks = Min(static_cast<uint32_t>(sfaKernelConstInfo.sparseBlockCount), visibleBlocks);
+    const uint32_t end = Min(validBlocks, static_cast<uint32_t>(sfaKernelConstInfo.s2End * sparseBlocksPerLoop));
+    runInfo.splitTopKEnd = end;
+    // Empty loops still traverse the pipeline, but must not read past the TopK row.
+    runInfo.curTopKIdx = 0;
+    runInfo.curOffsetInSparseBlock = 0;
+    uint32_t tokens = 0;
+    while (curTopKIdx < end && tokens < sfaKernelConstInfo.s2BaseSize) {
+        const int32_t index = topKGm.GetValue(runInfo.topKBaseOffset + curTopKIdx);
+        if (index < 0) {
+            curTopKIdx = end;
+            break;
+        }
+        const int64_t begin = static_cast<int64_t>(index) * sfaKernelConstInfo.sparseBlockSize;
+        const uint64_t length =
+            begin < runInfo.threshold ?
+                Min(static_cast<int64_t>(sfaKernelConstInfo.sparseBlockSize), runInfo.threshold - begin) :
+                0;
+        if (curOffsetInSparseBlock >= length) {
+            ++curTopKIdx;
+            curOffsetInSparseBlock = 0;
+            continue;
+        }
+        if (tokens == 0) {
+            runInfo.curTopKIdx = curTopKIdx;
+            runInfo.curOffsetInSparseBlock = curOffsetInSparseBlock;
+        }
+        const uint32_t count = Min(static_cast<uint32_t>(length - curOffsetInSparseBlock),
+                                   static_cast<uint32_t>(sfaKernelConstInfo.s2BaseSize - tokens));
+        tokens += count;
+        curOffsetInSparseBlock += count;
+        if (curOffsetInSparseBlock == length) {
+            ++curTopKIdx;
+            curOffsetInSparseBlock = 0;
+        }
+    }
+    runInfo.actualSingleProcessSInnerSize = tokens;
+    runInfo.actualSingleProcessSInnerSizeAlign =
+        SFAAlign(tokens, static_cast<uint32_t>(SFAVectorService<SFAT>::BYTE_BLOCK));
+    sfaKernelLoopInfo.s2BasicSizeTail = tokens == sfaKernelConstInfo.s2BaseSize ? 0 : tokens;
+}
+
+template <typename SFAT>
 __aicore__ inline void SparseFlashAttentionMla<SFAT>::CalcSinnerTopKBegin(RunInfo& sfaKernelRunInfo,
                                                                           uint32_t& curTopKIdx,
                                                                           uint64_t& curOffsetInSparseBlock)
@@ -985,14 +1282,29 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::CalcSinnerTopKBegin(RunInf
         return;
     }
 
+    if constexpr (FLASH_DECODE && TEMPLATE_MODE == C_TEMPLATE) {
+        if (splitActive) {
+            if (sfaKernelRunInfo.isValid) {
+                CalcSplitTopKBegin(sfaKernelRunInfo, curTopKIdx, curOffsetInSparseBlock);
+            }
+            return;
+        }
+    }
+
     uint64_t thresholdSparseCount =
         (sfaKernelRunInfo.threshold + sfaKernelConstInfo.sparseBlockSize - 1) / sfaKernelConstInfo.sparseBlockSize;
     uint64_t validCount = (sfaKernelConstInfo.sparseBlockCount > thresholdSparseCount) ?
                               thresholdSparseCount :
                               sfaKernelConstInfo.sparseBlockCount;
 
+    if (curTopKIdx >= validCount) {
+        sfaKernelRunInfo.actualSingleProcessSInnerSize = 0;
+        sfaKernelRunInfo.actualSingleProcessSInnerSizeAlign = 0;
+        sfaKernelLoopInfo.s2BasicSizeTail = 0;
+        return;
+    }
     int32_t sparseIndices = topKGm.GetValue(sfaKernelRunInfo.topKBaseOffset + curTopKIdx);
-    if (sparseIndices == -1 || curTopKIdx == validCount) {
+    if (sparseIndices == -1) {
         sfaKernelRunInfo.actualSingleProcessSInnerSize = 0;
         sfaKernelRunInfo.actualSingleProcessSInnerSizeAlign = 0;
         sfaKernelLoopInfo.s2BasicSizeTail = 0;

@@ -194,6 +194,7 @@ BEGIN_TILING_DATA_DEF(SparseFlashAttentionSplitKVParamsMla)
 TILING_DATA_FIELD_DEF(uint32_t, s2)            // S2切分份数
 TILING_DATA_FIELD_DEF(uint32_t, accumOutSize)  // FD workspace
 TILING_DATA_FIELD_DEF(uint32_t, logSumExpSize) // FD workspace
+TILING_DATA_FIELD_DEF(uint64_t, stagingOffset) // offset within the user workspace
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(SparseFlashAttentionSplitKVParamsMlaOp, SparseFlashAttentionSplitKVParamsMla)
 
@@ -317,9 +318,9 @@ private:
     void InitParams();
 
     void SplitBalanced();
+    uint64_t GetSplitKVQueryCount() const;
+    bool IsSplitKVSupported() const;
     void CalcInnerSize(uint32_t sfaS2Size);
-
-    bool IsFlashDecode(uint32_t coreNum);
 
     void FillTilingSplitKVMla();
     void FillTilingBaseParamsMla();
@@ -331,11 +332,6 @@ private:
     void CalcUbBmm();
     void CheckUbSpace();
     void GetWorkspaceSize();
-    void NormalCalcFDWorkSpace(const uint32_t actCoreNum);
-    void CalcFDWorkSpace(const uint32_t actCoreNum);
-
-    uint32_t CalcBalanceFDParamNums(const uint32_t actCoreNum) const;
-
     void CalcBlockDim();
 
     gert::TilingContext* context_ = nullptr;
@@ -369,7 +365,6 @@ private:
 
     uint32_t headDimAlign_ = 0;
     uint32_t mBaseSize_ = 128;
-    uint32_t mFdBaseSize_ = 8;
 
     SFATilingInfo* sfaInfo_ = nullptr;
 };

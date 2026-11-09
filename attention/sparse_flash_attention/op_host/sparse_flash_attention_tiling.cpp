@@ -330,7 +330,8 @@ void SFAMlaTiling::GenTilingKey()
     }
 
     tilingKey_ = GET_TPL_TILING_KEY(
-        0U, pageAttention, layoutQuery, layoutKV, perfMode_ == SFAPerfMode::V_TEMPLATE_MODE,
+        static_cast<uint32_t>(splitKVFlag_), pageAttention, layoutQuery, layoutKV,
+        perfMode_ == SFAPerfMode::V_TEMPLATE_MODE,
         static_cast<uint32_t>(sfaInfo_->gSize > 64), // N1 > 64时核间切G; rope 用独立 tiling key 避免污染原路径
         static_cast<uint32_t>(sfaInfo_->ropeHeadDim != 0));
 
@@ -387,14 +388,6 @@ void SFAMlaTiling::CheckUbSpace()
 void SFAMlaTiling::CalcInnerSize(uint32_t sfaS2Size)
 {
     sInnerSize_ = 512; // 512:s2默认切分大小
-    // FlashDecode时，如果S2的计算量>=256(确保切分后不小于128)但又不足以分2次计算时，则修改sInnerSize_，均分为2份进行计算，确保Nbuffer=2
-    if (splitKVFlag_ && sfaInfo_->qLayout != SFALayout::TND) {
-        if (sfaS2Size == 256) { // 256:s2Size的阈值，判断sInnerSize_是否切分
-            sInnerSize_ = 128;  // 128:sInnerSize_值为s2Size的一半，均分为2份进行计算，
-        } else if (sfaS2Size > 256 && sfaS2Size <= sInnerSize_) { // 256:s2Size的阈值，判断sInnerSize_是否切分
-            sInnerSize_ = (sInnerSize_ + 1) / 2;                  // 2:减半
-        }
-    }
 
     sInnerLoopTimes_ = (sfaS2Size + sInnerSize_ - 1) / sInnerSize_;
     sInnerSizeTail_ = sfaS2Size - (sInnerLoopTimes_ - 1) * sInnerSize_;
@@ -404,6 +397,23 @@ void SFAMlaTiling::CalcInnerSize(uint32_t sfaS2Size)
     sInnerSizeAlign_ = Align(sInnerSize_, BYTE_BLOCK); // 元素个数按照基本块大小对齐
 
     CheckUbSpace();
+}
+
+uint64_t SFAMlaTiling::GetSplitKVQueryCount() const
+{
+    return sfaInfo_->qLayout == SFALayout::TND ? sfaInfo_->s1Size :
+                                                 static_cast<uint64_t>(sfaInfo_->bSize) * sfaInfo_->s1Size;
+}
+
+bool SFAMlaTiling::IsSplitKVSupported() const
+{
+    const auto& info = *sfaInfo_;
+    // DAV_2201 covers arch22 on both Ascend 910B (A2) and Ascend 910_93 (A3).
+    // Common validation covers native G values and matching FP16/BF16 types.
+    const bool kernelSupported = info.npuArch == NpuArch::DAV_2201 && info.opParamInfo.sinks.tensor == nullptr;
+    const uint64_t sparseTokens = static_cast<uint64_t>(info.sparseBlockCount) * info.sparseBlockSize;
+    const bool workloadSupported = GetSplitKVQueryCount() > 0 && info.s2Size >= sparseTokens;
+    return kernelSupported && workloadSupported;
 }
 
 void SFAMlaTiling::SplitBalanced()
@@ -417,6 +427,23 @@ void SFAMlaTiling::SplitBalanced()
     tilingData_.innerSplitParams.set_s2BaseSize(sfaInnerSplitParams.s2BaseSize);
 
     usedCoreNum_ = aicNum_;
+    if (!IsSplitKVSupported()) {
+        return;
+    }
+    const uint32_t splitBlockSize = sInnerSize_;
+    const uint64_t sparseTokens = static_cast<uint64_t>(sfaInfo_->sparseBlockCount) * sfaInfo_->sparseBlockSize;
+    const uint64_t sparseBlocks = (sparseTokens + splitBlockSize - 1U) / splitBlockSize;
+    const uint64_t queryCount = GetSplitKVQueryCount();
+    // One query per core; allow any partition count supported by the work and platform.
+    const uint32_t maxSplitCount = std::min<uint64_t>(aicNum_ / queryCount, sparseBlocks);
+    if (maxSplitCount > 1) {
+        // Keep the minimum possible maximum tile load, without creating redundant merge partitions.
+        const uint64_t tilesPerPart = (sparseBlocks + maxSplitCount - 1U) / maxSplitCount;
+        const uint32_t splitCount = (sparseBlocks + tilesPerPart - 1U) / tilesPerPart;
+        splitKVFlag_ = true;
+        kvSplitPart_ = splitCount;
+        usedCoreNum_ = queryCount * splitCount;
+    }
 }
 
 void SFAMlaTiling::Split()
@@ -483,30 +510,6 @@ void SFAMlaTiling::FillTiling()
     FillTilingSingleCoreTensorSizeMla();
 }
 
-uint32_t SFAMlaTiling::CalcBalanceFDParamNums(const uint32_t actCoreNum) const
-{
-    return actCoreNum * 2 * sfaInfo_->n2Size * mBaseSize_; // 2:每个核可能有头规约和尾规约，一共两份规约信息
-}
-
-void SFAMlaTiling::NormalCalcFDWorkSpace(const uint32_t actCoreNum)
-{
-    if (splitKVFlag_) {
-        uint32_t accumOutSize = 0;
-        uint32_t logSumExpSize = 0;
-        uint32_t FDParamNums = CalcBalanceFDParamNums(
-            actCoreNum); // balanceModeFlag_ ? CalcBalanceFDParamNums(actCoreNum) : CalcUnbalanceFDParamNums();
-        accumOutSize = FDParamNums * headDimAlign_;
-        logSumExpSize =
-            2 * FDParamNums * (BYTE_BLOCK / sfaInfo_->blockTypeSize); // log和sum的存储空间一致，共需要2份内存
-        workspaceSize_ += (accumOutSize + logSumExpSize) * sfaInfo_->blockTypeSize;
-    }
-}
-
-void SFAMlaTiling::CalcFDWorkSpace(const uint32_t actCoreNum)
-{
-    NormalCalcFDWorkSpace(actCoreNum);
-}
-
 void SFAMlaTiling::GetWorkspaceSize()
 {
     uint32_t actCoreNum = coreNum_;
@@ -520,11 +523,15 @@ void SFAMlaTiling::GetWorkspaceSize()
         if (sfaInfo_->gSize > 64) { // N1大于64时切G，相邻两个cube核处理同一个s2Base
             sfaAicNum = sfaAicNum >> 1;
         }
+        if (splitKVFlag_) {
+            sfaAicNum = usedCoreNum_;
+        }
         workspaceSize_ +=
             (S2_BASE_SIZE * D_SIZE * SFAGetTypeSize(sfaInfo_->inputQType) * TRIPLE_BUFFER_NUM * sfaAicNum);
     } else {
-        uint32_t sfaMmResElemSize = 4;       // 4:fp32
-        uint32_t sfaVec1ResElemSize = 2;     // 2:fp16/bf16
+        uint32_t sfaMmResElemSize = 4;                     // 4:fp32
+        const uint32_t weightParts = splitKVFlag_ ? 2 : 1; // high plus residual for split-KV
+        uint32_t sfaVec1ResElemSize = weightParts * SFAGetTypeSize(sfaInfo_->inputKvType);
         uint32_t sfaBmm2ResElemSize = 4;     // 4:fp32
         uint32_t sfaQPreProcResElemSize = 0; // 普通场景不涉及Q预处理
         uint32_t sfaNUpdateElemSize = 4;     // 4:int32
@@ -554,7 +561,13 @@ void SFAMlaTiling::GetWorkspaceSize()
             4 * 128 * 4 * (2 * actCoreNum); // 4:缓存有效mte2 size的长度 128:份数  4:512B对齐的长度  2:aiv核数
     }
 
-    CalcFDWorkSpace(actCoreNum);
+    tilingData_.splitKVParams.set_stagingOffset(workspaceSize_ - libapiSize_);
+    if (splitKVFlag_) {
+        constexpr uint32_t RESERVE_MAX_AND_SUM_SPACE = 2; // One softmax max and sum per partition, query, and head.
+        // Keep partition outputs and statistics in FP32 until the final merge.
+        workspaceSize_ += static_cast<uint64_t>(kvSplitPart_) * GetSplitKVQueryCount() * sfaInfo_->gSize *
+                          (headDimAlign_ + RESERVE_MAX_AND_SUM_SPACE) * sizeof(float);
+    }
 }
 
 void SFAMlaTiling::CalcBlockDim()

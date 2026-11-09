@@ -115,6 +115,8 @@ __aicore__ inline void DataCopyPA(LocalTensor<T>& dstTensor,  // l1
 template <typename SFAT>
 class SFAMatmulService {
 public:
+    using RunInfo =
+        std::conditional_t<SFAT::flashDecode && SFAT::templateMode == C_TEMPLATE, CTemplateRunInfo, ::RunInfo>;
     // 中间计算数据类型为float, 高精度模式
     using T = float;
     using Q_T = typename SFAT::queryType;
@@ -127,8 +129,9 @@ public:
     __aicore__ inline void InitMm1GlobalTensor(GlobalTensor<Q_T> queryGm, GlobalTensor<Q_T> qRopeGm,
                                                GlobalTensor<KV_T> keyGm, GlobalTensor<KV_T> kRopeGm,
                                                GlobalTensor<MM_OUT_T> mm1ResGm);
-    __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<KV_T> vec1ResGm, GlobalTensor<KV_T> valueGm,
-                                               GlobalTensor<MM_OUT_T> mm2ResGm, GlobalTensor<OUT_T> attentionOutGm);
+    __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<KV_T> vec1ResGm, GlobalTensor<KV_T> vec1ResLoGm,
+                                               GlobalTensor<KV_T> valueGm, GlobalTensor<MM_OUT_T> mm2ResGm,
+                                               GlobalTensor<OUT_T> attentionOutGm);
     __aicore__ inline void InitPageAttentionInfo(const GlobalTensor<KV_T>& kvMergeGm,
                                                  GlobalTensor<int32_t> blockTableGm, GlobalTensor<int32_t> topKGm,
                                                  uint32_t blockSize, uint32_t maxBlockNumPerBatch);
@@ -201,6 +204,7 @@ private:
 
     // mm2
     GlobalTensor<KV_T> vec1ResGm;
+    GlobalTensor<KV_T> vec1ResLoGm;
     GlobalTensor<KV_T> valueGm;
     GlobalTensor<MM_OUT_T> mm2ResGm;
     GlobalTensor<OUT_T> attentionOutGm;
@@ -278,12 +282,14 @@ __aicore__ inline void SFAMatmulService<SFAT>::InitMm1GlobalTensor(GlobalTensor<
 
 template <typename SFAT>
 __aicore__ inline void SFAMatmulService<SFAT>::InitMm2GlobalTensor(GlobalTensor<KV_T> vec1ResGm,
+                                                                   GlobalTensor<KV_T> vec1ResLoGm,
                                                                    GlobalTensor<KV_T> valueGm,
                                                                    GlobalTensor<MM_OUT_T> mm2ResGm,
                                                                    GlobalTensor<OUT_T> attentionOutGm)
 {
     // mm2
     this->vec1ResGm = vec1ResGm;
+    this->vec1ResLoGm = vec1ResLoGm;
     this->valueGm = valueGm;
     this->mm2ResGm = mm2ResGm;
     this->attentionOutGm = attentionOutGm;
@@ -548,7 +554,11 @@ __aicore__ inline void SFAMatmulService<SFAT>::CalcTopKBlockInfo(const RunInfo& 
         curOffsetInSparseBlock += copyRowCnt;
         copyRowCnt = blockLen - curOffsetInSparseBlock;
     } else {
-        for (uint64_t topkidx = curTopKIdx + 1; topkidx < sfaCubeConstInfo.sparseBlockCount; topkidx++) {
+        uint64_t topKEnd = sfaCubeConstInfo.sparseBlockCount;
+        if constexpr (SFAT::flashDecode && TEMPLATE_MODE == C_TEMPLATE) {
+            topKEnd = sfaCubeRunInfo.splitTopKEnd;
+        }
+        for (uint64_t topkidx = curTopKIdx + 1; topkidx < topKEnd; topkidx++) {
             int64_t sparseIndices = topKGm.GetValue(sfaCubeRunInfo.topKBaseOffset + topkidx);
             if (sparseIndices == -1) {
                 break;
@@ -1068,11 +1078,15 @@ template <typename SFAT>
 __aicore__ inline void SFAMatmulService<SFAT>::ComputeMm2(const RunInfo& sfaCubeRunInfo,
                                                           const MSplitInfo sfaCubeSplitInfo)
 {
+    // Two 64x256 FP16/BF16 tiles fit in one existing 72 KiB Q/P L1 block.
+    constexpr uint32_t MM2_M_SPLIT_SIZE = FLASH_DECODE ? M_SPLIT_SIZE / 2 : M_SPLIT_SIZE;
+    uint32_t kL1Size = 256;
+    uint32_t RESIDUAL_L1_OFFSET = MM2_M_SPLIT_SIZE * kL1Size;
     uint32_t mSize = sfaCubeSplitInfo.nBufferDealM;
     uint32_t mSizeAlign = (mSize + 16 - 1) / 16;
-    uint32_t sfaML1LoopCount = (mSize + M_SPLIT_SIZE - 1) / M_SPLIT_SIZE;
-    uint32_t mL1SizeAlign = M_SPLIT_SIZE; // 16对齐
-    uint32_t mL1Size = M_SPLIT_SIZE;      // m的实际大小
+    uint32_t sfaML1LoopCount = (mSize + MM2_M_SPLIT_SIZE - 1) / MM2_M_SPLIT_SIZE;
+    uint32_t mL1SizeAlign = MM2_M_SPLIT_SIZE; // 16对齐
+    uint32_t mL1Size = MM2_M_SPLIT_SIZE;      // m的实际大小
 
     uint32_t nSize = BlockAlign<KV_T>(sfaCubeConstInfo.headDim);
     uint32_t nL1Loops = (nSize + N_SPLIT_SIZE - 1) / N_SPLIT_SIZE;
@@ -1080,7 +1094,6 @@ __aicore__ inline void SFAMatmulService<SFAT>::ComputeMm2(const RunInfo& sfaCube
     uint32_t nL1Size = N_SPLIT_SIZE;      // n的实际大小
 
     uint32_t kSize = sfaCubeRunInfo.actualSingleProcessSInnerSize;
-    uint32_t kL1Size = 256;
     uint32_t kL1SizeAlign = SFAAlign(kL1Size, 16U);
     uint32_t kL1Loops = (kSize + kL1Size - 1) / kL1Size;
     uint32_t kL0Size = 128;
@@ -1111,7 +1124,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::ComputeMm2(const RunInfo& sfaCube
         for (uint32_t k1 = 0; k1 < kL1Loops; k1++) { // k切L1, 这里套了一层l0来操作
             if (k1 == (kL1Loops - 1)) {
                 // 尾块
-                kL1Size = kSize - (kL1Loops - 1) * 256;
+                kL1Size = kSize - (kL1Loops - 1) * (RESIDUAL_L1_OFFSET / MM2_M_SPLIT_SIZE);
                 kL1SizeAlign = SFAAlign(kL1Size, 16U);
             }
             kvL1BufIter++;
@@ -1130,7 +1143,8 @@ __aicore__ inline void SFAMatmulService<SFAT>::ComputeMm2(const RunInfo& sfaCube
                     kL0SizeAlign = SFAAlign(kL0Size, 16U);
                 }
 
-                uint32_t curSeqIdx = sfaCubeRunInfo.s2BatchOffset + (kL1 - kOffset) * 128 + k1 * 256;
+                uint32_t curSeqIdx =
+                    sfaCubeRunInfo.s2BatchOffset + (kL1 - kOffset) * 128 + k1 * (RESIDUAL_L1_OFFSET / MM2_M_SPLIT_SIZE);
                 uint32_t copyFinishRowCnt = 0;
                 if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
                     Nd2NzParams sfaCubeCopyParams;
@@ -1194,12 +1208,12 @@ __aicore__ inline void SFAMatmulService<SFAT>::ComputeMm2(const RunInfo& sfaCube
             }
             SetFlag<HardEvent::MTE2_MTE1>(sfaMte21KvEvents[sfaKvBufferIndex]);
             WaitFlag<HardEvent::MTE2_MTE1>(sfaMte21KvEvents[sfaKvBufferIndex]);
-            mL1SizeAlign = M_SPLIT_SIZE;
-            mL1Size = M_SPLIT_SIZE; // m的实际大小
+            mL1SizeAlign = MM2_M_SPLIT_SIZE;
+            mL1Size = MM2_M_SPLIT_SIZE; // m的实际大小
             for (uint32_t mL1 = 0; mL1 < sfaML1LoopCount; mL1++) {
                 if (mL1 == (sfaML1LoopCount - 1)) {
                     // 尾块
-                    mL1Size = mSize - (sfaML1LoopCount - 1) * M_SPLIT_SIZE;
+                    mL1Size = mSize - (sfaML1LoopCount - 1) * MM2_M_SPLIT_SIZE;
                     mL1SizeAlign = SFAAlign(mL1Size, 16U);
                 }
 
@@ -1208,8 +1222,18 @@ __aicore__ inline void SFAMatmulService<SFAT>::ComputeMm2(const RunInfo& sfaCube
                 LocalTensor<KV_T> aL1Tensor = l1QPTensor[sfaQueryBufferIndex * L1_BLOCK_OFFSET];
                 if (nL1 == 0) {
                     WaitFlag<HardEvent::MTE1_MTE2>(mte21QPIds[sfaQueryBufferIndex]);
-                    CopyInMm2AToL1(aL1Tensor, sfaCubeRunInfo, sfaCubeSplitInfo.nBufferStartM + mL1 * M_SPLIT_SIZE,
-                                   mL1Size, kL1Size, 256 * k1);
+                    CopyInMm2AToL1(aL1Tensor, sfaCubeRunInfo, sfaCubeSplitInfo.nBufferStartM + mL1 * MM2_M_SPLIT_SIZE,
+                                   mL1Size, kL1Size, k1 * (RESIDUAL_L1_OFFSET / MM2_M_SPLIT_SIZE));
+                    if constexpr (FLASH_DECODE) {
+                        auto residualL1 = aL1Tensor[RESIDUAL_L1_OFFSET];
+                        auto residualGm = vec1ResLoGm[(sfaCubeRunInfo.loop % sfaCubeConstInfo.preLoadNum) *
+                                                          sfaCubeConstInfo.mmResUbSize +
+                                                      (sfaCubeSplitInfo.nBufferStartM + mL1 * MM2_M_SPLIT_SIZE) *
+                                                          sfaCubeRunInfo.actualSingleProcessSInnerSizeAlign +
+                                                      k1 * (RESIDUAL_L1_OFFSET / MM2_M_SPLIT_SIZE)];
+                        CopyGmToL1(residualL1, residualGm, mL1Size, kL1Size,
+                                   sfaCubeRunInfo.actualSingleProcessSInnerSizeAlign);
+                    }
                     SetFlag<HardEvent::MTE2_MTE1>(mte21QPIds[sfaQueryBufferIndex]);
                     WaitFlag<HardEvent::MTE2_MTE1>(mte21QPIds[sfaQueryBufferIndex]);
                 }
@@ -1293,7 +1317,23 @@ __aicore__ inline void SFAMatmulService<SFAT>::ComputeMm2(const RunInfo& sfaCube
                     sfaMmadParams.cmatrixSource = false;
                     sfaMmadParams.unitFlag = ((k1 == (kL1Loops - 1)) && (kL0 == (kL0Loops - 1))) ? 0b11 : 0b10;
 
+                    const auto finalUnitFlag = sfaMmadParams.unitFlag;
+                    if constexpr (FLASH_DECODE) {
+                        sfaMmadParams.unitFlag = 0b10;
+                    }
                     Mmad(cL0Tensor, aL0Tensor, bL0Tensor, sfaMmadParams);
+                    if constexpr (FLASH_DECODE) {
+                        // Keep V in L0B; reload only the residual A after the high product.
+                        SetFlag<HardEvent::M_MTE1>(Mte1MmABEventId(abL0BufIter % 2));
+                        WaitFlag<HardEvent::M_MTE1>(Mte1MmABEventId(abL0BufIter % 2));
+                        LoadData<KV_T, LOAD3DV2_CONFIG>(
+                            aL0Tensor, aL1Tensor[RESIDUAL_L1_OFFSET + kL0 * baseK * mL1SizeAlign], sfaMm2LoadAParams);
+                        SetFlag<HardEvent::MTE1_M>(Mte1MmABEventId(abL0BufIter % 2));
+                        WaitFlag<HardEvent::MTE1_M>(Mte1MmABEventId(abL0BufIter % 2));
+                        sfaMmadParams.cmatrixInitVal = false;
+                        sfaMmadParams.unitFlag = finalUnitFlag;
+                        Mmad(cL0Tensor, aL0Tensor, bL0Tensor, sfaMmadParams);
+                    }
                     if (((sfaMmadParams.m / 16) * (sfaMmadParams.n / 16)) < 10) {
                         PipeBarrier<PIPE_M>();
                     }
@@ -1322,7 +1362,7 @@ __aicore__ inline void SFAMatmulService<SFAT>::ComputeMm2(const RunInfo& sfaCube
                     fixParams.unitFlag = 0b11;
 
                     uint64_t mm2Offset =
-                        (sfaCubeSplitInfo.nBufferStartM + mL1 * M_SPLIT_SIZE) * nSize + nL1 * N_SPLIT_SIZE;
+                        (sfaCubeSplitInfo.nBufferStartM + mL1 * MM2_M_SPLIT_SIZE) * nSize + nL1 * N_SPLIT_SIZE;
                     Fixpipe(mm2ResGm[(sfaCubeRunInfo.bn2IdxInCurCore % (sfaCubeConstInfo.preLoadNum)) *
                                          sfaCubeConstInfo.bmm2ResUbSize +
                                      mm2Offset],
