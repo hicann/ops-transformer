@@ -30,6 +30,20 @@ CUBE_BASEN = 128  # s2 对齐 128
 HEAD_DIM_ALIGN = 128  # D 对齐 128 档
 BLOCK_ELEMS_F16 = 16
 
+# sfmg 前移 sp 缓冲的窗口规格（fag_mem 分配 / fag_buffers 视图 / process_presfmg
+# 枚举三方同口径）。zt 缩到 32KB 后，窗口由 [0x11000,0x21000) 扩到
+# [0x9000,0x40000)=220KB：分时复用 mm1 次槽、mm2_res 与主图
+# （y/dy/nzp/sfmg/lse/cast/l0c_load_ub），pre 与主循环由 sync_all 隔开。
+# 四个槽（sp_y×2 + sp_dy×2）全双，sp_out 另占 2×rows×4B，行数按下式取 8 的
+# 倍数（sp_out DN tile 的 32B 对齐）：
+#   rows ≤ (220KB - 2*rows*4B) / (4 * SP_WORK_W * 2B)
+#   128 → 216 行、192 → 144 行、256/768 → 104 行（768 列向本就按 256 列三趟
+# 装载，tile 无需 768 宽；窗口行数与读侧 64 行窗口解耦——ws 是扁平缓存）。
+# sp 的 mutex 号复用主图 tile 的号（见 fag_mem），让“pre 最后一次 store →
+# 主循环首次 load”有显式依赖；主图 tile 在 pre 阶段全部不活跃，故地址可复用。
+SP_ROWS = {128: 216, 192: 144, 256: 104, 768: 104}
+SP_WORK_W = {128: 128, 192: 192, 256: 256, 768: 256}
+
 # ---- 每档的 D 轴分块表 ----
 # D<=128 只有一块，展开后就是一次完整的 matmul，不产生分块开销。
 # D=192 切成等宽两块 96+96 而非 128+64：实测(bench_dsplit.py/bench_dsplit_n.py，
@@ -302,6 +316,8 @@ def set_const_info(tiling, coreNum, cu_q_tensor, cu_kv_tensor):
         n1Size=tiling.n2 * tiling.gSize,
         sequsedQOptional=tiling.sequsedQOptional,
         sequsedKvOptional=tiling.sequsedKvOptional,
+        # sfmg 前移开关：host 按 fasg enablePreSfmg 判据决定，写/读两侧共用。
+        enablePreSfmg=tiling.enablePreSfmg,
         aivCount=coreNum * 2,
     )
 

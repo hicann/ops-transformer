@@ -47,6 +47,8 @@ from fag_common import (
     D_PHYS_W,
     HEAD_DIM_ALIGN,
     NZP_ROWS,
+    SP_ROWS,
+    SP_WORK_W,
     VECTOR_BASEM,
     VECTOR_BASEN,
     SINK_REDUCE_BATCH,
@@ -156,12 +158,19 @@ class _Arena:
         self._cur = base
         self.map = []  # [(标签, 地址, 字节数, mutex id)]
 
-    def buf(self, label, nbytes, slots=1, align=1, cv=None):
+    def buf(self, label, nbytes, slots=1, align=1, cv=None, ids=None):
         """声明一块 buffer —— **地址和 buffer-id 在这一处一起发**。
 
         ``cv`` 给出 CV 共享段的名字时用钉死的两侧同号，否则由本侧 pool 发号。
+        ``ids`` 显式复用既有号（仅限与被复用 buffer 生命期不重叠的场景，
+        见 _MutexPool 的合并说明）：地址照常从本 arena 铺，槽位数 = len(ids)。
         """
-        ids = list(_CV_MTX[cv]) if cv else self._pool.take(label, slots)
+        if ids is None:
+            ids = list(_CV_MTX[cv]) if cv else self._pool.take(label, slots)
+        else:
+            ids = list(ids)
+            for i in ids:
+                self._pool.owners[i] = f"{label}(reuse)"
         return {"addrs": self._place(label, nbytes, len(ids), align, ids), "mutex": ids}
 
     def _place(self, label, nbytes, count, align, ids):
@@ -349,10 +358,20 @@ UB_HEAD_RESERVE = 0x1000
 # [64,1] fp32 只有 256B，但按 512B 一格排，保证后面的槽位对齐。
 _UB_ROW_SLOT = 0x200
 
-# pre/post 走一维元素，不按 [行, D] 切。三档都吃满可用 UB，且每档
-# elems 都能被 128 整除，full-tile 的 VF 段数是编译期常量。行区间已由 metadata
-# 按 nAiv 均分，块大不再空核。
-PRE_ELEMS = {64: 63488, 128: 63488, 192: 63360, 256: 63360, 768: 63360}  # 单槽 fp32
+# pre/post 走一维元素，不按 [行, D] 切。行区间已由 metadata 按 nAiv 均分，
+# 块大不再空核。zt(pre_zero) 单槽只占 [0x1000,0x9000) 的 32KB（与 mm1
+# 首槽同段，pre/post 阶段被 sync_all 与主循环隔开，可整块借用）：刻意与
+# sfmg 前移窗口 [0x9000,0x40000) 完全避开——zt 与 sp 不同 mutex 且无地址
+# 相交，框架不插 wait，pre_zero 清零写(MTE3)与 presfmg 载入(MTE2)/VF 得以
+# 在同一 section 并行（交错 pre，见 fag_kernel）。板测哨兵 192MB 清零
+# ~64µs≈3TB/s 聚合写带宽，32KB 背靠背突发效率仍高于顺序大块的拐点。
+# 各档 elems 一致且被 128 整除，full-tile 的 VF 段数是编译期常量。
+# ⚠️ 不能扩回 248KB@头部：zt 会横跨 sp 窗口，窗口阶段 sp 覆写该地址，
+# 晚于窗口的清零 store 读 zt 会把 sp 残留当「零」写进 ws 中段。
+# ⚠️ sp 借 mm1/mm2 + 主图段（[0x9000,0x40000)）需上板重新验证（见 sp arena
+# 注释）。zt 缩到 32KB 后清零 chunk 减半、任务数翻倍，属预期代价。
+PRE_ELEMS = {64: 8192, 128: 8192, 192: 8192, 256: 8192, 768: 8192}  # 单槽 fp32
+# f16 视图（BN2 need_zero）占一半，见 _build_ub 的 pre arena。
 POST_ELEMS = {
     64: 20480,
     128: 21120,
@@ -408,20 +427,65 @@ def _build_ub(width, pool):
 
     # pre 的 16-bit 支（BN2 need_zero）只占一半，按 fp32 算上限。
     pre = _Arena(f"UB pre d_align={width}", _UB_BYTES, pool, base=UB_HEAD_RESERVE)
-    zero = pre.buf("pre_zero", PRE_ELEMS[width] * 4)
 
     # post 的 fp32 输入与 16-bit 输出各用一套号，框架据此判定「下一块的 load」与
     # 「本块的 cast/store」无冲突，从而让 MTE2 / V / MTE3 三条流水重叠。
+    # f32/f16 先于 pre_zero 发号：zero 要复用 f32[0] 的号（见下）。
     post = _Arena(f"UB post d_align={width}", _UB_BYTES, pool, base=UB_HEAD_RESERVE)
     n = POST_ELEMS[width]
     f32 = post.buf("post_f32", n * 4, slots=2)
     f16 = post.buf("post_f16", n * 2, slots=2)
+    # pre_zero 与 post_f32 生命期不重叠（pre 段 vs post 段，中间隔着主循环
+    # 前后的 sync_all），显式复用 f32[0] 的号，给 sp_y/sp_dy 双槽腾位。
+    zero = pre.buf("pre_zero", PRE_ELEMS[width] * 4, ids=f32["mutex"][:1])
     # 收尾归约用 SINK_REDUCE_BATCH 个独立的 1 行 tile（同一批只等一次 barrier）
     sink_row_post = [
         post.buf(f"sink_row_post{i}", _UB_ROW_SLOT, align=_UB_ROW_SLOT)
         for i in range(SINK_REDUCE_BATCH)
     ]
     sink_red_post = post.buf("sink_red_post", _UB_ROW_SLOT, align=_UB_ROW_SLOT)
+
+    # sfmg 前移缓冲：窗口 [0x9000,0x40000)=220KB（zt 缩到 32KB 后 sp 前移），
+    # 覆盖 mm1 次槽、mm2_res 与主图 y/dy/nzp/sfmg/lse/cast/l0c_load_ub 的地址段。
+    # 这些 tile 在 pre 阶段全部不活跃（pre 与主循环之间隔着 sync_all，见
+    # fag_kernel），故地址可复用。
+    #
+    # 依赖方式（关键）：sp 的槽位 mutex 号**复用主图 tile 的号**（同址同号的
+    # 保守形式），让“pre 最后一次 store → 主循环首次 load”有显式依赖，而不是
+    # 完全独立的号。注意 4 个槽位各 52~54KB，必然跨多个主图 tile（单个主图
+    # tile 只有 16~32KB），因此每个槽位只能绑定其覆盖范围内的一个主图 tile；
+    # 其余重叠部分靠 sync_all 保证顺序。此布局必须上板验证。
+    #
+    # 三缓冲全双槽（slots=2）：slot 间独立 mutex，乒乓轮转（调用侧 .next()）
+    # 让 load(N+1)/VF(N)/store(N-1) 三条流水真正并行。**不能退回 sp_y/sp_dy
+    # 单槽**：pypto 对同一 tile（.current() 固定单槽）的跨队列操作不插 wait，
+    # load(N+1) 会覆盖 VF(N) 正在读的窗口——上板复现 sfmg 大面积错值 +
+    # 非逐位 + NaN（g2_batch_b8_n32_d256 / g2_nhead_n256_d768）。
+    # **必须排在 pre/post 之后发号**：zero/f32/f16/sink_* 是跨档扁平导出，
+    # 各档 id 必须一致，sp_* 只按档导出、放最后不影响前面的号序。
+    sfmg_pre = {}
+    if width >= 128:
+        sp = _Arena(
+            f"UB sfmg_pre {width}",
+            _UB_BYTES,
+            pool,
+            base=UB_HEAD_RESERVE + 0x8000,
+        )
+        slot = SP_ROWS[width] * SP_WORK_W[width] * 2
+        # sp_out 是 [rows,1] fp32，槽位字节数随行数变化（旧 512B 固定值在
+        # rows>128 时会越界），按 rows*4 向上取 512B 对齐。
+        out_bytes = max(_UB_ROW_SLOT, SP_ROWS[width] * 4)
+        # 4 个槽位复用主图 tile 的号（y/dy/nzp/cast）——保守同号，
+        # 保证 pre store 与主循环这些 tile 的首次 load 有显式依赖。
+        sp_y = sp.buf("sp_y", slot, slots=2, ids=[y["mutex"][0], dy["mutex"][0]])
+        sp_dy = sp.buf("sp_dy", slot, slots=2, ids=[nzp["mutex"][0], cast["mutex"][0]])
+        sp_out = sp.buf(
+            "sp_out",
+            out_bytes,
+            align=_UB_ROW_SLOT,
+            ids=[sfmg["mutex"][0], lse["mutex"][0]],
+        )
+        sfmg_pre = {"y": sp_y, "dy": sp_dy, "out": sp_out, "_arenas": [sp]}
 
     return {
         "y": y,
@@ -434,12 +498,13 @@ def _build_ub(width, pool):
         "l0c_load_ub": l0c_load_ub,
         "mm1": mm1,
         "mm2": mm2,
+        "sfmg_pre": sfmg_pre,
         "zero": zero,
         "f32": f32,
         "f16": f16,
         "sink_row_post": sink_row_post,
         "sink_red_post": sink_red_post,
-        "_arenas": [main, shared, pre, post],
+        "_arenas": [main, shared, pre, post] + sfmg_pre.get("_arenas", []),
     }
 
 
@@ -586,6 +651,16 @@ MTX_UB_SINK_ROW_POST = [
 MTX_UB_SINK_RED_POST = _flat(_UB, "sink_red_post")
 
 UB_PRE_ZERO = _UB[HEAD_DIM_ALIGN]["zero"]["addrs"][0]
+
+# sfmg 前移独立缓冲（仅 64 档不存在；构造时 sfmg_pre 为空 dict）。
+# 全档 double buffer：导出完整地址/mutex 列表（[slot0, slot1]），
+# 与 post_f32/post_f16 的 POST_F32_ADDRS / MTX_UB_POST_F32 同款口径。
+UB_SP_Y_A = {w: _UB[w]["sfmg_pre"]["y"]["addrs"] for w in _TIERS if w >= 128}
+UB_SP_DY_A = {w: _UB[w]["sfmg_pre"]["dy"]["addrs"] for w in _TIERS if w >= 128}
+UB_SP_OUT_A = {w: _UB[w]["sfmg_pre"]["out"]["addrs"] for w in _TIERS if w >= 128}
+MTX_UB_SP_Y = {w: _UB[w]["sfmg_pre"]["y"]["mutex"] for w in _TIERS if w >= 128}
+MTX_UB_SP_DY = {w: _UB[w]["sfmg_pre"]["dy"]["mutex"] for w in _TIERS if w >= 128}
+MTX_UB_SP_OUT = {w: _UB[w]["sfmg_pre"]["out"]["mutex"] for w in _TIERS if w >= 128}
 MTX_UB_ZERO = _flat(_UB, "zero")
 POST_F32_ADDRS = _addrs(_UB, "f32")
 POST_F16_ADDRS = _addrs(_UB, "f16")

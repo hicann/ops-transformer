@@ -451,6 +451,7 @@ def _run_preload3_vector_deter(
     tensor_dy = gm.tensor_dy
     tensor_lse = gm.tensor_lse
     tensor_mask = gm.tensor_mask
+    tensor_sfmg_ws = gm.tensor_sfmg_ws
     mm1_res = buf.mm1_res
     mm2_res = buf.mm2_res
     y_ub = buf.y_ub
@@ -564,6 +565,7 @@ def _run_preload3_vector_deter(
                     subIdx,
                     tensor_y,
                     tensor_dy,
+                    tensor_sfmg_ws,
                     y_ub.current(),
                     dy_ub.current(),
                     sfmg_ub.current(),
@@ -998,6 +1000,7 @@ def _run_preload2_vector_gs_deter(
     tensor_dy = gm.tensor_dy
     tensor_lse = gm.tensor_lse
     tensor_mask = gm.tensor_mask
+    tensor_sfmg_ws = gm.tensor_sfmg_ws
     mm1_res = buf.mm1_res
     mm2_res = buf.mm2_res
     y_ub = buf.y_ub
@@ -1110,6 +1113,7 @@ def _run_preload2_vector_gs_deter(
                 subIdx,
                 tensor_y,
                 tensor_dy,
+                tensor_sfmg_ws,
                 y_ub.current(),
                 dy_ub.current(),
                 sfmg_ub.current(),

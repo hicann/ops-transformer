@@ -331,6 +331,7 @@ def _run_preload3_vector_normal(
     tensor_dy = gm.tensor_dy
     tensor_lse = gm.tensor_lse
     tensor_mask = gm.tensor_mask
+    tensor_sfmg_ws = gm.tensor_sfmg_ws
     mm1_res = buf.mm1_res
     mm2_res = buf.mm2_res
     y_ub = buf.y_ub
@@ -364,6 +365,7 @@ def _run_preload3_vector_normal(
                 subIdx,
                 tensor_y,
                 tensor_dy,
+                tensor_sfmg_ws,
                 y_ub.current(),
                 dy_ub.current(),
                 sfmg_ub.current(),
@@ -1156,6 +1158,9 @@ def _run_preload2_vector_bn2(
     tensor_dq_out = gm.tensor_dq_out
     tensor_dk_out = gm.tensor_dk_out
     tensor_dq_ws = gm.tensor_dq_ws
+    # multiblk+dv_align>=128 时 process_vec1 读前移缓存（见其前移分支）；
+    # single/64 档此参数为 lse 占位、读分支不触发、永不被解引用。
+    tensor_sfmg_ws = gm.tensor_sfmg_ws
     if d_align > 128:
         # BN2 wide：V1~V4 走 GS1S2 的 D 档编排，v5/v6 从 4D workspace 内联
         # cast（192 的 dK 读 cube 搬进 UB 的结果；192/256 的 dV 不经过 vector）。
@@ -1205,6 +1210,9 @@ def _run_preload2_vector_bn2(
                     subIdx,
                     tensor_y,
                     tensor_dy,
+                    # wide+multiblk 读前移缓存（前移分支与 preload2 写入方
+                    # 同口径）；wide+single 走内联分支，此参数不被解引用。
+                    tensor_sfmg_ws,
                     y_ub.current(),
                     dy_ub.current(),
                     sfmg_ub.current(),
@@ -1213,12 +1221,15 @@ def _run_preload2_vector_bn2(
             else:
                 # BN2 的 host 门（Bn2FamilyFeasible）保证 d==dv，且 dv_align<=128
                 # 落在 process_vec1 的同一分支，直接复用。
+                # narrow 的 multiblk+dv_align=128 读前移缓存；single/64 档走
+                # 内联分支，tensor_sfmg_ws 为 lse 占位、永不被解引用。
                 process_vec1(
                     constInfo,
                     prevInfo,
                     subIdx,
                     tensor_y,
                     tensor_dy,
+                    tensor_sfmg_ws,
                     y_ub.current(),
                     dy_ub.current(),
                     sfmg_ub.current(),
@@ -1607,6 +1618,7 @@ def _run_preload2_vector_gs_normal(
     tensor_dy = gm.tensor_dy
     tensor_lse = gm.tensor_lse
     tensor_mask = gm.tensor_mask
+    tensor_sfmg_ws = gm.tensor_sfmg_ws
     mm1_res = buf.mm1_res
     mm2_res = buf.mm2_res
     y_ub = buf.y_ub
@@ -1698,6 +1710,7 @@ def _run_preload2_vector_gs_normal(
                 subIdx,
                 tensor_y,
                 tensor_dy,
+                tensor_sfmg_ws,
                 y_ub.current(),
                 dy_ub.current(),
                 sfmg_ub.current(),

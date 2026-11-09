@@ -72,6 +72,9 @@ TILING_DATA_FIELD_DEF(int64_t, deterMaxRound)
 // Optional effective lengths are runtime flags; sink is carried by tilingkey bit15.
 TILING_DATA_FIELD_DEF(int64_t, sequsedQOptional)
 TILING_DATA_FIELD_DEF(int64_t, sequsedKvOptional)
+// Runtime sfmg pre-move flag (aligns with fasg enablePreSfmg). Not a tilingkey
+// bit: one binary covers both the pre-move and inline-recompute paths.
+TILING_DATA_FIELD_DEF(int64_t, enablePreSfmg)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(FlashAttnGrad, FlashAttnGradTilingDataTmp)
 

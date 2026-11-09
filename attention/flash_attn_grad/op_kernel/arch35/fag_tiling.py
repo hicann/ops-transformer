@@ -86,6 +86,11 @@ class FlashAttnGradTilingData:
     # Optional effective lengths; cu_seqlens continues to describe physical storage.
     sequsedQOptional: int
     sequsedKvOptional: int
+    # sfmg 前移开关（运行时字段，不占 tilingkey）。判据在
+    # op_host/plan/flash_attn_grad_tiling_plan.cpp 的 DecidePreSfmg，对齐
+    # fasg DoPreTiling 的 enablePreSfmg。kernel 的写侧(process_presfmg)与
+    # 读侧(process_vec1)共用该标志：1=pre 算一次写 ws，0=主循环内联重算。
+    enablePreSfmg: int
 
 
 # 与 op_kernel/arch35/flash_attn_grad.py 的 FlashAttnGradTilingKey 一致
@@ -141,7 +146,6 @@ class FlashAttnGradTilingKey:
             deter,
             sink,
         ) = key
-        # 2/3 保留。不剪会当 GS1S2 多编死二进制。
         if template != Tmpl.BN2GS1S2 and template != Tmpl.BN2:
             return False
         if deter == 1:

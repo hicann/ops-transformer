@@ -30,7 +30,7 @@ namespace {
 // 布局钉死：改了 py 侧字段就会在这里断编译，逼着同步改 Tmp 和这些数字。
 // 注意 scaleValue 是唯一的 4 字节字段，它后面有 4 字节填充 —— 框架的
 // CheckAlignAndGenPlaceHolder 也会插同样的填充，两边才对得上。
-static_assert(sizeof(FlashAttnGradTilingData) == 216,
+static_assert(sizeof(FlashAttnGradTilingData) == 224,
               "TilingData layout changed; update FlashAttnGradTilingDataTmp in flash_attn_grad_tiling.h too.");
 static_assert(offsetof(FlashAttnGradTilingData, scaleValue) == 56, "scaleValue moved; re-check the 4-byte padding.");
 static_assert(offsetof(FlashAttnGradTilingData, gSize) == 64, "gSize moved; re-check the padding after scaleValue.");
@@ -43,6 +43,8 @@ static_assert(offsetof(FlashAttnGradTilingData, sequsedQOptional) == 200,
               "sequsedQOptional moved; earlier field offsets must stay unchanged.");
 static_assert(offsetof(FlashAttnGradTilingData, sequsedKvOptional) == 208,
               "sequsedKvOptional must follow sequsedQOptional.");
+static_assert(offsetof(FlashAttnGradTilingData, enablePreSfmg) == 216,
+              "enablePreSfmg must be appended after sequsedKvOptional.");
 
 void LogPlan(gert::TilingContext* context, const FagParsedInfo& info, const FagTilingPlan& plan,
              const FagRouteTrace& trace)
@@ -52,7 +54,7 @@ void LogPlan(gert::TilingContext* context, const FagParsedInfo& info, const FagT
             "layoutStr=%s, layout=%ld, maskMode=%ld, win=(%ld,%ld), sparseType=%ld, totalPerBatch=%ld, "
             "hasAttenMask=%d, hasSeqused=%d, hasSinks=%d, isEmptyShape=%d, "
             "template=%ld, isBn2MultiBlk=%ld, bn2NeedZero=%ld, swizzle=%ld, deter=%d, dAlign=%ld, dvAlign=%ld, "
-            "B=%ld, S1=%ld, S2=%ld, N1=%ld, N2=%ld, G=%ld, D=%ld, Dv=%ld, "
+            "enablePreSfmg=%ld, B=%ld, S1=%ld, S2=%ld, N1=%ld, N2=%ld, G=%ld, D=%ld, Dv=%ld, "
             "viewQ=[%ld,S,%ld,D] b0=%ld, viewKV=[%ld,S,%ld,D] b0=%ld, coefN=(%ld,%ld), "
             "tilingKey=%llu, workspaceSize=%zu.",
             plan.schedule.usedCube, plan.schedule.blockDim, static_cast<int>(plan.schedule.useActualCores),
@@ -61,9 +63,9 @@ void LogPlan(gert::TilingContext* context, const FagParsedInfo& info, const FagT
             static_cast<int>(info.hasSeqused), static_cast<int>(info.hasSinks), static_cast<int>(IsEmptyShape(info)),
             plan.kernel.tmpl, plan.kernel.isBn2MultiBlk, plan.kernel.bn2NeedZero, plan.schedule.swizzle,
             static_cast<int>(info.isDeterministic && plan.kernel.tmpl == TMPL_BN2GS1S2), plan.kernel.dAlign,
-            plan.kernel.dvAlign, info.b, info.s1, info.s2, info.n1, info.n2, info.g, info.d, info.dv, info.viewD0Q,
-            info.viewD2Q, info.coefB0Q, info.viewD0KV, info.viewD2KV, info.coefB0KV, info.coefN0, info.coefN2,
-            plan.tilingKey, plan.workspace.totalSize);
+            plan.kernel.dvAlign, plan.kernel.enablePreSfmg, info.b, info.s1, info.s2, info.n1, info.n2, info.g, info.d,
+            info.dv, info.viewD0Q, info.viewD2Q, info.coefB0Q, info.viewD0KV, info.viewD2KV, info.coefB0KV, info.coefN0,
+            info.coefN2, plan.tilingKey, plan.workspace.totalSize);
 
     // 决策追溯：上板发现别的模板更快时，先看这行就知道今天为什么选了它。
     // l2CacheSize 一起打出来：swizzle 的阈值以它为分母，各 ascend950 变体
@@ -176,6 +178,7 @@ ge::graphStatus FlashAttnGradTilingRegbase::WriteTilingData(const FagParsedInfo&
     tilingData->deterMaxRound = plan.schedule.deterMaxRound;
     tilingData->sequsedQOptional = info.hasSequsedQ ? 1 : 0;
     tilingData->sequsedKvOptional = info.hasSequsedKv ? 1 : 0;
+    tilingData->enablePreSfmg = plan.kernel.enablePreSfmg;
     return ge::GRAPH_SUCCESS;
 }
 

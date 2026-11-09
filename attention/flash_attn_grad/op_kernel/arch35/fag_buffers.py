@@ -48,6 +48,8 @@ from fag_common import (
     D_PHYS_W,
     HEAD_DIM_ALIGN,
     NZP_ROWS,
+    SP_ROWS,
+    SP_WORK_W,
     VECTOR_BASEM,
     VECTOR_BASEN,
     SINK_REDUCE_BATCH,
@@ -554,6 +556,79 @@ def make_sfmg_ub(v1w):
             else mem.UB_SFMG_A[v1w]
         ],
         mutex_ids=mem.MTX_UB_SFMG,
+    )
+
+
+def make_sp_y_ub(v1w):
+    """sfmg 前移独立 y 缓冲（pre section 专用）。
+
+    窗口 [0x9000,0x40000) 分时复用 mm1 次槽、mm2_res 与主图，mutex 号
+    复用主图 tile 的号（见 fag_mem 的 sfmg_pre 注释），使 pre 最后一次
+    store 与主循环首次 load 有显式依赖。
+
+    形状按档取窗口规格；双槽（slots=2，对齐 1102 已上板验证的设计）——
+    循环内 .next() 乒乓轮转：load(N+1) 写下一槽、VF(N) 读本槽，物理
+    隔离无需跨队列 wait。**不能用单槽 .current()**：pypto 对同一 tile
+    的跨队列操作不插 wait，load 会覆盖 VF 正在读的窗口（上板 sfmg 错）。
+    """
+    return pl.make_tile_group(
+        type=pl.TileType(
+            shape=[SP_ROWS[v1w], SP_WORK_W[v1w]],
+            dtype=input_dtype,
+            target_memory=pl.MemorySpace.Vec,
+            valid_shape=[-1, -1],
+        ),
+        addrs=mem.UB_SP_Y_A[v1w],
+        mutex_ids=mem.MTX_UB_SP_Y[v1w],
+    )
+
+
+def make_sp_dy_ub(v1w):
+    """sfmg 前移独立 dy 缓冲（双槽口径与 make_sp_y_ub 一致）。"""
+    return pl.make_tile_group(
+        type=pl.TileType(
+            shape=[SP_ROWS[v1w], SP_WORK_W[v1w]],
+            dtype=input_dtype,
+            target_memory=pl.MemorySpace.Vec,
+            valid_shape=[-1, -1],
+        ),
+        addrs=mem.UB_SP_DY_A[v1w],
+        mutex_ids=mem.MTX_UB_SP_DY[v1w],
+    )
+
+
+def make_sp_out_ub(v1w):
+    """sfmg 前移独立输出缓冲，depth 2。"""
+    return pl.make_tile_group(
+        type=pl.TileType(
+            shape=[SP_ROWS[v1w], 1],
+            dtype=pl.DT_FP32,
+            target_memory=pl.MemorySpace.Vec,
+            layout=pl.DN,
+        ),
+        addrs=mem.UB_SP_OUT_A[v1w],
+        mutex_ids=mem.MTX_UB_SP_OUT[v1w],
+    )
+
+
+def make_sp_out_flat(v1w):
+    """sp_out 的 [1,SP_ROWS] 扁平视图：同址同号（mask view 先例），depth 2。
+
+    ws 是 [1,N] 扁平 tensor，而 pl.store 的 order 必须升序——[rows,1] DN tile
+    无法用 order=[1,0] 落扁平行。改用本视图走 zt/sink 的恒等映射口径：
+    validshape [1,rows] + 无 order，语义为「线性 rows 个 fp32」。
+    VF 写 DN 列 tile、store 读本视图，同 mutex 保证先后序。
+    与 sp_out 共用同一 (addr, mutex) 槽位对——循环内同步 .next() 保持轮转一致。
+    """
+    return pl.make_tile_group(
+        type=pl.TileType(
+            shape=[1, SP_ROWS[v1w]],
+            dtype=pl.DT_FP32,
+            target_memory=pl.MemorySpace.Vec,
+            valid_shape=[-1, -1],
+        ),
+        addrs=mem.UB_SP_OUT_A[v1w],
+        mutex_ids=mem.MTX_UB_SP_OUT[v1w],
     )
 
 

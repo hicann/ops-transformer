@@ -169,6 +169,10 @@ struct FagKernelPlan {
     int64_t bn2NeedZero = 0;
     int64_t dAlign = 128;
     int64_t dvAlign = 128;
+    // 1 = pre 阶段前移 sfmg（对齐 fasg DoPreTiling 的 enablePreSfmg）。
+    // 运行时字段（不占 tilingkey）：kernel 的写侧（process_presfmg）与读侧
+    // （process_vec1）用同一标志，避免多编一份二进制。判据见 DecidePreSfmg。
+    int64_t enablePreSfmg = 0;
 };
 
 struct FagSchedulePlan {
@@ -195,6 +199,10 @@ struct FagWorkspacePlan {
     FagWorkspaceSegment dv; // T2*N2*Dv fp32
     // dsink 槽位：[aivNum x N1] fp32。每 AIV 一行，post 由 AIV0 归约。
     FagWorkspaceSegment dsink;
+    // sfmg 前移缓存：[N1*T1] fp32，token 主序（与 TND lse 同构）。kernel 的
+    // enablePreSfmg=1 时 pre 阶段一次算全 rowsum(dO*O)，主循环 V1 只读不算；
+    // =0 时主循环内联重算，该段不读不写，仅按最坏情况预留（大小是 dq 段的 1/D）。
+    FagWorkspaceSegment sfmg;
     size_t totalSize = 0;
 };
 

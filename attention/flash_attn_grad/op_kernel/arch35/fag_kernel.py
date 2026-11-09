@@ -167,9 +167,13 @@ def flash_attn_grad_preload3(
     dk_workspace = pl.addptr(dq_workspace, wsRowsQ * tiling.d)
     dv_workspace = pl.addptr(dk_workspace, wsRowsKV * tiling.d)
     # 128 行对齐垫之后是 dsink 槽位 [aivCount x N1]，与 host BuildWorkspacePlan 对齐。
+    # 垫宽仍按真实 max(d,dv)：两侧同口径，垫内容无语义。
     dsink_workspace = pl.addptr(
         dv_workspace, wsRowsKV * tiling.dv + 128 * pl.max(tiling.d, tiling.dv)
     )
+    # dsink 槽位之后是 sfmg 前移缓存 [N1*T1] fp32，与 host 的 plan.sfmg 对齐。
+    # dv_align>=128 时 pre 阶段全量写入、主循环 V1 只读现成值。
+    sfmg_workspace = pl.addptr(dsink_workspace, constInfo.aivCount * constInfo.n1Size)
 
     # ---- 统一四维视图 [viewD0, S, viewD2, D] ----
     # BSND 与 BNSD 共用同一套 make_tensor / pl.load(order=...) 代码，
@@ -267,8 +271,24 @@ def flash_attn_grad_preload3(
         )
     else:
         tensor_mask = tensor_lse
-    # dq/dk/dv workspace 为 fp32，供 atomicAdd 累加
-    # dq/dk 是 D 宽，dv 是 Dv 宽 —— 与 workspace 的分段宽度一致
+    # sfmg 前移缓存：[1, N1*T1] fp32 扁平，行号 = head*T1 + 全局 token 行
+    # （与 TND lse 的 [N1,T1] token 主序同构，读侧统一用 loadBaseTnd 口径）。
+    # dv_align=64 不前移：占位必须是 rank-2 扁平视图（与非 TND 的
+    # tensor_lse [B,N1,S1] 三维不同 rank，pypto 严格校验 load 的 offsets
+    # 数与源 rank 一致，直接占位 lse 会在 trace 期报 INVALID_SHAPE）。
+    # process_vec1 走内联分支时不解引用本占位。
+    if dv_align >= 128:
+        sfmgElems = n1Size * constInfo.t1Size
+        tensor_sfmg_ws = pl.make_tensor(
+            sfmg_workspace, [1, sfmgElems], [sfmgElems, 1], dtype=pl.DT_FP32
+        )
+    else:
+        lseElems = n1Size * constInfo.t1Size
+        tensor_sfmg_ws = pl.make_tensor(
+            softmax_lse, [1, lseElems], [lseElems, 1], dtype=pl.DT_FP32
+        )
+    # dq/dk/dv workspace 为 fp32，供 atomicAdd 累加。
+    # dq/dk 是 D 宽，dv 是 Dv 宽 —— 行距按各自段宽。
     tensor_dq_ws = pl.make_tensor(
         dq_workspace,
         [constInfo.viewD0Q, constInfo.s1ViewSize, viewD2Q, dQ],
@@ -287,10 +307,10 @@ def flash_attn_grad_preload3(
         [s2ndKVv, d2dKVv, dV, 1],
         dtype=pl.DT_FP32,
     )
-
     # ---- pre/post：一维视图 ----
     # InitOutput / Muls+Cast 按实际 T*N*D 个元素线性切（非 TND 的 T=B*S）。
     # dq 侧 head 数是 n1(=n2*G)，dk/dv 侧是 n2。
+    # ws 与 out 扁平视图都按真实 d/dv（无 padding）。
     dqRows = constInfo.t1Size * n1Size
     dkvRows = constInfo.t2Size * constInfo.n2Size
     dqElems = dqRows * dQ
@@ -347,22 +367,89 @@ def flash_attn_grad_preload3(
     # ==== Pre 阶段：清零 dq/dk/dv workspace ====
     # 三个 workspace 都用 atomicAdd 累加，进主循环前必须为 0。
     # 清完用 sync_all 隔开：主循环的 atomicAdd 必须看到已清零的 GM。
-    with pl.section_vector():
-        zero_ub = make_pre_zero_buffer_f32()
-        process_pre_from_meta(
-            meta,
-            fagOff,
-            tensor_dq_ws_flat,
-            tensor_dk_ws_flat,
-            tensor_dv_ws_flat,
-            dQ,
-            dV,
-            zero_ub.current(),
-        )
-        if sink == 1:
-            process_sink_zero(
-                tensor_dsink_ws, constInfo, zero_ub.current(), pl.get_block_idx()
+    # dv_align>=128 时整段走"交错清零"路径；是否真正追加 softmaxGrad 前移由
+    # 运行时 constInfo.enablePreSfmg 决定（host 按 fasg enablePreSfmg 判据，
+    # 见 flash_attn_grad_tiling_plan.cpp 的 DecidePreSfmg）。前移时一次算完
+    # 全部行的 rowsum(dO⊙O) 存 ws、主循环 V1 只读；否则主循环 V1 内联重算。
+    # 交错 pre：zt 单槽 32KB（[0x1000,0x9000)，见 fag_mem.PRE_ELEMS），与
+    # sp 窗口 [0x9000,0x40000) 完全避开（sp 借 mm1 次槽 + mm2 + 主图段，
+    # mutex 复用主图 tile 的号，见 fag_mem 的 sfmg_pre 注释），pre 与主循环
+    # 由 sync_all 分时。zero 与 sp
+    # 不同 mutex，框架不插 wait——清零写(MTE3)与 presfmg 载入(MTE2)/VF
+    # 两条流水并行，且分块交替 issue：三段清零按统一 chunk 切成任务流，穿插
+    # 在 presfmg 的窗口循环里（每窗 kBatch 个，见 process_presfmg 的
+    # _zero_step）——避免整段清零先灌满 MTE3 队列、拖延 sfmg 写的双缓冲
+    # 周转（实测中小 S 用例清零占 pre 搬运 1/3~1/2）。
+    if dv_align >= 128:
+        with pl.section_vector():
+            zero_ub = make_pre_zero_buffer_f32()
+            zt = zero_ub.current()
+            # 行区间与三段边界（原 process_pre_from_meta 的读法，见其文档）。
+            vBlockIdx = pl.get_block_idx()
+            one64 = pl.const(1, pl.DT_INT64)
+            dqRowStart = (
+                pl.getval(meta, fagOff + META_FAG_DQ_ROW_STARTS + vBlockIdx) * one64
             )
+            dqRowEnd = (
+                pl.getval(meta, fagOff + META_FAG_DQ_ROW_ENDS + vBlockIdx) * one64
+            )
+            dkvRowStart = (
+                pl.getval(meta, fagOff + META_FAG_DKV_ROW_STARTS + vBlockIdx) * one64
+            )
+            dkvRowEnd = (
+                pl.getval(meta, fagOff + META_FAG_DKV_ROW_ENDS + vBlockIdx) * one64
+            )
+            dqNElems = (dqRowEnd - dqRowStart) * dQ
+            dkNElems = (dkvRowEnd - dkvRowStart) * dQ
+            dvNElems = (dkvRowEnd - dkvRowStart) * dV
+            preElems = pl.min(
+                PRE_ELEMS[d_align], pl.max(dqNElems, pl.max(dkNElems, dvNElems))
+            )
+            fill_zero_vf(zt, (preElems + VF_LANES - 1) // VF_LANES)
+            if sink == 1:
+                process_sink_zero(tensor_dsink_ws, constInfo, zt, pl.get_block_idx())
+            sp_y_ub = make_sp_y_ub(v1w)
+            sp_dy_ub = make_sp_dy_ub(v1w)
+            sp_out_ub = make_sp_out_ub(v1w)
+            sp_out_flat = make_sp_out_flat(v1w)
+            process_presfmg(
+                constInfo,
+                tensor_y,
+                tensor_dy,
+                tensor_sfmg_ws,
+                sp_y_ub,
+                sp_dy_ub,
+                sp_out_ub,
+                sp_out_flat,
+                fag_common.SP_WORK_W[v1w],
+                zt,
+                tensor_dq_ws_flat,
+                tensor_dk_ws_flat,
+                tensor_dv_ws_flat,
+                dqRowStart * dQ,
+                dqNElems,
+                dkvRowStart * dQ,
+                dqNElems + dkNElems,
+                dkvRowStart * dV,
+                dqNElems + dkNElems + dvNElems,
+            )
+    else:
+        with pl.section_vector():
+            zero_ub = make_pre_zero_buffer_f32()
+            process_pre_from_meta(
+                meta,
+                fagOff,
+                tensor_dq_ws_flat,
+                tensor_dk_ws_flat,
+                tensor_dv_ws_flat,
+                dQ,
+                dV,
+                zero_ub.current(),
+            )
+            if sink == 1:
+                process_sink_zero(
+                    tensor_dsink_ws, constInfo, zero_ub.current(), pl.get_block_idx()
+                )
     pl.system.sync_all()
 
     with pl.section_cube():
@@ -466,6 +553,7 @@ def flash_attn_grad_preload3(
             tensor_mask=tensor_mask,
             tensor_sinks=tensor_sinks,
             tensor_dsink_ws=tensor_dsink_ws,
+            tensor_sfmg_ws=tensor_sfmg_ws,
         )
         buf = pl.make_tuple(
             mm1_res=mm1_res,
@@ -812,6 +900,27 @@ def flash_attn_grad_preload2(
     tensor_dsink_out = pl.make_tensor(
         dsink, [1, constInfo.n1Size], [constInfo.n1Size, 1], dtype=pl.DT_FP32
     )
+    # sfmg 前移缓存：[1, N1*T1] fp32 扁平（head*T1 + 全局 token 行），与
+    # host 的 plan.sfmg 对齐。是否真正写/读由运行时 constInfo.enablePreSfmg
+    # 决定（host 按 fasg enablePreSfmg 判据裁决）：
+    #   GS1S2 + dv_align>=128 —— 可能前移，建 ws 视图；
+    #   BN2（含 multiblk）/ dv_align=64 —— 不前移，占位必须是 rank-2 扁平
+    #     视图（非 TND 的 tensor_lse 是 [B,N1,S1] 三维，直接占位会因 load
+    #     offsets 数与源 rank 不一致在 trace 期报 INVALID_SHAPE），内联
+    #     分支不解引用。
+    if template != Tmpl.BN2GS1S2 or dv_align < 128:
+        lseElems = n1Size * constInfo.t1Size
+        tensor_sfmg_ws = pl.make_tensor(
+            softmax_lse, [1, lseElems], [lseElems, 1], dtype=pl.DT_FP32
+        )
+    else:
+        sfmgElems = n1Size * constInfo.t1Size
+        tensor_sfmg_ws = pl.make_tensor(
+            pl.addptr(dsink_workspace, dsinkElems),
+            [1, sfmgElems],
+            [sfmgElems, 1],
+            dtype=pl.DT_FP32,
+        )
 
     # AIV get_block_idx 按 vector 子核计数，必须换算成物理核，否则
     # cube/vector 的 numBlocks 不一致，set/wait 配不上。
@@ -884,23 +993,97 @@ def flash_attn_grad_preload2(
                         pl.get_block_idx(),
                     )
                 pl.system.sync_all()
+        # BN2（含 multiblk）不做 sfmg 前移：对齐 fasg enablePreSfmg 的
+        # splitAxis 门（仅 BN2GS1S2 / BN2S2；FAG 无 BN2S2）。BN2 的 rowsum
+        # 仍在主循环 V1 内联，多 s2Outer 的重复计算保留，行为与 fasg 一致。
+        # 上面的 need_zero/sink 子支各自带 sync_all（或空跑无清零），进主
+        # 循环前无需额外 barrier。
     else:
-        with pl.section_vector():
-            zero_ub = make_pre_zero_buffer_f32()
-            process_pre_from_meta(
-                meta,
-                fagOff,
-                tensor_dq_ws_flat,
-                tensor_dk_ws_flat,
-                tensor_dv_ws_flat,
-                dQ,
-                dV,
-                zero_ub.current(),
-            )
-            if sink == 1:
-                process_sink_zero(
-                    tensor_dsink_ws, constInfo, zero_ub.current(), pl.get_block_idx()
+        # GS1S2：三段 fp32 累加区清零；dv_align>=128 走交错 pre，是否追加
+        # softmaxGrad 前移由运行时 constInfo.enablePreSfmg 决定（对齐 fasg
+        # enablePreSfmg）：为 1 时一次算全 rowsum(dO⊙O) 存 ws、V1 只读，
+        # 为 0 时主循环 V1 内联重算（本分支只做清零）。
+        # 交错 pre（同 preload3）：zt 32KB 避开 sp 的窗口，无 UB 冒险；
+        # zero 与 sp 不同 mutex，框架不插 wait——清零写(MTE3)与 presfmg
+        # 载入(MTE2)/VF 并行，且分块交替 issue（见 process_presfmg 的
+        # _zero_step）。本函数（preload2）的 GS1S2 租户是 256/768 档——sp
+        # 用半窗塞进空洞。
+        if dv_align >= 128:
+            with pl.section_vector():
+                zero_ub = make_pre_zero_buffer_f32()
+                zt = zero_ub.current()
+                # 行区间与三段边界（同 preload3，见 process_pre_from_meta 文档）。
+                vBlockIdx = pl.get_block_idx()
+                one64 = pl.const(1, pl.DT_INT64)
+                dqRowStart = (
+                    pl.getval(meta, fagOff + META_FAG_DQ_ROW_STARTS + vBlockIdx) * one64
                 )
+                dqRowEnd = (
+                    pl.getval(meta, fagOff + META_FAG_DQ_ROW_ENDS + vBlockIdx) * one64
+                )
+                dkvRowStart = (
+                    pl.getval(meta, fagOff + META_FAG_DKV_ROW_STARTS + vBlockIdx)
+                    * one64
+                )
+                dkvRowEnd = (
+                    pl.getval(meta, fagOff + META_FAG_DKV_ROW_ENDS + vBlockIdx) * one64
+                )
+                dqNElems = (dqRowEnd - dqRowStart) * dQ
+                dkNElems = (dkvRowEnd - dkvRowStart) * dQ
+                dvNElems = (dkvRowEnd - dkvRowStart) * dV
+                preElems = pl.min(
+                    PRE_ELEMS[d_align], pl.max(dqNElems, pl.max(dkNElems, dvNElems))
+                )
+                fill_zero_vf(zt, (preElems + VF_LANES - 1) // VF_LANES)
+                if sink == 1:
+                    process_sink_zero(
+                        tensor_dsink_ws, constInfo, zt, pl.get_block_idx()
+                    )
+                sp_y_ub = make_sp_y_ub(v1w)
+                sp_dy_ub = make_sp_dy_ub(v1w)
+                sp_out_ub = make_sp_out_ub(v1w)
+                sp_out_flat = make_sp_out_flat(v1w)
+                process_presfmg(
+                    constInfo,
+                    tensor_y,
+                    tensor_dy,
+                    tensor_sfmg_ws,
+                    sp_y_ub,
+                    sp_dy_ub,
+                    sp_out_ub,
+                    sp_out_flat,
+                    fag_common.SP_WORK_W[v1w],
+                    zt,
+                    tensor_dq_ws_flat,
+                    tensor_dk_ws_flat,
+                    tensor_dv_ws_flat,
+                    dqRowStart * dQ,
+                    dqNElems,
+                    dkvRowStart * dQ,
+                    dqNElems + dkNElems,
+                    dkvRowStart * dV,
+                    dqNElems + dkNElems + dvNElems,
+                )
+        else:
+            with pl.section_vector():
+                zero_ub = make_pre_zero_buffer_f32()
+                process_pre_from_meta(
+                    meta,
+                    fagOff,
+                    tensor_dq_ws_flat,
+                    tensor_dk_ws_flat,
+                    tensor_dv_ws_flat,
+                    dQ,
+                    dV,
+                    zero_ub.current(),
+                )
+                if sink == 1:
+                    process_sink_zero(
+                        tensor_dsink_ws,
+                        constInfo,
+                        zero_ub.current(),
+                        pl.get_block_idx(),
+                    )
         pl.system.sync_all()
 
     with pl.section_cube():
@@ -1114,6 +1297,7 @@ def flash_attn_grad_preload2(
                 tensor_dv_ws=tensor_dv_ws,
                 tensor_sinks=tensor_sinks,
                 tensor_dsink_ws=tensor_dsink_ws,
+                tensor_sfmg_ws=tensor_sfmg_ws,
             )
             buf = pl.make_tuple(
                 mm1_res=mm1_res,
@@ -1178,6 +1362,7 @@ def flash_attn_grad_preload2(
                 tensor_dq_ws=tensor_dq_ws,
                 tensor_sinks=tensor_sinks,
                 tensor_dsink_ws=tensor_dsink_ws,
+                tensor_sfmg_ws=tensor_sfmg_ws,
             )
             buf = pl.make_tuple(
                 mm1_res=mm1_res,
@@ -1224,6 +1409,7 @@ def flash_attn_grad_preload2(
                 tensor_mask=tensor_mask,
                 tensor_sinks=tensor_sinks,
                 tensor_dsink_ws=tensor_dsink_ws,
+                tensor_sfmg_ws=tensor_sfmg_ws,
             )
             buf = pl.make_tuple(
                 mm1_res=mm1_res,
@@ -1272,6 +1458,7 @@ def flash_attn_grad_preload2(
                 tensor_mask=tensor_mask,
                 tensor_sinks=tensor_sinks,
                 tensor_dsink_ws=tensor_dsink_ws,
+                tensor_sfmg_ws=tensor_sfmg_ws,
             )
             buf = pl.make_tuple(
                 mm1_res=mm1_res,

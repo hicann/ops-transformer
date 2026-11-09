@@ -62,6 +62,13 @@ FagWorkspacePlan BuildWorkspacePlan(const FagParsedInfo& info)
     plan.dsink.size = static_cast<size_t>(info.aivNum) * static_cast<size_t>(info.n1) * FP32_SIZE;
     cursor += plan.dsink.size;
 
+    // sfmg 前移缓存：[N1*T1] fp32，token 主序。kernel 的 addptr 切分与这里
+    // 对齐（dsink 段之后）。无条件预留：非前移档位不读，dq 段的 1/D，
+    // 避免 host/kernel 判据漂移导致越界。
+    plan.sfmg.offset = cursor;
+    plan.sfmg.size = static_cast<size_t>(info.n1) * static_cast<size_t>(info.t1) * FP32_SIZE;
+    cursor += plan.sfmg.size;
+
     plan.totalSize = cursor;
     return plan;
 }
