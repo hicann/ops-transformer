@@ -23,8 +23,8 @@ namespace ge {
 * @brief Function QuantGroupedMatmulInplaceAdd. This op fuse GroupedMatmul with InplaceAdd.
 
 * @par Inputs:
-* @li x1: A tensor. Format supports ND. Data type supports hifloat8, float8_e5m2, float8_e4m3fn.
-* @li x2: A tensor. Format supports ND. Data type supports hifloat8, float8_e5m2, float8_e4m3fn.
+* @li x1: A tensor. Format supports ND. Data type supports hifloat8, float8_e5m2, float8_e4m3fn, float4_e2m1.
+* @li x2: A tensor. Format supports ND. Data type supports hifloat8, float8_e5m2, float8_e4m3fn, float4_e2m1.
 * @li scale2: A tensor. Indicating scaling factor of quantization parameter, introduced by x2 quantization.
 * Format supports ND. Data type supports float32, float8_e8m0.
 * @li group_list: A tensor. Indicating the matmul size distribution along separated dimension.
@@ -51,6 +51,7 @@ namespace ge {
 | pertensor-pertensor  | hifloat8                  | hifloat8                  | float32                        | float32                        | (K,M)     | (K,N)               | (B,M,N)   | (B,)/(B,1)                    | (B,)/(B,1)            |
 | pertensor-perchannel | hifloat8                  | hifloat8                  | float32                        | float32                        | (K,M)     | (K,N)               | (B,M,N)   | (B,N)                         | (B,)/(B,1)            |
 | mx                   | float8_e4m3fn/float8_e5m2 | float8_e4m3fn/float8_e5m2 | float8_e8m0                    | float8_e8m0                    | (K,M)     | (K,N)               | (B,M,N)   | (K/64+B,N,2)                  | (K/64+B,M,2)          |
+| mx                   | float4_e2m1               | float4_e2m1               | float8_e8m0                    | float8_e8m0                    | (K,M)     | (K,N)               | (B,M,N)   | (K/64+B,N,2)                  | (K/64+B,M,2)          |
 
 *\n
 * @attention Constraints
@@ -62,8 +63,8 @@ namespace ge {
 */
 // clang-format on
 REG_OP(QuantGroupedMatmulInplaceAdd)
-    .INPUT(x1, TensorType({DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_HIFLOAT8}))
-    .INPUT(x2, TensorType({DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_HIFLOAT8}))
+    .INPUT(x1, TensorType({DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_HIFLOAT8, DT_FLOAT4_E2M1}))
+    .INPUT(x2, TensorType({DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_HIFLOAT8, DT_FLOAT4_E2M1}))
     .INPUT(scale2, TensorType({DT_FLOAT8_E8M0, DT_FLOAT}))
     .INPUT(group_list, TensorType({DT_INT64}))
     .INPUT(y, TensorType({DT_FLOAT}))

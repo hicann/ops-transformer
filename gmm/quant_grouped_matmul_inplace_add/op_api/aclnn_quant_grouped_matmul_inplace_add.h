@@ -19,9 +19,10 @@ extern "C" {
  * @brief aclnnQuantGroupedMatmulInplaceAdd的第一段接口，根据具体的计算流程，计算workspace大小。
  * @domain aclnn_ops_infer
  *
- * @param [in] x1: 表示公式中的x1，数据类型支持FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8数据类型，数据格式支持ND。
+ * @param [in] x1:
+ * 表示公式中的x1，数据类型支持FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1数据类型，数据格式支持ND。
  * @param [in] x2:
- * 表示公式中的x2，数据类型支持FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8数据类型，数据格式支持ND。
+ * 表示公式中的x2，数据类型支持FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1数据类型，数据格式支持ND。
  * @param [in] scale1Optional：
  * 代表量化参数中的由输入x1量化引入的缩放因子，数据类型支持FLOAT32、FLOAT8_E8M0，数据格式支持ND。
  * @param [in] scale2: 表示量化参数，数据类型支持FLOAT32、FLOAT8_E8M0数据类型，数据格式支持ND。

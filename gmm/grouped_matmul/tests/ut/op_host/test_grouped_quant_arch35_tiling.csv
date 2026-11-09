@@ -42,3 +42,12 @@ Ascend950,mxfp8e5m2_empty_k_split2,true,mxfp8e5m2_empty_k_split2,,128,0,256,2,tr
 Ascend950,mxfp8e5m2_empty_k_split3,true,mxfp8e5m2_empty_k_split3,,128,0,256,2,true,false,2,ND,FLOAT8-E5M2,FLOAT8-E5M2,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,BF16,false,true,32,4,,3,0
 Ascend950,mxfp8e5m2_empty_k_counts_split2,true,mxfp8e5m2_empty_k_counts_split2,,128,0,256,2,true,false,2,ND,FLOAT8-E5M2,FLOAT8-E5M2,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,BF16,false,true,32,4,,2,1
 Ascend950,mxfp8e5m2_empty_k_counts_split3,true,mxfp8e5m2_empty_k_counts_split3,,128,0,256,2,true,false,2,ND,FLOAT8-E5M2,FLOAT8-E5M2,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,FLOAT16,false,true,32,4,,3,1
+Ascend950,mxfp4_basic_api_splitk_success,true,mxfp4_basic_api_splitk_success,,128,160,256,2,true,false,2,ND,FLOAT4_E2M1,FLOAT4_E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,BF16,false,true,32,4,,3,0
+Ascend950,mxfp4_basic_api_splitk_k1_success,true,mxfp4_basic_api_splitk_k1_success,,128,1,256,2,true,false,2,ND,FLOAT4_E2M1,FLOAT4_E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,BF16,false,true,32,4,,3,0
+Ascend950,mxfp4_splitk_empty_k_split3,true,mxfp4_splitk_empty_k_split3,,128,0,256,2,true,false,2,ND,FLOAT4_E2M1,FLOAT4_E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,BF16,false,true,32,4,,3,0
+Ascend950,mxfp4_basic_api_splitk_m_odd_error,true,mxfp4_basic_api_splitk_m_odd_error,,127,160,256,2,true,false,2,ND,FLOAT4_E2M1,FLOAT4_E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,BF16,false,false,0,0,,3,0
+Ascend950,mxfp4_basic_api_splitk_n_odd_error,true,mxfp4_basic_api_splitk_n_odd_error,,128,160,255,2,true,false,2,ND,FLOAT4_E2M1,FLOAT4_E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,BF16,false,false,0,0,,3,0
+Ascend950,mxfp4_basic_api_splitk_e1m2_pair_error,true,mxfp4_basic_api_splitk_e1m2_pair_error,,128,160,256,2,true,false,2,ND,FLOAT4_E2M1,FLOAT4_E1M2,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,BF16,false,false,0,0,,3,0
+Ascend950,mxfp4_basic_api_splitk_transx_required,true,mxfp4_basic_api_splitk_transx_required,,128,160,256,2,false,false,2,ND,FLOAT4_E2M1,FLOAT4_E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,BF16,false,false,0,0,,3,0
+Ascend950,mxfp4_basic_api_splitk_transw_forbidden,true,mxfp4_basic_api_splitk_transw_forbidden,,128,160,256,2,true,true,2,ND,FLOAT4_E2M1,FLOAT4_E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,BF16,false,false,0,0,,3,0
+Ascend950,mxfp4_basic_api_splitk_weight_nz_error,true,mxfp4_basic_api_splitk_weight_nz_error,,128,160,256,2,true,false,2,NZ,FLOAT4_E2M1,FLOAT4_E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,BF16,false,false,0,0,,3,0

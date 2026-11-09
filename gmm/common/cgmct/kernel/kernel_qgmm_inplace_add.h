@@ -98,6 +98,8 @@ public:
     using AType = typename BlockMmadBuilder::AType;
     using BType = typename BlockMmadBuilder::BType;
     using CType = typename BlockMmadBuilder::CType;
+    static constexpr bool IS_FP4_HIF4 = IsFp4Hif4Type<AType>();
+    static constexpr int32_t c0Size = IS_FP4_HIF4 ? MATMUL_MNK_ALIGN_INT4 : MATMUL_MNK_ALIGN_INT8;
     using TupleShape = typename BlockSchedulerOp::TupleShape; // m, n, k
     using BlockShape = AscendC::Shape<int64_t, int64_t, int64_t, int64_t>;
     using BlockCoord = AscendC::Coord<int64_t, int64_t, int64_t, int64_t>;
@@ -194,22 +196,19 @@ public:
         uint64_t m = Get<M_VALUE>(problemShape_);
         uint64_t n = Get<N_VALUE>(problemShape_);
         uint64_t k = Get<K_VALUE>(problemShape_);
-        // aBaseOffset += m * k
-        if constexpr (isHiF4) {
-            Get<IDX_A_OFFSET>(baseOffset_) += (m * k) >> 1;
-        } else {
-            Get<IDX_A_OFFSET>(baseOffset_) += m * k;
+        // A data group offset: m*k logical elements. FP4/HIF4 packs 2 elements per byte => halve byte offset.
+        uint64_t aOffset = m * k;
+        // B data group offset: n*k logical elements. FP4/HIF4 packs 2 elements per byte => halve byte offset.
+        uint64_t bOffset = n * k;
+        if constexpr (IS_FP4_HIF4) {
+            aOffset >>= 1;
+            bOffset >>= 1;
         }
-        // bBaseOffset += n * k
-        if constexpr (isHiF4) {
-            Get<IDX_B_OFFSET>(baseOffset_) += (n * k) >> 1;
-        } else {
-            Get<IDX_B_OFFSET>(baseOffset_) += n * k;
-        }
+        Get<IDX_A_OFFSET>(baseOffset_) = Get<IDX_A_OFFSET>(baseOffset_) + aOffset;
+        Get<IDX_B_OFFSET>(baseOffset_) = Get<IDX_B_OFFSET>(baseOffset_) + bOffset;
         constexpr uint64_t scaleBaseSize =
             IsHif4ScaleType<ScaleType>() ? MX_HIF4_SCALE_BASE_SIZE : MXFP_MULTI_BASE_SIZE;
-        constexpr uint64_t packedCompensation =
-            IsHif4ScaleType<ScaleType>() ? MXFP_MULTI_BASE_SIZE : MX_HIF4_SCALE_BASE_SIZE;
+        constexpr uint64_t packedCompensation = IS_FP4_HIF4 ? MXFP_MULTI_BASE_SIZE : MX_HIF4_SCALE_BASE_SIZE;
         uint64_t scaleK =
             (Get<IDX_B_OFFSET>(baseOffset_) * packedCompensation / n / MXFP_DIVISOR_SIZE + groupIdx) * scaleBaseSize;
         // scaleAAxisBaseOffset = (k / 64 + g) * m * 2
@@ -263,7 +262,8 @@ public:
                     Get<IDX_M_TILEIDX>(tileIdx), Get<IDX_N_TILEIDX>(tileIdx),
                     Get<IDX_M_TAIL_SPLIT_TILEIDX>(singleShape), Get<IDX_N_TAIL_SPLIT_TILEIDX>(singleShape));
             } else {
-                blockOffset_ = coord.template GetQuantOffset<GroupedMatmul::QuantMode::MX_PERGROUP_MODE>(
+                // FP4 uses a 64-element C0 alignment; FP8/HiF8 keeps the default 32.
+                blockOffset_ = coord.template GetQuantOffset<GroupedMatmul::QuantMode::MX_PERGROUP_MODE, c0Size>(
                     Get<IDX_M_TILEIDX>(tileIdx), Get<IDX_N_TILEIDX>(tileIdx),
                     Get<IDX_M_TAIL_SPLIT_TILEIDX>(singleShape), Get<IDX_N_TAIL_SPLIT_TILEIDX>(singleShape));
             }

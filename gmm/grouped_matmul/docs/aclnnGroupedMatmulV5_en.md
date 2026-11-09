@@ -316,7 +316,7 @@ aclnnStatus aclnnGroupedMatmulV5(
 #### Platform Constraints
 
 - groupType: M-axis grouping (0) and non-grouping (-1) are supported. K-axis grouping is additionally supported for non-quantization and full quantization (2).
-- On Ascend 950PR&950DT products, `weight` supports only the ND format through this interface. For NZ weights, use [aclnnGroupedMatmulWeightNz](aclnnGroupedMatmulWeightNz_en.md).
+- `weight` supports only the ND format through this interface. For NZ weights, use [aclnnGroupedMatmulWeightNz](aclnnGroupedMatmulWeightNz_en.md).
 - groupListType: The value can be 0, 1, or 2.
   - groupListType=0: The groupList must be a non-negative monotonically non-decreasing number sequence (cumulative sum). The last value cannot be greater than the first dimension of the tensor in x. For example, M = 256 and E = 4 (the sizes of each group are 64, 0, 128, and 64 in sequence): [64, 64, 192, 256]
   - groupListType=1: The groupList must be a non-negative number sequence (size of each group). The total value cannot be greater than the first dimension of the tensor in x. Example: [64, 0, 128, 64]
@@ -446,6 +446,7 @@ aclnnStatus aclnnGroupedMatmulV5(
 |:---:|:---:|:---:|:---:|:---:|:---|:---|
 | 0/2 | FLOAT8_E5M2/FLOAT8_E4M3FN | FLOAT8_E5M2/FLOAT8_E4M3FN | null | FLOAT8_E8M0 | FLOAT8_E8M0 | BFLOAT16/FLOAT16/FLOAT32 |
 | 0 | FLOAT4_E2M1 | FLOAT4_E2M1 | FLOAT32/null | FLOAT8_E8M0 | FLOAT8_E8M0 | BFLOAT16/FLOAT16/FLOAT32 |
+| 2 | FLOAT4_E2M1 | FLOAT4_E2M1 | null | FLOAT8_E8M0 | FLOAT8_E8M0 | BFLOAT16/FLOAT16/FLOAT32 |
 
 - scaleOptional shape:
 
@@ -461,7 +462,8 @@ aclnnStatus aclnnGroupedMatmulV5(
 | 0 | (M, ceil(K/64), 2) |
 | 2 | (K/64 + g, M, 2). The start address offset is the same as that of scale.|
 
-- When x is FLOAT4_E2M1, K must be an even number and K ≠ 2. When weight is not transposed, N must be an even number.
+- When x is FLOAT4_E2M1: for groupType=0, K must be an even number and K ≠ 2; for groupType=2, the M axis of x must be an even number, and when K=1, neither M nor N can be 2. When weight is not transposed, N must be an even number.
+- When x is FLOAT4_E2M1 and groupType=2, only the ND format is supported for weight.
 
 </details>
 
@@ -861,6 +863,7 @@ The following table provides links to sample code files in different scenarios. 
 | Fake-quantization-A16W8| ALL | [test_aclnn_grouped_matmul_a16w8.cpp](../examples/test_aclnn_grouped_matmul_a16w8.cpp) | x=BF16, weight=INT8, antiquantScale=BF16, antiquantOffset=BF16 |
 | fake-quantization - A16W4| ALL | [test_aclnn_grouped_matmul_a16w4.cpp](../examples/test_aclnn_grouped_matmul_a16w4.cpp) | x=BF16, weight=INT4, antiquantScale=BF16, antiquantOffset=BF16 |
 | MX Quantization| Ascend 950PR&950DT products | [arch35/test_aclnn_grouped_matmul_mx_quant.cpp](../examples/arch35/test_aclnn_grouped_matmul_mx_quant.cpp) | Ascend 950PR&950DT products MX Quantization Example|
+| MX Quantization (K-axis grouping)| Ascend 950PR&950DT products | [arch35/test_aclnn_grouped_matmul_v5_mxfp4_splitk.cpp](../examples/arch35/test_aclnn_grouped_matmul_v5_mxfp4_splitk.cpp) | FLOAT4_E2M1 on both sides + E8M0 on both sides, groupType=2|
 | Full quantization (dynamic K-C)| Ascend 950PR&950DT products | [arch35/test_aclnn_grouped_matmul_quant_dynamic.cpp](../examples/arch35/test_aclnn_grouped_matmul_quant_dynamic.cpp) | x=INT8, weight=INT8, scale=FLOAT32, perTokenScale=FLOAT |
 | G-B quantization| Ascend 950PR&950DT products | [arch35/test_aclnn_grouped_matmul_quant_gb.cpp](../examples/arch35/test_aclnn_grouped_matmul_quant_gb.cpp) | x/w=FLOAT8_E5M2, scale=FLOAT32 (3 dimensions), perTokenScale=FLOAT32 (2 dimensions)|
 | Fully quantized S8S4| Ascend 950PR&950DT products | [arch35/test_aclnn_grouped_matmul_v5_s8s4.cpp](../examples/arch35/test_aclnn_grouped_matmul_v5_s8s4.cpp) | Per-channel quantization with x=INT8, weight=INT4, and non-empty offset|

@@ -21,7 +21,7 @@ English | [简体中文](./README.md)
     - The input and output parameters are all of the aclTensor type.
     - The InplaceAdd computation is added after the GroupedMatMul computation.
     - Only quantization scenarios are supported (1. mx quantization; 2. T-C quantization; 3. T-T quantization). For quantization methods, refer to [Quantization Introduction](../../docs/zh/context/quant_mode_introduction_en.md).
-    - Only inputs where x1 and x2 are FLOAT8_E5M2, FLOAT8_E4M3FN, or HIFLOAT8 are supported.
+    - Only inputs where x1 and x2 are FLOAT8_E5M2, FLOAT8_E4M3FN, HIFLOAT8 or FLOAT4_E2M1 are supported.
 
 - Computation formula:
     - **mx quantization:**
@@ -63,14 +63,14 @@ English | [简体中文](./README.md)
     <td>x1</td>
     <td rowspan="1">Input</td>
     <td>Input x1 in the formula, indicating the input matrix (left matrix).</td>
-    <td>FLOAT8_E5M2, FLOAT8_E4M3FN, HIFLOAT8</td>
+    <td>FLOAT8_E5M2, FLOAT8_E4M3FN, HIFLOAT8, FLOAT4_E2M1</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>x2</td>
     <td rowspan="1">Input</td>
     <td>Input x2 in the formula, indicating the weight matrix (right matrix).</td>
-    <td>FLOAT8_E5M2, FLOAT8_E4M3FN, HIFLOAT8</td>
+    <td>FLOAT8_E5M2, FLOAT8_E4M3FN, HIFLOAT8, FLOAT4_E2M1</td>
     <td>ND</td>
   </tr>
   <tr>
@@ -148,6 +148,8 @@ English | [简体中文](./README.md)
         |:---------:| :------ |
         |scale1Optional| A 3D tensor with shape ((K / 64) + g, M, 2). The start address offset of scale\_i is ((K\_0 + K\_1 + ...+ K\_{i-1})/ 64 + g\_i) \* M \* 2, that is, the start address offset of scale_0 is 0, the start address offset of scale_1 is (K\_0 / 64 + 1) \* M \* 2, the start address offset of scale_2 is ((K\_0 + K\_1) / 64 + 2) \* M \* 2, and so on|
         |scale2| A 3D tensor with shape ((K / 64) + g, N, 2). The start address offset is determined in the same way as scale1Optional|
+
+      - In mxfp4, x1/x2 must both be FLOAT4_E2M1 and scale1/scale2 must both be FLOAT8_E8M0; the M axis of x1 and the N axis of x2 must be even; K \* M != 2 and K \* N != 2.
 
 ## Invocation Description
 

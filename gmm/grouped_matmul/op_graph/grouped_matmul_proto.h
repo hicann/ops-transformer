@@ -179,7 +179,7 @@ mx quant(group_size_k = 32)：
   | x type                    | weight type               | per_token_scale type | scale type       | group_type |
   | ------------------------- | ------------------------- | -------------------- | ---------------- | ---------- |
   | float8_e4m3fn/float8_e5m2 | float8_e4m3fn/float8_e5m2 | float8_e8m0          | float8_e8m0      | 0/2        |
-  | float4_e2m1               | float4_e2m1               | float8_e8m0          | float8_e8m0      | 0          |
+  | float4_e2m1               | float4_e2m1               | float8_e8m0          | float8_e8m0      | 0/2        |
   | float4_e2m1/float4_e1m2   | float4_e2m1/float4_e1m2(weight NZ)| float8_e8m0  | float8_e8m0      | 0          |
 *\n
 perchannel：
@@ -238,6 +238,7 @@ mx fake-quant(group_size_k = 32)：
 | mx                   | 2          | float8_e4m3fn/float8_e5m2          | float8_e8m0                     | [(K,M)]   | [(K,N)]             | [(B,M,N)] | [(K/64+B,N,2)]                            | (K/64+B,M,2)          | -          |
 | mx                   | 0          | float4_e2m1                        | float8_e8m0                     | [(M,K)]   | [(B,N,K)]/[(B,K,N)] | [(M,N)]   | [(B,N,ceil(K/64),2)]/[(B,ceil(K/64),N,2)] | (M,ceil(K/64),2)      | -/[(B,N)]  |
 | mx                 | 0     | float4_e2m1/float4_e1m2 | float8_e8m0 | [(M,K)] | [(B,ceil(K/64),ceil(N/16),16,64)]/[(B,ceil(N/64),ceil(K/16),16,64)] | [(M,N)] | [(B,N,ceil(K/64),2)]/[(B,ceil(K/64),N,2)] | (M,ceil(K/64),2) | -/[(B,N)] |
+| mx                   | 2          | float4_e2m1                        | float8_e8m0                     | [(K,M)]   | [(K,N)]             | [(B,M,N)] | [(K/64+B,N,2)]                            |  (K/64+B,M,2)         | -          |
 
 | quantization                      | group_type | x type        | weight type                        | per_token_scale type | scale type | antiquant_scale type | antiquant_offset type | x shape | weight shape                      | y shape | per_token_scale shape | scale shape | antiquant_scale shape       | antiquant_offset shape |
 |---------------------------------- |------------|---------------|------------------------------------|----------------------|------------|----------------------|-----------------------|---------------------------------------------|---------|-----------------------|-------------|-----------------------------|------------------------|------------------------|

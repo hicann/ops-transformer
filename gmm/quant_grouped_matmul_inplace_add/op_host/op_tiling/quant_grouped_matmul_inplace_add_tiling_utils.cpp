@@ -91,6 +91,9 @@ bool CheckDtypeForInplaceAdd(const GQmmInputInfo& inputParams)
     bool isHif4 =
         inputParams.aDtype == Ops::Transformer::DT_HIFLOAT4 && inputParams.bDtype == Ops::Transformer::DT_HIFLOAT4;
 
+    // MXFP4: both data operands FLOAT4_E2M1 with dual FLOAT8_E8M0 block scales (same scale contract as MXFP8).
+    bool isMx4 = inputParams.aDtype == ge::DT_FLOAT4_E2M1 && inputParams.bDtype == ge::DT_FLOAT4_E2M1;
+
     if (isHif4) {
         OP_CHECK_IF(inputParams.scaleDtype != Ops::Transformer::DT_HIFLOAT4_SCALE,
                     OP_LOGE_FOR_INVALID_DTYPE(inputParams.opType, "scale2",
@@ -119,7 +122,7 @@ bool CheckDtypeForInplaceAdd(const GQmmInputInfo& inputParams)
         return true;
     }
 
-    if (isFp8) {
+    if (isFp8 || isMx4) {
         OP_CHECK_IF(
             inputParams.scaleDtype != ge::DT_FLOAT8_E8M0,
             OP_LOGE_FOR_INVALID_DTYPE(inputParams.opType, "scale2",
@@ -137,9 +140,41 @@ bool CheckDtypeForInplaceAdd(const GQmmInputInfo& inputParams)
         inputParams.opType, "x1, x2",
         ListToString(ge::TypeUtils::DataTypeToSerialString(inputParams.aDtype),
                      ge::TypeUtils::DataTypeToSerialString(inputParams.bDtype)),
-        "in quant case, the dtypes of x1 and x2 must be both DT_HIFLOAT4, both DT_HIFLOAT8, or both "
-        "DT_FLOAT8_E4M3FN/DT_FLOAT8_E5M2");
+        "in quant case, the dtypes of x1 and x2 must be both DT_HIFLOAT4, both DT_HIFLOAT8, both "
+        "DT_FLOAT8_E4M3FN/DT_FLOAT8_E5M2 or both DT_FLOAT4_E2M1");
     return false;
+}
+
+bool CheckMx4PackedShapeForInplaceAdd(const gert::Shape& xShape, const gert::Shape& wShape,
+                                      const GQmmInputInfo& inputParams)
+{
+    // FP4 TN (left transposed / right non-transposed): the original tensors are x1 = [k, m] and x2 = [k, n].
+    // FLOAT4_E2M1 packs two elements per byte, so the packed axes m and n must both be even.
+    // mSize / nSize have already been extracted by SetMKN (m from x1, n from x2).
+    OP_CHECK_IF(xShape.GetDimNum() < DIM_NUM_2D || wShape.GetDimNum() < DIM_NUM_2D,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(
+                    inputParams.opType, "x1/x2",
+                    std::to_string(xShape.GetDimNum()) + "/" + std::to_string(wShape.GetDimNum()), "at least 2"),
+                return false);
+    auto mSize = inputParams.mSize;
+    auto nSize = inputParams.nSize;
+    auto kSize = inputParams.kSize;
+    // 2: FLOAT4_E2M1 packs two elements per byte along the inner (packed) axis.
+    OP_CHECK_IF(
+        mSize % 2 != 0 || nSize % 2 != 0,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            inputParams.opType, "x1/x2", "x1=[" + ShapeToString(xShape) + "], x2=[" + ShapeToString(wShape) + "]",
+            "in FP4 TN case, the packed axes m[" + std::to_string(mSize) + "] and n[" + std::to_string(nSize) +
+                "] of x1/x2 must both be even (FLOAT4_E2M1 packs 2 elements per byte)"),
+        return false);
+
+    OP_CHECK_IF(
+        kSize == 1 && (mSize == 2 || nSize == 2),
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(inputParams.opType, "x1/x2",
+                                               "x1=[" + ShapeToString(xShape) + "], x2=[" + ShapeToString(wShape) + "]",
+                                               "in mxfp4 case, if k is 1 then m and n must not be 2"),
+        return false);
+    return true;
 }
 
 bool CheckCoreNumForInplaceAdd(const gert::TilingContext* context, const GQmmInputInfo& inputParams)

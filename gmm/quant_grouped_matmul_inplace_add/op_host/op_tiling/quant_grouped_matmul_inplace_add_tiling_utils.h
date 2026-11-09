@@ -33,8 +33,13 @@ bool AnalyzeAttrsForInplaceAdd(const gert::TilingContext* context, optiling::GQm
 // 只读取 GQmmInputInfo 的 dtype 字段，合法性校验由 CheckDtypeForInplaceAdd 负责
 bool AnalyzeDtypeForInplaceAdd(const gert::TilingContext* context, optiling::GQmmInputInfo& inputParams);
 
-// 校验 HIFLOAT8+HIFLOAT8 (T-T/T-C) 或 FP8_E4M3FN/E5M2+FP8_E4M3FN/E5M2 (MX) 组合
+// 校验 HIFLOAT8+HIFLOAT8 (T-T/T-C) 或 FP8_E4M3FN/E5M2+FP8_E4M3FN/E5M2 (MX) 或 FLOAT4_E2M1+FLOAT4_E2M1 (MXFP4) 组合
 bool CheckDtypeForInplaceAdd(const optiling::GQmmInputInfo& inputParams);
+
+// MXFP4 (双 FLOAT4_E2M1 + 双 FLOAT8_E8M0) k 轴分组 TN：原始 x1=[k,m]、x2=[k,n] 的打包轴 m、n 需为偶数，且 k 为 1 时
+// m、n 不能为 2 （FLOAT4_E2M1 每字节打包 2 元素）。须在 SetMKN 之后调用（依赖 inputParams.mSize/nSize）。
+bool CheckMx4PackedShapeForInplaceAdd(const gert::Shape& xShape, const gert::Shape& wShape,
+                                      const optiling::GQmmInputInfo& inputParams);
 
 bool CheckCoreNumForInplaceAdd(const gert::TilingContext* context, const optiling::GQmmInputInfo& inputParams);
 

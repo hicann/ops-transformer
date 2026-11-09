@@ -31,7 +31,7 @@
     - Both input and output parameters are of the aclTensor type.
     - An InplaceAdd computation is added after the GroupedMatMul computation.
     - Only quantization use cases are supported (1. mx quantization; 2. T-C quantization; 3. T-T quantization). For details about the quantization modes, see [Quantization](../../../docs/en/context/quant_mode_introduction.md).
-    - Only x1 and x2 inputs of the FLOAT8_E5M2, FLOAT8_E4M3FN, or HIFLOAT8 type are supported.
+    - Only x1 and x2 inputs of the FLOAT8_E5M2, FLOAT8_E4M3FN, HIFLOAT8 or FLOAT4_E2M1 type are supported.
 
 - Formula:
     - **mx quantization:**
@@ -104,7 +104,7 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
       <td>Input</td>
       <td>aclTensor on the device, input x1 in the formula.</td>
       <td>-</td>
-      <td>FLOAT8_E4M3FN, FLOAT8_E5M2, HIFLOAT8</td>
+      <td>FLOAT8_E4M3FN, FLOAT8_E5M2, HIFLOAT8, FLOAT4_E2M1</td>
       <td>ND</td>
       <td>2(K, M)</td>
       <td>√</td>
@@ -114,7 +114,7 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
       <td>Input</td>
       <td>aclTensor on the device, input x2 in the formula.</td>
       <td>-</td>
-      <td>FLOAT8_E4M3FN, FLOAT8_E5M2, HIFLOAT8</td>
+      <td>FLOAT8_E4M3FN, FLOAT8_E5M2, HIFLOAT8, FLOAT4_E2M1</td>
       <td>ND</td>
       <td>2(K, N)</td>
       <td>√</td>
@@ -292,6 +292,7 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
         | x1       | x2  |  scale2  | scale1Optional |yRef     |
         |:-------:|:-------:| :-------    | :------   | :------ |
         |FLOAT8_E5M2/FLOAT8_E4M3FN  |FLOAT8_E5M2/FLOAT8_E4M3FN| FLOAT8_E8M0   | FLOAT8_E8M0    | FLOAT32 |
+        |FLOAT4_E2M1  |FLOAT4_E2M1| FLOAT8_E8M0   | FLOAT8_E8M0    | FLOAT32 |
 
       - scale1Optional/scale2 must satisfy the following constraints (where g is the number of matmul groups, i.e., the group count, and g_i is the i-th group (index starting from 0)):
 
@@ -299,6 +300,8 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
         |:---------:| :------ |
         |scale1Optional| 3D tensor with shape ((K / 64) + g, M, 2), scale\_i the start address offset is ((K\_0 + K\_1 + ...+ K\_{i-1})/ 64 + g\_i) \* M \* 2, that is, the start address offset of scale_0 is 0, the start address offset of scale_1 is (K\_0 / 64 + 1) \* M \* 2, the start address offset of scale_2 is ((K\_0 + K\_1) / 64 + 2) \* M \* 2, and so on.|
         |scale2| 3D tensor with shape ((K / 64) + g, N, 2). The start address offset is the same as that of scale1Optional.|
+
+      - In mxfp4, x1/x2 must both be FLOAT4_E2M1 and scale1/scale2 must both be FLOAT8_E8M0; the M axis of x1 and the N axis of x2 must be even; K \* M != 2 and K \* N != 2.
 
   - The first dimension of groupList supports a maximum of 1024, i.e., a maximum of 1024 groups.
 

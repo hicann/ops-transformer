@@ -44,7 +44,7 @@ public:
                                                  Tile::TileCopy<Arch::DAV2201, Tile::CopyWithParams>, TileCopy_>;
 
 public:
-    static_assert(IsFp8Fp8F32<AType, BType, CType>(), "Unsupported dtype");
+    static_assert(IsFp8Fp8F32<AType, BType, CType>() || IsFp4Fp4F32<AType, BType, CType>(), "Unsupported dtype");
     static_assert(IsND<AType>() && IsND<CType>(), "Only support ND format");
     static_assert(IsTileShapeValid<AType, BType, L1Shape, L0Shape>(), "L1Shape or L0Shape is invalid");
     static_assert(IsL1BufferValid<AType, BType, L1Shape>(), "L1 buffer overflow");

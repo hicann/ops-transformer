@@ -212,11 +212,15 @@ bool GroupedQmmTiling::AnalyzeAttrs()
         inputParams_.groupType != SPLIT_M && inputParams_.groupType != SPLIT_K,
         OP_LOGE_FOR_INVALID_VALUE(inputParams_.opType, "groupType", std::to_string(inputParams_.groupType), "0 or 2"),
         return false);
-    OP_CHECK_IF(
-        (inputParams_.aDtype == ge::DT_FLOAT4_E2M1 || inputParams_.aDtype == ge::DT_FLOAT4_E1M2) &&
-            inputParams_.groupType != SPLIT_M,
-        OP_LOGE_FOR_INVALID_VALUE(inputParams_.opType, "groupType", std::to_string(inputParams_.groupType), "0"),
-        return false);
+    const bool isFp4A = (inputParams_.aDtype == ge::DT_FLOAT4_E2M1 || inputParams_.aDtype == ge::DT_FLOAT4_E1M2);
+    const bool isE2M1Pair = inputParams_.aDtype == ge::DT_FLOAT4_E2M1 && inputParams_.bDtype == ge::DT_FLOAT4_E2M1;
+    OP_CHECK_IF(isFp4A && inputParams_.groupType == SPLIT_K && !isE2M1Pair,
+                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                    inputParams_.opType, "x and weight",
+                    ListToString(ge::TypeUtils::DataTypeToSerialString(inputParams_.aDtype),
+                                 ge::TypeUtils::DataTypeToSerialString(inputParams_.bDtype)),
+                    "when split K and dtypes are FP4, x and weight must both be FLOAT4_E2M1"),
+                return false);
     if (inputParams_.groupType == SPLIT_M) {
         OP_CHECK_IF(inputParams_.transA,
                     OP_LOGE_FOR_INVALID_VALUE(inputParams_.opType, "transpose_x1",
@@ -769,27 +773,35 @@ should be 1 or 2, but the actual dim num is %zu.",
 
 bool GroupedQmmTiling::CheckFp4Shape(const gert::Shape& xShape, const gert::Shape& wShape) const
 {
-    if (npuArch_ != NpuArch::DAV_9201 || !IsHif4Scale()) {
-        OP_CHECK_IF(
-            inputParams_.kSize % EVEN_FACTOR != 0 || inputParams_.kSize <= EVEN_FACTOR,
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(inputParams_.opType, "x, weight",
-                                                   ShapesToString({ShapeToString(xShape), ShapeToString(wShape)}),
-                                                   "when the dtype of x is FLOAT4, k size must be even and greater "
-                                                   "than 2"),
-            return false);
-    } else {
-        if (!inputParams_.transA) {
+    if (inputParams_.groupType == SPLIT_M) {
+        if (npuArch_ != NpuArch::DAV_9201 || !IsHif4Scale()) {
             OP_CHECK_IF(
-                inputParams_.kSize % EVEN_FACTOR != 0,
-                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(inputParams_.opType, "x, weight",
-                                                       ShapesToString({ShapeToString(xShape), ShapeToString(wShape)}),
-                                                       "when x is not transposed, k size must be even"),
+                inputParams_.kSize % EVEN_FACTOR != 0 || inputParams_.kSize <= EVEN_FACTOR,
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    inputParams_.opType, "x, weight", ShapesToString({ShapeToString(xShape), ShapeToString(wShape)}),
+                    "when the dtype of x is FLOAT4, k size must be even and greater than 2"),
                 return false);
+        } else {
+            if (!inputParams_.transA) {
+                OP_CHECK_IF(inputParams_.kSize % EVEN_FACTOR != 0,
+                            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                                inputParams_.opType, "x, weight",
+                                ShapesToString({ShapeToString(xShape), ShapeToString(wShape)}),
+                                "when x is not transposed, k size must be even"),
+                            return false);
+            }
+            OP_CHECK_IF(inputParams_.kSize == 2,
+                        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                            inputParams_.opType, "x, weight",
+                            ShapesToString({ShapeToString(xShape), ShapeToString(wShape)}), "k size must not be 2"),
+                        return false);
         }
-        OP_CHECK_IF(inputParams_.kSize == 2,
-                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                        inputParams_.opType, "x, weight",
-                        ShapesToString({ShapeToString(xShape), ShapeToString(wShape)}), "k size must not be 2"),
+    } else {
+        // split K, TN
+        OP_CHECK_IF(inputParams_.mSize % EVEN_FACTOR != 0,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        inputParams_.opType, "x", ShapeToString(xShape),
+                        "when the dtype of x is FLOAT4 and x is transposed, m size must be even number"),
                     return false);
     }
     if (!inputParams_.transB) {

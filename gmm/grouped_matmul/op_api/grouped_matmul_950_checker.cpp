@@ -1203,10 +1203,42 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckGroupedMatmulMxfp4() const
                      OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnOpName(), perTokenScaleName_.c_str(), "nullptr",
                                                            "in mx case, the value of perTokenScale cannot be nullptr"));
     CHECK_RET(CheckGroupedMatmulMxDtype() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
-    GMM_CHECK_REPORT(!gmmParams_.transposeX,
-                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                         GetAclnnOpName(), xName_.c_str(), ViewShapeToString(GetInputTensor(gmmParams_.x)),
-                         "when groupType is 0 (split m) and in mxfp4, the value of x transposition must be false"));
+    if (gmmParams_.groupType == SPLIT_M) {
+        GMM_CHECK_REPORT(!gmmParams_.transposeX,
+                         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                             GetAclnnOpName(), xName_.c_str(), ViewShapeToString(GetInputTensor(gmmParams_.x)),
+                             "when groupType is 0 (split m) and in mxfp4, the value of x transposition must be false"));
+    } else {
+        const auto* xTensor = GetInputTensor(gmmParams_.x);
+        const auto* weightTensor = GetInputTensor(gmmParams_.weight);
+        if (xTensor != nullptr && weightTensor != nullptr) {
+            if (xTensor->GetViewShape().GetDimNum() >= MXFP4_SPLIT_K_X_MIN_DIM_NUM &&
+                weightTensor->GetViewShape().GetDimNum() >= MXFP4_SPLIT_K_WEIGHT_MIN_DIM_NUM) {
+                int64_t kDim = xTensor->GetViewShape().GetDim(1);
+                int64_t mDim = xTensor->GetViewShape().GetDim(0);
+                int64_t nDim = weightTensor->GetViewShape().GetDim(weightTensor->GetViewShape().GetDimNum() - 1);
+                GMM_CHECK_REPORT(
+                    !(kDim == 1 && (mDim == 2 || nDim == 2)),
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(GetAclnnOpName(), "x and weight",
+                                                           xName_ + "=" + ViewShapeToString(xTensor) + ", " +
+                                                               weightName_ + "=" + ViewShapeToString(weightTensor),
+                                                           "when groupType is 2 (split k) and in mxfp4, "
+                                                           "if k==1 then m and n must not be 2."));
+            }
+        }
+        GMM_CHECK_REPORT(
+            gmmParams_.transposeX && !gmmParams_.transposeWeight,
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                GetAclnnOpName(), "x and weight",
+                xName_ + "=" + ViewShapeToString(GetInputTensor(gmmParams_.x)) + ", " + weightName_ + "=" +
+                    ViewShapeToString(GetInputTensor(gmmParams_.weight)),
+                "when groupType is 2 (split K) and in mxfp4, the value of x and weight transposition must be "
+                "true/false"));
+        GMM_CHECK_REPORT(gmmParams_.biasOptional == nullptr,
+                         OP_LOGE_FOR_INVALID_VALUE(GetAclnnOpName(), biasName_.c_str(), "nonnull", "nullptr"));
+        GMM_CHECK_REPORT(GetInputTensor(gmmParams_.weight)->GetStorageFormat() != op::Format::FORMAT_FRACTAL_NZ,
+                         OP_LOGE_FOR_INVALID_FORMAT(GetAclnnOpName(), weightName_.c_str(), "FRACTAL_NZ", "ND"));
+    }
     CHECK_RET(CheckGroupedMatmulMxScaleTranspose() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckGroupedMatmulPerGroupDim() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckGroupedMatmulMxShape() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
@@ -1289,15 +1321,17 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckGroupedMatmulFp4MxDimValue
         GMM_CHECK_REPORT(xTensor != nullptr && weightTensor != nullptr,
                          OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnOpName(), "x or weight", "nullptr",
                                                                "each x and weight tensor must be non-null"));
+        const bool isSplitK = (gmmParams_.groupType == SPLIT_K);
         auto weightNIndex = weightTensor->GetViewShape().GetDimNum() - 1;
         auto xKDimValue = xTensor->GetViewShape().GetDim(1);
         auto weightNDimValue = weightTensor->GetViewShape().GetDim(weightNIndex);
         auto weightKIndex = weightTensor->GetViewShape().GetDimNum() - LAST_TWO_DIM_INDEX;
         auto weightKDimValue = weightTensor->GetViewShape().GetDim(weightKIndex);
+        auto aPackedDimValue = isSplitK ? xTensor->GetViewShape().GetDim(0) : xTensor->GetViewShape().GetDim(1);
         // 2：检查N是否为偶数
         auto weightNDimModValue = weightNDimValue % 2;
-        // 2：检查K是否为偶数
-        auto xKDimModValue = xKDimValue % 2;
+        // 2：检查打包轴是否为偶数
+        auto aPackedDimModValue = aPackedDimValue % 2;
         if (!gmmParams_.transposeWeight) {
             GMM_CHECK_REPORT(weightNDimModValue == 0,
                              OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
@@ -1306,22 +1340,26 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckGroupedMatmulFp4MxDimValue
                                  "current value is " +
                                      std::to_string(weightNDimValue)));
         }
-        GMM_CHECK_REPORT(xKDimModValue == 0,
+        GMM_CHECK_REPORT(aPackedDimModValue == 0,
                          OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
                              GetAclnnOpName(), xName_.c_str(), ViewShapeToString(xTensor),
-                             "when the dtypes of x and weight inputs are fp4, axis K of x must be an even number, but "
-                             "the current value is " +
-                                 std::to_string(xKDimValue)));
-        // 2: mxfp4场景下不支持k轴为2
-        GMM_CHECK_REPORT(
-            xKDimValue != 2 && weightKDimValue != 2,
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                GetAclnnOpName(), "x and weight",
-                xName_ + "=" + ViewShapeToString(xTensor) + ", " + weightName_ + "=" + ViewShapeToString(weightTensor),
-                "when the dtypes of x and weight inputs are fp4, all axes K of x and weight must not be equal to 2, "
-                "but "
-                "the current values are x=" +
-                    std::to_string(xKDimValue) + ", weight=" + std::to_string(weightKDimValue)));
+                             isSplitK ? "when groupType is 2 (split K) and the dtypes of x and weight are fp4, axis M "
+                                        "of x must be an even number, but the current value is " +
+                                            std::to_string(aPackedDimValue) :
+                                        "when the dtypes of x and weight inputs are fp4, axis K of x must be an even "
+                                        "number, but the current value is " +
+                                            std::to_string(aPackedDimValue)));
+        if (!isSplitK) {
+            GMM_CHECK_REPORT(xKDimValue != 2 && weightKDimValue != 2,
+                             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                                 GetAclnnOpName(), "x and weight",
+                                 xName_ + "=" + ViewShapeToString(xTensor) + ", " + weightName_ + "=" +
+                                     ViewShapeToString(weightTensor),
+                                 "when the dtypes of x and weight inputs are fp4, all axes K of x and weight must not "
+                                 "be equal to 2, "
+                                 "but the current values are x=" +
+                                     std::to_string(xKDimValue) + ", weight=" + std::to_string(weightKDimValue)));
+        }
     }
     return ACLNN_SUCCESS;
 }
@@ -1835,15 +1873,26 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckFp8Params(const DataType& 
 template <typename T>
 aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckFp4Params(const DataType& scaleDtype) const
 {
-    GMM_CHECK_REPORT(
-        gmmParams_.groupType == SPLIT_M,
-        OP_LOGE_FOR_INVALID_VALUE(GetAclnnOpName(), "groupType", std::to_string(gmmParams_.groupType), "0"));
-    auto weightStorageFormat = GetInputTensor(gmmParams_.weight)->GetStorageFormat();
-    bool isE1M2 = (gmmParams_.xDtype == DataType::DT_FLOAT4_E1M2 ||
-                   GetInputTensor(gmmParams_.weight)->GetDataType() == DataType::DT_FLOAT4_E1M2);
-    if (isE1M2 && weightStorageFormat == op::Format::FORMAT_ND) {
-        OP_LOGE_FOR_INVALID_FORMAT(GetAclnnOpName(), weightName_.c_str(), "ND", "FRACTAL_NZ");
-        return ACLNN_ERR_PARAM_INVALID;
+    if (gmmParams_.groupType == SPLIT_K) {
+        const bool isE2M1Pair = gmmParams_.xDtype == DataType::DT_FLOAT4_E2M1 &&
+                                GetInputTensor(gmmParams_.weight)->GetDataType() == DataType::DT_FLOAT4_E2M1;
+        GMM_CHECK_REPORT(
+            isE2M1Pair, OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                            GetAclnnOpName(), "x and weight",
+                            std::string("x=") + op::ToString(gmmParams_.xDtype).GetString() + ", weight=" +
+                                op::ToString(GetInputTensor(gmmParams_.weight)->GetDataType()).GetString(),
+                            "when groupType is 2 (split K) and dtypes are FP4, x and weight must both be FLOAT4_E2M1"));
+    } else {
+        GMM_CHECK_REPORT(
+            gmmParams_.groupType == SPLIT_M,
+            OP_LOGE_FOR_INVALID_VALUE(GetAclnnOpName(), "groupType", std::to_string(gmmParams_.groupType), "0"));
+        auto weightStorageFormat = GetInputTensor(gmmParams_.weight)->GetStorageFormat();
+        bool isE1M2 = (gmmParams_.xDtype == DataType::DT_FLOAT4_E1M2 ||
+                       GetInputTensor(gmmParams_.weight)->GetDataType() == DataType::DT_FLOAT4_E1M2);
+        if (isE1M2 && weightStorageFormat == op::Format::FORMAT_ND) {
+            OP_LOGE_FOR_INVALID_FORMAT(GetAclnnOpName(), weightName_.c_str(), "ND", "FRACTAL_NZ");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
     }
     if (scaleDtype == DataType::DT_FLOAT8_E8M0) {
         return CheckGroupedMatmulMxfp4();

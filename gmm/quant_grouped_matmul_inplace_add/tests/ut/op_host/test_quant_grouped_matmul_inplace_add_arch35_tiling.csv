@@ -32,3 +32,11 @@ Ascend950,hif8_tt_empty_k_scale2_2d_glt0,true,hif8_tt_empty_k_scale2_2d_glt0,2,1
 Ascend950,hif8_tt_empty_k_scale2_2d_glt1,true,hif8_tt_empty_k_scale2_2d_glt1,2,128,0,256,HIFLOAT8,HIFLOAT8,FLOAT,FLOAT,FLOAT,1,true,4,2:1,2,0
 Ascend950,hif8_tt_empty_k_both_2d_glt0,true,hif8_tt_empty_k_both_2d_glt0,2,128,0,256,HIFLOAT8,HIFLOAT8,FLOAT,FLOAT,FLOAT,0,true,4,2:1,2:1,0
 Ascend950,hif8_tt_empty_k_both_2d_glt1,true,hif8_tt_empty_k_both_2d_glt1,2,128,0,256,HIFLOAT8,HIFLOAT8,FLOAT,FLOAT,FLOAT,1,true,4,2:1,2:1,0
+Ascend950,mxfp4_tn_valid,true,mxfp4_tn_valid,4,96,512,128,FLOAT4_E2M1,FLOAT4_E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,0,true,NONE,12:128:2,12:96:2,0
+Ascend950,mxfp4_single_group_valid,true,mxfp4_single_group_valid,1,64,128,64,FLOAT4_E2M1,FLOAT4_E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,0,true,NONE,3:64:2,3:64:2,0
+Ascend950,mxfp4_odd_m_invalid,true,mxfp4_odd_m_invalid,4,95,512,128,FLOAT4_E2M1,FLOAT4_E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,0,false,NONE,12:128:2,12:95:2,0
+Ascend950,mxfp4_odd_n_invalid,true,mxfp4_odd_n_invalid,4,96,512,127,FLOAT4_E2M1,FLOAT4_E2M1,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,0,false,NONE,12:127:2,12:96:2,0
+Ascend950,mxfp4_wrong_scale_dtype_invalid,true,mxfp4_wrong_scale_dtype_invalid,4,96,512,128,FLOAT4_E2M1,FLOAT4_E2M1,FLOAT,FLOAT,FLOAT,0,false,NONE,12:128,12:96,0
+Ascend950,mxfp4_single_side_fp4_invalid,true,mxfp4_single_side_fp4_invalid,4,96,512,128,FLOAT4_E2M1,FLOAT8-E5M2,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,0,false,NONE,12:128:2,12:96:2,0
+Ascend950,mxfp8_basic_valid_regression,true,mxfp8_basic_valid_regression,4,96,512,128,FLOAT8-E5M2,FLOAT8-E5M2,FLOAT8-E8M0,FLOAT8-E8M0,FLOAT,0,true,NONE,12:128:2,12:96:2,0
+Ascend950,hif8_tc_valid_regression,true,hif8_tc_valid_regression,4,96,512,128,HIFLOAT8,HIFLOAT8,FLOAT,FLOAT,FLOAT,0,true,NONE,4:128,4,0

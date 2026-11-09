@@ -315,7 +315,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 #### 平台约束
 
 - groupType：支持M轴分组（0）和不分组（-1）。非量化/全量化额外支持K轴分组（2）。
-- Ascend 950PR&950DT系列产品通过本接口传入的weight仅支持ND格式；NZ格式请使用[aclnnGroupedMatmulWeightNz](aclnnGroupedMatmulWeightNz.md)。
+- 通过本接口传入的weight仅支持ND格式；NZ格式请使用[aclnnGroupedMatmulWeightNz](aclnnGroupedMatmulWeightNz.md)。
 - groupListType：支持0、1、2。
   - groupListType=0：groupList须为非负单调非递减数列（累积和），最后一个值不大于x中tensor的第一维。以M=256、E=4（各组大小依次为64、0、128、64）为例：`[64, 64, 192, 256]`
   - groupListType=1：groupList须为非负数列（各组大小），数值总和不大于x中tensor的第一维。例如：`[64, 0, 128, 64]`
@@ -447,6 +447,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 |:---:|:---:|:---:|:---:|:---:|:---|:---|
 | 0/2 | FLOAT8_E5M2/FLOAT8_E4M3FN | FLOAT8_E5M2/FLOAT8_E4M3FN | null | FLOAT8_E8M0 | FLOAT8_E8M0 | BFLOAT16/FLOAT16/FLOAT32 |
 | 0 | FLOAT4_E2M1 | FLOAT4_E2M1 | FLOAT32/null | FLOAT8_E8M0 | FLOAT8_E8M0 | BFLOAT16/FLOAT16/FLOAT32 |
+| 2 | FLOAT4_E2M1 | FLOAT4_E2M1 | null | FLOAT8_E8M0 | FLOAT8_E8M0 | BFLOAT16/FLOAT16/FLOAT32 |
 
 - **scaleOptional shape**：
 
@@ -462,7 +463,8 @@ aclnnGroupedMatmulV5默认确定性实现。
 | 0 | `(M, ceil(K/64), 2)` |
 | 2 | `(K/64 + g, M, 2)`，起始地址偏移与scale同理 |
 
-- x为 FLOAT4_E2M1 时，K须为偶数且 K≠2；weight 非转置时 N须为偶数。
+- x为 FLOAT4_E2M1 时：groupType=0 场景 K须为偶数且 K≠2；groupType=2 场景 x的M轴须为偶数，且 K=1 时 M和N均不能为2。weight 非转置时 N须为偶数。
+- x为 FLOAT4_E2M1 且 groupType=2 时，weight 仅支持ND格式。
 
 </details>
 
@@ -865,6 +867,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 | 伪量化-A16W8 | ALL | [test_aclnn_grouped_matmul_a16w8.cpp](../examples/test_aclnn_grouped_matmul_a16w8.cpp) | x=BF16, weight=INT8, antiquantScale=BF16, antiquantOffset=BF16 |
 | 伪量化-A16W4 | ALL | [test_aclnn_grouped_matmul_a16w4.cpp](../examples/test_aclnn_grouped_matmul_a16w4.cpp) | x=BF16, weight=INT4, antiquantScale=BF16, antiquantOffset=BF16 |
 | MX量化 | Ascend 950 | [arch35/test_aclnn_grouped_matmul_mx_quant.cpp](../examples/arch35/test_aclnn_grouped_matmul_mx_quant.cpp) | Ascend 950 MX量化示例 |
+| MX量化（K轴分组） | Ascend 950 | [arch35/test_aclnn_grouped_matmul_v5_mxfp4_splitk.cpp](../examples/arch35/test_aclnn_grouped_matmul_v5_mxfp4_splitk.cpp) | 双侧 FLOAT4_E2M1 + 双侧 E8M0，groupType=2 |
 | 全量化（动态 K-C） | Ascend 950 | [arch35/test_aclnn_grouped_matmul_quant_dynamic.cpp](../examples/arch35/test_aclnn_grouped_matmul_quant_dynamic.cpp) | x=INT8, weight=INT8, scale=FLOAT32, perTokenScale=FLOAT |
 | G-B量化 | Ascend 950 | [arch35/test_aclnn_grouped_matmul_quant_gb.cpp](../examples/arch35/test_aclnn_grouped_matmul_quant_gb.cpp) | x/w=FLOAT8_E5M2, scale=FLOAT32 (3维), perTokenScale=FLOAT32 (2维) |
 | 全量化S8S4 | Ascend 950 | [arch35/test_aclnn_grouped_matmul_v5_s8s4.cpp](../examples/arch35/test_aclnn_grouped_matmul_v5_s8s4.cpp) | x=INT8, weight=INT4, offset非空的perchannel量化 |

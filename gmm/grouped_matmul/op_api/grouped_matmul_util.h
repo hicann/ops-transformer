@@ -80,6 +80,8 @@ constexpr size_t MX_MULTI_ANTIQUANT_SCALE_DIM = 3UL;
 constexpr size_t MX_SINGLE_ANTIQUANT_SCALE_DIM = 4UL;
 constexpr size_t MX_MULTI_BIAS_DIM = 1UL;
 constexpr size_t MX_SINGLE_BIAS_DIM = 2UL;
+constexpr size_t MXFP4_SPLIT_K_X_MIN_DIM_NUM = 2UL;
+constexpr size_t MXFP4_SPLIT_K_WEIGHT_MIN_DIM_NUM = 1UL;
 
 // mx dim num
 constexpr size_t PERGROUP_MULTI_ANTIQUANT_SCALE_DIM = 2UL;

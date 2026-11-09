@@ -105,6 +105,11 @@ bool QuantGroupedInplaceAddTiling::AnalyzeInputs()
     OP_CHECK_IF(!SetMKN(xShape, wShape), OP_LOGE(inputParams_.opName, "SetMKN failed."), return false);
     OP_CHECK_IF(!SetQuantModeForQGmmInplaceAdd(), OP_LOGE(inputParams_.opName, "SetQuantModeForQGmmInplaceAdd failed."),
                 return false);
+    // MXFP4 k-split TN: packed axes m/n of the original [k, m] / [k, n] tensors must both be even.
+    if (inputParams_.aDtype == ge::DT_FLOAT4_E2M1 && inputParams_.bDtype == ge::DT_FLOAT4_E2M1) {
+        OP_CHECK_IF(!CheckMx4PackedShapeForInplaceAdd(xShape, wShape, inputParams_),
+                    OP_LOGE(inputParams_.opName, "CheckMx4PackedShapeForInplaceAdd failed."), return false);
+    }
     if (inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE) {
         OP_CHECK_IF(!CheckShapeForMxQuant(x1ScaleShape, wScaleShape, inputParams_),
                     OP_LOGE(inputParams_.opName, "CheckShapeForMxQuant failed."), return false);

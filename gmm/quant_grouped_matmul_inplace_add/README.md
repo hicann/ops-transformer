@@ -19,7 +19,7 @@
     - 输入输出参数类型均为aclTensor。
     - 在GroupedMatMul计算结束后增加了InplaceAdd计算。
     - 仅支持量化场景（1.mx量化；2.T-C量化；3.T-T量化）。量化方式请参见[量化介绍](../../docs/zh/context/quant_mode_introduction.md)。
-    - 仅支持x1、x2是FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8的输入。
+    - 仅支持x1、x2是FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8、FLOAT4_E2M1的输入。
 
 - 计算公式：
     - **mx量化：**
@@ -61,14 +61,14 @@
     <td>x1</td>
     <td rowspan="1">输入</td>
     <td>公式中的输入x1，表示输入矩阵（左矩阵）。</td>
-    <td>FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8</td>
+    <td>FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8、FLOAT4_E2M1</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>x2</td>
     <td rowspan="1">输入</td>
     <td>公式中的输入x2，表示权重矩阵（右矩阵）。</td>
-    <td>FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8</td>
+    <td>FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8、FLOAT4_E2M1</td>
     <td>ND</td>
   </tr>
   <tr>
@@ -139,6 +139,7 @@
         | x1       | x2  |  scale2  | scale1Optional |yRef     |
         |:-------:|:-------:| :-------    | :------   | :------ |
         |FLOAT8_E5M2/FLOAT8_E4M3FN  |FLOAT8_E5M2/FLOAT8_E4M3FN| FLOAT8_E8M0   | FLOAT8_E8M0    | FLOAT32 |
+        |FLOAT4_E2M1  |FLOAT4_E2M1| FLOAT8_E8M0   | FLOAT8_E8M0    | FLOAT32 |
 
       - scale1Optional/scale2要满足以下约束（其中g为matmul组数即分组数，g\_i为第i个分组（下标从0开始））：
 
@@ -146,6 +147,8 @@
         |:---------:| :------ |
         |scale1Optional| 3维tensor，shape为((K / 64) + g, M, 2)，scale\_i起始地址偏移为((K\_0 + K\_1 + ...+ K\_{i-1})/ 64 + g\_i) \* M \* 2，即scale_0的起始地址偏移为0，scale_1的起始地址偏移为(K\_0 / 64 + 1) \* M \* 2， scale_2的起始地址偏移为((K\_0 + K\_1) / 64 + 2) \* M \* 2,依此类推|
         |scale2| 3维tensor，shape为((K / 64) + g, N, 2),起始地址偏移与scale1Optional同理|
+
+      - 在mxfp4量化场景下，x1和x2的数据类型必须同时为FLOAT4_E2M1，且scale1Optional和scale2必须同时为FLOAT8_E8M0；x1的M轴、x2的N轴必须为偶数；K\*M不等于2、K\*N不等于2。
 
 ## 调用说明
 
