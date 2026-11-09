@@ -349,6 +349,9 @@ static bool IsEmptyInput(gert::TilingContext* context)
     OP_CHECK_IF(keyShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "key"),
                 return ge::GRAPH_FAILED);
 
+    auto valueShape = context->GetInputShape(VALUE_INPUT_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context, valueShape);
+
     auto softmaxSumShape = context->GetOutputShape(SOFTMAXSUM_OUTPUT_INDEX);
     OP_CHECK_IF(softmaxSumShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "softmax_sum"),
                 return ge::GRAPH_FAILED);
@@ -356,8 +359,10 @@ static bool IsEmptyInput(gert::TilingContext* context)
     int64_t attentionOutShapeSize = attentionOutShape->GetStorageShape().GetShapeSize();
     int64_t queryShapeSize = queryShape->GetStorageShape().GetShapeSize();
     int64_t keyShapeSize = keyShape->GetStorageShape().GetShapeSize();
+    int64_t valueShapeSize = valueShape->GetStorageShape().GetShapeSize();
     int64_t softmaxSumShapeSize = softmaxSumShape->GetStorageShape().GetShapeSize();
-    if ((queryShapeSize == 0 || keyShapeSize == 0) && (attentionOutShapeSize != 0 || softmaxSumShapeSize != 0)) {
+    if ((queryShapeSize == 0 || keyShapeSize == 0 || valueShapeSize == 0) &&
+        (attentionOutShapeSize != 0 || softmaxSumShapeSize != 0)) {
         /* 以 MIN_COPY_UINT_SIZE 为 32Byte说明, blocks为数据的块数, blocks与coreNum存在三种关系:
           (1) blocks % coreNum == 0
              主核数量为coreNum,主核处理块数为blocks / coreNum, 最后一个核处理非32Byte对齐的数据, 尾核数量为0
