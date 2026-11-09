@@ -29,7 +29,10 @@ public:
             KERNEL_LOG_ERROR("Get soc_version failed!");
             return KERNEL_STATUS_PARAM_INVALID;
         }
-        return arch35Kernel_.Compute(ctx);
+        if ((socVersion.find("Ascend950") != std::string::npos) ||
+            (socVersion.find("Ascend960") != std::string::npos)) {
+            return arch35Kernel_.Compute(ctx);
+        }
     }
 
 private:

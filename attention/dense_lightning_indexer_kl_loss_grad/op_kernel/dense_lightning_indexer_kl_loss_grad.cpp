@@ -16,6 +16,7 @@
 #include "kernel_operator.h"
 using namespace AscendC;
 
+#if __CCE_AICORE__ == 310
 #include "arch35/dense_lightning_indexer_kl_loss_grad_regbase_common.h"
 #include "arch35/dense_lightning_indexer_kl_loss_grad_tiling_regbase.h"
 #include "arch35/dense_lightning_indexer_kl_loss_grad_template_tiling_key_regbase.h"
@@ -23,6 +24,15 @@ using namespace AscendC;
 #include "arch35/dense_lightning_indexer_kl_loss_grad_cube_block.h"
 #include "arch35/dense_lightning_indexer_kl_loss_grad_kernel_base.h"
 #include "arch35/dense_lightning_indexer_kl_loss_grad_post.h"
+#elif (defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)))
+#include "arch92/dense_lightning_indexer_kl_loss_grad_regbase_common_arch92.h"
+#include "arch92/dense_lightning_indexer_kl_loss_grad_tiling_regbase_arch92.h"
+#include "arch92/dense_lightning_indexer_kl_loss_grad_template_tiling_key_regbase_arch92.h"
+#include "arch92/dense_lightning_indexer_kl_loss_grad_vector_block_arch92.h"
+#include "arch92/dense_lightning_indexer_kl_loss_grad_cube_block_arch92.h"
+#include "arch92/dense_lightning_indexer_kl_loss_grad_kernel_base_arch92.h"
+#include "arch92/dense_lightning_indexer_kl_loss_grad_post_arch92.h"
+#endif
 using namespace Dlikg;
 #define DLI_OP_IMPL(templateClass, tilingdataClass, ...) \
     do { \
@@ -52,7 +62,11 @@ __global__ __aicore__ void dense_lightning_indexer_kl_loss_grad(
     __gm__ uint8_t* cmpResidualK, __gm__ uint8_t* metadata, __gm__ uint8_t* dq, __gm__ uint8_t* dk, __gm__ uint8_t* dw,
     __gm__ uint8_t* softmaxOut, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
+#if (defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)))
+    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+#else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+#endif
     REGISTER_TILING_DEFAULT(optiling::DenseLightningIndexerGradRegBaseTilingData);
     TPipe tPipe;
     __gm__ uint8_t* user = GetUserWorkspace(workspace);

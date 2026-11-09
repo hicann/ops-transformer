@@ -40,6 +40,7 @@ enum class SparseMode : uint8_t {
 enum class ValidSocVersion {
     ASCEND910 = 0,
     ASCEND950,
+    ASCEND960,
     RESERVED_VERSION = 99999
 };
 
@@ -249,8 +250,10 @@ inline ValidSocVersion DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::P
 {
     if (socVersion_.find("Ascend910") != std::string::npos) {
         return ValidSocVersion::ASCEND910;
-    } else {
+    } else if (socVersion_.find("Ascend950") != std::string::npos) {
         return ValidSocVersion::ASCEND950;
+    } else if (socVersion_.find("Ascend960") != std::string::npos) {
+        return ValidSocVersion::ASCEND960;
     }
 }
 
@@ -270,7 +273,7 @@ inline bool DenseLightningIndexerKLLossGradMetadataCpuKernelArch35::ParamsInit()
     validSocVersion_ = ProcessSocVersion();
     if (validSocVersion_ == ValidSocVersion::ASCEND910) {
         s2BaseSize_ = 2048U;
-    } else if (validSocVersion_ == ValidSocVersion::ASCEND950) {
+    } else if ((validSocVersion_ == ValidSocVersion::ASCEND950) || (validSocVersion_ == ValidSocVersion::ASCEND960)) {
         s2BaseSize_ = 128U;
     }
     return true;

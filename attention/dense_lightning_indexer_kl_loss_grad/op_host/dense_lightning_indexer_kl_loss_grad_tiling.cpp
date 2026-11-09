@@ -22,7 +22,11 @@
 #include "platform/platform_info.h"
 #include "op_host/tiling_templates_registry.h"
 #include "dense_lightning_indexer_kl_loss_grad_tiling_common.h"
+#if (defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)))
+#include "./arch92/dense_lightning_indexer_kl_loss_grad_tiling_general_regbase_arch92.h"
+#else
 #include "./arch35/dense_lightning_indexer_kl_loss_grad_tiling_general_regbase.h"
+#endif
 using std::map;
 using std::pair;
 using std::string;
