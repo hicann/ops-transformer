@@ -198,6 +198,7 @@
 |[aclnnMsaIndexScore](../../attention/msa_index_score/docs/aclnnMsaIndexScore.md)|计算 MSA Index Branch 的 block score，对每个 query token 与 KV sparse block 做 matmul+maxpool 得到重要性分数。|默认确定性实现|默认确定性实现|默认确定性实现|
 |[aclnnMsaIndexScoreV2](../../attention/msa_index_score/docs/aclnnMsaIndexScoreV2.md)|兼容 [aclnnMsaIndexScore](../../attention/msa_index_score/docs/aclnnMsaIndexScore.md)，支持指定 layout_query 与 pool_block_size。|默认确定性实现|默认确定性实现|默认确定性实现|
 |[aclnnMegaMhc](../../mhc/mega_mhc/docs/aclnnMegaMhc.md)|融合rms_norm_0、MHC Post、可选rms_norm_mid、MHC Pre和rms_norm_1，计算下一层输入及新的混合系数和残差状态。|-|-|默认确定性实现|
+|[aclnnTextGatedResidual](../../mhc/text_gated_residual/docs/aclnnTextGatedResidual.md)|融合分组 RMSNorm、低秩变换、门控混合及可选 inject。|-|-|默认确定性实现|
 |[aclnnMhcPre](../../mhc/mhc_pre/docs/aclnnMhcPre.md)|基于一系列计算得到MHC架构中hidden层的$H^{res}$和$H^{post}$投影矩阵以及Attention或MLP层的输入矩阵$h^{in}$。|默认确定性实现|默认确定性实现|默认确定性实现|
 |[aclnnMhcPreV2](../../mhc/mhc_pre/docs/aclnnMhcPreV2.md)|兼容[aclnnMhcPre](../../mhc/mhc_pre/docs/aclnnMhcPre.md)支持的功能，在此基础上新增opImplMode参数，供用户选择MhcPre计算模式。|-|-|默认确定性实现|
 |[aclnnMhcPreBackward](../../mhc/mhc_pre_backward/docs/aclnnMhcPreBackward.md)|[aclnnMhcPre](../../mhc/mhc_pre/docs/aclnnMhcPre.md)的反向传播。|默认确定性实现|默认确定性实现|默认确定性实现|

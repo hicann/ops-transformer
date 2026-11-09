@@ -2046,5 +2046,15 @@
     <td>AI Core</td>
     <td>输入understand段与generate段两路QKV融合张量，按cat_indices重排后拆分Q、K、V；对Q、K分别用两段各自的权重执行RMSNorm并做MRoPE多轴旋转位置编码，输出q；K、V按slot_mapping散写更新分页k_cache与v_cache。</td>
   </tr>
+  <tr>
+    <td>mhc</td>
+    <td><a href="../../mhc/text_gated_residual/README.md">text_gated_residual</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>融合分组 RMSNorm、低秩变换、门控混合及可选 inject。</td>
+  </tr>
 </tbody>
 </table>
