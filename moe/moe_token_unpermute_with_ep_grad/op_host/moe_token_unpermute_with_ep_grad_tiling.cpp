@@ -457,24 +457,9 @@ static ge::graphStatus SetTilingForTiling4MoeTokenUnpermuteWithEpGrad(gert::Tili
     int64_t hiddenSize = 0;
     const int64_t* topKPtr = attrPtr->GetAttrPointer<int64_t>(ATTR_TOPKNUM_IDX);
     int64_t topK = (topKPtr == nullptr) ? 1 : *topKPtr;
-    OP_CHECK_IF(topK < 1 || topK > MAX_TOPK,
-                OP_LOGE(context->GetNodeName(), "topkNum should be in [1, 512], but got %ld.", topK),
-                return ge::GRAPH_FAILED);
-    if (probShape != nullptr) {
-        const auto& shape = probShape->GetStorageShape();
-        OP_CHECK_IF(
-            shape.GetDimNum() != DIM_NUM_TWO,
-            OP_LOGE(context->GetNodeName(), "[MoeTokenUnpermuteWithEpGrad] probs dim number should be 2, but got %zu.",
-                    shape.GetDimNum()),
-            return ge::GRAPH_FAILED);
-        const int64_t probsTopK = shape.GetDim(DIM_1);
-        OP_CHECK_IF(probsTopK < 1 || probsTopK > MAX_TOPK,
-                    OP_LOGE(context->GetNodeName(), "probs dimension 1 should be in [1, 512], but got %ld.", probsTopK),
-                    return ge::GRAPH_FAILED);
-        OP_CHECK_IF(
-            topKPtr != nullptr && probsTopK != topK,
-            OP_LOGE(context->GetNodeName(), "topkNum (%ld) must equal probs dimension 1 (%ld).", topK, probsTopK),
-            return ge::GRAPH_FAILED);
+    if (topK < 1 || topK > MAX_TOPK) {
+        OP_LOGW(context->GetNodeName(), "[MoeTokenUnpermuteWithEpGrad] topkNum should be in [1, 512], but got %ld.",
+                topK);
     }
     int64_t totalNum = 0;
     int64_t numOutTokens = 0;
@@ -510,6 +495,11 @@ static ge::graphStatus SetTilingForTiling4MoeTokenUnpermuteWithEpGrad(gert::Tili
 
         if (probShape != nullptr) {
             const auto& probStorageShape = probShape->GetStorageShape();
+            OP_CHECK_IF(probStorageShape.GetDimNum() != DIM_NUM_TWO,
+                        OP_LOGE(context->GetNodeName(),
+                                "[MoeTokenUnpermuteWithEpGrad] probs dim number should be 2, but got %zu.",
+                                probStorageShape.GetDimNum()),
+                        return ge::GRAPH_FAILED);
             OP_CHECK_IF(probStorageShape.GetDim(DIM_0) != tokensNum,
                         OP_LOGE(context->GetNodeName(),
                                 "[MoeTokenUnpermuteWithEpGrad] probs dim0 should equal tokensNum, but got %ld and %ld.",
@@ -576,22 +566,6 @@ static ge::graphStatus SetTilingForTiling4MoeTokenUnpermuteWithEpGrad(gert::Tili
         totalNum = rowMap->GetStorageShape().GetDim(DIM_0);
         numOutTokens = (permutedTokensTensor == nullptr) ? rowMap->GetStorageShape().GetDim(DIM_0) :
                                                            permutedTokensShape->GetStorageShape().GetDim(DIM_0);
-    }
-
-    const auto* tokensGradShape = context->GetOutputShape(0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, tokensGradShape);
-    const auto& tokensGrad = tokensGradShape->GetStorageShape();
-    OP_CHECK_IF(
-        tokensGrad.GetDimNum() != DIM_NUM_TWO || tokensGrad.GetDim(DIM_0) != totalNum ||
-            tokensGrad.GetDim(DIM_1) != hiddenSize,
-        OP_LOGE(context->GetNodeName(), "permutedTokensGradOut shape must be (%ld, %ld).", totalNum, hiddenSize),
-        return ge::GRAPH_FAILED);
-    if (probShape != nullptr) {
-        const auto* probsGradShape = context->GetOutputShape(1);
-        OP_CHECK_NULL_WITH_CONTEXT(context, probsGradShape);
-        OP_CHECK_IF(probsGradShape->GetStorageShape() != probShape->GetStorageShape(),
-                    OP_LOGE(context->GetNodeName(), "probsGradOut shape must match probsOptional."),
-                    return ge::GRAPH_FAILED);
     }
 
     tiling.set_tokensNum(tokensNum);
