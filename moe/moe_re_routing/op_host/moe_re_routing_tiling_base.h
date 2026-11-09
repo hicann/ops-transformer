@@ -16,6 +16,7 @@
 #define OPS_BUILT_IN_OP_TILING_RUNTIME_MOE_RE_ROUTING_BASE_H_
 
 #include "moe_re_routing_tiling.h"
+#include "op_host/util/op_const_def.h"
 
 namespace optiling {
 
@@ -58,7 +59,7 @@ private:
 protected:
     int64_t coreNum_{0};
     int64_t ubSize_ = {0};
-    platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::RESERVED_VERSION;
+    NpuArch npuArch_ = Ops::Base::DAV_RESV;
     static constexpr int64_t INDEX_UB_SIZE = 256;
     static constexpr int64_t DOUBLE_BUFFER = 2;
     static constexpr size_t RESERVE_WORKSPACE_BYTE = 0;

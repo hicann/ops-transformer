@@ -89,7 +89,7 @@ struct ParamsMoeReRouting {
 struct MoeReRoutingCompileInfo {
     int64_t coreNum = 0;
     int64_t ubSize = 0;
-    platform_ascendc::SocVersion socVersion;
+    NpuArch npuArch;
 };
 
 } // namespace optiling

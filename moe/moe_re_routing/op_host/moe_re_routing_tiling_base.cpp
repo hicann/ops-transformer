@@ -95,14 +95,14 @@ ge::graphStatus MoeReRoutingTilingBase::GetPlatformInfo()
                     return ge::GRAPH_FAILED);
         coreNum_ = compileInfoPtr->coreNum;
         ubSize_ = compileInfoPtr->ubSize;
-        socVersion_ = compileInfoPtr->socVersion;
+        npuArch_ = compileInfoPtr->npuArch;
     } else {
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
         coreNum_ = ascendcPlatform.GetCoreNumAiv();
         int64_t ubSize = 0;
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ((uint64_t&)ubSize));
         ubSize_ = ubSize;
-        socVersion_ = ascendcPlatform.GetSocVersion();
+        npuArch_ = ascendcPlatform.GetCurNpuArch();
     }
     OP_CHECK_IF(
         (coreNum_ <= 0),

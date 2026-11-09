@@ -45,7 +45,7 @@ ge::graphStatus TilingPrepare4MoeReRouting(gert::TilingParseContext* context)
                 OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "compileInfo->ubSize",
                                           std::to_string(compileInfo->ubSize).c_str(), "> 0"),
                 return ge::GRAPH_FAILED);
-    compileInfo->socVersion = ascendcPlatform.GetSocVersion();
+    compileInfo->npuArch = ascendcPlatform.GetCurNpuArch();
     OP_LOGD(context, "coreNum: %ld, ubSize: %ld", compileInfo->coreNum, compileInfo->ubSize);
     OP_LOGD(context, "TilingPrepare4MoeReRouting success.");
     return ge::GRAPH_SUCCESS;

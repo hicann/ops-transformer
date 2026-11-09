@@ -16,6 +16,7 @@
 #define OPS_BUILT_IN_OP_TILING_RUNTIME_MOE_RE_ROUTING_MEMBASE_H_
 
 #include "moe_re_routing_tiling.h"
+#include "op_host/util/op_const_def.h"
 
 namespace optiling {
 
@@ -41,7 +42,7 @@ protected:
 
 private:
     uint64_t tilingKey_ = 0;
-    platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::RESERVED_VERSION;
+    NpuArch npuArch_ = Ops::Base::DAV_RESV;
     MoeReRoutingTilingData tilingData_;
     ParamsMoeReRouting commonParams_;
 };
