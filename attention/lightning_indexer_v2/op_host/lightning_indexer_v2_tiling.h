@@ -88,6 +88,7 @@ constexpr uint32_t TOPK_MAX = 8192;
 constexpr uint32_t TOPK_MULTIPLE = 1024;
 constexpr uint32_t G_SIZE_LIMIT = 64;
 constexpr uint32_t METADATA_LIMIT = 2048;
+constexpr int32_t BATCH_CONSISTENCY_LEVEL = 3;
 // ------------------candidate 两级TopK 常量（与 kernel common_arch22.h 保持一致）------------------
 constexpr int32_t CANDIDATE_TOPK_BLOCKS_OFF = -1;    // 关闭 candidate（默认值）
 constexpr uint32_t CANDIDATE_TOPK_BLOCKS_FIX = 2048; // 块级 topk 上限（BASE_TOPK 排序/归并结构约束）
@@ -96,6 +97,11 @@ constexpr uint32_t CANDIDATE_BLOCK_SIZE_DEFAULT = 8;
 constexpr uint32_t CANDIDATE_BLOCK_SIZE_MIN = 2; // [MIN, MAX] 内 2 的幂
 constexpr uint32_t CANDIDATE_BLOCK_SIZE_MAX = 64;
 
+// cubeFillVector模版限制常量
+constexpr int32_t QUERY_HEAD_24 = 24;
+constexpr int32_t QUERY_HEAD_32 = 32;
+constexpr int32_t TOPK_NUM_1024 = 1024;
+constexpr int32_t TOPK_NUM_2048 = 2048;
 // -----------算子TilingData定义---------------
 BEGIN_TILING_DATA_DEF(LIV2TilingData)
 TILING_DATA_FIELD_DEF(uint32_t, bSize)

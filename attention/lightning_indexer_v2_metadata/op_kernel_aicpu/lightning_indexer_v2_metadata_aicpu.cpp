@@ -23,9 +23,18 @@ uint32_t LightningIndexerV2MetadataCpuKernel::Compute(CpuKernelContext& ctx)
     if (!success) {
         return KERNEL_STATUS_PARAM_INVALID;
     }
+    const auto soc = ProcessSocVersion();
+    if (soc == ValidSocVersion::ASCEND910B) {
+        auto* metadata = static_cast<optiling::detail::LiV2MetadataArch22*>(metadata_->GetData());
+        // A3 普通路径自行分核，Fast 不准入时输出禁用标志并正常返回
+        metadata->fastMetadata = {};
+        GenFastMetadataArch22();
+        return KERNEL_STATUS_OK;
+    }
+
     SplitResult splitRes{aicCoreNum_, aivCoreNum_};
     success = BalanceSchedule(splitRes) && GenMetadata(splitRes);
-    if (success) {
+    if (success && soc == ValidSocVersion::ASCEND950) {
         GenFastMetadata();
     }
     return success ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;

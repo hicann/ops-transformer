@@ -1146,6 +1146,7 @@ void LIV2InfoParser::GenerateInfo(LIV2TilingInfo& liInfo)
     liInfo.s1Size = s1Size_;
     liInfo.s2Size = s2Size_;
     liInfo.gSize = gSize_;
+    liInfo.qkHeadDim = static_cast<uint32_t>(headDim_);
 
     liInfo.inputQType = inputQType_;
     liInfo.inputKType = inputKType_;
@@ -1245,13 +1246,46 @@ static uint64_t LiV2FastWorkspaceSize(uint32_t blocks)
     return rowsPerBlock * blocks * keyIndexPairSize * (topk + candidates * epochs) * sizeof(uint32_t);
 }
 
+// Host checks static capabilities; actual-length and performance admission stay on the AICPU.
+static bool LiV2CanUseFastMetadataArch22(gert::TilingContext* context, const LIV2TilingInfo& info)
+{
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(info.platformInfo);
+    // Cube补Vector的优化只支持A2/A3平台
+    return (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_2201) && (info.inputQLayout == DataLayout::TND) &&
+           (info.qkHeadDim == HEAD_DIM_LIMIT) && (context->GetDeterministicLevel() != BATCH_CONSISTENCY_LEVEL) &&
+           (info.inputKLayout == DataLayout::TND || info.inputKLayout == DataLayout::PA_BBND) &&
+           (info.maskMode == SPARSE_MODE_LOWER) && (info.cmpRatio == 1) && (info.returnValue == 0) &&
+           (info.n1Size == QUERY_HEAD_24 || info.n1Size == QUERY_HEAD_32) && (info.n2Size == 1) &&
+           (info.candidateTopkBlocks == CANDIDATE_TOPK_BLOCKS_OFF) &&
+           (info.topk == TOPK_NUM_1024 || info.topk == TOPK_NUM_2048) &&
+           (info.opParamInfo.outputIdxOffset.tensor == nullptr);
+}
+
+static uint64_t LiV2FastWorkspaceSizeArch22(uint32_t aicNum)
+{
+    // Match InitCubeFillVector: an eight-slot score ring and two AIV TopK states per AIC.
+    constexpr uint64_t SCORE_RING_DEPTH = 8;
+    constexpr uint64_t S2_BASE_SIZE = 512;
+    constexpr uint64_t SCORE_STORAGE_COLS = 16;
+    constexpr uint64_t AIV_PER_AIC = 2;
+    constexpr uint64_t CANDIDATE_GROUP_NUM = 3;
+    constexpr uint64_t QUERY_ROWS_PER_AIV = 4;
+    constexpr uint64_t TOPK_SIZE = 2048;
+    constexpr uint64_t TOPK_FIELD_NUM = 2;
+    const uint64_t scoreRingSize = SCORE_RING_DEPTH * S2_BASE_SIZE * SCORE_STORAGE_COLS * sizeof(float);
+    const uint64_t topkStateSize =
+        AIV_PER_AIC * CANDIDATE_GROUP_NUM * QUERY_ROWS_PER_AIV * TOPK_SIZE * TOPK_FIELD_NUM * sizeof(float);
+    return static_cast<uint64_t>(aicNum) * (scoreRingSize + topkStateSize);
+}
+
 ge::graphStatus LightningIndexerV2Tiling::DoTiling(LIV2TilingInfo* tilingInfo)
 {
     // -------------set blockdim-----------------
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo->platformInfo);
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
     uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
-    const bool fastCandidate = LiV2CanUseFastMetadata(context_, *tilingInfo);
+    const bool cubeFillVectorFastArch22 = LiV2CanUseFastMetadataArch22(context_, *tilingInfo);
+    const bool fastCandidate = cubeFillVectorFastArch22 || LiV2CanUseFastMetadata(context_, *tilingInfo);
     uint32_t blockDim = ascendcPlatform.CalcTschBlockDim(aivNum, aicNum, aivNum);
     context_->SetBlockDim(blockDim);
 
@@ -1291,8 +1325,10 @@ ge::graphStatus LightningIndexerV2Tiling::DoTiling(LIV2TilingInfo* tilingInfo)
     if (fastCandidate) {
         // The two kernels are mutually exclusive. Reuse the generic scratch;
         // keep its original layout and reserve enough bytes for either path.
-        workspaceSize =
-            std::max(workspaceSize, ascendcPlatform.GetLibApiWorkSpaceSize() + LiV2FastWorkspaceSize(aicNum));
+        // host侧无法确定是否真正的准入fast路径，workspace按照大容量申请
+        const uint64_t fastWorkspaceSize =
+            cubeFillVectorFastArch22 ? LiV2FastWorkspaceSizeArch22(aicNum) : LiV2FastWorkspaceSize(aicNum);
+        workspaceSize = std::max(workspaceSize, ascendcPlatform.GetLibApiWorkSpaceSize() + fastWorkspaceSize);
     }
 
     size_t* liV2WorkSpaces = context_->GetWorkspaceSizes(1);
@@ -1316,7 +1352,6 @@ ge::graphStatus LightningIndexerV2Tiling::DoTiling(LIV2TilingInfo* tilingInfo)
     // candidate (two-level topk)：-1 原值下发，kernel 侧推导 on/off
     tilingData_.set_candidateTopkBlocks(tilingInfo->candidateTopkBlocks);
     tilingData_.set_candidateBlockSize(tilingInfo->candidateBlockSize);
-    constexpr int32_t BATCH_CONSISTENCY_LEVEL = 3;
     tilingData_.set_batchInvariant(context_->GetDeterministicLevel() == BATCH_CONSISTENCY_LEVEL ? 1U : 0U);
     tilingData_.set_usedCoreNum(blockDim);
     tilingData_.set_batchSupperFlag(tilingInfo->batchSupperFlag);

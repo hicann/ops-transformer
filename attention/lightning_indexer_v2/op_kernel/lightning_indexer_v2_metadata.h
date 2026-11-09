@@ -50,6 +50,13 @@ inline constexpr uint32_t LI_V2_FAST_HEADER_WORDS = 2U;
 inline constexpr uint32_t LI_V2_FAST_TILE_START_INDEX = LI_V2_FAST_METADATA_OFFSET + LI_V2_FAST_HEADER_WORDS;
 inline constexpr uint32_t LI_V2_FAST_TILE_END_INDEX = LI_V2_FAST_TILE_START_INDEX + LI_V2_FAST_CORE_MAX_NUM;
 
+inline constexpr uint32_t LI_V2_FAST_CORE_INFO_INDEX = LI_V2_FAST_METADATA_OFFSET + 2U;
+inline constexpr uint32_t LI_V2_FAST_CORE_INFO_SIZE = 4U;
+inline constexpr uint32_t LI_V2_FAST_BN2_START_INDEX = 0U;
+inline constexpr uint32_t LI_V2_FAST_M_START_INDEX = 1U;
+inline constexpr uint32_t LI_V2_FAST_BN2_END_INDEX = 2U;
+inline constexpr uint32_t LI_V2_FAST_M_END_INDEX = 3U;
+
 // LD Metadata Index Definitions
 inline constexpr uint32_t LD_V2_CORE_ENABLE_INDEX = 0;
 inline constexpr uint32_t LD_V2_BN2_IDX_INDEX = 1;
@@ -85,15 +92,32 @@ struct LiV2FastMetadata {
     uint32_t tileEnd[LI_V2_FAST_CORE_MAX_NUM];
 };
 
+struct LiV2FastMetadataArch22 {
+    uint32_t enable;
+    uint32_t coreNum;
+    // Whole Q tiles own all visible K blocks, so K boundaries need no storage.
+    uint32_t coreInfo[AIC_CORE_MAX_NUM][LI_V2_FAST_CORE_INFO_SIZE];
+};
+
 struct LiV2Metadata {
     uint32_t liV2Metadata[AIC_CORE_MAX_NUM][LI_V2_METADATA_SIZE];
     uint32_t ldV2Metadata[AIV_CORE_MAX_NUM][LD_V2_METADATA_SIZE];
     LiV2FastMetadata fastMetadata;
 };
+
+// AICPU 按 SoC 将同一输出地址转换为对应类型，两种格式的 Fast 区起始偏移保持一致
+struct LiV2MetadataArch22 {
+    uint32_t liV2Metadata[AIC_CORE_MAX_NUM][LI_V2_METADATA_SIZE];
+    uint32_t ldV2Metadata[AIV_CORE_MAX_NUM][LD_V2_METADATA_SIZE];
+    LiV2FastMetadataArch22 fastMetadata;
+};
 }; // namespace detail
 
 static_assert(sizeof(detail::LiV2Metadata) == (LI_V2_FAST_TILE_END_INDEX + LI_V2_FAST_CORE_MAX_NUM) * sizeof(uint32_t));
+static_assert(sizeof(detail::LiV2MetadataArch22) ==
+              (LI_V2_FAST_CORE_INFO_INDEX + AIC_CORE_MAX_NUM * LI_V2_FAST_CORE_INFO_SIZE) * sizeof(uint32_t));
 static_assert(LI_V2_METADATA_TOTAL_SIZE * sizeof(LI_V2_METADATA_T) >= sizeof(detail::LiV2Metadata));
+static_assert(LI_V2_METADATA_TOTAL_SIZE * sizeof(LI_V2_METADATA_T) >= sizeof(detail::LiV2MetadataArch22));
 }; // namespace optiling
 
 #endif

@@ -31,6 +31,13 @@ constexpr int64_t FA_TOLERANCE_RATIO = 2;
 constexpr uint32_t COST_WEIGHT_M = 6U;
 constexpr uint32_t COST_WEIGHT_S2 = 10U;
 
+constexpr int32_t QUERY_HEAD_24 = 24;
+constexpr int32_t QUERY_HEAD_32 = 32;
+constexpr int32_t TOPK_NUM_1024 = 1024;
+constexpr int32_t TOPK_NUM_2048 = 2048;
+constexpr uint32_t HEAD_DIM_LIMIT = 128;
+constexpr uint32_t SPARSE_MODE_LOWER = 3;
+
 enum BlockType : uint32_t {
     NORMAL_BLOCK = 0,
     TAIL_BLOCK,
@@ -243,6 +250,7 @@ private:
     bool InitFastSequenceInputs(FastSequenceInputs& inputs) const;
     bool GetFastSequenceWork(uint32_t batch, const FastSequenceInputs& inputs, uint32_t& q, uint32_t& k);
     void GenFastMetadata();
+    void GenFastMetadataArch22();
 
     // util
     uint32_t GetS1SeqSize(uint32_t bIdx);

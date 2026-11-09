@@ -40,6 +40,22 @@
             return; \
         } \
     } while (0)
+#elif !((defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)) || (__CCE_AICORE__ == 310))
+#include "arch22/lightning_indexer_v2_kernel_fast_arch22.h"
+#define INVOKE_LI_V2_FAST(...) \
+    do { \
+        if (tiling_data->fastPathCandidate != 0U && metadata != nullptr) { \
+            GlobalTensor<uint32_t> fastMetadata; \
+            fastMetadata.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(metadata)); \
+            if (fastMetadata.GetValue(optiling::LI_V2_FAST_ENABLE_INDEX) != 0U) { \
+                LightningIndexerV2KernelFast<LIV2FastCommon::LIV2Type<__VA_ARGS__, true>> fastOp; \
+                fastOp.Init(q, k, w, cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, blocktable, \
+                            outputIdxOffset, metadata, sparseIndices, sparseValues, user, tiling_data, &tPipe); \
+                fastOp.Process(); \
+                return; \
+            } \
+        } \
+    } while (0)
 #else
 #define INVOKE_LI_V2_FAST(...)
 #endif
@@ -64,9 +80,10 @@ using namespace LIV2Kernel;
 // DAV_3510 上拒绝 candidate 模式）。
 #define INVOKE_LI_CANDIDATE_OP_IMPL(templateClass, ...) \
     do { \
-        templateClass<LIV2Type<__VA_ARGS__>> op; \
         GET_TILING_DATA_WITH_STRUCT(LIV2TilingData, tiling_data_in, tiling); \
         const LIV2TilingData* __restrict tiling_data = &tiling_data_in; \
+        INVOKE_LI_V2_FAST(__VA_ARGS__); \
+        templateClass<LIV2Type<__VA_ARGS__>> op; \
         op.Init(q, k, w, cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, blocktable, outputIdxOffset, \
                 metadata, sparseIndices, sparseValues, candidateBlockIndicesOut, candidateBlockLength, user, \
                 tiling_data, &tPipe); \
