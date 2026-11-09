@@ -92,12 +92,21 @@ ge::graphStatus QfaBaseChecker::CheckTensorContiguous(const uint32_t& tensorDimN
     if (tensorDimNum == 0 || tensorDimNum == 1) {
         return ge::GRAPH_SUCCESS;
     }
+    // 静态编译路径下 GE 对连续张量只下发一维 stride {1}(紧凑写法)，表示整体连续。
+    // 不识别该写法会按维读到超出行数范围的值，把连续张量误判为非连续
+    // (v_tail 校验据此误报"连续轴非连续")。
+    if (strides->GetDimNum() == 1 && strides->GetStride(0) == 1) {
+        return ge::GRAPH_SUCCESS;
+    }
+    // 静态编译路径对连续张量的紧凑写法为单元素 {1}，已在上方按连续放行；
+    // 其余形态(含 GE 只填 dim_num 但数组值真实的截断写法)沿用逐维比较，
+    // 保证最内轴非连续等非法输入仍被拦截。
     uint64_t preStride = 1; // 连续场景最后一维的 stride 默认为 1
     for (index = static_cast<int32_t>(tensorDimNum) - 1; index >= 0; index--) {
         if (inputShape.GetDim(index) == 1) { // dim=1 时步长不影响连续性
             continue;
         }
-        if (preStride != strides->GetStride(index)) {
+        if (preStride != static_cast<uint64_t>(strides->GetStride(index))) {
             return ge::GRAPH_FAILED;
         }
         preStride *= inputShape.GetDim(index);

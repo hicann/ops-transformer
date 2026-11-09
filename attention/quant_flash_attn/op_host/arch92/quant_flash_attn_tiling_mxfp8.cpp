@@ -376,7 +376,9 @@ void QuantFlashAttnTilingArch92::SetQFATilingData()
     auto& vTailStrides = tilingData_.baseTiling.quantFlashAttnVTailParams.vTailStrides;
     vTailStrides.bnStride = 0;
     vTailStrides.n2Stride = 0;
-    if (qfaInfo_->hasVTail && qfaInfo_->vTailStrides != nullptr) {
+    // stride 不足两维(如静态编译路径下连续张量的紧凑写法 {1})时保持 0/0，由 kernel 按连续布局推算；
+    // 否则 bnStride 会被写成 1，PA_BnNBsD/PA_NZ 会当真值使用，导致按 block 寻址错位
+    if (qfaInfo_->hasVTail && qfaInfo_->vTailStrides != nullptr && qfaInfo_->vTailStrides->GetDimNum() >= 2) {
         vTailStrides.bnStride = qfaInfo_->vTailStrides->GetStride(0);
         vTailStrides.n2Stride = qfaInfo_->vTailStrides->GetStride(1);
     }
