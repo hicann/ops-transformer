@@ -58,10 +58,27 @@ struct QSFAType {
     using outputType = OUT_T;
     static constexpr bool flashDecode = FLASH_DECODE;
     static constexpr bool noRope = NO_ROPE;
+    static constexpr bool adaptiveAddresses = false;
     static constexpr QSFA_LAYOUT layout = LAYOUT_T;
     static constexpr QSFA_LAYOUT kvLayout = KV_LAYOUT_T;
     static constexpr int templateMode = TEMPLATE_MODE;
     static constexpr bool pageAttention = (KV_LAYOUT_T == QSFA_LAYOUT::PA_BSND);
+};
+
+// Internal specialization only; public template keys and small-table types stay unchanged.
+template <typename BaseType>
+struct QSFAAdaptiveAddressType : BaseType {
+    static constexpr bool adaptiveAddresses = true;
+};
+
+template <typename BaseType, bool UseLargeTable>
+struct QSFAAddressTableType {
+    using type = BaseType;
+};
+
+template <typename BaseType>
+struct QSFAAddressTableType<BaseType, true> {
+    using type = QSFAAdaptiveAddressType<BaseType>;
 };
 
 // ================================Util functions==================================

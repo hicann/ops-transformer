@@ -62,7 +62,8 @@ using namespace AscendC;
 #else
 #define QSFA_OP_IMPL(templateClass, tilingdataClass, ...) \
     do { \
-        templateClass<QSFAType<__VA_ARGS__>> op; \
+        using KernelType = typename QSFAAddressTableType<QSFAType<__VA_ARGS__>, IS_VEC_S2PHYADDR != 0>::type; \
+        templateClass<KernelType> op; \
         GET_TILING_DATA_WITH_STRUCT(tilingdataClass, tiling_data_in, tiling); \
         const tilingdataClass* __restrict tiling_data = &tiling_data_in; \
         op.Init(query, key, value, sparseIndices, keyScale, valueScale, blocktable, actualSeqLengthsQuery, \

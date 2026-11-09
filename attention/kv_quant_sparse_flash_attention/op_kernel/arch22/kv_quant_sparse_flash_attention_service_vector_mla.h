@@ -79,6 +79,9 @@ public:
     // ================================Vector0==========================================
     __aicore__ inline void MergeKv(const RunInfo& kvVecRunInfo);
     __aicore__ inline bool PrepareQueryAddresses(int64_t topkBase, int64_t s2IdLimit, const RunInfo& info);
+    __aicore__ inline bool PrepareQueryAddressCache(int64_t topkBase, int64_t s2IdLimit, const RunInfo& info);
+    __aicore__ inline bool PrepareAddressBatch(int64_t topkBase, int32_t count, int64_t s2IdLimit, const RunInfo& info,
+                                               bool wholeQuery = false);
     __aicore__ inline void MergeKvTq4(const RunInfo& kvVecRunInfo);
     __aicore__ inline void DecodeTopkPairOptimized(int32_t idx0, int32_t idx1, int64_t posInBlock, int64_t& realS2Idx0,
                                                    int64_t& realS2Idx1);
@@ -157,6 +160,17 @@ public:
     static constexpr uint32_t REPEATE_STRIDE_UP_BOUND = 256;
 
 private:
+    struct AddressIndexBounds {
+        int32_t min;
+        int32_t max;
+    };
+    __aicore__ __attribute__((always_inline)) inline AddressIndexBounds ReduceAddressBounds(
+        const LocalTensor<float>& values, const LocalTensor<float>& reduceWork, const LocalTensor<float>& bounds,
+        int32_t full);
+    __aicore__ __attribute__((always_inline)) inline void GatherSparsePageIds(
+        const LocalTensor<int32_t>& indices, const LocalTensor<int32_t>& table, const LocalTensor<int32_t>& dmaOffsets,
+        const LocalTensor<int32_t>& addresses, DataCopyExtParams& params, DataCopyPadExtParams<int32_t>& padding,
+        int32_t count, int64_t batchBase);
     static constexpr bool PAGE_ATTENTION = QSFAT::pageAttention;
     static constexpr int TEMPLATE_MODE = QSFAT::templateMode;
     static constexpr bool FLASH_DECODE = QSFAT::flashDecode;
@@ -251,9 +265,19 @@ private:
     int64_t sparseBlockSize_ = 1;
     int64_t sparseBlockCount_ = 0;
     int64_t s2BaseSize_ = 0;
+    // tq4ScaleBuf_ is a 4-KiB allocation; one page-table entry is INT32.
+    static constexpr int32_t ADDRESS_TABLE_CACHE_PAGES = ConstInfo::BUFFER_SIZE_BYTE_4K / sizeof(int32_t);
+    static constexpr int32_t ADDRESS_TABLE_SEGMENT_PAGES = ADDRESS_TABLE_CACHE_PAGES;
+    // Temporary table staging reuses the existing 32-KiB inputBuff2.
+    static constexpr int32_t ADDRESS_TABLE_MAX_PAGES = ConstInfo::BUFFER_SIZE_BYTE_32K / sizeof(int32_t);
+    static constexpr int32_t ADDRESS_RESULT_CAPACITY = ConstInfo::BUFFER_SIZE_BYTE_8K / sizeof(int32_t) - 512;
+    int32_t largeTableCount_ = 0;
+    int32_t largeTableBatch_ = -1;
+    int32_t largeTableBegin_ = -1;
     int32_t addressTableBatch_ = -1;
     bool addressTableValid_ = false;
     bool queryAddressesValid_ = false;
+    int32_t queryAddressCount_ = 0;
     int32_t kvCacheBlockShift_ = -1;
     int64_t kvCacheBlockMask_ = 0;
 };
@@ -1835,9 +1859,277 @@ __aicore__ inline void QSFAVectorService<QSFAT>::CopyInKvOptimized(int64_t& mte2
 }
 
 template <typename QSFAT>
+__aicore__ __attribute__((always_inline)) inline typename QSFAVectorService<QSFAT>::AddressIndexBounds
+QSFAVectorService<QSFAT>::ReduceAddressBounds(const LocalTensor<float>& values, const LocalTensor<float>& reduceWork,
+                                              const LocalTensor<float>& bounds, int32_t full)
+{
+    ReduceMin(bounds, values, reduceWork, full, false);
+    PipeBarrier<PIPE_V>();
+    ReduceMax(bounds[8], values, reduceWork, full, false);
+    SetFlag<HardEvent::V_S>(6);
+    WaitFlag<HardEvent::V_S>(6);
+    const int32_t minIndex = static_cast<int32_t>(bounds.GetValue(0));
+    const int32_t maxIndex = static_cast<int32_t>(bounds.GetValue(8));
+    return {minIndex, maxIndex};
+}
+
+template <typename QSFAT>
+__aicore__ __attribute__((always_inline)) inline void QSFAVectorService<QSFAT>::GatherSparsePageIds(
+    const LocalTensor<int32_t>& indices, const LocalTensor<int32_t>& table, const LocalTensor<int32_t>& dmaOffsets,
+    const LocalTensor<int32_t>& addresses, DataCopyExtParams& params, DataCopyPadExtParams<int32_t>& padding,
+    int32_t count, int64_t batchBase)
+{
+    constexpr int32_t PAGE_ID_SLOT_ELEMS = 8; // One 32-byte DMA destination per page ID.
+    // Issue independent page-ID reads through MTE2, then wait once. This
+    // avoids a table-size ceiling and serial GM GetValue page lookups.
+    // Bound sparse staging independently of whole-query K. A chunk uses
+    // at most 256 * 32 bytes, including destination alignment padding.
+    for (int32_t base = 0; base < count; base += 256) {
+        const int32_t chunk = count - base < 256 ? count - base : 256;
+        params.blockLen = sizeof(int32_t);
+        for (int32_t j = 0; j < chunk; ++j) {
+            const int32_t logicalPage = indices.GetValue(base + j) >> 7;
+            DataCopyPad(table[j * PAGE_ID_SLOT_ELEMS], blkTableGm_[batchBase + logicalPage], params, padding);
+            dmaOffsets.SetValue(j, j * PAGE_ID_SLOT_ELEMS * sizeof(int32_t));
+        }
+        SetFlag<HardEvent::MTE2_V>(6);
+        WaitFlag<HardEvent::MTE2_V>(6);
+        SetFlag<HardEvent::S_V>(6);
+        WaitFlag<HardEvent::S_V>(6);
+        const int32_t vectorCount = chunk / 128 * 128;
+        if (vectorCount > 0) {
+            Gather(addresses[base], table, dmaOffsets.template ReinterpretCast<uint32_t>(), 0, vectorCount);
+        }
+        SetFlag<HardEvent::V_S>(6);
+        WaitFlag<HardEvent::V_S>(6);
+        SetFlag<HardEvent::MTE2_S>(6);
+        WaitFlag<HardEvent::MTE2_S>(6);
+        for (int32_t j = vectorCount; j < chunk; ++j) {
+            addresses.SetValue(base + j, table.GetValue(j * PAGE_ID_SLOT_ELEMS));
+        }
+        SetFlag<HardEvent::V_MTE2>(6);
+        WaitFlag<HardEvent::V_MTE2>(6);
+    }
+}
+
+template <typename QSFAT>
+__aicore__ inline bool QSFAVectorService<QSFAT>::PrepareAddressBatch(int64_t topkBase, int32_t count, int64_t s2IdLimit,
+                                                                     const RunInfo& info, bool wholeQuery)
+{
+    queryAddressesValid_ = false;
+    queryAddressCount_ = 0;
+    // Short tails keep the existing scalar path; all temporary storage below
+    // is bounded by the current AIV's S2 segment, not by the table width or K.
+    if (count < 128 || count > ADDRESS_RESULT_CAPACITY ||
+        ((count + 127) / 128 * 128) * 7 * sizeof(int32_t) > ConstInfo::BUFFER_SIZE_BYTE_32K * 2) {
+        return false;
+    }
+    PipeBarrier<PIPE_ALL>();
+    const int32_t span = ((count + 127) / 128) * 128;
+    int32_t full = count / 128 * 128;
+    LocalTensor<int32_t> work = inputBuff1.Get<int32_t>();
+    LocalTensor<int32_t> indices = work;
+    LocalTensor<int32_t> page = work[span];
+    LocalTensor<int32_t> offset = work[span * 2];
+    LocalTensor<float> values = work[span * 3].template ReinterpretCast<float>();
+    LocalTensor<float> reduceWork = work[span * 4].template ReinterpretCast<float>();
+    LocalTensor<float> bounds = work[span * 5].template ReinterpretCast<float>();
+    LocalTensor<int32_t> dmaOffsets = work[span * 6];
+    LocalTensor<int32_t> addresses = v0ValidSizeUb_[512];
+    DataCopyExtParams params;
+    params.blockCount = 1;
+    params.blockLen = count * sizeof(int32_t);
+    params.srcStride = 0;
+    params.dstStride = 0;
+    DataCopyPadExtParams<int32_t> padding{false, 0, 0, 0};
+    if (wholeQuery) {
+        const int32_t blocks = info.actS2Size / 512;
+        const int32_t tail = info.actS2Size % 512;
+        if (blocks > 0) {
+            params.blockCount = blocks;
+            params.blockLen = 256 * sizeof(int32_t);
+            params.srcStride = 256 * sizeof(int32_t);
+            DataCopyPad(indices, topkGm_[topkBase + GetSubBlockIdx() * 256], params, padding);
+        }
+        if (tail > 0) {
+            params.blockCount = 1;
+            params.blockLen = tail * sizeof(int32_t);
+            params.srcStride = 0;
+            DataCopyPad(indices[blocks * 256], topkGm_[topkBase + blocks * 512], params, padding);
+        }
+    } else {
+        DataCopyPad(indices, topkGm_[topkBase], params, padding);
+    }
+    params.blockCount = 1;
+    params.srcStride = 0;
+    SetFlag<HardEvent::MTE2_S>(6);
+    WaitFlag<HardEvent::MTE2_S>(6);
+    const int64_t tableWidth = kvVecConstInfo.maxBlockNumPerBatch;
+    const int64_t indexLimit = s2IdLimit < tableWidth * 128L ? s2IdLimit : tableWidth * 128L;
+    int32_t minIndex = INT32_MAX;
+    int32_t maxIndex = 0;
+    // FP32 exactly represents every index in this range. Use scalar bounds
+    // beyond it rather than accepting rounded, potentially invalid indices.
+    if (indexLimit <= (1L << 24)) {
+        SetFlag<HardEvent::MTE2_V>(6);
+        WaitFlag<HardEvent::MTE2_V>(6);
+        Cast(values, indices, RoundMode::CAST_NONE, full);
+        PipeBarrier<PIPE_V>();
+        const AddressIndexBounds indexBounds = ReduceAddressBounds(values, reduceWork, bounds, full);
+        minIndex = indexBounds.min;
+        maxIndex = indexBounds.max;
+        for (int32_t j = full; j < count; ++j) {
+            const int32_t index = indices.GetValue(j);
+            minIndex = index < minIndex ? index : minIndex;
+            maxIndex = index > maxIndex ? index : maxIndex;
+        }
+    } else {
+        for (int32_t j = 0; j < count; ++j) {
+            const int32_t index = indices.GetValue(j);
+            minIndex = index < minIndex ? index : minIndex;
+            maxIndex = index > maxIndex ? index : maxIndex;
+        }
+    }
+    if (minIndex < 0) {
+        // The operator contract places invalid indices after the valid prefix.
+        // Search the AIV's ordered subsequence; do not translate any sentinel.
+        int32_t lo = 0;
+        int32_t hi = count;
+        while (lo < hi) {
+            const int32_t mid = lo + (hi - lo) / 2;
+            if (indices.GetValue(mid) >= 0) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        count = lo;
+        if (count < 128) {
+            return false;
+        }
+        full = count / 128 * 128;
+        minIndex = INT32_MAX;
+        maxIndex = 0;
+        if (indexLimit <= (1L << 24)) {
+            // values already contains the original full-vector conversion.
+            const AddressIndexBounds indexBounds = ReduceAddressBounds(values, reduceWork, bounds, full);
+            minIndex = indexBounds.min;
+            maxIndex = indexBounds.max;
+            for (int32_t j = full; j < count; ++j) {
+                const int32_t index = indices.GetValue(j);
+                minIndex = index < minIndex ? index : minIndex;
+                maxIndex = index > maxIndex ? index : maxIndex;
+            }
+        } else {
+            for (int32_t j = 0; j < count; ++j) {
+                const int32_t index = indices.GetValue(j);
+                minIndex = index < minIndex ? index : minIndex;
+                maxIndex = index > maxIndex ? index : maxIndex;
+            }
+        }
+    }
+    if (minIndex < 0 || maxIndex >= indexLimit) {
+        return false;
+    }
+    const int32_t minPage = minIndex >> 7;
+    const int32_t maxPage = maxIndex >> 7;
+    const int64_t effectivePages = (indexLimit + 127) / 128;
+    const int64_t batchBase = info.bIdx * tableWidth;
+    const bool cachedWindow = largeTableBatch_ == static_cast<int32_t>(info.bIdx) && minPage >= largeTableBegin_ &&
+                              maxPage < largeTableBegin_ + largeTableCount_;
+    const bool useWindow = effectivePages <= ADDRESS_TABLE_CACHE_PAGES || cachedWindow ||
+                           maxPage - minPage + 1 <= ADDRESS_TABLE_CACHE_PAGES;
+    const int32_t windowBegin =
+        cachedWindow ? largeTableBegin_ : (effectivePages <= ADDRESS_TABLE_CACHE_PAGES ? 0 : minPage);
+    const int32_t rangePages = maxPage - minPage + 1;
+    // Prefer contiguous table reads while their size fits both the temporary
+    // buffer and the aligned storage required by per-index page-ID reads.
+    const bool gatherPageIds = !useWindow && (rangePages > ADDRESS_TABLE_MAX_PAGES || rangePages > count * 8);
+    const int32_t tableBegin = useWindow ? windowBegin : minPage;
+    LocalTensor<int32_t> table = useWindow ? tq4ScaleBuf_.Get<int32_t>() : inputBuff2.Get<int32_t>();
+    if (gatherPageIds) {
+        GatherSparsePageIds(indices, table, dmaOffsets, addresses, params, padding, count, batchBase);
+    } else if (!useWindow || !cachedWindow) {
+        const int32_t tableCount = useWindow ?
+                                       static_cast<int32_t>(effectivePages - tableBegin < ADDRESS_TABLE_SEGMENT_PAGES ?
+                                                                effectivePages - tableBegin :
+                                                                ADDRESS_TABLE_SEGMENT_PAGES) :
+                                       maxPage - minPage + 1;
+        for (int32_t start = 0; start < tableCount; start += ADDRESS_TABLE_SEGMENT_PAGES) {
+            const int32_t size =
+                tableCount - start < ADDRESS_TABLE_SEGMENT_PAGES ? tableCount - start : ADDRESS_TABLE_SEGMENT_PAGES;
+            params.blockLen = size * sizeof(int32_t);
+            DataCopyPad(table[start], blkTableGm_[batchBase + tableBegin + start], params, padding);
+        }
+        if (useWindow) {
+            largeTableBatch_ = info.bIdx;
+            largeTableBegin_ = tableBegin;
+            largeTableCount_ = tableCount;
+        }
+    }
+    SetFlag<HardEvent::MTE2_V>(6);
+    WaitFlag<HardEvent::MTE2_V>(6);
+    ShiftRight(page, indices, static_cast<int32_t>(7), full);
+    PipeBarrier<PIPE_V>();
+    ShiftLeft(offset, page, static_cast<int32_t>(7), full);
+    PipeBarrier<PIPE_V>();
+    Sub(offset, indices, offset, full);
+    if (!gatherPageIds) {
+        Adds(page, page, -tableBegin, full);
+        PipeBarrier<PIPE_V>();
+        ShiftLeft(page, page, static_cast<int32_t>(2), full);
+        PipeBarrier<PIPE_V>();
+        Gather(addresses, table, page.template ReinterpretCast<uint32_t>(), 0, full);
+    }
+    PipeBarrier<PIPE_V>();
+    Cast(values, addresses, RoundMode::CAST_NONE, full);
+    PipeBarrier<PIPE_V>();
+    ReduceMin(bounds, values, reduceWork, full, false);
+    PipeBarrier<PIPE_V>();
+    ReduceMax(bounds[8], values, reduceWork, full, false);
+    SetFlag<HardEvent::V_S>(6);
+    WaitFlag<HardEvent::V_S>(6);
+    if (bounds.GetValue(0) < 0 || bounds.GetValue(8) > (INT32_MAX - 127) / 128) {
+        return false;
+    }
+    ShiftLeft(addresses, addresses, static_cast<int32_t>(7), full);
+    PipeBarrier<PIPE_V>();
+    Add(addresses, addresses, offset, full);
+    SetFlag<HardEvent::V_S>(6);
+    WaitFlag<HardEvent::V_S>(6);
+    for (int32_t j = full; j < count; ++j) {
+        const int32_t index = indices.GetValue(j);
+        const int32_t physicalPage = gatherPageIds ? addresses.GetValue(j) : table.GetValue((index >> 7) - tableBegin);
+        if (physicalPage < 0 || physicalPage > (INT32_MAX - 127) / 128) {
+            return false;
+        }
+        addresses.SetValue(j, physicalPage * 128 + (index & 127));
+    }
+    queryAddressCount_ = count;
+    queryAddressesValid_ = true;
+    return true;
+}
+
+template <typename QSFAT>
+__aicore__ inline bool QSFAVectorService<QSFAT>::PrepareQueryAddressCache(int64_t topkBase, int64_t s2IdLimit,
+                                                                          const RunInfo& info)
+{
+    const int64_t valid = info.actS2Size;
+    const int64_t count = valid / 512 * 256 + valid % 512;
+    if (valid <= 0 || valid > sparseBlockCount_ || count > ADDRESS_RESULT_CAPACITY) {
+        queryAddressesValid_ = false;
+        return false;
+    }
+    return PrepareAddressBatch(topkBase, static_cast<int32_t>(count), s2IdLimit, info, true);
+}
+
+template <typename QSFAT>
 __aicore__ inline bool QSFAVectorService<QSFAT>::PrepareQueryAddresses(int64_t topkBase, int64_t s2IdLimit,
                                                                        const RunInfo& info)
 {
+    if constexpr (QSFAT::adaptiveAddresses) {
+        return PrepareQueryAddressCache(topkBase, s2IdLimit, info);
+    }
     // V0-only scratch: previous V1/V2 calls have returned. Preserve the
     // address cache above v0ValidSizeUb_[512] across subsequent S2 blocks.
     PipeBarrier<PIPE_ALL>();
@@ -1989,22 +2281,40 @@ __aicore__ inline void QSFAVectorService<QSFAT>::MergeKvOptimized(const RunInfo&
     bool useI64All = (qsfaS2GmStartOffset < qsfaS2GmLimit) && ((topkGmBaseOffset + topkIdx) & 1) == 0 &&
                      (lastTopkIdx + 1 < sparseBlockCount_);
     bool useQueryAddresses = false;
+    bool useAddressSegments = false;
     if constexpr (QSFAT::noRope && PAGE_ATTENTION && TEMPLATE_MODE == V_TEMPLATE) {
         // The cache occupies the unused upper 6KB of v0ValidSizeBuff.
         // At most 1535 offsets per AIV: half of each 512-row tile plus its tail.
         if (sparseBlockSize_ == 1 && kvCacheBlockShift_ == 7 && s2BaseSize_ == 512 && sparseBlockCount_ > 0 &&
-            sparseBlockCount_ <= 2560 && !kvVecRunInfo.tndIsS2SplitCore && kvVecConstInfo.maxBlockNumPerBatch > 0 &&
-            kvVecConstInfo.maxBlockNumPerBatch <= 256 && kvVecConstInfo.keyQuantMode != QUANT_MODE::TQ4) {
-            if (kvVecRunInfo.s2Idx == 0) {
+            !kvVecRunInfo.tndIsS2SplitCore && kvVecConstInfo.maxBlockNumPerBatch > 0 &&
+            (QSFAT::adaptiveAddresses || (sparseBlockCount_ <= 2560 && kvVecConstInfo.maxBlockNumPerBatch <= 256)) &&
+            kvVecConstInfo.keyQuantMode != QUANT_MODE::TQ4) {
+            if constexpr (QSFAT::adaptiveAddresses) {
+                const int64_t validK = kvVecRunInfo.actS2Size;
+                const int64_t addressCount = validK / 512 * 256 + validK % 512;
+                const int64_t alignedCount = (addressCount + 127) / 128 * 128;
+                useAddressSegments = addressCount > ADDRESS_RESULT_CAPACITY ||
+                                     alignedCount * 7 * sizeof(int32_t) > ConstInfo::BUFFER_SIZE_BYTE_32K * 2;
+            }
+            if (useAddressSegments) {
+                PrepareAddressBatch(topkGmBaseOffset + topkIdx,
+                                    static_cast<int32_t>(qsfaS2GmLimit - qsfaS2GmStartOffset), s2IdLimit, kvVecRunInfo);
+            } else if (kvVecRunInfo.s2Idx == 0) {
                 PrepareQueryAddresses(topkGmBaseOffset, s2IdLimit, kvVecRunInfo);
             }
             useQueryAddresses = queryAddressesValid_;
         }
         if (useQueryAddresses) {
             int32_t totalRows = static_cast<int32_t>(qsfaS2GmLimit - qsfaS2GmStartOffset);
-            int32_t queryCacheBase = kvVecRunInfo.s2Idx * 256;
-            if (kvVecRunInfo.s2Idx == kvVecRunInfo.actS2Size / 512) {
+            int32_t queryCacheBase = useAddressSegments ? 0 : kvVecRunInfo.s2Idx * 256;
+            if (!useAddressSegments && kvVecRunInfo.s2Idx == kvVecRunInfo.actS2Size / 512) {
                 queryCacheBase += qsfaS2GmStartOffset;
+            }
+            if constexpr (QSFAT::adaptiveAddresses) {
+                // Keep the original S2 limit for invalid-row zero fill below;
+                // only gather/dequantize the valid prefix in this segment.
+                const int32_t remaining = queryAddressCount_ - queryCacheBase;
+                totalRows = remaining < totalRows ? (remaining > 0 ? remaining : 0) : totalRows;
             }
             DataCopyExtParams kvParams;
             kvParams.blockCount = 2;

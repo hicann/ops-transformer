@@ -333,10 +333,19 @@ void QSFAMlaTiling::GenTilingKey()
         pageAttention = 1U;
     }
 
+    // Reuse the existing address-vectorization bit for the arch22 large-table
+    // specialization. Small-table and RoPE keys retain their previous values.
+    uint32_t addressVectorizeFlag = vectorizeFlag_;
+    if (!qsfaInfo_->isA5 && !qsfaInfo_->isA6 && qsfaInfo_->ropeHeadDim == 0 && qsfaInfo_->keyQuantMode == 2 &&
+        pageAttention != 0 && qsfaInfo_->blockSize == 128 && qsfaInfo_->sparseBlockSize == 1 && sInnerSize_ == 512 &&
+        perfMode_ == QSFAPerfMode::V_TEMPLATE_MODE && qsfaInfo_->sparseBlockCount >= 256 &&
+        (qsfaInfo_->maxBlockNumPerBatch > 256 || qsfaInfo_->sparseBlockCount > 2560)) {
+        addressVectorizeFlag = 1U;
+    }
     tilingKey_ =
         GET_TPL_TILING_KEY(0U, pageAttention, layoutQuery, layoutKV, perfMode_ == QSFAPerfMode::V_TEMPLATE_MODE,
-                           static_cast<uint32_t>(qsfaInfo_->gSize > 64), vectorizeFlag_, // G大于64时核间切G
-                           static_cast<uint32_t>(qsfaInfo_->ropeHeadDim == 0));
+                           static_cast<uint32_t>(qsfaInfo_->gSize > 64), addressVectorizeFlag,
+                           static_cast<uint32_t>(qsfaInfo_->ropeHeadDim == 0)); // G大于64时核间切G
     OP_LOGI(qsfaInfo_->opName, "QSFA tilingKey_: %lu.", tilingKey_);
 }
 
