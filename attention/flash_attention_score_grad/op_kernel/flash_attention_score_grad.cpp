@@ -573,8 +573,14 @@ __global__ __aicore__ void flash_attention_score_grad(
     if constexpr (UB0 == 4 && UB1 == 3 && Block == 4 && IsSameAB == 1) { // sameab
         REGISTER_TILING_FOR_TILINGKEY("TILING_KEY_VAR & 0x1FFF = 0x1434",
                                       FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb);
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_SAMEAB_IMPL(half, HasAttenMask, HasPse, HasDropOut, mm12Format, mock_layout,
-                                                     mm345Format, IsDeterministic);
+        if constexpr (DTemplateType == 6) {
+            INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_SAMEAB_L1_CUSTOM_IMPL(
+                half, HasAttenMask, HasPse, HasDropOut, mm12Format, mock_layout, mm345Format, IsDeterministic,
+                STemplateType::Aligned512, STemplateType::Aligned512, DTemplateType::Aligned192);
+        } else {
+            INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_SAMEAB_IMPL(half, HasAttenMask, HasPse, HasDropOut, mm12Format,
+                                                         mock_layout, mm345Format, IsDeterministic);
+        }
     } else if constexpr (UB0 == 4 && UB1 == 3 && Block == 4 && IsSameAB == 0) { // s1s2
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, HasAttenMask, HasPse, HasDropOut, mm12Format, mock_layout,
                                               mm345Format, TNDS1Pingpong);

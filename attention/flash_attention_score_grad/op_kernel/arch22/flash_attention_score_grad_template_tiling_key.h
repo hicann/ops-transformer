@@ -252,6 +252,25 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(HasRope, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb)),
     /////////////////////////// SAMEAB INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_SAMEAB_IMPL ///////////////////////////////
+    ASCENDC_TPL_ARGS_SEL(
+        ASCENDC_TPL_UINT_SEL(UB0, ASCENDC_TPL_UI_LIST, 4), ASCENDC_TPL_UINT_SEL(UB1, ASCENDC_TPL_UI_LIST, 3),
+        ASCENDC_TPL_UINT_SEL(Block, ASCENDC_TPL_UI_LIST, 4), ASCENDC_TPL_UINT_SEL(IsSameAb, ASCENDC_TPL_UI_LIST, 1),
+        ASCENDC_TPL_UINT_SEL(DataType, ASCENDC_TPL_UI_LIST, 3), ASCENDC_TPL_UINT_SEL(Layout, ASCENDC_TPL_UI_LIST, 3),
+        ASCENDC_TPL_UINT_SEL(Sparse, ASCENDC_TPL_UI_LIST, 0),
+        ASCENDC_TPL_UINT_SEL(MatmulConfig, ASCENDC_TPL_UI_LIST, 0),
+        ASCENDC_TPL_UINT_SEL(Mm12IsNZOut, ASCENDC_TPL_UI_LIST, 1),
+        ASCENDC_TPL_UINT_SEL(Mm345IsNZOut, ASCENDC_TPL_UI_LIST, 0),
+        ASCENDC_TPL_UINT_SEL(HasDropOut, ASCENDC_TPL_UI_LIST, 0), ASCENDC_TPL_UINT_SEL(HasPse, ASCENDC_TPL_UI_LIST, 0),
+        ASCENDC_TPL_UINT_SEL(HasAttenMask, ASCENDC_TPL_UI_LIST, 1),
+        ASCENDC_TPL_UINT_SEL(EnableL1Reuse, ASCENDC_TPL_UI_LIST, 0),
+        ASCENDC_TPL_UINT_SEL(TNDS1Pingpong, ASCENDC_TPL_UI_LIST, 0),
+        ASCENDC_TPL_UINT_SEL(S1TemplateType, ASCENDC_TPL_UI_LIST, 1),
+        ASCENDC_TPL_UINT_SEL(S2TemplateType, ASCENDC_TPL_UI_LIST, 1),
+        ASCENDC_TPL_UINT_SEL(DTemplateType, ASCENDC_TPL_UI_LIST, 6),
+        ASCENDC_TPL_UINT_SEL(IsDeterministic, ASCENDC_TPL_UI_LIST, 0),
+        ASCENDC_TPL_UINT_SEL(HasRope, ASCENDC_TPL_UI_LIST, 0),
+        ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb)),
+    /////////////////////////// SAMEAB INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_SAMEAB_IMPL ///////////////////////////////
     //////////////////////////////////////////////////////////// END SAMEAB
     ////////////////////////////////////////////////////////////////////
 

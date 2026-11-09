@@ -1364,11 +1364,13 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::ChooseL1Custom()
 {
     // enable L1 custom + constant propagation
     // disable: pse, dropout, deterministic mode, fp32, and TND shapes other than merged-MLA
-    // support: long sequence, s1/s2CvInner=512, special d, and TND merged-MLA (d=192 / value_d=128, no rope)
+    // support: long sequence, s1/s2CvInner=512, special d
+    // BF16: existing L1Custom cases; FP16: only TND merged-MLA (d=192 / value_d=128, no rope)
     bool tndNope192Cond = fBaseParams.layoutType == INPUT_FORMAT_TND && fBaseParams.rope_d == 0 &&
                           fBaseParams.d == 192 && fBaseParams.value_d == SPECIAL_HEADDIM_128;
-    bool inputCond = (fBaseParams.layoutType != INPUT_FORMAT_TND || tndNope192Cond) &&
-                     fBaseParams.queryType == ge::DT_BF16 &&
+    bool isTndMlaFp16 = tndNope192Cond && fBaseParams.queryType == ge::DT_FLOAT16;
+    bool dtypeCond = fBaseParams.queryType == ge::DT_BF16 || isTndMlaFp16;
+    bool inputCond = (fBaseParams.layoutType != INPUT_FORMAT_TND || tndNope192Cond) && dtypeCond &&
                      (fBaseParams.s1 >= 512 && fBaseParams.s2 >= 512);                              // long sequence
     bool optionalInputCond = fBaseParams.pseOptional != NORMAL_TENSOR && fBaseParams.keepProb >= 1; // no pse, no drop
     bool dtmCond = context_->GetDeterministic() != 1;
@@ -1490,6 +1492,8 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoLibApiTiling(
     matmul_tiling::DataType inputAType = matmul_tiling::DataType::DT_FLOAT;
     if (fBaseParams.mode == FP32) {
         inputAType = matmul_tiling::DataType::DT_FLOAT;
+    } else if (fBaseParams.enableL1Custom && fBaseParams.queryType == ge::DT_FLOAT16) {
+        inputAType = matmul_tiling::DataType::DT_FLOAT16;
     } else {
         inputAType = matmul_tiling::DataType::DT_BFLOAT16;
     }
