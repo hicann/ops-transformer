@@ -279,7 +279,7 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     baseInfo.queryHeadNum = numHeadsQ_;
     baseInfo.kvHeadNum = numHeadsKv_;
     baseInfo.headDimQk = headDim_;
-    baseInfo.headDimV = headDim_;
+    baseInfo.headDimV = headDimV_;
     baseInfo.attenMaskFlag = (maskMode_ != 0);
     baseInfo.sparseMode = static_cast<uint32_t>(maskMode_);
     baseInfo.preToken = winLeft_ == -1 ? std::numeric_limits<uint32_t>::max() : winLeft_;
@@ -305,7 +305,7 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     } else {
         // 保持原有逻辑与入参不变
         optiling::quant_flash_attn::qfa_tiling_util::AdjustSinnerAndSouter(
-            static_cast<uint32_t>(headDim_), static_cast<int64_t>(maxSeqlenQ_), static_cast<int64_t>(maxSeqlenKv_),
+            static_cast<uint32_t>(headDimV_), static_cast<int64_t>(maxSeqlenQ_), static_cast<int64_t>(maxSeqlenKv_),
             maskMode_, static_cast<int64_t>(winLeft_), static_cast<int64_t>(winRight_),
             optiling::quant_flash_attn::qfa_tiling_util::LAYOUT_BSND, static_cast<uint32_t>(quantMode_), sOuterFactor,
             sInnerFactor);

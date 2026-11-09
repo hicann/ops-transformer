@@ -8603,4 +8603,20 @@ SKIP_CASES = {
     "PA_BNBD_B1_QS0_KVS64_Nq1_Nkv1_D256_SP3_Decode",
 }
 
+# ---------------------------------------------------------------------------
+# 新增 D=192 / D_v=128 用例: 从全部 D=128 用例镜像而来, 与 D=128 用例对齐
+# (MXFP8 允许 QK head_dim=192 且 V head_dim=128 的非对称组合, 而 V 不支持 192)
+# ---------------------------------------------------------------------------
+_D192_MIRROR = {}
+for _name, _params in list(TEST_PARAMS.items()):
+    if _params.get("D") == [128]:
+        _mirrored = dict(_params)
+        _mirrored["D"] = [192]
+        _mirrored["D_v"] = [128]
+        _D192_MIRROR[_name.replace("D128", "D192", 1)] = _mirrored
+TEST_PARAMS.update(_D192_MIRROR)
+
+# 被 SKIP 的 D=128 边界用例, 其 D=192 镜像同样跳过
+SKIP_CASES |= {n.replace("D128", "D192", 1) for n in SKIP_CASES if "D128" in n}
+
 CASES = expand_paramset_to_cases(TEST_PARAMS)

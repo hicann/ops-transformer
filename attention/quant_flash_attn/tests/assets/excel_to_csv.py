@@ -245,9 +245,12 @@ class _Columns:
         if name is None:
             return None
         key = _norm_name(name)
+        idx = self._by_name.get(key)
+        if idx is not None:
+            return idx
         if key in _HEADER_ALIASES_NORM:
-            key = _HEADER_ALIASES_NORM[key]
-        return self._by_name.get(key)
+            return self._by_name.get(_HEADER_ALIASES_NORM[key])
+        return None
 
     def raw_get(self, name):
         """不做别名映射，按表头名归一化直接查列（用于别名目标本身也存在的场景）。"""

@@ -87,6 +87,10 @@ public:
     static constexpr ActualSeqLensMode Q_MODE = GetQActSeqMode<LAYOUT_Q>();
     static constexpr ActualSeqLensMode KV_MODE = GetKvActSeqMode<LAYOUT_KV, PAGE_ATTENTION>();
 
+    // D=192 / D_v=128(config5) 场景 L1 超预算, 定向回退为 3 槽;
+    // P 槽深度与 D 无关, producer(AIV) 领先 consumer(AIC) 恒为 2, 3 槽为理论下限
+    static constexpr bool USE_3_P_SLOTS = (dBaseSize == 192U && dVBaseSize == 128U);
+
     using INPUT_T = typename CubeBlockType::Q_T;
     using T = typename CubeBlockType::MM_T;
     using OUT_T = typename VecFaBlockType::OUT_T;
@@ -101,9 +105,10 @@ public:
     BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> bmm1Buffers_;
     BuffersPolicySingleBuffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> bmm2Buffers_;
     // Reserve the fourth P slot only when VTAIL is enabled.
-    using L1PBuffersPolicy =
-        std::conditional_t<HAS_V_TAIL, BuffersPolicy4buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>,
-                           BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>>;
+    // D=192 / D_v=128 场景 L1 超预算, 定向回退 3 槽(见 USE_3_P_SLOTS 定义)
+    using L1PBuffersPolicy = std::conditional_t<HAS_V_TAIL && !USE_3_P_SLOTS,
+                                                BuffersPolicy4buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>,
+                                                BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>>;
     L1PBuffersPolicy l1PBuffers_;
 
     GlobalTensor<int32_t> cuSeqLensGmQ_;

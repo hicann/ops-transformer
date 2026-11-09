@@ -23,6 +23,7 @@ PARAM_MAP = {
     "N_q": "N_q",
     "N_kv": "N_kv",
     "D": "D",
+    "D_v": "D_v",
     "cu_seqlens_q": "CU_SEQLENS_Q",
     "cu_seqlens_kv": "CU_SEQLENS_KV",
     "seqused_q": "SEQUSED_Q",

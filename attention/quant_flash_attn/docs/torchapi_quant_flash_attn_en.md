@@ -211,7 +211,7 @@ In the document constraints, common fields are defined as follows:
 | batch_size        | int           | Optional    | Batch size. If not passed, it is derived from cu_seqlens_q or seqused_q. The default value is None.                               | int32  | -    | -      | -         |
 | max_seqlen_q     | int           | Optional    | Specifies the upper limit of the query q sequence length.                                                                      | int32  | -    | -      | -         |
 | max_seqlen_kv    | int           | Optional    | Specifies the upper limit of the sequence lengths of key k and value v.                                                                    | int32  | -    | -      | -         |
-| head_dim_v       | int           | Optional    | Dimension of each attention head of v. The default value is None. Currently, only None or a value equal to head_dim can be passed. Other values will be intercepted.                          | int32  | -    | -      | -         |
+| head_dim_v       | int           | Optional    | Dimension of each attention head of v. The default value is None (equivalent to head_dim). Currently, only None, a value equal to head_dim, or 128 when head_dim is 192 can be passed. Other values will be intercepted.                     | int32  | -    | -      | -         |
 | mask_mode         | int/MaskMode  | Optional    | Mask mode. Supports passing the enumeration or the corresponding int value. For the enumeration definition, see "mask_mode Enumeration". The current version only supports 0/3                              | int32  | -    | -      | -         |
 | win_left          | int           | Optional    | Left boundary of the window.                                                                         | int32  | -    | -      | -         |
 | win_right         | int           | Optional    | Right boundary of the window.                                                                         | int32  | -    | -      | -         |
@@ -359,7 +359,7 @@ In the document constraints, common fields are defined as follows:
                         <li>65536 > B > 0</li>
                         <li>Q_S > 0; KV_S > 0</li>
                         <li>Q_T > 0, KV_T > 0</li>
-                        <li>D only supports 64, 72, 128, or 256; the HIF8 use case only supports D=128; the FP8 use case only supports D=128.</li>
+                        <li>D only supports 64, 72, 128, 192, or 256; the HIF8 use case only supports D=128; the FP8 use case only supports D=128.</li>
                         <li>Q_N % KV_N == 0 and Q_N / KV_N > 0</li>
                         <li>Q_N ≤ 256; KV_N ≤ 256; Q_N / KV_N ≤ 64</li>
                     </ul>

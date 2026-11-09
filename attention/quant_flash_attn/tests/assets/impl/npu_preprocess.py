@@ -170,9 +170,8 @@ def build_metadata_arguments(
     # must be None"), C++ CheckConsistency 进一步校验
     # cu_seqlens.numel()==batch_size+1。任何非 None 值 (含 -1) 都会被拦截;
     # 仅 attributes 未声明 batch_size (None) 时视为未传。
-    explicit_bs = get_attribute(kwargs, "batch_size")
     if is_varlen_q:
-        batch_size = None if explicit_bs is None else int(explicit_bs)
+        batch_size = None
     else:
         batch_size = _derive_batch_size(q_shape, layout_q, cu_q, seq_q, kwargs)
 

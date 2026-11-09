@@ -1179,8 +1179,10 @@ ge::graphStatus QuantChecker::CheckKVShape(const QfaTilingInfo& qfaInfo) const
         return ge::GRAPH_FAILED;
     }
 
-    // v 的 D 用 qkHeadDim
-    shapeParams.D = qfaInfo.qkHeadDim;
+    // v 的 D 用 vHeadDim（MxFP8 允许 Qd≠Vd），其余量化模式仍等于 qkHeadDim
+    shapeParams.D = (qfaInfo.quantMode == QfaQuantMode::A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32) ?
+                        qfaInfo.vHeadDim :
+                        qfaInfo.qkHeadDim;
     if (valueShapeCmp_->CompareShape(shapeParams, __func__) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
@@ -1318,7 +1320,7 @@ ge::graphStatus QuantChecker::CheckVTailFeature(const QfaTilingInfo& qfaInfo) co
                 return ge::GRAPH_FAILED);
     // BF16 PA_NZ requires a head dimension divisible by 16.
     auto vtailDimOk = [&qfaInfo](int64_t d) {
-        if (d != 64 && d != 72 && d != 128 && d != 256) {
+        if (d != 64 && d != 72 && d != 128 && d != 192 && d != 256) {
             return false;
         }
         return (qfaInfo.kvLayout != QfaLayout::PA_NZ) || (d % 16 == 0);
@@ -1327,7 +1329,7 @@ ge::graphStatus QuantChecker::CheckVTailFeature(const QfaTilingInfo& qfaInfo) co
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     qfaInfo.opName, "v_tail",
                     (std::to_string(qfaInfo.qkHeadDim) + "/" + std::to_string(qfaInfo.vHeadDim)).c_str(),
-                    "v_tail is only supported with qk/v head dim in {64, 72, 128, 256}, and requires dim %16 == 0 "
+                    "v_tail is only supported with qk/v head dim in {64, 72, 128, 192, 256}, and requires dim %16 == 0 "
                     "under PA_NZ layout (bf16 NZ fractal of inner dim 16)"),
                 return ge::GRAPH_FAILED);
     if (CheckVTailExistence(qfaInfo) != ge::GRAPH_SUCCESS || CheckVTailShape(qfaInfo) != ge::GRAPH_SUCCESS) {

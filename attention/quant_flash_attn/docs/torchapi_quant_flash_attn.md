@@ -213,7 +213,7 @@ cann_ops_transformer.quant_flash_attn(
 | batch_size        | int           | 可选    | batch大小。若未传入，则从cu_seqlens_q或seqused_q推导。默认值为None                               | int32  | -    | -      | -         |
 | max_seqlen_q     | int           | 可选    | 指定查询q序列的长度上限                                                                      | int32  | -    | -      | -         |
 | max_seqlen_kv    | int           | 可选    | 指定键k和值v序列的长度上限                                                                    | int32  | -    | -      | -         |
-| head_dim_v       | int           | 可选    | v的每个注意力头维度，默认值为None。当前仅支持传None或与head_dim相等的值，传入其他值会拦截                          | int32  | -    | -      | -         |
+| head_dim_v       | int           | 可选    | v的每个注意力头维度，默认值为None（等价于head_dim）。当前仅支持传None、与head_dim相等的值，或当head_dim=192时传128（即D=192、D_v=128的非对称组合）；其余值会拦截截                    | int32  | -    | -      | -         |
 | mask_mode         | int/MaskMode  | 可选    | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」。当前版本仅支持0/3                              | int32  | -    | -      | -         |
 | win_left          | int           | 可选    | window左界限                                                                         | int32  | -    | -      | -         |
 | win_right         | int           | 可选    | window右界限                                                                         | int32  | -    | -      | -         |
@@ -381,7 +381,7 @@ cann_ops_transformer.quant_flash_attn(
                         <li>65536 > B > 0</li>
                         <li>Q_S > 0；KV_S > 0</li>
                         <li>Q_T > 0、KV_T > 0</li>
-                        <li>D仅支持64、72、128或256；HIF8场景仅支持D=128；FP8场景仅支持D=128</li>
+                        <li>D仅支持64、72、128、192或256；HIF8场景仅支持D=128；FP8场景仅支持D=128</li>
                         <li>Q_N % KV_N == 0且Q_N / KV_N > 0</li>
                         <li>Q_N ≤ 256；KV_N ≤ 256；Q_N / KV_N ≤ 64</li>
                     </ul>
@@ -1258,7 +1258,7 @@ mask_mode参数解释：
             <td rowspan="3">
                 <ul>
                     <li>仅支持quant_mode=1的Paged Attention场景。</li>
-                    <li>Q/K和V的head dimension需分别属于<code>{64, 72, 128, 256}</code>，并满足主接口的维度匹配约束；<code>PA_NZ</code>另外要求D能被16整除，因此不支持D=72。</li>
+                    <li>Q/Khead dimension需分别属于<code>{64, 72, 128, 192, 256}</code>，Vhead dimension需分别属于<code>{64, 72, 128, 256}</code>，并满足主接口的维度匹配约束；<code>PA_NZ</code>另外要求D能被16整除，因此不支持D=72。</li>
                 </ul>
             </td>
         </tr>

@@ -334,7 +334,7 @@ inline void SectionStreamKImpl::CalcGridInfoSection(ComputeContext& computeConte
         auto gridLength = CalcBatchTokenNum(bIdx, computeContext);
         int64_t s1Size = gridLength.first;
         int64_t s2Size = gridLength.second;
-        int64_t s1Cost = s1Size * headDimQk * s1TypeCost * 2L; // 2: Q和O两份数据
+        int64_t s1Cost = s1Size * (headDimQk + headDimV) * s1TypeCost; // Q(headDimQk) + O(headDimV)
         int64_t s2vCost = s2Size * (headDimQk + headDimV) * s2TypeCost;
         int64_t singleHeadCost = s1Cost + s2vCost;
         maxSingleHeadTokenCost = std::max(maxSingleHeadTokenCost, singleHeadCost);

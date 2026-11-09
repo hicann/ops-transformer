@@ -644,6 +644,7 @@ def cpu_qfa_mxfp8(
     N_q = kwargs.get("N_q")
     N_kv = kwargs.get("N_kv")
     D = kwargs.get("D")
+    D_v = kwargs.get("head_dim_v") or D
     enable_pa = bool(kwargs.get("enable_pa", False))
     kv_cache_layout = kwargs.get("kv_cache_layout") or layout_kv
     block_size = kwargs.get("block_size", 0)
@@ -728,6 +729,7 @@ def cpu_qfa_mxfp8(
             "N_q": N_q,
             "N_kv": N_kv,
             "D": D,
+            "head_dim_v": D_v,
             "cu_seqlens_q": cu_seqlens_q_list,
             "cu_seqlens_kv": cu_seqlens_kv_list,
             "seqused_q": seqused_q_list,
@@ -839,8 +841,8 @@ def cpu_qfa_mxfp8(
             v_fp8_bnsd = mxfp8_golden_mod.pa_to_bnsd_data(
                 v_cache, actual_seq_kv, block_size, bt, kv_layout=kv_cache_layout
             )
-            if v_fp8_bnsd.shape[-1] > D:
-                v_fp8_bnsd = v_fp8_bnsd[:, :, :, :D].contiguous()
+            if v_fp8_bnsd.shape[-1] > D_v:
+                v_fp8_bnsd = v_fp8_bnsd[:, :, :, :D_v].contiguous()
 
         # K scale: e8m0 -> fp32 -> reverse layout -> out_cache (Bn,N,Bs,Dg//2,2) -> grouped BNSD
         if k_cache_empty:
@@ -885,11 +887,11 @@ def cpu_qfa_mxfp8(
                 f"V scale grouped first 3 dims mismatch: got {tuple(dv_bnsd_grouped.shape[:3])}, "
                 f"expected {(B, N_kv, Sg_max)}"
             )
-            assert dv_bnsd_grouped.shape[3] >= D, (
-                f"V scale grouped D={dv_bnsd_grouped.shape[3]} < logical D={D}"
+            assert dv_bnsd_grouped.shape[3] >= D_v, (
+                f"V scale grouped D_v={dv_bnsd_grouped.shape[3]} < logical D_v={D_v}"
             )
-            if dv_bnsd_grouped.shape[3] > D:
-                dv_bnsd_grouped = dv_bnsd_grouped[:, :, :, :D].contiguous()
+            if dv_bnsd_grouped.shape[3] > D_v:
+                dv_bnsd_grouped = dv_bnsd_grouped[:, :, :, :D_v].contiguous()
     else:
         # 非 PA: K/V 按解析的 KV 数据布局逆转换 -> BNSD
         k_fp8_tnd = _to_torch_fp8(k)
@@ -902,8 +904,8 @@ def cpu_qfa_mxfp8(
         v_fp8_bnsd = _data_layout_to_bnsd(
             v_fp8_tnd, actual_seq_kv, kv_data_layout, cu_seqlens=cu_seqlens_kv_list
         )
-        if v_fp8_bnsd.shape[-1] > D:
-            v_fp8_bnsd = v_fp8_bnsd[:, :, :, :D].contiguous()
+        if v_fp8_bnsd.shape[-1] > D_v:
+            v_fp8_bnsd = v_fp8_bnsd[:, :, :, :D_v].contiguous()
 
         # K scale: e8m0 -> fp32 -> 按 KV 数据布局 grouped -> BNSD grouped
         dk_e8m0 = _to_torch_e8m0(dequant_scale_k)
@@ -934,11 +936,11 @@ def cpu_qfa_mxfp8(
             f"V scale grouped first 3 dims mismatch: got {tuple(dv_bnsd_grouped.shape[:3])}, "
             f"expected {(B, N_kv, Sg_max)}"
         )
-        assert dv_bnsd_grouped.shape[3] >= D, (
-            f"V scale grouped D={dv_bnsd_grouped.shape[3]} < logical D={D}"
+        assert dv_bnsd_grouped.shape[3] >= D_v, (
+            f"V scale grouped D_v={dv_bnsd_grouped.shape[3]} < logical D_v={D_v}"
         )
-        if dv_bnsd_grouped.shape[3] > D:
-            dv_bnsd_grouped = dv_bnsd_grouped[:, :, :, :D].contiguous()
+        if dv_bnsd_grouped.shape[3] > D_v:
+            dv_bnsd_grouped = dv_bnsd_grouped[:, :, :, :D_v].contiguous()
 
     # ----- v_tail 尾块高精窗口: 从 slot 反算 BNSD bf16 + 尾长 (slot 驱动 gate) -----
     vtail_bnsd, vtail_tail_lens = _extract_vtail_bundle(
@@ -1690,6 +1692,7 @@ def cpu_qfa_hifp4(
     N_q = kwargs.get("N_q")
     N_kv = kwargs.get("N_kv")
     D = kwargs.get("D")
+    D_v = kwargs.get("head_dim_v") or D
     enable_pa = bool(kwargs.get("enable_pa", False))
     kv_cache_layout = kwargs.get("kv_cache_layout") or layout_kv
     block_size = kwargs.get("block_size", 0)

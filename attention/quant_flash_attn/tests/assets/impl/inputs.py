@@ -193,6 +193,7 @@ def generate_qfa_mxfp8_inputs(
     N_q = kwargs.get("N_q")
     N_kv = kwargs.get("N_kv")
     D = kwargs.get("D")
+    D_v = kwargs.get("head_dim_v") or D
     enable_pa = bool(kwargs.get("enable_pa", False))
     kv_cache_layout = kwargs.get("kv_cache_layout") or layout_kv
     block_size = kwargs.get("block_size", 0)
@@ -400,7 +401,7 @@ def generate_qfa_mxfp8_inputs(
     )
     torch.manual_seed(_SEED_MAP["v"])
     v_bf16 = (
-        torch.rand(B, N_kv, max_skv, D, dtype=torch.bfloat16) * (rv_max - rv_min)
+        torch.rand(B, N_kv, max_skv, D_v, dtype=torch.bfloat16) * (rv_max - rv_min)
         + rv_min
     )
 
@@ -431,7 +432,7 @@ def generate_qfa_mxfp8_inputs(
                 "v_tail 仅支持 PA (paged KV cache) 场景 (checker 契约)"
             )
         _layout_up = str(kv_cache_layout or "").upper()
-        if _layout_up in ("PA_NZ",) and D % 16 != 0:
+        if _layout_up in ("PA_NZ",) and D_v % 16 != 0:
             raise ValueError(
                 f"[INPUTS] PA_NZ + D={D} + v_tail 结构性不成立: NZ 的16列分形要求 "
                 f"D%16==0 (与 golden bundle / checker / kernel D/16 寻址一致)"
@@ -503,7 +504,7 @@ def generate_qfa_mxfp8_inputs(
                     )
                     .to(torch.bfloat16)
                 )
-            seg_pad = torch.zeros(N_kv, tail_capacity, D, dtype=torch.bfloat16)
+            seg_pad = torch.zeros(N_kv, tail_capacity, D_v, dtype=torch.bfloat16)
             if tail_lens[b] > 0:
                 seg_pad[:, : tail_lens[b], :] = seg
             v_tail_bnsd_list.append(seg_pad)

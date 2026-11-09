@@ -973,6 +973,7 @@ def _build_qfa_section_info(actual_seq_q, actual_seq_kv):
         num_heads_q=N_q,
         num_heads_kv=N_kv,
         head_dim=D,
+        head_dim_v=HEAD_DIM_V,
         quant_mode=1,
         cu_seqlens_q=cu_q_t,
         cu_seqlens_kv=cu_kv_t,
@@ -1494,7 +1495,7 @@ def cpu_mxfp8_golden(
     )[:, :, :, :D]
     dequant_scale_v_expanded = dequant_scale_v.repeat_interleave(
         QUANT_GROUP_SIZE, dim=2
-    )[:, :, :, :D]
+    )[:, :, :, :dv]
 
     # 尾块高精窗口: CPU参考 = 主体V反量化 + 尾段V的bf16原值(模拟完美尾块cache, 尾段scale恒1)
     # 注: V_BLOCKS 是 v_tensor 的 split 视图(共享存储), in-place 注入对视图可见

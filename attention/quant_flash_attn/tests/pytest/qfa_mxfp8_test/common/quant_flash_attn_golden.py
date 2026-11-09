@@ -95,7 +95,7 @@ B = 1
 N_q = 1  # query heads
 N_kv = 1  # kv heads
 D = 128
-
+D_v = None
 ENABLE_ROPE = False
 D_rope = 64
 
@@ -926,10 +926,10 @@ def generate_data():
     k_bf16 = (
         torch.rand(B, N_kv, max_skv, D, dtype=torch.bfloat16) * 2 - 1
     ) * DATA_RANGE_K
-
+    v_d = D if D_v is None else D_v
     torch.manual_seed(SEED_V)
     v_bf16 = (
-        torch.rand(B, N_kv, max_skv, D, dtype=torch.bfloat16) * 2 - 1
+        torch.rand(B, N_kv, max_skv, v_d, dtype=torch.bfloat16) * 2 - 1
     ) * DATA_RANGE_V
 
     qr_bf16 = None
@@ -1011,7 +1011,7 @@ def generate_data():
         for b in range(B):
             main_len = seqused_kv[b] - tail_lens[b]
             seg = v_bf16[b, :, main_len : seqused_kv[b], :]  # (N_kv, tail, D) fp16原值
-            seg_pad = torch.zeros(N_kv, tail_capacity, D, dtype=torch.float16)
+            seg_pad = torch.zeros(N_kv, tail_capacity, v_d, dtype=torch.float16)
             seg_pad[:, : tail_lens[b], :] = seg
             v_tail_bnsd_list.append(seg_pad)
         block_table_tail = (
@@ -1280,6 +1280,7 @@ def _build_qfa_section_info(actual_seq_q, actual_seq_kv):
         num_heads_q=N_q,
         num_heads_kv=N_kv,
         head_dim=D,
+        head_dim_v=D_v,
         quant_mode=1,
         cu_seqlens_q=cu_q_t,
         cu_seqlens_kv=cu_kv_t,
@@ -2454,6 +2455,7 @@ def _call_npu_fa_op(
         num_heads_q=q_n,
         num_heads_kv=kv_n,
         head_dim=q.shape[-1],
+        head_dim_v=D_v,
         quant_mode=1,
         cu_seqlens_q=cu_seqlens_q_t if is_tnd_q else None,
         cu_seqlens_kv=cu_seqlens_kv_t if is_tnd_kv else None,
@@ -2572,13 +2574,13 @@ class Network(nn.Module):
             num_heads_q=q_n,
             num_heads_kv=kv_n,
             head_dim=q.shape[-1],
+            head_dim_v=D_v,
             quant_mode=1,
             cu_seqlens_q=cu_seqlens_q,
             cu_seqlens_kv=cu_seqlens_kv,
             seqused_q=seqused_q,
             seqused_kv=seqused_kv,
             batch_size=batch_size,
-            head_dim_v=None,
             mask_mode=sparse_mode,
             layout_q=layout_q,
             layout_q_descale=layout_q_descale,

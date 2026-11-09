@@ -17,6 +17,7 @@ PARAM_NAMES = [
     "N_q",
     "N_kv",
     "D",
+    "D_v",
     "cu_seqlens_q",
     "cu_seqlens_kv",
     "seqused_q",
@@ -63,6 +64,7 @@ TEST_PARAMS_DEFAULTS = {
     "quant_mode": [1],
     "device_id": [0],
     "is_contiguous": [True],
+    "D_v": [None],
 }
 
 

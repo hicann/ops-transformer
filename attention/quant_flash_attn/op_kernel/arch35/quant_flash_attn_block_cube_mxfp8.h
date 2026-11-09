@@ -97,6 +97,9 @@ public:
     static constexpr uint32_t l1BaseD = 128;
     static constexpr uint32_t s2SplitSize =
         (dBaseSize == static_cast<uint32_t>(DTemplateType::Aligned256)) ? 128U : 256U;
+    // K 维分片宽度: 保证 A[s2SplitSize x baseK] 能放进单个 L0A(32KB)
+    static constexpr uint32_t dBaseK =
+        (dBaseSize <= (32 * 1024) / s2SplitSize) ? dBaseSize : ((32 * 1024) / s2SplitSize);
     static constexpr uint32_t MXFP_GROUP_SIZE = 32U;
     static constexpr uint32_t MXFP_DIVISOR_SIZE = 64U;
     static constexpr uint32_t MXFP_MULTI_BASE_SIZE = 2U;
@@ -104,6 +107,9 @@ public:
     static constexpr bool PAGE_ATTENTION = (KvLayoutType > 0);
     static constexpr bool USE_DN = useDn;
     static constexpr bool HAS_V_TAIL = hasVTail;
+    // D=192 / D_v=128(config5) 场景 L1 超预算, 定向回退为 3 槽;
+    // P 槽深度与 D 无关, producer(AIV) 领先 consumer(AIC) 恒为 2, 3 槽为理论下限
+    static constexpr bool USE_3_P_SLOTS = (dBaseSize == 192U && dVBaseSize == 128U);
     static constexpr InnerMLayout Q_M_LAYOUT = USE_DN ? InnerMLayout::S1_ONLY_LAYOUT : InnerMLayout::GS1_MERGE_LAYOUT;
 
     static constexpr FixpipeConfig BMM2_FIXPIPE_CONFIG = {CO2Layout::ROW_MAJOR, true};
@@ -118,10 +124,10 @@ public:
     using SCALE_T = fp8_e8m0_t;
     using MM_T = T;
     using MM1_DBUF_T = Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>;
-    // Reserve the fourth P slot only when VTAIL is enabled.
-    using MM2_ABUF_POLICY_T =
-        std::conditional_t<HAS_V_TAIL, BuffersPolicy4buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>,
-                           BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>>;
+    // Reserve the fourth P slot only when VTAIL is enabled (D=192/D_v=128 回退 3 槽)
+    using MM2_ABUF_POLICY_T = std::conditional_t<HAS_V_TAIL && !USE_3_P_SLOTS,
+                                                 BuffersPolicy4buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>,
+                                                 BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>>;
     using MM2_ABUF_T = Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>;
     using MM2_DBUF_T = Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>;
 
@@ -686,11 +692,19 @@ public:
         Buffer<BufferType::L0C> mm1ResL0C = mmL0CBuffers_.Get();
         mm1ResL0C.Wait<HardEvent::FIX_M>();
         MMParam param = MakeMMParam((uint32_t)runInfo.actMSize, (uint32_t)s2CurSize, dBaseSize, false, true);
-        MatmulFullMX<Q_T, KV_T, T, 128, (s2BaseSize >> 1), dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
-                     SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
-            mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
-            mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(qScaleOffset),
-            mm1B.GetTensor<SCALE_T>(kScaleOffset));
+        if constexpr (dBaseSize == 192) {
+            MatmulKMX<Q_T, KV_T, T, 128, (s2BaseSize >> 1), dBaseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
+                      SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
+                mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(qScaleOffset),
+                mm1B.GetTensor<SCALE_T>(kScaleOffset));
+        } else {
+            MatmulFullMX<Q_T, KV_T, T, 128, (s2BaseSize >> 1), dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
+                         SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
+                mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(qScaleOffset),
+                mm1B.GetTensor<SCALE_T>(kScaleOffset));
+        }
 
         // Release Q at the last main task even when a tail task follows.
         if (unlikely(IsLastDnTask(runInfo) && (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
@@ -832,11 +846,19 @@ public:
         Buffer<BufferType::L0C> mm1ResL0C = mmL0CBuffers_.Get();
         mm1ResL0C.Wait<HardEvent::FIX_M>();
         MMParam param = MakeMMParam((uint32_t)s2CalcSize, (uint32_t)runInfo.actMSize, dBaseSize, false, true);
-        MatmulFullMX<Q_T, KV_T, T, (s2BaseSize >> 1), 128, dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
-                     SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
-            mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
-            mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(kScaleOffset),
-            mm1B.GetTensor<SCALE_T>(qScaleOffset));
+        if constexpr (dBaseSize == 192) {
+            MatmulKMX<Q_T, KV_T, T, (s2BaseSize >> 1), 128, dBaseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
+                      SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
+                mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(kScaleOffset),
+                mm1B.GetTensor<SCALE_T>(qScaleOffset));
+        } else {
+            MatmulFullMX<Q_T, KV_T, T, (s2BaseSize >> 1), 128, dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
+                         SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
+                mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(kScaleOffset),
+                mm1B.GetTensor<SCALE_T>(qScaleOffset));
+        }
 
         // Release Q at the last main task even when a tail task follows.
         if (unlikely(IsLastDnTask(runInfo) && (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
@@ -897,11 +919,19 @@ public:
         Buffer<BufferType::L0C> mm1ResL0C = mmL0CBuffers_.Get();
         mm1ResL0C.Wait<HardEvent::FIX_M>();
         MMParam param = MakeMMParam((uint32_t)s2CalcSize, (uint32_t)runInfo.actMSize, dBaseSize, false, true);
-        MatmulFullMX<Q_T, KV_T, T, (s2BaseSize >> 1), 128, dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
-                     SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
-            mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
-            mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(kScaleOffset),
-            mm1B.GetTensor<SCALE_T>(qScaleOffset));
+        if constexpr (dBaseSize == 192) {
+            MatmulKMX<Q_T, KV_T, T, (s2BaseSize >> 1), 128, dBaseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
+                      SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
+                mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(kScaleOffset),
+                mm1B.GetTensor<SCALE_T>(qScaleOffset));
+        } else {
+            MatmulFullMX<Q_T, KV_T, T, (s2BaseSize >> 1), 128, dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
+                         SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
+                mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(kScaleOffset),
+                mm1B.GetTensor<SCALE_T>(qScaleOffset));
+        }
 
         if (unlikely(IsLastDnTask(runInfo) && (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
                                                (runInfo.actSingleLoopS2Size <= s2SplitSize)))) {
@@ -962,11 +992,19 @@ public:
         Buffer<BufferType::L0C> mm1ResL0C = mmL0CBuffers_.Get();
         mm1ResL0C.Wait<HardEvent::FIX_M>();
         MMParam param = MakeMMParam((uint32_t)runInfo.actMSize, (uint32_t)s2CurSize, dBaseSize, false, true);
-        MatmulFullMX<Q_T, KV_T, T, 128, (s2BaseSize >> 1), dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
-                     SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
-            mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
-            mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(qScaleOffset),
-            mm1B.GetTensor<SCALE_T>(kScaleOffset));
+        if constexpr (dBaseSize == 192) {
+            MatmulKMX<Q_T, KV_T, T, 128, (s2BaseSize >> 1), dBaseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
+                      SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
+                mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(qScaleOffset),
+                mm1B.GetTensor<SCALE_T>(kScaleOffset));
+        } else {
+            MatmulFullMX<Q_T, KV_T, T, 128, (s2BaseSize >> 1), dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
+                         SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+                mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers_, mmL0BBuffers_,
+                mm1ResL0C.GetTensor<T>(), param, mm1A.GetTensor<SCALE_T>(qScaleOffset),
+                mm1B.GetTensor<SCALE_T>(kScaleOffset));
+        }
 
         if (unlikely(IsLastDnTask(runInfo) && (((runInfo.actSingleLoopS2Size > s2SplitSize) && (subLoop % 2 == 1)) ||
                                                (runInfo.actSingleLoopS2Size <= s2SplitSize)))) {
@@ -1354,15 +1392,18 @@ public:
     static constexpr bool PAGE_ATTENTION = (KvLayoutType > 0);
     static constexpr bool USE_DN = useDn;
     static constexpr bool HAS_V_TAIL = hasVTail;
+    // D=192 / D_v=128(config5) 场景 L1 超预算, 定向回退为 3 槽;
+    // P 槽深度与 D 无关, producer(AIV) 领先 consumer(AIC) 恒为 2, 3 槽为理论下限
+    static constexpr bool USE_3_P_SLOTS = (dBaseSize == 192U && dVBaseSize == 128U);
 
     using Q_T = INPUT_T;
     using KV_T = INPUT_T;
     using MM_T = T;
     using MM1_DBUF_T = Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>;
-    // Reserve the fourth P slot only when VTAIL is enabled.
-    using MM2_ABUF_POLICY_T =
-        std::conditional_t<HAS_V_TAIL, BuffersPolicy4buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>,
-                           BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>>;
+    // Reserve the fourth P slot only when VTAIL is enabled (D=192/D_v=128 回退 3 槽)
+    using MM2_ABUF_POLICY_T = std::conditional_t<HAS_V_TAIL && !USE_3_P_SLOTS,
+                                                 BuffersPolicy4buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>,
+                                                 BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>>;
     using MM2_ABUF_T = Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>;
     using MM2_DBUF_T = Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>;
 

@@ -128,15 +128,18 @@ inline aclnnStatus QuantFlashAttnMetadataCheck::CheckBaseAttr(int64_t batchSize,
     constexpr int64_t HEAD_DIM_64 = 64;
     constexpr int64_t HEAD_DIM_72 = 72;
     constexpr int64_t HEAD_DIM_128 = 128;
+    constexpr int64_t HEAD_DIM_192 = 192;
     constexpr int64_t HEAD_DIM_256 = 256;
-    static const std::unordered_set<int64_t> headDimSet = {HEAD_DIM_64, HEAD_DIM_72, HEAD_DIM_128, HEAD_DIM_256};
+    static const std::unordered_set<int64_t> headDimSet = {HEAD_DIM_64, HEAD_DIM_72, HEAD_DIM_128, HEAD_DIM_192,
+                                                           HEAD_DIM_256};
     CHECK_COND(headDimSet.count(headDim) > 0, ACLNN_ERR_RUNTIME_ERROR,
-               "headDim only supports %ld, %ld, %ld, %ld, but got %ld", HEAD_DIM_64, HEAD_DIM_72, HEAD_DIM_128,
-               HEAD_DIM_256, headDim);
+               "headDim only supports %ld, %ld, %ld, %ld, %ld, but got %ld", HEAD_DIM_64, HEAD_DIM_72, HEAD_DIM_128,
+               HEAD_DIM_192, HEAD_DIM_256, headDim);
 
-    // 校验 headDimV: 当前仅支持与 headDim 相等 (head_dim_v 接口预留, 暂不支持异值)
-    CHECK_COND(headDimV == headDim, ACLNN_ERR_RUNTIME_ERROR,
-               "headDimV must be equal to headDim currently, but got headDimV=%ld, headDim=%ld", headDimV, headDim);
+    // 校验 headDimV: 仅 (headDim=192, headDimV=128) 允许异值, 其余仍要求 headDimV == headDim
+    CHECK_COND((headDim == HEAD_DIM_192 && headDimV == 128) || headDimV == headDim, ACLNN_ERR_RUNTIME_ERROR,
+               "headDimV must be equal to headDim, or be 128 when headDim is 192; got headDimV=%ld, headDim=%ld",
+               headDimV, headDim);
 
     static const std::unordered_set<std::string> layoutQSet = {"BSND", "TND", "BNSD", "NTD"};
     CHECK_COND(layoutQSet.count(layoutQ) > 0, ACLNN_ERR_RUNTIME_ERROR,
