@@ -29,6 +29,23 @@ def _require_parameters(function, names):
         raise RuntimeError(f"FFN TTK compatibility: unsupported signature: {function}")
 
 
+def _op_qualname(obj):
+    value = getattr(obj, "_qualified_op_name", None) or getattr(obj, "name", None)
+    return value.replace("::", ".") if isinstance(value, str) else None
+
+
+def _matches_ffn_api(api, target):
+    """Identity is unreliable here: TTK resolves torch.ops names through a
+    path that mints a fresh OpOverloadPacket object, so two packets for the
+    same op are never ``is``-equal. Compare by qualified op name instead
+    (covers OpOverloadPacket and OpOverload); fall back to identity only for
+    exotic callables without a name."""
+    name = _op_qualname(api)
+    if name is not None:
+        return name == _op_qualname(target)
+    return api is target or api is target.default
+
+
 def remember_graph_state(tensor, before, after):
     # One device case executes per worker. Discard closures retaining old tensors.
     _GRAPH_STATES.clear()
@@ -80,7 +97,7 @@ def install_graph():
             # TTK may wrap the model (SuperKernel scope / core limit); unwrap once.
             api = getattr(getattr(model, "_model", None), "api_func", None)
         compiled = original(model, backend, *args, **kwargs)
-        if api is not target and api is not target.default:
+        if not _matches_ffn_api(api, target):
             return compiled
 
         @functools.wraps(compiled)
@@ -143,7 +160,13 @@ def install_ge_graph():
             # TTK may wrap the model (SuperKernel scope / core limit); unwrap once.
             api = getattr(getattr(model, "_model", None), "api_func", None)
         compiled = original(model, backend, dynamic, fullgraph)
-        if api is not target and api is not target.default:
+        if not _matches_ffn_api(api, target):
+            logging.warning(
+                "FFN GE adapter skip: model api %r (%s) != target %r",
+                api,
+                type(api).__name__,
+                target,
+            )
             return compiled
 
         @functools.wraps(compiled)

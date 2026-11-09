@@ -32,6 +32,16 @@ import struct
 import numpy as np
 import torch
 
+# TTK 在同一 worker 进程内串行执行全部用例，且 e2e 图模式共用同一个
+# GraphNetwork.forward 帧：每个用例的整型属性组合是一组新 guard，默认
+# torch._dynamo recompile_limit=8 触顶后静默回退 eager（aclgraph 腿“通过”
+# 但实际未捕获图，性能侧报 no captured graph kernels）。放开上限保证
+# 每个用例的图模式腿都真实编译。
+try:
+    torch._dynamo.config.recompile_limit = 512
+except Exception:  # 旧版 torch 无该配置
+    pass
+
 # ttk 导入一律惰性（见 _ttk_global_storage）：golden 需能在无 ttk 的
 # xpu-server executor 进程中导入（三方参考 FfnWbTorchRef 在该端执行）。
 
@@ -1528,7 +1538,10 @@ def _configure_torch_execution(need_schedule):
         # 与 AscendIR attrs 数量不匹配时自动生成 converter 报错）；编译前重挂。
         _ttk_assets_compat().reattach_ge_converter()
     if need_schedule == 1:
-        if getattr(storage, "aclgraph_enabled", False):
+        # ACL graph 回放包装只在图腿内装配/放开多轮；输入生成与 eager 腿必须
+        # 落到下方单次执行分支，否则 eager 先于图腿多轮消费描述符，第二轮起
+        # 内核对空表永久等待（vector core timeout）并打挂设备。
+        if getattr(storage, "aclgraph_enabled", False) and _in_torch_graph_leg():
             graph_execution = _ttk_assets_compat().load_graph_execution()
             if graph_execution is None:
                 raise ImportError(
@@ -1756,10 +1769,17 @@ class TorchFfnWorkerBatchingTestSpec:
         _configure_torch_execution(need_schedule)
         # Only the 1024-byte header is part of this tensor; secondary buffers
         # have their own HBM allocations and are archived explicitly for replay.
-        if schedule_context.numel() < _SCHEDULE_CONTEXT_BYTES:
+        # TTK E2E passes ndarray in numpy-fallback scenarios (fp4 weights).
+        if isinstance(schedule_context, np.ndarray):
+            ctx_view = schedule_context
+            ctx_size = ctx_view.size
+        else:
+            ctx_view = schedule_context.numpy()
+            ctx_size = schedule_context.numel()
+        if ctx_size < _SCHEDULE_CONTEXT_BYTES:
             raise ValueError("schedule_context must include the 1024-byte header")
         AclnnFfnWorkerBatchingTestSpec.customize_inputs(
-            schedule_context.numpy(),
+            ctx_view,
             expert_num,
             max_out_shape,
             token_dtype,
@@ -1782,7 +1802,7 @@ class TorchFfnWorkerBatchingTestSpec:
                 sync_flag=sync_flag,
                 mx_output_uint8=mx_output_uint8,
             )
-            save_context_archive(archive, schedule_context.numpy(), attributes)
+            save_context_archive(archive, ctx_view, attributes)
 
     @staticmethod
     def golden(
@@ -1809,9 +1829,23 @@ class TorchFfnWorkerBatchingTestSpec:
             **kwargs,
         )
         if mx_output_uint8 and token_dtype >= 3:
-            outputs[6] = outputs[6].view(torch.uint8)
+            # Numpy fallback (fp4 inputs) yields numpy arrays: mirror the torch
+            # fp4x2 view with pack_4bits so shapes/dtypes match the op contract
+            # ((y, H/2) uint8 for FP4, (y, ceil(H/32)) uint8 for scales).
+            if isinstance(outputs[6], torch.Tensor):
+                outputs[6] = outputs[6].view(torch.uint8)
+            else:
+                outputs[6] = np.ascontiguousarray(outputs[6]).view(np.uint8)
             if token_dtype == 5:
-                outputs[0] = outputs[0].view(torch.uint8)
+                if isinstance(outputs[0], torch.Tensor):
+                    outputs[0] = outputs[0].view(torch.uint8)
+                else:
+                    from ttk.utilities.dtypes import pack_4bits
+
+                    y = np.ascontiguousarray(outputs[0])
+                    outputs[0] = pack_4bits(y).reshape(
+                        (*y.shape[:-1], y.shape[-1] // 2)
+                    )
         return outputs
 
     compare = staticmethod(AclnnFfnWorkerBatchingTestSpec.compare)
