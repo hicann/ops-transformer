@@ -99,7 +99,7 @@ aclnnStatus aclnnMatmulAllReduceV3(
           <td>x2</td>
           <td>输入</td>
           <td>MatMul计算的右矩阵，即计算公式中的x2。</td>
-          <td><ul><li>当前版本仅支持两维输入。</li><li>支持转置/不转置场景。</li><li>ND格式下支持最后两轴转置情况下的非连续的tensor，其他非连续tensor不支持</li></ul></td>
+          <td><ul><li>当前版本仅支持二维输入。</li><li>支持转置/不转置场景。</li><li>ND格式下支持最后两轴转置情况下的非连续的tensor，其他非连续tensor不支持</li></ul></td>
           <td>FLOAT16、BFLOAT16</td>
           <td>ND</td>
           <td>2</td>

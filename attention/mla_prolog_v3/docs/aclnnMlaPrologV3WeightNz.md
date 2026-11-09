@@ -30,7 +30,7 @@
 - **接口功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为七路:
     - 首先对输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后分为两路，第一路乘以$W^{UQ}$和$W^{UK}$经过两次上采样后，再乘以Query尺度矫正因子$\alpha_q$得到$q^N$；第二路乘以$W^{QR}$后经过旋转位置编码（ROPE）得到$q^R$。
     - 第三路是输入$x$乘以$W^{DKV}$进行下采样和RmsNorm后，乘以Key尺度矫正因子$\alpha_{kv}$传入Cache中得到$k^C$；
-    - 第四路是输入$x$乘以$W^{KR}$后经过旋转位置编码后传入另一个Cache中得到$k^R$；
+    - 第四路是输入$x$乘以$W^{KR}$后经过旋转位置编码传入另一个Cache中得到$k^R$；
     - 第五路是输出$q^N$经过DynamicQuant后得到的量化参数。
     - 第六路是queryNormFlag=true时，输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后得到压缩结果$c^Q$，作为queryNormOutOptional输出。
     - 第七路是queryNormFlag=true且量化场景（weightQuantMode≠0）下，对$c^Q$做DynamicQuant，最终得到量化后的queryNormOutOptional和对应量化参数dequantScaleQNormOutOptional。
@@ -502,7 +502,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
       <tr>
         <td>actualSeqLenOptional</td>
         <td>输入</td>
-        <td>表示每个batch中的序列长度，以前缀和的形式储存。</td>
+        <td>表示每个batch中的序列长度，以前缀和的形式存储。</td>
         <td>BS合轴且CacheMode="PA_BLK_BSND"/"PA_BLK_NZ"时需传</td>
         <td>INT32</td>
         <td>ND</td>
@@ -810,7 +810,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
         <tr>
           <td>ACLNN_ERR_RUNTIME_ERROR</td>
           <td>361001</td>
-          <td>API内存调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
+          <td>API内部调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
         </tr>
         <tr>
           <td>ACLNN_ERR_INNER_TILING_ERROR</td>

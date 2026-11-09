@@ -483,7 +483,7 @@ aclnnStatus aclnnMoeDistributeDispatchV4(
     - zeroExpertNum当commAlg="fullmesh"时，取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
     - copyExpertNum当commAlg="fullmesh"时，取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
     - constExpertNum当前版本不支持，传0即可。
-    - performanceInfoOptional可选择传入有效数据或填空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
+    - performanceInfoOptional可选择传入有效数据或空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
     </details>
     <!-- end id9 -->
 

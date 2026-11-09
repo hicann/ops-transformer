@@ -27,7 +27,7 @@
 
 - 计算公式：
 
-  对`x`的最后一维（d轴）按组计算每组的amax，并量化为目标dtype，记第g组为$x_g$：
+  对`x`的最后一维（d轴）计算每组的amax，并量化为目标dtype，记第g组为$x_g$：
 
   - 场景1（quantMode=0）：group(64)量化为FP8，`scale`存储为`bfloat16`；rope段保留`bfloat16`。
 

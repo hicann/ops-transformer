@@ -140,7 +140,7 @@ aclnnStatus aclnnMsaIndexScore(
     <tr>
       <td>attenMaskOptional</td>
       <td>输入</td>
-      <td>控制因果可见的mask掩码。</td>
+      <td>控制因果可见的 mask。</td>
       <td>仅在sparseMode=3时使用，作为base mask控制causal可见；取值为1代表该位不参与计算，为0代表该位参与计算。</td>
       <td>INT8</td>
       <td>ND</td>

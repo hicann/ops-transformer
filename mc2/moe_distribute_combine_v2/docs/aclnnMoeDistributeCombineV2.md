@@ -33,7 +33,7 @@
 
     `expertScales`为空Tensor时，路由专家结果直接求和；若传入`sharedExpertXOptional`，仍直接累加，不乘路由权重。
 
->注意该接口必须与`aclnnMoeDistributeDispatchV2`配套使用，相当于按`MoeDistributeDispatchV2`算子收集数据的路径原路返还。
+>注意该接口必须与`aclnnMoeDistributeDispatchV2`配套使用，相当于按`MoeDistributeDispatchV2`算子收集数据的路径原路返回。
 
 相较于`aclnnMoeDistributeCombine`接口，该接口变更如下：
 

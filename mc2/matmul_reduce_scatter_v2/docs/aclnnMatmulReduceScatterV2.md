@@ -430,8 +430,8 @@ aclnnStatus aclnnMatmulReduceScatterV2(
     - 当x1、x2的数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2时，x1和x2的数据类型可以为其中任意一种。
     - mx量化场景下，x2/x2Scale支持转置/不转置输入。
     - mx量化场景下，且x1和x2输入为FLOAT4_E2M1（MXFP4量化）时，k必须是偶数，当x2不转置输入时，n必须也是偶数。
-    - 支持2、4、8、16、32、64卡。<term>Ascend 950PR&950DT系列产品</term>支持CCU通信和AICPU通信，CCU仅支持单机UB域内互联，AICPU可支持跨机UB域内互联。
-    - CCU通信下，ReduceScatter集合通信数据总量不能超过63 * 256MB，集合通信数据总量计算方式为：m * n * sizeof(output_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
+    - 支持2、4、8、16、32、64卡。<term>Ascend 950PR&950DT系列产品</term>支持CCU通信和AI CPU通信，CCU仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
+    - CCU通信下，ReduceScatter集合通信数据总量不能超过63 × 256MB，集合通信数据总量计算方式为：m × n × sizeof(output_dtype)。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
 
 <!-- end id14 -->
 <!-- npu="A3,910b" id15 -->

@@ -322,7 +322,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
     <tr>
       <td>headNums</td>
       <td>输入</td>
-      <td>按[N<sub>q</sub>, N<sub>k</sub>, N<sub>v</sub>]顺序传入，提供输入参数qkv矩阵中，qkv分量单元中分的N维度具体尺寸。</td>
+      <td>按[N<sub>q</sub>, N<sub>k</sub>, N<sub>v</sub>]顺序传入，提供输入参数qkv矩阵中，qkv分量单元中的N维度具体尺寸。</td>
       <td>[N<sub>q</sub>, N<sub>k</sub>, N<sub>v</sub>]必须为实际原始值，不可进行约化。</td>
       <td>INT64</td>
       <td>-</td>
@@ -353,7 +353,7 @@ aclnnStatus aclnnQkvRmsNormRopeCache(
       <td>qOutBeforeQuant</td>
       <td>输出</td>
       <td>表示即将写入到qOut中的数据。</td>
-      <td><ul><li>分型、数据类型，需要与输入参数qkv保持一致。</li><li>shape为[B<sub>qkv</sub> * S<sub>qkv</sub>, N<sub>q</sub> * D<sub>qkv</sub>]。</li></ul></td>
+      <td><ul><li>格式、数据类型，需要与输入参数qkv保持一致。</li><li>shape为[B<sub>qkv</sub> * S<sub>qkv</sub>, N<sub>q</sub> * D<sub>qkv</sub>]。</li></ul></td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>2</td>

@@ -119,7 +119,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceAddRmsNorm(
           <td>x2</td>
           <td>输入</td>
           <td>MatMul计算的右矩阵，即计算公式中的x2。</td>
-          <td><ul><li>支持空Tensor。</li><li>当前版本仅支持二维输入，支持转置/不转置场景。</li><li>支持转置场景下的非连续的tensor。</li></ul></td>
+          <td><ul><li>支持空Tensor。</li><li>当前版本仅支持二维输入，支持转置/不转置场景。</li><li>支持转置场景下的非连续tensor。</li></ul></td>
           <td>INT8、INT4</td>
           <td>ND</td>
           <td>2</td>
@@ -179,7 +179,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceAddRmsNorm(
           <td>epsilon</td>
           <td>输入</td>
           <td>Host侧的双精度，用于防止除0错误，即计算公式中的epsilon。</td>
-          <td>epsilon取值满足取值范围(0,1)。</td>
+          <td>epsilon取值范围为(0,1)。</td>
           <td>Double</td>
           <td>-</td>
           <td>-</td>
@@ -282,7 +282,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceAddRmsNorm(
 
     返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-    第一阶段接口完成入参校验，出现以下场景报错：
+    第一段接口完成入参校验，出现以下场景报错：
 
     <table style="undefined;table-layout: fixed; width: 1030px"><colgroup>
     <col style="width: 250px">

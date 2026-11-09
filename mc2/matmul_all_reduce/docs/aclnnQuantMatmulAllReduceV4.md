@@ -238,7 +238,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
           <td>x3Optional</td>
           <td>输入</td>
           <td>MatMul计算后的add计算，即计算公式中的x3Optional。</td>
-          <td><ul><li>低比特通信场景下仅支持输出为BFLOAT16场景，且仅支持非空输入，要求数据类型、维度与output的维度一致。</li></ul></td>
+          <td><ul><li>低比特通信场景下仅支持输出为BFLOAT16，且仅支持非空输入，要求数据类型、维度与output的维度一致。</li></ul></td>
           <td>FLOAT16、BFLOAT16、FLOAT32</td>
           <td>ND</td>
           <td>2-3</td>
@@ -328,7 +328,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
           <td>groupSize</td>
           <td>输入</td>
           <td>用于表示反量化中x1Scale/x2Scale输入的一个数在其所在的对应维度方向上可以用于该方向x1/x2输入的多少个数的反量化。</td>
-          <td><ul><li>groupSize输入由3个方向的groupSizeM，groupSizeN，groupSizeK三个值拼接组成，每个值占16位，计算公式为：groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32。</li><li>perblock场景仅支持groupSizeM，groupSizeN，groupSizeK = 128,128,128</li><li>MXFP场景仅支持groupSizeM，groupSizeN，groupSizeK = 1,1,32</li><li>支持参数自动推导，任一参数输入0时，算子自动推导该参数值，全部输入0时，自动推导全部参数值</li></ul></td>
+          <td><ul><li>groupSize输入由groupSizeM，groupSizeN，groupSizeK三个值拼接组成，每个值占16位，计算公式为：groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32。</li><li>perblock场景仅支持groupSizeM，groupSizeN，groupSizeK = 128,128,128</li><li>MXFP场景仅支持groupSizeM，groupSizeN，groupSizeK = 1,1,32</li><li>支持参数自动推导，任一参数输入0时，算子自动推导该参数值，全部输入0时，自动推导全部参数值</li></ul></td>
           <td>INT64</td>
           <td>-</td>
           <td>-</td>

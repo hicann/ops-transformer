@@ -117,7 +117,7 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGrad(
       <td>permutedTokenOutputGrad</td>
       <td>输入</td>
       <td>表示正向输出permutedTokens的梯度。</td>
-      <td>shape支持2D维度，不支持空tensor，topK_num表示每个token最多被选中的专家数量上限，capacity表示每个专家选中的token数量。</td>
+      <td>shape支持2D维度，不支持空tensor，topK_num表示每个token被选中的专家数量上限，capacity表示每个专家选中的token数量。</td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>

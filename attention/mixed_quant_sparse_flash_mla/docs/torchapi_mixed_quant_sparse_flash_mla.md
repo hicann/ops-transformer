@@ -308,7 +308,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 #### 公共参数组
 
 - 入参为空的场景处理：
-  - 空tensor指必选输入、某调用场景下下必传输入和输出的shape size为0，即有任意轴为0。
+  - 空tensor指必选输入、某调用场景下必传输入和输出的shape size为0，即有任意轴为0。
   - 触发空tensor的用例将全部拦截报错。
 
 - q、ori_kv、cmp_kv、attention_out校验

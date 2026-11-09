@@ -398,7 +398,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
     <tr>
       <td>metadataOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>AICPU算子aclnnMixedQuantSparseFlashMlaMetadata的分核信息。</td>
+      <td>AI CPU算子aclnnMixedQuantSparseFlashMlaMetadata的分核信息。</td>
       <td>必须传入。由aclnnMixedQuantSparseFlashMlaMetadata算子生成。</td>
       <td>INT32</td>
       <td>ND</td>

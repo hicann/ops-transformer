@@ -539,7 +539,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllvV2(
 - e * epWorldSize 乘积最大支持256，其中e（单卡专家数），最大支持32，epWorldSize支持2/4/8/16/32/64/128/256;
 - gmmX的shape(A, H1)，A为sendCounts之和，H1取值范围(0, 65536);
 - gmmWeight的shape(e, H1, N1)，N1取值范围(0, 65536);
-- y的shape为(BSK, N1)，第一维其中K的范围[2, 8]，BSK为recvCounts之和;
+- y的shape为(BSK, N1)，其中K的范围[2, 8]，BSK为recvCounts之和;
 - mmX是共享专家的左矩阵，shape为(BS, H2)，H2的取值范围(0, 12288]；
 - mmWeight是共享专家的右矩阵，shape为(H2, N2)，N2的取值范围(0, 65536)；
 - sendCounts为发送到其他卡的token数，数组大小为e * epWorldSize;

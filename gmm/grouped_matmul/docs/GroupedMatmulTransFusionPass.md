@@ -2,7 +2,8 @@
 
 ## 融合模式
 
-### 融合模式一：
+### 融合模式一
+
 将Transpose或TransposeD从图中删除，并将x/weight转置信息添加在算子属性上。如下图所示。
 
 该融合模式支持的产品如下：
@@ -18,7 +19,8 @@ Ascend 950PR&950DT系列产品
 ![](../../../docs/zh/figures/GroupedMatmulTransFusionPass_2.png)
 
 <!-- npu="950,A3,910b" id1 -->
-### 融合模式二：
+### 融合模式二
+
 将x/weight前的Reshape+Transpose/TransposeD+Reshape从图中删除，并将x/weight转置信息打在算子属性上。如下图所示。
 
 该融合模式支持的产品如下：
@@ -45,7 +47,8 @@ Ascend 950PR&950DT系列产品
 
 <!-- end id1 -->
 <!-- npu="950" id5 -->
-### 融合模式三：
+### 融合模式三
+
 Ascend 950PR&950DT系列产品的伪量化场景下，将weight/antiquantScale前的Reshape+Transpose/TransposeD+Reshape从图中删除，并将weight转置信息打在算子属性上。如下图所示。
 
 该融合模式支持的产品如下：
@@ -55,7 +58,8 @@ Ascend 950PR&950DT系列产品
 
 ![](../../../docs/zh/figures/GroupedMatmulTransFusionPass_5.png)
 
-### 融合模式四：
+### 融合模式四
+
 Ascend 950PR&950DT系列产品的MX/GB量化场景下，融合模式是：将Transpose或TransposeD从图中删除，并将x和weight的转置信息打在算子属性上。如下图所示：
 
 该融合模式支持的产品如下：

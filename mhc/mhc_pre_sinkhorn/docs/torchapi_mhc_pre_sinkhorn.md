@@ -158,7 +158,7 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>hcEps</td>
         <td>float</td>
         <td>可选</td>
-        <td>H<sup>pre</sup>的sigmoid后的eps参数。对应公式中ε<sub>hc</sub>。默认值1e-6。</td>
+        <td>H<sup>pre</sup>经sigmoid后的eps参数。对应公式中ε<sub>hc</sub>。默认值1e-6。</td>
         <td>-</td>
         <td>-</td>
     </tr>

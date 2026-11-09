@@ -58,7 +58,7 @@
     $$
     q^N = q^C \cdot W^{UK}
     $$
-    其中 $\alpha_q$ 是Query的尺度矫正参数。
+    其中 $\alpha_q$ 是Query的尺度校正参数。
 
     对Query进行ROPE旋转位置编码
 
@@ -140,7 +140,6 @@
     $$
 
     其中$Q_{max}$为量化输出类型的最大值：INT8取127，FLOAT8_E4M3FN取448，HIFLOAT8取32768，8为FLOAT8_E4M3FN指数位的最大值emax。
-
 
 ## 函数原型
 

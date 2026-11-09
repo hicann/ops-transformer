@@ -868,7 +868,7 @@ int main() {
                   return ret);
     }
 
-    // 12. 调用第二段接口
+    // 13. 调用第二段接口
     ret = aclnnBlockSparseAttention(workspaceAddr, workspaceSize, executor, stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnBlockSparseAttention failed. ERROR: %d\n", ret);
               FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
@@ -877,7 +877,7 @@ int main() {
                            workspaceAddr, deviceId, &stream);
               return ret);
 
-    // 13. 同步等待任务执行结束
+    // 14. 同步等待任务执行结束
     ret = aclrtSynchronizeStream(stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret);
               FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor,
@@ -886,7 +886,7 @@ int main() {
                            workspaceAddr, deviceId, &stream);
               return ret);
 
-    // 14. 获取输出的值，将device侧内存上的结果拷贝至host侧
+    // 15. 获取输出的值，将device侧内存上的结果拷贝至host侧
     int64_t attentionOutSize = GetShapeSize(attentionOutShape);
     std::vector<op::fp16_t> resultData(attentionOutSize, 0);
     ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(op::fp16_t), attentionOutDeviceAddr,
@@ -898,14 +898,14 @@ int main() {
                            workspaceAddr, deviceId, &stream);
               return ret);
 
-    // 15. 打印部分结果
+    // 16. 打印部分结果
     uint64_t printNum = 10;
     LOG_PRINT("attentionOut results (first %lu elements):\n", printNum);
     for (uint64_t i = 0; i < printNum && i < resultData.size(); i++) {
         LOG_PRINT("  index %lu: %f\n", i, static_cast<float>(resultData[i]));
     }
 
-    // 16. 释放资源
+    // 17. 释放资源
     FreeResource(queryTensor, keyTensor, valueTensor, blockSparseMaskTensor, attentionOutTensor, actualSeqLengths,
                  actualSeqLengthsKv, blockShape, queryDeviceAddr, keyDeviceAddr, valueDeviceAddr,
                  blockSparseMaskDeviceAddr, attentionOutDeviceAddr, workspaceAddr, deviceId, &stream);

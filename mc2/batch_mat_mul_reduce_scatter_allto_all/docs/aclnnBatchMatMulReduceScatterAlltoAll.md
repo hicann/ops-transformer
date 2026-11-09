@@ -25,7 +25,7 @@
 
 ## 功能说明
 
-- 接口功能：BatchMatMulReduceScatterAllToAll是通算融合算子，实现BatchMatMul计算与ReduceScatter、AllToAll集合通信并行的算子。
+- 接口功能：BatchMatMulReduceScatterAllToAll是通算融合算子，实现BatchMatMul计算与ReduceScatter、AllToAll集合通信并行。
 
 - 计算公式：大体计算流程为：BatchMatMul计算-->转置（yShardType等于0时需要）-->ReduceScatter集合通信-->Add-->AllToAll集合通信。计算逻辑如下，其中y为输出
 

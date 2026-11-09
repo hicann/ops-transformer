@@ -385,7 +385,7 @@ aclnnStatus aclnnCompressor(
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
       <td>361001</td>
-      <td>API内存调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
+      <td>API内部调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
     </tr>
   </tbody>
   </table>

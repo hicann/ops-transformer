@@ -23,12 +23,12 @@
 
 ## 功能说明
 
-- 算子功能：该算子为AICPU算子，是aclnnSparseLightningIndexerKLLossGrad算子的前置算子。根据aclnnSparseLightningIndexerKLLossGrad算子的输入shape、layout、mask和压缩比例信息，计算并输出分核切分metadata。输出结果可作为aclnnSparseLightningIndexerKLLossGrad算子的metadataOptional输入，减少主算子tiling阶段对host array的访问。
+- 算子功能：该算子为AI CPU算子，是aclnnSparseLightningIndexerKLLossGrad算子的前置算子。根据aclnnSparseLightningIndexerKLLossGrad算子的输入shape、layout、mask和压缩比例信息，计算并输出分核切分metadata。输出结果可作为aclnnSparseLightningIndexerKLLossGrad算子的metadataOptional输入，减少主算子tiling阶段对host array的访问。
 
   **该算子不建议单独使用，建议与aclnnSparseLightningIndexerKLLossGrad算子配合使用，形成完整的工作流。**
     1. 接收主算子的shape信息，包括batchSize、maxSeqlenQ、maxSeqlenK、numHeadsQ、numHeadsK、headDim、topk、layout和mask信息。
     2. 根据每个q对应的有效sparse长度估算负载，并将B/S1合轴后的任务均衡切分到可用AIC核上。
-    3. 输出metadata后，后续作为aclnnSparseLightningIndexerKLLossGrad算子的metadataOptional输入使用。
+    3. 输出的metadata后续作为aclnnSparseLightningIndexerKLLossGrad算子的metadataOptional输入使用。
 
 ## 函数原型
 
@@ -381,7 +381,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
   - B（Batch）表示输入样本批量大小，q为配套的aclnnSparseLightningIndexerKLLossGrad算子的入参，S1表示layoutQOptional=BSND时，q shape中的S轴的大小。
   - 参数cuSeqlensQOptional、cuSeqlensKOptional要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。
   - 参数sequsedQOptional、sequsedKOptional要求其值表示每个Batch中的有效token数。
-  - 参数sequsedQOptional、sequsedKOptional、cmpResidualKOptional传入时均须为shape为(B,)的一维INT32张量，长度必须等于实际Batch数B。
+  - 参数sequsedQOptional、sequsedKOptional、cmpResidualKOptional传入时均须保证shape为(B,)的一维INT32张量，长度必须等于实际Batch数B。
   - cmpRatio不为1且maskMode为3时，cmpResidualKOptional必须传入非空张量。
   - 参数cmpResidualKOptional需满足cmpResidualKOptional[i] < cmpRatio。
   - layoutQOptional、layoutKOptional须相同。

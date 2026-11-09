@@ -264,7 +264,7 @@ aclnnStatus aclnnMoeInitRoutingV4(
     <tr>
       <td>activeNumOptional（aclTensor）</td>
       <td>输入</td>
-      <td>表示总的最大处理row数，输出expandedXOut只有这么多行是有效的</td>
+      <td>表示总的最大处理row数，expandedXOut只有这么多行是有效的</td>
       <td><ul>
         <li>可选输入，不输入时activeNum默认为NUM_ROWS*K；</li>
         <li>输入时为标量Tensor（shape为()或(1,)），数据类型为INT64，值大于等于0，0表示Dropless场景，大于0时表示Active场景，约束所有专家共同处理tokens总量。</li>

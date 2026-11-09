@@ -27,7 +27,7 @@
 
   `block_sparse_attention_grad`是基于`TorchNPU`的`cann_ops_transformer`扩展接口，用于调用`BlockSparseAttentionGrad`算子完成块级稀疏注意力反向计算。通过`block_sparse_mask`指定每个Q块需要参与计算的KV块，实现高效的稀疏注意力反向计算，并一次性返回`dq`、`dk`、`dv`。
 
-  该接口为前向接口`block_sparse_attention`的反向传播：前向的输出`attentionOut`与`softmaxLse`作为反向输入参与计算。
+  该接口为正向接口`block_sparse_attention`的反向传播：正向的输出`attentionOut`与`softmaxLse`作为反向输入参与计算。
 
 - **计算公式**：
 
@@ -284,4 +284,5 @@ cann_ops_transformer.block_sparse_attention_grad(
     ```
 
 > [!NOTE] 说明
+>
 > - `attention_out`与`softmax_lse`必须与`query`/`key`/`value`自洽。实际使用时请直接使用`block_sparse_attention`正向接口在`return_softmax_lse=True`时的返回值，示例中的参考实现仅用于保证示例可独立运行。

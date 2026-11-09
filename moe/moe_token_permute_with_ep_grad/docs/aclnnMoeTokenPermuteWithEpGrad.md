@@ -148,7 +148,7 @@ aclnnStatus aclnnMoeTokenPermuteWithEpGrad(
       <td>正向输出permutedProbs的梯度。</td>
       <td>
       • shape支持1D维度；<br>
-      • 与计算输出probsGradOut对应，传入空则不输出probsGradOut。</td>
+      • 与输出probsGradOut对应，传入空则不输出probsGradOut。</td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>((rangeOptional[1] - rangeOptional[0]))</td>

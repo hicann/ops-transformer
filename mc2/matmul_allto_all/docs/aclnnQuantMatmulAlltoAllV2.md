@@ -589,7 +589,7 @@ aclnnStatus aclnnQuantMatmulAlltoAllV2(
    <!-- npu="950" id21 -->
    - <term>Ascend 950PR&950DT系列产品</term>：
       - 支持CCU通信和AI CPU通信。
-      - CCU仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
+      - CCU仅支持单机UB域内互联，AI CPU可支持跨机UB域互联。
       - 通信域约束：同一个通信域内只能使用同一种通信方式。
 
    <!-- end id21 -->

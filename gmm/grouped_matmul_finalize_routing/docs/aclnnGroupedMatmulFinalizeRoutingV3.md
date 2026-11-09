@@ -63,7 +63,7 @@
     y[rowIndex[i],:] = \sum_{i \in \mathcal{E}[j]} y_i [j - start_i] + sharedInputWeight \times sharedInput[j, :]
     $$
 
-    其中$\mathcal{E}[j]$是表示分配给token j的专家集合。
+    其中$\mathcal{E}[j]$表示分配给token j的专家集合。
 
 ## 函数原型
 

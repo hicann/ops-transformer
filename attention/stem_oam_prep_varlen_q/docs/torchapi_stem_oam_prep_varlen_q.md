@@ -21,12 +21,11 @@
 - <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
-
 ## 功能说明
 
 - **接口功能**：
 
-  完成Stem OAM block-sparse attention中Q侧预处理计算。将变长Q tensor从paged存储格式转化为按stem block分组的flattened qFlat输出，供后续OAM score计算。
+  完成Stem OAM block-sparse attention中Q侧预处理计算。将变长Q tensor从paged存储格式转换为按stem block分组的flattened qFlat输出，供后续OAM score计算。
 
 - **计算公式**：
 

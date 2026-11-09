@@ -350,7 +350,7 @@ aclnnStatus aclnnFlashAttentionScoreGradV2(
         <td>innerPrecise</td>
         <td>可选输入</td>
         <td>内部计算精度控制。</td>
-        <td>保留参数，暂未使用。</td>
+        <td>预留参数，暂未使用。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>

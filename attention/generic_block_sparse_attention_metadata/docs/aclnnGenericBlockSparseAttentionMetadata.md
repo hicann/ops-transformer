@@ -360,7 +360,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
     <tr>
       <td>metadataOptional</td>
       <td>输出</td>
-      <td>AICPU算子生成的分核结果。</td>
+      <td>AI CPU算子生成的分核结果。</td>
       <td>必须传入。调用者须预先申请INT32、shape为(1024,)的Device侧Tensor；其内容为不透明格式，不应解析、修改或跨不同输入和属性复用。</td>
       <td>INT32</td>
       <td>ND</td>
@@ -395,7 +395,6 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 - <term>Ascend 950PR&950DT系列产品</term>非量化支持1≤blockShapeY≤128的任意整数；量化场景仅支持128。
 <!-- end id7 -->
 
-
 - **返回值**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
@@ -428,7 +427,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
     <tr>
       <td>ACLNN_ERR_INNER_NULLPTR</td>
       <td>561103</td>
-      <td>workspaceSize或executor为空，或API内部执行Contiguous、注册AICPU任务时出现空指针异常。</td>
+      <td>workspaceSize或executor为空，或API内部执行Contiguous、注册AI CPU任务时出现空指针异常。</td>
     </tr>
   </tbody>
   </table>

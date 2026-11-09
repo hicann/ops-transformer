@@ -293,7 +293,7 @@ aclnnStatus aclnnPromptFlashAttention(
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
       <td>361001</td>
-      <td>API内存调用npu runtime的接口异常。</td>
+      <td>API内部调用npu runtime的接口异常。</td>
     </tr>
   </tbody>
   </table>

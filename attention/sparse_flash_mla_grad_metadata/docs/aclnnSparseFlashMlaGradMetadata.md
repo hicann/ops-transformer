@@ -26,7 +26,7 @@
 - 接口功能：该接口为AI CPU算子接口，是aclnnSparseFlashMlaGrad算子的前置算子接口。根据aclnnSparseFlashMlaGrad算子接口的输入信息，计算并输出负载均衡结果。输出结果可以作为aclnnSparseFlashMlaGrad算子接口的输入，减少aclnnSparseFlashMlaGrad算子接口的执行耗时。
 
   **该算子不建议单独使用，建议与aclnnSparseFlashMlaGrad算子配合使用，形成完整的工作流。**
-    1. 接受aclnnSparseFlashMlaGrad算子接口输入数据shape信息，包含batchSize、qSeqlen、kSeqlen、mask。通过对输入分块并模拟计算耗时，均匀分配分块到可用核上，以降低aclnnSparseFlashMlaGrad算子的整体计算耗时，并提高硬件利用率。
+    1. 接收aclnnSparseFlashMlaGrad算子接口输入数据shape信息，包含batchSize、qSeqlen、kSeqlen、mask。通过对输入分块并模拟计算耗时，均匀分配分块到可用核上，以降低aclnnSparseFlashMlaGrad算子的整体计算耗时，并提高硬件利用率。
     2. 分配结果输出后，后续作为输入供aclnnSparseFlashMlaGrad算子使用。
     3. 分配结果包含每个AIC核基本块的起始点和终止点，以及每个AIV核的FD任务信息。详细内容可以参考[调用示例](#调用示例)。
 

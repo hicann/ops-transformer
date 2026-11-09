@@ -77,6 +77,7 @@ git commit --no-verify -m "msg"
 搜索输出中的 `Failed` 定位失败项，查看该 hook 下方输出处理，或粘贴给 AI 获取修复建议。
 
 拦截类钩子的报告落盘（不入 git），可随时复查：
+
 - `codespell_reports/codespell.log`（拼写命中清单）
 - `oat_reports/result.txt`（OAT 远程 hook，合规违规明细）
 

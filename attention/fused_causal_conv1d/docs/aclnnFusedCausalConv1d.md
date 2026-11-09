@@ -130,7 +130,7 @@
 
 - 计算公式：
 
-  计算公式：K 是卷积核宽度，L 是当前 batch 的序列长度，dim 是特征维度，batchId 是当前处理的变长序列索引，C 是 convStates 缓存空间长度（convStates.size(1)），B 是 APC 块大小（bSize）。对输入 x 中的每一个 batch 进行以下操作：
+  K 是卷积核宽度，L 是当前 batch 的序列长度，dim 是特征维度，batchId 是当前处理的变长序列索引，C 是 convStates 缓存空间长度（convStates.size(1)），B 是 APC 块大小（bSize）。对输入 x 中的每一个 batch 进行以下操作：
   1. 缓存读取
 
       缓存行索引：
@@ -407,7 +407,7 @@ aclnnStatus aclnnFusedCausalConv1d(
     <tr>
       <td>numAcceptedTokens（aclTensor*）</td>
       <td>可选输入</td>
-      <td>公式中的numAcceptedTokens，表示每个batch的随机投机数。</td>
+      <td>公式中的numAcceptedTokens，表示每个batch的投机数。</td>
       <td><ul><li>prefile对应的元素值为0；decode时，1<=numAcceptedTokens中的值<=seqlen -1，seqlen表示该batch的序列长度。</li><li>shape为[batch,]。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -648,7 +648,7 @@ aclnnStatus aclnnFusedCausalConv1d(
     - convStates必须是3维[..., K-1, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cacheIndices不等于padSlotId的batch个数）。
     - queryStartLoc必须存在。
     - cacheIndices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cuSeqLen范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
+    - cuSeqLen范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G], batch范围[1, 256]。
     - maxNumBlocks >= ceiv(maxQueryLen, blockSize)。
     - maxQueryLen > 8。
   - prefill和decode混合场景：
@@ -657,7 +657,7 @@ aclnnStatus aclnnFusedCausalConv1d(
     - convStates必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cacheIndices不等于padSlotId的batch个数）。
     - queryStartLoc必须存在。
     - cacheIndices为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cuSeqLen范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
+    - cuSeqLen范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G], batch范围[1, 256]。
     - maxNumBlocks >= ceiv(maxQueryLen, blockSize)。
     - maxQueryLen > 8。
   - decode场景（变长序列）：

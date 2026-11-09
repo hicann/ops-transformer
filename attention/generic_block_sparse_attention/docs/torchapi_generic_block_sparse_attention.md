@@ -167,6 +167,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 > [!NOTE]
 >
 > 当前仅支持 layout_sparse_pattern = 4。
+
 ## 参数说明
 
 ### generic_block_sparse_attention_metadata
@@ -255,7 +256,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 ## 约束说明
 
 - 参数cu_seqlens_q、cu_seqlens_kv、seqused_q、seqused_kv、sparse_block_idx、sparse_block_count及block_table属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
-- generic_block_sparse_attention_metadata和generic_block_sparse_attention的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由客户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
+- generic_block_sparse_attention_metadata和generic_block_sparse_attention的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由用户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 
 ### 产品差异约束
 

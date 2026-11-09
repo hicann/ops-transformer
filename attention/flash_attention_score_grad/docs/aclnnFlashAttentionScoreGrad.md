@@ -161,7 +161,7 @@ aclnnStatus aclnnFlashAttentionScoreGrad(
       <tr>
         <td>dy</td>
         <td>输入</td>
-        <td>公式中的输入dY。</td>
+        <td>公式中的dY。</td>
         <td>-</td>
         <td>FLOAT16、BFLOAT16、FLOAT32</td>
         <td>ND</td>

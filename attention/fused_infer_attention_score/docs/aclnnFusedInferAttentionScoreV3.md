@@ -693,7 +693,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
       <td>361001</td>
-      <td>API内存调用npu runtime的接口异常。</td>
+      <td>API内部调用npu runtime的接口异常。</td>
     </tr>
   </tbody>
   </table>
@@ -1391,7 +1391,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
     - <term>Atlas A2系列产品</term>：不支持Q为BF16/FP16、KV为INT4(INT32)的场景。
     <!-- end id47 -->
     <!-- npu="950" id48 -->
-    - <term>Ascend 950PR&950DT系列产品</term>：支持了Q为BF16/FP16、KV为INT4(INT32)的场景，不存在对QKV数据类型的限制。
+    - <term>Ascend 950PR&950DT系列产品</term>：支持Q为BF16/FP16、KV为INT4(INT32)的场景，不存在对QKV数据类型的限制。
     <!-- end id48 -->
     - kvCache的搬运起点计算公式为：KV_S - kvPaddingSize - actualSeqLengthsKv。kvCache的搬运终点计算公式为：KV_S - kvPaddingSize。其中kvCache的搬运起点或终点小于0时，返回数据结果为全0。
     - kvPaddingSize小于0时将被置为0。

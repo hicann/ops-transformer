@@ -190,7 +190,7 @@ aclnnStatus aclnnAttentionToFFN(
         <td>ffnTokenInfoTableShape</td>
         <td>输入</td>
         <td>表示FFN节点上token信息表格shape大小的列表。</td>
-        <td>长度为3，包括Attention节点的数量、microBatchSize的大小以及每个token对应的相关发送状态信息shape的大小。</td>
+        <td>长度为3，包括Attention节点的数量、microBatchSize的大小以及每个token对应的发送状态信息shape的大小。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>

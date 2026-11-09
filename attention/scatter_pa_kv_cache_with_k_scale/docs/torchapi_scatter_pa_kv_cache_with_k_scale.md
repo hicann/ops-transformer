@@ -52,7 +52,9 @@
   $$
 
   其中：
+
   - num_tokens = batch * seq_len
+
   - block_idx：slot_mapping映射到的block索引
   - block_offset：block内的偏移量
 

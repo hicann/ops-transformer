@@ -455,7 +455,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 
 <!-- npu="950" id10 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
-  - `layoutKOptional`额外支持BSND和TND；支持PA_BBND、BSND、TND。
+  - `layoutKOptional`支持PA_BBND、BSND、TND。
   - `quantMode`支持1（FLOAT8_e4m3fn量化）、2（INT8量化）、3（MXFP8量化）、4（HIFLOAT8量化）和5（MXFP4量化）。
   - `cmpRatio`支持(0, 128]内任意正整数。
   - 支持`returnValue`。

@@ -108,6 +108,7 @@
 > Q、K、V数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小batch_size、S（Seq-Length）表示输入样本序列长度、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸headdim。Q_S表示输入q tensor的序列长度，Q_N表示输入q tensor的头数，KV_S表示输入k/v tensor的序列长度，KV_N表示输入k/v tensor的头数。TND排布下Q_T表示所有batch的q序列长度累加和，KV_T表示所有batch的k/v序列长度累加和。
 
 ## 函数原型
+
 调用quant_flash_attn_grad接口之前，请先调用前置接口quant_flash_attn_metadata，完成quant_flash_attn_grad负载均衡的计算。
 
 ```python
@@ -182,8 +183,8 @@ cann_ops_transformer.quant_flash_attn_grad(
 | quant_mode | int/QuantMode | 必选 | 量化模式，支持传入枚举或对应 int 值，枚举定义见「quant_mode 枚举」 | int32 | - | - | - |
 | cu_seqlens_q | Tensor | 可选 | Q的累积序列长度，用于处理变长序列，第一个元素必须为0。TND排布下必须传入，非TND排布不支持传入 | int32 | ND | (B+1,) | × |
 | cu_seqlens_kv | Tensor | 可选 | KV的累积序列长度，用于处理变长序列，第一个元素必须为0。TND排布下必须传入，非TND排布不支持传入 | int32 | ND | (B+1,) | × |
-| seqused_q | Tensor | 可选 | Q的指定每batch中实际使用的序列长度，截断冗余运算。TND排布下其值需小于等于对应batch的cu_seqlens_q段长度 | int32 | ND | (B,) | × |
-| seqused_kv | Tensor | 可选 | KV的指定每batch中实际使用的序列长度，截断冗余运算。TND排布下其值需小于等于对应batch的cu_seqlens_kv段长度 | int32 | ND | (B,) | × |
+| seqused_q | Tensor | 可选 | Q指定每batch中实际使用的序列长度，截断冗余运算。TND排布下其值需小于等于对应batch的cu_seqlens_q段长度 | int32 | ND | (B,) | × |
+| seqused_kv | Tensor | 可选 | KV指定每batch中实际使用的序列长度，截断冗余运算。TND排布下其值需小于等于对应batch的cu_seqlens_kv段长度 | int32 | ND | (B,) | × |
 | v_descale | Tensor | 可选 | v的反量化缩放因子 | float32 | ND | (1,) | × |
 | batch_size | int | 可选 | batch大小。若未传入，则从cu_seqlens_q或seqused_q推导。TND排布下不支持传入。默认值为None | int32 | - | - | - |
 | max_seqlen_q | int | 可选 | 指定查询q序列的长度上限 | int32 | - | - | - |
@@ -219,7 +220,7 @@ cann_ops_transformer.quant_flash_attn_grad(
 | seqused_kv | Tensor | 可选 | 指定每batch中kv实际使用的序列长度，截断冗余运算。TND排布下其值需小于等于对应batch的cu_seqlens_kv段长度 | int32 | ND | (B,) | √ |
 | sinks | Tensor | 可选 | sink场景下的输入tensor。当前版本不支持，传None即可 | float32 | ND | (Q_N,) | √ |
 | attn_mask | Tensor | 可选 | 掩码矩阵，当mask_mode为3或4时必须传入，mask_mode为0时不允许传入 | int8 | ND | (2048, 2048) | √ |
-| metadata | Tensor | 可选 | tiling下沉的aicpu算子输出结果，当前不支持不传入，必须由quant_flash_attn_metadata生成 | int32 | ND | (2, max_schedule_size) | √ |
+| metadata | Tensor | 可选 | tiling下沉的AI CPU算子输出结果，当前不支持不传入，必须由quant_flash_attn_metadata生成 | int32 | ND | (2, max_schedule_size) | √ |
 | quant_mode | int/QuantMode | 必选 | 量化模式，支持传入枚举或对应 int 值，枚举定义见「quant_mode 枚举」 | int32 | - | - | - |
 | softmax_scale | float | 可选 | 缩放系数，默认值为1.0。推荐值：sqrt(head_dim)的倒数 | float32 | - | - | - |
 | mask_mode | int/MaskMode | 可选 | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」。当前版本支持0/3/4 | int32 | - | - | - |
@@ -231,6 +232,7 @@ cann_ops_transformer.quant_flash_attn_grad(
 | layout_kv | string | 可选 | 定义输入k/v张量的布局格式，支持"BSND"、"BNSD"、"TND"，默认值为"BSND" | string | - | - | - |
 
 ### quant_mode 枚举
+
 `quant_mode`在Python接口中支持传入`IntEnum`枚举或对应int值，枚举定义于`cann_ops_transformer.ops.quant_flash_attn_grad`
 
 | 枚举名 | 值 | 含义 |
@@ -238,7 +240,8 @@ cann_ops_transformer.quant_flash_attn_grad(
 | `HIF8_PER_TENSOR` | 0 | HIFLOAT8 per-tensor 量化 |
 
 ### mask_mode 枚举
-与`mask_mode`在Python接口中支持传入`IntEnum`枚举或对应int值，枚举定义于`cann_ops_transformer.ops.quant_flash_attn_grad`
+
+`mask_mode`在Python接口中支持传入`IntEnum`枚举或对应int值，枚举定义于`cann_ops_transformer.ops.quant_flash_attn_grad`
 
 | 枚举名 | 值 | 含义 |
 | :--- | :---: | :--- |
@@ -967,7 +970,6 @@ mask_mode参数解释
 ## 确定性计算
 
 - 确定性说明：quant_flash_attn_grad默认确定性实现。
-
 
 ## 调用示例
 

@@ -153,7 +153,7 @@ aclnnStatus aclnnDequantRopeQuantKvcache(
     <tr>
         <td>cos</td>
         <td>输入</td>
-        <td>公式中的用于位置编码的输入cos。</td>
+        <td>公式中用于位置编码的输入cos。</td>
         <td>x为3维时shape为[B, S, 1, D]，x为2维时shape为[B, D]。</td>
         <td>FLOAT16、BFLOAT16</td>
         <td>ND</td>

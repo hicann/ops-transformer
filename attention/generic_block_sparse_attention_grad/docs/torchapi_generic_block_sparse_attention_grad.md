@@ -44,7 +44,7 @@
 
   `generic_block_sparse_attention_grad`是基于`TorchNPU`的`cann_ops_transformer`扩展接口，用于调用`GenericBlockSparseAttentionGrad`算子完成块稀疏注意力的反向梯度计算。`layout_sparse_pattern=1`时通过`sparse_block_idx`指定每个KV块选择的Q块/token；`layout_sparse_pattern=0`时通过该参数指定每个Q token选择的完整KV块。算子返回`dq`/`dk`/`dv`。
 
-  `layout_sparse_pattern=1`时使用`generic_block_sparse_attention_grad_metadata`生成AICore任务切分与负载均衡信息，再传入主算子。`layout_sparse_pattern=0`时不调用该接口，主算子的`metadata`须传`None`。`layout_sparse_pattern=1`的典型调用流程如下：
+  `layout_sparse_pattern=1`时使用`generic_block_sparse_attention_grad_metadata`生成AI Core任务切分与负载均衡信息，再传入主算子。`layout_sparse_pattern=0`时不调用该接口，主算子的`metadata`须传`None`。`layout_sparse_pattern=1`的典型调用流程如下：
 
   1. 准备`q`、`k`、`v`、`dout`、`attn_out`、`softmax_lse`、`sparse_block_idx`、`sparse_block_count`、`cu_seqlens_q`、`cu_seqlens_kv`等输入。
   2. 调用`generic_block_sparse_attention_grad_metadata`生成`metadata`。
@@ -168,7 +168,6 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 | `ResidualBlockMode.INCOMPLETE_BLK_KEPT_BUT_NOT_IN_SPARSE_BLK_IDX` | 1 | 尾部不完整KV块必定参与计算，但不包含在`sparse_block_idx`中；`layout_sparse_pattern=0`时使用 |
 
 `generic_block_sparse_attention_grad`与`generic_block_sparse_attention_grad_metadata`接口均默认使用`ResidualBlockMode.MARKED_BY_SPARSE_BLK_IDX`。主算子按模式分别使用0或1；可传对应整数或枚举名字符串。字符串解析与`mask_mode`一致：忽略大小写及首尾空格。
-
 
 ## 参数说明
 
@@ -494,7 +493,7 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
         <td rowspan="3">
             <ul>
                 <li>`layout_sparse_pattern=1`：block_x=1，block_y>=128且为64的倍数</li>
-                <li>`layout_sparse_pattern=1`：layout_sparse_pattern=1，residual_block_mode=0</li>
+                <li>`layout_sparse_pattern=1`：residual_block_mode=0</li>
                 <li>`layout_sparse_pattern=0`：block_x=1，1≤block_y≤baseKtile；layout_sparse_pattern=0，residual_block_mode=1</li>
             </ul>
         </td>

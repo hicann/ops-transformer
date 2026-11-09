@@ -266,7 +266,7 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>mixScales（const aclTensor*）</td>
     <td>输入</td>
-    <td>MhcPre算子的投影阶段的MhcPre算子的投影阶段的三路缩放系数，对应公式中的mix_scales，依次对应Pre、Post、Res。</td>
+    <td>MhcPre算子的投影阶段的三路缩放系数，对应公式中的mix_scales，依次对应Pre、Post、Res。</td>
     <td>不支持空Tensor。</td>
     <td>FLOAT32</td>
     <td>ND</td>

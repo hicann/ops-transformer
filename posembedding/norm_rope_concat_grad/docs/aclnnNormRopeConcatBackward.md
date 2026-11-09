@@ -249,7 +249,7 @@ aclnnStatus aclnnNormRopeConcatBackward(
       <tr>
           <td>normKeyWeight</td>
           <td>可选输入</td>
-          <td>正向key进行归一化操作的权重值，对应公式中的γ，当图片Query、Key进行带仿射LayerNorm归一化操作时传入。</td>
+          <td>正向key进行归一化操作的权重值，对应公式中的γ。</td>
           <td>数据类型与参数gradQueryOutput保持一致。</td>
           <td>FLOAT32、FLOAT16、BFLOAT16</td>
           <td>ND</td>
@@ -269,7 +269,7 @@ aclnnStatus aclnnNormRopeConcatBackward(
       <tr>
           <td>normKeyRstd</td>
           <td>可选输入</td>
-          <td>正向key进行归一化操作时输出的方差相关项rstd，对应公式中的rstd。</td>
+          <td>正向key进行归一化操作时输出的方差相关项，对应公式中的rstd。</td>
           <td>当图片Query、Key进行归一化操作时传入。</td>
           <td>FLOAT32</td>
           <td>ND</td>

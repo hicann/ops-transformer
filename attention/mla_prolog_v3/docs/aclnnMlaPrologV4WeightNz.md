@@ -515,7 +515,7 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
       <tr>
         <td>actualSeqLenOptional</td>
         <td>输入</td>
-        <td>表示每个batch中的序列长度，以前缀和的形式储存。</td>
+        <td>表示每个batch中的序列长度，以前缀和的形式存储。</td>
         <td>BS合轴且CacheMode="PA_BLK_BSND"/"PA_BLK_NZ"时需传</td>
         <td>INT32</td>
         <td>ND</td>
@@ -836,7 +836,7 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
         <tr>
           <td>ACLNN_ERR_RUNTIME_ERROR</td>
           <td>361001</td>
-          <td>API内存调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
+          <td>API内部调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
         </tr>
         <tr>
           <td>ACLNN_ERR_INNER_TILING_ERROR</td>

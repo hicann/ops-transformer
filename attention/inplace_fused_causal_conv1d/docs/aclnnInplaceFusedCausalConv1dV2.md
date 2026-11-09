@@ -127,7 +127,6 @@
     maxDraftTokens: 投机个数（multiTokenNum），取值范围[0, 16]
     ```
 
-
 - 计算公式：
 
   计算公式：K 是卷积核宽度，L 是当前 batch 的序列长度，dim 是特征维度，batchId 是当前处理的变长序列索引，C 是 convStates 缓存空间长度（convStates.size(1)），B 是 APC 块大小（bSize）。对输入 x 中的每一个 batch 进行以下操作：
@@ -654,7 +653,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1dV2(
     - convStates必须是3维[..., K-1, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cacheIndicesOptional不等于padSlotId的batch个数）。
     - queryStartLocOptional必须存在。
     - cacheIndicesOptional为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cuSeqLen范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
+    - cuSeqLen范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G], batch范围[1, 256]。
     - maxNumBlocks >= ceiv(maxQueryLen, blockSize)。
     - maxQueryLen > maxDraftTokens + 1。
   - prefill和decode混合场景：
@@ -663,7 +662,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1dV2(
     - convStates必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cacheIndicesOptional不等于padSlotId的batch个数）。
     - queryStartLocOptional必须存在。
     - cacheIndicesOptional为1维[batch, ]或2维[batch, maxNumBlocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cuSeqLen范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
+    - cuSeqLen范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G], batch范围[1, 256]。
     - maxNumBlocks >= ceiv(maxQueryLen, blockSize)。
     - maxQueryLen > maxDraftTokens + 1。
   - decode场景（变长序列）：
@@ -700,7 +699,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1dV2(
   - maxDraftTokens的取值范围为[0, 16]。
   - Pangu V2 模式（convMode = 1）下，numComputedTokensOptional不能为 None。
   - 算子入参与中间计算结果，在对应数据类型（float16/bfloat16）下，数值均不会超出该类型值域范围。
-  - 算子输入不支持有±inf和Nan的情况。
+  - 算子输入不支持±inf和NaN的情况。
 
 ## 调用示例
 

@@ -36,7 +36,7 @@
   $$
 
   $$
-  expandedXOut[i]=quant(x[sortedRowIdx[i]\%NUM_ROWS)]
+  expandedXOut[i]=quant(x[sortedRowIdx[i]\%NUM_ROWS])
   $$
 
 ## 函数原型

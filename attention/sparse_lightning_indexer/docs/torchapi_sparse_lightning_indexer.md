@@ -27,7 +27,7 @@
 
   `sparse_lightning_indexer`（candidate consumer）在 LightningIndexerV2 加权 ReLU 打分框架上消费
   source 算子（`lightning_indexer`，即 aclnnLightningIndexerV3 candidate 模式）
-  输出的候选块索引，做无 leak 候选内 TopK（可达且命中介候选块的位置以真实分数参与排序，
+  输出的候选块索引，做无 leak 候选内 TopK（可达且命中候选块的位置以真实分数参与排序，
   **非候选块索引一律不进入 topk 输出**，候选内有效数不足 topk 时剩余槽位填 -1），
   输出每个 query 行的 top-k 索引与（`return_value=1` 时的）TopK 分数。
 

@@ -314,7 +314,7 @@ aclnnStatus aclnnFFNToAttention(
   | H（hidden size） | 表示hidden size隐藏层大小。<ul><li><term>Atlas A3系列产品</term>  ：<code>1024 ≤  H ≤ 8192 </code>。</li></ul> |
   | HS（hidden and scale size） | 表示hidden与scale隐藏层大小。<ul><li><term>Atlas A3系列产品</term>  ：<code>1152 ≤  HS ≤ 8320 </code>。</li></ul>|
   | MicroBatchNum    | 表示microBatch的大小，目前仅支持<code>MicroBatchNum = 1</code>。 |
-  | ExpertNumPerToken    | 表示每个Token对应的发送的Expert数量，<code>ExpertNumPerToken = K + sharedExpertNum</code>。 |
+  | ExpertNumPerToken    | 表示每个Token对应的Expert数量，<code>ExpertNumPerToken = K + sharedExpertNum</code>。 |
   | K    | 表示选取topK个专家，取值范围为<code>0 < K ≤ 16 </code>。 |
   | ffnRankNum    | 表示选取ffnRankNum个卡作为FFnWorker，取值范围为<code>0 < ffnRankNum < worldSize </code>。 |
   | attnRankNum    | 表示选取attnRankNum个卡作为AttnWorker，取值范围为<code>0 < attnRankNum < worldSize </code>。 |

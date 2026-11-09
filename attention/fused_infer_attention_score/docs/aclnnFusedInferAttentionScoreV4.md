@@ -845,7 +845,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
             <tr>
                 <td>ACLNN_ERR_RUNTIME_ERROR</td>
                 <td>361001</td>
-                <td>API内存调用npu runtime的接口异常。</td>
+                <td>API内部调用npu runtime的接口异常。</td>
             </tr>
         </tbody>
     </table>
@@ -1546,7 +1546,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
         <td>此时actualSeqLengthsKv长度等于key/value的batch值，每个元素表示对应batch的逻辑KV长度，且不大于blockTable第二维长度与blockSize的乘积（可大于单个cache block的blockSize）</td>
     </tr>
     <tr>
-        <td>MLA（要求queryRope和keyRope不等于空）</td>
+        <td>MLA（要求queryRope和keyRope不为空）</td>
         <td>queryRopeOptional和keyRopeOptional</td>
         <td>queryRopeOptional和keyRopeOptional的d为64</td>
     </tr>
@@ -2045,7 +2045,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
             <tr>
                 <td rowspan="3">INT8量化场景</td>
                 <td>quantScale2和quantOffset2</td>
-                <td>kvCache反量化的合成参数场景仅支持query为FLOAT16时，将INT8类型的key和value反量化到FLOAT16。入参key/value的datarange与入参antiquantScale的datarange乘积范围在（-1，1）范围内，高性能模式可以保证精度，否则需要开启高精度模式来保证精度。
+                <td>kvCache反量化的合成参数场景仅支持query为FLOAT16时，将INT8类型的key和value反量化到FLOAT16。入参key/value的datarange与入参antiquantScale的datarange乘积在（-1，1）范围内，高性能模式可以保证精度，否则需要开启高精度模式来保证精度。
                     <ul>
                     <li>输出为int8时，quantScale2和quantOffset2为per-channel时，暂不支持左padding、RingAttention或者D非32Byte对齐的场景。</li>
                     </ul>
@@ -2144,7 +2144,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
             <tr>
                 <td rowspan="2">kv左padding场景</td>
                 <td>attenMaskOptional</td>
-                <td>kv左padding场景与attenMaskOptional参数一起开启时，需要保证attenMaskOptional含义正确，即能够正确的对无效数据进行隐藏。否则将引入精度问题。</td>
+                <td>kv左padding场景与attenMaskOptional参数一起开启时，需要保证attenMaskOptional含义正确，即能够正确地对无效数据进行隐藏。否则将引入精度问题。</td>
             </tr>
             <tr>
                 <td colspan="2">kv左padding场景不支持PagedAttention、tensorlist，否则默认为kv右padding场景。</td>

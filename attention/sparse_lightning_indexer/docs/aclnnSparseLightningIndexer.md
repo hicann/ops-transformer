@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：aclnnSparseLightningIndexer 实现 candidate consumer 语义：在 LightningIndexerV2 加权 ReLU 打分框架上消费上游 source 算子（aclnnLightningIndexerV3 开启 candidateTopkBlocks 时输出的 candidateBlockIndices）的候选块索引，对每个 query 行做无 leak 候选内 TopK：可达且命中介候选块的位置以真实分数参与排序，其余位置（不可达 / 可达但不在候选内）一律无效不入选；非候选块索引一律不进入 topk 输出，候选内有效数不足 topk 时剩余槽位填 -1，输出每个 query 行的 top-k 索引与（returnValue为1时的）TopK 分数。算子仅注册 ascend910b / ascend910_93 平台（arch22），需与上游 aclnnLightningIndexerV3 的 candidate source 模式配套使用。
+- 接口功能：aclnnSparseLightningIndexer 实现 candidate consumer 语义：在 LightningIndexerV2 加权 ReLU 打分框架上消费上游 source 算子（aclnnLightningIndexerV3 开启 candidateTopkBlocks 时输出的 candidateBlockIndices）的候选块索引，对每个 query 行做无 leak 候选内 TopK：可达且命中候选块的位置以真实分数参与排序，其余位置（不可达 / 可达但不在候选内）一律无效不入选；非候选块索引一律不进入 topk 输出，候选内有效数不足 topk 时剩余槽位填 -1，输出每个 query 行的 top-k 索引与（returnValue为1时的）TopK 分数。算子仅注册 ascend910b / ascend910_93 平台（arch22），需与上游 aclnnLightningIndexerV3 的 candidate source 模式配套使用。
 
 - 计算公式（每 batch b、query 行 i，N2=1）：
 
@@ -482,7 +482,9 @@ aclnnStatus aclnnSparseLightningIndexer(
 - candidateBlockIndices 直接对接 aclnnLightningIndexerV3（开启 candidateTopkBlocks 时）的 candidateBlockIndices 输出，块号为同一 forward 内 batch 相对压缩块号，槽位无序（消费侧按集合消费）；
 - 候选块号不含 output_idx_offset 偏移；
 - candidateBlockSize、cmpRatio 必须与 source 侧配置一致；
+
 - 候选宽度 candBlocks 由输入 tensor shape 末维推导。
+
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。

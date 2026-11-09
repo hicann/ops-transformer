@@ -50,7 +50,7 @@
     \end{aligned}
     $$
 
-    第$i$次迭代（$i = 1, 2, \dots, \mathbf({numIters}-1)$）：
+    第$i$次迭代（$i = 1, 2, \dots, (\mathbf{numIters}-1)$）：
 
     $$
     \begin{aligned}

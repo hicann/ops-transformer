@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：RingAttentionUpdate算子功能是将两次FlashAttention的输出根据其不同的softmax的max和sum更新。
+- 接口功能：将两次FlashAttention的输出根据其不同的softmax的max和sum更新。
 
 - 计算公式：
 

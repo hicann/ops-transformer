@@ -155,7 +155,7 @@ aclnnStatus aclnnInplaceMatmulAllReduceAddRmsNorm(
           <td>epsilon</td>
           <td>输入</td>
           <td>用于防止除0错误，即计算公式中的epsilon。</td>
-          <td>epsilon取值满足取值范围(0,1)。</td>
+          <td>epsilon取值满足范围(0,1)。</td>
           <td>double</td>
           <td>-</td>
           <td>-</td>
@@ -238,7 +238,7 @@ aclnnStatus aclnnInplaceMatmulAllReduceAddRmsNorm(
 
     返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-    第一阶段接口完成入参校验，出现以下场景报错：
+    第一段接口完成入参校验，出现以下场景时报错：
     <table style="undefined;table-layout: fixed; width: 1030px"><colgroup>
     <col style="width: 250px">
     <col style="width: 130px">

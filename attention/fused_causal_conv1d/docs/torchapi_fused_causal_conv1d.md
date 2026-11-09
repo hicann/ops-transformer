@@ -27,7 +27,6 @@
 
     对序列执行因果一维卷积，沿序列维度使用缓存数据（长度为卷积核宽减1）对各序列头部进行padding，确保输出依赖当前及历史输入；卷积完成后，将当前序列部分数据更新到缓存；在因果一维卷积输出的基础上，将原始输入加到输出上以实现残差连接。支持APC（Automatic Prefix Caching）、MTP（投机解码）、残差连接等特性。相较于标准causal_conv1d算子，本算子新增APC缓存复用、PD混部、残差连接可选等功能。相比于fused_causal_conv1d_，本接口不支持输入x的原地更新。<br>
 
-
 - **计算公式**：
 
     K是卷积核宽度（固定为3），L是原始序列长度，dim是特征维度。
@@ -187,7 +186,7 @@ cann_ops_transformer.fused_causal_conv1d(
 | cache_indices | Tensor | 可选 | 缓存索引，指定每个序列对应的缓存状态在conv_states中的索引。默认None使用恒等映射。 | int32 | [batch] |
 | initial_state_mode | Tensor | 可选 | 初始状态标志。1=使用缓存历史，0=零初始化（冷启动）。默认None全部零初始化。 | int32 | [batch] |
 | bias | Tensor | 必选 | 卷积偏置，None表示不使用。 | 同x | [dim] |
-| num_accepted_tokens | Tensor | 可选 | 当前batch的随机投机数。 | int32 | [batch] |
+| num_accepted_tokens | Tensor | 可选 | 当前batch的投机数。 | int32 | [batch] |
 | num_computed_tokens | Tensor | 可选 | 当前batch已经处理的token总数，用于判断初始状态。 | int32 | [batch] |
 | block_idx_first_scheduled_token | Tensor | 可选 | 当前batch的起始位置对应的block索引。 | int32 | [batch] |
 | block_idx_last_scheduled_token | Tensor | 可选 | 当前batch的seq_len - 1处对应的block索引。 | int32 | [batch] |
@@ -203,6 +202,7 @@ cann_ops_transformer.fused_causal_conv1d(
 ## 返回值说明
 
 返回卷积输出Tensor y，shape与x一致，dtype与x一致。
+
 ## 约束说明
 
 - 输入shape限制：
@@ -212,7 +212,7 @@ cann_ops_transformer.fused_causal_conv1d(
     - conv_states必须是3维[..., K-1, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cache_indices不等于pad_slot_id的batch个数）。
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, max_num_blocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cu_seq_len范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
+    - cu_seq_len范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G], batch范围[1, 256]。
     - max_num_blocks >= ceiv(max_query_len, block_size)。
     - max_query_len > max_draft_tokens + 1。
   - prefill和decode混合场景：
@@ -221,7 +221,7 @@ cann_ops_transformer.fused_causal_conv1d(
     - conv_states必须是3维[..., K-1+m, dim]，第0维大小不固定且大于等于参与计算的batch个数（即cache_indices不等于pad_slot_id的batch个数）。
     - query_start_loc必须存在。
     - cache_indices为1维[batch, ]或2维[batch, max_num_blocks]，其中1维表示未开启APC，2维表示开启APC。
-    - cu_seq_len范围[batch, 1024 * 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 * batch, 4G], batch范围[1, 256]。
+    - cu_seq_len范围[batch, 1024 × 1024]，dim范围[64, 16384]且是16的倍数，且两者乘积需满足[64 × batch, 4G], batch范围[1, 256]。
     - max_num_blocks >= ceiv(max_query_len, block_size)。
     - max_query_len > max_draft_tokens + 1。
   - decode场景（变长序列）：

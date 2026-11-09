@@ -166,7 +166,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
     <tr>
       <td>metadataOptional</td>
       <td>输入</td>
-      <td>AICPU算子aclnnGenericBlockSparseAttentionMetadata的分核结果。</td>
+      <td>AI CPU算子aclnnGenericBlockSparseAttentionMetadata的分核结果。</td>
       <td>
         必须传入。由aclnnGenericBlockSparseAttentionMetadata生成，每次调用须重新生成。
       </td>
@@ -451,7 +451,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>residualBlockMode</td>
       <td>输入</td>
       <td>表示KV序列以blockShapeY为单位进行稀疏后，末尾块的状态。</td>
-      <td>当前仅支持取0或1。0代表末尾块是否参与运算由sparseBlockIdx传入的值决定，1表示尾部不完整块必定参与运算，但必定不包含在sparseBlockIdx中。</td>
+      <td>当前仅支持取0或1。0代表尾部不完整块是否参与运算由sparseBlockIdx传入的值决定，1表示尾部不完整块必定参与运算，但必定不包含在sparseBlockIdx中。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -518,7 +518,6 @@ aclnnStatus aclnnGenericBlockSparseAttention(
 <!-- npu="A3,910b" id9 -->
 - returnSoftmaxlse：非量化场景支持0或1；FP8路径仅支持0。
 <!-- end id9 -->
-
 
 - **返回值**
 
@@ -628,7 +627,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
 
 ### 基准说明
 
-资料约束中，常见字段释义如下：
+资料中，常见字段释义如下：
 
 | 命名 | 含义 |
 | :---: | :--- |

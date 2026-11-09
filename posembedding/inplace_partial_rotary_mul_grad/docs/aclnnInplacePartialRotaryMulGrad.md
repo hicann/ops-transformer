@@ -341,7 +341,7 @@ aclnnStatus aclnnInplacePartialRotaryMulGrad(
 - 确定性计算：
   - aclnnInplacePartialRotaryMulGrad默认确定性实现。
 
-- 输入张量dyRef支持BSND排布以及其B/S/N维度的广播变体（如111D、1SND、B1ND、BS1D、11ND、B11D、1S1D等）。各参数的shape约束可以描述如下：
+- 输入张量dyRef支持BSND排布及其B/S/N维度的广播变体（如111D、1SND、B1ND、BS1D、11ND、B11D、1S1D等）。各参数的shape约束可以描述如下：
   - 输入张量dyRef的最后一维大小D必须小于等于1024。
   - 当切片长度(end - start)大于0时，输入张量cos、sin的最后一维大小必须等于切片长度。
   - 输入张量cos和sin的shape必须完全相同，cos和sin的B、S、N维度需要与dyRef满足[broadcast关系](../../../docs/zh/context/broadcast_relationship.md)，且广播后的B、S、N必须等于dyRef的B、S、N。

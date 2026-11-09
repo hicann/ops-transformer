@@ -21,7 +21,6 @@
 - <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
-
 ## 功能说明
 
 - 接口功能：计算`SparseFlashMla`注意力的Softmax L1Norm结果，支持Compressed Attention以及Sparse Compressed Attention场景。该接口为`aclnnDenseLightningIndexerKLLossGrad`反向算子的配套接口，输出可用于反向梯度计算。调用过程中，需先调用`aclnnSparseFlashMlaSoftmaxL1NormMetadata`接口完成负载均衡计算，再调用`aclnnSparseFlashMlaSoftmaxL1Norm`接口完成算子计算过程。
@@ -58,11 +57,12 @@
 
     其中，$G$ 为group数（$G = N1 / N2$），$ReduceSum$ 在G维度（q head group维度）上对softmax概率$P$求和后取平均。
 
-
 ## 函数原型
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnSparseFlashMlaSoftmaxL1NormGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnSparseFlashMlaSoftmaxL1Norm”接口执行计算。
+
 ```c++
+
 aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormGetWorkspaceSize(
     const aclTensor   *q,
     const aclTensor   *k,
@@ -85,6 +85,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormGetWorkspaceSize(
     uint64_t          *workspaceSize,
     aclOpExecutor    **executor);
 ```
+
 ```c++
 aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
     void             *workspace,
@@ -395,7 +396,6 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
         </tbody>
     </table>
 
-
 ## aclnnSparseFlashMlaSoftmaxL1Norm
 
 - **参数说明：**
@@ -438,7 +438,6 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
 - **返回值**
 
    aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
-
 
 ## 约束说明
 

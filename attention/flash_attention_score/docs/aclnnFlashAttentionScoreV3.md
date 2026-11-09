@@ -465,7 +465,7 @@ aclnnStatus aclnnFlashAttentionScoreV3(
     <tr>
       <td>stream</td>
       <td>输入</td>
-      <td>指定执行任务的AscendCL stream流。</td>
+      <td>指定执行任务的AscendCL Stream。</td>
     </tr>
   </tbody>
   </table>

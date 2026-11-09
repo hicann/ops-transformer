@@ -23,12 +23,12 @@
 
 ## 功能说明
 
-- 接口功能：该算子为AICPU算子，是aclnnSparseFlashMlaSoftmaxL1Norm算子的前置算子。根据aclnnSparseFlashMlaSoftmaxL1Norm算子的输入shape、layout、mask和压缩比例信息，计算并输出分核切分metadata。输出结果可作为aclnnSparseFlashMlaSoftmaxL1Norm算子的metadataOptional输入，减少主算子tiling阶段对host array的访问。
+- 接口功能：该算子为AI CPU算子，是aclnnSparseFlashMlaSoftmaxL1Norm算子的前置算子。根据aclnnSparseFlashMlaSoftmaxL1Norm算子的输入shape、layout、mask和压缩比例信息，计算并输出分核切分metadata。输出结果可作为aclnnSparseFlashMlaSoftmaxL1Norm算子的metadataOptional输入，减少主算子tiling阶段对host array的访问。
 
   **该算子不建议单独使用，建议与aclnnSparseFlashMlaSoftmaxL1Norm算子配合使用，形成完整的工作流。**
     1. 接收主算子的shape信息，包括batchSize、maxSeqLenQ、maxSeqLenK、numHeadsQ、numHeadsK、headDim、topk、layout和mask信息。
     2. 根据layout和可选输入seqUsedQOptional计算参与负载均衡的seq总数，采用strided方式将任务均衡切分到可用AIC核上。
-    3. 输出metadata后，后续作为aclnnSparseFlashMlaSoftmaxL1Norm算子的metadataOptional输入使用。
+    3. 输出metadata后，作为aclnnSparseFlashMlaSoftmaxL1Norm算子的metadataOptional输入使用。
 
 ## 函数原型
 

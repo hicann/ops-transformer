@@ -152,9 +152,7 @@ class ElasticBuffer:
 - **训练**（`with_grad=True`）：将 `storage` 的锁页内存直接映射为Engram storage（零拷贝，无数据搬运），`storage` 的原地更新对后续 [engram_fetch](#engram_fetch) 可见。当 `storage` 为FP8量化类型时，须同时传入SF量化表 `sf`。
 
 写入完成后，内部都会获取通信上下文tensor、本地storage地址和rank数等信息，供后续 [engram_fetch](#engram_fetch) 使用。
-
 > **host pinned共享内存段**（推理模式）：指通过 `aclrtMallocHost` 分配的页锁定（pinned）主机内存，并经 `aclrtHostRegisterV2` 映射后获得设备可访问地址。该内存段既可被本卡NPU直接访问，也可被远端rank的NPU通过URMA读取，从而实现跨rank的零拷贝数据共享。其大小由构造函数的 `num_cpu_bytes` 参数指定。
-
 > **训练模式内存映射**：`storage` 的锁页主机内存经 `aclrtHostRegisterV2` 注册并映射到设备地址，再注册到HCCL通信域供远端rank访问。要求：`storage` 必须为锁页内存（如 `pin_memory()` 或 `torch.empty(..., pin_memory=True)` 分配）；普通（非锁页）CPU内存在当前驱动的主机注册路径下不受支持，会在首次调用时报 `aclrtHostGetDevicePointer` 失败；`storage` 在本ElasticBuffer生命周期内必须保持存活且地址不变。重复调用本接口须传入同一 `storage`（可作为表原地更新后的跨rank同步点），传入其他地址会报错。
 
 **计算公式**：
@@ -167,7 +165,7 @@ $$HostPinnedBuf[0 : storage.nbytes()] \leftarrow storage.data()$$
 
 $$EngramTable[rank\_id] \equiv storage$$
 
-分布式模式写入前后均有两次 `Barrier`；`group=None` local模式没有通信域，不执行 `Barrier`：
+分布式模式写入前后各执行一次 `Barrier`；`group=None` local模式没有通信域，不执行 `Barrier`：
 
 $$Barrier \rightarrow write(storage) \rightarrow Barrier$$
 
@@ -219,21 +217,21 @@ $EngramTable[rank\_id][local\_idx]$ 表示其中第 $local\_idx$ 个条目。
 
 1. 桶排序：按 $rank\_id_i = \lfloor indices[i] / num\_entries \rfloor$ 对 `indices` 分桶，记录桶排列序 $perm$ 与每rank发送量 $send\_counts$：
 
-$$send\_counts[r] = |\{\,i \mid rank\_id_i = r\,\}|, \quad r \in [0, world\_size)$$
+    $$send\_counts[r] = |\{\,i \mid rank\_id_i = r\,\}|, \quad r \in [0, world\_size)$$
 
 2. a2a交换indices：各rank将排序后的indices（全局索引）发送到目标rank，接收其他rank请求的全局索引，得到 $recv\_local\_entry$（均为映射到本rank的全局索引，即 `global_idx / num_entries == rank_id`）、$recv\_counts$，接收总量 $num\_recv = \sum_{r=0}^{world\_size-1} recv\_counts[r]$。
 
 3. 本地gather：将 $recv\_local\_entry$ 中的全局索引按 $local\_idx = recv\_local\_entry[j] \bmod num\_entries$ 转换后，从本地 $EngramTable[rank\_id]$ 读取：
 
-$$local\_data[j] = EngramTable[rank\_id][recv\_local\_entry[j] \bmod num\_entries], \quad j \in [0, num\_recv)$$
+    $$local\_data[j] = EngramTable[rank\_id][recv\_local\_entry[j] \bmod num\_entries], \quad j \in [0, num\_recv)$$
 
-启用SF量化时，SF行按同一 $local\_idx$ 从本rank SF表读取，与hidden数据同行存放（行宽 $rowStride = hidden\_bytes + sf\_bytes$）。
+    启用SF量化时，SF行按同一 $local\_idx$ 从本rank SF表读取，与hidden数据同行存放（行宽 $rowStride = hidden\_bytes + sf\_bytes$）。
 
 4. a2a交换data：将 $local\_data$（含SF行，每行 $rowStride$ 字节）沿原请求路径送回，得到 $recv\_data[i]$，$i \in [0, num\_tokens)$。
 
 5. 还原：按 $perm$ 重排回原始token顺序：
 
-$$fetched[perm[i]] = recv\_data[i], \quad i \in [0, num\_tokens)$$
+    $$fetched[perm[i]] = recv\_data[i], \quad i \in [0, num\_tokens)$$
 
 6. 保存反向上下文 $fetch\_ctx$（即 [EngramFetchCtx](#engramfetchctx)），包含 $perm$、$send\_counts$、$recv\_counts$、$recv\_local\_entry$、$num\_recv$ 五个字段，供反向 [engram_fetch_grad](#engram_fetch_grad) 使用。
 
@@ -272,15 +270,15 @@ ElasticBuffer.engram_fetch(indices) -> Callable
 
 1. Unsort：按 $perm$ 将 $grad\_fetched$ 重排回桶排序顺序：
 
-$$grad\_sorted[i] = grad\_fetched[perm[i]], \quad i \in [0, num\_tokens)$$
+    $$grad\_sorted[i] = grad\_fetched[perm[i]], \quad i \in [0, num\_tokens)$$
 
 2. 反向a2a交换：将 $grad\_sorted$ 通过a2a反向交换（$send\_counts$ 为send量，$recv\_counts$ 为recv量），各rank收到对应 $recv\_local\_entry$ 的梯度：
 
-$$grad\_recv[j] \leftrightarrow recv\_local\_entry[j], \quad j \in [0, num\_recv)$$
+    $$grad\_recv[j] \leftrightarrow recv\_local\_entry[j], \quad j \in [0, num\_recv)$$
 
 3. Unique：对 $recv\_local\_entry$ 按 $local\_idx = recv\_local\_entry[j] \bmod num\_entries$ 转换后去重，得到本rank local entry索引集合：
 
-$$unique\_local\_entry = \text{unique}(\{\,recv\_local\_entry[j] \bmod num\_entries \mid j \in [0, num\_recv)\,\})$$
+    $$unique\_local\_entry = \text{unique}(\{\,recv\_local\_entry[j] \bmod num\_entries \mid j \in [0, num\_recv)\,\})$$
 
 4. ScatterAdd：对每个unique entry，按FP32累加所有映射到该entry的梯度后转回输出dtype：
 

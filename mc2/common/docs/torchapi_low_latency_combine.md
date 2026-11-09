@@ -452,7 +452,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
   - 对于<term>Ascend 950PR&950DT系列产品</term>，当dispatch侧quant\_mode=0且x\_smooth\_scale非空时，dispatch token长度取max(Align32(2 \* h) + 64, Align32(Align32(2 \* h) + 4 \* h) + 16)，再按上述规则对齐。
   - 对于<term>Ascend 950PR&950DT系列产品</term>，上式中 combine 项按 `480Align512(2 * h)` 计算。
   <!-- end id11 -->
-  - 通信域内开设大小可通过调用MoeDistributeBuffer.get_low_latency_ccl_buffer_size接口计算。
+  - 通信域开设大小可通过调用MoeDistributeBuffer.get_low_latency_ccl_buffer_size接口计算。
 
 - 本文公式中的“/”表示整除。
 

@@ -66,7 +66,9 @@
   $$
 
   其中：
+
   - $T$ 表示 token 数量，$N$ 表示 `blockRes` 的 block 数量，$H$ 表示 hidden size。
+
   - $v_{t,i,h}$ 表示 `blockRes` 与 `partialBlock` 拼接后的 value，维度为 $(T,N+1,H)$。
   - $inv\_rms_{t,i}$ 表示前向逐行归一化系数。
   - $score\_weight_{h}$ 表示 `normWeight` 与 `projWeight` 逐元素相乘的结果。

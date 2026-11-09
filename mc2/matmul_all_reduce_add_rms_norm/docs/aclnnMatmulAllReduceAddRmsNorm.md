@@ -154,7 +154,7 @@ aclnnStatus aclnnMatmulAllReduceAddRmsNorm(
           <td>epsilon</td>
           <td>输入</td>
           <td>Host侧的双精度，用于防止除0错误，即计算公式中的epsilon。</td>
-          <td>epsilon取值满足取值范围(0,1)。</td>
+          <td>epsilon取值满足(0,1)。</td>
           <td>Double</td>
           <td>-</td>
           <td>-</td>

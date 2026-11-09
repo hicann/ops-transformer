@@ -7,7 +7,6 @@ abbr {
 }
 </style>
 
-
 ---
 
 ## 产品支持情况
@@ -496,7 +495,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 | 2 | `(K/gsK + g, M)`，per_token_scale_i地址偏移为 `((K_0 + K_1 + ... + K_{i-1}) / gsK + g_i) * M`（$g_i$ 为第 i 个分组，下标从 0 开始），即per_token_scale_0偏移为0，per_token_scale_1偏移为 `(K_0 / gsK + 1) * M`，per_token_scale_2偏移为 `((K_0 + K_1) / gsK + 2) * M`，依此类推 |
 
 - **动态量化特殊场景处理**：
-  - 在动态量化场景 M分组或K分组情况下，当 N等于1 且 scaleOptional 的 shape 为 `(g, 1)` 时，weight既可以pertensor量化也可以perchannel量化时，优先选择pertensor量化模式。
+  - 在动态量化场景 M分组或K分组情况下，当 N等于1 且 scaleOptional 的 shape 为 `(g, 1)` 时，weight既可以pertensor量化也可以perchannel量化，优先选择pertensor量化模式。
   - 在动态量化场景 M分组情况下，当 g = M 且 perTokenScaleOptional 的 shape 为 `(g,)` 时，x选择pertoken量化模式；当 g = M，K ≤ 128 且 perTokenScaleOptional 的 shape 为 `(g, 1)` 时，根据weight的量化模式选择x的量化模式（weight 如果是 perchannel 或者pertensor量化，x选择pertensor量化；weight 如果是 <abbr title="简称B量化，在所有轴上对数据分块，每块使用独立的量化参数">perblock</abbr> 量化，x选择 <abbr title="简称G量化，在reduce轴上对数据分组，每组使用独立的量化参数">pergroup</abbr> 量化）。
   - 在动态量化场景 K分组情况下，K小于128，N小于等于128 且 scaleOptional 的 shape 为 `(g, 1)` 时，按照现有量化模式区分规则，既可以为非pergroup量化，又可以为G-B量化，此种场景现一律按照G-B量化处理。
   - 在动态量化场景 K分组情况下，当 M等于1 且 perTokenScaleOptional 的 shape 为 `(g, 1)` 时，x既可以pertoken量化也可以pertensor量化时，优先选择pertensor量化模式。

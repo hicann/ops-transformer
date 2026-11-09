@@ -150,7 +150,7 @@ aclnnStatus aclnnCompressorGrad(
         <tr>
           <td>ACLNN_ERR_RUNTIME_ERROR</td>
           <td>361001</td>
-          <td>API内存调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
+          <td>API内部调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
         </tr>
         <tr>
           <td>ACLNN_ERR_INNER_TILING_ERROR</td>
@@ -238,7 +238,7 @@ aclnnStatus aclnnCompressorGrad(
     - BSH布局（x为[B,S,H]）：
         - seqused[b]超出[0, S]时按区间端点截断（负值按0处理即该batch无完整压缩块、输出全零；超上界按S处理即等同不传seqused）。
         - startPos[b]取模cmpRatio后的偏移参与块锚点计算，负值/垃圾值不会造成越界访问。
-    - 所有违规输入均保证不产生越界读写与数值下溢；调用方应按上述值域构造输入以获得正确梯度。
+    - 所有违规输入均保证不产生越界读写与数值溢出；调用方应按上述值域构造输入以获得正确梯度。
     - 结构性错误（shape/dtype/维度不一致、dCmpKv行数不足、空Tensor等）仍由host侧直接拒绝报错（返回ACLNN_ERR_INNER_TILING_ERROR）。
 - 输入值域限制：
     - 该接口支持B、S泛化，且存在如下场景限制：

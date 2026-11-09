@@ -560,7 +560,7 @@ aclnnStatus aclnnMlaPreprocess(
       <td>shape和dtype随cacheMode变化：<ul>
         <li>cacheMode为0：shape为[tokenNum, headNum, 576]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为1或3：shape为[tokenNum, headNum, 512]，dtype与input一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
-        <li>cacheMode为2：shape为[tokenNum, headNum, 512]，dtype为INT8，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND格式。</li></ul>
+        <li>cacheMode为2：shape为[tokenNum, headNum, 512]，dtype为INT8，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li></ul>
       </td>
       <td>INT8、FLOAT16、BFLOAT16</td>
       <td>ND</td>
@@ -662,7 +662,7 @@ aclnnStatus aclnnMlaPreprocess(
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
       <td>361001</td>
-      <td>API内存调用npu runtime的接口异常。</td>
+      <td>API内部调用npu runtime的接口异常。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_INNER_TILING_ERROR</td>

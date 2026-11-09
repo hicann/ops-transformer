@@ -210,7 +210,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMap(
       <td>restoreShapeOptional（aclIntArray*）</td>
       <td>输入</td>
       <td>表示unpermutedTokens的shape。</td>
-      <td>size大小为2。</td>
+      <td>size为2。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>

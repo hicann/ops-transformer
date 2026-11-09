@@ -169,7 +169,7 @@ aclnnStatus aclnnFusedFloydAttentionGrad(
         <tr>
           <td>dy（aclTensor）</td>
           <td>输入</td>
-          <td>公式中的输入dY。</td>
+          <td>公式中的dY。</td>
           <td>-</td>
           <td>FLOAT16、BFLOAT16</td>
           <td>ND</td>

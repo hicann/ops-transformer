@@ -299,7 +299,7 @@ aclnnStatus aclnnSwinAttentionScoreQuant(
     <tr>
         <td>ACLNN_ERR_PARAM_INVALID</td>
         <td>161002</td>
-        <td>入或输出参数的数据类型/数据格式不在支持的范围内。</td>
+        <td>输入或输出参数的数据类型/数据格式不在支持的范围内。</td>
     </tr>
     </tbody>
     </table>

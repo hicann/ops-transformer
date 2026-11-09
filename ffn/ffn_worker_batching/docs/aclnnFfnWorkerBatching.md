@@ -178,7 +178,7 @@ aclnnStatus aclnnFfnWorkerBatching(
       <td>输出</td>
       <td>重排后的token hidden states，按专家ID排序后连续存放。</td>
       <td>数据类型由tokenDtype决定；FP4的逻辑shape仍为(Y, H)，两个元素打包为一个字节。</td>
-      <td>FP16、BF16、INT8、支持FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1</td>
+      <td>FP16、BF16、INT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1</td>
       <td>ND</td>
       <td>2维，(Y, H)，其中Y = A × BS × (topK+1)</td>
       <td>×</td>

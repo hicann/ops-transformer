@@ -44,7 +44,7 @@
     \text{RMS}(x) = \sqrt{\frac{1}{N} \sum_{i=1}^{N} x_i^2 + \epsilon}
     $$
 
-    Query的计算公式中，包括下采样、RmsNorm和两次上采样
+    Query的计算公式，包括下采样、RmsNorm和两次上采样
 
     $$
     c^Q = RmsNorm(x \cdot W^{DQ})
@@ -544,7 +544,7 @@ aclnnStatus aclnnMlaPrologV2WeightNz(
         <tr>
           <td>ACLNN_ERR_RUNTIME_ERROR</td>
           <td>361001</td>
-          <td>API内存调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
+          <td>API内部调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
         </tr>
         <tr>
           <td>ACLNN_ERR_INNER_TILING_ERROR</td>

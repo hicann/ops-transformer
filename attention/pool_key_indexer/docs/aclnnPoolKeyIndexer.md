@@ -53,31 +53,31 @@
 
   1. 缩放点积：
 
-  $$
-  S = Q \otimes K_{pool}^T \odot \frac{1}{\sqrt{headDim}}
-  $$
+      $$
+      S = Q \otimes K_{pool}^T \odot \frac{1}{\sqrt{headDim}}
+      $$
 
   2. ReLU激活，过滤负相关信号：
 
-  $$
-  S' = \text{ReLU}(S)
-  $$
+      $$
+      S' = \text{ReLU}(S)
+      $$
 
   3. 多头权重聚合：
 
-  $$
-  PoolScores = W \otimes S'
-  $$
+      $$
+      PoolScores = W \otimes S'
+      $$
 
   4. 可见性过滤：根据因果性和padding状态标记有效候选pool，将无效pool分数置为$-\infty$。
 
   5. Top-k选择：
 
-  $$
-  TopK\_pool = \text{Top-}k(PoolScores)
-  $$
+      $$
+      TopK\_pool = \text{Top-}k(PoolScores)
+      $$
 
-  其中$k = \lfloor topk / pool\_size \rfloor$，即选取前$k$个pool。
+      其中$k = \lfloor topk / pool\_size \rfloor$，即选取前$k$个pool。
 
   **索引展开与追加：**
 
@@ -642,8 +642,8 @@ aclnnStatus aclnnPoolKeyIndexer(
 - 输入属性限制：
   - topk需满足topk % pool_size == 0，pool_size支持[1, 128]，topk支持[1, 2048]以及3072、4096、5120、6144、7168、8192。
   - block_size取值为16的倍数，最大支持2048。
-  - 当layoutKeyOptional为PA_BBND且poolKey为0轴非连续输入时，keyStride0应传入poolKey的实际stride(0)（元素单位，且不小于block_size * N2 * D）；keyStride0为-1时表示未指定，按连续输入推导；keyStride0指定值与poolKey运行时实际stride冲突时报错。
-  - 当layoutKeyOptional为PA_BBND且kDescaleOptional为0轴非连续输入时（量化场景），kDescaleStride0应传入kDescaleOptional的实际stride(0)（元素单位，且不小于连续stride：quantMode为0时为block_size * N2，quantMode为1时为block_size * N2 * (D / 32)）；kDescaleStride0为-1时表示未指定，按连续输入推导；kDescaleStride0指定值与kDescaleOptional运行时实际stride冲突时报错。
+  - 当layoutKeyOptional为PA_BBND且poolKey为0轴非连续输入时，keyStride0应传入poolKey的实际stride(0)（元素单位，且不小于block_size × N2 × D）；keyStride0为-1时表示未指定，按连续输入推导；keyStride0指定值与poolKey运行时实际stride冲突时报错。
+  - 当layoutKeyOptional为PA_BBND且kDescaleOptional为0轴非连续输入时（量化场景），kDescaleStride0应传入kDescaleOptional的实际stride(0)（元素单位，且不小于连续stride：quantMode为0时为block_size × N2，quantMode为1时为block_size × N2 × (D / 32)）；kDescaleStride0为-1时表示未指定，按连续输入推导；kDescaleStride0指定值与kDescaleOptional运行时实际stride冲突时报错。
 - 输入数据类型限制：
   - 参数query、poolKey的数据类型应保持一致。
   - 非量化场景（quantMode为-1）下，参数weights的数据类型应与query、poolKey保持一致；量化场景（quantMode为0或1）下，参数weights为FLOAT16或BFLOAT16；int8量化场景（quantMode为2）下，参数weights仅支持FLOAT16。
@@ -654,7 +654,7 @@ aclnnStatus aclnnPoolKeyIndexer(
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：不支持FLOAT8_E4M3FN与FLOAT8_E8M0数据类型，不支持FP8量化场景（quantMode为0或1）；支持INT8量化场景（quantMode为2时query、poolKey为INT8，weights、反量化系数为FLOAT16）。
   <!-- end id7 -->
 - 输入数据布局限制：
-  - 参数query、poolKey的数据布局（layoutQueryOptional与layoutKeyOptional）需保持一致，PageAttention场景（layoutKeyOptional为PA_BBND时）除外。
+  - 参数query、poolKey的数据布局（layoutQueryOptional与layoutKeyOptional）需保持一致，PageAttention场景（layoutKeyOptional为PA_BBND）除外。
 - 其他限制：
   - poolKey支持0轴非连续（仅PA_BBND布局，需配合keyStride0属性；BSND/TND布局要求连续输入）。
   - kDescaleOptional支持0轴非连续（仅PA_BBND布局且量化场景，需配合kDescaleStride0属性；BSND/TND布局要求连续输入）。

@@ -388,10 +388,10 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2(
   - <term>Atlas A2系列产品</term>：支持AIV通信。
   <!-- end id14 -->
   <!-- npu="A3" id8 -->
-  - <term>Atlas A3系列产品</term>：支持AIV和AICPU通信。
+  - <term>Atlas A3系列产品</term>：支持AIV和AI CPU通信。
   <!-- end id8 -->
   <!-- npu="950" id9 -->
-  - <term>Ascend 950DT系列产品</term>：支持 CCU 通信和 AICPU 通信，CCU 仅支持单机UB域内互联，AI CPU 可支持跨机 UB 域内互联。
+  - <term>Ascend 950DT系列产品</term>：支持 CCU 通信和 AI CPU 通信，CCU 仅支持单机UB域内互联，AI CPU 可支持跨机 UB 域内互联。
 
   <!-- end id9 -->
 

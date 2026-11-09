@@ -122,7 +122,7 @@ ffn_to_attention(buffer, x, session_ids, micro_batch_ids, token_ids, expert_offs
         <td>window_addr</td>
         <td>int</td>
         <td>可选</td>
-        <td>本卡（ffn侧）通信窗口内存的设备地址，与<code>window_size</code>必须成对传入。传入后该内存替代框架内部分配的通信窗口：框架会将其清零一次并注册进通信域，不会分配或释放该内存；调用方需保证该内存在buffer销毁前持续有效。仅channel后端（Ascend950）支持。默认值为None，表示由框架内部分配。</td>
+        <td>本卡（ffn侧）通信窗口内存的设备地址，与<code>window_size</code>必须成对传入。传入后该内存替代框架内部分配的通信窗口：框架会将其清零一次并注册进通信域，不会分配或释放该内存；调用方需保证该内存在buffer销毁前持续有效。仅channel后端（Ascend 950）支持。默认值为None，表示由框架内部分配。</td>
     </tr>
     <tr>
         <td>window_size</td>

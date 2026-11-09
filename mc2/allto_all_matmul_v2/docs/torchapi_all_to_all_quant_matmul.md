@@ -56,6 +56,7 @@
 ## 函数原型
 
 ```python
+
 cann_ops_transformer.all_to_all_quant_matmul(
     x1,
     x2,
@@ -103,7 +104,6 @@ cann_ops_transformer.all_to_all_quant_matmul(
 | 参数名          | 参数类型 | 描述                                                         | 数据类型                        | 数据格式       | 维度(shape)          |
 | --------------- | -------- | ------------------------------------------------------------ | ------------------------------- | -------------- | -------------------- |
 | `y`           | Tensor   | 矩阵乘输出。                                                 | 由`y_dtype`指定（BF16或FP16） | ND             | `(BS/rankSize, N)` |
-
 
 ## 约束说明
 
@@ -199,6 +199,7 @@ cann_ops_transformer.all_to_all_quant_matmul(
       for p in procs:
           p.join()
   ```
+
   运行方式：
 
   ```bash

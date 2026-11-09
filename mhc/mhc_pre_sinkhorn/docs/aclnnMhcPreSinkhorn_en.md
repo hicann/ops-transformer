@@ -52,7 +52,7 @@
     \end{aligned}
     $$
 
-    The $i$-th iteration ($i = 1, 2, \dots, \mathbf({numIters}-1)$):
+    The $i$-th iteration ($i = 1, 2, \dots, (\mathbf{numIters}-1)$):
 
     $$
     \begin{aligned}

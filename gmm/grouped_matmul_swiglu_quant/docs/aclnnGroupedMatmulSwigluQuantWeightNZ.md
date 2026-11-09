@@ -358,7 +358,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZ(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>传入的x、weight、weightScale、xScale、groupList、output、outputScale是空指针时。</td>
+      <td>传入的x、weight、weightScale、xScale、groupList、output、outputScale是空指针。</td>
     </tr>
     <tr>
       <td rowspan="7">ACLNN_ERR_PARAM_INVALID</td>

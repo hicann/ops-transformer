@@ -37,6 +37,7 @@
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnGroupedMatmulAddGetWorkspaceSize”接口获取入参并根据计算流程计算所需workspace大小，再调用“aclnnGroupedMatmulAdd”接口执行计算。
 
 ```c++
+
 aclnnStatus aclnnGroupedMatmulAddGetWorkspaceSize(
     const aclTensor *x,
     const aclTensor *weight,
@@ -283,6 +284,7 @@ aclnnStatus aclnnGroupedMatmulAdd(
 调用示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 <!-- npu="A3,910b" id8 -->
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
+
     ```c++
     #include <iostream>
     #include <vector>
@@ -483,6 +485,7 @@ aclnnStatus aclnnGroupedMatmulAdd(
 
 <!-- npu="950" id9 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
+
     ```c++
     #include <iostream>
     #include <vector>

@@ -332,7 +332,7 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMap(
       <tr>
         <td>stream</td>
         <td>输入</td>
-        <td>指定执行任务的Stream流。</td>
+        <td>指定执行任务的Stream。</td>
       </tr>
     </tbody>
   </table>

@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- **接口功能：** 根据sortedIndices存储的下标位置，去获取permutedTokens中的输入数据与probs相乘，并进行合并累加。
+- **接口功能：** 根据sortedIndices存储的下标位置，获取permutedTokens中的输入数据与probs相乘，并进行合并累加。
 
 - **计算公式：**
 
@@ -109,7 +109,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEp(
   <tr>
       <td>permutedTokens</td>
       <td>输入</td>
-      <td>表示经过扩展并排序过的tokens。</td>
+      <td>表示经过扩展并排序的tokens。</td>
       <td>shape支持2D维度，不支持空Tensor。rangeOptional非空时，第0维长度不小于rangeOptional[1]-rangeOptional[0]。</td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>

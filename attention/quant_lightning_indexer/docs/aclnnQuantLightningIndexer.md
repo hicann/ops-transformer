@@ -223,7 +223,7 @@ aclnnStatus aclnnQuantLightningIndexer(
         <ul>
                 <li>不支持空tensor。</li>
                 <li>PageAttention场景下，blockTableOptional必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大actualSeqLengthsKeyOptional对应的block数量）</li>
-                <li>blockSize取值为16的整数倍，最大支持到1024。</li>
+                <li>blockSize取值为16的倍数，最大支持1024。</li>
         </ul>
     </td>
     <td>INT32</td>

@@ -210,7 +210,7 @@ attn_mask = torch.triu(
 - 所有输入的数据格式均为ND，本接口支持非连续Tensor输入。与`flash_attn`联合调用时，还需满足前向接口的输入约束；通过`expand()`等方式得到的零stride K/V输入，请先调用`.contiguous()`再传入前向接口。
 - BSND、BNSD和TND均支持可选的`seqused_q`和`seqused_kv`（可以只传其中一侧），类型为int32、shape为(B,)。BSND/BNSD每侧满足`0 <= seqused[b] <= S`，未传的一侧使用完整物理S；TND每侧满足`0 <= seqused[b] <= cu_seqlens[b+1] - cu_seqlens[b] <= max_seqlen`，未传的一侧使用cu差分。
 - 生成FAG metadata时须明确传入正数`batch_size`。`max_seqlen_q/max_seqlen_kv`按布局区分：TND布局下可省略（默认-1），由cu_seqlens末位（物理packed总量）推导；BSND/BNSD布局下，每侧满足"提供该侧seqused"或"传入非负`max_seqlen`"至少其一——未提供seqused的侧必须传入，且该值必须等于输入shape中的物理S1/S2，不能只取seqused的最大值。反向接口的非TND最大长度可保持-1由shape推导；如显式指定正数，应与物理S一致。
-- `seqused`只控制有效计算范围和mask几何：BSND/BNSD仍使用完整S的存储跨度，TND仍使用cu描述的物理偏移。输出shape和LSE的物理跨度不变。未使用的dq/dk/dv尾部输出为零；所有batch均无有效Q/KV配对任务时仍清零输出，提供sinks时dsink也为零。
+- `seqused`只控制有效计算范围和mask几何：BSND/BNSD仍使用完整S的存储跨度，TND仍使用cu描述的物理偏移。输出shape和LSE的物理跨度不变。未使用的dq/dk/dv尾部输出为零；所有batch均无有效Q/KV配对时仍清零输出，提供sinks时dsink也为零。
 - `metadata`必须由`flash_attn_metadata`生成，并设置`is_grad_enabled=True`。生成metadata和调用本接口时，N1、N2、D、Dv、B、S1、S2、layout、cu_seqlens、seqused及mask相关参数必须一致，否则行为未定义。特别是`D=192, Dv=128`时，生成metadata必须显式传入`head_dim_v=128`。
 - 在配置一致的条件下，前向`flash_attn`和反向`flash_attn_grad`可使用同一份`is_grad_enabled=True`生成的metadata，无需分别生成。直接使用接口返回值，不要自行构造或修改metadata。
 - `softmax_lse`、`attn_out`必须来自与本次反向计算配置一致的前向调用，尤其是`softmax_scale`和layout必须一致。
@@ -245,7 +245,6 @@ cann_ops_transformer.flash_attn_metadata(
     is_grad_enabled=False
 ) -> Tensor
 ```
-
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度(shape) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |

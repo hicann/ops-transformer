@@ -98,7 +98,6 @@
     - $T$ 表示 token 数，$N$ 表示 `blockRes` 第 1 维可容纳的历史残差块数，$S$ 表示目标 slot 数，$D$ 表示HiddenSize。
     - $t\in[0,T)$、$n\in[0,N_v)$、$s\in[0,S)$、$d\in[0,D)$ 分别表示 token、有效历史残差块、目标 slot 和隐藏特征的索引。
 
-
 ## 函数原型
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnBlockAttnResPrepareGetWorkspaceSize”接口获取计算所需workspace大小以及包含算子计算流程的执行器，再调用“aclnnBlockAttnResPrepare”接口执行计算。

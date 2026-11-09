@@ -522,7 +522,7 @@ aclnnStatus aclnnFusedInferAttentionScore(
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
       <td>361001</td>
-      <td>API内存调用npu runtime的接口异常。</td>
+      <td>API内部调用npu runtime的接口异常。</td>
     </tr>
   </tbody>
   </table>
@@ -832,9 +832,9 @@ aclnnStatus aclnnFusedInferAttentionScore(
   - query左padding场景：
 
     - query的搬运起点计算公式为：Q_S - queryPaddingSize - actualSeqLengths。query的搬运终点计算公式为：Q_S - queryPaddingSize。其中query的搬运起点不能小于0，终点不能大于Q_S，否则结果将不符合预期。
-    - 场景kvPaddingSize小于0时将被置为0。
-    - 场景需要与actualSeqLengths参数一起开启，否则默认为query右padding场景。
-    - 场景不支持PageAttention，不能与blockTable参数一起开启。
+    - kvPaddingSize小于0时将被置为0。
+    - 需要与actualSeqLengths参数一起开启，否则默认为query右padding场景。
+    - 不支持PageAttention，不能与blockTable参数一起开启。
 
   - kv左padding场景：
 

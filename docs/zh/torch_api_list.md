@@ -103,5 +103,5 @@
 |[stem_oam_prep_varlen_q](../../attention/stem_oam_prep_varlen_q/docs/torchapi_stem_oam_prep_varlen_q.md)|完成Stem OAM block-sparse attention中Q侧预处理计算，将变长Q tensor转化为按stem block分组的flattened qFlat输出。|-|默认确定性实现|
 |[dense_lightning_indexer_kl_loss_grad](../../attention/dense_lightning_indexer_kl_loss_grad/docs/torchapi_dense_lightning_indexer_kl_loss_grad.md)| Lightning Indexer KL Loss训练Dense场景下的反向输出。需与`dense_lightning_indexer_kl_loss_grad_metadata`配套使用。| - |默认确定性实现|
 |[sparse_flash_mla_softmax_l1_norm](../../attention/sparse_flash_mla_softmax_l1_norm/docs/torchapi_sparse_flash_mla_softmax_l1_norm.md)|`dense_lightning_indexer_kl_loss_grad`的前置接口，生成attn_softmax_l1_norm。需与`sparse_flash_mla_softmax_l1_norm_metadata`配套使用。 |-|默认确定性实现|
-|[stem_oam_prep_paged_kv](../../attention/stem_oam_prep_paged_kv/docs/torchapi_stem_oam_prep_paged_kv.md)| 大模型推理动态稀疏注意力机制的前置评分模块，为block-sparse-attention的前置评分模块。| - |默认确定性实现|
+|[stem_oam_prep_paged_kv](../../attention/stem_oam_prep_paged_kv/docs/torchapi_stem_oam_prep_paged_kv.md)| 大模型推理动态稀疏注意力机制的前置评分模块，为block-sparse-attention提供前置评分。| - |默认确定性实现|
 |[und_gen_qkv_rms_norm_rope_cache](../../posembedding/und_gen_qkv_rms_norm_rope_cache/docs/torchapi_und_gen_qkv_rms_norm_rope_cache.md)|融合und/gen两段QKV的间接寻址拼接、Q/K RMSNorm、MRoPE和分页KV Cache更新，返回Q，k_cache/v_cache原地更新。|-|默认确定性实现|

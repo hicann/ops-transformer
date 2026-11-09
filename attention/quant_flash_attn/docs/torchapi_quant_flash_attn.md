@@ -94,6 +94,7 @@
 调用quant_flash_attn接口之前，请先调用前置接口quant_flash_attn_metadata，完成quant_flash_attn负载均衡的计算。
 
 ```python
+
 cann_ops_transformer.quant_flash_attn_metadata(
     num_heads_q,
     num_heads_kv,
@@ -970,9 +971,6 @@ q/k/v/attn_out shape匹配关系表：<a name="qkv_attn_out_shape匹配关系表
     </tbody>
 </table>
 
-
-
-
 #### Mask参数组
 
 mask_mode参数解释：
@@ -1413,6 +1411,7 @@ mask_mode参数解释：
 ## 调用示例
 
 - quant_flash_attn_metadata + quant_flash_attn联合调用示例（TND，非PA场景）
+
   ```python
   import torch
   import torch_npu
@@ -1444,7 +1443,7 @@ mask_mode参数解释：
   # v_descale第一维为各batch序列长度按64向上取整后求和
   v_descale = torch.randn(B * ((KV_S + 63) // 64), KV_N, D, 2, dtype=torch.float8_e8m0, device="npu")
 
-  # 累计序列长度（带前导0）
+  # 累积序列长度（带前导0）
   cu_seqlens_q = torch.tensor([0, Q_S, Q_S * 2], dtype=torch.int32, device="npu")
   cu_seqlens_kv = torch.tensor([0, KV_S, KV_S * 2], dtype=torch.int32, device="npu")
 
@@ -1491,6 +1490,7 @@ mask_mode参数解释：
   ```
 
 - quant_flash_attn_metadata + quant_flash_attn联合调用示例（TND + PA场景，causal mask）
+
   ```python
   import torch
   import torch_npu
@@ -1525,7 +1525,7 @@ mask_mode参数解释：
   # block_table
   block_table = torch.arange(total_blocks, dtype=torch.int32, device="npu").reshape(B, num_blocks_per_seq)
 
-  # 累计序列长度（带前导0）
+  # 累积序列长度（带前导0）
   cu_seqlens_q = torch.tensor([0, Q_S, Q_S * 2], dtype=torch.int32, device="npu")
 
   # PA场景下seqused_kv必选

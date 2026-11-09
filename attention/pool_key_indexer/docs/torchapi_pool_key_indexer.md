@@ -63,6 +63,7 @@
 ## 函数原型
 
 ```python
+
 cann_ops_transformer.pool_key_indexer(
   query,
   pool_key,

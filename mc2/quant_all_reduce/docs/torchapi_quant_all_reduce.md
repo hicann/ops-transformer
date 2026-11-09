@@ -97,7 +97,7 @@ cann_ops_transformer.ops.quant_all_reduce(
 - 该接口支持训练场景下使用。
 
 - 通信引擎约束：
-  - Ascend950DT：仅支持UB-Memory通信。
+  - Ascend 950DT系列产品：仅支持UB-Memory通信。
 
 - 通信域大小支持2、4、8。
 

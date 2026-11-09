@@ -153,7 +153,7 @@ cann_ops_transformer.lightning_indexer(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
-| metadata | Tensor | 必选 | 每个AIcore的Attention计算任务的batch、head、以及Q和K的分块的索引。数据格式为ND，不支持非连续的Tensor。 支持的shape为：shape为(2048,)。 | int32 | 1 |
+| metadata | Tensor | 必选 | 每个AIcore的Attention计算任务的batch、head、以及Q和K的分块的索引。数据格式为ND，不支持非连续的Tensor。 支持的shape为(2048,)。 | int32 | 1 |
 
 ### lightning_indexer
 
@@ -234,11 +234,14 @@ cann_ops_transformer.lightning_indexer(
 ### 基准信息说明
 
 #### 公共参数组
+
 - 入参为空的场景处理：
+
     - 空Tensor指必选输入和输出的shape size为0，即有任意轴为0。
     - 触发空tensor的用例将全部拦截报错。
 
 - q、k、sparse_indices、sparse_values校验
+
 <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
 <col style="width: 147px">
 <col style="width: 232px">
@@ -322,7 +325,6 @@ cann_ops_transformer.lightning_indexer(
     </tr>
 </tbody>
 </table>
-
 
 layout匹配关系表：
 <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
@@ -526,6 +528,7 @@ mask_mode参数解释
 </table>
 
 #### Paged Attention参数组
+
 当block_table不为空时，开启Paged Attention
 <table style="undefined;table-layout: fixed; width:1625px">
     <colgroup>
@@ -567,6 +570,7 @@ mask_mode参数解释
 </table>
 
 ## 确定性计算
+
 默认支持确定性计算
 
 ## 调用示例
