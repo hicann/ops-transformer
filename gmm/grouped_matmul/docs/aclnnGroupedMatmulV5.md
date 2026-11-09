@@ -760,7 +760,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 
 | x | weight | bias | scale | offset | perTokenScale | out |
 |---------|----------------|--------------|--------|------------|---------------|---------|
-| INT8 | INT4 (ND/NZ) | FLOAT | UINT64 | null | FLOAT | BFLOAT16 |
+| INT8 | INT4 (ND/NZ) | FLOAT | UINT64 | FLOAT/null | FLOAT | BFLOAT16 |
 | INT8 | INT4 (ND/NZ) | FLOAT | UINT64 | FLOAT/null | FLOAT | FLOAT16 |
 
 - **约束说明**
@@ -780,8 +780,9 @@ aclnnGroupedMatmulV5默认确定性实现。
     - 该场景下scale为pergroup与perchannel离线融合后的结果，shape要求为 $[E, quantGroupNum, N]$，其中 $quantGroupNum = k \div quantGroupSize$
     - 该场景下，各个专家处理的token数的预期值大于n/4时，即tuningConfigOptional中第一个值大于n/4时，通常会取得更好的性能，此时显存占用会增加 $g \times k \times n$ 字节（其中g为matmul组数即分组数）
   - offset不为空时
-    - scale为pergroup与perchannel离线融合后的结果，shape要求为 $[E, 1, N]$
-    - 该场景下offsetOptional不为空。非对称量化offsetOptional为计算过程中离线计算辅助结果，即 $antiquantOffset \times scale$，shape要求为 $[E, 1, N]$，dtype为FLOAT32
+    - scale为pergroup与perchannel离线融合后的结果，shape要求为 $[E, quantGroupNum, N]$，其中 $quantGroupNum = k \div quantGroupSize$，当前支持quantGroupSize=64/128/256
+    - 该场景下offsetOptional不为空。非对称量化offsetOptional为计算过程中离线计算辅助结果，即 $antiquantOffset \times scale$，shape要求为 $[E, quantGroupNum, N]$，dtype为FLOAT32
+    - 该场景不支持使能tuningConfigOptional第二位
   - tuningConfigOptional数组第二个元素可置1，以使能A8W4场景(仅支持perchannel)中weight的特殊格式模板，以优化算子性能(性能优势的shape范围参考：K >= 2048 && N >= 2048)。需要说明的是，该模板要求weight的shape为（E，N，K）,然后再对其进行ND2NZ转换后作为算子输入
 
 </details>

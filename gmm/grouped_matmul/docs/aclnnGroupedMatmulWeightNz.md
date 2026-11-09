@@ -579,13 +579,14 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 
       - 非对称量化场景：
 
-        - 输出out的dtype为FLOAT16
+        - 输出out的dtype为FLOAT16或BFLOAT16。
         - 仅支持count模式（算子不会检查groupListType的值）。
         - {k, n}要求为{7168, 4096}或者{2048, 7168}。
-        - scale为pergroup与perchannel离线融合后的结果，shape要求为$[E, 1, N]$。
-        - offsetOptional不为空。非对称量化offsetOptional为计算过程中离线计算辅助结果，即$antiquantOffset \times scale$，shape要求为$[E, 1, N]$，dtype为FLOAT32。
+        - scale为pergroup与perchannel离线融合后的结果，shape要求为$[E, quantGroupNum, N]$，其中 $quantGroupNum = k \div quantGroupSize$，当前支持quantGroupSize=64/128/256。
+        - offsetOptional不为空。非对称量化offsetOptional为计算过程中离线计算辅助结果，即$antiquantOffset \times scale$，shape要求为$[E, quantGroupNum, N]$，dtype为FLOAT32。
         - Bias为计算过程中离线计算的辅助结果，值要求为$8\times weight \times scale$，并在第1维累加，shape要求为$[E, N]$。
         - 要求N为8的整数倍。
+        - 不支持使能tuningConfigOptional第二位。
 
       - tuningConfigOptional数组第二个元素可置1，以开启S8S4（A8W4）场景的weight特殊格式模板，仅支持perchannel量化。此时weight须按`[E,N,K]`排布后进行ND2NZ转换，再作为算子输入。性能优势的shape范围参考：K >= 2048且N >= 2048。
 
