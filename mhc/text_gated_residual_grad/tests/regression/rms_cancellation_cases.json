@@ -1,0 +1,551 @@
+[
+  {
+    "id": 50,
+    "default_seed": 2026110550,
+    "name": "TextGatedResidualGrad",
+    "aclnn_name": "TextGatedResidualGrad",
+    "triton_name": null,
+    "kernel_name": null,
+    "version": "v2.1",
+    "expected_error_msg": null,
+    "api": "pytorch",
+    "api_type": "function_text_gated_residual_grad_cpu",
+    "aclnn_api_type": "function_text_gated_residual_grad_npu",
+    "triton_api_type": "triton_function",
+    "fusion_api_type": "fusion_function",
+    "fusion_mode": null,
+    "dist_api_type": "dist_function",
+    "kernel_api_type": "kernel_function",
+    "backward": false,
+    "standard": {
+      "acc": {
+        "tg_double_benchmark": {
+          "max_re_ratio": 5,
+          "avg_re_ratio": 1.5,
+          "root_mean_squared_ratio": 1.5,
+          "number_count_ratio": 2
+        }
+      },
+      "perf": "not_key",
+      "mem": 1.1
+    },
+    "outputs": null,
+    "inputs": [
+      {
+        "name": "grad_mixed",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          1,
+          1944,
+          1280
+        ],
+        "range_values": {
+          "name": "nd",
+          "mean": [
+            97.27844925068965
+          ],
+          "std": [
+            21.760660095959924
+          ]
+        },
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "grad_inject",
+        "type": "tensor",
+        "required": false,
+        "dtype": "bf16",
+        "shape": [
+          1,
+          1944,
+          2
+        ],
+        "range_values": "default",
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "x",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          1,
+          1944,
+          2560
+        ],
+        "range_values": {
+          "name": "nd",
+          "mean": [
+            97.27844925068965
+          ],
+          "std": [
+            21.760660095959924
+          ]
+        },
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "w_down",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          160,
+          2560
+        ],
+        "range_values": {
+          "name": "nd",
+          "mean": [
+            97.27844925068965
+          ],
+          "std": [
+            21.760660095959924
+          ]
+        },
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "w_up",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          2560,
+          160
+        ],
+        "range_values": {
+          "name": "nd",
+          "mean": [
+            97.27844925068965
+          ],
+          "std": [
+            21.760660095959924
+          ]
+        },
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "w_gate",
+        "type": "tensor",
+        "required": false,
+        "dtype": "bf16",
+        "shape": [
+          2,
+          2560
+        ],
+        "range_values": "default",
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "gamma",
+        "type": "tensor",
+        "required": true,
+        "dtype": "fp32",
+        "shape": [
+          2560
+        ],
+        "range_values": {
+          "name": "nd",
+          "mean": [
+            97.27844925068965
+          ],
+          "std": [
+            21.760660095959924
+          ]
+        },
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "inv_rms",
+        "type": "tensor",
+        "required": true,
+        "dtype": "fp32",
+        "shape": [
+          1,
+          1944,
+          2
+        ],
+        "range_values": [
+          0.5,
+          2.0
+        ],
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "inject",
+        "type": "tensor",
+        "required": false,
+        "dtype": "bf16",
+        "shape": [
+          1,
+          1944,
+          2
+        ],
+        "range_values": "default",
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "down_pre_act",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          1,
+          1944,
+          160
+        ],
+        "range_values": [
+          -5.0,
+          5.0
+        ],
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "up",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          1,
+          1944,
+          2560
+        ],
+        "range_values": [
+          -5.0,
+          5.0
+        ],
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "channels",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "shape": null,
+        "range_values": 2,
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      }
+    ],
+    "acl_json": "",
+    "method_inputs": null,
+    "tensor_input": null,
+    "compute_times": null,
+    "save_name": null,
+    "uuid": null,
+    "downloaded": false,
+    "is_boundary": false,
+    "xrun_cs_name": null,
+    "xrun_data": null,
+    "strategy": {}
+  },
+  {
+    "id": 550,
+    "default_seed": 2026111050,
+    "name": "TextGatedResidualGrad",
+    "aclnn_name": "TextGatedResidualGrad",
+    "triton_name": null,
+    "kernel_name": null,
+    "version": "v2.1",
+    "expected_error_msg": null,
+    "api": "pytorch",
+    "api_type": "function_text_gated_residual_grad_cpu",
+    "aclnn_api_type": "function_text_gated_residual_grad_npu",
+    "triton_api_type": "triton_function",
+    "fusion_api_type": "fusion_function",
+    "fusion_mode": null,
+    "dist_api_type": "dist_function",
+    "kernel_api_type": "kernel_function",
+    "backward": false,
+    "standard": {
+      "acc": {
+        "tg_double_benchmark": {
+          "max_re_ratio": 5,
+          "avg_re_ratio": 1.5,
+          "root_mean_squared_ratio": 1.5,
+          "number_count_ratio": 2
+        }
+      },
+      "perf": "not_key",
+      "mem": 1.1
+    },
+    "outputs": null,
+    "inputs": [
+      {
+        "name": "grad_mixed",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          2,
+          2154,
+          2560
+        ],
+        "range_values": {
+          "name": "nd",
+          "mean": [
+            97.65895173918898
+          ],
+          "std": [
+            2.703193461492818
+          ]
+        },
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "grad_inject",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          2,
+          2154,
+          4
+        ],
+        "range_values": {
+          "name": "nd",
+          "mean": [
+            97.65895173918898
+          ],
+          "std": [
+            2.703193461492818
+          ]
+        },
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "x",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          2,
+          2154,
+          10240
+        ],
+        "range_values": {
+          "name": "nd",
+          "mean": [
+            97.65895173918898
+          ],
+          "std": [
+            2.703193461492818
+          ]
+        },
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "w_down",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          320,
+          10240
+        ],
+        "range_values": {
+          "name": "nd",
+          "mean": [
+            97.65895173918898
+          ],
+          "std": [
+            2.703193461492818
+          ]
+        },
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "w_up",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          10240,
+          320
+        ],
+        "range_values": {
+          "name": "nd",
+          "mean": [
+            97.65895173918898
+          ],
+          "std": [
+            2.703193461492818
+          ]
+        },
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "w_gate",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          4,
+          10240
+        ],
+        "range_values": {
+          "name": "nd",
+          "mean": [
+            97.65895173918898
+          ],
+          "std": [
+            2.703193461492818
+          ]
+        },
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "gamma",
+        "type": "tensor",
+        "required": true,
+        "dtype": "fp32",
+        "shape": [
+          10240
+        ],
+        "range_values": {
+          "name": "nd",
+          "mean": [
+            97.65895173918898
+          ],
+          "std": [
+            2.703193461492818
+          ]
+        },
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "inv_rms",
+        "type": "tensor",
+        "required": true,
+        "dtype": "fp32",
+        "shape": [
+          2,
+          2154,
+          4
+        ],
+        "range_values": [
+          0.5,
+          2.0
+        ],
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "inject",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          2,
+          2154,
+          4
+        ],
+        "range_values": [
+          0.0,
+          2.0
+        ],
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "down_pre_act",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          2,
+          2154,
+          320
+        ],
+        "range_values": [
+          -5.0,
+          5.0
+        ],
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "up",
+        "type": "tensor",
+        "required": true,
+        "dtype": "bf16",
+        "shape": [
+          2,
+          2154,
+          10240
+        ],
+        "range_values": [
+          -5.0,
+          5.0
+        ],
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      },
+      {
+        "name": "channels",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "shape": null,
+        "range_values": 4,
+        "backward": false,
+        "align_32B": null,
+        "outlier_values": null
+      }
+    ],
+    "acl_json": "",
+    "method_inputs": null,
+    "tensor_input": null,
+    "compute_times": null,
+    "save_name": null,
+    "uuid": null,
+    "downloaded": false,
+    "is_boundary": false,
+    "xrun_cs_name": null,
+    "xrun_data": null,
+    "strategy": {}
+  }
+]

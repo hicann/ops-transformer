@@ -2696,6 +2696,22 @@ mhc:
     options:
       - block_attention_residuals
 
+  text_gated_residual_grad:
+    module: True
+    src:
+      - mhc/text_gated_residual_grad
+    exclude:
+      - mhc/text_gated_residual_grad/docs
+      - mhc/text_gated_residual_grad/README.md
+    ut_cov_exclude:
+      - mhc/text_gated_residual_grad/examples
+      - mhc/text_gated_residual_grad/tests
+    test:
+      examples: True
+      ut: True
+    options:
+      - text_gated_residual_grad
+
 mamba:
   causal_conv1d:
     module: True
