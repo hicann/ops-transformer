@@ -92,6 +92,15 @@ static aclnnStatus ParseBlockShape(const aclIntArray* blockShapeOptional)
         return ACLNN_ERR_PARAM_INVALID;
     }
 
+    constexpr int64_t blockAlignment = 16;
+    if ((data[0] % blockAlignment != 0 || data[1] % blockAlignment != 0) &&
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "Ascend 950 requires blockShapeOptional values to be multiples of 16, got [%ld, %ld].", data[0],
+                data[1]);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+
     return ACLNN_SUCCESS;
 }
 
@@ -105,6 +114,11 @@ static aclnnStatus ValidateParams(const BSAGParams& params)
         CheckMandatoryTensors(params.attentionOutGrad, params.query, params.key, params.value, params.attentionOut,
                               params.softmaxLse, params.blockSparseMaskOptional) == ACLNN_SUCCESS,
         ACLNN_ERR_PARAM_NULLPTR);
+    CHECK_COND(qLayout == kvLayout, ACLNN_ERR_PARAM_INVALID, "qInputLayout and kvInputLayout must be the same.");
+    CHECK_COND(qLayout == "BNSD" || qLayout == "TND" || qLayout == "BSND", ACLNN_ERR_PARAM_INVALID,
+               "qInputLayout and kvInputLayout must be BNSD, TND, or BSND.");
+    CHECK_COND(qLayout != "BSND" || op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510,
+               ACLNN_ERR_PARAM_INVALID, "BSND is supported only on Ascend 950. Use BNSD or TND on Atlas A2/A3.");
     // dtype检查
     DataType qDtype = params.query->GetDataType();
     DataType kDtype = params.key->GetDataType();
@@ -230,11 +244,6 @@ static aclnnStatus ValidateParams(const BSAGParams& params)
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    if (params.qInputLayout == nullptr || params.kvInputLayout == nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "Input layout strings are null.");
-        return ACLNN_ERR_PARAM_NULLPTR;
-    }
-
     if (qLayout == "TND" && params.actualSeqLengthsOptional == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, " actualSeqLengthsOptional  is mandatory when qInputLayout is TND.");
         return ACLNN_ERR_PARAM_INVALID;
@@ -242,17 +251,6 @@ static aclnnStatus ValidateParams(const BSAGParams& params)
 
     if (kvLayout == "TND" && params.actualSeqLengthsKvOptional == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, " actualSeqLengthsKvOptional  is mandatory when kvInputLayout is TND.");
-        return ACLNN_ERR_PARAM_INVALID;
-    }
-
-    // 验证Q和KV格式一致性：如果其中一个是BNSD，另一个也必须是BNSD
-    bool qIsBNSD = (qLayout == "BNSD");
-    bool kvIsBNSD = (kvLayout == "BNSD");
-    if (qIsBNSD != kvIsBNSD) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "Q and KV layouts must match: if one is BNSD, the other must also be BNSD. "
-                "Q layout: %s, KV layout: %s",
-                qLayout.c_str(), kvLayout.c_str());
         return ACLNN_ERR_PARAM_INVALID;
     }
 

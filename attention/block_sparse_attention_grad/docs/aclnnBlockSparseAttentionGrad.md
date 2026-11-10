@@ -34,7 +34,7 @@
 
   稀疏块大小为 $blockShapeX×blockShapeY$，其中blockShapeX表示Q方向的稀疏粒度，blockShapeY表示KV方向的稀疏粒度。两个方向的粒度相互独立，可以配置为不同值。
 
-  blockShapeX和blockShapeY均必须大于等于16，且为16的整数倍。除原有的128粒度外，还支持16、32、48、64、80、96、112等小于128的粒度。例如，[32, 64]表示Q方向每32个token划分一个块，KV方向每64个token划分一个块。
+  blockShapeX 和 blockShapeY 均须大于 0。Ascend 950 要求两者均为 16 的整数倍，支持 16、32、48、64、80、96、112 等小于 128 的粒度。例如，[32, 64]表示Q方向每32个token划分一个块，KV方向每64个token划分一个块。
 
   BlockSparseMask在逻辑块粒度上定义稀疏pattern，每个mask元素控制一个 $blockShapeX×blockShapeY$ 的连续块是否参与计算。
   已知正向计算公式为：
@@ -96,13 +96,10 @@ BlockSparseAttentionGrad输入dout、query、key、value, attentionOut的数据�
 - N：表示多头数（Head-Num）
 - D：表示隐藏层最小的单元尺寸，需满足D=H/N（Head-Dim）
 
-当前支持的布局：
+qInputLayout 和 kvInputLayout 必须一致。各产品支持的布局如下：
 
-- qInputLayout: "TND" "BNSD" "BSND"
-- kvInputLayout: "TND" "BNSD" "BSND"
-
-- <term>Atlas A2训练系列产品</term>、<term>Atlas A3训练系列产品</term>:
-不支持"BSND"。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：BNSD、TND。
+- <term>Ascend 950PR&950DT系列产品</term>：BNSD、TND、BSND。
 
 ## 函数原型
 
@@ -252,20 +249,14 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
     <td>×</td>
     </tr>
     <tr>
-    <td rowspan="3">blockShapeOptional（aclIntArray*）</td>
-    <td rowspan="3">输入</td>
-    <td rowspan="3">稀疏块形状数组。指定每个稀疏块的二维尺寸（行数和列数）。</td>
-    <td> <ul><li>当配置了blockSparseMaskOptional时：如配置此输入，算子会从中获取稀疏块尺寸；如不配置此输入，算子将默认稀疏块尺寸为[128,128]。</li></ul></td>
-    <td rowspan="3">INT64</td>
-    <td rowspan="3">-</td>
-    <td rowspan="3">1</td>
-    <td rowspan="3">-</td>
-    </tr>
-    <tr>
-    <td><ul><li>当未配置blockSparseMaskOptional时：无论此项如何配置，算子均将忽略。</li></ul></td>
-    </tr>
-    <tr>
-    <td>当配置此输入时的元素要求：<ul><li>必须包含至少两个元素[blockShapeX, blockShapeY]。</li><li>blockShapeX：Q方向稀疏块大小，必须大于等于16且为16的整数倍。</li><li>blockShapeY：KV方向稀疏块大小，必须大于等于16且为16的整数倍。</li><li>支持16、32、48、64、80、96、112等小于128的粒度。</li><li>blockShapeX与blockShapeY相互独立，无须相等，支持如[16, 32]、[48, 80]、[96, 112]等非对称配置。</li></ul></td>
+    <td>blockShapeOptional（aclIntArray*）</td>
+    <td>输入</td>
+    <td>Q 方向和 KV 方向的稀疏块大小。</td>
+    <td>必传。至少包含两个元素 [blockShapeX, blockShapeY]，两者均须大于 0，可以不同。Ascend 950 另要求两者均为 16 的整数倍。</td>
+    <td>INT64</td>
+    <td>-</td>
+    <td>1</td>
+    <td>-</td>
     </tr>
     <tr>
     <td>actualSeqLengthsOptional（aclIntArray*）</td>
@@ -291,7 +282,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
     <td>qInputLayout（char*）</td>
     <td>输入</td>
     <td>query的数据排布格式。指示输入张量在内存中的具体排布（如连续或合轴排列）。</td>
-    <td>当前仅支持"TND"、"BNSD"、"BSND"，qInputLayout与kvInputLayout需要保持一致。</td>
+    <td>须与另一布局参数一致。Atlas A2/A3 支持 BNSD、TND，Ascend 950 还支持 BSND。</td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -301,7 +292,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
     <td>kvInputLayout（char*）</td>
     <td>输入</td>
     <td>key和value的数据排布格式。指示输入张量在内存中的具体排布。</td>
-    <td>当前仅支持"TND"、"BNSD"、"BSND"，qInputLayout与kvInputLayout需要保持一致。</td>
+    <td>须与另一布局参数一致。Atlas A2/A3 支持 BNSD、TND，Ascend 950 还支持 BSND。</td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -439,26 +430,23 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
   </thead>
   <tbody>
     <tr>
-      <td rowspan="3">ACLNN_ERR_PARAM_NULLPTR</td>
-      <td rowspan="3">161001</td>
-      <td>输入dout，query，key，value，attentionOut传入的是空指针。</td>
+      <td>ACLNN_ERR_PARAM_NULLPTR</td>
+      <td>161001</td>
+      <td>必传张量输入或 blockShapeOptional 为空指针。</td>
     </tr>
     <tr>
-      <td>qInputLayout为"TND"时，actualSeqLengthsOptional传入的是空指针。</td>
+      <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="4">161002</td>
+      <td>dout、query、key 或 value 的数据类型不在支持范围内。</td>
     </tr>
     <tr>
-      <td>kvInputLayout为"TND"时，actualSeqLengthsKvOptional传入的是空指针。</td>
+      <td>TND 布局下未传入 actualSeqLengthsOptional 或 actualSeqLengthsKvOptional。</td>
     </tr>
     <tr>
-      <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="3">161002</td>
-      <td>dout，query，key，value数据类型不在支持的范围之内。</td>
+      <td>qInputLayout 或 kvInputLayout 非法、两者不一致，或在 Atlas A2/A3 上使用 BSND。</td>
     </tr>
     <tr>
-      <td>qInputLayout或kvInputLayout输入不合法，参数有效性校验失败。</td>
-    </tr>
-    <tr>
-      <td>blockShapeOptional少于两个元素，或blockShapeX、blockShapeY小于16，或不是16的整数倍。</td>
+      <td>blockShapeOptional 少于两个元素、任一块大小不大于 0，或 Ascend 950 上任一块大小不是 16 的整数倍。</td>
     </tr>
   </tbody></table>
 
@@ -510,8 +498,8 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
 - actualSeqLengthsOptional在qInputLayout为“TND”时必选；actualSeqLengthsKvOptional在kvInputLayout为“TND”时必选。
 - softmaxLse的layout需要与query的layout保持一致。如果query的layout为"BSND"时，softmaxLse的layout应传入"BNS1"。
-- HeadDim必须等于128。
-- blockShapeOptional中的blockShapeX和blockShapeY分别表示Q方向和KV方向的稀疏粒度。两者均必须大于等于16且为16的整数倍，可以配置为不同值；BlockSparseMask的Q块数和KV块数应分别按照对应方向的稀疏粒度计算。
+- Ascend 950 产品要求 HeadDim 等于 128。
+- blockShapeOptional中的blockShapeX和blockShapeY分别表示Q方向和KV方向的稀疏粒度。两者均须大于 0，可以配置为不同值。Ascend 950 要求两者均为 16 的整数倍。BlockSparseMask的Q块数和KV块数应分别按照对应方向的稀疏粒度计算。
 - 根据算子支持的输入 Layout，query 张量 Shape 中对应的 head 维度大小记为 N1，key 和 value 张量 Shape 中对应的 head 维度大小记为 N2。必须满足N1 % N2 == 0。 支持MQA、MHA、GQA场景。
 - actualSeqLengthsOptional与actualSeqLengthsKvOptional相关约束：当qInputLayout或kvInputLayout 为非"TND"时，会忽略这两个入参。
 

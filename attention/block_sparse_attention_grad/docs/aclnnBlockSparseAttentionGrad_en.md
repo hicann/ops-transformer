@@ -36,7 +36,7 @@
 
   The sparse block size is $blockShapeX×blockShapeY$, where blockShapeX indicates the sparse granularity in the Q direction and blockShapeY indicates the sparse granularity in the KV direction. The granularities of the two directions are independent of each other and can be set to different values.
 
-  blockShapeX and blockShapeY must be greater than or equal to 16 and be an integer multiple of 16. In addition to the original 128 granularity, granularities smaller than 128, such as 16, 32, 48, 64, 80, 96, and 112, are also supported. For example, [32, 64] indicates that one block is divided for every 32 tokens in the Q direction and one block for every 64 tokens in the KV direction.
+  blockShapeX and blockShapeY must be positive. On Ascend 950, both must be multiples of 16. Supported granularities below 128 include 16, 32, 48, 64, 80, 96, and 112. For example, [32, 64] indicates that one block is divided for every 32 tokens in the Q direction and one block for every 64 tokens in the KV direction.
 
   BlockSparseMask defines the sparse pattern at the logical block granularity. Each mask element controls whether a contiguous block of $blockShapeX×blockShapeY$ participates in the computation.
   The forward computation formula is as follows:
@@ -98,13 +98,10 @@ The data layouts of the BlockSparseAttentionGrad inputs dout, query, key, value,
 - N: Number of heads (Head-Num).
 - D: Minimum unit size of the hidden layer, satisfying D = H/N (Head-Dim).
 
-Currently supported layouts:
+qInputLayout and kvInputLayout must be the same. Supported layouts by product:
 
-- qInputLayout: "TND" "BNSD" "BSND"
-- kvInputLayout: "TND" "BNSD" "BSND"
-
-- <term>Atlas A2 training products</term>, <term>Atlas A3 training products</term>:
-"BSND" is not supported.
+- <term>Atlas A2 series</term> and <term>Atlas A3 series</term>: BNSD and TND.
+- <term>Ascend 950PR/950DT series</term>: BNSD, TND, and BSND.
 
 ## Function Prototype
 
@@ -254,20 +251,14 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
     <td>×</td>
     </tr>
     <tr>
-    <td rowspan="3">blockShapeOptional (aclIntArray*)</td>
-    <td rowspan="3">Input</td>
-    <td rowspan="3">Sparse block shape array. Specifies the two-dimensional size (number of rows and columns) of each sparse block.</td>
-    <td> <ul><li>When blockSparseMaskOptional is configured: if this input is configured, the operator obtains the sparse block size from it; if this input is not configured, the operator uses [128,128] as the default sparse block size.</li></ul></td>
-    <td rowspan="3">INT64</td>
-    <td rowspan="3">-</td>
-    <td rowspan="3">1</td>
-    <td rowspan="3">-</td>
-    </tr>
-    <tr>
-    <td><ul><li>When blockSparseMaskOptional is not configured: the operator ignores this input regardless of its configuration.</li></ul></td>
-    </tr>
-    <tr>
-    <td>Element requirements when this input is configured:<ul><li>Must contain at least two elements [blockShapeX, blockShapeY].</li><li>blockShapeX: sparse block size in the Q direction, must be greater than or equal to 16 and is an integer multiple of 16.</li><li>blockShapeY: sparse block size in the KV direction, must be greater than or equal to 16 and is an integer multiple of 16.</li><li>Sparse granularities smaller than 128 are supported, such as 16, 32, 48, 64, 80, 96, and 112.</li><li>blockShapeX and blockShapeY are independent of each other and are not required to be equal. Asymmetric configurations such as [16, 32], [48, 80], and [96, 112] are supported.</li></ul></td>
+    <td>blockShapeOptional (aclIntArray*)</td>
+    <td>Input</td>
+    <td>Sparse block sizes in the Q and KV directions, respectively.</td>
+    <td>Required. Pass at least two elements [blockShapeX, blockShapeY]. Both values must be positive and may differ. On Ascend 950, both must also be multiples of 16.</td>
+    <td>INT64</td>
+    <td>-</td>
+    <td>1</td>
+    <td>-</td>
     </tr>
     <tr>
     <td>actualSeqLengthsOptional (aclIntArray*)</td>
@@ -293,7 +284,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
     <td>qInputLayout(char*)</td>
     <td>Input</td>
     <td>Data layout format of query. Indicates the specific layout of the input tensor in memory (such as contiguous or axis-fused arrangement).</td>
-    <td>Currently, only "TND", "BNSD", and "BSND" are supported. qInputLayout must remain consistent with kvInputLayout.</td>
+    <td>Must match the other layout parameter. Atlas A2/A3 supports BNSD and TND. Ascend 950 also supports BSND.</td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -303,7 +294,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
     <td>kvInputLayout (char*)</td>
     <td>Input</td>
     <td>Data layout format of key and value. Indicates the specific layout of the input tensor in memory.</td>
-    <td>Currently only "TND", "BNSD", and "BSND" are supported. qInputLayout must remain consistent with kvInputLayout.</td>
+    <td>Must match the other layout parameter. Atlas A2/A3 supports BNSD and TND. Ascend 950 also supports BSND.</td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -432,26 +423,23 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
   </thead>
   <tbody>
     <tr>
-      <td rowspan="3">ACLNN_ERR_PARAM_NULLPTR</td>
-      <td rowspan="3">161001</td>
-      <td>What is passed in for input dout, query, key, value, and attentionOut is a null pointer.</td>
+      <td>ACLNN_ERR_PARAM_NULLPTR</td>
+      <td>161001</td>
+      <td>A required tensor input or blockShapeOptional is a null pointer.</td>
     </tr>
     <tr>
-      <td>When qInputLayout is "TND", what is passed in for actualSeqLengthsOptional is a null pointer.</td>
+      <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="4">161002</td>
+      <td>The data type of dout, query, key, or value is outside the supported range.</td>
     </tr>
     <tr>
-      <td>When kvInputLayout is "TND", what is passed in for actualSeqLengthsKvOptional is a null pointer.</td>
+      <td>TND layout requires both actualSeqLengthsOptional and actualSeqLengthsKvOptional.</td>
     </tr>
     <tr>
-      <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="3">161002</td>
-      <td>The data type of dout, query, key, and value is not in the supported range.</td>
+      <td>qInputLayout or kvInputLayout is invalid, the layouts differ, or BSND is used on Atlas A2/A3.</td>
     </tr>
     <tr>
-      <td>The input of qInputLayout or kvInputLayout is invalid, and the parameter validity check fails.</td>
-    </tr>
-    <tr>
-      <td>blockShapeOptional has fewer than two elements, or blockShapeX and blockShapeY are less than 16, or are not an integer multiple of 16.</td>
+      <td>blockShapeOptional has fewer than two elements, either block size is nonpositive, or either block size is not a multiple of 16 on Ascend 950.</td>
     </tr>
   </tbody></table>
 
@@ -503,8 +491,8 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
 - When using this API with PyTorch, ensure that the versions of CANN-related packages and PyTorch-related packages are compatible.
 - actualSeqLengthsOptional is mandatory when qInputLayout is "TND"; actualSeqLengthsKvOptional is mandatory when kvInputLayout is "TND".
 - The layout of softmaxLse must remain consistent with the layout of query. If the layout of query is "BSND", pass "BNS1" as the layout of softmaxLse.
-- HeadDim must equal 128.
-- blockShapeX and blockShapeY in blockShapeOptional indicate the sparse granularity in the Q direction and the KV direction, respectively. Both must be greater than or equal to 16 and are an integer multiple of 16, and can be set to different values. The number of Q blocks and KV blocks in BlockSparseMask should be calculated based on the sparse granularity in the corresponding direction, respectively.
+- HeadDim must be 128 on Ascend 950.
+- blockShapeX and blockShapeY in blockShapeOptional indicate the sparse granularity in the Q direction and the KV direction, respectively. Both values must be positive and may differ. On Ascend 950, both must also be multiples of 16. The number of Q blocks and KV blocks in BlockSparseMask should be calculated based on the sparse granularity in the corresponding direction, respectively.
 - Based on the input layouts supported by the operator, the head dimension size in the query tensor shape is denoted as N1, and the head dimension sizes in the key and value tensor shapes are denoted as N2. N1 % N2 == 0 must be satisfied.
   - <term>Atlas A2 training products</term> and <term>Atlas A3 training products</term>: Only MHA is currently supported, that is, N1 equals N2.
 

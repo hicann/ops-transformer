@@ -22,7 +22,7 @@ English | [简体中文](./README.md)
 
   The sparse block size is $blockShapeX×blockShapeY$, and BlockSparseMask specifies the sparsity pattern.
 
-  blockShapeX and blockShapeY must be positive multiples of 16. BlockSparseMask defines the sparsity pattern at the logical block granularity. Each mask element controls whether a contiguous block of blockShapeX × blockShapeY participates in the computation.
+  blockShapeX and blockShapeY must be positive. On Ascend 950, both must also be multiples of 16. BlockSparseMask defines the sparsity pattern at the logical block granularity. Each mask element controls whether a contiguous block of blockShapeX × blockShapeY participates in the computation.
   The forward computation formula is:
 
   $$
@@ -82,13 +82,10 @@ BlockSparseAttentionGrad supports multiple interpretations of the data layout of
 * N: Number of heads (Head-Num)
 * D: Size of the smallest unit of the hidden layer, which must satisfy D=H/N (Head-Dim)
 
-Currently supported layouts:
+qInputLayout and kvInputLayout must be the same. Supported layouts by product:
 
-* qInputLayout: "TND" "BNSD" "BSND"
-* kvInputLayout: "TND" "BNSD" "BSND"
-
-- <term>Atlas A2 training products</term> and <term>Atlas A3 training products</term>:
-"BSND" is not supported.
+- <term>Atlas A2 series</term> and <term>Atlas A3 series</term>: BNSD and TND.
+- <term>Ascend 950PR/950DT series</term>: BNSD, TND, and BSND.
 
 ## Parameter Description
 
@@ -197,20 +194,14 @@ Currently supported layouts:
     <td>×</td>
     </tr>
     <tr>
-    <td rowspan="3">blockShapeOptional (aclIntArray*)</td>
-    <td rowspan="3">Input</td>
-    <td rowspan="3">Array of sparse block shapes. It specifies the two-dimensional size (number of rows and columns) of each sparse block.</td>
-    <td> <ul><li>When blockSparseMaskOptional is configured: if this input is configured, the operator obtains the sparse block size from it; if this input is not configured, the operator uses the default sparse block size [128,128].</li></ul></td>
-    <td rowspan="3">INT64</td>
-    <td rowspan="3">-</td>
-    <td rowspan="3">1</td>
-    <td rowspan="3">-</td>
-    </tr>
-    <tr>
-    <td><ul><li>When blockSparseMaskOptional is not configured: the operator ignores this input regardless of how it is configured.</li></ul></td>
-    </tr>
-    <tr>
-    <td>Element requirements when this input is configured: <ul><li>It must contain at least two elements [blockShapeX, blockShapeY].</li><li>blockShapeX: block size along the Q direction. The value must be greater than 0.</li><li>blockShapeY: block size along the KV direction. The value must be greater than 0.</li></ul></td>
+    <td>blockShapeOptional (aclIntArray*)</td>
+    <td>Input</td>
+    <td>Sparse block sizes in the Q and KV directions, respectively.</td>
+    <td>Required. Pass at least two elements [blockShapeX, blockShapeY]. Both values must be positive and may differ. On Ascend 950, both must also be multiples of 16.</td>
+    <td>INT64</td>
+    <td>-</td>
+    <td>1</td>
+    <td>-</td>
     </tr>
     <tr>
     <td>actualSeqLengthsOptional (aclIntArray*)</td>
@@ -236,7 +227,7 @@ Currently supported layouts:
     <td>qInputLayout (char*)</td>
     <td>Input</td>
     <td>Data layout format of query. It indicates the specific arrangement of the input tensors in memory (such as contiguous or concatenated arrangement).</td>
-    <td>Currently only "TND", "BNSD", and "BSND" are supported, and qInputLayout must be consistent with kvInputLayout.</td>
+    <td>Must match the other layout parameter. Atlas A2/A3 supports BNSD and TND. Ascend 950 also supports BSND.</td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -246,7 +237,7 @@ Currently supported layouts:
     <td>kvInputLayout (char*)</td>
     <td>Input</td>
     <td>Data layout format of key and value. It indicates the specific arrangement of the input tensors in memory.</td>
-    <td>Currently only "TND", "BNSD", and "BSND" are supported, and qInputLayout must be consistent with kvInputLayout.</td>
+    <td>Must match the other layout parameter. Atlas A2/A3 supports BNSD and TND. Ascend 950 also supports BSND.</td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -370,7 +361,7 @@ maskType does not support the value 1; the attenMaskOptional input is ignored, a
 * When this API is used together with PyTorch, ensure that the versions of the CANN packages match those of the PyTorch packages.
 * actualSeqLengthsOptional is required when qInputLayout is "TND"; actualSeqLengthsKvOptional is required when kvInputLayout is "TND".
 * The layout of softmaxLse must be consistent with the layout of query. If the layout of query is "BSND", the layout "BNS1" should be passed in for softmaxLse.
-* HeadDim must be 128.
+* HeadDim must be 128 on Ascend 950.
 * According to the input layouts supported by the operator, the size of the corresponding head dimension in the query tensor shape is denoted as N1, and the size of the corresponding head dimension in the key and value tensor shapes is denoted as N2. N1 % N2 == 0 must be satisfied. MQA, MHA, and GQA scenarios are supported.
 * Constraints related to actualSeqLengthsOptional and actualSeqLengthsKvOptional: when qInputLayout or kvInputLayout is not "TND", these two input parameters are ignored.
 
