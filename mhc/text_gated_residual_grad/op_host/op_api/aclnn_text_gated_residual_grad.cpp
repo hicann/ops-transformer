@@ -68,7 +68,7 @@ struct TextGatedResidualGradParams {
     aclTensor* dgamma = nullptr;
 };
 
-aclnnStatus CheckNotNull(const TextGatedResidualGradParams& p)
+static aclnnStatus CheckNotNull(const TextGatedResidualGradParams& p)
 {
     CHECK_COND(p.gradMixed != nullptr, ACLNN_ERR_PARAM_NULLPTR, "gradMixed must not be nullptr.");
     CHECK_COND(p.x != nullptr, ACLNN_ERR_PARAM_NULLPTR, "x must not be nullptr.");
@@ -96,7 +96,7 @@ aclnnStatus CheckNotNull(const TextGatedResidualGradParams& p)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckDtype(const TextGatedResidualGradParams& p)
+static aclnnStatus CheckDtype(const TextGatedResidualGradParams& p)
 {
     const std::initializer_list<op::DataType> supportDtype = {op::DataType::DT_FLOAT16, op::DataType::DT_BF16};
     OP_CHECK_DTYPE_NOT_SUPPORT(p.x, supportDtype, return ACLNN_ERR_PARAM_INVALID);
@@ -126,7 +126,7 @@ aclnnStatus CheckDtype(const TextGatedResidualGradParams& p)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckTensorShape(const aclTensor* t, std::initializer_list<int64_t> expect, const char* name)
+static aclnnStatus CheckTensorShape(const aclTensor* t, std::initializer_list<int64_t> expect, const char* name)
 {
     auto shape = t->GetViewShape();
     CHECK_COND(shape.GetDimNum() == static_cast<int64_t>(expect.size()), ACLNN_ERR_PARAM_INVALID,
@@ -140,7 +140,7 @@ aclnnStatus CheckTensorShape(const aclTensor* t, std::initializer_list<int64_t> 
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckShape(const TextGatedResidualGradParams& p)
+static aclnnStatus CheckShape(const TextGatedResidualGradParams& p)
 {
     auto xShape = p.x->GetViewShape();
     CHECK_COND(xShape.GetDimNum() == INPUT_RANK, ACLNN_ERR_PARAM_INVALID, "x dim num should be 3, but got %zu",
@@ -184,7 +184,7 @@ aclnnStatus CheckShape(const TextGatedResidualGradParams& p)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckParams(const TextGatedResidualGradParams& p)
+static aclnnStatus CheckParams(const TextGatedResidualGradParams& p)
 {
     CHECK_COND(CheckNotNull(p) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR, "required param is nullptr.");
     CHECK_COND(CheckDtype(p) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "invalid dtype.");
@@ -192,7 +192,7 @@ aclnnStatus CheckParams(const TextGatedResidualGradParams& p)
     return ACLNN_SUCCESS;
 }
 
-const aclTensor* ContiguousOrNull(const aclTensor* t, aclOpExecutor* executor)
+static const aclTensor* ContiguousOrNull(const aclTensor* t, aclOpExecutor* executor)
 {
     if (t == nullptr) {
         return nullptr;
@@ -200,8 +200,8 @@ const aclTensor* ContiguousOrNull(const aclTensor* t, aclOpExecutor* executor)
     return l0op::Contiguous(t, executor);
 }
 
-aclnnStatus MakeContiguousInputs(const TextGatedResidualGradParams& p, TextGatedResidualGradParams& contiguous,
-                                 aclOpExecutor* executor)
+static aclnnStatus MakeContiguousInputs(const TextGatedResidualGradParams& p, TextGatedResidualGradParams& contiguous,
+                                        aclOpExecutor* executor)
 {
     // Make inputs contiguous.
     contiguous.gradMixed = l0op::Contiguous(p.gradMixed, executor);
