@@ -1044,20 +1044,36 @@ def _t_increattention_bnsd(fa_param):
                     acc = (acc.double() + chunk_sum).float()
                 bmm1Res = acc
                 scaleRes = bmm1Res * scaleValue
-                softmax_res, x_max, x_sum = softmax(scaleRes, cur_sinks)
-                exp_unnorm = torch.exp(scaleRes - x_max)
+                s2_base_size = 128
                 if fa_param["q_dtype"] == "float16":
-                    exp_quantized = exp_unnorm.to(torch.float16).float()
+                    q_torch_dtype = torch.float16
                 elif fa_param["q_dtype"] == "bfloat16":
-                    exp_quantized = exp_unnorm.to(torch.bfloat16).float()
+                    q_torch_dtype = torch.bfloat16
                 else:
-                    exp_quantized = exp_unnorm
-                bmm2Res = (
-                    torch.matmul(
-                        exp_quantized.to(torch.float64), v_sparse.to(torch.float64)
-                    ).float()
-                    / x_sum
-                )
+                    q_torch_dtype = torch.float32
+                if cur_sinks is not None:
+                    running_max = cur_sinks.float().clone()
+                    running_sum = torch.ones(g, dtype=torch.float32)
+                else:
+                    running_max = torch.full((g,), float("-inf"), dtype=torch.float32)
+                    running_sum = torch.zeros(g, dtype=torch.float32)
+                out_acc = torch.zeros([g, out_shape_bnsd[-1]], dtype=torch.float32)
+                v_sparse_f32 = v_sparse.float()
+                for block_start in range(0, v_sparse.shape[0], s2_base_size):
+                    block_x = scaleRes[:, block_start : block_start + s2_base_size]
+                    new_max = torch.maximum(running_max, block_x.max(dim=-1).values)
+                    exp_x = torch.exp(block_x - new_max.unsqueeze(-1))
+                    p_quantized = exp_x.to(q_torch_dtype).float()
+                    rescale = torch.exp(running_max - new_max)
+                    out_acc = out_acc * rescale.unsqueeze(-1) + torch.matmul(
+                        p_quantized,
+                        v_sparse_f32[block_start : block_start + s2_base_size],
+                    )
+                    running_sum = running_sum * rescale + exp_x.sum(dim=-1)
+                    running_max = new_max
+                bmm2Res = out_acc / running_sum.unsqueeze(-1)
+                x_max = running_max.unsqueeze(-1)
+                x_sum = running_sum.unsqueeze(-1)
                 y[batch, n2Idx * g : (n2Idx + 1) * g, s1Idx, :] = bmm2Res
 
                 if layout_query == "BSND":
