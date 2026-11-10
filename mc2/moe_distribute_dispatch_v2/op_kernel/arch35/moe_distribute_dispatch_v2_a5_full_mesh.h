@@ -141,10 +141,14 @@ private:
     __aicore__ inline int32_t GetRecvCntPrefix(uint32_t statusId);
     __aicore__ inline void SetValidExpertInfo(uint32_t expInfoSize, uint32_t& validNum);
     __aicore__ inline void SetValidExpertInfoTokenNums();
-    __aicore__ inline uint32_t CheckDataArriveWithFlag(uint32_t srcExpDataIdx, int32_t beginIdx, int32_t copyCnt);
-    __aicore__ inline void CopyInAndOut(LocalTensor<XOutType> xTmpTensor, GM_ADDR wAddr, uint32_t index,
-                                        uint32_t dstPosition, uint32_t arriveCount, uint32_t dataBufferId,
-                                        bool isDataBufferReused);
+    __aicore__ inline uint32_t LoadDataFlags(uint32_t beginIndex, uint32_t validNum, uint32_t maxCopyTokenCnt,
+                                             uint32_t localExpertNum);
+    __aicore__ inline bool CheckDataArriveWithFlag(uint32_t beginToken, uint32_t copyCnt);
+    __aicore__ inline uint64_t LoadReadyData(LocalTensor<XOutType> xTmpTensor, uint32_t beginIndex, uint32_t endIndex,
+                                             uint32_t maxCopyTokenCnt, uint32_t localExpertNum, uint32_t dataBufferId,
+                                             bool isDataBufferReused);
+    __aicore__ inline void CopyOut(LocalTensor<XOutType> xTmpTensor, uint32_t index, uint32_t dstPosition,
+                                   uint32_t copyCnt, uint32_t dataBufferId);
     __aicore__ inline void WaitAndFormatOutput(TBuf<> tBuf, uint32_t validNum);
     __aicore__ inline uint32_t GetLocalWindowSrcDataBlockIdx(uint32_t srcExpertId, uint32_t localExpertNum);
     __aicore__ inline void ClearLocalWindowDataFlags(TBuf<> tBuf, uint32_t validNum, uint32_t localExpertNum);
@@ -227,7 +231,7 @@ private:
     LocalTensor<uint32_t> expertLeftNumTensor_;
     LocalTensor<uint32_t> dataStateLocalTensor_;
 
-    LocalTensor<float> flagReduceWorkTensor_;
+    LocalTensor<uint64_t> flagReadyTensor_;
     LocalTensor<float> flagRecvTensor_;
 
     TBuf<> statusBuf_;
@@ -2081,65 +2085,131 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
 }
 
 template <TemplateMC2A5FullMeshTypeClass>
-__aicore__ inline uint32_t MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::CheckDataArriveWithFlag(
-    uint32_t srcExpDataIdx, int32_t beginIdx, int32_t copyCnt)
+__aicore__ inline uint32_t MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::LoadDataFlags(
+    uint32_t beginIndex, uint32_t validNum, uint32_t maxCopyTokenCnt, uint32_t localExpertNum)
 {
-    uint32_t flagNum = blockCntPerToken_ * uint32_t(copyCnt);
-    DataCopyParams expFlagCopyParams{static_cast<uint16_t>(flagNum), 1U,
-                                     static_cast<uint16_t>(SPLIT_BLOCK_DATA_SIZE / UB_ALIGN), 0U};
-    GlobalTensor<float> dataFlagGlobal;
-    GM_ADDR wAddr = (__gm__ uint8_t*)(windowGM_) + srcExpDataIdx * dataSectionSize_ + beginIdx * hCommuSize_ +
-                    SPLIT_BLOCK_DATA_SIZE;
-    dataFlagGlobal.SetGlobalBuffer((__gm__ float*)(wAddr));
-    DataCopy(flagRecvTensor_, dataFlagGlobal, expFlagCopyParams);
+    uint32_t endIndex = beginIndex;
+    uint32_t tokenNum = 0U;
+    // 每个片段占一位，单批片段数不超过就绪掩码位数
+    constexpr uint32_t readyMaskBits = sizeof(uint64_t) * BITS_PER_BYTE;
+    while (endIndex < validNum && tokenNum < maxCopyTokenCnt && endIndex - beginIndex < readyMaskBits) {
+        uint32_t copyCnt = expertLeftNumTensor_(endIndex);
+        copyCnt = copyCnt > maxCopyTokenCnt - tokenNum ? maxCopyTokenCnt - tokenNum : copyCnt;
+        if (copyCnt != 0U) {
+            uint32_t source = GetLocalWindowSrcDataBlockIdx(expertMapTensor_(endIndex), localExpertNum);
+            GlobalTensor<float> dataFlagGlobal;
+            dataFlagGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(
+                windowGM_ + source * dataSectionSize_ + expertFinishNumTensor_(endIndex) * hCommuSize_ +
+                SPLIT_BLOCK_DATA_SIZE));
+            DataCopyParams copyParams{static_cast<uint16_t>(copyCnt * blockCntPerToken_), 1U,
+                                      static_cast<uint16_t>(SPLIT_BLOCK_DATA_SIZE / UB_ALIGN), 0U};
+            DataCopy(flagRecvTensor_[tokenNum * blockCntPerToken_ * UB_ALIGN_DATA_COUNT], dataFlagGlobal, copyParams);
+            tokenNum += copyCnt;
+        }
+        ++endIndex;
+    }
+    if (tokenNum == 0U) {
+        return endIndex;
+    }
+
+    // 按实际标志数比较，尾部不读取额外标志块
     SyncFunc<AscendC::HardEvent::MTE2_V>();
-    LocalTensor<float> flagSumOutTensor = scalarBuf_.Get<float>();
-    ReduceSum(flagSumOutTensor, flagRecvTensor_, flagReduceWorkTensor_, 1U, flagNum, 1U);
+    SetMaskCount();
+    CompareScalar(flagReadyTensor_.ReinterpretCast<uint8_t>(), flagRecvTensor_, 1.0F, CMPMODE::EQ,
+                  static_cast<uint64_t>(tokenNum) * blockCntPerToken_ * UB_ALIGN_DATA_COUNT, 1,
+                  UnaryRepeatParams{1, 1, 8, 8});
+    SetMaskNorm();
     SyncFunc<AscendC::HardEvent::V_S>();
-    // aicore禁止uint->float的显式转换，借助浮点乘法隐式转换得到期望和
-    float expectFlagSum = 1.0F * flagNum;
-    return flagSumOutTensor.GetValue(0) == expectFlagSum ? static_cast<uint32_t>(copyCnt) : 0U;
+    return endIndex;
 }
 
 template <TemplateMC2A5FullMeshTypeClass>
-__aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::CopyInAndOut(
-    LocalTensor<XOutType> xTmpTensor, GM_ADDR wAddr, uint32_t index, uint32_t dstPosition, uint32_t arriveCount,
-    uint32_t dataBufferId, bool isDataBufferReused)
+__aicore__ inline bool MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::CheckDataArriveWithFlag(
+    uint32_t beginToken, uint32_t copyCnt)
+{
+    // 每个32B标志块对应一字节，只取首元素的比较位
+    constexpr uint64_t readyMask = 0x0101010101010101ULL;
+    constexpr uint32_t flagsPerWord = sizeof(uint64_t);
+    uint32_t beginFlag = beginToken * blockCntPerToken_;
+    uint32_t endFlag = beginFlag + copyCnt * blockCntPerToken_;
+    while (beginFlag < endFlag) {
+        uint32_t offset = beginFlag % flagsPerWord;
+        uint32_t flagNum = endFlag - beginFlag;
+        flagNum = flagNum > flagsPerWord - offset ? flagsPerWord - offset : flagNum;
+        uint64_t expected = readyMask >> ((flagsPerWord - flagNum) * BITS_PER_BYTE);
+        uint64_t flags = flagReadyTensor_.GetValue(beginFlag / flagsPerWord) >> (offset * BITS_PER_BYTE);
+        if ((flags & expected) != expected) {
+            return false;
+        }
+        beginFlag += flagNum;
+    }
+    return true;
+}
+
+template <TemplateMC2A5FullMeshTypeClass>
+__aicore__ inline uint64_t MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::LoadReadyData(
+    LocalTensor<XOutType> xTmpTensor, uint32_t beginIndex, uint32_t endIndex, uint32_t maxCopyTokenCnt,
+    uint32_t localExpertNum, uint32_t dataBufferId, bool isDataBufferReused)
+{
+    uint32_t tokenNum = 0U;
+    uint64_t readyMask = 0U;
+    const uint32_t packedTokenElems = blockCntPerToken_ * SPLIT_BLOCK_DATA_SIZE / sizeof(XOutType);
+    for (uint32_t index = beginIndex; index < endIndex; ++index) {
+        uint32_t copyCnt = expertLeftNumTensor_(index);
+        copyCnt = copyCnt > maxCopyTokenCnt - tokenNum ? maxCopyTokenCnt - tokenNum : copyCnt;
+        if (copyCnt == 0U) {
+            continue;
+        }
+        if (CheckDataArriveWithFlag(tokenNum, copyCnt)) {
+            if (readyMask == 0U && isDataBufferReused) {
+                AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(dataBufferId);
+                AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(dataBufferId);
+                AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(dataBufferId);
+            }
+            uint32_t source = GetLocalWindowSrcDataBlockIdx(expertMapTensor_(index), localExpertNum);
+            GlobalTensor<XOutType> dataGlobal;
+            dataGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ XOutType*>(windowGM_ + source * dataSectionSize_ +
+                                                                          expertFinishNumTensor_(index) * hCommuSize_));
+            DataCopyParams copyParams{static_cast<uint16_t>(blockCntPerToken_ * copyCnt),
+                                      static_cast<uint16_t>(SPLIT_BLOCK_DATA_SIZE), static_cast<uint16_t>(UB_ALIGN),
+                                      0U};
+            DataCopyPadParams padParams{false, 0U, 0U, 0U};
+            DataCopyPad(xTmpTensor[tokenNum * packedTokenElems], dataGlobal, copyParams, padParams);
+            readyMask |= 1ULL << (index - beginIndex);
+        }
+        tokenNum += copyCnt;
+    }
+    return readyMask;
+}
+
+template <TemplateMC2A5FullMeshTypeClass>
+__aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTypeFunc>::CopyOut(
+    LocalTensor<XOutType> xTmpTensor, uint32_t index, uint32_t dstPosition, uint32_t copyCnt, uint32_t dataBufferId)
 {
     uint32_t hOutElemCount = hOutSize_ / sizeof(XOutType); // expandXOutGlobal申请每个token的GM Buffer空间大小
-    GlobalTensor<XOutType> dataFlagGlobal, expandXOutGlobal;
+    GlobalTensor<XOutType> expandXOutGlobal;
     GlobalTensor<float> expertScaleInGlobal, expandScalesOutGlobal;
-    dataFlagGlobal.SetGlobalBuffer((__gm__ XOutType*)(wAddr));
     expandXOutGlobal.SetGlobalBuffer((__gm__ XOutType*)(expandXOutGM_) +
                                      static_cast<uint64_t>(dstPosition) * hOutElemCount);
-    DataCopyParams srcTokenCopyParams{static_cast<uint16_t>(blockCntPerToken_ * arriveCount),
-                                      static_cast<uint16_t>(SPLIT_BLOCK_DATA_SIZE), static_cast<uint16_t>(UB_ALIGN), 0};
     DataCopyExtParams scalesCopyParams{
-        uint16_t(arriveCount), static_cast<uint32_t>(scaleOutBytes_),
+        uint16_t(copyCnt), static_cast<uint32_t>(scaleOutBytes_),
         static_cast<uint32_t>((blockCntPerToken_ * SPLIT_BLOCK_DATA_SIZE - scaleOutBytes_) / UB_ALIGN), 0U, 0U};
     DataCopyExtParams tokenCopyParams{
-        uint16_t(arriveCount), hOutSize_,
+        uint16_t(copyCnt), hOutSize_,
         static_cast<uint32_t>((blockCntPerToken_ * SPLIT_BLOCK_DATA_SIZE - hOutSize_) / UB_ALIGN), 0U, 0U};
     DataCopyExtParams expandIdxCopyParams{
-        uint16_t(arriveCount), EXPAND_IDX_INFO * sizeof(int32_t),
+        uint16_t(copyCnt), EXPAND_IDX_INFO * sizeof(int32_t),
         static_cast<uint32_t>((blockCntPerToken_ * SPLIT_BLOCK_DATA_SIZE) / UB_ALIGN - 1), 0U, 0U};
-    DataCopyPadParams srcTokenPadParams{false, 0U, 0U, 0U};
     LocalTensor<int32_t> xOutInt32Tensor = xTmpTensor.template ReinterpretCast<int32_t>();
 
-    if (isDataBufferReused) {
-        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(dataBufferId);
-        AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(dataBufferId);
-        AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(dataBufferId);
-    }
-    DataCopyPad(xTmpTensor, dataFlagGlobal[expertFinishNumTensor_(index) * hCommuSize_ / sizeof(XOutType)],
-                srcTokenCopyParams, srcTokenPadParams);
-    AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(dataBufferId);
-    AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(dataBufferId);
     quantInst_.CopyScalesToOut(dstPosition, scaleOutBytes_, xTmpTensor, scalesCopyParams);
     DataCopyPad(expandXOutGlobal, xTmpTensor, tokenCopyParams);
     DataCopyPad(expandIdxGMTensor_[dstPosition * EXPAND_IDX_INFO], xOutInt32Tensor[tokenQuantAlign_],
                 expandIdxCopyParams);
     if (hasExpertScalesFlag_) {
+        uint32_t localExpertNum = isShareExpertRankFlag_ ? 1U : moeExpertNumPerRank_;
+        uint32_t source = GetLocalWindowSrcDataBlockIdx(expertMapTensor_(index), localExpertNum);
+        GM_ADDR wAddr = windowGM_ + source * dataSectionSize_;
         LocalTensor<float> xOutFloatTensor = xTmpTensor.template ReinterpretCast<float>();
         uint32_t expertScaleOffset = expertScaleAlign_ * sizeof(float);
         uint32_t expertScaleWinOffset =
@@ -2147,11 +2217,10 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
         expertScaleInGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(
             wAddr + expertFinishNumTensor_(index) * hCommuSize_ + expertScaleWinOffset));
         expandScalesOutGlobal.SetGlobalBuffer((__gm__ float*)(expandScalesOutGM_) + dstPosition);
-        DataCopyExtParams expertScaleCopyInParams{uint16_t(arriveCount), static_cast<uint32_t>(sizeof(float)),
+        DataCopyExtParams expertScaleCopyInParams{uint16_t(copyCnt), static_cast<uint32_t>(sizeof(float)),
                                                   static_cast<uint32_t>(hCommuSize_ - sizeof(float)), 0U, 0U};
         DataCopyPadExtParams<float> expertScalePadParams{false, 0U, 0U, 0.0f};
-        DataCopyExtParams expertScaleCopyOutParams{uint16_t(arriveCount), static_cast<uint32_t>(sizeof(float)), 0U, 0U,
-                                                   0U};
+        DataCopyExtParams expertScaleCopyOutParams{uint16_t(copyCnt), static_cast<uint32_t>(sizeof(float)), 0U, 0U, 0U};
         AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(dataBufferId);
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(dataBufferId);
         DataCopyPad(xOutFloatTensor, expertScaleInGlobal, expertScaleCopyInParams, expertScalePadParams);
@@ -2159,7 +2228,6 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(dataBufferId);
         DataCopyPad(expandScalesOutGlobal, xOutFloatTensor, expertScaleCopyOutParams);
     }
-    AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(dataBufferId);
 }
 
 template <TemplateMC2A5FullMeshTypeClass>
@@ -2223,72 +2291,63 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
     uint32_t index = 0;
     uint32_t finishNum = 0;
     uint32_t localExpertNum = isShareExpertRankFlag_ ? 1 : moeExpertNumPerRank_;
-    uint32_t srcExpertId, dstPosition, arriveCount, copyCnt, srcDataBlockIdx;
+    uint32_t srcExpertId, dstPosition, copyCnt;
     uint64_t packedTokenSize = static_cast<uint64_t>(blockCntPerToken_) * SPLIT_BLOCK_DATA_SIZE;
-    uint64_t minUbSizePerToken =
-        LOCAL_COPY_BUFFER_NUM * packedTokenSize + static_cast<uint64_t>(blockCntPerToken_) * (UB_ALIGN + sizeof(float));
+    uint64_t minUbSizePerToken = LOCAL_COPY_BUFFER_NUM * packedTokenSize +
+                                 static_cast<uint64_t>(blockCntPerToken_) * (UB_ALIGN + sizeof(uint8_t));
+    // 总预算按32B对齐，位图取整不改变可容纳的token数
     uint32_t maxCopyTokenCnt = static_cast<uint32_t>(tBufRealSize_ / minUbSizePerToken);
-    uint32_t dataBufferSize = 0;
-    uint32_t reduceWorkSize = 0;
-    uint32_t flagRecvSize = 0;
-    while (maxCopyTokenCnt > 0) {
-        dataBufferSize = static_cast<uint32_t>(packedTokenSize * maxCopyTokenCnt);
-        reduceWorkSize = Ceil(blockCntPerToken_ * maxCopyTokenCnt * sizeof(float), SIZE_ALIGN_256) * SIZE_ALIGN_256;
-        flagRecvSize = blockCntPerToken_ * maxCopyTokenCnt * UB_ALIGN;
-        uint64_t totalBufferSize =
-            static_cast<uint64_t>(LOCAL_COPY_BUFFER_NUM) * dataBufferSize + reduceWorkSize + flagRecvSize;
-        if (totalBufferSize <= tBufRealSize_) {
-            break;
-        }
-        --maxCopyTokenCnt;
-    }
-    if (maxCopyTokenCnt == 0) {
-        return;
-    }
+    uint32_t dataBufferSize = static_cast<uint32_t>(packedTokenSize * maxCopyTokenCnt);
+    uint32_t flagReadySize = Ceil(blockCntPerToken_ * maxCopyTokenCnt, UB_ALIGN) * UB_ALIGN;
+    uint32_t flagRecvSize = blockCntPerToken_ * maxCopyTokenCnt * UB_ALIGN;
 
     LocalTensor<XOutType> xTmpPingTensor = tBuf.GetWithOffset<XOutType>(dataBufferSize / sizeof(XOutType), 0);
     LocalTensor<XOutType> xTmpPongTensor =
         tBuf.GetWithOffset<XOutType>(dataBufferSize / sizeof(XOutType), dataBufferSize);
     uint32_t flagWorkOffset = LOCAL_COPY_BUFFER_NUM * dataBufferSize;
-    flagReduceWorkTensor_ = tBuf.GetWithOffset<float>(reduceWorkSize / sizeof(float), flagWorkOffset);
-    flagRecvTensor_ = tBuf.GetWithOffset<float>(flagRecvSize / sizeof(float), flagWorkOffset + reduceWorkSize);
+    flagReadyTensor_ = tBuf.GetWithOffset<uint64_t>(flagReadySize / sizeof(uint64_t), flagWorkOffset);
+    flagRecvTensor_ = tBuf.GetWithOffset<float>(flagRecvSize / sizeof(float), flagWorkOffset + flagReadySize);
 
     uint32_t copyBatchId = 0;
-    while (true) {
-        if (expertLeftNumTensor_(index) == 0) { // 当前核负责的不需要收集
-            index = (index + 1) % validNum;     // 轮询查询每个有效的index
+    while (validNum != finishNum) {
+        uint32_t beginIndex = index;
+        uint32_t endIndex = LoadDataFlags(index, validNum, maxCopyTokenCnt, localExpertNum);
+        uint32_t dataBufferId = copyBatchId % LOCAL_COPY_BUFFER_NUM;
+        LocalTensor<XOutType> xTmpTensor = dataBufferId == 0U ? xTmpPingTensor : xTmpPongTensor;
+        uint64_t readyMask = LoadReadyData(xTmpTensor, index, endIndex, maxCopyTokenCnt, localExpertNum, dataBufferId,
+                                           copyBatchId >= LOCAL_COPY_BUFFER_NUM);
+        if (readyMask == 0U) {
+            index = endIndex == validNum ? 0U : endIndex;
             continue;
         }
-        srcExpertId = expertMapTensor_(index);
-        copyCnt = expertLeftNumTensor_(index) > maxCopyTokenCnt ?
-                      maxCopyTokenCnt :
-                      expertLeftNumTensor_(index); // 按照ub大小一次搬入多个token
-        srcDataBlockIdx = GetLocalWindowSrcDataBlockIdx(srcExpertId, localExpertNum);
-        arriveCount = CheckDataArriveWithFlag(srcDataBlockIdx, expertFinishNumTensor_(index), copyCnt);
-        if (arriveCount == copyCnt) {
-            dstPosition = srcExpertId != 0 ? GetRecvCntPrefix(srcExpertId - 1U) : 0;
-            dstPosition += expertFinishNumTensor_(index);
-            GM_ADDR wAddr = (__gm__ uint8_t*)(windowGM_) + srcDataBlockIdx * dataSectionSize_;
-            uint32_t dataBufferId = copyBatchId % LOCAL_COPY_BUFFER_NUM;
-            LocalTensor<XOutType> xTmpTensor = xTmpPingTensor;
-            if (dataBufferId != 0) {
-                xTmpTensor = xTmpPongTensor;
+        // 已就绪片段先集中搬入，再统一等待搬入完成
+        AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(dataBufferId);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(dataBufferId);
+        uint32_t tokenNum = 0U;
+        for (; index < endIndex; ++index) {
+            if (expertLeftNumTensor_(index) == 0) { // 当前核负责的不需要收集
+                continue;
             }
-            CopyInAndOut(xTmpTensor, wAddr, index, dstPosition, arriveCount, dataBufferId,
-                         copyBatchId >= LOCAL_COPY_BUFFER_NUM);
-            ++copyBatchId;
-            // Update progress here; data flags are cleared in batches after all outputs are issued.
-            expertFinishNumTensor_(index) += arriveCount;
-            expertLeftNumTensor_(index) -= arriveCount;
-            if (expertLeftNumTensor_(index) == 0) {
-                finishNum++;
+            copyCnt = expertLeftNumTensor_(index);
+            copyCnt = copyCnt > maxCopyTokenCnt - tokenNum ? maxCopyTokenCnt - tokenNum : copyCnt;
+            if ((readyMask & (1ULL << (index - beginIndex))) != 0U) {
+                srcExpertId = expertMapTensor_(index);
+                dstPosition = srcExpertId != 0 ? GetRecvCntPrefix(srcExpertId - 1U) : 0;
+                dstPosition += expertFinishNumTensor_(index);
+                CopyOut(xTmpTensor[tokenNum * packedTokenSize / sizeof(XOutType)], index, dstPosition, copyCnt,
+                        dataBufferId);
+                // 更新进度，全部输出下发后统一清理标志
+                expertFinishNumTensor_(index) += copyCnt;
+                expertLeftNumTensor_(index) -= copyCnt;
+                if (expertLeftNumTensor_(index) == 0) {
+                    finishNum++;
+                }
             }
-        } else {
-            index = (index + 1) % validNum;
+            tokenNum += copyCnt;
         }
-        if (validNum == finishNum) {
-            break;
-        }
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(dataBufferId);
+        ++copyBatchId;
+        index = index == validNum ? 0U : index;
     }
 
     uint32_t usedDataBufferNum = copyBatchId > LOCAL_COPY_BUFFER_NUM ? LOCAL_COPY_BUFFER_NUM : copyBatchId;
@@ -2452,11 +2511,10 @@ __aicore__ inline void MoeDistributeDispatchV2A5FullMesh<TemplateMC2A5FullMeshTy
     uint32_t expertNum = endLocalExpertId - startLocalExpertId;
     uint32_t statusNum = expertNum * epWorldSize_;
     LocalTensor<float> countTensorFp32 = recvCountTensor_.ReinterpretCast<float>();
-    DataCopyParams fullCountCopyParams{static_cast<uint16_t>(statusNum), 1, 0, 0};
+    DataCopyParams fullCountCopyParams{1, static_cast<uint16_t>(statusNum), 0, 0};
     DataCopy(countTensorFp32,
              windowInstatusFp32Tensor_[startLocalExpertId * epWorldSize_ * STATE_OFFSET / sizeof(float)],
              fullCountCopyParams);
-    SyncFunc<AscendC::HardEvent::MTE2_V>();
     SyncFunc<AscendC::HardEvent::MTE2_S>();
     LocalTensor<int32_t> statusBlocksTensor = countTensorFp32.ReinterpretCast<int32_t>();
     LocalTensor<int64_t> expertTokenNumsLocalTensor = tokenNumBuf_.Get<int64_t>();
