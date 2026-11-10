@@ -1830,14 +1830,15 @@ public:
         return engramCommContext_.rankSize;
     }
 
-    static at::Tensor EngramFetch(const at::Tensor& context, const at::Tensor& indices, int64_t hiddenSize,
-                                  int64_t numEntries, int64_t dtypeEnum, const at::Tensor& sfTable,
-                                  at::Tensor& fetchedSf);
-    using EngramFetchTrainOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>;
+    using EngramFetchOutput = std::tuple<at::Tensor, at::Tensor>;
+    static EngramFetchOutput EngramFetch(const at::Tensor& context, const at::Tensor& indices, int64_t hiddenSize,
+                                         int64_t numEntries, int64_t dtypeEnum, const at::Tensor& sfTable);
+    using EngramFetchTrainOutput =
+        std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>;
     static EngramFetchTrainOutput EngramFetchTrain(const at::Tensor& context, const at::Tensor& indices,
                                                    int64_t hiddenSize, int64_t numEntries, int64_t dtypeEnum,
-                                                   const at::Tensor& localStorageAddr, const at::Tensor& sfTableAddr,
-                                                   at::Tensor& fetchedSf, int64_t numMaxTokensPerRank,
+                                                   const at::Tensor& localStorageAddr, const at::Tensor& sfTable,
+                                                   const at::Tensor& sfTableAddr, int64_t numMaxTokensPerRank,
                                                    int64_t commBufferSize, int64_t rankSize);
     static at::Tensor EngramFetchWait(const at::Tensor& context, const at::Tensor& fetched);
 
@@ -2200,28 +2201,32 @@ void ElasticBuffer::EngramWrite(const at::Tensor& storage, const c10::optional<a
 }
 
 // EngramFetch - stateless static method for torch CustomOp registration (graph-mode compatible).
-at::Tensor ElasticBuffer::EngramFetch(const at::Tensor& context, const at::Tensor& indices, int64_t hiddenSize,
-                                      int64_t numEntries, int64_t dtypeEnum, const at::Tensor& sfTable,
-                                      at::Tensor& fetchedSf)
+ElasticBuffer::EngramFetchOutput ElasticBuffer::EngramFetch(const at::Tensor& context, const at::Tensor& indices,
+                                                            int64_t hiddenSize, int64_t numEntries, int64_t dtypeEnum,
+                                                            const at::Tensor& sfTable)
 {
     auto dtype = static_cast<at::ScalarType>(dtypeEnum);
     int64_t numTokens = indices.size(0);
     auto fetched = at::empty({numTokens, hiddenSize}, at::TensorOptions().dtype(dtype).device(indices.device()));
+    int64_t sfPacks = (sfTable.dim() == 2 && sfTable.size(1) > 0) ? sfTable.size(1) : 0;
+    auto fetchedSf =
+        sfPacks > 0 ? at::empty({numTokens, sfPacks}, sfTable.options()) : at::empty({0}, sfTable.options());
     if (numTokens == 0) {
-        return fetched;
+        return std::make_tuple(fetched, fetchedSf);
     }
     aclTensor* nullTensor = nullptr;
     int64_t zero = 0;
     ACLNN_CMD(aclnnEngramFetch, context, indices, nullTensor, sfTable, fetched, nullTensor, nullTensor, nullTensor,
               nullTensor, nullTensor, fetchedSf, hiddenSize, numEntries, zero, zero, zero);
-    return fetched;
+    return {fetched, fetchedSf};
 }
 
 // EngramFetchTrain - stateless static method for training forward (graph-mode compatible).
-// Outputs: fetched + save-for-backward ctx tensors (perm, sendCounts, recvCounts, recvLocalEntry, numRecv).
+// Outputs: fetched, fetchedSf, and save-for-backward ctx tensors (perm, sendCounts, recvCounts, recvLocalEntry,
+// numRecv). sfTable provides the output shape/dtype; sfTableAddr remains the training kernel's mapped address.
 ElasticBuffer::EngramFetchTrainOutput ElasticBuffer::EngramFetchTrain(
     const at::Tensor& context, const at::Tensor& indices, int64_t hiddenSize, int64_t numEntries, int64_t dtypeEnum,
-    const at::Tensor& localStorageAddr, const at::Tensor& sfTableAddr, at::Tensor& fetchedSf,
+    const at::Tensor& localStorageAddr, const at::Tensor& sfTable, const at::Tensor& sfTableAddr,
     int64_t numMaxTokensPerRank, int64_t commBufferSize, int64_t rankSize)
 {
     auto dtype = static_cast<at::ScalarType>(dtypeEnum);
@@ -2237,6 +2242,9 @@ ElasticBuffer::EngramFetchTrainOutput ElasticBuffer::EngramFetchTrain(
     at::Tensor recvCounts = at::zeros({rankSize}, intOpts);
     at::Tensor recvLocalEntry = at::zeros({maxR}, intOpts);
     at::Tensor numRecv = at::zeros({1}, intOpts);
+    int64_t sfPacks = (sfTable.dim() == 2 && sfTable.size(1) > 0) ? sfTable.size(1) : 0;
+    auto sfOpts = at::TensorOptions().dtype(sfTable.scalar_type()).device(indices.device());
+    at::Tensor fetchedSf = sfPacks > 0 ? at::empty({numTokens, sfPacks}, sfOpts) : at::empty({0}, sfOpts);
 
     if (numTokens > 0) {
         constexpr int64_t withGrad = 1;
@@ -2245,7 +2253,7 @@ ElasticBuffer::EngramFetchTrainOutput ElasticBuffer::EngramFetchTrain(
                   recvCounts, recvLocalEntry, numRecv, fetchedSf, hiddenSize, numEntries, numMaxTokensPerRank,
                   commBufferSize, withGrad);
     }
-    return std::make_tuple(fetched, perm, sendCounts, recvCounts, recvLocalEntry, numRecv);
+    return std::make_tuple(fetched, fetchedSf, perm, sendCounts, recvCounts, recvLocalEntry, numRecv);
 }
 
 // EngramFetchWait - stateless static method for torch CustomOp registration.
@@ -2652,15 +2660,15 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         .def("engram_write", &Mc2Api::ElasticBuffer::EngramWrite, pybind11::arg("storage").noconvert(),
              pybind11::arg("sf") = pybind11::none(), pybind11::arg("zeroCopy"))
         .def_static("engram_fetch",
-                    static_cast<at::Tensor (*)(const at::Tensor&, const at::Tensor&, int64_t, int64_t, int64_t,
-                                               const at::Tensor&, at::Tensor&)>(&Mc2Api::ElasticBuffer::EngramFetch),
+                    static_cast<Mc2Api::ElasticBuffer::EngramFetchOutput (*)(
+                        const at::Tensor&, const at::Tensor&, int64_t, int64_t, int64_t, const at::Tensor&)>(
+                        &Mc2Api::ElasticBuffer::EngramFetch),
                     pybind11::arg("context"), pybind11::arg("indices"), pybind11::arg("hidden_size"),
-                    pybind11::arg("num_entries"), pybind11::arg("dtype"), pybind11::arg("sf_table"),
-                    pybind11::arg("fetched_sf"))
+                    pybind11::arg("num_entries"), pybind11::arg("dtype"), pybind11::arg("sf_table"))
         .def_static("engram_fetch_train", &Mc2Api::ElasticBuffer::EngramFetchTrain, pybind11::arg("context"),
                     pybind11::arg("indices"), pybind11::arg("hidden_size"), pybind11::arg("num_entries"),
-                    pybind11::arg("dtype"), pybind11::arg("local_storage_addr"), pybind11::arg("sf_table_addr"),
-                    pybind11::arg("fetched_sf"), pybind11::arg("num_max_tokens_per_rank"),
+                    pybind11::arg("dtype"), pybind11::arg("local_storage_addr"), pybind11::arg("sf_table"),
+                    pybind11::arg("sf_table_addr"), pybind11::arg("num_max_tokens_per_rank"),
                     pybind11::arg("comm_buffer_size"), pybind11::arg("rank_size"))
         .def_static("engram_fetch_wait", &Mc2Api::ElasticBuffer::EngramFetchWait, pybind11::arg("context"),
                     pybind11::arg("fetched"))
