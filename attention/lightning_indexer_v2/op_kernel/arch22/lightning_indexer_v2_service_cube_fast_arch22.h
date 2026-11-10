@@ -16,6 +16,7 @@
 #define LIGHTNING_INDEXER_V2_SERVICE_CUBE_FAST_ARCH22_H
 
 #include "kernel_operator.h"
+#include "c_api/asc_simd.h"
 #include "c_api/utils/union.h"
 #include "kernel_operator_list_tensor_intf.h"
 #include "kernel_tiling/kernel_tiling.h"
@@ -23,8 +24,6 @@
 #include "lib/matrix/matmul/tiling.h"
 #include "lightning_indexer_v2_common_fast_arch22.h"
 
-// Use the identical 2201 intrinsics underlying the four C API calls, avoiding
-// unrelated newer dtype declarations in the umbrella asc_simd.h on CANN 9.1.
 // Cube 补 Vector 流程：K×Q^T 在 L0C 生成 KQT，转存 L1 后与对角 Weight 相乘，Score 写入 GM ring。
 // L1 同时保存双 phase KQT、常驻 Q/Weight 和四槽 K，以流水重叠 MM1、MM2 与搬运。
 namespace LIV2Kernel {
@@ -255,21 +254,21 @@ __aicore__ inline void LightningIndexerV2ServiceCubeFast<LIT>::LoadWtDiagToL0b(c
     asc_fill_value_config fillConfig{};
     fillConfig.repeat = 1;
     fillConfig.blk_num = (CFV_WT_L0B_ELEMENTS + 256) * sizeof(float) / 32;
-    create_cbuf_matrix(wL1Ptr, fillConfig.config, static_cast<uint32_t>(0));
+    asc_fill_l1(wL1Ptr, static_cast<uint32_t>(0), fillConfig);
     AscendC::PipeBarrier<PIPE_MTE2>();
     uint64_t dstMatrixStride = 8 + (constInfo_.gSize / 8) * 128;
     uint64_t weightGmOffset = runInfo.tensorWeightsOffset + runInfo.gS1Idx * constInfo_.mBaseSize;
-    copy_gm_to_cbuf_multi_nd2nz_b32s(wL1Ptr + colOffset * 8,
-                                     const_cast<__gm__ float*>(weightsGmForDiag_[weightGmOffset].GetPhyAddr()), 0,
-                                     static_cast<uint16_t>(s1Rows), 1, static_cast<uint16_t>(constInfo_.gSize),
-                                     static_cast<uint16_t>(constInfo_.gSize), static_cast<uint16_t>(constInfo_.gSize),
-                                     16, 1, static_cast<uint16_t>(dstMatrixStride));
+    asc_copy_gm2l1_nd2nz(wL1Ptr + colOffset * 8,
+                         const_cast<__gm__ float*>(weightsGmForDiag_[weightGmOffset].GetPhyAddr()),
+                         static_cast<uint16_t>(s1Rows), 1, static_cast<uint16_t>(constInfo_.gSize),
+                         static_cast<uint16_t>(constInfo_.gSize), static_cast<uint16_t>(constInfo_.gSize), 16, 1,
+                         static_cast<uint16_t>(dstMatrixStride));
     AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(MTE2_MTE1_EVENT);
     AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(MTE2_MTE1_EVENT);
 
     AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(EVENT_ID1);
-    load_cbuf_to_cb(reinterpret_cast<__cb__ float*>(wtL0b_.GetPhyAddr()), wL1Ptr, 0,
-                    static_cast<uint8_t>(runInfo.actMBaseSize / 8), 1, 0, 0, false, inc);
+    asc_copy_l12l0b(reinterpret_cast<__cb__ float*>(wtL0b_.GetPhyAddr()), wL1Ptr, 0,
+                    static_cast<uint8_t>(runInfo.actMBaseSize / 8), 1, 0);
     AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(MTE1_M_EVENT);
     AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(MTE1_M_EVENT);
     AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(CFV_W_L1_EVENT);
@@ -499,10 +498,9 @@ __aicore__ inline void LightningIndexerV2ServiceCubeFast<LIT>::CfvFinishQkChunk(
     __cbuf__ void* dst = reinterpret_cast<__cbuf__ void*>(PHASE_BASE * sizeof(float) + Chunk * CFV_QK_L1_CHUNK_BYTES);
     __cc__ float* src = reinterpret_cast<__cc__ float*>(cL0_[C_SLOT * CFV_QK_C_SLOT_ELEMENTS].GetPhyAddr());
     // void* 重载保持 FP32 原格式；多写 2 行以完整回写 L0C 尾块。
-    copy_matrix_cc_to_cbuf_b4(dst, src, 0, static_cast<uint16_t>(CFV_QK_CHUNK),
-                              static_cast<uint16_t>(S2_BASIC_BLOCK_L0 + CFV_PAD_ROWS),
-                              static_cast<uint32_t>(S2_BASIC_BLOCK_L0), static_cast<uint16_t>(S2_BASIC_BLOCK_L0), 0,
-                              static_cast<QuantMode_t>(0), 1, true, false);
+    asc_copy_l0c2l1(dst, src, static_cast<uint16_t>(CFV_QK_CHUNK),
+                    static_cast<uint16_t>(S2_BASIC_BLOCK_L0 + CFV_PAD_ROWS), static_cast<uint32_t>(S2_BASIC_BLOCK_L0),
+                    static_cast<uint16_t>(S2_BASIC_BLOCK_L0), 0, 0, 1, true, false);
     AscendC::SetFlag<AscendC::HardEvent::FIX_M>(static_cast<event_t>(C_SLOT));
 }
 
