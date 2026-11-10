@@ -445,8 +445,8 @@ ge::graphStatus SparseFlashAttentionGradBs1Regbase::GetBaseShapeInfo()
                 selected_block_count);
         return ge::GRAPH_FAILED;
     }
-    int64_t selected_block_size = static_cast<int64_t>(
-        *context_->GetAttrs()->GetAttrPointer<int>(static_cast<size_t>(AttrIndex::SELECTED_BLOCK_SIZE)));
+    auto selected_block_size =
+        *context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::SELECTED_BLOCK_SIZE));
     std::set<int64_t> blockSizeSupportList = {1, 8, 16, 32, 64};
     if (!blockSizeSupportList.count(selected_block_size)) {
         OP_LOGE(context_,
@@ -456,12 +456,12 @@ ge::graphStatus SparseFlashAttentionGradBs1Regbase::GetBaseShapeInfo()
         return ge::GRAPH_FAILED;
     }
 
-    auto sparse_mode = *context_->GetAttrs()->GetAttrPointer<int>(static_cast<size_t>(AttrIndex::SPARSE_MODE));
+    auto sparse_mode = *context_->GetAttrs()->GetAttrPointer<int64_t>(static_cast<size_t>(AttrIndex::SPARSE_MODE));
     if (sparse_mode == 3 || sparse_mode == 0) {
         OP_LOGI(context_, "SparseFlashAttentionGrad AttenMask enable.");
         tmpData.attenEnable = true;
     } else {
-        OP_LOGE(context_, "SparseFlashAttentionGrad only support sparse_mode = 0 or 3, now sparse_mode=%d.",
+        OP_LOGE(context_, "SparseFlashAttentionGrad only support sparse_mode = 0 or 3, now sparse_mode=%ld.",
                 sparse_mode);
         return ge::GRAPH_FAILED;
     }
