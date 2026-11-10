@@ -221,7 +221,6 @@ protected:
     // ================================其他成员区========================================
     ConstInfo constInfo = {};
     MSplitInfo mSplitInfo = {};
-    uint32_t vec1BlockMaxElems_ = 8192; // vec1行块元素上限（大块模式48K块=12288，默认32K块=8192）
 
     static constexpr ActualSeqLensMode Q_MODE = GetQActSeqMode<LAYOUT_T>();
     static constexpr ActualSeqLensMode KV_MODE = GetKvActSeqMode<LAYOUT_T, PAGE_ATTENTION>();
@@ -369,8 +368,7 @@ __aicore__ inline void FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::I
 {
     if constexpr (ENABLE_COMPACT_GQA_PIPELINE) {
         /* 紧凑 GQA 路径：2×48K VecIn，vec1 行块 16→24。 */
-        pipe->InitBuffer(inputQue1, 2, 3 * ConstInfo::BUFFER_SIZE_BYTE_16K);          // 2×48K
-        vec1BlockMaxElems_ = 3 * ConstInfo::BUFFER_SIZE_BYTE_16K / sizeof(MM1_OUT_T); // 12288=24行×512
+        pipe->InitBuffer(inputQue1, 2, 3 * ConstInfo::BUFFER_SIZE_BYTE_16K); // 2×48K
         pipe->InitBuffer(outputQue1, 1, ConstInfo::BUFFER_SIZE_BYTE_32K);
     } else {
         pipe->InitBuffer(inputQue1, 2, ConstInfo::BUFFER_SIZE_BYTE_32K);
@@ -481,7 +479,10 @@ __aicore__ inline void FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::P
     if (mSplitInfo.vecDealM == 0) {
         return;
     }
-    uint32_t mSplitSize = vec1BlockMaxElems_ / info.actualSingleProcessSInnerSizeAlign;
+    constexpr uint32_t vec1BlockMaxElems = ENABLE_COMPACT_GQA_PIPELINE ?
+                                               3 * ConstInfo::BUFFER_SIZE_BYTE_16K / sizeof(MM1_OUT_T) :
+                                               BASE_BLOCK_MAX_ELEMENT_NUM;
+    uint32_t mSplitSize = vec1BlockMaxElems / info.actualSingleProcessSInnerSizeAlign;
     if constexpr (!SOFTMAX_WITH_BRC) {
         uint32_t alignVal = AttentionCommon::BYTE_BLOCK / sizeof(COMPUTE_T);
         // 向下8/16对齐是因为UB操作起始地址需32B对齐
@@ -492,19 +493,28 @@ __aicore__ inline void FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::P
     }
     uint32_t loopCount = (mSplitInfo.vecDealM + mSplitSize - 1) / mSplitSize;
     uint32_t tailSplitSize = mSplitInfo.vecDealM - (loopCount - 1) * mSplitSize;
-    // 一级软流水：先发起首个 S 子块搬入；此后每轮在当前子块 DeQue 后发起下一子块，
-    // 使 MTE2 读延迟与当前子块的计算重叠。状态槽仍由 info.loop % preLoadNum 选择。
-    IssueBmm1ResCopy(info, 0, mSplitSize, info.actualSingleProcessSInnerSizeAlign);
-    for (uint32_t i = 0, dealSize = mSplitSize; i < loopCount; i++) {
-        if (i == (loopCount - 1)) {
-            dealSize = tailSplitSize;
+    if constexpr (ENABLE_COMPACT_GQA_PIPELINE) {
+        // Compact GQA 一级软流水：提前发起下一 S 子块搬入，并与当前子块计算重叠。
+        IssueBmm1ResCopy(info, 0, mSplitSize, info.actualSingleProcessSInnerSizeAlign);
+        for (uint32_t i = 0, dealSize = mSplitSize; i < loopCount; i++) {
+            if (i == (loopCount - 1)) {
+                dealSize = tailSplitSize;
+            }
+            bool hasNext = (i + 1) < loopCount;
+            uint32_t nextDealSize = ((i + 1) == (loopCount - 1)) ? tailSplitSize : mSplitSize;
+            DealBmm1ResBaseBlock(info, i * mSplitSize, dealSize, info.actualSingleProcessSInnerSizeAlign,
+                                 info.actualSingleProcessSInnerSize, (i + 1) * mSplitSize, nextDealSize, hasNext);
+            SignalV1C2Tiles(info, i * mSplitSize + dealSize, signaledMask);
         }
-        bool hasNext = (i + 1) < loopCount;
-        uint32_t nextDealSize = ((i + 1) == (loopCount - 1)) ? tailSplitSize : mSplitSize;
-        DealBmm1ResBaseBlock(info, i * mSplitSize, dealSize, info.actualSingleProcessSInnerSizeAlign,
-                             info.actualSingleProcessSInnerSize, (i + 1) * mSplitSize, nextDealSize, hasNext);
-        // SetFlag 使用 PIPE_MTE3，确保对应 P 子块写入 GM 后再通知 AIC。
-        SignalV1C2Tiles(info, i * mSplitSize + dealSize, signaledMask);
+    } else {
+        // 保留通用 fallback 的原始串行 copy/compute 顺序，避免预取框架改变小 shape 流水。
+        for (uint32_t i = 0, dealSize = mSplitSize; i < loopCount; i++) {
+            if (i == (loopCount - 1)) {
+                dealSize = tailSplitSize;
+            }
+            DealBmm1ResBaseBlock(info, i * mSplitSize, dealSize, info.actualSingleProcessSInnerSizeAlign,
+                                 info.actualSingleProcessSInnerSize, 0U, 0U, false);
+        }
     }
 
     if constexpr (!ENABLE_COMPACT_GQA_PIPELINE) {
@@ -614,11 +624,19 @@ __aicore__ inline void FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::D
     uint32_t computeSize = dealRowCount * columnCount;
     uint64_t inOutGmOffset = (info.loop % constInfo.preLoadNum) * constInfo.mmResUbSize +
                              (mSplitInfo.nBufferStartM + mSplitInfo.vecStartM + startRow) * columnCount;
-    // 当前子块的 S 已提前发起，DeQue 负责等待对应 MTE2 完成。
-    LocalTensor<MM1_OUT_T> mmResUb = inputQue1.DeQue<MM1_OUT_T>();
-    // 当前子块 DeQue 后立刻发起下一子块搬入，使 MTE2 与当前子块计算重叠。
-    if (hasNext) {
-        IssueBmm1ResCopy(info, nextStartRow, nextDealRowCount, columnCount);
+    LocalTensor<MM1_OUT_T> mmResUb;
+    if constexpr (ENABLE_COMPACT_GQA_PIPELINE) {
+        // 当前子块的 S 已提前发起，DeQue 负责等待对应 MTE2 完成。
+        mmResUb = inputQue1.DeQue<MM1_OUT_T>();
+        if (hasNext) {
+            IssueBmm1ResCopy(info, nextStartRow, nextDealRowCount, columnCount);
+        }
+    } else {
+        // 恢复通用路径：当前子块先搬入，再等待 MTE2 完成后计算。
+        mmResUb = inputQue1.AllocTensor<MM1_OUT_T>();
+        DataCopy(mmResUb, mm1ResGm[inOutGmOffset], computeSize);
+        inputQue1.EnQue(mmResUb);
+        inputQue1.DeQue<MM1_OUT_T>();
     }
 
     ElewiseCompute(info, mmResUb, tmpBuff1, startRow, dealRowCount, columnCount, actualColumnCount);

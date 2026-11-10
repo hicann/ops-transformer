@@ -541,7 +541,10 @@ uint32_t FiaTilingNonQuant::GetL2CacheOffFlag()
         (!softmaxWithBrcbFlag_) && (!fiaInfo_->attenMaskFlag) && (!fiaInfo_->softmaxLseFlag) &&
         (!fiaInfo_->pseShiftFlag) && (!fiaInfo_->sysPrefixFlag) && (!fiaInfo_->slidingFlag) &&
         (fiaInfo_->actualLenQDims == 0U) && (fiaInfo_->actualLenKvDims == 0U) &&
-        (fiaInfo_->sparseMode == SPARSE_MODE_NO_MASK) && (kvTypeSize != 0U);
+        (fiaInfo_->sparseMode == SPARSE_MODE_NO_MASK) && (kvTypeSize != 0U) &&
+        // The denser cache policy was tuned for the compact pipeline. Keep the
+        // established policy when this tiling key will execute the fallback.
+        UseCompactGqaPipeline();
 
     if (isDenseCachePolicyCandidate) {
         if (hasLimitedL2) {
