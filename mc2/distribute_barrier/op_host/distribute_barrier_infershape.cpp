@@ -13,6 +13,7 @@
  * \brief
  */
 #include "mc2_log.h"
+#include "mc2_infer_failure_report.h"
 #include "platform/platform_info.h"
 #include "register/op_impl_registry.h"
 using namespace ge;
@@ -25,12 +26,21 @@ static constexpr size_t BARRIER_OUTPUT_X_REF_INDEX = 0;
 
 static ge::graphStatus InferShapeDistributeBarrier(gert::InferShapeContext* context)
 {
+    OP_CHECK_IF(context == nullptr,
+                Mc2Error::ReportInferFailure("DistributeBarrier",
+                                             "InferShape entry: context actual=null; expected materialized context"),
+                return ge::GRAPH_FAILED);
     OPS_LOG_D(context->GetNodeName(), "Begin to do InferShapeDistributeBarrier.");
     // 获取输入shape
     const gert::Shape* xRefInputShape = context->GetInputShape(BARRIER_INPUT_X_REF_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, xRefInputShape);
+    OP_CHECK_IF(xRefInputShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "x_ref"),
+                return ge::GRAPH_FAILED);
     gert::Shape* xRefOutputShape = context->GetOutputShape(BARRIER_OUTPUT_X_REF_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, xRefOutputShape);
+    OP_CHECK_IF(
+        xRefOutputShape == nullptr,
+        Mc2Error::ReportInferFailure(context->GetNodeName(),
+                                     "Output x_ref shape holder actual=null; expected materialized output holder"),
+        return ge::GRAPH_FAILED);
 
     // 这里要获取输入的dim，然后循环给输出赋值
 
@@ -43,6 +53,10 @@ static ge::graphStatus InferShapeDistributeBarrier(gert::InferShapeContext* cont
 
 static ge::graphStatus InferDataTypeDistributeBarrier(gert::InferDataTypeContext* context)
 {
+    OP_CHECK_IF(context == nullptr,
+                Mc2Error::ReportDataTypeMetadataFailure(
+                    "DistributeBarrier", "InferDataType entry: context actual=null; expected materialized context"),
+                return ge::GRAPH_FAILED);
     OPS_LOG_D(context->GetNodeName(), "Begin to do InferDataTypeDistributeBarrier.");
     auto xRefDtype = context->GetInputDataType(BARRIER_INPUT_X_REF_INDEX);
     context->SetOutputDataType(BARRIER_OUTPUT_X_REF_INDEX, xRefDtype);

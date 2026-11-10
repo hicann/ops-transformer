@@ -14,6 +14,7 @@
  */
 
 #include "vector"
+#include "mc2/common/utils/mc2_hccl_tiling_report.h"
 #include "platform/platform_infos_def.h"
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
@@ -269,20 +270,29 @@ static ge::graphStatus AllGatherMatmulAIVModeCheckAttrAndSetTiling(const gert::T
                                                                    AllGatherMatmulAIVModeInfo& info)
 {
     auto attrs = context->GetAttrs();
-    OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    OP_TILING_CHECK(attrs == nullptr,
+                    Mc2Error::ReportTilingFailure(context->GetNodeName(), "RuntimeAttrs holder is absent"),
+                    return ge::GRAPH_FAILED);
 
     // Attr相关tilingdata的设置、校验、打印
     auto groupPtr = attrs->GetAttrPointer<char>(static_cast<int>(ATTR_GROUP_INDEX));
     auto isTransposeX1 = attrs->GetAttrPointer<bool>(ATTR_IS_TRANS_X1);
     auto isTransposeX2 = attrs->GetAttrPointer<bool>(ATTR_IS_TRANS_X2);
-    OP_TILING_CHECK(groupPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "group"),
-                    return ge::GRAPH_FAILED);
-    if (strlen(groupPtr) == 0) {
-        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "group", "empty string", "non-empty communication group");
+    OP_TILING_CHECK(
+        groupPtr == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "group", "Required group is absent"),
+        return ge::GRAPH_FAILED);
+    if (strlen(groupPtr) == 0 || strlen(groupPtr) >= 128) {
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "group", std::to_string(strlen(groupPtr)).c_str(),
+                                  "communication group length in [1, 127]");
         return GRAPH_FAILED;
     }
-    OP_CHECK_NULL_WITH_CONTEXT(context, isTransposeX2);
-    OP_CHECK_NULL_WITH_CONTEXT(context, isTransposeX1);
+    OP_TILING_CHECK(isTransposeX2 == nullptr,
+                    Mc2Error::ReportTilingFailure(context->GetNodeName(), "Default is_trans_b attribute is absent"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(isTransposeX1 == nullptr,
+                    Mc2Error::ReportTilingFailure(context->GetNodeName(), "Default is_trans_a attribute is absent"),
+                    return ge::GRAPH_FAILED);
 
     info.isTransposeX1 = *isTransposeX1 ? *isTransposeX1 : false;
     info.isTransposeX2 = *isTransposeX2 ? *isTransposeX2 : false;
@@ -501,17 +511,28 @@ void SetTilingData(CoCTiling& cocTilingData, AllGatherMatmulAIVModeInfo& info, i
 
 ge::graphStatus AllGatherMatmulTilingAIVModeFunc(gert::TilingContext* context)
 {
+    OP_TILING_CHECK(context == nullptr, Mc2Error::ReportTilingFailure("AllGatherMatmulV2", "Tiling context is null"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(context->GetPlatformInfo() == nullptr,
+                    Mc2Error::ReportTilingFailure(context->GetNodeName(), "Platform resource metadata is absent"),
+                    return ge::GRAPH_FAILED);
     const char* nodeName = context->GetNodeName();
     OP_LOGI("Enter AllGatherMatmulAIVMode tiling func.");
 
     // 涉及SyncAll，设置batch mode模式，所有核同时启动
     uint32_t batchMode = 1U;
     auto ret = context->SetScheduleMode(batchMode);
-    MC2_CHECK_LOG_RET(nodeName, ret);
+    OP_TILING_CHECK(ret != ge::GRAPH_SUCCESS,
+                    Mc2Error::ReportTilingFailure(nodeName, "Schedule mode output slot is absent"),
+                    return ge::GRAPH_FAILED);
 
     // 1. tilingData
     AllGatherMatmulAIVModeTilingData* tilingData = context->GetTilingData<AllGatherMatmulAIVModeTilingData>();
-    OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tilingData"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(tilingData == nullptr,
+                    Mc2Error::ReportTilingFailure(
+                        nodeName, "Typed tiling buffer is absent or too small; required " +
+                                      std::to_string(sizeof(AllGatherMatmulAIVModeTilingData)) + " bytes"),
+                    return ge::GRAPH_FAILED);
     OP_LOGI(nodeName, "AllGatherMatmulAIVMode get tilingData.");
     AllGatherMatmulAIVModeInfo& info = tilingData->allGatherMatmulInfo;
     OP_LOGI(nodeName, "AllGatherMatmulAIVMode get tilingData info.");
@@ -533,9 +554,10 @@ ge::graphStatus AllGatherMatmulTilingAIVModeFunc(gert::TilingContext* context)
     const char* opName = context->GetNodeName();
     OP_TILING_CHECK(mc2tiling::CheckHcclBuffSize(context, ATTR_GROUP_INDEX, static_cast<int32_t>(CCL_BUFFER_MIN_BYTES),
                                                  opName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(opName, "Check CCL buffer size failed"), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(opName, "Check CCL buffer size failed"), return ge::GRAPH_FAILED);
     int64_t rankSize = 0;
-    mc2tiling::GetRankSize(opName, group, rankSize);
+    OP_TILING_CHECK(!mc2tiling::GetRankSize(opName, group, rankSize),
+                    OP_LOGE_WITHOUT_REPORT(opName, "Communication group size query failed"), return ge::GRAPH_FAILED);
     coctiling.rankSize = rankSize;
     OP_TILING_CHECK(
         rankSize != 2 && rankSize != 4 && rankSize != 8,
@@ -548,7 +570,16 @@ ge::graphStatus AllGatherMatmulTilingAIVModeFunc(gert::TilingContext* context)
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     auto aicNum = ascendcPlatform.GetCoreNumAic();
     auto aivNum = ascendcPlatform.GetCoreNumAiv();
+    OP_TILING_CHECK(aivNum == 0 || info.totalUbSize == 0,
+                    Mc2Error::ReportTilingFailure(nodeName, "Available AIV=" + std::to_string(aivNum) +
+                                                                ", UB bytes=" + std::to_string(info.totalUbSize) +
+                                                                "; positive AIV and UB resources are required"),
+                    return ge::GRAPH_FAILED);
     numBlocks = ascendcPlatform.CalcTschBlockDim(aivNum, aicNum, aivNum);
+    OP_TILING_CHECK(
+        numBlocks == 0,
+        Mc2Error::ReportTilingFailure(nodeName, "Calculated launch block count=0; check platform scheduling resources"),
+        return ge::GRAPH_FAILED);
     context->SetBlockDim(numBlocks);
     coctiling.numBlocks = numBlocks;
 
@@ -578,7 +609,9 @@ ge::graphStatus AllGatherMatmulTilingAIVModeFunc(gert::TilingContext* context)
 
     // 4. workspace
     size_t* workSpaces = context->GetWorkspaceSizes(1);
-    OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(nodeName, "workSpaces is nullptr."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(workSpaces == nullptr,
+                    Mc2Error::ReportTilingFailure(nodeName, "Workspace size holder is absent; required one slot"),
+                    return ge::GRAPH_FAILED);
 
     info.is910C = false;
     fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
@@ -612,22 +645,18 @@ ge::graphStatus AllGatherMatmulTilingAIVModeFunc(gert::TilingContext* context)
         uint32_t opType = 6;
         std::string algConfig = "AllGather=level0:fullmesh";
         AscendC::Mc2CcTilingConfig mc2CcTilingConfig(group, opType, algConfig);
-        OP_TILING_CHECK(mc2CcTilingConfig.GetTiling(tilingData->mc2InitTiling) != 0,
-                        OP_LOGE(nodeName, "mc2CcTilingConfig mc2tiling GetTiling mc2InitTiling failed"),
-                        return ge::GRAPH_FAILED);
-        OP_TILING_CHECK(mc2CcTilingConfig.GetTiling(tilingData->mc2CcTiling) != 0,
-                        OP_LOGE(nodeName, "mc2CcTilingConfig mc2tiling GetTiling mc2CcTiling failed"),
-                        return ge::GRAPH_FAILED);
+        if (Mc2Error::GetValidatedHcclTiling(mc2CcTilingConfig, tilingData->mc2InitTiling, tilingData->mc2CcTiling,
+                                             nodeName) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
     } else {
         uint32_t opType = 18;
         std::string algConfig = "MultiPut=level0:fullmesh";
         AscendC::Mc2CcTilingConfig mc2CcTilingConfig(group, opType, algConfig);
-        OP_TILING_CHECK(mc2CcTilingConfig.GetTiling(tilingData->mc2InitTiling) != 0,
-                        OP_LOGE(nodeName, "mc2CcTilingConfig mc2tiling GetTiling mc2InitTiling failed"),
-                        return ge::GRAPH_FAILED);
-        OP_TILING_CHECK(mc2CcTilingConfig.GetTiling(tilingData->mc2CcTiling) != 0,
-                        OP_LOGE(nodeName, "mc2CcTilingConfig mc2tiling GetTiling mc2CcTiling failed"),
-                        return ge::GRAPH_FAILED);
+        if (Mc2Error::GetValidatedHcclTiling(mc2CcTilingConfig, tilingData->mc2InitTiling, tilingData->mc2CcTiling,
+                                             nodeName) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
     }
 
     PrintfTilingData(info, coctiling);

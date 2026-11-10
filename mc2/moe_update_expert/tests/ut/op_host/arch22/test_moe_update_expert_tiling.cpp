@@ -10,7 +10,14 @@
 
 #include <iostream>
 #include <gtest/gtest.h>
+#include "mc2/common/tests/ut/internal_fallback_assertions.h"
+#include "experiment/metadef/common/util/error_manager/error_manager.h"
+#include "../../../../../common/tests/ut/formal_error_assertions.h"
 #include "mc2_tiling_case_executor.h"
+
+using Mc2ErrorCodeUT::ExcelErrorReportScope;
+using Mc2ErrorCodeUT::ExpectExcelFormalError;
+
 using namespace std;
 
 namespace MoeUpdateExpertUT {
@@ -1648,4 +1655,123 @@ TEST_F(MoeUpdateExpertArch22TilingTest, BoundaryFMax)
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, expectTilingKey);
 }
 
+TEST_F(MoeUpdateExpertArch22TilingTest, InvalidBalanceModeReportsSingleFormalError)
+{
+    ExcelErrorReportScope reportScope;
+    struct MoeUpdateExpertCompileInfo {
+    } compileInfo;
+    const std::string socVersion = "";
+    uint64_t coreNum = 20;
+    uint64_t ubSize = 196608;
+    uint64_t tilingDataSize = 8192;
+
+    gert::TilingContextPara tilingContextPara(
+        "MoeUpdateExpert", // 算子类型
+        {{{{128, 8}, {128, 8}}, ge::DT_INT32, ge::FORMAT_ND}, {{{256, 5}, {256, 5}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{{{128, 8}, {128, 8}}, ge::DT_INT32, ge::FORMAT_ND}, {{{128, 8}, {128, 8}}, ge::DT_BOOL, ge::FORMAT_ND}},
+        {{"local_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+         {"balance_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)}},
+        &compileInfo, socVersion, coreNum, ubSize, tilingDataSize);
+
+    uint64_t expectTilingKey = 0;
+    std::string expectTilingData = "34359738496 21474836736 20 0 8 0 0 "; // 根据实际情况设置
+    std::vector<size_t> expectWorkspaces = {4294967295};                  // 根据实际情况设置
+    uint64_t mc2TilingDataReservedLen = 0;                                // 根据实际情况设置
+
+    // 执行测试用例
+    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
+    Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_FAILED, UINT64_MAX);
+    ExpectExcelFormalError("EZ0026", "balance_mode", "2");
+}
+
+TEST_F(MoeUpdateExpertArch22TilingTest, InvalidRankRelationReportsSingleFormalError)
+{
+    ExcelErrorReportScope reportScope;
+    struct MoeUpdateExpertCompileInfo {
+    } compileInfo;
+    const std::string socVersion = "";
+    uint64_t coreNum = 20;
+    uint64_t ubSize = 196608;
+    uint64_t tilingDataSize = 8192;
+
+    gert::TilingContextPara tilingContextPara(
+        "MoeUpdateExpert", // 算子类型
+        {{{{128, 8}, {128, 8}}, ge::DT_INT32, ge::FORMAT_ND}, {{{256, 5}, {256, 5}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{{{128, 8}, {128, 8}}, ge::DT_INT32, ge::FORMAT_ND}, {{{128, 8}, {128, 8}}, ge::DT_BOOL, ge::FORMAT_ND}},
+        {{"local_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+         {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+         {"balance_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, socVersion, coreNum, ubSize, tilingDataSize);
+
+    uint64_t expectTilingKey = 0;
+    std::string expectTilingData = "34359738496 21474836736 20 0 8 0 0 "; // 根据实际情况设置
+    std::vector<size_t> expectWorkspaces = {4294967295};                  // 根据实际情况设置
+    uint64_t mc2TilingDataReservedLen = 0;                                // 根据实际情况设置
+
+    // 执行测试用例
+    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
+    Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_FAILED, UINT64_MAX);
+    ExpectExcelFormalError("EZ0027", "local_rank_id, world_size", "local_rank_id=8, world_size=8",
+                           "local_rank_id must be in [0, world_size)");
+}
+
+TEST_F(MoeUpdateExpertArch22TilingTest, InvalidWorldSizeReportsSingleFormalError)
+{
+    ExcelErrorReportScope reportScope;
+    struct MoeUpdateExpertCompileInfo {
+    } compileInfo;
+    const std::string socVersion = "";
+    uint64_t coreNum = 20;
+    uint64_t ubSize = 196608;
+    uint64_t tilingDataSize = 8192;
+
+    gert::TilingContextPara tilingContextPara(
+        "MoeUpdateExpert", // 算子类型
+        {{{{128, 8}, {128, 8}}, ge::DT_INT32, ge::FORMAT_ND}, {{{256, 5}, {256, 5}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{{{128, 8}, {128, 8}}, ge::DT_INT32, ge::FORMAT_ND}, {{{128, 8}, {128, 8}}, ge::DT_BOOL, ge::FORMAT_ND}},
+        {{"local_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"balance_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, socVersion, coreNum, ubSize, tilingDataSize);
+
+    uint64_t expectTilingKey = 0;
+    std::string expectTilingData = "34359738496 21474836736 20 0 8 0 0 "; // 根据实际情况设置
+    std::vector<size_t> expectWorkspaces = {4294967295};                  // 根据实际情况设置
+    uint64_t mc2TilingDataReservedLen = 0;                                // 根据实际情况设置
+
+    // 执行测试用例
+    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
+    Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_FAILED, UINT64_MAX);
+    ExpectExcelFormalError("EZ0026", "world_size", "0");
+}
+TEST_F(MoeUpdateExpertArch22TilingTest, MissingDefaultWorldSizeRetainsInternalFallback)
+{
+    ExcelErrorReportScope reportScope;
+    struct MoeUpdateExpertCompileInfo {
+    } compileInfo;
+    const std::string socVersion = "";
+    uint64_t coreNum = 20;
+    uint64_t ubSize = 196608;
+    uint64_t tilingDataSize = 8192;
+
+    gert::TilingContextPara tilingContextPara(
+        "MoeUpdateExpert", // 算子类型
+        {{{{128, 8}, {128, 8}}, ge::DT_INT32, ge::FORMAT_ND}, {{{256, 5}, {256, 5}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{{{128, 8}, {128, 8}}, ge::DT_INT32, ge::FORMAT_ND}, {{{128, 8}, {128, 8}}, ge::DT_BOOL, ge::FORMAT_ND}},
+        {{"local_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"balance_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, socVersion, coreNum, ubSize, tilingDataSize);
+
+    tilingContextPara.attrs_.erase(tilingContextPara.attrs_.begin() + 1, tilingContextPara.attrs_.end());
+    std::string expectTilingData = "34359738496 21474836736 20 0 8 0 0 "; // 根据实际情况设置
+    std::vector<size_t> expectWorkspaces = {4294967295};                  // 根据实际情况设置
+    uint64_t mc2TilingDataReservedLen = 0;                                // 根据实际情况设置
+
+    // 执行测试用例
+    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
+    Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_FAILED, UINT64_MAX);
+    Mc2ErrorCodeUT::ExpectInternalFallbackReport("CheckAttrs: Schema-defaulted world_size metadata is absent");
+}
 } // namespace MoeUpdateExpertUT

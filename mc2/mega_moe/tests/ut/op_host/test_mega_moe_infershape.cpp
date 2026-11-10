@@ -12,9 +12,13 @@
 #include <limits>
 #include <vector>
 #include <gtest/gtest.h>
+#include "../../../../common/tests/ut/formal_error_assertions.h"
 #include "mc2_infer_shape_case_executor.h"
 #include "infer_datatype_context_faker.h"
 #include "base/registry/op_impl_space_registry_v2.h"
+
+using Mc2ErrorCodeUT::ExcelErrorReportScope;
+using Mc2ErrorCodeUT::ExpectExcelFormalError;
 
 namespace MegaMoeUT {
 
@@ -352,4 +356,54 @@ TEST_F(MegaMoeInferShapeTest, InferDatatype_BF16_FP8E5M2)
     EXPECT_EQ(contextHolder.GetContext<gert::InferDataTypeContext>()->GetOutputDataType(1), ge::DT_INT32);
 }
 
+TEST_F(MegaMoeInferShapeTest, ZeroEpWorldSizeReportsSingleFormalError)
+{
+    ExcelErrorReportScope reportScope;
+    gert::StorageShape contextShape = {{1}, {}};
+    gert::StorageShape xShape = {{128, 4096}, {}};
+    gert::StorageShape topkIdsShape = {{128, 8}, {}};
+    gert::StorageShape topkWeightsShape = {{128, 8}, {}};
+    gert::StorageShape weight1Shape = {{4, 2048, 4096}, {}};
+    gert::StorageShape weight2Shape = {{4, 4096, 1024}, {}};
+    gert::StorageShape weightScales1Shape = {{4, 2048, 64, 2}, {}};
+    gert::StorageShape weightScales2Shape = {{4, 4096, 16, 2}, {}};
+    gert::StorageShape xActiveMaskShape = {{}, {}};
+    gert::StorageShape scalesShape = {{}, {}};
+
+    gert::InfershapeContextPara infershapeContextPara(
+        "MegaMoe",
+        {{contextShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xShape, ge::DT_BF16, ge::FORMAT_ND},
+         {topkIdsShape, ge::DT_INT32, ge::FORMAT_ND},
+         {topkWeightsShape, ge::DT_FLOAT, ge::FORMAT_ND},
+         {weight1Shape, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},
+         {weight2Shape, ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND},
+         {weightScales1Shape, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND},
+         {weightScales2Shape, ge::DT_FLOAT8_E8M0, ge::FORMAT_ND},
+         {xActiveMaskShape, ge::DT_INT8, ge::FORMAT_ND},
+         {scalesShape, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{{}, ge::DT_BF16, ge::FORMAT_ND}, {{}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+         {"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2097152)},
+         {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"dispatch_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+         {"dispatch_quant_out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(24)},
+         {"shared_expert_quant_out_dtype",
+          Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_UNDEFINED))},
+         {"combine_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>("")},
+         {"num_max_tokens_per_rank", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"activation", Ops::Transformer::AnyValue::CreateFrom<std::string>("swiglu")},
+         {"activation_params",
+          Ops::Transformer::AnyValue::CreateFrom<std::vector<float>>({std::numeric_limits<float>::max()})},
+         {"activation_out_dtype",
+          Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_UNDEFINED))},
+         {"transpose_weight1", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+         {"transpose_weight2", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+         {"weight1_interleave", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
+    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 4}};
+    Mc2ExecuteTestCase(infershapeContextPara, hcomTopologyMockValues, ge::GRAPH_FAILED, {});
+    ExpectExcelFormalError("EZ0026", "ep_world_size", "0", "ep_world_size must be greater than 0");
+}
 } // namespace MegaMoeUT

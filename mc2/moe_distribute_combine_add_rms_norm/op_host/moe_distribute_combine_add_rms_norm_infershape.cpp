@@ -13,6 +13,7 @@
  * \brief
  */
 #include "mc2_log.h"
+#include "mc2_infer_failure_report.h"
 #include "register/op_impl_registry.h"
 
 using namespace ge;
@@ -28,13 +29,17 @@ static constexpr uint32_t IDX_THIRTEEN = 13;
 static ge::graphStatus InferShapeCheck(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
+        Mc2Error::ReportInferFailure("MoeDistributeCombineAddRmsNorm",
+                                     "InferShapeCheck: context actual=null; expected a materialized InferShapeContext");
         return GRAPH_FAILED;
     }
 
     static const char* OUTPUT_NAMES[] = {"y", "rstdOut", "x"};
     for (uint32_t i = 0; i < IDX_THREE; ++i) {
         if (context->GetOutputShape(i) == nullptr) {
-            OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), OUTPUT_NAMES[i]);
+            Mc2Error::ReportInferFailure(
+                context->GetNodeName(),
+                std::string("InferShapeCheck: output shape holder actual=null for ") + OUTPUT_NAMES[i]);
             return GRAPH_FAILED;
         }
     }
@@ -42,7 +47,7 @@ static ge::graphStatus InferShapeCheck(gert::InferShapeContext* context)
     static const char* INPUT_NAMES[] = {"expand_x",       "expert_ids",    "assist_info_for_combine",
                                         "ep_send_counts", "expert_scales", "residual_x",
                                         "gamma",          "tp_send_counts"};
-    for (uint32_t i = 0; i < IDX_EIGHT; ++i) {
+    for (uint32_t i = 0; i < IDX_EIGHT - 1; ++i) {
         if (context->GetInputShape(i) == nullptr) {
             OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), INPUT_NAMES[i]);
             return GRAPH_FAILED;
@@ -60,15 +65,16 @@ static ge::graphStatus MoeDistributeCombineAddRmsNormInferShape(gert::InferShape
 
     OP_LOGD(context->GetNodeName(), "Begin to do Infershape of MoeDistributeCombineAddRmsNormInferShape.");
     const gert::Shape* residualX = context->GetInputShape(IDX_FIVE);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, residualX);
     gert::Shape* x1OutShape = context->GetOutputShape(IDX_ZERO);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, x1OutShape);
     gert::Shape* rstdOutShape = context->GetOutputShape(IDX_ONE);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, rstdOutShape);
     gert::Shape* x2OutShape = context->GetOutputShape(IDX_TWO);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, x2OutShape);
 
     size_t dimNum = residualX->GetDimNum();
+    OP_CHECK_IF(
+        dimNum == 0,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "residual_x", std::to_string(dimNum).c_str(),
+                                                 "rank must be positive before accessing the last dimension"),
+        return GRAPH_FAILED);
     x1OutShape->SetDimNum(IDX_THREE);
     x1OutShape->SetDim(IDX_ZERO, residualX->GetDim(IDX_ZERO));
     x1OutShape->SetDim(IDX_ONE, IDX_ONE);

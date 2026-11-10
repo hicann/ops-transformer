@@ -12,6 +12,7 @@
  * \file quant_matmul_allto_all_base.cpp
  * \brief
  */
+#include "mc2/common/op_api/mc2_api_error.h"
 #include "quant_matmul_allto_all_base.h"
 #include "securec.h"
 #include "matmul_allto_all_util.h"
@@ -654,7 +655,7 @@ aclnnStatus aclnnQuantMatmulAlltoAllBase(void* workspace, uint64_t workspaceSize
                                          aclrtStream stream)
 {
     if (executor == nullptr) {
-        OP_LOGE_LIBOPAPI_REPORT("aclnnQuantMatmulAlltoAllBase", "Param executor is nullptr.");
+        Mc2Aclnn::ReportRequiredApiPointer(__func__, "executor");
         return ACLNN_ERR_INNER;
     }
     if (NnopbaseSetHcclServerType) {

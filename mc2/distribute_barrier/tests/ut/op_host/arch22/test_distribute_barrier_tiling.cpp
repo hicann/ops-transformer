@@ -11,6 +11,8 @@
 #include <iostream>
 #include <unordered_set>
 #include <gtest/gtest.h>
+#include "mc2/common/tests/ut/internal_fallback_assertions.h"
+#include "mc2/common/tests/ut/formal_error_assertions.h"
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 #include "kernel_tiling/kernel_tiling.h"
@@ -377,6 +379,30 @@ TEST_F(DistributeBarrierArch22TilingTest, TestTilingElasticInfoFormatInvalid)
                                               &compileInfo, "Ascend910_93", coreNum, ubSize);
     TilingInfo tilingInfo;
     ASSERT_FALSE(ExecuteTiling(tilingContextPara, tilingInfo));
+}
+
+TEST_F(DistributeBarrierArch22TilingTest, AivZeroAndOneFailBeforeKernelDivisionInternalFallback)
+{
+    for (uint32_t aiv : {0U, 1U}) {
+        Mc2ErrorCodeUT::ExcelErrorReportScope reports;
+        struct {
+        } compileInfo;
+        gert::TilingContextPara para("DistributeBarrier", {{{{3, 4}, {3, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+                                     {{{{3, 4}, {3, 4}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+                                     {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("group")},
+                                      {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)}},
+                                     &compileInfo, "Ascend910_93", 20, 196608);
+        para.socInfoString_ =
+            std::string(R"({"hardware_info":{"CORE_NUM":20,"cube_core_cnt":20,"vector_core_cnt":)") +
+            std::to_string(aiv) +
+            R"(,"UB_SIZE":196608,"L1_SIZE":524288,"L0A_SIZE":65536,"L0B_SIZE":65536,"L0C_SIZE":131072}})";
+        TilingInfo info;
+        EXPECT_FALSE(ExecuteTiling(para, info));
+        Mc2ErrorCodeUT::ExpectInternalFallbackReport(
+            ("Available AIV core count=" + std::to_string(aiv) +
+             "; required at least 2 because one core receives while the remaining cores send")
+                .c_str());
+    }
 }
 
 } // namespace DistributeBarrierUT

@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include "mc2/common/op_api/mc2_api_error.h"
 #include "aclnn_all_gather_matmul_v2.h"
 #include "securec.h"
 #include "acl/acl.h"
@@ -696,7 +697,7 @@ aclnnStatus aclnnAllGatherMatmulV2GetWorkspaceSize(const aclTensor* x1, const ac
 {
     aclnnStatus ret = ACLNN_SUCCESS;
     if (commMode == nullptr) {
-        OP_LOGE_LIBOPAPI_REPORT("aclnnAllGatherMatmulV2", "CommMode is null.");
+        Mc2Aclnn::ReportRequiredApiPointer(__func__, "commMode");
         return ACLNN_ERR_INNER_NULLPTR;
     }
     if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
@@ -729,7 +730,7 @@ aclnnStatus aclnnAllGatherMatmulV2(void* workspace, uint64_t workspaceSize, aclO
     }
 
     if (executor == nullptr) {
-        OP_LOGE_LIBOPAPI_REPORT("aclnnAllGatherMatmulV2", "executor is null.");
+        Mc2Aclnn::ReportRequiredApiPointer(__func__, "executor");
         return ACLNN_ERR_INNER_NULLPTR;
     }
     if (NnopbaseSetHcclServerType) {

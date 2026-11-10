@@ -14,12 +14,31 @@
  */
 #include "runtime_util.h"
 #include "mc2_log.h"
+#include <string>
+#include <vector>
 #include "platform/platform_info.h"
 #include "runtime/rt_external_base.h"
 #include "op_host/util/op_const_def.h"
 
 using namespace ge;
 namespace ops {
+namespace {
+void ReportInferTypeMetadata(const char* opName, const char* detail)
+{
+    const std::string reason =
+        std::string(detail) + "; actual=null, expected=materialized inference metadata. Rebuild the inference context";
+    OP_LOGE(opName, "%s: %s", opName, reason.c_str());
+}
+
+void ReportDispatchInferMetadata(const char* opName, const char* stage, const char* detail)
+{
+    const char* name = opName == nullptr ? "MoeDistributeDispatch" : opName;
+    const std::string reason =
+        std::string(stage) + ": " + detail + "; rebuild the inference context with the required metadata";
+    OP_LOGE(name, "%s: %s", name, reason.c_str());
+}
+} // namespace
+
 static constexpr size_t DIM_ONE = 1UL;
 static constexpr size_t DIM_TWO = 2UL;
 static constexpr int64_t NEG_ONE = -1;
@@ -66,18 +85,23 @@ static ge::graphStatus InferExpertIdsShape(gert::InferShapeContext* context, int
 {
     // 获取输入shape
     const gert::Shape* xShape = context->GetInputShape(DISPATCH_INPUT_X_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, xShape);
+    OP_CHECK_IF(xShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "x"), return ge::GRAPH_FAILED);
     const gert::Shape* expertIdsShape = context->GetInputShape(DISPATCH_INPUT_EXPERT_IDX_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expertIdsShape);
+    OP_CHECK_IF(expertIdsShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "expert_ids"),
+                return ge::GRAPH_FAILED);
 
     gert::Shape* expandIdxShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_IDX_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expandIdxShape);
+    OP_CHECK_IF(
+        expandIdxShape == nullptr,
+        ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output expand_idx shape holder is absent"),
+        return ge::GRAPH_FAILED);
     const auto attrs = context->GetAttrs();
-    OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
     const auto globalBs = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_GLOBAL_BS_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, globalBs);
+    OP_CHECK_IF(globalBs == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "defaulted attribute global_bs is absent from RuntimeAttrs"),
+                return ge::GRAPH_FAILED);
     const auto tpRankId = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_TP_RANK_ID_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, tpRankId);
     int64_t bs = xShape->GetDimNum() == 1U ? NEG_ONE : xShape->GetDim(0);
     h = xShape->GetDimNum() == 1U ? NEG_ONE : xShape->GetDim(1);
     int64_t bsTmp = expertIdsShape->GetDimNum() == 1U ? NEG_ONE : expertIdsShape->GetDim(0);
@@ -108,22 +132,41 @@ static ge::graphStatus InferExpandXAndScalesShape(gert::InferShapeContext* conte
                                                   int64_t& localExpertNum, int64_t globalBsReal, int64_t epWorldSize)
 {
     gert::Shape* expandXShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_X_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expandXShape);
+    OP_CHECK_IF(expandXShape == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output expand_x shape holder is absent"),
+                return ge::GRAPH_FAILED);
     gert::Shape* dynamicScalesShape = context->GetOutputShape(DISPATCH_OUTPUT_DYNAMIC_SCALES_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, dynamicScalesShape);
+    OP_CHECK_IF(
+        dynamicScalesShape == nullptr,
+        ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output dynamic_scales shape holder is absent"),
+        return ge::GRAPH_FAILED);
     gert::Shape* expandScalesShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_SCALES);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expandScalesShape);
+    OP_CHECK_IF(
+        expandScalesShape == nullptr,
+        ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output expand_scales shape holder is absent"),
+        return ge::GRAPH_FAILED);
     const gert::Shape* expertScalesShape = context->GetOptionalInputShape(DISPATCH_INPUT_EXPERT_SCALES_IDX_INDEX);
     const auto attrs = context->GetAttrs();
-    OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
     const auto moeExpertNum = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_MOE_EXPERT_NUM_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, moeExpertNum);
     const auto sharedExpertRankNum = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_SHARED_EXPERT_RANK_NUM_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, sharedExpertRankNum);
     const auto epRankId = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_EP_RANK_ID_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, epRankId);
     const auto expertShardType = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_EXPERT_SHARD_TYPE_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expertShardType);
+    OP_CHECK_IF(
+        epRankId == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "ep_rank_id", "required attribute is absent"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(moeExpertNum == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "moe_expert_num",
+                                                         "required attribute is absent"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(expertShardType == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "defaulted attribute expert_shard_type is absent from RuntimeAttrs"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(sharedExpertRankNum == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "defaulted attribute shared_expert_rank_num is absent from RuntimeAttrs"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF((*sharedExpertRankNum < 0) || (*sharedExpertRankNum >= epWorldSize),
                 OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "sharedExpertRankNum",
                                           std::to_string(*sharedExpertRankNum).c_str(),
@@ -169,17 +212,34 @@ static ge::graphStatus InferShapeMoeDistributeDispatch(gert::InferShapeContext* 
     }
     OP_LOGD(context->GetNodeName(), "Begin to do InferShapeMoeDistributeDispatch.");
     gert::Shape* expertTokenNumsShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expertTokenNumsShape);
+    OP_CHECK_IF(expertTokenNumsShape == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "output expert_token_nums shape holder is absent"),
+                return ge::GRAPH_FAILED);
     gert::Shape* epRecvCountShape = context->GetOutputShape(DISPATCH_OUTPUT_EP_RECV_COUNTS_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, epRecvCountShape);
+    OP_CHECK_IF(
+        epRecvCountShape == nullptr,
+        ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output ep_recv_counts shape holder is absent"),
+        return ge::GRAPH_FAILED);
     gert::Shape* tpRecvCountShape = context->GetOutputShape(DISPATCH_OUTPUT_TP_RECV_COUNTS_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, tpRecvCountShape);
+    OP_CHECK_IF(
+        tpRecvCountShape == nullptr,
+        ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output tp_recv_counts shape holder is absent"),
+        return ge::GRAPH_FAILED);
     const auto attrs = context->GetAttrs();
-    OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    OP_CHECK_IF(attrs == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__, "RuntimeAttrs holder is absent"),
+                return ge::GRAPH_FAILED);
     const auto epWorldSize = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_EP_WORLD_SIZE_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, epWorldSize);
+    OP_CHECK_IF(epWorldSize == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "ep_world_size",
+                                                         "required attribute is absent"),
+                return ge::GRAPH_FAILED);
     const auto tpWorldSize = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_TP_WORLD_SIZE_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, tpWorldSize);
+    OP_CHECK_IF(tpWorldSize == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "defaulted attribute tp_world_size is absent from RuntimeAttrs"),
+                return ge::GRAPH_FAILED);
     int64_t k;
     int64_t h;
     int64_t localExpertNum;
@@ -216,9 +276,15 @@ static ge::graphStatus InferDataTypeMoeDistributeDispatch(gert::InferDataTypeCon
     OP_LOGD(context->GetNodeName(), "Begin to do InferDataTypeMoeDistributeDispatch.");
     auto xDtype = context->GetInputDataType(DISPATCH_INPUT_X_INDEX);
     const auto attrs = context->GetAttrs();
-    OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    OP_CHECK_IF(
+        attrs == nullptr,
+        ReportInferTypeMetadata(context->GetNodeName(), "InferDataType: GetAttrs returned no RuntimeAttrs holder"),
+        return ge::GRAPH_FAILED);
     const auto quantMode = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_QUANT_MODE_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, quantMode);
+    OP_CHECK_IF(quantMode == nullptr,
+                ReportInferTypeMetadata(context->GetNodeName(),
+                                        "InferDataType: GetAttrPointer for defaulted quant_mode returned no value"),
+                return ge::GRAPH_FAILED);
     const auto scalesType = context->GetOptionalInputDataType(DISPATCH_INPUT_SCALES_IDX_INDEX);
     bool quantFlag = (scalesType != ge::DT_UNDEFINED) ? true : false;
     OP_LOGD(context->GetNodeName(), "quantFlag is %d.", quantFlag);

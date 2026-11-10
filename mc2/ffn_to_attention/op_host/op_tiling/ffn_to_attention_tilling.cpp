@@ -31,6 +31,9 @@
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
 #include "mc2_log.h"
+#include "mc2_tiling_failure_report.h"
+#include <cstring>
+#include <cstdlib>
 #include "ffn_to_attention_tiling_base.h"
 #include "../../op_kernel/ffn_to_attention_tiling.h"
 #include "../../op_kernel/ffn_to_attention_tilling_key.h"
@@ -135,8 +138,8 @@ static bool CheckAttrLimits(const char* nodeName, const int64_t worldSize, const
 {
     OP_TILING_CHECK(
         (worldSize < MIN_WORLD_SIZE) || (worldSize > MAX_WORLD_SIZE),
-        OP_LOGE_FOR_INVALID_VALUE(
-            nodeName, "worldSize", std::to_string(worldSize).c_str(),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            nodeName, "world_size", std::to_string(worldSize).c_str(),
             (std::string("[") + std::to_string(MIN_WORLD_SIZE) + ", " + std::to_string(MAX_WORLD_SIZE) + "]").c_str()),
         return false);
     if (allowMultiMicroBatch) {
@@ -189,25 +192,46 @@ static bool CheckAndSetAttrs(const gert::TilingContext* context, const char* nod
                              const FFNToAttentionTilingConfig& config)
 {
     auto attrs = context->GetAttrs();
-    OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "attrs"), return false);
+    OP_TILING_CHECK(
+        attrs == nullptr,
+        Mc2Error::ReportTilingFailure(nodeName, "Attribute container actual=null; expected schema metadata"),
+        return false);
 
     auto groupPtr = attrs->GetAttrPointer<char>(config.attrGroupIndex);
-    auto worldSizePtr = attrs->GetAttrPointer<int>(config.attrWorldSizeIndex);
+    auto worldSizePtr = attrs->GetAttrPointer<int64_t>(config.attrWorldSizeIndex);
     auto tokenInfoTable = attrs->GetListInt(config.attrTokenInfoTableShapeIndex);
     auto tokenData = attrs->GetListInt(config.attrTokenDataShapeIndex);
-    auto tokenInfoTableShape = tokenInfoTable->GetData();
-    auto tokenDataShape = tokenData->GetData();
 
     // 当前仅对必选属性进行校空
-    OP_TILING_CHECK(groupPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "group"), return false);
-    OP_TILING_CHECK((strnlen(groupPtr, MAX_GROUP_NAME_LENGTH) == 0) ||
-                        (strnlen(groupPtr, MAX_GROUP_NAME_LENGTH) == MAX_GROUP_NAME_LENGTH),
-                    OP_LOGE_FOR_INVALID_VALUE(
-                        nodeName, "group",
-                        (std::string("length=") + std::to_string(strnlen(groupPtr, MAX_GROUP_NAME_LENGTH))).c_str(),
-                        "valid group name length"),
+    OP_TILING_CHECK(groupPtr == nullptr,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        nodeName, "group", "Required attribute group is missing; provide this attribute"),
                     return false);
-    OP_TILING_CHECK(worldSizePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "worldSize"), return false);
+    const size_t groupLength = strnlen(groupPtr, MAX_GROUP_NAME_LENGTH);
+    OP_TILING_CHECK(
+        groupLength == 0 || groupLength == MAX_GROUP_NAME_LENGTH,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            nodeName, "group",
+            (std::string(groupLength == MAX_GROUP_NAME_LENGTH ? "length>=" : "length=") + std::to_string(groupLength))
+                .c_str(),
+            (std::string("Group name length must be in [1, ") + std::to_string(MAX_GROUP_NAME_LENGTH - 1) + "]")
+                .c_str()),
+        return false);
+    OP_TILING_CHECK(worldSizePtr == nullptr,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        nodeName, "world_size", "Required attribute world_size is missing; provide this attribute"),
+                    return false);
+    OP_TILING_CHECK(
+        tokenInfoTable == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "token_info_table_shape",
+                                                 "Required list attribute token_info_table_shape is missing"),
+        return false);
+    OP_TILING_CHECK(tokenData == nullptr,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "token_data_shape",
+                                                             "Required list attribute token_data_shape is missing"),
+                    return false);
+    auto tokenInfoTableShape = tokenInfoTable->GetData();
+    auto tokenDataShape = tokenData->GetData();
     OP_TILING_CHECK(!CheckAttrShapes(nodeName, tokenInfoTable, tokenData), static_cast<void>(0), return false);
     // 判断是否满足其他限制
     int64_t worldSize = *worldSizePtr;
@@ -345,7 +369,7 @@ static bool CheckInputDim(gert::TilingContext* context, const char* nodeName, FF
                           const FFNToAttentionTilingConfig& config)
 {
     auto attrs = context->GetAttrs();
-    auto worldSizePtr = attrs->GetAttrPointer<int>(config.attrWorldSizeIndex);
+    auto worldSizePtr = attrs->GetAttrPointer<int64_t>(config.attrWorldSizeIndex);
     int64_t worldSize = *worldSizePtr;
     const gert::StorageShape* xShape = context->GetInputShape(config.xIndex);
     const gert::StorageShape* sessionIdsShape = context->GetInputShape(config.sessionIdsIndex);
@@ -361,7 +385,7 @@ static bool CheckInputDim(gert::TilingContext* context, const char* nodeName, FF
                     static_cast<void>(0), return false);
 
     OP_TILING_CHECK(!CheckInputDim0Dim1(context, nodeName, tilingData, config),
-                    OP_LOGE(nodeName, "Check Inputsdim0ordim1 failed!"), return false);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "Check Inputsdim0ordim1 failed!"), return false);
 
     if (isInputRankTable) {
         OP_TILING_CHECK(attnRankTableShape->GetStorageShape().GetDimNum() != ONE_DIM,
@@ -571,19 +595,22 @@ static bool CheckInputAndSetTilingData(gert::TilingContext* context, const char*
 {
     // 校验输入数据dim、format、dataType
     OP_TILING_CHECK(!CheckInputDim(context, nodeName, tilingData, config),
-                    OP_LOGE(nodeName, "Check Inputs dim failed!"), return false);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "Check Inputs dim failed!"), return false);
 
     OP_TILING_CHECK(!CheckInputDataType(context, nodeName, config),
-                    OP_LOGE(nodeName, "Check Inputs dataType is invalid."), return false);
-    OP_TILING_CHECK(!CheckInputFormat(context, nodeName, config), OP_LOGE(nodeName, "Check Inputs  format is invalid."),
-                    return false);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "Check Inputs dataType is invalid."), return false);
+    OP_TILING_CHECK(!CheckInputFormat(context, nodeName, config),
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "Check Inputs format is invalid."), return false);
     return true;
 }
 
 static ge::graphStatus SetWorkSpace(gert::TilingContext* context, const char* nodeName)
 {
     size_t* workSpaces = context->GetWorkspaceSizes(1);
-    OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "workSpaces"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        workSpaces == nullptr,
+        Mc2Error::ReportTilingFailure(nodeName, "SetWorkSpace: workspace holder actual=null; expected one size slot"),
+        return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     workSpaces[0] = ascendcPlatform.GetLibApiWorkSpaceSize();
     return ge::GRAPH_SUCCESS;
@@ -619,9 +646,32 @@ static ge::graphStatus SetHcommCfg(const gert::TilingContext* context, FFNToAtte
     OP_LOGD(nodeName, "ffnToAttention group = %s", group.c_str());
     uint32_t opType1 = OP_TYPE_ALL_TO_ALL;
     std::string algConfigAllToAllStr = "AlltoAll=level0:fullmesh;level1:pairwise";
+    OP_TILING_CHECK(
+        group.size() >= 128U,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            context->GetNodeName(), "group",
+            ("Group length actual=" + std::to_string(group.size()) + "; expected fewer than 128 bytes").c_str()),
+        return ge::GRAPH_FAILED);
+    const char* ascendHome = std::getenv("ASCEND_HOME_PATH");
+    if (ascendHome == nullptr || ascendHome[0] == '\0') {
+        OP_LOGE(context->GetNodeName(),
+                "SetHcommCfg failed: required environment variable ASCEND_HOME_PATH is absent or empty");
+        return ge::GRAPH_FAILED;
+    }
     AscendC::Mc2CcTilingConfig mc2CcTilingConfig(group, opType1, algConfigAllToAllStr);
-    mc2CcTilingConfig.GetTiling(tilingData.mc2InitTiling);
-    mc2CcTilingConfig.GetTiling(tilingData.mc2CcTiling1);
+    const auto initStatus = mc2CcTilingConfig.GetTiling(tilingData.mc2InitTiling);
+    OP_TILING_CHECK(initStatus != 0,
+                    Mc2Error::ReportTilingFailure(
+                        context->GetNodeName(),
+                        "SetHcommCfg: GetTiling(init) failed obtaining required rtGetSocVersion from " +
+                            std::string(ascendHome) + "/lib64/libruntime.so; actual rc=" + std::to_string(initStatus) +
+                            ", expected 0 for validated group and fixed AlltoAll algorithm"),
+                    return ge::GRAPH_FAILED);
+    const auto ccStatus = mc2CcTilingConfig.GetTiling(tilingData.mc2CcTiling1);
+    OP_TILING_CHECK(ccStatus != 0,
+                    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "SetHcommCfg: GetTiling(CC) invariant failed, rc=%u",
+                                           static_cast<unsigned>(ccStatus)),
+                    return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -629,7 +679,7 @@ static ge::graphStatus CheckMc2Context(const gert::TilingContext* context, const
                                        const FFNToAttentionTilingConfig& config)
 {
     const gert::StorageShape* contextStorageShape = context->GetInputShape(config.contextIndex);
-    OP_TILING_CHECK(contextStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "contextShape"),
+    OP_TILING_CHECK(contextStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "context"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(contextStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
                     OP_LOGE_FOR_INVALID_SHAPEDIM(
@@ -638,7 +688,9 @@ static ge::graphStatus CheckMc2Context(const gert::TilingContext* context, const
                     return ge::GRAPH_FAILED);
 
     auto contextDesc = context->GetInputDesc(config.contextIndex);
-    OP_TILING_CHECK(contextDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "contextDesc"),
+    OP_TILING_CHECK(contextDesc == nullptr,
+                    Mc2Error::ReportTilingFailure(nodeName, "CheckMc2Context: context descriptor actual=null after "
+                                                            "required shape was present; expected descriptor metadata"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(contextDesc->GetDataType() != ge::DT_INT32,
                     OP_LOGE_FOR_INVALID_DTYPE(nodeName, "context",
@@ -660,10 +712,16 @@ static ge::graphStatus CheckCclBufferSize(const gert::TilingContext* context, co
 {
     if (attrIndex != UINT32_MAX) {
         auto attrsPtr = context->GetAttrs();
-        OP_TILING_CHECK(attrsPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "attrs"), return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            attrsPtr == nullptr,
+            Mc2Error::ReportTilingFailure(nodeName, "Attribute container actual=null; expected schema metadata"),
+            return ge::GRAPH_FAILED);
         auto cclBufferSizePtr = attrsPtr->GetAttrPointer<int64_t>(attrIndex);
-        OP_TILING_CHECK(cclBufferSizePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "ccl_buffer_size"),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            cclBufferSizePtr == nullptr,
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                nodeName, "ccl_buffer_size", "Required attribute ccl_buffer_size is missing; provide this attribute"),
+            return ge::GRAPH_FAILED);
         OP_TILING_CHECK(*cclBufferSizePtr <= 0,
                         OP_LOGE_FOR_INVALID_VALUE(nodeName, "ccl_buffer_size",
                                                   std::to_string(*cclBufferSizePtr).c_str(), "greater than 0"),
@@ -721,10 +779,34 @@ static ge::graphStatus CheckFFNWindowSize(gert::TilingContext* context, const ch
 
 ge::graphStatus FFNToAttentionTilingFuncBase(gert::TilingContext* context, const FFNToAttentionTilingConfig& config)
 {
+    OP_TILING_CHECK(context == nullptr,
+                    Mc2Error::ReportTilingFailure(
+                        "FFNToAttention",
+                        "FFNToAttentionTilingFuncBase: context actual=null; expected materialized tiling context"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        context->GetPlatformInfo() == nullptr,
+        Mc2Error::ReportTilingFailure(
+            context->GetNodeName(),
+            "FFNToAttentionTilingFuncBase: platform metadata actual=null; expected CANN platform information"),
+        return ge::GRAPH_FAILED);
+    auto entryPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
+    const uint32_t entryAivNum = entryPlatform.GetCoreNumAiv();
+    OP_TILING_CHECK(
+        entryAivNum == 0U,
+        Mc2Error::ReportTilingFailure(context->GetNodeName(),
+                                      "FFNToAttentionTilingFuncBase: AIV core count actual=0; expected positive"),
+        return ge::GRAPH_FAILED);
+
     FFNToAttentionTilingData* tilingData = context->GetTilingData<FFNToAttentionTilingData>();
     std::string group = "";
     const char* nodeName = context->GetNodeName();
-    OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tilingData"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        tilingData == nullptr,
+        Mc2Error::ReportTilingFailure(
+            nodeName, "FFNToAttentionTilingFuncBase: raw tilingData actual=null or capacity insufficient; required=" +
+                          std::to_string(sizeof(FFNToAttentionTilingData))),
+        return ge::GRAPH_FAILED);
 
     if (config.isMc2Context) {
         OP_TILING_CHECK(CheckMc2Context(context, nodeName, config) != ge::GRAPH_SUCCESS,
@@ -733,11 +815,11 @@ ge::graphStatus FFNToAttentionTilingFuncBase(gert::TilingContext* context, const
 
     // Function that get check and set Attrs
     OP_TILING_CHECK(!CheckAndSetAttrs(context, nodeName, *tilingData, group, config),
-                    OP_LOGE(nodeName, "Check and set attributes failed!"), return ge::GRAPH_FAILED);
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "Check and set attributes failed!"), return ge::GRAPH_FAILED);
 
     // Function that check input dim 、format、datatype
     OP_TILING_CHECK(!CheckInputAndSetTilingData(context, nodeName, *tilingData, config),
-                    OP_LOGE(nodeName, "Check Inputs and Outputs failed!"), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "Check Inputs and Outputs failed!"), return ge::GRAPH_FAILED);
 
     // Check window Size
     uint64_t neededSize = 0;
@@ -757,11 +839,11 @@ ge::graphStatus FFNToAttentionTilingFuncBase(gert::TilingContext* context, const
 
     // Set WorkSpace
     OP_TILING_CHECK(SetWorkSpace(context, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Tiling set workspace failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "Tiling set workspace failed."), return ge::GRAPH_FAILED);
 
     // Set HcommCfg
     OP_TILING_CHECK(SetHcommCfg(context, *tilingData, group) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "setHcommCfg failed."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "setHcommCfg failed."), return ge::GRAPH_FAILED);
 
     // Set TilingKey
     bool rankTableMode = tilingData->ffnToAttentionInfo.isInputRankTable;

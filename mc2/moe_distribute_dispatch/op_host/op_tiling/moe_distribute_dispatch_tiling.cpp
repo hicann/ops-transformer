@@ -160,10 +160,10 @@ static ge::graphStatus CheckCommAttrValuesValid(gert::TilingContext* context, co
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(tpWorldSizePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tp_world_size"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(
-        *tpWorldSizePtr >= 2,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "tp_world_size", std::to_string(*tpWorldSizePtr).c_str(), "less than 2"),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(*tpWorldSizePtr >= 2,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "tp_world_size",
+                                                          std::to_string(*tpWorldSizePtr).c_str(), "less than 2"),
+                    return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -178,10 +178,8 @@ static ge::graphStatus CheckAttrValuesValid(gert::TilingContext* context, const 
     auto sharedExpertNumPtr = attrs->GetAttrPointer<int64_t>(static_cast<int>(ATTR_SHARED_EXPERT_NUM_INDEX));
     auto expertTokenNumsTypePtr = attrs->GetAttrPointer<int64_t>(static_cast<int>(ATTR_EXPERT_TOKEN_NUMS_TYPE_INDEX));
 
-    OP_TILING_CHECK(
-        CheckCommAttrValuesValid(context, nodeName) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "ep/tp attrs", "invalid", "EP/TP attr values must be valid"),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckCommAttrValuesValid(context, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "EP/TP attribute validation failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         *expertShardPtr != 0,
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "expertShardType", std::to_string(*expertShardPtr).c_str(), "0"),
@@ -192,7 +190,7 @@ static ge::graphStatus CheckAttrValuesValid(gert::TilingContext* context, const 
                                   (std::string("[0, ") + std::to_string(*epWorldSizePtr) + ")").c_str()),
         return ge::GRAPH_FAILED);
     OP_TILING_CHECK((*moeExpertNumPtr <= 0) || (*moeExpertNumPtr > MOE_EXPERT_MAX_NUM),
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "moeExpertNum", std::to_string(*moeExpertNumPtr).c_str(),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "moe_expert_num", std::to_string(*moeExpertNumPtr).c_str(),
                                               (std::string("(0, ") + std::to_string(MOE_EXPERT_MAX_NUM) + "]").c_str()),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
@@ -237,10 +235,8 @@ static ge::graphStatus GetAttrAndSetTilingData(gert::TilingContext* context, con
                     return ge::GRAPH_FAILED);
 
     // 判断是否满足uint32_t及其他限制
-    OP_TILING_CHECK(
-        CheckAttrValuesValid(context, nodeName) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "attrs", "invalid value", "All attr values must be valid"),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckAttrValuesValid(context, nodeName) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "All attr values must be valid"), return ge::GRAPH_FAILED);
 
     groupEp = std::string(groupEpPtr);
     tilingData.moeDistributeDispatchInfo.epWorldSize = static_cast<uint32_t>(*epWorldSizePtr);
@@ -265,19 +261,25 @@ static ge::graphStatus CheckExpertAttrs(gert::TilingContext* context, const char
 
     // 校验ep能否均分共享专家
     if ((sharedExpertRankNum != 0) && (epWorldSize % sharedExpertRankNum != 0)) {
-        OP_LOGE_FOR_INVALID_VALUE(
-            nodeName, "epWorldSize", std::to_string(epWorldSize).c_str(),
-            (std::string("divisible by sharedExpertRankNum (") + std::to_string(sharedExpertRankNum) + ")").c_str());
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            nodeName, "ep_world_size, shared_expert_rank_num",
+            (std::string("ep_world_size=") + std::to_string(epWorldSize) + ", " +
+             std::string("shared_expert_rank_num=") + std::to_string(sharedExpertRankNum))
+                .c_str(),
+            "ep_world_size must be divisible by shared_expert_rank_num");
         return ge::GRAPH_FAILED;
     }
 
     // 校验moe专家数量能否均分给多机
     localMoeExpertNum = moeExpertNum / (epWorldSize - sharedExpertRankNum);
     OP_TILING_CHECK(moeExpertNum % (epWorldSize - sharedExpertRankNum) != 0,
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "moe_expert_num", std::to_string(moeExpertNum).c_str(),
-                                              (std::string("divisible by ep_world_size - shared_expert_rank_num (") +
-                                               std::to_string(epWorldSize - sharedExpertRankNum) + ")")
-                                                  .c_str()),
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        nodeName, "moe_expert_num, ep_world_size, shared_expert_rank_num",
+                        (std::string("moe_expert_num=") + std::to_string(moeExpertNum) + ", " +
+                         std::string("ep_world_size=") + std::to_string(epWorldSize) + ", " +
+                         std::string("shared_expert_rank_num=") + std::to_string(sharedExpertRankNum))
+                            .c_str(),
+                        "moe_expert_num must be divisible by ep_world_size - shared_expert_rank_num"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(localMoeExpertNum <= 0,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "moe_expert_num", std::to_string(moeExpertNum).c_str(),
@@ -337,10 +339,8 @@ ge::graphStatus MoeDistributeDispatchTilingBase::CheckAttrs(gert::TilingContext*
                                                             MoeDistributeDispatchTilingData& tilingData,
                                                             uint32_t& localMoeExpertNum)
 {
-    OP_TILING_CHECK(
-        CheckExpertAttrs(context, nodeName, tilingData, localMoeExpertNum) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "expert", "invalid", "Expert params validation failed"),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(CheckExpertAttrs(context, nodeName, tilingData, localMoeExpertNum) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "Expert params validation failed"), return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(CheckEpWorldSizeAttrs(nodeName, tilingData) != ge::GRAPH_SUCCESS,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "epWorldSize", "invalid",
@@ -476,11 +476,11 @@ static ge::graphStatus CheckExpertScalesDtypeAndFormat(gert::TilingContext* cont
     }
     OP_TILING_CHECK(
         static_cast<ge::Format>(ge::GetPrimaryFormat(expertScalesDesc->GetStorageFormat())) == ge::FORMAT_FRACTAL_NZ,
-        OP_LOGE_FOR_INVALID_FORMAT(
+        OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
             nodeName, "expert_scales",
             Ops::Base::ToString(static_cast<ge::Format>(ge::GetPrimaryFormat(expertScalesDesc->GetStorageFormat())))
                 .c_str(),
-            "not FRACTAL_NZ"),
+            "FRACTAL_NZ is not supported for expert_scales"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -721,11 +721,10 @@ static ge::graphStatus CheckQuantizationAndTensorMetadata(gert::TilingContext* c
     // 检查输入输出的dim、format、dataType
     OP_TILING_CHECK(MoeDistributeDispatchTilingHelper::TilingCheckMoeDistributeDispatch(context, nodeName, isScales,
                                                                                         quantMode) != ge::GRAPH_SUCCESS,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "param", "invalid", "Tiling check param failed"),
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "Tiling check param failed; propagate lower-layer error"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckExpertScalesDtypeAndFormat(context, nodeName) != ge::GRAPH_SUCCESS,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "expert_scales", "invalid",
-                                                          "expert_scales dtype or format check failed"),
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "expert_scales dtype or format check failed"),
                     return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -739,10 +738,8 @@ ge::graphStatus MoeDistributeDispatchTilingBase::MoeDistributeDispatchA3A5Tiling
     std::string groupEp = "";
     uint32_t localMoeExpertNum = 1;
     // 获取入参属性
-    OP_TILING_CHECK(
-        GetAttrAndSetTilingData(context, nodeName, *tilingData, groupEp) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "attr", "invalid", "Get attr and set tiling data failed"),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(GetAttrAndSetTilingData(context, nodeName, *tilingData, groupEp) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "Get attr and set tiling data failed"), return ge::GRAPH_FAILED);
     // 获取scales
     const gert::StorageShape* scalesStorageShape = context->GetOptionalInputShape(SCALES_INDEX);
     isScales = (scalesStorageShape != nullptr);
@@ -753,8 +750,7 @@ ge::graphStatus MoeDistributeDispatchTilingBase::MoeDistributeDispatchA3A5Tiling
     }
     // 检查属性的取值是否合法
     OP_TILING_CHECK(CheckAttrs(context, nodeName, *tilingData, localMoeExpertNum) != ge::GRAPH_SUCCESS,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "attr", "invalid", "Attr value check failed"),
-                    return ge::GRAPH_FAILED);
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "Attr value check failed"), return ge::GRAPH_FAILED);
     bool isSharedExpert = true;
     uint32_t epRankId = tilingData->moeDistributeDispatchInfo.epRankId;
     uint32_t sharedExpertRankNum = tilingData->moeDistributeDispatchInfo.sharedExpertRankNum;
@@ -798,8 +794,7 @@ ge::graphStatus MoeDistributeDispatchTilingBase::MoeDistributeDispatchA3A5Tiling
     bool isScales = false;
 
     OP_TILING_CHECK(MoeDistributeDispatchA3A5TilingCheckAttr(context, quantMode, isScales) != ge::GRAPH_SUCCESS,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "attr", "invalid",
-                                                          "MoeDistributeDispatchA3A5TilingCheckAttr failed"),
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "MoeDistributeDispatchA3A5TilingCheckAttr failed"),
                     return ge::GRAPH_FAILED);
 
     uint64_t tilingKey = CalTilingKey(isScales, quantMode, mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510);

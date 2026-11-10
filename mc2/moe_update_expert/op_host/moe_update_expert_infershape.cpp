@@ -14,6 +14,7 @@
  */
 
 #include "mc2_log.h"
+#include "mc2_infer_failure_report.h"
 #include "register/op_impl_registry.h"
 #include "platform/platform_info.h"
 using namespace ge;
@@ -37,36 +38,48 @@ static constexpr size_t DIM_NUM_2 = 2;
 static ge::graphStatus CheckDims(const gert::InferShapeContext* context, const gert::Shape* expertIdsShape,
                                  const gert::Shape* eplbTableShape)
 {
-    auto result = ge::GRAPH_SUCCESS;
-
     auto expertIdsDimNum = expertIdsShape->GetDimNum();
     auto eplbTableDimNum = eplbTableShape->GetDimNum();
     if (expertIdsDimNum != DIM_NUM_2) {
         OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "expert_ids", std::to_string(expertIdsDimNum).c_str(),
                                      "2");
-        result = ge::GRAPH_FAILED;
+        return ge::GRAPH_FAILED;
     }
     if (eplbTableDimNum != DIM_NUM_2) {
         OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "eplb_table", std::to_string(eplbTableDimNum).c_str(),
                                      "2");
-        result = ge::GRAPH_FAILED;
+        return ge::GRAPH_FAILED;
     }
-    return result;
+    return ge::GRAPH_SUCCESS;
 }
 
 static ge::graphStatus InferShapeMoeUpdateExpert(gert::InferShapeContext* context)
 {
+    OP_CHECK_IF(context == nullptr,
+                Mc2Error::ReportInferFailure("MoeUpdateExpert",
+                                             "InferShape entry: context actual=null; expected materialized context"),
+                return ge::GRAPH_FAILED);
     auto* expertIdsShape = context->GetInputShape(IDX_IN_EXPERT_IDS);
     auto* eplbTableShape = context->GetInputShape(IDX_IN_EPLB_TABLE);
     auto* balancedExpertIdsShape = context->GetOutputShape(IDX_OUT_EXPERT_IDS);
     auto* balancedActiveMaskShape = context->GetOutputShape(IDX_OUT_ACTIVE_MASK);
 
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expertIdsShape);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, eplbTableShape);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, balancedExpertIdsShape);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, balancedActiveMaskShape);
+    OP_CHECK_IF(expertIdsShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "expert_ids"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(eplbTableShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "eplb_table"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(balancedExpertIdsShape == nullptr,
+                Mc2Error::ReportInferFailure(
+                    context->GetNodeName(),
+                    "Output shape holder balanced_expert_ids actual=null; expected materialized holder"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(balancedActiveMaskShape == nullptr,
+                Mc2Error::ReportInferFailure(
+                    context->GetNodeName(),
+                    "Output shape holder balanced_active_mask actual=null; expected materialized holder"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckDims(context, expertIdsShape, eplbTableShape) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context->GetNodeName(), "%s", "checkDims failed"), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "%s", "checkDims failed"), return ge::GRAPH_FAILED);
 
     int64_t BS = expertIdsShape->GetDim(DIM_0);
     int64_t K = expertIdsShape->GetDim(DIM_1);
@@ -82,6 +95,10 @@ static ge::graphStatus InferShapeMoeUpdateExpert(gert::InferShapeContext* contex
 
 static ge::graphStatus InferDataTypeMoeUpdateExpert(gert::InferDataTypeContext* context)
 {
+    OP_CHECK_IF(context == nullptr,
+                Mc2Error::ReportDataTypeMetadataFailure(
+                    "MoeUpdateExpert", "InferDataType entry: context actual=null; expected materialized context"),
+                return ge::GRAPH_FAILED);
     auto dType = context->GetInputDataType(IDX_IN_EXPERT_IDS);
     context->SetOutputDataType(IDX_OUT_EXPERT_IDS, dType);
     context->SetOutputDataType(IDX_OUT_ACTIVE_MASK, ge::DT_BOOL);

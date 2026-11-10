@@ -15,3 +15,11 @@ if(UT_TEST_ALL OR OP_HOST_UT)
         target_link_libraries(${OP_TILING_MODULE_NAME}_cases_obj PUBLIC error_manager)
     endif()
 endif()
+
+# The A2 diagnostic test directly references aclrtMemcpy in ProcessArgsForA2.
+if((UT_TEST_ALL OR OP_HOST_UT) AND TARGET ${OP_TILING_MODULE_NAME}_cases_obj)
+    get_target_property(_mc2_dump_case_sources ${OP_TILING_MODULE_NAME}_cases_obj SOURCES)
+    if("${_mc2_dump_case_sources}" MATCHES "test_mc2_dump_error_reporting_tiling\\.cpp")
+        target_link_libraries(${OP_TILING_MODULE_NAME}_cases_obj PRIVATE acl_rt)
+    endif()
+endif()

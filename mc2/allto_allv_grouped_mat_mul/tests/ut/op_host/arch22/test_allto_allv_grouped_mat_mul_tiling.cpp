@@ -16,12 +16,14 @@
 
 #include <iostream>
 #include <gtest/gtest.h>
+#include "mc2/common/tests/ut/internal_fallback_assertions.h"
 #include <initializer_list>
 #include <string>
 #include <utility>
 #include "experiment/metadef/common/util/error_manager/error_manager.h"
 
 #include "mc2_tiling_case_executor.h"
+#include "mc2/common/op_host/op_tiling/mc2_calc_num_blocks.h"
 
 using namespace std;
 
@@ -1386,6 +1388,115 @@ TEST_F(AlltoAllvGroupedMatMulArch22TilingTest, TransMmWeight1)
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues);
 }
+TEST_F(AlltoAllvGroupedMatMulArch22TilingTest, ZeroPlatformCoresReportInternalFallback)
+{
+    TestParam testParam{
+        "OwnerPlatformCore", {{"permuteOutFlag", "true"}, {"isNeedMM", "false"}}, {}, {}, ge::GRAPH_FAILED};
+
+    struct AlltoAllvGroupedMatMulCompileInfo {};
+    AlltoAllvGroupedMatMulCompileInfo compileInfo;
+
+    std::string socVersion = "Ascend910_93";
+    uint64_t coreNum = 0;
+    uint64_t ubSize = 196608;
+    uint64_t tilingDataSize = sizeof(AlltoAllvGmmAivTilingData);
+
+    TilingParams tilingParams;
+    InitializeTilingParams(testParam, tilingParams);
+
+    std::vector<std::string> targets = {"BS", "H2", "mmWeightDim0", "N2"};
+
+    auto mmXShape = CreateTensorShape({{tilingParams.BS, tilingParams.H2}, {tilingParams.BS, tilingParams.H2}},
+                                      ge::DT_FLOAT16, ge::FORMAT_ND);
+    auto mmWeightShape =
+        CreateTensorShape({{tilingParams.mmWeightDim0, tilingParams.N2}, {tilingParams.mmWeightDim0, tilingParams.N2}},
+                          ge::DT_FLOAT16, ge::FORMAT_ND);
+    auto mmYShape = CreateTensorShape({{tilingParams.BS, tilingParams.N2}, {tilingParams.BS, tilingParams.N2}},
+                                      ge::DT_FLOAT16, ge::FORMAT_ND);
+
+    if (!(has_any_target_key(testParam.tilingParamsStrPair, targets) || tilingParams.isNeedMM == false)) {
+        mmXShape->shape_ = {};
+        mmWeightShape->shape_ = {};
+    }
+
+    gert::TilingContextPara tilingContextPara(
+        "AlltoAllvGroupedMatMul", CreateInputTensors(tilingParams, mmXShape, mmWeightShape),
+        CreateOutputTensors(tilingParams, mmYShape),
+        {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>(tilingParams.group)},
+         {"epWorldSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(tilingParams.epWorldSize)},
+         {"sendCounts", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(tilingParams.sendCounts)},
+         {"recvCounts", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(tilingParams.recvCounts)},
+         {"transGmmWeight", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+         {"transMmWeight", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+         {"permuteOutFlag", Ops::Transformer::AnyValue::CreateFrom<bool>(tilingParams.permuteOutFlag)},
+         {"commMode", Ops::Transformer::AnyValue::CreateFrom<std::string>("ai_cpu")}},
+        &compileInfo, socVersion, coreNum, ubSize, tilingDataSize);
+
+    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
+    if (testParam.status == ge::GRAPH_FAILED) {
+        Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues);
+    } else {
+        uint64_t expectTilingKey = 4UL;
+        Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, expectTilingKey);
+    }
+    Mc2ErrorCodeUT::ExpectInternalFallbackReport(
+        "CheckCommonPlatformInfo: aic num actual=0; required positive platform resource");
+}
+
+TEST_F(AlltoAllvGroupedMatMulArch22TilingTest, ValidPlatformCoresControl)
+{
+    TestParam testParam{
+        "OwnerPlatformCore", {{"permuteOutFlag", "true"}, {"isNeedMM", "false"}}, {}, {}, ge::GRAPH_SUCCESS};
+
+    struct AlltoAllvGroupedMatMulCompileInfo {};
+    AlltoAllvGroupedMatMulCompileInfo compileInfo;
+
+    std::string socVersion = "Ascend910_93";
+    uint64_t coreNum = 20;
+    uint64_t ubSize = 196608;
+    uint64_t tilingDataSize = sizeof(AlltoAllvGmmAivTilingData);
+
+    TilingParams tilingParams;
+    InitializeTilingParams(testParam, tilingParams);
+
+    std::vector<std::string> targets = {"BS", "H2", "mmWeightDim0", "N2"};
+
+    auto mmXShape = CreateTensorShape({{tilingParams.BS, tilingParams.H2}, {tilingParams.BS, tilingParams.H2}},
+                                      ge::DT_FLOAT16, ge::FORMAT_ND);
+    auto mmWeightShape =
+        CreateTensorShape({{tilingParams.mmWeightDim0, tilingParams.N2}, {tilingParams.mmWeightDim0, tilingParams.N2}},
+                          ge::DT_FLOAT16, ge::FORMAT_ND);
+    auto mmYShape = CreateTensorShape({{tilingParams.BS, tilingParams.N2}, {tilingParams.BS, tilingParams.N2}},
+                                      ge::DT_FLOAT16, ge::FORMAT_ND);
+
+    if (!(has_any_target_key(testParam.tilingParamsStrPair, targets) || tilingParams.isNeedMM == false)) {
+        mmXShape->shape_ = {};
+        mmWeightShape->shape_ = {};
+    }
+
+    gert::TilingContextPara tilingContextPara(
+        "AlltoAllvGroupedMatMul", CreateInputTensors(tilingParams, mmXShape, mmWeightShape),
+        CreateOutputTensors(tilingParams, mmYShape),
+        {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>(tilingParams.group)},
+         {"epWorldSize", Ops::Transformer::AnyValue::CreateFrom<int64_t>(tilingParams.epWorldSize)},
+         {"sendCounts", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(tilingParams.sendCounts)},
+         {"recvCounts", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>(tilingParams.recvCounts)},
+         {"transGmmWeight", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+         {"transMmWeight", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+         {"permuteOutFlag", Ops::Transformer::AnyValue::CreateFrom<bool>(tilingParams.permuteOutFlag)},
+         {"commMode", Ops::Transformer::AnyValue::CreateFrom<std::string>("ai_cpu")}},
+        &compileInfo, socVersion, coreNum, ubSize, tilingDataSize);
+
+    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
+    if (testParam.status == ge::GRAPH_FAILED) {
+        Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues);
+    } else {
+        uint64_t expectTilingKey = 4UL;
+        Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, expectTilingKey);
+    }
+    EXPECT_TRUE(ErrorManager::GetInstance().GetRawErrorMessages().empty());
+}
+
 } // namespace AlltoAllvGroupedMatMulUT
 namespace AlltoAllvGroupedMatMulUT {
 TEST_F(AlltoAllvGroupedMatMulArch22TilingTest, AivBf16TilingContract)
@@ -1438,6 +1549,7 @@ TEST_F(AlltoAllvGroupedMatMulArch22TilingTest, AivBf16TilingContract)
     EXPECT_EQ(tiling->is910C, 1U);
     EXPECT_EQ(tilingInfo.tilingKey, 8);
 }
+
 } // namespace AlltoAllvGroupedMatMulUT
 
 namespace AlltoAllvGroupedMatMulUT {
@@ -1702,6 +1814,7 @@ TEST_F(AlltoAllvGroupedMatMulArch22TilingTest, AivRejectsCountEntryAboveTokenCap
     TilingInfo tilingInfo;
     EXPECT_FALSE(ExecuteAivHostCase(ge::DT_BF16, 4, sendCounts, recvCounts, false, false, false, tilingInfo));
 }
+
 } // namespace AlltoAllvGroupedMatMulUT
 
 namespace AlltoAllvGroupedMatMulUT {
@@ -1806,6 +1919,7 @@ TEST_F(AlltoAllvGroupedMatMulArch22TilingTest, AivPublishesInt32PrefixesFor1024G
     EXPECT_EQ(tiling->recvPrefix[1023], 1024);
     EXPECT_EQ(tiling->countBytes, 4096U);
 }
+
 } // namespace AlltoAllvGroupedMatMulUT
 
 namespace AlltoAllvGroupedMatMulUT {
@@ -1875,6 +1989,7 @@ TEST(AlltoAllvGroupedMatMulAivCommTest, KeepsPeerControlOffsetStableAcrossExpert
     EXPECT_EQ(controlE2.peerControlBytes, controlE16.peerControlBytes);
     EXPECT_EQ(layoutE2.controlOffset, layoutE16.controlOffset);
 }
+
 } // namespace AlltoAllvGroupedMatMulUT
 
 namespace AlltoAllvGroupedMatMulUT {

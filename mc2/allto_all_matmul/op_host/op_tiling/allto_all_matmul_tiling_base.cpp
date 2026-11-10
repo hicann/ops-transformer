@@ -16,6 +16,8 @@
 
 #include "mc2_log.h"
 
+#include "mc2/matmul_allto_all/op_host/op_tiling/common/matmul_allto_all_error.h"
+
 using namespace AscendC;
 using namespace ge;
 using namespace Mc2Tiling;
@@ -42,6 +44,25 @@ static bool IsContain(const std::vector<uint32_t>& list, uint32_t value)
 ge::graphStatus AllToAllMatmulTilingBase::GetShapeAttrsInfo()
 {
     opName_ = context_->GetNodeName();
+    OP_TILING_CHECK(
+        context_->GetRawTilingData() == nullptr,
+        ReportMatmulAlltoAllTilingFailure(opName_, "Raw tiling data holder is absent; rebuild the tiling context"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        context_->GetAttrs() == nullptr,
+        ReportMatmulAlltoAllTilingFailure(opName_, "RuntimeAttrs holder is absent; rebuild the tiling context"),
+        return ge::GRAPH_FAILED);
+    for (size_t index = 0; index < 2; ++index) {
+        const char* inputName = index == 0 ? "x1" : "x2";
+        OP_TILING_CHECK(context_->GetInputShape(index) == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, inputName),
+                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(
+            context_->GetInputDesc(index) == nullptr,
+            ReportMatmulAlltoAllTilingFailure(
+                opName_, std::string(inputName) +
+                             " descriptor is absent while its shape is present; rebuild the tiling context"),
+            return ge::GRAPH_FAILED);
+    }
     return ge::GRAPH_SUCCESS;
 };
 
@@ -53,9 +74,16 @@ ge::graphStatus AllToAllMatmulTilingBase::GetShapeAttrsInfo()
 ge::graphStatus AllToAllMatmulTilingBase::GetPlatformInfo()
 {
     fe::PlatFormInfos* platformInfo = context_->GetPlatformInfo();
-    OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE(opName_, "Fail to get platform info"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(platformInfo == nullptr,
+                    ReportMatmulAlltoAllTilingFailure(
+                        opName_, "GetPlatformInfo returned null; initialize platform resource metadata before tiling"),
+                    return ge::GRAPH_FAILED);
     platform_ascendc::PlatformAscendC ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     contextInfo_.args_.aicCoreNum = ascendcPlatform.GetCoreNumAic();
+    OP_TILING_CHECK(contextInfo_.args_.aicCoreNum == 0,
+                    ReportMatmulAlltoAllTilingFailure(
+                        opName_, "Available AIC core count=0; required at least 1; check platform resource metadata"),
+                    return ge::GRAPH_FAILED);
     const uint32_t aivCoreNum = ascendcPlatform.GetCoreNumAiv();
     cvRatio_ = 1U;
     if (contextInfo_.args_.aicCoreNum != 0U) {

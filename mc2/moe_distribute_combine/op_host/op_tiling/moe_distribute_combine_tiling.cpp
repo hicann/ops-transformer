@@ -274,20 +274,24 @@ static bool CheckExpertCountConfig(MoeDistributeCombineTilingData& tilingData, c
 
     // 校验ep能均分共享
     if ((sharedExpertRankNum != 0) && (epWorldSize % sharedExpertRankNum != 0)) {
-        OP_LOGE_FOR_INVALID_VALUE(
-            nodeName, "epWorldSize", std::to_string(epWorldSize).c_str(),
-            (std::string("divisible by sharedExpertRankNum (") + std::to_string(sharedExpertRankNum) + ")").c_str());
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            nodeName, "ep_world_size, shared_expert_rank_num",
+            (std::string("ep_world_size=") + std::to_string(epWorldSize) + ", " +
+             std::string("shared_expert_rank_num=") + std::to_string(sharedExpertRankNum))
+                .c_str(),
+            "ep_world_size must be divisible by shared_expert_rank_num");
         return false;
     }
 
     // 校验moe专家数量能否均分给多机
     if (moeExpertNum % (epWorldSize - sharedExpertRankNum) != 0) {
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "moeExpertNum",
-                                  (std::string("moeExpertNum=") + std::to_string(moeExpertNum) +
-                                   ", epWorldSize=" + std::to_string(epWorldSize) +
-                                   ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
-                                      .c_str(),
-                                  "moeExpertNum % (epWorldSize - sharedExpertRankNum) == 0");
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            nodeName, "moe_expert_num, ep_world_size, shared_expert_rank_num",
+            (std::string("moe_expert_num=") + std::to_string(moeExpertNum) + ", " + std::string("ep_world_size=") +
+             std::to_string(epWorldSize) + ", " + std::string("shared_expert_rank_num=") +
+             std::to_string(sharedExpertRankNum))
+                .c_str(),
+            "moe_expert_num must be divisible by ep_world_size - shared_expert_rank_num");
         return false;
     }
 
@@ -599,20 +603,17 @@ bool MoeDistributeCombineTilingBase::CheckAttrs(gert::TilingContext* context,
                                                 MoeDistributeCombineTilingData& tilingData, const char* nodeName,
                                                 uint32_t& localMoeExpertNum)
 {
+    OP_TILING_CHECK(!CheckExpertAttrs(context, tilingData, nodeName, localMoeExpertNum),
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "Expert params validation failed"), return false);
+
     OP_TILING_CHECK(
-        !CheckExpertAttrs(context, tilingData, nodeName, localMoeExpertNum),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "expert", "invalid", "Expert params validation failed"),
+        !CheckEpWorldSizeAttrs(context, tilingData, nodeName),
+        OP_LOGE_LIBOPAPI_REPORT(nodeName, "EpWorldSize params validation failed; propagate lower-layer error"),
         return false);
 
-    OP_TILING_CHECK(!CheckEpWorldSizeAttrs(context, tilingData, nodeName),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "epWorldSize", "invalid",
-                                                          "EpWorldSize params validation failed"),
+    OP_TILING_CHECK(!CheckBatchAttrs(context, tilingData, nodeName),
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "Batch params validation failed; propagate lower-layer error"),
                     return false);
-
-    OP_TILING_CHECK(
-        !CheckBatchAttrs(context, tilingData, nodeName),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(nodeName, "batch", "invalid", "Batch params validation failed"),
-        return false);
 
     return true;
 }

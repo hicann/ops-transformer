@@ -9,8 +9,10 @@
  */
 #include <iostream>
 #include <gtest/gtest.h>
+#include "mc2/common/tests/ut/internal_fallback_assertions.h"
 #include "../../../../op_host/op_tiling/grouped_mat_mul_allto_allv_tiling.h"
 #include "mc2_tiling_case_executor.h"
+#include "mc2/common/tests/ut/formal_error_assertions.h"
 
 namespace GroupedMatMulAlltoAllvUT {
 
@@ -101,6 +103,7 @@ protected:
 TEST_P(GroupedMatMulAlltoAllvArch22TilingTest, ShapeSize)
 {
     auto testParam = GetParam();
+    Mc2ErrorCodeUT::ExcelErrorReportScope errors;
     struct GroupedMatMulAlltoAllvCompileInfo {};
     GroupedMatMulAlltoAllvCompileInfo compileInfo;
     std::string socVersion = testParam.socVersion;
@@ -153,15 +156,27 @@ TEST_P(GroupedMatMulAlltoAllvArch22TilingTest, ShapeSize)
     if (testParam.omitCommMode) {
         tilingContextPara.attrs_.pop_back();
     }
+    // attrs_ is already RuntimeAttrs storage: removing its last entry simulates
+    // a missing materialized default slot, not legal omission at the public IR.
+    (void)ErrorManager::GetInstance().GetRawErrorMessages();
     if (testParam.status == ge::GRAPH_FAILED) {
         Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
         Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues);
     } else {
         Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", tilingParams.epWorldSize}};
-        // Match master: conversion failure is returned as the key, not the outer status.
-        uint64_t expectTilingKey = testParam.omitCommMode ? static_cast<uint64_t>(ge::GRAPH_FAILED) : 9UL;
-        Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, expectTilingKey);
+        Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, 9UL);
     }
+    if (testParam.testName == "Test_missing_comm_mode_retains_internal_fallback_a3") {
+        Mc2ErrorCodeUT::ExpectInternalFallbackReport(
+            "GetAttrPointer(comm_mode) returned null; expected default storage");
+    } else if (testParam.testName == "Test_default_comm_mode_materialized_a3" ||
+               testParam.testName == "Test_a3_aicpu_topk8") {
+        EXPECT_TRUE(ErrorManager::GetInstance().GetRawErrorMessages().empty());
+    } else if (testParam.testName == "Test_a3_aicpu_topk9") {
+        Mc2ErrorCodeUT::ExpectExcelFormalError("EZ0024", "K", "9", nullptr, nullptr,
+                                               {{"correct_value", "[2, 8]"}, {"op_name", "GroupedMatMulAlltoAllv"}});
+    }
+    (void)ErrorManager::GetInstance().GetRawErrorMessages();
 }
 
 static TestParam g_testParams[] = {
@@ -171,7 +186,9 @@ static TestParam g_testParams[] = {
     {"Test_a2_default_rejected", {}, {}, {}, ge::GRAPH_FAILED, false, "Ascend910B", "default"},
     {"Test_a2_ccu_rejected", {}, {}, {}, ge::GRAPH_FAILED, false, "Ascend910B", "ccu"},
     {"Test_a5_aicpu_unchanged", {}, {}, {}, ge::GRAPH_SUCCESS, false, "Ascend950"},
-    {"Test_missing_comm_mode_matches_master_a3", {}, {}, {}, ge::GRAPH_SUCCESS, true, "Ascend910_93"},
+    {"Test_missing_comm_mode_retains_internal_fallback_a3", {}, {}, {}, ge::GRAPH_FAILED, true, "Ascend910_93"},
+    // The explicit ai_cpu slot matches the OpDef default; this fixture does not materialize IR defaults.
+    {"Test_default_comm_mode_materialized_a3", {}, {}, {}, ge::GRAPH_SUCCESS, false, "Ascend910_93", "ai_cpu"},
     // A5 validates commMode in SetHcclTiling, before the final key conversion.
     {"Test_a5_missing_comm_mode_rejected", {}, {}, {}, ge::GRAPH_FAILED, true, "Ascend950"},
     {"Test_a3_aicpu_topk8", {{"BS", "512"}}, {}, {}, ge::GRAPH_SUCCESS},

@@ -12,6 +12,7 @@
  * \file matmul_allto_all_base.cpp
  * \brief
  */
+#include "mc2/common/op_api/mc2_api_error.h"
 #include "matmul_allto_all_base.h"
 #include "matmul_allto_all_util.h"
 #include "securec.h"
@@ -373,7 +374,7 @@ aclnnStatus aclnnMatmulAlltoAllBase(void* workspace, uint64_t workspaceSize, acl
                                     aclrtStream stream)
 {
     if (executor == nullptr) {
-        OP_LOGE_LIBOPAPI_REPORT("aclnnMatmulAlltoAllBase", "Param executor is nullptr.");
+        Mc2Aclnn::ReportRequiredApiPointer(__func__, "executor");
         return ACLNN_ERR_INNER;
     }
     if (NnopbaseSetHcclServerType) {

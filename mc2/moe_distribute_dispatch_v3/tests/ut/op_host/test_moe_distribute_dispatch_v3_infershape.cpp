@@ -14,16 +14,51 @@
  */
 #include <iostream>
 #include <gtest/gtest.h>
+#include "../../../../common/tests/ut/formal_error_assertions.h"
 #include "mc2_infer_shape_case_executor.h"
 #include "infer_datatype_context_faker.h"
 #include "base/registry/op_impl_space_registry_v2.h"
+#include "rt_soc_spec_mocker.h"
 #define private public
 #include "platform/platform_info.h"
 #undef private
 
+using Mc2ErrorCodeUT::ExcelErrorReportScope;
+using Mc2ErrorCodeUT::ExpectExcelFormalError;
+
 namespace MoeDistributeDispatchV3InfershapeUT {
 
-class MoeDistributeDispatchV3InfershapeTest : public testing::Test {};
+class V3PlatformStateGuard {
+public:
+    V3PlatformStateGuard()
+        : optional_(fe::PlatformInfoManager::Instance().opti_compilation_info_)
+    {
+        auto& cache = fe::PlatformInfoManager::Instance().platform_info_map_;
+        const auto found = cache.find("Ascend910B");
+        existed_ = found != cache.end();
+        if (existed_)
+            original_ = found->second;
+    }
+    ~V3PlatformStateGuard()
+    {
+        auto& manager = fe::PlatformInfoManager::Instance();
+        manager.SetOptionalCompilationInfo(optional_);
+        if (existed_)
+            manager.platform_info_map_["Ascend910B"] = original_;
+        else
+            manager.platform_info_map_.erase("Ascend910B");
+    }
+    V3PlatformStateGuard(const V3PlatformStateGuard&) = delete;
+    V3PlatformStateGuard& operator=(const V3PlatformStateGuard&) = delete;
+
+private:
+    fe::OptionalInfo optional_;
+    fe::PlatformInfo original_;
+    bool existed_ = false;
+};
+class MoeDistributeDispatchV3InfershapeTest : public testing::Test {
+    V3PlatformStateGuard platformState_;
+};
 
 // ============================================
 // InferShape 测试用例（保留能通过的测试）
@@ -876,7 +911,6 @@ TEST_F(MoeDistributeDispatchV3InfershapeTest, InferDtype_MxQuant_DynamicScalesE8
 // ============================================
 // rtGetSocSpec mock 控制（在 mc2_tiling_ut_stub 中提供实现）
 // ============================================
-#include "rt_soc_spec_mocker.h"
 
 // ============================================
 // A5 平台 / rtGetSocSpec 失败场景测试
@@ -1341,6 +1375,270 @@ TEST_F(MoeDistributeDispatchV3InfershapeTest, InferDtype_A5_PerGroupQuant_E4M3)
 
     SetRtSocSpecShortVersion("Ascend910B");
     SetRtSocSpecNpuArch("");
+}
+
+TEST_F(MoeDistributeDispatchV3InfershapeTest, InvalidEpRankRelationReportsSingleFormalError)
+{
+    ExcelErrorReportScope reportScope;
+    fe::PlatformInfo platformInfo;
+    fe::OptionalInfo optiCompilationInfo;
+    optiCompilationInfo.soc_version = "Ascend910B";
+    platformInfo.str_info.short_soc_version = "Ascend910B";
+    fe::PlatformInfoManager::Instance().platform_info_map_["Ascend910B"] = platformInfo;
+    fe::PlatformInfoManager::Instance().SetOptionalCompilationInfo(optiCompilationInfo);
+
+    gert::StorageShape contextShape = {{1, 2052}, {}};
+    gert::StorageShape xShape = {{32, 7168}, {}};
+    gert::StorageShape expertIdsShape = {{32, 8}, {}};
+
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeDistributeDispatchV3",
+        {{contextShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xShape, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {expertIdsShape, ge::DT_INT32, ge::FORMAT_ND}},
+        {{{}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{}, ge::DT_INT64, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(288)},
+         {"ep_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(288)},
+         {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(256)},
+         {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"tp_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"tp_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"expert_shard_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"shared_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"shared_expert_rank_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(32)},
+         {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"global_bs", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"expert_token_nums_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>("")},
+         {"zero_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"copy_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"const_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"y_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(28)}});
+
+    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
+    std::vector<std::vector<int64_t>> expectedOutputShape = {{288, 7168}};
+    Mc2ExecuteTestCase(infershapeContextPara, hcomTopologyMockValues, ge::GRAPH_FAILED, {});
+    ExpectExcelFormalError("EZ0027", "ep_rank_id, ep_world_size", "ep_rank_id=288, ep_world_size=288",
+                           "ep_rank_id must be in [0, ep_world_size)");
+}
+
+TEST_F(MoeDistributeDispatchV3InfershapeTest, InvalidSharedRankRelationReportsSingleFormalError)
+{
+    ExcelErrorReportScope reportScope;
+    fe::PlatformInfo platformInfo;
+    fe::OptionalInfo optiCompilationInfo;
+    optiCompilationInfo.soc_version = "Ascend910B";
+    platformInfo.str_info.short_soc_version = "Ascend910B";
+    fe::PlatformInfoManager::Instance().platform_info_map_["Ascend910B"] = platformInfo;
+    fe::PlatformInfoManager::Instance().SetOptionalCompilationInfo(optiCompilationInfo);
+
+    gert::StorageShape contextShape = {{1, 2052}, {}};
+    gert::StorageShape xShape = {{32, 7168}, {}};
+    gert::StorageShape expertIdsShape = {{32, 8}, {}};
+
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeDistributeDispatchV3",
+        {{contextShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xShape, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {expertIdsShape, ge::DT_INT32, ge::FORMAT_ND}},
+        {{{}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{}, ge::DT_INT64, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(288)},
+         {"ep_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(256)},
+         {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"tp_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"tp_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"expert_shard_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"shared_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"shared_expert_rank_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(288)},
+         {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"global_bs", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"expert_token_nums_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>("")},
+         {"zero_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"copy_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"const_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"y_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(28)}});
+
+    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
+    std::vector<std::vector<int64_t>> expectedOutputShape = {{288, 7168}};
+    Mc2ExecuteTestCase(infershapeContextPara, hcomTopologyMockValues, ge::GRAPH_FAILED, {});
+    ExpectExcelFormalError("EZ0027", "shared_expert_rank_num, ep_world_size",
+                           "shared_expert_rank_num=288, ep_world_size=288",
+                           "shared_expert_rank_num must be in [0, ep_world_size)");
+}
+
+TEST_F(MoeDistributeDispatchV3InfershapeTest, InvalidSharedExpertMultipleReportsSingleFormalError)
+{
+    ExcelErrorReportScope reportScope;
+    fe::PlatformInfo platformInfo;
+    fe::OptionalInfo optiCompilationInfo;
+    optiCompilationInfo.soc_version = "Ascend910B";
+    platformInfo.str_info.short_soc_version = "Ascend910B";
+    fe::PlatformInfoManager::Instance().platform_info_map_["Ascend910B"] = platformInfo;
+    fe::PlatformInfoManager::Instance().SetOptionalCompilationInfo(optiCompilationInfo);
+
+    gert::StorageShape contextShape = {{1, 2052}, {}};
+    gert::StorageShape xShape = {{32, 7168}, {}};
+    gert::StorageShape expertIdsShape = {{32, 8}, {}};
+
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeDistributeDispatchV3",
+        {{contextShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xShape, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {expertIdsShape, ge::DT_INT32, ge::FORMAT_ND}},
+        {{{}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{}, ge::DT_INT64, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(288)},
+         {"ep_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(256)},
+         {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"tp_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"tp_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"expert_shard_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"shared_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"shared_expert_rank_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(32)},
+         {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"global_bs", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"expert_token_nums_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>("")},
+         {"zero_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"copy_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"const_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"y_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(28)}});
+
+    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
+    std::vector<std::vector<int64_t>> expectedOutputShape = {{288, 7168}};
+    Mc2ExecuteTestCase(infershapeContextPara, hcomTopologyMockValues, ge::GRAPH_FAILED, {});
+    ExpectExcelFormalError("EZ0027", "shared_expert_rank_num, shared_expert_num",
+                           "shared_expert_rank_num=32, shared_expert_num=3",
+                           "Use (shared_expert_num, shared_expert_rank_num) = (1, 0) or (0, 0), or a positive "
+                           "shared_expert_num with shared_expert_rank_num a positive multiple of it");
+}
+
+static gert::InfershapeContextPara OwnerV3BoundaryContext()
+{
+    fe::PlatformInfo platformInfo;
+    fe::OptionalInfo optiCompilationInfo;
+    optiCompilationInfo.soc_version = "Ascend910B";
+    platformInfo.str_info.short_soc_version = "Ascend910B";
+    fe::PlatformInfoManager::Instance().platform_info_map_["Ascend910B"] = platformInfo;
+    fe::PlatformInfoManager::Instance().SetOptionalCompilationInfo(optiCompilationInfo);
+
+    gert::StorageShape contextShape = {{1, 2052}, {}};
+    gert::StorageShape xShape = {{32, 7168}, {}};
+    gert::StorageShape expertIdsShape = {{32, 8}, {}};
+
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeDistributeDispatchV3",
+        {{contextShape, ge::DT_INT32, ge::FORMAT_ND},
+         {xShape, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {expertIdsShape, ge::DT_INT32, ge::FORMAT_ND}},
+        {{{}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{}, ge::DT_INT64, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{}, ge::DT_INT32, ge::FORMAT_ND},
+         {{}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {{"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(288)},
+         {"ep_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(256)},
+         {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"tp_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"tp_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"expert_shard_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"shared_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"shared_expert_rank_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(288)},
+         {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"global_bs", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"expert_token_nums_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>("")},
+         {"zero_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"copy_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"const_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"y_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(28)}});
+
+    return infershapeContextPara;
+}
+
+TEST_F(MoeDistributeDispatchV3InfershapeTest, MoeRankDenominatorBoundariesPreserveFirstError)
+{
+    for (const auto world : {0LL, -1LL}) {
+        ExcelErrorReportScope errors;
+        auto context = OwnerV3BoundaryContext();
+        context.attrs_[0].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(world);
+        context.attrs_[8].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(0);
+        Mc2ExecuteTestCase(context, {{"rankNum", 8}}, ge::GRAPH_FAILED, {});
+        const auto actual = "ep_rank_id=0, ep_world_size=" + std::to_string(world);
+        ExpectExcelFormalError("EZ0027", "ep_rank_id, ep_world_size", actual.c_str(),
+                               "ep_rank_id must be in [0, ep_world_size)");
+    }
+    for (const auto shared : {-1LL, 9LL}) {
+        ExcelErrorReportScope errors;
+        auto context = OwnerV3BoundaryContext();
+        context.attrs_[0].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(8);
+        context.attrs_[8].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(shared);
+        Mc2ExecuteTestCase(context, {{"rankNum", 8}}, ge::GRAPH_FAILED, {});
+        const auto actual = "shared_expert_rank_num=" + std::to_string(shared) + ", ep_world_size=8";
+        ExpectExcelFormalError("EZ0027", "shared_expert_rank_num, ep_world_size", actual.c_str(),
+                               "shared_expert_rank_num must be in [0, ep_world_size)");
+    }
+}
+TEST_F(MoeDistributeDispatchV3InfershapeTest, MoeRankOneContinuesWithExpectedExpertCount)
+{
+    ExcelErrorReportScope errors;
+    auto context = OwnerV3BoundaryContext();
+    context.attrs_[0].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(8);
+    context.attrs_[1].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(7);
+    context.attrs_[8].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(7);
+    Mc2ExecuteTestCase(context, {{"rankNum", 8}}, ge::GRAPH_SUCCESS, {{2048, 7168}, {2048}, {262144}, {256}});
+    EXPECT_TRUE(ErrorManager::GetInstance().GetRawErrorMessages().empty());
+}
+TEST(V3PlatformStateGuardContract, RestoresExistingAndAbsentCacheEntries)
+{
+    V3PlatformStateGuard preserveOuterState;
+    auto& manager = fe::PlatformInfoManager::Instance();
+    manager.platform_info_map_.erase("Ascend910B");
+    fe::OptionalInfo before;
+    before.soc_version = "owner_original";
+    manager.SetOptionalCompilationInfo(before);
+    {
+        V3PlatformStateGuard scope;
+        fe::PlatformInfo replacement;
+        replacement.str_info.short_soc_version = "owner_replacement";
+        manager.platform_info_map_["Ascend910B"] = replacement;
+        fe::OptionalInfo after;
+        after.soc_version = "owner_replacement";
+        manager.SetOptionalCompilationInfo(after);
+    }
+    EXPECT_EQ(manager.platform_info_map_.count("Ascend910B"), 0U);
+    EXPECT_EQ(manager.opti_compilation_info_.soc_version, "owner_original");
+    fe::PlatformInfo original;
+    original.str_info.short_soc_version = "owner_original";
+    manager.platform_info_map_["Ascend910B"] = original;
+    {
+        V3PlatformStateGuard scope;
+        manager.platform_info_map_["Ascend910B"].str_info.short_soc_version = "owner_replacement";
+    }
+    EXPECT_EQ(manager.platform_info_map_.at("Ascend910B").str_info.short_soc_version, "owner_original");
 }
 
 } // namespace MoeDistributeDispatchV3InfershapeUT

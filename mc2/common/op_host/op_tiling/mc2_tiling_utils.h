@@ -17,6 +17,7 @@
 #define __MC2_TILING_UTILS_H__
 
 #include <cstdint>
+#include <cstring>
 #include <map>
 #include <string>
 
@@ -380,12 +381,37 @@ inline ge::graphStatus SetHcclCcTilingConfig(const gert::TilingContext* context,
                                              TilingDataT* tilingData)
 {
     constexpr uint32_t MC2_CC_OP_TYPE_BATCH_WRITE = 18; // batch write
+    constexpr size_t GROUP_BUFFER_BYTES = 128;
+    const char* nodeName = context->GetNodeName();
+    const auto reportTilingFailure = [nodeName](const std::string& reason) { OP_LOGE(nodeName, "%s", reason.c_str()); };
     auto attrs = context->GetAttrs();
+    if (attrs == nullptr || tilingData == nullptr) {
+        reportTilingFailure(std::string("SetHcclCcTilingConfig: missing ") +
+                            (attrs == nullptr ? "RuntimeAttrs" : "tiling data") + "; rebuild the tiling context");
+        return ge::GRAPH_FAILED;
+    }
     auto group = attrs->GetAttrPointer<char>(static_cast<int>(attrGroupIndex));
+    if (group == nullptr || std::strlen(group) >= GROUP_BUFFER_BYTES) {
+        const std::string reason = group == nullptr ?
+                                       "required group attribute is absent" :
+                                       "group name length=" + std::to_string(std::strlen(group)) +
+                                           "; expected fewer than " + std::to_string(GROUP_BUFFER_BYTES) + " bytes";
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(nodeName, "group", reason.c_str());
+        return ge::GRAPH_FAILED;
+    }
     const std::string algConfig = "MultiPut=level0:fullmesh";
     AscendC::Mc2CcTilingConfig mc2CcTilingConfig(group, MC2_CC_OP_TYPE_BATCH_WRITE, algConfig);
-    mc2CcTilingConfig.GetTiling(tilingData->mc2InitTiling);
-    mc2CcTilingConfig.GetTiling(tilingData->mc2CcTiling);
+    const auto initRet = mc2CcTilingConfig.GetTiling(tilingData->mc2InitTiling);
+    if (initRet != 0) {
+        OP_LOGE(nodeName, "MC2 tiling initialization failed: GetTiling(init) returned %u", initRet);
+        return ge::GRAPH_FAILED;
+    }
+    const auto commRet = mc2CcTilingConfig.GetTiling(tilingData->mc2CcTiling);
+    if (commRet != 0) {
+        OP_LOGE_WITHOUT_REPORT(
+            nodeName, "Mc2CcTiling invariant failed after initialization and group length validation; rc=%u", commRet);
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 

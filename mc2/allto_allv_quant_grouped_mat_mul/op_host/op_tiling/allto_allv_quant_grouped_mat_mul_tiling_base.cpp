@@ -14,6 +14,7 @@
  */
 #include "allto_allv_quant_grouped_mat_mul_tiling_base.h"
 #include <numeric>
+#include "mc2_tiling_failure_report.h"
 
 using namespace ge;
 using namespace AscendC;
@@ -42,25 +43,39 @@ ge::graphStatus AlltoAllvQuantGmmTilingBase::GetCommonPlatformInfo()
 ge::graphStatus AlltoAllvQuantGmmTilingBase::CheckCommonPlatformInfo()
 {
     OP_TILING_CHECK((aicCoreNum_ == 0U),
-                    OP_LOGE(context_->GetNodeName(), "platform info is invalid, aic num can not be 0."),
+                    Mc2Error::ReportTilingFailure(context_->GetNodeName(), "CheckCommonPlatformInfo: aic num actual=" +
+                                                                               std::to_string(aicCoreNum_) +
+                                                                               "; required positive platform resource"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK((aivCoreNum_ == 0U),
-                    OP_LOGE(context_->GetNodeName(), "platform info is invalid, aiv num can not be 0."),
+                    Mc2Error::ReportTilingFailure(context_->GetNodeName(), "CheckCommonPlatformInfo: aiv num actual=" +
+                                                                               std::to_string(aivCoreNum_) +
+                                                                               "; required positive platform resource"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK((l0aSize_ == 0U),
-                    OP_LOGE(context_->GetNodeName(), "platform info is invalid, l0a size can not be 0."),
+                    Mc2Error::ReportTilingFailure(context_->GetNodeName(), "CheckCommonPlatformInfo: l0a size actual=" +
+                                                                               std::to_string(l0aSize_) +
+                                                                               "; required positive platform resource"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK((l0bSize_ == 0U),
-                    OP_LOGE(context_->GetNodeName(), "platform info is invalid, l0b size can not be 0."),
+                    Mc2Error::ReportTilingFailure(context_->GetNodeName(), "CheckCommonPlatformInfo: l0b size actual=" +
+                                                                               std::to_string(l0bSize_) +
+                                                                               "; required positive platform resource"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK((l0cSize_ == 0U),
-                    OP_LOGE(context_->GetNodeName(), "platform info is invalid, l0c size can not be 0."),
+                    Mc2Error::ReportTilingFailure(context_->GetNodeName(), "CheckCommonPlatformInfo: l0c size actual=" +
+                                                                               std::to_string(l0cSize_) +
+                                                                               "; required positive platform resource"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK((l1Size_ == 0U),
-                    OP_LOGE(context_->GetNodeName(), "platform info is invalid, l1 size can not be 0."),
+                    Mc2Error::ReportTilingFailure(context_->GetNodeName(),
+                                                  "CheckCommonPlatformInfo: l1 size actual=" + std::to_string(l1Size_) +
+                                                      "; required positive platform resource"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK((ubSize_ == 0U),
-                    OP_LOGE(context_->GetNodeName(), "platform info is invalid, ub size can not be 0."),
+                    Mc2Error::ReportTilingFailure(context_->GetNodeName(),
+                                                  "CheckCommonPlatformInfo: ub size actual=" + std::to_string(ubSize_) +
+                                                      "; required positive platform resource"),
                     return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

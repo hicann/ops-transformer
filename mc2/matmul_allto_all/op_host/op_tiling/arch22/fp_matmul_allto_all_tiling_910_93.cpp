@@ -30,6 +30,8 @@ namespace {
 constexpr uint32_t ATTR_GROUP_INDEX = 0;
 }
 
+#include "mc2/matmul_allto_all/op_host/op_tiling/common/matmul_allto_all_error.h"
+
 namespace MC2Tiling {
 
 /**
@@ -40,7 +42,8 @@ namespace MC2Tiling {
 bool FpMatmulAllToAllTilingBaseA3::IsCapable()
 {
     fe::PlatFormInfos* platformInfoPtr = context_->GetPlatformInfo();
-    OP_TILING_CHECK(platformInfoPtr == nullptr, OP_LOGE(opName_, "fail to get platform info"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(platformInfoPtr == nullptr, OP_LOGE_WITHOUT_REPORT(opName_, "fail to get platform info"),
+                    return false);
     fe::PlatFormInfos& platformInfo = *platformInfoPtr;
     (void)platformInfo.GetPlatformResWithLock("version", "Short_SoC_version", socVersionStr_);
     OP_LOGD(opName_, "Current SocVersion_2201 is : %s", socVersionStr_.c_str());
@@ -95,7 +98,10 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::CheckA3NonQuantTensorDataType(cons
         return ge::GRAPH_FAILED);
     // 校验输出张量数据类型
     auto yDesc = context->GetOutputDesc(OUTPUT_Y_INDEX);
-    OP_TILING_CHECK((yDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "y"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (yDesc == nullptr),
+        ReportMatmulAlltoAllTilingFailure(opName, "Output y metadata holder is absent; rebuild the tiling context"),
+        return ge::GRAPH_FAILED);
     ge::DataType yDtype = yDesc->GetDataType();
     OP_TILING_CHECK((yDtype != x1Dtype),
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "y", Ops::Base::ToString(yDtype).c_str(),
@@ -137,8 +143,8 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::CheckBsRankSizeRange()
     const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
     int64_t rankSize = 0;
     if (worldSize == nullptr || *worldSize == RANK_DEFAULT_NUM) {
-        OP_TILING_CHECK(!mc2tiling::GetRankSize(opName_, group, rankSize), OP_LOGE(opName_, "GetRankSize failed."),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(!mc2tiling::GetRankSize(opName_, group, rankSize),
+                        OP_LOGE_WITHOUT_REPORT(opName_, "GetRankSize failed."), return ge::GRAPH_FAILED);
     } else {
         rankSize = *worldSize;
     }
@@ -179,13 +185,16 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::DoOpTiling()
         OP_LOGE_WITHOUT_REPORT(opName_, "input validation failed, status=%d", static_cast<int>(inputCheckStatus)),
         return ge::FAILED);
     // 参数校验通过后赋值给全局上下文变量
-    MC2_CHECK_LOG_RET(opName_, InitTilingContextParameters());
+    OP_TILING_CHECK(InitTilingContextParameters() != ge::GRAPH_SUCCESS,
+                    OP_LOGE_WITHOUT_REPORT(opName_, "InitTilingContextParameters() failed"), return ge::FAILED);
     // 进行通算切分
     MC2_CHECK_LOG_RET(opName_, TileCommAndCompute());
     // 调用非量化Matmul的tiling方法进行切分
-    MC2_CHECK_LOG_RET(opName_, DoMMTiling());
+    OP_TILING_CHECK(DoMMTiling() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(opName_, "DoMMTiling() failed"),
+                    return ge::FAILED);
     // hccl的tiling参数赋值处理
-    MC2_CHECK_LOG_RET(opName_, SetHcclTiling());
+    OP_TILING_CHECK(SetHcclTiling() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(opName_, "SetHcclTiling() failed"),
+                    return ge::FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -217,14 +226,18 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::SetHcclTiling()
 {
     OP_TILING_CHECK(mc2tiling::ConvertGeTypeToHcclType(opName_, contextInfo.args_.geCType) ==
                         mc2tiling::HcclDataType::HCCL_DATA_TYPE_RESERVED,
-                    OP_LOGE(opName_, "Cannot find HcclDataType according to ge datatype = %d.",
-                            static_cast<int32_t>(contextInfo.args_.geCType)),
+                    OP_LOGE_WITHOUT_REPORT(opName_, "Cannot find HcclDataType according to ge datatype = %d.",
+                                           static_cast<int32_t>(contextInfo.args_.geCType)),
                     return ge::GRAPH_FAILED;);
     auto group = context_->GetAttrs()->GetAttrPointer<char>(ATTR_GROUP_INDEX);
-    OP_TILING_CHECK(group == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "group"),
+    OP_TILING_CHECK(group == nullptr,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "group",
+                                                             "required communication group is absent"),
                     return ge::GRAPH_FAILED);
     auto commMode = context_->GetAttrs()->GetAttrPointer<char>(ATTR_COMM_MODE_INDEX);
-    OP_TILING_CHECK(commMode == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "comm_mode"),
+    OP_TILING_CHECK(commMode == nullptr,
+                    ReportMatmulAlltoAllTilingFailure(
+                        opName_, "Default comm_mode attribute storage is absent; rebuild RuntimeAttrs"),
                     return ge::GRAPH_FAILED);
     const size_t maxLength = 7UL;
     OP_TILING_CHECK((strncmp(commMode, "ai_cpu", maxLength) != 0),
@@ -237,15 +250,10 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::SetHcclTiling()
 
     OP_TILING_CHECK(mc2CcTilingConfig.SetSkipBufferWindowCopy(
                         static_cast<uint8_t>(mc2tiling::MC2_BUFFER_TYPE::MC2_BUFFER_TYPE_DEFAULT)) != 0,
-                    OP_LOGE(context_->GetNodeName(), "mc2CcTilingConfig setSkipBufferWindowCopy failed"),
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "mc2CcTilingConfig setSkipBufferWindowCopy failed"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(mc2CcTilingConfig.GetTiling(localTilingData_.mc2InitTiling) != 0,
-                    OP_LOGE(context_->GetNodeName(), "mc2CcTilingConfig mc2tiling GetTiling mc2InitTiling failed"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(mc2CcTilingConfig.GetTiling(localTilingData_.mc2CcTiling) != 0,
-                    OP_LOGE(context_->GetNodeName(), "mc2CcTilingConfig mc2tiling GetTiling mc2CcTiling failed"),
-                    return ge::GRAPH_FAILED);
-    return ge::GRAPH_SUCCESS;
+    return GetMatmulAlltoAllHcclTiling(mc2CcTilingConfig, localTilingData_.mc2InitTiling, localTilingData_.mc2CcTiling,
+                                       opName_);
 }
 
 /**
@@ -339,7 +347,11 @@ void FpMatmulAllToAllTilingBaseA3::SetUserWorkSpace()
 ge::graphStatus FpMatmulAllToAllTilingBaseA3::GetWorkspaceSize()
 {
     size_t* workspaces = context_->GetWorkspaceSizes(1);
-    OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "Get workspace failed"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(workspaces == nullptr,
+                    ReportMatmulAlltoAllTilingFailure(
+                        opName_, "GetWorkspaceSizes(1) returned null; actual workspace slots=" +
+                                     std::to_string(context_->GetWorkspaceNum()) + "; rebuild the workspace holder"),
+                    return ge::GRAPH_FAILED);
     SetUserWorkSpace();
     uint64_t workspaceSize_ =
         libApiWorkSpaceSize_ + inferredInfo.mmResultLen + inferredInfo.permuteLen + inferredInfo.biasLen;
@@ -356,19 +368,31 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::GetWorkspaceSize()
  */
 ge::graphStatus FpMatmulAllToAllTilingBaseA3::PostTiling()
 {
+    OP_TILING_CHECK(
+        context_->GetRawTilingData() == nullptr,
+        ReportMatmulAlltoAllTilingFailure(opName_, "Raw tiling data holder is absent; rebuild the tiling context"),
+        return ge::GRAPH_FAILED);
     SetTilingInfo(localTilingData_.matmulAlltoAllTilingInfo);
     MatmulAlltoAllTilingDataA3* outTilingData = context_->GetTilingData<MatmulAlltoAllTilingDataA3>();
     size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
-    OP_TILING_CHECK((outTilingData == nullptr), OP_LOGE(opName_, "Failed to get tiling data from context"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((tilingBufCap < sizeof(localTilingData_)),
-                    OP_LOGE(opName_, "TilingBuffer capacity too small, capacity = %zu, need = %zu.", tilingBufCap,
-                            sizeof(localTilingData_)),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (tilingBufCap < sizeof(localTilingData_)),
+        ReportMatmulAlltoAllTilingFailure(opName_, "Tiling data capacity=" + std::to_string(tilingBufCap) +
+                                                       ", required bytes=" + std::to_string(sizeof(localTilingData_)) +
+                                                       "; allocate a sufficient tiling buffer"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (outTilingData == nullptr),
+        ReportMatmulAlltoAllTilingFailure(
+            opName_,
+            "GetTilingData returned null; required a materialized tiling data holder; rebuild the tiling context"),
+        return ge::GRAPH_FAILED);
 
     errno_t ret = memcpy_s(outTilingData, tilingBufCap, &localTilingData_, sizeof(localTilingData_));
     if (ret != EOK) {
-        OP_LOGE(opName_, "MatmulAlltoAll postTiling: memcpy_s tiling data failed, ret=%d.", ret);
+        ReportMatmulAlltoAllTilingFailure(
+            opName_, "memcpy_s failed while writing tiling data; rc=" + std::to_string(ret) +
+                         ", buffer capacity=" + std::to_string(tilingBufCap) + "; rebuild the tiling buffer");
         return ge::GRAPH_FAILED;
     }
 

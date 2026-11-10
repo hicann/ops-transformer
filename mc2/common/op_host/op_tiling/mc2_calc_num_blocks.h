@@ -31,11 +31,14 @@ inline uint64_t GetNumBlocks(const uint64_t aicNum, const uint64_t aivNum, const
                 "so the actual enabled AIC cores is %lu and AIV cores is %lu.",
                 aicNum, aivNum, ratio, pairedAicNum, numBlocks, numBlocks * ratio);
     }
-    OP_TILING_CHECK((numBlocks == 0U),
-                    OP_LOGE_FOR_INVALID_VALUE(debugDesc, "aicNum, aivNum",
-                                              (std::to_string(aicNum) + ", " + std::to_string(aivNum)).c_str(),
-                                              "numBlocks=min(aicNum, aivNum/ratio) should not be 0"),
-                    return ge::GRAPH_FAILED);
+    if (numBlocks == 0U) {
+        const char* opName = debugDesc == nullptr ? "Mc2Tiling" : debugDesc;
+        const std::string reason = "GetNumBlocks: aic=" + std::to_string(aicNum) + ", aiv=" + std::to_string(aivNum) +
+                                   ", ratio=" + std::to_string(ratio) +
+                                   "; no logical core can be formed from the platform core counts";
+        OP_LOGE(opName, "%s", reason.c_str());
+        return 0;
+    }
     return numBlocks;
 }
 } // namespace mc2tiling

@@ -16,6 +16,7 @@
 #include "../../../op_kernel/arch22/grouped_mat_mul_allto_allv_mte_tiling.h"
 #include "op_mc2.h"
 #include "mc2_log.h"
+#include "mc2_tiling_failure_report.h"
 #include "op_host/tiling_templates_registry.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "mc2_comm_utils.h"
@@ -72,7 +73,13 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::DoOpTiling()
     // AllToAllMatmul/MatmulAlltoAll scheduling contract so every participating
     // core is launched as one batch.
     constexpr uint32_t batchMode = 1U;
-    MC2_CHECK_LOG_RET(opName_, context_->SetScheduleMode(batchMode));
+    const auto scheduleRet = context_->SetScheduleMode(batchMode);
+    if (scheduleRet != ge::GRAPH_SUCCESS) {
+        Mc2Error::ReportTilingFailure(
+            opName_,
+            "SetScheduleMode(1) failed; expected writable schedule output slot; rc=" + std::to_string(scheduleRet));
+        return ge::GRAPH_FAILED;
+    }
     {
         const ge::graphStatus status = CheckAndSetInputOutputInfo();
         if (status != ge::GRAPH_SUCCESS) {
@@ -565,12 +572,28 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::GetPlatformInfo()
         return status;
     }
     auto platformInfo = context_->GetPlatformInfo();
-    OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE(opName_, "Failed to get platform info."), return ge::GRAPH_FAILED);
+    // The shared GetPlatformInfo above guarantees a non-null platform.
+
     platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
     npuArch_ = ascendcPlatform.GetCurNpuArch();
     std::string socVersion;
     (void)platformInfo->GetPlatformResWithLock("version", "Short_SoC_version", socVersion);
     isA3_ = socVersion == "Ascend910_93";
+    const auto* attrs = context_->GetAttrs();
+    if (attrs == nullptr) {
+        Mc2Error::ReportTilingFailure(opName_, "GetAttrs returned null; expected materialized RuntimeAttrs");
+        return ge::GRAPH_FAILED;
+    }
+    const char* commMode = attrs->GetAttrPointer<char>(ATTR_COMM_MODE);
+    if (commMode == nullptr) {
+        Mc2Error::ReportTilingFailure(opName_, "GetAttrPointer(comm_mode) returned null; expected default storage");
+        return ge::GRAPH_FAILED;
+    }
+    if (std::strcmp(commMode, "aiv") == 0 && (npuArch_ == Ops::Base::DAV_3510 || npuArch_ == Ops::Base::DAV_9201)) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "comm_mode", commMode,
+                                              ("aiv requires Atlas A2/A3; actual SoC=" + socVersion).c_str());
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -601,19 +624,39 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::FillCommTiling(
     MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData& outData) const
 {
     const gert::RuntimeAttrs* attrs = context_->GetAttrs();
-    OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "attrs"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(attrs == nullptr, Mc2Error::ReportTilingFailure(opName_, "FillCommTiling: missing RuntimeAttrs"),
+                    return ge::GRAPH_FAILED);
     const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
-    OP_TILING_CHECK(group == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "group"), return ge::GRAPH_FAILED);
+    if (group == nullptr || strnlen(group, 128) >= 128) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "group",
+                                                 "required group name must be present and shorter than 128 bytes");
+        return ge::GRAPH_FAILED;
+    }
+    const char* ascendHome = std::getenv("ASCEND_HOME_PATH");
+    if (ascendHome == nullptr || ascendHome[0] == '\0') {
+        OP_LOGE(opName_, "FillCommTiling failed: required environment variable ASCEND_HOME_PATH is absent or empty");
+        return ge::GRAPH_FAILED;
+    }
     outData.isA3 = static_cast<uint32_t>(isA3_);
     const uint32_t opType = isA3_ ? OP_TYPE_ALL_TO_ALL : OP_TYPE_MULTI_PUT;
     const std::string& algConfig = isA3_ ? A3_MTE_HCCL_ALG_CONFIG : A2_MTE_HCCL_ALG_CONFIG;
     Mc2CcTilingConfig mc2InitConfig(group, opType, algConfig);
-    OP_TILING_CHECK(mc2InitConfig.SetCommEngine(Mc2Comm::ENGINE_MTE) != 0,
-                    OP_LOGE(opName_, "Failed to select the MTE communication engine."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(mc2InitConfig.GetTiling(outData.mc2InitTiling) != 0,
-                    OP_LOGE(opName_, "Failed to generate the MTE Mc2InitTiling header."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(mc2InitConfig.GetTiling(outData.mc2CcTiling) != 0,
-                    OP_LOGE(opName_, "Failed to generate the MTE Mc2CcTiling descriptor."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        mc2InitConfig.SetCommEngine(Mc2Comm::ENGINE_MTE) != 0,
+        OP_LOGE_WITHOUT_REPORT(
+            opName_, "SetCommEngine invariant failed; SDK implementation only assigns ENGINE_MTE and returns success"),
+        return ge::GRAPH_FAILED);
+    const auto initRet = mc2InitConfig.GetTiling(outData.mc2InitTiling);
+    if (initRet != 0) {
+        Mc2Error::ReportTilingFailure(opName_, "Mc2InitTiling could not obtain required rtGetSocVersion from " +
+                                                   std::string(ascendHome) +
+                                                   "/lib64/libruntime.so; rc=" + std::to_string(initRet));
+        return ge::GRAPH_FAILED;
+    }
+    OP_TILING_CHECK(
+        mc2InitConfig.GetTiling(outData.mc2CcTiling) != 0,
+        OP_LOGE_WITHOUT_REPORT(opName_, "Mc2CcTiling invariant failed after group and fixed-algorithm validation"),
+        return ge::GRAPH_FAILED);
     OP_TILING_CHECK(mc2tiling::GetCclBufferSize(group, &outData.commBufferSize, opName_) != ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(opName_, "Failed to get CCL buffer size for MTE communication."),
                     return ge::GRAPH_FAILED);
@@ -628,14 +671,16 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckCommBuffer(
                            MC2KernelTemplate::Gmma2avMteTiling::COUNT_TABLE_ALIGNMENT_BYTES);
     const uint64_t sendCountStagingBytes = MC2KernelTemplate::Gmma2avMteTiling::SEND_COUNT_STAGING_FROM_TAIL -
                                            MC2KernelTemplate::Gmma2avMteTiling::SYNC_REGION_FROM_TAIL;
-    OP_TILING_CHECK(countMatrixBytes > sendCountStagingBytes,
-                    OP_LOGE(opName_, "MTE send-count staging requires %lu bytes, but its CCL region has %lu bytes.",
-                            countMatrixBytes, sendCountStagingBytes),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        countMatrixBytes > sendCountStagingBytes,
+        OP_LOGE_WITHOUT_REPORT(opName_, "MTE send-count staging requires %lu bytes, but its CCL region has %lu bytes.",
+                               countMatrixBytes, sendCountStagingBytes),
+        return ge::GRAPH_FAILED);
     const uint64_t syncBytes = MC2KernelTemplate::Gmma2avMteTiling::FIXED_SYNC_BYTES;
     OP_TILING_CHECK(syncBytes > MC2KernelTemplate::Gmma2avMteTiling::CCL_TAIL_SAFETY_BYTES,
-                    OP_LOGE(opName_, "MTE fixed sync layout requires %lu bytes, but the CCL tail region has %lu bytes.",
-                            syncBytes, MC2KernelTemplate::Gmma2avMteTiling::CCL_TAIL_SAFETY_BYTES),
+                    OP_LOGE_WITHOUT_REPORT(
+                        opName_, "MTE fixed sync layout requires %lu bytes, but the CCL tail region has %lu bytes.",
+                        syncBytes, MC2KernelTemplate::Gmma2avMteTiling::CCL_TAIL_SAFETY_BYTES),
                     return ge::GRAPH_FAILED);
     const uint64_t dtypeSize = mc2tiling::GetDataTypeSize(opName_, localParams_.gmmYDtype);
     const uint64_t sendBytes = localParams_.A * localParams_.N1 * dtypeSize;
@@ -693,17 +738,31 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::FinishPostTiling(
     outData.cocTiling.swizzlCount = MC2KernelTemplate::Gmma2avMteTiling::SWIZZLE_COUNT;
     outData.cocTiling.swizzlDirect = MC2KernelTemplate::Gmma2avMteTiling::SWIZZLE_DIRECTION;
 
+    auto* raw = context_->GetRawTilingData();
+    if (raw == nullptr || raw->GetData() == nullptr) {
+        Mc2Error::ReportTilingFailure(opName_,
+                                      "FinishPostTiling: missing raw tiling holder/data; expected writable storage");
+        return ge::GRAPH_FAILED;
+    }
+    size_t tilingBufCap = raw->GetCapacity();
+    if (tilingBufCap < sizeof(outData)) {
+        Mc2Error::ReportTilingFailure(opName_, "FinishPostTiling capacity=" + std::to_string(tilingBufCap) +
+                                                   "; required=" + std::to_string(sizeof(outData)) + " bytes");
+        return ge::GRAPH_FAILED;
+    }
     auto* outTilingData = context_->GetTilingData<MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData>();
-    size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
-    OP_TILING_CHECK(outTilingData == nullptr, OP_LOGE(opName_, "Failed to get MTE tiling data from context"),
-                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
-        tilingBufCap < sizeof(outData),
-        OP_LOGE(opName_, "TilingBuffer too small, capacity = %zu, need = %zu.", tilingBufCap, sizeof(outData)),
+        outTilingData == nullptr,
+        Mc2Error::ReportTilingFailure(
+            opName_, "GetTilingData returned null after holder/capacity validation; expected writable MTE storage"),
         return ge::GRAPH_FAILED);
+
     static_assert(sizeof(outData) % sizeof(uint64_t) == 0U, "MTE tiling data must be 8-byte aligned");
     errno_t ret = memcpy_s(outTilingData, tilingBufCap, &outData, sizeof(outData));
-    OP_TILING_CHECK(ret != EOK, OP_LOGE(opName_, "postTiling: memcpy_s failed with ret=%d.", ret),
+    OP_TILING_CHECK(ret != EOK,
+                    Mc2Error::ReportTilingFailure(
+                        opName_, "FinishPostTiling memcpy_s failed; rc=" + std::to_string(ret) + "; capacity=" +
+                                     std::to_string(tilingBufCap) + "; required=" + std::to_string(sizeof(outData))),
                     return ge::GRAPH_FAILED);
     context_->GetRawTilingData()->SetDataSize(sizeof(outData));
     return ge::GRAPH_SUCCESS;
@@ -745,10 +804,11 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckExpertPipeline() const
                 "; rank size must be <= " + std::to_string(MC2KernelTemplate::Gmma2avMteTiling::MAX_RANK_SIZE) +
                 " and their product <= " + std::to_string(MC2KernelTemplate::Gmma2avMteTiling::MAX_COUNT_NUM)),
         return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(MC2KernelTemplate::Gmma2avMteTiling::FIXED_SYNC_BYTES >
-                        MC2KernelTemplate::Gmma2avMteTiling::SYNC_REGION_FROM_TAIL,
-                    OP_LOGE(opName_, "Expert-overlap fixed sync layout does not fit its reserved CCL region."),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        MC2KernelTemplate::Gmma2avMteTiling::FIXED_SYNC_BYTES >
+            MC2KernelTemplate::Gmma2avMteTiling::SYNC_REGION_FROM_TAIL,
+        OP_LOGE_WITHOUT_REPORT(opName_, "Expert-overlap fixed sync layout does not fit its reserved CCL region."),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -791,7 +851,10 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::SetExpertChunkRows(uint32_t& ex
 ge::graphStatus GroupedMatmulAllToAllvMteTiling::GetWorkspaceSize()
 {
     size_t* workspaces = context_->GetWorkspaceSizes(1);
-    OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "Failed to get workspace."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(workspaces == nullptr,
+                    Mc2Error::ReportTilingFailure(
+                        opName_, "GetWorkspaceSizes(1) returned null; expected one writable workspace slot"),
+                    return ge::GRAPH_FAILED);
     workspaces[0] = mteWorkspaceSize_;
     OP_LOGD(opName_, "MTE workspace size=%lu", mteWorkspaceSize_);
     return ge::GRAPH_SUCCESS;
@@ -812,10 +875,10 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::GetAndConvertCommMode(gert::Til
     OP_TILING_CHECK(commModeStr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "comm_mode"),
                     return ge::GRAPH_FAILED);
     constexpr size_t maxLength = 7UL;
-    OP_TILING_CHECK(
-        npuArch_ == Ops::Base::DAV_3510,
-        OP_LOGE(context->GetNodeName(), "GroupedMatMulAlltoAllv AIV-driven MTE mode only supports Atlas A2/A3."),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(npuArch_ == Ops::Base::DAV_3510,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "comm_mode", commModeStr,
+                                                          "aiv communication requires Atlas A2/A3"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(strncmp(commModeStr, "aiv", maxLength) != 0,
                     OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "comm_mode", commModeStr, "aiv"),
                     return ge::GRAPH_FAILED);

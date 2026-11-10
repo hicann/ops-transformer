@@ -314,10 +314,6 @@ static ge::graphStatus CheckTpAttrs(const char* nodeName, int64_t tpWorldSize, i
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "tpWorldSize", std::to_string(tpWorldSize).c_str(), "in supported range"),
         return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
-        tpWorldSize >= 2,
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "tp_world_size", std::to_string(tpWorldSize).c_str(), "less than 2"),
-        return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(
         tpRankId != 0,
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "tpRankId", std::to_string(tpRankId).c_str(), "should be 0 in NoTp mode"),
         return ge::GRAPH_FAILED);

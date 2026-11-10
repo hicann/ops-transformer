@@ -15,6 +15,7 @@
 
 #include "op_mc2.h"
 #include "mc2_log.h"
+#include "mc2_tiling_failure_report.h"
 #include "quant_grouped_mat_mul_allto_allv_tiling_common.h"
 #include "quant_grouped_mat_mul_allto_allv_tiling_adapter.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"
@@ -746,7 +747,8 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckLocalParams()
                                   "BSK=" + std::to_string(localParams_.BsK) + " BS=" + std::to_string(localParams_.Bs),
                                   "BSK should be an integer multiple of BS"),
         return ge::GRAPH_FAILED);
-    MC2_CHECK_LOG_RET(opName_, CheckTopK(localParams_.BsK / localParams_.Bs));
+    OP_TILING_CHECK(CheckTopK(localParams_.BsK / localParams_.Bs) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_WITHOUT_REPORT(opName_, "Shared matmul TopK validation failed"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK((localParams_.H2 == 0) || (localParams_.H2 > MAX_SHARED_H_SHAPE_SIZE),
                     OP_LOGE_FOR_INVALID_VALUE(opName_, "H2", std::to_string(localParams_.H2),
                                               "(0, " + std::to_string(MAX_SHARED_H_SHAPE_SIZE) + "]"),
@@ -792,11 +794,20 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckParamsRelationAndS
 ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::GetPlatformInfo()
 {
     fe::PlatFormInfos* platformInfo = context_->GetPlatformInfo();
-    OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE(opName_, "Failed to get platform info."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        platformInfo == nullptr,
+        Mc2Error::ReportTilingFailure(opName_, "GetPlatformInfo returned null; expected initialized platform metadata"),
+        return ge::GRAPH_FAILED);
     platform_ascendc::PlatformAscendC ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     libApiWorkSpaceSize_ = ascendcPlatform.GetLibApiWorkSpaceSize();
     localParams_.aivCoreNum = ascendcPlatform.GetCoreNumAiv();
     localParams_.aicCoreNum = ascendcPlatform.GetCoreNumAic();
+    if (localParams_.aivCoreNum == 0 || localParams_.aicCoreNum == 0) {
+        Mc2Error::ReportTilingFailure(
+            opName_, "Platform core counts must be positive; actual aiv=" + std::to_string(localParams_.aivCoreNum) +
+                         ", aic=" + std::to_string(localParams_.aicCoreNum));
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 };
 
@@ -996,7 +1007,8 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::SetHcclTiling()
 ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::DoOpTiling()
 {
     // 输入参数的校验:Attrs,Dtype,Shape等
-    MC2_CHECK_LOG_RET(opName_, CheckAndSetInputOutputInfo());
+    OP_TILING_CHECK(CheckAndSetInputOutputInfo() != ge::GRAPH_SUCCESS,
+                    OP_LOGE_LIBOPAPI_REPORT(opName_, "CheckAndSetInputOutputInfo failed."), return ge::FAILED);
 
     MC2_CHECK_LOG_RET(opName_, SetTilingCommonInfo());
     // 调用量化Matmul的tiling方法进行切分

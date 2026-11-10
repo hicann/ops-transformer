@@ -83,6 +83,8 @@ static void TilingParamDeal(CoCTiling& cocTilingData, MatmulAlltoAllInfo& info)
     }
 }
 
+#include "mc2/matmul_allto_all/op_host/op_tiling/common/matmul_allto_all_error.h"
+
 namespace MC2Tiling {
 
 static std::map<int, std::vector<std::vector<int>>> g_matmulalltoallTwoRankFP16M0Map = {
@@ -381,7 +383,8 @@ static std::map<int, std::vector<std::vector<int>>> g_matmulalltoallEightRankFP1
 bool MatmulAlltoAllTiling910B::IsCapable()
 {
     fe::PlatFormInfos* platformInfoPtr = context_->GetPlatformInfo();
-    OP_TILING_CHECK(platformInfoPtr == nullptr, OP_LOGE(opName_, "fail to get platform info"), return false);
+    OP_TILING_CHECK(platformInfoPtr == nullptr, OP_LOGE_WITHOUT_REPORT(opName_, "fail to get platform info"),
+                    return false);
     fe::PlatFormInfos& platformInfo = *platformInfoPtr;
     std::string socVersionStr;
     (void)platformInfo.GetPlatformResWithLock("version", "Short_SoC_version", socVersionStr);
@@ -402,18 +405,27 @@ bool MatmulAlltoAllTiling910B::IsCapable()
 ge::graphStatus MatmulAlltoAllTiling910B::CheckAndSetAttrsInfo(MatmulAlltoAllInfo& info)
 {
     const gert::RuntimeAttrs* attrs = context_->GetAttrs();
-    OP_TILING_CHECK(attrs == nullptr, OP_LOGE(opName_, "Failed to get attrs."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITHOUT_REPORT(opName_, "Failed to get attrs."), return ge::GRAPH_FAILED);
 
     const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
     const char* commMode = attrs->GetAttrPointer<char>(ATTR_COMM_MODE_INDEX);
     const int64_t* x1_quant_mode = attrs->GetAttrPointer<int64_t>(ATTR_X1_QUANTMODE_INDEX);
     const int64_t* x2_quant_mode = attrs->GetAttrPointer<int64_t>(ATTR_X2_QUANTMODE_INDEX);
     // 判断为空或者空字符串
-    OP_TILING_CHECK(group == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "group"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(group[0] == '\0', OP_LOGE_WITH_INVALID_INPUT(opName_, "group"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        group == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "group", "must be a nonempty required communication group"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        group[0] == '\0',
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "group", "must be a nonempty required communication group"),
+        return ge::GRAPH_FAILED);
 
     // A2的comm_mode只支持aiv
-    OP_TILING_CHECK(commMode == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "comm_mode"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(commMode == nullptr,
+                    ReportMatmulAlltoAllTilingFailure(
+                        opName_, "Default comm_mode attribute storage is absent; rebuild RuntimeAttrs"),
+                    return ge::GRAPH_FAILED);
     const size_t maxLength = 4UL;
     OP_TILING_CHECK((strncmp(commMode, "aiv", maxLength) != 0),
                     OP_LOGE_FOR_INVALID_VALUE(opName_, "comm_mode", commMode, "aiv"), return ge::GRAPH_FAILED);
@@ -430,6 +442,11 @@ ge::graphStatus MatmulAlltoAllTiling910B::CheckAndSetAttrsInfo(MatmulAlltoAllInf
 
     const bool* isTransX2 = attrs->GetAttrPointer<bool>(ATTR_X2_TRANSPOSE_INDEX);
     needTransX2 = (isTransX2 != nullptr) ? *isTransX2 : false;
+    OP_TILING_CHECK(
+        x1_quant_mode == nullptr || x2_quant_mode == nullptr,
+        ReportMatmulAlltoAllTilingFailure(
+            opName_, "Default x1_quant_mode or x2_quant_mode attribute storage is absent; rebuild RuntimeAttrs"),
+        return ge::GRAPH_FAILED);
     quantType = static_cast<uint32_t>((*x1_quant_mode) * X1_QUANT_SIGN + (*x2_quant_mode));
 
     return ge::GRAPH_SUCCESS;
@@ -447,7 +464,10 @@ ge::graphStatus MatmulAlltoAllTiling910B::CheckTensorDataType(MatmulAlltoAllInfo
     auto x2TensorDesc = context_->GetInputDesc(INPUT_X2_INDEX);
     OP_TILING_CHECK((x2TensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "x2"), return ge::GRAPH_FAILED);
     auto yDesc = context_->GetOutputDesc(OUTPUT_Y_INDEX);
-    OP_TILING_CHECK((yDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "y"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (yDesc == nullptr),
+        ReportMatmulAlltoAllTilingFailure(opName_, "Output y metadata holder is absent; rebuild the tiling context"),
+        return ge::GRAPH_FAILED);
 
     // 获取数据类型并校验一致性与范围
     ge::DataType x1Dtype = x1TensorDesc->GetDataType();
@@ -601,7 +621,10 @@ ge::graphStatus MatmulAlltoAllTiling910B::CheckShapeInfo(MatmulAlltoAllInfo& inf
 
     // 校验输出
     const gert::StorageShape* yShape = context_->GetOutputShape(OUTPUT_Y_INDEX);
-    OP_TILING_CHECK((yShape == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "y"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (yShape == nullptr),
+        ReportMatmulAlltoAllTilingFailure(opName_, "Output y metadata holder is absent; rebuild the tiling context"),
+        return ge::GRAPH_FAILED);
     uint64_t yDimNum = yShape->GetStorageShape().GetDimNum();
     OP_TILING_CHECK((yDimNum != 2),
                     OP_LOGE_FOR_INVALID_SHAPEDIM(opName_, "y", (std::to_string(yDimNum) + "D").c_str(), "2D"),
@@ -763,11 +786,22 @@ ge::graphStatus MatmulAlltoAllTiling910B::DoOpTiling()
     // 涉及SyncAll，设置batch mode模式，所有核同时启动
     uint32_t batch_mode = 1U;
     auto ret = context_->SetScheduleMode(batch_mode);
-    MC2_CHECK_LOG_RET(opName_, ret);
+    OP_TILING_CHECK(
+        ret != ge::GRAPH_SUCCESS,
+        ReportMatmulAlltoAllTilingFailure(opName_, "SetScheduleMode(1) failed; rebuild compute node metadata"),
+        return ge::FAILED);
+    OP_TILING_CHECK(
+        context_->GetRawTilingData() == nullptr,
+        ReportMatmulAlltoAllTilingFailure(opName_, "Raw tiling data holder is absent; rebuild the tiling context"),
+        return ge::GRAPH_FAILED);
     // 1. tilingData
     MatmulAlltoAllTilingData* tilingData = context_->GetTilingData<MatmulAlltoAllTilingData>();
-    OPS_CHECK(tilingData == nullptr, OPS_REPORT_VECTOR_INNER_ERR(opName_, "tilingData is nullptr."),
-              return ge::GRAPH_FAILED);
+    OPS_CHECK(
+        tilingData == nullptr,
+        ReportMatmulAlltoAllTilingFailure(
+            opName_,
+            "GetTilingData returned null; required a materialized tiling data holder; rebuild the tiling context"),
+        return ge::GRAPH_FAILED);
     OPS_LOG_I(opName_, "MatmulAlltoAll get tilingData.");
     MatmulAlltoAllInfo& info = tilingData->matmulAlltoAllInfo;
     OPS_LOG_I(opName_, "MatmulAlltoAll get tilingData info.");
@@ -778,7 +812,8 @@ ge::graphStatus MatmulAlltoAllTiling910B::DoOpTiling()
         OP_LOGE_WITHOUT_REPORT(opName_, "input validation failed, status=%d", static_cast<int>(inputCheckStatus)),
         return ge::FAILED);
     MC2_CHECK_LOG_RET(opName_, DoMmCommTiling(tilingData->cocTiling, info));
-    MC2_CHECK_LOG_RET(opName_, SetHcclTiling(tilingData));
+    OP_TILING_CHECK(SetHcclTiling(tilingData) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_WITHOUT_REPORT(opName_, "SetHcclTiling(tilingData) failed"), return ge::FAILED);
     // 校验HCCL BUFF空间大小
     MC2_CHECK_LOG_RET(opName_, mc2tiling::CheckHcclBuffSize(context_, ATTR_GROUP_INDEX, MAX_BUFF_BYTES, opName_));
 
@@ -828,7 +863,11 @@ ge::graphStatus MatmulAlltoAllTiling910B::SetHcclTiling(MatmulAlltoAllTilingData
 ge::graphStatus MatmulAlltoAllTiling910B::GetWorkspaceSize()
 {
     size_t* workspaces = context_->GetWorkspaceSizes(1);
-    OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "Get workspace failed"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(workspaces == nullptr,
+                    ReportMatmulAlltoAllTilingFailure(
+                        opName_, "GetWorkspaceSizes(1) returned null; actual workspace slots=" +
+                                     std::to_string(context_->GetWorkspaceNum()) + "; rebuild the workspace holder"),
+                    return ge::GRAPH_FAILED);
     size_t wsSize = SYSTEM_NEED_WORKSPACE;
     if (quantType == SUPPORT_QUANT_MODE) {
         wsSize += tileM0 * numBlocks * WORKSPACE_NUM * tileN0 * 4; // 4 is sizeof uint32_t

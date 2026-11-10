@@ -140,7 +140,7 @@ inline bool MoeDistributeDispatchTilingHelper::CheckOutputTensorDim(gert::Tiling
     if ((quantMode != static_cast<uint32_t>(QuantModeA5::NON_QUANT)) &&
         (quantMode != static_cast<uint32_t>(QuantModeA5::STATIC_QUANT))) {
         if (!CheckDynamicScalesDim(context, nodeName, quantMode)) {
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "dynamicScales", "", "dynamicScales shape check failed");
+            OP_LOGE_LIBOPAPI_REPORT(nodeName, "CheckDynamicScalesDim failed; propagate lower-layer error");
             return false;
         }
     }
@@ -190,7 +190,7 @@ bool MoeDistributeDispatchTilingHelper::CheckTensorDim(gert::TilingContext* cont
                                                        const uint32_t opVersion)
 {
     if (!CheckInputTensorDim(context, nodeName, isScales, quantMode)) {
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "input tensors", "", "input param shape is invalid");
+        OP_LOGE_LIBOPAPI_REPORT(nodeName, "CheckInputTensorDim failed; propagate lower-layer error");
         return false;
     }
 
@@ -205,7 +205,7 @@ bool MoeDistributeDispatchTilingHelper::CheckTensorDim(gert::TilingContext* cont
     }
 
     if ((!CheckOutputTensorDim(context, nodeName, quantMode)) || (!CheckEpTpRecvTensorDim(context, nodeName))) {
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "output tensors", "", "output param shape is invalid");
+        OP_LOGE_LIBOPAPI_REPORT(nodeName, "Output shape validation failed; propagate lower-layer error");
         return false;
     }
     return true;
@@ -582,11 +582,14 @@ ge::graphStatus MoeDistributeDispatchTilingHelper::TilingCheckMoeDistributeDispa
                                                                                     const uint32_t quantMode)
 {
     OP_TILING_CHECK(!CheckTensorDim(context, nodeName, isScales, quantMode, OP_VERSION_1),
-                    OP_LOGE_WITH_INVALID_INPUT(nodeName, "params shape"), return ge::GRAPH_FAILED);
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "CheckTensorDim failed; propagate lower-layer error"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(!CheckTensorDataType(context, nodeName, isScales, quantMode),
-                    OP_LOGE_WITH_INVALID_INPUT(nodeName, "params dataType"), return ge::GRAPH_FAILED);
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "CheckTensorDataType failed; propagate lower-layer error"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(!CheckTensorFormat(context, nodeName, isScales, quantMode),
-                    OP_LOGE_WITH_INVALID_INPUT(nodeName, "params format"), return ge::GRAPH_FAILED);
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "CheckTensorFormat failed; propagate lower-layer error"),
+                    return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -600,11 +603,14 @@ ge::graphStatus MoeDistributeDispatchTilingHelper::TilingCheckMoeDistributeDispa
     const char* nodeName = context->GetNodeName();
     auto opVersion = OpVersionManager::GetInstance().GetVersion();
     OP_TILING_CHECK(!CheckTensorDim(context, nodeName, isScales, quantMode, opVersion),
-                    OP_LOGE_WITH_INVALID_INPUT(nodeName, "params shape"), return ge::GRAPH_FAILED);
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "CheckTensorDim failed; propagate lower-layer error"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(!CheckTensorDataTypeA5(context, nodeName, isScales, quantMode),
-                    OP_LOGE_WITH_INVALID_INPUT(nodeName, "params dataType"), return ge::GRAPH_FAILED);
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "CheckTensorDataType failed; propagate lower-layer error"),
+                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(!CheckTensorFormat(context, nodeName, isScales, quantMode),
-                    OP_LOGE_WITH_INVALID_INPUT(nodeName, "params format"), return ge::GRAPH_FAILED);
+                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "CheckTensorFormat failed; propagate lower-layer error"),
+                    return ge::GRAPH_FAILED);
     if ((opVersion != OP_VERSION_1) && isTokenMask) {
         OP_TILING_CHECK(!CheckTokenMask(context, nodeName), OP_LOGE_WITHOUT_REPORT(nodeName, "xActiveMask is invalid."),
                         return ge::GRAPH_FAILED);

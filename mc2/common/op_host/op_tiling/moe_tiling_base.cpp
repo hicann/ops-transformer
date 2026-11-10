@@ -22,8 +22,13 @@ ge::graphStatus MoeTilingBase::GetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
     const char* nodeName = context_->GetNodeName();
-    OP_TILING_CHECK(nodeName == nullptr, OP_LOGE(nodeName, "Fail to get nodeName."), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE(nodeName, "fail to get platform info"), return ge::GRAPH_FAILED);
+    if (nodeName == nullptr || platformInfo == nullptr) {
+        const char* name = nodeName == nullptr ? "MoeTilingBase" : nodeName;
+        const char* reason = nodeName == nullptr ? "MoeTilingBase::GetPlatformInfo: node-name metadata is absent" :
+                                                   "MoeTilingBase::GetPlatformInfo: platform information is absent";
+        OP_LOGE(name, "%s", reason);
+        return ge::GRAPH_FAILED;
+    }
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     npuArch_ = ascendcPlatform.GetCurNpuArch();
     return ge::GRAPH_SUCCESS;
@@ -56,27 +61,30 @@ ge::graphStatus MoeTilingBase::CheckSharedExpertAttrValue(const char* nodeName, 
     if (sharedExpertRankNum == 0) {
         return ge::GRAPH_SUCCESS;
     }
-    OP_TILING_CHECK((sharedExpertNum == 0),
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "sharedExpertNum",
-                                              (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
-                                               ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
-                                                  .c_str(),
-                                              "sharedExpertNum != 0"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((sharedExpertNum > sharedExpertRankNum),
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "sharedExpertNum",
-                                              (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
-                                               ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
-                                                  .c_str(),
-                                              "sharedExpertNum <= sharedExpertRankNum"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK((sharedExpertRankNum % sharedExpertNum != 0),
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "sharedExpertRankNum",
-                                              (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
-                                               ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
-                                                  .c_str(),
-                                              "sharedExpertRankNum % sharedExpertNum == 0"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (sharedExpertNum == 0),
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(nodeName, "shared_expert_num, shared_expert_rank_num",
+                                               (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
+                                                ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
+                                                   .c_str(),
+                                               "sharedExpertNum != 0"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (sharedExpertNum > sharedExpertRankNum),
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(nodeName, "shared_expert_num, shared_expert_rank_num",
+                                               (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
+                                                ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
+                                                   .c_str(),
+                                               "sharedExpertNum <= sharedExpertRankNum"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (sharedExpertRankNum % sharedExpertNum != 0),
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(nodeName, "shared_expert_num, shared_expert_rank_num",
+                                               (std::string("sharedExpertNum=") + std::to_string(sharedExpertNum) +
+                                                ", sharedExpertRankNum=" + std::to_string(sharedExpertRankNum))
+                                                   .c_str(),
+                                               "sharedExpertRankNum % sharedExpertNum == 0"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 } // namespace optiling

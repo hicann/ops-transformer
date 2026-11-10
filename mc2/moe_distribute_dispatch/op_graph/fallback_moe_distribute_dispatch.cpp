@@ -205,12 +205,12 @@ static graphStatus MoeDistributeDispatchExecuteFunc(OpExecuteContext* host_api_c
     OpAttrs opAttrs;
 
     OP_CHECK_IF(MoeDistributeDispatchGetOpInput(host_api_ctx, opInput) != ge::GRAPH_SUCCESS,
-                OP_LOGE(moeDistributeDispatchInfo, "get input failed"), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(moeDistributeDispatchInfo, "get input failed"), return ge::GRAPH_FAILED);
     MoeDistributeDispatchGetOpOptionalInput(host_api_ctx, opOptionalInput);
     OP_CHECK_IF(MoeDistributeDispatchGetOpOutput(host_api_ctx, opOutput) != ge::GRAPH_SUCCESS,
-                OP_LOGE(moeDistributeDispatchInfo, "get output failed"), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(moeDistributeDispatchInfo, "get output failed"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(MoeDistributeDispatchGetOpAttrs(host_api_ctx, opAttrs) != ge::GRAPH_SUCCESS,
-                OP_LOGE(moeDistributeDispatchInfo, "get attrs failed"), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(moeDistributeDispatchInfo, "get attrs failed"), return ge::GRAPH_FAILED);
 
     const auto apiRet = EXEC_OPAPI_CMD(
         aclnnMoeDistributeDispatch, opInput.x, opInput.expertIds, opOptionalInput.scales, opOptionalInput.xActiveMask,
@@ -219,7 +219,8 @@ static graphStatus MoeDistributeDispatchExecuteFunc(OpExecuteContext* host_api_c
         *opAttrs.sharedExpertRankNum, *opAttrs.quantMode, *opAttrs.globalBs, *opAttrs.expertTokenNumsType,
         opOutput.expandX, opOutput.dynamicScales, opOutput.expandIdx, opOutput.expertTokenNums, opOutput.epRecvCounts,
         opOutput.tpRecvCounts, opOutput.expandScales);
-    OP_CHECK_IF(apiRet != ge::GRAPH_SUCCESS, OP_LOGE(moeDistributeDispatchInfo, "aclnn api error code %u", apiRet),
+    OP_CHECK_IF(apiRet != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(moeDistributeDispatchInfo, "aclnn api error code %u", apiRet),
                 return ge::GRAPH_FAILED);
     return GRAPH_SUCCESS;
 }

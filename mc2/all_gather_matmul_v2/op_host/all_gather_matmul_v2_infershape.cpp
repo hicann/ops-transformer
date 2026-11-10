@@ -13,6 +13,7 @@
  * \brief
  */
 #include "mc2_log.h"
+#include "mc2_infer_failure_report.h"
 #include "register/op_impl_registry.h"
 #include "mc2_hcom_topo_info.h"
 #include "op_host/mc2_common_infershape.h"
@@ -30,14 +31,30 @@ const size_t INDEX_GATHER_OUT = 1;
 
 static ge::graphStatus InferShapeAllGatherMatmulV2(gert::InferShapeContext* context)
 {
-    OP_LOGE_IF(AllGatherMatmulCommonInferShape(context, GATHER_OUT_V2) != GRAPH_SUCCESS, GRAPH_FAILED,
-               context->GetNodeName(), "infer shape execute failed.");
+    OP_CHECK_IF(context == nullptr,
+                Mc2Error::ReportInferFailure("AllGatherMatmulV2",
+                                             "InferShape entry: context actual=null; expected materialized context"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(AllGatherMatmulCommonInferShape(context, GATHER_OUT_V2) != GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "infer shape execute failed."), return GRAPH_FAILED);
     auto attrs = context->GetAttrs();
-    OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    OP_CHECK_IF(attrs == nullptr,
+                Mc2Error::ReportInferFailure(
+                    context->GetNodeName(),
+                    "InferShapeAllGatherMatmulV2: GetAttrs actual=null; expected schema attribute metadata"),
+                return ge::GRAPH_FAILED);
     const bool* isAmaxOut = attrs->GetAttrPointer<bool>(AG_IS_AMAX_OUT);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, isAmaxOut);
+    OP_CHECK_IF(isAmaxOut == nullptr,
+                Mc2Error::ReportInferFailure(context->GetNodeName(),
+                                             "InferShapeAllGatherMatmulV2: is_amax_out pointer actual=null; expected "
+                                             "materialized schema-defaulted attribute"),
+                return ge::GRAPH_FAILED);
     gert::Shape* amaxOutShape = context->GetOutputShape(2);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, amaxOutShape);
+    OP_CHECK_IF(
+        amaxOutShape == nullptr,
+        Mc2Error::ReportInferFailure(context->GetNodeName(), "InferShapeAllGatherMatmulV2: Output amax_out shape "
+                                                             "holder actual=null; expected materialized output holder"),
+        return ge::GRAPH_FAILED);
     if (*isAmaxOut) {
         amaxOutShape->SetDimNum(1);
         amaxOutShape->SetDim(0, 1);
@@ -50,8 +67,8 @@ static ge::graphStatus InferShapeAllGatherMatmulV2(gert::InferShapeContext* cont
 
 static ge::graphStatus InferDataTypeAllGatherMatmulV2(gert::InferDataTypeContext* context)
 {
-    OP_LOGE_IF(InferMatmulOutputDataType(context, INDEX_IN_X1, INDEX_ATTR_Y_DTYPE, INDEX_OUT) != GRAPH_SUCCESS,
-               GRAPH_FAILED, context->GetNodeName(), "Infer output dtype failed.");
+    OP_CHECK_IF(InferMatmulOutputDataType(context, INDEX_IN_X1, INDEX_ATTR_Y_DTYPE, INDEX_OUT) != GRAPH_SUCCESS,
+                OP_LOGE_LIBOPAPI_REPORT(context->GetNodeName(), "Infer output dtype failed."), return GRAPH_FAILED);
     const auto x1Dtype = context->GetInputDataType(INDEX_IN_X1);
     context->SetOutputDataType(INDEX_GATHER_OUT, x1Dtype);
     return GRAPH_SUCCESS;

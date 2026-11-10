@@ -14,6 +14,8 @@
  */
 #include "matmul_allto_all_util_tiling.h"
 
+#include "mc2/matmul_allto_all/op_host/op_tiling/common/matmul_allto_all_error.h"
+
 namespace MC2Tiling {
 
 /**
@@ -44,8 +46,8 @@ ge::graphStatus MatmulAlltoAllTilingUtil::GetAndValidateRankSize(const gert::Til
     const gert::RuntimeAttrs* attrs = context->GetAttrs();
     const int64_t* worldSize = attrs->GetAttrPointer<int64_t>(ATTR_WORLD_SIZE_INDEX);
     if ((worldSize == nullptr) || (*worldSize == RANK_DEFAULT_NUM)) {
-        OP_TILING_CHECK(!mc2tiling::GetRankSize(opName, group, rankDim), OP_LOGE(opName, "GetRankSize failed."),
-                        return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(!mc2tiling::GetRankSize(opName, group, rankDim),
+                        OP_LOGE_WITHOUT_REPORT(opName, "GetRankSize failed."), return ge::GRAPH_FAILED);
     } else {
         rankDim = *worldSize;
     }
@@ -69,9 +71,11 @@ ge::graphStatus MatmulAlltoAllTilingUtil::GetAndConvertCommMode(const gert::Tili
                                                                 const OpAttrIndexSchema& indexSchema, uint8_t& commMode)
 {
     const gert::RuntimeAttrs* attrs = context->GetAttrs();
-    OP_TILING_CHECK(attrs == nullptr, OP_LOGE(opName, "Failed to get attrs."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITHOUT_REPORT(opName, "Failed to get attrs."), return ge::GRAPH_FAILED);
     const char* commModeStr = attrs->GetAttrPointer<char>(indexSchema.commMode);
-    OP_TILING_CHECK(commModeStr == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName, "comm_mode attr"),
+    OP_TILING_CHECK(commModeStr == nullptr,
+                    ReportMatmulAlltoAllTilingFailure(
+                        opName, "Default comm_mode attribute storage is absent; rebuild RuntimeAttrs"),
                     return ge::GRAPH_FAILED);
 
     const size_t maxLength = 7UL;
@@ -120,14 +124,26 @@ ge::graphStatus MatmulAlltoAllTilingUtil::CheckAttrsInfo(const gert::TilingConte
                                                          const OpAttrIndexSchema& indexSchema)
 {
     const gert::RuntimeAttrs* attrs = context->GetAttrs();
-    OP_TILING_CHECK(attrs == nullptr, OP_LOGE(opName, "Failed to get attrs."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(attrs == nullptr,
+                    ReportMatmulAlltoAllTilingFailure(
+                        opName, "CheckAttrsInfo: RuntimeAttrs holder is absent; rebuild the tiling context"),
+                    return ge::GRAPH_FAILED);
 
     const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
     const char* commMode = attrs->GetAttrPointer<char>(indexSchema.commMode);
     // 判断为空或者空字符串
-    OP_TILING_CHECK(group == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName, "group"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(group[0] == '\0', OP_LOGE_WITH_INVALID_INPUT(opName, "group"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(commMode == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName, "comm_mode attr"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        group == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName, "group", "must be a nonempty required communication group"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        group[0] == '\0',
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName, "group", "must be a nonempty required communication group"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(commMode == nullptr,
+                    ReportMatmulAlltoAllTilingFailure(
+                        opName, "Default comm_mode attribute storage is absent; rebuild RuntimeAttrs"),
+                    return ge::GRAPH_FAILED);
     // 判断group是否超过127
     size_t groupLen = strlen(group);
     OP_TILING_CHECK(groupLen > MAX_GROUP_NAME_LEN,
@@ -170,7 +186,10 @@ ge::graphStatus MatmulAlltoAllTilingUtil::CheckTensorFormat(const gert::TilingCo
                     return ge::GRAPH_FAILED);
     // y:require
     auto yDesc = context->GetOutputDesc(OUTPUT_Y_INDEX);
-    OP_TILING_CHECK((yDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "y"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (yDesc == nullptr),
+        ReportMatmulAlltoAllTilingFailure(opName, "Output y metadata holder is absent; rebuild the tiling context"),
+        return ge::GRAPH_FAILED);
     ge::Format yFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(yDesc->GetStorageFormat()));
     OP_TILING_CHECK(yFormat != ge::FORMAT_ND,
                     OP_LOGE_FOR_INVALID_FORMAT(opName, "y", Ops::Base::ToString(yFormat).c_str(), "ND"),
@@ -254,7 +273,10 @@ ge::graphStatus MatmulAlltoAllTilingUtil::CheckNonQuantTensorDataType(const gert
 
     // 校验输出张量数据类型
     auto yDesc = context->GetOutputDesc(OUTPUT_Y_INDEX);
-    OP_TILING_CHECK((yDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "y"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (yDesc == nullptr),
+        ReportMatmulAlltoAllTilingFailure(opName, "Output y metadata holder is absent; rebuild the tiling context"),
+        return ge::GRAPH_FAILED);
     ge::DataType yDtype = yDesc->GetDataType();
     OP_TILING_CHECK((yDtype != x1Dtype),
                     OP_LOGE_FOR_INVALID_DTYPE(opName, "y", Ops::Base::ToString(yDtype).c_str(),
@@ -317,7 +339,10 @@ ge::graphStatus MatmulAlltoAllTilingUtil::CheckKcQuantTensorDataType(const gert:
                     return ge::GRAPH_FAILED);
     // 校验输出张量数据类型
     auto yDesc = context->GetOutputDesc(OUTPUT_Y_INDEX);
-    OP_TILING_CHECK((yDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "y"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (yDesc == nullptr),
+        ReportMatmulAlltoAllTilingFailure(opName, "Output y metadata holder is absent; rebuild the tiling context"),
+        return ge::GRAPH_FAILED);
     ge::DataType yDtype = yDesc->GetDataType();
     OP_TILING_CHECK(!IsContains(KC_QUANT_Y_DTYPE_LIST, yDtype),
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "y", Ops::Base::ToString(yDtype).c_str(),
@@ -520,7 +545,10 @@ ge::graphStatus MatmulAlltoAllTilingUtil::CheckShapeInfo(const gert::TilingConte
 
     // 校验输出是否为空及维度数目
     const gert::StorageShape* yShape = context->GetOutputShape(OUTPUT_Y_INDEX);
-    OP_TILING_CHECK((yShape == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "y"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (yShape == nullptr),
+        ReportMatmulAlltoAllTilingFailure(opName, "Output y metadata holder is absent; rebuild the tiling context"),
+        return ge::GRAPH_FAILED);
     status = CheckShapeDimensions(yShape, "output y", opName);
     if (status != ge::GRAPH_SUCCESS)
         return status;
@@ -573,7 +601,10 @@ ge::graphStatus MatmulAlltoAllTilingUtil::CheckKcQuantShapeInfo(const gert::Tili
         return status;
     // 校验输出
     const gert::StorageShape* yShape = context->GetOutputShape(OUTPUT_Y_INDEX);
-    OP_TILING_CHECK((yShape == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "y"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (yShape == nullptr),
+        ReportMatmulAlltoAllTilingFailure(opName, "Output y metadata holder is absent; rebuild the tiling context"),
+        return ge::GRAPH_FAILED);
     status = CheckShapeDimensions(yShape, "kc quant output y", opName);
     if (status != ge::GRAPH_SUCCESS) {
         return status;
@@ -736,7 +767,7 @@ QuantMode MatmulAlltoAllTilingUtil::GetQuantMode(const gert::TilingContext* cont
 {
     const gert::RuntimeAttrs* attrs = context->GetAttrs();
     if (attrs == nullptr) {
-        OP_LOGE(opName, "Failed to get attrs.");
+        OP_LOGE_WITHOUT_REPORT(opName, "Quantization mode is unavailable without RuntimeAttrs");
         return QuantMode::ERROR;
     }
     // 获取量化模式属性（默认为0，表示非量化）
@@ -752,11 +783,11 @@ QuantMode MatmulAlltoAllTilingUtil::GetQuantMode(const gert::TilingContext* cont
     auto x1TensorDesc = context->GetInputDesc(INPUT_X1_INDEX);
     auto x2TensorDesc = context->GetInputDesc(INPUT_X2_INDEX);
     if (x1TensorDesc == nullptr) {
-        OP_LOGE_WITH_INVALID_INPUT(opName, "x1");
+        OP_LOGE_WITHOUT_REPORT(opName, "Quantization mode is unavailable without x1 descriptor");
         return QuantMode::ERROR; // 返回一个异常值，代表没有落入量化组合模式范围内
     }
     if (x2TensorDesc == nullptr) {
-        OP_LOGE_WITH_INVALID_INPUT(opName, "x2");
+        OP_LOGE_WITHOUT_REPORT(opName, "Quantization mode is unavailable without x2 descriptor");
         return QuantMode::ERROR;
     }
     ge::DataType aType = x1TensorDesc->GetDataType();

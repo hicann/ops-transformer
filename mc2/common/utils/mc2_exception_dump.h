@@ -101,10 +101,10 @@ inline aclrtGetArgsFromExceptionInfo_t GetAclrtGetArgsFromExceptionInfoFunc()
         if (handle != nullptr) {
             func = (aclrtGetArgsFromExceptionInfo_t)dlsym(handle, "aclrtGetArgsFromExceptionInfo");
             if (func == nullptr) {
-                OP_LOGE(OP_NAME, "dlsym aclrtGetArgsFromExceptionInfo failed: %s", dlerror());
+                OP_LOGE_WITHOUT_REPORT(OP_NAME, "dlsym aclrtGetArgsFromExceptionInfo failed: %s", dlerror());
             }
         } else {
-            OP_LOGE(OP_NAME, "dlopen failed: %s", dlerror());
+            OP_LOGE_WITHOUT_REPORT(OP_NAME, "dlopen failed: %s", dlerror());
         }
     }
     return func;
@@ -122,12 +122,12 @@ inline acldumpGetPath_t GetAcldumpGetPathFunc()
         if (handle != nullptr) {
             func = (acldumpGetPath_t)dlsym(handle, "acldumpGetPath");
             if (func == nullptr) {
-                OP_LOGE(OP_NAME, "dlsym acldumpGetPath failed: %s", dlerror());
+                OP_LOGE_WITHOUT_REPORT(OP_NAME, "dlsym acldumpGetPath failed: %s", dlerror());
             } else {
                 OP_LOGD(OP_NAME, "Successfully loaded acldumpGetPath function");
             }
         } else {
-            OP_LOGE(OP_NAME, "dlopen libascend_dump.so failed: %s", dlerror());
+            OP_LOGE_WITHOUT_REPORT(OP_NAME, "dlopen libascend_dump.so failed: %s", dlerror());
         }
     }
     return func;
@@ -170,19 +170,19 @@ inline int DumpToFile(std::string dir, std::string name, uint32_t id, void* buf,
 {
     // check if dir and buf valid
     if (IsStrEmpty(dir) || IsStrEmpty(name)) {
-        OP_LOGE_WITH_INVALID_INPUT(OP_NAME, "dir or name");
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "Dump directory and filename must be nonempty");
         return -1;
     }
 
     std::string rankPath = dir + "/" + std::to_string(id) + "/";
     std::string path = rankPath + name;
-    OP_LOGE(OP_NAME, "Start to dump file. The dump path is %s", path.c_str());
+    OP_LOGE_WITHOUT_REPORT(OP_NAME, "Start to dump file. The dump path is %s", path.c_str());
 
     // Open file
     int fd = open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, FILE_MODE);
     if (fd < 0) {
         int openErrno = errno;
-        OP_LOGE(OP_NAME, "Failed to open a dump file. errno=%d(%s)", openErrno, strerror(openErrno));
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "Failed to open a dump file. errno=%d(%s)", openErrno, strerror(openErrno));
         return -1;
     }
 
@@ -190,14 +190,14 @@ inline int DumpToFile(std::string dir, std::string name, uint32_t id, void* buf,
     ssize_t ret = write(fd, buf, bufSize);
     if (ret < 0) {
         int writeErrno = errno;
-        OP_LOGE(OP_NAME, "Failed to write a dump file. errno=%d(%s)", writeErrno, strerror(writeErrno));
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "Failed to write a dump file. errno=%d(%s)", writeErrno, strerror(writeErrno));
         close(fd);
         return -1;
     }
 
     // Close file
     close(fd);
-    OP_LOGE(OP_NAME, "Dump to file %s done.", path.c_str());
+    OP_LOGE_WITHOUT_REPORT(OP_NAME, "Dump to file %s done.", path.c_str());
     return 0;
 }
 
@@ -329,26 +329,26 @@ inline int ProcessArgsForA3(uint64_t argsAddr, std::vector<uint8_t>& winBuf)
     auto ret = aclrtMemcpy(hcclArgs.data(), sizeof(CommContextForDump), (void*)argsAddr, sizeof(CommContextForDump),
                            ACL_MEMCPY_DEVICE_TO_HOST);
     if (ret != ACL_SUCCESS) {
-        OP_LOGE(OP_NAME, "aclrtMemcpy CommContextForDump from device to host failed. ret = %d", ret);
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "aclrtMemcpy CommContextForDump from device to host failed. ret = %d", ret);
         return -1;
     }
     CommContextForDump* winContext = reinterpret_cast<CommContextForDump*>(hcclArgs.data());
     if (winContext == nullptr) {
-        OP_LOGE_WITH_INVALID_INPUT(OP_NAME, "winContext");
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "Dump communication context is null");
         return -1;
     }
     OP_LOGD(OP_NAME, "Get winContext from args. rankId=%u", winContext->epRankId);
 
     void* winAddr = reinterpret_cast<void*>(winContext->epHcclBufffer_[winContext->epRankId]);
     if (winAddr == nullptr) {
-        OP_LOGE(OP_NAME, "Get win addr failed.");
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "Get win addr failed.");
         return -1;
     }
 
     // Get windowsIn of each rank from hccl context
     ret = aclrtMemcpy(winBuf.data(), WIN_SIZE, winAddr, WIN_SIZE, ACL_MEMCPY_DEVICE_TO_HOST);
     if (ret != ACL_SUCCESS) {
-        OP_LOGE(OP_NAME, "aclrtMemcpy win from device to host failed. ret = %d", ret);
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "aclrtMemcpy win from device to host failed. ret = %d", ret);
         return -1;
     }
     return 0;
@@ -358,21 +358,21 @@ inline int ProcessArgsForA2(const char* groupName, std::vector<uint8_t>& winBuf)
 {
     if (groupName == nullptr || strnlen(groupName, MAX_GROUP_NAME_LENGTH) == 0 ||
         strnlen(groupName, MAX_GROUP_NAME_LENGTH) == MAX_GROUP_NAME_LENGTH) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(OP_NAME, "groupName", groupName,
-                                              "The value of groupName must be within the supported range.");
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "Dump groupName %.128s must be nonempty and shorter than %zu bytes",
+                               groupName == nullptr ? "(null)" : groupName, MAX_GROUP_NAME_LENGTH);
         return -1;
     }
     uint64_t size;
     void* winAddr = nullptr;
     Mc2Hcom::MC2HcomTopology::CommGetHcclBufferByGroup(groupName, &winAddr, &size);
     if (winAddr == nullptr) {
-        OP_LOGE(OP_NAME, "Get win addr failed.");
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "Get win addr failed.");
         return -1;
     }
-    OP_LOGE(OP_NAME, "HCCL BUFFER SIZE=%luMB. WindowInAddr=%p.", size / (1 * 1024 * 1024) / 2, winAddr);
+    OP_LOGE_WITHOUT_REPORT(OP_NAME, "HCCL BUFFER SIZE=%luMB. WindowInAddr=%p.", size / (1 * 1024 * 1024) / 2, winAddr);
     auto ret = aclrtMemcpy(winBuf.data(), WIN_SIZE, winAddr, WIN_SIZE, ACL_MEMCPY_DEVICE_TO_HOST);
     if (ret != ACL_SUCCESS) {
-        OP_LOGE(OP_NAME, "aclrtMemcpy win from device to host failed. ret = %d", ret);
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "aclrtMemcpy win from device to host failed. ret = %d", ret);
         return -1;
     }
     return 0;
@@ -401,7 +401,7 @@ inline void* GetPeermemBase(const char* socName, uint64_t argsAddr)
     std::vector<uint8_t> hcclArgs(sizeof(CommContextForDump), 0);
     if (aclrtMemcpy(hcclArgs.data(), sizeof(CommContextForDump), reinterpret_cast<void*>(argsAddr),
                     sizeof(CommContextForDump), ACL_MEMCPY_DEVICE_TO_HOST) != ACL_SUCCESS) {
-        OP_LOGE(OP_NAME, "GetPeermemBase: aclrtMemcpy CommContextForDump failed");
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "GetPeermemBase: aclrtMemcpy CommContextForDump failed");
         return nullptr;
     }
     CommContextForDump* ctx = reinterpret_cast<CommContextForDump*>(hcclArgs.data());
@@ -420,32 +420,32 @@ inline int ParseStructuredDump(uint64_t argsAddr, std::vector<uint8_t>& winBuf)
     aclError ret = aclrtMemcpy(&hdr, sizeof(MC2ExceptionDump::Header), reinterpret_cast<void*>(argsAddr),
                                sizeof(MC2ExceptionDump::Header), ACL_MEMCPY_DEVICE_TO_HOST);
     if (ret != ACL_SUCCESS) {
-        OP_LOGE(OP_NAME, "aclrtMemcpy Header failed. ret=%d", ret);
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "aclrtMemcpy Header failed. ret=%d", ret);
         return -1;
     }
     OP_LOGD(OP_NAME, "Phase1: headerMagic=0x%x opType=%d stageNum=%d tilingDataSize=%u numBlocks=%u dumpCount=%lu",
             hdr.headerMagic, hdr.opType, hdr.stageNum, hdr.tilingDataSize, hdr.numBlocks, hdr.dumpCount);
     if (hdr.headerMagic != MC2ExceptionDump::HEADER_MAGIC) {
-        OP_LOGE(OP_NAME, "headerMagic mismatch: 0x%x != 0x%x, ExceptionDump not enabled", hdr.headerMagic,
-                MC2ExceptionDump::HEADER_MAGIC);
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "headerMagic mismatch: 0x%x != 0x%x, ExceptionDump not enabled",
+                               hdr.headerMagic, MC2ExceptionDump::HEADER_MAGIC);
         return -1;
     }
 
     uint64_t dumpCount = hdr.dumpCount;
     if (dumpCount > MC2ExceptionDump::MAX_DUMP_ENTRIES) {
-        OP_LOGE(OP_NAME, "dumpCount=%lu > MAX_DUMP_ENTRIES=%d, truncating", dumpCount,
-                MC2ExceptionDump::MAX_DUMP_ENTRIES);
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "dumpCount=%lu > MAX_DUMP_ENTRIES=%d, truncating", dumpCount,
+                               MC2ExceptionDump::MAX_DUMP_ENTRIES);
         dumpCount = MC2ExceptionDump::MAX_DUMP_ENTRIES;
     }
     uint32_t tilingDataSize = hdr.tilingDataSize;
     if (tilingDataSize > MC2ExceptionDump::MAX_DUMP_TILING_SIZE) {
-        OP_LOGE(OP_NAME, "tilingDataSize=%u > MAX=%zu, truncating", tilingDataSize,
-                MC2ExceptionDump::MAX_DUMP_TILING_SIZE);
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "tilingDataSize=%u > MAX=%zu, truncating", tilingDataSize,
+                               MC2ExceptionDump::MAX_DUMP_TILING_SIZE);
         tilingDataSize = MC2ExceptionDump::MAX_DUMP_TILING_SIZE;
     }
     uint32_t numBlocks = hdr.numBlocks;
     if (numBlocks == 0) {
-        OP_LOGE(OP_NAME, "numBlocks=0, Header not initialized");
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "numBlocks=0, Header not initialized");
         return -1;
     }
 
@@ -469,7 +469,7 @@ inline int ParseStructuredDump(uint64_t argsAddr, std::vector<uint8_t>& winBuf)
     ret = aclrtMemcpy(dumpParamsBuf.data(), dumpParamsSize, reinterpret_cast<void*>(dumpParamsOffset), dumpParamsSize,
                       ACL_MEMCPY_DEVICE_TO_HOST);
     if (ret != ACL_SUCCESS) {
-        OP_LOGE(OP_NAME, "aclrtMemcpy DumpParams failed. ret=%d", ret);
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "aclrtMemcpy DumpParams failed. ret=%d", ret);
         return -1;
     }
 
@@ -506,7 +506,7 @@ inline int ParseStructuredDump(uint64_t argsAddr, std::vector<uint8_t>& winBuf)
         ret = aclrtMemcpy(winBuf.data() + offset, tilingDataSize, reinterpret_cast<void*>(tilingOffset), tilingDataSize,
                           ACL_MEMCPY_DEVICE_TO_HOST);
         if (ret != ACL_SUCCESS) {
-            OP_LOGE(OP_NAME, "aclrtMemcpy Tiling failed. ret=%d", ret);
+            OP_LOGE_WITHOUT_REPORT(OP_NAME, "aclrtMemcpy Tiling failed. ret=%d", ret);
         }
     }
     offset += tilingDataSize;
@@ -518,7 +518,7 @@ inline int ParseStructuredDump(uint64_t argsAddr, std::vector<uint8_t>& winBuf)
         ret = aclrtMemcpy(winBuf.data() + offset, blockStageTotalSize, reinterpret_cast<void*>(blockStageOffset),
                           blockStageTotalSize, ACL_MEMCPY_DEVICE_TO_HOST);
         if (ret != ACL_SUCCESS) {
-            OP_LOGE(OP_NAME, "aclrtMemcpy BlockStage failed. ret=%d", ret);
+            OP_LOGE_WITHOUT_REPORT(OP_NAME, "aclrtMemcpy BlockStage failed. ret=%d", ret);
         }
     }
     offset += blockStageTotalSize;
@@ -541,15 +541,15 @@ inline int ParseStructuredDump(uint64_t argsAddr, std::vector<uint8_t>& winBuf)
             void* srcAddr = reinterpret_cast<void*>(dp->dumpAddr + b * dp->srcStride);
             ret = aclrtMemcpy(winBuf.data() + offset, dp->blockLen, srcAddr, dp->blockLen, ACL_MEMCPY_DEVICE_TO_HOST);
             if (ret != ACL_SUCCESS) {
-                OP_LOGE(OP_NAME, "aclrtMemcpy dump entry %lu block %zu failed. ret=%d", i, b, ret);
+                OP_LOGE_WITHOUT_REPORT(OP_NAME, "aclrtMemcpy dump entry %lu block %zu failed. ret=%d", i, b, ret);
                 break;
             }
             offset += dp->blockLen;
         }
     }
 
-    OP_LOGE(OP_NAME, "Structured dump completed: totalSize=%zu dumpCount=%lu winBufSize=%zu", totalSize, dumpCount,
-            winBuf.size());
+    OP_LOGE_WITHOUT_REPORT(OP_NAME, "Structured dump completed: totalSize=%zu dumpCount=%lu winBufSize=%zu", totalSize,
+                           dumpCount, winBuf.size());
     return 0;
 }
 
@@ -558,7 +558,7 @@ inline void Mc2ExceptionImpl(aclrtExceptionInfo* args, void* userdata, const cha
     const char* socName = aclrtGetSocName();
     if ((std::strstr(socName, "Ascend960") == nullptr) && (std::strstr(socName, "Ascend950") == nullptr) &&
         (std::strstr(socName, "Ascend910_93") == nullptr) && (std::strstr(socName, "Ascend910B") == nullptr)) {
-        OP_LOGE(OP_NAME, "The soc version is %s, skip dump process", socName);
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "The soc version is %s, skip dump process", socName);
         return;
     }
 
@@ -570,19 +570,19 @@ inline void Mc2ExceptionImpl(aclrtExceptionInfo* args, void* userdata, const cha
 
     auto aclrtGetArgsFromExceptionInfoFunc = GetAclrtGetArgsFromExceptionInfoFunc();
     if (aclrtGetArgsFromExceptionInfoFunc == nullptr) {
-        OP_LOGE(OP_NAME, "Failed to load aclrtGetArgsFromExceptionInfo function.");
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "Failed to load aclrtGetArgsFromExceptionInfo function.");
         return;
     }
 
     auto ret = aclrtGetArgsFromExceptionInfoFunc(args, &devArgsPtr, &devArgsLen);
     if (ret != ACL_SUCCESS) {
-        OP_LOGE(OP_NAME, "aclrtGetArgsFromExceptionInfo failed. ret=%d", ret);
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "aclrtGetArgsFromExceptionInfo failed. ret=%d", ret);
         return;
     }
 
     uint32_t deviceId = aclrtGetDeviceIdFromExceptionInfo(args);
     if (ret != ACL_SUCCESS) {
-        OP_LOGE(OP_NAME, "aclrtGetDeviceIdFromExceptionInfo failed. ret=%d", ret);
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "aclrtGetDeviceIdFromExceptionInfo failed. ret=%d", ret);
         return;
     }
     OP_LOGD(OP_NAME, "Get context from args. deviceId=%u, devArgsAddr=%p, devArgsLen=%u", deviceId, devArgsPtr,
@@ -601,7 +601,7 @@ inline void Mc2ExceptionImpl(aclrtExceptionInfo* args, void* userdata, const cha
     ret =
         aclrtMemcpy(&argsAddr, sizeof(uint64_t), devArgsPtr + argsOffset, sizeof(uint64_t), ACL_MEMCPY_DEVICE_TO_HOST);
     if (ret != ACL_SUCCESS) {
-        OP_LOGE(OP_NAME, "aclrtMemcpy address of args failed. ret=%d", ret);
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "aclrtMemcpy address of args failed. ret=%d", ret);
         return;
     }
     OP_LOGD(OP_NAME, "argsAddr=0x%lx (argsOffset=%lu)", argsAddr, argsOffset);
@@ -616,11 +616,11 @@ inline void Mc2ExceptionImpl(aclrtExceptionInfo* args, void* userdata, const cha
         OP_LOGD(OP_NAME, "MegaMoe structured dump: getting peermem base");
         void* peermemBase = GetPeermemBase(socName, argsAddr);
         if (peermemBase == nullptr) {
-            OP_LOGE(OP_NAME, "Failed to get peermem base.");
+            OP_LOGE_WITHOUT_REPORT(OP_NAME, "Failed to get peermem base.");
             return;
         }
         if (ParseStructuredDump(reinterpret_cast<uint64_t>(peermemBase), winContent) != 0) {
-            OP_LOGE(OP_NAME, "Failed to parse structured dump.");
+            OP_LOGE_WITHOUT_REPORT(OP_NAME, "Failed to parse structured dump.");
             return;
         }
     } else {
@@ -629,7 +629,7 @@ inline void Mc2ExceptionImpl(aclrtExceptionInfo* args, void* userdata, const cha
         winContent.resize(WIN_SIZE, 0);
         if (std::strstr(socName, "Ascend910_93") != nullptr) {
             if (ProcessArgsForA3(argsAddr, winContent) != 0) {
-                OP_LOGE(OP_NAME, "Failed to get win content.");
+                OP_LOGE_WITHOUT_REPORT(OP_NAME, "Failed to get win content.");
                 return;
             }
         } else if ((std::strstr(socName, "Ascend960") != nullptr) || (std::strstr(socName, "Ascend950") != nullptr)) {
@@ -640,7 +640,7 @@ inline void Mc2ExceptionImpl(aclrtExceptionInfo* args, void* userdata, const cha
         } else if (std::strstr(socName, "Ascend910B") != nullptr) {
             const char* groupName = MC2GroupNameManager::GetInstance().GetGroupName();
             if (ProcessArgsForA2(groupName, winContent) != 0) {
-                OP_LOGE(OP_NAME, "Failed to get win content.");
+                OP_LOGE_WITHOUT_REPORT(OP_NAME, "Failed to get win content.");
                 return;
             }
         }
@@ -649,14 +649,14 @@ inline void Mc2ExceptionImpl(aclrtExceptionInfo* args, void* userdata, const cha
     // 获取acldumpGetPath函数指针
     auto acldumpGetPathFunc = GetAcldumpGetPathFunc();
     if (acldumpGetPathFunc == nullptr) {
-        OP_LOGE(OP_NAME, "Failed to load acldumpGetPath function, skip dump");
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "Failed to load acldumpGetPath function, skip dump");
         return;
     }
 
     // 获取dump路径
     const char* dumpPath = acldumpGetPathFunc(acldumpType::AIC_ERR_BRIEF_DUMP);
     if (dumpPath == nullptr) {
-        OP_LOGE(OP_NAME, "acldumpGetPath returned NULL");
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "acldumpGetPath returned NULL");
         return;
     }
     OP_LOGD(OP_NAME, "dumpPath=%s, winContent.size()=%zu", dumpPath, winContent.size());
@@ -666,7 +666,7 @@ inline void Mc2ExceptionImpl(aclrtExceptionInfo* args, void* userdata, const cha
     OP_LOGD(OP_NAME, "Writing dump file: deviceId=%u fileName=%s bufSize=%zu", deviceId, fileName.c_str(),
             winContent.size());
     if (DumpToFile(std::string(dumpPath), fileName, deviceId, winContent.data(), winContent.size()) != 0) {
-        OP_LOGE(OP_NAME, "Failed to dump win content.");
+        OP_LOGE_WITHOUT_REPORT(OP_NAME, "Failed to dump win content.");
     }
 }
 

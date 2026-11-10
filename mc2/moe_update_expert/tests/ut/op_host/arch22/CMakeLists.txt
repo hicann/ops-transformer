@@ -11,3 +11,10 @@
 if(UT_TEST_ALL OR OP_HOST_UT)
     add_modules_ut_sources(UT_NAME ${OP_TILING_MODULE_NAME} MODE PRIVATE DIR ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
+
+if((UT_TEST_ALL OR OP_HOST_UT) AND TARGET ${OP_TILING_MODULE_NAME}_cases_obj)
+    get_target_property(_mc2_case_sources ${OP_TILING_MODULE_NAME}_cases_obj SOURCES)
+    if("${_mc2_case_sources}" MATCHES "test_moe_update_expert_tiling\\.cpp")
+        target_link_libraries(${OP_TILING_MODULE_NAME}_cases_obj PRIVATE error_manager)
+    endif()
+endif()

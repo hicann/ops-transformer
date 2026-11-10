@@ -13,6 +13,7 @@
  * \brief
  */
 #include "mc2_log.h"
+#include "mc2_infer_failure_report.h"
 #include "op_host/mc2_common_infershape.h"
 #include "context_util.h"
 #include "mc2_hcom_topo_info.h"
@@ -22,8 +23,12 @@ using namespace ge;
 namespace ops {
 static ge::graphStatus InferShapeMatmulReduceScatter(gert::InferShapeContext* context)
 {
-    OP_LOGE_IF(InferMatmulReduceScatterCommon(context) != GRAPH_SUCCESS, GRAPH_FAILED, context->GetNodeName(),
-               "infer shape execute failed.");
+    OP_CHECK_IF(context == nullptr,
+                Mc2Error::ReportInferFailure("MatmulReduceScatter",
+                                             "InferShape entry: context actual=null; expected materialized context"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(InferMatmulReduceScatterCommon(context) != GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "infer shape execute failed."), return GRAPH_FAILED);
     return GRAPH_SUCCESS;
 }
 

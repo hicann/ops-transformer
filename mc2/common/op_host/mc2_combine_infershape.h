@@ -22,11 +22,18 @@ inline ge::graphStatus InferCombineOutputShape(gert::InferShapeContext* context,
                                                size_t expertIdsIndex, size_t outputIndex)
 {
     const gert::Shape* expandXShape = context->GetInputShape(expandXIndex);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expandXShape);
+    OP_CHECK_IF(expandXShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "expand_x"),
+                return ge::GRAPH_FAILED);
     const gert::Shape* expertIdsShape = context->GetInputShape(expertIdsIndex);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expertIdsShape);
+    OP_CHECK_IF(expertIdsShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "expert_ids"),
+                return ge::GRAPH_FAILED);
     gert::Shape* xShape = context->GetOutputShape(outputIndex);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, xShape);
+    if (xShape == nullptr) {
+        const std::string reason =
+            "InferCombineOutputShape: output x shape holder is absent at index " + std::to_string(outputIndex);
+        OP_LOGE(context->GetNodeName(), "%s", reason.c_str());
+        return ge::GRAPH_FAILED;
+    }
 
     int64_t bs = ((expertIdsShape->GetDimNum() == 1U) ? -1 : expertIdsShape->GetDim(0));
     int64_t h = ((expandXShape->GetDimNum() == 1U) ? -1 : expandXShape->GetDim(1));

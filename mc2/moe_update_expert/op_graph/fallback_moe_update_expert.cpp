@@ -75,7 +75,8 @@ static ge::graphStatus MoeUpdateExpertExecuteFunc(gert::OpExecuteContext* host_a
         EXEC_OPAPI_CMD(aclnnMoeUpdateExpert, expertIds, eplbTable, expertScales, pruningThreshold, activeMask,
                        *localRankId, *worldSize, *balanceMode, balancedExpertIds, balancedActiveMask);
 
-    OPS_CHECK(apiRet != ge::GRAPH_SUCCESS, OP_LOGE("MoeUpdateExpertFallback", "Aclnn api error code %u", apiRet),
+    OPS_CHECK(apiRet != ge::GRAPH_SUCCESS,
+              OP_LOGE_WITHOUT_REPORT("MoeUpdateExpertFallback", "Aclnn api error code %u", apiRet),
               return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

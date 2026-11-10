@@ -13,6 +13,7 @@
  * \brief tiling ut
  */
 
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <thread>
@@ -21,6 +22,7 @@
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 #include "mc2_hcom_topology_mocker.h"
+#include "../../../../../common/tests/ut/formal_error_assertions.h"
 
 namespace MatmulAlltoAllUT {
 
@@ -3024,8 +3026,8 @@ static MatmulAlltoAllTestParam g_testCases[] = {
      {16777216},
      0},
 
-    // 910B case: long group name (>128 chars) passes in 910B
-    {"910B_long_groupName_legal",
+    // Mc2CcTiling groupName[128] requires room for the terminating null byte.
+    {"910B_group_name_128_bytes_rejected",
      {88, 128},
      ge::DT_BF16,
      ge::FORMAT_ND,
@@ -3053,8 +3055,7 @@ static MatmulAlltoAllTestParam g_testCases[] = {
      {704, 128},
      ge::DT_BF16,
      ge::FORMAT_ND,
-     "01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012"
-     "3456789012345671",
+     std::string(128, 'g'),
      8,
      0,
      0,
@@ -3068,7 +3069,7 @@ static MatmulAlltoAllTestParam g_testCases[] = {
      "aiv",
      "Ascend910B",
      24,
-     ge::GRAPH_SUCCESS,
+     ge::GRAPH_FAILED,
      0UL,
      "",
      {16777216},
@@ -3476,6 +3477,37 @@ TEST_P(MatmulAlltoAllA3TilingTest, GeneralCasesTest)
 TEST_F(MatmulAlltoAllA3TilingTest, GeneralCasesMultiThread)
 {
     TestExecMultiThread(g_testCases, sizeof(g_testCases) / sizeof(MatmulAlltoAllTestParam), 1);
+}
+
+TEST_F(MatmulAlltoAllA3TilingTest, GroupNameBufferBoundaryPreservesValidNames)
+{
+    auto* end = g_testCases + sizeof(g_testCases) / sizeof(g_testCases[0]);
+    const auto* found = std::find_if(g_testCases, end, [](const MatmulAlltoAllTestParam& item) {
+        return item.caseName == "910B_group_name_128_bytes_rejected";
+    });
+    ASSERT_NE(found, end);
+    ASSERT_EQ(found->groupAttr.size(), 128U);
+    auto param = *found;
+    {
+        Mc2ErrorCodeUT::ExcelErrorReportScope reports;
+        param.groupAttr.resize(127);
+        param.status = ge::GRAPH_SUCCESS;
+        TestOneParamCase(param);
+        EXPECT_TRUE(ErrorManager::GetInstance().GetRawErrorMessages().empty());
+    }
+    {
+        Mc2ErrorCodeUT::ExcelErrorReportScope reports;
+        param = *found;
+        TestOneParamCase(param);
+        const auto errors = ErrorManager::GetInstance().GetRawErrorMessages();
+        ASSERT_EQ(errors.size(), 1U);
+        EXPECT_EQ(errors[0].error_id, "EZ0037");
+        EXPECT_EQ(errors[0].args_map.at("param_name"), "group");
+        EXPECT_NE(errors[0].args_map.at("reason").find("length=128"), std::string::npos);
+        EXPECT_NE(errors[0].args_map.at("reason").find("fewer than 128"), std::string::npos);
+        ASSERT_EQ(ErrorManager::GetInstance().SetRawErrorMessages(errors), 0);
+        EXPECT_NE(ErrorManager::GetInstance().GetErrorMessage().find("EZ0037"), std::string::npos);
+    }
 }
 
 INSTANTIATE_TEST_CASE_P(MatmulAlltoAllTilingUT, MatmulAlltoAllA3TilingTest, testing::ValuesIn(g_testCases));

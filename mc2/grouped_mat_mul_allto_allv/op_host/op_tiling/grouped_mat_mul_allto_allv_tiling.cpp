@@ -15,6 +15,7 @@
 #include "grouped_mat_mul_allto_allv_tiling.h"
 #include "op_mc2.h"
 #include "mc2_log.h"
+#include "mc2_tiling_failure_report.h"
 #include "op_host/tiling_templates_registry.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "mc2_comm_utils.h"
@@ -280,7 +281,8 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckParamsAttrEpAndSetLocalParams
     OP_TILING_CHECK(epWorldSizePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "epWorldSize"),
                     return ge::GRAPH_FAILED);
     if (*epWorldSizePtr == RANK_DEFAULT_NUM) {
-        OP_TILING_CHECK(!mc2tiling::GetRankSize(opName_, group, rankDim), OP_LOGE(opName_, "GetRankSize failed."),
+        OP_TILING_CHECK(!mc2tiling::GetRankSize(opName_, group, rankDim),
+                        OP_LOGE_WITHOUT_REPORT(opName_, "GetRankSize failed; preserve the shared HCCL lookup report"),
                         return ge::GRAPH_FAILED);
     } else {
         rankDim = *epWorldSizePtr;
@@ -320,17 +322,23 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::GetPlatformInfo()
         return status;
     }
     auto platformInfo = context_->GetPlatformInfo();
-    OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE(opName_, "Failed to get platform info."), return ge::GRAPH_FAILED);
+    // The shared GetPlatformInfo above guarantees a non-null platform.
+
     platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
     npuArch_ = ascendcPlatform.GetCurNpuArch();
     std::string socVersion;
     (void)platformInfo->GetPlatformResWithLock("version", "Short_SoC_version", socVersion);
     // AIV has its own MTE tiling and GetPlatformInfo override. Reject 910B in
     // this legacy candidate before GetTilingKey, whose failure is only a key.
-    OP_TILING_CHECK(socVersion == "Ascend910B",
-                    OP_LOGE(opName_, "Ascend 910B only supports commMode 'aiv'; AICPU tiling is not supported."),
+    const auto* attrs = context_->GetAttrs();
+    const char* actualCommMode = attrs == nullptr ? nullptr : attrs->GetAttrPointer<char>(ATTR_COMM_MODE);
+    OP_TILING_CHECK(socVersion == "Ascend910B" && actualCommMode != nullptr,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "comm_mode", actualCommMode,
+                        "Ascend910B supports only the aiv MTE implementation; this legacy candidate cannot execute it"),
                     return ge::GRAPH_FAILED);
-    return ge::GRAPH_SUCCESS;
+    uint8_t commMode = 0;
+    return GetAndConvertCommMode(context_, commMode);
 }
 
 uint32_t GroupedMatmulAllToAllvTiling::GetCommModeIndex() const
@@ -342,11 +350,17 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::GetAndConvertCommMode(gert::Tiling
                                                                     uint8_t& commMode) const
 {
     const gert::RuntimeAttrs* attrs = context->GetAttrs();
-    OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "attrs"),
+    OP_TILING_CHECK(attrs == nullptr,
+                    Mc2Error::ReportTilingFailure(
+                        context->GetNodeName(),
+                        "GetAndConvertCommMode: missing RuntimeAttrs; expected materialized optional comm_mode"),
                     return ge::GRAPH_FAILED);
     const char* commModeStr = attrs->GetAttrPointer<char>(ATTR_COMM_MODE);
-    OP_TILING_CHECK(commModeStr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "comm_mode"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        commModeStr == nullptr,
+        Mc2Error::ReportTilingFailure(context->GetNodeName(),
+                                      "GetAttrPointer(comm_mode) returned null; expected optional/default storage"),
+        return ge::GRAPH_FAILED);
     const size_t maxLength = 7UL;
     if (npuArch_ == Ops::Base::DAV_3510 || npuArch_ == Ops::Base::DAV_9201) {
         if (strncmp(commModeStr, "ai_cpu", maxLength) == 0) {
@@ -354,20 +368,22 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::GetAndConvertCommMode(gert::Tiling
         } else if (strncmp(commModeStr, "ccu", maxLength) == 0) {
             if (npuArch_ == Ops::Base::DAV_9201) {
                 // A6(ascend960)无CCU引擎，显式ccu直接报错(默认ai_cpu不受影响)
-                OP_LOGE(context->GetNodeName(), "A6 has no CCU engine, commMode 'ccu' is not supported.");
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "comm_mode", commModeStr,
+                                                      "Ascend960 has no CCU engine; use ai_cpu");
                 return ge::GRAPH_FAILED;
             }
             commMode = Mc2Comm::COMM_MODE_CCU;
         } else {
-            OP_LOGD(context->GetNodeName(), "Currently, commMode only support 'ccu', 'ai_cpu', but got %s.",
-                    commModeStr);
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "comm_mode", commModeStr,
+                                                  "must be ccu or ai_cpu on Ascend950");
             return ge::GRAPH_FAILED;
         }
     } else {
         if (strncmp(commModeStr, "ai_cpu", maxLength) == 0) {
             commMode = Mc2Comm::COMM_MODE_AICPU;
         } else {
-            OP_LOGD(context->GetNodeName(), "Currently, commMode only support 'ai_cpu', but got %s.", commModeStr);
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "comm_mode", commModeStr,
+                                                  "this legacy communication implementation supports ai_cpu");
             return ge::GRAPH_FAILED;
         }
     }

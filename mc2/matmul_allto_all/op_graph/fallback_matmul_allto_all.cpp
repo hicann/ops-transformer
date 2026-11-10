@@ -242,14 +242,16 @@ static ge::graphStatus MatmulAlltoAllExecuteFunc(gert::OpExecuteContext* host_ap
 
     CommonMatmulParas matmulParas;
     ge::graphStatus retPara = GetCommonMatmulInputPara(host_api_ctx, matmulParas);
-    OPS_CHECK(retPara != ge::SUCCESS, OP_LOGE(host_api_ctx->GetNodeName(), "Failed to get common matmul input paras."),
+    OPS_CHECK(retPara != ge::SUCCESS,
+              OP_LOGE_WITHOUT_REPORT(host_api_ctx->GetNodeName(), "Failed to get common matmul input paras."),
               return ge::GRAPH_FAILED);
     const auto output = host_api_ctx->GetOutputTensor(INDEX_OUT);
     OPS_CHECK(output == nullptr, OP_LOGE_WITH_INVALID_INPUT(host_api_ctx->GetNodeName(), "output"),
               return ge::GRAPH_FAILED);
     AttrParas attrParas;
     OPS_CHECK(GetAttrPara(host_api_ctx, attrs, attrParas) != ge::SUCCESS,
-              OP_LOGE(host_api_ctx->GetNodeName(), "Failed to get attr paras."), return ge::GRAPH_FAILED);
+              OP_LOGE_WITHOUT_REPORT(host_api_ctx->GetNodeName(), "Failed to get attr paras."),
+              return ge::GRAPH_FAILED);
 
     const auto alltoAllAxesOptional = attrs->GetListInt(INDEX_ATTR_ALL2ALL_AXES);
     std::vector<int64_t> actSeqArray;
@@ -276,7 +278,7 @@ static ge::graphStatus MatmulAlltoAllExecuteFunc(gert::OpExecuteContext* host_ap
         QuantMatmulParas quantMatmulParas;
         retPara = GetQuantMatmulPara(host_api_ctx, quantMatmulParas);
         OPS_CHECK(retPara != ge::SUCCESS,
-                  OP_LOGE(host_api_ctx->GetNodeName(), "Failed to get quant matmul input paras."),
+                  OP_LOGE_WITHOUT_REPORT(host_api_ctx->GetNodeName(), "Failed to get quant matmul input paras."),
                   return ge::GRAPH_FAILED);
         const auto ret = EXEC_OPAPI_CMD(aclnnQuantMatmulAlltoAllV2, matmulParas.x1Acl, matmulParas.x2Acl,
                                         matmulParas.bias, quantMatmulParas.x1ScaleAcl, quantMatmulParas.x2ScaleAcl,

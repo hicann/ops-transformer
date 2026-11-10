@@ -748,6 +748,12 @@ ge::graphStatus AlltoAllvGmmTiling::setNumBlocks(gert::TilingContext* context)
     uint64_t aicNum = ascendcPlatform.GetCoreNumAic();
     uint64_t aivNum = ascendcPlatform.GetCoreNumAiv();
     uint64_t numBlocks = mc2tiling::GetNumBlocks(aicNum, aivNum, context_->GetNodeName());
+    if (numBlocks == 0U) {
+        OP_LOGE_LIBOPAPI_REPORT(context_->GetNodeName(),
+                                "GetNumBlocks returned 0 for AIC=%lu and AIV=%lu; see the core pairing diagnostic",
+                                aicNum, aivNum);
+        return ge::GRAPH_FAILED;
+    }
 
     tilingData->taskTilingInfo.ubSize = ubSize_;
     context->SetBlockDim(static_cast<uint32_t>(numBlocks));

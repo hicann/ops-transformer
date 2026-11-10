@@ -14,6 +14,8 @@
  */
 #include "register/op_impl_registry.h"
 #include "mc2_log.h"
+#include <string>
+#include <vector>
 #include "platform/platform_info.h"
 #include "runtime/rt_external_base.h"
 #include "op_host/util/op_const_def.h"
@@ -21,6 +23,22 @@
 
 using namespace ge;
 namespace ops {
+namespace {
+void ReportInferTypeMetadata(const char* opName, const char* detail)
+{
+    const std::string reason =
+        std::string(detail) + "; actual=null, expected=materialized inference metadata. Rebuild the inference context";
+    OP_LOGE(opName, "%s", reason.c_str());
+}
+
+void ReportDispatchInferMetadata(const char* opName, const char* stage, const char* detail)
+{
+    const char* name = opName == nullptr ? "MoeDistributeDispatchV3" : opName;
+    const std::string reason =
+        std::string(stage) + ": " + detail + "; rebuild the inference context with the required metadata";
+    OP_LOGE(name, "%s", reason.c_str());
+}
+} // namespace
 
 namespace {
 enum class QuantMode : int64_t {
@@ -168,12 +186,19 @@ static ge::graphStatus CheckSharedExpertAttr(const char* nodeName, int64_t epRan
                                              bool& isSharedDefault, bool& isNoShared)
 {
     OP_CHECK_IF((epRankId < 0) || (epRankId >= epWorldSize),
-                OP_LOGE_FOR_INVALID_VALUE(nodeName, "epRankId", std::to_string(epRankId).c_str(),
-                                          (std::string("[0, ") + std::to_string(epWorldSize) + ")").c_str()),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(nodeName, "ep_rank_id, ep_world_size",
+                                                       (std::string("ep_rank_id=") + std::to_string(epRankId) + ", " +
+                                                        std::string("ep_world_size=") + std::to_string(epWorldSize))
+                                                           .c_str(),
+                                                       "ep_rank_id must be in [0, ep_world_size)"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF((sharedExpertRankNum < 0) || (sharedExpertRankNum >= epWorldSize),
-                OP_LOGE_FOR_INVALID_VALUE(nodeName, "sharedExpertRankNum", std::to_string(sharedExpertRankNum).c_str(),
-                                          (std::string("[0, ") + std::to_string(epWorldSize) + ")").c_str()),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    nodeName, "shared_expert_rank_num, ep_world_size",
+                    (std::string("shared_expert_rank_num=") + std::to_string(sharedExpertRankNum) + ", " +
+                     std::string("ep_world_size=") + std::to_string(epWorldSize))
+                        .c_str(),
+                    "shared_expert_rank_num must be in [0, ep_world_size)"),
                 return ge::GRAPH_FAILED);
     isSharedDefault = ((sharedExpertNum == 1) && (sharedExpertRankNum == 0));
     isNoShared = ((sharedExpertNum == 0) && (sharedExpertRankNum == 0));
@@ -181,11 +206,13 @@ static ge::graphStatus CheckSharedExpertAttr(const char* nodeName, int64_t epRan
                           ((sharedExpertRankNum % sharedExpertNum) == 0));
     bool isSharedSettingValid = (isSharedDefault || isNoShared || isValidShared);
     OP_CHECK_IF(!isSharedSettingValid,
-                OP_LOGE_FOR_INVALID_VALUE(nodeName, "sharedExpertRankNum",
-                                          (std::string("sharedExpertRankNum=") + std::to_string(sharedExpertRankNum) +
-                                           ", sharedExpertNum=" + std::to_string(sharedExpertNum))
-                                              .c_str(),
-                                          "valid shared expert setting (default, no-shared, or divisible)"),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    nodeName, "shared_expert_rank_num, shared_expert_num",
+                    (std::string("shared_expert_rank_num=") + std::to_string(sharedExpertRankNum) + ", " +
+                     std::string("shared_expert_num=") + std::to_string(sharedExpertNum))
+                        .c_str(),
+                    "Use (shared_expert_num, shared_expert_rank_num) = (1, 0) or (0, 0), or a positive "
+                    "shared_expert_num with shared_expert_rank_num a positive multiple of it"),
                 return ge::GRAPH_FAILED);
     moeRankNum = epWorldSize - sharedExpertRankNum;
     OP_CHECK_IF(moeRankNum <= 0,
@@ -242,61 +269,114 @@ static ge::graphStatus InferShapeMoeDistributeDispatchV3(gert::InferShapeContext
     OP_LOGD(context->GetNodeName(), "Begin to do InferShapeMoeDistributeDispatchV3.");
     // 获取输入shape
     const gert::Shape* xShape = context->GetInputShape(DISPATCH_INPUT_X_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, xShape);
+    OP_CHECK_IF(xShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "x"), return ge::GRAPH_FAILED);
     const gert::Shape* expertIdsShape = context->GetInputShape(DISPATCH_INPUT_EXPERT_IDS_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expertIdsShape);
+    OP_CHECK_IF(expertIdsShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "expert_ids"),
+                return ge::GRAPH_FAILED);
     const gert::Shape* scalesShape = context->GetOptionalInputShape(DISPATCH_INPUT_SCALES_IDX_INDEX);
     const gert::Shape* expertScalesShape = context->GetOptionalInputShape(DISPATCH_INPUT_EXPERT_SCALES_IDX_INDEX);
     bool hasExpertScales = (expertScalesShape != nullptr);
     const gert::Shape* elasticInfoShape = context->GetOptionalInputShape(DISPATCH_INPUT_ELASTIC_INFO_IDX_INDEX);
 
     gert::Shape* expandXShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_X_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expandXShape);
+    OP_CHECK_IF(expandXShape == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output expand_x shape holder is absent"),
+                return ge::GRAPH_FAILED);
     gert::Shape* dynamicScalesShape = context->GetOutputShape(DISPATCH_OUTPUT_DYNAMIC_SCALES_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, dynamicScalesShape);
+    OP_CHECK_IF(
+        dynamicScalesShape == nullptr,
+        ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output dynamic_scales shape holder is absent"),
+        return ge::GRAPH_FAILED);
     gert::Shape* assistInfoShape = context->GetOutputShape(DISPATCH_OUTPUT_ASSIST_INFO_IDX_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, assistInfoShape);
+    OP_CHECK_IF(assistInfoShape == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "output assist_info_for_combine shape holder is absent"),
+                return ge::GRAPH_FAILED);
     gert::Shape* expertTokenNumsShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expertTokenNumsShape);
+    OP_CHECK_IF(expertTokenNumsShape == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "output expert_token_nums shape holder is absent"),
+                return ge::GRAPH_FAILED);
     gert::Shape* epRecvCountShape = context->GetOutputShape(DISPATCH_OUTPUT_EP_RECV_COUNTS_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, epRecvCountShape);
+    OP_CHECK_IF(
+        epRecvCountShape == nullptr,
+        ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output ep_recv_counts shape holder is absent"),
+        return ge::GRAPH_FAILED);
     gert::Shape* tpRecvCountShape = context->GetOutputShape(DISPATCH_OUTPUT_TP_RECV_COUNTS_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, tpRecvCountShape);
+    OP_CHECK_IF(
+        tpRecvCountShape == nullptr,
+        ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output tp_recv_counts shape holder is absent"),
+        return ge::GRAPH_FAILED);
     gert::Shape* expandScalesShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_SCALES);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expandScalesShape);
+    OP_CHECK_IF(
+        expandScalesShape == nullptr,
+        ReportDispatchInferMetadata(context->GetNodeName(), __func__, "output expand_scales shape holder is absent"),
+        return ge::GRAPH_FAILED);
 
     const auto attrs = context->GetAttrs();
-    OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    OP_CHECK_IF(attrs == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__, "RuntimeAttrs holder is absent"),
+                return ge::GRAPH_FAILED);
 
     const auto epWorldSize = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_EP_WORLD_SIZE_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, epWorldSize);
+    OP_CHECK_IF(epWorldSize == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "ep_world_size",
+                                                         "required attribute is absent"),
+                return ge::GRAPH_FAILED);
 
     const auto epRankId = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_EP_RANK_ID_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, epRankId);
+    OP_CHECK_IF(
+        epRankId == nullptr,
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "ep_rank_id", "required attribute is absent"),
+        return ge::GRAPH_FAILED);
 
     const auto moeExpertNum = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_MOE_EXPERT_NUM_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, moeExpertNum);
+    OP_CHECK_IF(moeExpertNum == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "moe_expert_num",
+                                                         "required attribute is absent"),
+                return ge::GRAPH_FAILED);
 
     const auto tpWorldSize = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_TP_WORLD_SIZE_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, tpWorldSize);
+    OP_CHECK_IF(tpWorldSize == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "defaulted attribute tp_world_size is absent from RuntimeAttrs"),
+                return ge::GRAPH_FAILED);
 
     const auto tpRankId = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_TP_RANK_ID_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, tpRankId);
+    OP_CHECK_IF(tpRankId == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "defaulted attribute tp_rank_id is absent from RuntimeAttrs"),
+                return ge::GRAPH_FAILED);
 
     const auto expertShardType = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_EXPERT_SHARD_TYPE_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expertShardType);
+    OP_CHECK_IF(expertShardType == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "defaulted attribute expert_shard_type is absent from RuntimeAttrs"),
+                return ge::GRAPH_FAILED);
 
     const auto sharedExpertNum = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_SHARED_EXPERT_NUM_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, sharedExpertNum);
+    OP_CHECK_IF(sharedExpertNum == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "defaulted attribute shared_expert_num is absent from RuntimeAttrs"),
+                return ge::GRAPH_FAILED);
 
     const auto sharedExpertRankNum = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_SHARED_EXPERT_RANK_NUM_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, sharedExpertRankNum);
+    OP_CHECK_IF(sharedExpertRankNum == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "defaulted attribute shared_expert_rank_num is absent from RuntimeAttrs"),
+                return ge::GRAPH_FAILED);
 
     const auto quantMode = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_QUANT_MODE_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, quantMode);
+    OP_CHECK_IF(quantMode == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "defaulted attribute quant_mode is absent from RuntimeAttrs"),
+                return ge::GRAPH_FAILED);
 
     const auto globalBs = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_GLOBAL_BS_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, globalBs);
+    OP_CHECK_IF(globalBs == nullptr,
+                ReportDispatchInferMetadata(context->GetNodeName(), __func__,
+                                            "defaulted attribute global_bs is absent from RuntimeAttrs"),
+                return ge::GRAPH_FAILED);
 
     bool isSharedDefault = false;
     bool isNoShared = false;
@@ -425,9 +505,15 @@ static ge::graphStatus InferDataTypeMoeDistributeDispatchV3(gert::InferDataTypeC
     OP_LOGD(context->GetNodeName(), "Begin to do InferDataTypeMoeDistributeDispatchV3.");
     auto xDtype = context->GetInputDataType(DISPATCH_INPUT_X_INDEX);
     const auto attrs = context->GetAttrs();
-    OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    OP_CHECK_IF(
+        attrs == nullptr,
+        ReportInferTypeMetadata(context->GetNodeName(), "InferDataType: GetAttrs returned no RuntimeAttrs holder"),
+        return ge::GRAPH_FAILED);
     const auto quantMode = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_QUANT_MODE_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, quantMode);
+    OP_CHECK_IF(quantMode == nullptr,
+                ReportInferTypeMetadata(context->GetNodeName(),
+                                        "InferDataType: GetAttrPointer for defaulted quant_mode returned no value"),
+                return ge::GRAPH_FAILED);
     const auto scalesType = context->GetOptionalInputDataType(DISPATCH_INPUT_SCALES_IDX_INDEX);
     const int64_t* yDtypePtr = nullptr;
     if (IsTargetNpuArchInfershape(context->GetNodeName(), NPUARCH_A5)) {
@@ -443,7 +529,7 @@ static ge::graphStatus InferDataTypeMoeDistributeDispatchV3(gert::InferDataTypeC
         int64_t yDtype = *yDtypePtr;
         OP_LOGD(context->GetNodeName(), "specified y_dtype = %lld.", yDtype);
         OP_CHECK_IF(CheckQuantMode(context, quantMode, yDtype) == ge::GRAPH_FAILED,
-                    OP_LOGE(context->GetNodeName(), "CheckQuantMode fail"), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "CheckQuantMode fail"), return ge::GRAPH_FAILED);
         expandXDtype = static_cast<ge::DataType>(yDtype);
     }
     context->SetOutputDataType(DISPATCH_OUTPUT_EXPAND_X_INDEX, expandXDtype);
