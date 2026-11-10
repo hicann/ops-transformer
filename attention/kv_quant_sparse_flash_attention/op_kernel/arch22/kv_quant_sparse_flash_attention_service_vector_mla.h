@@ -51,6 +51,11 @@ public:
     bool NO_AMLA = true;
 
     __aicore__ inline QSFAVectorService(){};
+#if KVQSFA_VERSION >= 2
+    __aicore__ inline void InitSoftmaxOutputs(__gm__ uint8_t* sinks, GlobalTensor<T> maxGm, GlobalTensor<T> sumGm);
+    __aicore__ inline void CopySoftmaxOutputs(const RunInfo& info, const MSplitInfo& split);
+    __aicore__ inline LocalTensor<T> GetSoftmaxOutputBuffer();
+#endif
     __aicore__ inline void ProcessVec1L(const RunInfo& kvVecInfo);
     __aicore__ inline void ProcessVec2L(const RunInfo& kvVecInfo);
     __aicore__ inline void InitBuffers(TPipe* pipe);
@@ -184,6 +189,11 @@ private:
     static constexpr uint64_t SYNC_OUTPUT_BUF1_FLAG = 4;
     static constexpr uint64_t TQ4_SCALE_SYNC_FLAG = 5;
     static constexpr uint64_t SYNC_OUTPUT_BUF2_FLAG = 5;
+    // Each producer sub-block owns one 512-byte valid-size partition.
+    static constexpr uint32_t VALID_SIZE_PART_STRIDE = ConstInfo::BUFFER_SIZE_BYTE_512B / sizeof(int32_t);
+    static constexpr uint32_t VALID_SIZE_UB_BASE = VALID_SIZE_PART_STRIDE;
+    static constexpr uint32_t VALID_SIZE_SECOND_PART_OFFSET = VALID_SIZE_UB_BASE + VALID_SIZE_PART_STRIDE;
+    static constexpr uint32_t VALID_SIZE_GM_SLOT_STRIDE = 2 * VALID_SIZE_PART_STRIDE;
     static constexpr uint32_t INPUT1_BUFFER_OFFSET = ConstInfo::BUFFER_SIZE_BYTE_32K;
     static constexpr uint32_t SOFTMAX_TMP_BUFFER_OFFSET = ConstInfo::BUFFER_SIZE_BYTE_512B / sizeof(T);
     static constexpr uint32_t BASE_BLOCK_MAX_ELEMENT_NUM = ConstInfo::BUFFER_SIZE_BYTE_32K / sizeof(T); // 32768/4=8096
@@ -192,7 +202,7 @@ private:
     static constexpr T FLOAT_E_SCALAR = 8388608;
     static constexpr T LN2 = 0.6931471805599453094172;
     static constexpr T RECIP_OF_LN2 = 1 / LN2;
-    static constexpr T SOFTMAX_MIN_NUM = -2e38;
+    static constexpr float SOFTMAX_MIN_NUM = -2.0e38F;
     static constexpr int32_t TQ4_DEQUANT_CHUNK = IsSameType<K_ROPE_T, bfloat16_t>::value ? 16 : 4;
     static constexpr uint32_t TQ4_NOPE_BYTES = 256U;
 
@@ -204,6 +214,14 @@ private:
     GlobalTensor<int32_t> mm2ResInt32Gm;
     GlobalTensor<MM1_OUT_T> mm1ResGm;
     GlobalTensor<K_ROPE_T> vec1ResGm;
+    static constexpr bool IS_V2 = KVQSFA_VERSION >= 2;
+#if KVQSFA_VERSION >= 2
+    GlobalTensor<T> sinksGm;
+    GlobalTensor<T> softmaxMaxGm;
+    GlobalTensor<T> softmaxSumGm;
+    bool hasSinks = false;
+    TBuf<> softmaxOutputBuff;
+#endif
     GlobalTensor<T> lseSumFdGm;
     GlobalTensor<T> lseMaxFdGm;
 
@@ -298,6 +316,11 @@ __aicore__ inline void QSFAVectorService<QSFAT>::InitBuffers(TPipe* pipe)
     pipe->InitBuffer(softmaxExpBuff, ConstInfo::BUFFER_SIZE_BYTE_512B * kvVecConstInfo.preLoadNum);
     pipe->InitBuffer(softmaxSumBuff, ConstInfo::BUFFER_SIZE_BYTE_512B * kvVecConstInfo.preLoadNum);
 
+    if constexpr (IS_V2) {
+        if (kvVecConstInfo.returnSoftmaxLse) {
+            pipe->InitBuffer(this->softmaxOutputBuff, 2 * ConstInfo::BUFFER_SIZE_BYTE_512B);
+        }
+    }
     pipe->InitBuffer(softmaxMaxDefaultBuff, ConstInfo::BUFFER_SIZE_BYTE_512B);
     pipe->InitBuffer(softmaxSumDefaultBuff, ConstInfo::BUFFER_SIZE_BYTE_512B);
 
@@ -444,6 +467,11 @@ __aicore__ inline void QSFAVectorService<QSFAT>::AllocEventID()
     SetFlag<AscendC::HardEvent::V_MTE2>(SYNC_INPUT_BUF2_FLAG);
     SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
     SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF2_FLAG);
+    if constexpr (IS_V2) {
+        if (kvVecConstInfo.returnSoftmaxLse) {
+            SetFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+        }
+    }
 }
 
 template <typename QSFAT>
@@ -454,6 +482,11 @@ __aicore__ inline void QSFAVectorService<QSFAT>::FreeEventID()
     WaitFlag<AscendC::HardEvent::V_MTE2>(SYNC_INPUT_BUF2_FLAG);
     WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
     WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF2_FLAG);
+    if constexpr (IS_V2) {
+        if (kvVecConstInfo.returnSoftmaxLse) {
+            WaitFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+        }
+    }
 }
 
 template <typename QSFAT>
@@ -517,8 +550,10 @@ __aicore__ inline void QSFAVectorService<QSFAT>::ElewiseCompute(const RunInfo& k
     }
     if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
         // v0的无效值判断
-        uint64_t qsfaS2ValidSizeFirstPart = v0ValidSizeUb_.GetValue(128 + kvVecInfo.loop % MERGE_CACHE_GM_BUF_NUM);
-        uint64_t qsfaS2ValidSizeSecondPart = v0ValidSizeUb_.GetValue(256 + kvVecInfo.loop % MERGE_CACHE_GM_BUF_NUM);
+        uint64_t qsfaS2ValidSizeFirstPart =
+            v0ValidSizeUb_.GetValue(VALID_SIZE_UB_BASE + kvVecInfo.loop % MERGE_CACHE_GM_BUF_NUM);
+        uint64_t qsfaS2ValidSizeSecondPart =
+            v0ValidSizeUb_.GetValue(VALID_SIZE_SECOND_PART_OFFSET + kvVecInfo.loop % MERGE_CACHE_GM_BUF_NUM);
 
         int64_t qsfaS2ProcessSize = kvVecInfo.actualSingleProcessSInnerSize;
         int64_t qsfaS2Pair = CeilDiv(qsfaS2ProcessSize, 2L * kvVecConstInfo.sparseBlockSize);
@@ -617,6 +652,21 @@ __aicore__ inline void QSFAVectorService<QSFAT>::SoftmaxFlashV2Compute(const Run
     uint32_t outIdx = kvVecInfo.loop % (kvVecConstInfo.preLoadNum);
     uint32_t softmaxOutOffset = outIdx * SOFTMAX_TMP_BUFFER_OFFSET + baseOffset;
     if (kvVecInfo.isFirstSInnerLoop) {
+        if constexpr (IS_V2) {
+            if (this->hasSinks) {
+                // The sink is a virtual logit with zero value contribution.
+                SetFlag<HardEvent::V_MTE2>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+                WaitFlag<HardEvent::V_MTE2>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+                uint32_t headOffset = kvVecSplitInfo.nBufferStartM + kvVecSplitInfo.vecStartM + startRow;
+                DataCopyExtParams copy{1, static_cast<uint32_t>(kvDealRows * sizeof(T)), 0, 0, 0};
+                DataCopyPadExtParams<T> pad{false, 0, 0, 0};
+                DataCopyPad(softmaxMaxDefaultUb, this->sinksGm[headOffset], copy, pad);
+                SetFlag<HardEvent::MTE2_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+                WaitFlag<HardEvent::MTE2_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+                Duplicate(softmaxSumDefaultUb, static_cast<T>(1), SOFTMAX_TMP_BUFFER_OFFSET);
+                PipeBarrier<PIPE_V>();
+            }
+        }
         inMaxTensor = softmaxMaxDefaultUb;
         inSumTensor = softmaxSumDefaultUb;
     } else {
@@ -714,13 +764,14 @@ __aicore__ inline void QSFAVectorService<QSFAT>::ProcessVec1SingleBuf(const RunI
     if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
         DataCopyExtParams dataCopyParams;
         dataCopyParams.blockCount = 1;
-        dataCopyParams.blockLen = 256 * sizeof(int32_t);
+        dataCopyParams.blockLen = VALID_SIZE_GM_SLOT_STRIDE * sizeof(int32_t);
         dataCopyParams.dstStride = 0;
         dataCopyParams.srcStride = 0;
         DataCopyPadExtParams<int32_t> padParams;
-        // 额外偏移128个元素，避免不同loop下v0和v1互相影响
-        DataCopyPad(v0ValidSizeUb_[128], kvValidSizeGm_[kvVecInfo.loop % MERGE_CACHE_GM_BUF_NUM * (128 * 2)],
-                    dataCopyParams, padParams);
+        // Use a separate UB partition so different V0 and V1 loops do not overlap.
+        DataCopyPad(v0ValidSizeUb_[VALID_SIZE_UB_BASE],
+                    kvValidSizeGm_[kvVecInfo.loop % MERGE_CACHE_GM_BUF_NUM * VALID_SIZE_GM_SLOT_STRIDE], dataCopyParams,
+                    padParams);
         if (kvVecConstInfo.keyQuantMode == QUANT_MODE::TQ4) {
             DataCopyExtParams qsfaScaleInParams;
             qsfaScaleInParams.blockCount = 1;
@@ -1252,10 +1303,11 @@ __aicore__ inline void QSFAVectorService<QSFAT>::MergeKvTq4(const RunInfo& kvVec
     WaitFlag<AscendC::HardEvent::S_MTE3>(1);
     DataCopyExtParams dataCopyParams;
     dataCopyParams.blockCount = 1;
-    dataCopyParams.blockLen = 128 * sizeof(int32_t);
+    dataCopyParams.blockLen = VALID_SIZE_PART_STRIDE * sizeof(int32_t);
     dataCopyParams.srcStride = 0;
     dataCopyParams.dstStride = 0;
-    DataCopyPad(kvValidSizeGm_[kvVecRunInfo.loop % MERGE_CACHE_GM_BUF_NUM * (128 * 2) + GetSubBlockIdx() * 128],
+    DataCopyPad(kvValidSizeGm_[kvVecRunInfo.loop % MERGE_CACHE_GM_BUF_NUM * VALID_SIZE_GM_SLOT_STRIDE +
+                               GetSubBlockIdx() * VALID_SIZE_PART_STRIDE],
                 v0ValidSizeUb_, dataCopyParams);
     return;
 }
@@ -1286,6 +1338,11 @@ __aicore__ inline void QSFAVectorService<QSFAT>::ProcessVec1L(const RunInfo& kvV
         // vec1 compute
         ProcessVec1SingleBuf(kvVecInfo, kvVecSplitInfo);
         CrossCoreSetFlag<ConstInfo::QSFA_SYNC_MODE2, PIPE_MTE3>(kvVecConstInfo.syncV1C2);
+        if constexpr (IS_V2) {
+            if (kvVecConstInfo.returnSoftmaxLse && kvVecInfo.isLastS2Loop && kvVecSplitInfo.vecDealM != 0) {
+                this->CopySoftmaxOutputs(kvVecInfo, kvVecSplitInfo);
+            }
+        }
         // move lse for flash decode
         if (kvVecInfo.s2Idx == kvVecInfo.curSInnerLoopTimes - 1) {
             if (kvVecInfo.tndIsS2SplitCore) {
@@ -1299,6 +1356,51 @@ __aicore__ inline void QSFAVectorService<QSFAT>::ProcessVec1L(const RunInfo& kvV
         }
     }
 }
+
+#if KVQSFA_VERSION >= 2
+template <typename QSFAT>
+__aicore__ inline void QSFAVectorService<QSFAT>::InitSoftmaxOutputs(__gm__ uint8_t* sinks, GlobalTensor<T> maxGm,
+                                                                    GlobalTensor<T> sumGm)
+{
+    hasSinks = sinks != nullptr;
+    if (hasSinks) {
+        sinksGm.SetGlobalBuffer((__gm__ T*)sinks);
+    }
+    softmaxMaxGm = maxGm;
+    softmaxSumGm = sumGm;
+}
+
+template <typename QSFAT>
+__aicore__ inline LocalTensor<typename QSFAVectorService<QSFAT>::T> QSFAVectorService<QSFAT>::GetSoftmaxOutputBuffer()
+{
+    return softmaxOutputBuff.Get<T>();
+}
+
+template <typename QSFAT>
+__aicore__ inline void QSFAVectorService<QSFAT>::CopySoftmaxOutputs(const RunInfo& info, const MSplitInfo& split)
+{
+    uint64_t token = info.gS1Idx / kvVecConstInfo.gSize;
+    if constexpr (LAYOUT_T == QSFA_LAYOUT::TND) {
+        token += info.bIdx == 0 ? 0 : actualSeqLengthsQGm.GetValue(info.bIdx - 1);
+    } else {
+        token += info.bIdx * kvVecConstInfo.qSeqSize;
+    }
+    uint64_t offset = token * kvVecConstInfo.gSize + split.nBufferStartM + split.vecStartM;
+    uint32_t source = (info.loop % kvVecConstInfo.preLoadNum) * SOFTMAX_TMP_BUFFER_OFFSET + split.nBufferStartM / 2;
+    auto maxOut = softmaxOutputBuff.Get<T>();
+    auto sumOut = maxOut[SOFTMAX_TMP_BUFFER_OFFSET];
+    WaitFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+    Adds(maxOut, softmaxMaxUb[source], static_cast<T>(0), split.vecDealM);
+    PipeBarrier<PIPE_V>();
+    Adds(sumOut, softmaxSumUb[source], static_cast<T>(0), split.vecDealM);
+    SetFlag<HardEvent::V_MTE3>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+    WaitFlag<HardEvent::V_MTE3>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+    DataCopyExtParams copy{1, static_cast<uint32_t>(split.vecDealM * sizeof(T)), 0, 0, 0};
+    DataCopyPad(softmaxMaxGm[offset], maxOut, copy);
+    DataCopyPad(softmaxSumGm[offset], sumOut, copy);
+    SetFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+}
+#endif
 
 template <typename QSFAT>
 __aicore__ inline uint64_t QSFAVectorService<QSFAT>::CalcAccumOffset(uint32_t bN2Idx, uint32_t gS1Idx)
@@ -2396,34 +2498,49 @@ __aicore__ inline void QSFAVectorService<QSFAT>::MergeKvOptimized(const RunInfo&
     if (unlikely(qsfaS2GmStartOffset + qsfaMte2Size < qsfaS2GmLimit)) {
         SetFlag<AscendC::HardEvent::MTE3_V>(0);
         WaitFlag<AscendC::HardEvent::MTE3_V>(0);
-        WaitFlag<AscendC::HardEvent::MTE3_MTE2>(qsfaMergeMte3Idx % MTE2_SLOT_NUM);
+        uint32_t mergeSlot = qsfaMergeMte3Idx % MTE2_SLOT_NUM;
+        WaitFlag<AscendC::HardEvent::MTE3_MTE2>(mergeSlot);
         LocalTensor<K_ROPE_T> mergeUb = kvMergUb_.template ReinterpretCast<K_ROPE_T>();
-        Duplicate(mergeUb, static_cast<K_ROPE_T>(0.0), kvVecConstInfo.headDim);
+        const int64_t zeroStart = qsfaS2GmStartOffset + qsfaMte2Size;
+        uint32_t zeroRows = 1;
+        if constexpr (!QSFAT::noRope) {
+            // Keep the zero source inside the free MTE2 slot. The other slots
+            // may still be used by asynchronous KV copy-out.
+            const uint32_t zeroRowsCapacity =
+                mte2SlotElems_ * sizeof(KV_T) / (kvVecConstInfo.headDim * sizeof(K_ROPE_T));
+            zeroRows = qsfaS2GmLimit - zeroStart < zeroRowsCapacity ? static_cast<uint32_t>(qsfaS2GmLimit - zeroStart) :
+                                                                      zeroRowsCapacity;
+            mergeUb = kvMergUb_[mergeSlot * mte2SlotElems_].template ReinterpretCast<K_ROPE_T>();
+        }
+        Duplicate(mergeUb, static_cast<K_ROPE_T>(0.0), zeroRows * kvVecConstInfo.headDim);
         SetFlag<AscendC::HardEvent::V_MTE3>(0);
         WaitFlag<AscendC::HardEvent::V_MTE3>(0);
 
         uint64_t blockElementNum = FP32_BLOCK_ELEMENT_NUM * 2;
-        DataCopyExtParams dataCopyParams;
-        dataCopyParams.blockCount = kvVecConstInfo.headDim / blockElementNum;
-        dataCopyParams.blockLen = blockElementNum * sizeof(K_ROPE_T);
-        dataCopyParams.srcStride = 0;
-        dataCopyParams.dstStride = (kvVecConstInfo.s2BaseSize - 1) * blockElementNum * sizeof(K_ROPE_T);
-        for (int64_t s2GmOffset = qsfaS2GmStartOffset + qsfaMte2Size; s2GmOffset < qsfaS2GmLimit; s2GmOffset++) {
-            if constexpr (QSFAT::noRope) {
+        if constexpr (QSFAT::noRope) {
+            for (int64_t s2GmOffset = zeroStart; s2GmOffset < qsfaS2GmLimit; s2GmOffset++) {
                 DataCopyExtParams ndParams{1, static_cast<uint32_t>(kvVecConstInfo.headDim * sizeof(K_ROPE_T)), 0, 0,
                                            0};
                 DataCopyPad(kvMergeGm_[kvVecRunInfo.loop % MERGE_CACHE_GM_BUF_NUM * 512 * 576 +
                                        s2GmOffset * kvVecConstInfo.headDim],
                             mergeUb, ndParams);
-            } else {
+            }
+        } else {
+            // An NZ column contains contiguous S2 rows, so one DMA can zero
+            // several rows while preserving the stride between columns.
+            DataCopyExtParams dataCopyParams;
+            dataCopyParams.srcStride = 0;
+            for (int64_t s2GmOffset = zeroStart; s2GmOffset < qsfaS2GmLimit; s2GmOffset += zeroRows) {
+                uint32_t rows = qsfaS2GmLimit - s2GmOffset < zeroRows ?
+                                    static_cast<uint32_t>(qsfaS2GmLimit - s2GmOffset) :
+                                    zeroRows;
+                dataCopyParams.blockCount = kvVecConstInfo.headDim / blockElementNum;
+                dataCopyParams.blockLen = rows * blockElementNum * sizeof(K_ROPE_T);
+                dataCopyParams.dstStride = (kvVecConstInfo.s2BaseSize - rows) * blockElementNum * sizeof(K_ROPE_T);
                 DataCopyPad(
                     kvMergeGm_[kvVecRunInfo.loop % MERGE_CACHE_GM_BUF_NUM * 512 * 576 + s2GmOffset * blockElementNum],
                     mergeUb, dataCopyParams);
-            }
-        }
-        if constexpr (!QSFAT::noRope) {
-            dataCopyParams.blockCount = (QSFAT::noRope ? 0U : 64U) / blockElementNum;
-            for (int64_t s2GmOffset = qsfaS2GmStartOffset + qsfaMte2Size; s2GmOffset < qsfaS2GmLimit; s2GmOffset++) {
+                dataCopyParams.blockCount = kvVecConstInfo.headDimRope / blockElementNum;
                 DataCopyPad(kvMergeGm_[kvVecRunInfo.loop % MERGE_CACHE_GM_BUF_NUM * 512 * 576 +
                                        512 * kvVecConstInfo.headDim + s2GmOffset * blockElementNum],
                             mergeUb, dataCopyParams);
@@ -2440,10 +2557,11 @@ __aicore__ inline void QSFAVectorService<QSFAT>::MergeKvOptimized(const RunInfo&
     WaitFlag<AscendC::HardEvent::S_MTE3>(1);
     DataCopyExtParams dataCopyParams;
     dataCopyParams.blockCount = 1;
-    dataCopyParams.blockLen = 128 * sizeof(int32_t);
+    dataCopyParams.blockLen = VALID_SIZE_PART_STRIDE * sizeof(int32_t);
     dataCopyParams.srcStride = 0;
     dataCopyParams.dstStride = 0;
-    DataCopyPad(kvValidSizeGm_[kvVecRunInfo.loop % MERGE_CACHE_GM_BUF_NUM * (128 * 2) + GetSubBlockIdx() * 128],
+    DataCopyPad(kvValidSizeGm_[kvVecRunInfo.loop % MERGE_CACHE_GM_BUF_NUM * VALID_SIZE_GM_SLOT_STRIDE +
+                               GetSubBlockIdx() * VALID_SIZE_PART_STRIDE],
                 v0ValidSizeUb_, dataCopyParams);
     return;
 }

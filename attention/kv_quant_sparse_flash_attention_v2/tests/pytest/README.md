@@ -25,8 +25,8 @@
 - `layout_kv`: 支持`BSND`、`TND`、`PA_BSND`
 - 非PA场景要求`layout_query == layout_kv`
 - `q_type`: 仅支持`torch.float16`、`torch.bfloat16`
-- `kv_dtype`: 支持`hifloat8`、`float8_e4m3fn`，也兼容`None`作为`float8_e4m3fn`默认生成路径
-- `N1`: 仅支持`1/2/4/8/16/32/48/64`
+- `kv_dtype`: 910B支持`int8`；A5支持`hifloat8`、`float8_e4m3fn`，也兼容`None`作为`float8_e4m3fn`默认生成路径
+- `N1`: 910B支持`1-128`；A5支持`1-128`
 - `N2`: 仅支持`1`
 - `sparse_mode`: 仅支持`0`和`3`
 - `sparse_block_size`: 当前仅支持`1`
@@ -61,10 +61,11 @@ pytest/
 ├── test_run.sh   # 执行脚本
 ├── check_valid_param.py   # 参数约束拦截
 ├── kv_quant_sparse_flash_attention_v2_golden.py  # tensor转换/cpu侧算子golden实现
-├── kv_quant_sparse_flash_attention_v2_paramset.py  # 单用例入参配置
+├── kv_quant_sparse_flash_attention_v2_paramset.py  # default/910b/model 参数统一配置
 ├── result_compare_method.py  # 输出精度对比
 ├── utils.py   # 参数解析/cpu npu执行入口
-├── test_kv_quant_sparse_flash_attention_v2_single.py # 单用例运行主程序
+├── test_kv_quant_sparse_flash_attention_v2_single.py # 常规、模型形状、RoPE 尾块回归
+├── test_kv_quant_sparse_flash_attention_v2_dcp.py # DCP 空行、空尾及共享 kernel 回归
 ├── test_kv_quant_sparse_flash_attention_v2_batch.py # 从pt文件批量执行NPU测试
 └── batch/
     ├── kv_quant_sparse_flash_attention_v2_process.py # npu接口
@@ -77,7 +78,7 @@ pytest/
 
 ## 使用方法
 
-在`attention/kv_quant_sparse_flash_attention_v2/test/pytest`目录下执行：
+在`attention/kv_quant_sparse_flash_attention_v2/tests/pytest`目录下执行：
 
 ### 命令格式
 
@@ -114,6 +115,16 @@ bash test_run.sh <模式> [-E excel_path] [-S sheet] [-P path] [-O output_path]
 ```bash
 bash test_run.sh single                              # 使用默认paramset
 bash test_run.sh single -P my_paramset                # 使用指定的paramset文件
+bash test_run.sh single -P kv_quant_sparse_flash_attention_v2_paramset:910b  # 910B INT8用例
+```
+
+910B参数集覆盖BSND/TND查询布局、分页/非分页KV、8/64/96 heads、sinks，以及`return_softmax_lse`开关。打开统计输出时，测试会同时比较attention、softmax_max和softmax_sum。
+
+模型形状用例使用`TND`查询和`PA_BSND`分页KV，覆盖`query=[8,128,576]`、`key/value=[7644,128,1,656]`、`sparse_indices=[8,1,2048]`和`block_table=[8,256]`。测试断言`[8,128,512]`的BF16 attention输出，以及两个`[1,8,128]`的FP32统计输出，并比较CPU/NPU精度、确认统计输出非零。输入只给出了两个actual sequence length张量的形状，未提供数值；用例暂设每个batch有1个query token、32768个KV token，并沿用现有TND_PA参数的其他属性。A2使用INT8，A5使用FLOAT8_E4M3；默认选择A2，切换A5时设置环境变量：
+
+```bash
+QSFA_MODEL_ARCH=A2 python3 -m pytest -q -s test_kv_quant_sparse_flash_attention_v2_single.py -k model -m ci
+QSFA_MODEL_ARCH=A5 python3 -m pytest -q -s test_kv_quant_sparse_flash_attention_v2_single.py -k model -m ci
 ```
 
 ### batch_save
@@ -159,3 +170,29 @@ bash test_run.sh batch_exec -P ./custom_pt_dir/       # 执行指定目录下所
 
 - `result.xlsx`：记录每个用例的关键信息、执行状态与`fulfill_percent`
 - `./pt_files/*.pt`：batch流程生成的中间测试用例
+
+## 合并后的参数与回归入口
+
+新增参数统一放在 `kv_quant_sparse_flash_attention_v2_paramset.py`：默认 `ENABLED_PARAMS` 保留原有四组配置，`get_enabled_params("910b")` 返回原六组 INT8 配置，`get_model_params("A2"/"A5")` 返回原模型配置。模型的默认架构仍由 `QSFA_MODEL_ARCH` 指定，未设置时为 A2。
+
+`test_kv_quant_sparse_flash_attention_v2_single.py` 保留常规参数化测试，并包含原模型形状/精度断言和八组 RoPE 尾块用例；DCP 保留独立文件。RoPE 稀疏尾块回归与独立 DCP 回归都仅在 A2/A3 的 INT8 arch22 路径执行，A5 跳过。用 `-k` 可单独选择模型或尾块测试：
+
+```bash
+QSFA_MODEL_ARCH=A2 python -m pytest -v test_kv_quant_sparse_flash_attention_v2_single.py -k model
+python -m pytest -v test_kv_quant_sparse_flash_attention_v2_single.py -k rope_sparse_tail_zeroing
+PARAMSET_FILE=kv_quant_sparse_flash_attention_v2_paramset:910b \
+  python -m pytest -v test_kv_quant_sparse_flash_attention_v2_single.py -k 'not model and not rope_sparse_tail_zeroing'
+```
+
+原 `-P kv_quant_sparse_flash_attention_v2_910b_paramset` 和 `-P kv_quant_sparse_flash_attention_v2_model_paramset` 仍通过 `utils.load_paramset` 兼容。独立导入旧参数模块的调用方应改用统一模块的函数；原模型与尾块测试文件路径改为上述 `single.py -k` 入口。
+
+### A3 无 sink 空行统计
+
+DCP 回归测试仅覆盖 A2/A3 的 INT8 arch22 路径，不对 A5 执行这些新增用例。
+
+全 `-1`、实际 KV 长度为零或因果可见范围为空的行，进入空行初始化时，
+统一输出 `attention=0`、`softmax_max=具名最小值常量`、`softmax_sum=1`。
+这里的 `sum=1` 是空行占位值，不表示有效 KV 数量；不再保存裁剪前候选计数。
+正常行及普通计算路径的逐块 softmax 保持真实计算结果，不把内部 sum 改成 1。
+有 sink 的空行仍使用 `max=sink, sum=1`。Torch 接口省略 sink 时会补零 sink，
+因此不属于无 sink 的 ACLNN 调用。

@@ -64,6 +64,14 @@ public:
     using MM2_OUT_T = T;
 
     __aicore__ inline KvQuantSparseFlashAttentionMla(){};
+#if KVQSFA_VERSION >= 2
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                __gm__ uint8_t* sparseIndices, __gm__ uint8_t* keyScale, __gm__ uint8_t* valueScale,
+                                __gm__ uint8_t* blockTable, __gm__ uint8_t* actualSeqLengthsQ,
+                                __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* sinks, __gm__ uint8_t* attentionOut,
+                                __gm__ uint8_t* softmaxMax, __gm__ uint8_t* softmaxSum, __gm__ uint8_t* workspace,
+                                const KvQuantSparseFlashAttentionTilingDataMla* __restrict tiling, TPipe* tPipe);
+#else
     __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
                                 __gm__ uint8_t* sparseIndices, __gm__ uint8_t* keyScale, __gm__ uint8_t* valueScale,
                                 __gm__ uint8_t* blockTable, __gm__ uint8_t* actualSeqLengthsQ,
@@ -71,15 +79,19 @@ public:
                                 __gm__ uint8_t* workspace,
                                 const KvQuantSparseFlashAttentionTilingDataMla* __restrict tiling,
                                 __gm__ uint8_t* gmTiling, TPipe* tPipe);
+#endif
 
     __aicore__ inline void Process();
 
 private:
+    static constexpr bool IS_V2 = KVQSFA_VERSION >= 2;
     static constexpr bool PAGE_ATTENTION = QSFAT::pageAttention;
     static constexpr int TEMPLATE_MODE = QSFAT::templateMode;
     static constexpr bool FLASH_DECODE = QSFAT::flashDecode;
     static constexpr QSFA_LAYOUT LAYOUT_T = QSFAT::layout;
     static constexpr QSFA_LAYOUT KV_LAYOUT_T = QSFAT::kvLayout;
+
+    static constexpr float SOFTMAX_MIN_NUM = -2.0e38F;
 
     static constexpr uint32_t PRELOAD_NUM = 2;
     static constexpr uint32_t N_BUFFER_M_BASIC_SIZE = 256;
@@ -140,6 +152,11 @@ private:
     GlobalTensor<K_ROPE_T> kRopeGm;
 
     GlobalTensor<OUT_T> attentionOutGm;
+#if KVQSFA_VERSION >= 2
+    GlobalTensor<T> softmaxMaxGm;
+    GlobalTensor<T> softmaxSumGm;
+    __gm__ uint8_t* sinksPtr = nullptr;
+#endif
     GlobalTensor<int32_t> blockTableGm;
     GlobalTensor<int32_t> topKGm;
 
@@ -169,6 +186,9 @@ private:
     __aicore__ inline void InitBuffers();
     __aicore__ inline void InitActualSeqLen(__gm__ uint8_t* actualSeqLengthsQ, __gm__ uint8_t* actualSeqLengths);
     __aicore__ inline void InitOutputSingleCore();
+#if KVQSFA_VERSION >= 2
+    __aicore__ inline void InitEmptySoftmaxOutput(uint64_t offset);
+#endif
     // ================================Process functions================================
     __aicore__ inline void ProcessBalance();
     __aicore__ inline void PreloadPipeline(uint32_t loop, uint64_t s2Start, uint64_t s2LoopIdx,
@@ -176,6 +196,7 @@ private:
     // ================================Offset Calc=====================================
     __aicore__ inline void GetActualSeqLen(uint32_t bIdx, uint32_t s1Idx = 0);
     __aicore__ inline void GetSparseActualSeqLen(uint32_t bIdx, uint32_t s1Idx, uint32_t n2Idx);
+    __aicore__ inline void TrimSparseCandidateLength(uint32_t bIdx, uint32_t s1Idx);
     __aicore__ inline void UpdateInnerLoopCond();
     __aicore__ inline void DealActSeqLenIsZero(uint32_t bIdx, uint32_t s1Idx, uint32_t n2Idx);
     __aicore__ inline void CalcParams(uint32_t loop, uint64_t s2Start, uint32_t s2LoopIdx, RunInfo& kvSfaKernelRunInfo);
@@ -212,6 +233,7 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::InitTilingData()
     kvSfaKernelConstInfo.qSeqSize = tilingData->baseParams.qSeqSize;
     kvSfaKernelConstInfo.maxBlockNumPerBatch = tilingData->baseParams.maxBlockNumPerBatch;
     kvSfaKernelConstInfo.kvCacheBlockSize = tilingData->baseParams.blockSize;
+    kvSfaKernelConstInfo.returnSoftmaxLse = IS_V2 && tilingData->baseParams.returnSoftmaxLse != 0;
     kvSfaKernelConstInfo.outputLayout = static_cast<QSFA_LAYOUT>(tilingData->baseParams.outputLayout);
     kvSfaKernelConstInfo.mBaseSize = tilingData->innerSplitParams.mBaseSize;
     kvSfaKernelConstInfo.s2BaseSize = tilingData->innerSplitParams.s2BaseSize;
@@ -271,6 +293,12 @@ template <typename QSFAT>
 __aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::InitAllZeroOutput(uint32_t bIdx, uint32_t s1Idx,
                                                                                 uint32_t n2Idx)
 {
+    if constexpr (IS_V2) {
+        if (kvSfaKernelConstInfo.returnSoftmaxLse) {
+            // InitOutput reuses a temporary UB buffer; wait before the next row overwrites it.
+            WaitFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+        }
+    }
     if (kvSfaKernelConstInfo.outputLayout == QSFA_LAYOUT::TND) {
         uint32_t tBase = bIdx == 0 ? 0 : actualSeqLengthsQGm.GetValue(bIdx - 1);
         uint32_t s1Count = kvSfaKernelLoopInfo.actS1Size;
@@ -285,7 +313,49 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::InitAllZeroOutput(
             n2Idx * kvSfaKernelConstInfo.gSize * headDim;              // N2轴偏移
         matmul::InitOutput<OUT_T>(attentionOutGm[attenOutOffset], kvSfaKernelConstInfo.gSize * headDim, 0);
     }
+    if constexpr (IS_V2) {
+        if (kvSfaKernelConstInfo.returnSoftmaxLse) {
+            SetFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+            WaitFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+            uint64_t token = LAYOUT_T == QSFA_LAYOUT::TND ?
+                                 (bIdx == 0 ? 0 : actualSeqLengthsQGm.GetValue(bIdx - 1)) + s1Idx :
+                                 bIdx * kvSfaKernelConstInfo.qSeqSize + s1Idx;
+            this->InitEmptySoftmaxOutput(token * kvSfaKernelConstInfo.gSize);
+        }
+    }
 }
+
+#if KVQSFA_VERSION >= 2
+template <typename QSFAT>
+__aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::InitEmptySoftmaxOutput(uint64_t offset)
+{
+    uint32_t count = kvSfaKernelConstInfo.gSize;
+    if (this->sinksPtr != nullptr) {
+        auto maxOut = kvSfaKernelVectorService.GetSoftmaxOutputBuffer();
+        GlobalTensor<T> sinksGm;
+        sinksGm.SetGlobalBuffer((__gm__ T*)sinksPtr);
+        DataCopyExtParams copy{1, static_cast<uint32_t>(count * sizeof(T)), 0, 0, 0};
+        DataCopyPadExtParams<T> pad{false, 0, 0, 0};
+        SetFlag<HardEvent::MTE3_MTE2>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+        WaitFlag<HardEvent::MTE3_MTE2>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+        DataCopyPad(maxOut, sinksGm, copy, pad);
+        SetFlag<HardEvent::MTE2_MTE3>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+        WaitFlag<HardEvent::MTE2_MTE3>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+        // Complete vector preparation before writing the sink maximum.
+        SetFlag<HardEvent::V_MTE3>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+        WaitFlag<HardEvent::V_MTE3>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+        DataCopyPad(softmaxMaxGm[offset], maxOut, copy);
+        matmul::InitOutput<T>(softmaxSumGm[offset], count, 1);
+        SetFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+    } else {
+        matmul::InitOutput<T>(softmaxMaxGm[offset], count, SOFTMAX_MIN_NUM);
+        SetFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+        WaitFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+        matmul::InitOutput<T>(softmaxSumGm[offset], count, 1);
+        SetFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+    }
+}
+#endif
 
 template <typename QSFAT>
 __aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::InitOutputSingleCore()
@@ -300,6 +370,23 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::InitOutputSingleCo
         uint64_t qsfaSingleInitOutputSize = qsfaTailSize < qsfaSingleCoreSize ? qsfaTailSize : qsfaSingleCoreSize;
         if (tmpBlockIdx * qsfaSingleCoreSize < qsfaTotalOutputSize && qsfaSingleInitOutputSize > 0) {
             matmul::InitOutput<OUT_T>(attentionOutGm[tmpBlockIdx * qsfaSingleCoreSize], qsfaSingleInitOutputSize, 0);
+        }
+        if constexpr (IS_V2) {
+            if (kvSfaKernelConstInfo.returnSoftmaxLse) {
+                uint64_t totalLseSize = kvSfaKernelConstInfo.batchSize * kvSfaKernelConstInfo.kvHeadNum *
+                                        kvSfaKernelConstInfo.qSeqSize * kvSfaKernelConstInfo.gSize;
+                uint64_t perCore = (totalLseSize + 2 * qsfaCoreNum - 1) / (2 * qsfaCoreNum);
+                uint64_t start = tmpBlockIdx * perCore;
+                if (start < totalLseSize) {
+                    uint64_t count = totalLseSize - start < perCore ? totalLseSize - start : perCore;
+                    SetFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+                    WaitFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+                    matmul::InitOutput<T>(this->softmaxMaxGm[start], count, SOFTMAX_MIN_NUM);
+                    SetFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+                    WaitFlag<HardEvent::MTE3_V>(ConstInfo::QSFA_SOFTMAX_OUTPUT_EVENT_ID);
+                    matmul::InitOutput<T>(this->softmaxSumGm[start], count, 1);
+                }
+            }
         }
         SyncAll();
     }
@@ -329,6 +416,7 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::GetSparseActualSeq
             (kvSfaKernelConstInfo.sparseBlockCount * kvSfaKernelConstInfo.sparseBlockSize > threshold) ?
                 threshold :
                 kvSfaKernelConstInfo.sparseBlockCount * kvSfaKernelConstInfo.sparseBlockSize;
+        TrimSparseCandidateLength(bIdx, s1Idx);
     } else {
         uint64_t topKBaseOffset = 0;
         if constexpr (LAYOUT_T == QSFA_LAYOUT::BSND) { // B,S1,N2 K
@@ -366,6 +454,48 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::GetSparseActualSeq
 }
 
 template <typename QSFAT>
+__aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::TrimSparseCandidateLength(uint32_t bIdx, uint32_t s1Idx)
+{
+    const uint64_t candidateLength = kvSfaKernelLoopInfo.curActualSeqLen;
+    // Only trim one complete query row; preserve grouped-M and S2-split scheduling.
+    if (candidateLength == 0 || kvSfaKernelConstInfo.sparseBlockSize != 1 || kvSfaKernelConstInfo.kvHeadNum != 1 ||
+        kvSfaKernelConstInfo.mBaseSize != kvSfaKernelConstInfo.gSize || kvSfaKernelConstInfo.s2Start != 0 ||
+        kvSfaKernelConstInfo.coreStartKVSplitPos != 0) {
+        return;
+    }
+    if constexpr (LAYOUT_T == QSFA_LAYOUT::TND || LAYOUT_T == QSFA_LAYOUT::BSND) {
+        uint64_t queryBase = bIdx * kvSfaKernelConstInfo.qSeqSize;
+        if constexpr (LAYOUT_T == QSFA_LAYOUT::TND) {
+            queryBase = bIdx == 0 ? 0 : actualSeqLengthsQGm.GetValue(bIdx - 1);
+        }
+        const uint64_t rowOffset = (queryBase + s1Idx) * kvSfaKernelConstInfo.sparseBlockCount;
+        // Full-valid rows return after one read; a limited valid prefix also needs no search.
+        if (topKGm.GetValue(rowOffset + kvSfaKernelConstInfo.sparseBlockCount - 1) != -1 ||
+            (candidateLength < kvSfaKernelConstInfo.sparseBlockCount &&
+             topKGm.GetValue(rowOffset + candidateLength - 1) != -1)) {
+            return;
+        }
+        // Valid indices precede the -1 suffix, so an invalid first item means the whole row is empty.
+        if (topKGm.GetValue(rowOffset) == -1) {
+            kvSfaKernelLoopInfo.curActualSeqLen = 0;
+            return;
+        }
+        uint64_t firstInvalid = 0;
+        uint64_t validEnd = candidateLength;
+        // All three core roles use the same read-only search before deriving S2 loops and tail sizes.
+        while (firstInvalid < validEnd) {
+            const uint64_t middle = firstInvalid + (validEnd - firstInvalid) / 2;
+            if (topKGm.GetValue(rowOffset + middle) == -1) {
+                validEnd = middle;
+            } else {
+                firstInvalid = middle + 1;
+            }
+        }
+        kvSfaKernelLoopInfo.curActualSeqLen = firstInvalid;
+    }
+}
+
+template <typename QSFAT>
 __aicore__ inline uint32_t KvQuantSparseFlashAttentionMla<QSFAT>::GetActualSeqLenKV(uint32_t bIdx)
 {
     if constexpr (KV_LAYOUT_T == QSFA_LAYOUT::TND) {
@@ -395,7 +525,10 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::DealActSeqLenIsZer
                                                                                   uint32_t n2Idx)
 {
     if ASCEND_IS_AIV {
-        InitAllZeroOutput(bIdx, s1Idx, n2Idx);
+        // One writer owns the whole query row when no KV contributes.
+        if (tmpBlockIdx % 2 == 0) {
+            InitAllZeroOutput(bIdx, s1Idx, n2Idx);
+        }
     }
 }
 
@@ -441,11 +574,20 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::UpdateInner(uint32
 }
 
 template <typename QSFAT>
+#if KVQSFA_VERSION >= 2
+__aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::Init(
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* sparseIndices,
+    __gm__ uint8_t* keyScale, __gm__ uint8_t* valueScale, __gm__ uint8_t* blockTable, __gm__ uint8_t* actualSeqLengthsQ,
+    __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* sinks, __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxMax,
+    __gm__ uint8_t* softmaxSum, __gm__ uint8_t* workspace,
+    const KvQuantSparseFlashAttentionTilingDataMla* __restrict tiling, TPipe* tPipe)
+#else
 __aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::Init(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* sparseIndices,
     __gm__ uint8_t* keyScale, __gm__ uint8_t* valueScale, __gm__ uint8_t* blockTable, __gm__ uint8_t* actualSeqLengthsQ,
     __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace,
     const KvQuantSparseFlashAttentionTilingDataMla* __restrict tiling, __gm__ uint8_t* gmTiling, TPipe* tPipe)
+#endif
 {
     if ASCEND_IS_AIC {
         tmpBlockIdx = GetBlockIdx(); // cube:0-23
@@ -473,6 +615,13 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::Init(
     valueGm.SetGlobalBuffer((__gm__ KV_T*)valuePtr);
 
     attentionOutGm.SetGlobalBuffer((__gm__ OUT_T*)attentionOut);
+#if KVQSFA_VERSION >= 2
+    sinksPtr = sinks;
+    if (kvSfaKernelConstInfo.returnSoftmaxLse) {
+        softmaxMaxGm.SetGlobalBuffer((__gm__ T*)softmaxMax);
+        softmaxSumGm.SetGlobalBuffer((__gm__ T*)softmaxSum);
+    }
+#endif
 
     if ASCEND_IS_AIV {
         if (kvSfaKernelConstInfo.needInit && LAYOUT_T != QSFA_LAYOUT::TND) {
@@ -554,6 +703,9 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::InitVectorService(
 {
     if ASCEND_IS_AIV {
         kvSfaKernelVectorService.InitParams(kvSfaKernelConstInfo, tilingData);
+        if constexpr (IS_V2) {
+            kvSfaKernelVectorService.InitSoftmaxOutputs(this->sinksPtr, this->softmaxMaxGm, this->softmaxSumGm);
+        }
         kvSfaKernelVectorService.InitMm2ResInt32GmGlobalTensor(mm2ResInt32Gm);
         if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
             kvSfaKernelVectorService.InitVec0GlobalTensor(kvValidSizeGm_, kvMergeGm_, kRopeGm, keyGm, blockTableGm);

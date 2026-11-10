@@ -27,10 +27,13 @@
 #include "../../kv_quant_sparse_flash_attention/op_kernel/arch92/kv_quant_sparse_flash_attention_kernel_mla_arch92.h"
 #elif (__CCE_AICORE__ == 310)
 #include "../../kv_quant_sparse_flash_attention/op_kernel/arch35/kv_quant_sparse_flash_attention_kernel_mla_arch35.h"
+#else
+#include "../../kv_quant_sparse_flash_attention/op_kernel/arch22/kv_quant_sparse_flash_attention_kernel_mla.h"
 #endif
 
 using namespace AscendC;
 
+#if (__CCE_AICORE__ == 310) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
 #if defined(__DAV_C310_CUBE__)
 #define QSFA_V2_OP_IMPL(templateClass, tilingdataClass, ...) \
     do { \
@@ -113,8 +116,10 @@ __aicore__ inline void DispatchKernelDtype310V2(__gm__ uint8_t* query, __gm__ ui
     }
 }
 
+#endif
+
 template <int FLASH_DECODE, int PAGE_ATTENTION, int LAYOUT_T, int KV_LAYOUT_T, int TEMPLATE_MODE, int IS_SPLIT_G,
-          int IS_VEC_S2PHYADDR>
+          int IS_VEC_S2PHYADDR, int NO_ROPE>
 __global__ __aicore__ void kv_quant_sparse_flash_attention_v2(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* sparseIndices,
     __gm__ uint8_t* keyScale, __gm__ uint8_t* valueScale, __gm__ uint8_t* blocktable,
@@ -130,8 +135,20 @@ __global__ __aicore__ void kv_quant_sparse_flash_attention_v2(
 
     TPipe tPipe;
     __gm__ uint8_t* user = GetUserWorkspace(workspace);
+#if (__CCE_AICORE__ == 310) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
     DispatchKernelDtype310V2<FLASH_DECODE, PAGE_ATTENTION, LAYOUT_T, KV_LAYOUT_T, TEMPLATE_MODE, IS_SPLIT_G,
                              IS_VEC_S2PHYADDR>(query, key, value, sparseIndices, keyScale, valueScale, blocktable,
                                                actualSeqLengthsQuery, actualSeqLengthsKV, sinks, attentionOut,
                                                softmaxMax, softmaxSum, user, tiling, tPipe);
+#else
+    GET_TILING_DATA_WITH_STRUCT(KvQuantSparseFlashAttentionTilingDataMla, tilingData, tiling);
+    using QueryType = typename std::conditional<ORIG_DTYPE_QUERY == DT_FLOAT16, half, bfloat16_t>::type;
+    using BaseType = QSFAType<QueryType, int8_t, QueryType, FLASH_DECODE, static_cast<QSFA_LAYOUT>(LAYOUT_T),
+                              static_cast<QSFA_LAYOUT>(KV_LAYOUT_T), TEMPLATE_MODE, NO_ROPE>;
+    using OpType = typename QSFAAddressTableType<BaseType, IS_VEC_S2PHYADDR != 0>::type;
+    KvQuantSparseFlashAttentionMla<OpType> op;
+    op.Init(query, key, value, sparseIndices, keyScale, valueScale, blocktable, actualSeqLengthsQuery,
+            actualSeqLengthsKV, sinks, attentionOut, softmaxMax, softmaxSum, user, &tilingData, &tPipe);
+    op.Process();
+#endif
 }

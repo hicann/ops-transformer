@@ -94,6 +94,16 @@ public:
         this->Attr("rope_head_dim").AttrType(OPTIONAL).Int(64); // 64:默认值
         this->Attr("return_softmax_lse").AttrType(OPTIONAL).Bool(false);
 
+        OpAICoreConfig aicore_config;
+        aicore_config.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true);
+        this->AICore().AddConfig("ascend910b", aicore_config);
+        this->AICore().AddConfig("ascend910_93", aicore_config);
+
         OpAICoreConfig aicore_config_95;
         aicore_config_95.Input("query")
             .ParamType(REQUIRED)

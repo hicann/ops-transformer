@@ -64,7 +64,7 @@ The released `kv_quant_sparse_flash_attention` is a new operator designed for Sp
       <tr>
           <td>query</td>
           <td>Input</td>
-          <td>Q input of the attention structure. Non-contiguous input is not supported. query is obtained by concatenating q_nope and q_rope of the same data type along the D dimension. When layout_query is "BSND", the shape is [B, Q_S, Q_N, Q_D]. When layout_query is "TND", the shape is [Q_T, Q_N, Q_D]. Q_D supports only 576, that is, q_nope+q_rope=512+64. Q_N supports 1/2/4/8/16/32/48/64/128.</td>
+          <td>Q input of the attention structure. Non-contiguous input is not supported. query is obtained by concatenating q_nope and q_rope of the same data type along the D dimension. When layout_query is "BSND", the shape is [B, Q_S, Q_N, Q_D]. When layout_query is "TND", the shape is [Q_T, Q_N, Q_D]. Q_D supports only 576, that is, q_nope+q_rope=512+64. Q_N supports all integers from 1 to 128 on A2/A3 and A5 platforms. On A6 platforms, Q_N supports 1/2/4/8/16/32/48/64/128.</td>
           <td>FLOAT16, BFLOAT16</td>
           <td>ND</td>
       </tr>
@@ -239,7 +239,7 @@ The released `kv_quant_sparse_flash_attention` is a new operator designed for Sp
   - Only when layout_kv is PA_BSND does key support non-contiguous input along axis 0.
   - TQ4 INT4 mode (key\_quant\_mode=3, value\_quant\_mode=3) is not supported. If 3 is passed in, the tiling check rejects it.
 - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>:
-  - Q_N of query does not support 48.
+  - Q_N of query supports all integers from 1 to 128.
   - The data types of key and value support only int8.
   - sparse\_block\_size supports [1,16] and must be a power of two. In the PageAttention scenario, sparse\_block\_size must divide block\_size exactly.
   - Non-contiguous key is not supported.

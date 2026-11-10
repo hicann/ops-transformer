@@ -62,7 +62,7 @@ TQ4 当前面向 Ascend 910B 的 MLA-absorb 场景，query 支持 FLOAT16/BFLOAT
       <tr>
           <td>query</td>
           <td>输入</td>
-          <td>attention结构的Q输入，不支持非连续。query由相同数据类型的q_nope和q_rope按D维度拼接得到。layout_query为"BSND"时shape为[B, Q_S, Q_N, Q_D]。layout_query为"TND"时shape为[Q_T, Q_N, Q_D]。其中Q_D值仅支持576，即q_nope+q_rope=512+64；Q_N值支持1/2/4/8/16/32/48/64/128。</td>
+          <td>attention结构的Q输入，不支持非连续。query由相同数据类型的q_nope和q_rope按D维度拼接得到。layout_query为"BSND"时shape为[B, Q_S, Q_N, Q_D]。layout_query为"TND"时shape为[Q_T, Q_N, Q_D]。其中Q_D值仅支持576，即q_nope+q_rope=512+64；A2/A3和A5平台的Q_N值支持1-128，A6平台支持1/2/4/8/16/32/48/64/128。</td>
           <td>FLOAT16、BFLOAT16</td>
           <td>ND</td>
       </tr>
@@ -237,7 +237,7 @@ TQ4 当前面向 Ascend 910B 的 MLA-absorb 场景，query 支持 FLOAT16/BFLOAT
   - 仅在layout_kv为PA_BSND时，key支持0轴非连续。
   - TQ4 INT4 模式（key\_quant\_mode=3、value\_quant\_mode=3）不支持，传入3会被tiling校验拦截。
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-  - query Q_N不支持48。
+  - query Q_N支持1-128；
   - 参数key、value数据类型仅支持int8数据类型。
   - 参数sparse\_block\_size支持[1,16]，且要求是2的幂次方，在PageAttention场景下要求sparse\_block\_size整除block\_size。
   - key不支持非连续。

@@ -7,8 +7,8 @@ English | [简体中文](./README.md)
 |Product      | Supported |
 |:----------------------------|:-----------:|
 |<term>Ascend 950PR&950DT products</term>|      √     |
-|<term>Atlas A3 products</term>|      ×     |
-|<term>Atlas A2 products</term>|      ×     |
+|<term>Atlas A3 products</term>|      √     |
+|<term>Atlas A2 products</term>|      √     |
 |<term>Atlas 200I/500 A2 inference products</term>|      ×     |
 |<term>Atlas inference products</term>|      ×     |
 |<term>Atlas training products</term>|      ×     |
@@ -50,7 +50,7 @@ The released `kv_quant_sparse_flash_attention_v2` is a new operator designed for
       <tr>
           <td>query</td>
           <td>Input</td>
-          <td>Q input of the attention structure. Non-contiguous input is not supported. query is obtained by concatenating q_nope and q_rope of the same data type along the D dimension. When layout_query is "BSND", the shape is [B, Q_S, Q_N, Q_D]. When layout_query is "TND", the shape is [Q_T, Q_N, Q_D]. Q_D supports only 576, that is, q_nope+q_rope=512+64. Q_N supports 1/2/4/8/16/32/48/64/128.</td>
+          <td>Q input of the attention structure. Non-contiguous input is not supported. query is obtained by concatenating q_nope and q_rope of the same data type along the D dimension. When layout_query is "BSND", the shape is [B, Q_S, Q_N, Q_D]. When layout_query is "TND", the shape is [Q_T, Q_N, Q_D]. Q_D supports only 576, that is, q_nope+q_rope=512+64. For V2, Q_N supports all integers from 1 to 128 on A2/A3 and A5 platforms. A6 follows its platform-specific constraints.</td>
           <td>FLOAT16, BFLOAT16</td>
           <td>ND</td>
       </tr>

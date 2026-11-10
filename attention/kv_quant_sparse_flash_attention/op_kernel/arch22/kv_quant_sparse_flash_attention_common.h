@@ -155,6 +155,9 @@ struct RunInfo {
 struct ConstInfo {
     // CUBE与VEC核间同步的模式
     static constexpr uint32_t QSFA_SYNC_MODE2 = 2;
+    // Shared VEC event for Kernel empty-output initialization and Vector statistics writes.
+    // AllocEventID primes MTE3_V; writers consume/rearm it and FreeEventID drains it.
+    static constexpr uint64_t QSFA_SOFTMAX_OUTPUT_EVENT_ID = 7;
     // BUFFER的字节数
     static constexpr uint32_t BUFFER_SIZE_BYTE_1K = 1024;
     static constexpr uint32_t BUFFER_SIZE_BYTE_2K = 2048;
@@ -199,6 +202,7 @@ struct ConstInfo {
     QSFA_LAYOUT outputLayout;         // 输出的Transpose格式
     uint32_t sparseMode = 0;
     bool needInit = false;
+    bool returnSoftmaxLse = false;
 
     // FlashDecoding
     uint64_t combineLseOffset = 0ULL;

@@ -5,8 +5,8 @@
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
 |<term>Ascend 950PR&950DT系列产品</term>|      √     |
-|<term>Atlas A3系列产品</term>|      ×     |
-|<term>Atlas A2系列产品</term>|      ×     |
+|<term>Atlas A3系列产品</term>|      √     |
+|<term>Atlas A2系列产品</term>|      √     |
 |<term>Atlas 200I/500 A2推理产品</term>|      ×     |
 |<term>Atlas推理系列产品</term>|      ×     |
 |<term>Atlas训练系列产品</term>|      ×     |
@@ -48,7 +48,7 @@
       <tr>
           <td>query</td>
           <td>输入</td>
-          <td>attention结构的Q输入，不支持非连续。query由相同数据类型的q_nope和q_rope按D维度拼接得到。layout_query为"BSND"时shape为[B, Q_S, Q_N, Q_D]。layout_query为"TND"时shape为[Q_T, Q_N, Q_D]。其中Q_D值仅支持576，即q_nope+q_rope=512+64；Q_N值支持1/2/4/8/16/32/48/64/128。</td>
+          <td>attention结构的Q输入，不支持非连续。query由相同数据类型的q_nope和q_rope按D维度拼接得到。layout_query为"BSND"时shape为[B, Q_S, Q_N, Q_D]。layout_query为"TND"时shape为[Q_T, Q_N, Q_D]。其中Q_D值仅支持576，即q_nope+q_rope=512+64；A2/A3 和 A5 的 V2 Q_N 支持 1-128；A6 按平台约束。</td>
           <td>FLOAT16、BFLOAT16</td>
           <td>ND</td>
       </tr>

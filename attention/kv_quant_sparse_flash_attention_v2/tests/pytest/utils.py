@@ -67,7 +67,19 @@ def _parse_excel_cell_value(value):
 
 
 def load_paramset(paramset_file):
-    module = __import__(paramset_file)
+    # Keep existing -P names working after their files are consolidated.
+    aliases = {
+        "kv_quant_sparse_flash_attention_v2_910b_paramset": "910b",
+        "kv_quant_sparse_flash_attention_v2_model_paramset": "model",
+    }
+    if paramset_file in aliases:
+        from kv_quant_sparse_flash_attention_v2_paramset import get_enabled_params
+
+        return get_enabled_params(aliases[paramset_file])
+    module_name, separator, profile = paramset_file.partition(":")
+    module = __import__(module_name)
+    if separator:
+        return module.get_enabled_params(profile)
     return module.ENABLED_PARAMS
 
 

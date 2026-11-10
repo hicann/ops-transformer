@@ -61,8 +61,8 @@ def check_valid_param(params):
     if N2 != 1:
         raise ValueError(f"N2 only supports 1, but got {N2}")
 
-    if N1 not in (1, 2, 4, 8, 16, 32, 48, 64):
-        raise ValueError(f"N1 only supports 1/2/4/8/16/32/48/64, but got {N1}")
+    if N1 not in (1, 2, 4, 8, 16, 32, 48, 64, 96, 128):
+        raise ValueError(f"N1 only supports 1/2/4/8/16/32/48/64/96/128, but got {N1}")
 
     if sparse_block_size != 1:
         raise ValueError(

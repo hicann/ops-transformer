@@ -416,7 +416,7 @@ void QSFAMlaTiling::SplitBalanced()
     qsfaInnerSplitParams.s1GBaseSize = qsfaInfo_->gSize;
     tilingData_.innerSplitParams.set_mBaseSize(qsfaInnerSplitParams.s1GBaseSize);
 
-    qsfaInnerSplitParams.s2BaseSize = sInnerSize_;
+    qsfaInnerSplitParams.s2BaseSize = sInnerSizeAlign_;
     tilingData_.innerSplitParams.set_s2BaseSize(qsfaInnerSplitParams.s2BaseSize);
 
     usedCoreNum_ = aicNum_;
@@ -1320,29 +1320,25 @@ ge::graphStatus QSFATilingCheck::CheckFeatureMlaAntiquantShapeSizes() const
                         std::to_string(n2Size_) + ")"),
                 return ge::GRAPH_FAILED);
 
-    if (isA5_ || isA6_) {
-        std::vector<uint32_t> gSizeSupportList = {1, 2, 4, 8, 16, 32, 48, 64, 128};
-        OP_CHECK_IF(std::find(gSizeSupportList.begin(), gSizeSupportList.end(), gSize_) == gSizeSupportList.end(),
-                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                        opName_, "query and key",
-                        Ops::Base::ToString(opParamInfo_.query.shape->GetStorageShape()) + " and " +
-                            Ops::Base::ToString(opParamInfo_.key.shape->GetStorageShape()),
-                        "The value of (the head num of query ceildivided by the head num of key) "
-                        "should be in [1, 2, 4, 8, 16, 32, 48, 64, 128], but got " +
-                            std::to_string(gSize_)),
-                    return ge::GRAPH_FAILED);
+    bool unsupportedGSize;
+    std::string supportReason;
+    if (isA6_) {
+        const std::vector<uint32_t> gSizeSupportList{1, 2, 4, 8, 16, 32, 48, 64, 128};
+        unsupportedGSize =
+            std::find(gSizeSupportList.begin(), gSizeSupportList.end(), gSize_) == gSizeSupportList.end();
+        supportReason = "should be in [1, 2, 4, 8, 16, 32, 48, 64, 128], but got ";
     } else {
-        std::vector<uint32_t> gSizeSupportList = {1, 2, 4, 8, 16, 32, 64, 128};
-        OP_CHECK_IF(std::find(gSizeSupportList.begin(), gSizeSupportList.end(), gSize_) == gSizeSupportList.end(),
-                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                        opName_, "query and key",
-                        Ops::Base::ToString(opParamInfo_.query.shape->GetStorageShape()) + " and " +
-                            Ops::Base::ToString(opParamInfo_.key.shape->GetStorageShape()),
-                        "The value of (the head num of query ceildivided by the head num of key) "
-                        "should be in [1, 2, 4, 8, 16, 32, 64, 128], but got " +
-                            std::to_string(gSize_)),
-                    return ge::GRAPH_FAILED);
+        unsupportedGSize = gSize_ < 1U || gSize_ > 128U;
+        supportReason = "should be in [1, 128], but got ";
     }
+    OP_CHECK_IF(unsupportedGSize,
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    opName_, "query and key",
+                    Ops::Base::ToString(opParamInfo_.query.shape->GetStorageShape()) + " and " +
+                        Ops::Base::ToString(opParamInfo_.key.shape->GetStorageShape()),
+                    "The value of (the head num of query ceildivided by the head num of key) " + supportReason +
+                        std::to_string(gSize_)),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }

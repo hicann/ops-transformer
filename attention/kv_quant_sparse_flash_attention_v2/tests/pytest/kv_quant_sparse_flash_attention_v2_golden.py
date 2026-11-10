@@ -19,6 +19,8 @@ import time
 
 import generate_tensor_data
 
+EMPTY_SOFTMAX_MAX = -2.0e38
+
 
 def trans_np_hifuint8_tensor_to_float32(in_tensor):
     shape_tensor = in_tensor.shape
@@ -953,6 +955,7 @@ def _t_increattention_bnsd(fa_param):
     g = numheads // numKeyValueHeads
     sinks_tensor = fa_param.get("sinks_tensor")
     if sinks_tensor is None:
+        # The Torch V2 interface supplies a zero sink when it is omitted.
         sinks_tensor = torch.zeros(numheads, dtype=torch.float32)
     else:
         sinks_tensor = sinks_tensor.cpu().float()
@@ -990,8 +993,8 @@ def _t_increattention_bnsd(fa_param):
     else:
         total_t1 = sum(actualSeqLengths_q)
         lse_shape = [numKeyValueHeads, total_t1, g]
-    softmax_max_all = torch.full(lse_shape, float("-inf"), dtype=torch.float32)
-    softmax_sum_all = torch.zeros(lse_shape, dtype=torch.float32)
+    softmax_max_all = torch.full(lse_shape, EMPTY_SOFTMAX_MAX, dtype=torch.float32)
+    softmax_sum_all = torch.ones(lse_shape, dtype=torch.float32)
 
     t_offset = 0
     for batch in range(batch_size):
@@ -999,6 +1002,14 @@ def _t_increattention_bnsd(fa_param):
         curr_actualSeq = actualSeqLengths_kv[batch]
         for n2Idx in range(numKeyValueHeads):
             for s1Idx in range(curr_actualSeq_q):
+                cur_sinks = None
+                if sinks_tensor is not None:
+                    cur_sinks = sinks_tensor[n2Idx * g : (n2Idx + 1) * g]
+                    # Empty active rows contain only the explicit virtual sink.
+                    if layout_query == "BSND":
+                        softmax_max_all[batch, n2Idx, s1Idx, :] = cur_sinks
+                    else:
+                        softmax_max_all[n2Idx, t_offset + s1Idx, :] = cur_sinks
                 if s1Idx < curr_actualSeq_q - curr_actualSeq and sparse_mode != 0:
                     y[batch, n2Idx * g : (n2Idx + 1) * g, s1Idx, :] = torch.zeros(
                         [g, out_shape_bnsd[-1]], dtype=torch.float32
@@ -1020,9 +1031,6 @@ def _t_increattention_bnsd(fa_param):
                     curr_actualSeq_q,
                     sparse_mode,
                 )
-                cur_sinks = None
-                if sinks_tensor is not None:
-                    cur_sinks = sinks_tensor[n2Idx * g : (n2Idx + 1) * g]
                 if emptyFlag:
                     continue
                 k_dim = q_curr.shape[-1]

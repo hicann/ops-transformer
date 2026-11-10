@@ -31,12 +31,11 @@
 #define C_TEMPLATE 0
 #define V_TEMPLATE 1
 
-// V2 retains the original seven-argument kernel entry.
-#if KVQSFA_VERSION == 2
-#define QSFA_ROPE_TPL_DECL
-#define QSFA_ROPE_TPL_SEL
-#else
+// V1 and V2 share the no-RoPE tiling bit on arch22.
 #define QSFA_ROPE_TPL_DECL ASCENDC_TPL_BOOL_DECL(NO_ROPE, 0, 1),
+#if defined(__CCE_AICORE__) && (__CCE_AICORE__ == 310)
+#define QSFA_ROPE_TPL_SEL ASCENDC_TPL_BOOL_SEL(NO_ROPE, 0),
+#else
 #define QSFA_ROPE_TPL_SEL ASCENDC_TPL_BOOL_SEL(NO_ROPE, 0, 1),
 #endif
 

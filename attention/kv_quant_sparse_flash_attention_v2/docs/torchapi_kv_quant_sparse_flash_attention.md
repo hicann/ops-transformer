@@ -93,7 +93,7 @@ cann_ops_transformer.kv_quant_sparse_flash_attention(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| query | Tensor | 必选 | attention结构的Q输入，不支持非连续。由相同数据类型的`q_nope`和`q_rope`按D维度拼接得到。`layout_query`为`BSND`时shape为`(B, Q_S, Q_N, Q_D)`；`layout_query`为`TND`时shape为`(Q_T, Q_N, Q_D)`。其中Q_D值仅支持576，即q_nope+q_rope=512+64；Q_N值支持1/2/4/8/16/32/48/64/128。 | float16、bfloat16 | ND | `BSND`：(B, Q_S, Q_N, Q_D)<br>`TND`：(Q_T, Q_N, Q_D) |
+| query | Tensor | 必选 | attention结构的Q输入，不支持非连续。由相同数据类型的`q_nope`和`q_rope`按D维度拼接得到。`layout_query`为`BSND`时shape为`(B, Q_S, Q_N, Q_D)`；`layout_query`为`TND`时shape为`(Q_T, Q_N, Q_D)`。其中Q_D值仅支持576，即q_nope+q_rope=512+64；A2/A3 和 A5 的 V2 Q_N 支持 1-128；其他平台按对应约束。 | float16、bfloat16 | ND | `BSND`：(B, Q_S, Q_N, Q_D)<br>`TND`：(Q_T, Q_N, Q_D) |
 | key | Tensor | 必选 | attention结构的K输入。`k_nope`、与query相同数据类型的`k_rope`和float32的量化参数按D维度拼接得到。`layout_kv`为`BSND`时shape为`(B, KV_S, KV_N, KV_D)`；`layout_kv`为`TND`时shape为`(KV_T, KV_N, KV_D)`；`layout_kv`为`PA_BSND`（PageAttention）时shape为`(block_num, block_size, KV_N, KV_D)`，其中block_size取值为16的整数倍，最大支持到1024。KV_N仅支持1；KV_D值仅支持656，即nope+rope*2+dequant_scale*4=512+64*2+4*4。 | float8_e4m3、int8、hifloat8 | ND | `BSND`：(B, KV_S, KV_N, KV_D)<br>`TND`：(KV_T, KV_N, KV_D)<br>`PA_BSND`：(block_num, block_size, KV_N, KV_D) |
 | value | Tensor | 必选 | attention结构的V输入。数据类型与key相同。 | float8_e4m3、int8、hifloat8 | ND | 与key保持一致 |
 | sparse_indices | Tensor | 必选 | 代表离散取kvCache的索引，不支持非连续。`layout_query`为`BSND`时shape为`(B, Q_S, KV_N, sparse_size)`；`layout_query`为`TND`时shape为`(Q_T, KV_N, sparse_size)`。每行有效值均在前半部分，无效值（-1）均在后半部分，且sparse_size需大于0。当key和value的数据类型为hifloat8时，sparse_size仅支持2048。 | int32 | ND | `BSND`：(B, Q_S, KV_N, sparse_size)<br>`TND`：(Q_T, KV_N, sparse_size) |
