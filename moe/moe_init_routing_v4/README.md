@@ -15,7 +15,7 @@
 
 - 算子功能：MoE的routing计算，根据MoeGatingTopKSoftmax算子的计算结果做routing处理，支持非量化、静态量化和动态量化模式。本算子针对MoeInitRoutingV3算子做了如下功能变更，请根据实际情况选择合适的算子：
 
-    1.active_num从属性改为可选输入，支持图模式下动态传入active_num值。
+    1.active_num为可选输入，当前仅支持值等于NUM_ROWS*K，不支持Active截断场景。
 
     2.新增可选输入topkWeight和可选输出expandedTopkWeightOut，支持对topkWeight按排序后的索引进行重排，使得expandedTopkWeightOut与expandedXOut一一对应。topkWeight与expandedTopkWeightOut必须同时传入或同时不传入。
 
@@ -75,7 +75,7 @@
 
         - 当quantMode为13时，动态量化使用对称量化范围[-8, 7]，scale计算中的分母为7，量化结果沿H维每两个INT4值打包为1个字节。
 
-  5.对quantResult取前min(activeNum, NUM_ROWS*K)个sortedRowIdx的对应位置的值，得出expandedXOut：
+  5.Dropless场景下，按照排序后的路由索引搬运数据，输出expandedXOut的shape为[NUM_ROWS*K, H]，前availableIdxNum行为有效数据。量化场景的有效行计算如下，非量化场景使用x代替quantResult：
 
     $$
     expandedXOut[i]=quantResult[sortedRowIdx[i]/K]
@@ -87,7 +87,7 @@
     expandedTopkWeightOut[i]=topkWeight[sortedRowIdx[i]]
     $$
 
-    其中i的取值范围为[0, min(activeNum, availableIdxNum))。
+    Dropless场景下，i的取值范围为[0, availableIdxNum)。
 
   7.expandedRowIdxOut的有效元素数量availableIdxNum计算方式为，expertIdx中activeExpertRangeOptional范围内的元素的个数
     $$
@@ -148,7 +148,7 @@
       <tr>
         <td>activeNumOptional</td>
         <td>可选输入</td>
-        <td>表示总的最大处理row数，输出expandedXOut只有这么多行是有效的。不输入时activeNum默认为NUM_ROWS*K；输入时为标量Tensor（shape为()或(1,)），数据类型为INT64，值大于等于0，0表示Dropless场景，大于0时表示Active场景，约束所有专家共同处理tokens总量。</td>
+        <td>表示总的最大处理row数，当前固定为NUM_ROWS*K；实际有效行数由专家范围过滤等路由规则决定。不输入时activeNum默认为NUM_ROWS*K；输入时为标量Tensor（shape为()或(1,)），数据类型为INT64，数值仅支持NUM_ROWS*K。当前不支持通过该参数限制实际处理的路由数量。</td>
         <td>INT64</td>
         <td>ND</td>
       </tr>
@@ -219,7 +219,7 @@
         <td>expandedXOut</td>
         <td>输出</td>
         <td>根据expertIdx进行扩展过的特征。非量化场景下数据类型同x，量化场景quantMode为0、1时数据类型支持INT8，quantMode为13且x数据类型为FLOAT32或BFLOAT16时数据类型支持INT4，quantMode为2、4、14、16时数据类型支持FLOAT8_E5M2，quantMode为3、5、15、17时数据类型支持FLOAT8_E4M3FN，quantMode为6、7、8时数据类型支持HIFLOAT8，quantMode为9时数据类型支持FLOAT4_E2M1，quantMode为11、12时数据类型分别支持FLOAT8_E5M2、FLOAT8_E4M3FN。
-        <br>• Dropless场景shape为[NUM_ROWS * K, H]。<br>• Active场景shape为[min(activeNum, NUM_ROWS * K), H]。<br>• DropPad场景下要求是一个3D的Tensor，shape为[expertNum, expertCapacity, H]。</td>
+        <br>• Dropless场景shape为[NUM_ROWS * K, H]。<br>• DropPad场景下要求是一个3D的Tensor，shape为[expertNum, expertCapacity, H]。</td>
         <td>FLOAT32、FLOAT16、BFLOAT16、INT8、INT4、FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8、FLOAT4_E2M1</td>
         <td>ND</td>
       </tr>
@@ -247,7 +247,7 @@
       <tr>
         <td>expandedTopkWeightOut</td>
         <td>可选输出</td>
-        <td>按排序索引重排后的路由权重，与expandedXOut一一对应。topkWeight输入时必须同时输出。<br>• Dropless场景下shape为[min(activeNum, NUM_ROWS*K), 1]，前effectiveNum个元素为有效数据，其余未初始化，effectiveNum=min(activeNum, availableIdxNum)。<br>• DropPad场景下shape为[expertNum*expertCapacity, 1]，已分配容量的位置为有效数据，未分配容量的位置填充为0。</td>
+        <td>按排序索引重排后的路由权重，与expandedXOut一一对应。topkWeight输入时必须同时输出。<br>• Dropless场景下shape为[NUM_ROWS*K, 1]，前effectiveNum个元素为有效数据，其余未初始化，effectiveNum=availableIdxNum。<br>• DropPad场景下shape为[expertNum*expertCapacity, 1]，已分配容量的位置为有效数据，未分配容量的位置填充为0。</td>
         <td>FLOAT32</td>
         <td>ND</td>
       </tr>
@@ -255,6 +255,8 @@
   </table>
 
 ## 约束说明
+
+- `activeNumOptional`显式传入时仅支持值等于`NUM_ROWS*K`，当前不支持Active截断场景。
 
 - expertCapacity在Dropless场景下仅校验其值，不使用该参数；在DropPad场景下必须校验且取值范围为(0, NUM_ROWS]。
 - 支持quantMode为13的INT4动态量化场景，需同时满足：

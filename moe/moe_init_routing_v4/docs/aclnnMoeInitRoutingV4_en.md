@@ -26,7 +26,7 @@
 ## Function
 
 - Description: routing computation of MoE. The API performs routing processing based on the computation result of [aclnnMoeGatingTopKSoftmaxV2](../../moe_gating_top_k_softmax_v2/docs/aclnnMoeGatingTopKSoftmaxV2_en.md) and supports the non-quantization, static quantization, and dynamic quantization modes. This API has the following function changes compared with V3 API [aclnnMoeInitRoutingV3](../../moe_init_routing_v3/docs/aclnnMoeInitRoutingV3_en.md). Select an appropriate API as required:<br>
-  <ol><li>active_num is changed from an attribute to an optional input, allowing its value to be dynamically passed in graph mode.</li><li>Optional input topkWeight and optional output expandedTopkWeightOut are added. topkWeight can be rearranged based on the sorted index so that expandedTopkWeightOut and expandedXOut are in one-to-one correspondence. topkWeight and expandedTopkWeightOut must be passed in together or not at all.</li></ol>
+  <ol><li>active_num is an optional input. Currently, only the value NUM_ROWS*K is supported; Active truncation is not supported.</li><li>Optional input topkWeight and optional output expandedTopkWeightOut are added. topkWeight can be rearranged based on the sorted index so that expandedTopkWeightOut and expandedXOut are in one-to-one correspondence. topkWeight and expandedTopkWeightOut must be passed in together or not at all.</li></ol>
 
 - Formula:
 
@@ -122,7 +122,7 @@
       where effectiveNum is:
 
       $$
-      effectiveNum = \min(activeNum, availableIdxNum)
+      effectiveNum = availableIdxNum
       $$
 
     - DropPad use case (dropPadMode=1)
@@ -266,10 +266,10 @@ aclnnStatus aclnnMoeInitRoutingV4(
     <tr>
       <td>activeNumOptional (aclTensor)</td>
       <td>Input</td>
-      <td>Maximum total number of rows to process. Only this number of rows in output expandedXOut are valid.</td>
+      <td>Maximum total number of rows to process, currently fixed at NUM_ROWS*K. The actual number of valid rows depends on routing rules such as expert range filtering.</td>
       <td><ul>
         <li>Optional input. If not provided, activeNum defaults to NUM_ROWS*K;</li>
-        <li>If provided, it is a scalar Tensor (shape () or (1,)) of data type INT64, with a value greater than or equal to 0. 0 indicates the Dropless use case, and a value greater than 0 indicates the Active use case, which limits the total number of tokens jointly processed by all experts.</li>
+        <li>If provided, it must be a scalar Tensor (shape () or (1,)) of data type INT64. Only the value NUM_ROWS*K is supported. Currently, this parameter cannot be used to limit the number of routes processed.</li>
       </ul></td>
       <td>INT64</td>
       <td>ND</td>
@@ -403,7 +403,6 @@ aclnnStatus aclnnMoeInitRoutingV4(
       <td>Features expanded based on expertIdx.</td>
       <td><ul>
         <li>In Dropless scenarios, the shape is [NUM_ROWS * K, H].</li>
-        <li>In Active scenarios, the shape is [min(activeNum, NUM_ROWS * K), H].</li>
         <li>In Drop/Pad scenarios, the tensor must be 3D, with the shape [expertNum, expertCapacity, H].</li>
         <li>In non-quantization scenarios, the data type is the same as that of x. In quantization scenarios, the supported data type is INT8 when quantMode is 0 or 1; INT4 when quantMode is 13 and the data type of x is FLOAT32 or BFLOAT16; FLOAT8_E5M2 when quantMode is 2, 4, 14, or 16; FLOAT8_E4M3FN when quantMode is 3, 5, 15, or 17; HIFLOAT8 when quantMode is 6, 7, or 8; FLOAT4_E2M1 when quantMode is 9; and FLOAT8_E5M2 and FLOAT8_E4M3FN when quantMode is 11 and 12, respectively.</li>
       </ul></td>
@@ -468,7 +467,7 @@ aclnnStatus aclnnMoeInitRoutingV4(
       <td>Routing weights rearranged by sorted index, in one-to-one correspondence with expandedXOut.</td>
       <td><ul>
         <li>Optional output; must be output together with the topkWeight input;</li>
-        <li>In the Dropless use case, the shape is [min(activeNum, NUM_ROWS*K), 1]; the first effectiveNum elements are valid data and the rest are uninitialized, where effectiveNum=min(activeNum, availableIdxNum);</li>
+        <li>In the Dropless use case, the shape is [NUM_ROWS*K, 1]; the first effectiveNum elements are valid data and the rest are uninitialized, where effectiveNum=availableIdxNum;</li>
         <li>In the DropPad use case, the shape is [expertNum*expertCapacity, 1]; positions with allocated capacity contain valid data, and positions without allocated capacity are filled with 0;</li>
         <li>Only the FLOAT32 data type is supported.</li>
       </ul></td>
@@ -581,6 +580,8 @@ aclnnStatus aclnnMoeInitRoutingV4(
   Returns an aclnnStatus status code. For details, see [aclnn Return Codes](../../../docs/en/context/aclnn_return_code.md).
 
 ## Constraints
+
+- When explicitly provided, `activeNumOptional` only supports the value `NUM_ROWS*K`. Active truncation is currently not supported.
 
 - Deterministic computation:
   - aclnnMoeInitRoutingV4 defaults to a deterministic implementation.

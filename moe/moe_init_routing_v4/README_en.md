@@ -17,7 +17,7 @@ English | [简体中文](./README.md)
 
 - Operator function: Performs the routing computation of MoE. This operator performs routing processing based on the computation result of the MoeGatingTopKSoftmax operator, and supports the non-quantization, static quantization, and dynamic quantization modes. This operator provides the following functional changes compared with the MoeInitRoutingV3 operator. Select an appropriate operator based on actual requirements:
 
-    1.active_num is changed from an attribute to an optional input, supporting dynamic passing of the active_num value in graph mode.
+    1.active_num is an optional input. Currently, only the value NUM_ROWS*K is supported; Active truncation is not supported.
 
     2.Adds the optional input topkWeight and the optional output expandedTopkWeightOut, which support reordering topkWeight by the sorted indices so that expandedTopkWeightOut corresponds one-to-one with expandedXOut. topkWeight and expandedTopkWeightOut must be passed in or omitted together.
 
@@ -77,7 +77,7 @@ English | [简体中文](./README.md)
 
         - When quantMode is 13, dynamic quantization uses the symmetric quantization range [-8, 7], the denominator in the scale computation is 7, and every two INT4 values along the H dimension are packed into 1 byte in the quantization result.
 
-  5.Take the values at the positions corresponding to the first min(activeNum, NUM_ROWS*K) entries of sortedRowIdx in quantResult to obtain expandedXOut:
+  5.In the Dropless scenario, data is copied according to the sorted routing indices. The shape of expandedXOut is [NUM_ROWS*K, H], and the first availableIdxNum rows are valid. Valid rows in quantization scenarios are calculated as follows; in non-quantization scenarios, use x instead of quantResult:
 
     $$
     expandedXOut[i]=quantResult[sortedRowIdx[i]/K]
@@ -89,7 +89,7 @@ English | [简体中文](./README.md)
     expandedTopkWeightOut[i]=topkWeight[sortedRowIdx[i]]
     $$
 
-    The value range of i is [0, min(activeNum, availableIdxNum)).
+    In the Dropless scenario, the value range of i is [0, availableIdxNum).
 
   7.The number of valid elements availableIdxNum in expandedRowIdxOut is computed as the number of elements in expertIdx within the activeExpertRangeOptional range:
     $$
@@ -150,7 +150,7 @@ English | [简体中文](./README.md)
       <tr>
         <td>activeNumOptional</td>
         <td>Optional input</td>
-        <td>Maximum total number of rows to process. Only this number of rows in the output expandedXOut are valid. If it is not entered, activeNum defaults to NUM_ROWS*K. If entered, it is a scalar tensor (shape () or (1,)) of the INT64 data type. The value must be greater than or equal to 0. A value of 0 indicates the Dropless scenario. A value greater than 0 indicates the Active scenario, which limits the total number of tokens processed by all experts.</td>
+        <td>Maximum total number of rows to process, currently fixed at NUM_ROWS*K. The actual number of valid rows depends on routing rules such as expert range filtering. If not provided, activeNum defaults to NUM_ROWS*K. If provided, it is a scalar tensor (shape () or (1,)) of the INT64 data type, and only the value NUM_ROWS*K is supported. This parameter cannot currently limit the number of routes processed.</td>
         <td>INT64</td>
         <td>ND</td>
       </tr>
@@ -221,7 +221,7 @@ English | [简体中文](./README.md)
         <td>expandedXOut</td>
         <td>Output</td>
         <td>Features expanded based on expertIdx. In the non-quantization scenario, the data type is the same as that of x. In the quantization scenario, the INT8 data type is supported when quantMode is 0 or 1; the INT4 data type is supported when quantMode is 13 and the data type of x is FLOAT32 or BFLOAT16; the FLOAT8_E5M2 data type is supported when quantMode is 2, 4, 14, or 16; the FLOAT8_E4M3FN data type is supported when quantMode is 3, 5, 15, or 17; the HIFLOAT8 data type is supported when quantMode is 6, 7, or 8; the FLOAT4_E2M1 data type is supported when quantMode is 9; and the FLOAT8_E5M2 and FLOAT8_E4M3FN data types are supported when quantMode is 11 and 12, respectively.
-        <br>• In the Dropless scenario, the shape is [NUM_ROWS * K, H].<br>• In the Active scenario, the shape is [min(activeNum, NUM_ROWS * K), H].<br>• In the DropPad scenario, it must be a 3D tensor with shape [expertNum, expertCapacity, H].</td>
+        <br>• In the Dropless scenario, the shape is [NUM_ROWS * K, H].<br>• In the DropPad scenario, it must be a 3D tensor with shape [expertNum, expertCapacity, H].</td>
         <td>FLOAT32, FLOAT16, BFLOAT16, INT8, INT4, FLOAT8_E5M2, FLOAT8_E4M3FN, HIFLOAT8, FLOAT4_E2M1</td>
         <td>ND</td>
       </tr>
@@ -249,7 +249,7 @@ English | [简体中文](./README.md)
       <tr>
         <td>expandedTopkWeightOut</td>
         <td>Optional output</td>
-        <td>Routing weights reordered by the sorted indices, corresponding one-to-one with expandedXOut. It must be output together when topkWeight is entered.<br>• In the Dropless scenario, the shape is [min(activeNum, NUM_ROWS*K), 1]. The first effectiveNum elements are valid data, and the rest are not initialized, where effectiveNum=min(activeNum, availableIdxNum).<br>• In the DropPad scenario, the shape is [expertNum*expertCapacity, 1]. Positions with allocated capacity contain valid data, and positions without allocated capacity are filled with 0.</td>
+        <td>Routing weights reordered by the sorted indices, corresponding one-to-one with expandedXOut. It must be output together when topkWeight is entered.<br>• In the Dropless scenario, the shape is [NUM_ROWS*K, 1]. The first effectiveNum elements are valid data, and the rest are not initialized, where effectiveNum=availableIdxNum.<br>• In the DropPad scenario, the shape is [expertNum*expertCapacity, 1]. Positions with allocated capacity contain valid data, and positions without allocated capacity are filled with 0.</td>
         <td>FLOAT32</td>
         <td>ND</td>
       </tr>
@@ -257,6 +257,8 @@ English | [简体中文](./README.md)
   </table>
 
 ## Constraints
+
+- When explicitly provided, `activeNumOptional` only supports the value `NUM_ROWS*K`. Active truncation is currently not supported.
 
 - In the Dropless scenario, only the value of expertCapacity is checked and this parameter is not used. In the DropPad scenario, expertCapacity must be checked and its value range is (0, NUM_ROWS].
 - The INT4 dynamic quantization scenario where quantMode is 13 is supported only when all the following conditions are met:

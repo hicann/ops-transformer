@@ -122,7 +122,7 @@
       其中effectiveNum为：
 
       $$
-      effectiveNum = \min(activeNum, availableIdxNum)
+      effectiveNum = availableIdxNum
       $$
 
     - DropPad场景（dropPadMode=1）
@@ -267,10 +267,10 @@ aclnnStatus aclnnMoeInitRoutingV5(
     <tr>
       <td>activeNumOptional（aclTensor）</td>
       <td>输入</td>
-      <td>表示总的最大处理row数，输出expandedXOut只有这么多行是有效的</td>
+      <td>表示总的最大处理row数，当前固定为NUM_ROWS*K；实际有效行数由专家范围过滤等路由规则决定。</td>
       <td><ul>
         <li>可选输入，不输入时activeNum默认为NUM_ROWS*K；</li>
-        <li>输入时为标量Tensor（shape为()或(1,)），数据类型为INT64，值大于等于0，0表示Dropless场景，大于0时表示Active场景，约束所有专家共同处理tokens总量。</li>
+        <li>输入时为标量Tensor（shape为()或(1,)），数据类型为INT64，数值仅支持NUM_ROWS*K。当前不支持通过该参数限制实际处理的路由数量。</li>
       </ul></td>
       <td>INT64</td>
       <td>ND</td>
@@ -417,7 +417,6 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>根据expertIdx进行扩展过的特征</td>
       <td><ul>
         <li>Dropless场景shape为[NUM_ROWS * K, H]。</li>
-        <li>Active场景shape为[min(activeNum, NUM_ROWS * K), H]。</li>
         <li>Drop/Pad场景下要求是一个3D的Tensor，shape为[expertNum, expertCapacity, H]。</li>
         <li>非量化场景下数据类型同x，量化场景quantMode为0、1时数据类型支持INT8，quantMode为13且x数据类型为FLOAT32或BFLOAT16时数据类型支持INT4，quantMode为2、4、14、16时数据类型支持FLOAT8_E5M2，quantMode为3、5、15、17时数据类型支持FLOAT8_E4M3FN，quantMode为6、7、8时数据类型支持HIFLOAT8，quantMode为9时数据类型支持FLOAT4_E2M1，quantMode为11、12时数据类型分别支持FLOAT8_E5M2、FLOAT8_E4M3FN。</li>
       </ul></td>
@@ -482,7 +481,7 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>按排序索引重排后的路由权重，与expandedXOut一一对应</td>
       <td><ul>
         <li>可选输出，topkWeight输入时必须同时输出；</li>
-        <li>Dropless场景下shape为[min(activeNum, NUM_ROWS*K), 1]，前effectiveNum个元素为有效数据，其余未初始化，effectiveNum=min(activeNum, availableIdxNum)；</li>
+        <li>Dropless场景下shape为[NUM_ROWS*K, 1]，前effectiveNum个元素为有效数据，其余未初始化，effectiveNum=availableIdxNum；</li>
         <li>DropPad场景下shape为[expertNum*expertCapacity, 1]，已分配容量的位置为有效数据，未分配容量的位置填充为0；</li>
         <li>数据类型仅支持FLOAT32。</li>
       </ul></td>
@@ -596,6 +595,8 @@ aclnnStatus aclnnMoeInitRoutingV5(
   返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
 ## 约束说明
+
+- `activeNumOptional`显式传入时仅支持值等于`NUM_ROWS*K`，当前不支持Active截断场景。
 
 - 确定性计算：
   - aclnnMoeInitRoutingV5默认确定性实现。

@@ -121,7 +121,7 @@
       where effectiveNum is:
 
       $$
-      effectiveNum = \min(activeNum, availableIdxNum)
+      effectiveNum = availableIdxNum
       $$
 
     - DropPad scenario (dropPadMode=1)
@@ -170,7 +170,7 @@ cann_ops_transformer.moe_init_routing(
 |  scale  |  Tensor |  Optional  |  Parameter used to calculate the quantization result, corresponding to scaleOptional in the formula. The default value is None. If not passed in, scale is not used during computation, and the values in the output `expanded_scale` are meaningless. For input requirements in different scenarios, see the description below.  |  float32, float8_e8m0   | 1-3  |
 |  offset  |  Tensor |  Optional  |  Offset value used to calculate the quantization result, corresponding to offsetOptional in the formula. The default value is None.  |  float32   | 1  |
 |  topk_weight  |  Tensor |  Optional  |  Routing weight of the topk experts, used for reordering by the sorted index to have a one-to-one correspondence with `expanded_x`. The default value is None. If not passed in, `expanded_topk_weight` is not output. The shape is (NUM_ROWS, K). It is linked with `expanded_topk_weight`: they must be passed in together or not passed in together.  |  float32   | 2  |
-|  active_num  |  Union[int, torch.SymInt] |  Optional  |  Maximum total number of rows to process. Only this number of rows in the output `expanded_x` are valid, which restricts the total number of tokens processed by all experts. The default value is -1. Input validation requires the value to be greater than or equal to 0. 0 indicates the Dropless scenario, and a value greater than 0 indicates the Active scenario. The parameter only supports the value equal to NUM_ROWS*K. Both `int` and `torch.SymInt` are supported. Passing in `torch.SymInt` (such as `x.size(0) * k`) in graph mode prevents it from being fixed as a constant, enabling reuse of the dynamic shape compilation cache. In eager mode, passing in `int` is sufficient. The upper-layer calling script does not need to perceive the type difference, and the same code can run normally in both modes.  |  int  | - |
+|  active_num  |  Union[int, torch.SymInt] |  Optional  |  Maximum total number of rows to process, currently fixed at NUM_ROWS*K. The actual number of valid rows depends on routing rules such as expert range filtering. The default value is -1, which means processing with a row limit of NUM_ROWS*K. When explicitly specifying the row limit, only NUM_ROWS*K is supported. Active truncation is currently not supported. Both `int` and `torch.SymInt` are supported. Passing in `torch.SymInt` (such as `x.size(0) * k`) in graph mode prevents it from being fixed as a constant, enabling reuse of the dynamic shape compilation cache. In eager mode, passing in `int` is sufficient. The upper-layer calling script does not need to perceive the type difference, and the same code can run normally in both modes.  |  int  | - |
 |  expert_capacity  |  int |  Optional  |  Number of tokens that each expert can process. The default value is -1. Input validation requires the value to be greater than 0 and less than NUM_ROWS. In the Dropless scenario, only its value is validated and this parameter is not used. In the DropPad scenario, the value range is (0, NUM_ROWS].  |  -  | - |
 |  expert_num  |  int |  Optional  |  Number of experts. The default value is -1, which must be greater than 0. When `expert_tokens_num_type` is the key_value mode, the value range is [1, 5120]. In other modes, the value range is [1, 10240].  |  -  | - |
 |  drop_pad_mode  |  int |  Optional  |  Whether it is the drop_pad scenario. The default value is 0. 0 indicates the Dropless scenario, in which `expert_capacity` is not validated. 1 indicates the Drop_Pad scenario.  |  -  | - |
@@ -222,7 +222,7 @@ cann_ops_transformer.moe_init_routing(
 
 | Name | Type | Type | Description | Data Type | Dimension (Shape) |
 |---------|----------|----------|---------------|---------------|------------|
-|  expanded_x  |  Tensor |  Required  |  Features expanded based on expert_idx. In the non-quantized scenario, the data type is the same as that of `x`; in the quantization scenario, the data type is determined by quant_mode. In the quantization scenario, if the data type of `x` is `int8`, the output value is meaningless. In the Dropless scenario, the shape is [NUM_ROWS *K, H]; in the Active scenario, the shape is [min(activeNum, NUM_ROWS* K), H]; in the Drop/Pad scenario, it is required to be a 3D tensor with shape [expertNum, expertCapacity, H].  |  float16, bfloat16, float32, int8, float8_e5m2, float8_e4m3fn, hifloat8, float4_e2m1, int4   | 2-3  |
+|  expanded_x  |  Tensor |  Required  |  Features expanded based on expert_idx. In the non-quantized scenario, the data type is the same as that of `x`; in the quantization scenario, the data type is determined by quant_mode. In the quantization scenario, if the data type of `x` is `int8`, the output value is meaningless. In the Dropless scenario, the shape is [NUM_ROWS *K, H]; in the Drop/Pad scenario, it is required to be a 3D tensor with shape [expertNum, expertCapacity, H].  |  float16, bfloat16, float32, int8, float8_e5m2, float8_e4m3fn, hifloat8, float4_e2m1, int4   | 2-3  |
 |  expanded_row_idx  |  Tensor |  Required  |  Mapping between expanded_x and x, with shape [NUM_ROWS*K]. The first availableIdxNum elements are valid data. The remaining invalid data is determined by `row_idx_type`: if the value is 0, the invalid data is filled with -1; if the value is 1, it is uninitialized.  |  int32   | 1-2  |
 |  expert_token_cumsum_or_count  |  Tensor |  Required  |  Statistical result or cumulative value of the number of tokens processed by each expert.  |  int64   | 1-2  |
 |  expanded_scale  |  Tensor |  Required  |  Intermediate values of scale in different quantization processes. For the output shape and data type under different scenarios, see the description below.  |  float32, float8_e8m0   | 1-3  |
@@ -247,7 +247,7 @@ cann_ops_transformer.moe_init_routing(
 
 **Output shape of expanded_topk_weight in different scenarios:**
 
-- In the Dropless scenario, the shape is [min(activeNum, NUM_ROWS*K), 1]. The first effectiveNum elements are valid data, and the rest are uninitialized. effectiveNum=min(activeNum, availableIdxNum).
+- In the Dropless scenario, the shape is [NUM_ROWS*K, 1]. The first effectiveNum elements are valid data, and the rest are uninitialized. effectiveNum=availableIdxNum.
 - In the DropPad scenario, the shape is [expertNum*expertCapacity, 1]. Positions with allocated capacity are valid data, and positions without allocated capacity are filled with 0.
 
 ## Constraints
@@ -258,7 +258,7 @@ cann_ops_transformer.moe_init_routing(
 - `expert_num` must be greater than 0.
 - When `drop_pad_mode=1`, `row_idx_type` only supports taking the value 0 (gather index), `quant_mode` only supports -1 (non-quantized), and the data type of `x` only supports `float16`, `bfloat16`, `float32`, `int8`, and `hifloat8`.
 - `expert_tokens_num_flag` only supports taking the value true.
-- `active_num` only supports a value equal to NUM_ROWS*K.
+- The default value of `active_num` is -1, which means processing with a row limit of NUM_ROWS*K. When explicitly specifying the row limit, only NUM_ROWS*K is supported. Active truncation is currently not supported.
 - In the MXFP4/INT4 dynamic quantization scenarios where quantMode is 9 or 13, and in the non-quantized passthrough scenario where quantMode is -1 and the data type of `x` is `float4_e2m1` (specified by `x_dtype`), the last dimension H of `x` is required to be even. The INT4 dynamic quantization scenario where quantMode is 13 must also meet the following requirements: the data type of `x` is `float32` or `bfloat16`, `drop_pad_mode` is 0, and the input `offset` is not supported.
 - Empty tensor handling: When NUM_ROWS=0 or K=0, there are no routing elements, and the empty Tensor handling path is used. The expert count is 0. The output shape must still meet the constraints of the corresponding mode. When NUM_ROWS*K>0 and H=0, the normal routing process is still used to generate `expanded_row_idx` and `expert_token_cumsum_or_count`.
 - **Automatic reverse (autograd) constraints**: Automatic reverse is supported only when the forward pass degrades to the aclnnMoeInitRoutingV2 use case, that is, no specific feature of aclnnMoeInitRoutingV4 is used. Specific requirements: `scale` is not passed in, `offset` is not passed in, `topk_weight` is not passed in, `quant_mode=-1` (non-quantized), `row_idx_type=0` (gather index), `x_dtype` is None, and `drop_pad_mode` is 0 or 1. When a specific feature of aclnnMoeInitRoutingV4 is used (quantization, `scale`, `offset`, `topk_weight`, `x_dtype`, `row_idx_type` other than 0, etc.), calling automatic reverse raises `NotImplementedError`. `active_expert_range` does not affect the reverse and is not considered a specific feature of aclnnMoeInitRoutingV4.

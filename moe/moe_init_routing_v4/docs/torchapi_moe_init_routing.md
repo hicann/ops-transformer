@@ -119,7 +119,7 @@
       其中effectiveNum为：
 
       $$
-      effectiveNum = \min(activeNum, availableIdxNum)
+      effectiveNum = availableIdxNum
       $$
 
     - DropPad场景（dropPadMode=1）
@@ -169,7 +169,7 @@ cann_ops_transformer.moe_init_routing(
 |  scale  |  Tensor |  可选  |  用于计算量化结果的参数，对应公式中scaleOptional。默认值为None，不输入表示计算时不使用scale，且输出`expanded_scale`中的值无意义。不同场景下的输入要求见下方说明。  |  float32、float8_e8m0   | 1-3  |
 |  offset  |  Tensor |  可选  |  用于计算量化结果的偏移值，对应公式中offsetOptional。默认值为None。  |  float32   | 1  |
 |  topk_weight  |  Tensor |  可选  |  表示topk专家的路由权重，用于按排序索引重排以与`expanded_x`一一对应。默认值为None，不输入表示不输出`expanded_topk_weight`。shape为(NUM_ROWS, K)，与`expanded_topk_weight`联动：必须同时传入或同时不传入。  |  float32   | 2  |
-|  active_num  |  Union[int, torch.SymInt] |  可选  |  表示总的最大处理row数，输出`expanded_x`只有这么多行是有效的，约束所有专家共同处理tokens总量。默认值为-1，入参校验需大于等于0，0表示Dropless场景，大于0时表示Active场景。仅支持值等于NUM_ROWS*K。支持`int`或`torch.SymInt`类型，图模式下传入`torch.SymInt`（如`x.size(0) * k`）可避免被固化为常量，实现动态shape编译缓存复用。eager模式下传入`int`即可，上层调用脚本无需感知类型差异，同一份代码在两种模式下均可正常运行。  |  int  | - |
+|  active_num  |  Union[int, torch.SymInt] |  可选  |  表示总的最大处理row数，当前固定为NUM_ROWS*K；实际有效行数由专家范围过滤等路由规则决定。默认值为-1，表示按NUM_ROWS*K处理；显式指定处理数量时仅支持NUM_ROWS*K，当前不支持Active截断场景。支持`int`或`torch.SymInt`类型，图模式下传入`torch.SymInt`（如`x.size(0) * k`）可避免被固化为常量，实现动态shape编译缓存复用。eager模式下传入`int`即可，上层调用脚本无需感知类型差异，同一份代码在两种模式下均可正常运行。  |  int  | - |
 |  expert_capacity  |  int |  可选  |  表示每个专家能够处理的tokens数。默认值为-1，入参校验大于0小于NUM_ROWS。Dropless场景下仅校验其值，不使用该参数；DropPad场景下取值范围为(0, NUM_ROWS]。  |  -  | - |
 |  expert_num  |  int |  可选  |  表示专家数。默认值为-1，必须大于0。`expert_tokens_num_type`为key_value模式时，取值范围为[1, 5120]；其他模式取值范围为[1, 10240]。  |  -  | - |
 |  drop_pad_mode  |  int |  可选  |  表示是否为drop_pad场景。默认值为0，0表示Dropless场景，该场景下不校验`expert_capacity`；1表示Drop_Pad场景。  |  -  | - |
@@ -222,7 +222,7 @@ cann_ops_transformer.moe_init_routing(
 
 |  参数名   | 参数类型 |  可选/必选 |    描述    |     数据类型    |   维度(shape)   |
 |---------|----------|----------|---------------|---------------|------------|
-|  expanded_x  |  Tensor |  必选  |  根据expert_idx进行扩展过的特征。非量化场景下数据类型同`x`；量化场景下数据类型根据quant_mode确定。量化场景下，当`x`的数据类型为`int8`时，输出值无意义。Dropless场景shape为[NUM_ROWS *K, H]，Active场景shape为[min(activeNum, NUM_ROWS* K), H]，Drop/Pad场景下要求是一个3D的Tensor，shape为[expertNum, expertCapacity, H]。  |  float16、bfloat16、float32、int8、float8_e5m2、float8_e4m3fn、hifloat8、float4_e2m1、int4   | 2-3  |
+|  expanded_x  |  Tensor |  必选  |  根据expert_idx进行扩展过的特征。非量化场景下数据类型同`x`；量化场景下数据类型根据quant_mode确定。量化场景下，当`x`的数据类型为`int8`时，输出值无意义。Dropless场景shape为[NUM_ROWS *K, H]，Drop/Pad场景下要求是一个3D的Tensor，shape为[expertNum, expertCapacity, H]。  |  float16、bfloat16、float32、int8、float8_e5m2、float8_e4m3fn、hifloat8、float4_e2m1、int4   | 2-3  |
 |  expanded_row_idx  |  Tensor |  必选  |  expanded_x和x的映射关系，shape为[NUM_ROWS*K]。前availableIdxNum个元素为有效数据，其余无效数据由`row_idx_type`决定：为0时由-1填充，为1时未初始化。  |  int32   | 1-2  |
 |  expert_token_cumsum_or_count  |  Tensor |  必选  |  表示每个专家处理的token数量的统计结果或累加值。  |  int64   | 1-2  |
 |  expanded_scale  |  Tensor |  必选  |  输出不同量化过程中scale的中间值。不同场景下的输出shape和数据类型见下方说明。  |  float32、float8_e8m0   | 1-3  |
@@ -247,7 +247,7 @@ cann_ops_transformer.moe_init_routing(
 
 **expanded_topk_weight不同场景下的输出shape：**
 
-- Dropless场景下shape为[min(activeNum, NUM_ROWS*K), 1]，前effectiveNum个元素为有效数据，其余未初始化，effectiveNum=min(activeNum, availableIdxNum)。
+- Dropless场景下shape为[NUM_ROWS*K, 1]，前effectiveNum个元素为有效数据，其余未初始化，effectiveNum=availableIdxNum。
 - DropPad场景下shape为[expertNum*expertCapacity, 1]，已分配容量的位置为有效数据，未分配容量的位置填充为0。
 
 ## 约束说明
@@ -257,7 +257,7 @@ cann_ops_transformer.moe_init_routing(
 - `topk_weight`不受`quant_mode`影响，`expanded_topk_weight`数据类型始终为`float32`。
 - `expert_num`必须大于0。
 - `drop_pad_mode=1`时，`row_idx_type`仅支持取值为0（gather索引），`quant_mode`仅支持-1（非量化），且`x`数据类型仅支持`float16`、`bfloat16`、`float32`、`int8`、`hifloat8`。
-- `active_num`仅支持值等于NUM_ROWS*K。
+- `active_num`默认值为-1，表示按NUM_ROWS*K处理；显式指定处理数量时仅支持NUM_ROWS*K，当前不支持Active截断场景。
 - quantMode为9或13的MXFP4/INT4动态量化场景，以及quantMode为-1且`x`数据类型为`float4_e2m1`（通过`x_dtype`指定）的非量化透传场景，`x`的最后一维H要求为偶数。quantMode为13的INT4动态量化场景还需满足：`x`数据类型为`float32`或`bfloat16`，`drop_pad_mode`为0，不支持输入`offset`。
 - `scale_alg`取值为0或1；`scale_alg`为1仅对受支持的量化场景生效，其他场景必须为0，否则抛出异常。
 - 空tensor处理：NUM_ROWS=0或K=0时没有路由元素，进入空Tensor处理路径，专家计数为0；输出shape仍需满足相应模式的约束。NUM_ROWS*K>0且H=0时仍走正常路由流程，生成`expanded_row_idx`和`expert_token_cumsum_or_count`。
