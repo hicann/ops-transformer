@@ -754,12 +754,7 @@ else()
 endif ()
 cannbotdsl_clean_resources()
 if(NOT ENABLE_BUILT_IN)
-    target_sources(cust_opmaster PRIVATE
-        $<$<TARGET_EXISTS:${OPHOST_NAME}_cannbotdsl_tiling_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_cannbotdsl_tiling_obj>>)
-    if(TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj)
-        target_link_libraries(cust_opmaster PRIVATE ${OPHOST_NAME}_cannbotdsl_tiling_obj)
-        cannbotdsl_finalize_host(cust_opmaster)
-    endif()
+    cannbotdsl_link_host(cust_opmaster)
     target_sources(cust_opapi PRIVATE
         $<$<TARGET_EXISTS:${OPHOST_NAME}_cannbotdsl_opapi_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_cannbotdsl_opapi_obj>>)
     target_link_libraries(cust_opapi PRIVATE $<TARGET_NAME_IF_EXISTS:${OPHOST_NAME}_cannbotdsl_opapi_obj>)

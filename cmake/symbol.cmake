@@ -11,7 +11,6 @@
 # ophost shared
 function(gen_ophost_symbol)
   add_library(${OPHOST_NAME} SHARED
-    $<$<TARGET_EXISTS:${OPHOST_NAME}_cannbotdsl_tiling_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_cannbotdsl_tiling_obj>>
     $<$<TARGET_EXISTS:${OPHOST_NAME}_infer_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_infer_obj>>
     $<$<TARGET_EXISTS:${OPHOST_NAME}_tiling_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_tiling_obj>>
     $<$<TARGET_EXISTS:${OPHOST_NAME}_aicpu_objs>:$<TARGET_OBJECTS:${OPHOST_NAME}_aicpu_objs>>
@@ -43,10 +42,7 @@ function(gen_ophost_symbol)
     ${ASCEND_DIR}/${SYSTEM_PREFIX}/lib64
   )
 
-  if(TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj)
-    target_link_libraries(${OPHOST_NAME} PRIVATE ${OPHOST_NAME}_cannbotdsl_tiling_obj)
-    cannbotdsl_finalize_host(${OPHOST_NAME})
-  endif()
+  cannbotdsl_link_host(${OPHOST_NAME})
   install(TARGETS ${OPHOST_NAME}
     LIBRARY DESTINATION ${OPHOST_LIB_INSTALL_PATH}
   )
@@ -232,11 +228,11 @@ endfunction()
 
 function(gen_cust_optiling_symbol)
   # op_tiling
-  if(NOT TARGET ${OPHOST_NAME}_tiling_obj AND NOT TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj)
+  get_property(_dsl_archives GLOBAL PROPERTY CANNBOTDSL_NATIVE_ARCHIVES)
+  if(NOT TARGET ${OPHOST_NAME}_tiling_obj AND NOT _dsl_archives)
     return()
   endif()
   add_library(cust_opmaster SHARED
-    $<$<TARGET_EXISTS:${OPHOST_NAME}_cannbotdsl_tiling_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_cannbotdsl_tiling_obj>>
     $<$<TARGET_EXISTS:${OPHOST_NAME}_tiling_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_tiling_obj>
     $<$<TARGET_EXISTS:${COMMON_NAME}_obj>:$<TARGET_OBJECTS:${COMMON_NAME}_obj>>>
     $<$<TARGET_EXISTS:opbase_util_objs>:$<TARGET_OBJECTS:opbase_util_objs>>
@@ -258,10 +254,7 @@ function(gen_cust_optiling_symbol)
     PRIVATE
     ${ASCEND_DIR}/${SYSTEM_PREFIX}/lib64
   )
-  if(TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj)
-    target_link_libraries(cust_opmaster PRIVATE ${OPHOST_NAME}_cannbotdsl_tiling_obj)
-    cannbotdsl_finalize_host(cust_opmaster)
-  endif()
+  cannbotdsl_link_host(cust_opmaster)
   set_target_properties(cust_opmaster PROPERTIES OUTPUT_NAME "cust_opmaster_rt2.0")
 
   install(TARGETS cust_opmaster

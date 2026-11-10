@@ -760,6 +760,40 @@ function(enable_pypto_kernel op_file)
     set_property(GLOBAL APPEND PROPERTY PYPTO_ENABLED_OPS ${op_file})
 endfunction()
 
+# build.sh passes an empty budget when parallelism belongs to the parent build.
+if("${CANNBOTDSL_JOBS}" STREQUAL "")
+    unset(CANNBOTDSL_JOBS CACHE)
+endif()
+
+function(cannbotdsl_schedule_host _job _output _source _inputs _layout _aclnn_type)
+    set(_options)
+    if(_aclnn_type)
+        list(APPEND _options --aclnn-type "${_aclnn_type}")
+    endif()
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${_env}
+        "${HI_PYTHON}" "${_builder}" --mode layout --source "${_source}" --output "${_layout}" ${_options}
+        RESULT_VARIABLE _result)
+    if(NOT _result EQUAL 0)
+        message(FATAL_ERROR "DSL Host layout discovery failed: ${_job}")
+    endif()
+    file(READ "${_layout}" _plan)
+    string(JSON _last LENGTH "${_plan}" files)
+    math(EXPR _last "${_last} - 1")
+    set(_outputs)
+    foreach(_index RANGE ${_last})
+        string(JSON _file GET "${_plan}" files ${_index})
+        list(APPEND _outputs "${_output}/${_file}")
+    endforeach()
+    set(_stamp "${_output}.built")
+    add_custom_command(OUTPUT "${_stamp}" ${_outputs}
+        COMMAND ${_jobserver_command} "${CMAKE_COMMAND}" -E env ${_env}
+            "${HI_PYTHON}" "${_builder}" ${_target_args} ${_jobs_args} --mode host --source "${_source}"
+            --output "${_output}" --inputs "${_inputs}" --layout "${_layout}" ${_options}
+        COMMAND "${CMAKE_COMMAND}" -E touch "${_stamp}"
+        DEPENDS ${_dependencies} "${_builder}" "${_inputs}" "${_layout}" VERBATIM)
+    add_custom_target(${_job} DEPENDS "${_stamp}" ${_outputs})
+endfunction()
+
 # Build PIC Host archives and publish devices into the existing ASC kernel tree.
 function(enable_cannbotdsl_kernel op_name source_dir)
     # Unit-test targets do not publish DSL Host archives or device resources.
@@ -793,10 +827,28 @@ function(enable_cannbotdsl_kernel op_name source_dir)
     set(_source "${_source_dir}/${op_name}.py")
     set(_builder "${OPS_ADV_DIR}/cmake/scripts/build_cannbotdsl.py")
     set(_target_args --soc "${CANNBOTDSL_COMPUTE_UNIT}" --target "${CANNBOTDSL_TARGET}")
+    set(_jobserver_command)
+    if(CMAKE_GENERATOR STREQUAL "Unix Makefiles")
+        # Use $(MAKE) as sh's $0 to inherit the jobserver without launching a submake.
+        # Make runs recursive recipes even in dry-run/query/touch mode.
+        set(_jobserver_command sh -c
+            [=[case "${MAKEFLAGS%% *}" in -*) \;\; *[nqt]*) exit 0\;\; esac\; exec "$@"]=] "OpKit $(MAKE)")
+    endif()
+    set(_jobs_args)
+    if(DEFINED CANNBOTDSL_JOBS)
+        set(_jobs_args --jobs "${CANNBOTDSL_JOBS}")
+    endif()
     file(GLOB_RECURSE _sources CONFIGURE_DEPENDS "${_source_dir}/*.py")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${_sources} "${_builder}")
     set(_env "ASCEND_HOME_PATH=${ASCEND_CANN_PACKAGE_PATH}"
         TORCH_DEVICE_BACKEND_AUTOLOAD=0 PYTHONDONTWRITEBYTECODE=1)
+    set(_cache "$ENV{CANNBOTDSL_CACHE_DIR}")
+    if("${_cache}" STREQUAL "")
+        set(_cache "${CMAKE_BINARY_DIR}/cannbot_dsl/lowering-cache")
+    elseif(NOT _cache MATCHES "^~")
+        get_filename_component(_cache "${_cache}" ABSOLUTE BASE_DIR "${CMAKE_BINARY_DIR}")
+    endif()
+    list(APPEND _env "CANNBOTDSL_CACHE_DIR=${_cache}")
     set(_root "${CMAKE_BINARY_DIR}/cannbot_dsl/${op_name}")
     set(_inputs "${_root}/inputs.json")
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${_env}
@@ -828,33 +880,17 @@ function(enable_cannbotdsl_kernel op_name source_dir)
         set_property(GLOBAL PROPERTY CANNBOTDSL_ACLNN_ENABLED TRUE)
     endif()
     if(ENABLE_OPS_HOST AND _dsl_native)
-        # Imported archive targets and runtime sources must exist at configure time.
-        execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${_env}
-            "${HI_PYTHON}" "${_builder}" ${_target_args} --mode host --source "${_source}" --output "${_root}/host"
-            --inputs "${_inputs}"
-            RESULT_VARIABLE _result)
-        if(NOT _result EQUAL 0)
-            message(FATAL_ERROR "DSL Host archive build failed: ${op_name}")
-        endif()
+        set(_job "${op_name}_cannbotdsl_native_host")
+        set(_OPKIT_NATIVE_OUTPUT "${_root}/host")
+        set(_layout_dir "${_root}/host-layout")
+        cannbotdsl_schedule_host("${_job}" "${_OPKIT_NATIVE_OUTPUT}" "${_source}" "${_inputs}"
+            "${_layout_dir}/layout.json" "")
         set(CANN_ROOT "${ASCEND_CANN_PACKAGE_PATH}" CACHE PATH "CANN SDK for OpKit runtime" FORCE)
-        add_subdirectory("${_root}/host" "${_root}/host-build")
-        get_property(_archives DIRECTORY "${_root}/host" PROPERTY _OPKIT_NATIVE_ARCHIVE_TARGETS)
-        if(NOT _archives)
-            message(FATAL_ERROR "OpKit Host archive targets missing: ${op_name}")
-        endif()
-        foreach(_archive IN LISTS _archives)
-            if(NOT TARGET "${_archive}")
-                message(FATAL_ERROR "OpKit Host archive target missing: ${_archive}")
-            endif()
-            get_target_property(_archive_path "${_archive}" IMPORTED_LOCATION)
-            get_filename_component(_archive_name "${_archive_path}" NAME_WE)
-            file(GLOB _objects "${_root}/host/objects/${_archive_name}/*.o")
-            if(NOT TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj)
-                add_library(${OPHOST_NAME}_cannbotdsl_tiling_obj OBJECT IMPORTED GLOBAL)
-            endif()
-            set_property(TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj APPEND PROPERTY IMPORTED_OBJECTS ${_objects})
-            target_link_libraries(${OPHOST_NAME}_cannbotdsl_tiling_obj INTERFACE "${_archive}")
-        endforeach()
+        add_subdirectory("${_layout_dir}" "${_root}/host-build")
+        get_property(_archives DIRECTORY "${_layout_dir}" PROPERTY _OPKIT_NATIVE_ARCHIVE_TARGETS)
+        set_property(GLOBAL APPEND PROPERTY CANNBOTDSL_NATIVE_ARCHIVES ${_archives})
+        set_property(GLOBAL APPEND PROPERTY CANNBOTDSL_NATIVE_BUILD_TARGETS "${_job}")
+        set_property(GLOBAL APPEND PROPERTY CANNBOTDSL_NATIVE_BUILD_STAMPS "${_OPKIT_NATIVE_OUTPUT}.built")
     endif()
     if(ENABLE_OPS_HOST AND _dsl_aclnn)
         # ACLNN and Native Host packages have different ABIs and independent caches.
@@ -867,20 +903,19 @@ function(enable_cannbotdsl_kernel op_name source_dir)
         if(NOT _result EQUAL 0)
             message(FATAL_ERROR "DSL ACLNN input discovery failed: ${op_name}")
         endif()
-        execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${_env}
-            "${HI_PYTHON}" "${_builder}" ${_target_args} --mode host --source "${_source}" --output "${_aclnn_host}"
-            --inputs "${_aclnn_inputs}" --aclnn-type "${_aclnn_type}"
-            RESULT_VARIABLE _result)
-        if(NOT _result EQUAL 0)
-            message(FATAL_ERROR "DSL ACLNN Host publication failed: ${op_name}")
-        endif()
+        set(_job "${op_name}_cannbotdsl_aclnn_host")
+        set(_layout "${_root}/aclnn/layout.json")
+        cannbotdsl_schedule_host("${_job}" "${_aclnn_host}" "${_source}" "${_aclnn_inputs}"
+            "${_layout}" "${_aclnn_type}")
+        set_property(GLOBAL PROPERTY "CANNBOTDSL_LAYOUT_${_aclnn_host}" "${_layout}")
+        set_property(GLOBAL PROPERTY "CANNBOTDSL_BUILD_${_aclnn_host}" "${_job}")
         set_property(GLOBAL APPEND PROPERTY CANNBOTDSL_ACLNN_PACKAGES "${_aclnn_host}")
     endif()
     if(ENABLE_OPS_KERNEL)
         set(_stamp "${_root}/kernel.built")
         add_custom_command(OUTPUT "${_stamp}"
-            COMMAND "${CMAKE_COMMAND}" -E env ${_env}
-                "${HI_PYTHON}" "${_builder}" ${_target_args} --mode kernel --source "${_source}"
+            COMMAND ${_jobserver_command} "${CMAKE_COMMAND}" -E env ${_env}
+                "${HI_PYTHON}" "${_builder}" ${_target_args} ${_jobs_args} --mode kernel --source "${_source}"
                 --output "${_root}/device" --kernel-output "${ASCEND_BINARY_OUT_DIR}/${CANNBOTDSL_COMPUTE_UNIT}/bin"
                 --inputs "${_inputs}"
             COMMAND "${CMAKE_COMMAND}" -E touch "${_stamp}"
@@ -902,7 +937,8 @@ endfunction()
 # Remove only resources owned by unselected DSL builds.
 function(cannbotdsl_clean_resources)
     set(_host_enabled)
-    if(TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj)
+    get_property(_archives GLOBAL PROPERTY CANNBOTDSL_NATIVE_ARCHIVES)
+    if(_archives)
         set(_host_enabled --host-enabled)
     endif()
     if(PREPARE_BUILD)
@@ -924,11 +960,16 @@ function(cannbotdsl_clean_resources)
     endif()
 endfunction()
 
-# Keep the generated metadata and device validation on the final installed library.
-function(cannbotdsl_finalize_host _target)
-    if(NOT TARGET ${OPHOST_NAME}_cannbotdsl_tiling_obj)
+function(cannbotdsl_link_host _target)
+    get_property(_archives GLOBAL PROPERTY CANNBOTDSL_NATIVE_ARCHIVES)
+    if(NOT _archives)
         return()
     endif()
+    get_property(_jobs GLOBAL PROPERTY CANNBOTDSL_NATIVE_BUILD_TARGETS)
+    get_property(_stamps GLOBAL PROPERTY CANNBOTDSL_NATIVE_BUILD_STAMPS)
+    add_dependencies(${_target} ${_jobs})
+    target_link_libraries(${_target} PRIVATE "-Wl,--whole-archive" ${_archives} "-Wl,--no-whole-archive")
+    set_property(TARGET ${_target} PROPERTY _OPKIT_HOST_DEPENDS ${_jobs} ${_stamps})
     get_property(_kernel_packages GLOBAL PROPERTY CANNBOTDSL_KERNEL_PACKAGES)
     set(_resources)
     set(_device_depends)

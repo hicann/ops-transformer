@@ -2220,6 +2220,7 @@ if [ -n "${INPUT_JOB_NUM}" ]; then
     get_cpu_num
     JOB_NUM="-j${INPUT_JOB_NUM}"
 fi
+CUSTOM_OPTION="${CUSTOM_OPTION} -DCANNBOTDSL_JOBS:INTERNAL=${JOB_NUM#-j}"
 
 # 非打包命令调用，打包模式会打进同一个包里
 function set_compute_unit_option() {

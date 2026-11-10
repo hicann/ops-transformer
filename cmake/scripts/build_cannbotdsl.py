@@ -16,13 +16,15 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 import tempfile
 from contextlib import contextmanager
 from importlib import import_module
 from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
+
+
+_NATIVE_ARCHIVE_INDEX = "host/config/archive_info_config.json"
 
 
 def digest(path):
@@ -268,15 +270,18 @@ def clean(root, binary_root, packages, host_enabled):
         shutil.rmtree(root / "metadata", ignore_errors=True)
 
 
-def extract_host_objects(root):
-    for archive in (root / "host").glob("*.a"):
-        objects = root / "objects" / archive.stem
-        objects.mkdir(parents=True)
-        subprocess.run(
-            [os.environ.get("AR", "ar"), "x", str(archive.resolve())],
-            cwd=objects,
-            check=True,
-        )
+def aclnn_required_files(module, aclnn_type):
+    stem = Path(module).name
+    files = [
+        f"op_api/aclnn_{stem}.h",
+        f"op_host/{stem}_tiling.cpp",
+        f"op_host/{stem}_binding.cpp",
+    ]
+    if aclnn_type != "aclnn_exclude":
+        files.append(f"op_api/{stem}.cpp")
+    if aclnn_type == "aclnn":
+        files.append(f"op_api/aclnn_{stem}.cpp")
+    return [f"{module}/{file}" for file in files]
 
 
 def validate_aclnn_host(root, aclnn_type, target="dav-3510"):
@@ -297,23 +302,77 @@ def validate_aclnn_host(root, aclnn_type, target="dav-3510"):
     ):
         raise ValueError("Expected an OpKit ACLNN Host source package")
     for name, module in package["modules"].items():
-        stem = Path(module).name
         if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name) or not re.fullmatch(
             r"aclnn/[a-z][a-z0-9_]*", module
         ):
             raise ValueError("Invalid ACLNN module name or path")
         required = [
-            "CMakeLists.txt",
-            f"op_api/aclnn_{stem}.h",
-            f"op_host/{stem}_tiling.cpp",
-            f"op_host/{stem}_binding.cpp",
+            f"{module}/CMakeLists.txt",
+            *aclnn_required_files(module, aclnn_type),
         ]
-        if aclnn_type != "aclnn_exclude":
-            required.append(f"op_api/{stem}.cpp")
-        if aclnn_type == "aclnn":
-            required.append(f"op_api/aclnn_{stem}.cpp")
-        if any(f"{module}/{path}" not in files for path in required):
+        if any(path not in files for path in required):
             raise ValueError(f"Missing ACLNN module sources: {name}")
+    return package
+
+
+def collector_pattern(source, aclnn_type):
+    if aclnn_type is not None and source.with_name("aclnn_" + source.name).is_file():
+        return "*.py"
+    return source.name
+
+
+def host_layout(source, output, aclnn_type):
+    from cannbotdsl.aot.collection import Mark, discover
+    from opkit.api import _compilation_symbols
+    from opkit.package import Package, _native_host_layout
+
+    package = Package(output.parent)
+
+    def describe(entry):
+        if entry.name not in package.modules:
+            package.add(entry.name, {})
+        return lambda: None
+
+    mark = Mark(frozenset({"aclnn"}), "__cannbot_aclnn__", describe)
+    discovery = discover(
+        collectors=source.parent,
+        pattern=collector_pattern(source, aclnn_type),
+        marks=[] if aclnn_type is None else [mark],
+        exclude_dirs=frozenset({"tests", "test", "build", "dist"}),
+    )
+    with _compilation_symbols(), discovery as tasks:
+        if aclnn_type is None:
+            _native_host_layout(tasks, output.parent)
+            archives = {task: f"host/lib{task}.a" for task in tasks}
+            files = [_NATIVE_ARCHIVE_INDEX]
+            for archive in archives.values():
+                files.extend((archive, Path(archive).with_suffix(".json").as_posix()))
+            write_json(output, dict(archives=archives, files=files))
+        else:
+            if not package.modules:
+                raise ValueError(f"No ACLNN entry found in {source}")
+            runtime = distribution("opkit").locate_file("opkit/resources/runtime")
+            files = []
+            sources = {}
+            for name, module in package.modules.items():
+                stem = Path(module).name
+                required = aclnn_required_files(module, aclnn_type)
+                sources[name] = [path for path in required if path.endswith(".cpp")]
+                files.extend(required)
+                files.extend(
+                    (f"{module}/op_api/{stem}.h", f"{module}/op_host/{stem}_tiling.h")
+                )
+            write_json(
+                output,
+                dict(
+                    aclnn_type=aclnn_type,
+                    operators=list(package.modules),
+                    modules=package.modules,
+                    runtime=str(runtime),
+                    sources=sources,
+                    files=files,
+                ),
+            )
 
 
 def build(
@@ -325,6 +384,8 @@ def build(
     inputs=None,
     aclnn_type=None,
     target="dav-3510",
+    layout=None,
+    jobs=None,
 ):
     import opkit
 
@@ -337,6 +398,9 @@ def build(
         mode=mode,
         aclnn_type=aclnn_type,
     )
+    if mode == "host":
+        plan = json.loads(Path(layout).read_text())
+        record["layout"] = plan
     state = output / ".transformer-build.json"
     cached = json.loads(state.read_text()) if state.is_file() else {}
     if cached.get("record") != record or cached.get("files") != package_files(output):
@@ -354,21 +418,33 @@ def build(
                 collectors=source.parent,
                 # Only ACLNN Host publication collects the L2 declaration.
                 # Native Host and device profiles come from the implementation.
-                pattern=(
-                    "*.py"
-                    if source.with_name("aclnn_" + source.name).is_file()
-                    and aclnn_type is not None
-                    else source.name
-                ),
+                pattern=collector_pattern(source, aclnn_type),
                 target=target,
                 output=stage,
                 mode=mode,
+                jobs=jobs,
                 **options,
             )
-            if aclnn_type is None and mode == "host":
-                extract_host_objects(stage)
-            if aclnn_type is not None and mode == "host":
-                validate_aclnn_host(stage, aclnn_type, target)
+            if mode == "host":
+                if aclnn_type is None:
+                    index = json.loads((stage / _NATIVE_ARCHIVE_INDEX).read_text())
+                    actual = {
+                        task: item["binPath"] for task, item in index["tasks"].items()
+                    }
+                    if plan["archives"] != actual:
+                        raise ValueError(
+                            "Native archive paths differ from the configured layout"
+                        )
+                else:
+                    package = validate_aclnn_host(stage, aclnn_type, target)
+                    if plan["modules"] != package["modules"]:
+                        raise ValueError(
+                            "ACLNN modules differ from the configured layout"
+                        )
+                if any(not (stage / path).is_file() for path in plan["files"]):
+                    raise ValueError(
+                        "Host package is missing files declared in the configured layout"
+                    )
             write_json(
                 stage / ".transformer-build.json",
                 dict(record=record, files=package_files(stage)),
@@ -381,7 +457,7 @@ def build(
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--mode", choices=("host", "kernel", "inputs", "clean"), required=True
+        "--mode", choices=("host", "kernel", "inputs", "layout", "clean"), required=True
     )
     parser.add_argument("--source", type=Path)
     parser.add_argument("--output", type=Path)
@@ -390,6 +466,8 @@ def main():
     parser.add_argument("--kernel-output", type=Path)
     parser.add_argument("--packages", nargs="*", type=Path, default=[])
     parser.add_argument("--inputs", type=Path)
+    parser.add_argument("--layout", type=Path)
+    parser.add_argument("--jobs", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--host-enabled", action="store_true")
     parser.add_argument(
         "--aclnn-type", choices=("aclnn", "aclnn_inner", "aclnn_exclude")
@@ -397,6 +475,8 @@ def main():
     args = parser.parse_args()
     if args.output is None:
         parser.error("--output is required for publication modes")
+    if args.mode == "host" and args.layout is None:
+        parser.error("--layout is required for Host publication")
     if args.mode == "inputs":
         record = input_record(args.source, args.soc, args.aclnn_type, args.target)
         write_json(args.output, record)
@@ -409,6 +489,8 @@ def main():
                 for name, enabled in source_exports(args.source).items()
             )
         )
+    elif args.mode == "layout":
+        host_layout(args.source, args.output, args.aclnn_type)
     elif args.mode == "clean":
         clean(args.output, args.kernel_output, args.packages, args.host_enabled)
     else:
@@ -421,6 +503,8 @@ def main():
             args.inputs,
             args.aclnn_type,
             args.target,
+            args.layout,
+            args.jobs,
         )
 
 
