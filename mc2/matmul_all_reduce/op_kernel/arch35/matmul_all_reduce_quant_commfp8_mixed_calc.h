@@ -305,8 +305,8 @@ __aicore__ inline void MatmulAllReduceCommFp8MixedCalc<XType, WType, YType, MmTy
     uint32_t tileMPerRank = padM / rankNum_;
     uint32_t oneLineSCnt = Ceil(tileN, TILELEN);
     uint32_t quantNandSLen = tileN * sizeof(XType) + oneLineSCnt * sizeof(float);
-    uint64_t all2allOutOffset = padM * quantNandSLen;
-    uint64_t allGatherInOffset = tileMPerRank * quantNandSLen;
+    uint64_t all2allOutOffset = static_cast<uint64_t>(padM) * quantNandSLen;
+    uint64_t allGatherInOffset = static_cast<uint64_t>(tileMPerRank) * quantNandSLen;
     if (notifyFlag_) {
         hccl_.Wait(all2allHandleId_[all2allWaitIdx_]);
     }
@@ -363,8 +363,9 @@ __aicore__ inline void MatmulAllReduceCommFp8MixedCalc<XType, WType, YType, MmTy
             if (i < mc2Tiling.tileCnt) {
                 uint32_t quantNandSLen =
                     tilingData_->tilematmulTiling.matmulTiling.N * sizeof(XType) + tileOneLineSCnt_ * sizeof(float);
-                uint64_t allGatherOutOffset = tilingData_->tilematmulTiling.matmulTiling.M * quantNandSLen;
-                uint64_t outOffset = tilingData_->tilematmulTiling.matmulTiling.M *
+                uint64_t allGatherOutOffset =
+                    static_cast<uint64_t>(tilingData_->tilematmulTiling.matmulTiling.M) * quantNandSLen;
+                uint64_t outOffset = static_cast<uint64_t>(tilingData_->tilematmulTiling.matmulTiling.M) *
                                      tilingData_->tilematmulTiling.matmulTiling.N * sizeof(YType);
                 quantOp.Init(allGatherOutGM_, outGM_, tilingData_->tilematmulTiling.matmulTiling.M,
                              tilingData_->tilematmulTiling.matmulTiling.N, tileOneLineSCnt_, coreNum_,
@@ -375,8 +376,9 @@ __aicore__ inline void MatmulAllReduceCommFp8MixedCalc<XType, WType, YType, MmTy
             } else {
                 uint32_t quantNandSLen =
                     tilingData_->tailmatmulTiling.matmulTiling.N * sizeof(XType) + tailOneLineSCnt_ * sizeof(float);
-                uint64_t allGatherOutOffset = tilingData_->tailmatmulTiling.matmulTiling.M * quantNandSLen;
-                uint64_t outOffset = tilingData_->tailmatmulTiling.matmulTiling.M *
+                uint64_t allGatherOutOffset =
+                    static_cast<uint64_t>(tilingData_->tailmatmulTiling.matmulTiling.M) * quantNandSLen;
+                uint64_t outOffset = static_cast<uint64_t>(tilingData_->tailmatmulTiling.matmulTiling.M) *
                                      tilingData_->tailmatmulTiling.matmulTiling.N * sizeof(YType);
                 quantOp.Init(allGatherOutGM_, outGM_, tilingData_->tailmatmulTiling.matmulTiling.M,
                              tilingData_->tailmatmulTiling.matmulTiling.N, tailOneLineSCnt_, coreNum_,

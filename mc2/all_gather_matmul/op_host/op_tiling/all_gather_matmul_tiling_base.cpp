@@ -441,7 +441,7 @@ static uint64_t GetStorage_a(Mc2Tiling::AllGatherMatmulTilingData& tilingData, m
     } else {
         auto alignM = cfg.rankM + 16;
         auto alignK = cfg.rankK + 16;
-        nd2nzLen = mc2tiling::AlignUp(alignM * alignK * args.inputDtypeSize, alignAddrLen);
+        nd2nzLen = mc2tiling::AlignUp(static_cast<uint64_t>(alignM) * alignK * args.inputDtypeSize, alignAddrLen);
     }
 
     if (args.cmdType == mc2tiling::AicpuComType::HCCL_CMD_ALLGATHER) {
@@ -449,9 +449,11 @@ static uint64_t GetStorage_a(Mc2Tiling::AllGatherMatmulTilingData& tilingData, m
         uint64_t gatherLen = 0;
         if (args.isStorageGather == false) {
             if (gatherIndex == 0) { // A矩阵
-                gatherLen = mc2tiling::AlignUp(cfg.rankM * cfg.rankK * args.inputDtypeSize, alignAddrLen);
+                gatherLen = mc2tiling::AlignUp(static_cast<uint64_t>(cfg.rankM) * cfg.rankK * args.inputDtypeSize,
+                                               alignAddrLen);
             } else {
-                gatherLen = mc2tiling::AlignUp(cfg.rankK * cfg.rankN * args.inputDtypeSize, alignAddrLen);
+                gatherLen = mc2tiling::AlignUp(static_cast<uint64_t>(cfg.rankK) * cfg.rankN * args.inputDtypeSize,
+                                               alignAddrLen);
             }
             gatherLen *= cfg.rankDim;
         }

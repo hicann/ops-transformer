@@ -1000,7 +1000,7 @@ ge::graphStatus QuantBmmReduceScatterTiling::DoAdaptSlidWindowTiling()
     uint32_t tempMValue = tileMValue_ == 0 ? MutableRCSTilingDataA5().rankM : tileMValue_;
     args_.mValue = ((quantMode_ == mc2tiling::Mc2QuantMode::PERTENSOR_MODE) ||
                     (quantMode_ == mc2tiling::Mc2QuantMode::MXFP_MODE)) ?
-                       (tempMValue * args_.rankDim) :
+                       (static_cast<uint64_t>(tempMValue) * args_.rankDim) :
                        tempMValue;
 
     QuantBmmReduceScatterHelper mmTile(*this, quantBmmMatmulReducescatterTilingData_->quantBmmV3TileTiling);

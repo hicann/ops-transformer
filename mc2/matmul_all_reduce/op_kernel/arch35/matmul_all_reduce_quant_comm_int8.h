@@ -75,8 +75,8 @@ private:
     GM_ADDR outGM_;
     uint32_t tilePadM_ = 0U;
     uint32_t tailPadM_ = 0U;
-    uint32_t tilePadDataCnt_ = 0U;
-    uint32_t tailPadDataCnt_ = 0U;
+    uint64_t tilePadDataCnt_ = 0U;
+    uint64_t tailPadDataCnt_ = 0U;
 
     // 仅在0核上使用
     AscendC::HcclHandle all2allHandleId_[MAX_HANDLE_NUM] = {0};
@@ -153,9 +153,11 @@ __aicore__ inline void MatmulAllReduceQuantCommInt8<XType, WType, YType, MmType,
         tailPadM_ += rankNum - (tailM % rankNum);
     }
 
-    tilePadDataCnt_ = tilePadM_ * tilingData_->tilematmulTiling.matmulTiling.N; // 一个MM头块的数据个数
-    tailPadDataCnt_ = tailPadM_ * tilingData_->tailmatmulTiling.matmulTiling.N; // 一个MM尾块的数据个数
-    const int64_t tempBufOffsetTilePad = tilePadDataCnt_ * sizeof(int8_t);      // 偏移计算
+    tilePadDataCnt_ =
+        static_cast<uint64_t>(tilePadM_) * tilingData_->tilematmulTiling.matmulTiling.N; // 一个MM头块的数据个数
+    tailPadDataCnt_ =
+        static_cast<uint64_t>(tailPadM_) * tilingData_->tailmatmulTiling.matmulTiling.N; // 一个MM尾块的数据个数
+    const int64_t tempBufOffsetTilePad = tilePadDataCnt_ * sizeof(int8_t);               // 偏移计算
     const int64_t tempBufOffsetTailPad = tailPadDataCnt_ * sizeof(int8_t);
     const int64_t tempBufOffsetTilePadPerRank = tempBufOffsetTilePad / rankNum;
     const int64_t tempBufOffsetTailPadPerRank = tempBufOffsetTailPad / rankNum;
@@ -255,12 +257,12 @@ __aicore__ inline void MatmulAllReduceQuantCommInt8<XType, WType, YType, MmType,
                 MatmulAllReduceQuantReduceSumInt8<YType, commMode>(all2allOutGM_, commQuantScale1GM_,
                                                                    commQuantScale2GM_, tilePadM_,
                                                                    mmTiling->matmulTiling.N, tPipe_, hccl_);
-                all2allOutGM_ += tilePadM_ * mmTiling->matmulTiling.N * sizeof(int8_t);
+                all2allOutGM_ += static_cast<uint64_t>(tilePadM_) * mmTiling->matmulTiling.N * sizeof(int8_t);
             } else {
                 MatmulAllReduceQuantReduceSumInt8<YType, commMode>(all2allOutGM_, commQuantScale1GM_,
                                                                    commQuantScale2GM_, curPadM,
                                                                    mmTiling->matmulTiling.N, tPipe_, hccl_);
-                all2allOutGM_ += curPadM * mmTiling->matmulTiling.N * sizeof(int8_t);
+                all2allOutGM_ += static_cast<uint64_t>(curPadM) * mmTiling->matmulTiling.N * sizeof(int8_t);
             }
             SyncAll();
             if (notifyFlag_) {

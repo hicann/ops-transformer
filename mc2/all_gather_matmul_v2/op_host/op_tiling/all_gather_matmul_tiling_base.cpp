@@ -712,7 +712,7 @@ uint64_t AllGatherMatmulTilingBase::CalcGatherLen(uint32_t dimA, uint32_t dimB, 
     if (CheckSupportDtype(args_.geAType, FP4_DTYPE_SUPPORT_LIST)) {
         return mc2tiling::AlignUp(static_cast<uint64_t>(dimA) * static_cast<uint64_t>(dimB) / 2U, alignAddrLen);
     }
-    return mc2tiling::AlignUp(dimA * dimB * args_.inputDtypeSize, alignAddrLen);
+    return mc2tiling::AlignUp(static_cast<uint64_t>(dimA) * dimB * args_.inputDtypeSize, alignAddrLen);
 }
 
 uint64_t AllGatherMatmulTilingBase::GetStorageA(Mc2Tiling::RCSTiling& rcsCfg)
@@ -734,7 +734,7 @@ uint64_t AllGatherMatmulTilingBase::GetStorageA(Mc2Tiling::RCSTiling& rcsCfg)
         } else {
             auto alignM = rcsCfg.rankM + 16;
             auto alignK = rcsCfg.rankK + 16;
-            nd2nzLen = mc2tiling::AlignUp(alignM * alignK * args_.inputDtypeSize, alignAddrLen);
+            nd2nzLen = mc2tiling::AlignUp(static_cast<uint64_t>(alignM) * alignK * args_.inputDtypeSize, alignAddrLen);
         }
     }
 
