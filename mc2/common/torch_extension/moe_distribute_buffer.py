@@ -17,6 +17,10 @@ def _empty_topk_weights_like(tensor):
     return tensor.new_empty((0,), dtype=torch.float32)
 
 
+def _is_a5_device():
+    return "Ascend950" in torch_npu.npu.get_device_name()
+
+
 def _get_hccl_comm_name(group, rank_id):
     if hasattr(group, "get_hccl_comm_name"):
         return group.get_hccl_comm_name(rank_id, init_comm=False)
@@ -26,10 +30,15 @@ def _get_hccl_comm_name(group, rank_id):
 
 class MoeDistributeBuffer:
     def __init__(self, group, ccl_buffer_size: int = 0, comm_alg: int = 0):
+        """A5 上正数 ccl_buffer_size 表示 HCCL 配置容量，单位为 MB。"""
         self.group = group
         self.rank_id = torch.distributed.get_rank(group)
         self.world_size = torch.distributed.get_world_size(group)
         self.group_name = _get_hccl_comm_name(group, self.rank_id)
+        ccl_buffer_size_bytes = ccl_buffer_size
+        if _is_a5_device() and ccl_buffer_size > 0:
+            # A5 实际窗口容量为估算接口返回的 HCCL MB 配置容量的两倍。
+            ccl_buffer_size_bytes *= 2 * 1024 * 1024
         self._ctx_manager = CommContextManager(
             self.group_name,
             self.world_size,
@@ -38,11 +47,9 @@ class MoeDistributeBuffer:
                 "Ascend910_93": "kfc",
                 "Ascend950": "channel",
             },
-            customCclBufferSize=ccl_buffer_size,
+            customCclBufferSize=ccl_buffer_size_bytes,
         )
         self.context = self._ctx_manager.create_context()
-        self.ccl_buffer_size = self._ctx_manager.ccl_buffer_size
-
         self.ccl_buffer_size = self._ctx_manager.ccl_buffer_size
 
     @staticmethod
@@ -58,6 +65,8 @@ class MoeDistributeBuffer:
     ) -> int:
         def inline_align(value, base):
             return (value + base - 1) // base * base
+
+        is_a5 = _is_a5_device()
 
         torch._check(
             ((world_size >= 2) and (world_size <= 768)),  # world_size当前仅支持[2,768]
@@ -167,7 +176,9 @@ class MoeDistributeBuffer:
             )
             + mb_conversion
         )
-        ## hccl按照2*bufferSize大小开设
+        if is_a5:
+            minimum_buffer_size += world_size * 1024
+        # 返回 HCCL 配置容量，单位为 MB；HCCL 实际申请两倍容量，首个 MB 用于状态区。
         ccl_buffer_size = (
             inline_align(
                 inline_align(minimum_buffer_size, mb_conversion) // mb_conversion, 2

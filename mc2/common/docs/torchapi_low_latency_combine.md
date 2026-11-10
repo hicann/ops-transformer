@@ -437,11 +437,15 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
   <!-- end id8 -->
 - HCCL通信域缓存区大小：
 
-    调用本接口前需检查通信域缓存区大小取值是否合理，单位MB，不配置时默认为200MB。
-  - 该场景仅支持通过环境变量HCCL_BUFFSIZE配置，该环境变量按通信域粒度管理，每个通信域独占一组“2\*HCCL_BUFFSIZE”大小的内存。
+    调用本接口前需检查通信域缓存区大小配置是否合理，单位MB。
+  - 通过环境变量HCCL\_BUFFSIZE配置时，该环境变量按通信域粒度管理，不配置时默认为200MB，每个通信域独占一组“2*HCCL\_BUFFSIZE”大小的内存。
   - ep通信域内：设置大小要求 >= 2且满足>= 2 \* (local_expert_num \* max_bs \* ep_world_size \* Align512(Align32(2 \* h) + 64) + (k + shared_expert_num) \* max_bs\* Align512(2 \* h))。
   - 其中480Align512(x) = ((x+480-1)/480)\*512,Align512(x) = ((x+512-1)/512)\*512,Align32(x) = ((x+32-1)/32)\*32。
   - 通信域内开设大小可通过调用MoeDistributeBuffer.get_low_latency_ccl_buffer_size接口计算。
+  <!-- npu="950" id9 -->
+  - 对于<term>Ascend 950PR&950DT系列产品</term>，支持在初始化`MoeDistributeBuffer`时，通过`ccl_buffer_size`参数指定内部申请的通信缓存区大小。该参数单位为MB，可直接使用`MoeDistributeBuffer.get_low_latency_ccl_buffer_size`接口的返回值。
+  - 对于<term>Ascend 950PR&950DT系列产品</term>，正数`ccl_buffer_size`参数优先于ProcessGroup的`hccl_buffer_size`和HCCL\_BUFFSIZE环境变量，使用内部申请的通信缓存区；当该参数为0时，使用通信域默认缓存区，沿用ProcessGroup的`hccl_buffer_size`或HCCL\_BUFFSIZE配置。
+  <!-- end id9 -->
 
 - 本文公式中的“/”表示整除。
 

@@ -127,8 +127,8 @@ inline ge::graphStatus CheckActualWinSize(const gert::TilingContext *context, co
                     " (maxBs * tokenNeedSizeCombine * (k + sharedExpertNum))) * 2) + epWorldSize * 1024 = %luMB,"
                     " HCCL_BUFFSIZE=%luMB, actual CCL_BUFFSIZE=%luMB.",
                     maxBs, h, epWorldSize, winSizeData.localMoeExpertNum, sharedExpertNum, tokenNeedSizeDispatch,
-                    tokenNeedSizeCombine, winSizeData.k, actualSize / MB_SIZE + 1UL, hcclBufferSizeEp / (MB_SIZE * 2),
-                    hcclBufferSizeEp / MB_SIZE),
+                    tokenNeedSizeCombine, winSizeData.k, (actualSize + 2UL * MB_SIZE - 1UL) / MB_SIZE,
+                    hcclBufferSizeEp / (MB_SIZE * 2), hcclBufferSizeEp / MB_SIZE),
                 return ge::GRAPH_FAILED);
         } else {
             OP_TILING_CHECK((actualSize > maxWindowSizeEp),
