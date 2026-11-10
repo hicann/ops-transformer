@@ -1169,8 +1169,11 @@ public:
             if (gStartIdx == gEndIdx) {
                 ret = (s1StartTdx < s1FirstValidToken) || (s1EndTdx > s1LastValidToken);
             } else {
-                ret = (s1StartTdx < s1FirstValidToken);
-                ret = ret || (s1EndTdx < s1FirstValidToken) || (s1EndTdx > s1LastValidToken);
+                // GS布局跨G块: 行集 = [s1StartTdx..actS1Size-1] ∪ 中间完整G([0..actS1Size-1]) ∪ [0..s1EndTdx]
+                // 中间/尾G的行从s1=0重新计数, 仅检查起止行会漏检:
+                // s1FirstValidToken>0时中间/尾G必含s1<first的无效行; 上边界超last时同样含无效行
+                ret = (s1StartTdx < s1FirstValidToken) || (s1EndTdx > s1LastValidToken) ||
+                      (static_cast<int32_t>(runInfo.actS1Size) - 1 > s1LastValidToken) || (s1FirstValidToken > 0);
             }
         }
         return ret;

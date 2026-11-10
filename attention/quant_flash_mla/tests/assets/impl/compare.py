@@ -66,6 +66,148 @@ logger = logging.getLogger(__name__)
 _EPS = 1e-10
 
 
+def cal_relative_diff_torch(real_data, expect_data):
+    diff = abs(float(real_data) - float(expect_data))
+    return diff / (abs(float(expect_data)) + _EPS)
+
+
+def display_output_torch(real_data, expect_data, start, end, expect_fp32_data=None):
+    has_fp32 = expect_fp32_data is not None
+
+    logger.info(
+        "---------------------------------------------------------------------------------------"
+    )
+    logger.info(
+        "Loop \t ExpFP32Out \t ExpFP16Out \t NPUOut \tFpDiff(min) \t RateDiff"
+        if has_fp32
+        else "Loop \t\t ExpectOut \t RealOut \t FpDiff \t RateDiff"
+    )
+    logger.info(
+        "---------------------------------------------------------------------------------------"
+    )
+
+    split_count = int(end - start)
+
+    def display_row(i):
+        j = start + i
+        real_value = float(real_data[j])
+        expect_value = float(expect_data[j])
+        diff_rate = cal_relative_diff_torch(real_value, expect_value)
+        idx = start + i + 1
+
+        if not torch.isfinite(expect_data[j]).item():
+            diff_abs = "inf" if torch.isinf(expect_data[j]).item() else "nan"
+            if has_fp32:
+                logger.info(
+                    "%08d \t %-7s \t %-7s \t %-7s \t %-7s \t %-7s",
+                    idx,
+                    float(expect_fp32_data[j]),
+                    expect_value,
+                    real_value,
+                    diff_abs,
+                    diff_rate,
+                )
+            else:
+                logger.info(
+                    "%08d \t %-7s \t %-7s \t %-7s \t %-7s",
+                    idx,
+                    expect_value,
+                    real_value,
+                    diff_abs,
+                    diff_rate,
+                )
+        else:
+            diff_abs = abs(expect_value - real_value)
+            if has_fp32:
+                logger.info(
+                    "%08d \t %0.7f \t %0.7f \t %0.7f \t %0.7f \t %0.7f",
+                    idx,
+                    float(expect_fp32_data[j]),
+                    expect_value,
+                    real_value,
+                    diff_abs,
+                    diff_rate,
+                )
+            else:
+                logger.info(
+                    "%08d \t %0.7f \t %0.7f \t %0.7f \t %0.7f",
+                    idx,
+                    expect_value,
+                    real_value,
+                    diff_abs,
+                    diff_rate,
+                )
+
+    if split_count <= 20:
+        for i in range(split_count + 1):
+            display_row(i)
+    else:
+        for i in range(10):
+            display_row(i)
+        logger.info("...   \t\t   ...   \t   ...   \t   ...    \t   ...")
+        for i in range(split_count - 10 + 1, split_count + 1):
+            display_row(i)
+
+
+def display_error_output_torch(real_data, expect_data, err_idx, relative_diff):
+    logger.info(
+        "Error Line-----------------------------------------------------------------------------"
+    )
+    logger.info("Loop \t\t ExpectOut \t RealOut \t FpDiff \t RateDiff")
+    logger.info(
+        "---------------------------------------------------------------------------------------"
+    )
+
+    len_err = int(err_idx.numel())
+    for count, i in enumerate(err_idx.tolist(), 1):
+        if count < 10 or (90 < count < 100):
+            expect_value = float(expect_data[i])
+            real_value = float(real_data[i])
+            logger.info(
+                "%08d \t %.7f \t %.7f \t %.7f \t %.7f",
+                i,
+                expect_value,
+                real_value,
+                abs(expect_value - real_value),
+                float(relative_diff[count - 1].item()),
+            )
+        elif count == 10 or (count == 100 and len_err > 100):
+            logger.info(
+                "%08s \t %07s \t %07s \t %07s \t %07s",
+                "...",
+                "...",
+                "...",
+                "...",
+                "...",
+            )
+        elif count > 100:
+            break
+
+    logger.info(
+        "Max-RE line:---------------------------------------------------------------------------"
+    )
+    max_error = (
+        float(torch.max(relative_diff).item()) if relative_diff.numel() > 0 else 0.0
+    )
+    m_idx_list = err_idx[relative_diff == max_error]
+    for m_count, m_idx in enumerate(m_idx_list.tolist()):
+        if m_count >= 3:
+            break
+        expect_value = float(expect_data[m_idx])
+        real_value = float(real_data[m_idx])
+        logger.info(
+            "%08d \t %.7f \t %.7f \t %.7f \t %.7f",
+            m_idx,
+            expect_value,
+            real_value,
+            abs(expect_value - real_value),
+            max_error,
+        )
+    logger.info(
+        "---------------------------------------------------------------------------------------"
+    )
+
+
 def _resolve_csv_tolerance(idx):
     """从 golden 模块读 csv 注入的 precision_tolerances / absolute_precision。
 
@@ -123,61 +265,6 @@ def _to_torch(x):
     return torch.as_tensor(x)
 
 
-def display_error_output_torch(real_data, expect_data, err_idx, relative_diff):
-    logger.info(
-        "Error Line-----------------------------------------------------------------------------"
-    )
-    logger.info("Loop \t ExpectOut \t RealOut \t FpDiff \t RateDiff")
-    logger.info(
-        "---------------------------------------------------------------------------------------"
-    )
-
-    len_err = int(err_idx.numel())
-    for count, i in enumerate(err_idx[:100].tolist(), 1):
-        if count < 10 or (90 < count < 100):
-            expect_value = float(expect_data[i])
-            real_value = float(real_data[i])
-            logger.info(
-                "%08d \t %.7f \t %.7f \t %.7f \t %.7f",
-                i,
-                expect_value,
-                real_value,
-                abs(expect_value - real_value),
-                float(relative_diff[count - 1].item()),
-            )
-        elif count == 10 or (count == 100 and len_err > 100):
-            logger.info(
-                "%08s \t %07s \t %07s \t %07s \t %07s",
-                "...",
-                "...",
-                "...",
-                "...",
-                "...",
-            )
-
-    logger.info(
-        "Max-RE line:---------------------------------------------------------------------------"
-    )
-    max_error = (
-        float(torch.max(relative_diff).item()) if relative_diff.numel() > 0 else 0.0
-    )
-    m_idx_list = err_idx[relative_diff == max_error]
-    for m_idx in m_idx_list[:3].tolist():
-        expect_value = float(expect_data[m_idx])
-        real_value = float(real_data[m_idx])
-        logger.info(
-            "%08d \t %.7f \t %.7f \t %.7f \t %.7f",
-            m_idx,
-            expect_value,
-            real_value,
-            abs(expect_value - real_value),
-            max_error,
-        )
-    logger.info(
-        "---------------------------------------------------------------------------------------"
-    )
-
-
 def check_result(
     expect,
     npu_result,
@@ -205,11 +292,33 @@ def check_result(
     )
 
     if tuple(npu_result.shape) != tuple(expect.shape):
+        logger.info(
+            "Error,the size of npu output[%s] and benchmark[%s] is not equal.",
+            tuple(npu_result.shape),
+            tuple(expect.shape),
+        )
         return "Failed", 0.0, 0
     if real_data.numel() == 0:
+        logger.info(
+            'The npu_output is [],and it is same as bm_output, the result of data_compare is "Pass"'
+        )
         return "Pass", 100.0, 0
 
     split_count = real_data.numel()
+
+    overflows_count = int(
+        torch.isinf(expect_data).sum().item() + torch.isnan(expect_data).sum().item()
+    )
+    if overflows_count > 0:
+        logger.info(
+            "Overflow,size:%s,benchmark_output:%s, %s",
+            overflows_count,
+            expect_data[torch.isinf(expect_data)][0:10],
+            expect_data[torch.isnan(expect_data)][0:10],
+        )
+
+    logger.info("split_count:%s; max_diff_hd:%s;", float(split_count), max_diff_hd)
+
     real_float = real_data.to(torch.float32)
     expect_float = expect_data.to(torch.float32)
 
@@ -237,6 +346,9 @@ def check_result(
     )
 
     fulfill_percent = float(split_count - err_idx.numel()) / float(split_count) * 100.0
+
+    display_output_torch(real_data, expect_data, 0, split_count - 1)
+
     pct_thd = (1 - pct_thd) * 100.0
     result = "Pass" if fulfill_percent >= pct_thd else "Failed"
 
@@ -247,14 +359,25 @@ def check_result(
             result = "Failed"
 
     logger.info(
-        "Rtol=%.6f  Atol=%.6f  PctThd=%.2f%%  PctRlt=%.6f%%  Result=%s  MaxRE=%s",
+        "---------------------------------------------------------------------------------------"
+    )
+    logger.info("Rtol   \t\t Atol   \t PctThd   \t PctRlt   \t Result")
+    logger.info(
+        "---------------------------------------------------------------------------------------"
+    )
+    logger.info(
+        "%.4f    \t %.6f  \t %.2f%%   \t %.6f%%   \t %s",
         rtol,
         atol,
         pct_thd,
         fulfill_percent,
         result,
-        max_error,
     )
+
+    if err_diff.numel() > 0:
+        logger.info(
+            "Max-RelativeError is: %s. Threshold is: %s.", max_error, max_diff_hd
+        )
 
     if result == "Failed":
         display_error_output_torch(real_data, expect_data, err_idx, err_diff)
