@@ -653,6 +653,9 @@ public:
                                                                                 (qHeads_gmlse - 1) * sizeof(float), 0));
                             }
                         }
+                        // Wait for the LSE copy before tvUbTensor is reused by a following non-split task.
+                        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID5);
+                        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID5);
                         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID4);
                     }
                 }
