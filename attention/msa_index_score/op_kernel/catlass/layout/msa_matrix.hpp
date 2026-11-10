@@ -11,12 +11,12 @@
 #ifndef CATLASS_MSA_LAYOUT_MATRIX_HPP
 #define CATLASS_MSA_LAYOUT_MATRIX_HPP
 
-#include "catlass/msa_catlass.hpp"
-#include "catlass/msa_coord.hpp"
-#include "catlass/msa_numeric_size.hpp"
-#include "catlass/detail/msa_alignment.hpp"
-#include "catlass/msa_matrix_coord.hpp"
-#include "catlass/msa_conv_coord.hpp"
+#include "../../catlass/msa_catlass.hpp"
+#include "../../catlass/msa_coord.hpp"
+#include "../../catlass/msa_numeric_size.hpp"
+#include "../../catlass/detail/msa_alignment.hpp"
+#include "../../catlass/msa_matrix_coord.hpp"
+#include "../../catlass/msa_conv_coord.hpp"
 
 namespace Catlass::layout {
 

@@ -23,19 +23,19 @@
 
 #include "kernel_operator.h"
 
-#include "catlass/msa_catlass.hpp"
-#include "catlass/arch/msa_arch.hpp"
-#include "catlass/arch/msa_resource.hpp"
-#include "catlass/arch/msa_cross_core_sync.hpp"
-#include "catlass/msa_coord.hpp"
-#include "catlass/msa_gemm_coord.hpp"
-#include "catlass/msa_matrix_coord.hpp"
-#include "catlass/layout/msa_layout.hpp"
-#include "catlass/gemm/msa_gemm_type.hpp"
+#include "../catlass/msa_catlass.hpp"
+#include "../catlass/arch/msa_arch.hpp"
+#include "../catlass/arch/msa_resource.hpp"
+#include "../catlass/arch/msa_cross_core_sync.hpp"
+#include "../catlass/msa_coord.hpp"
+#include "../catlass/msa_gemm_coord.hpp"
+#include "../catlass/msa_matrix_coord.hpp"
+#include "../catlass/layout/msa_layout.hpp"
+#include "../catlass/gemm/msa_gemm_type.hpp"
 
 #include "../msa_index_score_common.h"
 #include "msa_block_mmad_arch22.h"
-#include "msa_index_score_task.h"
+#include "../msa_index_score_task.h"
 #include "msa_seg_row_max_epilogue_arch22.h"
 
 namespace MsaIndexScoreNs {

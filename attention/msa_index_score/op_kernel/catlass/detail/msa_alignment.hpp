@@ -11,7 +11,7 @@
 #ifndef CATLASS_MSA_ALIGNMENT_HPP
 #define CATLASS_MSA_ALIGNMENT_HPP
 
-#include "catlass/detail/msa_macros.hpp"
+#include "../../catlass/detail/msa_macros.hpp"
 
 template <uint32_t ALIGN, typename T>
 CATLASS_HOST_DEVICE constexpr T RoundUp(const T& val)

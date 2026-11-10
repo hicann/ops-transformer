@@ -24,7 +24,7 @@
 #define MSA_INDEX_SCORE_TASK_H
 
 #include "kernel_operator.h"
-#include "../msa_index_score_common.h"
+#include "msa_index_score_common.h"
 
 namespace MsaIndexScoreNs {
 

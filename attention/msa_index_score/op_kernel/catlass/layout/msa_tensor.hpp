@@ -11,9 +11,9 @@
 #ifndef CATLASS_MSA_LAYOUT_TENSOR_HPP
 #define CATLASS_MSA_LAYOUT_TENSOR_HPP
 
-#include "catlass/msa_catlass.hpp"
-#include "catlass/detail/msa_alignment.hpp"
-#include "catlass/msa_conv_coord.hpp"
+#include "../../catlass/msa_catlass.hpp"
+#include "../../catlass/detail/msa_alignment.hpp"
+#include "../../catlass/msa_conv_coord.hpp"
 
 namespace Catlass::layout {
 

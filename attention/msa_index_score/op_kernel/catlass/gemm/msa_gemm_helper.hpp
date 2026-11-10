@@ -11,10 +11,10 @@
 #ifndef CATLASS_MSA_GEMM_HELPER_HPP
 #define CATLASS_MSA_GEMM_HELPER_HPP
 
-#include "catlass/msa_catlass.hpp"
-#include "catlass/msa_numeric_size.hpp"
-#include "catlass/layout/msa_layout.hpp"
-#include "catlass/gemm/msa_gemm_type.hpp"
+#include "../../catlass/msa_catlass.hpp"
+#include "../../catlass/msa_numeric_size.hpp"
+#include "../../catlass/layout/msa_layout.hpp"
+#include "../../catlass/gemm/msa_gemm_type.hpp"
 
 namespace Catlass::Gemm::helper {
 

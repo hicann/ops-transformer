@@ -11,7 +11,7 @@
 #ifndef CATLASS_MSA_GEMM_COORD_HPP
 #define CATLASS_MSA_GEMM_COORD_HPP
 
-#include "catlass/msa_coord.hpp"
+#include "../catlass/msa_coord.hpp"
 
 namespace Catlass {
 

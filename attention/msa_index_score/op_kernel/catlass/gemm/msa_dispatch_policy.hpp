@@ -11,8 +11,8 @@
 #ifndef CATLASS_MSA_GEMM_DISPATCH_POLICY_HPP
 #define CATLASS_MSA_GEMM_DISPATCH_POLICY_HPP
 
-#include "catlass/msa_catlass.hpp"
-#include "catlass/arch/msa_arch.hpp"
+#include "../../catlass/msa_catlass.hpp"
+#include "../../catlass/arch/msa_arch.hpp"
 
 namespace Catlass::Gemm {
 

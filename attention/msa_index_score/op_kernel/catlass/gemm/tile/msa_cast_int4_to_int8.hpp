@@ -11,12 +11,12 @@
 #ifndef CATLASS_MSA_GEMM_TILE_CAST_INT4_TO_INT8_HPP
 #define CATLASS_MSA_GEMM_TILE_CAST_INT4_TO_INT8_HPP
 
-#include "catlass/msa_catlass.hpp"
-#include "catlass/arch/msa_resource.hpp"
-#include "catlass/msa_coord.hpp"
-#include "catlass/msa_gemm_coord.hpp"
-#include "catlass/gemm/msa_dispatch_policy.hpp"
-#include "catlass/gemm/msa_gemm_helper.hpp"
+#include "../../../catlass/msa_catlass.hpp"
+#include "../../../catlass/arch/msa_resource.hpp"
+#include "../../../catlass/msa_coord.hpp"
+#include "../../../catlass/msa_gemm_coord.hpp"
+#include "../../../catlass/gemm/msa_dispatch_policy.hpp"
+#include "../../../catlass/gemm/msa_gemm_helper.hpp"
 
 namespace Catlass::Gemm::Tile {
 

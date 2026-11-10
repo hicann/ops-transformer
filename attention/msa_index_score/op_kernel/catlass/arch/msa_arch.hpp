@@ -11,7 +11,7 @@
 #ifndef CATLASS_MSA_ARCH_ARCH_HPP
 #define CATLASS_MSA_ARCH_ARCH_HPP
 
-#include "catlass/msa_catlass.hpp"
+#include "../../catlass/msa_catlass.hpp"
 
 namespace Catlass::Arch {
 

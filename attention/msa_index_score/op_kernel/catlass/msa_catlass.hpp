@@ -17,9 +17,9 @@
 #include <kernel_operator.h>
 #endif
 
-#include "catlass/detail/msa_alignment.hpp"
-#include "catlass/detail/msa_dependent_false.hpp"
-#include "catlass/detail/msa_macros.hpp"
+#include "../catlass/detail/msa_alignment.hpp"
+#include "../catlass/detail/msa_dependent_false.hpp"
+#include "../catlass/detail/msa_macros.hpp"
 
 namespace Catlass {
 

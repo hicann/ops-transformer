@@ -10,7 +10,7 @@
 #ifndef CATLASS_MSA_NUMERIC_SIZE_HPP
 #define CATLASS_MSA_NUMERIC_SIZE_HPP
 
-#include "catlass/msa_catlass.hpp"
+#include "../catlass/msa_catlass.hpp"
 
 namespace Catlass {
 

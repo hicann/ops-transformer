@@ -12,19 +12,19 @@
 #define CATLASS_MSA_GEMM_TILE_TILE_COPY_HPP
 
 #include <type_traits>
-#include "catlass/msa_catlass.hpp"
-#include "catlass/gemm/tile/msa_copy_gm_to_l1.hpp"
-#include "catlass/gemm/tile/msa_copy_l1_to_fp.hpp"
-#include "catlass/gemm/tile/msa_copy_l0c_to_gm.hpp"
-#include "catlass/gemm/tile/msa_copy_l1_to_l0a.hpp"
-#include "catlass/gemm/tile/msa_copy_l1_to_l0b.hpp"
-#include "catlass/gemm/tile/msa_copy_l1_to_bt.hpp"
-#include "catlass/gemm/tile/msa_copy_gm_to_ub.hpp"
-#include "catlass/gemm/tile/msa_copy_ub_to_gm.hpp"
-#include "catlass/gemm/tile/msa_cast_int4_to_int8.hpp"
-#include "catlass/gemm/tile/msa_cast_int8_to_fp16.hpp"
-#include "catlass/gemm/tile/msa_cast_fp8_to_fp16.hpp"
-#include "catlass/gemm/msa_gemm_helper.hpp"
+#include "../../../catlass/msa_catlass.hpp"
+#include "../../../catlass/gemm/tile/msa_copy_gm_to_l1.hpp"
+#include "../../../catlass/gemm/tile/msa_copy_l1_to_fp.hpp"
+#include "../../../catlass/gemm/tile/msa_copy_l0c_to_gm.hpp"
+#include "../../../catlass/gemm/tile/msa_copy_l1_to_l0a.hpp"
+#include "../../../catlass/gemm/tile/msa_copy_l1_to_l0b.hpp"
+#include "../../../catlass/gemm/tile/msa_copy_l1_to_bt.hpp"
+#include "../../../catlass/gemm/tile/msa_copy_gm_to_ub.hpp"
+#include "../../../catlass/gemm/tile/msa_copy_ub_to_gm.hpp"
+#include "../../../catlass/gemm/tile/msa_cast_int4_to_int8.hpp"
+#include "../../../catlass/gemm/tile/msa_cast_int8_to_fp16.hpp"
+#include "../../../catlass/gemm/tile/msa_cast_fp8_to_fp16.hpp"
+#include "../../../catlass/gemm/msa_gemm_helper.hpp"
 
 namespace Catlass::Gemm::Tile {
 

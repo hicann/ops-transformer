@@ -11,9 +11,9 @@
 #ifndef CATLASS_MSA_LAYOUT_VECTOR_HPP
 #define CATLASS_MSA_LAYOUT_VECTOR_HPP
 
-#include "catlass/msa_catlass.hpp"
-#include "catlass/msa_coord.hpp"
-#include "catlass/msa_numeric_size.hpp"
+#include "../../catlass/msa_catlass.hpp"
+#include "../../catlass/msa_coord.hpp"
+#include "../../catlass/msa_numeric_size.hpp"
 
 namespace Catlass::layout {
 

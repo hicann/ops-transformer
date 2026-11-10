@@ -11,9 +11,9 @@
 #ifndef CATLASS_MSA_GEMM_TILE_TILE_MMAD_HPP
 #define CATLASS_MSA_GEMM_TILE_TILE_MMAD_HPP
 
-#include "catlass/msa_catlass.hpp"
-#include "catlass/arch/msa_arch.hpp"
-#include "catlass/gemm/msa_gemm_helper.hpp"
+#include "../../../catlass/msa_catlass.hpp"
+#include "../../../catlass/arch/msa_arch.hpp"
+#include "../../../catlass/gemm/msa_gemm_helper.hpp"
 namespace Catlass::Gemm::Tile {
 
 ///////////////////////////////////////////////////////////

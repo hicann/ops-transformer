@@ -11,8 +11,8 @@
 #ifndef CATLASS_MSA_RESOURCE_HPP
 #define CATLASS_MSA_RESOURCE_HPP
 
-#include "catlass/msa_catlass.hpp"
-#include "catlass/arch/msa_local_tensor_buffer.hpp"
+#include "../../catlass/msa_catlass.hpp"
+#include "../../catlass/arch/msa_local_tensor_buffer.hpp"
 
 namespace Catlass::Arch {
 

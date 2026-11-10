@@ -11,11 +11,11 @@
 #ifndef CATLASS_MSA_GEMM_TILE_COPY_L1_TO_L0B_HPP
 #define CATLASS_MSA_GEMM_TILE_COPY_L1_TO_L0B_HPP
 
-#include "catlass/msa_catlass.hpp"
-#include "catlass/msa_numeric_size.hpp"
-#include "catlass/arch/msa_arch.hpp"
-#include "catlass/layout/msa_layout.hpp"
-#include "catlass/gemm/msa_gemm_type.hpp"
+#include "../../../catlass/msa_catlass.hpp"
+#include "../../../catlass/msa_numeric_size.hpp"
+#include "../../../catlass/arch/msa_arch.hpp"
+#include "../../../catlass/layout/msa_layout.hpp"
+#include "../../../catlass/gemm/msa_gemm_type.hpp"
 
 namespace Catlass::Gemm::Tile {
 

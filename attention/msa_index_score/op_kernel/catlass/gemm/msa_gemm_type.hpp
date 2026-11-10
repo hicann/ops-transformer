@@ -11,7 +11,7 @@
 #ifndef CATLASS_MSA_GEMM_GEMM_TYPE_HPP
 #define CATLASS_MSA_GEMM_GEMM_TYPE_HPP
 
-#include "catlass/msa_catlass.hpp"
+#include "../../catlass/msa_catlass.hpp"
 
 namespace Catlass::Gemm {
 

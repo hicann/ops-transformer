@@ -11,8 +11,8 @@
 #ifndef CATLASS_MSA_LOCAL_TENSOR_BUFFER_HPP
 #define CATLASS_MSA_LOCAL_TENSOR_BUFFER_HPP
 
-#include "catlass/msa_catlass.hpp"
-#include "catlass/arch/msa_arch.hpp"
+#include "../../catlass/msa_catlass.hpp"
+#include "../../catlass/arch/msa_arch.hpp"
 
 namespace Catlass::Arch {
 

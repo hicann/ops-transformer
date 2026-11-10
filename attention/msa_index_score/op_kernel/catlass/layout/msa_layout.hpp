@@ -11,9 +11,9 @@
 #ifndef CATLASS_MSA_LAYOUT_LAYOUT_HPP
 #define CATLASS_MSA_LAYOUT_LAYOUT_HPP
 
-#include "catlass/msa_catlass.hpp"
-#include "catlass/layout/msa_matrix.hpp"
-#include "catlass/layout/msa_vector.hpp"
-#include "catlass/layout/msa_tensor.hpp"
+#include "../../catlass/msa_catlass.hpp"
+#include "../../catlass/layout/msa_matrix.hpp"
+#include "../../catlass/layout/msa_vector.hpp"
+#include "../../catlass/layout/msa_tensor.hpp"
 
 #endif // CATLASS_MSA_LAYOUT_LAYOUT_HPP
