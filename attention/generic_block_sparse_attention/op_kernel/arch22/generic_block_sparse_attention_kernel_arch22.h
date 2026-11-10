@@ -64,10 +64,6 @@ public:
         FetchTilingData(tilingData, params.metaData);
         const uint32_t qLayout = tilingData->qLayout, kvLayout = tilingData->kvLayout;
         const uint32_t qCapacity = tilingData->qSeqCapacity, kvCapacity = tilingData->kvSeqCapacity;
-        if ((qLayout == 0U && params.cuSeqLengths == nullptr) ||
-            (!isPaged && kvLayout == 0U && params.cuSeqLengthsKv == nullptr)) {
-            return;
-        }
         __gm__ const GbsaMetadata::Metadata* meta =
             reinterpret_cast<__gm__ const GbsaMetadata::Metadata*>(params.metaData);
         const uint32_t physicalAicNum = AscendC::GetBlockNum();
@@ -401,8 +397,10 @@ public:
 #endif
                 continue;
             }
-            // Disable prefetch when kv blocks <= PRE_LAUNCH (avoids empty CrossCore rounds).
-            uint32_t preLaunch = (kvSLoopNum > PRE_LAUNCH) ? PRE_LAUNCH : 0;
+            // One 512-token tile has the same lookahead depth as two 256-token tiles.
+            const uint32_t preLaunchLimit =
+                kvBaseTile_ == GbsaSparsePairCopy::KV_COPY_MAX_TILE_TOKENS ? 1U : PRE_LAUNCH;
+            const uint32_t preLaunch = kvSLoopNum > preLaunchLimit ? preLaunchLimit : 0U;
 
             uint32_t rowNum = groupSize;
             int64_t blockTOffset = static_cast<int64_t>(batchIdx) * maxBlocksPerBatch_;
@@ -438,9 +436,14 @@ public:
                         static_cast<uint64_t>(stageId) * WORKSPACE_BLOCK_SIZE_DB;
 
 #ifdef __DAV_C220_CUBE__
-                    auto* kvCopyInfo = kvCopyInfos[stageId];
-                    for (uint32_t pi = 0; pi < copySubTiles; ++pi) {
-                        kvCopyInfo[pi].count = GbsaSparsePairCopy::KV_COPY_INVALID_COUNT;
+                    auto* kvCopyInfo = saveKvCopyInfo ? kvCopyInfos[stageId] : nullptr;
+                    if (kvCopyInfo != nullptr) {
+                        // QK and PV use the same 128-token group index within the base tile.
+                        const uint32_t activeCopyGroups =
+                            CeilDiv<GbsaSparsePairCopy::KV_COPY_SUB_TILE_TOKENS>(kvSTileSizeAct);
+                        for (uint32_t pi = 0; pi < activeCopyGroups; ++pi) {
+                            kvCopyInfo[pi].count = GbsaSparsePairCopy::KV_COPY_INVALID_COUNT;
+                        }
                     }
                     // Stage 1: QK Matmul
                     LayoutK gmKLayout(strideKVRow, kvTileWidth);
@@ -450,8 +453,7 @@ public:
                     blockMmadQK(gQ[gmOffsetQ], gK[gmOffsetK], gS[gmOffsetS], gBatchBlockTable, gTaskSparseBlockIdx,
                                 gmQLayout, gmKLayout, ubSLayout, actualBlockShapeQK, kvBlockIdx, kvSLoopNum,
                                 kvBaseTile_, strideKVRow, blockShapeY_, selectNum, yBlockNum, visibleKvEnd, blockSize_,
-                                kStride0_, localExplicitBlockCount, residualBlockId, vStride0_,
-                                saveKvCopyInfo ? kvCopyInfo : nullptr);
+                                kStride0_, localExplicitBlockCount, residualBlockId, vStride0_, kvCopyInfo);
 
                     NpuArch::Arch::CrossCoreSetFlag<0x2, PIPE_FIX>(qkReady_);
 #endif
@@ -496,7 +498,7 @@ public:
                                 gTaskSparseBlockIdx, ubPLayout, gmVLayout, ubOTmpLayout, actualBlockShapePV,
                                 kvBlockIdxDe, kvSLoopNum, kvBaseTile_, visibleKvEnd, strideKVRow, 1, softmaxReady_,
                                 blockShapeY_, selectNum, yBlockNum, blockSize_, vStride0_, localExplicitBlockCount,
-                                residualBlockId, kStride0_, kvBaseTile_ <= 512U ? kvCopyInfos[stageId] : nullptr);
+                                residualBlockId, kStride0_, saveKvCopyInfo ? kvCopyInfos[stageId] : nullptr);
                     NpuArch::Arch::CrossCoreSetFlag<0x2, PIPE_FIX>(pvReady_);
 #endif
 

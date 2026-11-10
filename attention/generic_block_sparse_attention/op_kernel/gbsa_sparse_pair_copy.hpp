@@ -199,6 +199,19 @@ __aicore__ inline void Load(AscendC::LocalTensor<Element> dst, AscendC::GlobalTe
                             uint32_t kvYBlockNum, uint32_t kvSeqlen, KvCopyInfo* plan = nullptr,
                             uint32_t recordBase = 0U)
 {
+    // The paged callers use 128-token pages and pass at most one page per copy when Y is 128.
+    constexpr uint32_t pageTokens = 128U;
+    if (blockY == pageTokens && blocks == 1U) {
+        const uint32_t block = static_cast<uint32_t>(indices.GetPhyAddr(firstSlot)[0]);
+        if (block < kvYBlockNum && block < kvSeqlen / pageTokens) {
+            const uint32_t page = static_cast<uint32_t>(table.GetPhyAddr()[block]);
+            const uint64_t source = static_cast<uint64_t>(page) * pageStride;
+            // Like the dense-run path, a whole-page copy leaves the peer copy plan untouched.
+            Emit<IS_QK>(dst, src, layout, dstBegin, source, pageTokens, 1U, 0U, embed, tokenStride);
+            return;
+        }
+    }
+
     KvCopyGeometry geometry;
     if (!MakeKvCopyGeometry(blockY, tokenStride, geometry)) {
         return;

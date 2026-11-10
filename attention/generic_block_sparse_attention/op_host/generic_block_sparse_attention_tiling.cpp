@@ -1146,8 +1146,7 @@ ge::graphStatus GBSATiling::CheckQuantConfig(gert::TilingContext* context)
         socVer_ == SOC_VER_950_CODE ?
             (embeddingSize_ == GBSA_TILE_SIZE_128 || (!isQuant5 && embeddingSize_ <= GBSA_TILE_SIZE_256)) :
             (embeddingSize_ >= 1U && embeddingSize_ <= GBSA_TILE_SIZE_256);
-    constexpr uint32_t GBSA_FD_MAX_TOPK = 512U;
-    fdStaticEnabled_ = topK_ >= 12U && fdHeadDimSupported && (socVer_ == SOC_VER_950_CODE || topK_ <= GBSA_FD_MAX_TOPK);
+    fdStaticEnabled_ = topK_ >= 12U && fdHeadDimSupported;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1351,7 +1350,8 @@ ge::graphStatus GBSATiling::GetTiling(gert::TilingContext* context, GenericBlock
         CalcBaseTileTilingParams950();
         CalcMatmulPhaseL1TileInfo950();
     } else {
-        kvBaseTile_ = GBSA_TILE_SIZE_256;
+        const bool smallM = groupSize_ <= GBSA_TILE_SIZE_16 && blockShapeX_ == 1U;
+        kvBaseTile_ = smallM && embeddingSize_ <= GBSA_TILE_SIZE_256 ? GBSA_TILE_SIZE_512 : GBSA_TILE_SIZE_256;
     }
     ret = CalculateWorkSpace(context);
     if (ret != ge::GRAPH_SUCCESS) {

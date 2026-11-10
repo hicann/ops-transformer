@@ -269,47 +269,48 @@ public:
         uint32_t mRound = RoundUp<L1AAlignHelper::M_ALIGNED>(mActual);
         LayoutBInL1 layoutBInL1 = LayoutBInL1::template MakeLayout<ElementB>(kActual, nActual);
 
-        // The arch22 entry limits rowNum to one M tile (16 or 128 rows).
-        uint32_t kL0Loop = CeilDiv<L0TileShape::K>(kActual);
+        // The entry uses 128-wide Q panels and D <= 256, so both panels fit in L0A.
+        const uint32_t kL0Loop = CeilDiv<L0TileShape::K>(kActual);
+        const bool firstL1 = nL1Idx == 0U;
+        const bool lastL1 = nL1Idx + 1U == nL1Loop;
 
         AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(l0CPingPongFlag);
 
-        for (uint32_t kL0Idx = 0; kL0Idx < kL0Loop; kL0Idx++) {
-            uint32_t kL0Actual = (kL0Idx < kL0Loop - 1) ? L0TileShape::K : (kActual - kL0Idx * L0TileShape::K);
-
-            LayoutAInL0 layoutAInL0 = LayoutAInL0::template MakeLayout<ElementA>(mActual, kL0Actual);
-            MatrixCoord l1ATileCoord{0U, kL0Idx * L0TileShape::K};
-            auto l1ATile = l1ATensor[layoutAInL1.GetOffset(l1ATileCoord)];
-
-            AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag);
-            copyL1ToL0A(l0ATensor[l0ABPingPongFlag], l1ATile, layoutAInL0, layoutAInL1);
-
-            LayoutBInL0 layoutBInL0 = LayoutBInL0::template MakeLayout<ElementB>(kL0Actual, nActual);
-            MatrixCoord l1BTileCoord{kL0Idx * L0TileShape::K, 0};
-            auto l1BTile = l1BTensor[stage][layoutBInL1.GetOffset(l1BTileCoord)];
-
-            if (kL0Idx == 0) {
+        for (uint32_t kL0Idx = 0; kL0Idx < kL0Loop; ++kL0Idx) {
+            const uint32_t kOffset = kL0Idx * L0TileShape::K;
+            const uint32_t kL0Actual = min(L0TileShape::K, kActual - kOffset);
+            const uint32_t l0AStage = (l0APingPongFlag + kL0Idx) % STAGES;
+            if (firstL1) {
+                auto layoutAInL0 = LayoutAInL0::template MakeLayout<ElementA>(mActual, kL0Actual);
+                auto l1ATile = l1ATensor[layoutAInL1.GetOffset(MatrixCoord{0U, kOffset})];
+                AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0AStage);
+                copyL1ToL0A(l0ATensor[l0AStage], l1ATile, layoutAInL0, layoutAInL1);
+            }
+            if (kL0Idx == 0U) {
                 AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(stage);
             }
 
-            AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag + 2);
-            copyL1ToL0B(l0BTensor[l0ABPingPongFlag], l1BTile, layoutBInL0, layoutBInL1);
-
-            if (kL0Idx == kL0Loop - 1) {
+            const uint32_t l0BStage = l0BPingPongFlag;
+            auto layoutBInL0 = LayoutBInL0::template MakeLayout<ElementB>(kL0Actual, nActual);
+            auto l1BTile = l1BTensor[stage][layoutBInL1.GetOffset(MatrixCoord{kOffset, 0U})];
+            AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0BStage + 2U);
+            copyL1ToL0B(l0BTensor[l0BStage], l1BTile, layoutBInL0, layoutBInL1);
+            if (kL0Idx + 1U == kL0Loop) {
                 AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(stage);
             }
 
             AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
             AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
-
-            bool initMmad = kL0Idx == 0;
-            tileMmad(l0CTensor[l0CPingPongFlag], l0ATensor[l0ABPingPongFlag], l0BTensor[l0ABPingPongFlag], mRound,
-                     nActual, kL0Actual, initMmad);
-
-            AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag);
-            AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag + 2);
-
-            l0ABPingPongFlag = 1 - l0ABPingPongFlag;
+            tileMmad(l0CTensor[l0CPingPongFlag], l0ATensor[l0AStage], l0BTensor[l0BStage], mRound, nActual, kL0Actual,
+                     kL0Idx == 0U);
+            AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0BStage + 2U);
+            l0BPingPongFlag = 1U - l0BStage;
+            if (lastL1) {
+                AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0AStage);
+            }
+        }
+        if (lastL1) {
+            l0APingPongFlag = (l0APingPongFlag + kL0Loop) % STAGES;
         }
         AscendC::SetFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
         AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
@@ -377,7 +378,8 @@ protected:
 
     uint32_t l1KvPingPongFlag = 0;
     uint32_t l0CPingPongFlag = 0;
-    uint32_t l0ABPingPongFlag = 0;
+    uint32_t l0APingPongFlag = 0;
+    uint32_t l0BPingPongFlag = 0;
 };
 
 ////////////////////////////////////////////////////////////////////

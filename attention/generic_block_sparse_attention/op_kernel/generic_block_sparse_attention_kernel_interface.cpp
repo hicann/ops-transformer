@@ -27,7 +27,7 @@ using namespace NpuArch;
 using namespace GbsaKernelArch22;
 
 template <class InDtype, class SMDtype, class REDtype, Epilogue::LseMode lseMode, bool isPaged, bool hasResidualBlock,
-          bool wideSmallM>
+          bool useKvTile512>
 __aicore__ inline void GbsaInferIntfRegularArch22Impl(GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR sparseBlockIdx,
                                                       GM_ADDR sparseBlockCount, GM_ADDR metaData, GM_ADDR cuSeqLengths,
                                                       GM_ADDR cuSeqLengthsKv, GM_ADDR sequsedQ, GM_ADDR sequsedKv,
@@ -52,8 +52,9 @@ __aicore__ inline void GbsaInferIntfRegularArch22Impl(GM_ADDR q, GM_ADDR k, GM_A
     using LayoutOTmp = layout::RowMajor;
 
     // QK matmul
-    using L1TileShapeQK = std::conditional_t<wideSmallM, GemmShape<16, 256, 128>, GemmShape<128, 128, 128>>;
-    using L0TileShapeQK = std::conditional_t<wideSmallM, GemmShape<16, 256, 64>, GemmShape<128, 128, 128>>;
+    // Like A5 for D=256, ping-pong K in 128-token chunks so a full P and V tile fit in L1.
+    using L1TileShapeQK = std::conditional_t<useKvTile512, GemmShape<16, 128, 128>, GemmShape<128, 128, 128>>;
+    using L0TileShapeQK = L1TileShapeQK;
     using DispatchPolicyQK = Gemm::MmadAtlasA2SFAIQK<isPaged, false, hasResidualBlock>;
     using QType = Gemm::GemmType<ElementQ, LayoutQ>;
     using KType = Gemm::GemmType<ElementK, LayoutK>;
@@ -67,8 +68,10 @@ __aicore__ inline void GbsaInferIntfRegularArch22Impl(GM_ADDR q, GM_ADDR k, GM_A
     using EpilogueOnlineSoftmax = Epilogue::Block::BlockEpilogue<DispatchPolicyOnlineSoftmax, PType, SType, MaskType>;
 
     // PV matmul
-    using L1TileShapePV = std::conditional_t<wideSmallM, GemmShape<16, 128, 256>, GemmShape<128, 128, 256>>;
-    using L0TileShapePV = std::conditional_t<wideSmallM, GemmShape<16, 256, 64>, GemmShape<128, 128, 128>>;
+    using L1TileShapePV =
+        std::conditional_t<useKvTile512, GemmShape<16, 128, GbsaSparsePairCopy::KV_COPY_MAX_TILE_TOKENS>,
+                           GemmShape<128, 128, 256>>;
+    using L0TileShapePV = std::conditional_t<useKvTile512, GemmShape<16, 128, 128>, GemmShape<128, 128, 128>>;
     using DispatchPolicyPV = Gemm::MmadAtlasA2SFAIPV<isPaged, false, hasResidualBlock>;
     using VType = Gemm::GemmType<ElementV, LayoutV>;
     using OTmpType = Gemm::GemmType<ElementOTmp, LayoutOTmp>;
@@ -103,9 +106,9 @@ __global__ __aicore__ void GbsaInferIntfRegularArch22(GM_ADDR q, GM_ADDR k, GM_A
     // Static kernels embed tiling data and pass nullptr for the GM tiling argument.
     GET_TILING_DATA_WITH_STRUCT(GenericBlockSparseAttn::GenericBlockSparseAttentionTilingData, tilingDataLocal, tiling);
     const auto* data = &tilingDataLocal;
-    const bool wideSmallM = data->embeddingSize > 0U && data->embeddingSize <= 256U && data->groupSize > 0U &&
-                            data->groupSize <= 16U && data->blockShapeX == 1U && data->baseTileInfo.kvBaseTile == 256U;
-    if (wideSmallM) {
+    const bool smallM = data->embeddingSize > 0U && data->embeddingSize <= 256U && data->groupSize > 0U &&
+                        data->groupSize <= 16U && data->blockShapeX == 1U;
+    if (smallM && data->baseTileInfo.kvBaseTile == GbsaSparsePairCopy::KV_COPY_MAX_TILE_TOKENS) {
         GbsaInferIntfRegularArch22Impl<InDtype, SMDtype, REDtype, lseMode, isPaged, hasResidualBlock, true>(
             q, k, v, sparseBlockIdx, sparseBlockCount, metaData, cuSeqLengths, cuSeqLengthsKv, sequsedQ, sequsedKv,
             blockTable, o, softmaxLse, workspace, tiling);

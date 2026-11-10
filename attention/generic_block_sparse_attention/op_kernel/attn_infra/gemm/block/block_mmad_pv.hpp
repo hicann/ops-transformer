@@ -65,7 +65,6 @@ public:
 
     static constexpr uint32_t STAGES = DispatchPolicy::STAGES;
     static constexpr uint32_t L1A_SIZE = L1TileShape::M * L1TileShape::K * sizeof(ElementA);
-    static constexpr uint32_t L1B_SIZE = L1TileShape::N * L1TileShape::K * sizeof(ElementB);
     static constexpr uint32_t L0A_SIZE = ArchTag::L0A_SIZE;
     static constexpr uint32_t L0B_SIZE = ArchTag::L0B_SIZE;
     static constexpr uint32_t L0C_SIZE = ArchTag::L0C_SIZE;
@@ -102,6 +101,15 @@ public:
         actualShape[2] = nSplitSize;
     }
 
+    __aicore__ inline void LoadP(AscendC::GlobalTensor<ElementA> gA, const LayoutAInL1& layoutAInL1,
+                                 const LayoutA& layoutTileA, Arch::CrossCoreFlag softmaxFlag)
+    {
+        Arch::CrossCoreWaitFlag(softmaxFlag);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1PPingPongFlag);
+        copyGmToL1A(l1ATensor[l1PPingPongFlag], gA, layoutAInL1, layoutTileA);
+        AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1PPingPongFlag);
+    }
+
     __aicore__ inline void operator()(AscendC::GlobalTensor<ElementA> gA, AscendC::GlobalTensor<ElementB> gB,
                                       AscendC::GlobalTensor<ElementC> gC, AscendC::GlobalTensor<int32_t> gBlockTable,
                                       AscendC::GlobalTensor<int32_t> gSelectIdx, LayoutA layoutA, LayoutB layoutB,
@@ -120,13 +128,23 @@ public:
         // load V
         LayoutBInL1 layoutBInL1 = LayoutBInL1::template MakeLayout<ElementB>(stackSeqTile, embed);
         constexpr uint32_t copySubTileTokens = GbsaSparsePairCopy::KV_COPY_SUB_TILE_TOKENS;
-        // Arch22 tiling guarantees page size 128, positive D, one M tile,
-        // and power-of-two Y in [1, 128]. The caller initializes every record pointer.
+        constexpr bool groupedV = L1TileShape::N == copySubTileTokens && L0TileShape::K == copySubTileTokens &&
+                                  L1TileShape::K == GbsaSparsePairCopy::KV_COPY_MAX_TILE_TOKENS;
+        // Arch22 tiling guarantees that Y divides 128.
         const uint32_t maxPlanRecords = copySubTileTokens / y;
-        const bool streamV = PAGED_CACHE_FLAG_ && stackSeqTile == 2U * copySubTileTokens && embed <= L0TileShape::N &&
-                             kvCopyInfo != nullptr && kvCopyInfo[0].count > 0U &&
+        // Small M fits both 128-column accumulators in a single L0C slot.
+        constexpr bool packL0C =
+            L1TileShape::M * 2U * L0TileShape::N * sizeof(ElementAccumulator) <= L0C_PINGPONG_BUF_SIZE;
+        constexpr uint32_t streamVMaxEmbed = packL0C ? 2U * L0TileShape::N : L0TileShape::N;
+        constexpr bool streamVGeometry = L1TileShape::N == copySubTileTokens &&
+                                         L1TileShape::K == 2U * copySubTileTokens &&
+                                         copySubTileTokens % L0TileShape::K == 0U;
+        const bool streamV = PAGED_CACHE_FLAG_ && streamVGeometry && stackSeqTile == 2U * copySubTileTokens &&
+                             embed <= streamVMaxEmbed && kvCopyInfo != nullptr && kvCopyInfo[0].count > 0U &&
                              kvCopyInfo[0].count <= maxPlanRecords && kvCopyInfo[1].count > 0U &&
                              kvCopyInfo[1].count <= maxPlanRecords;
+        // Both output panels use the same full P tile in L1.
+        const auto layoutAInL1 = LayoutAInL1::template MakeLayout<ElementA>(rowNum, stackSeqTile);
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(EVENT_ID4);
         uint32_t nL1Loop = CeilDiv<L1TileShape::N>(stackSeqTile);
 
@@ -241,67 +259,67 @@ public:
                     }
                 }
             }
+            if constexpr (groupedV) {
+                AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID4 + blockStackIdx);
+                // P shares MTE2 on Arch22. Queue it after the first V group so
+                // MTE1 can start PV while the remaining V groups arrive.
+                if (blockStackIdx == 0U) {
+                    LoadP(gA, layoutAInL1, layoutA.GetTileLayout(MakeCoord(rowNum, stackSeqTile)), softmaxFlag);
+                }
+            }
         }
 
-        if (streamV) {
-            AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID4);
-            AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID4);
-        } else {
-            AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID0);
-            AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID0);
+        if constexpr (!groupedV) {
+            if (streamV) {
+                AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID4);
+                AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID4);
+            } else {
+                AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID0);
+                AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID0);
+            }
+            LoadP(gA, layoutAInL1, layoutA.GetTileLayout(MakeCoord(rowNum, stackSeqTile)), softmaxFlag);
         }
+        AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1PPingPongFlag);
 
-        Arch::CrossCoreWaitFlag(softmaxFlag);
+        const uint32_t nL0Loop = CeilDiv<L0TileShape::N>(embed);
+        const uint32_t kL0Loop = CeilDiv<L0TileShape::K>(stackSeqTile);
+        const uint32_t mRound = RoundUp<L1AAlignHelper::M_ALIGNED>(rowNum);
+        for (uint32_t kL0Idx = 0U; kL0Idx < kL0Loop; ++kL0Idx) {
+            const uint32_t kOffset = kL0Idx * L0TileShape::K;
+            const uint32_t kL0Actual = min(L0TileShape::K, stackSeqTile - kOffset);
+            const uint32_t l0AStage = l0APingPongFlag;
+            const auto layoutAInL0 = LayoutAInL0::template MakeLayout<ElementA>(rowNum, kL0Actual);
+            auto l1ATile = l1ATensor[l1PPingPongFlag][layoutAInL1.GetOffset(MatrixCoord{0U, kOffset})];
+            AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0AStage);
+            copyL1ToL0A(l0ATensor[l0AStage], l1ATile, layoutAInL0, layoutAInL1);
+            if (kL0Idx + 1U == kL0Loop) {
+                AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(l1PPingPongFlag);
+            }
+            if constexpr (groupedV) {
+                AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID4 + kOffset / copySubTileTokens);
+            } else if (streamV && kOffset == copySubTileTokens) {
+                AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID4);
+            }
 
-        // The arch22 entry uses one M tile and a KV tile of at most 256 tokens.
-        uint32_t nL1LoopN = CeilDiv<L0TileShape::N>(embed);
-        for (uint32_t nL1Idx = 0; nL1Idx < nL1LoopN; nL1Idx++) {
-            uint32_t nL1Actual = (nL1Idx < nL1LoopN - 1) ? L0TileShape::N : (embed - nL1Idx * L0TileShape::N);
-            uint32_t mRound = RoundUp<L1AAlignHelper::M_ALIGNED>(rowNum);
-            AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(l0CPingPongFlag);
-
-            // load P
-            AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1PPingPongFlag);
-            MatrixCoord gmATileCoord{0U, 0U};
-            auto gmTileA = gA[layoutA.GetOffset(gmATileCoord)];
-            auto layoutTileA = layoutA.GetTileLayout(MakeCoord(rowNum, stackSeqTile));
-            LayoutAInL1 layoutAInL1 = LayoutAInL1::template MakeLayout<ElementA>(rowNum, stackSeqTile);
-            copyGmToL1A(l1ATensor[l1PPingPongFlag], gmTileA, layoutAInL1, layoutTileA);
-            AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1PPingPongFlag);
-
-            uint32_t kL0Loop = CeilDiv<L0TileShape::K>(stackSeqTile);
-            for (uint32_t kL0Idx = 0; kL0Idx < kL0Loop; kL0Idx++) {
-                uint32_t kL0Actual = (kL0Idx < kL0Loop - 1) ? L0TileShape::K : (stackSeqTile - kL0Idx * L0TileShape::K);
-
-                LayoutAInL0 layoutAInL0 = LayoutAInL0::template MakeLayout<ElementA>(rowNum, kL0Actual);
-                MatrixCoord l1ATileCoord{0, kL0Idx * L0TileShape::K};
-                auto l1ATile = l1ATensor[l1PPingPongFlag][layoutAInL1.GetOffset(l1ATileCoord)];
-
-                AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag);
-                if (kL0Idx == 0) {
-                    AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1PPingPongFlag);
-                }
-                copyL1ToL0A(l0ATensor[l0ABPingPongFlag], l1ATile, layoutAInL0, layoutAInL1);
-                if (kL0Idx == kL0Loop - 1) {
-                    AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(l1PPingPongFlag);
-                }
-
-                LayoutBInL0 layoutBInL0 = LayoutBInL0::template MakeLayout<ElementB>(kL0Actual, nL1Actual);
-                MatrixCoord l1BTileCoord{kL0Idx * L0TileShape::K, L0TileShape::N * nL1Idx};
-                auto l1BTile = l1BTensor[layoutBInL1.GetOffset(l1BTileCoord)];
-
-                AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag + 2);
-                if (streamV && kL0Idx * L0TileShape::K == copySubTileTokens) {
-                    AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID4);
-                }
-                copyL1ToL0B(l0BTensor[l0ABPingPongFlag], l1BTile, layoutBInL0, layoutBInL1);
+            // Hold the P panel in L0A until all N panels finish reading it.
+            for (uint32_t nL0Idx = 0U; nL0Idx < nL0Loop; ++nL0Idx) {
+                const uint32_t nOffset = nL0Idx * L0TileShape::N;
+                const uint32_t nL0Actual = min(L0TileShape::N, embed - nOffset);
+                const uint32_t l0BStage = l0BPingPongFlag;
+                const uint32_t l0CStage = packL0C ? l0CPingPongFlag : (l0CPingPongFlag + nL0Idx) % STAGES;
+                const auto layoutBInL0 = LayoutBInL0::template MakeLayout<ElementB>(kL0Actual, nL0Actual);
+                auto l1BTile = l1BTensor[layoutBInL1.GetOffset(MatrixCoord{kOffset, nOffset})];
+                AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0BStage + 2U);
+                copyL1ToL0B(l0BTensor[l0BStage], l1BTile, layoutBInL0, layoutBInL1);
 
                 AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
                 AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
-                bool initMmad = kL0Idx == 0;
-                tileMmad(l0CTensor[l0CPingPongFlag], l0ATensor[l0ABPingPongFlag], l0BTensor[l0ABPingPongFlag], mRound,
-                         nL1Actual, kL0Actual, initMmad);
-                if (streamV && kL0Idx == 0U) {
+                if (kL0Idx == 0U && (!packL0C || nL0Idx == 0U)) {
+                    AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(l0CStage);
+                }
+                auto l0CTile = l0CTensor[l0CStage][packL0C ? nOffset * mRound : 0U];
+                tileMmad(l0CTile, l0ATensor[l0AStage], l0BTensor[l0BStage], mRound, nL0Actual, kL0Actual, kL0Idx == 0U);
+                if (streamV && kL0Idx == 0U && nL0Idx == 0U) {
                     const auto& plan = kvCopyInfo[1];
                     for (uint32_t ri = 0U; ri < plan.count; ++ri) {
                         const auto& r = plan.records[ri];
@@ -310,21 +328,27 @@ public:
                     }
                     AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID4);
                 }
-                AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag);
-                AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0ABPingPongFlag + 2);
-                l0ABPingPongFlag = 1 - l0ABPingPongFlag;
+                AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0BStage + 2U);
+                l0BPingPongFlag = 1U - l0BStage;
             }
-            l1PPingPongFlag = 1 - l1PPingPongFlag;
-            AscendC::SetFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
-            AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
-            MatrixCoord gmCTileCoord{0U, L0TileShape::N * nL1Idx};
-            uint32_t nFixAligned = RoundUp(nL1Actual, 8U);
-            LayoutC layoutCTile = layoutC.GetTileLayout(MakeCoord(rowNum, nFixAligned));
-            auto layoutInL0C = LayoutCInL0::MakeLayoutInL0C(MakeCoord(rowNum, nL1Actual));
-            copyL0CToGm(gC[layoutC.GetOffset(gmCTileCoord)], l0CTensor[l0CPingPongFlag], layoutCTile, layoutInL0C);
-            AscendC::SetFlag<AscendC::HardEvent::FIX_M>(l0CPingPongFlag);
-            l0CPingPongFlag = 1 - l0CPingPongFlag;
+            AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0AStage);
+            l0APingPongFlag = 1U - l0AStage;
         }
+        l1PPingPongFlag = 1U - l1PPingPongFlag;
+
+        AscendC::SetFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
+        AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
+        const uint32_t nFixLoop = packL0C ? 1U : nL0Loop;
+        for (uint32_t nFixIdx = 0U; nFixIdx < nFixLoop; ++nFixIdx) {
+            const uint32_t nOffset = nFixIdx * L0TileShape::N;
+            const uint32_t nActual = packL0C ? embed : min(L0TileShape::N, embed - nOffset);
+            const uint32_t l0CStage = (l0CPingPongFlag + nFixIdx) % STAGES;
+            auto layoutCTile = layoutC.GetTileLayout(MakeCoord(rowNum, RoundUp(nActual, 8U)));
+            auto layoutInL0C = LayoutCInL0::MakeLayoutInL0C(MakeCoord(rowNum, nActual));
+            copyL0CToGm(gC[layoutC.GetOffset(MatrixCoord{0U, nOffset})], l0CTensor[l0CStage], layoutCTile, layoutInL0C);
+            AscendC::SetFlag<AscendC::HardEvent::FIX_M>(l0CStage);
+        }
+        l0CPingPongFlag = (l0CPingPongFlag + nFixLoop) % STAGES;
         AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(EVENT_ID4);
     }
 
@@ -345,7 +369,8 @@ protected:
 
     uint32_t l1PPingPongFlag = 0;
     uint32_t l0CPingPongFlag = 0;
-    uint32_t l0ABPingPongFlag = 0;
+    uint32_t l0APingPongFlag = 0;
+    uint32_t l0BPingPongFlag = 0;
 };
 
 ////////////////////////////////////////////////////////////////////
