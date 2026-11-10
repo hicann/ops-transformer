@@ -132,12 +132,44 @@ static void WarnIfInputFormatIsNotNd(const aclTensor* query, const aclTensor* ke
     warnIfNotNd("dy", dy);
 }
 
+// Validate known invalid attribute combinations before invoking l0op. A null l0op
+// output alone does not identify a parameter error.
+static aclnnStatus CheckSparseModeAttributes(int64_t sparseMode, const char* inputLayout,
+                                             const aclIntArray* prefixOptional)
+{
+    constexpr int64_t PREFIX = 5;
+    constexpr int64_t PREFIX_COMPRESS = 6;
+    constexpr int64_t RIGHT_DOWN_CAUSAL_BAND = 7;
+    constexpr int64_t BAND_LEFT_UP_CAUSAL = 8;
+    if (sparseMode < 0 || sparseMode > BAND_LEFT_UP_CAUSAL) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("FlashAttentionScoreGrad", "sparseMode", std::to_string(sparseMode),
+                                              "sparseMode must be an integer in the range [0, 8]");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if ((sparseMode == RIGHT_DOWN_CAUSAL_BAND || sparseMode == BAND_LEFT_UP_CAUSAL) &&
+        (inputLayout == nullptr || strcmp(inputLayout, "TND") != 0)) {
+        const std::string values =
+            "{" + std::string(inputLayout == nullptr ? "null" : inputLayout) + ", " + std::to_string(sparseMode) + "}";
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON("FlashAttentionScoreGrad", "inputLayout, sparseMode", values,
+                                               "sparseMode 7 and 8 require TND inputLayout");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if ((sparseMode == PREFIX || sparseMode == PREFIX_COMPRESS) &&
+        (prefixOptional == nullptr || prefixOptional->Size() == 0)) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            "FlashAttentionScoreGrad", "sparseMode", std::to_string(sparseMode),
+            "prefixOptional must be provided and non-empty when sparseMode is 5 or 6");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
 static aclnnStatus CheckSparseModeAttenMask(const aclTensor* attenMaskOptional, int64_t sparseMode)
 {
     constexpr int64_t RIGHT_DOWN_CAUSAL_BAND = 7;
     constexpr int64_t BAND_LEFT_UP_CAUSAL = 8;
     if ((sparseMode == RIGHT_DOWN_CAUSAL_BAND || sparseMode == BAND_LEFT_UP_CAUSAL) &&
-        (attenMaskOptional == nullptr || attenMaskOptional->GetViewShape().GetDimNum() == 0)) {
+        (attenMaskOptional == nullptr || attenMaskOptional->GetViewShape().GetShapeSize() == 0)) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
             "FlashAttentionScoreGrad", "attenMaskOptional",
             "attenMaskOptional must be provided and non-empty when sparseMode is 7 or 8");
@@ -1991,6 +2023,9 @@ aclnnStatus aclnnFlashAttentionScoreGradGetWorkspaceSize(
              return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
              return ACLNN_ERR_PARAM_NULLPTR);
+    auto sparseModeRet = CheckSparseModeAttributes(sparseMode, inputLayout, prefixOptional);
+    CHECK_RET(sparseModeRet == ACLNN_SUCCESS, sparseModeRet);
+
     // 空Tensor处理
     if (dqOut->IsEmpty() && dkOut->IsEmpty() && dvOut->IsEmpty()) {
         if (dpseOut == nullptr || dpseOut->IsEmpty()) {
@@ -2056,6 +2091,8 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize(
         OP_LOGE_FOR_INVALID_FORMAT("FlashAttentionScoreGrad", "inputLayout", inputLayout, "TND");
         return ACLNN_ERR_PARAM_INVALID;
     }
+    auto sparseModeRet = CheckSparseModeAttributes(sparseMode, inputLayout, prefixOptional);
+    CHECK_RET(sparseModeRet == ACLNN_SUCCESS, sparseModeRet);
 
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -2248,6 +2285,9 @@ aclnnStatus aclnnFlashAttentionScoreGradV2GetWorkspaceSize(
              return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
              return ACLNN_ERR_PARAM_NULLPTR);
+    auto sparseModeRet = CheckSparseModeAttributes(sparseMode, inputLayout, prefixOptional);
+    CHECK_RET(sparseModeRet == ACLNN_SUCCESS, sparseModeRet);
+
     if (dqOut->IsEmpty() && dkOut->IsEmpty() && dvOut->IsEmpty()) {
         if (dpseOut == nullptr || dpseOut->IsEmpty()) {
             OP_LOGD("All out tensor is empty");
@@ -2315,6 +2355,8 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV2GetWorkspaceSize(
         OP_LOGE_FOR_INVALID_FORMAT("FlashAttentionScoreGrad", "inputLayout", inputLayout, "TND");
         return ACLNN_ERR_PARAM_INVALID;
     }
+    auto sparseModeRet = CheckSparseModeAttributes(sparseMode, inputLayout, prefixOptional);
+    CHECK_RET(sparseModeRet == ACLNN_SUCCESS, sparseModeRet);
 
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -2507,6 +2549,8 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV3GetWorkspaceSize(
         OP_LOGE_FOR_INVALID_FORMAT("FlashAttentionScoreGrad", "inputLayout", inputLayout, "TND");
         return ACLNN_ERR_PARAM_INVALID;
     }
+    auto sparseModeRet = CheckSparseModeAttributes(sparseMode, inputLayout, prefixOptional);
+    CHECK_RET(sparseModeRet == ACLNN_SUCCESS, sparseModeRet);
 
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -2609,6 +2653,8 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV4GetWorkspaceSize(
                                   "same_as_input or empty string");
         return ACLNN_ERR_PARAM_INVALID;
     }
+    auto sparseModeRet = CheckSparseModeAttributes(sparseMode, inputLayout, prefixOptional);
+    CHECK_RET(sparseModeRet == ACLNN_SUCCESS, sparseModeRet);
 
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -2819,6 +2865,8 @@ aclnnStatus aclnnFlashAttentionScoreGradV3GetWorkspaceSize(
              return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
              return ACLNN_ERR_PARAM_NULLPTR);
+    auto sparseModeRet = CheckSparseModeAttributes(sparseMode, inputLayout, prefixOptional);
+    CHECK_RET(sparseModeRet == ACLNN_SUCCESS, sparseModeRet);
     if (dqOut->IsEmpty() && dkOut->IsEmpty() && dvOut->IsEmpty()) {
         if (dpseOut == nullptr || dpseOut->IsEmpty()) {
             OP_LOGD("All out tensor is empty");
@@ -2889,6 +2937,8 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5GetWorkspaceSize(
         OP_LOGE_FOR_INVALID_FORMAT("FlashAttentionScoreGrad", "inputLayout", inputLayout, "TND");
         return ACLNN_ERR_PARAM_INVALID;
     }
+    auto sparseModeRet = CheckSparseModeAttributes(sparseMode, inputLayout, prefixOptional);
+    CHECK_RET(sparseModeRet == ACLNN_SUCCESS, sparseModeRet);
 
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -2986,6 +3036,8 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5GetMaxWorkspaceSize(
         OP_LOGE_FOR_INVALID_FORMAT("FlashAttentionScoreGrad", "inputLayout", inputLayout, "TND");
         return ACLNN_ERR_PARAM_INVALID;
     }
+    auto sparseModeRet = CheckSparseModeAttributes(sparseMode, inputLayout, prefixOptional);
+    CHECK_RET(sparseModeRet == ACLNN_SUCCESS, sparseModeRet);
 
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
