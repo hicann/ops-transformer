@@ -458,7 +458,6 @@ aclnnStatus aclnnRopeWithSinCosCache(
 - rotaryDim：始终小于等于headSize；数据类型为BFLOAT16或FLOAT16时为32的倍数，数据类型为FLOAT32时为16的倍数;mrope模式下应满足mropeSection所有元素累加为rotaryDim值的一半。
 - 输入tensor positions的取值应小于cosSinCache的0维maxSeqLen。
 - mrope模式下，mropeSection：取值当前仅支持[16, 24, 24]、[24, 20, 20]、[8, 12, 12]和[16, 16, 16, 16]。
-- Atlas A5系列产品不支持mropeSection取值为[8, 12, 12]和[16, 16, 16, 16]。
 
 ## 调用示例
 
