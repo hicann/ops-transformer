@@ -90,7 +90,7 @@ def _small_ops_golden(
     return g_dx, g_dwkv, g_dwgate, g_dape
 
 
-def run_small_ops_case(case, device, compare_mode=3):
+def run_small_ops_case(case, device, compare_mode=3, device_id=0):
     """通路 3：小算子拼接通路——小算子拼接 + 自动反向推导梯度作 golden，
     算子侧经 pta 反向传播串联正反向（与通路 1 相同 NPU 流程）。
 
@@ -145,7 +145,7 @@ def run_small_ops_case(case, device, compare_mode=3):
     # 前向一致——对齐通路 1/5 run_forward_direct_case 的 state_cpu_initial 处理
     # （coff=2 读 cache 历史场景，防更新后 state 污染读值）
     state_initial_npu = b["state_cache_npu"].clone()
-    backend = NPUBackend(device_id=DEVICE_ID)
+    backend = NPUBackend(device_id=device_id)
     npu_result = backend.compute(inputs=b["inputs"])
     torch.npu.synchronize()
 
@@ -252,25 +252,64 @@ def run_small_ops_case(case, device, compare_mode=3):
     return {"status": status, "detail": "  ".join(statuses)}
 
 
+# ── 芯片 arch 探测（pypto_pro 接口）──
+# kernel 代码按芯片分目录：op_kernel/arch35(ascend950/a5)、op_kernel/arch92(ascend960dt)；
+# arch22(ascend910b/910_93) 为原生 AscendC cpp，无 PyPTO kernel
+def _detect_kernel_arch():
+    """pypto.platform.npuarch：DAV_3510=arch35(ascend950)，DAV_9201/9202=arch92(ascend960dt)。
+
+    探测按尽力而为处理：无 pypto_pro 环境（arch22/910_93）import 即失败、
+    设备未初始化等运行时异常，均返回 None -> 基础用例集 + 通路 2 跳过，
+    保证测试文件在任意环境可收集（通路 1/3/4/5 不依赖 PyPTO kernel）。
+    """
+    try:
+        import pypto
+
+        npuarch = str(pypto.platform.npuarch)
+    except Exception:
+        return None
+    if npuarch == "DAV_3510":
+        return "arch35"
+    if npuarch in ("DAV_9201", "DAV_9202"):
+        return "arch92"
+    return None
+
+
+_KERNEL_ARCH = _detect_kernel_arch()
+
 # PyPTO kernel 直跑（通路 2）：不经 aclnn/custom 包，运行时 JIT 编译
-sys.path.insert(
-    0,
-    os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "op_kernel", "arch35"
-    ),
-)
-# pypto_pro 仅 ascend950 环境提供；本机（910_93）无法导入 A5 PyPTO kernel，
+# pypto_pro 仅 ascend950/ascend960dt 环境提供；910_93无法导入 PyPTO kernel，
 # 通路 2（PyPTO 直跑）不可用 -> 跳过。其余通路（1/3/4/5）与 checker 逻辑不变。
+if _KERNEL_ARCH is not None:
+    sys.path.insert(
+        0,
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "..",
+            "op_kernel",
+            _KERNEL_ARCH,
+        ),
+    )
 try:
     from compressor_grad import compressor_grad, CompressorGradTiling  # noqa: E402
 
     _HAS_PYPTO_KERNEL = True
 except ModuleNotFoundError:
-    # 只捕"模块不存在"：kernel 模块自身 import 链里的其它 ImportError（如
-    # pypto_pro 半装）属环境问题，静默吞掉会误判通路 2 不可用
+    # 只捕"模块不存在"：arch22（无 PyPTO kernel 目录）或无 pypto_pro 环境，通路 2 跳过；
+    # kernel 模块自身 import 链里的其它 ImportError（如 pypto_pro 半装）属环境问题，
+    # 静默吞掉会误判通路 2 不可用
     _HAS_PYPTO_KERNEL = False
 
-from test_compressor_grad_cases import REDLINE_CASES
+from test_cases.test_compressor_grad_cases import REDLINE_CASES
+
+if _KERNEL_ARCH == "arch92":
+    from test_cases.test_compressor_grad_cases_arch92 import (
+        REDLINE_CASES as ARCH92_READLINE_CASES,
+    )
+
+    REDLINE_CASES += ARCH92_READLINE_CASES
+
 from compressor_grad_cpu_golden import compressor_grad_golden
 from compressor_grad_npu import NPUBackend
 from cann_ops_transformer.ops.attention.compressor.compressor import (
@@ -286,8 +325,6 @@ from compressor_grad_check import (
     format_case_line,
     three_way_report,
 )
-
-DEVICE_ID = 0
 
 
 def _ceil_div(a, b):
@@ -1329,7 +1366,10 @@ def run_backward_case(case, device, compare_mode=3):
     spNpu = torch.tensor(sps, device=device, dtype=torch.int32) if sps else None
 
     # ── TilingData（派生与 op_host/compressor_grad_tiling.cpp 一致）──
-    cubeCoreNum, coreNum = 32, 64
+    from pypto_pro.runtime.platform import get_platform_info
+
+    _plat = get_platform_info()  # 与 op_host GetCoreNumAic/Aiv 一致，运行时查询
+    cubeCoreNum, coreNum = _plat.cube_core_num, _plat.vector_core_num
     coffCoef = 2 // coff
     totalHeadDim = coff * D
     cmpSize = coff * cr * D
@@ -1502,6 +1542,11 @@ def _compare_mode(request):
     return request.config.getoption("--compare-mode")
 
 
+def _device(request):
+    """当前 NPU 设备号（--device: 默认 0）。"""
+    return request.config.getoption("--device")
+
+
 @pytest.mark.parametrize(
     "case",
     [c for c in REDLINE_CASES if c.get("enable", True)],
@@ -1515,7 +1560,7 @@ def test_compressor_grad(case, request):
     """
     if _pathway(request) != 1:
         pytest.skip(f"pathway={_pathway(request)}")
-    device = f"npu:{DEVICE_ID}"
+    device = f"npu:{_device(request)}"
     torch.npu.set_device(device)
     result = run_case(case, device, _compare_mode(request))
     assert result["status"] == "PASS", format_case_line(result)
@@ -1534,8 +1579,12 @@ def test_compressor_grad_backward(case, request):
     if _pathway(request) != 2:
         pytest.skip(f"pathway={_pathway(request)}")
     if not _HAS_PYPTO_KERNEL:
-        pytest.skip("pypto_pro unavailable on this env (ascend950-only runtime)")
-    result = run_backward_case(case, f"npu:{DEVICE_ID}", _compare_mode(request))
+        pytest.skip(
+            "pypto_pro unavailable on this env (ascend950/ascend960dt-only runtime)"
+        )
+    device = f"npu:{_device(request)}"
+    torch.npu.set_device(device)  # PyPTO kernel launch binds to torch current device
+    result = run_backward_case(case, device, _compare_mode(request))
     assert result["status"] == "PASS", result["detail"]
 
 
@@ -1551,7 +1600,9 @@ def test_compressor_grad_small_ops(case, request):
     """
     if _pathway(request) != 3:
         pytest.skip(f"pathway={_pathway(request)}")
-    result = run_small_ops_case(case, f"npu:{DEVICE_ID}", _compare_mode(request))
+    result = run_small_ops_case(
+        case, f"npu:{_device(request)}", _compare_mode(request), _device(request)
+    )
     assert result["status"] == "PASS", result["detail"]
 
 
@@ -1569,7 +1620,7 @@ def test_compressor_grad_backward_direct(case, request):
     """
     if _pathway(request) != 4:
         pytest.skip(f"pathway={_pathway(request)}")
-    device = f"npu:{DEVICE_ID}"
+    device = f"npu:{_device(request)}"
     torch.npu.set_device(device)
     p, totalValid, cuNpu, sps, sqs, seed = _prepare_case(case, device)
     b = _build_inputs(
@@ -1597,7 +1648,7 @@ def test_compressor_grad_forward_direct(case, request):
     """
     if _pathway(request) != 5:
         pytest.skip(f"pathway={_pathway(request)}")
-    device = f"npu:{DEVICE_ID}"
+    device = f"npu:{_device(request)}"
     torch.npu.set_device(device)
     p, totalValid, cuNpu, sps, sqs, seed = _prepare_case(case, device)
     b = _build_inputs(
@@ -1607,359 +1658,3 @@ def test_compressor_grad_forward_direct(case, request):
         case, p, b, totalValid, device, compare_mode=_compare_mode(request)
     )
     assert result["status"] == "PASS", format_case_line(result)
-
-
-# ================================================================
-#  非法元数据负例（检视意见 2/3/4/5/6：cu_seqlens/seqused/start_pos 值域）
-#  契约（与 README/aclnn 文档一致）：host 编译期读不到设备张量值，值域违规
-#  不做拒绝式拦截，kernel 侧守卫 = 安全降级——
-#    TH: cu 负值/超T/非单调 → 该 batch 跳过（输出全零），其余 batch 正常；
-#        seqused/start_pos 越界 clamp 到 [0, 本 batch 窗口长度]；
-#    BSH: seqused clamp 到 [0, S]（负值→0 块全零、超上界→等同不传）。
-#  断言口径：不崩溃 + 四输出与"语义等价的合法输入"的 golden 一致（即
-#  违规 batch 全零/截断行为精确落地）+ 显式零区域检查。
-# ================================================================
-
-
-def _run_neg_grad(
-    device,
-    layout_id,
-    B,
-    T,
-    S,
-    H,
-    D,
-    cr,
-    coff,
-    dtype,
-    cu,
-    sq,
-    sp,
-    seed,
-    d_cmp_kv_dim1=None,
-):
-    """负例公共执行器：随机构造反向输入（不经 forward），带给定元数据直调
-    _compressor_backward（aclnn → arch22 kernel），返回 NPU 四输出（CPU float）。
-
-    layout_id: 1=TH（x [T,H]，cu 必给），0=BSH（x [B,S,H]，cu 必为 None）。
-    d_cmp_kv_dim1: 覆盖 d_cmp_kv/sm/kv 的块数维（BSH；None = ceil(S/cr)）。
-    """
-    io_dtype = torch.float16 if dtype == "float16" else torch.bfloat16
-    torch.manual_seed(seed)
-    torch.npu.set_device(device)
-    if layout_id == 1:
-        rows = min(T, T // cr + B)
-        x_op = torch.randn(T, H, device=device, dtype=io_dtype)
-        dc_op = torch.randn(rows, D, device=device, dtype=io_dtype)
-        kv = torch.randn(rows, coff * cr, D, device=device, dtype=torch.float32)
-        sm = torch.softmax(torch.randn(rows, coff * cr, D, device=device), dim=1)
-    else:
-        blocks = d_cmp_kv_dim1 if d_cmp_kv_dim1 is not None else (S + cr - 1) // cr
-        x_op = torch.randn(B, S, H, device=device, dtype=io_dtype)
-        dc_op = torch.randn(B, blocks, D, device=device, dtype=io_dtype)
-        kv = torch.randn(B, blocks, coff * cr, D, device=device, dtype=torch.float32)
-        sm = torch.softmax(torch.randn(B, blocks, coff * cr, D, device=device), dim=2)
-    wkv = torch.randn(coff * D, H, device=device, dtype=io_dtype)
-    wgate = torch.randn(coff * D, H, device=device, dtype=io_dtype)
-    cu_arg = (
-        torch.tensor(cu, device=device, dtype=torch.int32) if cu is not None else None
-    )
-    sq_arg = (
-        torch.tensor(sq, device=device, dtype=torch.int32) if sq is not None else None
-    )
-    sp_arg = (
-        torch.tensor(sp, device=device, dtype=torch.int32) if sp is not None else None
-    )
-    d_x, d_wkv, d_wgate, d_ape = _compressor_backward(
-        dc_op,
-        x_op,
-        wkv,
-        wgate,
-        sm,
-        kv,
-        cu_seqlens=cu_arg,
-        seqused=sq_arg,
-        start_pos=sp_arg,
-        cmp_ratio=cr,
-        coff=coff,
-    )
-    torch.npu.synchronize()
-    return dict(
-        d_x=d_x.cpu().float().reshape(-1, H),
-        d_wkv=d_wkv.cpu().float(),
-        d_wgate=d_wgate.cpu().float(),
-        d_ape=d_ape.cpu().float().reshape(cr, coff * D),
-        x=x_op.detach().cpu(),
-        wkv=wkv.detach().cpu(),
-        wgate=wgate.detach().cpu(),
-        dc=dc_op.detach().cpu(),
-        sm=sm.detach().cpu(),
-        kv=kv.detach().cpu(),
-    )
-
-
-def _check_neg_vs_golden(name, npu_out, golden_kw, dtype, total_valid):
-    """负例公共比对：NPU 输出 vs 语义等价 golden，四输出全 PASS。
-
-    精度口径与 ATK 对齐：fp16-io 用 high 口径（golden fp64 简单算术，三方 C 腿
-    同款）。bf16-io 的 two 口径存在已知的输出双舍入翻转（~6% 1-ULP 假挂，见
-    ATK sameprec 结论），负例一律用 fp16-io 构造。
-    """
-    g_dx, g_dwkv, g_dwgate, g_dape = compressor_grad_golden(
-        **golden_kw, device="cpu", compute_dtype=torch.float64, matmul_mode="high"
-    )
-    checks = [
-        ("d_wkv", g_dwkv.float(), npu_out["d_wkv"], dtype),
-        ("d_wgate", g_dwgate.float(), npu_out["d_wgate"], dtype),
-        ("d_ape", g_dape.float(), npu_out["d_ape"], "float32"),
-        ("d_x", g_dx.float().reshape(-1, g_dx.shape[-1]), npu_out["d_x"], dtype),
-    ]
-    statuses = []
-    for out_name, exp, act, dt in checks:
-        r = check_one_output(out_name, exp, act, dt, True, total_valid, get_pct_thd(dt))
-        statuses.append(f"{out_name}={r['status']}")
-    ok = all("PASS" in s for s in statuses)
-    print_log(f"[neg:{name}] {'  '.join(statuses)}")
-    return ok, "  ".join(statuses)
-
-
-def _neg_golden_kw(npu_out, layout_id, B, S, H, cr, coff, cu, sq, sp):
-    x_cpu = npu_out["x"]
-    if layout_id == 0:
-        x_cpu = x_cpu.reshape(B, S, H)
-    return dict(
-        x=x_cpu,
-        wkv=npu_out["wkv"],
-        wgate=npu_out["wgate"],
-        d_cpm_kv=npu_out["dc"],
-        softmax_score=npu_out["sm"],
-        kv=npu_out["kv"],
-        cu_seqlens=torch.tensor(cu, dtype=torch.int32) if cu is not None else None,
-        seqused=torch.tensor(sq, dtype=torch.int32) if sq is not None else None,
-        start_pos=torch.tensor(sp, dtype=torch.int32) if sp is not None else None,
-        cmp_ratio=cr,
-        coff=coff,
-    )
-
-
-# 负例 1（意见 2/6）：TH cu_seqlens 非单调（cu[2] < cu[1] → used 无符号下溢源）。
-# 期望：batch1 跳过 → d_x 行 [64,128) 全零；batch0 正常；golden 同 cu（python
-# 整数语义下 batch1 used=-32 → 0 块，与 kernel 守卫语义天然一致）。
-def test_neg_th_cu_non_monotonic():
-    device = f"npu:{DEVICE_ID}"
-    B, T, S, H, D, cr, coff = 2, 128, 0, 2048, 128, 4, 2
-    out = _run_neg_grad(
-        device,
-        1,
-        B,
-        T,
-        S,
-        H,
-        D,
-        cr,
-        coff,
-        "float16",
-        cu=[0, 64, 32],
-        sq=None,
-        sp=None,
-        seed=20260101,
-    )
-    assert torch.count_nonzero(out["d_x"][64:128, :]) == 0, (
-        "violating batch must be all-zero"
-    )
-    assert torch.count_nonzero(out["d_x"][0:64, :]) > 0, "legal batch must be processed"
-    ok, detail = _check_neg_vs_golden(
-        "th_cu_non_monotonic",
-        out,
-        _neg_golden_kw(out, 1, B, S, H, cr, coff, cu=[0, 64, 32], sq=None, sp=None),
-        "float16",
-        16,
-    )
-    assert ok, detail
-
-
-# 负例 2（意见 6）：TH cu_seqlens[0] != 0。期望：不崩溃；[0, cu[0]) 行不属任何
-# batch → d_x 对应行全零；各 batch 在自身 [cu[b], cu[b+1]) 窗口正常计算（golden
-# 同 cu，与 kernel 的窗口语义一致）。
-def test_neg_th_cu_first_not_zero():
-    device = f"npu:{DEVICE_ID}"
-    B, T, S, H, D, cr, coff = 2, 128, 0, 2048, 128, 4, 2
-    out = _run_neg_grad(
-        device,
-        1,
-        B,
-        T,
-        S,
-        H,
-        D,
-        cr,
-        coff,
-        "float16",
-        cu=[4, 68, 128],
-        sq=None,
-        sp=None,
-        seed=20260102,
-    )
-    assert torch.count_nonzero(out["d_x"][0:4, :]) == 0, (
-        "tokens before cu[0] must be all-zero"
-    )
-    assert torch.count_nonzero(out["d_x"][4:68, :]) > 0, (
-        "batch window must be processed"
-    )
-    ok, detail = _check_neg_vs_golden(
-        "th_cu_first_not_zero",
-        out,
-        _neg_golden_kw(out, 1, B, S, H, cr, coff, cu=[4, 68, 128], sq=None, sp=None),
-        "float16",
-        31,
-    )
-    assert ok, detail
-
-
-# 负例 3（意见 3/4）：TH seqused > 本 batch 窗口长度（96 > cu[1]-cu[0]=64）。
-# 期望：不崩溃，越界值 clamp 到窗口长度——输出与 seqused=[64,32]（合法截断值）
-# 的 golden 一致（batch0 等同不传 seqused，batch1 正常）。
-def test_neg_th_seqused_exceeds_span():
-    device = f"npu:{DEVICE_ID}"
-    B, T, S, H, D, cr, coff = 2, 128, 0, 2048, 128, 4, 2
-    out = _run_neg_grad(
-        device,
-        1,
-        B,
-        T,
-        S,
-        H,
-        D,
-        cr,
-        coff,
-        "float16",
-        cu=[0, 64, 128],
-        sq=[96, 32],
-        sp=None,
-        seed=20260103,
-    )
-    ok, detail = _check_neg_vs_golden(
-        "th_seqused_exceeds_span",
-        out,
-        _neg_golden_kw(
-            out, 1, B, S, H, cr, coff, cu=[0, 64, 128], sq=[64, 32], sp=None
-        ),
-        "float16",
-        24,
-    )
-    assert ok, detail
-
-
-# 负例 4（意见 5）：BSH seqused > S（80 > 64）。期望：不崩溃，clamp 到 S——
-# 输出与 seqused=[64,32] 的 golden 一致（batch0 等同不传 seqused，batch1 正常）。
-def test_neg_bsh_seqused_exceeds_s():
-    device = f"npu:{DEVICE_ID}"
-    B, T, S, H, D, cr, coff = 2, 0, 64, 2048, 128, 4, 2
-    out = _run_neg_grad(
-        device,
-        0,
-        B,
-        T,
-        S,
-        H,
-        D,
-        cr,
-        coff,
-        "float16",
-        cu=None,
-        sq=[80, 32],
-        sp=None,
-        seed=20260104,
-    )
-    ok, detail = _check_neg_vs_golden(
-        "bsh_seqused_exceeds_s",
-        out,
-        _neg_golden_kw(out, 0, B, S, H, cr, coff, cu=None, sq=[64, 32], sp=None),
-        "float16",
-        24,
-    )
-    assert ok, detail
-
-
-# 负例 5（意见 5）：BSH seqused < 0（-8）。期望：不崩溃，clamp 到 0 → 该 batch
-# 无完整压缩块 → d_x batch0 行段全零；batch1 正常；输出与 seqused=[0,32] 的
-# golden 一致。
-def test_neg_bsh_seqused_negative():
-    device = f"npu:{DEVICE_ID}"
-    B, T, S, H, D, cr, coff = 2, 0, 64, 2048, 128, 4, 2
-    out = _run_neg_grad(
-        device,
-        0,
-        B,
-        T,
-        S,
-        H,
-        D,
-        cr,
-        coff,
-        "float16",
-        cu=None,
-        sq=[-8, 32],
-        sp=None,
-        seed=20260105,
-    )
-    assert torch.count_nonzero(out["d_x"][0:64, :]) == 0, (
-        "violating batch must be all-zero"
-    )
-    assert torch.count_nonzero(out["d_x"][64:128, :]) > 0, (
-        "legal batch must be processed"
-    )
-    ok, detail = _check_neg_vs_golden(
-        "bsh_seqused_negative",
-        out,
-        _neg_golden_kw(out, 0, B, S, H, cr, coff, cu=None, sq=[0, 32], sp=None),
-        "float16",
-        8,
-    )
-    assert ok, detail
-
-
-# 负例 6（意见 4）：BSH d_cmp_kv 块数维不足（15 < S/cr=16）——结构性错误，
-# host tiling 直接拒绝（nblkIn < nblk），aclnn 报错抛异常。
-def test_neg_bsh_dcmpkv_rows_insufficient():
-    device = f"npu:{DEVICE_ID}"
-    torch.npu.set_device(device)
-    B, T, S, H, D, cr, coff = 1, 0, 64, 2048, 128, 4, 2
-    # 对照：行数足额（16）时同一调用成功，证明异常来自 rows 不足而非其它
-    out = _run_neg_grad(
-        device,
-        0,
-        B,
-        T,
-        S,
-        H,
-        D,
-        cr,
-        coff,
-        "float16",
-        cu=None,
-        sq=None,
-        sp=None,
-        seed=20260106,
-        d_cmp_kv_dim1=(S + cr - 1) // cr,
-    )
-    assert torch.count_nonzero(out["d_x"]) > 0
-    # rows=15 < nblk=16：host tiling 结构性拒绝
-    with pytest.raises(Exception):
-        _run_neg_grad(
-            device,
-            0,
-            B,
-            T,
-            S,
-            H,
-            D,
-            cr,
-            coff,
-            "float16",
-            cu=None,
-            sq=None,
-            sp=None,
-            seed=20260106,
-            d_cmp_kv_dim1=15,
-        )

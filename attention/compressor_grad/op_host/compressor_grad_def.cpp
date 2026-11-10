@@ -93,6 +93,7 @@ public:
         this->AICore().AddConfig("ascend910b", aicore_config);   // arch22
         this->AICore().AddConfig("ascend910_93", aicore_config); // arch22
         this->AICore().AddConfig("ascend950", aicore_config);    // arch35
+        this->AICore().AddConfig("ascend960dt", aicore_config);  // arch92
     }
 };
 OP_ADD(CompressorGrad, optiling::CompressorGradCompileInfo);

@@ -10,7 +10,8 @@
 
 /*!
  * \file compressor_grad_tiling_register.cpp
- * \brief CompressorGrad 算子 tiling 入口注册与 arch 分发（arch35 = PyPTO，arch22 = 原生 AscendC）
+ * \brief CompressorGrad 算子 tiling 入口注册与 arch 分发（arch35(ascend950)/arch92(ascend960dt) = PyPTO
+ *        共用同一 tiling 实现，arch22(ascend910b/ascend910_93) = 原生 AscendC）
  */
 
 #include "register/op_def_registry.h"
@@ -43,7 +44,11 @@ CMP_GRAD_EXTERN_C ge::graphStatus TilingCompressorGrad(gert::TilingContext* cont
                 return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
 #ifdef COMPRESSOR_GRAD_HAS_ARCH35
-    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
+    // ascend950(DAV_3510/a5) 与 ascend960dt(DAV_9201/9202) 均走 PyPTO tiling：
+    // 实现（compressor_grad_tiling.cpp）按平台核数自适配 a5 2:1 / ascend960dt 1:1 CV 配比，
+    // tiling 结构体由对应 arch 的 PyPTO codegen 生成头 force-include 提供
+    auto npuArch = ascendcPlatform.GetCurNpuArch();
+    if (npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202) {
         return TilingCompressorGradArch35(context);
     }
 #endif

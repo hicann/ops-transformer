@@ -12,7 +12,8 @@
 def pytest_addoption(parser):
     """选择验证通路：1=正反向全链路（通路5+通路4拼接，默认） 2=单反向PyPTO直跑
     3=小算子拼接golden 4=单反向直调（_compressor_backward） 5=单正向直调（_compressor_forward）
-    compare-mode：two=两方（现有golden） three=三方（NPU小算子+float64高精度，默认）"""
+    compare-mode：two=两方（现有golden） three=三方（NPU小算子+float64高精度，默认）
+    device：NPU 设备号（默认 0）"""
     parser.addoption(
         "--pathway",
         action="store",
@@ -29,6 +30,13 @@ def pytest_addoption(parser):
         choices=[2, 3],
         help="精度比对模式: 2=两方(现有golden, 回归用) "
         "3=三方(NPU小算子+float64高精度, 默认)",
+    )
+    parser.addoption(
+        "--device",
+        action="store",
+        type=int,
+        default=0,
+        help="NPU 设备号(默认 0), 如 --device 1 指定 npu:1",
     )
 
 
@@ -67,6 +75,10 @@ def pytest_runtest_call(item):
         }
         print(f"\n{'=' * 60}")
         print(f"[RUN] {name}")
+        print(
+            f"pathway={cur} device=npu:{item.config.getoption('--device')} "
+            f"compare_mode={item.config.getoption('--compare-mode')}"
+        )
         for k, v in params.items():
             if v is not None:
                 print(f"      {k}={v}")
